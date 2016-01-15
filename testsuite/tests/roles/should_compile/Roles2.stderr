@@ -1,4 +1,6 @@
 TYPE SIGNATURES
+  Roles2.K1 :: forall a. IO a -> T1 a
+  Roles2.K2 :: forall a. FunPtr a -> T2 a
 TYPE CONSTRUCTORS
   data T1 a = K1 (IO a)
     Kind: * -> *
@@ -8,21 +10,33 @@ TYPE CONSTRUCTORS
 COERCION AXIOMS
 Dependent modules: []
 Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,
-                     integer-gmp-1.0.0.0]
+                     integer-gmp-1.0.0.1]
 
 ==================== Typechecker ====================
 Roles2.$tcT2
   = GHC.Types.TyCon
-      0## 0## Roles2.$trModule (GHC.Types.TrNameS "T2"#)
+      5934726586329293381##
+      1923031187495159753##
+      Roles2.$trModule
+      (GHC.Types.TrNameS "T2"#)
 Roles2.$tc'K2
   = GHC.Types.TyCon
-      0## 0## Roles2.$trModule (GHC.Types.TrNameS "'K2"#)
+      1362115092449420584##
+      15899377929296700609##
+      Roles2.$trModule
+      (GHC.Types.TrNameS "'K2"#)
 Roles2.$tcT1
   = GHC.Types.TyCon
-      0## 0## Roles2.$trModule (GHC.Types.TrNameS "T1"#)
+      13879106829711353992##
+      15151456821588362072##
+      Roles2.$trModule
+      (GHC.Types.TrNameS "T1"#)
 Roles2.$tc'K1
   = GHC.Types.TyCon
-      0## 0## Roles2.$trModule (GHC.Types.TrNameS "'K1"#)
+      14735176013935828521##
+      17563925141462511949##
+      Roles2.$trModule
+      (GHC.Types.TrNameS "'K1"#)
 Roles2.$trModule
   = GHC.Types.Module
       (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "Roles2"#)

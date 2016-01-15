@@ -623,8 +623,7 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
        ; checkValidCoAxBranch mb_clsinfo fam_tc co_ax_branch
 
          -- (3) construct coercion axiom
-       ; rep_tc_name <- newFamInstAxiomName loc (unLoc fam_lname)
-                                            [co_ax_branch]
+       ; rep_tc_name <- newFamInstAxiomName fam_lname [coAxBranchLHS co_ax_branch]
        ; let axiom = mkUnbranchedCoAxiom rep_tc_name fam_tc co_ax_branch
        ; newFamInst SynFamilyInst axiom }
 
@@ -667,7 +666,7 @@ tcDataFamInstDecl mb_clsinfo
 
          -- Construct representation tycon
        ; rep_tc_name <- newFamInstTyConName fam_tc_name pats'
-       ; axiom_name  <- newImplicitBinder rep_tc_name mkInstTyCoOcc
+       ; axiom_name  <- newFamInstAxiomName fam_tc_name [pats']
        ; let (eta_pats, etad_tvs) = eta_reduce pats'
              eta_tvs              = filterOut (`elem` etad_tvs) tvs'
              full_tvs             = eta_tvs ++ etad_tvs

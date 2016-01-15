@@ -6,7 +6,7 @@ Bar :: k -> * -> *
 type family F a
   Kind: * -> *
   	-- Defined at T7939.hs:8:1
-type instance F Int = Bool 	-- Defined at T7939.hs:9:1
+type instance F Int = Bool 	-- Defined at T7939.hs:9:15
 F :: * -> *
 type family G a
   Kind: * -> *

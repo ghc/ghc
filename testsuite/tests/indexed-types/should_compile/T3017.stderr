@@ -1,5 +1,8 @@
 TYPE SIGNATURES
+  Foo.L :: forall a. [a] -> ListColl a
+  empty :: forall c. Coll c => c
   emptyL :: forall a. ListColl a
+  insert :: forall c. Coll c => Elem c -> c -> c
   test2 ::
     forall c t t1. (Elem c ~ (t, t1), Coll c, Num t1, Num t) => c -> c
 TYPE CONSTRUCTORS
@@ -12,7 +15,7 @@ TYPE CONSTRUCTORS
   data ListColl a = L [a]
     Kind: * -> *
 COERCION AXIOMS
-  axiom Foo.TFCo:R:ElemListColl ::
+  axiom Foo.D:R:ElemListColl ::
     Elem (ListColl a) = a -- Defined at T3017.hs:13:9
 INSTANCES
   instance Coll (ListColl a) -- Defined at T3017.hs:12:11
@@ -20,4 +23,4 @@ FAMILY INSTANCES
   type Elem (ListColl a)
 Dependent modules: []
 Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,
-                     integer-gmp-1.0.0.0]
+                     integer-gmp-1.0.0.1]

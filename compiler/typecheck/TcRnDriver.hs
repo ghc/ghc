@@ -828,7 +828,7 @@ checkHiBootIface'
                      ; return Nothing }
             (dfun:_) -> return (Just (local_boot_dfun, dfun))
                      where
-                        local_boot_dfun = Id.mkExportedLocalId VanillaId boot_dfun_name (idType dfun)
+                        local_boot_dfun = Id.mkExportedVanillaId boot_dfun_name (idType dfun)
                            -- Name from the /boot-file/ ClsInst, but type from the dfun
                            -- defined in /this module/.  That ensures that the TyCon etc
                            -- inside the type are the ones defined in this module, not
@@ -1484,8 +1484,8 @@ check_main dflags tcg_env explicit_mod_hdr
         ; let { root_main_name =  mkExternalName rootMainKey rOOT_MAIN
                                    (mkVarOccFS (fsLit "main"))
                                    (getSrcSpan main_name)
-              ; root_main_id = Id.mkExportedLocalId VanillaId root_main_name
-                                                    (mkTyConApp ioTyCon [res_ty])
+              ; root_main_id = Id.mkExportedVanillaId root_main_name
+                                                      (mkTyConApp ioTyCon [res_ty])
               ; co  = mkWpTyApps [res_ty]
               ; rhs = nlHsApp (mkLHsWrap co (nlHsVar run_main_id)) main_expr
               ; main_bind = mkVarBind root_main_id rhs }
@@ -2414,10 +2414,9 @@ ppr_types type_env
                 = True
                 | otherwise
                 = isExternalName (idName id) &&
-                  (case idDetails id of { VanillaId -> True; _ -> False })
-        -- Looking for VanillaId ignores data constructors, records selectors etc.
-        -- The isExternalName ignores local evidence bindings that the type checker
-        -- has invented.  Top-level user-defined things have External names.
+                  (not (isDerivedOccName (getOccName id)))
+        -- Top-level user-defined things have External names.
+        -- Suppress internally-generated things unless -dppr-debug
 
 ppr_tycons :: [FamInst] -> TypeEnv -> SDoc
 ppr_tycons fam_insts type_env

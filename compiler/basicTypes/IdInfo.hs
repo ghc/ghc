@@ -137,17 +137,6 @@ data IdDetails
 
   | CoVarId                    -- ^ A coercion variable
 
-  -- The rest are distinguished only for debugging reasons
-  -- e.g. to suppress them in -ddump-types
-  -- Currently we don't persist these through interface file
-  -- (see MkIface.toIfaceIdDetails), but we easily could if it mattered
-
-  | ReflectionId                -- ^ A top-level Id to support runtime reflection
-                                -- e.g. $trModule, or $tcT
-
-  | PatSynId                    -- ^ A top-level Id to support pattern synonyms;
-                                -- the builder or matcher for the pattern synonym
-
 data RecSelParent = RecSelData TyCon | RecSelPatSyn PatSyn deriving Eq
   -- Either `TyCon` or `PatSyn` depending
   -- on the origin of the record selector.
@@ -177,8 +166,6 @@ pprIdDetails VanillaId = empty
 pprIdDetails other     = brackets (pp other)
  where
    pp VanillaId         = panic "pprIdDetails"
-   pp ReflectionId      = ptext (sLit "ReflectionId")
-   pp PatSynId          = ptext (sLit "PatSynId")
    pp (DataConWorkId _) = ptext (sLit "DataCon")
    pp (DataConWrapId _) = ptext (sLit "DataConWrapper")
    pp (ClassOpId {})    = ptext (sLit "ClassOp")

@@ -712,9 +712,23 @@ tcTyClDecl1 _parent rec_info
                                 ; return (tvs1', tvs2') }
 
 tcFamDecl1 :: Maybe Class -> FamilyDecl Name -> TcM TyCon
-tcFamDecl1 parent (FamilyDecl { fdInfo = OpenTypeFamily, fdLName = L _ tc_name
+tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info, fdLName = tc_lname@(L _ tc_name)
                               , fdTyVars = tvs, fdResultSig = L _ sig
                               , fdInjectivityAnn = inj })
+  | DataFamily <- fam_info
+  = tcTyClTyVars tc_name tvs $ \ kvs' tvs' tycon_kind res_kind -> do
+  { traceTc "data family:" (ppr tc_name)
+  ; checkFamFlag tc_name
+  ; extra_tvs   <- tcDataKindSig res_kind
+  ; tc_rep_name <- newTyConRepName tc_name
+  ; let final_tvs = (kvs' ++ tvs') `chkAppend` extra_tvs -- we may not need these
+        tycon = mkFamilyTyCon tc_name tycon_kind final_tvs
+                              (resultVariableName sig)
+                              (DataFamilyTyCon tc_rep_name)
+                              parent NotInjective
+  ; return tycon }
+
+  | OpenTypeFamily <- fam_info
   = tcTyClTyVars tc_name tvs $ \ kvs' tvs' full_kind _res_kind -> do
   { traceTc "open type family:" (ppr tc_name)
   ; checkFamFlag tc_name
@@ -725,13 +739,10 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = OpenTypeFamily, fdLName = L _ tc_name
                                parent inj'
   ; return tycon }
 
-tcFamDecl1 parent
-            (FamilyDecl { fdInfo = ClosedTypeFamily mb_eqns
-                        , fdLName = L _ tc_name, fdTyVars = tvs
-                        , fdResultSig = L _ sig, fdInjectivityAnn = inj })
--- Closed type families are a little tricky, because they contain the definition
--- of both the type family and the equations for a CoAxiom.
-  = do { traceTc "Closed type family:" (ppr tc_name)
+  | ClosedTypeFamily mb_eqns <- fam_info
+  = -- Closed type families are a little tricky, because they contain the definition
+    -- of both the type family and the equations for a CoAxiom.
+    do { traceTc "Closed type family:" (ppr tc_name)
          -- the variables in the header scope only over the injectivity
          -- declaration but this is not involved here
        ; (tvs', inj', kind) <- tcTyClTyVars tc_name tvs
@@ -769,8 +780,7 @@ tcFamDecl1 parent
          -- because there will only be one axiom, so we don't need to
          -- differentiate names.
          -- See [Zonking inside the knot] in TcHsType
-       ; loc <- getSrcSpanM
-       ; co_ax_name <- newFamInstAxiomName loc tc_name []
+       ; co_ax_name <- newFamInstAxiomName tc_lname []
 
        ; let mb_co_ax
               | null eqns = Nothing   -- mkBranchedCoAxiom fails on empty list
@@ -779,26 +789,13 @@ tcFamDecl1 parent
              fam_tc = mkFamilyTyCon tc_name kind tvs' (resultVariableName sig)
                       (ClosedSynFamilyTyCon mb_co_ax) parent inj'
 
+         -- We check for instance validity later, when doing validity
+         -- checking for the tycon. Exception: checking equations
+         -- overlap done by dropDominatedAxioms
        ; return fam_tc } }
 
--- We check for instance validity later, when doing validity checking for
--- the tycon. Exception: checking equations overlap done by dropDominatedAxioms
+  | otherwise = panic "tcFamInst1"  -- Silence pattern-exhaustiveness checker
 
-tcFamDecl1 parent
-           (FamilyDecl { fdInfo = DataFamily, fdLName = L _ tc_name
-                       , fdTyVars = tvs, fdResultSig = L _ sig })
-  = tcTyClTyVars tc_name tvs $ \ kvs' tvs' tycon_kind res_kind -> do
-  { traceTc "data family:" (ppr tc_name)
-  ; checkFamFlag tc_name
-  ; extra_tvs   <- tcDataKindSig res_kind
-  ; tc_rep_name <- newTyConRepName tc_name
-  ; let final_tvs = (kvs' ++ tvs') `chkAppend` extra_tvs -- we may not need these
-        tycon = mkFamilyTyCon tc_name tycon_kind final_tvs
-                              (resultVariableName sig)
-                              (DataFamilyTyCon tc_rep_name)
-                              parent NotInjective
-
-  ; return tycon }
 
 -- | Maybe return a list of Bools that say whether a type family was declared
 -- injective in the corresponding type arguments. Length of the list is equal to

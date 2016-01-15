@@ -59,7 +59,6 @@ import FastString
 import PatSyn
 
 import IfaceEnv
-import IdInfo
 import Data.IORef       ( atomicModifyIORef', modifyIORef )
 
 import Control.Monad
@@ -461,7 +460,7 @@ dsExpr (HsStatic expr@(L loc _)) = do
     let tvars = tyCoVarsOfTypeWellScoped ty
         speTy = ASSERT( all isTyVar tvars )  -- ty is top-level, so this is OK
                 mkInvForAllTys tvars $ mkTyConApp staticPtrTyCon [ty]
-        speId = mkExportedLocalId VanillaId n' speTy
+        speId = mkExportedVanillaId n' speTy
         fp@(Fingerprint w0 w1) = fingerprintName $ idName speId
         fp_core = mkConApp fingerprintDataCon
                     [ mkWord64LitWordRep dflags w0
