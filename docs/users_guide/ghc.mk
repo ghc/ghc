@@ -23,11 +23,11 @@ html_docs/users_guide : docs/users_guide/images/prof_scc.svg
 docs/users_guide_MAN_RST_SOURCES := docs/users_guide/ghc.rst
 
 MAN_SECTION := 1
-MAN_PAGES := docs/users_guide/ghc.1
+MAN_PAGES := docs/users_guide/build-man/ghc.1
 
 ifneq "$(BINDIST)" "YES"
 $(MAN_PAGES): $(docs/users_guide_MAN_RST_SOURCES) $(utils/mkUserGuidePart_GENERATED_RST_SOURCES)
-	$(SPHINXBUILD) -b man -d docs/users_guide/.doctrees-man docs/users_guide docs/users_guide
+	$(SPHINXBUILD) -b man -d docs/users_guide/.doctrees-man docs/users_guide docs/users_guide/build-man
 endif
 
 man : $(MAN_PAGES)
