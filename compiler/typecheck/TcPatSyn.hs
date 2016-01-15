@@ -29,7 +29,7 @@ import Outputable
 import FastString
 import Var
 import Id
-import IdInfo( IdDetails(..), RecSelParent(..))
+import IdInfo( RecSelParent(..))
 import TcBinds
 import BasicTypes
 import TcSimplify
@@ -242,6 +242,7 @@ tcCheckPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details
        ; (tclvl, wanted, (lpat', (ex_tvs', prov_dicts, args'))) <-
            ASSERT2( equalLength arg_names arg_tys, ppr name $$ ppr arg_names $$ ppr arg_tys )
            pushLevelAndCaptureConstraints $
+           tcExtendTyVarEnv univ_tvs      $
            tcPat PatSyn lpat pat_ty $
            do { (subst, ex_tvs') <- if   isUnidirectional dir
                                     then newMetaTyVars    ex_tvs
@@ -384,13 +385,8 @@ tc_patsyn_finish lname dir has_sig is_infix lpat'
        ; req_theta    <- zonkTcTypes req_theta
        ; pat_ty       <- zonkTcType pat_ty
        ; arg_tys      <- zonkTcTypes arg_tys
-       ; let qtvs    = univ_tvs ++ ex_tvs
-             -- See Note [Record PatSyn Desugaring]
-             theta   = prov_theta ++ req_theta
 
-       ;
-
-        traceTc "tc_patsyn_finish {" $
+       ; traceTc "tc_patsyn_finish {" $
            ppr (unLoc lname) $$ ppr (unLoc lpat') $$
            ppr (univ_tvs, req_theta, req_ev_binds, req_dicts) $$
            ppr (ex_tvs, prov_theta, prov_dicts) $$
@@ -407,7 +403,9 @@ tc_patsyn_finish lname dir has_sig is_infix lpat'
 
 
        -- Make the 'builder'
-       ; builder_id <- mkPatSynBuilderId has_sig dir lname qtvs theta
+       ; builder_id <- mkPatSynBuilderId has_sig dir lname
+                                         univ_tvs req_theta
+                                         ex_tvs   prov_theta
                                          arg_tys pat_ty
 
          -- TODO: Make this have the proper information
@@ -482,7 +480,7 @@ tcPatSynMatcher has_sig (L loc name) lpat
 
        ; let matcher_tau   = mkFunTys [pat_ty, cont_ty, fail_ty] res_ty
              matcher_sigma = mkInvSigmaTy (lev_tv:res_tv:univ_tvs) req_theta matcher_tau
-             matcher_id    = mkExportedLocalId PatSynId matcher_name matcher_sigma
+             matcher_id    = mkExportedVanillaId matcher_name matcher_sigma
                              -- See Note [Exported LocalIds] in Id
 
              inst_wrap = mkWpEvApps prov_dicts <.> mkWpTyApps ex_tys
@@ -556,30 +554,40 @@ isUnidirectional ExplicitBidirectional{} = False
 
 mkPatSynBuilderId :: Bool  -- True <=> signature provided
                   -> HsPatSynDir a -> Located Name
-                  -> [TyVar] -> ThetaType -> [Type] -> Type
+                  -> [TyVar] -> ThetaType
+                  -> [TyVar] -> ThetaType
+                  -> [Type] -> Type
                   -> TcM (Maybe (Id, Bool))
-mkPatSynBuilderId has_sig dir  (L _ name) qtvs theta arg_tys pat_ty
+mkPatSynBuilderId has_sig dir (L _ name)
+                  univ_tvs req_theta ex_tvs prov_theta
+                  arg_tys pat_ty
   | isUnidirectional dir
   = return Nothing
   | otherwise
   = do { builder_name <- newImplicitBinder name mkBuilderOcc
-       ; let mk_sigma      = if has_sig then mkSpecSigmaTy else mkInvSigmaTy
-             builder_sigma = add_void $
-                             mk_sigma qtvs theta (mkFunTys arg_tys pat_ty)
-             builder_id    =
+       ; let qtvs           = univ_tvs ++ ex_tvs
+             theta          = req_theta ++ prov_theta
+             mk_sigma       = if has_sig then mkSpecSigmaTy else mkInvSigmaTy
+             need_dummy_arg = isUnLiftedType pat_ty && null arg_tys && null theta
+             builder_sigma  = add_void need_dummy_arg $
+                              mk_sigma qtvs theta (mkFunTys arg_tys pat_ty)
+             builder_id     = mkExportedVanillaId builder_name builder_sigma
               -- See Note [Exported LocalIds] in Id
-              mkExportedLocalId VanillaId builder_name builder_sigma
+
        ; return (Just (builder_id, need_dummy_arg)) }
   where
-    add_void | need_dummy_arg = mkFunTy voidPrimTy
-             | otherwise      = id
-    need_dummy_arg = isUnLiftedType pat_ty && null arg_tys && null theta
 
-tcPatSynBuilderBind :: PatSynBind Name Name
+add_void :: Bool -> Type -> Type
+add_void need_dummy_arg ty
+  | need_dummy_arg = mkFunTy voidPrimTy ty
+  | otherwise      = ty
+
+tcPatSynBuilderBind :: TcSigFun
+                    -> PatSynBind Name Name
                     -> TcM (LHsBinds Id)
 -- See Note [Matchers and builders for pattern synonyms] in PatSyn
-tcPatSynBuilderBind PSB{ psb_id = L loc name, psb_def = lpat
-                       , psb_dir = dir, psb_args = details }
+tcPatSynBuilderBind sig_fun PSB{ psb_id = L loc name, psb_def = lpat
+                               , psb_dir = dir, psb_args = details }
   | isUnidirectional dir
   = return emptyBag
 
@@ -603,8 +611,7 @@ tcPatSynBuilderBind PSB{ psb_id = L loc name, psb_def = lpat
                             , bind_fvs    = placeHolderNamesTc
                             , fun_tick    = [] }
 
-       ; sig <- instTcTySigFromId builder_id
-                -- See Note [Redundant constraints for builder]
+       ; sig <- get_builder_sig sig_fun name builder_id need_dummy_arg
 
        ; (builder_binds, _) <- tcPolyCheck NonRecursive emptyPragEnv sig (noLoc bind)
        ; traceTc "tcPatSynBuilderBind }" $ ppr builder_binds
@@ -636,6 +643,33 @@ tcPatSynBuilderBind PSB{ psb_id = L loc name, psb_def = lpat
                 = L l [L loc (Match NonFunBindMatch [nlWildPatName] ty grhss)] }
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
                              pprMatches (PatSyn :: HsMatchContext Name) other_mg
+
+get_builder_sig :: TcSigFun -> Name -> Id -> Bool -> TcM TcIdSigInfo
+get_builder_sig sig_fun name builder_id need_dummy_arg
+  | Just (TcPatSynSig sig) <- sig_fun name
+  , TPSI { patsig_univ_tvs = univ_tvs
+         , patsig_req      = req
+         , patsig_ex_tvs   = ex_tvs
+         , patsig_prov     = prov
+         , patsig_arg_tys  = arg_tys
+         , patsig_body_ty  = body_ty } <- sig
+  = -- Constuct a TcIdSigInfo from a TcPatSynInfo
+    -- This does unfortunately mean that we have to know how to
+    -- make the builder Id's type from the TcPatSynInfo, which
+    -- duplicates the construction in mkPatSynBuilderId
+    -- But we really want to use the scoped type variables from
+    -- the actual sigature, so this is really the Right Thing
+    return (TISI { sig_bndr  = CompleteSig builder_id
+                 , sig_skols = [(tyVarName tv, tv) | tv <- univ_tvs ++ ex_tvs]
+                 , sig_theta = req ++ prov
+                 , sig_tau   = add_void need_dummy_arg $
+                               mkFunTys arg_tys body_ty
+                 , sig_ctxt  = PatSynCtxt name
+                 , sig_loc   = getSrcSpan name })
+  | otherwise
+  = -- No signature, so fake up a TcIdSigInfo from the builder Id
+    instTcTySigFromId builder_id
+    -- See Note [Redundant constraints for builder]
 
 tcPatSynBuilderOcc :: PatSyn -> TcM (HsExpr TcId, TcSigmaType)
 -- monadic only for failure

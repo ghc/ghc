@@ -1440,7 +1440,7 @@ tcHsTyVarBndrs orig_hs_tvs thing_inside
              thing (tv : tvs) }
 
 tcHsTyVarBndr :: HsTyVarBndr Name -> TcM TcTyVar
--- Return a type variable initialised with a kind variable.
+-- Return a SkolemTv TcTyVar, initialised with a kind variable.
 -- Typically the Kind inside the HsTyVarBndr will be a tyvar
 -- with a mutable kind in it.
 -- NB: These variables must not be in scope. This function

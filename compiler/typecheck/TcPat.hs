@@ -8,7 +8,7 @@ TcPat: Typechecking patterns
 
 {-# LANGUAGE CPP, RankNTypes #-}
 
-module TcPat ( tcLetPat, TcSigFun
+module TcPat ( tcLetPat
              , TcPragEnv, lookupPragEnv, emptyPragEnv
              , LetBndrSpec(..), addInlinePrags
              , tcPat, tcPat_O, tcPats, newNoSigLetBndr
@@ -145,7 +145,6 @@ inPatBind (PE { pe_ctxt = LamPat {} }) = False
 
 ---------------
 type TcPragEnv = NameEnv [LSig Name]
-type TcSigFun  = Name -> Maybe TcSigInfo
 
 emptyPragEnv :: TcPragEnv
 emptyPragEnv = emptyNameEnv
