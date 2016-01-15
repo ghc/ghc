@@ -598,22 +598,22 @@ warnRuleShadowing rule_name rule_act fn_id arg_ids
       | isLocalId lhs_id || canUnfold (idUnfolding lhs_id)
                        -- If imported with no unfolding, no worries
       , idInlineActivation lhs_id `competesWith` rule_act
-      = warnDs (vcat [ hang (ptext (sLit "Rule") <+> pprRuleName rule_name
-                               <+> ptext (sLit "may never fire"))
-                            2 (ptext (sLit "because") <+> quotes (ppr lhs_id)
-                               <+> ptext (sLit "might inline first"))
-                     , ptext (sLit "Probable fix: add an INLINE[n] or NOINLINE[n] pragma for")
+      = warnDs (vcat [ hang (text "Rule" <+> pprRuleName rule_name
+                               <+> text "may never fire")
+                            2 (text "because" <+> quotes (ppr lhs_id)
+                               <+> text "might inline first")
+                     , text "Probable fix: add an INLINE[n] or NOINLINE[n] pragma for"
                        <+> quotes (ppr lhs_id)
                      , ifPprDebug (ppr (idInlineActivation lhs_id) $$ ppr rule_act) ])
 
       | check_rules_too
       , bad_rule : _ <- get_bad_rules lhs_id
-      = warnDs (vcat [ hang (ptext (sLit "Rule") <+> pprRuleName rule_name
-                               <+> ptext (sLit "may never fire"))
-                            2 (ptext (sLit "because rule") <+> pprRuleName (ruleName bad_rule)
-                               <+> ptext (sLit "for")<+> quotes (ppr lhs_id)
-                               <+> ptext (sLit "might fire first"))
-                      , ptext (sLit "Probable fix: add phase [n] or [~n] to the competing rule")
+      = warnDs (vcat [ hang (text "Rule" <+> pprRuleName rule_name
+                               <+> text "may never fire")
+                            2 (text "because rule" <+> pprRuleName (ruleName bad_rule)
+                               <+> text "for"<+> quotes (ppr lhs_id)
+                               <+> text "might fire first")
+                      , text "Probable fix: add phase [n] or [~n] to the competing rule"
                       , ifPprDebug (ppr bad_rule) ])
 
       | otherwise

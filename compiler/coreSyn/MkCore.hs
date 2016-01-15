@@ -366,8 +366,8 @@ data FloatBind
       -- See Note [Floating cases] in SetLevels
 
 instance Outputable FloatBind where
-  ppr (FloatLet b) = ptext (sLit "LET") <+> ppr b
-  ppr (FloatCase e b c bs) = hang (ptext (sLit "CASE") <+> ppr e <+> ptext (sLit "of") <+> ppr b)
+  ppr (FloatLet b) = text "LET" <+> ppr b
+  ppr (FloatCase e b c bs) = hang (text "CASE" <+> ppr e <+> ptext (sLit "of") <+> ppr b)
                                 2 (ppr c <+> ppr bs)
 
 wrapFloat :: FloatBind -> CoreExpr -> CoreExpr

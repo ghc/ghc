@@ -169,7 +169,7 @@ tcRnSignature dflags hsc_src
         case tcg_sig_of tcg_env of {
           Just sof
            | hsc_src /= HsigFile -> do
-                { addErr (ptext (sLit "Illegal -sig-of specified for non hsig"))
+                { addErr (text "Illegal -sig-of specified for non hsig")
                 ; return tcg_env
                 }
            | otherwise -> do
@@ -189,7 +189,7 @@ tcRnSignature dflags hsc_src
                 { return tcg_env
                 }
              | HsigFile <- hsc_src -> do
-                { addErr (ptext (sLit "Missing -sig-of for hsig"))
+                { addErr (text "Missing -sig-of for hsig")
                 ; failM }
              | otherwise -> return tcg_env
         }
@@ -385,7 +385,7 @@ tcRnModuleTcRnM hsc_env hsc_src
 
 implicitPreludeWarn :: SDoc
 implicitPreludeWarn
-  = ptext (sLit "Module `Prelude' implicitly imported")
+  = text "Module `Prelude' implicitly imported"
 
 {-
 ************************************************************************
@@ -445,7 +445,7 @@ tcRnImports hsc_env import_decls
                 -- interfaces, so that their rules and instance decls will be
                 -- found.  But filter out a self hs-boot: these instances
                 -- will be checked when we define them locally.
-        ; loadModuleInterfaces (ptext (sLit "Loading orphan modules"))
+        ; loadModuleInterfaces (text "Loading orphan modules")
                                (filter (/= this_mod) (imp_orphs imports))
 
                 -- Check type-family consistency
@@ -573,7 +573,7 @@ tc_rn_src_decls ds
                         { Nothing -> return () ;
                         ; Just (SpliceDecl (L loc _) _, _)
                             -> setSrcSpan loc $
-                               addErr (ptext (sLit "Declaration splices are not permitted inside top-level declarations added with addTopDecls"))
+                               addErr (text "Declaration splices are not permitted inside top-level declarations added with addTopDecls")
                         } ;
 
                     -- Rename TH-generated top-level declarations
@@ -691,12 +691,12 @@ tcRnHsBootDecls hsc_src decls
 badBootDecl :: HscSource -> String -> Located decl -> TcM ()
 badBootDecl hsc_src what (L loc _)
   = addErrAt loc (char 'A' <+> text what
-      <+> ptext (sLit "declaration is not (currently) allowed in a")
+      <+> text "declaration is not (currently) allowed in a"
       <+> (case hsc_src of
-            HsBootFile -> ptext (sLit "hs-boot")
-            HsigFile -> ptext (sLit "hsig")
+            HsBootFile -> text "hs-boot"
+            HsigFile -> text "hsig"
             _ -> panic "badBootDecl: should be an hsig or hs-boot file")
-      <+> ptext (sLit "file"))
+      <+> text "file")
 
 {-
 Once we've typechecked the body of the module, we want to compare what
@@ -1081,31 +1081,31 @@ emptyRnEnv2 = mkRnEnv2 emptyInScopeSet
 ----------------
 missingBootThing :: Bool -> Name -> String -> SDoc
 missingBootThing is_boot name what
-  = quotes (ppr name) <+> ptext (sLit "is exported by the")
-    <+> (if is_boot then ptext (sLit "hs-boot") else ptext (sLit "hsig"))
-    <+> ptext (sLit "file, but not")
-    <+> text what <+> ptext (sLit "the module")
+  = quotes (ppr name) <+> text "is exported by the"
+    <+> (if is_boot then text "hs-boot" else text "hsig")
+    <+> text "file, but not"
+    <+> text what <+> text "the module"
 
 bootMisMatch :: Bool -> SDoc -> TyThing -> TyThing -> SDoc
 bootMisMatch is_boot extra_info real_thing boot_thing
   = vcat [ppr real_thing <+>
-          ptext (sLit "has conflicting definitions in the module"),
-          ptext (sLit "and its") <+>
-            (if is_boot then ptext (sLit "hs-boot file")
-                       else ptext (sLit "hsig file")),
-          ptext (sLit "Main module:") <+> PprTyThing.pprTyThing real_thing,
+          text "has conflicting definitions in the module",
+          text "and its" <+>
+            (if is_boot then text "hs-boot file"
+                       else text "hsig file"),
+          text "Main module:" <+> PprTyThing.pprTyThing real_thing,
           (if is_boot
-            then ptext (sLit "Boot file:  ")
-            else ptext (sLit "Hsig file: "))
+            then text "Boot file:  "
+            else text "Hsig file: ")
             <+> PprTyThing.pprTyThing boot_thing,
           extra_info]
 
 instMisMatch :: Bool -> ClsInst -> SDoc
 instMisMatch is_boot inst
   = hang (ppr inst)
-       2 (ptext (sLit "is defined in the") <+>
-        (if is_boot then ptext (sLit "hs-boot") else ptext (sLit "hsig"))
-       <+> ptext (sLit "file, but not in the module itself"))
+       2 (text "is defined in the" <+>
+        (if is_boot then text "hs-boot" else text "hsig")
+       <+> text "file, but not in the module itself")
 
 {-
 ************************************************************************
@@ -1511,9 +1511,9 @@ check_main dflags tcg_env explicit_mod_hdr
         -- In other modes, fail altogether, so that we don't go on
         -- and complain a second time when processing the export list.
 
-    mainCtxt  = ptext (sLit "When checking the type of the") <+> pp_main_fn
-    noMainMsg = ptext (sLit "The") <+> pp_main_fn
-                <+> ptext (sLit "is not defined in module") <+> quotes (ppr main_mod)
+    mainCtxt  = text "When checking the type of the" <+> pp_main_fn
+    noMainMsg = text "The" <+> pp_main_fn
+                <+> text "is not defined in module" <+> quotes (ppr main_mod)
     pp_main_fn = ppMainFn main_fn
 
 -- | Get the unqualified name of the function to use as the \"main\" for the main module.
@@ -1532,15 +1532,15 @@ checkMainExported tcg_env
          do { dflags <- getDynFlags
             ; let main_mod = mainModIs dflags
             ; checkTc (main_name `elem` concatMap availNames (tcg_exports tcg_env)) $
-                ptext (sLit "The") <+> ppMainFn (nameRdrName main_name) <+>
-                ptext (sLit "is not exported by module") <+> quotes (ppr main_mod) }
+                text "The" <+> ppMainFn (nameRdrName main_name) <+>
+                text "is not exported by module" <+> quotes (ppr main_mod) }
 
 ppMainFn :: RdrName -> SDoc
 ppMainFn main_fn
   | rdrNameOcc main_fn == mainOcc
-  = ptext (sLit "IO action") <+> quotes (ppr main_fn)
+  = text "IO action" <+> quotes (ppr main_fn)
   | otherwise
-  = ptext (sLit "main IO action") <+> quotes (ppr main_fn)
+  = text "main IO action" <+> quotes (ppr main_fn)
 
 mainOcc :: OccName
 mainOcc = mkVarOccFS (fsLit "main")
@@ -1720,7 +1720,7 @@ tcRnStmt hsc_env rdr_stmt
     return (global_ids, zonked_expr, fix_env)
     }
   where
-    bad_unboxed id = addErr (sep [ptext (sLit "GHCi can't bind a variable of unlifted type:"),
+    bad_unboxed id = addErr (sep [text "GHCi can't bind a variable of unlifted type:",
                                   nest 2 (ppr id <+> dcolon <+> ppr (idType id))])
 
 {-
@@ -2113,7 +2113,7 @@ externaliseAndTidyId this_mod id
 getModuleInterface :: HscEnv -> Module -> IO (Messages, Maybe ModIface)
 getModuleInterface hsc_env mod
   = runTcInteractive hsc_env $
-    loadModuleInterface (ptext (sLit "getModuleInterface")) mod
+    loadModuleInterface (text "getModuleInterface") mod
 
 tcRnLookupRdrName :: HscEnv -> Located RdrName
                   -> IO (Messages, Maybe [Name])
@@ -2127,7 +2127,7 @@ tcRnLookupRdrName hsc_env (L loc rdr_name)
          let rdr_names = dataTcOccs rdr_name
        ; names_s <- mapM lookupInfoOccRn rdr_names
        ; let names = concat names_s
-       ; when (null names) (addErrTc (ptext (sLit "Not in scope:") <+> quotes (ppr rdr_name)))
+       ; when (null names) (addErrTc (text "Not in scope:" <+> quotes (ppr rdr_name)))
        ; return names }
 #endif
 
@@ -2213,7 +2213,7 @@ loadUnqualIfaces hsc_env ictxt
                   , nameIsFromExternalPackage this_pkg name
                   , isTcOcc (nameOccName name)   -- Types and classes only
                   , unQualOK gre ]               -- In scope unqualified
-    doc = ptext (sLit "Need interface for module whose export(s) are in scope unqualified")
+    doc = text "Need interface for module whose export(s) are in scope unqualified"
 
 {-
 ******************************************************************************
@@ -2394,9 +2394,9 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
          , ppr_fam_insts fam_insts
          , vcat (map ppr rules)
          , vcat (map ppr vects)
-         , ptext (sLit "Dependent modules:") <+>
+         , text "Dependent modules:" <+>
                 ppr (sortBy cmp_mp $ eltsUFM (imp_dep_mods imports))
-         , ptext (sLit "Dependent packages:") <+>
+         , text "Dependent packages:" <+>
                 ppr (sortBy stableUnitIdCmp $ imp_dep_pkgs imports)]
   where         -- The two uses of sortBy are just to reduce unnecessary
                 -- wobbling in testsuite output

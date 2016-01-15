@@ -37,10 +37,10 @@ profilingInitCode this_mod (local_CCs, ___extern_CCs, singleton_CCSs)
     ]
  where
    emitRegisterCC cc   =
-      ptext (sLit "extern CostCentre ") <> cc_lbl <> ptext (sLit "[];") $$
-      ptext (sLit "REGISTER_CC(") <> cc_lbl <> char ')' <> semi
+      text "extern CostCentre " <> cc_lbl <> ptext (sLit "[];") $$
+      text "REGISTER_CC(" <> cc_lbl <> char ')' <> semi
      where cc_lbl = ppr (mkCCLabel cc)
    emitRegisterCCS ccs =
-      ptext (sLit "extern CostCentreStack ") <> ccs_lbl <> ptext (sLit "[];") $$
-      ptext (sLit "REGISTER_CCS(") <> ccs_lbl <> char ')' <> semi
+      text "extern CostCentreStack " <> ccs_lbl <> ptext (sLit "[];") $$
+      text "REGISTER_CCS(" <> ccs_lbl <> char ')' <> semi
      where ccs_lbl = ppr (mkCCSLabel ccs)

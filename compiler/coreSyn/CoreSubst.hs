@@ -231,7 +231,7 @@ extendTCvSubst subst v r
   | Just co <- isCoercionTy_maybe r
   = extendCvSubst subst v co
   | otherwise
-  = pprPanic "CoreSubst.extendTCvSubst" (ppr v <+> ptext (sLit "|->") <+> ppr r)
+  = pprPanic "CoreSubst.extendTCvSubst" (ppr v <+> text "|->" <+> ppr r)
 
 -- | Adds multiple 'TyVar' substitutions to the 'Subst': see also 'extendTCvSubst'
 extendTCvSubstList :: Subst -> [(TyVar,Type)] -> Subst
@@ -274,7 +274,7 @@ lookupIdSubst doc (Subst in_scope ids _ _) v
   | Just e  <- lookupVarEnv ids       v = e
   | Just v' <- lookupInScope in_scope v = Var v'
         -- Vital! See Note [Extending the Subst]
-  | otherwise = WARN( True, ptext (sLit "CoreSubst.lookupIdSubst") <+> doc <+> ppr v
+  | otherwise = WARN( True, text "CoreSubst.lookupIdSubst" <+> doc <+> ppr v
                             $$ ppr in_scope)
                 Var v
 
@@ -344,10 +344,10 @@ setInScope (Subst _ ids tvs cvs) in_scope = Subst in_scope ids tvs cvs
 
 instance Outputable Subst where
   ppr (Subst in_scope ids tvs cvs)
-        =  ptext (sLit "<InScope =") <+> braces (fsep (map ppr (varEnvElts (getInScopeVars in_scope))))
-        $$ ptext (sLit " IdSubst   =") <+> ppr ids
-        $$ ptext (sLit " TvSubst   =") <+> ppr tvs
-        $$ ptext (sLit " CvSubst   =") <+> ppr cvs
+        =  text "<InScope =" <+> braces (fsep (map ppr (varEnvElts (getInScopeVars in_scope))))
+        $$ text " IdSubst   =" <+> ppr ids
+        $$ text " TvSubst   =" <+> ppr tvs
+        $$ text " CvSubst   =" <+> ppr cvs
          <> char '>'
 
 {-
@@ -714,7 +714,7 @@ substRule subst subst_ru_fn rule@(Rule { ru_bndrs = bndrs, ru_args = args
            -- Do NOT optimise the RHS (previously we did simplOptExpr here)
            -- See Note [Substitute lazily]
   where
-    doc = ptext (sLit "subst-rule") <+> ppr fn_name
+    doc = text "subst-rule" <+> ppr fn_name
     (subst', bndrs') = substBndrs subst bndrs
 
 ------------------

@@ -141,8 +141,8 @@ tcPatSynSig name sig_ty
        -- should not appear in the result type
        ; let bad_tvs = filter (`elemVarSet` tyCoVarsOfType body_ty) ex_tvs
        ; unless (null bad_tvs) $ addErr $
-         hang (ptext (sLit "The result type") <+> quotes (ppr body_ty))
-            2 (ptext (sLit "mentions existential type variable") <> plural bad_tvs
+         hang (text "The result type" <+> quotes (ppr body_ty))
+            2 (text "mentions existential type variable" <> plural bad_tvs
                <+> pprQuotedList bad_tvs)
 
          -- Split [Splitting the implicit tyvars in a pattern synonym]
@@ -348,15 +348,15 @@ collectPatSynArgInfo details =
 addPatSynCtxt :: Located Name -> TcM a -> TcM a
 addPatSynCtxt (L loc name) thing_inside
   = setSrcSpan loc $
-    addErrCtxt (ptext (sLit "In the declaration for pattern synonym")
+    addErrCtxt (text "In the declaration for pattern synonym"
                 <+> quotes (ppr name)) $
     thing_inside
 
 wrongNumberOfParmsErr :: Name -> Arity -> Arity -> SDoc
 wrongNumberOfParmsErr name decl_arity ty_arity
-  = hang (ptext (sLit "Patten synonym") <+> quotes (ppr name) <+> ptext (sLit "has")
-          <+> speakNOf decl_arity (ptext (sLit "argument")))
-       2 (ptext (sLit "but its type signature has") <+> speakN ty_arity)
+  = hang (text "Patten synonym" <+> quotes (ppr name) <+> ptext (sLit "has")
+          <+> speakNOf decl_arity (text "argument"))
+       2 (text "but its type signature has" <+> speakN ty_arity)
 
 -------------------------
 -- Shared by both tcInferPatSyn and tcCheckPatSyn
@@ -593,7 +593,7 @@ tcPatSynBuilderBind sig_fun PSB{ psb_id = L loc name, psb_def = lpat
 
   | isNothing mb_match_group       -- Can't invert the pattern
   = setSrcSpan (getLoc lpat) $ failWithTc $
-    hang (ptext (sLit "Right-hand side of bidirectional pattern synonym cannot be used as an expression"))
+    hang (text "Right-hand side of bidirectional pattern synonym cannot be used as an expression")
        2 (ppr lpat)
 
   | otherwise  -- Bidirectional
@@ -779,25 +779,25 @@ tcCheckPatSynPat = go
 asPatInPatSynErr :: OutputableBndr name => Pat name -> TcM a
 asPatInPatSynErr pat
   = failWithTc $
-    hang (ptext (sLit "Pattern synonym definition cannot contain as-patterns (@):"))
+    hang (text "Pattern synonym definition cannot contain as-patterns (@):")
        2 (ppr pat)
 
 thInPatSynErr :: OutputableBndr name => Pat name -> TcM a
 thInPatSynErr pat
   = failWithTc $
-    hang (ptext (sLit "Pattern synonym definition cannot contain Template Haskell:"))
+    hang (text "Pattern synonym definition cannot contain Template Haskell:")
        2 (ppr pat)
 
 nPlusKPatInPatSynErr :: OutputableBndr name => Pat name -> TcM a
 nPlusKPatInPatSynErr pat
   = failWithTc $
-    hang (ptext (sLit "Pattern synonym definition cannot contain n+k-pattern:"))
+    hang (text "Pattern synonym definition cannot contain n+k-pattern:")
        2 (ppr pat)
 
 nonBidirectionalErr :: Outputable name => name -> TcM a
 nonBidirectionalErr name = failWithTc $
-    ptext (sLit "non-bidirectional pattern synonym")
-    <+> quotes (ppr name) <+> ptext (sLit "used in an expression")
+    text "non-bidirectional pattern synonym"
+    <+> quotes (ppr name) <+> text "used in an expression"
 
 tcPatToExpr :: [Located Name] -> LPat Name -> Maybe (LHsExpr Name)
 tcPatToExpr args = go

@@ -445,8 +445,8 @@ instance (OutputableBndr idL, OutputableBndr idR) => Outputable (HsValBindsLR id
         pprDeclList (pprLHsBindsForUser (unionManyBags (map snd sccs)) sigs)
    where
      ppr_scc (rec_flag, binds) = pp_rec rec_flag <+> pprLHsBinds binds
-     pp_rec Recursive    = ptext (sLit "rec")
-     pp_rec NonRecursive = ptext (sLit "nonrec")
+     pp_rec Recursive    = text "rec"
+     pp_rec NonRecursive = text "nonrec"
 
 pprLHsBinds :: (OutputableBndr idL, OutputableBndr idR) => LHsBindsLR idL idR -> SDoc
 pprLHsBinds binds
@@ -566,15 +566,15 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
   = sdocWithDynFlags $ \ dflags ->
     if gopt Opt_PrintTypecheckerElaboration dflags then
       -- Show extra information (bug number: #10662)
-      hang (ptext (sLit "AbsBinds") <+> brackets (interpp'SP tyvars)
+      hang (text "AbsBinds" <+> brackets (interpp'SP tyvars)
                                     <+> brackets (interpp'SP dictvars))
          2 $ braces $ vcat
-      [ ptext (sLit "Exports:") <+>
+      [ text "Exports:" <+>
           brackets (sep (punctuate comma (map ppr exports)))
-      , ptext (sLit "Exported types:") <+>
+      , text "Exported types:" <+>
           vcat [pprBndr LetBind (abe_poly ex) | ex <- exports]
-      , ptext (sLit "Binds:") <+> pprLHsBinds val_binds
-      , ptext (sLit "Evidence:") <+> ppr ev_binds ]
+      , text "Binds:" <+> pprLHsBinds val_binds
+      , text "Evidence:" <+> ppr ev_binds ]
     else
       pprLHsBinds val_binds
 ppr_monobind (AbsBindsSig { abs_tvs         = tyvars
@@ -594,7 +594,7 @@ ppr_monobind (AbsBindsSig { abs_tvs         = tyvars
 instance (OutputableBndr id) => Outputable (ABExport id) where
   ppr (ABE { abe_wrap = wrap, abe_inst_wrap = inst_wrap
            , abe_poly = gbl, abe_mono = lcl, abe_prags = prags })
-    = vcat [ ppr gbl <+> ptext (sLit "<=") <+> ppr lcl
+    = vcat [ ppr gbl <+> text "<=" <+> ppr lcl
            , nest 2 (pprTcSpecPrags prags)
            , nest 2 (ppr wrap)
            , nest 2 (ppr inst_wrap)]
@@ -603,7 +603,7 @@ instance (OutputableBndr idL, OutputableBndr idR) => Outputable (PatSynBind idL 
   ppr (PSB{ psb_id = L _ psyn, psb_args = details, psb_def = pat, psb_dir = dir })
       = ppr_lhs <+> ppr_rhs
     where
-      ppr_lhs = ptext (sLit "pattern") <+> ppr_details
+      ppr_lhs = text "pattern" <+> ppr_details
       ppr_simple syntax = syntax <+> ppr pat
 
       ppr_details = case details of
@@ -614,9 +614,9 @@ instance (OutputableBndr idL, OutputableBndr idR) => Outputable (PatSynBind idL 
                       <> braces (sep (punctuate comma (map ppr vs)))
 
       ppr_rhs = case dir of
-          Unidirectional           -> ppr_simple (ptext (sLit "<-"))
+          Unidirectional           -> ppr_simple (text "<-")
           ImplicitBidirectional    -> ppr_simple equals
-          ExplicitBidirectional mg -> ppr_simple (ptext (sLit "<-")) <+> ptext (sLit "where") $$
+          ExplicitBidirectional mg -> ppr_simple (text "<-") <+> ptext (sLit "where") $$
                                       (nest 2 $ pprFunBind psyn mg)
 
 pprTicks :: SDoc -> SDoc -> SDoc
@@ -888,17 +888,17 @@ isMinimalLSig (L _ (MinimalSig {})) = True
 isMinimalLSig _                    = False
 
 hsSigDoc :: Sig name -> SDoc
-hsSigDoc (TypeSig {})           = ptext (sLit "type signature")
-hsSigDoc (PatSynSig {})         = ptext (sLit "pattern synonym signature")
+hsSigDoc (TypeSig {})           = text "type signature"
+hsSigDoc (PatSynSig {})         = text "pattern synonym signature"
 hsSigDoc (ClassOpSig is_deflt _ _)
- | is_deflt                     = ptext (sLit "default type signature")
- | otherwise                    = ptext (sLit "class method signature")
-hsSigDoc (IdSig {})             = ptext (sLit "id signature")
-hsSigDoc (SpecSig {})           = ptext (sLit "SPECIALISE pragma")
-hsSigDoc (InlineSig _ prag)     = ppr (inlinePragmaSpec prag) <+> ptext (sLit "pragma")
-hsSigDoc (SpecInstSig {})       = ptext (sLit "SPECIALISE instance pragma")
-hsSigDoc (FixSig {})            = ptext (sLit "fixity declaration")
-hsSigDoc (MinimalSig {})        = ptext (sLit "MINIMAL pragma")
+ | is_deflt                     = text "default type signature"
+ | otherwise                    = text "class method signature"
+hsSigDoc (IdSig {})             = text "id signature"
+hsSigDoc (SpecSig {})           = text "SPECIALISE pragma"
+hsSigDoc (InlineSig _ prag)     = ppr (inlinePragmaSpec prag) <+> text "pragma"
+hsSigDoc (SpecInstSig {})       = text "SPECIALISE instance pragma"
+hsSigDoc (FixSig {})            = text "fixity declaration"
+hsSigDoc (MinimalSig {})        = text "MINIMAL pragma"
 
 {-
 Check if signatures overlap; this is used when checking for duplicate
@@ -912,7 +912,7 @@ instance (OutputableBndr name) => Outputable (Sig name) where
 ppr_sig :: OutputableBndr name => Sig name -> SDoc
 ppr_sig (TypeSig vars ty)    = pprVarSig (map unLoc vars) (ppr ty)
 ppr_sig (ClassOpSig is_deflt vars ty)
-  | is_deflt                 = ptext (sLit "default") <+> pprVarSig (map unLoc vars) (ppr ty)
+  | is_deflt                 = text "default" <+> pprVarSig (map unLoc vars) (ppr ty)
   | otherwise                = pprVarSig (map unLoc vars) (ppr ty)
 ppr_sig (IdSig id)           = pprVarSig [id] (ppr (varType id))
 ppr_sig (FixSig fix_sig)     = ppr fix_sig
@@ -920,16 +920,16 @@ ppr_sig (SpecSig var ty inl)
   = pragBrackets (pprSpec (unLoc var) (interpp'SP ty) inl)
 ppr_sig (InlineSig var inl)       = pragBrackets (ppr inl <+> pprPrefixOcc (unLoc var))
 ppr_sig (SpecInstSig _ ty)
-  = pragBrackets (ptext (sLit "SPECIALIZE instance") <+> ppr ty)
+  = pragBrackets (text "SPECIALIZE instance" <+> ppr ty)
 ppr_sig (MinimalSig _ bf)         = pragBrackets (pprMinimalSig bf)
 ppr_sig (PatSynSig name sig_ty)
-  = ptext (sLit "pattern") <+> pprPrefixOcc (unLoc name) <+> dcolon
+  = text "pattern" <+> pprPrefixOcc (unLoc name) <+> dcolon
                            <+> ppr sig_ty
 
 pprPatSynSig :: (OutputableBndr name)
              => name -> Bool -> SDoc -> Maybe SDoc -> Maybe SDoc -> SDoc -> SDoc
 pprPatSynSig ident _is_bidir tvs req prov ty
-  = ptext (sLit "pattern") <+> pprPrefixOcc ident <+> dcolon <+>
+  = text "pattern" <+> pprPrefixOcc ident <+> dcolon <+>
     tvs <+> context <+> ty
   where
     context = case (req, prov) of
@@ -944,7 +944,7 @@ instance OutputableBndr name => Outputable (FixitySig name) where
       pprops = hsep $ punctuate comma (map (pprInfixOcc . unLoc) names)
 
 pragBrackets :: SDoc -> SDoc
-pragBrackets doc = ptext (sLit "{-#") <+> doc <+> ptext (sLit "#-}")
+pragBrackets doc = text "{-#" <+> doc <+> ptext (sLit "#-}")
 
 pprVarSig :: (OutputableBndr id) => [id] -> SDoc -> SDoc
 pprVarSig vars pp_ty = sep [pprvars <+> dcolon, nest 2 pp_ty]
@@ -952,20 +952,20 @@ pprVarSig vars pp_ty = sep [pprvars <+> dcolon, nest 2 pp_ty]
     pprvars = hsep $ punctuate comma (map pprPrefixOcc vars)
 
 pprSpec :: (OutputableBndr id) => id -> SDoc -> InlinePragma -> SDoc
-pprSpec var pp_ty inl = ptext (sLit "SPECIALIZE") <+> pp_inl <+> pprVarSig [var] pp_ty
+pprSpec var pp_ty inl = text "SPECIALIZE" <+> pp_inl <+> pprVarSig [var] pp_ty
   where
     pp_inl | isDefaultInlinePragma inl = empty
            | otherwise = ppr inl
 
 pprTcSpecPrags :: TcSpecPrags -> SDoc
-pprTcSpecPrags IsDefaultMethod = ptext (sLit "<default method>")
+pprTcSpecPrags IsDefaultMethod = text "<default method>"
 pprTcSpecPrags (SpecPrags ps)  = vcat (map (ppr . unLoc) ps)
 
 instance Outputable TcSpecPrag where
-  ppr (SpecPrag var _ inl) = pprSpec var (ptext (sLit "<type>")) inl
+  ppr (SpecPrag var _ inl) = pprSpec var (text "<type>") inl
 
 pprMinimalSig :: OutputableBndr name => LBooleanFormula (Located name) -> SDoc
-pprMinimalSig (L _ bf) = ptext (sLit "MINIMAL") <+> ppr (fmap unLoc bf)
+pprMinimalSig (L _ bf) = text "MINIMAL" <+> ppr (fmap unLoc bf)
 
 {-
 ************************************************************************

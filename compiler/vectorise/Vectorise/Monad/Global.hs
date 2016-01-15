@@ -47,7 +47,6 @@ import Name
 import VarEnv
 import VarSet
 import Var as Var
-import FastString
 import Outputable
 
 
@@ -100,11 +99,11 @@ defGlobalVar v v'
        }
   where
     moduleOf var var' | var == var'
-                      = ptext (sLit "vectorises to itself")
+                      = text "vectorises to itself"
                       | Just mod <- nameModule_maybe (Var.varName var')
-                      = ptext (sLit "in module") <+> ppr mod
+                      = text "in module" <+> ppr mod
                       | otherwise
-                      = ptext (sLit "in the current module")
+                      = text "in the current module"
 
 -- |Remove the mapping of a variable in the vectorisation map.
 --
@@ -180,11 +179,11 @@ defTyConName tc nameOfTc' tc'
        }
   where
     moduleOf tc tc' | tc == tc'
-                    = ptext (sLit "vectorises to itself")
+                    = text "vectorises to itself"
                     | Just mod <- nameModule_maybe (tyConName tc')
-                    = ptext (sLit "in module") <+> ppr mod
+                    = text "in module" <+> ppr mod
                     | otherwise
-                    = ptext (sLit "in the current module")
+                    = text "in the current module"
 
 -- |Add a mapping between plain and vectorised `TyCon`s to the global environment.
 --

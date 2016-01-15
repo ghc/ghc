@@ -67,9 +67,9 @@ data Safety
   {-! derive: Binary !-}
 
 instance Outputable Safety where
-  ppr PlaySafe = ptext (sLit "safe")
-  ppr PlayInterruptible = ptext (sLit "interruptible")
-  ppr PlayRisky = ptext (sLit "unsafe")
+  ppr PlaySafe = text "safe"
+  ppr PlayInterruptible = text "interruptible"
+  ppr PlayRisky = text "unsafe"
 
 playSafe :: Safety -> Bool
 playSafe PlaySafe = True
@@ -154,11 +154,11 @@ data CCallConv = CCallConv | CApiConv | StdCallConv | PrimCallConv | JavaScriptC
   {-! derive: Binary !-}
 
 instance Outputable CCallConv where
-  ppr StdCallConv = ptext (sLit "stdcall")
-  ppr CCallConv   = ptext (sLit "ccall")
-  ppr CApiConv    = ptext (sLit "capi")
-  ppr PrimCallConv = ptext (sLit "prim")
-  ppr JavaScriptCallConv = ptext (sLit "javascript")
+  ppr StdCallConv = text "stdcall"
+  ppr CCallConv   = text "ccall"
+  ppr CApiConv    = text "capi"
+  ppr PrimCallConv = text "prim"
+  ppr JavaScriptCallConv = text "javascript"
 
 defaultCCallConv :: CCallConv
 defaultCCallConv = CCallConv

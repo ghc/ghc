@@ -43,7 +43,6 @@ import BasicTypes
 import UniqFM
 import Util
 import Id
-import FastString
 import Data.Data        ( Data, Typeable )
 import Data.Maybe       ( isJust, isNothing )
 
@@ -173,14 +172,14 @@ pprInstance :: ClsInst -> SDoc
 -- Prints the ClsInst as an instance declaration
 pprInstance ispec
   = hang (pprInstanceHdr ispec)
-       2 (vcat [ ptext (sLit "--") <+> pprDefinedAt (getName ispec)
+       2 (vcat [ text "--" <+> pprDefinedAt (getName ispec)
                , ifPprDebug (ppr (is_dfun ispec)) ])
 
 -- * pprInstanceHdr is used in VStudio to populate the ClassView tree
 pprInstanceHdr :: ClsInst -> SDoc
 -- Prints the ClsInst as an instance declaration
 pprInstanceHdr (ClsInst { is_flag = flag, is_dfun = dfun })
-  = ptext (sLit "instance") <+> ppr flag <+> pprSigmaType (idType dfun)
+  = text "instance" <+> ppr flag <+> pprSigmaType (idType dfun)
 
 pprInstances :: [ClsInst] -> SDoc
 pprInstances ispecs = vcat (map pprInstance ispecs)
@@ -667,12 +666,13 @@ lookupUniqueInstEnv instEnv cls tys
   = case lookupInstEnv False instEnv cls tys of
       ([(inst, inst_tys)], _, _)
              | noFlexiVar -> Right (inst, inst_tys')
-             | otherwise  -> Left $ ptext (sLit "flexible type variable:") <+>
+             | otherwise  -> Left $ text "flexible type variable:" <+>
                                     (ppr $ mkTyConApp (classTyCon cls) tys)
              where
                inst_tys'  = [ty | Just ty <- inst_tys]
                noFlexiVar = all isJust inst_tys
-      _other -> Left $ ptext (sLit "instance not found") <+> (ppr $ mkTyConApp (classTyCon cls) tys)
+      _other -> Left $ text "instance not found" <+>
+                       (ppr $ mkTyConApp (classTyCon cls) tys)
 
 lookupInstEnv' :: InstEnv          -- InstEnv to look in
                -> VisibleOrphanModules   -- But filter against this

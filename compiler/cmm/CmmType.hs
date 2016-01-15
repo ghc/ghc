@@ -63,9 +63,9 @@ instance Outputable CmmType where
   ppr (CmmType cat wid) = ppr cat <> ppr (widthInBits wid)
 
 instance Outputable CmmCat where
-  ppr FloatCat       = ptext $ sLit("F")
-  ppr GcPtrCat       = ptext $ sLit("P")
-  ppr BitsCat        = ptext $ sLit("I")
+  ppr FloatCat       = text "F"
+  ppr GcPtrCat       = text "P"
+  ppr BitsCat        = text "I"
   ppr (VecCat n cat) = ppr cat <> text "x" <> ppr n <> text "V"
 
 -- Why is CmmType stratified?  For native code generation,

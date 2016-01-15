@@ -69,7 +69,6 @@ import Util
 import Maybes
 import Outputable
 import StaticFlags
-import FastString
 
 {-
 ************************************************************************
@@ -99,7 +98,7 @@ data InScopeSet = InScope (VarEnv Var) {-# UNPACK #-} !Int
         -- INVARIANT: it's not zero; we use it as a multiplier in uniqAway
 
 instance Outputable InScopeSet where
-  ppr (InScope s _) = ptext (sLit "InScope") <+> ppr s
+  ppr (InScope s _) = text "InScope" <+> ppr s
 
 emptyInScopeSet :: InScopeSet
 emptyInScopeSet = InScope emptyVarSet 1

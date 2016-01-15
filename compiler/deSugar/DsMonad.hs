@@ -195,11 +195,11 @@ initDs hsc_env mod rdr_env type_env fam_inst_env thing_inside
                    _           -> pprPgmError "Unable to use Data Parallel Haskell (DPH):" err
                } }
 
-        paErr       = ptext (sLit "To use ParallelArrays,") <+> specBackend $$ hint1 $$ hint2
-        veErr       = ptext (sLit "To use -fvectorise,") <+> specBackend $$ hint1 $$ hint2
-        specBackend = ptext (sLit "you must specify a DPH backend package")
-        hint1       = ptext (sLit "Look for packages named 'dph-lifted-*' with 'ghc-pkg'")
-        hint2       = ptext (sLit "You may need to install them with 'cabal install dph-examples'")
+        paErr       = text "To use ParallelArrays," <+> specBackend $$ hint1 $$ hint2
+        veErr       = text "To use -fvectorise," <+> specBackend $$ hint1 $$ hint2
+        specBackend = text "you must specify a DPH backend package"
+        hint1       = text "Look for packages named 'dph-lifted-*' with 'ghc-pkg'"
+        hint2       = text "You may need to install them with 'cabal install dph-examples'"
 
     initDPHBuiltins thing_inside
       = do {   -- If '-XParallelArrays' given, we populate the builtin table for desugaring those
@@ -261,7 +261,7 @@ mkDsEnvs :: DynFlags -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
          -> (DsGblEnv, DsLclEnv)
 mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var static_binds_var
   = let if_genv = IfGblEnv { if_rec_types = Just (mod, return type_env) }
-        if_lenv = mkIfLclEnv mod (ptext (sLit "GHC error in desugarer lookup in") <+> ppr mod)
+        if_lenv = mkIfLclEnv mod (text "GHC error in desugarer lookup in" <+> ppr mod)
         real_span = realSrcLocSpan (mkRealSrcLoc (moduleNameFS (moduleName mod)) 1 1)
         gbl_env = DsGblEnv { ds_mod     = mod
                            , ds_fam_inst_env = fam_inst_env

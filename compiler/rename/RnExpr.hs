@@ -401,7 +401,7 @@ hsHoleExpr = HsUnboundVar (mkVarOcc "_")
 
 arrowFail :: HsExpr RdrName -> RnM (HsExpr Name, FreeVars)
 arrowFail e
-  = do { addErr (vcat [ ptext (sLit "Arrow command found where an expression was expected:")
+  = do { addErr (vcat [ text "Arrow command found where an expression was expected:"
                       , nest 2 (ppr e) ])
          -- Return a place-holder hole, so that we can carry on
          -- to report other errors
@@ -903,7 +903,7 @@ rnParallelStmts ctxt return_op segs thing_inside
            ; return ((seg':segs', thing), fvs) }
 
     cmpByOcc n1 n2 = nameOccName n1 `compare` nameOccName n2
-    dupErr vs = addErr (ptext (sLit "Duplicate binding in parallel list comprehension for:")
+    dupErr vs = addErr (text "Duplicate binding in parallel list comprehension for:"
                     <+> quotes (ppr (head vs)))
 
 lookupStmtName :: HsStmtContext Name -> Name -> RnM (HsExpr Name, FreeVars)
@@ -1026,7 +1026,7 @@ rn_rec_stmt_lhs fix_env (L loc (BindStmt pat body a b))
                fv_pat)]
 
 rn_rec_stmt_lhs _ (L _ (LetStmt (L _ binds@(HsIPBinds _))))
-  = failWith (badIpBinds (ptext (sLit "an mdo expression")) binds)
+  = failWith (badIpBinds (text "an mdo expression") binds)
 
 rn_rec_stmt_lhs fix_env (L loc (LetStmt (L l(HsValBinds binds))))
     = do (_bound_names, binds') <- rnLocalValBindsLHS fix_env binds
@@ -1101,7 +1101,7 @@ rn_rec_stmt rnBody _ (L loc (BindStmt pat' body _ _), fv_pat)
                   L loc (BindStmt pat' body' bind_op fail_op))] }
 
 rn_rec_stmt _ _ (L _ (LetStmt (L _ binds@(HsIPBinds _))), _)
-  = failWith (badIpBinds (ptext (sLit "an mdo expression")) binds)
+  = failWith (badIpBinds (text "an mdo expression") binds)
 
 rn_rec_stmt _ all_bndrs (L loc (LetStmt (L l (HsValBinds binds'))), _)
   = do { (binds', du_binds) <- rnLocalValBindsRHS (mkNameSet all_bndrs) binds'
@@ -1665,9 +1665,9 @@ okEmpty (PatGuard {}) = True
 okEmpty _             = False
 
 emptyErr :: HsStmtContext Name -> SDoc
-emptyErr (ParStmtCtxt {})   = ptext (sLit "Empty statement group in parallel comprehension")
-emptyErr (TransStmtCtxt {}) = ptext (sLit "Empty statement group preceding 'group' or 'then'")
-emptyErr ctxt               = ptext (sLit "Empty") <+> pprStmtContext ctxt
+emptyErr (ParStmtCtxt {})   = text "Empty statement group in parallel comprehension"
+emptyErr (TransStmtCtxt {}) = text "Empty statement group preceding 'group' or 'then'"
+emptyErr ctxt               = text "Empty" <+> pprStmtContext ctxt
 
 ----------------------
 checkLastStmt :: Outputable (body RdrName) => HsStmtContext Name
@@ -1689,8 +1689,8 @@ checkLastStmt ctxt lstmt@(L loc stmt)
           LastStmt {}      -> return lstmt   -- "Deriving" clauses may generate a
                                              -- LastStmt directly (unlike the parser)
           _                -> do { addErr (hang last_error 2 (ppr stmt)); return lstmt }
-    last_error = (ptext (sLit "The last statement in") <+> pprAStmtContext ctxt
-                  <+> ptext (sLit "must be an expression"))
+    last_error = (text "The last statement in" <+> pprAStmtContext ctxt
+                  <+> text "must be an expression")
 
     check_comp  -- Expect LastStmt; this should be enforced by the parser!
       = case stmt of
@@ -1710,17 +1710,17 @@ checkStmt ctxt (L _ stmt)
            IsValid        -> return ()
            NotValid extra -> addErr (msg $$ extra) }
   where
-   msg = sep [ ptext (sLit "Unexpected") <+> pprStmtCat stmt <+> ptext (sLit "statement")
-             , ptext (sLit "in") <+> pprAStmtContext ctxt ]
+   msg = sep [ text "Unexpected" <+> pprStmtCat stmt <+> ptext (sLit "statement")
+             , text "in" <+> pprAStmtContext ctxt ]
 
 pprStmtCat :: Stmt a body -> SDoc
-pprStmtCat (TransStmt {})     = ptext (sLit "transform")
-pprStmtCat (LastStmt {})      = ptext (sLit "return expression")
-pprStmtCat (BodyStmt {})      = ptext (sLit "body")
-pprStmtCat (BindStmt {})      = ptext (sLit "binding")
-pprStmtCat (LetStmt {})       = ptext (sLit "let")
-pprStmtCat (RecStmt {})       = ptext (sLit "rec")
-pprStmtCat (ParStmt {})       = ptext (sLit "parallel")
+pprStmtCat (TransStmt {})     = text "transform"
+pprStmtCat (LastStmt {})      = text "return expression"
+pprStmtCat (BodyStmt {})      = text "body"
+pprStmtCat (BindStmt {})      = text "binding"
+pprStmtCat (LetStmt {})       = text "let"
+pprStmtCat (RecStmt {})       = text "rec"
+pprStmtCat (ParStmt {})       = text "parallel"
 pprStmtCat (ApplicativeStmt {}) = panic "pprStmtCat: ApplicativeStmt"
 
 ------------
@@ -1767,7 +1767,7 @@ okDoStmt dflags ctxt stmt
        RecStmt {}
          | LangExt.RecursiveDo `xopt` dflags -> IsValid
          | ArrowExpr <- ctxt -> IsValid    -- Arrows allows 'rec'
-         | otherwise         -> NotValid (ptext (sLit "Use RecursiveDo"))
+         | otherwise         -> NotValid (text "Use RecursiveDo")
        BindStmt {} -> IsValid
        LetStmt {}  -> IsValid
        BodyStmt {} -> IsValid
@@ -1781,10 +1781,10 @@ okCompStmt dflags _ stmt
        BodyStmt {} -> IsValid
        ParStmt {}
          | LangExt.ParallelListComp `xopt` dflags -> IsValid
-         | otherwise -> NotValid (ptext (sLit "Use ParallelListComp"))
+         | otherwise -> NotValid (text "Use ParallelListComp")
        TransStmt {}
          | LangExt.TransformListComp `xopt` dflags -> IsValid
-         | otherwise -> NotValid (ptext (sLit "Use TransformListComp"))
+         | otherwise -> NotValid (text "Use TransformListComp")
        RecStmt {}  -> emptyInvalid
        LastStmt {} -> emptyInvalid  -- Should not happen (dealt with by checkLastStmt)
        ApplicativeStmt {} -> emptyInvalid
@@ -1797,7 +1797,7 @@ okPArrStmt dflags _ stmt
        BodyStmt {} -> IsValid
        ParStmt {}
          | LangExt.ParallelListComp `xopt` dflags -> IsValid
-         | otherwise -> NotValid (ptext (sLit "Use ParallelListComp"))
+         | otherwise -> NotValid (text "Use ParallelListComp")
        TransStmt {} -> emptyInvalid
        RecStmt {}   -> emptyInvalid
        LastStmt {}  -> emptyInvalid  -- Should not happen (dealt with by checkLastStmt)
@@ -1809,21 +1809,21 @@ checkTupleSection args
   = do  { tuple_section <- xoptM LangExt.TupleSections
         ; checkErr (all tupArgPresent args || tuple_section) msg }
   where
-    msg = ptext (sLit "Illegal tuple section: use TupleSections")
+    msg = text "Illegal tuple section: use TupleSections"
 
 ---------
 sectionErr :: HsExpr RdrName -> SDoc
 sectionErr expr
-  = hang (ptext (sLit "A section must be enclosed in parentheses"))
-       2 (ptext (sLit "thus:") <+> (parens (ppr expr)))
+  = hang (text "A section must be enclosed in parentheses")
+       2 (text "thus:" <+> (parens (ppr expr)))
 
 patSynErr :: HsExpr RdrName -> RnM (HsExpr Name, FreeVars)
-patSynErr e = do { addErr (sep [ptext (sLit "Pattern syntax in expression context:"),
+patSynErr e = do { addErr (sep [text "Pattern syntax in expression context:",
                                 nest 4 (ppr e)] $$
                            text "Did you mean to enable TypeApplications?")
                  ; return (EWildPat, emptyFVs) }
 
 badIpBinds :: Outputable a => SDoc -> a -> SDoc
 badIpBinds what binds
-  = hang (ptext (sLit "Implicit-parameter bindings illegal in") <+> what)
+  = hang (text "Implicit-parameter bindings illegal in" <+> what)
          2 (ppr binds)

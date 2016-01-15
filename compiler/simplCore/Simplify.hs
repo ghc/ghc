@@ -2307,7 +2307,7 @@ missingAlt :: SimplEnv -> Id -> [InAlt] -> SimplCont -> SimplM (SimplEnv, OutExp
                 -- it "sees" that the entire branch of an outer case is
                 -- inaccessible.  So we simply put an error case here instead.
 missingAlt env case_bndr _ cont
-  = WARN( True, ptext (sLit "missingAlt") <+> ppr case_bndr )
+  = WARN( True, text "missingAlt" <+> ppr case_bndr )
     return (env, mkImpossibleExpr (contResultType cont))
 
 {-
@@ -2487,7 +2487,7 @@ mkDupableAlt env case_bndr (con, bndrs', rhs') = do
                              unf = mkInlineUnfolding Nothing rhs
                              rhs = mkConApp2 dc (tyConAppArgs scrut_ty) bndrs'
 
-                      LitAlt {} -> WARN( True, ptext (sLit "mkDupableAlt")
+                      LitAlt {} -> WARN( True, text "mkDupableAlt"
                                                 <+> ppr case_bndr <+> ppr con )
                                    case_bndr
                            -- The case binder is alive but trivial, so why has

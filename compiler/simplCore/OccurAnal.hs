@@ -39,7 +39,6 @@ import Unique
 import UniqFM
 import Util
 import Outputable
-import FastString
 import Data.List
 import Control.Arrow    ( second )
 
@@ -668,12 +667,12 @@ data Details
   }
 
 instance Outputable Details where
-   ppr nd = ptext (sLit "ND") <> braces
-             (sep [ ptext (sLit "bndr =") <+> ppr (nd_bndr nd)
-                  , ptext (sLit "uds =") <+> ppr (nd_uds nd)
-                  , ptext (sLit "inl =") <+> ppr (nd_inl nd)
-                  , ptext (sLit "weak =") <+> ppr (nd_weak nd)
-                  , ptext (sLit "rule =") <+> ppr (nd_active_rule_fvs nd)
+   ppr nd = text "ND" <> braces
+             (sep [ text "bndr =" <+> ppr (nd_bndr nd)
+                  , text "uds =" <+> ppr (nd_uds nd)
+                  , text "inl =" <+> ppr (nd_inl nd)
+                  , text "weak =" <+> ppr (nd_weak nd)
+                  , text "rule =" <+> ppr (nd_active_rule_fvs nd)
              ])
 
 makeNode :: OccEnv -> ImpRuleEdges -> VarSet -> (Var, CoreExpr) -> Node Details
@@ -1484,8 +1483,8 @@ data OccEncl
                         -- Do inline into constructor args here
 
 instance Outputable OccEncl where
-  ppr OccRhs     = ptext (sLit "occRhs")
-  ppr OccVanilla = ptext (sLit "occVanilla")
+  ppr OccRhs     = text "occRhs"
+  ppr OccVanilla = text "occVanilla"
 
 type OneShots = [OneShotInfo]
         -- []           No info

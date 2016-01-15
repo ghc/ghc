@@ -226,7 +226,7 @@ tcHsDeriv hs_ty
        ; let (tvs, pred) = splitForAllTys ty
        ; case getClassPredTys_maybe pred of
            Just (cls, tys) -> return (tvs, cls, tys, arg_kind)
-           Nothing -> failWithTc (ptext (sLit "Illegal deriving item") <+> quotes (ppr hs_ty)) }
+           Nothing -> failWithTc (text "Illegal deriving item" <+> quotes (ppr hs_ty)) }
 
 tcHsClsInstType :: UserTypeCtxt    -- InstDeclCtxt or SpecInstCtxt
                 -> LHsSigType Name
@@ -266,7 +266,7 @@ tcHsVectInst ty
                                return (cls, args)
            _ -> failWithTc (text "Too many arguments passed to" <+> ppr cls_name) }
   | otherwise
-  = failWithTc $ ptext (sLit "Malformed instance type")
+  = failWithTc $ text "Malformed instance type"
 
 ----------------------------------------------
 -- | Type-check a visible type application
@@ -489,15 +489,15 @@ tc_hs_type _ ty@(HsBangTy {}) _
     -- While top-level bangs at this point are eliminated (eg !(Maybe Int)),
     -- other kinds of bangs are not (eg ((!Maybe) Int)). These kinds of
     -- bangs are invalid, so fail. (#7210)
-    = failWithTc (ptext (sLit "Unexpected strictness annotation:") <+> ppr ty)
+    = failWithTc (text "Unexpected strictness annotation:" <+> ppr ty)
 tc_hs_type _ ty@(HsRecTy _)      _
       -- Record types (which only show up temporarily in constructor
       -- signatures) should have been removed by now
-    = failWithTc (ptext (sLit "Record syntax is illegal here:") <+> ppr ty)
+    = failWithTc (text "Record syntax is illegal here:" <+> ppr ty)
 
 -- This should never happen; type splices are expanded by the renamer
 tc_hs_type _ ty@(HsSpliceTy {}) _exp_kind
-  = failWithTc (ptext (sLit "Unexpected type splice:") <+> ppr ty)
+  = failWithTc (text "Unexpected type splice:" <+> ppr ty)
 
 ---------- Functions and applications
 tc_hs_type mode (HsFunTy ty1 ty2) exp_kind
@@ -511,7 +511,7 @@ tc_hs_type mode (HsOpTy ty1 (L _ op) ty2) exp_kind
 tc_hs_type mode hs_ty@(HsForAllTy { hst_bndrs = hs_tvs, hst_body = ty }) exp_kind
     -- Do not kind-generalise here.  See Note [Kind generalisation]
   | isConstraintKind exp_kind
-  = failWithTc (hang (ptext (sLit "Illegal constraint:")) 2 (ppr hs_ty))
+  = failWithTc (hang (text "Illegal constraint:") 2 (ppr hs_ty))
 
   | otherwise
   = fmap fst $
@@ -714,9 +714,9 @@ finish_tuple tup_sort tau_tys tau_kinds exp_kind
 
 bigConstraintTuple :: Arity -> MsgDoc
 bigConstraintTuple arity
-  = hang (ptext (sLit "Constraint tuple arity too large:") <+> int arity
-          <+> parens (ptext (sLit "max arity =") <+> int mAX_CTUPLE_SIZE))
-       2 (ptext (sLit "Instead, use a nested tuple"))
+  = hang (text "Constraint tuple arity too large:" <+> int arity
+          <+> parens (text "max arity =" <+> int mAX_CTUPLE_SIZE))
+       2 (text "Instead, use a nested tuple")
 
 ---------------------------
 -- | Apply a type of a given kind to a list of arguments. This instantiates
@@ -1231,7 +1231,7 @@ addTypeCtxt :: LHsType Name -> TcM a -> TcM a
 addTypeCtxt (L _ ty) thing
   = addErrCtxt doc thing
   where
-    doc = ptext (sLit "In the type") <+> quotes (ppr ty)
+    doc = text "In the type" <+> quotes (ppr ty)
 
 {-
 ************************************************************************
@@ -1912,7 +1912,7 @@ tcDataKindSig kind
 
 badKindSig :: Kind -> SDoc
 badKindSig kind
- = hang (ptext (sLit "Kind signature on data type declaration has non-* return kind"))
+ = hang (text "Kind signature on data type declaration has non-* return kind")
         2 (ppr kind)
 
 {-
@@ -2059,17 +2059,17 @@ tcPatSig in_pat_bind sig res_ty
     mk_msg sig_ty tidy_env
        = do { (tidy_env, sig_ty) <- zonkTidyTcType tidy_env sig_ty
             ; (tidy_env, res_ty) <- zonkTidyTcType tidy_env res_ty
-            ; let msg = vcat [ hang (ptext (sLit "When checking that the pattern signature:"))
+            ; let msg = vcat [ hang (text "When checking that the pattern signature:")
                                   4 (ppr sig_ty)
-                             , nest 2 (hang (ptext (sLit "fits the type of its context:"))
+                             , nest 2 (hang (text "fits the type of its context:")
                                           2 (ppr res_ty)) ]
             ; return (tidy_env, msg) }
 
 patBindSigErr :: [TcTyVar] -> SDoc
 patBindSigErr sig_tvs
-  = hang (ptext (sLit "You cannot bind scoped type variable") <> plural sig_tvs
+  = hang (text "You cannot bind scoped type variable" <> plural sig_tvs
           <+> pprQuotedList sig_tvs)
-       2 (ptext (sLit "in a pattern binding signature"))
+       2 (text "in a pattern binding signature")
 
 {-
 Note [Pattern signature binders]
@@ -2151,12 +2151,12 @@ tcLHsKind = tc_lhs_kind kindLevelMode
 
 tc_lhs_kind :: TcTyMode -> LHsKind Name -> TcM Kind
 tc_lhs_kind mode k
-  = addErrCtxt (ptext (sLit "In the kind") <+> quotes (ppr k)) $
+  = addErrCtxt (text "In the kind" <+> quotes (ppr k)) $
     tc_lhs_type (kindLevel mode) k liftedTypeKind
 
 promotionErr :: Name -> PromotionErr -> TcM a
 promotionErr name err
-  = failWithTc (hang (pprPECategory err <+> quotes (ppr name) <+> ptext (sLit "cannot be used here"))
+  = failWithTc (hang (pprPECategory err <+> quotes (ppr name) <+> text "cannot be used here")
                    2 (parens reason))
   where
     reason = case err of
@@ -2177,12 +2177,12 @@ promotionErr name err
 
 badPatSigTvs :: TcType -> [TyVar] -> SDoc
 badPatSigTvs sig_ty bad_tvs
-  = vcat [ fsep [ptext (sLit "The type variable") <> plural bad_tvs,
+  = vcat [ fsep [text "The type variable" <> plural bad_tvs,
                  quotes (pprWithCommas ppr bad_tvs),
-                 ptext (sLit "should be bound by the pattern signature") <+> quotes (ppr sig_ty),
-                 ptext (sLit "but are actually discarded by a type synonym") ]
-         , ptext (sLit "To fix this, expand the type synonym")
-         , ptext (sLit "[Note: I hope to lift this restriction in due course]") ]
+                 text "should be bound by the pattern signature" <+> quotes (ppr sig_ty),
+                 text "but are actually discarded by a type synonym" ]
+         , text "To fix this, expand the type synonym"
+         , text "[Note: I hope to lift this restriction in due course]" ]
 
 {-
 ************************************************************************
@@ -2196,6 +2196,6 @@ badPatSigTvs sig_ty bad_tvs
 -- Used for both expressions and types.
 funAppCtxt :: (Outputable fun, Outputable arg) => fun -> arg -> Int -> SDoc
 funAppCtxt fun arg arg_no
-  = hang (hsep [ ptext (sLit "In the"), speakNth arg_no, ptext (sLit "argument of"),
+  = hang (hsep [ text "In the", speakNth arg_no, ptext (sLit "argument of"),
                     quotes (ppr fun) <> text ", namely"])
        2 (quotes (ppr arg))

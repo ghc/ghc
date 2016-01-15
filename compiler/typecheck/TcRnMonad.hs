@@ -953,9 +953,9 @@ checkTH e what = failTH e what  -- Raise an error in a stage-1 compiler
 failTH :: Outputable a => a -> String -> TcRn x
 failTH e what  -- Raise an error in a stage-1 compiler
   = failWithTc (vcat [ hang (char 'A' <+> text what
-                             <+> ptext (sLit "requires GHC with interpreter support:"))
+                             <+> text "requires GHC with interpreter support:")
                           2 (ppr e)
-                     , ptext (sLit "Perhaps you are using a stage-1 compiler?") ])
+                     , text "Perhaps you are using a stage-1 compiler?" ])
 
 {-
 ************************************************************************
@@ -1353,7 +1353,7 @@ recordThSpliceUse = do { env <- getGblEnv; writeTcRef (tcg_th_splice_used env) T
 keepAlive :: Name -> TcRn ()     -- Record the name in the keep-alive set
 keepAlive name
   = do { env <- getGblEnv
-       ; traceRn (ptext (sLit "keep alive") <+> ppr name)
+       ; traceRn (text "keep alive" <+> ppr name)
        ; updTcRef (tcg_keep env) (`extendNameSet` name) }
 
 getStage :: TcM ThStage
@@ -1466,7 +1466,7 @@ initIfaceTc iface do_this
     }
   where
     mod = mi_module iface
-    doc = ptext (sLit "The interface for") <+> quotes (ppr mod)
+    doc = text "The interface for" <+> quotes (ppr mod)
 
 initIfaceLcl :: Module -> SDoc -> IfL a -> IfM lcl a
 initIfaceLcl mod loc_doc thing_inside

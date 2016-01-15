@@ -13,6 +13,8 @@ import GHCi.RemoteTypes
 import Data.Array
 import ByteCodeTypes
 import GHC.Stack.CCS
+import Foreign.C
+import qualified Data.ByteString as B
 #endif
 import Type
 import HsSyn
@@ -41,13 +43,11 @@ import CLabel
 import Util
 
 import Data.Time
-import Foreign.C
 import System.Directory
 
 import Trace.Hpc.Mix
 import Trace.Hpc.Util
 
-import qualified Data.ByteString as B
 import Data.Map (Map)
 import qualified Data.Map as Map
 
@@ -1328,9 +1328,9 @@ hpcInitCode this_mod (HpcInfo tickCount hashNo)
          <> text "(void) __attribute__((constructor));"
     , text "static void hpc_init_" <> ppr this_mod <> text "(void)"
     , braces (vcat [
-        ptext (sLit "extern StgWord64 ") <> tickboxes <>
-               ptext (sLit "[]") <> semi,
-        ptext (sLit "hs_hpc_module") <>
+        text "extern StgWord64 " <> tickboxes <>
+               text "[]" <> semi,
+        text "hs_hpc_module" <>
           parens (hcat (punctuate comma [
               doubleQuotes full_name_str,
               int tickCount, -- really StgWord32

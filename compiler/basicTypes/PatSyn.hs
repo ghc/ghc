@@ -31,7 +31,6 @@ import Outputable
 import Unique
 import Util
 import BasicTypes
-import FastString
 import Var
 import FieldLabel
 
@@ -386,7 +385,7 @@ patSynInstArgTys (MkPatSyn { psName = name, psUnivTyVars = univ_tvs
                            , psExTyVars = ex_tvs, psArgs = arg_tys })
                  inst_tys
   = ASSERT2( length tyvars == length inst_tys
-          , ptext (sLit "patSynInstArgTys") <+> ppr name $$ ppr tyvars $$ ppr inst_tys )
+          , text "patSynInstArgTys" <+> ppr name $$ ppr tyvars $$ ppr inst_tys )
     map (substTyWith tyvars inst_tys) arg_tys
   where
     tyvars = univ_tvs ++ ex_tvs
@@ -401,5 +400,5 @@ patSynInstResTy (MkPatSyn { psName = name, psUnivTyVars = univ_tvs
                           , psOrigResTy = res_ty })
                 inst_tys
   = ASSERT2( length univ_tvs == length inst_tys
-           , ptext (sLit "patSynInstResTy") <+> ppr name $$ ppr univ_tvs $$ ppr inst_tys )
+           , text "patSynInstResTy" <+> ppr name $$ ppr univ_tvs $$ ppr inst_tys )
     substTyWith univ_tvs inst_tys res_ty

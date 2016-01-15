@@ -124,7 +124,6 @@ import ListSetOps
 import Maybes
 
 import Control.Monad (foldM)
-import FastString
 import Control.Arrow ( first )
 import Data.Function ( on )
 
@@ -223,10 +222,10 @@ ppr_co p co@(TransCo {}) = maybeParen p FunPrec $
                              (co:cos) -> sep ( ppr_co FunPrec co
                                              : [ char ';' <+> ppr_co FunPrec co | co <- cos])
 ppr_co p (InstCo co arg) = maybeParen p TyConPrec $
-                           pprParendCo co <> ptext (sLit "@") <> ppr_co TopPrec arg
+                           pprParendCo co <> text "@" <> ppr_co TopPrec arg
 
 ppr_co p (UnivCo UnsafeCoerceProv r ty1 ty2)
-  = pprPrefixApp p (ptext (sLit "UnsafeCo") <+> ppr r)
+  = pprPrefixApp p (text "UnsafeCo" <+> ppr r)
                    [pprParendType ty1, pprParendType ty2]
 ppr_co _ (UnivCo p r t1 t2)= angleBrackets ( ppr t1 <> comma <+> ppr t2 ) <> ppr_role r <> ppr_prov
   where
@@ -234,14 +233,14 @@ ppr_co _ (UnivCo p r t1 t2)= angleBrackets ( ppr t1 <> comma <+> ppr t2 ) <> ppr
       HoleProv h          -> ppr h
       PhantomProv kind_co -> braces (ppr kind_co)
       _                   -> empty
-ppr_co p (SymCo co)          = pprPrefixApp p (ptext (sLit "Sym")) [pprParendCo co]
-ppr_co p (NthCo n co)        = pprPrefixApp p (ptext (sLit "Nth:") <> int n) [pprParendCo co]
+ppr_co p (SymCo co)          = pprPrefixApp p (text "Sym") [pprParendCo co]
+ppr_co p (NthCo n co)        = pprPrefixApp p (text "Nth:" <> int n) [pprParendCo co]
 ppr_co p (LRCo sel co)       = pprPrefixApp p (ppr sel) [pprParendCo co]
 ppr_co p (CoherenceCo c1 c2) = maybeParen p TyConPrec $
-                               (ppr_co FunPrec c1) <+> (ptext (sLit "|>")) <+>
+                               (ppr_co FunPrec c1) <+> (text "|>") <+>
                                (ppr_co FunPrec c2)
-ppr_co p (KindCo co)         = pprPrefixApp p (ptext (sLit "kind")) [pprParendCo co]
-ppr_co p (SubCo co)         = pprPrefixApp p (ptext (sLit "Sub")) [pprParendCo co]
+ppr_co p (KindCo co)         = pprPrefixApp p (text "kind") [pprParendCo co]
+ppr_co p (SubCo co)         = pprPrefixApp p (text "Sub") [pprParendCo co]
 ppr_co p (AxiomRuleCo co cs) = maybeParen p TopPrec $ ppr_axiom_rule_co co cs
 
 ppr_axiom_rule_co :: CoAxiomRule -> [Coercion] -> SDoc

@@ -894,7 +894,7 @@ skolemiseUnboundMetaTyVar tv details
               final_name  = mkInternalName uniq tv_name span
               final_tv    = mkTcTyVar final_name kind details
 
-        ; traceTc "Skolemising" (ppr tv <+> ptext (sLit ":=") <+> ppr final_tv)
+        ; traceTc "Skolemising" (ppr tv <+> text ":=" <+> ppr final_tv)
         ; writeMetaTyVar tv (mkTyVarTy final_tv)
         ; return final_tv }
 

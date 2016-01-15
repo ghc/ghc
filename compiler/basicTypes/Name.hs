@@ -514,7 +514,7 @@ pprExternal sty uniq mod occ is_wired is_builtin
         -- ToDo: maybe we could print all wired-in things unqualified
         --       in code style, to reduce symbol table bloat?
   | debugStyle sty = pp_mod <> ppr_occ_name occ
-                     <> braces (hsep [if is_wired then ptext (sLit "(w)") else empty,
+                     <> braces (hsep [if is_wired then text "(w)" else empty,
                                       pprNameSpaceBrief (occNameSpace occ),
                                       pprUnique uniq])
   | BuiltInSyntax <- is_builtin = ppr_occ_name occ  -- Never qualify builtin syntax
@@ -583,7 +583,7 @@ ppr_z_occ_name occ = ztext (zEncodeFS (occNameFS occ))
 -- Prints (if mod information is available) "Defined at <loc>" or
 --  "Defined in <mod>" information for a Name.
 pprDefinedAt :: Name -> SDoc
-pprDefinedAt name = ptext (sLit "Defined") <+> pprNameDefnLoc name
+pprDefinedAt name = text "Defined" <+> pprNameDefnLoc name
 
 pprNameDefnLoc :: Name -> SDoc
 -- Prints "at <loc>" or
@@ -593,12 +593,12 @@ pprNameDefnLoc name
          -- nameSrcLoc rather than nameSrcSpan
          -- It seems less cluttered to show a location
          -- rather than a span for the definition point
-       RealSrcLoc s -> ptext (sLit "at") <+> ppr s
+       RealSrcLoc s -> text "at" <+> ppr s
        UnhelpfulLoc s
          | isInternalName name || isSystemName name
-         -> ptext (sLit "at") <+> ftext s
+         -> text "at" <+> ftext s
          | otherwise
-         -> ptext (sLit "in") <+> quotes (ppr (nameModule name))
+         -> text "in" <+> quotes (ppr (nameModule name))
 
 
 -- | Get a string representation of a 'Name' that's unique and stable

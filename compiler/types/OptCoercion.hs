@@ -23,7 +23,6 @@ import Outputable
 import FamInstEnv ( flattenTys )
 import Pair
 import ListSetOps ( getNth )
-import FastString
 import Util
 import Unify
 import InstEnv
@@ -214,7 +213,7 @@ opt_co4 env sym rep r (CoVarCo cv)
   = ASSERT( isCoVar cv1 ) wrapRole rep r $ wrapSym sym (CoVarCo cv1)
                 -- cv1 might have a substituted kind!
 
-  | otherwise = WARN( True, ptext (sLit "opt_co: not in scope:") <+> ppr cv $$ ppr env)
+  | otherwise = WARN( True, text "opt_co: not in scope:" <+> ppr cv $$ ppr env)
                 ASSERT( isCoVar cv )
                 wrapRole rep r $ wrapSym sym (CoVarCo cv)
 

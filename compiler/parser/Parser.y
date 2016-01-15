@@ -2949,9 +2949,9 @@ tyvarop : '`' tyvarid '`'       {% ams (sLL $1 $> (unLoc $2))
                                        [mj AnnBackquote $1,mj AnnVal $2
                                        ,mj AnnBackquote $3] }
         | '.'                   {% parseErrorSDoc (getLoc $1)
-                                      (vcat [ptext (sLit "Illegal symbol '.' in type"),
-                                             ptext (sLit "Perhaps you intended to use RankNTypes or a similar language"),
-                                             ptext (sLit "extension to enable explicit-forall syntax: forall <tvs>. <type>")])
+                                      (vcat [text "Illegal symbol '.' in type",
+                                             text "Perhaps you intended to use RankNTypes or a similar language",
+                                             text "extension to enable explicit-forall syntax: forall <tvs>. <type>"])
                                 }
 
 tyvarid :: { Located RdrName }

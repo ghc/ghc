@@ -191,10 +191,10 @@ isValNameSpace VarName  = True
 isValNameSpace _        = False
 
 pprNameSpace :: NameSpace -> SDoc
-pprNameSpace DataName  = ptext (sLit "data constructor")
-pprNameSpace VarName   = ptext (sLit "variable")
-pprNameSpace TvName    = ptext (sLit "type variable")
-pprNameSpace TcClsName = ptext (sLit "type constructor or class")
+pprNameSpace DataName  = text "data constructor"
+pprNameSpace VarName   = text "variable"
+pprNameSpace TvName    = text "type variable"
+pprNameSpace TcClsName = text "type constructor or class"
 
 pprNonVarNameSpace :: NameSpace -> SDoc
 pprNonVarNameSpace VarName = empty
@@ -203,8 +203,8 @@ pprNonVarNameSpace ns = pprNameSpace ns
 pprNameSpaceBrief :: NameSpace -> SDoc
 pprNameSpaceBrief DataName  = char 'd'
 pprNameSpaceBrief VarName   = char 'v'
-pprNameSpaceBrief TvName    = ptext (sLit "tv")
-pprNameSpaceBrief TcClsName = ptext (sLit "tc")
+pprNameSpaceBrief TvName    = text "tv"
+pprNameSpaceBrief TcClsName = text "tc"
 
 -- demoteNameSpace lowers the NameSpace if possible.  We can not know
 -- in advance, since a TvName can appear in an HsTyVar.

@@ -324,7 +324,7 @@ warnRedundantConstraints ctxt env info ev_vars
  | SigSkol {} <- info
  = setLclEnv env $  -- We want to add "In the type signature for f"
                     -- to the error context, which is a bit tiresome
-   addErrCtxt (ptext (sLit "In") <+> ppr info) $
+   addErrCtxt (text "In" <+> ppr info) $
    do { env <- getLclEnv
       ; msg <- mkErrorReport ctxt env (important doc)
       ; reportWarning msg }
@@ -335,7 +335,7 @@ warnRedundantConstraints ctxt env info ev_vars
  = do { msg <- mkErrorReport ctxt env (important doc)
       ; reportWarning msg }
  where
-   doc = ptext (sLit "Redundant constraint") <> plural redundant_evs <> colon
+   doc = text "Redundant constraint" <> plural redundant_evs <> colon
          <+> pprEvVarTheta redundant_evs
 
    redundant_evs = case info of -- See Note [Redundant constraints in instance decls]
@@ -364,8 +364,8 @@ This only matters in instance declarations..
 
 reportWanteds :: ReportErrCtxt -> TcLevel -> WantedConstraints -> TcM ()
 reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl = implics })
-  = do { traceTc "reportWanteds" (vcat [ ptext (sLit "Simples =") <+> ppr simples
-                                       , ptext (sLit "Suppress =") <+> ppr (cec_suppress ctxt)])
+  = do { traceTc "reportWanteds" (vcat [ text "Simples =" <+> ppr simples
+                                       , text "Suppress =" <+> ppr (cec_suppress ctxt)])
        ; let tidy_cts = bagToList (mapBag (tidyCt env) (insols `unionBags` simples))
 
          -- First deal with things that are utterly wrong
@@ -860,30 +860,30 @@ mkHoleError ctxt ct@(CHoleCan { cc_occ = occ, cc_hole = hole_sort })
       | otherwise   = hang herald 2 pp_with_type
 
     pp_with_type = hang (pprPrefixOcc occ) 2 (dcolon <+> pprType hole_ty)
-    herald | isDataOcc occ = ptext (sLit "Data constructor not in scope:")
-           | otherwise     = ptext (sLit "Variable not in scope:")
+    herald | isDataOcc occ = text "Data constructor not in scope:"
+           | otherwise     = text "Variable not in scope:"
 
     hole_msg = case hole_sort of
-      ExprHole -> vcat [ hang (ptext (sLit "Found hole:"))
+      ExprHole -> vcat [ hang (text "Found hole:")
                             2 pp_with_type
                        , tyvars_msg, expr_hole_hint ]
-      TypeHole -> vcat [ hang (ptext (sLit "Found type wildcard") <+> quotes (ppr occ))
-                            2 (ptext (sLit "standing for") <+> quotes (pprType hole_ty))
+      TypeHole -> vcat [ hang (text "Found type wildcard" <+> quotes (ppr occ))
+                            2 (text "standing for" <+> quotes (pprType hole_ty))
                        , tyvars_msg, type_hole_hint ]
 
     tyvars_msg = ppUnless (null tyvars) $
-                 ptext (sLit "Where:") <+> vcat (map loc_msg tyvars)
+                 text "Where:" <+> vcat (map loc_msg tyvars)
 
     type_hole_hint
          | HoleError <- cec_type_holes ctxt
-         = ptext (sLit "To use the inferred type, enable PartialTypeSignatures")
+         = text "To use the inferred type, enable PartialTypeSignatures"
          | otherwise
          = empty
 
     expr_hole_hint                       -- Give hint for, say,   f x = _x
          | lengthFS (occNameFS occ) > 1  -- Don't give this hint for plain "_"
-         = ptext (sLit "Or perhaps") <+> quotes (ppr occ)
-           <+> ptext (sLit "is mis-spelled, or not in scope")
+         = text "Or perhaps" <+> quotes (ppr occ)
+           <+> text "is mis-spelled, or not in scope"
          | otherwise
          = empty
 
@@ -891,7 +891,7 @@ mkHoleError ctxt ct@(CHoleCan { cc_occ = occ, cc_hole = hole_sort })
        | isTyVar tv
        = case tcTyVarDetails tv of
           SkolemTv {} -> pprSkol (cec_encl ctxt) tv
-          MetaTv {}   -> quotes (ppr tv) <+> ptext (sLit "is an ambiguous type variable")
+          MetaTv {}   -> quotes (ppr tv) <+> text "is an ambiguous type variable"
           det -> pprTcTyVarDetails det
        | otherwise
        = sdocWithDynFlags $ \dflags ->
@@ -910,7 +910,7 @@ mkIPErr ctxt cts
              givens  = getUserGivens ctxt
              msg | null givens
                  = addArising orig $
-                   sep [ ptext (sLit "Unbound implicit parameter") <> plural cts
+                   sep [ text "Unbound implicit parameter" <> plural cts
                        , nest 2 (pprTheta preds) ]
                  | otherwise
                  = couldNotDeduce givens (preds, orig)
@@ -988,7 +988,7 @@ mkEqErr1 ctxt ct
     -- with one from the implication.  See Note [Inaccessible code]
     mk_given loc []           = (loc, empty)
     mk_given loc (implic : _) = (setCtLocEnv loc (ic_env implic)
-                                , hang (ptext (sLit "Inaccessible code in"))
+                                , hang (text "Inaccessible code in")
                                      2 (ppr (ic_info implic)))
 
        -- If the types in the error message are the same as the types
@@ -1146,10 +1146,10 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
        ; mkErrorMsgFromCt ctxt ct $ mconcat [occCheckMsg, extra2, report] }
 
   | OC_Forall <- occ_check_expand
-  = do { let msg = vcat [ ptext (sLit "Cannot instantiate unification variable")
+  = do { let msg = vcat [ text "Cannot instantiate unification variable"
                           <+> quotes (ppr tv1)
                         , hang (text "with a" <+> what <+> text "involving foralls:") 2 (ppr ty2)
-                        , nest 2 (ptext (sLit "GHC doesn't yet support impredicative polymorphism")) ]
+                        , nest 2 (text "GHC doesn't yet support impredicative polymorphism") ]
        -- Unlike the other reports, this discards the old 'report_important'
        -- instead of augmenting it.  This is because the details are not likely
        -- to be helpful since this is just an unimplemented feature.
@@ -1176,9 +1176,9 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
   = do { let msg = important $ misMatchMsg ct oriented ty1 ty2
              esc_doc = sep [ text "because" <+> what <+> text "variable" <> plural esc_skols
                              <+> pprQuotedList esc_skols
-                           , ptext (sLit "would escape") <+>
-                             if isSingleton esc_skols then ptext (sLit "its scope")
-                                                      else ptext (sLit "their scope") ]
+                           , text "would escape" <+>
+                             if isSingleton esc_skols then text "its scope"
+                                                      else text "their scope" ]
              tv_extra = important $
                         vcat [ nest 2 $ esc_doc
                              , sep [ (if isSingleton esc_skols
@@ -1186,9 +1186,9 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
                                            what <+> text "variable is"
                                       else text "These (rigid, skolem)" <+>
                                            what <+> text "variables are")
-                               <+> ptext (sLit "bound by")
+                               <+> text "bound by"
                              , nest 2 $ ppr skol_info
-                             , nest 2 $ ptext (sLit "at") <+> ppr (tcl_loc env) ] ]
+                             , nest 2 $ text "at" <+> ppr (tcl_loc env) ] ]
        ; mkErrorMsgFromCt ctxt ct (mconcat [msg, tv_extra, report]) }
 
   -- Nastiest case: attempt to unify an untouchable variable
@@ -1197,10 +1197,10 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
   = do { let msg = important $ misMatchMsg ct oriented ty1 ty2
              tclvl_extra = important $
                   nest 2 $
-                  sep [ quotes (ppr tv1) <+> ptext (sLit "is untouchable")
-                      , nest 2 $ ptext (sLit "inside the constraints:") <+> pprEvVarTheta given
-                      , nest 2 $ ptext (sLit "bound by") <+> ppr skol_info
-                      , nest 2 $ ptext (sLit "at") <+> ppr (tcl_loc env) ]
+                  sep [ quotes (ppr tv1) <+> text "is untouchable"
+                      , nest 2 $ text "inside the constraints:" <+> pprEvVarTheta given
+                      , nest 2 $ text "bound by" <+> ppr skol_info
+                      , nest 2 $ text "at" <+> ppr (tcl_loc env) ]
              tv_extra = important $ extraTyVarInfo ctxt tv1 ty2
              add_sig  = important $ suggestAddSig ctxt ty1 ty2
        ; mkErrorMsgFromCt ctxt ct $ mconcat
@@ -1249,8 +1249,8 @@ mkEqInfoMsg ct ty1 ty2
     tyfun_msg | Just tc1 <- mb_fun1
               , Just tc2 <- mb_fun2
               , tc1 == tc2
-              = ptext (sLit "NB:") <+> quotes (ppr tc1)
-                <+> ptext (sLit "is a type function, and may not be injective")
+              = text "NB:" <+> quotes (ppr tc1)
+                <+> text "is a type function, and may not be injective"
               | otherwise = empty
 
 isUserSkolem :: ReportErrCtxt -> TcTyVar -> Bool
@@ -1285,20 +1285,20 @@ misMatchOrCND ctxt ct oriented ty1 ty2
 
 couldNotDeduce :: [UserGiven] -> (ThetaType, CtOrigin) -> SDoc
 couldNotDeduce givens (wanteds, orig)
-  = vcat [ addArising orig (ptext (sLit "Could not deduce:") <+> pprTheta wanteds)
+  = vcat [ addArising orig (text "Could not deduce:" <+> pprTheta wanteds)
          , vcat (pp_givens givens)]
 
 pp_givens :: [UserGiven] -> [SDoc]
 pp_givens givens
    = case givens of
          []     -> []
-         (g:gs) ->      ppr_given (ptext (sLit "from the context:")) g
-                 : map (ppr_given (ptext (sLit "or from:"))) gs
+         (g:gs) ->      ppr_given (text "from the context:") g
+                 : map (ppr_given (text "or from:")) gs
     where
        ppr_given herald (gs, skol_info, _, loc)
            = hang (herald <+> pprEvVarTheta gs)
-                2 (sep [ ptext (sLit "bound by") <+> ppr skol_info
-                       , ptext (sLit "at") <+> ppr loc])
+                2 (sep [ text "bound by" <+> ppr skol_info
+                       , text "at" <+> ppr loc])
 
 extraTyVarInfo :: ReportErrCtxt -> TcTyVar -> TcType -> SDoc
 -- Add on extra info about skolem constants
@@ -1315,8 +1315,8 @@ extraTyVarInfo ctxt tv1 ty2
                 , let pp_tv = quotes (ppr tv)
                 = case tcTyVarDetails tv of
                     SkolemTv {}   -> pprSkol implics tv
-                    FlatSkol {}   -> pp_tv <+> ptext (sLit "is a flattening type variable")
-                    RuntimeUnk {} -> pp_tv <+> ptext (sLit "is an interactive-debugger skolem")
+                    FlatSkol {}   -> pp_tv <+> text "is a flattening type variable"
+                    RuntimeUnk {} -> pp_tv <+> text "is an interactive-debugger skolem"
                     MetaTv {}     -> empty
 
                 | otherwise             -- Normal case
@@ -1328,9 +1328,9 @@ suggestAddSig ctxt ty1 ty2
   | null inferred_bndrs
   = empty
   | [bndr] <- inferred_bndrs
-  = ptext (sLit "Possible fix: add a type signature for") <+> quotes (ppr bndr)
+  = text "Possible fix: add a type signature for" <+> quotes (ppr bndr)
   | otherwise
-  = ptext (sLit "Possible fix: add type signatures for some or all of") <+> (ppr inferred_bndrs)
+  = text "Possible fix: add type signatures for some or all of" <+> (ppr inferred_bndrs)
   where
     inferred_bndrs = nub (get_inf ty1 ++ get_inf ty2)
     get_inf ty | Just tv <- tcGetTyVar_maybe ty
@@ -1623,19 +1623,19 @@ sameOccExtra ty1 ty2
         same_pkg = moduleUnitId (nameModule n1) == moduleUnitId (nameModule n2)
   , n1 /= n2   -- Different Names
   , same_occ   -- but same OccName
-  = ptext (sLit "NB:") <+> (ppr_from same_pkg n1 $$ ppr_from same_pkg n2)
+  = text "NB:" <+> (ppr_from same_pkg n1 $$ ppr_from same_pkg n2)
   | otherwise
   = empty
   where
     ppr_from same_pkg nm
       | isGoodSrcSpan loc
-      = hang (quotes (ppr nm) <+> ptext (sLit "is defined at"))
+      = hang (quotes (ppr nm) <+> text "is defined at")
            2 (ppr loc)
       | otherwise  -- Imported things have an UnhelpfulSrcSpan
       = hang (quotes (ppr nm))
-           2 (sep [ ptext (sLit "is defined in") <+> quotes (ppr (moduleName mod))
+           2 (sep [ text "is defined in" <+> quotes (ppr (moduleName mod))
                   , ppUnless (same_pkg || pkg == mainUnitId) $
-                    nest 4 $ ptext (sLit "in package") <+> quotes (ppr pkg) ])
+                    nest 4 $ text "in package" <+> quotes (ppr pkg) ])
        where
          pkg = moduleUnitId mod
          mod = nameModule nm
@@ -1803,7 +1803,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
           = vcat [ ppWhen lead_with_ambig $
                      text "Probable fix: use a type annotation to specify what"
                      <+> pprQuotedList ambig_tvs <+> text "should be."
-                 , ptext (sLit "These potential instance") <> plural unifiers
+                 , text "These potential instance" <> plural unifiers
                    <+> text "exist:"]
 
     -- Report "potential instances" only when the constraint arises
@@ -1814,24 +1814,24 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
     add_to_ctxt_fixes has_ambig_tvs
       | not has_ambig_tvs && all_tyvars
       , (orig:origs) <- usefulContext ctxt pred
-      = [sep [ ptext (sLit "add") <+> pprParendType pred
-               <+> ptext (sLit "to the context of")
+      = [sep [ text "add" <+> pprParendType pred
+               <+> text "to the context of"
              , nest 2 $ ppr_skol orig $$
-                        vcat [ ptext (sLit "or") <+> ppr_skol orig
+                        vcat [ text "or" <+> ppr_skol orig
                              | orig <- origs ] ] ]
       | otherwise = []
 
-    ppr_skol (PatSkol dc _) = ptext (sLit "the data constructor") <+> quotes (ppr dc)
+    ppr_skol (PatSkol dc _) = text "the data constructor" <+> quotes (ppr dc)
     ppr_skol skol_info      = ppr skol_info
 
     extra_note | any isFunTy (filterOutInvisibleTypes (classTyCon clas) tys)
-               = ptext (sLit "(maybe you haven't applied a function to enough arguments?)")
+               = text "(maybe you haven't applied a function to enough arguments?)"
                | className clas == typeableClassName  -- Avoid mysterious "No instance for (Typeable T)
                , [_,ty] <- tys                        -- Look for (Typeable (k->*) (T k))
                , Just (tc,_) <- tcSplitTyConApp_maybe ty
                , not (isTypeFamilyTyCon tc)
-               = hang (ptext (sLit "GHC can't yet do polykinded"))
-                    2 (ptext (sLit "Typeable") <+>
+               = hang (text "GHC can't yet do polykinded")
+                    2 (text "Typeable" <+>
                        parens (ppr ty <+> dcolon <+> ppr (typeKind ty)))
                | otherwise
                = empty
@@ -1842,22 +1842,22 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
                    DerivOriginCoerce {} -> [drv_fix]
                    _                -> []
 
-    drv_fix = hang (ptext (sLit "use a standalone 'deriving instance' declaration,"))
-                 2 (ptext (sLit "so you can specify the instance context yourself"))
+    drv_fix = hang (text "use a standalone 'deriving instance' declaration,")
+                 2 (text "so you can specify the instance context yourself")
 
     -- Normal overlap error
     overlap_msg
       = ASSERT( not (null matches) )
-        vcat [  addArising orig (ptext (sLit "Overlapping instances for")
+        vcat [  addArising orig (text "Overlapping instances for"
                                 <+> pprType (mkClassPred clas tys))
 
              ,  ppUnless (null matching_givens) $
-                  sep [ptext (sLit "Matching givens (or their superclasses):")
+                  sep [text "Matching givens (or their superclasses):"
                       , nest 2 (vcat matching_givens)]
 
              ,  sdocWithDynFlags $ \dflags ->
                 getPprStyle $ \sty ->
-                pprPotentials dflags sty (ptext (sLit "Matching instances:")) $
+                pprPotentials dflags sty (text "Matching instances:") $
                 ispecs ++ unifiers
 
              ,  ppWhen (null matching_givens && isSingleton matches && null unifiers) $
@@ -1867,15 +1867,15 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
                 -- constraints are non-flat and non-rewritten so we
                 -- simply report back the whole given
                 -- context. Accelerate Smart.hs showed this problem.
-                  sep [ ptext (sLit "There exists a (perhaps superclass) match:")
+                  sep [ text "There exists a (perhaps superclass) match:"
                       , nest 2 (vcat (pp_givens givens))]
 
              ,  ppWhen (isSingleton matches) $
-                parens (vcat [ ptext (sLit "The choice depends on the instantiation of") <+>
+                parens (vcat [ text "The choice depends on the instantiation of" <+>
                                   quotes (pprWithCommas ppr (tyCoVarsOfTypesList tys))
                              , ppWhen (null (matching_givens)) $
-                               vcat [ ptext (sLit "To pick the first instance above, use IncoherentInstances")
-                                    , ptext (sLit "when compiling the other instance declarations")]
+                               vcat [ text "To pick the first instance above, use IncoherentInstances"
+                                    , text "when compiling the other instance declarations"]
                         ])]
         where
             givens = getUserGivens ctxt
@@ -1885,8 +1885,8 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
               = case ev_vars_matching of
                      [] -> Nothing
                      _  -> Just $ hang (pprTheta ev_vars_matching)
-                                    2 (sep [ ptext (sLit "bound by") <+> ppr skol_info
-                                           , ptext (sLit "at") <+> ppr loc])
+                                    2 (sep [ text "bound by" <+> ppr skol_info
+                                           , text "at" <+> ppr loc])
                 where ev_vars_matching = filter ev_var_matches (map evVarPred evvars)
                       ev_var_matches ty = case getClassPredTys_maybe ty of
                          Just (clas', tys')
@@ -1900,17 +1900,18 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
     -- Overlap error because of Safe Haskell (first
     -- match should be the most specific match)
     safe_haskell_msg
-      = ASSERT( length matches == 1 && not (null unsafe_ispecs) )
-        vcat [ addArising orig (ptext (sLit "Unsafe overlapping instances for")
-                        <+> pprType (mkClassPred clas tys))
-             , sep [ptext (sLit "The matching instance is:"),
-                    nest 2 (pprInstance $ head ispecs)]
-             , vcat [ ptext $ sLit "It is compiled in a Safe module and as such can only"
-                    , ptext $ sLit "overlap instances from the same module, however it"
-                    , ptext $ sLit "overlaps the following instances from different modules:"
-                    , nest 2 (vcat [pprInstances $ unsafe_ispecs])
-                    ]
-             ]
+     = ASSERT( length matches == 1 && not (null unsafe_ispecs) )
+       vcat [ addArising orig (text "Unsafe overlapping instances for"
+                       <+> pprType (mkClassPred clas tys))
+            , sep [text "The matching instance is:",
+                   nest 2 (pprInstance $ head ispecs)]
+            , vcat [ text "It is compiled in a Safe module and as such can only"
+                   , text "overlap instances from the same module, however it"
+                   , text "overlaps the following instances from different" <+>
+                     text "modules:"
+                   , nest 2 (vcat [pprInstances $ unsafe_ispecs])
+                   ]
+            ]
 
 {- Note [Highlighting ambiguous type variables]
 -----------------------------------------------
@@ -1955,8 +1956,8 @@ usefulContext ctxt pred
 
 show_fixes :: [SDoc] -> SDoc
 show_fixes []     = empty
-show_fixes (f:fs) = sep [ ptext (sLit "Possible fix:")
-                        , nest 2 (vcat (f : map (ptext (sLit "or") <+>) fs))]
+show_fixes (f:fs) = sep [ text "Possible fix:"
+                        , nest 2 (vcat (f : map (text "or" <+>) fs))]
 
 pprPotentials :: DynFlags -> PprStyle -> SDoc -> [ClsInst] -> SDoc
 -- See Note [Displaying potential instances]
@@ -1973,9 +1974,9 @@ pprPotentials dflags sty herald insts
   = hang herald
        2 (vcat [ pprInstances show_these
                , ppWhen (n_in_scope_hidden > 0) $
-                 ptext (sLit "...plus")
-                   <+> speakNOf n_in_scope_hidden (ptext (sLit "other"))
-               , not_in_scope_msg (ptext (sLit "...plus"))
+                 text "...plus"
+                   <+> speakNOf n_in_scope_hidden (text "other")
+               , not_in_scope_msg (text "...plus")
                , flag_hint ])
   where
     n_show = 3 :: Int
@@ -2012,11 +2013,11 @@ pprPotentials dflags sty herald insts
       = empty
       | otherwise
       = hang (herald <+> speakNOf (length not_in_scope)
-                                  (ptext (sLit "instance involving out-of-scope types")))
+                                  (text "instance involving out-of-scope types"))
            2 (ppWhen show_potentials (pprInstances not_in_scope))
 
     flag_hint = ppUnless (show_potentials || length show_these == length insts) $
-                ptext (sLit "(use -fprint-potential-instances to see them all)")
+                text "(use -fprint-potential-instances to see them all)"
 
 {- Note [Displaying potential instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2076,46 +2077,46 @@ mkAmbigMsg prepend_msg ct
 
     msg |  any isRuntimeUnkSkol ambig_kvs  -- See Note [Runtime skolems]
         || any isRuntimeUnkSkol ambig_tvs
-        = vcat [ ptext (sLit "Cannot resolve unknown runtime type")
+        = vcat [ text "Cannot resolve unknown runtime type"
                  <> plural ambig_tvs <+> pprQuotedList ambig_tvs
-               , ptext (sLit "Use :print or :force to determine these types")]
+               , text "Use :print or :force to determine these types"]
 
         | not (null ambig_tvs)
-        = pp_ambig (ptext (sLit "type")) ambig_tvs
+        = pp_ambig (text "type") ambig_tvs
 
         | otherwise  -- All ambiguous kind variabes; suggest -fprint-explicit-kinds
-        = vcat [ pp_ambig (ptext (sLit "kind")) ambig_kvs
+        = vcat [ pp_ambig (text "kind") ambig_kvs
                , sdocWithDynFlags suggest_explicit_kinds ]
 
     pp_ambig what tkvs
       | prepend_msg -- "Ambiguous type variable 't0'"
-      = ptext (sLit "Ambiguous") <+> what <+> ptext (sLit "variable")
+      = text "Ambiguous" <+> what <+> text "variable"
         <> plural tkvs <+> pprQuotedList tkvs
 
       | otherwise -- "The type variable 't0' is ambiguous"
-      = ptext (sLit "The") <+> what <+> ptext (sLit "variable") <> plural tkvs
-        <+> pprQuotedList tkvs <+> is_or_are tkvs <+> ptext (sLit "ambiguous")
+      = text "The" <+> what <+> text "variable" <> plural tkvs
+        <+> pprQuotedList tkvs <+> is_or_are tkvs <+> text "ambiguous"
 
     is_or_are [_] = text "is"
     is_or_are _   = text "are"
 
     suggest_explicit_kinds dflags  -- See Note [Suggest -fprint-explicit-kinds]
       | gopt Opt_PrintExplicitKinds dflags = empty
-      | otherwise = ptext (sLit "Use -fprint-explicit-kinds to see the kind arguments")
+      | otherwise = text "Use -fprint-explicit-kinds to see the kind arguments"
 
 pprSkol :: [Implication] -> TcTyVar -> SDoc
 pprSkol implics tv
   | (skol_tvs, skol_info) <- getSkolemInfo implics tv
   = case skol_info of
-      UnkSkol         -> pp_tv <+> ptext (sLit "is an unknown type variable")
+      UnkSkol         -> pp_tv <+> text "is an unknown type variable"
       SigSkol ctxt ty -> ppr_rigid (pprSigSkolInfo ctxt
                                       (mkSpecForAllTys skol_tvs ty))
       _               -> ppr_rigid (pprSkolInfo skol_info)
   where
     pp_tv = quotes (ppr tv)
-    ppr_rigid pp_info = hang (pp_tv <+> ptext (sLit "is a rigid type variable bound by"))
+    ppr_rigid pp_info = hang (pp_tv <+> text "is a rigid type variable bound by")
                            2 (sep [ pp_info
-                                  , ptext (sLit "at") <+> ppr (getSrcLoc tv) ])
+                                  , text "at" <+> ppr (getSrcLoc tv) ])
 
 getAmbigTkvs :: Ct -> ([Var],[Var])
 getAmbigTkvs ct
@@ -2176,7 +2177,7 @@ relevantBindings want_filtering ctxt ct
          -- which are probably the most relevant ones
 
        ; let doc = ppUnless (null docs) $
-                   hang (ptext (sLit "Relevant bindings include"))
+                   hang (text "Relevant bindings include")
                       2 (vcat docs $$ ppWhen discards discardMsg)
 
              -- Put a zonked, tidied CtOrigin into the Ct
@@ -2209,7 +2210,7 @@ relevantBindings want_filtering ctxt ct
             ; traceTc "relevantBindings 1" (ppr id <+> dcolon <+> ppr tidy_ty)
             ; let id_tvs = tyCoVarsOfType tidy_ty
                   doc = sep [ pprPrefixOcc id <+> dcolon <+> ppr tidy_ty
-                            , nest 2 (parens (ptext (sLit "bound at")
+                            , nest 2 (parens (text "bound at"
                                  <+> ppr (getSrcLoc id)))]
                   new_seen = tvs_seen `unionVarSet` id_tvs
 
@@ -2233,7 +2234,8 @@ relevantBindings want_filtering ctxt ct
               else go tidy_env' ct_tvs (dec_max n_left) new_seen (doc:docs) discards tc_bndrs }
 
 discardMsg :: SDoc
-discardMsg = ptext (sLit "(Some bindings suppressed; use -fmax-relevant-binds=N or -fno-max-relevant-binds)")
+discardMsg = text "(Some bindings suppressed;" <+>
+             text "use -fmax-relevant-binds=N or -fno-max-relevant-binds)"
 
 -----------------------
 warnDefaulting :: [Ct] -> Type -> TcM ()

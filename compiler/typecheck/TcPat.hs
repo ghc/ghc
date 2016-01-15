@@ -46,7 +46,6 @@ import SrcLoc
 import VarSet
 import Util
 import Outputable
-import FastString
 import Maybes( orElse )
 import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
@@ -217,8 +216,8 @@ addInlinePrags poly_id prags
          warn_multiple_inlines inl2 inls
        | otherwise
        = setSrcSpan loc $
-         addWarnTc (hang (ptext (sLit "Multiple INLINE pragmas for") <+> ppr poly_id)
-                       2 (vcat (ptext (sLit "Ignoring all but the first")
+         addWarnTc (hang (text "Multiple INLINE pragmas for" <+> ppr poly_id)
+                       2 (vcat (text "Ignoring all but the first"
                                 : map pp_inl (inl1:inl2:inls))))
 
     pp_inl (L loc prag) = ppr prag <+> parens (ppr loc)
@@ -1027,7 +1026,7 @@ maybeWrapPatCtxt pat tcm thing_inside
    worth_wrapping (ParPat {}) = False
    worth_wrapping (AsPat {})  = False
    worth_wrapping _           = True
-   msg = hang (ptext (sLit "In the pattern:")) 2 (ppr pat)
+   msg = hang (text "In the pattern:") 2 (ppr pat)
 
 -----------------------------------------------
 checkExistentials :: [TyVar]   -- existentials
@@ -1043,12 +1042,12 @@ checkExistentials _ _ _                                   = return ()
 
 existentialLazyPat :: SDoc
 existentialLazyPat
-  = hang (ptext (sLit "An existential or GADT data constructor cannot be used"))
-       2 (ptext (sLit "inside a lazy (~) pattern"))
+  = hang (text "An existential or GADT data constructor cannot be used")
+       2 (text "inside a lazy (~) pattern")
 
 existentialProcPat :: SDoc
 existentialProcPat
-  = ptext (sLit "Proc patterns cannot use existential or GADT data constructors")
+  = text "Proc patterns cannot use existential or GADT data constructors"
 
 existentialLetPat :: SDoc
 existentialLetPat
@@ -1058,16 +1057,16 @@ existentialLetPat
 
 badFieldCon :: ConLike -> FieldLabelString -> SDoc
 badFieldCon con field
-  = hsep [ptext (sLit "Constructor") <+> quotes (ppr con),
-          ptext (sLit "does not have field"), quotes (ppr field)]
+  = hsep [text "Constructor" <+> quotes (ppr con),
+          text "does not have field", quotes (ppr field)]
 
 polyPatSig :: TcType -> SDoc
 polyPatSig sig_ty
-  = hang (ptext (sLit "Illegal polymorphic type signature in pattern:"))
+  = hang (text "Illegal polymorphic type signature in pattern:")
        2 (ppr sig_ty)
 
 lazyUnliftedPatErr :: OutputableBndr name => Pat name -> TcM ()
 lazyUnliftedPatErr pat
   = failWithTc $
-    hang (ptext (sLit "A lazy (~) pattern cannot contain unlifted types:"))
+    hang (text "A lazy (~) pattern cannot contain unlifted types:")
        2 (ppr pat)

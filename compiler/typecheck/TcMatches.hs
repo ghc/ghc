@@ -37,7 +37,6 @@ import TcEvidence
 import Outputable
 import Util
 import SrcLoc
-import FastString
 import DynFlags
 import PrelNames (monadFailClassName)
 import qualified GHC.LanguageExtensions as LangExt
@@ -94,8 +93,8 @@ tcMatchesFun fun_name matches exp_ty
         ; return (wrap_gen <.> wrap_fun, group) }
   where
     arity = matchGroupArity matches
-    herald = ptext (sLit "The equation(s) for")
-             <+> quotes (ppr fun_name) <+> ptext (sLit "have")
+    herald = text "The equation(s) for"
+             <+> quotes (ppr fun_name) <+> text "have"
     match_ctxt = MC { mc_what = FunRhs fun_name, mc_body = tcBody }
 
 {-
@@ -1059,10 +1058,10 @@ checkArgs fun (MG { mg_alts = L _ (match1:matches) })
     | null bad_matches
     = return ()
     | otherwise
-    = failWithTc (vcat [ptext (sLit "Equations for") <+> quotes (ppr fun) <+>
-                          ptext (sLit "have different numbers of arguments"),
-                        nest 2 (ppr (getLoc match1)),
-                        nest 2 (ppr (getLoc (head bad_matches)))])
+    = failWithTc (vcat [ text "Equations for" <+> quotes (ppr fun) <+>
+                         text "have different numbers of arguments"
+                       , nest 2 (ppr (getLoc match1))
+                       , nest 2 (ppr (getLoc (head bad_matches)))])
   where
     n_args1 = args_in_match match1
     bad_matches = [m | m <- matches, args_in_match m /= n_args1]

@@ -124,7 +124,7 @@ wrapMsg what item (CvtM m)
   where
         -- Show the item in pretty syntax normally,
         -- but with all its constructors if you say -dppr-debug
-    msg sty = hang (ptext (sLit "When splicing a TH") <+> text what <> colon)
+    msg sty = hang (text "When splicing a TH" <+> text what <> colon)
                  2 (if debugStyle sty
                     then text (show item)
                     else text (pprint item))
@@ -148,7 +148,7 @@ cvtDec (TH.ValD pat body ds)
   | otherwise
   = do  { pat' <- cvtPat pat
         ; body' <- cvtGuard body
-        ; ds' <- cvtLocalDecs (ptext (sLit "a where clause")) ds
+        ; ds' <- cvtLocalDecs (text "a where clause") ds
         ; returnJustL $ Hs.ValD $
           PatBind { pat_lhs = pat', pat_rhs = GRHSs body' (noLoc ds')
                   , pat_rhs_ty = placeHolderType, bind_fvs = placeHolderNames
@@ -156,9 +156,9 @@ cvtDec (TH.ValD pat body ds)
 
 cvtDec (TH.FunD nm cls)
   | null cls
-  = failWith (ptext (sLit "Function binding for")
+  = failWith (text "Function binding for"
                  <+> quotes (text (TH.pprint nm))
-                 <+> ptext (sLit "has no equations"))
+                 <+> text "has no equations")
   | otherwise
   = do  { nm' <- vNameL nm
         ; cls' <- mapM cvtClause cls
@@ -229,7 +229,7 @@ cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
 cvtDec (ClassD ctxt cl tvs fds decs)
   = do  { (cxt', tc', tvs') <- cvt_tycl_hdr ctxt cl tvs
         ; fds'  <- mapM cvt_fundep fds
-        ; (binds', sigs', fams', ats', adts') <- cvt_ci_decs (ptext (sLit "a class declaration")) decs
+        ; (binds', sigs', fams', ats', adts') <- cvt_ci_decs (text "a class declaration") decs
         ; unless (null adts')
             (failWith $ (text "Default data instance declarations"
                      <+> text "are not allowed:")
@@ -251,7 +251,7 @@ cvtDec (ClassD ctxt cl tvs fds decs)
                         Left (_, msg) -> failWith msg
 
 cvtDec (InstanceD ctxt ty decs)
-  = do  { let doc = ptext (sLit "an instance declaration")
+  = do  { let doc = text "an instance declaration"
         ; (binds', sigs', fams', ats', adts') <- cvt_ci_decs doc decs
         ; unless (null fams') (failWith (mkBadDecMsg doc fams'))
         ; ctxt' <- cvtContext ctxt
@@ -429,7 +429,7 @@ is_bind decl                   = Right decl
 
 mkBadDecMsg :: Outputable a => MsgDoc -> [a] -> MsgDoc
 mkBadDecMsg doc bads
-  = sep [ ptext (sLit "Illegal declaration(s) in") <+> doc <> colon
+  = sep [ text "Illegal declaration(s) in" <+> doc <> colon
         , nest 2 (vcat (map Outputable.ppr bads)) ]
 
 ---------------------------------------------------
@@ -552,7 +552,7 @@ cvtForD (ImportF callconv safety from nm ty)
                                  from (noLoc from)
   = mk_imp impspec
   | otherwise
-  = failWith $ text (show from) <+> ptext (sLit "is not a valid ccall impent")
+  = failWith $ text (show from) <+> text "is not a valid ccall impent"
   where
     mk_imp impspec
       = do { nm' <- vNameL nm
@@ -695,7 +695,7 @@ cvtClause :: TH.Clause -> CvtM (Hs.LMatch RdrName (LHsExpr RdrName))
 cvtClause (Clause ps body wheres)
   = do  { ps' <- cvtPats ps
         ; g'  <- cvtGuard body
-        ; ds' <- cvtLocalDecs (ptext (sLit "a where clause")) wheres
+        ; ds' <- cvtLocalDecs (text "a where clause") wheres
         ; returnL $ Hs.Match NonFunBindMatch ps' Nothing
                              (GRHSs g' (noLoc ds')) }
 
@@ -734,10 +734,10 @@ cvtl e = wrapL (cvt e)
     cvt (CondE x y z)  = do { x' <- cvtl x; y' <- cvtl y; z' <- cvtl z;
                             ; return $ HsIf (Just noSyntaxExpr) x' y' z' }
     cvt (MultiIfE alts)
-      | null alts      = failWith (ptext (sLit "Multi-way if-expression with no alternatives"))
+      | null alts      = failWith (text "Multi-way if-expression with no alternatives")
       | otherwise      = do { alts' <- mapM cvtpair alts
                             ; return $ HsMultiIf placeHolderType alts' }
-    cvt (LetE ds e)    = do { ds' <- cvtLocalDecs (ptext (sLit "a let expression")) ds
+    cvt (LetE ds e)    = do { ds' <- cvtLocalDecs (text "a let expression") ds
                             ; e' <- cvtl e; return $ HsLet (noLoc ds') e' }
     cvt (CaseE e ms)   = do { e' <- cvtl e; ms' <- mapM cvtMatch ms
                             ; return $ HsCase e' (mkMatchGroup FromSource ms') }
@@ -885,7 +885,7 @@ cvtOpApp x op y
 
 cvtHsDo :: HsStmtContext Name.Name -> [TH.Stmt] -> CvtM (HsExpr RdrName)
 cvtHsDo do_or_lc stmts
-  | null stmts = failWith (ptext (sLit "Empty stmt list in do-block"))
+  | null stmts = failWith (text "Empty stmt list in do-block")
   | otherwise
   = do  { stmts' <- cvtStmts stmts
         ; let Just (stmts'', last') = snocView stmts'
@@ -896,9 +896,9 @@ cvtHsDo do_or_lc stmts
 
         ; return $ HsDo do_or_lc (noLoc (stmts'' ++ [last''])) placeHolderType }
   where
-    bad_last stmt = vcat [ ptext (sLit "Illegal last statement of") <+> pprAStmtContext do_or_lc <> colon
+    bad_last stmt = vcat [ text "Illegal last statement of" <+> pprAStmtContext do_or_lc <> colon
                          , nest 2 $ Outputable.ppr stmt
-                         , ptext (sLit "(It should be an expression.)") ]
+                         , text "(It should be an expression.)" ]
 
 cvtStmts :: [TH.Stmt] -> CvtM [Hs.LStmt RdrName (LHsExpr RdrName)]
 cvtStmts = mapM cvtStmt
@@ -906,7 +906,7 @@ cvtStmts = mapM cvtStmt
 cvtStmt :: TH.Stmt -> CvtM (Hs.LStmt RdrName (LHsExpr RdrName))
 cvtStmt (NoBindS e)    = do { e' <- cvtl e; returnL $ mkBodyStmt e' }
 cvtStmt (TH.BindS p e) = do { p' <- cvtPat p; e' <- cvtl e; returnL $ mkBindStmt p' e' }
-cvtStmt (TH.LetS ds)   = do { ds' <- cvtLocalDecs (ptext (sLit "a let binding")) ds
+cvtStmt (TH.LetS ds)   = do { ds' <- cvtLocalDecs (text "a let binding") ds
                             ; returnL $ LetStmt (noLoc ds') }
 cvtStmt (TH.ParS dss)  = do { dss' <- mapM cvt_one dss; returnL $ ParStmt dss' noSyntaxExpr noSyntaxExpr }
                        where
@@ -916,7 +916,7 @@ cvtMatch :: TH.Match -> CvtM (Hs.LMatch RdrName (LHsExpr RdrName))
 cvtMatch (TH.Match p body decs)
   = do  { p' <- cvtPat p
         ; g' <- cvtGuard body
-        ; decs' <- cvtLocalDecs (ptext (sLit "a where clause")) decs
+        ; decs' <- cvtLocalDecs (text "a where clause") decs
         ; returnL $ Hs.Match NonFunBindMatch [p'] Nothing
                              (GRHSs g' (noLoc decs')) }
 
@@ -1343,8 +1343,8 @@ isVarName (TH.Name occ _)
 
 badOcc :: OccName.NameSpace -> String -> SDoc
 badOcc ctxt_ns occ
-  = ptext (sLit "Illegal") <+> pprNameSpace ctxt_ns
-        <+> ptext (sLit "name:") <+> quotes (text occ)
+  = text "Illegal" <+> pprNameSpace ctxt_ns
+        <+> text "name:" <+> quotes (text occ)
 
 thRdrName :: SrcSpan -> OccName.NameSpace -> String -> TH.NameFlavour -> RdrName
 -- This turns a TH Name into a RdrName; used for both binders and occurrences

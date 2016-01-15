@@ -97,7 +97,7 @@ pprGNUSectionHeader t suffix = sdocWithDynFlags $ \dflags ->
   let splitSections = gopt Opt_SplitSections dflags
       subsection | splitSections = char '.' <> ppr suffix
                  | otherwise     = empty
-  in  ptext (sLit ".section ") <> ptext header <> subsection
+  in  text ".section " <> ptext header <> subsection
   where
     header = case t of
       Text -> sLit ".text"

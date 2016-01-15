@@ -44,7 +44,6 @@ import DmdAnal          ( dmdAnalProgram )
 import CallArity        ( callArityAnalProgram )
 import WorkWrap         ( wwTopBinds )
 import Vectorise        ( vectorise )
-import FastString
 import SrcLoc
 import Util
 import Module
@@ -604,11 +603,11 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
         -- about to begin, with '1' for the first
       | iteration_no > max_iterations   -- Stop if we've run out of iterations
       = WARN( debugIsOn && (max_iterations > 2)
-            , hang (ptext (sLit "Simplifier bailing out after") <+> int max_iterations
-                    <+> ptext (sLit "iterations")
+            , hang (text "Simplifier bailing out after" <+> int max_iterations
+                    <+> text "iterations"
                     <+> (brackets $ hsep $ punctuate comma $
                          map (int . simplCountN) (reverse counts_so_far)))
-                 2 (ptext (sLit "Size =") <+> ppr (coreBindsStats binds)))
+                 2 (text "Size =" <+> ppr (coreBindsStats binds)))
 
                 -- Subtract 1 from iteration_no to get the
                 -- number of iterations we actually completed
@@ -720,10 +719,10 @@ dump_end_iteration dflags print_unqual iteration_no counts binds rules
             | otherwise                               = Nothing
             -- Show details if Opt_D_dump_simpl_iterations is on
 
-    hdr = ptext (sLit "Simplifier iteration=") <> int iteration_no
-    pp_counts = vcat [ ptext (sLit "---- Simplifier counts for") <+> hdr
+    hdr = text "Simplifier iteration=" <> int iteration_no
+    pp_counts = vcat [ text "---- Simplifier counts for" <+> hdr
                      , pprSimplCount counts
-                     , ptext (sLit "---- End of simplifier counts for") <+> hdr ]
+                     , text "---- End of simplifier counts for" <+> hdr ]
 
 {-
 ************************************************************************
@@ -929,7 +928,7 @@ shortMeOut ind_env exported_id local_id
     then
         if hasShortableIdInfo exported_id
         then True       -- See Note [Messing up the exported Id's IdInfo]
-        else WARN( True, ptext (sLit "Not shorting out:") <+> ppr exported_id )
+        else WARN( True, text "Not shorting out:" <+> ppr exported_id )
              False
     else
         False

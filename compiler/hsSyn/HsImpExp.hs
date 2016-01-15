@@ -90,7 +90,7 @@ instance (OutputableBndr name, HasOccName name) => Outputable (ImportDecl name) 
                     , ideclSource = from, ideclSafe = safe
                     , ideclQualified = qual, ideclImplicit = implicit
                     , ideclAs = as, ideclHiding = spec })
-      = hang (hsep [ptext (sLit "import"), ppr_imp from, pp_implicit implicit, pp_safe safe,
+      = hang (hsep [text "import", ppr_imp from, pp_implicit implicit, pp_safe safe,
                     pp_qual qual, pp_pkg pkg, ppr mod', pp_as as])
              4 (pp_spec spec)
       where
@@ -101,22 +101,22 @@ instance (OutputableBndr name, HasOccName name) => Outputable (ImportDecl name) 
         pp_pkg (Just (StringLiteral _ p)) = doubleQuotes (ftext p)
 
         pp_qual False   = empty
-        pp_qual True    = ptext (sLit "qualified")
+        pp_qual True    = text "qualified"
 
         pp_safe False   = empty
-        pp_safe True    = ptext (sLit "safe")
+        pp_safe True    = text "safe"
 
         pp_as Nothing   = empty
-        pp_as (Just a)  = ptext (sLit "as") <+> ppr a
+        pp_as (Just a)  = text "as" <+> ppr a
 
-        ppr_imp True  = ptext (sLit "{-# SOURCE #-}")
+        ppr_imp True  = text "{-# SOURCE #-}"
         ppr_imp False = empty
 
         pp_spec Nothing             = empty
         pp_spec (Just (False, (L _ ies))) = ppr_ies ies
-        pp_spec (Just (True, (L _ ies))) = ptext (sLit "hiding") <+> ppr_ies ies
+        pp_spec (Just (True, (L _ ies))) = text "hiding" <+> ppr_ies ies
 
-        ppr_ies []  = ptext (sLit "()")
+        ppr_ies []  = text "()"
         ppr_ies ies = char '(' <+> interpp'SP ies <+> char ')'
 
 {-
@@ -219,7 +219,7 @@ pprImpExp :: (HasOccName name, OutputableBndr name) => name -> SDoc
 pprImpExp name = type_pref <+> pprPrefixOcc name
     where
     occ = occName name
-    type_pref | isTcOcc occ && isSymOcc occ = ptext (sLit "type")
+    type_pref | isTcOcc occ && isSymOcc occ = text "type"
               | otherwise                   = empty
 
 instance (HasOccName name, OutputableBndr name) => Outputable (IE name) where
@@ -239,7 +239,7 @@ instance (HasOccName name, OutputableBndr name) => Outputable (IE name) where
                 let (bs, as) = splitAt pos (map (pprImpExp . unLoc) withs)
                 in bs ++ [text ".."] ++ as
     ppr (IEModuleContents mod')
-        = ptext (sLit "module") <+> ppr mod'
+        = text "module" <+> ppr mod'
     ppr (IEGroup n _)           = text ("<IEGroup: " ++ show n ++ ">")
     ppr (IEDoc doc)             = ppr doc
     ppr (IEDocNamed string)     = text ("<IEDocNamed: " ++ string ++ ">")

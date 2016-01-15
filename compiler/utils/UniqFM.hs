@@ -69,7 +69,6 @@ module UniqFM (
         joinUFM, pprUniqFM
     ) where
 
-import FastString
 import Unique           ( Uniquable(..), Unique, getKey )
 import Outputable
 
@@ -320,5 +319,5 @@ instance Outputable a => Outputable (UniqFM a) where
 pprUniqFM :: (a -> SDoc) -> UniqFM a -> SDoc
 pprUniqFM ppr_elt ufm
   = brackets $ fsep $ punctuate comma $
-    [ ppr uq <+> ptext (sLit ":->") <+> ppr_elt elt
+    [ ppr uq <+> text ":->" <+> ppr_elt elt
     | (uq, elt) <- ufmToList ufm ]

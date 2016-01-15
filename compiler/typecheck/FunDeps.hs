@@ -32,7 +32,6 @@ import Outputable
 import ErrUtils( Validity(..), allValid )
 import SrcLoc
 import Util
-import FastString
 
 import Pair             ( Pair(..) )
 import Data.List        ( nubBy )
@@ -185,8 +184,8 @@ improveFromAnother _ _ _ = []
 
 pprEquation :: FunDepEqn a -> SDoc
 pprEquation (FDEqn { fd_qtvs = qtvs, fd_eqs = pairs })
-  = vcat [ptext (sLit "forall") <+> braces (pprWithCommas ppr qtvs),
-          nest 2 (vcat [ ppr t1 <+> ptext (sLit "~") <+> ppr t2
+  = vcat [text "forall" <+> braces (pprWithCommas ppr qtvs),
+          nest 2 (vcat [ ppr t1 <+> text "~" <+> ppr t2
                        | Pair t1 t2 <- pairs])]
 
 improveFromInstEnv :: InstEnvs
@@ -389,26 +388,26 @@ checkInstCoverage be_liberal clas theta inst_taus
                       -- , text "theta" <+> ppr theta
                       -- , text "oclose" <+> ppr (oclose theta (closeOverKinds ls_tvs))
                       -- , text "rs_tvs" <+> ppr rs_tvs
-                      sep [ ptext (sLit "The")
-                            <+> ppWhen be_liberal (ptext (sLit "liberal"))
-                            <+> ptext (sLit "coverage condition fails in class")
+                      sep [ text "The"
+                            <+> ppWhen be_liberal (text "liberal")
+                            <+> text "coverage condition fails in class"
                             <+> quotes (ppr clas)
-                          , nest 2 $ ptext (sLit "for functional dependency:")
+                          , nest 2 $ text "for functional dependency:"
                             <+> quotes (pprFunDep fd) ]
-                    , sep [ ptext (sLit "Reason: lhs type")<>plural ls <+> pprQuotedList ls
+                    , sep [ text "Reason: lhs type"<>plural ls <+> pprQuotedList ls
                           , nest 2 $
                             (if isSingleton ls
-                             then ptext (sLit "does not")
-                             else ptext (sLit "do not jointly"))
-                            <+> ptext (sLit "determine rhs type")<>plural rs
+                             then text "does not"
+                             else text "do not jointly")
+                            <+> text "determine rhs type"<>plural rs
                             <+> pprQuotedList rs ]
-                    , ptext (sLit "Un-determined variable") <> plural undet_list <> colon
+                    , text "Un-determined variable" <> plural undet_list <> colon
                             <+> pprWithCommas ppr undet_list
                     , ppWhen (isEmptyVarSet $ pSnd undetermined_tvs) $
-                      ptext (sLit "(Use -fprint-explicit-kinds to see the kind variables in the types)")
+                      text "(Use -fprint-explicit-kinds to see the kind variables in the types)"
                     , ppWhen (not be_liberal &&
                               and (isEmptyVarSet <$> liberal_undet_tvs)) $
-                      ptext (sLit "Using UndecidableInstances might help") ]
+                      text "Using UndecidableInstances might help" ]
 
 {- Note [Closing over kinds in coverage]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

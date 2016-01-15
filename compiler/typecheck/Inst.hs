@@ -467,9 +467,9 @@ syntaxNameCtxt :: HsExpr Name -> CtOrigin -> Type -> TidyEnv
                -> TcRn (TidyEnv, SDoc)
 syntaxNameCtxt name orig ty tidy_env
   = do { inst_loc <- getCtLocM orig (Just TypeLevel)
-       ; let msg = vcat [ ptext (sLit "When checking that") <+> quotes (ppr name)
-                          <+> ptext (sLit "(needed by a syntactic construct)")
-                        , nest 2 (ptext (sLit "has the required type:")
+       ; let msg = vcat [ text "When checking that" <+> quotes (ppr name)
+                          <+> text "(needed by a syntactic construct)"
+                        , nest 2 (text "has the required type:"
                                   <+> ppr (tidyType tidy_env ty))
                         , nest 2 (pprCtLoc inst_loc) ]
        ; return (tidy_env, msg) }
@@ -524,7 +524,7 @@ newClsInst overlap_mode dfun_name tvs theta clas tys
 
 instOrphWarn :: ClsInst -> SDoc
 instOrphWarn inst
-  = hang (ptext (sLit "Orphan instance:")) 2 (pprInstanceHdr inst)
+  = hang (text "Orphan instance:") 2 (pprInstanceHdr inst)
     $$ text "To avoid this"
     $$ nest 4 (vcat possibilities)
   where
@@ -656,12 +656,12 @@ traceDFuns ispecs
 
 funDepErr :: ClsInst -> [ClsInst] -> TcRn ()
 funDepErr ispec ispecs
-  = addClsInstsErr (ptext (sLit "Functional dependencies conflict between instance declarations:"))
+  = addClsInstsErr (text "Functional dependencies conflict between instance declarations:")
                     (ispec : ispecs)
 
 dupInstErr :: ClsInst -> ClsInst -> TcRn ()
 dupInstErr ispec dup_ispec
-  = addClsInstsErr (ptext (sLit "Duplicate instance declarations:"))
+  = addClsInstsErr (text "Duplicate instance declarations:")
                     [ispec, dup_ispec]
 
 addClsInstsErr :: SDoc -> [ClsInst] -> TcRn ()

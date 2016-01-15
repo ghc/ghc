@@ -61,7 +61,6 @@ import SrcLoc
 import ListSetOps
 import Digraph
 import DynFlags
-import FastString
 import Unique
 import BasicTypes
 import qualified GHC.LanguageExtensions as LangExt
@@ -267,7 +266,7 @@ kcTyClGroup :: TyClGroup Name -> TcM [(Name,Kind)]
 -- See Note [Kind checking for type and class decls]
 kcTyClGroup (TyClGroup { group_tyclds = decls })
   = do  { mod <- getModule
-        ; traceTc "kcTyClGroup" (ptext (sLit "module") <+> ppr mod $$ vcat (map ppr decls))
+        ; traceTc "kcTyClGroup" (text "module" <+> ppr mod $$ vcat (map ppr decls))
 
           -- Kind checking;
           --    1. Bind kind variables for non-synonyms
@@ -962,7 +961,7 @@ tcDefaultAssocDecl _ []
   = return Nothing  -- No default declaration
 
 tcDefaultAssocDecl _ (d1:_:_)
-  = failWithTc (ptext (sLit "More than one default declaration for")
+  = failWithTc (text "More than one default declaration for"
                 <+> ppr (tfe_tycon (unLoc d1)))
 
 tcDefaultAssocDecl fam_tc [L loc (TyFamEqn { tfe_tycon = L _ tc_name
@@ -971,7 +970,7 @@ tcDefaultAssocDecl fam_tc [L loc (TyFamEqn { tfe_tycon = L _ tc_name
   | HsQTvs { hsq_implicit = imp_vars, hsq_explicit = exp_vars } <- hs_tvs
   = -- See Note [Type-checking default assoc decls]
     setSrcSpan loc $
-    tcAddFamInstCtxt (ptext (sLit "default type instance")) tc_name $
+    tcAddFamInstCtxt (text "default type instance") tc_name $
     do { traceTc "tcDefaultAssocDecl" (ppr tc_name)
        ; let shape@(fam_tc_name, fam_arity, _) = famTyConShape fam_tc
 
@@ -2106,16 +2105,16 @@ checkValidDataCon dflags existential_ok tc con
     check_bang (HsSrcBang _ _ SrcLazy) _ n
       | not (xopt LangExt.StrictData dflags)
       = addErrTc
-          (bad_bang n (ptext (sLit "Lazy annotation (~) without StrictData")))
+          (bad_bang n (text "Lazy annotation (~) without StrictData"))
     check_bang (HsSrcBang _ want_unpack strict_mark) rep_bang n
       | isSrcUnpacked want_unpack, not is_strict
-      = addWarnTc (bad_bang n (ptext (sLit "UNPACK pragma lacks '!'")))
+      = addWarnTc (bad_bang n (text "UNPACK pragma lacks '!'"))
       | isSrcUnpacked want_unpack
       , case rep_bang of { HsUnpack {} -> False; _ -> True }
       , not (gopt Opt_OmitInterfacePragmas dflags)
            -- If not optimising, se don't unpack, so don't complain!
            -- See MkId.dataConArgRep, the (HsBang True) case
-      = addWarnTc (bad_bang n (ptext (sLit "Ignoring unusable UNPACK pragma")))
+      = addWarnTc (bad_bang n (text "Ignoring unusable UNPACK pragma"))
       where
         is_strict = case strict_mark of
                       NoSrcStrict -> xopt LangExt.StrictData dflags
@@ -2125,8 +2124,8 @@ checkValidDataCon dflags existential_ok tc con
       = return ()
 
     bad_bang n herald
-      = hang herald 2 (ptext (sLit "on the") <+> speakNth n
-                       <+> ptext (sLit "argument of") <+> quotes (ppr con))
+      = hang herald 2 (text "on the" <+> speakNth n
+                       <+> text "argument of" <+> quotes (ppr con))
 -------------------------------
 checkNewDataCon :: DataCon -> TcM ()
 -- Further checks for the data constructor of a newtype
@@ -2135,14 +2134,14 @@ checkNewDataCon con
               -- One argument
 
         ; check_con (null eq_spec) $
-          ptext (sLit "A newtype constructor must have a return type of form T a1 ... an")
+          text "A newtype constructor must have a return type of form T a1 ... an"
                 -- Return type is (T a b c)
 
         ; check_con (null theta) $
-          ptext (sLit "A newtype constructor cannot have a context in its type")
+          text "A newtype constructor cannot have a context in its type"
 
         ; check_con (null ex_tvs) $
-          ptext (sLit "A newtype constructor cannot have existential type variables")
+          text "A newtype constructor cannot have existential type variables"
                 -- No existentials
 
         ; checkTc (all ok_bang (dataConSrcBangs con))
@@ -2253,8 +2252,8 @@ checkFamFlag tc_name
   = do { idx_tys <- xoptM LangExt.TypeFamilies
        ; checkTc idx_tys err_msg }
   where
-    err_msg = hang (ptext (sLit "Illegal family declaration for") <+> quotes (ppr tc_name))
-                 2 (ptext (sLit "Use TypeFamilies to allow indexed type families"))
+    err_msg = hang (text "Illegal family declaration for" <+> quotes (ppr tc_name))
+                 2 (text "Use TypeFamilies to allow indexed type families")
 
 {-
 Note [Abort when superclass cycle is detected]
@@ -2357,11 +2356,11 @@ checkValidRoles tc
     check_ty_roles env role (TyVarTy tv)
       = case lookupVarEnv env tv of
           Just role' -> unless (role' `ltRole` role || role' == role) $
-                        report_error $ ptext (sLit "type variable") <+> quotes (ppr tv) <+>
-                                       ptext (sLit "cannot have role") <+> ppr role <+>
-                                       ptext (sLit "because it was assigned role") <+> ppr role'
-          Nothing    -> report_error $ ptext (sLit "type variable") <+> quotes (ppr tv) <+>
-                                       ptext (sLit "missing in environment")
+                        report_error $ text "type variable" <+> quotes (ppr tv) <+>
+                                       text "cannot have role" <+> ppr role <+>
+                                       text "because it was assigned role" <+> ppr role'
+          Nothing    -> report_error $ text "type variable" <+> quotes (ppr tv) <+>
+                                       text "missing in environment"
 
     check_ty_roles env Representational (TyConApp tc tys)
       = let roles' = tyConRoles tc in
@@ -2399,9 +2398,9 @@ checkValidRoles tc
         check_ty_roles env role ty
 
     report_error doc
-      = addErrTc $ vcat [ptext (sLit "Internal error in role inference:"),
+      = addErrTc $ vcat [text "Internal error in role inference:",
                          doc,
-                         ptext (sLit "Please report this as a GHC bug: http://www.haskell.org/ghc/reportabug")]
+                         text "Please report this as a GHC bug: http://www.haskell.org/ghc/reportabug"]
 
 {-
 ************************************************************************
@@ -2413,7 +2412,7 @@ checkValidRoles tc
 
 tcAddTyFamInstCtxt :: TyFamInstDecl Name -> TcM a -> TcM a
 tcAddTyFamInstCtxt decl
-  = tcAddFamInstCtxt (ptext (sLit "type instance")) (tyFamInstDeclName decl)
+  = tcAddFamInstCtxt (text "type instance") (tyFamInstDeclName decl)
 
 tcMkDataFamInstCtxt :: DataFamInstDecl Name -> SDoc
 tcMkDataFamInstCtxt decl
@@ -2437,31 +2436,31 @@ tcAddClosedTypeFamilyDeclCtxt :: TyCon -> TcM a -> TcM a
 tcAddClosedTypeFamilyDeclCtxt tc
   = addErrCtxt ctxt
   where
-    ctxt = ptext (sLit "In the equations for closed type family") <+>
+    ctxt = text "In the equations for closed type family" <+>
            quotes (ppr tc)
 
 resultTypeMisMatch :: FieldLabelString -> DataCon -> DataCon -> SDoc
 resultTypeMisMatch field_name con1 con2
-  = vcat [sep [ptext (sLit "Constructors") <+> ppr con1 <+> ptext (sLit "and") <+> ppr con2,
-                ptext (sLit "have a common field") <+> quotes (ppr field_name) <> comma],
-          nest 2 $ ptext (sLit "but have different result types")]
+  = vcat [sep [text "Constructors" <+> ppr con1 <+> text "and" <+> ppr con2,
+                text "have a common field" <+> quotes (ppr field_name) <> comma],
+          nest 2 $ text "but have different result types"]
 
 fieldTypeMisMatch :: FieldLabelString -> DataCon -> DataCon -> SDoc
 fieldTypeMisMatch field_name con1 con2
-  = sep [ptext (sLit "Constructors") <+> ppr con1 <+> ptext (sLit "and") <+> ppr con2,
-         ptext (sLit "give different types for field"), quotes (ppr field_name)]
+  = sep [text "Constructors" <+> ppr con1 <+> text "and" <+> ppr con2,
+         text "give different types for field", quotes (ppr field_name)]
 
 dataConCtxtName :: [Located Name] -> SDoc
 dataConCtxtName [con]
-   = ptext (sLit "In the definition of data constructor") <+> quotes (ppr con)
+   = text "In the definition of data constructor" <+> quotes (ppr con)
 dataConCtxtName con
-   = ptext (sLit "In the definition of data constructors") <+> interpp'SP con
+   = text "In the definition of data constructors" <+> interpp'SP con
 
 dataConCtxt :: Outputable a => a -> SDoc
-dataConCtxt con = ptext (sLit "In the definition of data constructor") <+> quotes (ppr con)
+dataConCtxt con = text "In the definition of data constructor" <+> quotes (ppr con)
 
 classOpCtxt :: Var -> Type -> SDoc
-classOpCtxt sel_id tau = sep [ptext (sLit "When checking the class method:"),
+classOpCtxt sel_id tau = sep [text "When checking the class method:",
                               nest 2 (pprPrefixOcc sel_id <+> dcolon <+> ppr tau)]
 
 classArityErr :: Int -> Class -> SDoc
@@ -2470,32 +2469,32 @@ classArityErr n cls
     | otherwise = mkErr "Too many" "multi-parameter"
   where
     mkErr howMany allowWhat =
-        vcat [ptext (sLit $ howMany ++ " parameters for class") <+> quotes (ppr cls),
-              parens (ptext (sLit $ "Use MultiParamTypeClasses to allow "
+        vcat [text (howMany ++ " parameters for class") <+> quotes (ppr cls),
+              parens (text ("Use MultiParamTypeClasses to allow "
                                     ++ allowWhat ++ " classes"))]
 
 classFunDepsErr :: Class -> SDoc
 classFunDepsErr cls
-  = vcat [ptext (sLit "Fundeps in class") <+> quotes (ppr cls),
-          parens (ptext (sLit "Use FunctionalDependencies to allow fundeps"))]
+  = vcat [text "Fundeps in class" <+> quotes (ppr cls),
+          parens (text "Use FunctionalDependencies to allow fundeps")]
 
 badMethPred :: Id -> TcPredType -> SDoc
 badMethPred sel_id pred
-  = vcat [ hang (ptext (sLit "Constraint") <+> quotes (ppr pred)
-                 <+> ptext (sLit "in the type of") <+> quotes (ppr sel_id))
-              2 (ptext (sLit "constrains only the class type variables"))
-         , ptext (sLit "Use ConstrainedClassMethods to allow it") ]
+  = vcat [ hang (text "Constraint" <+> quotes (ppr pred)
+                 <+> text "in the type of" <+> quotes (ppr sel_id))
+              2 (text "constrains only the class type variables")
+         , text "Use ConstrainedClassMethods to allow it" ]
 
 noClassTyVarErr :: Class -> TyCon -> SDoc
 noClassTyVarErr clas fam_tc
-  = sep [ ptext (sLit "The associated type") <+> quotes (ppr fam_tc)
-        , ptext (sLit "mentions none of the type or kind variables of the class") <+>
+  = sep [ text "The associated type" <+> quotes (ppr fam_tc)
+        , text "mentions none of the type or kind variables of the class" <+>
                 quotes (ppr clas <+> hsep (map ppr (classTyVars clas)))]
 
 recSynErr :: [LTyClDecl Name] -> TcRn ()
 recSynErr syn_decls
   = setSrcSpan (getLoc (head sorted_decls)) $
-    addErr (sep [ptext (sLit "Cycle in type synonym declarations:"),
+    addErr (sep [text "Cycle in type synonym declarations:",
                  nest 2 (vcat (map ppr_decl sorted_decls))])
   where
     sorted_decls = sortLocated syn_decls
@@ -2503,55 +2502,55 @@ recSynErr syn_decls
 
 badDataConTyCon :: DataCon -> Type -> Type -> SDoc
 badDataConTyCon data_con res_ty_tmpl actual_res_ty
-  = hang (ptext (sLit "Data constructor") <+> quotes (ppr data_con) <+>
-                ptext (sLit "returns type") <+> quotes (ppr actual_res_ty))
-       2 (ptext (sLit "instead of an instance of its parent type") <+> quotes (ppr res_ty_tmpl))
+  = hang (text "Data constructor" <+> quotes (ppr data_con) <+>
+                text "returns type" <+> quotes (ppr actual_res_ty))
+       2 (text "instead of an instance of its parent type" <+> quotes (ppr res_ty_tmpl))
 
 badGadtDecl :: Name -> SDoc
 badGadtDecl tc_name
-  = vcat [ ptext (sLit "Illegal generalised algebraic data declaration for") <+> quotes (ppr tc_name)
-         , nest 2 (parens $ ptext (sLit "Use GADTs to allow GADTs")) ]
+  = vcat [ text "Illegal generalised algebraic data declaration for" <+> quotes (ppr tc_name)
+         , nest 2 (parens $ text "Use GADTs to allow GADTs") ]
 
 badExistential :: DataCon -> SDoc
 badExistential con
-  = hang (ptext (sLit "Data constructor") <+> quotes (ppr con) <+>
-                ptext (sLit "has existential type variables, a context, or a specialised result type"))
+  = hang (text "Data constructor" <+> quotes (ppr con) <+>
+                text "has existential type variables, a context, or a specialised result type")
        2 (vcat [ ppr con <+> dcolon <+> ppr (dataConUserType con)
-               , parens $ ptext (sLit "Use ExistentialQuantification or GADTs to allow this") ])
+               , parens $ text "Use ExistentialQuantification or GADTs to allow this" ])
 
 badStupidTheta :: Name -> SDoc
 badStupidTheta tc_name
-  = ptext (sLit "A data type declared in GADT style cannot have a context:") <+> quotes (ppr tc_name)
+  = text "A data type declared in GADT style cannot have a context:" <+> quotes (ppr tc_name)
 
 newtypeConError :: Name -> Int -> SDoc
 newtypeConError tycon n
-  = sep [ptext (sLit "A newtype must have exactly one constructor,"),
-         nest 2 $ ptext (sLit "but") <+> quotes (ppr tycon) <+> ptext (sLit "has") <+> speakN n ]
+  = sep [text "A newtype must have exactly one constructor,",
+         nest 2 $ text "but" <+> quotes (ppr tycon) <+> text "has" <+> speakN n ]
 
 newtypeStrictError :: DataCon -> SDoc
 newtypeStrictError con
-  = sep [ptext (sLit "A newtype constructor cannot have a strictness annotation,"),
-         nest 2 $ ptext (sLit "but") <+> quotes (ppr con) <+> ptext (sLit "does")]
+  = sep [text "A newtype constructor cannot have a strictness annotation,",
+         nest 2 $ text "but" <+> quotes (ppr con) <+> text "does"]
 
 newtypeFieldErr :: DataCon -> Int -> SDoc
 newtypeFieldErr con_name n_flds
-  = sep [ptext (sLit "The constructor of a newtype must have exactly one field"),
-         nest 2 $ ptext (sLit "but") <+> quotes (ppr con_name) <+> ptext (sLit "has") <+> speakN n_flds]
+  = sep [text "The constructor of a newtype must have exactly one field",
+         nest 2 $ text "but" <+> quotes (ppr con_name) <+> text "has" <+> speakN n_flds]
 
 badSigTyDecl :: Name -> SDoc
 badSigTyDecl tc_name
-  = vcat [ ptext (sLit "Illegal kind signature") <+>
+  = vcat [ text "Illegal kind signature" <+>
            quotes (ppr tc_name)
-         , nest 2 (parens $ ptext (sLit "Use KindSignatures to allow kind signatures")) ]
+         , nest 2 (parens $ text "Use KindSignatures to allow kind signatures") ]
 
 emptyConDeclsErr :: Name -> SDoc
 emptyConDeclsErr tycon
-  = sep [quotes (ppr tycon) <+> ptext (sLit "has no constructors"),
-         nest 2 $ ptext (sLit "(EmptyDataDecls permits this)")]
+  = sep [quotes (ppr tycon) <+> text "has no constructors",
+         nest 2 $ text "(EmptyDataDecls permits this)"]
 
 wrongKindOfFamily :: TyCon -> SDoc
 wrongKindOfFamily family
-  = ptext (sLit "Wrong category of family instance; declaration was for a")
+  = text "Wrong category of family instance; declaration was for a"
     <+> kindOfFamily
   where
     kindOfFamily | isTypeFamilyTyCon family = text "type family"
@@ -2560,45 +2559,45 @@ wrongKindOfFamily family
 
 wrongNumberOfParmsErr :: Arity -> SDoc
 wrongNumberOfParmsErr max_args
-  = ptext (sLit "Number of parameters must match family declaration; expected")
+  = text "Number of parameters must match family declaration; expected"
     <+> ppr max_args
 
 defaultAssocKindErr :: TyCon -> SDoc
 defaultAssocKindErr fam_tc
-  = ptext (sLit "Kind mis-match on LHS of default declaration for")
+  = text "Kind mis-match on LHS of default declaration for"
     <+> quotes (ppr fam_tc)
 
 wrongTyFamName :: Name -> Name -> SDoc
 wrongTyFamName fam_tc_name eqn_tc_name
-  = hang (ptext (sLit "Mismatched type name in type family instance."))
-       2 (vcat [ ptext (sLit "Expected:") <+> ppr fam_tc_name
-               , ptext (sLit "  Actual:") <+> ppr eqn_tc_name ])
+  = hang (text "Mismatched type name in type family instance.")
+       2 (vcat [ text "Expected:" <+> ppr fam_tc_name
+               , text "  Actual:" <+> ppr eqn_tc_name ])
 
 badRoleAnnot :: Name -> Role -> Role -> SDoc
 badRoleAnnot var annot inferred
-  = hang (ptext (sLit "Role mismatch on variable") <+> ppr var <> colon)
-       2 (sep [ ptext (sLit "Annotation says"), ppr annot
-              , ptext (sLit "but role"), ppr inferred
-              , ptext (sLit "is required") ])
+  = hang (text "Role mismatch on variable" <+> ppr var <> colon)
+       2 (sep [ text "Annotation says", ppr annot
+              , text "but role", ppr inferred
+              , text "is required" ])
 
 wrongNumberOfRoles :: [a] -> LRoleAnnotDecl Name -> SDoc
 wrongNumberOfRoles tyvars d@(L _ (RoleAnnotDecl _ annots))
-  = hang (ptext (sLit "Wrong number of roles listed in role annotation;") $$
-          ptext (sLit "Expected") <+> (ppr $ length tyvars) <> comma <+>
-          ptext (sLit "got") <+> (ppr $ length annots) <> colon)
+  = hang (text "Wrong number of roles listed in role annotation;" $$
+          text "Expected" <+> (ppr $ length tyvars) <> comma <+>
+          text "got" <+> (ppr $ length annots) <> colon)
        2 (ppr d)
 
 illegalRoleAnnotDecl :: LRoleAnnotDecl Name -> TcM ()
 illegalRoleAnnotDecl (L loc (RoleAnnotDecl tycon _))
   = setErrCtxt [] $
     setSrcSpan loc $
-    addErrTc (ptext (sLit "Illegal role annotation for") <+> ppr tycon <> char ';' $$
-              ptext (sLit "they are allowed only for datatypes and classes."))
+    addErrTc (text "Illegal role annotation for" <+> ppr tycon <> char ';' $$
+              text "they are allowed only for datatypes and classes.")
 
 needXRoleAnnotations :: TyCon -> SDoc
 needXRoleAnnotations tc
-  = ptext (sLit "Illegal role annotation for") <+> ppr tc <> char ';' $$
-    ptext (sLit "did you intend to use RoleAnnotations?")
+  = text "Illegal role annotation for" <+> ppr tc <> char ';' $$
+    text "did you intend to use RoleAnnotations?"
 
 incoherentRoles :: SDoc
 incoherentRoles = (text "Roles other than" <+> quotes (text "nominal") <+>
@@ -2611,8 +2610,8 @@ addTyConCtxt tc
   where
     name = getName tc
     flav = text (tyConFlavour tc)
-    ctxt = hsep [ ptext (sLit "In the"), flav
-                , ptext (sLit "declaration for"), quotes (ppr name) ]
+    ctxt = hsep [ text "In the", flav
+                , text "declaration for", quotes (ppr name) ]
 
 addRoleAnnotCtxt :: Name -> TcM a -> TcM a
 addRoleAnnotCtxt name

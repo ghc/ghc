@@ -59,7 +59,7 @@ pprCmms :: (Outputable info, Outputable g)
         => [GenCmmGroup CmmStatics info g] -> SDoc
 pprCmms cmms = pprCode CStyle (vcat (intersperse separator $ map ppr cmms))
         where
-          separator = space $$ ptext (sLit "-------------------") $$ space
+          separator = space $$ text "-------------------" $$ space
 
 writeCmms :: (Outputable info, Outputable g)
           => DynFlags -> Handle -> [GenCmmGroup CmmStatics info g] -> IO ()
@@ -96,7 +96,7 @@ pprTop :: (Outputable d, Outputable info, Outputable i)
 
 pprTop (CmmProc info lbl live graph)
 
-  = vcat [ ppr lbl <> lparen <> rparen <+> ptext (sLit "// ") <+> ppr live
+  = vcat [ ppr lbl <> lparen <> rparen <+> text "// " <+> ppr live
          , nest 8 $ lbrace <+> ppr info $$ rbrace
          , nest 4 $ ppr graph
          , rbrace ]
@@ -117,15 +117,15 @@ pprInfoTable :: CmmInfoTable -> SDoc
 pprInfoTable (CmmInfoTable { cit_lbl = lbl, cit_rep = rep
                            , cit_prof = prof_info
                            , cit_srt = _srt })
-  = vcat [ ptext (sLit "label:") <+> ppr lbl
-         , ptext (sLit "rep:") <> ppr rep
+  = vcat [ text "label:" <+> ppr lbl
+         , text "rep:" <> ppr rep
          , case prof_info of
              NoProfilingInfo -> empty
-             ProfilingInfo ct cd -> vcat [ ptext (sLit "type:") <+> pprWord8String ct
-                                         , ptext (sLit "desc: ") <> pprWord8String cd ] ]
+             ProfilingInfo ct cd -> vcat [ text "type:" <+> pprWord8String ct
+                                         , text "desc: " <> pprWord8String cd ] ]
 
 instance Outputable C_SRT where
-  ppr NoC_SRT = ptext (sLit "_no_srt_")
+  ppr NoC_SRT = text "_no_srt_"
   ppr (C_SRT label off bitmap)
       = parens (ppr label <> comma <> ppr off <> comma <> ppr bitmap)
 
@@ -146,7 +146,7 @@ pprStatics (Statics lbl ds) = vcat ((ppr lbl <> colon) : map ppr ds)
 
 pprStatic :: CmmStatic -> SDoc
 pprStatic s = case s of
-    CmmStaticLit lit   -> nest 4 $ ptext (sLit "const") <+> pprLit lit <> semi
+    CmmStaticLit lit   -> nest 4 $ text "const" <+> pprLit lit <> semi
     CmmUninitialised i -> nest 4 $ text "I8" <> brackets (int i)
     CmmString s'       -> nest 4 $ text "I8[]" <+> text (show s')
 
@@ -157,7 +157,7 @@ pprSection :: Section -> SDoc
 pprSection (Section t suffix) =
   section <+> doubleQuotes (pprSectionType t <+> char '.' <+> ppr suffix)
   where
-    section = ptext (sLit "section")
+    section = text "section"
 
 pprSectionType :: SectionType -> SDoc
 pprSectionType s = doubleQuotes (ptext t)

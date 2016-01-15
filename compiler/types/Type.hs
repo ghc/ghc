@@ -1087,8 +1087,8 @@ data RepType = UbxTupleRep [UnaryType] -- INVARIANT: never an empty list (see No
              | UnaryRep UnaryType
 
 instance Outputable RepType where
-  ppr (UbxTupleRep tys) = ptext (sLit "UbxTupleRep") <+> ppr tys
-  ppr (UnaryRep ty)     = ptext (sLit "UnaryRep")    <+> ppr ty
+  ppr (UbxTupleRep tys) = text "UbxTupleRep" <+> ppr tys
+  ppr (UnaryRep ty)     = text "UnaryRep"    <+> ppr ty
 
 flattenRepType :: RepType -> [UnaryType]
 flattenRepType (UbxTupleRep tys) = tys

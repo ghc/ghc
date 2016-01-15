@@ -534,7 +534,7 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 
   arg_cname n stg_ty
         | libffi    = char '*' <> parens (stg_ty <> char '*') <>
-                      ptext (sLit "args") <> brackets (int (n-1))
+                      text "args" <> brackets (int (n-1))
         | otherwise = text ('a':show n)
 
   -- generate a libffi-style stub if this is a "wrapper" and libffi is enabled
@@ -580,7 +580,7 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
   -- Now we can cook up the prototype for the exported function.
   pprCconv = ccallConvAttribute cc
 
-  header_bits = ptext (sLit "extern") <+> fun_proto <> semi
+  header_bits = text "extern" <+> fun_proto <> semi
 
   fun_args
     | null aug_arg_info = text "void"
@@ -589,8 +589,8 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 
   fun_proto
     | libffi
-      = ptext (sLit "void") <+> ftext c_nm <>
-          parens (ptext (sLit "void *cif STG_UNUSED, void* resp, void** args, void* the_stableptr"))
+      = text "void" <+> ftext c_nm <>
+          parens (text "void *cif STG_UNUSED, void* resp, void** args, void* the_stableptr")
     | otherwise
       = cResType <+> pprCconv <+> ftext c_nm <> parens fun_args
 
@@ -633,14 +633,14 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
     fun_proto  $$
     vcat
      [ lbrace
-     ,   ptext (sLit "Capability *cap;")
+     ,   text "Capability *cap;"
      ,   declareResult
      ,   declareCResult
      ,   text "cap = rts_lock();"
           -- create the application + perform it.
-     ,   ptext (sLit "rts_evalIO") <> parens (
+     ,   text "rts_evalIO" <> parens (
                 char '&' <> cap <>
-                ptext (sLit "rts_apply") <> parens (
+                text "rts_apply" <> parens (
                     cap <>
                     text "(HaskellObj)"
                  <> ptext (if is_IO_res_ty
@@ -651,15 +651,15 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
                 ) <+> comma
                <> text "&ret"
              ) <> semi
-     ,   ptext (sLit "rts_checkSchedStatus") <> parens (doubleQuotes (ftext c_nm)
+     ,   text "rts_checkSchedStatus" <> parens (doubleQuotes (ftext c_nm)
                                                 <> comma <> text "cap") <> semi
      ,   assignCResult
-     ,   ptext (sLit "rts_unlock(cap);")
+     ,   text "rts_unlock(cap);"
      ,   ppUnless res_hty_is_unit $
          if libffi
                   then char '*' <> parens (ffi_cResType <> char '*') <>
-                       ptext (sLit "resp = cret;")
-                  else ptext (sLit "return cret;")
+                       text "resp = cret;"
+                  else text "return cret;"
      , rbrace
      ]
 
@@ -720,7 +720,7 @@ toCType = f False
               = f voidOK t'
            -- Otherwise we don't know the C type. If we are allowing
            -- void then return that; otherwise something has gone wrong.
-           | voidOK = (Nothing, ptext (sLit "void"))
+           | voidOK = (Nothing, text "void")
            | otherwise
               = pprPanic "toCType" (ppr t)
 

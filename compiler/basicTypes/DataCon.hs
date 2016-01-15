@@ -630,10 +630,10 @@ instance Outputable HsSrcBang where
     ppr (HsSrcBang _ prag mark) = ppr prag <+> ppr mark
 
 instance Outputable HsImplBang where
-    ppr HsLazy                  = ptext (sLit "Lazy")
-    ppr (HsUnpack Nothing)      = ptext (sLit "Unpacked")
-    ppr (HsUnpack (Just co))    = ptext (sLit "Unpacked") <> parens (ppr co)
-    ppr HsStrict                = ptext (sLit "StrictNotUnpacked")
+    ppr HsLazy                  = text "Lazy"
+    ppr (HsUnpack Nothing)      = text "Unpacked"
+    ppr (HsUnpack (Just co))    = text "Unpacked" <> parens (ppr co)
+    ppr HsStrict                = text "StrictNotUnpacked"
 
 instance Outputable SrcStrictness where
     ppr SrcLazy     = char '~'
@@ -641,12 +641,12 @@ instance Outputable SrcStrictness where
     ppr NoSrcStrict = empty
 
 instance Outputable SrcUnpackedness where
-    ppr SrcUnpack   = ptext (sLit "{-# UNPACK #-}")
-    ppr SrcNoUnpack = ptext (sLit "{-# NOUNPACK #-}")
+    ppr SrcUnpack   = text "{-# UNPACK #-}"
+    ppr SrcNoUnpack = text "{-# NOUNPACK #-}"
     ppr NoSrcUnpack = empty
 
 instance Outputable StrictnessMark where
-    ppr MarkedStrict    = ptext (sLit "!")
+    ppr MarkedStrict    = text "!"
     ppr NotMarkedStrict = empty
 
 instance Binary SrcStrictness where
@@ -1042,7 +1042,7 @@ dataConInstArgTys :: DataCon    -- ^ A datacon with no existentials or equality 
 dataConInstArgTys dc@(MkData {dcUnivTyVars = univ_tvs,
                               dcExTyVars = ex_tvs}) inst_tys
  = ASSERT2( length univ_tvs == length inst_tys
-          , ptext (sLit "dataConInstArgTys") <+> ppr dc $$ ppr univ_tvs $$ ppr inst_tys)
+          , text "dataConInstArgTys" <+> ppr dc $$ ppr univ_tvs $$ ppr inst_tys)
    ASSERT2( null ex_tvs, ppr dc )
    map (substTyWith univ_tvs inst_tys) (dataConRepArgTys dc)
 
@@ -1059,7 +1059,7 @@ dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
                                   dcUnivTyVars = univ_tvs,
                                   dcExTyVars = ex_tvs}) inst_tys
   = ASSERT2( length tyvars == length inst_tys
-          , ptext (sLit "dataConInstOrigArgTys") <+> ppr dc $$ ppr tyvars $$ ppr inst_tys )
+          , text "dataConInstOrigArgTys" <+> ppr dc $$ ppr tyvars $$ ppr inst_tys )
     map (substTyWith tyvars inst_tys) arg_tys
   where
     tyvars = univ_tvs ++ ex_tvs

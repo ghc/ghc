@@ -281,12 +281,12 @@ match_fun_tys swap_tys herald ct_orig arity orig_ty orig_old_args full_arity
     mk_msg full_ty ty n_args
       = herald <+> speakNOf full_arity (text "argument") <> comma $$
         if n_args == full_arity
-          then ptext (sLit "its type is") <+> quotes (pprType full_ty) <>
+          then text "its type is" <+> quotes (pprType full_ty) <>
                comma $$
-               ptext (sLit "it is specialized to") <+> quotes (pprType ty)
-          else sep [ptext (sLit "but its type") <+> quotes (pprType ty),
-                    if n_args == 0 then ptext (sLit "has none")
-                    else ptext (sLit "has only") <+> speakN n_args]
+               text "it is specialized to" <+> quotes (pprType ty)
+          else sep [text "but its type" <+> quotes (pprType ty),
+                    if n_args == 0 then text "has none"
+                    else text "has only" <+> speakN n_args]
 
 ----------------------
 matchExpectedListTy :: TcRhoType -> TcM (TcCoercionN, TcRhoType)
@@ -539,9 +539,9 @@ addSubTypeCtxt ty_actual ty_expected thing_inside
     mk_msg tidy_env
       = do { (tidy_env, ty_actual)   <- zonkTidyTcType tidy_env ty_actual
            ; (tidy_env, ty_expected) <- zonkTidyTcType tidy_env ty_expected
-           ; let msg = vcat [ hang (ptext (sLit "When checking that:"))
+           ; let msg = vcat [ hang (text "When checking that:")
                                  4 (ppr ty_actual)
-                            , nest 2 (hang (ptext (sLit "is more polymorphic than:"))
+                            , nest 2 (hang (text "is more polymorphic than:")
                                          2 (ppr ty_expected)) ]
            ; return (tidy_env, msg) }
 
@@ -922,8 +922,8 @@ unifyTheta :: TcThetaType -> TcThetaType -> TcM [TcCoercion]
 -- Actual and expected types
 unifyTheta theta1 theta2
   = do  { checkTc (equalLength theta1 theta2)
-                  (vcat [ptext (sLit "Contexts differ in length"),
-                         nest 2 $ parens $ ptext (sLit "Use RelaxedPolyRec to allow this")])
+                  (vcat [text "Contexts differ in length",
+                         nest 2 $ parens $ text "Use RelaxedPolyRec to allow this"])
         ; zipWithM unifyPred theta1 theta2 }
 
 {-
