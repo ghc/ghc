@@ -20,8 +20,8 @@ module Base (
     bootPackageConstraints, packageDependencies,
 
     -- * Output
-    putColoured, putOracle, putBuild, putSuccess, putError, renderAction,
-    renderLibrary, renderProgram,
+    putColoured, putOracle, putBuild, putBuildInfo, putSuccess, putError,
+    renderAction, renderLibrary, renderProgram,
 
     -- * Miscellaneous utilities
     bimap, minusOrd, intersectOrd, replaceEq, quote, replaceSeparators,
@@ -129,9 +129,12 @@ putOracle = putColoured Blue
 
 -- | Make build output more distinguishable
 putBuild :: String -> Action ()
-putBuild = if buildInfo /= None
-    then putColoured White
-    else const (pure ())
+putBuild = putColoured White
+
+-- | Switch for @putBuild@ filtered through @buildInfo@
+putBuildInfo :: String -> Action ()
+putBuildInfo s | buildInfo /= None = putBuild s
+putBuildInfo _                     = pure ()
 
 -- | A more colourful version of success message
 putSuccess :: String -> Action ()
