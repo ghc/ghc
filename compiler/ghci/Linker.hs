@@ -846,6 +846,8 @@ dynLoadObjs _       pls []   = return pls
 dynLoadObjs hsc_env pls objs = do
     let dflags = hsc_dflags hsc_env
     let platform = targetPlatform dflags
+    let minus_ls = [ lib | Option ('-':'l':lib) <- ldInputs dflags ]
+    let minus_big_ls = [ lib | Option ('-':'L':lib) <- ldInputs dflags ]
     (soFile, libPath , libName) <- newTempLibName dflags (soExt platform)
     let
         dflags2 = dflags {
@@ -863,7 +865,17 @@ dynLoadObjs hsc_env pls objs = do
                                  , Option ("-Wl," ++ lp)
                                  , Option ("-l" ++  l)
                                  ])
-                            (temp_sos pls),
+                            (temp_sos pls)
+                        ++ concatMap
+                             (\lp ->
+                                 [ Option ("-L" ++ lp)
+                                 , Option ("-Wl,-rpath")
+                                 , Option ("-Wl," ++ lp)
+                                 ])
+                             minus_big_ls
+                        ++ map (\l -> Option ("-l" ++ l)) minus_ls,
+                      -- Add -l options and -L options from dflags.
+                      --
                       -- When running TH for a non-dynamic way, we still
                       -- need to make -l flags to link against the dynamic
                       -- libraries, so we need to add WayDyn to ways.
