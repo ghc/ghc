@@ -1028,7 +1028,7 @@ See Trac #3731, #4809, #5751, #5913, #6117, #6161, which all
 describe somewhat more complicated situations, but ones
 encountered in practice.
 
-See also tests tcrun020, tcrun021, tcrun033
+See also tests tcrun020, tcrun021, tcrun033, and Trac #11427.
 
 ----- THE PROBLEM --------
 The problem is that it is all too easy to create a class whose
