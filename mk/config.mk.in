@@ -775,8 +775,8 @@ BZIP2_CMD      = bzip2
 GZIP_CMD       = gzip
 XZ_CMD         = xz -9e
 
-# bzip2 is default compression
-TAR_COMP      = bzip2
+# xz is default compression
+TAR_COMP      = xz
 
 # select compression command and .tar extension based on TAR_COMP value
 ifeq "$(TAR_COMP)" "bzip2"
