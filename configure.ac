@@ -1103,27 +1103,38 @@ if test -e shake-build/cfg/system.config.in; then
     AC_CONFIG_FILES([shake-build/cfg/system.config])
 fi
 
-AC_CONFIG_FILES([mk/config.mk mk/install.mk mk/project.mk compiler/ghc.cabal ghc/ghc-bin.cabal utils/runghc/runghc.cabal libraries/ghc-boot/ghc-boot.cabal libraries/ghci/ghci.cabal settings docs/users_guide/ghc_config.py docs/index.html libraries/prologue.txt distrib/configure.ac])
-AC_OUTPUT
-
 # We got caught by
 #     http://savannah.gnu.org/bugs/index.php?1516
 #     $(eval ...) inside conditionals causes errors
 # with make 3.80, so warn the user if it looks like they're about to
 # try to use it.
 # We would use "grep -q" here, but Solaris's grep doesn't support it.
+print_make_warning=""
 checkMake380() {
-    if $1 --version 2>&1 | head -1 | grep 'GNU Make 3\.80' > /dev/null
+    make_ver=`$1 --version 2>&1 | head -1`
+    if echo "$make_ver" | grep 'GNU Make 3\.80' > /dev/null
     then
-        echo
-        echo "WARNING: It looks like \"$1\" is GNU make 3.80."
-        echo "This version cannot be used to build GHC."
-        echo "Please use GNU make >= 3.81."
+        print_make_warning="true"
+    fi
+    if echo "$make_ver" | grep 'GNU Make' > /dev/null
+    then
+        MakeCmd=$1
+        AC_SUBST(MakeCmd)
     fi
 }
 
 checkMake380 make
 checkMake380 gmake
+
+AC_CONFIG_FILES([mk/config.mk mk/install.mk mk/project.mk compiler/ghc.cabal ghc/ghc-bin.cabal utils/runghc/runghc.cabal libraries/ghc-boot/ghc-boot.cabal libraries/ghci/ghci.cabal settings docs/users_guide/ghc_config.py docs/index.html libraries/prologue.txt distrib/configure.ac])
+AC_OUTPUT
+
+if test "$print_make_warning" = "true"; then
+   echo
+   echo "WARNING: It looks like \"$MakeCmd\" is GNU make 3.80."
+   echo "This version cannot be used to build GHC."
+   echo "Please use GNU make >= 3.81."
+fi
 
 echo ["
 ----------------------------------------------------------------------
