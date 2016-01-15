@@ -74,7 +74,6 @@ import LoadIface
 import PrelNames
 import TysWiredIn
 import Id
-import IdInfo( IdDetails(VanillaId) )
 import Var
 import VarSet
 import RdrName
@@ -871,9 +870,9 @@ newGlobalBinder.
 newFamInstTyConName :: Located Name -> [Type] -> TcM Name
 newFamInstTyConName (L loc name) tys = mk_fam_inst_name id loc name [tys]
 
-newFamInstAxiomName :: SrcSpan -> Name -> [CoAxBranch] -> TcM Name
-newFamInstAxiomName loc name branches
-  = mk_fam_inst_name mkInstTyCoOcc loc name (map coAxBranchLHS branches)
+newFamInstAxiomName :: Located Name -> [[Type]] -> TcM Name
+newFamInstAxiomName (L loc name) branches
+  = mk_fam_inst_name mkInstTyCoOcc loc name branches
 
 mk_fam_inst_name :: (OccName -> OccName) -> SrcSpan -> Name -> [[Type]] -> TcM Name
 mk_fam_inst_name adaptOcc loc tc_name tyss
@@ -901,7 +900,7 @@ mkStableIdFromString str sig_ty loc occ_wrapper = do
     name <- mkWrapperName "stable" str
     let occ = mkVarOccFS name :: OccName
         gnm = mkExternalName uniq mod (occ_wrapper occ) loc :: Name
-        id  = mkExportedLocalId VanillaId gnm sig_ty :: Id
+        id  = mkExportedVanillaId gnm sig_ty :: Id
     return id
 
 mkStableIdFromName :: Name -> Type -> SrcSpan -> (OccName -> OccName) -> TcM TcId

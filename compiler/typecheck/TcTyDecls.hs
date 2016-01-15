@@ -878,7 +878,7 @@ mkDefaultMethodIds :: [TyCon] -> [Id]
 -- the filled-in default methods of each instance declaration
 -- See Note [Default method Ids and Template Haskell]
 mkDefaultMethodIds tycons
-  = [ mkExportedLocalId VanillaId dm_name (mk_dm_ty cls sel_id dm_spec)
+  = [ mkExportedVanillaId dm_name (mk_dm_ty cls sel_id dm_spec)
     | tc <- tycons
     , Just cls <- [tyConClass_maybe tc]
     , (sel_id, Just (dm_name, dm_spec)) <- classOpItems cls ]

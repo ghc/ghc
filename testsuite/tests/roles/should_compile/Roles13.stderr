@@ -14,7 +14,7 @@ a1 = GHC.Types.TrNameS "Roles13"#
 
 -- RHS size: {terms: 3, types: 0, coercions: 0}
 Roles13.$trModule :: GHC.Types.Module
-[GblId[ReflectionId], Caf=NoCafRefs, Str=DmdType]
+[GblId, Caf=NoCafRefs, Str=DmdType]
 Roles13.$trModule = GHC.Types.Module a a1
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
@@ -24,8 +24,10 @@ a2 = GHC.Types.TrNameS "'MkAge"#
 
 -- RHS size: {terms: 5, types: 0, coercions: 0}
 Roles13.$tc'MkAge :: GHC.Types.TyCon
-[GblId[ReflectionId], Caf=NoCafRefs, Str=DmdType]
-Roles13.$tc'MkAge = GHC.Types.TyCon 0## 0## Roles13.$trModule a2
+[GblId, Caf=NoCafRefs, Str=DmdType]
+Roles13.$tc'MkAge =
+  GHC.Types.TyCon
+    1226019810264079099## 12180888342844277416## Roles13.$trModule a2
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
 a3 :: GHC.Types.TrName
@@ -34,8 +36,10 @@ a3 = GHC.Types.TrNameS "Age"#
 
 -- RHS size: {terms: 5, types: 0, coercions: 0}
 Roles13.$tcAge :: GHC.Types.TyCon
-[GblId[ReflectionId], Caf=NoCafRefs, Str=DmdType]
-Roles13.$tcAge = GHC.Types.TyCon 0## 0## Roles13.$trModule a3
+[GblId, Caf=NoCafRefs, Str=DmdType]
+Roles13.$tcAge =
+  GHC.Types.TyCon
+    18304088376370610314## 1954648846714895105## Roles13.$trModule a3
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
 a4 :: GHC.Types.TrName
@@ -44,8 +48,10 @@ a4 = GHC.Types.TrNameS "'MkWrap"#
 
 -- RHS size: {terms: 5, types: 0, coercions: 0}
 Roles13.$tc'MkWrap :: GHC.Types.TyCon
-[GblId[ReflectionId], Caf=NoCafRefs, Str=DmdType]
-Roles13.$tc'MkWrap = GHC.Types.TyCon 0## 0## Roles13.$trModule a4
+[GblId, Caf=NoCafRefs, Str=DmdType]
+Roles13.$tc'MkWrap =
+  GHC.Types.TyCon
+    12402878715225676312## 13345418993613492500## Roles13.$trModule a4
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
 a5 :: GHC.Types.TrName
@@ -54,8 +60,10 @@ a5 = GHC.Types.TrNameS "Wrap"#
 
 -- RHS size: {terms: 5, types: 0, coercions: 0}
 Roles13.$tcWrap :: GHC.Types.TyCon
-[GblId[ReflectionId], Caf=NoCafRefs, Str=DmdType]
-Roles13.$tcWrap = GHC.Types.TyCon 0## 0## Roles13.$trModule a5
+[GblId, Caf=NoCafRefs, Str=DmdType]
+Roles13.$tcWrap =
+  GHC.Types.TyCon
+    5278920226786541118## 14554440859491798587## Roles13.$trModule a5
 
 -- RHS size: {terms: 2, types: 2, coercions: 0}
 a6 :: Wrap Age -> Wrap Age
@@ -67,7 +75,7 @@ convert :: Wrap Age -> Int
 [GblId, Arity=1, Caf=NoCafRefs, Str=DmdType]
 convert =
   a6
-  `cast` (<Wrap Age>_R -> Roles13.NTCo:Wrap[0] Roles13.NTCo:Age[0]
+  `cast` (<Wrap Age>_R -> Roles13.N:Wrap[0] Roles13.N:Age[0]
           :: (Wrap Age -> Wrap Age) ~R# (Wrap Age -> Int))
 
 

@@ -14,7 +14,6 @@ import TcEnv
 import TcRnMonad
 import PrelNames( gHC_TYPES, trModuleDataConName, trTyConDataConName, trNameSDataConName )
 import Id
-import IdInfo( IdDetails(..) )
 import Type
 import TyCon
 import DataCon
@@ -113,8 +112,8 @@ mkModIdBindings
        ; tr_mod_dc  <- tcLookupDataCon trModuleDataConName
        ; tr_name_dc <- tcLookupDataCon trNameSDataConName
        ; mod_nm     <- newGlobalBinder mod (mkVarOcc "$trModule") loc
-       ; let mod_id   = mkExportedLocalId ReflectionId mod_nm
-                                          (mkTyConApp (dataConTyCon tr_mod_dc) [])
+       ; let mod_ty   = mkTyConApp (dataConTyCon tr_mod_dc) []
+             mod_id   = mkExportedVanillaId mod_nm mod_ty
              mod_bind = mkVarBind mod_id mod_rhs
              mod_rhs  = nlHsApps (dataConWrapId tr_mod_dc)
                            [ trNameLit tr_name_dc (unitIdFS (moduleUnitId mod))
@@ -178,7 +177,7 @@ mkTyConRepBinds (dflags, mod_expr, pkg_str, mod_str, tr_datacon, trn_datacon) ty
   = case tyConRepName_maybe tycon of
       Just rep_name -> unitBag (mkVarBind rep_id rep_rhs)
          where
-           rep_id  = mkExportedLocalId ReflectionId rep_name (mkTyConApp tr_tycon [])
+           rep_id  = mkExportedVanillaId rep_name (mkTyConApp tr_tycon [])
       _ -> emptyBag
   where
     tr_tycon = dataConTyCon tr_datacon

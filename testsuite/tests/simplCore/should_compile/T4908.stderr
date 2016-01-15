@@ -22,7 +22,7 @@ T4908.$trModule1 = GHC.Types.TrNameS "T4908"#
 
 -- RHS size: {terms: 3, types: 0, coercions: 0}
 T4908.$trModule :: Module
-[GblId[ReflectionId],
+[GblId,
  Caf=NoCafRefs,
  Str=DmdType m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,

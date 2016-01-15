@@ -2,6 +2,7 @@
 T8958.hs:1:31: warning:
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 TYPE SIGNATURES
+  T8958.MkMap :: forall k v. [(k, v)] -> Map k v
 TYPE CONSTRUCTORS
   type role Map nominal representational
   newtype (Nominal k, Representational v) => Map k v = MkMap [(k, v)]
@@ -10,35 +11,52 @@ TYPE CONSTRUCTORS
   type role Representational representational
   class Representational a
 COERCION AXIOMS
-  axiom T8958.NTCo:Map ::
-    Map k v = [(k, v)] -- Defined at T8958.hs:13:1
+  axiom T8958.N:Map :: Map k v = [(k, v)] -- Defined at T8958.hs:13:1
 INSTANCES
   instance [incoherent] Nominal a -- Defined at T8958.hs:7:10
   instance [incoherent] Representational a
     -- Defined at T8958.hs:10:10
 Dependent modules: []
 Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,
-                     integer-gmp-1.0.0.0]
+                     integer-gmp-1.0.0.1]
 
 ==================== Typechecker ====================
 T8958.$tcMap
   = GHC.Types.TyCon
-      0## 0## T8958.$trModule (GHC.Types.TrNameS "Map"#)
+      11173210732975605893##
+      6338753504925142034##
+      T8958.$trModule
+      (GHC.Types.TrNameS "Map"#)
 T8958.$tc'MkMap
   = GHC.Types.TyCon
-      0## 0## T8958.$trModule (GHC.Types.TrNameS "'MkMap"#)
+      10702411725744601909##
+      8660532495248702786##
+      T8958.$trModule
+      (GHC.Types.TrNameS "'MkMap"#)
 T8958.$tcRepresentational
   = GHC.Types.TyCon
-      0## 0## T8958.$trModule (GHC.Types.TrNameS "Representational"#)
-T8958.$tc'D:Representational
+      17939208465687456137##
+      86959701938445380##
+      T8958.$trModule
+      (GHC.Types.TrNameS "Representational"#)
+T8958.$tc'C:Representational
   = GHC.Types.TyCon
-      0## 0## T8958.$trModule (GHC.Types.TrNameS "'D:Representational"#)
+      6623579006299218188##
+      18041743345929230411##
+      T8958.$trModule
+      (GHC.Types.TrNameS "'C:Representational"#)
 T8958.$tcNominal
   = GHC.Types.TyCon
-      0## 0## T8958.$trModule (GHC.Types.TrNameS "Nominal"#)
-T8958.$tc'D:Nominal
+      5048799062136959048##
+      4899664595355811926##
+      T8958.$trModule
+      (GHC.Types.TrNameS "Nominal"#)
+T8958.$tc'C:Nominal
   = GHC.Types.TyCon
-      0## 0## T8958.$trModule (GHC.Types.TrNameS "'D:Nominal"#)
+      13167926310643805202##
+      1726092271306256063##
+      T8958.$trModule
+      (GHC.Types.TrNameS "'C:Nominal"#)
 T8958.$trModule
   = GHC.Types.Module
       (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "T8958"#)
@@ -49,7 +67,7 @@ AbsBinds [a] []
    Exported types: T8958.$fRepresentationala
                      :: forall a. Representational a
                    [LclIdX[DFunId], Str=DmdType]
-   Binds: $dRepresentational = T8958.D:Representational
+   Binds: $dRepresentational = T8958.C:Representational
    Evidence: [EvBinds{}]}
 AbsBinds [a] []
   {Exports: [T8958.$fNominala <= $dNominal
@@ -57,5 +75,6 @@ AbsBinds [a] []
                <>]
    Exported types: T8958.$fNominala :: forall a. Nominal a
                    [LclIdX[DFunId], Str=DmdType]
-   Binds: $dNominal = T8958.D:Nominal
+   Binds: $dNominal = T8958.C:Nominal
    Evidence: [EvBinds{}]}
+

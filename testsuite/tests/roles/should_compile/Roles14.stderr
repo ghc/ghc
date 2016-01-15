@@ -1,22 +1,29 @@
 TYPE SIGNATURES
+  meth2 :: forall a. C2 a => a -> a
 TYPE CONSTRUCTORS
   type role C2 representational
   class C2 a where
     meth2 :: a -> a
     {-# MINIMAL meth2 #-}
 COERCION AXIOMS
-  axiom Roles12.NTCo:C2 :: C2 a = a -> a -- Defined at Roles14.hs:6:1
+  axiom Roles12.N:C2 :: C2 a = a -> a -- Defined at Roles14.hs:6:1
 Dependent modules: []
 Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,
-                     integer-gmp-1.0.0.0]
+                     integer-gmp-1.0.0.1]
 
 ==================== Typechecker ====================
 Roles12.$tcC2
   = GHC.Types.TyCon
-      0## 0## Roles12.$trModule (GHC.Types.TrNameS "C2"#)
-Roles12.$tc'D:C2
+      4006088231579841122##
+      4783761708993822739##
+      Roles12.$trModule
+      (GHC.Types.TrNameS "C2"#)
+Roles12.$tc'C:C2
   = GHC.Types.TyCon
-      0## 0## Roles12.$trModule (GHC.Types.TrNameS "'D:C2"#)
+      5555822832309788726##
+      2795860317217328413##
+      Roles12.$trModule
+      (GHC.Types.TrNameS "'C:C2"#)
 Roles12.$trModule
   = GHC.Types.Module
       (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "Roles12"#)

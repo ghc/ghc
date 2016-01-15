@@ -1,4 +1,11 @@
 TYPE SIGNATURES
+  Roles1.K1 :: forall a. a -> T1 a
+  Roles1.K2 :: forall a. a -> T2 a
+  Roles1.K3 :: forall k (a :: k). T3 a
+  Roles1.K4 :: forall (a :: * -> *) b. a b -> T4 a b
+  Roles1.K5 :: forall a. a -> T5 a
+  Roles1.K6 :: forall k (a :: k). T6 a
+  Roles1.K7 :: forall k (a :: k) b. b -> T7 a b
 TYPE CONSTRUCTORS
   type role T1 nominal
   data T1 a = K1 a
@@ -22,7 +29,7 @@ TYPE CONSTRUCTORS
 COERCION AXIOMS
 Dependent modules: []
 Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,
-                     integer-gmp-1.0.0.0]
+                     integer-gmp-1.0.0.1]
 
 ==================== Typechecker ====================
 Roles1.$tcT7

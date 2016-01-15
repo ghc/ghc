@@ -41,7 +41,7 @@ T7360.$trModule1 = GHC.Types.TrNameS "T7360"#
 
 -- RHS size: {terms: 3, types: 0, coercions: 0}
 T7360.$trModule :: GHC.Types.Module
-[GblId[ReflectionId],
+[GblId,
  Caf=NoCafRefs,
  Str=DmdType m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
@@ -60,7 +60,7 @@ T7360.$tc'Foo6 = GHC.Types.TrNameS "'Foo3"#
 
 -- RHS size: {terms: 5, types: 0, coercions: 0}
 T7360.$tc'Foo3 :: GHC.Types.TyCon
-[GblId[ReflectionId],
+[GblId,
  Caf=NoCafRefs,
  Str=DmdType m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
@@ -83,7 +83,7 @@ T7360.$tc'Foo5 = GHC.Types.TrNameS "'Foo2"#
 
 -- RHS size: {terms: 5, types: 0, coercions: 0}
 T7360.$tc'Foo2 :: GHC.Types.TyCon
-[GblId[ReflectionId],
+[GblId,
  Caf=NoCafRefs,
  Str=DmdType m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
@@ -106,7 +106,7 @@ T7360.$tc'Foo4 = GHC.Types.TrNameS "'Foo1"#
 
 -- RHS size: {terms: 5, types: 0, coercions: 0}
 T7360.$tc'Foo1 :: GHC.Types.TyCon
-[GblId[ReflectionId],
+[GblId,
  Caf=NoCafRefs,
  Str=DmdType m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
@@ -129,7 +129,7 @@ T7360.$tcFoo1 = GHC.Types.TrNameS "Foo"#
 
 -- RHS size: {terms: 5, types: 0, coercions: 0}
 T7360.$tcFoo :: GHC.Types.TyCon
-[GblId[ReflectionId],
+[GblId,
  Caf=NoCafRefs,
  Str=DmdType m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,

@@ -32,7 +32,7 @@ module Id (
         mkGlobalId, mkVanillaGlobal, mkVanillaGlobalWithInfo,
         mkLocalId, mkLocalCoVar, mkLocalIdOrCoVar,
         mkLocalIdOrCoVarWithInfo,
-        mkLocalIdWithInfo, mkExportedLocalId,
+        mkLocalIdWithInfo, mkExportedLocalId, mkExportedVanillaId,
         mkSysLocal, mkSysLocalM, mkSysLocalOrCoVar, mkSysLocalOrCoVarM,
         mkUserLocal, mkUserLocalCoVar, mkUserLocalOrCoVar,
         mkDerivedLocalCoVarM,
@@ -286,6 +286,10 @@ mkLocalIdWithInfo name ty info = Var.mkLocalVar VanillaId name ty info
 -- See Note [Exported LocalIds]
 mkExportedLocalId :: IdDetails -> Name -> Type -> Id
 mkExportedLocalId details name ty = Var.mkExportedLocalVar details name ty vanillaIdInfo
+        -- Note [Free type variables]
+
+mkExportedVanillaId :: Name -> Type -> Id
+mkExportedVanillaId name ty = Var.mkExportedLocalVar VanillaId name ty vanillaIdInfo
         -- Note [Free type variables]
 
 

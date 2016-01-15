@@ -1648,11 +1648,6 @@ toIfaceIdDetails (RecSelId { sel_naughty = n
                 RecSelPatSyn pat_syn -> Right (patSynToIfaceDecl pat_syn)
   in IfRecSelId iface n
 
-  -- Currently we don't persist these three "advisory" IdInfos
-  -- through interface files.  We easily could if it mattered
-toIfaceIdDetails PatSynId     = IfVanillaId
-toIfaceIdDetails ReflectionId = IfVanillaId
-
   -- The remaining cases are all "implicit Ids" which don't
   -- appear in interface files at all
 toIfaceIdDetails other = pprTrace "toIfaceIdDetails" (ppr other)
