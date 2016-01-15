@@ -56,9 +56,11 @@ module TcRnTypes(
         ArrowCtxt(..),
 
         -- TcSigInfo
-        TcSigInfo(..), TcIdSigInfo(..), TcPatSynInfo(..), TcIdSigBndr(..),
+        TcSigFun, TcSigInfo(..), TcIdSigInfo(..),
+        TcPatSynInfo(..), TcIdSigBndr(..),
         findScopedTyVars, isPartialSig, noCompleteSig, tcSigInfoName,
-        completeIdSigPolyId, completeSigPolyId_maybe, completeIdSigPolyId_maybe,
+        completeIdSigPolyId, completeSigPolyId_maybe,
+        completeIdSigPolyId_maybe,
 
         -- Canonical constraints
         Xi, Ct(..), Cts, emptyCts, andCts, andManyCts, pprCts,
@@ -1132,6 +1134,8 @@ instance Outputable WhereFrom where
                 Type signatures
 *                                                                      *
 ********************************************************************* -}
+
+type TcSigFun  = Name -> Maybe TcSigInfo
 
 data TcSigInfo = TcIdSig     TcIdSigInfo
                | TcPatSynSig TcPatSynInfo

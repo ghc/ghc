@@ -619,7 +619,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
           let tycon = dataConTyCon data_con in
           (mkTyConApp tycon in_inst_tys, mkFamilyTyConApp tycon out_inst_tys)
         PatSynCon pat_syn ->
-          (patSynInstResTy pat_syn in_inst_tys
+          ( patSynInstResTy pat_syn in_inst_tys
           , patSynInstResTy pat_syn out_inst_tys)
     mk_alt upd_fld_env con
       = do { let (univ_tvs, ex_tvs, eq_spec,
@@ -641,8 +641,8 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                  inst_con = noLoc $ HsWrap wrap (HsVar (noLoc wrap_id))
                         -- Reconstruct with the WrapId so that unpacking happens
                  -- The order here is because of the order in `TcPatSyn`.
-                 wrap = dict_req_wrap                                           <.>
-                        mkWpEvVarApps theta_vars                                <.>
+                 wrap = mkWpEvVarApps theta_vars                                <.>
+                        dict_req_wrap                                           <.>
                         mkWpTyApps    (mkTyVarTys ex_tvs)                       <.>
                         mkWpTyApps    [ ty
                                       | (tv, ty) <- univ_tvs `zip` out_inst_tys

@@ -568,6 +568,8 @@ mkSigTvFn sigs
       = add_scoped_tvs names (hsScopedTvs sig_ty) env
     add_scoped_sig (L _ (TypeSig names sig_ty)) env
       = add_scoped_tvs names (hsWcScopedTvs sig_ty) env
+    add_scoped_sig (L _ (PatSynSig name sig_ty)) env
+      = add_scoped_tvs [name] (hsScopedTvs sig_ty) env
     add_scoped_sig _ env = env
 
     add_scoped_tvs :: [Located Name] -> [Name] -> NameEnv [Name] -> NameEnv [Name]
@@ -620,29 +622,33 @@ dupFixityDecl loc rdr_name
 rnPatSynBind :: (Name -> [Name])                -- Signature tyvar function
              -> PatSynBind Name RdrName
              -> RnM (PatSynBind Name Name, [Name], Uses)
-rnPatSynBind _sig_fn bind@(PSB { psb_id = L _ name
-                               , psb_args = details
-                               , psb_def = pat
-                               , psb_dir = dir })
+rnPatSynBind sig_fn bind@(PSB { psb_id = L _ name
+                              , psb_args = details
+                              , psb_def = pat
+                              , psb_dir = dir })
        -- invariant: no free vars here when it's a FunBind
   = do  { pattern_synonym_ok <- xoptM LangExt.PatternSynonyms
         ; unless pattern_synonym_ok (addErr patternSynonymErr)
+        ; let sig_tvs = sig_fn name
 
-        ; ((pat', details'), fvs1) <- rnPat PatSyn pat $ \pat' -> do
+        ; ((pat', details'), fvs1) <- bindSigTyVarsFV sig_tvs $
+                                      rnPat PatSyn pat $ \pat' ->
          -- We check the 'RdrName's instead of the 'Name's
          -- so that the binding locations are reported
          -- from the left-hand side
-        { (details', fvs) <- case details of
+            case details of
                PrefixPatSyn vars ->
                    do { checkDupRdrNames vars
                       ; names <- mapM lookupVar vars
-                      ; return (PrefixPatSyn names, mkFVs (map unLoc names)) }
+                      ; return ( (pat', PrefixPatSyn names)
+                               , mkFVs (map unLoc names)) }
                InfixPatSyn var1 var2 ->
                    do { checkDupRdrNames [var1, var2]
                       ; name1 <- lookupVar var1
                       ; name2 <- lookupVar var2
                       -- ; checkPrecMatch -- TODO
-                      ; return (InfixPatSyn name1 name2, mkFVs (map unLoc [name1, name2])) }
+                      ; return ( (pat', InfixPatSyn name1 name2)
+                               , mkFVs (map unLoc [name1, name2])) }
                RecordPatSyn vars ->
                    do { checkDupRdrNames (map recordPatSynSelectorId vars)
                       ; let rnRecordPatSynField
@@ -651,16 +657,15 @@ rnPatSynBind _sig_fn bind@(PSB { psb_id = L _ name
                               ; hidden'  <- lookupVar hidden
                               ; return $ RecordPatSynField visible' hidden' }
                       ; names <- mapM rnRecordPatSynField  vars
-                      ; return (RecordPatSyn names
+                      ; return ( (pat', RecordPatSyn names)
                                , mkFVs (map (unLoc . recordPatSynPatVar) names)) }
 
-
-        ; return ((pat', details'), fvs) }
         ; (dir', fvs2) <- case dir of
             Unidirectional -> return (Unidirectional, emptyFVs)
             ImplicitBidirectional -> return (ImplicitBidirectional, emptyFVs)
             ExplicitBidirectional mg ->
-                do { (mg', fvs) <- rnMatchGroup PatSyn rnLExpr mg
+                do { (mg', fvs) <- bindSigTyVarsFV sig_tvs $
+                                   rnMatchGroup PatSyn rnLExpr mg
                    ; return (ExplicitBidirectional mg', fvs) }
 
         ; mod <- getModule

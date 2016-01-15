@@ -359,7 +359,7 @@ tcValBinds top_lvl binds sigs thing_inside
             { (binds', (extra_binds', thing)) <- tcBindGroups top_lvl sig_fn prag_fn binds $ do
                    { thing <- thing_inside
                      -- See Note [Pattern synonym builders don't yield dependencies]
-                   ; patsyn_builders <- mapM tcPatSynBuilderBind patsyns
+                   ; patsyn_builders <- mapM (tcPatSynBuilderBind sig_fn) patsyns
                    ; let extra_binds = [ (NonRecursive, builder) | builder <- patsyn_builders ]
                    ; return (extra_binds, thing) }
             ; return (binds' ++ extra_binds', thing) }}
@@ -1885,12 +1885,15 @@ instTcTySigFromId id
        ; (tvs, theta, tau) <- tcInstType (tcInstSigTyVarsLoc loc)
                                          (idType id)
        ; return $ TISI { sig_bndr  = CompleteSig id
-                          -- False: do not report redundant constraints
-                          -- The user has no control over the signature!
                        , sig_skols = [(tyVarName tv, tv) | tv <- tvs]
+                          -- These are freshly instantiated, so although
+                          -- we put them in the type envt, doing so has
+                          -- no effect
                        , sig_theta = theta
                        , sig_tau   = tau
                        , sig_ctxt  = FunSigCtxt name False
+                          -- False: do not report redundant constraints
+                          -- The user has no control over the signature!
                        , sig_loc   = loc } }
 
 instTcTySig :: UserTypeCtxt

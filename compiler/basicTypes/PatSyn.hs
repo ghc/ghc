@@ -99,7 +99,7 @@ data PatSyn
              -- Nothing  => uni-directional pattern synonym
              -- Just (builder, is_unlifted) => bi-directional
              -- Builder function, of type
-             --  forall univ_tvs, ex_tvs. (prov_theta, req_theta)
+             --  forall univ_tvs, ex_tvs. (req_theta, prov_theta)
              --                       =>  arg_tys -> res_ty
              -- See Note [Builder for pattern synonyms with unboxed type]
   }
@@ -213,7 +213,7 @@ For *bidirectional* pattern synonyms, we also generate a "builder"
 function which implements the pattern synonym in an expression
 context. For our running example, it will be:
 
-        $bP :: forall t b. (Show (Maybe t), Ord b, Eq t, Num t)
+        $bP :: forall t b. (Eq t, Num t, Show (Maybe t), Ord b)
             => b -> T (Maybe t)
         $bP x = MkT [x] (Just 42)
 
