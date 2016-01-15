@@ -78,7 +78,6 @@ import Name hiding (varName)
 import Unique
 import Util
 import DynFlags
-import FastString
 import Outputable
 
 import Data.Data
@@ -236,7 +235,7 @@ instance Outputable Var where
 
 ppr_debug :: Var -> PprStyle -> SDoc
 ppr_debug (TyVar {}) sty
-  | debugStyle sty = brackets (ptext (sLit "tv"))
+  | debugStyle sty = brackets (text "tv")
 ppr_debug (TcTyVar {tc_tv_details = d}) sty
   | dumpStyle sty || debugStyle sty = brackets (pprTcTyVarDetails d)
 ppr_debug (Id { idScope = s, id_details = d }) sty
@@ -244,9 +243,9 @@ ppr_debug (Id { idScope = s, id_details = d }) sty
 ppr_debug _ _ = empty
 
 ppr_id_scope :: IdScope -> SDoc
-ppr_id_scope GlobalId              = ptext (sLit "gid")
-ppr_id_scope (LocalId Exported)    = ptext (sLit "lidx")
-ppr_id_scope (LocalId NotExported) = ptext (sLit "lid")
+ppr_id_scope GlobalId              = text "gid"
+ppr_id_scope (LocalId Exported)    = text "lidx"
+ppr_id_scope (LocalId NotExported) = text "lid"
 
 instance NamedThing Var where
   getName = varName

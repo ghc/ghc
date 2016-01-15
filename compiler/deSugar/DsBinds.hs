@@ -566,7 +566,7 @@ dsSpec :: Maybe CoreExpr        -- Just rhs => RULE is for a local binding
 dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
   | isJust (isClassOpId_maybe poly_id)
   = putSrcSpanDs loc $
-    do { warnDs (ptext (sLit "Ignoring useless SPECIALISE pragma for class method selector")
+    do { warnDs (text "Ignoring useless SPECIALISE pragma for class method selector"
                  <+> quotes (ppr poly_id))
        ; return Nothing  }  -- There is no point in trying to specialise a class op
                             -- Moreover, classops don't (currently) have an inl_sat arity set
@@ -574,7 +574,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
 
   | no_act_spec && isNeverActive rule_act
   = putSrcSpanDs loc $
-    do { warnDs (ptext (sLit "Ignoring useless SPECIALISE pragma for NOINLINE function:")
+    do { warnDs (text "Ignoring useless SPECIALISE pragma for NOINLINE function:"
                  <+> quotes (ppr poly_id))
        ; return Nothing  }  -- Function is NOINLINE, and the specialiation inherits that
                             -- See Note [Activation pragmas for SPECIALISE]
@@ -588,9 +588,9 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
        ; (bndrs, ds_lhs) <- liftM collectBinders
                                   (dsHsWrapper spec_co (Var poly_id))
        ; let spec_ty = mkPiTypes bndrs (exprType ds_lhs)
-       ; -- pprTrace "dsRule" (vcat [ ptext (sLit "Id:") <+> ppr poly_id
-         --                         , ptext (sLit "spec_co:") <+> ppr spec_co
-         --                         , ptext (sLit "ds_rhs:") <+> ppr ds_lhs ]) $
+       ; -- pprTrace "dsRule" (vcat [ text "Id:" <+> ppr poly_id
+         --                         , text "spec_co:" <+> ppr spec_co
+         --                         , text "ds_rhs:" <+> ppr ds_lhs ]) $
          case decomposeRuleLhs bndrs ds_lhs of {
            Left msg -> do { warnDs msg; return Nothing } ;
            Right (rule_bndrs, _fn, args) -> do
@@ -614,7 +614,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
 
 -- Commented out: see Note [SPECIALISE on INLINE functions]
 --       ; when (isInlinePragma id_inl)
---              (warnDs $ ptext (sLit "SPECIALISE pragma on INLINE function probably won't fire:")
+--              (warnDs $ text "SPECIALISE pragma on INLINE function probably won't fire:"
 --                        <+> quotes (ppr poly_name))
 
        ; return (Just (unitOL (spec_id, spec_rhs), rule))
@@ -667,7 +667,7 @@ dsMkUserRule this_mod is_local name act fn bndrs args rhs = do
     return rule
 
 ruleOrphWarn :: CoreRule -> SDoc
-ruleOrphWarn rule = ptext (sLit "Orphan rule:") <+> ppr rule
+ruleOrphWarn rule = text "Orphan rule:" <+> ppr rule
 
 {- Note [SPECIALISE on INLINE functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -744,12 +744,12 @@ decomposeRuleLhs orig_bndrs orig_lhs
 
   | Just (fn_id, args) <- decompose fun2 args2
   , let extra_dict_bndrs = mk_extra_dict_bndrs fn_id args
-  = -- pprTrace "decmposeRuleLhs" (vcat [ ptext (sLit "orig_bndrs:") <+> ppr orig_bndrs
-    --                                  , ptext (sLit "orig_lhs:") <+> ppr orig_lhs
-    --                                  , ptext (sLit "lhs1:")     <+> ppr lhs1
-    --                                  , ptext (sLit "extra_dict_bndrs:") <+> ppr extra_dict_bndrs
-    --                                  , ptext (sLit "fn_id:") <+> ppr fn_id
-    --                                  , ptext (sLit "args:")   <+> ppr args]) $
+  = -- pprTrace "decmposeRuleLhs" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
+    --                                  , text "orig_lhs:" <+> ppr orig_lhs
+    --                                  , text "lhs1:"     <+> ppr lhs1
+    --                                  , text "extra_dict_bndrs:" <+> ppr extra_dict_bndrs
+    --                                  , text "fn_id:" <+> ppr fn_id
+    --                                  , text "args:"   <+> ppr args]) $
     Right (orig_bndrs ++ extra_dict_bndrs, fn_id, args)
 
   | otherwise
@@ -778,18 +778,18 @@ decomposeRuleLhs orig_bndrs orig_lhs
 
    decompose _ _ = Nothing
 
-   bad_shape_msg = hang (ptext (sLit "RULE left-hand side too complicated to desugar"))
+   bad_shape_msg = hang (text "RULE left-hand side too complicated to desugar")
                       2 (vcat [ text "Optimised lhs:" <+> ppr lhs2
                               , text "Orig lhs:" <+> ppr orig_lhs])
-   dead_msg bndr = hang (sep [ ptext (sLit "Forall'd") <+> pp_bndr bndr
-                             , ptext (sLit "is not bound in RULE lhs")])
+   dead_msg bndr = hang (sep [ text "Forall'd" <+> pp_bndr bndr
+                             , text "is not bound in RULE lhs"])
                       2 (vcat [ text "Orig bndrs:" <+> ppr orig_bndrs
                               , text "Orig lhs:" <+> ppr orig_lhs
                               , text "optimised lhs:" <+> ppr lhs2 ])
    pp_bndr bndr
-    | isTyVar bndr                      = ptext (sLit "type variable") <+> quotes (ppr bndr)
-    | Just pred <- evVarPred_maybe bndr = ptext (sLit "constraint") <+> quotes (ppr pred)
-    | otherwise                         = ptext (sLit "variable") <+> quotes (ppr bndr)
+    | isTyVar bndr                      = text "type variable" <+> quotes (ppr bndr)
+    | Just pred <- evVarPred_maybe bndr = text "constraint" <+> quotes (ppr pred)
+    | otherwise                         = text "variable" <+> quotes (ppr bndr)
 
    drop_dicts :: CoreExpr -> CoreExpr
    drop_dicts e

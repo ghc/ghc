@@ -76,7 +76,7 @@ type Annotation b = Expr b -> SDoc
 
 -- | Annotate with the size of the right-hand-side
 sizeAnn :: CoreExpr -> SDoc
-sizeAnn e = ptext (sLit "-- RHS size:") <+> ppr (exprStats e)
+sizeAnn e = text "-- RHS size:" <+> ppr (exprStats e)
 
 -- | No annotation
 noAnn :: Expr b -> SDoc
@@ -94,12 +94,12 @@ pprTopBind ann (NonRec binder expr)
  = ppr_binding ann (binder,expr) $$ blankLine
 
 pprTopBind _ (Rec [])
-  = ptext (sLit "Rec { }")
+  = text "Rec { }"
 pprTopBind ann (Rec (b:bs))
-  = vcat [ptext (sLit "Rec {"),
+  = vcat [text "Rec {",
           ppr_binding ann b,
           vcat [blankLine $$ ppr_binding ann b | b <- bs],
-          ptext (sLit "end Rec }"),
+          text "end Rec }",
           blankLine]
 
 ppr_bind :: OutputableBndr b => Annotation b -> Bind b -> SDoc
@@ -123,7 +123,7 @@ noParens pp = pp
 pprOptCo :: Coercion -> SDoc
 pprOptCo co = sdocWithDynFlags $ \dflags ->
               if gopt Opt_SuppressCoercions dflags
-              then ptext (sLit "...")
+              then text "..."
               else parens (sep [ppr co, dcolon <+> ppr (coercionType co)])
 
 ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
@@ -131,19 +131,19 @@ ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
         -- an atomic value (e.g. function args)
 
 ppr_expr _       (Var name)    = ppr name
-ppr_expr add_par (Type ty)     = add_par (ptext (sLit "TYPE:") <+> ppr ty)       -- Weird
-ppr_expr add_par (Coercion co) = add_par (ptext (sLit "CO:") <+> ppr co)
+ppr_expr add_par (Type ty)     = add_par (text "TYPE:" <+> ppr ty)       -- Weird
+ppr_expr add_par (Coercion co) = add_par (text "CO:" <+> ppr co)
 ppr_expr add_par (Lit lit)     = pprLiteral add_par lit
 
 ppr_expr add_par (Cast expr co)
-  = add_par $ sep [pprParendExpr expr, ptext (sLit "`cast`") <+> pprOptCo co]
+  = add_par $ sep [pprParendExpr expr, text "`cast`" <+> pprOptCo co]
 
 ppr_expr add_par expr@(Lam _ _)
   = let
         (bndrs, body) = collectBinders expr
     in
     add_par $
-    hang (ptext (sLit "\\") <+> sep (map (pprBndr LambdaBind) bndrs) <+> arrow)
+    hang (text "\\" <+> sep (map (pprBndr LambdaBind) bndrs) <+> arrow)
          2 (pprCoreExpr body)
 
 ppr_expr add_par expr@(App {})
@@ -180,18 +180,18 @@ ppr_expr add_par (Case expr var ty [(con,args,rhs)])
   = sdocWithDynFlags $ \dflags ->
     if gopt Opt_PprCaseAsLet dflags
     then add_par $  -- See Note [Print case as let]
-         sep [ sep [ ptext (sLit "let! {")
+         sep [ sep [ text "let! {"
                      <+> ppr_case_pat con args
-                     <+> ptext (sLit "~")
+                     <+> text "~"
                      <+> ppr_bndr var
-                   , ptext (sLit "<-") <+> ppr_expr id expr
-                     <+> ptext (sLit "} in") ]
+                   , text "<-" <+> ppr_expr id expr
+                     <+> text "} in" ]
              , pprCoreExpr rhs
              ]
     else add_par $
-         sep [sep [ptext (sLit "case") <+> pprCoreExpr expr,
+         sep [sep [text "case" <+> pprCoreExpr expr,
                    ifPprDebug (text "return" <+> ppr ty),
-                   sep [ptext (sLit "of") <+> ppr_bndr var,
+                   sep [text "of" <+> ppr_bndr var,
                         char '{' <+> ppr_case_pat con args <+> arrow]
                ],
               pprCoreExpr rhs,
@@ -202,10 +202,10 @@ ppr_expr add_par (Case expr var ty [(con,args,rhs)])
 
 ppr_expr add_par (Case expr var ty alts)
   = add_par $
-    sep [sep [ptext (sLit "case")
+    sep [sep [text "case"
                 <+> pprCoreExpr expr
                 <+> ifPprDebug (text "return" <+> ppr ty),
-              ptext (sLit "of") <+> ppr_bndr var <+> char '{'],
+              text "of" <+> ppr_bndr var <+> char '{'],
          nest 2 (vcat (punctuate semi (map pprCoreAlt alts))),
          char '}'
     ]
@@ -220,16 +220,16 @@ ppr_expr add_par (Case expr var ty alts)
 ppr_expr add_par (Let bind@(NonRec val_bdr rhs@(Let _ _)) body)
   = add_par $
     vcat [
-      hsep [ptext (sLit "let {"), (pprBndr LetBind val_bdr $$ ppr val_bndr), equals],
+      hsep [text "let {", (pprBndr LetBind val_bdr $$ ppr val_bndr), equals],
       nest 2 (pprCoreExpr rhs),
-      ptext (sLit "} in"),
+      text "} in",
       pprCoreExpr body ]
 
 ppr_expr add_par (Let bind@(NonRec val_bdr rhs) expr@(Let _ _))
   = add_par
-    (hang (ptext (sLit "let {"))
+    (hang (text "let {")
           2 (hsep [ppr_binding (val_bdr,rhs),
-                   ptext (sLit "} in")])
+                   text "} in"])
      $$
      pprCoreExpr expr)
 -}
@@ -237,7 +237,7 @@ ppr_expr add_par (Let bind@(NonRec val_bdr rhs) expr@(Let _ _))
 -- General case (recursive case, too)
 ppr_expr add_par (Let bind expr)
   = add_par $
-    sep [hang (ptext keyword) 2 (ppr_bind noAnn bind <+> ptext (sLit "} in")),
+    sep [hang (ptext keyword) 2 (ppr_bind noAnn bind <+> text "} in"),
          pprCoreExpr expr]
   where
     keyword = case bind of
@@ -274,8 +274,8 @@ pprArg (Type ty)
  = sdocWithDynFlags $ \dflags ->
    if gopt Opt_SuppressTypeApplications dflags
    then empty
-   else ptext (sLit "@") <+> pprParendType ty
-pprArg (Coercion co) = ptext (sLit "@~") <+> pprOptCo co
+   else text "@" <+> pprParendType ty
+pprArg (Coercion co) = text "@~" <+> pprOptCo co
 pprArg expr          = pprParendExpr expr
 
 {-
@@ -312,7 +312,7 @@ pprCoreBinder bind_site bndr
 
 pprUntypedBinder :: Var -> SDoc
 pprUntypedBinder binder
-  | isTyVar binder = ptext (sLit "@") <+> ppr binder    -- NB: don't print kind
+  | isTyVar binder = text "@" <+> ppr binder    -- NB: don't print kind
   | otherwise      = pprIdBndr binder
 
 pprTypedLamBinder :: BindingSite -> Bool -> Var -> SDoc
@@ -339,7 +339,7 @@ pprTypedLamBinder bind_site debug_on var
     suppress_sigs = gopt Opt_SuppressTypeSignatures
 
     unf_info = unfoldingInfo (idInfo var)
-    pp_unf | hasSomeUnfolding unf_info = ptext (sLit "Unf=") <> ppr unf_info
+    pp_unf | hasSomeUnfolding unf_info = text "Unf=" <> ppr unf_info
            | otherwise                 = empty
 
 pprTypedLetBinder :: Var -> SDoc
@@ -355,7 +355,7 @@ pprTypedLetBinder binder
 pprKindedTyVarBndr :: TyVar -> SDoc
 -- Print a type variable binder with its kind (but not if *)
 pprKindedTyVarBndr tyvar
-  = ptext (sLit "@") <+> pprTvBndr tyvar
+  = text "@" <+> pprTvBndr tyvar
 
 -- pprIdBndr does *not* print the type
 -- When printing any Id binder in debug mode, we print its inline pragma and one-shot-ness
@@ -379,10 +379,10 @@ pprIdBndrInfo info
     has_lbv   = not (hasNoOneShotInfo lbv_info)
 
     doc = showAttributes
-          [ (has_prag, ptext (sLit "InlPrag=") <> ppr prag_info)
-          , (has_occ,  ptext (sLit "Occ=") <> ppr occ_info)
-          , (has_dmd,  ptext (sLit "Dmd=") <> ppr dmd_info)
-          , (has_lbv , ptext (sLit "OS=") <> ppr lbv_info)
+          [ (has_prag, text "InlPrag=" <> ppr prag_info)
+          , (has_occ,  text "Occ=" <> ppr occ_info)
+          , (has_dmd,  text "Dmd=" <> ppr dmd_info)
+          , (has_lbv , text "OS=" <> ppr lbv_info)
           ]
 
 {-
@@ -397,19 +397,19 @@ ppIdInfo id info
     ppUnless (gopt Opt_SuppressIdInfo dflags) $
     showAttributes
     [ (True, pp_scope <> ppr (idDetails id))
-    , (has_arity,        ptext (sLit "Arity=") <> int arity)
-    , (has_called_arity, ptext (sLit "CallArity=") <> int called_arity)
-    , (has_caf_info,     ptext (sLit "Caf=") <> ppr caf_info)
-    , (True,             ptext (sLit "Str=") <> pprStrictness str_info)
-    , (has_unf,          ptext (sLit "Unf=") <> ppr unf_info)
-    , (not (null rules), ptext (sLit "RULES:") <+> vcat (map pprRule rules))
+    , (has_arity,        text "Arity=" <> int arity)
+    , (has_called_arity, text "CallArity=" <> int called_arity)
+    , (has_caf_info,     text "Caf=" <> ppr caf_info)
+    , (True,             text "Str=" <> pprStrictness str_info)
+    , (has_unf,          text "Unf=" <> ppr unf_info)
+    , (not (null rules), text "RULES:" <+> vcat (map pprRule rules))
     ]   -- Inline pragma, occ, demand, one-shot info
         -- printed out with all binders (when debug is on);
         -- see PprCore.pprIdBndr
   where
-    pp_scope | isGlobalId id   = ptext (sLit "GblId")
-             | isExportedId id = ptext (sLit "LclIdX")
-             | otherwise       = ptext (sLit "LclId")
+    pp_scope | isGlobalId id   = text "GblId"
+             | isExportedId id = text "LclIdX"
+             | otherwise       = text "LclId"
 
     arity = arityInfo info
     has_arity = arity /= 0
@@ -441,47 +441,47 @@ showAttributes stuff
 -}
 
 instance Outputable UnfoldingGuidance where
-    ppr UnfNever  = ptext (sLit "NEVER")
+    ppr UnfNever  = text "NEVER"
     ppr (UnfWhen { ug_arity = arity, ug_unsat_ok = unsat_ok, ug_boring_ok = boring_ok })
-      = ptext (sLit "ALWAYS_IF") <>
-        parens (ptext (sLit "arity=")     <> int arity    <> comma <>
-                ptext (sLit "unsat_ok=")  <> ppr unsat_ok <> comma <>
-                ptext (sLit "boring_ok=") <> ppr boring_ok)
+      = text "ALWAYS_IF" <>
+        parens (text "arity="     <> int arity    <> comma <>
+                text "unsat_ok="  <> ppr unsat_ok <> comma <>
+                text "boring_ok=" <> ppr boring_ok)
     ppr (UnfIfGoodArgs { ug_args = cs, ug_size = size, ug_res = discount })
-      = hsep [ ptext (sLit "IF_ARGS"),
+      = hsep [ text "IF_ARGS",
                brackets (hsep (map int cs)),
                int size,
                int discount ]
 
 instance Outputable UnfoldingSource where
-  ppr InlineCompulsory  = ptext (sLit "Compulsory")
-  ppr InlineStable      = ptext (sLit "InlineStable")
-  ppr InlineRhs         = ptext (sLit "<vanilla>")
+  ppr InlineCompulsory  = text "Compulsory"
+  ppr InlineStable      = text "InlineStable"
+  ppr InlineRhs         = text "<vanilla>"
 
 instance Outputable Unfolding where
-  ppr NoUnfolding                = ptext (sLit "No unfolding")
-  ppr (OtherCon cs)              = ptext (sLit "OtherCon") <+> ppr cs
+  ppr NoUnfolding                = text "No unfolding"
+  ppr (OtherCon cs)              = text "OtherCon" <+> ppr cs
   ppr (DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = args })
-       = hang (ptext (sLit "DFun:") <+> ptext (sLit "\\")
+       = hang (text "DFun:" <+> ptext (sLit "\\")
                 <+> sep (map (pprBndr LambdaBind) bndrs) <+> arrow)
             2 (ppr con <+> sep (map ppr args))
   ppr (CoreUnfolding { uf_src = src
                      , uf_tmpl=rhs, uf_is_top=top, uf_is_value=hnf
                      , uf_is_conlike=conlike, uf_is_work_free=wf
                      , uf_expandable=exp, uf_guidance=g })
-        = ptext (sLit "Unf") <> braces (pp_info $$ pp_rhs)
+        = text "Unf" <> braces (pp_info $$ pp_rhs)
     where
       pp_info = fsep $ punctuate comma
-                [ ptext (sLit "Src=")        <> ppr src
-                , ptext (sLit "TopLvl=")     <> ppr top
-                , ptext (sLit "Value=")      <> ppr hnf
-                , ptext (sLit "ConLike=")    <> ppr conlike
-                , ptext (sLit "WorkFree=")   <> ppr wf
-                , ptext (sLit "Expandable=") <> ppr exp
-                , ptext (sLit "Guidance=")   <> ppr g ]
+                [ text "Src="        <> ppr src
+                , text "TopLvl="     <> ppr top
+                , text "Value="      <> ppr hnf
+                , text "ConLike="    <> ppr conlike
+                , text "WorkFree="   <> ppr wf
+                , text "Expandable=" <> ppr exp
+                , text "Guidance="   <> ppr g ]
       pp_tmpl = sdocWithDynFlags $ \dflags ->
                 ppUnless (gopt Opt_SuppressUnfoldings dflags) $
-                ptext (sLit "Tmpl=") <+> ppr rhs
+                text "Tmpl=" <+> ppr rhs
       pp_rhs | isStableSource src = pp_tmpl
              | otherwise          = empty
             -- Don't print the RHS or we get a quadratic
@@ -501,16 +501,16 @@ pprRules rules = vcat (map pprRule rules)
 
 pprRule :: CoreRule -> SDoc
 pprRule (BuiltinRule { ru_fn = fn, ru_name = name})
-  = ptext (sLit "Built in rule for") <+> ppr fn <> colon <+> doubleQuotes (ftext name)
+  = text "Built in rule for" <+> ppr fn <> colon <+> doubleQuotes (ftext name)
 
 pprRule (Rule { ru_name = name, ru_act = act, ru_fn = fn,
                 ru_bndrs = tpl_vars, ru_args = tpl_args,
                 ru_rhs = rhs })
   = hang (doubleQuotes (ftext name) <+> ppr act)
-       4 (sep [ptext (sLit "forall") <+>
+       4 (sep [text "forall" <+>
                   sep (map (pprCoreBinder LambdaBind) tpl_vars) <> dot,
                nest 2 (ppr fn <+> sep (map pprArg tpl_args)),
-               nest 2 (ptext (sLit "=") <+> pprCoreExpr rhs)
+               nest 2 (text "=" <+> pprCoreExpr rhs)
             ])
 
 {-
@@ -521,24 +521,24 @@ pprRule (Rule { ru_name = name, ru_act = act, ru_fn = fn,
 
 instance Outputable id => Outputable (Tickish id) where
   ppr (HpcTick modl ix) =
-      hcat [ptext (sLit "hpc<"),
+      hcat [text "hpc<",
             ppr modl, comma,
             ppr ix,
-            ptext (sLit ">")]
+            text ">"]
   ppr (Breakpoint ix vars) =
-      hcat [ptext (sLit "break<"),
+      hcat [text "break<",
             ppr ix,
-            ptext (sLit ">"),
+            text ">",
             parens (hcat (punctuate comma (map ppr vars)))]
   ppr (ProfNote { profNoteCC = cc,
                   profNoteCount = tick,
                   profNoteScope = scope }) =
       case (tick,scope) of
-         (True,True)  -> hcat [ptext (sLit "scctick<"), ppr cc, char '>']
-         (True,False) -> hcat [ptext (sLit "tick<"),    ppr cc, char '>']
-         _            -> hcat [ptext (sLit "scc<"),     ppr cc, char '>']
+         (True,True)  -> hcat [text "scctick<", ppr cc, char '>']
+         (True,False) -> hcat [text "tick<",    ppr cc, char '>']
+         _            -> hcat [text "scc<",     ppr cc, char '>']
   ppr (SourceNote span _) =
-      hcat [ ptext (sLit "src<"), pprUserRealSpan True span, char '>']
+      hcat [ text "src<", pprUserRealSpan True span, char '>']
 
 {-
 -----------------------------------------------------
@@ -547,14 +547,14 @@ instance Outputable id => Outputable (Tickish id) where
 -}
 
 instance Outputable CoreVect where
-  ppr (Vect     var e)               = hang (ptext (sLit "VECTORISE") <+> ppr var <+> char '=')
+  ppr (Vect     var e)               = hang (text "VECTORISE" <+> ppr var <+> char '=')
                                          4 (pprCoreExpr e)
-  ppr (NoVect   var)                 = ptext (sLit "NOVECTORISE") <+> ppr var
-  ppr (VectType False var Nothing)   = ptext (sLit "VECTORISE type") <+> ppr var
-  ppr (VectType True  var Nothing)   = ptext (sLit "VECTORISE SCALAR type") <+> ppr var
-  ppr (VectType False var (Just tc)) = ptext (sLit "VECTORISE type") <+> ppr var <+> char '=' <+>
+  ppr (NoVect   var)                 = text "NOVECTORISE" <+> ppr var
+  ppr (VectType False var Nothing)   = text "VECTORISE type" <+> ppr var
+  ppr (VectType True  var Nothing)   = text "VECTORISE SCALAR type" <+> ppr var
+  ppr (VectType False var (Just tc)) = text "VECTORISE type" <+> ppr var <+> char '=' <+>
                                        ppr tc
-  ppr (VectType True var (Just tc))  = ptext (sLit "VECTORISE SCALAR type") <+> ppr var <+>
+  ppr (VectType True var (Just tc))  = text "VECTORISE SCALAR type" <+> ppr var <+>
                                        char '=' <+> ppr tc
-  ppr (VectClass tc)                 = ptext (sLit "VECTORISE class") <+> ppr tc
-  ppr (VectInst var)                 = ptext (sLit "VECTORISE SCALAR instance") <+> ppr var
+  ppr (VectClass tc)                 = text "VECTORISE class" <+> ppr tc
+  ppr (VectInst var)                 = text "VECTORISE SCALAR instance" <+> ppr var

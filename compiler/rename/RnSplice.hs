@@ -534,12 +534,12 @@ rnSplicePat.
 
 spliceCtxt :: HsSplice RdrName -> SDoc
 spliceCtxt splice
-  = hang (ptext (sLit "In the") <+> what) 2 (ppr splice)
+  = hang (text "In the" <+> what) 2 (ppr splice)
   where
     what = case splice of
-             HsUntypedSplice {} -> ptext (sLit "untyped splice:")
-             HsTypedSplice   {} -> ptext (sLit "typed splice:")
-             HsQuasiQuote    {} -> ptext (sLit "quasi-quotation:")
+             HsUntypedSplice {} -> text "untyped splice:"
+             HsTypedSplice   {} -> text "typed splice:"
+             HsQuasiQuote    {} -> text "quasi-quotation:"
 
 -- | The splice data to be logged
 data SpliceInfo
@@ -589,16 +589,16 @@ traceSplice (SpliceInfo { spliceDescription = sd, spliceSource = mb_src
              , gen ]
 
 illegalTypedSplice :: SDoc
-illegalTypedSplice = ptext (sLit "Typed splices may not appear in untyped brackets")
+illegalTypedSplice = text "Typed splices may not appear in untyped brackets"
 
 illegalUntypedSplice :: SDoc
-illegalUntypedSplice = ptext (sLit "Untyped splices may not appear in typed brackets")
+illegalUntypedSplice = text "Untyped splices may not appear in typed brackets"
 
 -- spliceResultDoc :: OutputableBndr id => LHsExpr id -> SDoc
 -- spliceResultDoc expr
---  = vcat [ hang (ptext (sLit "In the splice:"))
+--  = vcat [ hang (text "In the splice:")
 --              2 (char '$' <> pprParendExpr expr)
---        , ptext (sLit "To see what the splice expanded to, use -ddump-splices") ]
+--        , text "To see what the splice expanded to, use -ddump-splices" ]
 #endif
 
 checkThLocalName :: Name -> RnM ()

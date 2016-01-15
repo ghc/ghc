@@ -812,7 +812,7 @@ data Value    = ConVal AltCon [CoreArg] -- _Saturated_ constructors
 
 instance Outputable Value where
    ppr (ConVal con args) = ppr con <+> interpp'SP args
-   ppr LambdaVal         = ptext (sLit "<Lambda>")
+   ppr LambdaVal         = text "<Lambda>"
 
 ---------------------
 initScEnv :: DynFlags -> Module -> UniqFM SpecConstrAnnotation -> ScEnv
@@ -1058,8 +1058,8 @@ data Call = Call Id [CoreArg] ValueEnv
 
 instance Outputable ScUsage where
   ppr (SCU { scu_calls = calls, scu_occs = occs })
-    = ptext (sLit "SCU") <+> braces (sep [ ptext (sLit "calls =") <+> ppr calls
-                                         , ptext (sLit "occs =") <+> ppr occs ])
+    = text "SCU" <+> braces (sep [ ptext (sLit "calls =") <+> ppr calls
+                                         , text "occs =" <+> ppr occs ])
 
 instance Outputable Call where
   ppr (Call fn args _) = ppr fn <+> fsep (map pprParendExpr args)
@@ -1071,8 +1071,8 @@ combineCalls :: CallEnv -> CallEnv -> CallEnv
 combineCalls = plusVarEnv_C (++)
   where
 --    plus cs ds | length res > 1
---               = pprTrace "combineCalls" (vcat [ ptext (sLit "cs:") <+> ppr cs
---                                               , ptext (sLit "ds:") <+> ppr ds])
+--               = pprTrace "combineCalls" (vcat [ text "cs:" <+> ppr cs
+--                                               , text "ds:" <+> ppr ds])
 --                 res
 --               | otherwise = res
 --       where
@@ -1118,9 +1118,9 @@ A pattern binds b, x::a, y::b, z::b->a, but not 'a'!
 -}
 
 instance Outputable ArgOcc where
-  ppr (ScrutOcc xs) = ptext (sLit "scrut-occ") <> ppr xs
-  ppr UnkOcc        = ptext (sLit "unk-occ")
-  ppr NoOcc         = ptext (sLit "no-occ")
+  ppr (ScrutOcc xs) = text "scrut-occ" <> ppr xs
+  ppr UnkOcc        = text "unk-occ"
+  ppr NoOcc         = text "no-occ"
 
 evalScrutOcc :: ArgOcc
 evalScrutOcc = ScrutOcc emptyUFM
@@ -1545,14 +1545,14 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
                         return (nullUsage, spec_info)
                    else return (nullUsage, spec_info)
                 where
-                   msg = vcat [ sep [ ptext (sLit "Function") <+> quotes (ppr fn)
-                                    , nest 2 (ptext (sLit "has") <+>
-                                              speakNOf spec_count' (ptext (sLit "call pattern")) <> comma <+>
-                                              ptext (sLit "but the limit is") <+> int max) ]
-                              , ptext (sLit "Use -fspec-constr-count=n to set the bound")
+                   msg = vcat [ sep [ text "Function" <+> quotes (ppr fn)
+                                    , nest 2 (text "has" <+>
+                                              speakNOf spec_count' (text "call pattern") <> comma <+>
+                                              text "but the limit is" <+> int max) ]
+                              , text "Use -fspec-constr-count=n to set the bound"
                               , extra ]
-                   extra | not opt_PprStyle_Debug = ptext (sLit "Use -dppr-debug to see specialisations")
-                         | otherwise = ptext (sLit "Specialisations:") <+> ppr (pats ++ [p | OS p _ _ _ <- specs])
+                   extra | not opt_PprStyle_Debug = text "Use -dppr-debug to see specialisations"
+                         | otherwise = text "Specialisations:" <+> ppr (pats ++ [p | OS p _ _ _ <- specs])
 
             _normal_case -> do {
 

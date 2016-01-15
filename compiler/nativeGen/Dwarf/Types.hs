@@ -296,7 +296,7 @@ pprDwarfFrame DwarfFrame{dwCieLabel=cieLabel,dwCieInit=cieInit,dwCieProcs=procs}
     in vcat [ ppr cieLabel <> colon
             , pprData4' length -- Length of CIE
             , ppr cieStartLabel <> colon
-            , pprData4' (ptext (sLit "-1"))
+            , pprData4' (text "-1")
                                -- Common Information Entry marker (-1 = 0xf..f)
             , pprByte 3        -- CIE version (we require DWARF 3)
             , pprByte 0        -- Augmentation (none)
@@ -449,9 +449,9 @@ pprUnwindExpr spIsCFA expr
         pprE (UwPlus u1 u2)   = pprE u1 $$ pprE u2 $$ pprByte dW_OP_plus
         pprE (UwMinus u1 u2)  = pprE u1 $$ pprE u2 $$ pprByte dW_OP_minus
         pprE (UwTimes u1 u2)  = pprE u1 $$ pprE u2 $$ pprByte dW_OP_mul
-    in ptext (sLit "\t.uleb128 1f-.-1") $$ -- DW_FORM_block length
+    in text "\t.uleb128 1f-.-1" $$ -- DW_FORM_block length
        pprE expr $$
-       ptext (sLit "1:")
+       text "1:"
 
 -- | Generate code for re-setting the unwind information for a
 -- register to @undefined@
@@ -464,7 +464,7 @@ pprUndefUnwind plat g  = pprByte dW_CFA_undefined $$
 -- | Align assembly at (machine) word boundary
 wordAlign :: SDoc
 wordAlign = sdocWithPlatform $ \plat ->
-  ptext (sLit "\t.align ") <> case platformOS plat of
+  text "\t.align " <> case platformOS plat of
     OSDarwin -> case platformWordSize plat of
       8      -> text "3"
       4      -> text "2"
@@ -473,7 +473,7 @@ wordAlign = sdocWithPlatform $ \plat ->
 
 -- | Assembly for a single byte of constant DWARF data
 pprByte :: Word8 -> SDoc
-pprByte x = ptext (sLit "\t.byte ") <> ppr (fromIntegral x :: Word)
+pprByte x = text "\t.byte " <> ppr (fromIntegral x :: Word)
 
 -- | Assembly for a two-byte constant integer
 pprHalf :: Word16 -> SDoc
@@ -492,7 +492,7 @@ pprFlag f = pprByte (if f then 0xff else 0x00)
 
 -- | Assembly for 4 bytes of dynamic DWARF data
 pprData4' :: SDoc -> SDoc
-pprData4' x = ptext (sLit "\t.long ") <> x
+pprData4' x = text "\t.long " <> x
 
 -- | Assembly for 4 bytes of constant DWARF data
 pprData4 :: Word -> SDoc
@@ -508,8 +508,8 @@ pprDwWord = pprData4'
 pprWord :: SDoc -> SDoc
 pprWord s = (<> s) . sdocWithPlatform $ \plat ->
   case platformWordSize plat of
-    4 -> ptext (sLit "\t.long ")
-    8 -> ptext (sLit "\t.quad ")
+    4 -> text "\t.long "
+    8 -> text "\t.quad "
     n -> panic $ "pprWord: Unsupported target platform word length " ++
                  show n ++ "!"
 
@@ -532,7 +532,7 @@ pprLEBInt x | x >= -64 && x < 64
 -- | Generates a dynamic null-terminated string. If required the
 -- caller needs to make sure that the string is escaped properly.
 pprString' :: SDoc -> SDoc
-pprString' str = ptext (sLit "\t.asciz \"") <> str <> char '"'
+pprString' str = text "\t.asciz \"" <> str <> char '"'
 
 -- | Generate a string constant. We take care to escape the string.
 pprString :: String -> SDoc
@@ -544,9 +544,9 @@ pprString str
 
 -- | Escape a single non-unicode character
 escapeChar :: Char -> SDoc
-escapeChar '\\' = ptext (sLit "\\\\")
-escapeChar '\"' = ptext (sLit "\\\"")
-escapeChar '\n' = ptext (sLit "\\n")
+escapeChar '\\' = text "\\\\"
+escapeChar '\"' = text "\\\""
+escapeChar '\n' = text "\\n"
 escapeChar c
   | isAscii c && isPrint c && c /= '?' -- prevents trigraph warnings
   = char c

@@ -51,7 +51,6 @@ module UniqDFM (
         alwaysUnsafeUfmToUdfm,
     ) where
 
-import FastString
 import Unique           ( Uniquable(..), Unique, getKey )
 import Outputable
 
@@ -297,5 +296,5 @@ instance Outputable a => Outputable (UniqDFM a) where
 pprUniqDFM :: (a -> SDoc) -> UniqDFM a -> SDoc
 pprUniqDFM ppr_elt ufm
   = brackets $ fsep $ punctuate comma $
-    [ ppr uq <+> ptext (sLit ":->") <+> ppr_elt elt
+    [ ppr uq <+> text ":->" <+> ppr_elt elt
     | (uq, elt) <- udfmToList ufm ]

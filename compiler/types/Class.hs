@@ -34,7 +34,6 @@ import SrcLoc
 import PrelNames    ( eqTyConKey, coercibleTyConKey, typeableClassKey,
                       heqTyConKey )
 import Outputable
-import FastString
 import BooleanFormula (BooleanFormula)
 
 import Data.Typeable (Typeable)
@@ -300,8 +299,8 @@ instance Outputable Class where
 
 pprDefMethInfo :: DefMethInfo -> SDoc
 pprDefMethInfo Nothing                  = empty   -- No default method
-pprDefMethInfo (Just (n, VanillaDM))    = ptext (sLit "Default method") <+> ppr n
-pprDefMethInfo (Just (n, GenericDM ty)) = ptext (sLit "Generic default method")
+pprDefMethInfo (Just (n, VanillaDM))    = text "Default method" <+> ppr n
+pprDefMethInfo (Just (n, GenericDM ty)) = text "Generic default method"
                                           <+> ppr n <+> dcolon <+> ppr ty
 
 pprFundeps :: Outputable a => [FunDep a] -> SDoc
@@ -309,7 +308,7 @@ pprFundeps []  = empty
 pprFundeps fds = hsep (vbar : punctuate comma (map pprFunDep fds))
 
 pprFunDep :: Outputable a => FunDep a -> SDoc
-pprFunDep (us, vs) = hsep [interppSP us, ptext (sLit "->"), interppSP vs]
+pprFunDep (us, vs) = hsep [interppSP us, text "->", interppSP vs]
 
 instance Data.Data Class where
     -- don't traverse?

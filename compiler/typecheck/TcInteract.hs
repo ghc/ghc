@@ -11,7 +11,6 @@ module TcInteract (
 
 import BasicTypes ( infinity, IntWithInf, intGtLimit )
 import HsTypes ( HsIPName(..) )
-import FastString
 import TcCanonical
 import TcFlatten
 import VarSet
@@ -154,18 +153,18 @@ solveSimpleWanteds simples
        ; dflags <- getDynFlags
        ; (n,wc) <- go 1 (solverIterations dflags) (emptyWC { wc_simple = simples })
        ; traceTcS "solveSimples end }" $
-             vcat [ ptext (sLit "iterations =") <+> ppr n
-                  , ptext (sLit "residual =") <+> ppr wc ]
+             vcat [ text "iterations =" <+> ppr n
+                  , text "residual =" <+> ppr wc ]
        ; return wc }
   where
     go :: Int -> IntWithInf -> WantedConstraints -> TcS (Int, WantedConstraints)
     go n limit wc
       | n `intGtLimit` limit
-      = failTcS (hang (ptext (sLit "solveSimpleWanteds: too many iterations")
-                       <+> parens (ptext (sLit "limit =") <+> ppr limit))
-                    2 (vcat [ ptext (sLit "Set limit with -fsolver-iterations=n; n=0 for no limit")
-                            , ptext (sLit "Simples =") <+> ppr simples
-                            , ptext (sLit "WC =")      <+> ppr wc ]))
+      = failTcS (hang (text "solveSimpleWanteds: too many iterations"
+                       <+> parens (text "limit =" <+> ppr limit))
+                    2 (vcat [ text "Set limit with -fsolver-iterations=n; n=0 for no limit"
+                            , text "Simples =" <+> ppr simples
+                            , text "WC ="      <+> ppr wc ]))
 
      | isEmptyBag (wc_simple wc)
      = return (n,wc)
@@ -378,8 +377,8 @@ runSolverPipeline :: [(String,SimplifierStage)] -- The pipeline
 runSolverPipeline pipeline workItem
   = do { initial_is <- getTcSInerts
        ; traceTcS "Start solver pipeline {" $
-                  vcat [ ptext (sLit "work item = ") <+> ppr workItem
-                       , ptext (sLit "inerts    = ") <+> ppr initial_is]
+                  vcat [ text "work item = " <+> ppr workItem
+                       , text "inerts    = " <+> ppr initial_is]
 
        ; bumpStepCountTcS    -- One step for each constraint processed
        ; final_res  <- run_pipeline pipeline (ContinueWith workItem)
@@ -388,13 +387,13 @@ runSolverPipeline pipeline workItem
        ; case final_res of
            Stop ev s       -> do { traceFireTcS ev s
                                  ; traceTcS "End solver pipeline (discharged) }"
-                                       (ptext (sLit "inerts =") <+> ppr final_is)
+                                       (text "inerts =" <+> ppr final_is)
                                  ; return () }
-           ContinueWith ct -> do { traceFireTcS (ctEvidence ct) (ptext (sLit "Kept as inert"))
+           ContinueWith ct -> do { traceFireTcS (ctEvidence ct) (text "Kept as inert")
                                  ; traceTcS "End solver pipeline (kept as inert) }" $
-                                       vcat [ ptext (sLit "final_item =") <+> ppr ct
+                                       vcat [ text "final_item =" <+> ppr ct
                                             , pprTvBndrs (varSetElems $ tyCoVarsOfCt ct)
-                                            , ptext (sLit "inerts     =") <+> ppr final_is]
+                                            , text "inerts     =" <+> ppr final_is]
                                  ; addInertCan ct }
        }
   where run_pipeline :: [(String,SimplifierStage)] -> StopOrContinue Ct
@@ -497,9 +496,9 @@ data InteractResult
    | IRDelete    -- Delete the existing inert constraint from the inert set
 
 instance Outputable InteractResult where
-  ppr IRKeep    = ptext (sLit "keep")
-  ppr IRReplace = ptext (sLit "replace")
-  ppr IRDelete  = ptext (sLit "delete")
+  ppr IRKeep    = text "keep"
+  ppr IRReplace = text "replace"
+  ppr IRDelete  = text "delete"
 
 solveOneFromTheOther :: CtEvidence  -- Inert
                      -> CtEvidence  -- WorkItem
@@ -661,7 +660,7 @@ interactIrred inerts workItem@(CIrredEvCan { cc_ev = ev_w })
                          -- These const upd's assume that solveOneFromTheOther
                          -- has no side effects on InertCans
        ; if stop_now then
-            return (Stop ev_w (ptext (sLit "Irred equal") <+> parens (ppr inert_effect)))
+            return (Stop ev_w (text "Irred equal" <+> parens (ppr inert_effect)))
        ; else
             continueWith workItem }
 
@@ -712,7 +711,7 @@ interactDict inerts workItem@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs
            IRDelete  -> updInertDicts $ \ ds -> delDict ds cls tys
            IRReplace -> updInertDicts $ \ ds -> addDict ds cls tys workItem
        ; if stop_now then
-            return (Stop ev_w (ptext (sLit "Dict equal") <+> parens (ppr inert_effect)))
+            return (Stop ev_w (text "Dict equal" <+> parens (ppr inert_effect)))
          else
             continueWith workItem }
 
@@ -879,9 +878,9 @@ improveLocalFunEqs :: CtLoc -> InertCans -> TyCon -> [TcType] -> TcTyVar
 improveLocalFunEqs loc inerts fam_tc args fsk
   | not (null improvement_eqns)
   = do { traceTcS "interactFunEq improvements: " $
-         vcat [ ptext (sLit "Eqns:") <+> ppr improvement_eqns
-              , ptext (sLit "Candidates:") <+> ppr funeqs_for_tc
-              , ptext (sLit "TvEqs:") <+> ppr tv_eqs ]
+         vcat [ text "Eqns:" <+> ppr improvement_eqns
+              , text "Candidates:" <+> ppr funeqs_for_tc
+              , text "TvEqs:" <+> ppr tv_eqs ]
        ; mapM_ (unifyDerived loc Nominal) improvement_eqns }
   | otherwise
   = return ()
@@ -1117,7 +1116,7 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv
        ; if canSolveByUnification tclvl ev eq_rel tv rhs
          then do { solveByUnification ev tv rhs
                  ; n_kicked <- kickOutAfterUnification tv
-                 ; return (Stop ev (ptext (sLit "Solved by unification") <+> ppr_kicked n_kicked)) }
+                 ; return (Stop ev (text "Solved by unification" <+> ppr_kicked n_kicked)) }
 
          else do { traceTcS "Can't solve tyvar equality"
                        (vcat [ text "LHS:" <+> ppr tv <+> dcolon <+> ppr (tyVarKind tv)
@@ -1127,7 +1126,7 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv
                              , text "RHS:" <+> ppr rhs <+> dcolon <+> ppr (typeKind rhs)
                              , text "TcLevel =" <+> ppr tclvl ])
                  ; addInertEq workItem
-                 ; return (Stop ev (ptext (sLit "Kept as inert"))) } }
+                 ; return (Stop ev (text "Kept as inert")) } }
 
 interactTyVarEq _ wi = pprPanic "interactTyVarEq" (ppr wi)
 
@@ -1181,7 +1180,7 @@ solveByUnification :: CtEvidence -> TcTyVar -> Xi -> TcS ()
 solveByUnification wd tv xi
   = do { let tv_ty = mkTyVarTy tv
        ; traceTcS "Sneaky unification:" $
-                       vcat [text "Unifies:" <+> ppr tv <+> ptext (sLit ":=") <+> ppr xi,
+                       vcat [text "Unifies:" <+> ppr tv <+> text ":=" <+> ppr xi,
                              text "Coercion:" <+> pprEq tv_ty xi,
                              text "Left Kind is:" <+> ppr (typeKind tv_ty),
                              text "Right Kind is:" <+> ppr (typeKind xi) ]
@@ -1191,7 +1190,7 @@ solveByUnification wd tv xi
 
 ppr_kicked :: Int -> SDoc
 ppr_kicked 0 = empty
-ppr_kicked n = parens (int n <+> ptext (sLit "kicked out"))
+ppr_kicked n = parens (int n <+> text "kicked out")
 
 {- Note [Avoid double unifications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1263,7 +1262,7 @@ topReactionsStage wi
  = do { tir <- doTopReact wi
       ; case tir of
           ContinueWith wi -> continueWith wi
-          Stop ev s       -> return (Stop ev (ptext (sLit "Top react:") <+> s)) }
+          Stop ev s       -> return (Stop ev (text "Top react:" <+> s)) }
 
 doTopReact :: WorkItem -> TcS (StopOrContinue Ct)
 -- The work item does not react with the inert set, so try interaction with top-level

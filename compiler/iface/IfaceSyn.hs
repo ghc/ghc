@@ -527,7 +527,7 @@ pprAxBranch pp_tc (IfaceAxBranch { ifaxbTyVars = tvs
                   pprWithCommas pprIfaceIdBndr cvs)
     pp_lhs = hang pp_tc 2 (pprParendIfaceTcArgs pat_tys)
     maybe_incomps = ppUnless (null incomps) $ parens $
-                    ptext (sLit "incompatible indices:") <+> ppr incomps
+                    text "incompatible indices:" <+> ppr incomps
 
 instance Outputable IfaceAnnotation where
   ppr (IfaceAnnotation target value) = ppr target <+> colon <+> ppr value
@@ -609,7 +609,7 @@ ppr_trim xs
   where
     go (Just doc) (_,     so_far) = (False, doc : so_far)
     go Nothing    (True,  so_far) = (True, so_far)
-    go Nothing    (False, so_far) = (True, ptext (sLit "...") : so_far)
+    go Nothing    (False, so_far) = (True, text "..." : so_far)
 
 isIfaceDataInstance :: IfaceTyConParent -> Bool
 isIfaceDataInstance IfNoParent = False
@@ -637,12 +637,12 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
 
     gadt_style = gadt || any (not . isVanillaIfaceConDecl) cons
     cons       = visibleIfConDecls condecls
-    pp_where   = ppWhen (gadt_style && not (null cons)) $ ptext (sLit "where")
+    pp_where   = ppWhen (gadt_style && not (null cons)) $ text "where"
     pp_cons    = ppr_trim (map show_con cons) :: [SDoc]
 
     pp_lhs = case parent of
                IfNoParent -> pprIfaceDeclHead context ss tycon kind tc_tyvars
-               _          -> ptext (sLit "instance") <+> pprIfaceTyConParent parent
+               _          -> text "instance" <+> pprIfaceTyConParent parent
 
     pp_roles
       | is_data_instance = empty
@@ -682,9 +682,9 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     (tc_bndrs, _, _) = splitIfaceSigmaTy kind
 
     pp_nd = case condecls of
-              IfAbstractTyCon d -> ptext (sLit "abstract") <> ppShowIface ss (parens (ppr d))
-              IfDataTyCon{}     -> ptext (sLit "data")
-              IfNewTyCon{}      -> ptext (sLit "newtype")
+              IfAbstractTyCon d -> text "abstract" <> ppShowIface ss (parens (ppr d))
+              IfDataTyCon{}     -> text "data"
+              IfNewTyCon{}      -> text "newtype"
 
     pp_extra = vcat [pprCType ctype, pprRec isrec, text "Kind:" <+> ppr kind]
 
@@ -695,14 +695,14 @@ pprIfaceDecl ss (IfaceClass { ifATs = ats, ifSigs = sigs, ifRec = isrec
                             , ifFDs    = fds, ifMinDef = minDef
                             , ifKind   = kind })
   = vcat [ pprRoles (== Nominal) (pprPrefixIfDeclBndr ss clas) bndrs roles
-         , ptext (sLit "class") <+> pprIfaceDeclHead context ss clas kind tyvars
+         , text "class" <+> pprIfaceDeclHead context ss clas kind tyvars
                                 <+> pprFundeps fds <+> pp_where
          , nest 2 (vcat [ vcat asocs, vcat dsigs, pprec
                         , ppShowAllSubs ss (pprMinDef minDef)])]
     where
       (bndrs, _, _) = splitIfaceSigmaTy kind
 
-      pp_where = ppShowRhs ss $ ppUnless (null sigs && null ats) (ptext (sLit "where"))
+      pp_where = ppShowRhs ss $ ppUnless (null sigs && null ats) (text "where")
 
       asocs = ppr_trim $ map maybeShowAssoc ats
       dsigs = ppr_trim $ map maybeShowSig sigs
@@ -720,16 +720,16 @@ pprIfaceDecl ss (IfaceClass { ifATs = ats, ifSigs = sigs, ifRec = isrec
 
       pprMinDef :: BooleanFormula IfLclName -> SDoc
       pprMinDef minDef = ppUnless (isTrue minDef) $ -- hide empty definitions
-        ptext (sLit "{-# MINIMAL") <+>
+        text "{-# MINIMAL" <+>
         pprBooleanFormula
           (\_ def -> cparen (isLexSym def) (ppr def)) 0 minDef <+>
-        ptext (sLit "#-}")
+        text "#-}"
 
 pprIfaceDecl ss (IfaceSynonym { ifName    = tc
                               , ifTyVars  = tv
                               , ifSynRhs  = mono_ty
                               , ifSynKind = kind})
-  = hang (ptext (sLit "type") <+> pprIfaceDeclHead [] ss tc kind tv <+> equals)
+  = hang (text "type" <+> pprIfaceDeclHead [] ss tc kind tv <+> equals)
        2 (sep [pprIfaceForAll tvs, pprIfaceContextArr theta, ppr tau])
   where
     (tvs, theta, tau) = splitIfaceSigmaTy mono_ty
@@ -738,7 +738,7 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon, ifTyVars = tyvars
                              , ifFamFlav = rhs, ifFamKind = kind
                              , ifResVar = res_var, ifFamInj = inj })
   | IfaceDataFamilyTyCon <- rhs
-  = ptext (sLit "data family") <+> pprIfaceDeclHead [] ss tycon kind tyvars
+  = text "data family" <+> pprIfaceDeclHead [] ss tycon kind tyvars
 
   | otherwise
   = hang (text "type family" <+> pprIfaceDeclHead [] ss tycon kind tyvars)
@@ -758,20 +758,20 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon, ifTyVars = tyvars
        tvs -> hsep [vbar, ppr res, text "->", interppSP (map fst tvs)]
 
     pp_rhs IfaceDataFamilyTyCon
-      = ppShowIface ss (ptext (sLit "data"))
+      = ppShowIface ss (text "data")
     pp_rhs IfaceOpenSynFamilyTyCon
-      = ppShowIface ss (ptext (sLit "open"))
+      = ppShowIface ss (text "open")
     pp_rhs IfaceAbstractClosedSynFamilyTyCon
-      = ppShowIface ss (ptext (sLit "closed, abstract"))
+      = ppShowIface ss (text "closed, abstract")
     pp_rhs (IfaceClosedSynFamilyTyCon {})
       = empty  -- see pp_branches
     pp_rhs IfaceBuiltInSynFamTyCon
-      = ppShowIface ss (ptext (sLit "built-in"))
+      = ppShowIface ss (text "built-in")
 
     pp_branches (IfaceClosedSynFamilyTyCon (Just (ax, brs)))
       = hang (text "where")
            2 (vcat (map (pprAxBranch (pprPrefixIfDeclBndr ss tycon)) brs)
-              $$ ppShowIface ss (ptext (sLit "axiom") <+> ppr ax))
+              $$ ppShowIface ss (text "axiom" <+> ppr ax))
     pp_branches _ = Outputable.empty
 
 pprIfaceDecl _ (IfacePatSyn { ifName = name, ifPatBuilder = builder,
@@ -798,13 +798,13 @@ pprIfaceDecl ss (IfaceId { ifName = var, ifType = ty,
 
 pprIfaceDecl _ (IfaceAxiom { ifName = name, ifTyCon = tycon
                            , ifAxBranches = branches })
-  = hang (ptext (sLit "axiom") <+> ppr name <> dcolon)
+  = hang (text "axiom" <+> ppr name <> dcolon)
        2 (vcat $ map (pprAxBranch (ppr tycon)) branches)
 
 
 pprCType :: Maybe CType -> SDoc
 pprCType Nothing      = Outputable.empty
-pprCType (Just cType) = ptext (sLit "C type:") <+> ppr cType
+pprCType (Just cType) = text "C type:" <+> ppr cType
 
 -- if, for each role, suppress_if role is True, then suppress the role
 -- output
@@ -814,11 +814,11 @@ pprRoles suppress_if tyCon bndrs roles
   = sdocWithDynFlags $ \dflags ->
       let froles = suppressIfaceInvisibles dflags bndrs roles
       in ppUnless (all suppress_if roles || null froles) $
-         ptext (sLit "type role") <+> tyCon <+> hsep (map ppr froles)
+         text "type role" <+> tyCon <+> hsep (map ppr froles)
 
 pprRec :: RecFlag -> SDoc
 pprRec NonRecursive = Outputable.empty
-pprRec Recursive    = ptext (sLit "RecFlag: Recursive")
+pprRec Recursive    = text "RecFlag: Recursive"
 
 pprInfixIfDeclBndr, pprPrefixIfDeclBndr :: ShowSub -> OccName -> SDoc
 pprInfixIfDeclBndr (ShowSub { ss_ppr_bndr = ppr_bndr }) occ
@@ -834,7 +834,7 @@ pprIfaceClassOp ss (IfaceClassOp n ty dm)
   = pp_sig n ty $$ generic_dm
   where
    generic_dm | Just (GenericDM dm_ty) <- dm
-              =  ptext (sLit "default") <+> pp_sig n dm_ty
+              =  text "default" <+> pp_sig n dm_ty
               | otherwise
               = empty
    pp_sig n ty = pprPrefixIfDeclBndr ss n <+> dcolon <+> pprIfaceSigmaType ty
@@ -848,7 +848,7 @@ pprIfaceAT ss (IfaceAT d mb_def)
          , case mb_def of
               Nothing  -> Outputable.empty
               Just rhs -> nest 2 $
-                          ptext (sLit "Default:") <+> ppr rhs ]
+                          text "Default:" <+> ppr rhs ]
 
 instance Outputable IfaceTyConParent where
   ppr p = pprIfaceTyConParent p
@@ -912,8 +912,8 @@ pprIfaceConDecl ss gadt_style mk_user_con_res_ty fls
 
     ppr_bang IfNoBang = ppWhen opt_PprStyle_Debug $ char '_'
     ppr_bang IfStrict = char '!'
-    ppr_bang IfUnpack = ptext (sLit "{-# UNPACK #-}")
-    ppr_bang (IfUnpackCo co) = ptext (sLit "! {-# UNPACK #-}") <>
+    ppr_bang IfUnpack = text "{-# UNPACK #-}"
+    ppr_bang (IfUnpackCo co) = text "! {-# UNPACK #-}" <>
                                pprParendIfaceCoercion co
 
     pprParendBangTy (bang, ty) = ppr_bang bang <> pprParendIfaceType ty
@@ -939,22 +939,22 @@ instance Outputable IfaceRule where
   ppr (IfaceRule { ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
                    ifRuleHead = fn, ifRuleArgs = args, ifRuleRhs = rhs })
     = sep [hsep [pprRuleName name, ppr act,
-                 ptext (sLit "forall") <+> pprIfaceBndrs bndrs],
+                 text "forall" <+> pprIfaceBndrs bndrs],
            nest 2 (sep [ppr fn <+> sep (map pprParendIfaceExpr args),
-                        ptext (sLit "=") <+> ppr rhs])
+                        text "=" <+> ppr rhs])
       ]
 
 instance Outputable IfaceClsInst where
   ppr (IfaceClsInst { ifDFun = dfun_id, ifOFlag = flag
                     , ifInstCls = cls, ifInstTys = mb_tcs})
-    = hang (ptext (sLit "instance") <+> ppr flag
+    = hang (text "instance" <+> ppr flag
                 <+> ppr cls <+> brackets (pprWithCommas ppr_rough mb_tcs))
          2 (equals <+> ppr dfun_id)
 
 instance Outputable IfaceFamInst where
   ppr (IfaceFamInst { ifFamInstFam = fam, ifFamInstTys = mb_tcs
                     , ifFamInstAxiom = tycon_ax})
-    = hang (ptext (sLit "family instance") <+>
+    = hang (text "family instance" <+>
             ppr fam <+> pprWithCommas (brackets . ppr_rough) mb_tcs)
          2 (equals <+> ppr tycon_ax)
 
@@ -1024,37 +1024,37 @@ pprIfaceExpr add_par i@(IfaceLam _ _)
     collect bs e              = (reverse bs, e)
 
 pprIfaceExpr add_par (IfaceECase scrut ty)
-  = add_par (sep [ ptext (sLit "case") <+> pprIfaceExpr noParens scrut
-                 , ptext (sLit "ret_ty") <+> pprParendIfaceType ty
-                 , ptext (sLit "of {}") ])
+  = add_par (sep [ text "case" <+> pprIfaceExpr noParens scrut
+                 , text "ret_ty" <+> pprParendIfaceType ty
+                 , text "of {}" ])
 
 pprIfaceExpr add_par (IfaceCase scrut bndr [(con, bs, rhs)])
-  = add_par (sep [ptext (sLit "case")
-                        <+> pprIfaceExpr noParens scrut <+> ptext (sLit "of")
+  = add_par (sep [text "case"
+                        <+> pprIfaceExpr noParens scrut <+> text "of"
                         <+> ppr bndr <+> char '{' <+> ppr_con_bs con bs <+> arrow,
                   pprIfaceExpr noParens rhs <+> char '}'])
 
 pprIfaceExpr add_par (IfaceCase scrut bndr alts)
-  = add_par (sep [ptext (sLit "case")
-                        <+> pprIfaceExpr noParens scrut <+> ptext (sLit "of")
+  = add_par (sep [text "case"
+                        <+> pprIfaceExpr noParens scrut <+> text "of"
                         <+> ppr bndr <+> char '{',
                   nest 2 (sep (map ppr_alt alts)) <+> char '}'])
 
 pprIfaceExpr _       (IfaceCast expr co)
   = sep [pprParendIfaceExpr expr,
-         nest 2 (ptext (sLit "`cast`")),
+         nest 2 (text "`cast`"),
          pprParendIfaceCoercion co]
 
 pprIfaceExpr add_par (IfaceLet (IfaceNonRec b rhs) body)
-  = add_par (sep [ptext (sLit "let {"),
+  = add_par (sep [text "let {",
                   nest 2 (ppr_bind (b, rhs)),
-                  ptext (sLit "} in"),
+                  text "} in",
                   pprIfaceExpr noParens body])
 
 pprIfaceExpr add_par (IfaceLet (IfaceRec pairs) body)
-  = add_par (sep [ptext (sLit "letrec {"),
+  = add_par (sep [text "letrec {",
                   nest 2 (sep (map ppr_bind pairs)),
-                  ptext (sLit "} in"),
+                  text "} in",
                   pprIfaceExpr noParens body])
 
 pprIfaceExpr add_par (IfaceTick tickish e)
@@ -1096,36 +1096,36 @@ instance Outputable IfaceConAlt where
 ------------------
 instance Outputable IfaceIdDetails where
   ppr IfVanillaId       = Outputable.empty
-  ppr (IfRecSelId tc b) = ptext (sLit "RecSel") <+> ppr tc
+  ppr (IfRecSelId tc b) = text "RecSel" <+> ppr tc
                           <+> if b
-                                then ptext (sLit "<naughty>")
+                                then text "<naughty>"
                                 else Outputable.empty
-  ppr IfDFunId          = ptext (sLit "DFunId")
+  ppr IfDFunId          = text "DFunId"
 
 instance Outputable IfaceIdInfo where
   ppr NoInfo       = Outputable.empty
-  ppr (HasInfo is) = ptext (sLit "{-") <+> pprWithCommas ppr is
-                     <+> ptext (sLit "-}")
+  ppr (HasInfo is) = text "{-" <+> pprWithCommas ppr is
+                     <+> text "-}"
 
 instance Outputable IfaceInfoItem where
-  ppr (HsUnfold lb unf)     = ptext (sLit "Unfolding")
-                              <> ppWhen lb (ptext (sLit "(loop-breaker)"))
+  ppr (HsUnfold lb unf)     = text "Unfolding"
+                              <> ppWhen lb (text "(loop-breaker)")
                               <> colon <+> ppr unf
-  ppr (HsInline prag)       = ptext (sLit "Inline:") <+> ppr prag
-  ppr (HsArity arity)       = ptext (sLit "Arity:") <+> int arity
-  ppr (HsStrictness str) = ptext (sLit "Strictness:") <+> pprIfaceStrictSig str
-  ppr HsNoCafRefs           = ptext (sLit "HasNoCafRefs")
+  ppr (HsInline prag)       = text "Inline:" <+> ppr prag
+  ppr (HsArity arity)       = text "Arity:" <+> int arity
+  ppr (HsStrictness str) = text "Strictness:" <+> pprIfaceStrictSig str
+  ppr HsNoCafRefs           = text "HasNoCafRefs"
 
 instance Outputable IfaceUnfolding where
-  ppr (IfCompulsory e)     = ptext (sLit "<compulsory>") <+> parens (ppr e)
+  ppr (IfCompulsory e)     = text "<compulsory>" <+> parens (ppr e)
   ppr (IfCoreUnfold s e)   = (if s
-                                then ptext (sLit "<stable>")
+                                then text "<stable>"
                                 else Outputable.empty)
                               <+> parens (ppr e)
-  ppr (IfInlineRule a uok bok e) = sep [ptext (sLit "InlineRule")
+  ppr (IfInlineRule a uok bok e) = sep [text "InlineRule"
                                             <+> ppr (a,uok,bok),
                                         pprParendIfaceExpr e]
-  ppr (IfDFunUnfold bs es) = hang (ptext (sLit "DFun:") <+> sep (map ppr bs) <> dot)
+  ppr (IfDFunUnfold bs es) = hang (text "DFun:" <+> sep (map ppr bs) <> dot)
                                 2 (sep (map pprParendIfaceExpr es))
 
 {-

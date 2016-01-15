@@ -229,11 +229,11 @@ tcExpr (HsLam match) res_ty
         ; return (mkHsWrap co_fn (HsLam match')) }
   where
     match_ctxt = MC { mc_what = LambdaExpr, mc_body = tcBody }
-    herald = sep [ ptext (sLit "The lambda expression") <+>
+    herald = sep [ text "The lambda expression" <+>
                    quotes (pprSetDepth (PartWay 1) $
                            pprMatches (LambdaExpr :: HsMatchContext Name) match),
                         -- The pprSetDepth makes the abstraction print briefly
-                   ptext (sLit "has")]
+                   text "has"]
 
 tcExpr e@(HsLamCase _ matches) res_ty
   = do { (co_fn, ~[arg_ty], matches')
@@ -241,8 +241,8 @@ tcExpr e@(HsLamCase _ matches) res_ty
            -- The laziness annotation is because we don't want to fail here
            -- if there are multiple arguments
        ; return (mkHsWrap co_fn $ HsLamCase arg_ty matches') }
-  where msg = sep [ ptext (sLit "The function") <+> quotes (ppr e)
-                  , ptext (sLit "requires")]
+  where msg = sep [ text "The function" <+> quotes (ppr e)
+                  , text "requires"]
         match_ctxt = MC { mc_what = CaseAlt, mc_body = tcBody }
 
 tcExpr e@(ExprWithTySig expr sig_ty) res_ty
@@ -342,7 +342,7 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
   = do { traceTc "Application rule" (ppr op)
        ; (arg1', arg1_ty) <- tcInferSigma arg1
 
-       ; let doc   = ptext (sLit "The first argument of ($) takes")
+       ; let doc   = text "The first argument of ($) takes"
              orig1 = exprCtOrigin (unLoc arg1)
        ; (wrap_arg1, [arg2_sigma], op_res_ty) <-
            matchActualFunTys doc orig1 1 arg1_ty
@@ -556,7 +556,7 @@ tcExpr (HsStatic expr) res_ty
   = do  { staticPtrTyCon  <- tcLookupTyCon staticPtrTyConName
         ; (co, [expr_ty]) <- matchExpectedTyConApp staticPtrTyCon res_ty
         ; (expr', lie)    <- captureConstraints $
-            addErrCtxt (hang (ptext (sLit "In the body of a static form:"))
+            addErrCtxt (hang (text "In the body of a static form:")
                              2 (ppr expr)
                        ) $
             tcPolyExprNC expr expr_ty
@@ -1096,8 +1096,8 @@ tcApp m_herald orig_fun orig_args res_ty
            ; return (wrap_res, mkLHsWrap wrap_fun fun1, args1) }
 
 mk_app_msg :: LHsExpr Name -> SDoc
-mk_app_msg fun = sep [ ptext (sLit "The function") <+> quotes (ppr fun)
-                     , ptext (sLit "is applied to")]
+mk_app_msg fun = sep [ text "The function" <+> quotes (ppr fun)
+                     , text "is applied to"]
 
 mk_op_msg :: LHsExpr Name -> SDoc
 mk_op_msg op = text "The operator" <+> quotes (ppr op) <+> text "takes"
@@ -1329,7 +1329,7 @@ tcInferId :: Name -> TcM (HsExpr TcId, TcSigmaType)
 -- Look up an occurrence of an Id
 tcInferId id_name
   | id_name `hasKey` tagToEnumKey
-  = failWithTc (ptext (sLit "tagToEnum# must appear applied to one argument"))
+  = failWithTc (text "tagToEnum# must appear applied to one argument")
         -- tcApp catches the case (tagToEnum# arg)
 
   | id_name `hasKey` assertIdKey
@@ -1374,7 +1374,7 @@ tc_infer_id lbl id_name
                  PatSynCon ps    -> tcPatSynBuilderOcc ps
 
              _ -> failWithTc $
-                  ppr thing <+> ptext (sLit "used where a value identifier was expected") }
+                  ppr thing <+> text "used where a value identifier was expected" }
   where
     return_id id = return (HsVar (noLoc id), idType id)
 
@@ -1561,14 +1561,14 @@ tcTagToEnum loc fun_name args res_ty
        ; return (mkWpCastR (mkTcSymCo coi), fun', [arg']) }
                  -- coi is a Representational coercion
   where
-    doc1 = vcat [ ptext (sLit "Specify the type by giving a type signature")
-                , ptext (sLit "e.g. (tagToEnum# x) :: Bool") ]
-    doc2 = ptext (sLit "Result type must be an enumeration type")
+    doc1 = vcat [ text "Specify the type by giving a type signature"
+                , text "e.g. (tagToEnum# x) :: Bool" ]
+    doc2 = text "Result type must be an enumeration type"
 
     mk_error :: TcType -> SDoc -> SDoc
     mk_error ty what
-      = hang (ptext (sLit "Bad call to tagToEnum#")
-               <+> ptext (sLit "at type") <+> ppr ty)
+      = hang (text "Bad call to tagToEnum#"
+               <+> text "at type" <+> ppr ty)
            2 what
 
     too_many_args :: TcM a
@@ -1647,7 +1647,7 @@ checkCrossStageLifting _ _ = return ()
 
 polySpliceErr :: Id -> SDoc
 polySpliceErr id
-  = ptext (sLit "Can't splice the polymorphic local variable") <+> quotes (ppr id)
+  = text "Can't splice the polymorphic local variable" <+> quotes (ppr id)
 
 {-
 Note [Lifting strings]
@@ -2090,11 +2090,11 @@ addExprErrCtxt expr = addErrCtxt (exprCtxt expr)
 
 exprCtxt :: LHsExpr Name -> SDoc
 exprCtxt expr
-  = hang (ptext (sLit "In the expression:")) 2 (ppr expr)
+  = hang (text "In the expression:") 2 (ppr expr)
 
 fieldCtxt :: FieldLabelString -> SDoc
 fieldCtxt field_name
-  = ptext (sLit "In the") <+> quotes (ppr field_name) <+> ptext (sLit "field of a record")
+  = text "In the" <+> quotes (ppr field_name) <+> ptext (sLit "field of a record")
 
 addFunResCtxt :: Bool  -- There is at least one argument
               -> HsExpr Name -> TcType -> TcType
@@ -2120,13 +2120,13 @@ addFunResCtxt has_args fun fun_res_ty env_ty
                  info  | n_fun == n_env = Outputable.empty
                        | n_fun > n_env
                        , not_fun res_env
-                       = ptext (sLit "Probable cause:") <+> quotes (ppr fun)
-                         <+> ptext (sLit "is applied to too few arguments")
+                       = text "Probable cause:" <+> quotes (ppr fun)
+                         <+> text "is applied to too few arguments"
 
                        | has_args
                        , not_fun res_fun
-                       = ptext (sLit "Possible cause:") <+> quotes (ppr fun)
-                         <+> ptext (sLit "is applied to too many arguments")
+                       = text "Possible cause:" <+> quotes (ppr fun)
+                         <+> text "is applied to too many arguments"
 
                        | otherwise
                        = Outputable.empty  -- Never suggest that a naked variable is                                         -- applied to too many args!
@@ -2140,7 +2140,7 @@ addFunResCtxt has_args fun fun_res_ty env_ty
 
 badFieldTypes :: [(FieldLabelString,TcType)] -> SDoc
 badFieldTypes prs
-  = hang (ptext (sLit "Record update for insufficiently polymorphic field")
+  = hang (text "Record update for insufficiently polymorphic field"
                          <> plural prs <> colon)
        2 (vcat [ ppr f <+> dcolon <+> ppr ty | (f,ty) <- prs ])
 
@@ -2149,7 +2149,7 @@ badFieldsUpd
   -> [ConLike] -- Data cons of the type which the first field name belongs to
   -> SDoc
 badFieldsUpd rbinds data_cons
-  = hang (ptext (sLit "No constructor has all these fields:"))
+  = hang (text "No constructor has all these fields:")
        2 (pprQuotedList conflictingFields)
           -- See Note [Finding the conflicting fields]
   where
@@ -2221,23 +2221,23 @@ a decent stab, no more.  See Trac #7989.
 
 naughtyRecordSel :: RdrName -> SDoc
 naughtyRecordSel sel_id
-  = ptext (sLit "Cannot use record selector") <+> quotes (ppr sel_id) <+>
-    ptext (sLit "as a function due to escaped type variables") $$
-    ptext (sLit "Probable fix: use pattern-matching syntax instead")
+  = text "Cannot use record selector" <+> quotes (ppr sel_id) <+>
+    text "as a function due to escaped type variables" $$
+    text "Probable fix: use pattern-matching syntax instead"
 
 notSelector :: Name -> SDoc
 notSelector field
-  = hsep [quotes (ppr field), ptext (sLit "is not a record selector")]
+  = hsep [quotes (ppr field), text "is not a record selector"]
 
 mixedSelectors :: [Id] -> [Id] -> SDoc
 mixedSelectors data_sels@(dc_rep_id:_) pat_syn_sels@(ps_rep_id:_)
   = ptext
       (sLit "Cannot use a mixture of pattern synonym and record selectors") $$
-    ptext (sLit "Record selectors defined by")
+    text "Record selectors defined by"
       <+> quotes (ppr (tyConName rep_dc))
       <> text ":"
       <+> pprWithCommas ppr data_sels $$
-    ptext (sLit "Pattern synonym selectors defined by")
+    text "Pattern synonym selectors defined by"
       <+> quotes (ppr (patSynName rep_ps))
       <> text ":"
       <+> pprWithCommas ppr pat_syn_sels
@@ -2255,26 +2255,26 @@ missingStrictFields con fields
                                            -- with strict fields
          | otherwise   = colon <+> pprWithCommas ppr fields
 
-    header = ptext (sLit "Constructor") <+> quotes (ppr con) <+>
-             ptext (sLit "does not have the required strict field(s)")
+    header = text "Constructor" <+> quotes (ppr con) <+>
+             text "does not have the required strict field(s)"
 
 missingFields :: ConLike -> [FieldLabelString] -> SDoc
 missingFields con fields
-  = ptext (sLit "Fields of") <+> quotes (ppr con) <+> ptext (sLit "not initialised:")
+  = text "Fields of" <+> quotes (ppr con) <+> ptext (sLit "not initialised:")
         <+> pprWithCommas ppr fields
 
--- callCtxt fun args = ptext (sLit "In the call") <+> parens (ppr (foldl mkHsApp fun args))
+-- callCtxt fun args = text "In the call" <+> parens (ppr (foldl mkHsApp fun args))
 
 noPossibleParents :: [LHsRecUpdField Name] -> SDoc
 noPossibleParents rbinds
-  = hang (ptext (sLit "No type has all these fields:"))
+  = hang (text "No type has all these fields:")
        2 (pprQuotedList fields)
   where
     fields = map (hsRecFieldLbl . unLoc) rbinds
 
 badOverloadedUpdate :: SDoc
-badOverloadedUpdate = ptext (sLit "Record update is ambiguous, and requires a type signature")
+badOverloadedUpdate = text "Record update is ambiguous, and requires a type signature"
 
 fieldNotInType :: RecSelParent -> RdrName -> SDoc
 fieldNotInType p rdr
-  = unknownSubordinateErr (ptext (sLit "field of type") <+> quotes (ppr p)) rdr
+  = unknownSubordinateErr (text "field of type" <+> quotes (ppr p)) rdr

@@ -722,11 +722,11 @@ specImport dflags this_mod top_env done callers rb fn calls_for_fn
        ; return (rules2 ++ rules1, final_binds) }
 
   |  warnMissingSpecs dflags callers
-  = do { warnMsg (vcat [ hang (ptext (sLit "Could not specialise imported function") <+> quotes (ppr fn))
-                            2 (vcat [ ptext (sLit "when specialising") <+> quotes (ppr caller)
+  = do { warnMsg (vcat [ hang (text "Could not specialise imported function" <+> quotes (ppr fn))
+                            2 (vcat [ text "when specialising" <+> quotes (ppr caller)
                                     | caller <- callers])
-                      , ifPprDebug (ptext (sLit "calls:") <+> vcat (map (pprCallInfo fn) calls_for_fn))
-                      , ptext (sLit "Probable fix: add INLINEABLE pragma on") <+> quotes (ppr fn) ])
+                      , ifPprDebug (text "calls:" <+> vcat (map (pprCallInfo fn) calls_for_fn))
+                      , text "Probable fix: add INLINEABLE pragma on" <+> quotes (ppr fn) ])
        ; return ([], []) }
 
   | otherwise
@@ -1169,7 +1169,7 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
 
   | otherwise   -- No calls or RHS doesn't fit our preconceptions
   = WARN( not (exprIsTrivial rhs) && notNull calls_for_me,
-          ptext (sLit "Missed specialisation opportunity for")
+          text "Missed specialisation opportunity for"
                                  <+> ppr fn $$ _trace_doc )
           -- Note [Specialisation shape]
     -- pprTrace "specDefn: none" (ppr fn <+> ppr calls_for_me) $
@@ -1273,9 +1273,9 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
                 --      forall b, d1',d2'.  f t1 b t3 d1' d2' = f1 b
                 herald = case mb_mod of
                            Nothing        -- Specialising local fn
-                               -> ptext (sLit "SPEC")
+                               -> text "SPEC"
                            Just this_mod  -- Specialising imoprted fn
-                               -> ptext (sLit "SPEC/") <> ppr this_mod
+                               -> text "SPEC/" <> ppr this_mod
 
                 rule_name = mkFastString $ showSDocForUser dflags neverQualify $
                             herald <+> ppr fn <+> hsep (map ppr_call_key_ty call_ts)
@@ -1694,9 +1694,9 @@ data UsageDetails
 
 instance Outputable UsageDetails where
   ppr (MkUD { ud_binds = dbs, ud_calls = calls })
-        = ptext (sLit "MkUD") <+> braces (sep (punctuate comma
-                [ptext (sLit "binds") <+> equals <+> ppr dbs,
-                 ptext (sLit "calls") <+> equals <+> ppr calls]))
+        = text "MkUD" <+> braces (sep (punctuate comma
+                [text "binds" <+> equals <+> ppr dbs,
+                 text "calls" <+> equals <+> ppr calls]))
 
 -- | A 'DictBind' is a binding along with a cached set containing its free
 -- variables (both type variables and dictionaries)
@@ -1724,7 +1724,7 @@ data CallInfoSet = CIS Id (Map CallKey ([DictExpr], VarSet))
 type CallInfo = (CallKey, ([DictExpr], VarSet))
 
 instance Outputable CallInfoSet where
-  ppr (CIS fn map) = hang (ptext (sLit "CIS") <+> ppr fn)
+  ppr (CIS fn map) = hang (text "CIS" <+> ppr fn)
                         2 (ppr map)
 
 pprCallInfo :: Id -> CallInfo -> SDoc

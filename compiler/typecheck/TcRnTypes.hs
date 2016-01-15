@@ -921,20 +921,20 @@ instance Outputable PromotionErr where
 
 pprTcTyThingCategory :: TcTyThing -> SDoc
 pprTcTyThingCategory (AGlobal thing)    = pprTyThingCategory thing
-pprTcTyThingCategory (ATyVar {})        = ptext (sLit "Type variable")
-pprTcTyThingCategory (ATcId {})         = ptext (sLit "Local identifier")
-pprTcTyThingCategory (ATcTyCon {})     = ptext (sLit "Local tycon")
+pprTcTyThingCategory (ATyVar {})        = text "Type variable"
+pprTcTyThingCategory (ATcId {})         = text "Local identifier"
+pprTcTyThingCategory (ATcTyCon {})     = text "Local tycon"
 pprTcTyThingCategory (APromotionErr pe) = pprPECategory pe
 
 pprPECategory :: PromotionErr -> SDoc
-pprPECategory ClassPE        = ptext (sLit "Class")
-pprPECategory TyConPE        = ptext (sLit "Type constructor")
-pprPECategory PatSynPE       = ptext (sLit "Pattern synonym")
-pprPECategory FamDataConPE   = ptext (sLit "Data constructor")
-pprPECategory RecDataConPE   = ptext (sLit "Data constructor")
-pprPECategory NoDataKinds    = ptext (sLit "Data constructor")
-pprPECategory NoTypeInTypeTC = ptext (sLit "Type constructor")
-pprPECategory NoTypeInTypeDC = ptext (sLit "Data constructor")
+pprPECategory ClassPE        = text "Class"
+pprPECategory TyConPE        = text "Type constructor"
+pprPECategory PatSynPE       = text "Pattern synonym"
+pprPECategory FamDataConPE   = text "Data constructor"
+pprPECategory RecDataConPE   = text "Data constructor"
+pprPECategory NoDataKinds    = text "Data constructor"
+pprPECategory NoTypeInTypeTC = text "Type constructor"
+pprPECategory NoTypeInTypeDC = text "Data constructor"
 
 {- Note [Bindings with closed types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1119,10 +1119,10 @@ data WhereFrom
                                         -- See Note [Care with plugin imports] in LoadIface
 
 instance Outputable WhereFrom where
-  ppr (ImportByUser is_boot) | is_boot     = ptext (sLit "{- SOURCE -}")
+  ppr (ImportByUser is_boot) | is_boot     = text "{- SOURCE -}"
                              | otherwise   = empty
-  ppr ImportBySystem                       = ptext (sLit "{- SYSTEM -}")
-  ppr ImportByPlugin                       = ptext (sLit "{- PLUGIN -}")
+  ppr ImportBySystem                       = text "{- SYSTEM -}"
+  ppr ImportByPlugin                       = text "{- PLUGIN -}"
 
 
 {- *********************************************************************
@@ -1220,8 +1220,8 @@ instance Outputable TcIdSigInfo where
                , ppr (map fst tyvars) ]
 
 instance Outputable TcIdSigBndr where
-    ppr (CompleteSig f)               = ptext (sLit "CompleteSig") <+> ppr f
-    ppr (PartialSig { sig_name = n }) = ptext (sLit "PartialSig")  <+> ppr n
+    ppr (CompleteSig f)               = text "CompleteSig" <+> ppr f
+    ppr (PartialSig { sig_name = n }) = text "PartialSig"  <+> ppr n
 
 instance Outputable TcPatSynInfo where
     ppr (TPSI{ patsig_name = name}) = ppr name
@@ -1903,10 +1903,10 @@ trulyInsoluble _tc_lvl insol
 
 instance Outputable WantedConstraints where
   ppr (WC {wc_simple = s, wc_impl = i, wc_insol = n})
-   = ptext (sLit "WC") <+> braces (vcat
-        [ ppr_bag (ptext (sLit "wc_simple")) s
-        , ppr_bag (ptext (sLit "wc_insol")) n
-        , ppr_bag (ptext (sLit "wc_impl")) i ])
+   = text "WC" <+> braces (vcat
+        [ ppr_bag (text "wc_simple") s
+        , ppr_bag (text "wc_insol") n
+        , ppr_bag (text "wc_impl") i ])
 
 ppr_bag :: Outputable a => SDoc -> Bag a -> SDoc
 ppr_bag doc bag
@@ -1969,23 +1969,23 @@ instance Outputable Implication where
               , ic_given = given, ic_no_eqs = no_eqs
               , ic_wanted = wanted, ic_status = status
               , ic_binds = binds, ic_info = info })
-   = hang (ptext (sLit "Implic") <+> lbrace)
-        2 (sep [ ptext (sLit "TcLevel =") <+> ppr tclvl
-               , ptext (sLit "Skolems =") <+> pprTvBndrs skols
-               , ptext (sLit "No-eqs =") <+> ppr no_eqs
-               , ptext (sLit "Status =") <+> ppr status
-               , hang (ptext (sLit "Given ="))  2 (pprEvVars given)
-               , hang (ptext (sLit "Wanted =")) 2 (ppr wanted)
-               , ptext (sLit "Binds =") <+> ppr binds
+   = hang (text "Implic" <+> lbrace)
+        2 (sep [ text "TcLevel =" <+> ppr tclvl
+               , text "Skolems =" <+> pprTvBndrs skols
+               , text "No-eqs =" <+> ppr no_eqs
+               , text "Status =" <+> ppr status
+               , hang (text "Given =")  2 (pprEvVars given)
+               , hang (text "Wanted =") 2 (ppr wanted)
+               , text "Binds =" <+> ppr binds
                , pprSkolInfo info ] <+> rbrace)
 
 instance Outputable ImplicStatus where
-  ppr IC_Insoluble   = ptext (sLit "Insoluble")
-  ppr IC_Unsolved    = ptext (sLit "Unsolved")
+  ppr IC_Insoluble   = text "Insoluble"
+  ppr IC_Unsolved    = text "Unsolved"
   ppr (IC_Solved { ics_need = vs, ics_dead = dead })
-    = ptext (sLit "Solved")
-      <+> (braces $ vcat [ ptext (sLit "Dead givens =") <+> ppr dead
-                         , ptext (sLit "Needed =") <+> ppr vs ])
+    = text "Solved"
+      <+> (braces $ vcat [ text "Dead givens =" <+> ppr dead
+                         , text "Needed =" <+> ppr vs ])
 
 {-
 Note [Needed evidence variables]
@@ -2174,9 +2174,9 @@ instance Outputable TcEvDest where
 
 instance Outputable CtEvidence where
   ppr fl = case fl of
-             CtGiven {}   -> ptext (sLit "[G]") <+> ppr (ctev_evar fl) <+> ppr_pty
-             CtWanted {}  -> ptext (sLit "[W]") <+> ppr (ctev_dest fl) <+> ppr_pty
-             CtDerived {} -> ptext (sLit "[D]") <+> text "_" <+> ppr_pty
+             CtGiven {}   -> text "[G]" <+> ppr (ctev_evar fl) <+> ppr_pty
+             CtWanted {}  -> text "[W]" <+> ppr (ctev_dest fl) <+> ppr_pty
+             CtDerived {} -> text "[D]" <+> text "_" <+> ppr_pty
          where ppr_pty = dcolon <+> ppr (ctEvPred fl)
 
 isWanted :: CtEvidence -> Bool
@@ -2533,28 +2533,28 @@ instance Outputable SkolemInfo where
 pprSkolInfo :: SkolemInfo -> SDoc
 -- Complete the sentence "is a rigid type variable bound by..."
 pprSkolInfo (SigSkol ctxt ty) = pprSigSkolInfo ctxt ty
-pprSkolInfo (IPSkol ips)      = ptext (sLit "the implicit-parameter binding") <> plural ips <+> ptext (sLit "for")
+pprSkolInfo (IPSkol ips)      = text "the implicit-parameter binding" <> plural ips <+> text "for"
                                 <+> pprWithCommas ppr ips
-pprSkolInfo (ClsSkol cls)     = ptext (sLit "the class declaration for") <+> quotes (ppr cls)
-pprSkolInfo (DerivSkol pred)  = ptext (sLit "the deriving clause for") <+> quotes (ppr pred)
-pprSkolInfo InstSkol          = ptext (sLit "the instance declaration")
-pprSkolInfo (InstSC n)        = ptext (sLit "the instance declaration") <> ifPprDebug (parens (ppr n))
-pprSkolInfo DataSkol          = ptext (sLit "a data type declaration")
-pprSkolInfo FamInstSkol       = ptext (sLit "a family instance declaration")
-pprSkolInfo BracketSkol       = ptext (sLit "a Template Haskell bracket")
-pprSkolInfo (RuleSkol name)   = ptext (sLit "the RULE") <+> pprRuleName name
-pprSkolInfo ArrowSkol         = ptext (sLit "an arrow form")
+pprSkolInfo (ClsSkol cls)     = text "the class declaration for" <+> quotes (ppr cls)
+pprSkolInfo (DerivSkol pred)  = text "the deriving clause for" <+> quotes (ppr pred)
+pprSkolInfo InstSkol          = text "the instance declaration"
+pprSkolInfo (InstSC n)        = text "the instance declaration" <> ifPprDebug (parens (ppr n))
+pprSkolInfo DataSkol          = text "a data type declaration"
+pprSkolInfo FamInstSkol       = text "a family instance declaration"
+pprSkolInfo BracketSkol       = text "a Template Haskell bracket"
+pprSkolInfo (RuleSkol name)   = text "the RULE" <+> pprRuleName name
+pprSkolInfo ArrowSkol         = text "an arrow form"
 pprSkolInfo (PatSkol cl mc)   = sep [ pprPatSkolInfo cl
-                                    , ptext (sLit "in") <+> pprMatchContext mc ]
-pprSkolInfo (InferSkol ids)   = sep [ ptext (sLit "the inferred type of")
+                                    , text "in" <+> pprMatchContext mc ]
+pprSkolInfo (InferSkol ids)   = sep [ text "the inferred type of"
                                     , vcat [ ppr name <+> dcolon <+> ppr ty
                                            | (name,ty) <- ids ]]
-pprSkolInfo (UnifyForAllSkol ty) = ptext (sLit "the type") <+> ppr ty
+pprSkolInfo (UnifyForAllSkol ty) = text "the type" <+> ppr ty
 
 -- UnkSkol
 -- For type variables the others are dealt with by pprSkolTvBinding.
 -- For Insts, these cases should not happen
-pprSkolInfo UnkSkol = WARN( True, text "pprSkolInfo: UnkSkol" ) ptext (sLit "UnkSkol")
+pprSkolInfo UnkSkol = WARN( True, text "pprSkolInfo: UnkSkol" ) text "UnkSkol"
 
 pprSigSkolInfo :: UserTypeCtxt -> Type -> SDoc
 pprSigSkolInfo ctxt ty
@@ -2563,12 +2563,12 @@ pprSigSkolInfo ctxt ty
        _              -> vcat [ pprUserTypeCtxt ctxt <> colon
                               , nest 2 (ppr ty) ]
   where
-    pp_sig f = vcat [ ptext (sLit "the type signature for:")
+    pp_sig f = vcat [ text "the type signature for:"
                     , nest 2 (pprPrefixOcc f <+> dcolon <+> ppr ty) ]
 
 pprPatSkolInfo :: ConLike -> SDoc
 pprPatSkolInfo (RealDataCon dc)
-  = sep [ ptext (sLit "a pattern with constructor:")
+  = sep [ text "a pattern with constructor:"
         , nest 2 $ ppr dc <+> dcolon
           <+> pprType (dataConUserType dc) <> comma ]
           -- pprType prints forall's regardless of -fprint-explict-foralls
@@ -2576,7 +2576,7 @@ pprPatSkolInfo (RealDataCon dc)
           -- type variable 't' is bound by ...
 
 pprPatSkolInfo (PatSynCon ps)
-  = sep [ ptext (sLit "a pattern with pattern synonym:")
+  = sep [ text "a pattern with pattern synonym:"
         , nest 2 $ ppr ps <+> dcolon
                    <+> pprType (patSynType ps) <> comma ]
 
@@ -2709,7 +2709,7 @@ instance Outputable ErrorThing where
   ppr (ErrorThing thing _ _) = ppr thing
 
 ctoHerald :: SDoc
-ctoHerald = ptext (sLit "arising from")
+ctoHerald = text "arising from"
 
 -- | Extract a suitable CtOrigin from a HsExpr
 exprCtOrigin :: HsExpr Name -> CtOrigin
@@ -2797,38 +2797,38 @@ pprCtOrigin (GivenOrigin sk) = ctoHerald <+> ppr sk
 
 pprCtOrigin (SpecPragOrigin ctxt)
   = case ctxt of
-       FunSigCtxt n _ -> ptext (sLit "a SPECIALISE pragma for") <+> quotes (ppr n)
-       SpecInstCtxt   -> ptext (sLit "a SPECIALISE INSTANCE pragma")
-       _              -> ptext (sLit "a SPECIALISE pragma")  -- Never happens I think
+       FunSigCtxt n _ -> text "a SPECIALISE pragma for" <+> quotes (ppr n)
+       SpecInstCtxt   -> text "a SPECIALISE INSTANCE pragma"
+       _              -> text "a SPECIALISE pragma"  -- Never happens I think
 
 pprCtOrigin (FunDepOrigin1 pred1 loc1 pred2 loc2)
-  = hang (ctoHerald <+> ptext (sLit "a functional dependency between constraints:"))
+  = hang (ctoHerald <+> text "a functional dependency between constraints:")
        2 (vcat [ hang (quotes (ppr pred1)) 2 (pprCtLoc loc1)
                , hang (quotes (ppr pred2)) 2 (pprCtLoc loc2) ])
 
 pprCtOrigin (FunDepOrigin2 pred1 orig1 pred2 loc2)
-  = hang (ctoHerald <+> ptext (sLit "a functional dependency between:"))
-       2 (vcat [ hang (ptext (sLit "constraint") <+> quotes (ppr pred1))
+  = hang (ctoHerald <+> text "a functional dependency between:")
+       2 (vcat [ hang (text "constraint" <+> quotes (ppr pred1))
                     2 (pprCtOrigin orig1 )
-               , hang (ptext (sLit "instance") <+> quotes (ppr pred2))
-                    2 (ptext (sLit "at") <+> ppr loc2) ])
+               , hang (text "instance" <+> quotes (ppr pred2))
+                    2 (text "at" <+> ppr loc2) ])
 
 pprCtOrigin (KindEqOrigin t1 t2 _ _)
-  = hang (ctoHerald <+> ptext (sLit "a kind equality arising from"))
+  = hang (ctoHerald <+> text "a kind equality arising from")
        2 (sep [ppr t1, char '~', ppr t2])
 
 pprCtOrigin (UnboundOccurrenceOf name)
-  = ctoHerald <+> ptext (sLit "an undeclared identifier") <+> quotes (ppr name)
+  = ctoHerald <+> text "an undeclared identifier" <+> quotes (ppr name)
 
 pprCtOrigin (DerivOriginDC dc n)
-  = hang (ctoHerald <+> ptext (sLit "the") <+> speakNth n
-          <+> ptext (sLit "field of") <+> quotes (ppr dc))
-       2 (parens (ptext (sLit "type") <+> quotes (ppr ty)))
+  = hang (ctoHerald <+> text "the" <+> speakNth n
+          <+> text "field of" <+> quotes (ppr dc))
+       2 (parens (text "type" <+> quotes (ppr ty)))
   where
     ty = dataConOrigArgTys dc !! (n-1)
 
 pprCtOrigin (DerivOriginCoerce meth ty1 ty2)
-  = hang (ctoHerald <+> ptext (sLit "the coercion of the method") <+> quotes (ppr meth))
+  = hang (ctoHerald <+> text "the coercion of the method" <+> quotes (ppr meth))
        2 (sep [ text "from type" <+> quotes (ppr ty1)
               , nest 2 $ text "to type" <+> quotes (ppr ty2) ])
 
@@ -2860,37 +2860,37 @@ pprCtOrigin simple_origin
 
 -- | Short one-liners
 pprCtO :: CtOrigin -> SDoc
-pprCtO (OccurrenceOf name)   = hsep [ptext (sLit "a use of"), quotes (ppr name)]
-pprCtO (OccurrenceOfRecSel name) = hsep [ptext (sLit "a use of"), quotes (ppr name)]
-pprCtO AppOrigin             = ptext (sLit "an application")
-pprCtO (IPOccOrigin name)    = hsep [ptext (sLit "a use of implicit parameter"), quotes (ppr name)]
-pprCtO (OverLabelOrigin l)   = hsep [ptext (sLit "the overloaded label")
+pprCtO (OccurrenceOf name)   = hsep [text "a use of", quotes (ppr name)]
+pprCtO (OccurrenceOfRecSel name) = hsep [text "a use of", quotes (ppr name)]
+pprCtO AppOrigin             = text "an application"
+pprCtO (IPOccOrigin name)    = hsep [text "a use of implicit parameter", quotes (ppr name)]
+pprCtO (OverLabelOrigin l)   = hsep [text "the overloaded label"
                                     ,quotes (char '#' <> ppr l)]
-pprCtO RecordUpdOrigin       = ptext (sLit "a record update")
-pprCtO ExprSigOrigin         = ptext (sLit "an expression type signature")
-pprCtO PatSigOrigin          = ptext (sLit "a pattern type signature")
-pprCtO PatOrigin             = ptext (sLit "a pattern")
-pprCtO ViewPatOrigin         = ptext (sLit "a view pattern")
-pprCtO IfOrigin              = ptext (sLit "an if expression")
-pprCtO (LiteralOrigin lit)   = hsep [ptext (sLit "the literal"), quotes (ppr lit)]
-pprCtO (ArithSeqOrigin seq)  = hsep [ptext (sLit "the arithmetic sequence"), quotes (ppr seq)]
-pprCtO (PArrSeqOrigin seq)   = hsep [ptext (sLit "the parallel array sequence"), quotes (ppr seq)]
-pprCtO SectionOrigin         = ptext (sLit "an operator section")
-pprCtO TupleOrigin           = ptext (sLit "a tuple")
-pprCtO NegateOrigin          = ptext (sLit "a use of syntactic negation")
-pprCtO (ScOrigin n)          = ptext (sLit "the superclasses of an instance declaration")
+pprCtO RecordUpdOrigin       = text "a record update"
+pprCtO ExprSigOrigin         = text "an expression type signature"
+pprCtO PatSigOrigin          = text "a pattern type signature"
+pprCtO PatOrigin             = text "a pattern"
+pprCtO ViewPatOrigin         = text "a view pattern"
+pprCtO IfOrigin              = text "an if expression"
+pprCtO (LiteralOrigin lit)   = hsep [text "the literal", quotes (ppr lit)]
+pprCtO (ArithSeqOrigin seq)  = hsep [text "the arithmetic sequence", quotes (ppr seq)]
+pprCtO (PArrSeqOrigin seq)   = hsep [text "the parallel array sequence", quotes (ppr seq)]
+pprCtO SectionOrigin         = text "an operator section"
+pprCtO TupleOrigin           = text "a tuple"
+pprCtO NegateOrigin          = text "a use of syntactic negation"
+pprCtO (ScOrigin n)          = text "the superclasses of an instance declaration"
                                <> ifPprDebug (parens (ppr n))
-pprCtO DerivOrigin           = ptext (sLit "the 'deriving' clause of a data type declaration")
-pprCtO StandAloneDerivOrigin = ptext (sLit "a 'deriving' declaration")
-pprCtO DefaultOrigin         = ptext (sLit "a 'default' declaration")
-pprCtO DoOrigin              = ptext (sLit "a do statement")
+pprCtO DerivOrigin           = text "the 'deriving' clause of a data type declaration"
+pprCtO StandAloneDerivOrigin = text "a 'deriving' declaration"
+pprCtO DefaultOrigin         = text "a 'default' declaration"
+pprCtO DoOrigin              = text "a do statement"
 pprCtO MCompOrigin           = text "a statement in a monad comprehension"
-pprCtO ProcOrigin            = ptext (sLit "a proc expression")
-pprCtO (TypeEqOrigin t1 t2 _)= ptext (sLit "a type equality") <+> sep [ppr t1, char '~', ppr t2]
-pprCtO AnnOrigin             = ptext (sLit "an annotation")
-pprCtO HoleOrigin            = ptext (sLit "a use of") <+> quotes (ptext $ sLit "_")
-pprCtO ListOrigin            = ptext (sLit "an overloaded list")
-pprCtO StaticOrigin          = ptext (sLit "a static form")
+pprCtO ProcOrigin            = text "a proc expression"
+pprCtO (TypeEqOrigin t1 t2 _)= text "a type equality" <+> sep [ppr t1, char '~', ppr t2]
+pprCtO AnnOrigin             = text "an annotation"
+pprCtO HoleOrigin            = text "a use of" <+> quotes (text "_")
+pprCtO ListOrigin            = text "an overloaded list"
+pprCtO StaticOrigin          = text "a static form"
 pprCtO _                     = panic "pprCtOrigin"
 
 {-

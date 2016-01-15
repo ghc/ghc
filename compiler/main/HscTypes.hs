@@ -192,13 +192,15 @@ import GHC.Serialized   ( Serialized )
 
 import Foreign
 import Control.Monad    ( guard, liftM, when, ap )
-import Control.Concurrent
 import Data.IORef
 import Data.Time
 import Data.Typeable    ( Typeable )
 import Exception
 import System.FilePath
+#ifdef GHCI
+import Control.Concurrent
 import System.Process   ( ProcessHandle )
+#endif
 
 -- -----------------------------------------------------------------------------
 -- Compilation state
@@ -606,8 +608,8 @@ hptSomeThingsBelowUs extract include_hi_boot hsc_env deps
     , let things = case lookupUFM hpt mod of
                     Just info -> extract info
                     Nothing -> pprTrace "WARNING in hptSomeThingsBelowUs" msg []
-          msg = vcat [ptext (sLit "missing module") <+> ppr mod,
-                      ptext (sLit "Probable cause: out-of-date interface files")]
+          msg = vcat [text "missing module" <+> ppr mod,
+                      text "Probable cause: out-of-date interface files"]
                         -- This really shouldn't happen, but see Trac #962
 
         -- And get its dfuns
@@ -2659,20 +2661,20 @@ isNoIfaceVectInfo (IfaceVectInfo l1 l2 l3 l4 l5)
 
 instance Outputable VectInfo where
   ppr info = vcat
-             [ ptext (sLit "variables       :") <+> ppr (vectInfoVar            info)
-             , ptext (sLit "tycons          :") <+> ppr (vectInfoTyCon          info)
-             , ptext (sLit "datacons        :") <+> ppr (vectInfoDataCon        info)
-             , ptext (sLit "parallel vars   :") <+> ppr (vectInfoParallelVars   info)
-             , ptext (sLit "parallel tycons :") <+> ppr (vectInfoParallelTyCons info)
+             [ text "variables       :" <+> ppr (vectInfoVar            info)
+             , text "tycons          :" <+> ppr (vectInfoTyCon          info)
+             , text "datacons        :" <+> ppr (vectInfoDataCon        info)
+             , text "parallel vars   :" <+> ppr (vectInfoParallelVars   info)
+             , text "parallel tycons :" <+> ppr (vectInfoParallelTyCons info)
              ]
 
 instance Outputable IfaceVectInfo where
   ppr info = vcat
-             [ ptext (sLit "variables       :") <+> ppr (ifaceVectInfoVar            info)
-             , ptext (sLit "tycons          :") <+> ppr (ifaceVectInfoTyCon          info)
-             , ptext (sLit "tycons reuse    :") <+> ppr (ifaceVectInfoTyConReuse     info)
-             , ptext (sLit "parallel vars   :") <+> ppr (ifaceVectInfoParallelVars   info)
-             , ptext (sLit "parallel tycons :") <+> ppr (ifaceVectInfoParallelTyCons info)
+             [ text "variables       :" <+> ppr (ifaceVectInfoVar            info)
+             , text "tycons          :" <+> ppr (ifaceVectInfoTyCon          info)
+             , text "tycons reuse    :" <+> ppr (ifaceVectInfoTyConReuse     info)
+             , text "parallel vars   :" <+> ppr (ifaceVectInfoParallelVars   info)
+             , text "parallel tycons :" <+> ppr (ifaceVectInfoParallelTyCons info)
              ]
 
 
@@ -2737,10 +2739,10 @@ numToTrustInfo 4 = setSafeMode Sf_Safe -- retained for backwards compat, used
 numToTrustInfo n = error $ "numToTrustInfo: bad input number! (" ++ show n ++ ")"
 
 instance Outputable IfaceTrustInfo where
-    ppr (TrustInfo Sf_None)          = ptext $ sLit "none"
-    ppr (TrustInfo Sf_Unsafe)        = ptext $ sLit "unsafe"
-    ppr (TrustInfo Sf_Trustworthy)   = ptext $ sLit "trustworthy"
-    ppr (TrustInfo Sf_Safe)          = ptext $ sLit "safe"
+    ppr (TrustInfo Sf_None)          = text "none"
+    ppr (TrustInfo Sf_Unsafe)        = text "unsafe"
+    ppr (TrustInfo Sf_Trustworthy)   = text "trustworthy"
+    ppr (TrustInfo Sf_Safe)          = text "safe"
 
 instance Binary IfaceTrustInfo where
     put_ bh iftrust = putByte bh $ trustInfoToNum iftrust

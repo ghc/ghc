@@ -45,7 +45,6 @@ import TcType
 import Outputable
 import TcExpr
 import SrcLoc
-import FastString
 import THNames
 import TcUnify
 import TcEnv
@@ -103,6 +102,7 @@ import Unique
 import VarSet           ( isEmptyVarSet, filterVarSet )
 import Data.List        ( find )
 import Data.Maybe
+import FastString
 import BasicTypes hiding( SuccessFlag(..) )
 import Maybes( MaybeErr(..) )
 import DynFlags
@@ -226,7 +226,7 @@ tcTExpTy tau
 
 quotationCtxtDoc :: HsBracket Name -> SDoc
 quotationCtxtDoc br_body
-  = hang (ptext (sLit "In the Template Haskell quotation"))
+  = hang (text "In the Template Haskell quotation")
          2 (ppr br_body)
 
 
@@ -497,14 +497,14 @@ tcTopSplice expr res_ty
 
 spliceCtxtDoc :: HsSplice Name -> SDoc
 spliceCtxtDoc splice
-  = hang (ptext (sLit "In the Template Haskell splice"))
+  = hang (text "In the Template Haskell splice")
          2 (pprSplice splice)
 
 spliceResultDoc :: LHsExpr Name -> SDoc
 spliceResultDoc expr
-  = sep [ ptext (sLit "In the result of the splice:")
+  = sep [ text "In the result of the splice:"
         , nest 2 (char '$' <> pprParendExpr expr)
-        , ptext (sLit "To see what the splice expanded to, use -ddump-splices")]
+        , text "To see what the splice expanded to, use -ddump-splices"]
 
 -------------------
 tcTopSpliceExpr :: SpliceType -> TcM (LHsExpr Id) -> TcM (LHsExpr Id)
@@ -870,7 +870,7 @@ instance TH.Quasi TcM where
 
       bindName name =
           addErr $
-          hang (ptext (sLit "The binder") <+> quotes (ppr name) <+> ptext (sLit "is not a NameU."))
+          hang (text "The binder" <+> quotes (ppr name) <+> ptext (sLit "is not a NameU."))
              2 (text "Probable cause: you used mkName instead of newName to generate a binding.")
 
   qAddModFinalizer fin = do
@@ -1069,7 +1069,7 @@ getAnnotationsByTypeRep th_name tyrep
 
 reifyInstances :: TH.Name -> [TH.Type] -> TcM [TH.Dec]
 reifyInstances th_nm th_tys
-   = addErrCtxt (ptext (sLit "In the argument of reifyInstances:")
+   = addErrCtxt (text "In the argument of reifyInstances:"
                  <+> ppr_th th_nm <+> sep (map ppr_th th_tys)) $
      do { loc <- getSrcSpanM
         ; rdr_ty <- cvt loc (mkThAppTs (TH.ConT th_nm) th_tys)
@@ -1104,8 +1104,8 @@ reifyInstances th_nm th_tys
                      ; let matches = lookupFamInstEnv inst_envs tc tys
                      ; traceTc "reifyInstances2" (ppr matches)
                      ; reifyFamilyInstances tc (map fim_instance matches) }
-            _  -> bale_out (hang (ptext (sLit "reifyInstances:") <+> quotes (ppr ty))
-                               2 (ptext (sLit "is not a class constraint or type family application"))) }
+            _  -> bale_out (hang (text "reifyInstances:" <+> quotes (ppr ty))
+                               2 (text "is not a class constraint or type family application")) }
   where
     doc = ClassInstanceCtx
     bale_out msg = failWithTc msg
@@ -1219,12 +1219,12 @@ tcLookupTh name
 
 notInScope :: TH.Name -> SDoc
 notInScope th_name = quotes (text (TH.pprint th_name)) <+>
-                     ptext (sLit "is not in scope at a reify")
+                     text "is not in scope at a reify"
         -- Ugh! Rather an indirect way to display the name
 
 notInEnv :: Name -> SDoc
 notInEnv name = quotes (ppr name) <+>
-                     ptext (sLit "is not in the type environment at a reify")
+                     text "is not in the type environment at a reify"
 
 ------------------------------
 reifyRoles :: TH.Name -> TcM [TH.Role]
@@ -1232,7 +1232,7 @@ reifyRoles th_name
   = do { thing <- getThing th_name
        ; case thing of
            AGlobal (ATyCon tc) -> return (map reify_role (tyConRoles tc))
-           _ -> failWithTc (ptext (sLit "No roles associated with") <+> (ppr thing))
+           _ -> failWithTc (text "No roles associated with" <+> (ppr thing))
        }
   where
     reify_role Nominal          = TH.NominalR
@@ -1823,7 +1823,7 @@ reifyFixity name
                           -- Do NOT use mi_fix_fn to look up the fixity,
                           -- because if there is a cache miss, it will return
                           -- defaultFixity, which we want to avoid
-                          do { let doc = ptext (sLit "Checking fixity for")
+                          do { let doc = text "Checking fixity for"
                                            <+> ppr name
                              ; iface <- loadInterfaceForName doc name
                              ; return . fmap conv_fix
@@ -1887,7 +1887,7 @@ reifyModule (TH.Module (TH.PkgName pkgString) (TH.ModName mString)) = do
         return $ TH.ModuleInfo usages
 
       reifyFromIface reifMod = do
-        iface <- loadInterfaceForModule (ptext (sLit "reifying module from TH for") <+> ppr reifMod) reifMod
+        iface <- loadInterfaceForModule (text "reifying module from TH for" <+> ppr reifMod) reifMod
         let usages = [modToTHMod m | usage <- mi_usages iface,
                                      Just m <- [usageToModule (moduleUnitId reifMod) usage] ]
         return $ TH.ModuleInfo usages
@@ -1902,8 +1902,8 @@ mkThAppTs :: TH.Type -> [TH.Type] -> TH.Type
 mkThAppTs fun_ty arg_tys = foldl TH.AppT fun_ty arg_tys
 
 noTH :: LitString -> SDoc -> TcM a
-noTH s d = failWithTc (hsep [ptext (sLit "Can't represent") <+> ptext s <+>
-                                ptext (sLit "in Template Haskell:"),
+noTH s d = failWithTc (hsep [text "Can't represent" <+> ptext s <+>
+                                text "in Template Haskell:",
                              nest 2 d])
 
 ppr_th :: TH.Ppr a => a -> SDoc

@@ -56,7 +56,6 @@ import Maybes
 import Util
 import BasicTypes
 import Outputable
-import FastString
 import Type(mkStrLitTy, tidyOpenType)
 import PrelNames( mkUnboundName, gHC_PRIM )
 import TcValidity (checkValidType)
@@ -217,7 +216,7 @@ tcHsBootSigs binds sigs
     tc_boot_sig s = pprPanic "tcHsBootSigs/tc_boot_sig" (ppr s)
 
 badBootDeclErr :: MsgDoc
-badBootDeclErr = ptext (sLit "Illegal declarations in an hs-boot file")
+badBootDeclErr = text "Illegal declarations in an hs-boot file"
 
 ------------------------
 tcLocalBinds :: HsLocalBinds Name -> TcM thing
@@ -439,10 +438,10 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) thing_inside
 recursivePatSynErr :: OutputableBndr name => LHsBinds name -> TcM a
 recursivePatSynErr binds
   = failWithTc $
-    hang (ptext (sLit "Recursive pattern synonym definition with following bindings:"))
+    hang (text "Recursive pattern synonym definition with following bindings:")
        2 (vcat $ map pprLBind . bagToList $ binds)
   where
-    pprLoc loc  = parens (ptext (sLit "defined at") <+> ppr loc)
+    pprLoc loc  = parens (text "defined at" <+> ppr loc)
     pprLBind (L loc bind) = pprWithCommas ppr (collectHsBindBinders bind) <+>
                             pprLoc loc
 
@@ -906,22 +905,22 @@ mk_impedence_match_msg (MBI { mbi_poly_name = name, mbi_sig = mb_sig })
                        inf_ty sig_ty tidy_env
  = do { (tidy_env1, inf_ty) <- zonkTidyTcType tidy_env  inf_ty
       ; (tidy_env2, sig_ty) <- zonkTidyTcType tidy_env1 sig_ty
-      ; let msg = vcat [ ptext (sLit "When checking that the inferred type")
+      ; let msg = vcat [ text "When checking that the inferred type"
                        , nest 2 $ ppr name <+> dcolon <+> ppr inf_ty
-                       , ptext (sLit "is as general as its") <+> what <+> ptext (sLit "signature")
+                       , text "is as general as its" <+> what <+> text "signature"
                        , nest 2 $ ppr name <+> dcolon <+> ppr sig_ty ]
       ; return (tidy_env2, msg) }
   where
     what = case mb_sig of
-             Nothing                     -> ptext (sLit "inferred")
-             Just sig | isPartialSig sig -> ptext (sLit "(partial)")
+             Nothing                     -> text "inferred"
+             Just sig | isPartialSig sig -> text "(partial)"
                       | otherwise        -> empty
 
 
 mk_inf_msg :: Name -> TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
 mk_inf_msg poly_name poly_ty tidy_env
  = do { (tidy_env1, poly_ty) <- zonkTidyTcType tidy_env poly_ty
-      ; let msg = vcat [ ptext (sLit "When checking the inferred type")
+      ; let msg = vcat [ text "When checking the inferred type"
                        , nest 2 $ ppr poly_name <+> dcolon <+> ppr poly_ty ]
       ; return (tidy_env1, msg) }
 
@@ -933,7 +932,7 @@ localSigWarn id mb_sig
   | not (isSigmaTy (idType id))    = return ()
   | otherwise                      = warnMissingSig msg id
   where
-    msg = ptext (sLit "Polymorphic local binding with no type signature:")
+    msg = text "Polymorphic local binding with no type signature:"
 
 warnMissingSig :: SDoc -> Id -> TcM ()
 warnMissingSig msg id
@@ -1165,7 +1164,7 @@ mkPragEnv sigs binds
         -- add arity only for real INLINE pragmas, not INLINABLE
       = case lookupNameEnv ar_env n of
           Just ar -> inl_prag { inl_sat = Just ar }
-          Nothing -> WARN( True, ptext (sLit "mkPragEnv no arity") <+> ppr n )
+          Nothing -> WARN( True, text "mkPragEnv no arity" <+> ppr n )
                      -- There really should be a binding for every INLINE pragma
                      inl_prag
       | otherwise
@@ -1202,7 +1201,7 @@ tcSpecPrags poly_id prag_sigs
     is_bad_sig s = not (isSpecLSig s || isInlineLSig s)
 
     warn_discarded_sigs
-      = addWarnTc (hang (ptext (sLit "Discarding unexpected pragmas for") <+> ppr poly_id)
+      = addWarnTc (hang (text "Discarding unexpected pragmas for" <+> ppr poly_id)
                       2 (vcat (map (ppr . getLoc) bad_sigs)))
 
 --------------
@@ -1217,7 +1216,7 @@ tcSpecPrag poly_id prag@(SpecSig fun_name hs_tys inl)
 -- what the user wrote (Trac #8537)
   = addErrCtxt (spec_ctxt prag) $
     do  { warnIf (not (isOverloadedTy poly_ty || isInlinePragma inl))
-                 (ptext (sLit "SPECIALISE pragma for non-overloaded function")
+                 (text "SPECIALISE pragma for non-overloaded function"
                   <+> quotes (ppr fun_name))
                   -- Note [SPECIALISE pragmas]
         ; spec_prags <- mapM tc_one hs_tys
@@ -1226,7 +1225,7 @@ tcSpecPrag poly_id prag@(SpecSig fun_name hs_tys inl)
   where
     name      = idName poly_id
     poly_ty   = idType poly_id
-    spec_ctxt prag = hang (ptext (sLit "In the SPECIALISE pragma")) 2 (ppr prag)
+    spec_ctxt prag = hang (text "In the SPECIALISE pragma") 2 (ppr prag)
 
     tc_one hs_ty
       = do { spec_ty <- tcHsSigType   (FunSigCtxt name False) hs_ty
@@ -1287,11 +1286,11 @@ tcImpSpec (name, prag)
 
 impSpecErr :: Name -> SDoc
 impSpecErr name
-  = hang (ptext (sLit "You cannot SPECIALISE") <+> quotes (ppr name))
-       2 (vcat [ ptext (sLit "because its definition has no INLINE/INLINABLE pragma")
+  = hang (text "You cannot SPECIALISE" <+> quotes (ppr name))
+       2 (vcat [ text "because its definition has no INLINE/INLINABLE pragma"
                , parens $ sep
-                   [ ptext (sLit "or its defining module") <+> quotes (ppr mod)
-                   , ptext (sLit "was compiled without -O")]])
+                   [ text "or its defining module" <+> quotes (ppr mod)
+                   , text "was compiled without -O"]])
   where
     mod = nameModule name
 
@@ -1314,7 +1313,7 @@ tcVectDecls decls
   where
     reportVectDups (first:_second:_more)
       = addErrAt (getSrcSpan first) $
-          ptext (sLit "Duplicate vectorisation declarations for") <+> ppr first
+          text "Duplicate vectorisation declarations for" <+> ppr first
     reportVectDups _ = return ()
 
 --------------
@@ -1394,10 +1393,10 @@ tcVect (HsVectInstOut _)
   = panic "TcBinds.tcVect: Unexpected 'HsVectInstOut'"
 
 vectCtxt :: Outputable thing => thing -> SDoc
-vectCtxt thing = ptext (sLit "When checking the vectorisation declaration for") <+> ppr thing
+vectCtxt thing = text "When checking the vectorisation declaration for" <+> ppr thing
 
 scalarTyConMustBeNullary :: MsgDoc
-scalarTyConMustBeNullary = ptext (sLit "VECTORISE SCALAR type constructor must be nullary")
+scalarTyConMustBeNullary = text "VECTORISE SCALAR type constructor must be nullary"
 
 {-
 Note [SPECIALISE pragmas]
@@ -1922,9 +1921,9 @@ data GeneralisationPlan
 -- no "polymorphic Id" and "monmomorphic Id"; there is just the one
 
 instance Outputable GeneralisationPlan where
-  ppr NoGen          = ptext (sLit "NoGen")
-  ppr (InferGen b)   = ptext (sLit "InferGen") <+> ppr b
-  ppr (CheckGen _ s) = ptext (sLit "CheckGen") <+> ppr s
+  ppr NoGen          = text "NoGen"
+  ppr (InferGen b)   = text "InferGen" <+> ppr b
+  ppr (CheckGen _ s) = text "CheckGen" <+> ppr s
 
 decideGeneralisationPlan
    :: DynFlags -> TcTypeEnv -> [Name]
@@ -2081,17 +2080,17 @@ unliftedMustBeBang binds
 
 polyBindErr :: [LHsBind Name] -> SDoc
 polyBindErr binds
-  = hang (ptext (sLit "You can't mix polymorphic and unlifted bindings"))
+  = hang (text "You can't mix polymorphic and unlifted bindings")
        2 (vcat [vcat (map ppr binds),
-                ptext (sLit "Probable fix: add a type signature")])
+                text "Probable fix: add a type signature"])
 
 strictBindErr :: String -> Bool -> [LHsBind Name] -> SDoc
 strictBindErr flavour any_unlifted_bndr binds
-  = hang (text flavour <+> msg <+> ptext (sLit "aren't allowed:"))
+  = hang (text flavour <+> msg <+> text "aren't allowed:")
        2 (vcat (map ppr binds))
   where
-    msg | any_unlifted_bndr = ptext (sLit "bindings for unlifted types")
-        | otherwise         = ptext (sLit "bang-pattern or unboxed-tuple bindings")
+    msg | any_unlifted_bndr = text "bindings for unlifted types"
+        | otherwise         = text "bang-pattern or unboxed-tuple bindings"
 
 
 {- Note [Compiling GHC.Prim]
@@ -2121,7 +2120,7 @@ the common case.) -}
 -- and on RHS, when pat is TcId and grhss is still Name
 patMonoBindsCtxt :: (OutputableBndr id, Outputable body) => LPat id -> GRHSs Name body -> SDoc
 patMonoBindsCtxt pat grhss
-  = hang (ptext (sLit "In a pattern binding:")) 2 (pprPatBind pat grhss)
+  = hang (text "In a pattern binding:") 2 (pprPatBind pat grhss)
 
 typeSigCtxt :: UserTypeCtxt -> TcIdSigBndr -> SDoc
 typeSigCtxt ctxt (PartialSig { sig_hs_ty = hs_ty })

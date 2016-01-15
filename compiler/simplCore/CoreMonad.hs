@@ -148,30 +148,30 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CorePrep
 
 instance Outputable CoreToDo where
-  ppr (CoreDoSimplify _ _)     = ptext (sLit "Simplifier")
-  ppr (CoreDoPluginPass s _)   = ptext (sLit "Core plugin: ") <+> text s
-  ppr CoreDoFloatInwards       = ptext (sLit "Float inwards")
-  ppr (CoreDoFloatOutwards f)  = ptext (sLit "Float out") <> parens (ppr f)
-  ppr CoreLiberateCase         = ptext (sLit "Liberate case")
-  ppr CoreDoStaticArgs         = ptext (sLit "Static argument")
-  ppr CoreDoCallArity          = ptext (sLit "Called arity analysis")
-  ppr CoreDoStrictness         = ptext (sLit "Demand analysis")
-  ppr CoreDoWorkerWrapper      = ptext (sLit "Worker Wrapper binds")
-  ppr CoreDoSpecialising       = ptext (sLit "Specialise")
-  ppr CoreDoSpecConstr         = ptext (sLit "SpecConstr")
-  ppr CoreCSE                  = ptext (sLit "Common sub-expression")
-  ppr CoreDoVectorisation      = ptext (sLit "Vectorisation")
-  ppr CoreDesugar              = ptext (sLit "Desugar (before optimization)")
-  ppr CoreDesugarOpt           = ptext (sLit "Desugar (after optimization)")
-  ppr CoreTidy                 = ptext (sLit "Tidy Core")
-  ppr CorePrep                 = ptext (sLit "CorePrep")
-  ppr CoreDoPrintCore          = ptext (sLit "Print core")
-  ppr (CoreDoRuleCheck {})     = ptext (sLit "Rule check")
-  ppr CoreDoNothing            = ptext (sLit "CoreDoNothing")
-  ppr (CoreDoPasses passes)    = ptext (sLit "CoreDoPasses") <+> ppr passes
+  ppr (CoreDoSimplify _ _)     = text "Simplifier"
+  ppr (CoreDoPluginPass s _)   = text "Core plugin: " <+> text s
+  ppr CoreDoFloatInwards       = text "Float inwards"
+  ppr (CoreDoFloatOutwards f)  = text "Float out" <> parens (ppr f)
+  ppr CoreLiberateCase         = text "Liberate case"
+  ppr CoreDoStaticArgs         = text "Static argument"
+  ppr CoreDoCallArity          = text "Called arity analysis"
+  ppr CoreDoStrictness         = text "Demand analysis"
+  ppr CoreDoWorkerWrapper      = text "Worker Wrapper binds"
+  ppr CoreDoSpecialising       = text "Specialise"
+  ppr CoreDoSpecConstr         = text "SpecConstr"
+  ppr CoreCSE                  = text "Common sub-expression"
+  ppr CoreDoVectorisation      = text "Vectorisation"
+  ppr CoreDesugar              = text "Desugar (before optimization)"
+  ppr CoreDesugarOpt           = text "Desugar (after optimization)"
+  ppr CoreTidy                 = text "Tidy Core"
+  ppr CorePrep                 = text "CorePrep"
+  ppr CoreDoPrintCore          = text "Print core"
+  ppr (CoreDoRuleCheck {})     = text "Rule check"
+  ppr CoreDoNothing            = text "CoreDoNothing"
+  ppr (CoreDoPasses passes)    = text "CoreDoPasses" <+> ppr passes
 
 pprPassDetails :: CoreToDo -> SDoc
-pprPassDetails (CoreDoSimplify n md) = vcat [ ptext (sLit "Max iterations =") <+> int n
+pprPassDetails (CoreDoSimplify n md) = vcat [ text "Max iterations =" <+> int n
                                             , ppr md ]
 pprPassDetails _ = Outputable.empty
 
@@ -189,15 +189,15 @@ instance Outputable SimplifierMode where
     ppr (SimplMode { sm_phase = p, sm_names = ss
                    , sm_rules = r, sm_inline = i
                    , sm_eta_expand = eta, sm_case_case = cc })
-       = ptext (sLit "SimplMode") <+> braces (
-         sep [ ptext (sLit "Phase =") <+> ppr p <+>
+       = text "SimplMode" <+> braces (
+         sep [ text "Phase =" <+> ppr p <+>
                brackets (text (concat $ intersperse "," ss)) <> comma
              , pp_flag i   (sLit "inline") <> comma
              , pp_flag r   (sLit "rules") <> comma
              , pp_flag eta (sLit "eta-expand") <> comma
              , pp_flag cc  (sLit "case-of-case") ])
          where
-           pp_flag f s = ppUnless f (ptext (sLit "no")) <+> ptext s
+           pp_flag f s = ppUnless f (text "no") <+> ptext s
 
 data FloatOutSwitches = FloatOutSwitches {
   floatOutLambdas   :: Maybe Int,  -- ^ Just n <=> float lambdas to top level, if
@@ -220,11 +220,11 @@ instance Outputable FloatOutSwitches where
 
 pprFloatOutSwitches :: FloatOutSwitches -> SDoc
 pprFloatOutSwitches sw
-  = ptext (sLit "FOS") <+> (braces $
+  = text "FOS" <+> (braces $
      sep $ punctuate comma $
-     [ ptext (sLit "Lam =")    <+> ppr (floatOutLambdas sw)
-     , ptext (sLit "Consts =") <+> ppr (floatOutConstants sw)
-     , ptext (sLit "OverSatApps =")   <+> ppr (floatOutOverSatApps sw) ])
+     [ text "Lam ="    <+> ppr (floatOutLambdas sw)
+     , text "Consts =" <+> ppr (floatOutConstants sw)
+     , text "OverSatApps ="   <+> ppr (floatOutOverSatApps sw) ])
 
 -- The core-to-core pass ordering is derived from the DynFlags:
 runWhen :: Bool -> CoreToDo -> CoreToDo
@@ -360,14 +360,14 @@ plusSimplCount (VerySimplCount n) (VerySimplCount m) = VerySimplCount (n+m)
 plusSimplCount _                  _                  = panic "plusSimplCount"
        -- We use one or the other consistently
 
-pprSimplCount (VerySimplCount n) = ptext (sLit "Total ticks:") <+> int n
+pprSimplCount (VerySimplCount n) = text "Total ticks:" <+> int n
 pprSimplCount (SimplCount { ticks = tks, details = dts, log1 = l1, log2 = l2 })
-  = vcat [ptext (sLit "Total ticks:    ") <+> int tks,
+  = vcat [text "Total ticks:    " <+> int tks,
           blankLine,
           pprTickCounts dts,
           if verboseSimplStats then
                 vcat [blankLine,
-                      ptext (sLit "Log (most recent first)"),
+                      text "Log (most recent first)",
                       nest 4 (vcat (map ppr l1) $$ vcat (map ppr l2))]
           else Outputable.empty
     ]

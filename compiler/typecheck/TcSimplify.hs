@@ -44,7 +44,6 @@ import Var
 import VarSet
 import BasicTypes    ( IntWithInf, intGtLimit )
 import ErrUtils      ( emptyMessages )
-import FastString
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad ( when, unless )
@@ -500,11 +499,11 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
 
   | otherwise
   = do { traceTc "simplifyInfer {"  $ vcat
-             [ ptext (sLit "sigs =") <+> ppr sigs
-             , ptext (sLit "binds =") <+> ppr name_taus
-             , ptext (sLit "rhs_tclvl =") <+> ppr rhs_tclvl
-             , ptext (sLit "apply_mr =") <+> ppr apply_mr
-             , ptext (sLit "(unzonked) wanted =") <+> ppr wanteds
+             [ text "sigs =" <+> ppr sigs
+             , text "binds =" <+> ppr name_taus
+             , text "rhs_tclvl =" <+> ppr rhs_tclvl
+             , text "apply_mr =" <+> ppr apply_mr
+             , text "(unzonked) wanted =" <+> ppr wanteds
              ]
 
        -- First do full-blown solving
@@ -630,13 +629,13 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
 
          -- All done!
        ; traceTc "} simplifyInfer/produced residual implication for quantification" $
-         vcat [ ptext (sLit "quant_pred_candidates =") <+> ppr quant_pred_candidates
-              , ptext (sLit "zonked_taus") <+> ppr zonked_taus
-              , ptext (sLit "zonked_tau_tvs=") <+> ppr zonked_tau_tvs
-              , ptext (sLit "promote_tvs=") <+> ppr promote_tvs
-              , ptext (sLit "bound_theta =") <+> ppr bound_theta
-              , ptext (sLit "qtvs =") <+> ppr qtvs
-              , ptext (sLit "implic =") <+> ppr implic ]
+         vcat [ text "quant_pred_candidates =" <+> ppr quant_pred_candidates
+              , text "zonked_taus" <+> ppr zonked_taus
+              , text "zonked_tau_tvs=" <+> ppr zonked_tau_tvs
+              , text "promote_tvs=" <+> ppr promote_tvs
+              , text "bound_theta =" <+> ppr bound_theta
+              , text "qtvs =" <+> ppr qtvs
+              , text "implic =" <+> ppr implic ]
 
        ; return ( qtvs, bound_theta_vars, TcEvBinds ev_binds_var ) }
 
@@ -722,10 +721,10 @@ decideQuantification apply_mr sigs name_taus constraints
        ; let mr_bites = constrained_tvs `intersectsVarSet` zonked_tkvs
        ; warnTc (warn_mono && mr_bites) $
          hang (text "The Monomorphism Restriction applies to the binding"
-               <> plural bndrs <+> ptext (sLit "for") <+> pp_bndrs)
+               <> plural bndrs <+> text "for" <+> pp_bndrs)
              2 (text "Consider giving a type signature for"
                 <+> if isSingleton bndrs then pp_bndrs
-                                         else ptext (sLit "these binders"))
+                                         else text "these binders")
 
        -- All done
        ; traceTc "decideQuantification 1" (vcat [ppr constraints, ppr gbl_tvs, ppr mono_tvs
@@ -1018,14 +1017,14 @@ simpl_loop n limit floated_eqs no_new_scs
   = return wc  -- Done!
 
   | n `intGtLimit` limit
-  = failTcS (hang (ptext (sLit "solveWanteds: too many iterations")
-                   <+> parens (ptext (sLit "limit =") <+> ppr limit))
-                2 (vcat [ ptext (sLit "Unsolved:") <+> ppr wc
+  = failTcS (hang (text "solveWanteds: too many iterations"
+                   <+> parens (text "limit =" <+> ppr limit))
+                2 (vcat [ text "Unsolved:" <+> ppr wc
                         , ppUnless (isEmptyBag floated_eqs) $
-                          ptext (sLit "Floated equalities:") <+> ppr floated_eqs
+                          text "Floated equalities:" <+> ppr floated_eqs
                         , ppUnless no_new_scs $
-                          ptext (sLit "New superclasses found")
-                        , ptext (sLit "Set limit with -fconstraint-solver-iterations=n; n=0 for no limit")
+                          text "New superclasses found"
+                        , text "Set limit with -fconstraint-solver-iterations=n; n=0 for no limit"
                   ]))
 
   | otherwise

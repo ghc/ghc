@@ -174,8 +174,8 @@ instance Outputable theta => Outputable (DerivSpec theta) where
   ppr = pprDerivSpec
 
 instance Outputable EarlyDerivSpec where
-  ppr (InferTheta spec) = ppr spec <+> ptext (sLit "(Infer)")
-  ppr (GivenTheta spec) = ppr spec <+> ptext (sLit "(Given)")
+  ppr (InferTheta spec) = ppr spec <+> text "(Infer)"
+  ppr (GivenTheta spec) = ppr spec <+> text "(Given)"
 
 instance Outputable PredOrigin where
   ppr (PredOrigin ty _ _) = ppr ty -- The origin is not so interesting when debugging
@@ -368,7 +368,7 @@ tcDeriving deriv_infos deriv_decls
                    -> Bag FamInst             -- ^ Rep type family instances
                    -> SDoc
     ddump_deriving inst_infos extra_binds repFamInsts
-      =    hang (ptext (sLit "Derived instances:"))
+      =    hang (text "Derived instances:")
               2 (vcat (map (\i -> pprInstInfoDetails i $$ text "") (bagToList inst_infos))
                  $$ ppr extra_binds)
         $$ hangP "GHC.Generics representation types:"
@@ -379,7 +379,7 @@ tcDeriving deriv_infos deriv_decls
 -- Prints the representable type family instance
 pprRepTy :: FamInst -> SDoc
 pprRepTy fi@(FamInst { fi_tys = lhs })
-  = ptext (sLit "type") <+> ppr (mkTyConApp (famInstTyCon fi) lhs) <+>
+  = text "type" <+> ppr (mkTyConApp (famInstTyCon fi) lhs) <+>
       equals <+> ppr rhs
   where rhs = famInstRHS fi
 
@@ -495,8 +495,8 @@ makeDerivSpecs is_boot deriv_infos deriv_decls
   where
     add_deriv_err eqn
        = setSrcSpan (earlyDSLoc eqn) $
-         addErr (hang (ptext (sLit "Deriving not permitted in hs-boot file"))
-                    2 (ptext (sLit "Use an instance declaration instead")))
+         addErr (hang (text "Deriving not permitted in hs-boot file")
+                    2 (text "Use an instance declaration instead"))
 
 ------------------------------------------------------------------
 -- | Process a `deriving` clause
@@ -554,15 +554,15 @@ deriveStandalone (L loc (DerivDecl deriv_ty overlap_mode))
 
            _  -> -- Complain about functions, primitive types, etc,
                  failWithTc $ derivingThingErr False cls cls_tys inst_ty $
-                 ptext (sLit "The last argument of the instance must be a data or newtype application")
+                 text "The last argument of the instance must be a data or newtype application"
         }
 
 warnUselessTypeable :: TcM ()
 warnUselessTypeable
   = do { warn <- woptM Opt_WarnDerivingTypeable
        ; when warn $ addWarnTc
-                   $ ptext (sLit "Deriving") <+> quotes (ppr typeableClassName) <+>
-                     ptext (sLit "has no effect: all types now auto-derive Typeable") }
+                   $ text "Deriving" <+> quotes (ppr typeableClassName) <+>
+                     text "has no effect: all types now auto-derive Typeable" }
 
 ------------------------------------------------------------------
 deriveTyData :: [TyVar] -> TyCon -> [Type]   -- LHS of data or data instance
@@ -722,7 +722,7 @@ mkEqnHelp overlap_mode tvs cls cls_tys tycon tc_args mtheta
        ; let (rep_tc, rep_tc_args, _co) = tcLookupDataFamInst fam_envs tycon tc_args
               -- If it's still a data family, the lookup failed; i.e no instance exists
        ; when (isDataFamilyTyCon rep_tc)
-              (bale_out (ptext (sLit "No family instance for") <+> quotes (pprTypeApp tycon tc_args)))
+              (bale_out (text "No family instance for" <+> quotes (pprTypeApp tycon tc_args)))
 
        -- For standalone deriving (mtheta /= Nothing),
        -- check that all the data constructors are in scope.
@@ -1088,12 +1088,12 @@ checkSideConditions dflags mtheta cls cls_tys rep_tc rep_tc_args
 
 
 classArgsErr :: Class -> [Type] -> SDoc
-classArgsErr cls cls_tys = quotes (ppr (mkClassPred cls cls_tys)) <+> ptext (sLit "is not a class")
+classArgsErr cls cls_tys = quotes (ppr (mkClassPred cls cls_tys)) <+> text "is not a class"
 
 nonStdErr :: Class -> SDoc
 nonStdErr cls =
       quotes (ppr cls)
-  <+> ptext (sLit "is not a standard derivable class (Eq, Show, etc.)")
+  <+> text "is not a standard derivable class (Eq, Show, etc.)"
 
 sideConditions :: DerivContext -> Class -> Maybe Condition
 -- Side conditions for classes that GHC knows about,
@@ -1144,10 +1144,10 @@ canDeriveAnyClass :: DynFlags -> TyCon -> Class -> Maybe SDoc
 -- Precondition: the class is not one of the standard ones
 canDeriveAnyClass dflags _tycon clas
   | not (xopt LangExt.DeriveAnyClass dflags)
-  = Just (ptext (sLit "Try enabling DeriveAnyClass"))
+  = Just (text "Try enabling DeriveAnyClass")
   | not (any (target_kind `tcEqKind`) [ liftedTypeKind, typeToTypeKind ])
-  = Just (ptext (sLit "The last argument of class") <+> quotes (ppr clas)
-          <+> ptext (sLit "does not have kind * or (* -> *)"))
+  = Just (text "The last argument of class" <+> quotes (ppr clas)
+          <+> text "does not have kind * or (* -> *)")
   | otherwise
   = Nothing   -- OK!
   where
@@ -1172,7 +1172,7 @@ orCond c1 c2 tc
   = case (c1 tc, c2 tc) of
      (IsValid,    _)          -> IsValid    -- c1 succeeds
      (_,          IsValid)    -> IsValid    -- c21 succeeds
-     (NotValid x, NotValid y) -> NotValid (x $$ ptext (sLit "  or") $$ y)
+     (NotValid x, NotValid y) -> NotValid (x $$ text "  or" $$ y)
                                             -- Both fail
 
 andCond :: Condition -> Condition -> Condition
@@ -1193,22 +1193,22 @@ cond_stdOK Nothing permissive (_, rep_tc, _)
   | not (null con_whys) = NotValid (vcat con_whys $$ suggestion)
   | otherwise           = IsValid
   where
-    suggestion = ptext (sLit "Possible fix: use a standalone deriving declaration instead")
+    suggestion = text "Possible fix: use a standalone deriving declaration instead"
     data_cons  = tyConDataCons rep_tc
     con_whys   = getInvalids (map check_con data_cons)
 
     check_con :: DataCon -> Validity
     check_con con
       | not (isVanillaDataCon con)
-      = NotValid (badCon con (ptext (sLit "has existentials or constraints in its type")))
+      = NotValid (badCon con (text "has existentials or constraints in its type"))
       | not (permissive || all isTauTy (dataConOrigArgTys con))
-      = NotValid (badCon con (ptext (sLit "has a higher-rank type")))
+      = NotValid (badCon con (text "has a higher-rank type"))
       | otherwise
       = IsValid
 
 no_cons_why :: TyCon -> SDoc
 no_cons_why rep_tc = quotes (pprSourceTyCon rep_tc) <+>
-                     ptext (sLit "must have at least one data constructor")
+                     text "must have at least one data constructor"
 
 cond_RepresentableOk :: Condition
 cond_RepresentableOk (_, tc, tc_args) = canDoGenerics tc tc_args
@@ -1226,8 +1226,8 @@ cond_args :: Class -> Condition
 cond_args cls (_, tc, _)
   = case bad_args of
       []     -> IsValid
-      (ty:_) -> NotValid (hang (ptext (sLit "Don't know how to derive") <+> quotes (ppr cls))
-                             2 (ptext (sLit "for type") <+> quotes (ppr ty)))
+      (ty:_) -> NotValid (hang (text "Don't know how to derive" <+> quotes (ppr cls))
+                             2 (text "for type" <+> quotes (ppr ty)))
   where
     bad_args = [ arg_ty | con <- tyConDataCons tc
                         , arg_ty <- dataConOrigArgTys con
@@ -1252,8 +1252,8 @@ cond_isEnumeration (_, rep_tc, _)
   | otherwise                 = NotValid why
   where
     why = sep [ quotes (pprSourceTyCon rep_tc) <+>
-                  ptext (sLit "must be an enumeration type")
-              , ptext (sLit "(an enumeration consists of one or more nullary, non-GADT constructors)") ]
+                  text "must be an enumeration type"
+              , text "(an enumeration consists of one or more nullary, non-GADT constructors)" ]
                   -- See Note [Enumeration types] in TyCon
 
 cond_isProduct :: Condition
@@ -1262,7 +1262,7 @@ cond_isProduct (_, rep_tc, _)
   | otherwise             = NotValid why
   where
     why = quotes (pprSourceTyCon rep_tc) <+>
-          ptext (sLit "must have precisely one constructor")
+          text "must have precisely one constructor"
 
 cond_functorOK :: Bool -> Bool -> Condition
 -- OK for Functor/Foldable/Traversable class
@@ -1273,12 +1273,12 @@ cond_functorOK :: Bool -> Bool -> Condition
 --            (e) no "stupid context" on data type
 cond_functorOK allowFunctions allowExQuantifiedLastTyVar (_, rep_tc, _)
   | null tc_tvs
-  = NotValid (ptext (sLit "Data type") <+> quotes (ppr rep_tc)
-              <+> ptext (sLit "must have some type parameters"))
+  = NotValid (text "Data type" <+> quotes (ppr rep_tc)
+              <+> text "must have some type parameters")
 
   | not (null bad_stupid_theta)
-  = NotValid (ptext (sLit "Data type") <+> quotes (ppr rep_tc)
-              <+> ptext (sLit "must not have a class context:") <+> pprTheta bad_stupid_theta)
+  = NotValid (text "Data type" <+> quotes (ppr rep_tc)
+              <+> text "must not have a class context:" <+> pprTheta bad_stupid_theta)
 
   | otherwise
   = allValid (map check_con data_cons)
@@ -1313,18 +1313,18 @@ cond_functorOK allowFunctions allowExQuantifiedLastTyVar (_, rep_tc, _)
                       , ft_bad_app = NotValid (badCon con wrong_arg)
                       , ft_forall = \_ x   -> x }
 
-    existential = ptext (sLit "must be truly polymorphic in the last argument of the data type")
-    covariant   = ptext (sLit "must not use the type variable in a function argument")
-    functions   = ptext (sLit "must not contain function types")
-    wrong_arg   = ptext (sLit "must use the type variable only as the last argument of a data type")
+    existential = text "must be truly polymorphic in the last argument of the data type"
+    covariant   = text "must not use the type variable in a function argument"
+    functions   = text "must not contain function types"
+    wrong_arg   = text "must use the type variable only as the last argument of a data type"
 
 checkFlag :: LangExt.Extension -> Condition
 checkFlag flag (dflags, _, _)
   | xopt flag dflags = IsValid
   | otherwise        = NotValid why
   where
-    why = ptext (sLit "You need ") <> text flag_str
-          <+> ptext (sLit "to derive an instance for this class")
+    why = text "You need " <> text flag_str
+          <+> text "to derive an instance for this class"
     flag_str = case [ flagSpecName f | f <- xFlags , flagSpecFlag f == flag ] of
                  [s]   -> s
                  other -> pprPanic "checkFlag" (ppr other)
@@ -1351,7 +1351,7 @@ non_coercible_class cls
                          , traversableClassKey, liftClassKey ])
 
 badCon :: DataCon -> SDoc -> SDoc
-badCon con msg = ptext (sLit "Constructor") <+> quotes (ppr con) <+> msg
+badCon con msg = text "Constructor" <+> quotes (ppr con) <+> msg
 
 {-
 Note [Check that the type variable is truly universal]
@@ -1470,8 +1470,8 @@ mkNewTypeEqn dflags overlap_mode tvs
 
       -- CanDerive/DerivableViaInstance
       _ -> do when (newtype_deriving && deriveAnyClass) $
-                addWarnTc (sep [ ptext (sLit "Both DeriveAnyClass and GeneralizedNewtypeDeriving are enabled")
-                               , ptext (sLit "Defaulting to the DeriveAnyClass strategy for instantiating") <+> ppr cls ])
+                addWarnTc (sep [ text "Both DeriveAnyClass and GeneralizedNewtypeDeriving are enabled"
+                               , text "Defaulting to the DeriveAnyClass strategy for instantiating" <+> ppr cls ])
               go_for_it
   where
         newtype_deriving  = xopt LangExt.GeneralizedNewtypeDeriving dflags
@@ -1482,7 +1482,7 @@ mkNewTypeEqn dflags overlap_mode tvs
         bale_out' b = failWithTc . derivingThingErr b cls cls_tys inst_ty
 
         non_std     = nonStdErr cls
-        suggest_gnd = ptext (sLit "Try GeneralizedNewtypeDeriving for GHC's newtype-deriving extension")
+        suggest_gnd = text "Try GeneralizedNewtypeDeriving for GHC's newtype-deriving extension"
 
         -- Here is the plan for newtype derivings.  We see
         --        newtype T a1...an = MkT (t ak+1...an) deriving (.., C s1 .. sm, ...)
@@ -1596,8 +1596,8 @@ mkNewTypeEqn dflags overlap_mode tvs
         cant_derive_err
            = vcat [ ppUnless eta_ok eta_msg
                   , ppUnless ats_ok ats_msg ]
-        eta_msg   = ptext (sLit "cannot eta-reduce the representation type enough")
-        ats_msg   = ptext (sLit "the class has associated types")
+        eta_msg   = text "cannot eta-reduce the representation type enough"
+        ats_msg   = text "the class has associated types"
 
 {-
 Note [Recursive newtypes]
@@ -1819,7 +1819,7 @@ simplifyDeriv pred tvs theta
 
        ; let skol_set  = mkVarSet tvs_skols
              skol_info = DerivSkol pred
-             doc = ptext (sLit "deriving") <+> parens (ppr pred)
+             doc = text "deriving" <+> parens (ppr pred)
              mk_ct (PredOrigin t o t_or_k)
                  = newWanted o (Just t_or_k) (substTy skol_subst t)
 
@@ -2110,7 +2110,7 @@ getDataConFixityFun tc
                  ; return (mi_fix_fn iface . nameOccName) } }
   where
     name = tyConName tc
-    doc = ptext (sLit "Data con fixities for") <+> ppr name
+    doc = text "Data con fixities for" <+> ppr name
 
 {-
 Note [Bindings for Generalised Newtype Deriving]
@@ -2167,41 +2167,41 @@ the empty instance declaration case).
 -}
 
 derivingNullaryErr :: MsgDoc
-derivingNullaryErr = ptext (sLit "Cannot derive instances for nullary classes")
+derivingNullaryErr = text "Cannot derive instances for nullary classes"
 
 derivingKindErr :: TyCon -> Class -> [Type] -> Kind -> MsgDoc
 derivingKindErr tc cls cls_tys cls_kind
-  = hang (ptext (sLit "Cannot derive well-kinded instance of form")
-                <+> quotes (pprClassPred cls cls_tys <+> parens (ppr tc <+> ptext (sLit "..."))))
-       2 (ptext (sLit "Class") <+> quotes (ppr cls)
-            <+> ptext (sLit "expects an argument of kind") <+> quotes (pprKind cls_kind))
+  = hang (text "Cannot derive well-kinded instance of form"
+                <+> quotes (pprClassPred cls cls_tys <+> parens (ppr tc <+> text "...")))
+       2 (text "Class" <+> quotes (ppr cls)
+            <+> text "expects an argument of kind" <+> quotes (pprKind cls_kind))
 
 derivingEtaErr :: Class -> [Type] -> Type -> MsgDoc
 derivingEtaErr cls cls_tys inst_ty
-  = sep [ptext (sLit "Cannot eta-reduce to an instance of form"),
-         nest 2 (ptext (sLit "instance (...) =>")
+  = sep [text "Cannot eta-reduce to an instance of form",
+         nest 2 (text "instance (...) =>"
                 <+> pprClassPred cls (cls_tys ++ [inst_ty]))]
 
 derivingThingErr :: Bool -> Class -> [Type] -> Type -> MsgDoc -> MsgDoc
 derivingThingErr newtype_deriving clas tys ty why
-  = sep [(hang (ptext (sLit "Can't make a derived instance of"))
+  = sep [(hang (text "Can't make a derived instance of")
              2 (quotes (ppr pred))
           $$ nest 2 extra) <> colon,
          nest 2 why]
   where
-    extra | newtype_deriving = ptext (sLit "(even with cunning GeneralizedNewtypeDeriving)")
+    extra | newtype_deriving = text "(even with cunning GeneralizedNewtypeDeriving)"
           | otherwise        = Outputable.empty
     pred = mkClassPred clas (tys ++ [ty])
 
 derivingHiddenErr :: TyCon -> SDoc
 derivingHiddenErr tc
-  = hang (ptext (sLit "The data constructors of") <+> quotes (ppr tc) <+> ptext (sLit "are not all in scope"))
-       2 (ptext (sLit "so you cannot derive an instance for it"))
+  = hang (text "The data constructors of" <+> quotes (ppr tc) <+> ptext (sLit "are not all in scope"))
+       2 (text "so you cannot derive an instance for it")
 
 standaloneCtxt :: LHsSigType Name -> SDoc
-standaloneCtxt ty = hang (ptext (sLit "In the stand-alone deriving instance for"))
+standaloneCtxt ty = hang (text "In the stand-alone deriving instance for")
                        2 (quotes (ppr ty))
 
 derivInstCtxt :: PredType -> MsgDoc
 derivInstCtxt pred
-  = ptext (sLit "When deriving the instance for") <+> parens (ppr pred)
+  = text "When deriving the instance for" <+> parens (ppr pred)

@@ -53,7 +53,6 @@ import Bag
 import Exception
 import Outputable
 import Panic
-import FastString
 import SrcLoc
 import DynFlags
 
@@ -174,9 +173,9 @@ mkLocMessage severity locn msg
     -- Add prefixes, like    Foo.hs:34: warning:
     --                           <the warning message>
     sev_info = case severity of
-                 SevWarning -> ptext (sLit "warning:")
-                 SevError -> ptext (sLit "error:")
-                 SevFatal -> ptext (sLit "fatal:")
+                 SevWarning -> text "warning:"
+                 SevError -> text "error:"
+                 SevFatal -> text "fatal:"
                  _ -> empty
 
 makeIntoWarning :: ErrMsg -> ErrMsg

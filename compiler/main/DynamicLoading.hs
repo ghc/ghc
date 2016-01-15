@@ -84,8 +84,8 @@ loadPlugin' occ_name plugin_name hsc_env mod_name
        ; case mb_name of {
             Nothing ->
                 throwGhcExceptionIO (CmdLineError $ showSDoc dflags $ hsep
-                          [ ptext (sLit "The module"), ppr mod_name
-                          , ptext (sLit "did not export the plugin name")
+                          [ text "The module", ppr mod_name
+                          , text "did not export the plugin name"
                           , ppr plugin_rdr_name ]) ;
             Just name ->
 
@@ -94,9 +94,9 @@ loadPlugin' occ_name plugin_name hsc_env mod_name
         ; case mb_plugin of
             Nothing ->
                 throwGhcExceptionIO (CmdLineError $ showSDoc dflags $ hsep
-                          [ ptext (sLit "The value"), ppr name
-                          , ptext (sLit "did not have the type")
-                          , ppr pluginTyConName, ptext (sLit "as required")])
+                          [ text "The value", ppr name
+                          , text "did not have the type"
+                          , ppr pluginTyConName, text "as required"])
             Just plugin -> return plugin } } }
 
 
@@ -123,7 +123,7 @@ forceLoadNameModuleInterface hsc_env reason name = do
 -- * The name did not exist in the loaded module
 forceLoadTyCon :: HscEnv -> Name -> IO TyCon
 forceLoadTyCon hsc_env con_name = do
-    forceLoadNameModuleInterface hsc_env (ptext (sLit "contains a name used in an invocation of loadTyConTy")) con_name
+    forceLoadNameModuleInterface hsc_env (text "contains a name used in an invocation of loadTyConTy") con_name
 
     mb_con_thing <- lookupTypeHscEnv hsc_env con_name
     case mb_con_thing of
@@ -155,7 +155,7 @@ getValueSafely hsc_env val_name expected_type = do
 
 getHValueSafely :: HscEnv -> Name -> Type -> IO (Maybe HValue)
 getHValueSafely hsc_env val_name expected_type = do
-    forceLoadNameModuleInterface hsc_env (ptext (sLit "contains a name used in an invocation of getHValueSafely")) val_name
+    forceLoadNameModuleInterface hsc_env (text "contains a name used in an invocation of getHValueSafely") val_name
     -- Now look up the names for the value and type constructor in the type environment
     mb_val_thing <- lookupTypeHscEnv hsc_env val_name
     case mb_val_thing of
@@ -185,9 +185,10 @@ getHValueSafely hsc_env val_name expected_type = do
 --    if it /does/ segfault
 lessUnsafeCoerce :: DynFlags -> String -> a -> IO b
 lessUnsafeCoerce dflags context what = do
-    debugTraceMsg dflags 3 $ (ptext $ sLit "Coercing a value in") <+> (text context) <> (ptext $ sLit "...")
+    debugTraceMsg dflags 3 $ (text "Coercing a value in") <+> (text context) <>
+                             (text "...")
     output <- evaluate (unsafeCoerce# what)
-    debugTraceMsg dflags 3 $ ptext $ sLit "Successfully evaluated coercion"
+    debugTraceMsg dflags 3 (text "Successfully evaluated coercion")
     return output
 
 
@@ -225,17 +226,17 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
                         []    -> return Nothing
                         _     -> panic "lookupRdrNameInModule"
 
-                Nothing -> throwCmdLineErrorS dflags $ hsep [ptext (sLit "Could not determine the exports of the module"), ppr mod_name]
+                Nothing -> throwCmdLineErrorS dflags $ hsep [text "Could not determine the exports of the module", ppr mod_name]
         err -> throwCmdLineErrorS dflags $ cannotFindModule dflags mod_name err
   where
     dflags = hsc_dflags hsc_env
-    doc = ptext (sLit "contains a name used in an invocation of lookupRdrNameInModule")
+    doc = text "contains a name used in an invocation of lookupRdrNameInModule"
 
 wrongTyThingError :: Name -> TyThing -> SDoc
-wrongTyThingError name got_thing = hsep [ptext (sLit "The name"), ppr name, ptext (sLit "is not that of a value but rather a"), pprTyThingCategory got_thing]
+wrongTyThingError name got_thing = hsep [text "The name", ppr name, ptext (sLit "is not that of a value but rather a"), pprTyThingCategory got_thing]
 
 missingTyThingError :: Name -> SDoc
-missingTyThingError name = hsep [ptext (sLit "The name"), ppr name, ptext (sLit "is not in the type environment: are you sure it exists?")]
+missingTyThingError name = hsep [text "The name", ppr name, ptext (sLit "is not in the type environment: are you sure it exists?")]
 
 throwCmdLineErrorS :: DynFlags -> SDoc -> IO a
 throwCmdLineErrorS dflags = throwCmdLineError . showSDoc dflags

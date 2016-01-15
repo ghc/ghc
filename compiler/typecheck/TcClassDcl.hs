@@ -211,7 +211,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
        ; spec_prags <- discardConstraints $
                        tcSpecPrags global_dm_id prags
        ; warnTc (not (null spec_prags))
-                (ptext (sLit "Ignoring SPECIALISE pragmas on default method")
+                (text "Ignoring SPECIALISE pragmas on default method"
                  <+> quotes (ppr sel_name))
 
        ; let hs_ty = lookupHsSig hs_sig_fn sel_name
@@ -386,8 +386,8 @@ This makes the error messages right.
 -}
 
 tcMkDeclCtxt :: TyClDecl Name -> SDoc
-tcMkDeclCtxt decl = hsep [ptext (sLit "In the"), pprTyClDeclFlavour decl,
-                      ptext (sLit "declaration for"), quotes (ppr (tcdName decl))]
+tcMkDeclCtxt decl = hsep [text "In the", pprTyClDeclFlavour decl,
+                      text "declaration for", quotes (ppr (tcdName decl))]
 
 tcAddDeclCtxt :: TyClDecl Name -> TcM a -> TcM a
 tcAddDeclCtxt decl thing_inside
@@ -395,44 +395,44 @@ tcAddDeclCtxt decl thing_inside
 
 badMethodErr :: Outputable a => a -> Name -> SDoc
 badMethodErr clas op
-  = hsep [ptext (sLit "Class"), quotes (ppr clas),
-          ptext (sLit "does not have a method"), quotes (ppr op)]
+  = hsep [text "Class", quotes (ppr clas),
+          text "does not have a method", quotes (ppr op)]
 
 badGenericMethod :: Outputable a => a -> Name -> SDoc
 badGenericMethod clas op
-  = hsep [ptext (sLit "Class"), quotes (ppr clas),
-          ptext (sLit "has a generic-default signature without a binding"), quotes (ppr op)]
+  = hsep [text "Class", quotes (ppr clas),
+          text "has a generic-default signature without a binding", quotes (ppr op)]
 
 {-
 badGenericInstanceType :: LHsBinds Name -> SDoc
 badGenericInstanceType binds
-  = vcat [ptext (sLit "Illegal type pattern in the generic bindings"),
+  = vcat [text "Illegal type pattern in the generic bindings",
           nest 2 (ppr binds)]
 
 missingGenericInstances :: [Name] -> SDoc
 missingGenericInstances missing
-  = ptext (sLit "Missing type patterns for") <+> pprQuotedList missing
+  = text "Missing type patterns for" <+> pprQuotedList missing
 
 dupGenericInsts :: [(TyCon, InstInfo a)] -> SDoc
 dupGenericInsts tc_inst_infos
-  = vcat [ptext (sLit "More than one type pattern for a single generic type constructor:"),
+  = vcat [text "More than one type pattern for a single generic type constructor:",
           nest 2 (vcat (map ppr_inst_ty tc_inst_infos)),
-          ptext (sLit "All the type patterns for a generic type constructor must be identical")
+          text "All the type patterns for a generic type constructor must be identical"
     ]
   where
     ppr_inst_ty (_,inst) = ppr (simpleInstInfoTy inst)
 -}
 badDmPrag :: Id -> Sig Name -> TcM ()
 badDmPrag sel_id prag
-  = addErrTc (ptext (sLit "The") <+> hsSigDoc prag <+> ptext (sLit "for default method")
+  = addErrTc (text "The" <+> hsSigDoc prag <+> ptext (sLit "for default method")
               <+> quotes (ppr sel_id)
-              <+> ptext (sLit "lacks an accompanying binding"))
+              <+> text "lacks an accompanying binding")
 
 warningMinimalDefIncomplete :: ClassMinimalDef -> SDoc
 warningMinimalDefIncomplete mindef
-  = vcat [ ptext (sLit "The MINIMAL pragma does not require:")
+  = vcat [ text "The MINIMAL pragma does not require:"
          , nest 2 (pprBooleanFormulaNice mindef)
-         , ptext (sLit "but there is no default implementation.") ]
+         , text "but there is no default implementation." ]
 
 tcATDefault :: Bool -- If a warning should be emitted when a default instance
                     -- definition is not provided by the user
@@ -493,6 +493,6 @@ warnMissingAT name
   = do { warn <- woptM Opt_WarnMissingMethods
        ; traceTc "warn" (ppr name <+> ppr warn)
        ; warnTc warn  -- Warn only if -Wmissing-methods
-                (ptext (sLit "No explicit") <+> text "associated type"
-                    <+> ptext (sLit "or default declaration for     ")
+                (text "No explicit" <+> text "associated type"
+                    <+> text "or default declaration for     "
                     <+> quotes (ppr name)) }

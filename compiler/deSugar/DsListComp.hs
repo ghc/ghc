@@ -31,7 +31,6 @@ import Match
 import PrelNames
 import SrcLoc
 import Outputable
-import FastString
 import TcType
 import ListSetOps( getNth )
 import Util
@@ -582,7 +581,7 @@ dePArrComp (LetStmt (L _ ds) : qs) pa cea = do
     let projBody = mkCoreLet (NonRec let'v clet) $
                    mkCoreTup [Var v, Var let'v]
         errTy    = exprType projBody
-        errMsg   = ptext (sLit "DsListComp.dePArrComp: internal error!")
+        errMsg   = text "DsListComp.dePArrComp: internal error!"
     cerr <- mkErrorAppDs pAT_ERROR_ID errTy errMsg
     ccase <- matchSimply (Var v) (StmtCtxt PArrComp) pa projBody cerr
     let pa'    = mkLHsPatTup [pa, mkLHsPatTup (map nlVarPat xs)]
@@ -648,7 +647,7 @@ mkLambda :: Type                        -- type of the argument
          -> DsM (CoreExpr, Type)
 mkLambda ty p ce = do
     v <- newSysLocalDs ty
-    let errMsg = ptext (sLit "DsListComp.deLambda: internal error!")
+    let errMsg = text "DsListComp.deLambda: internal error!"
         ce'ty  = exprType ce
     cerr <- mkErrorAppDs pAT_ERROR_ID ce'ty errMsg
     res <- matchSimply (Var v) (StmtCtxt PArrComp) p ce cerr

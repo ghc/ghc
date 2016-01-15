@@ -433,9 +433,9 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
 
     -- Check for hand-written Generic instances (disallowed in Safe Haskell)
     genInstCheck ty = is_cls_nm (iSpec ty) `elem` genericClassNames
-    genInstErr i = hang (ptext (sLit $ "Generic instances can only be "
+    genInstErr i = hang (text ("Generic instances can only be "
                             ++ "derived in Safe Haskell.") $+$
-                         ptext (sLit "Replace the following instance:"))
+                         text "Replace the following instance:")
                      2 (pprInstanceHdr (iSpec i))
 
     -- Report an error or a warning for a Typeable instances.
@@ -449,11 +449,11 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
              then
                do warn <- woptM Opt_WarnDerivingTypeable
                   when warn $ addWarnTc $ vcat
-                    [ ppTypeable <+> ptext (sLit "instances in .hs-boot files are ignored")
-                    , ptext (sLit "This warning will become an error in future versions of the compiler")
+                    [ ppTypeable <+> text "instances in .hs-boot files are ignored"
+                    , text "This warning will become an error in future versions of the compiler"
                     ]
-             else addErrTc $ ptext (sLit "Class") <+> ppTypeable
-                             <+> ptext (sLit "does not support user-specified instances")
+             else addErrTc $ text "Class" <+> ppTypeable
+                             <+> text "does not support user-specified instances"
     ppTypeable :: SDoc
     ppTypeable = quotes (ppr typeableClassName)
 
@@ -1450,18 +1450,18 @@ methSigCtxt :: Name -> TcType -> TcType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
 methSigCtxt sel_name sig_ty meth_ty env0
   = do { (env1, sig_ty)  <- zonkTidyTcType env0 sig_ty
        ; (env2, meth_ty) <- zonkTidyTcType env1 meth_ty
-       ; let msg = hang (ptext (sLit "When checking that instance signature for") <+> quotes (ppr sel_name))
-                      2 (vcat [ ptext (sLit "is more general than its signature in the class")
-                              , ptext (sLit "Instance sig:") <+> ppr sig_ty
-                              , ptext (sLit "   Class sig:") <+> ppr meth_ty ])
+       ; let msg = hang (text "When checking that instance signature for" <+> quotes (ppr sel_name))
+                      2 (vcat [ text "is more general than its signature in the class"
+                              , text "Instance sig:" <+> ppr sig_ty
+                              , text "   Class sig:" <+> ppr meth_ty ])
        ; return (env2, msg) }
 
 misplacedInstSig :: Name -> LHsSigType Name -> SDoc
 misplacedInstSig name hs_ty
-  = vcat [ hang (ptext (sLit "Illegal type signature in instance declaration:"))
+  = vcat [ hang (text "Illegal type signature in instance declaration:")
               2 (hang (pprPrefixName name)
                     2 (dcolon <+> ppr hs_ty))
-         , ptext (sLit "(Use InstanceSigs to allow this)") ]
+         , text "(Use InstanceSigs to allow this)" ]
 
 {-
 Note [Instance method signatures]
@@ -1534,10 +1534,10 @@ mkGenericDefMethBind clas inst_tys sel_id dm_name
 ----------------------
 derivBindCtxt :: Id -> Class -> [Type ] -> SDoc
 derivBindCtxt sel_id clas tys
-   = vcat [ ptext (sLit "When typechecking the code for") <+> quotes (ppr sel_id)
-          , nest 2 (ptext (sLit "in a derived instance for")
+   = vcat [ text "When typechecking the code for" <+> quotes (ppr sel_id)
+          , nest 2 (text "in a derived instance for"
                     <+> quotes (pprClassPred clas tys) <> colon)
-          , nest 2 $ ptext (sLit "To see the code I am typechecking, use -ddump-deriv") ]
+          , nest 2 $ text "To see the code I am typechecking, use -ddump-deriv" ]
 
 warnUnsatisfiedMinimalDefinition :: ClassMinimalDef -> TcM ()
 warnUnsatisfiedMinimalDefinition mindef
@@ -1545,7 +1545,7 @@ warnUnsatisfiedMinimalDefinition mindef
        ; warnTc warn message
        }
   where
-    message = vcat [ptext (sLit "No explicit implementation for")
+    message = vcat [text "No explicit implementation for"
                    ,nest 2 $ pprBooleanFormulaNice mindef
                    ]
 
@@ -1733,7 +1733,7 @@ tcSpecInst dfun_id prag@(SpecInstSig _ hs_ty)
         ; co_fn <- tcSpecWrapper SpecInstCtxt (idType dfun_id) spec_dfun_ty
         ; return (SpecPrag dfun_id co_fn defaultInlinePragma) }
   where
-    spec_ctxt prag = hang (ptext (sLit "In the SPECIALISE pragma")) 2 (ppr prag)
+    spec_ctxt prag = hang (text "In the SPECIALISE pragma") 2 (ppr prag)
 
 tcSpecInst _  _ = panic "tcSpecInst"
 
@@ -1757,34 +1757,34 @@ instDeclCtxt2 dfun_ty
     (_,_,cls,tys) = tcSplitDFunTy dfun_ty
 
 inst_decl_ctxt :: SDoc -> SDoc
-inst_decl_ctxt doc = hang (ptext (sLit "In the instance declaration for"))
+inst_decl_ctxt doc = hang (text "In the instance declaration for")
                         2 (quotes doc)
 
 badBootFamInstDeclErr :: SDoc
 badBootFamInstDeclErr
-  = ptext (sLit "Illegal family instance in hs-boot file")
+  = text "Illegal family instance in hs-boot file"
 
 notFamily :: TyCon -> SDoc
 notFamily tycon
-  = vcat [ ptext (sLit "Illegal family instance for") <+> quotes (ppr tycon)
-         , nest 2 $ parens (ppr tycon <+> ptext (sLit "is not an indexed type family"))]
+  = vcat [ text "Illegal family instance for" <+> quotes (ppr tycon)
+         , nest 2 $ parens (ppr tycon <+> text "is not an indexed type family")]
 
 tooFewParmsErr :: Arity -> SDoc
 tooFewParmsErr arity
-  = ptext (sLit "Family instance has too few parameters; expected") <+>
+  = text "Family instance has too few parameters; expected" <+>
     ppr arity
 
 assocInClassErr :: Located Name -> SDoc
 assocInClassErr name
- = ptext (sLit "Associated type") <+> quotes (ppr name) <+>
-   ptext (sLit "must be inside a class instance")
+ = text "Associated type" <+> quotes (ppr name) <+>
+   text "must be inside a class instance"
 
 badFamInstDecl :: Located Name -> SDoc
 badFamInstDecl tc_name
-  = vcat [ ptext (sLit "Illegal family instance for") <+>
+  = vcat [ text "Illegal family instance for" <+>
            quotes (ppr tc_name)
-         , nest 2 (parens $ ptext (sLit "Use TypeFamilies to allow indexed type families")) ]
+         , nest 2 (parens $ text "Use TypeFamilies to allow indexed type families") ]
 
 notOpenFamily :: TyCon -> SDoc
 notOpenFamily tc
-  = ptext (sLit "Illegal instance for closed family") <+> quotes (ppr tc)
+  = text "Illegal instance for closed family" <+> quotes (ppr tc)

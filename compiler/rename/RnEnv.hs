@@ -372,26 +372,26 @@ lookupExactOcc_either name
            gres -> return (Left (sameNameErr gres))   -- Ugh!  See Note [Template Haskell ambiguity]
        }
   where
-    exact_nm_err = hang (ptext (sLit "The exact Name") <+> quotes (ppr name) <+> ptext (sLit "is not in scope"))
-                      2 (vcat [ ptext (sLit "Probable cause: you used a unique Template Haskell name (NameU), ")
-                              , ptext (sLit "perhaps via newName, but did not bind it")
-                              , ptext (sLit "If that's it, then -ddump-splices might be useful") ])
+    exact_nm_err = hang (text "The exact Name" <+> quotes (ppr name) <+> ptext (sLit "is not in scope"))
+                      2 (vcat [ text "Probable cause: you used a unique Template Haskell name (NameU), "
+                              , text "perhaps via newName, but did not bind it"
+                              , text "If that's it, then -ddump-splices might be useful" ])
 
 sameNameErr :: [GlobalRdrElt] -> MsgDoc
 sameNameErr [] = panic "addSameNameErr: empty list"
 sameNameErr gres@(_ : _)
-  = hang (ptext (sLit "Same exact name in multiple name-spaces:"))
+  = hang (text "Same exact name in multiple name-spaces:")
        2 (vcat (map pp_one sorted_names) $$ th_hint)
   where
     sorted_names = sortWith nameSrcLoc (map gre_name gres)
     pp_one name
       = hang (pprNameSpace (occNameSpace (getOccName name))
               <+> quotes (ppr name) <> comma)
-           2 (ptext (sLit "declared at:") <+> ppr (nameSrcLoc name))
+           2 (text "declared at:" <+> ppr (nameSrcLoc name))
 
-    th_hint = vcat [ ptext (sLit "Probable cause: you bound a unique Template Haskell name (NameU),")
-                   , ptext (sLit "perhaps via newName, in different name-spaces.")
-                   , ptext (sLit "If that's it, then -ddump-splices might be useful") ]
+    th_hint = vcat [ text "Probable cause: you bound a unique Template Haskell name (NameU),"
+                   , text "perhaps via newName, in different name-spaces."
+                   , text "If that's it, then -ddump-splices might be useful" ]
 
 
 -----------------------------------------------
@@ -426,7 +426,7 @@ lookupInstDeclBndr cls what rdr
            Left err -> do { addErr err; return (mkUnboundNameRdr rdr) }
            Right nm -> return nm }
   where
-    doc = what <+> ptext (sLit "of class") <+> quotes (ppr cls)
+    doc = what <+> text "of class" <+> quotes (ppr cls)
 
 
 -----------------------------------------------
@@ -434,7 +434,7 @@ lookupFamInstName :: Maybe Name -> Located RdrName -> RnM (Located Name)
 -- Used for TyData and TySynonym family instances only,
 -- See Note [Family instance binders]
 lookupFamInstName (Just cls) tc_rdr  -- Associated type; c.f RnBinds.rnMethodBind
-  = wrapLocM (lookupInstDeclBndr cls (ptext (sLit "associated type"))) tc_rdr
+  = wrapLocM (lookupInstDeclBndr cls (text "associated type")) tc_rdr
 lookupFamInstName Nothing tc_rdr     -- Family instance; tc_rdr is an *occurrence*
   = lookupLocatedOccRn tc_rdr
 
@@ -750,7 +750,7 @@ lookup_demoted rdr_name dflags
   = reportUnboundName rdr_name
 
   where
-    suggest_dk = ptext (sLit "A data constructor of that name is in scope; did you mean DataKinds?")
+    suggest_dk = text "A data constructor of that name is in scope; did you mean DataKinds?"
     untickedPromConstrWarn name =
       text "Unticked promoted constructor" <> colon <+> quotes (ppr name) <> dot
       $$
@@ -1053,19 +1053,19 @@ warnIfDeprecated gre@(GRE { gre_name = name, gre_imp = iss })
   where
     occ = greOccName gre
     name_mod = ASSERT2( isExternalName name, ppr name ) nameModule name
-    doc = ptext (sLit "The name") <+> quotes (ppr occ) <+> ptext (sLit "is mentioned explicitly")
+    doc = text "The name" <+> quotes (ppr occ) <+> ptext (sLit "is mentioned explicitly")
 
     mk_msg imp_spec txt
-      = sep [ sep [ ptext (sLit "In the use of")
+      = sep [ sep [ text "In the use of"
                     <+> pprNonVarNameSpace (occNameSpace occ)
                     <+> quotes (ppr occ)
                   , parens imp_msg <> colon ]
             , ppr txt ]
       where
         imp_mod  = importSpecModule imp_spec
-        imp_msg  = ptext (sLit "imported from") <+> ppr imp_mod <> extra
+        imp_msg  = text "imported from" <+> ppr imp_mod <> extra
         extra | imp_mod == moduleName name_mod = Outputable.empty
-              | otherwise = ptext (sLit ", but defined in") <+> ppr name_mod
+              | otherwise = text ", but defined in" <+> ppr name_mod
 
 lookupImpDeprec :: ModIface -> GlobalRdrElt -> Maybe WarningTxt
 lookupImpDeprec iface gre
@@ -1150,7 +1150,7 @@ lookupQualifiedNameGHCi rdr_name
       = do { traceRn (text "lookupQualifedNameGHCi: off" <+> ppr rdr_name)
            ; return [] }
 
-    doc = ptext (sLit "Need to find") <+> ppr rdr_name
+    doc = text "Need to find" <+> ppr rdr_name
 
 {-
 Note [Looking up signature names]
@@ -1256,7 +1256,7 @@ lookupBindGroupOcc ctxt what rdr_name
     lookup_cls_op cls
       = lookupSubBndrOcc True cls doc rdr_name
       where
-        doc = ptext (sLit "method of class") <+> quotes (ppr cls)
+        doc = text "method of class" <+> quotes (ppr cls)
 
     lookup_top keep_me
       = do { env <- getGlobalRdrEnv
@@ -1275,13 +1275,13 @@ lookupBindGroupOcc ctxt what rdr_name
                Nothing                         -> bale_out_with Outputable.empty }
 
     bale_out_with msg
-        = return (Left (sep [ ptext (sLit "The") <+> what
-                                <+> ptext (sLit "for") <+> quotes (ppr rdr_name)
-                           , nest 2 $ ptext (sLit "lacks an accompanying binding")]
+        = return (Left (sep [ text "The" <+> what
+                                <+> text "for" <+> quotes (ppr rdr_name)
+                           , nest 2 $ text "lacks an accompanying binding"]
                        $$ nest 2 msg))
 
-    local_msg = parens $ ptext (sLit "The")  <+> what <+> ptext (sLit "must be given where")
-                           <+> quotes (ppr rdr_name) <+> ptext (sLit "is declared")
+    local_msg = parens $ text "The"  <+> what <+> ptext (sLit "must be given where")
+                           <+> quotes (ppr rdr_name) <+> text "is declared"
 
 
 ---------------
@@ -1445,7 +1445,7 @@ lookupFixityRn' name occ
                       vcat [ppr name, ppr $ mi_fix_fn iface occ])
            ; return (mi_fix_fn iface occ) }
 
-    doc = ptext (sLit "Checking fixity for") <+> ppr name
+    doc = text "Checking fixity for" <+> ppr name
 
 ---------------
 lookupTyFixityRn :: Located Name -> RnM Fixity
@@ -1681,7 +1681,7 @@ checkShadowedOccs (global_env,local_env) get_loc_occ ns
     check_shadow n
         | startsWithUnderscore occ = return ()  -- Do not report shadowing for "_x"
                                                 -- See Trac #3262
-        | Just n <- mb_local = complain [ptext (sLit "bound at") <+> ppr (nameSrcLoc n)]
+        | Just n <- mb_local = complain [text "bound at" <+> ppr (nameSrcLoc n)]
         | otherwise = do { gres' <- filterM is_shadowed_gre gres
                          ; complain (map pprNameProvenance gres') }
         where
@@ -1739,7 +1739,7 @@ unboundNameX where_look rdr_name extra
 
 unknownNameErr :: SDoc -> RdrName -> SDoc
 unknownNameErr what rdr_name
-  = vcat [ hang (ptext (sLit "Not in scope:"))
+  = vcat [ hang (text "Not in scope:")
               2 (what <+> quotes (ppr rdr_name))
          , extra ]
   where
@@ -1773,7 +1773,7 @@ similarNameSuggestions where_look dflags global_env
   = case suggest of
       []  -> Outputable.empty
       [p] -> perhaps <+> pp_item p
-      ps  -> sep [ perhaps <+> ptext (sLit "one of these:")
+      ps  -> sep [ perhaps <+> text "one of these:"
                  , nest 2 (pprWithCommas pp_item ps) ]
   where
     all_possibilities :: [(String, (RdrName, HowInScope))]
@@ -1783,15 +1783,15 @@ similarNameSuggestions where_look dflags global_env
        ++ [ (showPpr dflags r, rp) | (r, rp) <- global_possibilities global_env ]
 
     suggest = fuzzyLookup (showPpr dflags tried_rdr_name) all_possibilities
-    perhaps = ptext (sLit "Perhaps you meant")
+    perhaps = text "Perhaps you meant"
 
     pp_item :: (RdrName, HowInScope) -> SDoc
     pp_item (rdr, Left loc) = pp_ns rdr <+> quotes (ppr rdr) <+> loc' -- Locally defined
         where loc' = case loc of
                      UnhelpfulSpan l -> parens (ppr l)
-                     RealSrcSpan l -> parens (ptext (sLit "line") <+> int (srcSpanStartLine l))
+                     RealSrcSpan l -> parens (text "line" <+> int (srcSpanStartLine l))
     pp_item (rdr, Right is) = pp_ns rdr <+> quotes (ppr rdr) <+>   -- Imported
-                              parens (ptext (sLit "imported from") <+> ppr (is_mod is))
+                              parens (text "imported from" <+> ppr (is_mod is))
 
     pp_ns :: RdrName -> SDoc
     pp_ns rdr | ns /= tried_ns = pprNameSpace ns
@@ -1889,42 +1889,42 @@ importSuggestions _dflags imports rdr_name
   | null interesting_imports
   , Just name <- mod_name
   = hsep
-      [ ptext (sLit "No module named")
+      [ text "No module named"
       , quotes (ppr name)
-      , ptext (sLit "is imported.")
+      , text "is imported."
       ]
   | is_qualified
   , null helpful_imports
   , [(mod,_)] <- interesting_imports
   = hsep
-      [ ptext (sLit "Module")
+      [ text "Module"
       , quotes (ppr mod)
-      , ptext (sLit "does not export")
+      , text "does not export"
       , quotes (ppr occ_name) <> dot
       ]
   | is_qualified
   , null helpful_imports
   , mods <- map fst interesting_imports
   = hsep
-      [ ptext (sLit "Neither")
+      [ text "Neither"
       , quotedListWithNor (map ppr mods)
-      , ptext (sLit "exports")
+      , text "exports"
       , quotes (ppr occ_name) <> dot
       ]
   | [(mod,imv)] <- helpful_imports_non_hiding
   = fsep
-      [ ptext (sLit "Perhaps you want to add")
+      [ text "Perhaps you want to add"
       , quotes (ppr occ_name)
-      , ptext (sLit "to the import list")
-      , ptext (sLit "in the import of")
+      , text "to the import list"
+      , text "in the import of"
       , quotes (ppr mod)
       , parens (ppr (imv_span imv)) <> dot
       ]
   | not (null helpful_imports_non_hiding)
   = fsep
-      [ ptext (sLit "Perhaps you want to add")
+      [ text "Perhaps you want to add"
       , quotes (ppr occ_name)
-      , ptext (sLit "to one of these import lists:")
+      , text "to one of these import lists:"
       ]
     $$
     nest 2 (vcat
@@ -1933,19 +1933,19 @@ importSuggestions _dflags imports rdr_name
         ])
   | [(mod,imv)] <- helpful_imports_hiding
   = fsep
-      [ ptext (sLit "Perhaps you want to remove")
+      [ text "Perhaps you want to remove"
       , quotes (ppr occ_name)
-      , ptext (sLit "from the explicit hiding list")
-      , ptext (sLit "in the import of")
+      , text "from the explicit hiding list"
+      , text "in the import of"
       , quotes (ppr mod)
       , parens (ppr (imv_span imv)) <> dot
       ]
   | not (null helpful_imports_hiding)
   = fsep
-      [ ptext (sLit "Perhaps you want to remove")
+      [ text "Perhaps you want to remove"
       , quotes (ppr occ_name)
-      , ptext (sLit "from the hiding clauses")
-      , ptext (sLit "in one of these imports:")
+      , text "from the hiding clauses"
+      , text "in one of these imports:"
       ]
     $$
     nest 2 (vcat
@@ -2071,7 +2071,7 @@ warnUnusedLocal :: NameEnv (FieldLabelString, Name) -> Name -> RnM ()
 warnUnusedLocal fld_env name
   = when (reportable name) $
     addUnusedWarning occ (nameSrcSpan name)
-                     (ptext (sLit "Defined but not used"))
+                     (text "Defined but not used")
   where
     occ = case lookupNameEnv fld_env name of
               Just (fl, _) -> mkVarOccFS fl
@@ -2088,7 +2088,7 @@ warnUnusedGRE gre@(GRE { gre_name = name, gre_lcl = lcl, gre_imp = is })
         where
            span = importSpecLoc spec
            pp_mod = quotes (ppr (importSpecModule spec))
-           msg = ptext (sLit "Imported from") <+> pp_mod <+> ptext (sLit "but not used")
+           msg = text "Imported from" <+> pp_mod <+> ptext (sLit "but not used")
 
 -- | Make a map from selector names to field labels and parent tycon
 -- names, to be used when reporting unused record fields.
@@ -2119,12 +2119,12 @@ addNameClashErrRn rdr_name gres
                -- If there are two or more *local* defns, we'll have reported
   = return ()  -- that already, and we don't want an error cascade
   | otherwise
-  = addErr (vcat [ptext (sLit "Ambiguous occurrence") <+> quotes (ppr rdr_name),
-                  ptext (sLit "It could refer to") <+> vcat (msg1 : msgs)])
+  = addErr (vcat [text "Ambiguous occurrence" <+> quotes (ppr rdr_name),
+                  text "It could refer to" <+> vcat (msg1 : msgs)])
   where
     (np1:nps) = gres
     msg1 = ptext  (sLit "either") <+> mk_ref np1
-    msgs = [ptext (sLit "    or") <+> mk_ref np | np <- nps]
+    msgs = [text "    or" <+> mk_ref np | np <- nps]
     mk_ref gre = sep [nom <> comma, pprNameProvenance gre]
       where nom = case gre_par gre of
                     FldParent { par_lbl = Just lbl } -> text "the field" <+> quotes (ppr lbl)
@@ -2132,57 +2132,57 @@ addNameClashErrRn rdr_name gres
 
 shadowedNameWarn :: OccName -> [SDoc] -> SDoc
 shadowedNameWarn occ shadowed_locs
-  = sep [ptext (sLit "This binding for") <+> quotes (ppr occ)
-            <+> ptext (sLit "shadows the existing binding") <> plural shadowed_locs,
+  = sep [text "This binding for" <+> quotes (ppr occ)
+            <+> text "shadows the existing binding" <> plural shadowed_locs,
          nest 2 (vcat shadowed_locs)]
 
 perhapsForallMsg :: SDoc
 perhapsForallMsg
-  = vcat [ ptext (sLit "Perhaps you intended to use ExplicitForAll or similar flag")
-         , ptext (sLit "to enable explicit-forall syntax: forall <tvs>. <type>")]
+  = vcat [ text "Perhaps you intended to use ExplicitForAll or similar flag"
+         , text "to enable explicit-forall syntax: forall <tvs>. <type>"]
 
 unknownSubordinateErr :: SDoc -> RdrName -> SDoc
 unknownSubordinateErr doc op    -- Doc is "method of class" or
                                 -- "field of constructor"
-  = quotes (ppr op) <+> ptext (sLit "is not a (visible)") <+> doc
+  = quotes (ppr op) <+> text "is not a (visible)" <+> doc
 
 badOrigBinding :: RdrName -> SDoc
 badOrigBinding name
-  = ptext (sLit "Illegal binding of built-in syntax:") <+> ppr (rdrNameOcc name)
+  = text "Illegal binding of built-in syntax:" <+> ppr (rdrNameOcc name)
         -- The rdrNameOcc is because we don't want to print Prelude.(,)
 
 dupNamesErr :: Outputable n => (n -> SrcSpan) -> [n] -> RnM ()
 dupNamesErr get_loc names
   = addErrAt big_loc $
-    vcat [ptext (sLit "Conflicting definitions for") <+> quotes (ppr (head names)),
+    vcat [text "Conflicting definitions for" <+> quotes (ppr (head names)),
           locations]
   where
     locs      = map get_loc names
     big_loc   = foldr1 combineSrcSpans locs
-    locations = ptext (sLit "Bound at:") <+> vcat (map ppr (sort locs))
+    locations = text "Bound at:" <+> vcat (map ppr (sort locs))
 
 kindSigErr :: Outputable a => a -> SDoc
 kindSigErr thing
-  = hang (ptext (sLit "Illegal kind signature for") <+> quotes (ppr thing))
-       2 (ptext (sLit "Perhaps you intended to use KindSignatures"))
+  = hang (text "Illegal kind signature for" <+> quotes (ppr thing))
+       2 (text "Perhaps you intended to use KindSignatures")
 
 badQualBndrErr :: RdrName -> SDoc
 badQualBndrErr rdr_name
-  = ptext (sLit "Qualified name in binding position:") <+> ppr rdr_name
+  = text "Qualified name in binding position:" <+> ppr rdr_name
 
 opDeclErr :: RdrName -> SDoc
 opDeclErr n
-  = hang (ptext (sLit "Illegal declaration of a type or class operator") <+> quotes (ppr n))
-       2 (ptext (sLit "Use TypeOperators to declare operators in type and declarations"))
+  = hang (text "Illegal declaration of a type or class operator" <+> quotes (ppr n))
+       2 (text "Use TypeOperators to declare operators in type and declarations")
 
 checkTupSize :: Int -> RnM ()
 checkTupSize tup_size
   | tup_size <= mAX_TUPLE_SIZE
   = return ()
   | otherwise
-  = addErr (sep [ptext (sLit "A") <+> int tup_size <> ptext (sLit "-tuple is too large for GHC"),
-                 nest 2 (parens (ptext (sLit "max size is") <+> int mAX_TUPLE_SIZE)),
-                 nest 2 (ptext (sLit "Workaround: use nested tuples or define a data type"))])
+  = addErr (sep [text "A" <+> int tup_size <> ptext (sLit "-tuple is too large for GHC"),
+                 nest 2 (parens (text "max size is" <+> int mAX_TUPLE_SIZE)),
+                 nest 2 (text "Workaround: use nested tuples or define a data type")])
 
 {-
 ************************************************************************
@@ -2221,7 +2221,7 @@ withHsDocContext :: HsDocContext -> SDoc -> SDoc
 withHsDocContext ctxt doc = doc $$ inHsDocContext ctxt
 
 inHsDocContext :: HsDocContext -> SDoc
-inHsDocContext ctxt = ptext (sLit "In") <+> pprHsDocContext ctxt
+inHsDocContext ctxt = text "In" <+> pprHsDocContext ctxt
 
 pprHsDocContext :: HsDocContext -> SDoc
 pprHsDocContext (GenericCtx doc)      = doc
@@ -2244,10 +2244,10 @@ pprHsDocContext (SpliceTypeCtx hs_ty) = text "the spliced type" <+> quotes (ppr 
 pprHsDocContext ClassInstanceCtx      = text "TcSplice.reifyInstances"
 
 pprHsDocContext (ForeignDeclCtx name)
-   = ptext (sLit "the foreign declaration for") <+> quotes (ppr name)
+   = text "the foreign declaration for" <+> quotes (ppr name)
 pprHsDocContext (ConDeclCtx [name])
    = text "the definition of data constructor" <+> quotes (ppr name)
 pprHsDocContext (ConDeclCtx names)
    = text "the definition of data constructors" <+> interpp'SP names
 pprHsDocContext (VectDeclCtx tycon)
-   = ptext (sLit "the VECTORISE pragma for type constructor") <+> quotes (ppr tycon)
+   = text "the VECTORISE pragma for type constructor" <+> quotes (ppr tycon)

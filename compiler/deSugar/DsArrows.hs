@@ -47,7 +47,6 @@ import Bag
 import VarSet
 import SrcLoc
 import ListSetOps( assocDefault )
-import FastString
 import Data.List
 
 data DsCmdEnv = DsCmdEnv {
@@ -74,7 +73,7 @@ mkCmdEnv tc_meths
 
     find_meth prs std_name
       = assocDefault (mk_panic std_name) prs std_name
-    mk_panic std_name = pprPanic "mkCmdEnv" (ptext (sLit "Not found:") <+> ppr std_name)
+    mk_panic std_name = pprPanic "mkCmdEnv" (text "Not found:" <+> ppr std_name)
 
 -- arr :: forall b c. (b -> c) -> a b c
 do_arr :: DsCmdEnv -> Type -> Type -> CoreExpr -> CoreExpr

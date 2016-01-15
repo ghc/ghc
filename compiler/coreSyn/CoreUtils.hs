@@ -183,10 +183,10 @@ applyTypeToArgs e op_ty args
     go_ty_args op_ty rev_tys args
        = go (applyTysD panic_msg_w_hdr op_ty (reverse rev_tys)) args
 
-    panic_msg_w_hdr = hang (ptext (sLit "applyTypeToArgs")) 2 panic_msg
-    panic_msg = vcat [ ptext (sLit "Expression:") <+> pprCoreExpr e
-                     , ptext (sLit "Type:") <+> ppr op_ty
-                     , ptext (sLit "Args:") <+> ppr args ]
+    panic_msg_w_hdr = hang (text "applyTypeToArgs") 2 panic_msg
+    panic_msg = vcat [ text "Expression:" <+> pprCoreExpr e
+                     , text "Type:" <+> ppr op_ty
+                     , text "Args:" <+> ppr args ]
 
 
 {-
@@ -202,8 +202,8 @@ applyTypeToArgs e op_ty args
 mkCast :: CoreExpr -> Coercion -> CoreExpr
 mkCast e co
   | ASSERT2( coercionRole co == Representational
-           , ptext (sLit "coercion") <+> ppr co <+> ptext (sLit "passed to mkCast")
-             <+> ppr e <+> ptext (sLit "has wrong role") <+> ppr (coercionRole co) )
+           , text "coercion" <+> ppr co <+> ptext (sLit "passed to mkCast")
+             <+> ppr e <+> text "has wrong role" <+> ppr (coercionRole co) )
     isReflCo co
   = e
 
@@ -218,9 +218,9 @@ mkCast (Cast expr co2) co
   = WARN(let { Pair  from_ty  _to_ty  = coercionKind co;
                Pair _from_ty2  to_ty2 = coercionKind co2} in
             not (from_ty `eqType` to_ty2),
-             vcat ([ ptext (sLit "expr:") <+> ppr expr
-                   , ptext (sLit "co2:") <+> ppr co2
-                   , ptext (sLit "co:") <+> ppr co ]) )
+             vcat ([ text "expr:" <+> ppr expr
+                   , text "co2:" <+> ppr co2
+                   , text "co:" <+> ppr co ]) )
     mkCast expr (mkTransCo co2 co)
 
 mkCast (Tick t expr) co

@@ -205,7 +205,7 @@ rnImportDecl this_mod
     -- If there's an error in loadInterface, (e.g. interface
     -- file not found) we get lots of spurious errors from 'filterImports'
     let imp_mod_name = unLoc loc_imp_mod_name
-        doc = ppr imp_mod_name <+> ptext (sLit "is directly imported")
+        doc = ppr imp_mod_name <+> text "is directly imported"
 
     -- Check for self-import, which confuses the typechecker (Trac #9032)
     -- ghc --make rejects self-import cycles already, but batch-mode may not
@@ -227,7 +227,7 @@ rnImportDecl this_mod
              Nothing         -> True
              Just (StringLiteral _ pkg_fs) -> pkg_fs == fsLit "this" ||
                             fsToUnitId pkg_fs == moduleUnitId this_mod))
-         (addErr (ptext (sLit "A module cannot import itself:") <+> ppr imp_mod_name))
+         (addErr (text "A module cannot import itself:" <+> ppr imp_mod_name))
 
     -- Check for a missing import list (Opt_WarnMissingImportList also
     -- checks for T(..) items but that is done in checkDodgyImport below)
@@ -256,7 +256,7 @@ rnImportDecl this_mod
     warnIf (want_boot && not (mi_boot iface) && isOneShot (ghcMode dflags))
            (warnRedundantSourceImport imp_mod_name)
     when (mod_safe && not (safeImportsOn dflags)) $
-        addErr (ptext (sLit "safe import can't be used as Safe Haskell isn't on!")
+        addErr (text "safe import can't be used as Safe Haskell isn't on!"
                 $+$ ptext (sLit $ "please enable Safe Haskell through either "
                                    ++ "Safe, Trustworthy or Unsafe"))
 
@@ -401,7 +401,7 @@ calculateAvails dflags iface mod_safe' want_boot =
 
 warnRedundantSourceImport :: ModuleName -> SDoc
 warnRedundantSourceImport mod_name
-  = ptext (sLit "Unnecessary {-# SOURCE #-} in the import of module")
+  = text "Unnecessary {-# SOURCE #-} in the import of module"
           <+> quotes (ppr mod_name)
 
 {-
@@ -1547,8 +1547,8 @@ warnUnusedImportDecls gbl_env
        ; let usage :: [ImportDeclUsage]
              usage = findImportUsage user_imports uses
 
-       ; traceRn (vcat [ ptext (sLit "Uses:") <+> ppr uses
-                       , ptext (sLit "Import usage") <+> ppr usage])
+       ; traceRn (vcat [ text "Uses:" <+> ppr uses
+                       , text "Import usage" <+> ppr usage])
        ; whenWOptM Opt_WarnUnusedImports $
          mapM_ (warnUnusedImport fld_env) usage
 
@@ -1614,7 +1614,7 @@ topSigWarnId sig_ns (ty, name)
   | name `elemNameSet` sig_ns      = warnMissingSig msg (ty, name)
   | otherwise                      = return ()
   where
-    msg = ptext (sLit "Top-level binding with no type signature:")
+    msg = text "Top-level binding with no type signature:"
 
 warnMissingSig :: SDoc -> (Type, Name) -> RnM ()
 warnMissingSig msg (ty, name) = do
@@ -1738,10 +1738,10 @@ warnUnusedImport fld_env (L loc decl, used, unused)
   | otherwise   = addWarnAt loc msg2   -- Some imports are unused
   where
     msg1 = vcat [pp_herald <+> quotes pp_mod <+> pp_not_used,
-                 nest 2 (ptext (sLit "except perhaps to import instances from")
+                 nest 2 (text "except perhaps to import instances from"
                                    <+> quotes pp_mod),
-                 ptext (sLit "To import instances alone, use:")
-                                   <+> ptext (sLit "import") <+> pp_mod <> parens Outputable.empty ]
+                 text "To import instances alone, use:"
+                                   <+> text "import" <+> pp_mod <> parens Outputable.empty ]
     msg2 = sep [pp_herald <+> quotes sort_unused,
                     text "from module" <+> quotes pp_mod <+> pp_not_used]
     pp_herald  = text "The" <+> pp_qual <+> text "import of"
@@ -1897,39 +1897,39 @@ not in scope without their enclosing datatype.
 
 qualImportItemErr :: RdrName -> SDoc
 qualImportItemErr rdr
-  = hang (ptext (sLit "Illegal qualified name in import item:"))
+  = hang (text "Illegal qualified name in import item:")
        2 (ppr rdr)
 
 badImportItemErrStd :: ModIface -> ImpDeclSpec -> IE RdrName -> SDoc
 badImportItemErrStd iface decl_spec ie
-  = sep [ptext (sLit "Module"), quotes (ppr (is_mod decl_spec)), source_import,
-         ptext (sLit "does not export"), quotes (ppr ie)]
+  = sep [text "Module", quotes (ppr (is_mod decl_spec)), source_import,
+         text "does not export", quotes (ppr ie)]
   where
-    source_import | mi_boot iface = ptext (sLit "(hi-boot interface)")
+    source_import | mi_boot iface = text "(hi-boot interface)"
                   | otherwise     = Outputable.empty
 
 badImportItemErrDataCon :: OccName -> ModIface -> ImpDeclSpec -> IE RdrName -> SDoc
 badImportItemErrDataCon dataType_occ iface decl_spec ie
-  = vcat [ ptext (sLit "In module")
+  = vcat [ text "In module"
              <+> quotes (ppr (is_mod decl_spec))
              <+> source_import <> colon
          , nest 2 $ quotes datacon
-             <+> ptext (sLit "is a data constructor of")
+             <+> text "is a data constructor of"
              <+> quotes dataType
-         , ptext (sLit "To import it use")
-         , nest 2 $ quotes (ptext (sLit "import"))
+         , text "To import it use"
+         , nest 2 $ quotes (text "import")
              <+> ppr (is_mod decl_spec)
              <> parens_sp (dataType <> parens_sp datacon)
-         , ptext (sLit "or")
-         , nest 2 $ quotes (ptext (sLit "import"))
+         , text "or"
+         , nest 2 $ quotes (text "import")
              <+> ppr (is_mod decl_spec)
-             <> parens_sp (dataType <> ptext (sLit "(..)"))
+             <> parens_sp (dataType <> text "(..)")
          ]
   where
     datacon_occ = rdrNameOcc $ ieName ie
     datacon = parenSymOcc datacon_occ (ppr datacon_occ)
     dataType = parenSymOcc dataType_occ (ppr dataType_occ)
-    source_import | mi_boot iface = ptext (sLit "(hi-boot interface)")
+    source_import | mi_boot iface = text "(hi-boot interface)"
                   | otherwise     = Outputable.empty
     parens_sp d = parens (space <> d <> space)  -- T( f,g )
 
@@ -1949,35 +1949,35 @@ badImportItemErr iface decl_spec ie avails
     importedFS = occNameFS . rdrNameOcc $ ieName ie
 
 illegalImportItemErr :: SDoc
-illegalImportItemErr = ptext (sLit "Illegal import item")
+illegalImportItemErr = text "Illegal import item"
 
 dodgyImportWarn :: RdrName -> SDoc
-dodgyImportWarn item = dodgyMsg (ptext (sLit "import")) item
+dodgyImportWarn item = dodgyMsg (text "import") item
 dodgyExportWarn :: Name -> SDoc
-dodgyExportWarn item = dodgyMsg (ptext (sLit "export")) item
+dodgyExportWarn item = dodgyMsg (text "export") item
 
 dodgyMsg :: (OutputableBndr n, HasOccName n) => SDoc -> n -> SDoc
 dodgyMsg kind tc
-  = sep [ ptext (sLit "The") <+> kind <+> ptext (sLit "item")
+  = sep [ text "The" <+> kind <+> ptext (sLit "item")
                              <+> quotes (ppr (IEThingAll (noLoc tc)))
-                <+> ptext (sLit "suggests that"),
-          quotes (ppr tc) <+> ptext (sLit "has (in-scope) constructors or class methods,"),
-          ptext (sLit "but it has none") ]
+                <+> text "suggests that",
+          quotes (ppr tc) <+> text "has (in-scope) constructors or class methods,",
+          text "but it has none" ]
 
 exportItemErr :: IE RdrName -> SDoc
 exportItemErr export_item
-  = sep [ ptext (sLit "The export item") <+> quotes (ppr export_item),
-          ptext (sLit "attempts to export constructors or class methods that are not visible here") ]
+  = sep [ text "The export item" <+> quotes (ppr export_item),
+          text "attempts to export constructors or class methods that are not visible here" ]
 
 exportClashErr :: GlobalRdrEnv -> Name -> Name -> IE RdrName -> IE RdrName
                -> MsgDoc
 exportClashErr global_env name1 name2 ie1 ie2
-  = vcat [ ptext (sLit "Conflicting exports for") <+> quotes (ppr occ) <> colon
+  = vcat [ text "Conflicting exports for" <+> quotes (ppr occ) <> colon
          , ppr_export ie1' name1'
          , ppr_export ie2' name2' ]
   where
     occ = nameOccName name1
-    ppr_export ie name = nest 3 (hang (quotes (ppr ie) <+> ptext (sLit "exports") <+>
+    ppr_export ie name = nest 3 (hang (quotes (ppr ie) <+> text "exports" <+>
                                        quotes (ppr name))
                                     2 (pprNameProvenance (get_gre name)))
 
@@ -1996,12 +1996,12 @@ addDupDeclErr [] = panic "addDupDeclErr: empty list"
 addDupDeclErr gres@(gre : _)
   = addErrAt (getSrcSpan (last sorted_names)) $
     -- Report the error at the later location
-    vcat [ptext (sLit "Multiple declarations of") <+>
+    vcat [text "Multiple declarations of" <+>
              quotes (ppr (nameOccName name)),
              -- NB. print the OccName, not the Name, because the
              -- latter might not be in scope in the RdrEnv and so will
              -- be printed qualified.
-          ptext (sLit "Declared at:") <+>
+          text "Declared at:" <+>
                    vcat (map (ppr . nameSrcLoc) sorted_names)]
   where
     name = gre_name gre
@@ -2010,44 +2010,44 @@ addDupDeclErr gres@(gre : _)
 dupExportWarn :: OccName -> IE RdrName -> IE RdrName -> SDoc
 dupExportWarn occ_name ie1 ie2
   = hsep [quotes (ppr occ_name),
-          ptext (sLit "is exported by"), quotes (ppr ie1),
-          ptext (sLit "and"),            quotes (ppr ie2)]
+          text "is exported by", quotes (ppr ie1),
+          text "and",            quotes (ppr ie2)]
 
 dupModuleExport :: ModuleName -> SDoc
 dupModuleExport mod
-  = hsep [ptext (sLit "Duplicate"),
-          quotes (ptext (sLit "Module") <+> ppr mod),
-          ptext (sLit "in export list")]
+  = hsep [text "Duplicate",
+          quotes (text "Module" <+> ppr mod),
+          text "in export list"]
 
 moduleNotImported :: ModuleName -> SDoc
 moduleNotImported mod
-  = ptext (sLit "The export item `module") <+> ppr mod <>
-    ptext (sLit "' is not imported")
+  = text "The export item `module" <+> ppr mod <>
+    text "' is not imported"
 
 nullModuleExport :: ModuleName -> SDoc
 nullModuleExport mod
-  = ptext (sLit "The export item `module") <+> ppr mod <> ptext (sLit "' exports nothing")
+  = text "The export item `module" <+> ppr mod <> ptext (sLit "' exports nothing")
 
 missingImportListWarn :: ModuleName -> SDoc
 missingImportListWarn mod
-  = ptext (sLit "The module") <+> quotes (ppr mod) <+> ptext (sLit "does not have an explicit import list")
+  = text "The module" <+> quotes (ppr mod) <+> ptext (sLit "does not have an explicit import list")
 
 missingImportListItem :: IE RdrName -> SDoc
 missingImportListItem ie
-  = ptext (sLit "The import item") <+> quotes (ppr ie) <+> ptext (sLit "does not have an explicit import list")
+  = text "The import item" <+> quotes (ppr ie) <+> ptext (sLit "does not have an explicit import list")
 
 moduleWarn :: ModuleName -> WarningTxt -> SDoc
 moduleWarn mod (WarningTxt _ txt)
-  = sep [ ptext (sLit "Module") <+> quotes (ppr mod) <> ptext (sLit ":"),
+  = sep [ text "Module" <+> quotes (ppr mod) <> ptext (sLit ":"),
           nest 2 (vcat (map (ppr . sl_fs . unLoc) txt)) ]
 moduleWarn mod (DeprecatedTxt _ txt)
-  = sep [ ptext (sLit "Module") <+> quotes (ppr mod)
-                                <+> ptext (sLit "is deprecated:"),
+  = sep [ text "Module" <+> quotes (ppr mod)
+                                <+> text "is deprecated:",
           nest 2 (vcat (map (ppr . sl_fs . unLoc) txt)) ]
 
 packageImportErr :: SDoc
 packageImportErr
-  = ptext (sLit "Package-qualified imports are not enabled; use PackageImports")
+  = text "Package-qualified imports are not enabled; use PackageImports"
 
 -- This data decl will parse OK
 --      data T = a Int
@@ -2064,4 +2064,4 @@ checkConName name = checkErr (isRdrDataCon name) (badDataCon name)
 
 badDataCon :: RdrName -> SDoc
 badDataCon name
-   = hsep [ptext (sLit "Illegal data constructor name"), quotes (ppr name)]
+   = hsep [text "Illegal data constructor name", quotes (ppr name)]

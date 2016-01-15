@@ -31,7 +31,6 @@ import TysPrim
 import BasicTypes( Arity )
 import SrcLoc
 import Outputable
-import FastString
 import Util
 
 import Control.Monad
@@ -168,7 +167,7 @@ tc_cmd env (HsCmdIf (Just fun) pred b1 b2) res_ty -- Rebindable syntax for if
         ; let r_ty = mkTyVarTy r_tv
         ; let if_ty = mkFunTys [pred_ty, r_ty, r_ty] r_ty
         ; checkTc (not (r_tv `elemVarSet` tyCoVarsOfType pred_ty))
-                  (ptext (sLit "Predicate type of `ifThenElse' depends on result type"))
+                  (text "Predicate type of `ifThenElse' depends on result type")
         ; fun'  <- tcSyntaxOp IfOrigin fun if_ty
         ; pred' <- tcMonoExpr pred pred_ty
         ; b1'   <- tcCmd env b1 res_ty
@@ -314,8 +313,8 @@ tc_cmd env cmd@(HsCmdArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 -- This is where expressions that aren't commands get rejected
 
 tc_cmd _ cmd _
-  = failWithTc (vcat [ptext (sLit "The expression"), nest 2 (ppr cmd),
-                      ptext (sLit "was found where an arrow command was expected")])
+  = failWithTc (vcat [text "The expression", nest 2 (ppr cmd),
+                      text "was found where an arrow command was expected"])
 
 
 matchExpectedCmdArgs :: Arity -> TcType -> TcM (TcCoercionN, [TcType], TcType)
@@ -420,4 +419,4 @@ arrowTyConKind = mkFunTys [liftedTypeKind, liftedTypeKind] liftedTypeKind
 -}
 
 cmdCtxt :: HsCmd Name -> SDoc
-cmdCtxt cmd = ptext (sLit "In the command:") <+> ppr cmd
+cmdCtxt cmd = text "In the command:" <+> ppr cmd

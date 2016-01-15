@@ -592,7 +592,7 @@ vectDictExpr (Case e bndr ty alts)
     --
     vectDictAltCon (DataAlt datacon) = DataAlt <$> maybeV dataConErr (lookupDataCon datacon)
       where
-        dataConErr = ptext (sLit "Cannot vectorise data constructor:") <+> ppr datacon
+        dataConErr = text "Cannot vectorise data constructor:" <+> ppr datacon
     vectDictAltCon (LitAlt lit)      = return $ LitAlt lit
     vectDictAltCon DEFAULT           = return DEFAULT
 vectDictExpr (Let bnd body)
@@ -637,7 +637,8 @@ mkScalarFun arg_tys res_ty expr
        ; return (vExpr, unused)
        }
   | otherwise
-  = do { traceVt "mkScalarFun: " $ ppr expr $$ ptext (sLit "  ::") <+> ppr (mkFunTys arg_tys res_ty)
+  = do { traceVt "mkScalarFun: " $ ppr expr $$ text "  ::" <+>
+                                   ppr (mkFunTys arg_tys res_ty)
 
        ; fn_var  <- hoistExpr (fsLit "fn") expr DontInline
        ; zipf    <- zipScalars arg_tys res_ty

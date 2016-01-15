@@ -221,10 +221,10 @@ pprFamInst famInst
   = hang (pprFamInstHdr famInst) 2 (ifPprDebug debug_stuff)
   where
     ax = fi_axiom famInst
-    debug_stuff = vcat [ ptext (sLit "Coercion axiom:") <+> ppr ax
-                       , ptext (sLit "Tvs:") <+> ppr (fi_tvs famInst)
-                       , ptext (sLit "LHS:") <+> ppr (fi_tys famInst)
-                       , ptext (sLit "RHS:") <+> ppr (fi_rhs famInst) ]
+    debug_stuff = vcat [ text "Coercion axiom:" <+> ppr ax
+                       , text "Tvs:" <+> ppr (fi_tvs famInst)
+                       , text "LHS:" <+> ppr (fi_tys famInst)
+                       , text "RHS:" <+> ppr (fi_rhs famInst) ]
 
 pprFamInstHdr :: FamInst -> SDoc
 pprFamInstHdr fi@(FamInst {fi_flavor = flavor})
@@ -234,7 +234,7 @@ pprFamInstHdr fi@(FamInst {fi_flavor = flavor})
     -- For *top level* type instances, say "type instance T Int = blah"
     pp_instance
       | isTyConAssoc fam_tc = empty
-      | otherwise           = ptext (sLit "instance")
+      | otherwise           = text "instance"
 
     (fam_tc, etad_lhs_tys) = famInstSplitLHS fi
     vanilla_pp_head = pprTypeApp fam_tc etad_lhs_tys
@@ -256,12 +256,12 @@ pprFamInstHdr fi@(FamInst {fi_flavor = flavor})
             = vanilla_pp_head
 
     pprTyConSort = case flavor of
-                     SynFamilyInst        -> ptext (sLit "type")
+                     SynFamilyInst        -> text "type"
                      DataFamilyInst tycon
-                       | isDataTyCon     tycon -> ptext (sLit "data")
-                       | isNewTyCon      tycon -> ptext (sLit "newtype")
-                       | isAbstractTyCon tycon -> ptext (sLit "data")
-                       | otherwise             -> ptext (sLit "WEIRD") <+> ppr tycon
+                       | isDataTyCon     tycon -> text "data"
+                       | isNewTyCon      tycon -> text "newtype"
+                       | isAbstractTyCon tycon -> text "data"
+                       | otherwise             -> text "WEIRD" <+> ppr tycon
 
 pprFamInsts :: [FamInst] -> SDoc
 pprFamInsts finsts = vcat (map pprFamInst finsts)
@@ -371,7 +371,7 @@ newtype FamilyInstEnv
   = FamIE [FamInst]     -- The instances for a particular family, in any order
 
 instance Outputable FamilyInstEnv where
-  ppr (FamIE fs) = ptext (sLit "FamIE") <+> vcat (map ppr fs)
+  ppr (FamIE fs) = text "FamIE" <+> vcat (map ppr fs)
 
 -- INVARIANTS:
 --  * The fs_tvs are distinct in each FamInst
@@ -707,7 +707,7 @@ instance Outputable FamInstMatch where
   ppr (FamInstMatch { fim_instance = inst
                     , fim_tys      = tys
                     , fim_cos      = cos })
-    = ptext (sLit "match with") <+> parens (ppr inst) <+> ppr tys <+> ppr cos
+    = text "match with" <+> parens (ppr inst) <+> ppr tys <+> ppr cos
 
 lookupFamInstEnvByTyCon :: FamInstEnvs -> TyCon -> [FamInst]
 lookupFamInstEnvByTyCon (pkg_ie, home_ie) fam_tc

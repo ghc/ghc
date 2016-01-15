@@ -1071,8 +1071,8 @@ data StackSlot = Occupied | Empty
      -- Occupied: a return address or part of an update frame
 
 instance Outputable StackSlot where
-  ppr Occupied = ptext (sLit "XXX")
-  ppr Empty    = ptext (sLit "---")
+  ppr Occupied = text "XXX"
+  ppr Empty    = text "---"
 
 dropEmpty :: WordOff -> [StackSlot] -> Maybe [StackSlot]
 dropEmpty 0 ss           = Just ss

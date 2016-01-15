@@ -1196,7 +1196,7 @@ ppr_fun_ty ctxt_prec ty1 ty2
         p2 = ppr_mono_lty TopPrec ty2
     in
     maybeParen ctxt_prec FunPrec $
-    sep [p1, ptext (sLit "->") <+> p2]
+    sep [p1, text "->" <+> p2]
 
 --------------------------
 ppr_app_ty :: OutputableBndr name => TyPrec -> HsAppType name -> SDoc

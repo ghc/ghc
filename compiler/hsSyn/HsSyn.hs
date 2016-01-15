@@ -50,7 +50,6 @@ import OccName          ( HasOccName )
 import Outputable
 import SrcLoc
 import Module           ( ModuleName )
-import FastString
 
 -- libraries:
 import Data.Data hiding ( Fixity )
@@ -120,11 +119,11 @@ instance (OutputableBndr name, HasOccName name)
       = vcat [
             pp_mb mbDoc,
             case exports of
-              Nothing -> pp_header (ptext (sLit "where"))
+              Nothing -> pp_header (text "where")
               Just es -> vcat [
                            pp_header lparen,
                            nest 8 (fsep (punctuate comma (map ppr (unLoc es)))),
-                           nest 4 (ptext (sLit ") where"))
+                           nest 4 (text ") where")
                           ],
             pp_nonnull imports,
             pp_nonnull decls
@@ -134,7 +133,7 @@ instance (OutputableBndr name, HasOccName name)
            Nothing -> pp_modname <+> rest
            Just d -> vcat [ pp_modname, ppr d, rest ]
 
-        pp_modname = ptext (sLit "module") <+> ppr name
+        pp_modname = text "module" <+> ppr name
 
 pp_mb :: Outputable t => Maybe t -> SDoc
 pp_mb (Just x) = ppr x

@@ -1000,11 +1000,11 @@ pprCLabel platform (DynamicLinkerLabel info lbl)
 
 pprCLabel _ PicBaseLabel
  | cGhcWithNativeCodeGen == "YES"
-   = ptext (sLit "1b")
+   = text "1b"
 
 pprCLabel platform (DeadStripPreventer lbl)
  | cGhcWithNativeCodeGen == "YES"
-   = pprCLabel platform lbl <> ptext (sLit "_dsp")
+   = pprCLabel platform lbl <> text "_dsp"
 
 pprCLabel platform lbl
    = getPprStyle $ \ sty ->
@@ -1028,22 +1028,22 @@ pprAsmCLbl _ lbl
 
 pprCLbl :: CLabel -> SDoc
 pprCLbl (StringLitLabel u)
-  = pprUnique u <> ptext (sLit "_str")
+  = pprUnique u <> text "_str"
 
 pprCLbl (CaseLabel u CaseReturnPt)
-  = hcat [pprUnique u, ptext (sLit "_ret")]
+  = hcat [pprUnique u, text "_ret"]
 pprCLbl (CaseLabel u CaseReturnInfo)
-  = hcat [pprUnique u, ptext (sLit "_info")]
+  = hcat [pprUnique u, text "_info"]
 pprCLbl (CaseLabel u (CaseAlt tag))
-  = hcat [pprUnique u, pp_cSEP, int tag, ptext (sLit "_alt")]
+  = hcat [pprUnique u, pp_cSEP, int tag, text "_alt"]
 pprCLbl (CaseLabel u CaseDefault)
-  = hcat [pprUnique u, ptext (sLit "_dflt")]
+  = hcat [pprUnique u, text "_dflt"]
 
 pprCLbl (SRTLabel u)
-  = pprUnique u <> pp_cSEP <> ptext (sLit "srt")
+  = pprUnique u <> pp_cSEP <> text "srt"
 
-pprCLbl (LargeSRTLabel u)  = pprUnique u <> pp_cSEP <> ptext (sLit "srtd")
-pprCLbl (LargeBitmapLabel u)  = text "b" <> pprUnique u <> pp_cSEP <> ptext (sLit "btm")
+pprCLbl (LargeSRTLabel u)  = pprUnique u <> pp_cSEP <> text "srtd"
+pprCLbl (LargeBitmapLabel u)  = text "b" <> pprUnique u <> pp_cSEP <> text "btm"
 -- Some bitsmaps for tuple constructors have a numeric tag (e.g. '7')
 -- until that gets resolved we'll just force them to start
 -- with a letter so the label will be legal assmbly code.
@@ -1053,56 +1053,56 @@ pprCLbl (CmmLabel _ str CmmCode)        = ftext str
 pprCLbl (CmmLabel _ str CmmData)        = ftext str
 pprCLbl (CmmLabel _ str CmmPrimCall)    = ftext str
 
-pprCLbl (RtsLabel (RtsApFast str))   = ftext str <> ptext (sLit "_fast")
+pprCLbl (RtsLabel (RtsApFast str))   = ftext str <> text "_fast"
 
 pprCLbl (RtsLabel (RtsSelectorInfoTable upd_reqd offset))
-  = hcat [ptext (sLit "stg_sel_"), text (show offset),
+  = hcat [text "stg_sel_", text (show offset),
           ptext (if upd_reqd
                  then (sLit "_upd_info")
                  else (sLit "_noupd_info"))
         ]
 
 pprCLbl (RtsLabel (RtsSelectorEntry upd_reqd offset))
-  = hcat [ptext (sLit "stg_sel_"), text (show offset),
+  = hcat [text "stg_sel_", text (show offset),
                 ptext (if upd_reqd
                         then (sLit "_upd_entry")
                         else (sLit "_noupd_entry"))
         ]
 
 pprCLbl (RtsLabel (RtsApInfoTable upd_reqd arity))
-  = hcat [ptext (sLit "stg_ap_"), text (show arity),
+  = hcat [text "stg_ap_", text (show arity),
                 ptext (if upd_reqd
                         then (sLit "_upd_info")
                         else (sLit "_noupd_info"))
         ]
 
 pprCLbl (RtsLabel (RtsApEntry upd_reqd arity))
-  = hcat [ptext (sLit "stg_ap_"), text (show arity),
+  = hcat [text "stg_ap_", text (show arity),
                 ptext (if upd_reqd
                         then (sLit "_upd_entry")
                         else (sLit "_noupd_entry"))
         ]
 
 pprCLbl (CmmLabel _ fs CmmInfo)
-  = ftext fs <> ptext (sLit "_info")
+  = ftext fs <> text "_info"
 
 pprCLbl (CmmLabel _ fs CmmEntry)
-  = ftext fs <> ptext (sLit "_entry")
+  = ftext fs <> text "_entry"
 
 pprCLbl (CmmLabel _ fs CmmRetInfo)
-  = ftext fs <> ptext (sLit "_info")
+  = ftext fs <> text "_info"
 
 pprCLbl (CmmLabel _ fs CmmRet)
-  = ftext fs <> ptext (sLit "_ret")
+  = ftext fs <> text "_ret"
 
 pprCLbl (CmmLabel _ fs CmmClosure)
-  = ftext fs <> ptext (sLit "_closure")
+  = ftext fs <> text "_closure"
 
 pprCLbl (RtsLabel (RtsPrimOp primop))
-  = ptext (sLit "stg_") <> ppr primop
+  = text "stg_" <> ppr primop
 
 pprCLbl (RtsLabel (RtsSlowFastTickyCtr pat))
-  = ptext (sLit "SLOW_CALL_fast_") <> text pat <> ptext (sLit "_ctr")
+  = text "SLOW_CALL_fast_" <> text pat <> ptext (sLit "_ctr")
 
 pprCLbl (ForeignLabel str _ _ _)
   = ftext str
@@ -1113,10 +1113,10 @@ pprCLbl (CC_Label cc)           = ppr cc
 pprCLbl (CCS_Label ccs)         = ppr ccs
 
 pprCLbl (PlainModuleInitLabel mod)
-   = ptext (sLit "__stginit_") <> ppr mod
+   = text "__stginit_" <> ppr mod
 
 pprCLbl (HpcTicksLabel mod)
-  = ptext (sLit "_hpc_tickboxes_")  <> ppr mod <> ptext (sLit "_hpc")
+  = text "_hpc_tickboxes_"  <> ppr mod <> ptext (sLit "_hpc")
 
 pprCLbl (AsmTempLabel {})       = panic "pprCLbl AsmTempLabel"
 pprCLbl (AsmTempDerivedLabel {})= panic "pprCLbl AsmTempDerivedLabel"
@@ -1127,19 +1127,19 @@ pprCLbl (DeadStripPreventer {}) = panic "pprCLbl DeadStripPreventer"
 ppIdFlavor :: IdLabelInfo -> SDoc
 ppIdFlavor x = pp_cSEP <>
                (case x of
-                       Closure          -> ptext (sLit "closure")
-                       SRT              -> ptext (sLit "srt")
-                       InfoTable        -> ptext (sLit "info")
-                       LocalInfoTable   -> ptext (sLit "info")
-                       Entry            -> ptext (sLit "entry")
-                       LocalEntry       -> ptext (sLit "entry")
-                       Slow             -> ptext (sLit "slow")
-                       RednCounts       -> ptext (sLit "ct")
-                       ConEntry         -> ptext (sLit "con_entry")
-                       ConInfoTable     -> ptext (sLit "con_info")
-                       StaticConEntry   -> ptext (sLit "static_entry")
-                       StaticInfoTable  -> ptext (sLit "static_info")
-                       ClosureTable     -> ptext (sLit "closure_tbl")
+                       Closure          -> text "closure"
+                       SRT              -> text "srt"
+                       InfoTable        -> text "info"
+                       LocalInfoTable   -> text "info"
+                       Entry            -> text "entry"
+                       LocalEntry       -> text "entry"
+                       Slow             -> text "slow"
+                       RednCounts       -> text "ct"
+                       ConEntry         -> text "con_entry"
+                       ConInfoTable     -> text "con_info"
+                       StaticConEntry   -> text "static_entry"
+                       StaticInfoTable  -> text "static_info"
+                       ClosureTable     -> text "closure_tbl"
                       )
 
 

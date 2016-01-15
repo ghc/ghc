@@ -43,10 +43,10 @@ import RdrName
 import CoreSyn
 #ifdef GHCI
 import GHCi.RemoteTypes
+import SrcLoc
+import Type
 #endif
 import BasicTypes
-import Type
-import SrcLoc
 
 import Data.Maybe
 

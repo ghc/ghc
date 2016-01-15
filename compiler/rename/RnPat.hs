@@ -57,7 +57,6 @@ import Util
 import ListSetOps          ( removeDups )
 import Outputable
 import SrcLoc
-import FastString
 import Literal             ( inCharRange )
 import TysWiredIn          ( nilDataCon )
 import DataCon
@@ -299,7 +298,7 @@ rnPats ctxt pats thing_inside
           collectPatsBinders pats'
         ; thing_inside pats' } }
   where
-    doc_pat = ptext (sLit "In") <+> pprMatchContext ctxt
+    doc_pat = text "In" <+> pprMatchContext ctxt
 
 rnPat :: HsMatchContext Name -- for error messages
       -> LPat RdrName
@@ -550,8 +549,8 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
            -- We don't want that to screw up the dot-dot fill-in stuff.
 
     doc = case mb_con of
-            Nothing  -> ptext (sLit "constructor field name")
-            Just con -> ptext (sLit "field of constructor") <+> quotes (ppr con)
+            Nothing  -> text "constructor field name"
+            Just con -> text "field of constructor" <+> quotes (ppr con)
 
     rn_fld :: Bool -> Maybe Name -> LHsRecField RdrName (Located arg)
            -> RnM (LHsRecField Name (Located arg))
@@ -671,7 +670,7 @@ rnHsRecUpdFields flds
 
        ; return (flds1, plusFVs fvss) }
   where
-    doc = ptext (sLit "constructor field name")
+    doc = text "constructor field name"
 
     rn_fld :: Bool -> Bool -> LHsRecUpdField RdrName -> RnM (LHsRecUpdField Name, FreeVars)
     rn_fld pun_ok overload_ok (L l (HsRecField { hsRecFieldLbl = L loc f
@@ -728,31 +727,31 @@ getFieldUpdLbls :: [LHsRecUpdField id] -> [RdrName]
 getFieldUpdLbls flds = map (rdrNameAmbiguousFieldOcc . unLoc . hsRecFieldLbl . unLoc) flds
 
 needFlagDotDot :: HsRecFieldContext -> SDoc
-needFlagDotDot ctxt = vcat [ptext (sLit "Illegal `..' in record") <+> pprRFC ctxt,
-                            ptext (sLit "Use RecordWildCards to permit this")]
+needFlagDotDot ctxt = vcat [text "Illegal `..' in record" <+> pprRFC ctxt,
+                            text "Use RecordWildCards to permit this"]
 
 badDotDotCon :: Name -> SDoc
 badDotDotCon con
-  = vcat [ ptext (sLit "Illegal `..' notation for constructor") <+> quotes (ppr con)
-         , nest 2 (ptext (sLit "The constructor has no labelled fields")) ]
+  = vcat [ text "Illegal `..' notation for constructor" <+> quotes (ppr con)
+         , nest 2 (text "The constructor has no labelled fields") ]
 
 emptyUpdateErr :: SDoc
-emptyUpdateErr = ptext (sLit "Empty record update")
+emptyUpdateErr = text "Empty record update"
 
 badPun :: Located RdrName -> SDoc
-badPun fld = vcat [ptext (sLit "Illegal use of punning for field") <+> quotes (ppr fld),
-                   ptext (sLit "Use NamedFieldPuns to permit this")]
+badPun fld = vcat [text "Illegal use of punning for field" <+> quotes (ppr fld),
+                   text "Use NamedFieldPuns to permit this"]
 
 dupFieldErr :: HsRecFieldContext -> [RdrName] -> SDoc
 dupFieldErr ctxt dups
-  = hsep [ptext (sLit "duplicate field name"),
+  = hsep [text "duplicate field name",
           quotes (ppr (head dups)),
-          ptext (sLit "in record"), pprRFC ctxt]
+          text "in record", pprRFC ctxt]
 
 pprRFC :: HsRecFieldContext -> SDoc
-pprRFC (HsRecFieldCon {}) = ptext (sLit "construction")
-pprRFC (HsRecFieldPat {}) = ptext (sLit "pattern")
-pprRFC (HsRecFieldUpd {}) = ptext (sLit "update")
+pprRFC (HsRecFieldCon {}) = text "construction"
+pprRFC (HsRecFieldPat {}) = text "pattern"
+pprRFC (HsRecFieldUpd {}) = text "update"
 
 {-
 ************************************************************************
@@ -803,13 +802,13 @@ rnOverLit origLit
 
 patSigErr :: Outputable a => a -> SDoc
 patSigErr ty
-  =  (ptext (sLit "Illegal signature in pattern:") <+> ppr ty)
-        $$ nest 4 (ptext (sLit "Use ScopedTypeVariables to permit it"))
+  =  (text "Illegal signature in pattern:" <+> ppr ty)
+        $$ nest 4 (text "Use ScopedTypeVariables to permit it")
 
 bogusCharError :: Char -> SDoc
 bogusCharError c
-  = ptext (sLit "character literal out of range: '\\") <> char c  <> char '\''
+  = text "character literal out of range: '\\" <> char c  <> char '\''
 
 badViewPat :: Pat RdrName -> SDoc
-badViewPat pat = vcat [ptext (sLit "Illegal view pattern: ") <+> ppr pat,
-                       ptext (sLit "Use ViewPatterns to enable view patterns")]
+badViewPat pat = vcat [text "Illegal view pattern: " <+> ppr pat,
+                       text "Use ViewPatterns to enable view patterns"]

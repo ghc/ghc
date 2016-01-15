@@ -235,8 +235,8 @@ canDoGenerics1 rep_tc tc_args =
     additionalChecks
         -- check (f) from Note [Requirements for deriving Generic and Rep]
       | null (tyConTyVars rep_tc) = NotValid $
-          ptext (sLit "Data type") <+> quotes (ppr rep_tc)
-      <+> ptext (sLit "must have some type parameters")
+          text "Data type" <+> quotes (ppr rep_tc)
+      <+> text "must have some type parameters"
 
       | otherwise = mergeErrors $ concatMap check_con data_cons
 
@@ -246,7 +246,7 @@ canDoGenerics1 rep_tc tc_args =
       IsValid -> _ccdg1_errors `map` foldDataConArgs (ft_check con) con
 
     bad :: DataCon -> SDoc -> SDoc
-    bad con msg = ptext (sLit "Constructor") <+> quotes (ppr con) <+> msg
+    bad con msg = text "Constructor" <+> quotes (ppr con) <+> msg
 
     check_vanilla :: DataCon -> Validity
     check_vanilla con | isVanillaDataCon con = IsValid

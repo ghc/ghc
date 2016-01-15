@@ -1340,12 +1340,12 @@ pprTyThing thing = pprTyThingCategory thing <+> quotes (ppr (getName thing))
 
 pprTyThingCategory :: TyThing -> SDoc
 pprTyThingCategory (ATyCon tc)
-  | isClassTyCon tc = ptext (sLit "Class")
-  | otherwise       = ptext (sLit "Type constructor")
-pprTyThingCategory (ACoAxiom _) = ptext (sLit "Coercion axiom")
-pprTyThingCategory (AnId   _)   = ptext (sLit "Identifier")
-pprTyThingCategory (AConLike (RealDataCon _)) = ptext (sLit "Data constructor")
-pprTyThingCategory (AConLike (PatSynCon _))  = ptext (sLit "Pattern synonym")
+  | isClassTyCon tc = text "Class"
+  | otherwise       = text "Type constructor"
+pprTyThingCategory (ACoAxiom _) = text "Coercion axiom"
+pprTyThingCategory (AnId   _)   = text "Identifier"
+pprTyThingCategory (AConLike (RealDataCon _)) = text "Data constructor"
+pprTyThingCategory (AConLike (PatSynCon _))  = text "Pattern synonym"
 
 
 instance NamedThing TyThing where       -- Can't put this with the type
@@ -1553,7 +1553,7 @@ extendSubstEnvs (tenv, cenv) v ty
   | CoercionTy co <- ty
   = (tenv, extendVarEnv cenv v co)
   | otherwise
-  = pprPanic "extendSubstEnvs" (ppr v <+> ptext (sLit "|->") <+> ppr ty)
+  = pprPanic "extendSubstEnvs" (ppr v <+> text "|->" <+> ppr ty)
 
 extendTCvSubst :: TCvSubst -> Var -> Type -> TCvSubst
 extendTCvSubst (TCvSubst in_scope tenv cenv) tv ty
@@ -1682,10 +1682,10 @@ zipCoEnv cvs cos = mkVarEnv (zipEqual "zipCoEnv" cvs cos)
 
 instance Outputable TCvSubst where
   ppr (TCvSubst ins tenv cenv)
-    = brackets $ sep[ ptext (sLit "TCvSubst"),
-                      nest 2 (ptext (sLit "In scope:") <+> ppr ins),
-                      nest 2 (ptext (sLit "Type env:") <+> ppr tenv),
-                      nest 2 (ptext (sLit "Co env:") <+> ppr cenv) ]
+    = brackets $ sep[ text "TCvSubst",
+                      nest 2 (text "In scope:" <+> ppr ins),
+                      nest 2 (text "Type env:" <+> ppr tenv),
+                      nest 2 (text "Co env:" <+> ppr cenv) ]
 
 {-
 %************************************************************************
@@ -2143,7 +2143,7 @@ ppr_type p (AppTy t1 t2)
 
 ppr_type p (CastTy ty co)
   = if_print_coercions
-      (parens (ppr_type TopPrec ty <+> ptext (sLit "|>") <+> ppr co))
+      (parens (ppr_type TopPrec ty <+> text "|>" <+> ppr co))
       (ppr_type p ty)
 
 ppr_type _ (CoercionTy co)
@@ -2301,8 +2301,8 @@ instance Outputable VisibilityFlag where
 instance Outputable Coercion where -- defined here to avoid orphans
   ppr = pprCo
 instance Outputable LeftOrRight where
-  ppr CLeft    = ptext (sLit "Left")
-  ppr CRight   = ptext (sLit "Right")
+  ppr CLeft    = text "Left"
+  ppr CRight   = text "Right"
 
 {-
 Note [When to print foralls]
@@ -2370,7 +2370,7 @@ pprTyTcApp p tc tys
   | tc `hasKey` ipTyConKey
   , [LitTy (StrTyLit n),ty] <- tys
   = maybeParen p FunPrec $
-    char '?' <> ftext n <> ptext (sLit "::") <> ppr_type TopPrec ty
+    char '?' <> ftext n <> text "::" <> ppr_type TopPrec ty
 
   | tc `hasKey` consDataConKey
   , [_kind,ty1,ty2] <- tys
@@ -2435,9 +2435,9 @@ pprTupleApp :: TyPrec -> (TyPrec -> a -> SDoc)
 pprTupleApp p pp tc sort tys
   | null tys
   , ConstraintTuple <- sort
-  = if opt_PprStyle_Debug then ptext (sLit "(%%)")
+  = if opt_PprStyle_Debug then text "(%%)"
                           else maybeParen p FunPrec $
-                               ptext (sLit "() :: Constraint")
+                               text "() :: Constraint"
   | otherwise
   = pprPromotionQuote tc <>
     tupleParens sort (pprWithCommas (pp TopPrec) tys)

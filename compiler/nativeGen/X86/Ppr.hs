@@ -93,7 +93,7 @@ pprSizeDecl :: CLabel -> SDoc
 pprSizeDecl lbl
  = sdocWithPlatform $ \platform ->
    if osElfTarget (platformOS platform)
-   then ptext (sLit "\t.size") <+> ppr lbl <> ptext (sLit ", .-") <> ppr lbl
+   then text "\t.size" <+> ppr lbl <> ptext (sLit ", .-") <> ppr lbl
    else empty
 
 pprBasicBlock :: BlockEnv CmmStatics -> NatBasicBlock Instr -> SDoc
@@ -128,21 +128,21 @@ pprData (CmmString str) = pprASCII str
 
 pprData (CmmUninitialised bytes)
  = sdocWithPlatform $ \platform ->
-   if platformOS platform == OSDarwin then ptext (sLit ".space ") <> int bytes
-                                      else ptext (sLit ".skip ")  <> int bytes
+   if platformOS platform == OSDarwin then text ".space " <> int bytes
+                                      else text ".skip "  <> int bytes
 
 pprData (CmmStaticLit lit) = pprDataItem lit
 
 pprGloblDecl :: CLabel -> SDoc
 pprGloblDecl lbl
   | not (externallyVisibleCLabel lbl) = empty
-  | otherwise = ptext (sLit ".globl ") <> ppr lbl
+  | otherwise = text ".globl " <> ppr lbl
 
 pprTypeAndSizeDecl :: CLabel -> SDoc
 pprTypeAndSizeDecl lbl
     = sdocWithPlatform $ \platform ->
       if osElfTarget (platformOS platform) && externallyVisibleCLabel lbl
-      then ptext (sLit ".type ") <> ppr lbl <> ptext (sLit ", @object")
+      then text ".type " <> ppr lbl <> ptext (sLit ", @object")
       else empty
 
 pprLabel :: CLabel -> SDoc
@@ -156,12 +156,12 @@ pprASCII str
   = vcat (map do1 str) $$ do1 0
     where
        do1 :: Word8 -> SDoc
-       do1 w = ptext (sLit "\t.byte\t") <> int (fromIntegral w)
+       do1 w = text "\t.byte\t" <> int (fromIntegral w)
 
 pprAlign :: Int -> SDoc
 pprAlign bytes
         = sdocWithPlatform $ \platform ->
-          ptext (sLit ".align ") <> int (alignment platform)
+          text ".align " <> int (alignment platform)
   where
         alignment platform = if platformOS platform == OSDarwin
                              then log2 bytes
@@ -339,8 +339,8 @@ pprImm (ImmCLbl l)    = ppr l
 pprImm (ImmIndex l i) = ppr l <> char '+' <> int i
 pprImm (ImmLit s)     = s
 
-pprImm (ImmFloat _)  = ptext (sLit "naughty float immediate")
-pprImm (ImmDouble _) = ptext (sLit "naughty double immediate")
+pprImm (ImmFloat _)  = text "naughty float immediate"
+pprImm (ImmDouble _) = text "naughty double immediate"
 
 pprImm (ImmConstantSum a b) = pprImm a <> char '+' <> pprImm b
 pprImm (ImmConstantDiff a b) = pprImm a <> char '-'
@@ -369,7 +369,7 @@ pprAddr (AddrBaseIndex base index displacement)
     case (base, index) of
       (EABaseNone,  EAIndexNone) -> pp_disp
       (EABaseReg b, EAIndexNone) -> pp_off (pp_reg b)
-      (EABaseRip,   EAIndexNone) -> pp_off (ptext (sLit "%rip"))
+      (EABaseRip,   EAIndexNone) -> pp_off (text "%rip")
       (EABaseNone,  EAIndex r i) -> pp_off (comma <> pp_reg r <> comma <> int i)
       (EABaseReg b, EAIndex r i) -> pp_off (pp_reg b <> comma <> pp_reg r
                                        <> comma <> int i)
@@ -386,7 +386,7 @@ pprSectionAlign (Section (OtherSection _) _) =
 pprSectionAlign sec@(Section seg _) =
   sdocWithPlatform $ \platform ->
     pprSectionHeader platform sec $$
-    ptext (sLit ".align ") <>
+    text ".align " <>
     case platformOS platform of
       OSDarwin
        | target32Bit platform ->
@@ -400,7 +400,7 @@ pprSectionAlign sec@(Section seg _) =
       _
        | target32Bit platform ->
           case seg of
-           Text              -> ptext (sLit "4,0x90")
+           Text              -> text "4,0x90"
            ReadOnlyData16    -> int 16
            _                 -> int 4
        | otherwise ->
@@ -419,17 +419,17 @@ pprDataItem' dflags lit
         imm = litToImm lit
 
         -- These seem to be common:
-        ppr_item II8   _ = [ptext (sLit "\t.byte\t") <> pprImm imm]
-        ppr_item II16  _ = [ptext (sLit "\t.word\t") <> pprImm imm]
-        ppr_item II32  _ = [ptext (sLit "\t.long\t") <> pprImm imm]
+        ppr_item II8   _ = [text "\t.byte\t" <> pprImm imm]
+        ppr_item II16  _ = [text "\t.word\t" <> pprImm imm]
+        ppr_item II32  _ = [text "\t.long\t" <> pprImm imm]
 
         ppr_item FF32  (CmmFloat r _)
            = let bs = floatToBytes (fromRational r)
-             in  map (\b -> ptext (sLit "\t.byte\t") <> pprImm (ImmInt b)) bs
+             in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
 
         ppr_item FF64 (CmmFloat r _)
            = let bs = doubleToBytes (fromRational r)
-             in  map (\b -> ptext (sLit "\t.byte\t") <> pprImm (ImmInt b)) bs
+             in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
 
         ppr_item II64 _
             = case platformOS platform of
@@ -437,17 +437,17 @@ pprDataItem' dflags lit
                | target32Bit platform ->
                   case lit of
                   CmmInt x _ ->
-                      [ptext (sLit "\t.long\t")
+                      [text "\t.long\t"
                           <> int (fromIntegral (fromIntegral x :: Word32)),
-                       ptext (sLit "\t.long\t")
+                       text "\t.long\t"
                           <> int (fromIntegral
                               (fromIntegral (x `shiftR` 32) :: Word32))]
                   _ -> panic "X86.Ppr.ppr_item: no match for II64"
                | otherwise ->
-                  [ptext (sLit "\t.quad\t") <> pprImm imm]
+                  [text "\t.quad\t" <> pprImm imm]
               _
                | target32Bit platform ->
-                  [ptext (sLit "\t.quad\t") <> pprImm imm]
+                  [text "\t.quad\t" <> pprImm imm]
                | otherwise ->
                   -- x86_64: binutils can't handle the R_X86_64_PC64
                   -- relocation type, which means we can't do
@@ -462,10 +462,10 @@ pprDataItem' dflags lit
                   case lit of
                   -- A relative relocation:
                   CmmLabelDiffOff _ _ _ ->
-                      [ptext (sLit "\t.long\t") <> pprImm imm,
-                       ptext (sLit "\t.long\t0")]
+                      [text "\t.long\t" <> pprImm imm,
+                       text "\t.long\t0"]
                   _ ->
-                      [ptext (sLit "\t.quad\t") <> pprImm imm]
+                      [text "\t.quad\t" <> pprImm imm]
 
         ppr_item _ _
                 = panic "X86.Ppr.ppr_item: no match"
@@ -476,11 +476,11 @@ pprInstr :: Instr -> SDoc
 
 pprInstr (COMMENT _) = empty -- nuke 'em
 {-
-pprInstr (COMMENT s) = ptext (sLit "# ") <> ftext s
+pprInstr (COMMENT s) = text "# " <> ftext s
 -}
 
 pprInstr (LOCATION file line col _name)
-   = ptext (sLit "\t.loc ") <> ppr file <+> ppr line <+> ppr col
+   = text "\t.loc " <> ppr file <+> ppr line <+> ppr col
 
 pprInstr (DELTA d)
    = pprInstr (COMMENT (mkFastString ("\tdelta = " ++ show d)))
@@ -494,17 +494,17 @@ pprInstr (LDATA _ _)
 {-
 pprInstr (SPILL reg slot)
    = hcat [
-        ptext (sLit "\tSPILL"),
+        text "\tSPILL",
         char ' ',
         pprUserReg reg,
         comma,
-        ptext (sLit "SLOT") <> parens (int slot)]
+        text "SLOT" <> parens (int slot)]
 
 pprInstr (RELOAD slot reg)
    = hcat [
-        ptext (sLit "\tRELOAD"),
+        text "\tRELOAD",
         char ' ',
-        ptext (sLit "SLOT") <> parens (int slot),
+        text "SLOT" <> parens (int slot),
         comma,
         pprUserReg reg]
 -}
@@ -637,12 +637,12 @@ pprInstr (PUSH format op) = pprFormatOp (sLit "push") format op
 pprInstr (POP format op) = pprFormatOp (sLit "pop") format op
 
 -- both unused (SDM):
--- pprInstr PUSHA = ptext (sLit "\tpushal")
--- pprInstr POPA = ptext (sLit "\tpopal")
+-- pprInstr PUSHA = text "\tpushal"
+-- pprInstr POPA = text "\tpopal"
 
-pprInstr NOP = ptext (sLit "\tnop")
-pprInstr (CLTD II32) = ptext (sLit "\tcltd")
-pprInstr (CLTD II64) = ptext (sLit "\tcqto")
+pprInstr NOP = text "\tnop"
+pprInstr (CLTD II32) = text "\tcltd"
+pprInstr (CLTD II64) = text "\tcqto"
 
 pprInstr (SETCC cond op) = pprCondInstr (sLit "set") cond (pprOperand II8 op)
 
@@ -652,14 +652,14 @@ pprInstr (JXX cond blockid)
 
 pprInstr        (JXX_GBL cond imm) = pprCondInstr (sLit "j") cond (pprImm imm)
 
-pprInstr        (JMP (OpImm imm) _) = ptext (sLit "\tjmp ") <> pprImm imm
+pprInstr        (JMP (OpImm imm) _) = text "\tjmp " <> pprImm imm
 pprInstr (JMP op _)          = sdocWithPlatform $ \platform ->
-                               ptext (sLit "\tjmp *")
+                               text "\tjmp *"
                                    <> pprOperand (archWordFormat (target32Bit platform)) op
 pprInstr (JMP_TBL op _ _ _)  = pprInstr (JMP op [])
-pprInstr        (CALL (Left imm) _)    = ptext (sLit "\tcall ") <> pprImm imm
+pprInstr        (CALL (Left imm) _)    = text "\tcall " <> pprImm imm
 pprInstr (CALL (Right reg) _)   = sdocWithPlatform $ \platform ->
-                                  ptext (sLit "\tcall *")
+                                  text "\tcall *"
                                       <> pprReg (archWordFormat (target32Bit platform)) reg
 
 pprInstr (IDIV fmt op)   = pprFormatOp (sLit "idiv") fmt op
@@ -681,9 +681,9 @@ pprInstr (CVTSI2SD fmt from to)   = pprFormatOpReg (sLit "cvtsi2sd") fmt from to
 
     -- FETCHGOT for PIC on ELF platforms
 pprInstr (FETCHGOT reg)
-   = vcat [ ptext (sLit "\tcall 1f"),
-            hcat [ ptext (sLit "1:\tpopl\t"), pprReg II32 reg ],
-            hcat [ ptext (sLit "\taddl\t$_GLOBAL_OFFSET_TABLE_+(.-1b), "),
+   = vcat [ text "\tcall 1f",
+            hcat [ text "1:\tpopl\t", pprReg II32 reg ],
+            hcat [ text "\taddl\t$_GLOBAL_OFFSET_TABLE_+(.-1b), ",
                    pprReg II32 reg ]
           ]
 
@@ -692,8 +692,8 @@ pprInstr (FETCHGOT reg)
     -- (Terminology note: the IP is called Program Counter on PPC,
     --  and it's a good thing to use the same name on both platforms)
 pprInstr (FETCHPC reg)
-   = vcat [ ptext (sLit "\tcall 1f"),
-            hcat [ ptext (sLit "1:\tpopl\t"), pprReg II32 reg ]
+   = vcat [ text "\tcall 1f",
+            hcat [ text "1:\tpopl\t", pprReg II32 reg ]
           ]
 
 
@@ -912,15 +912,15 @@ pprInstr g@(GDIV _ src1 src2 dst)
 
 
 pprInstr GFREE
-   = vcat [ ptext (sLit "\tffree %st(0) ;ffree %st(1) ;ffree %st(2) ;ffree %st(3)"),
-            ptext (sLit "\tffree %st(4) ;ffree %st(5)")
+   = vcat [ text "\tffree %st(0) ;ffree %st(1) ;ffree %st(2) ;ffree %st(3)",
+            text "\tffree %st(4) ;ffree %st(5)"
           ]
 
 -- Atomics
 
-pprInstr (LOCK i) = ptext (sLit "\tlock") $$ pprInstr i
+pprInstr (LOCK i) = text "\tlock" $$ pprInstr i
 
-pprInstr MFENCE = ptext (sLit "\tmfence")
+pprInstr MFENCE = text "\tmfence"
 
 pprInstr (XADD format src dst) = pprFormatOpOp (sLit "xadd") format src dst
 
@@ -1043,7 +1043,7 @@ pprGInstr (GDIV fmt src1 src2 dst) = pprFormatRegRegReg (sLit "gdiv") fmt src1 s
 pprGInstr _ = panic "X86.Ppr.pprGInstr: no match"
 
 pprDollImm :: Imm -> SDoc
-pprDollImm i = ptext (sLit "$") <> pprImm i
+pprDollImm i = text "$" <> pprImm i
 
 
 pprOperand :: Format -> Operand -> SDoc

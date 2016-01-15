@@ -72,7 +72,6 @@ import Maybes           ( orElse )
 import Type            ( Type, isUnLiftedType )
 import TyCon           ( isNewTyCon, isClassTyCon )
 import DataCon         ( splitDataProductType_maybe )
-import FastString
 
 {-
 ************************************************************************
@@ -787,8 +786,8 @@ data TypeShape = TsFun TypeShape
                | TsUnk
 
 instance Outputable TypeShape where
-  ppr TsUnk        = ptext (sLit "TsUnk")
-  ppr (TsFun ts)   = ptext (sLit "TsFun") <> parens (ppr ts)
+  ppr TsUnk        = text "TsUnk"
+  ppr (TsFun ts)   = text "TsFun" <> parens (ppr ts)
   ppr (TsProd tss) = parens (hsep $ punctuate comma $ map ppr tss)
 
 trimToType :: Demand -> TypeShape -> Demand

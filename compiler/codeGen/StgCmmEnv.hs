@@ -38,7 +38,6 @@ import MkGraph
 import BlockId
 import CmmExpr
 import CmmUtils
-import FastString
 import Id
 import VarEnv
 import Control.Monad
@@ -158,7 +157,7 @@ cgLookupPanic id
   = do  local_binds <- getBinds
         pprPanic "StgCmmEnv: variable not found"
                 (vcat [ppr id,
-                ptext (sLit "local binds for:"),
+                text "local binds for:",
                 vcat [ ppr (cg_id info) | info <- varEnvElts local_binds ]
               ])
 

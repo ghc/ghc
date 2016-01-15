@@ -56,7 +56,6 @@ import TyCon
 import Outputable
 import Type
 import SrcLoc
-import FastString
 import Bag -- collect ev vars from pats
 import Maybes
 -- libraries:
@@ -431,7 +430,7 @@ instance (Outputable arg)
   ppr (HsRecFields { rec_flds = flds, rec_dotdot = Just n })
         = braces (fsep (punctuate comma (map ppr (take n flds) ++ [dotdot])))
         where
-          dotdot = ptext (sLit "..") <+> ifPprDebug (ppr (drop n flds))
+          dotdot = text ".." <+> ifPprDebug (ppr (drop n flds))
 
 instance (Outputable id, Outputable arg)
       => Outputable (HsRecField' id arg) where

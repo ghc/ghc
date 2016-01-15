@@ -8,7 +8,6 @@ import Config          ( cProjectName, cProjectVersion )
 import CoreSyn         ( Tickish(..) )
 import Debug
 import DynFlags
-import FastString
 import Module
 import Outputable
 import Platform
@@ -107,13 +106,13 @@ compileUnitHeader :: Unique -> SDoc
 compileUnitHeader unitU = sdocWithPlatform $ \plat ->
   let cuLabel = mkAsmTempLabel unitU  -- sits right before initialLength field
       length = ppr (mkAsmTempEndLabel cuLabel) <> char '-' <> ppr cuLabel
-               <> ptext (sLit "-4")       -- length of initialLength field
+               <> text "-4"       -- length of initialLength field
   in vcat [ ppr cuLabel <> colon
-          , ptext (sLit "\t.long ") <> length  -- compilation unit size
+          , text "\t.long " <> length  -- compilation unit size
           , pprHalf 3                          -- DWARF version
           , sectionOffset (ptext dwarfAbbrevLabel) (ptext dwarfAbbrevLabel)
                                                -- abbrevs offset
-          , ptext (sLit "\t.byte ") <> ppr (platformWordSize plat) -- word size
+          , text "\t.byte " <> ppr (platformWordSize plat) -- word size
           ]
 
 -- | Compilation unit footer, mainly establishing size of debug sections

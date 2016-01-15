@@ -59,7 +59,6 @@ import PrelNames
 import TysPrim          ( realWorldStatePrimTy )
 import Bag
 import Util
-import FastString
 import Outputable
 import ForeignCall
 
@@ -181,7 +180,7 @@ specUnfolding _dflags subst new_bndrs spec_args
 specUnfolding _ _ _ _ _ = noUnfolding
 
 spec_doc :: SDoc
-spec_doc = ptext (sLit "specUnfolding")
+spec_doc = text "specUnfolding"
 
 {-
 Note [Specialising unfoldings]
@@ -864,7 +863,7 @@ data ExprSize
              }
 
 instance Outputable ExprSize where
-  ppr TooBig         = ptext (sLit "TooBig")
+  ppr TooBig         = text "TooBig"
   ppr (SizeIs a _ c) = brackets (int a <+> int c)
 
 -- subtract the discount before deciding whether to bale out. eg. we
@@ -996,9 +995,9 @@ data ArgSummary = TrivArg       -- Nothing interesting
                                 -- ..or con-like. Note [Conlike is interesting]
 
 instance Outputable ArgSummary where
-  ppr TrivArg    = ptext (sLit "TrivArg")
-  ppr NonTrivArg = ptext (sLit "NonTrivArg")
-  ppr ValueArg   = ptext (sLit "ValueArg")
+  ppr TrivArg    = text "TrivArg"
+  ppr NonTrivArg = text "NonTrivArg"
+  ppr ValueArg   = text "ValueArg"
 
 nonTriv ::  ArgSummary -> Bool
 nonTriv TrivArg = False
@@ -1018,12 +1017,12 @@ data CallCtxt
                         -- that decomposes its scrutinee
 
 instance Outputable CallCtxt where
-  ppr CaseCtxt    = ptext (sLit "CaseCtxt")
-  ppr ValAppCtxt  = ptext (sLit "ValAppCtxt")
-  ppr BoringCtxt  = ptext (sLit "BoringCtxt")
-  ppr RhsCtxt     = ptext (sLit "RhsCtxt")
-  ppr DiscArgCtxt = ptext (sLit "DiscArgCtxt")
-  ppr RuleArgCtxt = ptext (sLit "RuleArgCtxt")
+  ppr CaseCtxt    = text "CaseCtxt"
+  ppr ValAppCtxt  = text "ValAppCtxt"
+  ppr BoringCtxt  = text "BoringCtxt"
+  ppr RhsCtxt     = text "RhsCtxt"
+  ppr DiscArgCtxt = text "DiscArgCtxt"
+  ppr RuleArgCtxt = text "RuleArgCtxt"
 
 callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
   = case idUnfolding id of
@@ -1055,7 +1054,7 @@ tryUnfolding dflags id lone_variable
              arg_infos cont_info unf_template is_top
              is_wf is_exp guidance
  = case guidance of
-     UnfNever -> traceInline dflags str (ptext (sLit "UnfNever")) Nothing
+     UnfNever -> traceInline dflags str (text "UnfNever") Nothing
 
      UnfWhen { ug_arity = uf_arity, ug_unsat_ok = unsat_ok, ug_boring_ok = boring_ok }
         | enough_args && (boring_ok || some_benefit)

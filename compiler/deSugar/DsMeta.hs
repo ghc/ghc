@@ -2270,5 +2270,5 @@ notHandledL loc what doc
 notHandled :: String -> SDoc -> DsM a
 notHandled what doc = failWithDs msg
   where
-    msg = hang (text what <+> ptext (sLit "not (yet) handled by Template Haskell"))
+    msg = hang (text what <+> text "not (yet) handled by Template Haskell")
              2 doc

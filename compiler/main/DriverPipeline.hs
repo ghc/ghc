@@ -56,7 +56,6 @@ import StringBuffer     ( hGetStringBuffer )
 import BasicTypes       ( SuccessFlag(..) )
 import Maybes           ( expectJust )
 import SrcLoc
-import FastString
 import LlvmCodeGen      ( llvmFixupAsm )
 import MonadUtils
 import Platform
@@ -372,7 +371,7 @@ link' dflags batch_attempt_linking hpt
         linking_needed <- linkingNeeded dflags staticLink linkables pkg_deps
 
         if not (gopt Opt_ForceRecomp dflags) && not linking_needed
-           then do debugTraceMsg dflags 2 (text exe_file <+> ptext (sLit "is up to date, linking not required."))
+           then do debugTraceMsg dflags 2 (text exe_file <+> text "is up to date, linking not required.")
                    return Succeeded
            else do
 
@@ -684,7 +683,7 @@ pipeLoop phase input_fn = do
 
    _
      -> do liftIO $ debugTraceMsg dflags 4
-                                  (ptext (sLit "Running phase") <+> ppr phase)
+                                  (text "Running phase" <+> ppr phase)
            (next_phase, output_fn) <- runHookedPhase phase input_fn dflags
            r <- pipeLoop next_phase output_fn
            case phase of
@@ -1618,7 +1617,7 @@ mkExtraObjToLinkIntoBinary dflags = do
                       else "rtsFalse") <> semi,
       case rtsOpts dflags of
          Nothing   -> Outputable.empty
-         Just opts -> ptext (sLit "    __conf.rts_opts= ") <>
+         Just opts -> text "    __conf.rts_opts= " <>
                         text (show opts) <> semi,
       text " __conf.rts_hs_main = rtsTrue;",
       text " return hs_main(argc,argv,&ZCMain_main_closure,__conf);",

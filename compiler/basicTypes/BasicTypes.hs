@@ -192,8 +192,8 @@ bestOneShot OneShotLam    _          = OneShotLam
 
 pprOneShotInfo :: OneShotInfo -> SDoc
 pprOneShotInfo NoOneShotInfo = empty
-pprOneShotInfo ProbOneShot   = ptext (sLit "ProbOneShot")
-pprOneShotInfo OneShotLam    = ptext (sLit "OneShot")
+pprOneShotInfo ProbOneShot   = text "ProbOneShot"
+pprOneShotInfo OneShotLam    = text "OneShot"
 
 instance Outputable OneShotInfo where
     ppr = pprOneShotInfo
@@ -211,8 +211,8 @@ data SwapFlag
   | IsSwapped   -- Args are: expected, actual
 
 instance Outputable SwapFlag where
-  ppr IsSwapped  = ptext (sLit "Is-swapped")
-  ppr NotSwapped = ptext (sLit "Not-swapped")
+  ppr IsSwapped  = text "Is-swapped"
+  ppr NotSwapped = text "Not-swapped"
 
 flipSwap :: SwapFlag -> SwapFlag
 flipSwap IsSwapped  = NotSwapped
@@ -326,9 +326,9 @@ data FixityDirection = InfixL | InfixR | InfixN
                      deriving (Eq, Data, Typeable)
 
 instance Outputable FixityDirection where
-    ppr InfixL = ptext (sLit "infixl")
-    ppr InfixR = ptext (sLit "infixr")
-    ppr InfixN = ptext (sLit "infix")
+    ppr InfixL = text "infixl"
+    ppr InfixR = text "infixr"
+    ppr InfixN = text "infix"
 
 ------------------------
 maxPrecedence, minPrecedence :: Int
@@ -390,8 +390,8 @@ isTopLevel TopLevel     = True
 isTopLevel NotTopLevel  = False
 
 instance Outputable TopLevelFlag where
-  ppr TopLevel    = ptext (sLit "<TopLevel>")
-  ppr NotTopLevel = ptext (sLit "<NotTopLevel>")
+  ppr TopLevel    = text "<TopLevel>"
+  ppr NotTopLevel = text "<NotTopLevel>"
 
 {-
 ************************************************************************
@@ -439,8 +439,8 @@ boolToRecFlag True  = Recursive
 boolToRecFlag False = NonRecursive
 
 instance Outputable RecFlag where
-  ppr Recursive    = ptext (sLit "Recursive")
-  ppr NonRecursive = ptext (sLit "NonRecursive")
+  ppr Recursive    = text "Recursive"
+  ppr NonRecursive = text "NonRecursive"
 
 {-
 ************************************************************************
@@ -459,8 +459,8 @@ isGenerated Generated = True
 isGenerated FromSource = False
 
 instance Outputable Origin where
-  ppr FromSource  = ptext (sLit "FromSource")
-  ppr Generated   = ptext (sLit "Generated")
+  ppr FromSource  = text "FromSource"
+  ppr Generated   = text "Generated"
 
 {-
 ************************************************************************
@@ -569,13 +569,13 @@ instance Outputable OverlapFlag where
 
 instance Outputable OverlapMode where
    ppr (NoOverlap    _) = empty
-   ppr (Overlappable _) = ptext (sLit "[overlappable]")
-   ppr (Overlapping  _) = ptext (sLit "[overlapping]")
-   ppr (Overlaps     _) = ptext (sLit "[overlap ok]")
-   ppr (Incoherent   _) = ptext (sLit "[incoherent]")
+   ppr (Overlappable _) = text "[overlappable]"
+   ppr (Overlapping  _) = text "[overlapping]"
+   ppr (Overlaps     _) = text "[overlap ok]"
+   ppr (Incoherent   _) = text "[incoherent]"
 
 pprSafeOverlap :: Bool -> SDoc
-pprSafeOverlap True  = ptext $ sLit "[safe]"
+pprSafeOverlap True  = text "[safe]"
 pprSafeOverlap False = empty
 
 {-
@@ -603,9 +603,9 @@ boxityTupleSort Unboxed = UnboxedTuple
 
 tupleParens :: TupleSort -> SDoc -> SDoc
 tupleParens BoxedTuple      p = parens p
-tupleParens UnboxedTuple    p = ptext (sLit "(#") <+> p <+> ptext (sLit "#)")
+tupleParens UnboxedTuple    p = text "(#" <+> p <+> ptext (sLit "#)")
 tupleParens ConstraintTuple p   -- In debug-style write (% Eq a, Ord b %)
-  | opt_PprStyle_Debug        = ptext (sLit "(%") <+> p <+> ptext (sLit "%)")
+  | opt_PprStyle_Debug        = text "(%" <+> p <+> ptext (sLit "%)")
   | otherwise                 = parens p
 
 {-
@@ -745,10 +745,10 @@ zapFragileOcc occ         = occ
 instance Outputable OccInfo where
   -- only used for debugging; never parsed.  KSW 1999-07
   ppr NoOccInfo            = empty
-  ppr (IAmALoopBreaker ro) = ptext (sLit "LoopBreaker") <> if ro then char '!' else empty
-  ppr IAmDead              = ptext (sLit "Dead")
+  ppr (IAmALoopBreaker ro) = text "LoopBreaker" <> if ro then char '!' else empty
+  ppr IAmDead              = text "Dead"
   ppr (OneOcc inside_lam one_branch int_cxt)
-        = ptext (sLit "Once") <> pp_lam <> pp_br <> pp_args
+        = text "Once" <> pp_lam <> pp_br <> pp_args
         where
           pp_lam | inside_lam = char 'L'
                  | otherwise  = empty
@@ -775,8 +775,8 @@ data DefMethSpec ty
   | GenericDM ty  -- Default method given with code of this type
 
 instance Outputable (DefMethSpec ty) where
-  ppr VanillaDM      = ptext (sLit "{- Has default method -}")
-  ppr (GenericDM {}) = ptext (sLit "{- Has generic default method -}")
+  ppr VanillaDM      = text "{- Has default method -}"
+  ppr (GenericDM {}) = text "{- Has generic default method -}"
 
 {-
 ************************************************************************
@@ -789,8 +789,8 @@ instance Outputable (DefMethSpec ty) where
 data SuccessFlag = Succeeded | Failed
 
 instance Outputable SuccessFlag where
-    ppr Succeeded = ptext (sLit "Succeeded")
-    ppr Failed    = ptext (sLit "Failed")
+    ppr Succeeded = text "Succeeded"
+    ppr Failed    = text "Failed"
 
 successIf :: Bool -> SuccessFlag
 successIf True  = Succeeded
@@ -887,7 +887,7 @@ data CompilerPhase
 
 instance Outputable CompilerPhase where
    ppr (Phase n)    = int n
-   ppr InitialPhase = ptext (sLit "InitialPhase")
+   ppr InitialPhase = text "InitialPhase"
 
 data Activation = NeverActive
                 | AlwaysActive
@@ -1051,19 +1051,19 @@ setInlinePragmaRuleMatchInfo :: InlinePragma -> RuleMatchInfo -> InlinePragma
 setInlinePragmaRuleMatchInfo prag info = prag { inl_rule = info }
 
 instance Outputable Activation where
-   ppr AlwaysActive     = brackets (ptext (sLit "ALWAYS"))
-   ppr NeverActive      = brackets (ptext (sLit "NEVER"))
+   ppr AlwaysActive     = brackets (text "ALWAYS")
+   ppr NeverActive      = brackets (text "NEVER")
    ppr (ActiveBefore n) = brackets (char '~' <> int n)
    ppr (ActiveAfter n)  = brackets (int n)
 
 instance Outputable RuleMatchInfo where
-   ppr ConLike = ptext (sLit "CONLIKE")
-   ppr FunLike = ptext (sLit "FUNLIKE")
+   ppr ConLike = text "CONLIKE"
+   ppr FunLike = text "FUNLIKE"
 
 instance Outputable InlineSpec where
-   ppr Inline          = ptext (sLit "INLINE")
-   ppr NoInline        = ptext (sLit "NOINLINE")
-   ppr Inlinable       = ptext (sLit "INLINABLE")
+   ppr Inline          = text "INLINE"
+   ppr NoInline        = text "NOINLINE"
+   ppr Inlinable       = text "INLINABLE"
    ppr EmptyInlineSpec = empty
 
 instance Outputable InlinePragma where
@@ -1075,7 +1075,7 @@ instance Outputable InlinePragma where
       pp_act NoInline NeverActive  = empty
       pp_act _        act          = ppr act
 
-      pp_sat | Just ar <- mb_arity = parens (ptext (sLit "sat-args=") <> int ar)
+      pp_sat | Just ar <- mb_arity = parens (text "sat-args=" <> int ar)
              | otherwise           = empty
       pp_info | isFunLike info = empty
               | otherwise      = ppr info

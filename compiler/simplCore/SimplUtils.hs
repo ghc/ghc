@@ -59,7 +59,6 @@ import BasicTypes
 import Util
 import MonadUtils
 import Outputable
-import FastString
 import Pair
 
 import Control.Monad    ( when )
@@ -170,23 +169,23 @@ the following invariants hold
 -}
 
 instance Outputable DupFlag where
-  ppr OkToDup    = ptext (sLit "ok")
-  ppr NoDup      = ptext (sLit "nodup")
-  ppr Simplified = ptext (sLit "simpl")
+  ppr OkToDup    = text "ok"
+  ppr NoDup      = text "nodup"
+  ppr Simplified = text "simpl"
 
 instance Outputable SimplCont where
-  ppr (Stop ty interesting) = ptext (sLit "Stop") <> brackets (ppr interesting) <+> ppr ty
-  ppr (CastIt co cont  )    = (ptext (sLit "CastIt") <+> ppr co) $$ ppr cont
-  ppr (TickIt t cont)       = (ptext (sLit "TickIt") <+> ppr t) $$ ppr cont
+  ppr (Stop ty interesting) = text "Stop" <> brackets (ppr interesting) <+> ppr ty
+  ppr (CastIt co cont  )    = (text "CastIt" <+> ppr co) $$ ppr cont
+  ppr (TickIt t cont)       = (text "TickIt" <+> ppr t) $$ ppr cont
   ppr (ApplyToTy  { sc_arg_ty = ty, sc_cont = cont })
-    = (ptext (sLit "ApplyToTy") <+> pprParendType ty) $$ ppr cont
+    = (text "ApplyToTy" <+> pprParendType ty) $$ ppr cont
   ppr (ApplyToVal { sc_arg = arg, sc_dup = dup, sc_cont = cont })
-    = (ptext (sLit "ApplyToVal") <+> ppr dup <+> pprParendExpr arg)
+    = (text "ApplyToVal" <+> ppr dup <+> pprParendExpr arg)
                                         $$ ppr cont
-  ppr (StrictBind b _ _ _ cont)       = (ptext (sLit "StrictBind") <+> ppr b) $$ ppr cont
-  ppr (StrictArg ai _ cont)           = (ptext (sLit "StrictArg") <+> ppr (ai_fun ai)) $$ ppr cont
+  ppr (StrictBind b _ _ _ cont)       = (text "StrictBind" <+> ppr b) $$ ppr cont
+  ppr (StrictArg ai _ cont)           = (text "StrictArg" <+> ppr (ai_fun ai)) $$ ppr cont
   ppr (Select { sc_dup = dup, sc_bndr = bndr, sc_alts = alts, sc_env = se, sc_cont = cont })
-    = (ptext (sLit "Select") <+> ppr dup <+> ppr bndr) $$
+    = (text "Select" <+> ppr dup <+> ppr bndr) $$
        ifPprDebug (nest 2 $ vcat [ppr (seTvSubst se), ppr alts]) $$ ppr cont
 
 
@@ -241,9 +240,9 @@ data ArgSpec
   | CastBy OutCoercion                -- Cast by this; c.f. CastIt
 
 instance Outputable ArgSpec where
-  ppr (ValArg e)                 = ptext (sLit "ValArg") <+> ppr e
-  ppr (TyArg { as_arg_ty = ty }) = ptext (sLit "TyArg") <+> ppr ty
-  ppr (CastBy c)                 = ptext (sLit "CastBy") <+> ppr c
+  ppr (ValArg e)                 = text "ValArg" <+> ppr e
+  ppr (TyArg { as_arg_ty = ty }) = text "TyArg" <+> ppr ty
+  ppr (CastBy c)                 = text "CastBy" <+> ppr c
 
 addValArgTo :: ArgInfo -> OutExpr -> ArgInfo
 addValArgTo ai arg = ai { ai_args = ValArg arg : ai_args ai
@@ -1377,7 +1376,7 @@ tryEtaExpandRhs env bndr rhs
        ; (new_arity, new_rhs) <- try_expand dflags
 
        ; WARN( new_arity < old_id_arity,
-               (ptext (sLit "Arity decrease:") <+> (ppr bndr <+> ppr old_id_arity
+               (text "Arity decrease:" <+> (ppr bndr <+> ppr old_id_arity
                 <+> ppr old_arity <+> ppr new_arity) $$ ppr new_rhs) )
                         -- Note [Arity decrease] in Simplify
          return (new_arity, new_rhs) }

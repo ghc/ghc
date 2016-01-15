@@ -30,7 +30,6 @@ import TcType
 import Name
 import VarEnv( emptyTidyEnv )
 import Outputable
-import FastString
 
 -- -----------------------------------------------------------------------------
 -- Pretty-printing entities that we get from the GHC API
@@ -88,7 +87,7 @@ pprFamInst (FamInst { fi_flavor = DataFamilyInst rep_tc })
 pprFamInst (FamInst { fi_flavor = SynFamilyInst, fi_axiom = axiom
                     , fi_tys = lhs_tys, fi_rhs = rhs })
   = showWithLoc (pprDefinedAt (getName axiom)) $
-    hang (ptext (sLit "type instance") <+> pprTypeApp (coAxiomTyCon axiom) lhs_tys)
+    hang (text "type instance" <+> pprTypeApp (coAxiomTyCon axiom) lhs_tys)
        2 (equals <+> ppr rhs)
 
 ----------------------------
@@ -162,4 +161,4 @@ showWithLoc loc doc
     = hang doc 2 (char '\t' <> comment <+> loc)
                 -- The tab tries to make them line up a bit
   where
-    comment = ptext (sLit "--")
+    comment = text "--"
