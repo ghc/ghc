@@ -98,6 +98,7 @@ _darcs/
 /docs/users_guide/users_guide.pdf
 /docs/users_guide/build-html
 /docs/users_guide/build-pdf
+/docs/users_guide/build-man
 /docs/users_guide/.doctrees-*
 /docs/users_guide/.doctrees/
 /driver/ghci/ghc-pkg-inplace
