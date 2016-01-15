@@ -1,4 +1,6 @@
-module Settings.Builders.Ghc (ghcBuilderArgs, ghcMBuilderArgs, commonGhcArgs) where
+module Settings.Builders.Ghc (
+    ghcBuilderArgs, ghcMBuilderArgs, commonGhcArgs, gmpLibNameCache
+    ) where
 
 import Base
 import Expression
@@ -8,6 +10,10 @@ import Predicates hiding (way, stage)
 import Settings
 import Settings.Builders.GhcCabal (bootPackageDbArgs)
 import Settings.Builders.Common (cIncludeArgs)
+
+-- GMP library names extracted from integer-gmp.buildinfo
+gmpLibNameCache :: FilePath
+gmpLibNameCache = shakeFilesPath -/- "gmp-lib-names"
 
 -- TODO: add support for -dyno
 -- $1/$2/build/%.$$($3_o-bootsuf) : $1/$4/%.hs-boot
@@ -20,6 +26,7 @@ ghcBuilderArgs = stagedBuilder Ghc ? do
     way    <- getWay
     let buildObj = ("//*." ++ osuf way) ?== output || ("//*." ++ obootsuf way) ?== output
     libs    <- getPkgDataList DepExtraLibs
+    gmpLibs <- lift $ readFileLines gmpLibNameCache
     libDirs <- getPkgDataList DepLibDirs
     mconcat [ commonGhcArgs
             , arg "-H32m"
@@ -29,7 +36,7 @@ ghcBuilderArgs = stagedBuilder Ghc ? do
             , arg "-fwarn-tabs"
             , splitObjectsArgs
             , not buildObj ? arg "-no-auto-link-packages"
-            , not buildObj ? append [ "-optl-l" ++ lib | lib <- libs    ]
+            , not buildObj ? append [ "-optl-l" ++ lib | lib <- libs ++ gmpLibs ]
             , not buildObj ? append [ "-optl-L" ++ dir | dir <- libDirs ]
             , buildObj ? arg "-c"
             , append =<< getInputs

@@ -1,5 +1,6 @@
-# Edit 'user.config' to override these settings.
-#===============================================
+# This file is processed by the configure script
+# See 'src/Settings/User.hs' for user-defined settings
+#=====================================================
 
 # Paths to builders:
 #===================
@@ -39,6 +40,7 @@ nm               = @NmCmd@
 objdump          = @ObjdumpCmd@
 ranlib           = @REAL_RANLIB_CMD@
 tar              = @TarCmd@
+patch            = @PatchCmd@
 perl             = @PerlCmd@
 
 # Information about builders:

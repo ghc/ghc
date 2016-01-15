@@ -30,6 +30,7 @@ install:
     - bash -lc "cd /home/ghc; mkdir -p ghc-tarballs/mingw-w64/x86_64/"
     - bash -lc "cd /home/ghc; mkdir -p ghc-tarballs/perl/"
     - bash -lc "cd /home/ghc; exec 0</dev/null; ./configure --enable-tarballs-autodownload"
+    - bash -lc "cat /home/ghc/shake-build/cfg/system.config"
     - ghc   --version
     - stack --version
     - alex  --version
