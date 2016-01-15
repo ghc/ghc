@@ -7,6 +7,7 @@ import Expression
 import GHC
 import Oracles.Config.Setting
 import Rules.Actions
+import Settings.Builders.Ghc
 import Settings.Packages.IntegerGmp
 import Settings.User
 
@@ -62,78 +63,84 @@ configureIntGmpArguments = do
     includes      <- settingList GmpIncludeDirs
     libs          <- settingList GmpLibDirs
     return $ map ("--with-gmp-includes=" ++) includes
-               ++ map ("--with-gmp-libraries=" ++) libs
-
+          ++ map ("--with-gmp-libraries=" ++) libs
 
 -- TODO: we rebuild gmp every time.
 gmpRules :: Rules ()
 gmpRules = do
 
     -- TODO: split into multiple rules
-    gmpLibraryH %> \_ -> do
+    [gmpLibraryH, gmpLibNameCache] &%> \_ -> do
         when trackBuildSystem $ need [sourcePath -/- "Rules/Gmp.hs"]
 
         liftIO $ removeFiles gmpBuildPath ["//*"]
 
-        -- Note: We use a tarball like gmp-4.2.4-nodoc.tar.bz2, which is
-        -- gmp-4.2.4.tar.bz2 repacked without the doc/ directory contents.
-        -- That's because the doc/ directory contents are under the GFDL,
-        -- which causes problems for Debian.
-        tarballs <- getDirectoryFiles "" [gmpBase -/- "tarball/gmp*.tar.bz2"]
-        when (length tarballs /= 1) $
-            putError $ "gmpRules: exactly one tarball expected"
-                     ++ "(found: " ++ show tarballs ++ ")."
-
-        need tarballs
-        createDirectory gmpBuildPath
-        build $ fullTarget gmpTarget Tar tarballs [gmpBuildPath]
-
-        forM_ gmpPatches $ \src -> do
-            let patch     = takeFileName src
-                patchPath = gmpBuildPath -/- patch
-            copyFile src patchPath
-            applyPatch gmpBuildPath patch
-
-        -- TODO: What's `chmod +x libraries/integer-gmp/gmp/ln` for?
-
-        let filename = dropExtension . dropExtension . takeFileName $ head tarballs
-            suffix   = "-nodoc-patched"
-        unless (suffix `isSuffixOf` filename) $
-            putError $ "gmpRules: expected suffix " ++ suffix
-                     ++ " (found: " ++ filename ++ ")."
-        let libName = take (length filename - length suffix) filename
-            libPath = gmpBuildPath -/- libName
-
-        envs <- configureEnvironment
-        args <- configureArguments
-        runConfigure libPath envs args
-
         -- TODO: currently we configure integerGmp package twice -- optimise
-        intGmpArgs <- configureIntGmpArguments
-        runConfigure (pkgPath integerGmp) envs intGmpArgs
+        args <- configureIntGmpArguments
+        envs <- configureEnvironment
+        runConfigure (pkgPath integerGmp) envs args
 
         createDirectory $ takeDirectory gmpLibraryH
         -- We don't use system GMP on Windows. TODO: fix?
-        windows  <- windowsHost
+        windows <- windowsHost
         configMk <- liftIO . readFile $ gmpBase -/- "config.mk"
-        if not windows && any (`isInfixOf` configMk) [ "HaveFrameworkGMP = YES"
-                                                     , "HaveLibGmp = YES" ]
+        if not windows && any (`isInfixOf` configMk) [ "HaveFrameworkGMP = YES", "HaveLibGmp = YES" ]
         then do
             putBuild "| GMP library/framework detected and will be used"
             copyFile gmpLibraryFakeH gmpLibraryH
+            buildInfo <- readFileLines $ pkgPath integerGmp -/- "integer-gmp.buildinfo"
+            let prefix = "extra-libraries: "
+                libs s = case stripPrefix prefix s of
+                    Nothing    -> []
+                    Just value -> words value
+            writeFileChanged gmpLibNameCache . unlines $ concatMap libs buildInfo
         else do
-          putBuild "| No GMP library/framework detected; in tree GMP will be built"
-          runMake libPath ["MAKEFLAGS="]
+            putBuild "| No GMP library/framework detected; in tree GMP will be built"
+            writeFileChanged gmpLibNameCache ""
 
-          copyFile (libPath -/- "gmp.h") gmpLibraryInTreeH
-          copyFile (libPath -/- "gmp.h") gmpLibraryH
-           -- TODO: why copy library, can we move it instead?
-          copyFile (libPath -/- ".libs/libgmp.a") gmpLibrary
+            -- Note: We use a tarball like gmp-4.2.4-nodoc.tar.bz2, which is
+            -- gmp-4.2.4.tar.bz2 repacked without the doc/ directory contents.
+            -- That's because the doc/ directory contents are under the GFDL,
+            -- which causes problems for Debian.
+            tarballs <- getDirectoryFiles "" [gmpBase -/- "tarball/gmp*.tar.bz2"]
+            when (length tarballs /= 1) $
+                putError $ "gmpRules: exactly one tarball expected"
+                         ++ "(found: " ++ show tarballs ++ ")."
 
-          createDirectory gmpObjects
-          build $ fullTarget gmpTarget Ar [gmpLibrary] [gmpObjects]
+            need tarballs
+            createDirectory gmpBuildPath
+            build $ fullTarget gmpTarget Tar tarballs [gmpBuildPath]
 
-          runBuilder Ranlib [gmpLibrary]
+            forM_ gmpPatches $ \src -> do
+                let patch     = takeFileName src
+                    patchPath = gmpBuildPath -/- patch
+                copyFile src patchPath
+                applyPatch gmpBuildPath patch
+
+            -- TODO: What's `chmod +x libraries/integer-gmp/gmp/ln` for?
+
+            let filename = dropExtension . dropExtension . takeFileName $ head tarballs
+                suffix   = "-nodoc-patched"
+            unless (suffix `isSuffixOf` filename) $
+                putError $ "gmpRules: expected suffix " ++ suffix
+                         ++ " (found: " ++ filename ++ ")."
+            let libName = take (length filename - length suffix) filename
+                libPath = gmpBuildPath -/- libName
+
+            args2 <- configureArguments
+            runConfigure libPath envs args2
+
+            runMake libPath ["MAKEFLAGS="]
+
+            copyFile (libPath -/- "gmp.h") gmpLibraryInTreeH
+            copyFile (libPath -/- "gmp.h") gmpLibraryH
+            -- TODO: why copy library, can we move it instead?
+            copyFile (libPath -/- ".libs/libgmp.a") gmpLibrary
+
+            createDirectory gmpObjects
+            build $ fullTarget gmpTarget Ar [gmpLibrary] [gmpObjects]
+
+            runBuilder Ranlib [gmpLibrary]
 
         putSuccess "| Successfully built custom library 'integer-gmp'"
 
