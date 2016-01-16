@@ -9,15 +9,15 @@ import Expression
 
 -- | Is the build currently in the provided stage?
 stage :: Stage -> Predicate
-stage s = fmap (s ==) getStage
+stage s = (s ==) <$> getStage
 
 -- | Is a particular package being built?
 package :: Package -> Predicate
-package p = fmap (p ==) getPackage
+package p = (p ==) <$> getPackage
 
 -- | Is an unstaged builder is being used such as /GhcCabal/?
 builder :: Builder -> Predicate
-builder b = fmap (b ==) getBuilder
+builder b = (b ==) <$> getBuilder
 
 -- | Is a certain builder used in the current stage?
 stagedBuilder :: (Stage -> Builder) -> Predicate
@@ -35,11 +35,11 @@ builderGhc = stagedBuilder Ghc ||^ stagedBuilder GhcM
 
 -- | Does any of the output files match a given pattern?
 file :: FilePattern -> Predicate
-file f = fmap (any (f ?==)) getOutputs
+file f = any (f ?==) <$> getOutputs
 
 -- | Is the current build 'Way' equal to a certain value?
 way :: Way -> Predicate
-way w = fmap (w ==) getWay
+way w = (w ==) <$> getWay
 
 -- | Is the build currently in stage 0?
 stage0 :: Predicate
