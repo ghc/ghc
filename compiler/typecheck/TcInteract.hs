@@ -506,7 +506,7 @@ solveOneFromTheOther :: CtEvidence  -- Inert
                      -> TcS (InteractResult, StopNowFlag)
 -- Preconditions:
 -- 1) inert and work item represent evidence for the /same/ predicate
--- 2) ip/class/irred evidence (no coercions) only
+-- 2) ip/class/irred constraints only; not used for equalities
 solveOneFromTheOther ev_i ev_w
   | isDerived ev_w         -- Work item is Derived; just discard it
   = return (IRKeep, True)
@@ -843,7 +843,7 @@ interactFunEq inerts workItem@(CFunEqCan { cc_ev = ev, cc_fun = tc
                                          , cc_tyargs = args, cc_fsk = fsk })
   | Just (CFunEqCan { cc_ev = ev_i
                     , cc_fsk = fsk_i }) <- matching_inerts
-  = if ev_i `canDischarge` ev
+  = if ev_i `funEqCanDischarge` ev
     then  -- Rewrite work-item using inert
       do { traceTcS "reactFunEq (discharge work item):" $
            vcat [ text "workItem =" <+> ppr workItem
@@ -851,7 +851,7 @@ interactFunEq inerts workItem@(CFunEqCan { cc_ev = ev, cc_fun = tc
          ; reactFunEq ev_i fsk_i ev fsk
          ; stopWith ev "Inert rewrites work item" }
     else  -- Rewrite inert using work-item
-      ASSERT2( ev `canDischarge` ev_i, ppr ev $$ ppr ev_i )
+      ASSERT2( ev `funEqCanDischarge` ev_i, ppr ev $$ ppr ev_i )
       do { traceTcS "reactFunEq (rewrite inert item):" $
            vcat [ text "workItem =" <+> ppr workItem
                 , text "inertItem=" <+> ppr ev_i ]
@@ -881,15 +881,15 @@ improveLocalFunEqs loc inerts fam_tc args fsk
   = do { traceTcS "interactFunEq improvements: " $
          vcat [ ptext (sLit "Eqns:") <+> ppr improvement_eqns
               , ptext (sLit "Candidates:") <+> ppr funeqs_for_tc
-              , ptext (sLit "TvEqs:") <+> ppr tv_eqs ]
+              , ptext (sLit "Model:") <+> ppr model ]
        ; mapM_ (unifyDerived loc Nominal) improvement_eqns }
   | otherwise
   = return ()
   where
-    tv_eqs        = inert_model inerts
+    model         = inert_model inerts
     funeqs        = inert_funeqs inerts
     funeqs_for_tc = findFunEqsByTyCon funeqs fam_tc
-    rhs           = lookupFlattenTyVar tv_eqs fsk
+    rhs           = lookupFlattenTyVar model fsk
 
     --------------------
     improvement_eqns
@@ -906,14 +906,14 @@ improveLocalFunEqs loc inerts fam_tc args fsk
 
     --------------------
     do_one_built_in ops (CFunEqCan { cc_tyargs = iargs, cc_fsk = ifsk })
-      = sfInteractInert ops args rhs iargs (lookupFlattenTyVar tv_eqs ifsk)
+      = sfInteractInert ops args rhs iargs (lookupFlattenTyVar model ifsk)
     do_one_built_in _ _ = pprPanic "interactFunEq 1" (ppr fam_tc)
 
     --------------------
     -- See Note [Type inference for type families with injectivity]
     do_one_injective injective_args
                     (CFunEqCan { cc_tyargs = iargs, cc_fsk = ifsk })
-      | rhs `tcEqType` lookupFlattenTyVar tv_eqs ifsk
+      | rhs `tcEqType` lookupFlattenTyVar model ifsk
       = [Pair arg iarg | (arg, iarg, True)
                            <- zip3 args iargs injective_args ]
       | otherwise
@@ -922,8 +922,7 @@ improveLocalFunEqs loc inerts fam_tc args fsk
 
 -------------
 lookupFlattenTyVar :: InertModel -> TcTyVar -> TcType
--- ^ Look up a flatten-tyvar in the inert nominal TyVarEqs;
--- this is used only when dealing with a CFunEqCan
+-- See Note [lookupFlattenTyVar]
 lookupFlattenTyVar model ftv
   = case lookupVarEnv model ftv of
       Just (CTyEqCan { cc_rhs = rhs, cc_eq_rel = NomEq }) -> rhs
@@ -950,7 +949,18 @@ reactFunEq from_this fsk1 solve_this fsk2
        ; traceTcS "reactFunEq done" (ppr from_this $$ ppr fsk1 $$
                                      ppr solve_this $$ ppr fsk2) }
 
-{-
+{- Note [lookupFlattenTyVar]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Supppose we have an injective function F and
+  inert_funeqs:   F t1 ~ fsk1
+                  F t2 ~ fsk2
+  model           fsk1 ~ fsk2
+
+We never rewrite the RHS (cc_fsk) of a CFunEqCan.  But we /do/ want to
+get the [D] t1 ~ t2 from the injectiveness of F.  So we look up the
+cc_fsk of CFunEqCans in the model when trying to find derived
+equalities arising from injectivity.
+
 Note [Type inference for type families with injectivity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have a type family with an injectivity annotation:
@@ -1086,10 +1096,10 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv
                                           , cc_eq_rel = eq_rel })
   | (ev_i : _) <- [ ev_i | CTyEqCan { cc_ev = ev_i, cc_rhs = rhs_i }
                              <- findTyEqs inerts tv
-                         , ev_i `canDischarge` ev
+                         , ev_i `eqCanDischarge` ev
                          , rhs_i `tcEqType` rhs ]
-  =  -- Inert:     a ~ b
-     -- Work item: a ~ b
+  =  -- Inert:     a ~ ty
+     -- Work item: a ~ ty
     do { setEvBindIfWanted ev $
           EvCoercion (tcDowngradeRole (eqRelRole eq_rel)
                                       (ctEvRole ev_i)
@@ -1100,7 +1110,7 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv
   | Just tv_rhs <- getTyVar_maybe rhs
   , (ev_i : _) <- [ ev_i | CTyEqCan { cc_ev = ev_i, cc_rhs = rhs_i }
                              <- findTyEqs inerts tv_rhs
-                         , ev_i `canDischarge` ev
+                         , ev_i `eqCanDischarge` ev
                          , rhs_i `tcEqType` mkTyVarTy tv ]
   =  -- Inert:     a ~ b
      -- Work item: b ~ a
@@ -1530,7 +1540,7 @@ shortCutReduction old_ev fsk ax_co fam_tc tc_args
                                         `mkTcTransCo` ctEvCoercion old_ev) )
 
        ; let new_ct = CFunEqCan { cc_ev = new_ev, cc_fun = fam_tc, cc_tyargs = xis, cc_fsk = fsk }
-       ; emitWorkCt new_ct
+       ; updWorkListTcS (extendWorkListFunEq new_ct)
        ; stopWith old_ev "Fun/Top (given, shortcut)" }
 
   | otherwise
@@ -1549,8 +1559,9 @@ shortCutReduction old_ev fsk ax_co fam_tc tc_args
                      (ax_co `mkTcTransCo` mkTcSymCo (mkTcTyConAppCo Nominal fam_tc cos)
                             `mkTcTransCo` new_co)
 
-       ; let new_ct = CFunEqCan { cc_ev = new_ev, cc_fun = fam_tc, cc_tyargs = xis, cc_fsk = fsk }
-       ; emitWorkCt new_ct
+       ; let new_ct = CFunEqCan { cc_ev = new_ev, cc_fun = fam_tc
+                                , cc_tyargs = xis, cc_fsk = fsk }
+       ; updWorkListTcS (extendWorkListFunEq new_ct)
        ; stopWith old_ev "Fun/Top (wanted, shortcut)" }
   where
     loc = ctEvLoc old_ev
@@ -1631,7 +1642,7 @@ Note [Cached solved FunEqs]
 When trying to solve, say (FunExpensive big-type ~ ty), it's important
 to see if we have reduced (FunExpensive big-type) before, lest we
 simply repeat it.  Hence the lookup in inert_solved_funeqs.  Moreover
-we must use `canDischarge` because both uses might (say) be Wanteds,
+we must use `funEqCanDischarge` because both uses might (say) be Wanteds,
 and we *still* want to save the re-computation.
 
 Note [MATCHING-SYNONYMS]
