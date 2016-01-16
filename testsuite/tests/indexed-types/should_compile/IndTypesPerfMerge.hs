@@ -51,6 +51,50 @@ merge ::
 -}
 merge x y = mkMerge (merger x y) x y
 
+
+{- ------------- NASTY TYPE FOR merge -----------------
+   -- See Trac #11408
+
+   x:tx, y:ty
+   mkMerge @ gamma
+   merger @ alpha beta
+   merge :: tx -> ty -> tr
+
+Constraints generated:
+   gamma ~ MergerType alpha beta
+   UnmergedLeft gamma ~ tx
+   UnmergedRight gamma ~ ty
+   alpha ~ tx
+   beta ~ ty
+   tr ~ Merged gamma
+   Mergeable tx ty
+   Merger gamma
+
+One solve path:
+  gamma := t
+  tx := alpha := UnmergedLeft t
+  ty := beta  := UnmergedRight t
+
+  Mergeable (UnmergedLeft t) (UnmergedRight t)
+  Merger t
+  t ~ MergerType (UnmergedLeft t) (UnmergedRight t)
+
+  LEADS TO AMBIGUOUS TYPE
+
+Another solve path:
+  tx := alpha
+  ty := beta
+  gamma := MergerType alpha beta
+
+  UnmergedLeft (MergerType alpah beta) ~ alpha
+  UnmergedRight (MergerType alpah beta) ~ beta
+  Merger (MergerType alpha beta)
+  Mergeable alpha beta
+
+  LEADS TO NON-AMBIGUOUS TYPE
+---------------  -}
+
+
 data TakeRight a
 data TakeLeft a
 data DiscardRightHead a b c d

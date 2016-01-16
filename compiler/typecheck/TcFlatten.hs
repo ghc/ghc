@@ -242,7 +242,7 @@ BUT this works badly for Trac #10340:
 For 'foo' we instantiate 'get' at types mm ss
        [W] MonadState ss mm, [W] mm ss ~ State Any Any
 Flatten, and decompose
-       [W] MnadState ss mm, [W] Any ~ fmv, [W] mm ~ State fmv, [W] fmv ~ ss
+       [W] MonadState ss mm, [W] Any ~ fmv, [W] mm ~ State fmv, [W] fmv ~ ss
 Unify mm := State fmv:
        [W] MonadState ss (State fmv), [W] Any ~ fmv, [W] fmv ~ ss
 If we orient with (untouchable) fmv on the left we are now stuck:
@@ -1147,7 +1147,7 @@ flatten_exact_fam_app_fully tc tys
        ; fr <- getFlavourRole
        ; case mb_ct of
            Just (co, rhs_ty, flav)  -- co :: F xis ~ fsk
-             | (flav, NomEq) `canDischargeFR` fr
+             | (flav, NomEq) `funEqCanDischargeFR` fr
              ->  -- Usable hit in the flat-cache
                  -- We certainly *can* use a Wanted for a Wanted
                 do { traceFlat "flatten/flat-cache hit" $ (ppr tc <+> ppr xis $$ ppr rhs_ty)

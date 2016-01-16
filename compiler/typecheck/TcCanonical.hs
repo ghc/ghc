@@ -1453,9 +1453,9 @@ canEqTyVarTyVar ev eq_rel swapped tv1 tv2 kco2
       -- the floating step looks for meta tyvars on the left
       | isMetaTyVar tv2 = True
 
-      -- So neither is a meta tyvar
+      -- So neither is a meta tyvar (including FlatMetaTv)
 
-      -- If only one is a flatten tyvar, put it on the left
+      -- If only one is a flatten skolem, put it on the left
       -- See Note [Eliminate flat-skols]
       | not (isFlattenTyVar tv1), isFlattenTyVar tv2 = True
 

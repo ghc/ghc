@@ -112,7 +112,8 @@ module TcRnTypes(
 
         CtFlavour(..), ctEvFlavour,
         CtFlavourRole, ctEvFlavourRole, ctFlavourRole,
-        eqCanRewrite, eqCanRewriteFR, canDischarge, canDischargeFR,
+        eqCanRewrite, eqCanRewriteFR,  eqCanDischarge,
+        funEqCanDischarge, funEqCanDischargeFR,
 
         -- Pretty printing
         pprEvVarTheta,
@@ -2273,54 +2274,74 @@ we can; straight from the Wanteds during improvment. And from a Derived
 ReprEq we could conceivably get a Derived NomEq improvment (by decomposing
 a type constructor with Nomninal role), and hence unify.
 
-Note [canDischarge]
-~~~~~~~~~~~~~~~~~~~
-(x1:c1 `canDischarge` x2:c2) returns True if we can use c1 to
-/discharge/ c2; that is, if we can simply drop (x2:c2) altogether,
-perhaps adding a binding for x2 in terms of x1.  We only ask this
-question in two cases:
+Note [funEqCanDischarge]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have two CFunEqCans with the same LHS:
+    (x1:F ts ~ f1) `funEqCanDischarge` (x2:F ts ~ f2)
+Can we drop x2 in favour of x1, either unifying
+f2 (if it's a flatten meta-var) or adding a new Given
+(f1 ~ f2), if x2 is a Given?
 
-* Identical equality constraints:
-      (x1:s~t) `canDischarge` (xs:s~t)
-  In this case we can just drop x2 in favour of x1.
+Answer: yes if funEqCanDischarge is true.
 
-* Function calls with the same LHS:
-    (x1:F ts ~ f1) `canDischarge` (x2:F ts ~ f2)
-  Here we can drop x2 in favour of x1, either unifying
-  f2 (if it's a flatten meta-var) or adding a new Given
-  (f1 ~ f2), if x2 is a Given.
+Note [eqCanDischarge]
+~~~~~~~~~~~~~~~~~~~~~
+Suppose we have two identicla equality constraints
+(i.e. both LHS and RHS are the same)
+      (x1:s~t) `eqCanDischarge` (xs:s~t)
+Can we just drop x2 in favour of x1?
 
-This is different from eqCanRewrite; for exammple, a Wanted
-can certainly discharge an identical Wanted.  So canDicharge
-does /not/ define a can-rewrite relation in the sense of
-Definition [Can-rewrite relation] in TcSMonad.
+Answer: yes if eqCanDischarge is true.
+
+Note that we do /not/ allow Wanted to discharge Derived.
+We must keep both.  Why?  Because the Derived may rewrite
+other Deriveds in the model whereas the Wanted cannot.
+
+However a Wanted can certainly discharge an identical Wanted.  So
+eqCanDischarge does /not/ define a can-rewrite relation in the
+sense of Definition [Can-rewrite relation] in TcSMonad.
 -}
 
+-----------------
 eqCanRewrite :: CtEvidence -> CtEvidence -> Bool
-eqCanRewrite ev1 ev2 = eqCanRewriteFR (ctEvFlavourRole ev1)
-                                      (ctEvFlavourRole ev2)
-
-eqCanRewriteFR :: CtFlavourRole -> CtFlavourRole -> Bool
 -- Very important function!
 -- See Note [eqCanRewrite]
 -- See Note [Wanteds do not rewrite Wanteds]
 -- See Note [Deriveds do rewrite Deriveds]
-eqCanRewriteFR (Given, NomEq)  (_, _)      = True
-eqCanRewriteFR (Given, ReprEq) (_, ReprEq) = True
-eqCanRewriteFR _               _           = False
-
-canDischarge :: CtEvidence -> CtEvidence -> Bool
--- See Note [canDischarge]
-canDischarge ev1 ev2 = canDischargeFR (ctEvFlavourRole ev1)
+eqCanRewrite ev1 ev2 = eqCanRewriteFR (ctEvFlavourRole ev1)
                                       (ctEvFlavourRole ev2)
 
-canDischargeFR :: CtFlavourRole -> CtFlavourRole -> Bool
-canDischargeFR (_, ReprEq)  (_, NomEq)   = False
-canDischargeFR (Given,   _) _            = True
-canDischargeFR (Wanted,  _) (Wanted,  _) = True
-canDischargeFR (Wanted,  _) (Derived, _) = True
-canDischargeFR (Derived, _) (Derived, _) = True
-canDischargeFR _            _            = False
+eqCanRewriteFR :: CtFlavourRole -> CtFlavourRole -> Bool
+eqCanRewriteFR (Given, NomEq)   (_, _)           = True
+eqCanRewriteFR (Given, ReprEq)  (_, ReprEq)      = True
+eqCanRewriteFR (Derived, NomEq) (Derived, NomEq) = True
+eqCanRewriteFR _                _                = False
+
+-----------------
+funEqCanDischarge :: CtEvidence -> CtEvidence -> Bool
+-- See Note [funEqCanDischarge]
+funEqCanDischarge ev1 ev2 = funEqCanDischargeFR (ctEvFlavourRole ev1)
+                                      (ctEvFlavourRole ev2)
+
+funEqCanDischargeFR :: CtFlavourRole -> CtFlavourRole -> Bool
+funEqCanDischargeFR (_, ReprEq)  (_, NomEq)   = False
+funEqCanDischargeFR (Given,   _) _            = True
+funEqCanDischargeFR (Wanted,  _) (Wanted,  _) = True
+funEqCanDischargeFR (Wanted,  _) (Derived, _) = True
+funEqCanDischargeFR (Derived, _) (Derived, _) = True
+funEqCanDischargeFR _            _            = False
+
+-----------------
+eqCanDischarge :: CtEvidence -> CtEvidence -> Bool
+-- See Note [eqCanDischarge]
+eqCanDischarge ev1 ev2 = eqCanDischargeFR (ctEvFlavourRole ev1)
+                                          (ctEvFlavourRole ev2)
+eqCanDischargeFR :: CtFlavourRole -> CtFlavourRole -> Bool
+eqCanDischargeFR (_, ReprEq)  (_, NomEq)   = False
+eqCanDischargeFR (Given,   _) (Given,_)    = True
+eqCanDischargeFR (Wanted,  _) (Wanted,  _) = True
+eqCanDischargeFR (Derived, _) (Derived, _) = True
+eqCanDischargeFR _            _            = False
 
 {-
 ************************************************************************
