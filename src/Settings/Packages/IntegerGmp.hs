@@ -4,11 +4,7 @@ import Base
 import Expression
 import GHC (integerGmp)
 import Predicates (builder, builderGcc, package)
-import Settings.User
-
--- TODO: move elsewhere
-gmpBuildPath :: FilePath
-gmpBuildPath = buildRootPath -/- "stage0/gmp"
+import Settings.Paths
 
 -- TODO: move build artefacts to buildRootPath, see #113
 -- TODO: Is this needed?

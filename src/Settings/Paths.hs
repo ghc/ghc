@@ -1,6 +1,7 @@
 module Settings.Paths (
     targetDirectory, targetPath, pkgDataFile, pkgHaddockFile, pkgLibraryFile,
-    pkgGhciLibraryFile, packageConfiguration, packageConfigurationInitialised
+    pkgGhciLibraryFile, packageConfiguration, packageConfigurationInitialised,
+    gmpBuildPath, gmpLibNameCache
     ) where
 
 import Base
@@ -47,6 +48,13 @@ packageConfiguration _      = "inplace/lib/package.conf.d"
 
 -- StageN, N > 0, share the same packageConfiguration (see above)
 packageConfigurationInitialised :: Stage -> FilePath
-packageConfigurationInitialised stage =
-    shakeFilesPath -/- "package-configuration-initialised-"
-    ++ stageString (min stage Stage1)
+packageConfigurationInitialised stage = packageConfiguration stage -/-
+    "package-configuration-initialised-" ++ stageString (min stage Stage1)
+
+-- This is the build directory for in-tree GMP library
+gmpBuildPath :: FilePath
+gmpBuildPath = buildRootPath -/- "stage0/gmp"
+
+-- GMP library names extracted from integer-gmp.buildinfo
+gmpLibNameCache :: FilePath
+gmpLibNameCache = gmpBuildPath -/- "gmp-lib-names"

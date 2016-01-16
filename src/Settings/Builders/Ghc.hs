@@ -11,10 +11,6 @@ import Settings
 import Settings.Builders.GhcCabal (bootPackageDbArgs)
 import Settings.Builders.Common (cIncludeArgs)
 
--- GMP library names extracted from integer-gmp.buildinfo
-gmpLibNameCache :: FilePath
-gmpLibNameCache = shakeFilesPath -/- "gmp-lib-names"
-
 -- TODO: add support for -dyno
 -- $1/$2/build/%.$$($3_o-bootsuf) : $1/$4/%.hs-boot
 --     $$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@

@@ -157,12 +157,10 @@ putInfo Target.Target {..} = putProgressInfo $ renderAction
     digest [x] = x
     digest (x:xs) = x ++ " (and " ++ show (length xs) ++ " more)"
 
-
 -- | Switch for @putBuild@ filtered through @buildInfo@
 putProgressInfo :: String -> Action ()
 putProgressInfo s | buildInfo /= None = putBuild s
 putProgressInfo _                     = pure ()
-
 
 -- | Render an action.
 renderAction :: String -> String -> String -> String
