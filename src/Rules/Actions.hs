@@ -110,16 +110,15 @@ runMake dir args = do
     path <- builderPath Make
 
     -- FIXME: temporary safety net for those who are not on GHC HEAD, see #167
+    -- TODO: add need [path] once lookupInPath is enabled on Windows
     fixPath <- if path == "@MakeCmd@" <.> exe
                then do
                    putColoured Red $ "You are behind GHC HEAD, make autodetection is disabled."
                    return "make"
-               else do
-                   needBuilder False Make
-                   return path
+               else return path
 
     let note = if null args then "" else " (" ++ intercalate ", " args ++ ")"
-    putBuild $ "| Run " ++ fixPath ++ " " ++ note ++ " in " ++ dir ++ "..."
+    putBuild $ "| Run " ++ fixPath ++ note ++ " in " ++ dir ++ "..."
     quietly $ cmd Shell (EchoStdout False) fixPath ["-C", dir] args
 
 applyPatch :: FilePath -> FilePath -> Action ()
