@@ -37,23 +37,6 @@ typedef
         }
    SectionAlloc;
 
-
-#if defined(mingw32_TARGET_OS)
-   typedef unsigned char          UChar;
-   typedef short                  Int16;
-
-   typedef
-   struct _Symbol {
-       void*   start;              /* actual start of symbol in memory */
-       void*   end;                /* actual end of the symbol in memory: start + size */
-       StgWord size;               /* actual size of symbol in memory */
-       short   SectionNumber;      /* section symbol is defined in. */
-       UChar*  name;
-
-   } Symbol;
-
-#endif
-
 typedef
    struct _Section {
       void* start;                /* actual start of section in memory */
@@ -67,10 +50,6 @@ typedef
       StgWord mapped_offset;      /* offset from the image of mapped_start */
       void* mapped_start;         /* start of mmap() block */
       StgWord mapped_size;        /* size of mmap() block */
-
-#if defined(mingw32_TARGET_OS)
-      Symbol* symbols;            /* resolved symbol blocks in the CODE sections*/
-#endif
    }
    Section;
 
@@ -175,6 +154,10 @@ typedef struct _ObjectCode {
 #endif
 
     ForeignExportStablePtr *stable_ptrs;
+
+    /* Indicates whether this object should be
+       loaded and relocations performed. */
+    HsBool loadObject;
 
 } ObjectCode;
 

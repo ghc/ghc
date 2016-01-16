@@ -1777,9 +1777,11 @@ mkOc( pathchar *path, char *image, int imageSize,
    if (archiveMemberName) {
        oc->archiveMemberName = stgMallocBytes( strlen(archiveMemberName)+1, "loadObj" );
        strcpy(oc->archiveMemberName, archiveMemberName);
+       oc->loadObject = HS_BOOL_FALSE;
    }
    else {
        oc->archiveMemberName = NULL;
+       oc->loadObject = HS_BOOL_TRUE;
    }
 
    oc->fileSize          = imageSize;
@@ -2516,7 +2518,20 @@ static HsInt resolveObjs_ (void)
     IF_DEBUG(linker, debugBelch("resolveObjs: start\n"));
 
     for (oc = objects; oc; oc = oc->next) {
-        if (oc->status != OBJECT_RESOLVED) {
+        // If the object code has been deferred then
+        // check to see if we need any symbols from it.
+        // If we do, mark it as load.
+        if (oc->loadObject == HS_BOOL_FALSE) {
+            for (int s = 0; s < oc->n_symbols; s++) {
+                if (oc->symbols[s] != NULL && lookupStrHashTable(reqSymHash, oc->symbols[s]) != NULL) {
+                    oc->loadObject = HS_BOOL_TRUE;
+                    removeStrHashTable(reqSymHash, oc->symbols[s], NULL);
+                    break;
+                }
+            }
+        }
+
+        if (oc->status != OBJECT_RESOLVED && oc->loadObject == HS_BOOL_TRUE) {
 #           if defined(OBJFORMAT_ELF)
             r = ocResolve_ELF ( oc );
 #           elif defined(OBJFORMAT_PEi386)
@@ -3718,8 +3733,6 @@ ocGetNames_PEi386 ( ObjectCode* oc )
    oc->n_symbols = hdr->NumberOfSymbols;
    oc->symbols   = stgCallocBytes(sizeof(char*), oc->n_symbols,
                                   "ocGetNames_PEi386(oc->symbols)");
-   Symbol* symbols = stgCallocBytes(sizeof(Symbol), oc->n_symbols,
-                            "ocGetNames_PEi386(oc->symbols)");
 
    /* Work out the size of the global BSS section */
    StgWord globalBssSize = 0;
@@ -3791,32 +3804,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       }
 
       if (addr != NULL ) {
-
-        COFF_section* sectabent
-              = (COFF_section*)myindex(sizeof_COFF_section,
-              sectab,
-              symtab_i->SectionNumber);
-
         sname = cstring_from_COFF_symbol_name(symtab_i->Name, strtab);
-
-         /* store symbols information */
-         symbols[i].start = addr;
-
-         if (i == oc->n_symbols - 1)
-         {
-             UInt32 sz = sectabent->SizeOfRawData;
-             if (sz < sectabent->VirtualSize) sz = sectabent->VirtualSize;
-             symbols[i].end = ((UChar*)(oc->image))
-                            + sectabent->PointerToRawData
-                            + sz;
-         }
-         else if (i > 0)
-         {
-             symbols[i].end = ((UChar*)symbols[i - 0].start) - 1;
-         }
-
-         symbols[i].SectionNumber = symtab_i->SectionNumber;
-         symbols[i].name = sname;
 
          /* debugBelch("addSymbol %p `%s \n", addr,sname);  */
          IF_DEBUG(linker, debugBelch("addSymbol %p `%s'\n", addr,sname);)
@@ -3825,7 +3813,6 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          oc->symbols[i] = (char*)sname;
          if (! ghciInsertSymbolTable(oc->fileName, symhash, (char*)sname, addr,
                                      isWeak, oc)) {
-             stgFree(symbols);
              return 0;
          }
 
@@ -3833,13 +3820,6 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          if (oc->archiveMemberName == NULL)
          {
              insertStrHashTable(reqSymHash, sname, addr);
-         }
-         else if (lookupStrHashTable(reqSymHash, sname) != NULL)
-         {
-             /* If symbol is from an archive file and is required by a required symbol,
-                then also add it as required it for relocation */
-             // Start = addr
-             // End =
          }
 
       } else {
@@ -3869,7 +3849,6 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       i += symtab_i->NumberOfAuxSymbols;
    }
 
-   stgFree(symbols);
    return 1;
 }
 
@@ -4039,11 +4018,9 @@ ocResolve_PEi386 ( ObjectCode* oc )
             S = (size_t) lookupSymbol_( (char*)symbol );
             if ((void*)S != NULL) goto foundit;
 
-            if (lookupStrHashTable(reqSymHash, symbol) != NULL || oc->archiveMemberName == NULL)
-            {
-                errorBelch("%" PATH_FMT ": unknown symbol `%s'", oc->fileName, symbol);
-                return 0;
-            }
+            errorBelch("%" PATH_FMT ": unknown symbol `%s'", oc->fileName, symbol);
+            return 0;
+
            foundit:;
          }
          /* All supported relocations write at least 4 bytes */
