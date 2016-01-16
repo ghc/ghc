@@ -3,7 +3,8 @@ module Settings.User (
     userArgs, userPackages, userLibWays, userRtsWays, userKnownPackages,
     integerLibrary, buildHaddock, validating, ghciWithDebugger, ghcProfiled,
     ghcDebugged, dynamicGhcPrograms, laxDependencies, buildSystemConfigFile,
-    verboseCommands, turnWarningsIntoErrors, splitObjects
+    verboseCommands, turnWarningsIntoErrors, splitObjects,
+    compileInterfaceFilesSeparately
     ) where
 
 import GHC
@@ -101,3 +102,7 @@ verboseCommands = return False
 -- | To enable -Werror in Stage2 set turnWarningsIntoErrors = stage2.
 turnWarningsIntoErrors :: Predicate
 turnWarningsIntoErrors = return False
+
+-- | Decouple the compilation of @*.hi@ and @*.o@ files by setting to True.
+compileInterfaceFilesSeparately :: Bool
+compileInterfaceFilesSeparately = True
