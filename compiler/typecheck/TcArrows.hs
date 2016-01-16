@@ -37,7 +37,7 @@ import Util
 import Control.Monad
 
 {-
-Note [Arrow overivew]
+Note [Arrow overview]
 ~~~~~~~~~~~~~~~~~~~~~
 Here's a summary of arrows and how they typecheck.  First, here's
 a cut-down syntax:

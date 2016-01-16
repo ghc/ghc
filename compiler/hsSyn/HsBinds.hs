@@ -729,7 +729,7 @@ data Sig name
       -- P :: forall a b. Prov => Req => ty
 
       -- | A signature for a class method
-      --   False: ordinary class-method signauure
+      --   False: ordinary class-method signature
       --   True:  default class method signature
       -- e.g.   class C a where
       --          op :: a -> a                   -- Ordinary

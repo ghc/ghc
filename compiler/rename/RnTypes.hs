@@ -87,7 +87,7 @@ rnHsSigWcTypeScoped :: HsDocContext -> LHsSigWcType RdrName
 rnHsSigWcTypeScoped ctx sig_ty thing_inside
   = rn_hs_sig_wc_type False ctx sig_ty thing_inside
     -- False: for pattern type sigs and rules we /do/ want
-    --        to bring those type varibles into scope
+    --        to bring those type variables into scope
     -- e.g  \ (x :: forall a. a-> b) -> e
     -- Here we do bring 'b' into scope
 

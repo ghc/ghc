@@ -932,7 +932,7 @@ Given a pattern synonym definition of the form ::
 
 it is assigned a *pattern type* of the form ::
 
-      pattern P :: CReq => CProf => t1 -> t2 -> ... -> tN -> t
+      pattern P :: CReq => CProv => t1 -> t2 -> ... -> tN -> t
 
 where ⟨CProv⟩ and ⟨CReq⟩ are type contexts, and ⟨t1⟩, ⟨t2⟩, ..., ⟨tN⟩
 and ⟨t⟩ are types. Notice the unusual form of the type, with two
@@ -7976,7 +7976,7 @@ An implicit parameter is *bound* using the standard ``let`` or ``where``
 binding forms. For example, we define the ``min`` function by binding
 ``cmp``. ::
 
-      min :: [a] -> a
+      min :: Ord a => [a] -> a
       min  = let ?cmp = (<=) in least
 
 A group of implicit-parameter bindings may occur anywhere a normal group
