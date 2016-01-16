@@ -75,10 +75,14 @@ gmpRules = do
 
         liftIO $ removeFiles gmpBuildPath ["//*"]
 
-        -- TODO: currently we configure integerGmp package twice -- optimise
-        args <- configureIntGmpArguments
         envs <- configureEnvironment
-        runConfigure (pkgPath integerGmp) envs args
+        -- TODO: without the optimisation below we configure integerGmp package
+        -- twice -- think how this can be optimised (shall we solve #18 first?)
+        -- TODO: this is a hacky optimisation: we do not rerun configure of
+        -- integerGmp package if we detect the results of the previous run
+        unlessM (doesFileExist $ gmpBase -/- "config.mk") $ do
+            args <- configureIntGmpArguments
+            runConfigure (pkgPath integerGmp) envs args
 
         createDirectory $ takeDirectory gmpLibraryH
         -- We don't use system GMP on Windows. TODO: fix?
