@@ -3821,7 +3821,6 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          {
              insertStrHashTable(reqSymHash, sname, addr);
          }
-
       } else {
 #        if 0
          debugBelch(
@@ -4968,6 +4967,12 @@ ocGetNames_ELF ( ObjectCode* oc )
                     goto fail;
                 }
                 oc->symbols[j] = nm;
+
+                /* If symbol is an object file add as required it for relocation */
+                if (oc->archiveMemberName == NULL)
+                {
+                    insertStrHashTable(reqSymHash, nm, ad);
+                }
             }
          } else {
             /* Skip. */
@@ -6746,13 +6751,24 @@ ocGetNames_MachO(ObjectCode* oc)
                     else
                     {
                             IF_DEBUG(linker, debugBelch("ocGetNames_MachO: inserting %s\n", nm));
-                            ghciInsertSymbolTable(oc->fileName, symhash, nm,
-                                                    image
-                                                    + sections[nlist[i].n_sect-1].offset
-                                                    - sections[nlist[i].n_sect-1].addr
-                                                    + nlist[i].n_value,
-                                                    HS_BOOL_FALSE,
-                                                    oc);
+                            char* addr = image
+                                       + sections[nlist[i].n_sect - 1].offset
+                                       - sections[nlist[i].n_sect - 1].addr
+                                       + nlist[i].n_value;
+
+                            ghciInsertSymbolTable( oc->fileName
+                                                 , symhash
+                                                 , nm
+                                                 , addr
+                                                 , HS_BOOL_FALSE
+                                                 , oc);
+
+                            /* If symbol is an object file add as required it for relocation */
+                            if (oc->archiveMemberName == NULL)
+                            {
+                                insertStrHashTable(reqSymHash, nm, addr);
+                            }
+
                             oc->symbols[curSymbol++] = nm;
                     }
                 }
