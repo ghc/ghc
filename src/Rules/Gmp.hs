@@ -2,6 +2,8 @@ module Rules.Gmp (
     gmpRules, gmpBuildPath, gmpObjects, gmpLibraryH, gmpDependencies
     ) where
 
+import qualified System.Directory as IO
+
 import Base
 import Expression
 import GHC
@@ -80,7 +82,7 @@ gmpRules = do
         -- twice -- think how this can be optimised (shall we solve #18 first?)
         -- TODO: this is a hacky optimisation: we do not rerun configure of
         -- integerGmp package if we detect the results of the previous run
-        unlessM (doesFileExist $ gmpBase -/- "config.mk") $ do
+        unlessM (liftIO . IO.doesFileExist $ gmpBase -/- "config.mk") $ do
             args <- configureIntGmpArguments
             runConfigure (pkgPath integerGmp) envs args
 
