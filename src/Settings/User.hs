@@ -1,6 +1,6 @@
 module Settings.User (
     buildRootPath, userTargetDirectory, userProgramPath, trackBuildSystem,
-    userArgs, userPackages, userLibWays, userRtsWays, userKnownPackages,
+    userArgs, userPackages, userLibraryWays, userRtsWays, userKnownPackages,
     integerLibrary, buildHaddock, validating, ghciWithDebugger, ghcProfiled,
     ghcDebugged, dynamicGhcPrograms, laxDependencies, buildSystemConfigFile,
     verboseCommands, turnWarningsIntoErrors, splitObjects,
@@ -36,24 +36,26 @@ userPackages = mempty
 userKnownPackages :: [Package]
 userKnownPackages = []
 
--- Control which ways libraries and rts are built
--- TODO: skip profiling for speed, skip dynamic since it's currently broken
-userLibWays :: Ways
-userLibWays = remove [profiling, dynamic]
+-- | Control which ways library packages are built
+-- FIXME: skip profiling for speed
+-- FIXME: skip dynamic since it's currently broken #4
+userLibraryWays :: Ways
+userLibraryWays = remove [profiling, dynamic]
 
+-- | Control which ways the 'rts' package is built
 userRtsWays :: Ways
 userRtsWays = mempty
 
--- Choose integer library: integerGmp, integerGmp2 or integerSimple
+-- | Choose the integer library: integerGmp or integerSimple
 integerLibrary :: Package
 integerLibrary = integerGmp
 
--- User-defined flags. Note the following type semantics:
+-- | User-defined flags. Note the following type semantics:
 -- * Bool: a plain Boolean flag whose value is known at compile time
 -- * Action Bool: a flag whose value can depend on the build environment
 -- * Predicate: a flag depending on the build environment and the current target
 
--- Set this to True if you are making any changes in the build system and want
+-- | Set this to True if you are making any changes in the build system and want
 -- appropriate rebuilds to be initiated. Switching this to False speeds things
 -- up a little (particularly zero builds).
 -- WARNING: a complete rebuild is required when changing this setting.
@@ -80,7 +82,7 @@ ghcProfiled = False
 ghcDebugged :: Bool
 ghcDebugged = False
 
--- When laxDependencies flag is set to True, dependencies on the GHC executable
+-- | When laxDependencies is set to True, dependencies on the GHC executable
 -- are turned into order-only dependencies to avoid needless recompilation when
 -- making changes to GHC's sources. In certain situations this can lead to build
 -- failures, in which case you should reset the flag (at least temporarily).
@@ -93,8 +95,8 @@ buildHaddock = return False -- FIXME: should be return True, see #98
 buildSystemConfigFile :: Bool
 buildSystemConfigFile = False
 
--- Set to True to print full command lines during the build process. Note, this
--- is a Predicate, hence you can enable verbose output for a chosen package
+-- | Set to True to print full command lines during the build process. Note,
+-- this is a Predicate, hence you can enable verbose output for a chosen package
 -- only, e.g.: verboseCommands = package ghcPrim
 verboseCommands :: Predicate
 verboseCommands = return False

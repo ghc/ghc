@@ -101,6 +101,7 @@ granSim = wayFromUnits [GranSim]
 
 -- RTS only ways
 -- TODO: do we need to define *only* these? Shall we generalise/simplify?
+-- See compiler/main/DynFlags.hs.
 threaded, threadedProfiling, threadedLogging, debug, debugProfiling,
     threadedDebug, threadedDebugProfiling, dynamic, profilingDynamic,
     threadedProfilingDynamic, threadedDynamic, threadedDebugDynamic,

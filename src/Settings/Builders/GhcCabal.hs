@@ -49,7 +49,7 @@ ghcCabalHsColourBuilderArgs = builder GhcCabalHsColour ? do
 -- TODO: Need compiler_stage1_CONFIGURE_OPTS += --disable-library-for-ghci?
 libraryArgs :: Args
 libraryArgs = do
-    ways     <- getWays
+    ways     <- getLibraryWays
     withGhci <- lift ghcWithInterpreter
     append [ if vanilla `elem` ways
              then  "--enable-library-vanilla"

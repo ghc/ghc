@@ -48,7 +48,7 @@ splitObjectsArgs = splitObjects ? do
 
 ghcMBuilderArgs :: Args
 ghcMBuilderArgs = stagedBuilder GhcM ? do
-    ways <- getWays
+    ways <- getLibraryWays
     mconcat [ arg "-M"
             , commonGhcArgs
             , arg "-include-pkg-deps"
