@@ -24,8 +24,7 @@ ghcBuilderArgs :: Args
 ghcBuilderArgs = stagedBuilder Ghc ? do
     output <- getOutput
     way    <- getWay
-    let buildObj = ("//*." ++  osuf way) ?== output || ("//*." ++  obootsuf way) ?== output
-        buildHi  = ("//*." ++ hisuf way) ?== output || ("//*." ++ hibootsuf way) ?== output
+    let buildObj = ("//*." ++ osuf way) ?== output || ("//*." ++ obootsuf way) ?== output
     libs    <- getPkgDataList DepExtraLibs
     gmpLibs <- lift $ readFileLines gmpLibNameCache
     libDirs <- getPkgDataList DepLibDirs
@@ -41,8 +40,7 @@ ghcBuilderArgs = stagedBuilder Ghc ? do
             , not buildObj ? append [ "-optl-L" ++ dir | dir <- libDirs ]
             , buildObj ? arg "-c"
             , append =<< getInputs
-            , buildHi ? append ["-fno-code", "-fwrite-interface"]
-            , not buildHi ? mconcat [ arg "-o", arg =<< getOutput ] ]
+            , arg "-o", arg =<< getOutput ]
 
 splitObjectsArgs :: Args
 splitObjectsArgs = splitObjects ? do
