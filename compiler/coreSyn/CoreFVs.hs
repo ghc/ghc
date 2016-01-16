@@ -180,7 +180,7 @@ exprsSomeFreeVars fv_cand es =
 addBndr :: CoreBndr -> FV -> FV
 addBndr bndr fv fv_cand in_scope acc
   = (varTypeTyCoVarsAcc bndr `unionFV`
-        -- Include type varibles in the binder's type
+        -- Include type variables in the binder's type
         --      (not just Ids; coercion variables too!)
      FV.delFV bndr fv) fv_cand in_scope acc
 

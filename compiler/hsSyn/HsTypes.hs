@@ -123,7 +123,7 @@ This is the syntax for types as seen in type signatures.
 
 Note [HsBSig binder lists]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider a binder (or pattern) decoarated with a type or kind,
+Consider a binder (or pattern) decorated with a type or kind,
    \ (x :: a -> a). blah
    forall (a :: k -> *) (b :: k). blah
 Then we use a LHsBndrSig on the binder, so that the
@@ -140,7 +140,7 @@ is a bit complicated.  Here's how it works.
 * In a HsType,
      HsForAllTy   represents an /explicit, user-written/ 'forall'
                    e.g.   forall a b. ...
-     HsQualTy     reprsents an /explicit, user-written/ context
+     HsQualTy     represents an /explicit, user-written/ context
                    e.g.   (Eq a, Show a) => ...
                   The context can be empty if that's what the user wrote
   These constructors represent what the user wrote, no more
@@ -154,8 +154,7 @@ is a bit complicated.  Here's how it works.
 
 * HsImplicitBndrs is a wrapper that gives the implicitly-quantified
   kind and type variables of the wrapped thing.  It is filled in by
-  the renamer.   For example, if the
-  user writes
+  the renamer. For example, if the user writes
      f :: a -> a
   the HsImplicitBinders binds the 'a' (not a HsForAllTy!).
   NB: this implicit quantification is purely lexical: we bind any

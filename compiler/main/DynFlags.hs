@@ -2453,7 +2453,7 @@ dynamic_flags = [
   , defFlag "dppr-cols"        (intSuffix (\n d -> d{ pprCols = n }))
   , defGhcFlag "dtrace-level"  (intSuffix (\n d -> d{ traceLevel = n }))
   -- Suppress all that is suppressable in core dumps.
-  -- Except for uniques, as some simplifier phases introduce new varibles that
+  -- Except for uniques, as some simplifier phases introduce new variables that
   -- have otherwise identical names.
   , defGhcFlag "dsuppress-all"
       (NoArg $ do setGeneralFlag Opt_SuppressCoercions
