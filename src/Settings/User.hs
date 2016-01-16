@@ -105,4 +105,4 @@ turnWarningsIntoErrors = return False
 
 -- | Decouple the compilation of @*.hi@ and @*.o@ files by setting to True.
 compileInterfaceFilesSeparately :: Bool
-compileInterfaceFilesSeparately = True
+compileInterfaceFilesSeparately = False
