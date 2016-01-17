@@ -357,7 +357,10 @@ instance Show TypeRep where
   showsPrec p (TypeRep _ tycon kinds tys) =
     case tys of
       [] -> showsPrec p tycon
-      [x]   | tycon == tcList -> showChar '[' . shows x . showChar ']'
+      [x@(TypeRep _ argCon _ _)]
+        | tycon == tcList -> showChar '[' . shows x . showChar ']'
+        | tycon == tcTYPE && argCon == tc'Lifted   -> showChar '*'
+        | tycon == tcTYPE && argCon == tc'Unlifted -> showChar '#'
       [a,r] | tycon == tcFun  -> showParen (p > 8) $
                                  showsPrec 9 a .
                                  showString " -> " .

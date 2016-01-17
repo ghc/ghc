@@ -210,4 +210,5 @@ test('T9848',
         , only_ways(['normal'])],
       compile_and_run,
       ['-O'])
-test('T10149',normal, compile_and_run,[''])
+test('T10149', normal, compile_and_run, [''])
+test('T11334', normal, compile_and_run, [''])
