@@ -1,0 +1,4 @@
+--  When completing operators take into account spaceless cases
+:l T10576.hs
+
+:complete repl "x1☀"
