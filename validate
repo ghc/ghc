@@ -47,6 +47,10 @@ hpc=NO
 speed=NORMAL
 use_dph=0
 be_quiet=0
+# Validate uses gzip compression for the binary distribution to avoid the rather
+# heavy cost of xz, which is the typical default. The options are defined in
+# mk/config.mk.in
+tar_comp=gzip
 
 while [ $# -gt 0 ]
 do
@@ -211,8 +215,8 @@ check_packages post-build
 
 if [ $speed != "FAST" ]; then
 
-    $make binary-dist-prep
-    $make test_bindist TEST_PREP=YES
+    $make binary-dist-prep TAR_COMP=$tar_comp
+    $make test_bindist TEST_PREP=YES TAR_COMP=$tar_comp
 
     #
     # Install the xhtml package into the bindist.
