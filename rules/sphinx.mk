@@ -22,7 +22,7 @@ $(call profStart, sphinx($1,$2))
 # $1 = dir
 # $2 = docname
 
-$(call clean-target,$1,sphinx,$1/.doctrees-html/ $1/.doctrees-pdf/ $1/build-html/ $1/build-pdf/ $1/$2.pdf)
+$(eval $(call clean-target,$1,sphinx,$1/.doctrees-html/ $1/.doctrees-pdf/ $1/build-html/ $1/build-pdf/ $1/$2.pdf))
 
 # empty "all_$1" target just in case we're not building docs at all
 $(call all-target,$1,)
