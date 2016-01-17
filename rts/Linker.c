@@ -1245,13 +1245,16 @@ static void* lookupSymbol_ (char *lbl)
             if (ghciLookupSymbolOwnerTable(symhash, lbl, &oc)) {
                 if (oc != NULL && oc->loadObject == HS_BOOL_FALSE) {
                     oc->loadObject = HS_BOOL_TRUE;
-                    r = ocTryLoad(oc);
                     IF_DEBUG(linker, debugBelch("lookupSymbol: on-demand loaded symbol '%s'\n", lbl));
+                    r = ocTryLoad(oc);
 
                     if (!r) {
                         errorBelch("Could not on-demand load symbol '%s'\n", lbl);
                         return NULL;
                     }
+
+                    // Store that we've already loaded the symbol
+                    insertStrHashTable(reqSymHash, lbl, val);
                 }
             }
             else {
@@ -2601,20 +2604,22 @@ static HsInt resolveObjs_ (void)
 
     IF_DEBUG(linker, debugBelch("resolveObjs: start\n"));
 
-    for (oc = objects; oc; oc = oc->next) {
-        // If the object code has been deferred then
-        // check to see if we need any symbols from it.
-        // If we do, mark it as load.
-        if (oc != NULL && oc->loadObject == HS_BOOL_FALSE) {
-            for (int s = 0; s < oc->n_symbols; s++) {
-                if (oc->symbols[s] != NULL && lookupStrHashTable(reqSymHash, oc->symbols[s]) != NULL) {
-                    oc->loadObject = HS_BOOL_TRUE;
-                    IF_DEBUG(linker, debugBelch("resolveObjs: picked symbol '%s'\n", oc->symbols[s]));
-                    break;
-                }
-            }
+    // Mark any required sections as load
+    // If the object code has been deferred then
+    // check to see if we need any symbols from it.
+    // If we do, mark it as load.
+    int symbols_n = keyCountHashTable(reqSymHash);
+    StgWord* symbols = malloc(sizeof(StgWord) * symbols_n);
+    symbols_n = keysHashTable(reqSymHash, symbols, symbols_n);
+    for (int n = 0; n < symbols_n; n++) {
+        char* symbol = (char*)symbols[n];
+        if (ghciLookupSymbolOwnerTable(symhash, symbol, &oc)) {
+            oc->loadObject = HS_BOOL_TRUE;
+            IF_DEBUG(linker, debugBelch("resolveObjs: picked symbol '%s'\n", symbol));
         }
+    }
 
+    for (oc = objects; oc; oc = oc->next) {
         r = ocTryLoad(oc);
         if (!r)
         {
