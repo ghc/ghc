@@ -23,7 +23,9 @@ import Settings
 installTargets :: [FilePath]
 installTargets = [ "inplace/lib/template-hsc.h"
                  , "inplace/lib/platformConstants"
-                 , "inplace/lib/settings" ]
+                 , "inplace/lib/settings"
+                 , "inplace/lib/ghc-usage.txt"
+                 , "inplace/lib/ghci-usage.txt" ]
 
 primopsSource :: FilePath
 primopsSource = "compiler/prelude/primops.txt.pp"
@@ -167,6 +169,8 @@ copyRules = do
     "inplace/lib/template-hsc.h"    <~ pkgPath hsc2hs
     "inplace/lib/platformConstants" <~ derivedConstantsPath
     "inplace/lib/settings"          <~ "."
+    "inplace/lib/ghc-usage.txt"     <~ "driver"
+    "inplace/lib/ghci-usage.txt"    <~ "driver"
   where
     file <~ dir = file %> \_ -> copyFile (dir -/- takeFileName file) file
 
