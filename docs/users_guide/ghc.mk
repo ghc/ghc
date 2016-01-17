@@ -30,6 +30,8 @@ $(MAN_PAGES): $(docs/users_guide_MAN_RST_SOURCES) $(utils/mkUserGuidePart_GENERA
 	$(SPHINXBUILD) -b man -d docs/users_guide/.doctrees-man docs/users_guide docs/users_guide/build-man
 endif
 
+$(eval $(call clean-target,users-guide,manpage,docs/users_guide/.doctrees-man/ docs/users_guide/build-man/))
+
 man : $(MAN_PAGES)
 
 ifeq "$(BUILD_MAN)" "YES"
