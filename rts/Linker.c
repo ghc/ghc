@@ -2584,34 +2584,26 @@ static HsInt resolveObjs_ (void)
     int r;
 
     IF_DEBUG(linker, debugBelch("resolveObjs: start\n"));
-    //int nkeys = keyCountHashTable(reqSymHash);
-    //debugBelch("resolving %d symbols from required cache.\n", nkeys);
-    //StgWord* keys = malloc(sizeof(StgWord) * nkeys);
-    //keysHashTable(reqSymHash, keys, nkeys);
-
-    //for (int n = 0; n < nkeys; n++){
-    //    debugBelch("required key '%s'\n", (char*)keys[n]);
-    //}
 
     for (oc = objects; oc; oc = oc->next) {
-        //debugBelch("resolveObjs: checking oc '%ls'\n", oc->fileName);
-
         // If the object code has been deferred then
         // check to see if we need any symbols from it.
         // If we do, mark it as load.
-        if (oc->loadObject == HS_BOOL_FALSE) {
+        if (oc != NULL && oc->loadObject == HS_BOOL_FALSE) {
             for (int s = 0; s < oc->n_symbols; s++) {
                 if (oc->symbols[s] != NULL && lookupStrHashTable(reqSymHash, oc->symbols[s]) != NULL) {
                     oc->loadObject = HS_BOOL_TRUE;
-                    // removeStrHashTable(reqSymHash, oc->symbols[s], NULL);
-                    debugBelch("resolveObjs: picked symbol '%s'\n", oc->symbols[s]);
+                    IF_DEBUG(linker, debugBelch("resolveObjs: picked symbol '%s'\n", oc->symbols[s]));
                     break;
                 }
             }
         }
 
         r = ocTryLoad(oc);
-        if (!r) { return r; }
+        if (!r)
+        {
+            return r;
+        }
     }
 
 #ifdef PROFILING
