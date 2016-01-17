@@ -132,7 +132,7 @@
 
 typedef struct _RtsSymbolInfo {
     void *value;
-    const ObjectCode *owner;
+    ObjectCode *owner;
     HsBool weak;
 } RtsSymbolInfo;
 
@@ -503,6 +503,23 @@ static HsBool ghciLookupSymbolTable(HashTable *table,
     return HS_BOOL_TRUE;
 }
 
+static HsBool ghciLookupSymbolOwnerTable(HashTable *table,
+    const char *key, ObjectCode **result)
+{
+    RtsSymbolInfo *pinfo = lookupStrHashTable(table, key);
+    if (!pinfo) {
+        *result = NULL;
+        return HS_BOOL_FALSE;
+    }
+    if (pinfo->weak)
+        IF_DEBUG(linker, debugBelch("lookup: promoting %s\n", key));
+    /* Once it's looked up, it can no longer be overridden */
+    pinfo->weak = HS_BOOL_FALSE;
+
+    *result = pinfo->owner;
+    return HS_BOOL_TRUE;
+}
+
 static void ghciRemoveSymbolTable(HashTable *table, const char *key,
     ObjectCode *owner)
 {
@@ -667,7 +684,8 @@ exitLinker( void ) {
    }
 #endif
    if (linker_init_done == 1) {
-       freeHashTable(symhash, free);
+       freeHashTable(symhash   , free);
+       freeHashTable(reqSymHash, NULL);
    }
 #ifdef THREADED_RTS
    closeMutex(&linker_mutex);
@@ -1224,23 +1242,21 @@ static void* lookupSymbol_ (char *lbl)
             int r;
             ObjectCode* oc;
             // Symbol can be found during linking, but hasn't been relocated. Do so now.
-            for (oc = objects; oc; oc = oc->next) {
+            if (ghciLookupSymbolOwnerTable(symhash, lbl, &oc)) {
                 if (oc != NULL && oc->loadObject == HS_BOOL_FALSE) {
-                    for (int s = 0; s < oc->n_symbols; s++) {
-                        if (oc->symbols[s] != NULL && strcmp(oc->symbols[s], lbl) == 0) {
-                            oc->loadObject = HS_BOOL_TRUE;
-                            r = ocTryLoad(oc);
-                            IF_DEBUG(linker, debugBelch("resolveObjs: on-demand loaded symbol '%s'\n", lbl));
+                    oc->loadObject = HS_BOOL_TRUE;
+                    r = ocTryLoad(oc);
+                    IF_DEBUG(linker, debugBelch("resolveObjs: on-demand loaded symbol '%s'\n", lbl));
 
-                            if (!r) {
-                                errorBelch("Could not on-demand load symbol '%s'\n", lbl);
-                                return NULL;
-                            }
-
-                            return val;
-                        }
+                    if (!r) {
+                        errorBelch("Could not on-demand load symbol '%s'\n", lbl);
+                        return NULL;
                     }
                 }
+            }
+            else {
+                // The symbol could be found, but not loaded nor relocated.
+                return NULL;
             }
         }
 
