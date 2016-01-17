@@ -219,6 +219,9 @@ static pathchar* mkPath(char* path)
 #endif
 }
 
+/* Generic wrapper function to try and Resolve and RunInit oc files */
+int ocTryLoad( ObjectCode* oc );
+
 #if defined(OBJFORMAT_ELF)
 static int ocVerifyImage_ELF    ( ObjectCode* oc );
 static int ocGetNames_ELF       ( ObjectCode* oc );
@@ -1214,6 +1217,33 @@ static void* lookupSymbol_ (char *lbl)
 #       endif
     } else {
         IF_DEBUG(linker, debugBelch("lookupSymbol: value of %s is %p\n", lbl, val));
+        if (lookupStrHashTable(reqSymHash, lbl) != NULL) {
+            // Symbol has already been loaded and relocated. Just return the address.
+        }
+        else {
+            int r;
+            ObjectCode* oc;
+            // Symbol can be found during linking, but hasn't been relocated. Do so now.
+            for (oc = objects; oc; oc = oc->next) {
+                if (oc != NULL && oc->loadObject == HS_BOOL_FALSE) {
+                    for (int s = 0; s < oc->n_symbols; s++) {
+                        if (oc->symbols[s] != NULL && strcmp(oc->symbols[s], lbl) == 0) {
+                            oc->loadObject = HS_BOOL_TRUE;
+                            r = ocTryLoad(oc);
+                            IF_DEBUG(linker, debugBelch("resolveObjs: on-demand loaded symbol '%s'\n", lbl));
+
+                            if (!r) {
+                                errorBelch("Could not on-demand load symbol '%s'\n", lbl);
+                                return NULL;
+                            }
+
+                            return val;
+                        }
+                    }
+                }
+            }
+        }
+
         return val;
     }
 }
@@ -2502,32 +2532,14 @@ static HsInt loadOc (ObjectCode* oc)
 }
 
 /* -----------------------------------------------------------------------------
- * resolve all the currently unlinked objects in memory
- *
- * Returns: 1 if ok, 0 on error.
- */
-static HsInt resolveObjs_ (void)
-{
-    ObjectCode *oc;
+* try to load and initialize an ObjectCode into memory
+*
+* Returns: 1 if ok, 0 on error.
+*/
+int ocTryLoad (ObjectCode* oc) {
     int r;
 
-    IF_DEBUG(linker, debugBelch("resolveObjs: start\n"));
-
-    for (oc = objects; oc; oc = oc->next) {
-        // If the object code has been deferred then
-        // check to see if we need any symbols from it.
-        // If we do, mark it as load.
-        if (oc->loadObject == HS_BOOL_FALSE) {
-            for (int s = 0; s < oc->n_symbols; s++) {
-                if (oc->symbols[s] != NULL && lookupStrHashTable(reqSymHash, oc->symbols[s]) != NULL) {
-                    oc->loadObject = HS_BOOL_TRUE;
-                    removeStrHashTable(reqSymHash, oc->symbols[s], NULL);
-                    break;
-                }
-            }
-        }
-
-        if (oc->status != OBJECT_RESOLVED && oc->loadObject == HS_BOOL_TRUE) {
+    if (oc->status != OBJECT_RESOLVED && oc->loadObject == HS_BOOL_TRUE) {
 #           if defined(OBJFORMAT_ELF)
             r = ocResolve_ELF ( oc );
 #           elif defined(OBJFORMAT_PEi386)
@@ -2555,8 +2567,51 @@ static HsInt resolveObjs_ (void)
 
             if (!r) { return r; }
 
-            oc->status = OBJECT_RESOLVED;
+        oc->status = OBJECT_RESOLVED;
+    }
+
+    return 1;
+}
+
+/* -----------------------------------------------------------------------------
+ * resolve all the currently unlinked objects in memory
+ *
+ * Returns: 1 if ok, 0 on error.
+ */
+static HsInt resolveObjs_ (void)
+{
+    ObjectCode *oc;
+    int r;
+
+    IF_DEBUG(linker, debugBelch("resolveObjs: start\n"));
+    //int nkeys = keyCountHashTable(reqSymHash);
+    //debugBelch("resolving %d symbols from required cache.\n", nkeys);
+    //StgWord* keys = malloc(sizeof(StgWord) * nkeys);
+    //keysHashTable(reqSymHash, keys, nkeys);
+
+    //for (int n = 0; n < nkeys; n++){
+    //    debugBelch("required key '%s'\n", (char*)keys[n]);
+    //}
+
+    for (oc = objects; oc; oc = oc->next) {
+        //debugBelch("resolveObjs: checking oc '%ls'\n", oc->fileName);
+
+        // If the object code has been deferred then
+        // check to see if we need any symbols from it.
+        // If we do, mark it as load.
+        if (oc->loadObject == HS_BOOL_FALSE) {
+            for (int s = 0; s < oc->n_symbols; s++) {
+                if (oc->symbols[s] != NULL && lookupStrHashTable(reqSymHash, oc->symbols[s]) != NULL) {
+                    oc->loadObject = HS_BOOL_TRUE;
+                    // removeStrHashTable(reqSymHash, oc->symbols[s], NULL);
+                    debugBelch("resolveObjs: picked symbol '%s'\n", oc->symbols[s]);
+                    break;
+                }
+            }
         }
+
+        r = ocTryLoad(oc);
+        if (!r) { return r; }
     }
 
 #ifdef PROFILING
