@@ -9,5 +9,5 @@ runGhcPackageArgs :: Args
 runGhcPackageArgs = package runGhc ? do
     version <- getSetting ProjectVersion
     mconcat [ builderGhc ?
-              file "//Main.o" ?
+              file "//Main.*" ?
               append ["-cpp", "-DVERSION=\"" ++ version ++ "\""] ]

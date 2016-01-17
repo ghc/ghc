@@ -12,7 +12,7 @@ compilePackage _ target @ (PartialTarget stage pkg) = do
     let buildPath = targetPath stage pkg -/- "build"
 
     matchBuildResult buildPath "hi" ?> \hi ->
-        if compileInterfaceFilesSeparately
+        if compileInterfaceFilesSeparately && not ("//HpcParser.*" ?== hi)
         then do
             let way = detectWay hi
             (src, deps) <- dependencies buildPath $ hi -<.> osuf way
@@ -32,16 +32,22 @@ compilePackage _ target @ (PartialTarget stage pkg) = do
     -- TODO: add dependencies for #include of .h and .hs-incl files (gcc -MM?)
     matchBuildResult buildPath "o" ?> \obj -> do
         (src, deps) <- dependencies buildPath obj
-        need $ src : deps
         if ("//*.c" ?== src)
-        then build $ fullTarget target (Gcc stage) [src] [obj]
+        then do
+            need $ src : deps
+            build $ fullTarget target (Gcc stage) [src] [obj]
         else do
             let way = detectWay obj
+            if compileInterfaceFilesSeparately && "//*.hs" ?== src && not ("//HpcParser.*" ?== src)
+            then need $ (obj -<.> hisuf (detectWay obj)) : src : deps
+            else need $ src : deps
             build $ fullTargetWithWay target (Ghc stage) way [src] [obj]
 
     -- TODO: get rid of these special cases
     matchBuildResult buildPath "o-boot" ?> \obj -> do
         (src, deps) <- dependencies buildPath obj
-        need $ src : deps
         let way = detectWay obj
+        if compileInterfaceFilesSeparately
+        then need $ (obj -<.> hibootsuf (detectWay obj)) : src : deps
+        else need $ src : deps
         build $ fullTargetWithWay target (Ghc stage) way [src] [obj]
