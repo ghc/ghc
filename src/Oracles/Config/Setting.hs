@@ -47,6 +47,7 @@ data Setting = BuildArch
              | TargetPlatform
              | TargetPlatformFull
              | TargetVendor
+             | UseSystemFfi
 
 data SettingList = ConfCcArgs Stage
                  | ConfCppArgs Stage
@@ -57,6 +58,8 @@ data SettingList = ConfCcArgs Stage
                  | HsCppArgs
                  | IconvIncludeDirs
                  | IconvLibDirs
+                 | FfiIncludeDirs
+                 | FfiLibDirs
 
 setting :: Setting -> Action String
 setting key = askConfig $ case key of
@@ -88,6 +91,7 @@ setting key = askConfig $ case key of
     TargetPlatform     -> "target-platform"
     TargetPlatformFull -> "target-platform-full"
     TargetVendor       -> "target-vendor"
+    UseSystemFfi       -> "use-system-ffi"
 
 settingList :: SettingList -> Action [String]
 settingList key = fmap words $ askConfig $ case key of
@@ -100,6 +104,8 @@ settingList key = fmap words $ askConfig $ case key of
     HsCppArgs               -> "hs-cpp-args"
     IconvIncludeDirs        -> "iconv-include-dirs"
     IconvLibDirs            -> "iconv-lib-dirs"
+    FfiIncludeDirs          -> "ffi-include-dirs"
+    FfiLibDirs              -> "ffi-lib-dirs"
 
 getSetting :: Setting -> ReaderT a Action String
 getSetting = lift . setting
