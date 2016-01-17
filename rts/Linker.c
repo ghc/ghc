@@ -1246,7 +1246,7 @@ static void* lookupSymbol_ (char *lbl)
                 if (oc != NULL && oc->loadObject == HS_BOOL_FALSE) {
                     oc->loadObject = HS_BOOL_TRUE;
                     r = ocTryLoad(oc);
-                    IF_DEBUG(linker, debugBelch("resolveObjs: on-demand loaded symbol '%s'\n", lbl));
+                    IF_DEBUG(linker, debugBelch("lookupSymbol: on-demand loaded symbol '%s'\n", lbl));
 
                     if (!r) {
                         errorBelch("Could not on-demand load symbol '%s'\n", lbl);
