@@ -268,12 +268,8 @@ static void machoInitSymbolsWithoutUnderscore( void );
 #endif
 
 #if defined(OBJFORMAT_PEi386)
-static int checkAndLoadImportLibrary(
-    pathchar* arch_name,
-    char* member_name,
-    FILE* f);
 
-/* Hack, for bug in ld.  Will be removed soon.  */
+/* Add ld symbol for PE image base. */
 #if defined(__GNUC__)
 #define __ImageBase __MINGW_LSYMBOL(_image_base__)
 #endif
