@@ -111,6 +111,7 @@ import System.IO.Unsafe ( unsafePerformIO )
 import System.Process
 import Text.Printf
 import Text.Read ( readMaybe )
+import Text.Read.Lex (isSymbolChar)
 
 #ifndef mingw32_HOST_OS
 import System.Posix hiding ( getEnv )
@@ -231,10 +232,12 @@ ghciCommands = map mkCmd [
 -- NOTE: in order for us to override the default correctly, any custom entry
 -- must be a SUBSET of word_break_chars.
 word_break_chars :: String
-word_break_chars = let symbols = "!#$%&*+/<=>?@\\^|-~"
-                       specials = "(),;[]`{}"
-                       spaces = " \t\n"
-                   in spaces ++ specials ++ symbols
+word_break_chars = spaces ++ specials ++ symbols
+
+symbols, specials, spaces :: String
+symbols = "!#$%&*+/<=>?@\\^|-~"
+specials = "(),;[]`{}"
+spaces = " \t\n"
 
 flagWordBreakChars :: String
 flagWordBreakChars = " \t\n"
@@ -2770,13 +2773,24 @@ completeGhciCommand, completeMacro, completeIdentifier, completeModule,
     completeHomeModuleOrFile, completeExpression
     :: CompletionFunc GHCi
 
+-- | Provide completions for last word in a given string.
+--
+-- Takes a tuple of two strings.  First string is a reversed line to be
+-- completed.  Second string is likely unused, 'completeCmd' always passes an
+-- empty string as second item in tuple.
 ghciCompleteWord :: CompletionFunc GHCi
 ghciCompleteWord line@(left,_) = case firstWord of
+    -- If given string starts with `:` colon, and there is only one following
+    -- word then provide REPL command completions.  If there is more than one
+    -- word complete either filename or builtin ghci commands or macros.
     ':':cmd     | null rest     -> completeGhciCommand line
                 | otherwise     -> do
                         completion <- lookupCompletion cmd
                         completion line
+    -- If given string starts with `import` keyword provide module name
+    -- completions
     "import"    -> completeModule line
+    -- otherwise provide identifier completions
     _           -> completeExpression line
   where
     (firstWord,rest) = break isSpace $ dropWhile isSpace $ reverse left
@@ -2801,10 +2815,16 @@ completeMacro = wrapIdentCompleter $ \w -> do
   cmds <- liftIO $ readIORef macros_ref
   return (filter (w `isPrefixOf`) (map cmdName cmds))
 
-completeIdentifier = wrapIdentCompleter $ \w -> do
-  rdrs <- GHC.getRdrNamesInScope
-  dflags <- GHC.getSessionDynFlags
-  return (filter (w `isPrefixOf`) (map (showPpr dflags) rdrs))
+completeIdentifier line@(left, _) =
+  -- Note: `left` is a reversed input
+  case left of
+    (x:_) | isSymbolChar x -> wrapCompleter (specials ++ spaces) complete line
+    _                      -> wrapIdentCompleter complete line
+  where
+    complete w = do
+      rdrs <- GHC.getRdrNamesInScope
+      dflags <- GHC.getSessionDynFlags
+      return (filter (w `isPrefixOf`) (map (showPpr dflags) rdrs))
 
 completeModule = wrapIdentCompleter $ \w -> do
   dflags <- GHC.getSessionDynFlags

@@ -30,6 +30,8 @@ module Text.Read.Lex
   , readOctP
   , readDecP
   , readHexP
+
+  , isSymbolChar
   )
  where
 
@@ -214,18 +216,19 @@ lexSymbol =
         return (Punc s)         -- Reserved-ops count as punctuation
       else
         return (Symbol s)
- where
-  isSymbolChar c = not (isPuncChar c) && case generalCategory c of
-      MathSymbol              -> True
-      CurrencySymbol          -> True
-      ModifierSymbol          -> True
-      OtherSymbol             -> True
-      DashPunctuation         -> True
-      OtherPunctuation        -> not (c `elem` "'\"")
-      ConnectorPunctuation    -> c /= '_'
-      _                       -> False
-  reserved_ops   = ["..", "::", "=", "\\", "|", "<-", "->", "@", "~", "=>"]
+  where
+    reserved_ops   = ["..", "::", "=", "\\", "|", "<-", "->", "@", "~", "=>"]
 
+isSymbolChar :: Char -> Bool
+isSymbolChar c = not (isPuncChar c) && case generalCategory c of
+    MathSymbol              -> True
+    CurrencySymbol          -> True
+    ModifierSymbol          -> True
+    OtherSymbol             -> True
+    DashPunctuation         -> True
+    OtherPunctuation        -> not (c `elem` "'\"")
+    ConnectorPunctuation    -> c /= '_'
+    _                       -> False
 -- ----------------------------------------------------------------------
 -- identifiers
 
