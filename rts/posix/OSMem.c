@@ -222,7 +222,7 @@ my_mmap_or_barf (void *addr, W_ size, int operation)
             // If we request more than 3Gig, then we get EINVAL
             // instead of ENOMEM (at least on Linux).
             errorBelch("out of memory (requested %" FMT_Word " bytes)", size);
-            stg_exit(EXIT_FAILURE);
+            stg_exit(EXIT_HEAPOVERFLOW);
         } else {
             barf("getMBlock: mmap: %s", strerror(errno));
         }
