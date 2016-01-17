@@ -47,7 +47,6 @@ data Setting = BuildArch
              | TargetPlatform
              | TargetPlatformFull
              | TargetVendor
-             | UseSystemFfi
 
 data SettingList = ConfCcArgs Stage
                  | ConfCppArgs Stage
@@ -91,7 +90,6 @@ setting key = askConfig $ case key of
     TargetPlatform     -> "target-platform"
     TargetPlatformFull -> "target-platform-full"
     TargetVendor       -> "target-vendor"
-    UseSystemFfi       -> "use-system-ffi"
 
 settingList :: SettingList -> Action [String]
 settingList key = fmap words $ askConfig $ case key of

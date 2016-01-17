@@ -20,11 +20,11 @@ rtsConf = pkgPath rts -/- targetDirectory Stage1 rts -/- "package.conf.inplace"
 
 rtsLibffiLibraryName :: Action FilePath
 rtsLibffiLibraryName = do
-    use_system_ffi <- setting UseSystemFfi
+    use_system_ffi <- flag UseSystemFfi
     windows <- windowsHost
     case (use_system_ffi, windows) of
-      ("YES", False) -> return "ffi"
-      ("NO", False) -> return "Cffi"
+      (True, False) -> return "ffi"
+      (False, False) -> return "Cffi"
       (_, True) -> return "Cffi-6"
       (_, _) -> error "Unsupported FFI library configuration case"
 

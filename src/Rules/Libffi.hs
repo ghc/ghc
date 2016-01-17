@@ -70,9 +70,9 @@ configureArguments = do
 libffiRules :: Rules ()
 libffiRules = do
     libffiDependencies &%> \_ -> do
-        use_system_ffi <- setting UseSystemFfi
         ffi_header_dirs <- settingList FfiIncludeDirs
-        if use_system_ffi == "YES"
+        use_system_ffi <- flag UseSystemFfi
+        if use_system_ffi
         then do
           putBuild "| System supplied FFI library will be used"
           let ffi_header_dir = head ffi_header_dirs
