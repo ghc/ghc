@@ -34,8 +34,8 @@ import TyCon
 import Type
 import TyCoRep
 import TysPrim ( alphaTyVars )
-import TysWiredIn ( listTyConName, ipTyCon )
-import PrelNames ( hasKey, eqTyConKey )
+import TysWiredIn ( listTyConName )
+import PrelNames ( hasKey, eqTyConKey, ipClassKey )
 import Unique ( getUnique )
 import Util ( filterByList, filterOut )
 import Var
@@ -372,7 +372,7 @@ synifyType _ (TyConApp tc tys)
   | getName tc == listTyConName, [ty] <- tys =
      noLoc $ HsListTy (synifyType WithinType ty)
   -- ditto for implicit parameter tycons
-  | tc == ipTyCon
+  | tc `hasKey` ipClassKey
   , [name, ty] <- tys
   , Just x <- isStrLitTy name
   = noLoc $ HsIParamTy (HsIPName x) (synifyType WithinType ty)
