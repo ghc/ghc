@@ -90,11 +90,11 @@ ppHtml dflags doctitle maybe_package ifaces odir prologue
 
   when (isNothing maybe_index_url) $
     ppHtmlIndex odir doctitle maybe_package
-      themes maybe_contents_url maybe_source_url maybe_wiki_url
+      themes maybe_mathjax_url maybe_contents_url maybe_source_url maybe_wiki_url
       (map toInstalledIface visible_ifaces) debug
 
   mapM_ (ppHtmlModule odir doctitle themes
-           maybe_source_url maybe_wiki_url
+           maybe_mathjax_url maybe_source_url maybe_wiki_url
            maybe_contents_url maybe_index_url unicode qual debug) visible_ifaces
 
 
@@ -269,7 +269,7 @@ ppHtmlContents dflags odir doctitle _maybe_package
   writeFile (joinPath [odir, contentsHtmlFile]) (renderToString debug html)
 
   -- XXX: think of a better place for this?
-  ppHtmlContentsFrame odir doctitle themes ifaces debug
+  ppHtmlContentsFrame odir doctitle themes mathjax_url ifaces debug
 
 
 ppPrologue :: Qualification -> String -> Maybe (MDoc GHC.RdrName) -> Html
@@ -342,12 +342,12 @@ flatModuleTree ifaces =
         << toHtml txt
 
 
-ppHtmlContentsFrame :: FilePath -> String -> Themes
+ppHtmlContentsFrame :: FilePath -> String -> Themes -> Maybe String
   -> [InstalledInterface] -> Bool -> IO ()
-ppHtmlContentsFrame odir doctitle themes ifaces debug = do
+ppHtmlContentsFrame odir doctitle themes maybe_mathjax_url ifaces debug = do
   let mods = flatModuleTree ifaces
       html =
-        headHtml doctitle Nothing themes Nothing +++
+        headHtml doctitle Nothing themes maybe_mathjax_url +++
         miniBody << divModuleList <<
           (sectionName << "Modules" +++
            ulist << [ li ! [theclass "module"] << m | m <- mods ])
@@ -365,13 +365,14 @@ ppHtmlIndex :: FilePath
             -> Maybe String
             -> Themes
             -> Maybe String
+            -> Maybe String
             -> SourceURLs
             -> WikiURLs
             -> [InstalledInterface]
             -> Bool
             -> IO ()
 ppHtmlIndex odir doctitle _maybe_package themes
-  maybe_contents_url maybe_source_url maybe_wiki_url ifaces debug = do
+  maybe_mathjax_url maybe_contents_url maybe_source_url maybe_wiki_url ifaces debug = do
   let html = indexPage split_indices Nothing
               (if split_indices then [] else index)
 
@@ -387,7 +388,7 @@ ppHtmlIndex odir doctitle _maybe_package themes
 
   where
     indexPage showLetters ch items =
-      headHtml (doctitle ++ " (" ++ indexName ch ++ ")") Nothing themes Nothing +++
+      headHtml (doctitle ++ " (" ++ indexName ch ++ ")") Nothing themes maybe_mathjax_url +++
       bodyHtml doctitle Nothing
         maybe_source_url maybe_wiki_url
         maybe_contents_url Nothing << [
@@ -487,11 +488,11 @@ ppHtmlIndex odir doctitle _maybe_package themes
 
 ppHtmlModule
         :: FilePath -> String -> Themes
-        -> SourceURLs -> WikiURLs
+        -> Maybe String -> SourceURLs -> WikiURLs
         -> Maybe String -> Maybe String -> Bool -> QualOption
         -> Bool -> Interface -> IO ()
 ppHtmlModule odir doctitle themes
-  maybe_source_url maybe_wiki_url
+  maybe_mathjax_url maybe_source_url maybe_wiki_url
   maybe_contents_url maybe_index_url unicode qual debug iface = do
   let
       mdl = ifaceMod iface
@@ -499,7 +500,7 @@ ppHtmlModule odir doctitle themes
       mdl_str = moduleString mdl
       real_qual = makeModuleQual qual aliases mdl
       html =
-        headHtml mdl_str (Just $ "mini_" ++ moduleHtmlFile mdl) themes Nothing +++
+        headHtml mdl_str (Just $ "mini_" ++ moduleHtmlFile mdl) themes maybe_mathjax_url +++
         bodyHtml doctitle (Just iface)
           maybe_source_url maybe_wiki_url
           maybe_contents_url maybe_index_url << [
@@ -509,14 +510,14 @@ ppHtmlModule odir doctitle themes
 
   createDirectoryIfMissing True odir
   writeFile (joinPath [odir, moduleHtmlFile mdl]) (renderToString debug html)
-  ppHtmlModuleMiniSynopsis odir doctitle themes iface unicode real_qual debug
+  ppHtmlModuleMiniSynopsis odir doctitle themes maybe_mathjax_url iface unicode real_qual debug
 
 ppHtmlModuleMiniSynopsis :: FilePath -> String -> Themes
-  -> Interface -> Bool -> Qualification -> Bool -> IO ()
-ppHtmlModuleMiniSynopsis odir _doctitle themes iface unicode qual debug = do
+  -> Maybe String -> Interface -> Bool -> Qualification -> Bool -> IO ()
+ppHtmlModuleMiniSynopsis odir _doctitle themes maybe_mathjax_url iface unicode qual debug = do
   let mdl = ifaceMod iface
       html =
-        headHtml (moduleString mdl) Nothing themes Nothing +++
+        headHtml (moduleString mdl) Nothing themes maybe_mathjax_url +++
         miniBody <<
           (divModuleHeader << sectionName << moduleString mdl +++
            miniSynopsis mdl iface unicode qual)

@@ -292,7 +292,7 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
 
   when (Flag_GenIndex `elem` flags) $ do
     ppHtmlIndex odir title pkgStr
-                themes opt_contents_url sourceUrls' opt_wiki_urls
+                themes opt_mathjax opt_contents_url sourceUrls' opt_wiki_urls
                 allVisibleIfaces pretty
     copyHtmlBits odir libDir themes
 
