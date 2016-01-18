@@ -281,11 +281,19 @@ The available mode flags are:
 .. ghc-flag:: -M
 
     .. index::
-       single: dependency-generation mode; of GHC
+        single: dependency-generation mode; of GHC
 
     Dependency-generation mode. In this mode, GHC can be used to
     generate dependency information suitable for use in a ``Makefile``.
     See :ref:`makefile-dependencies`.
+
+.. ghc-flag:: --frontend <module>
+
+    .. index::
+        single: frontend plugins; using
+
+    Run GHC using the given frontend plugin. See :ref:`frontend_plugins` for
+    details.
 
 .. ghc-flag:: --mk-dll
 
