@@ -1117,7 +1117,7 @@ Note [Adding an inert canonical constraint the InertCans]
      * [Given/Wanted] a ~N ty
           1. Add it to inert_eqs
           2. Emit [D] a~ty
-       As a result of (2), the current model will rewrite teh new [D] a~ty
+       As a result of (2), the current model will rewrite the new [D] a~ty
        during canonicalisation, and then it'll be added to the model using
        the steps of [Derived] above.
 
