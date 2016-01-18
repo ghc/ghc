@@ -971,42 +971,64 @@ tcDefaultAssocDecl _ (d1:_:_)
 tcDefaultAssocDecl fam_tc [L loc (TyFamEqn { tfe_tycon = L _ tc_name
                                            , tfe_pats = hs_tvs
                                            , tfe_rhs = rhs })]
-  = setSrcSpan loc $
+  | HsQTvs { hsq_implicit = imp_vars, hsq_explicit = exp_vars } <- hs_tvs
+  = -- See Note [Type-checking default assoc decls]
+    setSrcSpan loc $
     tcAddFamInstCtxt (ptext (sLit "default type instance")) tc_name $
     do { traceTc "tcDefaultAssocDecl" (ppr tc_name)
-       ; let shape@(fam_name, fam_pat_arity, _) = famTyConShape fam_tc
-             fam_tc_tvs                         = tyConTyVars fam_tc
+       ; let shape@(fam_tc_name, fam_arity, _) = famTyConShape fam_tc
 
        -- Kind of family check
-       ; checkTc (isTypeFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
+       ; ASSERT( fam_tc_name == tc_name )
+         checkTc (isTypeFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
 
        -- Arity check
-       ; ASSERT( fam_name == tc_name )
-         checkTc (length (hsQTvExplicit hs_tvs) == fam_pat_arity)
-                 (wrongNumberOfParmsErr fam_pat_arity)
+       ; checkTc (length exp_vars == fam_arity)
+                 (wrongNumberOfParmsErr fam_arity)
 
        -- Typecheck RHS
-       -- Oddly, we don't pass in any enclosing class info, and we treat
-       -- this as a top-level type instance. Type family defaults are renamed
-       -- outside the scope of their enclosing class and so the ClsInfo would
-       -- be of no use.
-       ; let HsQTvs { hsq_implicit = imp_vars, hsq_explicit = exp_vars } = hs_tvs
-             pats = HsIB { hsib_vars = imp_vars ++ map hsLTyVarName exp_vars
+       ; let pats = HsIB { hsib_vars = imp_vars ++ map hsLTyVarName exp_vars
                          , hsib_body = map hsLTyVarBndrToType exp_vars }
           -- NB: Use tcFamTyPats, not tcTyClTyVars. The latter expects to get
           -- the LHsQTyVars used for declaring a tycon, but the names here
           -- are different.
-       ; (ktvs, rhs_ty)
+       ; (pats', rhs_ty)
            <- tcFamTyPats shape Nothing pats
-              (discardResult . tcCheckLHsType rhs) $ \ktvs _ rhs_kind ->
+              (discardResult . tcCheckLHsType rhs) $ \_ pats' rhs_kind ->
               do { rhs_ty <- solveEqualities $
                              tcCheckLHsType rhs rhs_kind
-                 ; return (ktvs, rhs_ty) }
-
+                 ; return (pats', rhs_ty) }
+       -- pats' is fully zonked already
        ; rhs_ty <- zonkTcTypeToType emptyZonkEnv rhs_ty
-       ; let subst = zipTopTCvSubst ktvs (mkTyVarTys fam_tc_tvs)
-       ; return ( Just (substTy subst rhs_ty, loc) ) }
-    -- We check for well-formedness and validity later, in checkValidClass
+
+         -- See Note [Type-checking default assoc decls]
+       ; case tcMatchTys pats' (mkTyVarTys (tyConTyVars fam_tc)) of
+           Just subst -> return ( Just (substTy subst rhs_ty, loc) )
+           Nothing    -> failWithTc (defaultAssocKindErr fam_tc)
+           -- We check for well-formedness and validity later,
+           -- in checkValidClass
+     }
+
+{- Note [Type-checking default assoc decls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this default declaration for an associated type
+
+   class C a where
+      type F (a :: k) b :: *
+      type F x y = Proxy x -> y
+
+Note that the class variable 'a' doesn't scope over the default assoc
+decl (rather oddly I think), and (less oddly) neither does the second
+argument 'b' of the associated type 'F', or the kind variable 'k'.
+Instead, the default decl is treated more like a top-level type
+instance.
+
+However we store the default rhs (Proxy x -> y) in F's TyCon, using
+F's own type variables, so we need to convert it to (Proxy a -> b).
+We do this by calling tcMatchTys to match them up.  This also ensures
+that x's kind matches a's and similarly for y and b.  The error
+message isnt' great, mind you.  (Trac #11361 was caused by not doing a
+proper tcMatchTys here.)  -}
 
 -------------------------
 kcTyFamInstEqn :: FamTyConShape -> LTyFamInstEqn Name -> TcM ()
@@ -2543,6 +2565,11 @@ wrongNumberOfParmsErr :: Arity -> SDoc
 wrongNumberOfParmsErr max_args
   = ptext (sLit "Number of parameters must match family declaration; expected")
     <+> ppr max_args
+
+defaultAssocKindErr :: TyCon -> SDoc
+defaultAssocKindErr fam_tc
+  = ptext (sLit "Kind mis-match on LHS of default declaration for")
+    <+> quotes (ppr fam_tc)
 
 wrongTyFamName :: Name -> Name -> SDoc
 wrongTyFamName fam_tc_name eqn_tc_name
