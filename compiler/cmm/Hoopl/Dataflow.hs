@@ -236,15 +236,11 @@ analyzeFwd
    -> FactBase f
 analyzeFwd FwdPass { fp_lattice = lattice,
                      fp_transfer = FwdTransfer3 (ftr, mtr, ltr) }
-  entries g in_fact = graph g in_fact
+  (JustC entries) (GMany NothingO blockmap NothingO) in_fact
+  = body entries in_fact
   where
-    graph :: Graph n C C -> Fact C f -> FactBase f
-    graph (GMany entry blockmap NothingO)
-      = case (entries, entry) of
-         (JustC entries, NothingO) -> body entries
-     where
-       body  :: [Label] -> FactBase f -> FactBase f
-       body entries f
+    body  :: [Label] -> FactBase f -> FactBase f
+    body entries f
          = fixpointAnal Fwd (fact_join lattice) do_block entries blockmap f
          where
            do_block :: forall x . Block n C x -> FactBase f -> Fact x f
