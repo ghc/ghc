@@ -1235,10 +1235,7 @@ static void* lookupSymbol_ (char *lbl)
 #       endif
     } else {
         IF_DEBUG(linker, debugBelch("lookupSymbol: value of %s is %p\n", lbl, val));
-        if (lookupStrHashTable(reqSymHash, lbl) != NULL) {
-            // Symbol has already been loaded and relocated. Just return the address.
-        }
-        else {
+        if (lookupStrHashTable(reqSymHash, lbl) == NULL) {
             int r;
             ObjectCode* oc;
             // Symbol can be found during linking, but hasn't been relocated. Do so now.
