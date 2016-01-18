@@ -264,9 +264,9 @@ improveClsFD clas_tvs fd
              length tys_inst == length clas_tvs
             , ppr tys_inst <+> ppr tys_actual )
 
-    case tcMatchTys qtv_set ltys1 ltys2 of
+    case tcMatchTys ltys1 ltys2 of
         Nothing  -> []
-        Just subst | isJust (tcMatchTysX qtv_set subst rtys1 rtys2)
+        Just subst | isJust (tcMatchTysX subst rtys1 rtys2)
                         -- Don't include any equations that already hold.
                         -- Reason: then we know if any actual improvement has happened,
                         --         in which case we need to iterate the solver
@@ -320,7 +320,6 @@ improveClsFD clas_tvs fd
                         --              whose kind mentions that kind variable!
                         --          Trac #6015, #6068
   where
-    qtv_set = mkVarSet qtvs
     (ltys1, rtys1) = instFD fd clas_tvs tys_inst
     (ltys2, rtys2) = instFD fd clas_tvs tys_actual
 
