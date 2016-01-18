@@ -47,6 +47,8 @@ data Setting = BuildArch
              | TargetPlatform
              | TargetPlatformFull
              | TargetVendor
+             | FfiIncludeDir
+             | FfiLibDir
 
 data SettingList = ConfCcArgs Stage
                  | ConfCppArgs Stage
@@ -88,6 +90,8 @@ setting key = askConfig $ case key of
     TargetPlatform     -> "target-platform"
     TargetPlatformFull -> "target-platform-full"
     TargetVendor       -> "target-vendor"
+    FfiIncludeDir      -> "ffi-include-dir"
+    FfiLibDir          -> "ffi-lib-dir"
 
 settingList :: SettingList -> Action [String]
 settingList key = fmap words $ askConfig $ case key of

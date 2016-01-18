@@ -71,43 +71,53 @@ libffiRules :: Rules ()
 libffiRules = do
     libffiDependencies &%> \_ -> do
         when trackBuildSystem $ need [sourcePath -/- "Rules/Libffi.hs"]
-        removeDirectory libffiBuild
-        createDirectory $ buildRootPath -/- stageString Stage0
+        ffi_header_dir <- setting FfiIncludeDir
+        use_system_ffi <- flag UseSystemFfi
+        if use_system_ffi
+        then do
+          putBuild "| System supplied FFI library will be used"
+          forM_ ["ffi.h", "ffitarget.h"] $ \file -> do
+              let src = ffi_header_dir  -/- file
+              copyFile src (rtsBuildPath -/- file)
+          putSuccess $ "| Successfully copied system supplied FFI library header files"
+        else do
+            removeDirectory libffiBuild
+            createDirectory $ buildRootPath -/- stageString Stage0
 
-        tarballs <- getDirectoryFiles "" ["libffi-tarballs/libffi*.tar.gz"]
-        when (length tarballs /= 1) $
-            putError $ "libffiRules: exactly one libffi tarball expected"
-                     ++ "(found: " ++ show tarballs ++ ")."
+            tarballs <- getDirectoryFiles "" ["libffi-tarballs/libffi*.tar.gz"]
+            when (length tarballs /= 1) $
+                 putError $ "libffiRules: exactly one libffi tarball expected"
+                              ++ "(found: " ++ show tarballs ++ ")."
 
-        need tarballs
-        let libname = dropExtension . dropExtension . takeFileName $ head tarballs
+            need tarballs
+            let libname = dropExtension . dropExtension . takeFileName $ head tarballs
 
-        removeDirectory (buildRootPath -/- libname)
-        actionFinally (do
-            build $ fullTarget libffiTarget Tar tarballs [buildRootPath]
-            moveDirectory (buildRootPath -/- libname) libffiBuild) $
-                removeFiles buildRootPath [libname <//> "*"]
+            removeDirectory (buildRootPath -/- libname)
+            actionFinally (do
+                            build $ fullTarget libffiTarget Tar tarballs [buildRootPath]
+                            moveDirectory (buildRootPath -/- libname) libffiBuild) $
+                            removeFiles buildRootPath [libname <//> "*"]
 
-        fixFile (libffiBuild -/- "Makefile.in") fixLibffiMakefile
+            fixFile (libffiBuild -/- "Makefile.in") fixLibffiMakefile
 
-        forM_ ["config.guess", "config.sub"] $ \file ->
-            copyFile file (libffiBuild -/- file)
+            forM_ ["config.guess", "config.sub"] $ \file ->
+              copyFile file (libffiBuild -/- file)
 
-        envs <- configureEnvironment
-        args <- configureArguments
-        runConfigure libffiBuild envs args
+            envs <- configureEnvironment
+            args <- configureArguments
+            runConfigure libffiBuild envs args
 
-        runMake libffiBuild ["MAKEFLAGS="]
-        runMake libffiBuild ["MAKEFLAGS=", "install"]
+            runMake libffiBuild ["MAKEFLAGS="]
+            runMake libffiBuild ["MAKEFLAGS=", "install"]
 
-        forM_ ["ffi.h", "ffitarget.h"] $ \file -> do
-            let src = libffiBuild -/- "inst/lib" -/- libname -/- "include" -/- file
-            copyFile src (rtsBuildPath -/- file)
+            forM_ ["ffi.h", "ffitarget.h"] $ \file -> do
+                                   let src = libffiBuild -/- "inst/lib" -/- libname -/- "include" -/- file
+                                   copyFile src (rtsBuildPath -/- file)
 
-        libffiName <- rtsLibffiLibraryName
-        copyFile libffiLibrary (rtsBuildPath -/- "lib" ++ libffiName <.> "a")
+            libffiName <- rtsLibffiLibraryName
+            copyFile libffiLibrary (rtsBuildPath -/- "lib" ++ libffiName <.> "a")
 
-        putSuccess $ "| Successfully built custom library 'libffi'"
+            putSuccess $ "| Successfully built custom library 'libffi'"
 
 -- chmod +x libffi/ln
 -- # wc on OS X has spaces in its output, which libffi's Makefile
