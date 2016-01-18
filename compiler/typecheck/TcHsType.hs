@@ -741,7 +741,8 @@ tcInferArgs fun fun_kind mb_kind_info args
        ; let (invis_bndrs, really_res_kind) = splitPiTysInvisible res_kind
        ; (subst, invis_args)
            <- tcInstBindersX emptyTCvSubst mb_kind_info invis_bndrs
-       ; return ( substTy subst really_res_kind, args' `chkAppend` invis_args
+       ; return ( substTy subst really_res_kind
+                , args' `chkAppend` invis_args
                 , leftovers, n ) }
 
 -- | See comments for 'tcInferArgs'. But this version does not instantiate
