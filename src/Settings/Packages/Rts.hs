@@ -51,6 +51,8 @@ rtsPackageArgs = package rts ? do
     path           <- getTargetPath
     top            <- getTopDirectory
     libffiName     <- lift $ rtsLibffiLibraryName
+    ffiIncludeDir  <- getSetting FfiIncludeDir
+    ffiLibraryDir  <- getSetting FfiLibDir
     mconcat
         [ builderGcc ? mconcat
           [ arg "-Irts"
@@ -92,8 +94,8 @@ rtsPackageArgs = package rts ? do
 
         , builder HsCpp ? mconcat
           [ arg ("-DTOP=" ++ quote top)
-          , arg "-DFFI_INCLUDE_DIR="
-          , arg "-DFFI_LIB_DIR="
+          , arg ("-DFFI_INCLUDE_DIR=" ++ quote ffiIncludeDir)
+          , arg ("-DFFI_LIB_DIR=" ++ quote ffiLibraryDir)
           , arg $ "-DFFI_LIB=" ++ quote libffiName ] ]
 
 
