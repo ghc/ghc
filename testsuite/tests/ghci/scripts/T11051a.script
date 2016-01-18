@@ -1,0 +1,3 @@
+-- Ensure that type representation bindings aren't visible to user
+:set +t
+data Hi
