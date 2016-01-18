@@ -590,7 +590,7 @@ A frontend plugin allows you to add new major modes to GHC.  You may prefer
 this over a traditional program which calls the GHC API, as GHC manages a lot
 of parsing flags and administrative nonsense which can be difficult to
 manage manually.  To load a frontend plugin exported by ``Foo.FrontendPlugin``,
-we just invoke GHC as follows:
+we just invoke GHC with the :ghc-flag:`--frontend` flag as follows:
 
 .. code-block:: none
 

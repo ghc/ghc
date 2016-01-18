@@ -32,8 +32,14 @@ modeOptions =
          }
   , flag { flagName = "-M"
          , flagDescription =
-           "denerate dependency information suitable for use in a "++
+           "generate dependency information suitable for use in a "++
            "``Makefile``; see :ref:`makefile-dependencies` for details."
+         , flagType = ModeFlag
+         }
+  , flag { flagName = "--frontend ⟨module⟩"
+         , flagDescription =
+           "run GHC with the given frontend plugin; see "++
+           ":ref:`frontend_plugins` for details."
          , flagType = ModeFlag
          }
   , flag { flagName = "--supported-extensions, --supported-languages"
