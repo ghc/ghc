@@ -313,12 +313,12 @@ generate directory distdir dll0Modules config_args
       -- generate inplace-pkg-config
       withLibLBI pd lbi $ \lib clbi ->
           do cwd <- getCurrentDirectory
-             let ipid = ComponentId (display (packageId pd))
+             let ipid = mkUnitId (display (packageId pd))
              let installedPkgInfo = inplaceInstalledPackageInfo cwd distdir
-                                        pd (Installed.AbiHash "") lib lbi clbi
+                                        pd (AbiHash "") lib lbi clbi
                  final_ipi = mangleIPI directory distdir lbi $ installedPkgInfo {
-                                 Installed.installedComponentId = ipid,
-                                 Installed.compatPackageKey = ipid,
+                                 Installed.installedUnitId = ipid,
+                                 Installed.compatPackageKey = display (packageId pd),
                                  Installed.haddockHTMLs = []
                              }
                  content = Installed.showInstalledPackageInfo final_ipi ++ "\n"
@@ -369,12 +369,12 @@ generate directory distdir dll0Modules config_args
           dep_ids  = map snd (externalPackageDeps lbi)
           deps     = map display dep_ids
           dep_direct = map (fromMaybe (error "ghc-cabal: dep_keys failed")
-                           . PackageIndex.lookupComponentId
+                           . PackageIndex.lookupUnitId
                                             (installedPkgs lbi)
                            . fst)
                        . externalPackageDeps
                        $ lbi
-          dep_ipids = map (display . Installed.installedComponentId) dep_direct
+          dep_ipids = map (display . Installed.installedUnitId) dep_direct
           depLibNames
             | packageKeySupported comp = dep_ipids
             | otherwise = deps
@@ -406,7 +406,7 @@ generate directory distdir dll0Modules config_args
           allMods = mods ++ otherMods
       let xs = [variablePrefix ++ "_VERSION = " ++ display (pkgVersion (package pd)),
                 -- TODO: move inside withLibLBI
-                variablePrefix ++ "_COMPONENT_ID = " ++ display (localCompatPackageKey lbi),
+                variablePrefix ++ "_COMPONENT_ID = " ++ localCompatPackageKey lbi,
                 variablePrefix ++ "_MODULES = " ++ unwords mods,
                 variablePrefix ++ "_HIDDEN_MODULES = " ++ unwords otherMods,
                 variablePrefix ++ "_SYNOPSIS =" ++ (unwords $ lines $ synopsis pd),

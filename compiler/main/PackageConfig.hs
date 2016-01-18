@@ -20,7 +20,6 @@ module PackageConfig (
         PackageName(..),
         Version(..),
         defaultPackageConfig,
-        componentIdString,
         sourcePackageIdString,
         packageNameString,
         pprPackageConfig,
@@ -41,7 +40,6 @@ import Unique
 -- which is similar to a subset of the InstalledPackageInfo type from Cabal.
 
 type PackageConfig = InstalledPackageInfo
-                       ComponentId
                        SourcePackageId
                        PackageName
                        Module.UnitId
@@ -88,13 +86,10 @@ instance Outputable PackageName where
 -- | Pretty-print an 'ExposedModule' in the same format used by the textual
 -- installed package database.
 pprExposedModule :: (Outputable a, Outputable b) => ExposedModule a b -> SDoc
-pprExposedModule (ExposedModule exposedName exposedReexport exposedSignature) =
+pprExposedModule (ExposedModule exposedName exposedReexport) =
     sep [ ppr exposedName
         , case exposedReexport of
             Just m -> sep [text "from", pprOriginalModule m]
-            Nothing -> empty
-        , case exposedSignature of
-            Just m -> sep [text "is", pprOriginalModule m]
             Nothing -> empty
         ]
 
@@ -106,11 +101,6 @@ pprOriginalModule (OriginalModule originalPackageId originalModuleName) =
 
 defaultPackageConfig :: PackageConfig
 defaultPackageConfig = emptyInstalledPackageInfo
-
-componentIdString :: PackageConfig -> String
-componentIdString pkg = unpackFS str
-  where
-    ComponentId str = componentId pkg
 
 sourcePackageIdString :: PackageConfig -> String
 sourcePackageIdString pkg = unpackFS str
@@ -127,7 +117,7 @@ pprPackageConfig InstalledPackageInfo {..} =
     vcat [
       field "name"                 (ppr packageName),
       field "version"              (text (showVersion packageVersion)),
-      field "id"                   (ppr componentId),
+      field "id"                   (ppr unitId),
       field "exposed"              (ppr exposed),
       field "exposed-modules"
         (if all isExposedModule exposedModules
@@ -152,7 +142,7 @@ pprPackageConfig InstalledPackageInfo {..} =
     ]
   where
     field name body = text name <> colon <+> nest 4 body
-    isExposedModule (ExposedModule _ Nothing Nothing) = True
+    isExposedModule (ExposedModule _ Nothing) = True
     isExposedModule _ = False
 
 
@@ -163,7 +153,7 @@ pprPackageConfig InstalledPackageInfo {..} =
 -- #package_naming#
 -- Mostly the compiler deals in terms of 'UnitId's, which are md5 hashes
 -- of a package ID, keys of its dependencies, and Cabal flags. You're expected
--- to pass in the unit id in the @-this-package-key@ flag. However, for
+-- to pass in the unit id in the @-this-unit-id@ flag. However, for
 -- wired-in packages like @base@ & @rts@, we don't necessarily know what the
 -- version is, so these are handled specially; see #wired_in_packages#.
 

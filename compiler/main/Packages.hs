@@ -602,15 +602,11 @@ matchingStr str p
         || str == packageNameString p
 
 matchingId :: String -> PackageConfig -> Bool
-matchingId str p =  str == componentIdString p
-
-matchingKey :: String -> PackageConfig -> Bool
-matchingKey str p = str == unitIdString (packageConfigId p)
+matchingId str p = str == unitIdString (packageConfigId p)
 
 matching :: PackageArg -> PackageConfig -> Bool
 matching (PackageArg str) = matchingStr str
-matching (PackageIdArg str) = matchingId str
-matching (UnitIdArg str) = matchingKey str
+matching (UnitIdArg str)  = matchingId str
 
 sortByVersion :: [PackageConfig] -> [PackageConfig]
 sortByVersion = sortBy (flip (comparing packageVersion))
@@ -1159,8 +1155,7 @@ mkModuleToPkgConfAll dflags pkg_db vis_map =
 
     es :: Bool -> [(ModuleName, Map Module ModuleOrigin)]
     es e = do
-     -- TODO: signature support
-     ExposedModule m exposedReexport _exposedSignature <- exposed_mods
+     ExposedModule m exposedReexport <- exposed_mods
      let (pk', m', pkg', origin') =
           case exposedReexport of
            Nothing -> (pk, m, pkg, fromExposedModules e)
