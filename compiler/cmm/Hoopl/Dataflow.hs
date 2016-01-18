@@ -200,8 +200,7 @@ arfGraph pass@FwdPass { fp_lattice = lattice,
             (Block n C x ->        f -> UniqSM (DG f n C x, Fact x f))
          -> (Block n C x -> Fact C f -> UniqSM (DG f n C x, Fact x f))
     arfx arf thing fb =
-      arf thing $ fromJust $ lookupFact (entryLabel thing) $ joinInFacts lattice fb
-     -- joinInFacts adds debugging information
+      arf thing $ fromJust $ lookupFact (entryLabel thing) fb
 
 
                     -- Outgoing factbase is restricted to Labels *not* in
@@ -210,20 +209,11 @@ arfGraph pass@FwdPass { fp_lattice = lattice,
     body entries blockmap init_fbase
       = fixpoint Fwd lattice do_block entries blockmap init_fbase
       where
-        lattice = fp_lattice pass
         do_block :: forall x . Block n C x -> FactBase f
                  -> UniqSM (DG f n C x, Fact x f)
         do_block b fb = block b entryFact
           where entryFact = getFact lattice (entryLabel b) fb
 
-
--- Join all the incoming facts with bottom.
--- We know the results _shouldn't change_, but the transfer
--- functions might, for example, generate some debugging traces.
-joinInFacts :: DataflowLattice f -> FactBase f -> FactBase f
-joinInFacts (lattice @ DataflowLattice {fact_bot = bot, fact_join = fj}) fb =
-  mkFactBase lattice $ map botJoin $ mapToList fb
-    where botJoin (l, f) = (l, snd $ fj l (OldFact bot) (NewFact f))
 
 forwardBlockList :: (NonLocal n)
                  => [Label] -> Body n -> [Block n C C]
@@ -255,7 +245,7 @@ analyzeFwd FwdPass { fp_lattice = lattice,
      where
        body  :: [Label] -> Fact C f -> Fact C f
        body entries f
-         = fixpointAnal Fwd lattice do_block entries blockmap f
+         = fixpointAnal Fwd (fact_join lattice) do_block entries blockmap f
          where
            do_block :: forall x . Block n C x -> FactBase f -> Fact x f
            do_block b fb = block b entryFact
@@ -297,7 +287,7 @@ analyzeFwdBlocks FwdPass { fp_lattice = lattice,
      where
        body  :: [Label] -> Fact C f -> Fact C f
        body entries f
-         = fixpointAnal Fwd lattice do_block entries blockmap f
+         = fixpointAnal Fwd (fact_join lattice) do_block entries blockmap f
          where
            do_block :: forall x . Block n C x -> FactBase f -> Fact x f
            do_block b fb = block b entryFact
@@ -339,7 +329,7 @@ analyzeBwd BwdPass { bp_lattice = lattice,
      where
        body  :: [Label] -> Fact C f -> Fact C f
        body entries f
-         = fixpointAnal Bwd lattice do_block entries blockmap f
+         = fixpointAnal Bwd (fact_join lattice) do_block entries blockmap f
          where
            do_block :: forall x . Block n C x -> Fact x f -> FactBase f
            do_block b fb = mapSingleton (entryLabel b) (block b fb)
@@ -461,10 +451,8 @@ arbGraph pass@BwdPass { bp_lattice  = lattice,
          -> (Block n C x -> Fact x f -> UniqSM (DG f n C x, Fact C f))
 
     arbx arb thing f = do { (rg, f) <- arb thing f
-                          ; let fb = joinInFacts (bp_lattice pass) $
-                                     mapSingleton (entryLabel thing) f
+                          ; let fb = mapSingleton (entryLabel thing) f
                           ; return (rg, fb) }
-     -- joinInFacts adds debugging information
 
                     -- Outgoing factbase is restricted to Labels *not* in
                     -- in the Body; the facts for Labels *in*
@@ -501,14 +489,13 @@ data Direction = Fwd | Bwd
 --
 fixpointAnal :: forall n f. NonLocal n
  => Direction
- -> DataflowLattice f
+ -> JoinFun f
  -> (Block n C C -> Fact C f -> Fact C f)
  -> [Label]
  -> LabelMap (Block n C C)
  -> Fact C f -> FactBase f
 
-fixpointAnal direction DataflowLattice{ fact_bot = _, fact_join = join }
-              do_block entries blockmap init_fbase
+fixpointAnal direction join do_block entries blockmap init_fbase
   = loop start init_fbase
   where
     blocks     = sortBlocks direction entries blockmap
