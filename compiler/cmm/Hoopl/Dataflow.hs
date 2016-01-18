@@ -231,21 +231,16 @@ forwardBlockList entries blks = postorder_dfs_from blks entries
 analyzeFwd
    :: forall n f .  NonLocal n =>
       FwdPass UniqSM n f
-   -> MaybeC C [Label]
+   -> Label
    -> Graph n C C -> FactBase f
    -> FactBase f
 analyzeFwd FwdPass { fp_lattice = lattice,
                      fp_transfer = FwdTransfer3 (ftr, mtr, ltr) }
-  (JustC entries) (GMany NothingO blockmap NothingO) in_fact
-  = body entries in_fact
+  entry (GMany NothingO blockmap NothingO) in_fact
+  = fixpointAnal Fwd (fact_join lattice) do_block [entry] blockmap in_fact
   where
-    body  :: [Label] -> FactBase f -> FactBase f
-    body entries f
-         = fixpointAnal Fwd (fact_join lattice) do_block entries blockmap f
-         where
-           do_block :: forall x . Block n C x -> FactBase f -> Fact x f
-           do_block b fb = block b entryFact
-             where entryFact = getFact (entryLabel b) fb
+    do_block :: forall x . Block n C x -> FactBase f -> Fact x f
+    do_block b fb = block b (getFact (entryLabel b) fb)
 
     -- NB. eta-expand block, GHC can't do this by itself.  See #5809.
     block :: forall e x . Block n e x -> f -> Fact x f
@@ -268,22 +263,17 @@ analyzeFwd FwdPass { fp_lattice = lattice,
 analyzeFwdBlocks
    :: forall n f.  NonLocal n =>
       FwdPass UniqSM n f
-   -> MaybeC C [Label]
+   -> Label
    -> Graph n C C -> Fact C f
    -> FactBase f
 analyzeFwdBlocks FwdPass { fp_lattice = lattice,
                            fp_transfer = FwdTransfer3 (ftr, _, ltr) }
-                 (JustC entries)
+                 entry
                  (GMany NothingO blockmap NothingO) in_fact
-  = body entries in_fact
+  = fixpointAnal Fwd (fact_join lattice) do_block [entry] blockmap in_fact
   where
-    body  :: [Label] -> Fact C f -> Fact C f
-    body entries f
-         = fixpointAnal Fwd (fact_join lattice) do_block entries blockmap f
-         where
-           do_block :: Block n C C -> FactBase f -> Fact C f
-           do_block b fb = block b entryFact
-             where entryFact = getFact (entryLabel b) fb
+    do_block :: Block n C C -> FactBase f -> Fact C f
+    do_block b fb = block b (getFact (entryLabel b) fb)
 
     -- NB. eta-expand block, GHC can't do this by itself.  See #5809.
     block :: forall e x . Block n e x -> f -> Fact x f
