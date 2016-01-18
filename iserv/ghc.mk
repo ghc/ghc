@@ -54,11 +54,31 @@ iserv_stage2_dyn_INSTALL_INPLACE = YES
 
 $(eval $(call build-prog,iserv,stage2,1))
 
+ifeq "$(CLEANING)" "YES"
+
+NEED_iserv_p = YES
+NEED_iserv_dyn = YES
+
+else
+
 ifneq "$(findstring p, $(GhcLibWays))" ""
-$(eval $(call build-prog,iserv,stage2_p,1))
+NEED_iserv_p = YES
+else
+NEED_iserv_p = NO
 endif
 
 ifneq "$(findstring dyn, $(GhcLibWays))" ""
+NEED_iserv_dyn = YES
+else
+NEED_iserv_dyn = NO
+endif
+endif
+
+ifeq "$(NEED_iserv_p)" "YES"
+$(eval $(call build-prog,iserv,stage2_p,1))
+endif
+
+ifeq "$(NEED_iserv_dyn)" "YES"
 $(eval $(call build-prog,iserv,stage2_dyn,1))
 endif
 
