@@ -1280,12 +1280,10 @@ checkConsistentFamInst (Just (clas, mini_env)) fam_tc at_tvs at_tys
        ; discardResult $ foldrM check_arg emptyTCvSubst $
                          tyConTyVars fam_tc `zip` at_tys }
   where
-    at_tv_set = mkVarSet at_tvs
-
     check_arg :: (TyVar, Type) -> TCvSubst -> TcM TCvSubst
     check_arg (fam_tc_tv, at_ty) subst
       | Just inst_ty <- lookupVarEnv mini_env fam_tc_tv
-      = case tcMatchTyX at_tv_set subst at_ty inst_ty of
+      = case tcMatchTyX subst at_ty inst_ty of
            Just subst | all_distinct subst -> return subst
            _ -> failWithTc $ wrongATArgErr at_ty inst_ty
                 -- No need to instantiate here, because the axiom

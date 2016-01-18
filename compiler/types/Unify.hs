@@ -92,44 +92,45 @@ requires dealing with coercions in this manner.
 
 -}
 
--- | @tcMatchTy tys t1 t2@ produces a substitution (over a subset of
--- the variables @tys@) @s@ such that @s(t1)@ equals @t2@.
--- The returned substitution might
--- bind coercion variables, if the variable is an argument to a GADT
--- constructor.
-tcMatchTy :: TyCoVarSet -> Type -> Type -> Maybe TCvSubst
-tcMatchTy tmpls ty1 ty2 = tcMatchTys tmpls [ty1] [ty2]
+-- | @tcMatchTy t1 t2@ produces a substitution (over fvs(t1))
+-- @s@ such that @s(t1)@ equals @t2@.
+-- The returned substitution might bind coercion variables,
+-- if the variable is an argument to a GADT constructor.
+--
+-- We don't pass in a set of "template variables" to be bound
+-- by the match, because tcMatchTy (and similar functions) are
+-- always used on top-level types, so we can bind any of the
+-- free variables of the LHS.
+tcMatchTy :: Type -> Type -> Maybe TCvSubst
+tcMatchTy ty1 ty2 = tcMatchTys [ty1] [ty2]
 
 -- | This is similar to 'tcMatchTy', but extends a substitution
-tcMatchTyX :: TyCoVarSet          -- ^ Template tyvars
-           -> TCvSubst            -- ^ Substitution to extend
+tcMatchTyX :: TCvSubst            -- ^ Substitution to extend
            -> Type                -- ^ Template
            -> Type                -- ^ Target
            -> Maybe TCvSubst
-tcMatchTyX tmpls subst ty1 ty2 = tcMatchTysX tmpls subst [ty1] [ty2]
+tcMatchTyX subst ty1 ty2 = tcMatchTysX subst [ty1] [ty2]
 
 -- | Like 'tcMatchTy' but over a list of types.
-tcMatchTys :: TyCoVarSet     -- ^ Template tyvars
-           -> [Type]         -- ^ Template
+tcMatchTys :: [Type]         -- ^ Template
            -> [Type]         -- ^ Target
            -> Maybe TCvSubst -- ^ One-shot; in principle the template
                              -- variables could be free in the target
-tcMatchTys tmpls tys1 tys2
-  = tcMatchTysX tmpls (mkEmptyTCvSubst in_scope) tys1 tys2
+tcMatchTys tys1 tys2
+  = tcMatchTysX (mkEmptyTCvSubst in_scope) tys1 tys2
   where
-    in_scope = mkInScopeSet (tmpls `unionVarSet` tyCoVarsOfTypes tys2)
-        -- We're assuming that all the interesting
-        -- tyvars in tys1 are in tmpls
+    in_scope = mkInScopeSet (tyCoVarsOfTypes tys1 `unionVarSet` tyCoVarsOfTypes tys2)
 
 -- | Like 'tcMatchTys', but extending a substitution
-tcMatchTysX :: TyCoVarSet     -- ^ Template tyvars
-            -> TCvSubst       -- ^ Substitution to extend
+tcMatchTysX :: TCvSubst       -- ^ Substitution to extend
             -> [Type]         -- ^ Template
             -> [Type]         -- ^ Target
             -> Maybe TCvSubst -- ^ One-shot substitution
-tcMatchTysX tmpls (TCvSubst in_scope tv_env cv_env) tys1 tys2
+tcMatchTysX (TCvSubst in_scope tv_env cv_env) tys1 tys2
 -- See Note [Kind coercions in Unify]
-  = case tc_unify_tys (matchBindFun tmpls) False False
+  = case tc_unify_tys (const BindMe)
+                      False  -- Matching, not unifying
+                      False  -- Not an injectivity check
                       (mkRnEnv2 in_scope) tv_env cv_env tys1 tys2 of
       Unifiable (tv_env', cv_env')
         -> Just $ TCvSubst in_scope tv_env' cv_env'

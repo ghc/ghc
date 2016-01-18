@@ -1959,8 +1959,7 @@ disambigGroup (default_ty:default_tys) group@(the_tv, wanteds)
       = return False
 
     the_ty   = mkTyVarTy the_tv
-    tmpl_tvs = tyCoVarsOfType the_ty
-    mb_subst = tcMatchTy tmpl_tvs the_ty default_ty
+    mb_subst = tcMatchTy the_ty default_ty
       -- Make sure the kinds match too; hence this call to tcMatchTy
       -- E.g. suppose the only constraint was (Typeable k (a::k))
       -- With the addition of polykinded defaulting we also want to reject

@@ -1891,7 +1891,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
                       ev_var_matches ty = case getClassPredTys_maybe ty of
                          Just (clas', tys')
                            | clas' == clas
-                           , Just _ <- tcMatchTys (tyCoVarsOfTypes tys) tys tys'
+                           , Just _ <- tcMatchTys tys tys'
                            -> True
                            | otherwise
                            -> any ev_var_matches (immSuperClasses clas' tys')

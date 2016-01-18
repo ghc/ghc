@@ -425,11 +425,9 @@ identicalFamInstHead (FamInst { fi_axiom = ax1 }) (FamInst { fi_axiom = ax2 })
     brs2 = coAxiomBranches ax2
 
     identical_branch br1 br2
-      =  isJust (tcMatchTys tvs1 lhs1 lhs2)
-      && isJust (tcMatchTys tvs2 lhs2 lhs1)
+      =  isJust (tcMatchTys lhs1 lhs2)
+      && isJust (tcMatchTys lhs2 lhs1)
       where
-        tvs1 = mkVarSet (coAxBranchTyVars br1)
-        tvs2 = mkVarSet (coAxBranchTyVars br2)
         lhs1 = coAxBranchLHS br1
         lhs2 = coAxBranchLHS br2
 
@@ -726,7 +724,7 @@ lookupFamInstEnv
 lookupFamInstEnv
    = lookup_fam_inst_env match
    where
-     match _ tpl_tvs tpl_tys tys = tcMatchTys tpl_tvs tpl_tys tys
+     match _ _ tpl_tys tys = tcMatchTys tpl_tys tys
 
 lookupFamInstEnvConflicts
     :: FamInstEnvs
@@ -1014,8 +1012,8 @@ isDominatedBy branch branches
   = or $ map match branches
     where
       lhs = coAxBranchLHS branch
-      match (CoAxBranch { cab_tvs = tvs, cab_lhs = tys })
-        = isJust $ tcMatchTys (mkVarSet tvs) tys lhs
+      match (CoAxBranch { cab_lhs = tys })
+        = isJust $ tcMatchTys tys lhs
 
 {-
 ************************************************************************
@@ -1105,7 +1103,7 @@ findBranch branches target_tys
                             map (tyCoVarsOfTypes . coAxBranchLHS) incomps)
             -- See Note [Flattening] below
             flattened_target = flattenTys in_scope target_tys
-        in case tcMatchTys (mkVarSet (tpl_tvs ++ tpl_cvs)) tpl_lhs target_tys of
+        in case tcMatchTys tpl_lhs target_tys of
         Just subst -- matching worked. now, check for apartness.
           |  apartnessCheck flattened_target branch
           -> -- matching worked & we're apart from all incompatible branches.
