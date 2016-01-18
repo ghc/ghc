@@ -66,56 +66,58 @@ data GHCiState = GHCiState
      {
         progname       :: String,
         args           :: [String],
-        evalWrapper    :: ForeignHValue, -- IO a -> IO a
+        evalWrapper    :: ForeignHValue, -- ^ of type @IO a -> IO a@
         prompt         :: String,
         prompt2        :: String,
         editor         :: String,
         stop           :: String,
         options        :: [GHCiOption],
-        line_number    :: !Int,         -- input line
+        line_number    :: !Int,         -- ^ input line
         break_ctr      :: !Int,
         breaks         :: ![(Int, BreakLocation)],
         tickarrays     :: ModuleEnv TickArray,
-                -- tickarrays caches the TickArray for loaded modules,
-                -- so that we don't rebuild it each time the user sets
-                -- a breakpoint.
-        -- available ghci commands
+            -- ^ 'tickarrays' caches the 'TickArray' for loaded modules,
+            -- so that we don't rebuild it each time the user sets
+            -- a breakpoint.
         ghci_commands  :: [Command],
-        -- ":" at the GHCi prompt repeats the last command, so we
-        -- remember it here:
+            -- ^ available ghci commands
+        ghci_macros    :: [Command],
+            -- ^ user-defined macros
         last_command   :: Maybe Command,
+            -- ^ @:@ at the GHCi prompt repeats the last command, so we
+            -- remember it here
         cmdqueue       :: [String],
 
         remembered_ctx :: [InteractiveImport],
-             -- the imports that the user has asked for, via import
-             -- declarations and :module commands.  This list is
-             -- persistent over :reloads (but any imports for modules
-             -- that are not loaded are temporarily ignored).  After a
-             -- :load, all the home-package imports are stripped from
-             -- this list.
-
-             -- See bugs #2049, #1873, #1360
+            -- ^ The imports that the user has asked for, via import
+            -- declarations and :module commands.  This list is
+            -- persistent over :reloads (but any imports for modules
+            -- that are not loaded are temporarily ignored).  After a
+            -- :load, all the home-package imports are stripped from
+            -- this list.
+            --
+            -- See bugs #2049, #1873, #1360
 
         transient_ctx  :: [InteractiveImport],
-             -- An import added automatically after a :load, usually of
-             -- the most recently compiled module.  May be empty if
-             -- there are no modules loaded.  This list is replaced by
-             -- :load, :reload, and :add.  In between it may be modified
-             -- by :module.
+            -- ^ An import added automatically after a :load, usually of
+            -- the most recently compiled module.  May be empty if
+            -- there are no modules loaded.  This list is replaced by
+            -- :load, :reload, and :add.  In between it may be modified
+            -- by :module.
 
-        ghc_e :: Bool, -- True if this is 'ghc -e' (or runghc)
+        ghc_e :: Bool, -- ^ True if this is 'ghc -e' (or runghc)
 
-        -- help text to display to a user
         short_help :: String,
+            -- ^ help text to display to a user
         long_help  :: String,
         lastErrorLocations :: IORef [(FastString, Int)],
 
         mod_infos  :: !(Map ModuleName ModInfo),
 
-        -- hFlush stdout; hFlush stderr in the interpreter
         flushStdHandles :: ForeignHValue,
-        -- hSetBuffering NoBuffering for stdin/stdout/stderr
+            -- ^ @hFlush stdout; hFlush stderr@ in the interpreter
         noBuffering :: ForeignHValue
+            -- ^ @hSetBuffering NoBuffering@ for stdin/stdout/stderr
      }
 
 type TickArray = Array Int [(GHC.BreakIndex,RealSrcSpan)]

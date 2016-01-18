@@ -147,8 +147,6 @@ ghciWelcomeMsg :: String
 ghciWelcomeMsg = "GHCi, version " ++ cProjectVersion ++
                  ": http://www.haskell.org/ghc/  :? for help"
 
-GLOBAL_VAR(macros_ref, [], [Command])
-
 ghciCommands :: [Command]
 ghciCommands = map mkCmd [
   -- Hugs users are accustomed to :e, so make sure it doesn't overlap
@@ -453,6 +451,7 @@ interactiveUI config srcs maybe_exprs = do
                    breaks             = [],
                    tickarrays         = emptyModuleEnv,
                    ghci_commands      = availableCommands config,
+                   ghci_macros        = [],
                    last_command       = Nothing,
                    cmdqueue           = [],
                    remembered_ctx     = [],
@@ -1097,7 +1096,7 @@ lookupCommand str = do
 lookupCommand' :: String -> GHCi (Maybe Command)
 lookupCommand' ":" = return Nothing
 lookupCommand' str' = do
-  macros    <- liftIO $ readIORef macros_ref
+  macros    <- ghci_macros <$> getGHCiState
   ghci_cmds <- ghci_commands <$> getGHCiState
 
   let ghci_cmds_nohide = filter (not . cmdHidden) ghci_cmds
@@ -1342,9 +1341,9 @@ defineMacro _ (':':_) =
   liftIO $ putStrLn "macro name cannot start with a colon"
 defineMacro overwrite s = do
   let (macro_name, definition) = break isSpace s
-  macros <- liftIO (readIORef macros_ref)
+  macros <- ghci_macros <$> getGHCiState
   let defined = map cmdName macros
-  if (null macro_name)
+  if null macro_name
         then if null defined
                 then liftIO $ putStrLn "no macros defined"
                 else liftIO $ putStr ("the following macros are defined:\n" ++
@@ -1354,8 +1353,6 @@ defineMacro overwrite s = do
         then throwGhcException (CmdLineError
                 ("macro '" ++ macro_name ++ "' is already defined"))
         else do
-
-  let filtered = [ cmd | cmd <- macros, cmdName cmd /= macro_name ]
 
   -- compile the expression
   handleSourceError GHC.printException $ do
@@ -1376,7 +1373,9 @@ defineMacro overwrite s = do
                          }
 
     -- later defined macros have precedence
-    liftIO $ writeIORef macros_ref (newCmd : filtered)
+    modifyGHCiState $ \s ->
+        let filtered = [ cmd | cmd <- macros, cmdName cmd /= macro_name ]
+        in s { ghci_macros = newCmd : filtered }
 
 runMacro :: GHC.ForeignHValue{-String -> IO String-} -> String -> GHCi Bool
 runMacro fun s = do
@@ -1392,12 +1391,15 @@ runMacro fun s = do
 undefineMacro :: String -> GHCi ()
 undefineMacro str = mapM_ undef (words str)
  where undef macro_name = do
-        cmds <- liftIO (readIORef macros_ref)
+        cmds <- ghci_macros <$> getGHCiState
         if (macro_name `notElem` map cmdName cmds)
            then throwGhcException (CmdLineError
                 ("macro '" ++ macro_name ++ "' is not defined"))
            else do
-            liftIO (writeIORef macros_ref (filter ((/= macro_name) . cmdName) cmds))
+            -- This is a tad racy but really, it's a shell
+            modifyGHCiState $ \s ->
+                s { ghci_macros = filter ((/= macro_name) . cmdName)
+                                         (ghci_macros s) }
 
 
 -----------------------------------------------------------------------------
@@ -2802,7 +2804,7 @@ ghciCompleteWord line@(left,_) = case firstWord of
             Nothing  -> return completeFilename
 
 completeGhciCommand = wrapCompleter " " $ \w -> do
-  macros <- liftIO $ readIORef macros_ref
+  macros <- ghci_macros <$> getGHCiState
   cmds   <- ghci_commands `fmap` getGHCiState
   let macro_names = map (':':) . map cmdName $ macros
   let command_names = map (':':) . map cmdName $ filter (not . cmdHidden) cmds
@@ -2812,7 +2814,7 @@ completeGhciCommand = wrapCompleter " " $ \w -> do
   return $ filter (w `isPrefixOf`) candidates
 
 completeMacro = wrapIdentCompleter $ \w -> do
-  cmds <- liftIO $ readIORef macros_ref
+  cmds <- ghci_macros <$> getGHCiState
   return (filter (w `isPrefixOf`) (map cmdName cmds))
 
 completeIdentifier line@(left, _) =
