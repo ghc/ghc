@@ -199,6 +199,7 @@ tcExpr e@(HsIPVar x) res_ty
               be a tau-type.) -}
          ip_ty <- newOpenFlexiTyVarTy
        ; let ip_name = mkStrLitTy (hsIPNameFS x)
+       ; ipClass <- tcLookupClass ipClassName
        ; ip_var <- emitWantedEvVar origin (mkClassPred ipClass [ip_name, ip_ty])
        ; tcWrapResult e (fromDict ipClass ip_name ip_ty (HsVar (noLoc ip_var)))
                       ip_ty res_ty }

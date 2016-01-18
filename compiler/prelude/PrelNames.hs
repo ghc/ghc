@@ -326,9 +326,14 @@ basicKnownKeyNames
         -- Overloaded labels
         isLabelClassName,
 
-        -- Source locations
-        callStackDataConName, callStackTyConName,
+        -- Implicit Parameters
+        ipClassName,
+
+        -- Call Stacks
+        callStackTyConName,
         emptyCallStackName, pushCallStackName,
+
+        -- Source Locations
         srcLocDataConName,
 
         -- Annotation type checking
@@ -1327,11 +1332,14 @@ isLabelClassName :: Name
 isLabelClassName
  = clsQual gHC_OVER_LABELS (fsLit "IsLabel") isLabelClassNameKey
 
+-- Implicit Parameters
+ipClassName :: Name
+ipClassName
+  = clsQual gHC_CLASSES (fsLit "IP") ipClassKey
+
 -- Source Locations
-callStackDataConName, callStackTyConName, emptyCallStackName, pushCallStackName,
+callStackTyConName, emptyCallStackName, pushCallStackName,
   srcLocDataConName :: Name
-callStackDataConName
-  = dcQual gHC_STACK_TYPES  (fsLit "CallStack") callStackDataConKey
 callStackTyConName
   = tcQual gHC_STACK_TYPES  (fsLit "CallStack") callStackTyConKey
 emptyCallStackName
@@ -1483,6 +1491,10 @@ isLabelClassNameKey = mkPreludeClassUnique 45
 semigroupClassKey, monoidClassKey :: Unique
 semigroupClassKey = mkPreludeClassUnique 46
 monoidClassKey    = mkPreludeClassUnique 47
+
+-- Implicit Parameters
+ipClassKey :: Unique
+ipClassKey = mkPreludeClassUnique 48
 
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES ClassUniques 200-299
@@ -1711,13 +1723,6 @@ callStackTyConKey = mkPreludeTyConUnique 182
 typeRepTyConKey :: Unique
 typeRepTyConKey = mkPreludeTyConUnique 183
 
--- Implicit Parameters
-ipTyConKey :: Unique
-ipTyConKey = mkPreludeTyConUnique 184
-
-ipCoNameKey :: Unique
-ipCoNameKey = mkPreludeTyConUnique 185
-
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES TyConUniques 200-299
 -----------------------------------------------------
@@ -1792,12 +1797,8 @@ staticPtrInfoDataConKey                 = mkPreludeDataConUnique 34
 fingerprintDataConKey :: Unique
 fingerprintDataConKey                   = mkPreludeDataConUnique 35
 
-callStackDataConKey, srcLocDataConKey :: Unique
-callStackDataConKey                     = mkPreludeDataConUnique 36
+srcLocDataConKey :: Unique
 srcLocDataConKey                        = mkPreludeDataConUnique 37
-
-ipDataConKey :: Unique
-ipDataConKey                            = mkPreludeDataConUnique 38
 
 -- Levity
 liftedDataConKey, unliftedDataConKey :: Unique

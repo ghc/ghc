@@ -1626,7 +1626,7 @@ mkPrintUnqualified dflags env = QueryQualify qual_name
         forceUnqualNames :: [Name]
         forceUnqualNames =
           map tyConName [ constraintKindTyCon, heqTyCon, coercibleTyCon
-                        , starKindTyCon, unicodeStarKindTyCon, ipTyCon ]
+                        , starKindTyCon, unicodeStarKindTyCon ]
           ++ [ eqTyConName ]
 
         right_name gre = nameModule_maybe (gre_name gre) == Just mod

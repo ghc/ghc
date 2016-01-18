@@ -2367,7 +2367,7 @@ pprTyTcApp :: TyPrec -> TyCon -> [Type] -> SDoc
 -- Used for types only; so that we can make a
 -- special case for type-level lists
 pprTyTcApp p tc tys
-  | tc `hasKey` ipTyConKey
+  | tc `hasKey` ipClassKey
   , [LitTy (StrTyLit n),ty] <- tys
   = maybeParen p FunPrec $
     char '?' <> ftext n <> ptext (sLit "::") <> ppr_type TopPrec ty

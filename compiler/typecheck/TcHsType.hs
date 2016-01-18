@@ -616,6 +616,7 @@ tc_hs_type mode (HsIParamTy n ty) exp_kind
   = do { MASSERT( isTypeLevel (mode_level mode) )
        ; ty' <- tc_lhs_type mode ty liftedTypeKind
        ; let n' = mkStrLitTy $ hsIPNameFS n
+       ; ipClass <- tcLookupClass ipClassName
        ; checkExpectedKind (mkClassPred ipClass [n',ty'])
            constraintKind exp_kind }
 

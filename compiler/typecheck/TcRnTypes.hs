@@ -130,7 +130,6 @@ import HsSyn
 import CoreSyn
 import HscTypes
 import TcEvidence
-import TysWiredIn ( callStackTyCon, ipClass )
 import Type
 import Class    ( Class )
 import TyCon    ( TyCon )
@@ -139,6 +138,8 @@ import ConLike  ( ConLike(..) )
 import DataCon  ( DataCon, dataConUserType, dataConOrigArgTys )
 import PatSyn   ( PatSyn, patSynType )
 import Id       ( idName )
+import PrelNames ( callStackTyConKey, ipClassKey )
+import Unique ( hasKey )
 import FieldLabel ( FieldLabel )
 import TcType
 import Annotations
@@ -1757,10 +1758,10 @@ isUserTypeErrorCt ct = case getUserTypeErrorMsg ct of
 -- If so, returns @Just "name"@.
 isCallStackCt :: Ct -> Maybe FastString
 isCallStackCt CDictCan { cc_class = cls, cc_tyargs = tys }
-  | cls == ipClass
+  | cls `hasKey` ipClassKey
   , [ip_name_ty, ty] <- tys
   , Just (tc, _) <- splitTyConApp_maybe ty
-  , tc == callStackTyCon
+  , tc `hasKey` callStackTyConKey
   = isStrLitTy ip_name_ty
 isCallStackCt _
   = Nothing
