@@ -128,8 +128,8 @@ gmp-include-dirs   = @GMP_INCLUDE_DIRS@
 gmp-lib-dirs       = @GMP_LIB_DIRS@
 
 use-system-ffi     = @UseSystemLibFFI@
-ffi-include-dirs   = @FFIIncludeDir@
-ffi-lib-dirs       = @FFILibDir@
+ffi-include-dir   = @FFIIncludeDir@
+ffi-lib-dir       = @FFILibDir@
 
 # Optional Dependencies:
 #=======================
