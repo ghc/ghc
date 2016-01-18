@@ -237,7 +237,7 @@ analyzeFwd
 analyzeFwd FwdPass { fp_lattice = lattice,
                      fp_transfer = FwdTransfer3 (ftr, mtr, ltr) }
   entry (GMany NothingO blockmap NothingO) in_fact
-  = fixpointAnal Fwd (fact_join lattice) do_block [entry] blockmap in_fact
+  = fixpointAnal Fwd (fact_join lattice) do_block entry blockmap in_fact
   where
     do_block :: forall x . Block n C x -> FactBase f -> Fact x f
     do_block b fb = block b (getFact (entryLabel b) fb)
@@ -270,7 +270,7 @@ analyzeFwdBlocks FwdPass { fp_lattice = lattice,
                            fp_transfer = FwdTransfer3 (ftr, _, ltr) }
                  entry
                  (GMany NothingO blockmap NothingO) in_fact
-  = fixpointAnal Fwd (fact_join lattice) do_block [entry] blockmap in_fact
+  = fixpointAnal Fwd (fact_join lattice) do_block entry blockmap in_fact
   where
     do_block :: Block n C C -> FactBase f -> Fact C f
     do_block b fb = block b (getFact (entryLabel b) fb)
@@ -303,7 +303,7 @@ analyzeBwd BwdPass { bp_lattice  = lattice,
                      bp_transfer = BwdTransfer3 (ftr, mtr, ltr) }
           entry
           (GMany NothingO blockmap NothingO) in_fact
-   = fixpointAnal Bwd (fact_join lattice) do_block [entry] blockmap in_fact
+   = fixpointAnal Bwd (fact_join lattice) do_block entry blockmap in_fact
    where
     do_block :: Block n C C -> FactBase f -> FactBase f
     do_block b fb = mapSingleton (entryLabel b) (block b fb)
@@ -465,14 +465,14 @@ fixpointAnal :: forall n f. NonLocal n
  => Direction
  -> JoinFun f
  -> (Block n C C -> Fact C f -> Fact C f)
- -> [Label]
+ -> Label
  -> LabelMap (Block n C C)
  -> Fact C f -> FactBase f
 
-fixpointAnal direction join do_block entries blockmap init_fbase
+fixpointAnal direction join do_block entry blockmap init_fbase
   = loop start init_fbase
   where
-    blocks     = sortBlocks direction entries blockmap
+    blocks     = sortBlocks direction [entry] blockmap
     n          = length blocks
     block_arr  = {-# SCC "block_arr" #-} listArray (0,n-1) blocks
     start      = {-# SCC "start" #-} [0..n-1]
