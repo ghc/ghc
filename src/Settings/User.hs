@@ -1,28 +1,18 @@
 module Settings.User (
-    buildRootPath, userTargetDirectory, userProgramPath, trackBuildSystem,
+    buildRootPath, trackBuildSystem, compileInterfaceFilesSeparately,
     userArgs, userPackages, userLibraryWays, userRtsWays, userKnownPackages,
     integerLibrary, buildHaddock, validating, ghciWithDebugger, ghcProfiled,
     ghcDebugged, dynamicGhcPrograms, laxDependencies, buildSystemConfigFile,
-    verboseCommands, turnWarningsIntoErrors, splitObjects,
-    compileInterfaceFilesSeparately
+    verboseCommands, turnWarningsIntoErrors, splitObjects
     ) where
 
 import GHC
 import Expression
 import Predicates
-import Settings.Default
 
 -- | All build artefacts are stored in 'buildRootPath' directory.
 buildRootPath :: FilePath
 buildRootPath = ".build"
-
--- | Control where build results go (see GHC.hs for defaults)
-userTargetDirectory :: Stage -> Package -> FilePath
-userTargetDirectory = defaultTargetDirectory
-
--- Control how built programs are called (see GHC.hs for defaults)
-userProgramPath :: Stage -> Package -> Maybe FilePath
-userProgramPath = defaultProgramPath
 
 -- Control user-specific settings
 userArgs :: Args
