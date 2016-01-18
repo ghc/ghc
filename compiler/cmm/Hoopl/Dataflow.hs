@@ -270,26 +270,22 @@ analyzeFwd FwdPass { fp_lattice = lattice,
 -- | if the graph being analyzed is open at the entry, there must
 --   be no other entry point, or all goes horribly wrong...
 analyzeFwdBlocks
-   :: forall n f e .  NonLocal n =>
+   :: forall n f.  NonLocal n =>
       FwdPass UniqSM n f
-   -> MaybeC e [Label]
-   -> Graph n e C -> Fact e f
+   -> MaybeC C [Label]
+   -> Graph n C C -> Fact C f
    -> FactBase f
 analyzeFwdBlocks FwdPass { fp_lattice = lattice,
                            fp_transfer = FwdTransfer3 (ftr, _, ltr) }
-  entries g in_fact = graph g in_fact
+                 (JustC entries)
+                 (GMany NothingO blockmap NothingO) in_fact
+  = body entries in_fact
   where
-    graph :: Graph n e C -> Fact e f -> FactBase f
-    graph (GMany entry blockmap NothingO)
-      = case (entries, entry) of
-         (NothingC, JustO entry)   -> block entry `cat` body (successors entry)
-         (JustC entries, NothingO) -> body entries
-     where
-       body  :: [Label] -> Fact C f -> Fact C f
-       body entries f
+    body  :: [Label] -> Fact C f -> Fact C f
+    body entries f
          = fixpointAnal Fwd (fact_join lattice) do_block entries blockmap f
          where
-           do_block :: forall x . Block n C x -> FactBase f -> Fact x f
+           do_block :: Block n C C -> FactBase f -> Fact C f
            do_block b fb = block b entryFact
              where entryFact = getFact (entryLabel b) fb
 
