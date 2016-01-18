@@ -5,62 +5,42 @@
 # Paths to builders:
 #===================
 
-system-ghc       = @WithGhc@
-ghc-stage1       = inplace/bin/ghc-stage1
-ghc-stage2       = inplace/bin/ghc-stage2
-ghc-stage3       = inplace/bin/ghc-stage3
-
-system-gcc       = @CC_STAGE0@
-gcc              = @WhatGccIsCalled@
-
-system-ghc-pkg   = @GhcPkgCmd@
-ghc-pkg          = inplace/bin/ghc-pkg
-
-ghc-cabal        = inplace/bin/ghc-cabal
-
-haddock          = inplace/bin/haddock
-
-hsc2hs           = inplace/bin/hsc2hs
-
-genprimopcode    = inplace/bin/genprimopcode
-genapply         = inplace/bin/genapply
-derive-constants = inplace/bin/deriveConstants
-
-hs-cpp           = @HaskellCPPCmd@
-hs-cpp-args      = @HaskellCPPArgs@
-
-unlit            = inplace/lib/bin/unlit
-
-alex             = @AlexCmd@
-ar               = @ArCmd@
-happy            = @HappyCmd@
-hscolour         = @HSCOLOUR@
-ld               = @LdCmd@
-make             = @MakeCmd@
-nm               = @NmCmd@
-objdump          = @ObjdumpCmd@
-ranlib           = @REAL_RANLIB_CMD@
-tar              = @TarCmd@
-patch            = @PatchCmd@
-perl             = @PerlCmd@
+alex           = @AlexCmd@
+ar             = @ArCmd@
+gcc            = @WhatGccIsCalled@
+happy          = @HappyCmd@
+hs-cpp         = @HaskellCPPCmd@
+hscolour       = @HSCOLOUR@
+ld             = @LdCmd@
+make           = @MakeCmd@
+nm             = @NmCmd@
+objdump        = @ObjdumpCmd@
+ranlib         = @REAL_RANLIB_CMD@
+system-gcc     = @CC_STAGE0@
+system-ghc     = @WithGhc@
+system-ghc-pkg = @GhcPkgCmd@
+tar            = @TarCmd@
+patch          = @PatchCmd@
+perl           = @PerlCmd@
 
 # Information about builders:
 #============================
 
+ar-supports-at-file = @ArSupportsAtFile@
+cc-clang-backend    = @CC_CLANG_BACKEND@
+cc-llvm-backend     = @CC_LLVM_BACKEND@
 gcc-is-clang        = @GccIsClang@
 gcc-lt-46           = @GccLT46@
-ar-supports-at-file = @ArSupportsAtFile@
-cc-llvm-backend     = @CC_LLVM_BACKEND@
-cc-clang-backend    = @CC_CLANG_BACKEND@
+hs-cpp-args         = @HaskellCPPArgs@
 
 # Build options:
 #===============
 
-solaris-broken-shld   = @SOLARIS_BROKEN_SHLD@
-split-objects-broken  = @SplitObjsBroken@
-ghc-unregisterised    = @Unregisterised@
-ghc-source-path       = @hardtop@
-leading-underscore    = @LeadingUnderscore@
+solaris-broken-shld  = @SOLARIS_BROKEN_SHLD@
+split-objects-broken = @SplitObjsBroken@
+ghc-unregisterised   = @Unregisterised@
+ghc-source-path      = @hardtop@
+leading-underscore   = @LeadingUnderscore@
 
 # Information about build, host and target systems:
 #==================================================
@@ -98,7 +78,6 @@ project-patch-level1  = @ProjectPatchLevel1@
 project-patch-level2  = @ProjectPatchLevel2@
 project-git-commit-id = @ProjectGitCommitId@
 
-
 # Compilation and linking flags:
 #===============================
 
@@ -126,7 +105,6 @@ iconv-lib-dirs     = @ICONV_LIB_DIRS@
 
 gmp-include-dirs   = @GMP_INCLUDE_DIRS@
 gmp-lib-dirs       = @GMP_LIB_DIRS@
-
 
 # Optional Dependencies:
 #=======================
