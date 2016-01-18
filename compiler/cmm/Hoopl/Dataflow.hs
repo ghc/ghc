@@ -312,26 +312,21 @@ analyzeFwdBlocks FwdPass { fp_lattice = lattice,
 -- | if the graph being analyzed is open at the entry, there must
 --   be no other entry point, or all goes horribly wrong...
 analyzeBwd
-   :: forall n f e .  NonLocal n =>
+   :: forall n f.  NonLocal n =>
       BwdPass UniqSM n f
-   -> MaybeC e [Label]
-   -> Graph n e C -> Fact C f
+   -> MaybeC C [Label]
+   -> Graph n C C -> FactBase f
    -> FactBase f
-analyzeBwd BwdPass { bp_lattice = lattice,
+analyzeBwd BwdPass { bp_lattice  = lattice,
                      bp_transfer = BwdTransfer3 (ftr, mtr, ltr) }
-   entries g in_fact = graph g in_fact
-  where
-    graph :: Graph n e C -> Fact C f -> FactBase f
-    graph (GMany entry blockmap NothingO)
-      = case (entries, entry) of
-         (NothingC, JustO entry)   -> body (successors entry)
-         (JustC entries, NothingO) -> body entries
-     where
-       body  :: [Label] -> Fact C f -> Fact C f
-       body entries f
+          (JustC entries)
+          (GMany NothingO blockmap NothingO) in_fact = body entries in_fact
+   where
+    body  :: [Label] -> FactBase f -> FactBase f
+    body entries f
          = fixpointAnal Bwd (fact_join lattice) do_block entries blockmap f
          where
-           do_block :: forall x . Block n C x -> Fact x f -> FactBase f
+           do_block :: Block n C C -> FactBase f -> FactBase f
            do_block b fb = mapSingleton (entryLabel b) (block b fb)
 
     -- NB. eta-expand block, GHC can't do this by itself.  See #5809.
@@ -360,8 +355,8 @@ analyzeBwd BwdPass { bp_lattice = lattice,
 analyzeAndRewriteBwd
    :: NonLocal n
    => BwdPass UniqSM n f
-   -> MaybeC e [Label] -> Graph n e x -> Fact x f
-   -> UniqSM (Graph n e x, FactBase f, MaybeO e f)
+   -> MaybeC C [Label] -> Graph n C x -> Fact x f
+   -> UniqSM (Graph n C x, FactBase f, MaybeO C f)
 analyzeAndRewriteBwd pass entries g f =
   do (rg, fout) <- arbGraph pass (fmap targetLabels entries) g f
      let (g', fb) = normalizeGraph rg
