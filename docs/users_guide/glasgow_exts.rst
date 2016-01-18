@@ -90,8 +90,6 @@ here.
 Unboxed types
 -------------
 
-Unboxed types (Glasgow extension)
-
 Most types in GHC are boxed, which means that values of that type are
 represented by a pointer to a heap object. The representation of a
 Haskell ``Int``, for example, is a two-word heap object. An unboxed
