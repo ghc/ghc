@@ -70,6 +70,7 @@ configureArguments = do
 libffiRules :: Rules ()
 libffiRules = do
     libffiDependencies &%> \_ -> do
+        when trackBuildSystem $ need [sourcePath -/- "Rules/Libffi.hs"]
         ffi_header_dir <- setting FfiIncludeDir
         use_system_ffi <- flag UseSystemFfi
         if use_system_ffi
@@ -80,7 +81,6 @@ libffiRules = do
               copyFile src (rtsBuildPath -/- file)
           putSuccess $ "| Successfully copied system supplied FFI library header files"
         else do
-            when trackBuildSystem $ need [sourcePath -/- "Rules/Libffi.hs"]
             removeDirectory libffiBuild
             createDirectory $ buildRootPath -/- stageString Stage0
 
