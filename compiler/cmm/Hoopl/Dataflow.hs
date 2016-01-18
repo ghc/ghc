@@ -296,20 +296,17 @@ analyzeFwdBlocks FwdPass { fp_lattice = lattice,
 analyzeBwd
    :: forall n f.  NonLocal n =>
       BwdPass UniqSM n f
-   -> MaybeC C [Label]
+   -> Label
    -> Graph n C C -> FactBase f
    -> FactBase f
 analyzeBwd BwdPass { bp_lattice  = lattice,
                      bp_transfer = BwdTransfer3 (ftr, mtr, ltr) }
-          (JustC entries)
-          (GMany NothingO blockmap NothingO) in_fact = body entries in_fact
+          entry
+          (GMany NothingO blockmap NothingO) in_fact
+   = fixpointAnal Bwd (fact_join lattice) do_block [entry] blockmap in_fact
    where
-    body  :: [Label] -> FactBase f -> FactBase f
-    body entries f
-         = fixpointAnal Bwd (fact_join lattice) do_block entries blockmap f
-         where
-           do_block :: Block n C C -> FactBase f -> FactBase f
-           do_block b fb = mapSingleton (entryLabel b) (block b fb)
+    do_block :: Block n C C -> FactBase f -> FactBase f
+    do_block b fb = mapSingleton (entryLabel b) (block b fb)
 
     -- NB. eta-expand block, GHC can't do this by itself.  See #5809.
     block :: forall e x . Block n e x -> Fact x f -> f
