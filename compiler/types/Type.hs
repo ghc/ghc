@@ -1560,11 +1560,11 @@ isIPPred ty = case tyConAppTyCon_maybe ty of
     _       -> False
 
 isIPTyCon :: TyCon -> Bool
-isIPTyCon tc = tc `hasKey` ipTyConKey
+isIPTyCon tc = tc `hasKey` ipClassKey
+  -- Class and its corresponding TyCon have the same Unique
 
 isIPClass :: Class -> Bool
-isIPClass cls = cls `hasKey` ipTyConKey
-  -- Class and it corresponding TyCon have the same Unique
+isIPClass cls = cls `hasKey` ipClassKey
 
 isCTupleClass :: Class -> Bool
 isCTupleClass cls = isTupleTyCon (classTyCon cls)

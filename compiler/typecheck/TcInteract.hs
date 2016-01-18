@@ -24,8 +24,8 @@ import TcType
 import Name
 import PrelNames ( knownNatClassName, knownSymbolClassName,
                    typeableClassName, coercibleTyConKey,
-                   heqTyConKey )
-import TysWiredIn ( ipClass, typeNatKind, typeSymbolKind, heqDataCon,
+                   heqTyConKey, ipClassKey )
+import TysWiredIn ( typeNatKind, typeSymbolKind, heqDataCon,
                     coercibleDataCon )
 import TysPrim    ( eqPrimTyCon, eqReprPrimTyCon )
 import Id( idType )
@@ -716,7 +716,7 @@ interactDict inerts workItem@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs
          else
             continueWith workItem }
 
-  | cls == ipClass
+  | cls `hasKey` ipClassKey
   , isGiven ev_w
   = interactGivenIP inerts workItem
 

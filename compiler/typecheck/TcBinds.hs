@@ -38,7 +38,6 @@ import FamInst( tcGetFamInstEnvs )
 import TyCon
 import TcType
 import TysPrim
-import TysWiredIn
 import Id
 import Var
 import VarSet
@@ -58,7 +57,7 @@ import BasicTypes
 import Outputable
 import FastString
 import Type(mkStrLitTy, tidyOpenType)
-import PrelNames( mkUnboundName, gHC_PRIM )
+import PrelNames( mkUnboundName, gHC_PRIM, ipClassName )
 import TcValidity (checkValidType)
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -233,7 +232,8 @@ tcLocalBinds (HsValBinds (ValBindsOut binds sigs)) thing_inside
 tcLocalBinds (HsValBinds (ValBindsIn {})) _ = panic "tcLocalBinds"
 
 tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
-  = do  { (given_ips, ip_binds') <-
+  = do  { ipClass <- tcLookupClass ipClassName
+        ; (given_ips, ip_binds') <-
             mapAndUnzipM (wrapLocSndM (tc_ip_bind ipClass)) ip_binds
 
         -- If the binding binds ?x = E, we  must now
