@@ -39,6 +39,8 @@ import UniqSupply
 import Data.Maybe
 import Data.Array
 
+import Panic
+
 import Compiler.Hoopl hiding
    ( mkBRewrite3, mkFRewrite3, noFwdRewrite, noBwdRewrite
    , analyzeAndRewriteBwd, analyzeAndRewriteFwd
@@ -100,11 +102,11 @@ mkBRewrite3 f m l = BwdRewrite3 (lift f, lift m, lift l)
 -- | if the graph being analyzed is open at the entry, there must
 --   be no other entry point, or all goes horribly wrong...
 analyzeAndRewriteFwd
-   :: forall n f e x .  NonLocal n =>
+   :: forall n f x .  NonLocal n =>
       FwdPass UniqSM n f
-   -> MaybeC e [Label]
-   -> Graph n  e x -> Fact e f
-   -> UniqSM (Graph n e x, FactBase f, MaybeO x f)
+   -> MaybeC C [Label]
+   -> Graph n C x -> Fact C f
+   -> UniqSM (Graph n C x, FactBase f, MaybeO x f)
 analyzeAndRewriteFwd pass entries g f =
   do (rg, fout) <- arfGraph pass (fmap targetLabels entries) g f
      let (g', fb) = normalizeGraph rg
@@ -207,13 +209,12 @@ arfGraph pass@FwdPass { fp_lattice = lattice,
                     -- in the Body; the facts for Labels *in*
                     -- the Body are in the 'DG f n C C'
     body entries blockmap init_fbase
-      = fixpoint Fwd lattice do_block entries blockmap init_fbase
+      = fixpoint Fwd (fact_join lattice) do_block entries blockmap init_fbase
       where
         do_block :: forall x . Block n C x -> FactBase f
                  -> UniqSM (DG f n C x, Fact x f)
         do_block b fb = block b entryFact
-          where entryFact = getFact lattice (entryLabel b) fb
-
+          where entryFact = getFact (entryLabel b) fb
 
 forwardBlockList :: (NonLocal n)
                  => [Label] -> Body n -> [Block n C C]
@@ -228,28 +229,27 @@ forwardBlockList entries blks = postorder_dfs_from blks entries
 -- | if the graph being analyzed is open at the entry, there must
 --   be no other entry point, or all goes horribly wrong...
 analyzeFwd
-   :: forall n f e .  NonLocal n =>
+   :: forall n f .  NonLocal n =>
       FwdPass UniqSM n f
-   -> MaybeC e [Label]
-   -> Graph n e C -> Fact e f
+   -> MaybeC C [Label]
+   -> Graph n C C -> FactBase f
    -> FactBase f
 analyzeFwd FwdPass { fp_lattice = lattice,
                      fp_transfer = FwdTransfer3 (ftr, mtr, ltr) }
   entries g in_fact = graph g in_fact
   where
-    graph :: Graph n e C -> Fact e f -> FactBase f
+    graph :: Graph n C C -> Fact C f -> FactBase f
     graph (GMany entry blockmap NothingO)
       = case (entries, entry) of
-         (NothingC, JustO entry)   -> block entry `cat` body (successors entry)
          (JustC entries, NothingO) -> body entries
      where
-       body  :: [Label] -> Fact C f -> Fact C f
+       body  :: [Label] -> FactBase f -> FactBase f
        body entries f
          = fixpointAnal Fwd (fact_join lattice) do_block entries blockmap f
          where
            do_block :: forall x . Block n C x -> FactBase f -> Fact x f
            do_block b fb = block b entryFact
-             where entryFact = getFact lattice (entryLabel b) fb
+             where entryFact = getFact (entryLabel b) fb
 
     -- NB. eta-expand block, GHC can't do this by itself.  See #5809.
     block :: forall e x . Block n e x -> f -> Fact x f
@@ -291,7 +291,7 @@ analyzeFwdBlocks FwdPass { fp_lattice = lattice,
          where
            do_block :: forall x . Block n C x -> FactBase f -> Fact x f
            do_block b fb = block b entryFact
-             where entryFact = getFact lattice (entryLabel b) fb
+             where entryFact = getFact (entryLabel b) fb
 
     -- NB. eta-expand block, GHC can't do this by itself.  See #5809.
     block :: forall e x . Block n e x -> f -> Fact x f
@@ -458,7 +458,7 @@ arbGraph pass@BwdPass { bp_lattice  = lattice,
                     -- in the Body; the facts for Labels *in*
                     -- the Body are in the 'DG f n C C'
     body entries blockmap init_fbase
-      = fixpoint Bwd (bp_lattice pass) do_block entries blockmap init_fbase
+      = fixpoint Bwd (fact_join lattice) do_block entries blockmap init_fbase
       where
         do_block :: forall x. Block n C x -> Fact x f -> UniqSM (DG f n C x, LabelMap f)
         do_block b f = do (g, f) <- block b f
@@ -532,14 +532,13 @@ fixpointAnal direction join do_block entries blockmap init_fbase
 --
 fixpoint :: forall n f. NonLocal n
  => Direction
- -> DataflowLattice f
+ -> JoinFun f
  -> (Block n C C -> Fact C f -> UniqSM (DG f n C C, Fact C f))
  -> [Label]
  -> LabelMap (Block n C C)
  -> (Fact C f -> UniqSM (DG f n C C, Fact C f))
 
-fixpoint direction DataflowLattice{ fact_bot = _, fact_join = join }
-         do_block entries blockmap init_fbase
+fixpoint direction join do_block entries blockmap init_fbase
   = do
         -- trace ("fixpoint: " ++ show (case direction of Fwd -> True; Bwd -> False) ++ " " ++ show (mapKeys blockmap) ++ show entries ++ " " ++ show (mapKeys init_fbase)) $ return()
         (fbase, newblocks) <- loop start init_fbase mapEmpty
@@ -783,8 +782,10 @@ class ShapeLifter e x where
 
 instance ShapeLifter C O where
   singletonDG f n = gUnitCO (DBlock f (BlockCO n BNil))
-  fwdEntryFact     n f  = mapSingleton (entryLabel n) f
-  bwdEntryFact lat n fb = getFact lat (entryLabel n) fb
+  fwdEntryFact     b f  = mapSingleton (entryLabel b) f
+  bwdEntryFact lat b fb = case lookupFact (entryLabel b) fb of
+                              Just f  -> f
+                              Nothing -> fact_bot lat
   ftransfer (FwdTransfer3 (ft, _, _)) n f = ft n f
   btransfer (BwdTransfer3 (bt, _, _)) n f = bt n f
   frewrite  (FwdRewrite3  (fr, _, _)) n f = fr n f
@@ -826,10 +827,10 @@ instance ShapeLifter O C where
 -}
 
 -- Fact lookup: the fact `orelse` bottom
-getFact  :: DataflowLattice f -> Label -> FactBase f -> f
-getFact lat l fb = case lookupFact l fb of Just  f -> f
-                                           Nothing -> fact_bot lat
-
+getFact  :: Label -> FactBase f -> f
+getFact l fb = case lookupFact l fb of
+                 Just  f -> f
+                 Nothing -> panic "getFact"
 
 
 {-  Note [Respects fuel]
