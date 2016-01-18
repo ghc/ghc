@@ -1138,8 +1138,7 @@ isNoLink _      = False
 -- is used.
 data PackageArg =
       PackageArg String    -- ^ @-package@, by 'PackageName'
-    | PackageIdArg String  -- ^ @-package-id@, by 'SourcePackageId'
-    | UnitIdArg String -- ^ @-package-key@, by 'ComponentId'
+    | UnitIdArg String     -- ^ @-package-id@, by 'UnitId'
   deriving (Eq, Show)
 
 -- | Represents the renaming that may be associated with an exposed
@@ -1172,7 +1171,6 @@ data TrustFlag
 -- | Flags for manipulating packages visibility.
 data PackageFlag
   = ExposePackage   String PackageArg ModRenaming -- ^ @-package@, @-package-id@
-                                           -- and @-package-key@
   | HidePackage     String -- ^ @-hide-package@
   deriving (Eq)
 -- NB: equality instance is used by InteractiveUI to test if
@@ -2779,15 +2777,21 @@ package_flags = [
       (NoArg $ do removeUserPkgConf
                   deprecate "Use -no-user-package-db instead")
 
-  , defGhcFlag "package-name"      (HasArg $ \name -> do
+  , defGhcFlag "package-name"       (HasArg $ \name -> do
+                                      upd (setUnitId name))
+                                      -- TODO: Since we JUST deprecated
+                                      -- -this-package-key, let's keep this
+                                      -- undeprecated for another cycle.
+                                      -- Deprecate this eventually.
+                                      -- deprecate "Use -this-unit-id instead")
+  , defGhcFlag "this-package-key"   (HasArg $ \name -> do
                                       upd (setUnitId name)
-                                      deprecate "Use -this-package-key instead")
-  , defGhcFlag "this-package-key"   (hasArg setUnitId)
-  , defFlag "package-id"            (HasArg exposePackageId)
+                                      deprecate "Use -this-unit-id instead")
+  , defGhcFlag "this-unit-id"       (hasArg setUnitId)
   , defFlag "package"               (HasArg exposePackage)
   , defFlag "plugin-package-id"     (HasArg exposePluginPackageId)
   , defFlag "plugin-package"        (HasArg exposePluginPackage)
-  , defFlag "package-key"           (HasArg exposeUnitId)
+  , defFlag "package-id"            (HasArg exposePackageId)
   , defFlag "hide-package"          (HasArg hidePackage)
   , defFlag "hide-all-packages"     (NoArg (setGeneralFlag Opt_HideAllPackages))
   , defFlag "hide-all-plugin-packages" (NoArg (setGeneralFlag Opt_HideAllPluginPackages))
@@ -3865,23 +3869,20 @@ parsePackageFlag flag constr str
              return (orig, orig))
         tok m = m >>= \x -> skipSpaces >> return x
 
-exposePackage, exposePackageId, exposeUnitId, hidePackage,
+exposePackage, exposePackageId, hidePackage,
         exposePluginPackage, exposePluginPackageId,
         ignorePackage,
         trustPackage, distrustPackage :: String -> DynP ()
 exposePackage p = upd (exposePackage' p)
 exposePackageId p =
   upd (\s -> s{ packageFlags =
-    parsePackageFlag "-package-id" PackageIdArg p : packageFlags s })
+    parsePackageFlag "-package-id" UnitIdArg p : packageFlags s })
 exposePluginPackage p =
   upd (\s -> s{ pluginPackageFlags =
     parsePackageFlag "-plugin-package" PackageArg p : pluginPackageFlags s })
 exposePluginPackageId p =
   upd (\s -> s{ pluginPackageFlags =
-    parsePackageFlag "-plugin-package-id" PackageIdArg p : pluginPackageFlags s })
-exposeUnitId p =
-  upd (\s -> s{ packageFlags =
-    parsePackageFlag "-package-key" UnitIdArg p : packageFlags s })
+    parsePackageFlag "-plugin-package-id" UnitIdArg p : pluginPackageFlags s })
 hidePackage p =
   upd (\s -> s{ packageFlags = HidePackage p : packageFlags s })
 ignorePackage p =
@@ -4290,18 +4291,34 @@ compilerInfo dflags
        ("Tables next to code",         cGhcEnableTablesNextToCode),
        ("RTS ways",                    cGhcRTSWays),
        ("RTS expects libdw",           showBool cGhcRtsWithLibdw),
+       -- Whether or not we support @-dynamic-too@
        ("Support dynamic-too",         showBool $ not isWindows),
+       -- Whether or not we support the @-j@ flag with @--make@.
        ("Support parallel --make",     "YES"),
+       -- Whether or not we support "Foo from foo-0.1-XXX:Foo" syntax in
+       -- installed package info.
        ("Support reexported-modules",  "YES"),
+       -- Whether or not we support extended @-package foo (Foo)@ syntax.
        ("Support thinning and renaming package flags", "YES"),
+       -- If true, we require that the 'id' field in installed package info
+       -- match what is passed to the @-this-unit-id@ flag for modules
+       -- built in it
        ("Requires unified installed package IDs", "YES"),
+       -- Whether or not we support the @-this-package-key@ flag.  Prefer
+       -- "Uses unit IDs" over it.
        ("Uses package keys",           "YES"),
+       -- Whether or not we support the @-this-unit-id@ flag
+       ("Uses unit IDs",               "YES"),
+       -- Whether or not GHC compiles libraries as dynamic by default
        ("Dynamic by default",          showBool $ dYNAMIC_BY_DEFAULT dflags),
+       -- Whether or not GHC was compiled using -dynamic
        ("GHC Dynamic",                 showBool dynamicGhc),
+       -- Whether or not GHC was compiled using -prof
        ("GHC Profiled",                showBool rtsIsProfiled),
        ("Leading underscore",          cLeadingUnderscore),
        ("Debug on",                    show debugIsOn),
        ("LibDir",                      topDir dflags),
+       -- The path of the global package database used by GHC
        ("Global Package DB",           systemPackageConfig dflags)
       ]
   where

@@ -96,19 +96,19 @@ define distdir-way-opts # args: $1 = dir, $2 = distdir, $3 = way, $4 = stage
 # $1_$2_$3_MOST_HC_OPTS is also passed to C compilations when we use
 # GHC as the C compiler.
 
-ifeq "$(SUPPORTS_COMPONENT_ID)" "NO"
+ifeq "$(SUPPORTS_THIS_UNIT_ID)" "NO"
 ifeq "$4" "0"
-$4_USE_COMPONENT_ID=NO
+$4_USE_THIS_UNIT_ID=NO
 endif
 endif
 
 $1_$2_$4_DEP_OPTS = \
  $$(foreach pkg,$$($1_$2_DEP_IPIDS),-package-id $$(pkg))
 
-ifeq "$($4_USE_COMPONENT_ID)" "NO"
-$4_THIS_COMPONENT_ID = -package-name
+ifeq "$($4_USE_THIS_UNIT_ID)" "NO"
+$4_THIS_UNIT_ID = -this-package-key
 else
-$4_THIS_COMPONENT_ID = -this-package-key
+$4_THIS_UNIT_ID = -this-unit-id
 endif
 
 $1_$2_$3_MOST_HC_OPTS = \
@@ -119,7 +119,7 @@ $1_$2_$3_MOST_HC_OPTS = \
  $$($1_HC_OPTS) \
  $$($1_$2_HC_PKGCONF) \
  $$(if $$($1_$2_PROG),, \
-        $$(if $$($1_PACKAGE),$$($4_THIS_COMPONENT_ID) $$($1_$2_COMPONENT_ID))) \
+        $$(if $$($1_PACKAGE),$$($4_THIS_UNIT_ID) $$($1_$2_COMPONENT_ID))) \
  $$(if $$($1_PACKAGE),-hide-all-packages) \
  -i $$(if $$($1_$2_HS_SRC_DIRS),$$(foreach dir,$$($1_$2_HS_SRC_DIRS),-i$1/$$(dir)),-i$1) \
  -i$1/$2/build -i$1/$2/build/autogen \

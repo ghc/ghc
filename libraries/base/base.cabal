@@ -362,4 +362,4 @@ Library
 
     -- We need to set the unit id to base (without a version number)
     -- as it's magic.
-    ghc-options: -this-package-key base
+    ghc-options: -this-unit-id base

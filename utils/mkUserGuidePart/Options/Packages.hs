@@ -4,8 +4,8 @@ import Types
 
 packagesOptions :: [Flag]
 packagesOptions =
-  [ flag { flagName = "-this-package-key⟨P⟩"
-         , flagDescription = "Compile to be part of package ⟨P⟩"
+  [ flag { flagName = "-this-unit-id⟨P⟩"
+         , flagDescription = "Compile to be part of unit (i.e. package) ⟨P⟩"
          , flagType = DynamicFlag
          }
   , flag { flagName = "-package⟨P⟩"

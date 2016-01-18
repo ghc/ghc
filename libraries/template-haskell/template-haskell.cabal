@@ -55,7 +55,10 @@ Library
     -- version number) as it's magic.
     ghc-options: -Wall
 
-    if impl( ghc >= 7.9 )
-        ghc-options:  -this-package-key template-haskell
+    if impl( ghc >= 7.11 )
+        ghc-options:  -this-unit-id template-haskell
     else
-        ghc-options:  -package-name template-haskell
+        if impl( ghc >= 7.9 )
+            ghc-options:  -this-package-key template-haskell
+        else
+            ghc-options:  -package-name template-haskell

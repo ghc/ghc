@@ -68,4 +68,4 @@ Library
 
     -- We need to set the unit ID to ghc-prim (without a version number)
     -- as it's magic.
-    ghc-options: -this-package-key ghc-prim
+    ghc-options: -this-unit-id ghc-prim

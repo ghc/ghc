@@ -274,6 +274,14 @@ Compiler
    expressivity may come with a high price in terms of compilation time and
    memory consumption, it is turned off by default.
 
+-  :ghc-flag:`-this-package-key` has been renamed again (hopefully for the last time!)
+   to :ghc-flag:`-this-unit-id`.  The renaming was motivated by the fact that
+   the identifier you pass to GHC here doesn't have much to do with packages:
+   you may provide different unit IDs for libraries which are in the same
+   package.  :ghc-flag:`-this-package-key` is deprecated; you should use
+   :ghc-flag:`-this-unit-id` or, if you need compatibility over multiple
+   versions of GHC, :ghc-flag:`-package-name`.
+
 GHCi
 ~~~~
 

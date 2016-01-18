@@ -161,10 +161,12 @@ The GHC command line options that control packages are:
 
         $ ghc -o myprog Foo.hs Main.hs -package network
 
-.. ghc-flag:: -package-id ⟨pkg-id⟩
+.. ghc-flag:: -package-id ⟨unit-id⟩
 
     Exposes a package like :ghc-flag:`-package`, but the package is named by its
-    installed package ID rather than by name. This is a more robust way
+    unit ID (i.e. the value of ``id`` in its entry in the installed
+    package database, also previously known as an installed package ID)
+    rather than by name. This is a more robust way
     to name packages, and can be used to select packages that would
     otherwise be shadowed. Cabal passes ``-package-id`` flags to GHC.
     ``-package-id`` supports thinning and renaming described in
@@ -208,11 +210,14 @@ The GHC command line options that control packages are:
     By default, GHC will automatically link in the ``base`` and ``rts``
     packages. This flag disables that behaviour.
 
-.. ghc-flag:: -this-package-key ⟨pkg-key⟩
+.. ghc-flag:: -this-unit-id ⟨unit-id⟩
 
     Tells GHC the the module being compiled forms part of unit ID
-    ⟨pkg-key⟩; internally, these keys are used to determine type equality
-    and linker symbols.
+    ⟨unit-id⟩; internally, these keys are used to determine type equality
+    and linker symbols.  As of GHC 8.0, unit IDs must consist solely
+    of alphanumeric characters, dashes, underscores and periods.  GHC
+    reserves the right to interpret other characters in a special
+    way in later releases.
 
 .. ghc-flag:: -library-name ⟨hash⟩
 
@@ -255,7 +260,7 @@ The ``main`` package
 --------------------
 
 Every complete Haskell program must define ``main`` in module ``Main``
-in package ``main``. Omitting the :ghc-flag:`-this-package-key` flag compiles
+in package ``main``. Omitting the :ghc-flag:`-this-unit-id` flag compiles
 code for package ``main``. Failure to do so leads to a somewhat obscure
 link-time error of the form:
 

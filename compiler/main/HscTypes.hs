@@ -1230,7 +1230,7 @@ The details are a bit tricky though:
    extend the HPT.
 
  * The 'thisPackage' field of DynFlags is *not* set to 'interactive'.
-   It stays as 'main' (or whatever -this-package-key says), and is the
+   It stays as 'main' (or whatever -this-unit-id says), and is the
    package to which :load'ed modules are added to.
 
  * So how do we arrange that declarations at the command prompt get to
@@ -1239,7 +1239,7 @@ The details are a bit tricky though:
    call to initTc in initTcInteractive, which in turn get the module
    from it 'icInteractiveModule' field of the interactive context.
 
-   The 'thisPackage' field stays as 'main' (or whatever -this-package-key says.
+   The 'thisPackage' field stays as 'main' (or whatever -this-unit-id says.
 
  * The main trickiness is that the type environment (tcg_type_env) and
    fixity envt (tcg_fix_env), now contain entities from all the
