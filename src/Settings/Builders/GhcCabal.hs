@@ -79,10 +79,10 @@ configureArgs = do
         , conf "LDFLAGS"  ldFlags
         , conf "CPPFLAGS" cppFlags
         , appendSubD "--gcc-options" $ cFlags <> ldFlags
-        , conf "--with-iconv-includes"    $ argSettingList IconvIncludeDirs
-        , conf "--with-iconv-libraries"   $ argSettingList IconvLibDirs
-        , conf "--with-gmp-includes"      $ argSettingList GmpIncludeDirs
-        , conf "--with-gmp-libraries"     $ argSettingList GmpLibDirs
+        , conf "--with-iconv-includes"    $ argSetting IconvIncludeDir
+        , conf "--with-iconv-libraries"   $ argSetting IconvLibDir
+        , conf "--with-gmp-includes"      $ argSetting GmpIncludeDir
+        , conf "--with-gmp-libraries"     $ argSetting GmpLibDir
         , crossCompiling ? (conf "--host" $ argSetting TargetPlatformFull)
         , conf "--with-cc" $ argStagedBuilderPath Gcc ]
 
