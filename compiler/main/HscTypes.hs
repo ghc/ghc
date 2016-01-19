@@ -408,10 +408,6 @@ data HscEnv
 #endif
  }
 
-instance ContainsDynFlags HscEnv where
-    extractDynFlags env = hsc_dflags env
-    replaceDynFlags env dflags = env {hsc_dflags = dflags}
-
 #ifdef GHCI
 data IServ = IServ
   { iservPipe :: Pipe

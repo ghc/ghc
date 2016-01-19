@@ -278,6 +278,10 @@ discardResult a = a >> return ()
 getTopEnv :: TcRnIf gbl lcl HscEnv
 getTopEnv = do { env <- getEnv; return (env_top env) }
 
+updTopEnv :: (HscEnv -> HscEnv) -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+updTopEnv upd = updEnv (\ env@(Env { env_top = top }) ->
+                          env { env_top = upd top })
+
 getGblEnv :: TcRnIf gbl lcl gbl
 getGblEnv = do { env <- getEnv; return (env_gbl env) }
 
@@ -319,16 +323,16 @@ woptM :: WarningFlag -> TcRnIf gbl lcl Bool
 woptM flag = do { dflags <- getDynFlags; return (wopt flag dflags) }
 
 setXOptM :: LangExt.Extension -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
-setXOptM flag = updEnv (\ env@(Env { env_top = top }) ->
-                          env { env_top = top { hsc_dflags = xopt_set (hsc_dflags top) flag}} )
+setXOptM flag =
+  updTopEnv (\top -> top { hsc_dflags = xopt_set (hsc_dflags top) flag})
 
 unsetGOptM :: GeneralFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
-unsetGOptM flag = updEnv (\ env@(Env { env_top = top }) ->
-                            env { env_top = top { hsc_dflags = gopt_unset (hsc_dflags top) flag}} )
+unsetGOptM flag =
+  updTopEnv (\top -> top { hsc_dflags = gopt_unset (hsc_dflags top) flag})
 
 unsetWOptM :: WarningFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
-unsetWOptM flag = updEnv (\ env@(Env { env_top = top }) ->
-                            env { env_top = top { hsc_dflags = wopt_unset (hsc_dflags top) flag}} )
+unsetWOptM flag =
+  updTopEnv (\top -> top { hsc_dflags = wopt_unset (hsc_dflags top) flag})
 
 -- | Do it flag is true
 whenDOptM :: DumpFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
@@ -351,11 +355,9 @@ getGhcMode :: TcRnIf gbl lcl GhcMode
 getGhcMode = do { env <- getTopEnv; return (ghcMode (hsc_dflags env)) }
 
 withDoDynamicToo :: TcRnIf gbl lcl a -> TcRnIf gbl lcl a
-withDoDynamicToo m = do env <- getEnv
-                        let dflags = extractDynFlags env
-                            dflags' = dynamicTooMkDynamicDynFlags dflags
-                            env' = replaceDynFlags env dflags'
-                        setEnv env' m
+withDoDynamicToo =
+  updTopEnv (\top@(HscEnv { hsc_dflags = dflags }) ->
+              top { hsc_dflags = dynamicTooMkDynamicDynFlags dflags })
 
 getEpsVar :: TcRnIf gbl lcl (TcRef ExternalPackageState)
 getEpsVar = do { env <- getTopEnv; return (hsc_EPS env) }
