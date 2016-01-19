@@ -71,13 +71,13 @@ libffiRules :: Rules ()
 libffiRules = do
     libffiDependencies &%> \_ -> do
         when trackBuildSystem $ need [sourcePath -/- "Rules/Libffi.hs"]
-        ffi_header_dir <- setting FfiIncludeDir
-        use_system_ffi <- flag UseSystemFfi
-        if use_system_ffi
+        ffiHeaderDir <- setting FfiIncludeDir
+        useSystemFfi <- flag UseSystemFfi
+        if useSystemFfi
         then do
           putBuild "| System supplied FFI library will be used"
           forM_ ["ffi.h", "ffitarget.h"] $ \file -> do
-              let src = ffi_header_dir  -/- file
+              let src = ffiHeaderDir  -/- file
               copyFile src (rtsBuildPath -/- file)
           putSuccess $ "| Successfully copied system supplied FFI library header files"
         else do

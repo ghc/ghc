@@ -32,7 +32,7 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
     mconcat [ arg $ "--cc=" ++ ccPath
             , arg $ "--ld=" ++ ccPath
             , notM windowsHost ? arg "--cross-safe"
-            , append $ map ("-I"       ++) [gmpDir]
+            , append . map ("-I"       ++) $ words gmpDir
             , append $ map ("--cflag=" ++) cFlags
             , append $ map ("--lflag=" ++) lFlags
             , notStage0 ? crossCompiling ? arg "--cross-compile"

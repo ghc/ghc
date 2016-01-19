@@ -106,7 +106,7 @@ iconv-lib-dir     = @ICONV_LIB_DIRS@
 gmp-include-dir   = @GMP_INCLUDE_DIRS@
 gmp-lib-dir       = @GMP_LIB_DIRS@
 
-use-system-ffi     = @UseSystemLibFFI@
+use-system-ffi    = @UseSystemLibFFI@
 ffi-include-dir   = @FFIIncludeDir@
 ffi-lib-dir       = @FFILibDir@
 
