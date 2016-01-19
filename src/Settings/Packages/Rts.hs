@@ -23,11 +23,9 @@ rtsLibffiLibraryName = do
     use_system_ffi <- flag UseSystemFfi
     windows <- windowsHost
     case (use_system_ffi, windows) of
-      (True, False) -> return "ffi"
+      (True , False) -> return "ffi"
       (False, False) -> return "Cffi"
-      (_, True) -> return "Cffi-6"
-      (_, _) -> error "Unsupported FFI library configuration case"
-
+      (_    , True ) -> return "Cffi-6"
 
 rtsPackageArgs :: Args
 rtsPackageArgs = package rts ? do
