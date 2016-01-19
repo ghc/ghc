@@ -1,0 +1,2 @@
+:m + GHC.Prim
+:browse GHC.Prim
