@@ -1,7 +1,6 @@
 module Settings.Paths (
     targetDirectory, targetPath, pkgDataFile, pkgHaddockFile, pkgLibraryFile,
-    pkgGhciLibraryFile, packageConfiguration, packageConfigurationInitialised,
-    gmpBuildPath, gmpLibNameCache
+    pkgGhciLibraryFile, gmpBuildPath, gmpLibNameCache, packageDbDirectory
     ) where
 
 import Base
@@ -38,16 +37,6 @@ pkgGhciLibraryFile :: Stage -> Package -> String -> FilePath
 pkgGhciLibraryFile stage pkg componentId =
     targetPath stage pkg -/- "build" -/- "HS" ++ componentId <.> "o"
 
--- TODO: move to buildRootPath, see #113
-packageConfiguration :: Stage -> FilePath
-packageConfiguration Stage0 = buildRootPath -/- "stage0/bootstrapping.conf"
-packageConfiguration _      = "inplace/lib/package.conf.d"
-
--- StageN, N > 0, share the same packageConfiguration (see above)
-packageConfigurationInitialised :: Stage -> FilePath
-packageConfigurationInitialised stage = packageConfiguration stage -/-
-    "package-configuration-initialised-" ++ stageString (min stage Stage1)
-
 -- This is the build directory for in-tree GMP library
 gmpBuildPath :: FilePath
 gmpBuildPath = buildRootPath -/- "stage0/gmp"
@@ -55,3 +44,9 @@ gmpBuildPath = buildRootPath -/- "stage0/gmp"
 -- GMP library names extracted from integer-gmp.buildinfo
 gmpLibNameCache :: FilePath
 gmpLibNameCache = gmpBuildPath -/- "gmp-lib-names"
+
+-- TODO: move to buildRootPath, see #113
+-- StageN, N > 0, share the same packageDbDirectory
+packageDbDirectory :: Stage -> FilePath
+packageDbDirectory Stage0 = buildRootPath -/- "stage0/bootstrapping.conf"
+packageDbDirectory _      = "inplace/lib/package.conf.d"

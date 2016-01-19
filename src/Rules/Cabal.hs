@@ -42,20 +42,6 @@ cabalRules = do
                 return . unwords $ pkgNameString pkg : sort depNames
         writeFileChanged out . unlines $ pkgDeps
 
-    -- When the file exists, the packageConfiguration has been initialised
-    -- TODO: get rid of an extra file?
-
-    forM_ [Stage0, Stage1] $ \stage ->
-        packageConfigurationInitialised stage %> \out -> do
-            let target  = PartialTarget stage cabal
-                pkgConf = packageConfiguration stage
-            removeDirectoryIfExists pkgConf
-            -- TODO: can we get rid of this fake target?
-            build $ fullTarget target (GhcPkg stage) [] [pkgConf]
-            let message = "Successfully initialised " ++ pkgConf
-            writeFileChanged out message
-            putSuccess message
-
 collectDeps :: Maybe (CondTree v [Dependency] a) -> [Dependency]
 collectDeps Nothing = []
 collectDeps (Just (CondNode _ deps ifs)) = deps ++ concatMap f ifs

@@ -31,6 +31,7 @@ executable ghc-shake
                        , Oracles.LookupInPath
                        , Oracles.ModuleFiles
                        , Oracles.PackageData
+                       , Oracles.PackageDb
                        , Oracles.PackageDeps
                        , Oracles.WindowsRoot
                        , Package

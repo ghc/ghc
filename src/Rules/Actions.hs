@@ -1,8 +1,8 @@
 {-# LANGUAGE RecordWildCards #-}
 module Rules.Actions (
-    build, buildWithResources, copyFile, createDirectory, removeDirectory, moveDirectory,
-    fixFile, runConfigure, runMake, applyPatch, renderLibrary, renderProgram,
-    runBuilder, makeExecutable,
+    build, buildWithResources, copyFile, createDirectory, removeDirectory,
+    moveDirectory, fixFile, runConfigure, runMake, applyPatch, renderLibrary,
+    renderProgram, runBuilder, makeExecutable
     ) where
 
 import qualified System.Directory as IO

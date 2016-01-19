@@ -11,8 +11,8 @@ ghcPkgWrapper program = do
     stage <- getStage
     -- Use the package configuration for the next stage in the wrapper.
     -- The wrapper is generated in StageN, but used in StageN+1.
-    let pkgConf = top -/- packageConfiguration (succ stage)
+    let packageDb = top -/- packageDbDirectory (succ stage)
     return $ unlines
         [ "#!/bin/bash"
         , "exec " ++ (top -/- program)
-          ++ " --global-package-db " ++ pkgConf ++ " ${1+\"$@\"}" ]
+          ++ " --global-package-db " ++ packageDb ++ " ${1+\"$@\"}" ]

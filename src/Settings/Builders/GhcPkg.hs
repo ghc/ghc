@@ -11,7 +11,7 @@ ghcPkgBuilderArgs :: Args
 ghcPkgBuilderArgs = stagedBuilder GhcPkg ? (initArgs <> updateArgs)
 
 initPredicate :: Predicate
-initPredicate = orM $ map (file . packageConfiguration) [Stage0 ..]
+initPredicate = orM $ map (file . packageDbDirectory) [Stage0 ..]
 
 initArgs :: Args
 initArgs = initPredicate ? do
