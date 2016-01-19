@@ -348,32 +348,36 @@ setCloseOnExec fd = do
 
 #if !defined(mingw32_HOST_OS)
 type CFilePath = CString
+#define POSIX_FUNCTION(HEADER, NAME) #HEADER ## #NAME
 #else
 type CFilePath = CWString
+-- On Windows, POSIX functions follows ISO C++ standards, which 
+-- requires the _ prefix for functions.
+#define POSIX_FUNCTION(HEADER, NAME) #HEADER ## "_" ## #NAME
 #endif
 
-foreign import ccall unsafe "HsBase.h access"
+foreign import ccall unsafe POSIX_FUNCTION(HsBase.h, access)
    c_access :: CString -> CInt -> IO CInt
 
-foreign import ccall unsafe "HsBase.h chmod"
+foreign import ccall unsafe POSIX_FUNCTION(HsBase.h, chmod)
    c_chmod :: CString -> CMode -> IO CInt
 
-foreign import ccall unsafe "HsBase.h close"
+foreign import ccall unsafe POSIX_FUNCTION(HsBase.h, close)
    c_close :: CInt -> IO CInt
 
-foreign import ccall unsafe "HsBase.h creat"
+foreign import ccall unsafe POSIX_FUNCTION(HsBase.h, creat)
    c_creat :: CString -> CMode -> IO CInt
 
-foreign import ccall unsafe "HsBase.h dup"
+foreign import ccall unsafe POSIX_FUNCTION(HsBase.h, dup)
    c_dup :: CInt -> IO CInt
 
-foreign import ccall unsafe "HsBase.h dup2"
+foreign import ccall unsafe POSIX_FUNCTION(HsBase.h, dup2)
    c_dup2 :: CInt -> CInt -> IO CInt
 
 foreign import ccall unsafe "HsBase.h __hscore_fstat"
    c_fstat :: CInt -> Ptr CStat -> IO CInt
 
-foreign import ccall unsafe "HsBase.h isatty"
+foreign import ccall unsafe POSIX_FUNCTION(HsBase.h, isatty)
    c_isatty :: CInt -> IO CInt
 
 #if defined(mingw32_HOST_OS)
@@ -397,34 +401,34 @@ foreign import ccall safe "HsBase.h __hscore_open"
    c_safe_open :: CFilePath -> CInt -> CMode -> IO CInt
 
 -- See Note: CSsize
-foreign import capi unsafe "HsBase.h read"
+foreign import capi unsafe POSIX_FUNCTION(HsBase.h, read)
    c_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
 -- See Note: CSsize
-foreign import capi safe "HsBase.h read"
+foreign import capi safe POSIX_FUNCTION(HsBase.h, read)
    c_safe_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
 foreign import ccall unsafe "HsBase.h __hscore_stat"
    c_stat :: CFilePath -> Ptr CStat -> IO CInt
 
-foreign import ccall unsafe "HsBase.h umask"
+foreign import ccall unsafe POSIX_FUNCTION(HsBase.h, umask)
    c_umask :: CMode -> IO CMode
 
 -- See Note: CSsize
-foreign import capi unsafe "HsBase.h write"
+foreign import capi unsafe POSIX_FUNCTION(HsBase.h, write)
    c_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
 -- See Note: CSsize
-foreign import capi safe "HsBase.h write"
+foreign import capi safe POSIX_FUNCTION(HsBase.h, write)
    c_safe_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
 foreign import ccall unsafe "HsBase.h __hscore_ftruncate"
    c_ftruncate :: CInt -> COff -> IO CInt
 
-foreign import ccall unsafe "HsBase.h unlink"
+foreign import ccall unsafe POSIX_FUNCTION(HsBase.h, unlink)
    c_unlink :: CString -> IO CInt
 
-foreign import ccall unsafe "HsBase.h getpid"
+foreign import ccall unsafe POSIX_FUNCTION(HsBase.h, getpid)
    c_getpid :: IO CPid
 
 #if !defined(mingw32_HOST_OS)

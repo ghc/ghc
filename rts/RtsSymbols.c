@@ -93,39 +93,12 @@
       RTS___MINGW_VFPRINTF_SYM                           \
       SymI_HasProto(rts_InstallConsoleEvent)             \
       SymI_HasProto(rts_ConsoleHandlerDone)              \
-      SymI_NeedsProto(mktime)                            \
-      SymI_NeedsProto(localtime)                         \
-      SymI_NeedsProto(gmtime)                            \
-      SymI_NeedsProto(opendir)                           \
-      SymI_NeedsProto(readdir)                           \
-      SymI_NeedsProto(rewinddir)                         \
       RTS_WIN32_ONLY(SymI_NeedsProto(__chkstk_ms))       \
       RTS_WIN64_ONLY(SymI_NeedsProto(___chkstk_ms))      \
-      SymI_NeedsProto(localeconv)                        \
-      SymI_HasProto(close)                               \
-      SymI_HasProto(read)                                \
-      SymI_HasProto(dup)                                 \
-      SymI_HasProto(dup2)                                \
-      SymI_HasProto(write)                               \
-      SymI_NeedsProto(getpid)                            \
-      SymI_HasProto(access)                              \
-      SymI_HasProto(chmod)                               \
-      SymI_HasProto(creat)                               \
-      SymI_HasProto(umask)                               \
-      SymI_HasProto(unlink)                              \
-      SymI_HasProto(_errno)                              \
-      SymI_NeedsProto(ftruncate64)                       \
-      SymI_HasProto(setmode)                             \
-      SymI_HasProto(_wstat64)                            \
-      SymI_HasProto(_fstat64)                            \
-      SymI_HasProto(_wsopen)                             \
       RTS_WIN32_ONLY(SymI_HasProto(_imp___environ))      \
       RTS_WIN64_ONLY(SymI_HasProto(__imp__environ))      \
       RTS_WIN32_ONLY(SymI_HasProto(_imp___iob))          \
       RTS_WIN64_ONLY(SymI_HasProto(__iob_func))          \
-      SymI_HasProto(_get_osfhandle)                      \
-      SymI_NeedsProto(raise)                             \
-      SymI_NeedsProto(_getpid)                           \
       RTS_MINGW_GETTIMEOFDAY_SYM                         \
       SymI_HasProto(isatty)                              \
       SymI_NeedsProto(closedir)
