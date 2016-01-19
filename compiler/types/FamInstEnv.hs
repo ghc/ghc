@@ -1237,7 +1237,7 @@ normalise_tc_app tc tys
        ; case expandSynTyCon_maybe tc ntys of
          { Just (tenv, rhs, ntys') ->
            do { (co2, ninst_rhs)
-                  <- normalise_type (substTy (mkTopTCvSubst tenv) rhs)
+                  <- normalise_type (substTyUnchecked (mkTopTCvSubst tenv) rhs)
               ; return $
                 if isReflCo co2
                 then (args_co,                 mkTyConApp tc ntys)

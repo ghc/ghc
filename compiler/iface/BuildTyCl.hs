@@ -184,7 +184,7 @@ buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
     -- compatible with the pattern synonym
     ASSERT2((and [ univ_tvs `equalLength` univ_tvs1
                  , ex_tvs `equalLength` ex_tvs1
-                 , pat_ty `eqType` substTy subst pat_ty1
+                 , pat_ty `eqType` substTyUnchecked subst pat_ty1
                  , prov_theta `eqTypes` substTys subst prov_theta1
                  , req_theta `eqTypes` substTys subst req_theta1
                  , arg_tys `eqTypes` substTys subst arg_tys1

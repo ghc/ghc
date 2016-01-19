@@ -1554,10 +1554,12 @@ addInertSafehask _ item
   = pprPanic "addInertSafehask: can't happen! Inserting " $ ppr item
 
 insertSafeOverlapFailureTcS :: Ct -> TcS ()
+-- See Note [Safe Haskell Overlapping Instances Implementation] in TcSimplify
 insertSafeOverlapFailureTcS item
   = updInertCans (\ics -> addInertSafehask ics item)
 
 getSafeOverlapFailures :: TcS Cts
+-- See Note [Safe Haskell Overlapping Instances Implementation] in TcSimplify
 getSafeOverlapFailures
  = do { IC { inert_safehask = safehask } <- getInertCans
       ; return $ foldDicts consCts safehask emptyCts }
@@ -2856,7 +2858,7 @@ instFlexiTcS tvs = wrapTcS (mapAccumLM inst_one emptyTCvSubst tvs)
   where
      inst_one subst tv
          = do { ty' <- instFlexiTcSHelper (tyVarName tv)
-                                          (substTy subst (tyVarKind tv))
+                                          (substTyUnchecked subst (tyVarKind tv))
               ; return (extendTCvSubst subst tv ty', ty') }
 
 instFlexiTcSHelper :: Name -> Kind -> TcM TcType
@@ -3064,8 +3066,8 @@ deferTcSForAllEq role loc kind_cos (bndrs1,body1) (bndrs2,body2)
                        mkCastTy (mkTyVarTys tvs1) kind_cos
             body2' = substTyWith tvs2 tvs1' body2
       ; (subst, skol_tvs) <- wrapTcS $ TcM.tcInstSkolTyVars tvs1
-      ; let phi1  = Type.substTy subst body1
-            phi2  = Type.substTy subst body2'
+      ; let phi1  = Type.substTyUnchecked subst body1
+            phi2  = Type.substTyUnchecked subst body2'
             skol_info = UnifyForAllSkol skol_tvs phi1
 
       ; (ctev, hole_co) <- newWantedEq loc role phi1 phi2

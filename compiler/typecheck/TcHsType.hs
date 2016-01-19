@@ -760,7 +760,7 @@ tc_infer_args mode orig_ty ki mb_kind_info orig_args n0
        ; go emptyTCvSubst ki orig_args n0 [] }
   where
     go subst fun_kind []   n acc
-      = return ( substTy subst fun_kind, reverse acc, [], n )
+      = return ( substTyUnchecked subst fun_kind, reverse acc, [], n )
     -- when we call this when checking type family patterns, we really
     -- do want to instantiate all invisible arguments. During other
     -- typechecking, we don't.
@@ -784,7 +784,7 @@ tc_infer_args mode orig_ty ki mb_kind_info orig_args n0
         do { let mode' | isNamedBinder bndr = kindLevel mode
                        | otherwise          = mode
            ; arg' <- addErrCtxt (funAppCtxt orig_ty arg n) $
-                     tc_lhs_type mode' arg (substTy subst $ binderType bndr)
+                     tc_lhs_type mode' arg (substTyUnchecked subst $ binderType bndr)
            ; let subst' = case binderVar_maybe bndr of
                    Just tv -> extendTCvSubst subst tv arg'
                    Nothing -> subst

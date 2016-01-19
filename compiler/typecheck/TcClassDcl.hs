@@ -456,7 +456,7 @@ tcATDefault emit_warn loc inst_subst defined_ats (ATI fam_tc defs)
   | Just (rhs_ty, _loc) <- defs
   = do { let (subst', pat_tys') = mapAccumL subst_tv inst_subst
                                             (tyConTyVars fam_tc)
-             rhs'     = substTy subst' rhs_ty
+             rhs'     = substTyUnchecked subst' rhs_ty
              tcv_set' = tyCoVarsOfTypes pat_tys'
              (tv_set', cv_set') = partitionVarSet isTyVar tcv_set'
              tvs'     = varSetElemsWellScoped tv_set'
@@ -486,7 +486,7 @@ tcATDefault emit_warn loc inst_subst defined_ats (ATI fam_tc defs)
       | otherwise
       = (extendTCvSubst subst tc_tv ty', ty')
       where
-        ty' = mkTyVarTy (updateTyVarKind (substTy subst) tc_tv)
+        ty' = mkTyVarTy (updateTyVarKind (substTyUnchecked subst) tc_tv)
 
 warnMissingAT :: Name -> TcM ()
 warnMissingAT name

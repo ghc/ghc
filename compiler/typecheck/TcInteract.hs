@@ -1257,7 +1257,7 @@ emitFunDepDeriveds fd_eqns
 
     do_one_eq loc subst (Pair ty1 ty2)
        = unifyDerived loc Nominal $
-         Pair (Type.substTy subst ty1) (Type.substTy subst ty2)
+         Pair (Type.substTyUnchecked subst ty1) (Type.substTyUnchecked subst ty2)
 
 {-
 **********************************************************************
@@ -1513,7 +1513,7 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
       injImproveEqns inj_args (ax_args, theta, unsubstTvs, cabr) = do
         (theta', _) <- instFlexiTcS (varSetElems unsubstTvs)
         let subst = theta `unionTCvSubst` theta'
-        return [ Pair arg (substTy subst ax_arg)
+        return [ Pair arg (substTyUnchecked subst ax_arg)
                | case cabr of
                   Just cabr' -> apartnessCheck (substTys subst ax_args) cabr'
                   _          -> True

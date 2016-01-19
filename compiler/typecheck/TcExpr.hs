@@ -872,7 +872,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
                                                       (con1_tvs `zip` result_inst_tys)
 
         ; let rec_res_ty    = TcType.substTy result_subst con1_res_ty
-              scrut_ty      = TcType.substTy scrut_subst  con1_res_ty
+              scrut_ty      = TcType.substTyUnchecked scrut_subst con1_res_ty
               con1_arg_tys' = map (TcType.substTy result_subst) con1_arg_tys
 
         ; wrap_res <- tcSubTypeHR (exprCtOrigin expr)

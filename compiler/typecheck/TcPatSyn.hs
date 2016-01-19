@@ -281,7 +281,7 @@ tcCheckPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details
              arg_id <- tcLookupId arg_name
            ; coi <- unifyType (Just arg_id)
                               (idType arg_id)
-                              (substTy subst arg_ty)
+                              (substTyUnchecked subst arg_ty)
            ; return (mkLHsWrapCo coi $ nlHsVar arg_id) }
 
 {- Note [Checking against a pattern signature]

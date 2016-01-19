@@ -1566,12 +1566,12 @@ dataConInstPat fss uniqs con inst_tys
                                      , new_tv)
       where
         new_tv = mkTyVar (mkSysTvName uniq fs) kind
-        kind   = Type.substTy subst (tyVarKind tv)
+        kind   = Type.substTyUnchecked subst (tyVarKind tv)
 
       -- Make value vars, instantiating types
     arg_ids = zipWith4 mk_id_var id_uniqs id_fss arg_tys arg_strs
     mk_id_var uniq fs ty str
-      = mkLocalIdOrCoVarWithInfo name (Type.substTy full_subst ty) info
+      = mkLocalIdOrCoVarWithInfo name (Type.substTyUnchecked full_subst ty) info
       where
         name = mkInternalName uniq (mkVarOccFS fs) noSrcSpan
         info | isMarkedStrict str = vanillaIdInfo `setUnfoldingInfo` evaldUnfolding
