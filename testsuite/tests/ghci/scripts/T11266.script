@@ -1,2 +1,4 @@
-:m + GHC.Prim
+:m + GHC.Prim GHC.Base GHC.Exts
 :browse GHC.Prim
+:browse GHC.Base
+:browse GHC.Exts
