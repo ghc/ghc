@@ -1368,10 +1368,10 @@ tcConDecl new_or_data rep_tycon tmpl_tvs res_tmpl
                Nothing -> ([], [])
                Just (HsQTvs { hsq_implicit = kvs, hsq_explicit = tvs })
                        -> (kvs, tvs)
-       ; (kvs, (ctxt, arg_tys, field_lbls, stricts, tvs))
+       ; (_, (ctxt, arg_tys, field_lbls, stricts))
            <- solveEqualities $
               tcImplicitTKBndrs hs_kvs $
-              tcHsTyVarBndrs hs_tvs $ \tvs ->
+              tcExplicitTKBndrs hs_tvs $ \ _ ->
               do { traceTc "tcConDecl" (ppr name <+> text "tvs:" <+> ppr hs_tvs)
                  ; ctxt <- tcHsContext (fromMaybe (noLoc []) hs_ctxt)
                  ; btys <- tcConArgs new_or_data hs_details
@@ -1379,13 +1379,17 @@ tcConDecl new_or_data rep_tycon tmpl_tvs res_tmpl
                  ; let (arg_tys, stricts) = unzip btys
                        bound_vars = allBoundVariabless ctxt `unionVarSet`
                                     allBoundVariabless arg_tys
-                 ; return ((ctxt, arg_tys, field_lbls, stricts, tvs), bound_vars)
+                 ; return ((ctxt, arg_tys, field_lbls, stricts), bound_vars)
                  }
 
+             -- Kind generalisation
+       ; tkvs <- quantifyTyVars (mkVarSet tmpl_tvs)
+                                (splitDepVarsOfTypes (ctxt++arg_tys))
+
              -- Zonk to Types
-       ; (ze, qtkvs) <- zonkTyBndrsX emptyZonkEnv (kvs ++ tvs)
-       ; arg_tys <- zonkTcTypeToTypes ze arg_tys
-       ; ctxt    <- zonkTcTypeToTypes ze ctxt
+       ; (ze, qtkvs) <- zonkTyBndrsX emptyZonkEnv tkvs
+       ; arg_tys     <- zonkTcTypeToTypes ze arg_tys
+       ; ctxt        <- zonkTcTypeToTypes ze ctxt
 
        ; fam_envs <- tcGetFamInstEnvs
 
@@ -1461,12 +1465,11 @@ tcGadtSigType :: SDoc -> Name -> LHsSigType Name
                                     (Located [LConDeclField Name]) )
 tcGadtSigType doc name ty@(HsIB { hsib_vars = vars })
   = do { let (hs_details', res_ty', cxt, gtvs) = gadtDeclDetails ty
-       ; (hs_details, res_ty) <-
-           updateGadtResult failWithTc doc hs_details' res_ty'
+       ; (hs_details, res_ty) <- updateGadtResult failWithTc doc hs_details' res_ty'
        ; (_, (ctxt, arg_tys, res_ty, field_lbls, stricts))
            <- solveEqualities $
               tcImplicitTKBndrs vars $
-              tcHsTyVarBndrs gtvs $ \ _ ->
+              tcExplicitTKBndrs gtvs $ \ _ ->
               do { ctxt <- tcHsContext cxt
                  ; btys <- tcConArgs DataType hs_details
                  ; ty' <- tcHsLiftedType res_ty
@@ -1477,7 +1480,7 @@ tcGadtSigType doc name ty@(HsIB { hsib_vars = vars })
 
                  ; return ((ctxt, arg_tys, ty', field_lbls, stricts), bound_vars)
                  }
-       ; return (ctxt,stricts,field_lbls,arg_tys,res_ty,hs_details)
+       ; return (ctxt, stricts, field_lbls, arg_tys, res_ty, hs_details)
        }
 
 tcConIsInfixH98 :: Name
@@ -2076,10 +2079,6 @@ checkValidDataCon dflags existential_ok tc con
 
         ; traceTc "checkValidDataCon 2" (ppr (dataConUserType con))
 
-          -- Check that existentials are allowed if they are used
-        ; checkTc (existential_ok || isVanillaDataCon con)
-                  (badExistential con)
-
           -- Check that the result type is a *monotype*
           --  e.g. reject this:   MkT :: T (forall a. a->a)
           -- Reason: it's really the argument of an equality constraint
@@ -2090,6 +2089,10 @@ checkValidDataCon dflags existential_ok tc con
 
           -- Extra checks for newtype data constructors
         ; when (isNewTyCon tc) (checkNewDataCon con)
+
+          -- Check that existentials are allowed if they are used
+        ; checkTc (existential_ok || isVanillaDataCon con)
+                  (badExistential con)
 
           -- Check that UNPACK pragmas and bangs work out
           -- E.g.  reject   data T = MkT {-# UNPACK #-} Int     -- No "!"
