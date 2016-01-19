@@ -514,9 +514,7 @@ fixpoint :: forall n f. NonLocal n
 
 fixpoint direction join do_block entries blockmap init_fbase
   = do
-        -- trace ("fixpoint: " ++ show (case direction of Fwd -> True; Bwd -> False) ++ " " ++ show (mapKeys blockmap) ++ show entries ++ " " ++ show (mapKeys init_fbase)) $ return()
         (fbase, newblocks) <- loop start init_fbase mapEmpty
-        -- trace ("fixpoint DONE: " ++ show (mapKeys fbase) ++ show (mapKeys newblocks)) $ return()
         return (GMany NothingO newblocks NothingO,
                 mapDeleteList (mapKeys blockmap) fbase)
     -- The successors of the Graph are the the Labels
@@ -539,15 +537,10 @@ fixpoint direction join do_block entries blockmap init_fbase
     loop (ix:todo) fbase !newblocks = do
            let blk = block_arr ! ix
 
-           -- trace ("analysing: " ++ show (entryLabel blk)) $ return ()
            (rg, out_facts) <- do_block blk fbase
            let !(todo', fbase') =
                   mapFoldWithKey (updateFact join dep_blocks)
                                  (todo,fbase) out_facts
-
-           -- trace ("fbase': " ++ show (mapKeys fbase')) $ return ()
-           -- trace ("changed: " ++ show changed) $ return ()
-           -- trace ("to analyse: " ++ show to_analyse) $ return ()
 
            let newblocks' = case rg of
                               GMany _ blks _ -> mapUnion blks newblocks
