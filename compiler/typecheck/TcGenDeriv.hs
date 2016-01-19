@@ -786,16 +786,19 @@ gen_Ix_binds loc tycon
            ))
         )
 
+    -- This produces something like `(ch >= ah) && (ch <= bh)`
     enum_inRange
       = mk_easy_FunBind loc inRange_RDR [nlTuplePat [a_Pat, b_Pat] Boxed, c_Pat] $
           untag_Expr tycon [(a_RDR, ah_RDR)] (
           untag_Expr tycon [(b_RDR, bh_RDR)] (
           untag_Expr tycon [(c_RDR, ch_RDR)] (
-          nlHsIf (genPrimOpApp (nlHsVar ch_RDR) geInt_RDR (nlHsVar ah_RDR)) (
-             (genPrimOpApp (nlHsVar ch_RDR) leInt_RDR (nlHsVar bh_RDR))
-          ) {-else-} (
-             false_Expr
-          ))))
+          -- This used to use `if`, which interacts badly with RebindableSyntax.
+          -- See #11396.
+          nlHsApps and_RDR
+              [ genPrimOpApp (nlHsVar ch_RDR) geInt_RDR (nlHsVar ah_RDR)
+              , genPrimOpApp (nlHsVar ch_RDR) leInt_RDR (nlHsVar bh_RDR)
+              ]
+          )))
 
     --------------------------------------------------------------
     single_con_ixes
