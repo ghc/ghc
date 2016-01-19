@@ -1026,7 +1026,7 @@ However we store the default rhs (Proxy x -> y) in F's TyCon, using
 F's own type variables, so we need to convert it to (Proxy a -> b).
 We do this by calling tcMatchTys to match them up.  This also ensures
 that x's kind matches a's and similarly for y and b.  The error
-message isnt' great, mind you.  (Trac #11361 was caused by not doing a
+message isn't great, mind you.  (Trac #11361 was caused by not doing a
 proper tcMatchTys here.)  -}
 
 -------------------------

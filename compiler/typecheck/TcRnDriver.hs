@@ -657,7 +657,7 @@ tcRnHsBootDecls hsc_src decls
         ; mapM_ (badBootDecl hsc_src "rule")    rule_decls
         ; mapM_ (badBootDecl hsc_src "vect")    vect_decls
 
-                -- Typecheck type/class/isntance decls
+                -- Typecheck type/class/instance decls
         ; traceTc "Tc2 (boot)" empty
         ; (tcg_env, inst_infos, _deriv_binds)
              <- tcTyClsInstDecls tycl_decls inst_decls deriv_decls val_binds
