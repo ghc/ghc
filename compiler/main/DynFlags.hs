@@ -911,7 +911,6 @@ instance (Monad m, HasDynFlags m) => HasDynFlags (ExceptT e m) where
 
 class ContainsDynFlags t where
     extractDynFlags :: t -> DynFlags
-    replaceDynFlags :: t -> DynFlags -> t
 
 data ProfAuto
   = NoProfAuto         -- ^ no SCC annotations added

@@ -611,7 +611,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
          -- If we are compiling a Haskell module, and doing
          -- -dynamic-too, but couldn't do the -dynamic-too fast
          -- path, then rerun the pipeline for the dyn way
-         let dflags = extractDynFlags hsc_env
+         let dflags = hsc_dflags hsc_env
          -- NB: Currently disabled on Windows (ref #7134, #8228, and #5987)
          when (not $ platformOS (targetPlatform dflags) == OSMinGW32) $ do
            when isHaskellishFile $ whenCannotGenerateDynamicToo dflags $ do
