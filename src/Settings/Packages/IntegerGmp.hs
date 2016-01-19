@@ -15,17 +15,13 @@ import Oracles.Config.Setting
 integerGmpPackageArgs :: Args
 integerGmpPackageArgs = package integerGmp ? do
     let includeGmp = "-I" ++ gmpBuildPath -/- "include"
-    gmp_includedir <- getSetting GmpIncludeDir
-    gmp_libdir <- getSetting GmpLibDir
-    let gmp_args = if (gmp_includedir == "" && gmp_libdir == "")
-                   then
-                   [ arg "--configure-option=--with-intree-gmp" ]
-                   else
-                   []
+    gmpIncludeDir <- getSetting GmpIncludeDir
+    gmpLibDir <- getSetting GmpLibDir
 
     mconcat [ builder GhcCabal ? mconcat
-              (gmp_args ++
-               [ appendSub "--configure-option=CFLAGS" [includeGmp]
-               , appendSub "--gcc-options"             [includeGmp] ] )
+              [ (null gmpIncludeDir && null gmpLibDir) ?
+                arg "--configure-option=--with-intree-gmp"
+              , appendSub "--configure-option=CFLAGS" [includeGmp]
+              , appendSub "--gcc-options"             [includeGmp] ]
 
             , builderGcc ? arg includeGmp ]
