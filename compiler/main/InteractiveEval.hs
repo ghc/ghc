@@ -248,8 +248,18 @@ runDeclsWithLocation source linenumber expr =
     hsc_env' <- liftIO $ rttiEnvironment hsc_env
     modifySession (\_ -> hsc_env')
     return $ filter (not . isDerivedOccName . nameOccName)
+             -- For this filter, see Note [What to show to users]
            $ map getName tyThings
 
+{- Note [What to show to users]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We don't want to display internally-generated bindings to users.
+Things like the coercion axiom for newtypes. These bindings all get
+OccNames that users can't write, to avoid the possiblity of name
+clashes (in linker symbols).  That gives a convenient way to suppress
+them. The relevant predicate is OccName.isDerivedOccName.
+See Trac #11051 for more background and examples.
+-}
 
 withVirtualCWD :: GhcMonad m => m a -> m a
 withVirtualCWD m = do
