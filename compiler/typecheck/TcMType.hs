@@ -294,7 +294,7 @@ tcInstType inst_tyvars ty
                             return ([], theta, tau)
 
         (tyvars, rho) -> do { (subst, tyvars') <- inst_tyvars tyvars
-                            ; let (theta, tau) = tcSplitPhiTy (substTy subst rho)
+                            ; let (theta, tau) = tcSplitPhiTy (substTyUnchecked subst rho)
                             ; return (tyvars', theta, tau) }
 
 tcSkolDFunType :: Type -> TcM ([TcTyVar], TcThetaType, TcType)
@@ -311,9 +311,10 @@ tcSuperSkolTyVars = mapAccumL tcSuperSkolTyVar (mkTopTCvSubst [])
 
 tcSuperSkolTyVar :: TCvSubst -> TyVar -> (TCvSubst, TcTyVar)
 tcSuperSkolTyVar subst tv
-  = (extendTCvSubst subst tv (mkTyVarTy new_tv), new_tv)
+  = (extendTCvSubst (extendTCvInScope subst new_tv) tv (mkTyVarTy new_tv)
+    , new_tv)
   where
-    kind   = substTy subst (tyVarKind tv)
+    kind   = substTyUnchecked subst (tyVarKind tv)
     new_tv = mkTcTyVar (tyVarName tv) kind superSkolemTv
 
 -- Wrappers
@@ -392,10 +393,13 @@ instSkolTyCoVarX :: (Unique -> Name -> Kind -> TyCoVar)
 instSkolTyCoVarX mk_tcv subst tycovar
   = do  { uniq <- newUnique
         ; let new_tv = mk_tcv uniq old_name kind
-        ; return (extendTCvSubst subst tycovar (mk_ty_co new_tv), new_tv) }
+        ; return (extendTCvSubst (extendTCvInScope subst new_tv) tycovar
+                   (mk_ty_co new_tv)
+                 , new_tv)
+        }
   where
     old_name = tyVarName tycovar
-    kind     = substTy subst (tyVarKind tycovar)
+    kind     = substTyUnchecked subst (tyVarKind tycovar)
 
     mk_ty_co v
       | isTyVar v = mkTyVarTy v
@@ -687,9 +691,12 @@ newMetaTyVarX subst tyvar
         ; details <- newMetaDetails info
         ; let name   = mkSystemName uniq (getOccName tyvar)
                        -- See Note [Name of an instantiated type variable]
-              kind   = substTy subst (tyVarKind tyvar)
+              kind   = substTyUnchecked subst (tyVarKind tyvar)
               new_tv = mkTcTyVar name kind details
-        ; return (extendTCvSubst subst tyvar (mkTyVarTy new_tv), new_tv) }
+        ; return (extendTCvSubst (extendTCvInScope subst new_tv) tyvar
+                   (mkTyVarTy new_tv)
+                 , new_tv)
+        }
 
 newMetaSigTyVarX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
 -- Just like newMetaTyVarX, but make a SigTv
@@ -699,7 +706,9 @@ newMetaSigTyVarX subst tyvar
         ; let name   = mkSystemName uniq (getOccName tyvar)
               kind   = substTy subst (tyVarKind tyvar)
               new_tv = mkTcTyVar name kind details
-        ; return (extendTCvSubst subst tyvar (mkTyVarTy new_tv), new_tv) }
+        ; return (extendTCvSubst (extendTCvInScope subst new_tv) tyvar
+                   (mkTyVarTy new_tv)
+                 , new_tv) }
 
 {- Note [Name of an instantiated type variable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

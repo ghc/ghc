@@ -730,7 +730,7 @@ dataConArgUnpack arg_ty
                          [(DataAlt con, rep_ids, body)]
           ; return (rep_ids, unbox_fn) }
      , Boxer $ \ subst ->
-       do { rep_ids <- mapM (newLocal . TcType.substTy subst) rep_tys
+       do { rep_ids <- mapM (newLocal . TcType.substTyUnchecked subst) rep_tys
           ; return (rep_ids, Var (dataConWorkId con)
                              `mkTyApps` (substTys subst tc_args)
                              `mkVarApps` rep_ids ) } ) )

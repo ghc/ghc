@@ -999,7 +999,7 @@ tcDefaultAssocDecl fam_tc [L loc (TyFamEqn { tfe_tycon = L _ tc_name
 
          -- See Note [Type-checking default assoc decls]
        ; case tcMatchTys pats' (mkTyVarTys (tyConTyVars fam_tc)) of
-           Just subst -> return ( Just (substTy subst rhs_ty, loc) )
+           Just subst -> return ( Just (substTyUnchecked subst rhs_ty, loc) )
            Nothing    -> failWithTc (defaultAssocKindErr fam_tc)
            -- We check for well-formedness and validity later,
            -- in checkValidClass

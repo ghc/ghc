@@ -137,7 +137,8 @@ deeplySkolemise ty
   = do { ids1 <- newSysLocalIds (fsLit "dk") arg_tys
        ; (subst, tvs1) <- tcInstSkolTyVars tvs
        ; ev_vars1 <- newEvVars (substTheta subst theta)
-       ; (wrap, tvs2, ev_vars2, rho) <- deeplySkolemise (substTy subst ty')
+       ; (wrap, tvs2, ev_vars2, rho) <-
+           deeplySkolemise (substTyAddInScope subst ty')
        ; return ( mkWpLams ids1
                    <.> mkWpTyLams tvs1
                    <.> mkWpLams ev_vars1
@@ -178,8 +179,8 @@ top_instantiate inst_all orig ty
                | otherwise        = ([], theta)
        ; (subst, inst_tvs') <- newMetaTyVars (map (binderVar "top_inst") inst_bndrs)
        ; let inst_theta' = substTheta subst inst_theta
-             sigma'      = substTy    subst (mkForAllTys leave_bndrs $
-                                             mkFunTys leave_theta rho)
+             sigma'      = substTyAddInScope subst (mkForAllTys leave_bndrs $
+                                                    mkFunTys leave_theta rho)
 
        ; wrap1 <- instCall orig (mkTyVarTys inst_tvs') inst_theta'
        ; traceTc "Instantiating"
@@ -227,7 +228,7 @@ deeplyInstantiate orig ty
                                                 , text "with" <+> ppr tvs'
                                                 , text "args:" <+> ppr ids1
                                                 , text "theta:" <+>  ppr theta' ])
-       ; (wrap2, rho2) <- deeplyInstantiate orig (substTy subst rho)
+       ; (wrap2, rho2) <- deeplyInstantiate orig (substTyUnchecked subst rho)
        ; return (mkWpLams ids1
                     <.> wrap2
                     <.> wrap1

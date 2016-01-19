@@ -600,7 +600,7 @@ substCoVarBndr (Subst in_scope id_env tv_env cv_env) cv
 
 -- | See 'Type.substTy'
 substTy :: Subst -> Type -> Type
-substTy subst ty = Type.substTy (getTCvSubst subst) ty
+substTy subst ty = Type.substTyUnchecked (getTCvSubst subst) ty
 
 getTCvSubst :: Subst -> TCvSubst
 getTCvSubst (Subst in_scope _ tenv cenv) = TCvSubst in_scope tenv cenv
