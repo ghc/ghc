@@ -946,7 +946,7 @@ checkValidInstHead ctxt clas cls_args
                  (instTypeErr clas cls_args abstract_class_msg)
 
            -- Check language restrictions;
-           -- but not for SPECIALISE isntance pragmas
+           -- but not for SPECIALISE instance pragmas
        ; let ty_args = filterOutInvisibleTypes (classTyCon clas) cls_args
        ; unless spec_inst_prag $
          do { checkTc (xopt LangExt.TypeSynonymInstances dflags ||
