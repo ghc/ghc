@@ -1409,16 +1409,22 @@ tyConToIfaceDecl env tycon
   -- For pretty printing purposes only.
   = ( env
     , IfaceData { ifName       = getOccName tycon,
+                  ifKind       =
+                    -- These don't have `tyConTyVars`, so we use an empty
+                    -- environment here, instead of `tc_env1` defined below.
+                    tidyToIfaceType emptyTidyEnv (tyConKind tycon),
                   ifCType      = Nothing,
                   ifTyVars     = funAndPrimTyVars,
                   ifRoles      = tyConRoles tycon,
-                  ifKind       = if_kind,
                   ifCtxt       = [],
                   ifCons       = IfDataTyCon [] False [],
                   ifRec        = boolToRecFlag False,
                   ifGadtSyntax = False,
                   ifParent     = IfNoParent })
   where
+    -- NOTE: Not all TyCons have `tyConTyVars` field. Forcing this when `tycon`
+    -- is one of these TyCons (FunTyCon, PrimTyCon, PromotedDataCon) will cause
+    -- an error.
     (tc_env1, tc_tyvars) = tidyTyClTyCoVarBndrs env (tyConTyVars tycon)
     if_tc_tyvars = toIfaceTvBndrs tc_tyvars
     if_kind = tidyToIfaceType tc_env1 (tyConKind tycon)
