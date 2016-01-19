@@ -4,7 +4,6 @@ import Base
 import Expression
 import GHC (integerGmp)
 import Predicates (builder, builderGcc, package)
-import Settings.Builders.Common
 import Settings.Paths
 import Oracles.Config.Setting
 
