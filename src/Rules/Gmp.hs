@@ -62,10 +62,10 @@ configureArguments = do
 
 configureIntGmpArguments :: Action [String]
 configureIntGmpArguments = do
-    includes      <- settingList GmpIncludeDirs
-    libs          <- settingList GmpLibDirs
-    return $ map ("--with-gmp-includes=" ++) includes
-          ++ map ("--with-gmp-libraries=" ++) libs
+    includes      <- setting GmpIncludeDir
+    libs          <- setting GmpLibDir
+    return $ map ("--with-gmp-includes=" ++) [includes]
+          ++ map ("--with-gmp-libraries=" ++) [libs]
 
 -- TODO: we rebuild gmp every time.
 gmpRules :: Rules ()

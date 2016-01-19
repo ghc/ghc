@@ -17,7 +17,7 @@ hsc2hsBuilderArgs :: Args
 hsc2hsBuilderArgs = builder Hsc2Hs ? do
     stage   <- getStage
     ccPath  <- lift . builderPath $ Gcc stage
-    gmpDirs <- getSettingList GmpIncludeDirs
+    gmpDir  <- getSetting GmpIncludeDir
     cFlags  <- getCFlags
     lFlags  <- getLFlags
     top     <- getTopDirectory
@@ -32,7 +32,7 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
     mconcat [ arg $ "--cc=" ++ ccPath
             , arg $ "--ld=" ++ ccPath
             , notM windowsHost ? arg "--cross-safe"
-            , append $ map ("-I"       ++) gmpDirs
+            , append $ map ("-I"       ++) [gmpDir]
             , append $ map ("--cflag=" ++) cFlags
             , append $ map ("--lflag=" ++) lFlags
             , notStage0 ? crossCompiling ? arg "--cross-compile"

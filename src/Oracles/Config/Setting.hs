@@ -49,16 +49,16 @@ data Setting = BuildArch
              | TargetVendor
              | FfiIncludeDir
              | FfiLibDir
+             | GmpIncludeDir
+             | GmpLibDir
+             | IconvIncludeDir
+             | IconvLibDir
 
 data SettingList = ConfCcArgs Stage
                  | ConfCppArgs Stage
                  | ConfGccLinkerArgs Stage
                  | ConfLdLinkerArgs Stage
-                 | GmpIncludeDirs
-                 | GmpLibDirs
                  | HsCppArgs
-                 | IconvIncludeDirs
-                 | IconvLibDirs
 
 setting :: Setting -> Action String
 setting key = askConfig $ case key of
@@ -92,6 +92,10 @@ setting key = askConfig $ case key of
     TargetVendor       -> "target-vendor"
     FfiIncludeDir      -> "ffi-include-dir"
     FfiLibDir          -> "ffi-lib-dir"
+    GmpIncludeDir      -> "gmp-include-dir"
+    GmpLibDir          -> "gmp-lib-dir"
+    IconvIncludeDir    -> "iconv-include-dir"
+    IconvLibDir        -> "iconv-lib-dir"
 
 settingList :: SettingList -> Action [String]
 settingList key = fmap words $ askConfig $ case key of
@@ -99,11 +103,7 @@ settingList key = fmap words $ askConfig $ case key of
     ConfCppArgs       stage -> "conf-cpp-args-"        ++ stageString stage
     ConfGccLinkerArgs stage -> "conf-gcc-linker-args-" ++ stageString stage
     ConfLdLinkerArgs  stage -> "conf-ld-linker-args-"  ++ stageString stage
-    GmpIncludeDirs          -> "gmp-include-dirs"
-    GmpLibDirs              -> "gmp-lib-dirs"
     HsCppArgs               -> "hs-cpp-args"
-    IconvIncludeDirs        -> "iconv-include-dirs"
-    IconvLibDirs            -> "iconv-lib-dirs"
 
 getSetting :: Setting -> ReaderT a Action String
 getSetting = lift . setting

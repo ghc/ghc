@@ -100,11 +100,11 @@ conf-ld-linker-args-stage2  = @CONF_LD_LINKER_OPTS_STAGE2@
 # Include and library directories:
 #=================================
 
-iconv-include-dirs = @ICONV_INCLUDE_DIRS@
-iconv-lib-dirs     = @ICONV_LIB_DIRS@
+iconv-include-dir = @ICONV_INCLUDE_DIRS@
+iconv-lib-dir     = @ICONV_LIB_DIRS@
 
-gmp-include-dirs   = @GMP_INCLUDE_DIRS@
-gmp-lib-dirs       = @GMP_LIB_DIRS@
+gmp-include-dir   = @GMP_INCLUDE_DIRS@
+gmp-lib-dir       = @GMP_LIB_DIRS@
 
 use-system-ffi     = @UseSystemLibFFI@
 ffi-include-dir   = @FFIIncludeDir@
