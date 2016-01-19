@@ -20,9 +20,9 @@ rtsConf = pkgPath rts -/- targetDirectory Stage1 rts -/- "package.conf.inplace"
 
 rtsLibffiLibraryName :: Action FilePath
 rtsLibffiLibraryName = do
-    use_system_ffi <- flag UseSystemFfi
-    windows <- windowsHost
-    case (use_system_ffi, windows) of
+    useSystemFfi <- flag UseSystemFfi
+    windows      <- windowsHost
+    case (useSystemFfi, windows) of
       (True , False) -> return "ffi"
       (False, False) -> return "Cffi"
       (_    , True ) -> return "Cffi-6"
