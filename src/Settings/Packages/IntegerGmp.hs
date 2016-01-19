@@ -5,6 +5,7 @@ import Expression
 import GHC (integerGmp)
 import Predicates (builder, builderGcc, package)
 import Settings.Paths
+import Oracles.Config.Setting
 
 -- TODO: move build artefacts to buildRootPath, see #113
 -- TODO: Is this needed?
@@ -14,11 +15,13 @@ import Settings.Paths
 integerGmpPackageArgs :: Args
 integerGmpPackageArgs = package integerGmp ? do
     let includeGmp = "-I" ++ gmpBuildPath -/- "include"
+    gmpIncludeDir <- getSetting GmpIncludeDir
+    gmpLibDir <- getSetting GmpLibDir
+
     mconcat [ builder GhcCabal ? mconcat
-              [ arg "--configure-option=--with-intree-gmp"
+              [ (null gmpIncludeDir && null gmpLibDir) ?
+                arg "--configure-option=--with-intree-gmp"
               , appendSub "--configure-option=CFLAGS" [includeGmp]
               , appendSub "--gcc-options"             [includeGmp] ]
 
             , builderGcc ? arg includeGmp ]
-  where
-
