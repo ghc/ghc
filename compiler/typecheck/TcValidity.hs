@@ -1553,7 +1553,7 @@ If there is a bad telescope, the kind-generalization will end up generalizing
 over a variable bound later in the telescope.
 
 For non-tycons, we do scope checking when we bring tyvars into scope,
-in tcImplicitTKBndrs and tcHsTyVarBndrs. Note that we also have to
+in tcImplicitTKBndrs and tcExplicitTKBndrs. Note that we also have to
 sort implicit binders into a well-scoped order whenever we have implicit
 binders to worry about. This is done in quantifyTyVars and in
 tcImplicitTKBndrs.

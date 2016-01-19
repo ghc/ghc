@@ -13,7 +13,7 @@ module TcPatSyn ( tcPatSynSig, tcInferPatSynDecl, tcCheckPatSynDecl
 
 import HsSyn
 import TcPat
-import TcHsType( tcImplicitTKBndrs, tcHsTyVarBndrs
+import TcHsType( tcImplicitTKBndrs, tcExplicitTKBndrs
                , tcHsContext, tcHsLiftedType, tcHsOpenType )
 import TcRnMonad
 import TcEnv
@@ -108,8 +108,8 @@ tcPatSynSig name sig_ty
   = do { (implicit_tvs, (univ_tvs, req, ex_tvs, prov, arg_tys, body_ty))
            <- solveEqualities $
               tcImplicitTKBndrs implicit_hs_tvs $
-              tcHsTyVarBndrs univ_hs_tvs  $ \ univ_tvs ->
-              tcHsTyVarBndrs ex_hs_tvs    $ \ ex_tvs   ->
+              tcExplicitTKBndrs univ_hs_tvs  $ \ univ_tvs ->
+              tcExplicitTKBndrs ex_hs_tvs    $ \ ex_tvs   ->
               do { req     <- tcHsContext hs_req
                  ; prov    <- tcHsContext hs_prov
                  ; arg_tys <- mapM tcHsOpenType (hs_arg_tys :: [LHsType Name])

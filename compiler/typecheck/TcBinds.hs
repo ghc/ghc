@@ -1826,7 +1826,7 @@ tcUserTypeSig hs_sig_ty mb_name
                   -- so that they can be unified under the forall
               tcImplicitTKBndrs vars $
               tcWildCardBinders wcs  $ \ wcs ->
-              tcHsTyVarBndrs hs_tvs  $ \ tvs2 ->
+              tcExplicitTKBndrs hs_tvs  $ \ tvs2 ->
          do { -- Instantiate the type-class context; but if there
               -- is an extra-constraints wildcard, just discard it here
               traceTc "tcPartial" (ppr name $$ ppr vars $$ ppr wcs)

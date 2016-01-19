@@ -17,7 +17,7 @@ module TcHsType (
         tcHsDeriv, tcHsVectInst,
         tcHsTypeApp,
         UserTypeCtxt(..),
-        tcImplicitTKBndrs, tcImplicitTKBndrsType, tcHsTyVarBndrs,
+        tcImplicitTKBndrs, tcImplicitTKBndrsType, tcExplicitTKBndrs,
 
                 -- Type checking type and class decls
         kcLookupKind, kcTyClTyVars, tcTyClTyVars,
@@ -515,7 +515,7 @@ tc_hs_type mode hs_ty@(HsForAllTy { hst_bndrs = hs_tvs, hst_body = ty }) exp_kin
 
   | otherwise
   = fmap fst $
-    tcHsTyVarBndrs hs_tvs $ \ tvs' ->
+    tcExplicitTKBndrs hs_tvs $ \ tvs' ->
     -- Do not kind-generalise here!  See Note [Kind generalisation]
     -- Why exp_kind?  See Note [Body kind of forall]
     do { ty' <- tc_lhs_type mode ty exp_kind
@@ -1410,13 +1410,13 @@ tcImplicitTKBndrsX new_tv var_ns thing_inside
 
        ; return (final_tvs, result) }
 
-tcHsTyVarBndrs :: [LHsTyVarBndr Name]
-               -> ([TyVar] -> TcM (a, TyVarSet))
-                  -- ^ Thing inside returns the set of variables bound
-                  -- in the scope. See Note [Scope-check inferred kinds]
-               -> TcM (a, TyVarSet)  -- ^ returns augmented bound vars
+tcExplicitTKBndrs :: [LHsTyVarBndr Name]
+                  -> ([TyVar] -> TcM (a, TyVarSet))
+                        -- ^ Thing inside returns the set of variables bound
+                        -- in the scope. See Note [Scope-check inferred kinds]
+                  -> TcM (a, TyVarSet)  -- ^ returns augmented bound vars
 -- No cloning: returned TyVars have the same Name as the incoming LHsTyVarBndrs
-tcHsTyVarBndrs orig_hs_tvs thing_inside
+tcExplicitTKBndrs orig_hs_tvs thing_inside
   = go orig_hs_tvs $ \ tvs ->
     do { (result, bound_tvs) <- thing_inside tvs
 
@@ -1425,7 +1425,7 @@ tcHsTyVarBndrs orig_hs_tvs thing_inside
        ; tvs <- checkZonkValidTelescope (interppSP orig_hs_tvs) tvs empty
        ; checkValidInferredKinds tvs bound_tvs empty
 
-       ; traceTc "tcHsTyVarBndrs" $
+       ; traceTc "tcExplicitTKBndrs" $
            vcat [ text "Hs vars:" <+> ppr orig_hs_tvs
                 , text "tvs:" <+> sep (map pprTvBndr tvs) ]
 
