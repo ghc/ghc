@@ -578,6 +578,13 @@ Library
             Dwarf.Types
             Dwarf.Constants
 
+    if !flag(stage1)
+        -- ghc:Serialized moved to ghc-boot:GHC.Serialized.  So for
+        -- compatibility with GHC 7.10 and earlier, we reexport it
+        -- under the old name.
+        reexported-modules:
+            ghc-boot:GHC.Serialized as Serialized
+
     if flag(ghci)
         Exposed-Modules:
             Convert
