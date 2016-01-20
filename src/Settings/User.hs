@@ -6,9 +6,12 @@ module Settings.User (
     verboseCommands, turnWarningsIntoErrors, splitObjects
     ) where
 
+import Base
+import CmdLineFlag
 import GHC
 import Expression
 import Predicates
+import Settings.Default
 
 -- | All build artefacts are stored in 'buildRootPath' directory.
 buildRootPath :: FilePath
@@ -55,9 +58,10 @@ trackBuildSystem = True
 validating :: Bool
 validating = False
 
--- To switch on split objects use 'splitObjects = defaultSplitObjects', see #153
+-- | Control when split objects are generated. Note, due to the GHC bug #11315
+-- it is necessary to do a full clean rebuild when changing this option.
 splitObjects :: Predicate
-splitObjects = return False
+splitObjects = (lift $ cmdSplitObjects) &&^ defaultSplitObjects
 
 dynamicGhcPrograms :: Bool
 dynamicGhcPrograms = False
