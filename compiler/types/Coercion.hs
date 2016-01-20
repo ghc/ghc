@@ -233,12 +233,18 @@ ppr_co p (InstCo co arg) = maybeParen p TyConPrec $
 ppr_co p (UnivCo UnsafeCoerceProv r ty1 ty2)
   = pprPrefixApp p (text "UnsafeCo" <+> ppr r)
                    [pprParendType ty1, pprParendType ty2]
-ppr_co _ (UnivCo p r t1 t2)= angleBrackets ( ppr t1 <> comma <+> ppr t2 ) <> ppr_role r <> ppr_prov
+ppr_co _ (UnivCo p r t1 t2)
+  = char 'U'
+    <> parens (ppr_prov <> comma <+> ppr t1 <> comma <+> ppr t2)
+    <> ppr_role r
   where
     ppr_prov = case p of
-      HoleProv h          -> ppr h
-      PhantomProv kind_co -> braces (ppr kind_co)
-      _                   -> empty
+      HoleProv h          -> text "hole:"   <> ppr h
+      PhantomProv kind_co -> text "phant:"  <> ppr kind_co
+      ProofIrrelProv co   -> text "irrel:"  <> ppr co
+      PluginProv s        -> text "plugin:" <> text s
+      UnsafeCoerceProv    -> text "unsafe"
+
 ppr_co p (SymCo co)          = pprPrefixApp p (text "Sym") [pprParendCo co]
 ppr_co p (NthCo n co)        = pprPrefixApp p (text "Nth:" <> int n) [pprParendCo co]
 ppr_co p (LRCo sel co)       = pprPrefixApp p (ppr sel) [pprParendCo co]
