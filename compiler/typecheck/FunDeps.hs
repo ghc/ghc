@@ -286,7 +286,7 @@ improveClsFD clas_tvs fd
                         -- executed.  What we're doing instead is recording the partial
                         -- work of the ls1/ls2 unification leaving a smaller unification problem
                   where
-                    rtys1' = map (substTy subst) rtys1
+                    rtys1' = map (substTyUnchecked subst) rtys1
 
                     fdeqs = zipAndComputeFDEqs (\_ _ -> False) rtys1' rtys2
                         -- Don't discard anything!
@@ -294,7 +294,7 @@ improveClsFD clas_tvs fd
                         -- eqType again, since we know for sure that /at least one/
                         -- equation in there is useful)
 
-                    meta_tvs = [ setVarType tv (substTy subst (varType tv))
+                    meta_tvs = [ setVarType tv (substTyUnchecked subst (varType tv))
                                | tv <- qtvs, tv `notElemTCvSubst` subst ]
                         -- meta_tvs are the quantified type variables
                         -- that have not been substituted out

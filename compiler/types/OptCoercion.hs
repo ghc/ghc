@@ -91,8 +91,8 @@ optCoercion env co
         (Pair in_ty1  in_ty2,  in_role)  = coercionKindRole co
         (Pair out_ty1 out_ty2, out_role) = coercionKindRole out_co
     in
-    ASSERT2( substTy env in_ty1 `eqType` out_ty1 &&
-             substTy env in_ty2 `eqType` out_ty2 &&
+    ASSERT2( substTyUnchecked env in_ty1 `eqType` out_ty1 &&
+             substTyUnchecked env in_ty2 `eqType` out_ty2 &&
              in_role == out_role
            , text "optCoercion changed types!"
              $$ hang (text "in_co:") 2 (ppr co)
@@ -371,8 +371,8 @@ opt_univ env sym prov role oty1 oty2
     mkForAllCo tv1' eta' (opt_univ env' sym prov role ty1 ty2')
 
   | otherwise
-  = let ty1 = substTy (lcSubstLeft  env) oty1
-        ty2 = substTy (lcSubstRight env) oty2
+  = let ty1 = substTyUnchecked (lcSubstLeft  env) oty1
+        ty2 = substTyUnchecked (lcSubstRight env) oty2
         (a, b) | sym       = (ty2, ty1)
                | otherwise = (ty1, ty2)
     in

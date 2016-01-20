@@ -1529,7 +1529,7 @@ substInteractiveContext ictxt@InteractiveContext{ ic_tythings = tts } subst
   | isEmptyTCvSubst subst = ictxt
   | otherwise             = ictxt { ic_tythings = map subst_ty tts }
   where
-    subst_ty (AnId id) = AnId $ id `setIdType` substTy subst (idType id)
+    subst_ty (AnId id) = AnId $ id `setIdType` substTyUnchecked subst (idType id)
     subst_ty tt        = tt
 
 instance Outputable InteractiveImport where
