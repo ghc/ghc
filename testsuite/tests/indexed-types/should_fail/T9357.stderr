@@ -1,8 +1,4 @@
 
-T9357.hs:7:15: error:
-    • Illegal unlifted type: Int#
-    • In the type instance declaration for ‘F’
-
-T9357.hs:8:15: error:
-    • Illegal polymorphic type: forall a. a -> a
+T9357.hs:12:15: error:
+    • Illegal polymorphic or qualified type: forall a1. a1 -> a1
     • In the type instance declaration for ‘F’
