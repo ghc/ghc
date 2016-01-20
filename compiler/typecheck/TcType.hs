@@ -60,7 +60,6 @@ module TcType (
   tcSplitTyConApp, tcSplitTyConApp_maybe, tcRepSplitTyConApp_maybe,
   tcTyConAppTyCon, tcTyConAppArgs,
   tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, tcRepSplitAppTy_maybe,
-  tcInstHeadTyNotSynonym, tcInstHeadTyAppAllTyVars,
   tcGetTyVar_maybe, tcGetTyVar, nextRole,
   tcSplitSigmaTy, tcDeepSplitSigmaTy_maybe,
 
@@ -205,7 +204,6 @@ import Util
 import Bag
 import Maybes
 import Pair
-import ListSetOps
 import Outputable
 import FastString
 import ErrUtils( Validity(..), MsgDoc, isValid )
@@ -1258,39 +1256,6 @@ tcSplitDFunTy ty
 
 tcSplitDFunHead :: Type -> (Class, [Type])
 tcSplitDFunHead = getClassPredTys
-
-tcInstHeadTyNotSynonym :: Type -> Bool
--- Used in Haskell-98 mode, for the argument types of an instance head
--- These must not be type synonyms, but everywhere else type synonyms
--- are transparent, so we need a special function here
-tcInstHeadTyNotSynonym ty
-  = case ty of
-        TyConApp tc _ -> not (isTypeSynonymTyCon tc)
-        _ -> True
-
-tcInstHeadTyAppAllTyVars :: Type -> Bool
--- Used in Haskell-98 mode, for the argument types of an instance head
--- These must be a constructor applied to type variable arguments.
--- But we allow kind instantiations.
-tcInstHeadTyAppAllTyVars ty
-  | Just ty' <- coreView ty       -- Look through synonyms
-  = tcInstHeadTyAppAllTyVars ty'
-  | otherwise
-  = case ty of
-        TyConApp tc tys         -> ok (filterOutInvisibleTypes tc tys)
-           -- avoid kinds
-
-        ForAllTy (Anon arg) res -> ok [arg, res]
-        _                       -> False
-  where
-        -- Check that all the types are type variables,
-        -- and that each is distinct
-    ok tys = equalLength tvs tys && hasNoDups tvs
-           where
-             tvs = mapMaybe get_tv tys
-
-    get_tv (TyVarTy tv)  = Just tv      -- through synonyms
-    get_tv _             = Nothing
 
 tcEqKind :: TcKind -> TcKind -> Bool
 tcEqKind = tcEqType
