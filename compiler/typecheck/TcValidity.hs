@@ -998,6 +998,48 @@ checkValidInstHead ctxt clas cls_args
     abstract_class_msg =
                 text "Manual instances of this class are not permitted."
 
+tcInstHeadTyNotSynonym :: Type -> Bool
+-- Used in Haskell-98 mode, for the argument types of an instance head
+-- These must not be type synonyms, but everywhere else type synonyms
+-- are transparent, so we need a special function here
+tcInstHeadTyNotSynonym ty
+  = case ty of  -- Do not use splitTyConApp,
+                -- because that expands synonyms!
+        TyConApp tc _ -> not (isTypeSynonymTyCon tc)
+        _ -> True
+
+tcInstHeadTyAppAllTyVars :: Type -> Bool
+-- Used in Haskell-98 mode, for the argument types of an instance head
+-- These must be a constructor applied to type variable arguments.
+-- But we allow kind instantiations.
+tcInstHeadTyAppAllTyVars ty
+  | Just (tc, tys) <- tcSplitTyConApp_maybe (dropCasts ty)
+  = ok (filterOutInvisibleTypes tc tys)  -- avoid kinds
+
+  | otherwise
+  = False
+  where
+        -- Check that all the types are type variables,
+        -- and that each is distinct
+    ok tys = equalLength tvs tys && hasNoDups tvs
+           where
+             tvs = mapMaybe tcGetTyVar_maybe tys
+
+dropCasts :: Type -> Type
+-- See Note [Casts during validity checking]
+-- This function can turn a well-kinded type into an ill-kinded
+-- one, so I've kept it local to this module
+-- To consider: drop only UnivCo(HoleProv) casts
+dropCasts (CastTy ty _)     = dropCasts ty
+dropCasts (AppTy t1 t2)     = mkAppTy (dropCasts t1) (dropCasts t2)
+dropCasts (TyConApp tc tys) = mkTyConApp tc (map dropCasts tys)
+dropCasts (ForAllTy b ty)   = ForAllTy (dropCastsB b) (dropCasts ty)
+dropCasts ty                = ty  -- LitTy, TyVarTy, CoercionTy
+
+dropCastsB :: TyBinder -> TyBinder
+dropCastsB (Anon ty) = Anon (dropCasts ty)
+dropCastsB b         = b   -- Don't bother in the kind of a forall
+
 abstractClassKeys :: [Unique]
 abstractClassKeys = [ heqTyConKey
                     , eqTyConKey
@@ -1010,8 +1052,23 @@ instTypeErr cls tys msg
              2 (quotes (pprClassPred cls tys)))
        2 msg
 
-{- Note [Valid 'deriving' predicate]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Casts during validity checking]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the (bogus)
+     instance Eq Char#
+We elaborate to  'Eq (Char# |> UnivCo(hole))'  where the hole is an
+insoluble equality constraint for * ~ #.  We'll report the insoluble
+constraint separately, but we don't want to *also* complain that Eq is
+not applied to a type constructor.  So we look gaily look through
+CastTys here.
+
+Another example:  Eq (Either a).  Then we actually get a cast in
+the middle:
+   Eq ((Either |> g) a)
+
+
+Note [Valid 'deriving' predicate]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 validDerivPred checks for OK 'deriving' context.  See Note [Exotic
 derived instance contexts] in TcDeriv.  However the predicate is
 here because it uses sizeTypes, fvTypes.
