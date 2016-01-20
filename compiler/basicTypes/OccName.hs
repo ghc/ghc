@@ -71,7 +71,7 @@ module OccName (
         mkPReprTyConOcc,
         mkPADFunOcc,
         mkRecFldSelOcc,
-        mkTyConRepUserOcc, mkTyConRepSysOcc,
+        mkTyConRepOcc,
 
         -- ** Deconstruction
         occNameFS, occNameString, occNameSpace,
@@ -591,7 +591,7 @@ mkDataConWrapperOcc, mkWorkerOcc,
         mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc, mkNewTyCoOcc,
         mkInstTyCoOcc, mkEqPredCoOcc, mkClassOpAuxOcc,
         mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
-        mkTyConRepUserOcc, mkTyConRepSysOcc
+        mkTyConRepOcc
    :: OccName -> OccName
 
 -- These derived variables have a prefix that no Haskell value could have
@@ -617,17 +617,10 @@ mkTag2ConOcc        = mk_simple_deriv varName  "$tag2con_"
 mkMaxTagOcc         = mk_simple_deriv varName  "$maxtag_"
 
 -- TyConRepName stuff; see Note [Grand plan for Typeable] in TcTypeable
--- incluing the wrinkle about mkSpecialTyConRepName
-mkTyConRepSysOcc occ = mk_simple_deriv varName prefix occ
+mkTyConRepOcc occ = mk_simple_deriv varName prefix occ
   where
     prefix | isDataOcc occ = "$tc'"
            | otherwise     = "$tc"
-
-mkTyConRepUserOcc occ = mk_simple_deriv varName prefix occ
-  where
-    -- *User-writable* prefix, for types in gHC_TYPES
-    prefix | isDataOcc occ = "tc'"
-           | otherwise     = "tc"
 
 -- Generic deriving mechanism
 

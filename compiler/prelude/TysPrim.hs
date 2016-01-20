@@ -272,7 +272,7 @@ funTyCon = mkFunTyCon funTyConName kind tc_rep_nm
         -- a prefix way, thus:  (->) Int# Int#.  And this is unusual.
         -- because they are never in scope in the source
 
-    tc_rep_nm = mkSpecialTyConRepName (fsLit "tcFun") funTyConName
+    tc_rep_nm = mkPrelTyConRepName funTyConName
 
 -- One step to remove subkinding.
 -- (->) :: * -> * -> *
@@ -329,7 +329,7 @@ tYPETyConName, unliftedTypeKindTyConName :: Name
 tYPETyCon = mkKindTyCon tYPETyConName
                         (ForAllTy (Anon levityTy) liftedTypeKind)
                         [Nominal]
-                        (mkSpecialTyConRepName (fsLit "tcTYPE") tYPETyConName)
+                        (mkPrelTyConRepName tYPETyConName)
 
    -- See Note [TYPE]
    -- NB: unlifted is wired in because there is no way to parse it in

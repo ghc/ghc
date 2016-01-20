@@ -71,7 +71,7 @@ import TcType
 import MkIface
 import TcSimplify
 import TcTyClsDecls
-import TcTypeable( mkModIdBindings )
+import TcTypeable( mkModIdBindings, mkPrimTypeableBinds )
 import LoadIface
 import TidyPgm    ( mkBootModDetailsTc )
 import RnNames
@@ -475,8 +475,9 @@ tcRnSrcDecls explicit_mod_hdr decls
         -- Do this before processing any data type declarations,
         -- which need tcg_tr_module to be initialised
       ; tcg_env <- mkModIdBindings
+      ; tcg_env <- setGblEnv tcg_env mkPrimTypeableBinds
 
-                -- Do all the declarations
+        -- Do all the declarations
       ; ((tcg_env, tcl_env), lie) <- setGblEnv tcg_env  $
                                      captureConstraints $
               do { (tcg_env, tcl_env) <- tc_rn_src_decls decls ;

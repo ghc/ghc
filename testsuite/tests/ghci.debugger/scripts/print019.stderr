@@ -7,7 +7,7 @@
       These potential instances exist:
         instance Show TypeRep -- Defined in ‘Data.Typeable.Internal’
         instance Show Ordering -- Defined in ‘GHC.Show’
-        instance Show TyCon -- Defined in ‘GHC.Show’
+        instance Show Integer -- Defined in ‘GHC.Show’
         ...plus 30 others
         ...plus 8 instance involving out-of-scope typess
         (use -fprint-potential-instances to see them all)

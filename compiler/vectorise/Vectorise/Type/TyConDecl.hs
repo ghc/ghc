@@ -100,7 +100,7 @@ vectTyConDecl tycon name'
              gadt_flag = isGadtSyntaxTyCon tycon
 
            -- build the vectorised type constructor
-       ; tc_rep_name <- mkDerivedName mkTyConRepUserOcc name'
+       ; tc_rep_name <- mkDerivedName mkTyConRepOcc name'
        ; return $ mkAlgTyCon
                     name'                   -- new name
                     (tyConKind tycon)       -- keep original kind
