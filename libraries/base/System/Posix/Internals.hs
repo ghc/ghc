@@ -348,51 +348,9 @@ setCloseOnExec fd = do
 
 #if !defined(mingw32_HOST_OS)
 type CFilePath = CString
-#define POSIX_FUNCTION(HEADER, NAME) #HEADER ## #NAME
 #else
 type CFilePath = CWString
--- On Windows, POSIX functions follows ISO C++ standards, which 
--- requires the _ prefix for functions.
-#define POSIX_FUNCTION(HEADER, NAME) #HEADER ## "_" ## #NAME
 #endif
-
-foreign import ccall unsafe POSIX_FUNCTION(HsBase.h, access)
-   c_access :: CString -> CInt -> IO CInt
-
-foreign import ccall unsafe POSIX_FUNCTION(HsBase.h, chmod)
-   c_chmod :: CString -> CMode -> IO CInt
-
-foreign import ccall unsafe POSIX_FUNCTION(HsBase.h, close)
-   c_close :: CInt -> IO CInt
-
-foreign import ccall unsafe POSIX_FUNCTION(HsBase.h, creat)
-   c_creat :: CString -> CMode -> IO CInt
-
-foreign import ccall unsafe POSIX_FUNCTION(HsBase.h, dup)
-   c_dup :: CInt -> IO CInt
-
-foreign import ccall unsafe POSIX_FUNCTION(HsBase.h, dup2)
-   c_dup2 :: CInt -> CInt -> IO CInt
-
-foreign import ccall unsafe "HsBase.h __hscore_fstat"
-   c_fstat :: CInt -> Ptr CStat -> IO CInt
-
-foreign import ccall unsafe POSIX_FUNCTION(HsBase.h, isatty)
-   c_isatty :: CInt -> IO CInt
-
-#if defined(mingw32_HOST_OS)
-foreign import ccall unsafe "io.h _lseeki64"
-   c_lseek :: CInt -> Int64 -> CInt -> IO Int64
-#else
--- We use CAPI as on some OSs (eg. Linux) this is wrapped by a macro
--- which redirects to the 64-bit-off_t versions when large file
--- support is enabled.
-foreign import capi unsafe "unistd.h lseek"
-   c_lseek :: CInt -> COff -> CInt -> IO COff
-#endif
-
-foreign import ccall unsafe "HsBase.h __hscore_lstat"
-   lstat :: CFilePath -> Ptr CStat -> IO CInt
 
 foreign import ccall unsafe "HsBase.h __hscore_open"
    c_open :: CFilePath -> CInt -> CMode -> IO CInt
@@ -400,36 +358,132 @@ foreign import ccall unsafe "HsBase.h __hscore_open"
 foreign import ccall safe "HsBase.h __hscore_open"
    c_safe_open :: CFilePath -> CInt -> CMode -> IO CInt
 
+foreign import ccall unsafe "HsBase.h __hscore_fstat"
+   c_fstat :: CInt -> Ptr CStat -> IO CInt
+   
+foreign import ccall unsafe "HsBase.h __hscore_lstat"
+   lstat :: CFilePath -> Ptr CStat -> IO CInt
+
+#if defined(mingw32_HOST_OS)
+foreign import ccall unsafe "io.h _lseeki64"
+   c_lseek :: CInt -> Int64 -> CInt -> IO Int64
+   
+foreign import ccall unsafe "HsBase.h _access"
+   c_access :: CString -> CInt -> IO CInt
+
+foreign import ccall unsafe "HsBase.h _chmod"
+   c_chmod :: CString -> CMode -> IO CInt
+
+foreign import ccall unsafe "HsBase.h _close"
+   c_close :: CInt -> IO CInt
+
+foreign import ccall unsafe "HsBase.h _creat"
+   c_creat :: CString -> CMode -> IO CInt
+
+foreign import ccall unsafe "HsBase.h _dup"
+   c_dup :: CInt -> IO CInt
+
+foreign import ccall unsafe "HsBase.h _dup2"
+   c_dup2 :: CInt -> CInt -> IO CInt
+
+foreign import ccall unsafe "HsBase.h _isatty"
+   c_isatty :: CInt -> IO CInt
+
 -- See Note: CSsize
-foreign import capi unsafe POSIX_FUNCTION(HsBase.h, read)
+foreign import capi unsafe "HsBase.h _read"
    c_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
 -- See Note: CSsize
-foreign import capi safe POSIX_FUNCTION(HsBase.h, read)
+foreign import capi safe "HsBase.h _read"
    c_safe_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
+   
+foreign import ccall unsafe "HsBase.h _umask"
+   c_umask :: CMode -> IO CMode
+
+-- See Note: CSsize
+foreign import capi unsafe "HsBase.h _write"
+   c_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
+
+-- See Note: CSsize
+foreign import capi safe "HsBase.h _write"
+   c_safe_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
+
+foreign import ccall unsafe "HsBase.h _unlink"
+   c_unlink :: CString -> IO CInt   
+
+foreign import ccall unsafe "HsBase.h _pipe"
+   c_pipe :: Ptr CInt -> IO CInt
+   
+foreign import capi unsafe "HsBase.h _utime"
+   c_utime :: CString -> Ptr CUtimbuf -> IO CInt
+
+foreign import ccall unsafe "HsBase.h _getpid"
+   c_getpid :: IO CPid   
+#else
+-- We use CAPI as on some OSs (eg. Linux) this is wrapped by a macro
+-- which redirects to the 64-bit-off_t versions when large file
+-- support is enabled.
+foreign import capi unsafe "unistd.h lseek"
+   c_lseek :: CInt -> COff -> CInt -> IO COff
+   
+foreign import ccall unsafe "HsBase.h access"
+   c_access :: CString -> CInt -> IO CInt
+
+foreign import ccall unsafe "HsBase.h chmod"
+   c_chmod :: CString -> CMode -> IO CInt
+
+foreign import ccall unsafe "HsBase.h close"
+   c_close :: CInt -> IO CInt
+
+foreign import ccall unsafe "HsBase.h creat"
+   c_creat :: CString -> CMode -> IO CInt
+
+foreign import ccall unsafe "HsBase.h dup"
+   c_dup :: CInt -> IO CInt
+
+foreign import ccall unsafe "HsBase.h dup2"
+   c_dup2 :: CInt -> CInt -> IO CInt
+
+foreign import ccall unsafe "HsBase.h isatty"
+   c_isatty :: CInt -> IO CInt
+
+-- See Note: CSsize
+foreign import capi unsafe "HsBase.h read"
+   c_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
+
+-- See Note: CSsize
+foreign import capi safe "HsBase.h read"
+   c_safe_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
+   
+foreign import ccall unsafe "HsBase.h umask"
+   c_umask :: CMode -> IO CMode
+
+-- See Note: CSsize
+foreign import capi unsafe "HsBase.h write"
+   c_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
+
+-- See Note: CSsize
+foreign import capi safe "HsBase.h write"
+   c_safe_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
+
+foreign import ccall unsafe "HsBase.h unlink"
+   c_unlink :: CString -> IO CInt   
+
+foreign import ccall unsafe "HsBase.h pipe"
+   c_pipe :: Ptr CInt -> IO CInt
+   
+foreign import capi unsafe "HsBase.h utime"
+   c_utime :: CString -> Ptr CUtimbuf -> IO CInt
+
+foreign import ccall unsafe "HsBase.h getpid"
+   c_getpid :: IO CPid   
+#endif
 
 foreign import ccall unsafe "HsBase.h __hscore_stat"
    c_stat :: CFilePath -> Ptr CStat -> IO CInt
 
-foreign import ccall unsafe POSIX_FUNCTION(HsBase.h, umask)
-   c_umask :: CMode -> IO CMode
-
--- See Note: CSsize
-foreign import capi unsafe POSIX_FUNCTION(HsBase.h, write)
-   c_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
-
--- See Note: CSsize
-foreign import capi safe POSIX_FUNCTION(HsBase.h, write)
-   c_safe_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
-
 foreign import ccall unsafe "HsBase.h __hscore_ftruncate"
    c_ftruncate :: CInt -> COff -> IO CInt
-
-foreign import ccall unsafe POSIX_FUNCTION(HsBase.h, unlink)
-   c_unlink :: CString -> IO CInt
-
-foreign import ccall unsafe POSIX_FUNCTION(HsBase.h, getpid)
-   c_getpid :: IO CPid
 
 #if !defined(mingw32_HOST_OS)
 foreign import capi unsafe "HsBase.h fcntl"
@@ -451,9 +505,6 @@ foreign import ccall unsafe "HsBase.h link"
 foreign import capi unsafe "HsBase.h mkfifo"
    c_mkfifo :: CString -> CMode -> IO CInt
 
-foreign import ccall unsafe "HsBase.h pipe"
-   c_pipe :: Ptr CInt -> IO CInt
-
 foreign import capi unsafe "signal.h sigemptyset"
    c_sigemptyset :: Ptr CSigset -> IO CInt
 
@@ -470,9 +521,6 @@ foreign import capi unsafe "HsBase.h tcgetattr"
 -- capi is required at least on Android
 foreign import capi unsafe "HsBase.h tcsetattr"
    c_tcsetattr :: CInt -> CInt -> Ptr CTermios -> IO CInt
-
-foreign import capi unsafe "HsBase.h utime"
-   c_utime :: CString -> Ptr CUtimbuf -> IO CInt
 
 foreign import ccall unsafe "HsBase.h waitpid"
    c_waitpid :: CPid -> Ptr CInt -> CInt -> IO CPid

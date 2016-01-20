@@ -1674,6 +1674,7 @@ static void removeOcSymbols (ObjectCode *oc)
     for (i = 0; i < oc->n_symbols; i++) {
         if (oc->symbols[i] != NULL) {
             ghciRemoveSymbolTable(symhash, oc->symbols[i], oc);
+            removeStrHashTable(reqSymHash, oc->symbols[i], NULL); // The string pointer is invalid. Remove it.
         }
     }
 
@@ -2610,7 +2611,7 @@ static HsInt resolveObjs_ (void)
     symbols_n = keysHashTable(reqSymHash, symbols, symbols_n);
     for (int n = 0; n < symbols_n; n++) {
         char* symbol = (char*)symbols[n];
-        if (ghciLookupSymbolOwnerTable(symhash, symbol, &oc)) {
+        if (symbol && ghciLookupSymbolOwnerTable(symhash, symbol, &oc) && oc) {
             oc->loadObject = HS_BOOL_TRUE;
             IF_DEBUG(linker, debugBelch("resolveObjs: picked symbol '%s'\n", symbol));
         }
@@ -2675,6 +2676,7 @@ static HsInt unloadObj_ (pathchar *path, rtsBool just_purge)
                 oc->next = unloaded_objects;
                 unloaded_objects = oc;
                 oc->status = OBJECT_UNLOADED;
+                oc->loadObject = HS_BOOL_FALSE;
                 RELEASE_LOCK(&linker_unloaded_mutex);
                 // We do not own oc any more; it can be released at any time by
                 // the GC in checkUnload().
