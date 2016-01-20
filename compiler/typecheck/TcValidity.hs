@@ -430,8 +430,20 @@ forAllAllowed _                         = False
 ----------------------------------------
 -- | Fail with error message if the type is unlifted
 check_lifted :: TidyEnv -> Type -> TcM ()
+check_lifted _ _ = return ()
+
+{- ------ Legacy comment ---------
+The check_unlifted function seems entirely redundant.  The
+kind system should check for uses of unlifted types.  So I've
+removed the check.  See Trac #11120 comment:19.
+
 check_lifted env ty
   = checkTcM (not (isUnLiftedType ty)) (unliftedArgErr env ty)
+
+unliftedArgErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
+unliftedArgErr env ty = (env, sep [text "Illegal unlifted type:", ppr_tidy env ty])
+------ End of legacy comment --------- -}
+
 
 check_type :: TidyEnv -> UserTypeCtxt -> Rank -> Type -> TcM ()
 -- The args say what the *type context* requires, independent
@@ -598,9 +610,8 @@ forAllEscapeErr env ty tau_kind
          2 (vcat [ text "   type:" <+> ppr_tidy env ty
                  , text "of kind:" <+> ppr_tidy env tau_kind ]) )
 
-unliftedArgErr, ubxArgTyErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
-unliftedArgErr  env ty = (env, sep [text "Illegal unlifted type:", ppr_tidy env ty])
-ubxArgTyErr     env ty = (env, sep [text "Illegal unboxed tuple type as function argument:", ppr_tidy env ty])
+ubxArgTyErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
+ubxArgTyErr env ty = (env, sep [text "Illegal unboxed tuple type as function argument:", ppr_tidy env ty])
 
 kindErr :: TidyEnv -> Kind -> (TidyEnv, SDoc)
 kindErr env kind = (env, sep [text "Expecting an ordinary type, but found a type of kind", ppr_tidy env kind])
