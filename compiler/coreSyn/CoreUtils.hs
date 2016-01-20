@@ -708,6 +708,8 @@ we need delete from the "impossible-default-constructors" all the
 known-con alternatives that we have eliminated. (In Trac #11172 we
 missed the first one.)
 
+-}
+
 combineIdenticalAlts :: [AltCon]    -- Constructors that cannot match DEFAULT
                      -> [CoreAlt]
                      -> (Bool,      -- True <=> something happened
