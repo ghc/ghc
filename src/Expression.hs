@@ -36,17 +36,18 @@ import Stage
 import Target
 import Way
 
--- | @Expr a@ is a computation that produces a value of type @Action a@ and can read
--- parameters of the current build 'Target'.
+-- | @Expr a@ is a computation that produces a value of type @Action a@ and can
+-- read parameters of the current build 'Target'.
 type Expr a = ReaderT Target Action a
 
 -- | @Diff a@ is a /difference list/ containing values of type @a@. A difference
--- list is a list with efficient concatenation, encoded as a value @a -> a@.
--- We could use @Dual (Endo a)@ instead of @Diff a@, but the former may look scary.
+-- list is a list with efficient concatenation, encoded as a value @a -> a@. We
+-- could use @Dual (Endo a)@ instead of @Diff a@, but the former may look scary.
 newtype Diff a = Diff { fromDiff :: a -> a }
 
--- | @DiffExpr a@ is a computation that builds a difference list (i.e., a function
--- of type @'Action' (a -> a)@) and can read parameters of the current build ''Target'.
+-- | @DiffExpr a@ is a computation that builds a difference list (i.e., a
+-- function of type @'Action' (a -> a)@) and can read parameters of the current
+-- build 'Target'.
 type DiffExpr a = Expr (Diff a)
 
 -- Note the reverse order of function composition (y . x), which ensures that
@@ -65,19 +66,19 @@ type Packages  = DiffExpr [Package]
 type Ways      = DiffExpr [Way]
 
 -- Basic operations on expressions:
--- | Transform an expression by applying a given function
+-- | Transform an expression by applying a given function.
 apply :: (a -> a) -> DiffExpr a
 apply = return . Diff
 
--- | Append something to an expression
+-- | Append something to an expression.
 append :: Monoid a => a -> DiffExpr a
 append x = apply (<> x)
 
--- | Remove given elements from a list expression
+-- | Remove given elements from a list expression.
 remove :: Eq a => [a] -> DiffExpr [a]
 remove xs = apply $ filter (`notElem` xs)
 
--- | Remove given pair of elements from a list expression
+-- | Remove given pair of elements from a list expression.
 -- Example: removePair "-flag" "b" ["-flag", "a", "-flag", "b"] = ["-flag", "a"]
 removePair :: Eq a => a -> a -> DiffExpr [a]
 removePair x y = apply filterPair
@@ -87,30 +88,30 @@ removePair x y = apply filterPair
                                 else z1 : filterPair (z2 : zs)
     filterPair zs = zs
 
--- | Apply a predicate to an expression
+-- | Apply a predicate to an expression.
 applyPredicate :: Monoid a => Predicate -> Expr a -> Expr a
 applyPredicate predicate expr = do
     bool <- predicate
     if bool then expr else return mempty
 
--- | Add a single argument to 'Args'
+-- | Add a single argument to 'Args'.
 arg :: String -> Args
 arg = append . return
 
--- | A convenient operator for predicate application
+-- | A convenient operator for predicate application.
 class PredicateLike a where
-    (?)  :: Monoid m => a -> Expr m -> Expr m
+    (?) :: Monoid m => a -> Expr m -> Expr m
 
 infixr 8 ?
 
 instance PredicateLike Predicate where
-    (?)  = applyPredicate
+    (?) = applyPredicate
 
 instance PredicateLike Bool where
-    (?)  = applyPredicate . return
+    (?) = applyPredicate . return
 
 instance PredicateLike (Action Bool) where
-    (?)  = applyPredicate . lift
+    (?) = applyPredicate . lift
 
 -- | @appendSub@ appends a list of sub-arguments to all arguments starting with a
 -- given prefix. If there is no argument with such prefix then a new argument
@@ -141,11 +142,11 @@ filterSub prefix p = apply $ map filterSubstr
         | otherwise             = s
 
 -- | Remove given elements from a list of sub-arguments with a given prefix
--- Example: removeSub "--configure-option=CFLAGS" ["-Werror"]
+-- Example: removeSub "--configure-option=CFLAGS" ["-Werror"].
 removeSub :: String -> [String] -> Args
 removeSub prefix xs = filterSub prefix (`notElem` xs)
 
--- | Interpret a given expression in a given environment
+-- | Interpret a given expression in a given environment.
 interpret :: Target -> Expr a -> Action a
 interpret = flip runReaderT
 
@@ -156,46 +157,46 @@ interpretWithStage :: Stage -> Expr a -> Action a
 interpretWithStage s = interpretPartial $
     PartialTarget s (error "interpretWithStage: package not set")
 
--- | Extract an expression from a difference expression
+-- | Extract an expression from a difference expression.
 fromDiffExpr :: Monoid a => DiffExpr a -> Expr a
 fromDiffExpr = fmap (($ mempty) . fromDiff)
 
--- | Interpret a given difference expression in a given environment
+-- | Interpret a given difference expression in a given environment.
 interpretDiff :: Monoid a => Target -> DiffExpr a -> Action a
 interpretDiff target = interpret target . fromDiffExpr
 
--- | Convenient getters for target parameters
+-- | Convenient getters for target parameters.
 getStage :: Expr Stage
 getStage = asks stage
 
--- | Get the 'Package' of the current 'Target'
+-- | Get the 'Package' of the current 'Target'.
 getPackage :: Expr Package
 getPackage = asks package
 
--- | Get the 'Builder' for the current 'Target'
+-- | Get the 'Builder' for the current 'Target'.
 getBuilder :: Expr Builder
 getBuilder = asks builder
 
--- | Get the 'Way' of the current 'Target'
+-- | Get the 'Way' of the current 'Target'.
 getWay :: Expr Way
 getWay = asks way
 
--- | Get the input files of the current 'Target'
+-- | Get the input files of the current 'Target'.
 getInputs :: Expr [FilePath]
 getInputs = asks inputs
 
--- | Run 'getInputs' and check that the result contains a single input file only
+-- | Run 'getInputs' and check that the result contains one input file only.
 getInput :: Expr FilePath
 getInput = do
     target <- ask
     getSingleton getInputs $
         "getInput: exactly one input file expected in target " ++ show target
 
--- | Get the files produced by the current 'Target'
+-- | Get the files produced by the current 'Target'.
 getOutputs :: Expr [FilePath]
 getOutputs = asks outputs
 
--- | Run 'getOutputs' and check that the result contains a output file only
+-- | Run 'getOutputs' and check that the result contains one output file only.
 getOutput :: Expr FilePath
 getOutput = do
     target <- ask
