@@ -585,7 +585,10 @@ filterAlts _tycon inst_tys imposs_cons alts
     impossible_alt inst_tys (DataAlt con, _, _) = dataConCannotMatch inst_tys con
     impossible_alt _  _                         = False
 
-refineDefaultAlt :: [Unique] -> TyCon -> [Type] -> [AltCon] -> [CoreAlt] -> (Bool, [CoreAlt])
+refineDefaultAlt :: [Unique] -> TyCon -> [Type]
+                 -> [AltCon]  -- Constructors tha cannot match the DEFAULT (if any)
+                 -> [CoreAlt]
+                 -> (Bool, [CoreAlt])
 -- Refine the default alterantive to a DataAlt,
 -- if there is a unique way to do so
 refineDefaultAlt us tycon tys imposs_deflt_cons all_alts
@@ -667,42 +670,70 @@ defeats combineIdenticalAlts (see Trac #7360).
 Note [Care with impossible-constructors when combining alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have (Trac #10538)
-   data T = A | B | C
+   data T = A | B | C | D
 
-   ... case x::T of
+      case x::T of   (Imposs-default-cons {A,B})
          DEFAULT -> e1
          A -> e2
          B -> e1
 
-When calling combineIdentialAlts, we'll have computed that the "impossible
-constructors" for the DEFAULT alt is {A,B}, since if x is A or B we'll
-take the other alternatives.  But suppose we combine B into the DEFAULT,
-to get
-   ... case x::T of
+When calling combineIdentialAlts, we'll have computed that the
+"impossible constructors" for the DEFAULT alt is {A,B}, since if x is
+A or B we'll take the other alternatives.  But suppose we combine B
+into the DEFAULT, to get
+
+      case x::T of   (Imposs-default-cons {A})
          DEFAULT -> e1
          A -> e2
+
 Then we must be careful to trim the impossible constructors to just {A},
 else we risk compiling 'e1' wrong!
--}
 
+Not only that, but we take care when there is no DEFAULT beforehand,
+because we are introducing one.  Consider
 
-combineIdenticalAlts :: [AltCon] -> [CoreAlt] -> (Bool, [AltCon], [CoreAlt])
+   case x of   (Imposs-default-cons {A,B,C})
+     A -> e1
+     B -> e2
+     C -> e1
+
+Then when combining the A and C alternatives we get
+
+   case x of   (Imposs-default-cons {B})
+     DEFAULT -> e1
+     B -> e2
+
+Note that we have a new DEFAULT branch that we didn't have before.  So
+we need delete from the "impossible-default-constructors" all the
+known-con alternatives that we have eliminated. (In Trac #11172 we
+missed the first one.)
+
+combineIdenticalAlts :: [AltCon]    -- Constructors that cannot match DEFAULT
+                     -> [CoreAlt]
+                     -> (Bool,      -- True <=> something happened
+                         [AltCon],  -- New contructors that cannot match DEFAULT
+                         [CoreAlt]) -- New alternatives
 -- See Note [Combine identical alternatives]
--- See Note [Care with impossible-constructors when combining alternatives]
 -- True <=> we did some combining, result is a single DEFAULT alternative
-combineIdenticalAlts imposs_cons ((_con1,bndrs1,rhs1) : con_alts)
+combineIdenticalAlts imposs_deflt_cons ((con1,bndrs1,rhs1) : rest_alts)
   | all isDeadBinder bndrs1    -- Remember the default
-  , not (null eliminated_alts) -- alternative comes first
-  = (True, imposs_cons', deflt_alt : filtered_alts)
+  , not (null elim_rest) -- alternative comes first
+  = (True, imposs_deflt_cons', deflt_alt : filtered_rest)
   where
-    (eliminated_alts, filtered_alts) = partition identical_to_alt1 con_alts
+    (elim_rest, filtered_rest) = partition identical_to_alt1 rest_alts
     deflt_alt = (DEFAULT, [], mkTicks (concat tickss) rhs1)
-    imposs_cons' = imposs_cons `minusList` map fstOf3 eliminated_alts
+
+     -- See Note [Care with impossible-constructors when combining alternatives]
+    imposs_deflt_cons' = imposs_deflt_cons `minusList` elim_cons
+    elim_cons = elim_con1 ++ map fstOf3 elim_rest
+    elim_con1 = case con1 of     -- Don't forget con1!
+                  DEFAULT -> []  -- See Note [
+                  _       -> [con1]
 
     cheapEqTicked e1 e2 = cheapEqExpr' tickishFloatable e1 e2
     identical_to_alt1 (_con,bndrs,rhs)
       = all isDeadBinder bndrs && rhs `cheapEqTicked` rhs1
-    tickss = map (stripTicksT tickishFloatable . thdOf3) eliminated_alts
+    tickss = map (stripTicksT tickishFloatable . thdOf3) elim_rest
 
 combineIdenticalAlts imposs_cons alts
   = (False, imposs_cons, alts)
