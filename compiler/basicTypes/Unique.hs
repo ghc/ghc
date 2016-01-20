@@ -317,15 +317,13 @@ mkCoVarUnique        i = mkUnique 'g' i
 mkPreludeClassUnique i = mkUnique '2' i
 
 --------------------------------------------------
--- Wired-in data constructor keys occupy *three* slots:
---    * u: the DataCon itself
---    * u+1: its worker Id
---    * u+2: the TyConRepName of the promoted TyCon
--- Prelude data constructors are too simple to need wrappers.
-mkPreludeTyConUnique i                = mkUnique '3' (3*i)
-mkTupleTyConUnique Boxed           a  = mkUnique '4' (3*a)
-mkTupleTyConUnique Unboxed         a  = mkUnique '5' (3*a)
-mkCTupleTyConUnique                a  = mkUnique 'k' (3*a)
+-- Wired-in type constructor keys occupy *two* slots:
+--    * u: the TyCon itself
+--    * u+1: the TyConRepName of the TyCon
+mkPreludeTyConUnique i                = mkUnique '3' (2*i)
+mkTupleTyConUnique Boxed           a  = mkUnique '4' (2*a)
+mkTupleTyConUnique Unboxed         a  = mkUnique '5' (2*a)
+mkCTupleTyConUnique                a  = mkUnique 'k' (2*a)
 
 tyConRepNameUnique :: Unique -> Unique
 tyConRepNameUnique  u = incrUnique u

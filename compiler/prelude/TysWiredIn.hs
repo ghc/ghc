@@ -88,17 +88,20 @@ module TysWiredIn (
 
         mkWiredInIdName,    -- used in MkId
 
+        -- * Type representations
+        trModuleTyCon, trModuleDataCon,
+        trNameTyCon, trNameSDataCon, trNameDDataCon,
+        trTyConTyCon, trTyConDataCon,
+
         -- * Levity
         levityTy, levityTyCon, liftedDataCon, unliftedDataCon,
         liftedPromDataCon, unliftedPromDataCon,
         liftedDataConTy, unliftedDataConTy,
         liftedDataConName, unliftedDataConName,
-
-        -- * Helpers for building type representations
-        tyConRepModOcc
     ) where
 
 #include "HsVersions.h"
+#include "MachDeps.h"
 
 import {-# SOURCE #-} MkId( mkDataConWorkId, mkDictSelId )
 
@@ -120,7 +123,7 @@ import RdrName
 import Name
 import NameSet          ( NameSet, mkNameSet, elemNameSet )
 import BasicTypes       ( Arity, RecFlag(..), Boxity(..),
-                           TupleSort(..) )
+                          TupleSort(..) )
 import ForeignCall
 import SrcLoc           ( noSrcSpan )
 import Unique
@@ -135,48 +138,6 @@ alpha_tyvar = [alphaTyVar]
 
 alpha_ty :: [Type]
 alpha_ty = [alphaTy]
-
--- * Some helpers for generating type representations
-
--- | Make a 'Name' for the 'Typeable' representation of the given wired-in type
-mkPrelTyConRepName :: Name -> Name
--- See Note [Grand plan for Typeable] in 'TcTypeable' in TcTypeable.
--- This doesn't really belong here but a refactoring of this code eliminating
--- these manually-defined representations is imminent
-mkPrelTyConRepName tc_name  -- Prelude tc_name is always External,
-                            -- so nameModule will work
-  = mkExternalName rep_uniq rep_mod rep_occ (nameSrcSpan tc_name)
-  where
-    name_occ  = nameOccName tc_name
-    name_mod  = nameModule  tc_name
-    name_uniq = nameUnique  tc_name
-    rep_uniq | isTcOcc name_occ = tyConRepNameUnique   name_uniq
-             | otherwise        = dataConRepNameUnique name_uniq
-    (rep_mod, rep_occ) = tyConRepModOcc name_mod name_occ
-
--- | The name (and defining module) for the Typeable representation (TyCon) of a
--- type constructor.
---
--- See Note [Grand plan for Typeable] in 'TcTypeable' in TcTypeable.
-tyConRepModOcc :: Module -> OccName -> (Module, OccName)
-tyConRepModOcc tc_module tc_occ
-  -- The list type is defined in GHC.Types and therefore must have its
-  -- representations defined manually in Data.Typeable.Internal.
-  -- However, $tc': isn't a valid Haskell identifier, so we override the derived
-  -- name here.
-  | is_wired_in promotedConsDataCon
-  = (tYPEABLE_INTERNAL, mkOccName varName "tc'Cons")
-  | is_wired_in promotedNilDataCon
-  = (tYPEABLE_INTERNAL, mkOccName varName "tc'Nil")
-
-  | tc_module == gHC_TYPES
-  = (tYPEABLE_INTERNAL, mkTyConRepUserOcc tc_occ)
-  | otherwise
-  = (tc_module,         mkTyConRepSysOcc tc_occ)
-  where
-    is_wired_in :: TyCon -> Bool
-    is_wired_in tc =
-      tc_module == gHC_TYPES && tc_occ == nameOccName (tyConName tc)
 
 {-
 ************************************************************************
@@ -227,6 +188,9 @@ wiredInTyCons = [ unitTyCon     -- Not treated like other tuples, because
               , liftedTypeKindTyCon
               , starKindTyCon
               , unicodeStarKindTyCon
+              , trModuleTyCon
+              , trTyConTyCon
+              , trNameTyCon
               ]
 
 mkWiredInTyConName :: BuiltInSyntax -> Module -> FastString -> Unique -> TyCon -> Name
@@ -661,7 +625,7 @@ heqSCSelId, coercibleSCSelId :: Id
   where
     tycon     = mkClassTyCon heqTyConName kind tvs roles
                              rhs klass NonRecursive
-                             (mkSpecialTyConRepName (fsLit "tcHEq") heqTyConName)
+                             (mkPrelTyConRepName heqTyConName)
     klass     = mkClass tvs [] [sc_pred] [sc_sel_id] [] [] (mkAnd []) tycon
     datacon   = pcDataCon heqDataConName tvs [sc_pred] tycon
 
@@ -912,7 +876,7 @@ listTyCon = buildAlgTyCon listTyConName alpha_tyvar [Representational]
                           Nothing []
                           (DataTyCon [nilDataCon, consDataCon] False )
                           Recursive False
-                          (VanillaAlgTyCon (mkSpecialTyConRepName (fsLit "tcList") listTyConName))
+                          (VanillaAlgTyCon $ mkPrelTyConRepName listTyConName)
 
 nilDataCon :: DataCon
 nilDataCon  = pcDataCon nilDataConName alpha_tyvar [] listTyCon
@@ -1099,3 +1063,56 @@ promotedGTDataCon     = promoteDataCon gtDataCon
 promotedConsDataCon, promotedNilDataCon :: TyCon
 promotedConsDataCon   = promoteDataCon consDataCon
 promotedNilDataCon    = promoteDataCon nilDataCon
+
+-- * Type representation types
+-- See Note [Grand plan for Typable] in TcTypeable.
+trModuleTyConName, trNameTyConName, trTyConTyConName :: Name
+trModuleTyConName   = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Module")
+                        trModuleTyConKey trModuleTyCon
+trNameTyConName     = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "TrName")
+                        trNameTyConKey trNameTyCon
+trTyConTyConName    = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "TyCon")
+                        trTyConTyConKey trTyConTyCon
+
+trModuleDataConName, trTyConDataConName,
+  trNameSDataConName, trNameDDataConName :: Name
+trModuleDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "Module")
+                        trModuleDataConKey trModuleDataCon
+trTyConDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "TyCon")
+                        trTyConDataConKey trTyConDataCon
+trNameSDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "TrNameS")
+                        trNameSDataConKey trNameSDataCon
+trNameDDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "TrNameD")
+                        trNameDDataConKey trNameDDataCon
+
+trModuleTyCon :: TyCon
+trModuleTyCon = pcNonRecDataTyCon trModuleTyConName Nothing [] [trModuleDataCon]
+
+trModuleDataCon :: DataCon
+trModuleDataCon = pcDataCon trModuleDataConName [] [trNameTy, trNameTy] trModuleTyCon
+
+trModuleTy :: Type
+trModuleTy = mkTyConTy trModuleTyCon
+
+trNameTyCon :: TyCon
+trNameTyCon = pcNonRecDataTyCon trNameTyConName Nothing [] [trNameSDataCon, trNameDDataCon]
+
+trNameSDataCon, trNameDDataCon :: DataCon
+trNameSDataCon = pcDataCon trNameSDataConName [] [addrPrimTy] trNameTyCon
+trNameDDataCon = pcDataCon trNameDDataConName [] [stringTy] trNameTyCon
+
+trNameTy :: Type
+trNameTy = mkTyConTy trNameTyCon
+
+trTyConTyCon :: TyCon
+trTyConTyCon = pcNonRecDataTyCon trTyConTyConName Nothing [] [trTyConDataCon]
+
+trTyConDataCon :: DataCon
+trTyConDataCon = pcDataCon trTyConDataConName [] [fprint, fprint, trModuleTy, trNameTy] trTyConTyCon
+  where
+    -- TODO: This should be for the target, no?
+#if WORD_SIZE_IN_BITS < 64
+    fprint = word64PrimTy
+#else
+    fprint = wordPrimTy
+#endif

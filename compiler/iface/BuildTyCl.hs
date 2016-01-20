@@ -18,7 +18,7 @@ module BuildTyCl (
 
 import IfaceEnv
 import FamInstEnv( FamInstEnvs, mkNewTypeCoAxiom )
-import TysWiredIn( isCTupleTyConName, tyConRepModOcc )
+import TysWiredIn( isCTupleTyConName )
 import DataCon
 import PatSyn
 import Var
@@ -357,4 +357,4 @@ newTyConRepName tc_name
   , (mod, occ) <- tyConRepModOcc mod (nameOccName tc_name)
   = newGlobalBinder mod occ noSrcSpan
   | otherwise
-  = newImplicitBinder tc_name mkTyConRepUserOcc
+  = newImplicitBinder tc_name mkTyConRepOcc

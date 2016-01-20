@@ -91,6 +91,8 @@ module TyCon(
 
         -- * Runtime type representation
         TyConRepName, tyConRepName_maybe,
+        mkPrelTyConRepName,
+        tyConRepModOcc,
 
         -- * Primitive representations of Types
         PrimRep(..), PrimElemRep(..),
@@ -124,6 +126,8 @@ import FastStringEnv
 import FieldLabel
 import Constants
 import Util
+import Unique( tyConRepNameUnique, dataConRepNameUnique )
+import Module
 
 import qualified Data.Data as Data
 import Data.Typeable (Typeable)
@@ -914,6 +918,31 @@ tyConRepName_maybe (PromotedDataCon { tcRepName = rep_nm })
   = Just rep_nm
 tyConRepName_maybe _ = Nothing
 
+-- | Make a 'Name' for the 'Typeable' representation of the given wired-in type
+mkPrelTyConRepName :: Name -> TyConRepName
+-- See Note [Grand plan for Typeable] in 'TcTypeable' in TcTypeable.
+mkPrelTyConRepName tc_name  -- Prelude tc_name is always External,
+                            -- so nameModule will work
+  = mkExternalName rep_uniq rep_mod rep_occ (nameSrcSpan tc_name)
+  where
+    name_occ  = nameOccName tc_name
+    name_mod  = nameModule  tc_name
+    name_uniq = nameUnique  tc_name
+    rep_uniq | isTcOcc name_occ = tyConRepNameUnique   name_uniq
+             | otherwise        = dataConRepNameUnique name_uniq
+    (rep_mod, rep_occ) = tyConRepModOcc name_mod name_occ
+
+-- | The name (and defining module) for the Typeable representation (TyCon) of a
+-- type constructor.
+--
+-- See Note [Grand plan for Typeable] in 'TcTypeable' in TcTypeable.
+tyConRepModOcc :: Module -> OccName -> (Module, OccName)
+tyConRepModOcc tc_module tc_occ = (rep_module, mkTyConRepOcc tc_occ)
+  where
+    rep_module
+      | tc_module == gHC_PRIM = gHC_TYPES
+      | otherwise             = tc_module
+
 
 {- *********************************************************************
 *                                                                      *
@@ -1196,7 +1225,7 @@ mkTcTyCon name kind
 -- | Create an unlifted primitive 'TyCon', such as @Int#@
 mkPrimTyCon :: Name  -> Kind -> [Role] -> PrimRep -> TyCon
 mkPrimTyCon name kind roles rep
-  = mkPrimTyCon' name kind roles rep True Nothing
+  = mkPrimTyCon' name kind roles rep True (Just $ mkPrelTyConRepName name)
 
 -- | Kind constructors
 mkKindTyCon :: Name -> Kind -> [Role] -> Name -> TyCon
