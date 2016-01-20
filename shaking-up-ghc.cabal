@@ -19,12 +19,12 @@ executable ghc-shake
     hs-source-dirs:      src
     other-modules:       Base
                        , Builder
+                       , CmdLineFlag
                        , Expression
                        , GHC
                        , Oracles
                        , Oracles.ArgsHash
                        , Oracles.Config
-                       , Oracles.Config.CmdLineFlag
                        , Oracles.Config.Flag
                        , Oracles.Config.Setting
                        , Oracles.Dependencies

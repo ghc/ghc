@@ -3,6 +3,7 @@ module Main (main) where
 import Development.Shake
 
 import qualified Base
+import           CmdLineFlag
 import qualified Rules
 import qualified Rules.Cabal
 import qualified Rules.Config
@@ -12,13 +13,13 @@ import qualified Rules.Libffi
 import qualified Rules.Oracles
 import qualified Rules.Perl
 import qualified Test
-import Oracles.Config.CmdLineFlag (putOptions, flags)
 
 main :: IO ()
 main = shakeArgsWith options flags $ \cmdLineFlags targets -> do
-    putOptions cmdLineFlags
-    return . Just $ if null targets then rules else want targets
-        >> withoutActions rules
+    putCmdLineFlags cmdLineFlags
+    return . Just $ if null targets
+                    then rules
+                    else want targets >> withoutActions rules
   where
     rules :: Rules ()
     rules = mconcat

@@ -9,10 +9,10 @@ import qualified System.Directory as IO
 import System.Console.ANSI
 
 import Base
+import CmdLineFlag
 import Expression
 import Oracles
 import Oracles.ArgsHash
-import Oracles.Config.CmdLineFlag (buildInfo, BuildInfoFlag(..))
 import Settings
 import Settings.Args
 import Settings.Builders.Ar
@@ -67,7 +67,7 @@ captureStdout target path argList = do
 
 copyFile :: FilePath -> FilePath -> Action ()
 copyFile source target = do
-    putProgressInfo $ renderAction "Copy file" source target
+    putProgressInfo =<< renderAction "Copy file" source target
     copyFileChanged source target
 
 createDirectory :: FilePath -> Action ()
@@ -83,7 +83,7 @@ removeDirectory dir = do
 -- Note, the source directory is untracked
 moveDirectory :: FilePath -> FilePath -> Action ()
 moveDirectory source target = do
-    putProgressInfo $ renderAction "Move directory" source target
+    putProgressInfo =<< renderAction "Move directory" source target
     liftIO $ IO.renameDirectory source target
 
 -- Transform a given file by applying a function to its contents
@@ -145,7 +145,7 @@ makeExecutable file = do
 
 -- Print out key information about the command being executed
 putInfo :: Target.Target -> Action ()
-putInfo Target.Target {..} = putProgressInfo $ renderAction
+putInfo Target.Target {..} = putProgressInfo =<< renderAction
     ("Run " ++ show builder ++ " (" ++ stageInfo
     ++ "package = " ++ pkgNameString package ++ wayInfo ++ ")")
     (digest inputs)
@@ -157,22 +157,25 @@ putInfo Target.Target {..} = putProgressInfo $ renderAction
     digest [x] = x
     digest (x:xs) = x ++ " (and " ++ show (length xs) ++ " more)"
 
--- | Switch for @putBuild@ filtered through @buildInfo@
+-- | Switch for @putBuild@ filtered through @progressInfo@
 putProgressInfo :: String -> Action ()
-putProgressInfo s | buildInfo /= None = putBuild s
-putProgressInfo _                     = pure ()
+putProgressInfo msg = do
+    skip <- (None ==) <$> cmdProgressInfo
+    unless skip $ putBuild msg
 
 -- | Render an action.
-renderAction :: String -> String -> String -> String
-renderAction what input output = case buildInfo of
-    Normal  -> renderBox [ what
-                         , "     input: " ++ input
-                         , " => output: " ++ output ]
-    Brief   -> "> " ++ what ++ ": " ++ input ++ " => " ++ output
-    Unicorn -> renderUnicorn [ what
+renderAction :: String -> String -> String -> Action String
+renderAction what input output = do
+    style <- cmdProgressInfo
+    return $ case style of
+        Normal  -> renderBox [ what
                              , "     input: " ++ input
                              , " => output: " ++ output ]
-    None    -> ""
+        Brief   -> "| " ++ what ++ ": " ++ input ++ " => " ++ output
+        Unicorn -> renderUnicorn [ what
+                                 , "     input: " ++ input
+                                 , " => output: " ++ output ]
+        None    -> ""
 
 -- | Render the successful build of a program
 renderProgram :: String -> String -> String -> String
