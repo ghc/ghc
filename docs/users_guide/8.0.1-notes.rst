@@ -200,7 +200,7 @@ Compiler
    compilers. The old ``-f``-based warning flags will remain functional for
    the forseeable future.
 
--  Added the option :ghc-flag:`-dth-dec-file`. This dumps out a .th.hs file of
+-  Added the option :ghc-flag:`-dth-dec-file`. This dumps out a ``.th.hs`` file of
    all Template Haskell declarations in a corresponding .hs file. The
    idea is that application developers can check this into their
    repository so that they can grep for identifiers used elsewhere that
@@ -209,6 +209,13 @@ Compiler
    file instead of being coupled to :ghc-flag:`-ddump-to-file` and only outputs
    code that does not exist in the .hs file and a comment for the splice
    location in the original file.
+
+-  After a long hiatus (see :ghc-ticket:`10935`) the
+   :ghc-flag:`-Wmonomorphism-restriction` (formerly
+   :ghc-flag:`-fwarn-monomorphism-restriction`) flag has returned.
+   The functionality of this flag was inadvertently removed by a commit in 2010;
+   this has been fixed and the flag should now issue warnings as it
+   previously did.
 
 -  Added the option :ghc-flag:`-fprint-expanded-types`. When enabled, GHC also
    prints type-synonym-expanded types in type errors.
