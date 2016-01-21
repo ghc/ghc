@@ -785,7 +785,11 @@ lintTyApp :: OutType -> OutType -> LintM OutType
 lintTyApp fun_ty arg_ty
   | Just (tv,body_ty) <- splitForAllTy_maybe fun_ty
   = do  { lintTyKind tv arg_ty
-        ; return (substTyWith [tv] [arg_ty] body_ty) }
+        ; in_scope <- getInScope
+        -- substTy needs the set of tyvars in scope to avoid generating
+        -- uniques that are already in scope.
+        -- See Note [The subsititution invariant] in TyCoRep
+        ; return (substTyWithInScope in_scope [tv] [arg_ty] body_ty) }
 
   | otherwise
   = failWithL (mkTyAppMsg fun_ty arg_ty)
@@ -1685,6 +1689,9 @@ updateTCvSubst subst' m
 
 getTCvSubst :: LintM TCvSubst
 getTCvSubst = LintM (\ env errs -> (Just (le_subst env), errs))
+
+getInScope :: LintM InScopeSet
+getInScope = LintM (\ env errs -> (Just (getTCvInScope $ le_subst env), errs))
 
 applySubstTy :: InType -> LintM OutType
 applySubstTy ty = do { subst <- getTCvSubst; return (substTy subst ty) }
