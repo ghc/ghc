@@ -97,12 +97,13 @@ fixFile file f = do
 runConfigure :: FilePath -> [CmdOption] -> [String] -> Action ()
 runConfigure dir opts args = do
     need [dir -/- "configure"]
+    let note = if null args || args == [""] then "" else " (" ++ intercalate ", " args ++ ")"
     if dir == "."
     then do
-        putBuild $ "| Run configure..."
+        putBuild $ "| Run configure" ++ note ++ "..."
         quietly $ cmd Shell (EchoStdout False) "bash configure" opts' args
     else do
-        putBuild $ "| Run configure in " ++ dir ++ "..."
+        putBuild $ "| Run configure" ++ note ++ " in " ++ dir ++ "..."
         quietly $ cmd Shell (EchoStdout False) [Cwd dir] "bash configure" opts' args
     where
         -- Always configure with bash.

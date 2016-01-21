@@ -61,7 +61,7 @@ flags = [ Option [] ["progress-info"] (OptArg readProgressInfo "STYLE")
         , Option [] ["split-objects"] (NoArg readSplitObjects)
           "Generate split objects (requires a full clean rebuild)."
         , Option [] ["configure"] (OptArg readConfigure "ARGS")
-          "Run boot and configure scripts (passing ARGS to the latter)." ]
+          "Run configure with ARGS (also run boot if necessary)." ]
 
 -- TODO: Avoid unsafePerformIO by using shakeExtra (awaiting Shake's release)
 {-# NOINLINE cmdLineFlags #-}
