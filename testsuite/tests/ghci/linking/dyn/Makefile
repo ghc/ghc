@@ -32,7 +32,7 @@ load_short_name:
 	mkdir bin_short
 	'$(TEST_HC)' $(MY_TEST_HC_OPTS) -odir "bin_short" -shared A.c -o "bin_short/$(call DLL,A)"
 	rm -f bin_short/*.a
-	echo ":q" | "$(TEST_HC)" --interactive -L"./bin_short" -lA -v0
+	echo ":q" | "$(TEST_HC)" --interactive -ignore-dot-ghci -L"./bin_short" -lA -v0
 
 .PHONY: compile_libAS
 compile_libAS:
