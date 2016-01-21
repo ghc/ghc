@@ -153,9 +153,9 @@ openFile fp im =
     (\e -> ioError (addFilePathToIOError "openFile" fp e))
 
 -- | Like 'openFile', but opens the file in ordinary blocking mode.
--- This can be useful for opening a FIFO for reading: if we open in
--- non-blocking mode then the open will fail if there are no writers,
--- whereas a blocking open will block until a writer appears.
+-- This can be useful for opening a FIFO for writing: if we open in
+-- non-blocking mode then the open will fail if there are no readers,
+-- whereas a blocking open will block until a reader appear.
 --
 -- @since 4.4.0.0
 openFileBlocking :: FilePath -> IOMode -> IO Handle
