@@ -48,7 +48,7 @@ import qualified Data.Map as M
 -- separated.
 
 -----------------------------------------------------------------------------
--- Magic Constants
+-- Note [Magic Constants in CmmSwitch]
 --
 -- There are a lot of heuristics here that depend on magic values where it is
 -- hard to determine the "best" value (for whatever that means). These are the
@@ -120,7 +120,7 @@ mkSwitchTargets signed range@(lo,hi) mbdef ids
            | otherwise     = Nothing
 
     -- Drop entries outside the range, if there is a range
-    restrict = M.filterWithKey (\x _ -> lo <= x && x <= hi)
+    restrict = restrictMap (lo,hi)
 
     -- Drop entries that equal the default, if there is a default
     dropDefault | Just l <- mbdef = M.filter (/= l)
@@ -152,9 +152,13 @@ switchTargetsSigned :: SwitchTargets -> Bool
 switchTargetsSigned (SwitchTargets signed _ _ _) = signed
 
 -- | switchTargetsToTable creates a dense jump table, usable for code generation.
--- Returns an offset to add to the value; the list is 0-based on the result.
--- The conversion from Integer to Int is a bit of a wart, but works due to
--- wrap-around arithmetic (as verified by the CmmSwitchTest test case).
+--
+-- Also returns an offset to add to the value; the list is 0-based on the
+-- result of that addition.
+--
+-- The conversion from Integer to Int is a bit of a wart, as the actual
+-- scrutinee might be an unsigned word, but it just works, due to wrap-around
+-- arithmetic (as verified by the CmmSwitchTest test case).
 switchTargetsToTable :: SwitchTargets -> (Int, [Maybe Label])
 switchTargetsToTable (SwitchTargets _ (lo,hi) mbdef branches)
     = (fromIntegral (-start), [ labelFor i | i <- [start..hi] ])
@@ -219,7 +223,7 @@ eqSwitchTargetWith eq (SwitchTargets signed1 range1 mbdef1 ids1) (SwitchTargets 
 -- Code generation for Switches
 
 
--- | A SwitchPlan abstractly descries how a Switch statement ought to be
+-- | A SwitchPlan abstractly describes how a Switch statement ought to be
 -- implemented. See Note [createSwitchPlan]
 data SwitchPlan
     = Unconditionally Label
@@ -235,18 +239,16 @@ data SwitchPlan
 -- smaller pieces suitable for code generation.
 --
 -- createSwitchPlan creates such a switch plan, in these steps:
---  1. it splits the switch statement at segments of non-default values that
---     are too large. See splitAtHoles and Note [When to split SwitchTargets]
+--  1. It splits the switch statement at segments of non-default values that
+--     are too large. See splitAtHoles and Note [Magic Constants in CmmSwitch]
 --  2. Too small jump tables should be avoided, so we break up smaller pieces
 --     in breakTooSmall.
---  3. We will in the segments between those pieces with a jump to the default
+--  3. We fill in the segments between those pieces with a jump to the default
 --     label (if there is one), returning a SeparatedList in mkFlatSwitchPlan
---  4. We find replace two less-than branches by a single equal-to-test in
+--  4. We find and replace two less-than branches by a single equal-to-test in
 --     findSingleValues
 --  5. The thus collected pieces are assembled to a balanced binary tree.
 
-
-type FlatSwitchPlan = SeparatedList Integer SwitchPlan
 
 -- | Does the target support switch out of the box? Then leave this to the
 -- target!
@@ -305,9 +307,12 @@ breakTooSmall m
 ---  Step 3: Fill in the blanks
 ---
 
--- A FlatSwitchPlan is a list of SwitchPlans, seperated by a integer dividing the range.
--- So if we have  [plan1] n [plan2], then we use plan1 if the expression is <
--- n, and plan2 otherwise.
+-- | A FlatSwitchPlan is a list of SwitchPlans, with an integer inbetween every
+-- two entries, dividing the range.
+-- So if we have (abusing list syntax) [plan1,n,plan2], then we use plan1 if
+-- the expression is < n, and plan2 otherwise.
+
+type FlatSwitchPlan = SeparatedList Integer SwitchPlan
 
 mkFlatSwitchPlan :: Bool -> Maybe Label -> (Integer, Integer) -> [M.Map Integer Label] -> FlatSwitchPlan
 
@@ -350,7 +355,7 @@ mkLeafPlan signed mbdef m
 ---  Step 4: Reduce the number of branches using ==
 ---
 
--- A seqence of three unconditional jumps, with the outer two pointing to the
+-- A sequence of three unconditional jumps, with the outer two pointing to the
 -- same value and the bounds off by exactly one can be improved
 findSingleValues :: FlatSwitchPlan -> FlatSwitchPlan
 findSingleValues (Unconditionally l, (i, Unconditionally l2) : (i', Unconditionally l3) : xs)
@@ -394,7 +399,7 @@ divideSL (p,xs) = ((p, xs1), m, (p', xs2))
 -- Other Utilities
 --
 
-restrictMap :: Integral a => (a,a) -> M.Map a b -> M.Map a b
+restrictMap :: (Integer,Integer) -> M.Map Integer b -> M.Map Integer b
 restrictMap (lo,hi) m = mid
   where (_,   mid_hi) = M.split (lo-1) m
         (mid, _) =      M.split (hi+1) mid_hi
