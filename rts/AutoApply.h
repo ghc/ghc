@@ -37,6 +37,17 @@
     Sp_adj(1 + n);                                      \
     jump %ENTRY_CODE(Sp(0)) [R1];
 
+// Just like when we enter a PAP, if we're building a new PAP by applying more
+// arguments to an existing PAP, we must construct the CCS for the new PAP as if
+// we had entered the existing PAP from the current CCS.  Otherwise, we lose any
+// stack information in the existing PAP.  See #5654, and the test T5654b-O0.
+#ifdef PROFILING
+#define ENTER_FUN_CCS_NEW_PAP(pap) \
+  ccall enterFunCCS(BaseReg "ptr", StgHeader_ccs(pap) "ptr");
+#else
+#define ENTER_FUN_CCS_NEW_PAP(pap) /* empty */
+#endif
+
 // Copy the old PAP, build a new one with the extra arg(s)
 // ret addr and m arguments taking up n words are on the stack.
 // NB. x is a dummy argument attached to the 'for' label so that
@@ -51,6 +62,7 @@
      HP_CHK_NP_ASSIGN_SP0(size,f);                              \
      TICK_ALLOC_PAP(size, 0);                                   \
      CCCS_ALLOC(size);                                          \
+     ENTER_FUN_CCS_NEW_PAP(pap);                                \
      new_pap = Hp + WDS(1) - size;                              \
      SET_HDR(new_pap, stg_PAP_info, CCCS);                      \
      StgPAP_arity(new_pap) = HALF_W_(arity - m);                \
