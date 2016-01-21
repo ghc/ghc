@@ -59,8 +59,7 @@ run m = case m of
   EvalString r -> evalString r
   EvalStringToString r s -> evalStringToString r s
   EvalIO r -> evalIO r
-  MkCostCentre mod name src ->
-    toRemotePtr <$> mkCostCentre (fromRemotePtr mod) name src
+  MkCostCentres mod ccs -> mkCostCentres mod ccs
   CostCentreStackInfo ptr -> ccsToStrings (fromRemotePtr ptr)
   NewBreakArray sz -> mkRemoteRef =<< newBreakArray sz
   EnableBreakpoint ref ix b -> do
@@ -324,17 +323,21 @@ mkString bs = B.unsafeUseAsCStringLen bs $ \(cstr,len) -> do
   copyBytes ptr cstr len
   return (castRemotePtr (toRemotePtr ptr))
 
-mkCostCentre :: Ptr CChar -> String -> String -> IO (Ptr CostCentre)
+mkCostCentres :: String -> [(String,String)] -> IO [RemotePtr CostCentre]
 #if defined(PROFILING)
-mkCostCentre c_module decl_path srcspan = do
-  c_name <- newCString decl_path
-  c_srcspan <- newCString srcspan
-  c_mkCostCentre c_name c_module c_srcspan
+mkCostCentres mod ccs = do
+  c_module <- newCString mod
+  mapM (mk_one c_module) ccs
+ where
+  mk_one c_module (decl_path,srcspan) = do
+    c_name <- newCString decl_path
+    c_srcspan <- newCString srcspan
+    toRemotePtr <$> c_mkCostCentre c_name c_module c_srcspan
 
 foreign import ccall unsafe "mkCostCentre"
   c_mkCostCentre :: Ptr CChar -> Ptr CChar -> Ptr CChar -> IO (Ptr CostCentre)
 #else
-mkCostCentre _ _ _ = return nullPtr
+mkCostCentres _ _ = return []
 #endif
 
 getIdValFromApStack :: HValue -> Int -> IO (Maybe HValue)

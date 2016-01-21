@@ -158,26 +158,18 @@ mkCCSArray
   :: HscEnv -> Module -> Int -> [MixEntry_]
   -> IO (Array BreakIndex (RemotePtr GHC.Stack.CCS.CostCentre))
 mkCCSArray hsc_env modul count entries = do
-  if interpreterProfiled (hsc_dflags hsc_env)
+  if interpreterProfiled dflags
     then do
-      let module_bs = fastStringToByteString (moduleNameFS (moduleName modul))
-      c_module <- GHCi.mallocData hsc_env (module_bs `B.snoc` 0)
-        -- NB. null-terminate the string
-      costcentres <-
-        mapM (mkCostCentre hsc_env (castRemotePtr c_module)) entries
+      let module_str = moduleNameString (moduleName modul)
+      costcentres <- GHCi.mkCostCentres hsc_env module_str (map mk_one entries)
       return (listArray (0,count-1) costcentres)
     else do
       return (listArray (0,-1) [])
  where
-    mkCostCentre
-     :: HscEnv
-     -> RemotePtr CChar
-     -> MixEntry_
-     -> IO (RemotePtr GHC.Stack.CCS.CostCentre)
-    mkCostCentre hsc_env@HscEnv{..}  c_module (srcspan, decl_path, _, _) = do
-      let name = concat (intersperse "." decl_path)
-          src = showSDoc hsc_dflags (ppr srcspan)
-      GHCi.mkCostCentre hsc_env c_module name src
+    dflags = hsc_dflags hsc_env
+    mk_one (srcspan, decl_path, _, _) = (name, src)
+      where name = concat (intersperse "." decl_path)
+            src = showSDoc dflags (ppr srcspan)
 #endif
 
 
