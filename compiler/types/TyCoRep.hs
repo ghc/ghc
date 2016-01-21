@@ -90,7 +90,7 @@ module TyCoRep (
         substTyWith, substTyWithCoVars, substTysWith, substTysWithCoVars,
         substCoWith,
         substTy, substTyAddInScope, substTyUnchecked,
-        substTyWithBinders,
+        substTyWithBinders, substTyWithInScope,
         substTys, substTheta,
         lookupTyVar, substTyVarBndr,
         substCo, substCos, substCoVar, substCoVars, lookupCoVar,
@@ -1416,7 +1416,7 @@ data TCvSubst
         -- See Note [Apply Once]
         -- and Note [Extending the TvSubstEnv]
         -- and Note [Substituting types and coercions]
-        -- and Note [Generating the in-scope set for a substitution]
+        -- and Note [The subsititution invariant]
 
 -- | A substitution of 'Type's for 'TyVar's
 --                 and 'Kind's for 'KindVar's
@@ -1489,7 +1489,7 @@ constructor) and the CvSubstEnv should *never* map a TyVar. Furthermore,
 the range of the TvSubstEnv should *never* include a type headed with
 CoercionTy.
 
-Note [Generating the in-scope set for a substitution]
+Note [The subsititution invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When calling substTy subst ty it should be the case that
 the in-scope set in the substitution is a superset of both:
@@ -1788,6 +1788,16 @@ substTyWith :: [TyVar] -> [Type] -> Type -> Type
 substTyWith tvs tys = ASSERT( length tvs == length tys )
                       substTyUnchecked (zipOpenTCvSubst tvs tys)
 
+-- | Substitute tyvars within a type using a known 'InScopeSet'.
+-- Pre-condition: the 'in_scope' set should satisfy Note [The substitution
+-- invariant]; specifically it should include the free vars of 'tys',
+-- and of 'ty' minus the domain of the subst.
+substTyWithInScope :: InScopeSet -> [TyVar] -> [Type] -> Type -> Type
+substTyWithInScope in_scope tvs tys ty =
+  ASSERT( length tvs == length tys )
+  substTy (mkTCvSubst in_scope (tenv, emptyCvSubstEnv)) ty
+  where tenv = zipTyEnv tvs tys
+
 -- | Coercion substitution making use of an 'TCvSubst' that
 -- is assumed to be open, see 'zipOpenTCvSubst'
 substCoWith :: [TyVar] -> [Type] -> Coercion -> Coercion
@@ -1819,7 +1829,7 @@ substTyWithBinders bndrs tys = ASSERT( length bndrs == length tys )
 -- | Substitute within a 'Type' after adding the free variables of the type
 -- to the in-scope set. This is useful for the case when the free variables
 -- aren't already in the in-scope set or easily available.
--- See also Note [Generating the in-scope set for a substitution].
+-- See also Note [The subsititution invariant].
 substTyAddInScope :: TCvSubst -> Type -> Type
 substTyAddInScope subst ty =
   substTy (extendTCvInScopeSet subst $ tyCoVarsOfType ty) ty
@@ -1827,7 +1837,7 @@ substTyAddInScope subst ty =
 -- | When calling `substTy` it should be the case that the in-scope set in
 -- the substitution is a superset of the free vars of the range of the
 -- substitution.
--- See also Note [Generating the in-scope set for a substitution].
+-- See also Note [The subsititution invariant].
 isValidTCvSubst :: TCvSubst -> Bool
 isValidTCvSubst (TCvSubst in_scope tenv cenv) =
   (tenvFVs `varSetInScope` in_scope) &&
@@ -1838,7 +1848,7 @@ isValidTCvSubst (TCvSubst in_scope tenv cenv) =
 
 -- | Substitute within a 'Type'
 -- The substitution has to satisfy the invariants described in
--- Note [Generating the in-scope set for a substitution].
+-- Note [The subsititution invariant].
 
 substTy ::
 -- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
@@ -1867,7 +1877,7 @@ substTy subst@(TCvSubst in_scope tenv cenv) ty
 
 -- | Substitute within a 'Type' disabling the sanity checks.
 -- The problems that the sanity checks in substTy catch are described in
--- Note [Generating the in-scope set for a substitution].
+-- Note [The subsititution invariant].
 -- The goal of #11371 is to migrate all the calls of substTyUnchecked to
 -- substTy and remove this function. Please don't use in new code.
 substTyUnchecked :: TCvSubst -> Type  -> Type
