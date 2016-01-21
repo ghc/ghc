@@ -686,12 +686,33 @@ check_valid_theta env ctxt theta
     (_,dups) = removeDups cmpType theta
 
 -------------------------
+{- Note [Validity checking for constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We look through constraint synonyms so that we can see the underlying
+constraint(s).  For example
+   type Foo = ?x::Int
+   instance Foo => C T
+We should reject the instance because it has an implicit parameter in
+the context.
+
+But we record, in 'under_syn', whether we have looked under a synonym
+to avoid requiring language extensions at the use site.  Main example
+(Trac #9838):
+
+   {-# LANGUAGE ConstraintKinds #-}
+   module A where
+      type EqShow a = (Eq a, Show a)
+
+   module B where
+      import A
+      foo :: EqShow a => a -> String
+
+We don't want to require ConstraintKinds in module B.
+-}
+
 check_pred_ty :: TidyEnv -> DynFlags -> UserTypeCtxt -> PredType -> TcM ()
 -- Check the validity of a predicate in a signature
--- Do not look through any type synonyms; any constraint kinded
--- type synonyms have been checked at their definition site
--- C.f. Trac #9838
-
+-- See Note [Validity checking for constraints]
 check_pred_ty env dflags ctxt pred
   = do { check_type env SigmaCtxt MustBeMonoType pred
        ; check_pred_help False env dflags ctxt pred }
@@ -825,11 +846,12 @@ okIPCtxt GhciCtxt           = True
 okIPCtxt SigmaCtxt          = True
 okIPCtxt (DataTyCtxt {})    = True
 okIPCtxt (PatSynCtxt {})    = True
+okIPCtxt (TySynCtxt {})     = True   -- e.g.   type Blah = ?x::Int
+                                     -- Trac #11466
 
 okIPCtxt (ClassSCCtxt {})  = False
 okIPCtxt (InstDeclCtxt {}) = False
 okIPCtxt (SpecInstCtxt {}) = False
-okIPCtxt (TySynCtxt {})    = False
 okIPCtxt (RuleSigCtxt {})  = False
 okIPCtxt DefaultDeclCtxt   = False
 
