@@ -151,7 +151,9 @@ import UniqFM
 import qualified Data.Data as Data hiding ( TyCon )
 import Data.List
 import Data.IORef ( IORef )   -- for CoercionHole
+#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
 import GHC.Stack (CallStack)
+#endif
 
 {-
 %************************************************************************
@@ -1844,7 +1846,13 @@ isValidTCvSubst (TCvSubst in_scope tenv cenv) =
 -- | Substitute within a 'Type'
 -- The substitution has to satisfy the invariants described in
 -- Note [Generating the in-scope set for a substitution].
-substTy :: (?callStack :: CallStack) => TCvSubst -> Type  -> Type
+
+substTy ::
+-- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
+#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
+    (?callStack :: CallStack) =>
+#endif
+    TCvSubst -> Type  -> Type
 substTy subst@(TCvSubst in_scope tenv cenv) ty
   | isEmptyTCvSubst subst = ty
   | otherwise = ASSERT2( isValidTCvSubst subst,
