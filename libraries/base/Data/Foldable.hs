@@ -125,28 +125,74 @@ class Foldable t where
 
     -- | Right-associative fold of a structure.
     --
-    -- @'foldr' f z = 'Prelude.foldr' f z . 'toList'@
+    -- In the case of lists, 'foldr', when applied to a binary operator, a
+    -- starting value (typically the right-identity of the operator), and a
+    -- list, reduces the list using the binary operator, from right to left:
+    --
+    -- > foldr f z [x1, x2, ..., xn] == x1 `f` (x2 `f` ... (xn `f` z)...)
+    --
+    -- Note that, since the head of the resulting expression is produced by
+    -- an application of the operator to the first element of the list,
+    -- 'foldr' can produce a terminating expression from an infinite list.
+    --
+    -- For a general 'Foldable' structure this should be semantically identical
+    -- to,
+    --
+    -- @foldr f z = 'List.foldr' f z . 'toList'@
+    --
     foldr :: (a -> b -> b) -> b -> t a -> b
     foldr f z t = appEndo (foldMap (Endo #. f) t) z
 
-    -- | Right-associative fold of a structure,
-    -- but with strict application of the operator.
+    -- | Right-associative fold of a structure, but with strict application of
+    -- the operator.
+    --
     foldr' :: (a -> b -> b) -> b -> t a -> b
     foldr' f z0 xs = foldl f' id xs z0
       where f' k x z = k $! f x z
 
     -- | Left-associative fold of a structure.
     --
-    -- @'foldl' f z = 'Prelude.foldl' f z . 'toList'@
+    -- In the case of lists, 'foldl', when applied to a binary
+    -- operator, a starting value (typically the left-identity of the operator),
+    -- and a list, reduces the list using the binary operator, from left to
+    -- right:
+    --
+    -- > foldl f z [x1, x2, ..., xn] == (...((z `f` x1) `f` x2) `f`...) `f` xn
+    --
+    -- Note that to produce the outermost application of the operator the
+    -- entire input list must be traversed. This means that 'foldl'' will
+    -- diverge if given an infinite list.
+    --
+    -- Also note that if you want an efficient left-fold, you probably want to
+    -- use 'foldl'' instead of 'foldl'. The reason for this is that latter does
+    -- not force the "inner" results (e.g. @z `f` x1@ in the above example)
+    -- before applying them to the operator (e.g. to @(`f` x2)@). This results
+    -- in a thunk chain @O(n)@ elements long, which then must be evaluated from
+    -- the outside-in.
+    --
+    -- For a general 'Foldable' structure this should be semantically identical
+    -- to,
+    --
+    -- @foldl f z = 'List.foldl' f z . 'toList'@
+    --
     foldl :: (b -> a -> b) -> b -> t a -> b
     foldl f z t = appEndo (getDual (foldMap (Dual . Endo . flip f) t)) z
     -- There's no point mucking around with coercions here,
     -- because flip forces us to build a new function anyway.
 
-    -- | Left-associative fold of a structure.
-    -- but with strict application of the operator.
+    -- | Left-associative fold of a structure but with strict application of
+    -- the operator.
     --
-    -- @'foldl' f z = 'List.foldl'' f z . 'toList'@
+    -- This ensures that each step of the fold is forced to weak head normal
+    -- form before being applied, avoiding the collection of thunks that would
+    -- otherwise occur. This is often what you want to strictly reduce a finite
+    -- list to a single, monolithic result (e.g. 'length').
+    --
+    -- For a general 'Foldable' structure this should be semantically identical
+    -- to,
+    --
+    -- @foldl f z = 'List.foldl'' f z . 'toList'@
+    --
     foldl' :: (b -> a -> b) -> b -> t a -> b
     foldl' f z0 xs = foldr f' id xs z0
       where f' x k z = k $! f z x
@@ -154,7 +200,7 @@ class Foldable t where
     -- | A variant of 'foldr' that has no base case,
     -- and thus may only be applied to non-empty structures.
     --
-    -- @'foldr1' f = 'Prelude.foldr1' f . 'toList'@
+    -- @'foldr1' f = 'List.foldr1' f . 'toList'@
     foldr1 :: (a -> a -> a) -> t a -> a
     foldr1 f xs = fromMaybe (errorWithoutStackTrace "foldr1: empty structure")
                     (foldr mf Nothing xs)
@@ -166,7 +212,7 @@ class Foldable t where
     -- | A variant of 'foldl' that has no base case,
     -- and thus may only be applied to non-empty structures.
     --
-    -- @'foldl1' f = 'Prelude.foldl1' f . 'toList'@
+    -- @'foldl1' f = 'List.foldl1' f . 'toList'@
     foldl1 :: (a -> a -> a) -> t a -> a
     foldl1 f xs = fromMaybe (errorWithoutStackTrace "foldl1: empty structure")
                     (foldl mf Nothing xs)
