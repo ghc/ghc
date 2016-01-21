@@ -1,16 +1,17 @@
 module Rules.Config (configRules) where
 
 import Base
-import Settings.User
+import CmdLineFlag
+import Rules.Actions
 
--- TODO: Consider removing this file.
 configRules :: Rules ()
-configRules = when buildSystemConfigFile $ do
-    configPath -/- "system.config" %> \_ -> do
-        need [configPath -/- "system.config.in", "configure"]
-        putBuild "Running configure..."
-        cmd "bash configure" -- TODO: get rid of 'bash'
+configRules = case cmdConfigure of
+    SkipConfigure     -> mempty
+    RunConfigure args -> do
+        configPath -/- "system.config" %> \_ -> do
+            need [configPath -/- "system.config.in"]
+            runConfigure "." [] [args]
 
-    "configure" %> \_ -> do
-        putBuild "Running autoconf..."
-        cmd "bash autoconf" -- TODO: get rid of 'bash'
+        "configure" %> \_ -> do
+            putBuild "| Running boot..."
+            unit $ cmd "perl boot"

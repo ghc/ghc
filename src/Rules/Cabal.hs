@@ -8,7 +8,6 @@ import Distribution.PackageDescription.Parse
 import Distribution.Verbosity
 import Expression
 import GHC
-import Rules.Actions
 import Settings
 
 cabalRules :: Rules ()

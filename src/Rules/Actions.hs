@@ -67,7 +67,7 @@ captureStdout target path argList = do
 
 copyFile :: FilePath -> FilePath -> Action ()
 copyFile source target = do
-    putProgressInfo =<< renderAction "Copy file" source target
+    putProgressInfo $ renderAction "Copy file" source target
     copyFileChanged source target
 
 createDirectory :: FilePath -> Action ()
@@ -83,7 +83,7 @@ removeDirectory dir = do
 -- Note, the source directory is untracked
 moveDirectory :: FilePath -> FilePath -> Action ()
 moveDirectory source target = do
-    putProgressInfo =<< renderAction "Move directory" source target
+    putProgressInfo $ renderAction "Move directory" source target
     liftIO $ IO.renameDirectory source target
 
 -- Transform a given file by applying a function to its contents
@@ -97,8 +97,13 @@ fixFile file f = do
 runConfigure :: FilePath -> [CmdOption] -> [String] -> Action ()
 runConfigure dir opts args = do
     need [dir -/- "configure"]
-    putBuild $ "| Run configure in " ++ dir ++ "..."
-    quietly $ cmd Shell (EchoStdout False) [Cwd dir] "bash configure" opts' args
+    if dir == "."
+    then do
+        putBuild $ "| Run configure..."
+        quietly $ cmd Shell (EchoStdout False) "bash configure" opts' args
+    else do
+        putBuild $ "| Run configure in " ++ dir ++ "..."
+        quietly $ cmd Shell (EchoStdout False) [Cwd dir] "bash configure" opts' args
     where
         -- Always configure with bash.
         -- This also injects /bin/bash into `libtool`, instead of /bin/sh
@@ -145,7 +150,7 @@ makeExecutable file = do
 
 -- Print out key information about the command being executed
 putInfo :: Target.Target -> Action ()
-putInfo Target.Target {..} = putProgressInfo =<< renderAction
+putInfo Target.Target {..} = putProgressInfo $ renderAction
     ("Run " ++ show builder ++ " (" ++ stageInfo
     ++ "package = " ++ pkgNameString package ++ wayInfo ++ ")")
     (digest inputs)
@@ -157,25 +162,21 @@ putInfo Target.Target {..} = putProgressInfo =<< renderAction
     digest [x] = x
     digest (x:xs) = x ++ " (and " ++ show (length xs) ++ " more)"
 
--- | Switch for @putBuild@ filtered through @progressInfo@
+-- | Version of @putBuild@ controlled by @progressInfo@ command line flag.
 putProgressInfo :: String -> Action ()
-putProgressInfo msg = do
-    skip <- (None ==) <$> cmdProgressInfo
-    unless skip $ putBuild msg
+putProgressInfo msg = when (cmdProgressInfo /= None) $ putBuild msg
 
 -- | Render an action.
-renderAction :: String -> String -> String -> Action String
-renderAction what input output = do
-    style <- cmdProgressInfo
-    return $ case style of
-        Normal  -> renderBox [ what
+renderAction :: String -> String -> String -> String
+renderAction what input output = case cmdProgressInfo of
+    Normal  -> renderBox [ what
+                         , "     input: " ++ input
+                         , " => output: " ++ output ]
+    Brief   -> "| " ++ what ++ ": " ++ input ++ " => " ++ output
+    Unicorn -> renderUnicorn [ what
                              , "     input: " ++ input
                              , " => output: " ++ output ]
-        Brief   -> "| " ++ what ++ ": " ++ input ++ " => " ++ output
-        Unicorn -> renderUnicorn [ what
-                                 , "     input: " ++ input
-                                 , " => output: " ++ output ]
-        None    -> ""
+    None    -> ""
 
 -- | Render the successful build of a program
 renderProgram :: String -> String -> String -> String

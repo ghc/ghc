@@ -2,8 +2,8 @@ module Settings.User (
     buildRootPath, trackBuildSystem, compileInterfaceFilesSeparately,
     userArgs, userPackages, userLibraryWays, userRtsWays, userKnownPackages,
     integerLibrary, buildHaddock, validating, ghciWithDebugger, ghcProfiled,
-    ghcDebugged, dynamicGhcPrograms, laxDependencies, buildSystemConfigFile,
-    verboseCommands, turnWarningsIntoErrors, splitObjects
+    ghcDebugged, dynamicGhcPrograms, laxDependencies, verboseCommands,
+    turnWarningsIntoErrors, splitObjects
     ) where
 
 import Base
@@ -61,7 +61,7 @@ validating = False
 -- | Control when split objects are generated. Note, due to the GHC bug #11315
 -- it is necessary to do a full clean rebuild when changing this option.
 splitObjects :: Predicate
-splitObjects = (lift $ cmdSplitObjects) &&^ defaultSplitObjects
+splitObjects = (return cmdSplitObjects) &&^ defaultSplitObjects
 
 dynamicGhcPrograms :: Bool
 dynamicGhcPrograms = False
@@ -85,9 +85,6 @@ laxDependencies = False
 
 buildHaddock :: Predicate
 buildHaddock = return False -- FIXME: should be return True, see #98
-
-buildSystemConfigFile :: Bool
-buildSystemConfigFile = False
 
 -- | Set to True to print full command lines during the build process. Note,
 -- this is a Predicate, hence you can enable verbose output for a chosen package
