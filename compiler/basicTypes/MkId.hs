@@ -1375,7 +1375,8 @@ no further floating will occur. This allows us to safely inline things like
 While the definition of @GHC.Magic.runRW#@, we override its type in @MkId@
 to be open-kinded,
 
-    runRW# :: (o :: OpenKind) => (State# RealWorld -> (# State# RealWorld, o #))
+    runRW# :: forall (lev :: Levity). (o :: TYPE lev)
+           => (State# RealWorld -> (# State# RealWorld, o #))
                               -> (# State# RealWorld, o #)
 
 
