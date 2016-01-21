@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 -----------------------------------------------------------------------------
 -- |
@@ -92,6 +93,12 @@ data InstalledPackageInfo srcpkgid srcpkgname unitid modulename
      }
   deriving (Eq, Show)
 
+-- | A convenience constraint synonym for common constraints over parameters
+-- to 'InstalledPackageInfo'.
+type RepInstalledPackageInfo srcpkgid srcpkgname unitid modulename =
+    (BinaryStringRep srcpkgid, BinaryStringRep srcpkgname,
+     BinaryStringRep unitid, BinaryStringRep modulename)
+
 -- | An original module is a fully-qualified module name (installed package ID
 -- plus module name) representing where a module was *originally* defined
 -- (i.e., the 'exposedReexport' field of the original ExposedModule entry should
@@ -127,8 +134,7 @@ class BinaryStringRep a where
   fromStringRep :: BS.ByteString -> a
   toStringRep   :: a -> BS.ByteString
 
-emptyInstalledPackageInfo :: (BinaryStringRep a, BinaryStringRep b,
-                              BinaryStringRep c)
+emptyInstalledPackageInfo :: RepInstalledPackageInfo a b c d
                           => InstalledPackageInfo a b c d
 emptyInstalledPackageInfo =
   InstalledPackageInfo {
@@ -159,8 +165,7 @@ emptyInstalledPackageInfo =
 
 -- | Read the part of the package DB that GHC is interested in.
 --
-readPackageDbForGhc :: (BinaryStringRep a, BinaryStringRep b, BinaryStringRep c,
-                        BinaryStringRep d) =>
+readPackageDbForGhc :: RepInstalledPackageInfo a b c d =>
                        FilePath -> IO [InstalledPackageInfo a b c d]
 readPackageDbForGhc file =
     decodeFromFile file getDbForGhc
@@ -193,8 +198,7 @@ readPackageDbForGhcPkg file =
 
 -- | Write the whole of the package DB, both parts.
 --
-writePackageDb :: (Binary pkgs, BinaryStringRep a, BinaryStringRep b,
-                   BinaryStringRep c, BinaryStringRep d) =>
+writePackageDb :: (Binary pkgs, RepInstalledPackageInfo a b c d) =>
                   FilePath -> [InstalledPackageInfo a b c d] -> pkgs -> IO ()
 writePackageDb file ghcPkgs ghcPkgPart =
     writeFileAtomic file (runPut putDbForGhcPkg)
@@ -281,8 +285,7 @@ writeFileAtomic targetPath content = do
         hClose handle
         renameFile tmpPath targetPath)
 
-instance (BinaryStringRep a, BinaryStringRep b, BinaryStringRep c,
-          BinaryStringRep d) =>
+instance (RepInstalledPackageInfo a b c d) =>
          Binary (InstalledPackageInfo a b c d) where
   put (InstalledPackageInfo
          unitId sourcePackageId
