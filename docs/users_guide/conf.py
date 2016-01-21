@@ -147,6 +147,8 @@ def parse_flag(env, sig, signode):
 def setup(app):
     from sphinx.util.docfields import Field, TypedField
 
+    increase_python_stack()
+
     # the :ghci-cmd: directive used in ghci.rst
     app.add_object_type('ghci-cmd', 'ghci-cmd',
                         parse_node=parse_ghci_cmd,
@@ -171,3 +173,11 @@ def setup(app):
                             Field('since', label='Introduced in GHC version', names=['since']),
                             Field('static')
                         ])
+
+def increase_python_stack():
+    # Workaround sphinx-build recursion limit overflow:
+    # pickle.dump(doctree, f, pickle.HIGHEST_PROTOCOL)
+    #  RuntimeError: maximum recursion depth exceeded while pickling an object
+    #
+    # Default python allows recursion depth of 1000 calls.
+    sys.setrecursionlimit(10000)
