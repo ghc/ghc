@@ -47,9 +47,19 @@ test('scc003', [req_profiling,
      compile_and_run,
      ['-fno-state-hack']) # Note [consistent stacks]
 
-test('scc004', [req_profiling,
+test('T5654', [req_profiling,
                 extra_ways(['prof']), only_ways(prof_ways),
                 expect_broken(5654)],
+     compile_and_run,
+     [''])
+
+test('T5654b-O0', [req_profiling,
+                extra_ways(['prof']), only_ways(['prof'])],
+     compile_and_run,
+     [''])
+
+test('T5654b-O1', [req_profiling,
+                only_ways(['profasm'])],
      compile_and_run,
      [''])
 
