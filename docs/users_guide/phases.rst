@@ -182,6 +182,11 @@ Options affecting the C pre-processor
 The GHC driver pre-defines several macros when processing Haskell source
 code (``.hs`` or ``.lhs`` files).
 
+.. _standard-cpp-macros:
+
+Standard CPP macros
+~~~~~~~~~~~~~~~~~~~
+
 The symbols defined by GHC are listed below. To check which symbols are
 defined by your local GHC installation, the following trick is useful:
 
@@ -258,7 +263,7 @@ defined by your local GHC installation, the following trick is useful:
     is required, the presence of the ``MIN_VERSION_GLASGOW_HASKELL``
     macro needs to be ensured before it is called, e.g.:
 
-    .. code-block: c
+    .. code-block:: c
 
         #ifdef MIN_VERSION_GLASGOW_HASKELL
         #if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
@@ -451,6 +456,7 @@ Options affecting code generation
     no-op on that platform.
 
 .. ghc-flag:: -dynamic
+    :noindex:
 
     When generating code, assume that entities imported from a different
     package will reside in a different shared library or binary.

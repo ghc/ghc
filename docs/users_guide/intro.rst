@@ -175,3 +175,6 @@ numbering GHC versions:
 The version number of your copy of GHC can be found by invoking ``ghc``
 with the ``--version`` flag (see :ref:`options-help`).
 
+The compiler version can be tested within compiled code with the
+``MIN_VERSION_GLASGOW_HASKELL`` CPP macro (defined only when
+:ghc-flag:`-XCPP` is used). See :ref:`standard-cpp-macros` for details. 
