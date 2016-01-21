@@ -13,7 +13,7 @@ module GHCi
   , evalString
   , evalStringToIOString
   , mallocData
-  , mkCostCentre
+  , mkCostCentres
   , costCentreStackInfo
   , newBreakArray
   , enableBreakpoint
@@ -65,7 +65,6 @@ import Data.Binary
 import Data.ByteString (ByteString)
 import Data.IORef
 import Foreign
-import Foreign.C
 import GHC.Stack.CCS (CostCentre,CostCentreStack)
 import System.Exit
 import Data.Maybe
@@ -253,10 +252,10 @@ evalStringToIOString hsc_env fhv str = do
 mallocData :: HscEnv -> ByteString -> IO (RemotePtr ())
 mallocData hsc_env bs = iservCmd hsc_env (MallocData bs)
 
-mkCostCentre
-  :: HscEnv -> RemotePtr CChar -> String -> String -> IO (RemotePtr CostCentre)
-mkCostCentre hsc_env c_module name src =
-  iservCmd hsc_env (MkCostCentre c_module name src)
+mkCostCentres
+  :: HscEnv -> String -> [(String,String)] -> IO [RemotePtr CostCentre]
+mkCostCentres hsc_env mod ccs =
+  iservCmd hsc_env (MkCostCentres mod ccs)
 
 
 costCentreStackInfo :: HscEnv -> RemotePtr CostCentreStack -> IO [String]

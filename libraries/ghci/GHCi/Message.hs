@@ -32,7 +32,6 @@ import qualified Data.ByteString.Lazy as LB
 import Data.Dynamic
 import Data.IORef
 import Data.Map (Map)
-import Foreign.C
 import GHC.Generics
 import GHC.Stack.CCS
 import qualified Language.Haskell.TH        as TH
@@ -122,12 +121,11 @@ data Message a where
    :: HValueRef {- IO a -}
    -> Message (EvalResult ())
 
-  -- | Create a CostCentre
-  MkCostCentre
-   :: RemotePtr CChar    -- module, RemotePtr so it can be shared
-   -> String       -- name
-   -> String       -- SrcSpan
-   -> Message (RemotePtr CostCentre)
+  -- | Create a set of CostCentres with the same module name
+  MkCostCentres
+   :: String     -- module, RemotePtr so it can be shared
+   -> [(String,String)] -- (name, SrcSpan)
+   -> Message [RemotePtr CostCentre]
 
   -- | Show a 'CostCentreStack' as a @[String]@
   CostCentreStackInfo
@@ -334,7 +332,7 @@ getMessage = do
       21 -> Msg <$> (EvalString <$> get)
       22 -> Msg <$> (EvalStringToString <$> get <*> get)
       23 -> Msg <$> (EvalIO <$> get)
-      24 -> Msg <$> (MkCostCentre <$> get <*> get <*> get)
+      24 -> Msg <$> (MkCostCentres <$> get <*> get)
       25 -> Msg <$> (CostCentreStackInfo <$> get)
       26 -> Msg <$> (NewBreakArray <$> get)
       27 -> Msg <$> (EnableBreakpoint <$> get <*> get <*> get)
@@ -389,7 +387,7 @@ putMessage m = case m of
   EvalString val              -> putWord8 21 >> put val
   EvalStringToString str val  -> putWord8 22 >> put str >> put val
   EvalIO val                  -> putWord8 23 >> put val
-  MkCostCentre mod name src   -> putWord8 24 >> put mod >> put name >> put src
+  MkCostCentres mod ccs       -> putWord8 24 >> put mod >> put ccs
   CostCentreStackInfo ptr     -> putWord8 25 >> put ptr
   NewBreakArray sz            -> putWord8 26 >> put sz
   EnableBreakpoint arr ix b   -> putWord8 27 >> put arr >> put ix >> put b
