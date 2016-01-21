@@ -459,8 +459,8 @@ test('T365',
       compile_fail,
       [''])
 
-test('T9360a', normal, run_command, ['{compiler} --interactive -e ""'])
-test('T9360b', normal, run_command, ['{compiler} -e "" --interactive'])
+test('T9360a', normal, run_command, ['{compiler} --interactive -e "" -ignore-dot-ghci'])
+test('T9360b', normal, run_command, ['{compiler} -e "" --interactive -ignore-dot-ghci'])
 
 test('T10970', normal, compile_and_run, ['-hide-all-packages -package base -package containers'])
 test('T10970a', normal, compile_and_run, [''])
