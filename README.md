@@ -82,6 +82,8 @@ The new build system still lacks many important features:
 * Build flavours and conventional command line flags are not implemented: [#188][flavours-issue].
 * Cross-compilation is not implemented: [#177][cross-compilation-issue].
 
+Check out [milestones] to see when we hope to resolve the above limitations.
+
 How to contribute
 -----------------
 
@@ -95,7 +97,7 @@ Acknowledgements
 ----------------
 
 I started this project as part of my 6-month research visit to Microsoft
-Research in Cambridge, which was funded by Newcastle University, EPSRC, and
+Research Cambridge, which was funded by Newcastle University, EPSRC, and
 Microsoft Research. I would like to thank Simon Peyton Jones, Neil Mitchell
 and Simon Marlow for kick-starting the project and for their guidance. Last
 but not least, big thanks to the project [contributors][contributors], who
@@ -119,6 +121,7 @@ helped me endure and enjoy the project.
 [validation-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/187
 [flavours-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/188
 [cross-compilation-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/177
+[milestones]: https://github.com/snowleopard/shaking-up-ghc/milestones
 [comments-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/55
 [doc-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/56
 [contributors]: https://github.com/snowleopard/shaking-up-ghc/graphs/contributors
