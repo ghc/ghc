@@ -6,6 +6,7 @@ import qualified Base
 import           CmdLineFlag
 import qualified Rules
 import qualified Rules.Cabal
+import qualified Rules.Clean
 import qualified Rules.Config
 import qualified Rules.Generate
 import qualified Rules.Gmp
@@ -24,6 +25,7 @@ main = shakeArgsWith options flags $ \cmdLineFlags targets -> do
     rules :: Rules ()
     rules = mconcat
         [ Rules.Cabal.cabalRules
+        , Rules.Clean.cleanRules
         , Rules.Config.configRules
         , Rules.Generate.copyRules
         , Rules.Generate.generateRules

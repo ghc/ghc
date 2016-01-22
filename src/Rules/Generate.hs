@@ -1,6 +1,6 @@
 module Rules.Generate (
     generatePackageCode, generateRules, installTargets, copyRules,
-    derivedConstantsPath, generatedDependencies
+    includesDependencies, derivedConstantsPath, generatedDependencies
     ) where
 
 import Base
