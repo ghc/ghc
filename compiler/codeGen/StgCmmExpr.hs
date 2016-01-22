@@ -697,8 +697,10 @@ cgIdApp fun_id args = do
         fun_name    = idName    cg_fun_id
         fun         = idInfoToAmode fun_info
         lf_info     = cg_lf         fun_info
+        n_args      = length args
+        v_args      = length $ filter (isVoidTy . stgArgType) args
         node_points dflags = nodeMustPointToIt dflags lf_info
-    case (getCallMethod dflags fun_name cg_fun_id lf_info (length args) (cg_loc fun_info) self_loop_info) of
+    case getCallMethod dflags fun_name cg_fun_id lf_info n_args v_args (cg_loc fun_info) self_loop_info of
 
             -- A value in WHNF, so we can just return it.
         ReturnIt -> emitReturn [fun]    -- ToDo: does ReturnIt guarantee tagged?
@@ -802,14 +804,36 @@ cgIdApp fun_id args = do
 --     of call will be generated. getCallMethod decides to generate a self
 --     recursive tail call when (a) environment stores information about
 --     possible self tail-call; (b) that tail call is to a function currently
---     being compiled; (c) number of passed arguments is equal to function's
---     arity. (d) loopification is turned on via -floopification command-line
---     option.
+--     being compiled; (c) number of passed non-void arguments is equal to
+--     function's arity. (d) loopification is turned on via -floopification
+--     command-line option.
 --
 --   * Command line option to turn loopification on and off is implemented in
 --     DynFlags.
 --
-
+--
+-- Note [Void arguments in self-recursive tail calls]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- State# tokens can get in the way of the loopification optimization as seen in
+-- #11372. Consider this:
+--
+-- foo :: [a]
+--     -> (a -> State# s -> (# State s, Bool #))
+--     -> State# s
+--     -> (# State# s, Maybe a #)
+-- foo [] f s = (# s, Nothing #)
+-- foo (x:xs) f s = case f x s of
+--      (# s', b #) -> case b of
+--          True -> (# s', Just x #)
+--          False -> foo xs f s'
+--
+-- We would like to compile the call to foo as a local jump instead of a call
+-- (see Note [Self-recursive tail calls]). However, the generated function has
+-- an arity of 2 while we apply it to 3 arguments, one of them being of void
+-- type. Thus, we mustn't count arguments of void type when checking whether
+-- we can turn a call into a self-recursive jump.
+--
 
 emitEnter :: CmmExpr -> FCode ReturnKind
 emitEnter fun = do
