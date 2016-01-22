@@ -71,7 +71,8 @@ experiment following the Haddock comments.
 
 To reset the new build system run the build script with `-B` flag. This forces Shake
 to rerun all rules, even if results of the previous build are still in the GHC tree.
-This is a temporary solution; we are working on proper reset functionality ([#131][reset-issue]).
+To remove all build artefacts, run the build script with `clean` target. Note, we are
+working towards a complete separation of GHC sources and build artefacts: [#113][build-artefacts-issue].
 
 Current limitations
 -------------------
@@ -114,7 +115,6 @@ helped me endure and enjoy the project.
 [build-artefacts-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/113
 [ghc-split-objs-bug]: https://ghc.haskell.org/trac/ghc/ticket/11315
 [user-settings]: https://github.com/snowleopard/shaking-up-ghc/blob/master/src/Settings/User.hs
-[reset-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/131
 [dynamic-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/4
 [profiling-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/186
 [haddock-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/98
