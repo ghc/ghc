@@ -328,8 +328,7 @@ ldvRecordCreate closure = do
 --
 -- | Called when a closure is entered, marks the closure as having
 -- been "used".  The closure is not an "inherently used" one.  The
--- closure is not @IND@ or @IND_OLDGEN@ because neither is considered
--- for LDV profiling.
+-- closure is not @IND@ because that is not considered for LDV profiling.
 --
 ldvEnterClosure :: ClosureInfo -> CmmReg -> FCode ()
 ldvEnterClosure closure_info node_reg = do
