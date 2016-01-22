@@ -39,11 +39,11 @@ test('ghci022', normal, ghci_script, ['ghci022.script'])
 
 test('ghci023', normal, ghci_script, ['ghci023.script'])
 test('ghci024',
-     when(fast(), skip),
+     [req_interp, when(fast(), skip)],
      run_command,
      ['$MAKE -s --no-print-directory ghci024'])
 test('T9367',
-     when(fast() or config.os != 'mingw32', skip),
+     [req_interp, when(fast() or config.os != 'mingw32', skip)],
      run_command,
      ['$MAKE -s --no-print-directory T9367'])
 test('ghci025', normal, ghci_script, ['ghci025.script'])
@@ -215,7 +215,7 @@ test('T10122', normal, ghci_script, ['T10122.script'])
 
 test('T10321', normal, ghci_script, ['T10321.script'])
 
-test('T10408', normal, run_command,
+test('T10408', req_interp, run_command,
     ['$MAKE -s --no-print-directory T10408'])
 test('T10248', normal, ghci_script, ['T10248.script'])
 test('T10110', normal, ghci_script, ['T10110.script'])
