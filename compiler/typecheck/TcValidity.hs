@@ -13,7 +13,6 @@ module TcValidity (
   checkInstTermination,
   ClsInfo, checkValidCoAxiom, checkValidCoAxBranch,
   checkValidTyFamEqn,
-  checkConsistentFamInst,
   arityErr, badATErr,
   checkValidTelescope, checkZonkValidTelescope, checkValidInferredKinds
   ) where
@@ -458,16 +457,17 @@ representationPolymorphismForbidden = go
 
 ----------------------------------------
 -- | Fail with error message if the type is unlifted
-check_lifted :: TidyEnv -> Type -> TcM ()
-check_lifted _ _ = return ()
+check_lifted :: Type -> TcM ()
+check_lifted _ = return ()
 
 {- ------ Legacy comment ---------
 The check_unlifted function seems entirely redundant.  The
 kind system should check for uses of unlifted types.  So I've
 removed the check.  See Trac #11120 comment:19.
 
-check_lifted env ty
-  = checkTcM (not (isUnliftedType ty)) (unliftedArgErr env ty)
+check_lifted ty
+  = do { env <- tcInitOpenTidyEnv (tyCoVarsOfType ty)
+       ; checkTcM (not (isUnLiftedType ty)) (unliftedArgErr env ty) }
 
 unliftedArgErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
 unliftedArgErr env ty = (env, sep [text "Illegal unlifted type:", ppr_tidy env ty])
@@ -615,8 +615,8 @@ check_arg_type env ctxt rank ty
                         -- and so that if it Must be a monotype, we check that it is!
 
         ; check_type env ctxt rank' ty
-        ; check_lifted env ty }
-             -- NB the isUnliftedType test also checks for
+        ; check_lifted ty }
+             -- NB the isUnLiftedType test also checks for
              --    T State#
              -- where there is an illegal partial application of State# (which has
              -- kind * -> #); see Note [The kind invariant] in TyCoRep
@@ -1029,22 +1029,7 @@ checkValidInstHead ctxt clas cls_args
                         null ty_args))
                  (instTypeErr clas cls_args head_one_type_msg) }
 
-         -- May not contain type family applications
-       ; mapM_ checkTyFamFreeness ty_args
-
-       ; mapM_ checkValidMonoType ty_args
-        -- For now, I only allow tau-types (not polytypes) in
-        -- the head of an instance decl.
-        --      E.g.  instance C (forall a. a->a) is rejected
-        -- One could imagine generalising that, but I'm not sure
-        -- what all the consequences might be
-
-         -- We can't have unlifted type arguments.
-         -- check_arg_type is redundant with checkValidMonoType
-       ; env <- tcInitOpenTidyEnv (tyCoVarsOfTypes ty_args)
-       ; mapM_ (check_lifted env) ty_args
-       }
-
+       ; mapM_ checkValidTypePat ty_args }
   where
     spec_inst_prag = case ctxt of { SpecInstCtxt -> True; _ -> False }
 
@@ -1397,48 +1382,79 @@ checkConsistentFamInst (Just (clas, mini_env)) fam_tc at_tvs at_tys
          checkTc (Just clas == tyConAssoc_maybe fam_tc)
                  (badATErr (className clas) (tyConName fam_tc))
 
-         -- See Note [Checking consistent instantiation] in TcTyClsDecls
+         -- See Note [Checking consistent instantiation]
          -- Check right to left, so that we spot type variable
          -- inconsistencies before (more confusing) kind variables
-       ; discardResult $ foldrM check_arg emptyTCvSubst $
-                         tyConTyVars fam_tc `zip` at_tys }
+       ; checkTc (check_args emptyTCvSubst (fam_tc_tvs `zip` at_tys))
+                 (wrongATArgErr fam_tc expected_args at_tys) }
   where
+    fam_tc_tvs  = tyConTyVars fam_tc
+    expected_args = zipWith pick fam_tc_tvs at_tys
+    pick fam_tc_tv at_ty = case lookupVarEnv mini_env fam_tc_tv of
+                              Just inst_ty -> inst_ty
+                              Nothing      -> at_ty
+
+    check_args :: TCvSubst -> [(TyVar,Type)] -> Bool
+    check_args subst ((fam_tc_tv, at_ty) : rest)
+      | Just inst_ty <- lookupVarEnv mini_env fam_tc_tv
+      = case tcMatchTyX subst at_ty inst_ty of
+           Just subst -> check_args subst rest
+           Nothing    -> False
+
+      | otherwise
+      = check_args subst rest
+
+    check_args subst []
+      = check_tvs subst [] at_tvs
+
+    check_tvs :: TCvSubst -> [TyVar] -> [TyVar] -> Bool
+    check_tvs _     _   [] = True   -- OK!!
+    check_tvs subst acc (tv:tvs)
+       | Just ty <- lookupTyVar subst tv
+       = case tcGetTyVar_maybe ty of
+           Nothing -> False
+           Just tv' | tv' `elem` acc -> False
+                    | otherwise      -> check_tvs subst (tv' : acc) tvs
+       | otherwise
+       = check_tvs subst acc tvs
+
+{-
     check_arg :: (TyVar, Type) -> TCvSubst -> TcM TCvSubst
     check_arg (fam_tc_tv, at_ty) subst
       | Just inst_ty <- lookupVarEnv mini_env fam_tc_tv
       = case tcMatchTyX subst at_ty inst_ty of
-           Just subst | all_distinct subst -> return subst
-           _ -> failWithTc $ wrongATArgErr at_ty inst_ty
+           Just subst -> return subst
+           Nothing    -> failWithTc $ wrongATArgErr at_ty inst_ty
                 -- No need to instantiate here, because the axiom
                 -- uses the same type variables as the assocated class
       | otherwise
       = return subst   -- Allow non-type-variable instantiation
                        -- See Note [Associated type instances]
 
-    all_distinct :: TCvSubst -> Bool
+    check_distinct :: TCvSubst -> TcM ()
     -- True if all the variables mapped the substitution
     -- map to *distinct* type *variables*
-    all_distinct subst = go [] at_tvs
+    check_distinct subst = go [] at_tvs
        where
-         go _   []       = True
+         go _   []       = return ()
          go acc (tv:tvs) = case lookupTyVar subst tv of
                              Nothing -> go acc tvs
                              Just ty | Just tv' <- tcGetTyVar_maybe ty
                                      , tv' `notElem` acc
                                      -> go (tv' : acc) tvs
-                             _other -> False
+                             _other -> addErrTc (dupTyVar tv)
+-}
 
 badATErr :: Name -> Name -> SDoc
 badATErr clas op
   = hsep [text "Class", quotes (ppr clas),
           text "does not have an associated type", quotes (ppr op)]
 
-wrongATArgErr :: Type -> Type -> SDoc
-wrongATArgErr ty instTy =
-  sep [ text "Type indexes must match class instance head"
-      , text "Found" <+> quotes (ppr ty)
-        <+> text "but expected" <+> quotes (ppr instTy)
-      ]
+wrongATArgErr :: TyCon -> [Type] -> [Type] -> SDoc
+wrongATArgErr fam_tc expected_args actual_args
+  = vcat [ text "Type indexes must match class instance head"
+         , text "Expected:" <+> ppr (mkTyConApp fam_tc expected_args)
+         , text "Actual:  " <+> ppr (mkTyConApp fam_tc actual_args) ]
 
 {-
 ************************************************************************
@@ -1524,7 +1540,7 @@ checkValidTyFamEqn :: Maybe ClsInfo
                    -> TcM ()
 checkValidTyFamEqn mb_clsinfo fam_tc tvs cvs typats rhs loc
   = setSrcSpan loc $
-    do { checkValidFamPats fam_tc tvs cvs typats
+    do { checkValidFamPats mb_clsinfo fam_tc tvs cvs typats
 
          -- The argument patterns, and RHS, are all boxed tau types
          -- E.g  Reject type family F (a :: k1) :: k2
@@ -1533,19 +1549,13 @@ checkValidTyFamEqn mb_clsinfo fam_tc tvs cvs typats rhs loc
          --             type instance F Int              = forall a. a->a
          --             type instance F Int              = Int#
          -- See Trac #9357
-       ; env <- tcInitOpenTidyEnv (tyCoVarsOfTypes (rhs : typats))
-       ; mapM_ checkValidMonoType typats
-       ; mapM_ (check_lifted env) typats
        ; checkValidMonoType rhs
-       ; check_lifted env rhs
+       ; check_lifted rhs
 
          -- We have a decidable instance unless otherwise permitted
        ; undecidable_ok <- xoptM LangExt.UndecidableInstances
        ; unless undecidable_ok $
-           mapM_ addErrTc (checkFamInstRhs typats (tcTyFamInsts rhs))
-
-         -- Check that type patterns match the class instance head
-       ; checkConsistentFamInst mb_clsinfo fam_tc tvs typats }
+           mapM_ addErrTc (checkFamInstRhs typats (tcTyFamInsts rhs)) }
 
 -- Make sure that each type family application is
 --   (1) strictly smaller than the lhs,
@@ -1569,7 +1579,7 @@ checkFamInstRhs lhsTys famInsts
         what    = text "type family application" <+> quotes (pprType (TyConApp tc tys))
         bad_tvs = fvTypes tys \\ fvs
 
-checkValidFamPats :: TyCon -> [TyVar] -> [CoVar] -> [Type] -> TcM ()
+checkValidFamPats :: Maybe ClsInfo -> TyCon -> [TyVar] -> [CoVar] -> [Type] -> TcM ()
 -- Patterns in a 'type instance' or 'data instance' decl should
 -- a) contain no type family applications
 --    (vanilla synonyms are fine, though)
@@ -1578,7 +1588,8 @@ checkValidFamPats :: TyCon -> [TyVar] -> [CoVar] -> [Type] -> TcM ()
 --         type T a = Int
 --         type instance F (T a) = a
 -- c) Have the right number of patterns
-checkValidFamPats fam_tc tvs cvs ty_pats
+-- d) For associated types, are consistently instantiated
+checkValidFamPats mb_clsinfo fam_tc tvs cvs ty_pats
   = do { -- A family instance must have exactly the same number of type
          -- parameters as the family declaration.  You can't write
          --     type family F a :: * -> *
@@ -1588,29 +1599,44 @@ checkValidFamPats fam_tc tvs cvs ty_pats
            wrongNumberOfParmsErr (fam_arity - count isInvisibleBinder fam_bndrs)
              -- report only explicit arguments
 
-       ; mapM_ checkTyFamFreeness ty_pats
+       ; mapM_ checkValidTypePat ty_pats
+
        ; let unbound_tcvs = filterOut (`elemVarSet` exactTyCoVarsOfTypes ty_pats) (tvs ++ cvs)
-       ; checkTc (null unbound_tcvs) (famPatErr fam_tc unbound_tcvs ty_pats) }
-  where fam_arity    = tyConArity fam_tc
-        fam_bndrs = tyConBinders fam_tc
+       ; checkTc (null unbound_tcvs) (famPatErr fam_tc unbound_tcvs ty_pats)
+
+         -- Check that type patterns match the class instance head
+       ; checkConsistentFamInst mb_clsinfo fam_tc tvs ty_pats }
+  where
+     fam_arity = tyConArity fam_tc
+     fam_bndrs = take fam_arity $ fst $ splitPiTys (tyConKind fam_tc)
+
+
+checkValidTypePat :: Type -> TcM ()
+-- Used for type patterns in class instances,
+-- and in type/data family instances
+checkValidTypePat pat_ty
+  = do { -- Check that pat_ty is a monotype
+         checkValidMonoType pat_ty
+             -- One could imagine generalising to allow
+             --      instance C (forall a. a->a)
+             -- but we don't know what all the consequences might be
+
+          -- Ensure that no type family instances occur a type pattern
+       ; checkTc (isTyFamFree pat_ty) $
+         tyFamInstIllegalErr pat_ty
+
+      ; check_lifted pat_ty }
+
+isTyFamFree :: Type -> Bool
+-- ^ Check that a type does not contain any type family applications.
+isTyFamFree = null . tcTyFamInsts
+
+-- Error messages
 
 wrongNumberOfParmsErr :: Arity -> SDoc
 wrongNumberOfParmsErr exp_arity
   = text "Number of parameters must match family declaration; expected"
     <+> ppr exp_arity
-
--- Ensure that no type family instances occur in a type.
-checkTyFamFreeness :: Type -> TcM ()
-checkTyFamFreeness ty
-  = checkTc (isTyFamFree ty) $
-    tyFamInstIllegalErr ty
-
--- Check that a type does not contain any type family applications.
---
-isTyFamFree :: Type -> Bool
-isTyFamFree = null . tcTyFamInsts
-
--- Error messages
 
 inaccessibleCoAxBranch :: CoAxiom br -> CoAxBranch -> SDoc
 inaccessibleCoAxBranch fi_ax cur_branch
