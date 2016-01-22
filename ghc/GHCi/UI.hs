@@ -527,7 +527,11 @@ runGHCi paths maybe_exprs = do
              do runInputTWithPrefs defaultPrefs defaultSettings $
                           runCommands $ fileLoop hdl
                 liftIO (hClose hdl `catchIO` \_ -> return ())
-                liftIO $ putStrLn ("Loaded GHCi configuration from " ++ file)
+                -- Don't print a message if this is really ghc -e (#11478).
+                -- Also, let the user silence the message with -v0
+                -- (the default verbosity in GHCi is 1).
+                when (isNothing maybe_exprs && verbosity dflags > 0) $
+                  liftIO $ putStrLn ("Loaded GHCi configuration from " ++ file)
 
   --
 

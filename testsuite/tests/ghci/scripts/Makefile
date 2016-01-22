@@ -54,3 +54,10 @@ T10408:
 	# and not be ignored when `-ignore-dot-ghci` is specified.
 	'$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci \
 	    -ghci-script T10408A.script -ghci-script T10408B.script < /dev/null
+
+.PHONY: T11389
+T11389:
+	# Test that "Loaded GHCi configuration" message is printed by default
+	# (without -v0)
+	'$(TEST_HC)' $(TEST_HC_OPTS) --interactive -ignore-dot-ghci \
+            -ghci-script T11389.script < /dev/null | grep 'configuration'

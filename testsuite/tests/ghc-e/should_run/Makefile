@@ -41,3 +41,7 @@ T9905:
 
 T9905b:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e "import qualified Data.List as L" -e "L.sort [2,1]"
+
+# Ensure that ghc -e does not output extra messages about GHCi configuration files
+T11478:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -ghci-script T11478.script -e 3
