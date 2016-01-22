@@ -30,7 +30,7 @@ packages, which need to be installed: `ansi-terminal`, `mtl`, `shake`, `QuickChe
     cd ghc
     git clone git://github.com/snowleopard/shaking-up-ghc shake-build
     ```
-* Start your first build:
+* Start your first build (you might want to enable parallelism with `-j`):
 
     ```bash
     shake-build/build.sh --configure
@@ -44,7 +44,8 @@ If you are interested in building in a Cabal sandbox, have a look at `shake-buil
 Using the build system
 ----------------------
 Once your first build is successful, simply run `shake-build/build.sh` or `shake-build/build.bat`
-to rebuild (you no longer need to use the `--configure` flag). Use `-j` flag to enable parallelism.
+to rebuild (you no longer need to use the `--configure` flag). Most build artefacts are placed
+into `.build` and `inplace` directories.
 
 ### Command line flags
 
