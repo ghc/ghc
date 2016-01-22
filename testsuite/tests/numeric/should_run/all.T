@@ -62,11 +62,7 @@ test('T7233', normal, compile_and_run, [''])
 test('NumDecimals', normal, compile_and_run, [''])
 test('T8726', normal, compile_and_run, [''])
 test('CarryOverflow', omit_ways(['ghci']), compile_and_run, [''])
-test('T9407', [
-     unless(opsys('mingw32') and wordsize(64), skip),
-     only_ways(['optasm'])
-     ],
-     compile_and_run, [''])
+test('T9407', normal, compile_and_run, [''])
 test('T9810', normal, compile_and_run, [''])
 test('T10011', normal, compile_and_run, [''])
 test('T10962', omit_ways(['ghci']), compile_and_run, [''])
