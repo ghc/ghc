@@ -181,9 +181,10 @@ defaultCallStacks wanteds
     wanteds <- defaultCallStacks (ic_wanted implic)
     return (implic { ic_wanted = wanteds })
 
-  defaultCallStack ct@(CDictCan { cc_ev = ev_w })
-    | Just _ <- isCallStackCt ct
-    = do { solveCallStack ev_w EvCsEmpty
+  defaultCallStack ct
+    | Just (cls, tys) <- getClassPredTys_maybe (ctPred ct)
+    , Just _ <- isCallStackDict cls tys
+    = do { solveCallStack (cc_ev ct) EvCsEmpty
          ; return Nothing }
 
   defaultCallStack ct
