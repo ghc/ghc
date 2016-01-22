@@ -66,6 +66,7 @@ module TcRnTypes(
         Xi, Ct(..), Cts, emptyCts, andCts, andManyCts, pprCts,
         singleCt, listToCts, ctsElts, consCts, snocCts, extendCtsList,
         isEmptyCts, isCTyEqCan, isCFunEqCan,
+        isPendingScDict, superClassesMightHelp,
         isCDictCan_Maybe, isCFunEqCan_maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt,
         isGivenCt, isHoleCt, isOutOfScopeCt, isExprHoleCt, isTypeHoleCt,
@@ -1526,12 +1527,18 @@ ctFlavour = ctEvFlavour . ctEvidence
 ctEqRel :: Ct -> EqRel
 ctEqRel = ctEvEqRel . ctEvidence
 
-dropDerivedWC :: WantedConstraints -> WantedConstraints
--- See Note [Dropping derived constraints]
-dropDerivedWC wc@(WC { wc_simple = simples, wc_insol = insols })
-  = wc { wc_simple = dropDerivedSimples simples
-       , wc_insol  = dropDerivedInsols insols }
-    -- The wc_impl implications are already (recursively) filtered
+instance Outputable Ct where
+  ppr ct = ppr (cc_ev ct) <+> parens pp_sort
+    where
+      pp_sort = case ct of
+         CTyEqCan {}      -> text "CTyEqCan"
+         CFunEqCan {}     -> text "CFunEqCan"
+         CNonCanonical {} -> text "CNonCanonical"
+         CDictCan { cc_pend_sc = pend_sc }
+            | pend_sc   -> text "CDictCan(psc)"
+            | otherwise -> text "CDictCan"
+         CIrredEvCan {}   -> text "CIrredEvCan"
+         CHoleCan { cc_occ = occ } -> text "CHoleCan:" <+> ppr occ
 
 {-
 ************************************************************************
@@ -1754,6 +1761,11 @@ isUserTypeErrorCt ct = case getUserTypeErrorMsg ct of
                          Just _ -> True
                          _      -> False
 
+isPendingScDict :: Ct -> Maybe Ct
+isPendingScDict ct@(CDictCan { cc_pend_sc = True })
+                  = Just (ct { cc_pend_sc = False })
+isPendingScDict _ = Nothing
+
 -- | Are we looking at an Implicit CallStack
 -- (i.e. @IP "name" CallStack@)?
 --
@@ -1768,18 +1780,44 @@ isCallStackDict cls tys
 isCallStackDict _ _
   = Nothing
 
-instance Outputable Ct where
-  ppr ct = ppr (cc_ev ct) <+> parens pp_sort
-    where
-      pp_sort = case ct of
-         CTyEqCan {}      -> text "CTyEqCan"
-         CFunEqCan {}     -> text "CFunEqCan"
-         CNonCanonical {} -> text "CNonCanonical"
-         CDictCan { cc_pend_sc = pend_sc }
-            | pend_sc   -> text "CDictCan(psc)"
-            | otherwise -> text "CDictCan"
-         CIrredEvCan {}   -> text "CIrredEvCan"
-         CHoleCan { cc_occ = occ } -> text "CHoleCan:" <+> ppr occ
+superClassesMightHelp :: Ct -> Bool
+-- ^ True if taking superclasses of givens, or of wanteds (to perhaps
+-- expose more equalities or functional dependencies) might help to
+-- solve this constraint.  See Note [When superclases help]
+superClassesMightHelp ct
+  | CDictCan { cc_class = cls } <- ct
+  , cls `hasKey` ipClassKey
+  = False
+  | otherwise
+  = True
+
+{- Note [When superclasses help]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+First read Note [The superclass story] in TcCanonical.
+
+We expand superclasses and iterate only if there is at unsolved wanted
+for which expansion of superclasses (e.g. from given constraints)
+might actually help. Usually the answer is "yes" but for implicit
+paramters it is "no".  If we have [W] ?x::ty, expanding superclasses
+won't help:
+  - Superclasses can't be implicit parameters
+  - If we have a [G] ?x:ty2, then we'll have another unsolved
+      [D] ty ~ ty2 (from the functional dependency)
+    which will trigger superclass expansion.
+
+It's a bit of a special case, but it's easy to do.  The runtime cost
+is low because the unsolved set is usually empty anyway (errors
+aside), and the first non-imlicit-parameter will terminate the search.
+
+The special case is worth it (Trac #11480, comment:2) because it
+applies to CallStack constraints, which aren't type errors. If we have
+   f :: (C a) => blah
+   f x = ...undefined...
+we'll get a CallStack constraint.  If that's the only unsolved constraint
+it'll eventually be solved by defaulting.  So we don't want to emit warnings
+about hitting the simplifier's iteration limit.  A CallStack constraint
+really isn't an unsolved constraint; it can always be solved by defaulting.
+-}
 
 singleCt :: Ct -> Cts
 singleCt = unitBag
@@ -1884,6 +1922,13 @@ addImplics wc implic = wc { wc_impl = wc_impl wc `unionBags` implic }
 addInsols :: WantedConstraints -> Bag Ct -> WantedConstraints
 addInsols wc cts
   = wc { wc_insol = wc_insol wc `unionBags` cts }
+
+dropDerivedWC :: WantedConstraints -> WantedConstraints
+-- See Note [Dropping derived constraints]
+dropDerivedWC wc@(WC { wc_simple = simples, wc_insol = insols })
+  = wc { wc_simple = dropDerivedSimples simples
+       , wc_insol  = dropDerivedInsols insols }
+    -- The wc_impl implications are already (recursively) filtered
 
 isInsolubleStatus :: ImplicStatus -> Bool
 isInsolubleStatus IC_Insoluble = True

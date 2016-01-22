@@ -497,3 +497,4 @@ test('T11462',
      ['', [('T11462_Plugin.hs', '-package ghc'),
            ('T11462.hs', '')],
       '-dynamic'])
+test('T11480', normal, compile, [''])
