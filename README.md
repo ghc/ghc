@@ -95,7 +95,7 @@ Acknowledgements
 ----------------
 
 I started this project as part of my 6-month research visit to Microsoft
-Research in Cambridge. It was funded by Newcastle University, EPSRC, and
+Research in Cambridge, which was funded by Newcastle University, EPSRC, and
 Microsoft Research. I would like to thank Simon Peyton Jones, Neil Mitchell
 and Simon Marlow for kick-starting the project and for their guidance. Last
 but not least, big thanks to the project [contributors][contributors], who
