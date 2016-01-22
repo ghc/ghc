@@ -2240,6 +2240,8 @@ checkValidClass cls
                         -- one of the class type variables
                         -- The check is disabled for nullary type classes,
                         -- since there is no possible ambiguity (Trac #10020)
+
+             -- Check that any default declarations for associated types are valid
            ; whenIsJust m_dflt_rhs $ \ (rhs, loc) ->
              checkValidTyFamEqn (Just (cls, mini_env)) fam_tc
                                 fam_tvs [] (mkTyVarTys fam_tvs) rhs loc }

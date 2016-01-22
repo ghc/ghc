@@ -650,12 +650,9 @@ tcDataFamInstDecl mb_clsinfo
                      (kcDataDefn (unLoc fam_tc_name) pats defn) $
            \tvs' pats' res_kind -> do
        {
-         -- Check that left-hand side contains no type family applications
-         -- (vanilla synonyms are fine, though, and we checked for
-         --  foralls earlier)
-       ; checkValidFamPats fam_tc tvs' [] pats'
-         -- Check that type patterns match class instance head, if any
-       ; checkConsistentFamInst mb_clsinfo fam_tc tvs' pats'
+         -- Check that left-hand sides are ok (mono-types, no type families,
+         -- consistent instantiations, etc)
+       ; checkValidFamPats mb_clsinfo fam_tc tvs' [] pats'
 
          -- Result kind must be '*' (otherwise, we have too few patterns)
        ; checkTc (isLiftedTypeKind res_kind) $ tooFewParmsErr (tyConArity fam_tc)
