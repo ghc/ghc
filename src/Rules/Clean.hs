@@ -12,13 +12,13 @@ cleanRules :: Rules ()
 cleanRules = do
     "clean" ~> do
         putBuild $ "| Remove files in " ++ buildRootPath ++ "..."
-        removeFilesAfter buildRootPath ["//*"]
+        liftIO $ removeFiles buildRootPath ["//*"]
         putBuild $ "| Remove files in " ++ programInplacePath ++ "..."
-        removeFilesAfter programInplacePath ["//*"]
+        liftIO $ removeFiles programInplacePath ["//*"]
         putBuild $ "| Remove files in inplace/lib..."
-        removeFilesAfter "inplace/lib" ["//*"]
+        liftIO $ removeFiles "inplace/lib" ["//*"]
         putBuild $ "| Remove files in " ++ derivedConstantsPath ++ "..."
-        removeFilesAfter derivedConstantsPath ["//*"]
+        liftIO $ removeFiles derivedConstantsPath ["//*"]
         forM_ includesDependencies $ \file -> do
             putBuild $ "| Remove " ++ file
             removeFileIfExists file
