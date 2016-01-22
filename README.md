@@ -45,9 +45,9 @@ Using the build system
 ----------------------
 Once your first build is successful, simply run `shake-build/build.sh` or `shake-build/build.bat`
 to rebuild (you no longer need to use the `--configure` flag). Most build artefacts are placed
-into `.build` and `inplace` directories.
+into `.build` and `inplace` directories ([#113][build-artefacts-issue]).
 
-### Command line flags
+#### Command line flags
 
 In addition to standard Shake flags (try `--help`), the build system
 currently supports several others:
@@ -61,13 +61,13 @@ build command; this is the default setting), and `unicorn` (when `normal` just w
 * `--split-objects`: generate split objects, which are switched off by default. Due to
 a GHC [bug][ghc-split-objs-bug], you need a full clean rebuild when using this flag.
 
-### User settings
+#### User settings
 
 The `make`-based build system uses `mk/build.mk` to specify user build settings. We
 use [`src/Settings/User.hs`][user-settings] for the same purpose. Feel free to
-experiment.
+experiment following the Haddock comments.
 
-### Resetting the build
+#### Resetting the build
 
 To reset the new build system run the build script with `-B` flag. This forces Shake
 to rerun all rules, even if results of the previous build are still in the GHC tree.
@@ -76,11 +76,11 @@ This is a temporary solution; we are working on proper reset functionality ([#13
 Current limitations
 -------------------
 The new build system still lacks many important features:
-* We only build `vanilla` way.
+* We only build `vanilla` way: [#4][dynamic-issue], [#186][profiling-issue].
 * Documentation is broken: [#98][haddock-issue].
-* Validation is not implemented.
-* Build flavours and conventional command line flags are not implemented.
-* Cross-compilation is not implemented.
+* Validation is not implemented: [#187][validation-issue].
+* Build flavours and conventional command line flags are not implemented: [#188][flavours-issue].
+* Cross-compilation is not implemented: [#177][cross-compilation-issue].
 
 How to contribute
 -----------------
@@ -88,7 +88,8 @@ How to contribute
 The best way to contribute is to try the new build system, report the issues
 you found, and attempt to fix them. Please note the codebase is very unstable
 at present and we expect a lot of further refactoring. The documentation is
-currently non-existent, but we are working on it.
+currently non-existent, but we are working on it: [#55][comments-issue],
+[#56][doc-issue].
 
 Acknowledgements
 ----------------
@@ -108,8 +109,16 @@ helped me endure and enjoy the project.
 [issues]: https://github.com/snowleopard/shaking-up-ghc/issues
 [ghc-preparation]: https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation
 [ghc-windows-quick-build]: https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation/Windows#AQuickBuild
+[build-artefacts-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/113
 [ghc-split-objs-bug]: https://ghc.haskell.org/trac/ghc/ticket/11315
 [user-settings]: https://github.com/snowleopard/shaking-up-ghc/blob/master/src/Settings/User.hs
 [reset-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/131
+[dynamic-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/4
+[profiling-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/186
 [haddock-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/98
+[validation-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/187
+[flavours-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/188
+[cross-compilation-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/177
+[comments-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/55
+[doc-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/56
 [contributors]: https://github.com/snowleopard/shaking-up-ghc/graphs/contributors
