@@ -489,3 +489,10 @@ test('T10592', normal, compile, [''])
 test('T11305', normal, compile, [''])
 test('T11254', normal, compile, [''])
 test('T11379', normal, compile, [''])
+test('T11462',
+     [extra_clean(['T11462_Plugin.hi', 'T11462_Plugin.o']),
+      unless(have_dynamic(), expect_broken(10301))],
+     multi_compile,
+     ['', [('T11462_Plugin.hs', '-package ghc'),
+           ('T11462.hs', '')],
+      '-dynamic'])
