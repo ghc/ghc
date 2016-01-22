@@ -27,4 +27,6 @@ cleanRules = do
             forM_ [Stage0 ..] $ \stage -> do
                 let dir = pkgPath pkg -/- targetDirectory stage pkg
                 removeDirectoryIfExists dir
+        putBuild $ "| Remove the Shake database " ++ shakeFilesPath ++ "..."
+        removeFilesAfter shakeFilesPath ["//*"]
         putSuccess $ "| Done. "
