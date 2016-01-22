@@ -53,7 +53,7 @@ module TcSMonad (
     emptyInert, getTcSInerts, setTcSInerts, takeGivenInsolubles,
     matchableGivens, prohibitedSuperClassSolve,
     getUnsolvedInerts,
-    removeInertCts, getPendingScDicts, isPendingScDict,
+    removeInertCts, getPendingScDicts,
     addInertCan, addInertEq, insertFunEq,
     emitInsoluble, emitWorkNC,
 
@@ -1698,16 +1698,13 @@ getPendingScDicts = updRetInertCans get_sc_dicts
         = addDict dicts cls tys ct
     add ct _ = pprPanic "getPendingScDicts" (ppr ct)
 
-isPendingScDict :: Ct -> Maybe Ct
-isPendingScDict ct@(CDictCan { cc_pend_sc = True })
-                  = Just (ct { cc_pend_sc = False })
-isPendingScDict _ = Nothing
-
 getUnsolvedInerts :: TcS ( Bag Implication
                          , Cts     -- Tyvar eqs: a ~ ty
                          , Cts     -- Fun eqs:   F a ~ ty
                          , Cts     -- Insoluble
                          , Cts )   -- All others
+-- Return all the unsolved [Wanted] or [Derived] constraints
+--
 -- Post-condition: the returned simple constraints are all fully zonked
 --                     (because they come from the inert set)
 --                 the unsolved implics may not be

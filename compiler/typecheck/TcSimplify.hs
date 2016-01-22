@@ -1059,20 +1059,26 @@ expandSuperClasses :: WantedConstraints -> TcS (Bool, WantedConstraints)
 -- unsolved wanteds or givens
 -- See Note [The superclass story] in TcCanonical
 expandSuperClasses wc@(WC { wc_simple = unsolved, wc_insol = insols })
-  | isEmptyBag unsolved  -- No unsolved simple wanteds, so do not add suerpclasses
+  | not (anyBag superClassesMightHelp unsolved)
   = return (True, wc)
   | otherwise
-  = do { let (pending_wanted, unsolved') = mapAccumBagL get [] unsolved
+  = do { traceTcS "expandSuperClasses {" empty
+       ; let (pending_wanted, unsolved') = mapAccumBagL get [] unsolved
              get acc ct = case isPendingScDict ct of
                             Just ct' -> (ct':acc, ct')
                             Nothing  -> (acc,     ct)
        ; pending_given <- getPendingScDicts
        ; if null pending_given && null pending_wanted
-         then return (True, wc)
+         then do { traceTcS "End expandSuperClasses no-op }" empty
+                 ; return (True, wc) }
          else
     do { new_given  <- makeSuperClasses pending_given
        ; new_insols <- solveSimpleGivens new_given
        ; new_wanted <- makeSuperClasses pending_wanted
+       ; traceTcS "End expandSuperClasses }"
+                  (vcat [ text "Given:" <+> ppr pending_given
+                        , text "Insols from given:" <+> ppr new_insols
+                        , text "Wanted:" <+> ppr new_wanted ])
        ; return (False, wc { wc_simple = unsolved' `unionBags` listToBag new_wanted
                            , wc_insol = insols `unionBags` new_insols }) } }
 

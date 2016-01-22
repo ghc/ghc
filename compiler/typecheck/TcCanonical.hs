@@ -260,11 +260,12 @@ So here's the plan:
    in solveSimpleGivens or solveSimpleWanteds.
    See Note [Danger of adding superclasses during solving]
 
-3. If we have any remaining unsolved wanteds, try harder:
-   take both the Givens and Wanteds, and expand superclasses again.
-   This may succeed in generating (a finite number of) extra Givens,
-   and extra Deriveds. Both may help the proof.
-   This is done in TcSimplify.expandSuperClasses.
+3. If we have any remaining unsolved wanteds
+        (see Note [When superclasses help] in TcRnTypes)
+   try harder: take both the Givens and Wanteds, and expand
+   superclasses again.  This may succeed in generating (a finite
+   number of) extra Givens, and extra Deriveds. Both may help the
+   proof.  This is done in TcSimplify.expandSuperClasses.
 
 4. Go round to (2) again.  This loop (2,3,4) is implemented
    in TcSimplify.simpl_loop.
