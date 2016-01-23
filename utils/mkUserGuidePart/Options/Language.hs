@@ -72,7 +72,7 @@ languageOptions =
            "As of GHC 7.10, this option is not needed, and should not be "++
            "used. Previously this would automatically :ref:`derive Typeable "++
            "instances for every datatype and type class declaration "++
-           "<deriving-typeable>`. Implies ``-XDeriveDataTypeable``."
+           "<deriving-typeable>`. Implies :ghc-flag:`XDeriveDataTypeable`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoAutoDeriveTypeable"
          , flagSince = "7.8.1"
@@ -141,7 +141,7 @@ languageOptions =
   , flag { flagName = "-XDeriveDataTypeable"
          , flagDescription =
            "Enable ``deriving`` for the :ref:`Data class "++
-           "<deriving-typeable>`. Implied by ``-XAutoDeriveTypeable``."
+           "<deriving-typeable>`. Implied by :ghc-flag:`XAutoDeriveTypeable`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoDeriveDataTypeable"
          , flagSince = "6.8.1"
@@ -149,7 +149,7 @@ languageOptions =
   , flag { flagName = "-XDeriveFunctor"
          , flagDescription =
            "Enable :ref:`deriving for the Functor class <deriving-extra>`. "++
-           "Implied by ``-XDeriveTraversable``."
+           "Implied by :ghc-flag:`XDeriveTraversable`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoDeriveFunctor"
          , flagSince = "7.10.1"
@@ -157,7 +157,7 @@ languageOptions =
   , flag { flagName = "-XDeriveFoldable"
          , flagDescription =
            "Enable :ref:`deriving for the Foldable class <deriving-extra>`. "++
-           "Implied by ``-XDeriveTraversable``."
+           "Implied by :ghc-flag:`XDeriveTraversable`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoDeriveFoldable"
          , flagSince = "7.10.1"
@@ -186,7 +186,7 @@ languageOptions =
   , flag { flagName = "-XDeriveTraversable"
          , flagDescription =
            "Enable :ref:`deriving for the Traversable class <deriving-extra>`. "++
-           "Implies ``-XDeriveFunctor`` and ``-XDeriveFoldable``."
+           "Implies :ghc-flag:`XDeriveFunctor` and :ghc-flag:`XDeriveFoldable`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoDeriveTraversable"
          , flagSince = "7.10.1"
@@ -194,7 +194,7 @@ languageOptions =
   , flag { flagName = "-XDisambiguateRecordFields"
          , flagDescription =
            "Enable :ref:`record field disambiguation <disambiguate-fields>`. "++
-           "Implied by ``-XRecordWildCards``."
+           "Implied by :ghc-flag:`XRecordWildCards`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoDisambiguateRecordFields"
          , flagSince = "6.8.1"
@@ -222,8 +222,8 @@ languageOptions =
   , flag { flagName = "-XExplicitForAll"
          , flagDescription =
            "Enable :ref:`explicit universal quantification <explicit-foralls>`."++
-           " Implied by ``-XScopedTypeVariables``, ``-XLiberalTypeSynonyms``,"++
-           " ``-XRankNTypes`` and ``-XExistentialQuantification``."
+           " Implied by :ghc-flag:`XScopedTypeVariables`, :ghc-flag:`XLiberalTypeSynonyms`,"++
+           " :ghc-flag:`XRankNTypes` and :ghc-flag:`XExistentialQuantification`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoExplicitForAll"
          , flagSince = "6.12.1"
@@ -232,7 +232,7 @@ languageOptions =
          , flagDescription =
            "Enable using the keyword ``type`` to specify the namespace of "++
            "entries in imports and exports (:ref:`explicit-namespaces`). "++
-           "Implied by ``-XTypeOperators`` and ``-XTypeFamilies``."
+           "Implied by :ghc-flag:`XTypeOperators` and :ghc-flag:`XTypeFamilies`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoExplicitNamespaces"
          , flagSince = "7.6.1"
@@ -248,7 +248,7 @@ languageOptions =
   , flag { flagName = "-XFlexibleContexts"
          , flagDescription =
            "Enable :ref:`flexible contexts <flexible-contexts>`. Implied by "++
-           "``-XImplicitParams``."
+           ":ghc-flag:`XImplicitParams`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoFlexibleContexts"
          , flagSince = "6.8.1"
@@ -256,8 +256,8 @@ languageOptions =
   , flag { flagName = "-XFlexibleInstances"
          , flagDescription =
            "Enable :ref:`flexible instances <instance-rules>`. "++
-           "Implies ``-XTypeSynonymInstances``. "++
-           "Implied by ``-XImplicitParams``."
+           "Implies :ghc-flag:`XTypeSynonymInstances`. "++
+           "Implied by :ghc-flag:`XImplicitParams`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoFlexibleInstances"
          , flagSince = "6.8.1"
@@ -272,7 +272,7 @@ languageOptions =
   , flag { flagName = "-XFunctionalDependencies"
          , flagDescription =
            "Enable :ref:`functional dependencies <functional-dependencies>`. "++
-           "Implies ``-XMultiParamTypeClasses``."
+           "Implies :ghc-flag:`XMultiParamTypeClasses`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoFunctionalDependencies"
          , flagSince = "6.8.1"
@@ -280,7 +280,7 @@ languageOptions =
   , flag { flagName = "-XGADTs"
          , flagDescription =
            "Enable :ref:`generalised algebraic data types <gadt>`. "++
-           "Implies ``-XGADTSyntax`` and ``-XMonoLocalBinds``."
+           "Implies :ghc-flag:`XGADTSyntax` and :ghc-flag:`XMonoLocalBinds`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoGADTs"
          , flagSince = "6.8.1"
@@ -311,7 +311,7 @@ languageOptions =
   , flag { flagName = "-XImplicitParams"
          , flagDescription =
            "Enable :ref:`Implicit Parameters <implicit-parameters>`. "++
-           "Implies ``-XFlexibleContexts`` and ``-XFlexibleInstances``."
+           "Implies :ghc-flag:`XFlexibleContexts` and :ghc-flag:`XFlexibleInstances`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoImplicitParams"
          , flagSince = "6.8.1"
@@ -319,7 +319,7 @@ languageOptions =
   , flag { flagName = "-XNoImplicitPrelude"
          , flagDescription =
            "Don't implicitly ``import Prelude``. "++
-           "Implied by ``-XRebindableSyntax``."
+           "Implied by :ghc-flag:`XRebindableSyntax`."
          , flagType = DynamicFlag
          , flagReverse = "-XImplicitPrelude"
          , flagSince = "6.8.1"
@@ -327,7 +327,7 @@ languageOptions =
   , flag { flagName = "-XImpredicativeTypes"
          , flagDescription =
            "Enable :ref:`impredicative types <impredicative-polymorphism>`. "++
-           "Implies ``-XRankNTypes``."
+           "Implies :ghc-flag:`XRankNTypes`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoImpredicativeTypes"
          , flagSince = "6.10.1"
@@ -335,7 +335,7 @@ languageOptions =
   , flag { flagName = "-XIncoherentInstances"
          , flagDescription =
            "Enable :ref:`incoherent instances <instance-overlap>`. "++
-           "Implies ``-XOverlappingInstances``."
+           "Implies :ghc-flag:`XOverlappingInstances`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoIncoherentInstances"
          , flagSince = "6.8.1"
@@ -343,7 +343,7 @@ languageOptions =
   , flag { flagName = "-XTypeFamilyDependencies"
          , flagDescription =
            "Enable :ref:`injective type families <injective-ty-fams>`. "++
-           "Implies ``-XTypeFamilies``."
+           "Implies :ghc-flag:`XTypeFamilies`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoTypeFamilyDependencies"
          , flagSince = "8.0.1"
@@ -364,7 +364,7 @@ languageOptions =
   , flag { flagName = "-XKindSignatures"
          , flagDescription =
            "Enable :ref:`kind signatures <kinding>`. "++
-           "Implied by ``-XTypeFamilies`` and ``-XPolyKinds``."
+           "Implied by :ghc-flag:`XTypeFamilies` and :ghc-flag:`XPolyKinds`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoKindSignatures"
          , flagSince = "6.8.1"
@@ -400,7 +400,7 @@ languageOptions =
   , flag { flagName = "-XMonoLocalBinds"
          , flagDescription =
            "Enable :ref:`do not generalise local bindings <mono-local-binds>`. "++
-           "Implied by ``-XTypeFamilies`` and ``-XGADTs``."
+           "Implied by :ghc-flag:`XTypeFamilies` and :ghc-flag:`XGADTs`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoMonoLocalBinds"
          , flagSince = "6.12.1"
@@ -416,7 +416,7 @@ languageOptions =
          , flagDescription =
            "Enable :ref:`multi parameter type classes "++
            "<multi-param-type-classes>`. Implied by "++
-           "``-XFunctionalDependencies``."
+           ":ghc-flag:`XFunctionalDependencies`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoMultiParamTypeClasses"
          , flagSince = "6.8.1"
@@ -457,7 +457,7 @@ languageOptions =
          , flagDescription =
            "Deprecated, does nothing. :ref:`nullary (no parameter) type "++
            "classes <nullary-type-classes>` are now enabled using "++
-           "``-XMultiParamTypeClasses``."
+           ":ghc-flag:`XMultiParamTypeClasses`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoNullaryTypeClasses"
          , flagSince = "7.8.1"
@@ -499,7 +499,7 @@ languageOptions =
          }
   , flag { flagName = "-XParallelArrays"
          , flagDescription =
-           "Enable parallel arrays. Implies ``-XParallelListComp``."
+           "Enable parallel arrays. Implies :ghc-flag:`XParallelListComp`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoParallelArrays"
          , flagSince = "7.4.1"
@@ -508,7 +508,7 @@ languageOptions =
          , flagDescription =
            "Enable :ref:`parallel list comprehensions "++
            "<parallel-list-comprehensions>`. "++
-           "Implied by ``-XParallelArrays``."
+           "Implied by :ghc-flag:`XParallelArrays`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoParallelListComp"
          , flagSince = "6.8.1"
@@ -536,7 +536,7 @@ languageOptions =
   , flag { flagName = "-XPolyKinds"
          , flagDescription =
            "Enable :ref:`kind polymorphism <kind-polymorphism>`. "++
-           "Implies ``-XKindSignatures``."
+           "Implies :ghc-flag:`XKindSignatures`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoPolyKinds"
          , flagSince = "7.4.1"
@@ -544,7 +544,7 @@ languageOptions =
   , flag { flagName = "-XPolymorphicComponents"
          , flagDescription =
            "Enable :ref:`polymorphic components for data constructors "++
-           "<universal-quantification>`. Synonym for ``-XRankNTypes``."
+           "<universal-quantification>`. Synonym for :ghc-flag:`XRankNTypes`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoPolymorphicComponents"
          , flagSince = "6.8.1"
@@ -565,7 +565,7 @@ languageOptions =
   , flag { flagName = "-XRank2Types"
          , flagDescription =
            "Enable :ref:`rank-2 types <universal-quantification>`. "++
-           "Synonym for ``-XRankNTypes``."
+           "Synonym for :ghc-flag:`XRankNTypes`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoRank2Types"
          , flagSince = "6.8.1"
@@ -573,7 +573,7 @@ languageOptions =
   , flag { flagName = "-XRankNTypes"
          , flagDescription =
            "Enable :ref:`rank-N types <universal-quantification>`. "++
-           "Implied by ``-XImpredicativeTypes``."
+           "Implied by :ghc-flag:`XImpredicativeTypes`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoRankNTypes"
          , flagSince = "6.8.1"
@@ -581,7 +581,7 @@ languageOptions =
   , flag { flagName = "-XRebindableSyntax"
          , flagDescription =
            "Employ :ref:`rebindable syntax <rebindable-syntax>`. "++
-           "Implies ``-XNoImplicitPrelude``."
+           "Implies :ghc-flag:`XNoImplicitPrelude`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoRebindableSyntax"
          , flagSince = "7.0.1"
@@ -589,7 +589,7 @@ languageOptions =
   , flag { flagName = "-XRecordWildCards"
          , flagDescription =
            "Enable :ref:`record wildcards <record-wildcards>`. "++
-           "Implies ``-XDisambiguateRecordFields``."
+           "Implies :ghc-flag:`XDisambiguateRecordFields`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoRecordWildCards"
          , flagSince = "6.8.1"
@@ -688,8 +688,8 @@ languageOptions =
   , flag { flagName = "-XTypeFamilies"
          , flagDescription =
            "Enable :ref:`type families <type-families>`. "++
-           "Implies ``-XExplicitNamespaces``, ``-XKindSignatures``, "++
-           "and ``-XMonoLocalBinds``."
+           "Implies :ghc-flag:`XExplicitNamespaces`, :ghc-flag:`XKindSignatures`, "++
+           "and :ghc-flag:`XMonoLocalBinds`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoTypeFamilies"
          , flagSince = "6.8.1"
@@ -697,7 +697,7 @@ languageOptions =
   , flag { flagName = "-XTypeOperators"
          , flagDescription =
            "Enable :ref:`type operators <type-operators>`. "++
-           "Implies ``-XExplicitNamespaces``."
+           "Implies :ghc-flag:`XExplicitNamespaces`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoTypeOperators"
          , flagSince = "6.8.1"
@@ -705,7 +705,7 @@ languageOptions =
   , flag { flagName = "-XTypeSynonymInstances"
          , flagDescription =
            "Enable :ref:`type synonyms in instance heads "++
-           "<flexible-instance-head>`. Implied by ``-XFlexibleInstances``."
+           "<flexible-instance-head>`. Implied by :ghc-flag:`XFlexibleInstances`."
          , flagType = DynamicFlag
          , flagReverse = "-XNoTypeSynonymInstances"
          , flagSince = "6.8.1"

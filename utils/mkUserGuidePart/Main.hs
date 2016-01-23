@@ -52,13 +52,11 @@ flagsTable theFlags =
           ["Flag", "Description", "Static/Dynamic", "Reverse"]
           (map flagRow theFlags)
   where
-    code ""  = ""
-    code str = "``"++str++"``"
     flagRow flag =
-        [ code (flagName flag)
+        [ role "ghc-flag" (flagName flag)
         , flagDescription flag
         , type_
-        , code (flagReverse flag)
+        , role "ghc-flag" (flagReverse flag)
         ]
       where
         type_ = case flagType flag of
@@ -70,6 +68,12 @@ flagsTable theFlags =
 -- | Place the given text in an ReST inline code element.
 inlineCode :: String -> ReST
 inlineCode s = "``" ++ s ++ "``"
+
+-- | @role "hi" "Hello world"@ produces the ReST inline role element
+-- @:hi:`Hello world`@.
+role :: String -> String -> ReST
+role _ "" = ""
+role r c  = concat [":",r,":`",c,"`"]
 
 heading :: Char -> String -> ReST
 heading chr title = unlines
