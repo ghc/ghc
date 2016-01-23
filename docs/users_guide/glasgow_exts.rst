@@ -4502,7 +4502,7 @@ Multi-parameter type classes
 
     :implies: :ghc-flag:`-XConstrainedClassMethods`
 
-    Allow the definition of typeclasses with more than one parameter. 
+    Allow the definition of typeclasses with more than one parameter.
 
 Multi-parameter type classes are permitted, with flag
 :ghc-flag:`-XMultiParamTypeClasses`. For example: ::
@@ -5277,7 +5277,7 @@ Overlapping instances
 
     Deprecated flags to weaken checks intended to ensure instance resolution
     termination.
-    
+
 In general, as discussed in :ref:`instance-resolution`, *GHC requires
 that it be unambiguous which instance declaration should be used to
 resolve a type-class constraint*. GHC also provides a way to to loosen
@@ -12623,7 +12623,7 @@ optionally had by adding ``!`` in front of a variable.
 
 ``Strict`` implies :ref:`StrictData <strict-data>`.
 
--  **Function definitions.**
+-  **Function definitions**
 
    When the user writes ::
 
@@ -12635,7 +12635,7 @@ optionally had by adding ``!`` in front of a variable.
 
    Adding ``~`` in front of ``x`` gives the regular lazy behavior.
 
--  **Let/where bindings.**
+-  **Let/where bindings**
 
    When the user writes ::
 
@@ -12691,7 +12691,7 @@ optionally had by adding ``!`` in front of a variable.
 
    all get implicit bangs on the ``x`` pattern.
 
--  ** Nested patterns **
+-  **Nested patterns**
 
    Notice that we do *not* put bangs on nested patterns. For
    example ::
@@ -12710,7 +12710,7 @@ optionally had by adding ``!`` in front of a variable.
    :ref:`strict-modularity` below). So ``p`` and ``q`` may end up bound to
    undefined. See also :ref:`recursive-and-polymorphic-let-bindings` below.
 
--  **Top level bindings.**
+-  **Top level bindings**
 
    are unaffected by ``Strict``. For example: ::
 
@@ -12720,7 +12720,7 @@ optionally had by adding ``!`` in front of a variable.
    Here ``x`` and the pattern binding ``(y,z)`` remain lazy. Reason:
    there is no good moment to force them, until first use.
 
--  **Newtypes.**
+-  **Newtypes**
 
    There is no effect on newtypes, which simply rename existing types.
    For example: ::
