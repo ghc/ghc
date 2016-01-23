@@ -1,4 +1,0 @@
-
-tc056.hs:16:10: Warning:
-    Redundant constraints: (Eq' a, Eq' a)
-    In the instance declaration for ‘Eq' [a]’
