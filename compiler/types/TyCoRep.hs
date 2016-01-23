@@ -151,7 +151,7 @@ import UniqFM
 import qualified Data.Data as Data hiding ( TyCon )
 import Data.List
 import Data.IORef ( IORef )   -- for CoercionHole
-#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
+#if __GLASGOW_HASKELL__ > 710
 import GHC.Stack (CallStack)
 #endif
 
@@ -1821,7 +1821,7 @@ isValidTCvSubst (TCvSubst in_scope tenv cenv) =
 
 substTy ::
 -- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
-#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
+#if __GLASGOW_HASKELL__ > 710
     (?callStack :: CallStack) =>
 #endif
     TCvSubst -> Type  -> Type
