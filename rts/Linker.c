@@ -463,7 +463,7 @@ static int ghciInsertSymbolTable(
       pinfo->weak = HS_BOOL_FALSE;
       return 1;
    }
-   else if (pinfo->owner != owner && owner->status != OBJECT_RESOLVED) {
+   else if (pinfo->owner && pathcmp(pinfo->owner->fileName, obj_name) == 0 && pinfo->owner->status != OBJECT_RESOLVED) {
             // If the other symbol hasn't been loaded, we can just swap it out.
             // and load the one that has been requested.
             ghciRemoveSymbolTable(symhash, key, pinfo->owner);
@@ -2549,7 +2549,9 @@ int ocTryLoad (ObjectCode* oc) {
         SymbolInfo symbol;
         for (x = 0; x < oc->n_symbols; x++) {
             symbol = oc->symbols[x];
-            if (!ghciInsertSymbolTable(oc->fileName, symhash, symbol.name, symbol.addr, HS_BOOL_FALSE, oc)){
+            if (   symbol.name
+                && symbol.addr
+                && !ghciInsertSymbolTable(oc->fileName, symhash, symbol.name, symbol.addr, HS_BOOL_FALSE, oc)){
                 return 0;
             }
         }
