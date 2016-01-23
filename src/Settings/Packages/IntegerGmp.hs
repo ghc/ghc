@@ -16,7 +16,7 @@ integerGmpPackageArgs :: Args
 integerGmpPackageArgs = package integerGmp ? do
     let includeGmp = "-I" ++ gmpBuildPath -/- "include"
     gmpIncludeDir <- getSetting GmpIncludeDir
-    gmpLibDir <- getSetting GmpLibDir
+    gmpLibDir     <- getSetting GmpLibDir
 
     mconcat [ builder GhcCabal ? mconcat
               [ (null gmpIncludeDir && null gmpLibDir) ?

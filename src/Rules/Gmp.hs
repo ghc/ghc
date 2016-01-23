@@ -1,6 +1,4 @@
-module Rules.Gmp (
-    gmpRules, gmpBuildPath, gmpObjects, gmpLibraryH, gmpDependencies
-    ) where
+module Rules.Gmp (gmpRules, gmpBuildPath, gmpObjects, gmpLibraryH) where
 
 import qualified System.Directory as IO
 
@@ -17,7 +15,7 @@ gmpBase :: FilePath
 gmpBase = "libraries/integer-gmp/gmp"
 
 gmpTarget :: PartialTarget
-gmpTarget = PartialTarget Stage0 integerGmp
+gmpTarget = PartialTarget Stage1 integerGmp
 
 gmpObjects :: FilePath
 gmpObjects = gmpBuildPath -/- "objs"
@@ -33,9 +31,6 @@ gmpLibraryH = gmpBuildPath -/- "include/ghc-gmp.h"
 
 gmpLibraryFakeH :: FilePath
 gmpLibraryFakeH = gmpBase -/- "ghc-gmp.h"
-
-gmpDependencies :: [FilePath]
-gmpDependencies = [gmpLibraryH]
 
 gmpPatches :: [FilePath]
 gmpPatches = (gmpBase -/-) <$> ["gmpsrc.patch", "tarball/gmp-5.0.4.patch"]
@@ -77,11 +72,11 @@ gmpRules = do
 
         liftIO $ removeFiles gmpBuildPath ["//*"]
 
-        envs <- configureEnvironment
         -- TODO: without the optimisation below we configure integerGmp package
         -- twice -- think how this can be optimised (shall we solve #18 first?)
         -- TODO: this is a hacky optimisation: we do not rerun configure of
         -- integerGmp package if we detect the results of the previous run
+        envs <- configureEnvironment
         unlessM (liftIO . IO.doesFileExist $ gmpBase -/- "config.mk") $ do
             args <- configureIntGmpArguments
             runConfigure (pkgPath integerGmp) envs args
@@ -148,6 +143,4 @@ gmpRules = do
 
             runBuilder Ranlib [gmpLibrary]
 
-        putSuccess "| Successfully built custom library 'integer-gmp'"
-
-    -- gmpLibraryInTreeH %> \_ -> need [gmpLibraryH]
+        putSuccess "| Successfully built custom library 'gmp'"

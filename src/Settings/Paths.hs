@@ -39,7 +39,7 @@ pkgGhciLibraryFile stage pkg componentId =
 
 -- This is the build directory for in-tree GMP library
 gmpBuildPath :: FilePath
-gmpBuildPath = buildRootPath -/- "stage0/gmp"
+gmpBuildPath = buildRootPath -/- "stage1/gmp"
 
 -- GMP library names extracted from integer-gmp.buildinfo
 gmpLibNameCache :: FilePath

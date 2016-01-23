@@ -43,11 +43,12 @@ includesDependencies = ("includes" -/-) <$>
     , "ghcplatform.h"
     , "ghcversion.h" ]
 
-defaultDependencies :: [FilePath]
-defaultDependencies = concat
+defaultDependencies :: Stage -> [FilePath]
+defaultDependencies stage = concat
     [ includesDependencies
-    , libffiDependencies
-    , gmpDependencies ]
+    , libffiDependencies ]
+    ++
+    [ gmpLibraryH | stage > Stage0 ]
 
 ghcPrimDependencies :: Stage -> [FilePath]
 ghcPrimDependencies stage = ((targetPath stage ghcPrim -/- "build") -/-) <$>
@@ -67,7 +68,7 @@ derivedConstantsDependencies = installTargets ++ fmap (derivedConstantsPath -/-)
 compilerDependencies :: Stage -> [FilePath]
 compilerDependencies stage =
     [ platformH stage ]
-    ++ defaultDependencies ++ derivedConstantsDependencies
+    ++ defaultDependencies stage ++ derivedConstantsDependencies
     ++ fmap ((targetPath stage compiler -/- "build") -/-)
        [ "primop-vector-uniques.hs-incl"
        , "primop-data-decl.hs-incl"
@@ -91,7 +92,7 @@ generatedDependencies stage pkg
     | pkg   == ghcPrim  = ghcPrimDependencies stage
     | pkg   == rts      = libffiDependencies ++ includesDependencies
                        ++ derivedConstantsDependencies
-    | stage == Stage0   = defaultDependencies
+    | stage == Stage0   = defaultDependencies Stage0
     | otherwise         = []
 
 -- The following generators and corresponding source extensions are supported:

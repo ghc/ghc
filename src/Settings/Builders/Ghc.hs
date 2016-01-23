@@ -19,12 +19,15 @@ import Settings.Builders.Common (cIncludeArgs)
 ghcBuilderArgs :: Args
 ghcBuilderArgs = stagedBuilder Ghc ? do
     output <- getOutput
+    stage  <- getStage
     way    <- getWay
     let buildObj  = ("//*." ++  osuf way) ?== output || ("//*." ++  obootsuf way) ?== output
         buildHi   = ("//*." ++ hisuf way) ?== output || ("//*." ++ hibootsuf way) ?== output
         buildProg = not (buildObj || buildHi)
     libs    <- getPkgDataList DepExtraLibs
-    gmpLibs <- lift $ readFileLines gmpLibNameCache
+    gmpLibs <- if stage > Stage0 && buildProg
+               then lift $ readFileLines gmpLibNameCache -- TODO: use oracles
+               else return []
     libDirs <- getPkgDataList DepLibDirs
     mconcat [ commonGhcArgs
             , arg "-H32m"
