@@ -37,21 +37,34 @@ The following flags are simple ways to select standard "packages" of warnings:
 
 .. ghc-flag:: -W
 
-    Provides the standard warnings plus :ghc-flag:`-Wunused-binds`,
-    :ghc-flag:`-Wunused-matches`, :ghc-flag:`-Wunused-imports`,
-    :ghc-flag:`-Wincomplete-patterns`, :ghc-flag:`-Wdodgy-exports`, and
-    :ghc-flag:`-Wdodgy-imports`.
+    Provides the standard warnings plus
+
+    .. hlist::
+        :columns: 3
+
+        * :ghc-flag:`-Wunused-binds`
+        * :ghc-flag:`-Wunused-matches`
+        * :ghc-flag:`-Wunused-imports`
+        * :ghc-flag:`-Wincomplete-patterns`
+        * :ghc-flag:`-Wdodgy-exports`
+        * :ghc-flag:`-Wdodgy-imports`
 
 .. ghc-flag:: -Wall
 
     Turns on all warning options that indicate potentially suspicious
     code. The warnings that are *not* enabled by :ghc-flag:`-Wall` are
-    :ghc-flag:`-Wincomplete-uni-patterns`,
-    :ghc-flag:`-Wincomplete-record-updates`,
-    :ghc-flag:`-Wmonomorphism-restriction`,
-    :ghc-flag:`-Wimplicit-prelude`, :ghc-flag:`-Wmissing-local-sigs`,
-    :ghc-flag:`-Wmissing-exported-sigs`, :ghc-flag:`-Wmissing-import-lists`
-    and :ghc-flag:`-Widentities`.
+
+    .. hlist::
+        :columns: 3
+
+        * :ghc-flag:`-Wincomplete-uni-patterns`
+        * :ghc-flag:`-Wincomplete-record-updates`
+        * :ghc-flag:`-Wmonomorphism-restriction`
+        * :ghc-flag:`-Wimplicit-prelude`
+        * :ghc-flag:`-Wmissing-local-sigs`
+        * :ghc-flag:`-Wmissing-exported-sigs`
+        * :ghc-flag:`-Wmissing-import-lists`
+        * :ghc-flag:`-Widentities`
 
 .. ghc-flag:: -Wcompat
 
@@ -60,8 +73,14 @@ The following flags are simple ways to select standard "packages" of warnings:
     eager to make their code future compatible to adapt to new features before
     they even generate warnings.
 
-    This currently enables :ghc-flag:`-Wmissing-monadfail-instance`,
-    :ghc-flag:`-Wsemigroup`, and :ghc-flag:`-Wnoncanonical-monoid-instances`.
+    This currently enables
+
+    .. hlist::
+        :columns: 3
+
+        * :ghc-flag:`-Wmissing-monadfail-instance`
+        * :ghc-flag:`-Wsemigroup`
+        * :ghc-flag:`-Wnoncanonical-monoid-instances`
 
 .. ghc-flag:: -Wno-compat
 
