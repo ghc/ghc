@@ -8125,10 +8125,10 @@ ordinary implicit parameters.
 ``GHC.Stack`` additionally exports a function ``freezeCallStack`` that
 allows users to freeze a ``CallStack``, preventing any future push
 operations from having an effect. This can be used by library authors
-to prevent ``CallStack``\s from exposing unecessary implementation
+to prevent ``CallStack``\s from exposing unnecessary implementation
 details. Consider the ``head`` example above, the ``myerror`` line in
 the printed stack is not particularly enlightening, so we might choose
-to surpress it by freezing the ``CallStack`` that we pass to ``myerror``.
+to suppress it by freezing the ``CallStack`` that we pass to ``myerror``.
 
 .. code-block:: none
 
