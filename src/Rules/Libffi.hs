@@ -19,10 +19,10 @@ libffiDependencies :: [FilePath]
 libffiDependencies = (rtsBuildPath -/-) <$> [ "ffi.h", "ffitarget.h" ]
 
 libffiTarget :: PartialTarget
-libffiTarget = PartialTarget Stage0 libffi
+libffiTarget = PartialTarget Stage1 libffi
 
 libffiBuild :: FilePath
-libffiBuild = buildRootPath -/- "stage0/libffi"
+libffiBuild = buildRootPath -/- "stage1/libffi"
 
 libffiLibrary :: FilePath
 libffiLibrary = libffiBuild -/- "inst/lib/libffi.a"
@@ -32,7 +32,6 @@ fixLibffiMakefile =
       replace "-MD" "-MMD"
     . replace "@toolexeclibdir@" "$(libdir)"
     . replace "@INSTALL@" "$(subst ../install-sh,C:/msys/home/chEEtah/ghc/install-sh,@INSTALL@)"
-
 
 -- TODO: remove code duplication (see Settings/Builders/GhcCabal.hs)
 configureEnvironment :: Action [CmdOption]

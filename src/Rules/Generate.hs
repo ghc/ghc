@@ -43,13 +43,6 @@ includesDependencies = ("includes" -/-) <$>
     , "ghcplatform.h"
     , "ghcversion.h" ]
 
-defaultDependencies :: Stage -> [FilePath]
-defaultDependencies stage = concat
-    [ includesDependencies
-    , libffiDependencies ]
-    ++
-    [ gmpLibraryH | stage > Stage0 ]
-
 ghcPrimDependencies :: Stage -> [FilePath]
 ghcPrimDependencies stage = ((targetPath stage ghcPrim -/- "build") -/-) <$>
        [ "GHC/PrimopWrappers.hs"
@@ -68,7 +61,10 @@ derivedConstantsDependencies = installTargets ++ fmap (derivedConstantsPath -/-)
 compilerDependencies :: Stage -> [FilePath]
 compilerDependencies stage =
     [ platformH stage ]
-    ++ defaultDependencies stage ++ derivedConstantsDependencies
+    ++ includesDependencies
+    ++ [ gmpLibraryH | stage > Stage0 ]
+    ++ filter (const $ stage > Stage0) libffiDependencies
+    ++ derivedConstantsDependencies
     ++ fmap ((targetPath stage compiler -/- "build") -/-)
        [ "primop-vector-uniques.hs-incl"
        , "primop-data-decl.hs-incl"
@@ -86,13 +82,14 @@ compilerDependencies stage =
        , "primop-vector-tycons.hs-incl"
        , "primop-vector-tys.hs-incl" ]
 
+-- TODO: Turn this into a FilePaths expression
 generatedDependencies :: Stage -> Package -> [FilePath]
 generatedDependencies stage pkg
     | pkg   == compiler = compilerDependencies stage
     | pkg   == ghcPrim  = ghcPrimDependencies stage
     | pkg   == rts      = libffiDependencies ++ includesDependencies
                        ++ derivedConstantsDependencies
-    | stage == Stage0   = defaultDependencies Stage0
+    | stage == Stage0   = includesDependencies
     | otherwise         = []
 
 -- The following generators and corresponding source extensions are supported:
