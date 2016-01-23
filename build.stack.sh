@@ -28,13 +28,13 @@ function rl {
     echo "$RESULT"
 }
 
-absoltueRoot="$(dirname "$(rl "$0")")"
-cd "$absoltueRoot"
+absoluteRoot="$(dirname "$(rl "$0")")"
+cd "$absoluteRoot"
 
 stack build --no-library-profiling
 
 stack exec ghc-shake --            \
     --lint                         \
-    --directory "$absoltueRoot/.." \
+    --directory "$absoluteRoot/.." \
     --colour                       \
     "$@"

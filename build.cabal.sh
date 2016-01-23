@@ -28,8 +28,8 @@ function rl {
     echo "$RESULT"
 }
 
-absoltueRoot="$(dirname "$(rl "$0")")"
-cd "$absoltueRoot"
+absoluteRoot="$(dirname "$(rl "$0")")"
+cd "$absoluteRoot"
 
 # Initialize sandbox if necessary
 if ! ( cabal sandbox hc-pkg list 2>&1 > /dev/null ); then
@@ -42,6 +42,6 @@ fi
 
 cabal run ghc-shake --             \
     --lint                         \
-    --directory "$absoltueRoot/.." \
+    --directory "$absoluteRoot/.." \
     --colour                       \
     "$@"
