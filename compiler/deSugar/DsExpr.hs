@@ -732,10 +732,14 @@ dsExpr (EAsPat        {})  = panic "dsExpr:EAsPat"
 dsExpr (EViewPat      {})  = panic "dsExpr:EViewPat"
 dsExpr (ELazyPat      {})  = panic "dsExpr:ELazyPat"
 dsExpr (HsType        {})  = panic "dsExpr:HsType" -- removed by typechecker
-dsExpr (HsTypeOut     {})  = panic "dsExpr:HsTypeOut" -- handled in HsApp case
 dsExpr (HsDo          {})  = panic "dsExpr:HsDo"
 dsExpr (HsRecFld      {})  = panic "dsExpr:HsRecFld"
 
+-- Normally handled in HsApp case, but a GHC API user might try to desugar
+-- an HsTypeOut, since it is an HsExpr in a typechecked module after all.
+-- (Such as ghci itself, in #11456.) So improve the error message slightly.
+dsExpr (HsTypeOut {})
+  = panic "dsExpr: tried to desugar a naked type application argument (HsTypeOut)"
 
 findField :: [LHsRecField Id arg] -> Name -> [arg]
 findField rbinds sel
