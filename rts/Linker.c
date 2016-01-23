@@ -139,10 +139,6 @@ typedef struct _RtsSymbolInfo {
 /* Hash table mapping symbol names to RtsSymbolInfo */
 static /*Str*/HashTable *symhash;
 
-/* Hash table mapping the required symbols,
-   these are essentially symbols in use from linking object files. */
-static HashTable *reqSymHash;
-
 /* List of currently loaded objects */
 ObjectCode *objects = NULL;     /* initially empty */
 
@@ -422,6 +418,15 @@ static void *mmap_32bit_base = (void *)MMAP_32BIT_BASE_DEFAULT;
 #define MAP_ANONYMOUS MAP_ANON
 #endif
 
+static void ghciRemoveSymbolTable(HashTable *table, const char *key,
+    ObjectCode *owner)
+{
+    RtsSymbolInfo *pinfo = lookupStrHashTable(table, key);
+    if (!pinfo || owner != pinfo->owner) return;
+    removeStrHashTable(table, key, NULL);
+    stgFree(pinfo);
+}
+
 /* -----------------------------------------------------------------------------
  * Insert symbols into hash tables, checking for duplicates.
  *
@@ -458,6 +463,18 @@ static int ghciInsertSymbolTable(
       pinfo->weak = HS_BOOL_FALSE;
       return 1;
    }
+   else if (pinfo->owner != owner && owner->status != OBJECT_RESOLVED) {
+            // If the other symbol hasn't been loaded, we can just swap it out.
+            // and load the one that has been requested.
+            ghciRemoveSymbolTable(symhash, key, pinfo->owner);
+            pinfo = stgMallocBytes(sizeof(*pinfo), "ghciInsertToSymbolTable");
+            pinfo->value = data;
+            pinfo->owner = owner;
+            pinfo->weak = weak;
+            insertStrHashTable(table, key, pinfo);
+            return 1;
+    }
+
    pathchar* archiveName = NULL;
    debugBelch(
       "GHC runtime linker: fatal error: I found a duplicate definition for symbol\n"
@@ -486,8 +503,8 @@ static int ghciInsertSymbolTable(
    return 0;
 }
 
-static HsBool ghciLookupSymbolTable(HashTable *table,
-    const char *key, void **result)
+static HsBool ghciLookupSymbolInfo(HashTable *table,
+    const char *key, RtsSymbolInfo **result)
 {
     RtsSymbolInfo *pinfo = lookupStrHashTable(table, key);
     if (!pinfo) {
@@ -499,35 +516,10 @@ static HsBool ghciLookupSymbolTable(HashTable *table,
     /* Once it's looked up, it can no longer be overridden */
     pinfo->weak = HS_BOOL_FALSE;
 
-    *result = pinfo->value;
+    *result = pinfo;
     return HS_BOOL_TRUE;
 }
 
-static HsBool ghciLookupSymbolOwnerTable(HashTable *table,
-    const char *key, ObjectCode **result)
-{
-    RtsSymbolInfo *pinfo = lookupStrHashTable(table, key);
-    if (!pinfo) {
-        *result = NULL;
-        return HS_BOOL_FALSE;
-    }
-    if (pinfo->weak)
-        IF_DEBUG(linker, debugBelch("lookup: promoting %s\n", key));
-    /* Once it's looked up, it can no longer be overridden */
-    pinfo->weak = HS_BOOL_FALSE;
-
-    *result = pinfo->owner;
-    return HS_BOOL_TRUE;
-}
-
-static void ghciRemoveSymbolTable(HashTable *table, const char *key,
-    ObjectCode *owner)
-{
-    RtsSymbolInfo *pinfo = lookupStrHashTable(table, key);
-    if (!pinfo || owner != pinfo->owner) return;
-    removeStrHashTable(table, key, NULL);
-    stgFree(pinfo);
-}
 /* -----------------------------------------------------------------------------
  * initialize the object linker
  */
@@ -585,8 +577,6 @@ initLinker_ (int retain_cafs)
 #endif
 #endif
     symhash    = allocStrHashTable();
-    reqSymHash = allocStrHashTable();
-
 
     /* populate the symbol table with stuff from the RTS */
     for (sym = rtsSyms; sym->lbl != NULL; sym++) {
@@ -685,7 +675,6 @@ exitLinker( void ) {
 #endif
    if (linker_init_done == 1) {
        freeHashTable(symhash   , free);
-       freeHashTable(reqSymHash, NULL);
    }
 #ifdef THREADED_RTS
    closeMutex(&linker_mutex);
@@ -1199,13 +1188,14 @@ HsInt insertSymbol(pathchar* obj_name, char* key, void* data)
  */
 static void* lookupSymbol_ (char *lbl)
 {
-    void *val;
     IF_DEBUG(linker, debugBelch("lookupSymbol: looking up %s\n", lbl));
 
     ASSERT(symhash != NULL);
+    RtsSymbolInfo *pinfo;
 
-    if (!ghciLookupSymbolTable(symhash, lbl, &val)) {
+    if (!ghciLookupSymbolInfo(symhash, lbl, &pinfo) || !pinfo) {
         IF_DEBUG(linker, debugBelch("lookupSymbol: symbol not found\n"));
+
 #       if defined(OBJFORMAT_ELF)
         return internal_dlsym(lbl);
 #       elif defined(OBJFORMAT_MACHO)
@@ -1234,28 +1224,20 @@ static void* lookupSymbol_ (char *lbl)
         return NULL;
 #       endif
     } else {
+        void *val = pinfo->value;
         IF_DEBUG(linker, debugBelch("lookupSymbol: value of %s is %p\n", lbl, val));
-        if (lookupStrHashTable(reqSymHash, lbl) == NULL) {
-            int r;
-            ObjectCode* oc;
-            // Symbol can be found during linking, but hasn't been relocated. Do so now.
-            if (ghciLookupSymbolOwnerTable(symhash, lbl, &oc)) {
-                if (oc != NULL && oc->loadObject == HS_BOOL_FALSE) {
-                    oc->loadObject = HS_BOOL_TRUE;
-                    IF_DEBUG(linker, debugBelch("lookupSymbol: on-demand loaded symbol '%s'\n", lbl));
-                    r = ocTryLoad(oc);
 
-                    if (!r) {
-                        errorBelch("Could not on-demand load symbol '%s'\n", lbl);
-                        return NULL;
-                    }
+        int r;
+        ObjectCode* oc = pinfo->owner;
 
-                    // Store that we've already loaded the symbol
-                    insertStrHashTable(reqSymHash, lbl, val);
-                }
-            }
-            else {
-                // The symbol could be found, but not loaded nor relocated.
+        // Symbol can be found during linking, but hasn't been relocated. Do so now.
+        if (oc && oc->loadObject == HS_BOOL_FALSE) {
+            oc->loadObject = HS_BOOL_TRUE;
+            IF_DEBUG(linker, debugBelch("lookupSymbol: on-demand loaded symbol '%s'\n", lbl));
+            r = ocTryLoad(oc);
+
+            if (!r) {
+                errorBelch("Could not on-demand load symbol '%s'\n", lbl);
                 return NULL;
             }
         }
@@ -1313,24 +1295,26 @@ void ghci_enquire ( char* addr );
 void ghci_enquire ( char* addr )
 {
    int   i;
-   char* sym;
-   char* a;
+   SymbolInfo sym;
+   RtsSymbolInfo* a;
    const int DELTA = 64;
    ObjectCode* oc;
 
    for (oc = objects; oc; oc = oc->next) {
       for (i = 0; i < oc->n_symbols; i++) {
          sym = oc->symbols[i];
-         if (sym == NULL) continue;
+         if (sym.name == NULL) continue;
          a = NULL;
          if (a == NULL) {
-            ghciLookupSymbolTable(symhash, sym, (void **)&a);
+             ghciLookupSymbolInfo(symhash, sym.name, &a);
          }
          if (a == NULL) {
              // debugBelch("ghci_enquire: can't find %s\n", sym);
          }
-         else if (addr-DELTA <= a && a <= addr+DELTA) {
-            debugBelch("%p + %3d  ==  `%s'\n", addr, (int)(a - addr), sym);
+         else if (   a->value
+                  && addr-DELTA <= (char*)a->value
+                  && (char*)a->value <= addr+DELTA) {
+             debugBelch("%p + %3d  ==  `%s'\n", addr, (int)((char*)a->value - addr), sym.name);
          }
       }
    }
@@ -1672,9 +1656,9 @@ static void removeOcSymbols (ObjectCode *oc)
     // Remove all the mappings for the symbols within this object..
     int i;
     for (i = 0; i < oc->n_symbols; i++) {
-        if (oc->symbols[i] != NULL) {
-            ghciRemoveSymbolTable(symhash, oc->symbols[i], oc);
-            removeStrHashTable(reqSymHash, oc->symbols[i], NULL); // The string pointer is invalid. Remove it.
+        if (oc->symbols[i].name != NULL) {
+            ghciRemoveSymbolTable(symhash, oc->symbols[i].name, oc);
+            stgFree(oc->symbols[i].name);
         }
     }
 
@@ -2557,6 +2541,19 @@ int ocTryLoad (ObjectCode* oc) {
     int r;
 
     if (oc->status != OBJECT_RESOLVED && oc->loadObject == HS_BOOL_TRUE) {
+        // Check for duplicate symbols/
+        // Duplicate symbols are any symbols
+        // which do not match our 'preferred' symbols
+        // which have been stored in `symhash`.
+        int x;
+        SymbolInfo symbol;
+        for (x = 0; x < oc->n_symbols; x++) {
+            symbol = oc->symbols[x];
+            if (!ghciInsertSymbolTable(oc->fileName, symhash, symbol.name, symbol.addr, HS_BOOL_FALSE, oc)){
+                return 0;
+            }
+        }
+
 #           if defined(OBJFORMAT_ELF)
             r = ocResolve_ELF ( oc );
 #           elif defined(OBJFORMAT_PEi386)
@@ -2564,7 +2561,7 @@ int ocTryLoad (ObjectCode* oc) {
 #           elif defined(OBJFORMAT_MACHO)
             r = ocResolve_MachO ( oc );
 #           else
-            barf("resolveObjs: not implemented on this platform");
+        barf("ocTryLoad: not implemented on this platform");
 #           endif
             if (!r) { return r; }
 
@@ -2578,7 +2575,7 @@ int ocTryLoad (ObjectCode* oc) {
 #elif defined(OBJFORMAT_MACHO)
             r = ocRunInit_MachO ( oc );
 #else
-            barf("resolveObjs: initializers not implemented on this platform");
+        barf("ocTryLoad: initializers not implemented on this platform");
 #endif
             loading_obj = NULL;
 
@@ -2601,21 +2598,6 @@ static HsInt resolveObjs_ (void)
     int r;
 
     IF_DEBUG(linker, debugBelch("resolveObjs: start\n"));
-
-    // Mark any required sections as load
-    // If the object code has been deferred then
-    // check to see if we need any symbols from it.
-    // If we do, mark it as load.
-    int symbols_n = keyCountHashTable(reqSymHash);
-    StgWord* symbols = malloc(sizeof(StgWord) * symbols_n);
-    symbols_n = keysHashTable(reqSymHash, symbols, symbols_n);
-    for (int n = 0; n < symbols_n; n++) {
-        char* symbol = (char*)symbols[n];
-        if (symbol && ghciLookupSymbolOwnerTable(symhash, symbol, &oc) && oc) {
-            oc->loadObject = HS_BOOL_TRUE;
-            IF_DEBUG(linker, debugBelch("resolveObjs: picked symbol '%s'\n", symbol));
-        }
-    }
 
     for (oc = objects; oc; oc = oc->next) {
         r = ocTryLoad(oc);
@@ -3794,7 +3776,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
    /* Copy exported symbols into the ObjectCode. */
 
    oc->n_symbols = hdr->NumberOfSymbols;
-   oc->symbols   = stgCallocBytes(sizeof(char*), oc->n_symbols,
+   oc->symbols   = stgCallocBytes(sizeof(SymbolInfo), oc->n_symbols,
                                   "ocGetNames_PEi386(oc->symbols)");
 
    /* Work out the size of the global BSS section */
@@ -3873,16 +3855,11 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          IF_DEBUG(linker, debugBelch("addSymbol %p `%s'\n", addr,sname);)
          ASSERT(i >= 0 && i < oc->n_symbols);
          /* cstring_from_COFF_symbol_name always succeeds. */
-         oc->symbols[i] = (char*)sname;
+         oc->symbols[i].name = (char*)sname;
+         oc->symbols[i].addr = addr;
          if (! ghciInsertSymbolTable(oc->fileName, symhash, (char*)sname, addr,
                                      isWeak, oc)) {
              return 0;
-         }
-
-         /* If symbol is an object file add as required it for relocation */
-         if (oc->archiveMemberName == NULL)
-         {
-             insertStrHashTable(reqSymHash, sname, addr);
          }
       } else {
 #        if 0
@@ -4078,12 +4055,11 @@ ocResolve_PEi386 ( ObjectCode* oc )
          } else {
             copyName ( sym->Name, strtab, symbol, 1000-1 );
             S = (size_t) lookupSymbol_( (char*)symbol );
-            if ((void*)S != NULL) goto foundit;
+            if ((void*)S == NULL) {
 
-            errorBelch("%" PATH_FMT ": unknown symbol `%s'", oc->fileName, symbol);
-            return 0;
-
-           foundit:;
+                errorBelch("%" PATH_FMT ": unknown symbol `%s'", oc->fileName, symbol);
+                return 0;
+            }
          }
          /* All supported relocations write at least 4 bytes */
          checkProddableBlock(oc, pP, 4);
@@ -4926,7 +4902,7 @@ ocGetNames_ELF ( ObjectCode* oc )
       nent = shdr[i].sh_size / sizeof(Elf_Sym);
 
       oc->n_symbols = nent;
-      oc->symbols = stgCallocBytes(oc->n_symbols, sizeof(char*),
+      oc->symbols = stgCallocBytes(oc->n_symbols, sizeof(SymbolInfo),
                                    "ocGetNames_ELF(oc->symbols)");
       // Note calloc: if we fail partway through initializing symbols, we need
       // to undo the additions to the symbol table so far. We know which ones
@@ -5029,13 +5005,8 @@ ocGetNames_ELF ( ObjectCode* oc )
                                             nm, ad, isWeak, oc)) {
                     goto fail;
                 }
-                oc->symbols[j] = nm;
-
-                /* If symbol is an object file add as required it for relocation */
-                if (oc->archiveMemberName == NULL)
-                {
-                    insertStrHashTable(reqSymHash, nm, ad);
-                }
+                oc->symbols[j].name = nm;
+                oc->symbols[j].addr = ad;
             }
          } else {
             /* Skip. */
@@ -5158,6 +5129,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
          } else {
             symbol = strtab + sym.st_name;
             S_tmp = lookupSymbol_( symbol );
+            if (S_tmp == NULL) return 0;
             S = (Elf_Addr)S_tmp;
          }
          if (!S) {
@@ -6793,7 +6765,7 @@ ocGetNames_MachO(ObjectCode* oc)
         }
     }
     IF_DEBUG(linker, debugBelch("ocGetNames_MachO: %d external symbols\n", oc->n_symbols));
-    oc->symbols = stgMallocBytes(oc->n_symbols * sizeof(char*),
+    oc->symbols = stgMallocBytes(oc->n_symbols * sizeof(SymbolInfo),
                                    "ocGetNames_MachO(oc->symbols)");
 
     if(symLC)
@@ -6826,13 +6798,8 @@ ocGetNames_MachO(ObjectCode* oc)
                                                  , HS_BOOL_FALSE
                                                  , oc);
 
-                            /* If symbol is an object file add as required it for relocation */
-                            if (oc->archiveMemberName == NULL)
-                            {
-                                insertStrHashTable(reqSymHash, nm, addr);
-                            }
-
-                            oc->symbols[curSymbol++] = nm;
+                            oc->symbols[curSymbol++].name = nm;
+                            oc->symbols[curSymbol].addr   = addr;
                     }
                 }
                 else
@@ -6864,7 +6831,8 @@ ocGetNames_MachO(ObjectCode* oc)
                 IF_DEBUG(linker, debugBelch("ocGetNames_MachO: inserting common symbol: %s\n", nm));
                 ghciInsertSymbolTable(oc->fileName, symhash, nm,
                                        (void*)commonCounter, HS_BOOL_FALSE, oc);
-                oc->symbols[curSymbol++] = nm;
+                oc->symbols[curSymbol++].name = nm;
+                oc->symbols[curSymbol].addr   = (void*)commonCounter;
 
                 commonCounter += sz;
             }
