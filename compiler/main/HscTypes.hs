@@ -399,7 +399,7 @@ data HscEnv
         hsc_type_env_var :: Maybe (Module, IORef TypeEnv)
                 -- ^ Used for one-shot compilation only, to initialise
                 -- the 'IfGblEnv'. See 'TcRnTypes.tcg_type_env_var' for
-                -- 'TcRunTypes.TcGblEnv'
+                -- 'TcRnTypes.TcGblEnv'
 
 #ifdef GHCI
         , hsc_iserv :: MVar (Maybe IServ)
