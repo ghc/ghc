@@ -515,7 +515,9 @@ addBinTickLHsExpr boxLabel (L pos e0)
 
 
 -- -----------------------------------------------------------------------------
--- Decoarate an HsExpr with ticks
+-- Decorate the body of an HsExpr with ticks.
+-- (Whether to put a tick around the whole expression was already decided,
+-- in the addTickLHsExpr family of functions.)
 
 addTickHsExpr :: HsExpr Id -> TM (HsExpr Id)
 addTickHsExpr e@(HsVar (L _ id)) = do freeVar id; return e
@@ -526,7 +528,13 @@ addTickHsExpr e@(HsOverLabel _)  = return e
 addTickHsExpr e@(HsLit _)        = return e
 addTickHsExpr (HsLam matchgroup) = liftM HsLam (addTickMatchGroup True matchgroup)
 addTickHsExpr (HsLamCase ty mgs) = liftM (HsLamCase ty) (addTickMatchGroup True mgs)
-addTickHsExpr (HsApp e1 e2)      = liftM2 HsApp (addTickLHsExprNever e1) (addTickLHsExpr e2)
+addTickHsExpr (HsApp e1 e2)      = liftM2 HsApp (addTickLHsExprNever e1) e2'
+  -- This might be a type application. Then don't put a tick around e2,
+  -- or dsExpr won't recognize it as a type application any more (#11329).
+  -- It doesn't make sense to put a tick on a type anyways.
+  where e2'
+          | isLHsTypeExpr e2 = return e2
+          | otherwise        = addTickLHsExpr e2
 
 addTickHsExpr (OpApp e1 e2 fix e3) =
         liftM4 OpApp
@@ -657,8 +665,6 @@ addTickHsExpr (ExprWithTySigOut e ty) =
         liftM2 ExprWithTySigOut
                (addTickLHsExprNever e) -- No need to tick the inner expression
                (return ty)             -- for expressions with signatures
-
-addTickHsExpr e@(HsTypeOut _) = return e
 
 -- Others should never happen in expression content.
 addTickHsExpr e  = pprPanic "addTickHsExpr" (ppr e)
