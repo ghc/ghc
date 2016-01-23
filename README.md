@@ -39,7 +39,7 @@ On Windows, use `build.bat` instead and pass an extra flag to configure (also se
     ```bash
     shake-build/build.bat --configure=--enable-tarballs-autodownload
     ```
-If you are interested in building in a Cabal sandbox, have a look at `shake-build/build.cabal.sh`.
+If you are interested in building in a Cabal sandbox or using Stack, have a look at `shake-build/build.cabal.sh` and `shake-build/build.stack.sh` scripts.
 
 Using the build system
 ----------------------
