@@ -797,13 +797,18 @@ executables:
 
 .. rts-flag:: -hT
 
-    (can be shortened to ``-h``.) Generates a basic heap profile, in the
-    file :file:`prog.hp`. To produce the heap profile graph, use :command:`hp2ps`
-    (see :ref:`hp2ps`). The basic heap profile is broken down by data
-    constructor, with other types of closures (functions, thunks, etc.)
-    grouped into broad categories (e.g. ``FUN``, ``THUNK``). To get a
-    more detailed profile, use the full profiling support
-    (:ref:`profiling`).
+    Generates a basic heap profile, in the file :file:`prog.hp`. To produce the
+    heap profile graph, use :command:`hp2ps` (see :ref:`hp2ps`). The basic heap
+    profile is broken down by data constructor, with other types of closures
+    (functions, thunks, etc.) grouped into broad categories (e.g. ``FUN``,
+    ``THUNK``). To get a more detailed profile, use the full profiling support
+    (:ref:`profiling`). Can be shortened to ``-h``.
+
+.. rts-flag:: -L <n>
+
+    :default: 25 characters
+
+    Sets the maximum length of the cost-centre names listed in the heap profile.
 
 .. _rts-eventlog:
 
