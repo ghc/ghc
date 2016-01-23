@@ -95,6 +95,18 @@ typedef struct {
 #endif
 } SymbolExtra;
 
+
+/* Top-level structure for an symbols in object module.  One of these is allocated
+* for each symbol in an object in use.
+*/
+typedef struct _SymbolInfo {
+    /* The name of the symbol. */
+    char*          name;
+
+    /* The address of the symbol. */
+    unsigned char* addr;
+} SymbolInfo;
+
 /* Top-level structure for an object module.  One of these is allocated
  * for each object file in use.
  */
@@ -113,8 +125,8 @@ typedef struct _ObjectCode {
        this object into the global symbol hash table.  This is so that
        we know which parts of the latter mapping to nuke when this
        object is removed from the system. */
-    char**     symbols;
-    int        n_symbols;
+    SymbolInfo* symbols;
+    int         n_symbols;
 
     /* ptr to mem containing the object file image */
     char*      image;
