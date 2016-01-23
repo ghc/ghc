@@ -4,3 +4,4 @@ cfg/system.config
 cabal.sandbox.config
 dist/
 .cabal-sandbox/
+.stack-work/

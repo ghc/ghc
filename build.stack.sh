@@ -31,16 +31,9 @@ function rl {
 absoluteRoot="$(dirname "$(rl "$0")")"
 cd "$absoluteRoot"
 
-# Initialize sandbox if necessary
-if ! ( cabal sandbox hc-pkg list 2>&1 > /dev/null ); then
-    cabal sandbox init
-    cabal install                   \
-        --dependencies-only         \
-        --disable-library-profiling \
-        --disable-shared
-fi
+stack build --no-library-profiling
 
-cabal run ghc-shake --             \
+stack exec ghc-shake --            \
     --lint                         \
     --directory "$absoluteRoot/.." \
     --colour                       \
