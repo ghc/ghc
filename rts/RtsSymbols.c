@@ -58,18 +58,6 @@
 #if defined(mingw32_HOST_OS)
 #define RTS_POSIX_ONLY_SYMBOLS  /**/
 
-#if HAVE_GETTIMEOFDAY
-#define RTS_MINGW_GETTIMEOFDAY_SYM SymI_NeedsProto(gettimeofday)
-#else
-#define RTS_MINGW_GETTIMEOFDAY_SYM /**/
-#endif
-
-#if HAVE___MINGW_VFPRINTF
-#define RTS___MINGW_VFPRINTF_SYM SymI_HasProto(__mingw_vfprintf)
-#else
-#define RTS___MINGW_VFPRINTF_SYM /**/
-#endif
-
 #if defined(i386_HOST_ARCH)
 #define RTS_WIN32_ONLY(X) X
 #else
@@ -86,11 +74,9 @@
       SymI_HasProto(stg_asyncReadzh)                     \
       SymI_HasProto(stg_asyncWritezh)                    \
       SymI_HasProto(stg_asyncDoProczh)                   \
-      SymI_HasProto(__mingw_raise_matherr)               \
       SymI_NeedsProto(mingw_app_type)                    \
       SymI_HasProto(getWin32ProgArgv)                    \
       SymI_HasProto(setWin32ProgArgv)                    \
-      RTS___MINGW_VFPRINTF_SYM                           \
       SymI_HasProto(rts_InstallConsoleEvent)             \
       SymI_HasProto(rts_ConsoleHandlerDone)              \
       RTS_WIN32_ONLY(SymI_NeedsProto(__chkstk_ms))       \
@@ -99,9 +85,7 @@
       RTS_WIN64_ONLY(SymI_HasProto(__imp__environ))      \
       RTS_WIN32_ONLY(SymI_HasProto(_imp___iob))          \
       RTS_WIN64_ONLY(SymI_HasProto(__iob_func))          \
-      RTS_MINGW_GETTIMEOFDAY_SYM                         \
-      SymI_HasProto(isatty)                              \
-      SymI_NeedsProto(closedir)
+      SymI_HasProto(isatty)
 
 #else
 #define RTS_MINGW_ONLY_SYMBOLS /**/

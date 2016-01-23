@@ -604,6 +604,11 @@ initLinker_ (int retain_cafs)
                                symhash, "__image_base__", __image_base, HS_BOOL_TRUE, NULL)) {
         barf("ghciInsertSymbolTable failed");
     }
+
+    if (!ghciInsertSymbolTable(WSTR("Mingw special symbol"),
+                               symhash, "__mingw_raise_matherr", __mingw_raise_matherr, HS_BOOL_TRUE, NULL)) {
+        barf("ghciInsertSymbolTable failed");
+    }
 #endif /* OBJFORMAT_PEi386 */
 
 
