@@ -292,7 +292,6 @@ removeIndirections (StgClosure* p)
         switch (get_itbl(q)->type) {
         case IND:
         case IND_STATIC:
-        case IND_PERM:
             p = ((StgInd *)q)->indirectee;
             continue;
 

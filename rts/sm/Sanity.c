@@ -276,7 +276,6 @@ checkClosure( StgClosure* p )
     case CONSTR_1_1:
     case CONSTR_0_2:
     case CONSTR_2_0:
-    case IND_PERM:
     case BLACKHOLE:
     case PRIM:
     case MUT_PRIM:

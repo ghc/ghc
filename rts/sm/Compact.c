@@ -649,7 +649,6 @@ thread_obj (StgInfoTable *info, StgPtr p)
     }
 
     case IND:
-    case IND_PERM:
         thread(&((StgInd *)p)->indirectee);
         return p + sizeofW(StgInd);
 

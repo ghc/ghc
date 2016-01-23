@@ -601,7 +601,6 @@ loop:
       return;
 
   case FUN:
-  case IND_PERM:
   case CONSTR:
       copy_tag_nolock(p,info,q,sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),gen_no,tag);
       return;
@@ -965,7 +964,6 @@ selector_loop:
                   info = INFO_PTR_TO_STRUCT((StgInfoTable *)info_ptr);
                   switch (info->type) {
                   case IND:
-                  case IND_PERM:
                   case IND_STATIC:
                       val = ((StgInd *)val)->indirectee;
                       goto val_loop;
@@ -998,7 +996,6 @@ selector_loop:
           }
 
       case IND:
-      case IND_PERM:
       case IND_STATIC:
           // Again, we might need to untag a constructor.
           selectee = UNTAG_CLOSURE( ((StgInd *)selectee)->indirectee );

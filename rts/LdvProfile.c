@@ -109,7 +109,6 @@ processHeapClosureForDead( StgClosure *c )
     case FUN_0_2:
     case BLACKHOLE:
     case BLOCKING_QUEUE:
-    case IND_PERM:
         /*
           'Ingore' cases
         */

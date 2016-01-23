@@ -580,7 +580,6 @@ scavenge_block (bdescr *bd)
         break;
     }
 
-    case IND_PERM:
     case BLACKHOLE:
         evacuate(&((StgInd *)p)->indirectee);
         p += sizeofW(StgInd);
@@ -980,12 +979,6 @@ scavenge_mark_stack(void)
             break;
         }
 
-        case IND_PERM:
-            // don't need to do anything here: the only possible case
-            // is that we're in a 1-space compacting collector, with
-            // no "old" generation.
-            break;
-
         case IND:
         case BLACKHOLE:
             evacuate(&((StgInd *)p)->indirectee);
@@ -1295,7 +1288,6 @@ scavenge_one(StgPtr p)
     case CONSTR_2_0:
     case WEAK:
     case PRIM:
-    case IND_PERM:
     {
         StgPtr q, end;
 

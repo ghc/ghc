@@ -258,45 +258,6 @@ INFO_TABLE(stg_IND_STATIC,1,0,IND_STATIC,"IND_STATIC","IND_STATIC")
     jump %GET_ENTRY(R1) [R1];
 }
 
-INFO_TABLE(stg_IND_PERM,1,0,IND_PERM,"IND_PERM","IND_PERM")
-    /* explicit stack */
-{
-    /* Don't add INDs to granularity cost */
-
-    /* Don't: TICK_ENT_STATIC_IND(Node); for ticky-ticky; this ind is
-       here only to help profiling */
-
-#if defined(TICKY_TICKY) && !defined(PROFILING)
-    /* TICKY_TICKY && !PROFILING means PERM_IND *replaces* an IND, rather than
-       being extra  */
-    TICK_ENT_PERM_IND();
-#endif
-
-    LDV_ENTER(R1);
-
-    /* For ticky-ticky, change the perm_ind to a normal ind on first
-     * entry, so the number of ent_perm_inds is the number of *thunks*
-     * entered again, not the number of subsequent entries.
-     *
-     * Since this screws up cost centres, we die if profiling and
-     * ticky_ticky are on at the same time.  KSW 1999-01.
-     */
-#ifdef TICKY_TICKY
-#  ifdef PROFILING
-#    error Profiling and ticky-ticky do not mix at present!
-#  endif  /* PROFILING */
-    StgHeader_info(R1) = stg_IND_info;
-#endif /* TICKY_TICKY */
-
-    R1 = UNTAG(StgInd_indirectee(R1));
-
-#if defined(TICKY_TICKY) && !defined(PROFILING)
-    TICK_ENT_VIA_NODE();
-#endif
-
-    jump %GET_ENTRY(R1) [R1];
-}
-
 /* ----------------------------------------------------------------------------
    Black holes.
 

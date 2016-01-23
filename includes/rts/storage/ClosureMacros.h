@@ -378,7 +378,6 @@ closure_sizeW_ (StgClosure *p, StgInfoTable *info)
     case PAP:
         return pap_sizeW((StgPAP *)p);
     case IND:
-    case IND_PERM:
         return sizeofW(StgInd);
     case ARR_WORDS:
         return arr_words_sizeW((StgArrBytes *)p);
