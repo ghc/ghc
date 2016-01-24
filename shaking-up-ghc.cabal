@@ -107,26 +107,24 @@ executable ghc-shake
                        , Test
                        , Way
 
-    default-extensions:  BangPatterns
-                       , LambdaCase
-                       , MultiWayIf
-                       , TupleSections
+    default-language:    Haskell2010
     other-extensions:    DeriveDataTypeable
                        , DeriveGeneric
                        , FlexibleInstances
+                       , GeneralizedNewtypeDeriving
+                       , LambdaCase
                        , OverloadedStrings
                        , RecordWildCards
                        , ScopedTypeVariables
-    build-depends:       base
-                       , ansi-terminal >= 0.6
-                       , Cabal >= 1.22
-                       , containers >= 0.5
-                       , directory >= 1.2
-                       , extra >= 1.4
-                       , mtl >= 2.2
-                       , QuickCheck >= 2.6
-                       , shake >= 0.15
-                       , transformers >= 0.4
-                       , unordered-containers >= 0.2
-    default-language:    Haskell2010
-    ghc-options:         -Wall -fno-warn-name-shadowing -rtsopts -with-rtsopts=-I0 -j
+    build-depends:       base >= 4.8 && < 5
+                       , ansi-terminal        == 0.6.*
+                       , Cabal                == 1.22.*
+                       , containers           == 0.5.*
+                       , directory            == 1.2.*
+                       , extra                == 1.4.*
+                       , mtl                  == 2.2.*
+                       , QuickCheck           >= 2.6 && < 2.9
+                       , shake                == 0.15.*
+                       , transformers         >= 0.4 && < 0.6
+                       , unordered-containers == 0.2.*
+    ghc-options:         -Wall -fno-warn-name-shadowing -rtsopts -with-rtsopts=-I0
