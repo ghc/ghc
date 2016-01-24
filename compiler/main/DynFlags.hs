@@ -597,6 +597,7 @@ data WarningFlag =
    | Opt_WarnDerivingTypeable
    | Opt_WarnDeferredTypeErrors
    | Opt_WarnNonCanonicalMonadInstances   -- since 8.0
+   | Opt_WarnNonCanonicalMonadFailInstances -- since 8.0
    | Opt_WarnNonCanonicalMonoidInstances  -- since 8.0
    | Opt_WarnMissingPatSynSigs            -- since 8.0
    deriving (Eq, Show, Enum)
@@ -2939,6 +2940,8 @@ wWarningFlags = [
   flagSpec "name-shadowing"              Opt_WarnNameShadowing,
   flagSpec "noncanonical-monad-instances"
                                          Opt_WarnNonCanonicalMonadInstances,
+  flagSpec "noncanonical-monadfail-instances"
+                                         Opt_WarnNonCanonicalMonadFailInstances,
   flagSpec "noncanonical-monoid-instances"
                                          Opt_WarnNonCanonicalMonoidInstances,
   flagSpec "orphans"                     Opt_WarnOrphans,

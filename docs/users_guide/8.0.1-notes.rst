@@ -238,8 +238,9 @@ Compiler
    is intended to alert users to cases where they apply ``INLINEABLE`` but
    may not get the speed-up they expect.
 
--  Added the option :ghc-flag:`-Wnoncanonical-monad-instances` which helps
-   detect noncanonical ``Applicative``/``Monad`` instance definitions.
+-  Added the option :ghc-flag:`-Wnoncanonical-monad-instances` and
+   :ghc-flag:`-Wnoncanonical-monadfail-instances` which help detect noncanonical
+   ``Applicative``/``Monad``/``MonadFail`` instance definitions.
    See flag description in :ref:`options-sanity` for more details.
 
 -  When printing an out-of-scope error message, GHC will give helpful advice if

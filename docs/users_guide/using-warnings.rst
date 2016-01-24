@@ -205,6 +205,28 @@ of ``-W(no-)*``.
 
     This option is off by default.
 
+.. ghc-flag:: -Wnoncanonical-monadfail-instances
+
+    Warn if noncanonical ``Monad`` or ``MonadFail`` instances
+    declarations are detected.
+
+    When this warning is enabled, the following conditions are verified:
+
+    In ``Monad`` instances declarations warn if any of the following
+    conditions does not hold:
+
+     * If ``fail`` is defined it must be canonical
+       (i.e. ``fail = Control.Monad.Fail.fail``).
+
+    Moreover, in ``MonadFail`` instance declarations:
+
+     * Warn if ``fail`` is defined backwards
+       (i.e. ``fail = Control.Monad.fail``).
+
+    See also :ghc-flag:`-Wmissing-monadfail-instance`.
+
+    This option is off by default.
+
 .. ghc-flag:: -Wnoncanonical-monoid-instances
 
     Warn if noncanonical ``Semigroup`` or ``Monoid`` instances
@@ -233,6 +255,8 @@ of ``-W(no-)*``.
 
     Warn when a failable pattern is used in a do-block that does not have a
     ``MonadFail`` instance.
+
+    See also :ghc-flag:`-Wnoncanonical-monadfail-instances`.
 
     Being part of the :ghc-flag:`-Wcompat` option group, this warning is off by
     default, but will be switched on in a future GHC release, as part of

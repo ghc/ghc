@@ -197,6 +197,14 @@ warningsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-Wno-noncanonical-monad-instances"
          }
+  , flag { flagName = "-Wnoncanonical-monadfail-instances"
+         , flagDescription =
+           "warn when ``Monad`` or ``MonadFail`` instances have "++
+           "noncanonical definitions of ``fail``."++
+           "See flag description in :ref:`options-sanity` for more details."
+         , flagType = DynamicFlag
+         , flagReverse = "-Wno-noncanonical-monadfail-instances"
+         }
   , flag { flagName = "-Wnoncanonical-monoid-instances"
          , flagDescription =
            "warn when ``Semigroup`` or ``Monoid`` instances have "++
