@@ -1,7 +1,6 @@
 module Settings.Args (getArgs) where
 
-import Data.Monoid
-
+import CmdLineFlag
 import Expression
 import Settings.Builders.Alex
 import Settings.Builders.Ar
@@ -18,6 +17,7 @@ import Settings.Builders.Hsc2Hs
 import Settings.Builders.HsCpp
 import Settings.Builders.Ld
 import Settings.Builders.Tar
+import Settings.Flavours.Quick
 import Settings.Packages.Base
 import Settings.Packages.Compiler
 import Settings.Packages.Directory
@@ -35,7 +35,10 @@ import Settings.Packages.Unlit
 import Settings.User
 
 getArgs :: Expr [String]
-getArgs = fromDiffExpr $ defaultBuilderArgs <> defaultPackageArgs <> userArgs
+getArgs = fromDiffExpr $ mconcat [ defaultBuilderArgs
+                                 , defaultPackageArgs
+                                 , flavourArgs
+                                 , userArgs ]
 
 -- TODO: add src-hc-args = -H32m -O
 -- TODO: GhcStage2HcOpts=-O2 unless GhcUnregisterised
@@ -80,3 +83,7 @@ defaultPackageArgs = mconcat
     , runGhcPackageArgs
     , touchyPackageArgs
     , unlitPackageArgs ]
+
+flavourArgs :: Args
+flavourArgs = mconcat
+    [ cmdFlavour == Quick ? quickFlavourArgs ]

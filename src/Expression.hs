@@ -102,7 +102,7 @@ arg = append . return
 class PredicateLike a where
     (?) :: Monoid m => a -> Expr m -> Expr m
 
-infixr 8 ?
+infixr 3 ?
 
 instance PredicateLike Predicate where
     (?) = applyPredicate

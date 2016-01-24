@@ -17,7 +17,7 @@ import qualified Rules.Perl
 import qualified Test
 
 main :: IO ()
-main = shakeArgsWith options CmdLineFlag.flags $ \cmdLineFlags targets -> do
+main = shakeArgsWith options CmdLineFlag.cmdFlags $ \cmdLineFlags targets -> do
     CmdLineFlag.putCmdLineFlags cmdLineFlags
     Environment.setupEnvironment
     return . Just $ if null targets
