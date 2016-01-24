@@ -64,7 +64,7 @@ install:
 script:
     - ( cd ghc/shake-build && cabal haddock --internal )
     - ./ghc/shake-build/build.sh selftest
-    - ./ghc/shake-build/build.sh -j --no-progress $TARGET
+    - ./ghc/shake-build/build.sh -j --no-progress --flavour=quick $TARGET
 
 cache:
     directories:
