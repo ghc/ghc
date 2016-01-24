@@ -380,40 +380,6 @@ integer literals in binary notation with the prefix ``0b`` or ``0B``. For
 instance, the binary integer literal ``0b11001001`` will be desugared into
 ``fromInteger 201`` when :ghc-flag:`-XBinaryLiterals` is enabled.
 
-.. _hierarchical-modules:
-
-Hierarchical Modules
---------------------
-
-GHC supports a small extension to the syntax of module names: a module
-name is allowed to contain a dot ``‘.’``. This is also known as the
-“hierarchical module namespace” extension, because it extends the
-normally flat Haskell module namespace into a more flexible hierarchy of
-modules.
-
-This extension has very little impact on the language itself; modules
-names are *always* fully qualified, so you can just think of the fully
-qualified module name as “the module name”. In particular, this means
-that the full module name must be given after the ``module`` keyword at
-the beginning of the module; for example, the module ``A.B.C`` must
-begin ::
-
-    module A.B.C
-
-It is a common strategy to use the ``as`` keyword to save some typing
-when using qualified names with hierarchical modules. For example: ::
-
-    import qualified Control.Monad.ST.Strict as ST
-
-For details on how GHC searches for source and interface files in the
-presence of hierarchical modules, see :ref:`search-path`.
-
-GHC comes with a large collection of libraries arranged hierarchically;
-see the accompanying `library
-documentation <../libraries/index.html>`__. More libraries to install
-are available from
-`HackageDB <http://hackage.haskell.org/packages/hackage.html>`__.
-
 .. _pattern-guards:
 
 Pattern guards

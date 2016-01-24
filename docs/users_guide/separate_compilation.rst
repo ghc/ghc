@@ -12,12 +12,6 @@ This section describes what files GHC expects to find, what files it
 creates, where these files are stored, and what options affect this
 behaviour.
 
-Note that this section is written with hierarchical modules in mind (see
-:ref:`hierarchical-modules`); hierarchical modules are an extension to
-Haskell 98 which extends the lexical syntax of module names to include a
-dot ``.``. Non-hierarchical modules are thus a special case in which none
-of the module names contain dots.
-
 Pathname conventions vary from system to system. In particular, the
 directory separator is "``/``" on Unix systems and "``\``" on
 Windows systems. In the sections that follow, we shall consistently use
