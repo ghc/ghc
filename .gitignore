@@ -1,7 +1,14 @@
-.shake/
-.db/
+/.shake/
+/.db/
 cfg/system.config
+
+# build.cabal.sh specific
+/dist/
+/.cabal-sandbox/
 cabal.sandbox.config
-dist/
-.cabal-sandbox/
-.stack-work/
+
+# build.cabal-new.sh specific
+/dist-newstyle/
+
+# build.stack.sh specific
+/.stack-work/
