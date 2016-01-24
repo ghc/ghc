@@ -8,10 +8,10 @@ module Target (
 ) where
 
 import Control.Monad.Trans.Reader
+import GHC.Generics (Generic)
 
 import Base
 import Builder
-import GHC.Generics (Generic)
 import Package
 import Stage
 import Way

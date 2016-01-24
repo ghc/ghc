@@ -17,8 +17,6 @@ configRules = do
                     ++ "Run the configure script either manually or via the "
                     ++ "build system by passing --configure[=ARGS] flag."
 
-    -- When we detect Windows paths in ACLOCAL_PATH we reset it.
-    -- TODO: Handle Windows paths in ACLOCAL_PATH more gracefully.
     "configure" %> \_ -> do
         putBuild "| Running boot..."
         quietly $ cmd (EchoStdout False) "perl boot"

@@ -1,12 +1,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-
 module Test (testRules) where
 
-import Way
 import Development.Shake
+import Settings.Builders.Ar (chunksOfSize)
 import Test.QuickCheck
-import Settings.Builders.Ar(chunksOfSize)
+import Way
 
 instance Arbitrary Way where
     arbitrary = wayFromUnits <$> arbitrary
@@ -16,7 +15,7 @@ instance Arbitrary WayUnit where
 
 testRules :: Rules ()
 testRules =
-    phony "selftest" $ do
+    "selftest" ~> do
         test $ \(x :: Way) -> read (show x) == x
         test $ \n xs ->
             let res = chunksOfSize n xs

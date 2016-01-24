@@ -39,4 +39,4 @@ install:
 build_script:
     - cd C:\msys64\home\ghc\shake-build
     - echo "" | stack --no-terminal exec -- build.bat selftest
-    - echo "" | stack --no-terminal exec -- build.bat -j --no-progress inplace/bin/ghc-cabal.exe
+    - echo "" | stack --no-terminal exec -- build.bat -j --no-progress inplace/bin/ghc-stage1.exe

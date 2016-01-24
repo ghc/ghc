@@ -19,7 +19,7 @@ import Stage
 -- all of them. However, not all of these packages will be built. For example,
 -- package /win32/ is built only on Windows.
 -- "Packages" defines default conditions for building each package, which can
--- be overridden in "User".
+-- be overridden in "Settings.User".
 defaultKnownPackages :: [Package]
 defaultKnownPackages =
     [ array, base, binary, bytestring, cabal, compiler, containers, compareSizes
@@ -30,7 +30,7 @@ defaultKnownPackages =
     , primitive, process, rts, runGhc, stm, templateHaskell, terminfo, time
     , touchy, transformers, unlit, unix, win32, xhtml ]
 
--- Package definitions (see "Package")
+-- | Package definitions, see 'Package'.
 array, base, binary, bytestring, cabal, compiler, containers, compareSizes,
     deepseq, deriveConstants, directory, dllSplit, filepath, genapply,
     genprimopcode, ghc, ghcBoot, ghcCabal, ghci, ghcPkg, ghcPrim, ghcTags,

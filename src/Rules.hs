@@ -12,7 +12,6 @@ import Settings
 allStages :: [Stage]
 allStages = [minBound ..]
 
--- TODO: not all program targets should be needed explicitly
 -- | 'need' all top-level build targets
 generateTargets :: Rules ()
 generateTargets = action $ do
@@ -29,7 +28,7 @@ targetsForStage stage = do
         needHaddock <- interpretPartial target buildHaddock
         return [ pkgHaddockFile pkg | needHaddock && stage == Stage1 ]
     let programTargets = [ prog | Just prog <- programPath stage <$> pkgs ]
-    return (libTargets ++ programTargets)
+    return $ libTargets ++ programTargets
 
 packageRules :: Rules ()
 packageRules = do
