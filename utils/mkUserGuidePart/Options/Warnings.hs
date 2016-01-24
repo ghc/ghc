@@ -188,22 +188,22 @@ warningsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-Wno-name-shadowing"
          }
-  , flag { flagName = "-Wnoncanonical-monad-instance"
+  , flag { flagName = "-Wnoncanonical-monad-instances"
          , flagDescription =
            "warn when ``Applicative`` or ``Monad`` instances have "++
            "noncanonical definitions of ``return``, ``pure``, ``(>>)``, "++
            "or ``(*>)``. "++
            "See flag description in :ref:`options-sanity` for more details."
          , flagType = DynamicFlag
-         , flagReverse = "-Wno-noncanonical-monad-instance"
+         , flagReverse = "-Wno-noncanonical-monad-instances"
          }
-  , flag { flagName = "-Wnoncanonical-monoid-instance"
+  , flag { flagName = "-Wnoncanonical-monoid-instances"
          , flagDescription =
            "warn when ``Semigroup`` or ``Monoid`` instances have "++
            "noncanonical definitions of ``(<>)`` or ``mappend``. "++
            "See flag description in :ref:`options-sanity` for more details."
          , flagType = DynamicFlag
-         , flagReverse = "-Wno-noncanonical-monoid-instance"
+         , flagReverse = "-Wno-noncanonical-monoid-instances"
          }
   , flag { flagName = "-Worphans"
          , flagDescription =
