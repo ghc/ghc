@@ -39,7 +39,6 @@ main = shakeArgsWith options CmdLineFlag.flags $ \cmdLineFlags targets -> do
         , Rules.packageRules
         , Test.testRules ]
     options = shakeOptions
-        { shakeChange   = ChangeModtimeAndDigest
-        , shakeFiles    = Base.shakeFilesPath
+        { shakeFiles    = Base.shakeFilesPath
         , shakeProgress = progressSimple
         , shakeTimings  = True }
