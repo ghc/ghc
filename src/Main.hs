@@ -3,7 +3,8 @@ module Main (main) where
 import Development.Shake
 
 import qualified Base
-import           CmdLineFlag
+import qualified CmdLineFlag
+import qualified Environment
 import qualified Rules
 import qualified Rules.Cabal
 import qualified Rules.Clean
@@ -16,8 +17,9 @@ import qualified Rules.Perl
 import qualified Test
 
 main :: IO ()
-main = shakeArgsWith options flags $ \cmdLineFlags targets -> do
-    putCmdLineFlags cmdLineFlags
+main = shakeArgsWith options CmdLineFlag.flags $ \cmdLineFlags targets -> do
+    CmdLineFlag.putCmdLineFlags cmdLineFlags
+    Environment.setupEnvironment
     return . Just $ if null targets
                     then rules
                     else want targets >> withoutActions rules
@@ -27,13 +29,13 @@ main = shakeArgsWith options flags $ \cmdLineFlags targets -> do
         [ Rules.Cabal.cabalRules
         , Rules.Clean.cleanRules
         , Rules.Config.configRules
-        , Rules.Generate.copyRules
         , Rules.Generate.generateRules
-        , Rules.Perl.perlScriptRules
-        , Rules.generateTargets
+        , Rules.Generate.copyRules
         , Rules.Gmp.gmpRules
         , Rules.Libffi.libffiRules
         , Rules.Oracles.oracleRules
+        , Rules.Perl.perlScriptRules
+        , Rules.generateTargets
         , Rules.packageRules
         , Test.testRules ]
     options = shakeOptions

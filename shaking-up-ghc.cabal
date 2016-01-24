@@ -20,6 +20,7 @@ executable ghc-shake
     other-modules:       Base
                        , Builder
                        , CmdLineFlag
+                       , Environment
                        , Expression
                        , GHC
                        , Oracles

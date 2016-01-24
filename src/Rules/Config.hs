@@ -21,10 +21,4 @@ configRules = do
     -- TODO: Handle Windows paths in ACLOCAL_PATH more gracefully.
     "configure" %> \_ -> do
         putBuild "| Running boot..."
-        aclocal <- getEnv "ACLOCAL_PATH"
-        let env = case aclocal of
-                Nothing -> []
-                Just s  -> if ":\\" `isPrefixOf` (drop 1 s)
-                           then [AddEnv "ACLOCAL_PATH" ""]
-                           else []
-        quietly $ cmd (EchoStdout False) env "perl boot"
+        quietly $ cmd (EchoStdout False) "perl boot"
