@@ -1149,6 +1149,7 @@ checkValidInstance ctxt hs_type ty
   | Just (clas,inst_tys) <- getClassPredTys_maybe tau
   , inst_tys `lengthIs` classArity clas
   = do  { setSrcSpan head_loc (checkValidInstHead ctxt clas inst_tys)
+        ; traceTc "checkValidInstance {" (ppr ty)
         ; checkValidTheta ctxt theta
 
         -- The Termination and Coverate Conditions
@@ -1162,14 +1163,17 @@ checkValidInstance ctxt hs_type ty
         --   the termination condition, because 'a' appears more often
         --   in the constraint than in the head
         ; undecidable_ok <- xoptM LangExt.UndecidableInstances
-        ; traceTc "cvi" (ppr undecidable_ok $$ ppr ty)
         ; if undecidable_ok
           then checkAmbiguity ctxt ty
           else checkInstTermination inst_tys theta
 
+        ; traceTc "cvi 2" (ppr ty)
+
         ; case (checkInstCoverage undecidable_ok clas theta inst_tys) of
             IsValid      -> return ()   -- Check succeeded
             NotValid msg -> addErrTc (instTypeErr clas inst_tys msg)
+
+        ; traceTc "End checkValidInstance }" empty
 
         ; return (tvs, theta, clas, inst_tys) }
 
