@@ -600,6 +600,7 @@ data WarningFlag =
    | Opt_WarnNonCanonicalMonadFailInstances -- since 8.0
    | Opt_WarnNonCanonicalMonoidInstances  -- since 8.0
    | Opt_WarnMissingPatSynSigs            -- since 8.0
+   | Opt_WarnUnrecognisedWarningFlags     -- since 8.0
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -2749,7 +2750,8 @@ dynamic_flags = [
  ++ map (mkFlag turnOff "XNo"       unSetExtensionFlag) xFlags
  ++ map (mkFlag turnOn  "X"         setLanguage       ) languageFlags
  ++ map (mkFlag turnOn  "X"         setSafeHaskell    ) safeHaskellFlags
- ++ [ defFlag "XGenerics"
+ ++ [ unrecognisedWarning
+    , defFlag "XGenerics"
         (NoArg (deprecate $
                   "it does nothing; look into -XDefaultSignatures " ++
                   "and -XDeriveGeneric for generic programming support."))
@@ -2757,6 +2759,16 @@ dynamic_flags = [
         (NoArg (deprecate $
                   "it does nothing; look into -XDefaultSignatures and " ++
                   "-XDeriveGeneric for generic programming support.")) ]
+
+-- | This is where we handle unrecognised warning flags. We only issue a warning
+-- if -Wunrecognised-warning-flags is set. See Trac #11429 for context.
+unrecognisedWarning :: Flag (CmdLineP DynFlags)
+unrecognisedWarning = defFlag "W" (Prefix action)
+  where
+    action :: String -> EwM (CmdLineP DynFlags) ()
+    action flag = do
+      f <- wopt Opt_WarnUnrecognisedWarningFlags <$> liftEwM getCmdLineState
+      when f $ addWarn $ "unrecognised warning flag: -W"++flag
 
 -- See Note [Supporting CLI completion]
 package_flags :: [Flag (CmdLineP DynFlags)]
@@ -2970,7 +2982,8 @@ wWarningFlags = [
   flagSpec "unused-top-binds"            Opt_WarnUnusedTopBinds,
   flagSpec "warnings-deprecations"       Opt_WarnWarningsDeprecations,
   flagSpec "wrong-do-bind"               Opt_WarnWrongDoBind,
-  flagSpec "missing-pat-syn-sigs"        Opt_WarnMissingPatSynSigs]
+  flagSpec "missing-pat-syn-sigs"        Opt_WarnMissingPatSynSigs,
+  flagSpec "unrecognised-warning-flags"  Opt_WarnUnrecognisedWarningFlags ]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
 negatableFlags :: [FlagSpec GeneralFlag]
@@ -3469,7 +3482,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
 -- please remember to update the User's Guide. The relevant file is:
 --
 --  * utils/mkUserGuidePart/
---  * docs/users_guide/using.rst
+--  * docs/users_guide/using-warnings.rst
 
 -- | Warnings enabled unless specified otherwise
 standardWarnings :: [WarningFlag]
@@ -3492,7 +3505,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnInlineRuleShadowing,
         Opt_WarnAlternativeLayoutRuleTransitional,
         Opt_WarnUnsupportedLlvmVersion,
-        Opt_WarnTabs
+        Opt_WarnTabs,
+        Opt_WarnUnrecognisedWarningFlags
       ]
 
 -- | Things you get with -W

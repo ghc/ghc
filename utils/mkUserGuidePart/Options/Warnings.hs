@@ -36,6 +36,13 @@ warningsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-Werror"
          }
+  , flag { flagName = "-Wunrecognised-warning-flags"
+         , flagDescription =
+           "throw a warning when an unreconised ``-W...`` flag is "++
+           "encountered on the command line."
+         , flagType = DynamicFlag
+         , flagReverse = "-Wno-unrecognised-warning-flags"
+         }
   , flag { flagName = "-fdefer-type-errors"
          , flagDescription =
            "Turn type errors into warnings, :ref:`deferring the error until "++

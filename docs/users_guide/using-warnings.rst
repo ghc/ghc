@@ -31,6 +31,7 @@ generally likely to indicate bugs in your program. These are:
     * :ghc-flag:`-Winline-rule-shadowing`
     * :ghc-flag:`-Wunsupported-llvm-version`
     * :ghc-flag:`-Wtabs`
+    * :ghc-flag:`-Wunrecognised-warning-flags`
 
 The following flags are simple ways to select standard "packages" of warnings:
 
@@ -105,6 +106,13 @@ warning, simply give the corresponding ``-Wno-...`` option on the
 command line. For backwards compatibility with GHC versions prior to 8.0,
 all these warnings can still be controlled with ``-f(no-)warn-*`` instead
 of ``-W(no-)*``.
+
+.. ghc-flag:: -Wunrecognised-warning-flags
+
+    Enables warnings when the compiler encounters a ``-W...`` flag that is not
+    recognised.
+
+    This warning is on by default.
 
 .. ghc-flag:: -Wtyped-holes
 
