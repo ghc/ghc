@@ -69,12 +69,11 @@ The `make`-based build system uses `mk/build.mk` to specify user build settings.
 use [`src/Settings/User.hs`][user-settings] for the same purpose. Feel free to
 experiment following the Haddock comments.
 
-#### Resetting the build
+#### Clean and full rebuild
 
-To reset the new build system run the build script with `-B` flag. This forces Shake
-to rerun all rules, even if results of the previous build are still in the GHC tree.
-To remove all build artefacts, run the build script with `clean` target. Note, we are
-working towards a complete separation of GHC sources and build artefacts: [#113][build-artefacts-issue].
+* `shake-build/build.sh clean` removes all build artefacts. Note, we are working towards a complete separation of GHC sources and build artefacts: [#113][build-artefacts-issue].
+
+* `shake-build/build.sh -B` forces Shake to rerun all rules, even if results of the previous build are still in the GHC tree. 
 
 Current limitations
 -------------------
