@@ -152,12 +152,12 @@ warningsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-Wno-missing-local-sigs"
          }
-  , flag { flagName = "-Wmissing-monadfail-instance"
+  , flag { flagName = "-Wmissing-monadfail-instances"
          , flagDescription =
            "warn when a failable pattern is used in a do-block that does " ++
            "not have a ``MonadFail`` instance."
          , flagType = DynamicFlag
-         , flagReverse = "-Wno-missing-monadfail-instance"
+         , flagReverse = "-Wno-missing-monadfail-instances"
          }
   , flag { flagName = "-Wsemigroup"
          , flagDescription =

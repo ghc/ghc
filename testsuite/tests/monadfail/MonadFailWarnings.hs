@@ -2,7 +2,7 @@
 -- Ensure that MonadFail warnings are issued correctly if the warning flag
 -- is enabled
 
-{-# OPTIONS_GHC -fwarn-missing-monadfail-instance #-}
+{-# OPTIONS_GHC -Wmissing-monadfail-instances #-}
 
 module MonadFailWarnings where
 

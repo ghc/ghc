@@ -566,7 +566,7 @@ data WarningFlag =
    | Opt_WarnWarningsDeprecations
    | Opt_WarnDeprecatedFlags
    | Opt_WarnAMP -- Introduced in GHC 7.8, obsolete since 7.10
-   | Opt_WarnMissingMonadFailInstance -- since 8.0
+   | Opt_WarnMissingMonadFailInstances -- since 8.0
    | Opt_WarnSemigroup -- since 8.0
    | Opt_WarnDodgyExports
    | Opt_WarnDodgyImports
@@ -2926,7 +2926,7 @@ wWarningFlags = [
   flagSpec "missing-import-lists"        Opt_WarnMissingImportList,
   flagSpec "missing-local-sigs"          Opt_WarnMissingLocalSigs,
   flagSpec "missing-methods"             Opt_WarnMissingMethods,
-  flagSpec "missing-monadfail-instance"  Opt_WarnMissingMonadFailInstance,
+  flagSpec "missing-monadfail-instances" Opt_WarnMissingMonadFailInstances,
   flagSpec "semigroup"                   Opt_WarnSemigroup,
   flagSpec "missing-signatures"          Opt_WarnMissingSigs,
   flagSpec "missing-exported-sigs"       Opt_WarnMissingExportedSigs,
@@ -3526,7 +3526,7 @@ minusWallOpts
 -- code future compatible to fix issues before they even generate warnings.
 minusWcompatOpts :: [WarningFlag]
 minusWcompatOpts
-    = [ Opt_WarnMissingMonadFailInstance
+    = [ Opt_WarnMissingMonadFailInstances
       , Opt_WarnSemigroup
       , Opt_WarnNonCanonicalMonoidInstances
       ]
