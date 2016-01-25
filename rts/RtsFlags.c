@@ -650,6 +650,7 @@ static void procRtsOpts (int rts_argc0,
            at the start each iteration and checked at the end. */
         rtsBool option_checked = rtsFalse;
 
+// See Note [OPTION_SAFE vs OPTION_UNSAFE].
 #define OPTION_SAFE option_checked = rtsTrue;
 #define OPTION_UNSAFE checkUnsafe(rtsOptsEnabled); option_checked = rtsTrue;
 
@@ -854,7 +855,6 @@ error = rtsTrue;
                   THREADED_BUILD_ONLY(
                     int nNodes;
                     int proc = (int)getNumberOfProcessors();
-                    OPTION_SAFE;
 
                     nNodes = strtol(rts_argv[arg]+5, (char **) NULL, 10);
                     if (nNodes > proc) { nNodes = proc; }
@@ -1011,15 +1011,15 @@ error = rtsTrue;
                   ) break;
               case 'h': /* serial heap profile */
 #if !defined(PROFILING)
-                OPTION_UNSAFE;
                 switch (rts_argv[arg][2]) {
                   case '\0':
                   case 'T':
+                    OPTION_UNSAFE;
                     RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_CLOSURE_TYPE;
                     break;
                   default:
-                    errorBelch("invalid heap profile option: %s",rts_argv[arg]);
-                    error = rtsTrue;
+                    OPTION_SAFE;
+                    PROFILING_BUILD_ONLY();
                 }
 #else
                 OPTION_SAFE;
@@ -1971,3 +1971,41 @@ void freeRtsArgs(void)
     freeProgArgv();
     freeRtsArgv();
 }
+
+
+/*
+Note [OPTION_SAFE vs OPTION_UNSAFE]
+
+Ticket #3910 originally pointed out that the RTS options are a potential
+security problem. For example the -t -s or -S flags can be used to
+overwrite files. This would be bad in the context of CGI scripts or
+setuid binaries. So we introduced a system where +RTS processing is more
+or less disabled unless you pass the -rtsopts flag at link time.
+
+This scheme is safe enough but it also really annoyes users. They have
+to use -rtsopts in many circumstances: with -threaded to use -N, with
+-eventlog to use -l, with -prof to use any of the profiling flags. Many
+users just set -rtsopts globally or in project .cabal files. Apart from
+annoying users it reduces security because it means that deployed
+binaries will have all RTS options enabled rather than just profiling
+ones.
+
+So now, we relax the set of RTS options that are available in the
+default -rtsopts=some case. For "deployment" ways like vanilla and
+-threaded we remain quite conservative. Only --info -? --help are
+allowed for vanilla. For -threaded, -N and -N<x> are allowed with a
+check that x <= num cpus.
+
+For "developer" ways like -debug, -eventlog, -prof, we allow all the
+options that are special to that way. Some of these allow writing files,
+but the file written is not directly under the control of the attacker.
+For the setuid case (where the attacker would have control over binary
+name, current dir, local symlinks etc) we check if the process is
+running setuid/setgid and refuse all RTS option processing. Users would
+need to use -rtsopts=all in this case.
+
+We are making the assumption that developers will not deploy binaries
+built in the -debug, -eventlog, -prof ways. And even if they do, the
+damage should be limited to DOS, information disclosure and writing
+files like <progname>.eventlog, not arbitrary files.
+*/
