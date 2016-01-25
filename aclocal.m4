@@ -451,6 +451,8 @@ AC_DEFUN([GET_ARM_ISA],
                     [ARM_ABI="SOFTFP"]
                )]
         )
+
+        AC_SUBST(ARM_ISA)
 ])
 
 
