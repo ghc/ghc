@@ -1,7 +1,7 @@
 {-# language KindSignatures, PolyKinds, TypeFamilies,
   NoImplicitPrelude, FlexibleContexts,
   MultiParamTypeClasses, GADTs,
-  ConstraintKinds, FlexibleInstances,
+  ConstraintKinds, FlexibleInstances, UndecidableInstances,
   FunctionalDependencies, UndecidableSuperClasses #-}
 
 module T11480a where
