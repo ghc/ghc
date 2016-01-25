@@ -85,6 +85,28 @@ all files; you cannot, for example, invoke
 ``ghc -c -O1 Foo.hs -O2 Bar.hs`` to apply different optimisation levels
 to the files ``Foo.hs`` and ``Bar.hs``.
 
+.. note::
+
+    .. index::
+       single: command-line; order of arguments
+
+    Note that command-line options are *order-dependent*, with arguments being
+    evaluated from left-to-right. This can have seemingly strange effects in the
+    presence of flag implication. For instance, consider
+    :ghc-flag:`-fno-specialise` and :ghc-flag:`-O1` (which implies
+    :ghc-flag:`-fspecialise`). These two command lines mean very different
+    things:
+
+    ``-fno-specialise -O1``
+
+        ``-fspecialise`` will be enabled as the ``-fno-specialise`` is overriden
+        by the ``-O1``.
+
+    ``-O1 -fno-specialise``
+
+        ``-fspecialise`` will not be enabled, since the ``-fno-specialise``
+        overrides the ``-fspecialise`` implied by ``-O1``.
+
 .. _source-file-options:
 
 Command line options in source files
