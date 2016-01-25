@@ -19,7 +19,6 @@ generally likely to indicate bugs in your program. These are:
     * :ghc-flag:`-Wwarnings-deprecations`
     * :ghc-flag:`-Wdeprecated-flags`
     * :ghc-flag:`-Wunrecognised-pragmas`
-    * :ghc-flag:`-Wmissed-specialisations`
     * :ghc-flag:`-Wduplicate-constraints`
     * :ghc-flag:`-Wduplicate-exports`
     * :ghc-flag:`-Woverflowed-literals`
@@ -179,6 +178,8 @@ of ``-W(no-)*``.
     The "non-all" form is intended to catch cases where an imported function
     that is marked as ``INLINEABLE`` (presumably to enable specialisation) cannot
     be specialised as it calls other functions that are themselves not specialised.
+
+    Note that these warnings will not throw errors if used with :ghc-flag:`-Werror`.
 
     These options are both off by default.
 
