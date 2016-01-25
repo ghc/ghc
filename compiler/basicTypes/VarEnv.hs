@@ -99,7 +99,10 @@ data InScopeSet = InScope (VarEnv Var) {-# UNPACK #-} !Int
         -- INVARIANT: it's not zero; we use it as a multiplier in uniqAway
 
 instance Outputable InScopeSet where
-  ppr (InScope s _) = text "InScope" <+> ppr s
+  ppr (InScope s _) = text "InScope"
+                      <+> braces (fsep (map (ppr . Var.varName) (varSetElems s)))
+                      -- In-scope sets get big, and with -dppr-debug
+                      -- the output is overwhelming
 
 emptyInScopeSet :: InScopeSet
 emptyInScopeSet = InScope emptyVarSet 1
