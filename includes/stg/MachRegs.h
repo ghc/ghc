@@ -485,14 +485,15 @@ the stack. See Note [Overlapping global registers] for implications.
    Here we consider ARM mode (i.e. 32bit isns)
    and also CPU with full VFPv3 implementation
 
-   ARM registers (see Chapter 5.1 in ARM IHI 0042D)
+   ARM registers (see Chapter 5.1 in ARM IHI 0042D and
+   Section 9.2.2 in ARM Software Development Toolkit Reference Guide)
 
    r15  PC         The Program Counter.
    r14  LR         The Link Register.
    r13  SP         The Stack Pointer.
    r12  IP         The Intra-Procedure-call scratch register.
-   r11  v8         Variable-register 8.
-   r10  v7         Variable-register 7.
+   r11  v8/fp      Variable-register 8.
+   r10  v7/sl      Variable-register 7.
    r9   v6/SB/TR   Platform register. The meaning of this register is
                    defined by the platform standard.
    r8   v5         Variable-register 5.
