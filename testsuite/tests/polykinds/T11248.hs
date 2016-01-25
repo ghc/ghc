@@ -1,3 +1,6 @@
+{-# OPTIONS_GHC -O #-}
+  -- Trac #11248, comment:6 showed that this tests failed with -O
+
 {-# LANGUAGE DataKinds, TypeOperators, TypeFamilies,
              KindSignatures, ConstraintKinds #-}
 
