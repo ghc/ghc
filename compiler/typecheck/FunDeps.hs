@@ -23,7 +23,7 @@ import Name
 import Var
 import Class
 import Type
-import TcType( immSuperClasses )
+import TcType( transSuperClasses )
 import Unify
 import InstEnv
 import VarSet
@@ -516,18 +516,17 @@ oclose preds fixed_tvs
     tv_fds  :: [(TyCoVarSet,TyCoVarSet)]
     tv_fds  = [ (tyCoVarsOfTypes ls, tyCoVarsOfTypes rs)
               | pred <- preds
-              , (ls, rs) <- determined pred ]
+              , pred' <- pred : transSuperClasses pred
+                   -- Look for fundeps in superclasses too
+              , (ls, rs) <- determined pred' ]
 
     determined :: PredType -> [([Type],[Type])]
     determined pred
        = case classifyPredType pred of
             EqPred NomEq t1 t2 -> [([t1],[t2]), ([t2],[t1])]
-            ClassPred cls tys -> local_fds ++ concatMap determined superclasses
-              where
-               local_fds = [ instFD fd cls_tvs tys
-                           | fd <- cls_fds ]
-               (cls_tvs, cls_fds) = classTvsFds cls
-               superclasses = immSuperClasses cls tys
+            ClassPred cls tys  -> [ instFD fd cls_tvs tys
+                                  | let (cls_tvs, cls_fds) = classTvsFds cls
+                                  , fd <- cls_fds ]
             _ -> []
 
 {-

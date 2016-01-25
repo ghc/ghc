@@ -1724,8 +1724,8 @@ mkMinimalBySCs ptys = go preds_with_scs []
    in_cloud p ps = or [ p `eqType` p' | (_, scs) <- ps, p' <- scs ]
 
 transSuperClasses :: PredType -> [PredType]
--- (transSuperClasses p) returns (p's superclasses)
--- not including p
+-- (transSuperClasses p) returns (p's superclasses) not including p
+-- Stop if you encounter the same class again
 -- See Note [Expanding superclasses]
 transSuperClasses p
   = go emptyNameSet p
