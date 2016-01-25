@@ -5009,7 +5009,6 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
          } else {
             symbol = strtab + sym.st_name;
             S_tmp = lookupSymbol_( symbol );
-            if (S_tmp == NULL) return 0;
             S = (Elf_Addr)S_tmp;
          }
          if (!S) {
