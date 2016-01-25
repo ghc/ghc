@@ -930,7 +930,7 @@ tcMonadFailOp orig pat fail_op res_ty
   = do { -- Issue MonadFail warnings
          rebindableSyntax <- xoptM LangExt.RebindableSyntax
        ; desugarFlag      <- xoptM LangExt.MonadFailDesugaring
-       ; missingWarning   <- woptM Opt_WarnMissingMonadFailInstance
+       ; missingWarning   <- woptM Opt_WarnMissingMonadFailInstances
        ; if | rebindableSyntax && (desugarFlag || missingWarning)
               -> warnRebindableClash pat
             | not desugarFlag && missingWarning
@@ -960,7 +960,7 @@ warnRebindableClash pattern = addWarnAt (getLoc pattern)
      nest 2 (text "is used together with -XRebindableSyntax."
              <+> text "If this is intentional,"
              $$
-             text "compile with -fno-warn-missing-monadfail-instance."))
+             text "compile with -Wno-missing-monadfail-instances."))
 
 {-
 Note [typechecking ApplicativeStmt]

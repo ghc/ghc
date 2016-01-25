@@ -78,7 +78,7 @@ The following flags are simple ways to select standard "packages" of warnings:
     .. hlist::
         :columns: 3
 
-        * :ghc-flag:`-Wmissing-monadfail-instance`
+        * :ghc-flag:`-Wmissing-monadfail-instances`
         * :ghc-flag:`-Wsemigroup`
         * :ghc-flag:`-Wnoncanonical-monoid-instances`
 
@@ -242,7 +242,7 @@ of ``-W(no-)*``.
      * Warn if ``fail`` is defined backwards
        (i.e. ``fail = Control.Monad.fail``).
 
-    See also :ghc-flag:`-Wmissing-monadfail-instance`.
+    See also :ghc-flag:`-Wmissing-monadfail-instances`.
 
     This option is off by default.
 
@@ -266,7 +266,7 @@ of ``-W(no-)*``.
     This warning is off by default. However, it is part of the
     :ghc-flag:`-Wcompat` option group.
 
-.. ghc-flag:: -Wmissing-monadfail-instance
+.. ghc-flag:: -Wmissing-monadfail-instances
 
     .. index::
        single: MFP
