@@ -55,6 +55,8 @@ currently supports several others:
 arguments; also run the `boot` script to create the `configure` script if necessary.
 You do not have to use this functionality of the new build system; feel free to run
 `boot` and `configure` scripts manually, as you do when using `make`.
+* `--flavour=FLAVOUR`: choose a build flavour. Two settings are currently supported:
+`default` and `quick` (adds `-O0` flag to all GHC invocations speeding up builds by 3x).
 * `--progress-info=STYLE`: choose how build progress info is printed. There are four
 settings: `none`, `brief` (one line per build command), `normal` (typically a box per
 build command; this is the default setting), and `unicorn` (when `normal` just won't do).
