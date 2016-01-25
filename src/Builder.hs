@@ -112,9 +112,9 @@ builderPath builder = case builderProvenance builder of
             ++ "' in configuration files. Have you forgot to run configure?"
         windows <- windowsHost
         case (path, windows) of
-            ("", _)    -> return path
-            (p, True)  -> fixAbsolutePathOnWindows (p -<.> exe)
-            (p, False) -> lookupInPath (p -<.> exe)
+            ("", _    ) -> return path
+            (p , True ) -> fixAbsolutePathOnWindows (p -<.> exe)
+            (p , False) -> lookupInPath p
 
 getBuilderPath :: Builder -> ReaderT a Action FilePath
 getBuilderPath = lift . builderPath
