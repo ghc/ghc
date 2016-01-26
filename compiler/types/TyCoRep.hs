@@ -1658,12 +1658,15 @@ zipOpenTCvSubstBinders bndrs tys
     is = mkInScopeSet (tyCoVarsOfTypes tys)
     tenv = mkVarEnv [ (tv, ty) | (Named tv _, ty) <- zip bndrs tys ]
 
--- | Called when doing top-level substitutions. Here we expect that the
--- free vars of the range of the substitution will be empty.
-mkTopTCvSubst :: [(TyCoVar, Type)] -> TCvSubst
-mkTopTCvSubst prs = TCvSubst emptyInScopeSet tenv cenv
-  where (tenv, cenv) = foldl extend (emptyTvSubstEnv, emptyCvSubstEnv) prs
-        extend envs (v, ty) = extendSubstEnvs envs v ty
+-- | Called when doing top-level substitutions. No CoVars, please!
+mkTopTCvSubst :: [(TyVar, Type)] -> TCvSubst
+mkTopTCvSubst prs =
+    ASSERT2( onlyTyVarsAndNoCoercionTy, text "prs" <+> ppr prs )
+    mkOpenTCvSubst tenv emptyCvSubstEnv
+  where tenv = mkVarEnv prs
+        onlyTyVarsAndNoCoercionTy =
+          and [ isTyVar tv && not (isCoercionTy ty)
+              | (tv, ty) <- prs ]
 
 zipTyEnv :: [TyVar] -> [Type] -> TvSubstEnv
 zipTyEnv tyvars tys

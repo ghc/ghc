@@ -307,7 +307,7 @@ tcSuperSkolTyVars :: [TyVar] -> (TCvSubst, [TcTyVar])
 -- Moreover, make them "super skolems"; see comments with superSkolemTv
 -- see Note [Kind substitution when instantiating]
 -- Precondition: tyvars should be ordered by scoping
-tcSuperSkolTyVars = mapAccumL tcSuperSkolTyVar (mkTopTCvSubst [])
+tcSuperSkolTyVars = mapAccumL tcSuperSkolTyVar emptyTCvSubst
 
 tcSuperSkolTyVar :: TCvSubst -> TyVar -> (TCvSubst, TcTyVar)
 tcSuperSkolTyVar subst tv
