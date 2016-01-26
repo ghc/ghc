@@ -1864,7 +1864,11 @@ substTy subst@(TCvSubst in_scope tenv cenv) ty
   | otherwise = ASSERT2( isValidTCvSubst subst,
                          text "in_scope" <+> ppr in_scope $$
                          text "tenv" <+> ppr tenv $$
+                         text "tenvFVs"
+                           <+> ppr (tyCoVarsOfTypes $ varEnvElts tenv) $$
                          text "cenv" <+> ppr cenv $$
+                         text "cenvFVs"
+                           <+> ppr (tyCoVarsOfCos $ varEnvElts cenv) $$
                          text "ty" <+> ppr ty )
                 ASSERT2( typeFVsInScope,
                          text "in_scope" <+> ppr in_scope $$

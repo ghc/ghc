@@ -693,7 +693,7 @@ newMetaTyVarX subst tyvar
                        -- See Note [Name of an instantiated type variable]
               kind   = substTyUnchecked subst (tyVarKind tyvar)
               new_tv = mkTcTyVar name kind details
-        ; return (extendTCvSubst (extendTCvInScope subst new_tv) tyvar
+        ; return (extendTCvSubstAndInScope subst tyvar
                    (mkTyVarTy new_tv)
                  , new_tv)
         }
