@@ -8,14 +8,12 @@ main = do
   main_thread <- myThreadId
   m <- newEmptyMVar
   forkIO (do { takeMVar m;  throwTo main_thread (ErrorCall "foo") })
-  (do 
-     error "wibble"
-	`Control.Exception.catch`
+  (do { throwIO (ErrorCall "wibble")
+	  `Control.Exception.catch`
 	    (\e -> let _ = e::ErrorCall in
-                   do putMVar m (); sum [1..10000] `seq` putStrLn "done.")
-     myDelay 500000
-   )
-    `Control.Exception.catch` 
+                   do putMVar m (); evaluate (sum [1..10000]); putStrLn "done.")
+       ; myDelay 500000 })
+    `Control.Exception.catch`
        \e -> putStrLn ("caught: " ++ show (e::SomeException))
 
 -- compensate for the fact that threadDelay is non-interruptible
