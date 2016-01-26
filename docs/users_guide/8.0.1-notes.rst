@@ -268,10 +268,20 @@ Compiler
    a warning when a pattern synonym definition doesn't have a type signature.
    It is turned off by default but enabled by :ghc-flag:`-Wall`.
 
--  Changed the :ghc-flag:`-fwarn-unused-matches` flag to report unused type variables
-   in data and type families in addition to its previous behaviour.
-   To avoid warnings, unused type variables should be prefixed or replaced with
-   underscores.
+-  Added the :ghc-flag:`-Wunused-type-patterns` flag to report unused
+   type variables in data and type family instances. This flag is not implied
+   by :ghc-flag:`-Wall`, since :ghc-flag:`-Wunused-type-patterns` will
+   warn about unused type variables even if the types themselves are intended
+   to be used as documentation. If :ghc-flag:`-Wunused-type-patterns` is
+   enabled, one can prefix or replace unused type variables with underscores to
+   avoid warnings.
+
+-  Split off the new flag :ghc-flag:`-Wunused-foralls` from the previously
+   existing flag :ghc-flag:`-Wunused-matches`. :ghc-flag:`-Wunused-foralls`
+   emits a warning in the specific case that a user writes explicit ``forall``
+   syntax with unused type variables, while :ghc-flag:`-Wunused-matches` only
+   warns in the case of unused term-level patterns. Both flags are implied by
+   :ghc-flag:`-W`.
 
 -  Added the :ghc-flag:`-Wtoo-many-guards` flag. When enabled, this will issue a
    warning if a pattern match contains too many guards (over 20 at the

@@ -8,7 +8,7 @@
 -- Module      :  Data.Either
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  portable
@@ -281,7 +281,7 @@ isRight (Right _) = True
 type family EqEither a b where
   EqEither ('Left x)  ('Left y)  = x == y
   EqEither ('Right x) ('Right y) = x == y
-  EqEither _a         _b         = 'False
+  EqEither a          b          = 'False
 type instance a == b = EqEither a b
 
 {-

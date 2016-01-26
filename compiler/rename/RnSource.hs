@@ -729,7 +729,7 @@ rnFamInstDecl doc mb_cls tycon (HsIB { hsib_body = pats }) payload rnPayload
                           -- appear *more than once* on the LHS
                           -- e.g.   F a Int a = Bool
                     ; let tv_nms_used = extendNameSetList rhs_fvs tv_nms_dups
-                    ; warnUnusedMatches var_names tv_nms_used
+                    ; warnUnusedTypePatterns var_names tv_nms_used
 
                          -- See Note [Renaming associated types]
                     ; let bad_tvs = case mb_cls of
@@ -854,7 +854,7 @@ fresh meta-variables whereas the former generate fresh skolems.
 
 Note [Unused type variables in family instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When the flag -fwarn-unused-matches is on, the compiler reports warnings
+When the flag -fwarn-unused-type-patterns is on, the compiler reports warnings
 about unused type variables. (rnFamInstDecl) A type variable is considered
 used
  * when it is either occurs on the RHS of the family instance, or
@@ -869,7 +869,7 @@ beginning with an underscore.
 Extra-constraints wild cards are not supported in type/data family
 instance declarations.
 
-Relevant tickets: #3699, #10586 and #10982.
+Relevant tickets: #3699, #10586, #10982 and #11451.
 
 Note [Renaming associated types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

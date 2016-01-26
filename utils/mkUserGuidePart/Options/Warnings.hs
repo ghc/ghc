@@ -291,6 +291,18 @@ warningsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-Wno-unused-matches"
          }
+  , flag { flagName = "-Wunused-foralls"
+         , flagDescription = "warn about type variables in user-written "++
+           "``forall``\\s that are unused"
+         , flagType = DynamicFlag
+         , flagReverse = "-Wno-unused-foralls"
+         }
+  , flag { flagName = "-Wunused-type-variables"
+         , flagDescription = "warn about variables in type family or data "++
+           "family instances that are unused"
+         , flagType = DynamicFlag
+         , flagReverse = "-Wno-unused-type-variables"
+         }
   , flag { flagName = "-Wunused-do-bind"
          , flagDescription =
            "warn about do bindings that appear to throw away values of types "++

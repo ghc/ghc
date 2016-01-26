@@ -41,7 +41,7 @@ module RnEnv (
         checkDupNames, checkDupAndShadowedNames, dupNamesErr,
         checkTupSize,
         addFvRn, mapFvRn, mapMaybeFvRn, mapFvRnCPS,
-        warnUnusedMatches,
+        warnUnusedMatches, warnUnusedTypePatterns,
         warnUnusedTopBinds, warnUnusedLocalBinds,
         mkFieldEnv,
         dataTcOccs, kindSigErr, perhapsForallMsg, unknownSubordinateErr,
@@ -2072,9 +2072,11 @@ warnUnusedTopBinds gres
                                else                 gres
          warnUnusedGREs gres'
 
-warnUnusedLocalBinds, warnUnusedMatches :: [Name] -> FreeVars -> RnM ()
-warnUnusedLocalBinds = check_unused Opt_WarnUnusedLocalBinds
-warnUnusedMatches    = check_unused Opt_WarnUnusedMatches
+warnUnusedLocalBinds, warnUnusedMatches, warnUnusedTypePatterns
+  :: [Name] -> FreeVars -> RnM ()
+warnUnusedLocalBinds   = check_unused Opt_WarnUnusedLocalBinds
+warnUnusedMatches      = check_unused Opt_WarnUnusedMatches
+warnUnusedTypePatterns = check_unused Opt_WarnUnusedTypePatterns
 
 check_unused :: WarningFlag -> [Name] -> FreeVars -> RnM ()
 check_unused flag bound_names used_names
