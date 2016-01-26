@@ -543,13 +543,13 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
    let tv_subst     = newTyVars us free_tvs
        filtered_ids = [ id | (id, Just _hv) <- zip ids mb_hValues ]
        (_,tidy_tys) = tidyOpenTypes emptyTidyEnv $
-                      map (substTyUnchecked tv_subst . idType) filtered_ids
+                      map (substTy tv_subst . idType) filtered_ids
 
    new_ids     <- zipWith3M mkNewId occs tidy_tys filtered_ids
    result_name <- newInteractiveBinder hsc_env (mkVarOccFS result_fs) span
 
    let result_id = Id.mkVanillaGlobal result_name
-                     (substTyUnchecked tv_subst result_ty)
+                     (substTy tv_subst result_ty)
        result_ok = isPointer result_id
 
        final_ids | result_ok = result_id : new_ids

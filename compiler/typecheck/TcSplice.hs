@@ -99,7 +99,7 @@ import GHC.Serialized
 import ErrUtils
 import Util
 import Unique
-import VarSet           ( isEmptyVarSet, filterVarSet )
+import VarSet           ( isEmptyVarSet, filterVarSet, mkVarSet, elemVarSet )
 import Data.List        ( find )
 import Data.Maybe
 import FastString
@@ -1395,8 +1395,8 @@ reifyDataCon isGadtDataCon tys dc
              name      = reifyName dc
              -- Universal tvs present in eq_spec need to be filtered out, as
              -- they will not appear anywhere in the type.
-             subst     = mkTopTCvSubst (map eqSpecPair g_eq_spec)
-             g_unsbst_univ_tvs = filter (`notElemTCvSubst` subst) g_univ_tvs
+             eq_spec_tvs = mkVarSet (map eqSpecTyVar g_eq_spec)
+             g_unsbst_univ_tvs = filterOut (`elemVarSet` eq_spec_tvs) g_univ_tvs
 
        ; r_arg_tys <- reifyTypes (if isGadtDataCon then g_arg_tys else arg_tys)
 
