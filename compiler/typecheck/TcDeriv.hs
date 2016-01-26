@@ -1008,7 +1008,7 @@ inferConstraints main_cls cls_tys inst_ty rep_tc rep_tc_args
     stupid_constraints = mkThetaOrigin DerivOrigin TypeLevel $
                          substTheta tc_subst (tyConStupidTheta rep_tc)
     tc_subst = ASSERT( equalLength rep_tc_tvs all_rep_tc_args )
-               zipTopTCvSubst rep_tc_tvs all_rep_tc_args
+               zipOpenTCvSubst rep_tc_tvs all_rep_tc_args
 
         -- Extra Data constraints
         -- The Data class (only) requires that for
@@ -1889,7 +1889,7 @@ simplifyDeriv pred tvs theta
 
 
        ; let min_theta  = mkMinimalBySCs (bagToList good)
-             subst_skol = zipTopTCvSubst tvs_skols $ mkTyVarTys tvs
+             subst_skol = zipOpenTCvSubst tvs_skols $ mkTyVarTys tvs
                           -- The reverse substitution (sigh)
        ; return (substTheta subst_skol min_theta) }
 

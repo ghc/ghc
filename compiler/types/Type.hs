@@ -150,7 +150,7 @@ module Type (
         -- ** Manipulating type substitutions
         emptyTvSubstEnv, emptyTCvSubst, mkEmptyTCvSubst,
 
-        mkTCvSubst, mkOpenTCvSubst, zipOpenTCvSubst, zipTopTCvSubst, mkTopTCvSubst,
+        mkTCvSubst, mkOpenTCvSubst, zipOpenTCvSubst, mkTopTCvSubst,
         notElemTCvSubst,
         getTvSubstEnv, setTvSubstEnv,
         zapTCvSubst, getTCvInScope,
@@ -1810,7 +1810,7 @@ mkFamilyTyConApp tc tys
   | Just (fam_tc, fam_tys) <- tyConFamInst_maybe tc
   , let tvs = tyConTyVars tc
         fam_subst = ASSERT2( length tvs == length tys, ppr tc <+> ppr tys )
-                    zipTopTCvSubst tvs tys
+                    zipOpenTCvSubst tvs tys
   = mkTyConApp fam_tc (substTys fam_subst fam_tys)
   | otherwise
   = mkTyConApp tc tys

@@ -647,7 +647,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty arg_pats thing_inside
         ; let all_arg_tys = eqSpecPreds eq_spec ++ theta ++ arg_tys
         ; checkExistentials ex_tvs all_arg_tys penv
         ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX
-                               (zipTopTCvSubst univ_tvs ctxt_res_tys) ex_tvs
+                               (zipOpenTCvSubst univ_tvs ctxt_res_tys) ex_tvs
                      -- Get location from monad, not from ex_tvs
 
         ; let -- pat_ty' = mkTyConApp tycon ctxt_res_tys
