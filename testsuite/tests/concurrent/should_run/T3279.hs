@@ -7,7 +7,7 @@ import GHC.IO (unsafeUnmask)
 
 f :: Int
 f = (1 +) . unsafePerformIO $ do
-        error "foo" `catch` \(SomeException e) -> do
+        throwIO (ErrorCall "foo") `catch` \(SomeException e) -> do
             myThreadId >>= flip throwTo e
             -- point X
             unsafeUnmask $ return 1
@@ -22,4 +22,4 @@ main = do
     yield
     -- should print 1 + 1 = 2
     print f
-    
+
