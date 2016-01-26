@@ -226,7 +226,7 @@ of ``-W(no-)*``.
      * If ``return`` is defined it must be canonical (i.e. ``return = pure``).
      * If ``(>>)`` is defined it must be canonical (i.e. ``(>>) = (*>)``).
 
-    Moreover, in 'Applicative' instance declarations:
+    Moreover, in ``Applicative`` instance declarations:
 
      * Warn if ``pure`` is defined backwards (i.e. ``pure = return``).
      * Warn if ``(*>)`` is defined backwards (i.e. ``(*>) = (>>)``).
@@ -268,7 +268,7 @@ of ``-W(no-)*``.
      * If ``mappend`` is defined it must be canonical
        (i.e. ``mappend = (Data.Semigroup.<>)``).
 
-    Moreover, in 'Semigroup' instance declarations:
+    Moreover, in ``Semigroup`` instance declarations:
 
      * Warn if ``(<>)`` is defined backwards (i.e. ``(<>) = mappend``).
 
