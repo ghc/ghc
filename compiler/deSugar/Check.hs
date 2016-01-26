@@ -723,7 +723,7 @@ mkOneConFull x usupply con = (con_abs, constraints)
                  Just (tc, tys) -> ASSERT( tc == data_tc ) tys
                  Nothing -> pprPanic "mkOneConFull: Not TyConApp:" (ppr res_ty)
 
-    subst1  = zipOpenTCvSubst univ_tvs tc_args
+    subst1  = zipTvSubst univ_tvs tc_args
 
     (subst, ex_tvs') = cloneTyVarBndrs subst1 ex_tvs usupply1
 

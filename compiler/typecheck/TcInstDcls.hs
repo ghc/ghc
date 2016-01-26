@@ -791,7 +791,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
 
        ; let (clas, inst_tys) = tcSplitDFunHead inst_head
              (class_tyvars, sc_theta, _, op_items) = classBigSig clas
-             sc_theta' = substTheta (zipOpenTCvSubst class_tyvars inst_tys) sc_theta
+             sc_theta' = substTheta (zipTvSubst class_tyvars inst_tys) sc_theta
 
        ; traceTc "tcInstDecl2" (vcat [ppr inst_tyvars, ppr inst_tys, ppr dfun_theta, ppr sc_theta'])
 

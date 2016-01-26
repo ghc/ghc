@@ -974,7 +974,7 @@ dataConInstSig (MkData { dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs
     , substTheta subst (eqSpecPreds eq_spec ++ theta)
     , substTys   subst arg_tys)
   where
-    univ_subst = zipOpenTCvSubst univ_tvs univ_tys
+    univ_subst = zipTvSubst univ_tvs univ_tys
     (subst, ex_tvs') = mapAccumL Type.substTyVarBndr univ_subst ex_tvs
 
 

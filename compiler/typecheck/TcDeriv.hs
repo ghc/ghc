@@ -1002,13 +1002,13 @@ inferConstraints main_cls cls_tys inst_ty rep_tc rep_tc_args
                      mkThetaOrigin DerivOrigin TypeLevel $
                      substTheta cls_subst (classSCTheta main_cls)
     cls_subst = ASSERT( equalLength cls_tvs inst_tys )
-                zipOpenTCvSubst cls_tvs inst_tys
+                zipTvSubst cls_tvs inst_tys
 
         -- Stupid constraints
     stupid_constraints = mkThetaOrigin DerivOrigin TypeLevel $
                          substTheta tc_subst (tyConStupidTheta rep_tc)
     tc_subst = ASSERT( equalLength rep_tc_tvs all_rep_tc_args )
-               zipOpenTCvSubst rep_tc_tvs all_rep_tc_args
+               zipTvSubst rep_tc_tvs all_rep_tc_args
 
         -- Extra Data constraints
         -- The Data class (only) requires that for
@@ -1574,7 +1574,7 @@ mkNewTypeEqn dflags overlap_mode tvs
         inst_ty    = mkTyConApp tycon tc_args
         inst_tys   = cls_tys ++ [inst_ty]
         sc_theta   = mkThetaOrigin DerivOrigin TypeLevel $
-                     substTheta (zipOpenTCvSubst cls_tyvars inst_tys) $
+                     substTheta (zipTvSubst cls_tyvars inst_tys) $
                      classSCTheta cls
 
         -- Next we collect Coercible constraints between
@@ -1889,7 +1889,7 @@ simplifyDeriv pred tvs theta
 
 
        ; let min_theta  = mkMinimalBySCs (bagToList good)
-             subst_skol = zipOpenTCvSubst tvs_skols $ mkTyVarTys tvs
+             subst_skol = zipTvSubst tvs_skols $ mkTyVarTys tvs
                           -- The reverse substitution (sigh)
        ; return (substTheta subst_skol min_theta) }
 

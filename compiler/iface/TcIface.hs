@@ -569,7 +569,7 @@ tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
 
         -- Remember, tycon is the representation tycon
         ; let orig_res_ty = mkFamilyTyConApp tycon
-                                (substTyVars (mkTopTCvSubst (map eqSpecPair eq_spec))
+                                (substTyVars (mkTvSubstPrs (map eqSpecPair eq_spec))
                                              tc_tyvars)
 
         ; prom_rep_name <- newTyConRepName dc_name

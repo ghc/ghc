@@ -150,7 +150,7 @@ module Type (
         -- ** Manipulating type substitutions
         emptyTvSubstEnv, emptyTCvSubst, mkEmptyTCvSubst,
 
-        mkTCvSubst, mkOpenTCvSubst, zipOpenTCvSubst, mkTopTCvSubst,
+        mkTCvSubst, zipTvSubst, mkTvSubstPrs,
         notElemTCvSubst,
         getTvSubstEnv, setTvSubstEnv,
         zapTCvSubst, getTCvInScope,
@@ -294,7 +294,7 @@ coreView :: Type -> Maybe Type
 -- By being non-recursive and inlined, this case analysis gets efficiently
 -- joined onto the case analysis that the caller is already doing
 coreView (TyConApp tc tys) | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
-  = Just (mkAppTys (substTy (mkTopTCvSubst tenv) rhs) tys')
+  = Just (mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys')
                -- The free vars of 'rhs' should all be bound by 'tenv', so it's
                -- ok to use 'substTy' here.
                -- See also Note [The substitution invariant] in TyCoRep.
@@ -326,7 +326,7 @@ expandTypeSynonyms ty
   where
     go subst (TyConApp tc tys)
       | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
-      = let subst' = unionTCvSubst subst (mkTopTCvSubst tenv) in
+      = let subst' = unionTCvSubst subst (mkTvSubstPrs tenv) in
         go subst' (mkAppTys rhs tys')
       | otherwise
       = TyConApp tc (map (go subst) tys)
@@ -1015,7 +1015,7 @@ mkCastTy ty co = -- NB: don't check if the coercion "from" type matches here;
       = let (bndrs, _inner_ki) = splitPiTys kind
             (no_dep_bndrs, some_dep_bndrs) = spanEnd isAnonBinder bndrs
             (some_dep_args, rest_args) = splitAtList some_dep_bndrs args
-            dep_subst = zipOpenTCvSubstBinders some_dep_bndrs some_dep_args
+            dep_subst = zipTyBinderSubst some_dep_bndrs some_dep_args
             used_no_dep_bndrs = takeList rest_args no_dep_bndrs
             rest_arg_tys = substTys dep_subst (map binderType used_no_dep_bndrs)
             co' = mkFunCos Nominal
@@ -1813,7 +1813,7 @@ mkFamilyTyConApp tc tys
   | Just (fam_tc, fam_tys) <- tyConFamInst_maybe tc
   , let tvs = tyConTyVars tc
         fam_subst = ASSERT2( length tvs == length tys, ppr tc <+> ppr tys )
-                    zipOpenTCvSubst tvs tys
+                    zipTvSubst tvs tys
   = mkTyConApp fam_tc (substTys fam_subst fam_tys)
   | otherwise
   = mkTyConApp tc tys

@@ -577,9 +577,9 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
      -- Similarly, clone the type variables mentioned in the types
      -- we have here, *and* make them all RuntimeUnk tyars
    newTyVars us tvs
-     = mkTopTCvSubst [ (tv, mkTyVarTy (mkRuntimeUnkTyVar name (tyVarKind tv)))
-                     | (tv, uniq) <- varSetElems tvs `zip` uniqsFromSupply us
-                     , let name = setNameUnique (tyVarName tv) uniq ]
+     = mkTvSubstPrs [ (tv, mkTyVarTy (mkRuntimeUnkTyVar name (tyVarKind tv)))
+                    | (tv, uniq) <- varSetElems tvs `zip` uniqsFromSupply us
+                    , let name = setNameUnique (tyVarName tv) uniq ]
 
 rttiEnvironment :: HscEnv -> IO HscEnv
 rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
