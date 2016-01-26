@@ -17,8 +17,12 @@ ifeq "$(ValidateSpeed)" "SLOW"
 GhcStage2HcOpts   += -DDEBUG
 endif
 
+ifeq "$(ValidateSpeed)" "SLOW"
+BUILD_PROF_LIBS    = YES
+endif
+
 ifneq "$(ValidateSpeed)" "FAST"
-BUILD_EXTRA_PKGS=YES
+BUILD_EXTRA_PKGS   = YES
 endif
 
 WERROR             = -Werror
