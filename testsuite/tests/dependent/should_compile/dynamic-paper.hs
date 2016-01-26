@@ -1,6 +1,9 @@
 {- This is the code extracted from "A reflection on types", by Simon PJ,
 Stephanie Weirich, Richard Eisenberg, and Dimitrios Vytiniotis, 2016. -}
 
+-- NB: it includes a negative-recursive function (see delta1), and
+-- so will give "simplifer ticks exhausted", at least with -O
+
 {-#  LANGUAGE RankNTypes, PolyKinds, TypeOperators,
              ScopedTypeVariables, GADTs, FlexibleInstances,
              UndecidableInstances, RebindableSyntax,
@@ -239,6 +242,10 @@ tcMaybe  = TyCon  { tc_module  = Module  { mod_pkg   = "base"
 rt = undefined
 
 delta1 :: Dynamic -> Dynamic
+-- NB: this function behaves like a negative-recursive data type
+-- and hence leads compiler into an infinite inlining loop,
+-- and we get "simplifier ticks exhausted".
+-- See Section 7 of the paper "A reflection on types"
 delta1 dn = case fromDynamic dn of
              Just f   -> f dn
              Nothing  -> dn
