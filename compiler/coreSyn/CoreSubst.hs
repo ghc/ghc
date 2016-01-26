@@ -542,8 +542,8 @@ cloneBndrs subst us vs
 
 cloneBndr :: Subst -> Unique -> Var -> (Subst, Var)
 cloneBndr subst uniq v
-      | isTyVar v = cloneTyVarBndr subst v uniq
-      | otherwise = clone_id subst subst (v,uniq)  -- Works for coercion variables too
+  | isTyVar v = cloneTyVarBndr subst v uniq
+  | otherwise = clone_id subst subst (v,uniq)  -- Works for coercion variables too
 
 -- | Clone a mutually recursive group of 'Id's
 cloneRecIdBndrs :: Subst -> UniqSupply -> [Id] -> (Subst, [Id])
