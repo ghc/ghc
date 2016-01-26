@@ -82,9 +82,9 @@ module TyCoRep (
         extendTCvSubst, extendTCvSubstAndInScope, extendTCvSubstList,
         extendTCvSubstBinder,
         unionTCvSubst, zipTyEnv, zipCoEnv, mkTyCoInScopeSet,
-        mkOpenTCvSubst, zipOpenTCvSubst, zipOpenTCvSubstCoVars,
-        zipOpenTCvSubstBinders,
-        mkTopTCvSubst,
+        zipTvSubst, zipCvSubst,
+        zipTyBinderSubst,
+        mkTvSubstPrs,
 
         substTelescope,
         substTyWith, substTyWithCoVars, substTysWith, substTysWithCoVars,
@@ -1609,7 +1609,7 @@ unionTCvSubst (TCvSubst in_scope1 tenv1 cenv1) (TCvSubst in_scope2 tenv2 cenv2)
              (tenv1     `plusVarEnv`   tenv2)
              (cenv1     `plusVarEnv`   cenv2)
 
--- mkOpenTCvSubst and zipOpenTCvSubst generate the in-scope set from
+-- mkTvSubstPrs and zipTvSubst generate the in-scope set from
 -- the types given; but it's just a thunk so with a bit of luck
 -- it'll never be evaluated
 
@@ -1620,50 +1620,46 @@ mkTyCoInScopeSet tys cos
   = mkInScopeSet (tyCoVarsOfTypes tys `unionVarSet` tyCoVarsOfCos cos)
 
 -- | Generates the in-scope set for the 'TCvSubst' from the types in the incoming
--- environment, hence "open"
-mkOpenTCvSubst :: TvSubstEnv -> CvSubstEnv -> TCvSubst
-mkOpenTCvSubst tenv cenv
-  = TCvSubst (mkTyCoInScopeSet (varEnvElts tenv) (varEnvElts cenv)) tenv cenv
-
--- | Generates the in-scope set for the 'TCvSubst' from the types in the incoming
--- environment, hence "open". No CoVars, please!
-zipOpenTCvSubst :: [TyVar] -> [Type] -> TCvSubst
-zipOpenTCvSubst tvs tys
+-- environment. No CoVars, please!
+zipTvSubst :: [TyVar] -> [Type] -> TCvSubst
+zipTvSubst tvs tys
   | debugIsOn
   , not (all isTyVar tvs) || length tvs /= length tys
-  = pprTrace "zipOpenTCvSubst" (ppr tvs $$ ppr tys) emptyTCvSubst
+  = pprTrace "zipTvSubst" (ppr tvs $$ ppr tys) emptyTCvSubst
   | otherwise
   = TCvSubst (mkInScopeSet (tyCoVarsOfTypes tys)) tenv emptyCvSubstEnv
   where
     tenv = zipTyEnv tvs tys
 
 -- | Generates the in-scope set for the 'TCvSubst' from the types in the incoming
--- environment, hence "open".  No TyVars, please!
-zipOpenTCvSubstCoVars :: [CoVar] -> [Coercion] -> TCvSubst
-zipOpenTCvSubstCoVars cvs cos
+-- environment.  No TyVars, please!
+zipCvSubst :: [CoVar] -> [Coercion] -> TCvSubst
+zipCvSubst cvs cos
   | debugIsOn
   , not (all isCoVar cvs) || length cvs /= length cos
-  = pprTrace "zipOpenTCvSubstCoVars" (ppr cvs $$ ppr cos) emptyTCvSubst
+  = pprTrace "zipCvSubst" (ppr cvs $$ ppr cos) emptyTCvSubst
   | otherwise
   = TCvSubst (mkInScopeSet (tyCoVarsOfCos cos)) emptyTvSubstEnv cenv
   where
     cenv = zipCoEnv cvs cos
 
--- | Create an open TCvSubst combining the binders and types provided.
+-- | Create a TCvSubst combining the binders and types provided.
 -- NB: It is specifically OK if the lists are of different lengths.
-zipOpenTCvSubstBinders :: [TyBinder] -> [Type] -> TCvSubst
-zipOpenTCvSubstBinders bndrs tys
+zipTyBinderSubst :: [TyBinder] -> [Type] -> TCvSubst
+zipTyBinderSubst bndrs tys
   = TCvSubst is tenv emptyCvSubstEnv
   where
     is = mkInScopeSet (tyCoVarsOfTypes tys)
     tenv = mkVarEnv [ (tv, ty) | (Named tv _, ty) <- zip bndrs tys ]
 
--- | Called when doing top-level substitutions. No CoVars, please!
-mkTopTCvSubst :: [(TyVar, Type)] -> TCvSubst
-mkTopTCvSubst prs =
+-- | Generates the in-scope set for the 'TCvSubst' from the types in the
+-- incoming environment. No CoVars, please!
+mkTvSubstPrs :: [(TyVar, Type)] -> TCvSubst
+mkTvSubstPrs prs =
     ASSERT2( onlyTyVarsAndNoCoercionTy, text "prs" <+> ppr prs )
-    mkOpenTCvSubst tenv emptyCvSubstEnv
+    TCvSubst in_scope tenv emptyCvSubstEnv
   where tenv = mkVarEnv prs
+        in_scope = mkInScopeSet $ tyCoVarsOfTypes $ map snd prs
         onlyTyVarsAndNoCoercionTy =
           and [ isTyVar tv && not (isCoercionTy ty)
               | (tv, ty) <- prs ]
@@ -1757,11 +1753,10 @@ substTelescope = go_subst emptyTCvSubst
     go_subst _ _ _ = panic "substTelescope"
 
 
--- | Type substitution making use of an 'TCvSubst' that
--- is assumed to be open, see 'zipOpenTCvSubst'
+-- | Type substitution, see 'zipTvSubst'
 substTyWith :: [TyVar] -> [Type] -> Type -> Type
 substTyWith tvs tys = ASSERT( length tvs == length tys )
-                      substTyUnchecked (zipOpenTCvSubst tvs tys)
+                      substTyUnchecked (zipTvSubst tvs tys)
 
 -- | Substitute tyvars within a type using a known 'InScopeSet'.
 -- Pre-condition: the 'in_scope' set should satisfy Note [The substitution
@@ -1773,33 +1768,30 @@ substTyWithInScope in_scope tvs tys ty =
   substTy (mkTCvSubst in_scope (tenv, emptyCvSubstEnv)) ty
   where tenv = zipTyEnv tvs tys
 
--- | Coercion substitution making use of an 'TCvSubst' that
--- is assumed to be open, see 'zipOpenTCvSubst'
+-- | Coercion substitution, see 'zipTvSubst'
 substCoWith :: [TyVar] -> [Type] -> Coercion -> Coercion
 substCoWith tvs tys = ASSERT( length tvs == length tys )
-                      substCo (zipOpenTCvSubst tvs tys)
+                      substCo (zipTvSubst tvs tys)
 
 -- | Substitute covars within a type
 substTyWithCoVars :: [CoVar] -> [Coercion] -> Type -> Type
-substTyWithCoVars cvs cos = substTy (zipOpenTCvSubstCoVars cvs cos)
+substTyWithCoVars cvs cos = substTy (zipCvSubst cvs cos)
 
--- | Type substitution making use of an 'TCvSubst' that
--- is assumed to be open, see 'zipOpenTCvSubst'
+-- | Type substitution, see 'zipTvSubst'
 substTysWith :: [TyVar] -> [Type] -> [Type] -> [Type]
 substTysWith tvs tys = ASSERT( length tvs == length tys )
-                       substTys (zipOpenTCvSubst tvs tys)
+                       substTys (zipTvSubst tvs tys)
 
--- | Type substitution making use of an 'TCvSubst' that
--- is assumed to be open, see 'zipOpenTCvSubst'
+-- | Type substitution, see 'zipTvSubst'
 substTysWithCoVars :: [CoVar] -> [Coercion] -> [Type] -> [Type]
 substTysWithCoVars cvs cos = ASSERT( length cvs == length cos )
-                             substTys (zipOpenTCvSubstCoVars cvs cos)
+                             substTys (zipCvSubst cvs cos)
 
 -- | Type substitution using 'Binder's. Anonymous binders
 -- simply ignore their matching type.
 substTyWithBinders :: [TyBinder] -> [Type] -> Type -> Type
 substTyWithBinders bndrs tys = ASSERT( length bndrs == length tys )
-                               substTyUnchecked (zipOpenTCvSubstBinders bndrs tys)
+                               substTyUnchecked (zipTyBinderSubst bndrs tys)
 
 -- | Substitute within a 'Type' after adding the free variables of the type
 -- to the in-scope set. This is useful for the case when the free variables

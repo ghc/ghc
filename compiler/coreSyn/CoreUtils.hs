@@ -1557,7 +1557,7 @@ dataConInstPat fss uniqs con inst_tys
     (ex_fss,   id_fss)   = splitAt n_ex fss
 
       -- Make the instantiating substitution for universals
-    univ_subst = zipOpenTCvSubst univ_tvs inst_tys
+    univ_subst = zipTvSubst univ_tvs inst_tys
 
       -- Make existential type variables, applyingn and extending the substitution
     (full_subst, ex_bndrs) = mapAccumL mk_ex_var univ_subst

@@ -722,8 +722,8 @@ checkAxInstCo (AxiomInstCo ax ind cos)
         incomps      = coAxBranchIncomps branch
         (tys, cotys) = splitAtList tvs (map (pFst . coercionKind) cos)
         co_args      = map stripCoercionTy cotys
-        subst        = zipOpenTCvSubst tvs tys `composeTCvSubst`
-                       zipOpenTCvSubstCoVars cvs co_args
+        subst        = zipTvSubst tvs tys `composeTCvSubst`
+                       zipCvSubst cvs co_args
         target   = Type.substTys subst (coAxBranchLHS branch)
         in_scope = mkInScopeSet $
                    unionVarSets (map (tyCoVarsOfTypes . coAxBranchLHS) incomps)

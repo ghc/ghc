@@ -522,7 +522,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
   where
     (univ_tvs, ex_tvs, eq_spec, theta, orig_arg_tys, _orig_res_ty)
       = dataConFullSig data_con
-    res_ty_args  = substTyVars (mkTopTCvSubst (map eqSpecPair eq_spec)) univ_tvs
+    res_ty_args  = substTyVars (mkTvSubstPrs (map eqSpecPair eq_spec)) univ_tvs
 
     tycon        = dataConTyCon data_con       -- The representation TyCon (not family)
     wrap_ty      = dataConUserType data_con
@@ -563,7 +563,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
     mk_boxer :: [Boxer] -> DataConBoxer
     mk_boxer boxers = DCB (\ ty_args src_vars ->
                       do { let (ex_vars, term_vars) = splitAtList ex_tvs src_vars
-                               subst1 = mkTopTCvSubst (univ_tvs `zip` ty_args)
+                               subst1 = mkTvSubstPrs (univ_tvs `zip` ty_args)
                                subst2 = extendTCvSubstList subst1 ex_tvs
                                                            (mkTyVarTys ex_vars)
                          ; (rep_ids, binds) <- go subst2 boxers term_vars

@@ -146,8 +146,8 @@ module TcType (
   -- Type substitutions
   TCvSubst(..),         -- Representation visible to a few friends
   TvSubstEnv, emptyTCvSubst,
-  mkOpenTCvSubst, zipOpenTCvSubst,
-  mkTopTCvSubst, notElemTCvSubst, unionTCvSubst,
+  zipTvSubst,
+  mkTvSubstPrs, notElemTCvSubst, unionTCvSubst,
   getTvSubstEnv, setTvSubstEnv, getTCvInScope, extendTCvInScope,
   Type.lookupTyVar, Type.extendTCvSubst, Type.substTyVarBndr,
   extendTCvSubstList, isInScope, mkTCvSubst, zipTyEnv, zipCoEnv,
@@ -1760,7 +1760,7 @@ transSuperClasses p
 
 immSuperClasses :: Class -> [Type] -> [PredType]
 immSuperClasses cls tys
-  = substTheta (zipOpenTCvSubst tyvars tys) sc_theta
+  = substTheta (zipTvSubst tyvars tys) sc_theta
   where
     (tyvars,sc_theta,_,_) = classBigSig cls
 

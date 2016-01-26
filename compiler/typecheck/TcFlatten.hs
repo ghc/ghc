@@ -960,7 +960,7 @@ flatten_one (TyConApp tc tys)
   -- Expand type synonyms that mention type families
   -- on the RHS; see Note [Flattening synonyms]
   | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
-  , let expanded_ty = mkAppTys (substTy (mkTopTCvSubst tenv) rhs) tys'
+  , let expanded_ty = mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys'
   = do { mode <- getMode
        ; let used_tcs = tyConsOfType rhs
        ; case mode of

@@ -157,7 +157,7 @@ mkDataConStupidTheta tycon arg_tys univ_tvs
   | null stupid_theta = []      -- The common case
   | otherwise         = filter in_arg_tys stupid_theta
   where
-    tc_subst     = zipOpenTCvSubst (tyConTyVars tycon) (mkTyVarTys univ_tvs)
+    tc_subst     = zipTvSubst (tyConTyVars tycon) (mkTyVarTys univ_tvs)
     stupid_theta = substTheta tc_subst (tyConStupidTheta tycon)
         -- Start by instantiating the master copy of the
         -- stupid theta, taken from the TyCon
@@ -205,8 +205,8 @@ buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
     (ex_tvs1, prov_theta1, cont_tau) = tcSplitSigmaTy cont_sigma
     (arg_tys1, _) = tcSplitFunTys cont_tau
     twiddle = char '~'
-    subst = zipOpenTCvSubst (univ_tvs1 ++ ex_tvs1)
-                            (mkTyVarTys (univ_tvs ++ ex_tvs))
+    subst = zipTvSubst (univ_tvs1 ++ ex_tvs1)
+                       (mkTyVarTys (univ_tvs ++ ex_tvs))
 
 ------------------------------------------------------
 type TcMethInfo = (Name, Type, Maybe (DefMethSpec Type))

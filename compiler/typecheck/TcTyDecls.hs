@@ -1018,7 +1018,7 @@ mkOneRecordSelector all_cons idDetails fl
 
     (univ_tvs, _, eq_spec, _, req_theta, _, data_ty) = conLikeFullSig con1
 
-    eq_subst = mkTopTCvSubst (map eqSpecPair eq_spec)
+    eq_subst = mkTvSubstPrs (map eqSpecPair eq_spec)
     inst_tys = substTyVars eq_subst univ_tvs
 
     unit_rhs = mkLHsTupleExpr []
