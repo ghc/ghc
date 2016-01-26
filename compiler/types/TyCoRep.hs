@@ -84,7 +84,7 @@ module TyCoRep (
         unionTCvSubst, zipTyEnv, zipCoEnv, mkTyCoInScopeSet,
         mkOpenTCvSubst, zipOpenTCvSubst, zipOpenTCvSubstCoVars,
         zipOpenTCvSubstBinders,
-        mkTopTCvSubst, zipTopTCvSubst,
+        mkTopTCvSubst,
 
         substTelescope,
         substTyWith, substTyWithCoVars, substTysWith, substTysWithCoVars,
@@ -1628,33 +1628,35 @@ mkOpenTCvSubst tenv cenv
 -- | Generates the in-scope set for the 'TCvSubst' from the types in the incoming
 -- environment, hence "open". No CoVars, please!
 zipOpenTCvSubst :: [TyVar] -> [Type] -> TCvSubst
-zipOpenTCvSubst tyvars tys
-  | debugIsOn && (length tyvars /= length tys)
-  = pprTrace "zipOpenTCvSubst" (ppr tyvars $$ ppr tys) emptyTCvSubst
+zipOpenTCvSubst tvs tys
+  | debugIsOn
+  , not (all isTyVar tvs) || length tvs /= length tys
+  = pprTrace "zipOpenTCvSubst" (ppr tvs $$ ppr tys) emptyTCvSubst
   | otherwise
   = TCvSubst (mkInScopeSet (tyCoVarsOfTypes tys)) tenv emptyCvSubstEnv
-  where tenv = zipTyEnv tyvars tys
+  where
+    tenv = zipTyEnv tvs tys
 
 -- | Generates the in-scope set for the 'TCvSubst' from the types in the incoming
--- environment, hence "open".
+-- environment, hence "open".  No TyVars, please!
 zipOpenTCvSubstCoVars :: [CoVar] -> [Coercion] -> TCvSubst
 zipOpenTCvSubstCoVars cvs cos
-  | debugIsOn && (length cvs /= length cos)
+  | debugIsOn
+  , not (all isCoVar cvs) || length cvs /= length cos
   = pprTrace "zipOpenTCvSubstCoVars" (ppr cvs $$ ppr cos) emptyTCvSubst
   | otherwise
   = TCvSubst (mkInScopeSet (tyCoVarsOfCos cos)) emptyTvSubstEnv cenv
-  where cenv = zipCoEnv cvs cos
-
+  where
+    cenv = zipCoEnv cvs cos
 
 -- | Create an open TCvSubst combining the binders and types provided.
--- NB: It is OK if the lists are of different lengths.
+-- NB: It is specifically OK if the lists are of different lengths.
 zipOpenTCvSubstBinders :: [TyBinder] -> [Type] -> TCvSubst
 zipOpenTCvSubstBinders bndrs tys
   = TCvSubst is tenv emptyCvSubstEnv
   where
     is = mkInScopeSet (tyCoVarsOfTypes tys)
-    (tvs, tys') = unzip [ (tv, ty) | (Named tv _, ty) <- zip bndrs tys ]
-    tenv = zipTyEnv tvs tys'
+    tenv = mkVarEnv [ (tv, ty) | (Named tv _, ty) <- zip bndrs tys ]
 
 -- | Called when doing top-level substitutions. Here we expect that the
 -- free vars of the range of the substitution will be empty.
@@ -1662,15 +1664,6 @@ mkTopTCvSubst :: [(TyCoVar, Type)] -> TCvSubst
 mkTopTCvSubst prs = TCvSubst emptyInScopeSet tenv cenv
   where (tenv, cenv) = foldl extend (emptyTvSubstEnv, emptyCvSubstEnv) prs
         extend envs (v, ty) = extendSubstEnvs envs v ty
-
--- | Makes a subst with an empty in-scope-set. No CoVars, please!
-zipTopTCvSubst :: [TyVar] -> [Type] -> TCvSubst
-zipTopTCvSubst tyvars tys
-  | debugIsOn && (length tyvars /= length tys)
-  = pprTrace "zipTopTCvSubst" (ppr tyvars $$ ppr tys) emptyTCvSubst
-  | otherwise
-  = TCvSubst emptyInScopeSet tenv emptyCvSubstEnv
-  where tenv = zipTyEnv tyvars tys
 
 zipTyEnv :: [TyVar] -> [Type] -> TvSubstEnv
 zipTyEnv tyvars tys
