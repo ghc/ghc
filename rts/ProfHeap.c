@@ -161,7 +161,7 @@ doingLDVProfiling( void )
             || RtsFlags.ProfFlags.bioSelector != NULL);
 }
 
-STATIC_INLINE rtsBool
+rtsBool
 doingRetainerProfiling( void )
 {
     return (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER

@@ -23,3 +23,13 @@ scc001:
 	$(call scc001Rule,-O0)
 	$(call scc001Rule,-O)
 
+.PHONY: T11489
+T11489:
+	$(RM) T11489
+	touch T11489.prof
+	chmod -w T11489.prof
+	"$(TEST_HC)" -v0 -prof T11489.hs
+	# Should print some message about not being to open the .prof file,
+	# then continue to run and exit normally.
+	# Caused a segmentation fault in GHC <= 7.10.3
+	./T11489 +RTS -hr{} -hc

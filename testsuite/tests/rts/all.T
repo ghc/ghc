@@ -55,8 +55,7 @@ test('divbyzero',
 
 test('outofmem', when(opsys('darwin'), skip),
                  run_command, ['$MAKE -s --no-print-directory outofmem'])
-test('outofmem2', extra_run_opts('+RTS -M5m -RTS'),
-                  run_command, ['$MAKE -s --no-print-directory outofmem2'])
+test('outofmem2', normal, run_command, ['$MAKE -s --no-print-directory outofmem2'])
 
 test('T2047', [ignore_output, extra_run_opts('+RTS -c -RTS')],
               compile_and_run, ['-package containers'])
