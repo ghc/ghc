@@ -134,3 +134,8 @@ test('T5363',
 test('profinline001',
     [ req_profiling, extra_ways(['prof']), only_ways(prof_ways) ],
     compile_and_run, [''])
+
+test('T11489', [
+     req_profiling,
+     extra_clean(['T11489.prof', 'T11489.hp']),
+     ], run_command, ['$MAKE -s --no-print-directory T11489'])
