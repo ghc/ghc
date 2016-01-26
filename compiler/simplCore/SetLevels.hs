@@ -13,10 +13,15 @@
 2. We also let-ify many expressions (notably case scrutinees), so they
    will have a fighting chance of being floated sensible.
 
-3. We clone the binders of any floatable let-binding, so that when it is
-   floated out it will be unique.  (This used to be done by the simplifier
-   but the latter now only ensures that there's no shadowing; indeed, even
-   that may not be true.)
+3. Note [Need for cloning during float-out]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   We clone the binders of any floatable let-binding, so that when it is
+   floated out it will be unique. Example
+      (let x=2 in x) + (let x=3 in x)
+   we must clone before floating so we get
+      let x1=2 in
+      let x2=3 in
+      x1+x2
 
    NOTE: this can't be done using the uniqAway idea, because the variable
          must be unique in the whole program, not just its current scope,
@@ -29,7 +34,9 @@
    We do *not* clone top-level bindings, because some of them must not change,
    but we *do* clone bindings that are heading for the top level
 
-4. In the expression
+4. Note [Binder-swap during float-out]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   In the expression
         case x of wild { p -> ...wild... }
    we substitute x for wild in the RHS of the case alternatives:
         case x of wild { p -> ...x... }
@@ -373,10 +380,8 @@ lvlCase env scrut_fvs scrut' case_bndr ty alts
   =     -- See Note [Floating cases]
         -- Always float the case if possible
         -- Unlike lets we don't insist that it escapes a value lambda
-    do { (rhs_env, (case_bndr':bs')) <- cloneVars NonRecursive env dest_lvl (case_bndr:bs)
-                   -- We don't need to use extendCaseBndrLvlEnv here
-                   -- because we are floating the case outwards so
-                   -- no need to do the binder-swap thing
+    do { (env1, (case_bndr' : bs')) <- cloneCaseBndrs env dest_lvl (case_bndr : bs)
+       ; let rhs_env = extendCaseBndrEnv env1 case_bndr scrut'
        ; body' <- lvlMFE True rhs_env body
        ; let alt' = (con, [TB b (StayPut dest_lvl) | b <- bs'], body')
        ; return (Case scrut' (TB case_bndr' (FloatMe dest_lvl)) ty [alt']) }
@@ -387,15 +392,15 @@ lvlCase env scrut_fvs scrut' case_bndr ty alts
        ; alts' <- mapM (lvl_alt alts_env) alts
        ; return (Case scrut' case_bndr' ty alts') }
   where
-      incd_lvl = incMinorLvl (le_ctxt_lvl env)
-      dest_lvl = maxFvLevel (const True) env scrut_fvs
-              -- Don't abstact over type variables, hence const True
+    incd_lvl = incMinorLvl (le_ctxt_lvl env)
+    dest_lvl = maxFvLevel (const True) env scrut_fvs
+            -- Don't abstact over type variables, hence const True
 
-      lvl_alt alts_env (con, bs, rhs)
-        = do { rhs' <- lvlMFE True new_env rhs
-             ; return (con, bs', rhs') }
-        where
-          (new_env, bs') = substAndLvlBndrs NonRecursive alts_env incd_lvl bs
+    lvl_alt alts_env (con, bs, rhs)
+      = do { rhs' <- lvlMFE True new_env rhs
+           ; return (con, bs', rhs') }
+      where
+        (new_env, bs') = substAndLvlBndrs NonRecursive alts_env incd_lvl bs
 
 {-
 Note [Floating cases]
@@ -708,7 +713,7 @@ lvlBind env (AnnNonRec bndr rhs)
   | null abs_vars
   = do {  -- No type abstraction; clone existing binder
          rhs' <- lvlExpr (setCtxtLvl env dest_lvl) rhs
-       ; (env', [bndr']) <- cloneVars NonRecursive env dest_lvl [bndr]
+       ; (env', [bndr']) <- cloneLetVars NonRecursive env dest_lvl [bndr]
        ; return (NonRec (TB bndr' (FloatMe dest_lvl)) rhs', env') }
 
   | otherwise
@@ -732,7 +737,7 @@ lvlBind env (AnnRec pairs)
        ; return (Rec (bndrs' `zip` rhss'), env') }
 
   | null abs_vars
-  = do { (new_env, new_bndrs) <- cloneVars Recursive env dest_lvl bndrs
+  = do { (new_env, new_bndrs) <- cloneLetVars Recursive env dest_lvl bndrs
        ; new_rhss <- mapM (lvlExpr (setCtxtLvl new_env dest_lvl)) rhss
        ; return ( Rec ([TB b (FloatMe dest_lvl) | b <- new_bndrs] `zip` new_rhss)
                 , new_env) }
@@ -754,7 +759,7 @@ lvlBind env (AnnRec pairs)
     let (rhs_env, abs_vars_w_lvls) = lvlLamBndrs env dest_lvl abs_vars
         rhs_lvl = le_ctxt_lvl rhs_env
 
-    (rhs_env', [new_bndr]) <- cloneVars Recursive rhs_env rhs_lvl [bndr]
+    (rhs_env', [new_bndr]) <- cloneLetVars Recursive rhs_env rhs_lvl [bndr]
     let
         (lam_bndrs, rhs_body)   = collectAnnBndrs rhs
         (body_env1, lam_bndrs1) = substBndrsSL NonRecursive rhs_env' lam_bndrs
@@ -856,11 +861,10 @@ lvlBndrs :: LevelEnv -> Level -> [CoreBndr] -> (LevelEnv, [LevelledBndr])
 -- all or none.  We never separate binders.
 lvlBndrs env@(LE { le_lvl_env = lvl_env }) new_lvl bndrs
   = ( env { le_ctxt_lvl = new_lvl
-          , le_lvl_env  = foldl add_lvl lvl_env bndrs }
+          , le_lvl_env  = addLvls new_lvl lvl_env bndrs }
     , lvld_bndrs)
   where
     lvld_bndrs    = [TB bndr (StayPut new_lvl) | bndr <- bndrs]
-    add_lvl env v = extendVarEnv env v new_lvl
 
   -- Destination level is the max Id level of the expression
   -- (We'll abstract the type variables, if any.)
@@ -960,6 +964,12 @@ initialEnv float_lams
        , le_subst = emptySubst
        , le_env = emptyVarEnv }
 
+addLvl :: Level -> VarEnv Level -> OutVar -> VarEnv Level
+addLvl dest_lvl env v' = extendVarEnv env v' dest_lvl
+
+addLvls :: Level -> VarEnv Level -> [OutVar] -> VarEnv Level
+addLvls dest_lvl env vs = foldl (addLvl dest_lvl) env vs
+
 floatLams :: LevelEnv -> Maybe Int
 floatLams le = floatOutLambdas (le_switches le)
 
@@ -972,8 +982,8 @@ floatOverSat le = floatOutOverSatApps (le_switches le)
 setCtxtLvl :: LevelEnv -> Level -> LevelEnv
 setCtxtLvl env lvl = env { le_ctxt_lvl = lvl }
 
--- extendCaseBndrLvlEnv adds the mapping case-bndr->scrut-var if it can
--- (see point 4 of the module overview comment)
+-- extendCaseBndrEnv adds the mapping case-bndr->scrut-var if it can
+-- See Note [Binder-swap during float-out]
 extendCaseBndrEnv :: LevelEnv
                   -> Id                 -- Pre-cloned case binder
                   -> Expr LevelledBndr  -- Post-cloned scrutinee
@@ -1061,12 +1071,11 @@ newPolyBndrs dest_lvl
    do { uniqs <- getUniquesM
       ; let new_bndrs = zipWith mk_poly_bndr bndrs uniqs
             bndr_prs  = bndrs `zip` new_bndrs
-            env' = env { le_lvl_env = foldl add_lvl   lvl_env new_bndrs
+            env' = env { le_lvl_env = addLvls dest_lvl lvl_env new_bndrs
                        , le_subst   = foldl add_subst subst   bndr_prs
                        , le_env     = foldl add_id    id_env  bndr_prs }
       ; return (env', new_bndrs) }
   where
-    add_lvl   env v' = extendVarEnv env v' dest_lvl
     add_subst env (v, v') = extendIdSubst env v (mkVarApps (Var v') abs_vars)
     add_id    env (v, v') = extendVarEnv env v ((v':abs_vars), mkVarApps (Var v') abs_vars)
 
@@ -1091,11 +1100,24 @@ newLvlVar lvld_rhs is_bot
     rhs_ty = exprType de_tagged_rhs
     mk_name uniq = mkSystemVarName uniq (mkFastString "lvl")
 
-cloneVars :: RecFlag -> LevelEnv -> Level -> [Var] -> LvlM (LevelEnv, [Var])
--- Works for Ids, TyVars and CoVars
+cloneCaseBndrs :: LevelEnv -> Level -> [Var] -> LvlM (LevelEnv, [Var])
+cloneCaseBndrs env@(LE { le_subst = subst, le_lvl_env = lvl_env, le_env = id_env })
+               new_lvl vs
+  = do { us <- getUniqueSupplyM
+       ; let (subst', vs') = cloneBndrs subst us vs
+             env' = env { le_ctxt_lvl = new_lvl
+                        , le_lvl_env  = addLvls new_lvl lvl_env vs'
+                        , le_subst    = subst'
+                        , le_env      = foldl add_id id_env (vs `zip` vs') }
+
+       ; return (env', vs') }
+
+cloneLetVars :: RecFlag -> LevelEnv -> Level -> [Var] -> LvlM (LevelEnv, [Var])
+-- See Note [Need for cloning during float-out]
+-- Works for Ids bound by let(rec)
 -- The dest_lvl is attributed to the binders in the new env,
 -- but cloneVars doesn't affect the ctxt_lvl of the incoming env
-cloneVars is_rec
+cloneLetVars is_rec
           env@(LE { le_subst = subst, le_lvl_env = lvl_env, le_env = id_env })
           dest_lvl vs
   = do { us <- getUniqueSupplyM
@@ -1104,13 +1126,11 @@ cloneVars is_rec
                                Recursive    -> cloneRecIdBndrs subst us vs
              vs2  = map zap_demand_info vs1  -- See Note [Zapping the demand info]
              prs  = vs `zip` vs2
-             env' = env { le_lvl_env = foldl add_lvl lvl_env vs2
+             env' = env { le_lvl_env = addLvls dest_lvl lvl_env vs2
                         , le_subst   = subst'
                         , le_env     = foldl add_id id_env prs }
 
        ; return (env', vs2) }
-  where
-     add_lvl env v_cloned = extendVarEnv env v_cloned dest_lvl
 
 add_id :: IdEnv ([Var], LevelledExpr) -> (Var, Var) -> IdEnv ([Var], LevelledExpr)
 add_id id_env (v, v1)

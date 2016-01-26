@@ -2021,7 +2021,8 @@ substTyVarBndrCallback subst_fn subst@(TCvSubst in_scope tenv cenv) old_var
         -- Here we must simply zap the substitution for x
 
     new_var | no_kind_change = uniqAway in_scope old_var
-            | otherwise = uniqAway in_scope $ updateTyVarKind (subst_fn subst) old_var
+            | otherwise = uniqAway in_scope $
+                          setTyVarKind old_var (subst_fn subst old_ki)
         -- The uniqAway part makes sure the new variable is not already in scope
 
 substCoVarBndr :: TCvSubst -> CoVar -> (TCvSubst, CoVar)
@@ -2055,16 +2056,18 @@ substCoVarBndrCallback sym subst_fun subst@(TCvSubst in_scope tenv cenv) old_var
                   -- because they can have free type variables
 
 cloneTyVarBndr :: TCvSubst -> TyVar -> Unique -> (TCvSubst, TyVar)
-cloneTyVarBndr (TCvSubst in_scope tv_env cv_env) tv uniq
-  | isTyVar tv
-  = (TCvSubst (extendInScopeSet in_scope tv')
+cloneTyVarBndr subst@(TCvSubst in_scope tv_env cv_env) tv uniq
+  = ASSERT2( isTyVar tv, ppr tv )   -- I think it's only called on TyVars
+    (TCvSubst (extendInScopeSet in_scope tv')
               (extendVarEnv tv_env tv (mkTyVarTy tv')) cv_env, tv')
-  | otherwise
-  = (TCvSubst (extendInScopeSet in_scope tv')
-              tv_env (extendVarEnv cv_env tv (mkCoVarCo tv')), tv')
   where
-    tv' = setVarUnique tv uniq  -- Simply set the unique; the kind
-                                -- has no type variables to worry about
+    old_ki = tyVarKind tv
+    no_kind_change = isEmptyVarSet (tyCoVarsOfType old_ki) -- verify that kind is closed
+
+    tv1 | no_kind_change = tv
+        | otherwise      = setTyVarKind tv (substTy subst old_ki)
+
+    tv' = setVarUnique tv1 uniq
 
 cloneTyVarBndrs :: TCvSubst -> [TyVar] -> UniqSupply -> (TCvSubst, [TyVar])
 cloneTyVarBndrs subst []     _usupply = (subst, [])
