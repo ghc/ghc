@@ -9,6 +9,10 @@ on [Shake][shake] and we hope that it will eventually replace the current
 ideas behind the project you can find more details on the [wiki page][ghc-shake-wiki]
 and in this [blog post][blog-post-1].
 
+The new build system can work side-by-side with the existing build system. Note, there is
+some interaction between them: they put (some) build results in the same directories,
+e.g. `inplace/bin/ghc-stage1`. 
+
 [Join us on #shaking-up-ghc on Freenode](irc://chat.freenode.net/#shaking-up-ghc).
 
 Your first build
