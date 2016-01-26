@@ -336,7 +336,7 @@ def unless(b, f):
 def doing_ghci():
     return 'ghci' in config.run_ways
 
-def ghci_dynamic( ):
+def ghc_dynamic():
     return config.ghc_dynamic
 
 def fast():

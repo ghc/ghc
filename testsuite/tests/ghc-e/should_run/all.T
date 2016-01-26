@@ -7,7 +7,7 @@ test('ghc-e005', req_interp, run_command, ['$MAKE --no-print-directory -s ghc-e0
 test('ghc-e006', req_interp, run_command, ['$MAKE --no-print-directory -s ghc-e006'])
 
 test('T2228',
-     [req_interp, when(ghci_dynamic(), expect_broken(7298))],
+     [req_interp, when(ghc_dynamic(), expect_broken(7298))],
      run_command,
      ['$MAKE --no-print-directory -s T2228'])
 test('T2636', req_interp, run_command, ['$MAKE --no-print-directory -s T2636'])

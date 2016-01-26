@@ -72,7 +72,7 @@ test('T680',
 
 test('T2552',
      [ req_profiling, extra_ways(['prof']), only_ways(prof_ways),
-       expect_broken_for(10037,['prof'])],
+       expect_broken_for(10037, opt_ways)],
      compile_and_run,
      [''])
 
