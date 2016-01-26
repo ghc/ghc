@@ -763,27 +763,27 @@ newtype (:.:) f (g :: * -> *) (p :: *) = Comp1 { unComp1 :: f (g p) }
 data family URec (a :: *) (p :: *)
 
 -- | Used for marking occurrences of 'Addr#'
-data instance URec (Ptr ()) _p = UAddr { uAddr# :: Addr# }
+data instance URec (Ptr ()) p = UAddr { uAddr# :: Addr# }
   deriving (Eq, Ord, Generic)
 
 -- | Used for marking occurrences of 'Char#'
-data instance URec Char _p = UChar { uChar# :: Char# }
+data instance URec Char p = UChar { uChar# :: Char# }
   deriving (Eq, Ord, Show, Generic)
 
 -- | Used for marking occurrences of 'Double#'
-data instance URec Double _p = UDouble { uDouble# :: Double# }
+data instance URec Double p = UDouble { uDouble# :: Double# }
   deriving (Eq, Ord, Show, Generic)
 
 -- | Used for marking occurrences of 'Float#'
-data instance URec Float _p = UFloat { uFloat# :: Float# }
+data instance URec Float p = UFloat { uFloat# :: Float# }
   deriving (Eq, Ord, Show, Generic)
 
 -- | Used for marking occurrences of 'Int#'
-data instance URec Int _p = UInt { uInt# :: Int# }
+data instance URec Int p = UInt { uInt# :: Int# }
   deriving (Eq, Ord, Show, Generic)
 
 -- | Used for marking occurrences of 'Word#'
-data instance URec Word _p = UWord { uWord# :: Word# }
+data instance URec Word p = UWord { uWord# :: Word# }
   deriving (Eq, Ord, Show, Generic)
 
 -- | Type synonym for 'URec': 'Addr#'
@@ -1051,7 +1051,7 @@ class (kparam ~ 'KProxy) => SingKind (kparam :: KProxy k) where
   fromSing :: Sing (a :: k) -> DemoteRep kparam
 
 -- Singleton symbols
-data instance Sing (_s :: Symbol) where
+data instance Sing (s :: Symbol) where
   SSym :: KnownSymbol s => Sing s
 
 instance KnownSymbol a => SingI a where sing = SSym
@@ -1061,7 +1061,7 @@ instance SingKind ('KProxy :: KProxy Symbol) where
   fromSing (SSym :: Sing s) = symbolVal (Proxy :: Proxy s)
 
 -- Singleton booleans
-data instance Sing (_a :: Bool) where
+data instance Sing (a :: Bool) where
   STrue  :: Sing 'True
   SFalse :: Sing 'False
 
@@ -1074,7 +1074,7 @@ instance SingKind ('KProxy :: KProxy Bool) where
   fromSing SFalse = False
 
 -- Singleton Maybe
-data instance Sing (_b :: Maybe _a) where
+data instance Sing (b :: Maybe a) where
   SNothing :: Sing 'Nothing
   SJust    :: Sing a -> Sing ('Just a)
 
@@ -1089,7 +1089,7 @@ instance SingKind ('KProxy :: KProxy a) =>
   fromSing (SJust a) = Just (fromSing a)
 
 -- Singleton Fixity
-data instance Sing (_a :: FixityI) where
+data instance Sing (a :: FixityI) where
   SPrefix :: Sing 'PrefixI
   SInfix  :: Sing a -> Integer -> Sing ('InfixI a n)
 
@@ -1103,7 +1103,7 @@ instance SingKind ('KProxy :: KProxy FixityI) where
   fromSing (SInfix a n) = Infix (fromSing a) (I# (integerToInt n))
 
 -- Singleton Associativity
-data instance Sing (_a :: Associativity) where
+data instance Sing (a :: Associativity) where
   SLeftAssociative  :: Sing 'LeftAssociative
   SRightAssociative :: Sing 'RightAssociative
   SNotAssociative   :: Sing 'NotAssociative
@@ -1119,7 +1119,7 @@ instance SingKind ('KProxy :: KProxy Associativity) where
   fromSing SNotAssociative   = NotAssociative
 
 -- Singleton SourceUnpackedness
-data instance Sing (_a :: SourceUnpackedness) where
+data instance Sing (a :: SourceUnpackedness) where
   SNoSourceUnpackedness :: Sing 'NoSourceUnpackedness
   SSourceNoUnpack       :: Sing 'SourceNoUnpack
   SSourceUnpack         :: Sing 'SourceUnpack
@@ -1135,7 +1135,7 @@ instance SingKind ('KProxy :: KProxy SourceUnpackedness) where
   fromSing SSourceUnpack         = SourceUnpack
 
 -- Singleton SourceStrictness
-data instance Sing (_a :: SourceStrictness) where
+data instance Sing (a :: SourceStrictness) where
   SNoSourceStrictness :: Sing 'NoSourceStrictness
   SSourceLazy         :: Sing 'SourceLazy
   SSourceStrict       :: Sing 'SourceStrict
@@ -1151,7 +1151,7 @@ instance SingKind ('KProxy :: KProxy SourceStrictness) where
   fromSing SSourceStrict       = SourceStrict
 
 -- Singleton DecidedStrictness
-data instance Sing (_a :: DecidedStrictness) where
+data instance Sing (a :: DecidedStrictness) where
   SDecidedLazy   :: Sing 'DecidedLazy
   SDecidedStrict :: Sing 'DecidedStrict
   SDecidedUnpack :: Sing 'DecidedUnpack

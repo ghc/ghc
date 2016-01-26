@@ -44,6 +44,7 @@ The following flags are simple ways to select standard "packages" of warnings:
 
         * :ghc-flag:`-Wunused-binds`
         * :ghc-flag:`-Wunused-matches`
+        * :ghc-flag:`-Wunused-foralls`
         * :ghc-flag:`-Wunused-imports`
         * :ghc-flag:`-Wincomplete-patterns`
         * :ghc-flag:`-Wdodgy-exports`
@@ -871,13 +872,17 @@ of ``-W(no-)*``.
        single: unused matches, warning
        single: matches, unused
 
-    Report all unused variables which arise from pattern matches,
-    including patterns consisting of a single variable. This includes
-    unused type variables in type family instances. For instance
+    Report all unused variables which arise from term-level pattern matches,
+    including patterns consisting of a single variable. For instance
     ``f x y = []`` would report ``x`` and ``y`` as unused. The warning
     is suppressed if the variable name begins with an underscore, thus: ::
 
         f _x = True
+
+    Note that :ghc-flag:`-Wunused-matches` does not warn about variables which
+    arise from type-level patterns, as found in type family and data family
+    instances. This must be enabled separately through the
+    :ghc-flag:`-Wunused-type-patterns` flag.
 
 .. ghc-flag:: -Wunused-do-bind
 
@@ -899,6 +904,41 @@ of ``-W(no-)*``.
     Of course, in this particular situation you can do even better: ::
 
         do { mapM_ popInt xs ; return 10 }
+
+.. ghc-flag:: -Wunused-type-patterns
+
+    .. index::
+       single: unused type patterns, warning
+       single: type patterns, unused
+
+    Report all unused type variables which arise from patterns in type family
+    and data family instances. For instance: ::
+
+        type instance F x y = []
+
+    would report ``x`` and ``y`` as unused. The warning is suppressed if the
+    type variable name begins with an underscore, like so: ::
+
+        type instance F _x _y = []
+
+    Unlike :ghc-flag:`-Wunused-matches`, :ghc-flag:`-Wunused-type-variables` is
+    not implied by :ghc-flag:`-Wall`. The rationale for this decision is that
+    unlike term-level pattern names, type names are often chosen expressly for
+    documentation purposes, so using underscores in type names can make the
+    documentation harder to read.
+
+.. ghc-flag:: -Wunused-foralls
+
+    .. index::
+       single: unused foralls, warning
+       single: foralls, unused
+
+    Report all unused type variables which arise from explicit, user-written
+    ``forall`` statements. For instance: ::
+
+        g :: forall a b c. (b -> b)
+
+    would report ``a`` and ``c`` as unused.
 
 .. ghc-flag:: -Wwrong-do-bind
 

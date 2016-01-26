@@ -1404,7 +1404,7 @@ inTypeDoc ty = text "In the type" <+> quotes (ppr ty)
 
 warnUnusedForAll :: SDoc -> LHsTyVarBndr Name -> FreeVars -> TcM ()
 warnUnusedForAll in_doc (L loc tv) used_names
-  = whenWOptM Opt_WarnUnusedMatches $
+  = whenWOptM Opt_WarnUnusedForalls $
     unless (hsTyVarName tv `elemNameSet` used_names) $
     addWarnAt loc $
     vcat [ text "Unused quantified type variable" <+> quotes (ppr tv)

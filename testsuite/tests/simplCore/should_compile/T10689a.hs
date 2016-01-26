@@ -76,9 +76,9 @@ type family Foldr1 (a_afe5 :: TyFun a_afdP (TyFun a_afdP a_afdP
                                             -> *)
                               -> *)
                    (a_afe6 :: [a_afdP]) :: a_afdP where
-  Foldr1 _z_afe7 '[x_afe8] = x_afe8
+  Foldr1 z_afe7 '[x_afe8] = x_afe8
   Foldr1 f_afe9 ((:) x_afea ((:) wild_1627448474_afeb wild_1627448476_afec)) = Apply (Apply f_afe9 x_afea) (Apply (Apply Foldr1Sym0 f_afe9) (Let1627448493XsSym4 f_afe9 x_afea wild_1627448474_afeb wild_1627448476_afec))
-  Foldr1 _z_afew '[] = Apply ErrorSym0 "Data.Singletons.List.foldr1: empty list"
+  Foldr1 z_afew '[] = Apply ErrorSym0 "Data.Singletons.List.foldr1: empty list"
 
 sFoldr1 ::
   forall (x :: TyFun a_afdP (TyFun a_afdP a_afdP -> *) -> *)

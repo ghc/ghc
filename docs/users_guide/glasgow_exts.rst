@@ -6035,12 +6035,13 @@ declaration doesn't matter, it can be replaced with an underscore
     -- Equivalent to
     data instance F Int b = Int
 
-When the flag :ghc-flag:`-fwarn-unused-matches` is enabled, type variables that are
-mentioned in the patterns on the left hand side, but not used on the right
-hand side are reported. Variables that occur multiple times on the left hand side
-are also considered used. To suppress the warnings, unused variables should
-be either replaced or prefixed with underscores. Type variables starting with
-an underscore (``_x``) are otherwise treated as ordinary type variables.
+When the flag :ghc-flag:`-Wunused-type-patterns` is enabled, type
+variables that are mentioned in the patterns on the left hand side, but not
+used on the right hand side are reported. Variables that occur multiple times
+on the left hand side are also considered used. To suppress the warnings,
+unused variables should be either replaced or prefixed with underscores. Type
+variables starting with an underscore (``_x``) are otherwise treated as
+ordinary type variables.
 
 This resembles the wildcards that can be used in
 :ref:`partial-type-signatures`. However, there are some differences.
@@ -6193,9 +6194,10 @@ for data instances. For example, the ``[e]`` instance for ``Elem`` is ::
 
 Type arguments can be replaced with underscores (``_``) if the names of
 the arguments don't matter. This is the same as writing type variables
-with unique names. Unused type arguments should be replaced or prefixed
-with underscores to avoid warnings when the `-fwarn-unused-matches` flag
-is enabled. The same rules apply as for :ref:`data-instance-declarations`.
+with unique names. Unused type arguments can be replaced or prefixed
+with underscores to avoid warnings when the
+:ghc-flag:`-Wunused-type-patterns` flag is enabled. The same rules apply
+as for :ref:`data-instance-declarations`.
 
 Type family instance declarations are only legitimate when an
 appropriate family declaration is in scope - just like class instances
@@ -7700,6 +7702,14 @@ The two are treated identically.
 
 Of course ``forall`` becomes a keyword; you can't use ``forall`` as a
 type variable any more!
+
+If the :ghc-flag:`-Wunused-foralls` flag is enabled, a warning will be emitted
+when you write a type variable in an explicit ``forall`` statement that is
+otherwise unused. For instance: ::
+
+    g :: forall a b. (b -> b)
+
+would warn about the unused type variable `a`.
 
 .. _flexible-contexts:
 

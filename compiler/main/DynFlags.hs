@@ -565,6 +565,8 @@ data WarningFlag =
    | Opt_WarnUnusedPatternBinds
    | Opt_WarnUnusedImports
    | Opt_WarnUnusedMatches
+   | Opt_WarnUnusedTypePatterns
+   | Opt_WarnUnusedForalls
    | Opt_WarnContextQuantification -- remove in 8.2
    | Opt_WarnWarningsDeprecations
    | Opt_WarnDeprecatedFlags
@@ -2975,11 +2977,13 @@ wWarningFlags = [
   flagSpec "unticked-promoted-constructors"
                                          Opt_WarnUntickedPromotedConstructors,
   flagSpec "unused-do-bind"              Opt_WarnUnusedDoBind,
+  flagSpec "unused-foralls"              Opt_WarnUnusedForalls,
   flagSpec "unused-imports"              Opt_WarnUnusedImports,
   flagSpec "unused-local-binds"          Opt_WarnUnusedLocalBinds,
   flagSpec "unused-matches"              Opt_WarnUnusedMatches,
   flagSpec "unused-pattern-binds"        Opt_WarnUnusedPatternBinds,
   flagSpec "unused-top-binds"            Opt_WarnUnusedTopBinds,
+  flagSpec "unused-type-patterns"        Opt_WarnUnusedTypePatterns,
   flagSpec "warnings-deprecations"       Opt_WarnWarningsDeprecations,
   flagSpec "wrong-do-bind"               Opt_WarnWrongDoBind,
   flagSpec "missing-pat-syn-sigs"        Opt_WarnMissingPatSynSigs,
@@ -3517,6 +3521,7 @@ minusWOpts
         Opt_WarnUnusedLocalBinds,
         Opt_WarnUnusedPatternBinds,
         Opt_WarnUnusedMatches,
+        Opt_WarnUnusedForalls,
         Opt_WarnUnusedImports,
         Opt_WarnIncompletePatterns,
         Opt_WarnDodgyExports,
