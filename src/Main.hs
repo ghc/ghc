@@ -14,7 +14,7 @@ import qualified Rules.Gmp
 import qualified Rules.Libffi
 import qualified Rules.Oracles
 import qualified Rules.Perl
-import qualified Test
+import qualified Selftest
 
 main :: IO ()
 main = shakeArgsWith options CmdLineFlag.cmdFlags $ \cmdLineFlags targets -> do
@@ -37,7 +37,7 @@ main = shakeArgsWith options CmdLineFlag.cmdFlags $ \cmdLineFlags targets -> do
         , Rules.Perl.perlScriptRules
         , Rules.generateTargets
         , Rules.packageRules
-        , Test.testRules ]
+        , Selftest.selftestRules ]
     options = shakeOptions
         { shakeChange   = ChangeModtimeAndDigest
         , shakeFiles    = Base.shakeFilesPath

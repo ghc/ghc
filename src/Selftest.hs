@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module Test (testRules) where
+module Selftest (selftestRules) where
 
 import Development.Shake
 import Settings.Builders.Ar (chunksOfSize)
@@ -13,8 +13,8 @@ instance Arbitrary Way where
 instance Arbitrary WayUnit where
     arbitrary = arbitraryBoundedEnum
 
-testRules :: Rules ()
-testRules =
+selftestRules :: Rules ()
+selftestRules =
     "selftest" ~> do
         test $ \(x :: Way) -> read (show x) == x
         test $ \n xs ->
