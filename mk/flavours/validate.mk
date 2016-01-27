@@ -1,4 +1,5 @@
 SRC_HC_OPTS        = -O0 -H64m
+SRC_HC_OPTS_STAGE1 = -fllvm-fill-undef-with-garbage   # See Trac 11487
 GhcStage1HcOpts    = -O
 GhcStage2HcOpts    = -O -dcore-lint
 GhcLibHcOpts       = -O -dcore-lint

@@ -217,7 +217,31 @@ ppLit f@(LMFloatLit _ _)       = sdocWithDynFlags (\dflags ->
                                    error $ "Can't print this float literal!" ++ showSDoc dflags (ppr f))
 ppLit (LMVectorLit ls  )       = char '<' <+> ppCommaJoin ls <+> char '>'
 ppLit (LMNullLit _     )       = text "null"
-ppLit (LMUndefLit _    )       = text "undef"
+-- Trac 11487 was an issue where we passed undef for some arguments
+-- that were actually live. By chance the registers holding those
+-- arguments usually happened to have the right values anyways, but
+-- that was not guaranteed. To find such bugs reliably, we set the
+-- flag below when validating, which replaces undef literals (at
+-- common types) with values that are likely to cause a crash or test
+-- failure.
+ppLit (LMUndefLit t    )       = sdocWithDynFlags f
+  where f dflags
+          | gopt Opt_LlvmFillUndefWithGarbage dflags,
+            Just lit <- garbageLit t   = ppLit lit
+          | otherwise                  = text "undef"
+
+garbageLit :: LlvmType -> Maybe LlvmLit
+garbageLit t@(LMInt w)     = Just (LMIntLit (0xbbbbbbbbbbbbbbb0 `mod` (2^w)) t)
+  -- Use a value that looks like an untagged pointer, so we are more
+  -- likely to try to enter it
+garbageLit t
+  | isFloat t              = Just (LMFloatLit 12345678.9 t)
+garbageLit t@(LMPointer _) = Just (LMNullLit t)
+  -- Using null isn't totally ideal, since some functions may check for null.
+  -- But producing another value is inconvenient since it needs a cast,
+  -- and the knowledge for how to format casts is in PpLlvm.
+garbageLit _               = Nothing
+  -- More cases could be added, but this should do for now.
 
 -- | Return the 'LlvmType' of the 'LlvmVar'
 getVarType :: LlvmVar -> LlvmType
