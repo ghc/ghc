@@ -932,7 +932,7 @@ For example, if we have
 and we wish to compute S(W/R, T a b), the correct answer is T a Bool, NOT
 T Int Bool. The reason is that T's first parameter has a nominal role, and
 thus rewriting a to Int in T a b is wrong. Indeed, this non-congruence of
-subsitution means that the proof in Note [The inert equalities] may need
+substitution means that the proof in Note [The inert equalities] may need
 to be revisited, but we don't think that the end conclusion is wrong.
 
 Note [Examples of how the inert_model helps completeness]
