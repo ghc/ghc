@@ -638,7 +638,7 @@ showTypeCategory ty
   | otherwise = case tcSplitTyConApp_maybe ty of
   Nothing -> '.'
   Just (tycon, _) ->
-    (if isUnLiftedTyCon tycon then Data.Char.toLower else \x -> x) $
+    (if isUnliftedTyCon tycon then Data.Char.toLower else \x -> x) $
     let anyOf us = getUnique tycon `elem` us in
     case () of
       _ | anyOf [funTyConKey] -> '>'

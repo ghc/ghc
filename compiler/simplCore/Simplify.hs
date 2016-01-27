@@ -457,7 +457,7 @@ prepareRhs :: TopLevelFlag -> SimplEnv -> OutId -> OutExpr -> SimplM (SimplEnv, 
 -- Adds new floats to the env iff that allows us to return a good RHS
 prepareRhs top_lvl env id (Cast rhs co)    -- Note [Float coercions]
   | Pair ty1 _ty2 <- coercionKind co       -- Do *not* do this if rhs has an unlifted type
-  , not (isUnLiftedType ty1)            -- see Note [Float coercions (unlifted)]
+  , not (isUnliftedType ty1)            -- see Note [Float coercions (unlifted)]
   = do  { (env', rhs') <- makeTrivialWithInfo top_lvl env sanitised_info rhs
         ; return (env', Cast rhs' co) }
   where
@@ -600,7 +600,7 @@ bindingOk :: TopLevelFlag -> CoreExpr -> Type -> Bool
 -- True iff we can have a binding of this expression at this level
 -- Precondition: the type is the type of the expression
 bindingOk top_lvl _ expr_ty
-  | isTopLevel top_lvl = not (isUnLiftedType expr_ty)
+  | isTopLevel top_lvl = not (isUnliftedType expr_ty)
   | otherwise          = True
 
 {-
@@ -1914,7 +1914,7 @@ rebuildCase env scrut case_bndr alts@[(_, bndrs, rhs)] cont
            Just (rule_rhs, cont') -> simplExprF env' rule_rhs cont'
            Nothing                -> reallyRebuildCase env scrut case_bndr alts cont }
   where
-    is_unlifted        = isUnLiftedType (idType case_bndr)
+    is_unlifted        = isUnliftedType (idType case_bndr)
     all_dead_bndrs     = all isDeadBinder bndrs       -- bndrs are [InId]
     is_plain_seq       = all_dead_bndrs && isDeadBinder case_bndr -- Evaluation *only* for effect
     seq_id_ty          = idType seqId
@@ -2412,7 +2412,7 @@ mkDupableCont env cont@(Select { sc_bndr = case_bndr, sc_alts = [(_, bs, _rhs)] 
 --  | not (exprIsDupable rhs && contIsDupable case_cont)
 --  | not (isDeadBinder case_bndr)
   | all isDeadBinder bs  -- InIds
-    && not (isUnLiftedType (idType case_bndr))
+    && not (isUnliftedType (idType case_bndr))
     -- Note [Single-alternative-unlifted]
   = return (env, mkBoringStop (contHoleType cont), cont)
 
@@ -2654,7 +2654,7 @@ for several reasons
   where v::Void#.  The value passed to this function is void,
   which generates (almost) no code.
 
-* CPR.  We used to say "&& isUnLiftedType rhs_ty'" here, but now
+* CPR.  We used to say "&& isUnliftedType rhs_ty'" here, but now
   we make the join point into a function whenever used_bndrs'
   is empty.  This makes the join-point more CPR friendly.
   Consider:       let j = if .. then I# 3 else I# 4

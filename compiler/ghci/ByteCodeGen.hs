@@ -413,7 +413,7 @@ schemeE d s p e@(AnnLit lit)     = returnUnboxedAtom d s p e (typeArgRep (litera
 schemeE d s p e@(AnnCoercion {}) = returnUnboxedAtom d s p e V
 
 schemeE d s p e@(AnnVar v)
-    | isUnLiftedType (idType v) = returnUnboxedAtom d s p e (bcIdArgRep v)
+    | isUnliftedType (idType v) = returnUnboxedAtom d s p e (bcIdArgRep v)
     | otherwise                 = schemeT d s p e
 
 schemeE d s p (AnnLet (AnnNonRec x (_,rhs)) (_,body))
@@ -492,7 +492,7 @@ schemeE d s p (AnnLet binds (_,body)) = do
 -- best way to calculate the free vars but it seemed like the least
 -- intrusive thing to do
 schemeE d s p exp@(AnnTick (Breakpoint _id _fvs) _rhs)
-   = if isUnLiftedType ty
+   = if isUnliftedType ty
         then do
           -- If the result type is unlifted, then we must generate
           --   let f = \s . tick<n> e
@@ -826,7 +826,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
                    Nothing       -> p_alts0
 
         bndr_ty = idType bndr
-        isAlgCase = not (isUnLiftedType bndr_ty) && isNothing is_unboxed_tuple
+        isAlgCase = not (isUnliftedType bndr_ty) && isNothing is_unboxed_tuple
 
         -- given an alt, return a discr and code for it.
         codeAlt (DEFAULT, _, (_,rhs))

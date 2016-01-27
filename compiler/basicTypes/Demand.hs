@@ -69,7 +69,7 @@ import BasicTypes
 import Binary
 import Maybes           ( orElse )
 
-import Type            ( Type, isUnLiftedType )
+import Type            ( Type, isUnliftedType )
 import TyCon           ( isNewTyCon, isClassTyCon )
 import DataCon         ( splitDataProductType_maybe )
 
@@ -1355,7 +1355,7 @@ toCleanDmd (JD { sd = s, ud = u }) expr_ty
                  Abs | is_unlifted -> (Use One (), Used)
                      | otherwise   -> (Abs,        Used)
 
-    is_unlifted = isUnLiftedType expr_ty
+    is_unlifted = isUnliftedType expr_ty
     -- See Note [Analysing with absent demand]
 
 

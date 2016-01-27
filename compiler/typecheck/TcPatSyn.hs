@@ -579,7 +579,7 @@ mkPatSynBuilderId has_sig dir (L _ name)
        ; let qtvs           = univ_tvs ++ ex_tvs
              theta          = req_theta ++ prov_theta
              mk_sigma       = if has_sig then mkSpecSigmaTy else mkInvSigmaTy
-             need_dummy_arg = isUnLiftedType pat_ty && null arg_tys && null theta
+             need_dummy_arg = isUnliftedType pat_ty && null arg_tys && null theta
              builder_sigma  = add_void need_dummy_arg $
                               mk_sigma qtvs theta (mkFunTys arg_tys pat_ty)
              builder_id     = mkExportedVanillaId builder_name builder_sigma

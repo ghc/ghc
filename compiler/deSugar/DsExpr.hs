@@ -115,7 +115,7 @@ ds_val_bind (NonRecursive, hsbinds) body
 ds_val_bind (_is_rec, binds) body
   = do  { (force_vars,prs) <- dsLHsBinds binds
         ; let body' = foldr seqVar body force_vars
-        ; ASSERT2( not (any (isUnLiftedType . idType . fst) prs), ppr _is_rec $$ ppr binds )
+        ; ASSERT2( not (any (isUnliftedType . idType . fst) prs), ppr _is_rec $$ ppr binds )
           case prs of
             [] -> return body
             _  -> return (Let (Rec prs) body') }
@@ -184,11 +184,11 @@ unliftedMatchOnly (AbsBinds { abs_binds = lbinds })
 unliftedMatchOnly (AbsBindsSig { abs_sig_bind = L _ bind })
   = unliftedMatchOnly bind
 unliftedMatchOnly (PatBind { pat_lhs = lpat, pat_rhs_ty = rhs_ty })
-  =  isUnLiftedType rhs_ty
+  =  isUnliftedType rhs_ty
   || isUnliftedLPat lpat
-  || any (isUnLiftedType . idType) (collectPatBinders lpat)
+  || any (isUnliftedType . idType) (collectPatBinders lpat)
 unliftedMatchOnly (FunBind { fun_id = L _ id })
-  = isUnLiftedType (idType id)
+  = isUnliftedType (idType id)
 unliftedMatchOnly _ = False -- I hope!  Checked immediately by caller in fact
 
 {-

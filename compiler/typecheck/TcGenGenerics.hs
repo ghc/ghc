@@ -175,7 +175,7 @@ canDoGenerics tc tc_args
 
         -- Nor can we do the job if it's an existential data constructor,
         -- Nor if the args are polymorphic types (I don't think)
-    bad_arg_type ty = (isUnLiftedType ty && not (allowedUnliftedTy ty))
+    bad_arg_type ty = (isUnliftedType ty && not (allowedUnliftedTy ty))
                       || not (isTauTy ty)
 
 allowedUnliftedTy :: Type -> Bool

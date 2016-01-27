@@ -431,7 +431,7 @@ forAllAllowed _                         = False
 -- | Fail with error message if the type is unlifted
 check_lifted :: TidyEnv -> Type -> TcM ()
 check_lifted env ty
-  = checkTcM (not (isUnLiftedType ty)) (unliftedArgErr env ty)
+  = checkTcM (not (isUnliftedType ty)) (unliftedArgErr env ty)
 
 check_type :: TidyEnv -> UserTypeCtxt -> Rank -> Type -> TcM ()
 -- The args say what the *type context* requires, independent
@@ -573,7 +573,7 @@ check_arg_type env ctxt rank ty
 
         ; check_type env ctxt rank' ty
         ; check_lifted env ty }
-             -- NB the isUnLiftedType test also checks for
+             -- NB the isUnliftedType test also checks for
              --    T State#
              -- where there is an illegal partial application of State# (which has
              -- kind * -> #); see Note [The kind invariant] in TyCoRep

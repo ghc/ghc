@@ -101,7 +101,7 @@ module Type (
         isPiTy,
 
         -- (Lifting and boxity)
-        isUnLiftedType, isUnboxedTupleType, isAlgType, isClosedAlgType,
+        isUnliftedType, isUnboxedTupleType, isAlgType, isClosedAlgType,
         isPrimitiveType, isStrictType,
         isLevityTy, isLevityVar, getLevity, getLevityFromKind,
 
@@ -1852,17 +1852,17 @@ pprSourceTyCon tycon
 -}
 
 -- | See "Type#type_classification" for what an unlifted type is
-isUnLiftedType :: Type -> Bool
-        -- isUnLiftedType returns True for forall'd unlifted types:
+isUnliftedType :: Type -> Bool
+        -- isUnliftedType returns True for forall'd unlifted types:
         --      x :: forall a. Int#
         -- I found bindings like these were getting floated to the top level.
         -- They are pretty bogus types, mind you.  It would be better never to
         -- construct them
 
-isUnLiftedType ty | Just ty' <- coreView ty = isUnLiftedType ty'
-isUnLiftedType (ForAllTy (Named {}) ty) = isUnLiftedType ty
-isUnLiftedType (TyConApp tc _)          = isUnLiftedTyCon tc
-isUnLiftedType _                        = False
+isUnliftedType ty | Just ty' <- coreView ty = isUnliftedType ty'
+isUnliftedType (ForAllTy (Named {}) ty) = isUnliftedType ty
+isUnliftedType (TyConApp tc _)          = isUnliftedTyCon tc
+isUnliftedType _                        = False
 
 -- | Extract the levity classifier of a type. Panics if this is not possible.
 getLevity :: String   -- ^ Printed in case of an error
@@ -1912,10 +1912,10 @@ isClosedAlgType ty
 
 -- | Computes whether an argument (or let right hand side) should
 -- be computed strictly or lazily, based only on its type.
--- Currently, it's just 'isUnLiftedType'.
+-- Currently, it's just 'isUnliftedType'.
 
 isStrictType :: Type -> Bool
-isStrictType = isUnLiftedType
+isStrictType = isUnliftedType
 
 isPrimitiveType :: Type -> Bool
 -- ^ Returns true of types that are opaque to Haskell.

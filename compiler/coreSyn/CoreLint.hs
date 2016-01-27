@@ -473,7 +473,7 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
 
         -- Check the let/app invariant
         -- See Note [CoreSyn let/app invariant] in CoreSyn
-       ; checkL (not (isUnLiftedType binder_ty)
+       ; checkL (not (isUnliftedType binder_ty)
             || (isNonRec rec_flag && exprOkForSpeculation rhs))
            (mkRhsPrimMsg binder rhs)
 
@@ -759,7 +759,7 @@ lintCoreArg fun_ty (Type arg_ty)
 
 lintCoreArg fun_ty arg
   = do { arg_ty <- lintCoreExpr arg
-       ; checkL (not (isUnLiftedType arg_ty) || exprOkForSpeculation arg)
+       ; checkL (not (isUnliftedType arg_ty) || exprOkForSpeculation arg)
                 (mkLetAppMsg arg)
        ; lintValApp arg fun_ty arg_ty }
 
@@ -1042,7 +1042,7 @@ lintType ty@(TyConApp tc tys)
   = lintType ty'   -- Expand type synonyms, so that we do not bogusly complain
                    --  about un-saturated type synonyms
 
-  | isUnLiftedTyCon tc || isTypeSynonymTyCon tc || isTypeFamilyTyCon tc
+  | isUnliftedTyCon tc || isTypeSynonymTyCon tc || isTypeFamilyTyCon tc
        -- Also type synonyms and type families
   , length tys < tyConArity tc
   = failWithL (hang (text "Un-saturated type application") 2 (ppr ty))
@@ -1294,7 +1294,7 @@ lintCoercion (CoVarCo cv)
   | otherwise
   = do { lintTyCoVarInScope cv
        ; cv' <- lookupIdInScope cv
-       ; lintUnLiftedCoVar cv
+       ; lintUnliftedCoVar cv
        ; return $ coVarKindsTypesRole cv' }
 
 -- See Note [Bad unsafe coercion]
@@ -1513,9 +1513,9 @@ lintCoercion this@(AxiomRuleCo co cs)
                           , text "Provided:" <+> int n ]
 
 ----------
-lintUnLiftedCoVar :: CoVar -> LintM ()
-lintUnLiftedCoVar cv
-  = when (not (isUnLiftedType (coVarKind cv))) $
+lintUnliftedCoVar :: CoVar -> LintM ()
+lintUnliftedCoVar cv
+  = when (not (isUnliftedType (coVarKind cv))) $
     failWithL (text "Bad lifted equality:" <+> ppr cv
                  <+> dcolon <+> ppr (coVarKind cv))
 

@@ -156,7 +156,7 @@ module TcType (
   substTyAddInScope, substTyUnchecked,
   substTheta,
 
-  isUnLiftedType,       -- Source types are always lifted
+  isUnliftedType,       -- Source types are always lifted
   isUnboxedTupleType,   -- Ditto
   isPrimitiveType,
 
@@ -2202,13 +2202,13 @@ legalOutgoingTyCon dflags _ tc
 legalFFITyCon :: TyCon -> Validity
 -- True for any TyCon that can possibly be an arg or result of an FFI call
 legalFFITyCon tc
-  | isUnLiftedTyCon tc = IsValid
+  | isUnliftedTyCon tc = IsValid
   | tc == unitTyCon    = IsValid
   | otherwise          = boxedMarshalableTyCon tc
 
 marshalableTyCon :: DynFlags -> TyCon -> Validity
 marshalableTyCon dflags tc
-  | isUnLiftedTyCon tc
+  | isUnliftedTyCon tc
   , not (isUnboxedTupleTyCon tc)
   , case tyConPrimRep tc of        -- Note [Marshalling VoidRep]
        VoidRep -> False
@@ -2238,7 +2238,7 @@ legalFIPrimArgTyCon :: DynFlags -> TyCon -> Validity
 -- Strictly speaking it is unnecessary to ban unboxed tuples here since
 -- currently they're of the wrong kind to use in function args anyway.
 legalFIPrimArgTyCon dflags tc
-  | isUnLiftedTyCon tc
+  | isUnliftedTyCon tc
   , not (isUnboxedTupleTyCon tc)
   = validIfUnliftedFFITypes dflags
   | otherwise
@@ -2248,7 +2248,7 @@ legalFIPrimResultTyCon :: DynFlags -> TyCon -> Validity
 -- Check result type of 'foreign import prim'. Allow simple unlifted
 -- types and also unboxed tuple result types '... -> (# , , #)'
 legalFIPrimResultTyCon dflags tc
-  | isUnLiftedTyCon tc
+  | isUnliftedTyCon tc
   , (isUnboxedTupleTyCon tc
      || case tyConPrimRep tc of      -- Note [Marshalling VoidRep]
            VoidRep -> False

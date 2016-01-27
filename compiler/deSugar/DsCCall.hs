@@ -157,7 +157,7 @@ unboxArg arg
   -- Data types with a single constructor, which has a single, primitive-typed arg
   -- This deals with Int, Float etc; also Ptr, ForeignPtr
   | is_product_type && data_con_arity == 1
-  = ASSERT2(isUnLiftedType data_con_arg_ty1, pprType arg_ty)
+  = ASSERT2(isUnliftedType data_con_arg_ty1, pprType arg_ty)
                         -- Typechecker ensures this
     do case_bndr <- newSysLocalDs arg_ty
        prim_arg <- newSysLocalDs data_con_arg_ty1

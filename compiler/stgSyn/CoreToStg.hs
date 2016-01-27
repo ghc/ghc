@@ -480,7 +480,7 @@ coreToStgExpr e = pprPanic "coreToStgExpr" (ppr e)
 mkStgAltType :: Id -> [CoreAlt] -> AltType
 mkStgAltType bndr alts = case repType (idType bndr) of
     UnaryRep rep_ty -> case tyConAppTyCon_maybe rep_ty of
-        Just tc | isUnLiftedTyCon tc -> PrimAlt tc
+        Just tc | isUnliftedTyCon tc -> PrimAlt tc
                 | isAbstractTyCon tc -> look_for_better_tycon
                 | isAlgTyCon tc      -> AlgAlt tc
                 | otherwise          -> ASSERT2( _is_poly_alt_tycon tc, ppr tc )
@@ -654,7 +654,7 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
     let
         arg_ty = exprType arg
         stg_arg_ty = stgArgType stg_arg
-        bad_args = (isUnLiftedType arg_ty && not (isUnLiftedType stg_arg_ty))
+        bad_args = (isUnliftedType arg_ty && not (isUnliftedType stg_arg_ty))
                 || (map typePrimRep (flattenRepType (repType arg_ty))
                         /= map typePrimRep (flattenRepType (repType stg_arg_ty)))
         -- In GHCi we coerce an argument of type BCO# (unlifted) to HValue (lifted),

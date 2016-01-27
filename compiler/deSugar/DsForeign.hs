@@ -782,7 +782,7 @@ getPrimTyOf ty
   case splitDataProductType_maybe rep_ty of
      Just (_, _, data_con, [prim_ty]) ->
         ASSERT(dataConSourceArity data_con == 1)
-        ASSERT2(isUnLiftedType prim_ty, ppr prim_ty)
+        ASSERT2(isUnliftedType prim_ty, ppr prim_ty)
         prim_ty
      _other -> pprPanic "DsForeign.getPrimTyOf" (ppr ty)
   where

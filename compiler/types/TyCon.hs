@@ -51,7 +51,7 @@ module TyCon(
         isOpenTypeFamilyTyCon, isClosedSynFamilyTyConWithAxiom_maybe,
         familyTyConInjectivityInfo,
         isBuiltInSynFamTyCon_maybe,
-        isUnLiftedTyCon,
+        isUnliftedTyCon,
         isGadtSyntaxTyCon, isInjectiveTyCon, isGenerativeTyCon, isGenInjAlgRhs,
         isTyConAssoc, tyConAssoc_maybe,
         isRecursiveTyCon,
@@ -574,7 +574,7 @@ data TyCon
                                  -- pointers). This 'PrimRep' holds that
                                  -- information.  Only relevant if tyConKind = #
 
-        isUnLifted   :: Bool,    -- ^ Most primitive tycons are unlifted (may
+        isUnlifted   :: Bool,    -- ^ Most primitive tycons are unlifted (may
                                  -- not contain bottom) but other are lifted,
                                  -- e.g. @RealWorld@
                                  -- Only relevant if tyConKind = *
@@ -1250,7 +1250,7 @@ mkPrimTyCon' name kind roles rep is_unlifted rep_nm
         tyConArity   = length roles,
         tcRoles      = roles,
         primTyConRep = rep,
-        isUnLifted   = is_unlifted,
+        isUnlifted   = is_unlifted,
         primRepName  = rep_nm
     }
 
@@ -1321,7 +1321,7 @@ makeTyConAbstract tc
                 tyConArity       = tyConArity tc,
                 tcRoles          = tyConRoles tc,
                 primTyConRep     = PtrRep,
-                isUnLifted       = False,
+                isUnlifted       = False,
                 primRepName      = Nothing }
   where
     name = tyConName tc
@@ -1333,13 +1333,13 @@ isPrimTyCon _              = False
 
 -- | Is this 'TyCon' unlifted (i.e. cannot contain bottom)? Note that this can
 -- only be true for primitive and unboxed-tuple 'TyCon's
-isUnLiftedTyCon :: TyCon -> Bool
-isUnLiftedTyCon (PrimTyCon  {isUnLifted = is_unlifted})
+isUnliftedTyCon :: TyCon -> Bool
+isUnliftedTyCon (PrimTyCon  {isUnlifted = is_unlifted})
   = is_unlifted
-isUnLiftedTyCon (AlgTyCon { algTcRhs = rhs } )
+isUnliftedTyCon (AlgTyCon { algTcRhs = rhs } )
   | TupleTyCon { tup_sort = sort } <- rhs
   = not (isBoxed (tupleSortBoxity sort))
-isUnLiftedTyCon _ = False
+isUnliftedTyCon _ = False
 
 -- | Returns @True@ if the supplied 'TyCon' resulted from either a
 -- @data@ or @newtype@ declaration
