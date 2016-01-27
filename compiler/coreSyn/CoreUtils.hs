@@ -97,7 +97,7 @@ exprType (Lit lit)           = literalType lit
 exprType (Coercion co)       = coercionType co
 exprType (Let bind body)
   | NonRec tv rhs <- bind    -- See Note [Type bindings]
-  , Type ty <- rhs           = substTyWith [tv] [ty] (exprType body)
+  , Type ty <- rhs           = substTyWithUnchecked [tv] [ty] (exprType body)
   | otherwise                = exprType body
 exprType (Case _ _ ty _)     = ty
 exprType (Cast _ co)         = pSnd (coercionKind co)

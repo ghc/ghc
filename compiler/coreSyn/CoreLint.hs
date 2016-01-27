@@ -1284,7 +1284,7 @@ lintCoercion (ForAllCo tv1 kind_co co)
        ; (k3, k4, t1, t2, r) <- addInScopeVar tv1 $ lintCoercion co
        ; let tyl = mkNamedForAllTy tv1 Invisible t1
              tyr = mkNamedForAllTy tv2 Invisible $
-                   substTyWith [tv1] [TyVarTy tv2 `mkCastTy` mkSymCo kind_co] t2
+                   substTyWithUnchecked [tv1] [TyVarTy tv2 `mkCastTy` mkSymCo kind_co] t2
        ; return (k3, k4, tyl, tyr, r) }
 
 lintCoercion (CoVarCo cv)

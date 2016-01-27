@@ -153,7 +153,10 @@ module TcType (
   Type.lookupTyVar, Type.extendTCvSubst, Type.substTyVarBndr,
   extendTCvSubstList, isInScope, mkTCvSubst, zipTyEnv, zipCoEnv,
   Type.substTy, substTys, substTyWith, substTyWithCoVars,
-  substTyAddInScope, substTyUnchecked,
+  substTyAddInScope,
+  substTyUnchecked, substTysUnchecked, substThetaUnchecked,
+  substTyWithBindersUnchecked, substTyWithUnchecked,
+  substCoUnchecked, substCoWithUnchecked,
   substTheta,
 
   isUnliftedType,       -- Source types are always lifted

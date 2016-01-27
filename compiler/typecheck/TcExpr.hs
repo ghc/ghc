@@ -887,7 +887,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
         ; rbinds'      <- tcRecordUpd con1 con1_arg_tys' rbinds
 
         -- STEP 6: Deal with the stupid theta
-        ; let theta' = substTheta scrut_subst (conLikeStupidTheta con1)
+        ; let theta' = substThetaUnchecked scrut_subst (conLikeStupidTheta con1)
         ; instStupidTheta RecordUpdOrigin theta'
 
         -- Step 7: make a cast for the scrutinee, in the
@@ -902,7 +902,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
         -- Step 8: Check that the req constraints are satisfied
         -- For normal data constructors req_theta is empty but we must do
         -- this check for pattern synonyms.
-        ; let req_theta' = substTheta scrut_subst req_theta
+        ; let req_theta' = substThetaUnchecked scrut_subst req_theta
         ; req_wrap <- instCallConstraints RecordUpdOrigin req_theta'
 
         -- Phew!
@@ -1160,7 +1160,7 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
                  ASSERT( binderVisibility binder == Specified )
                  do { let kind = tyVarKind tv
                     ; ty_arg <- tcHsTypeApp hs_ty_arg kind
-                    ; let insted_ty = substTyWith [tv] [ty_arg] inner_ty
+                    ; let insted_ty = substTyWithUnchecked [tv] [ty_arg] inner_ty
                     ; (inner_wrap, args', res_ty)
                         <- go acc_args (n+1) insted_ty args
                    -- inner_wrap :: insted_ty "->" (map typeOf args') -> res_ty

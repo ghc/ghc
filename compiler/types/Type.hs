@@ -161,7 +161,10 @@ module Type (
 
         -- ** Performing substitution on types and kinds
         substTy, substTys, substTyWith, substTysWith, substTheta,
-        substTyAddInScope, substTyUnchecked,
+        substTyAddInScope,
+        substTyUnchecked, substTysUnchecked, substThetaUnchecked,
+        substTyWithBindersUnchecked, substTyWithUnchecked,
+        substCoUnchecked, substCoWithUnchecked,
         substTyVarBndr, substTyVar, substTyVars,
         cloneTyVarBndr, cloneTyVarBndrs, lookupTyVar, substTelescope,
 
@@ -798,7 +801,7 @@ funResultTy ty = piResultTy ty (pprPanic "funResultTy" (ppr ty))
 piResultTy :: Type -> Type -> Type
 piResultTy ty arg | Just ty' <- coreView ty = piResultTy ty' arg
 piResultTy (ForAllTy (Anon _) res)     _   = res
-piResultTy (ForAllTy (Named tv _) res) arg = substTyWith [tv] [arg] res
+piResultTy (ForAllTy (Named tv _) res) arg = substTyWithUnchecked [tv] [arg] res
 piResultTy ty arg                          = pprPanic "piResultTy"
                                                  (ppr ty $$ ppr arg)
 
@@ -1404,11 +1407,11 @@ applyTysD :: SDoc -> Type -> [Type] -> Type     -- Debug version
 applyTysD _   orig_fun_ty []      = orig_fun_ty
 applyTysD doc orig_fun_ty arg_tys
   | n_bndrs == n_args     -- The vastly common case
-  = substTyWithBinders bndrs arg_tys rho_ty
+  = substTyWithBindersUnchecked bndrs arg_tys rho_ty
   | n_bndrs > n_args      -- Too many for-alls
-  = substTyWithBinders (take n_args bndrs) arg_tys
-                       (mkForAllTys (drop n_args bndrs) rho_ty)
-  | otherwise           -- Too many type args
+  = substTyWithBindersUnchecked (take n_args bndrs) arg_tys
+                                (mkForAllTys (drop n_args bndrs) rho_ty)
+  | otherwise             -- Too many type args
   = ASSERT2( n_bndrs > 0, doc $$ ppr orig_fun_ty $$ ppr arg_tys )       -- Zero case gives infinite loop!
     applyTysD doc (substTyWithBinders bndrs (take n_bndrs arg_tys) rho_ty)
                   (drop n_bndrs arg_tys)
@@ -1421,7 +1424,7 @@ applyTysX :: [TyVar] -> Type -> [Type] -> Type
 -- applyTyxX beta-reduces (/\tvs. body_ty) arg_tys
 applyTysX tvs body_ty arg_tys
   = ASSERT2( length arg_tys >= n_tvs, ppr tvs $$ ppr body_ty $$ ppr arg_tys )
-    mkAppTys (substTyWith tvs (take n_tvs arg_tys) body_ty)
+    mkAppTys (substTyWithUnchecked tvs (take n_tvs arg_tys) body_ty)
              (drop n_tvs arg_tys)
   where
     n_tvs = length tvs
@@ -1537,7 +1540,7 @@ isPredTy ty = go ty []
     -- True <=> kind is k1 -> .. -> kn -> Constraint
     go_k k [] = isConstraintKind k
     go_k (ForAllTy bndr k1) (arg:args)
-      = go_k (substTyWithBinders [bndr] [arg] k1) args
+      = go_k (substTyWithBindersUnchecked [bndr] [arg] k1) args
     go_k _ _ = False                  -- Typeable * Int :: Constraint
 
 isClassPred, isEqPred, isNomEqPred, isIPPred :: PredType -> Bool

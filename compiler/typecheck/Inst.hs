@@ -136,7 +136,7 @@ deeplySkolemise ty
   | Just (arg_tys, tvs, theta, ty') <- tcDeepSplitSigmaTy_maybe ty
   = do { ids1 <- newSysLocalIds (fsLit "dk") arg_tys
        ; (subst, tvs1) <- tcInstSkolTyVars tvs
-       ; ev_vars1 <- newEvVars (substTheta subst theta)
+       ; ev_vars1 <- newEvVars (substThetaUnchecked subst theta)
        ; (wrap, tvs2, ev_vars2, rho) <-
            deeplySkolemise (substTyAddInScope subst ty')
        ; return ( mkWpLams ids1
@@ -178,7 +178,7 @@ top_instantiate inst_all orig ty
                | null leave_bndrs = (theta, [])
                | otherwise        = ([], theta)
        ; (subst, inst_tvs') <- newMetaTyVars (map (binderVar "top_inst") inst_bndrs)
-       ; let inst_theta' = substTheta subst inst_theta
+       ; let inst_theta' = substThetaUnchecked subst inst_theta
              sigma'      = substTyAddInScope subst (mkForAllTys leave_bndrs $
                                                     mkFunTys leave_theta rho)
 
@@ -221,8 +221,8 @@ deeplyInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 deeplyInstantiate orig ty
   | Just (arg_tys, tvs, theta, rho) <- tcDeepSplitSigmaTy_maybe ty
   = do { (subst, tvs') <- newMetaTyVars tvs
-       ; ids1  <- newSysLocalIds (fsLit "di") (substTys subst arg_tys)
-       ; let theta' = substTheta subst theta
+       ; ids1  <- newSysLocalIds (fsLit "di") (substTysUnchecked subst arg_tys)
+       ; let theta' = substThetaUnchecked subst theta
        ; wrap1 <- instCall orig (mkTyVarTys tvs') theta'
        ; traceTc "Instantiating (deeply)" (vcat [ text "origin" <+> pprCtOrigin orig
                                                 , text "type" <+> ppr ty
@@ -302,7 +302,7 @@ instDFunType :: DFunId -> [DFunInstType]
 -- See Note [DFunInstType: instantiating types] in InstEnv
 instDFunType dfun_id dfun_inst_tys
   = do { (subst, inst_tys) <- go emptyTCvSubst dfun_tvs dfun_inst_tys
-       ; return (inst_tys, substTheta subst dfun_theta) }
+       ; return (inst_tys, substThetaUnchecked subst dfun_theta) }
   where
     (dfun_tvs, dfun_theta, _) = tcSplitSigmaTy (idType dfun_id)
 

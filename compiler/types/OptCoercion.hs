@@ -570,7 +570,7 @@ opt_trans_rule is co1 co2
       mkForAllCo tv1 (opt_trans is eta1 eta2) (opt_trans is' r1 r2')
     where
       is' = is `extendInScopeSet` tv1
-      r2' = substCoWith [tv2] [TyVarTy tv1] r2
+      r2' = substCoWithUnchecked [tv2] [TyVarTy tv1] r2
 
 -- Push transitivity inside axioms
 opt_trans_rule is co1 co2
