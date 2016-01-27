@@ -54,6 +54,8 @@ The highlights, since the 7.10 branch, are:
 
 - A rewritten (and greatly improved) pattern exhaustiveness checker
 
+- More flexible rebindable syntax
+
 - GHC can run the interpreter in a separate process (see
   :ref:`external-interpreter`), and the interpreter can now run profiled
   code.
@@ -136,6 +138,12 @@ Language
 
 -  The :ghc-flag:`-XDeriveAnyClass` extension now fills in associated type family
    default instances when deriving a class that contains them.
+
+-  The :ghc-flag:`-XRebindableSyntax` feature is now much more flexible, imposing
+   fewer restrictions on the types of the rebindable syntax elements. For example,
+   your ``negate`` function may now return a different type than it accepts.
+   Rebindable syntax also supports higher-rank types fully, allowing types
+   like ``(>>=) :: m a -> (forall x. a x -> m b) -> m b``.
 
 -  Users can now define record pattern synonyms. This allows pattern synonyms
    to behave more like normal data constructors. For example, ::
