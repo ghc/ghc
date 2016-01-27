@@ -78,7 +78,7 @@ import Literal          ( litIsTrivial )
 import Demand           ( StrictSig )
 import Name             ( getOccName, mkSystemVarName )
 import OccName          ( occNameString )
-import Type             ( isUnLiftedType, Type, mkPiTypes )
+import Type             ( isUnliftedType, Type, mkPiTypes )
 import BasicTypes       ( Arity, RecFlag(..) )
 import UniqSupply
 import Util
@@ -475,10 +475,10 @@ lvlMFE True env e@(_, AnnCase {})
   = lvlExpr env e     -- Don't share cases
 
 lvlMFE strict_ctxt env ann_expr
-  |  isUnLiftedType (exprType expr)
+  |  isUnliftedType (exprType expr)
          -- Can't let-bind it; see Note [Unlifted MFEs]
          -- This includes coercions, which we don't want to float anyway
-         -- NB: no need to substitute cos isUnLiftedType doesn't change
+         -- NB: no need to substitute cos isUnliftedType doesn't change
   || notWorthFloating ann_expr abs_vars
   || not float_me
   =     -- Don't float it out
@@ -699,7 +699,7 @@ lvlBind env (AnnNonRec bndr rhs)
   || isCoVar bndr   -- Difficult to fix up CoVar occurrences (see extendPolyLvlEnv)
                     -- so we will ignore this case for now
   || not (profitableFloat env dest_lvl)
-  || (isTopLvl dest_lvl && isUnLiftedType (idType bndr))
+  || (isTopLvl dest_lvl && isUnliftedType (idType bndr))
           -- We can't float an unlifted binding to top level, so we don't
           -- float it at all.  It's a bit brutal, but unlifted bindings
           -- aren't expensive either

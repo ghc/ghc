@@ -207,7 +207,7 @@ mkWorkerArgs dflags args all_one_shot res_ty
     = (args ++ [newArg], args ++ [voidPrimId])
     where
       needsAValueLambda =
-        isUnLiftedType res_ty
+        isUnliftedType res_ty
         || not (gopt Opt_FunToThunk dflags)
            -- see Note [Protecting the last value argument]
 
@@ -628,7 +628,7 @@ mkWWcpr_help :: (DataCon, [Type], [Type], Coercion)
 
 mkWWcpr_help (data_con, inst_tys, arg_tys, co)
   | [arg_ty1] <- arg_tys
-  , isUnLiftedType arg_ty1
+  , isUnliftedType arg_ty1
         -- Special case when there is a single result of unlifted type
         --
         -- Wrapper:     case (..call worker..) of x -> C x
@@ -742,7 +742,7 @@ every primitive type, so the function is partial.
 
 mk_absent_let :: DynFlags -> Id -> Maybe (CoreExpr -> CoreExpr)
 mk_absent_let dflags arg
-  | not (isUnLiftedType arg_ty)
+  | not (isUnliftedType arg_ty)
   = Just (Let (NonRec arg abs_rhs))
   | Just tc <- tyConAppTyCon_maybe arg_ty
   , Just lit <- absentLiteralOf tc

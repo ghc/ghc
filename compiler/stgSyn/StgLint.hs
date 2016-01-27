@@ -105,8 +105,8 @@ lint_binds_help (binder, rhs)
         _maybe_rhs_ty <- lintStgRhs rhs
 
         -- Check binder doesn't have unlifted type
-        checkL (not (isUnLiftedType binder_ty))
-               (mkUnLiftedTyMsg binder rhs)
+        checkL (not (isUnliftedType binder_ty))
+               (mkUnliftedTyMsg binder rhs)
 
         -- Check match to RHS type
         -- Actually we *can't* check the RHS type, because
@@ -520,8 +520,8 @@ _mkRhsMsg binder ty
               hsep [text "Rhs type:", ppr ty]
              ]
 
-mkUnLiftedTyMsg :: Id -> StgRhs -> SDoc
-mkUnLiftedTyMsg binder rhs
+mkUnliftedTyMsg :: Id -> StgRhs -> SDoc
+mkUnliftedTyMsg binder rhs
   = (text "Let(rec) binder" <+> quotes (ppr binder) <+>
      text "has unlifted type" <+> quotes (ppr (idType binder)))
     $$

@@ -25,7 +25,7 @@ import CoreUtils        ( exprIsDupable, exprIsExpandable,
 import CoreFVs
 import Id               ( isOneShotBndr, idType )
 import Var
-import Type             ( isUnLiftedType )
+import Type             ( isUnliftedType )
 import VarSet
 import Util
 import DynFlags
@@ -385,7 +385,7 @@ floating in cases with a single alternative that may bind values.
 -}
 
 fiExpr dflags to_drop (_, AnnCase scrut case_bndr _ [(con,alt_bndrs,rhs)])
-  | isUnLiftedType (idType case_bndr)
+  | isUnliftedType (idType case_bndr)
   , exprOkForSideEffects (deAnnotate scrut)
       -- See PrimOp, Note [PrimOp can_fail and has_side_effects]
   = wrapFloats shared_binds $
@@ -444,7 +444,7 @@ noFloatIntoRhs :: CoreExprWithFVs -> Bool
 -- ^ True if it's a bad idea to float bindings into this RHS
 -- Preconditio:  rhs :: rhs_ty
 noFloatIntoRhs rhs@(_, rhs')
-  =  isUnLiftedType rhs_ty   -- See Note [Do not destroy the let/app invariant]
+  =  isUnliftedType rhs_ty   -- See Note [Do not destroy the let/app invariant]
   || noFloatIntoExpr rhs'
   where
     rhs_ty = exprTypeFV rhs

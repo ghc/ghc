@@ -1204,7 +1204,7 @@ mkTickish :: BoxLabel -> Bool -> Bool -> SrcSpan -> OccEnv Id -> [String]
           -> TM (Tickish Id)
 mkTickish boxLabel countEntries topOnly pos fvs decl_path = do
 
-  let ids = filter (not . isUnLiftedType . idType) $ occEnvElts fvs
+  let ids = filter (not . isUnliftedType . idType) $ occEnvElts fvs
           -- unlifted types cause two problems here:
           --   * we can't bind them  at the GHCi prompt
           --     (bindLocalsAtBreakpoint already fliters them out),

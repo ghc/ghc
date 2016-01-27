@@ -423,7 +423,7 @@ unitFloat bind = Floats (unitOL bind) (flag bind)
     flag (NonRec bndr rhs)
       | not (isStrictId bndr)    = FltLifted
       | exprOkForSpeculation rhs = FltOkSpec  -- Unlifted, and lifted but ok-for-spec (eg HNF)
-      | otherwise                = ASSERT2( not (isUnLiftedType (idType bndr)), ppr bndr )
+      | otherwise                = ASSERT2( not (isUnliftedType (idType bndr)), ppr bndr )
                                    FltCareful
       -- Unlifted binders can only be let-bound if exprOkForSpeculation holds
 

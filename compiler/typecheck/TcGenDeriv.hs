@@ -478,7 +478,7 @@ mkCompareFields tycon op tys
   where
     go []   _      _          = eqResult op
     go [ty] (a:_)  (b:_)
-      | isUnLiftedType ty     = unliftedOrdOp tycon ty op a b
+      | isUnliftedType ty     = unliftedOrdOp tycon ty op a b
       | otherwise             = genOpApp (nlHsVar a) (ordMethRdr op) (nlHsVar b)
     go (ty:tys) (a:as) (b:bs) = mk_compare ty a b
                                   (ltResult op)
@@ -490,7 +490,7 @@ mkCompareFields tycon op tys
     --    (case (compare a b) of { LT -> <lt>; EQ -> <eq>; GT -> <bt> })
     -- but with suitable special cases for
     mk_compare ty a b lt eq gt
-      | isUnLiftedType ty
+      | isUnliftedType ty
       = unliftedCompare lt_op eq_op a_expr b_expr lt eq gt
       | otherwise
       = nlHsCase (nlHsPar (nlHsApp (nlHsApp (nlHsVar compare_RDR) a_expr) b_expr))
@@ -1055,7 +1055,7 @@ gen_Read_binds get_fixity loc tycon
 
     data_con_str con = occNameString (getOccName con)
 
-    read_arg a ty = ASSERT( not (isUnLiftedType ty) )
+    read_arg a ty = ASSERT( not (isUnliftedType ty) )
                     noLoc (mkBindStmt (nlVarPat a) (nlHsVarApps step_RDR [readPrec_RDR]))
 
     read_field lbl a = read_lbl lbl ++
@@ -1174,7 +1174,7 @@ gen_Show_binds get_fixity loc tycon
 
              show_arg :: RdrName -> Type -> LHsExpr RdrName
              show_arg b arg_ty
-               | isUnLiftedType arg_ty
+               | isUnliftedType arg_ty
                -- See Note [Deriving and unboxed types] in TcDeriv
                = nlHsApps compose_RDR [mk_shows_app boxed_arg,
                                        mk_showString_app postfixMod]
@@ -1932,7 +1932,7 @@ gen_Lift_binds loc tycon
             tys_needed   = dataConOrigArgTys data_con
 
             mk_lift_app ty a
-              | not (isUnLiftedType ty) = nlHsApp (nlHsVar lift_RDR)
+              | not (isUnliftedType ty) = nlHsApp (nlHsVar lift_RDR)
                                                   (nlHsVar a)
               | otherwise = nlHsApp (nlHsVar litE_RDR)
                               (primLitOp (mkBoxExp (nlHsVar a)))
@@ -2263,7 +2263,7 @@ and_Expr a b = genOpApp a and_RDR    b
 
 eq_Expr :: TyCon -> Type -> LHsExpr RdrName -> LHsExpr RdrName -> LHsExpr RdrName
 eq_Expr tycon ty a b
-    | not (isUnLiftedType ty) = genOpApp a eq_RDR b
+    | not (isUnliftedType ty) = genOpApp a eq_RDR b
     | otherwise               = genPrimOpApp a prim_eq b
  where
    (_, _, prim_eq, _, _) = primOrdOps "Eq" tycon ty

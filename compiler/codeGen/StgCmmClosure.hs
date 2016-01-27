@@ -173,7 +173,7 @@ data LambdaFormInfo
                         --        because then we know the entry code will do
                         --        For a function, the entry code is the fast entry point
 
-  | LFUnLifted          -- A value of unboxed type;
+  | LFUnlifted          -- A value of unboxed type;
                         -- always a value, needs evaluation
 
   | LFLetNoEscape       -- See LetNoEscape module for precise description
@@ -211,7 +211,7 @@ data StandardFormInfo
 
 mkLFArgument :: Id -> LambdaFormInfo
 mkLFArgument id
-  | isUnLiftedType ty             = LFUnLifted
+  | isUnliftedType ty             = LFUnlifted
   | might_be_a_function ty = LFUnknown True
   | otherwise                    = LFUnknown False
   where
@@ -234,7 +234,7 @@ mkLFReEntrant top fvs args arg_descr
 -------------
 mkLFThunk :: Type -> TopLevelFlag -> [Id] -> UpdateFlag -> LambdaFormInfo
 mkLFThunk thunk_ty top fvs upd_flag
-  = ASSERT( not (isUpdatable upd_flag) || not (isUnLiftedType thunk_ty) )
+  = ASSERT( not (isUpdatable upd_flag) || not (isUnliftedType thunk_ty) )
     LFThunk top (null fvs)
             (isUpdatable upd_flag)
             NonStandardThunk
@@ -421,7 +421,7 @@ nodeMustPointToIt _ (LFCon _) = True
         -- 27/11/92.
 
 nodeMustPointToIt _ (LFUnknown _)   = True
-nodeMustPointToIt _ LFUnLifted      = False
+nodeMustPointToIt _ LFUnlifted      = False
 nodeMustPointToIt _ LFLetNoEscape   = False
 
 {- Note [GC recovery]
@@ -525,7 +525,7 @@ getCallMethod dflags name id (LFReEntrant _ arity _ _) n_args _v_args _cg_loc
   | n_args < arity = SlowCall        -- Not enough args
   | otherwise      = DirectEntry (enterIdLabel dflags name (idCafInfo id)) arity
 
-getCallMethod _ _name _ LFUnLifted n_args _v_args _cg_loc _self_loop_info
+getCallMethod _ _name _ LFUnlifted n_args _v_args _cg_loc _self_loop_info
   = ASSERT( n_args == 0 ) ReturnIt
 
 getCallMethod _ _name _ (LFCon _) n_args _v_args _cg_loc _self_loop_info

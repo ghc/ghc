@@ -953,7 +953,7 @@ inferConstraints main_cls cls_tys inst_ty rep_tc rep_tc_args
         , (arg_n, arg_t_or_k, arg_ty)
             <- zip3 [1..] t_or_ks $
                dataConInstOrigArgTys data_con all_rep_tc_args
-        , not (isUnLiftedType arg_ty)
+        , not (isUnliftedType arg_ty)
         , let orig = DerivOriginDC data_con arg_n
         , pred <- get_arg_constraints orig arg_t_or_k arg_ty ]
 
@@ -1261,7 +1261,7 @@ cond_args cls (_, tc, _)
   where
     bad_args = [ arg_ty | con <- tyConDataCons tc
                         , arg_ty <- dataConOrigArgTys con
-                        , isUnLiftedType arg_ty
+                        , isUnliftedType arg_ty
                         , not (ok_ty arg_ty) ]
 
     cls_key = classKey cls

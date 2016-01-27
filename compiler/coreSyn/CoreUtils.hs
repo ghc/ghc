@@ -429,7 +429,7 @@ bindNonRec bndr rhs body
 -- | Tests whether we have to use a @case@ rather than @let@ binding for this expression
 -- as per the invariants of 'CoreExpr': see "CoreSyn#let_app_invariant"
 needsCaseBinding :: Type -> CoreExpr -> Bool
-needsCaseBinding ty rhs = isUnLiftedType ty && not (exprOkForSpeculation rhs)
+needsCaseBinding ty rhs = isUnliftedType ty && not (exprOkForSpeculation rhs)
         -- Make a case expression instead of a let
         -- These can arise either from the desugarer,
         -- or from beta reductions: (\x.e) (x +# y)
@@ -1278,7 +1278,7 @@ app_ok primop_ok fun args
         -> primop_ok op                   -- A bit conservative: we don't really need
         && all (expr_ok primop_ok) args   -- to care about lazy arguments, but this is easy
 
-      _other -> isUnLiftedType (idType fun)          -- c.f. the Var case of exprIsHNF
+      _other -> isUnliftedType (idType fun)          -- c.f. the Var case of exprIsHNF
              || idArity fun > n_val_args             -- Partial apps
              || (n_val_args == 0 &&
                  isEvaldUnfolding (idUnfolding fun)) -- Let-bound values

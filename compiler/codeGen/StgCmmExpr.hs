@@ -395,7 +395,7 @@ MutVar#.  The types are compatible though, so we can just generate an
 assignment.
 -}
 cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
-  | isUnLiftedType (idType v)  -- Note [Dodgy unsafeCoerce 1]
+  | isUnliftedType (idType v)  -- Note [Dodgy unsafeCoerce 1]
   || reps_compatible
   = -- assignment suffices for unlifted types
     do { dflags <- getDynFlags

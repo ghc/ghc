@@ -438,7 +438,7 @@ removed the check.  See Trac #11120 comment:19.
 
 check_lifted ty
   = do { env <- tcInitOpenTidyEnv (tyCoVarsOfType ty)
-       ; checkTcM (not (isUnLiftedType ty)) (unliftedArgErr env ty) }
+       ; checkTcM (not (isUnliftedType ty)) (unliftedArgErr env ty) }
 
 unliftedArgErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
 unliftedArgErr env ty = (env, sep [text "Illegal unlifted type:", ppr_tidy env ty])
@@ -585,7 +585,7 @@ check_arg_type env ctxt rank ty
 
         ; check_type env ctxt rank' ty
         ; check_lifted ty }
-             -- NB the isUnLiftedType test also checks for
+             -- NB the isUnliftedType test also checks for
              --    T State#
              -- where there is an illegal partial application of State# (which has
              -- kind * -> #); see Note [The kind invariant] in TyCoRep

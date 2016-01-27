@@ -500,7 +500,7 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
     size_up (Let (NonRec binder rhs) body)
       = size_up rhs             `addSizeNSD`
         size_up body            `addSizeN`
-        (if isUnLiftedType (idType binder) then 0 else 10)
+        (if isUnliftedType (idType binder) then 0 else 10)
                 -- For the allocation
                 -- If the binder has an unlifted type there is no allocation
 
@@ -559,7 +559,7 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
 
                 -- unboxed variables, inline primops and unsafe foreign calls
                 -- are all "inline" things:
-          is_inline_scrut (Var v) = isUnLiftedType (idType v)
+          is_inline_scrut (Var v) = isUnliftedType (idType v)
           is_inline_scrut scrut
               | (Var f, _) <- collectArgs scrut
                 = case idDetails f of

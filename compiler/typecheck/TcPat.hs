@@ -350,7 +350,7 @@ tc_pat penv lpat@(LazyPat pat) pat_ty thing_inside
         --   see Note [Hopping the LIE in lazy patterns]
 
         -- Check there are no unlifted types under the lazy pattern
-        ; when (any (isUnLiftedType . idType) $ collectPatBinders pat') $
+        ; when (any (isUnliftedType . idType) $ collectPatBinders pat') $
                lazyUnliftedPatErr lpat
 
         -- Check that the expected pattern type is itself lifted

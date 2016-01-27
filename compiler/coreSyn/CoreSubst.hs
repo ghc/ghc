@@ -1063,7 +1063,7 @@ maybe_substitute subst b r
   , isAlwaysActive (idInlineActivation b)       -- Note [Inline prag in simplOpt]
   , not (isStableUnfolding (idUnfolding b))
   , not (isExportedId b)
-  , not (isUnLiftedType (idType b)) || exprOkForSpeculation r
+  , not (isUnliftedType (idType b)) || exprOkForSpeculation r
   = Just (extendIdSubst subst b r)
 
   | otherwise
