@@ -112,7 +112,7 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
     maybe_infotable = case mapLookup blockid info_env of
        Nothing   -> empty
        Just (Statics info_lbl info) ->
-           pprSectionAlign (Section Text info_lbl) $$
+           pprAlignForSection Text $$
            vcat (map pprData info) $$
            pprLabel info_lbl
 
@@ -305,9 +305,16 @@ pprAddr (AddrRegImm r1 imm) = hcat [ pprImm imm, char '(', pprReg r1, char ')' ]
 pprSectionAlign :: Section -> SDoc
 pprSectionAlign sec@(Section seg _) =
  sdocWithPlatform $ \platform ->
+   pprSectionHeader platform sec $$
+   pprAlignForSection seg
+
+-- | Print appropriate alignment for the given section type.
+pprAlignForSection :: SectionType -> SDoc
+pprAlignForSection seg =
+ sdocWithPlatform $ \platform ->
  let osDarwin = platformOS platform == OSDarwin
      ppc64    = not $ target32Bit platform
-     align    = ptext $ case seg of
+ in ptext $ case seg of
        Text              -> sLit ".align 2"
        Data
         | ppc64          -> sLit ".align 3"
@@ -328,7 +335,6 @@ pprSectionAlign sec@(Section seg _) =
         | osDarwin       -> sLit ".align 4"
         | otherwise      -> sLit ".align 4"
        OtherSection _    -> panic "PprMach.pprSectionAlign: unknown section"
- in pprSectionHeader platform sec $$ align
 
 pprDataItem :: CmmLit -> SDoc
 pprDataItem lit
