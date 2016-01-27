@@ -160,7 +160,7 @@ ifneq "$$(findstring thr, $1)" ""
 rts_$1_EXTRA_C_SRCS  =  rts/dist/build/sm/Evac_thr.c rts/dist/build/sm/Scav_thr.c
 endif
 
-$(call distdir-way-opts,rts,dist,$1)
+$(call distdir-way-opts,rts,dist,$1,1) # 1 because the rts is built with stage1
 $(call c-suffix-rules,rts,dist,$1,YES)
 $(call cmm-suffix-rules,rts,dist,$1)
 
