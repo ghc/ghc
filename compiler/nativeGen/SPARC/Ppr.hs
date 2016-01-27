@@ -96,7 +96,7 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
     maybe_infotable = case mapLookup blockid info_env of
        Nothing   -> empty
        Just (Statics info_lbl info) ->
-           pprSectionAlign (Section Text info_lbl) $$
+           pprAlignForSection Text $$
            vcat (map pprData info) $$
            pprLabel info_lbl
 
@@ -326,6 +326,11 @@ pprSectionAlign :: Section -> SDoc
 pprSectionAlign sec@(Section seg _) =
   sdocWithPlatform $ \platform ->
     pprSectionHeader platform sec $$
+    pprAlignForSection seg
+
+-- | Print appropriate alignment for the given section type.
+pprAlignForSection :: SectionType -> SDoc
+pprAlignForSection seg =
     ptext (case seg of
       Text              -> sLit ".align 4"
       Data              -> sLit ".align 8"

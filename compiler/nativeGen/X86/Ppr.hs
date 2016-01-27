@@ -109,6 +109,7 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
     maybe_infotable = case mapLookup blockid info_env of
        Nothing   -> empty
        Just (Statics info_lbl info) ->
+           pprAlignForSection Text $$
            infoTableLoc $$
            vcat (map pprData info) $$
            pprLabel info_lbl
@@ -386,8 +387,15 @@ pprSectionAlign (Section (OtherSection _) _) =
 pprSectionAlign sec@(Section seg _) =
   sdocWithPlatform $ \platform ->
     pprSectionHeader platform sec $$
+    pprAlignForSection seg
+
+-- | Print appropriate alignment for the given section type.
+pprAlignForSection :: SectionType -> SDoc
+pprAlignForSection seg =
+  sdocWithPlatform $ \platform ->
     text ".align " <>
     case platformOS platform of
+      -- Darwin: alignments are given as shifts.
       OSDarwin
        | target32Bit platform ->
           case seg of
@@ -397,6 +405,7 @@ pprSectionAlign sec@(Section seg _) =
           case seg of
            ReadOnlyData16    -> int 4
            _                 -> int 3
+      -- Other: alignments are given as bytes.
       _
        | target32Bit platform ->
           case seg of
