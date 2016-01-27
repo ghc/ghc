@@ -1671,7 +1671,7 @@ genLit _ CmmHighStackMark
 -- and avoids having to deal with Phi node insertion.  This is also
 -- the approach recommended by LLVM developers.
 --
--- On the other hand, this is unecessarily verbose if the register in
+-- On the other hand, this is unnecessarily verbose if the register in
 -- question is never written. Therefore we skip it where we can to
 -- save a few lines in the output and hopefully speed compilation up a
 -- bit.
