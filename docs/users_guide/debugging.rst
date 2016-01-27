@@ -333,6 +333,12 @@ Checking for consistency
 
     Ditto for C-- level.
 
+.. ghc-flag:: -fllvm-fill-undef-with-garbage
+
+    Instructs the LLVM code generator to fill dead STG registers with garbage
+    instead of ``undef`` in calls. This makes it easier to catch subtle
+    code generator and runtime system bugs (e.g. see :ghc-ticket:`11487`).
+
 .. _checking-determinism:
 
 Checking for determinism
