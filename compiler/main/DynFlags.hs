@@ -28,7 +28,7 @@ module DynFlags (
         ProfAuto(..),
         glasgowExtsFlags,
         dopt, dopt_set, dopt_unset,
-        gopt, gopt_set, gopt_unset,
+        gopt, gopt_set, gopt_unset, setGeneralFlag', unSetGeneralFlag',
         wopt, wopt_set, wopt_unset,
         xopt, xopt_set, xopt_unset,
         lang_set,

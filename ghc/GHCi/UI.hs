@@ -1460,17 +1460,14 @@ checkModule m = do
 -- :load, :add, :reload
 
 -- | Sets '-fdefer-type-errors' if 'defer' is true, executes 'load' and unsets
--- '-fdefer-type-errors' again if it has not been set before
+-- '-fdefer-type-errors' again if it has not been set before.
 deferredLoad :: Bool -> InputT GHCi SuccessFlag -> InputT GHCi ()
 deferredLoad defer load = do
-  flags <- getDynFlags
-  deferredBefore <- return (gopt Opt_DeferTypeErrors flags)
-  when (defer) $ Monad.void $
-    GHC.setProgramDynFlags $ gopt_set flags Opt_DeferTypeErrors
+  originalFlags <- getDynFlags
+  when defer $ Monad.void $
+    GHC.setProgramDynFlags $ setGeneralFlag' Opt_DeferTypeErrors originalFlags
   Monad.void $ load
-  flags <- getDynFlags
-  when (not deferredBefore) $ Monad.void $
-    GHC.setProgramDynFlags $ gopt_unset flags Opt_DeferTypeErrors
+  Monad.void $ GHC.setProgramDynFlags $ originalFlags
 
 loadModule :: [(FilePath, Maybe Phase)] -> InputT GHCi SuccessFlag
 loadModule fs = timeIt (const Nothing) (loadModule' fs)
