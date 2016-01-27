@@ -1136,25 +1136,28 @@ lint_app :: SDoc -> LintedKind -> [(LintedType,LintedKind)] -> LintM Kind
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
 lint_app doc kfn kas
-    = foldlM go_app kfn kas
+    = do { in_scope <- getInScope
+         -- We need the in_scope set to satisfy the invariant in
+         -- Note [The substitution invariant] in TyCoRep
+         ; foldlM (go_app in_scope) kfn kas }
   where
     fail_msg = vcat [ hang (text "Kind application error in") 2 doc
                     , nest 2 (text "Function kind =" <+> ppr kfn)
                     , nest 2 (text "Arg kinds =" <+> ppr kas) ]
 
-    go_app kfn ka
+    go_app in_scope kfn ka
       | Just kfn' <- coreView kfn
-      = go_app kfn' ka
+      = go_app in_scope kfn' ka
 
-    go_app (ForAllTy (Anon kfa) kfb) (_,ka)
+    go_app _ (ForAllTy (Anon kfa) kfb) (_,ka)
       = do { unless (ka `eqType` kfa) (addErrL fail_msg)
            ; return kfb }
 
-    go_app (ForAllTy (Named kv _vis) kfn) (ta,ka)
+    go_app in_scope (ForAllTy (Named kv _vis) kfn) (ta,ka)
       = do { unless (ka `eqType` tyVarKind kv) (addErrL fail_msg)
-           ; return (substTyWith [kv] [ta] kfn) }
+           ; return (substTyWithInScope in_scope [kv] [ta] kfn) }
 
-    go_app _ _ = failWithL fail_msg
+    go_app _ _ _ = failWithL fail_msg
 
 {- *********************************************************************
 *                                                                      *
