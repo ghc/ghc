@@ -76,11 +76,13 @@ handle_tick(int unused STG_UNUSED)
               // but only if we're not profiling (e.g. passed -h or -p RTS
               // flags). If we are profiling we need to keep the timer active
               // so that samples continue to be collected.
-#ifndef PROFILING
+#ifdef PROFILING
               if (!(RtsFlags.ProfFlags.doHeapProfile
                     || RtsFlags.CcFlags.doCostCentres)) {
                   stopTimer();
               }
+#else
+              stopTimer();
 #endif
           }
       } else {
