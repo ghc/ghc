@@ -13,8 +13,6 @@ import GHCi.RemoteTypes
 import Data.Array
 import ByteCodeTypes
 import GHC.Stack.CCS
-import Foreign.C
-import qualified Data.ByteString as B
 #endif
 import Type
 import HsSyn
