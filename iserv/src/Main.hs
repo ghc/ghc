@@ -5,6 +5,7 @@ import GHCi.Run
 import GHCi.TH
 import GHCi.Message
 import GHCi.Signals
+import GHCi.Utils
 
 import Control.DeepSeq
 import Control.Exception
@@ -13,7 +14,6 @@ import Data.Binary
 import Data.IORef
 import System.Environment
 import System.Exit
-import System.Posix
 import Text.Printf
 
 main :: IO ()
@@ -22,13 +22,13 @@ main = do
   let wfd1 = read arg0; rfd2 = read arg1
   verbose <- case rest of
     ["-v"] -> return True
-    [] -> return False
-    _ -> die "iserv: syntax: iserv <write-fd> <read-fd> [-v]"
+    []     -> return False
+    _      -> die "iserv: syntax: iserv <write-fd> <read-fd> [-v]"
   when verbose $ do
     printf "GHC iserv starting (in: %d; out: %d)\n"
       (fromIntegral rfd2 :: Int) (fromIntegral wfd1 :: Int)
-  inh <- fdToHandle rfd2
-  outh <- fdToHandle wfd1
+  inh  <- getGhcHandle rfd2
+  outh <- getGhcHandle wfd1
   installSignalHandlers
   lo_ref <- newIORef Nothing
   let pipe = Pipe{pipeRead = inh, pipeWrite = outh, pipeLeftovers = lo_ref}

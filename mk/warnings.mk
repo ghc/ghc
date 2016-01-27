@@ -61,6 +61,11 @@ ifeq "$(HostOS_CPP)" "mingw32"
 libraries/time_dist-install_EXTRA_HC_OPTS += -Wno-unused-imports -Wno-identities
 endif
 
+# On Windows, the pattern for CallConv is already exaustive. Ignore the warning
+ifeq "$(HostOS_CPP)" "mingw32"
+libraries/ghci_dist-install_EXTRA_HC_OPTS += -Wno-overlapping-patterns
+endif
+
 # haskeline has warnings about deprecated use of block/unblock
 libraries/haskeline_dist-install_EXTRA_HC_OPTS += -Wno-deprecations
 libraries/haskeline_dist-install_EXTRA_HC_OPTS += -Wno-unused-imports

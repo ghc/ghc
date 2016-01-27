@@ -73,6 +73,7 @@ _darcs/
 /ghc/stage2/
 /ghc/stage3/
 /iserv/stage2*/
+/iserv/dist/
 
 # -----------------------------------------------------------------------------
 # specific generated files

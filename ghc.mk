@@ -670,9 +670,7 @@ BUILD_DIRS += utils/mkUserGuidePart
 BUILD_DIRS += docs/users_guide
 BUILD_DIRS += utils/count_lines
 BUILD_DIRS += utils/compare_sizes
-ifneq "$(Windows_Host)" "YES"
 BUILD_DIRS += iserv
-endif
 
 # ----------------------------------------------
 # Actually include the sub-ghc.mk's

@@ -4413,13 +4413,6 @@ makeDynFlagsConsistent dflags
     = let dflags' = gopt_unset dflags Opt_BuildDynamicToo
           warn    = "-dynamic-too is not supported on Windows"
       in loop dflags' warn
- -- Disalbe -fexternal-interpreter on Windows.  This is a temporary measure;
- -- all that is missing is the implementation of the interprocess communication
- -- which uses pipes on POSIX systems. (#11100)
- | os == OSMinGW32 && gopt Opt_ExternalInterpreter dflags
-    = let dflags' = gopt_unset dflags Opt_ExternalInterpreter
-          warn    = "-fexternal-interpreter is currently not supported on Windows"
-      in loop dflags' warn
  | hscTarget dflags == HscC &&
    not (platformUnregisterised (targetPlatform dflags))
     = if cGhcWithNativeCodeGen == "YES"
