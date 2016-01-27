@@ -3091,7 +3091,7 @@ deferTcSForAllEq :: Role -- Nominal or Representational
 deferTcSForAllEq role loc kind_cos (bndrs1,body1) (bndrs2,body2)
  = do { let tvs1'  = zipWithEqual "deferTcSForAllEq"
                        mkCastTy (mkTyVarTys tvs1) kind_cos
-            body2' = substTyWith tvs2 tvs1' body2
+            body2' = substTyWithUnchecked tvs2 tvs1' body2
       ; (subst, skol_tvs) <- wrapTcS $ TcM.tcInstSkolTyVars tvs1
       ; let phi1  = Type.substTyUnchecked subst body1
             phi2  = Type.substTyUnchecked subst body2'

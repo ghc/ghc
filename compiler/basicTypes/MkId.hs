@@ -732,7 +732,7 @@ dataConArgUnpack arg_ty
      , Boxer $ \ subst ->
        do { rep_ids <- mapM (newLocal . TcType.substTyUnchecked subst) rep_tys
           ; return (rep_ids, Var (dataConWorkId con)
-                             `mkTyApps` (substTys subst tc_args)
+                             `mkTyApps` (substTysUnchecked subst tc_args)
                              `mkVarApps` rep_ids ) } ) )
   | otherwise
   = pprPanic "dataConArgUnpack" (ppr arg_ty)

@@ -603,7 +603,7 @@ checkFunDeps inst_envs (ClsInst { is_tvs = qtvs1, is_cls = cls
           Just subst
             -> isNothing $   -- Bogus legacy test (Trac #10675)
                              -- See Note [Bogus consistency check]
-               tcUnifyTys bind_fn (substTys subst rtys1) (substTys subst rtys2)
+               tcUnifyTys bind_fn (substTysUnchecked subst rtys1) (substTysUnchecked subst rtys2)
 
       where
         trimmed_tcs    = trimRoughMatchTcs cls_tvs fd rough_tcs1

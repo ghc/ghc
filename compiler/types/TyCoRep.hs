@@ -92,7 +92,10 @@ module TyCoRep (
         substTelescope,
         substTyWith, substTyWithCoVars, substTysWith, substTysWithCoVars,
         substCoWith,
-        substTy, substTyAddInScope, substTyUnchecked,
+        substTy, substTyAddInScope,
+        substTyUnchecked, substTysUnchecked, substThetaUnchecked,
+        substTyWithBindersUnchecked, substTyWithUnchecked,
+        substCoUnchecked, substCoWithUnchecked,
         substTyWithBinders, substTyWithInScope,
         substTys, substTheta,
         lookupTyVar, substTyVarBndr,
@@ -1767,9 +1770,24 @@ substTelescope = go_subst emptyTCvSubst
 
 
 -- | Type substitution, see 'zipTvSubst'
-substTyWith :: [TyVar] -> [Type] -> Type -> Type
+substTyWith ::
+-- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
+#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
+    (?callStack :: CallStack) =>
+#endif
+    [TyVar] -> [Type] -> Type -> Type
 substTyWith tvs tys = ASSERT( length tvs == length tys )
-                      substTyUnchecked (zipTvSubst tvs tys)
+                      substTy (zipTvSubst tvs tys)
+
+-- | Type substitution, see 'zipTvSubst'. Disables sanity checks.
+-- The problems that the sanity checks in substTy catch are described in
+-- Note [The substitution invariant].
+-- The goal of #11371 is to migrate all the calls of substTyUnchecked to
+-- substTy and remove this function. Please don't use in new code.
+substTyWithUnchecked :: [TyVar] -> [Type] -> Type -> Type
+substTyWithUnchecked tvs tys
+  = ASSERT( length tvs == length tys )
+    substTyUnchecked (zipTvSubst tvs tys)
 
 -- | Substitute tyvars within a type using a known 'InScopeSet'.
 -- Pre-condition: the 'in_scope' set should satisfy Note [The substitution
@@ -1782,9 +1800,26 @@ substTyWithInScope in_scope tvs tys ty =
   where tenv = zipTyEnv tvs tys
 
 -- | Coercion substitution, see 'zipTvSubst'
-substCoWith :: [TyVar] -> [Type] -> Coercion -> Coercion
+substCoWith ::
+-- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
+#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
+    (?callStack :: CallStack) =>
+#endif
+    [TyVar] -> [Type] -> Coercion -> Coercion
 substCoWith tvs tys = ASSERT( length tvs == length tys )
                       substCo (zipTvSubst tvs tys)
+
+-- | Coercion substitution, see 'zipTvSubst'. Disables sanity checks.
+-- The problems that the sanity checks in substCo catch are described in
+-- Note [The substitution invariant].
+-- The goal of #11371 is to migrate all the calls of substCoUnchecked to
+-- substCo and remove this function. Please don't use in new code.
+substCoWithUnchecked :: [TyVar] -> [Type] -> Coercion -> Coercion
+substCoWithUnchecked tvs tys
+  = ASSERT( length tvs == length tys )
+    substCoUnchecked (zipTvSubst tvs tys)
+
+
 
 -- | Substitute covars within a type
 substTyWithCoVars :: [CoVar] -> [Coercion] -> Type -> Type
@@ -1802,9 +1837,25 @@ substTysWithCoVars cvs cos = ASSERT( length cvs == length cos )
 
 -- | Type substitution using 'Binder's. Anonymous binders
 -- simply ignore their matching type.
-substTyWithBinders :: [TyBinder] -> [Type] -> Type -> Type
+substTyWithBinders ::
+-- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
+#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
+    (?callStack :: CallStack) =>
+#endif
+    [TyBinder] -> [Type] -> Type -> Type
 substTyWithBinders bndrs tys = ASSERT( length bndrs == length tys )
-                               substTyUnchecked (zipTyBinderSubst bndrs tys)
+                               substTy (zipTyBinderSubst bndrs tys)
+
+-- | Type substitution using 'Binder's disabling the sanity checks.
+-- Anonymous binders simply ignore their matching type.
+-- The problems that the sanity checks in substTy catch are described in
+-- Note [The substitution invariant].
+-- The goal of #11371 is to migrate all the calls of substTyUnchecked to
+-- substTy and remove this function. Please don't use in new code.
+substTyWithBindersUnchecked :: [TyBinder] -> [Type] -> Type -> Type
+substTyWithBindersUnchecked bndrs tys
+  = ASSERT( length bndrs == length tys )
+    substTyUnchecked (zipTyBinderSubst bndrs tys)
 
 -- | Substitute within a 'Type' after adding the free variables of the type
 -- to the in-scope set. This is useful for the case when the free variables
@@ -1826,57 +1877,104 @@ isValidTCvSubst (TCvSubst in_scope tenv cenv) =
   tenvFVs = tyCoVarsOfTypes $ varEnvElts tenv
   cenvFVs = tyCoVarsOfCos $ varEnvElts cenv
 
+-- | This checks if the substitution satisfies the invariant from
+-- Note [The substitution invariant].
+checkValidSubst ::
+#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
+    (?callStack :: CallStack) =>
+#endif
+    TCvSubst -> [Type] -> [Coercion] -> a -> a
+checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
+  = ASSERT2( isValidTCvSubst subst,
+             text "in_scope" <+> ppr in_scope $$
+             text "tenv" <+> ppr tenv $$
+             text "tenvFVs"
+               <+> ppr (tyCoVarsOfTypes $ varEnvElts tenv) $$
+             text "cenv" <+> ppr cenv $$
+             text "cenvFVs"
+               <+> ppr (tyCoVarsOfCos $ varEnvElts cenv) $$
+             text "tys" <+> ppr tys $$
+             text "cos" <+> ppr cos )
+    ASSERT2( tysCosFVsInScope,
+             text "in_scope" <+> ppr in_scope $$
+             text "tenv" <+> ppr tenv $$
+             text "cenv" <+> ppr cenv $$
+             text "tys" <+> ppr tys $$
+             text "cos" <+> ppr cos $$
+             text "needInScope" <+> ppr needInScope )
+    a
+  where
+  substDomain = varEnvKeys tenv ++ varEnvKeys cenv
+  needInScope = (tyCoVarsOfTypes tys `unionVarSet` tyCoVarsOfCos cos)
+                  `delListFromUFM_Directly` substDomain
+  tysCosFVsInScope = needInScope `varSetInScope` in_scope
+
+
 -- | Substitute within a 'Type'
 -- The substitution has to satisfy the invariants described in
 -- Note [The substitution invariant].
-
 substTy ::
 -- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
 #if __GLASGOW_HASKELL__ > 710
     (?callStack :: CallStack) =>
 #endif
     TCvSubst -> Type  -> Type
-substTy subst@(TCvSubst in_scope tenv cenv) ty
+substTy subst ty
   | isEmptyTCvSubst subst = ty
-  | otherwise = ASSERT2( isValidTCvSubst subst,
-                         text "in_scope" <+> ppr in_scope $$
-                         text "tenv" <+> ppr tenv $$
-                         text "tenvFVs"
-                           <+> ppr (tyCoVarsOfTypes $ varEnvElts tenv) $$
-                         text "cenv" <+> ppr cenv $$
-                         text "cenvFVs"
-                           <+> ppr (tyCoVarsOfCos $ varEnvElts cenv) $$
-                         text "ty" <+> ppr ty )
-                ASSERT2( typeFVsInScope,
-                         text "in_scope" <+> ppr in_scope $$
-                         text "tenv" <+> ppr tenv $$
-                         text "cenv" <+> ppr cenv $$
-                         text "ty" <+> ppr ty $$
-                         text "needInScope" <+> ppr needInScope )
-                subst_ty subst ty
-  where
-  substDomain = varEnvKeys tenv ++ varEnvKeys cenv
-  needInScope = tyCoVarsOfType ty `delListFromUFM_Directly` substDomain
-  typeFVsInScope = needInScope `varSetInScope` in_scope
+  | otherwise = checkValidSubst subst [ty] [] $ subst_ty subst ty
 
 -- | Substitute within a 'Type' disabling the sanity checks.
 -- The problems that the sanity checks in substTy catch are described in
 -- Note [The substitution invariant].
 -- The goal of #11371 is to migrate all the calls of substTyUnchecked to
 -- substTy and remove this function. Please don't use in new code.
-substTyUnchecked :: TCvSubst -> Type  -> Type
+substTyUnchecked :: TCvSubst -> Type -> Type
 substTyUnchecked subst ty
                  | isEmptyTCvSubst subst = ty
                  | otherwise             = subst_ty subst ty
 
 -- | Substitute within several 'Type's
-substTys :: TCvSubst -> [Type] -> [Type]
-substTys subst tys | isEmptyTCvSubst subst = tys
-                   | otherwise             = map (subst_ty subst) tys
+-- The substitution has to satisfy the invariants described in
+-- Note [The substitution invariant].
+substTys ::
+-- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
+#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
+    (?callStack :: CallStack) =>
+#endif
+    TCvSubst -> [Type] -> [Type]
+substTys subst tys
+  | isEmptyTCvSubst subst = tys
+  | otherwise = checkValidSubst subst tys [] $ map (subst_ty subst) tys
+
+-- | Substitute within several 'Type's disabling the sanity checks.
+-- The problems that the sanity checks in substTys catch are described in
+-- Note [The substitution invariant].
+-- The goal of #11371 is to migrate all the calls of substTysUnchecked to
+-- substTys and remove this function. Please don't use in new code.
+substTysUnchecked :: TCvSubst -> [Type] -> [Type]
+substTysUnchecked subst tys
+                 | isEmptyTCvSubst subst = tys
+                 | otherwise             = map (subst_ty subst) tys
 
 -- | Substitute within a 'ThetaType'
-substTheta :: TCvSubst -> ThetaType -> ThetaType
+-- The substitution has to satisfy the invariants described in
+-- Note [The substitution invariant].
+substTheta ::
+-- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
+#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
+    (?callStack :: CallStack) =>
+#endif
+    TCvSubst -> ThetaType -> ThetaType
 substTheta = substTys
+
+-- | Substitute within a 'ThetaType' disabling the sanity checks.
+-- The problems that the sanity checks in substTys catch are described in
+-- Note [The substitution invariant].
+-- The goal of #11371 is to migrate all the calls of substThetaUnchecked to
+-- substTheta and remove this function. Please don't use in new code.
+substThetaUnchecked :: TCvSubst -> ThetaType -> ThetaType
+substThetaUnchecked = substTysUnchecked
+
 
 subst_ty :: TCvSubst -> Type -> Type
 -- subst_ty is the main workhorse for type substitution
@@ -1896,7 +1994,7 @@ subst_ty subst ty
     go (ForAllTy (Anon arg) res)
                          = (ForAllTy $! (Anon $! go arg)) $! go res
     go (ForAllTy (Named tv vis) ty)
-                         = case substTyVarBndr subst tv of
+                         = case substTyVarBndrUnchecked subst tv of
                              (subst', tv') ->
                                (ForAllTy $! ((Named $! tv') vis)) $!
                                             (subst_ty subst' ty)
@@ -1921,14 +2019,40 @@ lookupTyVar (TCvSubst _ tenv _) tv
     lookupVarEnv tenv tv
 
 -- | Substitute within a 'Coercion'
-substCo :: TCvSubst -> Coercion -> Coercion
-substCo subst co | isEmptyTCvSubst subst = co
-                 | otherwise             = subst_co subst co
+-- The substitution has to satisfy the invariants described in
+-- Note [The substitution invariant].
+substCo ::
+-- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
+#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
+    (?callStack :: CallStack) =>
+#endif
+    TCvSubst -> Coercion -> Coercion
+substCo subst co
+  | isEmptyTCvSubst subst = co
+  | otherwise = checkValidSubst subst [] [co] $ subst_co subst co
+
+-- | Substitute within a 'Coercion' disabling sanity checks.
+-- The problems that the sanity checks in substCo catch are described in
+-- Note [The substitution invariant].
+-- The goal of #11371 is to migrate all the calls of substCoUnchecked to
+-- substCo and remove this function. Please don't use in new code.
+substCoUnchecked :: TCvSubst -> Coercion -> Coercion
+substCoUnchecked subst co
+  | isEmptyTCvSubst subst = co
+  | otherwise = subst_co subst co
 
 -- | Substitute within several 'Coercion's
-substCos :: TCvSubst -> [Coercion] -> [Coercion]
-substCos subst cos | isEmptyTCvSubst subst = cos
-                   | otherwise             = map (substCo subst) cos
+-- The substitution has to satisfy the invariants described in
+-- Note [The substitution invariant].
+substCos ::
+-- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
+#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
+    (?callStack :: CallStack) =>
+#endif
+    TCvSubst -> [Coercion] -> [Coercion]
+substCos subst cos
+  | isEmptyTCvSubst subst = cos
+  | otherwise = checkValidSubst subst [] cos $ map (subst_co subst) cos
 
 subst_co :: TCvSubst -> Coercion -> Coercion
 subst_co subst co
@@ -1943,7 +2067,7 @@ subst_co subst co
                                in  args' `seqList` mkTyConAppCo r tc args'
     go (AppCo co arg)        = (mkAppCo $! go co) $! go arg
     go (ForAllCo tv kind_co co)
-      = case substForAllCoBndr subst tv kind_co of { (subst', tv', kind_co') ->
+      = case substForAllCoBndrUnchecked subst tv kind_co of { (subst', tv', kind_co') ->
           ((mkForAllCo $! tv') $! kind_co') $! subst_co subst' co }
     go (CoVarCo cv)          = substCoVar subst cv
     go (AxiomInstCo con ind cos) = mkAxiomInstCo con ind $! map go cos
@@ -1973,6 +2097,15 @@ subst_co subst co
 substForAllCoBndr :: TCvSubst -> TyVar -> Coercion -> (TCvSubst, TyVar, Coercion)
 substForAllCoBndr subst
   = substForAllCoBndrCallback False (substCo subst) subst
+
+-- | Like 'substForAllCoBndr', but disables sanity checks.
+-- The problems that the sanity checks in substCo catch are described in
+-- Note [The substitution invariant].
+-- The goal of #11371 is to migrate all the calls of substCoUnchecked to
+-- substCo and remove this function. Please don't use in new code.
+substForAllCoBndrUnchecked :: TCvSubst -> TyVar -> Coercion -> (TCvSubst, TyVar, Coercion)
+substForAllCoBndrUnchecked subst
+  = substForAllCoBndrCallback False (substCoUnchecked subst) subst
 
 -- See Note [Sym and ForAllCo]
 substForAllCoBndrCallback :: Bool  -- apply sym to binder?
@@ -2011,8 +2144,21 @@ substCoVars subst cvs = map (substCoVar subst) cvs
 lookupCoVar :: TCvSubst -> Var  -> Maybe Coercion
 lookupCoVar (TCvSubst _ _ cenv) v = lookupVarEnv cenv v
 
-substTyVarBndr :: TCvSubst -> TyVar -> (TCvSubst, TyVar)
-substTyVarBndr = substTyVarBndrCallback substTyUnchecked
+substTyVarBndr ::
+-- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
+#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
+    (?callStack :: CallStack) =>
+#endif
+    TCvSubst -> TyVar -> (TCvSubst, TyVar)
+substTyVarBndr = substTyVarBndrCallback substTy
+
+-- | Like 'substTyVarBndr' but disables sanity checks.
+-- The problems that the sanity checks in substTy catch are described in
+-- Note [The substitution invariant].
+-- The goal of #11371 is to migrate all the calls of substTyUnchecked to
+-- substTy and remove this function. Please don't use in new code.
+substTyVarBndrUnchecked :: TCvSubst -> TyVar -> (TCvSubst, TyVar)
+substTyVarBndrUnchecked = substTyVarBndrCallback substTyUnchecked
 
 -- | Substitute a tyvar in a binding position, returning an
 -- extended subst and a new tyvar.

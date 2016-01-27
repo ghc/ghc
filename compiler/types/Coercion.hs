@@ -891,7 +891,7 @@ mkLRCo lr co           = LRCo lr co
 -- | Instantiates a 'Coercion'.
 mkInstCo :: Coercion -> Coercion -> Coercion
 mkInstCo (ForAllCo tv _kind_co body_co) (Refl _ arg)
-  = substCoWith [tv] [arg] body_co
+  = substCoWithUnchecked [tv] [arg] body_co
 mkInstCo co arg = InstCo co arg
 
 -- This could work harder to produce Refl coercions, but that would be
@@ -1720,7 +1720,7 @@ coercionKind co = go co
       = let Pair _ k2          = go k_co
             tv2                = setTyVarKind tv1 k2
             Pair ty1 ty2       = go co
-            ty2' = substTyWith [tv1] [TyVarTy tv2 `mk_cast_ty` mkSymCo k_co] ty2 in
+            ty2' = substTyWithUnchecked [tv1] [TyVarTy tv2 `mk_cast_ty` mkSymCo k_co] ty2 in
         mkNamedForAllTy <$> Pair tv1 tv2 <*> pure Invisible <*> Pair ty1 ty2'
     go (CoVarCo cv)         = toPair $ coVarTypes cv
     go (AxiomInstCo ax ind cos)
@@ -1795,7 +1795,7 @@ coercionKindRole = go
       = let Pair _ k2          = coercionKind k_co
             tv2                = setTyVarKind tv1 k2
             (Pair ty1 ty2, r)  = go co
-            ty2' = substTyWith [tv1] [TyVarTy tv2 `mkCastTy` mkSymCo k_co] ty2 in
+            ty2' = substTyWithUnchecked [tv1] [TyVarTy tv2 `mkCastTy` mkSymCo k_co] ty2 in
         (mkNamedForAllTy <$> Pair tv1 tv2 <*> pure Invisible <*> Pair ty1 ty2', r)
     go (CoVarCo cv) = (toPair $ coVarTypes cv, coVarRole cv)
     go co@(AxiomInstCo ax _ _) = (coercionKind co, coAxiomRole ax)
