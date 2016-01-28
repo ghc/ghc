@@ -1882,8 +1882,8 @@ simplifyDeriv pred tvs theta
        -- generated instance declaration
        ; defer <- goptM Opt_DeferTypeErrors
        ; (implic, _) <- buildImplicationFor tclvl skol_info tvs_skols [] unsolved
-                   -- The buildImplication is just to bind the skolems, in
-                   -- case they are mentioned in error messages
+                   -- The buildImplicationFor is just to bind the skolems,
+                   -- in case they are mentioned in error messages
                    -- See Trac #11347
        ; unless defer (reportAllUnsolved (mkImplicWC implic))
 
