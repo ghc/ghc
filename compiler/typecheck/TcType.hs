@@ -750,7 +750,7 @@ exactTyCoVarsOfType ty
   = go ty
   where
     go ty | Just ty' <- coreView ty = go ty'  -- This is the key line
-    go (TyVarTy tv)         = unitVarSet tv
+    go (TyVarTy tv)         = unitVarSet tv `unionVarSet` go (tyVarKind tv)
     go (TyConApp _ tys)     = exactTyCoVarsOfTypes tys
     go (LitTy {})           = emptyVarSet
     go (AppTy fun arg)      = go fun `unionVarSet` go arg
