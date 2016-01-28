@@ -75,9 +75,19 @@ experiment following the Haddock comments.
 
 #### Clean and full rebuild
 
-* `shake-build/build.sh clean` removes all build artefacts. Note, we are working towards a complete separation of GHC sources and build artefacts: [#113][build-artefacts-issue].
+* `shake-build/build.sh clean` removes all build artefacts. Note, we are working
+towards a complete separation of GHC sources and build artefacts: [#113][build-artefacts-issue].
 
-* `shake-build/build.sh -B` forces Shake to rerun all rules, even if results of the previous build are still in the GHC tree. 
+* `shake-build/build.sh -B` forces Shake to rerun all rules, even if results of
+the previous build are still in the GHC tree. 
+
+#### Testing
+
+* `shake-build/build.sh test` runs GHC tests. The current implementation is very
+limited and cannot replace the `validate` script (see [#187][validation-issue]).
+
+* `shake-build/build.sh selftest` runs tests of the build system. Current test
+coverage is close to zero (see [#197][test-issue]).
 
 Current limitations
 -------------------
@@ -120,6 +130,7 @@ helped me endure and enjoy the project.
 [build-artefacts-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/113
 [ghc-split-objs-bug]: https://ghc.haskell.org/trac/ghc/ticket/11315
 [user-settings]: https://github.com/snowleopard/shaking-up-ghc/blob/master/src/Settings/User.hs
+[test-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/197
 [dynamic-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/4
 [profiling-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/186
 [haddock-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/98
