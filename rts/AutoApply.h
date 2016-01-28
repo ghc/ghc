@@ -78,13 +78,13 @@
 
 // Jump to target, saving CCCS and restoring it on return
 #if defined(PROFILING)
-#define jump_SAVE_CCCS(target)                  \
+#define jump_SAVE_CCCS(target,...)              \
     Sp(-1) = CCCS;                              \
     Sp(-2) = stg_restore_cccs_info;             \
     Sp_adj(-2);                                 \
-    jump (target) [R1]
+    jump (target) [__VA_ARGS__]
 #else
-#define jump_SAVE_CCCS(target) jump (target) [R1]
+#define jump_SAVE_CCCS(target,...) jump (target) [__VA_ARGS__]
 #endif
 
 #endif /* APPLY_H */
