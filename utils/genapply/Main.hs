@@ -157,10 +157,10 @@ mkJump :: RegStatus -- Registerised status
        -> [ArgRep]  -- Jump arguments
        -> Doc
 mkJump regstatus jump live args =
-    text "jump " <> jump <+> brackets (hcat (punctuate comma (map text regs)))
+    text "jump" <+> jump <+> brackets (hcat (punctuate comma (map text regs)))
   where
-   (reg_locs, _, _) = assignRegs regstatus 0 args
-   regs             = (nub . sort) (live ++ map fst reg_locs)
+    (reg_locs, _, _) = assignRegs regstatus 0 args
+    regs             = (nub . sort) (live ++ map fst reg_locs)
 
 -- make a ptr/non-ptr bitmap from a list of argument types
 mkBitmap :: [ArgRep] -> Word32
