@@ -109,7 +109,7 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
     maybe_infotable = case mapLookup blockid info_env of
        Nothing   -> empty
        Just (Statics info_lbl info) ->
-           pprAlignForSection Text $$
+           text ".align 4" $$
            infoTableLoc $$
            vcat (map pprData info) $$
            pprLabel info_lbl
