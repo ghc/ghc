@@ -580,6 +580,7 @@ argRep V32 = text "V32_"
 argRep V64 = text "V64_"
 argRep _   = text "W_"
 
+genApply :: RegStatus -> [ArgRep] -> Doc
 genApply regstatus args =
    let
     fun_ret_label  = mkApplyRetName args
@@ -776,6 +777,7 @@ genApply regstatus args =
 -- -----------------------------------------------------------------------------
 -- Making a fast unknown application, args are in regs
 
+genApplyFast :: RegStatus -> [ArgRep] -> Doc
 genApplyFast regstatus args =
    let
     fun_fast_label = mkApplyFastName args
