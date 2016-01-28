@@ -13,7 +13,7 @@ module TcUnify (
   tcWrapResult, tcWrapResultO, tcSkolemise, tcSkolemiseET,
   tcSubTypeHR, tcSubType, tcSubTypeO, tcSubType_NC, tcSubTypeDS, tcSubTypeDS_O,
   tcSubTypeDS_NC, tcSubTypeDS_NC_O, tcSubTypeET, tcSubTypeET_NC,
-  checkConstraints, buildImplication, buildImplicationFor,
+  checkConstraints, buildImplicationFor,
 
   -- Various unifications
   unifyType_, unifyType, unifyTheta, unifyKind, noThing,
