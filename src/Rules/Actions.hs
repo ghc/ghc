@@ -1,8 +1,8 @@
 {-# LANGUAGE RecordWildCards #-}
 module Rules.Actions (
     build, buildWithResources, copyFile, createDirectory, removeDirectory,
-    moveDirectory, fixFile, runConfigure, runMake, applyPatch, renderLibrary,
-    renderProgram, runBuilder, makeExecutable
+    moveDirectory, fixFile, runConfigure, runMake, runMakeVerbose, applyPatch,
+    renderLibrary, renderProgram, runBuilder, makeExecutable
     ) where
 
 import qualified System.Directory as IO
@@ -111,7 +111,13 @@ runConfigure dir opts args = do
         opts' = opts ++ [AddEnv "CONFIG_SHELL" "/bin/bash"]
 
 runMake :: FilePath -> [String] -> Action ()
-runMake dir args = do
+runMake = runMakeWithVerbosity False
+
+runMakeVerbose :: FilePath -> [String] -> Action ()
+runMakeVerbose = runMakeWithVerbosity True
+
+runMakeWithVerbosity :: Bool -> FilePath -> [String] -> Action ()
+runMakeWithVerbosity verbose dir args = do
     need [dir -/- "Makefile"]
     path <- builderPath Make
 
@@ -125,7 +131,9 @@ runMake dir args = do
 
     let note = if null args then "" else " (" ++ intercalate ", " args ++ ")"
     putBuild $ "| Run " ++ fixPath ++ note ++ " in " ++ dir ++ "..."
-    quietly $ cmd Shell (EchoStdout False) fixPath ["-C", dir] args
+    if verbose
+    then           cmd Shell                    fixPath ["-C", dir] args
+    else quietly $ cmd Shell (EchoStdout False) fixPath ["-C", dir] args
 
 applyPatch :: FilePath -> FilePath -> Action ()
 applyPatch dir patch = do

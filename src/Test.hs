@@ -7,12 +7,16 @@ import GHC (rts, libffi)
 import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Oracles.WindowsRoot -- TODO: rename to Oracles.TopDirectory
+import Rules.Actions
 import Settings.Packages
 import Settings.User
 
 -- TODO: clean up after testing
 testRules :: Rules ()
-testRules =
+testRules = do
+    "validate" ~> do
+        runMakeVerbose "testsuite/tests" ["fast"]
+
     "test" ~> do
         let quote s = "\"" ++ s ++ "\""
             yesNo x = quote $ if x then "YES" else "NO"
