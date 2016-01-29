@@ -29,7 +29,7 @@ pkgLibraryFile :: Stage -> Package -> String -> Way -> Action FilePath
 pkgLibraryFile stage pkg componentId way = do
     extension <- libsuf way
     let buildPath = targetPath stage pkg -/- "build"
-    return $ buildPath -/- "libHS" ++ componentId <.> extension
+    return $ buildPath -/- "libHS" ++ componentId ++ extension
 
 -- Relative path to a package ghci library file, e.g.:
 -- "libraries/array/dist-install/build/HSarray-0.5.1.0.o"

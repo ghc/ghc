@@ -46,7 +46,7 @@ buildPackageLibrary _ target @ (PartialTarget stage pkg) = do
         let objs = cObjs ++ splitObjs ++ eObjs
 
         asuf <- libsuf way
-        let isLib0 = ("//*-0" <.> asuf) ?== a
+        let isLib0 = ("//*-0" ++ asuf) ?== a
         if isLib0
         then build $ fullTarget target Ar [] [a] -- TODO: scan for dlls
         else build $ fullTarget target Ar objs [a]

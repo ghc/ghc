@@ -127,6 +127,10 @@ wayPrefix :: Way -> String
 wayPrefix way | way == vanilla = ""
               | otherwise      = show way ++ "_"
 
+waySuffix :: Way -> String
+waySuffix way | way == vanilla = ""
+              | otherwise      = "_" ++ show way
+
 osuf, ssuf, hisuf, hcsuf, obootsuf, hibootsuf :: Way -> String
 osuf      = (++ "o"      ) . wayPrefix
 ssuf      = (++ "s"      ) . wayPrefix
@@ -135,10 +139,6 @@ hcsuf     = (++ "hc"     ) . wayPrefix
 obootsuf  = (++ "o-boot" ) . wayPrefix
 hibootsuf = (++ "hi-boot") . wayPrefix
 
--- Note: in the previous build system libsuf was mysteriously different
--- from other suffixes. For example, in the profiling way it used to be
--- "_p.a" instead of ".p_a" which is how other suffixes work. I decided
--- to make all suffixes consistent: ".way_extension".
 -- TODO: find out why we need version number in the dynamic suffix
 -- The current theory: dynamic libraries are eventually placed in a single
 -- giant directory in the load path of the dynamic linker, and hence we must
@@ -148,7 +148,7 @@ hibootsuf = (++ "hi-boot") . wayPrefix
 libsuf :: Way -> Action String
 libsuf way @ (Way set) =
     if (not . wayUnit Dynamic $ way)
-    then return $ wayPrefix way ++ "a" -- e.g., p_a
+    then return $ waySuffix way ++ ".a" -- e.g., _p.a
     else do
         extension <- setting DynamicExtension  -- e.g., .dll or .so
         version   <- setting ProjectVersion    -- e.g., 7.11.20141222
@@ -172,7 +172,9 @@ safeDetectWay file = case reads prefix of
                 then extension
                 else takeExtension . dropExtension .
                      dropExtension . dropExtension $ file
-    prefix = drop 1 . dropWhileEnd (== '_') . dropWhileEnd (/= '_') $ prefixed
+    prefix = if extension == "a"
+             then drop 1 . dropWhile (/= '_') $ takeBaseName file
+             else drop 1 . dropWhileEnd (== '_') . dropWhileEnd (/= '_') $ prefixed
 
 -- Unsafe version of safeDetectWay. Useful when matchBuildResult has succeeded.
 detectWay :: FilePath -> Way
