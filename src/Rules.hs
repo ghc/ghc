@@ -15,9 +15,10 @@ allStages = [minBound ..]
 -- | 'need' all top-level build targets
 generateTargets :: Rules ()
 generateTargets = action $ do
-    targets <- fmap concat (traverse targetsForStage allStages)
-    rtsLib <- pkgLibraryFile Stage1 rts "rts" vanilla
-    need $ targets ++ installTargets ++ [ rtsLib ]
+    targets   <- fmap concat (traverse targetsForStage allStages)
+    rtsLib    <- pkgLibraryFile Stage1 rts "rts" vanilla
+    rtsThrLib <- pkgLibraryFile Stage1 rts "rts" threaded
+    need $ targets ++ installTargets ++ [ rtsLib, rtsThrLib ]
 
 targetsForStage :: Stage -> Action [String]
 targetsForStage stage = do
