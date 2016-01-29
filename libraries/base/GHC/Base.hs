@@ -965,7 +965,7 @@ eqString _        _        = False
 
 {-# RULES "eqString" (==) = eqString #-}
 -- eqString also has a BuiltInRule in PrelRules.lhs:
---      eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2) = s1==s2
+--      eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2)) = s1==s2
 
 
 ----------------------------------------------
