@@ -75,6 +75,7 @@ import System.Exit
 import Data.Maybe
 import GHC.IO.Handle.Types (Handle)
 #ifdef mingw32_HOST_OS
+import Foreign.C
 import GHC.IO.Handle.FD (fdToHandle)
 #else
 import System.Posix as Posix

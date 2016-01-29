@@ -951,7 +951,7 @@ logCCS(CostCentreStack *ccs, nat indent,
                 max_module_len - strlen_utf8(cc->module), "");
 
         fprintf(prof_file,
-                " %*ld %11" FMT_Word64 "  %5.1f  %5.1f   %5.1f  %5.1f",
+                " %*" FMT_Int "%11" FMT_Word64 "  %5.1f  %5.1f   %5.1f  %5.1f",
                 max_id_len, ccs->ccsID, ccs->scc_count,
                 total_prof_ticks == 0 ? 0.0 : ((double)ccs->time_ticks / (double)total_prof_ticks * 100.0),
                 total_alloc == 0 ? 0.0 : ((double)ccs->mem_alloc / (double)total_alloc * 100.0),
