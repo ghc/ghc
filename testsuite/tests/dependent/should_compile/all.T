@@ -10,7 +10,10 @@ test('RaeBlogPost', normal, compile, [''])
 test('mkGADTVars', normal, compile, [''])
 test('TypeLevelVec',normal,compile, [''])
 test('T9632', normal, compile, [''])
-test('dynamic-paper', normal, compile, [''])
+# Simon says in #11330: The "simplifier ticks exhausted" error is expected;
+# see Section 7 of the paper:
+# http://research.microsoft.com/en-us/um/people/simonpj/papers/haskell-dynamic/
+test('dynamic-paper', expect_fail_for(['optasm', 'optllvm']), compile, [''])
 test('T11311', normal, compile, [''])
 test('T11405', normal, compile, [''])
 
