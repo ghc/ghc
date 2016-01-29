@@ -112,6 +112,9 @@ programPath stage pkg
     | pkg `elem` [touchy, unlit] = case stage of
         Stage0 -> Just $ "inplace/lib/bin" -/- pkgNameString pkg <.> exe
         _      -> Nothing
+    | pkg == hpcBin = case stage of
+        Stage1 -> Just $ inplaceProgram "hpc"
+        _      -> Nothing
     | isProgram pkg = case stage of
         Stage0 -> Just . inplaceProgram $ pkgNameString pkg
         _      -> Just . installProgram $ pkgNameString pkg

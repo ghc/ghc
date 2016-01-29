@@ -36,6 +36,7 @@ data Builder = Alex
              | GhcPkg Stage
              | Haddock
              | Happy
+             | Hpc
              | HsColour
              | HsCpp
              | Hsc2Hs
@@ -63,6 +64,7 @@ builderProvenance = \case
     GhcCabalHsColour -> builderProvenance $ GhcCabal
     GhcPkg stage     -> if stage > Stage0 then Just (Stage0, ghcPkg) else Nothing
     Haddock          -> Just (Stage2, haddock)
+    Hpc              -> Just (Stage1, hpcBin)
     Hsc2Hs           -> Just (Stage0, hsc2hs)
     Unlit            -> Just (Stage0, unlit)
     _                -> Nothing
