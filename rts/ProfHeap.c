@@ -515,7 +515,7 @@ fprint_ccs(FILE *fp, CostCentreStack *ccs, nat max_length)
         return;
     }
 
-    fprintf(fp, "(%ld)", ccs->ccsID);
+    fprintf(fp, "(%" FMT_Int ")", ccs->ccsID);
 
     p = buf;
     buf_end = buf + max_length + 1;
