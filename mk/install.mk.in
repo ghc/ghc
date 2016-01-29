@@ -40,7 +40,7 @@
 #
 # NOTE: The default e.g. ${docdir} above means that autoconf substitutes the
 # string "${docdir}", not the value of docdir! This is crucial for the GNU
-# coding standards.
+# coding standards. See Trac #1924.
 
 define set_default
 # $1 = variable to set
@@ -51,9 +51,6 @@ ifneq "$$(filter @%,$$($1))" ""
 $1 = $2
 endif
 endef
-
-# This gets used in the default docdir when autoconf >= 2.60 is used
-PACKAGE_TARNAME = @PACKAGE_TARNAME@
 
 prefix          = @prefix@
 
@@ -67,8 +64,10 @@ libdir          = @libdir@
 includedir      = @includedir@
 mandir          = @mandir@
 
+# Note that `./configure --docdir=/foo/bar` should work.
 docdir = @docdir@
-$(eval $(call set_default,docdir,$${datarootdir}/doc/ghc))
+PACKAGE_TARNAME = ghc-${ProjectVersion}
+$(eval $(call set_default,docdir,$${datarootdir}/doc/$${PACKAGE_TARNAME}))
 
 htmldir = @htmldir@
 dvidir  = @dvidir@
@@ -94,14 +93,12 @@ pdfdir    = $(docdir)
 psdir     = $(docdir)
 
 ghclibdir = $(libdir)
-ghcdocdir = $(datarootdir)/doc
 
 else
 
 # Unix: override libdir and datadir to put ghc-specific stuff in
 # a subdirectory with the version number included.
 ghclibdir     = $(libdir)/$(CrossCompilePrefix)ghc-$(ProjectVersion)
-ghcdocdir     = $(datarootdir)/doc/ghc
 endif
 
 ghclibexecdir = $(ghclibdir)
