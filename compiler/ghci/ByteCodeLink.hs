@@ -28,6 +28,7 @@ import SizedSeq
 import GHCi
 import ByteCodeTypes
 import HscTypes
+import DynFlags
 import Name
 import NameEnv
 import PrimOp
@@ -39,6 +40,8 @@ import Util
 
 -- Standard libraries
 import Data.Array.Unboxed
+import Data.Array.Base
+import Data.Word
 import Foreign.Ptr
 import GHC.IO           ( IO(..) )
 import GHC.Exts
@@ -68,9 +71,18 @@ linkBCO hsc_env ie ce bco_ix breakarray
            (UnlinkedBCO _ arity insns bitmap lits0 ptrs0) = do
   lits <- mapM (lookupLiteral hsc_env ie) (ssElts lits0)
   ptrs <- mapM (resolvePtr hsc_env ie ce bco_ix breakarray) (ssElts ptrs0)
-  return (ResolvedBCO arity insns bitmap
+  let dflags = hsc_dflags hsc_env
+  return (ResolvedBCO arity (toWordArray dflags insns) bitmap
               (listArray (0, fromIntegral (sizeSS lits0)-1) lits)
               (addListToSS emptySS ptrs))
+
+-- Turn the insns array from a Word16 array into a Word array.  The
+-- latter is much faster to serialize/deserialize. Assumes the input
+-- array is zero-indexed.
+toWordArray :: DynFlags -> UArray Int Word16 -> UArray Int Word
+toWordArray dflags (UArray _ _ n arr) = UArray 0 (n'-1) n' arr
+  where n' = (n + w16s_per_word - 1) `quot` w16s_per_word
+        w16s_per_word = wORD_SIZE dflags `quot` 2
 
 lookupLiteral :: HscEnv -> ItblEnv -> BCONPtr -> IO Word
 lookupLiteral _ _ (BCONPtrWord lit) = return lit
