@@ -4,13 +4,13 @@ module Main where
 
 import GHC.Conc (getNumProcessors, getNumCapabilities)
 import GHC.Environment
-import Data.Char
+import Data.List
 
 main :: IO ()
 main = do
   -- We're parsing args passed in to make sure things are proper between the
   -- cli and the program.
-  n <- getN
+  n <- getN <$> getFullArgs
 
   c <- getNumCapabilities
   p <- getNumProcessors
@@ -30,11 +30,7 @@ check n c p
 check _n _c _p = "maxN Error"
 
 -- Parsing ``-maxN<n>`` from Args to be sure of it.
-getN :: IO Int
-getN = getFullArgs >>= return . go
-  where
-    go :: [String] -> Int
-    go as = case reads (
-      dropWhile (not . isDigit) . (!! 2) $ as ) :: [(Int, String)] of
-        [x] -> fst x
-        _ -> 0
+getN :: [String] -> Int
+getN args = case filter (isPrefixOf "-maxN") (reverse args) of
+    (maxN:_) -> read (drop 5 maxN)
+    _        -> error "Please pass `-maxN<n>` on command-line"

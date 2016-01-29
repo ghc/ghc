@@ -333,5 +333,5 @@ test('T10590', [ignore_output, when(opsys('mingw32'),skip)], compile_and_run, ['
 test('T10904', [ omit_ways(['ghci']), extra_run_opts('20000') ],
                compile_and_run, ['T10904lib.c'])
 
-test('T10728', [extra_run_opts('+RTS -maxN3 -RTS'), req_smp],
-           compile_and_run, ['-threaded'])
+test('T10728', [extra_run_opts('+RTS -maxN3 -RTS'), only_ways(['threaded2'])],
+               compile_and_run, [''])
