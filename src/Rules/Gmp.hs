@@ -144,3 +144,5 @@ gmpRules = do
             runBuilder Ranlib [gmpLibrary]
 
         putSuccess "| Successfully built custom library 'gmp'"
+
+    gmpLibraryInTreeH %> \_ -> need [gmpLibraryH]
