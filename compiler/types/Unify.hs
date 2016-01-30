@@ -788,7 +788,7 @@ uVar tv1 ty kco
                                 -- this is because the range of the subst is the target
                                 -- type, not the template type. So, just check for
                                 -- normal type equality.
-                                guard (ty' `eqType` ty) }
+                                guard ((ty' `mkCastTy` kco) `eqType` ty) }
           Nothing  -> uUnrefined tv1 ty ty kco } -- No, continue
 
 uUnrefined :: TyVar             -- variable to be unified
