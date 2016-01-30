@@ -62,18 +62,18 @@ puts s = withCAStringLen (s ++ "\n") $ \(p, len) -> do
 -- ---------------------------------------------------------------------------
 -- Types
 
-type CFLock     = ()
+data {-# CTYPE "struct flock" #-} CFLock
 data {-# CTYPE "struct group" #-} CGroup
-type CLconv     = ()
-type CPasswd    = ()
-type CSigaction = ()
+data {-# CTYPE "struct lconv" #-} CLconv
+data {-# CTYPE "struct passwd" #-} CPasswd
+data {-# CTYPE "struct sigaction" #-} CSigaction
 data {-# CTYPE "sigset_t" #-} CSigset
-type CStat      = ()
-type CTermios   = ()
-type CTm        = ()
-type CTms       = ()
-type CUtimbuf   = ()
-type CUtsname   = ()
+data {-# CTYPE "struct stat" #-}  CStat
+data {-# CTYPE "struct termios" #-} CTermios
+data {-# CTYPE "struct tm" #-} CTm
+data {-# CTYPE "struct tms" #-} CTms
+data {-# CTYPE "struct utimbuf" #-} CUtimbuf
+data {-# CTYPE "struct utsname" #-} CUtsname
 
 type FD = CInt
 
