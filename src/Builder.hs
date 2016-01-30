@@ -124,6 +124,8 @@ getBuilderPath = lift . builderPath
 specified :: Builder -> Action Bool
 specified = fmap (not . null) . builderPath
 
+-- TODO: split into two functions: needBuilder (without laxDependencies) and
+-- unsafeNeedBuilder (with the laxDependencies parameter)
 -- | Make sure a builder exists on the given path and rebuild it if out of date.
 -- If 'laxDependencies' is True then we do not rebuild GHC even if it is out of
 -- date (can save a lot of build time when changing GHC).

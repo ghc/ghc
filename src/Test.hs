@@ -15,6 +15,9 @@ import Settings.User
 testRules :: Rules ()
 testRules = do
     "validate" ~> do
+        needBuilder False $ Ghc Stage2 -- TODO: get rid of False parameters
+        needBuilder False $ GhcPkg Stage1
+        needBuilder False $ Hpc
         runMakeVerbose "testsuite/tests" ["fast"]
 
     "test" ~> do
