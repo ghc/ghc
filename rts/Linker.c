@@ -463,15 +463,21 @@ static int ghciInsertSymbolTable(
       pinfo->weak = HS_BOOL_FALSE;
       return 1;
    }
-   else if (pinfo->owner && pathcmp(pinfo->owner->fileName, obj_name) == 0 && pinfo->owner->status != OBJECT_RESOLVED) {
-            // If the other symbol hasn't been loaded, we can just swap it out.
+   else if (  pinfo->owner
+           && pathcmp(pinfo->owner->fileName, obj_name) == 0
+           && pinfo->owner->status != OBJECT_RESOLVED) {
+            // If the other symbol hasn't been loaded and we want to
+            // explicitly load the new one, we can just swap it out
             // and load the one that has been requested.
-            ghciRemoveSymbolTable(symhash, key, pinfo->owner);
-            pinfo = stgMallocBytes(sizeof(*pinfo), "ghciInsertToSymbolTable");
-            pinfo->value = data;
-            pinfo->owner = owner;
-            pinfo->weak = weak;
-            insertStrHashTable(table, key, pinfo);
+            // If not, just keep the first one encountered.
+       if (owner && owner->loadObject == HS_BOOL_TRUE) {
+           ghciRemoveSymbolTable(symhash, key, pinfo->owner);
+           pinfo = stgMallocBytes(sizeof(*pinfo), "ghciInsertToSymbolTable");
+           pinfo->value = data;
+           pinfo->owner = owner;
+           pinfo->weak = weak;
+           insertStrHashTable(table, key, pinfo);
+       }
             return 1;
     }
 
@@ -602,11 +608,6 @@ initLinker_ (int retain_cafs)
 #if defined(OBJFORMAT_PEi386)
     if (!ghciInsertSymbolTable(WSTR("(GHCi/Ld special symbols)"),
                                symhash, "__image_base__", __image_base, HS_BOOL_TRUE, NULL)) {
-        barf("ghciInsertSymbolTable failed");
-    }
-
-    if (!ghciInsertSymbolTable(WSTR("Mingw special symbol"),
-                               symhash, "__mingw_raise_matherr", __mingw_raise_matherr, HS_BOOL_TRUE, NULL)) {
         barf("ghciInsertSymbolTable failed");
     }
 #endif /* OBJFORMAT_PEi386 */

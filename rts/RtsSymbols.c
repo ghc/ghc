@@ -74,7 +74,6 @@
       SymI_HasProto(stg_asyncReadzh)                     \
       SymI_HasProto(stg_asyncWritezh)                    \
       SymI_HasProto(stg_asyncDoProczh)                   \
-      SymI_NeedsProto(mingw_app_type)                    \
       SymI_HasProto(getWin32ProgArgv)                    \
       SymI_HasProto(setWin32ProgArgv)                    \
       SymI_HasProto(rts_InstallConsoleEvent)             \
@@ -84,8 +83,7 @@
       RTS_WIN32_ONLY(SymI_HasProto(_imp___environ))      \
       RTS_WIN64_ONLY(SymI_HasProto(__imp__environ))      \
       RTS_WIN32_ONLY(SymI_HasProto(_imp___iob))          \
-      RTS_WIN64_ONLY(SymI_HasProto(__iob_func))          \
-      SymI_HasProto(isatty)
+      RTS_WIN64_ONLY(SymI_HasProto(__iob_func))
 
 #else
 #define RTS_MINGW_ONLY_SYMBOLS /**/
