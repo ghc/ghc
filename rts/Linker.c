@@ -2557,7 +2557,7 @@ int ocTryLoad (ObjectCode* oc) {
             symbol = oc->symbols[x];
             if (   symbol.name
                 && symbol.addr
-                && !ghciInsertSymbolTable(oc->fileName, symhash, symbol.name, symbol.addr, HS_BOOL_FALSE, oc)){
+                && !ghciInsertSymbolTable(oc->fileName, symhash, symbol.name, symbol.addr, symbol.isWeak, oc)){
                 return 0;
             }
         }
@@ -3863,8 +3863,9 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          IF_DEBUG(linker, debugBelch("addSymbol %p `%s'\n", addr,sname);)
          ASSERT(i >= 0 && i < oc->n_symbols);
          /* cstring_from_COFF_symbol_name always succeeds. */
-         oc->symbols[i].name = (char*)sname;
-         oc->symbols[i].addr = addr;
+         oc->symbols[i].name   = (char*)sname;
+         oc->symbols[i].addr   = addr;
+         oc->symbols[i].isWeak = isWeak;
          if (! ghciInsertSymbolTable(oc->fileName, symhash, (char*)sname, addr,
                                      isWeak, oc)) {
              return 0;
@@ -5013,8 +5014,9 @@ ocGetNames_ELF ( ObjectCode* oc )
                                             nm, ad, isWeak, oc)) {
                     goto fail;
                 }
-                oc->symbols[j].name = nm;
-                oc->symbols[j].addr = ad;
+                oc->symbols[j].name   = nm;
+                oc->symbols[j].addr   = ad;
+                oc->symbols[j].isWeak = isWeak;
             }
          } else {
             /* Skip. */
@@ -6808,6 +6810,7 @@ ocGetNames_MachO(ObjectCode* oc)
 
                             oc->symbols[curSymbol++].name = nm;
                             oc->symbols[curSymbol].addr   = addr;
+                            oc->symbols[curSymbol].isWeak = HS_BOOL_FALSE;
                     }
                 }
                 else

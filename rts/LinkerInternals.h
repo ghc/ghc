@@ -105,6 +105,9 @@ typedef struct _SymbolInfo {
 
     /* The address of the symbol. */
     unsigned char* addr;
+
+    /* Indicates if the symbol is weak */
+    HsBool isWeak;
 } SymbolInfo;
 
 /* Top-level structure for an object module.  One of these is allocated
