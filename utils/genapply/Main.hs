@@ -157,10 +157,31 @@ mkJump :: RegStatus -- Registerised status
        -> [ArgRep]  -- Jump arguments
        -> Doc
 mkJump regstatus jump live args =
-    text "jump " <> jump <+> brackets (hcat (punctuate comma (map text regs)))
+    text "jump" <+> jump <+> brackets (hcat (punctuate comma liveRegs))
   where
-   (reg_locs, _, _) = assignRegs regstatus 0 args
-   regs             = (nub . sort) (live ++ map fst reg_locs)
+    liveRegs = mkJumpLiveRegs regstatus live args
+
+-- Make a jump, saving CCCS and restoring it on return
+mkJumpSaveCCCS :: RegStatus -- Registerised status
+               -> Doc       -- Jump target
+               -> [Reg]     -- Registers that are definitely live
+               -> [ArgRep]  -- Jump arguments
+               -> Doc
+mkJumpSaveCCCS regstatus jump live args =
+    text "jump_SAVE_CCCS" <> parens (hcat (punctuate comma (jump : liveRegs)))
+  where
+    liveRegs = mkJumpLiveRegs regstatus live args
+
+-- Calculate live registers for a jump
+mkJumpLiveRegs :: RegStatus -- Registerised status
+               -> [Reg]     -- Registers that are definitely live
+               -> [ArgRep]  -- Jump arguments
+               -> [Doc]
+mkJumpLiveRegs regstatus live args =
+    map text regs
+  where
+    (reg_locs, _, _) = assignRegs regstatus 0 args
+    regs             = (nub . sort) (live ++ map fst reg_locs)
 
 -- make a ptr/non-ptr bitmap from a list of argument types
 mkBitmap :: [ArgRep] -> Word32
@@ -318,7 +339,8 @@ genMkPAP regstatus macro jump live ticker disamb
                 else empty,
             if is_fun_case then mb_tag_node arity else empty,
             if overflow_regs
-                then text "jump_SAVE_CCCS" <> parens (text jump) <> semi
+                then mkJumpSaveCCCS
+                       regstatus (text jump) live (take arity args) <> semi
                 else mkJump regstatus (text jump) live (if no_load_regs then [] else args) <> semi
             ]) $$
            text "}"
@@ -580,6 +602,7 @@ argRep V32 = text "V32_"
 argRep V64 = text "V64_"
 argRep _   = text "W_"
 
+genApply :: RegStatus -> [ArgRep] -> Doc
 genApply regstatus args =
    let
     fun_ret_label  = mkApplyRetName args
@@ -739,7 +762,8 @@ genApply regstatus args =
           -- overwritten by an indirection, so we must enter the original
           -- info pointer we read, don't read it again, because it might
           -- not be enterable any more.
-          text "jump_SAVE_CCCS(%ENTRY_CODE(info));",
+          mkJumpSaveCCCS
+            regstatus (text "%ENTRY_CODE(info)") ["R1"] args <> semi,
             -- see Note [jump_SAVE_CCCS]
           text ""
          ]),
@@ -776,6 +800,7 @@ genApply regstatus args =
 -- -----------------------------------------------------------------------------
 -- Making a fast unknown application, args are in regs
 
+genApplyFast :: RegStatus -> [ArgRep] -> Doc
 genApplyFast regstatus args =
    let
     fun_fast_label = mkApplyFastName args
