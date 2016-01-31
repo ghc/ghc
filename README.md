@@ -83,8 +83,13 @@ the previous build are still in the GHC tree.
 
 #### Testing
 
-* `shake-build/build.sh test` runs GHC tests. The current implementation is very
-limited and cannot replace the `validate` script (see [#187][validation-issue]).
+* `shake-build/build.sh validate` runs GHC tests by simply executing `make fast` in `testsuite/tests`
+directory. This can be used instead of `sh validate --fast --no-clean` in the existing build system.
+Note: this will rebuild Stage2 GHC, `ghc-pkg` and `hpc` if they are out of date.
+
+* `shake-build/build.sh test` runs GHC tests by calling the `testsuite/driver/runtests.py` python
+script with appropriate flags. The current implementation is limited and cannot replace the
+`validate` script (see [#187][validation-issue]).
 
 * `shake-build/build.sh selftest` runs tests of the build system. Current test
 coverage is close to zero (see [#197][test-issue]).
