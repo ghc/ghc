@@ -451,11 +451,11 @@ static int ghciInsertSymbolTable(
       insertStrHashTable(table, key, pinfo);
       return 1;
    }
-   else if ((!pinfo->weak || pinfo->value) && weak)
+   else if (weak)
    {
-     return 1; /* duplicate weak symbol, throw it away */
+     return 1; /* weak symbol, can't possible replace existing, throw it away */
    }
-   else if (pinfo->weak) /* weak symbol is in the table */
+   else if (pinfo->weak && !weak) /* weak symbol is in the table */
    {
       /* override the weak definition with the non-weak one */
       pinfo->value = data;
@@ -3859,7 +3859,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       if (addr != NULL ) {
         sname = cstring_from_COFF_symbol_name(symtab_i->Name, strtab);
 
-         /* debugBelch("addSymbol %p `%s \n", addr,sname);  */
+         /* debugBelch("addSymbol %p `%s' Weak:%lld \n", addr, sname, isWeak); */
          IF_DEBUG(linker, debugBelch("addSymbol %p `%s'\n", addr,sname);)
          ASSERT(i >= 0 && i < oc->n_symbols);
          /* cstring_from_COFF_symbol_name always succeeds. */
