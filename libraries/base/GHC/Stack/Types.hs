@@ -1,4 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE ConstraintKinds   #-}
+{-# LANGUAGE ImplicitParams    #-}
+{-# LANGUAGE KindSignatures    #-}
+{-# LANGUAGE PolyKinds         #-}
+{-# LANGUAGE RankNTypes        #-}
+
 {-# OPTIONS_HADDOCK hide #-}
 -- we hide this module from haddock to enforce GHC.Stack as the main
 -- access point.
@@ -13,15 +19,17 @@
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
 --
--- type definitions for call-stacks via implicit parameters.
+-- type definitions for implicit call-stacks.
 -- Use "GHC.Stack" from the base package instead of importing this
 -- module directly.
 --
 -----------------------------------------------------------------------------
 
 module GHC.Stack.Types (
-    -- * Implicit parameter call stacks
-    CallStack(..), emptyCallStack, freezeCallStack, getCallStack, pushCallStack,
+    -- * Implicit call stacks
+    CallStack(..), HasCallStack,
+    emptyCallStack, freezeCallStack, getCallStack, pushCallStack,
+
     -- * Source locations
     SrcLoc(..)
   ) where
@@ -49,42 +57,74 @@ import GHC.Integer ()
 -- Explicit call-stacks built via ImplicitParams
 ----------------------------------------------------------------------
 
--- | Implicit @CallStack@s are an alternate method of obtaining the call stack
--- at a given point in the program.
+-- | Request a CallStack.
 --
--- GHC has two built-in rules for solving implicit-parameters of type
--- @CallStack@.
+-- NOTE: The implicit parameter @?callStack :: CallStack@ is an
+-- implementation detail and __should not__ be considered part of the
+-- 'CallStack' API, we may decide to change the implementation in the
+-- future.
 --
--- 1. If the @CallStack@ occurs in a function call, it appends the
---    source location of the call to the @CallStack@ in the environment.
--- 2. @CallStack@s that cannot be solved normally (i.e. unbound
---    occurrences) are defaulted to the empty @CallStack@.
+-- @since 4.9.0.0
+type HasCallStack = (?callStack :: CallStack)
+
+-- | 'CallStack's are a lightweight method of obtaining a
+-- partial call-stack at any point in the program.
 --
--- Otherwise implicit @CallStack@s behave just like ordinary implicit
--- parameters. For example:
---
--- @
--- myerror :: (?callStack :: CallStack) => String -> a
--- myerror msg = error (msg ++ "\n" ++ prettyCallStack ?callStack)
--- @
---
--- Will produce the following when evaluated,
+-- A function can request its call-site with the 'HasCallStack' constraint.
+-- For example, we can define
 --
 -- @
--- ghci> myerror "die"
+-- errorWithCallStack :: HasCallStack => String -> a
+-- @
+--
+-- as a variant of @error@ that will get its call-site. We can access the
+-- call-stack inside @errorWithCallStack@ with 'GHC.Stack.callStack'.
+--
+-- @
+-- errorWithCallStack :: HasCallStack => String -> a
+-- errorWithCallStack msg = error (msg ++ "\n" ++ prettyCallStack callStack)
+-- @
+--
+-- Thus, if we call @errorWithCallStack@ we will get a formatted call-stack
+-- alongside our error message.
+--
+--
+-- >>> errorWithCallStack "die"
 -- *** Exception: die
--- CallStack (from ImplicitParams):
---   myerror, called at <interactive>:2:1 in interactive:Ghci1
--- @
+-- CallStack (from HasCallStack):
+--   errorWithCallStack, called at <interactive>:2:1 in interactive:Ghci1
 --
--- @CallStack@s do not interact with the RTS and do not require compilation with
--- @-prof@. On the other hand, as they are built up explicitly using
--- implicit-parameters, they will generally not contain as much information as
--- the simulated call-stacks maintained by the RTS.
 --
--- A @CallStack@ is a @[(String, SrcLoc)]@. The @String@ is the name of
+-- GHC solves 'HasCallStack' constraints in three steps:
+--
+-- 1. If there is a 'CallStack' in scope -- i.e. the enclosing function
+--    has a 'HasCallStack' constraint -- GHC will append the new
+--    call-site to the existing 'CallStack'.
+--
+-- 2. If there is no 'CallStack' in scope -- e.g. in the GHCi session
+--    above -- and the enclosing definition does not have an explicit
+--    type signature, GHC will infer a 'HasCallStack' constraint for the
+--    enclosing definition (subject to the monomorphism restriction).
+--
+-- 3. If there is no 'CallStack' in scope and the enclosing definition
+--    has an explicit type signature, GHC will solve the 'HasCallStack'
+--    constraint for the singleton 'CallStack' containing just the
+--    current call-site.
+--
+-- 'CallStack's do not interact with the RTS and do not require compilation
+-- with @-prof@. On the other hand, as they are built up explicitly via the
+-- 'HasCallStack' constraints, they will generally not contain as much
+-- information as the simulated call-stacks maintained by the RTS.
+--
+-- A 'CallStack' is a @[(String, SrcLoc)]@. The @String@ is the name of
 -- function that was called, the 'SrcLoc' is the call-site. The list is
 -- ordered with the most recently called function at the head.
+--
+-- NOTE: The intrepid user may notice that 'HasCallStack' is just an
+-- alias for an implicit parameter @?callStack :: CallStack@. This is an
+-- implementation detail and __should not__ be considered part of the
+-- 'CallStack' API, we may decide to change the implementation in the
+-- future.
 --
 -- @since 4.8.1.0
 data CallStack
@@ -110,7 +150,7 @@ getCallStack stk = case stk of
 
 -- Note [Definition of CallStack]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- Implicit CallStacks are defined very early in base because they are
+-- CallStack is defined very early in base because it is
 -- used by error and undefined. At this point in the dependency graph,
 -- we do not have enough functionality to (conveniently) write a nice
 -- pretty-printer for CallStack. The sensible place to define the
@@ -142,6 +182,7 @@ pushCallStack cs stk = case stk of
 emptyCallStack :: CallStack
 emptyCallStack = EmptyCallStack
 {-# INLINE emptyCallStack #-}
+
 
 -- | Freeze a call-stack, preventing any further call-sites from being appended.
 --

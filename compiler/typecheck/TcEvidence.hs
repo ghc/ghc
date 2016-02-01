@@ -527,16 +527,18 @@ Note [Overview of implicit CallStacks]
 The goal of CallStack evidence terms is to reify locations
 in the program source as runtime values, without any support
 from the RTS. We accomplish this by assigning a special meaning
-to implicit parameters of type GHC.Stack.CallStack.
+to constraints of type GHC.Stack.Types.HasCallStack, an alias
 
-Implicit CallStacks are regular implicit parameters, augmented with two
-extra rules in the constraint solver:
+  type HasCallStack = (?callStack :: CallStack)
+
+Implicit parameters of type GHC.Stack.Types.CallStack (the name is not
+important) are solved in three steps:
 
 1. Occurrences of CallStack IPs are solved directly from the given IP,
    just like a regular IP. For example, the occurrence of `?stk` in
 
      error :: (?stk :: CallStack) => String -> a
-     error s = raise (ErrorCall (s ++ show ?stk))
+     error s = raise (ErrorCall (s ++ prettyCallStack ?stk))
 
    will be solved for the `?stk` in `error`s context as before.
 
@@ -604,14 +606,15 @@ in `g`, because `head` did not explicitly request a CallStack.
 Important Details:
 - GHC should NEVER report an insoluble CallStack constraint.
 
-- A CallStack (defined in GHC.Stack) is a [(String, SrcLoc)], where the String
-  is the name of the binder that is used at the SrcLoc. SrcLoc is defined in
-  GHC.SrcLoc and contains the package/module/file name, as well as the full
-  source-span. Both CallStack and SrcLoc are kept abstract so only GHC can
-  construct new values.
+- A CallStack (defined in GHC.Stack.Types) is a [(String, SrcLoc)],
+  where the String is the name of the binder that is used at the
+  SrcLoc. SrcLoc is also defined in GHC.Stack.Types and contains the
+  package/module/file name, as well as the full source-span. Both
+  CallStack and SrcLoc are kept abstract so only GHC can construct new
+  values.
 
-- We will automatically solve any wanted CallStack regardless of the name of the
-  IP, i.e.
+- We will automatically solve any wanted CallStack regardless of the
+  name of the IP, i.e.
 
     f = show (?stk :: CallStack)
     g = show (?loc :: CallStack)

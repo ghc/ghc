@@ -8040,83 +8040,6 @@ a type signature for ``y``, then ``y`` will get type
 ``let`` will see the inner binding of ``?x``, so ``(f 9)`` will return
 ``14``.
 
-.. _implicit-callstacks:
-
-Implicit CallStacks
-~~~~~~~~~~~~~~~~~~~
-
-Implicit parameters of the new ``base`` type ``GHC.Stack.CallStack`` are
-treated specially in function calls, the solver automatically pushes
-the source location of the call onto the ``CallStack`` in the
-environment. For example
-
-::
-
-   myerror :: (?callStack :: CallStack) => String -> a
-   myerror msg = error (msg ++ "\n" ++ prettyCallStack ?callStack)
-
-   ghci> myerror "die"
-   *** Exception: die
-   CallStack (from ImplicitParams):
-     myerror, called at <interactive>:2:1 in interactive:Ghci1
-
-prints the call-site of ``myerror``. The name of the implicit
-parameter does not matter, but within ``base`` we call it
-``?callStack``.
-
-The ``CallStack`` will only extend as far as the types allow it, for
-example
-
-.. code-block:: none
-
-   head :: (?callStack :: CallStack) => [a] -> a
-   head []     = myerror "empty"
-   head (x:xs) = x
-
-   bad :: Int
-   bad = head []
-
-   ghci> bad
-   *** Exception: empty
-   CallStack (from ImplicitParams):
-     myerror, called at Bad.hs:8:15 in main:Bad
-     head, called at Bad.hs:12:7 in main:Bad
-
-includes the call-site of ``myerror`` in ``head``, and of ``head`` in
-``bad``, but not the call-site of ``bad`` at the GHCi prompt.
-
-GHC will never report an unbound implicit ``CallStack``, and will
-instead default such occurrences to the empty ``CallStack``.
-
-``CallStack`` is kept abstract, but GHC provides a function ::
-
-      getCallStack :: CallStack -> [(String, SrcLoc)]
-
-to access the individual call-sites in the stack. The ``String`` is the
-name of the function that was called, and the ``SrcLoc`` provides the
-package, module, and file name, as well as the line and column numbers.
-GHC will infer ``CallStack`` constraints using the same rules as for
-ordinary implicit parameters.
-
-``GHC.Stack`` additionally exports a function ``freezeCallStack`` that
-allows users to freeze a ``CallStack``, preventing any future push
-operations from having an effect. This can be used by library authors
-to prevent ``CallStack``\s from exposing unnecessary implementation
-details. Consider the ``head`` example above, the ``myerror`` line in
-the printed stack is not particularly enlightening, so we might choose
-to suppress it by freezing the ``CallStack`` that we pass to ``myerror``.
-
-.. code-block:: none
-
-   head :: (?callStack :: CallStack) => [a] -> a
-   head []     = let ?callStack = freezeCallStack ?callStack in myerror "empty"
-   head (x:xs) = x
-
-   ghci> head []]
-   *** Exception: empty
-   CallStack (from ImplicitParams):
-     head, called at Bad.hs:12:7 in main:Bad
-
 
 .. _kinding:
 
@@ -12879,3 +12802,112 @@ intuitive: ::
         let f = /\a \(d::Eq a). fst (member, True) in body
 
 Note that the bang has no effect at all in this case
+
+.. _hascallstack:
+
+HasCallStack
+============
+
+``GHC.Stack.HasCallStack`` is a lightweight method of obtaining a
+partial call-stack at any point in the program.
+
+A function can request its call-site with the ``HasCallStack`` constraint.
+For example, we can define ::
+
+   errorWithCallStack :: HasCallStack => String -> a
+
+as a variant of ``error`` that will get its call-site. We can access the
+call-stack inside ``errorWithCallStack`` with ``GHC.Stack.callStack``. ::
+
+   errorWithCallStack :: HasCallStack => String -> a
+   errorWithCallStack msg = error (msg ++ "\n" ++ prettyCallStack callStack)
+
+Thus, if we call ``errorWithCallStack`` we will get a formatted call-stack
+alongside our error message.
+
+.. code-block:: none
+
+   ghci> errorWithCallStack "die"
+   *** Exception: die
+   CallStack (from HasCallStack):
+     errorWithCallStack, called at <interactive>:2:1 in interactive:Ghci1
+
+The ``CallStack`` will only extend as far as the types allow it, for
+example ::
+
+   head :: HasCallStack => [a] -> a
+   head []     = errorWithCallStack "empty"
+   head (x:xs) = x
+
+   bad :: Int
+   bad = head []
+
+.. code-block:: none
+
+   ghci> bad
+   *** Exception: empty
+   CallStack (from HasCallStack):
+     errorWithCallStack, called at Bad.hs:8:15 in main:Bad
+     head, called at Bad.hs:12:7 in main:Bad
+
+includes the call-site of ``errorWithCallStack`` in ``head``,
+and of ``head`` in ``bad``,
+but not the call-site of ``bad`` at the GHCi prompt.
+
+GHC solves ``HasCallStack`` constraints in three steps:
+
+1. If there is a ``CallStack`` in scope -- i.e. the enclosing function
+   has a ``HasCallStack`` constraint -- GHC will push the new call-site
+   onto the existing ``CallStack``.
+
+2. If there is no ``CallStack`` in scope -- e.g. in the GHCi session
+   above -- and the enclosing definition does not have an explicit
+   type signature, GHC will infer a ``HasCallStack`` constraint for the
+   enclosing definition (subject to the monomorphism restriction).
+
+3. If there is no ``CallStack`` in scope and the enclosing definition
+   has an explicit type signature, GHC will solve the ``HasCallStack``
+   constraint for the singleton ``CallStack`` containing just the
+   current call-site.
+
+``CallStack`` is kept abstract, but GHC provides a function ::
+
+   getCallStack :: CallStack -> [(String, SrcLoc)]
+
+to access the individual call-sites in the stack. The ``String`` is the
+name of the function that was called, and the ``SrcLoc`` provides the
+package, module, and file name, as well as the line and column numbers.
+
+``GHC.Stack`` additionally exports a function ``withFrozenCallStack`` that
+allows users to freeze the current ``CallStack``, preventing any future push
+operations from having an effect. This can be used by library authors
+to prevent ``CallStack``\s from exposing unnecessary implementation
+details. Consider the ``head`` example above, the ``errorWithCallStack`` line in
+the printed stack is not particularly enlightening, so we might choose
+to suppress it by freezing the ``CallStack`` that we pass to ``errorWithCallStack``. ::
+
+   head :: HasCallStack => [a] -> a
+   head []     = withFrozenCallStack (errorWithCallStack "empty")
+   head (x:xs) = x
+
+.. code-block:: none
+
+   ghci> head []
+   *** Exception: empty
+   CallStack (from HasCallStack):
+     head, called at Bad.hs:12:7 in main:Bad
+
+**NOTE**: The intrepid user may notice that ``HasCallStack`` is just an
+alias for an implicit parameter ``?callStack :: CallStack``. This is an
+implementation detail and **should not** be considered part of the
+``CallStack`` API, we may decide to change the implementation in the
+future.
+
+Compared with other sources of stack traces
+-------------------------------------------
+
+``HasCallStack`` does not interact with the RTS and does not require
+compilation with ``-prof``. On the other hand, as the ``CallStack`` is
+built up explicitly via the ``HasCallStack`` constraints, it will
+generally not contain as much information as the simulated call-stacks
+maintained by the RTS.

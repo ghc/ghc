@@ -200,7 +200,7 @@ showCCSStack stk = "CallStack (from -prof):" : map ("  " ++) (reverse stk)
 -- prettySrcLoc and prettyCallStack are defined here to avoid hs-boot
 -- files. See Note [Definition of CallStack]
 
--- | Pretty print 'SrcLoc'
+-- | Pretty print a 'SrcLoc'.
 --
 -- @since 4.8.1.0
 prettySrcLoc :: SrcLoc -> String
@@ -212,7 +212,7 @@ prettySrcLoc SrcLoc {..}
       , srcLocPackage, ":", srcLocModule
       ]
 
--- | Pretty print 'CallStack'
+-- | Pretty print a 'CallStack'.
 --
 -- @since 4.8.1.0
 prettyCallStack :: CallStack -> String
@@ -221,7 +221,7 @@ prettyCallStack = intercalate "\n" . prettyCallStackLines
 prettyCallStackLines :: CallStack -> [String]
 prettyCallStackLines cs = case getCallStack cs of
   []  -> []
-  stk -> "CallStack (from ImplicitParams):"
+  stk -> "CallStack (from HasCallStack):"
        : map (("  " ++) . prettyCallSite) stk
   where
     prettyCallSite (f, loc) = f ++ ", called at " ++ prettySrcLoc loc

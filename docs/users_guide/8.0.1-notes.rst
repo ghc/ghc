@@ -47,8 +47,8 @@ The highlights, since the 7.10 branch, are:
 - :ghc-flag:`-XDuplicateRecordFields`, allowing multiple datatypes to declare the same
   record field names provided they are used unambiguously (see :ref:`duplicate-record-fields`)
 
-- Support for implicit parameters providing light-weight
-  :ref:`callstacks and source locations <implicit-callstacks>`
+- Support for lightweight
+  :ref:`callstacks and source locations <hascallstack>`
 
 - User-defined error messages for type errors
 
@@ -85,24 +85,20 @@ Language
             -- | Just a normal sum
             Sum :: Int -> Int -> Expr Int
 
--  Implicit parameters of the new ``base`` type :base-ref:`GHC.Stack.CallStack <GHC-Stack.html>`
-   are treated specially in function calls, the solver automatically
-   appends the source location of the call to the ``CallStack`` in
-   the environment. For example ::
+-  The new ``base`` constraint :base-ref:`GHC.Stack.HasCallStack <GHC-Stack.html>`
+   can be used by functions to request a partial call-stack. For example ::
 
-        myerror :: (?callStack :: CallStack) => String -> a
-        myerror msg = error (msg ++ "\n" ++ prettyCallStack ?callStack)
+        errorWithCallStack :: HasCallStack => String -> a
+        errorWithCallStack msg = error (msg ++ "\n" ++ prettyCallStack callStack)
 
-        ghci> myerror "die"
+        ghci> errorWithCallStack "die"
         *** Exception: die
-        CallStack (from ImplicitParams):
-          myerror, called at <interactive>:2:1 in interactive:Ghci1
+        CallStack (from HasCallStack):
+          errorWithCallStack, called at <interactive>:2:1 in interactive:Ghci1
 
-   prints the call-site of ``myerror``. The name of the implicit
-   parameter does not matter, but within ``base`` we call it
-   ``?callStack``.
+   prints the call-site of ``errorWithCallStack``.
 
-   See :ref:`lib-base` for a description of the ``CallStack`` type.
+   See :ref:`hascallstack` for a description of ``HasCallStack``.
 
 -  GHC now supports visible type application, allowing
    programmers to easily specify how type parameters should be

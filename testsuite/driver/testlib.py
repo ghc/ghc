@@ -1689,13 +1689,17 @@ def normalise_whitespace( str ):
     # Merge contiguous whitespace characters into a single space.
     return ' '.join(w for w in str.split())
 
+callSite_re = re.compile(r', called at (.+):[\d]+:[\d]+ in [\w\-\.]+:')
+
 def normalise_callstacks(str):
     def repl(matches):
         location = matches.group(1)
         location = normalise_slashes_(location)
         return ', called at {0}:<line>:<column> in <package-id>:'.format(location)
     # Ignore line number differences in call stacks (#10834).
-    return re.sub(', called at (.+):[\\d]+:[\\d]+ in [\\w\-\.]+:', repl, str)
+    str1 = re.sub(callSite_re, repl, str)
+    # Ignore the change in how we identify implicit call-stacks
+    return str1.replace('from ImplicitParams', 'from HasCallStack')
 
 tyCon_re = re.compile(r'TyCon\s*\d+L?\#\#\s*\d+L?\#\#\s*', flags=re.MULTILINE)
 
