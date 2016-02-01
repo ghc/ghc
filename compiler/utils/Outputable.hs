@@ -95,6 +95,7 @@ import Platform
 import Pretty           ( Doc, Mode(..) )
 import Panic
 import GHC.Serialized
+import GHC.LanguageExtensions (Extension)
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -814,6 +815,9 @@ instance Outputable a => Outputable (SCC a) where
 
 instance Outputable Serialized where
     ppr (Serialized the_type bytes) = int (length bytes) <+> text "of type" <+> text (show the_type)
+
+instance Outputable Extension where
+    ppr = text . show
 
 {-
 ************************************************************************

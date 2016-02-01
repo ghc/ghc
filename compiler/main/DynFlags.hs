@@ -604,7 +604,10 @@ data WarningFlag =
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
-   deriving Enum
+   deriving (Eq, Enum, Show)
+
+instance Outputable Language where
+    ppr = text . show
 
 -- | The various Safe Haskell modes
 data SafeHaskellMode
@@ -1675,6 +1678,11 @@ Note [Verbosity levels]
 
 data OnOff a = On a
              | Off a
+  deriving (Eq, Show)
+
+instance Outputable a => Outputable (OnOff a) where
+  ppr (On x)  = text "On" <+> ppr x
+  ppr (Off x) = text "Off" <+> ppr x
 
 -- OnOffs accumulate in reverse order, so we use foldr in order to
 -- process them in the right order
