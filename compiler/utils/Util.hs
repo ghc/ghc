@@ -35,6 +35,8 @@ module Util (
 
         isIn, isn'tIn,
 
+        chunkList,
+
         -- * Tuples
         fstOf3, sndOf3, thdOf3,
         firstM, first3M,
@@ -505,6 +507,12 @@ isn'tIn msg x ys
       | i > 100 = trace ("Over-long notElem in " ++ msg) (x `notElem` (y:ys))
       | otherwise = x /= y && notElem100 (i + 1) x ys
 # endif /* DEBUG */
+
+
+-- | Split a list into chunks of /n/ elements
+chunkList :: Int -> [a] -> [[a]]
+chunkList _ [] = []
+chunkList n xs = as : chunkList n bs where (as,bs) = splitAt n xs
 
 {-
 ************************************************************************
