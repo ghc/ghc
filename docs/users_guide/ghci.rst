@@ -1136,8 +1136,8 @@ conjunction with ``-fexternal-interpreter``.
 There are three ways to get access to the current call stack.
 
 - ``error`` and ``undefined`` automatically attach the current stack
-  to the error message.  This often complements the implicit stack
-  stack (see :ref:`implicit-callstacks`), so both call stacks are
+  to the error message.  This often complements the ``HasCallStack``
+  stack (see :ref:`hascallstack`), so both call stacks are
   shown.
 
 - ``Debug.Trace.traceStack`` is a version of ``Debug.Trace.trace``

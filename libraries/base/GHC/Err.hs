@@ -34,25 +34,30 @@ import {-# SOURCE #-} GHC.Exception( errorCallWithCallStackException )
 
 -- | 'error' stops execution and displays an error message.
 error :: forall (v :: Levity). forall (a :: TYPE v).
-         (?callStack :: CallStack) => [Char] -> a
+         HasCallStack => [Char] -> a
 error s = raise# (errorCallWithCallStackException s ?callStack)
+          -- Bleh, we should be using 'GHC.Stack.callStack' instead of
+          -- '?callStack' here, but 'GHC.Stack.callStack' depends on
+          -- 'GHC.Stack.popCallStack', which is partial and depends on
+          -- 'error'.. Do as I say, not as I do.
 
 -- | A variant of 'error' that does not produce a stack trace.
 --
 -- @since 4.9.0.0
 errorWithoutStackTrace :: forall (v :: Levity). forall (a :: TYPE v).
                           [Char] -> a
-errorWithoutStackTrace s
-  = let ?callStack = freezeCallStack ?callStack
-    in error s
-{-# NOINLINE errorWithoutStackTrace #-}
+errorWithoutStackTrace s =
+  -- we don't have withFrozenCallStack yet, so we just inline the definition
+  let ?callStack = freezeCallStack emptyCallStack
+  in error s
+
 
 -- Note [Errors in base]
 -- ~~~~~~~~~~~~~~~~~~~~~
 -- As of base-4.9.0.0, `error` produces a stack trace alongside the
--- error message using the Implicit CallStack machinery. This provides
+-- error message using the HasCallStack machinery. This provides
 -- a partial stack trace, containing the call-site of each function
--- with a (?callStack :: CallStack) implicit parameter constraint.
+-- with a HasCallStack constraint.
 --
 -- In base, however, the only functions that have such constraints are
 -- error and undefined, so the stack traces from partial functions in
@@ -70,7 +75,7 @@ errorWithoutStackTrace s
 -- messages which are more appropriate to the context in which 'undefined'
 -- appears.
 undefined :: forall (v :: Levity). forall (a :: TYPE v).
-             (?callStack :: CallStack) => a
+             HasCallStack => a
 undefined =  error "Prelude.undefined"
 
 -- | Used for compiler-generated error message;
