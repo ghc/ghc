@@ -42,6 +42,7 @@ data CompiledByteCode = CompiledByteCode
   { bc_bcos   :: [UnlinkedBCO]  -- Bunch of interpretable bindings
   , bc_itbls  :: ItblEnv        -- A mapping from DataCons to their itbls
   , bc_ffis   :: [FFIInfo]      -- ffi blocks we allocated
+  , bc_strs   :: [RemotePtr ()] -- malloc'd strings
   , bc_breaks :: Maybe ModBreaks -- breakpoint info (Nothing if we're not
                                  -- creating breakpoints, for some reason)
   }

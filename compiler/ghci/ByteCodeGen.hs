@@ -125,7 +125,7 @@ coreExprToBCOs hsc_env this_mod expr
 
       dumpIfSet_dyn dflags Opt_D_dump_BCOs "Proto-BCOs" (ppr proto_bco)
 
-      assembleBCO dflags proto_bco
+      assembleOneBCO hsc_env proto_bco
 
 
 -- The regular freeVars function gives more information than is useful to

@@ -75,6 +75,7 @@ run m = case m of
     aps <- localRef ref
     mapM mkRemoteRef =<< getIdValFromApStack aps ix
   MallocData bs -> mkString bs
+  MallocStrings bss -> mapM mkString0 bss
   PrepFFI conv args res -> toRemotePtr <$> prepForeignCall conv args res
   FreeFFI p -> freeForeignCallInfo (fromRemotePtr p)
   MkConInfoTable ptrs nptrs tag desc ->
@@ -321,6 +322,13 @@ mkString :: ByteString -> IO (RemotePtr ())
 mkString bs = B.unsafeUseAsCStringLen bs $ \(cstr,len) -> do
   ptr <- mallocBytes len
   copyBytes ptr cstr len
+  return (castRemotePtr (toRemotePtr ptr))
+
+mkString0 :: ByteString -> IO (RemotePtr ())
+mkString0 bs = B.unsafeUseAsCStringLen bs $ \(cstr,len) -> do
+  ptr <- mallocBytes (len+1)
+  copyBytes ptr cstr len
+  pokeElemOff (ptr :: Ptr CChar) len 0
   return (castRemotePtr (toRemotePtr ptr))
 
 mkCostCentres :: String -> [(String,String)] -> IO [RemotePtr CostCentre]

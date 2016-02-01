@@ -18,6 +18,12 @@ data SizedSeq a = SizedSeq !Word [a]
 instance Functor SizedSeq where
   fmap f (SizedSeq sz l) = SizedSeq sz (fmap f l)
 
+instance Foldable SizedSeq where
+  foldr f c ss = foldr f c (ssElts ss)
+
+instance Traversable SizedSeq where
+  traverse f (SizedSeq sz l) = SizedSeq sz . reverse <$> traverse f (reverse l)
+
 instance Binary a => Binary (SizedSeq a)
 
 emptySS :: SizedSeq a
