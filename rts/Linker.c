@@ -193,7 +193,7 @@ static pathchar* pathdup(pathchar *path)
     ret = wcsdup(path);
 #else
     /* sigh, strdup() isn't a POSIX function, so do it the long way */
-    ret = stgMallocBytes( strlen(path)+1, "loadObj" );
+    ret = stgMallocBytes( strlen(path)+1, "pathdup" );
     strcpy(ret, path);
 #endif
     return ret;
