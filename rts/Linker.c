@@ -439,6 +439,7 @@ static int ghciInsertSymbolTable(
       "     loaded twice.\n",
       (char*)key,
       obj_name,
+      pinfo->owner == NULL ? "(GHCi built-in symbols)" :
       pinfo->owner->archiveMemberName ? pinfo->owner->archiveMemberName
       : pinfo->owner->fileName
    );
