@@ -11,6 +11,7 @@ the keys.
 
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Module
     (
@@ -87,7 +88,7 @@ import FastString
 import Binary
 import Util
 import {-# SOURCE #-} Packages
-import GHC.PackageDb (BinaryStringRep(..))
+import GHC.PackageDb (BinaryStringRep(..), DbModuleRep(..), DbModule(..))
 
 import Data.Data
 import Data.Map (Map)
@@ -370,6 +371,10 @@ class ContainsModule t where
 
 class HasModule m where
     getModule :: m Module
+
+instance DbModuleRep UnitId ModuleName Module where
+  fromDbModule (DbModule uid mod_name) = mkModule uid mod_name
+  toDbModule mod = DbModule (moduleUnitId mod) (moduleName mod)
 
 {-
 ************************************************************************

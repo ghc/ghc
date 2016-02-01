@@ -1,4 +1,7 @@
-{-# LANGUAGE CPP, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 -----------------------------------------------------------------------------
 --
@@ -12,6 +15,7 @@ module Main (main) where
 
 import Version ( version, targetOS, targetARCH )
 import qualified GHC.PackageDb as GhcPkg
+import GHC.PackageDb (BinaryStringRep(..))
 import qualified Distribution.Simple.PackageIndex as PackageIndex
 import qualified Data.Graph as Graph
 import qualified Distribution.ModuleName as ModuleName
@@ -1071,19 +1075,20 @@ updateDBCache verbosity db = do
       hPutChar handle c
 
 type PackageCacheFormat = GhcPkg.InstalledPackageInfo
-                            String     -- src package id
-                            String     -- package name
-                            String     -- unit id
-                            ModuleName -- module name
+                            PackageIdentifier
+                            PackageName
+                            UnitId
+                            ModuleName
+                            OriginalModule
 
 convertPackageInfoToCacheFormat :: InstalledPackageInfo -> PackageCacheFormat
 convertPackageInfoToCacheFormat pkg =
     GhcPkg.InstalledPackageInfo {
-       GhcPkg.unitId             = display (installedUnitId pkg),
-       GhcPkg.sourcePackageId    = display (sourcePackageId pkg),
-       GhcPkg.packageName        = display (packageName pkg),
+       GhcPkg.unitId             = installedUnitId pkg,
+       GhcPkg.sourcePackageId    = sourcePackageId pkg,
+       GhcPkg.packageName        = packageName pkg,
        GhcPkg.packageVersion     = packageVersion pkg,
-       GhcPkg.depends            = map display (depends pkg),
+       GhcPkg.depends            = depends pkg,
        GhcPkg.abiHash            = let AbiHash abi = abiHash pkg
                                    in abi,
        GhcPkg.importDirs         = importDirs pkg,
@@ -1104,19 +1109,32 @@ convertPackageInfoToCacheFormat pkg =
        GhcPkg.exposed            = exposed pkg,
        GhcPkg.trusted            = trusted pkg
     }
-  where convertExposed (ExposedModule n reexport) =
-            GhcPkg.ExposedModule n (fmap convertOriginal reexport)
-        convertOriginal (OriginalModule ipid m) =
-            GhcPkg.OriginalModule (display ipid) m
+  where convertExposed (ExposedModule n reexport) = (n, reexport)
+
+instance GhcPkg.BinaryStringRep PackageName where
+  fromStringRep = PackageName . fromStringRep
+  toStringRep   = toStringRep . display
+
+instance GhcPkg.BinaryStringRep PackageIdentifier where
+  fromStringRep = fromMaybe (error "BinaryStringRep PackageIdentifier")
+                . simpleParse . fromStringRep
+  toStringRep = toStringRep . display
+
+instance GhcPkg.BinaryStringRep UnitId where
+  fromStringRep = mkUnitId . fromStringRep
+  toStringRep (SimpleUnitId (ComponentId cid_str)) = toStringRep cid_str
 
 instance GhcPkg.BinaryStringRep ModuleName where
-  fromStringRep = ModuleName.fromString . fromUTF8 . BS.unpack
-  toStringRep   = BS.pack . toUTF8 . display
+  fromStringRep = ModuleName.fromString . fromStringRep
+  toStringRep   = toStringRep . display
 
 instance GhcPkg.BinaryStringRep String where
   fromStringRep = fromUTF8 . BS.unpack
   toStringRep   = BS.pack . toUTF8
 
+instance GhcPkg.DbModuleRep UnitId ModuleName OriginalModule where
+  fromDbModule (GhcPkg.DbModule uid mod_name) = OriginalModule uid mod_name
+  toDbModule (OriginalModule uid mod_name) = GhcPkg.DbModule uid mod_name
 
 -- -----------------------------------------------------------------------------
 -- Exposing, Hiding, Trusting, Distrusting, Unregistering are all similar

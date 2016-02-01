@@ -768,8 +768,12 @@ findWiredInPackages dflags pkgs vis_map = do
                   | otherwise
                   = pkg
                 upd_deps pkg = pkg {
-                      depends = map upd_wired_in (depends pkg)
+                      depends = map upd_wired_in (depends pkg),
+                      exposedModules
+                        = map (\(k,v) -> (k, fmap upd_wired_in_mod v))
+                              (exposedModules pkg)
                     }
+                upd_wired_in_mod (Module uid m) = Module (upd_wired_in uid) m
                 upd_wired_in key
                     | Just key' <- Map.lookup key wiredInMap = key'
                     | otherwise = key
@@ -1155,11 +1159,11 @@ mkModuleToPkgConfAll dflags pkg_db vis_map =
 
     es :: Bool -> [(ModuleName, Map Module ModuleOrigin)]
     es e = do
-     ExposedModule m exposedReexport <- exposed_mods
+     (m, exposedReexport) <- exposed_mods
      let (pk', m', pkg', origin') =
           case exposedReexport of
            Nothing -> (pk, m, pkg, fromExposedModules e)
-           Just (OriginalModule pk' m') ->
+           Just (Module pk' m') ->
             let pkg' = pkg_lookup pk'
             in (pk', m', pkg', fromReexportedModules e pkg')
      return (m, sing pk' m' pkg' origin')

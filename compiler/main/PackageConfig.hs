@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, RecordWildCards #-}
+{-# LANGUAGE CPP, RecordWildCards, MultiParamTypeClasses #-}
 
 -- |
 -- Package configuration information: essentially the interface to Cabal, with
@@ -44,6 +44,7 @@ type PackageConfig = InstalledPackageInfo
                        PackageName
                        Module.UnitId
                        Module.ModuleName
+                       Module.Module
 
 -- TODO: there's no need for these to be FastString, as we don't need the uniq
 --       feature, but ghc doesn't currently have convenient support for any
@@ -83,22 +84,6 @@ instance Outputable SourcePackageId where
 instance Outputable PackageName where
   ppr (PackageName str) = ftext str
 
--- | Pretty-print an 'ExposedModule' in the same format used by the textual
--- installed package database.
-pprExposedModule :: (Outputable a, Outputable b) => ExposedModule a b -> SDoc
-pprExposedModule (ExposedModule exposedName exposedReexport) =
-    sep [ ppr exposedName
-        , case exposedReexport of
-            Just m -> sep [text "from", pprOriginalModule m]
-            Nothing -> empty
-        ]
-
--- | Pretty-print an 'OriginalModule' in the same format used by the textual
--- installed package database.
-pprOriginalModule :: (Outputable a, Outputable b) => OriginalModule a b -> SDoc
-pprOriginalModule (OriginalModule originalPackageId originalModuleName) =
-    ppr originalPackageId <> char ':' <> ppr originalModuleName
-
 defaultPackageConfig :: PackageConfig
 defaultPackageConfig = emptyInstalledPackageInfo
 
@@ -119,10 +104,7 @@ pprPackageConfig InstalledPackageInfo {..} =
       field "version"              (text (showVersion packageVersion)),
       field "id"                   (ppr unitId),
       field "exposed"              (ppr exposed),
-      field "exposed-modules"
-        (if all isExposedModule exposedModules
-           then fsep (map pprExposedModule exposedModules)
-           else pprWithCommas pprExposedModule exposedModules),
+      field "exposed-modules"      (ppr exposedModules),
       field "hidden-modules"       (fsep (map ppr hiddenModules)),
       field "trusted"              (ppr trusted),
       field "import-dirs"          (fsep (map text importDirs)),
@@ -142,8 +124,6 @@ pprPackageConfig InstalledPackageInfo {..} =
     ]
   where
     field name body = text name <> colon <+> nest 4 body
-    isExposedModule (ExposedModule _ Nothing) = True
-    isExposedModule _ = False
 
 
 -- -----------------------------------------------------------------------------
