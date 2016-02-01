@@ -695,7 +695,7 @@ wrapCo co rep_ty (unbox_rep, box_rep)  -- co :: arg_ty ~ rep_ty
                          UnitBox -> do { rep_id <- newLocal (TcType.substTy subst rep_ty)
                                        ; return ([rep_id], Var rep_id) }
                          Boxer boxer -> boxer subst
-               ; let sco = substCo subst co
+               ; let sco = substCoUnchecked subst co
                ; return (rep_ids, rep_expr `Cast` mkSymCo sco) }
 
 ------------------------
