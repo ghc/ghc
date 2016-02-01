@@ -13,6 +13,7 @@ module GHCi
   , evalString
   , evalStringToIOString
   , mallocData
+  , createBCOs
   , mkCostCentres
   , costCentreStackInfo
   , newBreakArray
@@ -47,6 +48,7 @@ module GHCi
 import GHCi.Message
 import GHCi.Run
 import GHCi.RemoteTypes
+import GHCi.ResolvedBCO
 import GHCi.BreakArray (BreakArray)
 import HscTypes
 import UniqFM
@@ -57,14 +59,17 @@ import Outputable
 import Exception
 import BasicTypes
 import FastString
+import Util
 
 import Control.Concurrent
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Binary
+import Data.Binary.Put
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Lazy as LB
 import Data.IORef
-import Foreign
+import Foreign hiding (void)
 import GHC.Stack.CCS (CostCentre,CostCentreStack)
 import System.Exit
 import Data.Maybe
@@ -76,6 +81,7 @@ import GHC.IO.Handle.FD (fdToHandle)
 import System.Posix as Posix
 #endif
 import System.Process
+import GHC.Conc
 
 {- Note [Remote GHCi]
 
@@ -258,6 +264,37 @@ mkCostCentres
 mkCostCentres hsc_env mod ccs =
   iservCmd hsc_env (MkCostCentres mod ccs)
 
+-- | Create a set of BCOs that may be mutually recursive.
+createBCOs :: HscEnv -> [ResolvedBCO] -> IO [HValueRef]
+createBCOs hsc_env rbcos = do
+  n_jobs <- case parMakeCount (hsc_dflags hsc_env) of
+              Nothing -> liftIO getNumProcessors
+              Just n  -> return n
+  -- Serializing ResolvedBCO is expensive, so if we're in parallel mode
+  -- (-j<n>) parallelise the serialization.
+  if (n_jobs == 1)
+    then
+      iservCmd hsc_env (CreateBCOs [runPut (put rbcos)])
+
+    else do
+      old_caps <- getNumCapabilities
+      if old_caps == n_jobs
+         then void $ evaluate puts
+         else bracket_ (setNumCapabilities n_jobs)
+                       (setNumCapabilities old_caps)
+                       (void $ evaluate puts)
+      iservCmd hsc_env (CreateBCOs puts)
+ where
+  puts = parMap doChunk (chunkList 100 rbcos)
+
+  -- make sure we force the whole lazy ByteString
+  doChunk c = pseq (LB.length bs) bs
+    where bs = runPut (put c)
+
+  -- We don't have the parallel package, so roll our own simple parMap
+  parMap _ [] = []
+  parMap f (x:xs) = fx `par` (fxs `pseq` (fx : fxs))
+    where fx = f x; fxs = parMap f xs
 
 costCentreStackInfo :: HscEnv -> RemotePtr CostCentreStack -> IO [String]
 costCentreStackInfo hsc_env ccs =

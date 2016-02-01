@@ -14,7 +14,6 @@ module GHCi.Message
   ) where
 
 import GHCi.RemoteTypes
-import GHCi.ResolvedBCO
 import GHCi.InfoTable (StgInfoTable)
 import GHCi.FFI
 import GHCi.TH.Binary ()
@@ -66,7 +65,7 @@ data Message a where
   -- Interpreter -------------------------------------------
 
   -- | Create a set of BCO objects, and return HValueRefs to them
-  CreateBCOs :: [ResolvedBCO] -> Message [HValueRef]
+  CreateBCOs :: [LB.ByteString] -> Message [HValueRef]
 
   -- | Release 'HValueRef's
   FreeHValueRefs :: [HValueRef] -> Message ()

@@ -23,6 +23,8 @@ import Control.Concurrent
 import Control.DeepSeq
 import Control.Exception
 import Control.Monad
+import Data.Binary
+import Data.Binary.Get
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Unsafe as B
 import GHC.Exts
@@ -51,7 +53,7 @@ run m = case m of
   RemoveLibrarySearchPath ptr -> removeLibrarySearchPath (fromRemotePtr ptr)
   ResolveObjs -> resolveObjs
   FindSystemLibrary str -> findSystemLibrary str
-  CreateBCOs bco -> createBCOs bco
+  CreateBCOs bcos -> createBCOs (concatMap (runGet get) bcos)
   FreeHValueRefs rs -> mapM_ freeRemoteRef rs
   EvalStmt opts r -> evalStmt opts r
   ResumeStmt opts r -> resumeStmt opts r

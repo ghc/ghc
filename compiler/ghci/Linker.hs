@@ -499,7 +499,7 @@ linkExpr hsc_env span root_ul_bco
    ; let nobreakarray = error "no break array"
          bco_ix = mkNameEnv [(unlinkedBCOName root_ul_bco, 0)]
    ; resolved <- linkBCO hsc_env ie ce bco_ix nobreakarray root_ul_bco
-   ; [root_hvref] <- iservCmd hsc_env (CreateBCOs [resolved])
+   ; [root_hvref] <- createBCOs hsc_env [resolved]
    ; fhv <- mkFinalizedHValue hsc_env root_hvref
    ; return (pls, fhv)
    }}}
@@ -971,7 +971,7 @@ linkSomeBCOs hsc_env ie ce mods = foldr fun do_link mods []
         bco_ix = mkNameEnv (zip names [0..])
     resolved <- sequence [ linkBCO hsc_env ie ce bco_ix breakarray bco
                          | (breakarray, bco) <- flat ]
-    hvrefs <- iservCmd hsc_env (CreateBCOs resolved)
+    hvrefs <- createBCOs hsc_env resolved
     return (zip names hvrefs)
 
 -- | Useful to apply to the result of 'linkSomeBCOs'
