@@ -760,43 +760,69 @@ newtype (:.:) f (g :: * -> *) (p :: *) = Comp1 { unComp1 :: f (g p) }
   deriving (Eq, Ord, Read, Show, Generic)
 
 -- | Constants of kind @#@
+--
+-- @since 4.9.0.0
 data family URec (a :: *) (p :: *)
 
 -- | Used for marking occurrences of 'Addr#'
+--
+-- @since 4.9.0.0
 data instance URec (Ptr ()) p = UAddr { uAddr# :: Addr# }
   deriving (Eq, Ord, Generic)
 
 -- | Used for marking occurrences of 'Char#'
+--
+-- @since 4.9.0.0
 data instance URec Char p = UChar { uChar# :: Char# }
   deriving (Eq, Ord, Show, Generic)
 
 -- | Used for marking occurrences of 'Double#'
+--
+-- @since 4.9.0.0
 data instance URec Double p = UDouble { uDouble# :: Double# }
   deriving (Eq, Ord, Show, Generic)
 
 -- | Used for marking occurrences of 'Float#'
+--
+-- @since 4.9.0.0
 data instance URec Float p = UFloat { uFloat# :: Float# }
   deriving (Eq, Ord, Show, Generic)
 
 -- | Used for marking occurrences of 'Int#'
+--
+-- @since 4.9.0.0
 data instance URec Int p = UInt { uInt# :: Int# }
   deriving (Eq, Ord, Show, Generic)
 
 -- | Used for marking occurrences of 'Word#'
+--
+-- @since 4.9.0.0
 data instance URec Word p = UWord { uWord# :: Word# }
   deriving (Eq, Ord, Show, Generic)
 
 -- | Type synonym for 'URec': 'Addr#'
+--
+-- @since 4.9.0.0
 type UAddr   = URec (Ptr ())
 -- | Type synonym for 'URec': 'Char#'
+--
+-- @since 4.9.0.0
 type UChar   = URec Char
 -- | Type synonym for 'URec': 'Double#'
+--
+-- @since 4.9.0.0
 type UDouble = URec Double
 -- | Type synonym for 'URec': 'Float#'
+--
+-- @since 4.9.0.0
 type UFloat  = URec Float
 -- | Type synonym for 'URec': 'Int#'
+--
+-- @since 4.9.0.0
 type UInt    = URec Int
 -- | Type synonym for 'URec': 'Word#'
+--
+-- @since 4.9.0.0
 type UWord   = URec Word
 
 -- | Tag for K1: recursion (of kind *)
@@ -1008,6 +1034,8 @@ class Generic1 f where
 --   'Just' the record name. Otherwise, @mn@ is 'Nothing'. @su@ and @ss@ are
 --   the field's unpackedness and strictness annotations, and @ds@ is the
 --   strictness that GHC infers for the field.
+--
+-- @since 4.9.0.0
 data Meta = MetaData Symbol Symbol Symbol Bool
           | MetaCons Symbol FixityI Bool
           | MetaSel  (Maybe Symbol)
