@@ -2583,12 +2583,28 @@ dynamic_flags = [
   , defFlag "W"       (NoArg (mapM_ setWarningFlag minusWOpts))
   , defFlag "Werror"  (NoArg (setGeneralFlag           Opt_WarnIsError))
   , defFlag "Wwarn"   (NoArg (unSetGeneralFlag         Opt_WarnIsError))
+  , defFlag "Wnot"    (NoArg (do upd (\dfs -> dfs {warningFlags = IntSet.empty})
+                                 deprecate "Use -w or -Wno-everything instead"))
+  , defFlag "w"       (NoArg (upd (\dfs -> dfs {warningFlags = IntSet.empty})))
+
+     -- New-style uniform warning sets
+     --
+     -- Note that -Weverything > -Wall > -Wextra > -Wdefault > -Wno-everything
+  , defFlag "Weverything"    (NoArg (mapM_ setWarningFlag minusWeverythingOpts))
+  , defFlag "Wno-everything"
+                      (NoArg (upd (\dfs -> dfs {warningFlags = IntSet.empty})))
+
+  , defFlag "Wall"           (NoArg (mapM_ setWarningFlag minusWallOpts))
+  , defFlag "Wno-all"        (NoArg (mapM_ unSetWarningFlag minusWallOpts))
+
+  , defFlag "Wextra"         (NoArg (mapM_ setWarningFlag minusWOpts))
+  , defFlag "Wno-extra"      (NoArg (mapM_ unSetWarningFlag minusWOpts))
+
+  , defFlag "Wdefault"       (NoArg (mapM_ setWarningFlag standardWarnings))
+  , defFlag "Wno-default"    (NoArg (mapM_ unSetWarningFlag standardWarnings))
+
   , defFlag "Wcompat" (NoArg (mapM_ setWarningFlag minusWcompatOpts))
   , defFlag "Wno-compat" (NoArg (mapM_ unSetWarningFlag minusWcompatOpts))
-  , defFlag "Wall"    (NoArg (mapM_ setWarningFlag minusWallOpts))
-  , defFlag "Wnot"    (NoArg (do upd (\dfs -> dfs {warningFlags = IntSet.empty})
-                                 deprecate "Use -w instead"))
-  , defFlag "w"       (NoArg (upd (\dfs -> dfs {warningFlags = IntSet.empty})))
 
         ------ Plugin flags ------------------------------------------------
   , defGhcFlag "fplugin-opt" (hasArg addPluginModuleNameOption)
@@ -3542,6 +3558,10 @@ minusWallOpts
         Opt_WarnUntickedPromotedConstructors,
         Opt_WarnMissingPatSynSigs
       ]
+
+-- | Things you get with -Weverything, i.e. *all* known warnings flags
+minusWeverythingOpts :: [WarningFlag]
+minusWeverythingOpts = [ toEnum 0 .. ]
 
 -- | Things you get with -Wcompat.
 --
