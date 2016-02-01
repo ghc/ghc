@@ -73,6 +73,7 @@ data Message a where
 
   -- | Malloc some data and return a 'RemotePtr' to it
   MallocData :: ByteString -> Message (RemotePtr ())
+  MallocStrings :: [ByteString] -> Message [RemotePtr ()]
 
   -- | Calls 'GHCi.FFI.prepareForeignCall'
   PrepFFI :: FFIConv -> [FFIType] -> FFIType -> Message (RemotePtr C_ffi_cif)
@@ -323,42 +324,43 @@ getMessage = do
       12 -> Msg <$> CreateBCOs <$> get
       13 -> Msg <$> FreeHValueRefs <$> get
       14 -> Msg <$> MallocData <$> get
-      15 -> Msg <$> (PrepFFI <$> get <*> get <*> get)
-      16 -> Msg <$> FreeFFI <$> get
-      17 -> Msg <$> (MkConInfoTable <$> get <*> get <*> get <*> get)
-      18 -> Msg <$> (EvalStmt <$> get <*> get)
-      19 -> Msg <$> (ResumeStmt <$> get <*> get)
-      20 -> Msg <$> (AbandonStmt <$> get)
-      21 -> Msg <$> (EvalString <$> get)
-      22 -> Msg <$> (EvalStringToString <$> get <*> get)
-      23 -> Msg <$> (EvalIO <$> get)
-      24 -> Msg <$> (MkCostCentres <$> get <*> get)
-      25 -> Msg <$> (CostCentreStackInfo <$> get)
-      26 -> Msg <$> (NewBreakArray <$> get)
-      27 -> Msg <$> (EnableBreakpoint <$> get <*> get <*> get)
-      28 -> Msg <$> (BreakpointStatus <$> get <*> get)
-      29 -> Msg <$> (GetBreakpointVar <$> get <*> get)
-      30 -> Msg <$> return StartTH
-      31 -> Msg <$> FinishTH <$> get
-      32 -> Msg <$> (RunTH <$> get <*> get <*> get <*> get)
-      33 -> Msg <$> NewName <$> get
-      34 -> Msg <$> (Report <$> get <*> get)
-      35 -> Msg <$> (LookupName <$> get <*> get)
-      36 -> Msg <$> Reify <$> get
-      37 -> Msg <$> ReifyFixity <$> get
-      38 -> Msg <$> (ReifyInstances <$> get <*> get)
-      39 -> Msg <$> ReifyRoles <$> get
-      40 -> Msg <$> (ReifyAnnotations <$> get <*> get)
-      41 -> Msg <$> ReifyModule <$> get
-      42 -> Msg <$> ReifyConStrictness <$> get
-      43 -> Msg <$> AddDependentFile <$> get
-      44 -> Msg <$> AddTopDecls <$> get
-      45 -> Msg <$> (IsExtEnabled <$> get)
-      46 -> Msg <$> return ExtsEnabled
-      47 -> Msg <$> return StartRecover
-      48 -> Msg <$> EndRecover <$> get
-      49 -> Msg <$> return QDone
-      50 -> Msg <$> QException <$> get
+      15 -> Msg <$> MallocStrings <$> get
+      16 -> Msg <$> (PrepFFI <$> get <*> get <*> get)
+      17 -> Msg <$> FreeFFI <$> get
+      18 -> Msg <$> (MkConInfoTable <$> get <*> get <*> get <*> get)
+      19 -> Msg <$> (EvalStmt <$> get <*> get)
+      20 -> Msg <$> (ResumeStmt <$> get <*> get)
+      21 -> Msg <$> (AbandonStmt <$> get)
+      22 -> Msg <$> (EvalString <$> get)
+      23 -> Msg <$> (EvalStringToString <$> get <*> get)
+      24 -> Msg <$> (EvalIO <$> get)
+      25 -> Msg <$> (MkCostCentres <$> get <*> get)
+      26 -> Msg <$> (CostCentreStackInfo <$> get)
+      27 -> Msg <$> (NewBreakArray <$> get)
+      28 -> Msg <$> (EnableBreakpoint <$> get <*> get <*> get)
+      29 -> Msg <$> (BreakpointStatus <$> get <*> get)
+      30 -> Msg <$> (GetBreakpointVar <$> get <*> get)
+      31 -> Msg <$> return StartTH
+      32 -> Msg <$> FinishTH <$> get
+      33 -> Msg <$> (RunTH <$> get <*> get <*> get <*> get)
+      34 -> Msg <$> NewName <$> get
+      35 -> Msg <$> (Report <$> get <*> get)
+      36 -> Msg <$> (LookupName <$> get <*> get)
+      37 -> Msg <$> Reify <$> get
+      38 -> Msg <$> ReifyFixity <$> get
+      39 -> Msg <$> (ReifyInstances <$> get <*> get)
+      40 -> Msg <$> ReifyRoles <$> get
+      41 -> Msg <$> (ReifyAnnotations <$> get <*> get)
+      42 -> Msg <$> ReifyModule <$> get
+      43 -> Msg <$> ReifyConStrictness <$> get
+      44 -> Msg <$> AddDependentFile <$> get
+      45 -> Msg <$> AddTopDecls <$> get
+      46 -> Msg <$> (IsExtEnabled <$> get)
+      47 -> Msg <$> return ExtsEnabled
+      48 -> Msg <$> return StartRecover
+      49 -> Msg <$> EndRecover <$> get
+      50 -> Msg <$> return QDone
+      51 -> Msg <$> QException <$> get
       _  -> Msg <$> QFail <$> get
 
 putMessage :: Message a -> Put
@@ -378,43 +380,44 @@ putMessage m = case m of
   CreateBCOs bco              -> putWord8 12 >> put bco
   FreeHValueRefs val          -> putWord8 13 >> put val
   MallocData bs               -> putWord8 14 >> put bs
-  PrepFFI conv args res       -> putWord8 15 >> put conv >> put args >> put res
-  FreeFFI p                   -> putWord8 16 >> put p
-  MkConInfoTable p n t d      -> putWord8 17 >> put p >> put n >> put t >> put d
-  EvalStmt opts val           -> putWord8 18 >> put opts >> put val
-  ResumeStmt opts val         -> putWord8 19 >> put opts >> put val
-  AbandonStmt val             -> putWord8 20 >> put val
-  EvalString val              -> putWord8 21 >> put val
-  EvalStringToString str val  -> putWord8 22 >> put str >> put val
-  EvalIO val                  -> putWord8 23 >> put val
-  MkCostCentres mod ccs       -> putWord8 24 >> put mod >> put ccs
-  CostCentreStackInfo ptr     -> putWord8 25 >> put ptr
-  NewBreakArray sz            -> putWord8 26 >> put sz
-  EnableBreakpoint arr ix b   -> putWord8 27 >> put arr >> put ix >> put b
-  BreakpointStatus arr ix     -> putWord8 28 >> put arr >> put ix
-  GetBreakpointVar a b        -> putWord8 29 >> put a >> put b
-  StartTH                     -> putWord8 30
-  FinishTH val                -> putWord8 31 >> put val
-  RunTH st q loc ty           -> putWord8 32 >> put st >> put q >> put loc >> put ty
-  NewName a                   -> putWord8 33 >> put a
-  Report a b                  -> putWord8 34 >> put a >> put b
-  LookupName a b              -> putWord8 35 >> put a >> put b
-  Reify a                     -> putWord8 36 >> put a
-  ReifyFixity a               -> putWord8 37 >> put a
-  ReifyInstances a b          -> putWord8 38 >> put a >> put b
-  ReifyRoles a                -> putWord8 39 >> put a
-  ReifyAnnotations a b        -> putWord8 40 >> put a >> put b
-  ReifyModule a               -> putWord8 41 >> put a
-  ReifyConStrictness a        -> putWord8 42 >> put a
-  AddDependentFile a          -> putWord8 43 >> put a
-  AddTopDecls a               -> putWord8 44 >> put a
-  IsExtEnabled a              -> putWord8 45 >> put a
-  ExtsEnabled                 -> putWord8 46
-  StartRecover                -> putWord8 47
-  EndRecover a                -> putWord8 48 >> put a
-  QDone                       -> putWord8 49
-  QException a                -> putWord8 50 >> put a
-  QFail a                     -> putWord8 51  >> put a
+  MallocStrings bss           -> putWord8 15 >> put bss
+  PrepFFI conv args res       -> putWord8 16 >> put conv >> put args >> put res
+  FreeFFI p                   -> putWord8 17 >> put p
+  MkConInfoTable p n t d      -> putWord8 18 >> put p >> put n >> put t >> put d
+  EvalStmt opts val           -> putWord8 19 >> put opts >> put val
+  ResumeStmt opts val         -> putWord8 20 >> put opts >> put val
+  AbandonStmt val             -> putWord8 21 >> put val
+  EvalString val              -> putWord8 22 >> put val
+  EvalStringToString str val  -> putWord8 23 >> put str >> put val
+  EvalIO val                  -> putWord8 24 >> put val
+  MkCostCentres mod ccs       -> putWord8 25 >> put mod >> put ccs
+  CostCentreStackInfo ptr     -> putWord8 26 >> put ptr
+  NewBreakArray sz            -> putWord8 27 >> put sz
+  EnableBreakpoint arr ix b   -> putWord8 28 >> put arr >> put ix >> put b
+  BreakpointStatus arr ix     -> putWord8 29 >> put arr >> put ix
+  GetBreakpointVar a b        -> putWord8 30 >> put a >> put b
+  StartTH                     -> putWord8 31
+  FinishTH val                -> putWord8 32 >> put val
+  RunTH st q loc ty           -> putWord8 33 >> put st >> put q >> put loc >> put ty
+  NewName a                   -> putWord8 34 >> put a
+  Report a b                  -> putWord8 35 >> put a >> put b
+  LookupName a b              -> putWord8 36 >> put a >> put b
+  Reify a                     -> putWord8 37 >> put a
+  ReifyFixity a               -> putWord8 38 >> put a
+  ReifyInstances a b          -> putWord8 39 >> put a >> put b
+  ReifyRoles a                -> putWord8 40 >> put a
+  ReifyAnnotations a b        -> putWord8 41 >> put a >> put b
+  ReifyModule a               -> putWord8 42 >> put a
+  ReifyConStrictness a        -> putWord8 43 >> put a
+  AddDependentFile a          -> putWord8 44 >> put a
+  AddTopDecls a               -> putWord8 45 >> put a
+  IsExtEnabled a              -> putWord8 46 >> put a
+  ExtsEnabled                 -> putWord8 47
+  StartRecover                -> putWord8 48
+  EndRecover a                -> putWord8 49 >> put a
+  QDone                       -> putWord8 50
+  QException a                -> putWord8 51 >> put a
+  QFail a                     -> putWord8 52  >> put a
 
 -- -----------------------------------------------------------------------------
 -- Reading/writing messages

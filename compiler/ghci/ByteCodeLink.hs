@@ -92,8 +92,9 @@ lookupLiteral hsc_env _ (BCONPtrLbl  sym) = do
 lookupLiteral hsc_env ie (BCONPtrItbl nm)  = do
   Ptr a# <- lookupIE hsc_env ie nm
   return (W# (int2Word# (addr2Int# a#)))
-lookupLiteral hsc_env _ (BCONPtrStr bs) = do
-  fromIntegral . ptrToWordPtr . fromRemotePtr <$> mallocData hsc_env bs
+lookupLiteral _ _ (BCONPtrStr _) =
+  -- should be eliminated during assembleBCOs
+  panic "lookupLiteral: BCONPtrStr"
 
 lookupStaticPtr :: HscEnv -> FastString -> IO (Ptr ())
 lookupStaticPtr hsc_env addr_of_label_string = do

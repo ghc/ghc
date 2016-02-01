@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, CPP, MagicHash #-}
+{-# LANGUAGE BangPatterns, CPP, MagicHash, RecordWildCards #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
 --
 --  (c) The University of Glasgow 2002-2006
@@ -6,7 +6,7 @@
 
 -- | ByteCodeLink: Bytecode assembler and linker
 module ByteCodeAsm (
-        assembleBCOs, assembleBCO,
+        assembleBCOs, assembleOneBCO,
 
         bcoFreeNames,
         SizedSeq, sizeSS, ssElts,
@@ -19,6 +19,7 @@ import ByteCodeInstr
 import ByteCodeItbls
 import ByteCodeTypes
 import GHCi.RemoteTypes
+import GHCi
 
 import HscTypes
 import Name
@@ -52,7 +53,6 @@ import Data.Array.Base  ( UArray(..) )
 
 import Data.Array.Unsafe( castSTUArray )
 
-import qualified Data.ByteString as B
 import Foreign
 import Data.Char        ( ord )
 import Data.List
@@ -96,12 +96,60 @@ assembleBCOs
 assembleBCOs hsc_env proto_bcos tycons modbreaks = do
   itblenv <- mkITbls hsc_env tycons
   bcos    <- mapM (assembleBCO (hsc_dflags hsc_env)) proto_bcos
+  (bcos',ptrs) <- mallocStrings hsc_env bcos
   return CompiledByteCode
-    { bc_bcos = bcos
+    { bc_bcos = bcos'
     , bc_itbls =  itblenv
     , bc_ffis = concat (map protoBCOFFIs proto_bcos)
+    , bc_strs = ptrs
     , bc_breaks = modbreaks
     }
+
+-- Find all the literal strings and malloc them together.  We want to
+-- do this because:
+--
+--  a) It should be done when we compile the module, not each time we relink it
+--  b) For -fexternal-interpreter It's more efficient to malloc the strings
+--     as a single batch message, especially when compiling in parallel.
+--
+mallocStrings :: HscEnv -> [UnlinkedBCO] -> IO ([UnlinkedBCO], [RemotePtr ()])
+mallocStrings hsc_env ulbcos = do
+  let bytestrings = reverse (execState (mapM_ collect ulbcos) [])
+  ptrs <- iservCmd hsc_env (MallocStrings bytestrings)
+  return (evalState (mapM splice ulbcos) ptrs, ptrs)
+ where
+  splice bco@UnlinkedBCO{..} = do
+    lits <- mapM spliceLit unlinkedBCOLits
+    ptrs <- mapM splicePtr unlinkedBCOPtrs
+    return bco { unlinkedBCOLits = lits, unlinkedBCOPtrs = ptrs }
+
+  spliceLit (BCONPtrStr _) = do
+    (RemotePtr p : rest) <- get
+    put rest
+    return (BCONPtrWord (fromIntegral p))
+  spliceLit other = return other
+
+  splicePtr (BCOPtrBCO bco) = BCOPtrBCO <$> splice bco
+  splicePtr other = return other
+
+  collect UnlinkedBCO{..} = do
+    mapM_ collectLit unlinkedBCOLits
+    mapM_ collectPtr unlinkedBCOPtrs
+
+  collectLit (BCONPtrStr bs) = do
+    strs <- get
+    put (bs:strs)
+  collectLit _ = return ()
+
+  collectPtr (BCOPtrBCO bco) = collect bco
+  collectPtr _ = return ()
+
+
+assembleOneBCO :: HscEnv -> ProtoBCO Name -> IO UnlinkedBCO
+assembleOneBCO hsc_env pbco = do
+  ubco <- assembleBCO (hsc_dflags hsc_env) pbco
+  ([ubco'], _ptrs) <- mallocStrings hsc_env [ubco]
+  return ubco'
 
 assembleBCO :: DynFlags -> ProtoBCO Name -> IO UnlinkedBCO
 assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced) = do
@@ -389,7 +437,7 @@ assembleI dflags i = case i of
     literal (MachChar c)       = int (ord c)
     literal (MachInt64 ii)     = int64 (fromIntegral ii)
     literal (MachWord64 ii)    = int64 (fromIntegral ii)
-    literal (MachStr bs)       = lit [BCONPtrStr (bs `B.snoc` 0)]
+    literal (MachStr bs)       = lit [BCONPtrStr bs]
        -- MachStr requires a zero-terminator when emitted
     literal LitInteger{}       = panic "ByteCodeAsm.literal: LitInteger"
 
