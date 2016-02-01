@@ -430,13 +430,17 @@ static int ghciInsertSymbolTable(
       "   %s\n"
       "whilst processing object file\n"
       "   %" PATH_FMT "\n"
+      "The symbol was previously defined in\n"
+      "   %" PATH_FMT "\n"
       "This could be caused by:\n"
       "   * Loading two different object files which export the same symbol\n"
       "   * Specifying the same object file twice on the GHCi command line\n"
       "   * An incorrect `package.conf' entry, causing some object to be\n"
       "     loaded twice.\n",
       (char*)key,
-      obj_name
+      obj_name,
+      pinfo->owner->archiveMemberName ? pinfo->owner->archiveMemberName
+      : pinfo->owner->fileName
    );
    return 0;
 }
