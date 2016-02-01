@@ -11,6 +11,11 @@ setupEnvironment = do
     -- ghc-cabal refuses to work when GHC_PACKAGE_PATH is set (e.g. by Stack)
     unsetEnv "GHC_PACKAGE_PATH"
 
+    -- in MinGW if PWD is set to a Windows "C:\\" style path then configure
+    -- `pwd` will return the Windows path, and then modifying $PATH will fail.
+    -- See https://github.com/snowleopard/shaking-up-ghc/issues/189 for details.
+    unsetEnv "PWD"
+
     -- On Windows, some path variables start a prefix like "C:\\" which may
     -- lead to failures of scripts such as autoreconf. One particular variable
     -- which causes issues is ACLOCAL_PATH. At the moment we simply reset it
