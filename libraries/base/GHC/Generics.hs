@@ -75,9 +75,9 @@ module GHC.Generics  (
 --     'D1' ('MetaData \"Tree\" \"Main\" \"package-name\" 'False)
 --       ('C1' ('MetaCons \"Leaf\" 'PrefixI 'False)
 --          ('S1' '(MetaSel 'Nothing
---                           'NoSourceUnpackedness
---                           'NoSourceStrictness
---                           'DecidedLazy)
+--                          'NoSourceUnpackedness
+--                          'NoSourceStrictness
+--                          'DecidedLazy)
 --                 ('Rec0' a))
 --        ':+:'
 --        'C1' ('MetaCons \"Node\" 'PrefixI 'False)
@@ -828,8 +828,12 @@ class Datatype d where
   -- | The fully-qualified name of the module where the type is declared
   moduleName   :: t d (f :: * -> *) a -> [Char]
   -- | The package name of the module where the type is declared
+  --
+  -- @since 4.9.0.0
   packageName :: t d (f :: * -> *) a -> [Char]
   -- | Marks if the datatype is actually a newtype
+  --
+  -- @since 4.7.0.0
   isNewtype    :: t d (f :: * -> *) a -> Bool
   isNewtype _ = False
 
@@ -865,6 +869,8 @@ data Fixity = Prefix | Infix Associativity Int
   deriving (Eq, Show, Ord, Read, Generic)
 
 -- | This variant of 'Fixity' appears at the type level.
+--
+-- @since 4.9.0.0
 data FixityI = PrefixI | InfixI Associativity Nat
 
 -- | Get the precedence of a fixity value.
@@ -889,6 +895,8 @@ data Associativity = LeftAssociative
 --
 -- The fields of @ExampleConstructor@ have 'NoSourceUnpackedness',
 -- 'SourceNoUnpack', and 'SourceUnpack', respectively.
+--
+-- @since 4.9.0.0
 data SourceUnpackedness = NoSourceUnpackedness
                         | SourceNoUnpack
                         | SourceUnpack
@@ -903,6 +911,8 @@ data SourceUnpackedness = NoSourceUnpackedness
 --
 -- The fields of @ExampleConstructor@ have 'NoSourceStrictness',
 -- 'SourceLazy', and 'SourceStrict', respectively.
+--
+-- @since 4.9.0.0
 data SourceStrictness = NoSourceStrictness
                       | SourceLazy
                       | SourceStrict
@@ -928,6 +938,8 @@ data SourceStrictness = NoSourceStrictness
 --
 -- * If compiled with @-O2@ enabled, then the fields will have 'DecidedUnpack',
 --   'DecidedStrict', and 'DecidedLazy', respectively.
+--
+-- @since 4.9.0.0
 data DecidedStrictness = DecidedLazy
                        | DecidedStrict
                        | DecidedUnpack
@@ -938,10 +950,16 @@ class Selector s where
   -- | The name of the selector
   selName :: t s (f :: * -> *) a -> [Char]
   -- | The selector's unpackedness annotation (if any)
+  --
+  -- @since 4.9.0.0
   selSourceUnpackedness :: t s (f :: * -> *) a -> SourceUnpackedness
   -- | The selector's strictness annotation (if any)
+  --
+  -- @since 4.9.0.0
   selSourceStrictness :: t s (f :: * -> *) a -> SourceStrictness
   -- | The strictness that the compiler inferred for the selector
+  --
+  -- @since 4.9.0.0
   selDecidedStrictness :: t s (f :: * -> *) a -> DecidedStrictness
 
 instance (SingI mn, SingI su, SingI ss, SingI ds)
@@ -987,8 +1005,8 @@ class Generic1 f where
 --   and @s@ is @'True@ if the constructor contains record selectors.
 --
 -- * In @MetaSel mn su ss ds@, if the field is uses record syntax, then @mn@ is
---   'Just' the record name. Otherwise, @mn@ is 'Nothing. @su@ and @ss@ are the
---   field's unpackedness and strictness annotations, and @ds@ is the
+--   'Just' the record name. Otherwise, @mn@ is 'Nothing'. @su@ and @ss@ are
+--   the field's unpackedness and strictness annotations, and @ds@ is the
 --   strictness that GHC infers for the field.
 data Meta = MetaData Symbol Symbol Symbol Bool
           | MetaCons Symbol FixityI Bool
