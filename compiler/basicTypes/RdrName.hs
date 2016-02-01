@@ -416,6 +416,13 @@ type GlobalRdrEnv = OccEnv [GlobalRdrElt]
 --              happens only when type-checking a [d| ... |] Template
 --              Haskell quotation; see this note in RnNames
 --              Note [Top-level Names in Template Haskell decl quotes]
+--
+-- INVARIANT 3: If the GlobalRdrEnv maps [occ -> gre], then
+--                 greOccName gre = occ
+--
+--              NB: greOccName gre is usually the same as
+--                  nameOccName (gre_name gre), but not always in the
+--                  case of record seectors; see greOccName
 
 -- | An element of the 'GlobalRdrEnv'
 data GlobalRdrElt
