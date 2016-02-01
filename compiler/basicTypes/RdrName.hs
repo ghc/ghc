@@ -629,10 +629,10 @@ greUsedRdrName gre@GRE{ gre_name = name, gre_lcl = lcl, gre_imp = iss }
     occ = greOccName gre
 
 greRdrNames :: GlobalRdrElt -> [RdrName]
-greRdrNames GRE{ gre_name = name, gre_lcl = lcl, gre_imp = iss }
+greRdrNames gre@GRE{ gre_lcl = lcl, gre_imp = iss }
   = (if lcl then [unqual] else []) ++ concatMap do_spec (map is_decl iss)
   where
-    occ    = nameOccName name
+    occ    = greOccName gre
     unqual = Unqual occ
     do_spec decl_spec
         | is_qual decl_spec = [qual]

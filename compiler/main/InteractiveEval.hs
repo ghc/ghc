@@ -800,13 +800,16 @@ getNamesInScope :: GhcMonad m => m [Name]
 getNamesInScope = withSession $ \hsc_env -> do
   return (map gre_name (globalRdrEnvElts (ic_rn_gbl_env (hsc_IC hsc_env))))
 
+-- | Returns all 'RdrName's in scope in the current interactive
+-- context, excluding any that are internally-generated.
 getRdrNamesInScope :: GhcMonad m => m [RdrName]
 getRdrNamesInScope = withSession $ \hsc_env -> do
   let
       ic = hsc_IC hsc_env
       gbl_rdrenv = ic_rn_gbl_env ic
       gbl_names = concatMap greRdrNames $ globalRdrEnvElts gbl_rdrenv
-  return gbl_names
+  -- Exclude internally generated names; see e.g. Trac #11328
+  return (filter (not . isDerivedOccName . rdrNameOcc) gbl_names)
 
 
 -- | Parses a string as an identifier, and returns the list of 'Name's that
