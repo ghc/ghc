@@ -198,7 +198,7 @@ in a Cabal package, including the name and version of the containing package,
 the transitive dependencies of the component, and even the build information
 for the component.  This ID is opaque to GHC and selected by Cabal
 (although GHC may take a component ID and suffix it with a unit name to
-derive a new component ID.)  Component IDs identiy entries in the
+derive a new component ID.)  Component IDs identity entries in the
 \textbf{component database}, which contains the results of typechecking
 a component, but no actual object code.  However, it does contain the
 elaborated source, so that it can be built into actual code when
@@ -1152,7 +1152,7 @@ provide a record selector.  This capability seems quite attractive,
 although in practice record selectors rarely seem to be abstracted this
 way: one reason is that \verb|M.foo| still \emph{is} a record selector,
 and can be used to modify a record.  (Many library authors find this
-suprising!)
+surprising!)
 
 Nor does this seem to be an insurmountable instance of the avoidance
 problem:
