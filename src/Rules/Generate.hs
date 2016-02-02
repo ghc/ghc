@@ -21,11 +21,11 @@ import Rules.Resources (Resources)
 import Settings
 
 installTargets :: [FilePath]
-installTargets = [ "inplace/lib/template-hsc.h"
+installTargets = [ "inplace/lib/ghc-usage.txt"
+                 , "inplace/lib/ghci-usage.txt"
                  , "inplace/lib/platformConstants"
                  , "inplace/lib/settings"
-                 , "inplace/lib/ghc-usage.txt"
-                 , "inplace/lib/ghci-usage.txt" ]
+                 , "inplace/lib/template-hsc.h" ]
 
 primopsSource :: FilePath
 primopsSource = "compiler/prelude/primops.txt.pp"
@@ -45,8 +45,8 @@ includesDependencies = ("includes" -/-) <$>
 
 ghcPrimDependencies :: Stage -> [FilePath]
 ghcPrimDependencies stage = ((targetPath stage ghcPrim -/- "build") -/-) <$>
-       [ "GHC/PrimopWrappers.hs"
-       , "autogen/GHC/Prim.hs" ]
+       [ "autogen/GHC/Prim.hs"
+       , "GHC/PrimopWrappers.hs" ]
 
 derivedConstantsPath :: FilePath
 derivedConstantsPath = "includes/dist-derivedconstants/header"
@@ -54,9 +54,9 @@ derivedConstantsPath = "includes/dist-derivedconstants/header"
 derivedConstantsDependencies :: [FilePath]
 derivedConstantsDependencies = installTargets ++ fmap (derivedConstantsPath -/-)
     [ "DerivedConstants.h"
+    , "GHCConstantsHaskellExports.hs"
     , "GHCConstantsHaskellType.hs"
-    , "GHCConstantsHaskellWrappers.hs"
-    , "GHCConstantsHaskellExports.hs" ]
+    , "GHCConstantsHaskellWrappers.hs" ]
 
 compilerDependencies :: Stage -> [FilePath]
 compilerDependencies stage =
@@ -66,21 +66,21 @@ compilerDependencies stage =
     ++ filter (const $ stage > Stage0) libffiDependencies
     ++ derivedConstantsDependencies
     ++ fmap ((targetPath stage compiler -/- "build") -/-)
-       [ "primop-vector-uniques.hs-incl"
-       , "primop-data-decl.hs-incl"
-       , "primop-tag.hs-incl"
-       , "primop-list.hs-incl"
-       , "primop-strictness.hs-incl"
-       , "primop-fixity.hs-incl"
-       , "primop-primop-info.hs-incl"
-       , "primop-out-of-line.hs-incl"
-       , "primop-has-side-effects.hs-incl"
-       , "primop-can-fail.hs-incl"
+       [ "primop-can-fail.hs-incl"
        , "primop-code-size.hs-incl"
        , "primop-commutable.hs-incl"
-       , "primop-vector-tys-exports.hs-incl"
+       , "primop-data-decl.hs-incl"
+       , "primop-fixity.hs-incl"
+       , "primop-has-side-effects.hs-incl"
+       , "primop-list.hs-incl"
+       , "primop-out-of-line.hs-incl"
+       , "primop-primop-info.hs-incl"
+       , "primop-strictness.hs-incl"
+       , "primop-tag.hs-incl"
        , "primop-vector-tycons.hs-incl"
-       , "primop-vector-tys.hs-incl" ]
+       , "primop-vector-tys-exports.hs-incl"
+       , "primop-vector-tys.hs-incl"
+       , "primop-vector-uniques.hs-incl" ]
 
 -- TODO: Turn this into a FilePaths expression
 generatedDependencies :: Stage -> Package -> [FilePath]
@@ -139,8 +139,8 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
 
         -- TODO: why different folders for generated files?
         fmap (buildPath -/-)
-            [ "GHC/PrimopWrappers.hs"
-            , "autogen/GHC/Prim.hs"
+            [ "autogen/GHC/Prim.hs"
+            , "GHC/PrimopWrappers.hs"
             , "*.hs-incl" ] |%> \file -> do
                 need [primopsTxt stage]
                 build $ fullTarget target GenPrimopCode [primopsTxt stage] [file]
@@ -164,11 +164,11 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
 
 copyRules :: Rules ()
 copyRules = do
-    "inplace/lib/template-hsc.h"    <~ pkgPath hsc2hs
-    "inplace/lib/platformConstants" <~ derivedConstantsPath
-    "inplace/lib/settings"          <~ "."
     "inplace/lib/ghc-usage.txt"     <~ "driver"
     "inplace/lib/ghci-usage.txt"    <~ "driver"
+    "inplace/lib/platformConstants" <~ derivedConstantsPath
+    "inplace/lib/settings"          <~ "."
+    "inplace/lib/template-hsc.h"    <~ pkgPath hsc2hs
   where
     file <~ dir = file %> \_ -> copyFile (dir -/- takeFileName file) file
 
