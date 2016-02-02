@@ -251,7 +251,13 @@ tcCheckPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details
                                     else newMetaSigTyVars ex_tvs
                     -- See the "Existential type variables part of
                     -- Note [Checking against a pattern signature]
-              ; prov_dicts <- mapM (emitWanted origin) (substTheta subst prov_theta)
+              ; prov_dicts <- mapM (emitWanted origin)
+                  (substTheta (extendTCvInScopeList subst univ_tvs) prov_theta)
+                  -- Add the free vars of 'prov_theta' to the in_scope set to
+                  -- satisfy the substition invariant. There's no need to
+                  -- add 'ex_tvs' as they are already in the domain of the
+                  -- substitution.
+                  -- See also Note [The substitution invariant] in TyCoRep.
               ; args'      <- zipWithM (tc_arg subst) arg_names arg_tys
               ; return (ex_tvs', prov_dicts, args') }
 
