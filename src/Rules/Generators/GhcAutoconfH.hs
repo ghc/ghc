@@ -1,4 +1,4 @@
-module Rules.Generators.GhcAutoconfH (generateGhcAutoconfH) where
+module Rules.Generators.GhcAutoconfH (generateGhcAutoconfH, configH) where
 
 import Base
 import Expression
