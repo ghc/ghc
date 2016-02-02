@@ -21,6 +21,7 @@ ghcBuilderArgs = stagedBuilder Ghc ? do
     output <- getOutput
     stage  <- getStage
     way    <- getWay
+    when (stage > Stage0) . lift $ needTouchy
     let buildObj  = ("//*." ++  osuf way) ?== output || ("//*." ++  obootsuf way) ?== output
         buildHi   = ("//*." ++ hisuf way) ?== output || ("//*." ++ hibootsuf way) ?== output
         buildProg = not (buildObj || buildHi)
@@ -43,6 +44,9 @@ ghcBuilderArgs = stagedBuilder Ghc ? do
             , append =<< getInputs
             , buildHi ? append ["-fno-code", "-fwrite-interface"]
             , not buildHi ? mconcat [ arg "-o", arg =<< getOutput ] ]
+
+needTouchy :: Action ()
+needTouchy = whenM windowsHost $ need [fromJust $ programPath Stage0 touchy ]
 
 splitObjectsArgs :: Args
 splitObjectsArgs = splitObjects ? do
