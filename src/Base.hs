@@ -16,7 +16,7 @@ module Base (
     module Development.Shake.FilePath,
 
     -- * Paths
-    shakeFilesPath, configPath, sourcePath, programInplacePath,
+    shakeFilesPath, configPath, configFile, sourcePath, programInplacePath,
     bootPackageConstraints, packageDependencies,
 
     -- * Output
@@ -53,6 +53,9 @@ shakeFilesPath = shakePath -/- ".db"
 
 configPath :: FilePath
 configPath = shakePath -/- "cfg"
+
+configFile :: FilePath
+configFile = configPath -/- "system.config"
 
 -- | Path to source files of the build system, e.g. this file is located at
 -- sourcePath -/- "Base.hs". We use this to `need` some of the source files.

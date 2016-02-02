@@ -8,9 +8,6 @@ import Development.Shake.Config
 newtype ConfigKey = ConfigKey String
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
-configFile :: FilePath
-configFile = configPath -/- "system.config"
-
 askConfig :: String -> Action String
 askConfig key = askConfigWithDefault key . putError
     $ "Cannot find key '" ++ key ++ "' in configuration files."
