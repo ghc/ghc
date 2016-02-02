@@ -150,7 +150,7 @@ newFlexiTyVar = unsafeTcPluginTcM . TcM.newFlexiTyVar
 isTouchableTcPluginM :: TcTyVar -> TcPluginM Bool
 isTouchableTcPluginM = unsafeTcPluginTcM . TcM.isTouchableTcM
 
-
+-- Confused by zonking? See Note [What is zonking?] in TcMType.
 zonkTcType :: TcType -> TcPluginM TcType
 zonkTcType = unsafeTcPluginTcM . TcM.zonkTcType
 

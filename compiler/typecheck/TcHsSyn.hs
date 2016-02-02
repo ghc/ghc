@@ -19,9 +19,12 @@ module TcHsSyn (
         shortCutLit, hsOverLitName,
         conLikeResTy,
 
-        -- re-exported from TcMonad
+        -- * re-exported from TcMonad
         TcId, TcIdSet,
 
+        -- * Zonking
+        -- | For a description of "zonking", see Note [What is zonking?]
+        -- in TcMType
         zonkTopDecls, zonkTopExpr, zonkTopLExpr,
         zonkTopBndrs, zonkTyBndrsX,
         emptyZonkEnv, mkEmptyZonkEnv,
@@ -172,6 +175,7 @@ It's all pretty boring stuff, because HsSyn is such a large type, and
 the environment manipulation is tiresome.
 -}
 
+-- Confused by zonking? See Note [What is zonking?] in TcMType.
 type UnboundTyVarZonker = TcTyVar -> TcM Type
         -- How to zonk an unbound type variable
         -- Note [Zonking the LHS of a RULE]
@@ -187,6 +191,8 @@ type UnboundTyVarZonker = TcTyVar -> TcM Type
 -- Ids. It is knot-tied. We must be careful never to put coercion variables
 -- (which are Ids, after all) in the knot-tied env, because coercions can
 -- appear in types, and we sometimes inspect a zonked type in this module.
+--
+-- Confused by zonking? See Note [What is zonking?] in TcMType.
 data ZonkEnv
   = ZonkEnv
       UnboundTyVarZonker
@@ -1570,6 +1576,7 @@ zonk_tycomapper = TyCoMapper
   , tcm_hole  = zonkCoHole
   , tcm_tybinder = \env tv _vis -> zonkTyBndrX env tv }
 
+-- Confused by zonking? See Note [What is zonking?] in TcMType.
 zonkTcTypeToType :: ZonkEnv -> TcType -> TcM Type
 zonkTcTypeToType = mapType zonk_tycomapper
 

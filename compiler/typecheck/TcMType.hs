@@ -975,6 +975,55 @@ skolemiseUnboundMetaTyVar tv details
         ; return final_tv }
 
 {-
+Note [What is a meta variable?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A "meta type-variable", also know as a "unification variable" is a placeholder
+introduced by the typechecker for an as-yet-unknown monotype.
+
+For example, when we see a call `reverse (f xs)`, we know that we calling
+    reverse :: forall a. [a] -> [a]
+So we know that the argument `f xs` must be a "list of something". But what is
+the "something"? We don't know until we explore the `f xs` a bit more. So we set
+out what we do know at the call of `reverse` by instantiate its type with a fresh
+meta tyvar, `alpha` say. So now the type of the argument `f xs`, and of the
+result, is `[alpha]`. The unification variable `alpha` stands for the
+as-yet-unknown type of the elements of the list.
+
+As type inference progresses we may learn more about `alpha`. For example, suppose
+`f` has the type
+    f :: forall b. b -> [Maybe b]
+Then we instantiate `f`'s type with another fresh unification variable, say
+`beta`; and equate `f`'s result type with reverse's argument type, thus
+`[alpha] ~ [Maybe beta]`.
+
+Now we can solve this equality to learn that `alpha ~ Maybe beta`, so we've
+refined our knowledge about `alpha`. And so on.
+
+If you found this Note useful, you may also want to have a look at
+Section 5 of "Practical type inference for higher rank types" (Peyton Jones,
+Vytiniotis, Weirich and Shields. J. Functional Programming. 2011).
+
+Note [What is zonking?]
+~~~~~~~~~~~~~~~~~~~~~~~
+GHC relies heavily on mutability in the typechecker for efficient operation.
+For this reason, throughout much of the type checking process meta type
+variables (the MetaTv constructor of TcTyVarDetails) are represented by mutable
+variables (known as TcRefs).
+
+Zonking is the process of ripping out these mutable variables and replacing them
+with a real TcType. This involves traversing the entire type expression, but the
+interesting part of replacing the mutable variables occurs in zonkTyVarOcc.
+
+There are two ways to zonk a Type:
+
+ * zonkTcTypeToType, which is intended to be used at the end of type-checking
+   for the final zonk. It has to deal with unfilled metavars, either by filling
+   it with a value like Any or failing (determined by the UnboundTyVarZonker
+   used).
+
+ * zonkTcType, which will happily ignore unfilled metavars. This is the
+   appropriate function to use while in the middle of type-checking.
+
 Note [Zonking to Skolem]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 We used to zonk quantified type variables to regular TyVars.  However, this
