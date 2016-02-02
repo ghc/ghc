@@ -3,7 +3,7 @@ sudo: false
 matrix:
     include:
         - os: linux
-          env: CABALVER=1.22 GHCVER=7.10.3
+          env: CABALVER=1.22 GHCVER=7.10.3 TARGET=
           addons:
               apt:
                   packages:
@@ -21,6 +21,7 @@ matrix:
               - cabal update
 
         - os: osx
+          env: TARGET=utils/ghc-pkg/stage1/build/tmp/ghc-pkg.exe
           before_install:
               - brew update
               - brew install ghc cabal-install
@@ -61,7 +62,7 @@ install:
 script:
     - ( cd ghc/shake-build && cabal haddock --internal )
     - ./ghc/shake-build/build.sh selftest
-    - ./ghc/shake-build/build.sh -j --no-progress --flavour=quick
+    - ./ghc/shake-build/build.sh -j --no-progress --flavour=quick $TARGET
 
 cache:
     directories:
