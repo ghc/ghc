@@ -134,7 +134,7 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
 
         -- TODO: needing platformH is ugly and fragile
         when (pkg == compiler) $ primopsTxt stage %> \file -> do
-            need [platformH stage, primopsSource]
+            need $ [platformH stage, primopsSource] ++ includesDependencies
             build $ fullTarget target HsCpp [primopsSource] [file]
 
         -- TODO: why different folders for generated files?
