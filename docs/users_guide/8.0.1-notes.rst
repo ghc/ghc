@@ -296,6 +296,10 @@ Compiler
    :ghc-flag:`-this-unit-id` or, if you need compatibility over multiple
    versions of GHC, :ghc-flag:`-package-name`.
 
+-  When :ghc-flag:`-fdefer-type-errors` is enabled and an expression fails to
+   typecheck, ``Control.Exception.TypeError`` will now be thrown instead of
+   ``Control.Exception.ErrorCall``.
+
 GHCi
 ~~~~
 
@@ -509,6 +513,10 @@ See ``changelog.md`` in the ``base`` package for full release notes.
 
 - Enable ``PolyKinds`` in the ``Data.Functor.Const`` module to give ``Const``
   the kind ``* -> k -> *`` (see :ghc-ticket:`10039`).
+
+- Add the ``TypeError`` datatype to ``Control.Exception``, which represents the
+  error that is thrown when an expression fails to typecheck when run using
+  :ghc-flag:`-fdefer-type-errors`. (see :ghc-ticket:`10284`)
 
 binary
 ~~~~~~

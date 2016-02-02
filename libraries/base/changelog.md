@@ -91,6 +91,9 @@
     precision: `log1p`, `expm1`, `log1pexp` and `log1mexp`. These are not
     available from `Prelude`, but the full class is exported from `Numeric`.
 
+  * New `Control.Exception.TypeError` datatype, which is thrown when an
+    expression fails to typecheck when run using `-fdefer-type-errors` (#10284)
+
 ### New instances
 
   * `Alt`, `Dual`, `First`, `Last`, `Product`, and `Sum` now have `Data`,
