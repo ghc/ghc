@@ -67,6 +67,7 @@ captureStdout target path argList = do
 
 copyFile :: FilePath -> FilePath -> Action ()
 copyFile source target = do
+    need [source] -- Guarantee source is built before printing progress info.
     putProgressInfo $ renderAction "Copy file" source target
     copyFileChanged source target
 
