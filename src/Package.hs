@@ -21,7 +21,8 @@ newtype PackageName = PackageName { getPackageName :: String }
 instance Show PackageName where
     show (PackageName name) = name
 
--- TODO: make PackageType more precise, #12
+-- TODO: Make PackageType more precise, #12
+-- TODO: Turn Program to Program FilePath thereby getting rid of programPath
 -- | We regard packages as either being libraries or programs. This is
 -- bit of a convenient lie as Cabal packages can be both, but it works
 -- for now.

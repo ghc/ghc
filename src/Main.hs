@@ -36,7 +36,7 @@ main = shakeArgsWith options CmdLineFlag.cmdFlags $ \cmdLineFlags targets -> do
         , Rules.Libffi.libffiRules
         , Rules.Oracles.oracleRules
         , Rules.Perl.perlScriptRules
-        , Rules.generateTargets
+        , Rules.topLevelTargets
         , Rules.packageRules
         , Selftest.selftestRules
         , Test.testRules ]

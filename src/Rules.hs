@@ -1,10 +1,11 @@
-module Rules (generateTargets, packageRules) where
+module Rules (topLevelTargets, packageRules) where
 
 import Base
 import Data.Foldable
 import Expression
 import GHC
-import Rules.Generate
+import Oracles.PackageData
+import qualified Rules.Generate
 import Rules.Package
 import Rules.Resources
 import Settings
@@ -13,23 +14,32 @@ allStages :: [Stage]
 allStages = [minBound ..]
 
 -- | 'need' all top-level build targets
-generateTargets :: Rules ()
-generateTargets = action $ do
-    targets   <- fmap concat (traverse targetsForStage allStages)
-    rtsLib    <- pkgLibraryFile Stage1 rts "rts" vanilla
-    rtsThrLib <- pkgLibraryFile Stage1 rts "rts" threaded
-    need $ targets ++ installTargets ++ [ rtsLib, rtsThrLib ]
+topLevelTargets :: Rules ()
+topLevelTargets = do
 
-targetsForStage :: Stage -> Action [String]
-targetsForStage stage = do
-    pkgs <- interpretWithStage stage getPackages
-    let libPkgs = filter isLibrary pkgs \\ [rts, libffi]
-    libTargets <- fmap concat . forM libPkgs $ \pkg -> do
-        let target = PartialTarget stage pkg
-        needHaddock <- interpretPartial target buildHaddock
-        return [ pkgHaddockFile pkg | needHaddock && stage == Stage1 ]
-    let programTargets = [ prog | Just prog <- programPath stage <$> pkgs ]
-    return $ libTargets ++ programTargets
+    want $ Rules.Generate.installTargets
+
+    -- TODO: do we want libffiLibrary to be a top-level target?
+
+    action $ do -- TODO: Add support for all rtsWays
+        rtsLib    <- pkgLibraryFile Stage1 rts "rts" vanilla
+        rtsThrLib <- pkgLibraryFile Stage1 rts "rts" threaded
+        need [ rtsLib, rtsThrLib ]
+
+    for_ allStages $ \stage ->
+        for_ (knownPackages \\ [rts, libffi]) $ \pkg -> action $ do
+            let target = PartialTarget stage pkg
+            activePackages <- interpretPartial target getPackages
+            when (pkg `elem` activePackages) $
+                if isLibrary pkg
+                then do -- build a library
+                    ways    <- interpretPartial target getLibraryWays
+                    compId  <- interpretPartial target $ getPkgData ComponentId
+                    libs    <- traverse (pkgLibraryFile stage pkg compId) ways
+                    haddock <- interpretPartial target buildHaddock
+                    need $ libs ++ [ pkgHaddockFile pkg | haddock && stage == Stage1 ]
+                else do -- otherwise build a program
+                    need [ fromJust $ programPath stage pkg ] -- TODO: drop fromJust
 
 packageRules :: Rules ()
 packageRules = do
