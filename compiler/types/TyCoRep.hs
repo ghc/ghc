@@ -39,6 +39,7 @@ module TyCoRep (
         mkFunTy, mkFunTys,
         isLiftedTypeKind, isUnliftedTypeKind,
         isCoercionType, isLevityTy, isLevityVar,
+        isLevityKindedTy, dropLevityArgs,
         sameVis,
 
         -- Functions over binders
@@ -120,7 +121,7 @@ module TyCoRep (
 import {-# SOURCE #-} DataCon( dataConTyCon, dataConFullSig
                               , DataCon, eqSpecTyVar )
 import {-# SOURCE #-} Type( isPredTy, isCoercionTy, mkAppTy
-                          , partitionInvisibles, coreView )
+                          , partitionInvisibles, coreView, typeKind )
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
 import {-# SOURCE #-} Coercion
@@ -523,12 +524,25 @@ isUnliftedTypeKind _ = False
 
 -- | Is this the type 'Levity'?
 isLevityTy :: Type -> Bool
+isLevityTy ty | Just ty' <- coreView ty = isLevityTy ty'
 isLevityTy (TyConApp tc []) = tc `hasKey` levityTyConKey
-isLevityTy _                = False
+isLevityTy _ = False
+
+-- | Is this a type of kind Levity? (e.g. Lifted, Unlifted)
+isLevityKindedTy :: Type -> Bool
+isLevityKindedTy = isLevityTy . typeKind
 
 -- | Is a tyvar of type 'Levity'?
 isLevityVar :: TyVar -> Bool
 isLevityVar = isLevityTy . tyVarKind
+
+-- | Drops prefix of Levity constructors in 'TyConApp's. Useful for e.g.
+-- dropping 'Lifted and 'Unlifted arguments of unboxed tuple TyCon applications:
+--
+--   dropLevityArgs ['Lifted, 'Unlifted, String, Int#] == [String, Int#]
+--
+dropLevityArgs :: [Type] -> [Type]
+dropLevityArgs = dropWhile isLevityKindedTy
 
 {-
 %************************************************************************

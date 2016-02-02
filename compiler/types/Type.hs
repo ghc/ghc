@@ -103,7 +103,9 @@ module Type (
         -- (Lifting and boxity)
         isUnliftedType, isUnboxedTupleType, isAlgType, isClosedAlgType,
         isPrimitiveType, isStrictType,
-        isLevityTy, isLevityVar, getLevity, getLevityFromKind,
+        isLevityTy, isLevityVar, isLevityKindedTy,
+        dropLevityArgs,
+        getLevity, getLevityFromKind,
 
         -- * Main data types representing Kinds
         Kind,
@@ -1134,7 +1136,7 @@ repType ty
          else UbxTupleRep (concatMap (flattenRepType . go rec_nts) non_levity_tys)
       where
           -- See Note [Unboxed tuple levity vars] in TyCon
-        non_levity_tys = drop (length tys `div` 2) tys
+        non_levity_tys = dropLevityArgs tys
 
     go rec_nts (CastTy ty _)
       = go rec_nts ty
