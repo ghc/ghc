@@ -107,9 +107,6 @@ for opt,arg in opts:
         config.threads = int(arg)
         config.use_threads = 1
 
-    if opt == '--check-files-written':
-        config.check_files_written = True
-
     if opt == '--skip-perf-tests':
         config.skip_perf_tests = True
 
