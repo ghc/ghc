@@ -20,6 +20,6 @@ configRules = do
                     ++ "Run the configure script either manually or via the "
                     ++ "build system by passing --configure[=ARGS] flag."
 
-    "configure" %> \_ -> do
+    ["configure", configH <.> "in"] &%> \_ -> do
         putBuild "| Running boot..."
         quietly $ cmd (EchoStdout False) "perl boot"
