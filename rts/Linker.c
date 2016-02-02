@@ -199,6 +199,21 @@ static pathchar* pathdup(pathchar *path)
     return ret;
 }
 
+static pathchar* mkPath(char* path)
+{
+#if defined(mingw32_HOST_OS)
+    size_t required = mbstowcs(NULL, path, 0);
+    pathchar *ret = stgMallocBytes(sizeof(pathchar) * (required + 1), "mkPath");
+    if (mbstowcs(ret, path, required) == (size_t)-1)
+    {
+        barf("mkPath failed converting char* to wchar_t*");
+    }
+
+    return ret;
+#else
+    return pathdup(path);
+#endif
+}
 
 #if defined(OBJFORMAT_ELF)
 static int ocVerifyImage_ELF    ( ObjectCode* oc );
@@ -425,6 +440,7 @@ static int ghciInsertSymbolTable(
       pinfo->weak = HS_BOOL_FALSE;
       return 1;
    }
+   pathchar* archiveName = NULL;
    debugBelch(
       "GHC runtime linker: fatal error: I found a duplicate definition for symbol\n"
       "   %s\n"
@@ -439,10 +455,16 @@ static int ghciInsertSymbolTable(
       "     loaded twice.\n",
       (char*)key,
       obj_name,
-      pinfo->owner == NULL ? "(GHCi built-in symbols)" :
-      pinfo->owner->archiveMemberName ? pinfo->owner->archiveMemberName
+      pinfo->owner == NULL ? WSTR("(GHCi built-in symbols)") :
+      pinfo->owner->archiveMemberName ? archiveName = mkPath(pinfo->owner->archiveMemberName)
       : pinfo->owner->fileName
    );
+
+   if (archiveName)
+   {
+       stgFree(archiveName);
+       archiveName = NULL;
+   }
    return 0;
 }
 
