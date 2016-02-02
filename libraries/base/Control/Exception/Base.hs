@@ -361,7 +361,9 @@ instance Exception NoMethodError
 -- |An expression that didn't typecheck during compile time was called.
 -- This is only possible with -fdefer-type-errors. The @String@ gives
 -- details about the failed type check.
-data TypeError = TypeError String
+--
+-- @since 4.9.0.0
+newtype TypeError = TypeError String
 
 instance Show TypeError where
     showsPrec _ (TypeError err) = showString err
