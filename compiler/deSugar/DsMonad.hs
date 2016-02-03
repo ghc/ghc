@@ -34,6 +34,9 @@ module DsMonad (
         -- Getting and setting EvVars and term constraints in local environment
         getDictsDs, addDictsDs, getTmCsDs, addTmCsDs,
 
+        -- Iterations for pm checking
+        incrCheckPmIterDs, resetPmIterDs,
+
         -- Warnings
         DsWarning, warnDs, failWithDs, discardWarningsDs,
 
@@ -146,10 +149,12 @@ initDs :: HscEnv
 initDs hsc_env mod rdr_env type_env fam_inst_env thing_inside
   = do  { msg_var <- newIORef (emptyBag, emptyBag)
         ; static_binds_var <- newIORef []
+        ; pm_iter_var      <- newIORef 0
         ; let dflags                   = hsc_dflags hsc_env
               (ds_gbl_env, ds_lcl_env) = mkDsEnvs dflags mod rdr_env type_env
                                                   fam_inst_env msg_var
                                                   static_binds_var
+                                                  pm_iter_var
 
         ; either_res <- initTcRnIf 'd' hsc_env ds_gbl_env ds_lcl_env $
                           loadDAP $
@@ -225,11 +230,12 @@ initDsTc thing_inside
         ; msg_var  <- getErrsVar
         ; dflags   <- getDynFlags
         ; static_binds_var <- liftIO $ newIORef []
+        ; pm_iter_var      <- liftIO $ newIORef 0
         ; let type_env = tcg_type_env tcg_env
               rdr_env  = tcg_rdr_env tcg_env
               fam_inst_env = tcg_fam_inst_env tcg_env
               ds_envs  = mkDsEnvs dflags this_mod rdr_env type_env fam_inst_env
-                                  msg_var static_binds_var
+                                  msg_var static_binds_var pm_iter_var
         ; setEnvs ds_envs thing_inside
         }
 
@@ -258,8 +264,8 @@ initTcDsForSolver thing_inside
 
 mkDsEnvs :: DynFlags -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
          -> IORef Messages -> IORef [(Fingerprint, (Id, CoreExpr))]
-         -> (DsGblEnv, DsLclEnv)
-mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var static_binds_var
+         -> IORef Int -> (DsGblEnv, DsLclEnv)
+mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var static_binds_var pmvar
   = let if_genv = IfGblEnv { if_rec_types = Just (mod, return type_env) }
         if_lenv = mkIfLclEnv mod (text "GHC error in desugarer lookup in" <+> ppr mod)
         real_span = realSrcLocSpan (mkRealSrcLoc (moduleNameFS (moduleName mod)) 1 1)
@@ -272,10 +278,11 @@ mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var static_binds_var
                            , ds_parr_bi = panic "DsMonad: uninitialised ds_parr_bi"
                            , ds_static_binds = static_binds_var
                            }
-        lcl_env = DsLclEnv { dsl_meta  = emptyNameEnv
-                           , dsl_loc   = real_span
-                           , dsl_dicts = emptyBag
-                           , dsl_tm_cs = emptyBag
+        lcl_env = DsLclEnv { dsl_meta    = emptyNameEnv
+                           , dsl_loc     = real_span
+                           , dsl_dicts   = emptyBag
+                           , dsl_tm_cs   = emptyBag
+                           , dsl_pm_iter = pmvar
                            }
     in (gbl_env, lcl_env)
 
@@ -354,6 +361,24 @@ getTmCsDs = do { env <- getLclEnv; return (dsl_tm_cs env) }
 addTmCsDs :: Bag SimpleEq -> DsM a -> DsM a
 addTmCsDs tm_cs
   = updLclEnv (\env -> env { dsl_tm_cs = unionBags tm_cs (dsl_tm_cs env) })
+
+-- | Check that we have not done more iterations
+-- than we are supposed to and inrease the counter
+
+-- | Increase the counter for elapsed pattern match check iterations.
+-- If the current counter is already over the limit, fail
+incrCheckPmIterDs :: DsM ()
+incrCheckPmIterDs = do
+  env <- getLclEnv
+  cnt <- readTcRef (dsl_pm_iter env)
+  max_iters <- maxPmCheckIterations <$> getDynFlags
+  if cnt >= max_iters
+    then failM
+    else updTcRef (dsl_pm_iter env) (+1)
+
+-- | Reset the counter for pattern match check iterations to zero
+resetPmIterDs :: DsM ()
+resetPmIterDs = do { env <- getLclEnv; writeTcRef (dsl_pm_iter env) 0 }
 
 getSrcSpanDs :: DsM SrcSpan
 getSrcSpanDs = do { env <- getLclEnv

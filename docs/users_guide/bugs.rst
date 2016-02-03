@@ -358,16 +358,6 @@ Bugs in GHC
    This flag ensures that yield points are inserted at every function entrypoint
    (at the expense of a bit of performance).
 
--  GHC's updated exhaustiveness and coverage checker (see
-   :ref:`options-sanity`) is quite expressive but with a rather high
-   performance cost (in terms of both time and memory consumption), mainly
-   due to guards. Two flags have been introduced to give more control to
-   the user over guard reasoning: :ghc-flag:`-Wtoo-many-guards`
-   and :ghc-flag:`-ffull-guard-reasoning` (see :ref:`options-sanity`).
-   When :ghc-flag:`-ffull-guard-reasoning` is on, pattern match checking for guards
-   runs in full power, which may run out of memory/substantially increase
-   compilation time.
-
 -  GHC does not allow you to have a data type with a context that
    mentions type variables that are not data type parameters. For
    example:

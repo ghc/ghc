@@ -2,16 +2,16 @@ pmc001.hs:14:1: warning:
     Pattern match(es) are non-exhaustive
     In an equation for ‘f’:
         Patterns not matched:
-            MkT3 (MkT2 _)
-            MkT3 MkT1
-            (MkT2 _) MkT3
             MkT1 MkT3
+            (MkT2 _) MkT3
+            MkT3 MkT1
+            MkT3 (MkT2 _)
 
 pmc001.hs:19:1: warning:
     Pattern match(es) are non-exhaustive
     In an equation for ‘g’:
         Patterns not matched:
-            MkT3 (MkT2 _)
-            MkT3 MkT1
-            (MkT2 _) MkT3
             MkT1 MkT3
+            (MkT2 _) MkT3
+            MkT3 MkT1
+            MkT3 (MkT2 _)

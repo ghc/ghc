@@ -2,9 +2,7 @@
 
 {-# LANGUAGE CPP #-}
  -- This module used to take 10GB of memory to compile with the new
- -- (Nov '15) pattern-match check. In order to be able to compile it,
- -- do not enable -ffull-guard-reasoning. Instead, simplify the guards
- -- (default behaviour when guards are too many).
+ -- (Nov '15) pattern-match checker.
 
 module OptCoercion ( optCoercion, checkAxInstCo ) where
 
