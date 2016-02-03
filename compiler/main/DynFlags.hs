@@ -531,9 +531,6 @@ data GeneralFlag
    -- safe haskell flags
    | Opt_DistrustAllPackages
    | Opt_PackageTrust
-
-   -- pm checking with guards
-   | Opt_FullGuardReasoning
    deriving (Eq, Show, Enum)
 
 data WarningFlag =
@@ -555,7 +552,6 @@ data WarningFlag =
    | Opt_WarnMissingLocalSigs
    | Opt_WarnNameShadowing
    | Opt_WarnOverlappingPatterns
-   | Opt_WarnTooManyGuards
    | Opt_WarnTypeDefaults
    | Opt_WarnMonomorphism
    | Opt_WarnUnusedTopBinds
@@ -645,6 +641,7 @@ data DynFlags = DynFlags {
   debugLevel            :: Int,         -- ^ How much debug information to produce
   simplPhases           :: Int,         -- ^ Number of simplifier phases
   maxSimplIterations    :: Int,         -- ^ Max simplifier iterations
+  maxPmCheckIterations  :: Int,         -- ^ Max no iterations for pm checking
   ruleCheck             :: Maybe String,
   strictnessBefore      :: [Int],       -- ^ Additional demand analysis
 
@@ -1438,6 +1435,7 @@ defaultDynFlags mySettings =
         debugLevel              = 0,
         simplPhases             = 2,
         maxSimplIterations      = 4,
+        maxPmCheckIterations    = 10000000,
         ruleCheck               = Nothing,
         maxRelevantBinds        = Just 6,
         simplTickFactor         = 100,
@@ -2632,6 +2630,8 @@ dynamic_flags = [
       (intSuffix (\n d -> d{ simplPhases = n }))
   , defFlag "fmax-simplifier-iterations"
       (intSuffix (\n d -> d{ maxSimplIterations = n }))
+  , defFlag "fmax-pmcheck-iterations"
+      (intSuffix (\n d -> d{ maxPmCheckIterations = n }))
   , defFlag "fsimpl-tick-factor"
       (intSuffix (\n d -> d{ simplTickFactor = n }))
   , defFlag "fspec-constr-threshold"
@@ -2980,7 +2980,6 @@ wWarningFlags = [
   flagSpec "orphans"                     Opt_WarnOrphans,
   flagSpec "overflowed-literals"         Opt_WarnOverflowedLiterals,
   flagSpec "overlapping-patterns"        Opt_WarnOverlappingPatterns,
-  flagSpec "too-many-guards"             Opt_WarnTooManyGuards,
   flagSpec "missed-specialisations"      Opt_WarnMissedSpecs,
   flagSpec "all-missed-specialisations"  Opt_WarnAllMissedSpecs,
   flagSpec' "safe"                       Opt_WarnSafe setWarnSafe,
@@ -3117,8 +3116,7 @@ fFlags = [
   flagSpec "unbox-strict-fields"              Opt_UnboxStrictFields,
   flagSpec "vectorisation-avoidance"          Opt_VectorisationAvoidance,
   flagSpec "vectorise"                        Opt_Vectorise,
-  flagSpec "worker-wrapper"                   Opt_WorkerWrapper,
-  flagSpec "full-guard-reasoning"             Opt_FullGuardReasoning
+  flagSpec "worker-wrapper"                   Opt_WorkerWrapper
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@

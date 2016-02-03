@@ -694,21 +694,9 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
 
             when (isAnyPmCheckEnabled dflags (DsMatchContext ctxt locn)) $ do
 
-              -- Count the number of guards that can fail
-              guards <- computeNoGuards matches
-
-              let simplify = not (gopt Opt_FullGuardReasoning dflags)
-                              && (guards > maximum_failing_guards)
-
               -- See Note [Type and Term Equality Propagation]
               addTmCsDs (genCaseTmCs1 mb_scr new_vars) $
-                dsPmWarn dflags (DsMatchContext ctxt locn) $
-                  checkMatches simplify new_vars matches
-
-              when (not (gopt Opt_FullGuardReasoning dflags)
-                      && wopt Opt_WarnTooManyGuards dflags
-                      && guards > maximum_failing_guards)
-                   (warnManyGuards (DsMatchContext ctxt locn))
+                checkMatches dflags (DsMatchContext ctxt locn) new_vars matches
 
         ; result_expr <- handleWarnings $
                          matchEquations ctxt new_vars eqns_info rhs_ty
@@ -777,7 +765,7 @@ matchSinglePat (Var var) ctx pat ty match_result
        ; locn   <- getSrcSpanDs
        ; let pat' = getMaybeStrictPat dflags pat
        -- pattern match check warnings
-       ; dsPmWarn dflags (DsMatchContext ctx locn) (checkSingle var pat')
+       ; checkSingle dflags (DsMatchContext ctx locn) var pat'
 
        ; match [var] ty
                [EqnInfo { eqn_pats = [pat'], eqn_rhs  = match_result }] }

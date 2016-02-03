@@ -338,7 +338,8 @@ data DsLclEnv = DsLclEnv {
         dsl_meta    :: DsMetaEnv,        -- Template Haskell bindings
         dsl_loc     :: RealSrcSpan,      -- To put in pattern-matching error msgs
         dsl_dicts   :: Bag EvVar,        -- Constraints from GADT pattern-matching
-        dsl_tm_cs   :: Bag SimpleEq
+        dsl_tm_cs   :: Bag SimpleEq,
+        dsl_pm_iter :: IORef Int         -- no iterations for pmcheck
      }
 
 -- Inside [| |] brackets, the desugarer looks

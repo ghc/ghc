@@ -10,14 +10,14 @@ module TmOracle (
 
         -- re-exported from PmExpr
         PmExpr(..), PmLit(..), SimpleEq, ComplexEq, PmVarEnv, falsePmExpr,
-        canDiverge, eqPmLit, filterComplex, isNotPmExprOther, runPmPprM,
-        pprPmExprWithParens, lhsExprToPmExpr, hsExprToPmExpr,
+        eqPmLit, filterComplex, isNotPmExprOther, runPmPprM, lhsExprToPmExpr,
+        hsExprToPmExpr, pprPmExprWithParens,
 
         -- the term oracle
-        tmOracle, TmState, initialTmState,
+        tmOracle, TmState, initialTmState, solveOneEq, extendSubst, canDiverge,
 
         -- misc.
-        exprDeepLookup, pmLitType, flattenPmVarEnv
+        toComplex, exprDeepLookup, pmLitType, flattenPmVarEnv
     ) where
 
 #include "HsVersions.h"
@@ -25,6 +25,7 @@ module TmOracle (
 import PmExpr
 
 import Id
+import Name
 import TysWiredIn
 import Type
 import HsLit
@@ -43,7 +44,7 @@ import qualified Data.Map as Map
 -}
 
 -- | The type of substitutions.
-type PmVarEnv = Map.Map Id PmExpr
+type PmVarEnv = Map.Map Name PmExpr
 
 -- | The environment of the oracle contains
 --     1. A Bool (are there any constraints we cannot handle? (PmExprOther)).
@@ -52,7 +53,7 @@ type TmOracleEnv = (Bool, PmVarEnv)
 
 -- | Check whether a constraint (x ~ BOT) can succeed,
 -- given the resulting state of the term oracle.
-canDiverge :: Id -> TmState -> Bool
+canDiverge :: Name -> TmState -> Bool
 canDiverge x (standby, (_unhandled, env))
   -- If the variable seems not evaluated, there is a possibility for
   -- constraint x ~ BOT to be satisfiable.
@@ -66,11 +67,11 @@ canDiverge x (standby, (_unhandled, env))
   | otherwise = False
 
   where
-    isForcedByEq :: Id -> ComplexEq -> Bool
+    isForcedByEq :: Name -> ComplexEq -> Bool
     isForcedByEq y (e1, e2) = varIn y e1 || varIn y e2
 
 -- | Check whether a variable is in the free variables of an expression
-varIn :: Id -> PmExpr -> Bool
+varIn :: Name -> PmExpr -> Bool
 varIn x e = case e of
   PmExprVar y    -> x == y
   PmExprCon _ es -> any (x `varIn`) es
@@ -131,7 +132,7 @@ solveComplexEq solver_state@(standby, (unhandled, env)) eq@(e1, e2) = case eq of
   _ -> Just (standby, (True, env)) -- I HATE CATCH-ALLS
 
 -- | Extend the substitution and solve the (possibly updated) constraints.
-extendSubstAndSolve :: Id -> PmExpr -> TmState -> Maybe TmState
+extendSubstAndSolve :: Name -> PmExpr -> TmState -> Maybe TmState
 extendSubstAndSolve x e (standby, (unhandled, env))
   = foldlM solveComplexEq new_incr_state (map simplifyComplexEq changed)
   where
@@ -141,6 +142,19 @@ extendSubstAndSolve x e (standby, (unhandled, env))
     -- See Note [Representation of Term Equalities] in deSugar/Check.hs
     (changed, unchanged) = partitionWith (substComplexEq x e) standby
     new_incr_state       = (unchanged, (unhandled, Map.insert x e env))
+
+-- | When we know that a variable is fresh, we do not actually have to
+-- check whether anything changes, we know that nothing does. Hence,
+-- `extendSubst` simply extends the substitution, unlike what
+-- `extendSubstAndSolve` does.
+extendSubst :: Id -> PmExpr -> TmState -> TmState
+extendSubst y e (standby, (unhandled, env))
+  | isNotPmExprOther simpl_e
+  = (standby, (unhandled, Map.insert x simpl_e env))
+  | otherwise = (standby, (True, env))
+  where
+    x = idName y
+    simpl_e = fst $ simplifyPmExpr $ exprDeepLookup env e
 
 -- | Simplify a complex equality.
 simplifyComplexEq :: ComplexEq -> ComplexEq
@@ -204,7 +218,7 @@ applySubstComplexEq :: PmVarEnv -> ComplexEq -> ComplexEq
 applySubstComplexEq env (e1,e2) = (exprDeepLookup env e1, exprDeepLookup env e2)
 
 -- | Apply an (un-flattened) substitution to a variable.
-varDeepLookup :: PmVarEnv -> Id -> PmExpr
+varDeepLookup :: PmVarEnv -> Name -> PmExpr
 varDeepLookup env x
   | Just e <- Map.lookup x env = exprDeepLookup env e -- go deeper
   | otherwise                  = PmExprVar x          -- terminal

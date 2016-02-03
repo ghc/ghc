@@ -430,7 +430,7 @@ test('T783',
             # 2014-09-03: 223377364 (Windows) better specialisation, raft of core-to-core optimisations
             # 2014-12-22: 235002220 (Windows) not sure why
 
-           (wordsize(64), 1134085384, 10)]),
+           (wordsize(64), 488592288, 10)]),
             # prev:       349263216 (amd64/Linux)
             # 07/08/2012: 384479856 (amd64/Linux)
             # 29/08/2012: 436927840 (amd64/Linux)
@@ -457,6 +457,8 @@ test('T783',
             #    (D757: Emit Typeable instances at site of type definition)
             # 2015-12-04: 1134085384 (amd64/Linux)
             #    (D1535: Major overhaul of pattern match checker, #11162)
+            # 2016-02-03: 488592288 (amd64/Linux)
+            #    (D1795: Another overhaul of pattern match checker, #11374)
       extra_hc_opts('-static')
       ],
       compile,[''])

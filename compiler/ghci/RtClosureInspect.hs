@@ -1,7 +1,4 @@
 {-# LANGUAGE CPP, ScopedTypeVariables, MagicHash, UnboxedTuples #-}
-#if __GLASGOW_HASKELL__ > 710
-{-# OPTIONS_GHC -ffull-guard-reasoning #-}
-#endif
 
 -----------------------------------------------------------------------------
 --

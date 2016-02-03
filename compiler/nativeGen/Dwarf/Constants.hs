@@ -1,9 +1,5 @@
 -- | Constants describing the DWARF format. Most of this simply
 -- mirrors /usr/include/dwarf.h.
-{-# LANGUAGE CPP #-}
-#if __GLASGOW_HASKELL__ > 710
-{-# OPTIONS_GHC -ffull-guard-reasoning #-}
-#endif
 
 module Dwarf.Constants where
 

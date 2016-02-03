@@ -2,8 +2,8 @@ T9951b.hs:7:1: warning:
     Pattern match(es) are non-exhaustive
     In an equation for ‘f’:
         Patterns not matched:
-            ('a':'b':_:_)
-            ('a':p:_) where p is not one of {'b'}
-            ['a']
+            []
             (p:_) where p is not one of {'a'}
+            ['a']
+            ('a':p:_) where p is not one of {'b'}
             ...
