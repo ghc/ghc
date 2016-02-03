@@ -41,8 +41,7 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
         let inTreeMk = oldPath -/- takeFileName dataFile
 
         need [cabalFile]
-        buildWithResources [(resGhcCabal rs, 1)] $
-            fullTarget target GhcCabal [cabalFile] [inTreeMk]
+        build $ fullTarget target GhcCabal [cabalFile] [inTreeMk]
 
         -- TODO: get rid of this, see #113
         liftIO $ IO.copyFile inTreeMk dataFile

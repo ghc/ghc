@@ -4,13 +4,9 @@ import Base
 
 data Resources = Resources
     {
-        resGhcCabal :: Resource,
-        resGhcPkg   :: Resource
+        resGhcPkg :: Resource
     }
 
--- Unfortunately parallel invokations of ghc-cabal or ghc-pkg do not work:
--- * https://mail.haskell.org/pipermail/ghc-commits/2013-May/001712.html
--- * ghc.mk: see comment about parallel ghc-pkg invokations
+-- We cannot register multiple packages in parallel:
 resourceRules :: Rules Resources
-resourceRules = liftM2 Resources (newResource "ghc-cabal" 1)
-                                 (newResource "ghc-pkg"   1)
+resourceRules = Resources <$> newResource "ghc-pkg" 1
