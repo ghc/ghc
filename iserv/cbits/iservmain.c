@@ -11,6 +11,7 @@ int main (int argc, char *argv[])
     // we must retain CAFs for running interpreted code.
     conf.keep_cafs = 1;
 
+    conf.rts_opts_enabled = RtsOptsAll;
     extern StgClosure ZCMain_main_closure;
     hs_main(argc, argv, &ZCMain_main_closure, conf);
 }
