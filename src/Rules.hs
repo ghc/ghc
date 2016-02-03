@@ -4,7 +4,6 @@ import Base
 import Data.Foldable
 import Expression
 import GHC
-import Oracles.PackageData
 import qualified Rules.Generate
 import Rules.Package
 import Rules.Resources
@@ -22,8 +21,8 @@ topLevelTargets = do
     -- TODO: do we want libffiLibrary to be a top-level target?
 
     action $ do -- TODO: Add support for all rtsWays
-        rtsLib    <- pkgLibraryFile Stage1 rts "rts" vanilla
-        rtsThrLib <- pkgLibraryFile Stage1 rts "rts" threaded
+        rtsLib    <- pkgLibraryFile Stage1 rts vanilla
+        rtsThrLib <- pkgLibraryFile Stage1 rts threaded
         need [ rtsLib, rtsThrLib ]
 
     for_ allStages $ \stage ->
@@ -34,8 +33,7 @@ topLevelTargets = do
                 if isLibrary pkg
                 then do -- build a library
                     ways    <- interpretPartial target getLibraryWays
-                    compId  <- interpretPartial target $ getPkgData ComponentId
-                    libs    <- traverse (pkgLibraryFile stage pkg compId) ways
+                    libs    <- traverse (pkgLibraryFile stage pkg) ways
                     haddock <- interpretPartial target buildHaddock
                     need $ libs ++ [ pkgHaddockFile pkg | haddock && stage == Stage1 ]
                 else do -- otherwise build a program

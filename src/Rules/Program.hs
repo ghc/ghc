@@ -86,14 +86,13 @@ buildBinary target @ (PartialTarget stage pkg) bin = do
     let deps = matchPackageNames (sort pkgs) (map PackageName $ sort depNames)
         ghci = ghciFlag == "YES" && stage == Stage1
     libs <- fmap concat . forM deps $ \dep -> do
-        let depTarget = PartialTarget libStage dep
-        compId <- interpretPartial depTarget $ getPkgData ComponentId
         libFiles <- fmap concat . forM ways $ \way -> do
-            libFile  <- pkgLibraryFile libStage dep compId           way
-            lib0File <- pkgLibraryFile libStage dep (compId ++ "-0") way
+            libFile  <- pkgLibraryFile  libStage dep way
+            lib0File <- pkgLibraryFile0 libStage dep way
             dll0     <- needDll0 libStage dep
             return $ libFile : [ lib0File | dll0 ]
-        return $ libFiles ++ [ pkgGhciLibraryFile libStage dep compId | ghci ]
+        ghciLib <- pkgGhciLibraryFile libStage dep
+        return $ libFiles ++ [ ghciLib | ghci ]
     let binDeps = if pkg == ghcCabal && stage == Stage0
                   then [ pkgPath pkg -/- src <.> "hs" | src <- hSrcs ]
                   else objs
