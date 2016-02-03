@@ -6,7 +6,6 @@ import Base
 import Expression
 import GHC
 import Oracles
-import Predicates (registerPackage)
 import Rules.Actions
 import Rules.Generate
 import Rules.Libffi
@@ -29,14 +28,14 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
         orderOnly $ generatedDependencies stage pkg
 
         -- GhcCabal may run the configure script, so we depend on it
-        -- We don't know who built the configure script from configure.ac
         whenM (doesFileExist $ configure <.> "ac") $ need [configure]
 
-        -- We configure packages in the order of their dependencies
+        -- Before we configure a package its dependencies need to be registered
         deps <- packageDeps pkg
         pkgs <- interpretPartial target getPackages
         let depPkgs = matchPackageNames (sort pkgs) deps
-        orderOnly $ map (pkgDataFile stage) depPkgs
+        depConfs <- traverse (pkgConfFile stage) depPkgs
+        orderOnly depConfs
 
         -- TODO: get rid of this, see #113
         let inTreeMk = oldPath -/- takeFileName dataFile
@@ -51,23 +50,6 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
         createDirectory $ targetPath stage pkg -/- "build/autogen"
         forM_ autogenFiles $ \file -> do
             copyFile (oldPath -/- file) (targetPath stage pkg -/- file)
-
-        -- ghc-pkg produces inplace-pkg-config when run on packages with
-        -- library components only
-        when (isLibrary pkg) .
-            whenM (interpretPartial target registerPackage) $ do
-
-                -- Post-process inplace-pkg-config. TODO: remove, see #113, #148
-                let fixPkgConf = unlines
-                               . map (replace oldPath (targetPath stage pkg)
-                               . replace (replaceSeparators '\\' $ oldPath)
-                                         (targetPath stage pkg) )
-                               . lines
-
-                fixFile (oldPath -/- "inplace-pkg-config") fixPkgConf
-
-                buildWithResources [(resGhcPkg rs, 1)] $
-                    fullTarget target (GhcPkg stage) [cabalFile] []
 
         postProcessPackageData stage pkg dataFile
 
@@ -141,7 +123,7 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
                         [ "C_SRCS = "
                           ++ unwords (cSrcs ++ cmmSrcs ++ sSrcs ++ extraSrcs)
                         , "CC_OPTS = "  ++ unwords includes
-                        , "COMPONENT_ID = " ++ "rts" ]
+                        , "COMPONENT_ID = rts" ]
                 writeFileChanged mk contents
                 putSuccess $ "| Successfully generated '" ++ mk ++ "'."
 

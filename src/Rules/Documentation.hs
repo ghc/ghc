@@ -26,7 +26,8 @@ buildPackageDocumentation _ target @ (PartialTarget stage pkg) =
 
             -- HsColour sources
             whenM (specified HsColour) $ do
-                need [cabalFile, pkgDataFile stage pkg ]
+                pkgConf <- pkgConfFile stage pkg
+                need [ cabalFile, pkgConf ] -- TODO: check if need pkgConf
                 build $ fullTarget target GhcCabalHsColour [cabalFile] []
 
             -- Build Haddock documentation

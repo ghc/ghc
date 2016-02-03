@@ -62,6 +62,7 @@ executable ghc-shake
                        , Rules.Package
                        , Rules.Perl
                        , Rules.Program
+                       , Rules.Register
                        , Rules.Resources
                        , Rules.Wrappers.Ghc
                        , Rules.Wrappers.GhcPkg

@@ -1,22 +1,24 @@
 module Rules.Package (buildPackage) where
 
 import Base
-import Rules.Compile
-import Rules.Data
-import Rules.Dependencies
-import Rules.Documentation
-import Rules.Generate
-import Rules.Library
-import Rules.Program
+import qualified Rules.Compile
+import qualified Rules.Data
+import qualified Rules.Dependencies
+import qualified Rules.Documentation
+import qualified Rules.Generate
+import qualified Rules.Library
+import qualified Rules.Program
+import qualified Rules.Register
 import Rules.Resources
 import Target
 
 buildPackage :: Resources -> PartialTarget -> Rules ()
 buildPackage = mconcat
-    [ buildPackageData
-    , buildPackageDependencies
-    , generatePackageCode
-    , compilePackage
-    , buildPackageLibrary
-    , buildPackageDocumentation
-    , buildProgram ]
+    [ Rules.Compile.compilePackage
+    , Rules.Data.buildPackageData
+    , Rules.Dependencies.buildPackageDependencies
+    , Rules.Documentation.buildPackageDocumentation
+    , Rules.Generate.generatePackageCode
+    , Rules.Library.buildPackageLibrary
+    , Rules.Program.buildProgram
+    , Rules.Register.registerPackage ]
