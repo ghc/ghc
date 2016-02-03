@@ -1,7 +1,7 @@
 -- | Convenient predicates
 module Predicates (
     stage, package, builder, stagedBuilder, builderGcc, builderGhc, file, way,
-    stage0, stage1, stage2, notStage0, notPackage, registerPackage
+    stage0, stage1, stage2, notStage0, notPackage
     ) where
 
 import Base
@@ -60,9 +60,3 @@ notStage0 = notM stage0
 -- | Is a certain package /not/ built right now?
 notPackage :: Package -> Predicate
 notPackage = notM . package
-
--- TODO: Actually, we don't register compiler in some circumstances -- fix.
--- | Do we need to run @ghc-pkg update@ on the currently built package?
--- See "Rules.Data".
-registerPackage :: Predicate
-registerPackage = return True
