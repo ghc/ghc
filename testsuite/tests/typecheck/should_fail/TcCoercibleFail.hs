@@ -20,9 +20,16 @@ foo4 = coerce $ one :: Down Int
 newtype Void = Void Void
 foo5 = coerce :: Void -> ()
 
+
+------------------------------------
+-- This next one generates an exponentally big type as it
+-- tries to unwrap.  See comment:15 in Trac #11518
+-- Adding asserions that force the types can make us
+-- run out of space.
 newtype VoidBad a = VoidBad (VoidBad (a,a))
 foo5' = coerce :: (VoidBad ()) -> ()
 
+------------------------------------
 -- This shoul fail with a context stack overflow
 newtype Fix f = Fix (f (Fix f))
 foo6 = coerce :: Fix (Either Int) -> Fix (Either Age)
