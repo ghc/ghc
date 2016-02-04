@@ -1275,7 +1275,7 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_
 {-
 ************************************************************************
 *                                                                      *
-\subsection{Figuring out CafInfo for an expression}
+           Figuring out CafInfo for an expression
 *                                                                      *
 ************************************************************************
 
@@ -1332,7 +1332,7 @@ cafRefsE p (Lit lit)           = cafRefsL p lit
 cafRefsE p (App f a)           = cafRefsE p f || cafRefsE p a
 cafRefsE p (Lam _ e)           = cafRefsE p e
 cafRefsE p (Let b e)           = cafRefsEs p (rhssOfBind b) || cafRefsE p e
-cafRefsE p (Case e _bndr _ alts) = cafRefsE p e || cafRefsEs p (rhssOfAlts alts)
+cafRefsE p (Case e _ _ alts)   = cafRefsE p e || cafRefsEs p (rhssOfAlts alts)
 cafRefsE p (Tick _n e)         = cafRefsE p e
 cafRefsE p (Cast e _co)        = cafRefsE p e
 cafRefsE _ (Type _)            = False
@@ -1355,10 +1355,13 @@ cafRefsV (subst, _) id
   | Just id' <- lookupVarEnv subst id = mayHaveCafRefs (idCafInfo id')
   | otherwise                         = False
 
+
 {-
-------------------------------------------------------------------------------
---               Old, dead, type-trimming code
--------------------------------------------------------------------------------
+************************************************************************
+*                                                                      *
+                  Old, dead, type-trimming code
+*                                                                      *
+************************************************************************
 
 We used to try to "trim off" the constructors of data types that are
 not exported, to reduce the size of interface files, at least without
