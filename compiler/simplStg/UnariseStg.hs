@@ -42,7 +42,6 @@ import MkId (realWorldPrimId)
 import Type
 import TysWiredIn
 import DataCon
-import VarSet
 import OccName
 import Name
 import Util
@@ -74,9 +73,9 @@ unariseBinding us rho bind = case bind of
 
 unariseRhs :: UniqSupply -> UnariseEnv -> StgRhs -> StgRhs
 unariseRhs us rho rhs = case rhs of
-  StgRhsClosure ccs b_info fvs update_flag srt args expr
+  StgRhsClosure ccs b_info fvs update_flag args expr
     -> StgRhsClosure ccs b_info (unariseIds rho fvs) update_flag
-                     (unariseSRT rho srt) args' (unariseExpr us' rho' expr)
+                     args' (unariseExpr us' rho' expr)
     where (us', rho', args') = unariseIdBinders us rho args
   StgRhsCon ccs con args
     -> StgRhsCon ccs con (unariseArgs rho args)
@@ -111,10 +110,8 @@ unariseExpr us rho (StgLam xs e)
   where
     (us', rho', xs') = unariseIdBinders us rho xs
 
-unariseExpr us rho (StgCase e case_lives alts_lives bndr srt alt_ty alts)
-  = StgCase (unariseExpr us1 rho e) (unariseLives rho case_lives)
-            (unariseLives rho alts_lives) bndr (unariseSRT rho srt)
-            alt_ty alts'
+unariseExpr us rho (StgCase e bndr alt_ty alts)
+  = StgCase (unariseExpr us1 rho e) bndr alt_ty alts'
  where
     (us1, us2) = splitUniqSupply us
     alts'      = unariseAlts us2 rho alt_ty bndr alts
@@ -124,9 +121,8 @@ unariseExpr us rho (StgLet bind e)
   where
     (us1, us2) = splitUniqSupply us
 
-unariseExpr us rho (StgLetNoEscape live_in_let live_in_bind bind e)
-  = StgLetNoEscape (unariseLives rho live_in_let) (unariseLives rho live_in_bind)
-                   (unariseBinding us1 rho bind) (unariseExpr us2 rho e)
+unariseExpr us rho (StgLetNoEscape bind e)
+  = StgLetNoEscape (unariseBinding us1 rho bind) (unariseExpr us2 rho e)
   where
     (us1, us2) = splitUniqSupply us
 
@@ -161,13 +157,6 @@ unariseAlt us rho (con, xs, uses, e)
     (us', rho', xs', uses') = unariseUsedIdBinders us rho xs uses
 
 ------------------------
-unariseSRT :: UnariseEnv -> SRT -> SRT
-unariseSRT _   NoSRT            = NoSRT
-unariseSRT rho (SRTEntries ids) = SRTEntries (concatMapVarSet (unariseId rho) ids)
-
-unariseLives :: UnariseEnv -> StgLiveVars -> StgLiveVars
-unariseLives rho ids = concatMapVarSet (unariseId rho) ids
-
 unariseArgs :: UnariseEnv -> [StgArg] -> [StgArg]
 unariseArgs rho = concatMap (unariseArg rho)
 
@@ -212,6 +201,3 @@ unariseIdBinder us rho x = case repType (idType x) of
 unboxedTupleBindersFrom :: UniqSupply -> Id -> [UnaryType] -> [Id]
 unboxedTupleBindersFrom us x tys = zipWith (mkSysLocalOrCoVar fs) (uniqsFromSupply us) tys
   where fs = occNameFS (getOccName x)
-
-concatMapVarSet :: (Var -> [Var]) -> VarSet -> VarSet
-concatMapVarSet f xs = mkVarSet [x' | x <- varSetElems xs, x' <- f x]

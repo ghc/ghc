@@ -124,10 +124,10 @@ lint_binds_help (binder, rhs)
 
 lintStgRhs :: StgRhs -> LintM (Maybe Type)   -- Just ty => type is exact
 
-lintStgRhs (StgRhsClosure _ _ _ _ _ [] expr)
+lintStgRhs (StgRhsClosure _ _ _ _ [] expr)
   = lintStgExpr expr
 
-lintStgRhs (StgRhsClosure _ _ _ _ _ binders expr)
+lintStgRhs (StgRhsClosure _ _ _ _ binders expr)
   = addLoc (LambdaBodyOf binders) $
       addInScopeVars binders $ runMaybeT $ do
         body_ty <- MaybeT $ lintStgExpr expr
@@ -176,7 +176,7 @@ lintStgExpr (StgLet binds body) = do
       addInScopeVars binders $
         lintStgExpr body
 
-lintStgExpr (StgLetNoEscape _ _ binds body) = do
+lintStgExpr (StgLetNoEscape binds body) = do
     binders <- lintStgBinds binds
     addLoc (BodyOfLetRec binders) $
       addInScopeVars binders $
@@ -184,7 +184,7 @@ lintStgExpr (StgLetNoEscape _ _ binds body) = do
 
 lintStgExpr (StgTick _ expr) = lintStgExpr expr
 
-lintStgExpr (StgCase scrut _ _ bndr _ alts_type alts) = runMaybeT $ do
+lintStgExpr (StgCase scrut bndr alts_type alts) = runMaybeT $ do
     _ <- MaybeT $ lintStgExpr scrut
 
     in_scope <- MaybeT $ liftM Just $
