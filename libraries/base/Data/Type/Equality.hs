@@ -54,13 +54,17 @@ import Data.Type.Bool
 -- | Lifted, homogeneous equality. By lifted, we mean that it can be
 -- bogus (deferred type error). By homogeneous, the two types @a@
 -- and @b@ must have the same kind.
-class a ~~ b => (a :: k) ~ (b :: k) | a -> b, b -> a
+class a ~~ b => (a :: k) ~ (b :: k)
   -- See Note [The equality types story] in TysPrim
   -- NB: All this class does is to wrap its superclass, which is
   --     the "real", inhomogeneous equality; this is needed when
   --     we have a Given (a~b), and we want to prove things from it
   -- NB: Not exported, as (~) is magical syntax. That's also why there's
   -- no fixity.
+
+  -- It's tempting to put functional dependencies on (~), but it's not
+  -- necessary because the functional-depedency coverage check looks
+  -- through superclasses, and (~#) is handled in that check.
 
 instance {-# INCOHERENT #-} a ~~ b => a ~ b
   -- See Note [The equality types story] in TysPrim
