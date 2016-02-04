@@ -104,7 +104,8 @@ typeNatExpTyCon = mkTypeNatFunTyCon2 name
 typeNatLeqTyCon :: TyCon
 typeNatLeqTyCon =
   mkFamilyTyCon name
-    (mkFunTys [ typeNatKind, typeNatKind ] boolTy)
+    (map mkAnonBinder [ typeNatKind, typeNatKind ])
+    boolTy
     (mkTemplateTyVars [ typeNatKind, typeNatKind ])
     Nothing
     (BuiltInSynFamTyCon ops)
@@ -123,7 +124,8 @@ typeNatLeqTyCon =
 typeNatCmpTyCon :: TyCon
 typeNatCmpTyCon =
   mkFamilyTyCon name
-    (mkFunTys [ typeNatKind, typeNatKind ] orderingKind)
+    (map mkAnonBinder [ typeNatKind, typeNatKind ])
+    orderingKind
     (mkTemplateTyVars [ typeNatKind, typeNatKind ])
     Nothing
     (BuiltInSynFamTyCon ops)
@@ -142,7 +144,8 @@ typeNatCmpTyCon =
 typeSymbolCmpTyCon :: TyCon
 typeSymbolCmpTyCon =
   mkFamilyTyCon name
-    (mkFunTys [ typeSymbolKind, typeSymbolKind ] orderingKind)
+    (map mkAnonBinder [ typeSymbolKind, typeSymbolKind ])
+    orderingKind
     (mkTemplateTyVars [ typeSymbolKind, typeSymbolKind ])
     Nothing
     (BuiltInSynFamTyCon ops)
@@ -166,7 +169,8 @@ typeSymbolCmpTyCon =
 mkTypeNatFunTyCon2 :: Name -> BuiltInSynFamily -> TyCon
 mkTypeNatFunTyCon2 op tcb =
   mkFamilyTyCon op
-    (mkFunTys [ typeNatKind, typeNatKind ] typeNatKind)
+    (map mkAnonBinder [ typeNatKind, typeNatKind ])
+    typeNatKind
     (mkTemplateTyVars [ typeNatKind, typeNatKind ])
     Nothing
     (BuiltInSynFamTyCon tcb)

@@ -14,6 +14,8 @@ module Inst (
        instCall, instDFunType, instStupidTheta,
        newWanted, newWanteds,
 
+       tcInstBinders, tcInstBindersX,
+
        newOverloadedLit, mkOverLit,
 
        newClsInst,
@@ -30,7 +32,7 @@ module Inst (
 #include "HsVersions.h"
 
 import {-# SOURCE #-}   TcExpr( tcPolyExpr, tcSyntaxOp )
-import {-# SOURCE #-}   TcUnify( unifyType, noThing )
+import {-# SOURCE #-}   TcUnify( unifyType, unifyKind, noThing )
 
 import FastString
 import HsSyn
@@ -39,8 +41,7 @@ import TcRnMonad
 import TcEnv
 import TcEvidence
 import InstEnv
-import DataCon     ( dataConWrapId )
-import TysWiredIn  ( heqDataCon )
+import TysWiredIn  ( heqDataCon, coercibleDataCon )
 import CoreSyn     ( isOrphan )
 import FunDeps
 import TcMType
@@ -51,7 +52,9 @@ import Class( Class )
 import MkId( mkDictFunId )
 import Id
 import Name
-import Var      ( EvVar )
+import Var      ( EvVar, mkTyVar )
+import DataCon
+import TyCon
 import VarEnv
 import PrelNames
 import SrcLoc
@@ -325,6 +328,122 @@ instStupidTheta :: CtOrigin -> TcThetaType -> TcM ()
 instStupidTheta orig theta
   = do  { _co <- instCallConstraints orig theta -- Discard the coercion
         ; return () }
+
+{-
+************************************************************************
+*                                                                      *
+         Instantiating Kinds
+*                                                                      *
+************************************************************************
+
+-}
+
+---------------------------
+-- | This is used to instantiate binders when type-checking *types* only.
+-- See also Note [Bidirectional type checking]
+tcInstBinders :: [TyBinder] -> TcM (TCvSubst, [TcType])
+tcInstBinders = tcInstBindersX emptyTCvSubst Nothing
+
+-- | This is used to instantiate binders when type-checking *types* only.
+-- The @VarEnv Kind@ gives some known instantiations.
+-- See also Note [Bidirectional type checking]
+tcInstBindersX :: TCvSubst -> Maybe (VarEnv Kind)
+               -> [TyBinder] -> TcM (TCvSubst, [TcType])
+tcInstBindersX subst mb_kind_info bndrs
+  = do { (subst, args) <- mapAccumLM (tcInstBinderX mb_kind_info) subst bndrs
+       ; traceTc "instantiating tybinders:"
+           (vcat $ zipWith (\bndr arg -> ppr bndr <+> text ":=" <+> ppr arg)
+                           bndrs args)
+       ; return (subst, args) }
+
+-- | Used only in *types*
+tcInstBinderX :: Maybe (VarEnv Kind)
+              -> TCvSubst -> TyBinder -> TcM (TCvSubst, TcType)
+tcInstBinderX mb_kind_info subst binder
+  | Just tv <- binderVar_maybe binder
+  = case lookup_tv tv of
+      Just ki -> return (extendTvSubstAndInScope subst tv ki, ki)
+      Nothing -> do { (subst', tv') <- newMetaTyVarX subst tv
+                    ; return (subst', mkTyVarTy tv') }
+
+     -- This is the *only* constraint currently handled in types.
+  | Just (mk, role, k1, k2) <- get_pred_tys_maybe substed_ty
+  = do { let origin = TypeEqOrigin { uo_actual   = k1
+                                   , uo_expected = mkCheckExpType k2
+                                   , uo_thing    = Nothing }
+       ; co <- case role of
+                 Nominal          -> unifyKind noThing k1 k2
+                 Representational -> emitWantedEq origin KindLevel role k1 k2
+                 Phantom          -> pprPanic "tcInstBinderX Phantom" (ppr binder)
+       ; arg' <- mk co k1 k2
+       ; return (subst, arg') }
+
+  | isPredTy substed_ty
+  = do { let (env, tidy_ty) = tidyOpenType emptyTidyEnv substed_ty
+       ; addErrTcM (env, text "Illegal constraint in a type:" <+> ppr tidy_ty)
+
+         -- just invent a new variable so that we can continue
+       ; u <- newUnique
+       ; let name = mkSysTvName u (fsLit "dict")
+       ; return (subst, mkTyVarTy $ mkTyVar name substed_ty) }
+
+
+  | otherwise
+  = do { ty <- newFlexiTyVarTy substed_ty
+       ; return (subst, ty) }
+
+  where
+    substed_ty = substTy subst (binderType binder)
+
+    lookup_tv tv = do { env <- mb_kind_info   -- `Maybe` monad
+                      ; lookupVarEnv env tv }
+
+      -- handle boxed equality constraints, because it's so easy
+    get_pred_tys_maybe ty
+      | Just (r, k1, k2) <- getEqPredTys_maybe ty
+      = Just (\co _ _ -> return $ mkCoercionTy co, r, k1, k2)
+      | Just (tc, [_, _, k1, k2]) <- splitTyConApp_maybe ty
+      = if | tc `hasKey` heqTyConKey
+             -> Just (mkHEqBoxTy, Nominal, k1, k2)
+           | otherwise
+             -> Nothing
+      | Just (tc, [_, k1, k2]) <- splitTyConApp_maybe ty
+      = if | tc `hasKey` eqTyConKey
+             -> Just (mkEqBoxTy, Nominal, k1, k2)
+           | tc `hasKey` coercibleTyConKey
+             -> Just (mkCoercibleBoxTy, Representational, k1, k2)
+           | otherwise
+             -> Nothing
+      | otherwise
+      = Nothing
+
+-------------------------------
+-- | This takes @a ~# b@ and returns @a ~~ b@.
+mkHEqBoxTy :: TcCoercion -> Type -> Type -> TcM Type
+-- monadic just for convenience with mkEqBoxTy
+mkHEqBoxTy co ty1 ty2
+  = return $
+    mkTyConApp (promoteDataCon heqDataCon) [k1, k2, ty1, ty2, mkCoercionTy co]
+  where k1 = typeKind ty1
+        k2 = typeKind ty2
+
+-- | This takes @a ~# b@ and returns @a ~ b@.
+mkEqBoxTy :: TcCoercion -> Type -> Type -> TcM Type
+mkEqBoxTy co ty1 ty2
+  = do { eq_tc <- tcLookupTyCon eqTyConName
+       ; let [datacon] = tyConDataCons eq_tc
+       ; hetero <- mkHEqBoxTy co ty1 ty2
+       ; return $ mkTyConApp (promoteDataCon datacon) [k, ty1, ty2, hetero] }
+  where k = typeKind ty1
+
+-- | This takes @a ~R# b@ and returns @Coercible a b@.
+mkCoercibleBoxTy :: TcCoercion -> Type -> Type -> TcM Type
+-- monadic just for convenience with mkEqBoxTy
+mkCoercibleBoxTy co ty1 ty2
+  = do { return $
+         mkTyConApp (promoteDataCon coercibleDataCon)
+                    [k, ty1, ty2, mkCoercionTy co] }
+  where k = typeKind ty1
 
 {-
 ************************************************************************

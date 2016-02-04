@@ -1067,7 +1067,7 @@ dsEvTerm (EvDelayedError ty msg) = return $ dsEvDelayedError ty msg
 
 dsEvDelayedError :: Type -> FastString -> CoreExpr
 dsEvDelayedError ty msg
-  = Var errorId `mkTyApps` [getLevity "dsEvTerm" ty, ty] `mkApps` [litMsg]
+  = Var errorId `mkTyApps` [getRuntimeRep "dsEvTerm" ty, ty] `mkApps` [litMsg]
   where
     errorId = tYPE_ERROR_ID
     litMsg  = Lit (MachStr (fastStringToByteString msg))

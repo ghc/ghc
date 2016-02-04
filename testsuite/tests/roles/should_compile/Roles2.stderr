@@ -3,10 +3,8 @@ TYPE SIGNATURES
   Roles2.K2 :: forall a. FunPtr a -> T2 a
 TYPE CONSTRUCTORS
   data T1 a = K1 (IO a)
-    Kind: * -> *
   type role T2 phantom
   data T2 a = K2 (FunPtr a)
-    Kind: * -> *
 COERCION AXIOMS
 Dependent modules: []
 Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,

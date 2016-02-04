@@ -94,9 +94,9 @@ data IfaceDecl
               ifIdInfo    :: IfaceIdInfo }
 
   | IfaceData { ifName       :: IfaceTopBndr,   -- Type constructor
-                ifKind       :: IfaceType,      -- Kind of type constructor
+                ifBinders    :: [IfaceTyConBinder],
+                ifResKind    :: IfaceType,      -- Result kind of type constructor
                 ifCType      :: Maybe CType,    -- C type for CAPI FFI
-                ifTyVars     :: [IfaceTvBndr],  -- Type variables
                 ifRoles      :: [Role],         -- Roles
                 ifCtxt       :: IfaceContext,   -- The "stupid theta"
                 ifCons       :: IfaceConDecls,  -- Includes new/data/data family info
@@ -108,25 +108,24 @@ data IfaceDecl
     }
 
   | IfaceSynonym { ifName    :: IfaceTopBndr,      -- Type constructor
-                   ifTyVars  :: [IfaceTvBndr],     -- Type variables
                    ifRoles   :: [Role],            -- Roles
-                   ifSynKind :: IfaceKind,         -- Kind of the *tycon*
+                   ifBinders :: [IfaceTyConBinder],
+                   ifResKind :: IfaceKind,         -- Kind of the *result*
                    ifSynRhs  :: IfaceType }
 
   | IfaceFamily  { ifName    :: IfaceTopBndr,      -- Type constructor
-                   ifTyVars  :: [IfaceTvBndr],     -- Type variables
                    ifResVar  :: Maybe IfLclName,   -- Result variable name, used
                                                    -- only for pretty-printing
                                                    -- with --show-iface
-                   ifFamKind :: IfaceKind,         -- Kind of the *tycon*
+                   ifBinders :: [IfaceTyConBinder],
+                   ifResKind :: IfaceKind,         -- Kind of the *tycon*
                    ifFamFlav :: IfaceFamTyConFlav,
                    ifFamInj  :: Injectivity }      -- injectivity information
 
   | IfaceClass { ifCtxt    :: IfaceContext,             -- Superclasses
                  ifName    :: IfaceTopBndr,             -- Name of the class TyCon
-                 ifTyVars  :: [IfaceTvBndr],            -- Type variables
                  ifRoles   :: [Role],                   -- Roles
-                 ifKind    :: IfaceType,                -- Kind of TyCon
+                 ifBinders :: [IfaceTyConBinder],
                  ifFDs     :: [FunDep FastString],      -- Functional dependencies
                  ifATs     :: [IfaceAT],                -- Associated type families
                  ifSigs    :: [IfaceClassOp],           -- Method signatures
@@ -618,11 +617,11 @@ pprIfaceDecl :: ShowSub -> IfaceDecl -> SDoc
 -- NB: pprIfaceDecl is also used for pretty-printing TyThings in GHCi
 --     See Note [Pretty-printing TyThings] in PprTyThing
 pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
-                             ifCtxt = context, ifTyVars = tc_tyvars,
+                             ifCtxt = context,
                              ifRoles = roles, ifCons = condecls,
                              ifParent = parent, ifRec = isrec,
                              ifGadtSyntax = gadt,
-                             ifKind = kind })
+                             ifBinders = binders })
 
   | gadt_style = vcat [ pp_roles
                       , pp_nd <+> pp_lhs <+> pp_where
@@ -640,14 +639,14 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     pp_cons    = ppr_trim (map show_con cons) :: [SDoc]
 
     pp_lhs = case parent of
-               IfNoParent -> pprIfaceDeclHead context ss tycon kind tc_tyvars
+               IfNoParent -> pprIfaceDeclHead context ss tycon binders Nothing
                _          -> text "instance" <+> pprIfaceTyConParent parent
 
     pp_roles
       | is_data_instance = empty
       | otherwise        = pprRoles (== Representational)
                                     (pprPrefixIfDeclBndr ss tycon)
-                                    tc_bndrs roles
+                                    binders roles
             -- Don't display roles for data family instances (yet)
             -- See discussion on Trac #8672.
 
@@ -657,50 +656,29 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     ok_con dc = showSub ss dc || any (showSub ss) (ifConFields dc)
 
     show_con dc
-      | ok_con dc = Just $ pprIfaceConDecl ss gadt_style mk_user_con_res_ty fls dc
+      | ok_con dc = Just $ pprIfaceConDecl ss gadt_style fls tycon binders parent dc
       | otherwise = Nothing
     fls = ifaceConDeclFields condecls
-
-    mk_user_con_res_ty :: IfaceEqSpec -> ([IfaceTvBndr], SDoc)
-    -- See Note [Result type of a data family GADT]
-    mk_user_con_res_ty eq_spec
-      | IfDataInstance _ tc tys <- parent
-      = (con_univ_tvs, pprIfaceType (IfaceTyConApp tc (substIfaceTcArgs gadt_subst tys)))
-      | otherwise
-      = (con_univ_tvs, sdocWithDynFlags (ppr_tc_app gadt_subst))
-      where
-        gadt_subst = mkFsEnv eq_spec
-        done_univ_tv (tv,_) = isJust (lookupFsEnv gadt_subst tv)
-        con_univ_tvs = filterOut done_univ_tv tc_tyvars
-
-    ppr_tc_app gadt_subst dflags
-       = pprPrefixIfDeclBndr ss tycon
-         <+> sep [ pprParendIfaceType (substIfaceTyVar gadt_subst tv)
-                 | (tv,_kind)
-                     <- suppressIfaceInvisibles dflags tc_bndrs tc_tyvars ]
-    (tc_bndrs, _, _) = splitIfaceSigmaTy kind
 
     pp_nd = case condecls of
               IfAbstractTyCon d -> text "abstract" <> ppShowIface ss (parens (ppr d))
               IfDataTyCon{}     -> text "data"
               IfNewTyCon{}      -> text "newtype"
 
-    pp_extra = vcat [pprCType ctype, pprRec isrec, text "Kind:" <+> ppr kind]
+    pp_extra = vcat [pprCType ctype, pprRec isrec]
 
 
 pprIfaceDecl ss (IfaceClass { ifATs = ats, ifSigs = sigs, ifRec = isrec
                             , ifCtxt   = context, ifName  = clas
-                            , ifTyVars = tyvars,  ifRoles = roles
+                            , ifRoles = roles
                             , ifFDs    = fds, ifMinDef = minDef
-                            , ifKind   = kind })
-  = vcat [ pprRoles (== Nominal) (pprPrefixIfDeclBndr ss clas) bndrs roles
-         , text "class" <+> pprIfaceDeclHead context ss clas kind tyvars
+                            , ifBinders = binders })
+  = vcat [ pprRoles (== Nominal) (pprPrefixIfDeclBndr ss clas) binders roles
+         , text "class" <+> pprIfaceDeclHead context ss clas binders Nothing
                                 <+> pprFundeps fds <+> pp_where
          , nest 2 (vcat [ vcat asocs, vcat dsigs, pprec
                         , ppShowAllSubs ss (pprMinDef minDef)])]
     where
-      (bndrs, _, _) = splitIfaceSigmaTy kind
-
       pp_where = ppShowRhs ss $ ppUnless (null sigs && null ats) (text "where")
 
       asocs = ppr_trim $ map maybeShowAssoc ats
@@ -725,26 +703,27 @@ pprIfaceDecl ss (IfaceClass { ifATs = ats, ifSigs = sigs, ifRec = isrec
         text "#-}"
 
 pprIfaceDecl ss (IfaceSynonym { ifName    = tc
-                              , ifTyVars  = tv
+                              , ifBinders = binders
                               , ifSynRhs  = mono_ty
-                              , ifSynKind = kind})
-  = hang (text "type" <+> pprIfaceDeclHead [] ss tc kind tv <+> equals)
-       2 (sep [pprIfaceForAll tvs, pprIfaceContextArr theta, ppr tau])
+                              , ifResKind = res_kind})
+  = hang (text "type" <+> pprIfaceDeclHead [] ss tc binders Nothing <+> equals)
+       2 (sep [ pprIfaceForAll tvs, pprIfaceContextArr theta, ppr tau
+              , ppUnless (isIfaceLiftedTypeKind res_kind) (dcolon <+> ppr res_kind) ])
   where
     (tvs, theta, tau) = splitIfaceSigmaTy mono_ty
 
-pprIfaceDecl ss (IfaceFamily { ifName = tycon, ifTyVars = tyvars
-                             , ifFamFlav = rhs, ifFamKind = kind
+pprIfaceDecl ss (IfaceFamily { ifName = tycon
+                             , ifFamFlav = rhs, ifBinders = binders
+                             , ifResKind = res_kind
                              , ifResVar = res_var, ifFamInj = inj })
   | IfaceDataFamilyTyCon <- rhs
-  = text "data family" <+> pprIfaceDeclHead [] ss tycon kind tyvars
+  = text "data family" <+> pprIfaceDeclHead [] ss tycon binders Nothing
 
   | otherwise
-  = hang (text "type family" <+> pprIfaceDeclHead [] ss tycon kind tyvars)
+  = hang (text "type family" <+> pprIfaceDeclHead [] ss tycon binders (Just res_kind))
        2 (pp_inj res_var inj <+> ppShowRhs ss (pp_rhs rhs))
     $$
-    nest 2 ( vcat [ text "Kind:" <+> ppr kind
-                  , ppShowRhs ss (pp_branches rhs) ] )
+    nest 2 (ppShowRhs ss (pp_branches rhs))
   where
     pp_inj Nothing    _   = empty
     pp_inj (Just res) inj
@@ -752,9 +731,9 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon, ifTyVars = tyvars
                                              , pp_inj_cond res injectivity]
        | otherwise = hsep [ equals, ppr res ]
 
-    pp_inj_cond res inj = case filterByList inj tyvars of
+    pp_inj_cond res inj = case filterByList inj binders of
        []  -> empty
-       tvs -> hsep [vbar, ppr res, text "->", interppSP (map fst tvs)]
+       tvs -> hsep [vbar, ppr res, text "->", interppSP (map ifTyConBinderName tvs)]
 
     pp_rhs IfaceDataFamilyTyCon
       = ppShowIface ss (text "data")
@@ -812,7 +791,7 @@ pprCType (Just cType) = text "C type:" <+> ppr cType
 
 -- if, for each role, suppress_if role is True, then suppress the role
 -- output
-pprRoles :: (Role -> Bool) -> SDoc -> [IfaceForAllBndr]
+pprRoles :: (Role -> Bool) -> SDoc -> [IfaceTyConBinder]
          -> [Role] -> SDoc
 pprRoles suppress_if tyCon bndrs roles
   = sdocWithDynFlags $ \dflags ->
@@ -866,15 +845,15 @@ pprIfaceTyConParent (IfDataInstance _ tc tys)
     in pprIfaceTypeApp tc ftys
 
 pprIfaceDeclHead :: IfaceContext -> ShowSub -> OccName
-                 -> IfaceType   -- of the tycon, for invisible-suppression
-                 -> [IfaceTvBndr] -> SDoc
-pprIfaceDeclHead context ss tc_occ kind tyvars
+                 -> [IfaceTyConBinder]   -- of the tycon, for invisible-suppression
+                 -> Maybe IfaceKind
+                 -> SDoc
+pprIfaceDeclHead context ss tc_occ bndrs m_res_kind
   = sdocWithDynFlags $ \ dflags ->
     sep [ pprIfaceContextArr context
         , pprPrefixIfDeclBndr ss tc_occ
-          <+> pprIfaceTvBndrs (suppressIfaceInvisibles dflags bndrs tyvars) ]
-  where
-    (bndrs, _, _) = splitIfaceSigmaTy kind
+          <+> pprIfaceTyConBinders (suppressIfaceInvisibles dflags bndrs bndrs)
+        , maybe empty (\res_kind -> dcolon <+> pprIfaceType res_kind) m_res_kind ]
 
 isVanillaIfaceConDecl :: IfaceConDecl -> Bool
 isVanillaIfaceConDecl (IfCon { ifConExTvs  = ex_tvs
@@ -883,10 +862,12 @@ isVanillaIfaceConDecl (IfCon { ifConExTvs  = ex_tvs
   = (null ex_tvs) && (null eq_spec) && (null ctxt)
 
 pprIfaceConDecl :: ShowSub -> Bool
-                -> (IfaceEqSpec -> ([IfaceTvBndr], SDoc))
                 -> [FieldLbl OccName]
+                -> IfaceTopBndr
+                -> [IfaceTyConBinder]
+                -> IfaceTyConParent
                 -> IfaceConDecl -> SDoc
-pprIfaceConDecl ss gadt_style mk_user_con_res_ty fls
+pprIfaceConDecl ss gadt_style fls tycon tc_binders parent
         (IfCon { ifConOcc = name, ifConInfix = is_infix,
                  ifConExTvs = ex_tvs,
                  ifConEqSpec = eq_spec, ifConCtxt = ctxt, ifConArgTys = arg_tys,
@@ -938,6 +919,25 @@ pprIfaceConDecl ss gadt_style mk_user_con_res_ty fls
         -- we have to look up the field label (in case
         -- DuplicateRecordFields was used for the definition)
         lbl = maybe sel (mkVarOccFS . flLabel) $ find (\ fl -> flSelector fl == sel) fls
+
+    mk_user_con_res_ty :: IfaceEqSpec -> ([IfaceTvBndr], SDoc)
+    -- See Note [Result type of a data family GADT]
+    mk_user_con_res_ty eq_spec
+      | IfDataInstance _ tc tys <- parent
+      = (con_univ_tvs, pprIfaceType (IfaceTyConApp tc (substIfaceTcArgs gadt_subst tys)))
+      | otherwise
+      = (con_univ_tvs, sdocWithDynFlags (ppr_tc_app gadt_subst))
+      where
+        gadt_subst = mkFsEnv eq_spec
+        done_univ_tv (tv,_) = isJust (lookupFsEnv gadt_subst tv)
+        con_univ_tvs = filterOut done_univ_tv (map ifTyConBinderTyVar tc_binders)
+
+    ppr_tc_app gadt_subst dflags
+       = pprPrefixIfDeclBndr ss tycon
+         <+> sep [ pprParendIfaceType (substIfaceTyVar gadt_subst tv)
+                 | (tv,_kind)
+                     <- map ifTyConBinderTyVar $
+                        suppressIfaceInvisibles dflags tc_binders tc_binders ]
 
 instance Outputable IfaceRule where
   ppr (IfaceRule { ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
@@ -1153,23 +1153,22 @@ freeNamesIfDecl (IfaceId _s t d i) =
   freeNamesIfIdInfo i &&&
   freeNamesIfIdDetails d
 freeNamesIfDecl d@IfaceData{} =
-  freeNamesIfType (ifKind d) &&&
-  freeNamesIfTvBndrs (ifTyVars d) &&&
+  freeNamesIfTyBinders (ifBinders d) &&&
+  freeNamesIfType (ifResKind d) &&&
   freeNamesIfaceTyConParent (ifParent d) &&&
   freeNamesIfContext (ifCtxt d) &&&
   freeNamesIfConDecls (ifCons d)
 freeNamesIfDecl d@IfaceSynonym{} =
-  freeNamesIfTvBndrs (ifTyVars d) &&&
   freeNamesIfType (ifSynRhs d) &&&
-  freeNamesIfKind (ifSynKind d)
+  freeNamesIfTyBinders (ifBinders d) &&&
+  freeNamesIfKind (ifResKind d)
 freeNamesIfDecl d@IfaceFamily{} =
-  freeNamesIfTvBndrs (ifTyVars d) &&&
   freeNamesIfFamFlav (ifFamFlav d) &&&
-  freeNamesIfKind (ifFamKind d)
+  freeNamesIfTyBinders (ifBinders d) &&&
+  freeNamesIfKind (ifResKind d)
 freeNamesIfDecl d@IfaceClass{} =
-  freeNamesIfTvBndrs (ifTyVars d) &&&
   freeNamesIfContext (ifCtxt d) &&&
-  freeNamesIfType (ifKind d) &&&
+  freeNamesIfTyBinders (ifBinders d) &&&
   fnList freeNamesIfAT     (ifATs d) &&&
   fnList freeNamesIfClsSig (ifSigs d)
 freeNamesIfDecl d@IfaceAxiom{} =
@@ -1308,6 +1307,13 @@ freeNamesIfTvBndrs = fnList freeNamesIfTvBndr
 
 freeNamesIfForAllBndr :: IfaceForAllBndr -> NameSet
 freeNamesIfForAllBndr (IfaceTv tv _) = freeNamesIfTvBndr tv
+
+freeNamesIfTyBinder :: IfaceTyConBinder -> NameSet
+freeNamesIfTyBinder (IfaceAnon _ ty) = freeNamesIfType ty
+freeNamesIfTyBinder (IfaceNamed b)   = freeNamesIfForAllBndr b
+
+freeNamesIfTyBinders :: [IfaceTyConBinder] -> NameSet
+freeNamesIfTyBinders = fnList freeNamesIfTyBinder
 
 freeNamesIfBndr :: IfaceBndr -> NameSet
 freeNamesIfBndr (IfaceIdBndr b) = freeNamesIfIdBndr b
@@ -1479,7 +1485,7 @@ instance Binary IfaceDecl where
         put_ bh a5
         put_ bh a6
 
-    put_ bh (IfaceClass a1 a2 a3 a4 a5 a6 a7 a8 a9 a10) = do
+    put_ bh (IfaceClass a1 a2 a3 a4 a5 a6 a7 a8 a9) = do
         putByte bh 5
         put_ bh a1
         put_ bh (occNameFS a2)
@@ -1490,7 +1496,6 @@ instance Binary IfaceDecl where
         put_ bh a7
         put_ bh a8
         put_ bh a9
-        put_ bh a10
 
     put_ bh (IfaceAxiom a1 a2 a3 a4) = do
         putByte bh 6
@@ -1559,9 +1564,8 @@ instance Binary IfaceDecl where
                     a7 <- get bh
                     a8 <- get bh
                     a9 <- get bh
-                    a10 <- get bh
                     occ <- return $! mkClsOccFS a2
-                    return (IfaceClass a1 occ a3 a4 a5 a6 a7 a8 a9 a10)
+                    return (IfaceClass a1 occ a3 a4 a5 a6 a7 a8 a9)
             6 -> do a1 <- get bh
                     a2 <- get bh
                     a3 <- get bh

@@ -30,10 +30,11 @@ module GHC.Types (
         SPEC(..),
         Nat, Symbol,
         type (~~), Coercible,
-        TYPE, Levity(..), Type, type (*), type (★), Constraint,
+        TYPE, RuntimeRep(..), Type, type (*), type (★), Constraint,
           -- The historical type * should ideally be written as
           -- `type *`, without the parentheses. But that's a true
           -- pain to parse, and for little gain.
+        VecCount(..), VecElem(..),
 
         -- * Runtime type representation
         Module(..), TrName(..), TyCon(..)
@@ -57,13 +58,13 @@ infixr 5 :
 data Constraint
 
 -- | The kind of types with values. For example @Int :: Type@.
-type Type = TYPE 'Lifted
+type Type = TYPE 'PtrRepLifted
 
 -- | A backward-compatible (pre-GHC 8.0) synonym for 'Type'
-type * = TYPE 'Lifted
+type * = TYPE 'PtrRepLifted
 
 -- | A unicode backward-compatible (pre-GHC 8.0) synonym for 'Type'
-type ★ = TYPE 'Lifted
+type ★ = TYPE 'PtrRepLifted
 
 {- *********************************************************************
 *                                                                      *
@@ -330,17 +331,59 @@ you're reading this in 2023 then things went wrong). See #8326.
 -- loops should be aggressively specialized.
 data SPEC = SPEC | SPEC2
 
--- | GHC divides all proper types (that is, types that can perhaps be
--- inhabited, as distinct from type constructors or type-level data)
--- into two worlds: lifted types and unlifted types. For example,
--- @Int@ is lifted while @Int#@ is unlifted. Certain operations need
--- to be polymorphic in this distinction. A classic example is 'unsafeCoerce#',
--- which needs to be able to coerce between lifted and unlifted types.
--- To achieve this, we use kind polymorphism: lifted types have kind
--- @TYPE Lifted@ and unlifted ones have kind @TYPE Unlifted@. 'Levity'
--- is the kind of 'Lifted' and 'Unlifted'. @*@ is a synonym for @TYPE Lifted@
--- and @#@ is a synonym for @TYPE Unlifted@.
-data Levity = Lifted | Unlifted
+
+{- *********************************************************************
+*                                                                      *
+                    RuntimeRep
+*                                                                      *
+********************************************************************* -}
+
+
+-- | GHC maintains a property that the kind of all inhabited types
+-- (as distinct from type constructors or type-level data) tells us
+-- the runtime representation of values of that type. This datatype
+-- encodes the choice of runtime value.
+-- Note that 'TYPE' is parameterised by 'RuntimeRep'; this is precisely
+-- what we mean by the fact that a type's kind encodes the runtime
+-- representation.
+--
+-- For boxed values (that is, values that are represented by a pointer),
+-- a further distinction is made, between lifted types (that contain ⊥),
+-- and unlifted ones (that don't).
+data RuntimeRep = VecRep VecCount VecElem   -- ^ a SIMD vector type
+                | PtrRepLifted    -- ^ lifted; represented by a pointer
+                | PtrRepUnlifted  -- ^ unlifted; represented by a pointer
+                | VoidRep         -- ^ erased entirely
+                | IntRep          -- ^ signed, word-sized value
+                | WordRep         -- ^ unsigned, word-sized value
+                | Int64Rep        -- ^ signed, 64-bit value (on 32-bit only)
+                | Word64Rep       -- ^ unsigned, 64-bit value (on 32-bit only)
+                | AddrRep         -- ^ A pointer, but /not/ to a Haskell value
+                | FloatRep        -- ^ a 32-bit floating point number
+                | DoubleRep       -- ^ a 64-bit floating point number
+                | UnboxedTupleRep -- ^ An unboxed tuple; this doesn't specify a concrete rep
+
+-- See also Note [Wiring in RuntimeRep] in TysWiredIn
+
+-- | Length of a SIMD vector type
+data VecCount = Vec2
+              | Vec4
+              | Vec8
+              | Vec16
+              | Vec32
+              | Vec64
+
+-- | Element of a SIMD vector type
+data VecElem = Int8ElemRep
+             | Int16ElemRep
+             | Int32ElemRep
+             | Int64ElemRep
+             | Word8ElemRep
+             | Word16ElemRep
+             | Word32ElemRep
+             | Word64ElemRep
+             | FloatElemRep
+             | DoubleElemRep
 
 {- *********************************************************************
 *                                                                      *

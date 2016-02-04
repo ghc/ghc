@@ -381,16 +381,9 @@ matchExpectedTyConApp tc orig_ty
     -- because that'll make types that are utterly ill-kinded.
     -- This happened in Trac #7368
     defer
-      = ASSERT2( classifiesTypeWithValues res_kind, ppr tc )
-        do { (k_subst, kvs') <- newMetaTyVars kvs
-           ; let arg_kinds' = substTys k_subst arg_kinds
-                 kappa_tys  = mkTyVarTys kvs'
-           ; tau_tys <- mapM newFlexiTyVarTy arg_kinds'
-           ; co <- unifyType noThing (mkTyConApp tc (kappa_tys ++ tau_tys)) orig_ty
-           ; return (co, kappa_tys ++ tau_tys) }
-
-    (bndrs, res_kind)     = splitPiTys (tyConKind tc)
-    (kvs, arg_kinds)      = partitionBinders bndrs
+      = do { (_subst, args) <- tcInstBinders (tyConBinders tc)
+           ; co <- unifyType noThing (mkTyConApp tc args) orig_ty
+           ; return (co, args) }
 
 ----------------------
 matchExpectedAppTy :: TcRhoType                         -- orig_ty
@@ -1181,13 +1174,13 @@ uType origin t_or_k orig_ty1 orig_ty2
         do { cos <- zipWith3M (uType origin) t_or_ks tys1 tys2
            ; return $ mkTyConAppCo Nominal tc1 cos }
       where
-        (bndrs, _) = splitPiTys (tyConKind tc1)
+        bndrs      = tyConBinders tc1
         t_or_ks    = case t_or_k of
                        KindLevel -> repeat KindLevel
                        TypeLevel -> map (\bndr -> if isNamedBinder bndr
                                                   then KindLevel
-                                                  else TypeLevel)
-                                        bndrs
+                                                  else TypeLevel) bndrs ++
+                                    repeat TypeLevel
 
     go (LitTy m) ty@(LitTy n)
       | m == n

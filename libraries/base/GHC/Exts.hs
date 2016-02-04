@@ -56,8 +56,8 @@ module GHC.Exts
         -- * Equality
         type (~~),
 
-        -- * Levity polymorphism
-        GHC.Prim.TYPE, Levity(..),
+        -- * Representation polymorphism
+        GHC.Prim.TYPE, RuntimeRep(..), VecCount(..), VecElem(..),
 
         -- * Transform comprehensions
         Down(..), groupWith, sortWith, the,

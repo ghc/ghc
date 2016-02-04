@@ -1,4 +1,4 @@
-data (->) a b 	-- Defined in ‘GHC.Prim’
+data (->) t1 t2 	-- Defined in ‘GHC.Prim’
 infixr 0 `(->)`
 instance Monad ((->) r) -- Defined in ‘GHC.Base’
 instance Functor ((->) r) -- Defined in ‘GHC.Base’

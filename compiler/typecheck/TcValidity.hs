@@ -950,7 +950,7 @@ tyConArityErr tc tks
 
     -- tc_type_arity = number of *type* args expected
     -- tc_type_args  = number of *type* args encountered
-    tc_type_arity = count isVisibleBinder $ fst $ splitPiTys (tyConKind tc)
+    tc_type_arity = count isVisibleBinder $ tyConBinders tc
     tc_type_args  = length vis_tks
 
 arityErr :: Outputable a => String -> a -> Int -> Int -> SDoc
@@ -1133,7 +1133,7 @@ It checks for three things
     Note that 'b' isn't a parameter of T.  This gives rise to all sorts of
     problems; in particular, it's hard to compare solutions for equality
     when finding the fixpoint, and that means the inferContext loop does
-   not converge.  See Trac #5287.
+    not converge.  See Trac #5287.
 
 Note [Equality class instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1568,7 +1568,7 @@ checkValidFamPats fam_tc tvs cvs ty_pats
        ; let unbound_tcvs = filterOut (`elemVarSet` exactTyCoVarsOfTypes ty_pats) (tvs ++ cvs)
        ; checkTc (null unbound_tcvs) (famPatErr fam_tc unbound_tcvs ty_pats) }
   where fam_arity    = tyConArity fam_tc
-        fam_bndrs    = take fam_arity $ fst $ splitPiTys (tyConKind fam_tc)
+        fam_bndrs = tyConBinders fam_tc
 
 wrongNumberOfParmsErr :: Arity -> SDoc
 wrongNumberOfParmsErr exp_arity

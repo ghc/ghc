@@ -807,8 +807,8 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 (nonPtrs clos)
     go ptr_i ws (ty:tys)
       | Just (tc, elem_tys) <- tcSplitTyConApp_maybe ty
       , isUnboxedTupleTyCon tc
-                -- See Note [Unboxed tuple levity vars] in TyCon
-      = do (ptr_i, ws, terms0) <- go ptr_i ws (drop (length elem_tys `div` 2) elem_tys)
+                -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+      = do (ptr_i, ws, terms0) <- go ptr_i ws (dropRuntimeRepArgs elem_tys)
            (ptr_i, ws, terms1) <- go ptr_i ws tys
            return (ptr_i, ws, unboxedTupleTerm ty terms0 : terms1)
       | otherwise

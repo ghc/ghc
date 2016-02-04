@@ -198,7 +198,10 @@ dsFCall fn_id co fcall mDeclHeader = do
         ty                     = pFst $ coercionKind co
         (all_bndrs, io_res_ty) = tcSplitPiTys ty
         (named_bndrs, arg_tys) = partitionBindersIntoBinders all_bndrs
-        tvs                    = map (binderVar "dsFCall") named_bndrs
+        tvs                    = ASSERT( fst (span isNamedBinder all_bndrs)
+                                         `equalLength` named_bndrs )
+                                   -- ensure that the named binders all come first
+                                 map (binderVar "dsFCall") named_bndrs
                 -- Must use tcSplit* functions because we want to
                 -- see that (IO t) in the corner
 
@@ -302,6 +305,7 @@ dsPrimCall fn_id co fcall = do
                 -- Must use tcSplit* functions because we want to
                 -- see that (IO t) in the corner
 
+    MASSERT( fst (span isNamedBinder bndrs) `equalLength` tvs )
     args <- newSysLocalsDs arg_tys
 
     ccall_uniq <- newUnique
@@ -412,6 +416,8 @@ dsFExportDynamic :: Id
                  -> CCallConv
                  -> DsM ([Binding], SDoc, SDoc)
 dsFExportDynamic id co0 cconv = do
+    MASSERT( fst (span isNamedBinder bndrs) `equalLength` tvs )
+      -- make sure that the named binders all come first
     fe_id <-  newSysLocalDs ty
     mod <- getModule
     dflags <- getDynFlags

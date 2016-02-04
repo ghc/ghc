@@ -11,6 +11,8 @@ data LeftOrRight
 data UnivCoProvenance
 data TCvSubst
 
+mkForAllTys :: [TyBinder] -> Type -> Type
+
 type PredType = Type
 type Kind = Type
 type ThetaType = [PredType]

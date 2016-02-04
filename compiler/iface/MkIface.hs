@@ -76,7 +76,6 @@ import DataCon
 import PatSyn
 import Type
 import TcType
-import TysPrim ( alphaTyVars )
 import InstEnv
 import FamInstEnv
 import TcRnMonad
@@ -1376,28 +1375,28 @@ tyConToIfaceDecl env tycon
   | Just syn_rhs <- synTyConRhs_maybe tycon
   = ( tc_env1
     , IfaceSynonym { ifName    = getOccName tycon,
-                     ifTyVars  = if_tc_tyvars,
                      ifRoles   = tyConRoles tycon,
                      ifSynRhs  = if_syn_type syn_rhs,
-                     ifSynKind = if_kind
+                     ifBinders = if_binders,
+                     ifResKind = if_res_kind
                    })
 
   | Just fam_flav <- famTyConFlav_maybe tycon
   = ( tc_env1
     , IfaceFamily { ifName    = getOccName tycon,
-                    ifTyVars  = if_tc_tyvars,
                     ifResVar  = if_res_var,
                     ifFamFlav = to_if_fam_flav fam_flav,
-                    ifFamKind = if_kind,
+                    ifBinders = if_binders,
+                    ifResKind = if_res_kind,
                     ifFamInj  = familyTyConInjectivityInfo tycon
                   })
 
   | isAlgTyCon tycon
   = ( tc_env1
     , IfaceData { ifName    = getOccName tycon,
-                  ifKind    = if_kind,
+                  ifBinders = if_binders,
+                  ifResKind = if_res_kind,
                   ifCType   = tyConCType tycon,
-                  ifTyVars  = if_tc_tyvars,
                   ifRoles   = tyConRoles tycon,
                   ifCtxt    = tidyToIfaceContext tc_env1 (tyConStupidTheta tycon),
                   ifCons    = ifaceConDecls (algTyConRhs tycon) (algTcFields tycon),
@@ -1409,12 +1408,10 @@ tyConToIfaceDecl env tycon
   -- For pretty printing purposes only.
   = ( env
     , IfaceData { ifName       = getOccName tycon,
-                  ifKind       =
-                    -- These don't have `tyConTyVars`, so we use an empty
-                    -- environment here, instead of `tc_env1` defined below.
-                    tidyToIfaceType emptyTidyEnv (tyConKind tycon),
+                  ifBinders    = if_degenerate_binders,
+                  ifResKind    = if_degenerate_res_kind,
+                    -- These don't have `tyConTyVars`, hence "degenerate"
                   ifCType      = Nothing,
-                  ifTyVars     = funAndPrimTyVars,
                   ifRoles      = tyConRoles tycon,
                   ifCtxt       = [],
                   ifCons       = IfDataTyCon [] False [],
@@ -1426,12 +1423,16 @@ tyConToIfaceDecl env tycon
     -- is one of these TyCons (FunTyCon, PrimTyCon, PromotedDataCon) will cause
     -- an error.
     (tc_env1, tc_tyvars) = tidyTyClTyCoVarBndrs env (tyConTyVars tycon)
-    if_tc_tyvars = toIfaceTvBndrs tc_tyvars
-    if_kind = tidyToIfaceType tc_env1 (tyConKind tycon)
+    if_binders  = zipIfaceBinders tc_tyvars (tyConBinders tycon)
+    if_res_kind = tidyToIfaceType tc_env1 (tyConResKind tycon)
     if_syn_type ty = tidyToIfaceType tc_env1 ty
     if_res_var     = getFS `fmap` tyConFamilyResVar_maybe tycon
 
-    funAndPrimTyVars = toIfaceTvBndrs $ take (tyConArity tycon) alphaTyVars
+      -- use these when you don't have tyConTyVars
+    (degenerate_binders, degenerate_res_kind)
+      = splitPiTys (tidyType env (tyConKind tycon))
+    if_degenerate_binders  = toDegenerateBinders degenerate_binders
+    if_degenerate_res_kind = toIfaceType degenerate_res_kind
 
     parent = case tyConFamInstSig_maybe tycon of
                Just (tc, ty, ax) -> IfDataInstance (coAxiomName ax)
@@ -1521,9 +1522,8 @@ classToIfaceDecl env clas
   = ( env1
     , IfaceClass { ifCtxt   = tidyToIfaceContext env1 sc_theta,
                    ifName   = getOccName tycon,
-                   ifTyVars = toIfaceTvBndrs clas_tyvars',
                    ifRoles  = tyConRoles (classTyCon clas),
-                   ifKind   = tidyToIfaceType env1 (tyConKind tycon),
+                   ifBinders = binders,
                    ifFDs    = map toIfaceFD clas_fds,
                    ifATs    = map toIfaceAT clas_ats,
                    ifSigs   = map toIfaceClassOp op_stuff,
@@ -1535,6 +1535,7 @@ classToIfaceDecl env clas
     tycon = classTyCon clas
 
     (env1, clas_tyvars') = tidyTyCoVarBndrs env clas_tyvars
+    binders = zipIfaceBinders clas_tyvars' (tyConBinders tycon)
 
     toIfaceAT :: ClassATItem -> IfaceAT
     toIfaceAT (ATI tc def)

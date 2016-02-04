@@ -11,7 +11,6 @@ TYPE SIGNATURES
     NamedWildcardInDataFamilyInstanceLHS.R:SingMyKind_a _a
 TYPE CONSTRUCTORS
   data MyKind = A | B
-    Kind: *
   data family Sing (a :: k)
 COERCION AXIOMS
   axiom NamedWildcardInDataFamilyInstanceLHS.D:R:SingMyKind_a0 ::

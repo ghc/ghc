@@ -41,9 +41,9 @@ module Type (
         splitForAllTy_maybe, splitForAllTys, splitForAllTy,
         splitPiTy_maybe, splitPiTys, splitPiTy,
         splitNamedPiTys,
-        mkPiType, mkPiTypes, mkPiTypesPreferFunTy,
+        mkPiType, mkPiTypes, mkTyBindersPreferAnon,
         piResultTy, piResultTys,
-        applyTys, applyTysD, applyTysX, dropForAlls,
+        applyTysX, dropForAlls,
 
         mkNumLitTy, isNumLitTy,
         mkStrLitTy, isStrLitTy,
@@ -58,7 +58,6 @@ module Type (
         splitPiTysInvisible, filterOutInvisibleTypes,
         filterOutInvisibleTyVars, partitionInvisibles,
         synTyConResKind,
-        tyConBinders,
 
         -- Analyzing types
         TyCoMapper(..), mapType, mapCoercion,
@@ -103,7 +102,9 @@ module Type (
         -- (Lifting and boxity)
         isUnliftedType, isUnboxedTupleType, isAlgType, isClosedAlgType,
         isPrimitiveType, isStrictType,
-        isLevityTy, isLevityVar, getLevity, getLevityFromKind,
+        isRuntimeRepTy, isRuntimeRepVar, isRuntimeRepKindedTy,
+        dropRuntimeRepArgs,
+        getRuntimeRep, getRuntimeRepFromKind,
 
         -- * Main data types representing Kinds
         Kind,
@@ -112,7 +113,7 @@ module Type (
         typeKind,
 
         -- ** Common Kind
-        liftedTypeKind, unliftedTypeKind,
+        liftedTypeKind,
 
         -- * Type free variables
         tyCoVarsOfType, tyCoVarsOfTypes, tyCoVarsOfTypeAcc,
@@ -141,7 +142,7 @@ module Type (
         tyConsOfType,
 
         -- * Type representation for the code generator
-        typePrimRep, typeRepArity,
+        typePrimRep, typeRepArity, kindPrimRep, tyConPrimRep,
 
         -- * Main type substitution data types
         TvSubstEnv,     -- Representation widely visible
@@ -314,7 +315,8 @@ coreView (TyConApp tc tys) | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc t
 coreView _ = Nothing
 
 -- | Like 'coreView', but it also "expands" @Constraint@ to become
--- @TYPE Lifted@.
+-- @TYPE PtrRepLifted@.
+{-# INLINE coreViewOneStarKind #-}
 coreViewOneStarKind :: Type -> Maybe Type
 coreViewOneStarKind = go Nothing
   where
@@ -1094,27 +1096,28 @@ mkCastTy ty co = -- NB: don't check if the coercion "from" type matches here;
       = split_apps (t2:args) t1 co
     split_apps args (TyConApp tc tc_args) co
       | mightBeUnsaturatedTyCon tc
-      = affix_co (tyConKind tc) (mkTyConTy tc) (tc_args `chkAppend` args) co
+      = affix_co (tyConBinders tc) (mkTyConTy tc) (tc_args `chkAppend` args) co
       | otherwise -- not decomposable... but it may still be oversaturated
       = let (non_decomp_args, decomp_args) = splitAt (tyConArity tc) tc_args
             saturated_tc = mkTyConApp tc non_decomp_args
         in
-        affix_co (typeKind saturated_tc) saturated_tc (decomp_args `chkAppend` args) co
+        affix_co (fst $ splitPiTys $ typeKind saturated_tc)
+                 saturated_tc (decomp_args `chkAppend` args) co
 
     split_apps args (ForAllTy (Anon arg) res) co
-      = affix_co (tyConKind funTyCon) (mkTyConTy funTyCon)
+      = affix_co (tyConBinders funTyCon) (mkTyConTy funTyCon)
                  (arg : res : args) co
     split_apps args ty co
-      = affix_co (typeKind ty) ty args co
+      = affix_co (fst $ splitPiTys $ typeKind ty)
+                 ty args co
 
     -- having broken everything apart, this figures out the point at which there
     -- are no more dependent quantifications, and puts the cast there
     affix_co _ ty [] co = no_double_casts ty co
-    affix_co kind ty args co
+    affix_co bndrs ty args co
       -- if kind contains any dependent quantifications, we can't push.
       -- apply arguments until it doesn't
-      = let (bndrs, _inner_ki) = splitPiTys kind
-            (no_dep_bndrs, some_dep_bndrs) = spanEnd isAnonBinder bndrs
+      = let (no_dep_bndrs, some_dep_bndrs) = spanEnd isAnonBinder bndrs
             (some_dep_args, rest_args) = splitAtList some_dep_bndrs args
             dep_subst = zipTyBinderSubst some_dep_bndrs some_dep_args
             used_no_dep_bndrs = takeList rest_args no_dep_bndrs
@@ -1229,10 +1232,10 @@ repType ty
       | isUnboxedTupleTyCon tc
       = if null tys
          then UnaryRep voidPrimTy -- See Note [Nullary unboxed tuple]
-         else UbxTupleRep (concatMap (flattenRepType . go rec_nts) non_levity_tys)
+         else UbxTupleRep (concatMap (flattenRepType . go rec_nts) non_rr_tys)
       where
-          -- See Note [Unboxed tuple levity vars] in TyCon
-        non_levity_tys = drop (length tys `div` 2) tys
+          -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+        non_rr_tys = dropRuntimeRepArgs tys
 
     go rec_nts (CastTy ty _)
       = go rec_nts ty
@@ -1247,16 +1250,31 @@ repType ty
 
 -- | Discovers the primitive representation of a more abstract 'UnaryType'
 typePrimRep :: UnaryType -> PrimRep
-typePrimRep ty
-  = case repType ty of
-      UbxTupleRep _ -> pprPanic "typePrimRep: UbxTupleRep" (ppr ty)
-      UnaryRep rep -> go rep
-    where go (TyConApp tc _)   = tyConPrimRep tc
-          go (ForAllTy _ _)    = PtrRep
-          go (AppTy _ _)       = PtrRep      -- See Note [AppTy rep]
-          go (TyVarTy _)       = PtrRep
-          go (CastTy ty _)     = go ty
-          go _                 = pprPanic "typePrimRep: UnaryRep" (ppr ty)
+typePrimRep ty = kindPrimRep (typeKind ty)
+
+-- | Find the primitive representation of a 'TyCon'. Defined here to
+-- avoid module loops. Call this only on unlifted tycons.
+tyConPrimRep :: TyCon -> PrimRep
+tyConPrimRep tc = kindPrimRep res_kind
+  where
+    res_kind = tyConResKind tc
+
+-- | Take a kind (of shape @TYPE rr@) and produce the 'PrimRep' of values
+-- of types of this kind.
+kindPrimRep :: Kind -> PrimRep
+kindPrimRep ki | Just ki' <- coreViewOneStarKind ki = kindPrimRep ki'
+kindPrimRep (TyConApp typ [runtime_rep])
+  = ASSERT( typ `hasKey` tYPETyConKey )
+    go runtime_rep
+  where
+    go rr | Just rr' <- coreView rr = go rr'
+    go (TyConApp rr_dc args)
+      | RuntimeRep fun <- tyConRuntimeRepInfo rr_dc
+      = fun args
+    go rr = pprPanic "kindPrimRep.go" (ppr rr)
+kindPrimRep ki = WARN( True
+                     , text "kindPrimRep defaulting to PtrRep on" <+> ppr ki )
+                 PtrRep  -- this can happen legitimately for, e.g., Any
 
 typeRepArity :: Arity -> Type -> RepArity
 typeRepArity 0 _ = 0
@@ -1267,7 +1285,8 @@ typeRepArity n ty = case repType ty of
 isVoidTy :: Type -> Bool
 -- True if the type has zero width
 isVoidTy ty = case repType ty of
-                UnaryRep (TyConApp tc _) -> isVoidRep (tyConPrimRep tc)
+                UnaryRep (TyConApp tc _) -> isUnliftedTyCon tc &&
+                                            isVoidRep (tyConPrimRep tc)
                 _                        -> False
 
 {-
@@ -1290,10 +1309,6 @@ mkForAllTy = ForAllTy
 mkNamedForAllTy :: TyVar -> VisibilityFlag -> Type -> Type
 mkNamedForAllTy tv vis = ASSERT( isTyVar tv )
                          ForAllTy (Named tv vis)
-
--- | Wraps foralls over the type using the provided 'TyVar's from left to right
-mkForAllTys :: [TyBinder] -> Type -> Type
-mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
 
 -- | Like mkForAllTys, but assumes all variables are dependent and invisible,
 -- a common case
@@ -1326,23 +1341,23 @@ mkPiType v ty
 
 mkPiTypes vs ty = foldr mkPiType ty vs
 
--- | Given a list of type-level vars, makes ForAllTys, preferring
+-- | Given a list of type-level vars and a result type, makes TyBinders, preferring
 -- anonymous binders if the variable is, in fact, not dependent.
 -- All binders are /visible/.
-mkPiTypesPreferFunTy :: [TyVar] -> Type -> Type
-mkPiTypesPreferFunTy vars inner_ty = fst $ go vars inner_ty
+mkTyBindersPreferAnon :: [TyVar] -> Type -> [TyBinder]
+mkTyBindersPreferAnon vars inner_ty = fst $ go vars inner_ty
   where
-    go :: [TyVar] -> Type -> (Type, VarSet) -- also returns the free vars
-    go [] ty = (ty, tyCoVarsOfType ty)
-    go (v:vs) ty
-      = if v `elemVarSet` fvs
-        then ( mkForAllTy (Named v Visible) qty
-             , fvs `delVarSet` v `unionVarSet` kind_vars )
-        else ( mkForAllTy (Anon (tyVarKind v)) qty
-             , fvs `unionVarSet` kind_vars )
+    go :: [TyVar] -> Type -> ([TyBinder], VarSet) -- also returns the free vars
+    go [] ty = ([], tyCoVarsOfType ty)
+    go (v:vs) ty |  v `elemVarSet` fvs
+                 = ( Named v Visible : binders
+                   , fvs `delVarSet` v `unionVarSet` kind_vars )
+                 | otherwise
+                 = ( Anon (tyVarKind v) : binders
+                   , fvs `unionVarSet` kind_vars )
       where
-        (qty, fvs) = go vs ty
-        kind_vars  = tyCoVarsOfType $ tyVarKind v
+        (binders, fvs) = go vs ty
+        kind_vars      = tyCoVarsOfType $ tyVarKind v
 
 -- | Take a ForAllTy apart, returning the list of tyvars and the result type.
 -- This always succeeds, even if it returns only an empty list. Note that the
@@ -1470,9 +1485,6 @@ splitPiTysInvisible ty = split ty ty []
 
      split orig_ty _ bndrs
        = (reverse bndrs, orig_ty)
-
-tyConBinders :: TyCon -> [TyBinder]
-tyConBinders = fst . splitPiTys . tyConKind
 
 applyTysX :: [TyVar] -> Type -> [Type] -> Type
 -- applyTyxX beta-reduces (/\tvs. body_ty) arg_tys
@@ -1934,25 +1946,26 @@ isUnliftedType (ForAllTy (Named {}) ty) = isUnliftedType ty
 isUnliftedType (TyConApp tc _)          = isUnliftedTyCon tc
 isUnliftedType _                        = False
 
--- | Extract the levity classifier of a type. Panics if this is not possible.
-getLevity :: String   -- ^ Printed in case of an error
-          -> Type -> Type
-getLevity err ty = getLevityFromKind err (typeKind ty)
+-- | Extract the RuntimeRep classifier of a type. Panics if this is not possible.
+getRuntimeRep :: String   -- ^ Printed in case of an error
+              -> Type -> Type
+getRuntimeRep err ty = getRuntimeRepFromKind err (typeKind ty)
 
--- | Extract the levity classifier of a type from its kind.
--- For example, getLevityFromKind * = Lifted; getLevityFromKind # = Unlifted.
+-- | Extract the RuntimeRep classifier of a type from its kind.
+-- For example, getRuntimeRepFromKind * = PtrRepLifted;
+--              getRuntimeRepFromKind # = PtrRepUnlifted.
 -- Panics if this is not possible.
-getLevityFromKind :: String  -- ^ Printed in case of an error
-                  -> Type -> Type
-getLevityFromKind err = go
+getRuntimeRepFromKind :: String  -- ^ Printed in case of an error
+                      -> Type -> Type
+getRuntimeRepFromKind err = go
   where
     go k | Just k' <- coreViewOneStarKind k = go k'
     go k
       | Just (tc, [arg]) <- splitTyConApp_maybe k
       , tc `hasKey` tYPETyConKey
       = arg
-    go k = pprPanic "getLevity" (text err $$
-                                 ppr k <+> dcolon <+> ppr (typeKind k))
+    go k = pprPanic "getRuntimeRep" (text err $$
+                                     ppr k <+> dcolon <+> ppr (typeKind k))
 
 isUnboxedTupleType :: Type -> Bool
 isUnboxedTupleType ty = case tyConAppTyCon_maybe ty of
