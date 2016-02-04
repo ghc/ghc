@@ -15,6 +15,7 @@ module TyCon(
         AlgTyConRhs(..), visibleDataCons,
         AlgTyConFlav(..), isNoParent,
         FamTyConFlav(..), Role(..), Injectivity(..),
+        RuntimeRepInfo(..),
 
         -- ** Field labels
         tyConFieldLabels, tyConFieldLabelEnv,
@@ -82,6 +83,8 @@ module TyCon(
         newTyConRhs, newTyConEtadArity, newTyConEtadRhs,
         unwrapNewTyCon_maybe, unwrapNewTyConEtad_maybe,
         algTcFields,
+        tyConRuntimeRepInfo,
+        tyConBinders, tyConResKind,
 
         -- ** Manipulating TyCons
         expandSynTyCon_maybe,
@@ -96,7 +99,7 @@ module TyCon(
 
         -- * Primitive representations of Types
         PrimRep(..), PrimElemRep(..),
-        tyConPrimRep, isVoidRep, isGcPtrRep,
+        isVoidRep, isGcPtrRep,
         primRepSizeW, primElemRepSizeB,
         primRepIsFloat,
 
@@ -107,7 +110,9 @@ module TyCon(
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} TyCoRep ( Kind, Type, PredType )
+import {-# SOURCE #-} TyCoRep ( Kind, Type, PredType, TyBinder, mkForAllTys )
+import {-# SOURCE #-} TysWiredIn  ( runtimeRepTyCon, constraintKind
+                                  , vecCountTyCon, vecElemTyCon, liftedTypeKind )
 import {-# SOURCE #-} DataCon ( DataCon, dataConExTyVars, dataConFieldLabels )
 
 import Binary
@@ -127,6 +132,7 @@ import FieldLabel
 import Constants
 import Util
 import Unique( tyConRepNameUnique, dataConRepNameUnique )
+import UniqSet
 import Module
 
 import qualified Data.Data as Data
@@ -322,12 +328,13 @@ it's worth noting that (~#)'s parameters are at role N. Promoted data
 constructors' type arguments are at role R. All kind arguments are at role
 N.
 
-Note [Unboxed tuple levity vars]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The contents of an unboxed tuple may be boxed or unboxed. Accordingly,
-the kind of the unboxed tuple constructor is sort-polymorphic. For example,
+Note [Unboxed tuple RuntimeRep vars]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The contents of an unboxed tuple may have any representation. Accordingly,
+the kind of the unboxed tuple constructor is runtime-representation
+polymorphic. For example,
 
-   (#,#) :: forall (v :: Levity) (w :: Levity). TYPE v -> TYPE w -> #
+   (#,#) :: forall (q :: RuntimeRep) (r :: RuntimeRep). TYPE q -> TYPE r -> #
 
 These extra tyvars (v and w) cause some delicate processing around tuples,
 where we used to be able to assume that the tycon arity and the
@@ -390,6 +397,13 @@ data TyCon
 
         tyConName   :: Name,     -- ^ Name of the constructor
 
+        tyConBinders :: [TyBinder], -- ^ The TyBinders for this TyCon's kind.
+                                    -- length tyConBinders == tyConArity.
+                                    -- This is a cached value and is redundant with
+                                    -- the tyConKind.
+
+        tyConResKind :: Kind,       -- ^ Cached result kind
+
         tyConKind   :: Kind,     -- ^ Kind of this TyCon (full kind, not just
                                  -- the return kind)
 
@@ -419,6 +433,13 @@ data TyCon
                                  -- tyConName field.
 
         tyConName    :: Name,    -- ^ Name of the constructor
+
+        tyConBinders :: [TyBinder], -- ^ The TyBinders for this TyCon's kind.
+                                    -- length tyConBinders == tyConArity.
+                                    -- This is a cached value and is redundant with
+                                    -- the tyConKind.
+
+        tyConResKind :: Kind,       -- ^ Cached result kind
 
         tyConKind    :: Kind,    -- ^ Kind of this TyCon (full kind, not just
                                  -- the return kind)
@@ -483,6 +504,13 @@ data TyCon
 
         tyConName    :: Name,    -- ^ Name of the constructor
 
+        tyConBinders :: [TyBinder], -- ^ The TyBinders for this TyCon's kind.
+                                    -- length tyConBinders == tyConArity.
+                                    -- This is a cached value and is redundant with
+                                    -- the tyConKind.
+
+        tyConResKind :: Kind,     -- ^ Cached result kind.
+
         tyConKind    :: Kind,    -- ^ Kind of this TyCon (full kind, not just
                                  -- the return kind)
 
@@ -510,6 +538,13 @@ data TyCon
                                  -- tyConName field.
 
         tyConName    :: Name,    -- ^ Name of the constructor
+
+        tyConBinders :: [TyBinder], -- ^ The TyBinders for this TyCon's kind.
+                                    -- length tyConBinders == tyConArity.
+                                    -- This is a cached value and is redundant with
+                                    -- the tyConKind.
+
+        tyConResKind :: Kind,     -- ^ Cached result kind
 
         tyConKind    :: Kind,    -- ^ Kind of this TyCon (full kind, not just
                                  -- the return kind)
@@ -558,6 +593,13 @@ data TyCon
 
         tyConName     :: Name,   -- ^ Name of the constructor
 
+        tyConBinders :: [TyBinder], -- ^ The TyBinders for this TyCon's kind.
+                                    -- length tyConBinders == tyConArity.
+                                    -- This is a cached value and is redundant with
+                                    -- the tyConKind.
+
+        tyConResKind   :: Kind,      -- ^ Cached result kind
+
         tyConKind     :: Kind,   -- ^ Kind of this TyCon (full kind, not just
                                  -- the return kind)
 
@@ -568,11 +610,6 @@ data TyCon
         tcRoles       :: [Role], -- ^ The role for each type variable
                                  -- This list has the same length as tyConTyVars
                                  -- See also Note [TyCon Role signatures]
-
-        primTyConRep  :: PrimRep,-- ^ Many primitive tycons are unboxed, but
-                                 -- some are boxed (represented by
-                                 -- pointers). This 'PrimRep' holds that
-                                 -- information.  Only relevant if tyConKind = #
 
         isUnlifted   :: Bool,    -- ^ Most primitive tycons are unlifted (may
                                  -- not contain bottom) but other are lifted,
@@ -585,13 +622,19 @@ data TyCon
 
   -- | Represents promoted data constructor.
   | PromotedDataCon {          -- See Note [Promoted data constructors]
-        tyConUnique :: Unique, -- ^ Same Unique as the data constructor
-        tyConName   :: Name,   -- ^ Same Name as the data constructor
-        tyConArity  :: Arity,
-        tyConKind   :: Kind,   -- ^ Translated type of the data constructor
-        tcRoles     :: [Role], -- ^ Roles: N for kind vars, R for type vars
-        dataCon     :: DataCon,-- ^ Corresponding data constructor
-        tcRepName   :: TyConRepName
+        tyConUnique   :: Unique, -- ^ Same Unique as the data constructor
+        tyConName     :: Name,   -- ^ Same Name as the data constructor
+        tyConArity    :: Arity,
+        tyConBinders :: [TyBinder], -- ^ The TyBinders for this TyCon's kind.
+                                    -- length tyConBinders == tyConArity.
+                                    -- This is a cached value and is redundant with
+                                    -- the tyConKind.
+        tyConResKind   :: Kind,   -- ^ Cached result kind
+        tyConKind     :: Kind,   -- ^ Type of the data constructor
+        tcRoles       :: [Role], -- ^ Roles: N for kind vars, R for type vars
+        dataCon       :: DataCon,-- ^ Corresponding data constructor
+        tcRepName     :: TyConRepName,
+        promDcRepInfo :: RuntimeRepInfo  -- ^ See comments with 'RuntimeRepInfo'
     }
 
   -- | These exist only during a recursive type/class type-checking knot.
@@ -600,6 +643,12 @@ data TyCon
       tyConName   :: Name,
       tyConUnsat  :: Bool,  -- ^ can this tycon be unsaturated?
       tyConArity  :: Arity,
+      tyConBinders :: [TyBinder],   -- ^ The TyBinders for this TyCon's kind.
+                                    -- length tyConBinders == tyConArity.
+                                    -- This is a cached value and is redundant with
+                                    -- the tyConKind.
+      tyConResKind :: Kind,          -- ^ Cached result kind
+
       tyConKind   :: Kind
       }
   deriving Typeable
@@ -667,6 +716,19 @@ data AlgTyConRhs
                              -- Watch out!  If any newtypes become transparent
                              -- again check Trac #1072.
     }
+
+-- | Some promoted datacons signify extra info relevant to GHC. For example,
+-- the @IntRep@ constructor of @RuntimeRep@ corresponds to the 'IntRep'
+-- constructor of 'PrimRep'. This data structure allows us to store this
+-- information right in the 'TyCon'. The other approach would be to look
+-- up things like @RuntimeRep@'s @PrimRep@ by known-key every time.
+data RuntimeRepInfo
+  = NoRRI       -- ^ an ordinary promoted data con
+  | RuntimeRep ([Type] -> PrimRep)
+      -- ^ A constructor of @RuntimeRep@. The argument to the function should
+      -- be the list of arguments to the promoted datacon.
+  | VecCount Int         -- ^ A constructor of @VecCount@
+  | VecElem PrimElemRep  -- ^ A constructor of @VecElem@
 
 -- | Extract those 'DataCon's that we are able to learn about.  Note
 -- that visibility in this sense does not correspond to visibility in
@@ -1132,14 +1194,16 @@ So we compromise, and move their Kind calculation to the call site.
 -- | Given the name of the function type constructor and it's kind, create the
 -- corresponding 'TyCon'. It is reccomended to use 'TyCoRep.funTyCon' if you want
 -- this functionality
-mkFunTyCon :: Name -> Kind -> Name -> TyCon
-mkFunTyCon name kind rep_nm
+mkFunTyCon :: Name -> [TyBinder] -> Name -> TyCon
+mkFunTyCon name binders rep_nm
   = FunTyCon {
-        tyConUnique = nameUnique name,
-        tyConName   = name,
-        tyConKind   = kind,
-        tyConArity  = 2,
-        tcRepName   = rep_nm
+        tyConUnique  = nameUnique name,
+        tyConName    = name,
+        tyConBinders = binders,
+        tyConResKind = liftedTypeKind,
+        tyConKind    = mkForAllTys binders liftedTypeKind,
+        tyConArity   = 2,
+        tcRepName    = rep_nm
     }
 
 -- | This is the making of an algebraic 'TyCon'. Notably, you have to
@@ -1147,7 +1211,8 @@ mkFunTyCon name kind rep_nm
 -- type constructor - you can get hold of it easily (see Generics
 -- module)
 mkAlgTyCon :: Name
-           -> Kind              -- ^ Kind of the resulting 'TyCon'
+           -> [TyBinder]        -- ^ Binders of the resulting 'TyCon'
+           -> Kind              -- ^ Result kind
            -> [TyVar]           -- ^ 'TyVar's scoped over: see 'tyConTyVars'.
                                 --   Arity is inferred from the length of this
                                 --   list
@@ -1161,11 +1226,13 @@ mkAlgTyCon :: Name
            -> RecFlag           -- ^ Is the 'TyCon' recursive?
            -> Bool              -- ^ Was the 'TyCon' declared with GADT syntax?
            -> TyCon
-mkAlgTyCon name kind tyvars roles cType stupid rhs parent is_rec gadt_syn
+mkAlgTyCon name binders res_kind tyvars roles cType stupid rhs parent is_rec gadt_syn
   = AlgTyCon {
         tyConName        = name,
         tyConUnique      = nameUnique name,
-        tyConKind        = kind,
+        tyConBinders     = binders,
+        tyConResKind     = res_kind,
+        tyConKind        = mkForAllTys binders res_kind,
         tyConArity       = length tyvars,
         tyConTyVars      = tyvars,
         tcRoles          = roles,
@@ -1179,26 +1246,30 @@ mkAlgTyCon name kind tyvars roles cType stupid rhs parent is_rec gadt_syn
     }
 
 -- | Simpler specialization of 'mkAlgTyCon' for classes
-mkClassTyCon :: Name -> Kind -> [TyVar] -> [Role] -> AlgTyConRhs -> Class
+mkClassTyCon :: Name -> [TyBinder]
+             -> [TyVar] -> [Role] -> AlgTyConRhs -> Class
              -> RecFlag -> Name -> TyCon
-mkClassTyCon name kind tyvars roles rhs clas is_rec tc_rep_name
-  = mkAlgTyCon name kind tyvars roles Nothing [] rhs
+mkClassTyCon name binders tyvars roles rhs clas is_rec tc_rep_name
+  = mkAlgTyCon name binders constraintKind tyvars roles Nothing [] rhs
                (ClassTyCon clas tc_rep_name)
                is_rec False
 
 mkTupleTyCon :: Name
-             -> Kind    -- ^ Kind of the resulting 'TyCon'
+             -> [TyBinder]
+             -> Kind    -- ^ Result kind of the 'TyCon'
              -> Arity   -- ^ Arity of the tuple
              -> [TyVar] -- ^ 'TyVar's scoped over: see 'tyConTyVars'
              -> DataCon
              -> TupleSort    -- ^ Whether the tuple is boxed or unboxed
              -> AlgTyConFlav
              -> TyCon
-mkTupleTyCon name kind arity tyvars con sort parent
+mkTupleTyCon name binders res_kind arity tyvars con sort parent
   = AlgTyCon {
         tyConName        = name,
         tyConUnique      = nameUnique name,
-        tyConKind        = kind,
+        tyConBinders     = binders,
+        tyConResKind     = res_kind,
+        tyConKind        = mkForAllTys binders res_kind,
         tyConArity       = arity,
         tyConTyVars      = tyvars,
         tcRoles          = replicate arity Representational,
@@ -1218,75 +1289,91 @@ mkTupleTyCon name kind arity tyvars con sort parent
 -- TcErrors sometimes calls typeKind.
 -- See also Note [Kind checking recursive type and class declarations]
 -- in TcTyClsDecls.
-mkTcTyCon :: Name -> Kind -> Bool -- ^ Can this be unsaturated?
-          -> Arity
+mkTcTyCon :: Name -> [TyBinder] -> Kind  -- ^ /result/ kind only
+          -> Bool  -- ^ Can this be unsaturated?
           -> TyCon
-mkTcTyCon name kind unsat arity
+mkTcTyCon name binders res_kind unsat
   = TcTyCon { tyConUnique  = getUnique name
             , tyConName    = name
-            , tyConKind    = kind
+            , tyConBinders = binders
+            , tyConResKind = res_kind
+            , tyConKind    = mkForAllTys binders res_kind
             , tyConUnsat   = unsat
-            , tyConArity   = arity }
+            , tyConArity   = length binders }
 
 -- | Create an unlifted primitive 'TyCon', such as @Int#@
-mkPrimTyCon :: Name  -> Kind -> [Role] -> PrimRep -> TyCon
-mkPrimTyCon name kind roles rep
-  = mkPrimTyCon' name kind roles rep True (Just $ mkPrelTyConRepName name)
+mkPrimTyCon :: Name -> [TyBinder]
+            -> Kind   -- ^ /result/ kind
+            -> [Role] -> TyCon
+mkPrimTyCon name binders res_kind roles
+  = mkPrimTyCon' name binders res_kind roles True (Just $ mkPrelTyConRepName name)
 
 -- | Kind constructors
-mkKindTyCon :: Name -> Kind -> [Role] -> Name -> TyCon
-mkKindTyCon name kind roles rep_nm
+mkKindTyCon :: Name -> [TyBinder]
+            -> Kind  -- ^ /result/ kind
+            -> [Role] -> Name -> TyCon
+mkKindTyCon name binders res_kind roles rep_nm
   = tc
   where
-    tc = mkPrimTyCon' name kind roles PtrRep False (Just rep_nm)
-      -- PtrRep because kinds have kind *.
+    tc = mkPrimTyCon' name binders res_kind roles False (Just rep_nm)
 
 -- | Create a lifted primitive 'TyCon' such as @RealWorld@
-mkLiftedPrimTyCon :: Name  -> Kind -> [Role] -> PrimRep -> TyCon
-mkLiftedPrimTyCon name kind roles rep
-  = mkPrimTyCon' name kind roles rep False Nothing
+mkLiftedPrimTyCon :: Name -> [TyBinder]
+                  -> Kind   -- ^ /result/ kind
+                  -> [Role] -> TyCon
+mkLiftedPrimTyCon name binders res_kind roles
+  = mkPrimTyCon' name binders res_kind roles False Nothing
 
-mkPrimTyCon' :: Name  -> Kind -> [Role] -> PrimRep
+mkPrimTyCon' :: Name -> [TyBinder]
+             -> Kind    -- ^ /result/ kind
+             -> [Role]
              -> Bool -> Maybe TyConRepName -> TyCon
-mkPrimTyCon' name kind roles rep is_unlifted rep_nm
+mkPrimTyCon' name binders res_kind roles is_unlifted rep_nm
   = PrimTyCon {
         tyConName    = name,
         tyConUnique  = nameUnique name,
-        tyConKind    = kind,
+        tyConBinders = binders,
+        tyConResKind = res_kind,
+        tyConKind    = mkForAllTys binders res_kind,
         tyConArity   = length roles,
         tcRoles      = roles,
-        primTyConRep = rep,
         isUnlifted   = is_unlifted,
         primRepName  = rep_nm
     }
 
 -- | Create a type synonym 'TyCon'
-mkSynonymTyCon :: Name -> Kind -> [TyVar] -> [Role] -> Type -> TyCon
-mkSynonymTyCon name kind tyvars roles rhs
+mkSynonymTyCon :: Name -> [TyBinder] -> Kind   -- ^ /result/ kind
+               -> [TyVar] -> [Role] -> Type -> TyCon
+mkSynonymTyCon name binders res_kind tyvars roles rhs
   = SynonymTyCon {
-        tyConName   = name,
-        tyConUnique = nameUnique name,
-        tyConKind   = kind,
-        tyConArity  = length tyvars,
-        tyConTyVars = tyvars,
-        tcRoles     = roles,
-        synTcRhs    = rhs
+        tyConName    = name,
+        tyConUnique  = nameUnique name,
+        tyConBinders = binders,
+        tyConResKind = res_kind,
+        tyConKind    = mkForAllTys binders res_kind,
+        tyConArity   = length tyvars,
+        tyConTyVars  = tyvars,
+        tcRoles      = roles,
+        synTcRhs     = rhs
     }
 
 -- | Create a type family 'TyCon'
-mkFamilyTyCon:: Name -> Kind -> [TyVar] -> Maybe Name -> FamTyConFlav
-             -> Maybe Class -> Injectivity -> TyCon
-mkFamilyTyCon name kind tyvars resVar flav parent inj
+mkFamilyTyCon :: Name -> [TyBinder] -> Kind  -- ^ /result/ kind
+              -> [TyVar] -> Maybe Name -> FamTyConFlav
+              -> Maybe Class -> Injectivity -> TyCon
+mkFamilyTyCon name binders res_kind tyvars resVar flav parent inj
   = FamilyTyCon
-      { tyConUnique = nameUnique name
-      , tyConName   = name
-      , tyConKind   = kind
-      , tyConArity  = length tyvars
-      , tyConTyVars = tyvars
-      , famTcResVar = resVar
-      , famTcFlav   = flav
-      , famTcParent = parent
-      , famTcInj    = inj
+      { tyConUnique  = nameUnique name
+      , tyConName    = name
+      , tyConBinders = binders
+      , tyConResKind = res_kind
+      , tyConKind    = mkForAllTys binders res_kind
+      , tyConArity   = length tyvars
+      , tyConTyVars  = tyvars
+      , famTcResVar  = resVar
+      , famTcFlav    = flav
+      , famTcParent  = parent
+      , famTcInj     = inj
       }
 
 
@@ -1294,16 +1381,20 @@ mkFamilyTyCon name kind tyvars resVar flav parent inj
 -- Somewhat dodgily, we give it the same Name
 -- as the data constructor itself; when we pretty-print
 -- the TyCon we add a quote; see the Outputable TyCon instance
-mkPromotedDataCon :: DataCon -> Name -> TyConRepName -> Kind -> [Role] -> TyCon
-mkPromotedDataCon con name rep_name kind roles
+mkPromotedDataCon :: DataCon -> Name -> TyConRepName -> [TyBinder] -> Kind -> [Role]
+                  -> RuntimeRepInfo -> TyCon
+mkPromotedDataCon con name rep_name binders res_kind roles rep_info
   = PromotedDataCon {
-        tyConUnique = nameUnique name,
-        tyConName   = name,
-        tyConArity  = arity,
-        tcRoles     = roles,
-        tyConKind   = kind,
-        dataCon     = con,
-        tcRepName   = rep_name
+        tyConUnique   = nameUnique name,
+        tyConName     = name,
+        tyConArity    = arity,
+        tcRoles       = roles,
+        tyConBinders  = binders,
+        tyConResKind  = res_kind,
+        tyConKind     = mkForAllTys binders res_kind,
+        dataCon       = con,
+        tcRepName     = rep_name,
+        promDcRepInfo = rep_info
   }
   where
     arity = length roles
@@ -1321,16 +1412,8 @@ isAbstractTyCon _ = False
 -- Used when recovering from errors
 makeTyConAbstract :: TyCon -> TyCon
 makeTyConAbstract tc
-  = PrimTyCon { tyConName        = name,
-                tyConUnique      = nameUnique name,
-                tyConKind        = tyConKind tc,
-                tyConArity       = tyConArity tc,
-                tcRoles          = tyConRoles tc,
-                primTyConRep     = PtrRep,
-                isUnlifted       = False,
-                primRepName      = Nothing }
-  where
-    name = tyConName tc
+  = mkTcTyCon (tyConName tc) (tyConBinders tc) (tyConResKind tc)
+              (mightBeUnsaturatedTyCon tc)
 
 -- | Does this 'TyCon' represent something that cannot be defined in Haskell?
 isPrimTyCon :: TyCon -> Bool
@@ -1642,12 +1725,18 @@ isPromotedDataCon_maybe _ = Nothing
 -- | Is this tycon really meant for use at the kind level? That is,
 -- should it be permitted without -XDataKinds?
 isKindTyCon :: TyCon -> Bool
-isKindTyCon tc = isLiftedTypeKindTyConName (tyConName tc) ||
-                 tc `hasKey` constraintKindTyConKey ||
-                 tc `hasKey` tYPETyConKey ||
-                 tc `hasKey` levityTyConKey ||
-                 tc `hasKey` liftedDataConKey ||
-                 tc `hasKey` unliftedDataConKey
+isKindTyCon tc = getUnique tc `elementOfUniqSet` kindTyConKeys
+
+-- | These TyCons should be allowed at the kind level, even without
+-- -XDataKinds.
+kindTyConKeys :: UniqSet Unique
+kindTyConKeys = unionManyUniqSets
+  ( mkUniqSet [ liftedTypeKindTyConKey, starKindTyConKey, unicodeStarKindTyConKey
+              , constraintKindTyConKey, tYPETyConKey ]
+  : map (mkUniqSet . tycon_with_datacons) [ runtimeRepTyCon
+                                          , vecCountTyCon, vecElemTyCon ] )
+  where
+    tycon_with_datacons tc = getUnique tc : map getUnique (tyConDataCons tc)
 
 isLiftedTypeKindTyConName :: Name -> Bool
 isLiftedTypeKindTyConName
@@ -1855,11 +1944,6 @@ newTyConCo tc = case newTyConCo_maybe tc of
                  Just co -> co
                  Nothing -> pprPanic "newTyConCo" (ppr tc)
 
--- | Find the primitive representation of a 'TyCon'
-tyConPrimRep :: TyCon -> PrimRep
-tyConPrimRep (PrimTyCon {primTyConRep = rep}) = rep
-tyConPrimRep tc = ASSERT(not (isUnboxedTupleTyCon tc)) PtrRep
-
 -- | Find the \"stupid theta\" of the 'TyCon'. A \"stupid theta\" is the context
 -- to the left of an algebraic type declaration, e.g. @Eq a@ in the declaration
 -- @data Eq a => T a ...@
@@ -1928,6 +2012,12 @@ tyConFamilyCoercion_maybe :: TyCon -> Maybe (CoAxiom Unbranched)
 tyConFamilyCoercion_maybe (AlgTyCon {algTcParent = DataFamInstTyCon ax _ _ })
   = Just ax
 tyConFamilyCoercion_maybe _ = Nothing
+
+-- | Extract any 'RuntimeRepInfo' from this TyCon
+tyConRuntimeRepInfo :: TyCon -> RuntimeRepInfo
+tyConRuntimeRepInfo (PromotedDataCon { promDcRepInfo = rri }) = rri
+tyConRuntimeRepInfo _                                         = NoRRI
+  -- could panic in that second case. But Douglas Adams told me not to.
 
 {-
 ************************************************************************

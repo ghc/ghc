@@ -138,7 +138,7 @@ buildDataCon fam_envs src_name declared_infix prom_info src_bangs impl_bangs fie
                 data_con = mkDataCon src_name declared_infix prom_info
                                      src_bangs field_lbls
                                      univ_tvs ex_tvs eq_spec ctxt
-                                     arg_tys res_ty rep_tycon
+                                     arg_tys res_ty NoRRI rep_tycon
                                      stupid_ctxt dc_wrk dc_rep
                 dc_wrk = mkDataConWorkId work_name data_con
                 dc_rep = initUs_ us (mkDataConRep dflags fam_envs wrap_name
@@ -215,7 +215,7 @@ type TcMethInfo = (Name, Type, Maybe (DefMethSpec Type))
 
 buildClass :: Name  -- Name of the class/tycon (they have the same Name)
            -> [TyVar] -> [Role] -> ThetaType
-           -> Kind
+           -> [TyBinder]
            -> [FunDep TyVar]               -- Functional dependencies
            -> [ClassATItem]                -- Associated types
            -> [TcMethInfo]                 -- Method info
@@ -223,7 +223,8 @@ buildClass :: Name  -- Name of the class/tycon (they have the same Name)
            -> RecFlag                      -- Info for type constructor
            -> TcRnIf m n Class
 
-buildClass tycon_name tvs roles sc_theta kind fds at_items sig_stuff mindef tc_isrec
+buildClass tycon_name tvs roles sc_theta binders
+           fds at_items sig_stuff mindef tc_isrec
   = fixM  $ \ rec_clas ->       -- Only name generation inside loop
     do  { traceIf (text "buildClass")
 
@@ -286,7 +287,7 @@ buildClass tycon_name tvs roles sc_theta kind fds at_items sig_stuff mindef tc_i
                                          , tup_sort = ConstraintTuple })
                  else return (mkDataTyConRhs [dict_con])
 
-        ; let { tycon = mkClassTyCon tycon_name kind tvs roles
+        ; let { tycon = mkClassTyCon tycon_name binders tvs roles
                                      rhs rec_clas tc_isrec tc_rep_name
                 -- A class can be recursive, and in the case of newtypes
                 -- this matters.  For example

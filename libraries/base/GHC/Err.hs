@@ -24,7 +24,7 @@
 
 module GHC.Err( absentErr, error, errorWithoutStackTrace, undefined ) where
 import GHC.CString ()
-import GHC.Types (Char, Levity)
+import GHC.Types (Char, RuntimeRep)
 import GHC.Stack.Types
 import GHC.Prim
 import GHC.Integer ()   -- Make sure Integer is compiled first
@@ -33,7 +33,7 @@ import GHC.Integer ()   -- Make sure Integer is compiled first
 import {-# SOURCE #-} GHC.Exception( errorCallWithCallStackException )
 
 -- | 'error' stops execution and displays an error message.
-error :: forall (v :: Levity). forall (a :: TYPE v).
+error :: forall (r :: RuntimeRep). forall (a :: TYPE r).
          HasCallStack => [Char] -> a
 error s = raise# (errorCallWithCallStackException s ?callStack)
           -- Bleh, we should be using 'GHC.Stack.callStack' instead of
@@ -44,7 +44,7 @@ error s = raise# (errorCallWithCallStackException s ?callStack)
 -- | A variant of 'error' that does not produce a stack trace.
 --
 -- @since 4.9.0.0
-errorWithoutStackTrace :: forall (v :: Levity). forall (a :: TYPE v).
+errorWithoutStackTrace :: forall (r :: RuntimeRep). forall (a :: TYPE r).
                           [Char] -> a
 errorWithoutStackTrace s =
   -- we don't have withFrozenCallStack yet, so we just inline the definition
@@ -74,7 +74,7 @@ errorWithoutStackTrace s =
 -- It is expected that compilers will recognize this and insert error
 -- messages which are more appropriate to the context in which 'undefined'
 -- appears.
-undefined :: forall (v :: Levity). forall (a :: TYPE v).
+undefined :: forall (r :: RuntimeRep). forall (a :: TYPE r).
              HasCallStack => a
 undefined =  error "Prelude.undefined"
 

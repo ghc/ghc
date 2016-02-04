@@ -1,5 +1,4 @@
 
 SimpleFail1a.hs:4:1: error:
-    • Expecting one more argument to ‘T1 Int’
-      Expected a type, but ‘T1 Int’ has kind ‘* -> *’
+    • Number of parameters must match family declaration; expected 2
     • In the data instance declaration for ‘T1’

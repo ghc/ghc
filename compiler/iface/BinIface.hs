@@ -344,7 +344,7 @@ putTupleName_ bh tc tup_sort thing_tag
     (sort_tag, arity) = case tup_sort of
       BoxedTuple      -> (0, fromIntegral (tyConArity tc))
       UnboxedTuple    -> (1, fromIntegral (tyConArity tc `div` 2))
-        -- See Note [Unboxed tuple levity vars] in TyCon
+        -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
       ConstraintTuple -> pprPanic "putTupleName:ConstraintTuple" (ppr tc)
 
 -- See Note [Symbol table representation of names]

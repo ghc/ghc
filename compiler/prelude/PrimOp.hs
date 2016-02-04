@@ -30,7 +30,7 @@ import TysWiredIn
 import CmmType
 import Demand
 import OccName          ( OccName, pprOccName, mkVarOccFS )
-import TyCon            ( TyCon, isPrimTyCon, tyConPrimRep, PrimRep(..) )
+import TyCon            ( TyCon, isPrimTyCon, PrimRep(..) )
 import Type
 import BasicTypes       ( Arity, Fixity(..), FixityDirection(..), Boxity(..) )
 import ForeignCall      ( CLabelString )

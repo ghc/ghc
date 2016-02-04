@@ -64,7 +64,7 @@ vectTyConDecl tycon name'
                      (tyConTyVars tycon)        -- keep original type vars
                      (map (const Nominal) (tyConRoles tycon)) -- all role are N for safety
                      theta'                     -- superclasses
-                     (tyConKind tycon)          -- keep original kind
+                     (tyConBinders tycon)       -- keep original kind
                      (snd . classTvsFds $ cls)  -- keep the original functional dependencies
                      []                         -- no associated types (for the moment)
                      methods'                   -- method info
@@ -103,7 +103,8 @@ vectTyConDecl tycon name'
        ; tc_rep_name <- mkDerivedName mkTyConRepOcc name'
        ; return $ mkAlgTyCon
                     name'                   -- new name
-                    (tyConKind tycon)       -- keep original kind
+                    (tyConBinders tycon)
+                    (tyConResKind tycon)    -- keep original kind
                     (tyConTyVars tycon)     -- keep original type vars
                     (map (const Nominal) (tyConRoles tycon)) -- all roles are N for safety
                     Nothing

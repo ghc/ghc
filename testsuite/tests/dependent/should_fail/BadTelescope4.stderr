@@ -1,12 +1,12 @@
 
 BadTelescope4.hs:9:1: error:
-    • These kind and type variables: (a :: k1)
+    • These kind and type variables: (a :: k)
                                      (c :: Proxy b)
                                      (d :: Proxy a)
                                      (x :: SameKind b d)
       are out of dependency order. Perhaps try this ordering:
-        k1
-        (a :: k1)
+        k
+        (a :: k)
         (b :: Proxy a)
         (c :: Proxy b)
         (d :: Proxy a)

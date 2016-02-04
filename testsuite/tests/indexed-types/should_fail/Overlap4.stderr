@@ -1,5 +1,6 @@
 
-Overlap4.hs:7:3:
-    Number of parameters must match family declaration; expected 2
-    In the equations for closed type family ‘F’
-    In the type family declaration for ‘F’
+Overlap4.hs:7:12: error:
+    • Expecting one more argument to ‘Maybe’
+      Expected a type, but ‘Maybe’ has kind ‘* -> *’
+    • In the type ‘Maybe’
+      In the type family declaration for ‘F’

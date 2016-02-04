@@ -37,10 +37,10 @@ module TyCoRep (
 
         -- Functions over types
         mkTyConTy, mkTyVarTy, mkTyVarTys,
-        mkFunTy, mkFunTys,
+        mkFunTy, mkFunTys, mkForAllTys,
         isLiftedTypeKind, isUnliftedTypeKind,
-        isCoercionType, isLevityTy, isLevityVar,
-        isLevityKindedTy, dropLevityArgs,
+        isCoercionType, isRuntimeRepTy, isRuntimeRepVar,
+        isRuntimeRepKindedTy, dropRuntimeRepArgs,
         sameVis,
 
         -- Functions over binders
@@ -465,6 +465,10 @@ mkFunTy arg res = ForAllTy (Anon arg) res
 mkFunTys :: [Type] -> Type -> Type
 mkFunTys tys ty = foldr mkFunTy ty tys
 
+-- | Wraps foralls over the type using the provided 'TyVar's from left to right
+mkForAllTys :: [TyBinder] -> Type -> Type
+mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
+
 -- | Does this type classify a core Coercion?
 isCoercionType :: Type -> Bool
 isCoercionType (TyConApp tc tys)
@@ -514,39 +518,47 @@ mkTyConTy tycon = TyConApp tycon []
 Some basic functions, put here to break loops eg with the pretty printer
 -}
 
+-- | This version considers Constraint to be distinct from *.
 isLiftedTypeKind :: Kind -> Bool
 isLiftedTypeKind ki | Just ki' <- coreView ki = isLiftedTypeKind ki'
-isLiftedTypeKind (TyConApp tc [TyConApp lev []])
-  = tc `hasKey` tYPETyConKey && lev `hasKey` liftedDataConKey
+isLiftedTypeKind (TyConApp tc [TyConApp ptr_rep []])
+  =  tc      `hasKey` tYPETyConKey
+  && ptr_rep `hasKey` ptrRepLiftedDataConKey
 isLiftedTypeKind _                = False
 
 isUnliftedTypeKind :: Kind -> Bool
 isUnliftedTypeKind ki | Just ki' <- coreView ki = isUnliftedTypeKind ki'
-isUnliftedTypeKind (TyConApp tc [TyConApp lev []])
-  = tc `hasKey` tYPETyConKey && lev `hasKey` unliftedDataConKey
+isUnliftedTypeKind (TyConApp tc [TyConApp ptr_rep []])
+  | tc       `hasKey` tYPETyConKey
+  , ptr_rep  `hasKey` ptrRepLiftedDataConKey
+  = False
+isUnliftedTypeKind (TyConApp tc [arg])
+  = tc `hasKey` tYPETyConKey && isEmptyVarSet (tyCoVarsOfType arg)
+      -- all other possibilities are unlifted
 isUnliftedTypeKind _ = False
 
--- | Is this the type 'Levity'?
-isLevityTy :: Type -> Bool
-isLevityTy ty | Just ty' <- coreView ty = isLevityTy ty'
-isLevityTy (TyConApp tc []) = tc `hasKey` levityTyConKey
-isLevityTy _ = False
+-- | Is this the type 'RuntimeRep'?
+isRuntimeRepTy :: Type -> Bool
+isRuntimeRepTy ty | Just ty' <- coreView ty = isRuntimeRepTy ty'
+isRuntimeRepTy (TyConApp tc []) = tc `hasKey` runtimeRepTyConKey
+isRuntimeRepTy _ = False
 
--- | Is this a type of kind Levity? (e.g. Lifted, Unlifted)
-isLevityKindedTy :: Type -> Bool
-isLevityKindedTy = isLevityTy . typeKind
+-- | Is this a type of kind RuntimeRep? (e.g. PtrRep)
+isRuntimeRepKindedTy :: Type -> Bool
+isRuntimeRepKindedTy = isRuntimeRepTy . typeKind
 
--- | Is a tyvar of type 'Levity'?
-isLevityVar :: TyVar -> Bool
-isLevityVar = isLevityTy . tyVarKind
+-- | Is a tyvar of type 'RuntimeRep'?
+isRuntimeRepVar :: TyVar -> Bool
+isRuntimeRepVar = isRuntimeRepTy . tyVarKind
 
--- | Drops prefix of Levity constructors in 'TyConApp's. Useful for e.g.
--- dropping 'Lifted and 'Unlifted arguments of unboxed tuple TyCon applications:
+-- | Drops prefix of RuntimeRep constructors in 'TyConApp's. Useful for e.g.
+-- dropping 'PtrRep arguments of unboxed tuple TyCon applications:
 --
---   dropLevityArgs ['Lifted, 'Unlifted, String, Int#] == [String, Int#]
+--   dropRuntimeRepArgs [ 'PtrRepLifted, 'PtrRepUnlifted
+--                      , String, Int# ] == [String, Int#]
 --
-dropLevityArgs :: [Type] -> [Type]
-dropLevityArgs = dropWhile isLevityKindedTy
+dropRuntimeRepArgs :: [Type] -> [Type]
+dropRuntimeRepArgs = dropWhile isRuntimeRepKindedTy
 
 {-
 %************************************************************************
@@ -2657,11 +2669,14 @@ pprTyTcApp p tc tys
   = text "(TypeError ...)"   -- Suppress detail unles you _really_ want to see
 
   | tc `hasKey` tYPETyConKey
-  , [TyConApp lev_tc []] <- tys
-  = if | lev_tc `hasKey` liftedDataConKey   ->
-           unicodeSyntax (char '★') (char '*')
-       | lev_tc `hasKey` unliftedDataConKey -> char '#'
-       | otherwise                          -> ppr_deflt
+  , [TyConApp ptr_rep []] <- tys
+  , ptr_rep `hasKey` ptrRepLiftedDataConKey
+  = unicodeSyntax (char '★') (char '*')
+
+  | tc `hasKey` tYPETyConKey
+  , [TyConApp ptr_rep []] <- tys
+  , ptr_rep `hasKey` ptrRepUnliftedDataConKey
+  = char '#'
 
   | otherwise
   = ppr_deflt
@@ -2669,27 +2684,33 @@ pprTyTcApp p tc tys
     ppr_deflt = pprTcAppTy p ppr_type tc tys
 
 pprTcAppTy :: TyPrec -> (TyPrec -> Type -> SDoc) -> TyCon -> [Type] -> SDoc
-pprTcAppTy = pprTcApp id
+pprTcAppTy p pp tc tys
+  = getPprStyle $ \style -> pprTcApp style id p pp tc tys
 
 pprTcAppCo :: TyPrec -> (TyPrec -> Coercion -> SDoc)
            -> TyCon -> [Coercion] -> SDoc
-pprTcAppCo = pprTcApp (pFst . coercionKind)
+pprTcAppCo p pp tc cos
+  = getPprStyle $ \style ->
+    pprTcApp style (pFst . coercionKind) p pp tc cos
 
-pprTcApp :: (a -> Type) -> TyPrec -> (TyPrec -> a -> SDoc) -> TyCon -> [a] -> SDoc
+pprTcApp :: PprStyle
+         -> (a -> Type) -> TyPrec -> (TyPrec -> a -> SDoc) -> TyCon -> [a] -> SDoc
 -- Used for both types and coercions, hence polymorphism
-pprTcApp _ _ pp tc [ty]
+pprTcApp _ _ _ pp tc [ty]
   | tc `hasKey` listTyConKey = pprPromotionQuote tc <> brackets   (pp TopPrec ty)
   | tc `hasKey` parrTyConKey = pprPromotionQuote tc <> paBrackets (pp TopPrec ty)
 
-pprTcApp to_type p pp tc tys
-  | Just sort <- tyConTuple_maybe tc
+pprTcApp style to_type p pp tc tys
+  | not (debugStyle style)
+  , Just sort <- tyConTuple_maybe tc
   , let arity = tyConArity tc
   , arity == length tys
   , let num_to_drop = case sort of UnboxedTuple -> arity `div` 2
                                    _            -> 0
   = pprTupleApp p pp tc sort (drop num_to_drop tys)
 
-  | Just dc <- isPromotedDataCon_maybe tc
+  | not (debugStyle style)
+  , Just dc <- isPromotedDataCon_maybe tc
   , let dc_tc = dataConTyCon dc
   , Just tup_sort <- tyConTuple_maybe dc_tc
   , let arity = tyConArity dc_tc    -- E.g. 3 for (,,) k1 k2 k3 t1 t2 t3
@@ -2700,7 +2721,6 @@ pprTcApp to_type p pp tc tys
 
   | otherwise
   = sdocWithDynFlags $ \dflags ->
-    getPprStyle $ \style ->
     pprTcApp_help to_type p pp tc tys dflags style
   where
 

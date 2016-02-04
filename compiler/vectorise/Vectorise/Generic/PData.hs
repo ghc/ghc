@@ -51,7 +51,8 @@ buildDataFamInst name' fam_tc vect_tc rhs
             rep_ty   = mkTyConApp rep_tc tys'
             pat_tys  = [mkTyConApp vect_tc tys']
             rep_tc   = mkAlgTyCon name'
-                           (mkPiTypesPreferFunTy tyvars' liftedTypeKind)
+                           (mkTyBindersPreferAnon tyvars' liftedTypeKind)
+                           liftedTypeKind
                            tyvars'
                            (map (const Nominal) tyvars')
                            Nothing

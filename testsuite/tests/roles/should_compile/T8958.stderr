@@ -6,7 +6,6 @@ TYPE SIGNATURES
 TYPE CONSTRUCTORS
   type role Map nominal representational
   newtype (Nominal k, Representational v) => Map k v = MkMap [(k, v)]
-    Kind: * -> * -> *
   class Nominal a
   type role Representational representational
   class Representational a

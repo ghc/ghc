@@ -322,13 +322,13 @@ mkCoreTup cs  = mkCoreConApps (tupleDataCon Boxed (length cs))
 
 -- | Build a small unboxed tuple holding the specified expressions,
 -- with the given types. The types must be the types of the expressions.
--- Do not include the levity specifiers; this function calculates them
+-- Do not include the RuntimeRep specifiers; this function calculates them
 -- for you.
 mkCoreUbxTup :: [Type] -> [CoreExpr] -> CoreExpr
 mkCoreUbxTup tys exps
   = ASSERT( tys `equalLength` exps)
     mkCoreConApps (tupleDataCon Unboxed (length tys))
-             (map (Type . getLevity "mkCoreUbxTup") tys ++ map Type tys ++ exps)
+             (map (Type . getRuntimeRep "mkCoreUbxTup") tys ++ map Type tys ++ exps)
 
 -- | Make a core tuple of the given boxity
 mkCoreTupBoxity :: Boxity -> [CoreExpr] -> CoreExpr
@@ -588,7 +588,8 @@ mkRuntimeErrorApp
         -> CoreExpr
 
 mkRuntimeErrorApp err_id res_ty err_msg
-  = mkApps (Var err_id) [Type (getLevity "mkRuntimeErrorApp" res_ty), Type res_ty, err_string]
+  = mkApps (Var err_id) [ Type (getRuntimeRep "mkRuntimeErrorApp" res_ty)
+                        , Type res_ty, err_string ]
   where
     err_string = Lit (mkMachString err_msg)
 
@@ -672,21 +673,18 @@ mkRuntimeErrorId name = pc_bottoming_Id1 name runtimeErrorTy
 
 runtimeErrorTy :: Type
 -- The runtime error Ids take a UTF8-encoded string as argument
-runtimeErrorTy = mkSpecSigmaTy [levity1TyVar, openAlphaTyVar] []
+runtimeErrorTy = mkSpecSigmaTy [runtimeRep1TyVar, openAlphaTyVar] []
                                (mkFunTy addrPrimTy openAlphaTy)
 
 {-
 Note [Error and friends have an "open-tyvar" forall]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 'error' and 'undefined' have types
-        error     :: forall (v :: Levity) (a :: TYPE v). String -> a
-        undefined :: forall (v :: Levity) (a :: TYPE v). a
-Notice the levity polymophism. This ensures that
-"error" can be instantiated at
-  * unboxed as well as boxed types
-  * polymorphic types
+        error     :: forall (v :: RuntimeRep) (a :: TYPE v). String -> a
+        undefined :: forall (v :: RuntimeRep) (a :: TYPE v). a
+Notice the runtime-representation polymophism. This ensures that
+"error" can be instantiated at unboxed as well as boxed types.
 This is OK because it never returns, so the return type is irrelevant.
-See Note [Sort-polymorphic tyvars accept foralls] in TcMType.
 
 
 ************************************************************************

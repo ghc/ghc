@@ -7,7 +7,6 @@ TYPE SIGNATURES
     forall tok st a. GenParser tok st a -> GenParser tok st ()
 TYPE CONSTRUCTORS
   data GenParser tok st a = GenParser tok st a
-    Kind: * -> * -> * -> *
 COERCION AXIOMS
 Dependent modules: []
 Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,

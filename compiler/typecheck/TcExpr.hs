@@ -361,7 +361,7 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
        ; arg2'  <- tcArg op arg2 arg2_sigma 2
 
        -- Make sure that the argument type has kind '*'
-       --   ($) :: forall (v:Levity) (a:*) (b:TYPE v). (a->b) -> a -> b
+       --   ($) :: forall (r:RuntimeRep) (a:*) (b:TYPE r). (a->b) -> a -> b
        -- Eg we do not want to allow  (D#  $  4.0#)   Trac #5570
        --    (which gives a seg fault)
        --
@@ -378,7 +378,7 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
 
        ; op_id  <- tcLookupId op_name
        ; res_ty <- readExpType res_ty
-       ; let op' = L loc (HsWrap (mkWpTyApps [ getLevity "tcExpr ($)" res_ty
+       ; let op' = L loc (HsWrap (mkWpTyApps [ getRuntimeRep "tcExpr ($)" res_ty
                                              , arg2_sigma
                                              , res_ty])
                                  (HsVar (L lv op_id)))
@@ -443,9 +443,9 @@ tcExpr expr@(ExplicitTuple tup_args boxity) res_ty
              tup_tc = tupleTyCon boxity arity
        ; res_ty <- expTypeToType res_ty
        ; (coi, arg_tys) <- matchExpectedTyConApp tup_tc res_ty
-                           -- Unboxed tuples have levity vars, which we
+                           -- Unboxed tuples have RuntimeRep vars, which we
                            -- don't care about here
-                           -- See Note [Unboxed tuple levity vars] in TyCon
+                           -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
        ; let arg_tys' = case boxity of Unboxed -> drop arity arg_tys
                                        Boxed   -> arg_tys
        ; tup_args1 <- tcTupArgs tup_args arg_tys'
@@ -1663,8 +1663,8 @@ tcSeq loc fun_name args res_ty
         ; (arg1, arg2, arg2_exp_ty) <- case args1 of
             [ty_arg_expr2, term_arg1, term_arg2]
               | Just hs_ty_arg2 <- isLHsTypeExpr_maybe ty_arg_expr2
-              -> do { lev_ty <- newFlexiTyVarTy levityTy
-                    ; ty_arg2 <- tcHsTypeApp hs_ty_arg2 (tYPE lev_ty)
+              -> do { rr_ty <- newFlexiTyVarTy runtimeRepTy
+                    ; ty_arg2 <- tcHsTypeApp hs_ty_arg2 (tYPE rr_ty)
                                    -- see Note [Typing rule for seq]
                     ; _ <- tcSubTypeDS GenSigCtxt noThing ty_arg2 res_ty
                     ; return (term_arg1, term_arg2, mkCheckExpType ty_arg2) }

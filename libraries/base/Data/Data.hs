@@ -114,7 +114,7 @@ import Data.Monoid
 import Data.Ord
 import Data.Typeable
 import Data.Version( Version(..) )
-import GHC.Base hiding (Any)
+import GHC.Base hiding (Any, IntRep, FloatRep)
 import GHC.List
 import GHC.Num
 import GHC.Read

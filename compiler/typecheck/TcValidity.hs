@@ -945,7 +945,7 @@ tyConArityErr tc tks
 
     -- tc_type_arity = number of *type* args expected
     -- tc_type_args  = number of *type* args encountered
-    tc_type_arity = count isVisibleBinder $ fst $ splitPiTys (tyConKind tc)
+    tc_type_arity = count isVisibleBinder $ tyConBinders tc
     tc_type_args  = length vis_tks
 
 arityErr :: Outputable a => String -> a -> Int -> Int -> SDoc
@@ -1583,7 +1583,7 @@ checkValidFamPats mb_clsinfo fam_tc tvs cvs ty_pats
        ; checkConsistentFamInst mb_clsinfo fam_tc tvs ty_pats }
   where
      fam_arity = tyConArity fam_tc
-     fam_bndrs = take fam_arity $ fst $ splitPiTys (tyConKind fam_tc)
+     fam_bndrs = tyConBinders fam_tc
 
 
 checkValidTypePat :: Type -> TcM ()

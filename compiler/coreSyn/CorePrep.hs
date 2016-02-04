@@ -512,7 +512,7 @@ cpeRhsE env (Var f `App` _{-type-} `App` arg)
   | f `hasKey` lazyIdKey          -- Replace (lazy a) by a
   = cpeRhsE env arg               -- See Note [lazyId magic] in MkId
 
-cpeRhsE env (Var f `App` _levity `App` _type `App` arg)
+cpeRhsE env (Var f `App` _runtimeRep `App` _type `App` arg)
     -- See Note [runRW magic] in MkId
   | f `hasKey` runRWKey           -- Replace (runRW# f) by (f realWorld#),
   = case arg of                   -- beta reducing if possible

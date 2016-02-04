@@ -7,7 +7,7 @@
 import GHC.Exts
 import GHC.Types
 
-class BoxIt (a :: TYPE 'Unlifted) where
+class BoxIt (a :: TYPE 'WordRep) where
     type Boxed a :: *
     boxed :: a -> Boxed a
 

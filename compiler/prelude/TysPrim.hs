@@ -15,13 +15,11 @@ module TysPrim(
         mkTemplateTyVars,
         alphaTyVars, alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar,
         alphaTys, alphaTy, betaTy, gammaTy, deltaTy,
-        levity1TyVar, levity2TyVar, levity1Ty, levity2Ty,
+        runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep1Ty, runtimeRep2Ty,
         openAlphaTy, openBetaTy, openAlphaTyVar, openBetaTyVar,
         kKiVar,
 
         -- Kind constructors...
-        tYPETyCon, unliftedTypeKindTyCon, unliftedTypeKind,
-
         tYPETyConName, unliftedTypeKindTyConName,
 
         -- Kinds
@@ -80,7 +78,18 @@ module TysPrim(
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} TysWiredIn ( levityTy, unliftedDataConTy, liftedTypeKind )
+import {-# SOURCE #-} TysWiredIn
+  ( runtimeRepTy, liftedTypeKind
+  , vecRepDataConTyCon, ptrRepUnliftedDataConTyCon
+  , voidRepDataConTy, intRepDataConTy
+  , wordRepDataConTy, int64RepDataConTy, word64RepDataConTy, addrRepDataConTy
+  , floatRepDataConTy, doubleRepDataConTy
+  , vec2DataConTy, vec4DataConTy, vec8DataConTy, vec16DataConTy, vec32DataConTy
+  , vec64DataConTy
+  , int8ElemRepDataConTy, int16ElemRepDataConTy, int32ElemRepDataConTy
+  , int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy
+  , word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy
+  , doubleElemRepDataConTy )
 
 import Var              ( TyVar, KindVar, mkTyVar )
 import Name
@@ -89,6 +98,7 @@ import SrcLoc
 import Unique
 import PrelNames
 import FastString
+import Outputable
 import TyCoRep   -- doesn't need special access, but this is easier to avoid
                  -- import loops
 
@@ -228,17 +238,17 @@ alphaTys = mkTyVarTys alphaTyVars
 alphaTy, betaTy, gammaTy, deltaTy :: Type
 (alphaTy:betaTy:gammaTy:deltaTy:_) = alphaTys
 
-levity1TyVar, levity2TyVar :: TyVar
-(levity1TyVar : levity2TyVar : _)
-  = drop 21 (mkTemplateTyVars (repeat levityTy))  -- selects 'v','w'
+runtimeRep1TyVar, runtimeRep2TyVar :: TyVar
+(runtimeRep1TyVar : runtimeRep2TyVar : _)
+  = drop 16 (mkTemplateTyVars (repeat runtimeRepTy))  -- selects 'q','r'
 
-levity1Ty, levity2Ty :: Type
-levity1Ty = mkTyVarTy levity1TyVar
-levity2Ty = mkTyVarTy levity2TyVar
+runtimeRep1Ty, runtimeRep2Ty :: Type
+runtimeRep1Ty = mkTyVarTy runtimeRep1TyVar
+runtimeRep2Ty = mkTyVarTy runtimeRep2TyVar
 
 openAlphaTyVar, openBetaTyVar :: TyVar
 [openAlphaTyVar,openBetaTyVar]
-  = mkTemplateTyVars [tYPE levity1Ty, tYPE levity2Ty]
+  = mkTemplateTyVars [tYPE runtimeRep1Ty, tYPE runtimeRep2Ty]
 
 openAlphaTy, openBetaTy :: Type
 openAlphaTy = mkTyVarTy openAlphaTyVar
@@ -260,9 +270,9 @@ funTyConName :: Name
 funTyConName = mkPrimTyConName (fsLit "(->)") funTyConKey funTyCon
 
 funTyCon :: TyCon
-funTyCon = mkFunTyCon funTyConName kind tc_rep_nm
+funTyCon = mkFunTyCon funTyConName (map Anon [liftedTypeKind, liftedTypeKind])
+                                   tc_rep_nm
   where
-    kind = mkFunTys [liftedTypeKind, liftedTypeKind] liftedTypeKind
         -- You might think that (->) should have type (?? -> ? -> *), and you'd be right
         -- But if we do that we get kind errors when saying
         --      instance Control.Arrow (->)
@@ -273,20 +283,6 @@ funTyCon = mkFunTyCon funTyConName kind tc_rep_nm
         -- because they are never in scope in the source
 
     tc_rep_nm = mkPrelTyConRepName funTyConName
-
--- One step to remove subkinding.
--- (->) :: * -> * -> *
--- but we should have (and want) the following typing rule for fully applied arrows
---      Gamma |- tau   :: k1    k1 in {*, #}
---      Gamma |- sigma :: k2    k2 in {*, #, (#)}
---      -----------------------------------------
---      Gamma |- tau -> sigma :: *
--- Currently we have the following rule which achieves more or less the same effect
---      Gamma |- tau   :: ??
---      Gamma |- sigma :: ?
---      --------------------------
---      Gamma |- tau -> sigma :: *
--- In the end we don't want subkinding at all.
 
 {-
 ************************************************************************
@@ -299,35 +295,48 @@ Note [TYPE]
 ~~~~~~~~~~~
 There are a few places where we wish to be able to deal interchangeably
 with kind * and kind #. unsafeCoerce#, error, and (->) are some of these
-places. The way we do this is to use levity polymorphism.
+places. The way we do this is to use runtime-representation polymorphism.
 
-We have (levityTyCon, liftedDataCon, unliftedDataCon)
+We have
 
-    data Levity = Lifted | Unlifted
+    data RuntimeRep = PtrRepLifted | PtrRepUnlifted | ...
 
 and a magical constant (tYPETyCon)
 
-    TYPE :: Levity -> TYPE Lifted
+    TYPE :: RuntimeRep -> TYPE PtrRepLifted
 
 We then have synonyms (liftedTypeKindTyCon, unliftedTypeKindTyCon)
 
-    type Type = TYPE Lifted
-    type # = TYPE Unlifted
+    type * = TYPE PtrRepLifted
+    type # = TYPE PtrRepUnlifted
 
-So, for example, we get
+The (...) in the definition for RuntimeRep includes possibilities for
+the unboxed, unlifted representations, isomorphic to the PrimRep type
+in TyCon. RuntimeRep is itself declared in GHC.Types.
 
-    unsafeCoerce# :: forall (v1 :: Levity) (v2 :: Levity)
+An alternative design would be to have
+
+  data RuntimeRep = PtrRep Levity | ...
+  data Levity = Lifted | Unlifted
+
+but this slowed down GHC because every time we looked at *, we had to
+follow a bunch of pointers. When we have unpackable sums, we should
+go back to the stratified representation. This would allow, for example:
+
+    unsafeCoerce# :: forall (r1 :: RuntimeRep) (v2 :: Levity)
                             (a :: TYPE v1) (b :: TYPE v2). a -> b
 
-This replaces the old sub-kinding machinery. We call variables `a` and `b`
-above "levity polymorphic".
+TYPE replaces the old sub-kinding machinery. We call variables `a` and `b`
+above "runtime-representation polymorphic".
+
 -}
 
 tYPETyCon, unliftedTypeKindTyCon :: TyCon
 tYPETyConName, unliftedTypeKindTyConName :: Name
 
 tYPETyCon = mkKindTyCon tYPETyConName
-                        (ForAllTy (Anon levityTy) liftedTypeKind)
+                        [Anon runtimeRepTy]
+                        liftedTypeKind
                         [Nominal]
                         (mkPrelTyConRepName tYPETyConName)
 
@@ -335,9 +344,9 @@ tYPETyCon = mkKindTyCon tYPETyConName
    -- NB: unlifted is wired in because there is no way to parse it in
    -- Haskell. That's the only reason for wiring it in.
 unliftedTypeKindTyCon = mkSynonymTyCon unliftedTypeKindTyConName
-                                       liftedTypeKind
-                                       [] []
-                                       (tYPE unliftedDataConTy)
+                          [] liftedTypeKind
+                          [] []
+                          (tYPE (TyConApp ptrRepUnliftedDataConTyCon []))
 
 --------------------------
 -- ... and now their names
@@ -346,9 +355,6 @@ unliftedTypeKindTyCon = mkSynonymTyCon unliftedTypeKindTyConName
 -- See Note [GHC Formalism] in coreSyn/CoreLint.hs
 tYPETyConName             = mkPrimTyConName (fsLit "TYPE") tYPETyConKey tYPETyCon
 unliftedTypeKindTyConName = mkPrimTyConName (fsLit "#") unliftedTypeKindTyConKey unliftedTypeKindTyCon
-
-unliftedTypeKind :: Kind
-unliftedTypeKind = tYPE unliftedDataConTy
 
 mkPrimTyConName :: FastString -> Unique -> TyCon -> Name
 mkPrimTyConName = mkPrimTcName BuiltInSyntax
@@ -360,9 +366,9 @@ mkPrimTcName built_in_syntax occ key tycon
   = mkWiredInName gHC_PRIM (mkTcOccFS occ) key (ATyCon tycon) built_in_syntax
 
 -----------------------------
--- | Given a Levity, applies TYPE to it. See Note [TYPE].
+-- | Given a RuntimeRep, applies TYPE to it. See Note [TYPE].
 tYPE :: Type -> Type
-tYPE lev = TyConApp tYPETyCon [lev]
+tYPE rr = TyConApp tYPETyCon [rr]
 
 {-
 ************************************************************************
@@ -375,16 +381,48 @@ tYPE lev = TyConApp tYPETyCon [lev]
 -- only used herein
 pcPrimTyCon :: Name -> [Role] -> PrimRep -> TyCon
 pcPrimTyCon name roles rep
-  = mkPrimTyCon name kind roles rep
+  = mkPrimTyCon name binders result_kind roles
   where
-    kind        = mkFunTys (map (const liftedTypeKind) roles) result_kind
-    result_kind = unliftedTypeKind
+    binders     = map (const (Anon liftedTypeKind)) roles
+    result_kind = tYPE rr
+
+    rr = case rep of
+      VoidRep       -> voidRepDataConTy
+      PtrRep        -> TyConApp ptrRepUnliftedDataConTyCon []
+      IntRep        -> intRepDataConTy
+      WordRep       -> wordRepDataConTy
+      Int64Rep      -> int64RepDataConTy
+      Word64Rep     -> word64RepDataConTy
+      AddrRep       -> addrRepDataConTy
+      FloatRep      -> floatRepDataConTy
+      DoubleRep     -> doubleRepDataConTy
+      VecRep n elem -> TyConApp vecRepDataConTyCon [n', elem']
+        where
+          n' = case n of
+            2  -> vec2DataConTy
+            4  -> vec4DataConTy
+            8  -> vec8DataConTy
+            16 -> vec16DataConTy
+            32 -> vec32DataConTy
+            64 -> vec64DataConTy
+            _  -> pprPanic "Disallowed VecCount" (ppr n)
+
+          elem' = case elem of
+            Int8ElemRep   -> int8ElemRepDataConTy
+            Int16ElemRep  -> int16ElemRepDataConTy
+            Int32ElemRep  -> int32ElemRepDataConTy
+            Int64ElemRep  -> int64ElemRepDataConTy
+            Word8ElemRep  -> word8ElemRepDataConTy
+            Word16ElemRep -> word16ElemRepDataConTy
+            Word32ElemRep -> word32ElemRepDataConTy
+            Word64ElemRep -> word64ElemRepDataConTy
+            FloatElemRep  -> floatElemRepDataConTy
+            DoubleElemRep -> doubleElemRepDataConTy
+
 
 pcPrimTyCon0 :: Name -> PrimRep -> TyCon
 pcPrimTyCon0 name rep
-  = mkPrimTyCon name result_kind [] rep
-  where
-    result_kind = unliftedTypeKind
+  = pcPrimTyCon name [] rep
 
 charPrimTy :: Type
 charPrimTy      = mkTyConTy charPrimTyCon
@@ -627,7 +665,7 @@ RealWorld; it's only used in the type system, to parameterise State#.
 -}
 
 realWorldTyCon :: TyCon
-realWorldTyCon = mkLiftedPrimTyCon realWorldTyConName liftedTypeKind [] PtrRep
+realWorldTyCon = mkLiftedPrimTyCon realWorldTyConName [] liftedTypeKind []
 realWorldTy :: Type
 realWorldTy          = mkTyConTy realWorldTyCon
 realWorldStatePrimTy :: Type
@@ -647,11 +685,12 @@ mkProxyPrimTy :: Type -> Type -> Type
 mkProxyPrimTy k ty = TyConApp proxyPrimTyCon [k, ty]
 
 proxyPrimTyCon :: TyCon
-proxyPrimTyCon = mkPrimTyCon proxyPrimTyConName kind [Nominal,Nominal] VoidRep
-  where kind = ForAllTy (Named kv Specified) $
-               mkFunTy k unliftedTypeKind
-        kv   = kKiVar
-        k    = mkTyVarTy kv
+proxyPrimTyCon = mkPrimTyCon proxyPrimTyConName binders res_kind [Nominal,Nominal]
+  where binders  = [ Named kv Specified
+                   , Anon k ]
+        res_kind = tYPE voidRepDataConTy
+        kv       = kKiVar
+        k        = mkTyVarTy kv
 
 
 {- *********************************************************************
@@ -663,10 +702,12 @@ proxyPrimTyCon = mkPrimTyCon proxyPrimTyConName kind [Nominal,Nominal] VoidRep
 
 eqPrimTyCon :: TyCon  -- The representation type for equality predicates
                       -- See Note [The equality types story]
-eqPrimTyCon  = mkPrimTyCon eqPrimTyConName kind roles VoidRep
-  where kind = ForAllTy (Named kv1 Specified) $
-               ForAllTy (Named kv2 Specified) $
-               mkFunTys [k1, k2] unliftedTypeKind
+eqPrimTyCon  = mkPrimTyCon eqPrimTyConName binders res_kind roles
+  where binders = [ Named kv1 Specified
+                  , Named kv2 Specified
+                  , Anon k1
+                  , Anon k2 ]
+        res_kind = tYPE voidRepDataConTy
         [kv1, kv2] = mkTemplateTyVars [liftedTypeKind, liftedTypeKind]
         k1 = mkTyVarTy kv1
         k2 = mkTyVarTy kv2
@@ -676,11 +717,12 @@ eqPrimTyCon  = mkPrimTyCon eqPrimTyConName kind roles VoidRep
 -- this should only ever appear as the type of a covar. Its role is
 -- interpreted in coercionRole
 eqReprPrimTyCon :: TyCon   -- See Note [The equality types story]
-eqReprPrimTyCon = mkPrimTyCon eqReprPrimTyConName kind
-                              roles VoidRep
-  where kind = ForAllTy (Named kv1 Specified) $
-               ForAllTy (Named kv2 Specified) $
-               mkFunTys [k1, k2] unliftedTypeKind
+eqReprPrimTyCon = mkPrimTyCon eqReprPrimTyConName binders res_kind roles
+  where binders = [ Named kv1 Specified
+                  , Named kv2 Specified
+                  , Anon k1
+                  , Anon k2 ]
+        res_kind = tYPE voidRepDataConTy
         [kv1, kv2]    = mkTemplateTyVars [liftedTypeKind, liftedTypeKind]
         k1            = mkTyVarTy kv1
         k2            = mkTyVarTy kv2
@@ -690,12 +732,13 @@ eqReprPrimTyCon = mkPrimTyCon eqReprPrimTyConName kind
 -- This is only used to make higher-order equalities. Nothing
 -- should ever actually have this type!
 eqPhantPrimTyCon :: TyCon
-eqPhantPrimTyCon = mkPrimTyCon eqPhantPrimTyConName kind
+eqPhantPrimTyCon = mkPrimTyCon eqPhantPrimTyConName binders res_kind
                                [Nominal, Nominal, Phantom, Phantom]
-                               VoidRep
-  where kind = ForAllTy (Named kv1 Specified) $
-               ForAllTy (Named kv2 Specified) $
-               mkFunTys [k1, k2] unliftedTypeKind
+  where binders = [ Named kv1 Specified
+                  , Named kv2 Specified
+                  , Anon k1
+                  , Anon k2 ]
+        res_kind = tYPE voidRepDataConTy
         [kv1, kv2]    = mkTemplateTyVars [liftedTypeKind, liftedTypeKind]
         k1            = mkTyVarTy kv1
         k2            = mkTyVarTy kv2
@@ -920,12 +963,13 @@ anyTy :: Type
 anyTy = mkTyConTy anyTyCon
 
 anyTyCon :: TyCon
-anyTyCon = mkFamilyTyCon anyTyConName kind [kKiVar] Nothing
+anyTyCon = mkFamilyTyCon anyTyConName binders res_kind [kKiVar] Nothing
                          (ClosedSynFamilyTyCon Nothing)
                          Nothing
                          NotInjective
   where
-    kind = ForAllTy (Named kKiVar Specified) (mkTyVarTy kKiVar)
+    binders  = [Named kKiVar Specified]
+    res_kind = mkTyVarTy kKiVar
 
 anyTypeOfKind :: Kind -> Type
 anyTypeOfKind kind = TyConApp anyTyCon [kind]

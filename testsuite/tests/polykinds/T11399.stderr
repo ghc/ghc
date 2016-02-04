@@ -1,9 +1,9 @@
 
 T11399.hs:7:32: error:
-    • Couldn't match kind ‘*’ with ‘GHC.Types.Levity’
+    • Couldn't match kind ‘*’ with ‘GHC.Types.RuntimeRep’
       When matching kinds
         k :: * -> *
-        TYPE :: GHC.Types.Levity -> *
+        TYPE :: GHC.Types.RuntimeRep -> *
       Expected kind ‘* -> *’, but ‘UhOh k’ has kind ‘k * -> *’
     • In the first argument of ‘Functor’, namely ‘UhOh k’
       In the instance declaration for ‘Functor (UhOh k)’

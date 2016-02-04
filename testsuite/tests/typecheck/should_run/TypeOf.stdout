@@ -15,9 +15,9 @@ Proxy Symbol "hello world"
 Proxy Nat 1
 Proxy [Nat] (': Nat 1 (': Nat 2 (': Nat 3 '[])))
 Proxy Ordering 'EQ
-Proxy (Levity -> Constraint) TYPE
+Proxy (RuntimeRep -> Constraint) TYPE
 Proxy Constraint Constraint
 Proxy Constraint Constraint
 Proxy Constraint Constraint
-Proxy Levity 'Lifted
+Proxy RuntimeRep 'PtrRepLifted
 Proxy (Constraint -> Constraint -> Constraint) ~~

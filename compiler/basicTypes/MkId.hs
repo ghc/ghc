@@ -1062,11 +1062,11 @@ dollarId = pcMiscPrelId dollarName ty
              (noCafIdInfo `setUnfoldingInfo` unf)
   where
     fun_ty = mkFunTy alphaTy openBetaTy
-    ty     = mkSpecForAllTys [levity2TyVar, alphaTyVar, openBetaTyVar] $
+    ty     = mkSpecForAllTys [runtimeRep2TyVar, alphaTyVar, openBetaTyVar] $
              mkFunTy fun_ty fun_ty
     unf    = mkInlineUnfolding (Just 2) rhs
     [f,x]  = mkTemplateLocals [fun_ty, alphaTy]
-    rhs    = mkLams [levity2TyVar, alphaTyVar, openBetaTyVar, f, x] $
+    rhs    = mkLams [runtimeRep2TyVar, alphaTyVar, openBetaTyVar, f, x] $
              App (Var f) (Var x)
 
 ------------------------------------------------
@@ -1083,7 +1083,9 @@ proxyHashId
     t       = mkTyVarTy tv
 
 ------------------------------------------------
--- unsafeCoerce# :: forall a b. a -> b
+-- unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+--                         (a :: TYPE r1) (b :: TYPE r2).
+--                         a -> b
 unsafeCoerceId :: Id
 unsafeCoerceId
   = pcMiscPrelId unsafeCoerceName ty info
@@ -1091,14 +1093,13 @@ unsafeCoerceId
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
 
-    ty  = mkSpecForAllTys [ levity1TyVar, levity2TyVar
-                          , openAlphaTyVar, openBetaTyVar ]
-                          (mkFunTy openAlphaTy openBetaTy)
+    tvs = [ runtimeRep1TyVar, runtimeRep2TyVar
+          , openAlphaTyVar, openBetaTyVar ]
+
+    ty  = mkSpecForAllTys tvs $ mkFunTy openAlphaTy openBetaTy
 
     [x] = mkTemplateLocals [openAlphaTy]
-    rhs = mkLams [ levity1TyVar, levity2TyVar
-                 , openAlphaTyVar, openBetaTyVar
-                 , x] $
+    rhs = mkLams (tvs ++ [x]) $
           Cast (Var x) (mkUnsafeCo Representational openAlphaTy openBetaTy)
 
 ------------------------------------------------
@@ -1166,13 +1167,13 @@ oneShotId = pcMiscPrelId oneShotName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
-    ty  = mkSpecForAllTys [ levity1TyVar, levity2TyVar
+    ty  = mkSpecForAllTys [ runtimeRep1TyVar, runtimeRep2TyVar
                           , openAlphaTyVar, openBetaTyVar ]
                           (mkFunTy fun_ty fun_ty)
-    fun_ty = mkFunTy alphaTy betaTy
+    fun_ty = mkFunTy openAlphaTy openBetaTy
     [body, x] = mkTemplateLocals [fun_ty, openAlphaTy]
     x' = setOneShotLambda x
-    rhs = mkLams [ levity1TyVar, levity2TyVar
+    rhs = mkLams [ runtimeRep1TyVar, runtimeRep2TyVar
                  , openAlphaTyVar, openBetaTyVar
                  , body, x'] $
           Var body `App` Var x
@@ -1196,7 +1197,7 @@ runRWId = pcMiscPrelId runRWName ty info
     arg_ty  = stateRW `mkFunTy` ret_ty
     -- (State# RealWorld -> (# State# RealWorld, o #))
     --   -> (# State# RealWorld, o #)
-    ty      = mkSpecForAllTys [levity1TyVar, openAlphaTyVar] $
+    ty      = mkSpecForAllTys [runtimeRep1TyVar, openAlphaTyVar] $
               arg_ty `mkFunTy` ret_ty
 
 --------------------------------------------------------------------------------
@@ -1375,7 +1376,7 @@ no further floating will occur. This allows us to safely inline things like
 While the definition of @GHC.Magic.runRW#@, we override its type in @MkId@
 to be open-kinded,
 
-    runRW# :: forall (lev :: Levity). (o :: TYPE lev)
+    runRW# :: forall (r1 :: RuntimeRep). (o :: TYPE r)
            => (State# RealWorld -> (# State# RealWorld, o #))
                               -> (# State# RealWorld, o #)
 

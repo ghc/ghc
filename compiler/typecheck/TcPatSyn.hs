@@ -19,7 +19,7 @@ import TcRnMonad
 import TcEnv
 import TcMType
 import TysPrim
-import TysWiredIn  ( levityTy )
+import TysWiredIn  ( runtimeRepTy )
 import Name
 import SrcLoc
 import PatSyn
@@ -463,13 +463,13 @@ tcPatSynMatcher has_sig (L loc name) lpat
                 (univ_tvs, req_theta, req_ev_binds, req_dicts)
                 (ex_tvs, ex_tys, prov_theta, prov_dicts)
                 (args, arg_tys) pat_ty
-  = do { lev_uniq <- newUnique
-       ; tv_uniq  <- newUnique
-       ; let lev_name = mkInternalName lev_uniq (mkTyVarOcc "rlev") loc
+  = do { rr_uniq <- newUnique
+       ; tv_uniq <- newUnique
+       ; let rr_name  = mkInternalName rr_uniq (mkTyVarOcc "rep") loc
              tv_name  = mkInternalName tv_uniq (mkTyVarOcc "r") loc
-             lev_tv   = mkTcTyVar lev_name levityTy   (SkolemTv False)
-             lev      = mkTyVarTy lev_tv
-             res_tv   = mkTcTyVar tv_name  (tYPE lev) (SkolemTv False)
+             rr_tv    = mkTcTyVar rr_name runtimeRepTy (SkolemTv False)
+             rr       = mkTyVarTy rr_tv
+             res_tv   = mkTcTyVar tv_name  (tYPE rr) (SkolemTv False)
              is_unlifted = null args && null prov_dicts
              res_ty = mkTyVarTy res_tv
              (cont_args, cont_arg_tys)
@@ -487,7 +487,7 @@ tcPatSynMatcher has_sig (L loc name) lpat
        ; fail         <- newSysLocalId (fsLit "fail")  fail_ty
 
        ; let matcher_tau   = mkFunTys [pat_ty, cont_ty, fail_ty] res_ty
-             matcher_sigma = mkInvSigmaTy (lev_tv:res_tv:univ_tvs) req_theta matcher_tau
+             matcher_sigma = mkInvSigmaTy (rr_tv:res_tv:univ_tvs) req_theta matcher_tau
              matcher_id    = mkExportedVanillaId matcher_name matcher_sigma
                              -- See Note [Exported LocalIds] in Id
 
@@ -517,7 +517,7 @@ tcPatSynMatcher has_sig (L loc name) lpat
                        , mg_res_ty = res_ty
                        , mg_origin = Generated
                        }
-             match = mkMatch [] (mkHsLams (lev_tv:res_tv:univ_tvs) req_dicts body')
+             match = mkMatch [] (mkHsLams (rr_tv:res_tv:univ_tvs) req_dicts body')
                              (noLoc EmptyLocalBinds)
              mg = MG{ mg_alts = L (getLoc match) [match]
                     , mg_arg_tys = []

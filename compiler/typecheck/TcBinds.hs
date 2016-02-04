@@ -963,7 +963,7 @@ recoveryCode binder_names sig_fn
       = mkLocalId name forall_a_a
 
 forall_a_a :: TcType
-forall_a_a = mkSpecForAllTys [levity1TyVar, openAlphaTyVar] openAlphaTy
+forall_a_a = mkSpecForAllTys [runtimeRep1TyVar, openAlphaTyVar] openAlphaTy
 
 {- *********************************************************************
 *                                                                      *

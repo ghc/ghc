@@ -2027,7 +2027,7 @@ onlyNamedBndrsApplied tc ks
  = all isNamedBinder used_bndrs &&
    not (any isNamedBinder leftover_bndrs)
  where
-   (bndrs, _)                   = splitPiTys (tyConKind tc)
+   bndrs                        = tyConBinders tc
    (used_bndrs, leftover_bndrs) = splitAtList ks bndrs
 
 doTyApp :: Class -> Type -> Type -> KindOrType -> TcS LookupInstResult

@@ -1,40 +1,31 @@
 
-ClosedFam3.hs-boot:5:1:
+ClosedFam3.hs-boot:5:1: error:
     Type constructor ‘Foo’ has conflicting definitions in the module
     and its hs-boot file
-    Main module: type family Foo a
-                   Kind: * -> *
+    Main module: type family Foo a :: *
                    where
-                     Foo Int = Bool
-                     Foo Double = Char
-    Boot file:   type family Foo a
-                   Kind: * -> *
-                   where
-                     Foo Int = Bool
+                       Foo Int = Bool
+                       Foo Double = Char
+    Boot file:   type family Foo a :: *
+                   where Foo Int = Bool
 
-ClosedFam3.hs-boot:8:1:
+ClosedFam3.hs-boot:8:1: error:
     Type constructor ‘Bar’ has conflicting definitions in the module
     and its hs-boot file
-    Main module: type family Bar a
-                   Kind: * -> *
+    Main module: type family Bar a :: *
                    where
-                     Bar Int = Bool
-                     Bar Double = Double
-    Boot file:   type family Bar a
-                   Kind: * -> *
+                       Bar Int = Bool
+                       Bar Double = Double
+    Boot file:   type family Bar a :: *
                    where
-                     Bar Int = Bool
-                     Bar Double = Char
+                       Bar Int = Bool
+                       Bar Double = Char
 
-ClosedFam3.hs-boot:12:1:
+ClosedFam3.hs-boot:12:1: error:
     Type constructor ‘Baz’ has conflicting definitions in the module
     and its hs-boot file
-    Main module: type family Baz a
-                   Kind: * -> *
-                   where
-                     Baz Int = Bool
-    Boot file:   type family Baz (a :: k)
-                   Kind: forall k1. k1 -> *
-                   where
-                     Baz * Int = Bool
+    Main module: type family Baz a :: *
+                   where Baz Int = Bool
+    Boot file:   type family Baz (a :: k) :: *
+                   where Baz * Int = Bool
     The types have different kinds

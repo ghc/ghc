@@ -22,7 +22,7 @@ module TcType (
   -- Types
   TcType, TcSigmaType, TcRhoType, TcTauType, TcPredType, TcThetaType,
   TcTyVar, TcTyVarSet, TcDTyVarSet, TcTyCoVarSet, TcDTyCoVarSet,
-  TcKind, TcCoVar, TcTyCoVar, TcTyBinder,
+  TcKind, TcCoVar, TcTyCoVar, TcTyBinder, TcTyCon,
 
   ExpType(..), ExpSigmaType, ExpRhoType, mkCheckExpType,
 
@@ -121,7 +121,7 @@ module TcType (
   --------------------------------
   -- Rexported from Kind
   Kind, typeKind,
-  unliftedTypeKind, liftedTypeKind,
+  liftedTypeKind,
   constraintKind,
   isLiftedTypeKind, isUnliftedTypeKind, classifiesTypeWithValues,
 
@@ -140,7 +140,7 @@ module TcType (
   mkClassPred,
   isDictLikeTy,
   tcSplitDFunTy, tcSplitDFunHead, tcSplitMethodTy,
-  isLevityVar, isLevityPolymorphic, isLevityPolymorphic_maybe,
+  isRuntimeRepVar, isRuntimeRepPolymorphic,
   isVisibleBinder, isInvisibleBinder,
 
   -- Type substitutions
@@ -269,6 +269,7 @@ type TcTyCoVar = Var    -- Either a TcTyVar or a CoVar
         -- a cannot occur inside a MutTyVar in T; that is,
         -- T is "flattened" before quantifying over a
 type TcTyBinder = TyBinder
+type TcTyCon = TyCon   -- these can be the TcTyCon constructor
 
 -- These types do not have boxy type variables in them
 type TcPredType     = PredType
@@ -1375,9 +1376,8 @@ tc_eq_type view_fun orig_ty1 orig_ty2 = go Visible orig_env orig_ty1 orig_ty2
        -- the repeat Visible is necessary because tycons can legitimately
        -- be oversaturated
       where
-        k          = tyConKind tc
-        (bndrs, _) = splitPiTys k
-        viss       = map binderVisibility bndrs
+        bndrs = tyConBinders tc
+        viss  = map binderVisibility bndrs
 
     check :: VisibilityFlag -> Bool -> Maybe VisibilityFlag
     check _   True  = Nothing

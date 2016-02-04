@@ -12,7 +12,6 @@ TYPE SIGNATURES
   foo :: Sing 'A
 TYPE CONSTRUCTORS
   data MyKind = A | B
-    Kind: *
   data family Sing (a :: k)
 COERCION AXIOMS
   axiom DataFamilyInstanceLHS.D:R:SingMyKind_0 ::

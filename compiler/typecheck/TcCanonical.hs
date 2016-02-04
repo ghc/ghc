@@ -1134,7 +1134,7 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
 
       -- the following makes a better distinction between "kind" and "type"
       -- in error messages
-    (bndrs, _) = splitPiTys (tyConKind tc)
+    bndrs      = tyConBinders tc
     kind_loc   = toKindLoc loc
     is_kinds   = map isNamedBinder bndrs
     new_locs | Just KindLevel <- ctLocTypeOrKind_maybe loc
@@ -1962,10 +1962,8 @@ unify_derived loc role    orig_ty1 orig_ty2
                 Nothing   -> bale_out }
     go _ _ = bale_out
 
-     -- no point in having *boxed* deriveds.
     bale_out = emitNewDerivedEq loc role orig_ty1 orig_ty2
 
 maybeSym :: SwapFlag -> TcCoercion -> TcCoercion
 maybeSym IsSwapped  co = mkTcSymCo co
 maybeSym NotSwapped co = co
-

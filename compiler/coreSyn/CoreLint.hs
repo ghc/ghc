@@ -988,8 +988,8 @@ lintAndScopeId id linterF
                 (text "Non-local Id binder" <+> ppr id)
                 -- See Note [Checking for global Ids]
        ; (ty, k) <- lintInTy (idType id)
-       ; lintL (not (isLevityPolymorphic k))
-           (text "Levity polymorphic binder:" <+>
+       ; lintL (not (isRuntimeRepPolymorphic k))
+           (text "RuntimeRep-polymorphic binder:" <+>
                  (ppr id <+> dcolon <+> parens (ppr ty <+> dcolon <+> ppr k)))
        ; let id' = setIdType id ty
        ; addInScopeVar id' $ (linterF id') }

@@ -929,9 +929,9 @@ Note [Flavours with roles]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 The system described in Note [inert_eqs: the inert equalities]
 discusses an abstract
-set of flavours. In GHC, flavours have three components: the flavour proper,
-taken from {Wanted, Derived, Given}; the equality relation (often called
-role), taken from {NomEq, ReprEq}; and the levity, taken from {Lifted, Unlifted}.
+set of flavours. In GHC, flavours have two components: the flavour proper,
+taken from {Wanted, Derived, Given} and the equality relation (often called
+role), taken from {NomEq, ReprEq}.
 When substituting w.r.t. the inert set,
 as described in Note [inert_eqs: the inert equalities],
 we must be careful to respect all components of a flavour.

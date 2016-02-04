@@ -684,12 +684,13 @@ tcDataFamInstDecl mb_clsinfo
                                              axiom_name eta_tvs [] fam_tc eta_pats
                                              (mkTyConApp rep_tc (mkTyVarTys eta_tvs))
                     parent = DataFamInstTyCon axiom fam_tc pats'
-                    rep_tc_kind = mkPiTypesPreferFunTy full_tvs liftedTypeKind
+                    ty_binders = mkTyBindersPreferAnon full_tvs liftedTypeKind
+
 
                       -- NB: Use the full_tvs from the pats. See bullet toward
                       -- the end of Note [Data type families] in TyCon
                     rep_tc   = mkAlgTyCon rep_tc_name
-                                          rep_tc_kind
+                                          ty_binders liftedTypeKind
                                           full_tvs
                                           (map (const Nominal) full_tvs)
                                           (fmap unLoc cType) stupid_theta
@@ -1275,7 +1276,7 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
         error_rhs dflags = L inst_loc $ HsApp error_fun (error_msg dflags)
         error_fun    = L inst_loc $
                        wrapId (mkWpTyApps
-                                [ getLevity "tcInstanceMethods.tc_default" meth_tau
+                                [ getRuntimeRep "tcInstanceMethods.tc_default" meth_tau
                                 , meth_tau])
                               nO_METHOD_BINDING_ERROR_ID
         error_msg dflags = L inst_loc (HsLit (HsStringPrim ""

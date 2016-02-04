@@ -14,6 +14,8 @@ module Util (
         zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
         zipLazy, stretchZipWith, zipWithAndUnzip,
 
+        zipWithLazy, zipWith3Lazy,
+
         filterByList, filterByLists, partitionByList,
 
         unzipWith,
@@ -321,6 +323,20 @@ zipWith4Equal msg _ _  _  _  _  =  panic ("zipWith4Equal: unequal lists:"++msg)
 zipLazy :: [a] -> [b] -> [(a,b)]
 zipLazy []     _       = []
 zipLazy (x:xs) ~(y:ys) = (x,y) : zipLazy xs ys
+
+-- | 'zipWithLazy' is like 'zipWith' but is lazy in the second list.
+-- The length of the output is always the same as the length of the first
+-- list.
+zipWithLazy :: (a -> b -> c) -> [a] -> [b] -> [c]
+zipWithLazy _ []     _       = []
+zipWithLazy f (a:as) ~(b:bs) = f a b : zipWithLazy f as bs
+
+-- | 'zipWith3Lazy' is like 'zipWith3' but is lazy in the second and third lists.
+-- The length of the output is always the same as the length of the first
+-- list.
+zipWith3Lazy :: (a -> b -> c -> d) -> [a] -> [b] -> [c] -> [d]
+zipWith3Lazy _ []     _       _       = []
+zipWith3Lazy f (a:as) ~(b:bs) ~(c:cs) = f a b c : zipWith3Lazy f as bs cs
 
 -- | 'filterByList' takes a list of Bools and a list of some elements and
 -- filters out these elements for which the corresponding value in the list of

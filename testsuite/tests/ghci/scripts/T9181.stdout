@@ -1,23 +1,23 @@
 type family (GHC.TypeLits.*) (a :: GHC.Types.Nat)
                              (b :: GHC.Types.Nat)
-  Kind: GHC.Types.Nat -> GHC.Types.Nat -> GHC.Types.Nat
+            :: GHC.Types.Nat
 type family (GHC.TypeLits.+) (a :: GHC.Types.Nat)
                              (b :: GHC.Types.Nat)
-  Kind: GHC.Types.Nat -> GHC.Types.Nat -> GHC.Types.Nat
+            :: GHC.Types.Nat
 type family (GHC.TypeLits.-) (a :: GHC.Types.Nat)
                              (b :: GHC.Types.Nat)
-  Kind: GHC.Types.Nat -> GHC.Types.Nat -> GHC.Types.Nat
+            :: GHC.Types.Nat
 type (GHC.TypeLits.<=) (x :: GHC.Types.Nat) (y :: GHC.Types.Nat) =
-  (x GHC.TypeLits.<=? y) ~ 'True
+  (x GHC.TypeLits.<=? y) ~ 'True :: Constraint
 type family (GHC.TypeLits.<=?) (a :: GHC.Types.Nat)
                                (b :: GHC.Types.Nat)
-  Kind: GHC.Types.Nat -> GHC.Types.Nat -> Bool
+            :: Bool
 type family GHC.TypeLits.CmpNat (a :: GHC.Types.Nat)
                                 (b :: GHC.Types.Nat)
-  Kind: GHC.Types.Nat -> GHC.Types.Nat -> Ordering
+            :: Ordering
 type family GHC.TypeLits.CmpSymbol (a :: GHC.Types.Symbol)
                                    (b :: GHC.Types.Symbol)
-  Kind: GHC.Types.Symbol -> GHC.Types.Symbol -> Ordering
+            :: Ordering
 data GHC.TypeLits.ErrorMessage where
   GHC.TypeLits.Text :: GHC.Types.Symbol -> GHC.TypeLits.ErrorMessage
   GHC.TypeLits.ShowType :: t -> GHC.TypeLits.ErrorMessage
@@ -38,10 +38,10 @@ data GHC.TypeLits.SomeSymbol where
   GHC.TypeLits.SomeSymbol :: GHC.TypeLits.KnownSymbol n =>
                              (Data.Proxy.Proxy n) -> GHC.TypeLits.SomeSymbol
 type family GHC.TypeLits.TypeError (a :: GHC.TypeLits.ErrorMessage)
-  Kind: forall b1. GHC.TypeLits.ErrorMessage -> b1
+            :: b
 type family (GHC.TypeLits.^) (a :: GHC.Types.Nat)
                              (b :: GHC.Types.Nat)
-  Kind: GHC.Types.Nat -> GHC.Types.Nat -> GHC.Types.Nat
+            :: GHC.Types.Nat
 GHC.TypeLits.natVal ::
   GHC.TypeLits.KnownNat n => proxy n -> Integer
 GHC.TypeLits.natVal' ::

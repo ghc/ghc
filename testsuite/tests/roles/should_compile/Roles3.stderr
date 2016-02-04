@@ -11,15 +11,13 @@ TYPE CONSTRUCTORS
     meth2 :: a ~ b => a -> b
     {-# MINIMAL meth2 #-}
   class C3 a b where
-    type family F3 b open
-      Kind: * -> *
+    type family F3 b :: * open
     meth3 :: a -> F3 b -> F3 b
     {-# MINIMAL meth3 #-}
   class C4 a b where
     meth4 :: a -> F4 b -> F4 b
     {-# MINIMAL meth4 #-}
-  type family F4 a open
-    Kind: * -> *
+  type family F4 a :: * open
   type Syn1 a = F4 a
   type Syn2 a = [a]
 COERCION AXIOMS

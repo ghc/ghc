@@ -5,4 +5,4 @@ module TypeSkolEscape where
 import GHC.Types
 import GHC.Exts
 
-type Bad = forall (v :: Levity) (a :: TYPE v). a
+type Bad = forall (v :: RuntimeRep) (a :: TYPE v). a
