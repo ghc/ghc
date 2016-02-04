@@ -279,6 +279,14 @@ Compiler
    warns in the case of unused term-level patterns. Both flags are implied by
    :ghc-flag:`-W`.
 
+-  Added the :ghc-flag:`-fmax-pmcheck-iterations` to control how many times
+   the pattern match checker iterates. Since coverage checking is exponential
+   in the general case, setting a default number of iterations prevents memory
+   and performance blowups. By default, the number of iterations is set to
+   10000000 but it can be set to ``n`` with: ``-fmax-pmcheck-iterations=n``.
+   If the set number of iterations is exceeded, an informative warning is
+   issued.
+
 -  :ghc-flag:`-this-package-key` has been renamed again (hopefully for the last time!)
    to :ghc-flag:`-this-unit-id`.  The renaming was motivated by the fact that
    the identifier you pass to GHC here doesn't have much to do with packages:
