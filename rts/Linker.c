@@ -3428,7 +3428,7 @@ lookupSymbolInDLLs ( UChar *lbl )
                 ret->next = indirects;
                 indirects = ret;
                 IF_DEBUG(linker,
-                  debugBelch("warning: %s from %S is linked instead of %s",
+                  debugBelch("warning: %s from %S is linked instead of %s\n",
                              (char*)(lbl+6+STRIP_LEADING_UNDERSCORE), o_dll->name, (char*)lbl));
                 return (void*) & ret->addr;
                }
@@ -4161,7 +4161,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
       }
    }
 
-   IF_DEBUG(linker, debugBelch("completed %" PATH_FMT, oc->fileName));
+   IF_DEBUG(linker, debugBelch("completed %" PATH_FMT "\n", oc->fileName));
    return 1;
 }
 
@@ -4203,6 +4203,9 @@ ocRunInit_PEi386 ( ObjectCode *oc )
     getProgArgv(&argc, &argv);
     getProgEnvv(&envc, &envv);
 
+    /* This part is just looking for .ctors section. This can be optimized
+       and should for function sections. The index of the .ctor section can
+       be saved in ObjectCode from ocGetNames so this loop isn't needed. */
     for (i = 0; i < hdr->NumberOfSections; i++) {
         COFF_section* sectab_i
             = (COFF_section*)
@@ -4212,6 +4215,9 @@ ocRunInit_PEi386 ( ObjectCode *oc )
             UChar *init_startC = (UChar*)(oc->image) + sectab_i->PointerToRawData;
             init_t *init_start, *init_end, *init;
             init_start = (init_t*)init_startC;
+            /* The first element is a dummy entry, we shouldn't jump to it.
+               See https://gcc.gnu.org/onlinedocs/gccint/Initialization.html */
+            init_start++;
             init_end = (init_t*)(init_startC + sectab_i->SizeOfRawData);
             // ctors are run *backwards*!
             for (init = init_end - 1; init >= init_start; init--) {
@@ -5805,6 +5811,9 @@ static int ocRunInit_ELF( ObjectCode *oc )
        && 0 == memcmp(".ctors", sh_strtab + shdr[i].sh_name, 6)) {
           char *init_startC = oc->sections[i].start;
          init_start = (init_t*)init_startC;
+         /* The first element is a dummy entry, we shouldn't jump to it.
+         See https://gcc.gnu.org/onlinedocs/gccint/Initialization.html */
+         init_start++;
          init_end = (init_t*)(init_startC + shdr[i].sh_size);
          // ctors run in reverse
          for (init = init_end - 1; init >= init_start; init--) {
