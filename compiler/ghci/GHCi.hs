@@ -81,7 +81,7 @@ import GHC.IO.Handle.FD (fdToHandle)
 import System.Posix as Posix
 #endif
 import System.Process
-import GHC.Conc
+import GHC.Conc (getNumProcessors, pseq, par)
 
 {- Note [Remote GHCi]
 
