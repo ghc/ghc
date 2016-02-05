@@ -934,9 +934,18 @@ runLink dflags args = do
   let (p,args0) = pgm_l dflags
       args1     = map Option (getOpts dflags opt_l)
       args2     = args0 ++ linkargs ++ args1 ++ args
-  mb_env <- getGccEnv args2
-  runSomethingResponseFile dflags ld_filter "Linker" p args2 mb_env
-  where
+      args3     = argFixup args2 []
+  mb_env <- getGccEnv args3
+  runSomethingResponseFile dflags ld_filter "Linker" p args3 mb_env
+  where    
+    testLib lib = "-l" `isPrefixOf` lib || ".a" `isSuffixOf` lib
+    argFixup []                        r = [] ++ r
+    argFixup (o@(Option       opt):xs) r = if testLib opt
+                                              then argFixup xs (r ++ [o])
+                                              else o:argFixup xs r
+    argFixup (o@(FileOption _ opt):xs) r = if testLib opt
+                                              then argFixup xs (r ++ [o])
+                                              else o:argFixup xs r
     ld_filter = case (platformOS (targetPlatform dflags)) of
                   OSSolaris2 -> sunos_ld_filter
                   _ -> id

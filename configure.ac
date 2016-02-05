@@ -1007,9 +1007,6 @@ AC_COMPILE_IFELSE(
    AC_DEFINE([CC_SUPPORTS_TLS],[0],[Define to 1 if __thread is supported])
   ])
 
-
-AC_CHECK_FUNCS(__mingw_vfprintf)
-
 dnl large address space support (see includes/rts/storage/MBlock.h)
 dnl
 dnl Darwin has vm_allocate/vm_protect
