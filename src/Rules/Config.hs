@@ -1,5 +1,7 @@
 module Rules.Config (configRules) where
 
+import qualified System.Info
+
 import Base
 import CmdLineFlag
 import Rules.Actions
@@ -14,7 +16,11 @@ configRules = do
         case cmdConfigure of
             RunConfigure args -> do
                 need [ settings <.> "in", cfgH <.> "in" ]
-                runConfigure "." [] [args]
+                -- We cannot use windowsHost here due to a cyclic dependency
+                let defaultArgs = if System.Info.os == "mingw32"
+                                  then [ "--enable-tarballs-autodownload" ]
+                                  else []
+                runConfigure "." [] $ defaultArgs ++ [args]
             SkipConfigure     -> unlessM (doesFileExist cfg) $
                 putError $ "Configuration file " ++ cfg ++ " is missing.\n"
                     ++ "Run the configure script either manually or via the "
