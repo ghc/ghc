@@ -1664,7 +1664,6 @@ static void removeOcSymbols (ObjectCode *oc)
     for (i = 0; i < oc->n_symbols; i++) {
         if (oc->symbols[i].name != NULL) {
             ghciRemoveSymbolTable(symhash, oc->symbols[i].name, oc);
-            stgFree(oc->symbols[i].name);
         }
     }
 
