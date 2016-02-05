@@ -98,7 +98,8 @@ fixFile file f = do
 runConfigure :: FilePath -> [CmdOption] -> [String] -> Action ()
 runConfigure dir opts args = do
     need [dir -/- "configure"]
-    let note = if null args || args == [""] then "" else " (" ++ intercalate ", " args ++ ")"
+    let args' = filter (not . null) args
+        note  = if null args' then "" else " (" ++ intercalate ", " args' ++ ")"
     if dir == "."
     then do
         putBuild $ "| Run configure" ++ note ++ "..."
