@@ -75,24 +75,24 @@ experiment following the Haddock comments.
 
 #### Clean and full rebuild
 
-* `shake-build/build.sh clean` removes all build artefacts. Note, we are working
-towards a complete separation of GHC sources and build artefacts: [#113][build-artefacts-issue].
+* `build clean` removes all build artefacts. Note, we are working towards a
+complete separation of GHC sources and build artefacts: [#113][build-artefacts-issue].
 
-* `shake-build/build.sh -B` forces Shake to rerun all rules, even if results of
-the previous build are still in the GHC tree. 
+* `build -B` forces Shake to rerun all rules, even if results of the previous build
+are still in the GHC tree. 
 
 #### Testing
 
-* `shake-build/build.sh validate` runs GHC tests by simply executing `make fast` in `testsuite/tests`
-directory. This can be used instead of `sh validate --fast --no-clean` in the existing build system.
-Note: this will rebuild Stage2 GHC, `ghc-pkg` and `hpc` if they are out of date.
+* `build validate` runs GHC tests by simply executing `make fast` in `testsuite/tests`
+directory. This can be used instead of `sh validate --fast --no-clean` in the existing
+build system. Note: this will rebuild Stage2 GHC, `ghc-pkg` and `hpc` if they are out of date.
 
-* `shake-build/build.sh test` runs GHC tests by calling the `testsuite/driver/runtests.py` python
-script with appropriate flags. The current implementation is limited and cannot replace the
-`validate` script (see [#187][validation-issue]).
+* `build test` runs GHC tests by calling the `testsuite/driver/runtests.py` python
+script with appropriate flags. The current implementation is limited and cannot
+replace the `validate` script (see [#187][validation-issue]).
 
-* `shake-build/build.sh selftest` runs tests of the build system. Current test
-coverage is close to zero (see [#197][test-issue]).
+* `build selftest` runs tests of the build system. Current test coverage is close to
+zero (see [#197][test-issue]).
 
 Current limitations
 -------------------
