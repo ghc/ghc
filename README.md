@@ -27,29 +27,26 @@ follow these steps:
 * This build system is written in Haskell (obviously) and depends on the following Haskell
 packages, which need to be installed: `ansi-terminal`, `mtl`, `shake`, `QuickCheck`.
 
-* Get the sources. It is important for the build system to be in the `shake-build` directory of the GHC source tree:
+* Get the sources and run standard configuration scripts. It is important for the build
+system to be in the `shake-build` directory of the GHC source tree:
 
     ```bash
     git clone --recursive git://git.haskell.org/ghc.git
     cd ghc
     git clone git://github.com/snowleopard/shaking-up-ghc shake-build
+    ./boot
+    ./configure # On Windows run ./configure --enable-tarballs-autodownload
     ```
-* Start your first build (you might want to enable parallelism with `-j`):
-
-    ```bash
-    shake-build/build.sh --configure
-    ```
-On Windows, use `build.bat` instead and pass an extra flag to configure (also see [building on Windows][ghc-windows-quick-build]):
-    ```bash
-    shake-build/build.bat --configure=--enable-tarballs-autodownload
-    ```
-If you are interested in building in a Cabal sandbox or using Stack, have a look at `shake-build/build.cabal.sh` and `shake-build/build.stack.sh` scripts.
+    
+* Build GHC using `shake-build/build.sh` or `shake-build/build.bat` (on Windows) instead
+of `make`. You might want to enable parallelism with `-j`. We will further refer to the
+build script simply as `build`. If you are interested in building in a Cabal sandbox
+or using Stack, have a look at `build.cabal.sh` and `build.stack.sh` scripts.
 
 Using the build system
 ----------------------
-Once your first build is successful, simply run `shake-build/build.sh` or `shake-build/build.bat`
-to rebuild (you no longer need to use the `--configure` flag). Most build artefacts are placed
-into `.build` and `inplace` directories ([#113][build-artefacts-issue]).
+Once your first build is successful, simply run `build` to rebuild. Most build artefacts
+are placed into `.build` and `inplace` directories ([#113][build-artefacts-issue]).
 
 #### Command line flags
 
@@ -58,7 +55,10 @@ currently supports several others:
 * `--configure[=ARGS]`: run the `configure` script forwarding `ARGS` as command line
 arguments; also run the `boot` script to create the `configure` script if necessary.
 You do not have to use this functionality of the new build system; feel free to run
-`boot` and `configure` scripts manually, as you do when using `make`.
+`boot` and `configure` scripts manually, as you do when using `make`. Note: on Windows 
+we automatically add flag `--enable-tarballs-autodownload` to `ARGS`, so you 
+don't have to do it manually. Beware, this uses network I/O which may sometimes be
+undesirable.
 * `--flavour=FLAVOUR`: choose a build flavour. Two settings are currently supported:
 `default` and `quick` (adds `-O0` flag to all GHC invocations speeding up builds by 3x).
 * `--progress-info=STYLE`: choose how build progress info is printed. There are four
