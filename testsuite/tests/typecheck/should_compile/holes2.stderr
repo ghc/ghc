@@ -8,7 +8,7 @@ holes2.hs:3:5: warning:
         instance Show Integer -- Defined in ‘GHC.Show’
         instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
         ...plus 22 others
-        ...plus three instance involving out-of-scope typess
+        ...plus four instance involving out-of-scope typess
         (use -fprint-potential-instances to see them all)
     • In the expression: show _
       In an equation for ‘f’: f = show _
