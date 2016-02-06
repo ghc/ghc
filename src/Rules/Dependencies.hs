@@ -10,7 +10,7 @@ import Development.Shake.Util (parseMakefile)
 
 -- TODO: simplify handling of AutoApply.cmm
 buildPackageDependencies :: Resources -> PartialTarget -> Rules ()
-buildPackageDependencies _ target @ (PartialTarget stage pkg) =
+buildPackageDependencies rs target @ (PartialTarget stage pkg) =
     let path      = targetPath stage pkg
         buildPath = path -/- "build"
         dropBuild = (pkgPath pkg ++) . drop (length buildPath)
@@ -29,7 +29,8 @@ buildPackageDependencies _ target @ (PartialTarget stage pkg) =
             need srcs
             if srcs == []
             then writeFileChanged out ""
-            else build $ fullTarget target (GhcM stage) srcs [out]
+            else buildWithResources [(resPackageDb rs, 1)] $
+                fullTarget target (GhcM stage) srcs [out]
             removeFileIfExists $ out <.> "bak"
 
         -- TODO: don't accumulate *.deps into .dependencies
