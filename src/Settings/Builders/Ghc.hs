@@ -103,9 +103,13 @@ wayGhcArgs = do
 -- TODO: Improve handling of "-hide-all-packages"
 packageGhcArgs :: Args
 packageGhcArgs = do
+    stage     <- getStage
     pkg       <- getPackage
     compId    <- getPkgData ComponentId
     pkgDepIds <- getPkgDataList DepIds
+    lift . when (isLibrary pkg) $ do
+        conf <- pkgConfFile stage pkg
+        need [conf]
     mconcat
         [ arg "-hide-all-packages"
         , arg "-no-user-package-db"
