@@ -8,7 +8,7 @@ import Rules.Resources
 import Settings
 
 compilePackage :: Resources -> PartialTarget -> Rules ()
-compilePackage _ target @ (PartialTarget stage pkg) = do
+compilePackage rs target @ (PartialTarget stage pkg) = do
     let buildPath = targetPath stage pkg -/- "build"
 
     matchBuildResult buildPath "hi" ?> \hi ->
@@ -17,7 +17,8 @@ compilePackage _ target @ (PartialTarget stage pkg) = do
             let way = detectWay hi
             (src, deps) <- dependencies buildPath $ hi -<.> osuf way
             need $ src : deps
-            build $ fullTargetWithWay target (Ghc stage) way [src] [hi]
+            buildWithResources [(resPackageDb rs, 1)] $
+                fullTargetWithWay target (Ghc stage) way [src] [hi]
         else need [ hi -<.> osuf (detectWay hi) ]
 
     matchBuildResult buildPath "hi-boot" ?> \hiboot ->
@@ -26,7 +27,8 @@ compilePackage _ target @ (PartialTarget stage pkg) = do
             let way = detectWay hiboot
             (src, deps) <- dependencies buildPath $ hiboot -<.> obootsuf way
             need $ src : deps
-            build $ fullTargetWithWay target (Ghc stage) way [src] [hiboot]
+            buildWithResources [(resPackageDb rs, 1)] $
+                fullTargetWithWay target (Ghc stage) way [src] [hiboot]
         else need [ hiboot -<.> obootsuf (detectWay hiboot) ]
 
     -- TODO: add dependencies for #include of .h and .hs-incl files (gcc -MM?)
@@ -41,7 +43,8 @@ compilePackage _ target @ (PartialTarget stage pkg) = do
             if compileInterfaceFilesSeparately && "//*.hs" ?== src && not ("//HpcParser.*" ?== src)
             then need $ (obj -<.> hisuf (detectWay obj)) : src : deps
             else need $ src : deps
-            build $ fullTargetWithWay target (Ghc stage) way [src] [obj]
+            buildWithResources [(resPackageDb rs, 1)] $
+                fullTargetWithWay target (Ghc stage) way [src] [obj]
 
     -- TODO: get rid of these special cases
     matchBuildResult buildPath "o-boot" ?> \obj -> do
@@ -50,4 +53,5 @@ compilePackage _ target @ (PartialTarget stage pkg) = do
         if compileInterfaceFilesSeparately
         then need $ (obj -<.> hibootsuf (detectWay obj)) : src : deps
         else need $ src : deps
-        build $ fullTargetWithWay target (Ghc stage) way [src] [obj]
+        buildWithResources [(resPackageDb rs, 1)] $
+            fullTargetWithWay target (Ghc stage) way [src] [obj]

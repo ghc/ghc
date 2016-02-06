@@ -12,11 +12,10 @@ import Rules.Libffi
 import Rules.Resources
 import Settings
 import Settings.Builders.Common
-import Settings.Packages.Rts
 
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
 buildPackageData :: Resources -> PartialTarget -> Rules ()
-buildPackageData rs target @ (PartialTarget stage pkg) = do
+buildPackageData _ target @ (PartialTarget stage pkg) = do
     let cabalFile = pkgCabalFile pkg
         configure = pkgPath pkg -/- "configure"
         dataFile  = pkgDataFile stage pkg
@@ -34,8 +33,7 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
         deps <- packageDeps pkg
         pkgs <- interpretPartial target getPackages
         let depPkgs = matchPackageNames (sort pkgs) deps
-        depConfs <- traverse (pkgConfFile stage) depPkgs
-        orderOnly depConfs
+        need =<< traverse (pkgConfFile stage) depPkgs
 
         -- TODO: get rid of this, see #113
         let inTreeMk = oldPath -/- takeFileName dataFile
@@ -125,24 +123,6 @@ buildPackageData rs target @ (PartialTarget stage pkg) = do
                         , "COMPONENT_ID = rts" ]
                 writeFileChanged mk contents
                 putSuccess $ "| Successfully generated '" ++ mk ++ "'."
-
-                need [rtsConf]
-                buildWithResources [(resGhcPkg rs, 1)] $
-                    fullTarget target (GhcPkg stage) [rtsConf] []
-
-            rtsConf %> \_ -> do
-                orderOnly $ generatedDependencies stage pkg
-                need [ rtsConfIn ]
-                build $ fullTarget target HsCpp [rtsConfIn] [rtsConf]
-
-                let fixRtsConf = unlines
-                               . map
-                               ( replace "\"\"" ""
-                               . replace "rts/dist/build" rtsBuildPath )
-                               . filter (not . null)
-                               . lines
-
-                fixFile rtsConf fixRtsConf
 
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:
 -- 1) Drop lines containing '$'

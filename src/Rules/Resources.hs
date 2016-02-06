@@ -1,12 +1,17 @@
-module Rules.Resources (resourceRules, Resources (..)) where
+module Rules.Resources (resourceRules, Resources (..), resPackageDbLimit) where
 
 import Base
 
 data Resources = Resources
     {
-        resGhcPkg :: Resource
+        resPackageDb :: Resource
     }
 
--- We cannot register multiple packages in parallel:
+-- We cannot register multiple packages in parallel. Also we cannot run GHC
+-- when the package database is being mutated by "ghc-pkg". This is a classic
+-- concurrent read exclusive write (CREW) conflict.
 resourceRules :: Rules Resources
-resourceRules = Resources <$> newResource "ghc-pkg" 1
+resourceRules = Resources <$> newResource "package-db" resPackageDbLimit
+
+resPackageDbLimit :: Int
+resPackageDbLimit = 1000
