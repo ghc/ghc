@@ -8,7 +8,7 @@ overloadedlistsfail01.hs:5:8: error:
         instance Show Integer -- Defined in ‘GHC.Show’
         instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
         ...plus 22 others
-        ...plus four instance involving out-of-scope typess
+        ...plus five instance involving out-of-scope typess
         (use -fprint-potential-instances to see them all)
     • In the expression: print [1]
       In an equation for ‘main’: main = print [1]

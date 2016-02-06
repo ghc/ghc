@@ -52,6 +52,7 @@ module GHC.Show
 import GHC.Base
 import GHC.List ((!!), foldr1, break)
 import GHC.Num
+import GHC.Stack.Types
 
 -- | The @shows@ functions return a function that prepends the
 -- output 'String' to an existing 'String'.  This allows constant-time
@@ -203,6 +204,8 @@ instance Show TrName where
 
 instance Show Module where
   showsPrec _ (Module p m) = shows p . (':' :) . shows m
+
+deriving instance Show SrcLoc
 
 --------------------------------------------------------------
 -- Show instances for the first few tuple
