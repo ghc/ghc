@@ -84,7 +84,7 @@ laxDependencies :: Bool
 laxDependencies = False
 
 buildHaddock :: Predicate
-buildHaddock = return False -- FIXME: should be return True, see #98
+buildHaddock = return cmdBuildHaddock
 
 -- | Set to True to print full command lines during the build process. Note,
 -- this is a Predicate, hence you can enable verbose output for a chosen package

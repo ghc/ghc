@@ -1,6 +1,6 @@
 module CmdLineFlag (
-    putCmdLineFlags, cmdFlags, cmdConfigure, Configure (..), cmdFlavour,
-    Flavour (..), cmdProgressInfo, ProgressInfo (..), cmdSplitObjects
+    putCmdLineFlags, cmdFlags, cmdBuildHaddock, cmdConfigure, Configure (..),
+    cmdFlavour, Flavour (..), cmdProgressInfo, ProgressInfo (..), cmdSplitObjects
     ) where
 
 import Data.List.Extra
@@ -18,7 +18,8 @@ data Flavour      = Default | Quick deriving (Eq, Show)
 -- command line. These flags are not tracked, that is they do not force any
 -- build rules to be rurun.
 data Untracked = Untracked
-    { configure    :: Configure
+    { buildHaddock :: Bool
+    , configure    :: Configure
     , flavour      :: Flavour
     , progressInfo :: ProgressInfo
     , splitObjects :: Bool }
@@ -27,10 +28,14 @@ data Untracked = Untracked
 -- | Default values for 'CmdLineFlag.Untracked'.
 defaultUntracked :: Untracked
 defaultUntracked = Untracked
-    { configure    = SkipConfigure
+    { buildHaddock = False
+    , configure    = SkipConfigure
     , flavour      = Default
     , progressInfo = Normal
     , splitObjects = False }
+
+readBuildHaddock :: Either String (Untracked -> Untracked)
+readBuildHaddock = Right $ \flags -> flags { buildHaddock = True }
 
 readConfigure :: Maybe String -> Either String (Untracked -> Untracked)
 readConfigure ms =
@@ -75,6 +80,8 @@ cmdFlags =
       "Run configure with ARGS (also run boot if necessary)."
     , Option [] ["flavour"] (OptArg readFlavour "FLAVOUR")
       "Build flavour (Default or Quick)."
+    , Option [] ["haddock"] (NoArg readBuildHaddock)
+      "Generate Haddock documentation."
     , Option [] ["progress-info"] (OptArg readProgressInfo "STYLE")
       "Progress info style (None, Brief, Normal, or Unicorn)."
     , Option [] ["split-objects"] (NoArg readSplitObjects)
@@ -92,6 +99,9 @@ putCmdLineFlags flags = modifyIORef cmdLineFlags (\f -> foldl (flip id) f flags)
 {-# NOINLINE getCmdLineFlags #-}
 getCmdLineFlags :: Untracked
 getCmdLineFlags = unsafePerformIO $ readIORef cmdLineFlags
+
+cmdBuildHaddock :: Bool
+cmdBuildHaddock = buildHaddock getCmdLineFlags
 
 cmdConfigure :: Configure
 cmdConfigure = configure getCmdLineFlags
