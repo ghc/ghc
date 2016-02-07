@@ -127,7 +127,7 @@ statRhs :: Bool -> (Id, StgRhs) -> StatEnv
 statRhs top (_, StgRhsCon _ _ _)
   = countOne (ConstructorBinds top)
 
-statRhs top (_, StgRhsClosure _ _ fv u _ body)
+statRhs top (_, StgRhsClosure _ _ fv u _ _ body)
   = statExpr body                       `combineSE`
     countN FreeVariables (length fv)    `combineSE`
     countOne (
@@ -153,7 +153,7 @@ statExpr (StgConApp _ _)  = countOne ConstructorApps
 statExpr (StgOpApp _ _ _) = countOne PrimitiveApps
 statExpr (StgTick _ e)    = statExpr e
 
-statExpr (StgLetNoEscape binds body)
+statExpr (StgLetNoEscape _ _ binds body)
   = statBinding False{-not top-level-} binds    `combineSE`
     statExpr body                               `combineSE`
     countOne LetNoEscapes
@@ -162,7 +162,7 @@ statExpr (StgLet binds body)
   = statBinding False{-not top-level-} binds    `combineSE`
     statExpr body
 
-statExpr (StgCase expr _ _ alts)
+statExpr (StgCase expr _ _ _ _ _ alts)
   = statExpr expr       `combineSE`
     stat_alts alts      `combineSE`
     countOne StgCases

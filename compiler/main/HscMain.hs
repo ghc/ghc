@@ -1436,8 +1436,8 @@ myCoreToStg :: DynFlags -> Module -> CoreProgram
             -> IO ( [StgBinding] -- output program
                   , CollectedCCs) -- cost centre info (declared and used)
 myCoreToStg dflags this_mod prepd_binds = do
-    let stg_binds
-         = {-# SCC "Core2Stg" #-}
+    stg_binds
+        <- {-# SCC "Core2Stg" #-}
            coreToStg dflags this_mod prepd_binds
 
     (stg_binds2, cost_centre_info)
