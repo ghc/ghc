@@ -1204,32 +1204,6 @@ W_ gcThreadLiveBlocks (nat i, nat g)
     return blocks;
 }
 
-// Return an accurate count of the live data in the heap, excluding
-// generation 0.
-W_ calcLiveWords (void)
-{
-    nat g;
-    W_ live;
-
-    live = 0;
-    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        live += genLiveWords(&generations[g]);
-    }
-    return live;
-}
-
-W_ calcLiveBlocks (void)
-{
-    nat g;
-    W_ live;
-
-    live = 0;
-    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        live += genLiveBlocks(&generations[g]);
-    }
-    return live;
-}
-
 /* Determine which generation will be collected next, and approximate
  * the maximum amount of memory that will be required to do the GC,
  * taking into account data that will be copied, and the space needed

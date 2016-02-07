@@ -124,9 +124,6 @@ W_    gcThreadLiveBlocks (nat i, nat g);
 W_    genLiveWords  (generation *gen);
 W_    genLiveBlocks (generation *gen);
 
-W_    calcLiveBlocks (void);
-W_    calcLiveWords  (void);
-
 /* ----------------------------------------------------------------------------
    Storage manager internal APIs and globals
    ------------------------------------------------------------------------- */
