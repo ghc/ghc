@@ -39,6 +39,8 @@ Thumbs.db
 *.stderr-ws-32.normalised
 *.interp.stdout
 *.interp.stderr
+*.prof.normalised
+*.prof.sample.normalised
 *.run.stdout
 *.run.stderr
 
