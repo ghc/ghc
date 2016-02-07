@@ -23,6 +23,9 @@
 #include "win32/IOManager.h"
 #endif
 
+static void blockedThrowTo (Capability *cap,
+                            StgTSO *target, MessageThrowTo *msg);
+
 static void removeFromQueues(Capability *cap, StgTSO *tso);
 
 static void removeFromMVarBlockedQueue (StgTSO *tso);

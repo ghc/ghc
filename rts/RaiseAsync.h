@@ -16,9 +16,6 @@
 
 #include "BeginPrivate.h"
 
-void blockedThrowTo (Capability *cap,
-                     StgTSO *target, MessageThrowTo *msg);
-
 StgTSO* raiseAsync (Capability *cap,
                     StgTSO *tso,
                     StgClosure *exception,
