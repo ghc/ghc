@@ -105,17 +105,12 @@ mut_user_time( void )
   mut_user_time_during_RP() returns the MUT time during retainer profiling.
   The same is for mut_user_time_during_HC();
  */
-double
+static double
 mut_user_time_during_RP( void )
 {
     return TimeToSecondsDbl(RP_start_time - GC_tot_cpu - RP_tot_time);
 }
 
-double
-mut_user_time_during_heap_census( void )
-{
-    return TimeToSecondsDbl(HC_start_time - GC_tot_cpu - RP_tot_time);
-}
 #endif /* PROFILING */
 
 /* ---------------------------------------------------------------------------

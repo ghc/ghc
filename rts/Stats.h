@@ -59,11 +59,6 @@ void      initStats1(void);
 double    mut_user_time_until(Time t);
 double    mut_user_time(void);
 
-#ifdef PROFILING
-double    mut_user_time_during_RP(void);
-double    mut_user_time_during_heap_census(void);
-#endif /* PROFILING */
-
 void      statDescribeGens( void );
 
 Time      stat_getElapsedGCTime(void);
