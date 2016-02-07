@@ -1555,7 +1555,7 @@ scavenge_one(StgPtr p)
    remove non-mutable objects from the mutable list at this point.
    -------------------------------------------------------------------------- */
 
-void
+static void
 scavenge_mutable_list(bdescr *bd, generation *gen)
 {
     StgPtr p, q;
