@@ -1,8 +1,8 @@
 {-# LANGUAGE RecordWildCards #-}
 module Rules.Actions (
     build, buildWithResources, copyFile, createDirectory, removeDirectory,
-    moveDirectory, fixFile, runConfigure, runMake, runMakeVerbose, applyPatch,
-    renderLibrary, renderProgram, runBuilder, makeExecutable
+    copyDirectory, moveDirectory, applyPatch, fixFile, runConfigure, runMake,
+    runMakeVerbose, renderLibrary, renderProgram, runBuilder, makeExecutable
     ) where
 
 import qualified System.Directory as IO
@@ -80,6 +80,12 @@ removeDirectory :: FilePath -> Action ()
 removeDirectory dir = do
     putBuild $ "| Remove directory " ++ dir
     removeDirectoryIfExists dir
+
+-- Note, the source directory is untracked
+copyDirectory :: FilePath -> FilePath -> Action ()
+copyDirectory source target = do
+    putProgressInfo $ renderAction "Copy directory" source target
+    quietly $ cmd (EchoStdout False) ["cp", "-r", source, target]
 
 -- Note, the source directory is untracked
 moveDirectory :: FilePath -> FilePath -> Action ()
