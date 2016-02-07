@@ -215,42 +215,26 @@ addElement(retainer r, RetainerSet *rs)
 }
 
 /* -----------------------------------------------------------------------------
- *  Call f() for each retainer set.
- * -------------------------------------------------------------------------- */
-void
-traverseAllRetainerSet(void (*f)(RetainerSet *))
-{
-    int i;
-    RetainerSet *rs;
-
-    (*f)(&rs_MANY);
-    for (i = 0; i < HASH_TABLE_SIZE; i++)
-        for (rs = hashTable[i]; rs != NULL; rs = rs->link)
-            (*f)(rs);
-}
-
-
-/* -----------------------------------------------------------------------------
  *  printRetainer() prints the full information on a given retainer,
  *  not a retainer set.
  * -------------------------------------------------------------------------- */
 #if defined(RETAINER_SCHEME_INFO)
 // Retainer scheme 1: retainer = info table
-void
+static void
 printRetainer(FILE *f, retainer itbl)
 {
     fprintf(f, "%s[%s]", GET_PROF_DESC(itbl), itbl->prof.closure_type);
 }
 #elif defined(RETAINER_SCHEME_CCS)
 // Retainer scheme 2: retainer = cost centre stack
-void
+static void
 printRetainer(FILE *f, retainer ccs)
 {
     fprintCCS(f, ccs);
 }
 #elif defined(RETAINER_SCHEME_CC)
 // Retainer scheme 3: retainer = cost centre
-void
+static void
 printRetainer(FILE *f, retainer cc)
 {
     fprintf(f,"%s.%s", cc->module, cc->label);

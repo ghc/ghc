@@ -160,9 +160,6 @@ isMember(retainer r, RetainerSet *rs)
 // Finds or creates a retainer set augmented with a new retainer.
 RetainerSet *addElement(retainer, RetainerSet *);
 
-// Call f() for each retainer set.
-void traverseAllRetainerSet(void (*f)(RetainerSet *));
-
 #ifdef SECOND_APPROACH
 // Prints a single retainer set.
 void printRetainerSetShort(FILE *, RetainerSet *, nat);
@@ -193,11 +190,6 @@ void outputAllRetainerSet(FILE *);
 */
 #define hashKeySingleton(r)       ((StgWord)(r))
 #define hashKeyAddElement(r, s)   (hashKeySingleton((r)) + (s)->hashKey)
-
-// Prints the full information on a given retainer.
-// Note: This function is not part of retainerSet interface, but this is
-//       the best place to define it.
-void printRetainer(FILE *, retainer);
 
 #include "EndPrivate.h"
 
