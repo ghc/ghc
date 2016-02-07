@@ -61,6 +61,7 @@ don't have to do it manually. Beware, this uses network I/O which may sometimes 
 undesirable.
 * `--flavour=FLAVOUR`: choose a build flavour. Two settings are currently supported:
 `default` and `quick` (adds `-O0` flag to all GHC invocations speeding up builds by 3x).
+* `--haddock`: build Haddock documentation.
 * `--progress-info=STYLE`: choose how build progress info is printed. There are four
 settings: `none`, `brief` (one line per build command), `normal` (typically a box per
 build command; this is the default setting), and `unicorn` (when `normal` just won't do).
@@ -98,8 +99,8 @@ Current limitations
 -------------------
 The new build system still lacks many important features:
 * We only build `vanilla` way: [#4][dynamic-issue], [#186][profiling-issue].
-* Documentation is broken: [#98][haddock-issue].
 * Validation is not implemented: [#187][validation-issue].
+* Only HTML Haddock documentation is supported (use `--haddock` flag). 
 * Build flavours and conventional command line flags are not implemented: [#188][flavours-issue].
 * Cross-compilation is not implemented: [#177][cross-compilation-issue].
 
@@ -138,7 +139,6 @@ helped me endure and enjoy the project.
 [test-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/197
 [dynamic-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/4
 [profiling-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/186
-[haddock-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/98
 [validation-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/187
 [flavours-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/188
 [cross-compilation-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/177
