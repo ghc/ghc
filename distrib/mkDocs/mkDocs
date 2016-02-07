@@ -30,7 +30,7 @@ cd ..
 [ "$NO_CLEAN" -eq 0 ] && rm -r linux
 tar -Jxf "$WINDOWS_BINDIST"
 mv ghc* windows
-cd inst/share/doc/ghc/html/libraries
+cd inst/share/doc/ghc*/html/libraries
 mv ../../../../../../windows/doc/html/libraries/Win32-* .
 sh gen_contents_index
 cd ..
