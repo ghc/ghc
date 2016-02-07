@@ -158,8 +158,8 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
 
         priority 2.0 $ do
             -- TODO: this is temporary hack, get rid of this (#113)
-            let oldPath = pkgPath pkg -/- targetDirectory stage pkg -/- "build"
-                olden f = oldPath ++ (drop (length buildPath) f)
+            let oldPath = pkgPath pkg -/- targetDirectory stage pkg
+                olden f = oldPath ++ (drop (length (targetPath stage pkg)) f)
 
             when (pkg == compiler) $ buildPath -/- "Config.hs" %> \file -> do
                 file <~ generateConfigHs
@@ -167,7 +167,6 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
 
             when (pkg == compiler) $ platformH stage %> \file -> do
                 file <~ generateGhcBootPlatformH
-                olden file <~ generateGhcBootPlatformH -- TODO: get rid of this (#113)
 
             when (pkg == ghcPkg) $ buildPath -/- "Version.hs" %> \file -> do
                 file <~ generateVersionHs
