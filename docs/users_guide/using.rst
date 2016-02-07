@@ -671,7 +671,7 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
         MkT :: forall (k :: BOX) (a :: k). T k a
 
     When :ghc-flag:`-fprint-unicode-syntax` is enabled, GHC prints type
-    signatures using the unicode symbols from the ``-XUnicodeSyntax``
+    signatures using the unicode symbols from the :ghc-flag:`-XUnicodeSyntax`
     extension.
 
     .. code-block:: none
