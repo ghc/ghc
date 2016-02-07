@@ -248,6 +248,9 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
     opt_latex_style      = optLaTeXStyle     flags
     opt_source_css       = optSourceCssFile  flags
     opt_mathjax          = optMathjax        flags
+    dflags'
+      | unicode          = gopt_set dflags Opt_PrintUnicodeSyntax
+      | otherwise        = dflags
 
     visibleIfaces    = [ i | i <- ifaces, OptHide `notElem` ifaceOptions i ]
 
@@ -287,7 +290,7 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
     sourceUrls' = (srcBase, srcModule', pkgSrcMap', pkgSrcLMap')
 
   libDir   <- getHaddockLibDir flags
-  prologue <- getPrologue dflags flags
+  prologue <- getPrologue dflags' flags
   themes   <- getThemes libDir flags >>= either bye return
 
   when (Flag_GenIndex `elem` flags) $ do
@@ -297,14 +300,14 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
     copyHtmlBits odir libDir themes
 
   when (Flag_GenContents `elem` flags) $ do
-    ppHtmlContents dflags odir title pkgStr
+    ppHtmlContents dflags' odir title pkgStr
                    themes opt_mathjax opt_index_url sourceUrls' opt_wiki_urls
                    allVisibleIfaces True prologue pretty
                    (makeContentsQual qual)
     copyHtmlBits odir libDir themes
 
   when (Flag_Html `elem` flags) $ do
-    ppHtml dflags title pkgStr visibleIfaces odir
+    ppHtml dflags' title pkgStr visibleIfaces odir
                 prologue
                 themes opt_mathjax sourceUrls' opt_wiki_urls
                 opt_contents_url opt_index_url unicode qual
@@ -326,7 +329,7 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
       Just (PackageName pkgNameFS, pkgVer) ->
           let pkgNameStr | unpackFS pkgNameFS == "main" && title /= [] = title
                          | otherwise = unpackFS pkgNameFS
-          in ppHoogle dflags pkgNameStr pkgVer title (fmap _doc prologue)
+          in ppHoogle dflags' pkgNameStr pkgVer title (fmap _doc prologue)
                visibleIfaces odir
 
   when (Flag_LaTeX `elem` flags) $ do
