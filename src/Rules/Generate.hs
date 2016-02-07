@@ -3,6 +3,8 @@ module Rules.Generate (
     includesDependencies, derivedConstantsPath, generatedDependencies
     ) where
 
+import qualified System.Directory as IO
+
 import Base
 import Expression
 import GHC
@@ -144,19 +146,32 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
             , "*.hs-incl" ] |%> \file -> do
                 need [primopsTxt stage]
                 build $ fullTarget target GenPrimopCode [primopsTxt stage] [file]
+                -- TODO: this is temporary hack, get rid of this (#113)
+                let oldPath = pkgPath pkg -/- targetDirectory stage pkg -/- "build"
+                    newFile = oldPath ++ (drop (length buildPath) file)
+                createDirectory $ takeDirectory newFile
+                liftIO $ IO.copyFile file newFile
+                putSuccess $ "| Duplicate file " ++ file ++ " -> " ++ newFile
 
         when (pkg == rts) $ buildPath -/- "AutoApply.cmm" %> \file -> do
             build $ fullTarget target GenApply [] [file]
 
         priority 2.0 $ do
+            -- TODO: this is temporary hack, get rid of this (#113)
+            let oldPath = pkgPath pkg -/- targetDirectory stage pkg -/- "build"
+                olden f = oldPath ++ (drop (length buildPath) f)
+
             when (pkg == compiler) $ buildPath -/- "Config.hs" %> \file -> do
                 file <~ generateConfigHs
+                olden file <~ generateConfigHs -- TODO: get rid of this (#113)
 
             when (pkg == compiler) $ platformH stage %> \file -> do
                 file <~ generateGhcBootPlatformH
+                olden file <~ generateGhcBootPlatformH -- TODO: get rid of this (#113)
 
             when (pkg == ghcPkg) $ buildPath -/- "Version.hs" %> \file -> do
                 file <~ generateVersionHs
+                olden file <~ generateVersionHs -- TODO: get rid of this (#113)
 
             when (pkg == runGhc) $ buildPath -/- "Main.hs" %> \file -> do
                 copyFileChanged (pkgPath pkg -/- "runghc.hs") file
