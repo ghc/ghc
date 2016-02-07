@@ -44,7 +44,6 @@ struct entry {
 };
 
 extern char *theident;
-extern char *thestring;
 extern int theinteger;
 extern floatish thefloatish;
 extern int ch;
@@ -65,7 +64,6 @@ struct entry *MakeEntry PROTO((char *));
 
 token GetNumber PROTO((FILE *));
 void  GetIdent  PROTO((FILE *));
-void  GetString PROTO((FILE *));
 boolish IsIdChar PROTO((int)); /* int is a "char" from getc */
 
 extern char *jobstring;

@@ -18,7 +18,7 @@ double atof PROTO((const char *));
 #define N_SAMPLES 500		/* start size of the sample table */
 
 char *theident;
-char *thestring;
+static char *thestring;
 int theinteger;
 floatish thefloatish;
 int ch;						/* last character read  */
@@ -38,6 +38,8 @@ static void GetHpLine PROTO((FILE *));		/* forward */
 static void GetHpTok  PROTO((FILE *, int));	/* forward */
 
 static struct entry *GetEntry PROTO((char *));	/* forward */
+
+static void GetString PROTO((FILE *));		/* forward */
 
 static void MakeIdentTable PROTO((void));	/* forward */
 

@@ -43,7 +43,7 @@ OrderFor(char *ident, int order)
  *	Otherwise, return 0 which is the minimum ordering value. 
  */
 
-int
+static int
 OrderOf(char *ident)
 {
     int i;

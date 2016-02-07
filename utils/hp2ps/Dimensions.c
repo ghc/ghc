@@ -87,7 +87,7 @@ KeyWidth(void)
  */
 
 
-floatish fonttab[] = {
+static floatish fonttab[] = {
     /*  20 (' ') = */ 3.0,
     /*  21 ('!') = */ 1.0,
     /*  22 ('"') = */ 1.0,

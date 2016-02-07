@@ -16,26 +16,26 @@
 #include "Error.h"
 #include "Utilities.h"
 
-boolish pflag = 0;	/* read auxiliary file			*/
+static boolish pflag = 0;	/* read auxiliary file			*/
 boolish eflag = 0;	/* scaled EPSF 				*/
-boolish dflag = 0;	/* sort by standard deviation		*/
-int     iflag = 0;	/* sort by identifier (3-way flag)      */
+static boolish dflag = 0;	/* sort by standard deviation		*/
+static int     iflag = 0;	/* sort by identifier (3-way flag)      */
 boolish gflag = 0;	/* output suitable for previewer	*/
 boolish yflag = 0; 	/* ignore marks				*/
 boolish bflag = 0; 	/* use a big title box			*/
 boolish sflag = 0;	/* use a small title box		*/
-int     mflag = 0;	/* max no. of bands displayed (default 20) */
-boolish tflag = 0;	/* ignored threshold specified          */
+static int     mflag = 0;	/* max no. of bands displayed (default 20) */
+static boolish tflag = 0;	/* ignored threshold specified          */
 boolish cflag = 0;      /* colour output                        */
 
-boolish filter;		/* true when running as a filter	*/
+static boolish filter;		/* true when running as a filter	*/
 boolish multipageflag = 0;  /* true when the output should be 2 pages - key and profile */ 
 
 static floatish WidthInPoints PROTO((char *));		  /* forward */
 static FILE *Fp PROTO((char *, char **, char *, char *)); /* forward */
 
 char *hpfile;
-char *psfile;
+static char *psfile;
 char *auxfile;
 
 char *programname;
@@ -45,7 +45,7 @@ static char *baseName; /* "basename" is a std C library name (sigh) */
 
 FILE* hpfp;
 FILE* psfp;
-FILE* auxfp;
+static FILE* auxfp;
 
 floatish xrange = 0.0;
 floatish yrange = 0.0;

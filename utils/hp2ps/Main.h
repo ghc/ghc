@@ -60,8 +60,6 @@ extern boolish gflag;
 extern boolish yflag;
 extern boolish bflag;
 extern boolish sflag;
-extern int     mflag;
-extern boolish tflag;
 extern boolish cflag;
 
 extern boolish multipageflag;
@@ -69,11 +67,9 @@ extern boolish multipageflag;
 extern char *programname;
 
 extern char *hpfile;
-extern char *psfile;
 extern char *auxfile;
 
 extern FILE *hpfp;
 extern FILE *psfp;
-extern FILE *auxfp;
 
 #endif /* MAIN_H */
