@@ -17,7 +17,6 @@ StgTSO * unblockOne (Capability *cap, StgTSO *tso);
 StgTSO * unblockOne_ (Capability *cap, StgTSO *tso, rtsBool allow_migrate);
 
 void checkBlockingQueues (Capability *cap, StgTSO *tso);
-void wakeBlockingQueue   (Capability *cap, StgBlockingQueue *bq);
 void tryWakeupThread     (Capability *cap, StgTSO *tso);
 void migrateThread       (Capability *from, StgTSO *tso, Capability *to);
 

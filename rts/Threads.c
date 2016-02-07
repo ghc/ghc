@@ -359,7 +359,7 @@ migrateThread (Capability *from, StgTSO *tso, Capability *to)
    wakes up all the threads on the specified queue.
    ------------------------------------------------------------------------- */
 
-void
+static void
 wakeBlockingQueue(Capability *cap, StgBlockingQueue *bq)
 {
     MessageBlackHole *msg;
