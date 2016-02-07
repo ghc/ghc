@@ -91,7 +91,7 @@ static char *ofilename = NULL;
  * if noisy is not set.
  */
 
-void complain(char *file, int lin, char *what)
+static void complain(char *file, int lin, char *what)
 {
     if (noisy) {
         if (file)
@@ -101,7 +101,7 @@ void complain(char *file, int lin, char *what)
     }
 }
 
-void writeerror(void)
+static void writeerror(void)
 {
     if (!strcmp(ofilename,"-")) {
 	fprintf(stderr, CANNOTWRITESTDOUT);
@@ -111,7 +111,7 @@ void writeerror(void)
     exit(1);
 }
 
-void myputc(char c, FILE *ostream)
+static void myputc(char c, FILE *ostream)
 {
     if (putc(c,ostream) == EOF) {
 	writeerror();
@@ -121,8 +121,7 @@ void myputc(char c, FILE *ostream)
 #define TABPOS 8
 
 /* As getc, but does TAB expansion */
-int
-egetc(FILE *istream)
+static int egetc(FILE *istream)
 {
     static int spleft = 0;
     static int linepos = 0;
@@ -171,7 +170,7 @@ egetc(FILE *istream)
  * stream.
  */
 
-line readline(FILE *istream, FILE *ostream) {
+static line readline(FILE *istream, FILE *ostream) {
     int c, c1;
     char buf[100];
     int i;
@@ -246,7 +245,7 @@ line readline(FILE *istream, FILE *ostream) {
  *  - there should be at least one DEFN line in a script.
  */
 
-void unlit(char *file, FILE *istream, FILE *ostream)
+static void unlit(char *file, FILE *istream, FILE *ostream)
 {
     line last, this=START;
     int  linesread=0;
