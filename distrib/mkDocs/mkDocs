@@ -21,14 +21,14 @@ WINDOWS_BINDIST=`realpath "$2"`
 mkdir docs
 cd docs
 INST=`pwd`/inst
-tar -jxf "$LINUX_BINDIST"
+tar -Jxf "$LINUX_BINDIST"
 mv ghc* linux
 cd linux
 ./configure --prefix="$INST"
 make install
 cd ..
 [ "$NO_CLEAN" -eq 0 ] && rm -r linux
-tar -jxf "$WINDOWS_BINDIST"
+tar -Jxf "$WINDOWS_BINDIST"
 mv ghc* windows
 cd inst/share/doc/ghc/html/libraries
 mv ../../../../../../windows/doc/html/libraries/Win32-* .
@@ -36,7 +36,7 @@ sh gen_contents_index
 cd ..
 for i in haddock libraries users_guide
 do
-    tar -jcf ../../../../../$i.html.tar.bz2 $i
+    tar -Jcf ../../../../../$i.html.tar.xz $i
 done
 mv index.html ../../../../..
 cd ..
