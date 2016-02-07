@@ -557,7 +557,7 @@ run_thread:
  * Run queue operations
  * -------------------------------------------------------------------------- */
 
-void
+static void
 removeFromRunQueue (Capability *cap, StgTSO *tso)
 {
     if (tso->block_info.prev == END_TSO_QUEUE) {
