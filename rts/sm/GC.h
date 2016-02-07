@@ -34,8 +34,6 @@ extern bdescr *mark_stack_bd;
 extern bdescr *mark_stack_top_bd;
 extern StgPtr mark_sp;
 
-extern long copied;
-
 extern rtsBool work_stealing;
 
 #ifdef DEBUG

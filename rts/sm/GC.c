@@ -129,7 +129,7 @@ StgWord8 the_gc_thread[sizeof(gc_thread) + 64 * sizeof(gen_workspace)];
 nat n_gc_threads;
 
 // For stats:
-long copied;        // *words* copied & scavenged during this GC
+static long copied;        // *words* copied & scavenged during this GC
 
 rtsBool work_stealing;
 
