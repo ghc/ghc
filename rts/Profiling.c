@@ -29,7 +29,7 @@
 /*
  * Profiling allocation arena.
  */
-Arena *prof_arena;
+static Arena *prof_arena;
 
 /*
  * Global variables used to assign unique IDs to cc's, ccs's, and
@@ -59,7 +59,7 @@ CostCentre      *CC_LIST  = NULL;
 CostCentreStack *CCS_LIST = NULL;
 
 #ifdef THREADED_RTS
-Mutex ccs_mutex;
+static Mutex ccs_mutex;
 #endif
 
 /*
