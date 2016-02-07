@@ -16,7 +16,6 @@
 
 void initRtsFlagsDefaults (void);
 void setupRtsFlags        (int *argc, char *argv[], RtsConfig rtsConfig);
-void setProgName          (char *argv[]);
 void freeRtsArgs          (void);
 
 extern RtsConfig rtsConfig;

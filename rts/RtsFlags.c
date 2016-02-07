@@ -112,6 +112,7 @@ static void errorUsage (void) GNU_ATTRIBUTE(__noreturn__);
 static char *  copyArg (char *arg);
 static char ** copyArgv (int argc, char *argv[]);
 static void    freeArgv (int argc, char *argv[]);
+static void setProgName (char *argv[]);
 
 static void errorRtsOptsDisabled (const char *s);
 
