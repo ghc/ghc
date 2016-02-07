@@ -33,9 +33,10 @@ import TcType ( tcSplitSigmaTy )
 import TyCon
 import Type
 import TyCoRep
-import TysPrim ( alphaTyVars )
-import TysWiredIn ( listTyConName )
-import PrelNames ( hasKey, eqTyConKey, ipClassKey )
+import TysPrim ( alphaTyVars, unliftedTypeKindTyConName )
+import TysWiredIn ( listTyConName, starKindTyConName )
+import PrelNames ( hasKey, eqTyConKey, ipClassKey
+                 , tYPETyConKey, liftedDataConKey, unliftedDataConKey )
 import Unique ( getUnique )
 import Util ( filterByList, filterOut )
 import Var
@@ -360,6 +361,15 @@ synifySigWcType s ty = mkEmptyImplicitBndrs (mkEmptyWildCardBndrs (synifyType s 
 synifyType :: SynifyTypeState -> Type -> LHsType Name
 synifyType _ (TyVarTy tv) = noLoc $ HsTyVar $ noLoc (getName tv)
 synifyType _ (TyConApp tc tys)
+  -- Use */# instead of TYPE 'Lifted/TYPE 'Unlifted (#473)
+  | tc `hasKey` tYPETyConKey
+  , [TyConApp lev []] <- tys
+  , lev `hasKey` liftedDataConKey
+  = noLoc (HsTyVar (noLoc starKindTyConName))
+  | tc `hasKey` tYPETyConKey
+  , [TyConApp lev []] <- tys
+  , lev `hasKey` unliftedDataConKey
+  = noLoc (HsTyVar (noLoc unliftedTypeKindTyConName))
   -- Use non-prefix tuple syntax where possible, because it looks nicer.
   | Just sort <- tyConTuple_maybe tc
   , tyConArity tc == length tys
