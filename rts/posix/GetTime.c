@@ -171,36 +171,6 @@ void getProcessTimes(Time *user, Time *elapsed)
 
 #endif // HAVE_TIMES
 
-Time getThreadCPUTime(void)
-{
-#if !defined(BE_CONSERVATIVE)            &&  \
-     defined(HAVE_CLOCK_GETTIME)       &&  \
-     defined(_SC_CPUTIME)             &&  \
-     defined(CLOCK_PROCESS_CPUTIME_ID) &&  \
-     defined(HAVE_SYSCONF)
-    {
-        static int checked_sysconf = 0;
-        static int sysconf_result = 0;
-
-        if (!checked_sysconf) {
-            sysconf_result = sysconf(_SC_THREAD_CPUTIME);
-            checked_sysconf = 1;
-        }
-        if (sysconf_result != -1) {
-            // clock_gettime() gives us per-thread CPU time.  It isn't
-            // reliable on Linux, but it's the best we have.
-            struct timespec ts;
-            int res;
-            res = clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
-            if (res == 0) {
-                return SecondsToTime(ts.tv_sec) + NSToTime(ts.tv_nsec);
-            }
-        }
-    }
-#endif
-    return getProcessCPUTime();
-}
-
 void getUnixEpochTime(StgWord64 *sec, StgWord32 *nsec)
 {
 #if defined(HAVE_GETTIMEOFDAY)

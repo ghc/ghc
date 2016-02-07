@@ -100,19 +100,6 @@ getProcessElapsedTime(void)
     return NSToTime(getMonotonicNSec());
 }
 
-Time
-getThreadCPUTime(void)
-{
-    FILETIME creationTime, exitTime, userTime, kernelTime = {0,0};
-
-    if (!GetThreadTimes(GetCurrentThread(), &creationTime,
-                        &exitTime, &kernelTime, &userTime)) {
-        return 0;
-    }
-
-    return fileTimeToRtsTime(userTime);
-}
-
 void
 getUnixEpochTime(StgWord64 *sec, StgWord32 *nsec)
 {
