@@ -312,6 +312,10 @@ The following options are available:
     combined with :option:`--theme`. Note that order matters: The first
     specified theme will be the default.
 
+.. option:: --use-unicode
+
+    Enable use of Unicode characters in HTML output.
+
 .. option:: -c <file>
             --css=<file>
 
