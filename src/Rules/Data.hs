@@ -47,6 +47,8 @@ buildPackageData _ target @ (PartialTarget stage pkg) = do
         createDirectory $ targetPath stage pkg -/- "build/autogen"
         forM_ autogenFiles $ \file -> do
             copyFile (oldPath -/- file) (targetPath stage pkg -/- file)
+        let haddockPrologue = "haddock-prologue.txt"
+        copyFile (oldPath -/- haddockPrologue) (targetPath stage pkg -/- haddockPrologue)
 
         postProcessPackageData stage pkg dataFile
 
