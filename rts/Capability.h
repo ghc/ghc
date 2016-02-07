@@ -224,11 +224,6 @@ INLINE_HEADER void releaseCapability_ (Capability* cap STG_UNUSED,
 //
 extern Capability **capabilities;
 
-// The Capability that was last free.  Used as a good guess for where
-// to assign new threads.
-//
-extern Capability *last_free_capability;
-
 //
 // Indicates that the RTS wants to synchronise all the Capabilities
 // for some reason.  All Capabilities should stop and return to the
@@ -303,11 +298,6 @@ INLINE_HEADER void    discardSparksCap  (Capability *cap);
 extern void grabCapability (Capability **pCap);
 
 #endif /* !THREADED_RTS */
-
-// Waits for a capability to drain of runnable threads and workers,
-// and then acquires it.  Used at shutdown time.
-//
-void shutdownCapability (Capability *cap, Task *task, rtsBool wait_foreign);
 
 // Shut down all capabilities.
 //

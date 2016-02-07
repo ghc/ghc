@@ -51,7 +51,7 @@ Capability **capabilities = NULL;
 // an in-call has a chance of quickly finding a free Capability.
 // Maintaining a global free list of Capabilities would require global
 // locking, so we don't do that.
-Capability *last_free_capability = NULL;
+static Capability *last_free_capability = NULL;
 
 /*
  * Indicates that the RTS wants to synchronise all the Capabilities
@@ -937,7 +937,7 @@ tryGrabCapability (Capability *cap, Task *task)
  *
  * ------------------------------------------------------------------------- */
 
-void
+static void
 shutdownCapability (Capability *cap USED_IF_THREADS,
                     Task *task USED_IF_THREADS,
                     rtsBool safe USED_IF_THREADS)
