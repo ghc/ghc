@@ -517,17 +517,6 @@ INLINE_HEADER void traceEventStopThread(Capability          *cap    STG_UNUSED,
                      (EventThreadStatus)status, (EventThreadID)info);
 }
 
-// needs to be EXTERN_INLINE as it is used in another EXTERN_INLINE function
-EXTERN_INLINE void traceEventThreadRunnable(Capability *cap STG_UNUSED,
-                                            StgTSO     *tso STG_UNUSED);
-
-EXTERN_INLINE void traceEventThreadRunnable(Capability *cap STG_UNUSED,
-                                            StgTSO     *tso STG_UNUSED)
-{
-    traceSchedEvent(cap, EVENT_THREAD_RUNNABLE, tso, 0);
-    dtraceThreadRunnable((EventCapNo)cap->no, (EventThreadID)tso->id);
-}
-
 INLINE_HEADER void traceEventMigrateThread(Capability *cap     STG_UNUSED,
                                            StgTSO     *tso     STG_UNUSED,
                                            nat         new_cap STG_UNUSED)
