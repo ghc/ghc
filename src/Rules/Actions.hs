@@ -106,17 +106,16 @@ runConfigure dir opts args = do
     need [dir -/- "configure"]
     let args' = filter (not . null) args
         note  = if null args' then "" else " (" ++ intercalate ", " args' ++ ")"
-    if dir == "."
-    then do
-        putBuild $ "| Run configure" ++ note ++ "..."
-        quietly $ cmd Shell (EchoStdout False) "bash configure" opts' args
-    else do
-        putBuild $ "| Run configure" ++ note ++ " in " ++ dir ++ "..."
-        quietly $ cmd Shell (EchoStdout False) [Cwd dir] "bash configure" opts' args
-    where
         -- Always configure with bash.
         -- This also injects /bin/bash into `libtool`, instead of /bin/sh
         opts' = opts ++ [AddEnv "CONFIG_SHELL" "/bin/bash"]
+    if dir == "."
+    then do
+        putBuild $ "| Run configure" ++ note ++ "..."
+        quietly $ cmd Shell (EchoStdout False) "bash configure" opts' args'
+    else do
+        putBuild $ "| Run configure" ++ note ++ " in " ++ dir ++ "..."
+        quietly $ cmd Shell (EchoStdout False) [Cwd dir] "bash configure" opts' args'
 
 runMake :: FilePath -> [String] -> Action ()
 runMake = runMakeWithVerbosity False
