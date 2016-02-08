@@ -554,8 +554,10 @@ Result
 
 data InertCans   -- See Note [Detailed InertCans Invariants] for more
   = IC { inert_model :: InertModel
+              -- See Note [inert_model: the inert model]
 
        , inert_eqs :: TyVarEnv EqualCtList
+              -- See Note [inert_eqs: the inert equalities]
               -- All Given/Wanted CTyEqCans; index is the LHS tyvar
 
        , inert_funeqs :: FunEqMap Ct
@@ -663,6 +665,10 @@ Note [inert_model: the inert model]
 
      - A Derived "shadow copy" for every Given or Wanted (a ~N ty) in
        inert_eqs.
+
+   * The model is not subject to "kicking-out". Reason: we make a Derived
+     shadow copy of any Given/Wanted (a ~ ty), and that Derived copy will
+     be fully rewritten by the model before it is added
 
    * The principal reason for maintaining the model is to generate
      equalities that tell us how to unify a variable: that is, what
@@ -1101,33 +1107,39 @@ Note [Adding an inert canonical constraint the InertCans]
 
 * Adding a *nominal* CTyEqCan (a ~N ty) to the inert set (TcSMonad.addInertEq).
 
-    * Always (G/W/D) kick out constraints that can be rewritten
-      (respecting flavours) by the new constraint. This is done
-      by kickOutRewritable.
+    (A) Always (G/W/D) kick out constraints that can be rewritten
+        (respecting flavours) by the new constraint. This is done
+        by kickOutRewritable.
 
-  Then, when adding:
+    (B) Applies only to nominal equalities: a ~ ty.  Four cases:
 
-     * [Derived] a ~N ty
-        1. Add (a~ty) to the model
-           NB: 'a' cannot be in fv(ty), because the constraint is canonical.
+        [Representational]   [G/W/D] a ~R ty:
+          Just add it to inert_eqs
 
-        2. (DShadow) Do emitDerivedShadows
-             For every inert G/W constraint c, st
-              (a) (a~ty) can rewrite c (see Note [Emitting shadow constraints]),
-                  and
-              (b) the model cannot rewrite c
-             kick out a Derived *copy*, leaving the original unchanged.
-             Reason for (b) if the model can rewrite c, then we have already
-             generated a shadow copy
+        [Derived Nominal]  [D] a ~N ty:
+          1. Add (a~ty) to the model
+             NB: 'a' cannot be in fv(ty), because the constraint is canonical.
 
-     * [Given/Wanted] a ~N ty
+          2. (DShadow) Do emitDerivedShadows
+               For every inert G/W constraint c, st
+                (a) (a~ty) can rewrite c (see Note [Emitting shadow constraints]),
+                    and
+                (b) the model cannot rewrite c
+               kick out a Derived *copy*, leaving the original unchanged.
+               Reason for (b) if the model can rewrite c, then we have already
+               generated a shadow copy
+
+       [Given/Wanted Nominal]  [G/W] a ~N ty:
           1. Add it to inert_eqs
           2. Emit [D] a~ty
-       As a result of (2), the current model will rewrite the new [D] a~ty
-       during canonicalisation, and then it'll be added to the model using
-       the steps of [Derived] above.
+          Step (2) is needed to allow the current model to fully
+          rewrite [D] a~ty before adding it using the [Derived Nominal]
+          steps above.
 
-     * [Representational equalities] a ~R ty: just add it to inert_eqs
+          We must do this even for Givens, because
+             work-item [G] a ~ [b], model has [D] b ~ a.
+          We need a shadow [D] a ~ [b] in the work-list
+          When we process it, we'll rewrite to a ~ [a] and get an occurs check
 
 
 * Unifying a:=ty, is like adding [G] a~ty, but we can't make a [D]
@@ -1207,21 +1219,11 @@ add_inert_eq ics@(IC { inert_count = n
   | ReprEq <- eq_rel
   = return new_ics
 
---   | isGiven ev
---   = return (new_ics { inert_model = extendVarEnv old_model tv ct }) }
--- No no!   E.g.
---   work-item [G] a ~ [b], model has [D] b ~ a.
---   We must not add the given to the model as-is.  Instead,
---   we put a shadow [D] a ~ [b] in the work-list
---   When we process it, we'll rewrite to a ~ [a] and get an occurs check
-
   | isDerived ev
   = do { emitDerivedShadows ics tv
        ; return (ics { inert_model = extendVarEnv old_model tv ct }) }
 
-  -- Nominal equality (tv ~N ty), Given/Wanted
-  -- See Note [Emitting shadow constraints]
-  | otherwise -- modelCanRewrite old_model rw_tvs   -- Shadow of new ct isn't inert; emit it
+  | otherwise   -- Given/Wanted Nominal equality [W] tv ~N ty
   = do { emitNewDerived loc pred
        ; return new_ics }
   where
@@ -1722,8 +1724,10 @@ getUnsolvedInerts
            , inert_dicts  = idicts
            , inert_insols = insols
            , inert_model  = model } <- getInertCans
+      ; keep_derived <- keepSolvingDeriveds
 
-      ; let der_tv_eqs       = foldVarEnv (add_der tv_eqs) emptyCts model  -- Want to float these
+      ; let der_tv_eqs       = foldVarEnv (add_der_eq keep_derived tv_eqs)
+                                          emptyCts model
             unsolved_tv_eqs  = foldTyEqs add_if_unsolved tv_eqs der_tv_eqs
             unsolved_fun_eqs = foldFunEqs add_if_unsolved fun_eqs emptyCts
             unsolved_irreds  = Bag.filterBag is_unsolved irreds
@@ -1743,8 +1747,10 @@ getUnsolvedInerts
               -- Keep even the given insolubles
               -- so that we can report dead GADT pattern match branches
   where
-    add_der tv_eqs ct cts
+    add_der_eq keep_derived tv_eqs ct cts
+       -- See Note [Unsolved Derived equalities]
        | CTyEqCan { cc_tyvar = tv, cc_rhs = rhs } <- ct
+       , isMetaTyVar tv || keep_derived
        , not (isInInertEqs tv_eqs tv rhs) = ct `consBag` cts
        | otherwise                        = cts
     add_if_unsolved :: Ct -> Cts -> Cts
@@ -1856,7 +1862,20 @@ prohibitedSuperClassSolve from_loc solve_loc
   | otherwise
   = False
 
-{-
+{- Note [Unsolved Derived equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In getUnsolvedInerts, we return a derived equality from the model
+for two possible reasons:
+
+  * Because it is a candidate for floating out of this implication.
+    We only float equalities with a meta-tyvar on the left, so we only
+    pull those out here.
+
+  * If we are only solving derived constraints (i.e. tcs_need_derived
+    is true; see Note [Solving for Derived constraints]), then we
+    those Derived constraints are effectively unsolved, and we need
+    them!
+
 Note [When does an implication have given equalities?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider an implication
@@ -2252,6 +2271,16 @@ All you can do is
 Filling in a dictionary evidence variable means to create a binding
 for it, so TcS carries a mutable location where the binding can be
 added.  This is initialised from the innermost implication constraint.
+
+Note [Solving for Derived constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Sometimes we invoke the solver on a bunch of Derived constraints, not to
+generate any evidence, but just to cause unification side effects or to
+produce a simpler set of constraints.  If that is what we are doing, we
+should do two things differently:
+  a) Don't stop when you've solved all the Wanteds; instead keep going
+     if there are any Deriveds in the work queue.
+  b) In getInertUnsolved, include Derived ones
 -}
 
 data TcSEnv
@@ -2277,9 +2306,8 @@ data TcSEnv
         -- See also Note [Tracking redundant constraints] in TcSimplify
 
       tcs_need_deriveds :: Bool
-        -- should we keep trying to solve even if all the unsolved
-        -- constraints are Derived? Usually False, but used whenever
-        -- toDerivedWC is used.
+        -- Keep solving, even if all the unsolved constraints are Derived
+        -- See Note [Solving for Derived constraints]
     }
 
 ---------------
