@@ -13,7 +13,8 @@ import Test.Haddock.Xhtml
 
 checkConfig :: CheckConfig Xml
 checkConfig = CheckConfig
-    { ccfgRead = \_ input -> strip <$> parseXml input
+    { ccfgRead = parseXml
+    , ccfgClean = \_ -> strip
     , ccfgDump = dumpXml
     , ccfgEqual = (==)
     }

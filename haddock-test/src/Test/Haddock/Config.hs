@@ -42,7 +42,11 @@ data TestPackage = TestPackage
 
 
 data CheckConfig c = CheckConfig
-    { ccfgRead :: String -> String -> Maybe c
+    { ccfgRead :: String -> Maybe c
+      -- ^ @f contents@ parses file contents @contents@ to
+      -- produce a thing to be compared.
+    , ccfgClean :: String -> c -> c
+      -- ^ @f fname x@ cleans @x@ to such that it can be compared
     , ccfgDump :: c -> String
     , ccfgEqual :: c -> c -> Bool
     }

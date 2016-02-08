@@ -9,7 +9,8 @@ import Test.Haddock
 
 checkConfig :: CheckConfig String
 checkConfig = CheckConfig
-    { ccfgRead = \_ input -> Just input
+    { ccfgRead = Just
+    , ccfgClean = \_ -> id
     , ccfgDump = id
     , ccfgEqual = (==)
     }
