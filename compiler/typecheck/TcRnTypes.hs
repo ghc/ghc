@@ -1366,7 +1366,7 @@ data Ct
       cc_class  :: Class,
       cc_tyargs :: [Xi],       -- cc_tyargs are function-free, hence Xi
       cc_pend_sc :: Bool       -- True <=> (a) cc_class has superclasses
-                               --          (b) we have not yet added those
+                               --          (b) we have not (yet) added those
                                --              superclasses as Givens
            -- NB: cc_pend_sc is used for G/W/D.  For W/D the reason
            --     we need superclasses is to expose possible improvement
@@ -1769,6 +1769,7 @@ isUserTypeErrorCt ct = case getUserTypeErrorMsg ct of
                          _      -> False
 
 isPendingScDict :: Ct -> Maybe Ct
+-- Says whether cc_pend_sc is True, AND if so flips the flag
 isPendingScDict ct@(CDictCan { cc_pend_sc = True })
                   = Just (ct { cc_pend_sc = False })
 isPendingScDict _ = Nothing

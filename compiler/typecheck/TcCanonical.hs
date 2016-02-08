@@ -372,21 +372,37 @@ mkGivensWithSuperClasses :: CtLoc -> [EvId] -> TcS [Ct]
 -- From a given EvId, make its Ct, plus the Ct's of its superclasses
 -- See Note [The superclass story]
 -- The loop-breaking here follows Note [Expanding superclasses] in TcType
+--
+-- Example:  class D a => C a
+--           class C [a] => D a
+-- makeGivensWithSuperClasses (C x) will return (C x, D x, C[x])
+--   i.e. up to and including the first repetition of C
 mkGivensWithSuperClasses loc ev_ids = concatMapM go ev_ids
   where
-    go ev_id = mk_superclasses emptyNameSet $
-               CtGiven { ctev_evar = ev_id
-                       , ctev_pred = evVarPred ev_id
-                       , ctev_loc  = loc }
+    go ev_id = mk_superclasses emptyNameSet this_ev
+       where
+         this_ev = CtGiven { ctev_evar = ev_id
+                           , ctev_pred = evVarPred ev_id
+                           , ctev_loc = loc }
 
 makeSuperClasses :: [Ct] -> TcS [Ct]
 -- Returns strict superclasses, transitively, see Note [The superclasses story]
 -- See Note [The superclass story]
 -- The loop-breaking here follows Note [Expanding superclasses] in TcType
+-- Specifically, for an incoming (C t) constraint, we return all of (C t)'s
+--    superclasses, up to /and including/ the first repetition of C
+--
+-- Example:  class D a => C a
+--           class C [a] => D a
+-- makeSuperClasses (C x) will return (D x, C [x])
+--
+-- NB: the incoming constraints have had their cc_pend_sc flag already
+--     flipped to False, by isPendingScDict, so we are /obliged/ to at
+--     least produce the immediate superclasses
 makeSuperClasses cts = concatMapM go cts
   where
     go (CDictCan { cc_ev = ev, cc_class = cls, cc_tyargs = tys })
-          = mk_strict_superclasses emptyNameSet ev cls tys
+          = mk_strict_superclasses (unitNameSet (className cls)) ev cls tys
     go ct = pprPanic "makeSuperClasses" (ppr ct)
 
 mk_superclasses :: NameSet -> CtEvidence -> TcS [Ct]
@@ -399,13 +415,13 @@ mk_superclasses rec_clss ev
   = return [mkNonCanonical ev]
 
 mk_superclasses_of :: NameSet -> CtEvidence -> Class -> [Type] -> TcS [Ct]
--- Return this class constraint, plus its superclasses
+-- Always return this class constraint,
+-- and expand its superclasses
 mk_superclasses_of rec_clss ev cls tys
-  | loop_found
-  = return [this_ct]
-  | otherwise
-  = do { sc_cts <- mk_strict_superclasses rec_clss' ev cls tys
-       ; return (this_ct : sc_cts) }
+  | loop_found = return [this_ct]  -- cc_pend_sc of this_ct = True
+  | otherwise  = do { sc_cts <- mk_strict_superclasses rec_clss' ev cls tys
+                    ; return (this_ct : sc_cts) }
+                                   -- cc_pend_sc of this_ct = False
   where
     cls_nm     = className cls
     loop_found = cls_nm `elemNameSet` rec_clss
@@ -413,14 +429,18 @@ mk_superclasses_of rec_clss ev cls tys
                | otherwise         = rec_clss `extendNameSet` cls_nm
     this_ct    = CDictCan { cc_ev = ev, cc_class = cls, cc_tyargs = tys
                           , cc_pend_sc = loop_found }
+                 -- NB: If there is a loop, we cut off, so we have not
+                 --     added the superclasses, hence cc_pend_sc = True
 
 mk_strict_superclasses :: NameSet -> CtEvidence -> Class -> [Type] -> TcS [Ct]
+-- Always return the immediate superclasses of (cls tys);
+-- and expand their superclasses, provided none of them are in rec_clss
+-- nor are repeated
 mk_strict_superclasses rec_clss ev cls tys
   | CtGiven { ctev_evar = evar, ctev_loc = loc } <- ev
   = do { sc_evs <- newGivenEvVars (mk_given_loc loc)
                                   (mkEvScSelectors (EvId evar) cls tys)
        ; concatMapM (mk_superclasses rec_clss) sc_evs }
-
 
   | isEmptyVarSet (tyCoVarsOfTypes tys)
   = return [] -- Wanteds with no variables yield no deriveds.
@@ -449,7 +469,6 @@ mk_strict_superclasses rec_clss ev cls tys
 
        | otherwise  -- Probably doesn't happen, since this function
        = loc        -- is only used for Givens, but does no harm
-
 
 
 {-
