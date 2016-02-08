@@ -1,4 +1,4 @@
 
-SimpleFail12.hs:8:15:
-    Illegal polymorphic or qualified type: forall a1. [a1]
-    In the type instance declaration for ‘C’
+SimpleFail12.hs:8:15: error:
+    • Illegal polymorphic type: forall a. [a]
+    • In the type instance declaration for ‘C’
