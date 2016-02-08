@@ -396,13 +396,14 @@ simplifyDefault :: ThetaType    -- Wanted; has no type variables in it
                 -> TcM ()       -- Succeeds if the constraint is soluble
 simplifyDefault theta
   = do { traceTc "simplifyInteractive" empty
-       ; wanted <- newWanteds DefaultOrigin theta
-       ; unsolved <- simplifyWantedsTcM wanted
-
+       ; loc <- getCtLocM DefaultOrigin Nothing
+       ; let wanted = [ CtDerived { ctev_pred = pred
+                                  , ctev_loc  = loc }
+                      | pred <- theta ]
+       ; unsolved <- runTcSDeriveds (solveWanteds (mkSimpleWC wanted))
        ; traceTc "reportUnsolved {" empty
        ; reportAllUnsolved unsolved
        ; traceTc "reportUnsolved }" empty
-
        ; return () }
 
 ------------------
