@@ -18,15 +18,13 @@ import Way
 
 -- | Parameters relevant to the current build target.
 data Target = Target
-     {
-        stage   :: Stage,      -- ^ Stage being built
-        package :: Package,    -- ^ Package being built
-        builder :: Builder,    -- ^ Builder to be invoked
-        way     :: Way,        -- ^ Way to build (set to vanilla for most targets)
-        inputs  :: [FilePath], -- ^ Source files passed to the builder
-        outputs :: [FilePath]  -- ^ Files to be produced
-     }
-     deriving (Show, Eq, Generic)
+    { stage   :: Stage      -- ^ Stage being built
+    , package :: Package    -- ^ Package being built
+    , builder :: Builder    -- ^ Builder to be invoked
+    , way     :: Way        -- ^ Way to build (set to vanilla for most targets)
+    , inputs  :: [FilePath] -- ^ Source files passed to the builder
+    , outputs :: [FilePath] -- ^ Files to be produced
+    } deriving (Show, Eq, Generic)
 
 -- | If values of type @a@ form a 'Monoid' then we can also derive a 'Monoid'
 -- instance for values of type @'ReaderT' 'Target' 'Action' a@:

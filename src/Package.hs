@@ -29,13 +29,11 @@ instance Show PackageName where
 data PackageType = Program | Library deriving Generic
 
 data Package = Package
-     {
-         pkgName :: PackageName, -- ^ Examples: "ghc", "Cabal"
-         pkgPath :: FilePath,    -- ^ pkgPath is the path to the source code relative to the root.
-                                 -- e.g. "compiler", "libraries/Cabal/Cabal"
-         pkgType :: PackageType
-     }
-     deriving Generic
+    { pkgName :: PackageName -- ^ Examples: "ghc", "Cabal"
+    , pkgPath :: FilePath    -- ^ pkgPath is the path to the source code relative to the root.
+                             -- e.g. "compiler", "libraries/Cabal/Cabal"
+    , pkgType :: PackageType
+    } deriving Generic
 
 -- | Prettyprint Package name.
 pkgNameString :: Package -> String

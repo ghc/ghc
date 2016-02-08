@@ -58,7 +58,7 @@ builderProvenance = \case
     DeriveConstants  -> Just (Stage0, deriveConstants)
     GenApply         -> Just (Stage0, genapply)
     GenPrimopCode    -> Just (Stage0, genprimopcode)
-    Ghc stage        -> if stage > Stage0 then Just (pred stage, ghc) else Nothing
+    Ghc stage        -> if stage == Stage0 then Nothing else Just (pred stage, ghc)
     GhcM stage       -> builderProvenance $ Ghc stage
     GhcCabal         -> Just (Stage0, ghcCabal)
     GhcCabalHsColour -> builderProvenance $ GhcCabal
