@@ -1793,11 +1793,10 @@ superClassesMightHelp :: Ct -> Bool
 -- expose more equalities or functional dependencies) might help to
 -- solve this constraint.  See Note [When superclases help]
 superClassesMightHelp ct
-  | CDictCan { cc_class = cls } <- ct
-  , cls `hasKey` ipClassKey
-  = False
-  | otherwise
-  = True
+  = isWantedCt ct && not (is_ip ct)
+  where
+    is_ip (CDictCan { cc_class = cls }) = isIPClass cls
+    is_ip _                             = False
 
 {- Note [When superclasses help]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1805,26 +1804,35 @@ First read Note [The superclass story] in TcCanonical.
 
 We expand superclasses and iterate only if there is at unsolved wanted
 for which expansion of superclasses (e.g. from given constraints)
-might actually help. Usually the answer is "yes" but for implicit
-paramters it is "no".  If we have [W] ?x::ty, expanding superclasses
-won't help:
-  - Superclasses can't be implicit parameters
-  - If we have a [G] ?x:ty2, then we'll have another unsolved
-      [D] ty ~ ty2 (from the functional dependency)
-    which will trigger superclass expansion.
+might actually help. The function superClassesMightHelp tells if
+doing this superclass expansion might help solve this constraint.
+Note that
 
-It's a bit of a special case, but it's easy to do.  The runtime cost
-is low because the unsolved set is usually empty anyway (errors
-aside), and the first non-imlicit-parameter will terminate the search.
+  * Superclasses help only for Wanted constraints.  Derived constraints
+    are not really "unsolved" and we certainly don't want them to
+    trigger superclass expansion. This was a good part of the loop
+    in  Trac #11523
 
-The special case is worth it (Trac #11480, comment:2) because it
-applies to CallStack constraints, which aren't type errors. If we have
-   f :: (C a) => blah
-   f x = ...undefined...
-we'll get a CallStack constraint.  If that's the only unsolved constraint
-it'll eventually be solved by defaulting.  So we don't want to emit warnings
-about hitting the simplifier's iteration limit.  A CallStack constraint
-really isn't an unsolved constraint; it can always be solved by defaulting.
+  * Even for Wanted constraints, we say "no" for implicit paramters.
+    we have [W] ?x::ty, expanding superclasses won't help:
+      - Superclasses can't be implicit parameters
+      - If we have a [G] ?x:ty2, then we'll have another unsolved
+        [D] ty ~ ty2 (from the functional dependency)
+        which will trigger superclass expansion.
+
+    It's a bit of a special case, but it's easy to do.  The runtime cost
+    is low because the unsolved set is usually empty anyway (errors
+    aside), and the first non-imlicit-parameter will terminate the search.
+
+    The special case is worth it (Trac #11480, comment:2) because it
+    applies to CallStack constraints, which aren't type errors. If we have
+       f :: (C a) => blah
+       f x = ...undefined...
+    we'll get a CallStack constraint.  If that's the only unsolved
+    constraint it'll eventually be solved by defaulting.  So we don't
+    want to emit warnings about hitting the simplifier's iteration
+    limit.  A CallStack constraint really isn't an unsolved
+    constraint; it can always be solved by defaulting.
 -}
 
 singleCt :: Ct -> Cts
