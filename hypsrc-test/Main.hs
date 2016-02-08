@@ -3,6 +3,7 @@
 
 import Data.Char
 import Data.List
+import Data.Function (on)
 
 import System.Environment
 import System.FilePath
@@ -16,7 +17,7 @@ checkConfig = CheckConfig
     { ccfgRead = parseXml
     , ccfgClean = \_ -> strip
     , ccfgDump = dumpXml
-    , ccfgEqual = (==)
+    , ccfgEqual = (==) `on` dumpXml
     }
   where
     strip = stripAnchors' . stripLinks' . stripFooter

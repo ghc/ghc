@@ -2,6 +2,7 @@
 
 
 import Data.Char
+import Data.Function (on)
 
 import System.Environment
 import System.FilePath
@@ -15,7 +16,7 @@ checkConfig = CheckConfig
     { ccfgRead = parseXml
     , ccfgClean = stripIfRequired
     , ccfgDump = dumpXml
-    , ccfgEqual = (==)
+    , ccfgEqual = (==) `on` dumpXml
     }
 
 
