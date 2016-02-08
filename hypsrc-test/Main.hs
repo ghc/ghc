@@ -3,6 +3,7 @@
 
 import Data.Char
 import Data.List
+import Data.Function (on)
 
 import System.Environment
 import System.FilePath
@@ -13,9 +14,10 @@ import Test.Haddock.Xhtml
 
 checkConfig :: CheckConfig Xml
 checkConfig = CheckConfig
-    { ccfgRead = \_ input -> strip <$> parseXml input
+    { ccfgRead = parseXml
+    , ccfgClean = \_ -> strip
     , ccfgDump = dumpXml
-    , ccfgEqual = (==)
+    , ccfgEqual = (==) `on` dumpXml
     }
   where
     strip = stripAnchors' . stripLinks' . stripFooter

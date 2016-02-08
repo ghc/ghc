@@ -24,10 +24,10 @@ baz' :: forall a b. a -> (a -> [a -> a] -> b) -> b
 baz' = undefined
 
 quux :: a -> (forall a. a -> a) -> a
-quux = undefined
+quux x f = f x
 
 quux' :: forall a. a -> (forall a. a -> a) -> a
-quux' = undefined
+quux' x f = f x
 
 
 num :: Num a => a -> a -> a
@@ -50,10 +50,10 @@ mon' = undefined
 
 
 norf :: a -> (forall a. Ord a => a -> a) -> a
-norf = undefined
+norf x f = x
 
 norf' :: forall a. a -> (forall a. Ord a => a -> a) -> a
-norf' = undefined
+norf' x f = x
 
 
 plugh :: forall a. a -> a

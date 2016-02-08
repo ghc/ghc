@@ -49,10 +49,10 @@ library
     , xhtml >= 3000.2 && < 3000.3
     , Cabal >= 1.10
     , ghc-boot
-    , ghc >= 7.10 && < 7.12
+    , ghc >= 8.0 && < 8.2
 
     , ghc-paths
-    , haddock-library == 1.2.*
+    , haddock-library == 1.4.*
 
   hs-source-dirs:
       src
@@ -115,9 +115,9 @@ test-suite spec
     Haddock.Backends.Hyperlinker.ParserSpec
 
   build-depends:
-      base >= 4.3 && < 4.9
+      base
     , containers
-    , ghc >= 7.10 && < 7.12
+    , ghc
     , hspec
     , QuickCheck == 2.*
 

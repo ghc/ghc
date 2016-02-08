@@ -2,6 +2,7 @@
 
 
 import Data.Char
+import Data.Function (on)
 
 import System.Environment
 import System.FilePath
@@ -12,9 +13,10 @@ import Test.Haddock.Xhtml
 
 checkConfig :: CheckConfig Xml
 checkConfig = CheckConfig
-    { ccfgRead = \mdl input -> stripIfRequired mdl <$> parseXml input
+    { ccfgRead = parseXml
+    , ccfgClean = stripIfRequired
     , ccfgDump = dumpXml
-    , ccfgEqual = (==)
+    , ccfgEqual = (==) `on` dumpXml
     }
 
 

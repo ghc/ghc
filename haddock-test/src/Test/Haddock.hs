@@ -16,6 +16,7 @@ import System.Exit
 import System.FilePath
 import System.IO
 import System.Process
+import qualified Data.ByteString.Char8 as BS
 
 import Test.Haddock.Config
 import Test.Haddock.Process
@@ -95,8 +96,8 @@ checkFile cfg file = do
     hasRef <- doesFileExist $ refFile dcfg file
     if hasRef
         then do
-            mout <- ccfgRead ccfg file <$> readFile (outFile dcfg file)
-            mref <- ccfgRead ccfg file <$> readFile (refFile dcfg file)
+            mout <- readOut cfg file
+            mref <- readRef cfg file
             return $ case (mout, mref) of
                 (Just out, Just ref)
                     | ccfgEqual ccfg out ref -> Pass
@@ -107,11 +108,34 @@ checkFile cfg file = do
     ccfg = cfgCheckConfig cfg
     dcfg = cfgDirConfig cfg
 
+-- We use ByteString here to ensure that no lazy I/O is performed.
+-- This way to ensure that the reference file isn't held open in
+-- case after `diffFile` (which is problematic if we need to rewrite
+-- the reference file in `maybeAcceptFile`)
+
+-- | Read the reference artifact for a test
+readRef :: Config c -> FilePath -> IO (Maybe c)
+readRef cfg file =
+    ccfgRead ccfg . BS.unpack
+    <$> BS.readFile (refFile dcfg file)
+  where
+    ccfg = cfgCheckConfig cfg
+    dcfg = cfgDirConfig cfg
+
+-- | Read (and clean) the test output artifact for a test
+readOut :: Config c -> FilePath -> IO (Maybe c)
+readOut cfg file =
+    fmap (ccfgClean ccfg file) . ccfgRead ccfg . BS.unpack
+    <$> BS.readFile (outFile dcfg file)
+  where
+    ccfg = cfgCheckConfig cfg
+    dcfg = cfgDirConfig cfg
+
 
 diffFile :: Config c -> FilePath -> FilePath -> IO ()
 diffFile cfg diff file = do
-    Just out <- ccfgRead ccfg file <$> readFile (outFile dcfg file)
-    Just ref <- ccfgRead ccfg file <$> readFile (refFile dcfg file)
+    Just out <- readOut cfg file
+    Just ref <- readRef cfg file
     writeFile outFile' $ ccfgDump ccfg out
     writeFile refFile' $ ccfgDump ccfg ref
 
@@ -130,10 +154,14 @@ diffFile cfg diff file = do
 
 
 maybeAcceptFile :: Config c -> FilePath -> CheckResult -> IO CheckResult
-maybeAcceptFile cfg@(Config { cfgDirConfig = dcfg }) file result
+maybeAcceptFile cfg file result
     | cfgAccept cfg && result `elem` [NoRef, Fail] = do
-        copyFile' (outFile dcfg file) (refFile dcfg file)
+        Just out <- readOut cfg file
+        writeFile (refFile dcfg file) $ ccfgDump ccfg out
         pure Accepted
+  where
+    dcfg = cfgDirConfig cfg
+    ccfg = cfgCheckConfig cfg
 maybeAcceptFile _ _ result = pure result
 
 
