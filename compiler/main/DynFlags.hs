@@ -1813,7 +1813,10 @@ lang_set dflags lang =
             extensionFlags = flattenExtensionFlags lang (extensions dflags)
           }
 
--- | Check whether to use unicode syntax for output
+-- | An internal helper to check whether to use unicode syntax for output.
+--
+-- Note: You should very likely be using 'Outputable.unicodeSyntax' instead
+-- of this function.
 useUnicodeSyntax :: DynFlags -> Bool
 useUnicodeSyntax = gopt Opt_PrintUnicodeSyntax
 
