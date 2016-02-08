@@ -13,8 +13,8 @@ setupRules = do
     -- passed to it can affect the contents of system.config file.
     [configFile, "settings", configH] &%> \[cfg, settings, cfgH] -> do
         alwaysRerun
-        case cmdConfigure of
-            RunConfigure args -> do
+        case cmdSetup of
+            RunSetup configureArgs -> do
                 need [ settings <.> "in", cfgH <.> "in" ]
                 -- We cannot use windowsHost here due to a cyclic dependency
                 when (System.Info.os == "mingw32") $ do
@@ -23,11 +23,11 @@ setupRules = do
                                   , "mk/get-win32-tarballs.sh"
                                   , "download"
                                   , System.Info.arch ]
-                runConfigure "." [] [args]
-            SkipConfigure     -> unlessM (doesFileExist cfg) $
+                runConfigure "." [] [configureArgs]
+            SkipSetup -> unlessM (doesFileExist cfg) $
                 putError $ "Configuration file " ++ cfg ++ " is missing.\n"
                     ++ "Run the configure script either manually or via the "
-                    ++ "build system by passing --configure[=ARGS] flag."
+                    ++ "build system by passing --setup[=CONFIGURE_ARGS] flag."
 
     ["configure", configH <.> "in"] &%> \_ -> do
         putBuild "| Running boot..."
