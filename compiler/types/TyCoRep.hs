@@ -2648,7 +2648,8 @@ pprTyTcApp p tc tys
 
   | tc `hasKey` tYPETyConKey
   , [TyConApp lev_tc []] <- tys
-  = if | lev_tc `hasKey` liftedDataConKey   -> char '*'
+  = if | lev_tc `hasKey` liftedDataConKey   ->
+           unicodeSyntax (char '★') (char '*')
        | lev_tc `hasKey` unliftedDataConKey -> char '#'
        | otherwise                          -> ppr_deflt
 

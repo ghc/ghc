@@ -35,6 +35,7 @@ module Outputable (
         fsep, fcat,
         hang, hangNotEmpty, punctuate, ppWhen, ppUnless,
         speakNth, speakN, speakNOf, plural, isOrAre, doOrDoes,
+        unicodeSyntax,
 
         coloured, PprColour, colType, colCoerc, colDataCon,
         colBinder, bold, keyword,
