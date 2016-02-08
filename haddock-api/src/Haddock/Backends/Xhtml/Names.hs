@@ -120,11 +120,11 @@ ppBinderWith :: Notation -> Bool -> OccName -> Html
 -- the documentation or is the actual definition; in the latter case, we also
 -- set the 'id' and 'class' attributes.
 ppBinderWith notation isRef n =
-  linkedAnchor name ! attributes << ppBinder' notation n
+  makeAnchor << ppBinder' notation n
   where
     name = nameAnchorId n
-    attributes | isRef     = []
-               | otherwise = [identifier name, theclass "def"]
+    makeAnchor | isRef     = linkedAnchor name
+               | otherwise = namedAnchor name ! [theclass "def"]
 
 ppBinder' :: Notation -> OccName -> Html
 ppBinder' notation n = wrapInfix notation n $ ppOccName n
