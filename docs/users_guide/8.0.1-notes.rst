@@ -409,6 +409,13 @@ Template Haskell
 Runtime system
 ~~~~~~~~~~~~~~
 
+- We have a shiny new two-step memory allocator for 64-bit platforms (see
+  :ghc-ticket:`9706`). In addition to simplifying the runtime system's
+  implementation this may significantly improve garbage collector performance.
+  Note, however, that Haskell processes will have an apparent virtual memory
+  footprint of a terabyte or so. Don't worry though, most of this amount is merely
+  mapped but uncommitted address space which is not backed by physical memory.
+
 - Support for performance monitoring with PAPI has been dropped.
 
 - :rts-flag:`-maxN⟨x⟩ <-maxN>` flag added to complement :rts-flag:`-N`. It will
