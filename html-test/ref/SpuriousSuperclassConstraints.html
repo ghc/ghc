@@ -1,32 +1,33 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml"
 ><head
   ><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"
      /><title
     >SpuriousSuperclassConstraints</title
-    ><link href="ocean.css" rel="stylesheet" type="text/css" title="Ocean"
+    ><link href="#" rel="stylesheet" type="text/css" title="Ocean"
      /><script src="haddock-util.js" type="text/javascript"
     ></script
+    ><script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"
+    ></script
     ><script type="text/javascript"
-    >//<![CDATA[
-window.onload = function () {pageLoad();setSynopsis("mini_SpuriousSuperclassConstraints.html");};
-//]]>
+    >//
+window.onload = function () {pageLoad();setSynopsis(&quot;mini_SpuriousSuperclassConstraints.html&quot;);};
+//
 </script
     ></head
   ><body
   ><div id="package-header"
     ><ul class="links" id="page-menu"
       ><li
-	><a href=""
+	><a href="#"
 	  >Contents</a
 	  ></li
 	><li
-	><a href=""
+	><a href="#"
 	  >Index</a
 	  ></li
 	></ul
       ><p class="caption empty"
-      >&nbsp;</p
+      ></p
       ></div
     ><div id="content"
     ><div id="module-header"
@@ -51,13 +52,13 @@ window.onload = function () {pageLoad();setSynopsis("mini_SpuriousSuperclassCons
 	  >Due to a change in GHC 7.6.1 we had a bug that superclass contraints were
  included in the instances list.  Edward K. repported it here:</p
 	  ><p
-	  ><a href=""
+	  ><a href="#"
 	    >http://www.haskell.org/pipermail/haskell-cafe/2012-September/103600.html</a
 	    ></p
 	  ><p
 	  >And here is the corresponding theard on glasgow-haskell-users:</p
 	  ><p
-	  ><a href=""
+	  ><a href="#"
 	    >http://www.haskell.org/pipermail/glasgow-haskell-users/2012-September/022914.html</a
 	    ></p
 	  ><p
@@ -74,7 +75,7 @@ Fix spurious superclass constraints bug.</pre
 	><p class="src"
 	  ><span class="keyword"
 	    >data</span
-	    > <a href="" id="t:SomeType" class="def"
+	    > <a href="#" id="t:SomeType" class="def"
 	    >SomeType</a
 	    > f a</p
 	  ><div class="subs instances"
@@ -87,14 +88,14 @@ Fix spurious superclass constraints bug.</pre
 		  ><span class="inst-left"
 		    ><span id="control.i:id:SomeType:Functor:1" class="instance expander" onclick="toggleSection('i:id:SomeType:Functor:1')"
 		      ></span
-		      > <a href=""
+		      > <a href="#"
 		      >Functor</a
-		      > (<a href=""
+		      > (<a href="#"
 		      >SomeType</a
 		      > f)</span
 		    ></td
 		  ><td class="doc empty"
-		  >&nbsp;</td
+		  ></td
 		  ></tr
 		><tr
 		><td colspan="2"
@@ -103,19 +104,19 @@ Fix spurious superclass constraints bug.</pre
 		      ><p class="caption"
 			>Methods</p
 			><p class="src"
-			><a href=""
+			><a href="#"
 			  >fmap</a
-			  > :: (a -&gt; b) -&gt; <a href=""
+			  > :: (a -&gt; b) -&gt; <a href="#"
 			  >SomeType</a
-			  > f a -&gt; <a href=""
+			  > f a -&gt; <a href="#"
 			  >SomeType</a
 			  > f b</p
 			><p class="src"
-			><a href=""
+			><a href="#"
 			  >(&lt;$)</a
-			  > :: a -&gt; <a href=""
+			  > :: a -&gt; <a href="#"
 			  >SomeType</a
-			  > f b -&gt; <a href=""
+			  > f b -&gt; <a href="#"
 			  >SomeType</a
 			  > f a</p
 			></div
@@ -127,16 +128,16 @@ Fix spurious superclass constraints bug.</pre
 		  ><span class="inst-left"
 		    ><span id="control.i:id:SomeType:Applicative:2" class="instance expander" onclick="toggleSection('i:id:SomeType:Applicative:2')"
 		      ></span
-		      > <a href=""
+		      > <a href="#"
 		      >Applicative</a
-		      > f =&gt; <a href=""
+		      > f =&gt; <a href="#"
 		      >Applicative</a
-		      > (<a href=""
+		      > (<a href="#"
 		      >SomeType</a
 		      > f)</span
 		    ></td
 		  ><td class="doc empty"
-		  >&nbsp;</td
+		  ></td
 		  ></tr
 		><tr
 		><td colspan="2"
@@ -145,39 +146,39 @@ Fix spurious superclass constraints bug.</pre
 		      ><p class="caption"
 			>Methods</p
 			><p class="src"
-			><a href=""
+			><a href="#"
 			  >pure</a
-			  > :: a -&gt; <a href=""
+			  > :: a -&gt; <a href="#"
 			  >SomeType</a
 			  > f a</p
 			><p class="src"
-			><a href=""
+			><a href="#"
 			  >(&lt;*&gt;)</a
-			  > :: <a href=""
+			  > :: <a href="#"
 			  >SomeType</a
-			  > f (a -&gt; b) -&gt; <a href=""
+			  > f (a -&gt; b) -&gt; <a href="#"
 			  >SomeType</a
-			  > f a -&gt; <a href=""
+			  > f a -&gt; <a href="#"
 			  >SomeType</a
 			  > f b</p
 			><p class="src"
-			><a href=""
+			><a href="#"
 			  >(*&gt;)</a
-			  > :: <a href=""
+			  > :: <a href="#"
 			  >SomeType</a
-			  > f a -&gt; <a href=""
+			  > f a -&gt; <a href="#"
 			  >SomeType</a
-			  > f b -&gt; <a href=""
+			  > f b -&gt; <a href="#"
 			  >SomeType</a
 			  > f b</p
 			><p class="src"
-			><a href=""
+			><a href="#"
 			  >(&lt;*)</a
-			  > :: <a href=""
+			  > :: <a href="#"
 			  >SomeType</a
-			  > f a -&gt; <a href=""
+			  > f a -&gt; <a href="#"
 			  >SomeType</a
-			  > f b -&gt; <a href=""
+			  > f b -&gt; <a href="#"
 			  >SomeType</a
 			  > f a</p
 			></div
@@ -191,11 +192,7 @@ Fix spurious superclass constraints bug.</pre
 	></div
       ></div
     ><div id="footer"
-    ><p
-      >Produced by <a href=""
-	>Haddock</a
-	> version 2.16.2</p
-      ></div
+    ></div
     ></body
   ></html
 >
