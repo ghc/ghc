@@ -913,9 +913,9 @@ flatten_one (TyVarTy tv)
        ; role <- getRole
        ; case mb_yes of
            FTRCasted tv' kco -> -- Done
-                       do { traceFlat "flattenTyVar1"
-                              (pprTvBndr tv' $$
-                               ppr kco <+> dcolon <+> ppr (coercionKind kco))
+                       do { -- traceFlat "flattenTyVar1"
+                            --   (pprTvBndr tv' $$
+                            --    ppr kco <+> dcolon <+> ppr (coercionKind kco))
                           ; return (ty', mkReflCo role ty
                                          `mkCoherenceLeftCo` mkSymCo kco) }
                     where
@@ -924,7 +924,7 @@ flatten_one (TyVarTy tv)
 
            FTRFollowed ty1 co1  -- Recur
                     -> do { (ty2, co2) <- flatten_one ty1
-                          ; traceFlat "flattenTyVar2" (ppr tv $$ ppr ty2)
+                          -- ; traceFlat "flattenTyVar2" (ppr tv $$ ppr ty2)
                           ; return (ty2, co2 `mkTransCo` co1) } }
 
 flatten_one (AppTy ty1 ty2)
@@ -1340,10 +1340,10 @@ flatten_tyvar3 tv
            <- setMode FM_SubstOnly $
               flattenKinds $
               flatten_one kind
-       ; traceFlat "flattenTyVarFinal"
-           (vcat [ ppr tv <+> dcolon <+> ppr (tyVarKind tv)
-                 , ppr _new_kind
-                 , ppr kind_co <+> dcolon <+> ppr (coercionKind kind_co) ])
+--       ; traceFlat "flattenTyVarFinal"
+--           (vcat [ ppr tv <+> dcolon <+> ppr (tyVarKind tv)
+--                 , ppr _new_kind
+--                 , ppr kind_co <+> dcolon <+> ppr (coercionKind kind_co) ])
        ; let Pair _ orig_kind = coercionKind kind_co
              -- orig_kind might be zonked
        ; return (FTRCasted (setTyVarKind tv orig_kind) kind_co) }
