@@ -17,10 +17,13 @@ setupRules = do
             RunConfigure args -> do
                 need [ settings <.> "in", cfgH <.> "in" ]
                 -- We cannot use windowsHost here due to a cyclic dependency
-                let defaultArgs = if System.Info.os == "mingw32"
-                                  then [ "--enable-tarballs-autodownload" ]
-                                  else []
-                runConfigure "." [] $ defaultArgs ++ [args]
+                when (System.Info.os == "mingw32") $ do
+                    putBuild "| Checking for Windows tarballs..."
+                    quietly $ cmd [ "bash"
+                                  , "mk/get-win32-tarballs.sh"
+                                  , "download"
+                                  , System.Info.arch ]
+                runConfigure "." [] [args]
             SkipConfigure     -> unlessM (doesFileExist cfg) $
                 putError $ "Configuration file " ++ cfg ++ " is missing.\n"
                     ++ "Run the configure script either manually or via the "
