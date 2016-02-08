@@ -139,7 +139,7 @@ module TcType (
   isClassPred, isEqPred, isNomEqPred, isIPPred,
   mkClassPred,
   isDictLikeTy,
-  tcSplitDFunTy, tcSplitDFunHead,
+  tcSplitDFunTy, tcSplitDFunHead, tcSplitMethodTy,
   isLevityVar, isLevityPolymorphic, isLevityPolymorphic_maybe,
   isVisibleBinder, isInvisibleBinder,
 
@@ -1262,6 +1262,25 @@ tcSplitDFunTy ty
 tcSplitDFunHead :: Type -> (Class, [Type])
 tcSplitDFunHead = getClassPredTys
 
+tcSplitMethodTy :: Type -> ([TyVar], PredType, Type)
+-- A class method (selector) always has a type like
+--   forall as. C as => blah
+-- So if the class looks like
+--   class C a where
+--     op :: forall b. (Eq a, Ix b) => a -> b
+-- the class method type looks like
+--  op :: forall a. C a => forall b. (Eq a, Ix b) => a -> b
+--
+-- tcSplitMethodTy just peels off the outer forall and
+-- that first predicate
+tcSplitMethodTy ty
+  | (sel_tyvars,sel_rho) <- tcSplitForAllTys ty
+  , Just (first_pred, local_meth_ty) <- tcSplitPredFunTy_maybe sel_rho
+  = (sel_tyvars, first_pred, local_meth_ty)
+  | otherwise
+  = pprPanic "tcSplitMethodTy" (ppr ty)
+
+-----------------------
 tcEqKind :: TcKind -> TcKind -> Bool
 tcEqKind = tcEqType
 

@@ -1963,13 +1963,76 @@ mk_appE_app a b = nlHsApps appE_RDR [a, b]
 *                                                                      *
 ************************************************************************
 
+Note [Newtype-deriving instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We take every method in the original instance and `coerce` it to fit
 into the derived instance. We need a type annotation on the argument
 to `coerce` to make it obvious what instantiation of the method we're
-coercing from.
+coercing from.  So from, say,
+  class C a b where
+    op :: a -> [b] -> Int
+
+  newtype T x = MkT <rep-ty>
+
+  instance C a <rep-ty> => C a (T x) where
+    op = (coerce
+             (op :: a -> [<rep-ty>] -> Int)
+         ) :: a -> [T x] -> Int
+
+Notice that we give the 'coerce' call two type signatures: one to
+fix the of the inner call, and one for the expected type.  The outer
+type signature ought to be redundant, but may improve error messages.
+The inner one is essential to fix the type at which 'op' is called.
 
 See #8503 for more discussion.
+
+Here's a wrinkle. Supppose 'op' is locally overloaded:
+
+  class C2 b where
+    op2 :: forall a. Eq a => a -> [b] -> Int
+
+Then we could do exactly as above, but it's a bit redundant to
+instantiate op, then re-generalise with the inner signature.
+(The inner sig is only there to fix the type at which 'op' is
+called.)  So we just instantiate the signature, and add
+
+  instance C2 <rep-ty> => C2 (T x) where
+    op2 = (coerce
+             (op2 :: a -> [<rep-ty>] -> Int)
+          ) :: forall a. Eq a => a -> [T x] -> Int
 -}
+
+gen_Newtype_binds :: SrcSpan
+                  -> Class   -- the class being derived
+                  -> [TyVar] -- the tvs in the instance head
+                  -> [Type]  -- instance head parameters (incl. newtype)
+                  -> Type    -- the representation type (already eta-reduced)
+                  -> LHsBinds RdrName
+-- See Note [Newtype-deriving instances]
+gen_Newtype_binds loc cls inst_tvs cls_tys rhs_ty
+  = listToBag $ map mk_bind (classMethods cls)
+  where
+    coerce_RDR = getRdrName coerceId
+
+    mk_bind :: Id -> LHsBind RdrName
+    mk_bind meth_id
+      = mkRdrFunBind (L loc meth_RDR) [mkSimpleMatch [] rhs_expr]
+      where
+        Pair from_ty to_ty = mkCoerceClassMethEqn cls inst_tvs cls_tys rhs_ty meth_id
+
+        -- See "wrinkle" in Note [Newtype-deriving instances]
+        (_, _, from_ty') = tcSplitSigmaTy from_ty
+
+        meth_RDR = getRdrName meth_id
+
+        rhs_expr = ( nlHsVar coerce_RDR
+                      `nlHsApp`
+                    (nlHsVar meth_RDR `nlExprWithTySig` toLHsSigWcType from_ty'))
+                  `nlExprWithTySig` toLHsSigWcType to_ty
+
+
+    nlExprWithTySig :: LHsExpr RdrName -> LHsSigWcType RdrName -> LHsExpr RdrName
+    nlExprWithTySig e s = noLoc (ExprWithTySig e s)
 
 mkCoerceClassMethEqn :: Class   -- the class being derived
                      -> [TyVar] -- the tvs in the instance head
@@ -1977,8 +2040,12 @@ mkCoerceClassMethEqn :: Class   -- the class being derived
                      -> Type    -- the representation type (already eta-reduced)
                      -> Id      -- the method to look at
                      -> Pair Type
+-- See Note [Newtype-deriving instances]
+-- The pair is the (from_type, to_type), where to_type is
+-- the type of the method we are tyrying to get
 mkCoerceClassMethEqn cls inst_tvs cls_tys rhs_ty id
-  = Pair (substTy rhs_subst user_meth_ty) (substTy lhs_subst user_meth_ty)
+  = Pair (substTy rhs_subst user_meth_ty)
+         (substTy lhs_subst user_meth_ty)
   where
     cls_tvs = classTyVars cls
     in_scope = mkInScopeSet $ mkVarSet inst_tvs
@@ -1987,42 +2054,12 @@ mkCoerceClassMethEqn cls inst_tvs cls_tys rhs_ty id
                         ( zipTyEnv cls_tvs (changeLast cls_tys rhs_ty)
                         , emptyCvSubstEnv )
     (_class_tvs, _class_constraint, user_meth_ty)
-      = tcSplitSigmaTy (varType id)
+      = tcSplitMethodTy (varType id)
 
     changeLast :: [a] -> a -> [a]
     changeLast []     _  = panic "changeLast"
     changeLast [_]    x  = [x]
     changeLast (x:xs) x' = x : changeLast xs x'
-
-
-gen_Newtype_binds :: SrcSpan
-                  -> Class   -- the class being derived
-                  -> [TyVar] -- the tvs in the instance head
-                  -> [Type]  -- instance head parameters (incl. newtype)
-                  -> Type    -- the representation type (already eta-reduced)
-                  -> LHsBinds RdrName
-gen_Newtype_binds loc cls inst_tvs cls_tys rhs_ty
-  = listToBag $ zipWith mk_bind
-        (classMethods cls)
-        (map (mkCoerceClassMethEqn cls inst_tvs cls_tys rhs_ty) (classMethods cls))
-  where
-    coerce_RDR = getRdrName coerceId
-    mk_bind :: Id -> Pair Type -> LHsBind RdrName
-    mk_bind id (Pair tau_ty user_ty)
-      = mkRdrFunBind (L loc meth_RDR) [mkSimpleMatch [] rhs_expr]
-      where
-        meth_RDR = getRdrName id
-        rhs_expr
-          = ( nlHsVar coerce_RDR
-                `nlHsApp`
-              (nlHsVar meth_RDR `nlExprWithTySig` toLHsSigWcType tau_ty'))
-            `nlExprWithTySig` toLHsSigWcType user_ty
-        -- Open the representation type here, so that it's forall'ed type
-        -- variables refer to the ones bound in the user_ty
-        (_, _, tau_ty')  = tcSplitSigmaTy tau_ty
-
-    nlExprWithTySig :: LHsExpr RdrName -> LHsSigWcType RdrName -> LHsExpr RdrName
-    nlExprWithTySig e s = noLoc (ExprWithTySig e s)
 
 {-
 ************************************************************************
