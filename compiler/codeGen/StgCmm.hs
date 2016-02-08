@@ -141,7 +141,7 @@ cgTopRhs :: DynFlags -> RecFlag -> Id -> StgRhs -> (CgIdInfo, FCode ())
 cgTopRhs dflags _rec bndr (StgRhsCon _cc con args)
   = cgTopRhsCon dflags bndr con args
 
-cgTopRhs dflags rec bndr (StgRhsClosure cc bi fvs upd_flag _srt args body)
+cgTopRhs dflags rec bndr (StgRhsClosure cc bi fvs upd_flag args body)
   = ASSERT(null fvs)    -- There should be no free variables
     cgTopRhsClosure dflags rec bndr cc bi upd_flag args body
 

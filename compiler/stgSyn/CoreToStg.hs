@@ -50,11 +50,10 @@ import Control.Monad (liftM, ap)
 -- Note [Live vs free]
 -- ~~~~~~~~~~~~~~~~~~~
 --
--- The actual Stg datatype is decorated with live variable information, as well
--- as free variable information. The two are not the same. Liveness is an
--- operational property rather than a semantic one. A variable is live at a
--- particular execution point if it can be referred to directly again. In
--- particular, a dead variable's stack slot (if it has one):
+-- The two are not the same. Liveness is an operational property rather
+-- than a semantic one. A variable is live at a particular execution
+-- point if it can be referred to directly again. In particular, a dead
+-- variable's stack slot (if it has one):
 --
 --           - should be stubbed to avoid space leaks, and
 --           - may be reused for something else.
@@ -88,8 +87,7 @@ import Control.Monad (liftM, ap)
 -- Note [Collecting live CAF info]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
--- In this pass we also collect information on which CAFs are live for
--- constructing SRTs (see SRT.hs).
+-- In this pass we also collect information on which CAFs are live.
 --
 -- A top-level Id has CafInfo, which is
 --
@@ -107,24 +105,6 @@ import Control.Monad (liftM, ap)
 -- The later SRT pass takes these lists of Ids and uses them to construct
 -- the actual nested SRTs, and replaces the lists of Ids with (offset,length)
 -- pairs.
-
-
--- Note [Interaction of let-no-escape with SRTs]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- Consider
---
---         let-no-escape x = ...caf1...caf2...
---         in
---         ...x...x...x...
---
--- where caf1,caf2 are CAFs.  Since x doesn't have a closure, we
--- build SRTs just as if x's defn was inlined at each call site, and
--- that means that x's CAF refs get duplicated in the overall SRT.
---
--- This is unlike ordinary lets, in which the CAF refs are not duplicated.
---
--- We could fix this loss of (static) sharing by making a sort of pseudo-closure
--- for x, solely to put in the SRTs lower down.
 
 -- Note [What is a non-escaping let]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -186,9 +166,9 @@ import Control.Monad (liftM, ap)
 -- Setting variable info: top-level, binds, RHSs
 -- --------------------------------------------------------------
 
-coreToStg :: DynFlags -> Module -> CoreProgram -> IO [StgBinding]
+coreToStg :: DynFlags -> Module -> CoreProgram -> [StgBinding]
 coreToStg dflags this_mod pgm
-  = return pgm'
+  = pgm'
   where (_, _, pgm') = coreTopBindsToStg dflags this_mod emptyVarEnv pgm
 
 coreExprToStg :: CoreExpr -> StgExpr
@@ -273,7 +253,7 @@ consistentCafInfo id bind
     safe  = id_marked_caffy || not binding_is_caffy
     exact = id_marked_caffy == binding_is_caffy
     id_marked_caffy  = mayHaveCafRefs (idCafInfo id)
-    binding_is_caffy = stgBindHasCafRefs bind
+    binding_is_caffy = topStgBindHasCafRefs bind
     is_sat_thing = occNameFS (nameOccName (idName id)) == fsLit "sat"
 
 coreToTopStgRhs
@@ -285,9 +265,8 @@ coreToTopStgRhs
 
 coreToTopStgRhs dflags this_mod scope_fv_info (bndr, rhs)
   = do { (new_rhs, rhs_fvs, _) <- coreToStgExpr rhs
-       ; lv_info <- freeVarsToLiveVars rhs_fvs
 
-       ; let stg_rhs   = mkTopStgRhs dflags this_mod rhs_fvs (mkSRT lv_info) bndr bndr_info new_rhs
+       ; let stg_rhs   = mkTopStgRhs dflags this_mod rhs_fvs bndr bndr_info new_rhs
              stg_arity = stgRhsArity stg_rhs
        ; return (ASSERT2( arity_ok stg_arity, mk_arity_msg stg_arity) stg_rhs,
                  rhs_fvs) }
@@ -314,7 +293,7 @@ coreToTopStgRhs dflags this_mod scope_fv_info (bndr, rhs)
                 text "STG arity:" <+> ppr stg_arity]
 
 mkTopStgRhs :: DynFlags -> Module -> FreeVarsInfo
-            -> SRT -> Id -> StgBinderInfo -> StgExpr
+            -> Id -> StgBinderInfo -> StgExpr
             -> StgRhs
 
 mkTopStgRhs dflags this_mod = mkStgRhs' con_updateable
@@ -414,23 +393,12 @@ coreToStgExpr (Case scrut bndr _ alts) = do
         alts_fvs_wo_bndr  = bndr `minusFVBinder` alts_fvs
         alts_escs_wo_bndr = alts_escs `delVarSet` bndr
 
-    alts_lv_info <- freeVarsToLiveVars alts_fvs_wo_bndr
-
         -- We tell the scrutinee that everything
         -- live in the alts is live in it, too.
-    (scrut2, scrut_fvs, _scrut_escs, scrut_lv_info)
-       <- setVarsLiveInCont alts_lv_info $ do
-            (scrut2, scrut_fvs, scrut_escs) <- coreToStgExpr scrut
-            scrut_lv_info <- freeVarsToLiveVars scrut_fvs
-            return (scrut2, scrut_fvs, scrut_escs, scrut_lv_info)
+    (scrut2, scrut_fvs, _scrut_escs) <- coreToStgExpr scrut
 
     return (
-      StgCase scrut2 (getLiveVars scrut_lv_info)
-                     (getLiveVars alts_lv_info)
-                     bndr'
-                     (mkSRT alts_lv_info)
-                     (mkStgAltType bndr alts)
-                     alts2,
+      StgCase scrut2 bndr' (mkStgAltType bndr alts) alts2,
       scrut_fvs `unionFVInfo` alts_fvs_wo_bndr,
       alts_escs_wo_bndr `unionVarSet` getFVSet scrut_fvs
                 -- You might think we should have scrut_escs, not
@@ -682,38 +650,28 @@ coreToStgLet
                                 -- is among the escaping vars
 
 coreToStgLet let_no_escape bind body = do
-    (bind2, bind_fvs, bind_escs, bind_lvs,
-     body2, body_fvs, body_escs, body_lvs)
-       <- mfix $ \ ~(_, _, _, _, _, rec_body_fvs, _, _) -> do
+    (bind2, bind_fvs, bind_escs,
+     body2, body_fvs, body_escs)
+       <- mfix $ \ ~(_, _, _, _, rec_body_fvs, _) -> do
 
-          -- Do the bindings, setting live_in_cont to empty if
-          -- we ain't in a let-no-escape world
-          live_in_cont <- getVarsLiveInCont
-          ( bind2, bind_fvs, bind_escs, bind_lv_info, env_ext)
-                <- setVarsLiveInCont (if let_no_escape
-                                          then live_in_cont
-                                          else emptyLiveInfo)
-                                     (vars_bind rec_body_fvs bind)
+          ( bind2, bind_fvs, bind_escs, env_ext)
+                <- vars_bind rec_body_fvs bind
 
           -- Do the body
           extendVarEnvLne env_ext $ do
              (body2, body_fvs, body_escs) <- coreToStgExpr body
-             body_lv_info <- freeVarsToLiveVars body_fvs
 
-             return (bind2, bind_fvs, bind_escs, getLiveVars bind_lv_info,
-                     body2, body_fvs, body_escs, getLiveVars body_lv_info)
+             return (bind2, bind_fvs, bind_escs,
+                     body2, body_fvs, body_escs)
 
 
         -- Compute the new let-expression
     let
-        new_let | let_no_escape = StgLetNoEscape live_in_whole_let bind_lvs bind2 body2
+        new_let | let_no_escape = StgLetNoEscape bind2 body2
                 | otherwise     = StgLet bind2 body2
 
         free_in_whole_let
           = binders `minusFVBinders` (bind_fvs `unionFVInfo` body_fvs)
-
-        live_in_whole_let
-          = bind_lvs `unionVarSet` (body_lvs `delVarSetList` binders)
 
         real_bind_escs = if let_no_escape then
                             bind_escs
@@ -747,49 +705,43 @@ coreToStgLet let_no_escape bind body = do
     set_of_binders = mkVarSet binders
     binders        = bindersOf bind
 
-    mk_binding bind_lv_info binder rhs
-        = (binder, LetBound (NestedLet live_vars) (manifestArity rhs))
-        where
-           live_vars | let_no_escape = addLiveVar bind_lv_info binder
-                     | otherwise     = unitLiveVar binder
-                -- c.f. the invariant on NestedLet
+    mk_binding binder rhs
+        = (binder, LetBound NestedLet (manifestArity rhs))
 
     vars_bind :: FreeVarsInfo           -- Free var info for body of binding
               -> CoreBind
               -> LneM (StgBinding,
                        FreeVarsInfo,
                        EscVarsSet,        -- free vars; escapee vars
-                       LiveInfo,          -- Vars and CAFs live in binding
                        [(Id, HowBound)])  -- extension to environment
 
 
     vars_bind body_fvs (NonRec binder rhs) = do
-        (rhs2, bind_fvs, bind_lv_info, escs) <- coreToStgRhs body_fvs [] (binder,rhs)
+        (rhs2, bind_fvs, escs) <- coreToStgRhs body_fvs (binder,rhs)
         let
-            env_ext_item = mk_binding bind_lv_info binder rhs
+            env_ext_item = mk_binding binder rhs
 
         return (StgNonRec binder rhs2,
-                bind_fvs, escs, bind_lv_info, [env_ext_item])
+                bind_fvs, escs, [env_ext_item])
 
 
     vars_bind body_fvs (Rec pairs)
-      = mfix $ \ ~(_, rec_rhs_fvs, _, bind_lv_info, _) ->
+      = mfix $ \ ~(_, rec_rhs_fvs, _, _) ->
            let
                 rec_scope_fvs = unionFVInfo body_fvs rec_rhs_fvs
                 binders = map fst pairs
-                env_ext = [ mk_binding bind_lv_info b rhs
+                env_ext = [ mk_binding b rhs
                           | (b,rhs) <- pairs ]
            in
            extendVarEnvLne env_ext $ do
-              (rhss2, fvss, lv_infos, escss)
-                     <- mapAndUnzip4M (coreToStgRhs rec_scope_fvs binders) pairs
+              (rhss2, fvss, escss)
+                     <- mapAndUnzip3M (coreToStgRhs rec_scope_fvs) pairs
               let
                         bind_fvs = unionFVInfos fvss
-                        bind_lv_info = foldr unionLiveInfo emptyLiveInfo lv_infos
                         escs     = unionVarSets escss
 
               return (StgRec (binders `zip` rhss2),
-                      bind_fvs, escs, bind_lv_info, env_ext)
+                      bind_fvs, escs, env_ext)
 
 
 is_join_var :: Id -> Bool
@@ -798,37 +750,35 @@ is_join_var :: Id -> Bool
 is_join_var j = occNameString (getOccName j) == "$j"
 
 coreToStgRhs :: FreeVarsInfo      -- Free var info for the scope of the binding
-             -> [Id]
              -> (Id,CoreExpr)
-             -> LneM (StgRhs, FreeVarsInfo, LiveInfo, EscVarsSet)
+             -> LneM (StgRhs, FreeVarsInfo, EscVarsSet)
 
-coreToStgRhs scope_fv_info binders (bndr, rhs) = do
+coreToStgRhs scope_fv_info (bndr, rhs) = do
     (new_rhs, rhs_fvs, rhs_escs) <- coreToStgExpr rhs
-    lv_info <- freeVarsToLiveVars (binders `minusFVBinders` rhs_fvs)
-    return (mkStgRhs rhs_fvs (mkSRT lv_info) bndr bndr_info new_rhs,
-            rhs_fvs, lv_info, rhs_escs)
+    return (mkStgRhs rhs_fvs bndr bndr_info new_rhs,
+            rhs_fvs, rhs_escs)
   where
     bndr_info = lookupFVInfo scope_fv_info bndr
 
-mkStgRhs :: FreeVarsInfo -> SRT -> Id -> StgBinderInfo -> StgExpr -> StgRhs
+mkStgRhs :: FreeVarsInfo -> Id -> StgBinderInfo -> StgExpr -> StgRhs
 mkStgRhs = mkStgRhs' con_updateable
   where con_updateable _ _ = False
 
 mkStgRhs' :: (DataCon -> [StgArg] -> Bool)
-            -> FreeVarsInfo -> SRT -> Id -> StgBinderInfo -> StgExpr -> StgRhs
-mkStgRhs' con_updateable rhs_fvs srt bndr binder_info rhs
+            -> FreeVarsInfo -> Id -> StgBinderInfo -> StgExpr -> StgRhs
+mkStgRhs' con_updateable rhs_fvs bndr binder_info rhs
   | StgLam bndrs body <- rhs
   = StgRhsClosure noCCS binder_info
                    (getFVs rhs_fvs)
                    ReEntrant
-                   srt bndrs body
+                   bndrs body
   | StgConApp con args <- unticked_rhs
   , not (con_updateable con args)
   = StgRhsCon noCCS con args
   | otherwise
   = StgRhsClosure noCCS binder_info
                    (getFVs rhs_fvs)
-                   upd_flag srt [] rhs
+                   upd_flag [] rhs
  where
 
     (_, unticked_rhs) = stripStgTicksTop (not . tickishIsCode) rhs
@@ -896,17 +846,10 @@ isPAP env _               = False
 
 newtype LneM a = LneM
     { unLneM :: IdEnv HowBound
-             -> LiveInfo                -- Vars and CAFs live in continuation
              -> a
     }
 
-type LiveInfo = (StgLiveVars,   -- Dynamic live variables;
-                                -- i.e. ones with a nested (non-top-level) binding
-                 CafSet)        -- Static live variables;
-                                -- i.e. top-level variables that are CAFs or refer to them
-
 type EscVarsSet = IdSet
-type CafSet     = IdSet
 
 data HowBound
   = ImportBound         -- Used only as a response to lookupBinding; never
@@ -920,10 +863,7 @@ data HowBound
 
 data LetInfo
   = TopLet              -- top level things
-  | NestedLet LiveInfo  -- For nested things, what is live if this
-                        -- thing is live?  Invariant: the binder
-                        -- itself is always a member of
-                        -- the dynamic set of its own LiveInfo
+  | NestedLet
 
 isLetBound :: HowBound -> Bool
 isLetBound (LetBound _ _) = True
@@ -948,31 +888,10 @@ topLevelBound _                   = False
 -- The set of dynamic live variables is guaranteed ot have no further
 -- let-no-escaped variables in it.
 
-emptyLiveInfo :: LiveInfo
-emptyLiveInfo = (emptyVarSet,emptyVarSet)
-
-unitLiveVar :: Id -> LiveInfo
-unitLiveVar lv = (unitVarSet lv, emptyVarSet)
-
-unitLiveCaf :: Id -> LiveInfo
-unitLiveCaf caf = (emptyVarSet, unitVarSet caf)
-
-addLiveVar :: LiveInfo -> Id -> LiveInfo
-addLiveVar (lvs, cafs) id = (lvs `extendVarSet` id, cafs)
-
-unionLiveInfo :: LiveInfo -> LiveInfo -> LiveInfo
-unionLiveInfo (lv1,caf1) (lv2,caf2) = (lv1 `unionVarSet` lv2, caf1 `unionVarSet` caf2)
-
-mkSRT :: LiveInfo -> SRT
-mkSRT (_, cafs) = SRTEntries cafs
-
-getLiveVars :: LiveInfo -> StgLiveVars
-getLiveVars (lvs, _) = lvs
-
 -- The std monad functions:
 
 initLne :: IdEnv HowBound -> LneM a -> a
-initLne env m = unLneM m env emptyLiveInfo
+initLne env m = unLneM m env
 
 
 
@@ -980,11 +899,11 @@ initLne env m = unLneM m env emptyLiveInfo
 {-# INLINE returnLne #-}
 
 returnLne :: a -> LneM a
-returnLne e = LneM $ \_ _ -> e
+returnLne e = LneM $ \_ -> e
 
 thenLne :: LneM a -> (a -> LneM b) -> LneM b
-thenLne m k = LneM $ \env lvs_cont
-  -> unLneM (k (unLneM m env lvs_cont)) env lvs_cont
+thenLne m k = LneM $ \env
+  -> unLneM (k (unLneM m env)) env
 
 instance Functor LneM where
     fmap = liftM
@@ -997,58 +916,24 @@ instance Monad LneM where
     (>>=)  = thenLne
 
 instance MonadFix LneM where
-    mfix expr = LneM $ \env lvs_cont ->
-                       let result = unLneM (expr result) env lvs_cont
+    mfix expr = LneM $ \env ->
+                       let result = unLneM (expr result) env
                        in  result
 
 -- Functions specific to this monad:
 
-getVarsLiveInCont :: LneM LiveInfo
-getVarsLiveInCont = LneM $ \_env lvs_cont -> lvs_cont
-
-setVarsLiveInCont :: LiveInfo -> LneM a -> LneM a
-setVarsLiveInCont new_lvs_cont expr
-   =    LneM $   \env _lvs_cont
-   -> unLneM expr env new_lvs_cont
-
 extendVarEnvLne :: [(Id, HowBound)] -> LneM a -> LneM a
 extendVarEnvLne ids_w_howbound expr
-   =    LneM $   \env lvs_cont
-   -> unLneM expr (extendVarEnvList env ids_w_howbound) lvs_cont
+   =    LneM $   \env
+   -> unLneM expr (extendVarEnvList env ids_w_howbound)
 
 lookupVarLne :: Id -> LneM HowBound
-lookupVarLne v = LneM $ \env _lvs_cont -> lookupBinding env v
+lookupVarLne v = LneM $ \env -> lookupBinding env v
 
 lookupBinding :: IdEnv HowBound -> Id -> HowBound
 lookupBinding env v = case lookupVarEnv env v of
                         Just xx -> xx
                         Nothing -> ASSERT2( isGlobalId v, ppr v ) ImportBound
-
-
--- The result of lookupLiveVarsForSet, a set of live variables, is
--- only ever tacked onto a decorated expression. It is never used as
--- the basis of a control decision, which might give a black hole.
-
-freeVarsToLiveVars :: FreeVarsInfo -> LneM LiveInfo
-freeVarsToLiveVars fvs = LneM freeVarsToLiveVars'
- where
-  freeVarsToLiveVars' _env live_in_cont = live_info
-   where
-    live_info    = foldr unionLiveInfo live_in_cont lvs_from_fvs
-    lvs_from_fvs = map do_one (allFreeIds fvs)
-
-    do_one (v, how_bound)
-      = case how_bound of
-          ImportBound                     -> unitLiveCaf v      -- Only CAF imports are
-                                                                -- recorded in fvs
-          LetBound TopLet _
-                | mayHaveCafRefs (idCafInfo v) -> unitLiveCaf v
-                | otherwise                    -> emptyLiveInfo
-
-          LetBound (NestedLet lvs) _      -> lvs        -- lvs already contains v
-                                                        -- (see the invariant on NestedLet)
-
-          _lambda_or_case_binding         -> unitLiveVar v      -- Bound by lambda or case
 
 
 -- ---------------------------------------------------------------------------
@@ -1117,11 +1002,6 @@ lookupFVInfo fvs id
                         Nothing         -> noBinderInfo
                         Just (_,_,info) -> info
 
-allFreeIds :: FreeVarsInfo -> [(Id,HowBound)]   -- Both top level and non-top-level Ids
-allFreeIds fvs = ASSERT( all (isId . fst) ids ) ids
-      where
-        ids = [(id,how_bound) | (id,how_bound,_) <- varEnvElts fvs]
-
 -- Non-top-level things only, both type variables and ids
 getFVs :: FreeVarsInfo -> [Var]
 getFVs fvs = [id | (id, how_bound, _) <- varEnvElts fvs,
@@ -1145,9 +1025,9 @@ check_eq_how_bound (LetBound li1 ar1) (LetBound li2 ar2) = ar1 == ar2 && check_e
 check_eq_how_bound _                  _                  = False
 
 check_eq_li :: LetInfo -> LetInfo -> Bool
-check_eq_li (NestedLet _) (NestedLet _) = True
-check_eq_li TopLet        TopLet        = True
-check_eq_li _             _             = False
+check_eq_li NestedLet NestedLet = True
+check_eq_li TopLet    TopLet    = True
+check_eq_li _         _         = False
 
 -- Misc.
 
