@@ -14,7 +14,7 @@ module TcSMonad (
 
     -- The TcS monad
     TcS, runTcS, runTcSDeriveds, runTcSWithEvBinds,
-    failTcS, warnTcS,
+    failTcS, warnTcS, addErrTcS,
     runTcSEqualities,
     nestTcS, nestImplicTcS,
 
@@ -2316,10 +2316,11 @@ wrapWarnTcS :: TcM a -> TcS a
 -- There's no static check; it's up to the user
 wrapWarnTcS = wrapTcS
 
-failTcS, panicTcS :: SDoc -> TcS a
-warnTcS           :: SDoc -> TcS ()
+failTcS, panicTcS  :: SDoc -> TcS a
+warnTcS, addErrTcS :: SDoc -> TcS ()
 failTcS      = wrapTcS . TcM.failWith
 warnTcS      = wrapTcS . TcM.addWarn
+addErrTcS    = wrapTcS . TcM.addErr
 panicTcS doc = pprPanic "TcCanonical" doc
 
 traceTcS :: String -> SDoc -> TcS ()
