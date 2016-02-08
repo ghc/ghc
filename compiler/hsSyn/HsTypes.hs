@@ -53,11 +53,12 @@ module HsTypes (
         hsScopedTvs, hsWcScopedTvs, dropWildCards,
         hsTyVarName, hsAllLTyVarNames, hsLTyVarLocNames,
         hsLTyVarName, hsLTyVarLocName, hsExplicitLTyVarNames,
-        splitLHsInstDeclTy,
+        splitLHsInstDeclTy, getLHsInstDeclHead, getLHsInstDeclClass_maybe,
         splitLHsPatSynTy,
         splitLHsForAllTy, splitLHsQualTy, splitLHsSigmaTy,
-        splitHsFunType, splitHsAppTys,
-        mkHsOpTy,
+        splitHsFunType, splitHsAppsTy,
+        splitHsAppTys, getAppsTyHead_maybe, hsTyGetAppHead_maybe,
+        mkHsOpTy, mkHsAppTy, mkHsAppTys,
         ignoreParens, hsSigType, hsSigWcType,
         hsLTyVarBndrToType, hsLTyVarBndrsToTypes,
 
@@ -569,9 +570,6 @@ data HsTyLit
   | HsStrTy SourceText FastString
     deriving (Data, Typeable)
 
-mkHsOpTy :: LHsType name -> Located name -> LHsType name -> HsType name
-mkHsOpTy ty1 op ty2 = HsOpTy ty1 op ty2
-
 newtype HsWildCardInfo name      -- See Note [The wildcard story for types]
     = AnonWildCard (PostRn name (Located Name))
       -- A anonymous wild card ('_'). A fresh Name is generated for
@@ -737,71 +735,6 @@ instance (Outputable arg, Outputable rec)
   ppr (RecCon rec)     = text "RecCon:" <+> ppr rec
   ppr (InfixCon l r)   = text "InfixCon:" <+> ppr [l, r]
 
-type LFieldOcc name = Located (FieldOcc name)
-
--- | Represents an *occurrence* of an unambiguous field.  We store
--- both the 'RdrName' the user originally wrote, and after the
--- renamer, the selector function.
-data FieldOcc name = FieldOcc { rdrNameFieldOcc  :: Located RdrName
-                                 -- ^ See Note [Located RdrNames] in HsExpr
-                              , selectorFieldOcc :: PostRn name name
-                              }
-  deriving Typeable
-deriving instance Eq (PostRn name name) => Eq (FieldOcc name)
-deriving instance Ord (PostRn name name) => Ord (FieldOcc name)
-deriving instance (Data name, Data (PostRn name name)) => Data (FieldOcc name)
-
-instance Outputable (FieldOcc name) where
-  ppr = ppr . rdrNameFieldOcc
-
-mkFieldOcc :: Located RdrName -> FieldOcc RdrName
-mkFieldOcc rdr = FieldOcc rdr PlaceHolder
-
-
--- | Represents an *occurrence* of a field that is potentially
--- ambiguous after the renamer, with the ambiguity resolved by the
--- typechecker.  We always store the 'RdrName' that the user
--- originally wrote, and store the selector function after the renamer
--- (for unambiguous occurrences) or the typechecker (for ambiguous
--- occurrences).
---
--- See Note [HsRecField and HsRecUpdField] in HsPat and
--- Note [Disambiguating record fields] in TcExpr.
--- See Note [Located RdrNames] in HsExpr
-data AmbiguousFieldOcc name
-  = Unambiguous (Located RdrName) (PostRn name name)
-  | Ambiguous   (Located RdrName) (PostTc name name)
-  deriving (Typeable)
-deriving instance ( Data name
-                  , Data (PostRn name name)
-                  , Data (PostTc name name))
-                  => Data (AmbiguousFieldOcc name)
-
-instance Outputable (AmbiguousFieldOcc name) where
-  ppr = ppr . rdrNameAmbiguousFieldOcc
-
-instance OutputableBndr (AmbiguousFieldOcc name) where
-  pprInfixOcc  = pprInfixOcc . rdrNameAmbiguousFieldOcc
-  pprPrefixOcc = pprPrefixOcc . rdrNameAmbiguousFieldOcc
-
-mkAmbiguousFieldOcc :: Located RdrName -> AmbiguousFieldOcc RdrName
-mkAmbiguousFieldOcc rdr = Unambiguous rdr PlaceHolder
-
-rdrNameAmbiguousFieldOcc :: AmbiguousFieldOcc name -> RdrName
-rdrNameAmbiguousFieldOcc (Unambiguous (L _ rdr) _) = rdr
-rdrNameAmbiguousFieldOcc (Ambiguous   (L _ rdr) _) = rdr
-
-selectorAmbiguousFieldOcc :: AmbiguousFieldOcc Id -> Id
-selectorAmbiguousFieldOcc (Unambiguous _ sel) = sel
-selectorAmbiguousFieldOcc (Ambiguous   _ sel) = sel
-
-unambiguousFieldOcc :: AmbiguousFieldOcc Id -> FieldOcc Id
-unambiguousFieldOcc (Unambiguous rdr sel) = FieldOcc rdr sel
-unambiguousFieldOcc (Ambiguous   rdr sel) = FieldOcc rdr sel
-
-ambiguousFieldOcc :: FieldOcc name -> AmbiguousFieldOcc name
-ambiguousFieldOcc (FieldOcc rdr sel) = Unambiguous rdr sel
-
 -- Takes details and result type of a GADT data constructor as created by the
 -- parser and rejigs them using information about fixities from the renamer.
 -- See Note [Sorting out the result type] in RdrHsSyn
@@ -925,9 +858,6 @@ hsLTyVarBndrsToTypes :: LHsQTyVars name -> [LHsType name]
 hsLTyVarBndrsToTypes (HsQTvs { hsq_explicit = tvbs }) = map hsLTyVarBndrToType tvbs
 
 ---------------------
-mkAnonWildCardTy :: HsType RdrName
-mkAnonWildCardTy = HsWildCardTy (AnonWildCard PlaceHolder)
-
 wildCardName :: HsWildCardInfo Name -> Name
 wildCardName (AnonWildCard  (L _ n)) = n
 
@@ -936,12 +866,118 @@ sameWildCard :: Located (HsWildCardInfo name)
              -> Located (HsWildCardInfo name) -> Bool
 sameWildCard (L l1 (AnonWildCard _))   (L l2 (AnonWildCard _))   = l1 == l2
 
+ignoreParens :: LHsType name -> LHsType name
+ignoreParens (L _ (HsParTy ty))                      = ignoreParens ty
+ignoreParens (L _ (HsAppsTy [L _ (HsAppPrefix ty)])) = ignoreParens ty
+ignoreParens ty                                      = ty
+
+{-
+************************************************************************
+*                                                                      *
+                Building types
+*                                                                      *
+************************************************************************
+-}
+
+mkAnonWildCardTy :: HsType RdrName
+mkAnonWildCardTy = HsWildCardTy (AnonWildCard PlaceHolder)
+
+mkHsOpTy :: LHsType name -> Located name -> LHsType name -> HsType name
+mkHsOpTy ty1 op ty2 = HsOpTy ty1 op ty2
+
+mkHsAppTy :: LHsType name -> LHsType name -> LHsType name
+mkHsAppTy t1 t2 = addCLoc t1 t2 (HsAppTy t1 t2)
+
+mkHsAppTys :: LHsType name -> [LHsType name] -> LHsType name
+mkHsAppTys = foldl mkHsAppTy
+
+
+{-
+************************************************************************
+*                                                                      *
+                Decomposing HsTypes
+*                                                                      *
+************************************************************************
+-}
+
+---------------------------------
+-- splitHsFunType decomposes a type (t1 -> t2 ... -> tn)
+-- Breaks up any parens in the result type:
+--      splitHsFunType (a -> (b -> c)) = ([a,b], c)
+-- Also deals with (->) t1 t2; that is why it only works on LHsType Name
+--   (see Trac #9096)
+splitHsFunType :: LHsType Name -> ([LHsType Name], LHsType Name)
+splitHsFunType (L _ (HsParTy ty))
+  = splitHsFunType ty
+
+splitHsFunType (L _ (HsFunTy x y))
+  | (args, res) <- splitHsFunType y
+  = (x:args, res)
+
+splitHsFunType orig_ty@(L _ (HsAppTy t1 t2))
+  = go t1 [t2]
+  where  -- Look for (->) t1 t2, possibly with parenthesisation
+    go (L _ (HsTyVar (L _ fn))) tys | fn == funTyConName
+                                 , [t1,t2] <- tys
+                                 , (args, res) <- splitHsFunType t2
+                                 = (t1:args, res)
+    go (L _ (HsAppTy t1 t2)) tys = go t1 (t2:tys)
+    go (L _ (HsParTy ty))    tys = go ty tys
+    go _                     _   = ([], orig_ty)  -- Failure to match
+
+splitHsFunType other = ([], other)
+
+--------------------------------
+-- | Retrieves the head of an HsAppsTy, if this can be done unambiguously,
+-- without consulting fixities.
+getAppsTyHead_maybe :: [LHsAppType name] -> Maybe (LHsType name, [LHsType name])
+getAppsTyHead_maybe tys = case splitHsAppsTy tys of
+  ([app1:apps], []) ->  -- no symbols, some normal types
+    Just (mkHsAppTys app1 apps, [])
+  ([app1l:appsl, app1r:appsr], [L loc op]) ->  -- one operator
+    Just (L loc (HsTyVar (L loc op)), [mkHsAppTys app1l appsl, mkHsAppTys app1r appsr])
+  _ -> -- can't figure it out
+    Nothing
+
+-- | Splits a [HsAppType name] (the payload of an HsAppsTy) into regions of prefix
+-- types (normal types) and infix operators.
+-- If @splitHsAppsTy tys = (non_syms, syms)@, then @tys@ starts with the first
+-- element of @non_syms@ followed by the first element of @syms@ followed by
+-- the next element of @non_syms@, etc. It is guaranteed that the non_syms list
+-- has one more element than the syms list.
+splitHsAppsTy :: [LHsAppType name] -> ([[LHsType name]], [Located name])
+splitHsAppsTy = go [] [] []
+  where
+    go acc acc_non acc_sym [] = (reverse (reverse acc : acc_non), reverse acc_sym)
+    go acc acc_non acc_sym (L _ (HsAppPrefix ty) : rest)
+      = go (ty : acc) acc_non acc_sym rest
+    go acc acc_non acc_sym (L _ (HsAppInfix op) : rest)
+      = go [] (reverse acc : acc_non) (op : acc_sym) rest
+
+-- Retrieve the name of the "head" of a nested type application
+-- somewhat like splitHsAppTys, but a little more thorough
+-- used to examine the result of a GADT-like datacon, so it doesn't handle
+-- *all* cases (like lists, tuples, (~), etc.)
+hsTyGetAppHead_maybe :: LHsType name -> Maybe (Located name, [LHsType name])
+hsTyGetAppHead_maybe = go []
+  where
+    go tys (L _ (HsTyVar ln))           = Just (ln, tys)
+    go tys (L _ (HsAppsTy apps))
+      | Just (head, args) <- getAppsTyHead_maybe apps
+                                         = go (args ++ tys) head
+    go tys (L _ (HsAppTy l r))           = go (r : tys) l
+    go tys (L _ (HsOpTy l (L loc n) r))  = Just (L loc n, l : r : tys)
+    go tys (L _ (HsParTy t))             = go tys t
+    go tys (L _ (HsKindSig t _))         = go tys t
+    go _   _                             = Nothing
+
 splitHsAppTys :: LHsType Name -> [LHsType Name] -> (LHsType Name, [LHsType Name])
   -- no need to worry about HsAppsTy here
 splitHsAppTys (L _ (HsAppTy f a)) as = splitHsAppTys f (a:as)
 splitHsAppTys (L _ (HsParTy f))   as = splitHsAppTys f as
 splitHsAppTys f                   as = (f,as)
 
+--------------------------------
 splitLHsPatSynTy :: LHsType name
                  -> ( [LHsTyVarBndr name]
                     , LHsContext name        -- Required
@@ -974,48 +1010,101 @@ splitLHsQualTy :: LHsType name -> (LHsContext name, LHsType name)
 splitLHsQualTy (L _ (HsQualTy { hst_ctxt = ctxt, hst_body = body })) = (ctxt,     body)
 splitLHsQualTy body                                                  = (noLoc [], body)
 
-splitLHsInstDeclTy
-    :: LHsSigType Name
-    -> ([Name], LHsContext Name, LHsType Name)
-        -- Split up an instance decl type, returning the pieces
+splitLHsInstDeclTy :: LHsSigType Name
+                   -> ([Name], LHsContext Name, LHsType Name)
+-- Split up an instance decl type, returning the pieces
 splitLHsInstDeclTy (HsIB { hsib_vars = itkvs
                          , hsib_body = inst_ty })
-  = (itkvs, cxt, body_ty)
+  | (tvs, cxt, body_ty) <- splitLHsSigmaTy inst_ty
+  = (itkvs ++ map hsLTyVarName tvs, cxt, body_ty)
          -- Return implicitly bound type and kind vars
          -- For an instance decl, all of them are in scope
   where
-    (cxt, body_ty) = splitLHsQualTy inst_ty
 
--- splitHsFunType decomposes a type (t1 -> t2 ... -> tn)
--- Breaks up any parens in the result type:
---      splitHsFunType (a -> (b -> c)) = ([a,b], c)
--- Also deals with (->) t1 t2; that is why it only works on LHsType Name
---   (see Trac #9096)
-splitHsFunType :: LHsType Name -> ([LHsType Name], LHsType Name)
-splitHsFunType (L _ (HsParTy ty))
-  = splitHsFunType ty
+getLHsInstDeclHead :: LHsSigType name -> LHsType name
+getLHsInstDeclHead inst_ty
+  | (_tvs, _cxt, body_ty) <- splitLHsSigmaTy (hsSigType inst_ty)
+  = body_ty
 
-splitHsFunType (L _ (HsFunTy x y))
-  | (args, res) <- splitHsFunType y
-  = (x:args, res)
+getLHsInstDeclClass_maybe :: LHsSigType name -> Maybe (Located name)
+-- Works on (HsSigType RdrName)
+getLHsInstDeclClass_maybe inst_ty
+  = do { let head_ty = getLHsInstDeclHead inst_ty
+       ; (cls, _) <- hsTyGetAppHead_maybe head_ty
+       ; return cls }
 
-splitHsFunType orig_ty@(L _ (HsAppTy t1 t2))
-  = go t1 [t2]
-  where  -- Look for (->) t1 t2, possibly with parenthesisation
-    go (L _ (HsTyVar (L _ fn))) tys | fn == funTyConName
-                                 , [t1,t2] <- tys
-                                 , (args, res) <- splitHsFunType t2
-                                 = (t1:args, res)
-    go (L _ (HsAppTy t1 t2)) tys = go t1 (t2:tys)
-    go (L _ (HsParTy ty))    tys = go ty tys
-    go _                     _   = ([], orig_ty)  -- Failure to match
+{-
+************************************************************************
+*                                                                      *
+                FieldOcc
+*                                                                      *
+************************************************************************
+-}
 
-splitHsFunType other = ([], other)
+type LFieldOcc name = Located (FieldOcc name)
 
-ignoreParens :: LHsType name -> LHsType name
-ignoreParens (L _ (HsParTy ty))                      = ignoreParens ty
-ignoreParens (L _ (HsAppsTy [L _ (HsAppPrefix ty)])) = ignoreParens ty
-ignoreParens ty                                      = ty
+-- | Represents an *occurrence* of an unambiguous field.  We store
+-- both the 'RdrName' the user originally wrote, and after the
+-- renamer, the selector function.
+data FieldOcc name = FieldOcc { rdrNameFieldOcc  :: Located RdrName
+                                 -- ^ See Note [Located RdrNames] in HsExpr
+                              , selectorFieldOcc :: PostRn name name
+                              }
+  deriving Typeable
+deriving instance Eq (PostRn name name) => Eq (FieldOcc name)
+deriving instance Ord (PostRn name name) => Ord (FieldOcc name)
+deriving instance (Data name, Data (PostRn name name)) => Data (FieldOcc name)
+
+instance Outputable (FieldOcc name) where
+  ppr = ppr . rdrNameFieldOcc
+
+mkFieldOcc :: Located RdrName -> FieldOcc RdrName
+mkFieldOcc rdr = FieldOcc rdr PlaceHolder
+
+
+-- | Represents an *occurrence* of a field that is potentially
+-- ambiguous after the renamer, with the ambiguity resolved by the
+-- typechecker.  We always store the 'RdrName' that the user
+-- originally wrote, and store the selector function after the renamer
+-- (for unambiguous occurrences) or the typechecker (for ambiguous
+-- occurrences).
+--
+-- See Note [HsRecField and HsRecUpdField] in HsPat and
+-- Note [Disambiguating record fields] in TcExpr.
+-- See Note [Located RdrNames] in HsExpr
+data AmbiguousFieldOcc name
+  = Unambiguous (Located RdrName) (PostRn name name)
+  | Ambiguous   (Located RdrName) (PostTc name name)
+  deriving (Typeable)
+deriving instance ( Data name
+                  , Data (PostRn name name)
+                  , Data (PostTc name name))
+                  => Data (AmbiguousFieldOcc name)
+
+instance Outputable (AmbiguousFieldOcc name) where
+  ppr = ppr . rdrNameAmbiguousFieldOcc
+
+instance OutputableBndr (AmbiguousFieldOcc name) where
+  pprInfixOcc  = pprInfixOcc . rdrNameAmbiguousFieldOcc
+  pprPrefixOcc = pprPrefixOcc . rdrNameAmbiguousFieldOcc
+
+mkAmbiguousFieldOcc :: Located RdrName -> AmbiguousFieldOcc RdrName
+mkAmbiguousFieldOcc rdr = Unambiguous rdr PlaceHolder
+
+rdrNameAmbiguousFieldOcc :: AmbiguousFieldOcc name -> RdrName
+rdrNameAmbiguousFieldOcc (Unambiguous (L _ rdr) _) = rdr
+rdrNameAmbiguousFieldOcc (Ambiguous   (L _ rdr) _) = rdr
+
+selectorAmbiguousFieldOcc :: AmbiguousFieldOcc Id -> Id
+selectorAmbiguousFieldOcc (Unambiguous _ sel) = sel
+selectorAmbiguousFieldOcc (Ambiguous   _ sel) = sel
+
+unambiguousFieldOcc :: AmbiguousFieldOcc Id -> FieldOcc Id
+unambiguousFieldOcc (Unambiguous rdr sel) = FieldOcc rdr sel
+unambiguousFieldOcc (Ambiguous   rdr sel) = FieldOcc rdr sel
+
+ambiguousFieldOcc :: FieldOcc name -> AmbiguousFieldOcc name
+ambiguousFieldOcc (FieldOcc rdr sel) = Unambiguous rdr sel
 
 {-
 ************************************************************************

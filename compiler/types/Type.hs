@@ -1406,13 +1406,17 @@ applyTys :: Type -> [KindOrType] -> Type
 applyTys ty args = applyTysD empty ty args
 
 applyTysD :: SDoc -> Type -> [Type] -> Type     -- Debug version
-applyTysD _   orig_fun_ty []      = orig_fun_ty
 applyTysD doc orig_fun_ty arg_tys
+  | null arg_tys
+  = orig_fun_ty
+
   | n_bndrs == n_args     -- The vastly common case
   = substTyWithBindersUnchecked bndrs arg_tys rho_ty
+
   | n_bndrs > n_args      -- Too many for-alls
   = substTyWithBindersUnchecked (take n_args bndrs) arg_tys
                                 (mkForAllTys (drop n_args bndrs) rho_ty)
+
   | otherwise             -- Too many type args
   = ASSERT2( n_bndrs > 0, doc $$ ppr orig_fun_ty $$ ppr arg_tys )       -- Zero case gives infinite loop!
     applyTysD doc (substTyWithBinders bndrs (take n_bndrs arg_tys) rho_ty)
@@ -1440,8 +1444,8 @@ applyTysX tvs body_ty arg_tys
 -}
 
 -- | Make a named binder
-mkNamedBinder :: Var -> VisibilityFlag -> TyBinder
-mkNamedBinder = Named
+mkNamedBinder :: VisibilityFlag -> Var -> TyBinder
+mkNamedBinder vis var = Named var vis
 
 -- | Make an anonymous binder
 mkAnonBinder :: Type -> TyBinder
@@ -1510,40 +1514,56 @@ partitionBindersIntoBinders = partitionWith named_or_anon
 ************************************************************************
 
 Predicates on PredType
+
+Note [isPredTy complications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+You would think that we could define
+  isPredTy ty = isConstraintKind (typeKind ty)
+But there are a number of complications:
+
+* isPredTy is used when printing types, which can happen in debug
+  printing during type checking of not-fully-zonked types.  So it's
+  not cool to say isConstraintKind (typeKind ty) because, absent
+  zonking, the type might be ill-kinded, and typeKind crashes. Hence the
+  rather tiresome story here
+
+* isPredTy must return "True" to *unlifted* coercions, such as (t1 ~# t2)
+  and (t1 ~R# t2), which are not of kind Constraint!  Currently they are
+  of kind #.
+
+* If we do form the type '(C a => C [a]) => blah', then we'd like to
+  print it as such. But that means that isPredTy must return True for
+  (C a => C [a]).  Admittedly that type is illegal in Haskell, but we
+  want to print it nicely in error messages.
 -}
 
 -- | Is the type suitable to classify a given/wanted in the typechecker?
 isPredTy :: Type -> Bool
-  -- NB: isPredTy is used when printing types, which can happen in debug printing
-  --     during type checking of not-fully-zonked types.  So it's not cool to say
-  --     isConstraintKind (typeKind ty) because absent zonking the type might
-  --     be ill-kinded, and typeKind crashes
-  --     Hence the rather tiresome story here
-  --
-  -- NB: This must return "True" to *unlifted* coercions, which are not
-  --     of kind Constraint!
+-- See Note [isPredTy complications]
 isPredTy ty = go ty []
   where
     go :: Type -> [KindOrType] -> Bool
-    go (AppTy ty1 ty2)   args = go ty1 (ty2 : args)
-    go (TyConApp tc tys) args
-      | tc `hasKey` eqPrimTyConKey || tc `hasKey` eqReprPrimTyConKey
-      , [_,_,_,_] <- all_args
-      = True
+    go (AppTy ty1 ty2)   args       = go ty1 (ty2 : args)
+    go (TyVarTy tv)      args       = go_k (tyVarKind tv) args
+    go (TyConApp tc tys) args       = ASSERT( null args )  -- TyConApp invariant
+                                      go_tc tc tys
+    go (ForAllTy (Anon arg) res) []
+      | isPredTy arg                = isPredTy res   -- (Eq a => C a)
+      | otherwise                   = False          -- (Int -> Bool)
+    go (ForAllTy (Named {}) ty) []  = go ty []
+    go _ _ = False
 
-      | otherwise
-      = go_k (tyConKind tc) all_args
-      where
-        all_args = tys ++ args
-    go (TyVarTy tv)      args = go_k (tyVarKind tv) args
-    go _                 _    = False
+    go_tc :: TyCon -> [KindOrType] -> Bool
+    go_tc tc args
+      | tc `hasKey` eqPrimTyConKey || tc `hasKey` eqReprPrimTyConKey
+                  = length args == 4  -- ~# and ~R# sadly have result kind #
+                                      -- not Contraint; but we still want
+                                      -- isPredTy to reply True.
+      | otherwise = go_k (tyConKind tc) args
 
     go_k :: Kind -> [KindOrType] -> Bool
-    -- True <=> kind is k1 -> .. -> kn -> Constraint
-    go_k k [] = isConstraintKind k
-    go_k (ForAllTy bndr k1) (arg:args)
-      = go_k (substTyWithBindersUnchecked [bndr] [arg] k1) args
-    go_k _ _ = False                  -- Typeable * Int :: Constraint
+    -- True <=> ('k' applied to 'kts') = Constraint
+    go_k k args = isConstraintKind (applyTys k args)
 
 isClassPred, isEqPred, isNomEqPred, isIPPred :: PredType -> Bool
 isClassPred ty = case tyConAppTyCon_maybe ty of

@@ -412,10 +412,12 @@ data Rank = ArbitraryRank         -- Any rank ok
 
           | MustBeMonoType  -- Monotype regardless of flags
 
-rankZeroMonoType, tyConArgMonoType, synArgMonoType :: Rank
-rankZeroMonoType = MonoType (text "Perhaps you intended to use RankNTypes or Rank2Types")
-tyConArgMonoType = MonoType (text "GHC doesn't yet support impredicative polymorphism")
-synArgMonoType   = MonoType (text "Perhaps you intended to use LiberalTypeSynonyms")
+
+rankZeroMonoType, tyConArgMonoType, synArgMonoType, constraintMonoType :: Rank
+rankZeroMonoType   = MonoType (text "Perhaps you intended to use RankNTypes or Rank2Types")
+tyConArgMonoType   = MonoType (text "GHC doesn't yet support impredicative polymorphism")
+synArgMonoType     = MonoType (text "Perhaps you intended to use LiberalTypeSynonyms")
+constraintMonoType = MonoType (text "A constraint must be a monotype")
 
 funArgResRank :: Rank -> (Rank, Rank)             -- Function argument and result
 funArgResRank (LimitedRank _ arg_rank) = (arg_rank, LimitedRank (forAllAllowed arg_rank) arg_rank)
@@ -454,7 +456,8 @@ check_type :: TidyEnv -> UserTypeCtxt -> Rank -> Type -> TcM ()
 
 check_type env ctxt rank ty
   | not (null tvs && null theta)
-  = do  { checkTcM (forAllAllowed rank) (forAllTyErr env' rank ty)
+  = do  { traceTc "check_type" (ppr ty $$ ppr (forAllAllowed rank))
+        ; checkTcM (forAllAllowed rank) (forAllTyErr env rank ty)
                 -- Reject e.g. (Maybe (?x::Int => Int)),
                 -- with a decent error message
 
@@ -594,9 +597,12 @@ check_arg_type env ctxt rank ty
 forAllTyErr :: TidyEnv -> Rank -> Type -> (TidyEnv, SDoc)
 forAllTyErr env rank ty
    = ( env
-     , vcat [ hang (text "Illegal polymorphic or qualified type:") 2 (ppr_tidy env ty)
+     , vcat [ hang herald 2 (ppr_tidy env ty)
             , suggestion ] )
   where
+    (tvs, _theta, _tau) = tcSplitSigmaTy ty
+    herald | null tvs  = text "Illegal qualified type:"
+           | otherwise = text "Illegal polymorphic type:"
     suggestion = case rank of
                    LimitedRank {} -> text "Perhaps you intended to use RankNTypes or Rank2Types"
                    MonoType d     -> d
@@ -714,7 +720,7 @@ check_pred_ty :: TidyEnv -> DynFlags -> UserTypeCtxt -> PredType -> TcM ()
 -- Check the validity of a predicate in a signature
 -- See Note [Validity checking for constraints]
 check_pred_ty env dflags ctxt pred
-  = do { check_type env SigmaCtxt MustBeMonoType pred
+  = do { check_type env SigmaCtxt constraintMonoType pred
        ; check_pred_help False env dflags ctxt pred }
 
 check_pred_help :: Bool    -- True <=> under a type synonym
@@ -1183,8 +1189,7 @@ checkValidInstance ctxt hs_type ty
     (tvs, theta, tau) = tcSplitSigmaTy ty
 
         -- The location of the "head" of the instance
-    head_loc = case splitLHsInstDeclTy hs_type of
-                 (_, _, L loc _) -> loc
+    head_loc = getLoc (getLHsInstDeclHead hs_type)
 
 {-
 Note [Paterson conditions]

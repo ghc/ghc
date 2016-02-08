@@ -8,13 +8,3 @@ T8806.hs:8:7: error:
     • Expected a constraint, but ‘Int’ has kind ‘*’
     • In the type signature:
         g :: (Int => Show a) => Int
-
-T8806.hs:8:7: error:
-    • Expected a constraint, but ‘Show a’ has kind ‘*’
-    • In the type signature:
-        g :: (Int => Show a) => Int
-
-T8806.hs:8:14: error:
-    • Expected a type, but ‘Show a’ has kind ‘Constraint’
-    • In the type signature:
-        g :: (Int => Show a) => Int

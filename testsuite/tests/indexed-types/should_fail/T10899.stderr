@@ -1,4 +1,4 @@
 
 T10899.hs:7:3: error:
-    Illegal polymorphic or qualified type: forall (m1 :: * -> *). m1 a
-    In the class declaration for ‘C’
+    • Illegal polymorphic type: forall (m :: * -> *). m a
+    • In the class declaration for ‘C’

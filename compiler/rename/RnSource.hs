@@ -633,8 +633,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
     -- stolen from TcInstDcls
     instDeclCtxt1 :: LHsSigType Name -> SDoc
     instDeclCtxt1 hs_inst_ty
-      | (_, _, head_ty) <- splitLHsInstDeclTy hs_inst_ty
-      = inst_decl_ctxt (ppr head_ty)
+      = inst_decl_ctxt (ppr (getLHsInstDeclHead hs_inst_ty))
 
     inst_decl_ctxt :: SDoc -> SDoc
     inst_decl_ctxt doc = hang (text "in the instance declaration for")
