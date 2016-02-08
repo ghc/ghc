@@ -10,7 +10,7 @@ module TcSMonad (
     appendWorkList,
     selectNextWorkItem,
     workListSize, workListWantedCount,
-    updWorkListTcS,
+    getWorkList, updWorkListTcS,
 
     -- The TcS monad
     TcS, runTcS, runTcSDeriveds, runTcSWithEvBinds,
@@ -150,6 +150,7 @@ import Unique
 import UniqFM
 import Maybes
 
+import StaticFlags( opt_PprStyle_Debug )
 import TrieMap
 import Control.Monad
 #if __GLASGOW_HASKELL__ > 710
@@ -283,6 +284,10 @@ selectWorkItem wl@(WL { wl_eqs = eqs, wl_funeqs = feqs
   | ct:cts <- rest = Just (ct, wl { wl_rest   = cts })
   | otherwise      = Nothing
 
+getWorkList :: TcS WorkList
+getWorkList = do { wl_var <- getTcSWorkListRef
+                 ; wrapTcS (TcM.readTcRef wl_var) }
+
 selectDerivedWorkItem  :: WorkList -> Maybe (Ct, WorkList)
 selectDerivedWorkItem wl@(WL { wl_deriv = ders })
   | ev:evs <- ders = Just (mkNonCanonical ev, wl { wl_deriv  = evs })
@@ -324,7 +329,9 @@ instance Outputable WorkList where
           , ppUnless (null ders) $
             text "Derived =" <+> vcat (map ppr ders)
           , ppUnless (isEmptyBag implics) $
-            text "Implics =" <+> vcat (map ppr (bagToList implics))
+            if opt_PprStyle_Debug  -- Typically we only want the work list for this level
+            then text "Implics =" <+> vcat (map ppr (bagToList implics))
+            else text "(Implics omitted)"
           ])
 
 

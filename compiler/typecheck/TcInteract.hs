@@ -137,8 +137,11 @@ solveSimpleGivens givens
   | null givens  -- Shortcut for common case
   = return emptyCts
   | otherwise
-  = do { go givens
-       ; takeGivenInsolubles }
+  = do { traceTcS "solveSimpleGivens {" (ppr givens)
+       ; go givens
+       ; given_insols <- takeGivenInsolubles
+       ; traceTcS "End solveSimpleGivens }" (text "Insoluble:" <+> pprCts given_insols)
+       ; return given_insols }
   where
     go givens = do { solveSimples (listToBag givens)
                    ; new_givens <- runTcPluginsGiven
@@ -149,10 +152,10 @@ solveSimpleWanteds :: Cts -> TcS WantedConstraints
 -- NB: 'simples' may contain /derived/ equalities, floated
 --     out from a nested implication. So don't discard deriveds!
 solveSimpleWanteds simples
-  = do { traceTcS "solveSimples {" (ppr simples)
+  = do { traceTcS "solveSimpleWanteds {" (ppr simples)
        ; dflags <- getDynFlags
        ; (n,wc) <- go 1 (solverIterations dflags) (emptyWC { wc_simple = simples })
-       ; traceTcS "solveSimples end }" $
+       ; traceTcS "solveSimpleWanteds end }" $
              vcat [ text "iterations =" <+> ppr n
                   , text "residual =" <+> ppr wc ]
        ; return wc }
@@ -375,10 +378,10 @@ runSolverPipeline :: [(String,SimplifierStage)] -- The pipeline
                   -> TcS ()
 -- Run this item down the pipeline, leaving behind new work and inerts
 runSolverPipeline pipeline workItem
-  = do { initial_is <- getTcSInerts
+  = do { wl <- getWorkList
        ; traceTcS "Start solver pipeline {" $
-                  vcat [ text "work item = " <+> ppr workItem
-                       , text "inerts    = " <+> ppr initial_is]
+                  vcat [ text "work item =" <+> ppr workItem
+                       , text "rest of worklist =" <+> ppr wl ]
 
        ; bumpStepCountTcS    -- One step for each constraint processed
        ; final_res  <- run_pipeline pipeline (ContinueWith workItem)
