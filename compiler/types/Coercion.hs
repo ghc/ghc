@@ -53,7 +53,7 @@ module Coercion (
         splitAppCo_maybe,
         splitForAllCo_maybe,
 
-        nthRole, tyConRolesX, setNominalRole_maybe,
+        nthRole, tyConRolesX, tyConRolesRepresentational, setNominalRole_maybe,
 
         pickLR,
 
@@ -608,7 +608,7 @@ mkAppCo (TyConAppCo r tc args) arg
   = case r of
       Nominal          -> TyConAppCo Nominal tc (args ++ [arg])
       Representational -> TyConAppCo Representational tc (args ++ [arg'])
-        where new_role = (tyConRolesX Representational tc) !! (length args)
+        where new_role = (tyConRolesRepresentational tc) !! (length args)
               arg'     = downgradeRole new_role Nominal arg
       Phantom          -> TyConAppCo Phantom tc (args ++ [toPhantomCo arg])
 mkAppCo co arg = AppCo co  arg
@@ -669,13 +669,13 @@ mkTransAppCo r1 co1 ty1a ty1b r2 co2 ty2a ty2b r3
       , nextRole ty1b == r2
       = (mkAppCo co1_repr (mkNomReflCo ty2a)) `mkTransCo`
         (mkTyConAppCo Representational tc1b
-           (zipWith mkReflCo (tyConRolesX Representational tc1b) tys1b
+           (zipWith mkReflCo (tyConRolesRepresentational tc1b) tys1b
             ++ [co2]))
 
       | Just (tc1a, tys1a) <- splitTyConApp_maybe ty1a
       , nextRole ty1a == r2
       = (mkTyConAppCo Representational tc1a
-           (zipWith mkReflCo (tyConRolesX Representational tc1a) tys1a
+           (zipWith mkReflCo (tyConRolesRepresentational tc1a) tys1a
             ++ [co2]))
         `mkTransCo`
         (mkAppCo co1_repr (mkNomReflCo ty2b))
@@ -1052,20 +1052,23 @@ toPhantomCo co
 -- Convert args to a TyConAppCo Nominal to the same TyConAppCo Representational
 applyRoles :: TyCon -> [Coercion] -> [Coercion]
 applyRoles tc cos
-  = zipWith (\r -> downgradeRole r Nominal) (tyConRolesX Representational tc) cos
+  = zipWith (\r -> downgradeRole r Nominal) (tyConRolesRepresentational tc) cos
 
 -- the Role parameter is the Role of the TyConAppCo
 -- defined here because this is intimiately concerned with the implementation
 -- of TyConAppCo
 tyConRolesX :: Role -> TyCon -> [Role]
-tyConRolesX Representational tc = tyConRoles tc ++ repeat Nominal
+tyConRolesX Representational tc = tyConRolesRepresentational tc
 tyConRolesX role             _  = repeat role
+
+tyConRolesRepresentational :: TyCon -> [Role]
+tyConRolesRepresentational tc = tyConRoles tc ++ repeat Nominal
 
 nthRole :: Role -> TyCon -> Int -> Role
 nthRole Nominal _ _ = Nominal
 nthRole Phantom _ _ = Phantom
 nthRole Representational tc n
-  = (tyConRolesX Representational tc) `getNth` n
+  = (tyConRolesRepresentational tc) `getNth` n
 
 ltRole :: Role -> Role -> Bool
 -- Is one role "less" than another?
