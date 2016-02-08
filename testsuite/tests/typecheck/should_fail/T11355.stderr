@@ -1,6 +1,6 @@
 
 T11355.hs:5:7: error:
-    • Illegal polymorphic or qualified type: forall (a1 :: TYPE t0). a1
+    • Illegal polymorphic type: forall (a :: TYPE t0). a
       GHC doesn't yet support impredicative polymorphism
     • In the expression:
         const @_ @((forall a. a) -> forall a. a) () (id @(forall a. a))

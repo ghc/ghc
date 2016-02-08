@@ -50,8 +50,8 @@ module TcType (
   --------------------------------
   -- Builders
   mkPhiTy, mkInvSigmaTy, mkSpecSigmaTy, mkSigmaTy,
-  mkNakedTyConApp, mkNakedAppTys, mkNakedAppTy, mkNakedFunTy,
-  mkNakedSpecSigmaTy, mkNakedCastTy, mkNakedPhiTy,
+  mkNakedTyConApp, mkNakedAppTys, mkNakedAppTy,
+  mkNakedCastTy,
 
   --------------------------------
   -- Splitters
@@ -989,29 +989,16 @@ mkSigmaTy bndrs theta tau = mkForAllTys bndrs (mkPhiTy theta tau)
 
 mkInvSigmaTy :: [TyVar] -> [PredType] -> Type -> Type
 mkInvSigmaTy tyvars
-  = mkSigmaTy (zipWith mkNamedBinder tyvars (repeat Invisible))
+  = mkSigmaTy (map (mkNamedBinder Invisible) tyvars)
 
 -- | Make a sigma ty where all type variables are "specified". That is,
 -- they can be used with visible type application
 mkSpecSigmaTy :: [TyVar] -> [PredType] -> Type -> Type
 mkSpecSigmaTy tyvars
-  = mkSigmaTy (zipWith mkNamedBinder tyvars (repeat Specified))
+  = mkSigmaTy (map (mkNamedBinder Specified) tyvars)
 
 mkPhiTy :: [PredType] -> Type -> Type
 mkPhiTy = mkFunTys
-
-mkNakedSigmaTy :: [TyBinder] -> [PredType] -> Type -> Type
--- See Note [Type-checking inside the knot] in TcHsType
-mkNakedSigmaTy bndrs theta tau = mkForAllTys bndrs (mkNakedPhiTy theta tau)
-
-mkNakedSpecSigmaTy :: [TyVar] -> [PredType] -> Type -> Type
--- See Note [Type-checking inside the knot] in TcHsType
-mkNakedSpecSigmaTy tyvars
-  = mkNakedSigmaTy (zipWith mkNamedBinder tyvars (repeat Specified))
-
-mkNakedPhiTy :: [PredType] -> Type -> Type
--- See Note [Type-checking inside the knot] in TcHsType
-mkNakedPhiTy = flip $ foldr mkNakedFunTy
 
 -- @isTauTy@ tests if a type is "simple"..
 isTauTy :: Type -> Bool
@@ -1066,10 +1053,6 @@ mkNakedAppTys ty1                tys2 = foldl AppTy ty1 tys2
 mkNakedAppTy :: Type -> Type -> Type
 -- See Note [Type-checking inside the knot] in TcHsType
 mkNakedAppTy ty1 ty2 = mkNakedAppTys ty1 [ty2]
-
-mkNakedFunTy :: Type -> Type -> Type
--- See Note [Type-checking inside the knot] in TcHsType
-mkNakedFunTy arg res = ForAllTy (Anon arg) res
 
 mkNakedCastTy :: Type -> Coercion -> Type
 mkNakedCastTy = CastTy

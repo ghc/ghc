@@ -232,28 +232,13 @@ tcHsClsInstType :: UserTypeCtxt    -- InstDeclCtxt or SpecInstCtxt
                 -> LHsSigType Name
                 -> TcM ([TyVar], ThetaType, Class, [Type])
 -- Like tcHsSigType, but for a class instance declaration
--- The significant difference is that we expect a /constraint/
--- not a /type/ for the bit after the '=>'.
-tcHsClsInstType user_ctxt hs_inst_ty@(HsIB { hsib_vars = sig_vars
-                                           , hsib_body = hs_qual_ty })
-    -- An explicit forall in an instance declaration isn't
-    -- allowed, so there won't be any HsForAllTy here
-  = setSrcSpan (getLoc hs_qual_ty) $
-    do { (tkvs, phi_ty) <- solveEqualities $
-                           tcImplicitTKBndrsType sig_vars $
-                    do { theta    <- tcHsContext cxt
-                       ; head_ty' <- tc_lhs_type typeLevelMode
-                                                 head_ty constraintKind
-                       ; return (mkPhiTy theta head_ty') }
-       ; let inst_ty = mkSpecForAllTys tkvs phi_ty
+tcHsClsInstType user_ctxt hs_inst_ty
+  = setSrcSpan (getLoc (hsSigType hs_inst_ty)) $
+    do { inst_ty <- tc_hs_sig_type hs_inst_ty constraintKind
        ; inst_ty <- kindGeneralizeType inst_ty
-       ; inst_ty <- zonkTcType inst_ty
        ; checkValidInstance user_ctxt hs_inst_ty inst_ty }
-  where
-    (cxt, head_ty) = splitLHsQualTy hs_qual_ty
 
 -- Used for 'VECTORISE [SCALAR] instance' declarations
---
 tcHsVectInst :: LHsSigType Name -> TcM (Class, [Type])
 tcHsVectInst ty
   | Just (L _ cls_name, tys) <- hsTyGetAppHead_maybe (hsSigType ty)
@@ -478,7 +463,7 @@ tc_fun_type mode ty1 ty2 exp_kind
        ; res_lev <- newFlexiTyVarTy levityTy
        ; ty1' <- tc_lhs_type mode ty1 (tYPE arg_lev)
        ; ty2' <- tc_lhs_type mode ty2 (tYPE res_lev)
-       ; checkExpectedKind (mkNakedFunTy ty1' ty2') liftedTypeKind exp_kind }
+       ; checkExpectedKind (mkFunTy ty1' ty2') liftedTypeKind exp_kind }
 
 ------------------------------------------
 -- See also Note [Bidirectional type checking]
@@ -508,34 +493,32 @@ tc_hs_type mode (HsOpTy ty1 (L _ op) ty2) exp_kind
   = tc_fun_type mode ty1 ty2 exp_kind
 
 --------- Foralls
-tc_hs_type mode hs_ty@(HsForAllTy { hst_bndrs = hs_tvs, hst_body = ty }) exp_kind
-    -- Do not kind-generalise here.  See Note [Kind generalisation]
-  | isConstraintKind exp_kind
-  = failWithTc (hang (text "Illegal constraint:") 2 (ppr hs_ty))
-
-  | otherwise
+tc_hs_type mode (HsForAllTy { hst_bndrs = hs_tvs, hst_body = ty }) exp_kind
   = fmap fst $
     tcExplicitTKBndrs hs_tvs $ \ tvs' ->
     -- Do not kind-generalise here!  See Note [Kind generalisation]
-    -- Why exp_kind?  See Note [Body kind of forall]
+    -- Why exp_kind?  See Note [Body kind of HsForAllTy]
     do { ty' <- tc_lhs_type mode ty exp_kind
        ; let bound_vars = allBoundVariables ty'
-       ; return (mkNakedSpecSigmaTy tvs' [] ty', bound_vars) }
+             bndrs      = map (mkNamedBinder Specified) tvs'
+       ; return (mkForAllTys bndrs ty', bound_vars) }
 
 tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_body = ty }) exp_kind
-  = do { ctxt' <- tc_hs_context mode ctxt
-       ; ty' <- if null (unLoc ctxt) then  -- Plain forall, no context
-                   tc_lhs_type mode ty exp_kind
-                     -- Why exp_kind?  See Note [Body kind of forall]
-                else
-                   -- If there is a context, then this forall is really a
-                   -- _function_, so the kind of the result really is *
-                   -- The body kind (result of the function) can be * or #, hence ekOpen
-                   do { ek <- ekOpen
-                      ; ty <- tc_lhs_type mode ty ek
-                      ; checkExpectedKind ty liftedTypeKind exp_kind }
+  | null (unLoc ctxt)
+  = tc_lhs_type mode ty exp_kind
 
-       ; return (mkNakedPhiTy ctxt' ty') }
+  | otherwise
+  = do { ctxt' <- tc_hs_context mode ctxt
+
+         -- See Note [Body kind of a HsQualTy]
+       ; ty' <- if isConstraintKind exp_kind
+                then tc_lhs_type mode ty constraintKind
+                else do { ek <- ekOpen -- The body kind (result of the
+                                       -- function) can be * or #, hence ekOpen
+                        ; ty <- tc_lhs_type mode ty ek
+                        ; checkExpectedKind ty liftedTypeKind exp_kind }
+
+       ; return (mkPhiTy ctxt' ty') }
 
 --------- Lists, arrays, and tuples
 tc_hs_type mode (HsListTy elt_ty) exp_kind
@@ -1101,8 +1084,8 @@ look at the TyCon or Class involved.
 This is horribly delicate.  I hate it.  A good example of how
 delicate it is can be seen in Trac #7903.
 
-Note [Body kind of a forall]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Body kind of a HsForAllTy]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The body of a forall is usually a type, but in principle
 there's no reason to prohibit *unlifted* types.
 In fact, GHC can itself construct a function with an
@@ -1111,37 +1094,6 @@ typecheck/should_compile/tc170).
 
 Moreover in instance heads we get forall-types with
 kind Constraint.
-
-Moreover if we have a signature
-   f :: Int#
-then we represent it as (HsForAll Implicit [] [] Int#).  And this must
-be legal!  We can't drop the empty forall until *after* typechecking
-the body because of kind polymorphism:
-   Typeable :: forall k. k -> Constraint
-   data Apply f t = Apply (f t)
-   -- Apply :: forall k. (k -> *) -> k -> *
-   instance Typeable Apply where ...
-Then the dfun has type
-   df :: forall k. Typeable ((k->*) -> k -> *) (Apply k)
-
-   f :: Typeable Apply
-
-   f :: forall (t:k->*) (a:k).  t a -> t a
-
-   class C a b where
-      op :: a b -> Typeable Apply
-
-   data T a = MkT (Typeable Apply)
-            | T2 a
-      T :: * -> *
-      MkT :: forall k. (Typeable ((k->*) -> k -> *) (Apply k)) -> T a
-
-   f :: (forall (k:*). forall (t:: k->*) (a:k). t a -> t a) -> Int
-   f :: (forall a. a -> Typeable Apply) -> Int
-
-So we *must* keep the HsForAll on the instance type
-   HsForAll Implicit [] [] (Typeable Apply)
-so that we do kind generalisation on it.
 
 It's tempting to check that the body kind is either * or #. But this is
 wrong. For example:
@@ -1153,6 +1105,33 @@ We're doing newtype-deriving for C. But notice how `a` isn't in scope in
 the predicate `C a`. So we quantify, yielding `forall a. C a` even though
 `C a` has kind `* -> Constraint`. The `forall a. C a` is a bit cheeky, but
 convenient. Bottom line: don't check for * or # here.
+
+Note [Body kind of a HsQualTy]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If ctxt is non-empty, the HsQualTy really is a /function/, so the
+kind of the result really is '*', and in that case the kind of the
+body-type can be lifted or unlifted.
+
+However, consider
+    instance Eq a => Eq [a] where ...
+or
+    f :: (Eq a => Eq [a]) => blah
+Here both body-kind of the HsQualTy is Constraint rather than *.
+Rather crudely we tell the difference by looking at exp_kind. It's
+very convenient to typecheck instance types like any other HsSigType.
+
+Admittedly the '(Eq a => Eq [a]) => blah' case is erroneous, but it's
+better to reject in checkValidType.  If we say that the body kind
+should be '*' we risk getting TWO error messages, one saying that Eq
+[a] doens't have kind '*', and one saying that we need a Constraint to
+the left of the outer (=>).
+
+How do we figure out the right body kind?  Well, it's a bit of a
+kludge: I just look at the expected kind.  If it's Constraint, we
+must be in this instance situation context. It's a kludge because it
+wouldn't work if any unification was involved to compute that result
+kind -- but it isn't.  (The true way might be to use the 'mode'
+parameter, but that seemed like a sledgehammer to crack a nut.)
 
 Note [Inferring tuple kinds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1338,7 +1317,7 @@ kcHsTyVarBndrs cusk (HsQTvs { hsq_implicit = kv_ns
            ; let k_fvs = tyCoVarsOfType k
                  (bndr, fvs')
                    | tv `elemVarSet` fvs
-                   = ( mkNamedBinder tv Visible
+                   = ( mkNamedBinder Visible tv
                      , fvs `delVarSet` tv `unionVarSet` k_fvs )
                    | otherwise
                    = (mkAnonBinder k, fvs `unionVarSet` k_fvs)
@@ -1490,6 +1469,7 @@ new_skolem_tv n k = mkTcTyVar n k vanillaSkolemTv
 
 ------------------
 kindGeneralizeType :: Type -> TcM Type
+-- Result is zonked
 kindGeneralizeType ty
   = do { kvs <- kindGeneralize ty
        ; zonkTcType (mkInvForAllTys kvs ty) }

@@ -450,8 +450,7 @@ mkTyVarTys = map mkTyVarTy -- a common use of mkTyVarTy
 infixr 3 `mkFunTy`      -- Associates to the right
 -- | Make an arrow type
 mkFunTy :: Type -> Type -> Type
-mkFunTy arg res
-  = ForAllTy (Anon arg) res
+mkFunTy arg res = ForAllTy (Anon arg) res
 
 -- | Make nested arrow types
 mkFunTys :: [Type] -> Type -> Type
