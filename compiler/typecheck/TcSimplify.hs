@@ -545,8 +545,8 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
                             -- again later. All we want here are the predicates over which to
                             -- quantify.
                             --
-                            -- If any meta-tyvar unifications take place (unlikely), we'll
-                            -- pick that up later.
+                            -- If any meta-tyvar unifications take place (unlikely),
+                            -- we'll pick that up later.
 
                       -- See Note [Promote _and_ default when inferring]
                       ; let def_tyvar tv
@@ -558,9 +558,10 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
                       ; WC { wc_simple = simples }
                            <- setTcLevel rhs_tclvl $
                               runTcSDeriveds       $
-                              solveSimpleWanteds $ mapBag toDerivedCt quant_cand
-                                -- NB: we don't want evidence, so used
-                                -- Derived constraints
+                              solveSimpleWanteds   $
+                              mapBag toDerivedCt quant_cand
+                                -- NB: we don't want evidence,
+                                -- so use Derived constraints
 
                       ; simples <- TcM.zonkSimples simples
 
@@ -961,7 +962,7 @@ This only half-works, but then let-generalisation only half-works.
 -}
 
 simplifyWantedsTcM :: [CtEvidence] -> TcM WantedConstraints
--- Zonk the input constraints, and simplify them
+-- Solve the specified Wanted constraints
 -- Discard the evidence binds
 -- Discards all Derived stuff in result
 -- Postcondition: fully zonked and unflattened constraints
@@ -1018,7 +1019,11 @@ simpl_loop n limit floated_eqs no_new_scs
   = return wc  -- Done!
 
   | n `intGtLimit` limit
-  = do { warnTcS (hang (text "solveWanteds: too many iterations"
+  = do { -- Add an error (not a warning) if we blow the limit,
+         -- Typically if we blow the limit we are going to report some other error
+         -- (an unsolved constraint), and we don't want that error to suppress
+         -- the iteration limit warning!
+         addErrTcS (hang (text "solveWanteds: too many iterations"
                    <+> parens (text "limit =" <+> ppr limit))
                 2 (vcat [ text "Unsolved:" <+> ppr wc
                         , ppUnless (isEmptyBag floated_eqs) $
@@ -1030,7 +1035,12 @@ simpl_loop n limit floated_eqs no_new_scs
        ; return wc }
 
   | otherwise
-  = do { traceTcS "simpl_loop, iteration" (int n)
+  = do { let n_floated = lengthBag floated_eqs
+       ; csTraceTcS $
+         text "simpl_loop iteration=" <> int n
+         <+> (parens $ hsep [ text "no new scs =" <+> ppr no_new_scs <> comma
+                            , int n_floated <+> text "floated eqs" <> comma
+                            , int (lengthBag simples) <+> text "simples to solve" ])
 
        -- solveSimples may make progress if either float_eqs hold
        ; (unifs1, wc1) <- reportUnifications $
