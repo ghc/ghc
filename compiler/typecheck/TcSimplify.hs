@@ -1760,12 +1760,12 @@ floatEqualities skols no_given_eqs
                 , wanteds { wc_simple = remaining_simples } ) }
   where
     skol_set = mkVarSet skols
-    (float_eqs, remaining_simples) = partitionBag (usefulToFloat is_useful) simples
-    is_useful pred = tyCoVarsOfType pred `disjointVarSet` skol_set
+    (float_eqs, remaining_simples) = partitionBag (usefulToFloat skol_set) simples
 
-usefulToFloat :: (TcPredType -> Bool) -> Ct -> Bool
-usefulToFloat is_useful_pred ct   -- The constraint is un-flattened and de-canonicalised
-  = is_meta_var_eq pred && is_useful_pred pred
+usefulToFloat :: VarSet -> Ct -> Bool
+usefulToFloat skol_set ct   -- The constraint is un-flattened and de-canonicalised
+  = is_meta_var_eq pred &&
+    (tyCoVarsOfType pred `disjointVarSet` skol_set)
   where
     pred = ctPred ct
 
