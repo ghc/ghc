@@ -37,7 +37,6 @@ import MkCore     ( nO_METHOD_BINDING_ERROR_ID )
 import Type
 import TcEvidence
 import TyCon
-import Coercion   ( emptyCvSubstEnv )
 import CoAxiom
 import DataCon
 import Class
@@ -529,8 +528,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
 
         ; (tyvars, theta, clas, inst_tys) <- tcHsClsInstType InstDeclCtxt poly_ty
         ; let mini_env   = mkVarEnv (classTyVars clas `zip` inst_tys)
-              mini_subst = mkTCvSubst (mkInScopeSet (mkVarSet tyvars))
-                                      (mini_env, emptyCvSubstEnv)
+              mini_subst = mkTvSubst (mkInScopeSet (mkVarSet tyvars)) mini_env
               mb_info    = Just (clas, mini_env)
 
         -- Next, process any associated types.
