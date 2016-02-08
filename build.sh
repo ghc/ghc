@@ -35,6 +35,7 @@ mkdir -p "$root/.shake"
 ghc                           \
     "$root/src/Main.hs"       \
     -Wall                     \
+    -fno-warn-name-shadowing  \
     -i"$root/src"             \
     -rtsopts                  \
     -with-rtsopts=-I0         \
