@@ -673,11 +673,12 @@ test('T9872a',
 test('T9872b',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 5199926080, 5),
+          [(wordsize(64), 4918990352, 5),
           # 2014-12-10    6483306280    Initally created
           # 2014-12-16    6892251912    Flattener parameterized over roles
           # 2014-12-18    3480212048    Reduce type families even more eagerly
 	  # 2015-12-11    5199926080    TypeInType (see #11196)
+	  # 2016-02-08    4918990352    Improved a bit by tyConRolesRepresentational
            (wordsize(32), 1700000000, 5)
           ]),
       ],
@@ -686,11 +687,12 @@ test('T9872b',
 test('T9872c',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 4723613784, 5),
+          [(wordsize(64), 4454071184, 5),
           # 2014-12-10    5495850096    Initally created
           # 2014-12-16    5842024784    Flattener parameterized over roles
           # 2014-12-18    2963554096    Reduce type families even more eagerly
 	  # 2015-12-11    4723613784    TypeInType (see #11196)
+	  # 2016-02-08    4454071184    Improved a bit by tyConRolesRepresentational
            (wordsize(32), 1500000000, 5)
           ]),
       ],
@@ -699,11 +701,12 @@ test('T9872c',
 test('T9872d',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 566134504, 5),
+          [(wordsize(64), 534693648, 5),
           # 2014-12-18    796071864   Initally created
           # 2014-12-18    739189056   Reduce type families even more eagerly
           # 2015-01-07    687562440   TrieMap leaf compression
           # 2015-03-17    726679784   tweak to solver; probably flattens more
+	  # 2016-02-08    534693648   Improved a bit by tyConRolesRepresentational
            (wordsize(32), 59651432, 5)
           # some date     328810212
           # 2015-07-11    350369584

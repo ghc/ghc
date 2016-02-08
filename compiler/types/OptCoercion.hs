@@ -180,7 +180,7 @@ opt_co4 env sym rep r g@(TyConAppCo _r tc cos)
       (True, Nominal) ->
         mkTyConAppCo Representational tc
                      (zipWith3 (opt_co3 env sym)
-                               (map Just (tyConRolesX Representational tc))
+                               (map Just (tyConRolesRepresentational tc))
                                (repeat Nominal)
                                cos)
       (False, Nominal) ->
@@ -189,7 +189,7 @@ opt_co4 env sym rep r g@(TyConAppCo _r tc cos)
                       -- must use opt_co2 here, because some roles may be P
                       -- See Note [Optimising coercion optimisation]
         mkTyConAppCo r tc (zipWith (opt_co2 env sym)
-                                   (tyConRolesX r tc)  -- the current roles
+                                   (tyConRolesRepresentational tc)  -- the current roles
                                    cos)
       (_, Phantom) -> pprPanic "opt_co4 sees a phantom!" (ppr g)
 

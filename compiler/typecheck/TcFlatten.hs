@@ -1035,7 +1035,7 @@ flatten_ty_con_app tc tys
        ; let role = eqRelRole eq_rel
        ; (xis, cos) <- case eq_rel of
                          NomEq  -> flatten_many_nom tys
-                         ReprEq -> flatten_many (tyConRolesX role tc) tys
+                         ReprEq -> flatten_many (tyConRolesRepresentational tc) tys
        ; return (mkTyConApp tc xis, mkTyConAppCo role tc cos) }
 
 {-
