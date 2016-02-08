@@ -151,7 +151,7 @@ module TcType (
   getTvSubstEnv, setTvSubstEnv, getTCvInScope, extendTCvInScope,
   extendTCvInScopeList, extendTCvInScopeSet, extendTCvSubstAndInScope,
   Type.lookupTyVar, Type.extendTCvSubst, Type.substTyVarBndr,
-  extendTCvSubstList, isInScope, mkTCvSubst, zipTyEnv, zipCoEnv,
+  extendTCvSubstList, isInScope, mkTCvSubst, mkTvSubst, zipTyEnv, zipCoEnv,
   Type.substTy, substTys, substTyWith, substTyWithCoVars,
   substTyAddInScope, substTyUnchecked,
   substTheta,

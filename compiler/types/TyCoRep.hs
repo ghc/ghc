@@ -76,7 +76,9 @@ module TyCoRep (
         -- * Substitutions
         TCvSubst(..), TvSubstEnv, CvSubstEnv,
         emptyTvSubstEnv, emptyCvSubstEnv, composeTCvSubstEnv, composeTCvSubst,
-        emptyTCvSubst, mkEmptyTCvSubst, isEmptyTCvSubst, mkTCvSubst, getTvSubstEnv,
+        emptyTCvSubst, mkEmptyTCvSubst, isEmptyTCvSubst,
+        mkTCvSubst, mkTvSubst,
+        getTvSubstEnv,
         getCvSubstEnv, getTCvInScope, isInScope, notElemTCvSubst,
         setTvSubstEnv, setCvSubstEnv, zapTCvSubst,
         extendTCvInScope, extendTCvInScopeList, extendTCvInScopeSet,
@@ -1533,6 +1535,10 @@ isEmptyTCvSubst (TCvSubst _ tenv cenv) = isEmptyVarEnv tenv && isEmptyVarEnv cen
 mkTCvSubst :: InScopeSet -> (TvSubstEnv, CvSubstEnv) -> TCvSubst
 mkTCvSubst in_scope (tenv, cenv) = TCvSubst in_scope tenv cenv
 
+mkTvSubst :: InScopeSet -> TvSubstEnv -> TCvSubst
+-- ^ Mkae a TCvSubst with specified tyvar subst and empty covar subst
+mkTvSubst in_scope tenv = TCvSubst in_scope tenv emptyCvSubstEnv
+
 getTvSubstEnv :: TCvSubst -> TvSubstEnv
 getTvSubstEnv (TCvSubst _ env _) = env
 
@@ -1634,7 +1640,7 @@ zipTvSubst tvs tys
   , not (all isTyVar tvs) || length tvs /= length tys
   = pprTrace "zipTvSubst" (ppr tvs $$ ppr tys) emptyTCvSubst
   | otherwise
-  = TCvSubst (mkInScopeSet (tyCoVarsOfTypes tys)) tenv emptyCvSubstEnv
+  = mkTvSubst (mkInScopeSet (tyCoVarsOfTypes tys)) tenv
   where
     tenv = zipTyEnv tvs tys
 
@@ -1654,7 +1660,7 @@ zipCvSubst cvs cos
 -- NB: It is specifically OK if the lists are of different lengths.
 zipTyBinderSubst :: [TyBinder] -> [Type] -> TCvSubst
 zipTyBinderSubst bndrs tys
-  = TCvSubst is tenv emptyCvSubstEnv
+  = mkTvSubst is tenv
   where
     is = mkInScopeSet (tyCoVarsOfTypes tys)
     tenv = mkVarEnv [ (tv, ty) | (Named tv _, ty) <- zip bndrs tys ]
@@ -1664,7 +1670,7 @@ zipTyBinderSubst bndrs tys
 mkTvSubstPrs :: [(TyVar, Type)] -> TCvSubst
 mkTvSubstPrs prs =
     ASSERT2( onlyTyVarsAndNoCoercionTy, text "prs" <+> ppr prs )
-    TCvSubst in_scope tenv emptyCvSubstEnv
+    mkTvSubst in_scope tenv
   where tenv = mkVarEnv prs
         in_scope = mkInScopeSet $ tyCoVarsOfTypes $ map snd prs
         onlyTyVarsAndNoCoercionTy =
@@ -1772,7 +1778,7 @@ substTyWith tvs tys = ASSERT( length tvs == length tys )
 substTyWithInScope :: InScopeSet -> [TyVar] -> [Type] -> Type -> Type
 substTyWithInScope in_scope tvs tys ty =
   ASSERT( length tvs == length tys )
-  substTy (mkTCvSubst in_scope (tenv, emptyCvSubstEnv)) ty
+  substTy (mkTvSubst in_scope tenv) ty
   where tenv = zipTyEnv tvs tys
 
 -- | Coercion substitution, see 'zipTvSubst'

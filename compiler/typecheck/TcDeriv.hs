@@ -43,7 +43,6 @@ import Avail
 import Unify( tcUnifyTy )
 import Class
 import Type
-import Coercion
 import ErrUtils
 import DataCon
 import Maybes
@@ -2108,8 +2107,7 @@ genDerivStuff loc clas dfun_name tycon inst_tys tyvars
            -- resort is -XDeriveAnyClass (since -XGeneralizedNewtypeDeriving
            -- fell through).
           let mini_env   = mkVarEnv (classTyVars clas `zip` inst_tys)
-              mini_subst = mkTCvSubst (mkInScopeSet (mkVarSet tyvars))
-                                      (mini_env, emptyCvSubstEnv)
+              mini_subst = mkTvSubst (mkInScopeSet (mkVarSet tyvars)) mini_env
 
          ; tyfam_insts <-
              ASSERT2( isNothing (canDeriveAnyClass dflags tycon clas)
