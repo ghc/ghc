@@ -1,4 +1,4 @@
-module Rules.Config (configRules) where
+module Rules.Setup (setupRules) where
 
 import qualified System.Info
 
@@ -7,8 +7,8 @@ import CmdLineFlag
 import Rules.Actions
 import Rules.Generators.GhcAutoconfH
 
-configRules :: Rules ()
-configRules = do
+setupRules :: Rules ()
+setupRules = do
     -- We always rerun the configure script in this mode, because the flags
     -- passed to it can affect the contents of system.config file.
     [configFile, "settings", configH] &%> \[cfg, settings, cfgH] -> do

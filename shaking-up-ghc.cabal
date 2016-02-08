@@ -42,7 +42,6 @@ executable ghc-shake
                        , Rules.Cabal
                        , Rules.Clean
                        , Rules.Compile
-                       , Rules.Config
                        , Rules.Data
                        , Rules.Dependencies
                        , Rules.Documentation
@@ -64,6 +63,7 @@ executable ghc-shake
                        , Rules.Program
                        , Rules.Register
                        , Rules.Resources
+                       , Rules.Setup
                        , Rules.Wrappers.Ghc
                        , Rules.Wrappers.GhcPkg
                        , Selftest
