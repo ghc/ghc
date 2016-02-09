@@ -2016,8 +2016,8 @@ pprPotentials dflags sty herald insts
       | null not_in_scope
       = empty
       | otherwise
-      = hang (herald <+> speakNOf (length not_in_scope)
-                                  (text "instance involving out-of-scope types"))
+      = hang (herald <+> speakNOf (length not_in_scope) (text "instance")
+                     <+> text "involving out-of-scope types")
            2 (ppWhen show_potentials (pprInstances not_in_scope))
 
     flag_hint = ppUnless (show_potentials || length show_these == length insts) $
