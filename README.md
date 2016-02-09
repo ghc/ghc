@@ -52,19 +52,19 @@ are placed into `.build` and `inplace` directories ([#113][build-artefacts-issue
 
 In addition to standard Shake flags (try `--help`), the build system
 currently supports several others:
-* `--configure[=ARGS]`: run the `configure` script forwarding `ARGS` as command line
-arguments; also run the `boot` script to create the `configure` script if necessary.
-You do not have to use this functionality of the new build system; feel free to run
-`boot` and `configure` scripts manually, as you do when using `make`. Note: on Windows 
-we automatically add flag `--enable-tarballs-autodownload` to `ARGS`, so you 
-don't have to do it manually. Beware, this uses network I/O which may sometimes be
-undesirable.
 * `--flavour=FLAVOUR`: choose a build flavour. Two settings are currently supported:
 `default` and `quick` (adds `-O0` flag to all GHC invocations speeding up builds by 3x).
 * `--haddock`: build Haddock documentation.
 * `--progress-info=STYLE`: choose how build progress info is printed. There are four
 settings: `none`, `brief` (one line per build command), `normal` (typically a box per
 build command; this is the default setting), and `unicorn` (when `normal` just won't do).
+* `--setup[=CONFIGURE_ARGS]`: setup the build system by running the `configure` script 
+with `CONFIGURE_ARGS` arguments; also run the `boot` script to create the `configure`
+script if necessary. On Windows, download the required tarballs by executing
+`mk/get-win32-tarballs.sh` with appropriate parameters. You do not have to
+use this functionality of the new build system; feel free to run `boot` and `configure`
+scripts manually, as you do when using `make`. Beware: `--setup` uses network I/O 
+which may sometimes be undesirable.
 * `--split-objects`: generate split objects, which are switched off by default. Due to
 a GHC [bug][ghc-split-objs-bug], you need a full clean rebuild when using this flag.
 
