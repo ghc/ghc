@@ -6,7 +6,6 @@ BUILD_PROF_LIBS    = NO
 SplitObjs          = NO
 HADDOCK_DOCS       = NO
 BUILD_SPHINX_HTML  = NO
-BUILD_SPHINX_PS    = NO
 BUILD_SPHINX_PDF   = NO
 BUILD_MAN          = NO
 
