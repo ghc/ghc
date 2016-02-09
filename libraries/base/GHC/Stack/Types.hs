@@ -47,6 +47,7 @@ import cycle,
     which imports ‘Data.Maybe’ (libraries/base/Data/Maybe.hs)
 -}
 
+import GHC.Classes (Eq)
 import GHC.Types
 
 -- Make implicit dependency known to build system
@@ -205,4 +206,4 @@ data SrcLoc = SrcLoc
   , srcLocStartCol  :: Int
   , srcLocEndLine   :: Int
   , srcLocEndCol    :: Int
-  }
+  } deriving Eq
