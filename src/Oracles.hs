@@ -6,7 +6,7 @@ module Oracles (
     module Oracles.LookupInPath,
     module Oracles.PackageData,
     module Oracles.PackageDeps,
-    module Oracles.WindowsRoot
+    module Oracles.WindowsPath
     ) where
 
 import Oracles.Config
@@ -16,4 +16,4 @@ import Oracles.Dependencies
 import Oracles.LookupInPath
 import Oracles.PackageData
 import Oracles.PackageDeps
-import Oracles.WindowsRoot
+import Oracles.WindowsPath

@@ -34,7 +34,7 @@ executable ghc-shake
                        , Oracles.PackageData
                        , Oracles.PackageDb
                        , Oracles.PackageDeps
-                       , Oracles.WindowsRoot
+                       , Oracles.WindowsPath
                        , Package
                        , Predicates
                        , Rules

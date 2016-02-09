@@ -17,4 +17,4 @@ oracleRules = do
     packageDataOracle  -- see Oracles.PackageData
     packageDbOracle    -- see Oracles.PackageData
     packageDepsOracle  -- see Oracles.PackageDeps
-    windowsRootOracle  -- see Oracles.WindowsRoot
+    windowsPathOracle  -- see Oracles.WindowsRoot

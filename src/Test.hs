@@ -6,7 +6,7 @@ import Expression
 import GHC (rts, libffi)
 import Oracles.Config.Flag
 import Oracles.Config.Setting
-import Oracles.WindowsRoot -- TODO: rename to Oracles.TopDirectory
+import Oracles.WindowsPath
 import Rules.Actions
 import Settings.Packages
 import Settings.User
