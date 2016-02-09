@@ -856,17 +856,25 @@ areaToSp dflags _ sp_hwm _ (CmmLit CmmHighStackMark)
     -- Replace CmmHighStackMark with the number of bytes of stack used,
     -- the sp_hwm.   See Note [Stack usage] in StgCmmHeap
 
-areaToSp dflags _ _ _ (CmmMachOp (MO_U_Lt _)
-                          [CmmMachOp (MO_Sub _)
-                                  [ CmmRegOff (CmmGlobal Sp) x_off
-                                  , CmmLit (CmmInt y_lit _)],
-                           CmmReg (CmmGlobal SpLim)])
-  | fromIntegral x_off >= y_lit
+areaToSp dflags _ _ _ (CmmMachOp (MO_U_Lt _) args)
+  | falseStackCheck args
   = zeroExpr dflags
+areaToSp dflags _ _ _ (CmmMachOp (MO_U_Ge _) args)
+  | falseStackCheck args
+  = mkIntExpr dflags 1
     -- Replace a stack-overflow test that cannot fail with a no-op
     -- See Note [Always false stack check]
 
 areaToSp _ _ _ _ other = other
+
+-- | Determine whether a stack check cannot fail.
+falseStackCheck :: [CmmExpr] -> Bool
+falseStackCheck [ CmmMachOp (MO_Sub _)
+                      [ CmmRegOff (CmmGlobal Sp) x_off
+                      , CmmLit (CmmInt y_lit _)]
+                , CmmReg (CmmGlobal SpLim)]
+  = fromIntegral x_off >= y_lit
+falseStackCheck _ = False
 
 -- Note [Always false stack check]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -880,11 +888,18 @@ areaToSp _ _ _ _ other = other
 -- A subsequent sinking pass will later drop the dead code.
 -- Optimising this away depends on knowing that SpLim <= Sp, so it is
 -- really the job of the stack layout algorithm, hence we do it now.
+--
+-- The control flow optimiser may negate a conditional to increase
+-- the likelihood of a fallthrough if the branch is not taken.  But
+-- not every conditional is inverted as the control flow optimiser
+-- places some requirements on the predecessors of both branch targets.
+-- So we better look for the inverted comparison too.
 
 optStackCheck :: CmmNode O C -> CmmNode O C
 optStackCheck n = -- Note [Always false stack check]
  case n of
    CmmCondBranch (CmmLit (CmmInt 0 _)) _true false _ -> CmmBranch false
+   CmmCondBranch (CmmLit (CmmInt _ _)) true _false _ -> CmmBranch true
    other -> other
 
 
