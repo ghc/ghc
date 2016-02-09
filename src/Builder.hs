@@ -112,11 +112,11 @@ builderPath builder = case builderProvenance builder of
         path <- askConfigWithDefault builderKey . putError $
             "\nCannot find path to '" ++ builderKey
             ++ "' in configuration files. Have you forgot to run configure?"
-        windows <- windowsHost
-        case (path, windows) of
-            ("", _    ) -> return path
-            (p , True ) -> fixAbsolutePathOnWindows (p -<.> exe)
-            (p , False) -> lookupInPath p
+        if path == "" -- TODO: get rid of "" paths
+        then return ""
+        else do
+            path' <- lookupInPath path
+            fixAbsolutePathOnWindows $ path' -<.> exe
 
 getBuilderPath :: Builder -> ReaderT a Action FilePath
 getBuilderPath = lift . builderPath
