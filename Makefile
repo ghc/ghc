@@ -18,6 +18,13 @@
 MAKEFLAGS += --no-builtin-rules
 .SUFFIXES:
 
+
+# -----------------------------------------------------------------------------
+# Sanitize environment
+
+# See Trac #11530
+export GREP_OPTIONS :=
+
 ifneq "$(filter maintainer-clean distclean clean clean_% help,$(MAKECMDGOALS))" ""
 -include mk/config.mk
 else

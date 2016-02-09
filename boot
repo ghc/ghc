@@ -11,6 +11,9 @@ my %required_tag;
 my $validate;
 my $curdir;
 
+# See Trac #11530
+$ENV{GREP_OPTIONS} = '';
+
 $required_tag{"-"} = 1;
 $validate = 0;
 

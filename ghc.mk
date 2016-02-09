@@ -92,7 +92,7 @@ $(error Your make does not support abspath. You need GNU make >= 3.81)
 endif
 ##################################################
 
-
+# -----------------------------------------------------------------------------
 # Catch make if it runs away into an infinite loop
 ifeq      "$(MAKE_RESTARTS)" ""
 else ifeq "$(MAKE_RESTARTS)" "1"
