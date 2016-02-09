@@ -362,7 +362,7 @@ addPatSynCtxt (L loc name) thing_inside
 
 wrongNumberOfParmsErr :: Name -> Arity -> Arity -> SDoc
 wrongNumberOfParmsErr name decl_arity ty_arity
-  = hang (text "Patten synonym" <+> quotes (ppr name) <+> ptext (sLit "has")
+  = hang (text "Pattern synonym" <+> quotes (ppr name) <+> ptext (sLit "has")
           <+> speakNOf decl_arity (text "argument"))
        2 (text "but its type signature has" <+> speakN ty_arity)
 
