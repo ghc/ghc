@@ -9,13 +9,10 @@ import Rules.Generators.GhcAutoconfH
 
 setupRules :: Rules ()
 setupRules = do
-    -- We always rerun the configure script in this mode, because the flags
-    -- passed to it can affect the contents of system.config file.
     [configFile, "settings", configH] &%> \[cfg, settings, cfgH] -> do
-        alwaysRerun
+        need [ settings <.> "in", cfgH <.> "in", "configure" ]
         case cmdSetup of
             RunSetup configureArgs -> do
-                need [ settings <.> "in", cfgH <.> "in" ]
                 -- We cannot use windowsHost here due to a cyclic dependency
                 when (System.Info.os == "mingw32") $ do
                     putBuild "| Checking for Windows tarballs..."
@@ -24,11 +21,23 @@ setupRules = do
                                   , "download"
                                   , System.Info.arch ]
                 runConfigure "." [] [configureArgs]
-            SkipSetup -> unlessM (doesFileExist cfg) $
-                putError $ "Configuration file " ++ cfg ++ " is missing.\n"
-                    ++ "Run the configure script either manually or via the "
+            SkipSetup -> do
+                cfgExists <- doesFileExist cfg
+                if cfgExists
+                then putError $ "Configuration file " ++ cfg ++ " is out-of-date."
+                    ++ "\nRerun the configure script either manually or via the "
+                    ++ "build system by passing --setup[=CONFIGURE_ARGS] flag."
+                else putError $ "Configuration file " ++ cfg ++ " is missing."
+                    ++ "\nRun the configure script either manually or via the "
                     ++ "build system by passing --setup[=CONFIGURE_ARGS] flag."
 
     ["configure", configH <.> "in"] &%> \_ -> do
-        putBuild "| Running boot..."
-        quietly $ cmd (EchoStdout False) "perl boot"
+        need ["configure.ac"]
+        case cmdSetup of
+            RunSetup _ -> do
+                putBuild "| Running boot..."
+                quietly $ cmd (EchoStdout False) "perl boot"
+            SkipSetup -> do
+                putError $ "The configure script is out-of-date."
+                    ++ "\nRun the boot script either manually or via the "
+                    ++ "build system by passing --setup[=CONFIGURE_ARGS] flag."
