@@ -148,8 +148,8 @@ tcTyClGroup tyclds
                  -- Also extend the local type envt with bindings giving
                  -- the (polymorphic) kind of each knot-tied TyCon or Class
                  -- See Note [Type checking recursive type and class declarations]
-             tcExtendKindEnv2 [ mkTcTyConPair name kind
-                              | (name, kind) <-  names_w_poly_kinds ]    $
+             tcExtendKindEnv2 [ mkTcTyConPair name kind unsat
+                              | (name, kind, unsat) <-  names_w_poly_kinds ] $
 
                  -- Kind and type check declarations for this group
              mapM (tcTyClDecl rec_flags) decls }
@@ -170,7 +170,7 @@ tcTyClGroup tyclds
        ; tcExtendTyConEnv tyclss $
          tcAddImplicits tyclss }
 
-zipRecTyClss :: [(Name, Kind)]
+zipRecTyClss :: [(Name, Kind, Bool)]
              -> [TyCon]           -- Knot-tied
              -> [(Name,TyThing)]
 -- Build a name-TyThing mapping for the TyCons bound by decls
@@ -179,7 +179,7 @@ zipRecTyClss :: [(Name, Kind)]
 -- because typechecking types (in, say, tcTyClDecl) looks at
 -- this outer constructor
 zipRecTyClss kind_pairs rec_tycons
-  = [ (name, ATyCon (get name)) | (name, _kind) <- kind_pairs ]
+  = [ (name, ATyCon (get name)) | (name, _kind, _unsat) <- kind_pairs ]
   where
     rec_tc_env :: NameEnv TyCon
     rec_tc_env = foldr add_tc emptyNameEnv rec_tycons
@@ -260,10 +260,11 @@ See also Note [Kind checking recursive type and class declarations]
 
 -}
 
-kcTyClGroup :: TyClGroup Name -> TcM [(Name,Kind)]
+kcTyClGroup :: TyClGroup Name -> TcM [(Name,Kind,Bool)]
 -- Kind check this group, kind generalize, and return the resulting local env
 -- This bindds the TyCons and Classes of the group, but not the DataCons
 -- See Note [Kind checking for type and class decls]
+-- Third return value is whether or not the tycon can appear unsaturated
 kcTyClGroup (TyClGroup { group_tyclds = decls })
   = do  { mod <- getModule
         ; traceTc "kcTyClGroup" (text "module" <+> ppr mod $$ vcat (map ppr decls))
@@ -301,21 +302,22 @@ kcTyClGroup (TyClGroup { group_tyclds = decls })
         ; return res }
 
   where
-    generalise :: TcTypeEnv -> Name -> TcM (Name, Kind)
+    generalise :: TcTypeEnv -> Name -> TcM (Name, Kind, Bool)
     -- For polymorphic things this is a no-op
     generalise kind_env name
-      = do { let kc_kind = case lookupNameEnv kind_env name of
-                               Just (ATcTyCon tc) -> tyConKind tc
-                               _ -> pprPanic "kcTyClGroup" (ppr name $$ ppr kind_env)
+      = do { let (kc_kind, kc_unsat) = case lookupNameEnv kind_env name of
+                   Just (ATcTyCon tc) -> ( tyConKind tc
+                                         , mightBeUnsaturatedTyCon tc )
+                   _ -> pprPanic "kcTyClGroup" (ppr name $$ ppr kind_env)
            ; kvs <- kindGeneralize kc_kind
            ; kc_kind' <- zonkTcTypeToType emptyZonkEnv kc_kind
 
                       -- Make sure kc_kind' has the final, zonked kind variables
            ; traceTc "Generalise kind" (vcat [ ppr name, ppr kc_kind, ppr kvs, ppr kc_kind' ])
-           ; return (name, mkInvForAllTys kvs kc_kind') }
+           ; return (name, mkInvForAllTys kvs kc_kind', kc_unsat) }
 
     generaliseTCD :: TcTypeEnv
-                  -> LTyClDecl Name -> TcM [(Name, Kind)]
+                  -> LTyClDecl Name -> TcM [(Name, Kind, Bool)]
     generaliseTCD kind_env (L _ decl)
       | ClassDecl { tcdLName = (L _ name), tcdATs = ats } <- decl
       = do { first <- generalise kind_env name
@@ -331,14 +333,15 @@ kcTyClGroup (TyClGroup { group_tyclds = decls })
            ; return [res] }
 
     generaliseFamDecl :: TcTypeEnv
-                      -> FamilyDecl Name -> TcM (Name, Kind)
+                      -> FamilyDecl Name -> TcM (Name, Kind, Bool)
     generaliseFamDecl kind_env (FamilyDecl { fdLName = L _ name })
       = generalise kind_env name
 
-mkTcTyConPair :: Name -> TcKind -> (Name, TcTyThing)
+mkTcTyConPair :: Name -> TcKind -> Bool  -- ^ can the tycon appear unsaturated?
+              -> (Name, TcTyThing)
 -- Makes a binding to put in the local envt, binding
 -- a name to a TcTyCon with the specified kind
-mkTcTyConPair name kind = (name,  ATcTyCon (mkTcTyCon name kind))
+mkTcTyConPair name kind unsat = (name,  ATcTyCon (mkTcTyCon name kind unsat))
 
 mk_thing_env :: [LTyClDecl Name] -> [(Name, TcTyThing)]
 mk_thing_env [] = []
@@ -383,7 +386,7 @@ getInitialKind decl@(ClassDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdATs =
            do { inner_prs <- getFamDeclInitialKinds ats
               ; return (constraintKind, inner_prs) }
        ; cl_kind <- zonkTcType cl_kind
-       ; let main_pr = mkTcTyConPair name cl_kind
+       ; let main_pr = mkTcTyConPair name cl_kind True
        ; return (main_pr : inner_prs) }
 
 getInitialKind decl@(DataDecl { tcdLName = L _ name
@@ -397,7 +400,7 @@ getInitialKind decl@(DataDecl { tcdLName = L _ name
                            Nothing   -> return liftedTypeKind
               ; return (res_k, ()) }
         ; decl_kind <- zonkTcType decl_kind
-        ; let main_pr = mkTcTyConPair name decl_kind
+        ; let main_pr = mkTcTyConPair name decl_kind True
               inner_prs = [ (unLoc con, APromotionErr RecDataConPE)
                           | L _ con' <- cons, con <- getConNames con' ]
         ; return (main_pr : inner_prs) }
@@ -419,7 +422,8 @@ getFamDeclInitialKind :: FamilyDecl Name
                       -> TcM [(Name, TcTyThing)]
 getFamDeclInitialKind decl@(FamilyDecl { fdLName     = L _ name
                                        , fdTyVars    = ktvs
-                                       , fdResultSig = L _ resultSig })
+                                       , fdResultSig = L _ resultSig
+                                       , fdInfo      = info })
   = do { (fam_kind, _) <-
            kcHsTyVarBndrs (famDeclHasCusk decl) ktvs $ \_ _ ->
            do { res_k <- case resultSig of
@@ -432,7 +436,12 @@ getFamDeclInitialKind decl@(FamilyDecl { fdLName     = L _ name
                         | otherwise                -> newMetaKindVar
               ; return (res_k, ()) }
        ; fam_kind <- zonkTcType fam_kind
-       ; return [ mkTcTyConPair name fam_kind ] }
+       ; return [ mkTcTyConPair name fam_kind unsat ] }
+  where
+    unsat = case info of
+      DataFamily         -> True
+      OpenTypeFamily     -> False
+      ClosedTypeFamily _ -> False
 
 ----------------
 kcSynDecls :: [SCC (LTyClDecl Name)]
@@ -440,7 +449,7 @@ kcSynDecls :: [SCC (LTyClDecl Name)]
 kcSynDecls [] = getLclEnv
 kcSynDecls (group : groups)
   = do  { (n,k) <- kcSynDecl1 group
-        ; tcExtendKindEnv2 [ mkTcTyConPair n k ] $
+        ; tcExtendKindEnv2 [ mkTcTyConPair n k False ] $
           kcSynDecls groups }
 
 kcSynDecl1 :: SCC (LTyClDecl Name)

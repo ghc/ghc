@@ -984,29 +984,17 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
        ; case thing of
            ATyVar _ tv -> return (mkTyVarTy tv, tyVarKind tv)
 
-           ATcTyCon tc_tc -> do { data_kinds <- xoptM LangExt.DataKinds
-                                ; unless (isTypeLevel (mode_level mode) ||
-                                          data_kinds) $
-                                  promotionErr name NoDataKindsTC
+           ATcTyCon tc_tc -> do { check_tc tc_tc
                                 ; tc <- get_loopy_tc name tc_tc
-                                ; return (mkNakedTyConApp tc [], tyConKind tc_tc) }
+                                ; handle_tyfams tc tc_tc }
                              -- mkNakedTyConApp: see Note [Type-checking inside the knot]
                  -- NB: we really should check if we're at the kind level
                  -- and if the tycon is promotable if -XNoTypeInType is set.
                  -- But this is a terribly large amount of work! Not worth it.
 
            AGlobal (ATyCon tc)
-             -> do { type_in_type <- xoptM LangExt.TypeInType
-                   ; data_kinds   <- xoptM LangExt.DataKinds
-                   ; unless (isTypeLevel (mode_level mode) ||
-                             data_kinds ||
-                             isKindTyCon tc) $
-                       promotionErr name NoDataKindsTC
-                   ; unless (isTypeLevel (mode_level mode) ||
-                             type_in_type ||
-                             isLegacyPromotableTyCon tc) $
-                       promotionErr name NoTypeInTypeTC
-                   ; return (mkTyConApp tc [], tyConKind tc) }
+             -> do { check_tc tc
+                   ; handle_tyfams tc tc }
 
            AGlobal (AConLike (RealDataCon dc))
              -> do { data_kinds <- xoptM LangExt.DataKinds
@@ -1026,6 +1014,33 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
 
            _  -> wrongThingErr "type" thing name }
   where
+    check_tc :: TyCon -> TcM ()
+    check_tc tc = do { type_in_type <- xoptM LangExt.TypeInType
+                     ; data_kinds   <- xoptM LangExt.DataKinds
+                     ; unless (isTypeLevel (mode_level mode) ||
+                               data_kinds ||
+                               isKindTyCon tc) $
+                       promotionErr name NoDataKindsTC
+                     ; unless (isTypeLevel (mode_level mode) ||
+                               type_in_type ||
+                               isLegacyPromotableTyCon tc) $
+                       promotionErr name NoTypeInTypeTC }
+
+    -- if we are type-checking a type family tycon, we must instantiate
+    -- any invisible arguments right away. Otherwise, we get #11246
+    handle_tyfams :: TyCon   -- the tycon to instantiate (might be loopy)
+                  -> TyCon   -- a non-loopy version of the tycon
+                  -> TcM (TcType, TcKind)
+    handle_tyfams tc tc_tc
+      | mightBeUnsaturatedTyCon tc_tc
+      = return (ty, tc_kind)
+
+      | otherwise
+      = instantiateTyN 0 ty tc_kind
+      where
+        ty      = mkNakedTyConApp tc []
+        tc_kind = tyConKind tc_tc
+
     get_loopy_tc :: Name -> TyCon -> TcM TyCon
     -- Return the knot-tied global TyCon if there is one
     -- Otherwise the local TcTyCon; we must be doing kind checking
