@@ -1,0 +1,5 @@
+
+T11516.hs:11:16: error:
+    • Expected kind ‘i0 -> i0 -> *’, but ‘()’ has kind ‘*’
+    • In the first argument of ‘Varpi’, namely ‘()’
+      In the instance declaration for ‘Varpi (->) (->) (Either f)’
