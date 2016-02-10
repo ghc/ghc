@@ -33,6 +33,7 @@ module TyCoRep (
         -- Coercions
         Coercion(..), LeftOrRight(..),
         UnivCoProvenance(..), CoercionHole(..),
+        CoercionN, CoercionR, CoercionP, KindCoercion,
 
         -- Functions over types
         mkTyConTy, mkTyVarTy, mkTyVarTys,
@@ -213,10 +214,10 @@ data Type
 
   | CastTy
         Type
-        Coercion    -- ^ A kind cast. The coercion is always nominal.
-                    -- INVARIANT: The cast is never refl.
-                    -- INVARIANT: The cast is "pushed down" as far as it
-                    -- can go. See Note [Pushing down casts]
+        KindCoercion  -- ^ A kind cast. The coercion is always nominal.
+                      -- INVARIANT: The cast is never refl.
+                      -- INVARIANT: The cast is "pushed down" as far as it
+                      -- can go. See Note [Pushing down casts]
 
   | CoercionTy
         Coercion    -- ^ Injection of a Coercion into a type
@@ -592,11 +593,11 @@ data Coercion
                -- we expand synonyms eagerly
                -- But it can be a type function
 
-  | AppCo Coercion Coercion             -- lift AppTy
+  | AppCo Coercion CoercionN             -- lift AppTy
           -- AppCo :: e -> N -> e
 
   -- See Note [Forall coercions]
-  | ForAllCo TyVar Coercion Coercion
+  | ForAllCo TyVar KindCoercion Coercion
          -- ForAllCo :: _ -> N -> e -> e
 
   -- These are special
@@ -626,15 +627,15 @@ data Coercion
     -- Using NthCo on a ForAllCo gives an N coercion always
     -- See Note [NthCo and newtypes]
 
-  | LRCo   LeftOrRight Coercion     -- Decomposes (t_left t_right)
+  | LRCo   LeftOrRight CoercionN     -- Decomposes (t_left t_right)
     -- :: _ -> N -> N
-  | InstCo Coercion Coercion
+  | InstCo Coercion CoercionN
     -- :: e -> N -> e
     -- See Note [InstCo roles]
 
   -- Coherence applies a coercion to the left-hand type of another coercion
   -- See Note [Coherence]
-  | CoherenceCo Coercion Coercion
+  | CoherenceCo Coercion KindCoercion
      -- :: e -> N -> e
 
   -- Extract a kind coercion from a (heterogeneous) type coercion
@@ -642,10 +643,15 @@ data Coercion
   | KindCo Coercion
      -- :: e -> N
 
-  | SubCo Coercion                  -- Turns a ~N into a ~R
+  | SubCo CoercionN                  -- Turns a ~N into a ~R
     -- :: N -> R
 
   deriving (Data.Data, Data.Typeable)
+
+type CoercionN = Coercion       -- always nominal
+type CoercionR = Coercion       -- always representational
+type CoercionP = Coercion       -- always phantom
+type KindCoercion = CoercionN   -- always nominal
 
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in coreSyn/CoreLint.hs
@@ -1002,10 +1008,12 @@ role and kind, which is done in the UnivCo constructor.
 data UnivCoProvenance
   = UnsafeCoerceProv   -- ^ From @unsafeCoerce#@. These are unsound.
 
-  | PhantomProv Coercion -- ^ See Note [Phantom coercions]
+  | PhantomProv KindCoercion -- ^ See Note [Phantom coercions]. Only in Phantom
+                             -- roled coercions
 
-  | ProofIrrelProv Coercion  -- ^ From the fact that any two coercions are
-                             --   considered equivalent. See Note [ProofIrrelProv]
+  | ProofIrrelProv KindCoercion  -- ^ From the fact that any two coercions are
+                                 --   considered equivalent. See Note [ProofIrrelProv].
+                                 -- Can be used in Nominal or Representational coercions
 
   | PluginProv String  -- ^ From a plugin, which asserts that this coercion
                        --   is sound. The string is for the use of the plugin.

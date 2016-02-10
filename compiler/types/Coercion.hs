@@ -127,13 +127,6 @@ import Control.Monad (foldM)
 import Control.Arrow ( first )
 import Data.Function ( on )
 
------------------------------------------------------------------
--- These synonyms are very useful as documentation
-
-type CoercionN = Coercion   -- nominal coercion
-type CoercionR = Coercion   -- representational coercion
-type CoercionP = Coercion   -- phantom coercion
-
 {-
 %************************************************************************
 %*                                                                      *
