@@ -48,7 +48,7 @@ whatGlasgowExtsDoes = unlines
 -- the users guide.
 flagsTable :: [Flag] -> ReST
 flagsTable theFlags =
-    table [50, 100, 30, 50]
+    table [50, 100, 30, 55]
           ["Flag", "Description", "Static/Dynamic", "Reverse"]
           (map flagRow theFlags)
   where
