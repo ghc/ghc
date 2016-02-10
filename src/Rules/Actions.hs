@@ -5,7 +5,9 @@ module Rules.Actions (
     runMakeVerbose, renderLibrary, renderProgram, runBuilder, makeExecutable
     ) where
 
-import qualified System.Directory as IO
+import qualified System.Directory       as IO
+import qualified System.IO              as IO
+import qualified Control.Exception.Base as IO
 
 import Base
 import CmdLineFlag
@@ -96,9 +98,12 @@ moveDirectory source target = do
 fixFile :: FilePath -> (String -> String) -> Action ()
 fixFile file f = do
     putBuild $ "| Fix " ++ file
-    old <- liftIO $ readFile file
-    let new = f old
-    length new `seq` liftIO $ writeFile file new
+    contents <- liftIO $ IO.withFile file IO.ReadMode $ \h -> do
+        old <- IO.hGetContents h
+        let new = f old
+        IO.evaluate $ rnf new
+        return new
+    liftIO $ writeFile file contents
 
 runConfigure :: FilePath -> [CmdOption] -> [String] -> Action ()
 runConfigure dir opts args = do
