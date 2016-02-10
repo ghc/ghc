@@ -21,13 +21,8 @@ setupRules = do
                                   , "download"
                                   , System.Info.arch ]
                 runConfigure "." [] [configureArgs]
-            SkipSetup -> do
-                cfgExists <- doesFileExist cfg
-                if cfgExists
-                then putError $ "Configuration file " ++ cfg ++ " is out-of-date."
-                    ++ "\nRerun the configure script either manually or via the "
-                    ++ "build system by passing --setup[=CONFIGURE_ARGS] flag."
-                else putError $ "Configuration file " ++ cfg ++ " is missing."
+            SkipSetup -> unlessM (doesFileExist cfg) $
+                putError $ "Configuration file " ++ cfg ++ " is missing."
                     ++ "\nRun the configure script either manually or via the "
                     ++ "build system by passing --setup[=CONFIGURE_ARGS] flag."
 
@@ -37,7 +32,7 @@ setupRules = do
             RunSetup _ -> do
                 putBuild "| Running boot..."
                 quietly $ cmd (EchoStdout False) "perl boot"
-            SkipSetup -> do
-                putError $ "The configure script is out-of-date."
+            SkipSetup -> unlessM (doesFileExist "configure") $
+                putError $ "The configure script is missing."
                     ++ "\nRun the boot script either manually or via the "
                     ++ "build system by passing --setup[=CONFIGURE_ARGS] flag."
