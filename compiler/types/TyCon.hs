@@ -598,6 +598,7 @@ data TyCon
   | TcTyCon {
       tyConUnique :: Unique,
       tyConName   :: Name,
+      tyConUnsat  :: Bool,  -- ^ can this tycon be unsaturated?
       tyConKind   :: Kind
       }
   deriving Typeable
@@ -1216,11 +1217,13 @@ mkTupleTyCon name kind arity tyvars con sort parent
 -- TcErrors sometimes calls typeKind.
 -- See also Note [Kind checking recursive type and class declarations]
 -- in TcTyClsDecls.
-mkTcTyCon :: Name -> Kind -> TyCon
-mkTcTyCon name kind
+mkTcTyCon :: Name -> Kind -> Bool -- ^ Can this be unsaturated?
+          -> TyCon
+mkTcTyCon name kind unsat
   = TcTyCon { tyConUnique  = getUnique name
             , tyConName    = name
-            , tyConKind    = kind }
+            , tyConKind    = kind
+            , tyConUnsat   = unsat }
 
 -- | Create an unlifted primitive 'TyCon', such as @Int#@
 mkPrimTyCon :: Name  -> Kind -> [Role] -> PrimRep -> TyCon
@@ -1509,6 +1512,7 @@ isTypeSynonymTyCon _                 = False
 mightBeUnsaturatedTyCon :: TyCon -> Bool
 mightBeUnsaturatedTyCon (SynonymTyCon {}) = False
 mightBeUnsaturatedTyCon (FamilyTyCon  { famTcFlav = flav}) = isDataFamFlav flav
+mightBeUnsaturatedTyCon (TcTyCon { tyConUnsat = unsat })   = unsat
 mightBeUnsaturatedTyCon _other            = True
 
 -- | Is this an algebraic 'TyCon' declared with the GADT syntax?
