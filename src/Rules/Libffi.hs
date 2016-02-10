@@ -3,7 +3,9 @@ module Rules.Libffi (rtsBuildPath, libffiRules, libffiDependencies) where
 import Base
 import Expression
 import GHC
-import Oracles
+import Oracles.Config.Flag
+import Oracles.Config.Setting
+import Oracles.WindowsPath
 import Rules.Actions
 import Settings.Builders.Common
 import Settings.Packages.Rts

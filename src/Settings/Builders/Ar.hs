@@ -2,7 +2,8 @@ module Settings.Builders.Ar (arBuilderArgs, arCmd, chunksOfSize) where
 
 import Base
 import Expression
-import Oracles
+import Oracles.Config.Flag
+import Oracles.Config.Setting
 import Predicates (builder)
 
 -- | Default arguments for 'Ar' builder

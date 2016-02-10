@@ -2,7 +2,7 @@ module Rules.Generators.GhcSplit (generateGhcSplit) where
 
 import Base
 import Expression
-import Oracles
+import Oracles.Config.Setting
 import Rules.Generators.Common
 
 ghcSplitSource :: FilePath

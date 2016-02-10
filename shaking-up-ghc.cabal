@@ -23,7 +23,6 @@ executable ghc-shake
                        , Environment
                        , Expression
                        , GHC
-                       , Oracles
                        , Oracles.ArgsHash
                        , Oracles.Config
                        , Oracles.Config.Flag

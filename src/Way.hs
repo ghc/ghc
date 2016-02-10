@@ -15,7 +15,7 @@ module Way (
 import Base hiding (unit)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as Set
-import Oracles
+import Oracles.Config.Setting
 
 -- Note: order of constructors is important for compatibility with the old build
 -- system, e.g. we want "thr_p", not "p_thr" (see instance Show Way).

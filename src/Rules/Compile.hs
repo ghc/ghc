@@ -2,7 +2,7 @@ module Rules.Compile (compilePackage) where
 
 import Base
 import Expression
-import Oracles
+import Oracles.Dependencies
 import Rules.Actions
 import Rules.Resources
 import Settings

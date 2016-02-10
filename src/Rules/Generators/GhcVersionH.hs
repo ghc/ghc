@@ -1,7 +1,7 @@
 module Rules.Generators.GhcVersionH (generateGhcVersionH) where
 
 import Expression
-import Oracles
+import Oracles.Config.Setting
 import Rules.Generators.Common
 
 generateGhcVersionH :: Expr String

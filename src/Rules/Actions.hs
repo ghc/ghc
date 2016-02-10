@@ -11,8 +11,8 @@ import System.Console.ANSI
 import Base
 import CmdLineFlag
 import Expression
-import Oracles
 import Oracles.ArgsHash
+import Oracles.WindowsPath
 import Settings
 import Settings.Args
 import Settings.Builders.Ar

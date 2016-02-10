@@ -3,7 +3,8 @@ module Rules.Generators.ConfigHs (generateConfigHs) where
 import Base
 import Expression
 import GHC
-import Oracles
+import Oracles.Config.Flag
+import Oracles.Config.Setting
 import Settings
 import Rules.Generators.Common
 

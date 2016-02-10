@@ -2,7 +2,8 @@ module Rules.Generators.GhcPlatformH (generateGhcPlatformH) where
 
 import Base
 import Expression
-import Oracles
+import Oracles.Config.Flag
+import Oracles.Config.Setting
 import Rules.Generators.Common
 
 generateGhcPlatformH :: Expr String

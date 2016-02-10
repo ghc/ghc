@@ -9,8 +9,9 @@ module Settings (
 
 import Base
 import Expression
-import Oracles
 import Oracles.ModuleFiles
+import Oracles.PackageData
+import Oracles.WindowsPath
 import Settings.Packages
 import Settings.Paths
 import Settings.User

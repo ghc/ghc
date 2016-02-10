@@ -5,7 +5,9 @@ import Control.Monad.Extra
 
 import Base
 import Expression
-import Oracles
+import Oracles.Config.Flag
+import Oracles.Config.Setting
+import Oracles.PackageData
 import Predicates (builder, stage0, notStage0)
 import Settings
 import Settings.Builders.Common

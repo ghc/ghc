@@ -5,7 +5,8 @@ import qualified System.Directory as IO
 import Base
 import Expression
 import GHC
-import Oracles
+import Oracles.Config.Setting
+import Oracles.PackageDeps
 import Rules.Actions
 import Rules.Generate
 import Rules.Libffi

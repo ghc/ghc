@@ -5,7 +5,7 @@ import Base
 import GHC
 import Package
 import Expression
-import Oracles
+import Oracles.PackageData
 import Predicates hiding (file)
 import Settings
 import Settings.Builders.Ghc

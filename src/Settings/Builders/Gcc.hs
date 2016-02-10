@@ -2,7 +2,7 @@ module Settings.Builders.Gcc (gccBuilderArgs, gccMBuilderArgs) where
 
 import Development.Shake.FilePath
 import Expression
-import Oracles
+import Oracles.PackageData
 import Predicates (stagedBuilder)
 import Settings
 import Settings.Builders.Common (cIncludeArgs)

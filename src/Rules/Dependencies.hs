@@ -2,7 +2,7 @@ module Rules.Dependencies (buildPackageDependencies) where
 
 import Base
 import Expression
-import Oracles
+import Oracles.PackageData
 import Rules.Actions
 import Rules.Resources
 import Settings

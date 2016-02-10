@@ -2,7 +2,8 @@ module Rules.Generators.GhcAutoconfH (generateGhcAutoconfH, configH) where
 
 import Base
 import Expression
-import Oracles
+import Oracles.Config.Flag
+import Oracles.Config.Setting
 import Rules.Generators.Common
 
 -- TODO: change `mk/config.h` to `shake-build/cfg/config.h`

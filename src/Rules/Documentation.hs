@@ -3,7 +3,7 @@ module Rules.Documentation (buildPackageDocumentation) where
 import Base
 import Expression
 import GHC
-import Oracles
+import Oracles.PackageData
 import Rules.Actions
 import Rules.Resources
 import Settings

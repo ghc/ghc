@@ -8,7 +8,9 @@ import Control.Monad.Trans.Reader
 import Base
 import GHC
 import GHC.Generics (Generic)
-import Oracles
+import Oracles.Config
+import Oracles.LookupInPath
+import Oracles.WindowsPath
 import Package
 import Stage
 

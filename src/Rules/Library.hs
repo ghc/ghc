@@ -5,7 +5,7 @@ import Data.Char
 import Base hiding (splitPath)
 import Expression
 import GHC
-import Oracles
+import Oracles.PackageData
 import Rules.Actions
 import Rules.Gmp
 import Rules.Resources

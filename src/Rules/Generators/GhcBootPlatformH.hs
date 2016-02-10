@@ -2,7 +2,7 @@ module Rules.Generators.GhcBootPlatformH (generateGhcBootPlatformH) where
 
 import Base
 import Expression
-import Oracles
+import Oracles.Config.Setting
 import Rules.Generators.Common
 
 generateGhcBootPlatformH :: Expr String
