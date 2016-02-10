@@ -34,7 +34,7 @@ windowsPathOracle :: Rules ()
 windowsPathOracle = do
     answer <- newCache $ \path -> do
         Stdout out <- quietly $ cmd ["cygpath", "-m", path]
-        let windowsPath = dropWhileEnd isSpace out
+        let windowsPath = unifyPath $ dropWhileEnd isSpace out
         putOracle $ "Windows path mapping: " ++ path ++ " => " ++ windowsPath
         return windowsPath
     _ <- addOracle $ \(WindowsPath query) -> answer query
