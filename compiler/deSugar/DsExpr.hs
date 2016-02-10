@@ -623,7 +623,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
     mk_alt upd_fld_env con
       = do { let (univ_tvs, ex_tvs, eq_spec,
                   prov_theta, _req_theta, arg_tys, _) = conLikeFullSig con
-                 subst = mkTvSubstPrs (univ_tvs `zip` in_inst_tys)
+                 subst = zipTvSubst univ_tvs in_inst_tys
 
                 -- I'm not bothering to clone the ex_tvs
            ; eqs_vars   <- mapM newPredVarDs (substTheta subst (eqSpecPreds eq_spec))
