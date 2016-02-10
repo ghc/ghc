@@ -6,7 +6,6 @@ module Rules.Actions (
     ) where
 
 import qualified System.Directory as IO
-import System.Console.ANSI
 
 import Base
 import CmdLineFlag
@@ -127,20 +126,11 @@ runMakeWithVerbosity :: Bool -> FilePath -> [String] -> Action ()
 runMakeWithVerbosity verbose dir args = do
     need [dir -/- "Makefile"]
     path <- builderPath Make
-
-    -- FIXME: temporary safety net for those who are not on GHC HEAD, see #167
-    -- TODO: add need [path] once lookupInPath is enabled on Windows
-    fixPath <- if path == "@MakeCmd@" <.> exe
-               then do
-                   putColoured Red $ "You are behind GHC HEAD, make autodetection is disabled."
-                   return "make"
-               else return path
-
     let note = if null args then "" else " (" ++ intercalate ", " args ++ ")"
-    putBuild $ "| Run " ++ fixPath ++ note ++ " in " ++ dir ++ "..."
+    putBuild $ "| Run make" ++ note ++ " in " ++ dir ++ "..."
     if verbose
-    then           cmd Shell                    fixPath ["-C", dir] args
-    else quietly $ cmd Shell (EchoStdout False) fixPath ["-C", dir] args
+    then           cmd Shell                    path ["-C", dir] args
+    else quietly $ cmd Shell (EchoStdout False) path ["-C", dir] args
 
 applyPatch :: FilePath -> FilePath -> Action ()
 applyPatch dir patch = do
