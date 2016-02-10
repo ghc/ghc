@@ -18,8 +18,10 @@ lookupInPathOracle :: Rules ()
 lookupInPathOracle = do
     answer <- newCache $ \query -> do
         maybePath <- liftIO $ findExecutable query
-        let path = fromMaybe query maybePath
-        putOracle $ "Lookup executable '" ++ query ++ "': " ++ path
+        path <- case maybePath of
+            Just value -> return $ unifyPath value
+            Nothing    -> putError $ "Cannot find executable '" ++ query ++ "'."
+        putOracle $ "Executable found: " ++ query ++ " => " ++ path
         return path
     _ <- addOracle $ \(LookupInPath query) -> answer query
     return ()
