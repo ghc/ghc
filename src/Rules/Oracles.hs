@@ -1,20 +1,24 @@
 module Rules.Oracles (oracleRules) where
 
 import Base
-import Oracles
-import Oracles.ArgsHash
-import Oracles.PackageDb
-import Oracles.ModuleFiles
+import qualified Oracles.Config
+import qualified Oracles.Dependencies
+import qualified Oracles.LookupInPath
+import qualified Oracles.PackageData
+import qualified Oracles.PackageDeps
+import qualified Oracles.WindowsPath
+import qualified Oracles.ArgsHash
+import qualified Oracles.ModuleFiles
+import qualified Oracles.PackageDb
 
--- TODO: replace comments with qualified imports
 oracleRules :: Rules ()
 oracleRules = do
-    argsHashOracle     -- see Oracles.ArgsHash
-    configOracle       -- see Oracles.Config
-    dependenciesOracle -- see Oracles.Dependencies
-    lookupInPathOracle -- see Oracles.LookupInPath
-    moduleFilesOracle  -- see Oracles.ModuleFiles
-    packageDataOracle  -- see Oracles.PackageData
-    packageDbOracle    -- see Oracles.PackageData
-    packageDepsOracle  -- see Oracles.PackageDeps
-    windowsPathOracle  -- see Oracles.WindowsRoot
+    Oracles.ArgsHash.argsHashOracle
+    Oracles.Config.configOracle
+    Oracles.Dependencies.dependenciesOracle
+    Oracles.LookupInPath.lookupInPathOracle
+    Oracles.ModuleFiles.moduleFilesOracle
+    Oracles.PackageData.packageDataOracle
+    Oracles.PackageDb.packageDbOracle
+    Oracles.PackageDeps.packageDepsOracle
+    Oracles.WindowsPath.windowsPathOracle
