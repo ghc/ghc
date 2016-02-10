@@ -278,8 +278,7 @@ kcTyClGroup (TyClGroup { group_tyclds = decls })
           --    4. Generalise the inferred kinds
           -- See Note [Kind checking for type and class decls]
 
-        ; lcl_env <- checkNoErrs $
-                     solveEqualities $
+        ; lcl_env <- solveEqualities $
           do {
                -- Step 1: Bind kind variables for non-synonyms
                let (syn_decls, non_syn_decls) = partition (isSynDecl . unLoc) decls
@@ -1176,8 +1175,7 @@ tcFamTyPats :: FamTyConShape
             -> TcM a
 tcFamTyPats fam_shape@(name,_,_) mb_clsinfo pats kind_checker thing_inside
   = do { (typats, res_kind)
-            <- checkNoErrs $ -- we'll get duplicate errors if we continue.
-               solveEqualities $  -- See Note [Constraints in patterns]
+            <- solveEqualities $  -- See Note [Constraints in patterns]
                tc_fam_ty_pats fam_shape mb_clsinfo pats kind_checker
 
           {- TODO (RAE): This should be cleverer. Consider this:

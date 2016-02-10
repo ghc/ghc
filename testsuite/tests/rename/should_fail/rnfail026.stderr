@@ -1,8 +1,4 @@
 
-rnfail026.hs:16:10: error:
-    • Illegal polymorphic or qualified type: forall a1. Eq a1 => Set a1
-    • In the instance declaration for ‘Monad (forall a. Eq a => Set a)’
-
 rnfail026.hs:16:27: error:
     • Expected kind ‘* -> *’, but ‘Set a’ has kind ‘*’
     • In the first argument of ‘Monad’, namely

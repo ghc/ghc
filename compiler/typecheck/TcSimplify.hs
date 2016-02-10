@@ -98,11 +98,11 @@ simplifyTop wanteds
        ; return (evBindMapBinds binds1 `unionBags` binds2) }
 
 -- | Type-check a thing that emits only equality constraints, then
--- solve those constraints. Emits errors -- but does not fail --
--- if there is trouble.
+-- solve those constraints. Fails outright if there is trouble.
 solveEqualities :: TcM a -> TcM a
 solveEqualities thing_inside
-  = do { (result, wanted) <- captureConstraints thing_inside
+  = checkNoErrs $  -- See Note [Fail fast on kind errors]
+    do { (result, wanted) <- captureConstraints thing_inside
        ; traceTc "solveEqualities {" $ text "wanted = " <+> ppr wanted
        ; (final_wc, _) <- runTcSEqualities $ simpl_top wanted
        ; traceTc "End solveEqualities }" empty
@@ -199,7 +199,23 @@ solveTopConstraints thing_inside
        ; ev_binds <- simplifyTop wanted
        ; return (result, ev_binds) }
 
-{-
+{- Note [Fail fast on kind errors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+solveEqualities is used to solve kind equalities when kind-checking
+user-written types. If solving fails we should fail outright, rather
+than just accumulate an error message, for two reasons:
+  * A kind-bogus type signature may cause a cascade of knock-on
+    errors if we let it pass
+
+  * More seriously, if we don't solve a constraint we'll be left
+    with a type that has a coercion hole in it, something like
+           <type> |> co-hole
+    where co-hole is not filled in.  Eeek!  That un-filled-in
+    hole actually causes GHC to crash with "fvProv falls into a hole"
+    See Trac #11563, #11520, #11516, #11399
+
+So it's important to use 'checkNoErrs' here!
+
 Note [When to do type-class defaulting]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In GHC 7.6 and 7.8.2, we did type-class defaulting only if insolubleWC
