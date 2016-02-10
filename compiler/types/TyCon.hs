@@ -599,6 +599,7 @@ data TyCon
       tyConUnique :: Unique,
       tyConName   :: Name,
       tyConUnsat  :: Bool,  -- ^ can this tycon be unsaturated?
+      tyConArity  :: Arity,
       tyConKind   :: Kind
       }
   deriving Typeable
@@ -1218,12 +1219,14 @@ mkTupleTyCon name kind arity tyvars con sort parent
 -- See also Note [Kind checking recursive type and class declarations]
 -- in TcTyClsDecls.
 mkTcTyCon :: Name -> Kind -> Bool -- ^ Can this be unsaturated?
+          -> Arity
           -> TyCon
-mkTcTyCon name kind unsat
+mkTcTyCon name kind unsat arity
   = TcTyCon { tyConUnique  = getUnique name
             , tyConName    = name
             , tyConKind    = kind
-            , tyConUnsat   = unsat }
+            , tyConUnsat   = unsat
+            , tyConArity   = arity }
 
 -- | Create an unlifted primitive 'TyCon', such as @Int#@
 mkPrimTyCon :: Name  -> Kind -> [Role] -> PrimRep -> TyCon

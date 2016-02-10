@@ -21,7 +21,7 @@ module Type (
         mkTyVarTy, mkTyVarTys, getTyVar, getTyVar_maybe, repGetTyVar_maybe,
         getCastedTyVar_maybe, tyVarKind,
 
-        mkAppTy, mkAppTys, splitAppTy, splitAppTys,
+        mkAppTy, mkAppTys, splitAppTy, splitAppTys, repSplitAppTys,
         splitAppTy_maybe, repSplitAppTy_maybe, tcRepSplitAppTy_maybe,
 
         mkFunTy, mkFunTys, splitFunTy, splitFunTy_maybe,
@@ -689,6 +689,21 @@ splitAppTys ty = split ty ty []
     split _   (ForAllTy (Anon ty1) ty2) args = ASSERT( null args )
                                                (TyConApp funTyCon [], [ty1,ty2])
     split orig_ty _                     args = (orig_ty, args)
+
+-- | Like 'splitAppTys', but doesn't look through type synonyms
+repSplitAppTys :: Type -> (Type, [Type])
+repSplitAppTys ty = split ty []
+  where
+    split (AppTy ty arg) args = split ty (arg:args)
+    split (TyConApp tc tc_args) args
+      = let n | mightBeUnsaturatedTyCon tc = 0
+              | otherwise                  = tyConArity tc
+            (tc_args1, tc_args2) = splitAt n tc_args
+        in
+        (TyConApp tc tc_args1, tc_args2 ++ args)
+    split (ForAllTy (Anon ty1) ty2) args = ASSERT( null args )
+                                           (TyConApp funTyCon [], [ty1, ty2])
+    split ty args = (ty, args)
 
 {-
                       LitTy

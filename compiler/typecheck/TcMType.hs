@@ -1328,13 +1328,14 @@ zonkTidyTcType env ty = do { ty' <- zonkTcType ty
 
 -- | Make an 'ErrorThing' storing a type.
 mkTypeErrorThing :: TcType -> ErrorThing
-mkTypeErrorThing ty = ErrorThing ty (Just $ length $ snd $ splitAppTys ty)
+mkTypeErrorThing ty = ErrorThing ty (Just $ length $ snd $ repSplitAppTys ty)
                                  zonkTidyTcType
+   -- NB: Use *rep*splitAppTys, else we get #11313
 
 -- | Make an 'ErrorThing' storing a type, with some extra args known about
 mkTypeErrorThingArgs :: TcType -> Int -> ErrorThing
 mkTypeErrorThingArgs ty num_args
-  = ErrorThing ty (Just $ (length $ snd $ splitAppTys ty) + num_args)
+  = ErrorThing ty (Just $ (length $ snd $ repSplitAppTys ty) + num_args)
                zonkTidyTcType
 
 zonkTidyOrigin :: TidyEnv -> CtOrigin -> TcM (TidyEnv, CtOrigin)
