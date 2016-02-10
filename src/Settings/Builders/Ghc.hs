@@ -1,5 +1,5 @@
 module Settings.Builders.Ghc (
-    ghcBuilderArgs, ghcMBuilderArgs, commonGhcArgs, gmpLibNameCache
+    ghcBuilderArgs, ghcMBuilderArgs, commonGhcArgs
     ) where
 
 import Base
@@ -23,12 +23,12 @@ ghcBuilderArgs = stagedBuilder Ghc ? do
     stage  <- getStage
     way    <- getWay
     when (stage > Stage0) . lift $ needTouchy
-    let buildObj  = ("//*." ++  osuf way) ?== output || ("//*." ++  obootsuf way) ?== output
-        buildHi   = ("//*." ++ hisuf way) ?== output || ("//*." ++ hibootsuf way) ?== output
+    let buildObj  = any (\s -> ("//*." ++ s way) ?== output) [ osuf,  obootsuf]
+        buildHi   = any (\s -> ("//*." ++ s way) ?== output) [hisuf, hibootsuf]
         buildProg = not (buildObj || buildHi)
     libs    <- getPkgDataList DepExtraLibs
     gmpLibs <- if stage > Stage0 && buildProg
-               then lift $ readFileLines gmpLibNameCache -- TODO: use oracles
+               then words <$> getSetting GmpLibDir
                else return []
     libDirs <- getPkgDataList DepLibDirs
     mconcat [ commonGhcArgs
@@ -47,7 +47,7 @@ ghcBuilderArgs = stagedBuilder Ghc ? do
             , not buildHi ? mconcat [ arg "-o", arg =<< getOutput ] ]
 
 needTouchy :: Action ()
-needTouchy = whenM windowsHost $ need [fromJust $ programPath Stage0 touchy ]
+needTouchy = whenM windowsHost $ need [fromJust $ programPath Stage0 touchy]
 
 splitObjectsArgs :: Args
 splitObjectsArgs = splitObjects ? do
