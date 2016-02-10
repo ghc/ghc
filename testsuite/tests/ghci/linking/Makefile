@@ -64,7 +64,7 @@ ghcilink004 :
 	echo 'name: test' >>$(PKG004)
 	echo 'version: 1.0' >>$(PKG004)
 	echo 'id: test-XXX' >>$(PKG004)
-	echo 'key: test-1.0' >>$(PKG004)
+	echo 'key: test-XXX' >>$(PKG004)
 	echo 'library-dirs: $${pkgroot}' >>$(PKG004)
 	echo 'extra-libraries: foo' >>$(PKG004)
 	'$(GHC_PKG)' init $(LOCAL_PKGCONF004)
@@ -92,7 +92,7 @@ ghcilink005 :
 	echo 'name: test' >>$(PKG005)
 	echo 'version: 1.0' >>$(PKG005)
 	echo 'id: test-XXX' >>$(PKG005)
-	echo 'key: test-1.0' >>$(PKG005)
+	echo 'key: test-XXX' >>$(PKG005)
 	echo 'library-dirs: $${pkgroot}' >>$(PKG005)
 	echo 'extra-libraries: foo' >>$(PKG005)
 	'$(GHC_PKG)' init $(LOCAL_PKGCONF005)
@@ -117,7 +117,7 @@ ghcilink006 :
 	echo "name: test" >>$(PKG006)
 	echo "version: 1.0" >>$(PKG006)
 	echo "id: test-XXX" >>$(PKG006)
-	echo "key: test-1.0" >>$(PKG006)
+	echo "key: test-XXX" >>$(PKG006)
 ifeq "$(WINDOWS)" "YES"
 	echo "extra-libraries: stdc++-6" >>$(PKG006)
 else
