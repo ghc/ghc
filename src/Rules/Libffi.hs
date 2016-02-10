@@ -72,15 +72,14 @@ libffiRules :: Rules ()
 libffiRules = do
     libffiDependencies &%> \_ -> do
         when trackBuildSystem $ need [sourcePath -/- "Rules/Libffi.hs"]
-        ffiHeaderDir <- setting FfiIncludeDir
         useSystemFfi <- flag UseSystemFfi
         if useSystemFfi
         then do
-          putBuild "| System supplied FFI library will be used"
-          forM_ ["ffi.h", "ffitarget.h"] $ \file -> do
-              let src = ffiHeaderDir  -/- file
-              copyFile src (rtsBuildPath -/- file)
-          putSuccess $ "| Successfully copied system supplied FFI library header files"
+            ffiIncludeDir <- setting FfiIncludeDir
+            putBuild "| System supplied FFI library will be used"
+            forM_ ["ffi.h", "ffitarget.h"] $ \file ->
+                copyFile (ffiIncludeDir -/- file) (rtsBuildPath -/- file)
+            putSuccess $ "| Successfully copied system FFI library header files"
         else do
             removeDirectory libffiBuild
             createDirectory $ buildRootPath -/- stageString Stage0
@@ -94,15 +93,16 @@ libffiRules = do
             let libname = dropExtension . dropExtension . takeFileName $ head tarballs
 
             removeDirectory (buildRootPath -/- libname)
+            -- TODO: Simplify.
             actionFinally (do
-                            build $ fullTarget libffiTarget Tar tarballs [buildRootPath]
-                            moveDirectory (buildRootPath -/- libname) libffiBuild) $
-                            removeFiles buildRootPath [libname <//> "*"]
+                build $ fullTarget libffiTarget Tar tarballs [buildRootPath]
+                moveDirectory (buildRootPath -/- libname) libffiBuild) $
+                    removeFiles buildRootPath [libname <//> "*"]
 
             fixFile (libffiBuild -/- "Makefile.in") fixLibffiMakefile
 
             forM_ ["config.guess", "config.sub"] $ \file ->
-              copyFile file (libffiBuild -/- file)
+                copyFile file (libffiBuild -/- file)
 
             envs <- configureEnvironment
             args <- configureArguments
@@ -111,17 +111,11 @@ libffiRules = do
             runMake libffiBuild ["MAKEFLAGS="]
             runMake libffiBuild ["MAKEFLAGS=", "install"]
 
+            let ffiHDir = libffiBuild -/- "inst/lib" -/- libname -/- "include"
             forM_ ["ffi.h", "ffitarget.h"] $ \file -> do
-                                   let src = libffiBuild -/- "inst/lib" -/- libname -/- "include" -/- file
-                                   copyFile src (rtsBuildPath -/- file)
+                copyFile (ffiHDir -/- file) (rtsBuildPath -/- file)
 
             libffiName <- rtsLibffiLibraryName
             copyFile libffiLibrary (rtsBuildPath -/- "lib" ++ libffiName <.> "a")
 
             putSuccess $ "| Successfully built custom library 'libffi'"
-
--- chmod +x libffi/ln
--- # wc on OS X has spaces in its output, which libffi's Makefile
--- # doesn't expect, so we tweak it to sed them out
--- mv libffi/build/Makefile libffi/build/Makefile.orig
--- sed "s#wc -w#wc -w | sed 's/ //g'#" < libffi/build/Makefile.orig > libffi/build/Makefile
