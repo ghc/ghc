@@ -106,7 +106,7 @@
 [submodule "nofib"]
 	path = nofib
 	url = ../nofib.git
-	ignore = none
+        ignore = untracked
 [submodule "utils/hsc2hs"]
 	path = utils/hsc2hs
 	url = ../hsc2hs.git
