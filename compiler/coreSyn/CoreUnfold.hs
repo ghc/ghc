@@ -578,13 +578,18 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
                                            size_up_app fun (arg:args) voids
     size_up_app (Var fun)     args voids = size_up_call fun args voids
     size_up_app (Tick _ expr) args voids = size_up_app expr args voids
-    size_up_app other         args voids = size_up other `addSizeN` (length args - voids)
+    size_up_app (Cast expr _) args voids = size_up_app expr args voids
+    size_up_app other         args voids = size_up other `addSizeN`
+                                           callSize (length args) voids
+       -- if the lhs is not an App or a Var, or an invisible thing like a
+       -- Tick or Cast, then we should charge for a complete call plus the
+       -- size of the lhs itself.
 
     ------------
     size_up_call :: Id -> [CoreExpr] -> Int -> ExprSize
     size_up_call fun val_args voids
        = case idDetails fun of
-           FCallId _        -> sizeN (10 * (1 + length val_args))
+           FCallId _        -> sizeN (callSize (length val_args) voids)
            DataConWorkId dc -> conSize    dc (length val_args)
            PrimOpId op      -> primOpSize op (length val_args)
            ClassOpId _      -> classOpSize dflags top_args val_args
@@ -657,6 +662,13 @@ classOpSize dflags top_args (arg1 : other_args)
                               -> unitBag (dict, ufDictDiscount dflags)
                      _other   -> emptyBag
 
+-- | The size of a function call
+callSize
+ :: Int  -- ^ number of value args
+ -> Int  -- ^ number of value args that are void
+ -> Int
+callSize n_val_args voids = 10 * (1 + n_val_args - voids)
+
 funSize :: DynFlags -> [Id] -> Id -> Int -> Int -> ExprSize
 -- Size for functions that are not constructors or primops
 -- Note [Function applications]
@@ -667,7 +679,7 @@ funSize dflags top_args fun n_val_args voids
   where
     some_val_args = n_val_args > 0
 
-    size | some_val_args = 10 * (1 + n_val_args - voids)
+    size | some_val_args = callSize n_val_args voids
          | otherwise     = 0
         -- The 1+ is for the function itself
         -- Add 1 for each non-trivial arg;
