@@ -147,7 +147,9 @@ rnWcSigTy env (L loc hs_ty@(HsForAllTy { hst_bndrs = tvs, hst_body = hs_tau }))
                       Nothing [] tvs $ \ _ tvs' ->
     do { (hs_tau', fvs) <- rnWcSigTy env hs_tau
        ; let hs_ty' = HsForAllTy { hst_bndrs = tvs', hst_body = hswc_body hs_tau' }
-       ; return ( hs_tau' { hswc_body = L loc hs_ty' }, fvs) }
+             awcs_bndrs = collectAnonWildCardsBndrs tvs'
+       ; return ( hs_tau' { hswc_wcs = hswc_wcs hs_tau' ++ awcs_bndrs
+                          , hswc_body = L loc hs_ty' }, fvs) }
 
 rnWcSigTy env (L loc (HsQualTy { hst_ctxt = hs_ctxt, hst_body = tau }))
   = do { (hs_ctxt', fvs1) <- rnWcSigContext env hs_ctxt
@@ -1043,6 +1045,11 @@ collectAnonWildCards lty = go lty
     prefix_types_only (HsAppPrefix ty) = Just ty
     prefix_types_only (HsAppInfix _)   = Nothing
 
+collectAnonWildCardsBndrs :: [LHsTyVarBndr Name] -> [Name]
+collectAnonWildCardsBndrs ltvs = concatMap (go . unLoc) ltvs
+  where
+    go (UserTyVar _)      = []
+    go (KindedTyVar _ ki) = collectAnonWildCards ki
 
 {-
 *********************************************************

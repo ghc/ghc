@@ -16,4 +16,4 @@ test('T9632', normal, compile, [''])
 test('dynamic-paper', expect_fail_for(['optasm', 'optllvm']), compile, [''])
 test('T11311', normal, compile, [''])
 test('T11405', normal, compile, [''])
-
+test('T11241', normal, compile, [''])
