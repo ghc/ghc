@@ -9599,8 +9599,9 @@ The :ghc-flag:`-XTemplateHaskellQuotes` extension is considered safe under
    *declaration groups*. A *declaration group* is the group of
    declarations created by a top-level declaration splice, plus those
    following it, down to but not including the next top-level
-   declaration splice. The first declaration group in a module includes
-   all top-level definitions down to but not including the first
+   declaration splice. N.B. only top-level splices delimit declaration
+   groups, not expression splices. The first declaration group in a module
+   includes all top-level definitions down to but not including the first
    top-level declaration splice.
 
    Each declaration group is mutually recursive only within the group.
@@ -9625,38 +9626,73 @@ The :ghc-flag:`-XTemplateHaskellQuotes` extension is considered safe under
        import ...
 
        f x = x
+
        $(th1 4)
+
        h y = k y y $(blah1)
+
        [qq|blah|]
-       k x y = x + y
+
+       k x y z = x + y + z
+
        $(th2 10)
+
        w z = $(blah2)
 
-   In this example
+   In this example, a ``reify`` inside...
 
-   1. The body of ``h`` would be unable to refer to the function ``w``.
+   1. The splice ``$(th1 ...)`` would see the definition of ``f`` - the
+      splice is top-level and thus all definitions in the previous
+      declaration group are visible (that is, all definitions in the module
+      up-to, but not including, the splice itself).
 
-      A ``reify`` inside the splice ``$(th1 ..)`` would see the
-      definition of ``f``.
+   2. The splice ``$(blah1)`` cannot refer to the function ``w`` - ``w`` is
+      part of a later declaration group, and thus invisible, similarly,
+      ``$(blah1)`` cannot see the definition of ``h`` (since it is part of
+      the same declaration group as ``$(blah1)``. However, the splice
+      ``$(blah1)`` can see the definition of ``f`` (since it is in the
+      immediately preceding declaration group).
 
-   2. A ``reify`` inside the splice ``$(blah1)`` would see the
-      definition of ``f``, but would not see the definition of ``h``.
+   3. The splice ``$(th2 ...)`` would see the definition of ``f``, all the
+      bindings created by ``$(th1 ...)``, the definition of ``h`` and all
+      bindings created by ``[qq|blah|]`` (they are all in previous
+      declaration groups).
 
-   3. A ``reify`` inside the splice ``$(th2..)`` would see the
-      definition of ``f``, all the bindings created by ``$(th1..)``, and
-      the definition of ``h``.
+   4. The body of ``h`` *can* refer to the function ``k`` appearing on the
+      other side of the declaration quasiquoter, as quasiquoters do not
+      cause a declaration group to be broken up.
 
-   4. A ``reify`` inside the splice ``$(blah2)`` would see the same
-      definitions as the splice ``$(th2...)``.
+   5. The ``qq`` quasiquoter would be able to see the definition of ``f``
+      from the preceding declaration group, but not the definitions of
+      ``h`` or ``k``, or any definitions from subsequent declaration
+      groups.
 
-   5. The body of ``h`` *is* able to refer to the function ``k``
-      appearing on the other side of the declaration quasiquoter, as
-      quasiquoters never cause a declaration group to be broken up.
+   6. The splice ``$(blah2)`` would see the same definitions as the splice
+      ``$(th2 ...)`` (but *not* any bindings it creates).
 
-      A ``reify`` inside the ``qq`` quasiquoter would be able to see the
-      definition of ``f`` from the preceding declaration group, but not
-      the definitions of ``h`` or ``k``, or any definitions from
-      subsequent declaration groups.
+   Note that since an expression splice is unable to refer to declarations
+   in the same declaration group, we can introduce a top-level (empty)
+   splice to break up the declaration group ::
+
+       module M where
+
+       data D = C1 | C2
+
+       f1 = $(th1 ...)
+
+       $(return [])
+
+       f2 = $(th2 ...)
+
+   Here
+
+   1. The splice ``$(th1 ...)`` *cannot* refer to ``D`` - it is in the same
+      declaration group.
+   2. The declaration group containing ``D`` is terminated by the empty
+      top-level declaration splice ``$(return [])`` (recall, ``Q`` is a
+      Monad, so we may simply ``return`` the empty list of declarations).
+   3. Since the declaration group containing ``D`` is in the previous
+      declaration group, the splice ``$(th2 ...)`` *can* refer to ``D``.
 
 -  Expression quotations accept most Haskell language constructs.
    However, there are some GHC-specific extensions which expression
