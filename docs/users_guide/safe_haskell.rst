@@ -697,16 +697,19 @@ And one general flag:
 And three warning flags:
 
 .. ghc-flag:: -Wunsafe
+
     Issue a warning if the module being compiled is regarded to be
     unsafe. Should be used to check the safety type of modules when
     using safe inference.
 
 .. ghc-flag:: -Wsafe
+
     Issue a warning if the module being compiled is regarded to be safe.
     Should be used to check the safety type of modules when using safe
     inference.
 
 .. ghc-flag:: -Wtrustworthy-safe
+
     Issue a warning if the module being compiled is marked as
     -XTrustworthy but it could instead be marked as
     -XSafe , a more informative bound. Can be used to detect once a Safe Haskell
