@@ -3723,6 +3723,7 @@ impliedXFlags
 optLevelFlags :: [([Int], GeneralFlag)]
 optLevelFlags -- see Note [Documenting optimisation flags]
   = [ ([0,1,2], Opt_DoLambdaEtaExpansion)
+    , ([0,1,2], Opt_DoEtaReduction)       -- See Note [Eta-reduction in -O0]
     , ([0,1,2], Opt_DmdTxDictSel)
     , ([0,1,2], Opt_LlvmTBAA)
     , ([0,1,2], Opt_VectorisationAvoidance)
@@ -3739,7 +3740,6 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_CmmElimCommonBlocks)
     , ([1,2],   Opt_CmmSink)
     , ([1,2],   Opt_CSE)
-    , ([1,2],   Opt_DoEtaReduction)
     , ([1,2],   Opt_EnableRewriteRules)  -- Off for -O0; see Note [Scoping for Builtin rules]
                                          --              in PrelRules
     , ([1,2],   Opt_FloatIn)
@@ -3760,6 +3760,21 @@ optLevelFlags -- see Note [Documenting optimisation flags]
 --  , ([2],     Opt_StaticArgumentTransformation)
 --   Static Argument Transformation needs investigation. See #9374
     ]
+
+{- Note [Eta-reduction in -O0]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Trac #11562 showed an example which tripped an ASSERT in CoreToStg; a
+function was marked as MayHaveCafRefs when in fact it obviously
+didn't.  Reason was:
+ * Eta reduction wasn't happening in the simplifier, but it was
+   happening in CorePrep, on
+        $fBla = MkDict (/\a. K a)
+ * Result: rhsIsStatic told TidyPgm that $fBla might have CAF refs
+   but the eta-reduced version (MkDict K) obviously doesn't
+Simple solution: just let the simplifier do eta-reduction even in -O0.
+After all, CorePrep does it unconditionally!  Not a big deal, but
+removes an assertion failure. -}
+
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
