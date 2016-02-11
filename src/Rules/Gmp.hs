@@ -53,13 +53,6 @@ configureArguments = do
            , "--host=" ++ hostPlatform
            , "--build=" ++ buildPlatform]
 
-configureIntGmpArguments :: Action [String]
-configureIntGmpArguments = do
-    includes      <- setting GmpIncludeDir
-    libs          <- setting GmpLibDir
-    return $ map ("--with-gmp-includes="  ++) (words includes)
-          ++ map ("--with-gmp-libraries=" ++) (words libs)
-
 -- TODO: we rebuild gmp every time.
 gmpRules :: Rules ()
 gmpRules = do
