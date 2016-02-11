@@ -1,7 +1,7 @@
 module Settings.Paths (
     targetDirectory, targetPath, pkgDataFile, pkgHaddockFile, pkgLibraryFile,
-    pkgLibraryFile0, pkgGhciLibraryFile, gmpBuildPath, packageDbDirectory,
-    pkgConfFile
+    pkgLibraryFile0, pkgGhciLibraryFile, gmpBuildPath, gmpBuildInfoPath,
+    packageDbDirectory, pkgConfFile
     ) where
 
 import Base
@@ -50,6 +50,10 @@ pkgFile stage pkg prefix suffix = do
 -- This is the build directory for in-tree GMP library
 gmpBuildPath :: FilePath
 gmpBuildPath = buildRootPath -/- "stage1/gmp"
+
+-- We extract system gmp library name from this file
+gmpBuildInfoPath :: FilePath
+gmpBuildInfoPath = pkgPath integerGmp -/- "integer-gmp.buildinfo"
 
 -- TODO: move to buildRootPath, see #113
 -- StageN, N > 0, share the same packageDbDirectory

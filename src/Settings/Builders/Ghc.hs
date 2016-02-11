@@ -12,9 +12,6 @@ import Settings
 import Settings.Builders.GhcCabal (bootPackageDbArgs)
 import Settings.Builders.Common (cIncludeArgs)
 
-buildInfoPath :: FilePath
-buildInfoPath = pkgPath integerGmp -/- "integer-gmp.buildinfo"
-
 -- TODO: add support for -dyno
 -- $1/$2/build/%.$$($3_o-bootsuf) : $1/$4/%.hs-boot
 --     $$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@
@@ -32,7 +29,7 @@ ghcBuilderArgs = stagedBuilder Ghc ? do
     libs    <- getPkgDataList DepExtraLibs
     gmpLibs <- if stage > Stage0 && buildProg
                then do -- TODO: get this data more gracefully
-                   buildInfo <- lift $ readFileLines buildInfoPath
+                   buildInfo <- lift $ readFileLines gmpBuildInfoPath
                    let extract s = case stripPrefix "extra-libraries: " s of
                            Nothing    -> []
                            Just value -> words value

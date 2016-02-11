@@ -119,4 +119,6 @@ gmpRules = do
 
     gmpLibraryInTreeH %> \_ -> need [gmpLibraryH]
 
-    gmpBase -/- "config.mk" %> \_ -> need [pkgDataFile Stage1 integerGmp]
+    -- This causes integerGmp package to be configured, hence creating the files
+    [gmpBase -/- "config.mk", gmpBuildInfoPath] &%> \_ ->
+        need [pkgDataFile Stage1 integerGmp]
