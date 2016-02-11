@@ -909,7 +909,7 @@ unknownFlagsErr fs = throwGhcException $ UsageError $ concatMap oneError fs
   where
     oneError f =
         "unrecognised flag: " ++ f ++ "\n" ++
-        (case fuzzyMatch f (nub allFlags) of
+        (case fuzzyMatch f (nub allNonDeprecatedFlags) of
             [] -> ""
             suggs -> "did you mean one of:\n" ++ unlines (map ("  " ++) suggs))
 
