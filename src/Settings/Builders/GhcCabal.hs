@@ -66,6 +66,7 @@ libraryArgs = do
              else "--disable-shared" ]
 
 -- TODO: LD_OPTS?
+-- TODO: WARNING: unrecognized options: --with-compiler, --with-gmp-libraries, --with-cc
 configureArgs :: Args
 configureArgs = do
     let conf key = appendSubD $ "--configure-option=" ++ key
