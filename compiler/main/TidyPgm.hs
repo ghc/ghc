@@ -887,9 +887,13 @@ reference to f_spec except from the RULE.
 
 Now that RULE *might* be useful to an importing module, but that is
 purely speculative, and meanwhile the code is taking up space and
-codegen time.  So is seeems better to drop the binding for f_spec if
-the auto-generated rule is the *only* reason that it is being kept
-alive.
+codegen time.  I found that binary sizes jumped by 6-10% when I
+started to specialise INLINE functions (again, Note [Inline
+specialisations] in Specialise).
+
+So it seeems better to drop the binding for f_spec, and the rule
+itself, if the auto-generated rule is the *only* reason that it is
+being kept alive.
 
 (The RULE still might have been useful in the past; that is, it was
 the right thing to have generated it in the first place.  See Note
@@ -902,12 +906,10 @@ So findExternalRules does this:
   * Remove all auto rules that mention bindings that have been removed
       (this is done by filtering by keep_rule)
 
-So if a binding is kept alive for some *other* reason (e.g. f_spec is
+NB: if a binding is kept alive for some *other* reason (e.g. f_spec is
 called in the final code), we keep the rule too.
 
-I found that binary sizes jumped by 6-10% when I started to specialise
-INLINE functions (again, Note [Inline specialisations] in Specialise).
-Adding trimAutoRules removed all this bloat.
+This stuff is the only reason for the ru_auto field in a Rule.
 -}
 
 findExternalRules :: Bool       -- Omit pragmas

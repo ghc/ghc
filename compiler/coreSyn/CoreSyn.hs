@@ -864,15 +864,16 @@ data CoreRule
                                         -- See Note [OccInfo in unfoldings and rules]
 
         -- Locality
-        ru_auto :: Bool,        -- ^ @True@  <=> this rule is auto-generated
-                                --   @False@ <=> generated at the users behest
-                                --   Main effect: reporting of orphan-hood
+        ru_auto :: Bool,   -- ^ @True@  <=> this rule is auto-generated
+                           --               (notably by Specialise or SpecConstr)
+                           --   @False@ <=> generated at the users behest
+                           -- See Note [Trimming auto-rules] in TidyPgm
+                           -- for the sole purpose of this field.
 
-        ru_origin :: !Module,    -- ^ 'Module' the rule was defined in, used
+        ru_origin :: !Module,   -- ^ 'Module' the rule was defined in, used
                                 -- to test if we should see an orphan rule.
 
-        ru_orphan :: !IsOrphan,
-                                -- ^ Whether or not the rule is an orphan.
+        ru_orphan :: !IsOrphan, -- ^ Whether or not the rule is an orphan.
 
         ru_local :: Bool        -- ^ @True@ iff the fn at the head of the rule is
                                 -- defined in the same module as the rule
