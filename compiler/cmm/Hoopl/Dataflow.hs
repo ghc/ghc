@@ -226,8 +226,6 @@ forwardBlockList entries blks = postorder_dfs_from blks entries
 --       Forward Analysis only
 ----------------------------------------------------------------
 
--- | if the graph being analyzed is open at the entry, there must
---   be no other entry point, or all goes horribly wrong...
 analyzeFwd
    :: forall n f .  NonLocal n =>
       FwdPass UniqSM n f
@@ -258,8 +256,6 @@ analyzeFwd FwdPass { fp_lattice = lattice,
     cat :: forall f1 f2 f3 . (f1 -> f2) -> (f2 -> f3) -> (f1 -> f3)
     cat ft1 ft2 = \f -> ft2 $! ft1 f
 
--- | if the graph being analyzed is open at the entry, there must
---   be no other entry point, or all goes horribly wrong...
 analyzeFwdBlocks
    :: forall n f.  NonLocal n =>
       FwdPass UniqSM n f
@@ -291,8 +287,6 @@ analyzeFwdBlocks FwdPass { fp_lattice = lattice,
 --       Backward Analysis only
 ----------------------------------------------------------------
 
--- | if the graph being analyzed is open at the entry, there must
---   be no other entry point, or all goes horribly wrong...
 analyzeBwd
    :: forall n f.  NonLocal n =>
       BwdPass UniqSM n f
@@ -329,8 +323,6 @@ analyzeBwd BwdPass { bp_lattice  = lattice,
 -----------------------------------------------------------------------------
 
 
--- | if the graph being analyzed is open at the exit, I don't
---   quite understand the implications of possible other exits
 analyzeAndRewriteBwd
    :: NonLocal n
    => BwdPass UniqSM n f
