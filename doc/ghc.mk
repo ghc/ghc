@@ -10,6 +10,11 @@
 #
 # -----------------------------------------------------------------------------
 
-utils/haddock/doc_DOCBOOK_SOURCES = utils/haddock/doc/haddock.xml
+INSTALL_HTML_DOC_DIRS += utils/haddock/doc/haddock
 
-$(eval $(call docbook,utils/haddock/doc,haddock))
+html : html_utils/haddock/doc
+
+html_utils/haddock/doc :
+	make -C utils/haddock/doc html SPHINX_BUILD=$(SPHINXBUILD)
+	cp -R utils/haddock/doc/.build-html utils/haddock/doc/haddock
+

@@ -1,6 +1,8 @@
-include config.mk
+SPHINX_BUILD ?= sphinx-build
 
-XML_DOC = haddock
-INSTALL_XML_DOC = haddock
+all : html
 
-include docbook-xml.mk
+.PHONY : html
+
+html :
+	$(SPHINX_BUILD) -b html . .build-html
