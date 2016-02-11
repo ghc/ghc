@@ -891,7 +891,7 @@ codegen time.  I found that binary sizes jumped by 6-10% when I
 started to specialise INLINE functions (again, Note [Inline
 specialisations] in Specialise).
 
-So it seeems better to drop the binding for f_spec, and the rule
+So it seems better to drop the binding for f_spec, and the rule
 itself, if the auto-generated rule is the *only* reason that it is
 being kept alive.
 

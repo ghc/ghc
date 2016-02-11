@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs #-}
 
--- Triggered a desugaring bug in earlier verison
+-- Triggered a desugaring bug in earlier version
 
 module Shouldcompile where
 

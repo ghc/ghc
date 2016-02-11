@@ -75,7 +75,7 @@ a short-hand, not an algorithm.
     (y:ys) -> E1[y,ys]	
     []     -> E2
 @
-Transformations of this kind are almost embarassingly simple.  How could
+Transformations of this kind are almost embarrassingly simple.  How could
 anyone write a paper about them?
 \end{itemize}
 This paper is about humble transformations, and how to implement them. 

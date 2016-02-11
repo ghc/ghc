@@ -1333,7 +1333,7 @@ strictenDmd (JD { sd = s, ud = u})
     poke_u Abs       = UHead
     poke_u (Use _ u) = u
 
--- Deferring and peeeling
+-- Deferring and peeling
 
 type DmdShell   -- Describes the "outer shell"
                 -- of a Demand

@@ -554,7 +554,7 @@ mkCoreAppsDs :: SDoc -> CoreExpr -> [CoreExpr] -> CoreExpr
 mkCoreAppsDs s fun args = foldl (mkCoreAppDs s) fun args
 
 mkCastDs :: CoreExpr -> Coercion -> CoreExpr
--- We define a desugarer-specific verison of CoreUtils.mkCast,
+-- We define a desugarer-specific version of CoreUtils.mkCast,
 -- because in the immediate output of the desugarer, we can have
 -- apparently-mis-matched coercions:  E.g.
 --     let a = b

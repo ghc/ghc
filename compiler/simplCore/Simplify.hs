@@ -1499,7 +1499,7 @@ Then we want to rewrite (g (h x)) to (k x) and only then try f's rules. If
 we match f's rules against the un-simplified RHS, it won't match.  This
 makes a particularly big difference when superclass selectors are involved:
         op ($p1 ($p2 (df d)))
-We want all this to unravel in one sweeep.
+We want all this to unravel in one sweep.
 
 Note [Avoid redundant simplification]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

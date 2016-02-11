@@ -1299,7 +1299,7 @@ did, we would do this:
 This loop goes on for ever and triggers the simpl_loop limit.
 
 Solution: kick out the CDictCan which will have pend_sc = False,
-becuase we've already added its superclasses.  So we won't re-add
+because we've already added its superclasses.  So we won't re-add
 them.  If we forget the pend_sc flag, our cunning scheme for avoiding
 generating superclasses repeatedly will fail.
 

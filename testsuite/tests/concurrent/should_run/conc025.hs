@@ -1,5 +1,5 @@
 -- !!! Simple test of dupChan
--- Embarassingly, the published version fails!
+-- Embarrassingly, the published version fails!
 
 module Main where
 
