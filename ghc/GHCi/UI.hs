@@ -2861,11 +2861,11 @@ listHomeModules w = do
 completeSetOptions = wrapCompleter flagWordBreakChars $ \w -> do
   return (filter (w `isPrefixOf`) opts)
     where opts = "args":"prog":"prompt":"prompt2":"editor":"stop":flagList
-          flagList = map head $ group $ sort allFlags
+          flagList = map head $ group $ sort allNonDeprecatedFlags
 
 completeSeti = wrapCompleter flagWordBreakChars $ \w -> do
   return (filter (w `isPrefixOf`) flagList)
-    where flagList = map head $ group $ sort allFlags
+    where flagList = map head $ group $ sort allNonDeprecatedFlags
 
 completeShowOptions = wrapCompleter flagWordBreakChars $ \w -> do
   return (filter (w `isPrefixOf`) opts)
