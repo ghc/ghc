@@ -1,7 +1,5 @@
 module Rules.Gmp (gmpRules, gmpBuildPath, gmpObjects, gmpLibraryH) where
 
-import qualified System.Directory as IO
-
 import Base
 import Expression
 import GHC
@@ -9,6 +7,7 @@ import Oracles.Config.Setting
 import Rules.Actions
 import Settings.Packages.IntegerGmp
 import Settings.User
+import Settings.Paths
 
 gmpBase :: FilePath
 gmpBase = "libraries/integer-gmp/gmp"
@@ -64,27 +63,15 @@ configureIntGmpArguments = do
 -- TODO: we rebuild gmp every time.
 gmpRules :: Rules ()
 gmpRules = do
-
     -- TODO: split into multiple rules
     gmpLibraryH %> \_ -> do
         when trackBuildSystem $ need [sourcePath -/- "Rules/Gmp.hs"]
-
         liftIO $ removeFiles gmpBuildPath ["//*"]
-
-        -- TODO: without the optimisation below we configure integerGmp package
-        -- twice -- think how this can be optimised (shall we solve #18 first?)
-        -- TODO: this is a hacky optimisation: we do not rerun configure of
-        -- integerGmp package if we detect the results of the previous run
-        envs <- configureEnvironment
-        unlessM (liftIO . IO.doesFileExist $ gmpBase -/- "config.mk") $ do
-            args <- configureIntGmpArguments
-            runConfigure (pkgPath integerGmp) envs args
-
         createDirectory $ takeDirectory gmpLibraryH
+
         -- We don't use system GMP on Windows. TODO: fix?
-        -- TODO: we don't track "config.mk" & "integer-gmp.buildinfo", see #173
         windows  <- windowsHost
-        configMk <- liftIO . readFile $ gmpBase -/- "config.mk"
+        configMk <- readFile' $ gmpBase -/- "config.mk"
         if not windows && any (`isInfixOf` configMk)
             [ "HaveFrameworkGMP = YES", "HaveLibGmp = YES" ]
         then do
@@ -111,8 +98,6 @@ gmpRules = do
                 copyFile src patchPath
                 applyPatch gmpBuildPath patch
 
-            -- TODO: What's `chmod +x libraries/integer-gmp/gmp/ln` for?
-
             let filename = dropExtension . dropExtension . takeFileName $ head tarballs
                 suffix   = "-nodoc-patched"
             unless (suffix `isSuffixOf` filename) $
@@ -121,8 +106,9 @@ gmpRules = do
             let libName = take (length filename - length suffix) filename
                 libPath = gmpBuildPath -/- libName
 
-            args2 <- configureArguments
-            runConfigure libPath envs args2
+            envs <- configureEnvironment
+            args <- configureArguments
+            runConfigure libPath envs args
 
             runMake libPath ["MAKEFLAGS="]
 
@@ -139,3 +125,5 @@ gmpRules = do
         putSuccess "| Successfully built custom library 'gmp'"
 
     gmpLibraryInTreeH %> \_ -> need [gmpLibraryH]
+
+    gmpBase -/- "config.mk" %> \_ -> need [pkgDataFile Stage1 integerGmp]
