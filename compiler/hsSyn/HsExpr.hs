@@ -122,8 +122,8 @@ instance OutputableBndr id => Outputable (SyntaxExpr id) where
     = sdocWithDynFlags $ \ dflags ->
       getPprStyle $ \s ->
       if debugStyle s || gopt Opt_PrintExplicitCoercions dflags
-      then ppr expr <> braces (pprWithCommas (pprHsWrapper (text "<>")) arg_wraps)
-                    <> braces (pprHsWrapper (text "<>") res_wrap)
+      then ppr expr <> braces (pprWithCommas ppr arg_wraps)
+                    <> braces (ppr res_wrap)
       else ppr expr
 
 type CmdSyntaxTable id = [(Name, HsExpr id)]
@@ -691,7 +691,7 @@ ppr_expr (HsCoreAnn _ (StringLiteral _ s) e)
 
 ppr_expr (HsApp e1 e2)
   = let (fun, args) = collect_args e1 [e2] in
-    hang (ppr_lexpr fun) 2 (sep (map pprParendExpr args))
+    hang (ppr_lexpr fun) 2 (sep (map pprParendLExpr args))
   where
     collect_args (L _ (HsApp fun arg)) args = collect_args fun (arg:args)
     collect_args fun args = (fun, args)
@@ -803,15 +803,18 @@ ppr_expr (ArithSeq _ _ info) = brackets (ppr info)
 ppr_expr (PArrSeq  _ info) = paBrackets (ppr info)
 
 ppr_expr EWildPat       = char '_'
-ppr_expr (ELazyPat e)   = char '~' <> pprParendExpr e
-ppr_expr (EAsPat v e)   = ppr v <> char '@' <> pprParendExpr e
+ppr_expr (ELazyPat e)   = char '~' <> pprParendLExpr e
+ppr_expr (EAsPat v e)   = ppr v <> char '@' <> pprParendLExpr e
 ppr_expr (EViewPat p e) = ppr p <+> text "->" <+> ppr e
 
 ppr_expr (HsSCC _ (StringLiteral _ lbl) expr)
   = sep [ text "{-# SCC" <+> doubleQuotes (ftext lbl) <+> ptext (sLit "#-}"),
-          pprParendExpr expr ]
+          pprParendLExpr expr ]
 
-ppr_expr (HsWrap co_fn e) = pprHsWrapper (pprExpr e) co_fn
+ppr_expr (HsWrap co_fn e)
+  = pprHsWrapper co_fn (\parens -> if parens then pprParendExpr e
+                                             else pprExpr       e)
+
 ppr_expr (HsType (HsWC { hswc_body = ty }))
   = char '@' <> pprParendHsType (unLoc ty)
 ppr_expr (HsTypeOut (HsWC { hswc_body = ty }))
@@ -828,7 +831,7 @@ ppr_expr (HsProc pat (L _ (HsCmdTop cmd _ _ _)))
   = hsep [text "proc", ppr pat, ptext (sLit "->"), ppr cmd]
 
 ppr_expr (HsStatic e)
-  = hsep [text "static", pprParendExpr e]
+  = hsep [text "static", pprParendLExpr e]
 
 ppr_expr (HsTick tickish exp)
   = pprTicks (ppr exp) $
@@ -874,7 +877,7 @@ HsSyn records exactly where the user put parens, with HsPar.
 So generally speaking we print without adding any parens.
 However, some code is internally generated, and in some places
 parens are absolutely required; so for these places we use
-pprParendExpr (but don't print double parens of course).
+pprParendLExpr (but don't print double parens of course).
 
 For operator applications we don't add parens, because the operator
 fixities should do the job, except in debug mode (-dppr-debug) so we
@@ -884,13 +887,16 @@ can see the structure of the parse tree.
 pprDebugParendExpr :: OutputableBndr id => LHsExpr id -> SDoc
 pprDebugParendExpr expr
   = getPprStyle (\sty ->
-    if debugStyle sty then pprParendExpr expr
+    if debugStyle sty then pprParendLExpr expr
                       else pprLExpr      expr)
 
-pprParendExpr :: OutputableBndr id => LHsExpr id -> SDoc
+pprParendLExpr :: OutputableBndr id => LHsExpr id -> SDoc
+pprParendLExpr (L _ e) = pprParendExpr e
+
+pprParendExpr :: OutputableBndr id => HsExpr id -> SDoc
 pprParendExpr expr
-  | hsExprNeedsParens (unLoc expr) = parens (pprLExpr expr)
-  | otherwise                      = pprLExpr expr
+  | hsExprNeedsParens expr = parens (pprExpr expr)
+  | otherwise              = pprExpr expr
         -- Using pprLExpr makes sure that we go 'deeper'
         -- I think that is usually (always?) right
 
@@ -1082,7 +1088,7 @@ ppr_cmd (HsCmdPar c) = parens (ppr_lcmd c)
 
 ppr_cmd (HsCmdApp c e)
   = let (fun, args) = collect_args c [e] in
-    hang (ppr_lcmd fun) 2 (sep (map pprParendExpr args))
+    hang (ppr_lcmd fun) 2 (sep (map pprParendLExpr args))
   where
     collect_args (L _ (HsCmdApp fun arg)) args = collect_args fun (arg:args)
     collect_args fun args = (fun, args)
@@ -1111,8 +1117,8 @@ ppr_cmd (HsCmdLet (L _ binds) cmd)
 
 ppr_cmd (HsCmdDo (L _ stmts) _)  = pprDo ArrowExpr stmts
 
-ppr_cmd (HsCmdWrap w cmd) = pprHsWrapper (ppr_cmd cmd) w
-
+ppr_cmd (HsCmdWrap w cmd)
+  = pprHsWrapper w (\_ -> parens (ppr_cmd cmd))
 ppr_cmd (HsCmdArrApp arrow arg _ HsFirstOrderApp True)
   = hsep [ppr_lexpr arrow, larrowt, ppr_lexpr arg]
 ppr_cmd (HsCmdArrApp arrow arg _ HsFirstOrderApp False)
@@ -1925,7 +1931,7 @@ ppr_splice :: OutputableBndr id => SDoc -> id -> LHsExpr id -> SDoc
 ppr_splice herald n e
     = herald <> ifPprDebug (brackets (ppr n)) <> eDoc
     where
-          -- We use pprLExpr to match pprParendExpr:
+          -- We use pprLExpr to match pprParendLExpr:
           --     Using pprLExpr makes sure that we go 'deeper'
           --     I think that is usually (always?) right
           pp_as_was = pprLExpr e
