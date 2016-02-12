@@ -43,12 +43,13 @@ import Haddock.Backends.Xhtml.DocMarkup
 import Haddock.Backends.Xhtml.Types
 import Haddock.Backends.Xhtml.Utils
 import Haddock.Types
-import Haddock.Utils (makeAnchorId)
+import Haddock.Utils (makeAnchorId, nameAnchorId)
 import qualified Data.Map as Map
 import Text.XHtml hiding ( name, title, p, quote )
 
 import FastString            ( unpackFS )
 import GHC
+import Name (nameOccName)
 
 --------------------------------------------------------------------------------
 -- * Sections of the document
@@ -256,9 +257,11 @@ topDeclElem lnks loc splice names html =
 -- | Adds a source and wiki link at the right hand side of the box.
 -- Name must be documented, otherwise we wouldn't get here.
 links :: LinksInfo -> SrcSpan -> Bool -> DocName -> Html
-links ((_,_,sourceMap,lineMap), (_,_,maybe_wiki_url)) loc splice (Documented n mdl) =
-   (srcLink <+> wikiLink)
-  where srcLink = let nameUrl = Map.lookup origPkg sourceMap
+links ((_,_,sourceMap,lineMap), (_,_,maybe_wiki_url)) loc splice docName@(Documented n mdl) =
+  srcLink <+> wikiLink <+> (selfLink ! [theclass "selflink"] << "#")
+  where selfLink = linkedAnchor (nameAnchorId (nameOccName (getName docName)))
+
+        srcLink = let nameUrl = Map.lookup origPkg sourceMap
                       lineUrl = Map.lookup origPkg lineMap
                       mUrl | splice    = lineUrl
                                         -- Use the lineUrl as a backup

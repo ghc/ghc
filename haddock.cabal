@@ -123,7 +123,7 @@ executable haddock
       Haddock.Syb
       Haddock.Convert
   else
-    build-depends:  haddock-api == 2.16.*
+    build-depends:  haddock-api == 2.17.*
 
 test-suite driver-test
   type:             exitcode-stdio-1.0
