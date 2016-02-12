@@ -513,7 +513,7 @@ spliceCtxtDoc splice
 spliceResultDoc :: LHsExpr Name -> SDoc
 spliceResultDoc expr
   = sep [ text "In the result of the splice:"
-        , nest 2 (char '$' <> pprParendExpr expr)
+        , nest 2 (char '$' <> pprParendLExpr expr)
         , text "To see what the splice expanded to, use -ddump-splices"]
 
 -------------------

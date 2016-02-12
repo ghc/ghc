@@ -1682,9 +1682,7 @@ tcSeq loc fun_name args res_ty
     too_many_args
       = failWith $
         hang (text "Too many type arguments to seq:")
-           2 (sep (map pprParendExpr args))
-
-
+           2 (sep (map pprParendLExpr args))
 tcTagToEnum :: SrcSpan -> Name -> [LHsExpr Name] -> ExpRhoType
             -> TcM (HsWrapper, LHsExpr TcId, [LHsExpr TcId])
 -- tagToEnum# :: forall a. Int# -> a
@@ -1744,7 +1742,7 @@ tcTagToEnum loc fun_name args res_ty
     too_many_args
       = failWith $
         hang (text "Too many type arguments to tagToEnum#:")
-           2 (sep (map pprParendExpr args))
+           2 (sep (map pprParendLExpr args))
 
 {-
 ************************************************************************

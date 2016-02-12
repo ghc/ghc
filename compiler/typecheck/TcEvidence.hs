@@ -48,7 +48,7 @@ import Type
 import TyCon
 import Class( Class )
 import PrelNames
-import DynFlags   ( gopt, GeneralFlag(Opt_PrintExplicitCoercions) )
+import DynFlags   ( gopt, GeneralFlag(Opt_PrintTypecheckerElaboration) )
 import VarEnv
 import VarSet
 import Name
@@ -716,16 +716,18 @@ evVarsOfTypeable ev =
 -}
 
 instance Outputable HsWrapper where
-  ppr co_fn = pprHsWrapper (text "<>") co_fn
+  ppr co_fn = pprHsWrapper co_fn (no_parens (text "<>"))
 
-pprHsWrapper :: SDoc -> HsWrapper -> SDoc
--- In debug mode, print the wrapper
--- otherwise just print what's inside
-pprHsWrapper doc wrap
+pprHsWrapper ::HsWrapper ->  (Bool -> SDoc) -> SDoc
+-- With -fprint-typechecker-elaboration, print the wrapper
+--   otherwise just print what's inside
+-- The pp_thing_inside function takes Bool to say whether
+--    it's in a position that needs parens for a non-atomic thing
+pprHsWrapper wrap pp_thing_inside
   = sdocWithDynFlags $ \ dflags ->
-    getPprStyle (\ s -> if debugStyle s || gopt Opt_PrintExplicitCoercions dflags
-                        then (help (add_parens doc) wrap False)
-                        else doc )
+    if gopt Opt_PrintTypecheckerElaboration dflags
+    then help pp_thing_inside wrap False
+    else pp_thing_inside False
   where
     help :: (Bool -> SDoc) -> HsWrapper -> Bool -> SDoc
     -- True  <=> appears in function application position
@@ -736,18 +738,18 @@ pprHsWrapper doc wrap
                                               help (\_ -> it True <+> help (\_ -> text "x") f1 True) f2 False
     help it (WpCast co)   = add_parens $ sep [it False, nest 2 (text "|>"
                                               <+> pprParendCo co)]
-    help it (WpEvApp id)    = no_parens  $ sep [it True, nest 2 (ppr id)]
-    help it (WpTyApp ty)    = no_parens  $ sep [it True, text "@" <+> pprParendType ty]
-    help it (WpEvLam id)    = add_parens $ sep [ text "\\" <> pp_bndr id, it False]
-    help it (WpTyLam tv)    = add_parens $ sep [text "/\\" <> pp_bndr tv, it False]
-    help it (WpLet binds)   = add_parens $ sep [text "let" <+> braces (ppr binds), it False]
+    help it (WpEvApp id)  = no_parens  $ sep [it True, nest 2 (ppr id)]
+    help it (WpTyApp ty)  = no_parens  $ sep [it True, text "@" <+> pprParendType ty]
+    help it (WpEvLam id)  = add_parens $ sep [ text "\\" <> pp_bndr id, it False]
+    help it (WpTyLam tv)  = add_parens $ sep [text "/\\" <> pp_bndr tv, it False]
+    help it (WpLet binds) = add_parens $ sep [text "let" <+> braces (ppr binds), it False]
 
     pp_bndr v = pprBndr LambdaBind v <> dot
 
-    add_parens, no_parens :: SDoc -> Bool -> SDoc
-    add_parens d True  = parens d
-    add_parens d False = d
-    no_parens d _ = d
+add_parens, no_parens :: SDoc -> Bool -> SDoc
+add_parens d True  = parens d
+add_parens d False = d
+no_parens d _ = d
 
 instance Outputable TcEvBinds where
   ppr (TcEvBinds v) = ppr v

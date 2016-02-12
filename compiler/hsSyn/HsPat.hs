@@ -57,6 +57,7 @@ import Outputable
 import Type
 import SrcLoc
 import Bag -- collect ev vars from pats
+import DynFlags( gopt, GeneralFlag(..) )
 import Maybes
 -- libraries:
 import Data.Data hiding (TyCon,Fixity)
@@ -378,17 +379,18 @@ pprParendLPat :: (OutputableBndr name) => LPat name -> SDoc
 pprParendLPat (L _ p) = pprParendPat p
 
 pprParendPat :: (OutputableBndr name) => Pat name -> SDoc
-pprParendPat p = getPprStyle $ \ sty ->
-                 if need_parens sty p
+pprParendPat p = sdocWithDynFlags $ \ dflags ->
+                 if need_parens dflags p
                  then parens (pprPat p)
                  else  pprPat p
   where
-    need_parens sty p
-      | CoPat {} <- p          -- In debug style we print the cast
-      , debugStyle sty = True  -- (see pprHsWrapper) so parens are needed
-      | otherwise      = hsPatNeedsParens p
-                         -- But otherwise the CoPat is discarded, so it
-                         -- is the pattern inside that matters.  Sigh.
+    need_parens dflags p
+      | CoPat {} <- p = gopt Opt_PrintTypecheckerElaboration dflags
+      | otherwise     = hsPatNeedsParens p
+      -- For a CoPat we need parens if we are going to show it, which
+      -- we do if -fprint-typechecker-elaboration is on (c.f. pprHsWrapper)
+      -- But otherwise the CoPat is discarded, so it
+      -- is the pattern inside that matters.  Sigh.
 
 pprPat :: (OutputableBndr name) => Pat name -> SDoc
 pprPat (VarPat (L _ var))     = pprPatBndr var
@@ -403,7 +405,9 @@ pprPat (NPat l Nothing  _ _)  = ppr l
 pprPat (NPat l (Just _) _ _)  = char '-' <> ppr l
 pprPat (NPlusKPat n k _ _ _ _)= hcat [ppr n, char '+', ppr k]
 pprPat (SplicePat splice)     = pprSplice splice
-pprPat (CoPat co pat _)       = pprHsWrapper (ppr pat) co
+pprPat (CoPat co pat _)       = pprHsWrapper co (\parens -> if parens
+                                                            then pprParendPat pat
+                                                            else pprPat pat)
 pprPat (SigPatIn pat ty)      = ppr pat <+> dcolon <+> ppr ty
 pprPat (SigPatOut pat ty)     = ppr pat <+> dcolon <+> ppr ty
 pprPat (ListPat pats _ _)     = brackets (interpp'SP pats)
