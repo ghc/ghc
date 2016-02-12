@@ -160,39 +160,37 @@ dsHsBind dflags
          (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                    , abs_exports = [export]
                    , abs_ev_binds = ev_binds, abs_binds = binds })
-  | ABE { abe_inst_wrap = inst_wrap, abe_wrap = wrap, abe_poly = global
+  | ABE { abe_wrap = wrap, abe_poly = global
         , abe_mono = local, abe_prags = prags } <- export
-  , not (xopt LangExt.Strict dflags)             -- handle strict binds
-  , not (anyBag (isBangedPatBind . unLoc) binds) -- in the next case
-  = -- push type constraints deeper for pattern match check
-    -- See Note [AbsBinds wrappers] in HsBinds
+  , not (xopt LangExt.Strict dflags)             -- Handle strict binds
+  , not (anyBag (isBangedPatBind . unLoc) binds) --        in the next case
+  = -- See Note [AbsBinds wrappers] in HsBinds
     addDictsDs (toTcTypeBag (listToBag dicts)) $
-     do { (_, bind_prs) <- ds_lhs_binds binds
-        ; let core_bind = Rec bind_prs
-        ; ds_binds <- dsTcEvBinds_s ev_binds
-        ; inner_rhs <- dsHsWrapper inst_wrap $
-                       Let core_bind $
-                       Var local
-        ; rhs <- dsHsWrapper wrap $  -- Usually the identity
-                 mkLams tyvars $ mkLams dicts $
-                 mkCoreLets ds_binds $
-                 inner_rhs
+         -- addDictsDs: push type constraints deeper for pattern match check
+    do { (_, bind_prs) <- ds_lhs_binds binds
+       ; let core_bind = Rec bind_prs
+       ; ds_binds <- dsTcEvBinds_s ev_binds
+       ; rhs <- dsHsWrapper wrap $  -- Usually the identity
+                mkLams tyvars $ mkLams dicts $
+                mkCoreLets ds_binds $
+                Let core_bind $
+                Var local
 
-        ; (spec_binds, rules) <- dsSpecs rhs prags
+       ; (spec_binds, rules) <- dsSpecs rhs prags
 
-        ; let   global'  = addIdSpecialisations global rules
-                main_bind = makeCorePair dflags global' (isDefaultMethod prags)
-                                         (dictArity dicts) rhs
+       ; let   global'  = addIdSpecialisations global rules
+               main_bind = makeCorePair dflags global' (isDefaultMethod prags)
+                                        (dictArity dicts) rhs
 
-        ; return ([], main_bind : fromOL spec_binds) }
+       ; return ([], main_bind : fromOL spec_binds) }
 
 dsHsBind dflags
          (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                    , abs_exports = exports, abs_ev_binds = ev_binds
                    , abs_binds = binds })
          -- See Note [Desugaring AbsBinds]
-  = -- push type constraints deeper for pattern match check
-    addDictsDs (toTcTypeBag (listToBag dicts)) $
+  = addDictsDs (toTcTypeBag (listToBag dicts)) $
+         -- addDictsDs: push type constraints deeper for pattern match check
      do { (local_force_vars, bind_prs) <- ds_lhs_binds binds
         ; let core_bind = Rec [ makeCorePair dflags (add_inline lcl_id) False 0 rhs
                               | (lcl_id, rhs) <- bind_prs ]
@@ -215,17 +213,15 @@ dsHsBind dflags
         -- Note [Desugar Strict binds]
         ; (exported_force_vars, extra_exports) <- get_exports local_force_vars
 
-        ; let mk_bind (ABE { abe_inst_wrap = inst_wrap, abe_wrap = wrap
+        ; let mk_bind (ABE { abe_wrap = wrap
                            , abe_poly = global
                            , abe_mono = local, abe_prags = spec_prags })
                          -- See Note [AbsBinds wrappers] in HsBinds
                 = do { tup_id  <- newSysLocalDs tup_ty
-                     ; inner_rhs <- dsHsWrapper inst_wrap $
-                                    mkTupleSelector all_locals local tup_id $
-                                    mkVarApps (Var poly_tup_id) (tyvars ++ dicts)
                      ; rhs <- dsHsWrapper wrap $
                               mkLams tyvars $ mkLams dicts $
-                              inner_rhs
+                              mkTupleSelector all_locals local tup_id $
+                              mkVarApps (Var poly_tup_id) (tyvars ++ dicts)
                      ; let rhs_for_spec = Let (NonRec poly_tup_id poly_tup_rhs) rhs
                      ; (spec_binds, rules) <- dsSpecs rhs_for_spec spec_prags
                      ; let global' = (global `setInlinePragma` defaultInlinePragma)
@@ -284,10 +280,9 @@ dsHsBind dflags
          return (ABE {abe_poly = global
                      ,abe_mono = local
                      ,abe_wrap = WpHole
-                     ,abe_inst_wrap = WpHole
                      ,abe_prags = SpecPrags []})
 
--- this is a combination of AbsBinds and FunBind
+-- AbsBindsSig is a combination of AbsBinds and FunBind
 dsHsBind dflags (AbsBindsSig { abs_tvs = tyvars, abs_ev_vars = dicts
                              , abs_sig_export  = global
                              , abs_sig_prags   = prags
@@ -298,6 +293,7 @@ dsHsBind dflags (AbsBindsSig { abs_tvs = tyvars, abs_ev_vars = dicts
                        , fun_tick    = tick } <- bind
   = putSrcSpanDs bind_loc $
     addDictsDs (toTcTypeBag (listToBag dicts)) $
+             -- addDictsDs: push type constraints deeper for pattern match check
     do { (args, body) <- matchWrapper (FunRhs (idName global)) Nothing matches
        ; let body' = mkOptTickBox tick body
        ; fun_rhs <- dsHsWrapper co_fn $

@@ -866,7 +866,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                 | otherwise
                 = SpecPrags spec_inst_prags
 
-             export = ABE { abe_wrap = idHsWrapper, abe_inst_wrap = idHsWrapper
+             export = ABE { abe_wrap = idHsWrapper
                           , abe_poly = dfun_id
                           , abe_mono = self_dict, abe_prags = dfun_spec_prags }
                           -- NB: see Note [SPECIALISE instance pragmas]
@@ -982,10 +982,9 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds _fam_envs sc_t
            ; let sc_top_ty = mkInvForAllTys tyvars (mkPiTypes dfun_evs sc_pred)
                  sc_top_id = mkLocalId sc_top_name sc_top_ty
                  export = ABE { abe_wrap = idHsWrapper
-                              , abe_inst_wrap = idHsWrapper
                               , abe_poly = sc_top_id
                               , abe_mono = sc_ev_id
-                              , abe_prags = SpecPrags [] }
+                              , abe_prags = noSpecPrags }
                  local_ev_binds = TcEvBinds ev_binds_var
                  bind = AbsBinds { abs_tvs      = tyvars
                                  , abs_ev_vars  = dfun_evs
@@ -1311,7 +1310,7 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                         -- Copy the inline pragma (if any) from the default
                         -- method to this version. Note [INLINE and default methods]
 
-                 export = ABE { abe_wrap = idHsWrapper, abe_inst_wrap = idHsWrapper
+                 export = ABE { abe_wrap = idHsWrapper
                               , abe_poly = meth_id1
                               , abe_mono = local_meth_id
                               , abe_prags = mk_meth_spec_prags meth_id1 spec_inst_prags [] }
@@ -1347,61 +1346,28 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
                      sel_id (L bind_loc meth_bind) bndr_loc
   = add_meth_ctxt $
     do { traceTc "tcMethodBody" (ppr sel_id <+> ppr (idType sel_id))
-       ; (global_meth_id, local_meth_id)  -- NB: type of local_meth_id is wrong
-                                          -- if there is an instance sig
-              <- setSrcSpan bndr_loc $
-                 mkMethIds clas tyvars dfun_ev_vars
-                           inst_tys sel_id
+       ; (global_meth_id, local_meth_id) <- setSrcSpan bndr_loc $
+                                            mkMethIds clas tyvars dfun_ev_vars
+                                                      inst_tys sel_id
 
-       ; let prags         = lookupPragEnv prag_fn sel_name
-             lm_bind       = meth_bind { fun_id = L bndr_loc (idName local_meth_id) }
-                             -- Substitute the local_meth_name for the binder
-                             -- NB: the binding is always a FunBind
+       ; let prags   = lookupPragEnv prag_fn (idName sel_id)
+             lm_bind = meth_bind { fun_id = L bndr_loc (idName local_meth_id) }
+                       -- Substitute the local_meth_name for the binder
+                       -- NB: the binding is always a FunBind
 
        ; global_meth_id <- addInlinePrags global_meth_id prags
        ; spec_prags     <- tcSpecPrags global_meth_id prags
 
             -- taking instance signature into account might change the type of
             -- the local_meth_id
-       ; (meth_implic, ev_binds_var, (tc_bind, hs_wrap, local_meth_id))
-         <- checkInstConstraints $
-         do { (local_meth_sig, hs_wrap)
-                <- case lookupHsSig sig_fn sel_name of
-                   { Just lhs_ty  -- There is a signature in the instance
-                                   -- See Note [Instance method signatures]
-                    -> setSrcSpan (getLoc (hsSigType lhs_ty)) $
-                    do { inst_sigs <- xoptM LangExt.InstanceSigs
-                       ; checkTc inst_sigs (misplacedInstSig sel_name lhs_ty)
-                       ; sig_ty  <- tcHsSigType (FunSigCtxt sel_name False) lhs_ty
-                       ; let ctxt    = FunSigCtxt sel_name True
-                             meth_ty = idType local_meth_id
-                       ; tc_sig  <- instTcTySig ctxt lhs_ty sig_ty (idName local_meth_id)
-                       ; hs_wrap <- addErrCtxtM (methSigCtxt sel_name sig_ty meth_ty) $
-                                    tcSubType ctxt (Just global_meth_id) sig_ty
-                                              (mkCheckExpType meth_ty)
-                       ; return (tc_sig, hs_wrap) }
-                   ; Nothing ->
-                     do { tc_sig <- instTcTySigFromId local_meth_id
-                        ; return (tc_sig, idHsWrapper) } }
-              -- Absent a type sig, there are no new scoped type variables here
-              -- Only the ones from the instance decl itself, which are already
-              -- in scope.  Example:
-              --      class C a where { op :: forall b. Eq b => ... }
-              --      instance C [c] where { op = <rhs> }
-              -- In <rhs>, 'c' is scope but 'b' is not!
-
-            ; (tc_bind, _) <- tcPolyCheck NonRecursive no_prag_fn local_meth_sig
-                                          (L bind_loc lm_bind)
-
-                 -- A method always has a complete type signature,
-                 -- hence it is safe to call completeIdSigPolyId
-            ; return (tc_bind, hs_wrap, completeIdSigPolyId local_meth_sig) }
+       ; (meth_implic, ev_binds_var, tc_bind)
+             <- checkInstConstraints $
+                tcMethodBodyHelp sig_fn sel_id local_meth_id (L bind_loc lm_bind)
 
         ; let specs  = mk_meth_spec_prags global_meth_id spec_inst_prags spec_prags
               export = ABE { abe_poly      = global_meth_id
                            , abe_mono      = local_meth_id
                            , abe_wrap      = idHsWrapper
-                           , abe_inst_wrap = hs_wrap
                            , abe_prags     = specs }
 
               local_ev_binds = TcEvBinds ev_binds_var
@@ -1420,10 +1386,54 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
       | is_derived = addLandmarkErrCtxt (derivBindCtxt sel_id clas inst_tys) thing
       | otherwise  = thing
 
+tcMethodBodyHelp :: HsSigFun -> Id -> TcId
+                 -> LHsBind Name -> TcM (LHsBinds TcId)
+tcMethodBodyHelp sig_fn sel_id local_meth_id meth_bind
+  | Just hs_sig_ty <- lookupHsSig sig_fn sel_name
+              -- There is a signature in the instance
+              -- See Note [Instance method signatures]
+  = do { (sig_ty, hs_wrap)
+             <- setSrcSpan (getLoc (hsSigType hs_sig_ty)) $
+                do { inst_sigs <- xoptM LangExt.InstanceSigs
+                   ; checkTc inst_sigs (misplacedInstSig sel_name hs_sig_ty)
+                   ; sig_ty  <- tcHsSigType (FunSigCtxt sel_name False) hs_sig_ty
+                   ; let local_meth_ty = idType local_meth_id
+                   ; hs_wrap <- addErrCtxtM (methSigCtxt sel_name sig_ty local_meth_ty) $
+                                tcSubType ctxt (Just sel_id) sig_ty
+                                          (mkCheckExpType local_meth_ty)
+                   ; return (sig_ty, hs_wrap) }
+
+       ; inner_meth_name <- newName (nameOccName sel_name)
+       ; tc_sig  <- instTcTySig ctxt hs_sig_ty sig_ty inner_meth_name
+       ; (tc_bind, [inner_id]) <- tcPolyCheck NonRecursive no_prag_fn tc_sig meth_bind
+
+       ; let export = ABE { abe_poly  = local_meth_id
+                          , abe_mono  = inner_id
+                          , abe_wrap  = hs_wrap
+                          , abe_prags = noSpecPrags }
+
+       ; return (unitBag $ L (getLoc meth_bind) $
+                 AbsBinds { abs_tvs = [], abs_ev_vars = []
+                          , abs_exports = [export]
+                          , abs_binds = tc_bind, abs_ev_binds = [] }) }
+
+  | otherwise  -- No instance signature
+  = do { tc_sig <- instTcTySigFromId local_meth_id
+              -- Absent a type sig, there are no new scoped type variables here
+              -- Only the ones from the instance decl itself, which are already
+              -- in scope.  Example:
+              --      class C a where { op :: forall b. Eq b => ... }
+              --      instance C [c] where { op = <rhs> }
+              -- In <rhs>, 'c' is scope but 'b' is not!
+
+       ; (tc_bind, _) <- tcPolyCheck NonRecursive no_prag_fn tc_sig meth_bind
+       ; return tc_bind }
+
+  where
+    ctxt       = FunSigCtxt sel_name True
+    sel_name   = idName sel_id
     no_prag_fn = emptyPragEnv   -- No pragmas for local_meth_id;
                                 -- they are all for meth_id
-
-    sel_name = idName sel_id
 
 
 ------------------------
@@ -1464,16 +1474,15 @@ misplacedInstSig name hs_ty
                     2 (dcolon <+> ppr hs_ty))
          , text "(Use InstanceSigs to allow this)" ]
 
-{-
-Note [Instance method signatures]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Instance method signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 With -XInstanceSigs we allow the user to supply a signature for the
 method in an instance declaration.  Here is an artificial example:
 
-       data Age = MkAge Int
-       instance Ord Age where
-         compare :: a -> a -> Bool
-         compare = error "You can't compare Ages"
+       data T a = MkT a
+       instance Ord a => Ord (T a) where
+         (>) :: forall b. b -> b -> Bool
+         (>) = error "You can't compare Ts"
 
 The instance signature can be *more* polymorphic than the instantiated
 class method (in this case: Age -> Age -> Bool), but it cannot be less
@@ -1488,15 +1497,27 @@ that the type variables bound in the signature will scope over the body.
 
 What about the check that the instance method signature is more
 polymorphic than the instantiated class method type?  We just do a
-tcSubType call in tcMethodBody, and use the HsWrapper thus generated in
-the method AbsBind.  It's very like the tcSubType impedance-matching
-call in mkExport.
+tcSubType call in tcMethodBodyHelp, and generate a nested AbsBind, like
+this (for the example above
 
-Note that mkMethIds does *not* look for an instance signature (as it's
-used when type-checking defaults, when such a check is sure to fail) and
-so the "local" id that it returns has the wrong type in the InstanceSig case.
-This is all sorted out in tcMethodBody.
+ AbsBind { abs_tvs = [a], abs_ev_vars = [d:Ord a]
+         , abs_exports
+             = ABExport { (>) :: forall a. Ord a => T a -> T a -> Bool
+                        , gr_lcl :: T a -> T a -> Bool }
+         , abs_binds
+             = AbsBind { abs_tvs = [], abs_ev_vars = []
+                       , abs_exports = ABExport { gr_lcl :: T a -> T a -> Bool
+                                                , gr_inner :: forall b. b -> b -> Bool }
+                       , abs_binds = AbsBind { abs_tvs = [b], abs_ev_vars = []
+                                             , ..etc.. }
+               } }
 
+Wow!  Three nested AbsBinds!
+ * The outer one abstracts over the tyvars and dicts for the instance
+ * The middle one is only present if there is an instance signature,
+   and does the impedance matching for that signature
+ * The inner one is for the method binding itself against either the
+   signature from the class, or the the instance signature.
 -}
 
 ----------------------

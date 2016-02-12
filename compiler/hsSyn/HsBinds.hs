@@ -246,10 +246,8 @@ deriving instance (DataId idL, DataId idR)
 data ABExport id
   = ABE { abe_poly      :: id    -- ^ Any INLINE pragmas is attached to this Id
         , abe_mono      :: id
-        , abe_inst_wrap :: HsWrapper    -- ^ See Note [AbsBinds wrappers]
-             -- ^ Shape: abe_mono ~ abe_insted
-        , abe_wrap      :: HsWrapper    -- ^ See Note [AbsBinds wrappers]
-             -- Shape: (forall abs_tvs. abs_ev_vars => abe_insted) ~ abe_poly
+        , abe_wrap      :: HsWrapper    -- ^ See Note [ABExport wrapper]
+             -- Shape: (forall abs_tvs. abs_ev_vars => abe_mono) ~ abe_poly
         , abe_prags     :: TcSpecPrags  -- ^ SPECIALISE pragmas
   } deriving (Data, Typeable)
 
@@ -367,9 +365,8 @@ bindings only when
    lacks a user type signature
  * The group forms a strongly connected component
 
-
-Note [AbsBinds wrappers]
-~~~~~~~~~~~~~~~~~~~~~~~~
+Note [ABExport wrapper]
+~~~~~~~~~~~~~~~~~~~~~~~
 Consider
    (f,g) = (\x.x, \y.y)
 This ultimately desugars to something like this:
@@ -384,27 +381,6 @@ The abe_wrap field deals with impedance-matching between
     (/\a b. case tup a b of { (f,g) -> f })
 and the thing we really want, which may have fewer type
 variables.  The action happens in TcBinds.mkExport.
-
-For abe_inst_wrap, consider this:
-  x = (*)
-The abe_mono type will be  forall a. Num a => a -> a -> a
-because no instantiation happens during typechecking. Before inferring
-a final type, we must instantiate this. See Note [Instantiate when inferring
-a type] in TcBinds. The abe_inst_wrap takes the uninstantiated abe_mono type
-to a proper instantiated type. In this case, the "abe_insted" is
-(b -> b -> b). Note that the value of "abe_insted" isn't important; it's
-just an intermediate form as we're going from abe_mono to abe_poly. See also
-the desugaring code in DsBinds.
-
-It's conceivable that we could combine the two wrappers, but note that there
-is a gap: neither wrapper tacks on the tvs and dicts from the outer AbsBinds.
-These bits are added manually in desugaring. (See DsBinds.dsHsBind.) A problem
-that would arise in combining them is that zonking becomes more challenging:
-we want to zonk the tvs and dicts in the AbsBinds, but then we end up re-zonking
-when we zonk the ABExport. And -- worse -- the combined wrapper would have
-the tvs and dicts in binding positions, so they would shadow the original
-tvs and dicts. This is all resolvable with some plumbing, but it seems simpler
-just to keep the two wrappers distinct.
 
 Note [Bind free vars]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -592,12 +568,10 @@ ppr_monobind (AbsBindsSig { abs_tvs         = tyvars
       ppr bind
 
 instance (OutputableBndr id) => Outputable (ABExport id) where
-  ppr (ABE { abe_wrap = wrap, abe_inst_wrap = inst_wrap
-           , abe_poly = gbl, abe_mono = lcl, abe_prags = prags })
+  ppr (ABE { abe_wrap = wrap, abe_poly = gbl, abe_mono = lcl, abe_prags = prags })
     = vcat [ ppr gbl <+> text "<=" <+> ppr lcl
            , nest 2 (pprTcSpecPrags prags)
-           , nest 2 (ppr wrap)
-           , nest 2 (ppr inst_wrap)]
+           , nest 2 (text "wrap:" <+> ppr wrap)]
 
 instance (OutputableBndr idL, OutputableBndr idR) => Outputable (PatSynBind idL idR) where
   ppr (PSB{ psb_id = L _ psyn, psb_args = details, psb_def = pat, psb_dir = dir })
