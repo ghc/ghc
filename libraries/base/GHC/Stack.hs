@@ -25,8 +25,8 @@ module GHC.Stack (
 
     -- * HasCallStack call stacks
     CallStack, HasCallStack, callStack, emptyCallStack, freezeCallStack,
-    getCallStack, popCallStack, prettyCallStack, pushCallStack,
-    withFrozenCallStack,
+    fromCallSiteList, getCallStack, popCallStack, prettyCallStack,
+    pushCallStack, withFrozenCallStack,
 
     -- * Source locations
     SrcLoc(..), prettySrcLoc,
