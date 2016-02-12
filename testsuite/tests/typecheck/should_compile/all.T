@@ -500,6 +500,7 @@ test('T11462',
 test('T11480', normal, compile, [''])
 test('RebindHR', normal, compile, [''])
 test('RebindNegate', normal, compile, [''])
+test('T11319', expect_broken(11319), compile, [''])
 test('T11397', normal, compile, [''])
 test('T11458', normal, compile, [''])
 test('T11524', normal, compile, [''])
