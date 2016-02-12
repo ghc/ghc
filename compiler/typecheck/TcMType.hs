@@ -32,6 +32,7 @@ module TcMType (
   ExpType(..), ExpSigmaType, ExpRhoType,
   mkCheckExpType, newOpenInferExpType, readExpType, readExpType_maybe,
   writeExpType, expTypeToType, checkingExpType_maybe, checkingExpType,
+  tauifyExpType,
 
   --------------------------------
   -- Creating fresh type variables for pm checking
@@ -385,6 +386,12 @@ checkingExpType_maybe _          = Nothing
 checkingExpType :: String -> ExpType -> TcType
 checkingExpType _   (Check ty) = ty
 checkingExpType err et         = pprPanic "checkingExpType" (text err $$ ppr et)
+
+tauifyExpType :: ExpType -> TcM ExpType
+-- ^ Turn a (Infer hole) type into a (Check alpha),
+-- where alpha is a fresh unificaiton variable
+tauifyExpType exp_ty = do { ty <- expTypeToType exp_ty
+                          ; return (Check ty) }
 
 -- | Extracts the expected type if there is one, or generates a new
 -- TauTv if there isn't.

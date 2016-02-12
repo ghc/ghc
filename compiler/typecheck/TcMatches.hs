@@ -90,9 +90,7 @@ tcMatchesFun fun_name matches exp_ty
                        <- matchExpectedFunTys herald arity exp_rho $
                           \ pat_tys rhs_ty ->
                      -- See Note [Case branches must never infer a non-tau type]
-                     do { rhs_ty : pat_tys
-                            <- mapM (tauifyMultipleMatches matches)
-                                    (rhs_ty : pat_tys)
+                     do { rhs_ty:pat_tys <- tauifyMultipleMatches matches (rhs_ty:pat_tys)
                         ; tcMatches match_ctxt pat_tys rhs_ty matches }
                   ; return (wrap_fun, matches') }
         ; return (wrap_gen <.> wrap_fun, group) }
@@ -117,7 +115,7 @@ tcMatchesCase :: (Outputable (body Name)) =>
                  -- wrapper goes from MatchGroup's ty to expected ty
 
 tcMatchesCase ctxt scrut_ty matches res_ty
-  = do { res_ty <- tauifyMultipleMatches matches res_ty
+  = do { [res_ty] <- tauifyMultipleMatches matches [res_ty]
        ; tcMatches ctxt [mkCheckExpType scrut_ty] res_ty matches }
 
 tcMatchLambda :: SDoc -- see Note [Herald for matchExpectedFunTys] in TcUnify
@@ -130,8 +128,7 @@ tcMatchLambda herald match_ctxt match res_ty
   = do { ((match', pat_tys), wrap)
            <- matchExpectedFunTys herald n_pats res_ty $
               \ pat_tys rhs_ty ->
-              do { rhs_ty : pat_tys <- mapM (tauifyMultipleMatches match)
-                                            (rhs_ty : pat_tys)
+              do { rhs_ty:pat_tys <- tauifyMultipleMatches match (rhs_ty:pat_tys)
                  ; match' <- tcMatches match_ctxt pat_tys rhs_ty match
                  ; pat_tys <- mapM readExpType pat_tys
                  ; return (match', pat_tys) }
@@ -192,16 +189,11 @@ still gets assigned a polytype.
 -- expected type into TauTvs.
 -- See Note [Case branches must never infer a non-tau type]
 tauifyMultipleMatches :: MatchGroup id body
-                      -> ExpType
-                      -> TcM ExpType
-tauifyMultipleMatches group exp_ty
-  | isSingletonMatchGroup group
-  = return exp_ty
-
-  | otherwise
-  = mkCheckExpType <$> expTypeToType exp_ty
-      -- NB: This also ensures that an empty match still fills in the
-      -- ExpType
+                      -> [ExpType] -> TcM [ExpType]
+tauifyMultipleMatches group exp_tys
+  | isSingletonMatchGroup group = return exp_tys
+  | otherwise                   = mapM tauifyExpType exp_tys
+  -- NB: In the empty-match case, this ensures we fill in the ExpType
 
 -- | Type-check a MatchGroup. If there are multiple RHSs, the expected type
 -- must already be tauified.
