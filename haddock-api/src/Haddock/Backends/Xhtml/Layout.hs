@@ -232,7 +232,7 @@ subFamInstDetails :: String -- ^ Instance unique id (for anchor generation)
                   -> Html   -- ^ Type or data family instance
                   -> Html
 subFamInstDetails iid fi =
-    subInstSection iid << declElem fi
+    subInstSection iid << thediv ! [theclass "src"] << fi
 
 subInstSection :: String -- ^ Instance unique id (for anchor generation)
                -> Html

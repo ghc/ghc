@@ -616,14 +616,15 @@ ppInstHead links splice unicode qual mdoc origin orphan no ihd@(InstHead {..}) =
             )
           where
             ptype = keyword "type" <+> typ
-            prhs = maybe noHtml (\t -> equals <+> ppType unicode qual t) rhs
+            prhs = ptype <+> maybe noHtml
+                                   (\t -> equals <+> ppType unicode qual t) rhs
         DataInst dd ->
             ( subInstHead iid pdata
             , mdoc
             , [subFamInstDetails iid pdecl])
           where
             pdata = keyword "data" <+> typ
-            pdecl = ppShortDataDecl False True dd unicode qual
+            pdecl = pdata <+> ppShortDataDecl False True dd unicode qual
   where
     iid = instanceId origin no orphan ihd
     typ = ppAppNameTypes ihdClsName ihdKinds ihdTypes unicode qual
