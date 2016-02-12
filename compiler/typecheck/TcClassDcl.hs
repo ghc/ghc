@@ -253,7 +253,6 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
                            -- completeSigPolyId
                            , abe_mono      = completeIdSigPolyId local_dm_sig
                            , abe_wrap      = idHsWrapper
-                           , abe_inst_wrap = idHsWrapper
                            , abe_prags     = IsDefaultMethod }
               full_bind = AbsBinds { abs_tvs      = tyvars
                                    , abs_ev_vars  = [this_dict]
