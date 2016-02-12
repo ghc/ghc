@@ -1,8 +1,10 @@
+{-# LANGUAGE RecordWildCards #-}
 module Rules.Program (buildProgram) where
 
 import Data.Char
 
 import Base
+import Context
 import Expression
 import GHC hiding (ghci)
 import Oracles.Config.Setting
@@ -14,6 +16,7 @@ import Rules.Wrappers.Ghc
 import Rules.Wrappers.GhcPkg
 import Settings
 import Settings.Builders.GhcCabal
+import Target
 
 -- TODO: move to buildRootPath, see #113
 -- Directory for wrapped binaries
@@ -24,17 +27,17 @@ programInplaceLibPath = "inplace/lib/bin"
 type Wrapper = FilePath -> Expr String
 
 -- List of wrappers we build
-wrappers :: [(PartialTarget, Wrapper)]
-wrappers = [ (PartialTarget Stage0 ghc, ghcWrapper)
-           , (PartialTarget Stage1 ghc, ghcWrapper)
-           , (PartialTarget Stage0 ghcPkg, ghcPkgWrapper)]
+wrappers :: [(Context, Wrapper)]
+wrappers = [ (vanillaContext Stage0 ghc   , ghcWrapper   )
+           , (vanillaContext Stage1 ghc   , ghcWrapper   )
+           , (vanillaContext Stage0 ghcPkg, ghcPkgWrapper)]
 
-buildProgram :: Resources -> PartialTarget -> Rules ()
-buildProgram _ target @ (PartialTarget stage pkg) = do
-    let match file = case programPath stage pkg of
+buildProgram :: Resources -> Context -> Rules ()
+buildProgram _ context @ (Context {..}) = do
+    let match file = case programPath stage package of
             Nothing      -> False
             Just program -> program == file
-        matchWrapped file = case programPath stage pkg of
+        matchWrapped file = case programPath stage package of
             Nothing      -> False
             Just program -> case computeWrappedPath program of
                 Nothing             -> False
@@ -43,47 +46,47 @@ buildProgram _ target @ (PartialTarget stage pkg) = do
     match ?> \bin -> do
         windows <- windowsHost
         if windows
-        then buildBinary target bin -- We don't build wrappers on Windows
-        else case find ((== target) . fst) wrappers of
-            Nothing -> buildBinary target bin -- No wrapper found
+        then buildBinary context bin -- We don't build wrappers on Windows
+        else case find ((== context) . fst) wrappers of
+            Nothing -> buildBinary context bin -- No wrapper found
             Just (_, wrapper) -> do
                 let Just wrappedBin = computeWrappedPath bin
                 need [wrappedBin]
-                buildWrapper target wrapper bin wrappedBin
+                buildWrapper context wrapper bin wrappedBin
 
-    matchWrapped ?> \bin -> buildBinary target bin
+    matchWrapped ?> \bin -> buildBinary context bin
 
 -- Replace programInplacePath with programInplaceLibPath in a given path
 computeWrappedPath :: FilePath -> Maybe FilePath
 computeWrappedPath =
     fmap (programInplaceLibPath ++) . stripPrefix programInplacePath
 
-buildWrapper :: PartialTarget -> Wrapper -> FilePath -> FilePath -> Action ()
-buildWrapper target @ (PartialTarget stage pkg) wrapper wrapperPath binPath = do
-    contents <- interpretPartial target $ wrapper binPath
+buildWrapper :: Context -> Wrapper -> FilePath -> FilePath -> Action ()
+buildWrapper context @ (Context stage package _) wrapper wrapperPath binPath = do
+    contents <- interpretInContext context $ wrapper binPath
     writeFileChanged wrapperPath contents
     makeExecutable wrapperPath
-    putSuccess $ "| Successfully created wrapper for '" ++ pkgNameString pkg
+    putSuccess $ "| Successfully created wrapper for '" ++ pkgNameString package
                ++ "' (" ++ show stage ++ ")."
 
 -- TODO: Get rid of the Paths_hsc2hs.o hack.
 -- TODO: Do we need to consider other ways when building programs?
-buildBinary :: PartialTarget -> FilePath -> Action ()
-buildBinary target @ (PartialTarget stage pkg) bin = do
-    let buildPath = targetPath stage pkg -/- "build"
-    cSrcs <- cSources target -- TODO: remove code duplication (Library.hs)
-    hSrcs <- hSources target
+buildBinary :: Context -> FilePath -> Action ()
+buildBinary context @ (Context stage package _) bin = do
+    let buildPath = targetPath stage package -/- "build"
+    cSrcs <- cSources context -- TODO: remove code duplication (Library.hs)
+    hSrcs <- hSources context
     let cObjs = [ buildPath -/- src -<.> osuf vanilla | src <- cSrcs   ]
         hObjs = [ buildPath -/- src  <.> osuf vanilla | src <- hSrcs   ]
-             ++ [ buildPath -/- "Paths_hsc2hs.o"      | pkg == hsc2hs  ]
-             ++ [ buildPath -/- "Paths_haddock.o"     | pkg == haddock ]
+             ++ [ buildPath -/- "Paths_hsc2hs.o"      | package == hsc2hs  ]
+             ++ [ buildPath -/- "Paths_haddock.o"     | package == haddock ]
         objs  = cObjs ++ hObjs
-    ways     <- interpretPartial target getLibraryWays
-    depNames <- interpretPartial target $ getPkgDataList TransitiveDepNames
-    let libStage  = min stage Stage1 -- libraries are built only in Stage0/1
-        libTarget = PartialTarget libStage pkg
-    pkgs     <- interpretPartial libTarget getPackages
-    ghciFlag <- interpretPartial libTarget $ getPkgData BuildGhciLib
+    ways     <- interpretInContext context getLibraryWays
+    depNames <- interpretInContext context $ getPkgDataList TransitiveDepNames
+    let libStage   = min stage Stage1 -- libraries are built only in Stage0/1
+        libContext = vanillaContext libStage package
+    pkgs     <- interpretInContext libContext getPackages
+    ghciFlag <- interpretInContext libContext $ getPkgData BuildGhciLib
     let deps = matchPackageNames (sort pkgs) (map PackageName $ sort depNames)
         ghci = ghciFlag == "YES" && stage == Stage1
     libs <- fmap concat . forM deps $ \dep -> do
@@ -94,13 +97,13 @@ buildBinary target @ (PartialTarget stage pkg) bin = do
             return $ libFile : [ lib0File | dll0 ]
         ghciLib <- pkgGhciLibraryFile libStage dep
         return $ libFiles ++ [ ghciLib | ghci ]
-    let binDeps = if pkg == ghcCabal && stage == Stage0
-                  then [ pkgPath pkg -/- src <.> "hs" | src <- hSrcs ]
+    let binDeps = if package == ghcCabal && stage == Stage0
+                  then [ pkgPath package -/- src <.> "hs" | src <- hSrcs ]
                   else objs
     need $ binDeps ++ libs
-    build $ fullTargetWithWay target (Ghc stage) vanilla binDeps [bin]
-    synopsis <- interpretPartial target $ getPkgData Synopsis
+    build $ Target context (Ghc stage) binDeps [bin]
+    synopsis <- interpretInContext context $ getPkgData Synopsis
     putSuccess $ renderProgram
-        ("'" ++ pkgNameString pkg ++ "' (" ++ show stage ++ ").")
+        ("'" ++ pkgNameString package ++ "' (" ++ show stage ++ ").")
         bin
         (dropWhileEnd isPunctuation synopsis)

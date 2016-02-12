@@ -11,20 +11,20 @@ import qualified Control.Exception.Base as IO
 
 import Base
 import CmdLineFlag
+import Context
 import Expression
 import Oracles.ArgsHash
 import Oracles.WindowsPath
 import Settings
 import Settings.Args
 import Settings.Builders.Ar
-import qualified Target
+import Target
 
 -- Build a given target using an appropriate builder and acquiring necessary
 -- resources. Force a rebuilt if the argument list has changed since the last
 -- built (that is, track changes in the build system).
 buildWithResources :: [(Resource, Int)] -> Target -> Action ()
-buildWithResources rs target = do
-    let builder = Target.builder target
+buildWithResources rs target @ Target {..} = do
     needBuilder laxDependencies builder
     path    <- builderPath builder
     argList <- interpret target getArgs
@@ -160,15 +160,15 @@ makeExecutable file = do
     quietly $ cmd "chmod +x " [file]
 
 -- Print out key information about the command being executed
-putInfo :: Target.Target -> Action ()
-putInfo Target.Target {..} = putProgressInfo $ renderAction
-    ("Run " ++ show builder ++ " (" ++ stageInfo
-    ++ "package = " ++ pkgNameString package ++ wayInfo ++ ")")
-    (digest inputs)
-    (digest outputs)
+putInfo :: Target -> Action ()
+putInfo Target {..} = putProgressInfo $ renderAction
+    ("Run " ++ show builder ++ contextInfo) (digest inputs) (digest outputs)
   where
-    stageInfo = if isStaged builder then "" else "stage = " ++ show stage ++ ", "
-    wayInfo   = if way == vanilla   then "" else ", way = " ++ show way
+    contextInfo = concat $ [ " (" ]
+        ++ [ "stage = "     ++ show (stage context) ]
+        ++ [ ", package = " ++ pkgNameString (package context) ]
+        ++ [ ", way = "     ++ show (way context) | way context /= vanilla ]
+        ++ [ ")" ]
     digest [] = "none"
     digest [x] = x
     digest (x:xs) = x ++ " (and " ++ show (length xs) ++ " more)"

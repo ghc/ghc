@@ -11,6 +11,7 @@ import Settings.Builders.Common
 import Settings.Packages.Rts
 import Settings.Paths
 import Settings.User
+import Target
 
 -- TODO: this should be moved elsewhere
 rtsBuildPath :: FilePath
@@ -20,8 +21,8 @@ rtsBuildPath = targetPath Stage1 rts -/- "build"
 libffiDependencies :: [FilePath]
 libffiDependencies = (rtsBuildPath -/-) <$> [ "ffi.h", "ffitarget.h" ]
 
-libffiTarget :: PartialTarget
-libffiTarget = PartialTarget Stage1 libffi
+libffiContext :: Context
+libffiContext = vanillaContext Stage1 libffi
 
 libffiBuild :: FilePath
 libffiBuild = buildRootPath -/- "stage1/libffi"
@@ -38,10 +39,10 @@ fixLibffiMakefile =
 -- TODO: remove code duplication (see Settings/Builders/GhcCabal.hs)
 configureEnvironment :: Action [CmdOption]
 configureEnvironment = do
-    cFlags  <- interpretPartial libffiTarget . fromDiffExpr $ mconcat
+    cFlags  <- interpretInContext libffiContext . fromDiffExpr $ mconcat
                [ cArgs
                , argStagedSettingList ConfCcArgs ]
-    ldFlags <- interpretPartial libffiTarget $ fromDiffExpr ldArgs
+    ldFlags <- interpretInContext libffiContext $ fromDiffExpr ldArgs
     sequence [ builderEnv "CC" $ Gcc Stage0
              , builderEnv "CXX" $ Gcc Stage0
              , builderEnv "LD" Ld
@@ -51,9 +52,9 @@ configureEnvironment = do
              , return . AddEnv  "CFLAGS" $ unwords  cFlags ++ " -w"
              , return . AddEnv "LDFLAGS" $ unwords ldFlags ++ " -w" ]
   where
-    builderEnv var builder = do
-        needBuilder False builder
-        path <- builderPath builder
+    builderEnv var bld = do
+        needBuilder False bld
+        path <- builderPath bld
         return $ AddEnv var path
 
 configureArguments :: Action [String]
@@ -95,7 +96,7 @@ libffiRules = do
             removeDirectory (buildRootPath -/- libname)
             -- TODO: Simplify.
             actionFinally (do
-                build $ fullTarget libffiTarget Tar tarballs [buildRootPath]
+                build $ Target libffiContext Tar tarballs [buildRootPath]
                 moveDirectory (buildRootPath -/- libname) libffiBuild) $
                     removeFiles buildRootPath [libname <//> "*"]
 

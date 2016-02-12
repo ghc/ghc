@@ -21,9 +21,8 @@ testRules = do
         runMakeVerbose "testsuite/tests" ["fast"]
 
     "test" ~> do
-        let quote s = "\"" ++ s ++ "\""
-            yesNo x = quote $ if x then "YES" else "NO"
-        pkgs     <- interpretWithStage Stage1 getPackages
+        let yesNo x = show $ if x then "YES" else "NO"
+        pkgs     <- interpretInContext (stageContext Stage1) getPackages
         tests    <- filterM doesDirectoryExist $ concat
                     [ [ pkgPath pkg -/- "tests", pkgPath pkg -/- "tests-ghc" ]
                     | pkg <- pkgs, isLibrary pkg, pkg /= rts, pkg /= libffi ]
@@ -41,7 +40,7 @@ testRules = do
             ++ map ("--rootdir="++) tests ++
             [ "-e", "windows=" ++ show windows
             , "-e", "config.speed=2"
-            , "-e", "ghc_compiler_always_flags=" ++ quote "-fforce-recomp -dcore-lint -dcmm-lint -dno-debug-output -no-user-package-db -rtsopts"
+            , "-e", "ghc_compiler_always_flags=" ++ show "-fforce-recomp -dcore-lint -dcmm-lint -dno-debug-output -no-user-package-db -rtsopts"
             , "-e", "ghc_with_native_codegen=" ++ show ghcWithNativeCodeGenInt
             , "-e", "ghc_debugged=" ++ yesNo ghcDebugged
             , "-e", "ghc_with_vanilla=1" -- TODO: do we always build vanilla?
@@ -57,9 +56,9 @@ testRules = do
             , "-e", "in_tree_compiler=True" -- TODO: when is it equal to False?
             , "-e", "clean_only=False" -- TODO: do we need to support True?
             , "--configfile=testsuite/config/ghc"
-            , "--config", "compiler=" ++ quote (top -/- compiler)
-            , "--config", "ghc_pkg="  ++ quote (top -/- ghcPkg)
-            , "--config", "haddock="  ++ quote (top -/- haddock)
+            , "--config", "compiler=" ++ show (top -/- compiler)
+            , "--config", "ghc_pkg="  ++ show (top -/- ghcPkg)
+            , "--config", "haddock="  ++ show (top -/- haddock)
             , "--summary-file", "testsuite_summary.txt"
             , "--threads=" ++ show threads
             ]

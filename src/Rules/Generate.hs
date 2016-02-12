@@ -6,6 +6,7 @@ module Rules.Generate (
 import qualified System.Directory as IO
 
 import Base
+import Context hiding (stage)
 import Expression
 import GHC
 import Rules.Generators.ConfigHs
@@ -21,6 +22,7 @@ import Rules.Gmp
 import Rules.Libffi
 import Rules.Resources (Resources)
 import Settings
+import Target hiding (builder, context)
 
 installTargets :: [FilePath]
 installTargets = [ "inplace/lib/ghc-usage.txt"
@@ -106,18 +108,18 @@ determineBuilder file = fmap fst $ find (\(_, e) -> e == ext) knownGenerators
   where
     ext = takeExtension file
 
-generate :: FilePath -> PartialTarget -> Expr String -> Action ()
-generate file target expr = do
-    contents <- interpretPartial target expr
+generate :: FilePath -> Context -> Expr String -> Action ()
+generate file context expr = do
+    contents <- interpretInContext context expr
     writeFileChanged file contents
     putSuccess $ "| Successfully generated '" ++ file ++ "'."
 
-generatePackageCode :: Resources -> PartialTarget -> Rules ()
-generatePackageCode _ target @ (PartialTarget stage pkg) =
+generatePackageCode :: Resources -> Context -> Rules ()
+generatePackageCode _ context @ (Context stage pkg _) =
     let buildPath   = targetPath stage pkg -/- "build"
         dropBuild   = drop (length buildPath + 1)
         generated f = (buildPath ++ "//*.hs") ?== f && not ("//autogen/*" ?== f)
-        file <~ gen = generate file target gen
+        file <~ gen = generate file context gen
     in do
         generated ?> \file -> do
             let srcFile = dropBuild file
@@ -129,7 +131,7 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
                 ++ " (found: " ++ show gens ++ ")."
             let (src, builder) = head gens
             need [src]
-            build $ fullTarget target builder [src] [file]
+            build $ Target context builder [src] [file]
             let srcBoot = src -<.> "hs-boot"
             whenM (doesFileExist srcBoot) $
                 copyFile srcBoot $ file -<.> "hs-boot"
@@ -137,7 +139,7 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
         -- TODO: needing platformH is ugly and fragile
         when (pkg == compiler) $ primopsTxt stage %> \file -> do
             need $ [platformH stage, primopsSource] ++ includesDependencies
-            build $ fullTarget target HsCpp [primopsSource] [file]
+            build $ Target context HsCpp [primopsSource] [file]
 
         -- TODO: why different folders for generated files?
         fmap (buildPath -/-)
@@ -145,7 +147,7 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
             , "GHC/PrimopWrappers.hs"
             , "*.hs-incl" ] |%> \file -> do
                 need [primopsTxt stage]
-                build $ fullTarget target GenPrimopCode [primopsTxt stage] [file]
+                build $ Target context GenPrimopCode [primopsTxt stage] [file]
                 -- TODO: this is temporary hack, get rid of this (#113)
                 let oldPath = pkgPath pkg -/- targetDirectory stage pkg -/- "build"
                     newFile = oldPath ++ (drop (length buildPath) file)
@@ -154,7 +156,7 @@ generatePackageCode _ target @ (PartialTarget stage pkg) =
                 putSuccess $ "| Duplicate file " ++ file ++ " -> " ++ newFile
 
         when (pkg == rts) $ buildPath -/- "AutoApply.cmm" %> \file -> do
-            build $ fullTarget target GenApply [] [file]
+            build $ Target context GenApply [] [file]
 
         priority 2.0 $ do
             -- TODO: this is temporary hack, get rid of this (#113)
@@ -196,17 +198,17 @@ generateRules = do
         generate ghcSplit emptyTarget generateGhcSplit
         makeExecutable ghcSplit
 
-    -- TODO: simplify, get rid of fake rts target
+    -- TODO: simplify, get rid of fake rts context
     derivedConstantsPath ++ "//*" %> \file -> do
         withTempDir $ \dir -> build $
-            fullTarget (PartialTarget Stage1 rts) DeriveConstants [] [file, dir]
+            Target (vanillaContext Stage1 rts) DeriveConstants [] [file, dir]
 
   where
     file <~ gen = file %> \out -> generate out emptyTarget gen
 
 -- TODO: Use the Types, Luke! (drop partial function)
 -- We sometimes need to evaluate expressions that do not require knowing all
--- information about the target. In this case, we don't want to know anything.
-emptyTarget :: PartialTarget
-emptyTarget = PartialTarget (error "Rules.Generate.emptyTarget: unknown stage")
-                            (error "Rules.Generate.emptyTarget: unknown package")
+-- information about the context. In this case, we don't want to know anything.
+emptyTarget :: Context
+emptyTarget = vanillaContext (error "Rules.Generate.emptyTarget: unknown stage")
+                             (error "Rules.Generate.emptyTarget: unknown package")

@@ -1,8 +1,10 @@
+{-# LANGUAGE RecordWildCards #-}
 module Rules.Data (buildPackageData) where
 
 import qualified System.Directory as IO
 
 import Base
+import Context
 import Expression
 import GHC
 import Oracles.Config.Setting
@@ -13,26 +15,27 @@ import Rules.Libffi
 import Rules.Resources
 import Settings
 import Settings.Builders.Common
+import Target
 
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
-buildPackageData :: Resources -> PartialTarget -> Rules ()
-buildPackageData _ target @ (PartialTarget stage pkg) = do
-    let cabalFile = pkgCabalFile pkg
-        configure = pkgPath pkg -/- "configure"
-        dataFile  = pkgDataFile stage pkg
-        oldPath   = pkgPath pkg -/- targetDirectory stage pkg -- TODO: remove, #113
+buildPackageData :: Resources -> Context -> Rules ()
+buildPackageData _ context @ (Context {..}) = do
+    let cabalFile = pkgCabalFile package
+        configure = pkgPath package -/- "configure"
+        dataFile  = pkgDataFile stage package
+        oldPath   = pkgPath package -/- targetDirectory stage package -- TODO: remove, #113
 
     [dataFile, oldPath -/- "package-data.mk"] &%> \_ -> do
         -- The first thing we do with any package is make sure all generated
         -- dependencies are in place before proceeding.
-        orderOnly $ generatedDependencies stage pkg
+        orderOnly $ generatedDependencies stage package
 
         -- GhcCabal may run the configure script, so we depend on it
         whenM (doesFileExist $ configure <.> "ac") $ need [configure]
 
         -- Before we configure a package its dependencies need to be registered
-        deps <- packageDeps pkg
-        pkgs <- interpretPartial target getPackages
+        deps <- packageDeps package
+        pkgs <- interpretInContext context getPackages
         let depPkgs = matchPackageNames (sort pkgs) deps
         need =<< traverse (pkgConfFile stage) depPkgs
 
@@ -40,24 +43,24 @@ buildPackageData _ target @ (PartialTarget stage pkg) = do
         let inTreeMk = oldPath -/- takeFileName dataFile
 
         need [cabalFile]
-        build $ fullTarget target GhcCabal [cabalFile] [inTreeMk]
+        build $ Target context GhcCabal [cabalFile] [inTreeMk]
 
         -- TODO: get rid of this, see #113
         liftIO $ IO.copyFile inTreeMk dataFile
         autogenFiles <- getDirectoryFiles oldPath ["build/autogen/*"]
-        createDirectory $ targetPath stage pkg -/- "build/autogen"
+        createDirectory $ targetPath stage package -/- "build/autogen"
         forM_ autogenFiles $ \file -> do
-            copyFile (oldPath -/- file) (targetPath stage pkg -/- file)
+            copyFile (oldPath -/- file) (targetPath stage package -/- file)
         let haddockPrologue = "haddock-prologue.txt"
-        copyFile (oldPath -/- haddockPrologue) (targetPath stage pkg -/- haddockPrologue)
+        copyFile (oldPath -/- haddockPrologue) (targetPath stage package -/- haddockPrologue)
 
-        postProcessPackageData stage pkg dataFile
+        postProcessPackageData stage package dataFile
 
     -- TODO: PROGNAME was $(CrossCompilePrefix)hp2ps
     priority 2.0 $ do
-        when (pkg == hp2ps) $ dataFile %> \mk -> do
-            includes <- interpretPartial target $ fromDiffExpr includesArgs
-            let prefix = fixKey (targetPath stage pkg) ++ "_"
+        when (package == hp2ps) $ dataFile %> \mk -> do
+            includes <- interpretInContext context $ fromDiffExpr includesArgs
+            let prefix = fixKey (targetPath stage package) ++ "_"
                 cSrcs  = [ "AreaBelow.c", "Curves.c", "Error.c", "Main.c"
                          , "Reorder.c", "TopTwenty.c", "AuxFile.c"
                          , "Deviation.c", "HpFile.c", "Marks.c", "Scale.c"
@@ -71,8 +74,8 @@ buildPackageData _ target @ (PartialTarget stage pkg) = do
             writeFileChanged mk contents
             putSuccess $ "| Successfully generated '" ++ mk ++ "'."
 
-        when (pkg == unlit) $ dataFile %> \mk -> do
-            let prefix   = fixKey (targetPath stage pkg) ++ "_"
+        when (package == unlit) $ dataFile %> \mk -> do
+            let prefix   = fixKey (targetPath stage package) ++ "_"
                 contents = unlines $ map (prefix++)
                     [ "PROGNAME = unlit"
                     , "C_SRCS = unlit.c"
@@ -80,8 +83,8 @@ buildPackageData _ target @ (PartialTarget stage pkg) = do
             writeFileChanged mk contents
             putSuccess $ "| Successfully generated '" ++ mk ++ "'."
 
-        when (pkg == touchy) $ dataFile %> \mk -> do
-            let prefix   = fixKey (targetPath stage pkg) ++ "_"
+        when (package == touchy) $ dataFile %> \mk -> do
+            let prefix   = fixKey (targetPath stage package) ++ "_"
                 contents = unlines $ map (prefix++)
                     [ "PROGNAME = touchy"
                     , "C_SRCS = touchy.c" ]
@@ -91,8 +94,8 @@ buildPackageData _ target @ (PartialTarget stage pkg) = do
         -- Bootstrapping `ghcCabal`: although `ghcCabal` is a proper cabal
         -- package, we cannot generate the corresponding `package-data.mk` file
         -- by running by running `ghcCabal`, because it has not yet been built.
-        when (pkg == ghcCabal && stage == Stage0) $ dataFile %> \mk -> do
-            let prefix   = fixKey (targetPath stage pkg) ++ "_"
+        when (package == ghcCabal && stage == Stage0) $ dataFile %> \mk -> do
+            let prefix   = fixKey (targetPath stage package) ++ "_"
                 contents = unlines $ map (prefix++)
                     [ "PROGNAME = ghc-cabal"
                     , "MODULES = Main"
@@ -101,24 +104,24 @@ buildPackageData _ target @ (PartialTarget stage pkg) = do
             writeFileChanged mk contents
             putSuccess $ "| Successfully generated '" ++ mk ++ "'."
 
-        when (pkg == rts && stage == Stage1) $ do
+        when (package == rts && stage == Stage1) $ do
             dataFile %> \mk -> do
-                orderOnly $ generatedDependencies stage pkg
+                orderOnly $ generatedDependencies stage package
                 windows <- windowsHost
-                let prefix = fixKey (targetPath stage pkg) ++ "_"
+                let prefix = fixKey (targetPath stage package) ++ "_"
                     dirs   = [ ".", "hooks", "sm", "eventlog" ]
                           ++ [ "posix" | not windows ]
                           ++ [ "win32" |     windows ]
                 -- TODO: rts/dist/build/sm/Evac_thr.c, rts/dist/build/sm/Scav_thr.c
                 -- TODO: adding cmm/S sources to C_SRCS is a hack; rethink after #18
-                cSrcs    <- getDirectoryFiles (pkgPath pkg) (map (-/- "*.c") dirs)
-                cmmSrcs  <- getDirectoryFiles (pkgPath pkg) ["*.cmm"]
+                cSrcs    <- getDirectoryFiles (pkgPath package) (map (-/- "*.c") dirs)
+                cmmSrcs  <- getDirectoryFiles (pkgPath package) ["*.cmm"]
                 buildAdjustor   <- anyTargetArch ["i386", "powerpc", "powerpc64"]
                 buildStgCRunAsm <- anyTargetArch ["powerpc64le"]
                 let sSrcs = [ "AdjustorAsm.S" | buildAdjustor   ]
                          ++ [ "StgCRunAsm.S"  | buildStgCRunAsm ]
                     extraSrcs = [ rtsBuildPath -/- "AutoApply.cmm" ]
-                includes <- interpretPartial target $ fromDiffExpr includesArgs
+                includes <- interpretInContext context $ fromDiffExpr includesArgs
                 let contents = unlines $ map (prefix++)
                         [ "C_SRCS = "
                           ++ unwords (cSrcs ++ cmmSrcs ++ sSrcs ++ extraSrcs)
@@ -137,16 +140,16 @@ buildPackageData _ target @ (PartialTarget stage pkg) = do
 -- is replaced by libraries_deepseq_dist-install_VERSION = 1.4.0.0
 -- Reason: Shake's built-in makefile parser doesn't recognise slashes
 postProcessPackageData :: Stage -> Package -> FilePath -> Action ()
-postProcessPackageData stage pkg file = fixFile file fixPackageData
+postProcessPackageData stage package file = fixFile file fixPackageData
   where
     fixPackageData = unlines . map processLine . filter (not . null) . filter ('$' `notElem`) . lines
     processLine line = fixKey fixedPrefix ++ suffix
       where
         (prefix, suffix) = break (== '=') line
-        -- Change pkg/path/targetDir to takeDirectory file
+        -- Change package/path/targetDir to takeDirectory file
         -- This is a temporary hack until we get rid of ghc-cabal
         fixedPrefix = takeDirectory file ++ drop len prefix
-        len         = length (pkgPath pkg -/- targetDirectory stage pkg)
+        len         = length (pkgPath package -/- targetDirectory stage package)
 
 -- TODO: remove, see #113
 fixKey :: String -> String

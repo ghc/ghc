@@ -1,6 +1,7 @@
 module Rules.Package (buildPackage) where
 
 import Base
+import Context
 import qualified Rules.Compile
 import qualified Rules.Data
 import qualified Rules.Dependencies
@@ -10,9 +11,8 @@ import qualified Rules.Library
 import qualified Rules.Program
 import qualified Rules.Register
 import Rules.Resources
-import Target
 
-buildPackage :: Resources -> PartialTarget -> Rules ()
+buildPackage :: Resources -> Context -> Rules ()
 buildPackage = mconcat
     [ Rules.Compile.compilePackage
     , Rules.Data.buildPackageData

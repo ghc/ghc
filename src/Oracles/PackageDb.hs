@@ -3,6 +3,7 @@ module Oracles.PackageDb (packageDbOracle) where
 import qualified System.Directory as IO
 
 import Base
+import Context hiding (stage)
 import Builder
 import GHC
 import Rules.Actions
@@ -16,8 +17,7 @@ packageDbOracle = do
         let dir  = packageDbDirectory stage
             file = dir -/- "package.cache"
         unlessM (liftIO $ IO.doesFileExist file) $ do
-            let target  = PartialTarget stage ghcPkg
             removeDirectoryIfExists dir
-            build $ fullTarget target (GhcPkg stage) [] [dir]
+            build $ Target (vanillaContext stage ghcPkg) (GhcPkg stage) [] [dir]
             putSuccess $ "| Successfully initialised " ++ dir
     return ()

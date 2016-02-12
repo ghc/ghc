@@ -8,12 +8,13 @@ import Rules.Actions
 import Settings.Packages.IntegerGmp
 import Settings.User
 import Settings.Paths
+import Target
 
 gmpBase :: FilePath
 gmpBase = "libraries/integer-gmp/gmp"
 
-gmpTarget :: PartialTarget
-gmpTarget = PartialTarget Stage1 integerGmp
+gmpContext :: Context
+gmpContext = vanillaContext Stage1 integerGmp
 
 gmpObjects :: FilePath
 gmpObjects = gmpBuildPath -/- "objs"
@@ -40,9 +41,9 @@ configureEnvironment = do
              , builderEnv "AR" Ar
              , builderEnv "NM" Nm ]
   where
-    builderEnv var builder = do
-        needBuilder False builder
-        path <- builderPath builder
+    builderEnv var bld = do
+        needBuilder False bld
+        path <- builderPath bld
         return $ AddEnv var path
 
 configureArguments :: Action [String]
@@ -83,7 +84,7 @@ gmpRules = do
                          ++ "(found: " ++ show tarballs ++ ")."
 
             need tarballs
-            build $ fullTarget gmpTarget Tar tarballs [gmpBuildPath]
+            build $ Target gmpContext Tar tarballs [gmpBuildPath]
 
             forM_ gmpPatches $ \src -> do
                 let patch     = takeFileName src
@@ -111,7 +112,7 @@ gmpRules = do
             copyFile (libPath -/- ".libs/libgmp.a") gmpLibrary
 
             createDirectory gmpObjects
-            build $ fullTarget gmpTarget Ar [gmpLibrary] [gmpObjects]
+            build $ Target gmpContext Ar [gmpLibrary] [gmpObjects]
 
             runBuilder Ranlib [gmpLibrary]
 

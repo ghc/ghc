@@ -1,19 +1,23 @@
+{-# LANGUAGE RecordWildCards #-}
 module Rules.Dependencies (buildPackageDependencies) where
 
+import Development.Shake.Util (parseMakefile)
+
 import Base
+import Context
 import Expression
 import Oracles.PackageData
 import Rules.Actions
 import Rules.Resources
 import Settings
-import Development.Shake.Util (parseMakefile)
+import Target
 
 -- TODO: simplify handling of AutoApply.cmm
-buildPackageDependencies :: Resources -> PartialTarget -> Rules ()
-buildPackageDependencies rs target @ (PartialTarget stage pkg) =
-    let path      = targetPath stage pkg
+buildPackageDependencies :: Resources -> Context -> Rules ()
+buildPackageDependencies rs context @ (Context {..}) =
+    let path      = targetPath stage package
         buildPath = path -/- "build"
-        dropBuild = (pkgPath pkg ++) . drop (length buildPath)
+        dropBuild = (pkgPath package ++) . drop (length buildPath)
         hDepFile  = buildPath -/- ".hs-dependencies"
     in do
         fmap (buildPath++)
@@ -22,15 +26,15 @@ buildPackageDependencies rs target @ (PartialTarget stage pkg) =
                               then dropExtension out
                               else dropBuild . dropExtension $ out
                 need [srcFile]
-                build $ fullTarget target (GccM stage) [srcFile] [out]
+                build $ Target context (GccM stage) [srcFile] [out]
 
         hDepFile %> \out -> do
-            srcs <- interpretPartial target getPackageSources
+            srcs <- interpretInContext context getPackageSources
             need srcs
             if srcs == []
             then writeFileChanged out ""
             else buildWithResources [(resPackageDb rs, 1)] $
-                fullTarget target (GhcM stage) srcs [out]
+                Target context (GhcM stage) srcs [out]
             removeFileIfExists $ out <.> "bak"
 
         -- TODO: don't accumulate *.deps into .dependencies

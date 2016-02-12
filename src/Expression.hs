@@ -6,13 +6,13 @@ module Expression (
     apply, append, arg, remove, removePair,
     appendSub, appendSubD, filterSub, removeSub,
     -- ** Evaluation
-    interpret, interpretPartial, interpretWithStage, interpretDiff,
+    interpret, interpretInContext, interpretDiff,
     -- ** Predicates
     Predicate, (?), applyPredicate,
     -- ** Common expressions
     Args, Ways, Packages,
-    -- ** Targets
-    Target, PartialTarget (..), unsafeFromPartial, fullTarget, fullTargetWithWay,
+    -- ** Context and Target
+    Context, vanillaContext, stageContext, Target, dummyTarget,
 
     -- * Convenient accessors
     getStage, getPackage, getBuilder, getOutputs, getInputs, getWay,
@@ -30,6 +30,7 @@ import Control.Monad.Trans.Reader
 import Data.Monoid
 
 import Base
+import Context
 import Package
 import Builder
 import Stage
@@ -146,16 +147,13 @@ filterSub prefix p = apply $ map filterSubstr
 removeSub :: String -> [String] -> Args
 removeSub prefix xs = filterSub prefix (`notElem` xs)
 
--- | Interpret a given expression in a given environment.
+-- | Interpret a given expression according to the given 'Target'.
 interpret :: Target -> Expr a -> Action a
 interpret = flip runReaderT
 
-interpretPartial :: PartialTarget -> Expr a -> Action a
-interpretPartial = interpret . unsafeFromPartial
-
-interpretWithStage :: Stage -> Expr a -> Action a
-interpretWithStage s = interpretPartial $
-    PartialTarget s (error "interpretWithStage: package not set")
+-- | Interpret a given expression by looking only at the given 'Context'.
+interpretInContext :: Context -> Expr a -> Action a
+interpretInContext = interpret . dummyTarget
 
 -- | Extract an expression from a difference expression.
 fromDiffExpr :: Monoid a => DiffExpr a -> Expr a
@@ -167,11 +165,11 @@ interpretDiff target = interpret target . fromDiffExpr
 
 -- | Convenient getters for target parameters.
 getStage :: Expr Stage
-getStage = asks stage
+getStage = stage <$> asks context
 
 -- | Get the 'Package' of the current 'Target'.
 getPackage :: Expr Package
-getPackage = asks package
+getPackage = package <$> asks context
 
 -- | Get the 'Builder' for the current 'Target'.
 getBuilder :: Expr Builder
@@ -179,7 +177,7 @@ getBuilder = asks builder
 
 -- | Get the 'Way' of the current 'Target'.
 getWay :: Expr Way
-getWay = asks way
+getWay = way <$> asks context
 
 -- | Get the input files of the current 'Target'.
 getInputs :: Expr [FilePath]

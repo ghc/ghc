@@ -1,12 +1,15 @@
+{-# LANGUAGE RecordWildCards #-}
 module Rules.Documentation (buildPackageDocumentation) where
 
 import Base
+import Context
 import Expression
 import GHC
 import Oracles.PackageData
 import Rules.Actions
 import Rules.Resources
 import Settings
+import Target
 
 haddockHtmlLib :: FilePath
 haddockHtmlLib = "inplace/lib/html/haddock-util.js"
@@ -14,14 +17,14 @@ haddockHtmlLib = "inplace/lib/html/haddock-util.js"
 -- Note: this build rule creates plenty of files, not just the .haddock one.
 -- All of them go into the 'doc' subdirectory. Pedantically tracking all built
 -- files in the Shake databases seems fragile and unnecesarry.
-buildPackageDocumentation :: Resources -> PartialTarget -> Rules ()
-buildPackageDocumentation _ target @ (PartialTarget stage pkg) =
-    let cabalFile   = pkgCabalFile pkg
-        haddockFile = pkgHaddockFile pkg
+buildPackageDocumentation :: Resources -> Context -> Rules ()
+buildPackageDocumentation _ context @ (Context {..}) =
+    let cabalFile   = pkgCabalFile package
+        haddockFile = pkgHaddockFile package
     in when (stage == Stage1) $ do
         haddockFile %> \file -> do
-            srcs <- interpretPartial target getPackageSources
-            deps <- map PackageName <$> interpretPartial target (getPkgDataList DepNames)
+            srcs <- interpretInContext context getPackageSources
+            deps <- map PackageName <$> interpretInContext context (getPkgDataList DepNames)
             let haddocks = [ pkgHaddockFile depPkg
                            | Just depPkg <- map findKnownPackage deps
                            , depPkg /= rts ]
@@ -30,15 +33,15 @@ buildPackageDocumentation _ target @ (PartialTarget stage pkg) =
             -- HsColour sources
             -- TODO: what is the output of GhcCabalHsColour?
             whenM (specified HsColour) $ do
-                pkgConf <- pkgConfFile stage pkg
+                pkgConf <- pkgConfFile stage package
                 need [ cabalFile, pkgConf ] -- TODO: check if need pkgConf
-                build $ fullTarget target GhcCabalHsColour [cabalFile] []
+                build $ Target context GhcCabalHsColour [cabalFile] []
 
             -- Build Haddock documentation
             let haddockWay = if dynamicGhcPrograms then dynamic else vanilla
-            build $ fullTargetWithWay target Haddock haddockWay srcs [file]
+            build $ Target (context {way = haddockWay}) Haddock srcs [file]
 
-        when (pkg == haddock) $ haddockHtmlLib %> \_ -> do
+        when (package == haddock) $ haddockHtmlLib %> \_ -> do
             let dir = takeDirectory haddockHtmlLib
             liftIO $ removeFiles dir ["//*"]
             copyDirectory "utils/haddock/haddock-api/resources/html" dir

@@ -3,7 +3,7 @@ module Rules (topLevelTargets, packageRules) where
 import Base
 import Data.Foldable
 import Expression
-import GHC
+import GHC hiding (haddock)
 import qualified Rules.Generate
 import Rules.Package
 import Rules.Resources
@@ -27,14 +27,14 @@ topLevelTargets = do
 
     for_ allStages $ \stage ->
         for_ (knownPackages \\ [rts, libffi]) $ \pkg -> action $ do
-            let target = PartialTarget stage pkg
-            activePackages <- interpretPartial target getPackages
+            let context = vanillaContext stage pkg
+            activePackages <- interpretInContext context getPackages
             when (pkg `elem` activePackages) $
                 if isLibrary pkg
                 then do -- build a library
-                    ways    <- interpretPartial target getLibraryWays
+                    ways    <- interpretInContext context getLibraryWays
                     libs    <- traverse (pkgLibraryFile stage pkg) ways
-                    haddock <- interpretPartial target buildHaddock
+                    haddock <- interpretInContext context buildHaddock
                     need $ libs ++ [ pkgHaddockFile pkg | haddock && stage == Stage1 ]
                 else do -- otherwise build a program
                     need [ fromJust $ programPath stage pkg ] -- TODO: drop fromJust
@@ -44,4 +44,4 @@ packageRules = do
     resources <- resourceRules
     for_ allStages $ \stage ->
         for_ knownPackages $ \pkg ->
-            buildPackage resources $ PartialTarget stage pkg
+            buildPackage resources $ vanillaContext stage pkg
