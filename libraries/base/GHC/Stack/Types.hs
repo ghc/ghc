@@ -28,7 +28,8 @@
 module GHC.Stack.Types (
     -- * Implicit call stacks
     CallStack(..), HasCallStack,
-    emptyCallStack, freezeCallStack, getCallStack, pushCallStack,
+    emptyCallStack, freezeCallStack, fromCallSiteList,
+    getCallStack, pushCallStack,
 
     -- * Source locations
     SrcLoc(..)
@@ -148,6 +149,12 @@ getCallStack stk = case stk of
   PushCallStack cs stk' -> cs : getCallStack stk'
   FreezeCallStack stk'  -> getCallStack stk'
 
+-- | Convert a list of call-sites to a 'CallStack'.
+--
+-- @since 4.9.0.0
+fromCallSiteList :: [([Char], SrcLoc)] -> CallStack
+fromCallSiteList (c:cs) = PushCallStack c (fromCallSiteList cs)
+fromCallSiteList []     = EmptyCallStack
 
 -- Note [Definition of CallStack]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

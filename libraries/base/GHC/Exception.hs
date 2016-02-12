@@ -28,8 +28,8 @@ module GHC.Exception
        , divZeroException, overflowException, ratioZeroDenomException
        , errorCallException, errorCallWithCallStackException
          -- re-export CallStack and SrcLoc from GHC.Types
-       , CallStack, getCallStack, prettyCallStack, prettyCallStackLines
-       , showCCSStack
+       , CallStack, fromCallSiteList, getCallStack, prettyCallStack
+       , prettyCallStackLines, showCCSStack
        , SrcLoc(..), prettySrcLoc
        ) where
 

@@ -205,6 +205,9 @@ instance Show TrName where
 instance Show Module where
   showsPrec _ (Module p m) = shows p . (':' :) . shows m
 
+instance Show CallStack where
+  showsPrec _ = shows . getCallStack
+
 deriving instance Show SrcLoc
 
 --------------------------------------------------------------

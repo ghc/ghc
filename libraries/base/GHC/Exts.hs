@@ -191,3 +191,12 @@ instance IsList Version where
   type (Item Version) = Int
   fromList = makeVersion
   toList = versionBranch
+
+-- | Be aware that 'fromList . toList = id' only for unfrozen 'CallStack's,
+-- since 'toList' removes frozenness information.
+--
+-- @since 4.9.0.0
+instance IsList CallStack where
+  type (Item CallStack) = (String, SrcLoc)
+  fromList = fromCallSiteList
+  toList   = getCallStack
