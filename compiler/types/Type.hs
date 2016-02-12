@@ -801,29 +801,15 @@ funResultTy ty = piResultTy ty (pprPanic "funResultTy" (ppr ty))
 
 -- | Essentially 'funResultTy' on kinds handling pi-types too
 piResultTy :: Type -> Type -> Type
-piResultTy ty arg = piResultTys ty [arg]
+piResultTy ty arg | Just ty' <- coreView ty = piResultTy ty' arg
+piResultTy (ForAllTy (Anon _) res)     _   = res
+piResultTy (ForAllTy (Named tv _) res) arg = substTyWithUnchecked [tv] [arg] res
+piResultTy ty arg                          = pprPanic "piResultTy"
+                                                 (ppr ty $$ ppr arg)
 
 -- | Fold 'piResultTy' over many types
 piResultTys :: Type -> [Type] -> Type
-piResultTys ty args = go empty_subst ty args
-  where
-    empty_subst = mkEmptyTCvSubst (mkInScopeSet $ tyCoVarsOfTypes (ty:args))
-    -- The free vars of 'ty' and 'args' need to be in scope to satisfy the
-    -- invariant in Note [The substitution invariant] in TyCoRep.
-
-    go subst ty [] = substTy subst ty
-    go subst ty args@(arg:args')
-      | Just (bndr, res) <- splitPiTy_maybe ty
-      = case bndr of
-          Anon _     -> go subst                         res args'
-          Named tv _ -> go (extendTCvSubst subst tv arg) res args'
-
-      | Just tv <- getTyVar_maybe ty
-        -- Deals with piResultTys (forall a. a) [forall b.b, Int]
-      = go empty_subst (substTyVar subst tv) args
-
-      | otherwise
-      = panic "piResultTys"
+piResultTys = foldl piResultTy
 
 funArgTy :: Type -> Type
 -- ^ Extract the function argument type and panic if that is not possible
