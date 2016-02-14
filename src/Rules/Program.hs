@@ -85,18 +85,18 @@ buildBinary context @ (Context stage package _) bin = do
     depNames <- interpretInContext context $ getPkgDataList TransitiveDepNames
     let libStage   = min stage Stage1 -- libraries are built only in Stage0/1
         libContext = vanillaContext libStage package
-    pkgs     <- interpretInContext libContext getPackages
-    ghciFlag <- interpretInContext libContext $ getPkgData BuildGhciLib
+    pkgs <- interpretInContext libContext getPackages
     let deps = matchPackageNames (sort pkgs) (map PackageName $ sort depNames)
-        ghci = ghciFlag == "YES" && stage == Stage1
     libs <- fmap concat . forM deps $ \dep -> do
+        let depContext = vanillaContext libStage dep
+        ghciFlag <- interpretInContext depContext $ getPkgData BuildGhciLib
         libFiles <- fmap concat . forM ways $ \way -> do
             libFile  <- pkgLibraryFile  libStage dep way
             lib0File <- pkgLibraryFile0 libStage dep way
             dll0     <- needDll0 libStage dep
             return $ libFile : [ lib0File | dll0 ]
         ghciLib <- pkgGhciLibraryFile libStage dep
-        return $ libFiles ++ [ ghciLib | ghci ]
+        return $ libFiles ++ [ ghciLib | ghciFlag == "YES" && stage == Stage1 ]
     let binDeps = if package == ghcCabal && stage == Stage0
                   then [ pkgPath package -/- src <.> "hs" | src <- hSrcs ]
                   else objs
