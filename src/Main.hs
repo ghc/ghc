@@ -20,13 +20,13 @@ main = shakeArgsWith options CmdLineFlag.cmdFlags $ \cmdLineFlags targets -> do
                     else want targets >> withoutActions rules
   where
     rules :: Rules ()
-    rules = mconcat
-        [ Rules.Clean.cleanRules
-        , Rules.Oracles.oracleRules
-        , Rules.Selftest.selftestRules
-        , Rules.Test.testRules
-        , Rules.buildRules
-        , Rules.topLevelTargets ]
+    rules = do
+        Rules.Clean.cleanRules
+        Rules.Oracles.oracleRules
+        Rules.Selftest.selftestRules
+        Rules.Test.testRules
+        Rules.buildRules
+        Rules.topLevelTargets
     options = shakeOptions
         { shakeChange   = ChangeModtimeAndDigest
         , shakeFiles    = Base.shakeFilesPath

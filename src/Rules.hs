@@ -67,12 +67,12 @@ packageRules = do
             Rules.Register.registerPackage resources context
 
 buildRules :: Rules ()
-buildRules = mconcat
-    [ Rules.Cabal.cabalRules
-    , Rules.Generate.generateRules
-    , Rules.Generate.copyRules
-    , Rules.Gmp.gmpRules
-    , Rules.Libffi.libffiRules
-    , Rules.Perl.perlScriptRules
-    , Rules.Setup.setupRules
-    , Rules.packageRules ]
+buildRules = do
+    Rules.Cabal.cabalRules
+    Rules.Generate.generateRules
+    Rules.Generate.copyRules
+    Rules.Gmp.gmpRules
+    Rules.Libffi.libffiRules
+    Rules.Perl.perlScriptRules
+    Rules.Setup.setupRules
+    Rules.packageRules
