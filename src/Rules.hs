@@ -5,20 +5,20 @@ import Data.Foldable
 import Base
 import Expression
 import GHC
-import qualified Rules.Compile
-import qualified Rules.Data
-import qualified Rules.Dependencies
-import qualified Rules.Documentation
-import qualified Rules.Generate
-import qualified Rules.Resources
-import qualified Rules.Cabal
-import qualified Rules.Gmp
-import qualified Rules.Libffi
-import qualified Rules.Library
-import qualified Rules.Perl
-import qualified Rules.Program
-import qualified Rules.Register
-import qualified Rules.Setup
+import Rules.Compile
+import Rules.Data
+import Rules.Dependencies
+import Rules.Documentation
+import Rules.Generate
+import Rules.Resources
+import Rules.Cabal
+import Rules.Gmp
+import Rules.Libffi
+import Rules.Library
+import Rules.Perl
+import Rules.Program
+import Rules.Register
+import Rules.Setup
 import Settings
 
 allStages :: [Stage]
@@ -53,26 +53,26 @@ topLevelTargets = do
 
 packageRules :: Rules ()
 packageRules = do
-    resources <- Rules.Resources.resourceRules
+    resources <- resourceRules
     for_ allStages $ \stage ->
         for_ knownPackages $ \package -> do
             let context = vanillaContext stage package
-            Rules.Compile.compilePackage resources context
-            Rules.Data.buildPackageData context
-            Rules.Dependencies.buildPackageDependencies resources context
-            Rules.Documentation.buildPackageDocumentation context
-            Rules.Generate.generatePackageCode context
-            Rules.Library.buildPackageLibrary context
-            Rules.Program.buildProgram context
-            Rules.Register.registerPackage resources context
+            compilePackage            resources context
+            buildPackageData                    context
+            buildPackageDependencies  resources context
+            buildPackageDocumentation           context
+            generatePackageCode                 context
+            buildPackageLibrary                 context
+            buildProgram                        context
+            registerPackage           resources context
 
 buildRules :: Rules ()
 buildRules = do
-    Rules.Cabal.cabalRules
-    Rules.Generate.generateRules
-    Rules.Generate.copyRules
-    Rules.Gmp.gmpRules
-    Rules.Libffi.libffiRules
-    Rules.Perl.perlScriptRules
-    Rules.Setup.setupRules
-    Rules.packageRules
+    cabalRules
+    generateRules
+    copyRules
+    gmpRules
+    libffiRules
+    perlScriptRules
+    setupRules
+    packageRules

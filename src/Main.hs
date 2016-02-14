@@ -27,6 +27,7 @@ main = shakeArgsWith options CmdLineFlag.cmdFlags $ \cmdLineFlags targets -> do
         Rules.Test.testRules
         Rules.buildRules
         Rules.topLevelTargets
+    options :: ShakeOptions
     options = shakeOptions
         { shakeChange   = ChangeModtimeAndDigest
         , shakeFiles    = Base.shakeFilesPath
