@@ -1,4 +1,4 @@
-module Test (testRules) where
+module Rules.Test (testRules) where
 
 import Base
 import Builder

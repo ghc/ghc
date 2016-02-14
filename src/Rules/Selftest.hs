@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module Selftest (selftestRules) where
+module Rules.Selftest (selftestRules) where
 
 import Development.Shake
 import Settings.Builders.Ar (chunksOfSize)

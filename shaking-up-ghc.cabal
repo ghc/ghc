@@ -63,10 +63,11 @@ executable ghc-shake
                        , Rules.Program
                        , Rules.Register
                        , Rules.Resources
+                       , Rules.Selftest
                        , Rules.Setup
+                       , Rules.Test
                        , Rules.Wrappers.Ghc
                        , Rules.Wrappers.GhcPkg
-                       , Selftest
                        , Settings
                        , Settings.Args
                        , Settings.Builders.Alex
@@ -106,7 +107,6 @@ executable ghc-shake
                        , Settings.Ways
                        , Stage
                        , Target
-                       , Test
                        , Way
 
     default-language:    Haskell2010

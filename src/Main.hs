@@ -8,8 +8,8 @@ import qualified Environment
 import qualified Rules
 import qualified Rules.Clean
 import qualified Rules.Oracles
-import qualified Selftest
-import qualified Test
+import qualified Rules.Selftest
+import qualified Rules.Test
 
 main :: IO ()
 main = shakeArgsWith options CmdLineFlag.cmdFlags $ \cmdLineFlags targets -> do
@@ -23,10 +23,10 @@ main = shakeArgsWith options CmdLineFlag.cmdFlags $ \cmdLineFlags targets -> do
     rules = mconcat
         [ Rules.Clean.cleanRules
         , Rules.Oracles.oracleRules
+        , Rules.Selftest.selftestRules
+        , Rules.Test.testRules
         , Rules.buildRules
-        , Rules.topLevelTargets
-        , Selftest.selftestRules
-        , Test.testRules ]
+        , Rules.topLevelTargets ]
     options = shakeOptions
         { shakeChange   = ChangeModtimeAndDigest
         , shakeFiles    = Base.shakeFilesPath
