@@ -1,12 +1,18 @@
-module Rules (topLevelTargets, packageRules) where
+module Rules (topLevelTargets, buildRules) where
+
+import Data.Foldable
 
 import Base
-import Data.Foldable
 import Expression
-import GHC hiding (haddock)
+import GHC
 import qualified Rules.Generate
-import Rules.Package
-import Rules.Resources
+import qualified Rules.Package
+import qualified Rules.Resources
+import qualified Rules.Cabal
+import qualified Rules.Gmp
+import qualified Rules.Libffi
+import qualified Rules.Perl
+import qualified Rules.Setup
 import Settings
 
 allStages :: [Stage]
@@ -32,16 +38,27 @@ topLevelTargets = do
             when (pkg `elem` activePackages) $
                 if isLibrary pkg
                 then do -- build a library
-                    ways    <- interpretInContext context getLibraryWays
-                    libs    <- traverse (pkgLibraryFile stage pkg) ways
-                    haddock <- interpretInContext context buildHaddock
-                    need $ libs ++ [ pkgHaddockFile pkg | haddock && stage == Stage1 ]
+                    ways <- interpretInContext context getLibraryWays
+                    libs <- traverse (pkgLibraryFile stage pkg) ways
+                    docs <- interpretInContext context buildHaddock
+                    need $ libs ++ [ pkgHaddockFile pkg | docs && stage == Stage1 ]
                 else do -- otherwise build a program
                     need [ fromJust $ programPath stage pkg ] -- TODO: drop fromJust
 
 packageRules :: Rules ()
 packageRules = do
-    resources <- resourceRules
+    resources <- Rules.Resources.resourceRules
     for_ allStages $ \stage ->
         for_ knownPackages $ \pkg ->
-            buildPackage resources $ vanillaContext stage pkg
+            Rules.Package.buildPackage resources $ vanillaContext stage pkg
+
+buildRules :: Rules ()
+buildRules = mconcat
+    [ Rules.Cabal.cabalRules
+    , Rules.Generate.generateRules
+    , Rules.Generate.copyRules
+    , Rules.Gmp.gmpRules
+    , Rules.Libffi.libffiRules
+    , Rules.Perl.perlScriptRules
+    , Rules.Setup.setupRules
+    , Rules.packageRules ]

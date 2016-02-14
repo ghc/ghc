@@ -6,14 +6,8 @@ import qualified Base
 import qualified CmdLineFlag
 import qualified Environment
 import qualified Rules
-import qualified Rules.Cabal
 import qualified Rules.Clean
-import qualified Rules.Generate
-import qualified Rules.Gmp
-import qualified Rules.Libffi
 import qualified Rules.Oracles
-import qualified Rules.Perl
-import qualified Rules.Setup
 import qualified Selftest
 import qualified Test
 
@@ -27,17 +21,10 @@ main = shakeArgsWith options CmdLineFlag.cmdFlags $ \cmdLineFlags targets -> do
   where
     rules :: Rules ()
     rules = mconcat
-        [ Rules.Cabal.cabalRules
-        , Rules.Clean.cleanRules
-        , Rules.Generate.generateRules
-        , Rules.Generate.copyRules
-        , Rules.Gmp.gmpRules
-        , Rules.Libffi.libffiRules
+        [ Rules.Clean.cleanRules
         , Rules.Oracles.oracleRules
-        , Rules.Perl.perlScriptRules
-        , Rules.Setup.setupRules
+        , Rules.buildRules
         , Rules.topLevelTargets
-        , Rules.packageRules
         , Selftest.selftestRules
         , Test.testRules ]
     options = shakeOptions
