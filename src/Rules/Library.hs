@@ -11,13 +11,12 @@ import GHC
 import Oracles.PackageData
 import Rules.Actions
 import Rules.Gmp
-import Rules.Resources
 import Settings
 import Target
 
 -- TODO: Use way from Context, #207
-buildPackageLibrary :: Resources -> Context -> Rules ()
-buildPackageLibrary _ context @ (Context {..}) = do
+buildPackageLibrary :: Context -> Rules ()
+buildPackageLibrary context @ (Context {..}) = do
     let buildPath = targetPath stage package -/- "build"
 
     -- TODO: handle dynamic libraries

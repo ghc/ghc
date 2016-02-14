@@ -55,19 +55,16 @@ packageRules :: Rules ()
 packageRules = do
     resources <- Rules.Resources.resourceRules
     for_ allStages $ \stage ->
-        for_ knownPackages $ \pkg ->
-            buildPackage resources $ vanillaContext stage pkg
-
-buildPackage :: Rules.Resources.Resources -> Context -> Rules ()
-buildPackage = mconcat
-    [ Rules.Compile.compilePackage
-    , Rules.Data.buildPackageData
-    , Rules.Dependencies.buildPackageDependencies
-    , Rules.Documentation.buildPackageDocumentation
-    , Rules.Generate.generatePackageCode
-    , Rules.Library.buildPackageLibrary
-    , Rules.Program.buildProgram
-    , Rules.Register.registerPackage ]
+        for_ knownPackages $ \package -> do
+            let context = vanillaContext stage package
+            Rules.Compile.compilePackage resources context
+            Rules.Data.buildPackageData context
+            Rules.Dependencies.buildPackageDependencies resources context
+            Rules.Documentation.buildPackageDocumentation context
+            Rules.Generate.generatePackageCode context
+            Rules.Library.buildPackageLibrary context
+            Rules.Program.buildProgram context
+            Rules.Register.registerPackage resources context
 
 buildRules :: Rules ()
 buildRules = mconcat

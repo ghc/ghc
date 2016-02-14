@@ -7,7 +7,6 @@ import Expression
 import GHC
 import Oracles.PackageData
 import Rules.Actions
-import Rules.Resources
 import Settings
 import Target
 
@@ -17,8 +16,8 @@ haddockHtmlLib = "inplace/lib/html/haddock-util.js"
 -- Note: this build rule creates plenty of files, not just the .haddock one.
 -- All of them go into the 'doc' subdirectory. Pedantically tracking all built
 -- files in the Shake databases seems fragile and unnecesarry.
-buildPackageDocumentation :: Resources -> Context -> Rules ()
-buildPackageDocumentation _ context @ (Context {..}) =
+buildPackageDocumentation :: Context -> Rules ()
+buildPackageDocumentation context @ (Context {..}) =
     let cabalFile   = pkgCabalFile package
         haddockFile = pkgHaddockFile package
     in when (stage == Stage1) $ do

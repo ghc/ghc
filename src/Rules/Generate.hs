@@ -20,7 +20,6 @@ import Oracles.ModuleFiles
 import Rules.Actions
 import Rules.Gmp
 import Rules.Libffi
-import Rules.Resources (Resources)
 import Settings
 import Target hiding (builder, context)
 
@@ -114,8 +113,8 @@ generate file context expr = do
     writeFileChanged file contents
     putSuccess $ "| Successfully generated '" ++ file ++ "'."
 
-generatePackageCode :: Resources -> Context -> Rules ()
-generatePackageCode _ context @ (Context stage pkg _) =
+generatePackageCode :: Context -> Rules ()
+generatePackageCode context @ (Context stage pkg _) =
     let buildPath   = targetPath stage pkg -/- "build"
         dropBuild   = drop (length buildPath + 1)
         generated f = (buildPath ++ "//*.hs") ?== f && not ("//autogen/*" ?== f)

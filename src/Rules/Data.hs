@@ -12,14 +12,13 @@ import Oracles.PackageDeps
 import Rules.Actions
 import Rules.Generate
 import Rules.Libffi
-import Rules.Resources
 import Settings
 import Settings.Builders.Common
 import Target
 
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
-buildPackageData :: Resources -> Context -> Rules ()
-buildPackageData _ context @ (Context {..}) = do
+buildPackageData :: Context -> Rules ()
+buildPackageData context @ (Context {..}) = do
     let cabalFile = pkgCabalFile package
         configure = pkgPath package -/- "configure"
         dataFile  = pkgDataFile stage package

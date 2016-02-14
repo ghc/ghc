@@ -11,7 +11,6 @@ import Oracles.Config.Setting
 import Oracles.PackageData
 import Rules.Actions
 import Rules.Library
-import Rules.Resources
 import Rules.Wrappers.Ghc
 import Rules.Wrappers.GhcPkg
 import Settings
@@ -32,8 +31,8 @@ wrappers = [ (vanillaContext Stage0 ghc   , ghcWrapper   )
            , (vanillaContext Stage1 ghc   , ghcWrapper   )
            , (vanillaContext Stage0 ghcPkg, ghcPkgWrapper)]
 
-buildProgram :: Resources -> Context -> Rules ()
-buildProgram _ context @ (Context {..}) = do
+buildProgram :: Context -> Rules ()
+buildProgram context @ (Context {..}) = do
     let match file = case programPath stage package of
             Nothing      -> False
             Just program -> program == file
