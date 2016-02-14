@@ -5,13 +5,19 @@ import Data.Foldable
 import Base
 import Expression
 import GHC
+import qualified Rules.Compile
+import qualified Rules.Data
+import qualified Rules.Dependencies
+import qualified Rules.Documentation
 import qualified Rules.Generate
-import qualified Rules.Package
 import qualified Rules.Resources
 import qualified Rules.Cabal
 import qualified Rules.Gmp
 import qualified Rules.Libffi
+import qualified Rules.Library
 import qualified Rules.Perl
+import qualified Rules.Program
+import qualified Rules.Register
 import qualified Rules.Setup
 import Settings
 
@@ -50,7 +56,18 @@ packageRules = do
     resources <- Rules.Resources.resourceRules
     for_ allStages $ \stage ->
         for_ knownPackages $ \pkg ->
-            Rules.Package.buildPackage resources $ vanillaContext stage pkg
+            buildPackage resources $ vanillaContext stage pkg
+
+buildPackage :: Rules.Resources.Resources -> Context -> Rules ()
+buildPackage = mconcat
+    [ Rules.Compile.compilePackage
+    , Rules.Data.buildPackageData
+    , Rules.Dependencies.buildPackageDependencies
+    , Rules.Documentation.buildPackageDocumentation
+    , Rules.Generate.generatePackageCode
+    , Rules.Library.buildPackageLibrary
+    , Rules.Program.buildProgram
+    , Rules.Register.registerPackage ]
 
 buildRules :: Rules ()
 buildRules = mconcat

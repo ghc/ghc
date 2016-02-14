@@ -58,7 +58,6 @@ executable ghc-shake
                        , Rules.Libffi
                        , Rules.Library
                        , Rules.Oracles
-                       , Rules.Package
                        , Rules.Perl
                        , Rules.Program
                        , Rules.Register
