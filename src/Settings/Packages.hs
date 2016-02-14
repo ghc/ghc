@@ -34,8 +34,7 @@ packagesStage1 = mconcat
     [ packagesStage0
     , append [ array, base, bytestring, containers, compareSizes, deepseq
              , directory, filepath, ghci, ghcPrim, haskeline, hpcBin
-             , integerLibrary, mkUserGuidePart, pretty, process, rts, runGhc
-             , time ]
+             , integerLibrary, pretty, process, rts, runGhc, time ]
     , windowsHost      ? append [win32]
     , notM windowsHost ? append [unix]
     , notM windowsHost ? append [iservBin]
@@ -45,7 +44,7 @@ packagesStage1 = mconcat
 -- in Stage2 and Stage3. Can we check this in compile time?
 packagesStage2 :: Packages
 packagesStage2 = mconcat
-    [ append [ghcTags]
+    [ append [ghcTags, mkUserGuidePart]
     , buildHaddock ? append [haddock] ]
 
 -- TODO: switch to Set Package as the order of packages should not matter?
