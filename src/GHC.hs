@@ -106,7 +106,7 @@ ghcSplit = "inplace/lib/bin/ghc-split"
 programPath :: Stage -> Package -> Maybe FilePath
 programPath stage pkg
     | pkg == ghc = Just . inplaceProgram $ "ghc-stage" ++ show (fromEnum stage + 1)
-    | pkg == haddock || pkg == ghcTags = case stage of
+    | pkg `elem` [ghcTags, haddock, mkUserGuidePart] = case stage of
         Stage2 -> Just . inplaceProgram $ pkgNameString pkg
         _      -> Nothing
     | pkg `elem` [touchy, unlit] = case stage of
