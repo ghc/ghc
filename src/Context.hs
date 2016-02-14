@@ -20,6 +20,8 @@ data Context = Context
 vanillaContext :: Stage -> Package -> Context
 vanillaContext s p = Context s p vanilla
 
+-- | Partial context with undefined 'Package' field. Useful for 'Packages'
+-- expressions that only read the environment and current 'Stage'.
 stageContext :: Stage -> Context
 stageContext s = vanillaContext s $ error "stageContext: package not set"
 
