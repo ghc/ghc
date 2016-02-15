@@ -44,4 +44,16 @@ redirectingOutputOptions =
          , flagDescription = "set output directory"
          , flagType = DynamicFlag
          }
+  , flag { flagName = "-dyno <filename>"
+         , flagDescription = "Set the output filename for dynamic object files (see ``-dynamic-too``)"
+         , flagType = DynamicFlag
+         }
+  , flag { flagName = "-dynosuf <suffix>"
+         , flagDescription = "Set the object suffix for dynamic object files (see ``-dynamic-too``)"
+         , flagType = DynamicFlag
+         }
+  , flag { flagName = "-dynhisuf <suffix>"
+         , flagDescription = "Set the hi suffix for dynamic object files (see ``-dynamic-too``)"
+         , flagType = DynamicFlag
+         }
   ]

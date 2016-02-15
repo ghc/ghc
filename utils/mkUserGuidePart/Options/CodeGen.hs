@@ -39,4 +39,14 @@ codegenOptions =
            "output. If ⟨n⟩ is omitted level 2 is assumed."
          , flagType = DynamicFlag
          }
+  , flag { flagName = "-dynamic"
+         , flagDescription = "Build dynamically-linked object files and executables"
+         , flagType = DynamicFlag
+         }
+  , flag { flagName = "-dynamic-too"
+         , flagDescription =
+           "Build dynamic object files *as well as* static object files " ++
+           "during compilation"
+         , flagType = DynamicFlag
+         }
   ]

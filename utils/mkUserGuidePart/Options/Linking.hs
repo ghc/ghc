@@ -21,25 +21,6 @@ linkingOptions =
            "Generate position-independent code (where available)"
          , flagType = DynamicFlag
          }
-  , flag { flagName = "-dynamic"
-         , flagDescription = "Use dynamic Haskell libraries (if available)"
-         , flagType = DynamicFlag
-         }
-  , flag { flagName = "-dynamic-too"
-         , flagDescription =
-           "Build dynamic object files *as well as* static object files " ++
-           "during compilation"
-         , flagType = DynamicFlag
-         }
-  , flag { flagName = "-dyno"
-         , flagDescription =
-           "Set the output path for the *dynamically* linked objects"
-         , flagType = DynamicFlag
-         }
-  , flag { flagName = "-dynosuf"
-         , flagDescription = "Set the output suffix for dynamic object files"
-         , flagType = DynamicFlag
-         }
   , flag { flagName = "-dynload"
          , flagDescription =
            "Selects one of a number of modes for finding shared libraries at runtime."
