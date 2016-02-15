@@ -211,12 +211,6 @@ def _extra_ways( name, opts, ways ):
 
 # -----
 
-def only_compiler_types( _compiler_types ):
-   # Don't delete yet. The libraries unix, stm and hpc still call this function.
-   return lambda _name, _opts: None
-
-# -----
-
 def set_stdin( file ):
    return lambda name, opts, f=file: _set_stdin(name, opts, f);
 
