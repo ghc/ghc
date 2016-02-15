@@ -676,7 +676,7 @@ tcDataFamInstDecl mb_clsinfo
                  -- (obtained from the pats) are at the end (Trac #11148)
              orig_res_ty          = mkTyConApp fam_tc pats'
 
-       ; (rep_tc, fam_inst) <- fixM $ \ ~(rec_rep_tc, _) ->
+       ; (rep_tc, axiom) <- fixM $ \ ~(rec_rep_tc, _) ->
            do { data_cons <- tcConDecls new_or_data
                                         rec_rep_tc
                                         (full_tvs, orig_res_ty) cons
@@ -689,23 +689,23 @@ tcDataFamInstDecl mb_clsinfo
                                              axiom_name eta_tvs [] fam_tc eta_pats
                                              (mkTyConApp rep_tc (mkTyVarTys eta_tvs))
                     parent = DataFamInstTyCon axiom fam_tc pats'
-                    kind   = mkPiTypesPreferFunTy tvs' liftedTypeKind
-
+                    rep_tc_kind = mkPiTypesPreferFunTy full_tvs liftedTypeKind
 
                       -- NB: Use the full_tvs from the pats. See bullet toward
                       -- the end of Note [Data type families] in TyCon
-                    rep_tc   = mkAlgTyCon rep_tc_name kind full_tvs
-                                             (map (const Nominal) full_tvs)
-                                             (fmap unLoc cType) stupid_theta
-                                             tc_rhs parent
-                                             Recursive gadt_syntax
+                    rep_tc   = mkAlgTyCon rep_tc_name
+                                          rep_tc_kind
+                                          full_tvs
+                                          (map (const Nominal) full_tvs)
+                                          (fmap unLoc cType) stupid_theta
+                                          tc_rhs parent
+                                          Recursive gadt_syntax
                  -- We always assume that indexed types are recursive.  Why?
                  -- (1) Due to their open nature, we can never be sure that a
                  -- further instance might not introduce a new recursive
                  -- dependency.  (2) They are always valid loop breakers as
                  -- they involve a coercion.
-              ; fam_inst <- newFamInst (DataFamilyInst rep_tc) axiom
-              ; return (rep_tc, fam_inst) }
+              ; return (rep_tc, axiom) }
 
          -- Remember to check validity; no recursion to worry about here
        ; checkValidTyCon rep_tc
@@ -717,6 +717,7 @@ tcDataFamInstDecl mb_clsinfo
                                   , di_preds  = preds
                                   , di_ctxt   = tcMkDataFamInstCtxt decl }
 
+       ; fam_inst <- newFamInst (DataFamilyInst rep_tc) axiom
        ; return (fam_inst, m_deriv_info) } }
   where
     eta_reduce :: [Type] -> ([Type], [TyVar])
