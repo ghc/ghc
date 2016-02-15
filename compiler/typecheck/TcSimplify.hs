@@ -188,11 +188,15 @@ defaultCallStacks wanteds
 solveEqualities is used to solve kind equalities when kind-checking
 user-written types. If solving fails we should fail outright, rather
 than just accumulate an error message, for two reasons:
+
   * A kind-bogus type signature may cause a cascade of knock-on
     errors if we let it pass
 
-  * More seriously, if we don't solve a constraint we'll be left
-    with a type that has a coercion hole in it, something like
+  * More seriously, we don't have a convenient term-level place to add
+    deferred bindings for unsolved kind-equality constraints, so we
+    don't build evidence bindings (by usine reportAllUnsolved). That
+    means that we'll be left with with a type that has coercion holes
+    in it, something like
            <type> |> co-hole
     where co-hole is not filled in.  Eeek!  That un-filled-in
     hole actually causes GHC to crash with "fvProv falls into a hole"

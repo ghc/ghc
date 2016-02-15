@@ -134,7 +134,12 @@ reportUnsolved wanted
        ; getTcEvBinds binds_var }
 
 -- | Report *all* unsolved goals as errors, even if -fdefer-type-errors is on
+-- However, do not make any evidence bindings, because we don't
+-- have any convenient place to put them.
 -- See Note [Deferring coercion errors to runtime]
+-- Used by solveEqualities for kind equalities
+--      (see Note [Fail fast on kind errors] in TcSimplify]
+-- and for simplifyDefault.
 reportAllUnsolved :: WantedConstraints -> TcM ()
 reportAllUnsolved wanted
   = report_unsolved Nothing False TypeError HoleError HoleError wanted
@@ -240,11 +245,15 @@ data ReportErrCtxt
                                        --   (innermost first)
                                        -- ic_skols and givens are tidied, rest are not
           , cec_tidy  :: TidyEnv
+
           , cec_binds :: Maybe EvBindsVar
-                         -- Nothinng <=> Report all errors, including holes; no bindings
-                         -- Just ev  <=> make some errors (depending on cec_defer)
-                         --              into warnings, and emit evidence bindings
-                         --              into 'ev' for unsolved constraints
+                         -- Nothing <=> Report all errors, including holes
+                         --             Do not add any evidence bindings, because
+                         --             we have no convenient place to put them
+                         --             See TcErrors.reportAllUnsolved
+                         -- Just ev <=> make some errors (depending on cec_defer)
+                         --             into warnings, and emit evidence bindings
+                         --             into 'ev' for unsolved constraints
 
           , cec_errors_as_warns :: Bool   -- Turn all errors into warnings
                                           -- (except for Holes, which are
