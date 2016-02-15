@@ -464,6 +464,20 @@ Options affecting code generation
     Note that using this option when linking causes GHC to link against
     shared libraries.
 
+.. ghc-flag:: -dynamic-too
+
+    Generates both dynamic and static object files in a single run of
+    GHC. This option is functionally equivalent to running GHC twice,
+    the second time adding ``-dynamic -osuf dyn_o -hisuf dyn_hi``.
+
+    Although it is equivalent to running GHC twice, using
+    ``-dynamic-too`` is more efficient, because the earlier phases of
+    the compiler up to code generation are performed just once.
+
+    When using ``-dynamic-too``, the options ``-dyno``, ``-dynosuf``,
+    and ``-dynhisuf`` are the counterparts of ``-o``, ``-osuf``, and
+    ``-hisuf`` respectively, but applying to the dynamic compilation.
+
 .. _options-linker:
 
 Options affecting linking
