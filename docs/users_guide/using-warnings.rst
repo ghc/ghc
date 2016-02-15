@@ -618,13 +618,13 @@ of ``-W(no-)*``.
     about any polymorphic local bindings. As part of the warning GHC
     also reports the inferred type. The option is off by default.
 
-.. ghc-flag:: -Wmissing-pat-syn-sigs
+.. ghc-flag:: -Wmissing-pat-syn-signatures
 
     .. index::
          single: type signatures, missing, pattern synonyms
 
     If you would like GHC to check that every pattern synonym has a type
-    signature, use the :ghc-flag:`-Wmissing-pat-syn-sigs` option. If this option is
+    signature, use the :ghc-flag:`-Wmissing-pat-syn-signatures` option. If this option is
     used in conjunction with :ghc-flag:`-Wmissing-exported-sigs` then only
     exported pattern synonyms must have a type signature. GHC also reports the
     inferred type. This option is off by default.

@@ -260,7 +260,7 @@ Compiler
    warnings makes sure the definition of ``Semigroup`` as a superclass of
    ``Monoid`` does not break any code.
 
--  Added the :ghc-flag:`-Wmissing-pat-syn-sigs` flag. When enabled, this will issue
+-  Added the :ghc-flag:`-Wmissing-pat-syn-signatures` flag. When enabled, this will issue
    a warning when a pattern synonym definition doesn't have a type signature.
    It is turned off by default but enabled by :ghc-flag:`-Wall`.
 

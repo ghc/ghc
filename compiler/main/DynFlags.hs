@@ -3219,7 +3219,7 @@ wWarningFlagsDeps = [
   flagSpec "unused-type-patterns"        Opt_WarnUnusedTypePatterns,
   flagSpec "warnings-deprecations"       Opt_WarnWarningsDeprecations,
   flagSpec "wrong-do-bind"               Opt_WarnWrongDoBind,
-  flagSpec "missing-pat-syn-sigs"        Opt_WarnMissingPatSynSigs,
+  flagSpec "missing-pat-syn-signatures"  Opt_WarnMissingPatSynSigs,
   flagSpec "unrecognised-warning-flags"  Opt_WarnUnrecognisedWarningFlags ]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
