@@ -1231,6 +1231,11 @@ lintStarCoercion g
 lintCoercion :: OutCoercion -> LintM (LintedKind, LintedKind, LintedType, LintedType, Role)
 -- Check the kind of a coercion term, returning the kind
 -- Post-condition: the returned OutTypes are lint-free
+--
+-- If   lintCorecion co = (k1, k2, s1, s2, r)
+-- then co :: s1 ~r s2
+--      s1 :: k2
+--      s2 :: k2
 
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
@@ -1266,7 +1271,7 @@ lintCoercion co@(AppCo co1 co2)
   | Refl _ (TyConApp {}) <- co1
   = failWithL (text "Refl (TyConApp ...) to the left of AppCo:" <+> ppr co)
   | otherwise
-  = do { (k1,k2,s1,s2,r1) <- lintCoercion co1
+  = do { (k1,  k2,  s1, s2, r1) <- lintCoercion co1
        ; (k'1, k'2, t1, t2, r2) <- lintCoercion co2
        ; k3 <- lint_co_app co k1 [(t1,k'1)]
        ; k4 <- lint_co_app co k2 [(t2,k'2)]
@@ -1448,7 +1453,7 @@ lintCoercion co@(AxiomInstCo con ind cos)
                                       (empty_subst, empty_subst)
                                       (zip3 (ktvs ++ cvs) roles cos)
        ; let lhs' = substTys subst_l lhs
-             rhs' = substTy subst_r rhs
+             rhs' = substTy  subst_r rhs
        ; case checkAxInstCo co of
            Just bad_branch -> bad_ax $ text "inconsistent with" <+>
                                        pprCoAxBranch con bad_branch
