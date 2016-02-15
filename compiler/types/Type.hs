@@ -1237,13 +1237,13 @@ mkPiTypesPreferFunTy :: [TyVar] -> Type -> Type
 mkPiTypesPreferFunTy vars inner_ty = fst $ go vars inner_ty
   where
     go :: [TyVar] -> Type -> (Type, VarSet) -- also returns the free vars
-    go [] ty = (ty, tyCoVarsOfType ty)
-    go (v:vs) ty
-      = if v `elemVarSet` fvs
-        then ( mkForAllTy (Named v Visible) qty
-             , fvs `delVarSet` v `unionVarSet` kind_vars )
-        else ( mkForAllTy (Anon (tyVarKind v)) qty
-             , fvs `unionVarSet` kind_vars )
+    go []     ty = (ty, tyCoVarsOfType ty)
+    go (v:vs) ty | v `elemVarSet` fvs
+                 = ( mkForAllTy (Named v Visible) qty
+                   , fvs `delVarSet` v `unionVarSet` kind_vars )
+                 | otherwise
+                 = ( mkForAllTy (Anon (tyVarKind v)) qty
+                   , fvs `unionVarSet` kind_vars )
       where
         (qty, fvs) = go vs ty
         kind_vars  = tyCoVarsOfType $ tyVarKind v
