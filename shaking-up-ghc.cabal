@@ -61,7 +61,6 @@ executable ghc-shake
                        , Rules.Perl
                        , Rules.Program
                        , Rules.Register
-                       , Rules.Resources
                        , Rules.Selftest
                        , Rules.Setup
                        , Rules.Test

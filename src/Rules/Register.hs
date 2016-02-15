@@ -9,14 +9,13 @@ import Expression
 import GHC
 import Rules.Actions
 import Rules.Libffi
-import Rules.Resources
 import Settings
 import Settings.Packages.Rts
 import Target
 
 -- TODO: Use way from Context, #207
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
-registerPackage :: Resources -> Context -> Rules ()
+registerPackage :: [(Resource, Int)] -> Context -> Rules ()
 registerPackage rs context @ (Context {..}) = do
     let oldPath = pkgPath package -/- targetDirectory stage package -- TODO: remove, #113
         pkgConf = packageDbDirectory stage -/- pkgNameString package
@@ -38,13 +37,13 @@ registerPackage rs context @ (Context {..}) = do
 
         fixFile pkgConfig fixPkgConf
 
-        buildWithResources [(resPackageDb rs, resPackageDbLimit)] $
+        buildWithResources rs $
             Target context (GhcPkg stage) [pkgConfig] [conf]
 
     when (package == rts && stage == Stage1) $ do
         packageDbDirectory Stage1 -/- "rts.conf" %> \conf -> do
             need [rtsConf]
-            buildWithResources [(resPackageDb rs, resPackageDbLimit)] $
+            buildWithResources rs $
                 Target context (GhcPkg stage) [rtsConf] [conf]
 
         rtsConf %> \_ -> do

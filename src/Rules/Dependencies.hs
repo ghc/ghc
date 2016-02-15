@@ -8,12 +8,11 @@ import Context
 import Expression
 import Oracles.PackageData
 import Rules.Actions
-import Rules.Resources
 import Settings
 import Target
 
 -- TODO: simplify handling of AutoApply.cmm
-buildPackageDependencies :: Resources -> Context -> Rules ()
+buildPackageDependencies :: [(Resource, Int)] -> Context -> Rules ()
 buildPackageDependencies rs context @ (Context {..}) =
     let path      = targetPath stage package
         buildPath = path -/- "build"
@@ -33,7 +32,7 @@ buildPackageDependencies rs context @ (Context {..}) =
             need srcs
             if srcs == []
             then writeFileChanged out ""
-            else buildWithResources [(resPackageDb rs, 1)] $
+            else buildWithResources rs $
                 Target context (GhcM stage) srcs [out]
             removeFileIfExists $ out <.> "bak"
 

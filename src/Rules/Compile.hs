@@ -6,12 +6,11 @@ import Context
 import Expression
 import Oracles.Dependencies
 import Rules.Actions
-import Rules.Resources
 import Settings
 import Target hiding (context)
 
 -- TODO: Use way from Context, #207
-compilePackage :: Resources -> Context -> Rules ()
+compilePackage :: [(Resource, Int)] -> Context -> Rules ()
 compilePackage rs context @ (Context {..}) = do
     let buildPath = targetPath stage package -/- "build"
 
@@ -21,7 +20,7 @@ compilePackage rs context @ (Context {..}) = do
             let w = detectWay hi
             (src, deps) <- dependencies buildPath $ hi -<.> osuf w
             need $ src : deps
-            buildWithResources [(resPackageDb rs, 1)] $
+            buildWithResources rs $
                 Target (context { way = w }) (Ghc stage) [src] [hi]
         else need [ hi -<.> osuf (detectWay hi) ]
 
@@ -31,7 +30,7 @@ compilePackage rs context @ (Context {..}) = do
             let w = detectWay hiboot
             (src, deps) <- dependencies buildPath $ hiboot -<.> obootsuf w
             need $ src : deps
-            buildWithResources [(resPackageDb rs, 1)] $
+            buildWithResources rs $
                 Target (context { way = w }) (Ghc stage) [src] [hiboot]
         else need [ hiboot -<.> obootsuf (detectWay hiboot) ]
 
@@ -47,7 +46,7 @@ compilePackage rs context @ (Context {..}) = do
             if compileInterfaceFilesSeparately && "//*.hs" ?== src && not ("//HpcParser.*" ?== src)
             then need $ (obj -<.> hisuf (detectWay obj)) : src : deps
             else need $ src : deps
-            buildWithResources [(resPackageDb rs, 1)] $
+            buildWithResources rs $
                 Target (context { way = w }) (Ghc stage) [src] [obj]
 
     -- TODO: get rid of these special cases
@@ -57,5 +56,5 @@ compilePackage rs context @ (Context {..}) = do
         if compileInterfaceFilesSeparately
         then need $ (obj -<.> hibootsuf (detectWay obj)) : src : deps
         else need $ src : deps
-        buildWithResources [(resPackageDb rs, 1)] $
+        buildWithResources rs $
             Target (context { way = w }) (Ghc stage) [src] [obj]

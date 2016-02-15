@@ -10,7 +10,6 @@ import Rules.Data
 import Rules.Dependencies
 import Rules.Documentation
 import Rules.Generate
-import Rules.Resources
 import Rules.Cabal
 import Rules.Gmp
 import Rules.Libffi
@@ -53,18 +52,25 @@ topLevelTargets = do
 
 packageRules :: Rules ()
 packageRules = do
-    resources <- resourceRules
+    -- We cannot register multiple packages in parallel. Also we cannot run GHC
+    -- when the package database is being mutated by "ghc-pkg". This is a
+    -- classic concurrent read exclusive write (CREW) conflict.
+    let maxConcurrentReaders = 1000
+    packageDb <- newResource "package-db" maxConcurrentReaders
+    let readPackageDb  = [(packageDb, 1)]
+        writePackageDb = [(packageDb, maxConcurrentReaders)]
+
     for_ allStages $ \stage ->
         for_ knownPackages $ \package -> do
             let context = vanillaContext stage package
-            compilePackage            resources context
-            buildPackageData                    context
-            buildPackageDependencies  resources context
-            buildPackageDocumentation           context
-            generatePackageCode                 context
-            buildPackageLibrary                 context
-            buildProgram                        context
-            registerPackage           resources context
+            compilePackage            readPackageDb  context
+            buildPackageData                         context
+            buildPackageDependencies  readPackageDb  context
+            buildPackageDocumentation                context
+            generatePackageCode                      context
+            buildPackageLibrary                      context
+            buildProgram                             context
+            registerPackage           writePackageDb context
 
 buildRules :: Rules ()
 buildRules = do
