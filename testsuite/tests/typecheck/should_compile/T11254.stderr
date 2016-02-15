@@ -4,16 +4,6 @@ T11254.hs:16:10: warning:
         arising from the superclasses of an instance declaration
     • In the instance declaration for ‘ID Rational’
 
-T11254.hs:16:10: warning:
-    • No instance for (Fractional Int)
-        arising from the superclasses of an instance declaration
-    • In the instance declaration for ‘ID Rational’
-
-T11254.hs:16:10: warning:
-    • No instance for (ID Int)
-        arising from the superclasses of an instance declaration
-    • In the instance declaration for ‘ID Rational’
-
 T11254.hs:18:12: warning:
     • Couldn't match type ‘GHC.Real.Ratio Integer’ with ‘Int’
       Expected type: Rational -> Frac Rational

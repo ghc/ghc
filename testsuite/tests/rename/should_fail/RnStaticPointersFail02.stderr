@@ -1,9 +1,3 @@
 
-RnStaticPointersFail02.hs:5:5: error:
-    • No instance for (Data.Typeable.Internal.Typeable t0)
-        arising from a static form
-    • In the expression: static T
-      In an equation for ‘f’: f = static T
-
 RnStaticPointersFail02.hs:5:12: error:
     Data constructor not in scope: T
