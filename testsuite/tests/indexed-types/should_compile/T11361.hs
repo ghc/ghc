@@ -1,8 +1,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
   -- this is needed because |FamHelper a x| /< |Fam a x|
-{-# OPTIONS_GHC -dinitial-unique=16777000 -dunique-increment=-1 #-}
-  -- This is what made GHC crash before
+  -- This file compiled with -dunique-increment=-1 made GHC crash before
 
 module T11361 where
 
