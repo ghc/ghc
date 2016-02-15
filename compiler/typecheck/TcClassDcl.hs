@@ -467,8 +467,7 @@ tcATDefault emit_warn loc inst_subst defined_ats (ATI fam_tc defs)
 
        ; traceTc "mk_deflt_at_instance" (vcat [ ppr fam_tc, ppr rhs_ty
                                               , pprCoAxiom axiom ])
-       ; fam_inst <- ASSERT( tyCoVarsOfType rhs' `subVarSet` tv_set' )
-                     newFamInst SynFamilyInst axiom
+       ; fam_inst <- newFamInst SynFamilyInst axiom
        ; return [fam_inst] }
 
    -- No defaults ==> generate a warning

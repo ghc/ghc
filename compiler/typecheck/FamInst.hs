@@ -62,7 +62,10 @@ newFamInst :: FamFlavor -> CoAxiom Unbranched -> TcRnIf gbl lcl FamInst
 -- Freshen the type variables of the FamInst branches
 -- Called from the vectoriser monad too, hence the rather general type
 newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
-  = do { (subst, tvs') <- freshenTyVarBndrs tvs
+  = ASSERT2( tyCoVarsOfTypes lhs `subVarSet` tcv_set, text "lhs" <+> pp_ax )
+    ASSERT2( tyCoVarsOfType  rhs `subVarSet` tcv_set, text "rhs" <+> pp_ax )
+    ASSERT2( lhs_kind `eqType` rhs_kind, text "kind" <+> pp_ax $$ ppr lhs_kind $$ ppr rhs_kind )
+    do { (subst, tvs') <- freshenTyVarBndrs tvs
        ; (subst, cvs') <- freshenCoVarBndrsX subst cvs
        ; return (FamInst { fi_fam      = tyConName fam_tc
                          , fi_flavor   = flavor
@@ -73,6 +76,10 @@ newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
                          , fi_rhs      = substTy  subst rhs
                          , fi_axiom    = axiom }) }
   where
+    lhs_kind = typeKind (mkTyConApp fam_tc lhs)
+    rhs_kind = typeKind rhs
+    tcv_set  = mkVarSet (tvs ++ cvs)
+    pp_ax    = pprCoAxiom axiom
     CoAxBranch { cab_tvs = tvs
                , cab_cvs = cvs
                , cab_lhs = lhs
