@@ -304,14 +304,19 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_given = given
                      , ic_info  = info' }
     ctxt' = ctxt { cec_tidy     = env1
                  , cec_encl     = implic' : cec_encl ctxt
-                 , cec_suppress = insoluble  -- Suppress inessential errors if there
-                                             -- are are insolubles anywhere in the
-                                             -- tree rooted here
+
+                 , cec_suppress = insoluble || cec_suppress ctxt
+                      -- Suppress inessential errors if there
+                      -- are are insolubles anywhere in the
+                      -- tree rooted here, or we've come across
+                      -- a suppress-worthy constraint higher up (Trac #11541)
+
                  , cec_binds    = cec_binds ctxt *> m_evb }
-                                  -- if cec_binds ctxt is Nothing, that means
-                                  -- we're reporting *all* errors. Don't change
-                                  -- that behavior just because we're going into
-                                  -- an implication.
+                      -- If cec_binds ctxt is Nothing, that means
+                      -- we're reporting *all* errors. Don't change
+                      -- that behavior just because we're going into
+                      -- an implication.
+
     dead_givens = case status of
                     IC_Solved { ics_dead = dead } -> dead
                     _                             -> []
