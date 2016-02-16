@@ -13,7 +13,6 @@ import Settings
 import Settings.Packages.Rts
 import Target
 
--- TODO: Use way from Context, #207
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
 registerPackage :: [(Resource, Int)] -> Context -> Rules ()
 registerPackage rs context @ (Context {..}) = do

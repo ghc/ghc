@@ -72,13 +72,9 @@ packageRules = do
         [ buildPackageData
         , buildPackageDependencies readPackageDb
         , buildPackageDocumentation
-        , generatePackageCode ]
-
-    for_ allStages $ \stage ->
-        for_ knownPackages $ \package -> do
-            let context = vanillaContext stage package
-            buildProgram                             context
-            registerPackage           writePackageDb context
+        , generatePackageCode
+        , buildProgram
+        , registerPackage writePackageDb ]
 
 buildRules :: Rules ()
 buildRules = do
