@@ -183,7 +183,7 @@ removeDirectoryIfExists d =
 -- comprising digits (@0-9@), dashes (@-@), and dots (@.@). Examples:
 --
 --- * @'matchVersionedFilePath' "foo/bar"  ".a" "foo/bar.a"     '==' 'True'@
---- * @'matchVersionedFilePath' "foo/bar"  ".a" "foo\bar.a"     '==' 'True'@
+--- * @'matchVersionedFilePath' "foo/bar"  ".a" "foo\bar.a"     '==' 'False'@
 --- * @'matchVersionedFilePath' "foo/bar"  "a"  "foo/bar.a"     '==' 'True'@
 --- * @'matchVersionedFilePath' "foo/bar"  ""   "foo/bar.a"     '==' 'False'@
 --- * @'matchVersionedFilePath' "foo/bar"  "a"  "foo/bar-0.1.a" '==' 'True'@
@@ -191,6 +191,6 @@ removeDirectoryIfExists d =
 --- * @'matchVersionedFilePath' "foo/bar/" "a"  "foo/bar-0.1.a" '==' 'False'@
 matchVersionedFilePath :: String -> String -> FilePath -> Bool
 matchVersionedFilePath prefix suffix filePath =
-    case stripPrefix prefix (unifyPath filePath) >>= stripSuffix suffix of
+    case stripPrefix prefix filePath >>= stripSuffix suffix of
         Nothing      -> False
         Just version -> all (\c -> isDigit c || c == '-' || c == '.') version
