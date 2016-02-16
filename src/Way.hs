@@ -1,14 +1,12 @@
 module Way (
     WayUnit (..), Way, wayUnit, wayFromUnits,
 
-    vanilla, profiling, logging,
-    threaded, threadedProfiling, threadedLogging,
-    debug, debugProfiling, threadedDebug, threadedDebugProfiling,
-    dynamic, profilingDynamic, threadedProfilingDynamic,
-    threadedDynamic, threadedDebugDynamic, debugDynamic,
-    loggingDynamic, threadedLoggingDynamic,
+    vanilla, profiling, dynamic, profilingDynamic, threaded, debug, logging,
+    threadedDebug, threadedProfiling, threadedLogging, threadedDynamic,
+    threadedDebugProfiling, threadedDebugDynamic, threadedProfilingDynamic,
+    threadedLoggingDynamic, debugProfiling, debugDynamic, loggingDynamic,
 
-    wayPrefix, hisuf, osuf, hcsuf, obootsuf, hibootsuf, ssuf, libsuf,
+    allWays, wayPrefix, hisuf, osuf, hcsuf, obootsuf, hibootsuf, ssuf, libsuf,
     safeDetectWay, detectWay, matchBuildResult
     ) where
 
@@ -120,6 +118,14 @@ threadedLoggingDynamic   = wayFromUnits [Threaded, Logging, Dynamic]
 debugProfiling           = wayFromUnits [Debug, Profiling]
 debugDynamic             = wayFromUnits [Debug, Dynamic]
 loggingDynamic           = wayFromUnits [Logging, Dynamic]
+
+-- | All ways supported by the build system.
+allWays :: [Way]
+allWays =
+    [ vanilla, profiling, dynamic, profilingDynamic, threaded, debug, logging
+    , threadedDebug, threadedProfiling, threadedLogging, threadedDynamic
+    , threadedDebugProfiling, threadedDebugDynamic, threadedProfilingDynamic
+    , threadedLoggingDynamic, debugProfiling, debugDynamic, loggingDynamic ]
 
 wayPrefix :: Way -> String
 wayPrefix way | way == vanilla = ""
