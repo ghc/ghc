@@ -91,9 +91,9 @@ Once we get to type checking, we decompose it into its parts, in tcPatSynSig.
      Note [The pattern-synonym signature splitting rule]
      the universals are the ones mentioned in
           - univ_tvs (and the kinds thereof)
-          - prov
+          - req
           - body_ty
-     the existential are the rest
+     the existentials are the rest
 
 * Moreover see Note
 -}
@@ -160,7 +160,7 @@ tcPatSynSig name sig_ty
               , text "univ_tvs" <+> ppr univ_tvs
               , text "req" <+> ppr req
               , text "extra_ex" <+> ppr extra_ex
-              , text "ex_tvs_" <+> ppr ex_tvs
+              , text "ex_tvs" <+> ppr ex_tvs
               , text "prov" <+> ppr prov
               , text "arg_tys" <+> ppr arg_tys
               , text "body_ty" <+> ppr body_ty ]
@@ -252,7 +252,7 @@ tcCheckPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details
            do { (subst, ex_tvs') <- if   isUnidirectional dir
                                     then newMetaTyVars    ex_tvs
                                     else newMetaSigTyVars ex_tvs
-                    -- See the "Existential type variables part of
+                    -- See the "Existential type variables" part of
                     -- Note [Checking against a pattern signature]
               ; prov_dicts <- mapM (emitWanted origin)
                   (substTheta (extendTCvInScopeList subst univ_tvs) prov_theta)
@@ -307,8 +307,8 @@ Example
     pattern P x = [MkT x]
 
 We must check that the (Eq a) that P claims to bind (and to
-make available to matches against P, is derivable from the
-acutal pattern.  For example:
+make available to matches against P), is derivable from the
+actual pattern.  For example:
     f (P (x::a)) = ...here (Eq a) should be available...
 And yes, (Eq a) is derivable from the (Ord a) bound by P's rhs.
 

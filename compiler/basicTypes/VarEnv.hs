@@ -90,7 +90,7 @@ data InScopeSet = InScope (VarEnv Var) {-# UNPACK #-} !Int
         -- unfolding), so this lookup is useful.
         --
         -- INVARIANT: the VarEnv maps (the Unique of) a variable to
-        --            a variable with the same Uniqua.  (This was not
+        --            a variable with the same Unique.  (This was not
         --            the case in the past, when we had a grevious hack
         --            mapping var1 to var2.
         --

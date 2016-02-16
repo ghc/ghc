@@ -509,7 +509,7 @@ language as follows: ::
 
 The representation of Typ is held abstract, permitting implementations
 to use a fancy representation (e.g., hash-consing to manage sharing).
-Without view patterns, using this signature a little inconvenient: ::
+Without view patterns, using this signature is a little inconvenient: ::
 
     size :: Typ -> Integer
     size t = case view t of
@@ -6086,8 +6086,8 @@ following is not possible: ::
     data instance T Int  = A
     data instance T Char = B
     foo :: T a -> Int
-    foo A = 1             -- WRONG: These two equations together...
-    foo B = 2             -- ...will produce a type error.
+    foo A = 1
+    foo B = 2
 
 Instead, you would have to write ``foo`` as a class operation, thus: ::
 
@@ -6100,7 +6100,7 @@ Instead, you would have to write ``foo`` as a class operation, thus: ::
 
 Given the functionality provided by GADTs (Generalised Algebraic Data
 Types), it might seem as if a definition, such as the above, should be
-feasible. However, type families are - in contrast to GADTs - are
+feasible. However, type families - in contrast to GADTs - are
 *open;* i.e., new instances can always be added, possibly in other
 modules. Supporting pattern matching across different data instances
 would require a form of extensible case construct.
@@ -8865,7 +8865,7 @@ Here are some more details:
    More information is given for explicit holes (i.e. ones that start
    with an underscore), than for out-of-scope variables, because the
    latter are often unintended typos, so the extra information is
-   distracting. If you the detailed information, use a leading
+   distracting. If you want the detailed information, use a leading
    underscore to make explicit your intent to use a hole.
 
 -  Unbound identifiers with the same name are never unified, even within

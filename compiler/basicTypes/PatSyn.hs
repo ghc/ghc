@@ -49,7 +49,7 @@ import Data.List
 
 -- | A pattern synonym
 -- See Note [Pattern synonym representation]
--- See Note [Patten synonym signatures]
+-- See Note [Pattern synonym signatures]
 data PatSyn
   = MkPatSyn {
         psName        :: Name,
@@ -104,7 +104,7 @@ data PatSyn
   }
   deriving Data.Typeable.Typeable
 
-{- Note [Patten synonym signatures]
+{- Note [Pattern synonym signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In a pattern synonym signature we write
    pattern P :: req => prov => t1 -> ... tn -> res_ty
@@ -128,7 +128,7 @@ Example 2:
       data T2 where
         MkT2 :: (Num a, Eq a) => a -> a -> T2
 
-      patttern P2 :: () => (Num a, Eq a) => a -> T2
+      pattern P2 :: () => (Num a, Eq a) => a -> T2
       pattern P2 x = MkT2 3 x
 
   When we match against P2 we get a Num dictionary provided.
@@ -323,7 +323,7 @@ patSynName = psName
 
 patSynType :: PatSyn -> Type
 -- The full pattern type, used only in error messages
--- See Note [Patten synonym signatures]
+-- See Note [Pattern synonym signatures]
 patSynType (MkPatSyn { psUnivTyVars = univ_tvs, psReqTheta = req_theta
                      , psExTyVars   = ex_tvs,   psProvTheta = prov_theta
                      , psArgs = orig_args, psOrigResTy = orig_res_ty })

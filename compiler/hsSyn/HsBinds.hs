@@ -706,7 +706,7 @@ data Sig name
 
       -- For details on above see note [Api annotations] in ApiAnnotation
   | PatSynSig (Located name) (LHsSigType name)
-      -- P :: forall a b. Prov => Req => ty
+      -- P :: forall a b. Req => Prov => ty
 
       -- | A signature for a class method
       --   False: ordinary class-method signature

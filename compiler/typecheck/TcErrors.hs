@@ -1368,7 +1368,7 @@ misMatchMsg ct oriented ty1 ty2
     text "Couldn't match a lifted type with an unlifted type"
 
   | otherwise  -- So now we have Nothing or (Just IsSwapped)
-               -- For some reason we treat Nothign like IsSwapped
+               -- For some reason we treat Nothing like IsSwapped
   = addArising orig $
     sep [ text herald1 <+> quotes (ppr ty1)
         , nest padding $

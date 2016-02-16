@@ -22,7 +22,7 @@ module Unique (
         -- * Main data types
         Unique, Uniquable(..),
 
-        -- ** Constructors, desctructors and operations on 'Unique's
+        -- ** Constructors, destructors and operations on 'Unique's
         hasKey, cmpByUnique,
 
         pprUnique,
