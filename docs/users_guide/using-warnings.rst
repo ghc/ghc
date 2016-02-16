@@ -371,10 +371,6 @@ of ``-W(no-)*``.
     Causes a warning to be emitted if an enumeration is empty, e.g.
     ``[5 .. 3]``.
 
-.. ghc-flag:: -Wlazy-unlifted-bindings
-
-    This flag is a no-op, and will be removed in GHC 7.10.
-
 .. ghc-flag:: -Wduplicate-constraints
 
     .. index::

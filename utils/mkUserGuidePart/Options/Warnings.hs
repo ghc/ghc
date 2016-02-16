@@ -117,13 +117,6 @@ warningsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-Wno-incomplete-record-updates"
          }
-  , flag { flagName = "-Wlazy-unlifted-bindings"
-         , flagDescription =
-           "*(deprecated)* warn when a pattern binding looks lazy but "++
-           "must be strict"
-         , flagType = DynamicFlag
-         , flagReverse = "-Wno-lazy-unlifted-bindings"
-         }
   , flag { flagName = "-Wmissing-fields"
          , flagDescription = "warn when fields of a record are uninitialised"
          , flagType = DynamicFlag
