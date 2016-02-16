@@ -17,9 +17,10 @@ import Target
 buildPackageLibrary :: Context -> Rules ()
 buildPackageLibrary context @ (Context {..}) = do
     let buildPath = targetPath stage package -/- "build"
+        libHs     = buildPath -/- "libHS" ++ pkgNameString package
 
     -- TODO: handle dynamic libraries
-    buildPath <//> "*" ++ waySuffix way ++ ".a" %> \a -> do
+    matchVersionedFilePath libHs (waySuffix way <.> "a") ?> \a -> do
         removeFileIfExists a
         cSrcs <- cSources context
         hSrcs <- hSources context
@@ -61,15 +62,16 @@ buildPackageLibrary context @ (Context {..}) = do
     -- TODO: this looks fragile as haskell objects can match this rule if their
     -- names start with "HS" and they are on top of the module hierarchy.
     -- This happens with hsc2hs, which has top-level file HSCParser.hs.
-    when (package /= hsc2hs) $ priority 2 $ (buildPath -/- "HS*.o") %> \obj -> do
-        cSrcs <- cSources context
-        hSrcs <- hSources context
-        let cObjs = [ buildPath -/- src -<.> "o" | src <- cSrcs
-                    , not ("//AutoApply.cmm" ?== src) ]
-                 ++ [ src -<.> "o" | src <- cSrcs, "//AutoApply.cmm" ?== src ]
-            hObjs = [ buildPath -/- src  <.> "o" | src <- hSrcs ]
-        need $ cObjs ++ hObjs
-        build $ Target context Ld (cObjs ++ hObjs) [obj]
+    priority 2 $ when (package /= hsc2hs && way == vanilla) $
+         (buildPath -/- "HS*.o") %> \obj -> do
+            cSrcs <- cSources context
+            hSrcs <- hSources context
+            let cObjs = [ buildPath -/- src -<.> "o" | src <- cSrcs
+                        , not ("//AutoApply.cmm" ?== src) ]
+                     ++ [ src -<.> "o" | src <- cSrcs, "//AutoApply.cmm" ?== src ]
+                hObjs = [ buildPath -/- src  <.> "o" | src <- hSrcs ]
+            need $ cObjs ++ hObjs
+            build $ Target context Ld (cObjs ++ hObjs) [obj]
 
 cSources :: Context -> Action [FilePath]
 cSources context = interpretInContext context $ getPkgDataList CSrcs
