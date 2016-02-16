@@ -13,7 +13,7 @@ module RnEnv (
         lookupLocalOccRn_maybe, lookupInfoOccRn,
         lookupLocalOccThLvl_maybe,
         lookupTypeOccRn, lookupKindOccRn,
-        lookupGlobalOccRn, lookupGlobalOccRn_maybe,
+        lookupGlobalOccRn, lookupGlobalOccRnExport, lookupGlobalOccRn_maybe,
         lookupOccRn_overloaded, lookupGlobalOccRn_overloaded,
         reportUnboundName, unknownNameSuggestions,
         addNameClashErrRn,
@@ -852,6 +852,27 @@ lookupGlobalOccRn rdr_name
            Just n  -> return n
            Nothing -> do { traceRn (text "lookupGlobalOccRn" <+> ppr rdr_name)
                          ; unboundName WL_Global rdr_name } }
+
+-- like lookupGlobalOccRn but suggests adding 'type' keyword
+-- to export type constructors mistaken for data constructors
+lookupGlobalOccRnExport :: RdrName -> RnM Name
+lookupGlobalOccRnExport rdr_name
+  = do { mb_name <- lookupGlobalOccRn_maybe rdr_name
+       ; case mb_name of
+           Just n  -> return n
+           Nothing -> do { env <- getGlobalRdrEnv
+                         ; let tycon = setOccNameSpace tcClsName (rdrNameOcc rdr_name)
+                               msg = case lookupOccEnv env tycon of
+                                   Just (gre : _) -> make_msg gre
+                                   _              -> Outputable.empty
+                               make_msg gre = hang
+                                   (hsep [text "Note: use",
+                                       quotes (text "type"),
+                                       text "keyword to export type constructor",
+                                       quotes (ppr (gre_name gre))])
+                                   2 (vcat [pprNameProvenance gre,
+                                       text "(requires TypeOperators extension)"])
+                         ; unboundNameX WL_Global rdr_name msg } }
 
 lookupInfoOccRn :: RdrName -> RnM [Name]
 -- lookupInfoOccRn is intended for use in GHCi's ":info" command
