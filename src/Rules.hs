@@ -3,6 +3,7 @@ module Rules (topLevelTargets, buildRules) where
 import Data.Foldable
 
 import Base
+import Context hiding (stage, package, way)
 import Expression
 import GHC
 import Rules.Compile
@@ -52,18 +53,21 @@ topLevelTargets = do
 
 packageRules :: Rules ()
 packageRules = do
-    -- We cannot register multiple packages in parallel. Also we cannot run GHC
-    -- when the package database is being mutated by "ghc-pkg". This is a
+    -- We cannot register multiple GHC packages in parallel. Also we cannot run
+    -- GHC when the package database is being mutated by "ghc-pkg". This is a
     -- classic concurrent read exclusive write (CREW) conflict.
     let maxConcurrentReaders = 1000
     packageDb <- newResource "package-db" maxConcurrentReaders
     let readPackageDb  = [(packageDb, 1)]
         writePackageDb = [(packageDb, maxConcurrentReaders)]
 
+    let contexts = liftM3 Context allStages knownPackages allWays
+
+    traverse_ (compilePackage readPackageDb) contexts
+
     for_ allStages $ \stage ->
         for_ knownPackages $ \package -> do
             let context = vanillaContext stage package
-            compilePackage            readPackageDb  context
             buildPackageData                         context
             buildPackageDependencies  readPackageDb  context
             buildPackageDocumentation                context

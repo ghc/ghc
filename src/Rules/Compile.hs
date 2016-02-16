@@ -9,52 +9,43 @@ import Rules.Actions
 import Settings
 import Target hiding (context)
 
--- TODO: Use way from Context, #207
 compilePackage :: [(Resource, Int)] -> Context -> Rules ()
 compilePackage rs context @ (Context {..}) = do
     let buildPath = targetPath stage package -/- "build"
 
-    matchBuildResult buildPath "hi" ?> \hi ->
+    buildPath <//> "*" <.> hisuf way %> \hi ->
         if compileInterfaceFilesSeparately && not ("//HpcParser.*" ?== hi)
         then do
-            let w = detectWay hi
-            (src, deps) <- dependencies buildPath $ hi -<.> osuf w
+            (src, deps) <- dependencies buildPath $ hi -<.> osuf way
             need $ src : deps
-            buildWithResources rs $
-                Target (context { way = w }) (Ghc stage) [src] [hi]
-        else need [ hi -<.> osuf (detectWay hi) ]
+            buildWithResources rs $ Target context (Ghc stage) [src] [hi]
+        else need [ hi -<.> osuf way ]
 
-    matchBuildResult buildPath "hi-boot" ?> \hiboot ->
+    buildPath <//> "*" <.> hibootsuf way %> \hiboot ->
         if compileInterfaceFilesSeparately
         then do
-            let w = detectWay hiboot
-            (src, deps) <- dependencies buildPath $ hiboot -<.> obootsuf w
+            (src, deps) <- dependencies buildPath $ hiboot -<.> obootsuf way
             need $ src : deps
-            buildWithResources rs $
-                Target (context { way = w }) (Ghc stage) [src] [hiboot]
-        else need [ hiboot -<.> obootsuf (detectWay hiboot) ]
+            buildWithResources rs $ Target context (Ghc stage) [src] [hiboot]
+        else need [ hiboot -<.> obootsuf way ]
 
     -- TODO: add dependencies for #include of .h and .hs-incl files (gcc -MM?)
-    matchBuildResult buildPath "o" ?> \obj -> do
+    buildPath <//> "*" <.> osuf way %> \obj -> do
         (src, deps) <- dependencies buildPath obj
         if ("//*.c" ?== src)
         then do
             need $ src : deps
             build $ Target context (Gcc stage) [src] [obj]
         else do
-            let w = detectWay obj
             if compileInterfaceFilesSeparately && "//*.hs" ?== src && not ("//HpcParser.*" ?== src)
-            then need $ (obj -<.> hisuf (detectWay obj)) : src : deps
+            then need $ (obj -<.> hisuf way) : src : deps
             else need $ src : deps
-            buildWithResources rs $
-                Target (context { way = w }) (Ghc stage) [src] [obj]
+            buildWithResources rs $ Target context (Ghc stage) [src] [obj]
 
     -- TODO: get rid of these special cases
-    matchBuildResult buildPath "o-boot" ?> \obj -> do
+    buildPath <//> "*" <.> obootsuf way %> \obj -> do
         (src, deps) <- dependencies buildPath obj
-        let w = detectWay obj
         if compileInterfaceFilesSeparately
-        then need $ (obj -<.> hibootsuf (detectWay obj)) : src : deps
+        then need $ (obj -<.> hibootsuf way) : src : deps
         else need $ src : deps
-        buildWithResources rs $
-            Target (context { way = w }) (Ghc stage) [src] [obj]
+        buildWithResources rs $ Target context (Ghc stage) [src] [obj]
