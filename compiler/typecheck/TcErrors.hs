@@ -39,6 +39,7 @@ import NameSet
 import Bag
 import ErrUtils         ( ErrMsg, errDoc, pprLocErrMsg )
 import BasicTypes
+import ConLike          ( ConLike(..) )
 import Util
 import FastString
 import Outputable
@@ -1839,8 +1840,9 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
                              | orig <- origs ] ] ]
       | otherwise = []
 
-    ppr_skol (PatSkol dc _) = text "the data constructor" <+> quotes (ppr dc)
-    ppr_skol skol_info      = ppr skol_info
+    ppr_skol (PatSkol (RealDataCon dc) _) = text "the data constructor" <+> quotes (ppr dc)
+    ppr_skol (PatSkol (PatSynCon ps)   _) = text "the pattern synonym"  <+> quotes (ppr ps)
+    ppr_skol skol_info = ppr skol_info
 
     extra_note | any isFunTy (filterOutInvisibleTypes (classTyCon clas) tys)
                = text "(maybe you haven't applied a function to enough arguments?)"

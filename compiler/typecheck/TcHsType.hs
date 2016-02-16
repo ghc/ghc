@@ -987,7 +987,7 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
            ATcTyCon tc_tc -> do { data_kinds <- xoptM LangExt.DataKinds
                                 ; unless (isTypeLevel (mode_level mode) ||
                                           data_kinds) $
-                                  promotionErr name NoDataKinds
+                                  promotionErr name NoDataKindsTC
                                 ; tc <- get_loopy_tc name tc_tc
                                 ; return (mkNakedTyConApp tc [], tyConKind tc_tc) }
                              -- mkNakedTyConApp: see Note [Type-checking inside the knot]
@@ -1001,7 +1001,7 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
                    ; unless (isTypeLevel (mode_level mode) ||
                              data_kinds ||
                              isKindTyCon tc) $
-                       promotionErr name NoDataKinds
+                       promotionErr name NoDataKindsTC
                    ; unless (isTypeLevel (mode_level mode) ||
                              type_in_type ||
                              isLegacyPromotableTyCon tc) $
@@ -1011,7 +1011,7 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
            AGlobal (AConLike (RealDataCon dc))
              -> do { data_kinds <- xoptM LangExt.DataKinds
                    ; unless (data_kinds || specialPromotedDc dc) $
-                       promotionErr name NoDataKinds
+                       promotionErr name NoDataKindsDC
                    ; type_in_type <- xoptM LangExt.TypeInType
                    ; unless ( type_in_type ||
                               ( isTypeLevel (mode_level mode) &&
@@ -2142,7 +2142,8 @@ promotionErr name err
   where
     reason = case err of
                FamDataConPE   -> text "it comes from a data family instance"
-               NoDataKinds    -> text "Perhaps you intended to use DataKinds"
+               NoDataKindsTC  -> text "Perhaps you intended to use DataKinds"
+               NoDataKindsDC  -> text "Perhaps you intended to use DataKinds"
                NoTypeInTypeTC -> text "Perhaps you intended to use TypeInType"
                NoTypeInTypeDC -> text "Perhaps you intended to use TypeInType"
                PatSynPE       -> text "Pattern synonyms cannot be promoted"
