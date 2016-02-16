@@ -1,7 +1,7 @@
 module Way (
     WayUnit (..), Way, wayUnit, wayFromUnits,
 
-    vanilla, profiling, logging, parallel, granSim,
+    vanilla, profiling, logging, parallel,
     threaded, threadedProfiling, threadedLogging,
     debug, debugProfiling, threadedDebug, threadedDebugProfiling,
     dynamic, profilingDynamic, threadedProfilingDynamic,
@@ -27,7 +27,6 @@ data WayUnit = Threaded
              | Logging
              | Dynamic
              | Parallel
-             | GranSim
              deriving (Eq, Enum, Bounded)
 
 -- TODO: get rid of non-derived Show instances
@@ -39,7 +38,6 @@ instance Show WayUnit where
         Logging   -> "l"
         Dynamic   -> "dyn"
         Parallel  -> "mp"
-        GranSim   -> "gm"
 
 instance Read WayUnit where
     readsPrec _ s = [(unit, "") | unit <- [minBound ..], show unit == s]
@@ -95,9 +93,6 @@ logging = wayFromUnits [Logging]
 -- | Build in parallel.
 parallel :: Way
 parallel = wayFromUnits [Parallel]
-
-granSim :: Way
-granSim = wayFromUnits [GranSim]
 
 -- RTS only ways
 -- TODO: do we need to define *only* these? Shall we generalise/simplify?

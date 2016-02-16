@@ -102,7 +102,6 @@ wayGhcArgs = do
             , (Profiling `wayUnit` way) ? arg "-prof"
             , (Logging   `wayUnit` way) ? arg "-eventlog"
             , (Parallel  `wayUnit` way) ? arg "-parallel"
-            , (GranSim   `wayUnit` way) ? arg "-gransim"
             , (way == debug || way == debugDynamic) ?
               append ["-ticky", "-DTICKY_TICKY"] ]
 
