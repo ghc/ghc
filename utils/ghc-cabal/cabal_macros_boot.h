@@ -1,6 +1,8 @@
 /* defines a few MIN_VERSION_...() macros used by some of the bootstrap packages */
 
-#if __GLASGOW_HASKELL__ >= 711
+#if __GLASGOW_HASKELL__ >= 800
+/* macros are generated accurately by GHC on the fly */
+#elif __GLASGOW_HASKELL__ >= 711
 /* package base-4.9.0.0 */
 # define MIN_VERSION_base(major1,major2,minor) (\
   (major1) <  4 || \
