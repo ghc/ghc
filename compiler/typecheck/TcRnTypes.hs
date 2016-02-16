@@ -905,7 +905,8 @@ data PromotionErr
 
   | RecDataConPE     -- Data constructor in a recursive loop
                      -- See Note [ARecDataCon: recusion and promoting data constructors] in TcTyClsDecls
-  | NoDataKinds      -- -XDataKinds not enabled
+  | NoDataKindsTC    -- -XDataKinds not enabled (for a tycon)
+  | NoDataKindsDC    -- -XDataKinds not enabled (for a datacon)
   | NoTypeInTypeTC   -- -XTypeInType not enabled (for a tycon)
   | NoTypeInTypeDC   -- -XTypeInType not enabled (for a datacon)
 
@@ -925,7 +926,8 @@ instance Outputable PromotionErr where
   ppr PatSynPE       = text "PatSynPE"
   ppr FamDataConPE   = text "FamDataConPE"
   ppr RecDataConPE   = text "RecDataConPE"
-  ppr NoDataKinds    = text "NoDataKinds"
+  ppr NoDataKindsTC  = text "NoDataKindsTC"
+  ppr NoDataKindsDC  = text "NoDataKindsDC"
   ppr NoTypeInTypeTC = text "NoTypeInTypeTC"
   ppr NoTypeInTypeDC = text "NoTypeInTypeDC"
 
@@ -942,7 +944,8 @@ pprPECategory TyConPE        = text "Type constructor"
 pprPECategory PatSynPE       = text "Pattern synonym"
 pprPECategory FamDataConPE   = text "Data constructor"
 pprPECategory RecDataConPE   = text "Data constructor"
-pprPECategory NoDataKinds    = text "Data constructor"
+pprPECategory NoDataKindsTC  = text "Type constructor"
+pprPECategory NoDataKindsDC  = text "Data constructor"
 pprPECategory NoTypeInTypeTC = text "Type constructor"
 pprPECategory NoTypeInTypeDC = text "Data constructor"
 
