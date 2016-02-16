@@ -101,7 +101,6 @@ wayGhcArgs = do
             , (Debug     `wayUnit` way) ? arg "-optc-DDEBUG"
             , (Profiling `wayUnit` way) ? arg "-prof"
             , (Logging   `wayUnit` way) ? arg "-eventlog"
-            , (Parallel  `wayUnit` way) ? arg "-parallel"
             , (way == debug || way == debugDynamic) ?
               append ["-ticky", "-DTICKY_TICKY"] ]
 
