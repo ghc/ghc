@@ -2,7 +2,7 @@
 MonadFailWarnings.hs:19:5: warning:
     • Could not deduce (MonadFail m)
         arising from the failable pattern ‘Just x’
-        (this will become an error a future GHC release)
+        (this will become an error in a future GHC release)
       from the context: Monad m
         bound by the type signature for:
                    general :: Monad m => m a
@@ -23,7 +23,7 @@ MonadFailWarnings.hs:19:5: warning:
 MonadFailWarnings.hs:35:5: warning:
     • No instance for (MonadFail Identity)
         arising from the failable pattern ‘Just x’
-        (this will become an error a future GHC release)
+        (this will become an error in a future GHC release)
     • In a stmt of a 'do' block: Just x <- undefined
       In the expression:
         do { Just x <- undefined;
@@ -36,7 +36,7 @@ MonadFailWarnings.hs:35:5: warning:
 MonadFailWarnings.hs:51:5: warning:
     • No instance for (MonadFail (ST s))
         arising from the failable pattern ‘Just x’
-        (this will become an error a future GHC release)
+        (this will become an error in a future GHC release)
     • In a stmt of a 'do' block: Just x <- undefined
       In the expression:
         do { Just x <- undefined;
@@ -49,7 +49,7 @@ MonadFailWarnings.hs:51:5: warning:
 MonadFailWarnings.hs:59:5: warning:
     • No instance for (MonadFail ((->) r))
         arising from the failable pattern ‘Just x’
-        (this will become an error a future GHC release)
+        (this will become an error in a future GHC release)
     • In a stmt of a 'do' block: Just x <- undefined
       In the expression:
         do { Just x <- undefined;

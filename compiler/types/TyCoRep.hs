@@ -2298,7 +2298,7 @@ Note [Precedence in types]
 We don't keep the fixity of type operators in the operator. So the pretty printer
 operates the following precedene structre:
    Type constructor application   binds more tightly than
-   Oerator applications           which bind more tightly than
+   Operator applications          which bind more tightly than
    Function arrow
 
 So we might see  a :+: T b -> c

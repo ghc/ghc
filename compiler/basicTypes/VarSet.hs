@@ -65,7 +65,7 @@ unionVarSet     :: VarSet -> VarSet -> VarSet
 unionVarSets    :: [VarSet] -> VarSet
 
 mapUnionVarSet  :: (a -> VarSet) -> [a] -> VarSet
--- ^ map the function oer the list, and union the results
+-- ^ map the function over the list, and union the results
 
 varSetElems     :: VarSet -> [Var]
 unitVarSet      :: Var -> VarSet

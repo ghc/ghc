@@ -219,7 +219,7 @@ type RnM  = TcRn
 -- | Historical "type-checking monad" (now it's just 'TcRn').
 type TcM  = TcRn
 
--- We 'stack' these envs through the Reader like monad infastructure
+-- We 'stack' these envs through the Reader like monad infrastructure
 -- as we move into an expression (although the change is focused in
 -- the lcl type).
 data Env gbl lcl
@@ -1183,7 +1183,7 @@ data TcIdSigInfo
     }
 
 data TcIdSigBndr   -- See Note [Complete and partial type signatures]
-  = CompleteSig    -- A complete signature with no wildards,
+  = CompleteSig    -- A complete signature with no wildcards,
                    -- so the complete polymorphic type is known.
         TcId          -- The polymorphic Id with that type
 
@@ -2174,7 +2174,7 @@ For Givens we make new EvVars and bind them immediately. Two main reasons:
     But that superclass selector can't (yet) appear in a coercion
     (see evTermCoercion), so the easy thing is to bind it to an Id.
 
-So a Given has EvVar inside it rather that (as previously) an EvTerm.
+So a Given has EvVar inside it rather than (as previously) an EvTerm.
 -}
 
 -- | A place for type-checking evidence to go after it is generated.
@@ -2447,7 +2447,7 @@ level.
 equalities involving type functions. Example:
   Assume we have a wanted at depth 7:
     [W] d{7} : F () ~ a
-  If thre is an type function equation "F () = Int", this would be rewritten to
+  If there is an type function equation "F () = Int", this would be rewritten to
     [W] d{8} : Int ~ a
   and remembered as having depth 8.
 
@@ -2938,7 +2938,7 @@ pprCtOrigin (MCompPatOrigin pat)
 pprCtOrigin (FailablePattern pat)
     = ctoHerald <+> text "the failable pattern" <+> quotes (ppr pat)
       $$
-      text "(this will become an error a future GHC release)"
+      text "(this will become an error in a future GHC release)"
 
 pprCtOrigin (Shouldn'tHappenOrigin note)
   = sdocWithDynFlags $ \dflags ->

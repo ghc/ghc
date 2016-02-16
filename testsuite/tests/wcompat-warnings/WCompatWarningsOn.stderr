@@ -2,7 +2,7 @@
 WCompatWarningsOn.hs:13:5: warning:
     • Could not deduce (Control.Monad.Fail.MonadFail m)
         arising from the failable pattern ‘Just _’
-        (this will become an error a future GHC release)
+        (this will become an error in a future GHC release)
       from the context: Monad m
         bound by the type signature for:
                    monadFail :: Monad m => m a

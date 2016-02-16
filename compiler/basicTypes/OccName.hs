@@ -815,7 +815,7 @@ We have to take care though! Consider a machine-generated module (Trac #10370)
      ...
      a2000 = e2000
 Then "a1", "a2" etc are all marked taken.  But now if we come across "a7" again,
-we have to do a linear search to find a free one, "a20001".  That might just be
+we have to do a linear search to find a free one, "a2001".  That might just be
 acceptable once.  But if we now come across "a8" again, we don't want to repeat
 that search.
 
@@ -851,7 +851,7 @@ tidyOccName env occ@(OccName occ_sp fs)
     find !k !n
       = case lookupUFM env new_fs of
           Just {} -> find (k+1 :: Int) (n+k)
-                       -- By using n+k, the n arguemt to find goes
+                       -- By using n+k, the n argument to find goes
                        --    1, add 1, add 2, add 3, etc which
                        -- moves at quadratic speed through a dense patch
 
@@ -859,8 +859,8 @@ tidyOccName env occ@(OccName occ_sp fs)
        where
          new_fs = mkFastString (base ++ show n)
          new_env = addToUFM (addToUFM env new_fs 1) base1 (n+1)
-                     -- Update:  base_fs, so that next time we'll start whwere we left off
-                     --          new_fs,  so that we know it is taken
+                     -- Update:  base1,  so that next time we'll start where we left off
+                     --          new_fs, so that we know it is taken
                      -- If they are the same (n==1), the former wins
                      -- See Note [TidyOccEnv]
 
