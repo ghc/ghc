@@ -366,22 +366,6 @@ def have_profiling( ):
 def in_tree_compiler( ):
     return config.in_tree_compiler
 
-def compiler_lt( compiler, version ):
-    assert compiler == 'ghc'
-    return version_lt(config.compiler_version, version)
-
-def compiler_le( compiler, version ):
-    assert compiler == 'ghc'
-    return version_le(config.compiler_version, version)
-
-def compiler_gt( compiler, version ):
-    assert compiler == 'ghc'
-    return version_gt(config.compiler_version, version)
-
-def compiler_ge( compiler, version ):
-    assert compiler == 'ghc'
-    return version_ge(config.compiler_version, version)
-
 def unregisterised( ):
     return config.unregisterised
 
@@ -2148,10 +2132,6 @@ def qualify( name, suff ):
 # Finding the sample output.  The filename is of the form
 #
 #   <test>.stdout[-ws-<wordsize>][-<platform>]
-#
-# and we pick the most specific version available.  The <version> is
-# the major version of the compiler (e.g. 6.8.2 would be "6.8").  For
-# more fine-grained control use compiler_lt().
 #
 def find_expected_file(name, suff):
     basename = add_suffix(name, suff)

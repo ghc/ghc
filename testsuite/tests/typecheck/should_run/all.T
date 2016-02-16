@@ -12,8 +12,8 @@ test('tcrun003', normal, compile_and_run, [''])
 test('tcrun004', normal, compile_and_run, [''])
 test('tcrun005', normal, compile_and_run, [''])
 test('Defer01', normal, compile_and_run, [''])
-test('TcNullaryTC', when(compiler_lt('ghc', '7.7'), skip), compile_and_run, [''])
-test('TcCoercible', when(compiler_lt('ghc', '7.7'), skip), compile_and_run, [''])
+test('TcNullaryTC', [], compile_and_run, [''])
+test('TcCoercible', [], compile_and_run, [''])
 
 # -----------------------------------------------------------------------------
 # Skip everything else if fast is on

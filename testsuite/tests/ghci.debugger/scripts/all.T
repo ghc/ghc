@@ -37,7 +37,7 @@ test('print034', normal, ghci_script, ['print034.script'])
 test('print035',
      [extra_clean(['../Unboxed.hi', '../Unboxed.o'])],
      ghci_script, ['print035.script'])
-test('print036', when(compiler_ge('ghc','7.8'), expect_broken(9046)), ghci_script, ['print036.script'])
+test('print036', expect_broken(9046), ghci_script, ['print036.script'])
 
 test('break001', normal, ghci_script, ['break001.script'])
 test('break002', normal, ghci_script, ['break002.script'])

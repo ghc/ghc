@@ -316,14 +316,9 @@ test('T8577',
      multimod_compile_fail,
      ['T8577', '-v0 ' + config.ghc_th_way_flags])
 test('T8625', normal, ghci_script, ['T8625.script'])
-test('TH_StaticPointers',
-     [ when(compiler_lt('ghc', '7.9'), skip)
-     , when(doing_ghci(), extra_hc_opts('-fobject-code'))
-     ],
+test('TH_StaticPointers', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
      compile_and_run, [''])
-test('TH_StaticPointers02',
-     [ when(compiler_lt('ghc', '7.9'), skip) ],
-     compile_fail, [''])
+test('TH_StaticPointers02', [], compile_fail, [''])
 test('T8759', normal, compile_fail, ['-v0'])
 test('T7021',
      extra_clean(['T7021a.hi', 'T7021a.o']), multimod_compile,
