@@ -332,9 +332,15 @@ the stack. See Note [Overlapping global registers] for implications.
 #define REG_F2          fr15
 #define REG_F3          fr16
 #define REG_F4          fr17
+#define REG_F5          fr18
+#define REG_F6          fr19
 
-#define REG_D1          fr18
-#define REG_D2          fr19
+#define REG_D1          fr20
+#define REG_D2          fr21
+#define REG_D3          fr22
+#define REG_D4          fr23
+#define REG_D5          fr24
+#define REG_D6          fr25
 
 #endif
 
