@@ -61,15 +61,16 @@ packageRules = do
     let readPackageDb  = [(packageDb, 1)]
         writePackageDb = [(packageDb, maxConcurrentReaders)]
 
-    let contexts = liftM3 Context allStages knownPackages allWays
+    let contexts        = liftM3 Context        allStages knownPackages allWays
+        vanillaContexts = liftM2 vanillaContext allStages knownPackages
 
-    traverse_ (compilePackage readPackageDb) contexts
+    traverse_ (compilePackage           readPackageDb) contexts
+    traverse_ (buildPackageDependencies readPackageDb) vanillaContexts
 
     for_ allStages $ \stage ->
         for_ knownPackages $ \package -> do
             let context = vanillaContext stage package
             buildPackageData                         context
-            buildPackageDependencies  readPackageDb  context
             buildPackageDocumentation                context
             generatePackageCode                      context
             buildPackageLibrary                      context

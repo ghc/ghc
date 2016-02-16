@@ -7,7 +7,7 @@ import Expression
 import Oracles.Dependencies
 import Rules.Actions
 import Settings
-import Target hiding (context)
+import Target
 
 compilePackage :: [(Resource, Int)] -> Context -> Rules ()
 compilePackage rs context @ (Context {..}) = do
