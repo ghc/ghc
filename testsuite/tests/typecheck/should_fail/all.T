@@ -247,6 +247,7 @@ test('tcfail220', normal, multimod_compile_fail, ['tcfail220.hsig', '-sig-of "Sh
 test('tcfail221', normal, multimod_compile_fail, ['tcfail221.hsig', '-sig-of "ShouldFail is base:Prelude"'])
 test('tcfail222', normal, multimod_compile_fail, ['tcfail222.hsig', '-sig-of "ShouldFail is base:Data.STRef"'])
 test('tcfail223', normal, compile_fail, [''])
+test('tcfail224', normal, compile_fail, [''])
 
 test('SilentParametersOverlapping', normal, compile, [''])
 test('FailDueToGivenOverlapping', normal, compile_fail, [''])

@@ -1758,7 +1758,13 @@ mk_dict_err :: ReportErrCtxt -> (Ct, ClsInstLookupResult)
 mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
   | null matches  -- No matches but perhaps several unifiers
   = do { (ctxt, binds_msg, ct) <- relevantBindings True ctxt ct
-       ; return (ctxt, cannot_resolve_msg ct binds_msg) }
+       ; instEnvs <- tcGetInstEnvs
+       ; let candidate_insts = case tys of
+               -- find data types with the same occ name, see #9611
+               [ty] -> filter (is_candidate_inst ty)
+                              (classInstances instEnvs clas)
+               _ -> []
+       ; return (ctxt, cannot_resolve_msg ct candidate_insts binds_msg) }
 
   | null unsafe_overlapped   -- Some matches => overlap errors
   = return (ctxt, overlap_msg)
@@ -1774,15 +1780,28 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
     givens        = getUserGivens ctxt
     all_tyvars    = all isTyVarTy tys
 
+    is_candidate_inst ty inst
+      | [other_ty] <- is_tys inst
+      , Just (tc1, _) <- tcSplitTyConApp_maybe ty
+      , Just (tc2, _) <- tcSplitTyConApp_maybe other_ty
+      = let n1 = tyConName tc1
+            n2 = tyConName tc2
+            different_names = n1 /= n2
+            same_occ_names = nameOccName n1 == nameOccName n2
+        in different_names && same_occ_names
+      | otherwise = False
 
-    cannot_resolve_msg :: Ct -> SDoc -> SDoc
-    cannot_resolve_msg ct binds_msg
+    cannot_resolve_msg :: Ct -> [ClsInst] -> SDoc -> SDoc
+    cannot_resolve_msg ct candidate_insts binds_msg
       = vcat [ no_inst_msg
              , nest 2 extra_note
              , vcat (pp_givens givens)
              , ppWhen (has_ambig_tvs && not (null unifiers && null givens))
                (vcat [ ppUnless lead_with_ambig ambig_msg, binds_msg, potential_msg ])
-             , show_fixes (add_to_ctxt_fixes has_ambig_tvs ++ drv_fixes) ]
+             , show_fixes (add_to_ctxt_fixes has_ambig_tvs ++ drv_fixes)
+             , ppWhen (not (null candidate_insts))
+               (hang (text "There are instances for similar types:")
+                   2 (vcat (map ppr candidate_insts))) ]
       where
         orig = ctOrigin ct
         -- See Note [Highlighting ambiguous type variables]
