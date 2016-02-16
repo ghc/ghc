@@ -183,6 +183,7 @@ removeDirectoryIfExists d =
 -- comprising digits (@0-9@), dashes (@-@), and dots (@.@). Examples:
 --
 --- * @'matchVersionedFilePath' "foo/bar"  ".a" "foo/bar.a"     '==' 'True'@
+--- * @'matchVersionedFilePath' "foo/bar"  ".a" "foo\bar.a"     '==' 'True'@
 --- * @'matchVersionedFilePath' "foo/bar"  "a"  "foo/bar.a"     '==' 'True'@
 --- * @'matchVersionedFilePath' "foo/bar"  ""   "foo/bar.a"     '==' 'False'@
 --- * @'matchVersionedFilePath' "foo/bar"  "a"  "foo/bar-0.1.a" '==' 'True'@
