@@ -1,13 +1,12 @@
 module Way (
-    WayUnit (..), Way, wayUnit, wayFromUnits,
+    WayUnit (..), Way, wayUnit, wayFromUnits, allWays,
 
     vanilla, profiling, dynamic, profilingDynamic, threaded, debug, logging,
     threadedDebug, threadedProfiling, threadedLogging, threadedDynamic,
     threadedDebugProfiling, threadedDebugDynamic, threadedProfilingDynamic,
     threadedLoggingDynamic, debugProfiling, debugDynamic, loggingDynamic,
 
-    allWays, wayPrefix, waySuffix, hisuf, osuf, hcsuf, obootsuf, hibootsuf, ssuf,
-    libsuf, safeDetectWay, detectWay, matchBuildResult
+    wayPrefix, waySuffix, hisuf, osuf, hcsuf, obootsuf, hibootsuf, ssuf, libsuf
     ) where
 
 import Base hiding (unit)
@@ -159,37 +158,6 @@ libsuf way @ (Way set) =
         let prefix = wayPrefix . Way . Set.delete (fromEnum Dynamic) $ set
         -- e.g., p_ghc7.11.20141222.dll (the result)
         return $ prefix ++ "ghc" ++ version ++ extension
-
--- | Detect way from a given 'FilePath'. Returns 'Nothing' if there is no match.
---
--- * @'safeDetectWay' "foo/bar.hi"           '==' 'Just' vanilla@
--- * @'safeDetectWay' "baz.thr_p_o"          '==' 'Just' threadedProfiling@
--- * @'safeDetectWay' "qwe.ph_i"             '==' 'Nothing' (expected "qwe.p_hi")@
--- * @'safeDetectWay' "xru.p_ghc7.11.123.so" '==' 'Just' profiling@
-safeDetectWay :: FilePath -> Maybe Way
-safeDetectWay file = case reads prefix of
-    [(way, "")] -> Just way
-    _           -> Nothing
-  where
-    extension = takeExtension file
-    prefixed  = if extension `notElem` [".so", ".dll", ".dynlib"]
-                then extension
-                else takeExtension . dropExtension .
-                     dropExtension . dropExtension $ file
-    prefix = if extension == "a"
-             then drop 1 . dropWhile (/= '_') $ takeBaseName file
-             else drop 1 . dropWhileEnd (== '_') . dropWhileEnd (/= '_') $ prefixed
-
--- Unsafe version of safeDetectWay. Useful when matchBuildResult has succeeded.
-detectWay :: FilePath -> Way
-detectWay = fromJust . safeDetectWay
-
--- Given a path, an extension suffix, and a file name check:
--- 1) the file conforms to pattern 'path//*suffix'
--- 2) file's extension has a valid way tag (i.e., safeDetectWay does not fail)
-matchBuildResult :: FilePath -> String -> FilePath -> Bool
-matchBuildResult path suffix file =
-    (path <//> "*" ++ suffix) ?== file && isJust (safeDetectWay file)
 
 -- Instances for storing in the Shake database
 instance Binary Way where
