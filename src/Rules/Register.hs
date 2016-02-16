@@ -1,8 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 module Rules.Register (registerPackage) where
 
-import Data.Char
-
 import Base
 import Context
 import Expression
@@ -18,12 +16,9 @@ registerPackage :: [(Resource, Int)] -> Context -> Rules ()
 registerPackage rs context @ (Context {..}) = do
     let oldPath = pkgPath package -/- targetDirectory stage package -- TODO: remove, #113
         pkgConf = packageDbDirectory stage -/- pkgNameString package
-        match f = case stripPrefix (pkgConf ++ "-") f of
-            Nothing  -> False
-            Just suf -> dropWhile (\c -> isDigit c || c == '.') suf == "conf"
 
-    when (stage <= Stage1) $ match ?> \conf -> do
-        -- This produces pkgConfig. TODO: Add explicit tracking
+    when (stage <= Stage1) $ matchVersionedFilePath pkgConf "conf" ?> \conf -> do
+        -- This produces inplace-pkg-config. TODO: Add explicit tracking
         need [pkgDataFile stage package]
 
         -- Post-process inplace-pkg-config. TODO: remove, see #113, #148
