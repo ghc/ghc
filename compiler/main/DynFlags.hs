@@ -1882,7 +1882,7 @@ combineSafeFlags :: SafeHaskellMode -> SafeHaskellMode -> DynP SafeHaskellMode
 combineSafeFlags a b | a == Sf_None         = return b
                      | b == Sf_None         = return a
                      | a == b               = return a
-                     | otherwise            = addErr errm >> return (panic errm)
+                     | otherwise            = addErr errm >> pure a
     where errm = "Incompatible Safe Haskell flags! ("
                     ++ show a ++ ", " ++ show b ++ ")"
 
