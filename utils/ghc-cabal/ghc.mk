@@ -18,6 +18,20 @@ CABAL_DOTTED_VERSION := $(shell grep "^version:" libraries/Cabal/Cabal/Cabal.cab
 CABAL_VERSION := $(subst .,$(comma),$(CABAL_DOTTED_VERSION))
 CABAL_CONSTRAINT := --constraint="Cabal == $(CABAL_DOTTED_VERSION)"
 
+# Starting with GHC 8.0 we make use of GHC's native ability to
+# generate MIN_VERSION_<pkgname>() CPP macros (rather than relying on
+# the fragile `cabal_macros_boot.h` hack). The generation of those
+# macros is triggered by `-hide-all-packages`, so we have to explicitly
+# enumerate all packages we need in scope. In order to simplify the logic,
+# we pass `-hide-all-packages` also to GHCs < 8, and we include
+# `cabal_macros_boot.h` also for GHC >= 8 (in which case it becomes a
+# dummy include that doesn't contribute any macro definitions).
+ifeq "$(Windows_Host)" "YES"
+CABAL_BUILD_DEPS := base array time containers bytestring deepseq process pretty directory Win32
+else
+CABAL_BUILD_DEPS := base array time containers bytestring deepseq process pretty directory unix
+endif
+
 ghc-cabal_DIST_BINARY_NAME = ghc-cabal$(exeext0)
 ghc-cabal_DIST_BINARY = utils/ghc-cabal/dist/build/tmp/$(ghc-cabal_DIST_BINARY_NAME)
 ghc-cabal_INPLACE = inplace/bin/$(ghc-cabal_DIST_BINARY_NAME)
@@ -34,6 +48,8 @@ $(ghc-cabal_DIST_BINARY): utils/ghc-cabal/Main.hs $(TOUCH_DEP) | $$(dir $$@)/. b
 	"$(GHC)" $(SRC_HC_OPTS) \
 	       $(addprefix -optc, $(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE0)) \
 	       $(addprefix -optl, $(SRC_LD_OPTS) $(CONF_LD_OPTS_STAGE0)) \
+	       -hide-all-packages \
+	       $(addprefix -package , $(CABAL_BUILD_DEPS)) \
 	       --make utils/ghc-cabal/Main.hs -o $@ \
 	       -no-user-$(GHC_PACKAGE_DB_FLAG) \
 	       -Wall -fno-warn-unused-imports -fno-warn-warnings-deprecations \
