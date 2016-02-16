@@ -14,7 +14,7 @@ compilePackage rs context @ (Context {..}) = do
     let buildPath = targetPath stage package -/- "build"
 
     buildPath <//> "*" <.> hisuf way %> \hi ->
-        if compileInterfaceFilesSeparately && not ("//HpcParser.*" ?== hi)
+        if compileInterfaceFilesSeparately
         then do
             (src, deps) <- dependencies buildPath $ hi -<.> osuf way
             need $ src : deps
@@ -37,7 +37,7 @@ compilePackage rs context @ (Context {..}) = do
             need $ src : deps
             build $ Target context (Gcc stage) [src] [obj]
         else do
-            if compileInterfaceFilesSeparately && "//*.hs" ?== src && not ("//HpcParser.*" ?== src)
+            if compileInterfaceFilesSeparately && "//*.hs" ?== src
             then need $ (obj -<.> hisuf way) : src : deps
             else need $ src : deps
             buildWithResources rs $ Target context (Ghc stage) [src] [obj]
