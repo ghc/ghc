@@ -1346,7 +1346,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     lookup_ie_with :: IE RdrName -> Located RdrName -> [Located RdrName]
                    -> RnM (Located Name, [Located Name], [Name], [FieldLabel])
     lookup_ie_with ie (L l rdr) sub_rdrs
-        = do name <- lookupGlobalOccRn rdr
+        = do name <- lookupGlobalOccRnExport rdr
              let gres = findChildren kids_env name
                  mchildren =
                   lookupChildren (map classifyGRE (gres ++ pat_syns)) sub_rdrs
@@ -1366,7 +1366,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     lookup_ie_all :: IE RdrName -> Located RdrName
                   -> RnM (Located Name, [Name], [FieldLabel])
     lookup_ie_all ie (L l rdr) =
-          do name <- lookupGlobalOccRn rdr
+          do name <- lookupGlobalOccRnExport rdr
              let gres = findChildren kids_env name
                  (non_flds, flds) = classifyGREs gres
              addUsedKids rdr gres
