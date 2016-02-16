@@ -37,6 +37,7 @@ buildPackageDocumentation context @ (Context {..}) =
                 build $ Target context GhcCabalHsColour [cabalFile] []
 
             -- Build Haddock documentation
+            -- TODO: pass the correct way from Rules via Context
             let haddockWay = if dynamicGhcPrograms then dynamic else vanilla
             build $ Target (context {way = haddockWay}) Haddock srcs [file]
 

@@ -14,24 +14,21 @@ import Rules.Gmp
 import Settings
 import Target
 
--- TODO: Use way from Context, #207
 buildPackageLibrary :: Context -> Rules ()
 buildPackageLibrary context @ (Context {..}) = do
     let buildPath = targetPath stage package -/- "build"
 
     -- TODO: handle dynamic libraries
-    matchBuildResult buildPath "a" ?> \a -> do
-
+    buildPath <//> "*" ++ waySuffix way ++ ".a" %> \a -> do
         removeFileIfExists a
         cSrcs <- cSources context
         hSrcs <- hSources context
 
-        -- TODO: simplify handling of AutoApply.cmm
-        let w     = detectWay a -- TODO: eliminate differences below
-            cObjs = [ buildPath -/- src -<.> osuf w | src <- cSrcs
+        -- TODO: simplify handling of AutoApply.cmm, eliminate differences below
+        let cObjs = [ buildPath -/- src -<.> osuf way | src <- cSrcs
                     , not ("//AutoApply.cmm" ?== src) ]
-                 ++ [ src -<.> osuf w | src <- cSrcs, "//AutoApply.cmm" ?== src ]
-            hObjs = [ buildPath -/- src  <.> osuf w | src <- hSrcs ]
+                 ++ [ src -<.> osuf way | src <- cSrcs, "//AutoApply.cmm" ?== src ]
+            hObjs = [ buildPath -/- src  <.> osuf way | src <- hSrcs ]
 
         -- This will create split objects if required (we don't track them
         -- explicitly as this would needlessly bloat the Shake database).

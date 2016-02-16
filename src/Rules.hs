@@ -64,16 +64,19 @@ packageRules = do
     let contexts        = liftM3 Context        allStages knownPackages allWays
         vanillaContexts = liftM2 vanillaContext allStages knownPackages
 
-    traverse_ (compilePackage           readPackageDb) contexts
-    traverse_ (buildPackageDependencies readPackageDb) vanillaContexts
+    for_ contexts $ mconcat
+        [ compilePackage readPackageDb
+        , buildPackageLibrary ]
+
+    for_ vanillaContexts $ mconcat
+        [ buildPackageData
+        , buildPackageDependencies readPackageDb
+        , buildPackageDocumentation
+        , generatePackageCode ]
 
     for_ allStages $ \stage ->
         for_ knownPackages $ \package -> do
             let context = vanillaContext stage package
-            buildPackageData                         context
-            buildPackageDocumentation                context
-            generatePackageCode                      context
-            buildPackageLibrary                      context
             buildProgram                             context
             registerPackage           writePackageDb context
 

@@ -6,8 +6,8 @@ module Way (
     threadedDebugProfiling, threadedDebugDynamic, threadedProfilingDynamic,
     threadedLoggingDynamic, debugProfiling, debugDynamic, loggingDynamic,
 
-    allWays, wayPrefix, hisuf, osuf, hcsuf, obootsuf, hibootsuf, ssuf, libsuf,
-    safeDetectWay, detectWay, matchBuildResult
+    allWays, wayPrefix, waySuffix, hisuf, osuf, hcsuf, obootsuf, hibootsuf, ssuf,
+    libsuf, safeDetectWay, detectWay, matchBuildResult
     ) where
 
 import Base hiding (unit)
