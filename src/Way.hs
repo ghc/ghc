@@ -76,7 +76,7 @@ instance Read Way where
 instance Eq Way where
     Way a == Way b = a == b
 
--- | Build with no 'WayUnit's at all.
+-- | Build default _vanilla_ way.
 vanilla :: Way
 vanilla = wayFromUnits []
 
@@ -84,33 +84,39 @@ vanilla = wayFromUnits []
 profiling :: Way
 profiling = wayFromUnits [Profiling]
 
--- | Build with logging.
+-- | Build with dynamic linking.
+dynamic :: Way
+dynamic = wayFromUnits [Dynamic]
+
+-- RTS only ways. See compiler/main/DynFlags.hs.
+-- | Build RTS with event logging.
 logging :: Way
 logging = wayFromUnits [Logging]
 
--- RTS only ways
--- TODO: do we need to define *only* these? Shall we generalise/simplify?
--- See compiler/main/DynFlags.hs.
-threaded, threadedProfiling, threadedLogging, debug, debugProfiling,
-    threadedDebug, threadedDebugProfiling, dynamic, profilingDynamic,
-    threadedProfilingDynamic, threadedDynamic, threadedDebugDynamic,
-    debugDynamic, loggingDynamic, threadedLoggingDynamic :: Way
+-- | Build multithreaded RTS.
+threaded :: Way
+threaded = wayFromUnits [Threaded]
 
-threaded                 = wayFromUnits [Threaded]
+-- | Build RTS with debug information.
+debug :: Way
+debug = wayFromUnits [Debug]
+
+threadedDebug, threadedProfiling, threadedLogging, threadedDynamic,
+    threadedDebugProfiling, threadedDebugDynamic, threadedProfilingDynamic,
+    threadedLoggingDynamic, debugProfiling, debugDynamic, profilingDynamic,
+    loggingDynamic :: Way
+threadedDebug            = wayFromUnits [Threaded, Debug]
 threadedProfiling        = wayFromUnits [Threaded, Profiling]
 threadedLogging          = wayFromUnits [Threaded, Logging]
-debug                    = wayFromUnits [Debug]
-debugProfiling           = wayFromUnits [Debug, Profiling]
-threadedDebug            = wayFromUnits [Threaded, Debug]
-threadedDebugProfiling   = wayFromUnits [Threaded, Debug, Profiling]
-dynamic                  = wayFromUnits [Dynamic]
-profilingDynamic         = wayFromUnits [Profiling, Dynamic]
-threadedProfilingDynamic = wayFromUnits [Threaded, Profiling, Dynamic]
 threadedDynamic          = wayFromUnits [Threaded, Dynamic]
+threadedDebugProfiling   = wayFromUnits [Threaded, Debug, Profiling]
 threadedDebugDynamic     = wayFromUnits [Threaded, Debug, Dynamic]
-debugDynamic             = wayFromUnits [Debug, Dynamic]
-loggingDynamic           = wayFromUnits [Logging, Dynamic]
+threadedProfilingDynamic = wayFromUnits [Threaded, Profiling, Dynamic]
 threadedLoggingDynamic   = wayFromUnits [Threaded, Logging, Dynamic]
+debugProfiling           = wayFromUnits [Debug, Profiling]
+debugDynamic             = wayFromUnits [Debug, Dynamic]
+profilingDynamic         = wayFromUnits [Profiling, Dynamic]
+loggingDynamic           = wayFromUnits [Logging, Dynamic]
 
 wayPrefix :: Way -> String
 wayPrefix way | way == vanilla = ""
