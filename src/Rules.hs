@@ -61,6 +61,7 @@ packageRules = do
     let readPackageDb  = [(packageDb, 1)]
         writePackageDb = [(packageDb, maxConcurrentReaders)]
 
+    -- TODO: not all build rules make sense for all stage/package combinations
     let contexts        = liftM3 Context        allStages knownPackages allWays
         vanillaContexts = liftM2 vanillaContext allStages knownPackages
 
@@ -72,6 +73,7 @@ packageRules = do
         [ buildPackageData
         , buildPackageDependencies readPackageDb
         , buildPackageDocumentation
+        , buildPackageGhciLibrary
         , generatePackageCode
         , buildProgram
         , registerPackage writePackageDb ]
