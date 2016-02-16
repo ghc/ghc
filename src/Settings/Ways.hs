@@ -13,6 +13,7 @@ getLibraryWays = fromDiffExpr $ defaultLibraryWays <> userLibraryWays
 getRtsWays :: Expr [Way]
 getRtsWays = fromDiffExpr $ defaultRtsWays <> userRtsWays
 
+-- TODO: what about profilingDynamic way? Do we need platformSupportsSharedLibs?
 -- These are default ways for library packages:
 -- * We always build 'vanilla' way.
 -- * We build 'profiling' way when stage > Stage0.

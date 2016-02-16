@@ -88,7 +88,11 @@ profiling = wayFromUnits [Profiling]
 dynamic :: Way
 dynamic = wayFromUnits [Dynamic]
 
--- RTS only ways. See compiler/main/DynFlags.hs.
+-- | Build with profiling and dynamic linking.
+profilingDynamic :: Way
+profilingDynamic = wayFromUnits [Profiling, Dynamic]
+
+-- RTS only ways below. See compiler/main/DynFlags.hs.
 -- | Build RTS with event logging.
 logging :: Way
 logging = wayFromUnits [Logging]
@@ -101,10 +105,10 @@ threaded = wayFromUnits [Threaded]
 debug :: Way
 debug = wayFromUnits [Debug]
 
+-- | Various combinations of RTS only ways.
 threadedDebug, threadedProfiling, threadedLogging, threadedDynamic,
     threadedDebugProfiling, threadedDebugDynamic, threadedProfilingDynamic,
-    threadedLoggingDynamic, debugProfiling, debugDynamic, profilingDynamic,
-    loggingDynamic :: Way
+    threadedLoggingDynamic, debugProfiling, debugDynamic, loggingDynamic :: Way
 threadedDebug            = wayFromUnits [Threaded, Debug]
 threadedProfiling        = wayFromUnits [Threaded, Profiling]
 threadedLogging          = wayFromUnits [Threaded, Logging]
@@ -115,7 +119,6 @@ threadedProfilingDynamic = wayFromUnits [Threaded, Profiling, Dynamic]
 threadedLoggingDynamic   = wayFromUnits [Threaded, Logging, Dynamic]
 debugProfiling           = wayFromUnits [Debug, Profiling]
 debugDynamic             = wayFromUnits [Debug, Dynamic]
-profilingDynamic         = wayFromUnits [Profiling, Dynamic]
 loggingDynamic           = wayFromUnits [Logging, Dynamic]
 
 wayPrefix :: Way -> String
