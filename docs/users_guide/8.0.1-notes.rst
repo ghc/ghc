@@ -192,7 +192,10 @@ Language
    In previous versions of GHC, this required a workaround via an
    explicit export list in ``Bar``.
 
-
+-  :ghc-flag:`-XDeriveFoldable` and :ghc-flag:`-XDeriveTraversable` now
+   generate code without superfluous ``mempty`` or ``pure`` expressions. As a
+   result, :ghc-flag:`-XDeriveTraversable` now works on datatypes that contain
+   arguments which have unlifted types.
 
 Compiler
 ~~~~~~~~

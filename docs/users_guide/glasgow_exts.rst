@@ -3515,8 +3515,11 @@ would generate the following instance::
 
 The algorithm for :ghc-flag:`-XDeriveFoldable` is adapted from the :ghc-flag:`-XDeriveFunctor`
 algorithm, but it generates definitions for ``foldMap`` and ``foldr`` instead
-of ``fmap``. Here are the differences between the generated code in each
-extension:
+of ``fmap``. In addition, :ghc-flag:`-XDeriveFoldable` filters out all
+constructor arguments on the RHS expression whose types do not mention the last
+type parameter, since those arguments do not need to be folded over.
+
+Here are the differences between the generated code in each extension:
 
 #. When a bare type variable ``a`` is encountered, :ghc-flag:`-XDeriveFunctor` would
    generate ``f a`` for an ``fmap`` definition. :ghc-flag:`-XDeriveFoldable` would
@@ -3526,10 +3529,6 @@ extension:
    contain ``a``, is encountered, :ghc-flag:`-XDeriveFunctor` recursively calls
    ``fmap`` on it. Similarly, :ghc-flag:`-XDeriveFoldable` would recursively call
    ``foldr`` and ``foldMap``.
-
-#. When a type that does not mention ``a`` is encountered, :ghc-flag:`-XDeriveFunctor`
-   leaves it alone. On the other hand, :ghc-flag:`-XDeriveFoldable` would generate
-   ``z`` (the state value) for ``foldr`` and ``mempty`` for ``foldMap``.
 
 #. :ghc-flag:`-XDeriveFunctor` puts everything back together again at the end by
    invoking the constructor. :ghc-flag:`-XDeriveFoldable`, however, builds up a value
@@ -3596,12 +3595,15 @@ would generate the following ``Traversable`` instance::
 
     instance Traversable Example where
       traverse f (Ex a1 a2 a3 a4)
-        = fmap Ex (f a1) <*> traverse f a3
+        = fmap (\b1 b3 -> Ex b1 a2 b3 a4) (f a1) <*> traverse f a3
 
 The algorithm for :ghc-flag:`-XDeriveTraversable` is adapted from the
 :ghc-flag:`-XDeriveFunctor` algorithm, but it generates a definition for ``traverse``
-instead of ``fmap``. Here are the differences between the generated code in
-each extension:
+instead of ``fmap``. In addition, :ghc-flag:`-XDeriveTraversable` filters out
+all constructor arguments on the RHS expression whose types do not mention the
+last type parameter, since those arguments do not produce any effects in a
+traversal. Here are the differences between the generated code in each
+extension:
 
 #. When a bare type variable ``a`` is encountered, both :ghc-flag:`-XDeriveFunctor` and
    :ghc-flag:`-XDeriveTraversable` would generate ``f a`` for an ``fmap`` and
@@ -3611,10 +3613,6 @@ each extension:
    contain ``a``, is encountered, :ghc-flag:`-XDeriveFunctor` recursively calls
    ``fmap`` on it. Similarly, :ghc-flag:`-XDeriveTraversable` would recursively call
    ``traverse``.
-
-#. When a type that does not mention ``a`` is encountered, :ghc-flag:`-XDeriveFunctor`
-   leaves it alone. On the other hand, :ghc-flag:`-XDeriveTraversable` would call
-   ``pure`` on the value of that type.
 
 #. :ghc-flag:`-XDeriveFunctor` puts everything back together again at the end by
    invoking the constructor. :ghc-flag:`-XDeriveTraversable` does something similar,

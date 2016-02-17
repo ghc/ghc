@@ -70,6 +70,7 @@ import StaticFlags( opt_PprStyle_Debug )
 
 import ListSetOps ( assocMaybe )
 import Data.List  ( partition, intersperse )
+import Data.Maybe ( catMaybes, isJust )
 
 type BagDerivStuff = Bag DerivStuff
 
@@ -1562,16 +1563,22 @@ gen_Functor_binds loc tycon
          | otherwise      = map fmap_eqn data_cons
 
     ft_fmap :: FFoldType (State [RdrName] (LHsExpr RdrName))
-    ft_fmap = FT { ft_triv = mkSimpleLam $ \x -> return x    -- fmap f = \x -> x
-                 , ft_var  = return f_Expr                   -- fmap f = f
-                 , ft_fun  = \g h -> do                      -- fmap f = \x b -> h (x (g b))
-                                 gg <- g
-                                 hh <- h
-                                 mkSimpleLam2 $ \x b -> return $ nlHsApp hh (nlHsApp x (nlHsApp gg b))
-                 , ft_tup = \t gs -> do                      -- fmap f = \x -> case x of (a1,a2,..) -> (g1 a1,g2 a2,..)
-                                 gg <- sequence gs
-                                 mkSimpleLam $ mkSimpleTupleCase match_for_con t gg
-                 , ft_ty_app = \_ g -> nlHsApp fmap_Expr <$> g  -- fmap f = fmap g
+    ft_fmap = FT { ft_triv = mkSimpleLam $ \x -> return x
+                   -- fmap f = \x -> x
+                 , ft_var  = return f_Expr
+                   -- fmap f = f
+                 , ft_fun  = \g h -> do
+                     gg <- g
+                     hh <- h
+                     mkSimpleLam2 $ \x b -> return $
+                       nlHsApp hh (nlHsApp x (nlHsApp gg b))
+                   -- fmap f = \x b -> h (x (g b))
+                 , ft_tup = \t gs -> do
+                     gg <- sequence gs
+                     mkSimpleLam $ mkSimpleTupleCase match_for_con t gg
+                   -- fmap f = \x -> case x of (a1,a2,..) -> (g1 a1,g2 a2,..)
+                 , ft_ty_app = \_ g -> nlHsApp fmap_Expr <$> g
+                   -- fmap f = fmap g
                  , ft_forall = \_ g -> g
                  , ft_bad_app = panic "in other argument"
                  , ft_co_var = panic "contravariant" }
@@ -1590,15 +1597,24 @@ This function works like a fold: it makes a value of type 'a' in a bottom up way
 -}
 
 -- Generic traversal for Functor deriving
+-- See Note [FFoldType and functorLikeTraverse]
 data FFoldType a      -- Describes how to fold over a Type in a functor like way
-   = FT { ft_triv    :: a                   -- Does not contain variable
-        , ft_var     :: a                   -- The variable itself
-        , ft_co_var  :: a                   -- The variable itself, contravariantly
-        , ft_fun     :: a -> a -> a         -- Function type
-        , ft_tup     :: TyCon -> [a] -> a   -- Tuple type
-        , ft_ty_app  :: Type -> a -> a      -- Type app, variable only in last argument
-        , ft_bad_app :: a                   -- Type app, variable other than in last argument
-        , ft_forall  :: TcTyVar -> a -> a   -- Forall type
+   = FT { ft_triv    :: a
+          -- ^ Does not contain variable
+        , ft_var     :: a
+          -- ^ The variable itself
+        , ft_co_var  :: a
+          -- ^ The variable itself, contravariantly
+        , ft_fun     :: a -> a -> a
+          -- ^ Function type
+        , ft_tup     :: TyCon -> [a] -> a
+          -- ^ Tuple type
+        , ft_ty_app  :: Type -> a -> a
+          -- ^ Type app, variable only in last argument
+        , ft_bad_app :: a
+          -- ^ Type app, variable other than in last argument
+        , ft_forall  :: TcTyVar -> a -> a
+          -- ^ Forall type
      }
 
 functorLikeTraverse :: forall a.
@@ -1697,6 +1713,12 @@ mkSimpleLam2 lam = do
     return (mkHsLam [nlVarPat n1,nlVarPat n2] body)
 
 -- "Con a1 a2 a3 -> fold [x1 a1, x2 a2, x3 a3]"
+--
+-- @mkSimpleConMatch fold extra_pats con insides@ produces a match clause in
+-- which the LHS pattern-matches on @extra_pats@, followed by a match on the
+-- constructor @con@ and its arguments. The RHS folds (with @fold@) over @con@
+-- and its arguments, applying an expression (from @insides@) to each of the
+-- respective arguments of @con@.
 mkSimpleConMatch :: Monad m => (RdrName -> [LHsExpr RdrName] -> m (LHsExpr RdrName))
                  -> [LPat RdrName]
                  -> DataCon
@@ -1707,6 +1729,57 @@ mkSimpleConMatch fold extra_pats con insides = do
     let vars_needed = takeList insides as_RDRs
     let pat = nlConVarPat con_name vars_needed
     rhs <- fold con_name (zipWith nlHsApp insides (map nlHsVar vars_needed))
+    return $ mkMatch (extra_pats ++ [pat]) rhs (noLoc emptyLocalBinds)
+
+-- "Con a1 a2 a3 -> fmap (\b2 -> Con a1 b2 a3) (traverse f a2)"
+--
+-- @mkSimpleConMatch2 fold extra_pats con insides@ behaves very similarly to
+-- 'mkSimpleConMatch', with two key differences:
+--
+-- 1. @insides@ is a @[Maybe (LHsExpr RdrName)]@ instead of a
+--    @[LHsExpr RdrName]@. This is because it filters out the expressions
+--    corresponding to arguments whose types do not mention the last type
+--    variable in a derived 'Foldable' or 'Traversable' instance (i.e., the
+--    'Nothing' elements of @insides@).
+--
+-- 2. @fold@ takes an expression as its first argument instead of a
+--    constructor name. This is because it uses a specialized
+--    constructor function expression that only takes as many parameters as
+--    there are argument types that mention the last type variable.
+--
+-- See Note [Generated code for DeriveFoldable and DeriveTraversable]
+mkSimpleConMatch2 :: Monad m
+                  => (LHsExpr RdrName -> [LHsExpr RdrName]
+                                      -> m (LHsExpr RdrName))
+                  -> [LPat RdrName]
+                  -> DataCon
+                  -> [Maybe (LHsExpr RdrName)]
+                  -> m (LMatch RdrName (LHsExpr RdrName))
+mkSimpleConMatch2 fold extra_pats con insides = do
+    let con_name = getRdrName con
+        vars_needed = takeList insides as_RDRs
+        pat = nlConVarPat con_name vars_needed
+        -- Make sure to zip BEFORE invoking catMaybes. We want the variable
+        -- indicies in each expression to match up with the argument indices
+        -- in con_expr (defined below).
+        exps = catMaybes $ zipWith (\i v -> (`nlHsApp` v) <$> i)
+                                   insides (map nlHsVar vars_needed)
+        -- An element of argTysTyVarInfo is True if the constructor argument
+        -- with the same index has a type which mentions the last type
+        -- variable.
+        argTysTyVarInfo = map isJust insides
+        (asWithTyVar, asWithoutTyVar) = partitionByList argTysTyVarInfo as_RDRs
+
+        con_expr
+          | null asWithTyVar = nlHsApps con_name $ map nlHsVar asWithoutTyVar
+          | otherwise =
+              let bs   = filterByList  argTysTyVarInfo bs_RDRs
+                  vars = filterByLists argTysTyVarInfo
+                                       (map nlHsVar bs_RDRs)
+                                       (map nlHsVar as_RDRs)
+              in mkHsLam (map nlVarPat bs) (nlHsApps con_name vars)
+
+    rhs <- fold con_expr exps
     return $ mkMatch (extra_pats ++ [pat]) rhs (noLoc emptyLocalBinds)
 
 -- "case x of (a1,a2,a3) -> fold [x1 a1, x2 a2, x3 a3]"
@@ -1730,20 +1803,41 @@ mkSimpleTupleCase match_for_con tc insides x
 
 Deriving Foldable instances works the same way as Functor instances,
 only Foldable instances are not possible for function types at all.
-Here the derived instance for the type T above is:
+Given (data T a = T a a (T a) deriving Foldable), we get:
 
   instance Foldable T where
-      foldr f z (T1 x1 x2 x3) = $(foldr 'a 'b1) x1 ( $(foldr 'a 'a) x2 ( $(foldr 'a 'b2) x3 z ) )
+      foldr f z (T1 x1 x2 x3) =
+        $(foldr 'a 'a) x1 ( $(foldr 'a 'a) x2 ( $(foldr 'a '(T a)) x3 z ) )
+
+-XDeriveFoldable is different from -XDeriveFunctor in that it filters out
+arguments to the constructor that would produce useless code in a Foldable
+instance. For example, the following datatype:
+
+  data Foo a = Foo Int a Int deriving Foldable
+
+would have the following generated Foldable instance:
+
+  instance Foldable Foo where
+    foldr f z (Foo x1 x2 x3) = $(foldr 'a 'a) x2
+
+since neither of the two Int arguments are folded over.
 
 The cases are:
 
-  $(foldr 'a 'b)         =  \x z -> z     -- when b does not contain a
   $(foldr 'a 'a)         =  f
   $(foldr 'a '(b1,b2))   =  \x z -> case x of (x1,x2) -> $(foldr 'a 'b1) x1 ( $(foldr 'a 'b2) x2 z )
   $(foldr 'a '(T b1 b2)) =  \x z -> foldr $(foldr 'a 'b2) z x  -- when a only occurs in the last parameter, b2
 
 Note that the arguments to the real foldr function are the wrong way around,
 since (f :: a -> b -> b), while (foldr f :: b -> t a -> b).
+
+One can envision a case for types that don't contain the last type variable:
+
+  $(foldr 'a 'b)         =  \x z -> z     -- when b does not contain a
+
+But this case will never materialize, since the aforementioned filtering
+removes all such types from consideration.
+See Note [Generated code for DeriveFoldable and DeriveTraversable].
 
 Foldable instances differ from Functor and Traversable instances in that
 Foldable instances can be derived for data types in which the last type
@@ -1772,44 +1866,82 @@ gen_Foldable_binds loc tycon
 
     foldr_bind = mkRdrFunBind (L loc foldable_foldr_RDR) eqns
     eqns = map foldr_eqn data_cons
-    foldr_eqn con = evalState (match_foldr z_Expr [f_Pat,z_Pat] con =<< parts) bs_RDRs
+    foldr_eqn con
+      = evalState (match_foldr z_Expr [f_Pat,z_Pat] con =<< parts) bs_RDRs
       where
         parts = sequence $ foldDataConArgs ft_foldr con
 
     foldMap_bind = mkRdrFunBind (L loc foldMap_RDR) (map foldMap_eqn data_cons)
-    foldMap_eqn con = evalState (match_foldMap [f_Pat] con =<< parts) bs_RDRs
+    foldMap_eqn con
+      = evalState (match_foldMap [f_Pat] con =<< parts) bs_RDRs
       where
         parts = sequence $ foldDataConArgs ft_foldMap con
 
-    ft_foldr :: FFoldType (State [RdrName] (LHsExpr RdrName))
-    ft_foldr = FT { ft_triv    = mkSimpleLam2 $ \_ z -> return z       -- foldr f = \x z -> z
-                  , ft_var     = return f_Expr                         -- foldr f = f
-                  , ft_tup     = \t g -> do gg <- sequence g           -- foldr f = (\x z -> case x of ...)
-                                            mkSimpleLam2 $ \x z -> mkSimpleTupleCase (match_foldr z) t gg x
-                  , ft_ty_app  = \_ g -> do gg <- g                    -- foldr f = (\x z -> foldr g z x)
-                                            mkSimpleLam2 $ \x z -> return $ nlHsApps foldable_foldr_RDR [gg,z,x]
-                  , ft_forall  = \_ g -> g
-                  , ft_co_var  = panic "contravariant"
-                  , ft_fun     = panic "function"
-                  , ft_bad_app = panic "in other argument" }
+    -- Yields 'Just' an expression if we're folding over a type that mentions
+    -- the last type parameter of the datatype. Otherwise, yields 'Nothing'.
+    -- See Note [FFoldType and functorLikeTraverse]
+    ft_foldr :: FFoldType (State [RdrName] (Maybe (LHsExpr RdrName)))
+    ft_foldr
+      = FT { ft_triv    = return Nothing
+             -- foldr f = \x z -> z
+           , ft_var     = return $ Just f_Expr
+             -- foldr f = f
+           , ft_tup     = \t g -> do
+               gg  <- sequence g
+               lam <- mkSimpleLam2 $ \x z ->
+                 mkSimpleTupleCase (match_foldr z) t gg x
+               return (Just lam)
+             -- foldr f = (\x z -> case x of ...)
+           , ft_ty_app  = \_ g -> do
+               gg <- g
+               mapM (\gg' -> mkSimpleLam2 $ \x z -> return $
+                 nlHsApps foldable_foldr_RDR [gg',z,x]) gg
+             -- foldr f = (\x z -> foldr g z x)
+           , ft_forall  = \_ g -> g
+           , ft_co_var  = panic "contravariant"
+           , ft_fun     = panic "function"
+           , ft_bad_app = panic "in other argument" }
 
-    match_foldr z = mkSimpleConMatch $ \_con_name xs -> return $ foldr nlHsApp z xs -- g1 v1 (g2 v2 (.. z))
+    match_foldr :: LHsExpr RdrName
+                -> [LPat RdrName]
+                -> DataCon
+                -> [Maybe (LHsExpr RdrName)]
+                -> State [RdrName] (LMatch RdrName (LHsExpr RdrName))
+    match_foldr z = mkSimpleConMatch2 $ \_ xs -> return (mkFoldr xs)
+      where
+        -- g1 v1 (g2 v2 (.. z))
+        mkFoldr :: [LHsExpr RdrName] -> LHsExpr RdrName
+        mkFoldr = foldr nlHsApp z
 
-    ft_foldMap :: FFoldType (State [RdrName] (LHsExpr RdrName))
-    ft_foldMap = FT { ft_triv = mkSimpleLam $ \_ -> return mempty_Expr  -- foldMap f = \x -> mempty
-                    , ft_var  = return f_Expr                           -- foldMap f = f
-                    , ft_tup  = \t g -> do gg <- sequence g             -- foldMap f = \x -> case x of (..,)
-                                           mkSimpleLam $ mkSimpleTupleCase match_foldMap t gg
-                    , ft_ty_app = \_ g -> nlHsApp foldMap_Expr <$> g    -- foldMap f = foldMap g
-                    , ft_forall = \_ g -> g
-                    , ft_co_var = panic "contravariant"
-                    , ft_fun = panic "function"
-                    , ft_bad_app = panic "in other argument" }
+    -- See Note [FFoldType and functorLikeTraverse]
+    ft_foldMap :: FFoldType (State [RdrName] (Maybe (LHsExpr RdrName)))
+    ft_foldMap
+      = FT { ft_triv = return Nothing
+             -- foldMap f = \x -> mempty
+           , ft_var  = return (Just f_Expr)
+             -- foldMap f = f
+           , ft_tup  = \t g -> do
+               gg  <- sequence g
+               lam <- mkSimpleLam $ mkSimpleTupleCase match_foldMap t gg
+               return (Just lam)
+             -- foldMap f = \x -> case x of (..,)
+           , ft_ty_app = \_ g -> fmap (nlHsApp foldMap_Expr) <$> g
+             -- foldMap f = foldMap g
+           , ft_forall = \_ g -> g
+           , ft_co_var = panic "contravariant"
+           , ft_fun = panic "function"
+           , ft_bad_app = panic "in other argument" }
 
-    match_foldMap = mkSimpleConMatch $ \_con_name xs -> return $
-        case xs of
-            [] -> mempty_Expr
-            xs -> foldr1 (\x y -> nlHsApps mappend_RDR [x,y]) xs
+    match_foldMap :: [LPat RdrName]
+                  -> DataCon
+                  -> [Maybe (LHsExpr RdrName)]
+                  -> State [RdrName] (LMatch RdrName (LHsExpr RdrName))
+    match_foldMap = mkSimpleConMatch2 $ \_ xs -> return (mkFoldMap xs)
+      where
+        -- mappend v1 (mappend v2 ..)
+        mkFoldMap :: [LHsExpr RdrName] -> LHsExpr RdrName
+        mkFoldMap [] = mempty_Expr
+        mkFoldMap xs = foldr1 (\x y -> nlHsApps mappend_RDR [x,y]) xs
 
 {-
 ************************************************************************
@@ -1824,17 +1956,30 @@ Again, Traversable is much like Functor and Foldable.
 
 The cases are:
 
-  $(traverse 'a 'b)          =  pure     -- when b does not contain a
   $(traverse 'a 'a)          =  f
   $(traverse 'a '(b1,b2))    =  \x -> case x of (x1,x2) -> (,) <$> $(traverse 'a 'b1) x1 <*> $(traverse 'a 'b2) x2
   $(traverse 'a '(T b1 b2))  =  traverse $(traverse 'a 'b2)  -- when a only occurs in the last parameter, b2
 
-Note that the generated code is not as efficient as it could be. For instance:
+Like -XDeriveFoldable, -XDeriveTraversable filters out arguments whose types
+do not mention the last type parameter. Therefore, the following datatype:
 
-  data T a = T Int a  deriving Traversable
+  data Foo a = Foo Int a Int
 
-gives the function: traverse f (T x y) = T <$> pure x <*> f y
-instead of:         traverse f (T x y) = T x <$> f y
+would have the following derived Traversable instance:
+
+  instance Traversable Foo where
+    traverse f (Foo x1 x2 x3) =
+      fmap (\b2 -> Foo x1 b2 x3) ( $(traverse 'a 'a) x2 )
+
+since the two Int arguments do not produce any effects in a traversal.
+
+One can envision a case for types that do not mention the last type parameter:
+
+  $(traverse 'a 'b)          =  pure     -- when b does not contain a
+
+But this case will never materialize, since the aforementioned filtering
+removes all such types from consideration.
+See Note [Generated code for DeriveFoldable and DeriveTraversable].
 -}
 
 gen_Traversable_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
@@ -1845,31 +1990,46 @@ gen_Traversable_binds loc tycon
 
     traverse_bind = mkRdrFunBind (L loc traverse_RDR) eqns
     eqns = map traverse_eqn data_cons
-    traverse_eqn con = evalState (match_for_con [f_Pat] con =<< parts) bs_RDRs
+    traverse_eqn con
+      = evalState (match_for_con [f_Pat] con =<< parts) bs_RDRs
       where
         parts = sequence $ foldDataConArgs ft_trav con
 
+    -- Yields 'Just' an expression if we're folding over a type that mentions
+    -- the last type parameter of the datatype. Otherwise, yields 'Nothing'.
+    -- See Note [FFoldType and functorLikeTraverse]
+    ft_trav :: FFoldType (State [RdrName] (Maybe (LHsExpr RdrName)))
+    ft_trav
+      = FT { ft_triv    = return Nothing
+             -- traverse f = pure x
+           , ft_var     = return (Just f_Expr)
+             -- traverse f = f x
+           , ft_tup     = \t gs -> do
+               gg  <- sequence gs
+               lam <- mkSimpleLam $ mkSimpleTupleCase match_for_con t gg
+               return (Just lam)
+             -- traverse f = \x -> case x of (a1,a2,..) ->
+             --                           (,,) <$> g1 a1 <*> g2 a2 <*> ..
+           , ft_ty_app  = \_ g -> fmap (nlHsApp traverse_Expr) <$> g
+             -- traverse f = traverse g
+           , ft_forall  = \_ g -> g
+           , ft_co_var  = panic "contravariant"
+           , ft_fun     = panic "function"
+           , ft_bad_app = panic "in other argument" }
 
-    ft_trav :: FFoldType (State [RdrName] (LHsExpr RdrName))
-    ft_trav = FT { ft_triv    = return pure_Expr                  -- traverse f = pure x
-                 , ft_var     = return f_Expr                     -- traverse f = f x
-                 , ft_tup     = \t gs -> do                       -- traverse f = \x -> case x of (a1,a2,..) ->
-                                    gg <- sequence gs             --                   (,,) <$> g1 a1 <*> g2 a2 <*> ..
-                                    mkSimpleLam $ mkSimpleTupleCase match_for_con t gg
-                 , ft_ty_app  = \_ g -> nlHsApp traverse_Expr <$> g  -- traverse f = travese g
-                 , ft_forall  = \_ g -> g
-                 , ft_co_var  = panic "contravariant"
-                 , ft_fun     = panic "function"
-                 , ft_bad_app = panic "in other argument" }
-
-    -- Con a1 a2 ... -> Con <$> g1 a1 <*> g2 a2 <*> ...
-    match_for_con = mkSimpleConMatch $
-        \con_name xs -> return $ mkApCon (nlHsVar con_name) xs
-
-    -- ((Con <$> x1) <*> x2) <*> ..
-    mkApCon con []     = nlHsApps pure_RDR [con]
-    mkApCon con (x:xs) = foldl appAp (nlHsApps fmap_RDR [con,x]) xs
-       where appAp x y = nlHsApps ap_RDR [x,y]
+    -- Con a1 a2 ... -> fmap (\b1 b2 ... -> Con b1 b2 ...) (g1 a1)
+    --                    <*> g2 a2 <*> ...
+    match_for_con :: [LPat RdrName]
+                  -> DataCon
+                  -> [Maybe (LHsExpr RdrName)]
+                  -> State [RdrName] (LMatch RdrName (LHsExpr RdrName))
+    match_for_con = mkSimpleConMatch2 $ \con xs -> return (mkApCon con xs)
+      where
+        -- fmap (\b1 b2 ... -> Con b1 b2 ...) x1 <*> x2 <*> ..
+        mkApCon :: LHsExpr RdrName -> [LHsExpr RdrName] -> LHsExpr RdrName
+        mkApCon con [] = nlHsApps pure_RDR [con]
+        mkApCon con (x:xs) = foldl appAp (nlHsApps fmap_RDR [con,x]) xs
+          where appAp x y = nlHsApps ap_RDR [x,y]
 
 {-
 ************************************************************************
@@ -2409,7 +2569,8 @@ bs_RDRs         = [ mkVarUnqual (mkFastString ("b"++show i)) | i <- [(1::Int) ..
 cs_RDRs         = [ mkVarUnqual (mkFastString ("c"++show i)) | i <- [(1::Int) .. ] ]
 
 a_Expr, c_Expr, f_Expr, z_Expr, ltTag_Expr, eqTag_Expr, gtTag_Expr,
-    false_Expr, true_Expr, fmap_Expr, pure_Expr, mempty_Expr, foldMap_Expr, traverse_Expr :: LHsExpr RdrName
+    false_Expr, true_Expr, fmap_Expr,
+    mempty_Expr, foldMap_Expr, traverse_Expr :: LHsExpr RdrName
 a_Expr          = nlHsVar a_RDR
 -- b_Expr       = nlHsVar b_RDR
 c_Expr          = nlHsVar c_RDR
@@ -2421,7 +2582,7 @@ gtTag_Expr      = nlHsVar gtTag_RDR
 false_Expr      = nlHsVar false_RDR
 true_Expr       = nlHsVar true_RDR
 fmap_Expr       = nlHsVar fmap_RDR
-pure_Expr       = nlHsVar pure_RDR
+-- pure_Expr       = nlHsVar pure_RDR
 mempty_Expr     = nlHsVar mempty_RDR
 foldMap_Expr    = nlHsVar foldMap_RDR
 traverse_Expr   = nlHsVar traverse_RDR
@@ -2564,4 +2725,159 @@ See Trac #10447 for the original discussion on this feature. Also see
 https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/DeriveFunctor
 for a more in-depth explanation.
 
+Note [FFoldType and functorLikeTraverse]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Deriving Functor, Foldable, and Traversable all require generating expressions
+which perform an operation on each argument of a data constructor depending
+on the argument's type. In particular, a generated operation can be different
+depending on whether the type mentions the last type variable of the datatype
+(e.g., if you have data T a = MkT a Int, then a generated foldr expresion would
+fold over the first argument of MkT, but not the second).
+
+This pattern is abstracted with the FFoldType datatype, which provides hooks
+for the user to specify how a constructor argument should be folded when it
+has a type with a particular "shape". The shapes are as follows (assume that
+a is the last type variable in a given datatype):
+
+* ft_triv:    The type does not mention the last type variable at all.
+              Examples: Int, b
+
+* ft_var:     The type is syntactically equal to the last type variable.
+              Moreover, the type appears in a covariant position (see
+              the Deriving Functor instances section of the users' guide
+              for an in-depth explanation of covariance vs. contravariance).
+              Example: a (covariantly)
+
+* ft_co_var:  The type is syntactically equal to the last type variable.
+              Moreover, the type appears in a contravariant position.
+              Example: a (contravariantly)
+
+* ft_fun:     A function type which mentions the last type variable in
+              the argument position, result position or both.
+              Examples: a -> Int, Int -> a, Maybe a -> [a]
+
+* ft_tup:     A tuple type which mentions the last type variable in at least
+              one of its fields. The TyCon argument of ft_tup represents the
+              particular tuple's type constructor.
+              Examples: (a, Int), (Maybe a, [a], Either a Int)
+
+* ft_ty_app:  A type is being applied to the last type parameter, where the
+              applied type does not mention the last type parameter (if it
+              did, it would fall under ft_bad_app). The Type argument to
+              ft_ty_app represents the applied type.
+
+              Note that functions, tuples, and foralls are distinct cases
+              and take precedence of ft_ty_app. (For example, (Int -> a) would
+              fall under (ft_fun Int a), not (ft_ty_app ((->) Int) a).
+              Examples: Maybe a, Either b a
+
+* ft_bad_app: A type application uses the last type parameter in a position
+              other than the last argument. This case is singled out because
+              Functor, Foldable, and Traversable instances cannot be derived
+              for datatypes containing arguments with such types.
+              Examples: Either a Int, Const a b
+
+* ft_forall:  A forall'd type mentions the last type parameter on its right-
+              hand side (and is not quantified on the left-hand side). This
+              case is present mostly for plumbing purposes.
+              Example: forall b. Either b a
+
+If FFoldType describes a strategy for folding subcomponents of a Type, then
+functorLikeTraverse is the function that applies that strategy to the entirety
+of a Type, returning the final folded-up result.
+
+foldDataConArgs applies functorLikeTraverse to every argument type of a
+constructor, returning a list of the fold results. This makes foldDataConArgs
+a natural way to generate the subexpressions in a generated fmap, foldr,
+foldMap, or traverse definition (the subexpressions must then be combined in
+a method-specific fashion to form the final generated expression).
+
+Deriving Generic1 also does validity checking by looking for the last type
+variable in certain positions of a constructor's argument types, so it also
+uses foldDataConArgs. See Note [degenerate use of FFoldType] in TcGenGenerics.
+
+Note [Generated code for DeriveFoldable and DeriveTraversable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We adapt the algorithms for -XDeriveFoldable and -XDeriveTraversable based on
+that of -XDeriveFunctor. However, there an important difference between deriving
+the former two typeclasses and the latter one, which is best illustrated by the
+following scenario:
+
+  data WithInt a = WithInt a Int# deriving (Functor, Foldable, Traversable)
+
+The generated code for the Functor instance is straightforward:
+
+  instance Functor WithInt where
+    fmap f (WithInt a i) = WithInt (f a) i
+
+But if we use too similar of a strategy for deriving the Foldable and
+Traversable instances, we end up with this code:
+
+  instance Foldable WithInt where
+    foldMap f (WithInt a i) = f a <> mempty
+
+  instance Traversable WithInt where
+    traverse f (WithInt a i) = fmap WithInt (f a) <*> pure i
+
+This is unsatisfying for two reasons:
+
+1. The Traversable instance doesn't typecheck! Int# is of kind #, but pure
+   expects an argument whose type is of kind *. This effectively prevents
+   Traversable from being derived for any datatype with an unlifted argument
+   type (Trac #11174).
+
+2. The generated code contains superfluous expressions. By the Monoid laws,
+   we can reduce (f a <> mempty) to (f a), and by the Applicative laws, we can
+   reduce (fmap WithInt (f a) <*> pure i) to (fmap (\b -> WithInt b i) (f a)).
+
+We can fix both of these issues by incorporating a slight twist to the usual
+algorithm that we use for -XDeriveFunctor. The differences can be summarized
+as follows:
+
+1. In the generated expression, we only fold over arguments whose types
+   mention the last type parameter. Any other argument types will simply
+   produce useless 'mempty's or 'pure's, so they can be safely ignored.
+
+2. In the case of -XDeriveTraversable, instead of applying ConName,
+   we apply (\b_i ... b_k -> ConName a_1 ... a_n), where
+
+   * ConName has n arguments
+   * {b_i, ..., b_k} is a subset of {a_1, ..., a_n} whose indices correspond
+     to the arguments whose types mention the last type parameter. As a
+     consequence, taking the difference of {a_1, ..., a_n} and
+     {b_i, ..., b_k} yields the all the argument values of ConName whose types
+     do not mention the last type parameter. Note that [i, ..., k] is a
+     strictly increasing—but not necessarily consecutive—integer sequence.
+
+     For example, the datatype
+
+       data Foo a = Foo Int a Int a
+
+     would generate the following Traversable instance:
+
+       instance Traversable Foo where
+         traverse f (Foo a1 a2 a3 a4) =
+           fmap (\b2 b4 -> Foo a1 b2 a3 b4) (f a2) <*> f a4
+
+Technically, this approach would also work for -XDeriveFunctor as well, but we
+decide not to do so because:
+
+1. There's not much benefit to generating, e.g., ((\b -> WithInt b i) (f a))
+   instead of (WithInt (f a) i).
+
+2. There would be certain datatypes for which the above strategy would
+   generate Functor code that would fail to typecheck. For example:
+
+     data Bar f a = Bar (forall f. Functor f => f a) deriving Functor
+
+   With the conventional algorithm, it would generate something like:
+
+     fmap f (Bar a) = Bar (fmap f a)
+
+   which typechecks. But with the strategy mentioned above, it would generate:
+
+     fmap f (Bar a) = (\b -> Bar b) (fmap f a)
+
+   which does not typecheck, since GHC cannot unify the rank-2 type variables
+   in the types of b and (fmap f a).
 -}
