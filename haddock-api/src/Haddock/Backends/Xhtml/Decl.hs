@@ -269,6 +269,11 @@ ppTyFamHeader summary associated d@(FamilyDecl { fdInfo = info
   (case injectivity of
      Nothing                   -> noHtml
      Just (L _ injectivityAnn) -> ppInjectivityAnn unicode qual injectivityAnn
+  ) <+>
+
+  (case info of
+     ClosedTypeFamily _ -> keyword "where ..."
+     _                  -> mempty
   )
 
 ppResultSig :: FamilyResultSig DocName -> Unicode -> Qualification -> Html
