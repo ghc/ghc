@@ -105,11 +105,12 @@ data RealSrcLoc
   = SrcLoc      FastString              -- A precise location (file name)
                 {-# UNPACK #-} !Int     -- line number, begins at 1
                 {-# UNPACK #-} !Int     -- column number, begins at 1
+  deriving (Eq, Ord)
 
 data SrcLoc
   = RealSrcLoc {-# UNPACK #-}!RealSrcLoc
   | UnhelpfulLoc FastString     -- Just a general indication
-  deriving Show
+  deriving (Eq, Ord, Show)
 
 {-
 ************************************************************************
@@ -164,35 +165,8 @@ advanceSrcLoc (SrcLoc f l c) _    = SrcLoc f  l (c + 1)
 ************************************************************************
 -}
 
--- SrcLoc is an instance of Ord so that we can sort error messages easily
-instance Eq SrcLoc where
-  loc1 == loc2 = case loc1 `cmpSrcLoc` loc2 of
-                 EQ     -> True
-                 _other -> False
-
-instance Eq RealSrcLoc where
-  loc1 == loc2 = case loc1 `cmpRealSrcLoc` loc2 of
-                 EQ     -> True
-                 _other -> False
-
-instance Ord SrcLoc where
-  compare = cmpSrcLoc
-
-instance Ord RealSrcLoc where
-  compare = cmpRealSrcLoc
-
 sortLocated :: [Located a] -> [Located a]
 sortLocated things = sortBy (comparing getLoc) things
-
-cmpSrcLoc :: SrcLoc -> SrcLoc -> Ordering
-cmpSrcLoc (UnhelpfulLoc s1) (UnhelpfulLoc s2) = s1 `compare` s2
-cmpSrcLoc (UnhelpfulLoc _)  (RealSrcLoc _)    = GT
-cmpSrcLoc (RealSrcLoc _)    (UnhelpfulLoc _)  = LT
-cmpSrcLoc (RealSrcLoc l1)   (RealSrcLoc l2)   = (l1 `compare` l2)
-
-cmpRealSrcLoc :: RealSrcLoc -> RealSrcLoc -> Ordering
-cmpRealSrcLoc (SrcLoc s1 l1 c1) (SrcLoc s2 l2 c2)
-  = (s1 `compare` s2) `thenCmp` (l1 `compare` l2) `thenCmp` (c1 `compare` c2)
 
 instance Outputable RealSrcLoc where
     ppr (SrcLoc src_path src_line src_col)
