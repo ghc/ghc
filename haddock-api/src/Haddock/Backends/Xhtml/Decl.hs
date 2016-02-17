@@ -171,6 +171,7 @@ ppFixities fs qual = foldr1 (+++) (map ppFix uniq_fs) +++ rightEdge
     rightEdge = thespan ! [theclass "rightedge"] << noHtml
 
 
+-- | Pretty-print type variables.
 ppTyVars :: [LHsTyVarBndr DocName] -> [Html]
 ppTyVars tvs = map (ppTyName . getName . hsLTyVarName) tvs
 
@@ -208,7 +209,7 @@ ppTySyn summary links fixities loc doc (SynDecl { tcdLName = L _ name, tcdTyVars
 ppTySyn _ _ _ _ _ _ _ _ _ = error "declaration not supported by ppTySyn"
 
 
-ppTypeSig :: Bool -> [OccName] -> Html  -> Bool -> Html
+ppTypeSig :: Bool -> [OccName] -> Html -> Unicode -> Html
 ppTypeSig summary nms pp_ty unicode =
   concatHtml htmlNames <+> dcolon unicode <+> pp_ty
   where
@@ -248,8 +249,8 @@ ppFamilyInfo _ (ClosedTypeFamily _) = keyword "type family"
 ppTyFamHeader :: Bool -> Bool -> FamilyDecl DocName
               -> Unicode -> Qualification -> Html
 ppTyFamHeader summary associated d@(FamilyDecl { fdInfo = info
-                                             , fdResultSig = L _ result
-                                             , fdInjectivityAnn = injectivity })
+                                               , fdResultSig = L _ result
+                                               , fdInjectivityAnn = injectivity })
               unicode qual =
   (case info of
      OpenTypeFamily
@@ -360,14 +361,14 @@ ppDataBinderWithVars summ decl =
 --------------------------------------------------------------------------------
 
 
--- | Print an application of a DocName and two lists of HsTypes (kinds, types)
+-- | Print an application of a 'DocName' and two lists of 'HsTypes' (kinds, types)
 ppAppNameTypes :: DocName -> [HsType DocName] -> [HsType DocName]
                -> Unicode -> Qualification -> Html
 ppAppNameTypes n ks ts unicode qual =
     ppTypeApp n ks ts (\p -> ppDocName qual p True) (ppParendType unicode qual)
 
 
--- | Print an application of a DocName and a list of Names
+-- | Print an application of a 'DocName' and a list of 'Names'
 ppAppDocNameNames :: Bool -> DocName -> [Name] -> Html
 ppAppDocNameNames summ n ns =
     ppTypeApp n [] ns ppDN ppTyName
