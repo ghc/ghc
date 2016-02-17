@@ -104,6 +104,7 @@ libraries/dph/dph-lifted-common-install_EXTRA_HC_OPTS += -Wwarn
 libraries/transformers_dist-boot_EXTRA_HC_OPTS += -fno-warn-unused-matches -fno-warn-unused-imports
 libraries/transformers_dist-install_EXTRA_HC_OPTS += -Wno-unused-matches -Wno-unused-imports
 libraries/transformers_dist-install_EXTRA_HC_OPTS += -Wno-redundant-constraints
+libraries/transformers_dist-install_EXTRA_HC_OPTS += -Wno-orphans
 
 # Turn of trustworthy-safe warning
 libraries/base_dist-install_EXTRA_HC_OPTS += -Wno-trustworthy-safe
