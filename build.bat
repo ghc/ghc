@@ -21,8 +21,8 @@
 
 @ghc %ghcArgs%
 
-@if %ERRORLEVEL% EQU 0 (
-    @rem Unset GHC_PACKAGE_PATH variable, as otherwise ghc-cabal complains
-    @set GHC_PACKAGE_PATH=
-    @.shake\build %shakeArgs%
-)
+@if %ERRORLEVEL% NEQ 0 EXIT /B %ERRORLEVEL%
+
+@rem Unset GHC_PACKAGE_PATH variable, as otherwise ghc-cabal complains
+@set GHC_PACKAGE_PATH=
+@.shake\build %shakeArgs%
