@@ -768,6 +768,8 @@ mkDataCon name declared_infix prom_info
 
     tag = assoc "mkDataCon" (tyConDataCons rep_tycon `zip` [fIRST_TAG..]) con
     rep_arg_tys = dataConRepArgTys con
+      -- NB: This type is user-facing for datatypes that don't need wrappers;
+      --     so it's important to use mkSpecForAllTys
     rep_ty = mkSpecForAllTys univ_tvs $ mkSpecForAllTys ex_tvs $
              mkFunTys rep_arg_tys $
              mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
