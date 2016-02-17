@@ -311,12 +311,11 @@ coreView _ = Nothing
 -- | Like 'coreView', but it also "expands" @Constraint@ to become
 -- @TYPE Lifted@.
 coreViewOneStarKind :: Type -> Maybe Type
-coreViewOneStarKind = go Nothing
-  where
-    go _ t | Just t' <- coreView t                    = go (Just t') t'
-    go _ (TyConApp tc []) | isStarKindSynonymTyCon tc = go (Just t') t'
-      where t' = liftedTypeKind
-    go res _ = res
+coreViewOneStarKind ty
+  | Just ty' <- coreView ty   = Just ty'
+  | TyConApp tc [] <- ty
+  , isStarKindSynonymTyCon tc = Just liftedTypeKind
+  | otherwise                 = Nothing
 
 -----------------------------------------------
 expandTypeSynonyms :: Type -> Type
