@@ -231,17 +231,17 @@ The GHC command line options that control packages are:
 .. ghc-flag:: -trust ⟨pkg⟩
 
     This option causes the install package ⟨pkg⟩ to be both exposed and
-    trusted by GHC. This command functions in the in a very similar way
+    trusted by GHC. This command functions in a very similar way
     to the :ghc-flag:`-package` command but in addition sets the selected
-    packaged to be trusted by GHC, regardless of the contents of the
+    packages to be trusted by GHC, regardless of the contents of the
     package database. (see :ref:`safe-haskell`).
 
 .. ghc-flag:: -distrust ⟨pkg⟩
 
     This option causes the install package ⟨pkg⟩ to be both exposed and
-    distrusted by GHC. This command functions in the in a very similar
+    distrusted by GHC. This command functions in a very similar
     way to the :ghc-flag:`-package` command but in addition sets the selected
-    packaged to be distrusted by GHC, regardless of the contents of the
+    packages to be distrusted by GHC, regardless of the contents of the
     package database. (see :ref:`safe-haskell`).
 
 .. ghc-flag:: -distrust-all
