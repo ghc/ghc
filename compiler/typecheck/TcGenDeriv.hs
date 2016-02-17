@@ -1806,7 +1806,7 @@ only Foldable instances are not possible for function types at all.
 Given (data T a = T a a (T a) deriving Foldable), we get:
 
   instance Foldable T where
-      foldr f z (T1 x1 x2 x3) =
+      foldr f z (T x1 x2 x3) =
         $(foldr 'a 'a) x1 ( $(foldr 'a 'a) x2 ( $(foldr 'a '(T a)) x3 z ) )
 
 -XDeriveFoldable is different from -XDeriveFunctor in that it filters out
