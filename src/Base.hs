@@ -3,6 +3,7 @@ module Base (
     -- * General utilities
     module Control.Applicative,
     module Control.Monad.Extra,
+    module Data.Bifunctor,
     module Data.Function,
     module Data.List.Extra,
     module Data.Maybe,
@@ -22,7 +23,7 @@ module Base (
     putColoured, putOracle, putBuild, putSuccess, putError,
 
     -- * Miscellaneous utilities
-    bimap, minusOrd, intersectOrd, replaceEq, quote, replaceSeparators,
+    minusOrd, intersectOrd, replaceEq, quote, replaceSeparators,
     decodeModule, encodeModule, unifyPath, (-/-), versionToInt,
     removeFileIfExists, removeDirectoryIfExists, matchVersionedFilePath
     ) where
@@ -30,6 +31,7 @@ module Base (
 import Control.Applicative
 import Control.Monad.Extra
 import Control.Monad.Reader
+import Data.Bifunctor
 import Data.Char
 import Data.Function
 import Data.List.Extra
@@ -142,11 +144,6 @@ putError msg = do
     putColoured Red msg
     error $ "GHC build system error: " ++ msg
 
--- Explicit definition to avoid dependency on Data.Bifunctor
--- | Bifunctor bimap.
-bimap :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
-bimap f g (x, y) = (f x, g y)
-
 -- Explicit definition to avoid dependency on Data.List.Ordered
 -- | Difference of two ordered lists.
 minusOrd :: Ord a => [a] -> [a] -> [a]
@@ -183,6 +180,7 @@ removeDirectoryIfExists d =
 -- comprising digits (@0-9@), dashes (@-@), and dots (@.@). Examples:
 --
 --- * @'matchVersionedFilePath' "foo/bar"  ".a" "foo/bar.a"     '==' 'True'@
+--- * @'matchVersionedFilePath' "foo/bar"  ".a" "foo\bar.a"     '==' 'False'@
 --- * @'matchVersionedFilePath' "foo/bar"  "a"  "foo/bar.a"     '==' 'True'@
 --- * @'matchVersionedFilePath' "foo/bar"  ""   "foo/bar.a"     '==' 'False'@
 --- * @'matchVersionedFilePath' "foo/bar"  "a"  "foo/bar-0.1.a" '==' 'True'@
@@ -190,6 +188,6 @@ removeDirectoryIfExists d =
 --- * @'matchVersionedFilePath' "foo/bar/" "a"  "foo/bar-0.1.a" '==' 'False'@
 matchVersionedFilePath :: String -> String -> FilePath -> Bool
 matchVersionedFilePath prefix suffix filePath =
-    case stripPrefix prefix (unifyPath filePath) >>= stripSuffix suffix of
+    case stripPrefix prefix filePath >>= stripSuffix suffix of
         Nothing      -> False
         Just version -> all (\c -> isDigit c || c == '-' || c == '.') version

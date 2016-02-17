@@ -1,5 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
-module Rules.Library (buildPackageLibrary, cSources, hSources) where
+module Rules.Library (
+    buildPackageLibrary, buildPackageGhciLibrary, cSources, hSources
+    ) where
 
 import Data.Char
 import qualified System.Directory as IO
@@ -17,10 +19,10 @@ import Target
 buildPackageLibrary :: Context -> Rules ()
 buildPackageLibrary context @ (Context {..}) = do
     let buildPath = targetPath stage package -/- "build"
-        libHs     = buildPath -/- "libHS" ++ pkgNameString package
+        libPrefix = buildPath -/- "libHS" ++ pkgNameString package
 
     -- TODO: handle dynamic libraries
-    matchVersionedFilePath libHs (waySuffix way <.> "a") ?> \a -> do
+    matchVersionedFilePath libPrefix (waySuffix way <.> "a") ?> \a -> do
         removeFileIfExists a
         cSrcs <- cSources context
         hSrcs <- hSources context
@@ -58,12 +60,13 @@ buildPackageLibrary context @ (Context {..}) = do
             a
             (dropWhileEnd isPunctuation synopsis)
 
+buildPackageGhciLibrary :: Context -> Rules ()
+buildPackageGhciLibrary context @ (Context {..}) = priority 2 $ do
+    let buildPath = targetPath stage package -/- "build"
+        libPrefix = buildPath -/- "HS" ++ pkgNameString package
+
     -- TODO: simplify handling of AutoApply.cmm
-    -- TODO: this looks fragile as haskell objects can match this rule if their
-    -- names start with "HS" and they are on top of the module hierarchy.
-    -- This happens with hsc2hs, which has top-level file HSCParser.hs.
-    priority 2 $ when (package /= hsc2hs && way == vanilla) $
-         (buildPath -/- "HS*.o") %> \obj -> do
+    matchVersionedFilePath libPrefix (waySuffix way <.> "o") ?> \obj -> do
             cSrcs <- cSources context
             hSrcs <- hSources context
             let cObjs = [ buildPath -/- src -<.> "o" | src <- cSrcs
