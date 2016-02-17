@@ -641,7 +641,7 @@ deriveTyData tvs tc tc_args deriv_pred
                 --  (c) The type class args, or remaining tycon args,
                 --      do not mention any of the dropped type variables
                 --              newtype T a s = ... deriving( ST s )
-                --              newtype K a a = ... deriving( Monad )
+                --              newtype instance K a a = ... deriving( Monad )
 
         ; spec <- mkEqnHelp Nothing tkvs
                             cls final_cls_tys tc final_tc_args Nothing
