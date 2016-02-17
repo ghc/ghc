@@ -263,7 +263,7 @@ ppTyFamHeader summary associated d@(FamilyDecl { fdInfo = info
                     -> keyword "type family"
   ) <+>
 
-  ppFamDeclBinderWithVars summary d <+>
+  ppFamDeclBinderWithVars summary unicode qual d <+>
   ppResultSig result unicode qual <+>
 
   (case injectivity of
@@ -347,9 +347,9 @@ ppAssocType summ links doc (L loc decl) fixities splice unicode qual =
 --------------------------------------------------------------------------------
 
 -- | Print a type family and its variables
-ppFamDeclBinderWithVars :: Bool -> FamilyDecl DocName -> Html
-ppFamDeclBinderWithVars summ (FamilyDecl { fdLName = lname, fdTyVars = tvs }) =
-  ppAppDocNameNames summ (unLoc lname) (tyvarNames tvs)
+ppFamDeclBinderWithVars :: Bool -> Unicode -> Qualification -> FamilyDecl DocName -> Html
+ppFamDeclBinderWithVars summ unicode qual (FamilyDecl { fdLName = lname, fdTyVars = tvs }) =
+  ppAppDocNameTyVarBndrs summ unicode qual (unLoc lname) (map unLoc $ hsq_explicit tvs)
 
 -- | Print a newtype / data binder and its variables
 ppDataBinderWithVars :: Bool -> TyClDecl DocName -> Html
@@ -360,6 +360,13 @@ ppDataBinderWithVars summ decl =
 -- * Type applications
 --------------------------------------------------------------------------------
 
+ppAppDocNameTyVarBndrs :: Bool -> Unicode -> Qualification -> DocName -> [HsTyVarBndr DocName] -> Html
+ppAppDocNameTyVarBndrs summ unicode qual n vs =
+    ppTypeApp n [] vs ppDN (ppHsTyVarBndr unicode qual)
+  where
+    ppDN notation = ppBinderFixity notation summ . nameOccName . getName
+    ppBinderFixity Infix = ppBinderInfix
+    ppBinderFixity _ = ppBinder
 
 -- | Print an application of a 'DocName' and two lists of 'HsTypes' (kinds, types)
 ppAppNameTypes :: DocName -> [HsType DocName] -> [HsType DocName]
