@@ -1764,12 +1764,7 @@ mk_dict_err :: ReportErrCtxt -> (Ct, ClsInstLookupResult)
 mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
   | null matches  -- No matches but perhaps several unifiers
   = do { (ctxt, binds_msg, ct) <- relevantBindings True ctxt ct
-       ; instEnvs <- tcGetInstEnvs
-       ; let candidate_insts = case tys of
-               -- find data types with the same occ name, see #9611
-               [ty] -> filter (is_candidate_inst ty)
-                              (classInstances instEnvs clas)
-               _ -> []
+       ; candidate_insts <- get_candidate_instances
        ; return (ctxt, cannot_resolve_msg ct candidate_insts binds_msg) }
 
   | null unsafe_overlapped   -- Some matches => overlap errors
@@ -1786,7 +1781,16 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
     givens        = getUserGivens ctxt
     all_tyvars    = all isTyVarTy tys
 
-    is_candidate_inst ty inst
+    get_candidate_instances :: TcM [ClsInst]
+    -- See Note [Report candidate instances]
+    get_candidate_instances
+      | [ty] <- tys   -- Only try for single-parameter classes
+      = do { instEnvs <- tcGetInstEnvs
+           ; return (filter (is_candidate_inst ty)
+                            (classInstances instEnvs clas)) }
+      | otherwise = return []
+
+    is_candidate_inst ty inst -- See Note [Report candidate instances]
       | [other_ty] <- is_tys inst
       , Just (tc1, _) <- tcSplitTyConApp_maybe ty
       , Just (tc2, _) <- tcSplitTyConApp_maybe other_ty
@@ -1808,6 +1812,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
              , ppWhen (not (null candidate_insts))
                (hang (text "There are instances for similar types:")
                    2 (vcat (map ppr candidate_insts))) ]
+                   -- See Note [Report candidate instances]
       where
         orig = ctOrigin ct
         -- See Note [Highlighting ambiguous type variables]
@@ -1952,8 +1957,19 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
                    ]
             ]
 
-{- Note [Highlighting ambiguous type variables]
------------------------------------------------
+{- Note [Report candidate instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have an unsolved (Num Int), where `Int` is not the Prelude Int,
+but comes from some other module, then it may be helpful to point out
+that there are some similarly named instances elsewhere.  So we get
+something like
+    No instance for (Num Int) arising from the literal ‘3’
+    There are instances for similar types:
+      instance Num GHC.Types.Int -- Defined in ‘GHC.Num’
+Discussion in Trac #9611.
+
+Note [Highlighting ambiguous type variables]
+~-------------------------------------------
 When we encounter ambiguous type variables (i.e. type variables
 that remain metavariables after type inference), we need a few more
 conditions before we can reason that *ambiguity* prevents constraints
