@@ -31,8 +31,8 @@ wrappers = [ (vanillaContext Stage0 ghc   , ghcWrapper   )
            , (vanillaContext Stage1 ghc   , ghcWrapper   )
            , (vanillaContext Stage0 ghcPkg, ghcPkgWrapper)]
 
-buildProgram :: Context -> Rules ()
-buildProgram context @ (Context {..}) = do
+buildProgram :: [(Resource, Int)] -> Context -> Rules ()
+buildProgram rs context @ (Context {..}) = do
     let match file = case programPath stage package of
             Nothing      -> False
             Just program -> program == file
@@ -45,15 +45,15 @@ buildProgram context @ (Context {..}) = do
     match ?> \bin -> do
         windows <- windowsHost
         if windows
-        then buildBinary context bin -- We don't build wrappers on Windows
+        then buildBinary rs context bin -- We don't build wrappers on Windows
         else case find ((== context) . fst) wrappers of
-            Nothing -> buildBinary context bin -- No wrapper found
+            Nothing -> buildBinary rs context bin -- No wrapper found
             Just (_, wrapper) -> do
                 let Just wrappedBin = computeWrappedPath bin
                 need [wrappedBin]
                 buildWrapper context wrapper bin wrappedBin
 
-    matchWrapped ?> \bin -> buildBinary context bin
+    matchWrapped ?> \bin -> buildBinary rs context bin
 
 -- Replace programInplacePath with programInplaceLibPath in a given path
 computeWrappedPath :: FilePath -> Maybe FilePath
@@ -70,8 +70,8 @@ buildWrapper context @ (Context stage package _) wrapper wrapperPath binPath = d
 
 -- TODO: Get rid of the Paths_hsc2hs.o hack.
 -- TODO: Do we need to consider other ways when building programs?
-buildBinary :: Context -> FilePath -> Action ()
-buildBinary context @ (Context stage package _) bin = do
+buildBinary :: [(Resource, Int)] -> Context -> FilePath -> Action ()
+buildBinary rs context @ (Context stage package _) bin = do
     let buildPath = targetPath stage package -/- "build"
     cSrcs <- cSources context -- TODO: remove code duplication (Library.hs)
     hSrcs <- hSources context
@@ -100,7 +100,7 @@ buildBinary context @ (Context stage package _) bin = do
                   then [ pkgPath package -/- src <.> "hs" | src <- hSrcs ]
                   else objs
     need $ binDeps ++ libs
-    build $ Target context (Ghc stage) binDeps [bin]
+    buildWithResources rs $ Target context (Ghc stage) binDeps [bin]
     synopsis <- interpretInContext context $ getPkgData Synopsis
     putSuccess $ renderProgram
         ("'" ++ pkgNameString package ++ "' (" ++ show stage ++ ").")

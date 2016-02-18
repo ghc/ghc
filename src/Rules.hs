@@ -75,7 +75,7 @@ packageRules = do
         , buildPackageDocumentation
         , buildPackageGhciLibrary
         , generatePackageCode
-        , buildProgram
+        , buildProgram readPackageDb
         , registerPackage writePackageDb ]
 
 buildRules :: Rules ()
