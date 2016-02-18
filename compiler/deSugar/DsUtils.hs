@@ -601,13 +601,13 @@ OR (B)       t = case e of p -> (x,y)
              x = case t of (x,_) -> x
              y = case t of (_,y) -> y
 
-We do (A) when
- * Matching the pattern is cheap so we don't mind
-   doing it twice.
- * Or if the pattern binds only one variable (so we'll only
-   match once)
- * AND the pattern can't fail (else we tiresomely get two inexhaustive
-   pattern warning messages)
+We do (A) when (test: isSingleton binders)
+ * The pattern binds only one variable (so we'll only match once)
+
+OR when (test: is_simple_lpat)
+ * Matching the pattern is cheap so we don't mind doing it twice.
+ * AND the pattern can't fail (else we tiresomely get one
+   inexhaustive pattern warning message for each binder
 
 Otherwise we do (B).  Really (A) is just an optimisation for very common
 cases like
@@ -633,7 +633,8 @@ mkSelectorBinds _ ticks (L _ (VarPat (L _ v))) val_expr
 mkSelectorBinds is_strict ticks pat val_expr
   | null binders, not is_strict
   = return (Nothing, [])
-  | isSingleton binders || is_simple_lpat pat
+
+  | isSingleton binders || is_simple_lpat pat  -- Case (A)
     -- See Note [mkSelectorBinds]
   = do { let pat_ty = hsLPatType pat
        ; val_var <- newSysLocalDs pat_ty
@@ -661,26 +662,22 @@ mkSelectorBinds is_strict ticks pat val_expr
                  (err_var, Lam alphaTyVar err_app) :
                  binds) }
 
-  | otherwise
-  = do { val_var <- newSysLocalDs (hsLPatType pat)
+  | otherwise  -- Case (B)
+  = do { val_var    <- newSysLocalDs (hsLPatType pat)
+       ; tuple_var  <- newSysLocalDs tuple_ty
        ; error_expr <- mkErrorAppDs iRREFUT_PAT_ERROR_ID tuple_ty (ppr pat)
-       ; tuple_expr
-           <- matchSimply (Var val_var) PatBindRhs pat local_tuple error_expr
-       ; tuple_var <- newSysLocalDs tuple_ty
+       ; tuple_expr <- matchSimply (Var val_var) PatBindRhs pat
+                                   local_tuple error_expr
        ; let mk_tup_bind tick binder
-              = (binder, mkOptTickBox tick $
-                            mkTupleSelector local_binders binder
-                                            tuple_var (Var tuple_var))
-         -- if strict and no binders we want to force the case
-         -- expression to force an error if the pattern match
-         -- failed. See Note [Desugar Strict binds] in DsBinds.
-       ; let force_var = if null binders && is_strict
-                         then tuple_var
-                         else val_var
-       ; return (Just force_var
-                ,(val_var,val_expr) :
-                 (tuple_var, tuple_expr) :
-                 zipWith mk_tup_bind ticks' binders) }
+               = (binder, mkOptTickBox tick $
+                          mkTupleSelector local_binders binder
+                                          tuple_var (Var tuple_var))
+             tup_binds
+               | null binders = []
+               | otherwise    = (tuple_var, tuple_expr)
+                                : zipWith mk_tup_bind ticks' binders
+       ; return ( Just val_var
+                , (val_var,val_expr) : tup_binds ) }
   where
     binders       = collectPatBinders pat
     ticks'        = ticks ++ repeat []
