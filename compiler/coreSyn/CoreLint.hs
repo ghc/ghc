@@ -1682,7 +1682,7 @@ addInScopeVar var m
 extendSubstL :: TyVar -> Type -> LintM a -> LintM a
 extendSubstL tv ty m
   = LintM $ \ env errs ->
-    unLintM m (env { le_subst = Type.extendTCvSubst (le_subst env) tv ty }) errs
+    unLintM m (env { le_subst = Type.extendTvSubst (le_subst env) tv ty }) errs
 
 updateTCvSubst :: TCvSubst -> LintM a -> LintM a
 updateTCvSubst subst' m

@@ -73,7 +73,7 @@ module Coercion (
         lookupCoVar,
         substCo, substCos, substCoVar, substCoVars, substCoWith,
         substCoVarBndr,
-        extendTCvSubstAndInScope, getCvSubstEnv,
+        extendTvSubstAndInScope, getCvSubstEnv,
 
         -- ** Lifting
         liftCoSubst, liftCoSubstTyVar, liftCoSubstWith, liftCoSubstWithEx,

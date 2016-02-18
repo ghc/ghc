@@ -1818,8 +1818,8 @@ mkGADTVars tmpl_tvs dc_tvs subst
             ,  tyVarKind r_tv `eqType` (substTy t_sub (tyVarKind t_tv))
             -> -- simple, well-kinded variable substitution.
                choose (r_tv:univs) eqs
-                      (extendTCvSubst t_sub t_tv r_ty)
-                      (extendTCvSubst r_sub r_tv r_ty)
+                      (extendTvSubst t_sub t_tv r_ty)
+                      (extendTvSubst r_sub r_tv r_ty)
                       t_tvs
             where
               r_tv1  = setTyVarName r_tv (choose_tv_name r_tv t_tv)

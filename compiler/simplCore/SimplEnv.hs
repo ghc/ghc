@@ -16,7 +16,8 @@ module SimplEnv (
 
         -- Environments
         SimplEnv(..), StaticEnv, pprSimplEnv,   -- Temp not abstract
-        mkSimplEnv, extendIdSubst, SimplEnv.extendTCvSubst,
+        mkSimplEnv, extendIdSubst,
+        SimplEnv.extendTvSubst, SimplEnv.extendCvSubst,
         zapSubstEnv, setSubstEnv,
         getInScope, setInScope, setInScopeSet, modifyInScope, addNewInScopeIds,
         getSimplRules,
@@ -271,14 +272,15 @@ extendIdSubst env@(SimplEnv {seIdSubst = subst}) var res
   = ASSERT2( isId var && not (isCoVar var), ppr var )
     env {seIdSubst = extendVarEnv subst var res}
 
-extendTCvSubst :: SimplEnv -> TyVar -> Type -> SimplEnv
-extendTCvSubst env@(SimplEnv {seTvSubst = tsubst, seCvSubst = csubst}) var res
-  | isTyVar var
-  = env {seTvSubst = extendVarEnv tsubst var res}
-  | Just co <- isCoercionTy_maybe res
-  = env {seCvSubst = extendVarEnv csubst var co}
-  | otherwise
-  = pprPanic "SimplEnv.extendTCvSubst" (ppr res)
+extendTvSubst :: SimplEnv -> TyVar -> Type -> SimplEnv
+extendTvSubst env@(SimplEnv {seTvSubst = tsubst}) var res
+  = ASSERT( isTyVar var )
+    env {seTvSubst = extendVarEnv tsubst var res}
+
+extendCvSubst :: SimplEnv -> CoVar -> Coercion -> SimplEnv
+extendCvSubst env@(SimplEnv {seCvSubst = csubst}) var co
+  = ASSERT( isCoVar var )
+    env {seCvSubst = extendVarEnv csubst var co}
 
 ---------------------
 getInScope :: SimplEnv -> InScopeSet

@@ -504,7 +504,7 @@ toIfaceTcArgs tc ty_args
       | otherwise            = ITC_Invis t' ts'
       where
         t'  = toIfaceType t
-        ts' = go (extendTCvSubstBinder env bndr t) res ts
+        ts' = go (extendTvSubstBinder env bndr t) res ts
 
     go env (TyVarTy tv) ts
       | Just ki <- lookupTyVar env tv = go env ki ts

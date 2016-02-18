@@ -228,7 +228,8 @@ deeplyInstantiate orig ty
                                                 , text "type" <+> ppr ty
                                                 , text "with" <+> ppr tvs'
                                                 , text "args:" <+> ppr ids1
-                                                , text "theta:" <+>  ppr theta' ])
+                                                , text "theta:" <+>  ppr theta'
+                                                , text "subst:" <+> ppr subst ])
        ; (wrap2, rho2) <- deeplyInstantiate orig (substTyUnchecked subst rho)
        ; return (mkWpLams ids1
                     <.> wrap2
@@ -309,7 +310,7 @@ instDFunType dfun_id dfun_inst_tys
     go :: TCvSubst -> [TyVar] -> [DFunInstType] -> TcM (TCvSubst, [TcType])
     go subst [] [] = return (subst, [])
     go subst (tv:tvs) (Just ty : mb_tys)
-      = do { (subst', tys) <- go (extendTCvSubst subst tv ty) tvs mb_tys
+      = do { (subst', tys) <- go (extendTvSubst subst tv ty) tvs mb_tys
            ; return (subst', ty : tys) }
     go subst (tv:tvs) (Nothing : mb_tys)
       = do { (subst', tv') <- newMetaTyVarX subst tv

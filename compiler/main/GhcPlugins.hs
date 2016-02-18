@@ -54,7 +54,7 @@ import Packages
 -- Important GHC types
 import Module
 import Type     hiding {- conflict with CoreSubst -}
-                ( substTy, extendTCvSubst, extendTCvSubstList, isInScope )
+                ( substTy, extendTvSubst, extendTvSubstList, isInScope )
 import Coercion hiding {- conflict with CoreSubst -}
                 ( substCo )
 import TyCon

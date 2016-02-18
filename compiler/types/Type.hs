@@ -155,7 +155,8 @@ module Type (
         getTvSubstEnv, setTvSubstEnv,
         zapTCvSubst, getTCvInScope,
         extendTCvInScope, extendTCvInScopeList, extendTCvInScopeSet,
-        extendTCvSubst, extendTCvSubstList, extendTCvSubstAndInScope,
+        extendTCvSubst, extendCvSubst,
+        extendTvSubst, extendTvSubstList, extendTvSubstAndInScope,
         isInScope, composeTCvSubstEnv, composeTCvSubst, zipTyEnv, zipCoEnv,
         isEmptyTCvSubst, unionTCvSubst,
 
@@ -166,7 +167,7 @@ module Type (
         substTyWithBindersUnchecked, substTyWithUnchecked,
         substCoUnchecked, substCoWithUnchecked,
         substTyVarBndr, substTyVar, substTyVars,
-        cloneTyVarBndr, cloneTyVarBndrs, lookupTyVar, substTelescope,
+        cloneTyVarBndr, cloneTyVarBndrs, lookupTyVar,
 
         -- * Pretty-printing
         pprType, pprParendType, pprTypeApp, pprTyThingCategory, pprTyThing,
@@ -1387,7 +1388,7 @@ partitionInvisibles tc get_ty = go emptyTCvSubst (tyConKind tc)
       | isVisibleBinder bndr = second (x :) (go subst' res_ki xs)
       | otherwise            = first  (x :) (go subst' res_ki xs)
       where
-        subst' = extendTCvSubstBinder subst bndr (get_ty x)
+        subst' = extendTvSubstBinder subst bndr (get_ty x)
     go subst (TyVarTy tv) xs
       | Just ki <- lookupTyVar subst tv = go subst ki xs
     go _ _ xs = ([], xs)  -- something is ill-kinded. But this can happen
