@@ -83,14 +83,16 @@ module TyCoRep (
         getCvSubstEnv, getTCvInScope, isInScope, notElemTCvSubst,
         setTvSubstEnv, setCvSubstEnv, zapTCvSubst,
         extendTCvInScope, extendTCvInScopeList, extendTCvInScopeSet,
-        extendTCvSubst, extendTCvSubstAndInScope, extendTCvSubstList,
-        extendTCvSubstBinder,
+        extendTCvSubst,
+        extendCvSubst, extendCvSubstWithClone,
+        extendTvSubst, extendTvSubstWithClone,
+        extendTvSubstList, extendTvSubstAndInScope,
+        extendTvSubstBinder,
         unionTCvSubst, zipTyEnv, zipCoEnv, mkTyCoInScopeSet,
         zipTvSubst, zipCvSubst,
         zipTyBinderSubst,
         mkTvSubstPrs,
 
-        substTelescope,
         substTyWith, substTyWithCoVars, substTysWith, substTysWithCoVars,
         substCoWith,
         substTy, substTyAddInScope,
@@ -239,8 +241,8 @@ data TyLit
 -- ('Named') or nondependent ('Anon'). They may also be visible or not.
 -- See also Note [TyBinder]
 data TyBinder
-  = Named TyVar VisibilityFlag
-  | Anon Type   -- visibility is determined by the type (Constraint vs. *)
+  = Named TyVar VisibilityFlag  -- Always a TyVar (not CoVar or Id)
+  | Anon Type   -- Visibility is determined by the type (Constraint vs. *)
     deriving (Data.Typeable, Data.Data)
 
 -- | Is something required to appear in source Haskell ('Visible'),
@@ -1517,7 +1519,7 @@ CoercionTy.
 
 Note [The substitution invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When calling substTy subst ty it should be the case that
+When calling (substTy subst ty) it should be the case that
 the in-scope set in the substitution is a superset of both:
 
   * The free vars of the range of the substitution
@@ -1624,39 +1626,50 @@ extendTCvInScopeSet :: TCvSubst -> VarSet -> TCvSubst
 extendTCvInScopeSet (TCvSubst in_scope tenv cenv) vars
   = TCvSubst (extendInScopeSetSet in_scope vars) tenv cenv
 
-extendSubstEnvs :: (TvSubstEnv, CvSubstEnv) -> Var -> Type
-                -> (TvSubstEnv, CvSubstEnv)
-extendSubstEnvs (tenv, cenv) v ty
+extendTCvSubst :: TCvSubst -> TyCoVar -> Type -> TCvSubst
+extendTCvSubst subst v ty
   | isTyVar v
-  = ASSERT( not $ isCoercionTy ty )
-    (extendVarEnv tenv v ty, cenv)
-
-    -- NB: v might *not* be a proper covar, because it might be lifted.
-    -- This happens in tcCoercionToCoercion
+  = extendTvSubst subst v ty
   | CoercionTy co <- ty
-  = (tenv, extendVarEnv cenv v co)
+  = extendCvSubst subst v co
   | otherwise
-  = pprPanic "extendSubstEnvs" (ppr v <+> text "|->" <+> ppr ty)
+  = pprPanic "extendTCvSubst" (ppr v <+> text "|->" <+> ppr ty)
 
-extendTCvSubst :: TCvSubst -> Var -> Type -> TCvSubst
-extendTCvSubst (TCvSubst in_scope tenv cenv) tv ty
-  = TCvSubst in_scope tenv' cenv'
-  where (tenv', cenv') = extendSubstEnvs (tenv, cenv) tv ty
+extendTvSubst :: TCvSubst -> TyVar -> Type -> TCvSubst
+extendTvSubst (TCvSubst in_scope tenv cenv) tv ty
+  = TCvSubst in_scope (extendVarEnv tenv tv ty) cenv
 
-extendTCvSubstAndInScope :: TCvSubst -> TyCoVar -> Type -> TCvSubst
+extendTvSubstWithClone :: TCvSubst -> TyVar -> TyVar -> TCvSubst
+-- Adds a new tv -> tv mapping, /and/ extends the in-scope set
+extendTvSubstWithClone (TCvSubst in_scope tenv cenv) tv tv'
+  = TCvSubst (extendInScopeSet in_scope tv')
+             (extendVarEnv tenv tv (mkTyVarTy tv'))
+             cenv
+
+extendCvSubst :: TCvSubst -> CoVar -> Coercion -> TCvSubst
+extendCvSubst (TCvSubst in_scope tenv cenv) v co
+  = TCvSubst in_scope tenv (extendVarEnv cenv v co)
+
+extendCvSubstWithClone :: TCvSubst -> CoVar -> CoVar -> TCvSubst
+extendCvSubstWithClone (TCvSubst in_scope tenv cenv) cv cv'
+  = TCvSubst (extendInScopeSet in_scope cv')
+             tenv
+             (extendVarEnv cenv cv (mkCoVarCo cv'))
+
+extendTvSubstAndInScope :: TCvSubst -> TyVar -> Type -> TCvSubst
 -- Also extends the in-scope set
-extendTCvSubstAndInScope (TCvSubst in_scope tenv cenv) tv ty
+extendTvSubstAndInScope (TCvSubst in_scope tenv cenv) tv ty
   = TCvSubst (in_scope `extendInScopeSetSet` tyCoVarsOfType ty)
-             tenv' cenv'
-  where (tenv', cenv') = extendSubstEnvs (tenv, cenv) tv ty
+             (extendVarEnv tenv tv ty)
+             cenv
 
-extendTCvSubstList :: TCvSubst -> [Var] -> [Type] -> TCvSubst
-extendTCvSubstList subst tvs tys
-  = foldl2 extendTCvSubst subst tvs tys
+extendTvSubstList :: TCvSubst -> [Var] -> [Type] -> TCvSubst
+extendTvSubstList subst tvs tys
+  = foldl2 extendTvSubst subst tvs tys
 
-extendTCvSubstBinder :: TCvSubst -> TyBinder -> Type -> TCvSubst
-extendTCvSubstBinder env (Anon {})    _  = env
-extendTCvSubstBinder env (Named tv _) ty = extendTCvSubst env tv ty
+extendTvSubstBinder :: TCvSubst -> TyBinder -> Type -> TCvSubst
+extendTvSubstBinder env (Anon {})    _  = env
+extendTvSubstBinder env (Named tv _) ty = extendTvSubst env tv ty
 
 unionTCvSubst :: TCvSubst -> TCvSubst -> TCvSubst
 -- Works when the ranges are disjoint
@@ -1798,19 +1811,6 @@ ForAllCo tv (sym h) (sym g[tv |-> tv |> sym h])
 
 -}
 
--- | Create a substitution from tyvars to types, but later types may depend
--- on earlier ones. Return the substed types and the built substitution.
-substTelescope :: [TyCoVar] -> [Type] -> ([Type], TCvSubst)
-substTelescope = go_subst emptyTCvSubst
-  where
-    go_subst :: TCvSubst -> [TyCoVar] -> [Type] -> ([Type], TCvSubst)
-    go_subst subst [] [] = ([], subst)
-    go_subst subst (tv:tvs) (k:ks)
-      = let k' = substTy subst k in
-        liftFst (k' :) $ go_subst (extendTCvSubst subst tv k') tvs ks
-    go_subst _ _ _ = panic "substTelescope"
-
-
 -- | Type substitution, see 'zipTvSubst'
 substTyWith ::
 -- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
@@ -1818,6 +1818,8 @@ substTyWith ::
     (?callStack :: CallStack) =>
 #endif
     [TyVar] -> [Type] -> Type -> Type
+-- Works only if the domain of the substitution is a
+-- superset of the type being substituted into
 substTyWith tvs tys = ASSERT( length tvs == length tys )
                       substTy (zipTvSubst tvs tys)
 

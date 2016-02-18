@@ -479,7 +479,7 @@ tcATDefault emit_warn loc inst_subst defined_ats (ATI fam_tc defs)
       | Just ty <- lookupVarEnv (getTvSubstEnv subst) tc_tv
       = (subst, ty)
       | otherwise
-      = (extendTCvSubst subst tc_tv ty', ty')
+      = (extendTvSubst subst tc_tv ty', ty')
       where
         ty' = mkTyVarTy (updateTyVarKind (substTyUnchecked subst) tc_tv)
 

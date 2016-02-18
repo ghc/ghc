@@ -1564,7 +1564,7 @@ dataConInstPat fss uniqs con inst_tys
                                        (zip3 ex_tvs ex_fss ex_uniqs)
 
     mk_ex_var :: TCvSubst -> (TyVar, FastString, Unique) -> (TCvSubst, TyVar)
-    mk_ex_var subst (tv, fs, uniq) = (Type.extendTCvSubst subst tv
+    mk_ex_var subst (tv, fs, uniq) = (Type.extendTvSubst subst tv
                                        (mkTyVarTy new_tv)
                                      , new_tv)
       where

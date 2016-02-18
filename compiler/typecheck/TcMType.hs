@@ -81,7 +81,7 @@ module TcMType (
 #include "HsVersions.h"
 
 -- friends:
-import TyCoRep ( CoercionHole(..) )
+import TyCoRep
 import TcType
 import Type
 import Coercion
@@ -453,8 +453,7 @@ tcSuperSkolTyVars = mapAccumL tcSuperSkolTyVar emptyTCvSubst
 
 tcSuperSkolTyVar :: TCvSubst -> TyVar -> (TCvSubst, TcTyVar)
 tcSuperSkolTyVar subst tv
-  = (extendTCvSubst (extendTCvInScope subst new_tv) tv (mkTyVarTy new_tv)
-    , new_tv)
+  = (extendTvSubstWithClone subst tv new_tv, new_tv)
   where
     kind   = substTyUnchecked subst (tyVarKind tv)
     new_tv = mkTcTyVar (tyVarName tv) kind superSkolemTv
@@ -535,18 +534,15 @@ instSkolTyCoVarX :: (Unique -> Name -> Kind -> TyCoVar)
 instSkolTyCoVarX mk_tcv subst tycovar
   = do  { uniq <- newUnique  -- using a new unique is critical. See
                              -- Note [Skolems in zonkSyntaxExpr] in TcHsSyn
-        ; let new_tv = mk_tcv uniq old_name kind
-        ; return (extendTCvSubst (extendTCvInScope subst new_tv) tycovar
-                   (mk_ty_co new_tv)
-                 , new_tv)
-        }
+        ; let new_tcv = mk_tcv uniq old_name kind
+              subst1 | isTyVar new_tcv
+                     = extendTvSubstWithClone subst tycovar new_tcv
+                     | otherwise
+                     = extendCvSubstWithClone subst tycovar new_tcv
+        ; return (subst1, new_tcv) }
   where
     old_name = tyVarName tycovar
     kind     = substTyUnchecked subst (tyVarKind tycovar)
-
-    mk_ty_co v
-      | isTyVar v = mkTyVarTy v
-      | otherwise = mkCoercionTy $ mkCoVarCo v
 
 newFskTyVar :: TcType -> TcM TcTyVar
 newFskTyVar fam_ty
@@ -777,29 +773,22 @@ newMetaTyVars = mapAccumLM newMetaTyVarX emptyTCvSubst
 newMetaTyVarX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
 -- Make a new unification variable tyvar whose Name and Kind come from
 -- an existing TyVar. We substitute kind variables in the kind.
-newMetaTyVarX subst tyvar
+newMetaTyVarX subst tyvar = new_meta_tv_x TauTv subst tyvar
+
+newMetaSigTyVarX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
+-- Just like newMetaTyVarX, but make a SigTv
+newMetaSigTyVarX subst tyvar = new_meta_tv_x SigTv subst tyvar
+
+new_meta_tv_x :: MetaInfo -> TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
+new_meta_tv_x info subst tyvar
   = do  { uniq <- newUnique
-        ; details <- newMetaDetails TauTv
+        ; details <- newMetaDetails info
         ; let name   = mkSystemName uniq (getOccName tyvar)
                        -- See Note [Name of an instantiated type variable]
               kind   = substTyUnchecked subst (tyVarKind tyvar)
               new_tv = mkTcTyVar name kind details
-        ; return (extendTCvSubstAndInScope subst tyvar
-                   (mkTyVarTy new_tv)
-                 , new_tv)
-        }
-
-newMetaSigTyVarX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
--- Just like newMetaTyVarX, but make a SigTv
-newMetaSigTyVarX subst tyvar
-  = do  { uniq <- newUnique
-        ; details <- newMetaDetails SigTv
-        ; let name   = mkSystemName uniq (getOccName tyvar)
-              kind   = substTy subst (tyVarKind tyvar)
-              new_tv = mkTcTyVar name kind details
-        ; return (extendTCvSubst (extendTCvInScope subst new_tv) tyvar
-                   (mkTyVarTy new_tv)
-                 , new_tv) }
+              subst1 = extendTvSubstWithClone subst tyvar new_tv
+        ; return (subst1, new_tv) }
 
 {- Note [Name of an instantiated type variable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

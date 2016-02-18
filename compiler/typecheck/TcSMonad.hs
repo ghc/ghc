@@ -2891,7 +2891,7 @@ instFlexiTcS tvs = wrapTcS (mapAccumLM inst_one emptyTCvSubst tvs)
      inst_one subst tv
          = do { ty' <- instFlexiTcSHelper (tyVarName tv)
                                           (substTyUnchecked subst (tyVarKind tv))
-              ; return (extendTCvSubst subst tv ty', ty') }
+              ; return (extendTvSubst subst tv ty', ty') }
 
 instFlexiTcSHelper :: Name -> Kind -> TcM TcType
 instFlexiTcSHelper tvname kind

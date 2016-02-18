@@ -10,8 +10,8 @@ module Specialise ( specProgram, specUnfolding ) where
 #include "HsVersions.h"
 
 import Id
-import TcType hiding( substTy, extendTCvSubstList )
-import Type   hiding( substTy, extendTCvSubstList )
+import TcType hiding( substTy )
+import Type   hiding( substTy, extendTvSubstList )
 import Coercion( Coercion )
 import Module( Module, HasModule(..) )
 import CoreMonad
@@ -1241,7 +1241,7 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
                 -- spec_tyvars = [a,c]
                 -- ty_args     = [t1,b,t3]
                 spec_tv_binds = [(tv,ty) | (tv, Just ty) <- rhs_tyvars `zip` call_ts]
-                env1          = extendTCvSubstList env spec_tv_binds
+                env1          = extendTvSubstList env spec_tv_binds
                 (rhs_env, poly_tyvars) = substBndrs env1
                                             [tv | (tv, Nothing) <- rhs_tyvars `zip` call_ts]
 
@@ -2133,9 +2133,9 @@ mapAndCombineSM f (x:xs) = do (y, uds1) <- f x
                               (ys, uds2) <- mapAndCombineSM f xs
                               return (y:ys, uds1 `plusUDs` uds2)
 
-extendTCvSubstList :: SpecEnv -> [(TyVar,Type)] -> SpecEnv
-extendTCvSubstList env tv_binds
-  = env { se_subst = CoreSubst.extendTCvSubstList (se_subst env) tv_binds }
+extendTvSubstList :: SpecEnv -> [(TyVar,Type)] -> SpecEnv
+extendTvSubstList env tv_binds
+  = env { se_subst = CoreSubst.extendTvSubstList (se_subst env) tv_binds }
 
 substTy :: SpecEnv -> Type -> Type
 substTy env ty = CoreSubst.substTy (se_subst env) ty

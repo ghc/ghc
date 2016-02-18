@@ -12,7 +12,7 @@ module Simplify ( simplTopBinds, simplExpr, simplRules ) where
 
 import DynFlags
 import SimplMonad
-import Type hiding      ( substTy, substTyVar, extendTCvSubst )
+import Type hiding      ( substTy, substTyVar, extendTvSubst, extendCvSubst )
 import SimplEnv
 import SimplUtils
 import FamInstEnv       ( FamInstEnv )
@@ -385,7 +385,7 @@ simplNonRecX env bndr new_rhs
                   --   the binding c = (a,b)
 
   | Coercion co <- new_rhs
-  = return (extendTCvSubst env bndr (mkCoercionTy co))
+  = return (extendCvSubst env bndr co)
 
   | otherwise
   = do  { (env', bndr') <- simplBinder env bndr
@@ -665,7 +665,7 @@ completeBind :: SimplEnv
 completeBind env top_lvl old_bndr new_bndr new_rhs
  | isCoVar old_bndr
  = case new_rhs of
-     Coercion co -> return (extendTCvSubst env old_bndr (mkCoercionTy co))
+     Coercion co -> return (extendCvSubst env old_bndr co)
      _           -> return (addNonRec env new_bndr new_rhs)
 
  | otherwise
@@ -1237,7 +1237,7 @@ simplLam env [] body cont = simplExprF env body cont
 
 simplLam env (bndr:bndrs) body (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = cont })
   = do { tick (BetaReduction bndr)
-       ; simplLam (extendTCvSubst env bndr arg_ty) bndrs body cont }
+       ; simplLam (extendTvSubst env bndr arg_ty) bndrs body cont }
 
 simplLam env (bndr:bndrs) body (ApplyToVal { sc_arg = arg, sc_env = arg_se
                                            , sc_cont = cont })
@@ -1245,7 +1245,7 @@ simplLam env (bndr:bndrs) body (ApplyToVal { sc_arg = arg, sc_env = arg_se
         ; simplNonRecE env' (zap_unfolding bndr) (arg, arg_se) (bndrs, body) cont }
   where
     env' | Coercion co <- arg
-         = extendTCvSubst env bndr (mkCoercionTy co)
+         = extendCvSubst env bndr co
          | otherwise
          = env
 
@@ -1321,7 +1321,7 @@ simplNonRecE :: SimplEnv
 simplNonRecE env bndr (Type ty_arg, rhs_se) (bndrs, body) cont
   = ASSERT( isTyVar bndr )
     do  { ty_arg' <- simplType (rhs_se `setInScope` env) ty_arg
-        ; simplLam (extendTCvSubst env bndr ty_arg') bndrs body cont }
+        ; simplLam (extendTvSubst env bndr ty_arg') bndrs body cont }
 
 simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
   = do dflags <- getDynFlags
@@ -2260,11 +2260,11 @@ knownCon env scrut dc dc_ty_args dc_args bndr bs rhs cont
 
     bind_args env' (b:bs') (Type ty : args)
       = ASSERT( isTyVar b )
-        bind_args (extendTCvSubst env' b ty) bs' args
+        bind_args (extendTvSubst env' b ty) bs' args
 
     bind_args env' (b:bs') (Coercion co : args)
       = ASSERT( isCoVar b )
-        bind_args (extendTCvSubst env' b (mkCoercionTy co)) bs' args
+        bind_args (extendCvSubst env' b co) bs' args
 
     bind_args env' (b:bs') (arg : args)
       = ASSERT( isId b )

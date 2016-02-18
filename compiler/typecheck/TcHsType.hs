@@ -769,7 +769,7 @@ tc_infer_args mode orig_ty ki mb_kind_info orig_args n0
            ; arg' <- addErrCtxt (funAppCtxt orig_ty arg n) $
                      tc_lhs_type mode' arg (substTyUnchecked subst $ binderType bndr)
            ; let subst' = case binderVar_maybe bndr of
-                   Just tv -> extendTCvSubst subst tv arg'
+                   Just tv -> extendTvSubst subst tv arg'
                    Nothing -> subst
            ; go subst' res_k args (n+1) (arg' : acc) }
 
@@ -830,7 +830,7 @@ tcInstBinderX :: Maybe (VarEnv Kind)
 tcInstBinderX mb_kind_info subst binder
   | Just tv <- binderVar_maybe binder
   = case lookup_tv tv of
-      Just ki -> return (extendTCvSubstAndInScope subst tv ki, ki)
+      Just ki -> return (extendTvSubstAndInScope subst tv ki, ki)
       Nothing -> do { (subst', tv') <- newMetaTyVarX subst tv
                     ; return (subst', mkTyVarTy tv') }
 

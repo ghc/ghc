@@ -21,7 +21,7 @@ module CoreSubst (
 
         -- ** Operations on substitutions
         emptySubst, mkEmptySubst, mkSubst, mkOpenSubst, substInScope, isEmptySubst,
-        extendIdSubst, extendIdSubstList, extendTCvSubst, extendTCvSubstList,
+        extendIdSubst, extendIdSubstList, extendTCvSubst, extendTvSubstList,
         extendSubst, extendSubstList, extendSubstWithVar, zapSubstEnv,
         addInScopeSet, extendInScope, extendInScopeList, extendInScopeIds,
         isInScope, setInScope,
@@ -50,7 +50,7 @@ import qualified Type
 import qualified Coercion
 
         -- We are defining local versions
-import Type     hiding ( substTy, extendTCvSubst, extendTCvSubstList
+import Type     hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                        , isInScope, substTyVarBndr, cloneTyVarBndr )
 import Coercion hiding ( substCo, substCoVarBndr )
 
@@ -215,48 +215,43 @@ extendIdSubst (Subst in_scope ids tvs cvs) v r = Subst in_scope (extendVarEnv id
 extendIdSubstList :: Subst -> [(Id, CoreExpr)] -> Subst
 extendIdSubstList (Subst in_scope ids tvs cvs) prs = Subst in_scope (extendVarEnvList ids prs) tvs cvs
 
--- | Add a substitution for a 'TyVar' to the 'Subst': the 'TyVar' *must*
--- be a real TyVar, and not a CoVar
-extend_tv_subst :: Subst -> TyVar -> Type -> Subst
-extend_tv_subst (Subst in_scope ids tvs cvs) tv ty
+-- | Add a substitution for a 'TyVar' to the 'Subst'
+-- The 'TyVar' *must* be a real TyVar, and not a CoVar
+-- You must ensure that the in-scope set is such that
+-- the "CoreSubst#in_scope_invariant" is true after extending
+-- the substitution like this.
+extendTvSubst :: Subst -> TyVar -> Type -> Subst
+extendTvSubst (Subst in_scope ids tvs cvs) tv ty
   = ASSERT( isTyVar tv )
     Subst in_scope ids (extendVarEnv tvs tv ty) cvs
 
--- | Add a substitution for a 'TyVar' to the 'Subst': you must ensure that the in-scope set is
--- such that the "CoreSubst#in_scope_invariant" is true after extending the substitution like this
-extendTCvSubst :: Subst -> TyVar -> Type -> Subst
-extendTCvSubst subst v r
-  | isTyVar v
-  = extend_tv_subst subst v r
-  | Just co <- isCoercionTy_maybe r
-  = extendCvSubst subst v co
-  | otherwise
-  = pprPanic "CoreSubst.extendTCvSubst" (ppr v <+> text "|->" <+> ppr r)
-
--- | Adds multiple 'TyVar' substitutions to the 'Subst': see also 'extendTCvSubst'
-extendTCvSubstList :: Subst -> [(TyVar,Type)] -> Subst
-extendTCvSubstList subst vrs
+-- | Adds multiple 'TyVar' substitutions to the 'Subst': see also 'extendTvSubst'
+extendTvSubstList :: Subst -> [(TyVar,Type)] -> Subst
+extendTvSubstList subst vrs
   = foldl' extend subst vrs
-  where extend subst (v, r) = extendTCvSubst subst v r
+  where
+    extend subst (v, r) = extendTvSubst subst v r
 
 -- | Add a substitution from a 'CoVar' to a 'Coercion' to the 'Subst': you must ensure that the in-scope set is
 -- such that the "CoreSubst#in_scope_invariant" is true after extending the substitution like this
 extendCvSubst :: Subst -> CoVar -> Coercion -> Subst
-extendCvSubst (Subst in_scope ids tvs cvs) v r = Subst in_scope ids tvs (extendVarEnv cvs v r)
+extendCvSubst (Subst in_scope ids tvs cvs) v r
+  = ASSERT( isCoVar v )
+    Subst in_scope ids tvs (extendVarEnv cvs v r)
 
 -- | Add a substitution appropriate to the thing being substituted
 --   (whether an expression, type, or coercion). See also
---   'extendIdSubst', 'extendTCvSubst'
+--   'extendIdSubst', 'extendTvSubst', 'extendCvSubst'
 extendSubst :: Subst -> Var -> CoreArg -> Subst
 extendSubst subst var arg
   = case arg of
-      Type ty     -> ASSERT( isTyVar var ) extend_tv_subst subst var ty
+      Type ty     -> ASSERT( isTyVar var ) extendTvSubst subst var ty
       Coercion co -> ASSERT( isCoVar var ) extendCvSubst subst var co
       _           -> ASSERT( isId    var ) extendIdSubst subst var arg
 
 extendSubstWithVar :: Subst -> Var -> Var -> Subst
 extendSubstWithVar subst v1 v2
-  | isTyVar v1 = ASSERT( isTyVar v2 ) extend_tv_subst subst v1 (mkTyVarTy v2)
+  | isTyVar v1 = ASSERT( isTyVar v2 ) extendTvSubst subst v1 (mkTyVarTy v2)
   | isCoVar v1 = ASSERT( isCoVar v2 ) extendCvSubst subst v1 (mkCoVarCo v2)
   | otherwise  = ASSERT( isId    v2 ) extendIdSubst subst v1 (Var v2)
 
@@ -1050,7 +1045,7 @@ maybe_substitute :: Subst -> InVar -> OutExpr -> Maybe Subst
 maybe_substitute subst b r
   | Type ty <- r        -- let a::* = TYPE ty in <body>
   = ASSERT( isTyVar b )
-    Just (extendTCvSubst subst b ty)
+    Just (extendTvSubst subst b ty)
 
   | Coercion co <- r
   = ASSERT( isCoVar b )

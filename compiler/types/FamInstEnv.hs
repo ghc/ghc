@@ -1427,13 +1427,11 @@ flattenTys is defined here because of module dependencies.
 -}
 
 data FlattenEnv = FlattenEnv { fe_type_map :: TypeMap TyVar
-                             , fe_in_scope :: InScopeSet
                              , fe_subst    :: TCvSubst }
 
 emptyFlattenEnv :: InScopeSet -> FlattenEnv
 emptyFlattenEnv in_scope
   = FlattenEnv { fe_type_map = emptyTypeMap
-               , fe_in_scope = in_scope
                , fe_subst    = mkEmptyTCvSubst in_scope }
 
 -- See Note [Flattening]
@@ -1502,28 +1500,27 @@ coreFlattenCo env co
   where
     (env1, kind') = coreFlattenTy env (coercionType co)
     fresh_name    = mkFlattenFreshCoName
-    in_scope      = fe_in_scope env1
-    covar         = uniqAway in_scope $ mkCoVar fresh_name kind'
-    env2          = env1 { fe_in_scope = in_scope `extendInScopeSet` covar }
+    subst1        = fe_subst env1
+    in_scope      = getTCvInScope subst1
+    covar         = uniqAway in_scope (mkCoVar fresh_name kind')
+    env2          = env1 { fe_subst = subst1 `extendTCvInScope` covar }
 
 coreFlattenVarBndr :: FlattenEnv -> TyVar -> (FlattenEnv, TyVar)
 coreFlattenVarBndr env tv
   | kind' `eqType` kind
-  = ( env { fe_subst = extendTCvSubst old_subst tv (mkTyVarTy tv) }
+  = ( env { fe_subst = extendTvSubst old_subst tv (mkTyVarTy tv) }
              -- override any previous binding for tv
     , tv)
+
   | otherwise
-  = let new_tv    = uniqAway (fe_in_scope env) (setTyVarKind tv kind')
-        new_subst = extendTCvSubst old_subst tv (mkTyVarTy new_tv)
-        new_is    = extendInScopeSet old_in_scope new_tv
+  = let new_tv    = uniqAway (getTCvInScope old_subst) (setTyVarKind tv kind')
+        new_subst = extendTvSubstWithClone old_subst tv new_tv
     in
-    (env' { fe_in_scope = new_is
-          , fe_subst    = new_subst }, new_tv)
+    (env' { fe_subst = new_subst }, new_tv)
   where
     kind          = tyVarKind tv
     (env', kind') = coreFlattenTy env kind
     old_subst     = fe_subst env
-    old_in_scope  = fe_in_scope env
 
 coreFlattenTyFamApp :: FlattenEnv
                     -> TyCon         -- type family tycon
@@ -1538,14 +1535,14 @@ coreFlattenTyFamApp env fam_tc fam_args
               -- contains *all* tyvars, even locally bound ones elsewhere in the
               -- overall type, so this really is fresh.
       Nothing -> let tyvar_name = mkFlattenFreshTyName fam_tc
-                     tv = uniqAway in_scope $ mkTyVar tyvar_name
-                                                      (typeKind fam_ty)
+                     tv = uniqAway (getTCvInScope subst) $
+                          mkTyVar tyvar_name (typeKind fam_ty)
                      env' = env { fe_type_map = extendTypeMap type_map fam_ty tv
-                                , fe_in_scope = extendInScopeSet in_scope tv }
+                                , fe_subst = extendTCvInScope subst tv }
                  in (env', tv)
   where fam_ty   = mkTyConApp fam_tc fam_args
         FlattenEnv { fe_type_map = type_map
-                   , fe_in_scope = in_scope } = env
+                   , fe_subst = subst } = env
 
 -- | Get the set of all type variables mentioned anywhere in the list
 -- of types. These variables are not necessarily free.

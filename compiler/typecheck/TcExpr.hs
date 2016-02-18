@@ -860,7 +860,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
               --   c.f. TcMType.newMetaTyVars
               mk_inst_ty subst (tv, result_inst_ty)
                 | is_fixed_tv tv   -- Same as result type
-                = return (extendTCvSubst subst tv result_inst_ty, result_inst_ty)
+                = return (extendTvSubst subst tv result_inst_ty, result_inst_ty)
                 | otherwise        -- Fresh type, of correct kind
                 = do { (subst', new_tv) <- newMetaTyVarX subst tv
                      ; return (subst', mkTyVarTy new_tv) }
