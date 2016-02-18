@@ -205,6 +205,11 @@ basicKnownKeyNames
         ioTyConName, ioDataConName,
         runMainIOName,
 
+        -- Type representation types
+        trModuleTyConName, trModuleDataConName,
+        trNameTyConName, trNameSDataConName, trNameDDataConName,
+        trTyConTyConName, trTyConDataConName,
+
         -- Typeable
         typeableClassName,
         typeRepTyConName,
@@ -1129,6 +1134,23 @@ rationalToDoubleName = varQual gHC_FLOAT (fsLit "rationalToDouble") rationalToDo
 -- Class Ix
 ixClassName :: Name
 ixClassName = clsQual gHC_ARR (fsLit "Ix") ixClassKey
+
+-- Typeable representation types
+trModuleTyConName
+  , trModuleDataConName
+  , trNameTyConName
+  , trNameSDataConName
+  , trNameDDataConName
+  , trTyConTyConName
+  , trTyConDataConName
+  :: Name
+trModuleTyConName     = tcQual gHC_TYPES          (fsLit "Module")         trModuleTyConKey
+trModuleDataConName   = dcQual gHC_TYPES          (fsLit "Module")         trModuleDataConKey
+trNameTyConName       = tcQual gHC_TYPES          (fsLit "TrName")         trNameTyConKey
+trNameSDataConName    = dcQual gHC_TYPES          (fsLit "TrNameS")        trNameSDataConKey
+trNameDDataConName    = dcQual gHC_TYPES          (fsLit "TrNameD")        trNameDDataConKey
+trTyConTyConName      = tcQual gHC_TYPES          (fsLit "TyCon")          trTyConTyConKey
+trTyConDataConName    = dcQual gHC_TYPES          (fsLit "TyCon")          trTyConDataConKey
 
 -- Class Typeable, and functions for constructing `Typeable` dictionaries
 typeableClassName

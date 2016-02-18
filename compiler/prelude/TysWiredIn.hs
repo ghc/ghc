@@ -88,11 +88,6 @@ module TysWiredIn (
 
         mkWiredInIdName,    -- used in MkId
 
-        -- * Type representations
-        trModuleTyCon, trModuleDataCon,
-        trNameTyCon, trNameSDataCon, trNameDDataCon,
-        trTyConTyCon, trTyConDataCon,
-
         -- * Levity
         levityTy, levityTyCon, liftedDataCon, unliftedDataCon,
         liftedPromDataCon, unliftedPromDataCon,
@@ -188,9 +183,6 @@ wiredInTyCons = [ unitTyCon     -- Not treated like other tuples, because
               , liftedTypeKindTyCon
               , starKindTyCon
               , unicodeStarKindTyCon
-              , trModuleTyCon
-              , trTyConTyCon
-              , trNameTyCon
               ]
 
 mkWiredInTyConName :: BuiltInSyntax -> Module -> FastString -> Unique -> TyCon -> Name
@@ -615,6 +607,7 @@ unboxedUnitDataCon = tupleDataCon   Unboxed 0
 ********************************************************************* -}
 
 -- See Note [The equality types story] in TysPrim
+-- (:~~: :: forall k1 k2 (a :: k1) (b :: k2). a -> b -> Constraint)
 heqTyCon, coercibleTyCon :: TyCon
 heqClass, coercibleClass :: Class
 heqDataCon, coercibleDataCon :: DataCon
@@ -1063,56 +1056,3 @@ promotedGTDataCon     = promoteDataCon gtDataCon
 promotedConsDataCon, promotedNilDataCon :: TyCon
 promotedConsDataCon   = promoteDataCon consDataCon
 promotedNilDataCon    = promoteDataCon nilDataCon
-
--- * Type representation types
--- See Note [Grand plan for Typable] in TcTypeable.
-trModuleTyConName, trNameTyConName, trTyConTyConName :: Name
-trModuleTyConName   = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Module")
-                        trModuleTyConKey trModuleTyCon
-trNameTyConName     = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "TrName")
-                        trNameTyConKey trNameTyCon
-trTyConTyConName    = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "TyCon")
-                        trTyConTyConKey trTyConTyCon
-
-trModuleDataConName, trTyConDataConName,
-  trNameSDataConName, trNameDDataConName :: Name
-trModuleDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "Module")
-                        trModuleDataConKey trModuleDataCon
-trTyConDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "TyCon")
-                        trTyConDataConKey trTyConDataCon
-trNameSDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "TrNameS")
-                        trNameSDataConKey trNameSDataCon
-trNameDDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "TrNameD")
-                        trNameDDataConKey trNameDDataCon
-
-trModuleTyCon :: TyCon
-trModuleTyCon = pcNonRecDataTyCon trModuleTyConName Nothing [] [trModuleDataCon]
-
-trModuleDataCon :: DataCon
-trModuleDataCon = pcDataCon trModuleDataConName [] [trNameTy, trNameTy] trModuleTyCon
-
-trModuleTy :: Type
-trModuleTy = mkTyConTy trModuleTyCon
-
-trNameTyCon :: TyCon
-trNameTyCon = pcNonRecDataTyCon trNameTyConName Nothing [] [trNameSDataCon, trNameDDataCon]
-
-trNameSDataCon, trNameDDataCon :: DataCon
-trNameSDataCon = pcDataCon trNameSDataConName [] [addrPrimTy] trNameTyCon
-trNameDDataCon = pcDataCon trNameDDataConName [] [stringTy] trNameTyCon
-
-trNameTy :: Type
-trNameTy = mkTyConTy trNameTyCon
-
-trTyConTyCon :: TyCon
-trTyConTyCon = pcNonRecDataTyCon trTyConTyConName Nothing [] [trTyConDataCon]
-
-trTyConDataCon :: DataCon
-trTyConDataCon = pcDataCon trTyConDataConName [] [fprint, fprint, trModuleTy, trNameTy] trTyConTyCon
-  where
-    -- TODO: This should be for the target, no?
-#if WORD_SIZE_IN_BITS < 64
-    fprint = word64PrimTy
-#else
-    fprint = wordPrimTy
-#endif

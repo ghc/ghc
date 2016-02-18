@@ -14,6 +14,11 @@ T2431.$WRefl [InlPrag=INLINE] :: forall a. a :~: a
 T2431.$WRefl =
   \ (@ a) -> T2431.Refl @ a @ a @~ (<a>_N :: a GHC.Prim.~# a)
 
+-- RHS size: {terms: 4, types: 8, coercions: 0}
+absurd :: forall a. Int :~: Bool -> a
+[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <L,U>x]
+absurd = \ (@ a4) (x :: Int :~: Bool) -> case x of _ [Occ=Dead] { }
+
 -- RHS size: {terms: 2, types: 0, coercions: 0}
 a :: GHC.Types.TrName
 [GblId, Caf=NoCafRefs, Str=DmdType]
@@ -52,11 +57,6 @@ T2431.$tc:~: :: GHC.Types.TyCon
 T2431.$tc:~: =
   GHC.Types.TyCon
     9759653149176674453## 12942818337407067047## T2431.$trModule a3
-
--- RHS size: {terms: 4, types: 8, coercions: 0}
-absurd :: forall a. Int :~: Bool -> a
-[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <L,U>x]
-absurd = \ (@ a4) (x :: Int :~: Bool) -> case x of _ [Occ=Dead] { }
 
 
 

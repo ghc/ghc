@@ -71,7 +71,7 @@ import TcType
 import MkIface
 import TcSimplify
 import TcTyClsDecls
-import TcTypeable( mkModIdBindings, mkPrimTypeableBinds )
+import TcTypeable ( mkTypeableBinds )
 import LoadIface
 import TidyPgm    ( mkBootModDetailsTc )
 import RnNames
@@ -471,20 +471,18 @@ tcRnSrcDecls :: Bool  -- False => no 'module M(..) where' header at all
         -- Returns the variables free in the decls
         -- Reason: solely to report unused imports and bindings
 tcRnSrcDecls explicit_mod_hdr decls
- = do { -- Create a binding for $trModule
-        -- Do this before processing any data type declarations,
-        -- which need tcg_tr_module to be initialised
-      ; tcg_env <- mkModIdBindings
-      ; tcg_env <- setGblEnv tcg_env mkPrimTypeableBinds
-
-        -- Do all the declarations
-      ; ((tcg_env, tcl_env), lie) <- setGblEnv tcg_env  $
-                                     captureConstraints $
+ = do { -- Do all the declarations
+      ; ((tcg_env, tcl_env), lie) <- captureConstraints $
               do { (tcg_env, tcl_env) <- tc_rn_src_decls decls ;
                  ; tcg_env <- setEnvs (tcg_env, tcl_env) $
                               checkMain explicit_mod_hdr
                  ; return (tcg_env, tcl_env) }
       ; setEnvs (tcg_env, tcl_env) $ do {
+
+        -- Emit Typeable bindings
+      ; tcg_env <- setGblEnv tcg_env mkTypeableBinds
+
+      ; setGblEnv tcg_env $ do {
 
 #ifdef GHCI
       ; finishTH
@@ -544,7 +542,7 @@ tcRnSrcDecls explicit_mod_hdr decls
 
       ; setGlobalTypeEnv tcg_env' final_type_env
 
-   } }
+   } } }
 
 tc_rn_src_decls :: [LHsDecl RdrName]
                 -> TcM (TcGblEnv, TcLclEnv)

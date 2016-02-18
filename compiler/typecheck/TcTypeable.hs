@@ -3,9 +3,9 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1999
 -}
 
-module TcTypeable(
-    mkTypeableBinds, mkPrimTypeableBinds, mkModIdBindings
-  ) where
+{-# LANGUAGE RecordWildCards #-}
+
+module TcTypeable(mkTypeableBinds) where
 
 
 import TcBinds( addTypecheckedBinds )
@@ -14,8 +14,6 @@ import TcEnv
 import TcRnMonad
 import PrelNames
 import TysPrim ( primTyCons )
-import TysWiredIn ( trModuleTyCon, trModuleDataCon, trTyConTyCon
-                  , trTyConDataCon, trNameSDataCon )
 import Id
 import Type
 import TyCon
@@ -28,8 +26,9 @@ import DynFlags
 import Bag
 import Fingerprint(Fingerprint(..), fingerprintString)
 import Outputable
-import Data.Word( Word64 )
 import FastString ( FastString, mkFastString )
+
+import Data.Word( Word64 )
 
 {- Note [Grand plan for Typeable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -67,14 +66,16 @@ The overall plan is this:
 
 There are many wrinkles:
 
-* Since we generate $tcT for every data type T, the types TyCon and
-  Module must be available right from the start; so they are wired in (and
-  defined in ghc-prim:GHC.Types).
+* The timing of when we produce this bindings is rather important: they must be
+  defined after the rest of the module has been typechecked since we need to be
+  able to lookup Module and TyCon in the type environment and we may be
+  currently compiling GHC.Types (where they are defined).
 
 * GHC.Prim doesn't have any associated object code, so we need to put the
-  representations for types defined in this module elsewhere. We put these
-  in GHC.Types. TcTypeable.mkPrimTypeableBinds is responsible for injecting
-  the bindings for the GHC.Prim representions when compiling GHC.Types.
+  representations for types defined in this module elsewhere. We chose this
+  place to be GHC.Types. TcTypeable.mkPrimTypeableBinds is responsible for
+  injecting the bindings for the GHC.Prim representions when compiling
+  GHC.Types.
 
 * TyCon.tyConRepModOcc is responsible for determining where to find
   the representation binding for a given type. This is where we handle
@@ -86,6 +87,32 @@ There are many wrinkles:
 
 -}
 
+-- | Generate the Typeable bindings for a module. This is the only
+-- entry-point of this module and is invoked by the typechecker driver in
+-- 'tcRnSrcDecls'.
+--
+-- See Note [Grand plan for Typeable] in TcTypeable.
+mkTypeableBinds :: TcM TcGblEnv
+mkTypeableBinds
+  = do { -- Create a binding for $trModule.
+         -- Do this before processing any data type declarations,
+         -- which need tcg_tr_module to be initialised
+       ; tcg_env <- mkModIdBindings
+         -- Now we can generate the TyCon representations...
+         -- First we handle the primitive TyCons if we are compiling GHC.Types
+       ; tcg_env <- setGblEnv tcg_env mkPrimTypeableBinds
+         -- Then we produce bindings for the user-defined types in this module.
+       ; setGblEnv tcg_env $
+             let tycons = filter needs_typeable_binds (tcg_tcs tcg_env)
+             in mkTypeableTyConBinds tycons
+       }
+  where
+    needs_typeable_binds tc =
+          (not (isFamInstTyCon tc) && isAlgTyCon tc)
+       || isDataFamilyTyCon tc
+       || isClassTyCon tc
+
+
 {- *********************************************************************
 *                                                                      *
             Building top-level binding for $trModule
@@ -96,20 +123,23 @@ mkModIdBindings :: TcM TcGblEnv
 mkModIdBindings
   = do { mod <- getModule
        ; loc <- getSrcSpanM
-       ; mod_nm     <- newGlobalBinder mod (mkVarOcc "$trModule") loc
-       ; let mod_id   = mkExportedVanillaId mod_nm
-                                            (mkTyConApp trModuleTyCon [])
-             mod_bind = mkVarBind mod_id (mkModIdRHS mod)
+       ; mod_nm        <- newGlobalBinder mod (mkVarOcc "$trModule") loc
+       ; trModuleTyCon <- tcLookupTyCon trModuleTyConName
+       ; let mod_id = mkExportedVanillaId mod_nm (mkTyConApp trModuleTyCon [])
+       ; mod_bind      <- mkVarBind mod_id <$> mkModIdRHS mod
 
        ; tcg_env <- tcExtendGlobalValEnv [mod_id] getGblEnv
        ; return (tcg_env { tcg_tr_module = Just mod_id }
                  `addTypecheckedBinds` [unitBag mod_bind]) }
 
-mkModIdRHS :: Module -> LHsExpr Id
+mkModIdRHS :: Module -> TcM (LHsExpr Id)
 mkModIdRHS mod
-  = nlHsApps (dataConWrapId trModuleDataCon)
-             [ trNameLit (unitIdFS (moduleUnitId mod))
-             , trNameLit (moduleNameFS (moduleName mod)) ]
+  = do { trModuleDataCon <- tcLookupDataCon trModuleDataConName
+       ; trNameLit <- mkTrNameLit
+       ; return $ nlHsApps (dataConWrapId trModuleDataCon)
+                           [ trNameLit (unitIdFS (moduleUnitId mod))
+                           , trNameLit (moduleNameFS (moduleName mod)) ]
+       }
 
 {- *********************************************************************
 *                                                                      *
@@ -117,18 +147,16 @@ mkModIdRHS mod
 *                                                                      *
 ********************************************************************* -}
 
-mkTypeableBinds :: [TyCon] -> TcM TcGblEnv
-mkTypeableBinds tycons
-  = do { dflags <- getDynFlags
-       ; gbl_env <- getGblEnv
+-- | Generate TyCon bindings for a set of type constructors
+mkTypeableTyConBinds :: [TyCon] -> TcM TcGblEnv
+mkTypeableTyConBinds tycons
+  = do { gbl_env <- getGblEnv
        ; mod <- getModule
-       ; let pkg_str  = unitIdString (moduleUnitId mod)
-             mod_str  = moduleNameString (moduleName mod)
-             mod_expr = case tcg_tr_module gbl_env of  -- Should be set by now
+       ; let mod_expr = case tcg_tr_module gbl_env of  -- Should be set by now
                            Just mod_id -> nlHsVar mod_id
                            Nothing     -> pprPanic "tcMkTypeableBinds" (ppr tycons)
-             stuff    = (dflags, mod_expr, pkg_str, mod_str)
-             all_tycons = [ tc' | tc <- tycons, tc' <- tc : tyConATs tc ]
+       ; stuff <- collect_stuff mod mod_expr
+       ; let all_tycons = [ tc' | tc <- tycons, tc' <- tc : tyConATs tc ]
                              -- We need type representations for any associated types
              tc_binds = map (mk_typeable_binds stuff) all_tycons
              tycon_rep_ids = foldr ((++) . collectHsBindsBinders) [] tc_binds
@@ -143,15 +171,28 @@ mkTypeableBinds tycons
 -- See Note [Grand plan for Typeable] in this module.
 mkPrimTypeableBinds :: TcM TcGblEnv
 mkPrimTypeableBinds
-  = do { dflags <- getDynFlags
-       ; mod <- getModule
-       ; let prim_binds :: LHsBinds Id
-             prim_binds
-               | mod == gHC_TYPES = ghcPrimTypeableBinds dflags
-               | otherwise        = emptyBag
-             prim_rep_ids = collectHsBindsBinders prim_binds
-       ; gbl_env <- tcExtendGlobalValEnv prim_rep_ids getGblEnv
-       ; return (gbl_env `addTypecheckedBinds` [prim_binds]) }
+  = do { mod <- getModule
+       ; if mod == gHC_TYPES
+           then do { trModuleTyCon <- tcLookupTyCon trModuleTyConName
+                   ; let ghc_prim_module_id =
+                             mkExportedVanillaId trGhcPrimModuleName
+                                                 (mkTyConTy trModuleTyCon)
+
+                   ; ghc_prim_module_bind <- mkVarBind ghc_prim_module_id
+                                             <$> mkModIdRHS gHC_PRIM
+
+                   ; stuff <- collect_stuff gHC_PRIM (nlHsVar ghc_prim_module_id)
+                   ; let prim_binds :: LHsBinds Id
+                         prim_binds = unitBag ghc_prim_module_bind
+                                      `unionBags` ghcPrimTypeableBinds stuff
+
+                         prim_rep_ids = collectHsBindsBinders prim_binds
+                   ; gbl_env <- tcExtendGlobalValEnv prim_rep_ids getGblEnv
+                   ; return (gbl_env `addTypecheckedBinds` [prim_binds])
+                   }
+           else getGblEnv
+       }
+  where
 
 -- | Generate bindings for the type representation of the wired-in TyCons defined
 -- by the virtual "GHC.Prim" module. This differs from the usual
@@ -160,35 +201,50 @@ mkPrimTypeableBinds
 -- "GHC.Types" yet are producing representations for types in "GHC.Prim").
 --
 -- See Note [Grand plan for Typeable] in this module.
-ghcPrimTypeableBinds :: DynFlags -> LHsBinds Id
-ghcPrimTypeableBinds dflags
-  = ghc_prim_module_bind `unionBags` unionManyBags (map mkBind all_prim_tys)
+ghcPrimTypeableBinds :: TypeableStuff -> LHsBinds Id
+ghcPrimTypeableBinds stuff
+  = unionManyBags (map mkBind all_prim_tys)
   where
     all_prim_tys :: [TyCon]
     all_prim_tys = [ tc' | tc <- funTyCon : primTyCons
                          , tc' <- tc : tyConATs tc ]
 
-    ghc_prim_module_id =
-        mkExportedVanillaId trGhcPrimModuleName (mkTyConTy trModuleTyCon)
-    ghc_prim_module_bind =
-        unitBag $ mkVarBind ghc_prim_module_id (mkModIdRHS gHC_PRIM)
-
-    stuff :: TypeableStuff
-    stuff = (dflags, nlHsVar ghc_prim_module_id, "ghc-prim", "GHC.Prim")
-
     mkBind :: TyCon -> LHsBinds Id
     mkBind = mk_typeable_binds stuff
 
-trNameLit :: FastString -> LHsExpr Id
-trNameLit fs
-  = nlHsApps (dataConWrapId trNameSDataCon) [nlHsLit (mkHsStringPrimLit fs)]
+data TypeableStuff
+    = Stuff { dflags         :: DynFlags
+            , mod_rep        :: LHsExpr Id  -- ^ Of type GHC.Types.Module
+            , pkg_str        :: String      -- ^ Package name
+            , mod_str        :: String      -- ^ Module name
+            , trTyConTyCon   :: TyCon       -- ^ of @TyCon@
+            , trTyConDataCon :: DataCon     -- ^ of @TyCon@
+            , trNameLit      :: FastString -> LHsExpr Id
+                                            -- ^ To construct @TrName@s
+            }
 
-type TypeableStuff
-  = ( DynFlags
-    , LHsExpr Id  -- Of type GHC.Types.Module
-    , String      -- Package name
-    , String      -- Module name
-    )
+-- | Collect various tidbits which we'll need to generate TyCon representations.
+collect_stuff :: Module -> LHsExpr Id -> TcM TypeableStuff
+collect_stuff mod mod_rep = do
+    dflags <- getDynFlags
+    let pkg_str  = unitIdString (moduleUnitId mod)
+        mod_str  = moduleNameString (moduleName mod)
+
+    trTyConTyCon   <- tcLookupTyCon trTyConTyConName
+    trTyConDataCon <- tcLookupDataCon trTyConDataConName
+    trNameLit      <- mkTrNameLit
+    return Stuff {..}
+
+-- | Lookup the necessary pieces to construct the @trNameLit@. We do this so we
+-- can save the work of repeating lookups when constructing many TyCon
+-- representations.
+mkTrNameLit :: TcM (FastString -> LHsExpr Id)
+mkTrNameLit = do
+    trNameSDataCon <- tcLookupDataCon trNameSDataConName
+    let trNameLit :: FastString -> LHsExpr Id
+        trNameLit fs = nlHsApps (dataConWrapId trNameSDataCon)
+                                [nlHsLit (mkHsStringPrimLit fs)]
+    return trNameLit
 
 -- | Make bindings for the type representations of a 'TyCon' and its
 -- promoted constructors.
@@ -196,28 +252,26 @@ mk_typeable_binds :: TypeableStuff -> TyCon -> LHsBinds Id
 mk_typeable_binds stuff tycon
   = mkTyConRepBinds stuff tycon
     `unionBags`
-    unionManyBags (map (mkTypeableDataConBinds stuff) (tyConDataCons tycon))
+    unionManyBags (map (mkTyConRepBinds stuff . promoteDataCon)
+                       (tyConDataCons tycon))
 
+-- | Make typeable bindings for the given 'TyCon'.
 mkTyConRepBinds :: TypeableStuff -> TyCon -> LHsBinds Id
-mkTyConRepBinds stuff tycon
+mkTyConRepBinds stuff@(Stuff {..}) tycon
   = case tyConRepName_maybe tycon of
       Just rep_name -> unitBag (mkVarBind rep_id rep_rhs)
          where
-           rep_id  = mkExportedVanillaId rep_name (mkTyConApp trTyConTyCon [])
+           rep_id  = mkExportedVanillaId rep_name (mkTyConTy trTyConTyCon)
            rep_rhs = mkTyConRepRHS stuff tycon
       _ -> emptyBag
 
--- | Produce typeable binds for the promoted 'TyCon' of a data constructor
-mkTypeableDataConBinds :: TypeableStuff -> DataCon -> LHsBinds Id
-mkTypeableDataConBinds stuff dc
-  = mkTyConRepBinds stuff (promoteDataCon dc)
-
+-- | Produce the right-hand-side of a @TyCon@ representation.
 mkTyConRepRHS :: TypeableStuff -> TyCon -> LHsExpr Id
-mkTyConRepRHS (dflags, mod_expr, pkg_str, mod_str) tycon = rep_rhs
+mkTyConRepRHS (Stuff {..}) tycon = rep_rhs
   where
     rep_rhs = nlHsApps (dataConWrapId trTyConDataCon)
                        [ nlHsLit (word64 high), nlHsLit (word64 low)
-                       , mod_expr
+                       , mod_rep
                        , trNameLit (mkFastString tycon_str) ]
 
     tycon_str = add_tick (occNameString (getOccName tycon))
@@ -232,4 +286,3 @@ mkTyConRepRHS (dflags, mod_expr, pkg_str, mod_str) tycon = rep_rhs
     word64 :: Word64 -> HsLit
     word64 | wORD_SIZE dflags == 4 = \n -> HsWord64Prim (show n) (toInteger n)
            | otherwise             = \n -> HsWordPrim   (show n) (toInteger n)
-
