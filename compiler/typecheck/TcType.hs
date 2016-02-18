@@ -693,13 +693,23 @@ isSigMaybe _                = Nothing
 -}
 
 -- | Finds outermost type-family applications occuring in a type,
--- after expanding synonyms.
+-- after expanding synonyms.  In the list (F, tys) that is returned
+-- we guarantee that tys matches F's arity.  For example, given
+--    type family F a :: * -> *    (arity 1)
+-- calling tcTyFamInsts on (Maybe (F Int Bool) will return
+--     (F, [Int]), not (F, [Int,Bool])
+--
+-- This is important for its use in deciding termination of type
+-- instances (see Trac #11581).  E.g.
+--    type instance G [Int] = ...(F Int <big type>)...
+-- we don't need to take <big type> into account when asking if
+-- the calls on the RHS are smaller than the LHS
 tcTyFamInsts :: Type -> [(TyCon, [Type])]
 tcTyFamInsts ty
   | Just exp_ty <- coreView ty  = tcTyFamInsts exp_ty
 tcTyFamInsts (TyVarTy _)        = []
 tcTyFamInsts (TyConApp tc tys)
-  | isTypeFamilyTyCon tc        = [(tc, tys)]
+  | isTypeFamilyTyCon tc        = [(tc, take (tyConArity tc) tys)]
   | otherwise                   = concat (map tcTyFamInsts tys)
 tcTyFamInsts (LitTy {})         = []
 tcTyFamInsts (ForAllTy bndr ty) = tcTyFamInsts (binderType bndr)
