@@ -1,3 +1,5 @@
+p = T8274.Positives 42# 4.23# 4.23## '4'# 4##
+n = T8274.Negatives -4# -4.0# -4.0##
 T8274.$trModule2 = GHC.Types.TrNameS "main"#
 T8274.$trModule1 = GHC.Types.TrNameS "T8274"#
 T8274.$tc'Positives1 = GHC.Types.TrNameS "'Positives"#
@@ -8,5 +10,3 @@ T8274.$tc'Negatives1 = GHC.Types.TrNameS "'Negatives"#
 T8274.$tc'Negatives = GHC.Types.TyCon 15950179315687996644## 11481167534507418130## T8274.$trModule T8274.$tc'Negatives1
 T8274.$tcN1 = GHC.Types.TrNameS "N"#
 T8274.$tcN = GHC.Types.TyCon 7479687563082171902## 17616649989360543185## T8274.$trModule T8274.$tcN1
-p = T8274.Positives 42# 4.23# 4.23## '4'# 4##
-n = T8274.Negatives -4# -4.0# -4.0##

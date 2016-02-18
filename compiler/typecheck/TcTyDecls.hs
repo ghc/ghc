@@ -30,7 +30,6 @@ module TcTyDecls(
 
 import TcRnMonad
 import TcEnv
-import TcTypeable( mkTypeableBinds )
 import TcBinds( tcRecSelBinds )
 import TyCoRep( Type(..), TyBinder(..), delBinderVar )
 import TcType
@@ -863,10 +862,7 @@ tcAddImplicits tycons
     do { traceTc "tcAddImplicits" $ vcat
             [ text "tycons" <+> ppr tycons
             , text "implicits" <+> ppr implicit_things ]
-       ; gbl_env <- mkTypeableBinds tycons
-       ; gbl_env <- setGblEnv gbl_env $
-                    tcRecSelBinds (mkRecSelBinds tycons)
-       ; return gbl_env }
+       ; tcRecSelBinds (mkRecSelBinds tycons) }
  where
    implicit_things = concatMap implicitTyConThings tycons
    def_meth_ids    = mkDefaultMethodIds tycons

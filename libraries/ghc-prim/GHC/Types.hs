@@ -344,7 +344,7 @@ data Levity = Lifted | Unlifted
 
 {- *********************************************************************
 *                                                                      *
-             Runtime represntation of TyCon
+             Runtime representation of TyCon
 *                                                                      *
 ********************************************************************* -}
 
