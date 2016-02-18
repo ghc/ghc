@@ -1766,7 +1766,7 @@ coercionKind co = go co
     -- Collect up all the arguments and apply all at once
     -- See Note [Nested InstCos]
     go_app (InstCo co arg) args = go_app co (arg:args)
-    go_app co              args = applyTys <$> go co <*> (sequenceA $ map go args)
+    go_app co              args = piResultTys <$> go co <*> (sequenceA $ map go args)
 
     -- The real mkCastTy is too slow, and we can easily have nested ForAllCos.
     mk_cast_ty :: Type -> Coercion -> Type
@@ -1831,7 +1831,7 @@ coercionKindRole = go
     go_app (InstCo co arg) args = go_app co (arg:args)
     go_app co              args
       = let (pair, r) = go co in
-        (applyTys <$> pair <*> (sequenceA $ map coercionKind args), r)
+        (piResultTys <$> pair <*> (sequenceA $ map coercionKind args), r)
 
 -- | Retrieve the role from a coercion.
 coercionRole :: Coercion -> Role
@@ -1852,8 +1852,7 @@ If we deal with the InstCos one at a time, we'll do this:
    1.  Find the kind of (g @ ty1 .. @ ty99) : forall a100. phi'
    2.  Substitute phi'[ ty100/a100 ], a single tyvar->type subst
 But this is a *quadratic* algorithm, and the blew up Trac #5631.
-So it's very important to do the substitution simultaneously.
-
-cf Type.applyTys (which in fact we call here)
+So it's very important to do the substitution simultaneously;
+cf Type.piResultTys (which in fact we call here).
 
 -}

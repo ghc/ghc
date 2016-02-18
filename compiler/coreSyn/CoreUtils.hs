@@ -175,15 +175,15 @@ applyTypeToArgs e op_ty args
                                   = go res_ty args
     go _ _ = pprPanic "applyTypeToArgs" panic_msg
 
-    -- go_ty_args: accumulate type arguments so we can instantiate all at once
+    -- go_ty_args: accumulate type arguments so we can
+    -- instantiate all at once with piResultTys
     go_ty_args op_ty rev_tys (Type ty : args)
        = go_ty_args op_ty (ty:rev_tys) args
     go_ty_args op_ty rev_tys (Coercion co : args)
        = go_ty_args op_ty (mkCoercionTy co : rev_tys) args
     go_ty_args op_ty rev_tys args
-       = go (applyTysD panic_msg_w_hdr op_ty (reverse rev_tys)) args
+       = go (piResultTys op_ty (reverse rev_tys)) args
 
-    panic_msg_w_hdr = hang (text "applyTypeToArgs") 2 panic_msg
     panic_msg = vcat [ text "Expression:" <+> pprCoreExpr e
                      , text "Type:" <+> ppr op_ty
                      , text "Args:" <+> ppr args ]

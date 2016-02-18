@@ -131,7 +131,7 @@ module TcType (
 
   mkForAllTy, mkForAllTys, mkInvForAllTys, mkSpecForAllTys, mkNamedForAllTy,
   mkFunTy, mkFunTys,
-  mkTyConApp, mkAppTy, mkAppTys, applyTys,
+  mkTyConApp, mkAppTy, mkAppTys,
   mkTyConTy, mkTyVarTy,
   mkTyVarTys,
   mkNamedBinder,
