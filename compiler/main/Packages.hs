@@ -771,8 +771,14 @@ findWiredInPackages dflags pkgs vis_map = do
                   | otherwise
                   = pkg
                 upd_deps pkg = pkg {
-                      depends = map upd_wired_in (depends pkg)
+                      depends = map upd_wired_in (depends pkg),
+                      exposedModules
+                        = map (\(ExposedModule k v) ->
+                                (ExposedModule k (fmap upd_wired_in_mod v)))
+                              (exposedModules pkg)
                     }
+                upd_wired_in_mod (OriginalModule uid m)
+                    = OriginalModule (upd_wired_in uid) m
                 upd_wired_in key
                     | Just key' <- Map.lookup key wiredInMap = key'
                     | otherwise = key
