@@ -26,7 +26,7 @@ import TcBinds
 import TcUnify
 import TcHsType
 import TcMType
-import Type     ( getClassPredTys_maybe, varSetElemsWellScoped )
+import Type     ( getClassPredTys_maybe, varSetElemsWellScoped, piResultTys )
 import TcType
 import TcRnMonad
 import BuildTyCl( TcMethInfo )
@@ -300,10 +300,7 @@ instantiateMethod :: Class -> Id -> [TcType] -> TcType
 instantiateMethod clas sel_id inst_tys
   = ASSERT( ok_first_pred ) local_meth_ty
   where
-    (sel_tyvars,sel_rho) = tcSplitForAllTys (idType sel_id)
-    rho_ty = ASSERT( length sel_tyvars == length inst_tys )
-             substTyWith sel_tyvars inst_tys sel_rho
-
+    rho_ty = piResultTys (idType sel_id) inst_tys
     (first_pred, local_meth_ty) = tcSplitPredFunTy_maybe rho_ty
                 `orElse` pprPanic "tcInstanceMethod" (ppr sel_id)
 

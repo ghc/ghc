@@ -829,25 +829,89 @@ splitFunTysN n ty = ASSERT2( isFunTy ty, int n <+> ppr ty )
 
 funResultTy :: Type -> Type
 -- ^ Extract the function result type and panic if that is not possible
-funResultTy ty = piResultTy ty (pprPanic "funResultTy" (ppr ty))
-
--- | Essentially 'funResultTy' on kinds handling pi-types too
-piResultTy :: Type -> Type -> Type
-piResultTy ty arg | Just ty' <- coreView ty = piResultTy ty' arg
-piResultTy (ForAllTy (Anon _) res)     _   = res
-piResultTy (ForAllTy (Named tv _) res) arg = substTyWithUnchecked [tv] [arg] res
-piResultTy ty arg                          = pprPanic "piResultTy"
-                                                 (ppr ty $$ ppr arg)
-
--- | Fold 'piResultTy' over many types
-piResultTys :: Type -> [Type] -> Type
-piResultTys = foldl piResultTy
+funResultTy ty | Just ty' <- coreView ty = funResultTy ty'
+funResultTy (ForAllTy (Anon {}) res)     = res
+funResultTy ty                           = pprPanic "funResultTy" (ppr ty)
 
 funArgTy :: Type -> Type
 -- ^ Extract the function argument type and panic if that is not possible
 funArgTy ty | Just ty' <- coreView ty = funArgTy ty'
 funArgTy (ForAllTy (Anon arg) _res) = arg
 funArgTy ty                         = pprPanic "funArgTy" (ppr ty)
+
+piResultTy :: Type -> Type -> Type
+-- ^ Just like 'piResultTys' but for a single argument
+-- Try not to iterate 'piResultTy', because it's inefficient to substitute
+-- one variable at a time; instead use 'piResultTys"
+piResultTy ty arg
+  | Just ty' <- coreView ty = piResultTy ty' arg
+
+  | ForAllTy bndr res <- ty
+  = case bndr of
+      Anon {}    -> res
+      Named tv _ -> substTy (extendTvSubst empty_subst tv arg) res
+        where
+          empty_subst = mkEmptyTCvSubst $ mkInScopeSet $
+                        tyCoVarsOfTypes [arg,res]
+  | otherwise
+  = panic "piResultTys"
+
+-- | (piResultTys f_ty [ty1, .., tyn]) gives the type of (f ty1 .. tyn)
+--   where f :: f_ty
+-- 'piResultTys' is interesting because:
+--      1. 'f_ty' may have more for-alls than there are args
+--      2. Less obviously, it may have fewer for-alls
+-- For case 2. think of:
+--   piResultTys (forall a.a) [forall b.b, Int]
+-- This really can happen, but only (I think) in situations involving
+-- undefined.  For example:
+--       undefined :: forall a. a
+-- Term: undefined @(forall b. b->b) @Int
+-- This term should have type (Int -> Int), but notice that
+-- there are more type args than foralls in 'undefined's type.
+
+-- If you edit this function, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in coreSyn/CoreLint.hs
+
+-- This is a heavily used function (e.g. from typeKind),
+-- so we pay attention to efficiency, especially in the special case
+-- where there are no for-alls so we are just dropping arrows from
+-- a function type/kind.
+piResultTys :: Type -> [Type] -> Type
+piResultTys ty [] = ty
+piResultTys ty orig_args@(arg:args)
+  | Just ty' <- coreView ty
+  = piResultTys ty' orig_args
+
+  | ForAllTy bndr res <- ty
+  = case bndr of
+      Anon {}    -> piResultTys res args
+      Named tv _ -> go (extendVarEnv emptyTvSubstEnv tv arg) res args
+
+  | otherwise
+  = panic "piResultTys"
+  where
+    go :: TvSubstEnv -> Type -> [Type] -> Type
+    go tv_env ty [] = substTy (mkTvSubst in_scope tv_env) ty
+      where
+        in_scope = mkInScopeSet (tyCoVarsOfTypes (ty:orig_args))
+
+    go tv_env ty all_args@(arg:args)
+      | Just ty' <- coreView ty
+      = go tv_env ty' all_args
+
+      | ForAllTy bndr res <- ty
+      = case bndr of
+          Anon _     -> go tv_env res args
+          Named tv _ -> go (extendVarEnv tv_env tv arg) res args
+
+      | TyVarTy tv <- ty
+      , Just ty' <- lookupVarEnv tv_env tv
+        -- Deals with piResultTys (forall a. a) [forall b.b, Int]
+      = piResultTys ty' all_args
+
+      | otherwise
+      = panic "piResultTys"
 
 {-
 ---------------------------------------------------------------------
@@ -1410,59 +1474,16 @@ splitPiTysInvisible ty = split ty ty []
 tyConBinders :: TyCon -> [TyBinder]
 tyConBinders = fst . splitPiTys . tyConKind
 
-{-
-applyTys
-~~~~~~~~~~~~~~~~~
--}
-
-applyTys :: Type -> [KindOrType] -> Type
--- ^ This function is interesting because:
---
---      1. The function may have more for-alls than there are args
---
---      2. Less obviously, it may have fewer for-alls
---
--- For case 2. think of:
---
--- > applyTys (forall a.a) [forall b.b, Int]
---
--- This really can happen, but only (I think) in situations involving
--- undefined.  For example:
---       undefined :: forall a. a
--- Term: undefined @(forall b. b->b) @Int
--- This term should have type (Int -> Int), but notice that
--- there are more type args than foralls in 'undefined's type.
-
--- If you edit this function, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.hs
-applyTys ty args = applyTysD empty ty args
-
-applyTysD :: SDoc -> Type -> [Type] -> Type     -- Debug version
-applyTysD doc orig_fun_ty arg_tys
-  | null arg_tys
-  = orig_fun_ty
-
-  | n_bndrs == n_args     -- The vastly common case
-  = substTyWithBindersUnchecked bndrs arg_tys rho_ty
-  | n_bndrs > n_args      -- Too many for-alls
-  = substTyWithBindersUnchecked (take n_args bndrs) arg_tys
-                                (mkForAllTys (drop n_args bndrs) rho_ty)
-  | otherwise             -- Too many type args
-  = ASSERT2( n_bndrs > 0, doc $$ ppr orig_fun_ty $$ ppr arg_tys )       -- Zero case gives infinite loop!
-    applyTysD doc (substTyWithBinders bndrs (take n_bndrs arg_tys) rho_ty)
-                  (drop n_bndrs arg_tys)
-  where
-    (bndrs, rho_ty) = splitPiTys orig_fun_ty
-    n_bndrs = length bndrs
-    n_args  = length arg_tys
-
 applyTysX :: [TyVar] -> Type -> [Type] -> Type
 -- applyTyxX beta-reduces (/\tvs. body_ty) arg_tys
+-- Assumes that (/\tvs. body_ty) is closed
 applyTysX tvs body_ty arg_tys
-  = ASSERT2( length arg_tys >= n_tvs, ppr tvs $$ ppr body_ty $$ ppr arg_tys )
-    mkAppTys (substTyWithUnchecked tvs (take n_tvs arg_tys) body_ty)
+  = ASSERT2( length arg_tys >= n_tvs, pp_stuff )
+    ASSERT2( tyCoVarsOfType body_ty `subVarSet` mkVarSet tvs, pp_stuff )
+    mkAppTys (substTyWith tvs (take n_tvs arg_tys) body_ty)
              (drop n_tvs arg_tys)
   where
+    pp_stuff = vcat [ppr tvs, ppr body_ty, ppr arg_tys]
     n_tvs = length tvs
 
 {-
@@ -1593,7 +1614,7 @@ isPredTy ty = go ty []
 
     go_k :: Kind -> [KindOrType] -> Bool
     -- True <=> ('k' applied to 'kts') = Constraint
-    go_k k args = isConstraintKind (applyTys k args)
+    go_k k args = isConstraintKind (piResultTys k args)
 
 isClassPred, isEqPred, isNomEqPred, isIPPred :: PredType -> Bool
 isClassPred ty = case tyConAppTyCon_maybe ty of
