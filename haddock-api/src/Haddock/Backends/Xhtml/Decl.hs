@@ -171,6 +171,7 @@ ppFixities fs qual = foldr1 (+++) (map ppFix uniq_fs) +++ rightEdge
     rightEdge = thespan ! [theclass "rightedge"] << noHtml
 
 
+-- | Pretty-print type variables.
 ppTyVars :: [LHsTyVarBndr DocName] -> [Html]
 ppTyVars tvs = map (ppTyName . getName . hsLTyVarName) tvs
 
@@ -208,7 +209,7 @@ ppTySyn summary links fixities loc doc (SynDecl { tcdLName = L _ name, tcdTyVars
 ppTySyn _ _ _ _ _ _ _ _ _ = error "declaration not supported by ppTySyn"
 
 
-ppTypeSig :: Bool -> [OccName] -> Html  -> Bool -> Html
+ppTypeSig :: Bool -> [OccName] -> Html -> Unicode -> Html
 ppTypeSig summary nms pp_ty unicode =
   concatHtml htmlNames <+> dcolon unicode <+> pp_ty
   where
@@ -248,8 +249,8 @@ ppFamilyInfo _ (ClosedTypeFamily _) = keyword "type family"
 ppTyFamHeader :: Bool -> Bool -> FamilyDecl DocName
               -> Unicode -> Qualification -> Html
 ppTyFamHeader summary associated d@(FamilyDecl { fdInfo = info
-                                             , fdResultSig = L _ result
-                                             , fdInjectivityAnn = injectivity })
+                                               , fdResultSig = L _ result
+                                               , fdInjectivityAnn = injectivity })
               unicode qual =
   (case info of
      OpenTypeFamily
@@ -262,12 +263,17 @@ ppTyFamHeader summary associated d@(FamilyDecl { fdInfo = info
                     -> keyword "type family"
   ) <+>
 
-  ppFamDeclBinderWithVars summary d <+>
+  ppFamDeclBinderWithVars summary unicode qual d <+>
   ppResultSig result unicode qual <+>
 
   (case injectivity of
      Nothing                   -> noHtml
      Just (L _ injectivityAnn) -> ppInjectivityAnn unicode qual injectivityAnn
+  ) <+>
+
+  (case info of
+     ClosedTypeFamily _ -> keyword "where ..."
+     _                  -> mempty
   )
 
 ppResultSig :: FamilyResultSig DocName -> Unicode -> Qualification -> Html
@@ -346,9 +352,9 @@ ppAssocType summ links doc (L loc decl) fixities splice unicode qual =
 --------------------------------------------------------------------------------
 
 -- | Print a type family and its variables
-ppFamDeclBinderWithVars :: Bool -> FamilyDecl DocName -> Html
-ppFamDeclBinderWithVars summ (FamilyDecl { fdLName = lname, fdTyVars = tvs }) =
-  ppAppDocNameNames summ (unLoc lname) (tyvarNames tvs)
+ppFamDeclBinderWithVars :: Bool -> Unicode -> Qualification -> FamilyDecl DocName -> Html
+ppFamDeclBinderWithVars summ unicode qual (FamilyDecl { fdLName = lname, fdTyVars = tvs }) =
+  ppAppDocNameTyVarBndrs summ unicode qual (unLoc lname) (map unLoc $ hsq_explicit tvs)
 
 -- | Print a newtype / data binder and its variables
 ppDataBinderWithVars :: Bool -> TyClDecl DocName -> Html
@@ -359,15 +365,22 @@ ppDataBinderWithVars summ decl =
 -- * Type applications
 --------------------------------------------------------------------------------
 
+ppAppDocNameTyVarBndrs :: Bool -> Unicode -> Qualification -> DocName -> [HsTyVarBndr DocName] -> Html
+ppAppDocNameTyVarBndrs summ unicode qual n vs =
+    ppTypeApp n [] vs ppDN (ppHsTyVarBndr unicode qual)
+  where
+    ppDN notation = ppBinderFixity notation summ . nameOccName . getName
+    ppBinderFixity Infix = ppBinderInfix
+    ppBinderFixity _ = ppBinder
 
--- | Print an application of a DocName and two lists of HsTypes (kinds, types)
+-- | Print an application of a 'DocName' and two lists of 'HsTypes' (kinds, types)
 ppAppNameTypes :: DocName -> [HsType DocName] -> [HsType DocName]
                -> Unicode -> Qualification -> Html
 ppAppNameTypes n ks ts unicode qual =
     ppTypeApp n ks ts (\p -> ppDocName qual p True) (ppParendType unicode qual)
 
 
--- | Print an application of a DocName and a list of Names
+-- | Print an application of a 'DocName' and a list of 'Names'
 ppAppDocNameNames :: Bool -> DocName -> [Name] -> Html
 ppAppDocNameNames summ n ns =
     ppTypeApp n [] ns ppDN ppTyName
