@@ -4,7 +4,7 @@ import Types
 
 findingImportsOptions :: [Flag]
 findingImportsOptions =
-  [ flag { flagName = "-i ⟨dir1⟩:⟨dir2⟩:..."
+  [ flag { flagName = "-i⟨dir1⟩:⟨dir2⟩:..."
          , flagDescription = "add ⟨dir⟩, ⟨dir2⟩, etc. to import path"
          , flagType = DynamicSettableFlag
          }
