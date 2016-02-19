@@ -251,10 +251,6 @@ getOptions' dflags toks
               = map (L (getLoc open)) ["-haddock-opts", removeSpaces str]
                 ++ parseToks xs
           parseToks (open:xs)
-              | ITdocOptionsOld str <- getToken open
-              = map (L (getLoc open)) ["-haddock-opts", removeSpaces str]
-                ++ parseToks xs
-          parseToks (open:xs)
               | ITlanguage_prag <- getToken open
               = parseLanguage xs
           parseToks (comment:xs) -- Skip over comments

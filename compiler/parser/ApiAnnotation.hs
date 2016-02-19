@@ -292,7 +292,6 @@ data AnnotationComment =
   | AnnDocCommentNamed String     -- ^ something beginning '-- $'
   | AnnDocSection      Int String -- ^ a section heading
   | AnnDocOptions      String     -- ^ doc options (prune, ignore-exports, etc)
-  | AnnDocOptionsOld   String     -- ^ doc options declared "-- # ..."-style
   | AnnLineComment     String     -- ^ comment starting by "--"
   | AnnBlockComment    String     -- ^ comment in {- -}
     deriving (Eq, Ord, Data, Typeable, Show)
