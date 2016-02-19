@@ -1,49 +1,51 @@
 module Settings.Paths (
-    targetDirectory, targetPath, pkgDataFile, pkgHaddockFile, pkgLibraryFile,
+    contextDirectory, contextPath, pkgDataFile, pkgHaddockFile, pkgLibraryFile,
     pkgLibraryFile0, pkgGhciLibraryFile, gmpBuildPath, gmpBuildInfoPath,
     packageDbDirectory, pkgConfFile
     ) where
 
 import Base
+import Context
 import Expression
 import GHC
 import Oracles.PackageData
 import Settings.User
 
 -- Path to the target directory from GHC source root
-targetPath :: Stage -> Package -> FilePath
-targetPath stage pkg = buildRootPath -/- targetDirectory stage pkg -/- pkgPath pkg
+contextPath :: Context -> FilePath
+contextPath context @ (Context {..}) =
+    buildRootPath -/- contextDirectory context -/- pkgPath package
 
-pkgDataFile :: Stage -> Package -> FilePath
-pkgDataFile stage pkg = targetPath stage pkg -/- "package-data.mk"
+pkgDataFile :: Context -> FilePath
+pkgDataFile context = contextPath context -/- "package-data.mk"
 
 -- Relative path to a package haddock file, e.g.:
 -- "libraries/array/dist-install/doc/html/array/array.haddock"
-pkgHaddockFile :: Package -> FilePath
-pkgHaddockFile pkg =
-    targetPath Stage1 pkg -/- "doc/html" -/- name -/- name <.> "haddock"
-  where name = pkgNameString pkg
+pkgHaddockFile :: Context -> FilePath
+pkgHaddockFile context @ (Context {..}) =
+    contextPath context -/- "doc/html" -/- name -/- name <.> "haddock"
+  where name = pkgNameString package
 
 -- Relative path to a package library file, e.g.:
 -- "libraries/array/stage2/build/libHSarray-0.5.1.0.a"
-pkgLibraryFile :: Stage -> Package -> Way -> Action FilePath
-pkgLibraryFile stage pkg way = do
+pkgLibraryFile :: Context -> Action FilePath
+pkgLibraryFile context @ (Context {..}) = do
     extension <- libsuf way
-    pkgFile stage pkg "build/libHS" extension
+    pkgFile context "build/libHS" extension
 
-pkgLibraryFile0 :: Stage -> Package -> Way -> Action FilePath
-pkgLibraryFile0 stage pkg way = do
+pkgLibraryFile0 :: Context -> Action FilePath
+pkgLibraryFile0 context @ (Context {..}) = do
     extension <- libsuf way
-    pkgFile stage pkg "build/libHS" ("-0" ++ extension)
+    pkgFile context "build/libHS" ("-0" ++ extension)
 
 -- Relative path to a package ghci library file, e.g.:
 -- "libraries/array/dist-install/build/HSarray-0.5.1.0.o"
-pkgGhciLibraryFile :: Stage -> Package -> Action FilePath
-pkgGhciLibraryFile stage pkg = pkgFile stage pkg "build/HS" ".o"
+pkgGhciLibraryFile :: Context -> Action FilePath
+pkgGhciLibraryFile context = pkgFile context "build/HS" ".o"
 
-pkgFile :: Stage -> Package -> String -> String -> Action FilePath
-pkgFile stage pkg prefix suffix = do
-    let path = targetPath stage pkg
+pkgFile :: Context -> String -> String -> Action FilePath
+pkgFile context prefix suffix = do
+    let path = contextPath context
     componentId <- pkgData $ ComponentId path
     return $ path -/- prefix ++ componentId ++ suffix
 
@@ -61,7 +63,7 @@ packageDbDirectory :: Stage -> FilePath
 packageDbDirectory Stage0 = buildRootPath -/- "stage0/bootstrapping.conf"
 packageDbDirectory _      = "inplace/lib/package.conf.d"
 
-pkgConfFile :: Stage -> Package -> Action FilePath
-pkgConfFile stage pkg = do
-    componentId <- pkgData . ComponentId $ targetPath stage pkg
+pkgConfFile :: Context -> Action FilePath
+pkgConfFile context @ (Context {..}) = do
+    componentId <- pkgData . ComponentId $ contextPath context
     return $ packageDbDirectory stage -/- componentId <.> "conf"

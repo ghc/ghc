@@ -20,8 +20,8 @@ buildPackageData :: Context -> Rules ()
 buildPackageData context @ (Context {..}) = do
     let cabalFile = pkgCabalFile package
         configure = pkgPath package -/- "configure"
-        dataFile  = pkgDataFile stage package
-        oldPath   = pkgPath package -/- targetDirectory stage package -- TODO: remove, #113
+        dataFile  = pkgDataFile context
+        oldPath   = pkgPath package -/- contextDirectory context -- TODO: remove, #113
 
     [dataFile, oldPath -/- "package-data.mk"] &%> \_ -> do
         -- The first thing we do with any package is make sure all generated
@@ -35,7 +35,7 @@ buildPackageData context @ (Context {..}) = do
         deps <- packageDeps package
         pkgs <- interpretInContext context getPackages
         let depPkgs = matchPackageNames (sort pkgs) deps
-        need =<< traverse (pkgConfFile stage) depPkgs
+        need =<< traverse (pkgConfFile . vanillaContext stage) depPkgs
 
         -- TODO: get rid of this, see #113
         let inTreeMk = oldPath -/- takeFileName dataFile
@@ -46,19 +46,19 @@ buildPackageData context @ (Context {..}) = do
         -- TODO: get rid of this, see #113
         liftIO $ IO.copyFile inTreeMk dataFile
         autogenFiles <- getDirectoryFiles oldPath ["build/autogen/*"]
-        createDirectory $ targetPath stage package -/- "build/autogen"
+        createDirectory $ contextPath context -/- "build/autogen"
         forM_ autogenFiles $ \file -> do
-            copyFile (oldPath -/- file) (targetPath stage package -/- file)
+            copyFile (oldPath -/- file) (contextPath context -/- file)
         let haddockPrologue = "haddock-prologue.txt"
-        copyFile (oldPath -/- haddockPrologue) (targetPath stage package -/- haddockPrologue)
+        copyFile (oldPath -/- haddockPrologue) (contextPath context -/- haddockPrologue)
 
-        postProcessPackageData stage package dataFile
+        postProcessPackageData context dataFile
 
     -- TODO: PROGNAME was $(CrossCompilePrefix)hp2ps
     priority 2.0 $ do
         when (package == hp2ps) $ dataFile %> \mk -> do
             includes <- interpretInContext context $ fromDiffExpr includesArgs
-            let prefix = fixKey (targetPath stage package) ++ "_"
+            let prefix = fixKey (contextPath context) ++ "_"
                 cSrcs  = [ "AreaBelow.c", "Curves.c", "Error.c", "Main.c"
                          , "Reorder.c", "TopTwenty.c", "AuxFile.c"
                          , "Deviation.c", "HpFile.c", "Marks.c", "Scale.c"
@@ -73,7 +73,7 @@ buildPackageData context @ (Context {..}) = do
             putSuccess $ "| Successfully generated '" ++ mk ++ "'."
 
         when (package == unlit) $ dataFile %> \mk -> do
-            let prefix   = fixKey (targetPath stage package) ++ "_"
+            let prefix   = fixKey (contextPath context) ++ "_"
                 contents = unlines $ map (prefix++)
                     [ "PROGNAME = unlit"
                     , "C_SRCS = unlit.c"
@@ -82,7 +82,7 @@ buildPackageData context @ (Context {..}) = do
             putSuccess $ "| Successfully generated '" ++ mk ++ "'."
 
         when (package == touchy) $ dataFile %> \mk -> do
-            let prefix   = fixKey (targetPath stage package) ++ "_"
+            let prefix   = fixKey (contextPath context) ++ "_"
                 contents = unlines $ map (prefix++)
                     [ "PROGNAME = touchy"
                     , "C_SRCS = touchy.c" ]
@@ -93,7 +93,7 @@ buildPackageData context @ (Context {..}) = do
         -- package, we cannot generate the corresponding `package-data.mk` file
         -- by running by running `ghcCabal`, because it has not yet been built.
         when (package == ghcCabal && stage == Stage0) $ dataFile %> \mk -> do
-            let prefix   = fixKey (targetPath stage package) ++ "_"
+            let prefix   = fixKey (contextPath context) ++ "_"
                 contents = unlines $ map (prefix++)
                     [ "PROGNAME = ghc-cabal"
                     , "MODULES = Main"
@@ -106,7 +106,7 @@ buildPackageData context @ (Context {..}) = do
             dataFile %> \mk -> do
                 orderOnly $ generatedDependencies stage package
                 windows <- windowsHost
-                let prefix = fixKey (targetPath stage package) ++ "_"
+                let prefix = fixKey (contextPath context) ++ "_"
                     dirs   = [ ".", "hooks", "sm", "eventlog" ]
                           ++ [ "posix" | not windows ]
                           ++ [ "win32" |     windows ]
@@ -137,8 +137,8 @@ buildPackageData context @ (Context {..}) = do
 -- For example libraries/deepseq/dist-install_VERSION = 1.4.0.0
 -- is replaced by libraries_deepseq_dist-install_VERSION = 1.4.0.0
 -- Reason: Shake's built-in makefile parser doesn't recognise slashes
-postProcessPackageData :: Stage -> Package -> FilePath -> Action ()
-postProcessPackageData stage package file = fixFile file fixPackageData
+postProcessPackageData :: Context -> FilePath -> Action ()
+postProcessPackageData context @ (Context {..}) file = fixFile file fixPackageData
   where
     fixPackageData = unlines . map processLine . filter (not . null) . filter ('$' `notElem`) . lines
     processLine line = fixKey fixedPrefix ++ suffix
@@ -147,7 +147,7 @@ postProcessPackageData stage package file = fixFile file fixPackageData
         -- Change package/path/targetDir to takeDirectory file
         -- This is a temporary hack until we get rid of ghc-cabal
         fixedPrefix = takeDirectory file ++ drop len prefix
-        len         = length (pkgPath package -/- targetDirectory stage package)
+        len         = length (pkgPath package -/- contextDirectory context)
 
 -- TODO: remove, see #113
 fixKey :: String -> String

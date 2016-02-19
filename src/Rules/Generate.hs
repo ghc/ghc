@@ -34,10 +34,12 @@ primopsSource :: FilePath
 primopsSource = "compiler/prelude/primops.txt.pp"
 
 primopsTxt :: Stage -> FilePath
-primopsTxt stage = targetPath stage compiler -/- "build/primops.txt"
+primopsTxt stage =
+    contextPath (vanillaContext stage compiler) -/- "build/primops.txt"
 
 platformH :: Stage -> FilePath
-platformH stage = targetPath stage compiler -/- "ghc_boot_platform.h"
+platformH stage =
+    contextPath (vanillaContext stage compiler) -/- "ghc_boot_platform.h"
 
 -- TODO: move generated files to buildRootPath, see #113
 includesDependencies :: [FilePath]
@@ -47,7 +49,8 @@ includesDependencies = ("includes" -/-) <$>
     , "ghcversion.h" ]
 
 ghcPrimDependencies :: Stage -> [FilePath]
-ghcPrimDependencies stage = ((targetPath stage ghcPrim -/- "build") -/-) <$>
+ghcPrimDependencies stage =
+    ((contextPath (vanillaContext stage ghcPrim) -/- "build") -/-) <$>
        [ "autogen/GHC/Prim.hs"
        , "GHC/PrimopWrappers.hs" ]
 
@@ -68,7 +71,7 @@ compilerDependencies stage =
     ++ [ gmpLibraryH | stage > Stage0 ]
     ++ filter (const $ stage > Stage0) libffiDependencies
     ++ derivedConstantsDependencies
-    ++ fmap ((targetPath stage compiler -/- "build") -/-)
+    ++ fmap ((contextPath (vanillaContext stage compiler) -/- "build") -/-)
        [ "primop-can-fail.hs-incl"
        , "primop-code-size.hs-incl"
        , "primop-commutable.hs-incl"
@@ -115,7 +118,7 @@ generate file context expr = do
 
 generatePackageCode :: Context -> Rules ()
 generatePackageCode context @ (Context stage pkg _) =
-    let buildPath   = targetPath stage pkg -/- "build"
+    let buildPath   = contextPath context -/- "build"
         dropBuild   = drop (length buildPath + 1)
         generated f = (buildPath ++ "//*.hs") ?== f && not ("//autogen/*" ?== f)
         file <~ gen = generate file context gen
@@ -123,7 +126,7 @@ generatePackageCode context @ (Context stage pkg _) =
         generated ?> \file -> do
             let srcFile = dropBuild file
                 pattern = "//" ++ srcFile -<.> "*"
-            files <- fmap (filter (pattern ?==)) $ moduleFiles stage pkg
+            files <- fmap (filter (pattern ?==)) $ moduleFiles context
             let gens = [ (f, b) | f <- files, Just b <- [determineBuilder f] ]
             when (length gens /= 1) . putError $
                 "Exactly one generator expected for " ++ file
@@ -148,7 +151,7 @@ generatePackageCode context @ (Context stage pkg _) =
                 need [primopsTxt stage]
                 build $ Target context GenPrimopCode [primopsTxt stage] [file]
                 -- TODO: this is temporary hack, get rid of this (#113)
-                let oldPath = pkgPath pkg -/- targetDirectory stage pkg -/- "build"
+                let oldPath = pkgPath pkg -/- contextDirectory context -/- "build"
                     newFile = oldPath ++ (drop (length buildPath) file)
                 createDirectory $ takeDirectory newFile
                 liftIO $ IO.copyFile file newFile
@@ -159,8 +162,8 @@ generatePackageCode context @ (Context stage pkg _) =
 
         priority 2.0 $ do
             -- TODO: this is temporary hack, get rid of this (#113)
-            let oldPath = pkgPath pkg -/- targetDirectory stage pkg
-                olden f = oldPath ++ (drop (length (targetPath stage pkg)) f)
+            let oldPath = pkgPath pkg -/- contextDirectory context
+                olden f = oldPath ++ (drop (length (contextPath context)) f)
 
             when (pkg == compiler) $ buildPath -/- "Config.hs" %> \file -> do
                 file <~ generateConfigHs
@@ -200,7 +203,7 @@ generateRules = do
     -- TODO: simplify, get rid of fake rts context
     derivedConstantsPath ++ "//*" %> \file -> do
         withTempDir $ \dir -> build $
-            Target (vanillaContext Stage1 rts) DeriveConstants [] [file, dir]
+            Target rtsContext DeriveConstants [] [file, dir]
 
   where
     file <~ gen = file %> \out -> generate out emptyTarget gen

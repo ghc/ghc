@@ -32,10 +32,10 @@ wrappers = [ (vanillaContext Stage0 ghc   , ghcWrapper   )
 
 buildProgram :: [(Resource, Int)] -> Context -> Rules ()
 buildProgram rs context @ (Context {..}) = do
-    let match file = case programPath stage package of
+    let match file = case programPath context of
             Nothing      -> False
             Just program -> program == file
-        matchWrapped file = case programPath stage package of
+        matchWrapped file = case programPath context of
             Nothing      -> False
             Just program -> case computeWrappedPath program of
                 Nothing             -> False
@@ -71,7 +71,7 @@ buildWrapper context @ (Context stage package _) wrapper wrapperPath binPath = d
 -- TODO: Do we need to consider other ways when building programs?
 buildBinary :: [(Resource, Int)] -> Context -> FilePath -> Action ()
 buildBinary rs context @ (Context stage package _) bin = do
-    let buildPath = targetPath stage package -/- "build"
+    let buildPath = contextPath context -/- "build"
     cSrcs <- cSources context -- TODO: remove code duplication (Library.hs)
     hSrcs <- hSources context
     let cObjs = [ buildPath -/- src -<.> osuf vanilla | src <- cSrcs   ]
@@ -89,11 +89,11 @@ buildBinary rs context @ (Context stage package _) bin = do
         let depContext = vanillaContext libStage dep
         ghciFlag <- interpretInContext depContext $ getPkgData BuildGhciLib
         libFiles <- fmap concat . forM ways $ \way -> do
-            libFile  <- pkgLibraryFile  libStage dep way
-            lib0File <- pkgLibraryFile0 libStage dep way
+            libFile  <- pkgLibraryFile  $ Context libStage dep way
+            lib0File <- pkgLibraryFile0 $ Context libStage dep way
             dll0     <- needDll0 libStage dep
             return $ libFile : [ lib0File | dll0 ]
-        ghciLib <- pkgGhciLibraryFile libStage dep
+        ghciLib <- pkgGhciLibraryFile $ vanillaContext libStage dep
         return $ libFiles ++ [ ghciLib | ghciFlag == "YES" && stage == Stage1 ]
     let binDeps = if package == ghcCabal && stage == Stage0
                   then [ pkgPath package -/- src <.> "hs" | src <- hSrcs ]

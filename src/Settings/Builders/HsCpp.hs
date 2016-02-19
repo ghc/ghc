@@ -13,7 +13,7 @@ hsCppBuilderArgs = builder HsCpp ? do
     mconcat [ append =<< getSettingList HsCppArgs
             , arg "-P"
             , cppArgs
-            , arg $ "-I" ++ targetPath stage compiler
+            , arg $ "-I" ++ contextPath (vanillaContext stage compiler)
             , arg "-x"
             , arg "c"
             , arg =<< getInput ]

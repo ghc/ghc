@@ -21,9 +21,9 @@ initArgs = initPredicate ? do
 -- TODO: move inplace-pkg-config to buildRootPath, see #113.
 updateArgs :: Args
 updateArgs = notM initPredicate ? do
-    pkg       <- getPackage
-    targetDir <- getTargetDirectory
+    pkg <- getPackage
+    dir <- getContextDirectory
     mconcat [ arg "update"
             , arg "--force"
             , bootPackageDbArgs
-            , arg $ pkgPath pkg -/- targetDir -/- "inplace-pkg-config" ]
+            , arg $ pkgPath pkg -/- dir -/- "inplace-pkg-config" ]

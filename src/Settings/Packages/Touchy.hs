@@ -8,7 +8,7 @@ import Settings
 
 touchyPackageArgs :: Args
 touchyPackageArgs = package touchy ? do
-    path <- getTargetPath
+    path <- getContextPath
     let cabalMacros = path -/- "build/autogen/cabal_macros.h"
     mconcat [ builderGhc ?
               mconcat [ arg "-no-hs-main"

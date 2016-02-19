@@ -14,13 +14,13 @@ haddockBuilderArgs :: Args
 haddockBuilderArgs = builder Haddock ? do
     output   <- getOutput
     pkg      <- getPackage
-    path     <- getTargetPath
+    path     <- getContextPath
     version  <- getPkgData Version
     synopsis <- getPkgData Synopsis
     hidden   <- getPkgDataList HiddenModules
     deps     <- getPkgDataList Deps
     depNames <- getPkgDataList DepNames
-    hVersion <- lift . pkgData . Version $ targetPath Stage2 haddock
+    hVersion <- lift . pkgData . Version $ contextPath (vanillaContext Stage2 haddock)
     ghcOpts  <- fromDiffExpr commonGhcArgs
     mconcat
         [ arg $ "--odir=" ++ takeDirectory output
@@ -35,7 +35,7 @@ haddockBuilderArgs = builder Haddock ? do
         , append $ map ("--hide=" ++) hidden
         , append $ [ "--read-interface=../" ++ dep
                      ++ ",../" ++ dep ++ "/src/%{MODULE/./-}.html\\#%{NAME},"
-                     ++ pkgHaddockFile depPkg
+                     ++ pkgHaddockFile (vanillaContext Stage1 depPkg)
                    | (dep, depName) <- zip deps depNames
                    , Just depPkg <- [findKnownPackage $ PackageName depName]
                    , depPkg /= rts ]

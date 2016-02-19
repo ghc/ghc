@@ -20,7 +20,7 @@ import Settings.Builders.Common
 ghcCabalBuilderArgs :: Args
 ghcCabalBuilderArgs = builder GhcCabal ? do
     path <- getPackagePath
-    dir  <- getTargetDirectory
+    dir  <- getContextDirectory
     mconcat [ arg "configure"
             , arg path
             , arg dir
@@ -41,7 +41,7 @@ ghcCabalBuilderArgs = builder GhcCabal ? do
 ghcCabalHsColourBuilderArgs :: Args
 ghcCabalHsColourBuilderArgs = builder GhcCabalHsColour ? do
     path <- getPackagePath
-    dir  <- getTargetDirectory
+    dir  <- getContextDirectory
     mconcat [ arg "hscolour"
             , arg path
             , arg dir ]

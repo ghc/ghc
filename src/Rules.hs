@@ -3,7 +3,7 @@ module Rules (topLevelTargets, buildRules) where
 import Data.Foldable
 
 import Base
-import Context hiding (stage, package, way)
+import Context
 import Expression
 import GHC
 import Rules.Compile
@@ -33,8 +33,8 @@ topLevelTargets = do
     -- TODO: do we want libffiLibrary to be a top-level target?
 
     action $ do -- TODO: Add support for all rtsWays
-        rtsLib    <- pkgLibraryFile Stage1 rts vanilla
-        rtsThrLib <- pkgLibraryFile Stage1 rts threaded
+        rtsLib    <- pkgLibraryFile $ rtsContext { way = vanilla  }
+        rtsThrLib <- pkgLibraryFile $ rtsContext { way = threaded }
         need [ rtsLib, rtsThrLib ]
 
     for_ allStages $ \stage ->
@@ -45,11 +45,11 @@ topLevelTargets = do
                 if isLibrary pkg
                 then do -- build a library
                     ways <- interpretInContext context getLibraryWays
-                    libs <- traverse (pkgLibraryFile stage pkg) ways
+                    libs <- traverse (pkgLibraryFile . Context stage pkg) ways
                     docs <- interpretInContext context buildHaddock
-                    need $ libs ++ [ pkgHaddockFile pkg | docs && stage == Stage1 ]
+                    need $ libs ++ [ pkgHaddockFile context | docs && stage == Stage1 ]
                 else do -- otherwise build a program
-                    need [ fromJust $ programPath stage pkg ] -- TODO: drop fromJust
+                    need [ fromJust $ programPath context ] -- TODO: drop fromJust
 
 packageRules :: Rules ()
 packageRules = do

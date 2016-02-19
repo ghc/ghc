@@ -4,7 +4,7 @@ module Settings (
     module Settings.User,
     module Settings.Ways,
     getPkgData, getPkgDataList, getTopDirectory, isLibrary,
-    getPackagePath, getTargetDirectory, getTargetPath, getPackageSources
+    getPackagePath, getContextDirectory, getContextPath, getPackageSources
     ) where
 
 import Base
@@ -20,17 +20,17 @@ import Settings.Ways
 getPackagePath :: Expr FilePath
 getPackagePath = pkgPath <$> getPackage
 
-getTargetDirectory :: Expr FilePath
-getTargetDirectory = targetDirectory <$> getStage <*> getPackage
+getContextDirectory :: Expr FilePath
+getContextDirectory = contextDirectory <$> getContext
 
-getTargetPath :: Expr FilePath
-getTargetPath = targetPath <$> getStage <*> getPackage
+getContextPath :: Expr FilePath
+getContextPath = contextPath <$> getContext
 
 getPkgData :: (FilePath -> PackageData) -> Expr String
-getPkgData key = lift . pkgData . key =<< getTargetPath
+getPkgData key = lift . pkgData . key =<< getContextPath
 
 getPkgDataList :: (FilePath -> PackageDataList) -> Expr [String]
-getPkgDataList key = lift . pkgDataList . key =<< getTargetPath
+getPkgDataList key = lift . pkgDataList . key =<< getContextPath
 
 getTopDirectory :: Expr FilePath
 getTopDirectory = lift topDirectory
@@ -38,12 +38,10 @@ getTopDirectory = lift topDirectory
 -- | Find all Haskell source files for the current target
 getPackageSources :: Expr [FilePath]
 getPackageSources = do
-    stage <- getStage
-    pkg   <- getPackage
-    path  <- getTargetPath
-    let buildPath = path -/- "build"
+    context <- getContext
+    let buildPath = contextPath context -/- "build"
         autogen   = buildPath -/- "autogen"
-    (found, missingMods) <- lift $ haskellModuleFiles stage pkg
+    (found, missingMods) <- lift $ haskellModuleFiles context
     -- Generated source files live in buildPath and have extension "hs"...
     let generated = [ buildPath -/- (replaceEq '.' '/' m) <.> "hs" | m <- missingMods ]
     -- ...except that GHC/Prim.hs lives in autogen. TODO: fix the inconsistency?

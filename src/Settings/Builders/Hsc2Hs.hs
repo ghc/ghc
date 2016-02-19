@@ -50,7 +50,7 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
 
 getCFlags :: Expr [String]
 getCFlags = fromDiffExpr $ do
-    path      <- getTargetPath
+    path      <- getContextPath
     cppArgs   <- getPkgDataList CppArgs
     depCcArgs <- getPkgDataList DepCcArgs
     mconcat [ cArgs

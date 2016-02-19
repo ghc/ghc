@@ -18,12 +18,12 @@ haddockHtmlLib = "inplace/lib/html/haddock-util.js"
 buildPackageDocumentation :: Context -> Rules ()
 buildPackageDocumentation context @ (Context {..}) =
     let cabalFile   = pkgCabalFile package
-        haddockFile = pkgHaddockFile package
+        haddockFile = pkgHaddockFile context
     in when (stage == Stage1) $ do
         haddockFile %> \file -> do
             srcs <- interpretInContext context getPackageSources
             deps <- map PackageName <$> interpretInContext context (getPkgDataList DepNames)
-            let haddocks = [ pkgHaddockFile depPkg
+            let haddocks = [ pkgHaddockFile $ vanillaContext Stage1 depPkg
                            | Just depPkg <- map findKnownPackage deps
                            , depPkg /= rts ]
             need $ srcs ++ haddocks ++ [haddockHtmlLib]
@@ -31,7 +31,7 @@ buildPackageDocumentation context @ (Context {..}) =
             -- HsColour sources
             -- TODO: what is the output of GhcCabalHsColour?
             whenM (specified HsColour) $ do
-                pkgConf <- pkgConfFile stage package
+                pkgConf <- pkgConfFile context
                 need [ cabalFile, pkgConf ] -- TODO: check if need pkgConf
                 build $ Target context GhcCabalHsColour [cabalFile] []
 

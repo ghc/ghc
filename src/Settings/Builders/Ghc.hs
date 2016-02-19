@@ -52,7 +52,8 @@ ghcBuilderArgs = stagedBuilder Ghc ? do
             , not buildHi ? mconcat [ arg "-o", arg =<< getOutput ] ]
 
 needTouchy :: Action ()
-needTouchy = whenM windowsHost $ need [fromJust $ programPath Stage0 touchy]
+needTouchy =
+    whenM windowsHost $ need [fromJust $ programPath (vanillaContext Stage0 touchy)]
 
 splitObjectsArgs :: Args
 splitObjectsArgs = splitObjects ? do
@@ -73,7 +74,7 @@ ghcMBuilderArgs = stagedBuilder GhcM ? do
 commonGhcArgs :: Args
 commonGhcArgs = do
     way     <- getWay
-    path    <- getTargetPath
+    path    <- getContextPath
     hsArgs  <- getPkgDataList HsArgs
     cppArgs <- getPkgDataList CppArgs
     let buildPath = path -/- "build"
@@ -107,12 +108,12 @@ wayGhcArgs = do
 -- TODO: Improve handling of "-hide-all-packages"
 packageGhcArgs :: Args
 packageGhcArgs = do
-    stage     <- getStage
+    context   <- getContext
     pkg       <- getPackage
     compId    <- getPkgData ComponentId
     pkgDepIds <- getPkgDataList DepIds
     lift . when (isLibrary pkg) $ do
-        conf <- pkgConfFile stage pkg
+        conf <- pkgConfFile context
         need [conf]
     mconcat
         [ arg "-hide-all-packages"
@@ -125,7 +126,7 @@ packageGhcArgs = do
 includeGhcArgs :: Args
 includeGhcArgs = do
     pkg     <- getPackage
-    path    <- getTargetPath
+    path    <- getContextPath
     srcDirs <- getPkgDataList SrcDirs
     let buildPath   = path -/- "build"
         autogenPath = buildPath -/- "autogen"

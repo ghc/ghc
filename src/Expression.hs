@@ -15,7 +15,7 @@ module Expression (
     Context, vanillaContext, stageContext, Target, dummyTarget,
 
     -- * Convenient accessors
-    getStage, getPackage, getBuilder, getOutputs, getInputs, getWay,
+    getContext, getStage, getPackage, getBuilder, getOutputs, getInputs, getWay,
     getInput, getOutput,
 
     -- * Re-exports
@@ -163,21 +163,25 @@ fromDiffExpr = fmap (($ mempty) . fromDiff)
 interpretDiff :: Monoid a => Target -> DiffExpr a -> Action a
 interpretDiff target = interpret target . fromDiffExpr
 
--- | Convenient getters for target parameters.
+-- | Get the current build 'Context'.
+getContext :: Expr Context
+getContext = asks context
+
+-- | Get the 'Stage' of the current 'Context'.
 getStage :: Expr Stage
 getStage = stage <$> asks context
 
--- | Get the 'Package' of the current 'Target'.
+-- | Get the 'Package' of the current 'Context'.
 getPackage :: Expr Package
 getPackage = package <$> asks context
+
+-- | Get the 'Way' of the current 'Context'.
+getWay :: Expr Way
+getWay = way <$> asks context
 
 -- | Get the 'Builder' for the current 'Target'.
 getBuilder :: Expr Builder
 getBuilder = asks builder
-
--- | Get the 'Way' of the current 'Target'.
-getWay :: Expr Way
-getWay = way <$> asks context
 
 -- | Get the input files of the current 'Target'.
 getInputs :: Expr [FilePath]

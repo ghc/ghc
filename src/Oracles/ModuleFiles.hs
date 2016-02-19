@@ -2,31 +2,31 @@
 module Oracles.ModuleFiles (moduleFiles, haskellModuleFiles, moduleFilesOracle) where
 
 import Base
+import Context
 import Oracles.PackageData
 import Package
-import Stage
 import Settings.Paths
 
 newtype ModuleFilesKey = ModuleFilesKey ([String], [FilePath])
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
-moduleFiles :: Stage -> Package -> Action [FilePath]
-moduleFiles stage pkg = do
-    let path = targetPath stage pkg
+moduleFiles :: Context -> Action [FilePath]
+moduleFiles context @ (Context {..}) = do
+    let path = contextPath context
     srcDirs <- fmap sort . pkgDataList $ SrcDirs path
     modules <- fmap sort . pkgDataList $ Modules path
-    let dirs = [ pkgPath pkg -/- dir | dir <- srcDirs ]
+    let dirs = [ pkgPath package -/- dir | dir <- srcDirs ]
     found :: [(String, FilePath)] <- askOracle $ ModuleFilesKey (modules, dirs)
     return $ map snd found
 
-haskellModuleFiles :: Stage -> Package -> Action ([FilePath], [String])
-haskellModuleFiles stage pkg = do
-    let path        = targetPath stage pkg
+haskellModuleFiles :: Context -> Action ([FilePath], [String])
+haskellModuleFiles context @ (Context {..}) = do
+    let path        = contextPath context
         autogen     = path -/- "build/autogen"
-        dropPkgPath = drop $ length (pkgPath pkg) + 1
+        dropPkgPath = drop $ length (pkgPath package) + 1
     srcDirs <- fmap sort . pkgDataList $ SrcDirs path
     modules <- fmap sort . pkgDataList $ Modules path
-    let dirs = [ pkgPath pkg -/- dir | dir <- srcDirs ]
+    let dirs = [ pkgPath package -/- dir | dir <- srcDirs ]
     foundSrcDirs <- askOracle $ ModuleFilesKey (modules, dirs     )
     foundAutogen <- askOracle $ ModuleFilesKey (modules, [autogen])
 

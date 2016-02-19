@@ -4,7 +4,7 @@ module Settings.Packages.Rts (
 
 import Base
 import Expression
-import GHC (rts)
+import GHC (rts, rtsContext)
 import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Predicates (builder, builderGcc, builderGhc, package, file)
@@ -16,7 +16,7 @@ rtsConfIn = pkgPath rts -/- "package.conf.in"
 
 -- TODO: move to buildRootPath, see #113
 rtsConf :: FilePath
-rtsConf = pkgPath rts -/- targetDirectory Stage1 rts -/- "package.conf.inplace"
+rtsConf = pkgPath rts -/- contextDirectory rtsContext -/- "package.conf.inplace"
 
 rtsLibffiLibraryName :: Action FilePath
 rtsLibffiLibraryName = do
@@ -46,7 +46,7 @@ rtsPackageArgs = package rts ? do
     ghcUnreg       <- yesNo $ flag GhcUnregisterised
     ghcEnableTNC   <- yesNo ghcEnableTablesNextToCode
     way            <- getWay
-    path           <- getTargetPath
+    path           <- getContextPath
     top            <- getTopDirectory
     libffiName     <- lift $ rtsLibffiLibraryName
     ffiIncludeDir  <- getSetting FfiIncludeDir

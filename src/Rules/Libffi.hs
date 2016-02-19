@@ -15,7 +15,7 @@ import Target
 
 -- TODO: this should be moved elsewhere
 rtsBuildPath :: FilePath
-rtsBuildPath = targetPath Stage1 rts -/- "build"
+rtsBuildPath = contextPath rtsContext -/- "build"
 
 -- TODO: Why copy these include files into rts? Keep in libffi!
 libffiDependencies :: [FilePath]

@@ -122,4 +122,4 @@ gmpRules = do
 
     -- This causes integerGmp package to be configured, hence creating the files
     [gmpBase -/- "config.mk", gmpBuildInfoPath] &%> \_ ->
-        need [pkgDataFile Stage1 integerGmp]
+        need [pkgDataFile gmpContext]

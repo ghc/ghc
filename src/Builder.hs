@@ -6,12 +6,12 @@ module Builder (
 import Control.Monad.Trans.Reader
 
 import Base
+import Context
 import GHC
 import GHC.Generics (Generic)
 import Oracles.Config
 import Oracles.LookupInPath
 import Oracles.WindowsPath
-import Package
 import Stage
 
 -- | A 'Builder' is an external command invoked in separate process using 'Shake.cmd'
@@ -54,22 +54,25 @@ data Builder = Alex
              deriving (Show, Eq, Generic)
 
 -- | Some builders are built by this very build system, in which case
--- 'builderProvenance' returns the corresponding 'Stage' and GHC 'Package'.
-builderProvenance :: Builder -> Maybe (Stage, Package)
+-- 'builderProvenance' returns the corresponding build 'Context' (which includes
+-- 'Stage' and GHC 'Package').
+builderProvenance :: Builder -> Maybe Context
 builderProvenance = \case
-    DeriveConstants  -> Just (Stage0, deriveConstants)
-    GenApply         -> Just (Stage0, genapply)
-    GenPrimopCode    -> Just (Stage0, genprimopcode)
-    Ghc stage        -> if stage == Stage0 then Nothing else Just (pred stage, ghc)
+    DeriveConstants  -> context Stage0 deriveConstants
+    GenApply         -> context Stage0 genapply
+    GenPrimopCode    -> context Stage0 genprimopcode
+    Ghc stage        -> if stage == Stage0 then Nothing else context (pred stage) ghc
     GhcM stage       -> builderProvenance $ Ghc stage
-    GhcCabal         -> Just (Stage0, ghcCabal)
+    GhcCabal         -> context Stage0 ghcCabal
     GhcCabalHsColour -> builderProvenance $ GhcCabal
-    GhcPkg stage     -> if stage > Stage0 then Just (Stage0, ghcPkg) else Nothing
-    Haddock          -> Just (Stage2, haddock)
-    Hpc              -> Just (Stage1, hpcBin)
-    Hsc2Hs           -> Just (Stage0, hsc2hs)
-    Unlit            -> Just (Stage0, unlit)
+    GhcPkg stage     -> if stage > Stage0 then context Stage0 ghcPkg else Nothing
+    Haddock          -> context Stage2 haddock
+    Hpc              -> context Stage1 hpcBin
+    Hsc2Hs           -> context Stage0 hsc2hs
+    Unlit            -> context Stage0 unlit
     _                -> Nothing
+  where
+    context s p = Just $ vanillaContext s p
 
 isInternal :: Builder -> Bool
 isInternal = isJust . builderProvenance
@@ -87,7 +90,7 @@ isStaged = \case
 -- | Determine the location of a 'Builder'
 builderPath :: Builder -> Action FilePath
 builderPath builder = case builderProvenance builder of
-    Just (stage, pkg) -> return . fromJust $ programPath stage pkg
+    Just context -> return . fromJust $ programPath context
     Nothing -> do
         let builderKey = case builder of
                 Alex          -> "alex"

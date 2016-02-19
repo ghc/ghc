@@ -16,7 +16,7 @@ ghcCabalPackageArgs = package ghcCabal ? mconcat
 -- TODO: do we need -DCABAL_VERSION=$(CABAL_VERSION)?
 ghcCabalBootArgs :: Args
 ghcCabalBootArgs = stage0 ? do
-    path <- getTargetPath
+    path <- getContextPath
     let cabalMacros     = path -/- "build/autogen/cabal_macros.h"
         cabalMacrosBoot = pkgPath ghcCabal -/- "cabal_macros_boot.h"
     mconcat

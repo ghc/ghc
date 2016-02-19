@@ -10,7 +10,7 @@ ghcPackageArgs :: Args
 ghcPackageArgs = package ghc ? do
     stage <- getStage
     mconcat [ builderGhc ? mconcat
-              [ arg $ "-I" ++ targetPath stage compiler
+              [ arg $ "-I" ++ contextPath (vanillaContext stage compiler)
               , arg "-no-hs-main" ]
 
             , builder GhcCabal ?

@@ -17,7 +17,7 @@ import Target
 
 buildPackageLibrary :: Context -> Rules ()
 buildPackageLibrary context @ (Context {..}) = do
-    let buildPath = targetPath stage package -/- "build"
+    let buildPath = contextPath context -/- "build"
         libPrefix = buildPath -/- "libHS" ++ pkgNameString package
 
     -- TODO: handle dynamic libraries
@@ -61,7 +61,7 @@ buildPackageLibrary context @ (Context {..}) = do
 
 buildPackageGhciLibrary :: Context -> Rules ()
 buildPackageGhciLibrary context @ (Context {..}) = priority 2 $ do
-    let buildPath = targetPath stage package -/- "build"
+    let buildPath = contextPath context -/- "build"
         libPrefix = buildPath -/- "HS" ++ pkgNameString package
 
     -- TODO: simplify handling of AutoApply.cmm

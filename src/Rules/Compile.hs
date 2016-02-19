@@ -10,7 +10,7 @@ import Target
 
 compilePackage :: [(Resource, Int)] -> Context -> Rules ()
 compilePackage rs context @ (Context {..}) = do
-    let buildPath = targetPath stage package -/- "build"
+    let buildPath = contextPath context -/- "build"
 
     buildPath <//> "*" <.> hisuf way %> \hi ->
         if compileInterfaceFilesSeparately

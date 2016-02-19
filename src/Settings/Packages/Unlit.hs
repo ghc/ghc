@@ -4,11 +4,11 @@ import Base
 import Expression
 import GHC (unlit)
 import Predicates (builderGhc, package)
-import Settings (getTargetPath)
+import Settings
 
 unlitPackageArgs :: Args
 unlitPackageArgs = package unlit ? do
-    path <- getTargetPath
+    path <- getContextPath
     let cabalMacros = path -/- "build/autogen/cabal_macros.h"
     mconcat [ builderGhc ?
               mconcat [ arg "-no-hs-main"

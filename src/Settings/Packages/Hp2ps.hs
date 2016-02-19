@@ -8,7 +8,7 @@ import Settings
 
 hp2psPackageArgs :: Args
 hp2psPackageArgs = package hp2ps ? do
-    path <- getTargetPath
+    path <- getContextPath
     let cabalMacros = path -/- "build/autogen/cabal_macros.h"
     mconcat [ builderGhc ?
               mconcat [ arg "-no-hs-main"

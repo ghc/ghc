@@ -13,19 +13,19 @@ import Target
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
 registerPackage :: [(Resource, Int)] -> Context -> Rules ()
 registerPackage rs context @ (Context {..}) = do
-    let oldPath = pkgPath package -/- targetDirectory stage package -- TODO: remove, #113
+    let oldPath = pkgPath package -/- contextDirectory context -- TODO: remove, #113
         pkgConf = packageDbDirectory stage -/- pkgNameString package
 
     when (stage <= Stage1) $ matchVersionedFilePath pkgConf "conf" ?> \conf -> do
         -- This produces inplace-pkg-config. TODO: Add explicit tracking
-        need [pkgDataFile stage package]
+        need [pkgDataFile context]
 
         -- Post-process inplace-pkg-config. TODO: remove, see #113, #148
         let pkgConfig  = oldPath -/- "inplace-pkg-config"
             fixPkgConf = unlines
-                       . map (replace oldPath (targetPath stage package)
+                       . map (replace oldPath (contextPath context)
                        . replace (replaceSeparators '\\' $ oldPath)
-                                 (targetPath stage package) )
+                                 (contextPath context) )
                        . lines
 
         fixFile pkgConfig fixPkgConf
@@ -40,7 +40,7 @@ registerPackage rs context @ (Context {..}) = do
                 Target context (GhcPkg stage) [rtsConf] [conf]
 
         rtsConf %> \_ -> do
-            need [ pkgDataFile Stage1 rts, rtsConfIn ]
+            need [ pkgDataFile rtsContext, rtsConfIn ]
             build $ Target context HsCpp [rtsConfIn] [rtsConf]
 
             let fixRtsConf = unlines
