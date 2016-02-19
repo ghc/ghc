@@ -15,13 +15,11 @@ lookupInPath name
     | otherwise                 = return name
 
 lookupInPathOracle :: Rules ()
-lookupInPathOracle = do
-    answer <- newCache $ \query -> do
-        maybePath <- liftIO $ findExecutable query
+lookupInPathOracle = void $
+    addOracle $ \(LookupInPath name) -> do
+        maybePath <- liftIO $ findExecutable name
         path <- case maybePath of
             Just value -> return $ unifyPath value
-            Nothing    -> putError $ "Cannot find executable '" ++ query ++ "'."
-        putOracle $ "Executable found: " ++ query ++ " => " ++ path
+            Nothing    -> putError $ "Cannot find executable '" ++ name ++ "'."
+        putOracle $ "Executable found: " ++ name ++ " => " ++ path
         return path
-    _ <- addOracle $ \(LookupInPath query) -> answer query
-    return ()

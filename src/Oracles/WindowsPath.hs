@@ -15,7 +15,7 @@ topDirectory = do
     ghcSourcePath <- setting GhcSourcePath
     fixAbsolutePathOnWindows ghcSourcePath
 
--- Fix an absolute path on Windows:
+-- | Fix an absolute path on Windows:
 -- * "/c/" => "C:/"
 -- * "/usr/bin/tar.exe" => "C:/msys/usr/bin/tar.exe"
 fixAbsolutePathOnWindows :: FilePath -> Action FilePath
@@ -29,13 +29,11 @@ fixAbsolutePathOnWindows path = do
     else
         return path
 
--- Detecting path mapping on Windows. This is slow and requires caching.
+-- | Compute path mapping on Windows. This is slow and requires caching.
 windowsPathOracle :: Rules ()
-windowsPathOracle = do
-    answer <- newCache $ \path -> do
+windowsPathOracle = void $
+    addOracle $ \(WindowsPath path) -> do
         Stdout out <- quietly $ cmd ["cygpath", "-m", path]
         let windowsPath = unifyPath $ dropWhileEnd isSpace out
         putOracle $ "Windows path mapping: " ++ path ++ " => " ++ windowsPath
         return windowsPath
-    _ <- addOracle $ \(WindowsPath query) -> answer query
-    return ()

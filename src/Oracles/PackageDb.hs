@@ -12,12 +12,11 @@ import Settings.Paths
 import Target
 
 packageDbOracle :: Rules ()
-packageDbOracle = do
-    _ <- addOracle $ \(PackageDbKey stage) -> do
+packageDbOracle = void $
+    addOracle $ \(PackageDbKey stage) -> do
         let dir  = packageDbDirectory stage
             file = dir -/- "package.cache"
         unlessM (liftIO $ IO.doesFileExist file) $ do
             removeDirectoryIfExists dir
             build $ Target (vanillaContext stage ghcPkg) (GhcPkg stage) [] [dir]
             putSuccess $ "| Successfully initialised " ++ dir
-    return ()

@@ -86,10 +86,9 @@ pkgDataList packageData = fmap (map unquote . words) $ case packageData of
 -- Oracle for 'package-data.mk' files
 packageDataOracle :: Rules ()
 packageDataOracle = do
-    pkgDataContents <- newCache $ \file -> do
+    keys <- newCache $ \file -> do
         need [file]
         putOracle $ "Reading " ++ file ++ "..."
         liftIO $ readConfigFile file
-    _ <- addOracle $ \(PackageDataKey (file, key)) ->
-        Map.lookup key <$> pkgDataContents file
+    _ <- addOracle $ \(PackageDataKey (file, key)) -> Map.lookup key <$> keys file
     return ()

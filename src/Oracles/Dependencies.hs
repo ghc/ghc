@@ -33,6 +33,5 @@ dependenciesOracle = do
         putOracle $ "Reading dependencies from " ++ file ++ "..."
         contents <- map words <$> readFileLines file
         return . Map.fromList $ map (\(x:xs) -> (x, xs)) contents
-
     _ <- addOracle $ \(DependenciesKey (file, obj)) -> Map.lookup obj <$> deps file
     return ()

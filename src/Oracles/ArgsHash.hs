@@ -29,6 +29,5 @@ checkArgsHash target = when trackBuildSystem $ do
 
 -- Oracle for storing per-target argument list hashes
 argsHashOracle :: Rules ()
-argsHashOracle = do
-    _ <- addOracle $ \(ArgsHashKey target) -> hash <$> interpret target getArgs
-    return ()
+argsHashOracle = void $
+    addOracle $ \(ArgsHashKey target) -> hash <$> interpret target getArgs
