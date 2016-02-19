@@ -766,7 +766,7 @@ Suppose
  * Import Lib(foo) into another module M
  * Call 'foo' at some specialised type in M
 Then you jolly well expect it to be specialised in M.  But what if
-'foo' calls another fuction 'Lib.bar'.  Then you'd like 'bar' to be
+'foo' calls another function 'Lib.bar'.  Then you'd like 'bar' to be
 specialised too.  But if 'bar' is not marked INLINEABLE it may well
 not be specialised.  The warning Opt_WarnMissedSpecs warns about this.
 

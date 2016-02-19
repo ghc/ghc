@@ -358,7 +358,7 @@ data type T.  Things to think about
   - We do this for every module (except this module GHC.Types), so we can't
     depend on anything else (eg string unpacking code)
 
-That's why we have these terribly low-level repesentations.  The TrName
+That's why we have these terribly low-level representations.  The TrName
 type lets us use the TrNameS constructor when allocating static data;
 but we also need TrNameD for the case where we are deserialising a TyCon
 or Module (for example when deserialising a TypeRep), in which case we

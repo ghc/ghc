@@ -1,5 +1,5 @@
 -- A variant of T5654 where instead of evaluating directly to a
--- funciton, f evaluates to a new PAP.  This exposes a slightly
+-- function, f evaluates to a new PAP.  This exposes a slightly
 -- different but related bug, where when we create a new PAP by
 -- applying arguments to an existing PAP, we should take into account
 -- the stack on the original PAP.
