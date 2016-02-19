@@ -155,9 +155,8 @@ $binit     = 0-1
 $octit     = 0-7
 $hexit     = [$decdigit A-F a-f]
 
-$suffix    = \x07 -- Trick Alex into handling Unicode. See alexGetByte.
--- TODO #10196. Only allow modifier letters in the suffix of an identifier.
-$idchar    = [$small $large $digit $suffix \']
+$modifier  = \x07 -- Trick Alex into handling Unicode. See alexGetByte.
+$idchar    = [$small $large $digit $modifier \']
 
 $pragmachar = [$small $large $digit]
 
@@ -1875,7 +1874,7 @@ alexGetByte (AI loc s)
         symbol          = '\x04'
         space           = '\x05'
         other_graphic   = '\x06'
-        suffix          = '\x07'
+        modifier        = '\x07'
 
         adj_c
           | c <= '\x06' = non_graphic
@@ -1892,7 +1891,7 @@ alexGetByte (AI loc s)
                   UppercaseLetter       -> upper
                   LowercaseLetter       -> lower
                   TitlecaseLetter       -> upper
-                  ModifierLetter        -> suffix -- see #10196
+                  ModifierLetter        -> modifier -- see #10196
                   OtherLetter           -> lower -- see #1103
                   NonSpacingMark        -> other_graphic
                   SpacingCombiningMark  -> other_graphic

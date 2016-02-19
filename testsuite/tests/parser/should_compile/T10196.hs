@@ -11,3 +11,8 @@ f =
       xᵪ = xᵢ
       xᵣ = xᵪ
   in xᵣ
+
+-- Modifier letters are also allowed in the middle of an identifier.
+-- This should not be lexed as 2 separate identifiers.
+xᵦx :: Int
+xᵦx = 1

@@ -28,7 +28,6 @@ module Lexeme (
   ) where
 
 import FastString
-import Util ((<||>))
 
 import Data.Char
 import qualified Data.Set as Set
@@ -183,8 +182,7 @@ okConSymOcc str = all okSymChar str &&
 -- but not worrying about case or clashing with reserved words?
 okIdOcc :: String -> Bool
 okIdOcc str
-  -- TODO. #10196. Only allow modifier letters in the suffix of an identifier.
-  = let hashes = dropWhile (okIdChar <||> okIdSuffixChar) str in
+  = let hashes = dropWhile okIdChar str in
     all (== '#') hashes   -- -XMagicHash allows a suffix of hashes
                           -- of course, `all` says "True" to an empty list
 
@@ -194,18 +192,12 @@ okIdChar :: Char -> Bool
 okIdChar c = case generalCategory c of
   UppercaseLetter -> True
   LowercaseLetter -> True
-  OtherLetter     -> True
   TitlecaseLetter -> True
+  ModifierLetter  -> True -- See #10196
+  OtherLetter     -> True
   DecimalNumber   -> True
   OtherNumber     -> True
   _               -> c == '\'' || c == '_'
-
--- | Is this character acceptable in the suffix of an identifier.
--- See alexGetByte in Lexer.x
-okIdSuffixChar :: Char -> Bool
-okIdSuffixChar c = case generalCategory c of
-  ModifierLetter  -> True  -- See #10196
-  _               -> False
 
 -- | Is this character acceptable in a symbol (after the first char)?
 -- See alexGetByte in Lexer.x
