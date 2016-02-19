@@ -38,8 +38,8 @@ haskellModuleFiles stage pkg = do
     return (haskellFiles, missingMods ++ map otherFileToMod otherFiles)
 
 moduleFilesOracle :: Rules ()
-moduleFilesOracle = do
-    answer <- newCache $ \(modules, dirs) -> do
+moduleFilesOracle = void $
+    addOracle $ \(ModuleFilesKey (modules, dirs)) -> do
         let decodedPairs = map decodeModule modules
             modDirFiles  = map (bimap head sort . unzip)
                          . groupBy ((==) `on` fst) $ decodedPairs
@@ -55,6 +55,3 @@ moduleFilesOracle = do
                 return (map (fullDir -/-) found, mDir)
 
         return $ sort [ (encodeModule d f, f) | (fs, d) <- result, f <- fs ]
-
-    _ <- addOracle $ \(ModuleFilesKey query) -> answer query
-    return ()
