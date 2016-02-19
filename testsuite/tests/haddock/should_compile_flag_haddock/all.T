@@ -1,3 +1,12 @@
+# should_compile_flag_haddock.
+#
+# * flag: we *do* pass the -haddock flag
+#
+# * haddock: and tests *do* contain haddock annotations
+#
+# When adding a new test here, think about adding it to the
+# should_compile_noflag_haddock directory as well.
+
 test('haddockA001', normal, compile, ['-haddock -ddump-parsed'])
 test('haddockA002', normal, compile, ['-haddock -ddump-parsed'])
 test('haddockA003', normal, compile, ['-haddock -ddump-parsed'])
@@ -30,6 +39,10 @@ test('haddockA029', normal, compile, ['-haddock -ddump-parsed'])
 test('haddockA030', normal, compile, ['-haddock -ddump-parsed'])
 test('haddockA031', normal, compile, ['-haddock -ddump-parsed -XExistentialQuantification'])
 test('haddockA032', normal, compile, ['-haddock -ddump-parsed'])
+
+# The tests below this line are not duplicated in
+# should_compile_noflag_haddock.
+
 test('haddockA033', normal, compile, ['-haddock -ddump-parsed'])
 test('haddockA034', normal, compile, ['-haddock -ddump-parsed'])
 test('T10398', normal, compile, ['-haddock -ddump-parsed'])

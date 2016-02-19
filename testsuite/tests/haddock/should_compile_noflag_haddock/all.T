@@ -1,3 +1,12 @@
+# should_compile_noflag_haddock
+#
+# * noflag: we do *not* pass the -haddock flag
+#
+# * haddock: but tests *do* contain haddock annotations
+#
+# When adding a new test here, think about adding it to the
+# should_compile_flag_haddock directory as well.
+
 test('haddockC001', normal, compile, [''])
 test('haddockC002', normal, compile, [''])
 test('haddockC003', normal, compile, [''])
@@ -30,4 +39,8 @@ test('haddockC029', normal, compile, [''])
 test('haddockC030', normal, compile, [''])
 test('haddockC031', normal, compile, ['-XExistentialQuantification'])
 test('haddockC032', normal, compile, [''])
+
+# The tests below this line are not duplicated in
+# should_compile_flag_haddock.
+
 test('haddockSimplUtilsBug', normal, compile, [''])
