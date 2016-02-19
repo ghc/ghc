@@ -36,6 +36,7 @@ ghc                           \
     "$root/src/Main.hs"       \
     -Wall                     \
     -fno-warn-name-shadowing  \
+    -XRecordWildCards         \
     -i"$root/src"             \
     -rtsopts                  \
     -with-rtsopts=-I0         \

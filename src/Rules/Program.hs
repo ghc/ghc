@@ -1,4 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
 module Rules.Program (buildProgram) where
 
 import Data.Char

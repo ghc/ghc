@@ -108,13 +108,13 @@ executable ghc-shake
                        , Way
 
     default-language:    Haskell2010
+    default-extensions:  RecordWildCards
     other-extensions:    DeriveDataTypeable
                        , DeriveGeneric
                        , FlexibleInstances
                        , GeneralizedNewtypeDeriving
                        , LambdaCase
                        , OverloadedStrings
-                       , RecordWildCards
                        , ScopedTypeVariables
     build-depends:       base >= 4.8 && < 5
                        , ansi-terminal        == 0.6.*

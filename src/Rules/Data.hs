@@ -1,4 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
 module Rules.Data (buildPackageData) where
 
 import qualified System.Directory as IO

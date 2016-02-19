@@ -1,4 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
 module Rules.Actions (
     build, buildWithResources, copyFile, createDirectory, removeDirectory,
     copyDirectory, moveDirectory, applyPatch, fixFile, runConfigure, runMake,

@@ -1,4 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
 module Rules.Dependencies (buildPackageDependencies) where
 
 import Development.Shake.Util (parseMakefile)

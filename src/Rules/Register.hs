@@ -1,4 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
 module Rules.Register (registerPackage) where
 
 import Base

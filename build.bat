@@ -4,6 +4,7 @@
 @set ghcArgs=--make                   ^
              -Wall                    ^
              -fno-warn-name-shadowing ^
+             -XRecordWildCards        ^
              src/Main.hs              ^
              -isrc                    ^
              -rtsopts                 ^

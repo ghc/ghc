@@ -1,4 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
 module Rules.Library (
     buildPackageLibrary, buildPackageGhciLibrary, cSources, hSources
     ) where

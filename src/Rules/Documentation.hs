@@ -1,4 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
 module Rules.Documentation (buildPackageDocumentation) where
 
 import Base
