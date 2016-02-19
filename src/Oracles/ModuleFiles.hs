@@ -37,6 +37,16 @@ haskellModuleFiles stage pkg = do
 
     return (haskellFiles, missingMods ++ map otherFileToMod otherFiles)
 
+-- | This is an important oracle whose role is to find and cache module source
+-- files. More specifically, it takes a list of module names @modules@ and a
+-- list of directories @dirs@ as arguments, and computes a sorted list of pairs
+-- of the form @(A.B.C, dir/A/B/C.extension)@, such that @A.B.C@ belongs to
+-- @modules@, @dir@ belongs to @dirs@, and file @dir/A/B/C.extension@ exists.
+-- For example, for 'compiler' package given
+-- @modules = ["CodeGen.Platform.ARM", "Lexer"]@, and
+-- @dirs = ["codeGen", "parser"]@, it produces
+-- @[("CodeGen.Platform.ARM", "codeGen/CodeGen/Platform/ARM.hs"),
+-- ("Lexer", "parser/Lexer.x")]@.
 moduleFilesOracle :: Rules ()
 moduleFilesOracle = void $
     addOracle $ \(ModuleFilesKey (modules, dirs)) -> do
