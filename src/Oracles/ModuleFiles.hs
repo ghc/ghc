@@ -7,7 +7,7 @@ import Oracles.PackageData
 import Package
 import Settings.Paths
 
-newtype ModuleFilesKey = ModuleFilesKey ([String], [FilePath])
+newtype ModuleFilesKey = ModuleFilesKey ([FilePath], [String])
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
 moduleFiles :: Context -> Action [FilePath]
@@ -16,7 +16,7 @@ moduleFiles context @ (Context {..}) = do
     srcDirs <- fmap sort . pkgDataList $ SrcDirs path
     modules <- fmap sort . pkgDataList $ Modules path
     let dirs = [ pkgPath package -/- dir | dir <- srcDirs ]
-    found :: [(String, FilePath)] <- askOracle $ ModuleFilesKey (modules, dirs)
+    found :: [(String, FilePath)] <- askOracle $ ModuleFilesKey (dirs, modules)
     return $ map snd found
 
 haskellModuleFiles :: Context -> Action ([FilePath], [String])
@@ -27,8 +27,8 @@ haskellModuleFiles context @ (Context {..}) = do
     srcDirs <- fmap sort . pkgDataList $ SrcDirs path
     modules <- fmap sort . pkgDataList $ Modules path
     let dirs = [ pkgPath package -/- dir | dir <- srcDirs ]
-    foundSrcDirs <- askOracle $ ModuleFilesKey (modules, dirs     )
-    foundAutogen <- askOracle $ ModuleFilesKey (modules, [autogen])
+    foundSrcDirs <- askOracle $ ModuleFilesKey (dirs     , modules)
+    foundAutogen <- askOracle $ ModuleFilesKey ([autogen], modules)
 
     let found          = foundSrcDirs ++ foundAutogen
         missingMods    = modules `minusOrd` (sort $ map fst found)
@@ -38,18 +38,18 @@ haskellModuleFiles context @ (Context {..}) = do
     return (haskellFiles, missingMods ++ map otherFileToMod otherFiles)
 
 -- | This is an important oracle whose role is to find and cache module source
--- files. More specifically, it takes a list of module names @modules@ and a
--- list of directories @dirs@ as arguments, and computes a sorted list of pairs
--- of the form @(A.B.C, dir/A/B/C.extension)@, such that @A.B.C@ belongs to
--- @modules@, @dir@ belongs to @dirs@, and file @dir/A/B/C.extension@ exists.
--- For example, for 'compiler' package given
--- @modules = ["CodeGen.Platform.ARM", "Lexer"]@, and
--- @dirs = ["codeGen", "parser"]@, it produces
--- @[("CodeGen.Platform.ARM", "codeGen/CodeGen/Platform/ARM.hs"),
--- ("Lexer", "parser/Lexer.x")]@.
+-- files. More specifically, it takes a list of directories @dirs@ and a sorted
+-- list of module names @modules@ as arguments, and for each module, e.g.
+-- @A.B.C@, returns a FilePath of the form @dir/A/B/C.extension@, such that
+-- @dir@ belongs to @dirs@, and file @dir/A/B/C.extension@ exists, or Nothing
+-- if there is no such file. If more than one matching file is found an error is
+-- raised. For example, for the 'compiler' package given
+-- @dirs = ["codeGen", "parser"]@, and
+-- @modules = ["CodeGen.Platform.ARM", "Lexer", "Missing.Module"]@, it produces
+-- @[Just "codeGen/CodeGen/Platform/ARM.hs", Just "parser/Lexer.x", Nothing]@.
 moduleFilesOracle :: Rules ()
 moduleFilesOracle = void $
-    addOracle $ \(ModuleFilesKey (modules, dirs)) -> do
+    addOracle $ \(ModuleFilesKey (dirs, modules)) -> do
         let decodedPairs = map decodeModule modules
             modDirFiles  = map (bimap head sort . unzip)
                          . groupBy ((==) `on` fst) $ decodedPairs
