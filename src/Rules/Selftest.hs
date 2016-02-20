@@ -24,6 +24,7 @@ selftestRules =
         testWays
         testChunksOfSize
         testMatchVersionedFilePath
+        testModuleNames
 
 testWays :: Action ()
 testWays = do
@@ -54,3 +55,16 @@ testMatchVersionedFilePath = do
         matchVersionedFilePath prefix suffix (prefix ++ version ++ suffix)
   where
     versions = listOf . elements $ '-' : '.' : ['0'..'9']
+
+testModuleNames :: Action ()
+testModuleNames = do
+    putBuild $ "==== Encode/decode module name"
+    test $ encodeModule "Data/Functor/" "Identity.hs" == "Data.Functor.Identity"
+    test $ encodeModule "./" "Prelude"                == "Prelude"
+
+    test $ decodeModule "Data.Functor.Identity" == ("Data/Functor/", "Identity")
+    test $ decodeModule "Prelude"               == ("./", "Prelude")
+
+    test $ forAll names $ \n -> uncurry encodeModule (decodeModule n) == n
+  where
+    names = intercalate "." <$> listOf1 (listOf1 $ elements "abcABC123_'")

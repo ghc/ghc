@@ -98,13 +98,16 @@ versionToInt s = major * 1000 + minor * 10 + patch
 
 -- | Given a module name extract the directory and file name, e.g.:
 --
--- > decodeModule "Data.Functor.Identity" = ("Data/Functor/", "Identity")
+-- > decodeModule "Data.Functor.Identity" == ("Data/Functor/", "Identity")
+-- > decodeModule "Prelude"               == ("./", "Prelude")
 decodeModule :: String -> (FilePath, String)
 decodeModule = splitFileName . replaceEq '.' '/'
 
 -- | Given the directory and file name find the corresponding module name, e.g.:
 --
--- > encodeModule "Data/Functor/" "Identity.hs" = "Data.Functor.Identity"
+-- > encodeModule "Data/Functor/" "Identity.hs" == "Data.Functor.Identity"
+-- > encodeModule "./" "Prelude"                == "Prelude"
+-- > uncurry encodeModule (decodeModule name)   == name
 encodeModule :: FilePath -> String -> String
 encodeModule dir file = replaceEq '/' '.' $ dir -/- takeBaseName file
 
