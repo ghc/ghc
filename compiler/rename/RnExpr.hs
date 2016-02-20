@@ -1549,24 +1549,36 @@ segments stmts = map fst $ merge $ reverse $ map reverse $ walk (reverse stmts)
           _otherwise -> (seg,all_lets) : rest
       where
         rest = merge segs
-        all_lets = all (not . isBindStmt . fst) seg
+        all_lets = all (isLetStmt . fst) seg
 
+    -- walk splits the statement sequence into segments, traversing
+    -- the sequence from the back to the front, and keeping track of
+    -- the set of free variables of the current segment.  Whenever
+    -- this set of free variables is empty, we have a complete segment.
+    walk :: [(ExprLStmt Name, FreeVars)] -> [[(ExprLStmt Name, FreeVars)]]
     walk [] = []
     walk ((stmt,fvs) : stmts) = ((stmt,fvs) : seg) : walk rest
-      where (seg,rest) = chunter (fvs `intersectNameSet` allvars) stmts
+      where (seg,rest) = chunter fvs' stmts
+            (_, fvs') = stmtRefs stmt fvs
 
     chunter _ [] = ([], [])
     chunter vars ((stmt,fvs) : rest)
        | not (isEmptyNameSet vars)
        = ((stmt,fvs) : chunk, rest')
        where (chunk,rest') = chunter vars' rest
-             evars = fvs `intersectNameSet` allvars
-             pvars = mkNameSet (collectStmtBinders (unLoc stmt))
+             (pvars, evars) = stmtRefs stmt fvs
              vars' = (vars `minusNameSet` pvars) `unionNameSet` evars
     chunter _ rest = ([], rest)
 
-    isBindStmt (L _ BindStmt{}) = True
-    isBindStmt _ = False
+    stmtRefs stmt fvs
+      | isLetStmt stmt = (pvars, fvs' `minusNameSet` pvars)
+      | otherwise      = (pvars, fvs')
+      where fvs' = fvs `intersectNameSet` allvars
+            pvars = mkNameSet (collectStmtBinders (unLoc stmt))
+
+isLetStmt :: LStmt a b -> Bool
+isLetStmt (L _ LetStmt{}) = True
+isLetStmt _ = False
 
 -- | Find a "good" place to insert a bind in an indivisible segment.
 -- This is the only place where we use heuristics.  The current
@@ -1576,6 +1588,9 @@ splitSegment
   :: [(ExprLStmt Name, FreeVars)]
   -> ( [(ExprLStmt Name, FreeVars)]
      , [(ExprLStmt Name, FreeVars)] )
+splitSegment [one,two] = ([one],[two])
+  -- there is no choice when there are only two statements; this just saves
+  -- some work in a common case.
 splitSegment stmts
   | Just (lets,binds,rest) <- slurpIndependentStmts stmts
   =  if not (null lets)

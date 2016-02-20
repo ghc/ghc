@@ -109,6 +109,17 @@ test10 = do
   x5 <- e
   return (const () (x3,x4,x5))
 
+-- (a | b)
+-- This demonstrated a bug in RnExpr.segments (#11612)
+test11 :: M ()
+test11 = do
+  x1 <- a
+  let x2 = x1
+  x3 <- b
+  let x4 = c
+      x5 = x4
+  return (const () (x1,x2,x3,x4))
+
 main = mapM_ run
  [ test1
  , test2
@@ -120,6 +131,7 @@ main = mapM_ run
  , test8
  , test9
  , test10
+ , test11
  ]
 
 -- Testing code, prints out the structure of a monad/applicative expression
