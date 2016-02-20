@@ -678,8 +678,8 @@ rnStmtsWithPostProcessing ctxt rnBody ppStmts stmts thing_inside
 -- | maybe rearrange statements according to the ApplicativeDo transformation
 postProcessStmtsForApplicativeDo
   :: HsStmtContext Name
-  -> [(LStmt Name (LHsExpr Name), FreeVars)]
-  -> RnM ([LStmt Name (LHsExpr Name)], FreeVars)
+  -> [(ExprLStmt Name, FreeVars)]
+  -> RnM ([ExprLStmt Name], FreeVars)
 postProcessStmtsForApplicativeDo ctxt stmts
   = do {
        -- rearrange the statements using ApplicativeStmt if
@@ -1430,8 +1430,8 @@ dsDo {(arg_1 | ... | arg_n); stmts} expr =
 -- Note [ApplicativeDo].
 rearrangeForApplicativeDo
   :: HsStmtContext Name
-  -> [(LStmt Name (LHsExpr Name), FreeVars)]
-  -> RnM ([LStmt Name (LHsExpr Name)], FreeVars)
+  -> [(ExprLStmt Name, FreeVars)]
+  -> RnM ([ExprLStmt Name], FreeVars)
 
 rearrangeForApplicativeDo _ [] = return ([], emptyNameSet)
 rearrangeForApplicativeDo ctxt stmts0 = do
@@ -1445,10 +1445,10 @@ rearrangeForApplicativeDo ctxt stmts0 = do
 -- | The ApplicativeDo transformation.
 ado
   :: HsStmtContext Name
-  -> [(LStmt Name (LHsExpr Name), FreeVars)] -- ^ input statements
-  -> [LStmt Name (LHsExpr Name)]             -- ^ the "tail"
+  -> [(ExprLStmt Name, FreeVars)] -- ^ input statements
+  -> [ExprLStmt Name]             -- ^ the "tail"
   -> FreeVars                                -- ^ free variables of the tail
-  -> RnM ( [LStmt Name (LHsExpr Name)]       -- ( output statements,
+  -> RnM ( [ExprLStmt Name]       -- ( output statements,
          , FreeVars )                        -- , things we needed
                                              --    e.g. <$>, <*>, join )
 
@@ -1491,10 +1491,10 @@ ado ctxt stmts tail tail_fvs =
 -- two halves.
 adoSegment
   :: HsStmtContext Name
-  -> [(LStmt Name (LHsExpr Name), FreeVars)]
-  -> [LStmt Name (LHsExpr Name)]
+  -> [(ExprLStmt Name, FreeVars)]
+  -> [ExprLStmt Name]
   -> FreeVars
-  -> RnM ( [LStmt Name (LHsExpr Name)], FreeVars )
+  -> RnM ( [ExprLStmt Name], FreeVars )
 adoSegment ctxt stmts tail tail_fvs
  = do {  -- choose somewhere to put a bind
         let (before,after) = splitSegment stmts
@@ -1509,7 +1509,7 @@ adoSegment ctxt stmts tail tail_fvs
 adoSegmentArg
   :: HsStmtContext Name
   -> FreeVars
-  -> [(LStmt Name (LHsExpr Name), FreeVars)]
+  -> [(ExprLStmt Name, FreeVars)]
   -> RnM (ApplicativeArg Name Name, FreeVars)
 adoSegmentArg _ _ [(L _ (BindStmt pat exp _ _ _),_)] =
   return (ApplicativeArgOne pat exp, emptyFVs)
@@ -1532,8 +1532,8 @@ adoSegmentArg ctxt tail_fvs stmts =
 -- | Divide a sequence of statements into segments, where no segment
 -- depends on any variables defined by a statement in another segment.
 segments
-  :: [(LStmt Name (LHsExpr Name), FreeVars)]
-  -> [[(LStmt Name (LHsExpr Name), FreeVars)]]
+  :: [(ExprLStmt Name, FreeVars)]
+  -> [[(ExprLStmt Name, FreeVars)]]
 segments stmts = map fst $ merge $ reverse $ map reverse $ walk (reverse stmts)
   where
     allvars = mkNameSet (concatMap (collectStmtBinders.unLoc.fst) stmts)
@@ -1573,9 +1573,9 @@ segments stmts = map fst $ merge $ reverse $ map reverse $ walk (reverse stmts)
 -- heuristic is to peel off the first group of independent statements
 -- and put the bind after those.
 splitSegment
-  :: [(LStmt Name (LHsExpr Name), FreeVars)]
-  -> ( [(LStmt Name (LHsExpr Name), FreeVars)]
-     , [(LStmt Name (LHsExpr Name), FreeVars)] )
+  :: [(ExprLStmt Name, FreeVars)]
+  -> ( [(ExprLStmt Name, FreeVars)]
+     , [(ExprLStmt Name, FreeVars)] )
 splitSegment stmts
   | Just (lets,binds,rest) <- slurpIndependentStmts stmts
   =  if not (null lets)
@@ -1629,8 +1629,8 @@ mkApplicativeStmt
   :: HsStmtContext Name
   -> [ApplicativeArg Name Name]         -- ^ The args
   -> Bool                               -- ^ True <=> need a join
-  -> [LStmt Name (LHsExpr Name)]        -- ^ The body statements
-  -> RnM ([LStmt Name (LHsExpr Name)], FreeVars)
+  -> [ExprLStmt Name]        -- ^ The body statements
+  -> RnM ([ExprLStmt Name], FreeVars)
 mkApplicativeStmt ctxt args need_join body_stmts
   = do { (fmap_op, fvs1) <- lookupStmtName ctxt fmapName
        ; (ap_op, fvs2) <- lookupStmtName ctxt apAName
@@ -1649,7 +1649,7 @@ mkApplicativeStmt ctxt args need_join body_stmts
 
 -- | Given the statements following an ApplicativeStmt, determine whether
 -- we need a @join@ or not, and remove the @return@ if necessary.
-needJoin :: [LStmt Name (LHsExpr Name)] -> (Bool, [LStmt Name (LHsExpr Name)])
+needJoin :: [ExprLStmt Name] -> (Bool, [ExprLStmt Name])
 needJoin [] = (False, [])  -- we're in an ApplicativeArg
 needJoin [L loc (LastStmt e _ t)]
  | Just arg <- isReturnApp e = (False, [L loc (LastStmt arg True t)])
