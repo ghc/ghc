@@ -1,3 +1,5 @@
+unexport MAKEFLAGS # See Trac #11569
+
 # Eliminate use of the built-in implicit rules, and clear out the default list
 # of suffixes for suffix rules. Speeds up make quite a bit. Both are needed
 # for the shortest `make -d` output.
