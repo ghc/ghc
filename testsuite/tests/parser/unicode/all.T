@@ -25,3 +25,4 @@ test('T7671', normal, compile, [''])
 # TODO: This test ought to be run in a non-UTF8 locale, but this is not yet
 # supported by the test suite (see 10907)
 test('T10907', normal, compile, [''])
+test('T7650', normal, compile, [''])

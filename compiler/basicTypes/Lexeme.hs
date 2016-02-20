@@ -194,9 +194,10 @@ okIdChar c = case generalCategory c of
   LowercaseLetter -> True
   TitlecaseLetter -> True
   ModifierLetter  -> True -- See #10196
-  OtherLetter     -> True
+  OtherLetter     -> True -- See #1103
+  NonSpacingMark  -> True -- See #7650
   DecimalNumber   -> True
-  OtherNumber     -> True
+  OtherNumber     -> True -- See #4373
   _               -> c == '\'' || c == '_'
 
 -- | Is this character acceptable in a symbol (after the first char)?

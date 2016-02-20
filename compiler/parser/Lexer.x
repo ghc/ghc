@@ -155,8 +155,8 @@ $binit     = 0-1
 $octit     = 0-7
 $hexit     = [$decdigit A-F a-f]
 
-$modifier  = \x07 -- Trick Alex into handling Unicode. See alexGetByte.
-$idchar    = [$small $large $digit $modifier \']
+$uniidchar = \x07 -- Trick Alex into handling Unicode. See alexGetByte.
+$idchar    = [$small $large $digit $uniidchar \']
 
 $pragmachar = [$small $large $digit]
 
@@ -1874,10 +1874,10 @@ alexGetByte (AI loc s)
         symbol          = '\x04'
         space           = '\x05'
         other_graphic   = '\x06'
-        modifier        = '\x07'
+        uniidchar       = '\x07'
 
         adj_c
-          | c <= '\x06' = non_graphic
+          | c <= '\x07' = non_graphic
           | c <= '\x7f' = c
           -- Alex doesn't handle Unicode, so when Unicode
           -- character is encountered we output these values
@@ -1891,9 +1891,9 @@ alexGetByte (AI loc s)
                   UppercaseLetter       -> upper
                   LowercaseLetter       -> lower
                   TitlecaseLetter       -> upper
-                  ModifierLetter        -> modifier -- see #10196
+                  ModifierLetter        -> uniidchar -- see #10196
                   OtherLetter           -> lower -- see #1103
-                  NonSpacingMark        -> other_graphic
+                  NonSpacingMark        -> uniidchar -- see #7650
                   SpacingCombiningMark  -> other_graphic
                   EnclosingMark         -> other_graphic
                   DecimalNumber         -> digit
