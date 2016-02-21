@@ -18,7 +18,7 @@ clean:
 
 .PHONY: dynamicToo004
 dynamicToo004:
-	$(MAKE) clean
+	$(MAKE) -s --no-print-directory clean
 
 	"$(GHC_PKG)" init $(LOCAL_PKGCONF)
 	"$(TEST_HC)" -v0 --make Setup.hs

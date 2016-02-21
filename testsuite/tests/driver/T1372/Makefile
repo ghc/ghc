@@ -18,18 +18,18 @@ clean:
 	rm -rf $(LOCAL_PKGCONF)
 
 T1372:
-	$(MAKE) clean
-	$(MAKE) prep
+	$(MAKE) -s --no-print-directory clean
+	$(MAKE) -s --no-print-directory prep
 # This should recompile Main.hs, because A in package p1 has changed
 # and recompiling Main.hs will now fail.
 	-cd p2 && ./setup build -v0
-	$(MAKE) clean
+	$(MAKE) -s --no-print-directory clean
 
 prep:
 	"$(GHC_PKG)" init $(LOCAL_PKGCONF)
 	cp p1/A1.hs p1/A.hs
-	$(MAKE) prep.p1
-	$(MAKE) prep.p2
+	$(MAKE) -s --no-print-directory prep.p1
+	$(MAKE) -s --no-print-directory prep.p2
 	cp p1/A2.hs p1/A.hs
 	cd p1 && ./setup build -v0
 

@@ -10,7 +10,7 @@ cleanSafeRecomp01:
 
 # Just a single file
 safeRecomp01:
-	'$(MAKE)' cleanSafeRecomp01
+	$(MAKE) -s --no-print-directory cleanSafeRecomp01
 	
 	'$(TEST_HC)' -c SafeRecomp01.hs
 	'$(TEST_HC)' --show-iface SafeRecomp01.hi | grep -E '^trusted:'
@@ -41,7 +41,7 @@ cleanSafeRecomp02:
 
 # mutli module program
 safeRecomp02:
-	'$(MAKE)' cleanSafeRecomp02
+	$(MAKE) -s --no-print-directory cleanSafeRecomp02
 	
 	'$(TEST_HC)' -c SafeRecomp02_A.hs
 	'$(TEST_HC)' --make SafeRecomp02.hs

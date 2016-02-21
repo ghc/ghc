@@ -11,7 +11,7 @@ clean:
 # invocation as the main-is flag now applies to it).
 
 mod175:
-	$(MAKE) clean
+	$(MAKE) -s --no-print-directory clean
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make -main-is Test.main  Test.hs  -o test
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make -main-is Test2.main Test2.hs -o test2
 	./test

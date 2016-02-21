@@ -22,11 +22,11 @@ clean :
 	$(RM) *.hi *.o prog
 
 recomp008 : 
-	$(MAKE) clean
+	$(MAKE) -s --no-print-directory clean
 	cp A1.hs A.hs
-	$(MAKE) prog
+	$(MAKE) -s --no-print-directory prog
 	./prog
 	sleep 1
 	cp A2.hs A.hs
-	$(MAKE) prog
+	$(MAKE) -s --no-print-directory prog
 	./prog

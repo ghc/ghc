@@ -27,7 +27,7 @@ SETUP = ../Setup -v0
 # should be exposed or hidden.
 
 cabal05: clean
-	$(MAKE) clean
+	$(MAKE) -s --no-print-directory clean
 	'$(GHC_PKG)' init tmp.d
 	'$(TEST_HC)' -v0 --make Setup
 	# build p
@@ -62,7 +62,7 @@ cabal05: clean
 	cd t && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d
 	! (cd t && $(SETUP) build)
 ifneq "$(CLEANUP)" ""
-	$(MAKE) clean
+	$(MAKE) -s --no-print-directory clean
 endif
 
 clean :

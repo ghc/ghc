@@ -15,7 +15,7 @@ HI_SUF = hi
 endif
 
 mkPackageDatabase.%:
-	'$(MAKE)' cleanPackageDatabase.$*
+	$(MAKE) -s --no-print-directory cleanPackageDatabase.$*
 	mkdir pdb.$*
 
 	'$(TEST_HC)' -outputdir pdb.$* -o pdb.$*/setup Setup.hs -v0
@@ -38,7 +38,7 @@ safePkg01_GHC_PKG = '$(GHC_PKG)' --no-user-package-db -f pdb.safePkg01/local.db
 
 SHOW_IFACE=-dppr-cols999 --show-iface
 safePkg01:
-	'$(MAKE)' mkPackageDatabase.safePkg01
+	$(MAKE) -s --no-print-directory mkPackageDatabase.safePkg01
 
 	$(safePkg01_GHC_PKG) list
 	$(safePkg01_GHC_PKG) field safePkg01-1.0 trusted

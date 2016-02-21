@@ -3,7 +3,7 @@ include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
 annth_make:
-	$(MAKE) clean_annth_make
+	$(MAKE) -s --no-print-directory clean_annth_make
 	mkdir build_make
 	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) -v0 --make \
 	   -odir build_make -hidir build_make -o build_make/annth annth.hs
@@ -12,7 +12,7 @@ clean_annth_make:
 	rm -rf build_make
 
 annth_compunits:
-	$(MAKE) clean_annth_compunits
+	$(MAKE) -s --no-print-directory clean_annth_compunits
 	mkdir build_compunits
 	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) -v0 \
 	  -odir build_compunits -hidir build_compunits \

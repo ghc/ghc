@@ -16,7 +16,7 @@ SETUP=../Setup -v0
 # Currently the error message from GHC is swallowed by Cabal.
 
 cabal03: clean
-	$(MAKE) clean
+	$(MAKE) -s --no-print-directory clean
 	'$(GHC_PKG)' init tmp.d
 	'$(TEST_HC)' -v0 --make Setup
 	cd p && $(SETUP) clean
@@ -32,7 +32,7 @@ cabal03: clean
 	cd p && $(SETUP) register
 	cd r && ! ../Setup configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --ghc-pkg-option=--force
 ifneq "$(CLEANUP)" ""
-	$(MAKE) clean
+	$(MAKE) -s --no-print-directory clean
 endif
 
 clean :

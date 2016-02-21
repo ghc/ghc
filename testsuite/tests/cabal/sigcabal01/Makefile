@@ -7,7 +7,7 @@ SETUP=../Setup -v0
 # This test is for a Cabal package with holes
 
 sigcabal01:
-	$(MAKE) clean
+	$(MAKE) -s --no-print-directory clean
 	'$(GHC_PKG)' field containers id | sed 's/^.*: *//' > containers
 	'$(GHC_PKG)' init tmp.d
 	'$(TEST_HC)' -v0 --make Setup
@@ -25,7 +25,7 @@ sigcabal01:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db=tmp.d -hide-all-packages -package base -package containers -package-id "`cat p_lazy` (P as P.Lazy)" -package-id "`cat p_strict` (P as P.Strict)" --make Main.hs
 	! ./Main
 ifneq "$(CLEANUP)" ""
-	$(MAKE) clean
+	$(MAKE) -s --no-print-directory clean
 endif
 
 clean :

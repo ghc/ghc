@@ -6,7 +6,7 @@ SETUP=../Setup -v0
 
 # in both cases, p2 should be preferred
 cabal08: clean
-	$(MAKE) clean
+	$(MAKE) -s --no-print-directory clean
 	'$(GHC_PKG)' init tmp1.d
 	'$(GHC_PKG)' init tmp2.d
 	'$(TEST_HC)' -v0 --make Setup
@@ -25,7 +25,7 @@ cabal08: clean
 	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db tmp1.d -package-db tmp2.d -hide-all-packages -package base -package p Main.hs
 	./Main
 ifneq "$(CLEANUP)" ""
-	$(MAKE) clean
+	$(MAKE) -s --no-print-directory clean
 endif
 
 clean :

@@ -14,15 +14,15 @@ clean:
 	rm -rf $(LOCAL_PKGCONF)
 
 bug1465:
-	$(MAKE) clean
-	$(MAKE) prep
+	$(MAKE) -s --no-print-directory clean
+	$(MAKE) -s --no-print-directory prep
 	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(LOCAL_PKGCONF) -c C.hs || exit 0
-	$(MAKE) clean
+	$(MAKE) -s --no-print-directory clean
 
 prep:
 	'$(GHC_PKG)' init $(LOCAL_PKGCONF)
-	$(MAKE) prep.v1
-	$(MAKE) prep.v2
+	$(MAKE) -s --no-print-directory prep.v1
+	$(MAKE) -s --no-print-directory prep.v2
 	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(LOCAL_PKGCONF) -c -package $(PKG)-1.0 B1.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(LOCAL_PKGCONF) -c -package $(PKG)-2.0 B2.hs
 

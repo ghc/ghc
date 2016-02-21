@@ -9,7 +9,7 @@ clean:
 	rm -rf package.conf
 
 T3007:
-	$(MAKE) clean
+	$(MAKE) -s --no-print-directory clean
 	'$(GHC_PKG)' init package.conf
 	cd A && '$(TEST_HC)' -v0 --make Setup
 	cd A && ./Setup configure -v0 --with-compiler='$(TEST_HC)' --ghc-pkg-option=--global-package-db=../package.conf --ghc-option=-package-db../package.conf

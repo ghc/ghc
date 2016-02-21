@@ -22,7 +22,7 @@ SETUP=../Setup -v0
 # dependencies it needs.
 
 cabal06: clean
-	$(MAKE) clean
+	$(MAKE) -s --no-print-directory clean
 	'$(GHC_PKG)' init tmp.d
 	'$(TEST_HC)' -v0 --make Setup
 	cd p-1.0 && $(SETUP) clean
@@ -60,7 +60,7 @@ cabal06: clean
 	inst-e/bin/cabal06
 	inst-f/bin/cabal06
 ifneq "$(CLEANUP)" ""
-	$(MAKE) clean
+	$(MAKE) -s --no-print-directory clean
 endif
 
 clean :

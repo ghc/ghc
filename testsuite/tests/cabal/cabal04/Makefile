@@ -11,14 +11,14 @@ SETUP=./Setup -v0
 # building the shared library (-rtsopts has no effect with -shared)
 
 cabal04:
-	$(MAKE) clean
+	$(MAKE) -s --no-print-directory clean
 	'$(TEST_HC)' -v0 --make Setup
 	$(SETUP) clean
 	$(SETUP) configure --with-ghc='$(TEST_HC)' --ghc-options='$(filter-out -rtsopts,$(TEST_HC_OPTS))' $(VANILLA) $(PROF) $(DYN)
 	$(SETUP) build 2> err
 	! grep -v "Creating library file" err
 ifneq "$(CLEANUP)" ""
-	$(MAKE) clean
+	$(MAKE) -s --no-print-directory clean
 endif
 
 clean :

@@ -20,7 +20,7 @@ PREFIX := $(abspath install)
 $(eval $(call canonicalise,PREFIX))
 
 cabal01:
-	$(MAKE) clean
+	$(MAKE) -s --no-print-directory clean
 	'$(TEST_HC)' --make -o setup Setup.lhs -v0
 
 	'$(GHC_PKG)' init local.db
@@ -41,4 +41,4 @@ cabal01:
 	./setup sdist -v0
 	echo dist:
 	ls -1 dist
-	if [ "$(CLEANUP)" != "" ]; then $(MAKE) clean; fi
+	if [ "$(CLEANUP)" != "" ]; then $(MAKE) -s --no-print-directory clean; fi
