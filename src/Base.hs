@@ -157,7 +157,7 @@ minusOrd (x:xs) (y:ys) = case compare x y of
     EQ ->     minusOrd xs ys
     GT ->     minusOrd (x:xs) ys
 
--- Explicit definition to avoid dependency on Data.List.Ordered
+-- Explicit definition to avoid dependency on Data.List.Ordered. TODO: add tests
 -- | Intersection of two ordered lists by a predicate.
 intersectOrd :: (a -> b -> Ordering) -> [a] -> [b] -> [a]
 intersectOrd cmp = loop
@@ -166,7 +166,7 @@ intersectOrd cmp = loop
     loop _ [] = []
     loop (x:xs) (y:ys) = case cmp x y of
         LT ->     loop xs (y:ys)
-        EQ -> x : loop xs ys
+        EQ -> x : loop xs (y:ys)
         GT ->     loop (x:xs) ys
 
 -- | Lookup all elements of a given sorted list in a given sorted dictionary.
