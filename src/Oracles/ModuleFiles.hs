@@ -16,8 +16,7 @@ moduleFiles context @ (Context {..}) = do
     srcDirs <- fmap sort . pkgDataList $ SrcDirs path
     modules <- fmap sort . pkgDataList $ Modules path
     let dirs = [ pkgPath package -/- dir | dir <- srcDirs ]
-    found :: [(String, FilePath)] <- askOracle $ ModuleFilesKey (dirs, modules)
-    return $ map snd found
+    fmap catMaybes . askOracle $ ModuleFilesKey (dirs, modules)
 
 haskellModuleFiles :: Context -> Action ([FilePath], [String])
 haskellModuleFiles context @ (Context {..}) = do
@@ -29,13 +28,17 @@ haskellModuleFiles context @ (Context {..}) = do
     let dirs = [ pkgPath package -/- dir | dir <- srcDirs ]
     foundSrcDirs <- askOracle $ ModuleFilesKey (dirs     , modules)
     foundAutogen <- askOracle $ ModuleFilesKey ([autogen], modules)
+    found <- sequence $ zipWith3 addSources modules foundSrcDirs foundAutogen
 
-    let found          = foundSrcDirs ++ foundAutogen
-        missingMods    = modules `minusOrd` (sort $ map fst found)
+    let missingMods    = map fst . filter (isNothing . snd) $ zip modules found
         otherFileToMod = replaceEq '/' '.' . dropExtension . dropPkgPath
-        (haskellFiles, otherFiles) = partition ("//*hs" ?==) (map snd found)
+        (haskellFiles, otherFiles) = partition ("//*hs" ?==) $ catMaybes found
 
     return (haskellFiles, missingMods ++ map otherFileToMod otherFiles)
+  where
+    addSources _ Nothing   r         = return r
+    addSources _ l         Nothing   = return l
+    addSources m (Just f1) (Just f2) = errorMultipleSources m f1 f2
 
 -- | This is an important oracle whose role is to find and cache module source
 -- files. More specifically, it takes a list of directories @dirs@ and a sorted
@@ -51,7 +54,7 @@ moduleFilesOracle :: Rules ()
 moduleFilesOracle = void $
     addOracle $ \(ModuleFilesKey (dirs, modules)) -> do
         let decodedPairs = map decodeModule modules
-            modDirFiles  = map (bimap head sort . unzip)
+            modDirFiles  = map (bimap head id . unzip)
                          . groupBy ((==) `on` fst) $ decodedPairs
 
         result <- fmap concat . forM dirs $ \dir -> do
@@ -64,4 +67,15 @@ moduleFilesOracle = void $
                     found    = intersectOrd cmp noBoot mFiles
                 return (map (fullDir -/-) found, mDir)
 
-        return $ sort [ (encodeModule d f, f) | (fs, d) <- result, f <- fs ]
+        let pairs = sort [ (encodeModule d f, f) | (fs, d) <- result, f <- fs ]
+            multi = [ (m, f1, f2) | (m, f1):(n, f2):_ <- tails pairs, m == n ]
+
+        unless (null multi) $ do
+            let (m, f1, f2) = head multi
+            errorMultipleSources m f1 f2
+
+        return $ lookupAll modules pairs
+
+errorMultipleSources :: String -> FilePath -> FilePath -> Action a
+errorMultipleSources m f1 f2 = putError $ "Module " ++ m ++
+    " has more than one source file: " ++ f1 ++ " and " ++ f2 ++ "."
