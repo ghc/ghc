@@ -23,7 +23,7 @@ module Base (
     putColoured, putOracle, putBuild, putSuccess, putError,
 
     -- * Miscellaneous utilities
-    minusOrd, intersectOrd, replaceEq, quote, replaceSeparators,
+    minusOrd, intersectOrd, lookupAll, replaceEq, quote, replaceSeparators,
     decodeModule, encodeModule, unifyPath, (-/-), versionToInt,
     removeFileIfExists, removeDirectoryIfExists, matchVersionedFilePath
     ) where
@@ -165,9 +165,23 @@ intersectOrd cmp = loop
     loop [] _ = []
     loop _ [] = []
     loop (x:xs) (y:ys) = case cmp x y of
-         LT ->     loop xs (y:ys)
-         EQ -> x : loop xs ys
-         GT ->     loop (x:xs) ys
+        LT ->     loop xs (y:ys)
+        EQ -> x : loop xs ys
+        GT ->     loop (x:xs) ys
+
+-- | Lookup all elements of a given sorted list in a given sorted dictionary.
+-- @lookupAll list dict@ is equivalent to @map (flip lookup dict) list@ but has
+-- linear complexity O(|list| + |dist|) instead of quadratic O(|list| * |dict|).
+--
+-- > lookupAll ["b", "c"] [("a", 1), ("c", 3), ("d", 4)] == [Nothing, Just 3]
+-- > list & dict are sorted: lookupAll list dict == map (flip lookup dict) list
+lookupAll :: Ord a => [a] -> [(a, b)] -> [Maybe b]
+lookupAll []     _      = []
+lookupAll (_:xs) []     = Nothing : lookupAll xs []
+lookupAll (x:xs) (y:ys) = case compare x (fst y) of
+    LT -> Nothing      : lookupAll xs (y:ys)
+    EQ -> Just (snd y) : lookupAll xs (y:ys)
+    GT -> lookupAll (x:xs) ys
 
 -- | Remove a file that doesn't necessarily exist
 removeFileIfExists :: FilePath -> Action ()

@@ -25,6 +25,7 @@ selftestRules =
         testChunksOfSize
         testMatchVersionedFilePath
         testModuleNames
+        testLookupAll
 
 testWays :: Action ()
 testWays = do
@@ -68,3 +69,17 @@ testModuleNames = do
     test $ forAll names $ \n -> uncurry encodeModule (decodeModule n) == n
   where
     names = intercalate "." <$> listOf1 (listOf1 $ elements "abcABC123_'")
+
+testLookupAll :: Action ()
+testLookupAll = do
+    putBuild $ "==== lookupAll"
+    test $ lookupAll ["b"    , "c"            ] [("a", 1), ("c", 3), ("d", 4)]
+                  == [Nothing, Just (3 :: Int)]
+    test $ forAll dicts $ \dict -> forAll extras $ \extra ->
+        let items = sort $ map fst dict ++ extra
+        in lookupAll items (sort dict) == map (flip lookup dict) items
+  where
+    dicts :: Gen [(Int, Int)]
+    dicts = nubBy ((==) `on` fst) <$> vector 20
+    extras :: Gen [Int]
+    extras = vector 20
