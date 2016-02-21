@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving, ScopedTypeVariables #-}
-module Oracles.ModuleFiles (moduleFiles, haskellModuleFiles, moduleFilesOracle) where
+module Oracles.ModuleFiles (
+    moduleFiles, haskellModuleFiles, moduleFilesOracle, findModuleFiles
+    ) where
 
 import Base
 import Context
@@ -16,7 +18,7 @@ moduleFiles context @ (Context {..}) = do
     srcDirs <- fmap sort . pkgDataList $ SrcDirs path
     modules <- fmap sort . pkgDataList $ Modules path
     let dirs = [ pkgPath package -/- dir | dir <- srcDirs ]
-    fmap catMaybes . askOracle $ ModuleFilesKey (dirs, modules)
+    fmap catMaybes $ findModuleFiles dirs modules
 
 haskellModuleFiles :: Context -> Action ([FilePath], [String])
 haskellModuleFiles context @ (Context {..}) = do
@@ -26,8 +28,8 @@ haskellModuleFiles context @ (Context {..}) = do
     srcDirs <- fmap sort . pkgDataList $ SrcDirs path
     modules <- fmap sort . pkgDataList $ Modules path
     let dirs = [ pkgPath package -/- dir | dir <- srcDirs ]
-    foundSrcDirs <- askOracle $ ModuleFilesKey (dirs     , modules)
-    foundAutogen <- askOracle $ ModuleFilesKey ([autogen], modules)
+    foundSrcDirs <- findModuleFiles dirs      modules
+    foundAutogen <- findModuleFiles [autogen] modules
     found <- sequence $ zipWith3 addSources modules foundSrcDirs foundAutogen
 
     let missingMods    = map fst . filter (isNothing . snd) $ zip modules found
@@ -43,13 +45,17 @@ haskellModuleFiles context @ (Context {..}) = do
 -- | This is an important oracle whose role is to find and cache module source
 -- files. More specifically, it takes a list of directories @dirs@ and a sorted
 -- list of module names @modules@ as arguments, and for each module, e.g.
--- @A.B.C@, returns a FilePath of the form @dir/A/B/C.extension@, such that
--- @dir@ belongs to @dirs@, and file @dir/A/B/C.extension@ exists, or Nothing
+-- @A.B.C@, returns a 'FilePath' of the form @dir/A/B/C.extension@, such that
+-- @dir@ belongs to @dirs@, and file @dir/A/B/C.extension@ exists, or 'Nothing'
 -- if there is no such file. If more than one matching file is found an error is
 -- raised. For example, for the 'compiler' package given
--- @dirs = ["codeGen", "parser"]@, and
+-- @dirs = ["compiler/codeGen", "compiler/parser"]@, and
 -- @modules = ["CodeGen.Platform.ARM", "Lexer", "Missing.Module"]@, it produces
--- @[Just "codeGen/CodeGen/Platform/ARM.hs", Just "parser/Lexer.x", Nothing]@.
+-- @[Just "compiler/codeGen/CodeGen/Platform/ARM.hs",
+-- Just "compiler/parser/Lexer.x", Nothing]@.
+findModuleFiles :: [FilePath] -> [String] -> Action [Maybe FilePath]
+findModuleFiles dirs modules = askOracle $ ModuleFilesKey (dirs, modules)
+
 moduleFilesOracle :: Rules ()
 moduleFilesOracle = void $
     addOracle $ \(ModuleFilesKey (dirs, modules)) -> do
