@@ -1,13 +1,5 @@
 # Test for #1227, #1418
 
-extra_prof_ways = ['prof', 'prof_hc_hb', 'prof_hb', 'prof_hd', 'prof_hy', 'prof_hr']
-
-test('heapprof001',
-     [only_ways(prof_ways),
-      when(have_profiling(), extra_ways(extra_prof_ways)),
-      extra_run_opts('7')],
-     compile_and_run, [''])
-
 test('heapprof002',
      [ pre_cmd('cp heapprof001.hs heapprof002.hs')
      , extra_clean(['heapprof002.hs'])
@@ -16,107 +8,72 @@ test('heapprof002',
      ],
      compile_and_run, [''])
 
+test('T11489', [req_profiling, extra_clean(['T11489.prof', 'T11489.hp'])],
+     run_command, ['$MAKE -s --no-print-directory T11489'])
+
+# Below this line, run tests only with profiling ways.
+setTestOpts(req_profiling)
+setTestOpts(extra_ways(['prof']))
+setTestOpts(only_ways(prof_ways))
+
+extra_prof_ways = ['prof', 'prof_hc_hb', 'prof_hb', 'prof_hd', 'prof_hy', 'prof_hr']
+
+test('heapprof001',
+     [when(have_profiling(), extra_ways(extra_prof_ways)), extra_run_opts('7')],
+     compile_and_run, [''])
+
 test('T2592',
-     [only_ways(['profasm']), req_profiling,
-      extra_run_opts('+RTS -M1m -RTS'), exit_code(251)],
+     [only_ways(['profasm']), extra_run_opts('+RTS -M1m -RTS'), exit_code(251)],
      compile_and_run, [''])
 
-test('T3001',
-     [only_ways(['prof_hb']), extra_ways(['prof_hb']), req_profiling],
+test('T3001', [only_ways(['prof_hb']), extra_ways(['prof_hb'])],
      compile_and_run, [''])
 
-test('T3001-2',
-     [only_ways(['prof_hb']), extra_ways(['prof_hb']), req_profiling],
+test('T3001-2', [only_ways(['prof_hb']), extra_ways(['prof_hb'])],
      compile_and_run, ['-package bytestring'])
 
-test('scc001', [req_profiling,
-                extra_ways(['prof']), only_ways(prof_ways),
-                expect_broken_for(10037,['prof'])],
-        # As with ioprof001, the unoptimised profile is different but
-        # not badly wrong (CAF attribution is different).
-     compile_and_run,
+# As with ioprof001, the unoptimised profile is different but
+# not badly wrong (CAF attribution is different).
+test('scc001', [expect_broken_for(10037, ['prof'])], compile_and_run,
      ['-fno-state-hack -fno-full-laziness']) # Note [consistent stacks]
 
-test('scc002', [req_profiling,
-                extra_ways(['prof']), only_ways(prof_ways)],
-     compile_and_run,
-     [''])
+test('scc002', [], compile_and_run, [''])
 
-test('scc003', [req_profiling,
-                extra_ways(['prof']), only_ways(prof_ways)],
-     compile_and_run,
+test('scc003', [], compile_and_run,
      ['-fno-state-hack']) # Note [consistent stacks]
 
-test('T5654', [req_profiling,
-                extra_ways(['prof']), only_ways(prof_ways),
-                expect_broken(5654)],
-     compile_and_run,
-     [''])
+test('T5654', [expect_broken(5654)], compile_and_run, [''])
 
-test('T5654b-O0', [req_profiling,
-                extra_ways(['prof']), only_ways(['prof'])],
-     compile_and_run,
-     [''])
+test('T5654b-O0', [only_ways(['prof'])], compile_and_run, [''])
 
-test('T5654b-O1', [req_profiling,
-                only_ways(['profasm'])],
-     compile_and_run,
-     [''])
+test('T5654b-O1', [only_ways(['profasm'])], compile_and_run, [''])
 
-test('scc005', [req_profiling,
-                extra_ways(['prof']), only_ways(prof_ways)],
-     compile_and_run,
-     [''])
+test('scc005', [], compile_and_run, [''])
 
-test('T5314',
-     [ only_ways(prof_ways),
-       extra_ways(extra_prof_ways),
-       req_profiling ],
-     compile_and_run,
-     [''])
+test('T5314', [extra_ways(extra_prof_ways)], compile_and_run, [''])
 
-test('T680',
-     [ req_profiling, extra_ways(['prof']), only_ways(prof_ways) ],
-     compile_and_run,
+test('T680', [], compile_and_run,
      ['-fno-full-laziness']) # Note [consistent stacks]
 
-test('T2552',
-     [ req_profiling, extra_ways(['prof']), only_ways(prof_ways),
-       expect_broken_for(10037, opt_ways)],
-     compile_and_run,
-     [''])
+test('T2552', [expect_broken_for(10037, opt_ways)], compile_and_run, [''])
 
-test('T949',
-     [ req_profiling, extra_ways(extra_prof_ways), only_ways(prof_ways) ],
-     compile_and_run,
-     [''])
+test('T949', [extra_ways(extra_prof_ways)], compile_and_run, [''])
 
-test('ioprof',
-     [ req_profiling, extra_ways(['prof']), only_ways(prof_ways),
-       expect_broken_for(10037,['prof']),
-        # The results for 'prof' are fine, but the ordering changes.
-        # We care more about getting the optimised results right, so ignoring
-        # this for now.
-       exit_code(1) ],
+# The results for 'prof' are fine, but the ordering changes.
+# We care more about getting the optimised results right, so ignoring
+# this for now.
+test('ioprof', [expect_broken_for(10037, ['prof']), exit_code(1)],
      compile_and_run,
      ['-fno-full-laziness -fno-state-hack']) # Note [consistent stacks]
 
 # These two examples are from the User's Guide:
 
-test('prof-doc-fib',
-     [ req_profiling, extra_ways(['prof']), only_ways(prof_ways) ],
-     compile_and_run,
-     [''])
+test('prof-doc-fib', [], compile_and_run, [''])
 
-test('prof-doc-last',
-     [ req_profiling, extra_ways(['prof']), only_ways(prof_ways) ],
-     compile_and_run,
-     ['-fno-full-laziness'])
+test('prof-doc-last', [], compile_and_run, ['-fno-full-laziness'])
 
-test('T5559', # unicode in cost centre names
-     [ req_profiling, extra_ways(['prof']), only_ways(prof_ways) ],
-     compile_and_run,
-     [''])
+# unicode in cost centre names
+test('T5559', [], compile_and_run, [''])
 
 # Note [consistent stacks]
 #  Certain optimisations can change the stacks we get out of the
@@ -126,26 +83,14 @@ test('T5559', # unicode in cost centre names
 #       -fno-state-hack
 #       -fno-full-laziness
 
-test('callstack001',
-     [ req_profiling, extra_ways(['prof']), only_ways(prof_ways),
-       expect_broken_for(10037,['prof'])],
+test('callstack001', [expect_broken_for(10037, ['prof'])],
      # unoptimised results are different w.r.t. CAF attribution
      compile_and_run, ['-fprof-auto-calls -fno-full-laziness -fno-state-hack'])
 
-test('callstack002',
-     [ req_profiling, extra_ways(['prof']), only_ways(prof_ways) ],
-     compile_and_run, ['-fprof-auto-calls -fno-full-laziness -fno-state-hack'])
+test('callstack002', [], compile_and_run,
+     ['-fprof-auto-calls -fno-full-laziness -fno-state-hack'])
 
 # Should not stack overflow with -prof -auto-all
-test('T5363',
-     [ req_profiling, extra_ways(['prof']), only_ways(prof_ways) ],
-     compile_and_run, [''])
+test('T5363', [], compile_and_run, [''])
 
-test('profinline001',
-    [ req_profiling, extra_ways(['prof']), only_ways(prof_ways) ],
-    compile_and_run, [''])
-
-test('T11489', [
-     req_profiling,
-     extra_clean(['T11489.prof', 'T11489.hp']),
-     ], run_command, ['$MAKE -s --no-print-directory T11489'])
+test('profinline001', [], compile_and_run, [''])
