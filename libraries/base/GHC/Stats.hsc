@@ -47,6 +47,7 @@ data GCStats = GCStats
     , numGcs :: !Int64 -- ^ Number of garbage collections performed
     , maxBytesUsed :: !Int64 -- ^ Maximum number of live bytes seen so far
     , numByteUsageSamples :: !Int64 -- ^ Number of byte usage samples taken
+
     -- | Sum of all byte usage samples, can be used with
     -- 'numByteUsageSamples' to calculate averages with
     -- arbitrary weighting (if you are sampling this record multiple
@@ -57,9 +58,11 @@ data GCStats = GCStats
     , currentBytesSlop :: !Int64 -- ^ Current number of bytes lost to slop
     , maxBytesSlop :: !Int64 -- ^ Maximum number of bytes lost to slop at any one time so far
     , peakMegabytesAllocated :: !Int64 -- ^ Maximum number of megabytes allocated
+
     -- | CPU time spent running mutator threads.  This does not include
     -- any profiling overhead or initialization.
     , mutatorCpuSeconds :: !Double
+
     -- | Wall clock time spent running mutator threads.  This does not
     -- include initialization.
     , mutatorWallSeconds :: !Double
@@ -67,11 +70,13 @@ data GCStats = GCStats
     , gcWallSeconds :: !Double -- ^ Wall clock time spent running GC
     , cpuSeconds :: !Double -- ^ Total CPU time elapsed since program start
     , wallSeconds :: !Double -- ^ Total wall clock time elapsed since start
+
     -- | Number of bytes copied during GC, minus space held by mutable
     -- lists held by the capabilities.  Can be used with
     -- 'parMaxBytesCopied' to determine how well parallel GC utilized
     -- all cores.
     , parTotBytesCopied :: !Int64
+
     -- | Sum of number of bytes copied each GC by the most active GC
     -- thread each GC.  The ratio of 'parTotBytesCopied' divided by
     -- 'parMaxBytesCopied' approaches 1 for a maximally sequential
