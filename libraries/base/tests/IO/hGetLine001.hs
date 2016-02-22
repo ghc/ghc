@@ -5,9 +5,9 @@ import System.IO
 -- one version of 'cat'
 main = do
   let loop h = do b <- hIsEOF h
-        	  if b then return ()
-		       else do l <- hGetLine h; putStrLn l; loop h
-  loop stdin 
+                  if b then return ()
+                       else do l <- hGetLine h; putStrLn l; loop h
+  loop stdin
 
   h <- openFile "hGetLine001.hs" ReadMode
 
