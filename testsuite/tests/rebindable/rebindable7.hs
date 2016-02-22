@@ -11,7 +11,7 @@ import GHC.Base hiding( Monad(..) )
 class Foo a where
   op :: a -> a
 
-data T a = MkT a 
+data T a = MkT a
 
 instance Foo Int where
   op x = x+1
@@ -32,7 +32,7 @@ t1 :: T Int
 t1 = MkT 4
 
 myt = do { x <- t1
-	 ; return x }
+         ; return x }
 
 main = case myt of
-	 MkT i -> Prelude.print i
+         MkT i -> Prelude.print i

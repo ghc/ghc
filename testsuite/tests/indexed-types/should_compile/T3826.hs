@@ -25,7 +25,7 @@ f t@(MkT x) = c x t
    [W] C alpha
    [W] E alpha ~ beta
    [W] alpha ~ T beta
-   [W] gamma ~ alpha   
+   [W] gamma ~ alpha
 
 --->                       beta = t_aqf  alpha = t_aqg
    alpha := T beta
@@ -34,7 +34,7 @@ f t@(MkT x) = c x t
    [W] E (T beta) ~ beta
 
 -->
-   [W] ufsk ~ beta      
+   [W] ufsk ~ beta
    [W] E (T beta) ~ ufsk
 
 --> (swap and subst)
@@ -44,7 +44,7 @@ f t@(MkT x) = c x t
 take a step   ax: E (T beta) ~ beta
 
 -->
-   [W] ufsk 
+   [W] ufsk
 --------------------------
  But what about this?
 --------------------------
@@ -53,7 +53,7 @@ axiom F [a] = F [a]
 
    x : F [a] ~ fsk
 step
-   ax : F [a] ~ F [a] 
+   ax : F [a] ~ F [a]
 flatten
    ax ; x : F [a] ~ fsk
    x = ax ; x       Oh dear!
