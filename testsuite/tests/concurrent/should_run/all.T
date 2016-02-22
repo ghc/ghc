@@ -208,7 +208,7 @@ test('conc038', only_ways(['threaded1','threaded2']), compile_and_run, [''])
 # Omit for GHCi, uses foreign export
 # Omit for the threaded ways, because in this case the main thread is allowed to 
 # complete, which causes the child thread to be interrupted.
-test('conc039', omit_ways(['ghci','threaded1','threaded2','profthreaded']), compile_and_run, [''])
+test('conc039', omit_ways(['ghci'] + threaded_ways), compile_and_run, [''])
 
 # Omit for GHCi, uses foreign export
 test('conc040', [exit_code(1), omit_ways(['ghci'])], compile_and_run, [''])

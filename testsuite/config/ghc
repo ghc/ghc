@@ -147,7 +147,7 @@ config.way_rts_flags = {
     'ghci-ext'         : [],
    }
 
-# Useful classes of ways that can be used with only_ways() and
+# Useful classes of ways that can be used with only_ways(), omit_ways() and
 # expect_broken_for().
 
 prof_ways     = [x[0] for x in config.way_flags('dummy_name').items()
