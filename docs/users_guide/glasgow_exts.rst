@@ -1771,72 +1771,6 @@ data constructor in an import or export list with the keyword
 ``pattern``, to allow the import or export of a data constructor without
 its parent type constructor (see :ref:`patsyn-impexp`).
 
-.. _visible-type-application:
-
-Visible type application
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. ghc-flag:: -XTypeApplications
-
-    :implies: :ghc-flag:`-XAllowAmbiguousTypes`
-    :since: 8.0.1
-
-    Allow the use of type application syntax.
-
-The :ghc-flag:`-XTypeApplications` extension allows you to use
-*visible type application* in expressions. Here is an
-example: ``show (read @Int "5")``. The ``@Int``
-is the visible type application; it specifies the value of the type variable
-in ``read``'s type.
-
-A visible type application is preceded with an ``@``
-sign. (To disambiguate the syntax, the ``@`` must be
-preceded with a non-identifier letter, usually a space. For example,
-``read@Int 5`` would not parse.) It can be used whenever
-the full polymorphic type of the function is known. If the function
-is an identifier (the common case), its type is considered known only when
-the identifier has been given a type signature. If the identifier does
-not have a type signature, visible type application cannot be used.
-
-Here are the details:
-
-- If an identifier's type signature does not include an
-  explicit ``forall``, the type variable arguments appear
-  in the left-to-right order in which the variables appear in the type.
-  So, ``foo :: Monad m => a b -> m (a c)``
-  will have its type variables
-  ordered as ``m, a, b, c``.
-
-- If any of the variables depend on other variables (that is, if some
-  of the variables are *kind* variables), the variables are reordered
-  so that kind variables come before type variables, preserving the
-  left-to-right order as much as possible. That is, GHC performs a
-  stable topological sort on the variables.
-
-  For example: if we have ``bar :: Proxy (a :: (j, k)) -> b``, then
-  the variables are ordered ``j``, ``k``, ``a``, ``b``.
-
-- Class methods' type arguments include the class type
-  variables, followed by any variables an individual method is polymorphic
-  in. So, ``class Monad m where return :: a -> m a`` means
-  that ``return``'s type arguments are ``m, a``.
-
-- With the :ghc-flag:`-XRankNTypes` extension
-  (:ref:`universal-quantification`), it is possible to declare
-  type arguments somewhere other than the beginning of a type. For example,
-  we can have ``pair :: forall a. a -> forall b. b -> (a, b)``
-  and then say ``pair @Bool True @Char`` which would have
-  type ``Char -> (Bool, Char)``.
-
-- Partial type signatures (:ref:`partial-type-signatures`)
-  work nicely with visible type
-  application. If you want to specify only the second type argument to
-  ``wurble``, then you can say ``wurble @_ @Int``.
-  The first argument is a wildcard, just like in a partial type signature.
-  However, if used in a visible type application, it is *not*
-  necessary to specify :ghc-flag:`-XPartialTypeSignatures` and your
-  code will not generate a warning informing you of the omitted type.
-
 .. _syntax-stolen:
 
 Summary of stolen syntax
@@ -8309,6 +8243,83 @@ The flag :ghc-flag:`-XMonoLocalBinds` is implied by :ghc-flag:`-XTypeFamilies`
 and :ghc-flag:`-XGADTs`. You can switch it off again with
 :ghc-flag:`-XNoMonoLocalBinds <-XMonoLocalBinds>` but type inference becomes
 less predicatable if you do so. (Read the papers!)
+
+.. _visible-type-application:
+
+Visible type application
+========================
+
+.. ghc-flag:: -XTypeApplications
+
+    :implies: :ghc-flag:`-XAllowAmbiguousTypes`
+    :since: 8.0.1
+
+    Allow the use of type application syntax.
+
+The :ghc-flag:`-XTypeApplications` extension allows you to use
+*visible type application* in expressions. Here is an
+example: ``show (read @Int "5")``. The ``@Int``
+is the visible type application; it specifies the value of the type variable
+in ``read``'s type.
+
+A visible type application is preceded with an ``@``
+sign. (To disambiguate the syntax, the ``@`` must be
+preceded with a non-identifier letter, usually a space. For example,
+``read@Int 5`` would not parse.) It can be used whenever
+the full polymorphic type of the function is known. If the function
+is an identifier (the common case), its type is considered known only when
+the identifier has been given a type signature. If the identifier does
+not have a type signature, visible type application cannot be used.
+
+Here are the details:
+
+- If an identifier's type signature does not include an
+  explicit ``forall``, the type variable arguments appear
+  in the left-to-right order in which the variables appear in the type.
+  So, ``foo :: Monad m => a b -> m (a c)``
+  will have its type variables
+  ordered as ``m, a, b, c``.
+
+- If any of the variables depend on other variables (that is, if some
+  of the variables are *kind* variables), the variables are reordered
+  so that kind variables come before type variables, preserving the
+  left-to-right order as much as possible. That is, GHC performs a
+  stable topological sort on the variables.
+
+  For example: if we have ``bar :: Proxy (a :: (j, k)) -> b``, then
+  the variables are ordered ``j``, ``k``, ``a``, ``b``.
+
+- Visible type application is available to instantiate only user-specified
+  type variables. This means that in ``data Proxy a = Proxy``, the unmentioned
+  kind variable used in ``a``'s kind is *not* available for visible type
+  application.
+
+- Class methods' type arguments include the class type
+  variables, followed by any variables an individual method is polymorphic
+  in. So, ``class Monad m where return :: a -> m a`` means
+  that ``return``'s type arguments are ``m, a``.
+
+- With the :ghc-flag:`-XRankNTypes` extension
+  (:ref:`universal-quantification`), it is possible to declare
+  type arguments somewhere other than the beginning of a type. For example,
+  we can have ``pair :: forall a. a -> forall b. b -> (a, b)``
+  and then say ``pair @Bool True @Char`` which would have
+  type ``Char -> (Bool, Char)``.
+
+- Partial type signatures (:ref:`partial-type-signatures`)
+  work nicely with visible type
+  application. If you want to specify only the second type argument to
+  ``wurble``, then you can say ``wurble @_ @Int``.
+  The first argument is a wildcard, just like in a partial type signature.
+  However, if used in a visible type application, it is *not*
+  necessary to specify :ghc-flag:`-XPartialTypeSignatures` and your
+  code will not generate a warning informing you of the omitted type.
+
+- When printing types with :ghc-flag:`-fprint-explicit-foralls` enabled,
+  type variables not available for visible type application are printed
+  in braces. Thus, if you write ``myLength = length`` without a type
+  signature, ``myLength``'s inferred type will be
+  ``forall {f} {a}. Foldable f => f a -> Int``.
 
 .. _implicit-parameters:
 
