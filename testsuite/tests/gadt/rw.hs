@@ -11,19 +11,19 @@ data T a where
 
 writeInt:: T a -> IORef a -> IO ()
 writeInt v ref = case v of
-		   ~(Li x) -> writeIORef ref (1::Int)
+                   ~(Li x) -> writeIORef ref (1::Int)
 
 readBool:: T a -> IORef a -> IO ()
 readBool v ref = case v of
-		   ~(Lb x) -> 
-		       readIORef ref >>= (print . not)
+                   ~(Lb x) ->
+                       readIORef ref >>= (print . not)
 
 tt::T a -> IO ()
 tt v = case v of
          ~(Li x) ->  print "OK"
 
 main = do
-	tt (La undefined)
-	ref <- newIORef undefined
-	writeInt (La undefined) ref
-	readBool (La undefined) ref
+        tt (La undefined)
+        ref <- newIORef undefined
+        writeInt (La undefined) ref
+        readBool (La undefined) ref

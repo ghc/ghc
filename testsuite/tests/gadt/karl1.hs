@@ -1,14 +1,14 @@
 {-# LANGUAGE GADTs, KindSignatures #-}
 
 -- See Trac #301
--- This particular one doesn't use GADTs per se, 
--- but it does use dictionaries in constructors 
+-- This particular one doesn't use GADTs per se,
+-- but it does use dictionaries in constructors
 
 module Expr1 where
 
-data Expr :: * -> * where	-- Not a GADT at all
+data Expr :: * -> * where       -- Not a GADT at all
   Const :: Show a => a -> Expr a
-		-- Note the Show constraint here
+                -- Note the Show constraint here
   Var   :: Var a -> Expr a
 
 newtype Var a = V String
@@ -66,7 +66,7 @@ showsExpr :: Expr a -> ShowS
 showsExpr (Const c) = shows c
 showsExpr (Var v) = shows v
 
-{- 
+{-
 
 We used to get a complaint about the |Const| alternative (then line
 63) that documents that the constraint in the type of |Const| must

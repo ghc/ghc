@@ -12,6 +12,6 @@ data MBloom s a = MB {
     , bitArrayMB :: {-# UNPACK #-} !(STUArray s Int Int)
     }
 
-f a b c = case maskMB (MB a b c) of 
-	    3 -> True
-	    _ -> False
+f a b c = case maskMB (MB a b c) of
+            3 -> True
+            _ -> False

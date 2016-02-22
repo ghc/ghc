@@ -8,11 +8,11 @@ import Foreign.Ptr
 import Data.IORef
 
 main = do
-  ms <- replicateM 100 $ do putStrLn "." 
-       		      	    m <- newEmptyMVar 
-			    forkOS (thread >> putMVar m ())
-			    thread
-			    return m
+  ms <- replicateM 100 $ do putStrLn "."
+                            m <- newEmptyMVar
+                            forkOS (thread >> putMVar m ())
+                            thread
+                            return m
   mapM takeMVar ms
 
 thread = do var <- newIORef 0
