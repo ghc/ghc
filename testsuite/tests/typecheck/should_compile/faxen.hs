@@ -19,15 +19,15 @@ instance HasEmpty (Maybe a) where
   isEmpty Nothing  = True
   isEmpty (Just x) = False
 
-test1 y 
+test1 y
   =  (null y)
   || (let f :: forall d. d -> Bool
-	  f x = isEmpty (y >> return x)
+          f x = isEmpty (y >> return x)
       in f y)
 
-test2 y 
+test2 y
   =  (let f :: forall d. d -> Bool
-	  f x = isEmpty (y >> return x)
+          f x = isEmpty (y >> return x)
       in f y)
   || (null y)
 

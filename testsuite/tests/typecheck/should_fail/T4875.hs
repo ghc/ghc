@@ -1,4 +1,4 @@
- {-# OPTIONS  -XMultiParamTypeClasses  -XFunctionalDependencies  -XFlexibleInstances #-}  
+ {-# OPTIONS  -XMultiParamTypeClasses  -XFunctionalDependencies  -XFlexibleInstances #-}
 module HaskellBug where
 
 data Relation c -- The basic Relation

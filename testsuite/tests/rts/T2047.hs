@@ -52,7 +52,7 @@ type Edge = (Cell,Cell)
 
 mkEdge cell1 cell2 = sortPair (cell1,cell2)
 
-cellsAround area = nubSorted $ sort $ 
+cellsAround area = nubSorted $ sort $
     do
         cell <- area
         dir <- directions
@@ -60,7 +60,7 @@ cellsAround area = nubSorted $ sort $
         guard $ cell2 `notElem` area
         return $ cell2
 
-increaseAreas areas = nubSorted $ sort $ 
+increaseAreas areas = nubSorted $ sort $
     do
         area <- areas
         cell2 <- cellsAround area
@@ -72,7 +72,7 @@ getAreasRaw n = areas
         areas = increaseAreas $ getAreas $ n - 1
 getAreas = cachedUsingList getAreasRaw
 
-getEdges area = mapPair12 (map snd) $ partition fst $ nubSorted $ sort $ 
+getEdges area = mapPair12 (map snd) $ partition fst $ nubSorted $ sort $
     do
         cell <- area
         dir <- directions
@@ -81,15 +81,15 @@ getEdges area = mapPair12 (map snd) $ partition fst $ nubSorted $ sort $
         return (isInternal,mkEdge cell cell2)
 
 type SizedArea = (Int,((Set.Set Cell,Set.Set Cell),(Set.Set Edge,Set.Set Edge)))
-getExtendedAreas n = 
+getExtendedAreas n =
     do
         area <- getAreas n
         let areaAround = cellsAround area
         let edgeInfo = getEdges area
-        return ((Set.fromList area,Set.fromList areaAround),mapPair12 Set.fromList edgeInfo)        
+        return ((Set.fromList area,Set.fromList areaAround),mapPair12 Set.fromList edgeInfo)
 
 getSizedAreasThrough :: Int -> [SizedArea]
-getSizedAreasThrough n = 
+getSizedAreasThrough n =
     do
         n' <- [1 .. n]
         extendedArea <- getExtendedAreas n'

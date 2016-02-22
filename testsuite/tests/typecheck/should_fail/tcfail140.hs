@@ -1,4 +1,4 @@
--- GHC 6.4 gave pretty horrible error messages 
+-- GHC 6.4 gave pretty horrible error messages
 -- for some of these examples
 -- c.f. SourceForge [ ghc-Bugs-1231273 ] confusing error
 
@@ -17,6 +17,6 @@ t = ((\Just x -> x) :: Maybe a -> a) (Just 1)
 
 g :: Int -> Int
 g x y = True
-  
+
 
 

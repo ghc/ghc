@@ -9,4 +9,4 @@ class C t where
     ttt :: TF t -> t
 
 b :: (C t, ?x :: TF t) => t
-b = ttt ?x 
+b = ttt ?x
