@@ -15,6 +15,7 @@ test('T11489', [req_profiling, extra_clean(['T11489.prof', 'T11489.hp'])],
 setTestOpts(req_profiling)
 setTestOpts(extra_ways(['prof']))
 setTestOpts(only_ways(prof_ways))
+setTestOpts(keep_prof_callstacks)
 
 extra_prof_ways = ['prof', 'prof_hc_hb', 'prof_hb', 'prof_hd', 'prof_hy', 'prof_hr']
 

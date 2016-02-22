@@ -494,6 +494,13 @@ def normalise_drive_letter(name, opts):
     # Windows only. Change D:\\ to C:\\.
     _normalise_fun(name, opts, lambda str: re.sub(r'[A-Z]:\\', r'C:\\', str))
 
+def keep_prof_callstacks(name, opts):
+    """Keep profiling callstacks.
+
+    Use together with `only_ways(prof_ways)`.
+    """
+    opts.keep_prof_callstacks = True
+
 def join_normalisers(*a):
     """
     Compose functions, flattening sequences.
@@ -1669,15 +1676,21 @@ def normalise_whitespace( str ):
 
 callSite_re = re.compile(r', called at (.+):[\d]+:[\d]+ in [\w\-\.]+:')
 
-def normalise_callstacks(str):
+def normalise_callstacks(s):
+    opts = getTestOpts()
     def repl(matches):
         location = matches.group(1)
         location = normalise_slashes_(location)
         return ', called at {0}:<line>:<column> in <package-id>:'.format(location)
     # Ignore line number differences in call stacks (#10834).
-    str1 = re.sub(callSite_re, repl, str)
+    s = re.sub(callSite_re, repl, s)
     # Ignore the change in how we identify implicit call-stacks
-    return str1.replace('from ImplicitParams', 'from HasCallStack')
+    s = s.replace('from ImplicitParams', 'from HasCallStack')
+    if not opts.keep_prof_callstacks:
+        # Don't output prof callstacks. Test output should be
+        # independent from the WAY we run the test.
+        s = re.sub(r'CallStack \(from -prof\):(\n  .*)*\n?', '', s)
+    return s
 
 tyCon_re = re.compile(r'TyCon\s*\d+L?\#\#\s*\d+L?\#\#\s*', flags=re.MULTILINE)
 
