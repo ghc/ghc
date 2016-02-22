@@ -50,7 +50,7 @@ import TyCon
 import TysWiredIn
 import Var
 import VarEnv
-import VarSet
+import NameEnv
 import ErrUtils
 import DynFlags
 import BasicTypes
@@ -1449,52 +1449,27 @@ checkTauTvUpdate dflags origin t_or_k tv ty
   | otherwise
   = do { ty   <- zonkTcType ty
        ; co_k <- uType kind_origin KindLevel (typeKind ty) (tyVarKind tv)
-       ; if | defer_me ty ->  -- Quick test
-                -- Failed quick test so try harder
-                case occurCheckExpand dflags tv ty of
-                   OC_OK ty2 | defer_me ty2 -> return Nothing
-                             | otherwise    -> return (Just (ty2, co_k))
-                   _                        -> return Nothing
-            | otherwise   -> return (Just (ty, co_k)) }
+       ; return $ case occurCheckExpand dflags tv ty of
+           OC_OK ty2 | type_fam_free ty2 -> Just (ty2, co_k)
+           _                             -> Nothing }
+
   where
     kind_origin   = KindEqOrigin (mkTyVarTy tv) (Just ty) origin (Just t_or_k)
     details       = tcTyVarDetails tv
     info          = mtv_info details
-    impredicative = canUnifyWithPolyType dflags details
 
-    defer_me :: TcType -> Bool
-    -- Checks for (a) occurrence of tv
-    --            (b) type family applications
-    --            (c) foralls
     -- See Note [Conservative unification check]
-    defer_me (LitTy {})        = False
-    defer_me (TyVarTy tv')     = tv == tv'
-    defer_me (TyConApp tc tys) = isTypeFamilyTyCon tc || any defer_me tys
-                                 || not (impredicative || isTauTyCon tc)
-    defer_me (ForAllTy bndr t) = defer_me (binderType bndr) || defer_me t
-                                 || (isNamedBinder bndr && not impredicative)
-    defer_me (AppTy fun arg)   = defer_me fun || defer_me arg
-    defer_me (CastTy ty co)    = defer_me ty || defer_me_co co
-    defer_me (CoercionTy co)   = defer_me_co co
-
-      -- We don't really care if there are type families in a coercion,
-      -- but we still can't have an occurs-check failure
-    defer_me_co co = tv `elemVarSet` tyCoVarsOfCo co
+    type_fam_free :: TcType -> Bool
+    type_fam_free = not . any isTypeFamilyTyCon . nameEnvElts . tyConsOfType
 
 {-
 Note [Conservative unification check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When unifying (tv ~ rhs), w try to avoid creating deferred constraints
-only for efficiency.  However, we do not unify (the defer_me check) if
-  a) There's an occurs check (tv is in fvs(rhs))
+only for efficiency.  However, we do not unify if
+  a) There's an occurs check (tv is in fvs(rhs)) (established by occurCheckExpand)
+     (see Note [Type synonyms and the occur check])
   b) There's a type-function call in 'rhs'
-
-If we fail defer_me we use occurCheckExpand to try to make it pass,
-(see Note [Type synonyms and the occur check]) and then use defer_me
-again to check.  Example: Trac #4917)
-       a ~ Const a b
-where type Const a b = a.  We can solve this immediately, even when
-'a' is a skolem, just by expanding the synonym.
 
 We always defer type-function calls, even if it's be perfectly safe to
 unify, eg (a ~ F [b]).  Reason: this ensures that the constraint
