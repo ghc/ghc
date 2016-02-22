@@ -3,7 +3,7 @@
 
 -- Trac #1783
 -- Like Trac #1781 you could argue that this one should succeed
--- but we stick with the old behaviour for now.  When we do 
+-- but we stick with the old behaviour for now.  When we do
 -- fundeps properly it'll probably start to work
 
 module ShouldCompile where

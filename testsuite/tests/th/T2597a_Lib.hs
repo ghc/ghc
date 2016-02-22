@@ -7,6 +7,6 @@ import Language.Haskell.TH
 
 mkBug :: ExpQ
 mkBug = return $ CompE [BindS (VarP $ mkName "p") (ListE []), NoBindS
-			 (VarE $ mkName "p")]
+                         (VarE $ mkName "p")]
 
 

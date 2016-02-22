@@ -1,4 +1,4 @@
--- Checks that the correct type is used checking the using clause of 
+-- Checks that the correct type is used checking the using clause of
 -- the group when a by clause is present
 
 {-# OPTIONS_GHC -XTransformListComp #-}

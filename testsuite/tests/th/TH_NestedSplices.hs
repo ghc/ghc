@@ -3,13 +3,13 @@ module TH_NestedSplices where
 
 import Language.Haskell.TH
 
-import TH_NestedSplices_Lib 
+import TH_NestedSplices_Lib
 -- This import brings in
 --   spliceExpr :: String -> Q Exp -> Q Exp
 --   declareFun :: String -> Q [Dec]
 
 -- Top level splice without $
-declareFun "a" 
+declareFun "a"
 
 -- Splice inside splice
 $(declareFun $(stringE "b"))
