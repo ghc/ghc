@@ -22,7 +22,7 @@ blockToNodeList ::
     Block n e x -> A e x n
 
 type A e x n = (MaybeC e (n C O), MaybeC x (n O C))
-blockToNodeList b = foldBlockNodesF (f, l) b z 
+blockToNodeList b = foldBlockNodesF (f, l) b z
   where
     z :: EitherCO e (EitherCO e (A C O n) (A O O n)) (EitherCO e (A C O n) (A O O n))
     z = undefined

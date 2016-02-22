@@ -5,19 +5,19 @@ data family Foo k :: * -> *
 
 ------------- Generalised newtype deriving of user class -----------
 class Bar f where
-	bar :: f a -> Int
+        bar :: f a -> Int
         woo :: f a -> f a
 
 instance Bar Maybe where
-	bar Nothing = 0
-	bar Just{} = 1
+        bar Nothing = 0
+        bar Just{} = 1
         woo x = x
 
 -- Deriving clause
 newtype instance Foo Int a = FooInt (Maybe a) deriving (Bar)
 
 -- Standalone deriving
-newtype instance Foo Char a = FooChar (Maybe a) 
+newtype instance Foo Char a = FooChar (Maybe a)
 deriving instance Bar (Foo Char)
 
 {-

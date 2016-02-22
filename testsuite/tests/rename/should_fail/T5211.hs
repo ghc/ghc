@@ -2,7 +2,7 @@
 module RedundantImport where
 
 -- this import is redundant, but GHC does not spot it
-import qualified Foreign.Storable 
+import qualified Foreign.Storable
 
 import Foreign.Storable (Storable, sizeOf, alignment, peek, poke, )
 import Foreign.Ptr (castPtr, )
