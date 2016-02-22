@@ -1179,7 +1179,20 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
                            hang (text "Occurs check: cannot construct the infinite" <+> what <> colon)
                               2 (sep [ppr ty1, char '~', ppr ty2])
              extra2 = important $ mkEqInfoMsg ct ty1 ty2
-       ; mkErrorMsgFromCt ctxt ct $ mconcat [occCheckMsg, extra2, report] }
+
+             interesting_tyvars
+               = filter (not . isEmptyVarSet . tyCoVarsOfType . tyVarKind) $
+                 filter isTyVar $
+                 varSetElems $
+                 tyCoVarsOfType ty1 `unionVarSet` tyCoVarsOfType ty2
+             extra3 = relevant_bindings $
+                      ppWhen (not (null interesting_tyvars)) $
+                      hang (text "Type variable kinds:") 2 $
+                      vcat (map (tyvar_binding . tidyTyVarOcc (cec_tidy ctxt))
+                                interesting_tyvars)
+
+             tyvar_binding tv = ppr tv <+> dcolon <+> ppr (tyVarKind tv)
+       ; mkErrorMsgFromCt ctxt ct $ mconcat [occCheckMsg, extra2, extra3, report] }
 
   | OC_Forall <- occ_check_expand
   = do { let msg = vcat [ text "Cannot instantiate unification variable"

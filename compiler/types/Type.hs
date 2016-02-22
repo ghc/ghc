@@ -127,6 +127,7 @@ module Type (
 
         -- * Well-scoped lists of variables
         varSetElemsWellScoped, toposortTyVars, tyCoVarsOfTypeWellScoped,
+        tyCoVarsOfTypesWellScoped,
 
         -- * Type comparison
         eqType, eqTypeX, eqTypes, cmpType, cmpTypes, cmpTypeX, cmpTypesX, cmpTc,
@@ -1872,6 +1873,10 @@ varSetElemsWellScoped = toposortTyVars . varSetElems
 tyCoVarsOfTypeWellScoped :: Type -> [TyVar]
 tyCoVarsOfTypeWellScoped = toposortTyVars . tyCoVarsOfTypeList
 
+-- | Get the free vars of types in scoped order
+tyCoVarsOfTypesWellScoped :: [Type] -> [TyVar]
+tyCoVarsOfTypesWellScoped = toposortTyVars . tyCoVarsOfTypesList
+
 {-
 ************************************************************************
 *                                                                      *
@@ -2271,7 +2276,9 @@ tyConsOfType ty
      go_prov (PhantomProv co)    = go_co co
      go_prov (ProofIrrelProv co) = go_co co
      go_prov (PluginProv _)      = emptyNameEnv
-     go_prov (HoleProv h)        = pprPanic "tyConsOfType hit a hole" (ppr h)
+     go_prov (HoleProv _)        = emptyNameEnv
+        -- this last case can happen from the tyConsOfType used from
+        -- checkTauTvUpdate
 
      go_s tys     = foldr (plusNameEnv . go)     emptyNameEnv tys
      go_cos cos   = foldr (plusNameEnv . go_co)  emptyNameEnv cos

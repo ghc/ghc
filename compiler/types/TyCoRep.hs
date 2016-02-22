@@ -126,6 +126,7 @@ module TyCoRep (
 import {-# SOURCE #-} DataCon( dataConTyCon, dataConFullSig
                               , DataCon, eqSpecTyVar )
 import {-# SOURCE #-} Type( isPredTy, isCoercionTy, mkAppTy
+                          , tyCoVarsOfTypesWellScoped, varSetElemsWellScoped
                           , partitionInvisibles, coreView, typeKind )
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
@@ -2867,7 +2868,7 @@ tidyFreeTyCoVars :: TidyEnv -> TyCoVarSet -> TidyEnv
 -- ^ Add the free 'TyVar's to the env in tidy form,
 -- so that we can tidy the type they are free in
 tidyFreeTyCoVars (full_occ_env, var_env) tyvars
-  = fst (tidyOpenTyCoVars (full_occ_env, var_env) (varSetElems tyvars))
+  = fst (tidyOpenTyCoVars (full_occ_env, var_env) (varSetElemsWellScoped tyvars))
 
         ---------------
 tidyOpenTyCoVars :: TidyEnv -> [TyCoVar] -> (TidyEnv, [TyCoVar])
@@ -2885,9 +2886,9 @@ tidyOpenTyCoVar env@(_, subst) tyvar
 
 ---------------
 tidyTyVarOcc :: TidyEnv -> TyVar -> TyVar
-tidyTyVarOcc (_, subst) tv
+tidyTyVarOcc env@(_, subst) tv
   = case lookupVarEnv subst tv of
-        Nothing  -> tv
+        Nothing  -> updateTyVarKind (tidyType env) tv
         Just tv' -> tv'
 
 ---------------
@@ -2913,19 +2914,21 @@ tidyType env (CoercionTy co)      = CoercionTy $! (tidyCo env co)
 ---------------
 -- | Grabs the free type variables, tidies them
 -- and then uses 'tidyType' to work over the type itself
-tidyOpenType :: TidyEnv -> Type -> (TidyEnv, Type)
-tidyOpenType env ty
-  = (env', tidyType (trimmed_occ_env, var_env) ty)
+tidyOpenTypes :: TidyEnv -> [Type] -> (TidyEnv, [Type])
+tidyOpenTypes env tys
+  = (env', tidyTypes (trimmed_occ_env, var_env) tys)
   where
-    (env'@(_, var_env), tvs') = tidyOpenTyCoVars env (tyCoVarsOfTypeList ty)
+    (env'@(_, var_env), tvs') = tidyOpenTyCoVars env $
+                                tyCoVarsOfTypesWellScoped tys
     trimmed_occ_env = initTidyOccEnv (map getOccName tvs')
       -- The idea here was that we restrict the new TidyEnv to the
-      -- _free_ vars of the type, so that we don't gratuitously rename
-      -- the _bound_ variables of the type.
+      -- _free_ vars of the types, so that we don't gratuitously rename
+      -- the _bound_ variables of the types.
 
 ---------------
-tidyOpenTypes :: TidyEnv -> [Type] -> (TidyEnv, [Type])
-tidyOpenTypes env tys = mapAccumL tidyOpenType env tys
+tidyOpenType :: TidyEnv -> Type -> (TidyEnv, Type)
+tidyOpenType env ty = let (env', [ty']) = tidyOpenTypes env [ty] in
+                      (env', ty')
 
 ---------------
 -- | Calls 'tidyType' on a top-level type (i.e. with an empty tidying environment)
