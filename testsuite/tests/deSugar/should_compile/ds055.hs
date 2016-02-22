@@ -10,7 +10,7 @@ module Foo where
 
    data Item = forall a. (Data a) => Leaf Bool a
              | forall a. (Data a) => Branch Bool a Int Int
-	     deriving (Typeable)
+             deriving (Typeable)
 
 
    instance Data Item where

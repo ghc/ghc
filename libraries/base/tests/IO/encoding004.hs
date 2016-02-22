@@ -42,7 +42,7 @@ main = forM_ [ ("CP936",  2, "CP936",      Just "CP936-UTF8")  -- Representative
     let fp = "encoded-data" </> file <.> "txt"
     enc <- mkTextEncoding enc_name
     bs <- BS.readFile fp
-    
+
     -- In a DBCS you should never fail to encode truncated input for two consecutive truncation points,
     -- assuming that the input file is actually error free:
     testTruncations enc max_byte_length bs
