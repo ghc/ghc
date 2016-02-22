@@ -15,7 +15,7 @@ Reason: 'a' is inline (not pre/post unconditionally; just ordinary inlining)
 Then, since ($dm>>) has arity 3, the rhs of (>>) is a PAP, so the arg is
 floated out, past the big lambdas.
 
-See Note [Unsaturated functions] in SimplUtils 
+See Note [Unsaturated functions] in SimplUtils
 
 ------------------------------------------------------------
 a_s9f{v} [lid] =
