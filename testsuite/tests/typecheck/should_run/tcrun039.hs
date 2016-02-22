@@ -16,7 +16,7 @@ data GADT a where
 
 g :: forall b. Read b => GADT b -> String -> b
 g (MkG n) s = -- Here we know Read [b]
-	      n : (read s)
+              n : (read s)
 
 main = do print (f (MkT (3::Int)) "4")
           print (g (MkG (3::Int)) "[4,5]")
