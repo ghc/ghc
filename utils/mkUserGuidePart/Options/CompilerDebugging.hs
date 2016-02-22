@@ -55,7 +55,8 @@ compilerDebuggingOptions =
          , flagType = DynamicFlag
          }
   , flag { flagName = "-ddump-llvm"
-         , flagDescription = "Dump LLVM intermediate code"
+         , flagDescription = "Dump LLVM intermediate code. "++
+           "Implies :ghc-flag:`-fllvm`."
          , flagType = DynamicFlag
          }
   , flag { flagName = "-ddump-occur-anal"

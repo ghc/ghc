@@ -144,6 +144,8 @@ Dumping out compiler intermediate structures
 
     .. ghc-flag:: -ddump-llvm
 
+        :implies: :ghc-flag:`-fllvm`
+
         LLVM code from the :ref:`LLVM code generator <llvm-code-gen>`
 
     .. ghc-flag:: -ddump-bcos
