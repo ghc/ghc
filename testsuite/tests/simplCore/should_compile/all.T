@@ -166,7 +166,7 @@ test('T7796',
      extra_clean(['T7796.prep']),
      run_command,
      ['$MAKE -s --no-print-directory T7796'])
-test('T5550', normal, compile, [''])
+test('T5550', omit_ways(prof_ways), compile, [''])
 test('T7865', normal, run_command, ['$MAKE -s --no-print-directory T7865'])
 test('T7785', only_ways(['optasm']), compile, ['-ddump-rules'])
 test('T7702', 

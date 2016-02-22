@@ -11,7 +11,7 @@ test('annrun01',
                     'annrun01.hi', 'annrun01.o',
                     'Config.hs', 'Config.hi', 'Config.o']),
       pre_cmd('$MAKE -s --no-print-directory config'),
-      omit_ways(['profasm','profthreaded', 'dyn'])],
+      omit_ways(['dyn'] + prof_ways)],
       multimod_compile_and_run,
       ['annrun01', '-package ghc ' + config.ghc_th_way_flags]
     )
