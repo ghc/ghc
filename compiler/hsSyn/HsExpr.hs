@@ -9,6 +9,7 @@
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE ExistentialQuantification #-}
 
 -- | Abstract Haskell syntax for expressions.
 module HsExpr where
@@ -202,6 +203,16 @@ data HsExpr id
        -- For details on above see note [Api annotations] in ApiAnnotation
 
   | HsApp     (LHsExpr id) (LHsExpr id) -- ^ Application
+
+  | HsAppType (LHsExpr id) (LHsWcType id) -- ^ Visible type application
+       --
+       -- Explicit type argument; e.g  f @Int x y
+       -- NB: Has wildcards, but no implicit quantification
+       --
+       -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt',
+
+  | HsAppTypeOut (LHsExpr id) (LHsWcType Name) -- just for pretty-printing
+
 
   -- | Operator applications:
   -- NB Bracketed ops such as (+) come out as Vars.
@@ -545,14 +556,6 @@ data HsExpr id
   -- For details on above see note [Api annotations] in ApiAnnotation
   | ELazyPat    (LHsExpr id) -- ~ pattern
 
-  -- | Use for type application in expressions.
-  -- 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt'
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsType      (LHsWcType id) -- Explicit type argument; e.g  f @Int x y
-                               -- NB: Has wildcards, but no implicit quant.
-
-  | HsTypeOut   (LHsWcType Name)  -- just for pretty-printing
 
   ---------------------------------------
   -- Finally, HsWrap appears only in typechecker output
@@ -663,10 +666,12 @@ isQuietHsExpr :: HsExpr id -> Bool
 -- Parentheses do display something, but it gives little info and
 -- if we go deeper when we go inside them then we get ugly things
 -- like (...)
-isQuietHsExpr (HsPar _) = True
+isQuietHsExpr (HsPar _)          = True
 -- applications don't display anything themselves
-isQuietHsExpr (HsApp _ _) = True
-isQuietHsExpr (OpApp _ _ _ _) = True
+isQuietHsExpr (HsApp _ _)        = True
+isQuietHsExpr (HsAppType _ _)    = True
+isQuietHsExpr (HsAppTypeOut _ _) = True
+isQuietHsExpr (OpApp _ _ _ _)    = True
 isQuietHsExpr _ = False
 
 pprBinds :: (OutputableBndr idL, OutputableBndr idR)
@@ -689,12 +694,9 @@ ppr_expr (HsPar e)        = parens (ppr_lexpr e)
 ppr_expr (HsCoreAnn _ (StringLiteral _ s) e)
   = vcat [text "HsCoreAnn" <+> ftext s, ppr_lexpr e]
 
-ppr_expr (HsApp e1 e2)
-  = let (fun, args) = collect_args e1 [e2] in
-    hang (ppr_lexpr fun) 2 (sep (map pprParendLExpr args))
-  where
-    collect_args (L _ (HsApp fun arg)) args = collect_args fun (arg:args)
-    collect_args fun args = (fun, args)
+ppr_expr e@(HsApp {})        = ppr_apps e []
+ppr_expr e@(HsAppType {})    = ppr_apps e []
+ppr_expr e@(HsAppTypeOut {}) = ppr_apps e []
 
 ppr_expr (OpApp e1 op _ e2)
   = case unLoc op of
@@ -815,11 +817,6 @@ ppr_expr (HsWrap co_fn e)
   = pprHsWrapper co_fn (\parens -> if parens then pprParendExpr e
                                              else pprExpr       e)
 
-ppr_expr (HsType (HsWC { hswc_body = ty }))
-  = char '@' <> pprParendHsType (unLoc ty)
-ppr_expr (HsTypeOut (HsWC { hswc_body = ty }))
-  = char '@' <> pprParendHsType (unLoc ty)
-
 ppr_expr (HsSpliceE s)         = pprSplice s
 ppr_expr (HsBracket b)         = pprHsBracket b
 ppr_expr (HsRnBracketOut e []) = ppr e
@@ -867,6 +864,26 @@ ppr_expr (HsArrForm op _ args)
   = hang (text "(|" <+> ppr_lexpr op)
          4 (sep (map (pprCmdArg.unLoc) args) <+> text "|)")
 ppr_expr (HsRecFld f) = ppr f
+
+-- We must tiresomely make the "id" parameter to the LHsWcType existential
+-- because it's different in the HsAppType case and the HsAppTypeOut case
+data LHsWcTypeX = forall id. OutputableBndr id => LHsWcTypeX (LHsWcType id)
+
+ppr_apps :: OutputableBndr id
+         => HsExpr id
+         -> [Either (LHsExpr id) LHsWcTypeX]
+         -> SDoc
+ppr_apps (HsApp (L _ fun) arg)        args
+  = ppr_apps fun (Left arg : args)
+ppr_apps (HsAppType (L _ fun) arg)    args
+  = ppr_apps fun (Right (LHsWcTypeX arg) : args)
+ppr_apps (HsAppTypeOut (L _ fun) arg) args
+  = ppr_apps fun (Right (LHsWcTypeX arg) : args)
+ppr_apps fun args = hang (ppr_expr fun) 2 (sep (map pp args))
+  where
+    pp (Left arg)                             = pprParendLExpr arg
+    pp (Right (LHsWcTypeX (HsWC { hswc_body = L _ arg })))
+      = char '@' <> pprParendHsType arg
 
 pprExternalSrcLoc :: (StringLiteral,(Int,Int),(Int,Int)) -> SDoc
 pprExternalSrcLoc (StringLiteral _ src,(n1,n2),(n3,n4))
@@ -923,8 +940,6 @@ hsExprNeedsParens (HsTcBracketOut {}) = False
 hsExprNeedsParens (HsDo sc _ _)
        | isListCompExpr sc            = False
 hsExprNeedsParens (HsRecFld{})        = False
-hsExprNeedsParens (HsType {})         = False
-hsExprNeedsParens (HsTypeOut {})      = False
 hsExprNeedsParens _ = True
 
 

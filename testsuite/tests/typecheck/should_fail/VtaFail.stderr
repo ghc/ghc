@@ -13,7 +13,7 @@ VtaFail.hs:12:26: error:
           answer_constraint_fail = addOne @Bool 5
 
 VtaFail.hs:14:17: error:
-    • Cannot apply expression of type ‘t0 -> t0’
+    • Cannot apply expression of type ‘t1 -> t1’
       to a visible type argument ‘Int’
     • In the expression: (\ x -> x) @Int 12
       In an equation for ‘answer_lambda’:

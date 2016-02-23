@@ -234,10 +234,11 @@ dsExpr (HsLamCase arg matches)
        ; return $ Lam arg_var $ bindNonRec discrim_var (Var arg_var) matching_code }
 
 dsExpr e@(HsApp fun arg)
+  = mkCoreAppDs (text "HsApp" <+> ppr e) <$> dsLExpr fun <*> dsLExpr arg
+
+dsExpr (HsAppTypeOut e _)
     -- ignore type arguments here; they're in the wrappers instead at this point
-  | isLHsTypeExpr arg = dsLExpr fun
-  | otherwise         = mkCoreAppDs (text "HsApp" <+> ppr e)
-                        <$> dsLExpr fun <*>  dsLExpr arg
+  = dsLExpr e
 
 
 {-
@@ -730,15 +731,9 @@ dsExpr (EWildPat      {})  = panic "dsExpr:EWildPat"
 dsExpr (EAsPat        {})  = panic "dsExpr:EAsPat"
 dsExpr (EViewPat      {})  = panic "dsExpr:EViewPat"
 dsExpr (ELazyPat      {})  = panic "dsExpr:ELazyPat"
-dsExpr (HsType        {})  = panic "dsExpr:HsType" -- removed by typechecker
+dsExpr (HsAppType     {})  = panic "dsExpr:HsAppType" -- removed by typechecker
 dsExpr (HsDo          {})  = panic "dsExpr:HsDo"
 dsExpr (HsRecFld      {})  = panic "dsExpr:HsRecFld"
-
--- Normally handled in HsApp case, but a GHC API user might try to desugar
--- an HsTypeOut, since it is an HsExpr in a typechecked module after all.
--- (Such as ghci itself, in #11456.) So improve the error message slightly.
-dsExpr (HsTypeOut {})
-  = panic "dsExpr: tried to desugar a naked type application argument (HsTypeOut)"
 
 ------------------------------
 dsSyntaxExpr :: SyntaxExpr Id -> [CoreExpr] -> DsM CoreExpr
