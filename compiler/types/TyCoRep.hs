@@ -2882,7 +2882,9 @@ tidyOpenTyCoVar :: TidyEnv -> TyCoVar -> (TidyEnv, TyCoVar)
 tidyOpenTyCoVar env@(_, subst) tyvar
   = case lookupVarEnv subst tyvar of
         Just tyvar' -> (env, tyvar')              -- Already substituted
-        Nothing     -> tidyTyCoVarBndr env tyvar  -- Treat it as a binder
+        Nothing     ->
+          let env' = tidyFreeTyCoVars env (tyCoVarsOfType (tyVarKind tyvar)) in
+          tidyTyCoVarBndr env' tyvar  -- Treat it as a binder
 
 ---------------
 tidyTyVarOcc :: TidyEnv -> TyVar -> TyVar

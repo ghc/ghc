@@ -84,6 +84,7 @@ module TcMType (
 import TyCoRep
 import TcType
 import Type
+import Kind
 import Coercion
 import Class
 import Var
@@ -936,15 +937,23 @@ zonkQuantifiedTyVarOrType tv
              else Left `liftM` skolemiseUnboundMetaTyVar tv vanillaSkolemTv
       _other -> pprPanic "zonkQuantifiedTyVar" (ppr tv) -- FlatSkol, RuntimeUnk
 
--- | Take an (unconstrained) meta tyvar and default it. Works only for
--- kind vars (of type *) and RuntimeRep vars (of type RuntimeRep).
+-- | Take an (unconstrained) meta tyvar and default it. Works only on
+-- vars of type RuntimeRep and of type *. For other kinds, it issues
+-- an error. See Note [Defaulting with -XNoPolyKinds]
 defaultKindVar :: TcTyVar -> TcM Kind
 defaultKindVar kv
   | ASSERT( isMetaTyVar kv )
     isRuntimeRepVar kv
   = writeMetaTyVar kv ptrRepLiftedTy >> return ptrRepLiftedTy
-  | otherwise
+  | isStarKind (tyVarKind kv)
   = writeMetaTyVar kv liftedTypeKind >> return liftedTypeKind
+  | otherwise
+  = do { addErr (vcat [ text "Cannot default kind variable" <+> quotes (ppr kv')
+                      , text "of kind:" <+> ppr (tyVarKind kv')
+                      , text "Perhaps enable PolyKinds or add a kind signature" ])
+       ; return (mkTyVarTy kv) }
+  where
+    (_, kv') = tidyOpenTyCoVar emptyTidyEnv kv
 
 skolemiseUnboundMetaTyVar :: TcTyVar -> TcTyVarDetails -> TcM TyVar
 -- We have a Meta tyvar with a ref-cell inside it
@@ -970,6 +979,27 @@ skolemiseUnboundMetaTyVar tv details
         ; return final_tv }
 
 {-
+Note [Defaulting with -XNoPolyKinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+  data Compose f g a = Mk (f (g a))
+
+We infer
+
+  Compose :: forall k1 k2. (k2 -> *) -> (k1 -> k2) -> k1 -> *
+  Mk :: forall k1 k2 (f :: k2 -> *) (g :: k1 -> k2) (a :: k1).
+        f (g a) -> Compose k1 k2 f g a
+
+Now, in another module, we have -XNoPolyKinds -XDataKinds in effect.
+What does 'Mk mean? Pre GHC-8.0 with -XNoPolyKinds,
+we just defaulted all kind variables to *. But that's no good here,
+because the kind variables in 'Mk aren't of kind *, so defaulting to *
+is ill-kinded.
+
+After some debate on #11334, we decided to issue an error in this case.
+The code is in defaultKindVar.
+
 Note [What is a meta variable?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A "meta type-variable", also know as a "unification variable" is a placeholder
