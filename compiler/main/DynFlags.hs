@@ -2931,14 +2931,16 @@ dynamic_flags_deps = [
     wWarningFlagsDeps
  ++ map (mkFlag turnOff "fno-warn-" unSetWarningFlag . hideFlag)
     wWarningFlagsDeps
+ ++ [ (NotDeprecated, unrecognisedWarning "W")
+    , (NotDeprecated, unrecognisedWarning "fwarn-")
+    , (NotDeprecated, unrecognisedWarning "fno-warn-") ]
  ++ map (mkFlag turnOn  "f"         setExtensionFlag  ) fLangFlagsDeps
  ++ map (mkFlag turnOff "fno-"      unSetExtensionFlag) fLangFlagsDeps
  ++ map (mkFlag turnOn  "X"         setExtensionFlag  ) xFlagsDeps
  ++ map (mkFlag turnOff "XNo"       unSetExtensionFlag) xFlagsDeps
  ++ map (mkFlag turnOn  "X"         setLanguage       ) languageFlagsDeps
  ++ map (mkFlag turnOn  "X"         setSafeHaskell    ) safeHaskellFlagsDeps
- ++ [ (NotDeprecated, unrecognisedWarning)
-    , make_dep_flag defFlag "XGenerics"
+ ++ [ make_dep_flag defFlag "XGenerics"
         (NoArg $ return ())
                   ("it does nothing; look into -XDefaultSignatures " ++
                    "and -XDeriveGeneric for generic programming support.")
@@ -2949,13 +2951,13 @@ dynamic_flags_deps = [
 
 -- | This is where we handle unrecognised warning flags. We only issue a warning
 -- if -Wunrecognised-warning-flags is set. See Trac #11429 for context.
-unrecognisedWarning :: Flag (CmdLineP DynFlags)
-unrecognisedWarning = defFlag "W" (Prefix action)
+unrecognisedWarning :: String -> Flag (CmdLineP DynFlags)
+unrecognisedWarning prefix = defFlag prefix (Prefix action)
   where
     action :: String -> EwM (CmdLineP DynFlags) ()
     action flag = do
       f <- wopt Opt_WarnUnrecognisedWarningFlags <$> liftEwM getCmdLineState
-      when f $ addWarn $ "unrecognised warning flag: -W" ++ flag
+      when f $ addWarn $ "unrecognised warning flag: -" ++ prefix ++ flag
 
 -- See Note [Supporting CLI completion]
 package_flags_deps :: [(Deprecation, Flag (CmdLineP DynFlags))]
