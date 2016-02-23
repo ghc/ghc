@@ -84,6 +84,7 @@ module TcMType (
 import TyCoRep
 import TcType
 import Type
+import Kind
 import Coercion
 import Class
 import Var
@@ -153,8 +154,8 @@ newEvVar :: TcPredType -> TcRnIf gbl lcl EvVar
 newEvVar ty = do { name <- newSysName (predTypeOccName ty)
                  ; return (mkLocalIdOrCoVar name ty) }
 
--- deals with both equality and non-equality predicates
 newWanted :: CtOrigin -> Maybe TypeOrKind -> PredType -> TcM CtEvidence
+-- Deals with both equality and non-equality predicates
 newWanted orig t_or_k pty
   = do loc <- getCtLocM orig t_or_k
        d <- if isEqPred pty then HoleDest  <$> newCoercionHole
@@ -936,15 +937,23 @@ zonkQuantifiedTyVarOrType tv
              else Left `liftM` skolemiseUnboundMetaTyVar tv vanillaSkolemTv
       _other -> pprPanic "zonkQuantifiedTyVar" (ppr tv) -- FlatSkol, RuntimeUnk
 
--- | Take an (unconstrained) meta tyvar and default it. Works only for
--- kind vars (of type *) and RuntimeRep vars (of type RuntimeRep).
+-- | Take an (unconstrained) meta tyvar and default it. Works only on
+-- vars of type RuntimeRep and of type *. For other kinds, it issues
+-- an error. See Note [Defaulting with -XNoPolyKinds]
 defaultKindVar :: TcTyVar -> TcM Kind
 defaultKindVar kv
   | ASSERT( isMetaTyVar kv )
     isRuntimeRepVar kv
   = writeMetaTyVar kv ptrRepLiftedTy >> return ptrRepLiftedTy
-  | otherwise
+  | isStarKind (tyVarKind kv)
   = writeMetaTyVar kv liftedTypeKind >> return liftedTypeKind
+  | otherwise
+  = do { addErr (vcat [ text "Cannot default kind variable" <+> quotes (ppr kv')
+                      , text "of kind:" <+> ppr (tyVarKind kv')
+                      , text "Perhaps enable PolyKinds or add a kind signature" ])
+       ; return (mkTyVarTy kv) }
+  where
+    (_, kv') = tidyOpenTyCoVar emptyTidyEnv kv
 
 skolemiseUnboundMetaTyVar :: TcTyVar -> TcTyVarDetails -> TcM TyVar
 -- We have a Meta tyvar with a ref-cell inside it
@@ -970,6 +979,76 @@ skolemiseUnboundMetaTyVar tv details
         ; return final_tv }
 
 {-
+Note [Defaulting with -XNoPolyKinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+  data Compose f g a = Mk (f (g a))
+
+We infer
+
+  Compose :: forall k1 k2. (k2 -> *) -> (k1 -> k2) -> k1 -> *
+  Mk :: forall k1 k2 (f :: k2 -> *) (g :: k1 -> k2) (a :: k1).
+        f (g a) -> Compose k1 k2 f g a
+
+Now, in another module, we have -XNoPolyKinds -XDataKinds in effect.
+What does 'Mk mean? Pre GHC-8.0 with -XNoPolyKinds,
+we just defaulted all kind variables to *. But that's no good here,
+because the kind variables in 'Mk aren't of kind *, so defaulting to *
+is ill-kinded.
+
+After some debate on #11334, we decided to issue an error in this case.
+The code is in defaultKindVar.
+
+Note [What is a meta variable?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A "meta type-variable", also know as a "unification variable" is a placeholder
+introduced by the typechecker for an as-yet-unknown monotype.
+
+For example, when we see a call `reverse (f xs)`, we know that we calling
+    reverse :: forall a. [a] -> [a]
+So we know that the argument `f xs` must be a "list of something". But what is
+the "something"? We don't know until we explore the `f xs` a bit more. So we set
+out what we do know at the call of `reverse` by instantiate its type with a fresh
+meta tyvar, `alpha` say. So now the type of the argument `f xs`, and of the
+result, is `[alpha]`. The unification variable `alpha` stands for the
+as-yet-unknown type of the elements of the list.
+
+As type inference progresses we may learn more about `alpha`. For example, suppose
+`f` has the type
+    f :: forall b. b -> [Maybe b]
+Then we instantiate `f`'s type with another fresh unification variable, say
+`beta`; and equate `f`'s result type with reverse's argument type, thus
+`[alpha] ~ [Maybe beta]`.
+
+Now we can solve this equality to learn that `alpha ~ Maybe beta`, so we've
+refined our knowledge about `alpha`. And so on.
+
+If you found this Note useful, you may also want to have a look at
+Section 5 of "Practical type inference for higher rank types" (Peyton Jones,
+Vytiniotis, Weirich and Shields. J. Functional Programming. 2011).
+
+Note [What is zonking?]
+~~~~~~~~~~~~~~~~~~~~~~~
+GHC relies heavily on mutability in the typechecker for efficient operation.
+For this reason, throughout much of the type checking process meta type
+variables (the MetaTv constructor of TcTyVarDetails) are represented by mutable
+variables (known as TcRefs).
+
+Zonking is the process of ripping out these mutable variables and replacing them
+with a real TcType. This involves traversing the entire type expression, but the
+interesting part of replacing the mutable variables occurs in zonkTyVarOcc.
+
+There are two ways to zonk a Type:
+
+ * zonkTcTypeToType, which is intended to be used at the end of type-checking
+   for the final zonk. It has to deal with unfilled metavars, either by filling
+   it with a value like Any or failing (determined by the UnboundTyVarZonker
+   used).
+
+ * zonkTcType, which will happily ignore unfilled metavars. This is the
+   appropriate function to use while in the middle of type-checking.
+
 Note [Zonking to Skolem]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 We used to zonk quantified type variables to regular TyVars.  However, this
