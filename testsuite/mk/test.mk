@@ -277,8 +277,11 @@ $(TIMEOUT_PROGRAM) :
 	@echo "Looks like you don't have timeout, building it first..."
 	$(MAKE) -C $(TOP)/timeout all
 
+# Use a '+' to make sure that any sub-MAKEs that python spawns can
+# communicate with the topmake.
+# See Note [Communicating options and variables to a submake]
 test: $(TIMEOUT_PROGRAM)
-	$(PYTHON) $(RUNTESTS) $(RUNTEST_OPTS) \
+	+$(PYTHON) $(RUNTESTS) $(RUNTEST_OPTS) \
 		$(patsubst %, --only=%, $(TEST)) \
 		$(patsubst %, --only=%, $(TESTS)) \
 		$(patsubst %, --way=%, $(WAY)) \
@@ -302,3 +305,65 @@ slow:
 list_broken:
 	$(MAKE) list_broken=YES
 
+# Note [Communicating options and variables to a submake]
+#
+# Consider the following scenario:
+#   * A test foo is defined as
+#     test('foo', [], run_command, ['$MAKE footarget'])
+#   * A user calls 'make -j24 TEST=foo'
+#
+# What happens is something like this:
+#   * make (topmake) reads all options and variables given on the commandline
+#     and adds them to the variable MAKEFLAGS [1]. This variable is exported by
+#     default [1], so submakes can use them.
+#   * The 'test' target calls 'python ..'
+#   * Python calls 'make footarget' (submake)
+#
+# **First question**: what happens to the '-j24' option when calling make
+# recursively?
+#
+# From
+# https://www.gnu.org/software/make/manual/html_node/Variables_002fRecursion.html:
+#
+#     "The ‘-j’ option is a special case (see Parallel Execution). If you set
+#     it to some numeric value ‘N’ and your operating system supports it (most
+#     any UNIX system will; others typically won’t), the parent make and all the
+#     sub-makes will communicate to ensure that there are only ‘N’ jobs running
+#     at the same time between them all."
+#
+# In our scenario, the user will actually see the following warning [2]:
+#
+#     ‘warning: jobserver unavailable: using -j1. Add `+' to parent make rule.’
+#
+# The problem is that topmake and submake don't know about eachother, since
+# python is in between. To let them communicate, we have to use the '+'
+# option, by calling '+python' instead of 'python' [2]. This works,
+# magically, and fixes #11569.
+#
+# **Second question**: can't we just unexport MAKEFLAGS, instead of using
+# that '+' trick? The testsuite driver (python) mangages parallelism by
+# itself already, so '-j24' doesn't do the right thing anyway. You have to
+# use 'make test THREADS=24'. Unexporting MAKEFLAGS would mean ignoring
+# any '-j' flags passed to make (either from the user calling 'make -j'
+# explicitly or from having MAKEFLAGS=-j set in the shell, see #11569).
+#
+# This almost works, except when calling 'make fast/slow/accept TEST_HC=ghc'
+# instead of just 'make test'. These targets call 'make test FAST=YES'
+# recursively (and 'make test' calls python, as before).
+#
+# The problem is that in boilerplate.mk we try to override the variable
+# TEST_HC (See Note [The TEST_HC variable]). Somewhere somehow this
+# information (of us wanting to update TEST_HC) gets lost in the process,
+# resulting in the final TEST_HC always getting set to the inplace compiler.
+# It seems possible to remedy this yet again by exporting TEST_HC explicitly,
+# but I didn't understand nor test it thoroughly (what about the other
+# variables we override, see calls to canonicalise), and the '+' trick seems
+# to work at least equally well (just don't run something like
+# 'make test fast slow accept').
+#
+# Tests:
+# * `make TEST=T3307 -j2` should not show a warning.
+# * `make TEST=tc001 TEST_HC=ghc fast` should not use the inplace compiler.
+#
+# [1] https://www.gnu.org/software/make/manual/html_node/Variables_002fRecursion.html
+# [2] https://www.gnu.org/software/make/manual/html_node/Error-Messages.html

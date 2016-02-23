@@ -1,4 +1,5 @@
-unexport MAKEFLAGS # See Trac #11569
+# Don't blindly unexport MAKEFLAGS, see
+# Note [Communicating options and variables to a submake].
 
 # Eliminate use of the built-in implicit rules, and clear out the default list
 # of suffixes for suffix rules. Speeds up make quite a bit. Both are needed
@@ -126,6 +127,8 @@ IMPLICIT_COMPILER = NO
 endif
 IN_TREE_COMPILER = NO
 
+# Note [The TEST_HC variable]
+#
 # As values of TEST_HC passed in by the user, we want to support:
 #  * both "ghc" and "/usr/bin/ghc"
 #      We use 'which' to convert the former to the latter.
