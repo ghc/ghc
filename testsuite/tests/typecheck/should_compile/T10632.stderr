@@ -1,5 +1,5 @@
 
 T10632.hs:3:1: warning:
-    Redundant constraint: ?file1::String
-    In the type signature for:
-         f :: (?file1::String) => IO ()
+    • Redundant constraint: ?file1::String
+    • In the type signature for:
+           f :: (?file1::String) => IO ()

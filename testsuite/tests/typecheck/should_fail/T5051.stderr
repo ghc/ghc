@@ -1,5 +1,5 @@
 
-T5051.hs:8:30: Warning:
-    No explicit implementation for
-      either ‘==’ or ‘/=’
-    In the instance declaration for ‘Eq [T]’
+T5051.hs:8:30: warning:
+    • No explicit implementation for
+        either ‘==’ or ‘/=’
+    • In the instance declaration for ‘Eq [T]’
