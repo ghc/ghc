@@ -9,7 +9,7 @@ import Settings
 import Target
 
 compilePackage :: [(Resource, Int)] -> Context -> Rules ()
-compilePackage rs context @ (Context {..}) = do
+compilePackage rs context @ Context {..} = do
     let buildPath = contextPath context -/- "build"
 
     buildPath <//> "*" <.> hisuf way %> \hi ->

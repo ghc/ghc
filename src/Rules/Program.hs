@@ -31,7 +31,7 @@ wrappers = [ (vanillaContext Stage0 ghc   , ghcWrapper   )
            , (vanillaContext Stage0 ghcPkg, ghcPkgWrapper)]
 
 buildProgram :: [(Resource, Int)] -> Context -> Rules ()
-buildProgram rs context @ (Context {..}) = do
+buildProgram rs context @ Context {..} = do
     let match file = case programPath context of
             Nothing      -> False
             Just program -> program == file

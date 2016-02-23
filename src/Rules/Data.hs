@@ -17,7 +17,7 @@ import Target
 
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
 buildPackageData :: Context -> Rules ()
-buildPackageData context @ (Context {..}) = do
+buildPackageData context @ Context {..} = do
     let cabalFile = pkgCabalFile package
         configure = pkgPath package -/- "configure"
         dataFile  = pkgDataFile context
@@ -138,7 +138,7 @@ buildPackageData context @ (Context {..}) = do
 -- is replaced by libraries_deepseq_dist-install_VERSION = 1.4.0.0
 -- Reason: Shake's built-in makefile parser doesn't recognise slashes
 postProcessPackageData :: Context -> FilePath -> Action ()
-postProcessPackageData context @ (Context {..}) file = fixFile file fixPackageData
+postProcessPackageData context @ Context {..} file = fixFile file fixPackageData
   where
     fixPackageData = unlines . map processLine . filter (not . null) . filter ('$' `notElem`) . lines
     processLine line = fixKey fixedPrefix ++ suffix

@@ -13,7 +13,7 @@ newtype ModuleFilesKey = ModuleFilesKey ([FilePath], [String])
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
 moduleFiles :: Context -> Action [FilePath]
-moduleFiles context @ (Context {..}) = do
+moduleFiles context @ Context {..} = do
     let path = contextPath context
     srcDirs <- fmap sort . pkgDataList $ SrcDirs path
     modules <- fmap sort . pkgDataList $ Modules path
@@ -21,7 +21,7 @@ moduleFiles context @ (Context {..}) = do
     fmap catMaybes $ findModuleFiles dirs modules
 
 haskellModuleFiles :: Context -> Action ([FilePath], [String])
-haskellModuleFiles context @ (Context {..}) = do
+haskellModuleFiles context @ Context {..} = do
     let path        = contextPath context
         autogen     = path -/- "build/autogen"
         dropPkgPath = drop $ length (pkgPath package) + 1

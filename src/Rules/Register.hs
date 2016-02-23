@@ -12,7 +12,7 @@ import Target
 
 -- Build package-data.mk by using GhcCabal to process pkgCabal file
 registerPackage :: [(Resource, Int)] -> Context -> Rules ()
-registerPackage rs context @ (Context {..}) = do
+registerPackage rs context @ Context {..} = do
     let oldPath = pkgPath package -/- contextDirectory context -- TODO: remove, #113
         pkgConf = packageDbDirectory stage -/- pkgNameString package
 
