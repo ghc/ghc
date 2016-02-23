@@ -1,2 +1,2 @@
 
-<interactive>:1:1: Not in scope: ‘thisIsNotDefined’
+<interactive>:1:1: error: Not in scope: ‘thisIsNotDefined’

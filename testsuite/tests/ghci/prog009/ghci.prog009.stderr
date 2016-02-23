@@ -2,7 +2,7 @@
 A.hs:1:16: error: parse error on input ‘where’
 
 <interactive>:25:1: error:
-    Variable not in scope: yan
-    Perhaps you meant ‘tan’ (imported from Prelude)
+    • Variable not in scope: yan
+    • Perhaps you meant ‘tan’ (imported from Prelude)
 
 A.hs:1:16: error: parse error on input ‘where’
