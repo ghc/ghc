@@ -146,6 +146,11 @@ rnExpr (HsApp fun arg)
        ; (arg',fvArg) <- rnLExpr arg
        ; return (HsApp fun' arg', fvFun `plusFV` fvArg) }
 
+rnExpr (HsAppType fun arg)
+  = do { (fun',fvFun) <- rnLExpr fun
+       ; (arg',fvArg) <- rnHsWcType HsTypeCtx arg
+       ; return (HsAppType fun' arg', fvFun `plusFV` fvArg) }
+
 rnExpr (OpApp e1 op  _ e2)
   = do  { (e1', fv_e1) <- rnLExpr e1
         ; (e2', fv_e2) <- rnLExpr e2
@@ -302,10 +307,6 @@ rnExpr (HsMultiIf _ty alts)
   = do { (alts', fvs) <- mapFvRn (rnGRHS IfAlt rnLExpr) alts
        -- ; return (HsMultiIf ty alts', fvs) }
        ; return (HsMultiIf placeHolderType alts', fvs) }
-
-rnExpr (HsType ty)
-  = do { (ty', fvT) <- rnHsWcType HsTypeCtx ty
-       ; return (HsType ty', fvT) }
 
 rnExpr (ArithSeq _ _ seq)
   = do { opt_OverloadedLists <- xoptM LangExt.OverloadedLists
@@ -1754,6 +1755,7 @@ isReturnApp (L _ (HsApp f arg))
   | otherwise = Nothing
  where
   is_return (L _ (HsPar e)) = is_return e
+  is_return (L _ (HsAppType e _)) = is_return e
   is_return (L _ (HsVar (L _ r))) = r == returnMName || r == pureAName
        -- TODO: I don't know how to get this right for rebindable syntax
   is_return _ = False

@@ -309,8 +309,8 @@ repDataDefn tc bndrs opt_tys
        }
 
 repSynDecl :: Core TH.Name -> Core [TH.TyVarBndr]
-          -> LHsType Name
-          -> DsM (Core TH.DecQ)
+           -> LHsType Name
+           -> DsM (Core TH.DecQ)
 repSynDecl tc bndrs ty
   = do { ty1 <- repLTy ty
        ; repTySyn tc bndrs ty1 }

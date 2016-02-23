@@ -609,6 +609,11 @@ zonkExpr env (HsApp e1 e2)
        new_e2 <- zonkLExpr env e2
        return (HsApp new_e1 new_e2)
 
+zonkExpr env (HsAppTypeOut e t)
+  = do new_e <- zonkLExpr env e
+       return (HsAppTypeOut new_e t)
+       -- NB: the type is an HsType; can't zonk that!
+
 zonkExpr _ e@(HsRnBracketOut _ _)
   = pprPanic "zonkExpr: HsRnBracketOut" (ppr e)
 
@@ -771,9 +776,6 @@ zonkExpr env (HsWrap co_fn expr)
 
 zonkExpr _ (HsUnboundVar v)
   = return (HsUnboundVar v)
-
-  -- nothing to do here. The payload is an LHsType, not a Type.
-zonkExpr _ e@(HsTypeOut {}) = return e
 
 zonkExpr _ expr = pprPanic "zonkExpr" (ppr expr)
 

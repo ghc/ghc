@@ -20,13 +20,13 @@ which deal with the instantiated versions are located elsewhere:
 
 module HsUtils(
   -- Terms
-  mkHsPar, mkHsApp, mkHsConApp, mkSimpleHsAlt,
+  mkHsPar, mkHsApp, mkHsAppType, mkHsAppTypeOut, mkHsConApp, mkSimpleHsAlt,
   mkSimpleMatch, unguardedGRHSs, unguardedRHS,
   mkMatchGroup, mkMatchGroupName, mkMatch, mkHsLam, mkHsIf,
   mkHsWrap, mkLHsWrap, mkHsWrapCo, mkHsWrapCoR, mkLHsWrapCo,
   mkHsDictLet, mkHsLams,
   mkHsOpApp, mkHsDo, mkHsComp, mkHsWrapPat, mkHsWrapPatCo,
-  mkLHsPar, mkHsCmdWrap, mkLHsCmdWrap, isLHsTypeExpr_maybe, isLHsTypeExpr,
+  mkLHsPar, mkHsCmdWrap, mkLHsCmdWrap,
 
   nlHsTyApp, nlHsTyApps, nlHsVar, nlHsLit, nlHsApp, nlHsApps, nlHsSyntaxApps,
   nlHsIntLit, nlHsVarApps,
@@ -168,6 +168,12 @@ mkMatchGroupName origin matches = MG { mg_alts = mkLocatedList matches
 
 mkHsApp :: LHsExpr name -> LHsExpr name -> LHsExpr name
 mkHsApp e1 e2 = addCLoc e1 e2 (HsApp e1 e2)
+
+mkHsAppType :: LHsExpr name -> LHsWcType name -> LHsExpr name
+mkHsAppType e t = addCLoc e (hswc_body t) (HsAppType e t)
+
+mkHsAppTypeOut :: LHsExpr Id -> LHsWcType Name -> LHsExpr Id
+mkHsAppTypeOut e t = addCLoc e (hswc_body t) (HsAppTypeOut e t)
 
 mkHsLam :: [LPat RdrName] -> LHsExpr RdrName -> LHsExpr RdrName
 mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam matches))
@@ -457,21 +463,6 @@ nlHsFunTy a b           = noLoc (HsFunTy a b)
 
 nlHsTyConApp :: name -> [LHsType name] -> LHsType name
 nlHsTyConApp tycon tys  = foldl nlHsAppTy (nlHsTyVar tycon) tys
-
--- | Extract a type argument from an HsExpr, with the list of wildcards in
--- the type
-isLHsTypeExpr_maybe :: LHsExpr name -> Maybe (LHsWcType name)
-isLHsTypeExpr_maybe (L _ (HsPar e))       = isLHsTypeExpr_maybe e
-isLHsTypeExpr_maybe (L _ (HsType ty))     = Just ty
-  -- the HsTypeOut case is ill-typed. We never need it here anyway.
-isLHsTypeExpr_maybe _                     = Nothing
-
--- | Is an expression a visible type application?
-isLHsTypeExpr :: LHsExpr name -> Bool
-isLHsTypeExpr (L _ (HsPar e))     = isLHsTypeExpr e
-isLHsTypeExpr (L _ (HsType _))    = True
-isLHsTypeExpr (L _ (HsTypeOut _)) = True
-isLHsTypeExpr _                   = False
 
 {-
 Tuples.  All these functions are *pre-typechecker* because they lack
@@ -1132,4 +1123,3 @@ lPatImplicits = hs_lpat
                                                                      (unLoc fld)
                                                           pat_explicit = maybe True (i<) (rec_dotdot fs)]
     details (InfixCon p1 p2) = hs_lpat p1 `unionNameSet` hs_lpat p2
-

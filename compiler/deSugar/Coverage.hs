@@ -482,13 +482,15 @@ addTickLHsExprNever (L pos e0) = do
 -- general heuristic: expressions which do not denote values are good
 -- break points
 isGoodBreakExpr :: HsExpr Id -> Bool
-isGoodBreakExpr (HsApp {})     = True
-isGoodBreakExpr (OpApp {})     = True
-isGoodBreakExpr _other         = False
+isGoodBreakExpr (HsApp {})        = True
+isGoodBreakExpr (HsAppTypeOut {}) = True
+isGoodBreakExpr (OpApp {})        = True
+isGoodBreakExpr _other            = False
 
 isCallSite :: HsExpr Id -> Bool
-isCallSite HsApp{}  = True
-isCallSite OpApp{}  = True
+isCallSite HsApp{}        = True
+isCallSite HsAppTypeOut{} = True
+isCallSite OpApp{}        = True
 isCallSite _ = False
 
 addTickLHsExprOptAlt :: Bool -> LHsExpr Id -> TM (LHsExpr Id)
@@ -518,13 +520,10 @@ addTickHsExpr e@(HsOverLabel _)  = return e
 addTickHsExpr e@(HsLit _)        = return e
 addTickHsExpr (HsLam matchgroup) = liftM HsLam (addTickMatchGroup True matchgroup)
 addTickHsExpr (HsLamCase ty mgs) = liftM (HsLamCase ty) (addTickMatchGroup True mgs)
-addTickHsExpr (HsApp e1 e2)      = liftM2 HsApp (addTickLHsExprNever e1) e2'
-  -- This might be a type application. Then don't put a tick around e2,
-  -- or dsExpr won't recognize it as a type application any more (#11329).
-  -- It doesn't make sense to put a tick on a type anyways.
-  where e2'
-          | isLHsTypeExpr e2 = return e2
-          | otherwise        = addTickLHsExpr e2
+addTickHsExpr (HsApp e1 e2)      = liftM2 HsApp (addTickLHsExprNever e1)
+                                                (addTickLHsExpr      e2)
+addTickHsExpr (HsAppTypeOut e ty) = liftM2 HsAppTypeOut (addTickLHsExprNever e)
+                                                        (return ty)
 
 addTickHsExpr (OpApp e1 e2 fix e3) =
         liftM4 OpApp

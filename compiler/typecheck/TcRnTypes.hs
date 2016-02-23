@@ -2816,6 +2816,8 @@ exprCtOrigin (HsLit {})         = Shouldn'tHappenOrigin "concrete literal"
 exprCtOrigin (HsLam matches)    = matchesCtOrigin matches
 exprCtOrigin (HsLamCase _ ms)   = matchesCtOrigin ms
 exprCtOrigin (HsApp (L _ e1) _) = exprCtOrigin e1
+exprCtOrigin (HsAppType (L _ e1) _) = exprCtOrigin e1
+exprCtOrigin (HsAppTypeOut {})      = panic "exprCtOrigin HsAppTypeOut"
 exprCtOrigin (OpApp _ (L _ op) _ _) = exprCtOrigin op
 exprCtOrigin (NegApp (L _ e) _) = exprCtOrigin e
 exprCtOrigin (HsPar (L _ e))    = exprCtOrigin e
@@ -2853,8 +2855,6 @@ exprCtOrigin EWildPat           = panic "exprCtOrigin EWildPat"
 exprCtOrigin (EAsPat {})        = panic "exprCtOrigin EAsPat"
 exprCtOrigin (EViewPat {})      = panic "exprCtOrigin EViewPat"
 exprCtOrigin (ELazyPat {})      = panic "exprCtOrigin ELazyPat"
-exprCtOrigin (HsType {})        = Shouldn'tHappenOrigin "type application"
-exprCtOrigin (HsTypeOut {})     = panic "exprCtOrigin HsTypeOut"
 exprCtOrigin (HsWrap {})        = panic "exprCtOrigin HsWrap"
 
 -- | Extract a suitable CtOrigin from a MatchGroup
