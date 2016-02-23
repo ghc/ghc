@@ -1527,47 +1527,39 @@ shortCutReduction :: CtEvidence -> TcTyVar -> TcCoercion
                   -> TyCon -> [TcType] -> TcS (StopOrContinue Ct)
 -- See Note [Top-level reductions for type functions]
 shortCutReduction old_ev fsk ax_co fam_tc tc_args
-  | isGiven old_ev
-  = ASSERT( ctEvEqRel old_ev == NomEq )
+  = ASSERT( ctEvEqRel old_ev == NomEq)
     do { (xis, cos) <- flattenManyNom old_ev tc_args
                -- ax_co :: F args ~ G tc_args
                -- cos   :: xis ~ tc_args
                -- old_ev :: F args ~ fsk
                -- G cos ; sym ax_co ; old_ev :: G xis ~ fsk
 
-       ; new_ev <- newGivenEvVar deeper_loc
+       ; new_ev <- case ctEvFlavour old_ev of
+           Given -> newGivenEvVar deeper_loc
                          ( mkPrimEqPred (mkTyConApp fam_tc xis) (mkTyVarTy fsk)
                          , EvCoercion (mkTcTyConAppCo Nominal fam_tc cos
                                         `mkTcTransCo` mkTcSymCo ax_co
                                         `mkTcTransCo` ctEvCoercion old_ev) )
 
-       ; let new_ct = CFunEqCan { cc_ev = new_ev, cc_fun = fam_tc, cc_tyargs = xis, cc_fsk = fsk }
-       ; updWorkListTcS (extendWorkListFunEq new_ct)
-       ; stopWith old_ev "Fun/Top (given, shortcut)" }
+           Derived -> newDerivedNC deeper_loc $
+                      mkPrimEqPred (mkTyConApp fam_tc xis)
+                                   (mkTyVarTy fsk)
 
-  | otherwise
-  = ASSERT( not (isDerived old_ev) )   -- Caller ensures this
-    ASSERT( ctEvEqRel old_ev == NomEq )
-    do { (xis, cos) <- flattenManyNom old_ev tc_args
-               -- ax_co :: F args ~ G tc_args
-               -- cos   :: xis ~ tc_args
-               -- G cos ; sym ax_co ; old_ev :: G xis ~ fsk
-               -- new_ev :: G xis ~ fsk
-               -- old_ev :: F args ~ fsk := ax_co ; sym (G cos) ; new_ev
-
-       ; (new_ev, new_co) <- newWantedEq deeper_loc Nominal
-                                     (mkTyConApp fam_tc xis) (mkTyVarTy fsk)
-       ; setWantedEq (ctev_dest old_ev)
-                     (ax_co `mkTcTransCo` mkTcSymCo (mkTcTyConAppCo Nominal fam_tc cos)
-                            `mkTcTransCo` new_co)
+           Wanted ->
+             do { (new_ev, new_co) <- newWantedEq deeper_loc Nominal
+                                        (mkTyConApp fam_tc xis) (mkTyVarTy fsk)
+                ; setWantedEq (ctev_dest old_ev) $
+                     ax_co `mkTcTransCo` mkTcSymCo (mkTcTyConAppCo Nominal
+                                                      fam_tc cos)
+                           `mkTcTransCo` new_co
+                ; return new_ev }
 
        ; let new_ct = CFunEqCan { cc_ev = new_ev, cc_fun = fam_tc
                                 , cc_tyargs = xis, cc_fsk = fsk }
        ; updWorkListTcS (extendWorkListFunEq new_ct)
-       ; stopWith old_ev "Fun/Top (wanted, shortcut)" }
+       ; stopWith old_ev "Fun/Top (shortcut)" }
   where
-    loc = ctEvLoc old_ev
-    deeper_loc = bumpCtLocDepth loc
+    deeper_loc = bumpCtLocDepth (ctEvLoc old_ev)
 
 dischargeFmv :: CtEvidence -> TcTyVar -> TcCoercion -> TcType -> TcS ()
 -- (dischargeFmv x fmv co ty)
