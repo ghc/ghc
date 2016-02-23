@@ -2956,12 +2956,12 @@ dynamic_flags_deps = [
 -- | This is where we handle unrecognised warning flags. We only issue a warning
 -- if -Wunrecognised-warning-flags is set. See Trac #11429 for context.
 unrecognisedWarning :: String -> Flag (CmdLineP DynFlags)
-unrecognisedWarning pfx = defFlag pfx (Prefix action)
+unrecognisedWarning prefix = defFlag prefix (Prefix action)
   where
     action :: String -> EwM (CmdLineP DynFlags) ()
     action flag = do
       f <- wopt Opt_WarnUnrecognisedWarningFlags <$> liftEwM getCmdLineState
-      when f $ addWarn $ "unrecognised warning flag: -" ++ pfx ++ flag
+      when f $ addWarn $ "unrecognised warning flag: -" ++ prefix ++ flag
 
 -- See Note [Supporting CLI completion]
 package_flags_deps :: [(Deprecation, Flag (CmdLineP DynFlags))]
