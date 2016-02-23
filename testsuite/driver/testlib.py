@@ -1647,9 +1647,13 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
                               way in getTestOpts().expect_fail_for):
             if_verbose(1, 'Test is expected to fail. Not accepting new output.')
             return 0
-        elif config.accept:
+        elif config.accept and actual_raw:
             if_verbose(1, 'Accepting new output.')
             write_file(expected_path, actual_raw)
+            return 1
+        elif config.accept:
+            if_verbose(1, 'No output. Deleting {0}.'.format(expected_path))
+            rm_no_fail(expected_path)
             return 1
         else:
             return 0
@@ -2306,4 +2310,8 @@ def printFailingTestInfosSummary(file, testInfos):
     file.write('\n')
 
 def modify_lines(s, f):
-    return '\n'.join([f(l) for l in s.splitlines()])
+    s = '\n'.join([f(l) for l in s.splitlines()])
+    if s and s[-1] != '\n':
+        # Prevent '\ No newline at end of file' warnings when diffing.
+        s += '\n'
+    return s
