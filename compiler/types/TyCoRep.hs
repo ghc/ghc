@@ -354,6 +354,58 @@ two types have the same kind. This allows us to be a little sloppier
 in keeping track of coercions, which is a good thing. It also means
 that eqType does not depend on eqCoercion, which is also a good thing.
 
+Why is this sensible? That is, why is something different than α-equivalence
+appropriate for the implementation of eqType?
+
+Anything smaller than ~ and homogeneous is an appropriate definition for
+equality. The type safety of FC depends only on ~. Let's say η : τ ~ σ. Any
+expression of type τ can be transmuted to one of type σ at any point by
+casting. The same is true of types of type τ. So in some sense, τ and σ are
+interchangeable.
+
+But let's be more precise. If we examine the typing rules of FC (say, those in
+http://www.cis.upenn.edu/~eir/papers/2015/equalities/equalities-extended.pdf)
+there are several places where the same metavariable is used in two different
+premises to a rule. (For example, see Ty_App.) There is an implicit equality
+check here. What definition of equality should we use? By convention, we use
+α-equivalence. Take any rule with one (or more) of these implicit equality
+checks. Then there is an admissible rule that uses ~ instead of the implicit
+check, adding in casts as appropriate.
+
+The only problem here is that ~ is heterogeneous. To make the kinds work out
+in the admissible rule that uses ~, it is necessary to homogenize the
+coercions. That is, if we have η : (τ : κ1) ~ (σ : κ2), then we don't use η;
+we use η |> kind η, which is homogeneous.
+
+The effect of this all is that eqType, the implementation of the implicit
+equality check, can use any homogeneous relation that is smaller than ~, as
+those rules must also be admissible.
+
+What would go wrong if we insisted on the casts matching? See the beginning of
+Section 8 in the unpublished paper above. Theoretically, nothing at all goes
+wrong. But in practical terms, getting the coercions right proved to be
+nightmarish. And types would explode: during kind-checking, we often produce
+reflexive kind coercions. When we try to cast by these, mkCastTy just discards
+them. But if we used an eqType that distinguished between Int and Int |> <*>,
+then we couldn't discard -- the output of kind-checking would be enormous,
+and we would need enormous casts with lots of CoherenceCo's to straighten
+them out.
+
+Would anything go wrong if eqType respected type families? No, not at all. But
+that makes eqType rather hard to implement.
+
+Thus, the guideline for eqType is that it should be the largest
+easy-to-implement relation that is still smaller than ~ and homogeneous. The
+precise choice of relation is somewhat incidental, as long as the smart
+constructors and destructors in Type respect whatever relation is chosen.
+
+Another helpful principle with eqType is this:
+
+ ** If (t1 eqType t2) then I can replace t1 by t2 anywhere. **
+
+This principle also tells us that eqType must relate only types with the
+same kinds.
+
 Note [VisibilityFlag]
 ~~~~~~~~~~~~~~~~~~~~~
 All named binders are equipped with a visibility flag, which says
