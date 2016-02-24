@@ -413,18 +413,14 @@ coreToStgExpr (Case scrut bndr _ alts) = do
         -- where a nullary tuple is mapped to (State# World#)
         ASSERT( null binders )
         do { (rhs2, rhs_fvs, rhs_escs) <- coreToStgExpr rhs
-           ; return ((DEFAULT, [], [], rhs2), rhs_fvs, rhs_escs) }
+           ; return ((DEFAULT, [], rhs2), rhs_fvs, rhs_escs) }
       | otherwise
       = let     -- Remove type variables
             binders' = filterStgBinders binders
         in
         extendVarEnvLne [(b, LambdaBound) | b <- binders'] $ do
         (rhs2, rhs_fvs, rhs_escs) <- coreToStgExpr rhs
-        let
-                -- Records whether each param is used in the RHS
-            good_use_mask = [ b `elementOfFVInfo` rhs_fvs | b <- binders' ]
-
-        return ( (con, binders', good_use_mask, rhs2),
+        return ( (con, binders', rhs2),
                  binders' `minusFVBinders` rhs_fvs,
                  rhs_escs `delVarSetList` binders' )
                 -- ToDo: remove the delVarSet;

@@ -131,16 +131,15 @@ unariseExpr us rho (StgTick tick e)
 
 ------------------------
 unariseAlts :: UniqSupply -> UnariseEnv -> AltType -> Id -> [StgAlt] -> [StgAlt]
-unariseAlts us rho (UbxTupAlt n) bndr [(DEFAULT, [], [], e)]
-  = [(DataAlt (tupleDataCon Unboxed n), ys, uses, unariseExpr us2' rho' e)]
+unariseAlts us rho (UbxTupAlt n) bndr [(DEFAULT, [], e)]
+  = [(DataAlt (tupleDataCon Unboxed n), ys, unariseExpr us2' rho' e)]
   where
     (us2', rho', ys) = unariseIdBinder us rho bndr
-    uses = replicate (length ys) (not (isDeadBinder bndr))
 
-unariseAlts us rho (UbxTupAlt n) bndr [(DataAlt _, ys, uses, e)]
-  = [(DataAlt (tupleDataCon Unboxed n), ys', uses', unariseExpr us2' rho'' e)]
+unariseAlts us rho (UbxTupAlt n) bndr [(DataAlt _, ys, e)]
+  = [(DataAlt (tupleDataCon Unboxed n), ys', unariseExpr us2' rho'' e)]
   where
-    (us2', rho', ys', uses') = unariseUsedIdBinders us rho ys uses
+    (us2', rho', ys') = unariseIdBinders us rho ys
     rho'' = extendVarEnv rho' bndr ys'
 
 unariseAlts _ _ (UbxTupAlt _) _ alts
@@ -151,10 +150,10 @@ unariseAlts us rho _ _ alts
 
 --------------------------
 unariseAlt :: UniqSupply -> UnariseEnv -> StgAlt -> StgAlt
-unariseAlt us rho (con, xs, uses, e)
-  = (con, xs', uses', unariseExpr us' rho' e)
+unariseAlt us rho (con, xs, e)
+  = (con, xs', unariseExpr us' rho' e)
   where
-    (us', rho', xs', uses') = unariseUsedIdBinders us rho xs uses
+    (us', rho', xs') = unariseIdBinders us rho xs
 
 ------------------------
 unariseArgs :: UnariseEnv -> [StgArg] -> [StgArg]
@@ -178,14 +177,6 @@ unariseId rho x
   = ASSERT2( case repType (idType x) of UbxTupleRep _ -> False; _ -> True
            , text "unariseId: was unboxed tuple" <+> ppr x )
     [x]
-
-unariseUsedIdBinders :: UniqSupply -> UnariseEnv -> [Id] -> [Bool]
-                     -> (UniqSupply, UnariseEnv, [Id], [Bool])
-unariseUsedIdBinders us rho xs uses
-  = case mapAccumL2 do_one us rho (zipEqual "unariseUsedIdBinders" xs uses) of
-      (us', rho', xs_usess) -> uncurry ((,,,) us' rho') (unzip (concat xs_usess))
-  where
-    do_one us rho (x, use) = third3 (map (flip (,) use)) (unariseIdBinder us rho x)
 
 unariseIdBinders :: UniqSupply -> UnariseEnv -> [Id] -> (UniqSupply, UnariseEnv, [Id])
 unariseIdBinders us rho xs = third3 concat $ mapAccumL2 unariseIdBinder us rho xs

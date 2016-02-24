@@ -223,15 +223,15 @@ lintStgAlts alts scrut_ty = do
           -- We can't check that the alternatives have the
           -- same type, because they don't, with unsafeCoerce#
 
-lintAlt :: Type -> (AltCon, [Id], [Bool], StgExpr) -> LintM (Maybe Type)
-lintAlt _ (DEFAULT, _, _, rhs)
+lintAlt :: Type -> (AltCon, [Id], StgExpr) -> LintM (Maybe Type)
+lintAlt _ (DEFAULT, _, rhs)
  = lintStgExpr rhs
 
-lintAlt scrut_ty (LitAlt lit, _, _, rhs) = do
+lintAlt scrut_ty (LitAlt lit, _, rhs) = do
    checkTys (literalType lit) scrut_ty (mkAltMsg1 scrut_ty)
    lintStgExpr rhs
 
-lintAlt scrut_ty (DataAlt con, args, _, rhs) = do
+lintAlt scrut_ty (DataAlt con, args, rhs) = do
     case splitTyConApp_maybe scrut_ty of
       Just (tycon, tys_applied) | isAlgTyCon tycon &&
                                   not (isNewTyCon tycon) -> do

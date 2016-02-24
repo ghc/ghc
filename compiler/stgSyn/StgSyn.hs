@@ -469,7 +469,7 @@ rhsHasCafRefs (StgRhsCon _ _ args)
   = any stgArgHasCafRefs args
 
 altHasCafRefs :: GenStgAlt bndr Id -> Bool
-altHasCafRefs (_, _, _, rhs) = exprHasCafRefs rhs
+altHasCafRefs (_, _, rhs) = exprHasCafRefs rhs
 
 stgArgHasCafRefs :: GenStgArg Id -> Bool
 stgArgHasCafRefs (StgVarArg id)
@@ -533,10 +533,6 @@ rather than from the scrutinee type.
 type GenStgAlt bndr occ
   = (AltCon,            -- alts: data constructor,
      [bndr],            -- constructor's parameters,
-     [Bool],            -- "use mask", same length as
-                        -- parameters; a True in a
-                        -- param's position if it is
-                        -- used in the ...
      GenStgExpr bndr occ)       -- ...right-hand side.
 
 data AltType
@@ -743,7 +739,7 @@ pprStgExpr (StgCase expr bndr alt_type alts)
 
 pprStgAlt :: (OutputableBndr bndr, Outputable occ, Ord occ)
           => GenStgAlt bndr occ -> SDoc
-pprStgAlt (con, params, _use_mask, expr)
+pprStgAlt (con, params, expr)
   = hang (hsep [ppr con, sep (map (pprBndr CaseBind) params), text "->"])
          4 (ppr expr <> semi)
 
