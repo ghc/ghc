@@ -30,12 +30,12 @@ module TyCoRep (
         PredType, ThetaType,      -- Synonyms
         VisibilityFlag(..),
 
-        -- Coercions
+        -- * Coercions
         Coercion(..), LeftOrRight(..),
         UnivCoProvenance(..), CoercionHole(..),
         CoercionN, CoercionR, CoercionP, KindCoercion,
 
-        -- Functions over types
+        -- * Functions over types
         mkTyConTy, mkTyVarTy, mkTyVarTys,
         mkFunTy, mkFunTys, mkForAllTys,
         isLiftedTypeKind, isUnliftedTypeKind,
@@ -43,14 +43,14 @@ module TyCoRep (
         isRuntimeRepKindedTy, dropRuntimeRepArgs,
         sameVis,
 
-        -- Functions over binders
+        -- * Functions over binders
         binderType, delBinderVar, isInvisibleBinder, isVisibleBinder,
         isNamedBinder, isAnonBinder,
 
-        -- Functions over coercions
+        -- * Functions over coercions
         pickLR,
 
-        -- Pretty-printing
+        -- * Pretty-printing
         pprType, pprParendType, pprTypeApp, pprTvBndr, pprTvBndrs,
         pprTyThing, pprTyThingCategory, pprSigmaType,
         pprTheta, pprForAll, pprForAllImplicit, pprUserForAll,
