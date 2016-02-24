@@ -37,7 +37,7 @@ import TyCoRep
 import TysPrim ( alphaTyVars, unliftedTypeKindTyConName )
 import TysWiredIn ( listTyConName, starKindTyConName )
 import PrelNames ( hasKey, eqTyConKey, ipClassKey
-                 , tYPETyConKey, liftedDataConKey, unliftedDataConKey )
+                 , tYPETyConKey, ptrRepLiftedDataConKey, ptrRepUnliftedDataConKey )
 import Unique ( getUnique )
 import Util ( filterByList, filterOut )
 import Var
@@ -181,12 +181,11 @@ synifyTyCon _coax tc
                  , fdLName = synifyName tc
                  , fdTyVars = synifyTyVars (tyConTyVars tc)
                  , fdResultSig =
-                       synifyFamilyResultSig resultVar tyConResKind
+                       synifyFamilyResultSig resultVar (tyConResKind tc)
                  , fdInjectivityAnn =
                        synifyInjectivityAnn  resultVar (tyConTyVars tc)
                                        (familyTyConInjectivityInfo tc)
                  }
-    tyConResKind = piResultTys (tyConKind tc) (mkTyVarTys (tyConTyVars tc))
 
 synifyTyCon coax tc
   | Just ty <- synTyConRhs_maybe tc
@@ -365,11 +364,11 @@ synifyType _ (TyConApp tc tys)
   -- Use */# instead of TYPE 'Lifted/TYPE 'Unlifted (#473)
   | tc `hasKey` tYPETyConKey
   , [TyConApp lev []] <- tys
-  , lev `hasKey` liftedDataConKey
+  , lev `hasKey` ptrRepLiftedDataConKey
   = noLoc (HsTyVar (noLoc starKindTyConName))
   | tc `hasKey` tYPETyConKey
   , [TyConApp lev []] <- tys
-  , lev `hasKey` unliftedDataConKey
+  , lev `hasKey` ptrRepUnliftedDataConKey
   = noLoc (HsTyVar (noLoc unliftedTypeKindTyConName))
   -- Use non-prefix tuple syntax where possible, because it looks nicer.
   | Just sort <- tyConTuple_maybe tc
