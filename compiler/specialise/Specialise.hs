@@ -1312,9 +1312,17 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
                   = (inl_prag { inl_inline = EmptyInlineSpec }, noUnfolding)
 
                   | otherwise
-                  = (inl_prag, specUnfolding dflags (se_subst env)
-                                             poly_tyvars (ty_args ++ spec_dict_args)
-                                             fn_unf)
+                  = (inl_prag, specUnfolding dflags spec_unf_subst poly_tyvars
+                                             spec_unf_args fn_unf)
+
+                spec_unf_args  = ty_args ++ spec_dict_args
+                spec_unf_subst = CoreSubst.setInScope (se_subst env)
+                                    (CoreSubst.substInScope (se_subst rhs_env2))
+                  -- Extend the in-scope set to satisfy the precondition of
+                  -- specUnfolding, namely that in-scope(unf_subst) includes
+                  -- the free vars of spec_unf_args.  The in-scope set of rhs_env2
+                  -- is just the ticket; but the actual substitution we want is
+                  -- the same old one from 'env'
 
                 --------------------------------------
                 -- Adding arity information just propagates it a bit faster
@@ -1360,9 +1368,12 @@ bindAuxiliaryDicts env@(SE { se_subst = subst, se_interesting = interesting })
   = (env', dx_binds, spec_dict_args)
   where
     (dx_binds, spec_dict_args) = go call_ds inst_dict_ids
-    env' = env { se_subst = CoreSubst.extendIdSubstList subst (orig_dict_ids `zip` spec_dict_args)
+    env' = env { se_subst = subst `CoreSubst.extendIdSubstList`
+                                     (orig_dict_ids `zip` spec_dict_args)
+                                  `CoreSubst.extendInScopeList` dx_ids
                , se_interesting = interesting `unionVarSet` interesting_dicts }
 
+    dx_ids = [dx_id | (NonRec dx_id _, _) <- dx_binds]
     interesting_dicts = mkVarSet [ dx_id | (NonRec dx_id dx, _) <- dx_binds
                                  , interestingDict env dx ]
                   -- See Note [Make the new dictionaries interesting]
@@ -1370,7 +1381,7 @@ bindAuxiliaryDicts env@(SE { se_subst = subst, se_interesting = interesting })
     go :: [CoreExpr] -> [CoreBndr] -> ([DictBind], [CoreExpr])
     go [] _  = ([], [])
     go (dx:dxs) (dx_id:dx_ids)
-      | exprIsTrivial dx = (dx_binds, dx:args)
+      | exprIsTrivial dx = (dx_binds,                          dx        : args)
       | otherwise        = (mkDB (NonRec dx_id dx) : dx_binds, Var dx_id : args)
       where
         (dx_binds, args) = go dxs dx_ids

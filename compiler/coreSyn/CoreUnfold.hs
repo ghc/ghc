@@ -149,6 +149,10 @@ mkInlinableUnfolding dflags expr
 
 specUnfolding :: DynFlags -> Subst -> [Var] -> [CoreExpr] -> Unfolding -> Unfolding
 -- See Note [Specialising unfoldings]
+-- specUnfolding subst new_bndrs spec_args unf
+--   = \new_bndrs. (subst( unf ) spec_args)
+--
+-- Precondition: in-scope(subst) `superset` fvs( spec_args )
 specUnfolding _ subst new_bndrs spec_args
               df@(DFunUnfolding { df_bndrs = bndrs, df_con = con , df_args = args })
   = ASSERT2( length bndrs >= length spec_args, ppr df $$ ppr spec_args $$ ppr new_bndrs )
