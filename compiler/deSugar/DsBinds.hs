@@ -142,13 +142,13 @@ dsHsBind dflags
                   , pat_ticks = (rhs_tick, var_ticks) })
   = do  { body_expr <- dsGuarded grhss ty
         ; let body' = mkOptTickBox rhs_tick body_expr
-              (is_strict,pat') = getUnBangedLPat dflags pat
+              pat'  = decideBangHood dflags pat
         ; (force_var,sel_binds) <-
-            mkSelectorBinds is_strict var_ticks pat' body'
+            mkSelectorBinds var_ticks pat body'
           -- We silently ignore inline pragmas; no makeCorePair
           -- Not so cool, but really doesn't matter
-        ; let force_var' = if is_strict
-                           then maybe [] (\v -> [v]) force_var
+        ; let force_var' = if isBangedLPat pat'
+                           then [force_var]
                            else []
         ; return (force_var', sel_binds) }
 

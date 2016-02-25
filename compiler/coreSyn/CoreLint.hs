@@ -591,10 +591,7 @@ lintCoreExpr :: CoreExpr -> LintM OutType
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
 lintCoreExpr (Var var)
-  = do  { checkL (not (var == oneTupleDataConId))
-                 (text "Illegal one-tuple")
-
-        ; checkL (isId var && not (isCoVar var))
+  = do  { checkL (isId var && not (isCoVar var))
                  (text "Non term variable" <+> ppr var)
 
         ; checkDeadIdOcc var
@@ -1719,10 +1716,6 @@ lookupIdInScope id
                               ; return id } }
   where
     out_of_scope = pprBndr LetBind id <+> text "is out of scope"
-
-
-oneTupleDataConId :: Id -- Should not happen
-oneTupleDataConId = dataConWorkId (tupleDataCon Boxed 1)
 
 lintTyCoVarInScope :: Var -> LintM ()
 lintTyCoVarInScope v = lintInScope (text "is out of scope") v

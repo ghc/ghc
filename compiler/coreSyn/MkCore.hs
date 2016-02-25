@@ -24,14 +24,15 @@ module MkCore (
         mkCoreTupBoxity,
 
         -- * Constructing big tuples
-        mkBigCoreVarTup, mkBigCoreVarTupTy,
-        mkBigCoreTup, mkBigCoreTupTy,
+        mkBigCoreVarTup, mkBigCoreVarTup1,
+        mkBigCoreVarTupTy, mkBigCoreTupTy,
+        mkBigCoreTup,
 
         -- * Deconstructing small tuples
         mkSmallTupleSelector, mkSmallTupleCase,
 
         -- * Deconstructing big tuples
-        mkTupleSelector, mkTupleCase,
+        mkTupleSelector, mkTupleSelector1, mkTupleCase,
 
         -- * Constructing list expressions
         mkNilExpr, mkConsExpr, mkListExpr,
@@ -303,17 +304,36 @@ Creating tuples and their types for Core expressions
 
 * If there are more elements than a big tuple can have, it nests
   the tuples.
+
+Note [Flattening one-tuples]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This family of functions creates a tuple of variables/expressions/types.
+  mkCoreTup [e1,e2,e3] = (e1,e2,e3)
+What if there is just one variable/expression/type in the agument?
+We could do one of two things:
+
+* Flatten it out, so that
+    mkCoreTup [e1] = e1
+
+* Built a one-tuple (see Note [One-tuples] in TysWiredIn)
+    mkCoreTup1 [e1] = Unit e1
+  We use a suffix "1" to indicate this.
+
+Usually we want the former, but occasionally the latter.
 -}
 
 -- | Build a small tuple holding the specified variables
+-- One-tuples are flattened; see Note [Flattening of one-tuples]
 mkCoreVarTup :: [Id] -> CoreExpr
 mkCoreVarTup ids = mkCoreTup (map Var ids)
 
 -- | Bulid the type of a small tuple that holds the specified variables
+-- One-tuples are flattened; see Note [Flattening of one-tuples]
 mkCoreVarTupTy :: [Id] -> Type
 mkCoreVarTupTy ids = mkBoxedTupleTy (map idType ids)
 
 -- | Build a small tuple holding the specified expressions
+-- One-tuples are flattened; see NOte [Flattening of one-tuples]
 mkCoreTup :: [CoreExpr] -> CoreExpr
 mkCoreTup []  = Var unitDataConId
 mkCoreTup [c] = c
@@ -324,6 +344,7 @@ mkCoreTup cs  = mkCoreConApps (tupleDataCon Boxed (length cs))
 -- with the given types. The types must be the types of the expressions.
 -- Do not include the RuntimeRep specifiers; this function calculates them
 -- for you.
+-- Does /not/ flatten one-tuples; see Note [Flattening one-tuples]
 mkCoreUbxTup :: [Type] -> [CoreExpr] -> CoreExpr
 mkCoreUbxTup tys exps
   = ASSERT( tys `equalLength` exps)
@@ -336,43 +357,32 @@ mkCoreTupBoxity Boxed   exps = mkCoreTup exps
 mkCoreTupBoxity Unboxed exps = mkCoreUbxTup (map exprType exps) exps
 
 -- | Build a big tuple holding the specified variables
+-- One-tuples are flattened; see Note [Flattening of one-tuples]
 mkBigCoreVarTup :: [Id] -> CoreExpr
 mkBigCoreVarTup ids = mkBigCoreTup (map Var ids)
 
+mkBigCoreVarTup1 :: [Id] -> CoreExpr
+-- Same as mkBigCoreVarTup, but one-tuples are NOT flattened
+--                          see Note [Flattening one-tuples]
+mkBigCoreVarTup1 [id] = mkCoreConApps (tupleDataCon Boxed 1)
+                                      [Type (idType id), Var id]
+mkBigCoreVarTup1 ids  = mkBigCoreTup (map Var ids)
+
 -- | Build the type of a big tuple that holds the specified variables
+-- One-tuples are flattened; see Note [Flattening of one-tuples]
 mkBigCoreVarTupTy :: [Id] -> Type
 mkBigCoreVarTupTy ids = mkBigCoreTupTy (map idType ids)
 
 -- | Build a big tuple holding the specified expressions
+-- One-tuples are flattened; see Note [Flattening of one-tuples]
 mkBigCoreTup :: [CoreExpr] -> CoreExpr
 mkBigCoreTup = mkChunkified mkCoreTup
 
 -- | Build the type of a big tuple that holds the specified type of thing
+-- One-tuples are flattened; see Note [Flattening of one-tuples]
 mkBigCoreTupTy :: [Type] -> Type
 mkBigCoreTupTy = mkChunkified mkBoxedTupleTy
 
-{-
-************************************************************************
-*                                                                      *
-                Floats
-*                                                                      *
-************************************************************************
--}
-
-data FloatBind
-  = FloatLet  CoreBind
-  | FloatCase CoreExpr Id AltCon [Var]
-      -- case e of y { C ys -> ... }
-      -- See Note [Floating cases] in SetLevels
-
-instance Outputable FloatBind where
-  ppr (FloatLet b) = text "LET" <+> ppr b
-  ppr (FloatCase e b c bs) = hang (text "CASE" <+> ppr e <+> ptext (sLit "of") <+> ppr b)
-                                2 (ppr c <+> ppr bs)
-
-wrapFloat :: FloatBind -> CoreExpr -> CoreExpr
-wrapFloat (FloatLet defns)       body = Let defns body
-wrapFloat (FloatCase e b con bs) body = Case e b (exprType body) [(con, bs, body)]
 
 {-
 ************************************************************************
@@ -392,11 +402,12 @@ wrapFloat (FloatCase e b con bs) body = Case e b (exprType body) [(con, bs, body
 -- just the identity.
 --
 -- If necessary, we pattern match on a \"big\" tuple.
-mkTupleSelector :: [Id]         -- ^ The 'Id's to pattern match the tuple against
-                -> Id           -- ^ The 'Id' to select
-                -> Id           -- ^ A variable of the same type as the scrutinee
-                -> CoreExpr     -- ^ Scrutinee
-                -> CoreExpr     -- ^ Selector expression
+mkTupleSelector, mkTupleSelector1
+    :: [Id]         -- ^ The 'Id's to pattern match the tuple against
+    -> Id           -- ^ The 'Id' to select
+    -> Id           -- ^ A variable of the same type as the scrutinee
+    -> CoreExpr     -- ^ Scrutinee
+    -> CoreExpr     -- ^ Selector expression
 
 -- mkTupleSelector [a,b,c,d] b v e
 --          = case e of v {
@@ -420,21 +431,34 @@ mkTupleSelector vars the_var scrut_var scrut
           tpl_vs  = mkTemplateLocals tpl_tys
           [(tpl_v, group)] = [(tpl,gp) | (tpl,gp) <- zipEqual "mkTupleSelector" tpl_vs vars_s,
                                          the_var `elem` gp ]
+-- ^ 'mkTupleSelector1' is like 'mkTupleSelector'
+-- but one-tuples are NOT flattened (see Note [Flattening one-tuples])
+mkTupleSelector1 vars the_var scrut_var scrut
+  | [_] <- vars
+  = mkSmallTupleSelector1 vars the_var scrut_var scrut
+  | otherwise
+  = mkTupleSelector vars the_var scrut_var scrut
 
 -- | Like 'mkTupleSelector' but for tuples that are guaranteed
 -- never to be \"big\".
 --
 -- > mkSmallTupleSelector [x] x v e = [| e |]
 -- > mkSmallTupleSelector [x,y,z] x v e = [| case e of v { (x,y,z) -> x } |]
-mkSmallTupleSelector :: [Id]        -- The tuple args
-          -> Id         -- The selected one
-          -> Id         -- A variable of the same type as the scrutinee
-          -> CoreExpr        -- Scrutinee
+mkSmallTupleSelector, mkSmallTupleSelector1
+          :: [Id]        -- The tuple args
+          -> Id          -- The selected one
+          -> Id          -- A variable of the same type as the scrutinee
+          -> CoreExpr    -- Scrutinee
           -> CoreExpr
 mkSmallTupleSelector [var] should_be_the_same_var _ scrut
   = ASSERT(var == should_be_the_same_var)
-    scrut
+    scrut  -- Special case for 1-tuples
 mkSmallTupleSelector vars the_var scrut_var scrut
+  = mkSmallTupleSelector1 vars the_var scrut_var scrut
+
+-- ^ 'mkSmallTupleSelector1' is like 'mkSmallTupleSelector'
+-- but one-tuples are NOT flattened (see Note [Flattening one-tuples])
+mkSmallTupleSelector1 vars the_var scrut_var scrut
   = ASSERT( notNull vars )
     Case scrut scrut_var (idType the_var)
          [(DataAlt (tupleDataCon Boxed (length vars)), vars, Var the_var)]
@@ -492,6 +516,29 @@ mkSmallTupleCase vars body scrut_var scrut
 -- One branch no refinement?
   = Case scrut scrut_var (exprType body)
          [(DataAlt (tupleDataCon Boxed (length vars)), vars, body)]
+
+{-
+************************************************************************
+*                                                                      *
+                Floats
+*                                                                      *
+************************************************************************
+-}
+
+data FloatBind
+  = FloatLet  CoreBind
+  | FloatCase CoreExpr Id AltCon [Var]
+      -- case e of y { C ys -> ... }
+      -- See Note [Floating cases] in SetLevels
+
+instance Outputable FloatBind where
+  ppr (FloatLet b) = text "LET" <+> ppr b
+  ppr (FloatCase e b c bs) = hang (text "CASE" <+> ppr e <+> ptext (sLit "of") <+> ppr b)
+                                2 (ppr c <+> ppr bs)
+
+wrapFloat :: FloatBind -> CoreExpr -> CoreExpr
+wrapFloat (FloatLet defns)       body = Let defns body
+wrapFloat (FloatCase e b con bs) body = Case e b (exprType body) [(con, bs, body)]
 
 {-
 ************************************************************************
