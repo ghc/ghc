@@ -27,6 +27,7 @@ import TyCon
 import Class
 import DataCon
 import TcEvidence
+import HsBinds ( PatSynBind(..) )
 import Name
 import RdrName ( lookupGRE_Name, GlobalRdrEnv, mkRdrUnqual )
 import PrelNames ( typeableClassName, hasKey, ptrRepLiftedDataConKey
@@ -1848,6 +1849,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
       = vcat [ no_inst_msg
              , nest 2 extra_note
              , vcat (pp_givens givens)
+             , in_other_words
              , ppWhen (has_ambig_tvs && not (null unifiers && null givens))
                (vcat [ ppUnless lead_with_ambig ambig_msg, binds_msg, potential_msg ])
              , show_fixes (add_to_ctxt_fixes has_ambig_tvs ++ drv_fixes)
@@ -1890,6 +1892,18 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
                  , text "These potential instance" <> plural unifiers
                    <+> text "exist:"]
 
+        in_other_words
+          | not lead_with_ambig
+          , ProvCtxtOrigin PSB{ psb_id  = (L _ name)
+                              , psb_def = (L _ pat) } <- orig
+            -- Here we check if the "required" context is empty, otherwise
+            -- the "In other words" is not strictly true
+          , null [ n | (_, SigSkol (PatSynCtxt n) _, _, _) <- givens, name == n ]
+          = vcat [ text "In other words, a successful match on the pattern"
+                 , nest 2 $ ppr pat
+                 , text "does not provide the constraint" <+> pprParendType pred ]
+          | otherwise = empty
+
     -- Report "potential instances" only when the constraint arises
     -- directly from the user's use of an overloaded function
     want_potential (TypeEqOrigin {}) = False
@@ -1897,7 +1911,7 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
 
     add_to_ctxt_fixes has_ambig_tvs
       | not has_ambig_tvs && all_tyvars
-      , (orig:origs) <- usefulContext ctxt pred
+      , (orig:origs) <- usefulContext ctxt ct
       = [sep [ text "add" <+> pprParendType pred
                <+> text "to the context of"
              , nest 2 $ ppr_skol orig $$
@@ -2016,11 +2030,11 @@ Once these conditions are satisfied, we can safely say that ambiguity prevents
 the constraint from being solved. -}
 
 
-usefulContext :: ReportErrCtxt -> TcPredType -> [SkolemInfo]
-usefulContext ctxt pred
+usefulContext :: ReportErrCtxt -> Ct -> [SkolemInfo]
+usefulContext ctxt ct
   = go (cec_encl ctxt)
   where
-    pred_tvs = tyCoVarsOfType pred
+    pred_tvs = tyCoVarsOfType $ ctPred ct
     go [] = []
     go (ic : ics)
        | implausible ic = rest
@@ -2035,9 +2049,18 @@ usefulContext ctxt pred
       | implausible_info (ic_info ic) = True
       | otherwise                     = False
 
-    implausible_info (SigSkol (InfSigCtxt {}) _) = True
-    implausible_info _                           = False
-    -- Do not suggest adding constraints to an *inferred* type signature!
+    implausible_info (SigSkol (InfSigCtxt {}  ) _) = True
+    implausible_info (SigSkol (PatSynCtxt name) _)
+      | (ProvCtxtOrigin PSB{ psb_id = (L _ name') }) <- ctOrigin ct
+      , name == name'                              = True
+    implausible_info _                             = False
+    -- Do not suggest adding constraints to an *inferred* type signature, or to
+    -- a pattern synonym signature when its "provided" context is the origin of
+    -- the wanted constraint.  For example,
+    --   pattern Pat :: () => Show a => a -> Maybe a
+    --   pattern Pat x = Just x
+    -- This declaration should not give the possible fix:
+    --   add (Show a) to the "required" context of the signature for `Pat'
 
 show_fixes :: [SDoc] -> SDoc
 show_fixes []     = empty

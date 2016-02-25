@@ -227,13 +227,13 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
 tcCheckPatSynDecl :: PatSynBind Name Name
                   -> TcPatSynInfo
                   -> TcM (LHsBinds Id, TcGblEnv)
-tcCheckPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details
-                     , psb_def = lpat, psb_dir = dir }
+tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
+                         , psb_def = lpat, psb_dir = dir }
                   TPSI{ patsig_univ_tvs = univ_tvs, patsig_prov = prov_theta
                       , patsig_ex_tvs   = ex_tvs,   patsig_req  = req_theta
                       , patsig_arg_tys  = arg_tys,  patsig_body_ty = pat_ty }
   = addPatSynCtxt lname $
-    do { let origin     = PatOrigin -- TODO
+    do { let origin     = ProvCtxtOrigin psb
              skol_info  = SigSkol (PatSynCtxt name) (mkCheckExpType $
                                                      mkFunTys arg_tys pat_ty)
              decl_arity = length arg_names

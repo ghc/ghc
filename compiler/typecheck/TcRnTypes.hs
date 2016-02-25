@@ -2713,6 +2713,9 @@ data CtOrigin
   | ExprSigOrigin       -- e :: ty
   | PatSigOrigin        -- p :: ty
   | PatOrigin           -- Instantiating a polytyped pattern at a constructor
+  | ProvCtxtOrigin      -- The "provided" context of a pattern synonym signature
+        (PatSynBind Name Name) -- Information about the pattern synonym, in particular
+                               -- the name and the right-hand side
   | RecordUpdOrigin
   | ViewPatOrigin
 
@@ -2948,6 +2951,10 @@ pprCtOrigin (Shouldn'tHappenOrigin note)
     vcat [ text "<< This should not appear in error messages. If you see this"
          , text "in an error message, please report a bug mentioning" <+> quotes (text note) <+> text "at"
          , text "https://ghc.haskell.org/trac/ghc/wiki/ReportABug >>" ]
+
+pprCtOrigin (ProvCtxtOrigin PSB{ psb_id = (L _ name) })
+  = hang (ctoHerald <+> text "the \"provided\" constraints claimed by")
+       2 (text "the signature of" <+> quotes (ppr name))
 
 pprCtOrigin simple_origin
   = ctoHerald <+> pprCtO simple_origin
