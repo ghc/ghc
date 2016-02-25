@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE TypeOperators #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -29,6 +30,7 @@ import Data.Maybe
 import Data.Monoid ( Dual(..), Sum(..), Product(..)
                    , First(..), Last(..), Alt(..) )
 import GHC.Base ( Monad, errorWithoutStackTrace, (.) )
+import GHC.Generics
 import GHC.List ( head, tail )
 import GHC.ST
 import System.IO
@@ -103,3 +105,19 @@ instance MonadFix Last where
 
 instance MonadFix f => MonadFix (Alt f) where
     mfix f   = Alt (mfix (getAlt . f))
+
+-- Instances for GHC.Generics
+instance MonadFix Par1 where
+    mfix f = Par1 (fix (unPar1 . f))
+
+instance MonadFix f => MonadFix (Rec1 f) where
+    mfix f = Rec1 (mfix (unRec1 . f))
+
+instance MonadFix f => MonadFix (M1 i c f) where
+    mfix f = M1 (mfix (unM1. f))
+
+instance (MonadFix f, MonadFix g) => MonadFix (f :*: g) where
+    mfix f = (mfix (fstP . f)) :*: (mfix (sndP . f))
+      where
+        fstP (a :*: _) = a
+        sndP (_ :*: b) = b

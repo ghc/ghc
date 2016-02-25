@@ -18,6 +18,7 @@ module Data.Bifunctor
   ) where
 
 import Control.Applicative  ( Const(..) )
+import GHC.Generics ( K1(..) )
 
 -- | Formally, the class 'Bifunctor' represents a bifunctor
 -- from @Hask@ -> @Hask@.
@@ -99,3 +100,6 @@ instance Bifunctor Either where
 
 instance Bifunctor Const where
     bimap f _ (Const a) = Const (f a)
+
+instance Bifunctor (K1 i) where
+    bimap f _ (K1 c) = K1 (f c)

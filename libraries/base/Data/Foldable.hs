@@ -1,6 +1,10 @@
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeOperators #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -61,6 +65,7 @@ import GHC.Arr  ( Array(..), elems, numElements,
                   foldlElems', foldrElems',
                   foldl1Elems, foldr1Elems)
 import GHC.Base hiding ( foldr )
+import GHC.Generics
 import GHC.Num  ( Num(..) )
 
 infix  4 `elem`, `notElem`
@@ -418,6 +423,23 @@ instance Ord a => Monoid (Min a) where
   (Min m@(Just x)) `mappend` (Min n@(Just y))
     | x <= y    = Min m
     | otherwise = Min n
+
+-- Instances for GHC.Generics
+deriving instance Foldable V1
+deriving instance Foldable U1
+deriving instance Foldable Par1
+deriving instance Foldable f => Foldable (Rec1 f)
+deriving instance Foldable (K1 i c)
+deriving instance Foldable f => Foldable (M1 i c f)
+deriving instance (Foldable f, Foldable g) => Foldable (f :+: g)
+deriving instance (Foldable f, Foldable g) => Foldable (f :*: g)
+deriving instance (Foldable f, Foldable g) => Foldable (f :.: g)
+deriving instance Foldable UAddr
+deriving instance Foldable UChar
+deriving instance Foldable UDouble
+deriving instance Foldable UFloat
+deriving instance Foldable UInt
+deriving instance Foldable UWord
 
 -- | Monadic fold over the elements of a structure,
 -- associating to the right, i.e. from right to left.
