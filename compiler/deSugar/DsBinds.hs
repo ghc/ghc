@@ -184,6 +184,26 @@ dsHsBind dflags
 
        ; return ([], main_bind : fromOL spec_binds) }
 
+        -- Another common case: no tyvars, no dicts
+        -- In this case we can have a much simpler desugaring
+dsHsBind dflags
+         (AbsBinds { abs_tvs = [], abs_ev_vars = []
+                   , abs_exports = exports
+                   , abs_ev_binds = ev_binds, abs_binds = binds })
+  = do { (force_vars, bind_prs) <- ds_lhs_binds binds
+       ; let mk_bind (ABE { abe_wrap = wrap
+                          , abe_poly = global
+                          , abe_mono = local
+                          , abe_prags = prags })
+              = do { rhs <- dsHsWrapper wrap (Var local)
+                   ; return (makeCorePair dflags global
+                                          (isDefaultMethod prags)
+                                          0 rhs) }
+       ; main_binds <- mapM mk_bind exports
+
+       ; ds_binds <- dsTcEvBinds_s ev_binds
+       ; return (force_vars, flattenBinds ds_binds ++ bind_prs ++ main_binds) }
+
 dsHsBind dflags
          (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                    , abs_exports = exports, abs_ev_binds = ev_binds
