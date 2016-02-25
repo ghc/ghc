@@ -429,7 +429,7 @@ tidy1 v (AsPat (L _ var) pat)
 -}
 
 tidy1 v (LazyPat pat)
-  = do  { (_,sel_prs) <- mkSelectorBinds False [] pat (Var v)
+  = do  { (_,sel_prs) <- mkSelectorBinds [] pat (Var v)
         ; let sel_binds =  [NonRec b rhs | (b,rhs) <- sel_prs]
         ; return (mkCoreLets sel_binds, WildPat (idType v)) }
 
@@ -690,13 +690,11 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
         ; eqns_info   <- mapM (mk_eqn_info new_vars) matches
 
         -- pattern match check warnings
-        ; unless (isGenerated origin) $ do
-
-            when (isAnyPmCheckEnabled dflags (DsMatchContext ctxt locn)) $ do
-
+        ; unless (isGenerated origin) $
+          when (isAnyPmCheckEnabled dflags (DsMatchContext ctxt locn)) $
+          addTmCsDs (genCaseTmCs1 mb_scr new_vars) $
               -- See Note [Type and Term Equality Propagation]
-              addTmCsDs (genCaseTmCs1 mb_scr new_vars) $
-                checkMatches dflags (DsMatchContext ctxt locn) new_vars matches
+          checkMatches dflags (DsMatchContext ctxt locn) new_vars matches
 
         ; result_expr <- handleWarnings $
                          matchEquations ctxt new_vars eqns_info rhs_ty
@@ -704,12 +702,12 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
   where
     mk_eqn_info vars (L _ (Match _ pats _ grhss))
       = do { dflags <- getDynFlags
-           ; let upats = map (getMaybeStrictPat dflags) pats
+           ; let upats = map (unLoc . decideBangHood dflags) pats
                  dicts = toTcTypeBag (collectEvVarsPats upats) -- Only TcTyVars
            ; tm_cs <- genCaseTmCs2 mb_scr upats vars
-           ; match_result <- addDictsDs dicts $  -- See Note [Type and Term Equality Propagation]
-                               addTmCsDs tm_cs $ -- See Note [Type and Term Equality Propagation]
-                                 dsGRHSs ctxt upats grhss rhs_ty
+           ; match_result <- addDictsDs dicts $ -- See Note [Type and Term Equality Propagation]
+                             addTmCsDs tm_cs  $ -- See Note [Type and Term Equality Propagation]
+                             dsGRHSs ctxt upats grhss rhs_ty
            ; return (EqnInfo { eqn_pats = upats, eqn_rhs  = match_result}) }
 
     handleWarnings = if isGenerated origin
@@ -763,22 +761,17 @@ matchSinglePat :: CoreExpr -> HsMatchContext Name -> LPat Id
 matchSinglePat (Var var) ctx pat ty match_result
   = do { dflags <- getDynFlags
        ; locn   <- getSrcSpanDs
-       ; let pat' = getMaybeStrictPat dflags pat
-       -- pattern match check warnings
-       ; checkSingle dflags (DsMatchContext ctx locn) var pat'
+                    -- Pattern match check warnings
+       ; checkSingle dflags (DsMatchContext ctx locn) var (unLoc pat)
 
-       ; match [var] ty
-               [EqnInfo { eqn_pats = [pat'], eqn_rhs  = match_result }] }
+       ; let eqn_info = EqnInfo { eqn_pats = [unLoc (decideBangHood dflags pat)]
+                                , eqn_rhs  = match_result }
+       ; match [var] ty [eqn_info] }
 
 matchSinglePat scrut hs_ctx pat ty match_result
   = do { var <- selectSimpleMatchVarL pat
        ; match_result' <- matchSinglePat (Var var) hs_ctx pat ty match_result
        ; return (adjustMatchResult (bindNonRec var scrut) match_result') }
-
-getMaybeStrictPat :: DynFlags -> LPat Id -> Pat Id
-getMaybeStrictPat dflags pat =
-  let (is_strict, pat') = getUnBangedLPat dflags pat
-  in if is_strict then BangPat pat' else unLoc pat'
 
 
 {-

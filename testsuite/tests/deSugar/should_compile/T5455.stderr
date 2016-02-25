@@ -1,4 +1,8 @@
 
-T5455.hs:13:13:
-    Warning: Pattern match(es) are non-exhaustive
-             In a pattern binding: Patterns not matched: []
+T5455.hs:8:11: warning:
+    Pattern match(es) are non-exhaustive
+    In a pattern binding: Patterns not matched: []
+
+T5455.hs:13:13: warning:
+    Pattern match(es) are non-exhaustive
+    In a pattern binding: Patterns not matched: []
