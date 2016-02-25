@@ -813,15 +813,30 @@ tcPatToExpr args = go
     lhsVars = mkNameSet (map unLoc args)
 
     go :: LPat Name -> Maybe (LHsExpr Name)
-    go (L loc (ConPatIn (L _ con) info))
-      = do { exprs <- mapM go (hsConPatArgs info)
-           ; return $ L loc $
-             foldl (\x y -> HsApp (L loc x) y) (HsVar (L loc con)) exprs }
+    go (L loc (ConPatIn con info))
+      = case info of
+          PrefixCon ps  -> mkPrefixConExpr con ps
+          InfixCon l r  -> mkPrefixConExpr con [l,r]
+          RecCon fields -> L loc <$> mkRecordConExpr con fields
 
     go (L _ (SigPatIn pat _)) = go pat
         -- See Note [Type signatures and the builder expression]
 
-    go (L loc p) = fmap (L loc) $ go1 p
+    go (L loc p) = L loc <$> go1 p
+
+    -- Make a prefix con for prefix and infix patterns for simplicity
+    mkPrefixConExpr :: Located Name -> [LPat Name] -> Maybe (LHsExpr Name)
+    mkPrefixConExpr con pats = do
+      exprs <- traverse go pats
+      return $ foldl (\x y -> L (combineLocs x y) (HsApp x y))
+                     (L (getLoc con) (HsVar con))
+                     exprs
+
+
+    mkRecordConExpr :: Located Name -> HsRecFields Name (LPat Name) -> Maybe (HsExpr Name)
+    mkRecordConExpr con fields = do
+      exprFields <- traverse go fields
+      return $ RecordCon con PlaceHolder noPostTcExpr exprFields
 
     go1 :: Pat Name -> Maybe (HsExpr Name)
     go1   (VarPat (L l var))
