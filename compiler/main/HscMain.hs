@@ -90,12 +90,12 @@ import Type             ( Type )
 import {- Kind parts of -} Type         ( Kind )
 import CoreLint         ( lintInteractiveExpr )
 import VarEnv           ( emptyTidyEnv )
-import THNames          ( templateHaskellNames )
 import Panic
 import ConLike
 import Control.Concurrent
 #endif
 
+import THNames          ( templateHaskellNames )
 import Module
 import Packages
 import RdrName
@@ -208,9 +208,7 @@ allKnownKeyNames                -- where templateHaskellNames are defined
   = all_names
   where
     all_names = knownKeyNames
-#ifdef GHCI
                 ++ templateHaskellNames
-#endif
 
     namesEnv      = foldl (\m n -> extendNameEnv_Acc (:) singleton m n n)
                           emptyUFM all_names
