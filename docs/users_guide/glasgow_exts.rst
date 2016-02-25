@@ -11047,11 +11047,11 @@ Using static pointers
 
 Each reference is given a key which can be used to locate it at runtime
 with
-:base-ref:`unsafeLookupStaticPtr <GHC.StaticPtr.html#v%3AunsafeLookupStaticPtr>`
+:base-ref:`unsafeLookupStaticPtr <GHC-StaticPtr.html#v%3AunsafeLookupStaticPtr>`
 which uses a global and immutable table called the Static Pointer Table.
 The compiler includes entries in this table for all static forms found
 in the linked modules. The value can be obtained from the reference via
-:base-ref:`deRefStaticPtr <GHC.StaticPtr.html#v%3AdeRefStaticPtr>`.
+:base-ref:`deRefStaticPtr <GHC-StaticPtr.html#v%3AdeRefStaticPtr>`.
 
 The body ``e`` of a ``static e`` expression must be a closed expression.
 That is, there can be no free variables occurring in ``e``, i.e. lambda-
@@ -11084,7 +11084,23 @@ Informally, if we have a closed expression ::
 
 the static form is of type ::
 
-    static e :: (Typeable a_1, ... , Typeable a_n) => StaticPtr t
+    static e :: (IsStatic p, Typeable a_1, ... , Typeable a_n) => p t
+
+
+A static form determines a value of type ``StaticPtr t``, but just
+like ``OverloadedLists`` and ``OverloadedStrings``, this literal
+expression is overloaded to allow lifting a ``StaticPtr`` into another
+type implicitly, via the ``IsStatic`` class: ::
+
+    class IsStatic p where
+        fromStaticPtr :: StaticPtr a -> p a
+
+The only predefined instance is the obvious one that does nothing: ::
+
+    instance IsStatic StaticPtr where
+        fromStaticPtr sptr = sptr
+
+See :base-ref:`IsStatic <GHC-StaticPtr.html#t%3AIsStatic>`.
 
 Furthermore, type ``t`` is constrained to have a ``Typeable`` instance.
 The following are therefore illegal: ::

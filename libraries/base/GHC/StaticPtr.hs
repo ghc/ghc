@@ -38,6 +38,7 @@ module GHC.StaticPtr
   , StaticPtrInfo(..)
   , staticPtrInfo
   , staticPtrKeys
+  , IsStatic(..)
   ) where
 
 import Foreign.C.Types     (CInt(..))
@@ -79,6 +80,13 @@ unsafeLookupStaticPtr (Fingerprint w1 w2) = do
            (# spe #) -> return (Just spe)
 
 foreign import ccall unsafe hs_spt_lookup :: Ptr () -> IO (Ptr a)
+
+-- | A class for things buildable from static pointers.
+class IsStatic p where
+    fromStaticPtr :: StaticPtr a -> p a
+
+instance IsStatic StaticPtr where
+    fromStaticPtr = id
 
 -- | Miscelaneous information available for debugging purposes.
 data StaticPtrInfo = StaticPtrInfo
