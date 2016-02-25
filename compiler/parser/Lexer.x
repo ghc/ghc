@@ -981,24 +981,35 @@ ifExtension pred bits _ _ _ = pred bits
 multiline_doc_comment :: Action
 multiline_doc_comment span buf _len = withLexedDocType (worker "")
   where
-    worker commentAcc input docType oneLine = case alexGetChar' input of
+    worker commentAcc input docType checkNextLine = case alexGetChar' input of
       Just ('\n', input')
-        | oneLine -> docCommentEnd input commentAcc docType buf span
-        | otherwise -> case checkIfCommentLine input' of
-          Just input -> worker ('\n':commentAcc) input docType False
+        | checkNextLine -> case checkIfCommentLine input' of
+          Just input -> worker ('\n':commentAcc) input docType checkNextLine
           Nothing -> docCommentEnd input commentAcc docType buf span
-      Just (c, input) -> worker (c:commentAcc) input docType oneLine
+        | otherwise -> docCommentEnd input commentAcc docType buf span
+      Just (c, input) -> worker (c:commentAcc) input docType checkNextLine
       Nothing -> docCommentEnd input commentAcc docType buf span
 
+    -- Check if the next line of input belongs to this doc comment as well.
+    -- A doc comment continues onto the next line when the following
+    -- conditions are met:
+    --   * The line starts with "--"
+    --   * The line doesn't start with "---".
+    --   * The line doesn't start with "-- $", because that would be the
+    --     start of a /new/ named haddock chunk (#10398).
+    checkIfCommentLine :: AlexInput -> Maybe AlexInput
     checkIfCommentLine input = check (dropNonNewlineSpace input)
       where
-        check input = case alexGetChar' input of
-          Just ('-', input) -> case alexGetChar' input of
-            Just ('-', input) -> case alexGetChar' input of
-              Just (c, _) | c /= '-' -> Just input
-              _ -> Nothing
-            _ -> Nothing
-          _ -> Nothing
+        check input = do
+          ('-', input) <- alexGetChar' input
+          ('-', input) <- alexGetChar' input
+          (c, after_c) <- alexGetChar' input
+          case c of
+            '-' -> Nothing
+            ' ' -> case alexGetChar' after_c of
+                     Just ('$', _) -> Nothing
+                     _ -> Just input
+            _   -> Just input
 
         dropNonNewlineSpace input = case alexGetChar' input of
           Just (c, input')
@@ -1062,8 +1073,10 @@ withLexedDocType :: (AlexInput -> (String -> Token) -> Bool -> P (RealLocated To
 withLexedDocType lexDocComment = do
   input@(AI _ buf) <- getInput
   case prevChar buf ' ' of
-    '|' -> lexDocComment input ITdocCommentNext False
-    '^' -> lexDocComment input ITdocCommentPrev False
+    -- The `Bool` argument to lexDocComment signals whether or not the next
+    -- line of input might also belong to this doc comment.
+    '|' -> lexDocComment input ITdocCommentNext True
+    '^' -> lexDocComment input ITdocCommentPrev True
     '$' -> lexDocComment input ITdocCommentNamed True
     '*' -> lexDocSection 1 input
     '#' -> lexDocComment input ITdocOptionsOld False
@@ -1071,7 +1084,7 @@ withLexedDocType lexDocComment = do
  where
     lexDocSection n input = case alexGetChar' input of
       Just ('*', input) -> lexDocSection (n+1) input
-      Just (_,   _)     -> lexDocComment input (ITdocSection n) True
+      Just (_,   _)     -> lexDocComment input (ITdocSection n) False
       Nothing -> do setInput input; lexToken -- eof reached, lex it normally
 
 -- RULES pragmas turn on the forall and '.' keywords, and we turn them
