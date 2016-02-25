@@ -1,4 +1,4 @@
 
-ds058.hs:5:7: warning:
-    Pattern match(es) are redundant
+ds058.hs:7:9: warning:
+    Pattern match is redundant
     In a case alternative: Just _ -> ...

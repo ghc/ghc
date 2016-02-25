@@ -1,6 +1,8 @@
 
-ds003.hs:5:1: Warning:
-    Pattern match(es) are redundant
-    In an equation for ‘f’:
-        f (x : x1 : x2 : x3) ~(y, ys) z = ...
-        f x y True = ...
+ds003.hs:7:1: warning:
+    Pattern match is redundant
+    In an equation for ‘f’: f (x : x1 : x2 : x3) ~(y, ys) z = ...
+
+ds003.hs:8:1: warning:
+    Pattern match is redundant
+    In an equation for ‘f’: f x y True = ...

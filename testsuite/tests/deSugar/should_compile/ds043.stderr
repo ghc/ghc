@@ -1,4 +1,4 @@
 
-ds043.hs:8:2: warning:
-    Pattern match(es) are redundant
+ds043.hs:10:3: warning:
+    Pattern match is redundant
     In a case alternative: B {e = True, f = False} -> ...

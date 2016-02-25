@@ -1,6 +1,8 @@
 
-ds022.hs:22:1: Warning:
-    Pattern match(es) are redundant
-    In an equation for ‘i’:
-        i 1 0.011e2 = ...
-        i 2 2.20000 = ...
+ds022.hs:24:1: warning:
+    Pattern match is redundant
+    In an equation for ‘i’: i 1 0.011e2 = ...
+
+ds022.hs:25:1: warning:
+    Pattern match is redundant
+    In an equation for ‘i’: i 2 2.20000 = ...

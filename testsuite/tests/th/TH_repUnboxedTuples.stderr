@@ -5,5 +5,5 @@ case (# 'b', GHC.Types.False #) of
     (# _, _ #) -> (# "Three", 3 #)
 
 TH_repUnboxedTuples.hs:18:13: warning:
-    Pattern match(es) are redundant
+    Pattern match is redundant
     In a case alternative: (# 'a', True #) -> ...

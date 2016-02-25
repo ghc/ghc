@@ -1,4 +1,4 @@
 
-ds056.hs:8:1: warning:
-    Pattern match(es) are redundant
+ds056.hs:10:1: warning:
+    Pattern match is redundant
     In an equation for ‘g’: g _ = ...
