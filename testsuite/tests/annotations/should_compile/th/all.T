@@ -1,6 +1,6 @@
 # Annotations and Template Haskell, require runtime evaluation.  In
 # order for this to work with profiling, we would have to build the
-# program twice and use -osuf p_o (see the TH_splitE5_prof test).  For
+# program twice and use -osuf p_o (see the TH_spliceE5_prof test).  For
 # now, just disable the profiling ways.
 
 test('annth_make',

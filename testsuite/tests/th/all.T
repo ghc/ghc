@@ -38,7 +38,8 @@ test('TH_NestedSplices',
      multimod_compile,
      ['TH_NestedSplices.hs', '-v0 ' + config.ghc_th_way_flags])
 
-# Testing profiling with TH is a bit tricky; we've already disabled
+# Testing profiling with TH is a bit tricky (when not using
+# -fexternal-interpreter); we've already disabled
 # the prof way above, and also we want to add options specifically for
 # profiling (-osuf p.o) because this is necessary when mixing
 # profiling w/ TH.  Furthermore we must have built the program the

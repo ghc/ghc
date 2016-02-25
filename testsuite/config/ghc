@@ -203,18 +203,22 @@ def get_compiler_info():
         # GHC < 7.7 doesn't have a "GHC Dynamic" field
         ghcDynamic = False
 
+    # See Note [WayFlags]
     if ghcDynamic:
         config.ghc_th_way_flags = "-dynamic"
         config.ghci_way_flags   = "-dynamic"
+        config.plugin_way_flags = "-dynamic"
         config.ghc_th_way       = "dyn"
         config.ghc_plugin_way   = "dyn"
     elif config.compiler_profiled:
         config.ghc_th_way_flags = "-prof"
         config.ghci_way_flags   = "-prof"
+        config.plugin_way_flags = "-prof"
         config.ghc_th_way       = "prof"
         config.ghc_plugin_way   = "prof"
     else:
         config.ghc_th_way_flags = "-static"
         config.ghci_way_flags   = "-static"
+        config.plugin_way_flags = "-static"
         config.ghc_th_way       = "normal"
         config.ghc_plugin_way   = "normal"

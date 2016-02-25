@@ -179,7 +179,7 @@ test('T7702',
           [(wordsize(32), 18, 70), (wordsize(64), 18, 70)]) 
      ], 
      compile, 
-     ['-v0 -package-db T7702plugin/pkg.T7702/local.package.conf -fplugin T7702Plugin -package T7702plugin ' + config.ghci_way_flags])
+     ['-v0 -package-db T7702plugin/pkg.T7702/local.package.conf -fplugin T7702Plugin -package T7702plugin ' + config.plugin_way_flags])
 
 test('T7995',
      # RULE doesn't seem to fire unless optimizations are turned on.
