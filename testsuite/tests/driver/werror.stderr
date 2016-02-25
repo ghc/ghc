@@ -19,12 +19,12 @@ werror.hs:10:1: warning:
       f :: forall t t1. [t] -> [t1]
 
 werror.hs:10:1: warning:
-    Pattern match(es) are redundant
-    In an equation for ‘f’: f [] = ...
-
-werror.hs:10:1: warning:
     Pattern match(es) are non-exhaustive
     In an equation for ‘f’: Patterns not matched: (_:_)
+
+werror.hs:11:1: warning:
+    Pattern match is redundant
+    In an equation for ‘f’: f [] = ...
 
 <no location info>: error: 
 Failing due to -Werror.

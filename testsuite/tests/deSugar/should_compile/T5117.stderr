@@ -1,4 +1,4 @@
 
-T5117.hs:15:1: Warning:
-    Pattern match(es) are redundant
+T5117.hs:16:1: warning:
+    Pattern match is redundant
     In an equation for ‘f3’: f3 (MyString "a") = ...

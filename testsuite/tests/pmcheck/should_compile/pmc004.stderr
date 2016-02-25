@@ -1,3 +1,4 @@
-pmc004.hs:15:1: warning:
-    Pattern match(es) have inaccessible right hand side
+
+pmc004.hs:16:1: warning:
+    Pattern match has inaccessible right hand side
     In an equation for ‘h’: h _ G1 = ...

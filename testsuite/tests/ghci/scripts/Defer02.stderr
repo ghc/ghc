@@ -18,7 +18,7 @@
       In an equation for ‘b’: b x = x == x
 
 ../../typecheck/should_run/Defer01.hs:25:1: warning:
-    Pattern match(es) have inaccessible right hand side
+    Pattern match has inaccessible right hand side
     In an equation for ‘c’: c (C2 x) = ...
 
 ../../typecheck/should_run/Defer01.hs:25:4: warning:
@@ -103,7 +103,7 @@
         k :: (Int ~ Bool) => Int -> Bool
 
 ../../typecheck/should_run/Defer01.hs:46:1: warning:
-    Pattern match(es) are redundant
+    Pattern match is redundant
     In an equation for ‘k’: k x = ...
 
 ../../typecheck/should_run/Defer01.hs:49:5: warning:

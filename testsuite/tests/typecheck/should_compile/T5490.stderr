@@ -1,8 +1,8 @@
 
-T5490.hs:245:15: warning:
-    Pattern match(es) are redundant
+T5490.hs:246:5: warning:
+    Pattern match is redundant
     In a case alternative: HDropZero -> ...
 
-T5490.hs:288:3: warning:
-    Pattern match(es) are redundant
+T5490.hs:295:5: warning:
+    Pattern match is redundant
     In a case alternative: _ -> ...

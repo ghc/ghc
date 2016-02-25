@@ -130,7 +130,7 @@ type Triple = (Bool, Uncovered, Bool)
 -- * Redundant clauses
 -- * Not-covered clauses
 -- * Clauses with inaccessible RHS
-type PmResult = ([[LPat Id]], Uncovered, [[LPat Id]])
+type PmResult = ([Located [LPat Id]], Uncovered, [Located [LPat Id]])
 
 {-
 %************************************************************************
@@ -142,15 +142,15 @@ type PmResult = ([[LPat Id]], Uncovered, [[LPat Id]])
 
 -- | Check a single pattern binding (let)
 checkSingle :: DynFlags -> DsMatchContext -> Id -> Pat Id -> DsM ()
-checkSingle dflags ctxt var p = do
-  mb_pm_res <- tryM (checkSingle' var p)
+checkSingle dflags ctxt@(DsMatchContext _ locn) var p = do
+  mb_pm_res <- tryM (checkSingle' locn var p)
   case mb_pm_res of
     Left  _   -> warnPmIters dflags ctxt
     Right res -> dsPmWarn dflags ctxt res
 
 -- | Check a single pattern binding (let)
-checkSingle' :: Id -> Pat Id -> DsM PmResult
-checkSingle' var p = do
+checkSingle' :: SrcSpan -> Id -> Pat Id -> DsM PmResult
+checkSingle' locn var p = do
   resetPmIterDs -- set the iter-no to zero
   fam_insts <- dsGetFamInstEnvs
   clause    <- translatePat fam_insts p
@@ -160,7 +160,7 @@ checkSingle' var p = do
     (True,  _    ) -> ([], us, []) -- useful
     (False, False) -> ( m, us, []) -- redundant
     (False, True ) -> ([], us,  m) -- inaccessible rhs
-  where m = [[noLoc p]]
+  where m = [L locn [L locn p]]
 
 -- | Check a matchgroup (case, functions, etc.)
 checkMatches :: DynFlags -> DsMatchContext
@@ -179,7 +179,7 @@ checkMatches' vars matches
       resetPmIterDs -- set the iter-no to zero
       missing    <- mkInitialUncovered vars
       (rs,us,ds) <- go matches missing
-      return (map hsLMatchPats rs, us, map hsLMatchPats ds)
+      return (map hsLMatchToLPats rs, us, map hsLMatchToLPats ds)
   where
     go []     missing = return ([], missing, [])
     go (m:ms) missing = do
@@ -191,6 +191,9 @@ checkMatches' vars matches
         (True,  _    ) -> (  rs, final_u,   is) -- useful
         (False, False) -> (m:rs, final_u,   is) -- redundant
         (False, True ) -> (  rs, final_u, m:is) -- inaccessible
+
+    hsLMatchToLPats :: LMatch id body -> Located [LPat id]
+    hsLMatchToLPats (L l (Match _ pats _ _)) = L l pats
 
 {-
 %************************************************************************
@@ -1238,22 +1241,22 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
       let exists_r = flag_i && notNull redundant
           exists_i = flag_i && notNull inaccessible
           exists_u = flag_u && notNull uncovered
-      when exists_r $ putSrcSpanDs loc (warnDs (pprEqns  redundant    rmsg))
-      when exists_i $ putSrcSpanDs loc (warnDs (pprEqns  inaccessible imsg))
-      when exists_u $ putSrcSpanDs loc (warnDs (pprEqnsU uncovered))
+      when exists_r $ forM_ redundant $ \(L l q) -> do
+        putSrcSpanDs l (warnDs (pprEqn q "is redundant"))
+      when exists_i $ forM_ inaccessible $ \(L l q) -> do
+        putSrcSpanDs l (warnDs (pprEqn q "has inaccessible right hand side"))
+      when exists_u $ putSrcSpanDs loc (warnDs (pprEqns uncovered))
   where
     (redundant, uncovered, inaccessible) = pm_result
 
     flag_i = wopt Opt_WarnOverlappingPatterns dflags
     flag_u = exhaustive dflags kind
 
-    rmsg = "are redundant"
-    imsg = "have inaccessible right hand side"
+    -- Print a single clause (for redundant/with-inaccessible-rhs)
+    pprEqn q txt = pp_context True ctx (text txt) $ \f -> ppr_eqn f kind q
 
-    pprEqns qs txt = pp_context ctx (text txt) $ \f ->
-      vcat (map (ppr_eqn f kind) (take maximum_output qs)) $$ dots qs
-
-    pprEqnsU qs = pp_context ctx (text "are non-exhaustive") $ \_ ->
+    -- Print several clauses (for uncovered clauses)
+    pprEqns qs = pp_context False ctx (text "are non-exhaustive") $ \_ ->
       case qs of -- See #11245
            [ValVec [] _]
                     -> text "Guards do not cover entire pattern space"
@@ -1299,12 +1302,16 @@ exhaustive _dflags (StmtCtxt {}) = False -- Don't warn about incomplete patterns
                                        -- etc. They are often *supposed* to be
                                        -- incomplete
 
-pp_context :: DsMatchContext -> SDoc -> ((SDoc -> SDoc) -> SDoc) -> SDoc
-pp_context (DsMatchContext kind _loc) msg rest_of_msg_fun
-  = vcat [text "Pattern match(es)" <+> msg,
+-- True <==> singular
+pp_context :: Bool -> DsMatchContext -> SDoc -> ((SDoc -> SDoc) -> SDoc) -> SDoc
+pp_context singular (DsMatchContext kind _loc) msg rest_of_msg_fun
+  = vcat [text txt <+> msg,
           sep [ text "In" <+> ppr_match <> char ':'
               , nest 4 (rest_of_msg_fun pref)]]
   where
+    txt | singular  = "Pattern match"
+        | otherwise = "Pattern match(es)"
+
     (ppr_match, pref)
         = case kind of
              FunRhs fun -> (pprMatchContext kind, \ pp -> ppr fun <+> pp)
