@@ -39,14 +39,7 @@ module HscMain
     , HscStatus (..)
     , hscIncrementalCompile
     , hscCompileCmmFile
-    , hscCompileCore
 
-    , hscIncrementalFrontend
-
-    , genModDetails
-    , hscSimpleIface
-    , hscWriteIface
-    , hscNormalIface
     , hscGenHardCode
     , hscInteractive
 
@@ -54,7 +47,6 @@ module HscMain
     , hscParse
     , hscTypecheckRename
     , hscDesugar
-    , makeSimpleIface
     , makeSimpleDetails
     , hscSimplify -- ToDo, shouldn't really export this
 
@@ -490,19 +482,6 @@ hscDesugar' mod_location tc_result = do
     -- warnings to arise before the backend.
     handleWarnings
     return r
-
--- | Make a 'ModIface' from the results of typechecking. Used when
--- not optimising, and the interface doesn't need to contain any
--- unfoldings or other cross-module optimisation info.
--- ToDo: the old interface is only needed to get the version numbers,
--- we should use fingerprint versions instead.
-makeSimpleIface :: HscEnv -> Maybe ModIface -> TcGblEnv -> ModDetails
-                -> IO (ModIface,Bool)
-makeSimpleIface hsc_env maybe_old_iface tc_result details = runHsc hsc_env $ do
-    safe_mode <- hscGetSafeMode tc_result
-    liftIO $ do
-        mkIfaceTc hsc_env (fmap mi_iface_hash maybe_old_iface) safe_mode
-                  details tc_result
 
 -- | Make a 'ModDetails' from the results of typechecking. Used when
 -- typechecking only, as opposed to full compilation.
@@ -1694,53 +1673,6 @@ hscParseThingWithLocation source linenumber parser str
             logWarningsReportErrors (getMessages pst)
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr thing)
             return thing
-
-hscCompileCore :: HscEnv -> Bool -> SafeHaskellMode -> ModSummary
-               -> CoreProgram -> FilePath -> IO ()
-hscCompileCore hsc_env simplify safe_mode mod_summary binds output_filename
-  = runHsc hsc_env $ do
-        guts <- maybe_simplify (mkModGuts (ms_mod mod_summary) safe_mode binds)
-        (iface, changed, _details, cgguts) <- hscNormalIface' guts Nothing
-        liftIO $ hscWriteIface (hsc_dflags hsc_env) iface changed mod_summary
-        _ <- liftIO $ hscGenHardCode hsc_env cgguts mod_summary output_filename
-        return ()
-
-  where
-    maybe_simplify mod_guts | simplify = hscSimplify' mod_guts
-                            | otherwise = return mod_guts
-
--- Makes a "vanilla" ModGuts.
-mkModGuts :: Module -> SafeHaskellMode -> CoreProgram -> ModGuts
-mkModGuts mod safe binds =
-    ModGuts {
-        mg_module       = mod,
-        mg_hsc_src      = HsSrcFile,
-        mg_loc          = mkGeneralSrcSpan (moduleNameFS (moduleName mod)),
-                                  -- A bit crude
-        mg_exports      = [],
-        mg_usages       = [],
-        mg_deps         = noDependencies,
-        mg_used_th      = False,
-        mg_rdr_env      = emptyGlobalRdrEnv,
-        mg_fix_env      = emptyFixityEnv,
-        mg_tcs          = [],
-        mg_insts        = [],
-        mg_fam_insts    = [],
-        mg_patsyns      = [],
-        mg_rules        = [],
-        mg_vect_decls   = [],
-        mg_binds        = binds,
-        mg_foreign      = NoStubs,
-        mg_warns        = NoWarnings,
-        mg_anns         = [],
-        mg_hpc_info     = emptyHpcInfo False,
-        mg_modBreaks    = Nothing,
-        mg_vect_info    = noVectInfo,
-        mg_inst_env     = emptyInstEnv,
-        mg_fam_inst_env = emptyFamInstEnv,
-        mg_safe_haskell = safe,
-        mg_trust_pkg    = False
-    }
 
 
 {- **********************************************************************
