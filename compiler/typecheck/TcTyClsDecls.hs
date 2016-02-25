@@ -2128,13 +2128,13 @@ checkValidDataCon dflags existential_ok tc con
           (bad_bang n (text "Lazy annotation (~) without StrictData"))
     check_bang (HsSrcBang _ want_unpack strict_mark) rep_bang n
       | isSrcUnpacked want_unpack, not is_strict
-      = addWarnTc (bad_bang n (text "UNPACK pragma lacks '!'"))
+      = addWarnTc NoReason (bad_bang n (text "UNPACK pragma lacks '!'"))
       | isSrcUnpacked want_unpack
       , case rep_bang of { HsUnpack {} -> False; _ -> True }
       , not (gopt Opt_OmitInterfacePragmas dflags)
            -- If not optimising, se don't unpack, so don't complain!
            -- See MkId.dataConArgRep, the (HsBang True) case
-      = addWarnTc (bad_bang n (text "Ignoring unusable UNPACK pragma"))
+      = addWarnTc NoReason (bad_bang n (text "Ignoring unusable UNPACK pragma"))
       where
         is_strict = case strict_mark of
                       NoSrcStrict -> xopt LangExt.StrictData dflags

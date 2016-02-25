@@ -1,5 +1,5 @@
 
-T9497a.hs:2:8: warning:
+T9497a.hs:2:8: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _main :: IO ()
       Or perhaps ‘_main’ is mis-spelled, or not in scope
     • In the expression: _main

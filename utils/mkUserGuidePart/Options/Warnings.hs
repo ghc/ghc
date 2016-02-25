@@ -43,6 +43,11 @@ warningsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-Wno-unrecognised-warning-flags"
          }
+  , flag { flagName = "-fshow-warning-groups"
+         , flagDescription = "show which group an emitted warning belongs to."
+         , flagType = DynamicFlag
+         , flagReverse = "-fno-show-warning-groups"
+         }
   , flag { flagName = "-fdefer-type-errors"
          , flagDescription =
            "Turn type errors into warnings, :ref:`deferring the error until "++

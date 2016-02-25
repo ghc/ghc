@@ -67,7 +67,13 @@ codeOutput dflags this_mod filenm location foreign_stubs pkg_deps cmm_stream
               do_lint cmm = do
                 { showPass dflags "CmmLint"
                 ; case cmmLint dflags cmm of
-                        Just err -> do { log_action dflags dflags SevDump noSrcSpan defaultDumpStyle err
+                        Just err -> do { log_action dflags
+                                                   dflags
+                                                   NoReason
+                                                   SevDump
+                                                   noSrcSpan
+                                                   defaultDumpStyle
+                                                   err
                                        ; ghcExit dflags 1
                                        }
                         Nothing  -> return ()

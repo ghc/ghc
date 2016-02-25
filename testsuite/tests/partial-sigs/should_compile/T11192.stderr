@@ -1,5 +1,5 @@
 
-T11192.hs:7:14: warning:
+T11192.hs:7:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘Int -> t -> t’
       Where: ‘t’ is a rigid type variable bound by
                the inferred type of go :: Int -> t -> t at T11192.hs:8:8
@@ -20,7 +20,7 @@ T11192.hs:7:14: warning:
         go :: Int -> t -> t (bound at T11192.hs:8:8)
         fails :: a (bound at T11192.hs:6:1)
 
-T11192.hs:13:14: warning:
+T11192.hs:13:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘t1 -> t -> t’
       Where: ‘t’ is a rigid type variable bound by
                the inferred type of go :: t1 -> t -> t at T11192.hs:14:8

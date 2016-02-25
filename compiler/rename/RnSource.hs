@@ -503,10 +503,12 @@ checkCanonicalInstances cls poly_ty mbinds = do
               case mbind of
                   FunBind { fun_id = L _ name, fun_matches = mg }
                       | name == pureAName, isAliasMG mg == Just returnMName
-                      -> addWarnNonCanonicalMethod1 "pure" "return"
+                      -> addWarnNonCanonicalMethod1
+                            Opt_WarnNonCanonicalMonadInstances "pure" "return"
 
                       | name == thenAName, isAliasMG mg == Just thenMName
-                      -> addWarnNonCanonicalMethod1 "(*>)" "(>>)"
+                      -> addWarnNonCanonicalMethod1
+                            Opt_WarnNonCanonicalMonadInstances "(*>)" "(>>)"
 
                   _ -> return ()
 
@@ -515,10 +517,12 @@ checkCanonicalInstances cls poly_ty mbinds = do
               case mbind of
                   FunBind { fun_id = L _ name, fun_matches = mg }
                       | name == returnMName, isAliasMG mg /= Just pureAName
-                      -> addWarnNonCanonicalMethod2 "return" "pure"
+                      -> addWarnNonCanonicalMethod2
+                            Opt_WarnNonCanonicalMonadInstances "return" "pure"
 
                       | name == thenMName, isAliasMG mg /= Just thenAName
-                      -> addWarnNonCanonicalMethod2 "(>>)" "(*>)"
+                      -> addWarnNonCanonicalMethod2
+                            Opt_WarnNonCanonicalMonadInstances "(>>)" "(*>)"
 
                   _ -> return ()
 
@@ -543,7 +547,9 @@ checkCanonicalInstances cls poly_ty mbinds = do
               case mbind of
                   FunBind { fun_id = L _ name, fun_matches = mg }
                       | name == failMName, isAliasMG mg == Just failMName_preMFP
-                      -> addWarnNonCanonicalMethod1 "fail" "Control.Monad.fail"
+                      -> addWarnNonCanonicalMethod1
+                            Opt_WarnNonCanonicalMonadFailInstances "fail"
+                            "Control.Monad.fail"
 
                   _ -> return ()
 
@@ -552,8 +558,9 @@ checkCanonicalInstances cls poly_ty mbinds = do
               case mbind of
                   FunBind { fun_id = L _ name, fun_matches = mg }
                       | name == failMName_preMFP, isAliasMG mg /= Just failMName
-                      -> addWarnNonCanonicalMethod2 "fail"
-                                                    "Control.Monad.Fail.fail"
+                      -> addWarnNonCanonicalMethod2
+                            Opt_WarnNonCanonicalMonadFailInstances "fail"
+                            "Control.Monad.Fail.fail"
                   _ -> return ()
 
       | otherwise = return ()
@@ -577,7 +584,8 @@ checkCanonicalInstances cls poly_ty mbinds = do
               case mbind of
                   FunBind { fun_id = L _ name, fun_matches = mg }
                       | name == sappendName, isAliasMG mg == Just mappendName
-                      -> addWarnNonCanonicalMethod1 "(<>)" "mappend"
+                      -> addWarnNonCanonicalMethod1
+                            Opt_WarnNonCanonicalMonoidInstances "(<>)" "mappend"
 
                   _ -> return ()
 
@@ -586,7 +594,8 @@ checkCanonicalInstances cls poly_ty mbinds = do
               case mbind of
                   FunBind { fun_id = L _ name, fun_matches = mg }
                       | name == mappendName, isAliasMG mg /= Just sappendName
-                      -> addWarnNonCanonicalMethod2NoDefault "mappend" "(<>)"
+                      -> addWarnNonCanonicalMethod2NoDefault
+                            Opt_WarnNonCanonicalMonoidInstances "mappend" "(<>)"
 
                   _ -> return ()
 
@@ -602,8 +611,9 @@ checkCanonicalInstances cls poly_ty mbinds = do
     isAliasMG _ = Nothing
 
     -- got "lhs = rhs" but expected something different
-    addWarnNonCanonicalMethod1 lhs rhs = do
-        addWarn $ vcat [ text "Noncanonical" <+>
+    addWarnNonCanonicalMethod1 flag lhs rhs = do
+        addWarn (Reason flag) $ vcat
+                       [ text "Noncanonical" <+>
                          quotes (text (lhs ++ " = " ++ rhs)) <+>
                          text "definition detected"
                        , instDeclCtxt1 poly_ty
@@ -613,8 +623,9 @@ checkCanonicalInstances cls poly_ty mbinds = do
                        ]
 
     -- expected "lhs = rhs" but got something else
-    addWarnNonCanonicalMethod2 lhs rhs = do
-        addWarn $ vcat [ text "Noncanonical" <+>
+    addWarnNonCanonicalMethod2 flag lhs rhs = do
+        addWarn (Reason flag) $ vcat
+                       [ text "Noncanonical" <+>
                          quotes (text lhs) <+>
                          text "definition detected"
                        , instDeclCtxt1 poly_ty
@@ -624,8 +635,9 @@ checkCanonicalInstances cls poly_ty mbinds = do
                        ]
 
     -- like above, but method has no default impl
-    addWarnNonCanonicalMethod2NoDefault lhs rhs = do
-        addWarn $ vcat [ text "Noncanonical" <+>
+    addWarnNonCanonicalMethod2NoDefault flag lhs rhs = do
+        addWarn (Reason flag) $ vcat
+                       [ text "Noncanonical" <+>
                          quotes (text lhs) <+>
                          text "definition detected"
                        , instDeclCtxt1 poly_ty

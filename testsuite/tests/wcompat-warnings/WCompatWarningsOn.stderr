@@ -1,5 +1,5 @@
 
-WCompatWarningsOn.hs:13:5: warning:
+WCompatWarningsOn.hs:13:5: warning: [-Wmissing-monadfail-instances (in -Wcompat)]
     • Could not deduce (Control.Monad.Fail.MonadFail m)
         arising from the failable pattern ‘Just _’
         (this will become an error in a future GHC release)
@@ -20,16 +20,16 @@ WCompatWarningsOn.hs:13:5: warning:
             = do { Just _ <- undefined;
                    undefined }
 
-WCompatWarningsOn.hs:16:1: warning:
+WCompatWarningsOn.hs:16:1: warning: [-Wsemigroup (in -Wcompat)]
     Local definition of ‘<>’ clashes with a future Prelude name.
     This will become an error in a future release.
 
-WCompatWarningsOn.hs:22:3: warning:
+WCompatWarningsOn.hs:22:3: warning: [-Wnoncanonical-monoid-instances (in -Wcompat)]
     Noncanonical ‘(<>) = mappend’ definition detected
     in the instance declaration for ‘Semi.Semigroup S’.
     Move definition from ‘mappend’ to ‘(<>)’
 
-WCompatWarningsOn.hs:25:3: warning:
+WCompatWarningsOn.hs:25:3: warning: [-Wnoncanonical-monoid-instances (in -Wcompat)]
     Noncanonical ‘mappend’ definition detected
     in the instance declaration for ‘Monoid S’.
     Define as ‘mappend = (<>)’

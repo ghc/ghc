@@ -4,7 +4,7 @@ Defer03.hs:4:5: warning:
     • In the expression: 'p'
       In an equation for ‘a’: a = 'p'
 
-Defer03.hs:7:5: warning:
+Defer03.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
     • In the expression: _
       In an equation for ‘f’: f = _
@@ -26,7 +26,7 @@ Defer03.hs:4:5: warning:
     • In the expression: 'p'
       In an equation for ‘a’: a = 'p'
 
-Defer03.hs:7:5: warning:
+Defer03.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
     • In the expression: _
       In an equation for ‘f’: f = _
@@ -48,7 +48,7 @@ Defer03.hs:4:5: warning:
     • In the expression: 'p'
       In an equation for ‘a’: a = 'p'
 
-Defer03.hs:7:5: warning:
+Defer03.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
     • In the expression: _
       In an equation for ‘f’: f = _

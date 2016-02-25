@@ -1,1 +1,3 @@
- T17d.hs:14:5: Warning: Defined but not used: ‘match’ 
+
+T17d.hs:14:5: warning: [-Wunused-local-binds (in -Wextra, -Wunused-binds)]
+    Defined but not used: ‘match’

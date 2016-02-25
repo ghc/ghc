@@ -1,2 +1,3 @@
 
-mc10.hs:14:11: Warning: Defined but not used: ‘y’
+mc10.hs:14:11: warning: [-Wunused-local-binds (in -Wextra, -Wunused-binds)]
+    Defined but not used: ‘y’

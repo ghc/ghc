@@ -219,7 +219,8 @@ addInlinePrags poly_id prags
          warn_multiple_inlines inl2 inls
        | otherwise
        = setSrcSpan loc $
-         addWarnTc (hang (text "Multiple INLINE pragmas for" <+> ppr poly_id)
+         addWarnTc NoReason
+                     (hang (text "Multiple INLINE pragmas for" <+> ppr poly_id)
                        2 (vcat (text "Ignoring all but the first"
                                 : map pp_inl (inl1:inl2:inls))))
 

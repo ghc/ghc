@@ -18,6 +18,7 @@ module TcSimplify(
 import Bag
 import Class         ( Class, classKey, classTyCon )
 import DynFlags      ( WarningFlag ( Opt_WarnMonomorphism )
+                     , WarnReason ( Reason )
                      , DynFlags( solverIterations ) )
 import Inst
 import ListSetOps
@@ -752,7 +753,7 @@ decideQuantification apply_mr sigs name_taus constraints
            -- Warn about the monomorphism restriction
        ; warn_mono <- woptM Opt_WarnMonomorphism
        ; let mr_bites = constrained_tvs `intersectsVarSet` zonked_tkvs
-       ; warnTc (warn_mono && mr_bites) $
+       ; warnTc (Reason Opt_WarnMonomorphism) (warn_mono && mr_bites) $
          hang (text "The Monomorphism Restriction applies to the binding"
                <> plural bndrs <+> text "for" <+> pp_bndrs)
              2 (text "Consider giving a type signature for"

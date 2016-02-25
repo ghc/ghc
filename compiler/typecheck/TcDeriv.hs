@@ -560,7 +560,7 @@ deriveStandalone (L loc (DerivDecl deriv_ty overlap_mode))
 warnUselessTypeable :: TcM ()
 warnUselessTypeable
   = do { warn <- woptM Opt_WarnDerivingTypeable
-       ; when warn $ addWarnTc
+       ; when warn $ addWarnTc (Reason Opt_WarnDerivingTypeable)
                    $ text "Deriving" <+> quotes (ppr typeableClassName) <+>
                      text "has no effect: all types now auto-derive Typeable" }
 
@@ -1500,7 +1500,8 @@ mkNewTypeEqn dflags overlap_mode tvs
 
       -- CanDerive/DerivableViaInstance
       _ -> do when (newtype_deriving && deriveAnyClass) $
-                addWarnTc (sep [ text "Both DeriveAnyClass and GeneralizedNewtypeDeriving are enabled"
+                addWarnTc NoReason
+                          (sep [ text "Both DeriveAnyClass and GeneralizedNewtypeDeriving are enabled"
                                , text "Defaulting to the DeriveAnyClass strategy for instantiating" <+> ppr cls ])
               go_for_it
   where

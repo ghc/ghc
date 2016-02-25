@@ -14,6 +14,8 @@ import {-# SOURCE #-} TcSplice ( runAnnotation )
 import Module
 import DynFlags
 import Control.Monad ( when )
+#else
+import DynFlags ( WarnReason(NoReason) )
 #endif
 
 import HsSyn
@@ -29,7 +31,7 @@ tcAnnotations :: [LAnnDecl Name] -> TcM [Annotation]
 -- No GHCI; emit a warning (not an error) and ignore. cf Trac #4268
 tcAnnotations [] = return []
 tcAnnotations anns@(L loc _ : _)
-  = do { setSrcSpan loc $ addWarnTc $
+  = do { setSrcSpan loc $ addWarnTc NoReason $
              (text "Ignoring ANN annotation" <> plural anns <> comma
              <+> text "because this is a stage-1 compiler or doesn't support GHCi")
        ; return [] }

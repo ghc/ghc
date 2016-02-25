@@ -2227,7 +2227,8 @@ checkMissingFields con_like rbinds
 
     warn <- woptM Opt_WarnMissingFields
     unless (not (warn && notNull missing_ns_fields))
-           (warnTc True (missingFields con_like missing_ns_fields))
+           (warnTc (Reason Opt_WarnMissingFields) True
+               (missingFields con_like missing_ns_fields))
 
   where
     missing_s_fields

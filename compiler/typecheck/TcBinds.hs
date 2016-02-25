@@ -707,7 +707,8 @@ mkExport prag_fn qtvs theta
                        tcSubType_NC sig_ctxt sel_poly_ty (mkCheckExpType poly_ty)
 
         ; warn_missing_sigs <- woptM Opt_WarnMissingLocalSignatures
-        ; when warn_missing_sigs $ localSigWarn poly_id mb_sig
+        ; when warn_missing_sigs $
+              localSigWarn Opt_WarnMissingLocalSignatures poly_id mb_sig
 
         ; return (ABE { abe_wrap = wrap
                         -- abe_wrap :: idType poly_id ~ (forall qtvs. theta => mono_ty)
@@ -797,7 +798,8 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
                  , ppr annotated_theta, ppr inferred_theta
                  , ppr inferred_diff ]
        ; case partial_sigs of
-           True | warn_partial_sigs -> reportWarning msg
+           True | warn_partial_sigs ->
+                      reportWarning (Reason Opt_WarnPartialTypeSignatures) msg
                 | otherwise         -> return ()
            False                    -> reportError msg
 
@@ -851,19 +853,19 @@ mk_inf_msg poly_name poly_ty tidy_env
 
 
 -- | Warn the user about polymorphic local binders that lack type signatures.
-localSigWarn :: Id -> Maybe TcIdSigInfo -> TcM ()
-localSigWarn id mb_sig
+localSigWarn :: WarningFlag -> Id -> Maybe TcIdSigInfo -> TcM ()
+localSigWarn flag id mb_sig
   | Just _ <- mb_sig               = return ()
   | not (isSigmaTy (idType id))    = return ()
-  | otherwise                      = warnMissingSignatures msg id
+  | otherwise                      = warnMissingSignatures flag msg id
   where
     msg = text "Polymorphic local binding with no type signature:"
 
-warnMissingSignatures :: SDoc -> Id -> TcM ()
-warnMissingSignatures msg id
+warnMissingSignatures :: WarningFlag -> SDoc -> Id -> TcM ()
+warnMissingSignatures flag msg id
   = do  { env0 <- tcInitTidyEnv
         ; let (env1, tidy_ty) = tidyOpenType env0 (idType id)
-        ; addWarnTcM (env1, mk_msg tidy_ty) }
+        ; addWarnTcM (Reason flag) (env1, mk_msg tidy_ty) }
   where
     mk_msg ty = sep [ msg, nest 2 $ pprPrefixName (idName id) <+> dcolon <+> ppr ty ]
 
@@ -1126,7 +1128,8 @@ tcSpecPrags poly_id prag_sigs
     is_bad_sig s = not (isSpecLSig s || isInlineLSig s)
 
     warn_discarded_sigs
-      = addWarnTc (hang (text "Discarding unexpected pragmas for" <+> ppr poly_id)
+      = addWarnTc NoReason
+                  (hang (text "Discarding unexpected pragmas for" <+> ppr poly_id)
                       2 (vcat (map (ppr . getLoc) bad_sigs)))
 
 --------------
@@ -1140,7 +1143,7 @@ tcSpecPrag poly_id prag@(SpecSig fun_name hs_tys inl)
 -- However we want to use fun_name in the error message, since that is
 -- what the user wrote (Trac #8537)
   = addErrCtxt (spec_ctxt prag) $
-    do  { warnIf (not (isOverloadedTy poly_ty || isInlinePragma inl))
+    do  { warnIf NoReason (not (isOverloadedTy poly_ty || isInlinePragma inl))
                  (text "SPECIALISE pragma for non-overloaded function"
                   <+> quotes (ppr fun_name))
                   -- Note [SPECIALISE pragmas]
@@ -1206,7 +1209,7 @@ tcImpSpec :: (Name, Sig Name) -> TcM [TcSpecPrag]
 tcImpSpec (name, prag)
  = do { id <- tcLookupId name
       ; unless (isAnyInlinePragma (idInlinePragma id))
-               (addWarnTc (impSpecErr name))
+               (addWarnTc NoReason (impSpecErr name))
       ; tcSpecPrag id prag }
 
 impSpecErr :: Name -> SDoc

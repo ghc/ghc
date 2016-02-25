@@ -1,6 +1,6 @@
 
-T10935.hs:5:11: warning:
-    The Monomorphism Restriction applies to the binding for ‘y’
-      Consider giving a type signature for ‘y’
-    In the expression: let y = x + 1 in (y, y)
-    In an equation for ‘f’: f x = let y = x + 1 in (y, y)
+T10935.hs:5:11: warning: [-Wmonomorphism-restriction]
+    • The Monomorphism Restriction applies to the binding for ‘y’
+        Consider giving a type signature for ‘y’
+    • In the expression: let y = x + 1 in (y, y)
+      In an equation for ‘f’: f x = let y = x + 1 in (y, y)

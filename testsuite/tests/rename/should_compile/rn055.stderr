@@ -1,2 +1,3 @@
 
-rn055.hs:1:1: Warning: Module `Prelude' implicitly imported
+rn055.hs:1:1: warning: [-Wimplicit-prelude]
+    Module `Prelude' implicitly imported
