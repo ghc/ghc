@@ -522,6 +522,11 @@ See ``changelog.md`` in the ``base`` package for full release notes.
   to define custom compile-time error messages. (see :ref:`custom-errors` and
   the original :ghc-wiki:`proposal <Proposal/CustomTypeErrors>`).
 
+- The datatypes in ``GHC.Generics`` now have ``Enum``, ``Bounded``, ``Ix``,
+  ``Functor``, ``Applicative``, ``Monad``, ``MonadFix``, ``MonadPlus``, ``MonadZip``,
+  ``Foldable``, ``Foldable``, ``Traversable``, ``Generic1``, and ``Data`` instances
+  as appropriate. (:ghc-ticket:`9043`)
+
 - The ``Generic`` instance for ``Proxy`` is now poly-kinded (see :ghc-ticket:`10775`)
 
 - The ``IsString`` instance for ``[Char]`` has been modified to eliminate
