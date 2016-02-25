@@ -7,7 +7,7 @@ T5095.hs:9:9: error:
           -- Defined in ‘Data.Either’
         instance Eq Ordering -- Defined in ‘GHC.Classes’
         ...plus 24 others
-        ...plus 14 instances involving out-of-scope types
+        ...plus 36 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
       (The choice depends on the instantiation of ‘a’
        To pick the first instance above, use IncoherentInstances

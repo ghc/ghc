@@ -1,5 +1,9 @@
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeOperators #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -58,6 +62,7 @@ import Data.Proxy ( Proxy(..) )
 import GHC.Arr
 import GHC.Base ( Applicative(..), Monad(..), Monoid, Maybe(..),
                   ($), (.), id, flip )
+import GHC.Generics
 import qualified GHC.List as List ( foldr )
 
 -- | Functors representing data structures that can be traversed from
@@ -221,6 +226,23 @@ instance Traversable Last where
 
 instance Traversable ZipList where
     traverse f (ZipList x) = ZipList <$> traverse f x
+
+-- Instances for GHC.Generics
+deriving instance Traversable V1
+deriving instance Traversable U1
+deriving instance Traversable Par1
+deriving instance Traversable f => Traversable (Rec1 f)
+deriving instance Traversable (K1 i c)
+deriving instance Traversable f => Traversable (M1 i c f)
+deriving instance (Traversable f, Traversable g) => Traversable (f :+: g)
+deriving instance (Traversable f, Traversable g) => Traversable (f :*: g)
+deriving instance (Traversable f, Traversable g) => Traversable (f :.: g)
+deriving instance Traversable UAddr
+deriving instance Traversable UChar
+deriving instance Traversable UDouble
+deriving instance Traversable UFloat
+deriving instance Traversable UInt
+deriving instance Traversable UWord
 
 -- general functions
 

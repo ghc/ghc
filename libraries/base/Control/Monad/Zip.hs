@@ -1,4 +1,5 @@
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE TypeOperators #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -19,6 +20,7 @@ module Control.Monad.Zip where
 
 import Control.Monad (liftM, liftM2)
 import Data.Monoid
+import GHC.Generics
 
 -- | `MonadZip` type class. Minimal definition: `mzip` or `mzipWith`
 --
@@ -75,3 +77,16 @@ instance MonadZip Last where
 
 instance MonadZip f => MonadZip (Alt f) where
     mzipWith f (Alt ma) (Alt mb) = Alt (mzipWith f ma mb)
+
+-- Instances for GHC.Generics
+instance MonadZip Par1 where
+    mzipWith = liftM2
+
+instance MonadZip f => MonadZip (Rec1 f) where
+    mzipWith f (Rec1 fa) (Rec1 fb) = Rec1 (mzipWith f fa fb)
+
+instance MonadZip f => MonadZip (M1 i c f) where
+    mzipWith f (M1 fa) (M1 fb) = M1 (mzipWith f fa fb)
+
+instance (MonadZip f, MonadZip g) => MonadZip (f :*: g) where
+    mzipWith f (x1 :*: y1) (x2 :*: y2) = mzipWith f x1 x2 :*: mzipWith f y1 y2
