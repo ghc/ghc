@@ -1,4 +1,2 @@
 
-mod70.hs:3:8: error:
-    Pattern syntax in expression context: ~1
-    Did you mean to enable TypeApplications?
+mod70.hs:3:8: error: Pattern syntax in expression context: ~1
