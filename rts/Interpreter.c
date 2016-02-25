@@ -674,7 +674,7 @@ do_apply:
                 // the appropriate info table in the gap.
                 for (i = 0; i < arity; i++) {
                     Sp[(int)i-1] = Sp[i];
-                    // ^^^^^ careful, i-1 might be negative, but i in unsigned
+                    // ^^^^^ careful, i-1 might be negative, but i is unsigned
                 }
                 Sp[arity-1] = app_ptrs_itbl[n-arity-1];
                 Sp--;
@@ -736,7 +736,7 @@ do_apply:
                 // the appropriate info table in the gap.
                 for (i = 0; i < arity; i++) {
                     Sp[(int)i-1] = Sp[i];
-                    // ^^^^^ careful, i-1 might be negative, but i in unsigned
+                    // ^^^^^ careful, i-1 might be negative, but i is unsigned
                 }
                 Sp[arity-1] = app_ptrs_itbl[n-arity-1];
                 Sp--;

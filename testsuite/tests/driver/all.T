@@ -326,7 +326,8 @@ test('dynHelloWorld',
      [''])
 
 test('T5313',
-     extra_run_opts('"' + config.libdir + '"'),
+     [ when(arch('powerpc64'), expect_broken(11259)),
+       extra_run_opts('"' + config.libdir + '"')],
      compile_and_run,
      ['-package ghc'])
 

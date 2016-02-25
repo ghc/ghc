@@ -4,10 +4,12 @@ test('ghci001', combined_output, ghci_script, ['ghci001.script'])
 test('ghci002', combined_output, ghci_script, ['ghci002.script'])
 test('ghci003', combined_output, ghci_script, ['ghci003.script'])
 test('ghci004', [ combined_output,
+		  when(arch('powerpc64'), expect_broken_for(11259,['ghci-ext'])),
                   unless(opsys('mingw32'),extra_ways(['ghci-ext'])) ],
                 ghci_script, ['ghci004.script'])
 test('ghci005', combined_output, ghci_script, ['ghci005.script'])
 test('ghci006', [ combined_output,
+                  when(arch('powerpc64'), expect_broken_for(11259,['ghci-ext'])),
                   unless(opsys('mingw32'),extra_ways(['ghci-ext'])) ],
                 ghci_script, ['ghci006.script'])
 test('ghci007', combined_output, ghci_script, ['ghci007.script'])

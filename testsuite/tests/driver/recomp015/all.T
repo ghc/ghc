@@ -4,7 +4,8 @@ test('recomp015',
      [ clean_cmd('$MAKE -s clean'),
        # See ticket:11022#comment:7
        unless(opsys('linux') or opsys('solaris2') or opsys('openbsd'), skip),
-       when(arch('arm'), skip)],
+       when(arch('arm'), skip),
+       when(arch('powerpc64'), expect_broken(11323))],
      run_command,
      ['$MAKE -s --no-print-directory recomp015'])
 

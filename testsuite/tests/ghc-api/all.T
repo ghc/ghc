@@ -2,16 +2,17 @@ test('ghcApi', normal, compile_and_run, ['-package ghc'])
 test('T6145', normal,
               run_command,
               ['$MAKE -s --no-print-directory T6145'])
-test('T8639_api', normal,
+test('T8639_api', when(arch('powerpc64'), expect_broken(11259)),
               run_command,
               ['$MAKE -s --no-print-directory T8639_api'])
-test('T8628', normal,
+test('T8628', when(arch('powerpc64'), expect_broken(11259)),
               run_command,
               ['$MAKE -s --no-print-directory T8628'])
 test('T9595', extra_run_opts('"' + config.libdir + '"'),
               compile_and_run,
               ['-package ghc'])
-test('T10508_api', extra_run_opts('"' + config.libdir + '"'),
+test('T10508_api', [ extra_run_opts('"' + config.libdir + '"'),
+                     when(arch('powerpc64'), expect_broken(11259))],
                    compile_and_run,
                    ['-package ghc'])
 test('T10942', extra_run_opts('"' + config.libdir + '"'),

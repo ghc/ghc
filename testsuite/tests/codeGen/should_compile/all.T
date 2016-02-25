@@ -26,9 +26,11 @@ test('T9155', normal, compile, ['-O2'])
 test('T9303', normal, compile, ['-O2'])
 test('T9329', [cmm_src], compile, [''])
 
-test('debug', extra_clean(['debug.cmm']),
+test('debug', [ extra_clean(['debug.cmm']), 
+                when(arch('powerpc64'), expect_broken(11261))],
      run_command,
      ['$MAKE -s --no-print-directory debug'])
 test('T9964', normal, compile, ['-O'])
 test('T10518', [cmm_src], compile, [''])
-test('T10667', normal, compile, ['-g'])
+test('T10667', [ when(arch('powerpc64'), expect_broken(11261)) ],
+     compile, ['-g'])
