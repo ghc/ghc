@@ -325,9 +325,10 @@ We return a (bogus) EWildPat in each case.
 -}
 
 rnExpr EWildPat        = return (hsHoleExpr, emptyFVs)   -- "_" is just a hole
-rnExpr e@(EAsPat {})   = patSynErr e
-rnExpr e@(EViewPat {}) = patSynErr e
-rnExpr e@(ELazyPat {}) = patSynErr e
+rnExpr e@(EAsPat {})   =
+  patSynErr e (text "Did you mean to enable TypeApplications?")
+rnExpr e@(EViewPat {}) = patSynErr e empty
+rnExpr e@(ELazyPat {}) = patSynErr e empty
 
 {-
 ************************************************************************
@@ -1854,10 +1855,10 @@ sectionErr expr
   = hang (text "A section must be enclosed in parentheses")
        2 (text "thus:" <+> (parens (ppr expr)))
 
-patSynErr :: HsExpr RdrName -> RnM (HsExpr Name, FreeVars)
-patSynErr e = do { addErr (sep [text "Pattern syntax in expression context:",
+patSynErr :: HsExpr RdrName -> SDoc -> RnM (HsExpr Name, FreeVars)
+patSynErr e explanation = do { addErr (sep [text "Pattern syntax in expression context:",
                                 nest 4 (ppr e)] $$
-                           text "Did you mean to enable TypeApplications?")
+                                  explanation)
                  ; return (EWildPat, emptyFVs) }
 
 badIpBinds :: Outputable a => SDoc -> a -> SDoc
