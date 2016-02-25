@@ -569,10 +569,10 @@ tcExpr (HsProc pat cmd) res_ty
   = do  { (pat', cmd', coi) <- tcProc pat cmd res_ty
         ; return $ mkHsWrapCo coi (HsProc pat' cmd') }
 
+-- Typechecks the static form and wraps it with a call to 'fromStaticPtr'.
 tcExpr (HsStatic expr) res_ty
-  = do  { staticPtrTyCon  <- tcLookupTyCon staticPtrTyConName
-        ; res_ty          <- expTypeToType res_ty
-        ; (co, [expr_ty]) <- matchExpectedTyConApp staticPtrTyCon res_ty
+  = do  { res_ty          <- expTypeToType res_ty
+        ; (co, (p_ty, expr_ty)) <- matchExpectedAppTy res_ty
         ; (expr', lie)    <- captureConstraints $
             addErrCtxt (hang (text "In the body of a static form:")
                              2 (ppr expr)
@@ -586,10 +586,16 @@ tcExpr (HsStatic expr) res_ty
         ; _ <- emitWantedEvVar StaticOrigin $
                   mkTyConApp (classTyCon typeableClass)
                              [liftedTypeKind, expr_ty]
-        -- Insert the static form in a global list for later validation.
+        -- Insert the constraints of the static form in a global list for later
+        -- validation.
         ; stWC <- tcg_static_wc <$> getGblEnv
         ; updTcRef stWC (andWC lie)
-        ; return $ mkHsWrapCo co $ HsStatic expr'
+        -- Wrap the static form with the 'fromStaticPtr' call.
+        ; fromStaticPtr <- newMethodFromName StaticOrigin fromStaticPtrName p_ty
+        ; let wrap = mkWpTyApps [expr_ty]
+        ; loc <- getSrcSpanM
+        ; return $ mkHsWrapCo co $ HsApp (L loc $ mkHsWrap wrap fromStaticPtr)
+                                         (L loc (HsStatic expr'))
         }
 
 {-

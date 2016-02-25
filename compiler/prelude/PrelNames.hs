@@ -371,6 +371,7 @@ basicKnownKeyNames
         -- StaticPtr
         , staticPtrTyConName
         , staticPtrDataConName, staticPtrInfoDataConName
+        , fromStaticPtrName
 
         -- Fingerprint
         , fingerprintDataConName
@@ -1382,6 +1383,10 @@ staticPtrDataConName :: Name
 staticPtrDataConName =
     dcQual gHC_STATICPTR (fsLit "StaticPtr") staticPtrDataConKey
 
+fromStaticPtrName :: Name
+fromStaticPtrName =
+    varQual gHC_STATICPTR (fsLit "fromStaticPtr") fromStaticPtrClassOpKey
+
 fingerprintDataConName :: Name
 fingerprintDataConName =
     dcQual gHC_FINGERPRINT_TYPE (fsLit "Fingerprint") fingerprintDataConKey
@@ -2183,6 +2188,9 @@ mconcatClassOpKey = mkPreludeMiscIdUnique 516
 emptyCallStackKey, pushCallStackKey :: Unique
 emptyCallStackKey = mkPreludeMiscIdUnique 517
 pushCallStackKey  = mkPreludeMiscIdUnique 518
+
+fromStaticPtrClassOpKey :: Unique
+fromStaticPtrClassOpKey = mkPreludeMiscIdUnique 519
 
 {-
 ************************************************************************
