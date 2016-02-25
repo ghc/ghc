@@ -2074,46 +2074,79 @@ cmpTypes ts1 ts2 = cmpTypesX rn_env ts1 ts2
   where
     rn_env = mkRnEnv2 (mkInScopeSet (tyCoVarsOfTypes (ts1 ++ ts2)))
 
+-- | An ordering relation between two 'Type's (known below as @t1 :: k1@
+-- and @t2 :: k2@)
+data TypeOrdering = TLT  -- ^ @t1 < t2@
+                  | TEQ  -- ^ @t1 ~ t2@ and there are no casts in either,
+                         -- therefore we can conclude @k1 ~ k2@
+                  | TEQX -- ^ @t1 ~ t2@ yet one of the types contains a cast so
+                         -- they may differ in kind.
+                  | TGT  -- ^ @t1 > t2@
+                  deriving (Eq, Ord, Enum, Bounded)
+
 cmpTypeX :: RnEnv2 -> Type -> Type -> Ordering  -- Main workhorse
     -- See Note [Non-trivial definitional equality] in TyCoRep
-cmpTypeX env orig_t1 orig_t2
-  = go env orig_t1 orig_t2 `thenCmp` go env k1 k2
-      -- NB: this ordering appears to be faster than the other
+cmpTypeX env orig_t1 orig_t2 =
+    case go env orig_t1 orig_t2 of
+      -- If there are casts then we also need to do a comparison of the kinds of
+      -- the types being compared
+      TEQX          -> toOrdering $ go env k1 k2
+      ty_ordering   -> toOrdering ty_ordering
   where
     k1 = typeKind orig_t1
     k2 = typeKind orig_t2
 
-      -- short-cut to handle comparing * against *.
-      -- appears to have a roughly 1% improvement in compile times
-    go _ (TyConApp tc1 []) (TyConApp tc2 []) | tc1 == tc2 = EQ
+    toOrdering :: TypeOrdering -> Ordering
+    toOrdering TLT  = LT
+    toOrdering TEQ  = EQ
+    toOrdering TEQX = EQ
+    toOrdering TGT  = GT
 
-    go env t1 t2 | Just t1' <- coreViewOneStarKind t1 = go env t1' t2
-    go env t1 t2 | Just t2' <- coreViewOneStarKind t2 = go env t1 t2'
+    liftOrdering :: Ordering -> TypeOrdering
+    liftOrdering LT = TLT
+    liftOrdering EQ = TEQ
+    liftOrdering GT = TGT
+
+    thenCmpTy :: TypeOrdering -> TypeOrdering -> TypeOrdering
+    thenCmpTy TEQ  rel  = rel
+    thenCmpTy TEQX rel  = hasCast rel
+    thenCmpTy rel  _    = rel
+
+    hasCast :: TypeOrdering -> TypeOrdering
+    hasCast TEQ = TEQX
+    hasCast rel = rel
+
+    -- Returns both the resulting ordering relation between the two types
+    -- and whether either contains a cast.
+    go :: RnEnv2 -> Type -> Type -> TypeOrdering
+    go env t1 t2
+      | Just t1' <- coreViewOneStarKind t1 = go env t1' t2
+      | Just t2' <- coreViewOneStarKind t2 = go env t1 t2'
 
     go env (TyVarTy tv1)       (TyVarTy tv2)
-      = rnOccL env tv1 `compare` rnOccR env tv2
+      = liftOrdering $ rnOccL env tv1 `compare` rnOccR env tv2
     go env (ForAllTy (Named tv1 _) t1) (ForAllTy (Named tv2 _) t2)
       = go env (tyVarKind tv1) (tyVarKind tv2)
-        `thenCmp` go (rnBndr2 env tv1 tv2) t1 t2
+        `thenCmpTy` go (rnBndr2 env tv1 tv2) t1 t2
         -- See Note [Equality on AppTys]
     go env (AppTy s1 t1) ty2
       | Just (s2, t2) <- repSplitAppTy_maybe ty2
-      = go env s1 s2 `thenCmp` go env t1 t2
+      = go env s1 s2 `thenCmpTy` go env t1 t2
     go env ty1 (AppTy s2 t2)
       | Just (s1, t1) <- repSplitAppTy_maybe ty1
-      = go env s1 s2 `thenCmp` go env t1 t2
+      = go env s1 s2 `thenCmpTy` go env t1 t2
     go env (ForAllTy (Anon s1) t1) (ForAllTy (Anon s2) t2)
-      = go env s1 s2 `thenCmp` go env t1 t2
+      = go env s1 s2 `thenCmpTy` go env t1 t2
     go env (TyConApp tc1 tys1) (TyConApp tc2 tys2)
-      = (tc1 `cmpTc` tc2) `thenCmp` gos env tys1 tys2
-    go _   (LitTy l1)          (LitTy l2)          = compare l1 l2
-    go env (CastTy t1 _)       t2                  = go env t1 t2
-    go env t1                  (CastTy t2 _)       = go env t1 t2
-    go _   (CoercionTy {})     (CoercionTy {})     = EQ
+      = liftOrdering (tc1 `cmpTc` tc2) `thenCmpTy` gos env tys1 tys2
+    go _   (LitTy l1)          (LitTy l2)          = liftOrdering (compare l1 l2)
+    go env (CastTy t1 _)       t2                  = hasCast $ go env t1 t2
+    go env t1                  (CastTy t2 _)       = hasCast $ go env t1 t2
+    go _   (CoercionTy {})     (CoercionTy {})     = TEQ
 
         -- Deal with the rest: TyVarTy < CoercionTy < AppTy < LitTy < TyConApp < ForAllTy
     go _ ty1 ty2
-      = (get_rank ty1) `compare` (get_rank ty2)
+      = liftOrdering $ (get_rank ty1) `compare` (get_rank ty2)
       where get_rank :: Type -> Int
             get_rank (CastTy {})
               = pprPanic "cmpTypeX.get_rank" (ppr [ty1,ty2])
@@ -2125,15 +2158,17 @@ cmpTypeX env orig_t1 orig_t2
             get_rank (ForAllTy (Anon {}) _)  = 6
             get_rank (ForAllTy (Named {}) _) = 7
 
-    gos _   []         []         = EQ
-    gos _   []         _          = LT
-    gos _   _          []         = GT
-    gos env (ty1:tys1) (ty2:tys2) = go env ty1 ty2 `thenCmp` gos env tys1 tys2
+    gos :: RnEnv2 -> [Type] -> [Type] -> TypeOrdering
+    gos _   []         []         = TEQ
+    gos _   []         _          = TLT
+    gos _   _          []         = TGT
+    gos env (ty1:tys1) (ty2:tys2) = go env ty1 ty2 `thenCmpTy` gos env tys1 tys2
 
 -------------
 cmpTypesX :: RnEnv2 -> [Type] -> [Type] -> Ordering
 cmpTypesX _   []        []        = EQ
-cmpTypesX env (t1:tys1) (t2:tys2) = cmpTypeX env t1 t2 `thenCmp` cmpTypesX env tys1 tys2
+cmpTypesX env (t1:tys1) (t2:tys2) = cmpTypeX env t1 t2
+                                      `thenCmp` cmpTypesX env tys1 tys2
 cmpTypesX _   []        _         = LT
 cmpTypesX _   _         []        = GT
 
