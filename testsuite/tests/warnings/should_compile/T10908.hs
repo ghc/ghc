@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fwarn-missing-exported-sigs #-}
+{-# OPTIONS_GHC -fwarn-missing-exported-signatures #-}
 
 module Bug (Data.List.intercalate, x) where
 

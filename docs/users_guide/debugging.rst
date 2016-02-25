@@ -105,7 +105,7 @@ Dumping out compiler intermediate structures
 
         Dump strictness analyser output
 
-    .. ghc-flag:: -ddump-strsigs
+    .. ghc-flag:: -ddump-str-signatures
 
         Dump strictness signatures
 

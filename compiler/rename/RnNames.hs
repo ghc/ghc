@@ -1480,7 +1480,7 @@ reportUnusedNames _export_decls gbl_env
   = do  { traceRn ((text "RUN") <+> (ppr (tcg_dus gbl_env)))
         ; warnUnusedImportDecls gbl_env
         ; warnUnusedTopBinds unused_locals
-        ; warnMissingSigs gbl_env }
+        ; warnMissingSignatures gbl_env }
   where
     used_names :: NameSet
     used_names = findUses (tcg_dus gbl_env) emptyNameSet
@@ -1556,8 +1556,8 @@ warnUnusedImportDecls gbl_env
          printMinimalImports usage }
 
 -- | Warn the user about top level binders that lack type signatures.
-warnMissingSigs :: TcGblEnv -> RnM ()
-warnMissingSigs gbl_env
+warnMissingSignatures :: TcGblEnv -> RnM ()
+warnMissingSignatures gbl_env
   = do { let exports = availsToNameSet (tcg_exports gbl_env)
              sig_ns = tcg_sigs gbl_env
              binds = tcg_binds gbl_env
@@ -1565,9 +1565,9 @@ warnMissingSigs gbl_env
 
          -- Warn about missing signatures
          -- Do this only when we we have a type to offer
-       ; warn_missing_sigs  <- woptM Opt_WarnMissingSigs
-       ; warn_only_exported <- woptM Opt_WarnMissingExportedSigs
-       ; warn_pat_syns      <- woptM Opt_WarnMissingPatSynSigs
+       ; warn_missing_sigs  <- woptM Opt_WarnMissingSignatures
+       ; warn_only_exported <- woptM Opt_WarnMissingExportedSignatures
+       ; warn_pat_syns      <- woptM Opt_WarnMissingPatternSynonymSignatures
 
        ; let sig_warn
                | warn_only_exported = topSigWarnIfExported exports sig_ns

@@ -338,7 +338,7 @@ data DumpFlag
    | Opt_D_dump_stg
    | Opt_D_dump_call_arity
    | Opt_D_dump_stranal
-   | Opt_D_dump_strsigs
+   | Opt_D_dump_str_signatures
    | Opt_D_dump_tc
    | Opt_D_dump_types
    | Opt_D_dump_rules
@@ -550,8 +550,8 @@ data WarningFlag =
    | Opt_WarnMissingFields
    | Opt_WarnMissingImportList
    | Opt_WarnMissingMethods
-   | Opt_WarnMissingSigs
-   | Opt_WarnMissingLocalSigs
+   | Opt_WarnMissingSignatures
+   | Opt_WarnMissingLocalSignatures
    | Opt_WarnNameShadowing
    | Opt_WarnOverlappingPatterns
    | Opt_WarnTypeDefaults
@@ -590,14 +590,14 @@ data WarningFlag =
    | Opt_WarnInlineRuleShadowing
    | Opt_WarnTypedHoles
    | Opt_WarnPartialTypeSignatures
-   | Opt_WarnMissingExportedSigs
+   | Opt_WarnMissingExportedSignatures
    | Opt_WarnUntickedPromotedConstructors
    | Opt_WarnDerivingTypeable
    | Opt_WarnDeferredTypeErrors
    | Opt_WarnNonCanonicalMonadInstances   -- since 8.0
    | Opt_WarnNonCanonicalMonadFailInstances -- since 8.0
    | Opt_WarnNonCanonicalMonoidInstances  -- since 8.0
-   | Opt_WarnMissingPatSynSigs            -- since 8.0
+   | Opt_WarnMissingPatternSynonymSignatures -- since 8.0
    | Opt_WarnUnrecognisedWarningFlags     -- since 8.0
    deriving (Eq, Show, Enum)
 
@@ -2625,8 +2625,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_call_arity)
   , make_ord_flag defGhcFlag "ddump-stranal"
         (setDumpFlag Opt_D_dump_stranal)
-  , make_ord_flag defGhcFlag "ddump-strsigs"
-        (setDumpFlag Opt_D_dump_strsigs)
+  , make_ord_flag defGhcFlag "ddump-str-signatures"
+        (setDumpFlag Opt_D_dump_str_signatures)
   , make_ord_flag defGhcFlag "ddump-tc"
         (setDumpFlag Opt_D_dump_tc)
   , make_ord_flag defGhcFlag "ddump-types"
@@ -3179,12 +3179,16 @@ wWarningFlagsDeps = [
   flagSpec "identities"                  Opt_WarnIdentities,
   flagSpec "missing-fields"              Opt_WarnMissingFields,
   flagSpec "missing-import-lists"        Opt_WarnMissingImportList,
-  flagSpec "missing-local-sigs"          Opt_WarnMissingLocalSigs,
+  depFlagSpec "missing-local-sigs"       Opt_WarnMissingLocalSignatures
+    "it is replaced by -Wmissing-local-signatures",
+  flagSpec "missing-local-signatures"    Opt_WarnMissingLocalSignatures,
   flagSpec "missing-methods"             Opt_WarnMissingMethods,
   flagSpec "missing-monadfail-instances" Opt_WarnMissingMonadFailInstances,
   flagSpec "semigroup"                   Opt_WarnSemigroup,
-  flagSpec "missing-signatures"          Opt_WarnMissingSigs,
-  flagSpec "missing-exported-sigs"       Opt_WarnMissingExportedSigs,
+  flagSpec "missing-signatures"          Opt_WarnMissingSignatures,
+  depFlagSpec "missing-exported-sigs"    Opt_WarnMissingExportedSignatures
+    "it is replaced by -Wmissing-exported-signatures",
+  flagSpec "missing-exported-signatures" Opt_WarnMissingExportedSignatures,
   flagSpec "monomorphism-restriction"    Opt_WarnMonomorphism,
   flagSpec "name-shadowing"              Opt_WarnNameShadowing,
   flagSpec "noncanonical-monad-instances"
@@ -3221,7 +3225,8 @@ wWarningFlagsDeps = [
   flagSpec "unused-type-patterns"        Opt_WarnUnusedTypePatterns,
   flagSpec "warnings-deprecations"       Opt_WarnWarningsDeprecations,
   flagSpec "wrong-do-bind"               Opt_WarnWrongDoBind,
-  flagSpec "missing-pat-syn-signatures"  Opt_WarnMissingPatSynSigs,
+  flagSpec "missing-pattern-synonym-signatures"
+                                    Opt_WarnMissingPatternSynonymSignatures,
   flagSpec "unrecognised-warning-flags"  Opt_WarnUnrecognisedWarningFlags ]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
@@ -3778,13 +3783,13 @@ minusWallOpts
     = minusWOpts ++
       [ Opt_WarnTypeDefaults,
         Opt_WarnNameShadowing,
-        Opt_WarnMissingSigs,
+        Opt_WarnMissingSignatures,
         Opt_WarnHiShadows,
         Opt_WarnOrphans,
         Opt_WarnUnusedDoBind,
         Opt_WarnTrustworthySafe,
         Opt_WarnUntickedPromotedConstructors,
-        Opt_WarnMissingPatSynSigs
+        Opt_WarnMissingPatternSynonymSignatures
       ]
 
 -- | Things you get with -Weverything, i.e. *all* known warnings flags

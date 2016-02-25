@@ -119,7 +119,7 @@ compilerDebuggingOptions =
          , flagDescription = "Dump strictness analyser output"
          , flagType = DynamicFlag
          }
-  , flag { flagName = "-ddump-strsigs"
+  , flag { flagName = "-ddump-str-signatures"
          , flagDescription = "Dump strictness signatures"
          , flagType = DynamicFlag
          }
