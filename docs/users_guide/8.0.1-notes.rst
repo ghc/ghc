@@ -271,9 +271,10 @@ Compiler
    warnings makes sure the definition of ``Semigroup`` as a superclass of
    ``Monoid`` does not break any code.
 
--  Added the :ghc-flag:`-Wmissing-pat-syn-signatures` flag. When enabled, this will issue
-   a warning when a pattern synonym definition doesn't have a type signature.
-   It is turned off by default but enabled by :ghc-flag:`-Wall`.
+-  Added the :ghc-flag:`-Wmissing-pattern-synonym-signatures`
+   flag. When enabled, this will issue a warning when a pattern
+   synonym definition doesn't have a type signature.  It is turned off
+   by default but enabled by :ghc-flag:`-Wall`.
 
 -  Added the :ghc-flag:`-Wunused-type-patterns` flag to report unused
    type variables in data and type family instances. This flag is not implied
@@ -309,6 +310,15 @@ Compiler
 -  When :ghc-flag:`-fdefer-type-errors` is enabled and an expression fails to
    typecheck, ``Control.Exception.TypeError`` will now be thrown instead of
    ``Control.Exception.ErrorCall``.
+
+-  :ghc-flag:`-Wmissing-local-sigs` is now deprecated in favor of
+   :ghc-flag:`-Wmissing-local-signatures`.
+
+-  :ghc-flag:`-Wmissing-exported-sigs` is now deprecated in favor of
+   :ghc-flag:`-Wmissing-exported-signatures`.
+
+-  :ghc-flag:`-ddump-strsigs` has been renamed to
+   :ghc-flag:`-ddump-str-signatures`.
 
 GHCi
 ~~~~

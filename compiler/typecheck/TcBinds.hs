@@ -706,7 +706,7 @@ mkExport prag_fn qtvs theta
                   else addErrCtxtM (mk_impedence_match_msg mono_info sel_poly_ty poly_ty) $
                        tcSubType_NC sig_ctxt sel_poly_ty (mkCheckExpType poly_ty)
 
-        ; warn_missing_sigs <- woptM Opt_WarnMissingLocalSigs
+        ; warn_missing_sigs <- woptM Opt_WarnMissingLocalSignatures
         ; when warn_missing_sigs $ localSigWarn poly_id mb_sig
 
         ; return (ABE { abe_wrap = wrap
@@ -855,12 +855,12 @@ localSigWarn :: Id -> Maybe TcIdSigInfo -> TcM ()
 localSigWarn id mb_sig
   | Just _ <- mb_sig               = return ()
   | not (isSigmaTy (idType id))    = return ()
-  | otherwise                      = warnMissingSig msg id
+  | otherwise                      = warnMissingSignatures msg id
   where
     msg = text "Polymorphic local binding with no type signature:"
 
-warnMissingSig :: SDoc -> Id -> TcM ()
-warnMissingSig msg id
+warnMissingSignatures :: SDoc -> Id -> TcM ()
+warnMissingSignatures msg id
   = do  { env0 <- tcInitTidyEnv
         ; let (env1, tidy_ty) = tidyOpenType env0 (idType id)
         ; addWarnTcM (env1, mk_msg tidy_ty) }
