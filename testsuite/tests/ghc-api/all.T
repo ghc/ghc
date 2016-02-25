@@ -21,3 +21,5 @@ test('T10942', extra_run_opts('"' + config.libdir + '"'),
 test('T9015', extra_run_opts('"' + config.libdir + '"'),
               compile_and_run,
               ['-package ghc'])
+test('T11579', extra_run_opts('"' + config.libdir + '"'), compile_and_run,
+     ['-package ghc'])

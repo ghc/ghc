@@ -22,7 +22,7 @@
 -- Your GHC must have been built with @libdw@ support for this to work.
 --
 -- @
--- $ ghc --info | grep libdw
+-- user@host:~$ ghc --info | grep libdw
 --  ,("RTS expects libdw","YES")
 -- @
 --
