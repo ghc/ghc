@@ -1678,7 +1678,7 @@ isReturnApp (L _ (HsApp f arg))
   | otherwise = Nothing
  where
   is_return (L _ (HsPar e)) = is_return e
-  is_return (L _ (HsVar (L _ r))) = r == returnMName
+  is_return (L _ (HsVar (L _ r))) = r == returnMName || r == pureAName
        -- TODO: I don't know how to get this right for rebindable syntax
   is_return _ = False
 isReturnApp _ = Nothing
