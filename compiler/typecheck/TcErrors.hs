@@ -343,13 +343,13 @@ warnRedundantConstraints ctxt env info ev_vars
    addErrCtxt (text "In" <+> ppr info) $
    do { env <- getLclEnv
       ; msg <- mkErrorReport ctxt env (important doc)
-      ; reportWarning msg }
+      ; reportWarning NoReason msg }
 
  | otherwise  -- But for InstSkol there already *is* a surrounding
               -- "In the instance declaration for Eq [a]" context
               -- and we don't want to say it twice. Seems a bit ad-hoc
  = do { msg <- mkErrorReport ctxt env (important doc)
-      ; reportWarning msg }
+      ; reportWarning NoReason msg }
  where
    doc = text "Redundant constraint" <> plural redundant_evs <> colon
          <+> pprEvVarTheta redundant_evs
@@ -573,8 +573,9 @@ reportGroup mk_err ctxt cts =
   case partition isMonadFailInstanceMissing cts of
         -- Only warn about missing MonadFail constraint when
         -- there are no other missing contstraints!
-        (monadFailCts, []) -> do { err <- mk_err ctxt monadFailCts
-                                 ; reportWarning err }
+        (monadFailCts, []) ->
+            do { err <- mk_err ctxt monadFailCts
+               ; reportWarning (Reason Opt_WarnMissingMonadFailInstances) err }
 
         (_, cts') -> do { err <- mk_err ctxt cts'
                         ; maybeReportError ctxt err
@@ -598,7 +599,7 @@ maybeReportHoleError ctxt ct err
     -- only if -fwarn_partial_type_signatures is on
     case cec_type_holes ctxt of
        HoleError -> reportError err
-       HoleWarn  -> reportWarning err
+       HoleWarn  -> reportWarning (Reason Opt_WarnPartialTypeSignatures) err
        HoleDefer -> return ()
 
   -- Otherwise this is a typed hole in an expression
@@ -606,7 +607,7 @@ maybeReportHoleError ctxt ct err
   = -- If deferring, report a warning only if -Wtyped-holds is on
     case cec_expr_holes ctxt of
        HoleError -> reportError err
-       HoleWarn  -> reportWarning err
+       HoleWarn  -> reportWarning (Reason Opt_WarnTypedHoles) err
        HoleDefer -> return ()
 
 maybeReportError :: ReportErrCtxt -> ErrMsg -> TcM ()
@@ -616,12 +617,12 @@ maybeReportError ctxt err
   = return ()            -- so suppress this error/warning
 
   | cec_errors_as_warns ctxt
-  = reportWarning err
+  = reportWarning NoReason err
 
   | otherwise
   = case cec_defer_type_errors ctxt of
       TypeDefer -> return ()
-      TypeWarn  -> reportWarning err
+      TypeWarn  -> reportWarning NoReason err
       TypeError -> reportError err
 
 addDeferredBinding :: ReportErrCtxt -> ErrMsg -> Ct -> TcM ()
@@ -2365,7 +2366,7 @@ warnDefaulting wanteds default_ty
                            , quotes (ppr default_ty) ])
                      2
                      ppr_wanteds
-       ; setCtLocM loc $ warnTc warn_default warn_msg }
+       ; setCtLocM loc $ warnTc (Reason Opt_WarnTypeDefaults) warn_default warn_msg }
 
 {-
 Note [Runtime skolems]

@@ -462,7 +462,7 @@ rnBind _ bind@(PatBind { pat_lhs = pat
         --           or an occurrence of, a variable on the RHS
         ; whenWOptM Opt_WarnUnusedPatternBinds $
           when (null bndrs && not is_wild_pat) $
-          addWarn $ unusedPatBindWarn bind'
+          addWarn (Reason Opt_WarnUnusedPatternBinds) $ unusedPatBindWarn bind'
 
         ; fvs' `seq` -- See Note [Free-variable space leak]
           return (bind', bndrs, all_fvs) }
@@ -1104,7 +1104,7 @@ rnGRHS' ctxt rnBody (GRHS guards rhs)
                                     rnBody rhs
 
         ; unless (pattern_guards_allowed || is_standard_guard guards')
-                 (addWarn (nonStdGuardErr guards'))
+                 (addWarn NoReason (nonStdGuardErr guards'))
 
         ; return (GRHS guards' rhs', fvs) }
   where

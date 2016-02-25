@@ -1,5 +1,5 @@
 
-Defaulting1MROff.hs:7:10: warning:
+Defaulting1MROff.hs:7:10: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘Integer’
     • In the type signature:
         alpha :: _

@@ -428,7 +428,8 @@ ruleCheckPass current_phase pat guts = do
     dflags <- getDynFlags
     vis_orphs <- getVisibleOrphanMods
     liftIO $ Err.showPass dflags "RuleCheck"
-    liftIO $ log_action dflags dflags Err.SevDump noSrcSpan defaultDumpStyle
+    liftIO $ log_action dflags dflags NoReason Err.SevDump noSrcSpan
+                 defaultDumpStyle
                  (ruleCheckProgram current_phase pat
                     (RuleEnv rb vis_orphs) (mg_binds guts))
     return guts

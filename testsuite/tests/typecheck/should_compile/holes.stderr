@@ -1,5 +1,5 @@
 
-holes.hs:3:5: warning:
+holes.hs:3:5: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: t
       Where: ‘t’ is a rigid type variable bound by
                the inferred type of f :: t at holes.hs:3:1
@@ -7,7 +7,7 @@ holes.hs:3:5: warning:
       In an equation for ‘f’: f = _
     • Relevant bindings include f :: t (bound at holes.hs:3:1)
 
-holes.hs:6:7: warning:
+holes.hs:6:7: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Char
     • In the expression: _
       In an equation for ‘g’: g x = _
@@ -15,14 +15,14 @@ holes.hs:6:7: warning:
         x :: Int (bound at holes.hs:6:3)
         g :: Int -> Char (bound at holes.hs:6:1)
 
-holes.hs:8:5: warning:
+holes.hs:8:5: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: [Char]
     • In the first argument of ‘(++)’, namely ‘_’
       In the expression: _ ++ "a"
       In an equation for ‘h’: h = _ ++ "a"
     • Relevant bindings include h :: [Char] (bound at holes.hs:8:1)
 
-holes.hs:11:15: warning:
+holes.hs:11:15: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: b0
       Where: ‘b0’ is an ambiguous type variable
     • In the second argument of ‘const’, namely ‘_’

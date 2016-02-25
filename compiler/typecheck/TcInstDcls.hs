@@ -447,7 +447,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
            if isHsBootOrSig (tcg_src env)
              then
                do warn <- woptM Opt_WarnDerivingTypeable
-                  when warn $ addWarnTc $ vcat
+                  when warn $ addWarnTc (Reason Opt_WarnDerivingTypeable) $ vcat
                     [ ppTypeable <+> text "instances in .hs-boot files are ignored"
                     , text "This warning will become an error in future versions of the compiler"
                     ]
@@ -1571,7 +1571,7 @@ derivBindCtxt sel_id clas tys
 warnUnsatisfiedMinimalDefinition :: ClassMinimalDef -> TcM ()
 warnUnsatisfiedMinimalDefinition mindef
   = do { warn <- woptM Opt_WarnMissingMethods
-       ; warnTc warn message
+       ; warnTc (Reason Opt_WarnMissingMethods) warn message
        }
   where
     message = vcat [text "No explicit implementation for"

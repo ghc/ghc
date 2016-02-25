@@ -41,9 +41,9 @@ compileInGhc targets handlerOutput = do
         TargetFile file Nothing -> file
         _ -> error "fileFromTarget: not a known target"
 
-    collectSrcError handlerOutput flags SevOutput _srcspan style msg
+    collectSrcError handlerOutput flags _ SevOutput _srcspan style msg
       = handlerOutput $ GHC.showSDocForUser flags (queryQual style) msg
-    collectSrcError _ _ _ _ _ _
+    collectSrcError _ _ _ _ _ _ _
       = return ()
 
 main :: IO ()

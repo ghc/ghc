@@ -473,8 +473,8 @@ resetLastErrorLocations = do
     liftIO $ writeIORef (lastErrorLocations st) []
 
 ghciLogAction :: IORef [(FastString, Int)] ->  LogAction
-ghciLogAction lastErrLocations dflags severity srcSpan style msg = do
-    defaultLogAction dflags severity srcSpan style msg
+ghciLogAction lastErrLocations dflags flag severity srcSpan style msg = do
+    defaultLogAction dflags flag severity srcSpan style msg
     case severity of
         SevError -> case srcSpan of
             RealSrcSpan rsp -> modifyIORef lastErrLocations

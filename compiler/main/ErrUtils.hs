@@ -23,7 +23,7 @@ module ErrUtils (
         pprLocErrMsg, printBagOfErrors,
 
         -- ** Construction
-        emptyMessages, mkLocMessage, makeIntoWarning,
+        emptyMessages, mkLocMessage, mkLocMessageAnn, makeIntoWarning,
         mkErrMsg, mkPlainErrMsg, mkErrDoc, mkLongErrMsg, mkWarnMsg,
         mkPlainWarnMsg,
         warnIsErrorMsg, mkLongWarnMsg,
@@ -110,7 +110,8 @@ data ErrMsg = ErrMsg {
         errMsgDoc         :: ErrDoc,
         -- | This has the same text as errDocImportant . errMsgDoc.
         errMsgShortString :: String,
-        errMsgSeverity    :: Severity
+        errMsgSeverity    :: Severity,
+        errMsgReason      :: WarnReason
         }
         -- The SrcSpan is used for sorting errors into line-number order
 
@@ -160,15 +161,18 @@ pprMessageBag :: Bag MsgDoc -> SDoc
 pprMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))
 
 mkLocMessage :: Severity -> SrcSpan -> MsgDoc -> MsgDoc
+mkLocMessage = mkLocMessageAnn Nothing
+
+mkLocMessageAnn :: Maybe String -> Severity -> SrcSpan -> MsgDoc -> MsgDoc
   -- Always print the location, even if it is unhelpful.  Error messages
   -- are supposed to be in a standard format, and one without a location
   -- would look strange.  Better to say explicitly "<no location info>".
-mkLocMessage severity locn msg
+mkLocMessageAnn ann severity locn msg
     = sdocWithDynFlags $ \dflags ->
       let locn' = if gopt Opt_ErrorSpans dflags
                   then ppr locn
                   else ppr (srcSpanStart locn)
-      in hang (locn' <> colon <+> sev_info) 4 msg
+      in hang (locn' <> colon <+> sev_info <> opt_ann) 4 msg
   where
     -- Add prefixes, like    Foo.hs:34: warning:
     --                           <the warning message>
@@ -178,8 +182,13 @@ mkLocMessage severity locn msg
                  SevFatal -> text "fatal:"
                  _ -> empty
 
-makeIntoWarning :: ErrMsg -> ErrMsg
-makeIntoWarning err = err { errMsgSeverity = SevWarning }
+    -- Add optional information
+    opt_ann = text $ maybe "" (\i -> " ["++i++"]") ann
+
+makeIntoWarning :: WarnReason -> ErrMsg -> ErrMsg
+makeIntoWarning reason err = err
+    { errMsgSeverity = SevWarning
+    , errMsgReason = reason }
 
 -- -----------------------------------------------------------------------------
 -- Collecting up messages for later ordering and printing.
@@ -190,7 +199,8 @@ mk_err_msg dflags sev locn print_unqual doc
           , errMsgContext = print_unqual
           , errMsgDoc = doc
           , errMsgShortString = showSDoc dflags (vcat (errDocImportant doc))
-          , errMsgSeverity = sev }
+          , errMsgSeverity = sev
+          , errMsgReason = NoReason }
 
 mkErrDoc :: DynFlags -> SrcSpan -> PrintUnqualified -> ErrDoc -> ErrMsg
 mkErrDoc dflags = mk_err_msg dflags SevError
@@ -226,10 +236,11 @@ errorsFound _dflags (_warns, errs) = not (isEmptyBag errs)
 printBagOfErrors :: DynFlags -> Bag ErrMsg -> IO ()
 printBagOfErrors dflags bag_of_errors
   = sequence_ [ let style = mkErrStyle dflags unqual
-                in log_action dflags dflags sev s style (formatErrDoc dflags doc)
+                in log_action dflags dflags reason sev s style (formatErrDoc dflags doc)
               | ErrMsg { errMsgSpan      = s,
                          errMsgDoc       = doc,
                          errMsgSeverity  = sev,
+                         errMsgReason    = reason,
                          errMsgContext   = unqual } <- sortMsgBag (Just dflags)
                                                                   bag_of_errors ]
 
@@ -283,7 +294,13 @@ doIfSet_dyn dflags flag action | gopt flag dflags = action
 dumpIfSet :: DynFlags -> Bool -> String -> SDoc -> IO ()
 dumpIfSet dflags flag hdr doc
   | not flag   = return ()
-  | otherwise  = log_action dflags dflags SevDump noSrcSpan defaultDumpStyle (mkDumpDoc hdr doc)
+  | otherwise  = log_action dflags
+                            dflags
+                            NoReason
+                            SevDump
+                            noSrcSpan
+                            defaultDumpStyle
+                            (mkDumpDoc hdr doc)
 
 -- | a wrapper around 'dumpSDoc'.
 -- First check whether the dump flag is set
@@ -359,7 +376,7 @@ dumpSDoc dflags print_unqual flag hdr doc
               let (doc', severity)
                     | null hdr  = (doc, SevOutput)
                     | otherwise = (mkDumpDoc hdr doc, SevDump)
-              log_action dflags dflags severity noSrcSpan dump_style doc'
+              log_action dflags dflags NoReason severity noSrcSpan dump_style doc'
 
 
 -- | Choose where to put a dump file based on DynFlags
@@ -416,18 +433,18 @@ ifVerbose dflags val act
 
 errorMsg :: DynFlags -> MsgDoc -> IO ()
 errorMsg dflags msg
-   = log_action dflags dflags SevError noSrcSpan (defaultErrStyle dflags) msg
+   = log_action dflags dflags NoReason SevError noSrcSpan (defaultErrStyle dflags) msg
 
 warningMsg :: DynFlags -> MsgDoc -> IO ()
 warningMsg dflags msg
-   = log_action dflags dflags SevWarning noSrcSpan (defaultErrStyle dflags) msg
+   = log_action dflags dflags NoReason SevWarning noSrcSpan (defaultErrStyle dflags) msg
 
 fatalErrorMsg :: DynFlags -> MsgDoc -> IO ()
 fatalErrorMsg dflags msg = fatalErrorMsg' (log_action dflags) dflags msg
 
 fatalErrorMsg' :: LogAction -> DynFlags -> MsgDoc -> IO ()
 fatalErrorMsg' la dflags msg =
-    la dflags SevFatal noSrcSpan (defaultErrStyle dflags) msg
+    la dflags NoReason SevFatal noSrcSpan (defaultErrStyle dflags) msg
 
 fatalErrorMsg'' :: FatalMessager -> String -> IO ()
 fatalErrorMsg'' fm msg = fm msg
@@ -458,11 +475,13 @@ printOutputForUser dflags print_unqual msg
   = logOutput dflags (mkUserStyle print_unqual AllTheWay) msg
 
 logInfo :: DynFlags -> PprStyle -> MsgDoc -> IO ()
-logInfo dflags sty msg = log_action dflags dflags SevInfo noSrcSpan sty msg
+logInfo dflags sty msg
+  = log_action dflags dflags NoReason SevInfo noSrcSpan sty msg
 
 logOutput :: DynFlags -> PprStyle -> MsgDoc -> IO ()
 -- ^ Like 'logInfo' but with 'SevOutput' rather then 'SevInfo'
-logOutput dflags sty msg = log_action dflags dflags SevOutput noSrcSpan sty msg
+logOutput dflags sty msg
+  = log_action dflags dflags NoReason SevOutput noSrcSpan sty msg
 
 prettyPrintGhcErrors :: ExceptionMonad m => DynFlags -> m a -> m a
 prettyPrintGhcErrors dflags

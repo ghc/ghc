@@ -1,5 +1,5 @@
 
-T10438.hs:7:22: warning:
+T10438.hs:7:22: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘t2’
       Where: ‘t2’ is a rigid type variable bound by
                the inferred type of g :: t2 -> t2 at T10438.hs:6:9

@@ -1,5 +1,5 @@
 
-T10519.hs:5:18: warning:
+T10519.hs:5:18: warning: [-Wpartial-type-signatures (in -Wdefault)]
     Found constraint wildcard ‘_’ standing for ‘Eq a’
     In the type signature:
       foo :: forall a. _ => a -> a -> Bool

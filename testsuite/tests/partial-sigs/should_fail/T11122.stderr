@@ -1,5 +1,5 @@
 
-T11122.hs:19:18: warning:
+T11122.hs:19:18: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘Int’
     • In the type signature:
         parser :: Parser _

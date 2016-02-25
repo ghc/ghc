@@ -2351,9 +2351,10 @@ wrapWarnTcS :: TcM a -> TcS a
 wrapWarnTcS = wrapTcS
 
 failTcS, panicTcS  :: SDoc -> TcS a
-warnTcS, addErrTcS :: SDoc -> TcS ()
+warnTcS   :: WarningFlag -> SDoc -> TcS ()
+addErrTcS :: SDoc -> TcS ()
 failTcS      = wrapTcS . TcM.failWith
-warnTcS      = wrapTcS . TcM.addWarn
+warnTcS flag = wrapTcS . TcM.addWarn (Reason flag)
 addErrTcS    = wrapTcS . TcM.addErr
 panicTcS doc = pprPanic "TcCanonical" doc
 

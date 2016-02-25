@@ -825,7 +825,7 @@ msg sev doc
              user_sty = mkUserStyle unqual AllTheWay
              dump_sty = mkDumpStyle unqual
        ; liftIO $
-         (log_action dflags) dflags sev loc sty doc }
+         (log_action dflags) dflags NoReason sev loc sty doc }
 
 -- | Output a String message to the screen
 putMsgS :: String -> CoreM ()

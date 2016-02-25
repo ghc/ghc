@@ -21,7 +21,7 @@ module DynFlags (
         -- * Dynamic flags and associated configuration types
         DumpFlag(..),
         GeneralFlag(..),
-        WarningFlag(..),
+        WarningFlag(..), WarnReason(..),
         Language(..),
         PlatformConstants(..),
         FatalMessager, LogAction, FlushOut(..), FlushErr(..),
@@ -173,7 +173,7 @@ import FastString
 import Outputable
 import Foreign.C        ( CInt(..) )
 import System.IO.Unsafe ( unsafeDupablePerformIO )
-import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessage )
+import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessageAnn )
 
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.IORef
@@ -382,6 +382,7 @@ data GeneralFlag
    | Opt_NoLlvmMangler                 -- hidden flag
 
    | Opt_WarnIsError                    -- -Werror; makes warnings fatal
+   | Opt_ShowWarnGroups                 -- Show the group a warning belongs to
 
    | Opt_PrintExplicitForalls
    | Opt_PrintExplicitKinds
@@ -532,6 +533,11 @@ data GeneralFlag
    | Opt_DistrustAllPackages
    | Opt_PackageTrust
    deriving (Eq, Show, Enum)
+
+-- | Used when outputting warnings: if a reason is given, it is
+-- displayed. If a warning isn't controlled by a flag, this is made
+-- explicit at the point of use.
+data WarnReason = NoReason | Reason !WarningFlag
 
 data WarningFlag =
 -- See Note [Updating flag description in the User's Guide]
@@ -1616,13 +1622,20 @@ interpreterDynamic dflags
 --------------------------------------------------------------------------
 
 type FatalMessager = String -> IO ()
-type LogAction = DynFlags -> Severity -> SrcSpan -> PprStyle -> MsgDoc -> IO ()
+
+type LogAction = DynFlags
+              -> WarnReason
+              -> Severity
+              -> SrcSpan
+              -> PprStyle
+              -> MsgDoc
+              -> IO ()
 
 defaultFatalMessager :: FatalMessager
 defaultFatalMessager = hPutStrLn stderr
 
 defaultLogAction :: LogAction
-defaultLogAction dflags severity srcSpan style msg
+defaultLogAction dflags reason severity srcSpan style msg
     = case severity of
       SevOutput      -> printSDoc msg style
       SevDump        -> printSDoc (msg $$ blankLine) style
@@ -1630,7 +1643,7 @@ defaultLogAction dflags severity srcSpan style msg
       SevInfo        -> printErrs msg style
       SevFatal       -> printErrs msg style
       _              -> do hPutChar stderr '\n'
-                           printErrs (mkLocMessage severity srcSpan msg) style
+                           printErrs message style
                            -- careful (#2302): printErrs prints in UTF-8,
                            -- whereas converting to string first and using
                            -- hPutStr would just emit the low 8 bits of
@@ -1638,6 +1651,19 @@ defaultLogAction dflags severity srcSpan style msg
     where printSDoc  = defaultLogActionHPrintDoc  dflags stdout
           printErrs  = defaultLogActionHPrintDoc  dflags stderr
           putStrSDoc = defaultLogActionHPutStrDoc dflags stdout
+          -- Pretty print the warning flag, if any (#10752)
+          message = mkLocMessageAnn flagMsg severity srcSpan msg
+          flagMsg = case reason of
+                        NoReason -> Nothing
+                        Reason flag -> (\spec -> "-W" ++ flagSpecName spec ++ flagGrp flag) <$>
+                                          flagSpecOf flag
+
+          flagGrp flag
+              | gopt Opt_ShowWarnGroups dflags =
+                    case smallestGroups flag of
+                        [] -> ""
+                        groups -> " (in " ++ intercalate ", " (map ("-W"++) groups) ++ ")"
+              | otherwise = ""
 
 defaultLogActionHPrintDoc :: DynFlags -> Handle -> SDoc -> PprStyle -> IO ()
 defaultLogActionHPrintDoc dflags h d sty
@@ -3145,6 +3171,12 @@ useInstead flag turn_on
 nop :: TurnOnFlag -> DynP ()
 nop _ = return ()
 
+-- | Find the 'FlagSpec' for a 'WarningFlag'.
+flagSpecOf :: WarningFlag -> Maybe (FlagSpec WarningFlag)
+flagSpecOf flag = listToMaybe $ filter check wWarningFlags
+  where
+    check fs = flagSpecFlag fs == flag
+
 -- | These @-W\<blah\>@ flags can all be reversed with @-Wno-\<blah\>@
 wWarningFlags :: [FlagSpec WarningFlag]
 wWarningFlags = map snd wWarningFlagsDeps
@@ -3344,7 +3376,8 @@ fFlagsDeps = [
   flagSpec "unbox-strict-fields"              Opt_UnboxStrictFields,
   flagSpec "vectorisation-avoidance"          Opt_VectorisationAvoidance,
   flagSpec "vectorise"                        Opt_Vectorise,
-  flagSpec "worker-wrapper"                   Opt_WorkerWrapper
+  flagSpec "worker-wrapper"                   Opt_WorkerWrapper,
+  flagSpec "show-warning-groups"              Opt_ShowWarnGroups
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
@@ -3584,7 +3617,8 @@ defaultFlags settings
       Opt_ProfCountEntries,
       Opt_RPath,
       Opt_SharedImplib,
-      Opt_SimplPreInlining
+      Opt_SimplPreInlining,
+      Opt_ShowWarnGroups
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
@@ -3756,6 +3790,51 @@ removes an assertion failure. -}
 --
 --  * utils/mkUserGuidePart/
 --  * docs/users_guide/using-warnings.rst
+
+-- | Warning groups.
+--
+-- As all warnings are in the Weverything set, it is ignored when
+-- displaying to the user which group a warning is in.
+warningGroups :: [(String, [WarningFlag])]
+warningGroups =
+    [ ("compat",       minusWcompatOpts)
+    , ("unused-binds", unusedBindsFlags)
+    , ("default",      standardWarnings)
+    , ("extra",        minusWOpts)
+    , ("all",          minusWallOpts)
+    , ("everything",   minusWeverythingOpts)
+    ]
+
+-- | Warning group hierarchies, where there is an explicit inclusion
+-- relation.
+--
+-- Each inner list is a hierarchy of warning groups, ordered from
+-- smallest to largest, where each group is a superset of the one
+-- before it.
+--
+-- Separating this from 'warningGroups' allows for multiple
+-- hierarchies with no inherent relation to be defined.
+--
+-- The special-case Weverything group is not included.
+warningHierarchies :: [[String]]
+warningHierarchies = hierarchies ++ map (:[]) rest
+  where
+    hierarchies = [["default", "extra", "all"]]
+    rest = filter (`notElem` "everything" : concat hierarchies) $
+           map fst warningGroups
+
+-- | Find the smallest group in every hierarchy which a warning
+-- belongs to, excluding Weverything.
+smallestGroups :: WarningFlag -> [String]
+smallestGroups flag = mapMaybe go warningHierarchies where
+    -- Because each hierarchy is arranged from smallest to largest,
+    -- the first group we find in a hierarchy which contains the flag
+    -- is the smallest.
+    go (group:rest) = fromMaybe (go rest) $ do
+        flags <- lookup group warningGroups
+        guard (flag `elem` flags)
+        pure (Just group)
+    go [] = Nothing
 
 -- | Warnings enabled unless specified otherwise
 standardWarnings :: [WarningFlag]

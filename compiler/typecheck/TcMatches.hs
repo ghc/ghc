@@ -975,7 +975,9 @@ emitMonadFailConstraint pat res_ty
        ; return () }
 
 warnRebindableClash :: LPat TcId -> TcRn ()
-warnRebindableClash pattern = addWarnAt (getLoc pattern)
+warnRebindableClash pattern = addWarnAt
+    (Reason Opt_WarnMissingMonadFailInstances)
+    (getLoc pattern)
     (text "The failable pattern" <+> quotes (ppr pattern)
      $$
      nest 2 (text "is used together with -XRebindableSyntax."

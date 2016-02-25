@@ -1,17 +1,17 @@
 
-T2245.hs:4:10: warning:
+T2245.hs:4:10: warning: [-Wmissing-methods (in -Wdefault)]
     • No explicit implementation for
         ‘+’, ‘*’, ‘abs’, ‘signum’, ‘fromInteger’, and (either ‘negate’
                                                               or
                                                               ‘-’)
     • In the instance declaration for ‘Num T’
 
-T2245.hs:5:10: warning:
+T2245.hs:5:10: warning: [-Wmissing-methods (in -Wdefault)]
     • No explicit implementation for
         ‘fromRational’ and (either ‘recip’ or ‘/’)
     • In the instance declaration for ‘Fractional T’
 
-T2245.hs:7:29: warning:
+T2245.hs:7:29: warning: [-Wtype-defaults (in -Wall)]
     • Defaulting the following constraints to type ‘T’
         (Fractional a0)
           arising from the literal ‘1e400’ at T2245.hs:7:29-33

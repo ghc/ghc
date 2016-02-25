@@ -236,7 +236,8 @@ rnImportDecl this_mod
         _  | implicit   -> return () -- Do not bleat for implicit imports
            | qual_only  -> return ()
            | otherwise  -> whenWOptM Opt_WarnMissingImportList $
-                           addWarn (missingImportListWarn imp_mod_name)
+                           addWarn (Reason Opt_WarnMissingImportList)
+                                   (missingImportListWarn imp_mod_name)
 
     iface <- loadSrcInterface doc imp_mod_name want_boot (fmap sl_fs mb_pkg)
 
@@ -253,7 +254,8 @@ rnImportDecl this_mod
     -- the non-boot module depends on the compilation order, which
     -- is not deterministic.  The hs-boot test can show this up.
     dflags <- getDynFlags
-    warnIf (want_boot && not (mi_boot iface) && isOneShot (ghcMode dflags))
+    warnIf NoReason
+           (want_boot && not (mi_boot iface) && isOneShot (ghcMode dflags))
            (warnRedundantSourceImport imp_mod_name)
     when (mod_safe && not (safeImportsOn dflags)) $
         addErr (text "safe import can't be used as Safe Haskell isn't on!"
@@ -297,7 +299,8 @@ rnImportDecl this_mod
     -- Complain if we import a deprecated module
     whenWOptM Opt_WarnWarningsDeprecations (
        case (mi_warns iface) of
-          WarnAll txt -> addWarn $ moduleWarn imp_mod_name txt
+          WarnAll txt -> addWarn (Reason Opt_WarnWarningsDeprecations)
+                                (moduleWarn imp_mod_name txt)
           _           -> return ()
      )
 
@@ -814,11 +817,11 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
         where
             -- Warn when importing T(..) if T was exported abstractly
             emit_warning (DodgyImport n) = whenWOptM Opt_WarnDodgyImports $
-              addWarn (dodgyImportWarn n)
+              addWarn (Reason Opt_WarnDodgyImports) (dodgyImportWarn n)
             emit_warning MissingImportList = whenWOptM Opt_WarnMissingImportList $
-              addWarn (missingImportListItem ieRdr)
+              addWarn (Reason Opt_WarnMissingImportList) (missingImportListItem ieRdr)
             emit_warning BadImportW = whenWOptM Opt_WarnDodgyImports $
-              addWarn (lookup_err_msg BadImport)
+              addWarn (Reason Opt_WarnDodgyImports) (lookup_err_msg BadImport)
 
             run_lookup :: IELookupM a -> TcRn (Maybe a)
             run_lookup m = case m of
@@ -1262,7 +1265,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                              | (L _ (IEModuleContents (L _ mod))) <- ie_names ]
         , mod `elem` earlier_mods    -- Duplicate export of M
         = do { warn_dup_exports <- woptM Opt_WarnDuplicateExports ;
-               warnIf warn_dup_exports (dupModuleExport mod) ;
+               warnIf (Reason Opt_WarnDuplicateExports) warn_dup_exports
+                      (dupModuleExport mod) ;
                return acc }
 
         | otherwise
@@ -1276,7 +1280,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                }
 
              ; checkErr exportValid (moduleNotImported mod)
-             ; warnIf (warnDodgyExports && exportValid && null gre_prs)
+             ; warnIf (Reason Opt_WarnDodgyExports)
+                      (warnDodgyExports && exportValid && null gre_prs)
                       (nullModuleExport mod)
 
              ; traceRn (text "efa" <+> (ppr mod $$ ppr all_gres))
@@ -1373,7 +1378,9 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
              warnDodgyExports <- woptM Opt_WarnDodgyExports
              when (null gres) $
                   if isTyConName name
-                  then when warnDodgyExports $ addWarn (dodgyExportWarn name)
+                  then when warnDodgyExports $
+                           addWarn (Reason Opt_WarnDodgyExports)
+                                   (dodgyExportWarn name)
                   else -- This occurs when you export T(..), but
                        -- only import T abstractly, or T is a synonym.
                        addErr (exportItemErr ie)
@@ -1416,7 +1423,8 @@ check_occs ie occs names  -- 'names' are the entities specifed by 'ie'
             -- by two different module exports. See ticket #4478.
             -> do unless (dupExport_ok name ie ie') $ do
                       warn_dup_exports <- woptM Opt_WarnDuplicateExports
-                      warnIf warn_dup_exports (dupExportWarn name_occ ie ie')
+                      warnIf (Reason Opt_WarnDuplicateExports) warn_dup_exports
+                             (dupExportWarn name_occ ie ie')
                   return occs
 
             | otherwise    -- Same occ name but different names: an error
@@ -1550,7 +1558,7 @@ warnUnusedImportDecls gbl_env
        ; traceRn (vcat [ text "Uses:" <+> ppr uses
                        , text "Import usage" <+> ppr usage])
        ; whenWOptM Opt_WarnUnusedImports $
-         mapM_ (warnUnusedImport fld_env) usage
+         mapM_ (warnUnusedImport Opt_WarnUnusedImports fld_env) usage
 
        ; whenGOptM Opt_D_dump_minimal_imports $
          printMinimalImports usage }
@@ -1570,9 +1578,15 @@ warnMissingSignatures gbl_env
        ; warn_pat_syns      <- woptM Opt_WarnMissingPatternSynonymSignatures
 
        ; let sig_warn
-               | warn_only_exported = topSigWarnIfExported exports sig_ns
-               | warn_missing_sigs || warn_pat_syns = topSigWarn sig_ns
-               | otherwise          = noSigWarn
+               | warn_only_exported
+                   = topSigWarnIfExported Opt_WarnMissingExportedSignatures
+                                          exports sig_ns
+               | warn_missing_sigs
+                   = topSigWarn Opt_WarnMissingSignatures sig_ns
+               | warn_pat_syns
+                   = topSigWarn Opt_WarnMissingPatternSynonymSignatures sig_ns
+               | otherwise
+                   = noSigWarn
 
 
        ; let binders = (if warn_pat_syns then ps_binders else [])
@@ -1591,35 +1605,36 @@ type SigWarn = [(Type, Name)] -> RnM ()
 noSigWarn :: SigWarn
 noSigWarn _ = return ()
 
-topSigWarnIfExported :: NameSet -> NameSet -> SigWarn
-topSigWarnIfExported exported sig_ns ids
-  = mapM_ (topSigWarnIdIfExported exported sig_ns) ids
+topSigWarnIfExported :: WarningFlag -> NameSet -> NameSet -> SigWarn
+topSigWarnIfExported flag exported sig_ns ids
+  = mapM_ (topSigWarnIdIfExported flag exported sig_ns) ids
 
-topSigWarnIdIfExported :: NameSet -> NameSet -> (Type, Name) -> RnM ()
-topSigWarnIdIfExported exported sig_ns (ty, name)
+topSigWarnIdIfExported :: WarningFlag -> NameSet -> NameSet -> (Type, Name)
+                       -> RnM ()
+topSigWarnIdIfExported flag exported sig_ns (ty, name)
   | name `elemNameSet` exported
-  = topSigWarnId sig_ns (ty, name)
+  = topSigWarnId flag sig_ns (ty, name)
   | otherwise
   = return ()
 
-topSigWarn :: NameSet -> SigWarn
-topSigWarn sig_ns ids = mapM_ (topSigWarnId sig_ns) ids
+topSigWarn :: WarningFlag -> NameSet -> SigWarn
+topSigWarn flag sig_ns ids = mapM_ (topSigWarnId flag sig_ns) ids
 
-topSigWarnId :: NameSet -> (Type, Name) -> RnM ()
+topSigWarnId :: WarningFlag -> NameSet -> (Type, Name) -> RnM ()
 -- The NameSet is the Ids that *lack* a signature
 -- We have to do it this way round because there are
 -- lots of top-level bindings that are generated by GHC
 -- and that don't have signatures
-topSigWarnId sig_ns (ty, name)
-  | name `elemNameSet` sig_ns      = warnMissingSig msg (ty, name)
+topSigWarnId flag sig_ns (ty, name)
+  | name `elemNameSet` sig_ns      = warnMissingSig flag msg (ty, name)
   | otherwise                      = return ()
   where
     msg = text "Top-level binding with no type signature:"
 
-warnMissingSig :: SDoc -> (Type, Name) -> RnM ()
-warnMissingSig msg (ty, name) = do
+warnMissingSig :: WarningFlag -> SDoc -> (Type, Name) -> RnM ()
+warnMissingSig flag msg (ty, name) = do
     tymsg <- getMsg ty
-    addWarnAt (getSrcSpan name) (mk_msg tymsg)
+    addWarnAt (Reason flag) (getSrcSpan name) (mk_msg tymsg)
   where
     mk_msg endmsg = sep [ msg, nest 2 $ pprPrefixName name <+> endmsg ]
 
@@ -1723,9 +1738,9 @@ extendImportMap gre imp_map
                    -- For srcSpanEnd see Note [The ImportMap]
         avail    = availFromGRE gre
 
-warnUnusedImport :: NameEnv (FieldLabelString, Name) -> ImportDeclUsage
-                 -> RnM ()
-warnUnusedImport fld_env (L loc decl, used, unused)
+warnUnusedImport :: WarningFlag -> NameEnv (FieldLabelString, Name)
+                 -> ImportDeclUsage -> RnM ()
+warnUnusedImport flag fld_env (L loc decl, used, unused)
   | Just (False,L _ []) <- ideclHiding decl
                 = return ()            -- Do not warn for 'import M()'
 
@@ -1733,9 +1748,9 @@ warnUnusedImport fld_env (L loc decl, used, unused)
   , not (null hides)
   , pRELUDE_NAME == unLoc (ideclName decl)
                 = return ()            -- Note [Do not warn about Prelude hiding]
-  | null used   = addWarnAt loc msg1   -- Nothing used; drop entire decl
+  | null used   = addWarnAt (Reason flag) loc msg1 -- Nothing used; drop entire decl
   | null unused = return ()            -- Everything imported is used; nop
-  | otherwise   = addWarnAt loc msg2   -- Some imports are unused
+  | otherwise   = addWarnAt (Reason flag) loc msg2 -- Some imports are unused
   where
     msg1 = vcat [pp_herald <+> quotes pp_mod <+> pp_not_used,
                  nest 2 (text "except perhaps to import instances from"

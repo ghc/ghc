@@ -684,8 +684,9 @@ check_valid_theta _ _ []
   = return ()
 check_valid_theta env ctxt theta
   = do { dflags <- getDynFlags
-       ; warnTcM (wopt Opt_WarnDuplicateConstraints dflags &&
-                  notNull dups) (dupPredWarn env dups)
+       ; warnTcM (Reason Opt_WarnDuplicateConstraints)
+                 (wopt Opt_WarnDuplicateConstraints dflags && notNull dups)
+                 (dupPredWarn env dups)
        ; traceTc "check_valid_theta" (ppr theta)
        ; mapM_ (check_pred_ty env dflags ctxt) theta }
   where
@@ -1455,7 +1456,7 @@ checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
     --   (b) failure of injectivity
     check_branch_compat prev_branches cur_branch
       | cur_branch `isDominatedBy` prev_branches
-      = do { addWarnAt (coAxBranchSpan cur_branch) $
+      = do { addWarnAt NoReason (coAxBranchSpan cur_branch) $
              inaccessibleCoAxBranch ax cur_branch
            ; return prev_branches }
       | otherwise

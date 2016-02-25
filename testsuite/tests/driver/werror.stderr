@@ -1,20 +1,22 @@
 
-werror.hs:6:1: warning:
+werror.hs:6:1: warning: [-Wmissing-signatures (in -Wall)]
     Top-level binding with no type signature: main :: IO ()
 
-werror.hs:7:13: warning:
+werror.hs:7:13: warning: [-Wname-shadowing (in -Wall)]
     This binding for ‘main’ shadows the existing binding
       defined at werror.hs:6:1
 
-werror.hs:7:13: warning: Defined but not used: ‘main’
+werror.hs:7:13: warning: [-Wunused-local-binds (in -Wextra, -Wunused-binds)]
+    Defined but not used: ‘main’
 
 werror.hs:8:1: warning:
     Tab character found here.
     Please use spaces instead.
 
-werror.hs:10:1: warning: Defined but not used: ‘f’
+werror.hs:10:1: warning: [-Wunused-local-binds (in -Wextra, -Wunused-binds)]
+    Defined but not used: ‘f’
 
-werror.hs:10:1: warning:
+werror.hs:10:1: warning: [-Wmissing-signatures (in -Wall)]
     Top-level binding with no type signature:
       f :: forall t t1. [t] -> [t1]
 
