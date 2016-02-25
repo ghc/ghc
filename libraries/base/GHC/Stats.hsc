@@ -39,26 +39,37 @@ foreign import ccall "getGCStatsEnabled" getGCStatsEnabled :: IO Bool
 
 -- I'm probably violating a bucket of constraints here... oops.
 
--- | Global garbage collection and memory statistics.
+-- | Statistics about memory usage and the garbage collector. Apart from
+-- 'currentBytesUsed' and 'currentBytesSlop' all are cumulative values since
+-- the program started.
 --
 -- @since 4.5.0.0
 data GCStats = GCStats
-    { bytesAllocated :: !Int64 -- ^ Total number of bytes allocated
-    , numGcs :: !Int64 -- ^ Number of garbage collections performed
-    , maxBytesUsed :: !Int64 -- ^ Maximum number of live bytes seen so far
-    , numByteUsageSamples :: !Int64 -- ^ Number of byte usage samples taken
-
+    { -- | Total number of bytes allocated
+    bytesAllocated :: !Int64
+    -- | Number of garbage collections performed (any generation, major and
+    -- minor)
+    , numGcs :: !Int64
+    -- | Maximum number of live bytes seen so far
+    , maxBytesUsed :: !Int64
+    -- | Number of byte usage samples taken, or equivalently
+    -- the number of major GCs performed.
+    , numByteUsageSamples :: !Int64
     -- | Sum of all byte usage samples, can be used with
     -- 'numByteUsageSamples' to calculate averages with
     -- arbitrary weighting (if you are sampling this record multiple
     -- times).
     , cumulativeBytesUsed :: !Int64
-    , bytesCopied :: !Int64 -- ^ Number of bytes copied during GC
-    , currentBytesUsed :: !Int64 -- ^ Current number of live bytes
-    , currentBytesSlop :: !Int64 -- ^ Current number of bytes lost to slop
-    , maxBytesSlop :: !Int64 -- ^ Maximum number of bytes lost to slop at any one time so far
-    , peakMegabytesAllocated :: !Int64 -- ^ Maximum number of megabytes allocated
-
+    -- | Number of bytes copied during GC
+    , bytesCopied :: !Int64
+    -- | Number of live bytes at the end of the last major GC
+    , currentBytesUsed :: !Int64
+    -- | Current number of bytes lost to slop
+    , currentBytesSlop :: !Int64
+    -- | Maximum number of bytes lost to slop at any one time so far
+    , maxBytesSlop :: !Int64
+    -- | Maximum number of megabytes allocated
+    , peakMegabytesAllocated :: !Int64
     -- | CPU time spent running mutator threads.  This does not include
     -- any profiling overhead or initialization.
     , mutatorCpuSeconds :: !Double
@@ -66,11 +77,14 @@ data GCStats = GCStats
     -- | Wall clock time spent running mutator threads.  This does not
     -- include initialization.
     , mutatorWallSeconds :: !Double
-    , gcCpuSeconds :: !Double -- ^ CPU time spent running GC
-    , gcWallSeconds :: !Double -- ^ Wall clock time spent running GC
-    , cpuSeconds :: !Double -- ^ Total CPU time elapsed since program start
-    , wallSeconds :: !Double -- ^ Total wall clock time elapsed since start
-
+    -- | CPU time spent running GC
+    , gcCpuSeconds :: !Double
+    -- | Wall clock time spent running GC
+    , gcWallSeconds :: !Double
+    -- | Total CPU time elapsed since program start
+    , cpuSeconds :: !Double
+    -- | Total wall clock time elapsed since start
+    , wallSeconds :: !Double
     -- | Number of bytes copied during GC, minus space held by mutable
     -- lists held by the capabilities.  Can be used with
     -- 'parMaxBytesCopied' to determine how well parallel GC utilized
