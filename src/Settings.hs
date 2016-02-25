@@ -4,12 +4,11 @@ module Settings (
     module Settings.User,
     module Settings.Ways,
     getPkgData, getPkgDataList, getTopDirectory, isLibrary,
-    getPackagePath, getContextDirectory, getContextPath, getPackageSources
+    getPackagePath, getContextDirectory, getContextPath
     ) where
 
 import Base
 import Expression
-import Oracles.ModuleFiles
 import Oracles.PackageData
 import Oracles.WindowsPath
 import Settings.Packages
@@ -34,16 +33,3 @@ getPkgDataList key = lift . pkgDataList . key =<< getContextPath
 
 getTopDirectory :: Expr FilePath
 getTopDirectory = lift topDirectory
-
--- | Find all Haskell source files for the current target
-getPackageSources :: Expr [FilePath]
-getPackageSources = do
-    context <- getContext
-    let buildPath = contextPath context -/- "build"
-        autogen   = buildPath -/- "autogen"
-    (found, missingMods) <- lift $ haskellModuleFiles context
-    -- Generated source files live in buildPath and have extension "hs"...
-    let generated = [ buildPath -/- (replaceEq '.' '/' m) <.> "hs" | m <- missingMods ]
-    -- ...except that GHC/Prim.hs lives in autogen. TODO: fix the inconsistency?
-        fixGhcPrim = replaceEq (buildPath -/- "GHC/Prim.hs") (autogen -/- "GHC/Prim.hs")
-    return $ found ++ fixGhcPrim generated

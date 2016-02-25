@@ -5,6 +5,7 @@ import Development.Shake.Util (parseMakefile)
 import Base
 import Context
 import Expression
+import Oracles.ModuleFiles
 import Oracles.PackageData
 import Rules.Actions
 import Settings
@@ -27,7 +28,7 @@ buildPackageDependencies rs context @ Context {..} =
                 build $ Target context (GccM stage) [srcFile] [out]
 
         hDepFile %> \out -> do
-            srcs <- interpretInContext context getPackageSources
+            srcs <- haskellSources context
             need srcs
             if srcs == []
             then writeFileChanged out ""

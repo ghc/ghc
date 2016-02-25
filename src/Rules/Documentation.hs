@@ -4,6 +4,7 @@ import Base
 import Context
 import Expression
 import GHC
+import Oracles.ModuleFiles
 import Oracles.PackageData
 import Rules.Actions
 import Settings
@@ -21,7 +22,7 @@ buildPackageDocumentation context @ Context {..} =
         haddockFile = pkgHaddockFile context
     in when (stage == Stage1) $ do
         haddockFile %> \file -> do
-            srcs <- interpretInContext context getPackageSources
+            srcs <- haskellSources context
             deps <- map PackageName <$> interpretInContext context (getPkgDataList DepNames)
             let haddocks = [ pkgHaddockFile $ vanillaContext Stage1 depPkg
                            | Just depPkg <- map findKnownPackage deps

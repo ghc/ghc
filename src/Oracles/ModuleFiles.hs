@@ -1,12 +1,12 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving, ScopedTypeVariables #-}
 module Oracles.ModuleFiles (
-    moduleFiles, haskellModuleFiles, moduleFilesOracle, findModuleFiles
+    moduleFiles, haskellSources, moduleFilesOracle, findModuleFiles
     ) where
 
 import Base
 import Context
+import Expression
 import Oracles.PackageData
-import Package
 import Settings.Paths
 
 newtype ModuleFilesKey = ModuleFilesKey ([FilePath], [String])
@@ -14,11 +14,12 @@ newtype ModuleFilesKey = ModuleFilesKey ([FilePath], [String])
 
 moduleFiles :: Context -> Action [FilePath]
 moduleFiles context @ Context {..} = do
-    let path = contextPath context
+    let path    = contextPath context
+        autogen = path -/- "build/autogen"
     srcDirs <- fmap sort . pkgDataList $ SrcDirs path
     modules <- fmap sort . pkgDataList $ Modules path
     let dirs = [ pkgPath package -/- dir | dir <- srcDirs ]
-    fmap catMaybes $ findModuleFiles dirs modules
+    catMaybes <$> findModuleFiles (autogen : dirs) modules
 
 haskellModuleFiles :: Context -> Action ([FilePath], [String])
 haskellModuleFiles context @ Context {..} = do
@@ -28,19 +29,23 @@ haskellModuleFiles context @ Context {..} = do
     srcDirs <- fmap sort . pkgDataList $ SrcDirs path
     modules <- fmap sort . pkgDataList $ Modules path
     let dirs = [ pkgPath package -/- dir | dir <- srcDirs ]
-    foundSrcDirs <- findModuleFiles dirs      modules
-    foundAutogen <- findModuleFiles [autogen] modules
-    found <- sequence $ zipWith3 addSources modules foundSrcDirs foundAutogen
-
+    found <- findModuleFiles (autogen : dirs) modules
     let missingMods    = map fst . filter (isNothing . snd) $ zip modules found
         otherFileToMod = replaceEq '/' '.' . dropExtension . dropPkgPath
         (haskellFiles, otherFiles) = partition ("//*hs" ?==) $ catMaybes found
-
     return (haskellFiles, missingMods ++ map otherFileToMod otherFiles)
-  where
-    addSources _ Nothing   r         = return r
-    addSources _ l         Nothing   = return l
-    addSources m (Just f1) (Just f2) = errorMultipleSources m f1 f2
+
+-- | Find all Haskell source files for the current context
+haskellSources :: Context -> Action [FilePath]
+haskellSources context = do
+    let buildPath = contextPath context -/- "build"
+        autogen   = buildPath -/- "autogen"
+    (found, missingMods) <- haskellModuleFiles context
+    -- Generated source files live in buildPath and have extension "hs"...
+    let generated = [ buildPath -/- (replaceEq '.' '/' m) <.> "hs" | m <- missingMods ]
+    -- ...except that GHC/Prim.hs lives in autogen. TODO: fix the inconsistency?
+        fixGhcPrim = replaceEq (buildPath -/- "GHC/Prim.hs") (autogen -/- "GHC/Prim.hs")
+    return $ found ++ fixGhcPrim generated
 
 -- | This is an important oracle whose role is to find and cache module source
 -- files. More specifically, it takes a list of directories @dirs@ and a sorted
