@@ -953,6 +953,20 @@ Here the second equation is unreachable. The original constraint
 the *signature* (Trac #7293).  So, for Given errors we replace the
 env (and hence src-loc) on its CtLoc with that from the immediately
 enclosing implication.
+
+Note [Error messages for untouchables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (Trac #9109)
+  data G a where { GBool :: G Bool }
+  foo x = case x of GBool -> True
+
+Here we can't solve (t ~ Bool), where t is the untouchable result
+meta-var 't', because of the (a ~ Bool) from the pattern match.
+So we infer the type
+   f :: forall a t. G a -> t
+making the meta-var 't' into a skolem.  So when we come to report
+the unsolved (t ~ Bool), t won't look like an untouchable meta-var
+any more.  So we don't assert that it is.
 -}
 
 mkEqErr :: ReportErrCtxt -> [Ct] -> TcM ErrMsg
@@ -1204,9 +1218,13 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
        ; mkErrorMsgFromCt ctxt ct (mconcat [msg, tv_extra, report]) }
 
   -- Nastiest case: attempt to unify an untouchable variable
+  -- See Note [Error messages for untouchables]
   | (implic:_) <- cec_encl ctxt   -- Get the innermost context
-  , Implic { ic_env = env, ic_given = given, ic_info = skol_info } <- implic
-  = do { let msg = important $ misMatchMsg ct oriented ty1 ty2
+  , Implic { ic_env = env, ic_given = given
+           , ic_tclvl = lvl, ic_info = skol_info } <- implic
+  = ASSERT2( isTcTyVar tv1 && not (isTouchableMetaTyVar lvl tv1)
+           , ppr tv1 )  -- See Note [Error messages for untouchables]
+    do { let msg = important $ misMatchMsg ct oriented ty1 ty2
              tclvl_extra = important $
                   nest 2 $
                   sep [ quotes (ppr tv1) <+> text "is untouchable"
@@ -1316,23 +1334,21 @@ extraTyVarInfo :: ReportErrCtxt -> TcTyVar -> TcType -> SDoc
 -- Add on extra info about skolem constants
 -- NB: The types themselves are already tidied
 extraTyVarInfo ctxt tv1 ty2
-  = tv_extra tv1 $$ ty_extra ty2
+  = ASSERT2( isTcTyVar tv1, ppr tv1 )
+    tv_extra tv1 $$ ty_extra ty2
   where
     implics = cec_encl ctxt
     ty_extra ty = case tcGetTyVar_maybe ty of
                     Just tv -> tv_extra tv
                     Nothing -> empty
 
-    tv_extra tv | isTcTyVar tv, isSkolemTyVar tv
-                , let pp_tv = quotes (ppr tv)
-                = case tcTyVarDetails tv of
-                    SkolemTv {}   -> pprSkol implics tv
-                    FlatSkol {}   -> pp_tv <+> text "is a flattening type variable"
-                    RuntimeUnk {} -> pp_tv <+> text "is an interactive-debugger skolem"
-                    MetaTv {}     -> empty
-
-                | otherwise             -- Normal case
-                = empty
+    tv_extra tv
+      | let pp_tv = quotes (ppr tv)
+      = case tcTyVarDetails tv of
+          SkolemTv {}   -> pprSkol implics tv
+          FlatSkol {}   -> pp_tv <+> text "is a flattening type variable"
+          RuntimeUnk {} -> pp_tv <+> text "is an interactive-debugger skolem"
+          MetaTv {}     -> empty
 
 suggestAddSig :: ReportErrCtxt -> TcType -> TcType -> SDoc
 -- See Note [Suggest adding a type signature]
@@ -1346,7 +1362,7 @@ suggestAddSig ctxt ty1 ty2
   where
     inferred_bndrs = nub (get_inf ty1 ++ get_inf ty2)
     get_inf ty | Just tv <- tcGetTyVar_maybe ty
-               , isTcTyVar tv, isSkolemTyVar tv
+               , isSkolemTyVar tv
                , (_, InferSkol prs) <- getSkolemInfo (cec_encl ctxt) tv
                = map fst prs
                | otherwise
@@ -1689,8 +1705,9 @@ carry on. For example
    f x = x:x
 Here we will infer somethiing like
    f :: forall a. a -> [a]
-with a suspended error of (a ~ [a]).  So 'a' is now a skolem, but not
-one bound by the programmer!  Here we really should report an occurs check.
+with a deferred error of (a ~ [a]).  So in the deferred unsolved constraint
+'a' is now a skolem, but not one bound by the programmer in the context!
+Here we really should report an occurs check.
 
 So isUserSkolem distinguishes the two.
 

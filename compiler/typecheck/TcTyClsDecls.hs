@@ -2234,9 +2234,7 @@ checkValidClass cls
         ; unless constrained_class_methods $
           mapM_ check_constraint (tail (theta1 ++ theta2))
 
-        ; case dm of
-            Just (_, GenericDM ty) -> checkValidType ctxt ty
-            _                      -> return ()
+        ; check_dm ctxt dm
         }
         where
           ctxt    = FunSigCtxt op_name True -- Report redundant class constraints
@@ -2263,6 +2261,18 @@ checkValidClass cls
         where
           fam_tvs = tyConTyVars fam_tc
     mini_env = zipVarEnv tyvars (mkTyVarTys tyvars)
+
+    check_dm :: UserTypeCtxt -> DefMethInfo -> TcM ()
+    -- Check validity of the /top-level/ generic-default type
+    -- E.g for   class C a where
+    --             default op :: forall b. (a~b) => blah
+    -- we do not want to do an ambiguity check on a type with
+    -- a free TyVar 'a' (Trac #11608).  See TcType
+    -- Note [TyVars and TcTyVars during type checking]
+    -- Hence the mkSpecForAllTys to close the type.
+    check_dm ctxt (Just (_, GenericDM ty))
+      = checkValidType ctxt (mkSpecForAllTys tyvars ty)
+    check_dm _ _ = return ()
 
 checkFamFlag :: Name -> TcM ()
 -- Check that we don't use families without -XTypeFamilies
