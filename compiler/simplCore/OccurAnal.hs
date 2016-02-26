@@ -86,6 +86,7 @@ occurAnalysePgm this_mod active_rule imp_rules vects vectVars binds
     imp_rule_edges = foldr (plusVarEnv_C unionVarSet) emptyVarEnv
                             [ mapVarEnv (const maps_to) (exprFreeIds arg `delVarSetList` ru_bndrs imp_rule)
                             | imp_rule <- imp_rules
+                            , not (isBuiltinRule imp_rule)  -- See Note [Plugin rules]
                             , let maps_to = exprFreeIds (ru_rhs imp_rule)
                                              `delVarSetList` ru_bndrs imp_rule
                             , arg <- ru_args imp_rule ]
@@ -113,6 +114,19 @@ occurAnalyseExpr' enable_binder_swap expr
     env = (initOccEnv all_active_rules) {occ_binder_swap = enable_binder_swap}
     -- To be conservative, we say that all inlines and rules are active
     all_active_rules = \_ -> True
+
+{- Note [Plugin rules]
+~~~~~~~~~~~~~~~~~~~~~~
+Conal Eliot (Trac #11651) built a GHC plugin that added some
+BuiltinRules (for imported Ids) to the mg_rules field of ModGuts, to
+do some domain-specific transformations that could not be expressed
+with an ordinary pattern-matching CoreRule.  But then we can't extract
+the dependencies (in imp_rule_edges) from ru_rhs etc, because a
+BuiltinRule doesn't have any of that stuff.
+
+So we simply assume that BuiltinRules have no dependencies, and filter
+them out from the imp_rule_edges comprehension.
+-}
 
 {-
 ************************************************************************
