@@ -57,6 +57,7 @@ buildPackageData context @ Context {..} = do
     -- TODO: PROGNAME was $(CrossCompilePrefix)hp2ps
     priority 2.0 $ do
         when (package == hp2ps) $ dataFile %> \mk -> do
+            orderOnly $ generatedDependencies stage package
             includes <- interpretInContext context $ fromDiffExpr includesArgs
             let prefix = fixKey (contextPath context) ++ "_"
                 cSrcs  = [ "AreaBelow.c", "Curves.c", "Error.c", "Main.c"
@@ -73,6 +74,7 @@ buildPackageData context @ Context {..} = do
             putSuccess $ "| Successfully generated '" ++ mk ++ "'."
 
         when (package == unlit) $ dataFile %> \mk -> do
+            orderOnly $ generatedDependencies stage package
             let prefix   = fixKey (contextPath context) ++ "_"
                 contents = unlines $ map (prefix++)
                     [ "PROGNAME = unlit"
@@ -82,6 +84,7 @@ buildPackageData context @ Context {..} = do
             putSuccess $ "| Successfully generated '" ++ mk ++ "'."
 
         when (package == touchy) $ dataFile %> \mk -> do
+            orderOnly $ generatedDependencies stage package
             let prefix   = fixKey (contextPath context) ++ "_"
                 contents = unlines $ map (prefix++)
                     [ "PROGNAME = touchy"
@@ -93,6 +96,7 @@ buildPackageData context @ Context {..} = do
         -- package, we cannot generate the corresponding `package-data.mk` file
         -- by running by running `ghcCabal`, because it has not yet been built.
         when (package == ghcCabal && stage == Stage0) $ dataFile %> \mk -> do
+            orderOnly $ generatedDependencies stage package
             let prefix   = fixKey (contextPath context) ++ "_"
                 contents = unlines $ map (prefix++)
                     [ "PROGNAME = ghc-cabal"
