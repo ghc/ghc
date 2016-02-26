@@ -6,7 +6,6 @@ import Development.Shake
 import Test.QuickCheck
 
 import Base
-import Oracles.ModuleFiles
 import Settings.Builders.Ar (chunksOfSize)
 import Way
 
@@ -27,7 +26,6 @@ selftestRules =
         testMatchVersionedFilePath
         testModuleNames
         testLookupAll
-        testModuleFilesOracle
 
 testWays :: Action ()
 testWays = do
@@ -85,14 +83,3 @@ testLookupAll = do
     dicts = nubBy ((==) `on` fst) <$> vector 20
     extras :: Gen [Int]
     extras = vector 20
-
-testModuleFilesOracle :: Action ()
-testModuleFilesOracle = do
-    putBuild $ "==== moduleFilesOracle"
-    result <- findModuleFiles ["compiler/codeGen", "compiler/parser"]
-        [ "CodeGen.Platform.ARM"
-        , "Lexer"
-        , "Missing.Module"]
-    test $ result == [ Just "compiler/codeGen/CodeGen/Platform/ARM.hs"
-                     , Just "compiler/parser/Lexer.x"
-                     , Nothing]
