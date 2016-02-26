@@ -1598,6 +1598,14 @@ def check_hp_ok(name):
         return(False)
 
 def check_prof_ok(name, way):
+    (_, expected_prof_file) = find_expected_file(name, 'prof.sample')
+    expected_prof_path = in_testdir(expected_prof_file)
+
+    # Check actual prof file only if we have an expected prof file to
+    # compare it with.
+    if not os.path.exists(expected_prof_path):
+        return True
+
     actual_prof_file = add_suffix(name, 'prof')
     actual_prof_path = in_testdir(actual_prof_file)
 
@@ -1609,16 +1617,9 @@ def check_prof_ok(name, way):
         print(actual_prof_path + " is empty")
         return(False)
 
-    (_, expected_prof_file) = find_expected_file(name, 'prof.sample')
-    expected_prof_path = in_testdir(expected_prof_file)
-
-    # sample prof file is not required
-    if not os.path.exists(expected_prof_path):
-        return True
-    else:
-        return compare_outputs(way, 'prof', normalise_prof,
-                               expected_prof_file, actual_prof_file,
-                               whitespace_normaliser=normalise_whitespace)
+    return compare_outputs(way, 'prof', normalise_prof,
+                            expected_prof_file, actual_prof_file,
+                            whitespace_normaliser=normalise_whitespace)
 
 # Compare expected output to actual output, and optionally accept the
 # new output. Returns true if output matched or was accepted, false
