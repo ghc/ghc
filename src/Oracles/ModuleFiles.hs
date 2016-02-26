@@ -1,6 +1,6 @@
-{-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving, LambdaCase #-}
+{-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
 module Oracles.ModuleFiles (
-    findGenerator, haskellSources, moduleFilesOracle, findModuleFiles
+    findGenerator, haskellSources, moduleFilesOracle
     ) where
 
 import qualified Data.HashMap.Strict as Map
@@ -11,7 +11,7 @@ import Expression
 import Oracles.PackageData
 import Settings.Paths
 
-newtype ModuleFilesKey = ModuleFilesKey ([FilePath], [String])
+newtype ModuleFilesKey = ModuleFilesKey Context
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
 newtype Generator = Generator (Context, FilePath)
@@ -55,32 +55,29 @@ generatedFile context moduleName =
 contextFiles :: Context -> Action [(String, Maybe FilePath)]
 contextFiles context @ Context {..} = do
     let path = contextPath context
-    srcDirs <- fmap sort . pkgDataList $ SrcDirs path
     modules <- fmap sort . pkgDataList $ Modules path
-    let dirs = [ pkgPath package -/- dir | dir <- srcDirs ]
-    zip modules <$> findModuleFiles (path -/- "build/autogen" : dirs) modules
+    zip modules <$> askOracle (ModuleFilesKey context)
 
 -- | This is an important oracle whose role is to find and cache module source
--- files. More specifically, it takes a list of directories @dirs@ and a sorted
--- list of module names @modules@ as arguments, and for each module, e.g.
+-- files. It takes a 'Context', looks up corresponding source directories @dirs@
+-- and sorted list of module names @modules@, and for each module, e.g.
 -- @A.B.C@, returns a 'FilePath' of the form @dir/A/B/C.extension@, such that
 -- @dir@ belongs to @dirs@, and file @dir/A/B/C.extension@ exists, or 'Nothing'
 -- if there is no such file. If more than one matching file is found an error is
--- raised. For example, for the 'compiler' package given
--- @dirs = ["compiler/codeGen", "compiler/parser"]@, and
--- @modules = ["CodeGen.Platform.ARM", "Lexer", "Missing.Module"]@, it produces
--- @[Just "compiler/codeGen/CodeGen/Platform/ARM.hs",
--- Just "compiler/parser/Lexer.x", Nothing]@.
-findModuleFiles :: [FilePath] -> [String] -> Action [Maybe FilePath]
-findModuleFiles dirs modules = askOracle $ ModuleFilesKey (dirs, modules)
-
+-- raised. For example, for @Context Stage1 compiler vanilla@, @dirs@ will
+-- contain ["compiler/codeGen", "compiler/parser"], and @modules@ will contain
+-- ["CodeGen.Platform.ARM", "Config", "Lexer"]; the oracle will produce a list
+-- containing [Just "compiler/codeGen/CodeGen/Platform/ARM.hs", Nothing,
+-- Just "compiler/parser/Lexer.x"].
 moduleFilesOracle :: Rules ()
 moduleFilesOracle = void $ do
-    void $ addOracle $ \(ModuleFilesKey (dirs, modules)) -> do
-        let decodedPairs = map decodeModule modules
-            modDirFiles  = map (bimap head id . unzip)
-                         . groupBy ((==) `on` fst) $ decodedPairs
-
+    void $ addOracle $ \(ModuleFilesKey context) -> do
+        let path    = contextPath context
+            autogen = path -/- "build/autogen"
+        srcDirs <-             pkgDataList $ SrcDirs path
+        modules <- fmap sort . pkgDataList $ Modules path
+        let dirs = autogen : map (pkgPath (package context) -/-) srcDirs
+            modDirFiles = groupSort $ map decodeModule modules
         result <- fmap concat . forM dirs $ \dir -> do
             todo <- filterM (doesDirectoryExist . (dir -/-) . fst) modDirFiles
             forM todo $ \(mDir, mFiles) -> do
@@ -90,15 +87,12 @@ moduleFilesOracle = void $ do
                     cmp fe f = compare (dropExtension fe) f
                     found    = intersectOrd cmp noBoot mFiles
                 return (map (fullDir -/-) found, mDir)
-
         let pairs = sort [ (encodeModule d f, f) | (fs, d) <- result, f <- fs ]
             multi = [ (m, f1, f2) | (m, f1):(n, f2):_ <- tails pairs, m == n ]
-
         unless (null multi) $ do
             let (m, f1, f2) = head multi
             putError $ "Module " ++ m ++ " has more than one source file: "
                 ++ f1 ++ " and " ++ f2 ++ "."
-
         return $ lookupAll modules pairs
 
     gens <- newCache $ \context -> do
