@@ -745,6 +745,9 @@ instance Applicative U1 where
 instance Alternative U1 where
   empty = U1
   U1 <|> U1 = U1
+  -- The defaults will otherwise bottom; see #11650.
+  some U1 = U1
+  many U1 = U1
 
 instance Monad U1 where
   U1 >>= _ = U1
