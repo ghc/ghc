@@ -98,18 +98,6 @@ generatedDependencies stage pkg
     | stage == Stage0   = includesDependencies
     | otherwise         = []
 
--- The following generators and corresponding source extensions are supported:
-knownGenerators :: [ (Builder, String) ]
-knownGenerators =  [ (Alex  , ".x"  )
-                   , (Happy , ".y"  )
-                   , (Happy , ".ly" )
-                   , (Hsc2Hs, ".hsc") ]
-
-determineBuilder :: FilePath -> Maybe Builder
-determineBuilder file = fmap fst $ find (\(_, e) -> e == ext) knownGenerators
-  where
-    ext = takeExtension file
-
 generate :: FilePath -> Context -> Expr String -> Action ()
 generate file context expr = do
     contents <- interpretInContext context expr
@@ -119,19 +107,14 @@ generate file context expr = do
 generatePackageCode :: Context -> Rules ()
 generatePackageCode context @ (Context stage pkg _) =
     let buildPath   = contextPath context -/- "build"
-        dropBuild   = drop (length buildPath + 1)
         generated f = (buildPath ++ "//*.hs") ?== f && not ("//autogen/*" ?== f)
         file <~ gen = generate file context gen
     in do
         generated ?> \file -> do
-            let srcFile = dropBuild file
-                pattern = "//" ++ srcFile -<.> "*"
-            files <- fmap (filter (pattern ?==)) $ moduleFiles context
-            let gens = [ (f, b) | f <- files, Just b <- [determineBuilder f] ]
-            when (length gens /= 1) . putError $
-                "Exactly one generator expected for " ++ file
-                ++ " (found: " ++ show gens ++ ")."
-            let (src, builder) = head gens
+            maybeValue <- findGenerator context file
+            (src, builder) <- case maybeValue of
+                Nothing    -> putError $ "No generator for " ++ file ++ "."
+                Just value -> return value
             need [src]
             build $ Target context builder [src] [file]
             let srcBoot = src -<.> "hs-boot"

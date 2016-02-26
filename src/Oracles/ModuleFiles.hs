@@ -1,7 +1,9 @@
-{-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving, ScopedTypeVariables #-}
+{-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving, LambdaCase #-}
 module Oracles.ModuleFiles (
-    moduleFiles, haskellSources, moduleFilesOracle, findModuleFiles
+    findGenerator, haskellSources, moduleFilesOracle, findModuleFiles
     ) where
+
+import qualified Data.HashMap.Strict as Map
 
 import Base
 import Context
@@ -12,40 +14,51 @@ import Settings.Paths
 newtype ModuleFilesKey = ModuleFilesKey ([FilePath], [String])
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
-moduleFiles :: Context -> Action [FilePath]
-moduleFiles context @ Context {..} = do
-    let path    = contextPath context
-        autogen = path -/- "build/autogen"
-    srcDirs <- fmap sort . pkgDataList $ SrcDirs path
-    modules <- fmap sort . pkgDataList $ Modules path
-    let dirs = [ pkgPath package -/- dir | dir <- srcDirs ]
-    catMaybes <$> findModuleFiles (autogen : dirs) modules
+newtype Generator = Generator (Context, FilePath)
+    deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
-haskellModuleFiles :: Context -> Action ([FilePath], [String])
-haskellModuleFiles context @ Context {..} = do
-    let path        = contextPath context
-        autogen     = path -/- "build/autogen"
-        dropPkgPath = drop $ length (pkgPath package) + 1
-    srcDirs <- fmap sort . pkgDataList $ SrcDirs path
-    modules <- fmap sort . pkgDataList $ Modules path
-    let dirs = [ pkgPath package -/- dir | dir <- srcDirs ]
-    found <- findModuleFiles (autogen : dirs) modules
-    let missingMods    = map fst . filter (isNothing . snd) $ zip modules found
-        otherFileToMod = replaceEq '/' '.' . dropExtension . dropPkgPath
-        (haskellFiles, otherFiles) = partition ("//*hs" ?==) $ catMaybes found
-    return (haskellFiles, missingMods ++ map otherFileToMod otherFiles)
+-- The following generators and corresponding source extensions are supported:
+determineBuilder :: FilePath -> Maybe Builder
+determineBuilder file = case takeExtension file of
+    ".x"   -> Just Alex
+    ".y"   -> Just Happy
+    ".ly"  -> Just Happy
+    ".hsc" -> Just Hsc2Hs
+    _      -> Nothing
 
--- | Find all Haskell source files for the current context
+-- | Find the generator for a given 'Context' and a source file. For example:
+-- findGenerator (Context Stage1 compiler vanilla)
+--               ".build/stage1/compiler/build/Lexer.hs"
+-- == Just ("compiler/parser/Lexer.x", Alex)
+-- findGenerator (Context Stage1 base vanilla)
+--               ".build/stage1/base/build/Prelude.hs"
+-- == Nothing
+findGenerator :: Context -> FilePath -> Action (Maybe (FilePath, Builder))
+findGenerator context file = askOracle $ Generator (context, file)
+
+-- | Find all Haskell source files for a given 'Context'.
 haskellSources :: Context -> Action [FilePath]
 haskellSources context = do
-    let buildPath = contextPath context -/- "build"
-        autogen   = buildPath -/- "autogen"
-    (found, missingMods) <- haskellModuleFiles context
-    -- Generated source files live in buildPath and have extension "hs"...
-    let generated = [ buildPath -/- (replaceEq '.' '/' m) <.> "hs" | m <- missingMods ]
-    -- ...except that GHC/Prim.hs lives in autogen. TODO: fix the inconsistency?
-        fixGhcPrim = replaceEq (buildPath -/- "GHC/Prim.hs") (autogen -/- "GHC/Prim.hs")
-    return $ found ++ fixGhcPrim generated
+    let autogen = contextPath context -/- "build/autogen"
+    -- Generated source files live in build/ and have extension "hs", except
+    -- that GHC/Prim.hs lives in build/autogen/. TODO: fix the inconsistency?
+    let modFile ("GHC.Prim", _) = autogen -/- "GHC/Prim.hs"
+        modFile (m, Nothing   ) = generatedFile context m
+        modFile (m, Just file ) | "//*hs" ?== file = file
+                                | otherwise        = modFile (m, Nothing)
+    map modFile <$> contextFiles context
+
+generatedFile :: Context -> String -> FilePath
+generatedFile context moduleName =
+    contextPath context -/- "build" -/- replaceEq '.' '/' moduleName <.> "hs"
+
+contextFiles :: Context -> Action [(String, Maybe FilePath)]
+contextFiles context @ Context {..} = do
+    let path = contextPath context
+    srcDirs <- fmap sort . pkgDataList $ SrcDirs path
+    modules <- fmap sort . pkgDataList $ Modules path
+    let dirs = [ pkgPath package -/- dir | dir <- srcDirs ]
+    zip modules <$> findModuleFiles (path -/- "build/autogen" : dirs) modules
 
 -- | This is an important oracle whose role is to find and cache module source
 -- files. More specifically, it takes a list of directories @dirs@ and a sorted
@@ -62,8 +75,8 @@ findModuleFiles :: [FilePath] -> [String] -> Action [Maybe FilePath]
 findModuleFiles dirs modules = askOracle $ ModuleFilesKey (dirs, modules)
 
 moduleFilesOracle :: Rules ()
-moduleFilesOracle = void $
-    addOracle $ \(ModuleFilesKey (dirs, modules)) -> do
+moduleFilesOracle = void $ do
+    void $ addOracle $ \(ModuleFilesKey (dirs, modules)) -> do
         let decodedPairs = map decodeModule modules
             modDirFiles  = map (bimap head id . unzip)
                          . groupBy ((==) `on` fst) $ decodedPairs
@@ -83,10 +96,15 @@ moduleFilesOracle = void $
 
         unless (null multi) $ do
             let (m, f1, f2) = head multi
-            errorMultipleSources m f1 f2
+            putError $ "Module " ++ m ++ " has more than one source file: "
+                ++ f1 ++ " and " ++ f2 ++ "."
 
         return $ lookupAll modules pairs
 
-errorMultipleSources :: String -> FilePath -> FilePath -> Action a
-errorMultipleSources m f1 f2 = putError $ "Module " ++ m ++
-    " has more than one source file: " ++ f1 ++ " and " ++ f2 ++ "."
+    gens <- newCache $ \context -> do
+        files <- contextFiles context
+        return $ Map.fromList [ (generatedFile context modName, (src, builder))
+                              | (modName, Just src) <- files
+                              , let Just builder = determineBuilder src ]
+
+    addOracle $ \(Generator (context, file)) -> Map.lookup file <$> gens context
