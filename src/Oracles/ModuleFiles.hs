@@ -11,10 +11,10 @@ import Expression
 import Oracles.PackageData
 import Settings.Paths
 
-newtype ModuleFilesKey = ModuleFilesKey Context
+newtype ModuleFilesKey = ModuleFilesKey (Stage, Package)
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
-newtype Generator = Generator (Context, FilePath)
+newtype Generator = Generator (Stage, Package, FilePath)
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
 -- The following generators and corresponding source extensions are supported:
@@ -34,8 +34,8 @@ determineBuilder file = case takeExtension file of
 --               ".build/stage1/base/build/Prelude.hs"
 -- == Nothing
 findGenerator :: Context -> FilePath -> Action (Maybe (FilePath, Builder))
-findGenerator context file = do
-    maybeSource <- askOracle $ Generator (context, file)
+findGenerator Context {..} file = do
+    maybeSource <- askOracle $ Generator (stage, package, file)
     return $ do
         source  <- maybeSource
         builder <- determineBuilder source
@@ -62,7 +62,7 @@ contextFiles :: Context -> Action [(String, Maybe FilePath)]
 contextFiles context@Context {..} = do
     let path = contextPath context
     modules <- fmap sort . pkgDataList $ Modules path
-    zip modules <$> askOracle (ModuleFilesKey context)
+    zip modules <$> askOracle (ModuleFilesKey (stage, package))
 
 -- | This is an important oracle whose role is to find and cache module source
 -- files. It takes a 'Context', looks up corresponding source directories @dirs@
@@ -77,12 +77,12 @@ contextFiles context@Context {..} = do
 -- Just "compiler/parser/Lexer.x"].
 moduleFilesOracle :: Rules ()
 moduleFilesOracle = void $ do
-    void $ addOracle $ \(ModuleFilesKey context) -> do
-        let path    = contextPath context
+    void $ addOracle $ \(ModuleFilesKey (stage, package)) -> do
+        let path    = contextPath $ vanillaContext stage package
             autogen = path -/- "build/autogen"
         srcDirs <-             pkgDataList $ SrcDirs path
         modules <- fmap sort . pkgDataList $ Modules path
-        let dirs = autogen : map (pkgPath (package context) -/-) srcDirs
+        let dirs = autogen : map (pkgPath package -/-) srcDirs
             modDirFiles = groupSort $ map decodeModule modules
         result <- fmap concat . forM dirs $ \dir -> do
             todo <- filterM (doesDirectoryExist . (dir -/-) . fst) modDirFiles
@@ -103,10 +103,12 @@ moduleFilesOracle = void $ do
 
     -- Optimisation: we discard .(l)hs files here, because they are never used
     -- as generators, and hence would be discarded in 'findGenerator' anyway.
-    gens <- newCache $ \context -> do
+    generators <- newCache $ \(stage, package) -> do
+        let context = vanillaContext stage package
         files <- contextFiles context
         return $ Map.fromList [ (generatedFile context modName, src)
                               | (modName, Just src) <- files
                               , takeExtension src `notElem` [".hs", ".lhs"] ]
 
-    addOracle $ \(Generator (context, file)) -> Map.lookup file <$> gens context
+    addOracle $ \(Generator (stage, package, file)) ->
+        Map.lookup file <$> generators (stage, package)
