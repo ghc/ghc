@@ -453,7 +453,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
     very_wrong _ _                      = False
 
     -- Things like (a ~N b) or (a  ~N  F Bool)
-    skolem_eq _ (EqPred NomEq ty1 _) =  isSkolemTy tc_lvl ty1
+    skolem_eq _ (EqPred NomEq ty1 _) = isSkolemTy tc_lvl ty1
     skolem_eq _ _                    = False
 
     -- Things like (F a  ~N  Int)
@@ -486,19 +486,21 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
 
 ---------------
 isSkolemTy :: TcLevel -> Type -> Bool
+-- The type is a skolem tyvar
 isSkolemTy tc_lvl ty
-  = case getTyVar_maybe ty of
-      Nothing -> False
-      Just tv -> isSkolemTyVar tv
-              || (isSigTyVar tv && isTouchableMetaTyVar tc_lvl tv)
-         -- The latter case is for touchable SigTvs
-         -- we postpone untouchables to a latter test (too obscure)
+  | Just tv <- getTyVar_maybe ty
+  =  isSkolemTyVar tv
+  || (isSigTyVar tv && isTouchableMetaTyVar tc_lvl tv)
+     -- The last case is for touchable SigTvs
+     -- we postpone untouchables to a latter test (too obscure)
+
+  | otherwise
+  = False
 
 isTyFun_maybe :: Type -> Maybe TyCon
 isTyFun_maybe ty = case tcSplitTyConApp_maybe ty of
                       Just (tc,_) | isTypeFamilyTyCon tc -> Just tc
                       _ -> Nothing
-
 
 --------------------------------------------
 --      Reporters
