@@ -14,16 +14,15 @@ import Target
 -- TODO: simplify handling of AutoApply.cmm
 buildPackageDependencies :: [(Resource, Int)] -> Context -> Rules ()
 buildPackageDependencies rs context@Context {..} =
-    let path      = contextPath context
-        buildPath = path -/- "build"
-        dropBuild = (pkgPath package ++) . drop (length buildPath)
-        hDepFile  = buildPath -/- ".hs-dependencies"
+    let path     = buildPath context
+        dropPath = (pkgPath package ++) . drop (length path)
+        hDepFile = path -/- ".hs-dependencies"
     in do
-        fmap (buildPath ++)
+        fmap (path ++)
             [ "//*.c.deps", "//*.cmm.deps", "//*.S.deps" ] |%> \out -> do
                 let srcFile = if "//AutoApply.*" ?== out
                               then dropExtension out
-                              else dropBuild . dropExtension $ out
+                              else dropPath . dropExtension $ out
                 need [srcFile]
                 build $ Target context (GccM stage) [srcFile] [out]
 
@@ -36,9 +35,9 @@ buildPackageDependencies rs context@Context {..} =
             removeFileIfExists $ out <.> "bak"
 
         -- TODO: don't accumulate *.deps into .dependencies
-        buildPath -/- ".dependencies" %> \out -> do
+        path -/- ".dependencies" %> \out -> do
             cSrcs <- pkgDataList $ CSrcs path
-            let cDepFiles = [ buildPath -/- src <.> "deps" | src <- cSrcs
+            let cDepFiles = [ path -/- src <.> "deps" | src <- cSrcs
                             , not ("//AutoApply.cmm" ?== src) ]
                          ++ [ src <.> "deps" | src <- cSrcs, "//AutoApply.cmm" ?== src ]
 

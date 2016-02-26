@@ -45,12 +45,12 @@ buildPackageData context@Context {..} = do
 
         -- TODO: get rid of this, see #113
         liftIO $ IO.copyFile inTreeMk dataFile
-        autogenFiles <- getDirectoryFiles oldPath ["build/autogen/*"]
-        createDirectory $ contextPath context -/- "build/autogen"
+        autogenFiles <- getDirectoryFiles (oldPath -/- "build") ["autogen/*"]
+        createDirectory $ buildPath context -/- "autogen"
         forM_ autogenFiles $ \file -> do
-            copyFile (oldPath -/- file) (contextPath context -/- file)
+            copyFile (oldPath -/- "build" -/- file) (buildPath context -/- file)
         let haddockPrologue = "haddock-prologue.txt"
-        copyFile (oldPath -/- haddockPrologue) (contextPath context -/- haddockPrologue)
+        copyFile (oldPath -/- haddockPrologue) (buildPath context -/- haddockPrologue)
 
         postProcessPackageData context dataFile
 
@@ -59,7 +59,7 @@ buildPackageData context@Context {..} = do
         when (package == hp2ps) $ dataFile %> \mk -> do
             orderOnly $ generatedDependencies stage package
             includes <- interpretInContext context $ fromDiffExpr includesArgs
-            let prefix = fixKey (contextPath context) ++ "_"
+            let prefix = fixKey (buildPath context) ++ "_"
                 cSrcs  = [ "AreaBelow.c", "Curves.c", "Error.c", "Main.c"
                          , "Reorder.c", "TopTwenty.c", "AuxFile.c"
                          , "Deviation.c", "HpFile.c", "Marks.c", "Scale.c"
@@ -75,7 +75,7 @@ buildPackageData context@Context {..} = do
 
         when (package == unlit) $ dataFile %> \mk -> do
             orderOnly $ generatedDependencies stage package
-            let prefix   = fixKey (contextPath context) ++ "_"
+            let prefix   = fixKey (buildPath context) ++ "_"
                 contents = unlines $ map (prefix++)
                     [ "PROGNAME = unlit"
                     , "C_SRCS = unlit.c"
@@ -85,7 +85,7 @@ buildPackageData context@Context {..} = do
 
         when (package == touchy) $ dataFile %> \mk -> do
             orderOnly $ generatedDependencies stage package
-            let prefix   = fixKey (contextPath context) ++ "_"
+            let prefix   = fixKey (buildPath context) ++ "_"
                 contents = unlines $ map (prefix++)
                     [ "PROGNAME = touchy"
                     , "C_SRCS = touchy.c" ]
@@ -97,7 +97,7 @@ buildPackageData context@Context {..} = do
         -- by running by running `ghcCabal`, because it has not yet been built.
         when (package == ghcCabal && stage == Stage0) $ dataFile %> \mk -> do
             orderOnly $ generatedDependencies stage package
-            let prefix   = fixKey (contextPath context) ++ "_"
+            let prefix   = fixKey (buildPath context) ++ "_"
                 contents = unlines $ map (prefix++)
                     [ "PROGNAME = ghc-cabal"
                     , "MODULES = Main"
@@ -110,7 +110,7 @@ buildPackageData context@Context {..} = do
             dataFile %> \mk -> do
                 orderOnly $ generatedDependencies stage package
                 windows <- windowsHost
-                let prefix = fixKey (contextPath context) ++ "_"
+                let prefix = fixKey (buildPath context) ++ "_"
                     dirs   = [ ".", "hooks", "sm", "eventlog" ]
                           ++ [ "posix" | not windows ]
                           ++ [ "win32" |     windows ]

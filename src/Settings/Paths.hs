@@ -1,5 +1,5 @@
 module Settings.Paths (
-    contextDirectory, contextPath, pkgDataFile, pkgHaddockFile, pkgLibraryFile,
+    contextDirectory, buildPath, pkgDataFile, pkgHaddockFile, pkgLibraryFile,
     pkgLibraryFile0, pkgGhciLibraryFile, gmpBuildPath, gmpBuildInfoPath,
     packageDbDirectory, pkgConfFile
     ) where
@@ -12,19 +12,19 @@ import Oracles.PackageData
 import Settings.User
 
 -- | Path to the directory containing build artefacts of a given 'Context'.
-contextPath :: Context -> FilePath
-contextPath context@Context {..} =
+buildPath :: Context -> FilePath
+buildPath context@Context {..} =
     buildRootPath -/- contextDirectory context -/- pkgPath package
 
 -- | Path to the @package-data.mk@ of a given 'Context'.
 pkgDataFile :: Context -> FilePath
-pkgDataFile context = contextPath context -/- "package-data.mk"
+pkgDataFile context = buildPath context -/- "package-data.mk"
 
 -- | Path to the haddock file of a given 'Context', e.g.:
 -- ".build/stage1/libraries/array/doc/html/array/array.haddock".
 pkgHaddockFile :: Context -> FilePath
 pkgHaddockFile context@Context {..} =
-    contextPath context -/- "doc/html" -/- name -/- name <.> "haddock"
+    buildPath context -/- "doc/html" -/- name -/- name <.> "haddock"
   where name = pkgNameString package
 
 -- | Path to the library file of a given 'Context', e.g.:
@@ -48,9 +48,9 @@ pkgGhciLibraryFile context = pkgFile context "HS" ".o"
 
 pkgFile :: Context -> String -> String -> Action FilePath
 pkgFile context prefix suffix = do
-    let path = contextPath context
+    let path = buildPath context
     componentId <- pkgData $ ComponentId path
-    return $ path -/- "build" -/- prefix ++ componentId ++ suffix
+    return $ path -/- prefix ++ componentId ++ suffix
 
 -- | Build directory for in-tree GMP library.
 gmpBuildPath :: FilePath
@@ -70,5 +70,5 @@ packageDbDirectory _      = "inplace/lib/package.conf.d"
 -- | Path to the configuration file of a given 'Context'.
 pkgConfFile :: Context -> Action FilePath
 pkgConfFile context@Context {..} = do
-    componentId <- pkgData . ComponentId $ contextPath context
+    componentId <- pkgData . ComponentId $ buildPath context
     return $ packageDbDirectory stage -/- componentId <.> "conf"

@@ -34,12 +34,10 @@ primopsSource :: FilePath
 primopsSource = "compiler/prelude/primops.txt.pp"
 
 primopsTxt :: Stage -> FilePath
-primopsTxt stage =
-    contextPath (vanillaContext stage compiler) -/- "build/primops.txt"
+primopsTxt stage = buildPath (vanillaContext stage compiler) -/- "primops.txt"
 
 platformH :: Stage -> FilePath
-platformH stage =
-    contextPath (vanillaContext stage compiler) -/- "ghc_boot_platform.h"
+platformH stage = buildPath (vanillaContext stage compiler) -/- "ghc_boot_platform.h"
 
 -- TODO: move generated files to buildRootPath, see #113
 includesDependencies :: [FilePath]
@@ -49,8 +47,7 @@ includesDependencies = ("includes" -/-) <$>
     , "ghcversion.h" ]
 
 ghcPrimDependencies :: Stage -> [FilePath]
-ghcPrimDependencies stage =
-    ((contextPath (vanillaContext stage ghcPrim) -/- "build") -/-) <$>
+ghcPrimDependencies stage = (buildPath (vanillaContext stage ghcPrim) -/-) <$>
        [ "autogen/GHC/Prim.hs"
        , "GHC/PrimopWrappers.hs" ]
 
@@ -71,7 +68,7 @@ compilerDependencies stage =
     ++ [ gmpLibraryH | stage > Stage0 ]
     ++ filter (const $ stage > Stage0) libffiDependencies
     ++ derivedConstantsDependencies
-    ++ fmap ((contextPath (vanillaContext stage compiler) -/- "build") -/-)
+    ++ fmap (buildPath (vanillaContext stage compiler) -/-)
        [ "primop-can-fail.hs-incl"
        , "primop-code-size.hs-incl"
        , "primop-commutable.hs-incl"
@@ -106,8 +103,8 @@ generate file context expr = do
 
 generatePackageCode :: Context -> Rules ()
 generatePackageCode context@(Context stage pkg _) =
-    let buildPath   = contextPath context -/- "build"
-        generated f = (buildPath ++ "//*.hs") ?== f && not ("//autogen/*" ?== f)
+    let path        = buildPath context
+        generated f = (path ++ "//*.hs") ?== f && not ("//autogen/*" ?== f)
         file <~ gen = generate file context gen
     in do
         generated ?> \file -> do
@@ -127,7 +124,7 @@ generatePackageCode context@(Context stage pkg _) =
             build $ Target context HsCpp [primopsSource] [file]
 
         -- TODO: why different folders for generated files?
-        fmap (buildPath -/-)
+        fmap (path -/-)
             [ "autogen/GHC/Prim.hs"
             , "GHC/PrimopWrappers.hs"
             , "*.hs-incl" ] |%> \file -> do
@@ -135,31 +132,31 @@ generatePackageCode context@(Context stage pkg _) =
                 build $ Target context GenPrimopCode [primopsTxt stage] [file]
                 -- TODO: this is temporary hack, get rid of this (#113)
                 let oldPath = pkgPath pkg -/- contextDirectory context -/- "build"
-                    newFile = oldPath ++ (drop (length buildPath) file)
+                    newFile = oldPath ++ (drop (length path) file)
                 createDirectory $ takeDirectory newFile
                 liftIO $ IO.copyFile file newFile
                 putSuccess $ "| Duplicate file " ++ file ++ " -> " ++ newFile
 
-        when (pkg == rts) $ buildPath -/- "AutoApply.cmm" %> \file -> do
+        when (pkg == rts) $ path -/- "AutoApply.cmm" %> \file -> do
             build $ Target context GenApply [] [file]
 
         priority 2.0 $ do
             -- TODO: this is temporary hack, get rid of this (#113)
             let oldPath = pkgPath pkg -/- contextDirectory context
-                olden f = oldPath ++ (drop (length (contextPath context)) f)
+                olden f = oldPath ++ (drop (length (buildPath context)) f)
 
-            when (pkg == compiler) $ buildPath -/- "Config.hs" %> \file -> do
+            when (pkg == compiler) $ path -/- "Config.hs" %> \file -> do
                 file <~ generateConfigHs
                 olden file <~ generateConfigHs -- TODO: get rid of this (#113)
 
             when (pkg == compiler) $ platformH stage %> \file -> do
                 file <~ generateGhcBootPlatformH
 
-            when (pkg == ghcPkg) $ buildPath -/- "Version.hs" %> \file -> do
+            when (pkg == ghcPkg) $ path -/- "Version.hs" %> \file -> do
                 file <~ generateVersionHs
                 olden file <~ generateVersionHs -- TODO: get rid of this (#113)
 
-            when (pkg == runGhc) $ buildPath -/- "Main.hs" %> \file -> do
+            when (pkg == runGhc) $ path -/- "Main.hs" %> \file -> do
                 copyFileChanged (pkgPath pkg -/- "runghc.hs") file
                 putSuccess $ "| Successfully generated '" ++ file ++ "'."
 

@@ -21,12 +21,13 @@ registerPackage rs context@Context {..} = do
         need [pkgDataFile context]
 
         -- Post-process inplace-pkg-config. TODO: remove, see #113, #148
-        let pkgConfig  = oldPath -/- "inplace-pkg-config"
-            fixPkgConf = unlines
-                       . map (replace oldPath (contextPath context)
-                       . replace (replaceSeparators '\\' $ oldPath)
-                                 (contextPath context) )
-                       . lines
+        let pkgConfig    = oldPath -/- "inplace-pkg-config"
+            oldBuildPath = oldPath -/- "build"
+            fixPkgConf   = unlines
+                         . map (replace oldBuildPath (buildPath context)
+                         . replace (replaceSeparators '\\' $ oldBuildPath)
+                                   (buildPath context) )
+                         . lines
 
         fixFile pkgConfig fixPkgConf
 

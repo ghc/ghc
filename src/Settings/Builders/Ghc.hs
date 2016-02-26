@@ -74,10 +74,9 @@ ghcMBuilderArgs = stagedBuilder GhcM ? do
 commonGhcArgs :: Args
 commonGhcArgs = do
     way     <- getWay
-    path    <- getContextPath
+    path    <- getBuildPath
     hsArgs  <- getPkgDataList HsArgs
     cppArgs <- getPkgDataList CppArgs
-    let buildPath = path -/- "build"
     mconcat [ arg "-hisuf", arg $ hisuf way
             , arg "-osuf" , arg $  osuf way
             , arg "-hcsuf", arg $ hcsuf way
@@ -86,9 +85,9 @@ commonGhcArgs = do
             , includeGhcArgs
             , append hsArgs
             , append $ map ("-optP" ++) cppArgs
-            , arg "-odir"    , arg buildPath
-            , arg "-hidir"   , arg buildPath
-            , arg "-stubdir" , arg buildPath
+            , arg "-odir"    , arg path
+            , arg "-hidir"   , arg path
+            , arg "-stubdir" , arg path
             , arg "-rtsopts" ] -- TODO: ifeq "$(HC_VERSION_GE_6_13)" "YES"
 
 -- TODO: do '-ticky' in all debug ways?
@@ -126,17 +125,15 @@ packageGhcArgs = do
 includeGhcArgs :: Args
 includeGhcArgs = do
     pkg     <- getPackage
-    path    <- getContextPath
+    path    <- getBuildPath
     srcDirs <- getPkgDataList SrcDirs
-    let buildPath   = path -/- "build"
-        autogenPath = buildPath -/- "autogen"
     mconcat [ arg "-i"
-            , arg $ "-i" ++ buildPath
-            , arg $ "-i" ++ autogenPath
+            , arg $ "-i" ++ path
+            , arg $ "-i" ++ path -/- "autogen"
             , append [ "-i" ++ pkgPath pkg -/- dir | dir <- srcDirs ]
             , cIncludeArgs
             , arg "-optP-include"
-            , arg $ "-optP" ++ autogenPath -/- "cabal_macros.h" ]
+            , arg $ "-optP" ++ path -/- "autogen/cabal_macros.h" ]
 
 -- # Options for passing to plain ld
 -- $1_$2_$3_ALL_LD_OPTS = \

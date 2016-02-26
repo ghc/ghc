@@ -44,9 +44,9 @@ findGenerator Context {..} file = do
 -- | Find all Haskell source files for a given 'Context'.
 haskellSources :: Context -> Action [FilePath]
 haskellSources context = do
-    let autogen = contextPath context -/- "build/autogen"
-    -- Generated source files live in build/ and have extension "hs", except
-    -- that GHC/Prim.hs lives in build/autogen/. TODO: fix the inconsistency?
+    let autogen = buildPath context -/- "autogen"
+    -- Generated source files live in buildPath and have extension "hs", except
+    -- for GHC/Prim.hs that lives in autogen. TODO: fix the inconsistency?
     let modFile ("GHC.Prim", _) = autogen -/- "GHC/Prim.hs"
         modFile (m, Nothing   ) = generatedFile context m
         modFile (m, Just file )
@@ -56,12 +56,11 @@ haskellSources context = do
 
 generatedFile :: Context -> String -> FilePath
 generatedFile context moduleName =
-    contextPath context -/- "build" -/- replaceEq '.' '/' moduleName <.> "hs"
+    buildPath context -/- replaceEq '.' '/' moduleName <.> "hs"
 
 contextFiles :: Context -> Action [(String, Maybe FilePath)]
 contextFiles context@Context {..} = do
-    let path = contextPath context
-    modules <- fmap sort . pkgDataList $ Modules path
+    modules <- fmap sort . pkgDataList . Modules $ buildPath context
     zip modules <$> askOracle (ModuleFilesKey (stage, package))
 
 -- | This is an important oracle whose role is to find and cache module source
@@ -78,11 +77,10 @@ contextFiles context@Context {..} = do
 moduleFilesOracle :: Rules ()
 moduleFilesOracle = void $ do
     void $ addOracle $ \(ModuleFilesKey (stage, package)) -> do
-        let path    = contextPath $ vanillaContext stage package
-            autogen = path -/- "build/autogen"
+        let path = buildPath $ vanillaContext stage package
         srcDirs <-             pkgDataList $ SrcDirs path
         modules <- fmap sort . pkgDataList $ Modules path
-        let dirs = autogen : map (pkgPath package -/-) srcDirs
+        let dirs = (path -/- "autogen") : map (pkgPath package -/-) srcDirs
             modDirFiles = groupSort $ map decodeModule modules
         result <- fmap concat . forM dirs $ \dir -> do
             todo <- filterM (doesDirectoryExist . (dir -/-) . fst) modDirFiles

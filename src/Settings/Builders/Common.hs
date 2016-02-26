@@ -18,13 +18,12 @@ includesArgs = append $ map ("-I" ++) includes
 
 cIncludeArgs :: Args
 cIncludeArgs = do
-    context <- getContext
     pkg     <- getPackage
+    path    <- getBuildPath
     incDirs <- getPkgDataList IncludeDirs
     depDirs <- getPkgDataList DepIncludeDirs
-    let buildPath = contextPath context -/- "build"
-    mconcat [ arg $ "-I" ++ buildPath
-            , arg $ "-I" ++ buildPath -/- "autogen"
+    mconcat [ arg $ "-I" ++ path
+            , arg $ "-I" ++ path -/- "autogen"
             , append [ "-I" ++ pkgPath pkg -/- dir | dir <- incDirs ]
             , append [ "-I" ++                 dir | dir <- depDirs ] ]
 

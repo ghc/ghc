@@ -46,7 +46,7 @@ rtsPackageArgs = package rts ? do
     ghcUnreg       <- yesNo $ flag GhcUnregisterised
     ghcEnableTNC   <- yesNo ghcEnableTablesNextToCode
     way            <- getWay
-    path           <- getContextPath
+    path           <- getBuildPath
     top            <- getTopDirectory
     libffiName     <- lift $ rtsLibffiLibraryName
     ffiIncludeDir  <- getSetting FfiIncludeDir
@@ -54,7 +54,7 @@ rtsPackageArgs = package rts ? do
     mconcat
         [ builderGcc ? mconcat
           [ arg "-Irts"
-          , arg $ "-I" ++ path -/- "build"
+          , arg $ "-I" ++ path
           , arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""
           -- rts **must** be compiled with optimizations. The INLINE_HEADER macro,
           -- requires that functions are inlined to work as expected.  Inlining

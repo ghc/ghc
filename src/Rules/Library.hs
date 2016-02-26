@@ -17,8 +17,8 @@ import Target
 
 buildPackageLibrary :: Context -> Rules ()
 buildPackageLibrary context@Context {..} = do
-    let buildPath = contextPath context -/- "build"
-        libPrefix = buildPath -/- "libHS" ++ pkgNameString package
+    let path = buildPath context
+        libPrefix = path -/- "libHS" ++ pkgNameString package
 
     -- TODO: handle dynamic libraries
     matchVersionedFilePath libPrefix (waySuffix way <.> "a") ?> \a -> do
@@ -27,10 +27,10 @@ buildPackageLibrary context@Context {..} = do
         hSrcs <- hSources context
 
         -- TODO: simplify handling of AutoApply.cmm, eliminate differences below
-        let cObjs = [ buildPath -/- src -<.> osuf way | src <- cSrcs
+        let cObjs = [ path -/- src -<.> osuf way | src <- cSrcs
                     , not ("//AutoApply.cmm" ?== src) ]
                  ++ [ src -<.> osuf way | src <- cSrcs, "//AutoApply.cmm" ?== src ]
-            hObjs = [ buildPath -/- src  <.> osuf way | src <- hSrcs ]
+            hObjs = [ path -/- src  <.> osuf way | src <- hSrcs ]
 
         -- This will create split objects if required (we don't track them
         -- explicitly as this would needlessly bloat the Shake database).
@@ -39,7 +39,7 @@ buildPackageLibrary context@Context {..} = do
         split <- interpretInContext context splitObjects
         splitObjs <- if not split then return hObjs else -- TODO: make clearer!
             fmap concat $ forM hSrcs $ \src -> do
-                let splitPath = buildPath -/- src ++ "_" ++ osuf way ++ "_split"
+                let splitPath = path -/- src ++ "_" ++ osuf way ++ "_split"
                 contents <- liftIO $ IO.getDirectoryContents splitPath
                 return . map (splitPath -/-)
                        . filter (not . all (== '.')) $ contents
@@ -61,17 +61,17 @@ buildPackageLibrary context@Context {..} = do
 
 buildPackageGhciLibrary :: Context -> Rules ()
 buildPackageGhciLibrary context@Context {..} = priority 2 $ do
-    let buildPath = contextPath context -/- "build"
-        libPrefix = buildPath -/- "HS" ++ pkgNameString package
+    let path = buildPath context
+        libPrefix = path -/- "HS" ++ pkgNameString package
 
     -- TODO: simplify handling of AutoApply.cmm
     matchVersionedFilePath libPrefix (waySuffix way <.> "o") ?> \obj -> do
             cSrcs <- cSources context
             hSrcs <- hSources context
-            let cObjs = [ buildPath -/- src -<.> "o" | src <- cSrcs
+            let cObjs = [ path -/- src -<.> "o" | src <- cSrcs
                         , not ("//AutoApply.cmm" ?== src) ]
                      ++ [ src -<.> "o" | src <- cSrcs, "//AutoApply.cmm" ?== src ]
-                hObjs = [ buildPath -/- src  <.> "o" | src <- hSrcs ]
+                hObjs = [ path -/- src  <.> "o" | src <- hSrcs ]
             need $ cObjs ++ hObjs
             build $ Target context Ld (cObjs ++ hObjs) [obj]
 

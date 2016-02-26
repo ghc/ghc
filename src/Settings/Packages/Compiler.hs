@@ -12,7 +12,7 @@ compilerPackageArgs :: Args
 compilerPackageArgs = package compiler ? do
     stage   <- getStage
     rtsWays <- getRtsWays
-    path    <- getContextPath
+    path    <- getBuildPath
     mconcat [ builder Alex ? arg "--latin1"
 
             , builderGhc ? arg ("-I" ++ path)

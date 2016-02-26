@@ -8,8 +8,8 @@ import Settings
 
 touchyPackageArgs :: Args
 touchyPackageArgs = package touchy ? do
-    path <- getContextPath
-    let cabalMacros = path -/- "build/autogen/cabal_macros.h"
+    path <- getBuildPath
+    let cabalMacros = path -/- "autogen/cabal_macros.h"
     mconcat [ builderGhc ?
               mconcat [ arg "-no-hs-main"
                       , remove ["-hide-all-packages"]

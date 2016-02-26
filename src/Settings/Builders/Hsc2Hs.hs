@@ -50,7 +50,7 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
 
 getCFlags :: Expr [String]
 getCFlags = fromDiffExpr $ do
-    path      <- getContextPath
+    path      <- getBuildPath
     cppArgs   <- getPkgDataList CppArgs
     depCcArgs <- getPkgDataList DepCcArgs
     mconcat [ cArgs
@@ -61,7 +61,7 @@ getCFlags = fromDiffExpr $ do
             , append cppArgs
             , append depCcArgs
             , cWarnings
-            , arg "-include", arg $ path -/- "build/autogen/cabal_macros.h" ]
+            , arg "-include", arg $ path -/- "autogen/cabal_macros.h" ]
 
 getLFlags :: Expr [String]
 getLFlags = fromDiffExpr $ do

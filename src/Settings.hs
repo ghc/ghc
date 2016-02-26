@@ -4,7 +4,7 @@ module Settings (
     module Settings.User,
     module Settings.Ways,
     getPkgData, getPkgDataList, getTopDirectory, isLibrary,
-    getPackagePath, getContextDirectory, getContextPath
+    getPackagePath, getContextDirectory, getBuildPath
     ) where
 
 import Base
@@ -22,14 +22,14 @@ getPackagePath = pkgPath <$> getPackage
 getContextDirectory :: Expr FilePath
 getContextDirectory = contextDirectory <$> getContext
 
-getContextPath :: Expr FilePath
-getContextPath = contextPath <$> getContext
+getBuildPath :: Expr FilePath
+getBuildPath = buildPath <$> getContext
 
 getPkgData :: (FilePath -> PackageData) -> Expr String
-getPkgData key = lift . pkgData . key =<< getContextPath
+getPkgData key = lift . pkgData . key =<< getBuildPath
 
 getPkgDataList :: (FilePath -> PackageDataList) -> Expr [String]
-getPkgDataList key = lift . pkgDataList . key =<< getContextPath
+getPkgDataList key = lift . pkgDataList . key =<< getBuildPath
 
 getTopDirectory :: Expr FilePath
 getTopDirectory = lift topDirectory

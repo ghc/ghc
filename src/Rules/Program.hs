@@ -71,13 +71,13 @@ buildWrapper context@Context {..} wrapper wrapperPath binPath = do
 -- TODO: Do we need to consider other ways when building programs?
 buildBinary :: [(Resource, Int)] -> Context -> FilePath -> Action ()
 buildBinary rs context@(Context stage package _) bin = do
-    let buildPath = contextPath context -/- "build"
+    let path = buildPath context
     cSrcs <- cSources context -- TODO: remove code duplication (Library.hs)
     hSrcs <- hSources context
-    let cObjs = [ buildPath -/- src -<.> osuf vanilla | src <- cSrcs   ]
-        hObjs = [ buildPath -/- src  <.> osuf vanilla | src <- hSrcs   ]
-             ++ [ buildPath -/- "Paths_hsc2hs.o"      | package == hsc2hs  ]
-             ++ [ buildPath -/- "Paths_haddock.o"     | package == haddock ]
+    let cObjs = [ path -/- src -<.> osuf vanilla | src <- cSrcs   ]
+        hObjs = [ path -/- src  <.> osuf vanilla | src <- hSrcs   ]
+             ++ [ path -/- "Paths_hsc2hs.o"      | package == hsc2hs  ]
+             ++ [ path -/- "Paths_haddock.o"     | package == haddock ]
         objs  = cObjs ++ hObjs
     ways     <- interpretInContext context getLibraryWays
     depNames <- interpretInContext context $ getPkgDataList TransitiveDepNames

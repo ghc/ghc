@@ -10,27 +10,27 @@ import Target
 
 compilePackage :: [(Resource, Int)] -> Context -> Rules ()
 compilePackage rs context@Context {..} = do
-    let buildPath = contextPath context -/- "build"
+    let path = buildPath context
 
-    buildPath <//> "*" <.> hisuf way %> \hi ->
+    path <//> "*" <.> hisuf way %> \hi ->
         if compileInterfaceFilesSeparately
         then do
-            (src, deps) <- dependencies buildPath $ hi -<.> osuf way
+            (src, deps) <- dependencies path $ hi -<.> osuf way
             need $ src : deps
             buildWithResources rs $ Target context (Ghc stage) [src] [hi]
         else need [ hi -<.> osuf way ]
 
-    buildPath <//> "*" <.> hibootsuf way %> \hiboot ->
+    path <//> "*" <.> hibootsuf way %> \hiboot ->
         if compileInterfaceFilesSeparately
         then do
-            (src, deps) <- dependencies buildPath $ hiboot -<.> obootsuf way
+            (src, deps) <- dependencies path $ hiboot -<.> obootsuf way
             need $ src : deps
             buildWithResources rs $ Target context (Ghc stage) [src] [hiboot]
         else need [ hiboot -<.> obootsuf way ]
 
     -- TODO: add dependencies for #include of .h and .hs-incl files (gcc -MM?)
-    buildPath <//> "*" <.> osuf way %> \obj -> do
-        (src, deps) <- dependencies buildPath obj
+    path <//> "*" <.> osuf way %> \obj -> do
+        (src, deps) <- dependencies path obj
         if ("//*.c" ?== src)
         then do
             need $ src : deps
@@ -42,8 +42,8 @@ compilePackage rs context@Context {..} = do
             buildWithResources rs $ Target context (Ghc stage) [src] [obj]
 
     -- TODO: get rid of these special cases
-    buildPath <//> "*" <.> obootsuf way %> \obj -> do
-        (src, deps) <- dependencies buildPath obj
+    path <//> "*" <.> obootsuf way %> \obj -> do
+        (src, deps) <- dependencies path obj
         if compileInterfaceFilesSeparately
         then need $ (obj -<.> hibootsuf way) : src : deps
         else need $ src : deps
