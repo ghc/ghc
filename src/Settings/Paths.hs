@@ -11,58 +11,63 @@ import GHC
 import Oracles.PackageData
 import Settings.User
 
--- Path to the target directory from GHC source root
+-- | Path to the directory containing build artefacts of a given 'Context'.
 contextPath :: Context -> FilePath
 contextPath context@Context {..} =
     buildRootPath -/- contextDirectory context -/- pkgPath package
 
+-- | Path to the @package-data.mk@ of a given 'Context'.
 pkgDataFile :: Context -> FilePath
 pkgDataFile context = contextPath context -/- "package-data.mk"
 
--- Relative path to a package haddock file, e.g.:
--- "libraries/array/dist-install/doc/html/array/array.haddock"
+-- | Path to the haddock file of a given 'Context', e.g.:
+-- ".build/stage1/libraries/array/doc/html/array/array.haddock".
 pkgHaddockFile :: Context -> FilePath
 pkgHaddockFile context@Context {..} =
     contextPath context -/- "doc/html" -/- name -/- name <.> "haddock"
   where name = pkgNameString package
 
--- Relative path to a package library file, e.g.:
--- "libraries/array/stage2/build/libHSarray-0.5.1.0.a"
+-- | Path to the library file of a given 'Context', e.g.:
+-- ".build/stage1/libraries/array/build/libHSarray-0.5.1.0.a".
 pkgLibraryFile :: Context -> Action FilePath
 pkgLibraryFile context@Context {..} = do
     extension <- libsuf way
-    pkgFile context "build/libHS" extension
+    pkgFile context "libHS" extension
 
+-- | Path to the auxiliary library file of a given 'Context', e.g.:
+-- ".build/stage1/compiler/build/libHSghc-8.1-0.a".
 pkgLibraryFile0 :: Context -> Action FilePath
 pkgLibraryFile0 context@Context {..} = do
     extension <- libsuf way
-    pkgFile context "build/libHS" ("-0" ++ extension)
+    pkgFile context "libHS" ("-0" ++ extension)
 
--- Relative path to a package ghci library file, e.g.:
--- "libraries/array/dist-install/build/HSarray-0.5.1.0.o"
+-- | Path to the GHCi library file of a given 'Context', e.g.:
+-- ".build/stage1/libraries/array/build/HSarray-0.5.1.0.o".
 pkgGhciLibraryFile :: Context -> Action FilePath
-pkgGhciLibraryFile context = pkgFile context "build/HS" ".o"
+pkgGhciLibraryFile context = pkgFile context "HS" ".o"
 
 pkgFile :: Context -> String -> String -> Action FilePath
 pkgFile context prefix suffix = do
     let path = contextPath context
     componentId <- pkgData $ ComponentId path
-    return $ path -/- prefix ++ componentId ++ suffix
+    return $ path -/- "build" -/- prefix ++ componentId ++ suffix
 
--- This is the build directory for in-tree GMP library
+-- | Build directory for in-tree GMP library.
 gmpBuildPath :: FilePath
 gmpBuildPath = buildRootPath -/- "stage1/gmp"
 
--- We extract system gmp library name from this file
+-- | Path to the GMP library buildinfo file.
 gmpBuildInfoPath :: FilePath
 gmpBuildInfoPath = pkgPath integerGmp -/- "integer-gmp.buildinfo"
 
 -- TODO: move to buildRootPath, see #113
 -- StageN, N > 0, share the same packageDbDirectory
+-- | Path to package database directory of a given 'Stage'.
 packageDbDirectory :: Stage -> FilePath
 packageDbDirectory Stage0 = buildRootPath -/- "stage0/bootstrapping.conf"
 packageDbDirectory _      = "inplace/lib/package.conf.d"
 
+-- | Path to the configuration file of a given 'Context'.
 pkgConfFile :: Context -> Action FilePath
 pkgConfFile context@Context {..} = do
     componentId <- pkgData . ComponentId $ contextPath context
