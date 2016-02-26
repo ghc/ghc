@@ -101,6 +101,8 @@ moduleFilesOracle = void $ do
                 ++ f1 ++ " and " ++ f2 ++ "."
         return $ lookupAll modules pairs
 
+    -- Optimisation: we discard .(l)hs files here, because they are never used
+    -- as generators, and hence would be discarded in 'findGenerator' anyway.
     gens <- newCache $ \context -> do
         files <- contextFiles context
         return $ Map.fromList [ (generatedFile context modName, src)
