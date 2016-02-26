@@ -1175,7 +1175,7 @@ See also Note [Grouping of type and class declarations] in TcTyClsDecls.
 
 rnTyClDecls :: [TyClGroup RdrName]
             -> RnM ([TyClGroup Name], FreeVars)
--- Rename the declarations and do depedency analysis on them
+-- Rename the declarations and do dependency analysis on them
 rnTyClDecls tycl_ds
   = do { ds_w_fvs       <- mapM (wrapLocFstM rnTyClDecl) (tyClGroupConcat tycl_ds)
        ; let decl_names = mkNameSet (map (tcdName . unLoc . fst) ds_w_fvs)

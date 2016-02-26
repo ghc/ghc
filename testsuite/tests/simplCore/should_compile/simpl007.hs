@@ -43,7 +43,7 @@ class (Eq f, Show f) => FORMULA f where
     argList  = error ""
     same _ _ = False
 
--- By now extensibility is accomplished by existentialy
+-- By now extensibility is accomplished by existentially
 -- quantified type variables.
 
 data Formula = forall f . ( FORMULA f

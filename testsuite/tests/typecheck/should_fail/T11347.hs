@@ -1,4 +1,4 @@
--- Should AllowAmbiguousTypes relaly be needed here?
+-- Should AllowAmbiguousTypes really be needed here?
 {-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, MultiParamTypeClasses, FlexibleInstances, AllowAmbiguousTypes #-}
 module T11347 where
 

@@ -111,8 +111,8 @@
 
 /*......................................................................*/
 
-// If SHAKE is defined then validation will sometime spuriously fail.  They helps test
-// unusualy code paths if genuine contention is rare
+// If SHAKE is defined then validation will sometimes spuriously fail.  They help test
+// unusual code paths if genuine contention is rare
 
 #define TRACE(_x...) debugTrace(DEBUG_stm, "STM: " _x)
 

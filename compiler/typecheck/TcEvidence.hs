@@ -512,7 +512,7 @@ a more convenient function, defined in terms of `natSing`:
 
 The reason we don't use this directly in the class is that it is simpler
 and more efficient to pass around an integer rather than an entier function,
-especialy when the `KnowNat` evidence is packaged up in an existential.
+especially when the `KnowNat` evidence is packaged up in an existential.
 
 The story for kind `Symbol` is analogous:
   * class KnownSymbol
