@@ -34,7 +34,12 @@ determineBuilder file = case takeExtension file of
 --               ".build/stage1/base/build/Prelude.hs"
 -- == Nothing
 findGenerator :: Context -> FilePath -> Action (Maybe (FilePath, Builder))
-findGenerator context file = askOracle $ Generator (context, file)
+findGenerator context file = do
+    maybeSource <- askOracle $ Generator (context, file)
+    return $ do
+        source  <- maybeSource
+        builder <- determineBuilder source
+        return (source, builder)
 
 -- | Find all Haskell source files for a given 'Context'.
 haskellSources :: Context -> Action [FilePath]
@@ -44,8 +49,9 @@ haskellSources context = do
     -- that GHC/Prim.hs lives in build/autogen/. TODO: fix the inconsistency?
     let modFile ("GHC.Prim", _) = autogen -/- "GHC/Prim.hs"
         modFile (m, Nothing   ) = generatedFile context m
-        modFile (m, Just file ) | "//*hs" ?== file = file
-                                | otherwise        = modFile (m, Nothing)
+        modFile (m, Just file )
+            | takeExtension file `elem` [".hs", ".lhs"] = file
+            | otherwise = generatedFile context m
     map modFile <$> contextFiles context
 
 generatedFile :: Context -> String -> FilePath
@@ -53,7 +59,7 @@ generatedFile context moduleName =
     contextPath context -/- "build" -/- replaceEq '.' '/' moduleName <.> "hs"
 
 contextFiles :: Context -> Action [(String, Maybe FilePath)]
-contextFiles context @ Context {..} = do
+contextFiles context@Context {..} = do
     let path = contextPath context
     modules <- fmap sort . pkgDataList $ Modules path
     zip modules <$> askOracle (ModuleFilesKey context)
@@ -97,8 +103,8 @@ moduleFilesOracle = void $ do
 
     gens <- newCache $ \context -> do
         files <- contextFiles context
-        return $ Map.fromList [ (generatedFile context modName, (src, builder))
+        return $ Map.fromList [ (generatedFile context modName, src)
                               | (modName, Just src) <- files
-                              , let Just builder = determineBuilder src ]
+                              , takeExtension src `notElem` [".hs", ".lhs"] ]
 
     addOracle $ \(Generator (context, file)) -> Map.lookup file <$> gens context
