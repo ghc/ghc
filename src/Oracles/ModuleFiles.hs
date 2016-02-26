@@ -65,16 +65,16 @@ contextFiles context@Context {..} = do
     zip modules <$> askOracle (ModuleFilesKey (stage, package))
 
 -- | This is an important oracle whose role is to find and cache module source
--- files. It takes a 'Context', looks up corresponding source directories @dirs@
--- and sorted list of module names @modules@, and for each module, e.g.
--- @A.B.C@, returns a 'FilePath' of the form @dir/A/B/C.extension@, such that
--- @dir@ belongs to @dirs@, and file @dir/A/B/C.extension@ exists, or 'Nothing'
--- if there is no such file. If more than one matching file is found an error is
--- raised. For example, for @Context Stage1 compiler vanilla@, @dirs@ will
+-- files. It takes a 'Stage' and a 'Package', looks up corresponding source
+-- directories @dirs@ and a sorted list of module names @modules@, and for each
+-- module, e.g. @A.B.C@, returns a 'FilePath' of the form @dir/A/B/C.extension@,
+-- such that @dir@ belongs to @dirs@, and file @dir/A/B/C.extension@ exists, or
+-- 'Nothing' if there is no such file. If more than one matching file is found
+-- an error is raised. For example, for 'Stage1' and 'compiler', @dirs@ will
 -- contain ["compiler/codeGen", "compiler/parser"], and @modules@ will contain
 -- ["CodeGen.Platform.ARM", "Config", "Lexer"]; the oracle will produce a list
 -- containing [Just "compiler/codeGen/CodeGen/Platform/ARM.hs", Nothing,
--- Just "compiler/parser/Lexer.x"].
+-- Just "compiler/parser/Lexer.x"]. The oracle ignores @.(l)hs-boot@ files.
 moduleFilesOracle :: Rules ()
 moduleFilesOracle = void $ do
     void $ addOracle $ \(ModuleFilesKey (stage, package)) -> do
