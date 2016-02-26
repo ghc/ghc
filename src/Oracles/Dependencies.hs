@@ -1,9 +1,10 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
 module Oracles.Dependencies (dependencies, dependenciesOracle) where
 
-import Base
 import Control.Monad.Trans.Maybe
 import qualified Data.HashMap.Strict as Map
+
+import Base
 
 newtype DependenciesKey = DependenciesKey (FilePath, FilePath)
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
@@ -28,10 +29,9 @@ dependencies path obj = do
 
 -- Oracle for 'path/dist/.dependencies' files
 dependenciesOracle :: Rules ()
-dependenciesOracle = do
+dependenciesOracle = void $ do
     deps <- newCache $ \file -> do
         putOracle $ "Reading dependencies from " ++ file ++ "..."
         contents <- map words <$> readFileLines file
         return . Map.fromList $ map (\(x:xs) -> (x, xs)) contents
-    _ <- addOracle $ \(DependenciesKey (file, obj)) -> Map.lookup obj <$> deps file
-    return ()
+    addOracle $ \(DependenciesKey (file, obj)) -> Map.lookup obj <$> deps file
