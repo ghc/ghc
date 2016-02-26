@@ -149,7 +149,7 @@ hibootsuf = (++ "hi-boot") . wayPrefix
 -- in their own per-package directory and hence do not need a unique filename.
 -- We also need to respect the system's dynamic extension, e.g. .dll or .so.
 libsuf :: Way -> Action String
-libsuf way @ (Way set) =
+libsuf way@(Way set) =
     if (not . wayUnit Dynamic $ way)
     then return $ waySuffix way ++ ".a" -- e.g., _p.a
     else do

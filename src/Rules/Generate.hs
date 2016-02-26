@@ -105,7 +105,7 @@ generate file context expr = do
     putSuccess $ "| Successfully generated '" ++ file ++ "'."
 
 generatePackageCode :: Context -> Rules ()
-generatePackageCode context @ (Context stage pkg _) =
+generatePackageCode context@(Context stage pkg _) =
     let buildPath   = contextPath context -/- "build"
         generated f = (buildPath ++ "//*.hs") ?== f && not ("//autogen/*" ?== f)
         file <~ gen = generate file context gen

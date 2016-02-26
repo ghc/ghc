@@ -17,7 +17,7 @@ haddockHtmlLib = "inplace/lib/html/haddock-util.js"
 -- All of them go into the 'doc' subdirectory. Pedantically tracking all built
 -- files in the Shake databases seems fragile and unnecesarry.
 buildPackageDocumentation :: Context -> Rules ()
-buildPackageDocumentation context @ Context {..} =
+buildPackageDocumentation context@Context {..} =
     let cabalFile   = pkgCabalFile package
         haddockFile = pkgHaddockFile context
     in when (stage == Stage1) $ do

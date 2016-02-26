@@ -31,7 +31,7 @@ wrappers = [ (vanillaContext Stage0 ghc   , ghcWrapper   )
            , (vanillaContext Stage0 ghcPkg, ghcPkgWrapper)]
 
 buildProgram :: [(Resource, Int)] -> Context -> Rules ()
-buildProgram rs context @ Context {..} = do
+buildProgram rs context@Context {..} = do
     let match file = case programPath context of
             Nothing      -> False
             Just program -> program == file
@@ -60,7 +60,7 @@ computeWrappedPath =
     fmap (programInplaceLibPath ++) . stripPrefix programInplacePath
 
 buildWrapper :: Context -> Wrapper -> FilePath -> FilePath -> Action ()
-buildWrapper context @ (Context stage package _) wrapper wrapperPath binPath = do
+buildWrapper context@Context {..} wrapper wrapperPath binPath = do
     contents <- interpretInContext context $ wrapper binPath
     writeFileChanged wrapperPath contents
     makeExecutable wrapperPath
@@ -70,7 +70,7 @@ buildWrapper context @ (Context stage package _) wrapper wrapperPath binPath = d
 -- TODO: Get rid of the Paths_hsc2hs.o hack.
 -- TODO: Do we need to consider other ways when building programs?
 buildBinary :: [(Resource, Int)] -> Context -> FilePath -> Action ()
-buildBinary rs context @ (Context stage package _) bin = do
+buildBinary rs context@(Context stage package _) bin = do
     let buildPath = contextPath context -/- "build"
     cSrcs <- cSources context -- TODO: remove code duplication (Library.hs)
     hSrcs <- hSources context

@@ -13,7 +13,7 @@ import Target
 
 -- TODO: simplify handling of AutoApply.cmm
 buildPackageDependencies :: [(Resource, Int)] -> Context -> Rules ()
-buildPackageDependencies rs context @ Context {..} =
+buildPackageDependencies rs context@Context {..} =
     let path      = contextPath context
         buildPath = path -/- "build"
         dropBuild = (pkgPath package ++) . drop (length buildPath)

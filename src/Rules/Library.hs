@@ -16,7 +16,7 @@ import Settings
 import Target
 
 buildPackageLibrary :: Context -> Rules ()
-buildPackageLibrary context @ Context {..} = do
+buildPackageLibrary context@Context {..} = do
     let buildPath = contextPath context -/- "build"
         libPrefix = buildPath -/- "libHS" ++ pkgNameString package
 
@@ -60,7 +60,7 @@ buildPackageLibrary context @ Context {..} = do
             (dropWhileEnd isPunctuation synopsis)
 
 buildPackageGhciLibrary :: Context -> Rules ()
-buildPackageGhciLibrary context @ Context {..} = priority 2 $ do
+buildPackageGhciLibrary context@Context {..} = priority 2 $ do
     let buildPath = contextPath context -/- "build"
         libPrefix = buildPath -/- "HS" ++ pkgNameString package
 

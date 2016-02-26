@@ -23,7 +23,7 @@ import Target
 -- resources. Force a rebuilt if the argument list has changed since the last
 -- built (that is, track changes in the build system).
 buildWithResources :: [(Resource, Int)] -> Target -> Action ()
-buildWithResources rs target @ Target {..} = do
+buildWithResources rs target@Target {..} = do
     needBuilder laxDependencies builder
     path    <- builderPath builder
     argList <- interpret target getArgs

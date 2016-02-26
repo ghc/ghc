@@ -105,7 +105,7 @@ ghcSplit = "inplace/lib/bin/ghc-split"
 -- TODO: simplify, add programInplaceLibPath
 -- | The relative path to the program executable
 programPath :: Context -> Maybe FilePath
-programPath context @ Context {..}
+programPath context@Context {..}
     | package == ghc = Just . inplaceProgram $ "ghc-stage" ++ show (fromEnum stage + 1)
     | package `elem` [ghcTags, haddock, mkUserGuidePart] = case stage of
         Stage2 -> Just . inplaceProgram $ pkgNameString package
