@@ -9,7 +9,7 @@ werror.hs:7:13: warning: [-Wname-shadowing (in -Wall)]
 werror.hs:7:13: warning: [-Wunused-local-binds (in -Wextra, -Wunused-binds)]
     Defined but not used: ‘main’
 
-werror.hs:8:1: warning:
+werror.hs:8:1: warning: [-Wtabs (in -Wdefault)]
     Tab character found here.
     Please use spaces instead.
 
