@@ -1,5 +1,5 @@
 
-T9834.hs:23:10: warning:
+T9834.hs:23:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘p’ with ‘(->) (p a0)’
       ‘p’ is a rigid type variable bound by
         the class declaration for ‘ApplicativeFix’ at T9834.hs:21:39
@@ -20,7 +20,7 @@ T9834.hs:23:10: warning:
                 -> p a
           (bound at T9834.hs:23:3)
 
-T9834.hs:23:10: warning:
+T9834.hs:23:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘a’ with ‘a1’
       ‘a’ is a rigid type variable bound by
         the type signature for:

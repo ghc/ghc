@@ -1,5 +1,5 @@
 
-Defer03.hs:4:5: warning:
+Defer03.hs:4:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type ‘Int’ with actual type ‘Char’
     • In the expression: 'p'
       In an equation for ‘a’: a = 'p'
@@ -21,7 +21,7 @@ Defer03.hs:7:5: error:
       In an equation for ‘f’: f = _
     • Relevant bindings include f :: Int (bound at Defer03.hs:7:1)
 
-Defer03.hs:4:5: warning:
+Defer03.hs:4:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type ‘Int’ with actual type ‘Char’
     • In the expression: 'p'
       In an equation for ‘a’: a = 'p'
@@ -43,7 +43,7 @@ Defer03.hs:7:5: error:
       In an equation for ‘f’: f = _
     • Relevant bindings include f :: Int (bound at Defer03.hs:7:1)
 
-Defer03.hs:4:5: warning:
+Defer03.hs:4:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type ‘Int’ with actual type ‘Char’
     • In the expression: 'p'
       In an equation for ‘a’: a = 'p'

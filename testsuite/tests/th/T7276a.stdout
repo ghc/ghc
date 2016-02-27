@@ -1,5 +1,5 @@
 
-<interactive>:3:9: warning:
+<interactive>:3:9: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘[Dec]’ with ‘Exp’
       Expected type: Q Exp
         Actual type: DecsQ
