@@ -184,7 +184,7 @@ typedef struct StgTSO_ {
     StgWord32 saved_winerror;
 #endif
 
-} *StgTSOPtr;
+} *StgTSOPtr; // StgTSO defined in rts/Types.h
 
 typedef struct StgStack_ {
     StgHeader  header;
@@ -242,8 +242,6 @@ void dirty_STACK (Capability *cap, StgStack *stack);
         BlockedOnRead          NULL                 blocked_queue
         BlockedOnWrite         NULL                 blocked_queue
         BlockedOnDelay         NULL                 blocked_queue
-        BlockedOnGA            closure TSO blocks on   BQ of that closure
-        BlockedOnGA_NoSend     closure TSO blocks on   BQ of that closure
 
       tso->link == END_TSO_QUEUE, if the thread is currently running.
 
@@ -257,13 +255,6 @@ void dirty_STACK (Capability *cap, StgStack *stack);
 
       (tso->sp is left pointing at the top word on the stack so that
       the return value or exception will be retained by a GC).
-
-   The 2 cases BlockedOnGA and BlockedOnGA_NoSend are needed in a GUM
-   setup only. They mark a TSO that has entered a FETCH_ME or
-   FETCH_ME_BQ closure, respectively; only the first TSO hitting the
-   closure will send a Fetch message.
-   Currently we have no separate code for blocking on an RBH; we use the
-   BlockedOnBlackHole case for that.   -- HWL
 
  ---------------------------------------------------------------------------- */
 

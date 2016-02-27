@@ -177,12 +177,6 @@ STATIC_LINK(const StgInfoTable *info, StgClosure *p)
     }
 }
 
-INLINE_HEADER StgClosure *STATIC_LINK2(const StgInfoTable *info,
-                                       StgClosure *p) {
-    return (*(StgClosure**)(&((p)->payload[info->layout.payload.ptrs +
-                            info->layout.payload.nptrs + 1])));
-}
-
 /* -----------------------------------------------------------------------------
    INTLIKE and CHARLIKE closures.
    -------------------------------------------------------------------------- */

@@ -17,7 +17,7 @@
    position-independent code.
 
    Note [x86-64-relative]
-   There is a complication on the x86_64 platform, where pointeres are
+   There is a complication on the x86_64 platform, where pointers are
    64 bits, but the tools don't support 64-bit relative relocations.
    However, the default memory model (small) ensures that all symbols
    have values in the lower 2Gb of the address space, so offsets all
@@ -208,7 +208,7 @@ typedef struct StgInfoTable_ {
 #ifdef TABLES_NEXT_TO_CODE
     StgCode         code[];
 #endif
-} *StgInfoTablePtr;
+} *StgInfoTablePtr; // StgInfoTable defined in rts/Types.h
 
 
 /* -----------------------------------------------------------------------------

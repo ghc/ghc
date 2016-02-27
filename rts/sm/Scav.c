@@ -1702,10 +1702,6 @@ scavenge_static(void)
 
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
     info = get_itbl(p);
-    /*
-        if (info->type==RBH)
-        info = REVERT_INFOPTR(info); // if it's an RBH, look at the orig closure
-    */
     // make sure the info pointer is into text space
 
     /* Take this object *off* the static_objects list,

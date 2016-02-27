@@ -212,11 +212,6 @@
 /* Win32 only: */
 #define BlockedOnDoProc     7
 
-/* Only relevant for PAR: */
-  /* blocked on a remote closure represented by a Global Address: */
-#define BlockedOnGA         8
-  /* same as above but without sending a Fetch message */
-#define BlockedOnGA_NoSend  9
 /* Only relevant for THREADED_RTS: */
 #define BlockedOnCCall      10
 #define BlockedOnCCall_Interruptible 11
