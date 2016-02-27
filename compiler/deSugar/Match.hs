@@ -217,7 +217,7 @@ match vars@(v:_) ty eqns    -- Eqns *can* be empty
                                            case p of PgView e _ -> e:acc
                                                      _ -> acc) [] group) eqns
             maybeWarn [] = return ()
-            maybeWarn l = warnDs (vcat l)
+            maybeWarn l = warnDs NoReason (vcat l)
         in
           maybeWarn $ (map (\g -> text "Putting these view expressions into the same case:" <+> (ppr g))
                        (filter (not . null) gs))

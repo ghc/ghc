@@ -387,12 +387,15 @@ putSrcSpanDs (UnhelpfulSpan {}) thing_inside
 putSrcSpanDs (RealSrcSpan real_span) thing_inside
   = updLclEnv (\ env -> env {dsl_loc = real_span}) thing_inside
 
-warnDs :: SDoc -> DsM ()
-warnDs warn = do { env <- getGblEnv
-                 ; loc <- getSrcSpanDs
-                 ; dflags <- getDynFlags
-                 ; let msg = mkWarnMsg dflags loc (ds_unqual env)  warn
-                 ; updMutVar (ds_msgs env) (\ (w,e) -> (w `snocBag` msg, e)) }
+-- | Emit a warning for the current source location
+warnDs :: WarnReason -> SDoc -> DsM ()
+warnDs reason warn
+  = do { env <- getGblEnv
+       ; loc <- getSrcSpanDs
+       ; dflags <- getDynFlags
+       ; let msg = makeIntoWarning reason $
+                   mkWarnMsg dflags loc (ds_unqual env) warn
+       ; updMutVar (ds_msgs env) (\ (w,e) -> (w `snocBag` msg, e)) }
 
 failWithDs :: SDoc -> DsM a
 failWithDs err

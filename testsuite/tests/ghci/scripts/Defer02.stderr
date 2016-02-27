@@ -17,7 +17,7 @@
     • In the expression: x == x
       In an equation for ‘b’: b x = x == x
 
-../../typecheck/should_run/Defer01.hs:25:1: warning:
+../../typecheck/should_run/Defer01.hs:25:1: warning: [-Woverlapping-patterns (in -Wdefault)]
     Pattern match has inaccessible right hand side
     In an equation for ‘c’: c (C2 x) = ...
 
@@ -102,7 +102,7 @@
       In the type signature:
         k :: (Int ~ Bool) => Int -> Bool
 
-../../typecheck/should_run/Defer01.hs:46:1: warning:
+../../typecheck/should_run/Defer01.hs:46:1: warning: [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
     In an equation for ‘k’: k x = ...
 

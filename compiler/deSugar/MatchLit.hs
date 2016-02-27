@@ -139,9 +139,9 @@ warnAboutIdentities dflags (Var conv_fn) type_of_conv
   , idName conv_fn `elem` conversionNames
   , Just (arg_ty, res_ty) <- splitFunTy_maybe type_of_conv
   , arg_ty `eqType` res_ty  -- So we are converting  ty -> ty
-  = warnDs (vcat [ text "Call of" <+> ppr conv_fn <+> dcolon <+> ppr type_of_conv
+  = warnDs (Reason Opt_WarnIdentities)
+           (vcat [ text "Call of" <+> ppr conv_fn <+> dcolon <+> ppr type_of_conv
                  , nest 2 $ text "can probably be omitted"
-                 , parens (text "Use -fno-warn-identities to suppress this message")
            ])
 warnAboutIdentities _ _ _ = return ()
 
@@ -173,7 +173,8 @@ warnAboutOverflowedLiterals dflags lit
     check :: forall a. (Bounded a, Integral a) => Integer -> Name -> a -> DsM ()
     check i tc _proxy
       = when (i < minB || i > maxB) $ do
-        warnDs (vcat [ text "Literal" <+> integer i
+        warnDs (Reason Opt_WarnOverflowedLiterals)
+               (vcat [ text "Literal" <+> integer i
                        <+> text "is out of the" <+> ppr tc <+> ptext (sLit "range")
                        <+> integer minB <> text ".." <> integer maxB
                      , sug ])
@@ -209,7 +210,7 @@ warnAboutEmptyEnumerations dflags fromExpr mThnExpr toExpr
   , let check :: forall a. (Enum a, Num a) => a -> DsM ()
         check _proxy
           = when (null enumeration) $
-            warnDs (text "Enumeration is empty")
+            warnDs (Reason Opt_WarnEmptyEnumerations) (text "Enumeration is empty")
           where
             enumeration :: [a]
             enumeration = case mThn of

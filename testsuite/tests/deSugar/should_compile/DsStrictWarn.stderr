@@ -1,4 +1,4 @@
 
-DsStrictWarn.hs:7:11: warning:
+DsStrictWarn.hs:7:11: warning: [-Wincomplete-uni-patterns]
     Pattern match(es) are non-exhaustive
     In a pattern binding: Patterns not matched: []

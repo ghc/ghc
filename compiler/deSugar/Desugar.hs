@@ -563,7 +563,7 @@ dsRule (L loc (HsRule name rule_act vars lhs _tv_lhs rhs _fv_rhs))
         -- Substitute the dict bindings eagerly,
         -- and take the body apart into a (f args) form
         ; case decomposeRuleLhs bndrs'' lhs'' of {
-                Left msg -> do { warnDs msg; return Nothing } ;
+                Left msg -> do { warnDs NoReason msg; return Nothing } ;
                 Right (final_bndrs, fn_id, args) -> do
 
         { let is_local = isLocalId fn_id
@@ -598,7 +598,8 @@ warnRuleShadowing rule_name rule_act fn_id arg_ids
       | isLocalId lhs_id || canUnfold (idUnfolding lhs_id)
                        -- If imported with no unfolding, no worries
       , idInlineActivation lhs_id `competesWith` rule_act
-      = warnDs (vcat [ hang (text "Rule" <+> pprRuleName rule_name
+      = warnDs (Reason Opt_WarnInlineRuleShadowing)
+               (vcat [ hang (text "Rule" <+> pprRuleName rule_name
                                <+> text "may never fire")
                             2 (text "because" <+> quotes (ppr lhs_id)
                                <+> text "might inline first")
@@ -608,7 +609,8 @@ warnRuleShadowing rule_name rule_act fn_id arg_ids
 
       | check_rules_too
       , bad_rule : _ <- get_bad_rules lhs_id
-      = warnDs (vcat [ hang (text "Rule" <+> pprRuleName rule_name
+      = warnDs (Reason Opt_WarnInlineRuleShadowing)
+               (vcat [ hang (text "Rule" <+> pprRuleName rule_name
                                <+> text "may never fire")
                             2 (text "because rule" <+> pprRuleName (ruleName bad_rule)
                                <+> text "for"<+> quotes (ppr lhs_id)

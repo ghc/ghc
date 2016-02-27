@@ -1,5 +1,5 @@
 
-T7294.hs:25:1: warning:
+T7294.hs:25:1: warning: [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
     In an equation for ‘nth’: nth Nil _ = ...
 

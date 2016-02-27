@@ -1,4 +1,5 @@
-T9951b.hs:7:1: warning:
+
+T9951b.hs:7:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘f’:
         Patterns not matched:
