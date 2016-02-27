@@ -463,7 +463,6 @@ extern StgWord rts_breakpoint_io_action[];
 // Schedule.c
 extern StgWord RTS_VAR(blocked_queue_hd), RTS_VAR(blocked_queue_tl);
 extern StgWord RTS_VAR(sleeping_queue);
-extern StgWord RTS_VAR(blackhole_queue);
 extern StgWord RTS_VAR(sched_mutex);
 
 // Apply.cmm

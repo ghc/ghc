@@ -230,7 +230,7 @@ void dirty_STACK (Capability *cap, StgStack *stack);
         ----------------------------------------------------------------------
         NotBlocked             END_TSO_QUEUE        runnable_queue, or running
 
-        BlockedOnBlackHole     the BLACKHOLE        blackhole_queue
+        BlockedOnBlackHole     MessageBlackHole *   TSO->bq
 
         BlockedOnMVar          the MVAR             the MVAR's queue
 
