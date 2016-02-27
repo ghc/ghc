@@ -3617,8 +3617,7 @@ defaultFlags settings
       Opt_ProfCountEntries,
       Opt_RPath,
       Opt_SharedImplib,
-      Opt_SimplPreInlining,
-      Opt_ShowWarnGroups
+      Opt_SimplPreInlining
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]

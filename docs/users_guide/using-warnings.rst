@@ -103,13 +103,14 @@ The following flags are simple ways to select standard "packages" of warnings:
     default, but can be useful to negate a :ghc-flag:`-Werror` flag.
 
 When a warning is emitted, the specific warning flag which controls
-it, as well as the group it belongs to, are shown.
+it is shown.
 
 .. ghc-flag:: -fshow-warning-groups
 
-    Name the group a warning flag belongs to.
+    When showing which flag controls a warning, also show the
+    respective warning group flag(s) that warning is contained in.
 
-    This is enabled by default. Disable with ``-fno-show-warning-groups``.
+    This option is off by default.
 
 The full set of warning options is described below. To turn off any
 warning, simply give the corresponding ``-Wno-...`` option on the

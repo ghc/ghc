@@ -7,6 +7,7 @@ GHCi-specific dynamic flag settings:
 other dynamic, non-language, flag settings:
   -fno-ghci-history
   -fimplicit-import-qualified
+  -fshow-warning-groups
 warning settings:
 Should fail, GADTs is not enabled
 options currently set: none.
@@ -21,6 +22,7 @@ GHCi-specific dynamic flag settings:
 other dynamic, non-language, flag settings:
   -fno-ghci-history
   -fimplicit-import-qualified
+  -fshow-warning-groups
 warning settings:
 Should work, GADTs is in force from :set
 options currently set: none.
@@ -34,6 +36,7 @@ GHCi-specific dynamic flag settings:
 other dynamic, non-language, flag settings:
   -fno-ghci-history
   -fimplicit-import-qualified
+  -fshow-warning-groups
 warning settings:
 Should fail, GADTs is now disabled
 base language is: Haskell2010
@@ -49,6 +52,7 @@ GHCi-specific dynamic flag settings:
 other dynamic, non-language, flag settings:
   -fno-ghci-history
   -fimplicit-import-qualified
+  -fshow-warning-groups
 warning settings:
 Should fail, GADTs is only enabled at the prompt
 C :: T Int

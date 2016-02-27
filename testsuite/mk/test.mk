@@ -34,7 +34,7 @@ endif
 
 # TEST_HC_OPTS is passed to every invocation of TEST_HC 
 # in nested Makefiles
-TEST_HC_OPTS = -fforce-recomp -dcore-lint -dcmm-lint -dno-debug-output -no-user-$(GhcPackageDbFlag) -rtsopts $(EXTRA_HC_OPTS)
+TEST_HC_OPTS = -fforce-recomp -dcore-lint -dcmm-lint -dno-debug-output -fshow-warning-groups -no-user-$(GhcPackageDbFlag) -rtsopts $(EXTRA_HC_OPTS)
 
 # The warning suppression flag below is a temporary kludge. While working with
 # tests that contain tabs, please de-tab them so this flag can be eventually
