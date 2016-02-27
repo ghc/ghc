@@ -343,13 +343,13 @@ warnRedundantConstraints ctxt env info ev_vars
    addErrCtxt (text "In" <+> ppr info) $
    do { env <- getLclEnv
       ; msg <- mkErrorReport ctxt env (important doc)
-      ; reportWarning NoReason msg }
+      ; reportWarning (Reason Opt_WarnRedundantConstraints) msg }
 
  | otherwise  -- But for InstSkol there already *is* a surrounding
               -- "In the instance declaration for Eq [a]" context
               -- and we don't want to say it twice. Seems a bit ad-hoc
  = do { msg <- mkErrorReport ctxt env (important doc)
-      ; reportWarning NoReason msg }
+      ; reportWarning (Reason Opt_WarnRedundantConstraints) msg }
  where
    doc = text "Redundant constraint" <> plural redundant_evs <> colon
          <+> pprEvVarTheta redundant_evs
