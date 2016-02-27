@@ -97,7 +97,6 @@ extern volatile StgWord recent_activity;
 /* Thread queues.
  * Locks required  : sched_mutex
  */
-extern  StgTSO *blackhole_queue;
 #if !defined(THREADED_RTS)
 extern  StgTSO *blocked_queue_hd, *blocked_queue_tl;
 extern  StgTSO *sleeping_queue;

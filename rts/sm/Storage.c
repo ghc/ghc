@@ -1046,7 +1046,6 @@ dirty_TVAR(Capability *cap, StgTVar *p)
 // Setting a TSO's link field with a write barrier.
 // It is *not* necessary to call this function when
 //    * setting the link field to END_TSO_QUEUE
-//    * putting a TSO on the blackhole_queue
 //    * setting the link field of the currently running TSO, as it
 //      will already be dirty.
 void
