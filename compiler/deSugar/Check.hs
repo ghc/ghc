@@ -1242,15 +1242,19 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
           exists_i = flag_i && notNull inaccessible
           exists_u = flag_u && notNull uncovered
       when exists_r $ forM_ redundant $ \(L l q) -> do
-        putSrcSpanDs l (warnDs (pprEqn q "is redundant"))
+        putSrcSpanDs l (warnDs (Reason Opt_WarnOverlappingPatterns)
+                               (pprEqn q "is redundant"))
       when exists_i $ forM_ inaccessible $ \(L l q) -> do
-        putSrcSpanDs l (warnDs (pprEqn q "has inaccessible right hand side"))
-      when exists_u $ putSrcSpanDs loc (warnDs (pprEqns uncovered))
+        putSrcSpanDs l (warnDs (Reason Opt_WarnOverlappingPatterns)
+                               (pprEqn q "has inaccessible right hand side"))
+      when exists_u $
+        putSrcSpanDs loc (warnDs flag_u_reason (pprEqns uncovered))
   where
     (redundant, uncovered, inaccessible) = pm_result
 
     flag_i = wopt Opt_WarnOverlappingPatterns dflags
     flag_u = exhaustive dflags kind
+    flag_u_reason = maybe NoReason Reason (exhaustiveWarningFlag kind)
 
     -- Print a single clause (for redundant/with-inaccessible-rhs)
     pprEqn q txt = pp_context True ctx (text txt) $ \f -> ppr_eqn f kind q
@@ -1270,7 +1274,7 @@ warnPmIters :: DynFlags -> DsMatchContext -> PmM ()
 warnPmIters dflags (DsMatchContext kind loc)
   = when (flag_i || flag_u) $ do
       iters <- maxPmCheckIterations <$> getDynFlags
-      putSrcSpanDs loc (warnDs (msg iters))
+      putSrcSpanDs loc (warnDs NoReason (msg iters))
   where
     ctxt   = pprMatchContext kind
     msg is = fsep [ text "Pattern match checker exceeded"
@@ -1287,17 +1291,23 @@ dots qs | qs `lengthExceeds` maximum_output = text "..."
 
 -- | Check whether the exhaustiveness checker should run (exhaustiveness only)
 exhaustive :: DynFlags -> HsMatchContext id -> Bool
-exhaustive  dflags (FunRhs {})   = wopt Opt_WarnIncompletePatterns dflags
-exhaustive  dflags CaseAlt       = wopt Opt_WarnIncompletePatterns dflags
-exhaustive _dflags IfAlt         = False
-exhaustive  dflags LambdaExpr    = wopt Opt_WarnIncompleteUniPatterns dflags
-exhaustive  dflags PatBindRhs    = wopt Opt_WarnIncompleteUniPatterns dflags
-exhaustive  dflags ProcExpr      = wopt Opt_WarnIncompleteUniPatterns dflags
-exhaustive  dflags RecUpd        = wopt Opt_WarnIncompletePatternsRecUpd dflags
-exhaustive _dflags ThPatSplice   = False
-exhaustive _dflags PatSyn        = False
-exhaustive _dflags ThPatQuote    = False
-exhaustive _dflags (StmtCtxt {}) = False -- Don't warn about incomplete patterns
+exhaustive  dflags = maybe False (`wopt` dflags) . exhaustiveWarningFlag
+
+-- | Denotes whether an exhaustiveness check is supported, and if so,
+-- via which 'WarningFlag' it's controlled.
+-- Returns 'Nothing' if check is not supported.
+exhaustiveWarningFlag :: HsMatchContext id -> Maybe WarningFlag
+exhaustiveWarningFlag (FunRhs {})   = Just Opt_WarnIncompletePatterns
+exhaustiveWarningFlag CaseAlt       = Just Opt_WarnIncompletePatterns
+exhaustiveWarningFlag IfAlt         = Nothing
+exhaustiveWarningFlag LambdaExpr    = Just Opt_WarnIncompleteUniPatterns
+exhaustiveWarningFlag PatBindRhs    = Just Opt_WarnIncompleteUniPatterns
+exhaustiveWarningFlag ProcExpr      = Just Opt_WarnIncompleteUniPatterns
+exhaustiveWarningFlag RecUpd        = Just Opt_WarnIncompletePatternsRecUpd
+exhaustiveWarningFlag ThPatSplice   = Nothing
+exhaustiveWarningFlag PatSyn        = Nothing
+exhaustiveWarningFlag ThPatQuote    = Nothing
+exhaustiveWarningFlag (StmtCtxt {}) = Nothing -- Don't warn about incomplete patterns
                                        -- in list comprehensions, pattern guards
                                        -- etc. They are often *supposed* to be
                                        -- incomplete

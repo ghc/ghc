@@ -600,16 +600,16 @@ dsSpec :: Maybe CoreExpr        -- Just rhs => RULE is for a local binding
 dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
   | isJust (isClassOpId_maybe poly_id)
   = putSrcSpanDs loc $
-    do { warnDs (text "Ignoring useless SPECIALISE pragma for class method selector"
-                 <+> quotes (ppr poly_id))
+    do { warnDs NoReason (text "Ignoring useless SPECIALISE pragma for class method selector"
+                          <+> quotes (ppr poly_id))
        ; return Nothing  }  -- There is no point in trying to specialise a class op
                             -- Moreover, classops don't (currently) have an inl_sat arity set
                             -- (it would be Just 0) and that in turn makes makeCorePair bleat
 
   | no_act_spec && isNeverActive rule_act
   = putSrcSpanDs loc $
-    do { warnDs (text "Ignoring useless SPECIALISE pragma for NOINLINE function:"
-                 <+> quotes (ppr poly_id))
+    do { warnDs NoReason (text "Ignoring useless SPECIALISE pragma for NOINLINE function:"
+                          <+> quotes (ppr poly_id))
        ; return Nothing  }  -- Function is NOINLINE, and the specialiation inherits that
                             -- See Note [Activation pragmas for SPECIALISE]
 
@@ -626,7 +626,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
          --                         , text "spec_co:" <+> ppr spec_co
          --                         , text "ds_rhs:" <+> ppr ds_lhs ]) $
          case decomposeRuleLhs bndrs ds_lhs of {
-           Left msg -> do { warnDs msg; return Nothing } ;
+           Left msg -> do { warnDs NoReason msg; return Nothing } ;
            Right (rule_bndrs, _fn, args) -> do
 
        { dflags <- getDynFlags
@@ -697,7 +697,7 @@ dsMkUserRule this_mod is_local name act fn bndrs args rhs = do
     let rule = mkRule this_mod False is_local name act fn bndrs args rhs
     dflags <- getDynFlags
     when (isOrphan (ru_orphan rule) && wopt Opt_WarnOrphans dflags) $
-        warnDs (ruleOrphWarn rule)
+        warnDs (Reason Opt_WarnOrphans) (ruleOrphWarn rule)
     return rule
 
 ruleOrphWarn :: CoreRule -> SDoc
