@@ -624,7 +624,7 @@ maybeReportError ctxt err
   | otherwise
   = case cec_defer_type_errors ctxt of
       TypeDefer -> return ()
-      TypeWarn  -> reportWarning NoReason err
+      TypeWarn  -> reportWarning (Reason Opt_WarnDeferredTypeErrors) err
       TypeError -> reportError err
 
 addDeferredBinding :: ReportErrCtxt -> ErrMsg -> Ct -> TcM ()
