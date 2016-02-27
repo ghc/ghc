@@ -460,12 +460,16 @@ tcRnModule' hsc_env sum save_rn_syntax mod = do
             safe <- liftIO $ fst <$> readIORef (tcg_safeInfer tcg_res')
             when safe $ do
               case wopt Opt_WarnSafe dflags of
-                True -> (logWarnings $ unitBag $ mkPlainWarnMsg dflags
-                       (warnSafeOnLoc dflags) $ errSafe tcg_res')
+                True -> (logWarnings $ unitBag $
+                         makeIntoWarning (Reason Opt_WarnSafe) $
+                         mkPlainWarnMsg dflags (warnSafeOnLoc dflags) $
+                         errSafe tcg_res')
                 False | safeHaskell dflags == Sf_Trustworthy &&
                         wopt Opt_WarnTrustworthySafe dflags ->
-                  (logWarnings $ unitBag $ mkPlainWarnMsg dflags
-                    (trustworthyOnLoc dflags) $ errTwthySafe tcg_res')
+                        (logWarnings $ unitBag $
+                         makeIntoWarning (Reason Opt_WarnTrustworthySafe) $
+                         mkPlainWarnMsg dflags (trustworthyOnLoc dflags) $
+                         errTwthySafe tcg_res')
                 False -> return ()
             return tcg_res'
   where
@@ -1118,7 +1122,7 @@ markUnsafeInfer tcg_env whyUnsafe = do
     dflags <- getDynFlags
 
     when (wopt Opt_WarnUnsafe dflags)
-         (logWarnings $ unitBag $
+         (logWarnings $ unitBag $ makeIntoWarning (Reason Opt_WarnUnsafe) $
              mkPlainWarnMsg dflags (warnUnsafeOnLoc dflags) (whyUnsafe' dflags))
 
     liftIO $ writeIORef (tcg_safeInfer tcg_env) (False, whyUnsafe)
