@@ -62,7 +62,9 @@ rtsPackageArgs = package rts ? do
           -- there is a non-inlined variant to use instead. But rts does not
           -- provide non-inlined alternatives and hence needs the function to
           -- be inlined. See also Issue #90
-          , arg $ "-O2"
+          , arg "-O2"
+
+          , way == threaded ? arg "-DTHREADED_RTS"
 
           , (file "//RtsMessages.*" ||^ file "//Trace.*") ?
             arg ("-DProjectVersion=" ++ quote projectVersion)
@@ -82,7 +84,10 @@ rtsPackageArgs = package rts ? do
             , "-DTargetOS="                  ++ quote targetOs
             , "-DTargetVendor="              ++ quote targetVendor
             , "-DGhcUnregisterised="         ++ quote ghcUnreg
-            , "-DGhcEnableTablesNextToCode=" ++ quote ghcEnableTNC ] ]
+            , "-DGhcEnableTablesNextToCode=" ++ quote ghcEnableTNC ]
+
+            , (file "//Evac_thr.*" ||^ file "//Scav_thr.*") ?
+              append [ "-DPARALLEL_GC", "-Irts/sm" ] ]
 
         , builderGhc ? (arg "-Irts" <> includesArgs)
 
@@ -233,10 +238,3 @@ rtsPackageArgs = package rts ? do
 -- # -O3 helps unroll some loops (especially in copy() with a constant argument).
 -- rts/sm/Evac_CC_OPTS += -funroll-loops
 -- rts/dist/build/sm/Evac_thr_HC_OPTS += -optc-funroll-loops
-
--- # These files are just copies of sm/Evac.c and sm/Scav.c respectively,
--- # but compiled with -DPARALLEL_GC.
--- rts/dist/build/sm/Evac_thr_CC_OPTS += -DPARALLEL_GC -Irts/sm
--- rts/dist/build/sm/Scav_thr_CC_OPTS += -DPARALLEL_GC -Irts/sm
-
--- #-----------------------------------------------------------------------------
