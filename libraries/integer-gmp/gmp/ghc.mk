@@ -122,13 +122,16 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	cat libraries/integer-gmp/gmp/tarball/gmp-5.0.4.patch | { cd libraries/integer-gmp/gmp/gmpbuild && $(PATCH_CMD) -p1 ; }
 	chmod +x libraries/integer-gmp/gmp/ln
 
+	# Note: We must pass `TARGETPLATFORM` to the `--host` argument of GMP's
+	#       `./configure`, not `HOSTPLATFORM`: the 'host' on which GMP will
+	#       run is the 'target' platform of the compiler we're building.
 	cd libraries/integer-gmp/gmp; (set -o igncr 2>/dev/null) && set -o igncr; export SHELLOPTS; \
 	    PATH=`pwd`:$$PATH; \
 	    export PATH; \
 	    cd gmpbuild && \
 	    CC=$(CCX) NM=$(NM) AR=$(AR_STAGE1) ./configure \
 	          --enable-shared=no \
-	          --host=$(HOSTPLATFORM) --build=$(BUILDPLATFORM)
+	          --host=$(TARGETPLATFORM) --build=$(BUILDPLATFORM)
 	$(MAKE) -C libraries/integer-gmp/gmp/gmpbuild MAKEFLAGS=
 	$(CP) libraries/integer-gmp/gmp/gmpbuild/gmp.h libraries/integer-gmp/gmp/
 	$(CP) libraries/integer-gmp/gmp/gmpbuild/.libs/libgmp.a libraries/integer-gmp/gmp/
