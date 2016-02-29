@@ -228,8 +228,17 @@ instance Traversable ZipList where
     traverse f (ZipList x) = ZipList <$> traverse f x
 
 -- Instances for GHC.Generics
+instance Traversable U1 where
+    traverse _ _ = pure U1
+    {-# INLINE traverse #-}
+    sequenceA _ = pure U1
+    {-# INLINE sequenceA #-}
+    mapM _ _ = pure U1
+    {-# INLINE mapM #-}
+    sequence _ = pure U1
+    {-# INLINE sequence #-}
+
 deriving instance Traversable V1
-deriving instance Traversable U1
 deriving instance Traversable Par1
 deriving instance Traversable f => Traversable (Rec1 f)
 deriving instance Traversable (K1 i c)

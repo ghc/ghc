@@ -20,6 +20,7 @@ module Control.Monad.Zip where
 
 import Control.Monad (liftM, liftM2)
 import Data.Monoid
+import Data.Proxy
 import GHC.Generics
 
 -- | `MonadZip` type class. Minimal definition: `mzip` or `mzipWith`
@@ -78,7 +79,13 @@ instance MonadZip Last where
 instance MonadZip f => MonadZip (Alt f) where
     mzipWith f (Alt ma) (Alt mb) = Alt (mzipWith f ma mb)
 
+instance MonadZip Proxy where
+    mzipWith _ _ _ = Proxy
+
 -- Instances for GHC.Generics
+instance MonadZip U1 where
+    mzipWith _ _ _ = U1
+
 instance MonadZip Par1 where
     mzipWith = liftM2
 

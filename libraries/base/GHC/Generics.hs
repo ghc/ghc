@@ -712,10 +712,10 @@ import GHC.Types
 import GHC.Arr     ( Ix )
 import GHC.Base    ( Alternative(..), Applicative(..), Functor(..)
                    , Monad(..), MonadPlus(..), String )
-import GHC.Classes ( Eq, Ord )
+import GHC.Classes ( Eq(..), Ord(..) )
 import GHC.Enum    ( Bounded, Enum )
-import GHC.Read    ( Read )
-import GHC.Show    ( Show )
+import GHC.Read    ( Read(..), lex, readParen )
+import GHC.Show    ( Show(..), showString )
 
 -- Needed for metadata
 import Data.Proxy   ( Proxy(..), KProxy(..) )
@@ -736,21 +736,35 @@ deriving instance Show (V1 p)
 
 -- | Unit: used for constructors without arguments
 data U1 (p :: *) = U1
-  deriving (Eq, Ord, Read, Show, Functor, Generic, Generic1)
+  deriving (Generic, Generic1)
+
+instance Eq (U1 p) where
+  _ == _ = True
+
+instance Ord (U1 p) where
+  compare _ _ = EQ
+
+instance Read (U1 p) where
+  readsPrec d = readParen (d > 10) (\r -> [(U1, s) | ("U1",s) <- lex r ])
+
+instance Show (U1 p) where
+  showsPrec _ _ = showString "U1"
+
+instance Functor U1 where
+  fmap _ _ = U1
 
 instance Applicative U1 where
   pure _ = U1
-  U1 <*> U1 = U1
+  _ <*> _ = U1
 
 instance Alternative U1 where
   empty = U1
-  U1 <|> U1 = U1
-  -- The defaults will otherwise bottom; see #11650.
-  some U1 = U1
-  many U1 = U1
+  _ <|> _ = U1
 
 instance Monad U1 where
-  U1 >>= _ = U1
+  _ >>= _ = U1
+
+instance MonadPlus U1
 
 -- | Used for marking occurrences of the parameter
 newtype Par1 p = Par1 { unPar1 :: p }
