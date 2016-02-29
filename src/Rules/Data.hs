@@ -114,20 +114,20 @@ buildPackageData context@Context {..} = do
                     dirs   = [ ".", "hooks", "sm", "eventlog" ]
                           ++ [ "posix" | not windows ]
                           ++ [ "win32" |     windows ]
-                -- TODO: rts/dist/build/sm/Evac_thr.c, rts/dist/build/sm/Scav_thr.c
                 -- TODO: adding cmm/S sources to C_SRCS is a hack; rethink after #18
-                cSrcs    <- getDirectoryFiles (pkgPath package) (map (-/- "*.c") dirs)
-                cmmSrcs  <- getDirectoryFiles (pkgPath package) ["*.cmm"]
+                cSrcs   <- getDirectoryFiles (pkgPath package) (map (-/- "*.c") dirs)
+                cmmSrcs <- getDirectoryFiles (pkgPath package) ["*.cmm"]
                 buildAdjustor   <- anyTargetArch ["i386", "powerpc", "powerpc64"]
                 buildStgCRunAsm <- anyTargetArch ["powerpc64le"]
-                let sSrcs = [ "AdjustorAsm.S" | buildAdjustor   ]
-                         ++ [ "StgCRunAsm.S"  | buildStgCRunAsm ]
-                    extraSrcs = [ rtsBuildPath -/- "AutoApply.cmm" ]
+                let extraSrcs = [ "AdjustorAsm.S" | buildAdjustor   ]
+                             ++ [ "StgCRunAsm.S"  | buildStgCRunAsm ]
+                             ++ [ rtsBuildPath -/- "AutoApply.cmm"  ]
+                             ++ [ rtsBuildPath -/- "sm/Evac_thr.c"  ]
+                             ++ [ rtsBuildPath -/- "sm/Scav_thr.c"  ]
                 includes <- interpretInContext context $ fromDiffExpr includesArgs
                 let contents = unlines $ map (prefix++)
-                        [ "C_SRCS = "
-                          ++ unwords (cSrcs ++ cmmSrcs ++ sSrcs ++ extraSrcs)
-                        , "CC_OPTS = "  ++ unwords includes
+                        [ "C_SRCS = "  ++ unwords (cSrcs ++ cmmSrcs ++ extraSrcs)
+                        , "CC_OPTS = " ++ unwords includes
                         , "COMPONENT_ID = rts" ]
                 writeFileChanged mk contents
                 putSuccess $ "| Successfully generated '" ++ mk ++ "'."

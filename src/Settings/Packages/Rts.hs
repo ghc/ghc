@@ -56,12 +56,12 @@ rtsPackageArgs = package rts ? do
           [ arg "-Irts"
           , arg $ "-I" ++ path
           , arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""
-          -- rts **must** be compiled with optimizations. The INLINE_HEADER macro,
-          -- requires that functions are inlined to work as expected.  Inlining
-          -- only happens for optimized builds. Otherwise we can assume that
+          -- rts *must* be compiled with optimisations. The INLINE_HEADER macro
+          -- requires that functions are inlined to work as expected. Inlining
+          -- only happens for optimised builds. Otherwise we can assume that
           -- there is a non-inlined variant to use instead. But rts does not
           -- provide non-inlined alternatives and hence needs the function to
-          -- be inlined. See also Issue #90
+          -- be inlined. See also #90.
           , arg "-O2"
 
           , way == threaded ? arg "-DTHREADED_RTS"
@@ -86,8 +86,11 @@ rtsPackageArgs = package rts ? do
             , "-DGhcUnregisterised="         ++ quote ghcUnreg
             , "-DGhcEnableTablesNextToCode=" ++ quote ghcEnableTNC ]
 
-            , (file "//Evac_thr.*" ||^ file "//Scav_thr.*") ?
-              append [ "-DPARALLEL_GC", "-Irts/sm" ] ]
+            , file "//Evac.*"     ? arg "-funroll-loops"
+            , file "//Evac_thr.*" ? arg "-funroll-loops"
+
+            , file "//Evac_thr.*" ? append [ "-DPARALLEL_GC", "-Irts/sm" ]
+            , file "//Scav_thr.*" ? append [ "-DPARALLEL_GC", "-Irts/sm" ] ]
 
         , builderGhc ? (arg "-Irts" <> includesArgs)
 
@@ -234,7 +237,3 @@ rtsPackageArgs = package rts ? do
 -- ifneq "$(CC_CLANG_BACKEND)" "1"
 -- rts/sm/Compact_CC_OPTS += -finline-limit=2500
 -- endif
-
--- # -O3 helps unroll some loops (especially in copy() with a constant argument).
--- rts/sm/Evac_CC_OPTS += -funroll-loops
--- rts/dist/build/sm/Evac_thr_HC_OPTS += -optc-funroll-loops

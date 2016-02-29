@@ -11,20 +11,16 @@ import Rules.Actions
 import Settings
 import Target
 
--- TODO: simplify handling of AutoApply.cmm
 buildPackageDependencies :: [(Resource, Int)] -> Context -> Rules ()
 buildPackageDependencies rs context@Context {..} =
     let path     = buildPath context
-        dropPath = (pkgPath package ++) . drop (length path)
         hDepFile = path -/- ".hs-dependencies"
     in do
         fmap (path ++)
             [ "//*.c.deps", "//*.cmm.deps", "//*.S.deps" ] |%> \out -> do
-                let srcFile = if "//AutoApply.*" ?== out
-                              then dropExtension out
-                              else dropPath . dropExtension $ out
-                need [srcFile]
-                build $ Target context (GccM stage) [srcFile] [out]
+                let src = dep2src context out
+                need [src]
+                build $ Target context (GccM stage) [src] [out]
 
         hDepFile %> \out -> do
             srcs <- haskellSources context
@@ -37,10 +33,7 @@ buildPackageDependencies rs context@Context {..} =
         -- TODO: don't accumulate *.deps into .dependencies
         path -/- ".dependencies" %> \out -> do
             cSrcs <- pkgDataList $ CSrcs path
-            let cDepFiles = [ path -/- src <.> "deps" | src <- cSrcs
-                            , not ("//AutoApply.cmm" ?== src) ]
-                         ++ [ src <.> "deps" | src <- cSrcs, "//AutoApply.cmm" ?== src ]
-
+            let cDepFiles = map (src2dep context) cSrcs
             need $ hDepFile : cDepFiles -- need all for more parallelism
             cDeps <- fmap concat $ traverse readFile' cDepFiles
             hDeps <- readFile' hDepFile
@@ -52,3 +45,23 @@ buildPackageDependencies rs context@Context {..} =
                        . sortBy (compare `on` fst)
                        . parseMakefile $ cDeps ++ hDeps
             writeFileChanged out result
+
+-- Given a 'Context' and a 'FilePath' to a source file, compute the 'FilePath'
+-- to its dependencies. For example, in vanillaContext Stage1 rts:
+-- * "Task.c"                          -> ".build/stage1/rts/Task.c.deps"
+-- * ".build/stage1/rts/AutoApply.cmm" -> ".build/stage1/rts/AutoApply.cmm.deps"
+src2dep :: Context -> FilePath -> FilePath
+src2dep context src
+    | buildRootPath `isPrefixOf` src = src <.> "deps"
+    | otherwise                      = buildPath context -/- src <.> "deps"
+
+-- Given a 'Context' and a 'FilePath' to a file with dependencies, compute the
+-- 'FilePath' to the source file. For example, in vanillaContext Stage1 rts:
+-- * ".build/stage1/rts/Task.c.deps"        -> "Task.c"
+-- * ".build/stage1/rts/AutoApply.cmm.deps" -> ".build/stage1/rts/AutoApply.cmm"
+dep2src :: Context -> FilePath -> FilePath
+dep2src context@Context {..} dep
+    | takeBaseName dep `elem` [ "AutoApply.cmm", "Evac_thr.c", "Scav_thr.c" ] = src
+    | otherwise = pkgPath package ++ drop (length $ buildPath context) src
+  where
+    src = dropExtension dep

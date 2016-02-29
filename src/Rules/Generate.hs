@@ -142,7 +142,7 @@ generatePackageCode context@(Context stage pkg _) =
 
         priority 2.0 $ do
             -- TODO: this is temporary hack, get rid of this (#113)
-            let oldPath = pkgPath pkg -/- contextDirectory context
+            let oldPath = pkgPath pkg -/- contextDirectory context -/- "build"
                 olden f = oldPath ++ (drop (length (buildPath context)) f)
 
             when (pkg == compiler) $ path -/- "Config.hs" %> \file -> do
@@ -162,13 +162,15 @@ generatePackageCode context@(Context stage pkg _) =
 
 copyRules :: Rules ()
 copyRules = do
-    "inplace/lib/ghc-usage.txt"     <~ "driver"
-    "inplace/lib/ghci-usage.txt"    <~ "driver"
-    "inplace/lib/platformConstants" <~ derivedConstantsPath
-    "inplace/lib/settings"          <~ "."
-    "inplace/lib/template-hsc.h"    <~ pkgPath hsc2hs
+    "inplace/lib/ghc-usage.txt"      <~ "driver"
+    "inplace/lib/ghci-usage.txt"     <~ "driver"
+    "inplace/lib/platformConstants"  <~ derivedConstantsPath
+    "inplace/lib/settings"           <~ "."
+    "inplace/lib/template-hsc.h"     <~ pkgPath hsc2hs
+    rtsBuildPath -/- "sm/Evac_thr.c" %> copyFile (pkgPath rts -/- "sm/Evac.c")
+    rtsBuildPath -/- "sm/Scav_thr.c" %> copyFile (pkgPath rts -/- "sm/Scav.c")
   where
-    file <~ dir = file %> \_ -> copyFile (dir -/- takeFileName file) file
+    file <~ dir = file %> copyFile (dir -/- takeFileName file)
 
 generateRules :: Rules ()
 generateRules = do

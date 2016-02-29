@@ -26,11 +26,10 @@ buildPackageLibrary context@Context {..} = do
         cSrcs <- cSources context
         hSrcs <- hSources context
 
-        -- TODO: simplify handling of AutoApply.cmm, eliminate differences below
-        let cObjs = [ path -/- src -<.> osuf way | src <- cSrcs
-                    , not ("//AutoApply.cmm" ?== src) ]
-                 ++ [ src -<.> osuf way | src <- cSrcs, "//AutoApply.cmm" ?== src ]
-            hObjs = [ path -/- src  <.> osuf way | src <- hSrcs ]
+        let cObjs = [ objFile context src | src <- cSrcs
+                    , takeFileName src `notElem` ["Evac_thr.c", "Scav_thr.c"]
+                      || way == threaded ]
+            hObjs = [ path -/- src <.> osuf way | src <- hSrcs ]
 
         -- This will create split objects if required (we don't track them
         -- explicitly as this would needlessly bloat the Shake database).
@@ -50,7 +49,7 @@ buildPackageLibrary context@Context {..} = do
         asuf <- libsuf way
         let isLib0 = ("//*-0" ++ asuf) ?== a
         if isLib0
-        then build $ Target context Ar [] [a] -- TODO: scan for dlls
+        then build $ Target context Ar []   [a] -- TODO: scan for dlls
         else build $ Target context Ar objs [a]
 
         synopsis <- interpretInContext context $ getPkgData Synopsis
@@ -68,12 +67,22 @@ buildPackageGhciLibrary context@Context {..} = priority 2 $ do
     matchVersionedFilePath libPrefix (waySuffix way <.> "o") ?> \obj -> do
             cSrcs <- cSources context
             hSrcs <- hSources context
-            let cObjs = [ path -/- src -<.> "o" | src <- cSrcs
-                        , not ("//AutoApply.cmm" ?== src) ]
-                     ++ [ src -<.> "o" | src <- cSrcs, "//AutoApply.cmm" ?== src ]
-                hObjs = [ path -/- src  <.> "o" | src <- hSrcs ]
-            need $ cObjs ++ hObjs
-            build $ Target context Ld (cObjs ++ hObjs) [obj]
+
+            let cObjs = map (objFile context) cSrcs
+                hObjs = [ path -/- src <.> osuf way | src <- hSrcs ]
+                objs  = cObjs ++ hObjs
+            need objs
+            build $ Target context Ld objs [obj]
+
+-- TODO: Get rid of code duplication and simplify. See also src2dep.
+-- Given a 'Context' and a 'FilePath' to a source file, compute the 'FilePath'
+-- to its object file. For example, in Context Stage1 rts threaded:
+-- * "Task.c"                          -> ".build/stage1/rts/Task.thr_o"
+-- * ".build/stage1/rts/sm/Evac_thr.c" -> ".build/stage1/rts/sm/Evac_thr.thr_o"
+objFile :: Context -> FilePath -> FilePath
+objFile context@Context {..} src
+    | buildRootPath `isPrefixOf` src = src -<.> osuf way
+    | otherwise                      = buildPath context -/- src -<.> osuf way
 
 cSources :: Context -> Action [FilePath]
 cSources context = interpretInContext context $ getPkgDataList CSrcs
