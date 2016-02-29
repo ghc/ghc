@@ -327,9 +327,13 @@ test('T7989', normal, compile_fail, [''])
 test('T8034', normal, compile_fail, [''])
 test('T8142', normal, compile_fail, [''])
 test('T8262', normal, compile_fail, [''])
-test('TcCoercibleFail', when(compiler_lt('ghc', '7.7'), skip), compile_fail, [''])
-test('TcCoercibleFail2', when(compiler_lt('ghc', '7.7'), skip), compile_fail, [''])
-test('TcCoercibleFail3', when(compiler_lt('ghc', '7.7'), skip), compile_fail, [''])
+
+# TcCoercibleFail times out with the compiler is compiled with -DDEBUG.
+# This is expected (see comment in source file).
+test('TcCoercibleFail', [when(compiler_debugged(), skip)], compile_fail, [''])
+
+test('TcCoercibleFail2', [], compile_fail, [''])
+test('TcCoercibleFail3', [], compile_fail, [''])
 test('T8306', normal, compile_fail, [''])
 test('T8392a', normal, compile_fail, [''])
 test('T8428', normal, compile_fail, [''])
