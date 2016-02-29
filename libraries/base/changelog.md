@@ -49,6 +49,9 @@
     `GHC.Generics` as part of making GHC generics capable of handling
     unlifted types (#10868)
 
+  * The `Eq`, `Ord`, `Read`, and `Show` instances for `U1` now use lazier
+    pattern-matching
+
   * Keep `shift{L,R}` on `Integer` with negative shift-arguments from
     segfaulting (#10571)
 

@@ -425,8 +425,24 @@ instance Ord a => Monoid (Min a) where
     | otherwise = Min n
 
 -- Instances for GHC.Generics
+instance Foldable U1 where
+    foldMap _ _ = mempty
+    {-# INLINE foldMap #-}
+    fold _ = mempty
+    {-# INLINE fold #-}
+    foldr _ z _ = z
+    {-# INLINE foldr #-}
+    foldl _ z _ = z
+    {-# INLINE foldl #-}
+    foldl1 _ _ = errorWithoutStackTrace "foldl1: U1"
+    foldr1 _ _ = errorWithoutStackTrace "foldr1: U1"
+    length _   = 0
+    null _     = True
+    elem _ _   = False
+    sum _      = 0
+    product _  = 1
+
 deriving instance Foldable V1
-deriving instance Foldable U1
 deriving instance Foldable Par1
 deriving instance Foldable f => Foldable (Rec1 f)
 deriving instance Foldable (K1 i c)

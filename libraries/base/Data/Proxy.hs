@@ -89,9 +89,17 @@ instance Applicative Proxy where
     _ <*> _ = Proxy
     {-# INLINE (<*>) #-}
 
+instance Alternative Proxy where
+    empty = Proxy
+    {-# INLINE empty #-}
+    _ <|> _ = Proxy
+    {-# INLINE (<|>) #-}
+
 instance Monad Proxy where
     _ >>= _ = Proxy
     {-# INLINE (>>=) #-}
+
+instance MonadPlus Proxy
 
 -- | 'asProxyTypeOf' is a type-restricted version of 'const'.
 -- It is usually used as an infix operator, and its typing forces its first
