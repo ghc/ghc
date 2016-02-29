@@ -219,6 +219,14 @@ threadPaused(Capability *cap, StgTSO *tso)
     frame = (StgClosure *)tso->stackobj->sp;
 
     while ((P_)frame < stack_end) {
+        if (*(P_)frame & 1) {
+            nat frame_size = stack_frame_sizeW(frame);
+            weight_pending += frame_size;
+            frame = (StgClosure *)((StgPtr)frame + frame_size);
+            prev_was_update_frame = rtsFalse;
+            continue;
+        }
+
         info = get_ret_itbl(frame);
 
         switch (info->i.type) {

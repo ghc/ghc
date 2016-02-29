@@ -194,7 +194,11 @@ mkInfoTableContents dflags
                      | null liveness_data     = rET_SMALL -- Fits in extra_bits
                      | otherwise              = rET_BIG   -- Does not; extra_bits is
                                                           -- a label
-       ; return (prof_data ++ liveness_data, (std_info, srt_label)) }
+             mb_tiny_liveness = mkTinyLivenessBits frame
+       ; case (prof_data, liveness_data, srt_label, rts_tag == rET_SMALL,
+               srt_bitmap == toStgHalfWord dflags 0, mb_tiny_liveness) of
+          ([], [], [], True, True, Just b) -> return ([], ([b], []))
+          _ -> return (prof_data ++ liveness_data, (std_info, srt_label)) }
 
   | HeapRep _ ptrs nonptrs closure_type <- smrep
   = do { let layout  = packIntsCLit dflags ptrs nonptrs
@@ -316,6 +320,12 @@ makeRelativeRefTo _ _ lit = lit
 --
 -- The head of the stack layout is the top of the stack and
 -- the least-significant bit.
+
+mkTinyLivenessBits :: Liveness -> Maybe CmmLit
+mkTinyLivenessBits liveness
+  | length liveness > 7 = Nothing
+  | otherwise = Just (CmmInt b W8)
+  where b = foldr (.|.) 0 [ 1 `shiftL` n | (True,n) <- zip (liveness ++ [True]) [0..] ]
 
 mkLivenessBits :: DynFlags -> Liveness -> UniqSM (CmmLit, [RawCmmDecl])
               -- ^ Returns:

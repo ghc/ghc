@@ -174,6 +174,19 @@ static StgPtr scavenge_mut_arr_ptrs_marked (StgMutArrPtrs *a)
 }
 
 STATIC_INLINE StgPtr
+scavenge_tiny_bitmap (StgPtr p, uint8_t layout)
+{
+    while (layout > 1) {
+        if ((layout & 1) == 0) {
+            evacuate((StgClosure **)p);
+        }
+        p++;
+        layout = layout >> 1;
+    }
+    return p;
+}
+
+STATIC_INLINE StgPtr
 scavenge_small_bitmap (StgPtr p, StgWord size, StgWord bitmap)
 {
     while (size > 0) {
@@ -1807,6 +1820,13 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
    */
 
   while (p < stack_end) {
+    if (*p & 1) {
+        // Tiny liveness layout: no SRT
+        uint8_t liveness = *((uint8_t *)(*p) - 1);
+        p = scavenge_tiny_bitmap(p+1, liveness);
+        continue;
+    }
+
     info  = get_ret_itbl((StgClosure *)p);
 
     switch (info->i.type) {

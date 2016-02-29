@@ -108,6 +108,11 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
     asmLbl = mkAsmTempLabel (getUnique blockid)
     maybe_infotable = case mapLookup blockid info_env of
        Nothing   -> empty
+       Just (Statics info_lbl [b8@(CmmStaticLit (CmmInt _ W8))]) ->
+           text ".align 2" $$   -- XXX Needs to be adjusted for darwin
+           infoTableLoc $$
+           pprData b8 $$
+           pprLabel info_lbl
        Just (Statics info_lbl info) ->
            pprAlignForSection Text $$
            infoTableLoc $$

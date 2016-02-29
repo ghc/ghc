@@ -415,10 +415,25 @@ EXTERN_INLINE nat closure_sizeW (StgClosure *p)
    Sizes of stack frames
    -------------------------------------------------------------------------- */
 
+INLINE_HEADER StgWord tiny_bitmap_size(uint8_t liveness)
+{
+    StgWord bitmap_size = 0;
+    // XXX use a table or instruction?
+    while (liveness > 1) {
+        bitmap_size++;
+        liveness = liveness >> 1;
+    }
+    return bitmap_size;
+}
+
 EXTERN_INLINE StgWord stack_frame_sizeW( StgClosure *frame );
 EXTERN_INLINE StgWord stack_frame_sizeW( StgClosure *frame )
 {
     StgRetInfoTable *info;
+
+    if (*(P_)frame & 1) {
+        return 1 + tiny_bitmap_size(*(*(uint8_t **)frame - 1));
+    }
 
     info = get_ret_itbl(frame);
     switch (info->i.type) {
