@@ -74,6 +74,8 @@ import StaticFlags( opt_PprStyle_Debug )
 import ListSetOps ( assocMaybe )
 import Data.List  ( partition, intersperse )
 import Data.Maybe ( catMaybes, isJust )
+import Data.Traversable ( mapM )
+import Prelude hiding (mapM)
 
 type BagDerivStuff = Bag DerivStuff
 

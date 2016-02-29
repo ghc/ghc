@@ -51,6 +51,7 @@ import Data.Maybe
 import Control.Monad ( unless, zipWithM )
 import Data.List( partition )
 import Pair( Pair(..) )
+import Data.Traversable( traverse )
 
 #include "HsVersions.h"
 

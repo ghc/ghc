@@ -63,6 +63,8 @@ import DynFlags( gopt, GeneralFlag(..) )
 import Maybes
 -- libraries:
 import Data.Data hiding (TyCon,Fixity)
+import Data.Traversable (Traversable)
+import Data.Foldable (Foldable)
 
 type InPat id  = LPat id        -- No 'Out' constructors
 type OutPat id = LPat id        -- No 'In' constructors
