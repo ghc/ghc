@@ -1175,7 +1175,10 @@ lintCoreRule fun_ty (Rule { ru_name = name, ru_bndrs = bndrs
        ; ensureEqTys lhs_ty rhs_ty $
          (rule_doc <+> vcat [ text "lhs type:" <+> ppr lhs_ty
                             , text "rhs type:" <+> ppr rhs_ty ])
-       ; let bad_bndrs = filterOut (`elemVarSet` exprsFreeVars args) bndrs
+       ; let bad_bndrs = filterOut (`elemVarSet` exprsFreeVars args) $
+                         filter (`elemVarSet` exprFreeVars rhs) $
+                         bndrs
+
        ; checkL (null bad_bndrs)
                 (rule_doc <+> text "unbound" <+> ppr bad_bndrs)
             -- See Note [Linting rules]
@@ -1186,9 +1189,9 @@ lintCoreRule fun_ty (Rule { ru_name = name, ru_bndrs = bndrs
 {- Note [Linting rules]
 ~~~~~~~~~~~~~~~~~~~~~~~
 It's very bad if simplifying a rule means that one of the template
-variables (ru_bndrs) becomes not-mentioned in the template argumments
-(ru_args).  How can that happen?  Well, in Trac #10602, SpecConstr
-stupidly constructed a rule like
+variables (ru_bndrs) that /is/ mentioned on the RHS becomes
+not-mentioned in the LHS (ru_args).  How can that happen?  Well, in
+Trac #10602, SpecConstr stupidly constructed a rule like
 
   forall x,c1,c2.
      f (x |> c1 |> c2) = ....
@@ -1198,6 +1201,16 @@ Trac #10602, it collapsed to the identity and was removed altogether.)
 
 We don't have a great story for what to do here, but at least
 this check will nail it.
+
+NB (Trac #11643): it's possible that a variable listed in the
+binders becomes not-mentioned on both LHS and RHS.  Here's a silly
+example:
+   RULE forall x y. f (g x y) = g (x+1 (y-1)
+And suppose worker/wrapper decides that 'x' is Absent.  Then
+we'll end up with
+   RULE forall x y. f ($gw y) = $gw (x+1)
+This seems sufficiently obscure that there isn't enough payoff to
+try to trim the forall'd binder list.
 -}
 
 {-
