@@ -327,14 +327,26 @@ expandTypeSynonyms :: Type -> Type
 -- 'expandTypeSynonyms' only expands out type synonyms mentioned in the type,
 -- not in the kinds of any TyCon or TyVar mentioned in the type.
 expandTypeSynonyms ty
-  = go (mkEmptyTCvSubst (mkTyCoInScopeSet [ty] [])) ty
+  = go (mkEmptyTCvSubst in_scope) ty
   where
+    in_scope = mkInScopeSet (tyCoVarsOfType ty)
+
     go subst (TyConApp tc tys)
-      | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
-      = let subst' = unionTCvSubst subst (mkTvSubstPrs tenv) in
-        go subst' (mkAppTys rhs tys')
+      | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc expanded_tys
+      = let subst' = mkTvSubst in_scope (mkVarEnv tenv)
+            -- Make a fresh substitution; rhs has nothing to
+            -- do with anything that has happened so far
+            -- NB: if you make changes here, be sure to build an
+            --     /idempotent/ substitution, even in the nested case
+            --        type T a b = a -> b
+            --        type S x y = T y x
+            -- (Trac #11665)
+        in  mkAppTys (go subst' rhs) tys'
       | otherwise
-      = TyConApp tc (map (go subst) tys)
+      = TyConApp tc expanded_tys
+      where
+        expanded_tys = (map (go subst) tys)
+
     go _     (LitTy l)     = LitTy l
     go subst (TyVarTy tv)  = substTyVar subst tv
     go subst (AppTy t1 t2) = mkAppTy (go subst t1) (go subst t2)
