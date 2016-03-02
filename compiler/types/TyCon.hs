@@ -1798,10 +1798,9 @@ expandSynTyCon_maybe
 
 -- ^ Expand a type synonym application, if any
 expandSynTyCon_maybe tc tys
-  | SynonymTyCon { tyConTyVars = tvs, synTcRhs = rhs } <- tc
-  , let n_tvs = length tvs
-  = case n_tvs `compare` length tys of
-        LT -> Just (tvs `zip` tys, rhs, drop n_tvs tys)
+  | SynonymTyCon { tyConTyVars = tvs, synTcRhs = rhs, tyConArity = arity } <- tc
+  = case arity `compare` length tys of
+        LT -> Just (tvs `zip` tys, rhs, drop arity tys)
         EQ -> Just (tvs `zip` tys, rhs, [])
         GT -> Nothing
    | otherwise
