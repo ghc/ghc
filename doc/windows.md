@@ -23,4 +23,4 @@ Here are some alternatives that have been considered, but not yet tested. Use th
 
 * Use `shake-build/build.bat --setup` to replace `boot` and `configure`.
 * The `pacman` install of `gcc` is probably not necessary, but it does pull in a lot of tools, some of which probably are necessary. Ideally thin the list down.
-* Can Happy/Alex be installed by adding them as tool dependencies to the Stack file?
+* Happy/Alex should be able to be installed by adding them as `build-tools` in the Cabal file.
