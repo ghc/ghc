@@ -192,6 +192,10 @@ instance Ord FastString where
             | otherwise =  y
     compare a b = cmpFS a b
 
+instance Monoid FastString where
+    mempty = nilFS
+    mappend = appendFS
+
 instance Show FastString where
    show fs = show (unpackFS fs)
 
