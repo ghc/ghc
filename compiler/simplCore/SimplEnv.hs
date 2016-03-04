@@ -7,14 +7,15 @@
 {-# LANGUAGE CPP #-}
 
 module SimplEnv (
+        -- * Basic types
         InId, InBind, InExpr, InAlt, InArg, InType, InBndr, InVar,
         OutId, OutTyVar, OutBind, OutExpr, OutAlt, OutArg, OutType, OutBndr, OutVar,
         InCoercion, OutCoercion,
 
-        -- The simplifier mode
+        -- * The simplifier mode
         setMode, getMode, updMode,
 
-        -- Environments
+        -- * Environments
         SimplEnv(..), StaticEnv, pprSimplEnv,   -- Temp not abstract
         mkSimplEnv, extendIdSubst,
         SimplEnv.extendTvSubst, SimplEnv.extendCvSubst,
@@ -22,14 +23,16 @@ module SimplEnv (
         getInScope, setInScope, setInScopeSet, modifyInScope, addNewInScopeIds,
         getSimplRules,
 
+        -- * Substitution results
         SimplSR(..), mkContEx, substId, lookupRecBndr, refineFromInScope,
 
+        -- * Simplifying 'Id' binders
         simplNonRecBndr, simplRecBndrs,
         simplBinder, simplBinders,
         substTy, substTyVar, getTCvSubst,
         substCo, substCoVar,
 
-        -- Floats
+        -- * Floats
         Floats, emptyFloats, isEmptyFloats, addNonRec, addFloats, extendFloats,
         wrapFloats, setFloats, zapFloats, addRecFloats, mapFloats,
         doFloatFromRhs, getFloatBinds
@@ -38,7 +41,7 @@ module SimplEnv (
 #include "HsVersions.h"
 
 import SimplMonad
-import CoreMonad        ( SimplifierMode(..) )
+import CoreMonad                ( SimplifierMode(..) )
 import CoreSyn
 import CoreUtils
 import Var
@@ -139,6 +142,7 @@ pprSimplEnv env
 type SimplIdSubst = IdEnv SimplSR       -- IdId |--> OutExpr
         -- See Note [Extending the Subst] in CoreSubst
 
+-- | A substitution result.
 data SimplSR
   = DoneEx OutExpr              -- Completed term
   | DoneId OutId                -- Completed term variable
