@@ -86,6 +86,11 @@ isStaged = \case
     (GhcPkg _) -> True
     _          -> False
 
+isOptional :: Builder -> Bool
+isOptional = \case
+    HsColour -> True
+    _        -> False
+
 -- TODO: get rid of fromJust
 -- | Determine the location of a 'Builder'
 builderPath :: Builder -> Action FilePath
@@ -116,9 +121,13 @@ builderPath builder = case builderProvenance builder of
                 _ -> error $ "Cannot determine builderKey for " ++ show builder
         path <- askConfigWithDefault builderKey . putError $
             "\nCannot find path to '" ++ builderKey
-            ++ "' in configuration files. Have you forgot to run configure?"
-        if path == "" -- TODO: get rid of "" paths
-        then return ""
+            ++ "' in system.config file. Have you forgot to run configure?"
+        if null path
+        then do
+            if isOptional builder
+            then return ""
+            else putError $ "Builder '" ++ builderKey ++ "' is not specified in"
+                ++ " system.config file. Cannot proceed without it."
         else do
             path' <- lookupInPath path
             fixAbsolutePathOnWindows $ path' -<.> exe
