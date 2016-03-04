@@ -268,11 +268,6 @@ noDocForDecl :: DocForDecl name
 noDocForDecl = (Documentation Nothing Nothing, Map.empty)
 
 
-unrenameDocForDecl :: DocForDecl DocName -> DocForDecl Name
-unrenameDocForDecl (doc, fnArgsDoc) =
-    (fmap getName doc, (fmap . fmap) getName fnArgsDoc)
-
-
 -----------------------------------------------------------------------------
 -- * Cross-referencing
 -----------------------------------------------------------------------------

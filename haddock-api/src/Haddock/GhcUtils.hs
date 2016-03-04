@@ -35,13 +35,6 @@ import Class
 moduleString :: Module -> String
 moduleString = moduleNameString . moduleName
 
-lookupLoadedHomeModuleGRE  :: GhcMonad m => ModuleName -> m (Maybe GlobalRdrEnv)
-lookupLoadedHomeModuleGRE mod_name = withSession $ \hsc_env ->
-  case lookupUFM (hsc_HPT hsc_env) mod_name of
-    Just mod_info      -> return (mi_globals (hm_iface mod_info))
-    _not_a_home_module -> return Nothing
-
-
 isNameSym :: Name -> Bool
 isNameSym = isSymOcc . nameOccName
 
@@ -123,25 +116,10 @@ isUserLSig (L _(TypeSig {}))    = True
 isUserLSig (L _(ClassOpSig {})) = True
 isUserLSig _                    = False
 
-isTyClD :: HsDecl a -> Bool
-isTyClD (TyClD _) = True
-isTyClD _ = False
-
 
 isClassD :: HsDecl a -> Bool
 isClassD (TyClD d) = isClassDecl d
 isClassD _ = False
-
-
-isDocD :: HsDecl a -> Bool
-isDocD (DocD _) = True
-isDocD _ = False
-
-
-isInstD :: HsDecl a -> Bool
-isInstD (InstD _) = True
-isInstD _ = False
-
 
 isValD :: HsDecl a -> Bool
 isValD (ValD _) = True
@@ -156,11 +134,6 @@ declATs _ = []
 pretty :: Outputable a => DynFlags -> a -> String
 pretty = showPpr
 
-
-trace_ppr :: Outputable a => DynFlags -> a -> b -> b
-trace_ppr dflags x y = trace (pretty dflags x) y
-
-
 -------------------------------------------------------------------------------
 -- * Located
 -------------------------------------------------------------------------------
@@ -172,11 +145,6 @@ unL (L _ x) = x
 
 reL :: a -> Located a
 reL = L undefined
-
-
-before :: Located a -> Located a -> Bool
-before = (<) `on` getLoc
-
 
 -------------------------------------------------------------------------------
 -- * NamedThing instances
