@@ -216,6 +216,12 @@ optimizationsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-fno-omit-yields"
          }
+  , flag { flagName = "-foptimal-applicative-do"
+         , flagDescription =
+           "Use a slower but better algorithm for ApplicativeDo"
+         , flagType = DynamicFlag
+         , flagReverse = "-fno-optimal-applicative-do"
+         }
   , flag { flagName = "-fpedantic-bottoms"
          , flagDescription =
            "Make GHC be more precise about its treatment of bottom (but see "++

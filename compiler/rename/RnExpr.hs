@@ -48,6 +48,9 @@ import Control.Monad
 import TysWiredIn       ( nilDataConName )
 import qualified GHC.LanguageExtensions as LangExt
 
+import Data.Ord
+import Data.Array
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1439,25 +1442,120 @@ rearrangeForApplicativeDo
   -> RnM ([ExprLStmt Name], FreeVars)
 
 rearrangeForApplicativeDo _ [] = return ([], emptyNameSet)
+rearrangeForApplicativeDo _ [(one,_)] = return ([one], emptyNameSet)
 rearrangeForApplicativeDo ctxt stmts0 = do
-  (stmts', fvs) <- ado ctxt stmts [last] last_fvs
-  return (stmts', fvs)
-  where (stmts,(last,last_fvs)) = findLast stmts0
-        findLast [] = error "findLast"
-        findLast [last] = ([],last)
-        findLast (x:xs) = (x:rest,last) where (rest,last) = findLast xs
+  optimal_ado <- goptM Opt_OptimalApplicativeDo
+  let stmt_tree | optimal_ado = mkStmtTreeOptimal stmts
+                | otherwise = mkStmtTreeHeuristic stmts
+  stmtTreeToStmts ctxt stmt_tree [last] last_fvs
+  where
+    (stmts,(last,last_fvs)) = findLast stmts0
+    findLast [] = error "findLast"
+    findLast [last] = ([],last)
+    findLast (x:xs) = (x:rest,last) where (rest,last) = findLast xs
 
--- | The ApplicativeDo transformation.
-ado
+-- | A tree of statements using a mixture of applicative and bind constructs.
+data StmtTree a
+  = StmtTreeOne a
+  | StmtTreeBind (StmtTree a) (StmtTree a)
+  | StmtTreeApplicative [StmtTree a]
+
+flattenStmtTree :: StmtTree a -> [a]
+flattenStmtTree t = go t []
+ where
+  go (StmtTreeOne a) as = a : as
+  go (StmtTreeBind l r) as = go l (go r as)
+  go (StmtTreeApplicative ts) as = foldr go as ts
+
+type ExprStmtTree = StmtTree (ExprLStmt Name, FreeVars)
+type Cost = Int
+
+-- | Turn a sequence of statements into an ExprStmtTree using a
+-- heuristic algorithm.  /O(n^2)/
+mkStmtTreeHeuristic :: [(ExprLStmt Name, FreeVars)] -> ExprStmtTree
+mkStmtTreeHeuristic [one] = StmtTreeOne one
+mkStmtTreeHeuristic stmts =
+  case segments stmts of
+    [one] -> split one
+    segs -> StmtTreeApplicative (map split segs)
+ where
+  split [one] = StmtTreeOne one
+  split stmts =
+    StmtTreeBind (mkStmtTreeHeuristic before) (mkStmtTreeHeuristic after)
+    where (before, after) = splitSegment stmts
+
+-- | Turn a sequence of statements into an ExprStmtTree optimally,
+-- using dynamic programming.  /O(n^3)/
+mkStmtTreeOptimal :: [(ExprLStmt Name, FreeVars)] -> ExprStmtTree
+mkStmtTreeOptimal stmts =
+  ASSERT(not (null stmts)) -- the empty case is handled by the caller;
+                           -- we don't support empty StmtTrees.
+  fst (arr ! (0,n))
+  where
+    n = length stmts - 1
+    stmt_arr = listArray (0,n) stmts
+
+    -- lazy cache of optimal trees for subsequences of the input
+    arr :: Array (Int,Int) (ExprStmtTree, Cost)
+    arr = array ((0,0),(n,n))
+             [ ((lo,hi), tree lo hi)
+             | lo <- [0..n]
+             , hi <- [lo..n] ]
+
+    -- compute the optimal tree for the sequence [lo..hi]
+    tree lo hi
+      | hi == lo = (StmtTreeOne (stmt_arr ! lo), 1)
+      | otherwise =
+         case segments [ stmt_arr ! i | i <- [lo..hi] ] of
+           [] -> panic "mkStmtTree"
+           [_one] -> split lo hi
+           segs -> (StmtTreeApplicative trees, maximum costs)
+             where
+               bounds = scanl (\(_,hi) a -> (hi+1, hi + length a)) (0,lo-1) segs
+               (trees,costs) = unzip (map (uncurry split) (tail bounds))
+
+    -- find the best place to split the segment [lo..hi]
+    split :: Int -> Int -> (ExprStmtTree, Cost)
+    split lo hi
+      | hi == lo = (StmtTreeOne (stmt_arr ! lo), 1)
+      | otherwise = (StmtTreeBind before after, c1+c2)
+        where
+         -- As per the paper, for a sequence s1...sn, we want to find
+         -- the split with the minimum cost, where the cost is the
+         -- sum of the cost of the left and right subsequences.
+         --
+         -- As an optimisation (also in the paper) if the cost of
+         -- s1..s(n-1) is different from the cost of s2..sn, we know
+         -- that the optimal solution is the lower of the two.  Only
+         -- in the case that these two have the same cost do we need
+         -- to do the exhaustive search.
+         --
+         ((before,c1),(after,c2))
+           | hi - lo == 1
+           = ((StmtTreeOne (stmt_arr ! lo), 1),
+              (StmtTreeOne (stmt_arr ! hi), 1))
+           | left_cost < right_cost
+           = ((left,left_cost), (StmtTreeOne (stmt_arr ! hi), 1))
+           | otherwise -- left_cost > right_cost
+           = ((StmtTreeOne (stmt_arr ! lo), 1), (right,right_cost))
+           | otherwise = minimumBy (comparing cost) alternatives
+           where
+             (left, left_cost) = arr ! (lo,hi-1)
+             (right, right_cost) = arr ! (lo+1,hi)
+             cost ((_,c1),(_,c2)) = c1 + c2
+             alternatives = [ (arr ! (lo,k), arr ! (k+1,hi))
+                            | k <- [lo .. hi-1] ]
+
+
+-- | Turn the ExprStmtTree back into a sequence of statements, using
+-- ApplicativeStmt where necessary.
+stmtTreeToStmts
   :: HsStmtContext Name
-  -> [(ExprLStmt Name, FreeVars)] -- ^ input statements
+  -> ExprStmtTree
   -> [ExprLStmt Name]             -- ^ the "tail"
-  -> FreeVars                                -- ^ free variables of the tail
+  -> FreeVars                     -- ^ free variables of the tail
   -> RnM ( [ExprLStmt Name]       -- ( output statements,
-         , FreeVars )                        -- , things we needed
-                                             --    e.g. <$>, <*>, join )
-
-ado _ctxt []        tail _ = return (tail, emptyNameSet)
+         , FreeVars )             -- , things we needed
 
 -- If we have a single bind, and we can do it without a join, transform
 -- to an ApplicativeStmt.  This corresponds to the rule
@@ -1465,7 +1563,8 @@ ado _ctxt []        tail _ = return (tail, emptyNameSet)
 -- In the spec, but we do it here rather than in the desugarer,
 -- because we need the typechecker to typecheck the <$> form rather than
 -- the bind form, which would give rise to a Monad constraint.
-ado ctxt [(L _ (BindStmt pat rhs _ _ _),_)] tail _
+stmtTreeToStmts ctxt (StmtTreeOne (L _ (BindStmt pat rhs _ _ _),_))
+                tail _tail_fvs
   | isIrrefutableHsPat pat, (False,tail') <- needJoin tail
     -- WARNING: isIrrefutableHsPat on (HsPat Name) doesn't have enough info
     --          to know which types have only one constructor.  So only
@@ -1474,65 +1573,41 @@ ado ctxt [(L _ (BindStmt pat rhs _ _ _),_)] tail _
     --          isIrrefuatableHsPat
   = mkApplicativeStmt ctxt [ApplicativeArgOne pat rhs] False tail'
 
-ado _ctxt [(one,_)] tail _ = return (one:tail, emptyNameSet)
+stmtTreeToStmts _ctxt (StmtTreeOne (s,_)) tail _tail_fvs =
+  return (s : tail, emptyNameSet)
 
-ado ctxt stmts tail tail_fvs =
-  case segments stmts of  -- chop into segments
-    [] -> panic "ado"
-    [one] ->
-      -- one indivisible segment, divide it by adding a bind
-      adoSegment ctxt one tail tail_fvs
-    segs ->
-      -- multiple segments; recursively transform the segments, and
-      -- combine into an ApplicativeStmt
-      do { pairs <- mapM (adoSegmentArg ctxt tail_fvs) segs
-         ; let (stmts', fvss) = unzip pairs
-         ; let (need_join, tail') = needJoin tail
-         ; (stmts, fvs) <- mkApplicativeStmt ctxt stmts' need_join tail'
-         ; return (stmts, unionNameSets (fvs:fvss)) }
+stmtTreeToStmts ctxt (StmtTreeBind before after) tail tail_fvs = do
+  (stmts1, fvs1) <- stmtTreeToStmts ctxt after tail tail_fvs
+  let tail1_fvs = unionNameSets (tail_fvs : map snd (flattenStmtTree after))
+  (stmts2, fvs2) <- stmtTreeToStmts ctxt before stmts1 tail1_fvs
+  return (stmts2, fvs1 `plusFV` fvs2)
 
--- | Deal with an indivisible segment.  We pick a place to insert a
--- bind (it will actually be a join), and recursively transform the
--- two halves.
-adoSegment
-  :: HsStmtContext Name
-  -> [(ExprLStmt Name, FreeVars)]
-  -> [ExprLStmt Name]
-  -> FreeVars
-  -> RnM ( [ExprLStmt Name], FreeVars )
-adoSegment ctxt stmts tail tail_fvs
- = do {  -- choose somewhere to put a bind
-        let (before,after) = splitSegment stmts
-      ; (stmts1, fvs1) <- ado ctxt after tail tail_fvs
-      ; let tail1_fvs = unionNameSets (tail_fvs : map snd after)
-      ; (stmts2, fvs2) <- ado ctxt before stmts1 tail1_fvs
-      ; return (stmts2, fvs1 `plusFV` fvs2) }
+stmtTreeToStmts ctxt (StmtTreeApplicative trees) tail tail_fvs = do
+   pairs <- mapM (stmtTreeArg ctxt tail_fvs) trees
+   let (stmts', fvss) = unzip pairs
+   let (need_join, tail') = needJoin tail
+   (stmts, fvs) <- mkApplicativeStmt ctxt stmts' need_join tail'
+   return (stmts, unionNameSets (fvs:fvss))
+ where
+   stmtTreeArg _ctxt _tail_fvs (StmtTreeOne (L _ (BindStmt pat exp _ _ _), _)) =
+     return (ApplicativeArgOne pat exp, emptyFVs)
+   stmtTreeArg ctxt tail_fvs tree = do
+     let stmts = flattenStmtTree tree
+         pvarset = mkNameSet (concatMap (collectStmtBinders.unLoc.fst) stmts)
+                     `intersectNameSet` tail_fvs
+         pvars = nameSetElems pvarset
+         pat = mkBigLHsVarPatTup pvars
+         tup = mkBigLHsVarTup pvars
+     (stmts',fvs2) <- stmtTreeToStmts ctxt tree [] pvarset
+     (mb_ret, fvs1) <-
+        if | L _ ApplicativeStmt{} <- last stmts' ->
+             return (unLoc tup, emptyNameSet)
+           | otherwise -> do
+             (ret,fvs) <- lookupStmtNamePoly ctxt returnMName
+             return (HsApp (noLoc ret) tup, fvs)
+     return ( ApplicativeArgMany stmts' mb_ret pat
+            , fvs1 `plusFV` fvs2)
 
--- | Given a segment, make an ApplicativeArg.  Here we recursively
--- call adoSegment on the segment's contents to extract any further
--- available parallelism.
-adoSegmentArg
-  :: HsStmtContext Name
-  -> FreeVars
-  -> [(ExprLStmt Name, FreeVars)]
-  -> RnM (ApplicativeArg Name Name, FreeVars)
-adoSegmentArg _ _ [(L _ (BindStmt pat exp _ _ _),_)] =
-  return (ApplicativeArgOne pat exp, emptyFVs)
-adoSegmentArg ctxt tail_fvs stmts =
-  do { let pvarset = mkNameSet (concatMap (collectStmtBinders.unLoc.fst) stmts)
-                      `intersectNameSet` tail_fvs
-           pvars = nameSetElems pvarset
-           pat = mkBigLHsVarPatTup pvars
-           tup = mkBigLHsVarTup pvars
-     ; (stmts',fvs2) <- adoSegment ctxt stmts [] pvarset
-     ; (mb_ret, fvs1) <-
-          if | L _ ApplicativeStmt{} <- last stmts' ->
-               return (unLoc tup, emptyNameSet)
-             | otherwise -> do
-               (ret,fvs) <- lookupStmtNamePoly ctxt returnMName
-               return (HsApp (noLoc ret) tup, fvs)
-     ; return ( ApplicativeArgMany stmts' mb_ret pat
-              , fvs1 `plusFV` fvs2) }
 
 -- | Divide a sequence of statements into segments, where no segment
 -- depends on any variables defined by a statement in another segment.
@@ -1688,7 +1763,6 @@ isReturnApp (L _ (HsApp f arg))
        -- TODO: I don't know how to get this right for rebindable syntax
   is_return _ = False
 isReturnApp _ = Nothing
-
 
 {-
 ************************************************************************

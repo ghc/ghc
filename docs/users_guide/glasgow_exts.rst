@@ -939,6 +939,23 @@ then the expression will only require ``Applicative``. Otherwise, the expression
 will require ``Monad``. The block may return a pure expression ``E`` depending
 upon the results ``p1...pn`` with either ``return`` or ``pure``.
 
+When the statements of a ``do`` expression have dependencies between
+them, and ``ApplicativeDo`` cannot infer an ``Applicative`` type, it
+uses a heuristic algorithm to try to use ``<*>`` as much as possible.
+This algorithm usually finds the best solution, but in rare complex
+cases it might miss an opportunity.  There is an algorithm that finds
+the optimal solution, provided as an option:
+
+.. ghc-flag:: -foptimal-applicative-do
+
+    :since: 8.0.1
+
+    Enables an alternative algorithm for choosing where to use ``<*>``
+    in conjunction with the ``ApplicativeDo`` language extension.
+    This algorithm always finds the optimal solution, but it is
+    expensive: ``O(n^3)``, so this option can lead to long compile
+    times when there are very large ``do`` expressions (over 100
+    statements).  The default ``ApplicativeDo`` algorithm is ``O(n^2)``.
 
 .. _applicative-do-pitfall:
 
