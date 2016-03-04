@@ -1,6 +1,6 @@
-# Compiling on Windows
+# Building on Windows
 
-Here are a list of instructions to compile GHC, from source, on Windows. I tested these instructions on a clean machine using the [free Windows 10 VirtualBox image](https://dev.windows.com/en-us/microsoft-edge/tools/vms/windows/) (I bumped the VM CPUs to 4, and RAM to 4096Mb). These instructions are not currently the official GHC building instructions, but might be simpler and more robust than those.
+Here are a list of instructions to build GHC, from source, on Windows. I tested these instructions on a clean machine using the [free Windows 10 VirtualBox image](https://dev.windows.com/en-us/microsoft-edge/tools/vms/windows/) (I bumped the VM CPUs to 4, and RAM to 4096Mb). These instructions are not currently the official GHC building instructions, but might be simpler and more robust than those.
 
 The first step is to [install Stack](https://www.stackage.org/stack/windows-x86_64-installer) (I just accepted all the defaults), then open a command prompt and run:
 
