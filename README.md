@@ -41,7 +41,8 @@ system to be in the `shake-build` directory of the GHC source tree:
 * Build GHC using `shake-build/build.sh` or `shake-build/build.bat` (on Windows) instead
 of `make`. You might want to enable parallelism with `-j`. We will further refer to the
 build script simply as `build`. If you are interested in building in a Cabal sandbox
-or using Stack, have a look at `build.cabal.sh` and `build.stack.sh` scripts.
+or using Stack, have a look at `build.cabal.sh` and `build.stack.sh` scripts. Also
+see [instructions for building GHC on Windows using Stack][windows-build].
 
 Using the build system
 ----------------------
@@ -133,6 +134,7 @@ helped me endure and enjoy the project.
 [issues]: https://github.com/snowleopard/shaking-up-ghc/issues
 [ghc-preparation]: https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation
 [ghc-windows-quick-build]: https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation/Windows#AQuickBuild
+[windows-build]: https://github.com/snowleopard/shaking-up-ghc/blob/master/doc/windows.md
 [build-artefacts-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/113
 [ghc-split-objs-bug]: https://ghc.haskell.org/trac/ghc/ticket/11315
 [user-settings]: https://github.com/snowleopard/shaking-up-ghc/blob/master/src/Settings/User.hs
