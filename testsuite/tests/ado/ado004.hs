@@ -15,6 +15,15 @@ test2 f = do
   y <- f 4
   return (x + y)
 
+-- Test we can also infer the Functor version of the type
+test2a f = do
+  x <- f 3
+  return (x + 1)
+
+-- Test for just one statement
+test2b f = do
+  return (f 3)
+
 -- This one will use join
 test3 f g = do
   x <- f 3

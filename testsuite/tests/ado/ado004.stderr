@@ -5,6 +5,12 @@ TYPE SIGNATURES
     forall (f :: * -> *) b t.
     (Applicative f, Num t, Num b) =>
     (t -> f b) -> f b
+  test2a ::
+    forall (f :: * -> *) b t.
+    (Num t, Num b, Functor f) =>
+    (t -> f b) -> f b
+  test2b ::
+    forall (m :: * -> *) a t. (Num t, Monad m) => (t -> a) -> m a
   test3 ::
     forall (m :: * -> *) a t t1.
     (Num t, Monad m) =>
