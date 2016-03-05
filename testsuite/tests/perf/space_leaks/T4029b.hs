@@ -1,0 +1,23 @@
+module T4029b where
+
+
+data A01 = A01 deriving (Eq,Ord,Show,Read)
+data A02 = A02 deriving (Eq,Ord,Show,Read)
+data A03 = A03 deriving (Eq,Ord,Show,Read)
+data A04 = A04 deriving (Eq,Ord,Show,Read)
+data A05 = A05 deriving (Eq,Ord,Show,Read)
+data A06 = A06 deriving (Eq,Ord,Show,Read)
+data A07 = A07 deriving (Eq,Ord,Show,Read)
+data A08 = A08 deriving (Eq,Ord,Show,Read)
+data A09 = A09 deriving (Eq,Ord,Show,Read)
+data A10 = A10 deriving (Eq,Ord,Show,Read)
+data A11 = A11 deriving (Eq,Ord,Show,Read)
+data A12 = A12 deriving (Eq,Ord,Show,Read)
+data A13 = A13 deriving (Eq,Ord,Show,Read)
+data A14 = A14 deriving (Eq,Ord,Show,Read)
+data A15 = A15 deriving (Eq,Ord,Show,Read)
+data A16 = A16 deriving (Eq,Ord,Show,Read)
+data A17 = A17 deriving (Eq,Ord,Show,Read)
+data A18 = A18 deriving (Eq,Ord,Show,Read)
+data A19 = A19 deriving (Eq,Ord,Show,Read)
+data A20 = A20 deriving (Eq,Ord,Show,Read)

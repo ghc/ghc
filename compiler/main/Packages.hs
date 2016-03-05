@@ -1,6 +1,6 @@
 -- (c) The University of Glasgow, 2006
 
-{-# LANGUAGE CPP, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, ScopedTypeVariables, BangPatterns #-}
 
 -- | Package manipulation
 module Packages (
@@ -82,6 +82,7 @@ import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
 #endif
 import qualified Data.Map as Map
+import qualified Data.Map.Strict as MapStrict
 import qualified FiniteMap as Map
 import qualified Data.Set as Set
 
@@ -267,10 +268,10 @@ data PackageState = PackageState {
   -- | This is a full map from 'ModuleName' to all modules which may possibly
   -- be providing it.  These providers may be hidden (but we'll still want
   -- to report them in error messages), or it may be an ambiguous import.
-  moduleToPkgConfAll    :: ModuleToPkgConfAll,
+  moduleToPkgConfAll    :: !ModuleToPkgConfAll,
 
   -- | A map, like 'moduleToPkgConfAll', but controlling plugin visibility.
-  pluginModuleToPkgConfAll    :: ModuleToPkgConfAll
+  pluginModuleToPkgConfAll    :: !ModuleToPkgConfAll
   }
 
 emptyPackageState :: PackageState
@@ -1107,7 +1108,8 @@ mkPackageState dflags0 dbs preload0 = do
   dep_preload <- closeDeps dflags pkg_db (zip preload3 (repeat Nothing))
   let new_dep_preload = filter (`notElem` preload0) dep_preload
 
-  let pstate = PackageState{
+  -- Force pstate to avoid leaking the dflags0 passed to mkPackageState
+  let !pstate = PackageState{
     preloadPackages     = dep_preload,
     explicitPackages    = foldUFM (\pkg xs ->
                             if elemUFM (packageConfigId pkg) vis_map
@@ -1134,7 +1136,7 @@ mkModuleToPkgConfAll dflags pkg_db vis_map =
   emptyMap = Map.empty
   sing pk m _ = Map.singleton (mkModule pk m)
   addListTo = foldl' merge
-  merge m (k, v) = Map.insertWith (Map.unionWith mappend) k v m
+  merge m (k, v) = MapStrict.insertWith (Map.unionWith mappend) k v m
   setOrigins m os = fmap (const os) m
   extend_modmap modmap pkg = addListTo modmap theBindings
    where

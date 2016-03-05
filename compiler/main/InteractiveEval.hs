@@ -694,8 +694,8 @@ setContext imports
            Left (mod, err) ->
                liftIO $ throwGhcExceptionIO (formatError dflags mod err)
            Right all_env -> do {
-       ; let old_ic        = hsc_IC hsc_env
-             final_rdr_env = all_env `icExtendGblRdrEnv` ic_tythings old_ic
+       ; let old_ic         = hsc_IC hsc_env
+             !final_rdr_env = all_env `icExtendGblRdrEnv` ic_tythings old_ic
        ; modifySession $ \_ ->
          hsc_env{ hsc_IC = old_ic { ic_imports    = imports
                                   , ic_rn_gbl_env = final_rdr_env }}}}

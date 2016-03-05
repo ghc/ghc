@@ -367,7 +367,10 @@ load how_much = do
           liftIO $ intermediateCleanTempFiles dflags mods_to_keep hsc_env1
 
           -- there should be no Nothings where linkables should be, now
-          ASSERT(all (isJust.hm_linkable) (eltsUFM (hsc_HPT hsc_env))) do
+          ASSERT(   isNoLink (ghcLink dflags)
+                 || all (isJust.hm_linkable)
+                        (filter ((== HsSrcFile).mi_hsc_src.hm_iface)
+                                (eltsUFM hpt4))) do
 
           -- Link everything together
           linkresult <- liftIO $ link (ghcLink dflags) dflags False hpt4
@@ -404,15 +407,18 @@ discardProg hsc_env
 -- external packages.
 discardIC :: HscEnv -> HscEnv
 discardIC hsc_env
-  = hsc_env { hsc_IC = new_ic { ic_int_print = keep_external_name ic_int_print
-                              , ic_monad = keep_external_name ic_monad } }
+  = hsc_env { hsc_IC = empty_ic { ic_int_print = new_ic_int_print
+                                , ic_monad = new_ic_monad } }
   where
+  -- Force the new values for ic_int_print and ic_monad to avoid leaking old_ic
+  !new_ic_int_print = keep_external_name ic_int_print
+  !new_ic_monad = keep_external_name ic_monad
   dflags = ic_dflags old_ic
   old_ic = hsc_IC hsc_env
-  new_ic = emptyInteractiveContext dflags
+  empty_ic = emptyInteractiveContext dflags
   keep_external_name ic_name
     | nameIsFromExternalPackage this_pkg old_name = old_name
-    | otherwise = ic_name new_ic
+    | otherwise = ic_name empty_ic
     where
     this_pkg = thisPackage dflags
     old_name = ic_name old_ic
@@ -439,7 +445,8 @@ intermediateCleanTempFiles dflags summaries hsc_env
 guessOutputFile :: GhcMonad m => m ()
 guessOutputFile = modifySession $ \env ->
     let dflags = hsc_dflags env
-        mod_graph = hsc_mod_graph env
+        -- Force mod_graph to avoid leaking env
+        !mod_graph = hsc_mod_graph env
         mainModuleSrcPath :: Maybe String
         mainModuleSrcPath = do
             let isMain = (== mainModIs dflags) . ms_mod
