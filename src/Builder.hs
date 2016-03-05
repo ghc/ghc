@@ -86,9 +86,14 @@ isStaged = \case
     (GhcPkg _) -> True
     _          -> False
 
+-- TODO: Some builders are required only on certain platforms. For example,
+-- Objdump is only required on OpenBSD and AIX, as mentioned in #211. Add
+-- support for platform-specific optional builders as soon as we can reliably
+-- test this feature.
 isOptional :: Builder -> Bool
 isOptional = \case
     HsColour -> True
+    Objdump  -> True
     _        -> False
 
 -- TODO: get rid of fromJust
