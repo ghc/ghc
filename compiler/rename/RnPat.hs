@@ -562,7 +562,9 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
       = do { sel <- setSrcSpan loc $ lookupRecFieldOcc parent doc lbl
            ; arg' <- if pun
                      then do { checkErr pun_ok (badPun (L loc lbl))
-                             ; return (L loc (mk_arg loc lbl)) }
+                               -- Discard any module qualifier (#11662)
+                             ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
+                             ; return (L loc (mk_arg loc arg_rdr)) }
                      else return arg
            ; return (L l (HsRecField { hsRecFieldLbl
                                          = L loc (FieldOcc (L ll lbl) sel)
@@ -690,7 +692,9 @@ rnHsRecUpdFields flds
                           else fmap Left $ lookupGlobalOccRn lbl
            ; arg' <- if pun
                      then do { checkErr pun_ok (badPun (L loc lbl))
-                             ; return (L loc (HsVar (L loc lbl))) }
+                               -- Discard any module qualifier (#11662)
+                             ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
+                             ; return (L loc (HsVar (L loc arg_rdr))) }
                      else return arg
            ; (arg'', fvs) <- rnLExpr arg'
 
