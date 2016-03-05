@@ -1,7 +1,5 @@
 module Rules.Data (buildPackageData) where
 
-import qualified System.Directory as IO
-
 import Base
 import Context
 import Expression
@@ -22,8 +20,9 @@ buildPackageData context@Context {..} = do
         configure = pkgPath package -/- "configure"
         dataFile  = pkgDataFile context
         oldPath   = pkgPath package -/- contextDirectory context -- TODO: remove, #113
+        inTreeMk  = oldPath -/- takeFileName dataFile -- TODO: remove, #113
 
-    [dataFile, oldPath -/- "package-data.mk"] &%> \_ -> do
+    inTreeMk %> \mk -> do
         -- The first thing we do with any package is make sure all generated
         -- dependencies are in place before proceeding.
         orderOnly $ generatedDependencies stage package
@@ -37,22 +36,19 @@ buildPackageData context@Context {..} = do
         let depPkgs = matchPackageNames (sort pkgs) deps
         need =<< traverse (pkgConfFile . vanillaContext stage) depPkgs
 
-        -- TODO: get rid of this, see #113
-        let inTreeMk = oldPath -/- takeFileName dataFile
-
         need [cabalFile]
-        build $ Target context GhcCabal [cabalFile] [inTreeMk]
+        build $ Target context GhcCabal [cabalFile] [mk]
 
-        -- TODO: get rid of this, see #113
-        liftIO $ IO.copyFile inTreeMk dataFile
+    -- TODO: get rid of this, see #113
+    dataFile %> \mk -> do
+        copyFile inTreeMk mk
         autogenFiles <- getDirectoryFiles (oldPath -/- "build") ["autogen/*"]
         createDirectory $ buildPath context -/- "autogen"
         forM_ autogenFiles $ \file -> do
             copyFile (oldPath -/- "build" -/- file) (buildPath context -/- file)
         let haddockPrologue = "haddock-prologue.txt"
         copyFile (oldPath -/- haddockPrologue) (buildPath context -/- haddockPrologue)
-
-        postProcessPackageData context dataFile
+        postProcessPackageData context mk
 
     -- TODO: PROGNAME was $(CrossCompilePrefix)hp2ps
     priority 2.0 $ do
