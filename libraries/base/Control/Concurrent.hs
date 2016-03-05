@@ -253,7 +253,7 @@ waiting for the results in the main thread.
 -- If @rtsSupportsBoundThreads@ is 'False', 'isCurrentThreadBound'
 -- will always return 'False' and both 'forkOS' and 'runInBoundThread' will
 -- fail.
-foreign import ccall rtsSupportsBoundThreads :: Bool
+foreign import ccall unsafe rtsSupportsBoundThreads :: Bool
 
 
 {- |

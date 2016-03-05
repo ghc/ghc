@@ -7,7 +7,7 @@
 -- Module      :  GHC.ConsoleHandler
 -- Copyright   :  (c) The University of Glasgow
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC extensions)
@@ -15,7 +15,7 @@
 -- NB. the contents of this module are only available on Windows.
 --
 -- Installing Win32 console handlers.
--- 
+--
 -----------------------------------------------------------------------------
 
 module GHC.ConsoleHandler
@@ -137,9 +137,9 @@ installHandler handler
 
    no_handler = errorWithoutStackTrace "win32ConsoleHandler"
 
-foreign import ccall "rtsSupportsBoundThreads" threaded :: Bool
+foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
 
-foreign import ccall unsafe "RtsExternal.h rts_InstallConsoleEvent" 
+foreign import ccall unsafe "RtsExternal.h rts_InstallConsoleEvent"
   rts_installHandler :: CInt -> Ptr (StablePtr (CInt -> IO ())) -> IO CInt
 foreign import ccall unsafe "RtsExternal.h rts_ConsoleHandlerDone"
   rts_ConsoleHandlerDone :: CInt -> IO ()
