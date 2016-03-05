@@ -242,3 +242,4 @@ test('T11051b', normal, ghci_script, ['T11051b.script'])
 test('T11266', check_stdout(lambda *args: 1), ghci_script, ['T11266.script'])
 
 test('T11389', req_interp, run_command, ['$MAKE -s --no-print-directory T11389'])
+test('T11524a', normal, ghci_script, ['T11524a.script'])

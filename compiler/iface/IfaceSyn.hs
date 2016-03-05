@@ -57,7 +57,6 @@ import SrcLoc
 import Fingerprint
 import Binary
 import BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
-import HsBinds
 import TyCon ( Role (..), Injectivity(..) )
 import StaticFlags (opt_PprStyle_Debug)
 import Util( filterOut, filterByList )
@@ -774,20 +773,25 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon, ifTyVars = tyvars
               $$ ppShowIface ss (text "axiom" <+> ppr ax))
     pp_branches _ = Outputable.empty
 
-pprIfaceDecl _ (IfacePatSyn { ifName = name, ifPatBuilder = builder,
+pprIfaceDecl _ (IfacePatSyn { ifName = name,
                               ifPatUnivTvs = univ_tvs, ifPatExTvs = ex_tvs,
                               ifPatProvCtxt = prov_ctxt, ifPatReqCtxt = req_ctxt,
                               ifPatArgs = arg_tys,
                               ifPatTy = pat_ty} )
-  = pprPatSynSig name is_bidirectional
-                 (pprUserIfaceForAll (map tv_to_forall_bndr tvs))
-                 (pprIfaceContextMaybe req_ctxt)
-                 (pprIfaceContextMaybe prov_ctxt)
-                 (pprIfaceType ty)
+  = sdocWithDynFlags mk_msg
   where
-    is_bidirectional = isJust builder
-    tvs = univ_tvs ++ ex_tvs
-    ty = foldr IfaceFunTy pat_ty arg_tys
+    mk_msg dflags
+      = hsep [ text "pattern", pprPrefixOcc name, dcolon
+             , univ_msg, pprIfaceContextArr req_ctxt
+             , ppWhen insert_empty_ctxt $ parens empty <+> darrow
+             , ex_msg, pprIfaceContextArr prov_ctxt
+             , pprIfaceType $ foldr IfaceFunTy pat_ty arg_tys]
+      where
+        univ_msg = pprUserIfaceForAll $ map tv_to_forall_bndr univ_tvs
+        ex_msg   = pprUserIfaceForAll $ map tv_to_forall_bndr ex_tvs
+
+        insert_empty_ctxt = null req_ctxt
+            && not (null prov_ctxt && isEmpty dflags ex_msg)
 
 pprIfaceDecl ss (IfaceId { ifName = var, ifType = ty,
                               ifIdDetails = details, ifIdInfo = info })

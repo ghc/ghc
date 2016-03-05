@@ -38,7 +38,7 @@ module IfaceType (
 
         -- Printing
         pprIfaceType, pprParendIfaceType,
-        pprIfaceContext, pprIfaceContextArr, pprIfaceContextMaybe,
+        pprIfaceContext, pprIfaceContextArr,
         pprIfaceIdBndr, pprIfaceLamBndr, pprIfaceTvBndr, pprIfaceTvBndrs,
         pprIfaceBndrs, pprIfaceTcArgs, pprParendIfaceTcArgs,
         pprIfaceForAllPart, pprIfaceForAll, pprIfaceSigmaType,
@@ -75,7 +75,6 @@ import Outputable
 import FastString
 import UniqSet
 import VarEnv
-import Data.Maybe
 import UniqFM
 import Util
 
@@ -992,15 +991,13 @@ instance Binary IfaceTcArgs where
 -------------------
 pprIfaceContextArr :: Outputable a => [a] -> SDoc
 -- Prints "(C a, D b) =>", including the arrow
-pprIfaceContextArr = maybe empty (<+> darrow) . pprIfaceContextMaybe
+pprIfaceContextArr []    = empty
+pprIfaceContextArr preds = pprIfaceContext preds <+> darrow
 
 pprIfaceContext :: Outputable a => [a] -> SDoc
-pprIfaceContext = fromMaybe (parens empty) . pprIfaceContextMaybe
-
-pprIfaceContextMaybe :: Outputable a => [a] -> Maybe SDoc
-pprIfaceContextMaybe [] = Nothing
-pprIfaceContextMaybe [pred] = Just $ ppr pred -- No parens
-pprIfaceContextMaybe preds  = Just $ parens (fsep (punctuate comma (map ppr preds)))
+pprIfaceContext []     = parens empty
+pprIfaceContext [pred] = ppr pred -- No parens
+pprIfaceContext preds  = parens (fsep (punctuate comma (map ppr preds)))
 
 instance Binary IfaceType where
     put_ bh (IfaceForAllTy aa ab) = do
