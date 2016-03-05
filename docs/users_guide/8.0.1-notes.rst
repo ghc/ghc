@@ -10,8 +10,8 @@ performance improvements over the 7.10 branch.
 .. warning::
 
     Only Cabal versions 1.24 and newer will function properly with this release.
-    Consequently it will likely be necessary to recompile ``cabal-install``
-    before installing new packages.
+    (see :ghc-ticket:`11558`). Consequently it will likely be necessary to
+    recompile ``cabal-install`` before installing new packages.
 
     The reason for this is a change in how packages are identified in GHC
     8.0. While previous versions of Cabal identified packages to GHC with a
