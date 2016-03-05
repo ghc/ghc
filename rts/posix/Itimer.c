@@ -53,6 +53,31 @@
 #define USE_PTHREAD_FOR_ITIMER
 #endif
 
+/*
+ * On Linux in the threaded RTS we can use timerfd_* (introduced in Linux
+ * 2.6.25) and a thread instead of alarm signals. It avoids the risk of
+ * interrupting syscalls (see #10840) and the risk of being accidentally
+ * modified in user code using signals.
+ */
+#if defined(linux_HOST_OS) && defined(THREADED_RTS) && HAVE_SYS_TIMERFD_H
+#include <sys/timerfd.h>
+#include <fcntl.h>
+#define USE_PTHREAD_FOR_ITIMER
+#define USE_TIMERFD_FOR_ITIMER 1
+#undef USE_TIMER_CREATE
+#else
+#define USE_TIMERFD_FOR_ITIMER 0
+#endif
+
+/*
+ * TFD_CLOEXEC has been added in Linux 2.6.26.
+ * If it is not available, we use fcntl(F_SETFD).
+ */
+#ifndef TFD_CLOEXEC
+#define TFD_CLOEXEC 0
+#endif
+
+
 #if defined(USE_PTHREAD_FOR_ITIMER)
 #include <pthread.h>
 #include <unistd.h>
@@ -150,15 +175,50 @@ static void install_vtalrm_handler(TickProc handle_tick)
 #endif
 
 #if defined(USE_PTHREAD_FOR_ITIMER)
-static volatile int itimer_enabled;
+enum ItimerState {STOPPED, RUNNING, STOPPING, EXITED};
+static volatile enum ItimerState itimer_state = STOPPED;
 static void *itimer_thread_func(void *_handle_tick)
 {
     TickProc handle_tick = _handle_tick;
+    uint64_t nticks;
+    int timerfd = -1;
+
+#if USE_TIMERFD_FOR_ITIMER
+    struct itimerspec it;
+    it.it_value.tv_sec  = TimeToSeconds(itimer_interval);
+    it.it_value.tv_nsec = TimeToNS(itimer_interval) % 1000000000;
+    it.it_interval = it.it_value;
+
+    timerfd = timerfd_create(CLOCK_MONOTONIC,TFD_CLOEXEC);
+    if (timerfd == -1) {
+        sysErrorBelch("timerfd_create");
+        stg_exit(EXIT_FAILURE);
+    }
+    if (!TFD_CLOEXEC) {
+      fcntl(timerfd, F_SETFD, FD_CLOEXEC);
+    }
+    timerfd_settime(timerfd,0,&it,NULL);
+#endif
+
     while (1) {
-        usleep(TimeToUS(itimer_interval));
-        switch (itimer_enabled) {
-            case 1: handle_tick(0); break;
-            case 2: itimer_enabled = 0;
+        if (USE_TIMERFD_FOR_ITIMER) {
+            read(timerfd, &nticks, sizeof(nticks));
+        } else {
+            usleep(TimeToUS(itimer_interval));
+        }
+        switch (itimer_state) {
+            case RUNNING:
+                handle_tick(0);
+                break;
+            case STOPPED:
+                break;
+            case STOPPING:
+                itimer_state = STOPPED;
+                break;
+            case EXITED:
+                if (USE_TIMERFD_FOR_ITIMER)
+                    close(timerfd);
+                return NULL;
         }
     }
     return NULL;
@@ -172,7 +232,13 @@ initTicker (Time interval, TickProc handle_tick)
 
 #if defined(USE_PTHREAD_FOR_ITIMER)
     pthread_t tid;
-    pthread_create(&tid, NULL, itimer_thread_func, (void*)handle_tick);
+    int r = pthread_create(&tid, NULL, itimer_thread_func, (void*)handle_tick);
+    if (!r) {
+        pthread_detach(tid);
+#if HAVE_PTHREAD_SETNAME_NP
+        pthread_setname_np(tid, "ghc_ticker");
+#endif
+    }
 #elif defined(USE_TIMER_CREATE)
     {
         struct sigevent ev;
@@ -198,7 +264,7 @@ void
 startTicker(void)
 {
 #if defined(USE_PTHREAD_FOR_ITIMER)
-    itimer_enabled = 1;
+    itimer_state = RUNNING;
 #elif defined(USE_TIMER_CREATE)
     {
         struct itimerspec it;
@@ -232,10 +298,11 @@ void
 stopTicker(void)
 {
 #if defined(USE_PTHREAD_FOR_ITIMER)
-    if (itimer_enabled == 1) {
-        itimer_enabled = 2;
+    if (itimer_state == RUNNING) {
+        itimer_state = STOPPING;
         /* Wait for the thread to confirm it won't generate another tick. */
-        while (itimer_enabled != 0)
+        write_barrier();
+        while (itimer_state != STOPPED)
             sched_yield();
     }
 #elif defined(USE_TIMER_CREATE)
@@ -266,7 +333,9 @@ stopTicker(void)
 void
 exitTicker (rtsBool wait STG_UNUSED)
 {
-#if defined(USE_TIMER_CREATE)
+#if defined(USE_PTHREAD_FOR_ITIMER)
+    itimer_state = EXITED;
+#elif defined(USE_TIMER_CREATE)
     // Before deleting the timer set the signal to ignore to avoid the
     // possibility of the signal being delivered after the timer is deleted.
     signal(ITIMER_SIGNAL, SIG_IGN);
