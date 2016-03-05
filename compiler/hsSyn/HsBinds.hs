@@ -900,18 +900,6 @@ ppr_sig (PatSynSig name sig_ty)
   = text "pattern" <+> pprPrefixOcc (unLoc name) <+> dcolon
                            <+> ppr sig_ty
 
-pprPatSynSig :: (OutputableBndr name)
-             => name -> Bool -> SDoc -> Maybe SDoc -> Maybe SDoc -> SDoc -> SDoc
-pprPatSynSig ident _is_bidir tvs req prov ty
-  = text "pattern" <+> pprPrefixOcc ident <+> dcolon <+>
-    tvs <+> context <+> ty
-  where
-    context = case (req, prov) of
-        (Nothing, Nothing)    -> empty
-        (Nothing, Just prov)  -> parens empty <+> darrow <+> prov <+> darrow
-        (Just req, Nothing)   -> req <+> darrow
-        (Just req, Just prov) -> req <+> darrow <+> prov <+> darrow
-
 instance OutputableBndr name => Outputable (FixitySig name) where
   ppr (FixitySig names fixity) = sep [ppr fixity, pprops]
     where
