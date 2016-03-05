@@ -1463,7 +1463,8 @@ checkModule m = do
 -- '-fdefer-type-errors' again if it has not been set before.
 deferredLoad :: Bool -> InputT GHCi SuccessFlag -> InputT GHCi ()
 deferredLoad defer load = do
-  originalFlags <- getDynFlags
+  -- Force originalFlags to avoid leaking the associated HscEnv
+  !originalFlags <- getDynFlags
   when defer $ Monad.void $
     GHC.setProgramDynFlags $ setGeneralFlag' Opt_DeferTypeErrors originalFlags
   Monad.void $ load
@@ -3483,7 +3484,8 @@ showException se =
 
 ghciHandle :: (HasDynFlags m, ExceptionMonad m) => (SomeException -> m a) -> m a -> m a
 ghciHandle h m = gmask $ \restore -> do
-                 dflags <- getDynFlags
+                 -- Force dflags to avoid leaking the associated HscEnv
+                 !dflags <- getDynFlags
                  gcatch (restore (GHC.prettyPrintGhcErrors dflags m)) $ \e -> restore (h e)
 
 ghciTry :: GHCi a -> GHCi (Either SomeException a)
