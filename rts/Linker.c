@@ -281,6 +281,7 @@ struct m32_alloc_t {
 };
 
 #define M32_MAX_PAGES 32
+#define M32_REFCOUNT_BYTES 8
 
 /**
  * Allocator
@@ -1460,6 +1461,16 @@ static void munmapForLinker (void * addr, size_t size)
  */
 static void m32_allocator_init(m32_allocator m32) {
    memset(m32, 0, sizeof(struct m32_allocator_t));
+   // Preallocate the initial M32_MAX_PAGES to ensure that they don't
+   // fragment the memory.
+   unsigned int pgsz = (unsigned int)getPageSize();
+   char* bigchunk = mmapForLinker(pgsz * M32_MAX_PAGES,MAP_ANONYMOUS,-1,0);
+   int i;
+   for (i=0; i<M32_MAX_PAGES; i++) {
+      m32->pages[i].base_addr = bigchunk + i*pgsz;
+      *((uintptr_t*)m32->pages[i].base_addr) = 1;
+      m32->pages[i].current_size = M32_REFCOUNT_BYTES;
+   }
 }
 
 /**
@@ -1493,7 +1504,7 @@ static void m32_allocator_flush(m32_allocator m32) {
 
 // Return true if the object has its own dedicated set of pages
 #define m32_is_large_object(size,alignment) \
-   (size >= getPageSize() - ROUND_UP(8,alignment))
+   (size >= getPageSize() - ROUND_UP(M32_REFCOUNT_BYTES,alignment))
 
 // Return true if the object has its own dedicated set of pages
 #define m32_is_large_object_addr(addr) \
@@ -1544,6 +1555,14 @@ m32_alloc(m32_allocator m32, unsigned int size,
             empty = empty == -1 ? i : empty;
             continue;
          }
+         // If the page is referenced only by the allocator, we can reuse it.
+         // If we don't then we'll be left with a bunch of pages that have a
+         // few bytes left to allocate and we don't get to use or free them
+         // until we use up all the "filling" pages. This will unnecessarily
+         // allocate new pages and fragment the address space.
+         if (*((uintptr_t*)(m32->pages[i].base_addr)) == 1) {
+            m32->pages[i].current_size = M32_REFCOUNT_BYTES;
+         }
          // page can contain the buffer?
          unsigned int alsize = ROUND_UP(m32->pages[i].current_size, alignment);
          if (size <= pgsz - alsize) {
@@ -1575,12 +1594,13 @@ m32_alloc(m32_allocator m32, unsigned int size,
          return NULL;
       }
       m32->pages[empty].base_addr    = addr;
-      // Add 8 bytes for the counter + padding
-      m32->pages[empty].current_size = size+ROUND_UP(8,alignment);
+      // Add M32_REFCOUNT_BYTES bytes for the counter + padding
+      m32->pages[empty].current_size =
+          size+ROUND_UP(M32_REFCOUNT_BYTES,alignment);
       // Initialize the counter:
       // 1 for the allocator + 1 for the returned allocated memory
       *((uintptr_t*)addr)            = 2;
-      return (char*)addr + ROUND_UP(8,alignment);
+      return (char*)addr + ROUND_UP(M32_REFCOUNT_BYTES,alignment);
    }
 }
 
