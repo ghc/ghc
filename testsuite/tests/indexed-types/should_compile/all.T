@@ -1,3 +1,6 @@
+# Keep optimised tests, so we test coercion optimisation
+setTestOpts(omit_ways(['optasm', 'optllvm', 'hpc']))
+
 test('Simple1', normal, compile, [''])
 test('Simple2', normal, compile, [''])
 test('Simple3', normal, compile, [''])
@@ -78,13 +81,13 @@ test('Class3', normal, compile, [''])
 test('Refl', normal, compile, [''])
 test('Refl2', normal, compile, [''])
 
-test('Rules1', [expect_broken_for(11643, opt_ways)], compile, [''])
+test('Rules1', normal, compile, [''])
 
 test('Numerals', normal, compile, [''])
 
 test('ColInference', normal, compile, [''])
 test('ColInference2', normal, compile, [''])
-test('ColInference3', [expect_broken_for(11643, opt_ways)], compile, [''])
+test('ColInference3', normal, compile, [''])
 test('ColInference4', normal, compile, [''])
 test('ColInference5', normal, compile, [''])
 test('ColInference6', normal, compile, [''])
@@ -128,7 +131,7 @@ test('T3208b', normal, compile_fail, [''])
 test('T3418', normal, compile, [''])
 test('T3423', normal, compile, [''])
 test('T2850', normal, compile, [''])
-test('T3220', [expect_broken_for(11644, opt_ways)], compile, [''])
+test('T3220', normal, compile, [''])
 test('T3590', normal, compile, [''])
 test('CoTest3', normal, compile, [''])
 test('Roman1', normal, compile, [''])
@@ -206,8 +209,7 @@ test('T7489', normal, compile, [''])
 test('T7585', normal, compile, [''])
 test('T7282', normal, compile, [''])
 test('T7804', normal, compile, [''])
-test('T7837', expect_broken_for(9406, prof_ways), compile,
-     ['-O -ddump-rule-firings'])
+test('T7837', normal, compile, ['-O -ddump-rule-firings'])
 test('T4185', normal, compile, [''])
 
 # Caused infinite loop in the compiler
