@@ -188,7 +188,7 @@ flagsFromCabal distPref = do
       let bi = libBuildInfo lib
           odir = buildDir lbi
           opts = componentGhcOptions V.normal lbi bi clbi odir
-      in return $ renderGhcOptions (compiler lbi) opts
+      in return $ renderGhcOptions (compiler lbi) (hostPlatform lbi) opts
     _ -> error "no library"
 
 ----------------------------------------------------------------
