@@ -43,6 +43,8 @@
     fixity if there is an explicit fixity declaration for that `Name`, and
     `Nothing` otherwise (#10704 and #11345)
 
+  * Add `MonadFail Q` instance for GHC 8.0 and later (#11661)
+
   * TODO: document API changes and important bugfixes
 
 

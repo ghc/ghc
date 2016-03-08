@@ -12,6 +12,7 @@ import GHCi.RemoteTypes
 import GHC.Serialized
 
 import Control.Exception
+import qualified Control.Monad.Fail as Fail
 import Data.Binary
 import Data.Binary.Put
 import Data.ByteString (ByteString)
@@ -60,6 +61,9 @@ instance Monad GHCiQ where
     do (m', s')  <- runGHCiQ m s
        (a,  s'') <- runGHCiQ (f m') s'
        return (a, s'')
+  fail = Fail.fail
+
+instance Fail.MonadFail GHCiQ where
   fail err  = GHCiQ $ \s -> throwIO (GHCiQException s err)
 
 getState :: GHCiQ QState
