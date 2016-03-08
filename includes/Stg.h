@@ -222,11 +222,21 @@ typedef StgFunPtr       F_;
 #define II_(X)          static StgWordArray (X) GNU_ATTRIBUTE(aligned (8))
 #define IF_(f)    static StgFunPtr GNUC3_ATTRIBUTE(used) f(void)
 #define FN_(f)    StgFunPtr f(void)
-#define EF_(f)    extern StgFunPtr f()   /* See Note [External function prototypes] */
+#define EF_(f)    StgFunPtr f(void) /* External Cmm functions */
+#define EFF_(f)   void f() /* See Note [External function prototypes] */
 
-/* Note [External function prototypes]  See Trac #8965
+/* Note [External function prototypes]  See Trac #8965, #11395
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The external-function macro EF_(F) used to be defined as
+In generated C code we need to distinct between two types
+of external symbols:
+1.  Cmm functions declared by 'EF_' macro (External Functions)
+2.    C functions declared by 'EFF_' macro (External Foreign Functions)
+
+Cmm functions are simple as they are internal to GHC.
+
+C functions are trickier:
+
+The external-function macro EFF_(F) used to be defined as
     extern StgFunPtr f(void)
 i.e a function of zero arguments.  On most platforms this doesn't
 matter very much: calls to these functions put the parameters in the
@@ -249,6 +259,10 @@ unspecified argument list rather than a void argument list.  This is no
 worse for platforms that don't care either way, and allows a successful
 bootstrap of GHC 7.8 on little-endian Linux ppc64 (which uses the ELFv2
 ABI).
+
+Another case is m68k ABI where 'void*' return type is returned by 'a0'
+register while 'long' return type is returned by 'd0'. Thus we trick
+external prototype return neither of these types to workaround #11395.
 */
 
 
