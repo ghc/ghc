@@ -22,6 +22,9 @@ module Eval (
 
 import           Control.Applicative
 import           Control.Monad
+#if __GLASGOW_HASKELL__ >= 800
+import           Control.Monad.Fail (MonadFail(fail))
+#endif
 
 import           Data.Binary
 import           Data.Binary.Get
@@ -72,6 +75,11 @@ instance Monad GHCJSQ where
        (a,  s'') <- runGHCJSQ (f m') s'
        return (a, s'')
   return    = pure
+
+#if __GLASGOW_HASKELL__ >= 800
+instance MonadFail GHCJSQ where
+  fail = undefined
+#endif
 
 instance TH.Quasi GHCJSQ where qRunIO m = GHCJSQ $ \s -> fmap (,s) m
 

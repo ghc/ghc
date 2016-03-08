@@ -8,6 +8,10 @@
 #define HAS_NATURAL
 #endif
 
+#if MIN_VERSION_base(4,9,0)
+# define HAS_MONADFAIL 1
+#endif
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Language.Haskell.Syntax
@@ -48,13 +52,21 @@ import Language.Haskell.TH.LanguageExtensions
 import Numeric.Natural
 #endif
 
+#if HAS_MONADFAIL
+import qualified Control.Monad.Fail as Fail
+#endif
+
 -----------------------------------------------------
 --
 --              The Quasi class
 --
 -----------------------------------------------------
 
+#if HAS_MONADFAIL
+class Fail.MonadFail m => Quasi m where
+#else
 class (Applicative m, Monad m) => Quasi m where
+#endif
   qNewName :: String -> m Name
         -- ^ Fresh names
 
@@ -172,8 +184,17 @@ runQ (Q m) = m
 instance Monad Q where
   Q m >>= k  = Q (m >>= \x -> unQ (k x))
   (>>) = (*>)
+
   return     = pure
+
+#if !HAS_MONADFAIL
   fail s     = report True s >> Q (fail "Q monad failure")
+#else
+  fail       = Fail.fail
+
+instance Fail.MonadFail Q where
+  fail s     = report True s >> Q (Fail.fail "Q monad failure")
+#endif
 
 instance Functor Q where
   fmap f (Q x) = Q (fmap f x)
