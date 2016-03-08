@@ -1,8 +1,7 @@
-{-# LANGUAGE CPP, DeriveDataTypeable, PolymorphicComponents,
+{-# LANGUAGE CPP, DeriveDataTypeable,
              DeriveGeneric, FlexibleInstances, DefaultSignatures,
-             ScopedTypeVariables, Rank2Types #-}
+             RankNTypes, RoleAnnotations, ScopedTypeVariables #-}
 
-{-# LANGUAGE RoleAnnotations #-}
 {-# OPTIONS_GHC -fno-warn-inline-rule-shadowing #-}
 
 #if MIN_VERSION_base(4,8,0)

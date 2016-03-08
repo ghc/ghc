@@ -26,13 +26,15 @@ source-repository head
 Library
     default-language: Haskell2010
     other-extensions:
+        BangPatterns
+        CPP
+        DefaultSignatures
         DeriveDataTypeable
+        DeriveGeneric
         FlexibleInstances
-        MagicHash
-        PolymorphicComponents
         RankNTypes
+        RoleAnnotations
         ScopedTypeVariables
-        UnboxedTuples
 
     exposed-modules:
         Language.Haskell.TH
@@ -47,7 +49,7 @@ Library
         Language.Haskell.TH.Lib.Map
 
     build-depends:
-        base       >= 4.6 && < 4.10,
+        base       >= 4.8 && < 4.10,
         ghc-boot   == 8.1,
         pretty     == 1.1.*
 
