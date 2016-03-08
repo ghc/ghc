@@ -4,10 +4,6 @@
 
 {-# OPTIONS_GHC -fno-warn-inline-rule-shadowing #-}
 
-#if MIN_VERSION_base(4,8,0)
-#define HAS_NATURAL
-#endif
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Language.Haskell.Syntax
@@ -40,10 +36,7 @@ import Data.Ratio
 import GHC.Generics     ( Generic )
 import GHC.Lexeme       ( startsVarSym, startsVarId )
 import Language.Haskell.TH.LanguageExtensions
-
-#ifdef HAS_NATURAL
 import Numeric.Natural
-#endif
 
 -----------------------------------------------------
 --
@@ -570,10 +563,8 @@ instance Lift Word32 where
 instance Lift Word64 where
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
-#ifdef HAS_NATURAL
 instance Lift Natural where
   lift x = return (LitE (IntegerL (fromIntegral x)))
-#endif
 
 instance Integral a => Lift (Ratio a) where
   lift x = return (LitE (RationalL (toRational x)))
