@@ -23,8 +23,8 @@ newtype ArgsHashKey = ArgsHashKey Target
 -- TODO: Hash Target to improve accuracy and performance.
 checkArgsHash :: Target -> Action ()
 checkArgsHash target = when trackBuildSystem $ do
-    let firstInput = take 1 $ inputs target
-    _ <- askOracle . ArgsHashKey $ target { inputs = firstInput } :: Action Int
+    let hashed = [ show . hash $ inputs target ]
+    _ <- askOracle . ArgsHashKey $ target { inputs = hashed } :: Action Int
     return ()
 
 -- Oracle for storing per-target argument list hashes
