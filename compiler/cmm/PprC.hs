@@ -264,7 +264,7 @@ pprStmt stmt =
           -- We also need to cast mem primops to prevent conflicts with GCC
           -- builtins (see bug #5967).
           | Just _align <- machOpMemcpyishAlign op
-          = (text ";EF_(" <> fn <> char ')' <> semi) $$
+          = (text ";EFF_(" <> fn <> char ')' <> semi) $$
             pprForeignCall fn cconv hresults hargs
           | otherwise
           = pprCall fn cconv hresults hargs
@@ -1005,7 +1005,8 @@ pprExternDecl _in_srt lbl
         hcat [ visibility, label_type lbl,
                lparen, ppr lbl, text ");" ]
  where
-  label_type lbl | isCFunctionLabel lbl = text "F_"
+  label_type lbl | isForeignLabel lbl && isCFunctionLabel lbl = text "FF_"
+                 | isCFunctionLabel lbl = text "F_"
                  | otherwise            = text "I_"
 
   visibility

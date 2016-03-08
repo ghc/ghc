@@ -88,8 +88,9 @@ module CLabel (
 
         mkForeignLabel,
         addLabelSize,
-        foreignLabelStdcallInfo,
 
+        foreignLabelStdcallInfo,
+        isForeignLabel,
         mkCCLabel, mkCCSLabel,
 
         DynamicLinkerLabelInfo(..),
@@ -491,6 +492,11 @@ addLabelSize (ForeignLabel str _ src  fod) sz
     = ForeignLabel str (Just sz) src fod
 addLabelSize label _
     = label
+
+-- | Whether label is a non-haskell label (defined in C code)
+isForeignLabel :: CLabel -> Bool
+isForeignLabel (ForeignLabel _ _ _ _) = True
+isForeignLabel _lbl = False
 
 -- | Get the label size field from a ForeignLabel
 foreignLabelStdcallInfo :: CLabel -> Maybe Int

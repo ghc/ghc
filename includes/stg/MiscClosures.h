@@ -490,8 +490,19 @@ extern StgWord      RTS_VAR(CCS_LIST);         /* registered CCS list */
 extern StgWord      CCS_SYSTEM[];
 extern unsigned int RTS_VAR(CC_ID);            /* global ids */
 extern unsigned int RTS_VAR(CCS_ID);
-RTS_FUN_DECL(enterFunCCS);
-RTS_FUN_DECL(pushCostCentre);
+
+// Calls to these rts functions are generated directly
+// by codegen (see compiler/codeGen/StgCmmProf.hs)
+// and don't require (don't emit) forward declarations.
+//
+// In unregisterised mode (when building via .hc files)
+// the calls are ordinary C calls. Functions must be in
+// scope and must match prototype assumed by
+//    'compiler/codeGen/StgCmmProf.hs'
+// as opposed to real prototype declared in
+//    'includes/rts/prof/CCS.h'
+void enterFunCCS (void *reg, void *ccsfn);
+void * pushCostCentre (void *ccs, void *cc);
 
 // Capability.c
 extern unsigned int n_capabilities;
