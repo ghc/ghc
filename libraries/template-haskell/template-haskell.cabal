@@ -26,13 +26,15 @@ source-repository head
 Library
     default-language: Haskell2010
     other-extensions:
+        BangPatterns
+        CPP
+        DefaultSignatures
         DeriveDataTypeable
+        DeriveGeneric
         FlexibleInstances
-        MagicHash
-        PolymorphicComponents
         RankNTypes
+        RoleAnnotations
         ScopedTypeVariables
-        UnboxedTuples
 
     exposed-modules:
         Language.Haskell.TH
@@ -47,8 +49,8 @@ Library
         Language.Haskell.TH.Lib.Map
 
     build-depends:
-        base       >= 4.6 && < 4.10,
-        ghc-boot   >= 7.11 && < 8.1,
+        base       >= 4.7 && < 4.10,
+        ghc-boot   == 8.0.*,
         pretty     == 1.1.*
 
     -- We need to set the unit ID to template-haskell (without a
