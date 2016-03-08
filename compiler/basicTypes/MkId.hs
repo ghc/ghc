@@ -1323,23 +1323,46 @@ may fire.
 
 Note [lazyId magic]
 ~~~~~~~~~~~~~~~~~~~
-    lazy :: forall a?. a? -> a?   (i.e. works for unboxed types too)
+lazy :: forall a?. a? -> a?   (i.e. works for unboxed types too)
 
-Used to lazify pseq:   pseq a b = a `seq` lazy b
+'lazy' is used to make sure that a sub-expression, and its free variables,
+are truly used call-by-need, with no code motion.  Key examples:
 
-Also, no strictness: by being a built-in Id, all the info about lazyId comes from here,
-not from GHC.Base.hi.   This is important, because the strictness
-analyser will spot it as strict!
+* pseq:    pseq a b = a `seq` lazy b
+  We want to make sure that the free vars of 'b' are not evaluated
+  before 'a', even though the expression is plainly strict in 'b'.
 
-Also no unfolding in lazyId: it gets "inlined" by a HACK in CorePrep.
-It's very important to do this inlining *after* unfoldings are exposed
-in the interface file.  Otherwise, the unfolding for (say) pseq in the
-interface file will not mention 'lazy', so if we inline 'pseq' we'll totally
-miss the very thing that 'lazy' was there for in the first place.
-See Trac #3259 for a real world example.
+* catch:   catch a b = catch# (lazy a) b
+  Again, it's clear that 'a' will be evaluated strictly (and indeed
+  applied to a state token) but we want to make sure that any exceptions
+  arising from the evaluation of 'a' are caught by the catch (see
+  Trac #11555).
 
-lazyId is defined in GHC.Base, so we don't *have* to inline it.  If it
-appears un-applied, we'll end up just calling it.
+Implementing 'lazy' is a bit tricky:
+
+* It must not have a strictness signature: by being a built-in Id,
+  all the info about lazyId comes from here, not from GHC.Base.hi.
+  This is important, because the strictness analyser will spot it as
+  strict!
+
+* It must not have an unfolding: it gets "inlined" by a HACK in
+  CorePrep. It's very important to do this inlining *after* unfoldings
+  are exposed in the interface file.  Otherwise, the unfolding for
+  (say) pseq in the interface file will not mention 'lazy', so if we
+  inline 'pseq' we'll totally miss the very thing that 'lazy' was
+  there for in the first place. See Trac #3259 for a real world
+  example.
+
+* Suppose CorePrep sees (catch# (lazy e) b).  At all costs we must
+  avoid using call by value here:
+     case e of r -> catch# r b
+  Avoiding that is the whole point of 'lazy'.  So in CorePrep (which
+  generate the 'case' expression for a call-by-value call) we must
+  spot the 'lazy' on the arg (in CorePrep.cpeApp), and build a 'let'
+  instead.
+
+* lazyId is defined in GHC.Base, so we don't *have* to inline it.  If it
+  appears un-applied, we'll end up just calling it.
 
 Note [runRW magic]
 ~~~~~~~~~~~~~~~~~~
