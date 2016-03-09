@@ -42,16 +42,17 @@ import MkId
 import TcTyDecls
 import ConLike
 import FieldLabel
-#if __GLASGOW_HASKELL__ < 709
-import Data.Monoid( mconcat, mappend, mempty )
-#endif
 import Bag
 import Util
-import Data.Maybe
+import ErrUtils
 import Control.Monad ( unless, zipWithM )
 import Data.List( partition )
 import Pair( Pair(..) )
-import Data.Traversable( traverse )
+#if __GLASGOW_HASKELL__ < 709
+import Data.Monoid( mconcat, mappend, mempty )
+import Data.Traversable( mapM )
+import Prelude hiding ( mapM )
+#endif
 
 #include "HsVersions.h"
 
@@ -598,11 +599,6 @@ mkPatSynBuilderId has_sig dir (L _ name)
        ; return (Just (builder_id, need_dummy_arg)) }
   where
 
-add_void :: Bool -> Type -> Type
-add_void need_dummy_arg ty
-  | need_dummy_arg = mkFunTy voidPrimTy ty
-  | otherwise      = ty
-
 tcPatSynBuilderBind :: TcSigFun
                     -> PatSynBind Name Name
                     -> TcM (LHsBinds Id)
@@ -612,12 +608,14 @@ tcPatSynBuilderBind sig_fun PSB{ psb_id = L loc name, psb_def = lpat
   | isUnidirectional dir
   = return emptyBag
 
-  | isNothing mb_match_group       -- Can't invert the pattern
+  | Left why <- mb_match_group       -- Can't invert the pattern
   = setSrcSpan (getLoc lpat) $ failWithTc $
-    hang (text "Right-hand side of bidirectional pattern synonym cannot be used as an expression")
-       2 (ppr lpat)
+    vcat [ hang (text "Invalid right-hand side of bidirectional pattern synonym"
+                 <+> quotes (ppr name) <> colon)
+              2 why
+         , text "RHS pattern:" <+> ppr lpat ]
 
-  | otherwise  -- Bidirectional
+  | Right match_group <- mb_match_group  -- Bidirectional
   = do { patsyn <- tcLookupPatSyn name
        ; traceTc "tcPatSynBuilderBind {" $ ppr patsyn
        ; let Just (builder_id, need_dummy_arg) = patSynBuilder patsyn
@@ -637,13 +635,14 @@ tcPatSynBuilderBind sig_fun PSB{ psb_id = L loc name, psb_def = lpat
        ; (builder_binds, _) <- tcPolyCheck NonRecursive emptyPragEnv sig (noLoc bind)
        ; traceTc "tcPatSynBuilderBind }" $ ppr builder_binds
        ; return builder_binds }
+
+  | otherwise = panic "tcPatSynBuilderBind"  -- Both cases dealt with
   where
-    Just match_group = mb_match_group
     mb_match_group
        = case dir of
-           Unidirectional                    -> Nothing
-           ExplicitBidirectional explicit_mg -> Just explicit_mg
+           ExplicitBidirectional explicit_mg -> Right explicit_mg
            ImplicitBidirectional             -> fmap mk_mg (tcPatToExpr args lpat)
+           Unidirectional -> panic "tcPatSynBuilderBind"
 
     mk_mg :: LHsExpr Name -> MatchGroup Name (LHsExpr Name)
     mk_mg body = mkMatchGroupName Generated [builder_match]
@@ -658,10 +657,8 @@ tcPatSynBuilderBind sig_fun PSB{ psb_id = L loc name, psb_def = lpat
 
     add_dummy_arg :: MatchGroup Name (LHsExpr Name)
                   -> MatchGroup Name (LHsExpr Name)
-    add_dummy_arg mg@(MG { mg_alts
-                            = L l [L loc (Match NonFunBindMatch [] ty grhss)] })
-      = mg { mg_alts
-                = L l [L loc (Match NonFunBindMatch [nlWildPatName] ty grhss)] }
+    add_dummy_arg mg@(MG { mg_alts = L l [L loc match@(Match { m_pats = pats })] })
+      = mg { mg_alts = L l [L loc (match { m_pats = nlWildPatName : pats })] }
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
                              pprMatches (PatSyn :: HsMatchContext Name) other_mg
 
@@ -710,7 +707,95 @@ tcPatSynBuilderOcc ps
     name    = patSynName ps
     builder = patSynBuilder ps
 
-{-
+add_void :: Bool -> Type -> Type
+add_void need_dummy_arg ty
+  | need_dummy_arg = mkFunTy voidPrimTy ty
+  | otherwise      = ty
+
+tcPatToExpr :: [Located Name] -> LPat Name -> Either MsgDoc (LHsExpr Name)
+-- Given a /pattern/, return an /expression/ that builds a value
+-- that matches the pattern.  E.g. if the pattern is (Just [x]),
+-- the expression is (Just [x]).  They look the same, but the
+-- input uses constructors from HsPat and the output uses constructors
+-- from HsExpr.
+--
+-- Returns (Left r) if the pattern is not invertible, for reason r.
+-- See Note [Builder for a bidirectional pattern synonym]
+tcPatToExpr args pat = go pat
+  where
+    lhsVars = mkNameSet (map unLoc args)
+
+    -- Make a prefix con for prefix and infix patterns for simplicity
+    mkPrefixConExpr :: Located Name -> [LPat Name] -> Either MsgDoc (HsExpr Name)
+    mkPrefixConExpr lcon@(L loc _) pats
+      = do { exprs <- mapM go pats
+           ; return (foldl (\x y -> HsApp (L loc x) y)
+                           (HsVar lcon) exprs) }
+
+    mkRecordConExpr :: Located Name -> HsRecFields Name (LPat Name)
+                    -> Either MsgDoc (HsExpr Name)
+    mkRecordConExpr con fields
+      = do { exprFields <- mapM go fields
+           ; return (RecordCon con PlaceHolder noPostTcExpr exprFields) }
+
+    go :: LPat Name -> Either MsgDoc (LHsExpr Name)
+    go (L loc p) = L loc <$> go1 p
+
+    go1 :: Pat Name -> Either MsgDoc (HsExpr Name)
+    go1 (ConPatIn con info)
+      = case info of
+          PrefixCon ps  -> mkPrefixConExpr con ps
+          InfixCon l r  -> mkPrefixConExpr con [l,r]
+          RecCon fields -> mkRecordConExpr con fields
+
+    go1 (SigPatIn pat _) = go1 (unLoc pat)
+        -- See Note [Type signatures and the builder expression]
+
+    go1 (VarPat (L l var))
+        | var `elemNameSet` lhsVars
+        = return $ HsVar (L l var)
+        | otherwise
+        = Left (quotes (ppr var) <+> text "is not bound by the LHS of the pattern synonym")
+    go1 (ParPat pat)                = fmap HsPar $ go pat
+    go1 (LazyPat pat)               = go1 (unLoc pat)
+    go1 (BangPat pat)               = go1 (unLoc pat)
+    go1 (PArrPat pats ptt)          = do { exprs <- mapM go pats
+                                         ; return $ ExplicitPArr ptt exprs }
+    go1 (ListPat pats ptt reb)      = do { exprs <- mapM go pats
+                                         ; return $ ExplicitList ptt (fmap snd reb) exprs }
+    go1 (TuplePat pats box _)       = do { exprs <- mapM go pats
+                                         ; return $ ExplicitTuple
+                                              (map (noLoc . Present) exprs) box }
+    go1 (LitPat lit)                = return $ HsLit lit
+    go1 (NPat (L _ n) mb_neg _ _)
+        | Just neg <- mb_neg        = return $ unLoc $ nlHsSyntaxApps neg [noLoc (HsOverLit n)]
+        | otherwise                 = return $ HsOverLit n
+    go1 (ConPatOut{})               = panic "ConPatOut in output of renamer"
+    go1 (SigPatOut{})               = panic "SigPatOut in output of renamer"
+    go1 (CoPat{})                   = panic "CoPat in output of renamer"
+    go1 p = Left (text "pattern" <+> quotes (ppr p) <+> text "is not invertible")
+
+{- Note [Builder for a bidirectional pattern synonym]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For a bidirectional pattern synonym we need to produce an /expression/
+that matches the supplied /pattern/, given values for the arguments
+of the pattern synoymy.  For example
+  pattern F x y = (Just x, [y])
+The 'builder' for F looks like
+  $builderF x y = (Just x, [y])
+
+We can't always do this:
+ * Some patterns aren't invertible; e.g. view patterns
+      pattern F x = (reverse -> x:_)
+
+ * The RHS pattern might bind more variables than the pattern
+   synonym, so again we can't invert it
+      pattern F x = (x,y)
+
+ * Ditto wildcards
+      pattern F x = (x,_)
+
+
 Note [Redundant constraints for builder]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The builder can have redundant constraints, which are awkard to eliminate.
@@ -819,59 +904,6 @@ nonBidirectionalErr :: Outputable name => name -> TcM a
 nonBidirectionalErr name = failWithTc $
     text "non-bidirectional pattern synonym"
     <+> quotes (ppr name) <+> text "used in an expression"
-
-tcPatToExpr :: [Located Name] -> LPat Name -> Maybe (LHsExpr Name)
-tcPatToExpr args = go
-  where
-    lhsVars = mkNameSet (map unLoc args)
-
-    go :: LPat Name -> Maybe (LHsExpr Name)
-    go (L loc (ConPatIn con info))
-      = case info of
-          PrefixCon ps  -> mkPrefixConExpr con ps
-          InfixCon l r  -> mkPrefixConExpr con [l,r]
-          RecCon fields -> L loc <$> mkRecordConExpr con fields
-
-    go (L _ (SigPatIn pat _)) = go pat
-        -- See Note [Type signatures and the builder expression]
-
-    go (L loc p) = L loc <$> go1 p
-
-    -- Make a prefix con for prefix and infix patterns for simplicity
-    mkPrefixConExpr :: Located Name -> [LPat Name] -> Maybe (LHsExpr Name)
-    mkPrefixConExpr con pats = do
-      exprs <- traverse go pats
-      return $ foldl (\x y -> L (combineLocs x y) (HsApp x y))
-                     (L (getLoc con) (HsVar con))
-                     exprs
-
-
-    mkRecordConExpr :: Located Name -> HsRecFields Name (LPat Name) -> Maybe (HsExpr Name)
-    mkRecordConExpr con fields = do
-      exprFields <- traverse go fields
-      return $ RecordCon con PlaceHolder noPostTcExpr exprFields
-
-    go1 :: Pat Name -> Maybe (HsExpr Name)
-    go1   (VarPat (L l var))
-      | var `elemNameSet` lhsVars     = return $ HsVar (L l var)
-      | otherwise                     = Nothing
-    go1   (LazyPat pat)               = fmap HsPar $ go pat
-    go1   (ParPat pat)                = fmap HsPar $ go pat
-    go1   (BangPat pat)               = fmap HsPar $ go pat
-    go1   (PArrPat pats ptt)          = do { exprs <- mapM go pats
-                                           ; return $ ExplicitPArr ptt exprs }
-    go1   (ListPat pats ptt reb)      = do { exprs <- mapM go pats
-                                           ; return $ ExplicitList ptt (fmap snd reb) exprs }
-    go1   (TuplePat pats box _)       = do { exprs <- mapM go pats
-                                           ; return $ ExplicitTuple
-                                                (map (noLoc . Present) exprs) box }
-    go1   (LitPat lit)                = return $ HsLit lit
-    go1   (NPat (L _ n) Nothing _ _)  = return $ HsOverLit n
-    go1   (NPat (L _ n) (Just neg) _ _)= return $ unLoc $ nlHsSyntaxApps neg [noLoc (HsOverLit n)]
-    go1   (ConPatOut{})               = panic "ConPatOut in output of renamer"
-    go1   (SigPatOut{})               = panic "SigPatOut in output of renamer"
-    go1   (CoPat{})                   = panic "CoPat in output of renamer"
-    go1   _                           = Nothing
 
 -- Walk the whole pattern and for all ConPatOuts, collect the
 -- existentially-bound type variables and evidence binding variables.

@@ -1,4 +1,5 @@
 
-unidir.hs:4:18:
-    Right-hand side of bidirectional pattern synonym cannot be used as an expression
-      x : _
+unidir.hs:4:18: error:
+    Invalid right-hand side of bidirectional pattern synonym ‘Head’:
+      pattern ‘_’ is not invertible
+    RHS pattern: x : _
