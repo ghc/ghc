@@ -30,10 +30,9 @@ userKnownPackages :: [Package]
 userKnownPackages = []
 
 -- | Control which ways library packages are built
--- FIXME: skip profiling for speed
 -- FIXME: skip dynamic since it's currently broken #4
 userLibraryWays :: Ways
-userLibraryWays = remove [profiling, dynamic]
+userLibraryWays = remove [dynamic]
 
 -- | Control which ways the 'rts' package is built
 userRtsWays :: Ways
