@@ -508,7 +508,7 @@ pprLit1 other = pprLit other
 pprStatics :: DynFlags -> [CmmStatic] -> [SDoc]
 pprStatics _ [] = []
 pprStatics dflags (CmmStaticLit (CmmFloat f W32) : rest)
-  -- floats are padded to a word, see #1852
+  -- floats are padded to a word by padLitToWord, see #1852
   | wORD_SIZE dflags == 8, CmmStaticLit (CmmInt 0 W32) : rest' <- rest
   = pprLit1 (floatToWord dflags f) : pprStatics dflags rest'
   | wORD_SIZE dflags == 4
@@ -520,6 +520,7 @@ pprStatics dflags (CmmStaticLit (CmmFloat f W32) : rest)
           ppr' _other           = text "bad static!"
 pprStatics dflags (CmmStaticLit (CmmFloat f W64) : rest)
   = map pprLit1 (doubleToWords dflags f) ++ pprStatics dflags rest
+
 pprStatics dflags (CmmStaticLit (CmmInt i W64) : rest)
   | wordWidth dflags == W32
   = if wORDS_BIGENDIAN dflags
@@ -1181,54 +1182,72 @@ pprStringInCStyle s = doubleQuotes (text (concatMap charToC s))
 -- Initialising static objects with floating-point numbers.  We can't
 -- just emit the floating point number, because C will cast it to an int
 -- by rounding it.  We want the actual bit-representation of the float.
+--
+-- Consider a concrete C example:
+--    double d = 2.5e-10;
+--    float f  = 2.5e-10f;
+--
+--    int * i2 = &d;      printf ("i2: %08X %08X\n", i2[0], i2[1]);
+--    long long * l = &d; printf (" l: %016llX\n",   l[0]);
+--    int * i = &f;       printf (" i: %08X\n",      i[0]);
+-- Result on 64-bit LE (x86_64):
+--     i2: E826D695 3DF12E0B
+--      l: 3DF12E0BE826D695
+--      i: 2F89705F
+-- Result on 32-bit BE (m68k):
+--     i2: 3DF12E0B E826D695
+--      l: 3DF12E0BE826D695
+--      i: 2F89705F
+--
+-- The trick here is to notice that binary representation does not
+-- change much: only Word32 values get swapped on LE hosts / targets.
 
 -- This is a hack to turn the floating point numbers into ints that we
 -- can safely initialise to static locations.
 
-big_doubles :: DynFlags -> Bool
-big_doubles dflags
-  | widthInBytes W64 == 2 * wORD_SIZE dflags = True
-  | widthInBytes W64 == wORD_SIZE dflags     = False
-  | otherwise = panic "big_doubles"
+castFloatToWord32Array :: STUArray s Int Float -> ST s (STUArray s Int Word32)
+castFloatToWord32Array = U.castSTUArray
 
-castFloatToIntArray :: STUArray s Int Float -> ST s (STUArray s Int Int)
-castFloatToIntArray = U.castSTUArray
+castDoubleToWord64Array :: STUArray s Int Double -> ST s (STUArray s Int Word64)
+castDoubleToWord64Array = U.castSTUArray
 
-castDoubleToIntArray :: STUArray s Int Double -> ST s (STUArray s Int Int)
-castDoubleToIntArray = U.castSTUArray
-
--- floats are always 1 word
 floatToWord :: DynFlags -> Rational -> CmmLit
 floatToWord dflags r
   = runST (do
         arr <- newArray_ ((0::Int),0)
         writeArray arr 0 (fromRational r)
-        arr' <- castFloatToIntArray arr
-        i <- readArray arr' 0
-        return (CmmInt (toInteger i) (wordWidth dflags))
+        arr' <- castFloatToWord32Array arr
+        w32 <- readArray arr' 0
+        return (CmmInt (toInteger w32 `shiftL` wo) (wordWidth dflags))
     )
+    where wo | wordWidth dflags == W64
+             , wORDS_BIGENDIAN dflags    = 32
+             | otherwise                 = 0
 
 doubleToWords :: DynFlags -> Rational -> [CmmLit]
 doubleToWords dflags r
-  | big_doubles dflags                  -- doubles are 2 words
   = runST (do
         arr <- newArray_ ((0::Int),1)
         writeArray arr 0 (fromRational r)
-        arr' <- castDoubleToIntArray arr
-        i1 <- readArray arr' 0
-        i2 <- readArray arr' 1
-        return [ CmmInt (toInteger i1) (wordWidth dflags)
-               , CmmInt (toInteger i2) (wordWidth dflags)
-               ]
+        arr' <- castDoubleToWord64Array arr
+        w64 <- readArray arr' 0
+        return (pprWord64 w64)
     )
-  | otherwise                           -- doubles are 1 word
-  = runST (do
-        arr <- newArray_ ((0::Int),0)
-        writeArray arr 0 (fromRational r)
-        arr' <- castDoubleToIntArray arr
-        i <- readArray arr' 0
-        return [ CmmInt (toInteger i) (wordWidth dflags) ]
-    )
+    where targetWidth = wordWidth dflags
+          targetBE    = wORDS_BIGENDIAN dflags
+          pprWord64 w64
+              | targetWidth == W64 =
+                  [ CmmInt (toInteger w64) targetWidth ]
+              | targetWidth == W32 =
+                  [ CmmInt (toInteger targetW1) targetWidth
+                  , CmmInt (toInteger targetW2) targetWidth
+                  ]
+              | otherwise = panic "doubleToWords.pprWord64"
+              where (targetW1, targetW2)
+                        | targetBE  = (wHi, wLo)
+                        | otherwise = (wLo, wHi)
+                    wHi = w64 `shiftR` 32
+                    wLo = w64 .&. 0xFFFFffff
 
 -- ---------------------------------------------------------------------------
 -- Utils
