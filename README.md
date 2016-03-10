@@ -54,7 +54,8 @@ are placed into `.build` and `inplace` directories ([#113][build-artefacts-issue
 In addition to standard Shake flags (try `--help`), the build system
 currently supports several others:
 * `--flavour=FLAVOUR`: choose a build flavour. Two settings are currently supported:
-`default` and `quick` (adds `-O0` flag to all GHC invocations speeding up builds by 3x).
+`default` and `quick` (adds `-O0` flag to all GHC invocations and disables library
+profiling, which speeds up builds by 3-4x).
 * `--haddock`: build Haddock documentation.
 * `--progress-info=STYLE`: choose how build progress info is printed. There are four
 settings: `none`, `brief` (one line per build command), `normal` (typically a box per
