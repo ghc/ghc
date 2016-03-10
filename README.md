@@ -100,7 +100,7 @@ zero (see [#197][test-issue]).
 Current limitations
 -------------------
 The new build system still lacks many important features:
-* We only build `vanilla` way: [#4][dynamic-issue], [#186][profiling-issue].
+* We only build `vanilla` and `profiling` way: [#4][dynamic-issue].
 * Validation is not implemented: [#187][validation-issue].
 * Only HTML Haddock documentation is supported (use `--haddock` flag). 
 * Build flavours and conventional command line flags are not implemented: [#188][flavours-issue].
@@ -141,7 +141,6 @@ helped me endure and enjoy the project.
 [user-settings]: https://github.com/snowleopard/shaking-up-ghc/blob/master/src/Settings/User.hs
 [test-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/197
 [dynamic-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/4
-[profiling-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/186
 [validation-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/187
 [flavours-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/188
 [cross-compilation-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/177
