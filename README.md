@@ -105,6 +105,7 @@ The new build system still lacks many important features:
 * Only HTML Haddock documentation is supported (use `--haddock` flag). 
 * Build flavours and conventional command line flags are not implemented: [#188][flavours-issue].
 * Cross-compilation is not implemented: [#177][cross-compilation-issue].
+* There is no support for installation or binary/source distribution: [#219][install-issue].
 
 Check out [milestones] to see when we hope to resolve the above limitations.
 
@@ -144,6 +145,7 @@ helped me endure and enjoy the project.
 [validation-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/187
 [flavours-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/188
 [cross-compilation-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/177
+[install-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/219
 [milestones]: https://github.com/snowleopard/shaking-up-ghc/milestones
 [comments-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/55
 [doc-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/56
