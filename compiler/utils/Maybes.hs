@@ -14,11 +14,13 @@ module Maybes (
         whenIsJust,
         expectJust,
 
-        MaybeT(..), liftMaybeT
+        -- * MaybeT
+        MaybeT(..), liftMaybeT, tryMaybeT
     ) where
 
 import Control.Monad
 import Control.Monad.Trans.Maybe
+import Control.Exception (catch, SomeException(..))
 import Data.Maybe
 
 infixr 4 `orElse`
@@ -64,6 +66,12 @@ orElse = flip fromMaybe
 
 liftMaybeT :: Monad m => m a -> MaybeT m a
 liftMaybeT act = MaybeT $ Just `liftM` act
+
+-- | Try performing an 'IO' action, failing on error.
+tryMaybeT :: IO a -> MaybeT IO a
+tryMaybeT action = MaybeT $ catch (Just `fmap` action) handler
+  where
+    handler (SomeException _) = return Nothing
 
 {-
 ************************************************************************
