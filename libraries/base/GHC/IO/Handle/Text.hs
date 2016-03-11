@@ -246,7 +246,7 @@ hGetLineBufferedLoop handle_@Handle__{..}
 
 maybeFillReadBuffer :: Handle__ -> CharBuffer -> IO (Maybe CharBuffer)
 maybeFillReadBuffer handle_ buf
-  = Exception.catch
+  = catchException
      (do buf' <- getSomeCharacters handle_ buf
          return (Just buf')
      )
