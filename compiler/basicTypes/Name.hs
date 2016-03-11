@@ -68,7 +68,7 @@ module Name (
 
         -- * Class 'NamedThing' and overloaded friends
         NamedThing(..),
-        getSrcLoc, getSrcSpan, getOccString,
+        getSrcLoc, getSrcSpan, getOccString, getOccFS,
 
         pprInfixName, pprPrefixName, pprModulePrefix,
         nameStableString,
@@ -633,10 +633,12 @@ class NamedThing a where
 getSrcLoc           :: NamedThing a => a -> SrcLoc
 getSrcSpan          :: NamedThing a => a -> SrcSpan
 getOccString        :: NamedThing a => a -> String
+getOccFS            :: NamedThing a => a -> FastString
 
 getSrcLoc           = nameSrcLoc           . getName
 getSrcSpan          = nameSrcSpan          . getName
 getOccString        = occNameString        . getOccName
+getOccFS            = occNameFS            . getOccName
 
 pprInfixName :: (Outputable a, NamedThing a) => a -> SDoc
 -- See Outputable.pprPrefixVar, pprInfixVar;
