@@ -426,7 +426,7 @@ minusInteger x y = inline plusInteger x (inline negateInteger y)
 
 -- | Multiply two 'Integer's
 timesInteger :: Integer -> Integer -> Integer
-timesInteger _       (S# 0#) = S# 0#
+timesInteger !_      (S# 0#) = S# 0#
 timesInteger (S# 0#) _       = S# 0#
 timesInteger x       (S# 1#) = x
 timesInteger (S# 1#) y       = y
@@ -515,7 +515,7 @@ bitInteger i#
 
 -- | Test if /n/-th bit is set.
 testBitInteger :: Integer -> Int# -> Bool
-testBitInteger _  n# | isTrue# (n# <# 0#) = False
+testBitInteger !_  n# | isTrue# (n# <# 0#) = False
 testBitInteger (S# i#) n#
   | isTrue# (n# <# GMP_LIMB_BITS#) = isTrue# (((uncheckedIShiftL# 1# n#)
                                                `andI#` i#) /=# 0#)
@@ -614,7 +614,7 @@ xorInteger x           y {- S# -} = xorInteger x (unsafePromote y)
 -- | Bitwise AND operation
 andInteger :: Integer -> Integer -> Integer
 -- short-cuts
-andInteger (S# 0#)       _       = S# 0#
+andInteger (S# 0#)     !_        = S# 0#
 andInteger _           (S# 0#)   = S# 0#
 andInteger (S# -1#)   y          = y
 andInteger x           (S# -1#)  = x
@@ -646,7 +646,7 @@ unsafePromote x = x
 quotRemInteger :: Integer -> Integer -> (# Integer, Integer #)
 quotRemInteger n       (S# 1#) = (# n, S# 0# #)
 quotRemInteger n      (S# -1#) = let !q = negateInteger n in (# q, (S# 0#) #)
-quotRemInteger _       (S# 0#) = (# S# (quotInt# 0# 0#),S# (remInt# 0# 0#) #)
+quotRemInteger !_      (S# 0#) = (# S# (quotInt# 0# 0#),S# (remInt# 0# 0#) #)
 quotRemInteger (S# 0#) _       = (# S# 0#, S# 0# #)
 quotRemInteger (S# n#) (S# d#) = case quotRemInt# n# d# of
     (# q#, r# #) -> (# S# q#, S# r# #)
@@ -679,7 +679,7 @@ quotRemInteger n@(S# n#) (Jp# d) -- need to account for (S# minBound)
 quotInteger :: Integer -> Integer -> Integer
 quotInteger n       (S# 1#) = n
 quotInteger n      (S# -1#) = negateInteger n
-quotInteger _       (S# 0#) = S# (quotInt# 0# 0#)
+quotInteger !_      (S# 0#) = S# (quotInt# 0# 0#)
 quotInteger (S# 0#) _       = S# 0#
 quotInteger (S# n#)  (S# d#) = S# (quotInt# n# d#)
 quotInteger (Jp# n)   (S# d#)
@@ -699,7 +699,7 @@ quotInteger n d = case inline quotRemInteger n d of (# q, _ #) -> q
 {-# CONSTANT_FOLDED quotInteger #-}
 
 remInteger :: Integer -> Integer -> Integer
-remInteger _        (S# 1#) = S# 0#
+remInteger !_       (S# 1#) = S# 0#
 remInteger _       (S# -1#) = S# 0#
 remInteger _        (S# 0#) = S# (remInt# 0# 0#)
 remInteger (S# 0#) _        = S# 0#
@@ -763,7 +763,7 @@ gcdInteger (Jp# a) (S# b#)
 
 -- | Compute least common multiple.
 lcmInteger :: Integer -> Integer -> Integer
-lcmInteger (S# 0#) _   = S# 0#
+lcmInteger (S# 0#) !_  = S# 0#
 lcmInteger (S# 1#)  b  = absInteger b
 lcmInteger (S# -1#) b  = absInteger b
 lcmInteger _ (S# 0#)   = S# 0#
@@ -998,7 +998,7 @@ sqrBigNat x
 sqrBigNat x = timesBigNat x x -- TODO: mpn_sqr
 
 timesBigNatWord :: BigNat -> GmpLimb# -> BigNat
-timesBigNatWord _ 0## = zeroBigNat
+timesBigNatWord !_ 0## = zeroBigNat
 timesBigNatWord x 1## = x
 timesBigNatWord x@(BN# x#) y#
   | isTrue# (nx# ==# 1#) =
@@ -1231,7 +1231,7 @@ remBigNat n@(BN# nba#) d@(BN# dba#)
 
 -- | Note: Result of div/0 undefined
 quotRemBigNatWord :: BigNat -> GmpLimb# -> (# BigNat, GmpLimb# #)
-quotRemBigNatWord _            0## = (# nullBigNat, 0## #)
+quotRemBigNatWord !_           0## = (# nullBigNat, 0## #)
 quotRemBigNatWord n            1## = (# n,          0## #)
 quotRemBigNatWord n@(BN# nba#) d# = case compareBigNatWord n d# of
     LT -> (# zeroBigNat, bigNatToWord n #)
