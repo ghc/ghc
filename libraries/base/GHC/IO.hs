@@ -126,12 +126,22 @@ Now catch# has type
 have to work around that in the definition of catchException below).
 -}
 
+-- | Catch an exception in the 'IO' monad.
+--
+-- Note that this function is /strict/ in the action. That is,
+-- @catchException undefined b == _|_@. See #exceptions_and_strictness#
+-- for details.
 catchException :: Exception e => IO a -> (e -> IO a) -> IO a
 catchException (IO io) handler = IO $ catch# io handler'
     where handler' e = case fromException e of
                        Just e' -> unIO (handler e')
                        Nothing -> raiseIO# e
 
+-- | Catch any 'Exception' type in the 'IO' monad.
+--
+-- Note that this function is /strict/ in the action. That is,
+-- @catchException undefined b == _|_@. See #exceptions_and_strictness# for
+-- details.
 catchAny :: IO a -> (forall e . Exception e => e -> IO a) -> IO a
 catchAny (IO io) handler = IO $ catch# io handler'
     where handler' (SomeException e) = unIO (handler e)
@@ -373,3 +383,32 @@ a `finally` sequel =
 -- use @'return' '$!' x@.
 evaluate :: a -> IO a
 evaluate a = IO $ \s -> seq# a s -- NB. see #2273, #5129
+
+{- $exceptions_and_strictness
+
+Laziness can interact with @catch@-like operations in non-obvious ways (see,
+e.g. GHC Trac #11555). For instance, consider these subtly-different examples,
+
+> test1 = Control.Exception.catch (error "uh oh") (\(_ :: SomeException) -> putStrLn "it failed")
+>
+> test2 = GHC.IO.catchException (error "uh oh") (\(_ :: SomeException) -> putStrLn "it failed")
+
+While the first case is always guaranteed to print "it failed", the behavior of
+@test2@ may vary with optimization level.
+
+The unspecified behavior of @test2@ is due to the fact that GHC may assume that
+'catchException' (and the 'catch#' primitive operation which it is built upon)
+is strict in its first argument. This assumption allows the compiler to better
+optimize @catchException@ calls at the expense of deterministic behavior when
+the action may be bottom.
+
+Namely, the assumed strictness means that exceptions thrown while evaluating the
+action-to-be-executed may not be caught; only exceptions thrown during execution
+of the action will be handled by the exception handler.
+
+Since this strictness is a small optimization and may lead to surprising
+results, all of the @catch@ and @handle@ variants offered by "Control.Exception"
+are lazy in their first argument. If you are certain that that the action to be
+executed won't bottom in performance-sensitive code, you might consider using
+'GHC.IO.catchException' or 'GHC.IO.catchAny' for a small speed-up.
+-}

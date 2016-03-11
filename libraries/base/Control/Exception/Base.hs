@@ -147,7 +147,7 @@ catch   :: Exception e
         => IO a         -- ^ The computation to run
         -> (e -> IO a)  -- ^ Handler to invoke if an exception is raised
         -> IO a
-catch = catchException
+catch act = catchException (lazy act)
 
 -- | The function 'catchJust' is like 'catch', but it takes an extra
 -- argument which is an /exception predicate/, a function which
