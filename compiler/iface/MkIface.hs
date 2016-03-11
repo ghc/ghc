@@ -1428,7 +1428,7 @@ tyConToIfaceDecl env tycon
     if_binders  = zipIfaceBinders tc_tyvars (tyConBinders tycon)
     if_res_kind = tidyToIfaceType tc_env1 (tyConResKind tycon)
     if_syn_type ty = tidyToIfaceType tc_env1 ty
-    if_res_var     = getFS `fmap` tyConFamilyResVar_maybe tycon
+    if_res_var     = getOccFS `fmap` tyConFamilyResVar_maybe tycon
 
       -- use these when you don't have tyConTyVars
     (degenerate_binders, degenerate_res_kind)
@@ -1530,7 +1530,7 @@ classToIfaceDecl env clas
                    ifFDs    = map toIfaceFD clas_fds,
                    ifATs    = map toIfaceAT clas_ats,
                    ifSigs   = map toIfaceClassOp op_stuff,
-                   ifMinDef = fmap getFS (classMinimalDef clas),
+                   ifMinDef = fmap getOccFS (classMinimalDef clas),
                    ifRec    = boolToRecFlag (isRecursiveTyCon tycon) })
   where
     (clas_tyvars, clas_fds, sc_theta, _, clas_ats, op_stuff)
@@ -1564,8 +1564,8 @@ classToIfaceDecl env clas
     toDmSpec (_, VanillaDM)       = VanillaDM
     toDmSpec (_, GenericDM dm_ty) = GenericDM (tidyToIfaceType env1 dm_ty)
 
-    toIfaceFD (tvs1, tvs2) = (map (getFS . tidyTyVar env1) tvs1,
-                              map (getFS . tidyTyVar env1) tvs2)
+    toIfaceFD (tvs1, tvs2) = (map (getOccFS . tidyTyVar env1) tvs1,
+                              map (getOccFS . tidyTyVar env1) tvs2)
 
 --------------------------
 tidyToIfaceType :: TidyEnv -> Type -> IfaceType
@@ -1591,9 +1591,6 @@ tidyTyClTyCoVarBndr env@(_, subst) tv
 tidyTyVar :: TidyEnv -> TyVar -> TyVar
 tidyTyVar (_, subst) tv = lookupVarEnv subst tv `orElse` tv
    -- TcType.tidyTyVarOcc messes around with FlatSkols
-
-getFS :: NamedThing a => a -> FastString
-getFS x = occNameFS (getOccName x)
 
 --------------------------
 instanceToIfaceInst :: ClsInst -> IfaceClsInst
@@ -1770,7 +1767,7 @@ toIfaceExpr (Lam x b)       = IfaceLam (toIfaceBndr x, toIfaceOneShot x) (toIfac
 toIfaceExpr (App f a)       = toIfaceApp f [a]
 toIfaceExpr (Case s x ty as)
   | null as                 = IfaceECase (toIfaceExpr s) (toIfaceType ty)
-  | otherwise               = IfaceCase (toIfaceExpr s) (getFS x) (map toIfaceAlt as)
+  | otherwise               = IfaceCase (toIfaceExpr s) (getOccFS x) (map toIfaceAlt as)
 toIfaceExpr (Let b e)       = IfaceLet (toIfaceBind b) (toIfaceExpr e)
 toIfaceExpr (Cast e co)     = IfaceCast (toIfaceExpr e) (toIfaceCoercion co)
 toIfaceExpr (Tick t e)
@@ -1801,7 +1798,7 @@ toIfaceBind (Rec prs)    = IfaceRec [(toIfaceLetBndr b, toIfaceExpr r) | (b,r) <
 ---------------------
 toIfaceAlt :: (AltCon, [Var], CoreExpr)
            -> (IfaceConAlt, [FastString], IfaceExpr)
-toIfaceAlt (c,bs,r) = (toIfaceCon c, map getFS bs, toIfaceExpr r)
+toIfaceAlt (c,bs,r) = (toIfaceCon c, map getOccFS bs, toIfaceExpr r)
 
 ---------------------
 toIfaceCon :: AltCon -> IfaceConAlt
@@ -1837,5 +1834,5 @@ toIfaceVar v
     | Just fcall <- isFCallId_maybe v            = IfaceFCall fcall (toIfaceType (idType v))
        -- Foreign calls have special syntax
     | isExternalName name                        = IfaceExt name
-    | otherwise                                  = IfaceLcl (getFS name)
+    | otherwise                                  = IfaceLcl (getOccFS name)
   where name = idName v
