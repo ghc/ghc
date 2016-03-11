@@ -307,7 +307,7 @@ stg_killThreadzh (P_ target, P_ exception)
     } else {
         W_ msg;
 
-        (msg) = ccall throwTo(MyCapability() "ptr",
+        ("ptr" msg) = ccall throwTo(MyCapability() "ptr",
                                     CurrentTSO "ptr",
                                     target "ptr",
                                     exception "ptr");

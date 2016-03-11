@@ -32,8 +32,8 @@ INFO_TABLE_RET (stg_stack_underflow_frame, UNDERFLOW_FRAME,
     SAVE_STGREGS
 
     SAVE_THREAD_STATE();
-    ("ptr" ret_off) = foreign "C" threadStackUnderflow(MyCapability(),
-                                                       CurrentTSO);
+    (ret_off) = foreign "C" threadStackUnderflow(MyCapability() "ptr",
+                                                 CurrentTSO);
     LOAD_THREAD_STATE();
 
     RESTORE_STGREGS
