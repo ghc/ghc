@@ -18,7 +18,7 @@ module LlvmCodeGen.Base (
         runLlvm, liftStream, withClearVars, varLookup, varInsert,
         markStackReg, checkStackReg,
         funLookup, funInsert, getLlvmVer, getDynFlags, getDynFlag, getLlvmPlatform,
-        dumpIfSetLlvm, renderLlvm, runUs, markUsedVar, getUsedVars,
+        dumpIfSetLlvm, renderLlvm, markUsedVar, getUsedVars,
         ghcInternalFunctions,
 
         getMetaUniqueId,
@@ -228,6 +228,19 @@ instance Monad LlvmM where
 instance HasDynFlags LlvmM where
     getDynFlags = LlvmM $ \env -> return (envDynFlags env, env)
 
+instance MonadUnique LlvmM where
+    getUniqueSupplyM = do
+        us <- getEnv envUniq
+        let (us1, us2) = splitUniqSupply us
+        modifyEnv (\s -> s { envUniq = us2 })
+        return us1
+
+    getUniqueM = do
+        us <- getEnv envUniq
+        let (u,us') = takeUniqFromSupply us
+        modifyEnv (\s -> s { envUniq = us' })
+        return u
+
 -- | Lifting of IO actions. Not exported, as we want to encapsulate IO.
 liftIO :: IO a -> LlvmM a
 liftIO m = LlvmM $ \env -> do x <- m
@@ -326,12 +339,6 @@ renderLlvm sdoc = do
     -- Dump, if requested
     dumpIfSetLlvm Opt_D_dump_llvm "LLVM Code" sdoc
     return ()
-
--- | Run a @UniqSM@ action with our unique supply
-runUs :: UniqSM a -> LlvmM a
-runUs m = LlvmM $ \env -> do
-    let (x, us') = initUs (envUniq env) m
-    return (x, env { envUniq = us' })
 
 -- | Marks a variable as "used"
 markUsedVar :: LlvmVar -> LlvmM ()

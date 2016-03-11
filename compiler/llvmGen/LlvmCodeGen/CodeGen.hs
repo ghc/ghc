@@ -148,7 +148,7 @@ getInstrinct2 fname fty@(LMFunction funSig) = do
         return []
       Nothing -> do
         funInsert fname fty
-        un <- runUs getUniqueM
+        un <- getUniqueM
         let lbl = mkAsmTempLabel un
         return [CmmData (Section Data lbl) [([],[fty])]]
 
@@ -1787,7 +1787,7 @@ getHsFunc' name fty
 -- | Create a new local var
 mkLocalVar :: LlvmType -> LlvmM LlvmVar
 mkLocalVar ty = do
-    un <- runUs getUniqueM
+    un <- getUniqueM
     return $ LMLocalVar un ty
 
 
