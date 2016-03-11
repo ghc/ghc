@@ -2344,7 +2344,7 @@ stg_getSparkzh ()
 #ifndef THREADED_RTS
     return (0,ghczmprim_GHCziTypes_False_closure);
 #else
-    (spark) = ccall findSpark(MyCapability());
+    ("ptr" spark) = ccall findSpark(MyCapability() "ptr");
     if (spark != 0) {
         return (1,spark);
     } else {
