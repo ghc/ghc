@@ -402,11 +402,53 @@ rnSpliceExpr splice
 
            ; return (HsSpliceE rn_splice, lcl_names `plusFV` gbl_names) }
 
-      | otherwise  -- Run it here
+      | otherwise  -- Run it here, see Note [Running splices in the Renamer]
       = do { traceRn (text "rnSpliceExpr: untyped expression splice")
            ; rn_expr <- runRnSplice UntypedExpSplice runMetaE ppr rn_splice
            ; (lexpr3, fvs) <- checkNoErrs (rnLExpr rn_expr)
            ; return (HsPar lexpr3, fvs)  }
+
+{- Note [Running splices in the Renamer]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Splices used to be run in the typechecker, which led to (Trac #4364). Since the
+renamer must decide which expressions depend on which others, and it cannot
+reliably do this for arbitrary splices, we used to conservatively say that
+splices depend on all other expressions in scope. Unfortunately, this led to
+the problem of cyclic type declarations seen in (Trac #4364). Instead, by
+running splices in the renamer, we side-step the problem of determining
+dependencies: by the time the dependency analysis happens, any splices have
+already been run, and expression dependencies can be determined as usual.
+
+However, see (Trac #9813), for an example where we would like to run splices
+*after* performing dependency analysis (that is, after renaming). It would be
+desirable to typecheck "non-splicy" expressions (those expressions that do not
+contain splices directly or via dependence on an expression that does) before
+"splicy" expressions, such that types/expressions within the same declaration
+group would be available to `reify` calls, for example consider the following:
+
+> module M where
+>   data D = C
+>   f = 1
+>   g = $(mapM reify ['f, 'D, ''C] ...)
+
+Compilation of this example fails since D/C/f are not in the type environment
+and thus cannot be reified as they have not been typechecked by the time the
+splice is renamed and thus run.
+
+These requirements are at odds: we do not want to run splices in the renamer as
+we wish to first determine dependencies and typecheck certain expressions,
+making them available to reify, but cannot accurately determine dependencies
+without running splices in the renamer!
+
+Indeed, the conclusion of (Trac #9813) was that it is not worth the complexity
+to try and
+ a) implement and maintain the code for renaming/typechecking non-splicy
+    expressions before splicy expressions,
+ b) explain to TH users which expressions are/not available to reify at any
+    given point.
+
+-}
 
 ----------------------
 rnSpliceType :: HsSplice RdrName -> PostTc Name Kind
