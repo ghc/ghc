@@ -33,6 +33,15 @@ infixl 4 <$>
 
 -- | An infix synonym for 'fmap'.
 --
+-- The name of this operator is an allusion to '$'.
+-- Note the similarities between their types:
+--
+-- >  ($)  ::              (a -> b) ->   a ->   b
+-- > (<$>) :: Functor f => (a -> b) -> f a -> f b
+--
+-- Whereas '$' is function application, '<$>' is function
+-- application lifted over a 'Functor'.
+--
 -- ==== __Examples__
 --
 -- Convert from a @'Maybe' 'Int'@ to a @'Maybe' 'String'@ using 'show':
