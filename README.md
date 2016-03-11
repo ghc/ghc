@@ -32,7 +32,7 @@ There are two ways to get a source tree:
   repository from Github] [7].
 
   **DO NOT submit pull request directly to the github repo.**
-  *See the GHC team's working conventions re [how to contribute a patch to GHC](http://ghc.haskell.org/trac/ghc/wiki/WorkingConventions/FixingBugs "ghc.haskell.org/trac/ghc/wiki/WorkingConventions/FixingBug").*
+  *See the GHC team's working conventions re [how to contribute a patch to GHC](http://ghc.haskell.org/trac/ghc/wiki/WorkingConventions/FixingBugs).*
 
 
 Building & Installing
