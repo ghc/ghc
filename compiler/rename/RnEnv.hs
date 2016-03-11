@@ -1228,7 +1228,7 @@ data HsSigCtxt
   | ClsDeclCtxt   Name       -- Class decl for this class
   | InstDeclCtxt  NameSet    -- Instance decl whose user-written method
                              -- bindings are for these methods
-  | HsBootCtxt               -- Top level of a hs-boot file
+  | HsBootCtxt NameSet       -- Top level of a hs-boot file, binding these names
   | RoleAnnotCtxt NameSet    -- A role annotation, with the names of all types
                              -- in the group
 
@@ -1270,7 +1270,7 @@ lookupBindGroupOcc ctxt what rdr_name
 
   | otherwise
   = case ctxt of
-      HsBootCtxt       -> lookup_top (const True)
+      HsBootCtxt ns    -> lookup_top (`elemNameSet` ns)
       TopSigCtxt ns    -> lookup_top (`elemNameSet` ns)
       RoleAnnotCtxt ns -> lookup_top (`elemNameSet` ns)
       LocalBindCtxt ns -> lookup_group ns

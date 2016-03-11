@@ -13,7 +13,7 @@ they may be affected by renaming (which isn't fully worked out yet).
 
 module RnBinds (
    -- Renaming top-level bindings
-   rnTopBindsLHS, rnTopBindsRHS, rnValBindsRHS,
+   rnTopBindsLHS, rnTopBindsBoot, rnValBindsRHS,
 
    -- Renaming local bindings
    rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS,
@@ -173,22 +173,14 @@ rnTopBindsLHS :: MiniFixityEnv
 rnTopBindsLHS fix_env binds
   = rnValBindsLHS (topRecNameMaker fix_env) binds
 
-rnTopBindsRHS :: NameSet -> HsValBindsLR Name RdrName
-              -> RnM (HsValBinds Name, DefUses)
-rnTopBindsRHS bound_names binds
-  = do { is_boot <- tcIsHsBootOrSig
-       ; if is_boot
-         then rnTopBindsBoot binds
-         else rnValBindsRHS (TopSigCtxt bound_names) binds }
-
-rnTopBindsBoot :: HsValBindsLR Name RdrName -> RnM (HsValBinds Name, DefUses)
+rnTopBindsBoot :: NameSet -> HsValBindsLR Name RdrName -> RnM (HsValBinds Name, DefUses)
 -- A hs-boot file has no bindings.
 -- Return a single HsBindGroup with empty binds and renamed signatures
-rnTopBindsBoot (ValBindsIn mbinds sigs)
+rnTopBindsBoot bound_names (ValBindsIn mbinds sigs)
   = do  { checkErr (isEmptyLHsBinds mbinds) (bindsInHsBootFile mbinds)
-        ; (sigs', fvs) <- renameSigs HsBootCtxt sigs
+        ; (sigs', fvs) <- renameSigs (HsBootCtxt bound_names) sigs
         ; return (ValBindsOut [] sigs', usesOnly fvs) }
-rnTopBindsBoot b = pprPanic "rnTopBindsBoot" (ppr b)
+rnTopBindsBoot _ b = pprPanic "rnTopBindsBoot" (ppr b)
 
 {-
 *********************************************************
@@ -964,8 +956,8 @@ okHsSig ctxt (L _ sig)
      (IdSig {}, InstDeclCtxt {}) -> True
      (IdSig {}, _)               -> False
 
-     (InlineSig {}, HsBootCtxt) -> False
-     (InlineSig {}, _)          -> True
+     (InlineSig {}, HsBootCtxt {}) -> False
+     (InlineSig {}, _)             -> True
 
      (SpecSig {}, TopSigCtxt {})    -> True
      (SpecSig {}, LocalBindCtxt {}) -> True
