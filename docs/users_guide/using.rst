@@ -630,6 +630,8 @@ messages and in GHCi:
         ghci> :t (>>)
         (>>) :: ∀ (m :: * → *) a b. Monad m ⇒ m a → m b → m b
 
+.. _pretty-printing-types:
+    
 .. ghc-flag:: -fprint-explicit-foralls
 
     Using :ghc-flag:`-fprint-explicit-foralls` makes
@@ -699,7 +701,7 @@ messages and in GHCi:
     the internal equality relation used in GHC's solver. Generally,
     users should not need to worry about the subtleties here; ``~`` is
     probably what you want. Without :ghc-flag:`-fprint-equality-relations`, GHC
-    prints all of these as ``~``.
+    prints all of these as ``~``. See also :ref:`equality-constraints`.
 
 .. ghc-flag:: -fprint-expanded-synonyms
 

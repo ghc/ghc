@@ -193,7 +193,11 @@ inside GHC, to change the kind and type.
 
 -- | Lifted, heterogeneous equality. By lifted, we mean that it
 -- can be bogus (deferred type error). By heterogeneous, the two
--- types @a@ and @b@ might have different kinds.
+-- types @a@ and @b@ might have different kinds. Because @~~@ can
+-- appear unexpectedly in error messages to users who do not care
+-- about the difference between heterogeneous equality @~~@ and
+-- homogeneous equality @~@, this is printed as @~@ unless
+-- @-fprint-equality-relations@ is set.
 class a ~~ b
   -- See also Note [The equality types story] in TysPrim
 
