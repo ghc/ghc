@@ -109,7 +109,7 @@ import Control.Exception.Base as Exception
 
 import GHC.Conc hiding (threadWaitRead, threadWaitWrite,
                         threadWaitReadSTM, threadWaitWriteSTM)
-import GHC.IO           ( unsafeUnmask )
+import GHC.IO           ( unsafeUnmask, catchException )
 import GHC.IORef        ( newIORef, readIORef, writeIORef )
 import GHC.Base
 
@@ -308,7 +308,7 @@ forkOS action0
                         MaskedInterruptible -> action0
                         MaskedUninterruptible -> uninterruptibleMask_ action0
 
-            action_plus = Exception.catch action1 childHandler
+            action_plus = catchException action1 childHandler
 
         entry <- newStablePtr (myThreadId >>= putMVar mv >> action_plus)
         err <- forkOS_createThread entry
@@ -381,7 +381,7 @@ runInUnboundThread action = do
       mv <- newEmptyMVar
       mask $ \restore -> do
         tid <- forkIO $ Exception.try (restore action) >>= putMVar mv
-        let wait = takeMVar mv `Exception.catch` \(e :: SomeException) ->
+        let wait = takeMVar mv `catchException` \(e :: SomeException) ->
                      Exception.throwTo tid e >> wait
         wait >>= unsafeResult
     else action
