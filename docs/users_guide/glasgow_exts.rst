@@ -1873,7 +1873,15 @@ The following syntax is stolen:
 
     Stolen by: :ghc-flag:`-XImplicitParams`
 
-``[|``, ``[e|``, ``[p|``, ``[d|``, ``[t|``, ``$(``, ``$$(``, ``[||``, ``[e||``, ``$varid``, ``$$varid``
+``[|``, ``[e|``, ``[p|``, ``[d|``, ``[t|``, ``[||``, ``[e||``
+    .. index::
+       single: Quasi-quotes
+
+    Stolen by: :ghc-flag:`-XQuasiQuotes`. Moreover, this introduces an ambiguity
+    with list comprehension syntax. See
+    :ref:`quasi-quotes-list-comprehension-ambiguity` for details.
+
+``$(``, ``$$(``, ``$varid``, ``$$varid``
     .. index::
        single: Template Haskell
 
@@ -9984,6 +9992,24 @@ Here are the salient features
 -  Unlike normal declaration splices of the form ``$(...)``, declaration
    quasi-quotes do not cause a declaration group break. See
    :ref:`th-syntax` for more information.
+
+.. _quasi-quotes-list-comprehension-ambiguity:
+
+.. warning::
+
+    .. index::
+        single: quasi-quotes; ambiguity with list comprehensions
+        single: list comprehensions; ambiguity with quasi-quotes
+
+    :ghc-flag:`-XQuasiQuotes` introduces an unfortunate ambiguity with list
+    comprehension syntax. Consider the following, ::
+
+        let x = [v| v <- [0..10]]
+
+    Without :ghc-flag:`-XQuasiQuotes` this is parsed as a list comprehension.
+    With :ghc-flag:`-XQuasiQuotes` this is parsed as a quasi-quote; however,
+    this parse will fail due to the lack of a closing ``|]``. See
+    :ghc-ticket:`11679`.
 
 The example below shows quasi-quotation in action. The quoter ``expr``
 is bound to a value of type ``QuasiQuoter`` defined in module ``Expr``.
