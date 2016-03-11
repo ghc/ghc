@@ -202,7 +202,8 @@ static void *itimer_thread_func(void *_handle_tick)
 
     while (1) {
         if (USE_TIMERFD_FOR_ITIMER) {
-            read(timerfd, &nticks, sizeof(nticks));
+            if (read(timerfd, &nticks, sizeof(nticks)) != sizeof(nticks))
+                sysErrorBelch("Itimer: read(timer_fd) failed");
         } else {
             usleep(TimeToUS(itimer_interval));
         }
