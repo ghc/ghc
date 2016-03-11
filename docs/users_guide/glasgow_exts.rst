@@ -385,11 +385,15 @@ instance, the binary integer literal ``0b11001001`` will be desugared into
 Pattern guards
 --------------
 
-Pattern guards (Glasgow extension) The discussion that follows is an
-abbreviated version of Simon Peyton Jones's original
-`proposal <http://research.microsoft.com/~simonpj/Haskell/guards.html>`__.
-(Note that the proposal was written before pattern guards were
-implemented, so refers to them as unimplemented.)
+.. ghc-flag:: -XPatternGuards
+
+   Enable pattern matches in guards.
+
+The discussion that follows is an abbreviated version of Simon Peyton Jones's
+original `proposal
+<http://research.microsoft.com/~simonpj/Haskell/guards.html>`__. (Note that the
+proposal was written before pattern guards were implemented, so refers to them
+as unimplemented.)
 
 Suppose we have an abstract data type of finite maps, with a lookup
 operation: ::
