@@ -47,9 +47,9 @@ Roman.foo_$s$wgo [Occ=LoopBreaker]
 Roman.foo_$s$wgo =
   \ (sc :: GHC.Prim.Int#) (sc1 :: GHC.Prim.Int#) ->
     let {
-      a :: GHC.Prim.Int#
+      m :: GHC.Prim.Int#
       [LclId, Str=DmdType]
-      a =
+      m =
         GHC.Prim.+#
           (GHC.Prim.+#
              (GHC.Prim.+#
@@ -64,8 +64,8 @@ Roman.foo_$s$wgo =
           False ->
             case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# sc1 500#)
             of _ [Occ=Dead] {
-              False -> Roman.foo_$s$wgo (GHC.Prim.+# a a) (GHC.Prim.-# sc1 1#);
-              True -> Roman.foo_$s$wgo a (GHC.Prim.-# sc1 3#)
+              False -> Roman.foo_$s$wgo (GHC.Prim.+# m m) (GHC.Prim.-# sc1 1#);
+              True -> Roman.foo_$s$wgo m (GHC.Prim.-# sc1 3#)
             };
           True -> Roman.foo_$s$wgo sc (GHC.Prim.-# sc1 2#)
         };
@@ -87,9 +87,9 @@ Roman.$wgo =
       Just x ->
         case x of _ [Occ=Dead] { GHC.Types.I# ipv ->
         let {
-          a :: GHC.Prim.Int#
+          m :: GHC.Prim.Int#
           [LclId, Str=DmdType]
-          a =
+          m =
             GHC.Prim.+#
               (GHC.Prim.+#
                  (GHC.Prim.+#
@@ -97,7 +97,7 @@ Roman.$wgo =
                  ipv)
               ipv } in
         case w of _ [Occ=Dead] {
-          Nothing -> Roman.foo_$s$wgo a 10#;
+          Nothing -> Roman.foo_$s$wgo m 10#;
           Just n ->
             case n of _ [Occ=Dead] { GHC.Types.I# x2 ->
             case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<=# x2 0#)
@@ -108,8 +108,8 @@ Roman.$wgo =
                   False ->
                     case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# x2 500#)
                     of _ [Occ=Dead] {
-                      False -> Roman.foo_$s$wgo (GHC.Prim.+# a a) (GHC.Prim.-# x2 1#);
-                      True -> Roman.foo_$s$wgo a (GHC.Prim.-# x2 3#)
+                      False -> Roman.foo_$s$wgo (GHC.Prim.+# m m) (GHC.Prim.-# x2 1#);
+                      True -> Roman.foo_$s$wgo m (GHC.Prim.-# x2 3#)
                     };
                   True -> Roman.foo_$s$wgo ipv (GHC.Prim.-# x2 2#)
                 };
