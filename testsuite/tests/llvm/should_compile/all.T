@@ -13,3 +13,4 @@ test('T6158', [reqlib('vector'), reqlib('primitive')], compile, ['-package vecto
 test('T7571', cmm_src, compile, [''])
 test('T7575', unless(wordsize(32), skip), compile, [''])
 test('T8131b', normal, compile, [''])
+test('T11649', normal, compile, [''])
