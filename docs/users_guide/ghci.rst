@@ -232,7 +232,7 @@ We can compile ``D``, then load the whole program, like this:
     Compiling B                ( B.hs, interpreted )
     Compiling C                ( C.hs, interpreted )
     Compiling A                ( A.hs, interpreted )
-    Ok, modules loaded: A, B, C, D.
+    Ok, modules loaded: A, B, C, D (D.o).
     *Main>
 
 In the messages from the compiler, we see that there is no line for
@@ -304,7 +304,7 @@ picked up by :ghci-cmd:`:reload`, only :ghci-cmd:`:load`:
     *Main> :load A
     Compiling B                ( B.hs, interpreted )
     Compiling A                ( A.hs, interpreted )
-    Ok, modules loaded: A, B, C, D.
+    Ok, modules loaded: A, B, C (C.o), D (D.o).
 
 The automatic loading of object files can sometimes lead to confusion,
 because non-exported top-level definitions of a module are only

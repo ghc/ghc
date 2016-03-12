@@ -51,7 +51,7 @@ import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
 import HsImpExp
 import HsSyn
 import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
-                  setInteractivePrintName, hsc_dflags )
+                  setInteractivePrintName, hsc_dflags, msObjFilePath )
 import Module
 import Name
 import Packages ( trusted, getPackageDetails, listVisibleModuleNames, pprFlag )
@@ -1569,10 +1569,9 @@ afterLoad :: SuccessFlag
 afterLoad ok retain_context = do
   lift revertCAFs  -- always revert CAFs on load.
   lift discardTickArrays
-  loaded_mod_summaries <- getLoadedModules
-  let loaded_mods = map GHC.ms_mod loaded_mod_summaries
+  loaded_mods <- getLoadedModules
   modulesLoadedMsg ok loaded_mods
-  lift $ setContextAfterLoad retain_context loaded_mod_summaries
+  lift $ setContextAfterLoad retain_context loaded_mods
 
 setContextAfterLoad :: Bool -> [GHC.ModSummary] -> GHCi ()
 setContextAfterLoad keep_ctxt [] = do
@@ -1646,14 +1645,22 @@ keepPackageImports = filterM is_pkg_import
           mod_name = unLoc (ideclName d)
 
 
-modulesLoadedMsg :: SuccessFlag -> [Module] -> InputT GHCi ()
+modulesLoadedMsg :: SuccessFlag -> [GHC.ModSummary] -> InputT GHCi ()
 modulesLoadedMsg ok mods = do
   dflags <- getDynFlags
   unqual <- GHC.getPrintUnqual
+  let mod_name mod = do
+        is_interpreted <- GHC.isModuleInterpreted mod
+        return $ if is_interpreted
+                  then ppr (GHC.ms_mod mod)
+                  else ppr (GHC.ms_mod mod)
+                       <> text " ("
+                       <> text (normalise $ msObjFilePath mod)
+                       <> text ")" -- fix #9887
+  mod_names <- mapM mod_name mods
   let mod_commas
         | null mods = text "none."
-        | otherwise = hsep (
-            punctuate comma (map ppr mods)) <> text "."
+        | otherwise = hsep (punctuate comma mod_names) <> text "."
       status = case ok of
                    Failed    -> text "Failed"
                    Succeeded -> text "Ok"
