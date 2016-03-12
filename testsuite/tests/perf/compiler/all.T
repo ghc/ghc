@@ -364,7 +364,7 @@ test('T5030',
            #                        of family-applications leads to less sharing, I think
            # 2015-07-11:  201882912 reason unknown
 
-           (wordsize(64), 653710960, 10)]),
+           (wordsize(64), 342331936, 10)]),
              # Previously 530000000 (+/- 10%)
              # 17/1/13:   602993184  (x86_64/Linux)
              #            (new demand analyser)
@@ -382,6 +382,7 @@ test('T5030',
              #                          of family-applications leads to less sharing, I think
              # 2015-03-17 403932600  tweak to solver algorithm
 	     # 2015-12-11 653710960  TypeInType (see #11196)
+	     # 2016-03-14 342331936  unify type families eagerly
 
        only_ways(['normal'])
       ],
