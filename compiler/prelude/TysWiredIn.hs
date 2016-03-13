@@ -323,7 +323,7 @@ vecElemTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "VecElem") vec
 vecElemDataConNames :: [Name]
 vecElemDataConNames = zipWith3Lazy mk_special_dc_name
                         [ fsLit "Int8ElemRep", fsLit "Int16ElemRep", fsLit "Int32ElemRep"
-                        , fsLit "Int64ElemRep", fsLit "Word8ElemRep", fsLit "Word16elemRep"
+                        , fsLit "Int64ElemRep", fsLit "Word8ElemRep", fsLit "Word16ElemRep"
                         , fsLit "Word32ElemRep", fsLit "Word64ElemRep"
                         , fsLit "FloatElemRep", fsLit "DoubleElemRep" ]
                         vecElemDataConKeys
