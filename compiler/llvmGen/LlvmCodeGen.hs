@@ -31,6 +31,7 @@ import UniqSupply
 import SysTools ( figureLlvmVersion )
 import qualified Stream
 
+import Control.Applicative ( (<$>), pure )
 import Control.Monad ( when )
 import Data.Maybe ( fromMaybe, catMaybes )
 import System.IO
