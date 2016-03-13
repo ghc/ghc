@@ -7244,8 +7244,8 @@ kind-polymorphic, but not so ``D2``; and similarly ``F1``, ``F1``.
 
 .. _complete-kind-signatures:
 
-Polymorphic kind recursion and complete kind signatures
--------------------------------------------------------
+Complete user-supplied kind signatures and polymorphic recursion
+----------------------------------------------------------------
 
 Just as in type inference, kind inference for recursive types can only
 use *monomorphic* recursion. Consider this (contrived) example: ::
@@ -7294,6 +7294,18 @@ signature" for a type constructor? These are the forms:
        data T6 a b                         where ...
        -- No;  kind is inferred
 
+-  For a datatype with a top-level ``::`` when :ghc-flag:`-XTypeInType`
+   is in effect: all kind variables introduced after the ``::`` must
+   be explicitly quantified. ::
+
+     -- -XTypeInType is on
+     data T1 :: k -> *            -- No CUSK: `k` is not explicitly quantified
+     data T2 :: forall k. k -> *  -- CUSK: `k` is bound explicitly
+     data T3 :: forall (k :: *). k -> *   -- still a CUSK
+
+   Note that the first example would indeed have a CUSK without
+   :ghc-flag:`-XTypeInType`.
+
 -  For a class, every type variable must be annotated with a kind.
 
 -  For a type synonym, every type variable and the result type must all
@@ -7307,7 +7319,7 @@ signature" for a type constructor? These are the forms:
    rather apparent, but it is still not considered to have a complete
    signature -- no inference can be done before detecting the signature.
 
--  An open type or data family declaration *always* has a CUSK;
+-  An un-associated open type or data family declaration *always* has a CUSK;
    un-annotated type variables default to
    kind ``*``: ::
 
@@ -7316,13 +7328,14 @@ signature" for a type constructor? These are the forms:
        data family D3 (a :: k) :: *   -- D3 :: forall k. k -> *
        type family S1 a :: k -> *     -- S1 :: forall k. * -> k -> *
 
-       class C a where                -- C  :: k -> Constraint
-         type AT a b                  -- AT :: k -> * -> *
+-  An associated type or data family declaration has a CUSK precisely if
+   its enclosing class has a CUSK. ::
+       
+       class C a where                -- no CUSK
+         type AT a b                  -- no CUSK, b is defaulted
 
-   In the last example, the variable ``a`` has an implicit kind variable
-   annotation from the class declaration. It keeps its polymorphic kind
-   in the associated type declaration. The variable ``b``, however, gets
-   defaulted to ``*``.
+       class D (a :: k) where         -- yes CUSK
+         type AT2 a b                 -- yes CUSK, b is defaulted
 
 -  A closed type family has a complete signature when all of its type
    variables are annotated and a return kind (with a top-level ``::``)
@@ -7541,6 +7554,37 @@ If you like neither of these names, feel free to write your own synonym: ::
 
 All the affordances for ``*`` also apply to ``★``, the Unicode variant
 of ``*``.
+
+Inferring dependency in datatype declarations
+---------------------------------------------
+
+If a type variable ``a`` in a datatype, class, or type family declaration
+depends on another such variable ``k`` in the same declaration, two properties
+must hold:
+
+-  ``a`` must appear after ``k`` in the declaration, and
+
+-  ``k`` must appear explicitly in the kind of *some* type variable in that
+   declaration.
+
+The first bullet simply means that the dependency must be well-scoped. The
+second bullet concerns GHC's ability to infer dependency. Inferring this
+dependency is difficult, and GHC currently requires the dependency to be
+made explicit, meaning that ``k`` must appear in the kind of a type variable,
+making it obvious to GHC that dependency is intended. For example: ::
+
+  data Proxy k (a :: k)            -- OK: dependency is "obvious"
+  data Proxy2 k a = P (Proxy k a)  -- ERROR: dependency is unclear
+
+In the second declaration, GHC cannot immediately tell that ``k`` should
+be a dependent variable, and so the declaration is rejected.
+
+It is conceivable that this restriction will be relaxed in the future,
+but it is (at the time of writing) unclear if the difficulties around this
+scenario are theoretical (inferring this dependency would mean our type
+system does not have principal types) or merely practical (inferring this
+dependency is hard, given GHC's implementation). So, GHC takes the easy
+way out and requires a little help from the user.
 
 Kind defaulting without :ghc-flag:`-XPolyKinds`
 -----------------------------------------------

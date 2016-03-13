@@ -816,7 +816,7 @@ rnDataFamInstDecl :: Maybe (Name, [Name])
 rnDataFamInstDecl mb_cls (DataFamInstDecl { dfid_tycon = tycon
                                           , dfid_pats  = pats
                                           , dfid_defn  = defn })
-  = do { (tycon', pats', defn', fvs) <-
+  = do { (tycon', pats', (defn', _), fvs) <-
            rnFamInstDecl (TyDataCtx tycon) mb_cls tycon pats defn rnDataDefn
        ; return (DataFamInstDecl { dfid_tycon = tycon'
                                  , dfid_pats  = pats'
@@ -1264,11 +1264,17 @@ rnTyClDecl (DataDecl { tcdLName = tycon, tcdTyVars = tyvars, tcdDataDefn = defn 
        ; kvs <- extractDataDefnKindVars defn
        ; let doc = TyDataCtx tycon
        ; traceRn (text "rntycl-data" <+> ppr tycon <+> ppr kvs)
-       ; ((tyvars', defn'), fvs) <- bindHsQTyVars doc Nothing Nothing kvs tyvars $ \ tyvars' ->
-                                    do { (defn', fvs) <- rnDataDefn doc defn
-                                       ; return ((tyvars', defn'), fvs) }
+       ; ((tyvars', defn', no_kvs), fvs)
+           <- bindHsQTyVars doc Nothing Nothing kvs tyvars $ \ tyvars' ->
+              do { ((defn', no_kvs), fvs) <- rnDataDefn doc defn
+                 ; return ((tyvars', defn', no_kvs), fvs) }
+          -- See Note [Complete user-supplied kind signatures] in HsDecls
+       ; typeintype <- xoptM LangExt.TypeInType
+       ; let cusk = hsTvbAllKinded tyvars' &&
+                    (not typeintype || no_kvs)
        ; return (DataDecl { tcdLName = tycon', tcdTyVars = tyvars'
-                          , tcdDataDefn = defn', tcdFVs = fvs }, fvs) }
+                          , tcdDataDefn = defn', tcdDataCusk = cusk
+                          , tcdFVs = fvs }, fvs) }
 
 rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
                         tcdTyVars = tyvars, tcdFDs = fds, tcdSigs = sigs,
@@ -1391,14 +1397,23 @@ orphanRoleAnnotErr (L loc decl)
             quotes (ppr $ roleAnnotDeclName decl) <+>
             text "is declared.")
 
-rnDataDefn :: HsDocContext -> HsDataDefn RdrName -> RnM (HsDataDefn Name, FreeVars)
+rnDataDefn :: HsDocContext -> HsDataDefn RdrName
+           -> RnM ((HsDataDefn Name, Bool), FreeVars)
+                -- the Bool is True if the DataDefn is consistent with
+                -- having a CUSK. See Note [Complete user-supplied kind signatures]
+                -- in HsDecls
 rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
                            , dd_ctxt = context, dd_cons = condecls
-                           , dd_kindSig = sig, dd_derivs = derivs })
+                           , dd_kindSig = m_sig, dd_derivs = derivs })
   = do  { checkTc (h98_style || null (unLoc context))
                   (badGadtStupidTheta doc)
 
-        ; (sig', sig_fvs)  <- rnLHsMaybeKind doc sig
+        ; (m_sig', cusk, sig_fvs) <- case m_sig of
+             Just sig -> do { fkvs <- freeKiTyVarsAllVars <$>
+                                      extractHsTyRdrTyVars sig
+                            ; (sig', fvs) <- rnLHsKind doc sig
+                            ; return (Just sig', null fkvs, fvs) }
+             Nothing  -> return (Nothing, True, emptyFVs)
         ; (context', fvs1) <- rnContext doc context
         ; (derivs',  fvs3) <- rn_derivs derivs
 
@@ -1414,10 +1429,11 @@ rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
 
         ; let all_fvs = fvs1 `plusFV` fvs3 `plusFV`
                         con_fvs `plusFV` sig_fvs
-        ; return ( HsDataDefn { dd_ND = new_or_data, dd_cType = cType
-                              , dd_ctxt = context', dd_kindSig = sig'
-                              , dd_cons = condecls'
-                              , dd_derivs = derivs' }
+        ; return (( HsDataDefn { dd_ND = new_or_data, dd_cType = cType
+                               , dd_ctxt = context', dd_kindSig = m_sig'
+                               , dd_cons = condecls'
+                               , dd_derivs = derivs' }
+                  , cusk )
                  , all_fvs )
         }
   where
@@ -1504,7 +1520,7 @@ rnFamResultSig doc kv_names (TyVarSig tvbndr)
                           (mkNameSet kv_names) emptyNameSet
                                        -- use of emptyNameSet here avoids
                                        -- redundant duplicate errors
-                          tvbndr $ \ _ tvbndr' ->
+                          tvbndr $ \ _ _ tvbndr' ->
          return (TyVarSig tvbndr', unitFV (hsLTyVarName tvbndr')) }
 
 -- Note [Renaming injectivity annotation]

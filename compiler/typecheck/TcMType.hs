@@ -1309,7 +1309,7 @@ zonkTcTyCoVarBndr :: TcTyCoVar -> TcM TcTyCoVar
 -- unification variables.
 zonkTcTyCoVarBndr tyvar
     -- can't use isCoVar, because it looks at a TyCon. Argh.
-  = ASSERT2( isImmutableTyVar tyvar || (not $ isTyVar tyvar), ppr tyvar ) do
+  = ASSERT2( isImmutableTyVar tyvar || (not $ isTyVar tyvar), pprTvBndr tyvar )
     updateTyVarKindM zonkTcType tyvar
 
 -- | Zonk a TyBinder

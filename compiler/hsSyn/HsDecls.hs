@@ -106,7 +106,7 @@ import Util
 import SrcLoc
 
 import Bag
-import Data.Maybe ( fromMaybe )
+import Maybes
 import Data.Data        hiding (TyCon,Fixity)
 
 {-
@@ -503,6 +503,7 @@ data TyClDecl name
                                                   -- Here the type decl for 'f' includes 'a'
                                                   -- in its tcdTyVars
              , tcdDataDefn :: HsDataDefn name
+             , tcdDataCusk :: PostRn name Bool    -- ^ does this have a CUSK?
              , tcdFVs      :: PostRn name NameSet }
 
   | ClassDecl { tcdCtxt    :: LHsContext name,          -- ^ Context...
@@ -632,7 +633,7 @@ countTyClDecls decls
 -- | Does this declaration have a complete, user-supplied kind signature?
 -- See Note [Complete user-supplied kind signatures]
 hsDeclHasCusk :: TyClDecl Name -> Bool
-hsDeclHasCusk (FamDecl { tcdFam = fam_decl }) = famDeclHasCusk fam_decl
+hsDeclHasCusk (FamDecl { tcdFam = fam_decl }) = famDeclHasCusk Nothing fam_decl
 hsDeclHasCusk (SynDecl { tcdTyVars = tyvars, tcdRhs = rhs })
   = hsTvbAllKinded tyvars && rhs_annotated rhs
   where
@@ -640,7 +641,7 @@ hsDeclHasCusk (SynDecl { tcdTyVars = tyvars, tcdRhs = rhs })
       HsParTy lty  -> rhs_annotated lty
       HsKindSig {} -> True
       _            -> False
-hsDeclHasCusk (DataDecl { tcdTyVars = tyvars })  = hsTvbAllKinded tyvars
+hsDeclHasCusk (DataDecl { tcdDataCusk = cusk }) = cusk
 hsDeclHasCusk (ClassDecl { tcdTyVars = tyvars }) = hsTvbAllKinded tyvars
 
 -- Pretty-printing TyClDecl
@@ -837,12 +838,15 @@ data FamilyInfo name
 deriving instance (DataId name) => Data (FamilyInfo name)
 
 -- | Does this family declaration have a complete, user-supplied kind signature?
-famDeclHasCusk :: FamilyDecl name -> Bool
-famDeclHasCusk (FamilyDecl { fdInfo      = ClosedTypeFamily _
-                           , fdTyVars    = tyvars
-                           , fdResultSig = L _ resultSig })
+famDeclHasCusk :: Maybe Bool
+                   -- ^ if associated, does the enclosing class have a CUSK?
+               -> FamilyDecl name -> Bool
+famDeclHasCusk _ (FamilyDecl { fdInfo      = ClosedTypeFamily _
+                             , fdTyVars    = tyvars
+                             , fdResultSig = L _ resultSig })
   = hsTvbAllKinded tyvars && hasReturnKindSignature resultSig
-famDeclHasCusk _ = True  -- all open families have CUSKs!
+famDeclHasCusk mb_class_cusk _ = mb_class_cusk `orElse` True
+        -- all un-associated open families have CUSKs!
 
 -- | Does this family declaration have user-supplied return kind signature?
 hasReturnKindSignature :: FamilyResultSig a -> Bool
@@ -879,6 +883,10 @@ variables and its return type are annotated.
 
  - An open type family always has a CUSK -- unannotated type variables (and
 return type) default to *.
+
+ - Additionally, if -XTypeInType is on, then a data definition with a top-level
+   :: must explicitly bind all kind variables to the right of the ::.
+   See test dependent/should_compile/KindLevels, which requires this case.
 -}
 
 instance (OutputableBndr name) => Outputable (FamilyDecl name) where
@@ -1133,7 +1141,7 @@ pprConDecl (ConDeclH98 { con_name = L _ con
                                  <+> pprConDeclFields (unLoc fields)
     tvs = case mtvs of
       Nothing -> []
-      Just (HsQTvs _ tvs) -> tvs
+      Just (HsQTvs { hsq_explicit = tvs }) -> tvs
 
     cxt = fromMaybe (noLoc []) mcxt
 

@@ -10,7 +10,7 @@
 module RnTypes (
         -- Type related stuff
         rnHsType, rnLHsType, rnLHsTypes, rnContext,
-        rnHsKind, rnLHsKind, rnLHsMaybeKind,
+        rnHsKind, rnLHsKind,
         rnHsSigType, rnHsWcType,
         rnHsSigWcType, rnHsSigWcTypeScoped,
         rnLHsInstType,
@@ -144,7 +144,7 @@ rnWcSigTy :: RnTyKiEnv -> LHsType RdrName
 -- wildcard.  Some code duplication, but no big deal.
 rnWcSigTy env (L loc hs_ty@(HsForAllTy { hst_bndrs = tvs, hst_body = hs_tau }))
   = bindLHsTyVarBndrs (rtke_ctxt env) (Just $ inTypeDoc hs_ty)
-                      Nothing [] tvs $ \ _ tvs' ->
+                      Nothing [] tvs $ \ _ tvs' _ ->
     do { (hs_tau', fvs) <- rnWcSigTy env hs_tau
        ; let hs_ty' = HsForAllTy { hst_bndrs = tvs', hst_body = hswc_body hs_tau' }
              awcs_bndrs = collectAnonWildCardsBndrs tvs'
@@ -426,14 +426,6 @@ rnLHsKind ctxt kind = rnLHsTyKi (mkTyKiEnv ctxt KindLevel RnTypeBody) kind
 rnHsKind  :: HsDocContext -> HsKind RdrName -> RnM (HsKind Name, FreeVars)
 rnHsKind ctxt kind = rnHsTyKi  (mkTyKiEnv ctxt KindLevel RnTypeBody) kind
 
-rnLHsMaybeKind  :: HsDocContext -> Maybe (LHsKind RdrName)
-                -> RnM (Maybe (LHsKind Name), FreeVars)
-rnLHsMaybeKind _ Nothing
-  = return (Nothing, emptyFVs)
-rnLHsMaybeKind doc (Just kind)
-  = do { (kind', fvs) <- rnLHsKind doc kind
-       ; return (Just kind', fvs) }
-
 --------------
 rnTyKiContext :: RnTyKiEnv -> LHsContext RdrName -> RnM (LHsContext Name, FreeVars)
 rnTyKiContext env (L loc cxt)
@@ -458,7 +450,7 @@ rnHsTyKi :: RnTyKiEnv -> HsType RdrName -> RnM (HsType Name, FreeVars)
 rnHsTyKi env ty@(HsForAllTy { hst_bndrs = tyvars, hst_body  = tau })
   = do { checkTypeInType env ty
        ; bindLHsTyVarBndrs (rtke_ctxt env) (Just $ inTypeDoc ty)
-                           Nothing [] tyvars $ \ _ tyvars' ->
+                           Nothing [] tyvars $ \ _ tyvars' _ ->
     do { (tau',  fvs) <- rnLHsTyKi env tau
        ; return ( HsForAllTy { hst_bndrs = tyvars', hst_body =  tau' }
                 , fvs) } }
@@ -853,9 +845,10 @@ bindHsQTyVars :: forall a b.
 bindHsQTyVars doc mb_in_doc mb_assoc kv_bndrs tv_bndrs thing_inside
   = do { bindLHsTyVarBndrs doc mb_in_doc
                            mb_assoc kv_bndrs (hsQTvExplicit tv_bndrs) $
-         \ rn_kvs rn_bndrs ->
+         \ rn_kvs rn_bndrs dep_var_set ->
          thing_inside (HsQTvs { hsq_implicit = rn_kvs
-                              , hsq_explicit = rn_bndrs }) }
+                              , hsq_explicit = rn_bndrs
+                              , hsq_dependent = dep_var_set }) }
 
 bindLHsTyVarBndrs :: forall a b.
                      HsDocContext
@@ -867,11 +860,14 @@ bindLHsTyVarBndrs :: forall a b.
                   -> [LHsTyVarBndr RdrName]  -- ... these user-written tyvars
                   -> (   [Name]  -- all kv names
                       -> [LHsTyVarBndr Name]
+                      -> NameSet -- which names, from the preceding list,
+                                 -- are used dependently within that list
+                                 -- See Note [Dependent LHsQTyVars] in TcHsType
                       -> RnM (b, FreeVars))
                   -> RnM (b, FreeVars)
 bindLHsTyVarBndrs doc mb_in_doc mb_assoc kv_bndrs tv_bndrs thing_inside
   = do { when (isNothing mb_assoc) (checkShadowedRdrNames tv_names_w_loc)
-       ; go [] [] emptyNameSet emptyNameSet tv_bndrs }
+       ; go [] [] emptyNameSet emptyNameSet emptyNameSet tv_bndrs }
   where
     tv_names_w_loc = map hsLTyVarLocName tv_bndrs
 
@@ -879,29 +875,38 @@ bindLHsTyVarBndrs doc mb_in_doc mb_assoc kv_bndrs tv_bndrs thing_inside
        -> [LHsTyVarBndr Name]    -- already renamed (in reverse order)
        -> NameSet                -- kind vars already in scope (for dup checking)
        -> NameSet                -- type vars already in scope (for dup checking)
+       -> NameSet                -- (all) variables used dependently
        -> [LHsTyVarBndr RdrName] -- still to be renamed, scoped
        -> RnM (b, FreeVars)
-    go rn_kvs rn_tvs kv_names tv_names (tv_bndr : tv_bndrs)
+    go rn_kvs rn_tvs kv_names tv_names dep_vars (tv_bndr : tv_bndrs)
       = bindLHsTyVarBndr doc mb_assoc kv_names tv_names tv_bndr $
-        \ kv_nms tv_bndr' ->
+        \ kv_nms used_dependently tv_bndr' ->
         do { (b, fvs) <- go (reverse kv_nms ++ rn_kvs)
                             (tv_bndr' : rn_tvs)
                             (kv_names `extendNameSetList` kv_nms)
                             (tv_names `extendNameSet` hsLTyVarName tv_bndr')
+                            (dep_vars `unionNameSet` used_dependently)
                             tv_bndrs
            ; warn_unused tv_bndr' fvs
            ; return (b, fvs) }
 
-    go rn_kvs rn_tvs _kv_names tv_names []
+    go rn_kvs rn_tvs _kv_names tv_names dep_vars []
       = -- still need to deal with the kv_bndrs passed in originally
-        bindImplicitKvs doc mb_assoc kv_bndrs tv_names $ \ kv_nms ->
+        bindImplicitKvs doc mb_assoc kv_bndrs tv_names $ \ kv_nms others ->
         do { let all_rn_kvs = reverse (reverse kv_nms ++ rn_kvs)
                  all_rn_tvs = reverse rn_tvs
            ; env <- getLocalRdrEnv
+           ; let all_dep_vars = dep_vars `unionNameSet` others
+                 exp_dep_vars -- variables in all_rn_tvs that are in dep_vars
+                   = mkNameSet [ name
+                               | v <- all_rn_tvs
+                               , let name = hsLTyVarName v
+                               , name `elemNameSet` all_dep_vars ]
            ; traceRn (text "bindHsTyVars" <+> (ppr env $$
                                                ppr all_rn_kvs $$
-                                               ppr all_rn_tvs))
-           ; thing_inside all_rn_kvs all_rn_tvs }
+                                               ppr all_rn_tvs $$
+                                               ppr exp_dep_vars))
+           ; thing_inside all_rn_kvs all_rn_tvs exp_dep_vars }
 
     warn_unused tv_bndr fvs = case mb_in_doc of
       Just in_doc -> warnUnusedForAll in_doc tv_bndr fvs
@@ -912,8 +917,9 @@ bindLHsTyVarBndr :: HsDocContext
                  -> NameSet   -- kind vars already in scope
                  -> NameSet   -- type vars already in scope
                  -> LHsTyVarBndr RdrName
-                 -> ([Name] -> LHsTyVarBndr Name -> RnM (b, FreeVars))
+                 -> ([Name] -> NameSet -> LHsTyVarBndr Name -> RnM (b, FreeVars))
                    -- passed the newly-bound implicitly-declared kind vars,
+                   -- any other names used in a kind
                    -- and the renamed LHsTyVarBndr
                  -> RnM (b, FreeVars)
 bindLHsTyVarBndr doc mb_assoc kv_names tv_names hs_tv_bndr thing_inside
@@ -922,7 +928,7 @@ bindLHsTyVarBndr doc mb_assoc kv_names tv_names hs_tv_bndr thing_inside
         do { check_dup loc rdr
            ; nm <- newTyVarNameRn mb_assoc lrdr
            ; bindLocalNamesFV [nm] $
-             thing_inside [] (L loc (UserTyVar (L lv nm))) }
+             thing_inside [] emptyNameSet (L loc (UserTyVar (L lv nm))) }
       L loc (KindedTyVar lrdr@(L lv rdr) kind) ->
         do { check_dup lv rdr
 
@@ -932,11 +938,12 @@ bindLHsTyVarBndr doc mb_assoc kv_names tv_names hs_tv_bndr thing_inside
 
              -- deal with kind vars in the user-written kind
            ; free_kvs <- freeKiTyVarsAllVars <$> extractHsTyRdrTyVars kind
-           ; bindImplicitKvs doc mb_assoc free_kvs tv_names $ \ kv_nms ->
+           ; bindImplicitKvs doc mb_assoc free_kvs tv_names $
+             \ new_kv_nms other_kv_nms ->
              do { (kind', fvs1) <- rnLHsKind doc kind
                 ; tv_nm  <- newTyVarNameRn mb_assoc lrdr
                 ; (b, fvs2) <- bindLocalNamesFV [tv_nm] $
-                               thing_inside kv_nms
+                               thing_inside new_kv_nms other_kv_nms
                                  (L loc (KindedTyVar (L lv tv_nm) kind'))
                 ; return (b, fvs1 `plusFV` fvs2) }}
   where
@@ -964,9 +971,11 @@ bindImplicitKvs :: HsDocContext
                                       -- intent to bind is inferred
                 -> NameSet            -- ^ *type* variables, for type/kind
                                       -- misuse check for -XNoTypeInType
-                -> ([Name] -> RnM (b, FreeVars)) -- ^ passed new kv_names
+                -> ([Name] -> NameSet -> RnM (b, FreeVars))
+                   -- ^ passed new kv_names, and any other names used in a kind
                 -> RnM (b, FreeVars)
-bindImplicitKvs _   _        []       _        thing_inside = thing_inside []
+bindImplicitKvs _   _        []       _        thing_inside
+  = thing_inside [] emptyNameSet
 bindImplicitKvs doc mb_assoc free_kvs tv_names thing_inside
   = do { rdr_env <- getLocalRdrEnv
        ; let part_kvs lrdr@(L loc kv_rdr)
@@ -987,7 +996,7 @@ bindImplicitKvs doc mb_assoc free_kvs tv_names thing_inside
           -- bind the vars and move on
        ; kv_nms <- mapM (newTyVarNameRn mb_assoc) new_kvs
        ; bindLocalNamesFV kv_nms $
-         thing_inside kv_nms }
+         thing_inside kv_nms (mkNameSet (map unLoc bound_kvs)) }
   where
       -- check to see if the variables free in a kind are bound as type
       -- variables. Assume -XNoTypeInType.

@@ -1712,7 +1712,7 @@ tcImplicitTKBndrs.
 checkValidTelescope :: SDoc        -- the original user-written telescope
                     -> [TyVar]     -- explicit vars (not necessarily zonked)
                     -> SDoc        -- note to put at bottom of message
-                    -> TcM ()      -- returns zonked tyvars
+                    -> TcM ()
 checkValidTelescope hs_tvs orig_tvs extra
   = discardResult $ checkZonkValidTelescope hs_tvs orig_tvs extra
 

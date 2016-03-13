@@ -74,6 +74,7 @@ import PlaceHolder ( PostTc,PostRn,DataId,PlaceHolder(..) )
 import Id ( Id )
 import Name( Name )
 import RdrName ( RdrName )
+import NameSet ( NameSet, emptyNameSet )
 import DataCon( HsSrcBang(..), HsImplBang(..),
                 SrcStrictness(..), SrcUnpackedness(..) )
 import TysPrim( funTyConName )
@@ -246,23 +247,27 @@ data LHsQTyVars name   -- See Note [HsType binders]
   = HsQTvs { hsq_implicit :: PostRn name [Name]      -- implicit (dependent) variables
            , hsq_explicit :: [LHsTyVarBndr name]     -- explicit variables
              -- See Note [HsForAllTy tyvar binders]
+           , hsq_dependent :: PostRn name NameSet
+               -- which explicit vars are dependent
+               -- See Note [Dependent LHsQTyVars] in TcHsType
     }
   deriving( Typeable )
 
 deriving instance (DataId name) => Data (LHsQTyVars name)
 
 mkHsQTvs :: [LHsTyVarBndr RdrName] -> LHsQTyVars RdrName
-mkHsQTvs tvs = HsQTvs { hsq_implicit = PlaceHolder, hsq_explicit = tvs }
+mkHsQTvs tvs = HsQTvs { hsq_implicit = PlaceHolder, hsq_explicit = tvs
+                      , hsq_dependent = PlaceHolder }
 
 hsQTvExplicit :: LHsQTyVars name -> [LHsTyVarBndr name]
 hsQTvExplicit = hsq_explicit
 
 emptyLHsQTvs :: LHsQTyVars Name
-emptyLHsQTvs = HsQTvs [] []
+emptyLHsQTvs = HsQTvs [] [] emptyNameSet
 
 isEmptyLHsQTvs :: LHsQTyVars Name -> Bool
-isEmptyLHsQTvs (HsQTvs [] []) = True
-isEmptyLHsQTvs _              = False
+isEmptyLHsQTvs (HsQTvs [] [] _) = True
+isEmptyLHsQTvs _                = False
 
 ------------------------------------------------
 --            HsImplicitBndrs
