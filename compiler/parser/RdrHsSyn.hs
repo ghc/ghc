@@ -180,6 +180,7 @@ mkTyData loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
        ; return (L loc (DataDecl { tcdLName = tc, tcdTyVars = tyvars,
                                    tcdDataDefn = defn,
+                                   tcdDataCusk = PlaceHolder,
                                    tcdFVs = placeHolderNames })) }
 
 mkDataDefn :: NewOrData

@@ -1,0 +1,8 @@
+
+T11648b.hs:7:1: error:
+    You have written a *complete user-suppled kind signature*,
+    but the following variable is undetermined: k0 :: *
+    Perhaps add a kind signature.
+    Inferred kinds of user-written variables:
+      k :: k0
+      a :: Proxy k

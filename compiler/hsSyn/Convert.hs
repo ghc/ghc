@@ -215,6 +215,7 @@ cvtDec (DataD ctxt tc tvs ksig constrs derivs)
                                 , dd_cons = cons', dd_derivs = derivs' }
         ; returnJustL $ TyClD (DataDecl { tcdLName = tc', tcdTyVars = tvs'
                                         , tcdDataDefn = defn
+                                        , tcdDataCusk = PlaceHolder
                                         , tcdFVs = placeHolderNames }) }
 
 cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
@@ -229,6 +230,7 @@ cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
                                 , dd_derivs = derivs' }
         ; returnJustL $ TyClD (DataDecl { tcdLName = tc', tcdTyVars = tvs'
                                     , tcdDataDefn = defn
+                                    , tcdDataCusk = PlaceHolder
                                     , tcdFVs = placeHolderNames }) }
 
 cvtDec (ClassD ctxt cl tvs fds decs)

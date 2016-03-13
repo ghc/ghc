@@ -40,6 +40,7 @@ import Id
 import Name hiding( isVarOcc, isTcOcc, varName, tcName )
 import THNames
 import NameEnv
+import NameSet
 import TcType
 import TyCon
 import TysWiredIn
@@ -323,7 +324,8 @@ repFamilyDecl decl@(L loc (FamilyDecl { fdInfo      = info,
                                         fdInjectivityAnn = injectivity }))
   = do { tc1 <- lookupLOcc tc           -- See note [Binders and occurrences]
        ; let mkHsQTvs :: [LHsTyVarBndr Name] -> LHsQTyVars Name
-             mkHsQTvs tvs = HsQTvs { hsq_implicit = [], hsq_explicit = tvs }
+             mkHsQTvs tvs = HsQTvs { hsq_implicit = [], hsq_explicit = tvs
+                                   , hsq_dependent = emptyNameSet }
              resTyVar = case resultSig of
                      TyVarSig bndr -> mkHsQTvs [bndr]
                      _             -> mkHsQTvs []
@@ -471,7 +473,8 @@ repTyFamEqn (L _ (TyFamEqn { tfe_pats = HsIB { hsib_body = tys
                                              , hsib_vars = var_names }
                            , tfe_rhs = rhs }))
   = do { let hs_tvs = HsQTvs { hsq_implicit = var_names
-                             , hsq_explicit = [] }   -- Yuk
+                             , hsq_explicit = []
+                             , hsq_dependent = emptyNameSet }   -- Yuk
        ; addTyClTyVarBinds hs_tvs $ \ _ ->
          do { tys1 <- repLTys tys
             ; tys2 <- coreList typeQTyConName tys1
@@ -484,7 +487,8 @@ repDataFamInstD (DataFamInstDecl { dfid_tycon = tc_name
                                  , dfid_defn = defn })
   = do { tc <- lookupLOcc tc_name               -- See note [Binders and occurrences]
        ; let hs_tvs = HsQTvs { hsq_implicit = var_names
-                             , hsq_explicit = [] }   -- Yuk
+                             , hsq_explicit = []
+                             , hsq_dependent = emptyNameSet }   -- Yuk
        ; addTyClTyVarBinds hs_tvs $ \ bndrs ->
          do { tys1 <- repList typeQTyConName repLTy tys
             ; repDataDefn tc bndrs (Just tys1) defn } }
@@ -627,7 +631,8 @@ repC (L _ (ConDeclGADT { con_names = cons
   = do { let doc = text "In the constructor for " <+> ppr (head cons)
              con_tvs = HsQTvs { hsq_implicit = []
                               , hsq_explicit = (map (noLoc . UserTyVar . noLoc)
-                                                   con_vars) ++ tvs }
+                                                   con_vars) ++ tvs
+                              , hsq_dependent = emptyNameSet }
        ; addTyVarBinds con_tvs $ \ ex_bndrs -> do
        { (hs_details, gadt_res_ty) <-
            updateGadtResult failWithDs doc details res_ty'
@@ -875,7 +880,8 @@ repHsSigWcType (HsIB { hsib_vars = vars
   | (explicit_tvs, ctxt, ty) <- splitLHsSigmaTy (hswc_body sig1)
   = addTyVarBinds (HsQTvs { hsq_implicit = []
                           , hsq_explicit = map (noLoc . UserTyVar . noLoc) vars ++
-                                           explicit_tvs })
+                                           explicit_tvs
+                          , hsq_dependent = emptyNameSet })
                   $ \ th_tvs ->
     do { th_ctxt <- repLContext ctxt
        ; th_ty   <- repLTy ty
@@ -897,7 +903,8 @@ repForall :: HsType Name -> DsM (Core TH.TypeQ)
 -- Arg of repForall is always HsForAllTy or HsQualTy
 repForall ty
  | (tvs, ctxt, tau) <- splitLHsSigmaTy (noLoc ty)
- = addTyVarBinds (HsQTvs { hsq_implicit = [], hsq_explicit = tvs}) $ \bndrs ->
+ = addTyVarBinds (HsQTvs { hsq_implicit = [], hsq_explicit = tvs
+                         , hsq_dependent = emptyNameSet }) $ \bndrs ->
    do { ctxt1  <- repLContext ctxt
       ; ty1    <- repLTy tau
       ; repTForall bndrs ctxt1 ty1 }

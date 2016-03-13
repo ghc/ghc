@@ -87,6 +87,7 @@ module TcType (
   orphNamesOfTypes, orphNamesOfCoCon,
   getDFunTyKey,
   evVarPred_maybe, evVarPred,
+  anonymiseTyBinders,
 
   ---------------------------------
   -- Predicate types
@@ -225,6 +226,7 @@ import Control.Monad (liftM, ap)
 import Control.Applicative (Applicative(..), (<$>) )
 #endif
 import Data.Functor.Identity
+import Data.List ( mapAccumR )
 
 {-
 ************************************************************************
@@ -2345,3 +2347,28 @@ sizeType = go
 
 sizeTypes :: [Type] -> TypeSize
 sizeTypes tys = sum (map sizeType tys)
+
+{-
+************************************************************************
+*                                                                      *
+       Binders
+*                                                                      *
+************************************************************************
+-}
+
+-- | Given a list of binders and a type they bind in, turn any
+-- superfluous Named binders into Anon ones.
+anonymiseTyBinders :: [TyBinder] -> Type -> [TyBinder]
+anonymiseTyBinders binders res_ty = binders'
+  where
+    (_, binders') = mapAccumR go (tyCoVarsOfTypeAcc res_ty) binders
+
+    go :: FV -> TyBinder -> (FV, TyBinder)
+    go fv (Named tv Visible)
+      | not (tv `elemVarSet` runFVSet fv)
+      = ( (tv `FV.delFV` fv) `unionFV` tyCoVarsOfTypeAcc kind
+        , Anon kind )
+      where
+        kind = tyVarKind tv
+
+    go fv binder = (tyCoVarsBndrAcc binder fv, binder)
