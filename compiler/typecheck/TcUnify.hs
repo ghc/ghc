@@ -50,7 +50,6 @@ import TyCon
 import TysWiredIn
 import Var
 import VarEnv
-import NameEnv
 import ErrUtils
 import DynFlags
 import BasicTypes
@@ -1450,47 +1449,15 @@ checkTauTvUpdate dflags origin t_or_k tv ty
   = do { ty   <- zonkTcType ty
        ; co_k <- uType kind_origin KindLevel (typeKind ty) (tyVarKind tv)
        ; return $ case occurCheckExpand dflags tv ty of
-           OC_OK ty2 | type_fam_free ty2 -> Just (ty2, co_k)
-           _                             -> Nothing }
+           OC_OK ty2 -> Just (ty2, co_k)
+           _         -> Nothing }
 
   where
     kind_origin   = KindEqOrigin (mkTyVarTy tv) (Just ty) origin (Just t_or_k)
     details       = tcTyVarDetails tv
     info          = mtv_info details
 
-    -- See Note [Conservative unification check]
-    type_fam_free :: TcType -> Bool
-    type_fam_free = not . any isTypeFamilyTyCon . nameEnvElts . tyConsOfType
-
 {-
-Note [Conservative unification check]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When unifying (tv ~ rhs), w try to avoid creating deferred constraints
-only for efficiency.  However, we do not unify if
-  a) There's an occurs check (tv is in fvs(rhs)) (established by occurCheckExpand)
-     (see Note [Type synonyms and the occur check])
-  b) There's a type-function call in 'rhs'
-
-We always defer type-function calls, even if it's be perfectly safe to
-unify, eg (a ~ F [b]).  Reason: this ensures that the constraint
-solver gets to see, and hence simplify the type-function call, which
-in turn might simplify the type of an inferred function.  Test ghci046
-is a case in point.
-
-More mysteriously, test T7010 gave a horrible error
-  T7010.hs:29:21:
-    Couldn't match type `Serial (ValueTuple Float)' with `IO Float'
-    Expected type: (ValueTuple Vector, ValueTuple Vector)
-      Actual type: (ValueTuple Vector, ValueTuple Vector)
-because an insoluble type function constraint got mixed up with
-a soluble one when flattening.  I never fully understood this, but
-deferring type-function applications made it go away :-(.
-T5853 also got a less-good error message with more aggressive
-unification of type functions.
-
-Moreover the Note [Type family sharing] gives another reason, but
-again I'm not sure if it's really valid.
-
 Note [Type synonyms and the occur check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Generally speaking we try to update a variable with type synonyms not
@@ -1515,41 +1482,6 @@ the underlying definition of the type synonym.
 
 The same applies later on in the constraint interaction code; see TcInteract,
 function @occ_check_ok@.
-
-Note [Type family sharing]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-We must avoid eagerly unifying type variables to types that contain function symbols,
-because this may lead to loss of sharing, and in turn, in very poor performance of the
-constraint simplifier. Assume that we have a wanted constraint:
-{
-  m1 ~ [F m2],
-  m2 ~ [F m3],
-  m3 ~ [F m4],
-  D m1,
-  D m2,
-  D m3
-}
-where D is some type class. If we eagerly unify m1 := [F m2], m2 := [F m3], m3 := [F m4],
-then, after zonking, our constraint simplifier will be faced with the following wanted
-constraint:
-{
-  D [F [F [F m4]]],
-  D [F [F m4]],
-  D [F m4]
-}
-which has to be flattened by the constraint solver. In the absence of
-a flat-cache, this may generate a polynomially larger number of
-flatten skolems and the constraint sets we are working with will be
-polynomially larger.
-
-Instead, if we defer the unifications m1 := [F m2], etc. we will only
-be generating three flatten skolems, which is the maximum possible
-sharing arising from the original constraint.  That's why we used to
-use a local "ok" function, a variant of TcType.occurCheckExpand.
-
-HOWEVER, we *do* now have a flat-cache, which effectively recovers the
-sharing, so there's no great harm in losing it -- and it's generally
-more efficient to do the unification up-front.
 
 Note [Non-TcTyVars in TcUnify]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
