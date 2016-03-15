@@ -11,20 +11,18 @@ T7786.hs:86:22: error:
         Nil :: Sing xxx <- return
                              (buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db)
 
-T7786.hs:86:49: error:
+T7786.hs:86:22: error:
     • Couldn't match type ‘xxx’
                      with ‘Intersect (BuriedUnder sub k 'Empty) inv’
       Expected type: Sing xxx
         Actual type: Sing (Intersect (BuriedUnder sub k 'Empty) inv)
-    • In the first argument of ‘return’, namely
-        ‘(buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db)’
+    • When checking that the pattern signature: Sing xxx
+        fits the type of its context:
+          Sing (Intersect (BuriedUnder sub k 'Empty) inv)
+      In the pattern: Nil :: Sing xxx
       In a stmt of a 'do' block:
         Nil :: Sing xxx <- return
                              (buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db)
-      In the expression:
-        do { Nil :: Sing xxx <- return
-                                  (buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db);
-             return $ Sub db k sub }
     • Relevant bindings include
         sub :: Database sub (bound at T7786.hs:86:13)
         k :: Sing k (bound at T7786.hs:86:11)
