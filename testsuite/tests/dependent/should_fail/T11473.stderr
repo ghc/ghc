@@ -1,0 +1,7 @@
+
+T11473.hs:19:7: error:
+    The following variable has an unknown runtime representation:
+        Var name: x
+        Var type: a
+     Type's kind: TYPE r
+    Perhaps add a type or kind signature to fix the representation.
