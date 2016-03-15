@@ -117,7 +117,7 @@ decls (group, _, _, _) = concatMap ($ group)
     ]
   where
     typ (GHC.L _ t) = case t of
-        GHC.DataDecl name _ _ _ -> pure . decl $ name
+        GHC.DataDecl { tcdLName = name } -> pure . decl $ name
         GHC.SynDecl name _ _ _ -> pure . decl $ name
         GHC.FamDecl fam -> pure . decl $ GHC.fdLName fam
         GHC.ClassDecl{..} -> [decl tcdLName] ++ concatMap sig tcdSigs

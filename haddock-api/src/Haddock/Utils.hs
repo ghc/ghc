@@ -64,6 +64,7 @@ import Haddock.GhcUtils
 
 import GHC
 import Name
+import NameSet ( emptyNameSet )
 import HsTypes (selectorFieldOcc)
 
 import Control.Monad ( liftM )
@@ -201,7 +202,8 @@ restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
             c' = ConDeclH98
                    { con_name = head (con_names c)
                    , con_qvars = Just $ HsQTvs { hsq_implicit = mempty
-                                               , hsq_explicit = tvs }
+                                               , hsq_explicit = tvs
+                                               , hsq_dependent = emptyNameSet }
                    , con_cxt = Just cxt
                    , con_details = details
                    , con_doc = con_doc c
@@ -226,7 +228,8 @@ emptyHsQTvs :: LHsQTyVars Name
 -- does not necessarily have all the rigt kind variables.  It is used
 -- in Haddock just for printing, so it doesn't matter
 emptyHsQTvs = HsQTvs { hsq_implicit = error "haddock:emptyHsQTvs"
-                     , hsq_explicit = [] }
+                     , hsq_explicit = []
+                     , hsq_dependent = error "haddock:emptyHsQTvs" }
 
 
 --------------------------------------------------------------------------------

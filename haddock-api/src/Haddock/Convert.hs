@@ -27,6 +27,7 @@ import DataCon
 import FamInstEnv
 import HsSyn
 import Name
+import NameSet ( emptyNameSet )
 import RdrName ( mkVarUnqual )
 import PatSyn
 import SrcLoc ( Located, noLoc, unLoc )
@@ -145,7 +146,7 @@ synifyTyCon _coax tc
                          in HsQTvs { hsq_implicit = []   -- No kind polymorphism
                                    , hsq_explicit = zipWith mk_hs_tv (fst (splitFunTys (tyConKind tc)))
                                                                 alphaTyVars --a, b, c... which are unfortunately all kind *
-                                   }
+                                   , hsq_dependent = emptyNameSet }
 
            , tcdDataDefn = HsDataDefn { dd_ND = DataType  -- arbitrary lie, they are neither
                                                     -- algebraic data nor newtype:
@@ -155,6 +156,7 @@ synifyTyCon _coax tc
                                                -- we have their kind accurately:
                                       , dd_cons = []  -- No constructors
                                       , dd_derivs = Nothing }
+           , tcdDataCusk = False
            , tcdFVs = placeHolderNamesTc }
 
 synifyTyCon _coax tc
@@ -234,7 +236,7 @@ synifyTyCon coax tc
  in case lefts consRaw of
   [] -> return $
         DataDecl { tcdLName = name, tcdTyVars = tyvars, tcdDataDefn = defn
-                 , tcdFVs = placeHolderNamesTc }
+                 , tcdDataCusk = False, tcdFVs = placeHolderNamesTc }
   dataConErrs -> Left $ unlines dataConErrs
 
 synifyInjectivityAnn :: Maybe Name -> [TyVar] -> Injectivity
@@ -323,7 +325,8 @@ synifyCtx = noLoc . map (synifyType WithinType)
 
 synifyTyVars :: [TyVar] -> LHsQTyVars Name
 synifyTyVars ktvs = HsQTvs { hsq_implicit = []
-                           , hsq_explicit = map synifyTyVar ktvs }
+                           , hsq_explicit = map synifyTyVar ktvs
+                           , hsq_dependent = emptyNameSet }
 
 synifyTyVar :: TyVar -> LHsTyVarBndr Name
 synifyTyVar tv
