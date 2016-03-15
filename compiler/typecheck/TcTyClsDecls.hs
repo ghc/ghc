@@ -320,15 +320,14 @@ kcTyClGroup (TyClGroup { group_tyclds = decls })
                  kc_res_kind = tyConResKind tc
            ; kvs <- kindGeneralize (mkForAllTys kc_binders kc_res_kind)
            ; (kc_binders', kc_res_kind') <- zonkTcKindToKind kc_binders kc_res_kind
-           ; let kc_binders'' = anonymiseTyBinders kc_binders' kc_res_kind'
 
                       -- Make sure kc_kind' has the final, zonked kind variables
            ; traceTc "Generalise kind" $
              vcat [ ppr name, ppr kc_binders, ppr kc_res_kind
-                  , ppr kvs, ppr kc_binders'', ppr kc_res_kind' ]
+                  , ppr kvs, ppr kc_binders', ppr kc_res_kind' ]
 
            ; return (mkTcTyCon name
-                               (map (mkNamedBinder Invisible) kvs ++ kc_binders'')
+                               (map (mkNamedBinder Invisible) kvs ++ kc_binders')
                                kc_res_kind'
                                (mightBeUnsaturatedTyCon tc)) }
 
