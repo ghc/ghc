@@ -131,7 +131,8 @@ Unboxed type kinds
 ------------------
 
 Because unboxed types are represented without the use of pointers, we
-cannot store them in standard datatypes. For example, the ``Just`` node
+cannot store them in use a polymorphic datatype at an unboxed type.
+For example, the ``Just`` node
 of ``Just 42#`` would have to be different from the ``Just`` node of
 ``Just 42``; the former stores an integer directly, while the latter
 stores a pointer. GHC currently does not support this variety of ``Just``
@@ -145,10 +146,11 @@ specifies their runtime representation. For example, the type ``Int#`` has
 kind ``TYPE 'IntRep`` and ``Double#`` has kind ``TYPE 'DoubleRep``. These
 kinds say that the runtime representation of an ``Int#`` is a machine integer,
 and the runtime representation of a ``Double#`` is a machine double-precision
-floating point. More details of the ``TYPE`` mechanisms appear in
+floating point. In constrast, the kind ``*`` is actually just a synonym
+for ``TYPE 'PtrRepLifted``. More details of the ``TYPE`` mechanisms appear in
 the `section on runtime representation polymorphism <#runtime-rep>`__.
 
-Given that ``Int#``'s kind is not ``*``, it then is easy to see that
+Given that ``Int#``'s kind is not ``*``, it then it follows that
 ``Maybe Int#`` is disallowed. Similarly, because type variables tend
 to be of kind ``*`` (for example, in ``(.) :: (b -> c) -> (a -> b) -> a -> c``,
 all the type variables have kind ``*``), polymorphism tends not to work
@@ -6917,7 +6919,7 @@ With :ghc-flag:`-XDataKinds`, GHC automatically promotes every datatype
 to be a kind and its (value) constructors to be type constructors. The
 following types ::
 
-    data Nat = Ze | Su Nat
+    data Nat = Zero | Succ Nat
 
     data List a = Nil | Cons a (List a)
 
@@ -6925,11 +6927,12 @@ following types ::
 
     data Sum a b = L a | R b
 
-give rise to the following kinds and type constructors: ::
+give rise to the following kinds and type constructors (where promoted
+constructors are prefixed by a tick ``'``): ::
 
     Nat :: *
-    'Ze :: Nat
-    'Su :: Nat -> Nat
+    'Zero :: Nat
+    'Succ :: Nat -> Nat
 
     List :: * -> *
     'Nil  :: forall k. List k
@@ -6944,8 +6947,8 @@ give rise to the following kinds and type constructors: ::
 
 The following restrictions apply to promotion:
 
--  We promote ``data`` types and ``newtypes``, but not type synonyms, or
-   type/data families (:ref:`type-families`).
+-  We promote ``data`` types and ``newtypes``; type synonyms and
+   type/data families are not promoted (:ref:`type-families`).
 
 -  We only promote types whose kinds are of the form
    ``* -> ... -> * -> *``. In particular, we do not promote
@@ -7061,7 +7064,8 @@ not mentioned in the arguments, and thus it would seem that an instance
 would have to return a member of ``k`` *for any* ``k``. However, this is
 not the case. The type family ``UnEx`` is a kind-indexed type family.
 The return kind ``k`` is an implicit parameter to ``UnEx``. The
-elaborated definitions are as follows: ::
+elaborated definitions are as follows (where implicit parameters are
+denoted by braces): ::
 
     type family UnEx {k :: *} (ex :: Ex) :: k
     type instance UnEx {k} (MkEx @k x) = x
@@ -7084,7 +7088,9 @@ Kind polymorphism and Type-in-Type
     :implies: :ghc-flag:`-XPolyKinds`, :ghc-flag:`-XDataKinds`, :ghc-flag:`-XKindSignatures`
     :since: 8.0.1
 
-    Allow kinds to be as intricate as types.
+    Allow kinds to be as intricate as types, allowing explicit quantification
+    over kind variables, higher-rank kinds, and the use of type synonyms and
+    families in kinds, among other features.
 
 .. ghc-flag:: -XPolyKinds
 
@@ -7224,6 +7230,10 @@ This rule has occasionally-surprising consequences (see
 
 The kind-polymorphism from the class declaration makes ``D1``
 kind-polymorphic, but not so ``D2``; and similarly ``F1``, ``F1``.
+
+.. index::
+   single: CUSK
+   single: complete user-supplied kind signature
 
 .. _complete-kind-signatures:
 
@@ -7609,6 +7619,10 @@ kind polymorphism and are confused as to why GHC is rejecting (or accepting)
 your program, we encourage you to turn on these flags, especially
 :ghc-flag:`-fprint-explicit-kinds`.
 
+.. index::
+   single: TYPE
+   single: runtime representation polymorphism
+   
 .. _runtime-rep:
 
 Runtime representation polymorphism
@@ -7633,8 +7647,8 @@ Here are the key definitions, all available from ``GHC.Exts``: ::
 
   data RuntimeRep = PtrRepLifted     -- for things like `Int`
                   | PtrRepUnlifted   -- for things like `Array#`
-		  | IntRep           -- for things like `Int#`
-		  | ...
+                  | IntRep           -- for things like `Int#`
+                  | ...
   
   type * = TYPE PtrRepLifted    -- * is just an ordinary type synonym
 
@@ -7713,7 +7727,7 @@ by supposing all type variables of type ``RuntimeType`` to be ``'PtrRepLifted``
 when printing, and printing ``TYPE 'PtrRepLifted`` as ``*``.
 
 Should you wish to see representation polymorphism in your types, enable
-the flag :ghc-flag:`-Wprint-explicit-runtime-rep`.
+the flag :ghc-flag:`-fprint-explicit-runtime-reps`.
 
 .. _type-level-literals:
 
@@ -7876,12 +7890,15 @@ dependency. In class instances, we define the type instances of FD
 families in accordance with the class head. Method signatures are not
 affected by that process.
 
+.. index::
+   pair: Type equality constraints; kind heterogeneous
+
 Heterogeneous equality
 ----------------------
 
-GHC also supports *heterogeneous* equality, which relates two types of potentially
-different kinds. Heterogeneous equality is spelled ``~~``. Here are the
-kinds of ``~`` and ``~~`` to better understand their difference: ::
+GHC also supports *kind-heterogeneous* equality, which relates two types of
+potentially different kinds. Heterogeneous equality is spelled ``~~``. Here
+are the kinds of ``~`` and ``~~`` to better understand their difference: ::
 
   (~)  :: forall k. k -> k -> Constraint
   (~~) :: forall k1 k2. k1 -> k2 -> Constraint
