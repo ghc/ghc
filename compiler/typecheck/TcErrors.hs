@@ -1140,7 +1140,7 @@ reportEqErr :: ReportErrCtxt -> Report
             -> Maybe SwapFlag   -- Nothing <=> not sure
             -> TcType -> TcType -> TcM ErrMsg
 reportEqErr ctxt report ct oriented ty1 ty2
-  = mkErrorMsgFromCt ctxt ct (mconcat [misMatch, eqInfo, report])
+  = mkErrorMsgFromCt ctxt ct (mconcat [misMatch, report, eqInfo])
   where misMatch = important $ misMatchOrCND ctxt ct oriented ty1 ty2
         eqInfo = important $ mkEqInfoMsg ct ty1 ty2
 
@@ -1280,12 +1280,19 @@ mkEqInfoMsg ct ty1 ty2
               = snd (mkAmbigMsg False ct)
               | otherwise = empty
 
-    invis_msg | Just vis <- tcEqTypeVis ty1 ty2
+    -- better to check the exp/act types in the CtOrigin than the actual
+    -- mismatched types for suggestion about -fprint-explicit-kinds
+    (act_ty, exp_ty) = case ctOrigin ct of
+      TypeEqOrigin { uo_actual = act
+                   , uo_expected = Check exp } -> (act, exp)
+      _                                        -> (ty1, ty2)
+
+    invis_msg | Just vis <- tcEqTypeVis act_ty exp_ty
               , vis /= Visible
               = sdocWithDynFlags $ \dflags ->
                 if gopt Opt_PrintExplicitKinds dflags
-                then text "Use -fprint-explicit-kinds to see the kind arguments"
-                else empty
+                then empty
+                else text "Use -fprint-explicit-kinds to see the kind arguments"
 
               | otherwise
               = empty

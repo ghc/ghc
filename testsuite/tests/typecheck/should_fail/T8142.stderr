@@ -1,10 +1,10 @@
 
 T8142.hs:6:18: error:
     • Couldn't match type ‘Nu g0’ with ‘Nu g’
-      NB: ‘Nu’ is a type function, and may not be injective
-      The type variable ‘g0’ is ambiguous
       Expected type: Nu ((,) t) -> Nu g
         Actual type: Nu ((,) t0) -> Nu g0
+      NB: ‘Nu’ is a type function, and may not be injective
+      The type variable ‘g0’ is ambiguous
     • In the ambiguity check for the inferred type for ‘h’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the inferred type
