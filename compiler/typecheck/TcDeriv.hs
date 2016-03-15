@@ -1240,10 +1240,10 @@ no_cons_why rep_tc = quotes (pprSourceTyCon rep_tc) <+>
                      text "must have at least one data constructor"
 
 cond_RepresentableOk :: Condition
-cond_RepresentableOk (_, tc, tc_args) = canDoGenerics tc tc_args
+cond_RepresentableOk (dflags, tc, tc_args) = canDoGenerics dflags tc tc_args
 
 cond_Representable1Ok :: Condition
-cond_Representable1Ok (_, tc, tc_args) = canDoGenerics1 tc tc_args
+cond_Representable1Ok (dflags, tc, tc_args) = canDoGenerics1 dflags tc tc_args
 
 cond_enumOrProduct :: Class -> Condition
 cond_enumOrProduct cls = cond_isEnumeration `orCond`
