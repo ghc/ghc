@@ -1170,16 +1170,8 @@ uType origin t_or_k orig_ty1 orig_ty2
       -- See Note [Mismatched type lists and application decomposition]
       | tc1 == tc2, length tys1 == length tys2
       = ASSERT2( isGenerativeTyCon tc1 Nominal, ppr tc1 )
-        do { cos <- zipWith3M (uType origin) t_or_ks tys1 tys2
+        do { cos <- zipWithM (uType origin t_or_k) tys1 tys2
            ; return $ mkTyConAppCo Nominal tc1 cos }
-      where
-        bndrs      = tyConBinders tc1
-        t_or_ks    = case t_or_k of
-                       KindLevel -> repeat KindLevel
-                       TypeLevel -> map (\bndr -> if isNamedBinder bndr
-                                                  then KindLevel
-                                                  else TypeLevel) bndrs ++
-                                    repeat TypeLevel
 
     go (LitTy m) ty@(LitTy n)
       | m == n
