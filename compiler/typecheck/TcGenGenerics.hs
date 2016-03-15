@@ -18,6 +18,7 @@ import Type
 import TcType
 import TcGenDeriv
 import DataCon
+import DynFlags    ( DynFlags, GeneralFlag(Opt_PrintExplicitKinds), gopt )
 import TyCon
 import FamInstEnv       ( FamInst, FamFlavor(..), mkSingleCoAxiom )
 import FamInst
@@ -128,7 +129,7 @@ following constraints are satisfied.
 
 -}
 
-canDoGenerics :: TyCon -> [Type] -> Validity
+canDoGenerics :: DynFlags -> TyCon -> [Type] -> Validity
 -- canDoGenerics rep_tc tc_args determines if Generic/Rep can be derived for a
 -- type expression (rep_tc tc_arg0 tc_arg1 ... tc_argn).
 --
@@ -136,7 +137,7 @@ canDoGenerics :: TyCon -> [Type] -> Validity
 -- care of because canDoGenerics is applied to rep tycons.
 --
 -- It returns Nothing if deriving is possible. It returns (Just reason) if not.
-canDoGenerics tc tc_args
+canDoGenerics dflags tc tc_args
   = mergeErrors (
           -- Check (c) from Note [Requirements for deriving Generic and Rep].
               (if (not (null (tyConStupidTheta tc)))
@@ -146,7 +147,12 @@ canDoGenerics tc tc_args
           --
           -- Data family indices can be instantiated; the `tc_args` here are
           -- the representation tycon args
-              (if (all isTyVarTy (filterOutInvisibleTypes tc tc_args))
+          --
+          -- NB: Use user_tc here. In the case of a data *instance*, the
+          -- user_tc is the family tc, which has the right visibility settings.
+          -- (For a normal datatype, user_tc == tc.) Getting this wrong
+          -- led to #11357.
+              (if (all isTyVarTy (filterOutInvisibleTypes user_tc tc_args))
                 then IsValid
                 else NotValid (tc_name <+> text "must not be instantiated;" <+>
                                text "try deriving `" <> tc_name <+> tc_tys <>
@@ -156,9 +162,14 @@ canDoGenerics tc tc_args
   where
     -- The tc can be a representation tycon. When we want to display it to the
     -- user (in an error message) we should print its parent
-    (tc_name, tc_tys) = case tyConFamInst_maybe tc of
-        Just (ptc, tys) -> (ppr ptc, hsep (map ppr (tys ++ drop (length tys) tc_args)))
-        _               -> (ppr tc, hsep (map ppr (tyConTyVars tc)))
+    (user_tc, tc_name, tc_tys) = case tyConFamInst_maybe tc of
+        Just (ptc, tys) -> (ptc, ppr ptc, hsep (map ppr (filter_kinds $ tys ++ drop (length tys) tc_args)))
+        _               -> (tc, ppr tc, hsep (map ppr (filter_kinds $ mkTyVarTys $ tyConTyVars tc)))
+
+    filter_kinds | gopt Opt_PrintExplicitKinds dflags
+                 = id
+                 | otherwise
+                 = filterOutInvisibleTypes user_tc
 
         -- Check (d) from Note [Requirements for deriving Generic and Rep].
         --
@@ -228,9 +239,9 @@ explicitly, even though foldDataConArgs is also doing this internally.
 -- are taken care of by the call to canDoGenerics.
 --
 -- It returns Nothing if deriving is possible. It returns (Just reason) if not.
-canDoGenerics1 :: TyCon -> [Type] -> Validity
-canDoGenerics1 rep_tc tc_args =
-  canDoGenerics rep_tc tc_args `andValid` additionalChecks
+canDoGenerics1 :: DynFlags -> TyCon -> [Type] -> Validity
+canDoGenerics1 dflags rep_tc tc_args =
+  canDoGenerics dflags rep_tc tc_args `andValid` additionalChecks
   where
     additionalChecks
         -- check (f) from Note [Requirements for deriving Generic and Rep]
