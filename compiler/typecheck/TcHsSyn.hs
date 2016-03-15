@@ -276,6 +276,7 @@ zonkIdOccs env ids = map (zonkIdOcc env) ids
 zonkIdBndr :: ZonkEnv -> TcId -> TcM Id
 zonkIdBndr env id
   = do ty' <- zonkTcTypeToType env (idType id)
+       ensureNotRepresentationPolymorphic id ty'
        return (setIdType id ty')
 
 zonkIdBndrs :: ZonkEnv -> [TcId] -> TcM [Id]
@@ -456,25 +457,43 @@ zonk_bind env (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
                         , abe_mono = zonkIdOcc env mono_id
                         , abe_prags = new_prags })
 
-zonk_bind env (AbsBindsSig { abs_tvs         = tyvars
-                           , abs_ev_vars     = evs
-                           , abs_sig_export  = poly
-                           , abs_sig_prags   = prags
-                           , abs_sig_ev_bind = ev_bind
-                           , abs_sig_bind    = bind })
+zonk_bind env outer_bind@(AbsBindsSig { abs_tvs         = tyvars
+                                      , abs_ev_vars     = evs
+                                      , abs_sig_export  = poly
+                                      , abs_sig_prags   = prags
+                                      , abs_sig_ev_bind = ev_bind
+                                      , abs_sig_bind    = lbind })
+  | L bind_loc bind@(FunBind { fun_id      = L loc local
+                             , fun_matches = ms
+                             , fun_co_fn   = co_fn }) <- lbind
   = ASSERT( all isImmutableTyVar tyvars )
     do { (env0, new_tyvars)  <- zonkTyBndrsX env  tyvars
        ; (env1, new_evs)     <- zonkEvBndrsX env0 evs
        ; (env2, new_ev_bind) <- zonkTcEvBinds env1 ev_bind
-       ; new_val_bind        <- zonk_lbind env2 bind
+           -- Inline zonk_bind (FunBind ...) because we wish to skip
+           -- the check for representation-polymorphic binders. The
+           -- local binder in the FunBind in an AbsBindsSig is never actually
+           -- bound in Core -- indeed, that's the whole point of AbsBindsSig.
+           -- just calling zonk_bind causes #11405.
+       ; new_local           <- updateVarTypeM (zonkTcTypeToType env2) local
+       ; (env3, new_co_fn)   <- zonkCoFn env2 co_fn
+       ; new_ms              <- zonkMatchGroup env3 zonkLExpr ms
+           -- If there is a representation polymorphism problem, it will
+           -- be caught here:
        ; new_poly_id         <- zonkIdBndr env2 poly
        ; new_prags           <- zonkSpecPrags env2 prags
+       ; let new_val_bind = L bind_loc (bind { fun_id      = L loc new_local
+                                             , fun_matches = new_ms
+                                             , fun_co_fn   = new_co_fn })
        ; return (AbsBindsSig { abs_tvs         = new_tyvars
                              , abs_ev_vars     = new_evs
                              , abs_sig_export  = new_poly_id
                              , abs_sig_prags   = new_prags
                              , abs_sig_ev_bind = new_ev_bind
                              , abs_sig_bind    = new_val_bind  }) }
+
+  | otherwise
+  = pprPanic "zonk_bind" (ppr outer_bind)
 
 zonk_bind env (PatSynBind bind@(PSB { psb_id = L loc id
                                     , psb_args = details
@@ -1624,3 +1643,34 @@ zonkTypeZapping tv
                 | otherwise          = anyTypeOfKind (tyVarKind tv)
        ; writeMetaTyVar tv ty
        ; return ty }
+
+---------------------------------------
+-- | According to the rules around representation polymorphism
+-- (see https://ghc.haskell.org/trac/ghc/wiki/NoSubKinds), no binder
+-- can have a representation-polymorphic type. This check ensures
+-- that we respect this rule. It is a bit regrettable that this error
+-- occurs in zonking, after which we should have reported all errors.
+-- But it's hard to see where else to do it, because this can be discovered
+-- only after all solving is done. And, perhaps most importantly, this
+-- isn't really a compositional property of a type system, so it's
+-- not a terrible surprise that the check has to go in an awkward spot.
+ensureNotRepresentationPolymorphic
+  :: TcId  -- the id we're checking (for errors only)
+  -> Type  -- its zonked type
+  -> TcM ()
+ensureNotRepresentationPolymorphic id ty
+  = whenNoErrs $   -- sometimes we end up zonking bogus definitions of type
+                   -- forall a. a. See, for example, test ghci/scripts/T9140
+    unless (isEmptyVarSet (tyCoVarsOfType ki)) $
+    addErrAt (nameSrcSpan $ idName id) $
+    vcat [ text "The following variable has an unknown runtime representation:"
+         , text "    Var name:" <+> ppr id
+         , text "    Var type:" <+> ppr tidy_ty
+         , text " Type's kind:" <+> ppr tidy_ki
+         , text "Perhaps add a type or kind signature to fix the representation."
+         ]
+  where
+    ki = typeKind ty
+
+    (tidy_env, tidy_ty) = tidyOpenType emptyTidyEnv ty
+    tidy_ki             = tidyType tidy_env ki
