@@ -1326,10 +1326,14 @@ tcEqTypeNoKindCheck ty1 ty2
 -- are 'tcEqType'.
 tcEqTypeVis :: TcType -> TcType -> Maybe VisibilityFlag
 tcEqTypeVis ty1 ty2
-  = tc_eq_type coreView ty1 ty2 <!> tc_eq_type coreView ki1 ki2
+  = tc_eq_type coreView ty1 ty2 <!> invis (tc_eq_type coreView ki1 ki2)
   where
     ki1 = typeKind ty1
     ki2 = typeKind ty2
+
+      -- convert Just Visible to Just Invisible
+    invis :: Maybe VisibilityFlag -> Maybe VisibilityFlag
+    invis = fmap (const Invisible)
 
 (<!>) :: Maybe VisibilityFlag -> Maybe VisibilityFlag -> Maybe VisibilityFlag
 Nothing        <!> x            = x
@@ -1368,7 +1372,7 @@ tc_eq_type view_fun orig_ty1 orig_ty2 = go Visible orig_env orig_ty1 orig_ty2
       | Just (s1, t1) <- tcRepSplitAppTy_maybe ty1
       = go vis env s1 s2 <!> go vis env t1 t2
     go vis env (TyConApp tc1 ts1)   (TyConApp tc2 ts2)
-      = check vis (tc1 == tc2) <!> gos (tc_vis tc1) env ts1 ts2
+      = check vis (tc1 == tc2) <!> gos (tc_vis vis tc1) env ts1 ts2
     go vis env (CastTy t1 _)        t2              = go vis env t1 t2
     go vis env t1                   (CastTy t2 _)   = go vis env t1 t2
     go _   _   (CoercionTy {})      (CoercionTy {}) = Nothing
@@ -1379,13 +1383,15 @@ tc_eq_type view_fun orig_ty1 orig_ty2 = go Visible orig_env orig_ty1 orig_ty2
     gos (v:_)  _   _        _        = Just v
     gos _      _   _        _        = panic "tc_eq_type"
 
-    tc_vis :: TyCon -> [VisibilityFlag]
-    tc_vis tc = viss ++ repeat Visible
+    tc_vis :: VisibilityFlag -> TyCon -> [VisibilityFlag]
+    tc_vis Visible tc = viss ++ repeat Visible
        -- the repeat Visible is necessary because tycons can legitimately
        -- be oversaturated
       where
         bndrs = tyConBinders tc
         viss  = map binderVisibility bndrs
+    tc_vis vis _ = repeat vis   -- if we're not in a visible context, our args
+                                -- aren't either
 
     check :: VisibilityFlag -> Bool -> Maybe VisibilityFlag
     check _   True  = Nothing

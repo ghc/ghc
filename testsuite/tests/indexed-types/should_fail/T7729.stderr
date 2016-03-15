@@ -1,9 +1,9 @@
 
 T7729.hs:36:25: error:
     • Couldn't match type ‘BasePrimMonad m’ with ‘t0 (BasePrimMonad m)’
-      The type variable ‘t0’ is ambiguous
       Expected type: BasePrimMonad m a -> BasePrimMonad (Rand m) a
         Actual type: BasePrimMonad m a -> t0 (BasePrimMonad m) a
+      The type variable ‘t0’ is ambiguous
     • In the second argument of ‘(.)’, namely ‘lift’
       In the expression: liftPrim . lift
       In an equation for ‘liftPrim’: liftPrim = liftPrim . lift

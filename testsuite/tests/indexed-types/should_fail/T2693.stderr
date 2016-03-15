@@ -33,9 +33,9 @@ T2693.hs:19:23: error:
 
 T2693.hs:30:47: error:
     • Couldn't match type ‘TFn a0’ with ‘PVR a1’
-      The type variables ‘a0’, ‘a1’ are ambiguous
       Expected type: [PVR a1]
         Actual type: [TFn a0]
+      The type variables ‘a0’, ‘a1’ are ambiguous
     • In the second argument of ‘map’, namely ‘pvs’
       In the second argument of ‘min’, namely ‘(map pvrX pvs)’
       In the expression: (map pvrX pvs) `min` (map pvrX pvs)

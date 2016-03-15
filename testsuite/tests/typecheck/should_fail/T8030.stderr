@@ -11,10 +11,10 @@ T8030.hs:9:3: error:
 
 T8030.hs:10:3: error:
     • Couldn't match type ‘Pr a0’ with ‘Pr a’
+      Expected type: Pr a -> Pr a -> Pr a
+        Actual type: Pr a0 -> Pr a0 -> Pr a0
       NB: ‘Pr’ is a type function, and may not be injective
       The type variable ‘a0’ is ambiguous
-      Expected type: Pr a -> Pr a -> Pr a
-      Actual type: Pr a0 -> Pr a0 -> Pr a0
     • In the ambiguity check for ‘op2’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the class method:
