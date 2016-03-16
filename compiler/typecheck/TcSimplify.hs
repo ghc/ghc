@@ -133,10 +133,12 @@ simpl_top wanteds
       = return wc
       | otherwise
       = do { free_tvs <- TcS.zonkTyCoVarsAndFV (tyCoVarsOfWC wc)
-           ; let meta_tvs = varSetElems (filterVarSet isMetaTyVar free_tvs)
+           ; let meta_tvs = varSetElems $
+                            filterVarSet (isTyVar <&&> isMetaTyVar) free_tvs
                    -- zonkTyCoVarsAndFV: the wc_first_go is not yet zonked
                    -- filter isMetaTyVar: we might have runtime-skolems in GHCi,
                    -- and we definitely don't want to try to assign to those!
+                   -- the isTyVar needs to weed out coercion variables
 
            ; defaulted <- mapM defaultTyVarTcS meta_tvs   -- Has unification side effects
            ; if or defaulted
