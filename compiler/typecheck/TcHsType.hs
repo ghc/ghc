@@ -1842,12 +1842,18 @@ tcDataKindSig kind
                             , isNothing (lookupLocalRdrOcc rdr_env occ) ]
                  -- Note [Avoid name clashes for associated data types]
 
-        ; return ( [ mk_tv span uniq occ kind
-                   | ((kind, occ), uniq) <- arg_kinds `zip` occs `zip` uniqs ]
+            -- NB: Use the tv from a binder if there is one. Otherwise,
+            -- we end up inventing a new Unique for it, and any other tv
+            -- that mentions the first ends up with the wrong kind.
+        ; return ( [ tv
+                   | ((bndr, occ), uniq) <- bndrs `zip` occs `zip` uniqs
+                   , let tv | Just bndr_tv <- binderVar_maybe bndr
+                            = bndr_tv
+                            | otherwise
+                            = mk_tv span uniq occ (binderType bndr) ]
                  , bndrs, res_kind ) }
   where
     (bndrs, res_kind) = splitPiTys kind
-    arg_kinds         = map binderType bndrs
     mk_tv loc uniq occ kind
       = mkTyVar (mkInternalName uniq occ loc) kind
 

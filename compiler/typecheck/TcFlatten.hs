@@ -1344,8 +1344,8 @@ flatten_tyvar3 tv
 --           (vcat [ ppr tv <+> dcolon <+> ppr (tyVarKind tv)
 --                 , ppr _new_kind
 --                 , ppr kind_co <+> dcolon <+> ppr (coercionKind kind_co) ])
-       ; let Pair _ orig_kind = coercionKind kind_co
-             -- orig_kind might be zonked
+       ; orig_kind <- liftTcS $ zonkTcType kind
+             -- NB: orig_kind is *not* the kind returned from flatten
        ; return (FTRCasted (setTyVarKind tv orig_kind) kind_co) }
 
 {-
