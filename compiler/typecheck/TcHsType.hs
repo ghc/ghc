@@ -938,8 +938,11 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
 
       | otherwise
       = do { (tc_ty, kind) <- instantiateTyN 0 ty tc_kind
-           ; traceTc "tcTyVar2b" (vcat [ ppr tc <+> dcolon <+> ppr tc_kind
-                                       , ppr tc_ty $$ ppr kind ])
+           -- tc and tc_ty must not be traced here, because that would
+           -- force the evaluation of a potentially knot-tied variable (tc),
+           -- and the typechecker would hang, as per #11708
+           ; traceTc "tcTyVar2b" (vcat [ ppr tc_tc <+> dcolon <+> ppr tc_kind
+                                       , ppr kind ])
            ; return (tc_ty, kind) }
       where
         ty      = mkNakedTyConApp tc []
