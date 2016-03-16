@@ -933,10 +933,17 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
                   -> TcM (TcType, TcKind)
     handle_tyfams tc tc_tc
       | mightBeUnsaturatedTyCon tc_tc
-      = return (ty, tc_kind)
+      = do { traceTc "tcTyVar2a" (ppr tc_tc $$ ppr tc_kind)
+           ; return (ty, tc_kind) }
 
       | otherwise
-      = instantiateTyN 0 ty tc_kind
+      = do { (tc_ty, kind) <- instantiateTyN 0 ty tc_kind
+           -- tc and tc_ty must not be traced here, because that would
+           -- force the evaluation of a potentially knot-tied variable (tc),
+           -- and the typechecker would hang, as per #11708
+           ; traceTc "tcTyVar2b" (vcat [ ppr tc_tc <+> dcolon <+> ppr tc_kind
+                                       , ppr kind ])
+           ; return (tc_ty, kind) }
       where
         ty      = mkNakedTyConApp tc []
         tc_kind = tyConKind tc_tc
