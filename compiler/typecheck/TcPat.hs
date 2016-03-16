@@ -747,9 +747,14 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty arg_pats thing_inside
 
               arg_tys' = substTys tenv arg_tys
 
-        ; traceTc "tcConPat" (vcat [ ppr con_name, ppr univ_tvs, ppr ex_tvs
+        ; traceTc "tcConPat" (vcat [ ppr con_name
+                                   , pprTvBndrs univ_tvs
+                                   , pprTvBndrs ex_tvs
                                    , ppr eq_spec
-                                   , ppr ex_tvs', ppr ctxt_res_tys, ppr arg_tys'
+                                   , ppr theta
+                                   , pprTvBndrs ex_tvs'
+                                   , ppr ctxt_res_tys
+                                   , ppr arg_tys'
                                    , ppr arg_pats ])
         ; if null ex_tvs && null eq_spec && null theta
           then do { -- The common case; no class bindings etc

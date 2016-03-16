@@ -1826,6 +1826,7 @@ mkGADTVars tmpl_tvs dc_tvs subst
   = choose [] [] empty_subst empty_subst tmpl_tvs
   where
     in_scope = mkInScopeSet (mkVarSet tmpl_tvs `unionVarSet` mkVarSet dc_tvs)
+               `unionInScope` getTCvInScope subst
     empty_subst = mkEmptyTCvSubst in_scope
 
     choose :: [TyVar]           -- accumulator of univ tvs, reversed
@@ -1847,12 +1848,12 @@ mkGADTVars tmpl_tvs dc_tvs subst
             ,  tyVarKind r_tv `eqType` (substTy t_sub (tyVarKind t_tv))
             -> -- simple, well-kinded variable substitution.
                choose (r_tv:univs) eqs
-                      (extendTvSubst t_sub t_tv r_ty)
-                      (extendTvSubst r_sub r_tv r_ty)
+                      (extendTvSubst t_sub t_tv r_ty')
+                      (extendTvSubst r_sub r_tv r_ty')
                       t_tvs
             where
               r_tv1  = setTyVarName r_tv (choose_tv_name r_tv t_tv)
-              r_ty   = mkTyVarTy r_tv1
+              r_ty'  = mkTyVarTy r_tv1
 
                -- not a simple substitution. make an equality predicate
           _ -> choose (t_tv':univs) (mkEqSpec t_tv' r_ty : eqs)

@@ -565,7 +565,7 @@ can_eq_nc' flat _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
 -- Check only when flat because the zonk_eq_types check in canEqNC takes
 -- care of the non-flat case.
 can_eq_nc' True _rdr_env _envs ev ReprEq ty1 _ ty2 _
-  | ty1 `eqType` ty2
+  | ty1 `tcEqType` ty2
   = canEqReflexive ev ReprEq ty1
 
 -- When working with ReprEq, unwrap newtypes.
@@ -1510,7 +1510,7 @@ homogeniseRhsKind :: CtEvidence -- ^ the evidence to homogenise
                            -- the 'Xi' is the new RHS
                   -> TcS (StopOrContinue Ct)
 homogeniseRhsKind ev eq_rel lhs rhs build_ct
-  | k1 `eqType` k2
+  | k1 `tcEqType` k2
   = continueWith (build_ct ev rhs)
 
   | CtGiven { ctev_evar = evar } <- ev

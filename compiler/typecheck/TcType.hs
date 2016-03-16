@@ -180,6 +180,7 @@ module TcType (
   pprKind, pprParendKind, pprSigmaType,
   pprType, pprParendType, pprTypeApp, pprTyThingCategory,
   pprTheta, pprThetaArrowTy, pprClassPred,
+  pprTvBndr, pprTvBndrs,
 
   TypeSize, sizeType, sizeTypes, toposortTyVars
 
