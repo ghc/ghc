@@ -138,7 +138,12 @@ primOpRules nm WordMulOp   = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (*))
 primOpRules nm WordQuotOp  = mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (wordOp2 quot)
                                                , rightIdentityDynFlags onew ]
 primOpRules nm WordRemOp   = mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (wordOp2 rem)
-                                               , rightIdentityDynFlags onew ]
+                                               , leftZero zerow
+                                               , do l <- getLiteral 1
+                                                    dflags <- getDynFlags
+                                                    guard (l == onew dflags)
+                                                    retLit zerow
+                                               , equalArgs >> retLit zerow ]
 primOpRules nm AndOp       = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.&.))
                                                , idempotent
                                                , zeroElem zerow ]
