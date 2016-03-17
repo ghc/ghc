@@ -962,10 +962,14 @@ environment that makes things tricky for OutsideIn generalisation.
 Definition:
    A variable is "closed", and has tct_closed set to TopLevel,
 iff
-   a) all its free variables are imported, or are let-bound with closed types
+   a) all its free variables are imported, or are let-bound and closed
    b) generalisation is not restricted by the monomorphism restriction
 
 Invariant: a closed variable has no free type variables in its type.
+Why? Assume (induction hypothesis) that closed variables have closed
+types, and that we have a new binding f = e, satisfying (a) and (b).
+Then since monomorphism restriction does not apply, and there are no
+free type variables, we can fully generalise, so its type will be closed.
 
 Under OutsideIn we are free to generalise a closed let-binding.
 This is an extension compared to the JFP paper on OutsideIn, which

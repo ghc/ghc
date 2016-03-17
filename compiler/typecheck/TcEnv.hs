@@ -28,7 +28,7 @@ module TcEnv(
         tcExtendLetEnv, tcExtendLetEnvIds,
         tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2,
         tcExtendIdBndrs, tcExtendLocalTypeEnv,
-        isClosedLetBndr,
+        isTypeClosedLetBndr,
 
         tcLookup, tcLookupLocated, tcLookupLocalIds,
         tcLookupId, tcLookupTyVar,
@@ -409,29 +409,40 @@ getScopedTyVarBinds
   = do  { lcl_env <- getLclEnv
         ; return [(name, tv) | ATyVar name tv <- nameEnvElts (tcl_env lcl_env)] }
 
-isClosedLetBndr :: Id -> TopLevelFlag
+isTypeClosedLetBndr :: Id -> TopLevelFlag
 -- See Note [Bindings with closed types] in TcRnTypes
 -- Note that we decided if a let-bound variable is closed by
 -- looking at its type, which is slightly more liberal, and a whole
 -- lot easier to implement, than looking at its free variables
-isClosedLetBndr id
+isTypeClosedLetBndr id
   | isEmptyVarSet (tyCoVarsOfType (idType id)) = TopLevel
   | otherwise                                  = NotTopLevel
 
-tcExtendLetEnv :: TopLevelFlag -> [TcId] -> TcM a -> TcM a
+tcExtendLetEnv :: TopLevelFlag -> TopLevelFlag -> [TcId] -> TcM a -> TcM a
 -- Used for both top-level value bindings and and nested let/where-bindings
 -- Adds to the TcIdBinderStack too
-tcExtendLetEnv top_lvl ids thing_inside
+tcExtendLetEnv top_lvl closed_group ids thing_inside
   = tcExtendIdBndrs [TcIdBndr id top_lvl | id <- ids] $
-    tcExtendLetEnvIds top_lvl [(idName id, id) | id <- ids] thing_inside
+    tcExtendLetEnvIds' top_lvl closed_group [(idName id, id) | id <- ids]
+                       thing_inside
 
 tcExtendLetEnvIds :: TopLevelFlag -> [(Name,TcId)] -> TcM a -> TcM a
 -- Used for both top-level value bindings and and nested let/where-bindings
 -- Does not extend the TcIdBinderStack
-tcExtendLetEnvIds top_lvl pairs thing_inside
-  = tc_extend_local_env top_lvl [ (name, ATcId { tct_id = id
-                                               , tct_closed = isClosedLetBndr id })
-                                | (name,id) <- pairs ] $
+tcExtendLetEnvIds top_lvl
+  = tcExtendLetEnvIds' top_lvl TopLevel
+
+tcExtendLetEnvIds' :: TopLevelFlag -> TopLevelFlag -> [(Name,TcId)] -> TcM a
+                   -> TcM a
+-- Used for both top-level value bindings and and nested let/where-bindings
+-- Does not extend the TcIdBinderStack
+tcExtendLetEnvIds' top_lvl closed_group pairs thing_inside
+  = tc_extend_local_env top_lvl
+      [ (name, ATcId { tct_id = id
+                     , tct_closed = case closed_group of
+                         TopLevel -> isTypeClosedLetBndr id
+                         _        -> closed_group           })
+                     | (name,id) <- pairs ] $
     thing_inside
 
 tcExtendIdEnv :: [TcId] -> TcM a -> TcM a

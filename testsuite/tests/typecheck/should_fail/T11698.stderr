@@ -1,0 +1,7 @@
+
+T11698.hs:4:17: error:
+    • Couldn't match expected type ‘Char’ with actual type ‘Bool’
+    • In the first argument of ‘k’, namely ‘True’
+      In the expression: k True
+      In the expression: (k 'v', k True)
+
