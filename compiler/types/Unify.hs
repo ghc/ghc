@@ -710,11 +710,11 @@ unify_ty ty1 ty2 _kco
         -- so if one type is an App the other one jolly well better be too
 unify_ty (AppTy ty1a ty1b) ty2 _kco
   | Just (ty2a, ty2b) <- tcRepSplitAppTy_maybe ty2
-  = unify_ty_app ty1a ty1b ty2a ty2b
+  = unify_ty_app ty1a [ty1b] ty2a [ty2b]
 
 unify_ty ty1 (AppTy ty2a ty2b) _kco
   | Just (ty1a, ty1b) <- tcRepSplitAppTy_maybe ty1
-  = unify_ty_app ty1a ty1b ty2a ty2b
+  = unify_ty_app ty1a [ty1b] ty2a [ty2b]
 
 unify_ty (LitTy x) (LitTy y) _kco | x == y = return ()
 
@@ -757,15 +757,18 @@ unify_ty _ ty2 _
 
 unify_ty _ _ _ = surelyApart
 
-unify_ty_app :: Type -> Type -> Type -> Type -> UM ()
-unify_ty_app ty1a ty1b ty2a ty2b
-  = do { -- TODO (RAE): Remove this exponential behavior.
-         let ki1a = typeKind ty1a
-             ki2a = typeKind ty2a
-       ; unify_ty ki1a ki2a (mkNomReflCo liftedTypeKind)
-       ; let kind_co = mkNomReflCo ki1a
-       ; unify_ty ty1a ty2a kind_co
-       ; unify_ty ty1b ty2b (mkNthCo 0 kind_co) }
+unify_ty_app :: Type -> [Type] -> Type -> [Type] -> UM ()
+unify_ty_app ty1 ty1args ty2 ty2args
+  | Just (ty1', ty1a) <- repSplitAppTy_maybe ty1
+  , Just (ty2', ty2a) <- repSplitAppTy_maybe ty2
+  = unify_ty_app ty1' (ty1a : ty1args) ty2' (ty2a : ty2args)
+
+  | otherwise
+  = do { let ki1 = typeKind ty1
+             ki2 = typeKind ty2
+       ; unify_ty ki1 ki2 (mkNomReflCo liftedTypeKind)
+       ; unify_ty ty1 ty2 (mkNomReflCo ki1)
+       ; unify_tys ty1args ty2args }
 
 unify_tys :: [Type] -> [Type] -> UM ()
 unify_tys orig_xs orig_ys
@@ -1145,11 +1148,11 @@ ty_co_match menv subst ty (SubCo co) lkco rkco
 
 ty_co_match menv subst (AppTy ty1a ty1b) co _lkco _rkco
   | Just (co2, arg2) <- splitAppCo_maybe co     -- c.f. Unify.match on AppTy
-  = ty_co_match_app menv subst ty1a ty1b co2 arg2
+  = ty_co_match_app menv subst ty1a [ty1b] co2 [arg2]
 ty_co_match menv subst ty1 (AppCo co2 arg2) _lkco _rkco
   | Just (ty1a, ty1b) <- repSplitAppTy_maybe ty1
        -- yes, the one from Type, not TcType; this is for coercion optimization
-  = ty_co_match_app menv subst ty1a ty1b co2 arg2
+  = ty_co_match_app menv subst ty1a [ty1b] co2 [arg2]
 
 ty_co_match menv subst (TyConApp tc1 tys) (TyConAppCo _ tc2 cos) _lkco _rkco
   = ty_co_match_tc menv subst tc1 tys tc2 cos
@@ -1187,17 +1190,22 @@ ty_co_match_tc menv subst tc1 tys1 tc2 cos2
       = traverse (fmap mkNomReflCo . coercionKind) cos2
 
 ty_co_match_app :: MatchEnv -> LiftCoEnv
-                -> Type -> Type -> Coercion -> Coercion
+                -> Type -> [Type] -> Coercion -> [Coercion]
                 -> Maybe LiftCoEnv
-ty_co_match_app menv subst ty1a ty1b co2a co2b
-  = do { -- TODO (RAE): Remove this exponential behavior.
-         subst1 <- ty_co_match menv subst  ki1a ki2a ki_ki_co ki_ki_co
-       ; let Pair lkco rkco = mkNomReflCo <$> coercionKind ki2a
-       ; subst2 <- ty_co_match menv subst1 ty1a co2a lkco rkco
-       ; ty_co_match menv subst2 ty1b co2b (mkNthCo 0 lkco) (mkNthCo 0 rkco) }
+ty_co_match_app menv subst ty1 ty1args co2 co2args
+  | Just (ty1', ty1a) <- repSplitAppTy_maybe ty1
+  , Just (co2', co2a) <- splitAppCo_maybe co2
+  = ty_co_match_app menv subst ty1' (ty1a : ty1args) co2' (co2a : co2args)
+
+  | otherwise
+  = do { subst1 <- ty_co_match menv subst ki1 ki2 ki_ki_co ki_ki_co
+       ; let Pair lkco rkco = mkNomReflCo <$> coercionKind ki2
+       ; subst2 <- ty_co_match menv subst1 ty1 co2 lkco rkco
+       ; let Pair lkcos rkcos = traverse (fmap mkNomReflCo . coercionKind) co2args
+       ; ty_co_match_args menv subst2 ty1args co2args lkcos rkcos }
   where
-    ki1a = typeKind ty1a
-    ki2a = promoteCoercion co2a
+    ki1 = typeKind ty1
+    ki2 = promoteCoercion co2
     ki_ki_co = mkNomReflCo liftedTypeKind
 
 ty_co_match_args :: MatchEnv -> LiftCoEnv -> [Type]
