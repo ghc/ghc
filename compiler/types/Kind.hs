@@ -50,7 +50,7 @@ Constraint and *.  Indeed we can have coercions between the two. Consider
      op :: a -> a
 For this single-method class we may generate a newtype, which in turn
 generates an axiom witnessing
-    Ord a ~ (a -> a)
+    C a ~ (a -> a)
 so on the left we have Constraint, and on the right we have *.
 See Trac #7451.
 
