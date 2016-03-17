@@ -1175,7 +1175,10 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
            ; case tcSplitForAllTy_maybe upsilon_ty of
                Just (binder, inner_ty)
                  | Just tv <- binderVar_maybe binder ->
-                 ASSERT( binderVisibility binder == Specified )
+                 ASSERT2( binderVisibility binder == Specified
+                        , (vcat [ ppr fun_ty, ppr upsilon_ty, ppr binder
+                                , ppr inner_ty, pprTvBndr tv
+                                , ppr (binderVisibility binder) ]) )
                  do { let kind = tyVarKind tv
                     ; ty_arg <- tcHsTypeApp hs_ty_arg kind
                     ; let insted_ty = substTyWithUnchecked [tv] [ty_arg] inner_ty
