@@ -217,7 +217,7 @@ instance TyConAble RuntimeRep    where tyCon = RuntimeRep
 
 -- Can't just define Typeable the way we want, because the instances
 -- overlap. So we have to mock up instance chains via closed type families.
-class Typeable' (a :: k) (b :: Bool) where
+class Typeable' a (b :: Bool) where
   typeRep' :: TypeRep a
 
 type family CheckPrim a where
@@ -236,7 +236,7 @@ instance (Typeable a, Typeable b) => Typeable' (a b) 'False where
   typeRep' = TyApp typeRep typeRep
 
 typeRep :: forall a. Typeable a => TypeRep a
-typeRep = typeRep' @_ @_ @(CheckPrim a) -- RAE: #11512 says we need the extra @_.
+typeRep = typeRep' @_ @(CheckPrim a)
 
 -----------------------------
 -- Useful instances

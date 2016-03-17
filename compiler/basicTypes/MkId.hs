@@ -262,9 +262,6 @@ Then the top-level type for op is
               forall b. Ord b =>
               a -> b -> b
 
-This is unlike ordinary record selectors, which have all the for-alls
-at the outside.  When dealing with classes it's very convenient to
-recover the original type signature from the class op selector.
 -}
 
 mkDictSelId :: Name          -- Name of one of the *value* selectors
@@ -278,11 +275,23 @@ mkDictSelId name clas
     new_tycon      = isNewTyCon tycon
     [data_con]     = tyConDataCons tycon
     tyvars         = dataConUnivTyVars data_con
+    tc_binders     = tyConBinders tycon
     arg_tys        = dataConRepArgTys data_con  -- Includes the dictionary superclasses
     val_index      = assoc "MkId.mkDictSelId" (sel_names `zip` [0..]) name
 
-    sel_ty = mkSpecForAllTys tyvars (mkFunTy (mkClassPred clas (mkTyVarTys tyvars))
-                                             (getNth arg_tys val_index))
+    sel_ty = mkForAllTys (zipWith mk_binder tc_binders tyvars) $
+             mkFunTy (mkClassPred clas (mkTyVarTys tyvars)) $
+             getNth arg_tys val_index
+
+      -- copy the visibility from the tycon binders. Consider:
+      --   class C a where foo :: Proxy a
+      -- In the type of foo, `a` must be Specified but `k` must be Invisible
+    mk_binder tc_binder tyvar
+      | Invisible <- binderVisibility tc_binder
+      = mkNamedBinder Invisible tyvar
+      | otherwise
+      = mkNamedBinder Specified tyvar   -- don't just copy from tc_binder, because
+                                        -- tc_binders can be Visible
 
     base_info = noCafIdInfo
                 `setArityInfo`         1
