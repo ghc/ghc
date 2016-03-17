@@ -22,7 +22,7 @@ module SMRep (
         ConstrDescription,
 
         -- ** Construction
-        mkHeapRep, blackHoleRep, indStaticRep, mkStackRep, mkRTSRep, arrPtrsRep,
+        mkHeapRep, blackHoleRep, indStaticRep, countingIndRep, mkStackRep, mkRTSRep, arrPtrsRep,
         smallArrPtrsRep, arrWordsRep,
 
         -- ** Predicates
@@ -189,6 +189,7 @@ data ClosureTypeInfo
   | Thunk
   | ThunkSelector SelectorOffset
   | BlackHole
+  | CountingInd
   | IndStatic
 
 type ConstrTag         = Int
@@ -249,6 +250,10 @@ blackHoleRep = HeapRep False 0 0 BlackHole
 indStaticRep :: SMRep
 indStaticRep = HeapRep True 1 0 IndStatic
 
+countingIndRep :: SMRep
+countingIndRep = HeapRep False 1 2 CountingInd
+
+
 arrPtrsRep :: DynFlags -> WordOff -> SMRep
 arrPtrsRep dflags elems = ArrayPtrsRep elems (cardTableSizeW dflags elems)
 
@@ -279,6 +284,7 @@ isThunkRep :: SMRep -> Bool
 isThunkRep (HeapRep _ _ _ Thunk{})         = True
 isThunkRep (HeapRep _ _ _ ThunkSelector{}) = True
 isThunkRep (HeapRep _ _ _ BlackHole{})     = True
+isThunkRep (HeapRep _ _ _ CountingInd{})       = True
 isThunkRep (HeapRep _ _ _ IndStatic{})     = True
 isThunkRep _                               = False
 
@@ -386,6 +392,7 @@ closureTypeHdrSize dflags ty = case ty of
                   Thunk{}         -> thunkHdrSize dflags
                   ThunkSelector{} -> thunkHdrSize dflags
                   BlackHole{}     -> thunkHdrSize dflags
+                  CountingInd{}     -> thunkHdrSize dflags
                   IndStatic{}     -> thunkHdrSize dflags
                   _               -> fixedHdrSizeW dflags
         -- All thunks use thunkHdrSize, even if they are non-updatable.
@@ -459,6 +466,7 @@ rtsClosureType rep
       HeapRep True _ _ Thunk{}  -> THUNK_STATIC
 
       HeapRep False _ _ BlackHole{} -> BLACKHOLE
+      HeapRep False _ _ CountingInd{} -> COUNTING_IND
 
       HeapRep False _ _ IndStatic{} -> IND_STATIC
 
@@ -535,6 +543,7 @@ pprTypeInfo (ThunkSelector offset)
 
 pprTypeInfo Thunk     = text "Thunk"
 pprTypeInfo BlackHole = text "BlackHole"
+pprTypeInfo CountingInd   = text "CountingInd"
 pprTypeInfo IndStatic = text "IndStatic"
 
 -- XXX Does not belong here!!

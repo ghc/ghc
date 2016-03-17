@@ -19,7 +19,7 @@ module StgCmmUtils (
 
         emitMultiAssign, emitCmmLitSwitch, emitSwitch,
 
-        tagToClosure, mkTaggedObjectLoad,
+        tagToClosure, mkTaggedObjectExpr, mkTaggedObjectLoad,
 
         callerSaves, callerSaveVolatileRegs, get_GlobalReg_addr,
 
@@ -137,6 +137,11 @@ addToMemE rep ptr n
 --
 -------------------------------------------------------------------------
 
+mkTaggedObjectExpr
+  :: DynFlags -> LocalReg -> ByteOff -> DynTag -> CmmExpr
+mkTaggedObjectExpr dflags base offset tag
+  = cmmOffsetB dflags (CmmReg (CmmLocal base)) (offset - tag)
+
 mkTaggedObjectLoad
   :: DynFlags -> LocalReg -> LocalReg -> ByteOff -> DynTag -> CmmAGraph
 -- (loadTaggedObjectField reg base off tag) generates assignment
@@ -144,10 +149,7 @@ mkTaggedObjectLoad
 -- where K is fixed by 'reg'
 mkTaggedObjectLoad dflags reg base offset tag
   = mkAssign (CmmLocal reg)
-             (CmmLoad (cmmOffsetB dflags
-                                  (CmmReg (CmmLocal base))
-                                  (offset - tag))
-                      (localRegType reg))
+             (CmmLoad (mkTaggedObjectExpr dflags base offset tag) (localRegType reg))
 
 -------------------------------------------------------------------------
 --

@@ -109,6 +109,7 @@ processHeapClosureForDead( const StgClosure *c )
     case FUN_0_2:
     case BLACKHOLE:
     case BLOCKING_QUEUE:
+    case COUNTING_IND:
         /*
           'Ingore' cases
         */

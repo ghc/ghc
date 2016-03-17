@@ -46,6 +46,7 @@ import Module
 import ListSetOps
 import Util
 import BasicTypes
+import TyCon ( PrimRep )
 import Outputable
 import FastString
 import DynFlags
@@ -112,11 +113,12 @@ cgTopRhsClosure dflags rec id ccs _ upd_flag args body =
                  -- BUILD THE OBJECT, AND GENERATE INFO TABLE (IF NECESSARY)
         ; emitDataLits closure_label closure_rep
         ; let fv_details :: [(NonVoid Id, VirtualHpOffset)]
-              (_, _, fv_details) = mkVirtHeapOffsets dflags (isLFThunk lf_info)
-                                               (addIdReps [])
+              (_, _, fv_details, []) = mkVirtHeapOffsets dflags (isLFThunk lf_info)
+                                               (addIdReps []) 0
         -- Don't drop the non-void args until the closure info has been made
-        ; forkClosureBody (closureCodeBody True id closure_info ccs
-                                (nonVoidIds args) (length args) body fv_details)
+        ; forkClosureBody $
+            closureCodeBody True id closure_info ccs (nonVoidIds args)
+                            (length args) body fv_details Nothing
 
         ; return () }
 
@@ -325,7 +327,9 @@ mkRhsClosure dflags bndr cc _ fvs upd_flag args body
         ; return (id_info, gen_code lf_info reg) }
  where
  gen_code lf_info reg
-  = do  {       -- LAY OUT THE OBJECT
+  = do  { dflags <- getDynFlags
+
+        -- LAY OUT THE OBJECT
         -- If the binder is itself a free variable, then don't store
         -- it in the closure.  Instead, just bind it to Node on entry.
         -- NB we can be sure that Node will point to it, because we
@@ -339,16 +343,27 @@ mkRhsClosure dflags bndr cc _ fvs upd_flag args body
                 reduced_fvs | bndr_is_a_fv = fvs `minusList` [NonVoid bndr]
                             | otherwise    = fvs
 
+        ; let count_entries_in_code =
+                gopt Opt_Ticky_Dyn_Thunk dflags && not (null args)
+        ; let count_entry_with_wrapper =
+                gopt Opt_Ticky_Dyn_Thunk dflags && null args
 
         -- MAKE CLOSURE INFO FOR THIS CLOSURE
         ; mod_name <- getModuleName
-        ; dflags <- getDynFlags
         ; let   name  = idName bndr
                 descr = closureDescription dflags mod_name name
+                fv_reps :: [(PrimRep, Id)]
+                fv_reps = addIdReps (map unsafe_stripNV reduced_fvs)
+
                 fv_details :: [(NonVoid Id, ByteOff)]
-                (tot_wds, ptr_wds, fv_details)
-                   = mkVirtHeapOffsets dflags (isLFThunk lf_info)
-                                       (addIdReps (map unsafe_stripNV reduced_fvs))
+                (tot_wds, ptr_wds, fv_details, extra_word_offs)
+                   = mkVirtHeapOffsets dflags (isLFThunk lf_info) fv_reps 1
+
+                entry_ctr_offM
+                    | count_entries_in_code   = Just entry_ctr_off
+                    | otherwise = Nothing
+                        where [entry_ctr_off] = extra_word_offs
+
                 closure_info = mkClosureInfo dflags False       -- Not static
                                              bndr lf_info tot_wds ptr_wds
                                              descr
@@ -359,7 +374,7 @@ mkRhsClosure dflags bndr cc _ fvs upd_flag args body
                 --                  (b) ignore Sequel from context; use empty Sequel
                 -- And compile the body
                 closureCodeBody False bndr closure_info cc (nonVoidIds args)
-                                (length args) body fv_details
+                                (length args) body fv_details entry_ctr_offM
 
         -- BUILD THE OBJECT
 --      ; (use_cc, blame_cc) <- chooseDynCostCentres cc args body
@@ -370,8 +385,18 @@ mkRhsClosure dflags bndr cc _ fvs upd_flag args body
         ; hp_plus_n <- allocDynClosure (Just bndr) info_tbl lf_info use_cc blame_cc
                                          (map toVarArg fv_details)
 
+        ; -- Initialize dynamic entry counter to zero (where to do this properly?)
+        ; forM_ entry_ctr_offM $ \entry_ctr_off ->
+            emit (mkStore (cmmOffset dflags hp_plus_n entry_ctr_off) (zeroExpr dflags))
+
+        -- WRAP IT IN A COUNTING_IND
+        -- first and third arguments are only used for tickyDynAlloc
+        ; hp_plus_m <- if count_entry_with_wrapper
+                       then wrapInCountingInd dflags bndr use_cc hp_plus_n
+                       else return hp_plus_n
+
         -- RETURN
-        ; return (mkRhsInit dflags reg lf_info hp_plus_n) }
+        ; return (mkRhsInit dflags reg lf_info hp_plus_m) }
 
 -------------------------
 cgRhsStdThunk
@@ -391,8 +416,8 @@ cgRhsStdThunk bndr lf_info payload
   {     -- LAY OUT THE OBJECT
     mod_name <- getModuleName
   ; dflags <- getDynFlags
-  ; let (tot_wds, ptr_wds, payload_w_offsets)
-            = mkVirtHeapOffsets dflags (isLFThunk lf_info) (addArgReps payload)
+  ; let (tot_wds, ptr_wds, payload_w_offsets, [])
+            = mkVirtHeapOffsets dflags (isLFThunk lf_info) (addArgReps payload) 0
 
         descr = closureDescription dflags mod_name (idName bndr)
         closure_info = mkClosureInfo dflags False       -- Not static
@@ -402,14 +427,21 @@ cgRhsStdThunk bndr lf_info payload
 --  ; (use_cc, blame_cc) <- chooseDynCostCentres cc [{- no args-}] body
   ; let use_cc = curCCS; blame_cc = curCCS
 
-
         -- BUILD THE OBJECT
   ; let info_tbl = mkCmmInfo closure_info
   ; hp_plus_n <- allocDynClosure (Just bndr) info_tbl lf_info
                                    use_cc blame_cc payload_w_offsets
 
+  -- WRAP IT IN A COUNTING_IND
+  -- first and third arguments are only used for tickyDynAlloc
+  ; let count_entry_with_wrapper = gopt Opt_Ticky_Dyn_Thunk dflags
+
+  ; hp_plus_m <- if count_entry_with_wrapper
+                 then wrapInCountingInd dflags bndr use_cc hp_plus_n
+                 else return hp_plus_n
+
         -- RETURN
-  ; return (mkRhsInit dflags reg lf_info hp_plus_n) }
+  ; return (mkRhsInit dflags reg lf_info hp_plus_m) }
 
 
 mkClosureLFInfo :: DynFlags
@@ -438,6 +470,7 @@ closureCodeBody :: Bool            -- whether this is a top-level binding
                 -> Int             -- arity, including void args
                 -> StgExpr
                 -> [(NonVoid Id, ByteOff)] -- the closure's free vars
+                -> Maybe ByteOff       -- Offset of the dynamic entry ticky counter
                 -> FCode ()
 
 {- There are two main cases for the code for closures.
@@ -450,7 +483,7 @@ closureCodeBody :: Bool            -- whether this is a top-level binding
   normal form, so there is no need to set up an update frame.
 -}
 
-closureCodeBody top_lvl bndr cl_info cc _args arity body fv_details
+closureCodeBody top_lvl bndr cl_info cc _args arity body fv_details _entry_ctr_off
   | arity == 0 -- No args i.e. thunk
   = withNewTickyCounterThunk
         (isStaticClosure cl_info)
@@ -462,7 +495,7 @@ closureCodeBody top_lvl bndr cl_info cc _args arity body fv_details
      lf_info  = closureLFInfo cl_info
      info_tbl = mkCmmInfo cl_info
 
-closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
+closureCodeBody top_lvl bndr cl_info cc args arity body fv_details entry_ctr_offM
   = -- Note: args may be [], if all args are Void
     withNewTickyCounterFun
         (closureSingleEntry cl_info)
@@ -491,8 +524,15 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
                 ; entryHeapCheck cl_info node' arity arg_regs $ do
                 { -- emit LDV code when profiling
                   when node_points (ldvEnterClosure cl_info (CmmLocal node))
+
                 -- ticky after heap check to avoid double counting
-                ; tickyEnterFun cl_info
+                ; let tag = lfDynTag dflags lf_info
+                ; let entry_ctr_expM = case entry_ctr_offM of
+                        { Just entry_ctr_off -> Just $ mkTaggedObjectExpr dflags node entry_ctr_off tag
+                        ; Nothing -> Nothing
+                        }
+                ; tickyEnterFun cl_info entry_ctr_expM
+
                 ; enterCostCentreFun cc
                     (CmmMachOp (mo_wordSub dflags)
                          [ CmmReg (CmmLocal node) -- See [NodeReg clobbered with loopification]

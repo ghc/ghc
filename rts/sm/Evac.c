@@ -601,6 +601,7 @@ loop:
       return;
 
   case FUN:
+  case COUNTING_IND:
   case CONSTR:
       copy_tag_nolock(p,info,q,sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),gen_no,tag);
       return;
@@ -964,6 +965,7 @@ selector_loop:
                   info = INFO_PTR_TO_STRUCT((StgInfoTable *)info_ptr);
                   switch (info->type) {
                   case IND:
+                  case COUNTING_IND:
                   case IND_STATIC:
                       val = ((StgInd *)val)->indirectee;
                       goto val_loop;
@@ -1000,6 +1002,12 @@ selector_loop:
           // Again, we might need to untag a constructor.
           selectee = UNTAG_CLOSURE( ((StgInd *)selectee)->indirectee );
           goto selector_loop;
+
+      case COUNTING_IND:
+          // do not short cut a COUNTING_IND, as we would miss a the count
+	  // Can we simply tick the counter here? Not really: If this selector
+	  // thunk is not going to be used, we counted more than we wanted!
+          goto bale_out;
 
       case BLACKHOLE:
       {

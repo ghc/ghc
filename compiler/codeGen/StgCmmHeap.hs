@@ -19,7 +19,9 @@ module StgCmmHeap (
         mkStaticClosureFields, mkStaticClosure,
 
         allocDynClosure, allocDynClosureCmm, allocHeapClosure,
-        emitSetDynHdr
+        emitSetDynHdr,
+
+        wrapInCountingInd
     ) where
 
 #include "HsVersions.h"
@@ -42,7 +44,7 @@ import Cmm
 import CmmUtils
 import CostCentre
 import IdInfo( CafInfo(..), mayHaveCafRefs )
-import Id ( Id )
+import Id ( Id, idName )
 import Module
 import DynFlags
 import FastString( mkFastString, fsLit )
@@ -65,7 +67,7 @@ allocDynClosure
         -> CmmExpr              -- Cost Centre to blame for this alloc
                                 -- (usually the same; sometimes "OVERHEAD")
 
-        -> [(NonVoid StgArg, VirtualHpOffset)]  -- Offsets from start of object
+        -> [(NonVoid StgArg, ByteOff)]  -- Offsets from start of object
                                                 -- ie Info ptr has offset zero.
                                                 -- No void args in here
         -> FCode CmmExpr -- returns Hp+n
@@ -107,6 +109,18 @@ allocDynClosureCmm mb_id info_tbl lf_info use_cc _blame_cc amodes_w_offsets = do
   let info_ptr = CmmLit (CmmLabel (cit_lbl info_tbl))
   allocHeapClosure rep info_ptr use_cc amodes_w_offsets
 
+
+wrapInCountingInd :: DynFlags -> Id -> CmmExpr -> CmmExpr -> FCode CmmExpr
+wrapInCountingInd dflags id use_cc arg
+    = -- pprTrace "wrapInCountingInd" (ppr id <+> ppIdInfo id (idInfo id) <+> ppr (idRepArity id)) $
+      allocHeapClosure countingIndRep (CmmLit (CmmLabel mkCountingIndInfoLabel)) use_cc $
+            [ (arg,               hdr_size + oFFSET_StgCountingInd_indirectee dflags)
+            , (mkLblExpr ctr_lbl, hdr_size + oFFSET_StgCountingInd_ent_counter dflags)
+            , (zeroExpr dflags,   hdr_size + oFFSET_StgCountingInd_entries dflags)
+            ]
+  where
+    ctr_lbl = mkRednCountsLabel (idName id)
+    hdr_size = fixedHdrSize dflags
 
 -- | Low-level heap object allocation.
 allocHeapClosure

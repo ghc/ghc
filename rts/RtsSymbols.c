@@ -603,6 +603,7 @@
       SymI_HasProto(stg_MVAR_DIRTY_info)                                \
       SymI_HasProto(stg_TVAR_CLEAN_info)                                \
       SymI_HasProto(stg_TVAR_DIRTY_info)                                \
+      SymI_HasProto(stg_COUNTING_IND_info)                                  \
       SymI_HasProto(stg_IND_STATIC_info)                                \
       SymI_HasProto(stg_ARR_WORDS_info)                                 \
       SymI_HasProto(stg_MUT_ARR_PTRS_DIRTY_info)                        \

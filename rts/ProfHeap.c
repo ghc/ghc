@@ -977,6 +977,7 @@ heapCensusChain( Census *census, bdescr *bd )
 
             case CONSTR:
             case FUN:
+            case COUNTING_IND:
             case BLACKHOLE:
             case BLOCKING_QUEUE:
             case FUN_1_0:

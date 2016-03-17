@@ -137,6 +137,7 @@ import TyCon
 import Data.Maybe
 import qualified Data.Char
 import Control.Monad ( unless, when )
+import Data.Foldable ( forM_ )
 
 -----------------------------------------------------------------------------
 --
@@ -243,11 +244,14 @@ emitTickyCounter cloType name args
         -- properly and it led to chaos, panic and disorder.
             [ mkIntCLit dflags 0,               -- registered?
               mkIntCLit dflags (length args),   -- Arity
+              mkIntCLit dflags 0,               -- Allocation count for this thing
               mkIntCLit dflags 0,               -- Heap allocated for this thing
               fun_descr_lit,
               arg_descr_lit,
-              zeroCLit dflags,          -- Entries into this thing
-              zeroCLit dflags,          -- Heap allocated by this thing
+              zeroCLit dflags,          -- entry_count
+              zeroCLit dflags,          -- single_entry_count
+              zeroCLit dflags,          -- multi_entry_count
+              zeroCLit dflags,          -- allocs
               zeroCLit dflags                   -- Link to next StgEntCounter
             ]
         }
@@ -307,8 +311,8 @@ tickyUpdateBhCaf cl_info
     ctr | closureUpdReqd cl_info = (fsLit "UPD_CAF_BH_SINGLE_ENTRY_ctr")
         | otherwise              = (fsLit "UPD_CAF_BH_UPDATABLE_ctr")
 
-tickyEnterFun :: ClosureInfo -> FCode ()
-tickyEnterFun cl_info = ifTicky $ do
+tickyEnterFun :: ClosureInfo -> Maybe CmmExpr -> FCode ()
+tickyEnterFun cl_info entry_ctr_expM = ifTicky $ do
   ctr_lbl <- getTickyCtrLabel
 
   if isStaticClosure cl_info
@@ -318,6 +322,30 @@ tickyEnterFun cl_info = ifTicky $ do
             registerTickyCtrAtEntryDyn ctr_lbl
 
   bumpTickyEntryCount ctr_lbl
+
+  emitComment $ mkFastString "Foo"
+  forM_ entry_ctr_expM $ \entry_ctr_exp -> do
+      dflags <- getDynFlags
+      emitComment $ mkFastString "Dynamic entry counting code"
+
+      -- This code replicates the code of COUNTING_IND in StgMiscClosures.cmm. How
+      -- to de-duplicate that?
+      let test0 = cmmEqWord dflags (CmmLoad entry_ctr_exp (bWord dflags))
+                                   (zeroExpr dflags)
+          tick0 = catAGraphs $
+            [ addToMem (bWord dflags) (CmmLit (cmmLabelOffB ctr_lbl (oFFSET_StgEntCounter_single_entry_count dflags))) 1
+            ]
+          test1 = cmmEqWord dflags (CmmLoad entry_ctr_exp (bWord dflags))
+                                   (mkIntExpr dflags 1)
+          tick1 = catAGraphs $
+            [ addToMem (bWord dflags) (CmmLit (cmmLabelOffB ctr_lbl (oFFSET_StgEntCounter_single_entry_count dflags))) (-1)
+            , addToMem (bWord dflags) (CmmLit (cmmLabelOffB ctr_lbl (oFFSET_StgEntCounter_multi_entry_count dflags))) 1
+            ]
+      emit =<< mkCmmIfThen test0 tick0
+      emit =<< mkCmmIfThen test1 tick1
+      emit (addToMem (bWord dflags) entry_ctr_exp 1)
+
+
 
 tickyEnterLNE :: FCode ()
 tickyEnterLNE = ifTicky $ do
@@ -585,6 +613,7 @@ bumpTickyEntryCount lbl = do
 bumpTickyAllocd :: CLabel -> Int -> FCode ()
 bumpTickyAllocd lbl bytes = do
   dflags <- getDynFlags
+  bumpTickyLit   (cmmLabelOffB lbl (oFFSET_StgEntCounter_allocd_count dflags))
   bumpTickyLitBy (cmmLabelOffB lbl (oFFSET_StgEntCounter_allocd dflags)) bytes
 
 bumpTickyLbl :: CLabel -> FCode ()

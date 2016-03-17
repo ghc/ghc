@@ -55,6 +55,7 @@ module StgCmmClosure (
         -- * InfoTables
         mkDataConInfoTable,
         cafBlackHoleInfoTable,
+        countingIndInfoTable,
         indStaticInfoTable,
         staticClosureNeedsLink,
     ) where
@@ -1026,6 +1027,13 @@ indStaticInfoTable :: CmmInfoTable
 indStaticInfoTable
   = CmmInfoTable { cit_lbl  = mkIndStaticInfoLabel
                  , cit_rep  = indStaticRep
+                 , cit_prof = NoProfilingInfo
+                 , cit_srt  = NoC_SRT }
+
+countingIndInfoTable :: CmmInfoTable
+countingIndInfoTable
+  = CmmInfoTable { cit_lbl  = mkCountingIndInfoLabel
+                 , cit_rep  = countingIndRep
                  , cit_prof = NoProfilingInfo
                  , cit_srt  = NoC_SRT }
 

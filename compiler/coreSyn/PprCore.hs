@@ -11,7 +11,7 @@ module PprCore (
         pprCoreExpr, pprParendExpr,
         pprCoreBinding, pprCoreBindings, pprCoreAlt,
         pprCoreBindingWithSize, pprCoreBindingsWithSize,
-        pprRules
+        pprRules, ppIdInfo
     ) where
 
 import CoreSyn

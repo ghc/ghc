@@ -396,6 +396,7 @@ closure_sizeW_ (const StgClosure *p, const StgInfoTable *info)
     case PAP:
         return pap_sizeW((StgPAP *)p);
     case IND:
+    case COUNTING_IND:
         return sizeofW(StgInd);
     case ARR_WORDS:
         return arr_words_sizeW((StgArrBytes *)p);

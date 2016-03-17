@@ -18,16 +18,23 @@
    The StgEntCounter type - needed regardless of TICKY_TICKY
    -------------------------------------------------------------------------- */
 
+/*
+ * Changes here must be reflected in emitTickyCounter in StgCmmTicky.hs.
+ */
+
 typedef struct _StgEntCounter {
   /* Using StgWord for everything, because both the C and asm code
      generators make trouble if you try to pack things tighter */
     StgWord     registeredp;    /* 0 == no, 1 == yes */
     StgInt      arity;          /* arity (static info) */
-    StgInt      allocd;         /* # allocation of this closure */
+    StgInt      allocd_count;   /* instances allocated of this closure */
+    StgInt      allocd;         /* bytes allocates for this closure */
                                 /* (rest of args are in registers) */
     char        *str;           /* name of the thing */
     char        *arg_kinds;     /* info about the args types */
     StgInt      entry_count;    /* Trips to fast entry code */
+    StgInt      single_entry_count;  /* How many instance with a single entry */
+    StgInt      multi_entry_count;  /* How many instance with multiple entries */
     StgInt      allocs;         /* number of allocations by this fun */
     struct _StgEntCounter *link;/* link to chain them all together */
 } StgEntCounter;

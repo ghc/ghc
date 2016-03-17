@@ -655,6 +655,7 @@ genApply regstatus args =
 --        print "    [THUNK_SELECTOR]  &&thunk_lbl,"
 --        print "    [IND]            &&ind_lbl,"
 --        print "    [IND_STATIC]      &&ind_lbl,"
+--        print "    [COUNTING_IND]       &&ind_lbl,"
 --        print "  };"
 
        tickForArity (length args),
@@ -773,7 +774,8 @@ genApply regstatus args =
 --        print "    ind_lbl:"
 --    else:
         text "case IND,",
-        text "     IND_STATIC: {",
+        text "     IND_STATIC,",
+        text "     COUNTING_IND: {",
         nest 4 (vcat [
           text "R1 = StgInd_indirectee(R1);",
             -- An indirection node might contain a tagged pointer

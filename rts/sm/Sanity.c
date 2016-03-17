@@ -276,6 +276,7 @@ checkClosure( const StgClosure* p )
     case CONSTR_1_1:
     case CONSTR_0_2:
     case CONSTR_2_0:
+    case COUNTING_IND:
     case BLACKHOLE:
     case PRIM:
     case MUT_PRIM:

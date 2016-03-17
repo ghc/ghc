@@ -258,6 +258,49 @@ INFO_TABLE(stg_IND_STATIC,1,0,IND_STATIC,"IND_STATIC","IND_STATIC")
     jump %GET_ENTRY(R1) [R1];
 }
 
+INFO_TABLE(stg_COUNTING_IND,1,2,COUNTING_IND,"COUNTING_IND","COUNTING_IND")
+    /* explicit stack */
+{
+    W_ tag, clos, entries, ent_ctr;
+    /* Don't add INDs to granularity cost */
+
+    /* Don't: TICK_ENT_STATIC_IND(Node); for ticky-ticky; this ind is
+       here only to help profiling */
+
+    // Preserve tag
+    clos = UNTAG(R1);
+    tag = GETTAG(R1);
+
+    // ccall debugBelch("COUNTING_IND %p %p %d\n", StgInd_indirectee(clos), StgCountingInd_ent_counter(clos), StgCountingInd_entries(clos));
+
+    ent_ctr = StgCountingInd_ent_counter(clos);
+    entries = StgCountingInd_entries(clos);
+    if (entries == 0) {
+        StgEntCounter_single_entry_count(ent_ctr) = StgEntCounter_single_entry_count(ent_ctr) +1;
+    }
+    if (entries == 1) {
+        StgEntCounter_single_entry_count(ent_ctr) = StgEntCounter_single_entry_count(ent_ctr) - 1;
+        StgEntCounter_multi_entry_count(ent_ctr)  = StgEntCounter_multi_entry_count(ent_ctr) + 1;
+    }
+    StgCountingInd_entries(clos) = entries + 1;
+
+#if defined(TICKY_TICKY) && !defined(PROFILING)
+    /* TICKY_TICKY && !PROFILING means PERM_IND *replaces* an IND, rather than
+       being extra  */
+    TICK_ENT_PERM_IND();
+#endif
+
+    LDV_ENTER(R1);
+
+    R1 = UNTAG(StgCountingInd_indirectee(clos))+tag;
+
+#if defined(TICKY_TICKY) && !defined(PROFILING)
+    TICK_ENT_VIA_NODE();
+#endif
+
+    jump %GET_ENTRY(UNTAG(R1)) [R1];
+}
+
 /* ----------------------------------------------------------------------------
    Black holes.
 

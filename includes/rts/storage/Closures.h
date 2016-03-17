@@ -121,6 +121,13 @@ typedef struct {
 } StgInd;
 
 typedef struct {
+    StgHeader   header;
+    StgClosure *indirectee;
+    const void *ent_counter; // A StgEntCounter
+    StgWord     entries;
+} StgCountingInd;
+
+typedef struct {
     StgHeader     header;
     StgClosure   *indirectee;
     StgClosure   *static_link;

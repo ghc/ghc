@@ -330,6 +330,7 @@ eval_obj:
     switch ( get_itbl(obj)->type ) {
 
     case IND:
+    case COUNTING_IND:
     case IND_STATIC:
     {
         tagged_obj = ((StgInd*)obj)->indirectee;

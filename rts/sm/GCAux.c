@@ -88,6 +88,7 @@ isAlive(StgClosure *p)
 
     case IND:
     case IND_STATIC:
+    case COUNTING_IND:
       // follow indirections
       p = ((StgInd *)q)->indirectee;
       continue;

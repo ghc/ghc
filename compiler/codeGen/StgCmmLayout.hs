@@ -388,11 +388,13 @@ getHpRelOffset virtual_offset
 
 mkVirtHeapOffsets
   :: DynFlags
-  -> Bool                -- True <=> is a thunk
-  -> [(PrimRep,a)]        -- Things to make offsets for
+  -> Bool                     -- True <=> is a thunk
+  -> [(PrimRep,a)]            -- Things to make offsets for
+  -> Int                      -- Extra words to include
   -> (WordOff,                -- _Total_ number of words allocated
       WordOff,                -- Number of words allocated for *pointers*
-      [(NonVoid a, ByteOff)])
+      [(NonVoid a, ByteOff)], -- Offsets for things
+      [ByteOff])              -- Offsets for extra words
 
 -- Things with their offsets from start of object in order of
 -- increasing offset; BUT THIS MAY BE DIFFERENT TO INPUT ORDER
@@ -404,10 +406,11 @@ mkVirtHeapOffsets
 -- mkVirtHeapOffsets always returns boxed things with smaller offsets
 -- than the unboxed things
 
-mkVirtHeapOffsets dflags is_thunk things
+mkVirtHeapOffsets dflags is_thunk things extra_words
   = ( bytesToWordsRoundUp dflags tot_bytes
     , bytesToWordsRoundUp dflags bytes_of_ptrs
     , ptrs_w_offsets ++ non_ptrs_w_offsets
+    , extra_w_offsets
     )
   where
     hdr_words | is_thunk   = thunkHdrSize dflags
@@ -419,18 +422,26 @@ mkVirtHeapOffsets dflags is_thunk things
 
     (bytes_of_ptrs, ptrs_w_offsets) =
        mapAccumL computeOffset 0 ptrs
-    (tot_bytes, non_ptrs_w_offsets) =
+    (bytes_of_ptrs_non_ptrs, non_ptrs_w_offsets) =
        mapAccumL computeOffset bytes_of_ptrs non_ptrs
+    (tot_bytes, extra_w_offsets) =
+       mapAccumL computeOffset' bytes_of_ptrs_non_ptrs [1..extra_words]
 
     computeOffset bytes_so_far (rep, thing)
       = (bytes_so_far + wordsToBytes dflags (argRepSizeW dflags (toArgRep rep)),
          (NonVoid thing, hdr_bytes + bytes_so_far))
 
+    computeOffset' bytes_so_far _
+      = (bytes_so_far + wordsToBytes dflags 1,
+         (hdr_bytes + bytes_so_far))
+
 -- | Just like mkVirtHeapOffsets, but for constructors
 mkVirtConstrOffsets
   :: DynFlags -> [(PrimRep,a)]
   -> (WordOff, WordOff, [(NonVoid a, ByteOff)])
-mkVirtConstrOffsets dflags = mkVirtHeapOffsets dflags False
+mkVirtConstrOffsets dflags things =
+    let (tot_rds, ptr_wds, payload_w_offsets, []) = mkVirtHeapOffsets dflags False things 0
+    in  (tot_rds, ptr_wds, payload_w_offsets)
 
 
 -------------------------------------------------------------------------

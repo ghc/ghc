@@ -57,8 +57,8 @@ make_constr_itbls hsc_env cons =
                     | arg <- dataConRepArgTys dcon
                     , rep_arg <- flattenRepType (repType arg) ]
 
-         (tot_wds, ptr_wds, _) =
-             mkVirtHeapOffsets dflags False{-not a THUNK-} rep_args
+         (tot_wds, ptr_wds, _, []) =
+             mkVirtHeapOffsets dflags False{-not a THUNK-} rep_args 0
 
          ptrs'  = ptr_wds
          nptrs' = tot_wds - ptr_wds
