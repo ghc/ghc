@@ -206,7 +206,7 @@ cgRhs :: Id
                )
 
 cgRhs id (StgRhsCon cc con args)
-  = withNewTickyCounterThunk False (idName id) $ -- False for "not static"
+  = withNewTickyCounterCon (idName id) $
     buildDynCon id True cc con args
 
 {- See Note [GC recovery] in compiler/codeGen/StgCmmClosure.hs -}
@@ -386,7 +386,7 @@ cgRhsStdThunk bndr lf_info payload
        }
  where
  gen_code reg  -- AHA!  A STANDARD-FORM THUNK
-  = withNewTickyCounterStdThunk False (idName bndr) $ -- False for "not static"
+  = withNewTickyCounterStdThunk (lfUpdatable lf_info) (idName bndr) $
     do
   {     -- LAY OUT THE OBJECT
     mod_name <- getModuleName
@@ -402,7 +402,6 @@ cgRhsStdThunk bndr lf_info payload
 --  ; (use_cc, blame_cc) <- chooseDynCostCentres cc [{- no args-}] body
   ; let use_cc = curCCS; blame_cc = curCCS
 
-  ; tickyEnterStdThunk closure_info
 
         -- BUILD THE OBJECT
   ; let info_tbl = mkCmmInfo closure_info
@@ -453,7 +452,10 @@ closureCodeBody :: Bool            -- whether this is a top-level binding
 
 closureCodeBody top_lvl bndr cl_info cc _args arity body fv_details
   | arity == 0 -- No args i.e. thunk
-  = withNewTickyCounterThunk (isStaticClosure cl_info) (closureName cl_info) $
+  = withNewTickyCounterThunk
+        (isStaticClosure cl_info)
+        (closureUpdReqd cl_info)
+        (closureName cl_info) $
     emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl [] $
       \(_, node, _) -> thunkCode cl_info fv_details cc node arity body
    where
@@ -462,7 +464,10 @@ closureCodeBody top_lvl bndr cl_info cc _args arity body fv_details
 
 closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
   = -- Note: args may be [], if all args are Void
-    withNewTickyCounterFun (closureName cl_info) args $ do {
+    withNewTickyCounterFun
+        (closureSingleEntry cl_info)
+        (closureName cl_info)
+        args $ do {
 
         ; let
              lf_info  = closureLFInfo cl_info
