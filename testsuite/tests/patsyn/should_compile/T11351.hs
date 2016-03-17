@@ -1,4 +1,5 @@
-{-# LANGUAGE PatternSynonyms, TypeApplications, ScopedTypeVariables, ViewPatterns #-}
+{-# LANGUAGE PatternSynonyms, TypeApplications, ScopedTypeVariables, ViewPatterns,
+             AllowAmbiguousTypes #-}
 
 module T11351 where
 

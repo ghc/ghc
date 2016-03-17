@@ -8640,7 +8640,6 @@ Visible type application
 
 .. ghc-flag:: -XTypeApplications
 
-    :implies: :ghc-flag:`-XAllowAmbiguousTypes`
     :since: 8.0.1
 
     Allow the use of type application syntax.

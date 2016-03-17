@@ -3708,7 +3708,6 @@ impliedXFlags
 
     , (LangExt.TemplateHaskell, turnOn, LangExt.TemplateHaskellQuotes)
     , (LangExt.Strict, turnOn, LangExt.StrictData)
-    , (LangExt.TypeApplications, turnOn, LangExt.AllowAmbiguousTypes)
   ]
 
 -- Note [Documenting optimisation flags]

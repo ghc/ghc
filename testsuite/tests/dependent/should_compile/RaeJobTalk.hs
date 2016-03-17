@@ -1,7 +1,7 @@
 {- Copyright (c) 2016 Richard Eisenberg
  -}
 
-{-# LANGUAGE TypeOperators, TypeFamilies, TypeApplications,
+{-# LANGUAGE TypeOperators, TypeFamilies, TypeApplications, AllowAmbiguousTypes,
              ExplicitForAll, ScopedTypeVariables, GADTs, TypeFamilyDependencies,
              TypeInType, ConstraintKinds, UndecidableInstances,
              FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies,
