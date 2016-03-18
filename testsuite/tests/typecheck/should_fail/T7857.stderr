@@ -6,7 +6,7 @@ T7857.hs:8:11: error:
         at T7857.hs:8:1-21
       The type variable ‘a0’ is ambiguous
       These potential instances exist:
-        instance [safe] (a ~ ()) => PrintfType (IO a)
+        instance [safe] a ~ () => PrintfType (IO a)
           -- Defined in ‘Text.Printf’
         instance [safe] (PrintfArg a, PrintfType r) => PrintfType (a -> r)
           -- Defined in ‘Text.Printf’

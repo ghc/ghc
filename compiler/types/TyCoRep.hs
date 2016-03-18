@@ -127,7 +127,8 @@ import {-# SOURCE #-} DataCon( dataConTyCon, dataConFullSig
                               , DataCon, eqSpecTyVar )
 import {-# SOURCE #-} Type( isPredTy, isCoercionTy, mkAppTy
                           , tyCoVarsOfTypesWellScoped, varSetElemsWellScoped
-                          , partitionInvisibles, coreView, typeKind )
+                          , partitionInvisibles, coreView, typeKind
+                          , eqType )
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
 import {-# SOURCE #-} Coercion
@@ -2772,6 +2773,9 @@ pprTcApp_help :: (a -> Type) -> TyPrec -> (TyPrec -> a -> SDoc)
               -> TyCon -> [a] -> DynFlags -> PprStyle -> SDoc
 -- This one has accss to the DynFlags
 pprTcApp_help to_type p pp tc tys dflags style
+  | is_equality
+  = print_equality
+
   | print_prefix
   = pprPrefixApp p pp_tc (map (pp TyConPrec) tys_wo_kinds)
 
@@ -2785,25 +2789,65 @@ pprTcApp_help to_type p pp tc tys dflags style
   = pp_tc   -- Do not wrap *, # in parens
 
   | otherwise
-  = pprPrefixApp p (parens pp_tc) (map (pp TyConPrec) tys_wo_kinds)
+  = pprPrefixApp p (parens (pp_tc)) (map (pp TyConPrec) tys_wo_kinds)
   where
     tc_name = tyConName tc
 
-     -- With the solver working in unlifted equality, it will want to
-     -- to print unlifted equality constraints sometimes. But these are
-     -- confusing to users. So fix them up here.
-    (print_prefix, pp_tc)
-      | (tc `hasKey` eqPrimTyConKey || tc `hasKey` heqTyConKey) && not print_eqs
-      = (False, text "~")
-      | tc `hasKey` eqReprPrimTyConKey && not print_eqs
-      = (True, text "Coercible")
-      | otherwise
-      = (not (isSymOcc (nameOccName tc_name)), ppr tc)
+    is_equality = tc `hasKey` eqPrimTyConKey ||
+                  tc `hasKey` heqTyConKey ||
+                  tc `hasKey` eqReprPrimTyConKey ||
+                  tc `hasKey` eqTyConKey
+                  -- don't include Coercible here, which should be printed
+                  -- normally
 
-    print_eqs    = gopt Opt_PrintEqualityRelations dflags ||
-                   dumpStyle style ||
-                   debugStyle style
+      -- This is all a bit ad-hoc, trying to print out the best representation
+      -- of equalities. If you see a better design, go for it.
+    print_equality = case either_op_msg of
+      Left op ->
+        sep [ parens (pp TyOpPrec ty1 <+> dcolon <+> pp TyOpPrec ki1)
+            , op
+            , parens (pp TyOpPrec ty2 <+> dcolon <+> pp TyOpPrec ki2)]
+      Right msg ->
+        msg
+      where
+        hetero_tc =  tc `hasKey` eqPrimTyConKey
+                  || tc `hasKey` eqReprPrimTyConKey
+                  || tc `hasKey` heqTyConKey
+
+        print_kinds   = gopt Opt_PrintExplicitKinds dflags
+        print_eqs     = gopt Opt_PrintEqualityRelations dflags ||
+                        dumpStyle style ||
+                        debugStyle style
+
+        (ki1, ki2, ty1, ty2)
+          | hetero_tc
+          , [k1, k2, t1, t2] <- tys
+          = (k1, k2, t1, t2)
+          | [k, t1, t2] <- tys  -- we must have (~)
+          = (k, k, t1, t2)
+          | otherwise
+          = pprPanic "print_equality" pp_tc
+
+         -- if "Left", print hetero equality; if "Right" just print that msg
+        either_op_msg
+          | print_eqs
+          = Left pp_tc
+
+          | hetero_tc
+          , print_kinds || not (to_type ki1 `eqType` to_type ki2)
+          = Left $ if tc `hasKey` eqPrimTyConKey
+                   then text "~~"
+                   else pp_tc
+
+          | otherwise
+          = Right $ if tc `hasKey` eqReprPrimTyConKey
+                    then text "Coercible" <+> (sep [ pp TyConPrec ty1
+                                                   , pp TyConPrec ty2 ])
+                    else sep [pp TyOpPrec ty1, text "~", pp TyOpPrec ty2]
+
+    print_prefix = not (isSymOcc (nameOccName tc_name))
     tys_wo_kinds = suppressInvisibles to_type dflags tc tys
+    pp_tc        = ppr tc
 
 ------------------
 -- | Given a 'TyCon',and the args to which it is applied,

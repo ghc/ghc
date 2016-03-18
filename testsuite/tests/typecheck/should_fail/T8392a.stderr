@@ -3,7 +3,7 @@ T8392a.hs:6:8: error:
     • Couldn't match type ‘Int’ with ‘Bool’
       Inaccessible code in
         the type signature for:
-          foo :: (Int ~ Bool) => a -> a
+          foo :: Int ~ Bool => a -> a
     • In the ambiguity check for ‘foo’
       In the type signature:
         foo :: (Int ~ Bool) => a -> a
