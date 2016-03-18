@@ -395,7 +395,7 @@ test('T5631',
         # expected value: 392904228 (x86/Linux)
         # 2014-04-04:     346389856 (x86 Windows, 64 bit machine)
         # 2014-12-01:     390199244 (Windows laptop)
-           (wordsize(64), 1198327544, 5)]),
+           (wordsize(64), 1124068664, 5)]),
         # expected value: 774595008 (amd64/Linux):
         # expected value: 735486328 (amd64/Linux) 2012/12/12:
         # expected value: 690742040 (amd64/Linux) Call Arity improvements
@@ -404,6 +404,7 @@ test('T5631',
         # 2015-06-01:     812288344 (amd64/Linux) unknown cause
 	# 2015-12-11:     1128828928 (amd64/Linux) TypeInType (see #11196)
 	# 2015-12-21:     1198327544 (Mac) TypeApplications (will fix with #11196)
+	# 2015-03-18:     1124068664 (Mac) optimize Unify & zonking
        only_ways(['normal'])
       ],
      compile,
@@ -558,7 +559,7 @@ test('T5837',
              # 2014-12-01: 135914136 (Windows laptop, regression see below)
              # 2014-12-08  115905208  Constraint solver perf improvements (esp kick-out)
 
-           (wordsize(64), 43877520, 10)])
+           (wordsize(64), 48507272, 10)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
@@ -575,6 +576,8 @@ test('T5837',
              # 2015-03-17 53424304  Mac  Better depth checking; fails earlier
              # 2015-06-09 38834096  Better "improvement"; I'm not sure whey it improves things
 	     # 2015-12-11 43877520  amd64/Linux, TypeInType (see #11196)
+	     # 2016-03-18 48507272  Mac, accept small regression in exchange
+	     #                           for other optimisations
       ],
       compile_fail,['-freduction-depth=50'])
 
@@ -704,12 +707,13 @@ test('T9872c',
 test('T9872d',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 534693648, 5),
+          [(wordsize(64), 506691240, 5),
           # 2014-12-18    796071864   Initally created
           # 2014-12-18    739189056   Reduce type families even more eagerly
           # 2015-01-07    687562440   TrieMap leaf compression
           # 2015-03-17    726679784   tweak to solver; probably flattens more
 	  # 2016-02-08    534693648   Improved a bit by tyConRolesRepresentational
+	  # 2016-03-18    506691240   optimize Unify & zonking
            (wordsize(32), 59651432, 5)
           # some date     328810212
           # 2015-07-11    350369584

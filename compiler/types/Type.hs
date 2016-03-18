@@ -470,6 +470,8 @@ mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
   where
     go (TyVarTy tv) = tyvar env tv
     go (AppTy t1 t2) = mkappty <$> go t1 <*> go t2
+    go t@(TyConApp _ []) = return t  -- avoid allocation in this exceedingly
+                                     -- common case (mostly, for *)
     go (TyConApp tc tys) = mktyconapp tc <$> mapM go tys
     go (ForAllTy (Anon arg) res) = mkfunty <$> go arg <*> go res
     go (ForAllTy (Named tv vis) inner)

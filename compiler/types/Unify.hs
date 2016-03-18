@@ -977,11 +977,15 @@ umRnBndr2 v1 v2 thing = UM $ \env state ->
   let rn_env' = rnBndr2 (um_rn_env env) v1 v2 in
   unUM thing (env { um_rn_env = rn_env' }) state
 
-checkRnEnv :: (RnEnv2 -> Var -> Bool) -> VarSet -> UM ()
-checkRnEnv inRnEnv varset = UM $ \env state ->
-  if any (inRnEnv (um_rn_env env)) (varSetElems varset)
-  then MaybeApart (state, ())
-  else Unifiable (state, ())
+checkRnEnv :: (RnEnv2 -> VarSet) -> VarSet -> UM ()
+checkRnEnv get_set varset = UM $ \env state ->
+  let env_vars = get_set (um_rn_env env) in
+  if isEmptyVarSet env_vars || varset `disjointVarSet` env_vars
+     -- NB: That isEmptyVarSet is a critical optimization; it
+     -- means we don't have to calculate the free vars of
+     -- the type, often saving quite a bit of allocation.
+  then Unifiable (state, ())
+  else MaybeApart (state, ())
 
 -- | Converts any SurelyApart to a MaybeApart
 don'tBeSoSure :: UM () -> UM ()
@@ -991,13 +995,13 @@ don'tBeSoSure um = UM $ \env state ->
     other       -> other
 
 checkRnEnvR :: Type -> UM ()
-checkRnEnvR ty = checkRnEnv inRnEnvR (tyCoVarsOfType ty)
+checkRnEnvR ty = checkRnEnv rnEnvR (tyCoVarsOfType ty)
 
 checkRnEnvL :: Type -> UM ()
-checkRnEnvL ty = checkRnEnv inRnEnvL (tyCoVarsOfType ty)
+checkRnEnvL ty = checkRnEnv rnEnvL (tyCoVarsOfType ty)
 
 checkRnEnvRCo :: Coercion -> UM ()
-checkRnEnvRCo co = checkRnEnv inRnEnvR (tyCoVarsOfCo co)
+checkRnEnvRCo co = checkRnEnv rnEnvR (tyCoVarsOfCo co)
 
 umRnOccL :: TyVar -> UM TyVar
 umRnOccL v = UM $ \env state ->
