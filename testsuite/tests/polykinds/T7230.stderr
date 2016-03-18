@@ -3,8 +3,7 @@ T7230.hs:48:32: error:
     • Could not deduce: (x :<<= x1) ~ 'True
       from the context: Increasing xs ~ 'True
         bound by the type signature for:
-                   crash :: (Increasing xs ~ 'True) =>
-                            SList xs -> SBool (Increasing xs)
+                   crash :: Increasing xs ~ 'True => SList xs -> SBool (Increasing xs)
         at T7230.hs:47:1-68
       or from: xs ~ (x : xs1)
         bound by a pattern with constructor:
@@ -19,7 +18,7 @@ T7230.hs:48:32: error:
                  in an equation for ‘crash’
         at T7230.hs:48:17-26
       Expected type: SBool (Increasing xs)
-      Actual type: SBool (x :<<= x1)
+        Actual type: SBool (x :<<= x1)
     • In the expression: x %:<<= y
       In an equation for ‘crash’:
           crash (SCons x (SCons y xs)) = x %:<<= y

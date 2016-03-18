@@ -2,7 +2,7 @@
 FrozenErrorTests.hs:12:12: error:
     • Couldn't match type ‘Int’ with ‘Bool’
       Inaccessible code in
-        a pattern with constructor: MkT3 :: forall a. (a ~ Bool) => T a,
+        a pattern with constructor: MkT3 :: forall a. a ~ Bool => T a,
         in a case alternative
     • In the pattern: MkT3
       In a case alternative: MkT3 -> ()
