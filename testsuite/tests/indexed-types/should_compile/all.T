@@ -273,4 +273,4 @@ test('UnusedTyVarWarningsNamedWCs', normal, compile, ['-Wunused-type-patterns'])
 test('T11408', normal, compile, [''])
 test('T11361', normal, compile, [''])
 test('T11361a', normal, compile_fail, [''])
-test('T7788', normal, compile, [''])
+

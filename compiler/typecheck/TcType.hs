@@ -1418,6 +1418,10 @@ We have
   occurCheckExpand b (F (G b)) = F Char
 even though we could also expand F to get rid of b.
 
+The two variants of the function are to support TcUnify.checkTauTvUpdate,
+which wants to prevent unification with type families. For more on this
+point, see Note [Prevent unification with type families] in TcUnify.
+
 See also Note [occurCheckExpand] in TcCanonical
 -}
 
@@ -1475,7 +1479,8 @@ occurCheckExpand dflags tv ty
     -- True => fine
     fast_check (LitTy {})          = True
     fast_check (TyVarTy tv')       = tv /= tv' && fast_check (tyVarKind tv')
-    fast_check (TyConApp tc tys)   = all fast_check tys && (isTauTyCon tc || impredicative)
+    fast_check (TyConApp tc tys)   = all fast_check tys
+                                     && (isTauTyCon tc || impredicative)
     fast_check (ForAllTy (Anon a) r) = fast_check a && fast_check r
     fast_check (AppTy fun arg)     = fast_check fun && fast_check arg
     fast_check (ForAllTy (Named tv' _) ty)

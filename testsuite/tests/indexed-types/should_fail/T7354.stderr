@@ -1,10 +1,11 @@
 
 T7354.hs:28:11: error:
     • Occurs check: cannot construct the infinite type:
-        a ~ Prim [Base t a] (Base t a)
-      Expected type: a -> Base t a
-        Actual type: Prim [Base t a] (Base t a) -> Base t a
+        t1 ~ Base t (Prim [t1] t1)
+      Expected type: Prim [t1] t1 -> Base t (Prim [t1] t1)
+        Actual type: Prim [t1] t1 -> t1
     • In the first argument of ‘ana’, namely ‘alg’
       In the expression: ana alg
       In an equation for ‘foo’: foo = ana alg
-    • Relevant bindings include foo :: a -> t (bound at T7354.hs:28:1)
+    • Relevant bindings include
+        foo :: Prim [t1] t1 -> t (bound at T7354.hs:28:1)

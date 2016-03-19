@@ -31,13 +31,14 @@ T2693.hs:19:23: error:
       In the expression: fst x + snd x
     • Relevant bindings include n :: a5 (bound at T2693.hs:19:7)
 
-T2693.hs:30:47: error:
+T2693.hs:29:20: error:
     • Couldn't match type ‘TFn a0’ with ‘PVR a1’
-      Expected type: [PVR a1]
-        Actual type: [TFn a0]
+      Expected type: () -> Maybe (PVR a1)
+        Actual type: () -> Maybe (TFn a0)
       The type variables ‘a0’, ‘a1’ are ambiguous
-    • In the second argument of ‘map’, namely ‘pvs’
-      In the second argument of ‘min’, namely ‘(map pvrX pvs)’
-      In the expression: (map pvrX pvs) `min` (map pvrX pvs)
-    • Relevant bindings include
-        pvs :: [TFn a0] (bound at T2693.hs:29:8)
+    • In the first argument of ‘mapM’, namely ‘g’
+      In a stmt of a 'do' block: pvs <- mapM g undefined
+      In the expression:
+        do { pvs <- mapM g undefined;
+             let n = (map pvrX pvs) `min` (map pvrX pvs);
+             undefined }
