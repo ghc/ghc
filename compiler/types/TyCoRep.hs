@@ -118,13 +118,15 @@ module TyCoRep (
         tidyTyVarOcc,
         tidyTopType,
         tidyKind,
-        tidyCo, tidyCos
+        tidyCo, tidyCos,
+        tidyTyBinder, tidyTyBinders
     ) where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-} DataCon( dataConTyCon, dataConFullSig
-                              , DataCon, eqSpecTyVar )
+                              , dataConUnivTyBinders, dataConExTyBinders
+                              , DataCon, filterEqSpec )
 import {-# SOURCE #-} Type( isPredTy, isCoercionTy, mkAppTy
                           , tyCoVarsOfTypesWellScoped, varSetElemsWellScoped
                           , partitionInvisibles, coreView, typeKind )
@@ -153,7 +155,6 @@ import StaticFlags ( opt_PprStyle_Debug )
 import FastString
 import Pair
 import UniqSupply
-import ListSetOps
 import Util
 import UniqFM
 
@@ -2662,9 +2663,10 @@ pprDataCons = sepWithVBars . fmap pprDataConWithArgs . tyConDataCons
 pprDataConWithArgs :: DataCon -> SDoc
 pprDataConWithArgs dc = sep [forAllDoc, thetaDoc, ppr dc <+> argsDoc]
   where
-    (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty) = dataConFullSig dc
-    forAllDoc = pprUserForAll $ map (\tv -> Named tv Specified) $
-                ((univ_tvs `minusList` map eqSpecTyVar eq_spec) ++ ex_tvs)
+    (_univ_tvs, _ex_tvs, eq_spec, theta, arg_tys, _res_ty) = dataConFullSig dc
+    univ_bndrs = dataConUnivTyBinders dc
+    ex_bndrs   = dataConExTyBinders dc
+    forAllDoc = pprUserForAll $ (filterEqSpec eq_spec univ_bndrs ++ ex_bndrs)
     thetaDoc  = pprThetaArrowTy theta
     argsDoc   = hsep (fmap pprParendType arg_tys)
 
@@ -2886,6 +2888,17 @@ tidyTyCoVarBndr tidy_env@(occ_env, subst) tyvar
            then mkTyVarOcc (occNameString occ ++ "0")
            else mkVarOcc   (occNameString occ ++ "0")
          | otherwise         = occ
+
+tidyTyBinder :: TidyEnv -> TyBinder -> (TidyEnv, TyBinder)
+tidyTyBinder tidy_env (Named tv vis)
+  = (tidy_env', Named tv' vis)
+  where
+    (tidy_env', tv') = tidyTyCoVarBndr tidy_env tv
+tidyTyBinder tidy_env (Anon ty)
+  = (tidy_env, Anon $ tidyType tidy_env ty)
+
+tidyTyBinders :: TidyEnv -> [TyBinder] -> (TidyEnv, [TyBinder])
+tidyTyBinders = mapAccumL tidyTyBinder
 
 ---------------
 tidyFreeTyCoVars :: TidyEnv -> TyCoVarSet -> TidyEnv

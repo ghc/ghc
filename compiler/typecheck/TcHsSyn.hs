@@ -23,7 +23,7 @@ module TcHsSyn (
         TcId, TcIdSet,
 
         zonkTopDecls, zonkTopExpr, zonkTopLExpr,
-        zonkTopBndrs, zonkTyBndrsX,
+        zonkTopBndrs, zonkTyBndrsX, zonkTyBinders,
         emptyZonkEnv, mkEmptyZonkEnv,
         zonkTcTypeToType, zonkTcTypeToTypes, zonkTyVarOcc,
         zonkCoToCo, zonkTcKindToKind

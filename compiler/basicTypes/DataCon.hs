@@ -18,7 +18,7 @@ module DataCon (
         -- ** Equality specs
         EqSpec, mkEqSpec, eqSpecTyVar, eqSpecType,
         eqSpecPair, eqSpecPreds,
-        substEqSpec,
+        substEqSpec, filterEqSpec,
 
         -- ** Field labels
         FieldLbl(..), FieldLabel, FieldLabelString,
@@ -30,7 +30,9 @@ module DataCon (
         dataConRepType, dataConSig, dataConInstSig, dataConFullSig,
         dataConName, dataConIdentity, dataConTag, dataConTyCon,
         dataConOrigTyCon, dataConUserType,
-        dataConUnivTyVars, dataConExTyVars, dataConAllTyVars,
+        dataConUnivTyVars, dataConUnivTyBinders,
+        dataConExTyVars, dataConExTyBinders,
+        dataConAllTyVars,
         dataConEqSpec, dataConTheta,
         dataConStupidTheta,
         dataConInstArgTys, dataConOrigArgTys, dataConOrigResTy,
@@ -301,6 +303,13 @@ data DataCon
         dcUnivTyVars   :: [TyVar],      -- Universally-quantified type vars [a,b,c]
                                         -- INVARIANT: length matches arity of the dcRepTyCon
                                         ---           result type of (rep) data con is exactly (T a b c)
+        dcUnivTyBinders :: [TyBinder],  -- Binders for universal tyvars. These will all
+                                        -- be Named, and all be Invisible or Specified.
+                                        -- Storing these separately from dcUnivTyVars
+                                        -- is solely because we usually don't need the
+                                        -- binders, and the extraction of the tyvars is
+                                        -- unnecessary work. See also
+                                        -- Note [TyBinders in DataCons]
 
         dcExTyVars     :: [TyVar],    -- Existentially-quantified type vars
                 -- In general, the dcUnivTyVars are NOT NECESSARILY THE SAME AS THE TYVARS
@@ -308,6 +317,8 @@ data DataCon
                 -- the same number of type variables.
                 -- [This is a change (Oct05): previously, vanilla datacons guaranteed to
                 --  have the same type variables as their parent TyCon, but that seems ugly.]
+
+        dcExTyBinders  :: [TyBinder],  -- see dcUnivTyBinders
 
         -- INVARIANT: the UnivTyVars and ExTyVars all have distinct OccNames
         -- Reason: less confusing, and easier to generate IfaceSyn
@@ -529,6 +540,14 @@ substEqSpec subst (EqSpec tv ty)
   where
     tv' = getTyVar "substEqSpec" (substTyVar subst tv)
 
+-- | Filter out any TyBinders mentioned in an EqSpec
+filterEqSpec :: [EqSpec] -> [TyBinder] -> [TyBinder]
+filterEqSpec eq_spec
+  = filter not_in_eq_spec
+  where
+    not_in_eq_spec bndr = let var = binderVar "filterEqSpec" bndr in
+                          all (not . (== var) . eqSpecTyVar) eq_spec
+
 instance Outputable EqSpec where
   ppr (EqSpec tv ty) = ppr (tv, ty)
 
@@ -705,6 +724,42 @@ isMarkedStrict _               = True   -- All others are strict
 \subsection{Construction}
 *                                                                      *
 ************************************************************************
+
+Note [TyBinders in DataCons]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A DataCon needs to keep track of the visibility of its universals and
+existentials, so that visible type application can work properly. This
+is done by storing the universal and existential TyBinders, along with
+the TyVars. These TyBinders should all be Named and should all be
+Invisible or Specified; we don't have Visible or Anon type arguments.
+
+During construction of a DataCon, we often have the TyBinders of the
+parent TyCon. But those TyBinders are *different* than those of the
+DataCon. Here is an example:
+
+  data Proxy a = P
+
+The TyCon has these TyBinders:
+
+  [ Named (k :: *) Invisible, Anon k ]
+
+Note that Proxy's kind is forall k. k -> *. But the DataCon P should
+have (universal) TyBinders
+
+  [ Named (k :: *) Invisible, Named (a :: k) Specified ]
+
+So we want to take the TyCon's TyBinders and the TyCon's TyVars and
+merge them, pulling variable names from the TyVars but visibilities
+from the TyBinders, perserving Invisible but changing Visible to
+Specified. (The `a` in Proxy is indeed Visible, but the `a` in P should
+be Specified.) This merging operation is done in buildDataCon. In contrast,
+the TyBinders passed to mkDataCon are the real TyBinders stored in the
+DataCon. Note that passing the TyVars into mkDataCon is redundant, but
+convenient for both caller and the function's implementation.
+
+In most places in GHC, it's just the TyVars that are needed,
+so that's what's returned from, say, dataConFullSig.
+
 -}
 
 -- | Build a new data constructor
@@ -714,8 +769,9 @@ mkDataCon :: Name
           -> [HsSrcBang]    -- ^ Strictness/unpack annotations, from user
           -> [FieldLabel]   -- ^ Field labels for the constructor,
                             -- if it is a record, otherwise empty
-          -> [TyVar]        -- ^ Universally quantified type variables
-          -> [TyVar]        -- ^ Existentially quantified type variables
+          -> [TyVar] -> [TyBinder]  -- ^ Universals. See Note [TyBinders in DataCons]
+          -> [TyVar] -> [TyBinder]  -- ^ Existentials.
+                            -- (These last two must be Named and Invisible/Specified)
           -> [EqSpec]       -- ^ GADT equalities
           -> ThetaType      -- ^ Theta-type occuring before the arguments proper
           -> [Type]         -- ^ Original argument types
@@ -732,7 +788,7 @@ mkDataCon :: Name
 mkDataCon name declared_infix prom_info
           arg_stricts   -- Must match orig_arg_tys 1-1
           fields
-          univ_tvs ex_tvs
+          univ_tvs univ_bndrs ex_tvs ex_bndrs
           eq_spec theta
           orig_arg_tys orig_res_ty rep_info rep_tycon
           stupid_theta work_id rep
@@ -749,7 +805,8 @@ mkDataCon name declared_infix prom_info
     is_vanilla = null ex_tvs && null eq_spec && null theta
     con = MkData {dcName = name, dcUnique = nameUnique name,
                   dcVanilla = is_vanilla, dcInfix = declared_infix,
-                  dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs,
+                  dcUnivTyVars = univ_tvs, dcUnivTyBinders = univ_bndrs,
+                  dcExTyVars = ex_tvs, dcExTyBinders = ex_bndrs,
                   dcEqSpec = eq_spec,
                   dcOtherTheta = theta,
                   dcStupidTheta = stupid_theta,
@@ -769,14 +826,14 @@ mkDataCon name declared_infix prom_info
 
     tag = assoc "mkDataCon" (tyConDataCons rep_tycon `zip` [fIRST_TAG..]) con
     rep_arg_tys = dataConRepArgTys con
-    rep_ty = mkSpecForAllTys univ_tvs $ mkSpecForAllTys ex_tvs $
+
+    rep_ty = mkForAllTys univ_bndrs $ mkForAllTys ex_bndrs $
              mkFunTys rep_arg_tys $
              mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
 
       -- See Note [Promoted data constructors] in TyCon
-    prom_binders = map (mkNamedBinder Specified)
-                       ((univ_tvs `minusList` map eqSpecTyVar eq_spec) ++
-                        ex_tvs) ++
+    prom_binders = filterEqSpec eq_spec univ_bndrs ++
+                   ex_bndrs ++
                    map mkAnonBinder theta ++
                    map mkAnonBinder orig_arg_tys
     prom_res_kind = orig_res_ty
@@ -819,9 +876,17 @@ dataConIsInfix = dcInfix
 dataConUnivTyVars :: DataCon -> [TyVar]
 dataConUnivTyVars = dcUnivTyVars
 
+-- | 'TyBinder's for the universally-quantified type variables
+dataConUnivTyBinders :: DataCon -> [TyBinder]
+dataConUnivTyBinders = dcUnivTyBinders
+
 -- | The existentially-quantified type variables of the constructor
 dataConExTyVars :: DataCon -> [TyVar]
 dataConExTyVars = dcExTyVars
+
+-- | 'TyBinder's for the existentially-quantified type variables
+dataConExTyBinders :: DataCon -> [TyBinder]
+dataConExTyBinders = dcExTyBinders
 
 -- | Both the universal and existentiatial type variables of the constructor
 dataConAllTyVars :: DataCon -> [TyVar]
@@ -1028,15 +1093,16 @@ dataConUserType :: DataCon -> Type
 --
 -- NB: If the constructor is part of a data instance, the result type
 -- mentions the family tycon, not the internal one.
-dataConUserType (MkData { dcUnivTyVars = univ_tvs,
-                          dcExTyVars = ex_tvs, dcEqSpec = eq_spec,
+dataConUserType (MkData { dcUnivTyBinders = univ_bndrs,
+                          dcExTyBinders = ex_bndrs, dcEqSpec = eq_spec,
                           dcOtherTheta = theta, dcOrigArgTys = arg_tys,
                           dcOrigResTy = res_ty })
-  = mkSpecForAllTys ((univ_tvs `minusList` map eqSpecTyVar eq_spec) ++
-                      ex_tvs) $
+  = mkForAllTys (filterEqSpec eq_spec univ_bndrs) $
+    mkForAllTys ex_bndrs $
     mkFunTys theta $
     mkFunTys arg_tys $
     res_ty
+  where
 
 -- | Finds the instantiated types of the arguments required to construct a 'DataCon' representation
 -- NB: these INCLUDE any dictionary args

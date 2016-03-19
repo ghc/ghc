@@ -1015,13 +1015,13 @@ mkSigmaTy bndrs theta tau = mkForAllTys bndrs (mkPhiTy theta tau)
 
 mkInvSigmaTy :: [TyVar] -> [PredType] -> Type -> Type
 mkInvSigmaTy tyvars
-  = mkSigmaTy (map (mkNamedBinder Invisible) tyvars)
+  = mkSigmaTy (mkNamedBinders Invisible tyvars)
 
 -- | Make a sigma ty where all type variables are "specified". That is,
 -- they can be used with visible type application
 mkSpecSigmaTy :: [TyVar] -> [PredType] -> Type -> Type
 mkSpecSigmaTy tyvars
-  = mkSigmaTy (map (mkNamedBinder Specified) tyvars)
+  = mkSigmaTy (mkNamedBinders Specified tyvars)
 
 mkPhiTy :: [PredType] -> Type -> Type
 mkPhiTy = mkFunTys
