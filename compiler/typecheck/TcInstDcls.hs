@@ -672,9 +672,10 @@ tcDataFamInstDecl mb_clsinfo
              orig_res_ty          = mkTyConApp fam_tc pats'
 
        ; (rep_tc, axiom) <- fixM $ \ ~(rec_rep_tc, _) ->
-           do { data_cons <- tcConDecls new_or_data
+           do { let ty_binders = mkTyBindersPreferAnon full_tvs liftedTypeKind
+              ; data_cons <- tcConDecls new_or_data
                                         rec_rep_tc
-                                        (full_tvs, orig_res_ty) cons
+                                        (full_tvs, ty_binders, orig_res_ty) cons
               ; tc_rhs <- case new_or_data of
                      DataType -> return (mkDataTyConRhs data_cons)
                      NewType  -> ASSERT( not (null data_cons) )
@@ -684,7 +685,6 @@ tcDataFamInstDecl mb_clsinfo
                                              axiom_name eta_tvs [] fam_tc eta_pats
                                              (mkTyConApp rep_tc (mkTyVarTys eta_tvs))
                     parent = DataFamInstTyCon axiom fam_tc pats'
-                    ty_binders = mkTyBindersPreferAnon full_tvs liftedTypeKind
 
 
                       -- NB: Use the full_tvs from the pats. See bullet toward

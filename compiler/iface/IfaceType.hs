@@ -32,6 +32,7 @@ module IfaceType (
         toIfaceTyCon, toIfaceTyCon_name,
         toIfaceTcArgs, toIfaceTvBndrs,
         zipIfaceBinders, toDegenerateBinders,
+        binderToIfaceForAllBndr,
 
         -- Conversion from IfaceTcArgs -> IfaceType
         tcArgsIfaceTypes,
@@ -1340,6 +1341,11 @@ toIfaceCoVar = occNameFS . getOccName
 varToIfaceForAllBndr :: TyVar -> VisibilityFlag -> IfaceForAllBndr
 varToIfaceForAllBndr v vis
   = IfaceTv (toIfaceTvBndr v) vis
+
+binderToIfaceForAllBndr :: TyBinder -> IfaceForAllBndr
+binderToIfaceForAllBndr (Named v vis) = IfaceTv (toIfaceTvBndr v) vis
+binderToIfaceForAllBndr binder
+  = pprPanic "binderToIfaceForAllBndr" (ppr binder)
 
 ----------------
 toIfaceTyCon :: TyCon -> IfaceTyCon

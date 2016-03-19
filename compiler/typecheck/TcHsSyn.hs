@@ -26,7 +26,7 @@ module TcHsSyn (
         -- | For a description of "zonking", see Note [What is zonking?]
         -- in TcMType
         zonkTopDecls, zonkTopExpr, zonkTopLExpr,
-        zonkTopBndrs, zonkTyBndrsX,
+        zonkTopBndrs, zonkTyBndrsX, zonkTyBinders,
         emptyZonkEnv, mkEmptyZonkEnv,
         zonkTcTypeToType, zonkTcTypeToTypes, zonkTyVarOcc,
         zonkCoToCo, zonkTcKindToKind

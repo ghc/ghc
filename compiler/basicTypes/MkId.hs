@@ -274,24 +274,14 @@ mkDictSelId name clas
     sel_names      = map idName (classAllSelIds clas)
     new_tycon      = isNewTyCon tycon
     [data_con]     = tyConDataCons tycon
+    binders        = dataConUnivTyBinders data_con
     tyvars         = dataConUnivTyVars data_con
-    tc_binders     = tyConBinders tycon
     arg_tys        = dataConRepArgTys data_con  -- Includes the dictionary superclasses
     val_index      = assoc "MkId.mkDictSelId" (sel_names `zip` [0..]) name
 
-    sel_ty = mkForAllTys (zipWith mk_binder tc_binders tyvars) $
+    sel_ty = mkForAllTys binders $
              mkFunTy (mkClassPred clas (mkTyVarTys tyvars)) $
              getNth arg_tys val_index
-
-      -- copy the visibility from the tycon binders. Consider:
-      --   class C a where foo :: Proxy a
-      -- In the type of foo, `a` must be Specified but `k` must be Invisible
-    mk_binder tc_binder tyvar
-      | Invisible <- binderVisibility tc_binder
-      = mkNamedBinder Invisible tyvar
-      | otherwise
-      = mkNamedBinder Specified tyvar   -- don't just copy from tc_binder, because
-                                        -- tc_binders can be Visible
 
     base_info = noCafIdInfo
                 `setArityInfo`         1

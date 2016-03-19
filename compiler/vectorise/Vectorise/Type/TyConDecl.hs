@@ -191,8 +191,8 @@ vectDataCon dc
                     (dataConSrcBangs dc)           -- strictness as original constructor
                     (Just $ dataConImplBangs dc)
                     []                             -- no labelled fields for now
-                    univ_tvs                       -- universally quantified vars
-                    []                             -- no existential tvs for now
+                    univ_tvs univ_bndrs            -- universally quantified vars
+                    [] []                          -- no existential tvs for now
                     []                             -- no equalities for now
                     []                             -- no context for now
                     arg_tys                        -- argument types
@@ -204,3 +204,4 @@ vectDataCon dc
     rep_arg_tys = dataConRepArgTys dc
     tycon       = dataConTyCon dc
     (univ_tvs, ex_tvs, eq_spec, theta, _arg_tys, _res_ty) = dataConFullSig dc
+    univ_bndrs  = dataConUnivTyBinders dc

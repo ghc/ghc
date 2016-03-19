@@ -1304,8 +1304,8 @@ patSynToIfaceDecl ps
                 , ifPatMatcher    = to_if_pr (patSynMatcher ps)
                 , ifPatBuilder    = fmap to_if_pr (patSynBuilder ps)
                 , ifPatIsInfix    = patSynIsInfix ps
-                , ifPatUnivTvs    = toIfaceTvBndrs univ_tvs'
-                , ifPatExTvs      = toIfaceTvBndrs ex_tvs'
+                , ifPatUnivBndrs  = map binderToIfaceForAllBndr univ_bndrs'
+                , ifPatExBndrs    = map binderToIfaceForAllBndr ex_bndrs'
                 , ifPatProvCtxt   = tidyToIfaceContext env2 prov_theta
                 , ifPatReqCtxt    = tidyToIfaceContext env2 req_theta
                 , ifPatArgs       = map (tidyToIfaceType env2) args
@@ -1313,9 +1313,11 @@ patSynToIfaceDecl ps
                 , ifFieldLabels   = (patSynFieldLabels ps)
                 }
   where
-    (univ_tvs, req_theta, ex_tvs, prov_theta, args, rhs_ty) = patSynSig ps
-    (env1, univ_tvs') = tidyTyCoVarBndrs emptyTidyEnv univ_tvs
-    (env2, ex_tvs')   = tidyTyCoVarBndrs env1 ex_tvs
+    (_univ_tvs, req_theta, _ex_tvs, prov_theta, args, rhs_ty) = patSynSig ps
+    univ_bndrs = patSynUnivTyBinders ps
+    ex_bndrs   = patSynExTyBinders ps
+    (env1, univ_bndrs') = tidyTyBinders emptyTidyEnv univ_bndrs
+    (env2, ex_bndrs')   = tidyTyBinders env1 ex_bndrs
     to_if_pr (id, needs_dummy) = (idName id, needs_dummy)
 
 --------------------------
@@ -1470,7 +1472,7 @@ tyConToIfaceDecl env tycon
         = IfCon   { ifConOcc     = getOccName (dataConName data_con),
                     ifConInfix   = dataConIsInfix data_con,
                     ifConWrapper = isJust (dataConWrapId_maybe data_con),
-                    ifConExTvs   = toIfaceTvBndrs ex_tvs',
+                    ifConExTvs   = map binderToIfaceForAllBndr ex_bndrs',
                     ifConEqSpec  = map (to_eq_spec . eqSpecPair) eq_spec,
                     ifConCtxt    = tidyToIfaceContext con_env2 theta,
                     ifConArgTys  = map (tidyToIfaceType con_env2) arg_tys,
@@ -1481,8 +1483,9 @@ tyConToIfaceDecl env tycon
                     ifConSrcStricts = map toIfaceSrcBang
                                           (dataConSrcBangs data_con)}
         where
-          (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _)
+          (univ_tvs, _ex_tvs, eq_spec, theta, arg_tys, _)
             = dataConFullSig data_con
+          ex_bndrs = dataConExTyBinders data_con
 
           -- Tidy the univ_tvs of the data constructor to be identical
           -- to the tyConTyVars of the type constructor.  This means
@@ -1494,7 +1497,7 @@ tyConToIfaceDecl env tycon
           con_env1 = (fst tc_env1, mkVarEnv (zipEqual "ifaceConDecl" univ_tvs tc_tyvars))
                      -- A bit grimy, perhaps, but it's simple!
 
-          (con_env2, ex_tvs') = tidyTyCoVarBndrs con_env1 ex_tvs
+          (con_env2, ex_bndrs') = tidyTyBinders con_env1 ex_bndrs
           to_eq_spec (tv,ty)  = (toIfaceTyVar (tidyTyVar con_env2 tv), tidyToIfaceType con_env2 ty)
 
     ifaceOverloaded flds = case fsEnvElts flds of

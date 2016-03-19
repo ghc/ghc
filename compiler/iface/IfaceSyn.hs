@@ -146,8 +146,8 @@ data IfaceDecl
                   ifPatBuilder    :: Maybe (IfExtName, Bool),
                   -- Everything below is redundant,
                   -- but needed to implement pprIfaceDecl
-                  ifPatUnivTvs    :: [IfaceTvBndr],
-                  ifPatExTvs      :: [IfaceTvBndr],
+                  ifPatUnivBndrs  :: [IfaceForAllBndr],
+                  ifPatExBndrs    :: [IfaceForAllBndr],
                   ifPatProvCtxt   :: IfaceContext,
                   ifPatReqCtxt    :: IfaceContext,
                   ifPatArgs       :: [IfaceType],
@@ -215,7 +215,7 @@ data IfaceConDecl
         -- but it's not so easy for the original TyCon/DataCon
         -- So this guarantee holds for IfaceConDecl, but *not* for DataCon
 
-        ifConExTvs   :: [IfaceTvBndr],      -- Existential tyvars
+        ifConExTvs   :: [IfaceForAllBndr],  -- Existential tyvars (w/ visibility)
         ifConEqSpec  :: IfaceEqSpec,        -- Equality constraints
         ifConCtxt    :: IfaceContext,       -- Non-stupid context
         ifConArgTys  :: [IfaceType],        -- Arg types
@@ -753,7 +753,7 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon
     pp_branches _ = Outputable.empty
 
 pprIfaceDecl _ (IfacePatSyn { ifName = name,
-                              ifPatUnivTvs = univ_tvs, ifPatExTvs = ex_tvs,
+                              ifPatUnivBndrs = univ_bndrs, ifPatExBndrs = ex_bndrs,
                               ifPatProvCtxt = prov_ctxt, ifPatReqCtxt = req_ctxt,
                               ifPatArgs = arg_tys,
                               ifPatTy = pat_ty} )
@@ -766,8 +766,8 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name,
              , ex_msg, pprIfaceContextArr prov_ctxt
              , pprIfaceType $ foldr IfaceFunTy pat_ty arg_tys]
       where
-        univ_msg = pprUserIfaceForAll $ map tv_to_forall_bndr univ_tvs
-        ex_msg   = pprUserIfaceForAll $ map tv_to_forall_bndr ex_tvs
+        univ_msg = pprUserIfaceForAll univ_bndrs
+        ex_msg   = pprUserIfaceForAll ex_bndrs
 
         insert_empty_ctxt = null req_ctxt
             && not (null prov_ctxt && isEmpty dflags ex_msg)
@@ -883,7 +883,7 @@ pprIfaceConDecl ss gadt_style fls tycon tc_binders parent
     pp_prefix_con = pprPrefixIfDeclBndr ss name
 
     (univ_tvs, pp_res_ty) = mk_user_con_res_ty eq_spec
-    ppr_ty = pprIfaceForAllPart (map tv_to_forall_bndr (univ_tvs ++ ex_tvs))
+    ppr_ty = pprIfaceForAllPart (map tv_to_forall_bndr univ_tvs ++ ex_tvs)
                                 ctxt pp_tau
 
         -- A bit gruesome this, but we can't form the full con_tau, and ppr it,
@@ -1177,8 +1177,8 @@ freeNamesIfDecl d@IfaceAxiom{} =
 freeNamesIfDecl d@IfacePatSyn{} =
   unitNameSet (fst (ifPatMatcher d)) &&&
   maybe emptyNameSet (unitNameSet . fst) (ifPatBuilder d) &&&
-  freeNamesIfTvBndrs (ifPatUnivTvs d) &&&
-  freeNamesIfTvBndrs (ifPatExTvs d) &&&
+  fnList freeNamesIfForAllBndr (ifPatUnivBndrs d) &&&
+  fnList freeNamesIfForAllBndr (ifPatExBndrs d) &&&
   freeNamesIfContext (ifPatProvCtxt d) &&&
   freeNamesIfContext (ifPatReqCtxt d) &&&
   fnList freeNamesIfType (ifPatArgs d) &&&
@@ -1234,7 +1234,7 @@ freeNamesIfConDecls _                   = emptyNameSet
 
 freeNamesIfConDecl :: IfaceConDecl -> NameSet
 freeNamesIfConDecl c
-  = freeNamesIfTvBndrs (ifConExTvs c) &&&
+  = fnList freeNamesIfForAllBndr (ifConExTvs c) &&&
     freeNamesIfContext (ifConCtxt c) &&&
     fnList freeNamesIfType (ifConArgTys c) &&&
     fnList freeNamesIfType (map snd (ifConEqSpec c)) -- equality constraints

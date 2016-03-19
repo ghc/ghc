@@ -15,7 +15,7 @@ module PatSyn (
         patSynName, patSynArity, patSynIsInfix,
         patSynArgs, patSynType,
         patSynMatcher, patSynBuilder,
-        patSynExTyVars, patSynSig,
+        patSynUnivTyBinders, patSynExTyVars, patSynExTyBinders, patSynSig,
         patSynInstArgTys, patSynInstResTy, patSynFieldLabels,
         patSynFieldType,
 
@@ -65,12 +65,14 @@ data PatSyn
                                        -- psArgs
 
         psUnivTyVars  :: [TyVar],      -- Universially-quantified type variables
+        psUnivTyBinders :: [TyBinder], -- same, with visibility info
         psReqTheta    :: ThetaType,    -- Required dictionaries
                                        -- these constraints are very much like
                                        -- stupid thetas (which is a useful
                                        -- guideline when implementing)
                                        -- but are actually needed.
         psExTyVars    :: [TyVar],      -- Existentially-quantified type vars
+        psExTyBinders :: [TyBinder],   -- same, with visibility info
         psProvTheta   :: ThetaType,    -- Provided dictionaries
         psOrigResTy   :: Type,         -- Mentions only psUnivTyVars
 
@@ -288,9 +290,11 @@ instance Data.Data PatSyn where
 -- | Build a new pattern synonym
 mkPatSyn :: Name
          -> Bool                 -- ^ Is the pattern synonym declared infix?
-         -> ([TyVar], ThetaType) -- ^ Universially-quantified type variables
+         -> ([TyVar], [TyBinder], ThetaType)
+                                 -- ^ Universially-quantified type variables
                                  --   and required dicts
-         -> ([TyVar], ThetaType) -- ^ Existentially-quantified type variables
+         -> ([TyVar], [TyBinder], ThetaType)
+                                 -- ^ Existentially-quantified type variables
                                  --   and provided dicts
          -> [Type]               -- ^ Original arguments
          -> Type                 -- ^ Original result type
@@ -299,14 +303,17 @@ mkPatSyn :: Name
          -> [FieldLabel]         -- ^ Names of fields for
                                  --   a record pattern synonym
          -> PatSyn
+ -- NB: The univ and ex vars are both in TyBinder form and TyVar form for
+ -- convenience. All the TyBinders should be Named!
 mkPatSyn name declared_infix
-         (univ_tvs, req_theta)
-         (ex_tvs, prov_theta)
+         (univ_tvs, univ_bndrs, req_theta)
+         (ex_tvs, ex_bndrs, prov_theta)
          orig_args
          orig_res_ty
          matcher builder field_labels
     = MkPatSyn {psName = name, psUnique = getUnique name,
-                psUnivTyVars = univ_tvs, psExTyVars = ex_tvs,
+                psUnivTyVars = univ_tvs, psUnivTyBinders = univ_bndrs,
+                psExTyVars = ex_tvs, psExTyBinders = ex_bndrs,
                 psProvTheta = prov_theta, psReqTheta = req_theta,
                 psInfix = declared_infix,
                 psArgs = orig_args,
@@ -352,8 +359,14 @@ patSynFieldType ps label
       Just (_, ty) -> ty
       Nothing -> pprPanic "dataConFieldType" (ppr ps <+> ppr label)
 
+patSynUnivTyBinders :: PatSyn -> [TyBinder]
+patSynUnivTyBinders = psUnivTyBinders
+
 patSynExTyVars :: PatSyn -> [TyVar]
 patSynExTyVars = psExTyVars
+
+patSynExTyBinders :: PatSyn -> [TyBinder]
+patSynExTyBinders = psExTyBinders
 
 patSynSig :: PatSyn -> ([TyVar], ThetaType, [TyVar], ThetaType, [Type], Type)
 patSynSig (MkPatSyn { psUnivTyVars = univ_tvs, psExTyVars = ex_tvs

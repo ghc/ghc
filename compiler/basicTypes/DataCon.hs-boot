@@ -6,16 +6,18 @@ import FieldLabel ( FieldLabel )
 import Unique ( Uniquable )
 import Outputable ( Outputable, OutputableBndr )
 import BasicTypes (Arity)
-import {-# SOURCE #-} TyCoRep (Type, ThetaType)
+import {-# SOURCE #-} TyCoRep (Type, ThetaType, TyBinder)
 
 data DataCon
 data DataConRep
 data EqSpec
-eqSpecTyVar :: EqSpec -> TyVar
+filterEqSpec :: [EqSpec] -> [TyBinder] -> [TyBinder]
 
 dataConName      :: DataCon -> Name
 dataConTyCon     :: DataCon -> TyCon
+dataConUnivTyBinders :: DataCon -> [TyBinder]
 dataConExTyVars  :: DataCon -> [TyVar]
+dataConExTyBinders :: DataCon -> [TyBinder]
 dataConSourceArity  :: DataCon -> Arity
 dataConFieldLabels :: DataCon -> [FieldLabel]
 dataConInstOrigArgTys  :: DataCon -> [Type] -> [Type]

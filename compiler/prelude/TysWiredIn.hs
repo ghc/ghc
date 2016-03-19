@@ -409,8 +409,8 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri tyvars ex_tyvars arg_tys
     data_con = mkDataCon dc_name declared_infix prom_info
                 (map (const no_bang) arg_tys)
                 []      -- No labelled fields
-                tyvars
-                ex_tyvars
+                tyvars    (mkNamedBinders Specified tyvars)
+                ex_tyvars (mkNamedBinders Specified ex_tyvars)
                 []      -- No equality spec
                 []      -- No theta
                 arg_tys (mkTyConApp tycon (mkTyVarTys tyvars))
@@ -674,7 +674,7 @@ mk_tuple boxity arity = (tycon, tuple_con)
             in
             ( UnboxedTuple
             , gHC_PRIM
-            , map (mkNamedBinder Specified) rr_tvs ++
+            , mkNamedBinders Specified rr_tvs ++
               map (mkAnonBinder . tyVarKind) open_tvs
             , tYPE res_rep
             , arity * 2

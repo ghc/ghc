@@ -512,7 +512,7 @@ tc_hs_type mode (HsForAllTy { hst_bndrs = hs_tvs, hst_body = ty }) exp_kind
     -- Why exp_kind?  See Note [Body kind of HsForAllTy]
     do { ty' <- tc_lhs_type mode ty exp_kind
        ; let bound_vars = allBoundVariables ty'
-             bndrs      = map (mkNamedBinder Specified) tvs'
+             bndrs      = mkNamedBinders Specified tvs'
        ; return (mkForAllTys bndrs ty', bound_vars) }
 
 tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_body = ty }) exp_kind
@@ -1238,7 +1238,7 @@ kcHsTyVarBndrs cusk open_fam all_kind_vars
        ; when (not (null meta_tvs)) $
          report_non_cusk_tvs (qkvs ++ tvs)
 
-       ; return ( map (mkNamedBinder Specified) good_tvs ++ binders
+       ; return ( mkNamedBinders Specified good_tvs ++ binders
                 , res_kind, stuff ) }}
 
   | otherwise

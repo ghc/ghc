@@ -84,7 +84,8 @@ module Type (
 
         -- ** Binders
         sameVis,
-        mkNamedBinder, mkAnonBinder, isNamedBinder, isAnonBinder,
+        mkNamedBinder, mkNamedBinders,
+        mkAnonBinder, isNamedBinder, isAnonBinder,
         isIdLikeBinder, binderVisibility, binderVar_maybe,
         binderVar, binderRelevantType_maybe, caseBinder,
         partitionBinders, partitionBindersIntoBinders,
@@ -188,7 +189,8 @@ module Type (
         tidyOpenTyCoVar, tidyOpenTyCoVars,
         tidyTyVarOcc,
         tidyTopType,
-        tidyKind
+        tidyKind,
+        tidyTyBinder, tidyTyBinders
     ) where
 
 #include "HsVersions.h"
@@ -1505,6 +1507,10 @@ applyTysX tvs body_ty arg_tys
 -- | Make a named binder
 mkNamedBinder :: VisibilityFlag -> Var -> TyBinder
 mkNamedBinder vis var = Named var vis
+
+-- | Make many named binders
+mkNamedBinders :: VisibilityFlag -> [TyVar] -> [TyBinder]
+mkNamedBinders vis = map (mkNamedBinder vis)
 
 -- | Make an anonymous binder
 mkAnonBinder :: Type -> TyBinder
