@@ -38,6 +38,7 @@ import TyCon
 -- others:
 import HsSyn            -- HsType
 import TcRnMonad        -- TcType, amongst others
+import TcHsSyn     ( checkForRepresentationPolymorphism )
 import FunDeps
 import FamInstEnv  ( isDominatedBy, injectiveBranches,
                      InjectivityCheckResult(..) )
@@ -445,6 +446,16 @@ forAllAllowed ArbitraryRank             = True
 forAllAllowed (LimitedRank forall_ok _) = forall_ok
 forAllAllowed _                         = False
 
+-- The zonker issues errors if it zonks a representation-polymorphic binder
+-- But sometimes it's nice to check a little more eagerly, trying to report
+-- errors earlier.
+representationPolymorphismForbidden :: UserTypeCtxt -> Bool
+representationPolymorphismForbidden = go
+  where
+    go (ConArgCtxt _) = True     -- A rep-polymorphic datacon won't be useful
+    go (PatSynCtxt _) = True     -- Similar to previous case
+    go _              = False    -- Other cases are caught by zonker
+
 ----------------------------------------
 -- | Fail with error message if the type is unlifted
 check_lifted :: TidyEnv -> Type -> TcM ()
@@ -498,6 +509,8 @@ check_type _ _ _ (TyVarTy _) = return ()
 
 check_type env ctxt rank (ForAllTy (Anon arg_ty) res_ty)
   = do  { check_type env ctxt arg_rank arg_ty
+        ; when (representationPolymorphismForbidden ctxt) $
+          checkForRepresentationPolymorphism empty arg_ty
         ; check_type env ctxt res_rank res_ty }
   where
     (arg_rank, res_rank) = funArgResRank rank
