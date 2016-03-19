@@ -1,0 +1,7 @@
+
+T11723.hs:8:41: error:
+    • The type ‘a’ is not an unboxed tuple,
+      and yet its kind suggests that it has the representation
+      of an unboxed tuple. This is not allowed.
+    • In the definition of data constructor ‘Wat’
+      In the data type declaration for ‘Wat’

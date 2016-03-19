@@ -7638,7 +7638,7 @@ your program, we encourage you to turn on these flags, especially
 
 .. index::
    single: TYPE
-   single: runtime representation polymorphism
+   single: representation polymorphism
    
 .. _runtime-rep:
 

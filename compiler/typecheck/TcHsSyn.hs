@@ -29,7 +29,10 @@ module TcHsSyn (
         zonkTopBndrs, zonkTyBndrsX, zonkTyBinders,
         emptyZonkEnv, mkEmptyZonkEnv,
         zonkTcTypeToType, zonkTcTypeToTypes, zonkTyVarOcc,
-        zonkCoToCo, zonkTcKindToKind
+        zonkCoToCo, zonkTcKindToKind,
+
+        -- * Validity checking
+        checkForRepresentationPolymorphism
   ) where
 
 #include "HsVersions.h"
@@ -45,6 +48,7 @@ import TysPrim
 import TysWiredIn
 import Type
 import TyCoRep  ( TyBinder(..) )
+import TyCon
 import Coercion
 import ConLike
 import DataCon
@@ -1665,16 +1669,38 @@ ensureNotRepresentationPolymorphic
 ensureNotRepresentationPolymorphic id ty
   = whenNoErrs $   -- sometimes we end up zonking bogus definitions of type
                    -- forall a. a. See, for example, test ghci/scripts/T9140
-    unless (isEmptyVarSet (tyCoVarsOfType ki)) $
-    addErrAt (nameSrcSpan $ idName id) $
-    vcat [ text "The following variable has an unknown runtime representation:"
-         , text "    Var name:" <+> ppr id
-         , text "    Var type:" <+> ppr tidy_ty
-         , text " Type's kind:" <+> ppr tidy_ki
-         , text "Perhaps add a type or kind signature to fix the representation."
-         ]
+    checkForRepresentationPolymorphism
+      (text "In the type of binder" <+> quotes (ppr id)) ty
+
+checkForRepresentationPolymorphism :: SDoc -> Type -> TcM ()
+checkForRepresentationPolymorphism extra ty
+  | Just (tc, tys) <- splitTyConApp_maybe ty
+  , isUnboxedTupleTyCon tc
+  = mapM_ (checkForRepresentationPolymorphism extra) (dropRuntimeRepArgs tys)
+      -- You might think that we can just check the RuntimeRep args themselves.
+      -- But this would fail in the case of nested unboxed tuples, for which
+      -- one of the RuntimeRep args would be UnboxedTupleRep. So we just check
+      -- the type args directly.
+
+  | runtime_rep `eqType` unboxedTupleRepDataConTy
+  = addErr (vcat [ text "The type" <+> quotes (ppr tidy_ty) <+>
+                     text "is not an unboxed tuple,"
+                 , text "and yet its kind suggests that it has the representation"
+                 , text "of an unboxed tuple. This is not allowed." ] $$
+            extra)
+
+  | not (isEmptyVarSet (tyCoVarsOfType runtime_rep))
+  = addErr $
+    hang (text "A representation-polymorphic type is not allowed here:")
+       2 (vcat [ text "Type:" <+> ppr tidy_ty
+               , text "Kind:" <+> ppr tidy_ki ]) $$
+    extra
+
+  | otherwise
+  = return ()
   where
-    ki = typeKind ty
+    ki          = typeKind ty
+    runtime_rep = getRuntimeRepFromKind "check_type" ki
 
     (tidy_env, tidy_ty) = tidyOpenType emptyTidyEnv ty
-    tidy_ki             = tidyType tidy_env ki
+    tidy_ki             = tidyType tidy_env (typeKind ty)
