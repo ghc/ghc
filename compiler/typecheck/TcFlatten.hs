@@ -1346,6 +1346,9 @@ flatten_tyvar3 tv
 --                 , ppr kind_co <+> dcolon <+> ppr (coercionKind kind_co) ])
        ; orig_kind <- liftTcS $ zonkTcType kind
              -- NB: orig_kind is *not* the kind returned from flatten
+             -- This zonk is necessary because we might later see the tv's kind
+             -- in canEqTyVarTyVar (where we use getCastedTyVar_maybe).
+             -- If you remove it, then e.g. dependent/should_fail/T11407 panics
        ; return (FTRCasted (setTyVarKind tv orig_kind) kind_co) }
 
 {-
