@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, NoPolyKinds #-}
 
-module T11334 where
+module T11334b where
 
 import Data.Functor.Compose
 import Data.Proxy
