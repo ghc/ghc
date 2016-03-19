@@ -49,6 +49,7 @@ import Inst
 import TyCon
 import TysWiredIn
 import Var
+import VarSet
 import VarEnv
 import ErrUtils
 import DynFlags
@@ -1440,16 +1441,91 @@ checkTauTvUpdate dflags origin t_or_k tv ty
   | otherwise
   = do { ty   <- zonkTcType ty
        ; co_k <- uType kind_origin KindLevel (typeKind ty) (tyVarKind tv)
-       ; return $ case occurCheckExpand dflags tv ty of
-           OC_OK ty2 -> Just (ty2, co_k)
-           _         -> Nothing }
+       ; if | defer_me ty ->  -- Quick test
+                -- Failed quick test so try harder
+                case occurCheckExpand dflags tv ty of
+                   OC_OK ty2 | defer_me ty2 -> return Nothing
+                             | otherwise    -> return (Just (ty2, co_k))
+                   _                        -> return Nothing
+            | otherwise   -> return (Just (ty, co_k)) }
 
   where
     kind_origin   = KindEqOrigin (mkTyVarTy tv) (Just ty) origin (Just t_or_k)
     details       = tcTyVarDetails tv
     info          = mtv_info details
 
+    impredicative = canUnifyWithPolyType dflags details
+
+    defer_me :: TcType -> Bool
+    -- Checks for (a) occurrence of tv
+    --            (b) type family applications
+    --            (c) foralls
+    -- See Note [Prevent unification with type families]
+    -- See Note [Refactoring hazard: checkTauTvUpdate]
+    defer_me (LitTy {})        = False
+    defer_me (TyVarTy tv')     = tv == tv' || defer_me (tyVarKind tv')
+    defer_me (TyConApp tc tys) = isTypeFamilyTyCon tc || any defer_me tys
+                                 || not (impredicative || isTauTyCon tc)
+    defer_me (ForAllTy bndr t) = defer_me (binderType bndr) || defer_me t
+                                 || (isNamedBinder bndr && not impredicative)
+    defer_me (AppTy fun arg)   = defer_me fun || defer_me arg
+    defer_me (CastTy ty co)    = defer_me ty || defer_me_co co
+    defer_me (CoercionTy co)   = defer_me_co co
+
+      -- We don't really care if there are type families in a coercion,
+      -- but we still can't have an occurs-check failure
+    defer_me_co co = tv `elemVarSet` tyCoVarsOfCo co
+
 {-
+Note [Prevent unification with type families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We prevent unification with type families because of an uneasy compromise.
+It's perfectly sound to unify with type families, and it even improves the
+error messages in the testsuite. It also modestly improves performance, at
+least in some cases. But it's disastrous for test case perf/compiler/T3064.
+Here is the problem: Suppose we have (F ty) where we also have [G] F ty ~ a.
+What do we do? Do we reduce F? Or do we use the given? Hard to know what's
+best. GHC reduces. This is a disaster for T3064, where the type's size
+spirals out of control during reduction. (We're not helped by the fact that
+the flattener re-flattens all the arguments every time around.) If we prevent
+unification with type families, then the solver happens to use the equality
+before expanding the type family.
+
+It would be lovely in the future to revisit this problem and remove this
+extra, unnecessary check. But we retain it for now as it seems to work
+better in practice.
+
+Note [Refactoring hazard: checkTauTvUpdate]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+I (Richard E.) have a sad story about refactoring this code, retained here
+to prevent others (or a future me!) from falling into the same traps.
+
+It all started with #11407, which was caused by the fact that the TyVarTy
+case of defer_me didn't look in the kind. But it seemed reasonable to
+simply remove the defer_me check instead.
+
+It referred to two Notes (since removed) that were out of date, and the
+fast_check code in occurCheckExpand seemed to do just about the same thing as
+defer_me. The one piece that defer_me did that wasn't repeated by
+occurCheckExpand was the type-family check. (See Note [Prevent unification
+with type families].) So I checked the result of occurCheckExpand for any
+type family occurrences and deferred if there were any. This was done
+in commit e9bf7bb5cc9fb3f87dd05111aa23da76b86a8967 .
+
+This approach turned out not to be performant, because the expanded type
+was bigger than the original type, and tyConsOfType looks through type
+synonyms. So it then struck me that we could dispense with the defer_me
+check entirely. This simplified the code nicely, and it cut the allocations
+in T5030 by half. But, as documented in Note [Prevent unification with
+type families], this destroyed performance in T3064. Regardless, I missed this
+regression and the change was committed as
+3f5d1a13f112f34d992f6b74656d64d95a3f506d .
+
+Bottom lines:
+ * defer_me is back, but now fixed w.r.t. #11407.
+ * Tread carefully before you start to refactor here. There can be
+   lots of hard-to-predict consequences.
+
 Note [Type synonyms and the occur check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Generally speaking we try to update a variable with type synonyms not

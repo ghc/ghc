@@ -275,4 +275,3 @@ test('T11361', normal, compile, ['-dunique-increment=-1'])
   # -dunique-increment=-1 doesn't work inside the file
 test('T11361a', normal, compile_fail, [''])
 test('T11581', normal, compile, [''])
-test('T7788', normal, compile, [''])
