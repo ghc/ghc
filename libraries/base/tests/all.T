@@ -211,5 +211,5 @@ test('T9848',
       compile_and_run,
       ['-O'])
 test('T10149', normal, compile_and_run, [''])
-test('T11334', normal, compile_and_run, [''])
+test('T11334a', normal, compile_and_run, [''])
 test('T11555', normal, compile_and_run, [''])
