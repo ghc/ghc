@@ -62,3 +62,4 @@ test('SafeFlags29', normal, compile_fail, [''])
 test('Flags01', normal, compile, ['-XSafe'])
 test('Flags02', normal, compile, ['-XSafe'])
 
+test('SafeFlags30', normal, compile_fail, [''])
