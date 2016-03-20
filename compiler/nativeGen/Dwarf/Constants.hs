@@ -126,9 +126,10 @@ dW_CFA_val_expression     = 0x16
 dW_CFA_offset             = 0x80
 
 -- * Operations
-dW_OP_deref, dW_OP_consts,
+dW_OP_addr, dW_OP_deref, dW_OP_consts,
   dW_OP_minus, dW_OP_mul, dW_OP_plus,
   dW_OP_lit0, dW_OP_breg0, dW_OP_call_frame_cfa :: Word8
+dW_OP_addr           = 0x03
 dW_OP_deref          = 0x06
 dW_OP_consts         = 0x11
 dW_OP_minus          = 0x1c

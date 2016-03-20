@@ -258,6 +258,7 @@ type UnwindTable = Map.Map GlobalReg UnwindExpr
 data UnwindExpr = UwConst Int                   -- ^ literal value
                 | UwReg GlobalReg Int           -- ^ register plus offset
                 | UwDeref UnwindExpr            -- ^ pointer dereferencing
+                | UwLabel CLabel
                 | UwPlus UnwindExpr UnwindExpr
                 | UwMinus UnwindExpr UnwindExpr
                 | UwTimes UnwindExpr UnwindExpr
@@ -268,6 +269,7 @@ instance Outputable UnwindExpr where
   pprPrec _ (UwReg g 0)     = ppr g
   pprPrec p (UwReg g x)     = pprPrec p (UwPlus (UwReg g 0) (UwConst x))
   pprPrec _ (UwDeref e)     = char '*' <> pprPrec 3 e
+  pprPrec _ (UwLabel l)     = pprPrec 3 l
   pprPrec p (UwPlus e0 e1)  | p <= 0
                             = pprPrec 0 e0 <> char '+' <> pprPrec 0 e1
   pprPrec p (UwMinus e0 e1) | p <= 0
@@ -292,6 +294,7 @@ extractUnwind b = go $ blockToList mid
 -- possible.
 toUnwindExpr :: CmmExpr -> UnwindExpr
 toUnwindExpr (CmmLit (CmmInt i _))       = UwConst (fromIntegral i)
+toUnwindExpr (CmmLit (CmmLabel l))       = UwLabel l
 toUnwindExpr (CmmRegOff (CmmGlobal g) i) = UwReg g i
 toUnwindExpr (CmmReg (CmmGlobal g))      = UwReg g 0
 toUnwindExpr (CmmLoad e _)               = UwDeref (toUnwindExpr e)
