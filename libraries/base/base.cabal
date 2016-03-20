@@ -310,6 +310,7 @@ Library
         Data.OldList
         Foreign.ForeignPtr.Imp
         System.Environment.ExecutablePath
+        System.CPUTime.Utils
 
     c-sources:
         cbits/DarwinUtils.c
@@ -341,6 +342,8 @@ Library
             GHC.IO.Encoding.CodePage.Table
             GHC.Conc.Windows
             GHC.Windows
+        other-modules:
+            System.CPUTime.Windows
     else
         exposed-modules:
             GHC.Event
@@ -359,6 +362,11 @@ Library
             GHC.Event.Thread
             GHC.Event.TimerManager
             GHC.Event.Unique
+
+            System.CPUTime.Posix.ClockGetTime
+            System.CPUTime.Posix.Times
+            System.CPUTime.Posix.RUsage
+            System.CPUTime.Unsupported
 
     -- We need to set the unit id to base (without a version number)
     -- as it's magic.
