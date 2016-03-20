@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, CApiFFI, NumDecimals #-}
+{-# LANGUAGE CPP, CApiFFI, NondecreasingIndentation, NumDecimals #-}
 
 #include "HsFFI.h"
 #include "HsBaseConfig.h"
@@ -8,23 +8,12 @@ module System.CPUTime.Windows
     , getCpuTimePrecision
     ) where
 
-import Data.Ratio
 import Foreign
 import Foreign.C
 
 -- For FILETIME etc. on Windows
 #if HAVE_WINDOWS_H
 #include <windows.h>
-#endif
-
-#ifdef mingw32_HOST_OS
-# if defined(i386_HOST_ARCH)
-#  define WINDOWS_CCONV stdcall
-# elif defined(x86_64_HOST_ARCH)
-#  define WINDOWS_CCONV ccall
-# else
-#  error Unknown mingw32 arch
-# endif
 #endif
 
 getCPUTime :: IO Integer
@@ -61,6 +50,14 @@ getCpuTimePrecision = return 16e9
 
 type FILETIME = ()
 type HANDLE = ()
+
 -- need proper Haskell names (initial lower-case character)
-foreign import WINDOWS_CCONV unsafe "GetCurrentProcess" getCurrentProcess :: IO (Ptr HANDLE)
-foreign import WINDOWS_CCONV unsafe "GetProcessTimes" getProcessTimes :: Ptr HANDLE -> Ptr FILETIME -> Ptr FILETIME -> Ptr FILETIME -> Ptr FILETIME -> IO CInt
+#if defined(i386_HOST_ARCH)
+foreign import stdcall unsafe "GetCurrentProcess" getCurrentProcess :: IO (Ptr HANDLE)
+foreign import stdcall unsafe "GetProcessTimes" getProcessTimes :: Ptr HANDLE -> Ptr FILETIME -> Ptr FILETIME -> Ptr FILETIME -> Ptr FILETIME -> IO CInt
+#elif defined(x86_64_HOST_ARCH)
+foreign import ccall unsafe "GetCurrentProcess" getCurrentProcess :: IO (Ptr HANDLE)
+foreign import ccall unsafe "GetProcessTimes" getProcessTimes :: Ptr HANDLE -> Ptr FILETIME -> Ptr FILETIME -> Ptr FILETIME -> Ptr FILETIME -> IO CInt
+#else
+#error Unknown mingw32 arch
+#endif
