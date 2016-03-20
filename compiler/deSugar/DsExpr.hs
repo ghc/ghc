@@ -788,6 +788,12 @@ allocation in some nofib programs. Specifically
 Of course, if rules aren't turned on then there is pretty much no
 point doing this fancy stuff, and it may even be harmful.
 
+Moreover, for large lists (with a dynamic prefix longer than maxBuildLength) we
+choose not to perform this optimization as it will trade large static data for
+large code, which is generally a poor trade-off. See #11707 and the
+documentation for maxBuildLength.
+
+
 =======>  Note by SLPJ Dec 08.
 
 I'm unconvinced that we should *ever* generate a build for an explicit
@@ -803,9 +809,28 @@ We do not want to generate a build invocation on the LHS of this RULE!
 We fix this by disabling rules in rule LHSs, and testing that
 flag here; see Note [Desugaring RULE left hand sides] in Desugar
 
-To test this I've added a (static) flag -fsimple-list-literals, which
+To test this I've added a flag -fsimple-list-literals, which
 makes all list literals be generated via the simple route.
 -}
+
+{- | The longest list length which we will desugar using @build@.
+
+This is essentially a magic number and its setting is unfortunate rather
+arbitrary. The idea here, as mentioned in Note [Desugaring explicit lists],
+is to avoid deforesting large static data into large(r) code. Ideally we'd
+want a smaller threshold with larger consumers and vice-versa, but we have no
+way of knowing what will be consuming our list in the desugaring impossible to
+set generally correctly.
+
+The effect of reducing this number will be that 'build' fusion is applied
+less often. From a runtime performance perspective, applying 'build' more
+liberally on "moderately" sized lists should rarely hurt and will often it can
+only expose further optimization opportunities; if no fusion is possible it will
+eventually get rule-rewritten back to a list). We do, however, pay in compile
+time.
+-}
+maxBuildLength :: Int
+maxBuildLength = 32
 
 dsExplicitList :: Type -> Maybe (SyntaxExpr Id) -> [LHsExpr Id]
                -> DsM CoreExpr
@@ -815,6 +840,8 @@ dsExplicitList elt_ty Nothing xs
        ; xs' <- mapM dsLExpr xs
        ; let (dynamic_prefix, static_suffix) = spanTail is_static xs'
        ; if gopt Opt_SimpleListLiterals dflags        -- -fsimple-list-literals
+         || length dynamic_prefix > maxBuildLength
+                -- Don't generate builds if the list is very long.
          || not (gopt Opt_EnableRewriteRules dflags)  -- Rewrite rules off
                 -- Don't generate a build if there are no rules to eliminate it!
                 -- See Note [Desugaring RULE left hand sides] in Desugar

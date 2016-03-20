@@ -719,12 +719,13 @@ test('T9872d',
 test('T9961',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 745044392, 5),
+          [(wordsize(64), 519436672, 5),
           # 2015-01-12    807117816   Initally created
           # 2015-spring   772510192   Got better
           # 2015-05-22    663978160   Fix for #10370 improves it more
           # 2015-10-28    708680480   x86_64/Linux   Emit Typeable at definition site
           # 2015-12-17    745044392   x86_64/Darwin  Creep upwards
+          # 2016-03-20    519436672   x64_64/Linux   Don't use build desugaring for large lists (D2007)
            (wordsize(32), 375647160, 5)
           ]),
       ],
