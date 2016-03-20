@@ -98,3 +98,11 @@ test('callstack002', [], compile_and_run,
 test('T5363', [], compile_and_run, [''])
 
 test('profinline001', [], compile_and_run, [''])
+
+test('T11627a', [extra_ways(extra_prof_ways)], compile_and_run, [''])
+
+test('T11627b', [ extra_run_opts('+RTS -i0 -RTS')  # census after each GC
+                , extra_ways(extra_prof_ways)
+                ]
+                , compile_and_run
+                , [''])
