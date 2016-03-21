@@ -764,10 +764,14 @@ pprInstr (FNEG reg1 reg2) = pprUnary (sLit "fneg") reg1 reg2
 
 pprInstr (FCMP reg1 reg2) = hcat [
         char '\t',
-        text "fcmpu\tcr0, ",
+        text "fcmpu\t0, ",
             -- Note: we're using fcmpu, not fcmpo
             -- The difference is with fcmpo, compare with NaN is an invalid operation.
-            -- We don't handle invalid fp ops, so we don't care
+            -- We don't handle invalid fp ops, so we don't care.
+            -- Morever, we use `fcmpu 0, ...` rather than `fcmpu cr0, ...` for
+            -- better portability since some non-GNU assembler (such as
+            -- IBM's `as`) tend not to support the symbolic register name cr0.
+            -- This matches the syntax that GCC seems to emit for PPC targets.
         pprReg reg1,
         text ", ",
         pprReg reg2
