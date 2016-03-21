@@ -2308,13 +2308,27 @@ synTyConResKind :: TyCon -> Kind
 synTyConResKind tycon = piResultTys (tyConKind tycon) (mkTyVarTys (tyConTyVars tycon))
 
 -- | Retrieve the free variables in this type, splitting them based
--- on whether the variable was used in a dependent context. It's possible
--- for a variable to be reported twice, if it's used both dependently
--- and non-dependently. (This isn't the most precise analysis, because
+-- on whether the variable was used in a dependent context.
+-- (This isn't the most precise analysis, because
 -- it's used in the typechecking knot. It might list some dependent
 -- variables as also non-dependent.)
 splitDepVarsOfType :: Type -> Pair TyCoVarSet
-splitDepVarsOfType = go
+splitDepVarsOfType ty = Pair dep_vars final_nondep_vars
+  where
+    Pair dep_vars nondep_vars = split_dep_vars ty
+    final_nondep_vars = nondep_vars `minusVarSet` dep_vars
+
+-- | Like 'splitDepVarsOfType', but over a list of types
+splitDepVarsOfTypes :: [Type] -> Pair TyCoVarSet
+splitDepVarsOfTypes tys = Pair dep_vars final_nondep_vars
+  where
+    Pair dep_vars nondep_vars = foldMap split_dep_vars tys
+    final_nondep_vars = nondep_vars `minusVarSet` dep_vars
+
+-- | Worker for 'splitDepVarsOfType'. This might output the same var
+-- in both sets, if it's used in both a type and a kind.
+split_dep_vars :: Type -> Pair TyCoVarSet
+split_dep_vars = go
   where
     go (TyVarTy tv)              = Pair (tyCoVarsOfType $ tyVarKind tv)
                                         (unitVarSet tv)
@@ -2333,10 +2347,6 @@ splitDepVarsOfType = go
     go_co co = let Pair ty1 ty2 = coercionKind co in
                go ty1 `mappend` go ty2  -- NB: the Pairs separate along different
                                         -- dimensions here. Be careful!
-
--- | Like 'splitDepVarsOfType', but over a list of types
-splitDepVarsOfTypes :: [Type] -> Pair TyCoVarSet
-splitDepVarsOfTypes = foldMap splitDepVarsOfType
 
 -- | Retrieve the free variables in this type, splitting them based
 -- on whether they are used visibly or invisibly. Invisible ones come

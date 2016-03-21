@@ -1442,7 +1442,7 @@ kindGeneralize :: TcType -> TcM [KindVar]
 kindGeneralize ty
   = do { gbl_tvs <- tcGetGlobalTyCoVars -- Already zonked
        ; kvs <- zonkTcTypeAndFV ty
-       ; quantifyTyVars gbl_tvs (Pair kvs emptyVarSet) }
+       ; quantifyZonkedTyVars gbl_tvs (Pair kvs emptyVarSet) }
 
 {-
 Note [Kind generalisation]
@@ -1746,6 +1746,7 @@ tcTyClTyVars :: Name -> LHsQTyVars Name      -- LHS of the type or class decl
 -- ^ Used for the type variables of a type or class decl
 -- on the second full pass (type-checking/desugaring) in TcTyClDecls.
 -- This is *not* used in the initial-kind run, nor in the "kind-checking" pass.
+-- Accordingly, everything passed to the continuation is fully zonked.
 --
 -- (tcTyClTyVars T [a,b] thing_inside)
 --   where T : forall k1 k2 (a:k1 -> *) (b:k1). k2 -> *
