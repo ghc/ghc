@@ -861,7 +861,7 @@ piResultTy ty arg
           empty_subst = mkEmptyTCvSubst $ mkInScopeSet $
                         tyCoVarsOfTypes [arg,res]
   | otherwise
-  = panic "piResultTys"
+  = pprPanic "piResultTy" (ppr ty $$ ppr arg)
 
 -- | (piResultTys f_ty [ty1, .., tyn]) gives the type of (f ty1 .. tyn)
 --   where f :: f_ty
@@ -896,7 +896,7 @@ piResultTys ty orig_args@(arg:args)
       Named tv _ -> go (extendVarEnv emptyTvSubstEnv tv arg) res args
 
   | otherwise
-  = panic "piResultTys"
+  = pprPanic "piResultTys1" (ppr ty $$ ppr orig_args)
   where
     go :: TvSubstEnv -> Type -> [Type] -> Type
     go tv_env ty [] = substTy (mkTvSubst in_scope tv_env) ty
@@ -918,7 +918,7 @@ piResultTys ty orig_args@(arg:args)
       = piResultTys ty' all_args
 
       | otherwise
-      = panic "piResultTys"
+      = pprPanic "piResultTys2" (ppr ty $$ ppr orig_args $$ ppr all_args)
 
 {-
 ---------------------------------------------------------------------
