@@ -2026,9 +2026,6 @@ tyConRuntimeRepInfo _                                         = NoRRI
 ************************************************************************
 
 @TyCon@s are compared by comparing their @Unique@s.
-
-The strictness analyser needs @Ord@. It is a lexicographic order with
-the property @(a<=b) || (b<=a)@.
 -}
 
 instance Eq TyCon where
