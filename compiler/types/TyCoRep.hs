@@ -97,9 +97,9 @@ module TyCoRep (
         substCoWith,
         substTy, substTyAddInScope,
         substTyUnchecked, substTysUnchecked, substThetaUnchecked,
-        substTyWithBindersUnchecked, substTyWithUnchecked,
+        substTyWithUnchecked,
         substCoUnchecked, substCoWithUnchecked,
-        substTyWithBinders, substTyWithInScope,
+        substTyWithInScope,
         substTys, substTheta,
         lookupTyVar, substTyVarBndr,
         substCo, substCos, substCoVar, substCoVars, lookupCoVar,
@@ -1943,28 +1943,6 @@ substTysWith tvs tys = ASSERT( length tvs == length tys )
 substTysWithCoVars :: [CoVar] -> [Coercion] -> [Type] -> [Type]
 substTysWithCoVars cvs cos = ASSERT( length cvs == length cos )
                              substTys (zipCvSubst cvs cos)
-
--- | Type substitution using 'Binder's. Anonymous binders
--- simply ignore their matching type.
-substTyWithBinders ::
--- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
-#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
-    (?callStack :: CallStack) =>
-#endif
-    [TyBinder] -> [Type] -> Type -> Type
-substTyWithBinders bndrs tys = ASSERT( length bndrs == length tys )
-                               substTy (zipTyBinderSubst bndrs tys)
-
--- | Type substitution using 'Binder's disabling the sanity checks.
--- Anonymous binders simply ignore their matching type.
--- The problems that the sanity checks in substTy catch are described in
--- Note [The substitution invariant].
--- The goal of #11371 is to migrate all the calls of substTyUnchecked to
--- substTy and remove this function. Please don't use in new code.
-substTyWithBindersUnchecked :: [TyBinder] -> [Type] -> Type -> Type
-substTyWithBindersUnchecked bndrs tys
-  = ASSERT( length bndrs == length tys )
-    substTyUnchecked (zipTyBinderSubst bndrs tys)
 
 -- | Substitute within a 'Type' after adding the free variables of the type
 -- to the in-scope set. This is useful for the case when the free variables

@@ -156,7 +156,7 @@ module TcType (
   Type.substTy, substTys, substTyWith, substTyWithCoVars,
   substTyAddInScope,
   substTyUnchecked, substTysUnchecked, substThetaUnchecked,
-  substTyWithBindersUnchecked, substTyWithUnchecked,
+  substTyWithUnchecked,
   substCoUnchecked, substCoWithUnchecked,
   substTheta,
 
