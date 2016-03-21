@@ -65,12 +65,9 @@ instance Eq ConLike where
     (==) = (==) `on` getUnique
     (/=) = (/=) `on` getUnique
 
-instance Ord ConLike where
-    (<=) = (<=) `on` getUnique
-    (<) = (<) `on` getUnique
-    (>=) = (>=) `on` getUnique
-    (>) = (>) `on` getUnique
-    compare = compare `on` getUnique
+-- There used to be an Ord ConLike instance here that used Unique for ordering.
+-- It was intentionally removed to prevent determinism problems.
+-- See Note [Unique Determinism] in Unique.
 
 instance Uniquable ConLike where
     getUnique (RealDataCon dc) = getUnique dc

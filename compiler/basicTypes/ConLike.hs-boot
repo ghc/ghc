@@ -11,7 +11,6 @@ data ConLike = RealDataCon DataCon
 
 instance Eq ConLike
 instance Typeable ConLike
-instance Ord ConLike
 instance NamedThing ConLike
 instance Data ConLike
 instance Outputable ConLike

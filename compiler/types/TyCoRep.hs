@@ -1456,7 +1456,7 @@ data TyThing
   | AConLike ConLike
   | ATyCon   TyCon       -- TyCons and classes; see Note [ATyCon for classes]
   | ACoAxiom (CoAxiom Branched)
-  deriving (Eq, Ord)
+  deriving (Eq)
 
 instance Outputable TyThing where
   ppr = pprTyThing
