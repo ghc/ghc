@@ -801,18 +801,25 @@ flattenManyNom ev tys
 
 {- Note [Flattening]
 ~~~~~~~~~~~~~~~~~~~~
-  flatten ty  ==>   (xi, cc)
+  flatten ty  ==>   (xi, co)
     where
       xi has no type functions, unless they appear under ForAlls
-
-      cc = Auxiliary given (equality) constraints constraining
-           the fresh type variables in xi.  Evidence for these
-           is always the identity coercion, because internally the
-           fresh flattening skolem variables are actually identified
-           with the types they have been generated to stand in for.
+      co :: xi ~ ty
 
 Note that it is flatten's job to flatten *every type function it sees*.
 flatten is only called on *arguments* to type functions, by canEqGiven.
+
+Flattening also:
+  * zonks, removing any metavariables, and
+  * applies the substitution embodied in the inert set
+
+Because flattening zonks and the returned coercion ("co" above) is also
+zonked, it's possible that (co :: xi ~ ty) isn't quite true, as ty (the
+input to the flattener) might not be zonked. After zonking everything,
+(co :: xi ~ ty) will be true, however. It is for this reason that we
+occasionally have to explicitly zonk, when (co :: xi ~ ty) is important
+even before we zonk the whole program. (In particular, this is why the
+zonk in flatten_tyvar3 is necessary.)
 
 Flattening a type also means flattening its kind. In the case of a type
 variable whose kind mentions a type family, this might mean that the result
@@ -1353,6 +1360,7 @@ flatten_tyvar3 tv
              -- This zonk is necessary because we might later see the tv's kind
              -- in canEqTyVarTyVar (where we use getCastedTyVar_maybe).
              -- If you remove it, then e.g. dependent/should_fail/T11407 panics
+             -- See also Note [Flattening]
        ; return (FTRCasted (setTyVarKind tv orig_kind) kind_co) }
 
 {-
