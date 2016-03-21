@@ -121,10 +121,15 @@ tcPatSynSig name sig_ty
                           , bound_tvs) }
 
        -- Kind generalisation; c.f. kindGeneralise
-       ; let free_kvs = tyCoVarsOfTelescope (implicit_tvs ++ univ_tvs ++ ex_tvs) $
-                        tyCoVarsOfTypes (body_ty : req ++ prov ++ arg_tys)
+       ; free_kvs <- zonkTcTypeAndFV $
+                     mkSpecForAllTys (implicit_tvs ++ univ_tvs) $
+                     mkFunTys req $
+                     mkSpecForAllTys ex_tvs $
+                     mkFunTys prov $
+                     mkFunTys arg_tys $
+                     body_ty
 
-       ; kvs <- quantifyTyVars emptyVarSet (Pair free_kvs emptyVarSet)
+       ; kvs <- quantifyZonkedTyVars emptyVarSet (Pair free_kvs emptyVarSet)
 
        -- These are /signatures/ so we zonk to squeeze out any kind
        -- unification variables.  Do this after quantifyTyVars which may

@@ -1244,8 +1244,8 @@ tcFamTyPats fam_shape@(name,_,_,_) mb_clsinfo pats kind_checker thing_inside
             -- them into skolems, so that we don't subsequently
             -- replace a meta kind var with (Any *)
             -- Very like kindGeneralize
-       ; qtkvs <- quantifyTyVars emptyVarSet $
-                                 splitDepVarsOfTypes typats
+       ; vars  <- zonkTcTypesAndSplitDepVars typats
+       ; qtkvs <- quantifyZonkedTyVars emptyVarSet vars
 
        ; MASSERT( isEmptyVarSet $ coVarsOfTypes typats )
            -- This should be the case, because otherwise the solveEqualities
@@ -1437,17 +1437,18 @@ tcConDecl new_or_data rep_tycon tmpl_tvs tmpl_bndrs res_tmpl
 
              -- Kind generalisation
        ; let all_user_tvs = imp_tvs ++ exp_tvs
-       ; kvs <- quantifyTyVars (mkVarSet tmpl_tvs)
-                               (splitDepVarsOfType (mkSpecForAllTys all_user_tvs $
-                                                    mkFunTys ctxt $
-                                                    mkFunTys arg_tys $
-                                                    unitTy))
+       ; vars <- zonkTcTypeAndSplitDepVars (mkSpecForAllTys all_user_tvs $
+                                            mkFunTys ctxt $
+                                            mkFunTys arg_tys $
+                                            unitTy)
                  -- That type is a lie, of course. (It shouldn't end in ()!)
                  -- And we could construct a proper result type from the info
                  -- at hand. But the result would mention only the tmpl_tvs,
                  -- and so it just creates more work to do it right. Really,
                  -- we're doing this to get the right behavior around removing
                  -- any vars bound in exp_binders.
+
+       ; kvs <- quantifyZonkedTyVars (mkVarSet tmpl_tvs) vars
 
              -- Zonk to Types
        ; (ze, qkvs)      <- zonkTyBndrsX emptyZonkEnv kvs
@@ -1487,11 +1488,12 @@ tcConDecl _new_or_data rep_tycon tmpl_tvs _tmpl_bndrs res_tmpl
     do { traceTc "tcConDecl 1" (ppr names)
        ; (user_tvs, ctxt, stricts, field_lbls, arg_tys, res_ty,hs_details)
            <- tcGadtSigType (ppr names) (unLoc $ head names) ty
-       ; tkvs <- quantifyTyVars emptyVarSet
-                                (splitDepVarsOfType (mkSpecForAllTys user_tvs $
-                                                     mkFunTys ctxt $
-                                                     mkFunTys arg_tys $
-                                                     res_ty))
+
+       ; vars <- zonkTcTypeAndSplitDepVars (mkSpecForAllTys user_tvs $
+                                            mkFunTys ctxt $
+                                            mkFunTys arg_tys $
+                                            res_ty)
+       ; tkvs <- quantifyZonkedTyVars emptyVarSet vars
 
              -- Zonk to Types
        ; (ze, qtkvs) <- zonkTyBndrsX emptyZonkEnv (tkvs ++ user_tvs)
@@ -2160,11 +2162,13 @@ checkFieldCompat fld con1 con2 res1 res2 fty1 fty2
 -- produces the appropriate error message.
 checkValidTyConTyVars :: TyCon -> TcM ()
 checkValidTyConTyVars tc
-  = when duplicate_vars $
-    do { -- strip off the duplicates and look for ill-scoped things
+  = do { -- strip off the duplicates and look for ill-scoped things
          -- but keep the *last* occurrence of each variable, as it's
          -- most likely the one the user wrote
-         let stripped_tvs = reverse $ nub $ reverse tvs
+         let stripped_tvs | duplicate_vars
+                          = reverse $ nub $ reverse tvs
+                          | otherwise
+                          = tvs
              vis_tvs      = filterOutInvisibleTyVars tc tvs
              extra | not (vis_tvs `equalLength` stripped_tvs)
                    = text "NB: Implicitly declared kind variables are put first."
@@ -2174,11 +2178,12 @@ checkValidTyConTyVars tc
          `and_if_that_doesn't_error`
            -- This triggers on test case dependent/should_fail/InferDependency
            -- It reports errors around Note [Dependent LHsQTyVars] in TcHsType
-         addErr (vcat [ text "Invalid declaration for" <+>
-                        quotes (ppr tc) <> semi <+> text "you must explicitly"
-                      , text "declare which variables are dependent on which others."
-                      , hang (text "Inferred variable kinds:")
-                        2 (vcat (map pp_tv stripped_tvs)) ]) }
+         when duplicate_vars (
+          addErr (vcat [ text "Invalid declaration for" <+>
+                         quotes (ppr tc) <> semi <+> text "you must explicitly"
+                       , text "declare which variables are dependent on which others."
+                       , hang (text "Inferred variable kinds:")
+                         2 (vcat (map pp_tv stripped_tvs)) ])) }
   where
     tvs = tyConTyVars tc
     duplicate_vars = sizeVarSet (mkVarSet tvs) < length tvs

@@ -517,8 +517,8 @@ simplifyInfer :: TcLevel               -- Used when generating the constraints
 simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
   | isEmptyWC wanteds
   = do { gbl_tvs <- tcGetGlobalTyCoVars
-       ; qtkvs <- quantify_tvs sigs gbl_tvs $
-                  splitDepVarsOfTypes (map snd name_taus)
+       ; dep_vars <- zonkTcTypesAndSplitDepVars (map snd name_taus)
+       ; qtkvs <- quantify_tvs sigs gbl_tvs dep_vars
        ; traceTc "simplifyInfer: empty WC" (ppr name_taus $$ ppr qtkvs)
        ; return (qtkvs, [], emptyTcEvBinds) }
 
@@ -796,6 +796,8 @@ quantify_tvs :: [TcIdSigInfo]
              -> TcM [TcTyVar]
 -- See Note [Which type variables to quantify]
 quantify_tvs sigs mono_tvs (Pair tau_kvs tau_tvs)
+   -- NB: don't use quantifyZonkedTyVars because the sig stuff might
+   -- be unzonked
   = quantifyTyVars (mono_tvs `delVarSetList` sig_qtvs)
                    (Pair tau_kvs
                          (tau_tvs `extendVarSetList` sig_qtvs
