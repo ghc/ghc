@@ -64,6 +64,19 @@ stgMallocBytes (int n, char *msg)
 
     n2 = (size_t) n;
     if ((space = (char *) malloc(n2)) == NULL) {
+      /* Quoting POSIX.1-2008 (which says more or less the same as ISO C99):
+       *
+       *   "Upon successful completion with size not equal to 0, malloc() shall
+       *   return a pointer to the allocated space. If size is 0, either a null
+       *   pointer or a unique pointer that can be successfully passed to free()
+       *   shall be returned. Otherwise, it shall return a null pointer and set
+       *   errno to indicate the error."
+       *
+       * Consequently, a NULL pointer being returned by `malloc()` for a 0-size
+       * allocation is *not* to be considered an error.
+       */
+      if (n == 0) return NULL;
+
       /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
       rtsConfig.mallocFailHook((W_) n, msg); /*msg*/
       stg_exit(EXIT_INTERNAL_ERROR);
