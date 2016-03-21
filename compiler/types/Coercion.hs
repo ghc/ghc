@@ -1720,7 +1720,12 @@ coercionKind co = go co
       = let Pair _ k2          = go k_co
             tv2                = setTyVarKind tv1 k2
             Pair ty1 ty2       = go co
-            ty2' = substTyWithUnchecked [tv1] [TyVarTy tv2 `mk_cast_ty` mkSymCo k_co] ty2 in
+            subst = zipTvSubst [tv1] [TyVarTy tv2 `mk_cast_ty` mkSymCo k_co]
+            ty2' = substTyAddInScope subst ty2 in
+            -- We need free vars of ty2 in scope to satisfy the invariant
+            -- from Note [The substitution invariant]
+            -- This is doing repeated substitutions and probably doesn't
+            -- need to, see #11735
         mkNamedForAllTy <$> Pair tv1 tv2 <*> pure Invisible <*> Pair ty1 ty2'
     go (CoVarCo cv)         = toPair $ coVarTypes cv
     go (AxiomInstCo ax ind cos)
@@ -1795,7 +1800,12 @@ coercionKindRole = go
       = let Pair _ k2          = coercionKind k_co
             tv2                = setTyVarKind tv1 k2
             (Pair ty1 ty2, r)  = go co
-            ty2' = substTyWithUnchecked [tv1] [TyVarTy tv2 `mkCastTy` mkSymCo k_co] ty2 in
+            subst = zipTvSubst [tv1] [TyVarTy tv2 `mkCastTy` mkSymCo k_co]
+            ty2' = substTyAddInScope subst ty2 in
+            -- We need free vars of ty2 in scope to satisfy the invariant
+            -- from Note [The substitution invariant]
+            -- This is doing repeated substitutions and probably doesn't
+            -- need to, see #11735
         (mkNamedForAllTy <$> Pair tv1 tv2 <*> pure Invisible <*> Pair ty1 ty2', r)
     go (CoVarCo cv) = (toPair $ coVarTypes cv, coVarRole cv)
     go co@(AxiomInstCo ax _ _) = (coercionKind co, coAxiomRole ax)
