@@ -913,6 +913,18 @@ piResultTys ty orig_args@(arg:args)
       | otherwise
       = pprPanic "piResultTys2" (ppr ty $$ ppr orig_args $$ ppr all_args)
 
+applyTysX :: [TyVar] -> Type -> [Type] -> Type
+-- applyTyxX beta-reduces (/\tvs. body_ty) arg_tys
+-- Assumes that (/\tvs. body_ty) is closed
+applyTysX tvs body_ty arg_tys
+  = ASSERT2( length arg_tys >= n_tvs, pp_stuff )
+    ASSERT2( tyCoVarsOfType body_ty `subVarSet` mkVarSet tvs, pp_stuff )
+    mkAppTys (substTyWith tvs (take n_tvs arg_tys) body_ty)
+             (drop n_tvs arg_tys)
+  where
+    pp_stuff = vcat [ppr tvs, ppr body_ty, ppr arg_tys]
+    n_tvs = length tvs
+
 {-
 ---------------------------------------------------------------------
                                 TyConApp
@@ -1483,18 +1495,6 @@ splitPiTysInvisible ty = split ty ty []
 
      split orig_ty _ bndrs
        = (reverse bndrs, orig_ty)
-
-applyTysX :: [TyVar] -> Type -> [Type] -> Type
--- applyTyxX beta-reduces (/\tvs. body_ty) arg_tys
--- Assumes that (/\tvs. body_ty) is closed
-applyTysX tvs body_ty arg_tys
-  = ASSERT2( length arg_tys >= n_tvs, pp_stuff )
-    ASSERT2( tyCoVarsOfType body_ty `subVarSet` mkVarSet tvs, pp_stuff )
-    mkAppTys (substTyWith tvs (take n_tvs arg_tys) body_ty)
-             (drop n_tvs arg_tys)
-  where
-    pp_stuff = vcat [ppr tvs, ppr body_ty, ppr arg_tys]
-    n_tvs = length tvs
 
 {-
 %************************************************************************
