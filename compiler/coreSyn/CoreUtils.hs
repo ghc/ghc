@@ -753,8 +753,8 @@ Note [exprIsTrivial]
                 applications.  Note that primop Ids aren't considered
                 trivial unless
 
-Note [Variable are trivial]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Variables are trivial]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There used to be a gruesome test for (hasNoBinding v) in the
 Var case:
         exprIsTrivial (Var v) | hasNoBinding v = idArity v == 0
