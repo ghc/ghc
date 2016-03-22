@@ -1648,12 +1648,18 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
                              `setIdStrictness` spec_str
                              `setIdArity` count isId spec_lam_args
               spec_str   = calcSpecStrictness fn spec_lam_args pats
+
+
                 -- Conditionally use result of new worker-wrapper transform
               (spec_lam_args, spec_call_args) = mkWorkerArgs (sc_dflags env) qvars NoOneShotInfo body_ty
                 -- Usual w/w hack to avoid generating
                 -- a spec_rhs of unlifted type and no args
 
-              spec_rhs   = mkLams spec_lam_args spec_body
+              spec_lam_args_str = handOutStrictnessInformation (fst (splitStrictSig spec_str)) spec_lam_args
+                -- Annotate the variables with the strictness information from
+                -- the function (see Note [Strictness information in worker binders])
+
+              spec_rhs   = mkLams spec_lam_args_str spec_body
               body_ty    = exprType spec_body
               rule_rhs   = mkVarApps (Var spec_id) spec_call_args
               inline_act = idInlineActivation fn
@@ -1662,6 +1668,16 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
                                   rule_name inline_act fn_name qvars pats rule_rhs
                            -- See Note [Transfer activation]
         ; return (spec_usg, OS call_pat rule spec_id spec_rhs) }
+
+
+-- See Note [Strictness information in worker binders]
+handOutStrictnessInformation :: [Demand] -> [Var] -> [Var]
+handOutStrictnessInformation = go
+  where
+    go _ [] = []
+    go [] vs = vs
+    go (d:dmds) (v:vs) | isId v = setIdDemandInfo v d : go dmds vs
+    go dmds (v:vs) = v : go dmds vs
 
 calcSpecStrictness :: Id                     -- The original function
                    -> [Var] -> [CoreExpr]    -- Call pattern
@@ -1742,6 +1758,14 @@ See Trac #3437 for a good example.
 
 The function calcSpecStrictness performs the calculation.
 
+Note [Strictness information in worker binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+After having calculated the strictness annotation for the worker (see Note
+[Transfer strictness] above), we also want to have this information attached to
+the worker’s arguments, for the benefit of later passes. The function
+handOutStrictnessInformation decomposes the stricntess annotation calculated by
+calcSpecStrictness and attaches them to the variables.
 
 ************************************************************************
 *                                                                      *
