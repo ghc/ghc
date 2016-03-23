@@ -408,6 +408,9 @@ hs_exit_(rtsBool wait_foreign)
 
 #if defined(TICKY_TICKY)
     if (RtsFlags.TickyFlags.showTickyStats) PrintTickyInfo();
+
+    FILE *tf = RtsFlags.TickyFlags.tickyFile;
+    if (tf != NULL) fclose(tf);
 #endif
 
 #if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
