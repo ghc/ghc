@@ -609,9 +609,13 @@ thunkCode cl_info fv_details _cc node arity body
 
         -- Heap overflow check
         ; entryHeapCheck cl_info node' arity [] $ do
-        { -- Overwrite with black hole if necessary
+        {
+         -- Disabled for now, as we (temporarily unconditionally) move the
+         -- counting to the counting indirection
+         -- tickyEnterThunk cl_info
+
+          -- Overwrite with black hole if necessary
           -- but *after* the heap-overflow check
-        ; tickyEnterThunk cl_info
         ; when (blackHoleOnEntry cl_info && node_points)
                 (blackHoleIt node)
 

@@ -283,6 +283,7 @@ INFO_TABLE(stg_COUNTING_IND,1,2,COUNTING_IND,"COUNTING_IND","COUNTING_IND")
         StgEntCounter_multi_entry_count(ent_ctr)  = StgEntCounter_multi_entry_count(ent_ctr) + 1;
     }
     StgCountingInd_entries(clos) = entries + 1;
+    StgEntCounter_entry_count(ent_ctr) = StgEntCounter_entry_count(ent_ctr) + 1;
 
 #if defined(TICKY_TICKY) && !defined(PROFILING)
     /* TICKY_TICKY && !PROFILING means PERM_IND *replaces* an IND, rather than
