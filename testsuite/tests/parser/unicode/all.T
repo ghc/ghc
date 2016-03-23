@@ -26,3 +26,5 @@ test('T7671', normal, compile, [''])
 # supported by the test suite (see 10907)
 test('T10907', normal, compile, [''])
 test('T7650', normal, compile, [''])
+
+test('arrowsyntax', normal, compile, [''])

@@ -427,8 +427,8 @@ output it generates.
  ')'            { L _ ITcparen }
  '(#'           { L _ IToubxparen }
  '#)'           { L _ ITcubxparen }
- '(|'           { L _ IToparenbar }
- '|)'           { L _ ITcparenbar }
+ '(|'           { L _ (IToparenbar _) }
+ '|)'           { L _ (ITcparenbar _) }
  ';'            { L _ ITsemi }
  ','            { L _ ITcomma }
  '`'            { L _ ITbackquote }

@@ -395,8 +395,17 @@ $tab          { warnTab }
 
 <0> {
   "(|" / { ifExtension arrowsEnabled `alexAndPred` notFollowedBySymbol }
-                                        { special IToparenbar }
-  "|)" / { ifExtension arrowsEnabled }  { special ITcparenbar }
+                                        { special (IToparenbar NormalSyntax) }
+  "|)" / { ifExtension arrowsEnabled }  { special (ITcparenbar NormalSyntax) }
+
+  $unigraphic -- ⦇
+    / { ifCurrentChar '⦇' `alexAndPred`
+        ifExtension (\i -> unicodeSyntaxEnabled i && arrowsEnabled i) }
+    { special (IToparenbar UnicodeSyntax) }
+  $unigraphic -- ⦈
+    / { ifCurrentChar '⦈' `alexAndPred`
+        ifExtension (\i -> unicodeSyntaxEnabled i && arrowsEnabled i) }
+    { special (ITcparenbar UnicodeSyntax) }
 }
 
 <0> {
@@ -704,8 +713,8 @@ data Token
   -- Arrow notation extension
   | ITproc
   | ITrec
-  | IToparenbar                  --  (|
-  | ITcparenbar                  --  |)
+  | IToparenbar  IsUnicodeSyntax --  (|
+  | ITcparenbar  IsUnicodeSyntax --  |)
   | ITlarrowtail IsUnicodeSyntax --  -<
   | ITrarrowtail IsUnicodeSyntax --  >-
   | ITLarrowtail IsUnicodeSyntax --  -<<
@@ -941,6 +950,10 @@ notFollowedBySymbol _ _ _ (AI _ buf)
 followedByDigit :: AlexAccPred ExtsBitmap
 followedByDigit _ _ _ (AI _ buf)
   = afterOptionalSpace buf (\b -> nextCharIs b (`elem` ['0'..'9']))
+
+ifCurrentChar :: Char -> AlexAccPred ExtsBitmap
+ifCurrentChar char _ (AI _ buf) _ _
+  = nextCharIs buf (== char)
 
 -- We must reject doc comments as being ordinary comments everywhere.
 -- In some cases the doc comment will be selected as the lexeme due to
