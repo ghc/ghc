@@ -37,14 +37,12 @@ import TcHsSyn
 import Type
 import CoreSyn
 import CoreUtils
-import CoreFVs
 import MkCore
 
 import DynFlags
 import CostCentre
 import Id
 import Module
-import VarSet
 import ConLike
 import DataCon
 import TysWiredIn
@@ -757,60 +755,38 @@ Note [Desugaring explicit lists]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Explicit lists are desugared in a cleverer way to prevent some
 fruitless allocations.  Essentially, whenever we see a list literal
-[x_1, ..., x_n] we:
+[x_1, ..., x_n] we generate the corresponding expression in terms of
+build:
 
-1. Find the tail of the list that can be allocated statically (say
-   [x_k, ..., x_n]) by later stages and ensure we desugar that
-   normally: this makes sure that we don't cause a code size increase
-   by having the cons in that expression fused (see later) and hence
-   being unable to statically allocate any more
+Explicit lists (literals) are desugared to allow build/foldr fusion when
+beneficial. This is a bit of a trade-off,
 
-2. For the prefix of the list which cannot be allocated statically,
-   say [x_1, ..., x_(k-1)], we turn it into an expression involving
-   build so that if we find any foldrs over it it will fuse away
-   entirely!
+ * build/foldr fusion can generate far larger code than the corresponding
+   cons-chain (e.g. see #11707)
 
-   So in this example we will desugar to:
-   build (\c n -> x_1 `c` x_2 `c` .... `c` foldr c n [x_k, ..., x_n]
+ * even when it doesn't produce more code, build can still fail to fuse,
+   requiring that the simplifier do more work to bring the expression
+   back into cons-chain form; this costs compile time
 
-   If fusion fails to occur then build will get inlined and (since we
-   defined a RULE for foldr (:) []) we will get back exactly the
-   normal desugaring for an explicit list.
-
-This optimisation can be worth a lot: up to 25% of the total
-allocation in some nofib programs. Specifically
+ * when it works, fusion can be a significant win. Allocations are reduced
+   by up to 25% in some nofib programs. Specifically,
 
         Program           Size    Allocs   Runtime  CompTime
         rewrite          +0.0%    -26.3%      0.02     -1.8%
            ansi          -0.3%    -13.8%      0.00     +0.0%
            lift          +0.0%     -8.7%      0.00     -2.3%
 
-Of course, if rules aren't turned on then there is pretty much no
-point doing this fancy stuff, and it may even be harmful.
+At the moment we use a simple heuristic to determine whether build will be
+fruitful: for small lists we assume the benefits of fusion will be worthwhile;
+for long lists we assume that the benefits will be outweighted by the cost of
+code duplication. This magic length threshold is @maxBuildLength@. Also, fusion
+won't work at all if rewrite rules are disabled, so we don't use the build-based
+desugaring in this case.
 
-Moreover, for large lists (with a dynamic prefix longer than maxBuildLength) we
-choose not to perform this optimization as it will trade large static data for
-large code, which is generally a poor trade-off. See #11707 and the
-documentation for maxBuildLength.
-
-
-=======>  Note by SLPJ Dec 08.
-
-I'm unconvinced that we should *ever* generate a build for an explicit
-list.  See the comments in GHC.Base about the foldr/cons rule, which
-points out that (foldr k z [a,b,c]) may generate *much* less code than
-(a `k` b `k` c `k` z).
-
-Furthermore generating builds messes up the LHS of RULES.
-Example: the foldr/single rule in GHC.Base
-   foldr k z [x] = ...
-We do not want to generate a build invocation on the LHS of this RULE!
-
-We fix this by disabling rules in rule LHSs, and testing that
-flag here; see Note [Desugaring RULE left hand sides] in Desugar
-
-To test this I've added a flag -fsimple-list-literals, which
-makes all list literals be generated via the simple route.
+We used to have a more complex heuristic which would try to break the list into
+"static" and "dynamic" parts and only build-desugar the dynamic part.
+Unfortunately, determining "static-ness" reliably is a bit tricky and the
+heuristic at times produced surprising behavior (see #11710) so it was dropped.
 -}
 
 {- | The longest list length which we will desugar using @build@.
@@ -838,38 +814,23 @@ dsExplicitList :: Type -> Maybe (SyntaxExpr Id) -> [LHsExpr Id]
 dsExplicitList elt_ty Nothing xs
   = do { dflags <- getDynFlags
        ; xs' <- mapM dsLExpr xs
-       ; let (dynamic_prefix, static_suffix) = spanTail is_static xs'
-       ; if gopt Opt_SimpleListLiterals dflags        -- -fsimple-list-literals
-         || length dynamic_prefix > maxBuildLength
+       ; if length xs' > maxBuildLength
                 -- Don't generate builds if the list is very long.
+         || length xs' == 0
+                -- Don't generate builds when the [] constructor will do
          || not (gopt Opt_EnableRewriteRules dflags)  -- Rewrite rules off
                 -- Don't generate a build if there are no rules to eliminate it!
                 -- See Note [Desugaring RULE left hand sides] in Desugar
-         || null dynamic_prefix   -- Avoid build (\c n. foldr c n xs)!
          then return $ mkListExpr elt_ty xs'
-         else mkBuildExpr elt_ty (mkSplitExplicitList dynamic_prefix static_suffix) }
+         else mkBuildExpr elt_ty (mk_build_list xs') }
   where
-    is_static :: CoreExpr -> Bool
-    is_static e = all is_static_var (varSetElems (exprFreeVars e))
-
-    is_static_var :: Var -> Bool
-    is_static_var v
-      | isId v = isExternalName (idName v)  -- Top-level things are given external names
-      | otherwise = False                   -- Type variables
-
-    mkSplitExplicitList prefix suffix (c, _) (n, n_ty)
-      = do { let suffix' = mkListExpr elt_ty suffix
-           ; folded_suffix <- mkFoldrExpr elt_ty n_ty (Var c) (Var n) suffix'
-           ; return (foldr (App . App (Var c)) folded_suffix prefix) }
+    mk_build_list xs' (cons, _) (nil, _)
+      = return (foldr (App . App (Var cons)) (Var nil) xs')
 
 dsExplicitList elt_ty (Just fln) xs
   = do { list <- dsExplicitList elt_ty Nothing xs
        ; dflags <- getDynFlags
        ; dsSyntaxExpr fln [mkIntExprInt dflags (length xs), list] }
-
-spanTail :: (a -> Bool) -> [a] -> ([a], [a])
-spanTail f xs = (reverse rejected, reverse satisfying)
-    where (satisfying, rejected) = span f $ reverse xs
 
 dsArithSeq :: PostTcExpr -> (ArithSeqInfo Id) -> DsM CoreExpr
 dsArithSeq expr (From from)
