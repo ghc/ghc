@@ -201,7 +201,15 @@ Dumping out compiler intermediate structures
 
 .. ghc-flag:: -dshow-passes
 
-    Print out each pass name as it happens.
+    Print out each pass name, its runtime and heap allocations as it happens.
+    Note that this may come at a slight performance cost as the compiler will
+    be a bit more eager in forcing pass results to more accurately account for
+    their costs.
+
+    Two types of messages are produced: Those beginning with ``***`` are
+    denote the beginning of a compilation phase whereas those starting with
+    ``!!!`` mark the end of a pass and are accompanied by allocation and
+    runtime statistics.
 
 .. ghc-flag:: -ddump-core-stats
 

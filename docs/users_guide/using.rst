@@ -593,11 +593,11 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
 
     ``-v1``
         Minimal verbosity: print one line per compilation (this is the
-        default when ``--make`` or ``--interactive`` is on).
+        default when :ghc-flag:`--make` or :ghc-flag:`--interactive` is on).
 
     ``-v2``
         Print the name of each compilation phase as it is executed.
-        (equivalent to ``-dshow-passes``).
+        (equivalent to :ghc-flag:`-dshow-passes`).
 
     ``-v3``
         The same as ``-v2``, except that in addition the full command

@@ -14,7 +14,7 @@ module CoreLint (
     lintAnnots,
 
     -- ** Debug output
-    CoreLint.showPass, showPassIO, endPass, endPassIO,
+    endPass, endPassIO,
     dumpPassResult,
     CoreLint.dumpIfSet,
  ) where
@@ -175,13 +175,6 @@ These functions are not CoreM monad stuff, but they probably ought to
 be, and it makes a conveneint place.  place for them.  They print out
 stuff before and after core passes, and do Core Lint when necessary.
 -}
-
-showPass :: CoreToDo -> CoreM ()
-showPass pass = do { dflags <- getDynFlags
-                   ; liftIO $ showPassIO dflags pass }
-
-showPassIO :: DynFlags -> CoreToDo -> IO ()
-showPassIO dflags pass = Err.showPass dflags (showPpr dflags pass)
 
 endPass :: CoreToDo -> CoreProgram -> [CoreRule] -> CoreM ()
 endPass pass binds rules

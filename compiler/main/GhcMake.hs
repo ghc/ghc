@@ -114,15 +114,16 @@ depanal excluded_mods allow_dup_roots = do
          targets = hsc_targets hsc_env
          old_graph = hsc_mod_graph hsc_env
 
-  liftIO $ showPass dflags "Chasing dependencies"
-  liftIO $ debugTraceMsg dflags 2 (hcat [
-             text "Chasing modules from: ",
-             hcat (punctuate comma (map pprTarget targets))])
+  withTiming (pure dflags) (text "Chasing dependencies") (const ()) $ do
+    liftIO $ debugTraceMsg dflags 2 (hcat [
+              text "Chasing modules from: ",
+              hcat (punctuate comma (map pprTarget targets))])
 
-  mod_graphE <- liftIO $ downsweep hsc_env old_graph excluded_mods allow_dup_roots
-  mod_graph <- reportImportErrors mod_graphE
-  modifySession $ \_ -> hsc_env { hsc_mod_graph = mod_graph }
-  return mod_graph
+    mod_graphE <- liftIO $ downsweep hsc_env old_graph
+                                     excluded_mods allow_dup_roots
+    mod_graph <- reportImportErrors mod_graphE
+    modifySession $ \_ -> hsc_env { hsc_mod_graph = mod_graph }
+    return mod_graph
 
 -- | Describes which modules of the module graph need to be loaded.
 data LoadHowMuch
