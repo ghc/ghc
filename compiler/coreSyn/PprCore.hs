@@ -400,7 +400,7 @@ ppIdInfo id info
     , (has_arity,        text "Arity=" <> int arity)
     , (has_called_arity, text "CallArity=" <> int called_arity)
     , (has_caf_info,     text "Caf=" <> ppr caf_info)
-    , (True,             text "Str=" <> pprStrictness str_info)
+    , (has_str_info,     text "Str=" <> pprStrictness str_info)
     , (has_unf,          text "Unf=" <> ppr unf_info)
     , (not (null rules), text "RULES:" <+> vcat (map pprRule rules))
     ]   -- Inline pragma, occ, demand, one-shot info
@@ -421,6 +421,7 @@ ppIdInfo id info
     has_caf_info = not (mayHaveCafRefs caf_info)
 
     str_info = strictnessInfo info
+    has_str_info = not (isTopSig str_info)
 
     unf_info = unfoldingInfo info
     has_unf = hasSomeUnfolding unf_info

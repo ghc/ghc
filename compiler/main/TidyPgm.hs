@@ -37,7 +37,7 @@ import IdInfo
 import InstEnv
 import FamInstEnv
 import Type             ( tidyTopType )
-import Demand           ( appIsBottom, isNopSig, isBottomingSig )
+import Demand           ( appIsBottom, isTopSig, isBottomingSig )
 import BasicTypes
 import Name hiding (varName)
 import NameSet
@@ -1242,7 +1242,7 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_
     mb_bot_str = exprBotStrictness_maybe orig_rhs
 
     sig = strictnessInfo idinfo
-    final_sig | not $ isNopSig sig
+    final_sig | not $ isTopSig sig
                  = WARN( _bottom_hidden sig , ppr name ) sig
                  -- try a cheap-and-cheerful bottom analyser
                  | Just (_, nsig) <- mb_bot_str = nsig

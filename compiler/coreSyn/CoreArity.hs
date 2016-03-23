@@ -711,7 +711,7 @@ arityType env (Cast e co)
 
 arityType _ (Var v)
   | strict_sig <- idStrictness v
-  , not $ isNopSig strict_sig
+  , not $ isTopSig strict_sig
   , (ds, res) <- splitStrictSig strict_sig
   , let arity = length ds
   = if isBotRes res then ABot arity

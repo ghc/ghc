@@ -37,7 +37,7 @@ module Demand (
         appIsBottom, isBottomingSig, pprIfaceStrictSig,
         trimCPRInfo, returnsCPR_maybe,
         StrictSig(..), mkStrictSig, mkClosedStrictSig, nopSig, botSig, cprProdSig,
-        isNopSig, splitStrictSig, increaseStrictSigArity,
+        isTopSig, splitStrictSig, increaseStrictSigArity,
 
         seqDemand, seqDemandList, seqDmdType, seqStrictSig,
 
@@ -1262,10 +1262,10 @@ cprProdDmdType :: Arity -> DmdType
 cprProdDmdType arity
   = DmdType emptyDmdEnv [] (vanillaCprProdRes arity)
 
-isNopDmdType :: DmdType -> Bool
-isNopDmdType (DmdType env [] res)
+isTopDmdType :: DmdType -> Bool
+isTopDmdType (DmdType env [] res)
   | isTopRes res && isEmptyVarEnv env = True
-isNopDmdType _                        = False
+isTopDmdType _                        = False
 
 mkDmdType :: DmdEnv -> [Demand] -> DmdResult -> DmdType
 mkDmdType fv ds res = DmdType fv ds res
@@ -1669,8 +1669,8 @@ increaseStrictSigArity :: Int -> StrictSig -> StrictSig
 increaseStrictSigArity arity_increase (StrictSig (DmdType env dmds res))
   = StrictSig (DmdType env (replicate arity_increase topDmd ++ dmds) res)
 
-isNopSig :: StrictSig -> Bool
-isNopSig (StrictSig ty) = isNopDmdType ty
+isTopSig :: StrictSig -> Bool
+isTopSig (StrictSig ty) = isTopDmdType ty
 
 isBottomingSig :: StrictSig -> Bool
 -- True if the signature diverges or throws an exception
