@@ -33,7 +33,9 @@ import TcDeriv
 import TcEnv
 import TcHsType
 import TcUnify
+import CoreSyn    ( Expr(..), mkApps, mkVarApps, mkLams )
 import MkCore     ( nO_METHOD_BINDING_ERROR_ID )
+import CoreUnfold ( mkInlineUnfolding, mkDFunUnfolding )
 import Type
 import TcEvidence
 import TyCon
@@ -850,8 +852,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                      --    con_app_tys  = MkD ty1 ty2
                      --    con_app_scs  = MkD ty1 ty2 sc1 sc2
                      --    con_app_args = MkD ty1 ty2 sc1 sc2 op1 op2
-             con_app_tys  = wrapId (mkWpTyApps inst_tys)
-                                   (dataConWrapId dict_constr)
+             con_app_tys  = wrapId (mkWpTyApps inst_tys) (dataConWrapId dict_constr)
                        -- NB: We *can* have covars in inst_tys, in the case of
                        -- promoted GADT constructors.
 
@@ -863,17 +864,19 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
              inst_tv_tys = mkTyVarTys inst_tyvars
              arg_wrapper = mkWpEvVarApps dfun_ev_vars <.> mkWpTyApps inst_tv_tys
 
-                -- Do not inline the dfun; instead give it a magic DFunFunfolding
+             is_newtype = isNewTyCon class_tc
+             dfun_id_w_prags = addDFunPrags dfun_id dict_constr is_newtype
+                                 inst_tyvars dfun_ev_vars inst_tys sc_meth_ids
              dfun_spec_prags
-                | isNewTyCon class_tc = SpecPrags []
+                | is_newtype = SpecPrags []
+                | otherwise  = SpecPrags spec_inst_prags
                     -- Newtype dfuns just inline unconditionally,
                     -- so don't attempt to specialise them
-                | otherwise
-                = SpecPrags spec_inst_prags
 
              export = ABE { abe_wrap = idHsWrapper
-                          , abe_poly = dfun_id
-                          , abe_mono = self_dict, abe_prags = dfun_spec_prags }
+                          , abe_poly = dfun_id_w_prags
+                          , abe_mono = self_dict
+                          , abe_prags = dfun_spec_prags }
                           -- NB: see Note [SPECIALISE instance pragmas]
              main_bind = AbsBinds { abs_tvs = inst_tyvars
                                   , abs_ev_vars = dfun_ev_vars
@@ -886,6 +889,29 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
  where
    dfun_id = instanceDFunId ispec
    loc     = getSrcSpan dfun_id
+
+addDFunPrags :: DFunId -> DataCon -> Bool
+             -> [TyVar] -> [Id] -> [Type]
+             -> [Id] -> DFunId
+-- DFuns need a special Unfolding and InlinePrag
+--    See Note [ClassOp/DFun selection]
+--    and Note [Single-method classes]
+-- It's easiest to create those unfoldings right here, where
+-- have all the pieces in hand, even though we are messing with
+-- Core at this point, which the typechecker doesn't usually do
+addDFunPrags dfun_id dict_con is_newtype dfun_tvs dfun_evs inst_tys sc_meth_ids
+ | is_newtype
+  = dfun_id `setIdUnfolding`  mkInlineUnfolding (Just 0) con_app
+            `setInlinePragma` alwaysInlinePragma { inl_sat = Just 0 }
+ | otherwise
+ = dfun_id `setIdUnfolding`  mkDFunUnfolding dfun_bndrs dict_con dict_args
+           `setInlinePragma` dfunInlinePragma
+ where
+   dfun_bndrs = dfun_tvs ++ dfun_evs
+   dict_args  = map Type inst_tys ++
+                [mkVarApps (Var id) dfun_bndrs | id <- sc_meth_ids]
+   con_app    = mkLams dfun_bndrs $
+                mkApps (Var (dataConWrapId dict_con)) dict_args
 
 wrapId :: HsWrapper -> id -> HsExpr id
 wrapId wrapper id = mkHsWrap wrapper (HsVar (noLoc id))
