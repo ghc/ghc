@@ -12,7 +12,7 @@ module System.CPUTime.Posix.ClockGetTime
     , getCpuTimePrecision
     ) where
 
-#if defined(_POSIX_CPUTIME)
+#if _POSIX_TIMERS > 0 && defined(_POSIX_CPUTIME) && _POSIX_CPUTIME >= 0
 
 import Foreign
 import Foreign.C

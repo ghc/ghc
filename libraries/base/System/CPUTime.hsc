@@ -34,7 +34,7 @@ import System.IO.Unsafe (unsafePerformIO)
 #if defined(mingw32_HOST_OS)
 import qualified System.CPUTime.Windows as I
 
-#elif _POSIX_TIMERS > 0 && defined(_POSIX_CPUTIME)
+#elif _POSIX_TIMERS > 0 && defined(_POSIX_CPUTIME) && _POSIX_CPUTIME >= 0
 import qualified System.CPUTime.Posix.ClockGetTime as I
 
 #elif defined(HAVE_GETRUSAGE) && ! irix_HOST_OS && ! solaris2_HOST_OS
