@@ -430,7 +430,6 @@ data GeneralFlag
    | Opt_CmmSink
    | Opt_CmmElimCommonBlocks
    | Opt_OmitYields
-   | Opt_SimpleListLiterals
    | Opt_FunToThunk               -- allow WwLib.mkWorkerArgs to remove all value lambdas
    | Opt_DictsStrict                     -- be strict in argument dictionaries
    | Opt_DmdTxDictSel              -- use a special demand transformer for dictionary selectors
@@ -3359,7 +3358,6 @@ fFlagsDeps = [
   depFlagSpec' "rewrite-rules"                Opt_EnableRewriteRules
     (useInstead "enable-rewrite-rules"),
   flagSpec "shared-implib"                    Opt_SharedImplib,
-  flagSpec "simple-list-literals"             Opt_SimpleListLiterals,
   flagSpec "spec-constr"                      Opt_SpecConstr,
   flagSpec "specialise"                       Opt_Specialise,
   flagSpec "specialise-aggressively"          Opt_SpecialiseAggressively,
