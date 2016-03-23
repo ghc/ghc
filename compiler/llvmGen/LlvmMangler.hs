@@ -10,8 +10,9 @@
 module LlvmMangler ( llvmFixupAsm ) where
 
 import DynFlags ( DynFlags )
-import ErrUtils ( showPass )
+import ErrUtils ( withTiming )
 import LlvmCodeGen.Ppr ( infoSection )
+import Outputable ( text )
 
 import Control.Exception
 import Control.Monad ( when )
@@ -47,8 +48,8 @@ type Section = (B.ByteString, B.ByteString)
 
 -- | Read in assembly file and process
 llvmFixupAsm :: DynFlags -> FilePath -> FilePath -> IO ()
-llvmFixupAsm dflags f1 f2 = {-# SCC "llvm_mangler" #-} do
-    showPass dflags "LLVM Mangler"
+llvmFixupAsm dflags f1 f2 = {-# SCC "llvm_mangler" #-}
+    withTiming (pure dflags) (text "LLVM Mangler") id $ do
     r <- openBinaryFile f1 ReadMode
     w <- openBinaryFile f2 WriteMode
     ss <- readSections r w

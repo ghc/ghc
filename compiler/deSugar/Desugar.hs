@@ -96,9 +96,10 @@ deSugar hsc_env
 
   = do { let dflags = hsc_dflags hsc_env
              print_unqual = mkPrintUnqualified dflags rdr_env
-        ; showPass dflags "Desugar"
-
-        -- Desugar the program
+        ; withTiming (pure dflags)
+                     (text "Desugar"<+>brackets (ppr mod))
+                     (const ()) $
+     do { -- Desugar the program
         ; let export_set = availsToNameSet exports
               target     = hscTarget dflags
               hpcInfo    = emptyHpcInfo other_hpc_info
@@ -196,7 +197,7 @@ deSugar hsc_env
                 mg_dependent_files = dep_files
               }
         ; return (msgs, Just mod_guts)
-        }}}
+        }}}}
 
 dsImpSpecs :: [LTcSpecPrag] -> DsM (OrdList (Id,CoreExpr), [CoreRule])
 dsImpSpecs imp_specs

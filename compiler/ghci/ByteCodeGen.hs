@@ -75,7 +75,9 @@ byteCodeGen :: DynFlags
             -> ModBreaks
             -> IO CompiledByteCode
 byteCodeGen dflags this_mod binds tycs modBreaks
-   = do showPass dflags "ByteCodeGen"
+   = withTiming (pure dflags)
+                (text "ByteCodeGen"<+>brackets (ppr this_mod))
+                (const ()) $ do
 
         let flatBinds = [ (bndr, freeVars rhs)
                         | (bndr, rhs) <- flattenBinds binds]
@@ -102,7 +104,9 @@ coreExprToBCOs :: DynFlags
                -> CoreExpr
                -> IO UnlinkedBCO
 coreExprToBCOs dflags this_mod expr
- = do showPass dflags "ByteCodeGen"
+ = withTiming (pure dflags)
+              (text "ByteCodeGen"<+>brackets (ppr this_mod))
+              (const ()) $ do
 
       -- create a totally bogus name for the top-level BCO; this
       -- should be harmless, since it's never used for anything

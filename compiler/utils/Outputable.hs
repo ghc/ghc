@@ -20,7 +20,7 @@ module Outputable (
         empty, nest,
         char,
         text, ftext, ptext, ztext,
-        int, intWithCommas, integer, float, double, rational,
+        int, intWithCommas, integer, float, double, rational, doublePrec,
         parens, cparen, brackets, braces, quotes, quote,
         doubleQuotes, angleBrackets, paBrackets,
         semi, comma, colon, dcolon, space, equals, dot,
@@ -101,6 +101,7 @@ import Data.Word
 import System.IO        ( Handle )
 import System.FilePath
 import Text.Printf
+import Numeric (showFFloat)
 
 import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
@@ -475,6 +476,11 @@ integer n   = docToSDoc $ Pretty.integer n
 float n     = docToSDoc $ Pretty.float n
 double n    = docToSDoc $ Pretty.double n
 rational n  = docToSDoc $ Pretty.rational n
+
+-- | @doublePrec p n@ shows a floating point number @n@ with @p@
+-- digits of precision after the decimal point.
+doublePrec :: Int -> Double -> SDoc
+doublePrec p n = text (showFFloat (Just p) n "")
 
 parens, braces, brackets, quotes, quote,
         paBrackets, doubleQuotes, angleBrackets :: SDoc -> SDoc
