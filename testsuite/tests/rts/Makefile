@@ -45,6 +45,15 @@ T5423:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 T5423.o T5423_cmm.o -o T5423$(exeext)
 	./T5423
 
+.PHONY: T9405
+T9405:
+	@'$(TEST_HC)' $(TEST_HC_OPTS) -ticky -rtsopts T9405.hs; \
+    ./T9405 +RTS -rT9405.ticky & \
+    sleep 0.2; \
+    kill -2 $$!; \
+    wait $$!; \
+    [ -s T9405.ticky ] && echo Ticky-Ticky
+
 # Naming convention: 'T5423_' obj-way '_' obj-src
 # obj-way ::= v | dyn
 # obj-src ::= gcc // using __attribute__(constructor)

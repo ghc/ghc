@@ -589,9 +589,11 @@ void setupRtsFlags (int *argc, char *argv[], RtsConfig rts_config)
     if (RtsFlags.GcFlags.statsFile != NULL) {
         initStatsFile (RtsFlags.GcFlags.statsFile);
     }
+#ifdef TICKY_TICKY
     if (RtsFlags.TickyFlags.tickyFile != NULL) {
-        initStatsFile (RtsFlags.GcFlags.statsFile);
+        initStatsFile (RtsFlags.TickyFlags.tickyFile);
     }
+#endif
 }
 
 /* -----------------------------------------------------------------------------
