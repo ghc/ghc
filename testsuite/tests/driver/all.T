@@ -471,3 +471,8 @@ test('T11429a', normal, compile, ['-Wunrecognised-warning-flags -Wfoobar'])
 test('T11429b', normal, compile, ['-Wno-unrecognised-warning-flags -Wfoobar'])
 test('T11429c', normal, compile_fail, ['-Wunrecognised-warning-flags -Werror -Wfoobar'])
 
+test('T10320',
+     [ ignore_output
+     , extra_clean(['T10320', 'T10320.o', 'T10320.hi'])],
+     run_command,
+     ['$MAKE -s --no-print-directory T10320'])

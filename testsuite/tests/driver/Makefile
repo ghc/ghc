@@ -609,3 +609,11 @@ T10182:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c T10182.hs-boot
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c T10182a.hs
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c T10182.hs
+
+.PHONY: T10320
+T10320:
+	$(RM) -rf T10320 T10320.dump-rule-rewrites T10320.hi T10320.o
+	"$(TEST_HC)" $(TEST_HC_OPTS) -ddump-to-file -ddump-rule-rewrites -fenable-rewrite-rules T10320.hs
+	[ -s T10320.dump-rule-rewrites ]
+	"$(TEST_HC)" $(TEST_HC_OPTS) -ddump-to-file -ddump-rule-rewrites T10320.hs
+	[ -f T10320.dump-rule-rewrites ] && [ ! -s T10320.dump-rule-rewrites ]

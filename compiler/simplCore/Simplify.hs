@@ -1581,7 +1581,9 @@ tryRules env rules fn args call_cont
   = do { dflags <- getDynFlags
        ; case lookupRule dflags (getUnfoldingInRuleMatch env) (activeRule env)
                          fn (argInfoAppArgs args) rules of {
-           Nothing               -> return Nothing ;   -- No rule matches
+           Nothing ->
+             do { nodump dflags  -- This ensures that an empty file is written
+                ; return Nothing } ;  -- No rule matches
            Just (rule, rule_rhs) ->
              do { checkedTick (RuleFired (ru_name rule))
                 ; let cont' = pushSimplifiedArgs env
@@ -1602,6 +1604,16 @@ tryRules env rules fn args call_cont
       | dopt Opt_D_dump_rule_firings dflags
       = log_rule dflags Opt_D_dump_rule_firings "Rule fired:" $
           ftext (ru_name rule)
+
+      | otherwise
+      = return ()
+
+    nodump dflags
+      | dopt Opt_D_dump_rule_rewrites dflags
+      = liftIO $ dumpSDoc dflags alwaysQualify Opt_D_dump_rule_rewrites "" empty
+
+      | dopt Opt_D_dump_rule_firings dflags
+      = liftIO $ dumpSDoc dflags alwaysQualify Opt_D_dump_rule_firings "" empty
 
       | otherwise
       = return ()
