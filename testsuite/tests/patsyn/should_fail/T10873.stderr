@@ -12,13 +12,12 @@ T10873.hs:10:23: error:
     • Could not deduce (Show a)
         arising from the "provided" constraints claimed by
           the signature of ‘Pat2’
-      from the context: Enum a
-        bound by the type signature for pattern synonym ‘Pat2’:
-                   a -> T a
-        at T10873.hs:10:9-12
-      or from: Ord a
+      from the context: Ord a
         bound by a pattern with constructor:
                    MkT :: forall a. Ord a => a -> T a,
                  in a pattern synonym declaration
         at T10873.hs:10:19-23
+      In other words, a successful match on the pattern
+        MkT x
+      does not provide the constraint (Show a)
     • In the declaration for pattern synonym ‘Pat2’

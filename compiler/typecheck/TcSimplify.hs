@@ -1297,9 +1297,9 @@ warnRedundantGivens (SigSkol ctxt _)
        FunSigCtxt _ warn_redundant -> warn_redundant
        ExprSigCtxt                 -> True
        _                           -> False
-  -- To think about: do we want to report redundant givens for
-  -- pattern synonyms, PatSynCtxt? c.f Trac #9953, comment:21.
 
+  -- To think about: do we want to report redundant givens for
+  -- pattern synonyms, PatSynSigSkol? c.f Trac #9953, comment:21.
 warnRedundantGivens (InstSkol {}) = True
 warnRedundantGivens _             = False
 

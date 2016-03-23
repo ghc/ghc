@@ -2577,6 +2577,11 @@ data SkolemInfo
             ExpType             -- a programmer-supplied type signature
                                 -- Location of the binding site is on the TyVar
 
+  | PatSynSigSkol Name  -- Bound by a programmer-supplied type signature of a pattern
+                        -- synonym. Here we cannot use a SigSkol, see
+                        -- Note [Patterns synonyms and the data type Type] in
+                        -- basicTypes\PatSyn.hs
+
   | ClsSkol Class       -- Bound at a class decl
 
   | DerivSkol Type      -- Bound by a 'deriving' clause;
@@ -2640,6 +2645,8 @@ pprSkolInfo (InferSkol ids)   = sep [ text "the inferred type of"
                                     , vcat [ ppr name <+> dcolon <+> ppr ty
                                            | (name,ty) <- ids ]]
 pprSkolInfo (UnifyForAllSkol ty) = text "the type" <+> ppr ty
+pprSkolInfo (PatSynSigSkol name) = text "the type signature of pattern synonym"
+                                   <+> quotes (ppr name)
 
 -- UnkSkol
 -- For type variables the others are dealt with by pprSkolTvBinding.

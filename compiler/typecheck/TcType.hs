@@ -473,8 +473,7 @@ data UserTypeCtxt
   | TypeAppCtxt         -- Visible type application
   | ConArgCtxt Name     -- Data constructor argument
   | TySynCtxt Name      -- RHS of a type synonym decl
-  | PatSynCtxt Name     -- Type sig for a pattern synonym
-                        --   eg  pattern C :: Int -> T
+  | PatSynBuilderCtxt Name -- Type sig for the builder of a bidirectional pattern synonym
   | PatSigCtxt          -- Type sig in pattern
                         --   eg  f (x::t) = ...
                         --   or  (x::t, y) = e
@@ -659,7 +658,6 @@ pprUserTypeCtxt ExprSigCtxt       = text "an expression type signature"
 pprUserTypeCtxt TypeAppCtxt       = text "a type argument"
 pprUserTypeCtxt (ConArgCtxt c)    = text "the type of the constructor" <+> quotes (ppr c)
 pprUserTypeCtxt (TySynCtxt c)     = text "the RHS of the type synonym" <+> quotes (ppr c)
-pprUserTypeCtxt (PatSynCtxt c)    = text "the type signature for pattern synonym" <+> quotes (ppr c)
 pprUserTypeCtxt ThBrackCtxt       = text "a Template Haskell quotation [t|...|]"
 pprUserTypeCtxt PatSigCtxt        = text "a pattern type signature"
 pprUserTypeCtxt ResSigCtxt        = text "a result type signature"
@@ -672,6 +670,9 @@ pprUserTypeCtxt GhciCtxt          = text "a type in a GHCi command"
 pprUserTypeCtxt (ClassSCCtxt c)   = text "the super-classes of class" <+> quotes (ppr c)
 pprUserTypeCtxt SigmaCtxt         = text "the context of a polymorphic type"
 pprUserTypeCtxt (DataTyCtxt tc)   = text "the context of the data type declaration for" <+> quotes (ppr tc)
+pprUserTypeCtxt (PatSynBuilderCtxt n)
+  = vcat [ text "the type signature for bidirectional pattern synonym" <+> quotes (ppr n)
+         , text "when used in an expression context" ]
 
 pprSigCtxt :: UserTypeCtxt -> SDoc -> SDoc -> SDoc
 -- (pprSigCtxt ctxt <extra> <type>)
@@ -690,11 +691,11 @@ pprSigCtxt ctxt extra pp_ty
   where
 
 isSigMaybe :: UserTypeCtxt -> Maybe Name
-isSigMaybe (FunSigCtxt n _) = Just n
-isSigMaybe (ConArgCtxt n)   = Just n
-isSigMaybe (ForSigCtxt n)   = Just n
-isSigMaybe (PatSynCtxt n)   = Just n
-isSigMaybe _                = Nothing
+isSigMaybe (FunSigCtxt n _)      = Just n
+isSigMaybe (ConArgCtxt n)        = Just n
+isSigMaybe (ForSigCtxt n)        = Just n
+isSigMaybe (PatSynBuilderCtxt n) = Just n
+isSigMaybe _                     = Nothing
 
 {-
 ************************************************************************
