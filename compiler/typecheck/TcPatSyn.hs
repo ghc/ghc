@@ -247,8 +247,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                       , patsig_arg_tys    = arg_tys,    patsig_body_ty = pat_ty }
   = addPatSynCtxt lname $
     do { let origin     = ProvCtxtOrigin psb
-             skol_info  = SigSkol (PatSynCtxt name) (mkCheckExpType $
-                                                     mkFunTys arg_tys pat_ty)
+             skol_info  = PatSynSigSkol name
              decl_arity = length arg_names
              ty_arity   = length arg_tys
              (arg_names, rec_fields, is_infix) = collectPatSynArgInfo details
@@ -715,7 +714,7 @@ get_builder_sig sig_fun name builder_id need_dummy_arg
                  , sig_theta = req ++ prov
                  , sig_tau   = add_void need_dummy_arg $
                                mkFunTys arg_tys body_ty
-                 , sig_ctxt  = PatSynCtxt name
+                 , sig_ctxt  = PatSynBuilderCtxt name
                  , sig_loc   = getSrcSpan name })
   | otherwise
   = -- No signature, so fake up a TcIdSigInfo from the builder Id
