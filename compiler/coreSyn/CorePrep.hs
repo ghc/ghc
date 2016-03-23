@@ -169,10 +169,12 @@ type CpeRhs  = CoreExpr    -- Non-terminal 'rhs'
 ************************************************************************
 -}
 
-corePrepPgm :: HscEnv -> ModLocation -> CoreProgram -> [TyCon] -> IO CoreProgram
-corePrepPgm hsc_env mod_loc binds data_tycons = do
-    let dflags = hsc_dflags hsc_env
-    showPass dflags "CorePrep"
+corePrepPgm :: HscEnv -> Module -> ModLocation -> CoreProgram -> [TyCon]
+            -> IO CoreProgram
+corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
+    withTiming (pure dflags)
+               (text "CorePrep"<+>brackets (ppr this_mod))
+               (const ()) $ do
     us <- mkSplitUniqSupply 's'
     initialCorePrepEnv <- mkInitialCorePrepEnv dflags hsc_env
 
@@ -187,10 +189,12 @@ corePrepPgm hsc_env mod_loc binds data_tycons = do
 
     endPassIO hsc_env alwaysQualify CorePrep binds_out []
     return binds_out
+  where
+    dflags = hsc_dflags hsc_env
 
 corePrepExpr :: DynFlags -> HscEnv -> CoreExpr -> IO CoreExpr
-corePrepExpr dflags hsc_env expr = do
-    showPass dflags "CorePrep"
+corePrepExpr dflags hsc_env expr =
+    withTiming (pure dflags) (text "CorePrep [expr]") (const ()) $ do
     us <- mkSplitUniqSupply 's'
     initialCorePrepEnv <- mkInitialCorePrepEnv dflags hsc_env
     let new_expr = initUs_ us (cpeBodyNF initialCorePrepEnv expr)

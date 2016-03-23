@@ -78,9 +78,9 @@ byteCodeGen :: HscEnv
             -> Maybe ModBreaks
             -> IO CompiledByteCode
 byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
-   = do let dflags = hsc_dflags hsc_env
-        showPass dflags "ByteCodeGen"
-
+   = withTiming (pure dflags)
+                (text "ByteCodeGen"<+>brackets (ppr this_mod))
+                (const ()) $ do
         let flatBinds = [ (bndr, simpleFreeVars rhs)
                         | (bndr, rhs) <- flattenBinds binds]
 
@@ -99,6 +99,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
           (case modBreaks of
              Nothing -> Nothing
              Just mb -> Just mb{ modBreaks_breakInfo = breakInfo })
+  where dflags = hsc_dflags hsc_env
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for an expression
@@ -109,9 +110,9 @@ coreExprToBCOs :: HscEnv
                -> CoreExpr
                -> IO UnlinkedBCO
 coreExprToBCOs hsc_env this_mod expr
- = do let dflags = hsc_dflags hsc_env
-      showPass dflags "ByteCodeGen"
-
+ = withTiming (pure dflags)
+              (text "ByteCodeGen"<+>brackets (ppr this_mod))
+              (const ()) $ do
       -- create a totally bogus name for the top-level BCO; this
       -- should be harmless, since it's never used for anything
       let invented_name  = mkSystemVarName (mkPseudoUniqueE 0) (fsLit "ExprTopLevel")
@@ -130,7 +131,7 @@ coreExprToBCOs hsc_env this_mod expr
       dumpIfSet_dyn dflags Opt_D_dump_BCOs "Proto-BCOs" (ppr proto_bco)
 
       assembleOneBCO hsc_env proto_bco
-
+  where dflags = hsc_dflags hsc_env
 
 -- The regular freeVars function gives more information than is useful to
 -- us here. simpleFreeVars does the impedence matching.

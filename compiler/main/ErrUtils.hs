@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
 
 module ErrUtils (
         -- * Basic types
@@ -41,7 +42,7 @@ module ErrUtils (
         errorMsg, warningMsg,
         fatalErrorMsg, fatalErrorMsg', fatalErrorMsg'',
         compilationProgressMsg,
-        showPass,
+        showPass, withTiming,
         debugTraceMsg,
         ghcExit,
         prettyPrintGhcErrors,
@@ -68,6 +69,8 @@ import Data.Time
 import Control.Monad
 import Control.Monad.IO.Class
 import System.IO
+import GHC.Conc         ( getAllocationCounter )
+import System.CPUTime
 
 -------------------------
 type MsgDoc  = SDoc
@@ -458,6 +461,59 @@ showPass :: DynFlags -> String -> IO ()
 showPass dflags what
   = ifVerbose dflags 2 $
     logInfo dflags defaultUserStyle (text "***" <+> text what <> colon)
+
+-- | Time a compilation phase.
+--
+-- When timings are enabled (e.g. with the @-v2@ flag), the allocations
+-- and CPU time used by the phase will be reported to stderr. Consider
+-- a typical usage: @withTiming getDynFlags (text "simplify") force pass@.
+-- When timings are enabled the following costs are included in the
+-- produced accounting,
+--
+--  - The cost of executing @pass@ to a result @r@ in WHNF
+--  - The cost of evaluating @force r@ to WHNF (e.g. @()@)
+--
+-- The choice of the @force@ function depends upon the amount of forcing
+-- desired; the goal here is to ensure that the cost of evaluating the result
+-- is, to the greatest extent possible, included in the accounting provided by
+-- 'withTiming'. Often the pass already sufficiently forces its result during
+-- construction; in this case @const ()@ is a reasonable choice.
+-- In other cases, it is necessary to evaluate the result to normal form, in
+-- which case something like @Control.DeepSeq.rnf@ is appropriate.
+--
+-- To avoid adversely affecting compiler performance when timings are not
+-- requested, the result is only forced when timings are enabled.
+withTiming :: MonadIO m
+           => m DynFlags  -- ^ A means of getting a 'DynFlags' (often
+                          -- 'getDynFlags' will work here)
+           -> SDoc        -- ^ The name of the phase
+           -> (a -> ())   -- ^ A function to force the result
+                          -- (often either @const ()@ or 'rnf')
+           -> m a         -- ^ The body of the phase to be timed
+           -> m a
+withTiming getDFlags what force_result action
+  = do dflags <- getDFlags
+       if verbosity dflags >= 2
+          then do liftIO $ logInfo dflags defaultUserStyle
+                         $ text "***" <+> what <> colon
+                  alloc0 <- liftIO getAllocationCounter
+                  start <- liftIO getCPUTime
+                  !r <- action
+                  () <- pure $ force_result r
+                  end <- liftIO getCPUTime
+                  alloc1 <- liftIO getAllocationCounter
+                  -- recall that allocation counter counts down
+                  let alloc = alloc0 - alloc1
+                  liftIO $ logInfo dflags defaultUserStyle
+                      (text "!!!" <+> what <> colon <+> text "finished in"
+                       <+> doublePrec 2 (realToFrac (end - start) * 1e-9)
+                       <+> text "milliseconds"
+                       <> comma
+                       <+> text "allocated"
+                       <+> doublePrec 3 (realToFrac alloc / 1024 / 1024)
+                       <+> text "megabytes")
+                  pure r
+           else action
 
 debugTraceMsg :: DynFlags -> Int -> MsgDoc -> IO ()
 debugTraceMsg dflags val msg = ifVerbose dflags val $

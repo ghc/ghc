@@ -131,16 +131,18 @@ tcRnModule :: HscEnv
 tcRnModule hsc_env hsc_src save_rn_syntax
    parsedModule@HsParsedModule {hpm_module=L loc this_module}
  | RealSrcSpan real_loc <- loc
- = do { showPass (hsc_dflags hsc_env) "Renamer/typechecker" ;
-
-      ; initTc hsc_env hsc_src save_rn_syntax this_mod real_loc $
-               withTcPlugins hsc_env $
-               tcRnModuleTcRnM hsc_env hsc_src parsedModule pair }
+ = withTiming (pure dflags)
+              (text "Renamer/typechecker"<+>brackets (ppr this_mod))
+              (const ()) $
+   initTc hsc_env hsc_src save_rn_syntax this_mod real_loc $
+          withTcPlugins hsc_env $
+          tcRnModuleTcRnM hsc_env hsc_src parsedModule pair
 
   | otherwise
   = return ((emptyBag, unitBag err_msg), Nothing)
 
   where
+    dflags = hsc_dflags hsc_env
     err_msg = mkPlainErrMsg (hsc_dflags hsc_env) loc $
               text "Module does not have a RealSrcSpan:" <+> ppr this_mod
 
