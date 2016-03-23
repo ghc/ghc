@@ -9,7 +9,7 @@ Rec {
 $we_r1z8
   :: (GHC.Types.Int, GHC.Types.Int)
      -> GHC.Prim.Int# -> (# GHC.Types.Int, GHC.Types.Int #)
-[GblId, Arity=2, Caf=NoCafRefs, Str=DmdType S(AA)L]
+[GblId, Arity=2, Caf=NoCafRefs, Str=S(AA)L]
 $we_r1z8 =
   \ (w_s1yf :: (GHC.Types.Int, GHC.Types.Int))
     (ww_s1yi :: GHC.Prim.Int#) ->
@@ -30,7 +30,7 @@ $we_r2qK
      -> GHC.Types.Int
      -> GHC.Prim.Int#
      -> (# GHC.Types.Int, GHC.Types.Int #)
-[GblId, Arity=3, Caf=NoCafRefs, Str=DmdType <L,U><L,U><L,U>]
+[GblId, Arity=3, Caf=NoCafRefs, Str=<L,U><L,U><L,U>]
 $we_r2qK =
   \ (ww_s2pS :: GHC.Types.Int)
     (ww1_s2pT :: GHC.Types.Int)

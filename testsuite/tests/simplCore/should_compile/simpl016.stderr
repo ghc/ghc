@@ -4,7 +4,7 @@ simpl016.hs:7:1: Warning:
       Orig bndrs: [b, $dNum]
       Orig lhs: let {
                   $dEq :: Eq Int
-                  [LclId, Str=DmdType]
+                  [LclId]
                   $dEq = GHC.Classes.$fEqInt } in
                 delta' @ Int @ b $dEq
       optimised lhs: delta' @ Int @ b $dEq

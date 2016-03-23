@@ -9,7 +9,7 @@ Bad:
 Rec {
 go_r1us
   :: GHC.Types.Int -> Main.Tree GHC.Types.Int -> GHC.Types.Int
-[GblId, Arity=2, Caf=NoCafRefs, Str=DmdType SS]
+[GblId, Arity=2, Caf=NoCafRefs, Str=SS]
 go_r1us =
   \ (z_aeS :: GHC.Types.Int) (ds_dmD :: Main.Tree GHC.Types.Int) ->
     case ds_dmD of _ {
@@ -29,7 +29,7 @@ Good:
 Rec {
 $wgo_r2fS
   :: GHC.Prim.Int# -> Main.Tree GHC.Types.Int -> GHC.Prim.Int#
-[GblId, Arity=2, Caf=NoCafRefs, Str=DmdType <L,U><S,1*U>]
+[GblId, Arity=2, Caf=NoCafRefs, Str=<L,U><S,1*U>]
 $wgo_r2fS =
   \ (ww_s2eZ :: GHC.Prim.Int#) (w_s2eW :: Main.Tree GHC.Types.Int) ->
     case w_s2eW of _ [Occ=Dead] {

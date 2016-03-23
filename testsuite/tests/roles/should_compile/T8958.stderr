@@ -65,7 +65,6 @@ AbsBinds [a] []
    Exported types: T8958.$fRepresentationala [InlPrag=[ALWAYS] CONLIKE]
                      :: forall a. Representational a
                    [LclIdX[DFunId],
-                    Str=DmdType,
                     Unf=DFun: \ (@ a[ssk]) -> T8958.C:Representational TYPE: a[ssk]]
    Binds: $dRepresentational = T8958.C:Representational @ a
    Evidence: [EvBinds{}]}
@@ -75,7 +74,6 @@ AbsBinds [a] []
    Exported types: T8958.$fNominala [InlPrag=[ALWAYS] CONLIKE]
                      :: forall a. Nominal a
                    [LclIdX[DFunId],
-                    Str=DmdType,
                     Unf=DFun: \ (@ a[ssk]) -> T8958.C:Nominal TYPE: a[ssk]]
    Binds: $dNominal = T8958.C:Nominal @ a
    Evidence: [EvBinds{}]}

@@ -5,7 +5,7 @@ Result size of Tidy Core = {terms: 36, types: 14, coercions: 0}
 Rec {
 -- RHS size: {terms: 10, types: 2, coercions: 0}
 $wxs :: GHC.Prim.Int# -> ()
-[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <S,1*U>]
+[GblId, Arity=1, Caf=NoCafRefs, Str=<S,1*U>]
 $wxs =
   \ (ww :: GHC.Prim.Int#) ->
     case ww of ds1 {
@@ -16,7 +16,7 @@ end Rec }
 
 -- RHS size: {terms: 14, types: 5, coercions: 0}
 foo [InlPrag=NOINLINE] :: Int -> ()
-[GblId, Arity=1, Caf=NoCafRefs, Str=DmdType <S(S),1*U(U)>]
+[GblId, Arity=1, Caf=NoCafRefs, Str=<S(S),1*U(U)>]
 foo =
   \ (n :: Int) ->
     case n of _ [Occ=Dead] { GHC.Types.I# y ->
@@ -31,7 +31,7 @@ foo =
 T3772.$trModule1 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
- Str=DmdType m1,
+ Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
 T3772.$trModule1 = GHC.Types.TrNameS "T3772"#
@@ -40,7 +40,7 @@ T3772.$trModule1 = GHC.Types.TrNameS "T3772"#
 T3772.$trModule2 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
- Str=DmdType m1,
+ Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 20}]
 T3772.$trModule2 = GHC.Types.TrNameS "main"#
@@ -49,7 +49,7 @@ T3772.$trModule2 = GHC.Types.TrNameS "main"#
 T3772.$trModule :: GHC.Types.Module
 [GblId,
  Caf=NoCafRefs,
- Str=DmdType m,
+ Str=m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
 T3772.$trModule =

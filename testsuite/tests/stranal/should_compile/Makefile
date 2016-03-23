@@ -18,4 +18,4 @@ T10482a:
 
 T10694:
 	$(RM) -f T10694.o
-	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl T10694.hs | grep 'DmdType '
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl T10694.hs | grep 'Str='

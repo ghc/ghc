@@ -8,7 +8,7 @@ module Roman where
 -- Compare:
 --
 --   $s$wgo_s1CN :: Int# -> Int -> Int#
---   [LclId, Arity=2, Str=DmdType <L,U><L,U>]
+--   [LclId, Arity=2, Str=<L,U><L,U>]
 --   $s$wgo_s1CN =
 --     \ (sc_s1CI :: Int#) (sc_s1CJ :: Int) ->
 --       case tagToEnum# @ Bool (<=# sc_s1CI 0#) of _ [Occ=Dead] {
@@ -20,7 +20,7 @@ module Roman where
 -- vs
 --
 --   $s$wgo_s18mTj :: Int -> Int# -> Int#
---   [LclId, Arity=2, Str=DmdType <L,U><L,U>]
+--   [LclId, Arity=2, Str=<L,U><L,U>]
 --   $s$wgo_s18mTj =
 --     \ (sc_s18mTn :: Int) (sc_s18mTo :: Int#) ->
 --       case tagToEnum# @ Bool (<=# sc_s18mTo 0#) of _ [Occ=Dead] {

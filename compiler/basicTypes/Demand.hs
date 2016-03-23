@@ -1239,8 +1239,7 @@ bothDmdType (DmdType fv1 ds1 r1) (fv2, t2)
 
 instance Outputable DmdType where
   ppr (DmdType fv ds res)
-    = hsep [text "DmdType",
-            hcat (map ppr ds) <> ppr res,
+    = hsep [hcat (map ppr ds) <> ppr res,
             if null fv_elts then empty
             else braces (fsep (map pp_elt fv_elts))]
     where

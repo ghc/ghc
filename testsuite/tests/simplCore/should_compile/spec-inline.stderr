@@ -6,7 +6,7 @@ Result size of Tidy Core = {terms: 172, types: 65, coercions: 0}
 Roman.$trModule2 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
- Str=DmdType m1,
+ Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 20}]
 Roman.$trModule2 = GHC.Types.TrNameS "main"#
@@ -15,7 +15,7 @@ Roman.$trModule2 = GHC.Types.TrNameS "main"#
 Roman.$trModule1 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
- Str=DmdType m1,
+ Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
 Roman.$trModule1 = GHC.Types.TrNameS "Roman"#
@@ -24,7 +24,7 @@ Roman.$trModule1 = GHC.Types.TrNameS "Roman"#
 Roman.$trModule :: GHC.Types.Module
 [GblId,
  Caf=NoCafRefs,
- Str=DmdType m,
+ Str=m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
 Roman.$trModule =
@@ -32,7 +32,7 @@ Roman.$trModule =
 
 -- RHS size: {terms: 2, types: 2, coercions: 0}
 Roman.foo3 :: Int
-[GblId, Str=DmdType x]
+[GblId, Str=x]
 Roman.foo3 =
   Control.Exception.Base.patError
     @ 'GHC.Types.PtrRepLifted
@@ -43,12 +43,12 @@ Rec {
 -- RHS size: {terms: 55, types: 9, coercions: 0}
 Roman.foo_$s$wgo [Occ=LoopBreaker]
   :: GHC.Prim.Int# -> GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId, Arity=2, Caf=NoCafRefs, Str=DmdType <L,U><L,U>]
+[GblId, Arity=2, Caf=NoCafRefs, Str=<L,U><L,U>]
 Roman.foo_$s$wgo =
   \ (sc :: GHC.Prim.Int#) (sc1 :: GHC.Prim.Int#) ->
     let {
       m :: GHC.Prim.Int#
-      [LclId, Str=DmdType]
+      [LclId]
       m =
         GHC.Prim.+#
           (GHC.Prim.+#
@@ -77,7 +77,7 @@ end Rec }
 Roman.$wgo [InlPrag=[0]] :: Maybe Int -> Maybe Int -> GHC.Prim.Int#
 [GblId,
  Arity=2,
- Str=DmdType <S,1*U><S,1*U>,
+ Str=<S,1*U><S,1*U>,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 30] 256 0}]
 Roman.$wgo =
@@ -88,7 +88,7 @@ Roman.$wgo =
         case x of _ [Occ=Dead] { GHC.Types.I# ipv ->
         let {
           m :: GHC.Prim.Int#
-          [LclId, Str=DmdType]
+          [LclId]
           m =
             GHC.Prim.+#
               (GHC.Prim.+#
@@ -124,7 +124,7 @@ Roman.$wgo =
 Roman.foo_go [InlPrag=INLINE[0]] :: Maybe Int -> Maybe Int -> Int
 [GblId,
  Arity=2,
- Str=DmdType <S,1*U><S,1*U>m,
+ Str=<S,1*U><S,1*U>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
@@ -138,7 +138,7 @@ Roman.foo_go =
 Roman.foo2 :: Int
 [GblId,
  Caf=NoCafRefs,
- Str=DmdType m,
+ Str=m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 Roman.foo2 = GHC.Types.I# 6#
@@ -147,7 +147,7 @@ Roman.foo2 = GHC.Types.I# 6#
 Roman.foo1 :: Maybe Int
 [GblId,
  Caf=NoCafRefs,
- Str=DmdType m2,
+ Str=m2,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 Roman.foo1 = GHC.Base.Just @ Int Roman.foo2
@@ -157,7 +157,7 @@ foo :: Int -> Int
 [GblId,
  Arity=1,
  Caf=NoCafRefs,
- Str=DmdType <S,1*U(U)>m,
+ Str=<S,1*U(U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)

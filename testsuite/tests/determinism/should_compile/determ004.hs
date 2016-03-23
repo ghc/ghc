@@ -46,7 +46,7 @@ $s$wsFoldr1_szbtK
              (Let1627448493XsSym4 x_azbOM m_azbFg ipv_szbwN ipv_szbwO))
 [LclId,
  Arity=4,
- Str=DmdType <L,U><L,U><L,U><C(S(C(S))),C(U(1*C1(U)))>]
+ Str=<L,U><L,U><L,U><C(S(C(S))),C(U(1*C1(U)))>]
 $s$wsFoldr1_szbtK =
   \ (@ (m_azbFg :: a_afdP_azbON))
     (@ (x_azbOM :: TyFun
