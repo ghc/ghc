@@ -206,7 +206,7 @@ cgRhs :: Id
                )
 
 cgRhs id (StgRhsCon cc con args)
-  = withNewTickyCounterCon (idName id) $
+  = withNewTickyCounterThunk False (idName id) $ -- False for "not static"
     buildDynCon id True cc con args
 
 {- See Note [GC recovery] in compiler/codeGen/StgCmmClosure.hs -}
@@ -386,7 +386,7 @@ cgRhsStdThunk bndr lf_info payload
        }
  where
  gen_code reg  -- AHA!  A STANDARD-FORM THUNK
-  = withNewTickyCounterStdThunk (lfUpdatable lf_info) (idName bndr) $
+  = withNewTickyCounterStdThunk False (idName bndr) $ -- False for "not static"
     do
   {     -- LAY OUT THE OBJECT
     mod_name <- getModuleName
@@ -402,6 +402,7 @@ cgRhsStdThunk bndr lf_info payload
 --  ; (use_cc, blame_cc) <- chooseDynCostCentres cc [{- no args-}] body
   ; let use_cc = curCCS; blame_cc = curCCS
 
+  ; tickyEnterStdThunk closure_info
 
         -- BUILD THE OBJECT
   ; let info_tbl = mkCmmInfo closure_info
@@ -452,10 +453,7 @@ closureCodeBody :: Bool            -- whether this is a top-level binding
 
 closureCodeBody top_lvl bndr cl_info cc _args arity body fv_details
   | arity == 0 -- No args i.e. thunk
-  = withNewTickyCounterThunk
-        (isStaticClosure cl_info)
-        (closureUpdReqd cl_info)
-        (closureName cl_info) $
+  = withNewTickyCounterThunk (isStaticClosure cl_info) (closureName cl_info) $
     emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl [] $
       \(_, node, _) -> thunkCode cl_info fv_details cc node arity body
    where
@@ -578,7 +576,8 @@ thunkCode cl_info fv_details _cc node arity body
             -- that cc of enclosing scope will be recorded
             -- in update frame CAF/DICT functions will be
             -- subsumed by this enclosing cc
-            do { enterCostCentreThunk (CmmReg nodeReg)
+            do { tickyEnterThunk cl_info
+               ; enterCostCentreThunk (CmmReg nodeReg)
                ; let lf_info = closureLFInfo cl_info
                ; fv_bindings <- mapM bind_fv fv_details
                ; load_fvs node lf_info fv_bindings

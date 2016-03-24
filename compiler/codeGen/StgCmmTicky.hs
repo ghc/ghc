@@ -70,7 +70,6 @@ module StgCmmTicky (
   withNewTickyCounterLNE,
   withNewTickyCounterThunk,
   withNewTickyCounterStdThunk,
-  withNewTickyCounterCon,
 
   tickyDynAlloc,
   tickyAllocHeap,
@@ -144,13 +143,7 @@ import Control.Monad ( unless, when )
 --
 -----------------------------------------------------------------------------
 
-data TickyClosureType
-    = TickyFun
-    | TickyCon
-    | TickyThunk
-        Bool -- True <-> updateable
-        Bool -- True <-> standard thunk (AP or selector), has no entry counter
-    | TickyLNE
+data TickyClosureType = TickyFun | TickyThunk | TickyLNE
 
 withNewTickyCounterFun, withNewTickyCounterLNE :: Name -> [NonVoid Id] -> FCode a -> FCode a
 withNewTickyCounterFun = withNewTickyCounter TickyFun
@@ -159,38 +152,15 @@ withNewTickyCounterLNE nm args code = do
   b <- tickyLNEIsOn
   if not b then code else withNewTickyCounter TickyLNE nm args code
 
-withNewTickyCounterThunk
-  :: Bool -- ^ static
-  -> Bool -- ^ updateable
-  -> Name
-  -> FCode a
-  -> FCode a
-withNewTickyCounterThunk isStatic isUpdatable name code = do
+withNewTickyCounterThunk,withNewTickyCounterStdThunk ::
+  Bool -> Name -> FCode a -> FCode a
+withNewTickyCounterThunk isStatic name code = do
     b <- tickyDynThunkIsOn
     if isStatic || not b -- ignore static thunks
       then code
-      else withNewTickyCounter (TickyThunk isUpdatable False) name [] code
+      else withNewTickyCounter TickyThunk name [] code
 
-withNewTickyCounterStdThunk
-  :: Bool -- ^ updateable
-  -> Name
-  -> FCode a
-  -> FCode a
-withNewTickyCounterStdThunk isUpdatable name code = do
-    b <- tickyDynThunkIsOn
-    if not b
-      then code
-      else withNewTickyCounter (TickyThunk isUpdatable True) name [] code
-
-withNewTickyCounterCon
-  :: Name
-  -> FCode a
-  -> FCode a
-withNewTickyCounterCon name code = do
-    b <- tickyDynThunkIsOn
-    if not b
-      then code
-      else withNewTickyCounter TickyCon name [] code
+withNewTickyCounterStdThunk = withNewTickyCounterThunk
 
 -- args does not include the void arguments
 withNewTickyCounter :: TickyClosureType -> Name -> [NonVoid Id] -> FCode a -> FCode a
@@ -214,21 +184,21 @@ emitTickyCounter cloType name args
         ; let ppr_for_ticky_name :: SDoc
               ppr_for_ticky_name =
                 let n = ppr name
-                    ext = case cloType of
-                              TickyFun -> empty
-                              TickyCon -> parens (text "con")
-                              TickyThunk upd std -> parens $ hcat $ punctuate comma $
-                                  [text "thk"] ++ [text "se"|not upd] ++ [text "std"|std]
-                              TickyLNE | isInternalName name -> parens (text "LNE")
-                                       | otherwise -> panic "emitTickyCounter: how is this an external LNE?"
                     p = case hasHaskellName parent of
                             -- NB the default "top" ticky ctr does not
                             -- have a Haskell name
                           Just pname -> text "in" <+> ppr (nameUnique pname)
                           _ -> empty
-                in if isInternalName name
-                   then n <+> parens (ppr mod_name) <+> ext <+> p
-                   else n <+> ext <+> p
+                in (<+> p) $ if isInternalName name
+                   then let s = n <+> (parens (ppr mod_name))
+                        in case cloType of
+                          TickyFun -> s
+                          TickyThunk -> s <+> parens (text "thk")
+                          TickyLNE -> s <+> parens (text "LNE")
+                  else case cloType of
+                         TickyFun -> n
+                         TickyThunk -> n <+> parens (text "thk")
+                         TickyLNE -> panic "emitTickyCounter: how is this an external LNE?"
 
         ; fun_descr_lit <- newStringCLit $ showSDocDebug dflags ppr_for_ticky_name
         ; arg_descr_lit <- newStringCLit $ map (showTypeCategory . idType . unsafe_stripNV) args

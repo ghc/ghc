@@ -1533,7 +1533,7 @@ scavenge_one(StgPtr p)
         } else {
           size = gen->scan - start;
         }
-        debugBelch("evac IND: %ld bytes", size * sizeof(W_));
+        debugBelch("evac IND_OLDGEN: %ld bytes", size * sizeof(W_));
       }
 #endif
       break;
