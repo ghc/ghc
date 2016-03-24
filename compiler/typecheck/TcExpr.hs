@@ -1470,6 +1470,7 @@ tcExprSig expr sig@(TISI { sig_bndr  = s_bndr
                  else tcSubType_NC ExprSigCtxt inferred_sigma
                                    (mkCheckExpType my_sigma)
 
+       ; traceTc "tcExpSig" (ppr qtvs $$ ppr givens $$ ppr inferred_sigma $$ ppr my_sigma)
        ; let poly_wrap = wrap
                          <.> mkWpTyLams qtvs
                          <.> mkWpLams givens
