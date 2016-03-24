@@ -223,6 +223,21 @@ Arbitrary-sized tuples
 
        splitAt undefined [] = undefined
 
+``Show``\ ing records
+    The Haskell 2010 definition of ``Show`` stipulates that the rendered
+    string should only include parentheses which are necessary to unambiguously
+    parse the result. For historical reasons, ``Show`` instances derived by GHC
+    include parentheses around records despite the fact that record syntax
+    binds more tightly than function application; e.g., ::
+
+        data Hello = Hello { aField :: Int } deriving (Show)
+
+        -- GHC produces...
+        show (Just (Hello {aField=42})) == "Just (Hello {aField=42})"
+
+        -- whereas Haskell 2010 calls for...
+        show (Just (Hello {aField=42})) == "Just Hello {aField=42}"
+
 ``Read``\ ing integers
     GHC's implementation of the ``Read`` class for integral types
     accepts hexadecimal and octal literals (the code in the Haskell 98

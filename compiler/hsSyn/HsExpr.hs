@@ -791,8 +791,8 @@ ppr_expr (ExplicitPArr _ exprs)
 ppr_expr (RecordCon { rcon_con_name = con_id, rcon_flds = rbinds })
   = hang (ppr con_id) 2 (ppr rbinds)
 
-ppr_expr (RecordUpd { rupd_expr = aexp, rupd_flds = rbinds })
-  = hang (pprLExpr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
+ppr_expr (RecordUpd { rupd_expr = L _ aexp, rupd_flds = rbinds })
+  = hang (pprParendExpr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
 
 ppr_expr (ExprWithTySig expr sig)
   = hang (nest 2 (ppr_lexpr expr) <+> dcolon)
@@ -931,8 +931,6 @@ hsExprNeedsParens (HsOverLabel {})    = False
 hsExprNeedsParens (ExplicitTuple {})  = False
 hsExprNeedsParens (ExplicitList {})   = False
 hsExprNeedsParens (ExplicitPArr {})   = False
-hsExprNeedsParens (RecordCon {})      = False
-hsExprNeedsParens (RecordUpd {})      = False
 hsExprNeedsParens (HsPar {})          = False
 hsExprNeedsParens (HsBracket {})      = False
 hsExprNeedsParens (HsRnBracketOut {}) = False
