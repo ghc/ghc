@@ -370,6 +370,13 @@ warningsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-Wno-amp"
          }
+  , flag { flagName = "-Wredundant-constraints"
+         , flagDescription =
+           "Have the compiler warn about redundant constraints in type"++
+           "signatures."
+         , flagType = DynamicFlag
+         , flagReverse = "-Wno-redundant-constraints"
+         }
   , flag { flagName = "-Wdeferred-type-errors"
          , flagDescription =
            "Report warnings when :ref:`deferred type errors "++
