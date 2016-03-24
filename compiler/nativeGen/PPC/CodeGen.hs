@@ -1005,17 +1005,7 @@ genJump (CmmLit (CmmLabel lbl))
 genJump tree
   = do
         dflags <- getDynFlags
-        let platform = targetPlatform dflags
-        case platformOS platform of
-          OSLinux  -> case platformArch platform of
-                      ArchPPC           -> genJump' tree GCPLinux
-                      ArchPPC_64 ELF_V1 -> genJump' tree (GCPLinux64ELF 1)
-                      ArchPPC_64 ELF_V2 -> genJump' tree (GCPLinux64ELF 2)
-                      _   -> panic "PPC.CodeGen.genJump: Unknown Linux"
-          OSAIX    -> genJump' tree GCPAIX
-          OSDarwin -> genJump' tree GCPDarwin
-          _ -> panic "PPC.CodeGen.genJump: not defined for this os"
-
+        genJump' tree (platformToGCP (targetPlatform dflags))
 
 genJump' :: CmmExpr -> GenCCallPlatform -> NatM InstrBlock
 
@@ -1085,21 +1075,24 @@ genCCall :: ForeignTarget            -- function to call
          -> NatM InstrBlock
 genCCall target dest_regs argsAndHints
  = do dflags <- getDynFlags
-      let platform = targetPlatform dflags
-      case platformOS platform of
-       OSLinux  -> case platformArch platform of
-                   ArchPPC           -> genCCall' dflags GCPLinux
-                                           target dest_regs argsAndHints
-                   ArchPPC_64 ELF_V1 -> genCCall' dflags (GCPLinux64ELF 1)
-                                           target dest_regs argsAndHints
-                   ArchPPC_64 ELF_V2 -> genCCall' dflags (GCPLinux64ELF 2)
-                                           target dest_regs argsAndHints
-                   _  -> panic "PPC.CodeGen.genCCall: Unknown Linux"
-       OSAIX    -> genCCall' dflags GCPAIX    target dest_regs argsAndHints
-       OSDarwin -> genCCall' dflags GCPDarwin target dest_regs argsAndHints
-       _ -> panic "PPC.CodeGen.genCCall: not defined for this os"
+      genCCall' dflags (platformToGCP (targetPlatform dflags))
+                target dest_regs argsAndHints
 
-data GenCCallPlatform = GCPLinux | GCPDarwin | GCPLinux64ELF Int | GCPAIX
+-- TODO: replace 'Int' by an enum such as 'PPC_64ABI'
+data GenCCallPlatform = GCPLinux | GCPDarwin | GCPLinux64ELF !Int | GCPAIX
+                      deriving Eq
+
+platformToGCP :: Platform -> GenCCallPlatform
+platformToGCP platform = case platformOS platform of
+    OSLinux  -> case platformArch platform of
+        ArchPPC           -> GCPLinux
+        ArchPPC_64 ELF_V1 -> GCPLinux64ELF 1
+        ArchPPC_64 ELF_V2 -> GCPLinux64ELF 2
+        _ -> panic "PPC.CodeGen.platformToGCP: Unknown Linux"
+    OSAIX    -> GCPAIX
+    OSDarwin -> GCPDarwin
+    _ -> panic "PPC.CodeGen.platformToGCP: not defined for this OS"
+
 
 genCCall'
     :: DynFlags
