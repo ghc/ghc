@@ -1861,8 +1861,9 @@ The following syntax is stolen:
        single: Quasi-quotes
 
     Stolen by: :ghc-flag:`-XQuasiQuotes`. Moreover, this introduces an ambiguity
-    with list comprehension syntax. See
-    :ref:`quasi-quotes-list-comprehension-ambiguity` for details.
+    with list comprehension syntax. See the
+    :ref:`discussion on quasi-quoting <quasi-quotes-list-comprehension-ambiguity>`
+    for details.
 
 ``$(``, ``$$(``, ``$varid``, ``$$varid``
     .. index::
@@ -7635,10 +7636,10 @@ Pretty-printing in the presence of kind polymorphism
 With kind polymorphism, there is quite a bit going on behind the scenes that
 may be invisible to a Haskell programmer. GHC supports several flags that
 control how types are printed in error messages and at the GHCi prompt.
-See :ref:`pretty-printing-types` for the details. If you are using
-kind polymorphism and are confused as to why GHC is rejecting (or accepting)
-your program, we encourage you to turn on these flags, especially
-:ghc-flag:`-fprint-explicit-kinds`.
+See the :ref:`discussion of type pretty-printing options <pretty-printing-types>`
+for further details. If you are using kind polymorphism and are confused as to
+why GHC is rejecting (or accepting) your program, we encourage you to turn on
+these flags, especially :ghc-flag:`-fprint-explicit-kinds`.
 
 .. index::
    single: TYPE
@@ -8717,15 +8718,18 @@ Here are the details:
   for the time being; it is expected that these will be brought in line
   with other declarations in the future. The rules for GADT
   data constructors are as follows:
+
      * All kind and type variables are considered specified and available for
        visible type application.
+
      * Universal variables always come first, in precisely the order they
        appear in the type delcaration. Universal variables that are
        constrained by a GADT return type are not included in the data constructor.
+
      * Existential variables come next. Their order is determined by a user-
        written `forall`; or, if there is none, by taking the left-to-right order
        in the data constructor's type and doing a stable topological sort.
-  
+
 .. _implicit-parameters:
 
 Implicit parameters
