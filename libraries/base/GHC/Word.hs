@@ -602,8 +602,8 @@ instance Eq Word64 where
     (/=) = neWord64
 
 eqWord64, neWord64 :: Word64 -> Word64 -> Bool
-eqWord64 (W64# x) (W64# y) = isTrue# (x `eqWord#` y)
-neWord64 (W64# x) (W64# y) = isTrue# (x `neWord#` y)
+eqWord64 (W64# x) (W64# y) = isTrue# (x `eqWord64#` y)
+neWord64 (W64# x) (W64# y) = isTrue# (x `neWord64#` y)
 {-# INLINE [1] eqWord64 #-}
 {-# INLINE [1] neWord64 #-}
 
