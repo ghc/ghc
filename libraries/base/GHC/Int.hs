@@ -20,8 +20,15 @@
 #include "MachDeps.h"
 
 module GHC.Int (
-        Int8(..), Int16(..), Int32(..), Int64(..),
-        uncheckedIShiftL64#, uncheckedIShiftRA64#
+        Int(..), Int8(..), Int16(..), Int32(..), Int64(..),
+        uncheckedIShiftL64#, uncheckedIShiftRA64#,
+        -- * Equality operators
+        -- | See GHC.Classes#matching_overloaded_methods_in_rules
+        eqInt, neInt,
+        eqInt8, neInt8,
+        eqInt16, neInt16,
+        eqInt32, neInt32,
+        eqInt64, neInt64
     ) where
 
 import Data.Bits
@@ -47,8 +54,19 @@ import GHC.Show
 -- Int8 is represented in the same way as Int. Operations may assume
 -- and must ensure that it holds only values from its logical range.
 
-data {-# CTYPE "HsInt8" #-} Int8 = I8# Int# deriving (Eq, Ord)
+data {-# CTYPE "HsInt8" #-} Int8 = I8# Int# deriving (Ord)
 -- ^ 8-bit signed integer type
+
+-- See GHC.Classes#matching_overloaded_methods_in_rules
+instance Eq Int8 where
+    (==) = eqInt8
+    (/=) = neInt8
+
+eqInt8, neInt8 :: Int8 -> Int8 -> Bool
+eqInt8 (I8# x) (I8# y) = isTrue# (x ==# y)
+neInt8 (I8# x) (I8# y) = isTrue# (x /=# y)
+{-# INLINE [1] eqInt8 #-}
+{-# INLINE [1] neInt8 #-}
 
 instance Show Int8 where
     showsPrec p x = showsPrec p (fromIntegral x :: Int)
@@ -208,8 +226,19 @@ instance FiniteBits Int8 where
 -- Int16 is represented in the same way as Int. Operations may assume
 -- and must ensure that it holds only values from its logical range.
 
-data {-# CTYPE "HsInt16" #-} Int16 = I16# Int# deriving (Eq, Ord)
+data {-# CTYPE "HsInt16" #-} Int16 = I16# Int# deriving (Ord)
 -- ^ 16-bit signed integer type
+
+-- See GHC.Classes#matching_overloaded_methods_in_rules
+instance Eq Int16 where
+    (==) = eqInt16
+    (/=) = neInt16
+
+eqInt16, neInt16 :: Int16 -> Int16 -> Bool
+eqInt16 (I16# x) (I16# y) = isTrue# (x ==# y)
+neInt16 (I16# x) (I16# y) = isTrue# (x /=# y)
+{-# INLINE [1] eqInt16 #-}
+{-# INLINE [1] neInt16 #-}
 
 instance Show Int16 where
     showsPrec p x = showsPrec p (fromIntegral x :: Int)
@@ -374,8 +403,19 @@ instance FiniteBits Int16 where
 -- from its logical range.
 #endif
 
-data {-# CTYPE "HsInt32" #-} Int32 = I32# Int# deriving (Eq, Ord)
+data {-# CTYPE "HsInt32" #-} Int32 = I32# Int# deriving (Ord)
 -- ^ 32-bit signed integer type
+
+-- See GHC.Classes#matching_overloaded_methods_in_rules
+instance Eq Int32 where
+    (==) = eqInt32
+    (/=) = neInt32
+
+eqInt32, neInt32 :: Int32 -> Int32 -> Bool
+eqInt32 (I32# x) (I32# y) = isTrue# (x ==# y)
+neInt32 (I32# x) (I32# y) = isTrue# (x /=# y)
+{-# INLINE [1] eqInt32 #-}
+{-# INLINE [1] neInt32 #-}
 
 instance Show Int32 where
     showsPrec p x = showsPrec p (fromIntegral x :: Int)
@@ -554,9 +594,16 @@ instance Ix Int32 where
 data {-# CTYPE "HsInt64" #-} Int64 = I64# Int64#
 -- ^ 64-bit signed integer type
 
+-- See GHC.Classes#matching_overloaded_methods_in_rules
 instance Eq Int64 where
-    (I64# x#) == (I64# y#) = isTrue# (x# `eqInt64#` y#)
-    (I64# x#) /= (I64# y#) = isTrue# (x# `neInt64#` y#)
+    (==) = eqInt64
+    (/=) = neInt64
+
+eqInt64, neInt64 :: Int64 -> Int64 -> Bool
+eqInt64 (I64# x) (I64# y) = isTrue# (x ==# y)
+neInt64 (I64# x) (I64# y) = isTrue# (x /=# y)
+{-# INLINE [1] eqInt64 #-}
+{-# INLINE [1] neInt64 #-}
 
 instance Ord Int64 where
     (I64# x#) <  (I64# y#) = isTrue# (x# `ltInt64#` y#)
@@ -726,8 +773,19 @@ a `iShiftRA64#` b | isTrue# (b >=# 64#) = if isTrue# (a `ltInt64#` (intToInt64# 
 -- Operations may assume and must ensure that it holds only values
 -- from its logical range.
 
-data {-# CTYPE "HsInt64" #-} Int64 = I64# Int# deriving (Eq, Ord)
+data {-# CTYPE "HsInt64" #-} Int64 = I64# Int# deriving (Ord)
 -- ^ 64-bit signed integer type
+
+-- See GHC.Classes#matching_overloaded_methods_in_rules
+instance Eq Int64 where
+    (==) = eqInt64
+    (/=) = neInt64
+
+eqInt64, neInt64 :: Int64 -> Int64 -> Bool
+eqInt64 (I64# x) (I64# y) = isTrue# (x ==# y)
+neInt64 (I64# x) (I64# y) = isTrue# (x /=# y)
+{-# INLINE [1] eqInt64 #-}
+{-# INLINE [1] neInt64 #-}
 
 instance Show Int64 where
     showsPrec p x = showsPrec p (fromIntegral x :: Int)
