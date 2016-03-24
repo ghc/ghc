@@ -600,8 +600,8 @@ instance Eq Int64 where
     (/=) = neInt64
 
 eqInt64, neInt64 :: Int64 -> Int64 -> Bool
-eqInt64 (I64# x) (I64# y) = isTrue# (x ==# y)
-neInt64 (I64# x) (I64# y) = isTrue# (x /=# y)
+eqInt64 (I64# x) (I64# y) = isTrue# (x `eqInt64#` y)
+neInt64 (I64# x) (I64# y) = isTrue# (x `neInt64#` y)
 {-# INLINE [1] eqInt64 #-}
 {-# INLINE [1] neInt64 #-}
 
