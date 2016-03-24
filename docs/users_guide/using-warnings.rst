@@ -398,6 +398,8 @@ of ``-W(no-)*``.
 
 .. ghc-flag:: -Wredundant-constraints
 
+    :since: 8.0
+
     .. index::
        single: redundant constraints, warning
 
