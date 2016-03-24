@@ -133,7 +133,7 @@ import Data.Function ( on )
      -- The coercion arguments always *precisely* saturate
      -- arity of (that branch of) the CoAxiom.  If there are
      -- any left over, we use AppCo.  See
-     -- See [Coercion axioms applied to coercions]
+     -- See [Coercion axioms applied to coercions] in TyCoRep
 
 \subsection{Coercion variables}
 %*                                                                      *
