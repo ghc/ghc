@@ -34,8 +34,7 @@ module Id (
         mkLocalIdOrCoVarWithInfo,
         mkLocalIdWithInfo, mkExportedLocalId, mkExportedVanillaId,
         mkSysLocal, mkSysLocalM, mkSysLocalOrCoVar, mkSysLocalOrCoVarM,
-        mkUserLocal, mkUserLocalCoVar, mkUserLocalOrCoVar,
-        mkDerivedLocalCoVarM,
+        mkUserLocal, mkUserLocalOrCoVar,
         mkTemplateLocals, mkTemplateLocalsNum, mkTemplateLocal,
         mkWorkerId,
 
@@ -302,10 +301,7 @@ mkSysLocal fs uniq ty = ASSERT( not (isCoercionType ty) )
 -- | Like 'mkSysLocal', but checks to see if we have a covar type
 mkSysLocalOrCoVar :: FastString -> Unique -> Type -> Id
 mkSysLocalOrCoVar fs uniq ty
-  | isCoercionType ty = mkLocalCoVar name ty
-  | otherwise         = mkLocalId    name ty
-  where
-    name = mkSystemVarName uniq fs
+  = mkLocalIdOrCoVar (mkSystemVarName uniq fs) ty
 
 mkSysLocalM :: MonadUnique m => FastString -> Type -> m Id
 mkSysLocalM fs ty = getUniqueM >>= (\uniq -> return (mkSysLocal fs uniq ty))
@@ -319,22 +315,10 @@ mkUserLocal :: OccName -> Unique -> Type -> SrcSpan -> Id
 mkUserLocal occ uniq ty loc = ASSERT( not (isCoercionType ty) )
                               mkLocalId (mkInternalName uniq occ loc) ty
 
--- | Like 'mkUserLocal' for covars
-mkUserLocalCoVar :: OccName -> Unique -> Type -> SrcSpan -> Id
-mkUserLocalCoVar occ uniq ty loc
-  = mkLocalCoVar (mkInternalName uniq occ loc) ty
-
 -- | Like 'mkUserLocal', but checks if we have a coercion type
 mkUserLocalOrCoVar :: OccName -> Unique -> Type -> SrcSpan -> Id
 mkUserLocalOrCoVar occ uniq ty loc
   = mkLocalIdOrCoVar (mkInternalName uniq occ loc) ty
-
-mkDerivedLocalCoVarM :: MonadUnique m => (OccName -> OccName) -> Id -> Type -> m Id
-mkDerivedLocalCoVarM deriv_name id ty
-    = ASSERT( isCoercionType ty )
-      do { uniq <- getUniqueM
-         ; let name = mkDerivedInternalName deriv_name uniq (getName id)
-         ; return (mkLocalCoVar name ty) }
 
 {-
 Make some local @Ids@ for a template @CoreExpr@.  These have bogus

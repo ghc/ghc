@@ -110,7 +110,7 @@ import TysWiredIn
 data Subst
   = Subst InScopeSet  -- Variables in in scope (both Ids and TyVars) /after/
                       -- applying the substitution
-          IdSubstEnv  -- Substitution for Ids
+          IdSubstEnv  -- Substitution from NcIds to CoreExprs
           TvSubstEnv  -- Substitution from TyVars to Types
           CvSubstEnv  -- Substitution from CoVars to Coercions
 
@@ -180,7 +180,7 @@ TvSubstEnv and CvSubstEnv?
 -}
 
 -- | An environment for substituting for 'Id's
-type IdSubstEnv = IdEnv CoreExpr
+type IdSubstEnv = IdEnv CoreExpr   -- Domain is NcIds, i.e. not coercions
 
 ----------------------------
 isEmptySubst :: Subst -> Bool
@@ -209,11 +209,15 @@ zapSubstEnv (Subst in_scope _ _ _) = Subst in_scope emptyVarEnv emptyVarEnv empt
 -- such that the "CoreSubst#in_scope_invariant" is true after extending the substitution like this
 extendIdSubst :: Subst -> Id -> CoreExpr -> Subst
 -- ToDo: add an ASSERT that fvs(subst-result) is already in the in-scope set
-extendIdSubst (Subst in_scope ids tvs cvs) v r = Subst in_scope (extendVarEnv ids v r) tvs cvs
+extendIdSubst (Subst in_scope ids tvs cvs) v r
+  = ASSERT2( isNonCoVarId v, ppr v $$ ppr r )
+    Subst in_scope (extendVarEnv ids v r) tvs cvs
 
 -- | Adds multiple 'Id' substitutions to the 'Subst': see also 'extendIdSubst'
 extendIdSubstList :: Subst -> [(Id, CoreExpr)] -> Subst
-extendIdSubstList (Subst in_scope ids tvs cvs) prs = Subst in_scope (extendVarEnvList ids prs) tvs cvs
+extendIdSubstList (Subst in_scope ids tvs cvs) prs
+  = ASSERT( all (isNonCoVarId . fst) prs )
+    Subst in_scope (extendVarEnvList ids prs) tvs cvs
 
 -- | Add a substitution for a 'TyVar' to the 'Subst'
 -- The 'TyVar' *must* be a real TyVar, and not a CoVar

@@ -584,7 +584,7 @@ lintCoreExpr :: CoreExpr -> LintM OutType
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
 lintCoreExpr (Var var)
-  = do  { checkL (isId var && not (isCoVar var))
+  = do  { checkL (isNonCoVarId var)
                  (text "Non term variable" <+> ppr var)
 
         ; checkDeadIdOcc var

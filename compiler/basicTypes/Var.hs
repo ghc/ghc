@@ -34,7 +34,7 @@
 
 module Var (
         -- * The main data type and synonyms
-        Var, CoVar, Id, DictId, DFunId, EvVar, EqVar, EvId, IpId,
+        Var, CoVar, Id, NcId, DictId, DFunId, EvVar, EqVar, EvId, IpId,
         TyVar, TypeVar, KindVar, TKVar, TyCoVar,
 
         -- ** Taking 'Var's apart
@@ -52,7 +52,7 @@ module Var (
 
         -- ** Predicates
         isId, isTKVar, isTyVar, isTcTyVar,
-        isLocalVar, isLocalId, isCoVar, isTyCoVar,
+        isLocalVar, isLocalId, isCoVar, isNonCoVarId, isTyCoVar,
         isGlobalId, isExportedId,
         mustHaveLocalBinding,
 
@@ -93,6 +93,14 @@ import Data.Data
 -}
 
 type Id    = Var       -- A term-level identifier
+                       --  predicate: isId
+
+type CoVar = Id        -- See Note [Evidence: EvIds and CoVars]
+                       --   predicate: isCoVar
+
+type NcId  = Id        -- A term-level (value) variable that is
+                       -- /not/ an (unlifted) coercion
+                       --    predicate: isNonCoVarId
 
 type TyVar   = Var     -- Type *or* kind variable (historical)
 
@@ -109,18 +117,18 @@ type DictId = EvId      -- A dictionary variable
 type IpId   = EvId      -- A term-level implicit parameter
 type EqVar  = EvId      -- Boxed equality evidence
 
-type CoVar = Id         -- See Note [Evidence: EvIds and CoVars]
-
 type TyCoVar = Id       -- Type, kind, *or* coercion variable
+                        --   predicate: isTyCoVar
 
-{-
-Note [Evidence: EvIds and CoVars]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Evidence: EvIds and CoVars]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * An EvId (evidence Id) is a term-level evidence variable
   (dictionary, implicit parameter, or equality). Could be boxed or unboxed.
 
 * DictId, IpId, and EqVar are synonyms when we know what kind of
   evidence we are talking about.  For example, an EqVar has type (t1 ~ t2).
+
+* A CoVar is always an un-lifted coercion, of type (t1 ~# t2) or (t1 ~R# t2)
 
 Note [Kind and type variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -433,15 +441,22 @@ isTcTyVar :: Var -> Bool
 isTcTyVar (TcTyVar {}) = True
 isTcTyVar _            = False
 
+isTyCoVar :: Var -> Bool
+isTyCoVar v = isTyVar v || isCoVar v
+
 isId :: Var -> Bool
 isId (Id {}) = True
 isId _       = False
 
-isTyCoVar :: Var -> Bool
-isTyCoVar v = isTyVar v || isCoVar v
-
 isCoVar :: Var -> Bool
-isCoVar v = isId v && isCoVarDetails (id_details v)
+-- A coercion variable
+isCoVar (Id { id_details = details }) = isCoVarDetails details
+isCoVar _                             = False
+
+isNonCoVarId :: Var -> Bool
+-- A term variable (Id) that is /not/ a coercion variable
+isNonCoVarId (Id { id_details = details }) = not (isCoVarDetails details)
+isNonCoVarId _                             = False
 
 isLocalId :: Var -> Bool
 isLocalId (Id { idScope = LocalId _ }) = True

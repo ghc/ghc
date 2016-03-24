@@ -229,3 +229,4 @@ test('T11155',
      run_command,
      ['$MAKE -s --no-print-directory T11155'])
 test('T11232', normal, compile, ['-O2'])
+test('T11644', normal, compile, ['-O2'])

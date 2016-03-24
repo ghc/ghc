@@ -134,7 +134,9 @@ data IdDetails
        --                  implemented with a newtype, so it might be bad
        --                  to be strict on this dictionary
 
-  | CoVarId                    -- ^ A coercion variable
+  | CoVarId    -- ^ A coercion variable
+               -- This only covers /un-lifted/ coercions, of type
+               -- (t1 ~# t2) or (t1 ~R# t2), not their lifted variants
 
 data RecSelParent = RecSelData TyCon | RecSelPatSyn PatSyn deriving Eq
   -- Either `TyCon` or `PatSyn` depending
