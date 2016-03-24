@@ -594,15 +594,10 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         ;;
 
     powerpc-ibm-aix*)
-        # On IBM AIX, we need to workaround XCOFF's limitations. Specifically,
-        # there's a TOC which only supports at most 16k entries (see
-        # http://www.ibm.com/developerworks/rational/library/overview-toc-aix/
-        # for more details), and by using `-mminimal-toc` we use up only one TOC
-        # entry per translation unit, at the cost of an additional pointer
-        # indirection. However, see note in `compiler/ghc.mk` about `Parser.hs`.
-        # Finally, we need `-D_THREAD_SAFE` to unlock a thread-local `errno`.
-        $2="$$2 -mminimal-toc -D_THREAD_SAFE"
-        $3="$$3 -mminimal-toc -D_THREAD_SAFE"
+        # We need `-D_THREAD_SAFE` to unlock the thread-local `errno`.
+        $2="$$2 -D_THREAD_SAFE"
+        $3="$$3 -D_THREAD_SAFE -Wl,-bnotextro"
+        $4="$$4 -bnotextro"
         $5="$$5 -D_THREAD_SAFE"
         ;;
 

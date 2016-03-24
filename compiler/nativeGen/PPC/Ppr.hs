@@ -31,6 +31,7 @@ import Outputable
 import DynFlags
 
 import Data.Word
+import Data.Int
 import Data.Bits
 
 -- -----------------------------------------------------------------------------
@@ -127,6 +128,7 @@ pprData (CmmUninitialised bytes) = keyword <> int bytes
     where keyword = sdocWithPlatform $ \platform ->
                     case platformOS platform of
                     OSDarwin -> text ".space "
+                    OSAIX    -> text ".space "
                     _        -> text ".skip "
 pprData (CmmStaticLit lit)       = pprDataItem lit
 
@@ -262,6 +264,11 @@ pprImm (ImmConstantSum a b) = pprImm a <> char '+' <> pprImm b
 pprImm (ImmConstantDiff a b) = pprImm a <> char '-'
                    <> lparen <> pprImm b <> rparen
 
+pprImm (LO (ImmInt i))     = pprImm (LO (ImmInteger (toInteger i)))
+pprImm (LO (ImmInteger i)) = pprImm (ImmInteger (toInteger lo16))
+  where
+    lo16 = fromInteger (i .&. 0xffff) :: Int16
+
 pprImm (LO i)
   = sdocWithPlatform $ \platform ->
     if platformOS platform == OSDarwin
@@ -273,6 +280,13 @@ pprImm (HI i)
     if platformOS platform == OSDarwin
     then hcat [ text "hi16(", pprImm i, rparen ]
     else pprImm i <> text "@h"
+
+pprImm (HA (ImmInt i))     = pprImm (HA (ImmInteger (toInteger i)))
+pprImm (HA (ImmInteger i)) = pprImm (ImmInteger ha16)
+  where
+    ha16 = if lo16 >= 0x8000 then hi16+1 else hi16
+    hi16 = (i `shiftR` 16)
+    lo16 = i .&. 0xffff
 
 pprImm (HA i)
   = sdocWithPlatform $ \platform ->
@@ -570,7 +584,11 @@ pprInstr (BCCFAR cond blockid) = vcat [
     ]
     where lbl = mkAsmTempLabel (getUnique blockid)
 
-pprInstr (JMP lbl) = hcat [ -- an alias for b that takes a CLabel
+pprInstr (JMP lbl)
+  -- We never jump to ForeignLabels; if we ever do, c.f. handling for "BL"
+  | isForeignLabel lbl = panic "PPC.Ppr.pprInstr: JMP to ForeignLabel"
+  | otherwise =
+    hcat [ -- an alias for b that takes a CLabel
         char '\t',
         text "b",
         char '\t',
@@ -587,10 +605,21 @@ pprInstr (BCTR _ _) = hcat [
         char '\t',
         text "bctr"
     ]
-pprInstr (BL lbl _) = hcat [
-        text "\tbl\t",
-        ppr lbl
-    ]
+pprInstr (BL lbl _) = do
+    sdocWithPlatform $ \platform -> case platformOS platform of
+        OSAIX | isForeignLabel lbl ->
+          -- On AIX, "printf" denotes a function-descriptor (for use
+          -- by function pointers), whereas the actual entry-code
+          -- address is denoted by the dot-prefixed ".printf" label
+          hcat [
+            text "\tbl\t.",
+            ppr lbl
+          ]
+        _ ->
+          hcat [
+            text "\tbl\t",
+            ppr lbl
+          ]
 pprInstr (BCTRL _) = hcat [
         char '\t',
         text "bctrl"

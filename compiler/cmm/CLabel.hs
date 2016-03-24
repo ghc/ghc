@@ -1167,10 +1167,10 @@ underscorePrefix :: Bool   -- leading underscore on assembler labels?
 underscorePrefix = (cLeadingUnderscore == "YES")
 
 asmTempLabelPrefix :: Platform -> LitString  -- for formatting labels
-asmTempLabelPrefix platform =
-    if platformOS platform == OSDarwin
-    then sLit "L"
-    else sLit ".L"
+asmTempLabelPrefix platform = case platformOS platform of
+    OSDarwin -> sLit "L"
+    OSAIX    -> sLit "__L" -- follow IBM XL C's convention
+    _        -> sLit ".L"
 
 pprDynamicLinkerAsmLabel :: Platform -> DynamicLinkerLabelInfo -> CLabel -> SDoc
 pprDynamicLinkerAsmLabel platform dllInfo lbl
@@ -1184,6 +1184,11 @@ pprDynamicLinkerAsmLabel platform dllInfo lbl
         else case dllInfo of
              CodeStub  -> char 'L' <> ppr lbl <> text "$stub"
              SymbolPtr -> char 'L' <> ppr lbl <> text "$non_lazy_ptr"
+             _         -> panic "pprDynamicLinkerAsmLabel"
+
+   else if platformOS platform == OSAIX
+        then case dllInfo of
+             SymbolPtr -> text "LC.." <> ppr lbl -- GCC's naming convention
              _         -> panic "pprDynamicLinkerAsmLabel"
 
    else if osElfTarget (platformOS platform)
