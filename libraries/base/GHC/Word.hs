@@ -21,11 +21,23 @@
 
 module GHC.Word (
     Word(..), Word8(..), Word16(..), Word32(..), Word64(..),
+
+    -- * Shifts
     uncheckedShiftL64#,
     uncheckedShiftRL64#,
+
+    -- * Byte swapping
     byteSwap16,
     byteSwap32,
-    byteSwap64
+    byteSwap64,
+
+    -- * Equality operators
+    -- | See GHC.Classes#matching_overloaded_methods_in_rules
+    eqWord, neWord,
+    eqWord8, neWord8,
+    eqWord16, neWord16,
+    eqWord32, neWord32,
+    eqWord64, neWord64
     ) where
 
 import Data.Bits
@@ -50,8 +62,19 @@ import GHC.Show
 -- Word8 is represented in the same way as Word. Operations may assume
 -- and must ensure that it holds only values from its logical range.
 
-data {-# CTYPE "HsWord8" #-} Word8 = W8# Word# deriving (Eq, Ord)
+data {-# CTYPE "HsWord8" #-} Word8 = W8# Word# deriving (Ord)
 -- ^ 8-bit unsigned integer type
+
+-- See GHC.Classes#matching_overloaded_methods_in_rules
+instance Eq Word8 where
+    (==) = eqWord8
+    (/=) = neWord8
+
+eqWord8, neWord8 :: Word8 -> Word8 -> Bool
+eqWord8 (W8# x) (W8# y) = isTrue# (x `eqWord#` y)
+neWord8 (W8# x) (W8# y) = isTrue# (x `neWord#` y)
+{-# INLINE [1] eqWord8 #-}
+{-# INLINE [1] neWord8 #-}
 
 instance Show Word8 where
     showsPrec p x = showsPrec p (fromIntegral x :: Int)
@@ -199,8 +222,19 @@ instance FiniteBits Word8 where
 -- Word16 is represented in the same way as Word. Operations may assume
 -- and must ensure that it holds only values from its logical range.
 
-data {-# CTYPE "HsWord16" #-} Word16 = W16# Word# deriving (Eq, Ord)
+data {-# CTYPE "HsWord16" #-} Word16 = W16# Word# deriving (Ord)
 -- ^ 16-bit unsigned integer type
+
+-- See GHC.Classes#matching_overloaded_methods_in_rules
+instance Eq Word16 where
+    (==) = eqWord16
+    (/=) = neWord16
+
+eqWord16, neWord16 :: Word16 -> Word16 -> Bool
+eqWord16 (W16# x) (W16# y) = isTrue# (x `eqWord#` y)
+neWord16 (W16# x) (W16# y) = isTrue# (x `neWord#` y)
+{-# INLINE [1] eqWord16 #-}
+{-# INLINE [1] neWord16 #-}
 
 instance Show Word16 where
     showsPrec p x = showsPrec p (fromIntegral x :: Int)
@@ -391,8 +425,19 @@ byteSwap16 (W16# w#) = W16# (narrow16Word# (byteSwap16# w#))
 
 #endif
 
-data {-# CTYPE "HsWord32" #-} Word32 = W32# Word# deriving (Eq, Ord)
+data {-# CTYPE "HsWord32" #-} Word32 = W32# Word# deriving (Ord)
 -- ^ 32-bit unsigned integer type
+
+-- See GHC.Classes#matching_overloaded_methods_in_rules
+instance Eq Word32 where
+    (==) = eqWord32
+    (/=) = neWord32
+
+eqWord32, neWord32 :: Word32 -> Word32 -> Bool
+eqWord32 (W32# x) (W32# y) = isTrue# (x `eqWord#` y)
+neWord32 (W32# x) (W32# y) = isTrue# (x `neWord#` y)
+{-# INLINE [1] eqWord32 #-}
+{-# INLINE [1] neWord32 #-}
 
 instance Num Word32 where
     (W32# x#) + (W32# y#)  = W32# (narrow32Word# (x# `plusWord#` y#))
@@ -551,9 +596,16 @@ byteSwap32 (W32# w#) = W32# (narrow32Word# (byteSwap32# w#))
 data {-# CTYPE "HsWord64" #-} Word64 = W64# Word64#
 -- ^ 64-bit unsigned integer type
 
+-- See GHC.Classes#matching_overloaded_methods_in_rules
 instance Eq Word64 where
-    (W64# x#) == (W64# y#) = isTrue# (x# `eqWord64#` y#)
-    (W64# x#) /= (W64# y#) = isTrue# (x# `neWord64#` y#)
+    (==) = eqWord64
+    (/=) = neWord64
+
+eqWord64, neWord64 :: Word64 -> Word64 -> Bool
+eqWord64 (W64# x) (W64# y) = isTrue# (x `eqWord#` y)
+neWord64 (W64# x) (W64# y) = isTrue# (x `neWord#` y)
+{-# INLINE [1] eqWord64 #-}
+{-# INLINE [1] neWord64 #-}
 
 instance Ord Word64 where
     (W64# x#) <  (W64# y#) = isTrue# (x# `ltWord64#` y#)
@@ -667,8 +719,19 @@ a `shiftRL64#` b | isTrue# (b >=# 64#) = wordToWord64# 0##
 -- Operations may assume and must ensure that it holds only values
 -- from its logical range.
 
-data {-# CTYPE "HsWord64" #-} Word64 = W64# Word# deriving (Eq, Ord)
+data {-# CTYPE "HsWord64" #-} Word64 = W64# Word# deriving (Ord)
 -- ^ 64-bit unsigned integer type
+
+-- See GHC.Classes#matching_overloaded_methods_in_rules
+instance Eq Word64 where
+    (==) = eqWord64
+    (/=) = neWord64
+
+eqWord64, neWord64 :: Word64 -> Word64 -> Bool
+eqWord64 (W64# x) (W64# y) = isTrue# (x `eqWord#` y)
+neWord64 (W64# x) (W64# y) = isTrue# (x `neWord#` y)
+{-# INLINE [1] eqWord64 #-}
+{-# INLINE [1] neWord64 #-}
 
 instance Num Word64 where
     (W64# x#) + (W64# y#)  = W64# (x# `plusWord#` y#)

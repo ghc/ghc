@@ -27,9 +27,15 @@
 
 #include "ieee-flpt.h"
 
-module GHC.Float( module GHC.Float, Float(..), Double(..), Float#, Double#
-                , double2Int, int2Double, float2Int, int2Float )
-    where
+module GHC.Float
+   ( module GHC.Float
+   , Float(..), Double(..), Float#, Double#
+   , double2Int, int2Double, float2Int, int2Float
+
+    -- * Monomorphic equality operators
+    -- | See GHC.Classes#matching_overloaded_methods_in_rules
+   , eqFloat, eqDouble
+   ) where
 
 import Data.Maybe
 
@@ -1059,11 +1065,9 @@ divideFloat (F# x) (F# y) = F# (divideFloat# x y)
 negateFloat :: Float -> Float
 negateFloat (F# x)        = F# (negateFloat# x)
 
-gtFloat, geFloat, eqFloat, neFloat, ltFloat, leFloat :: Float -> Float -> Bool
+gtFloat, geFloat, ltFloat, leFloat :: Float -> Float -> Bool
 gtFloat     (F# x) (F# y) = isTrue# (gtFloat# x y)
 geFloat     (F# x) (F# y) = isTrue# (geFloat# x y)
-eqFloat     (F# x) (F# y) = isTrue# (eqFloat# x y)
-neFloat     (F# x) (F# y) = isTrue# (neFloat# x y)
 ltFloat     (F# x) (F# y) = isTrue# (ltFloat# x y)
 leFloat     (F# x) (F# y) = isTrue# (leFloat# x y)
 
@@ -1099,11 +1103,9 @@ divideDouble (D# x) (D# y) = D# (x /## y)
 negateDouble :: Double -> Double
 negateDouble (D# x)        = D# (negateDouble# x)
 
-gtDouble, geDouble, eqDouble, neDouble, leDouble, ltDouble :: Double -> Double -> Bool
+gtDouble, geDouble, leDouble, ltDouble :: Double -> Double -> Bool
 gtDouble    (D# x) (D# y) = isTrue# (x >##  y)
 geDouble    (D# x) (D# y) = isTrue# (x >=## y)
-eqDouble    (D# x) (D# y) = isTrue# (x ==## y)
-neDouble    (D# x) (D# y) = isTrue# (x /=## y)
 ltDouble    (D# x) (D# y) = isTrue# (x <##  y)
 leDouble    (D# x) (D# y) = isTrue# (x <=## y)
 

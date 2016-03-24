@@ -1,7 +1,14 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash #-}
 
-module GHC.Char (chr) where
+module GHC.Char
+    ( -- * Utilities
+      chr
+
+      -- * Monomorphic equality operators
+      -- | See GHC.Classes#matching_overloaded_methods_in_rules
+    , eqChar, neChar
+    ) where
 
 import GHC.Base
 import GHC.Show
