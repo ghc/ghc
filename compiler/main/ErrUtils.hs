@@ -462,6 +462,14 @@ showPass dflags what
   = ifVerbose dflags 2 $
     logInfo dflags defaultUserStyle (text "***" <+> text what <> colon)
 
+#if ! MIN_VERSION_base(4,8,0)
+-- This is a hack to allow us to build stage1 with 7.8 compilers, which
+-- did not support getAllocationCounter. This means that the allocation numbers
+-- produced by stage1 are bogus, but stage2 will be fine.
+getAllocationCounter :: IO Int64
+getAllocationCounter = return 0
+#endif
+
 -- | Time a compilation phase.
 --
 -- When timings are enabled (e.g. with the @-v2@ flag), the allocations
