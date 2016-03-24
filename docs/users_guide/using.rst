@@ -684,6 +684,22 @@ messages and in GHCi:
         ghci> :t MkT
         MkT :: forall (k :: BOX) (a :: k). T k a
 
+.. ghc-flag:: -fprint-explicit-runtime-reps
+
+    When :ghc-flag:`-fprint-explicit-runtime-reps` is enabled, GHC prints
+    ``RuntimeRep`` type variables for runtime-representation-polymorphic types.
+    Otherwise GHC will default these to ``PtrRepLifted``. For example,
+
+    .. code-block:: none
+
+        ghci> :t ($)
+        ($) :: (a -> b) -> a -> b
+        ghci> :set -fprint-explicit-runtime-reps
+        ghci> :t ($)
+        ($)
+          :: forall (r :: GHC.Types.RuntimeRep) a (b :: TYPE r).
+             (a -> b) -> a -> b
+
 .. ghc-flag:: -fprint-explicit-coercions
 
     Using :ghc-flag:`-fprint-explicit-coercions` makes GHC print coercions in

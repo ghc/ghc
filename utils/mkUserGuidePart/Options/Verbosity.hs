@@ -33,6 +33,13 @@ verbosityOptions =
          , flagType = DynamicFlag
          , flagReverse = "-fno-print-explicit-kinds"
          }
+  , flag { flagName = "-fprint-explicit-runtime-reps"
+         , flagDescription =
+           "Print ``RuntimeRep`` variables in types which are "++
+           "runtime-representation polymorphic."
+         , flagType = DynamicFlag
+         , flagReverse = "-fno-print-explicit-runtime-reps"
+         }
   , flag { flagName = "-fprint-unicode-syntax"
          , flagDescription =
            "Use unicode syntax when printing expressions, types and kinds. " ++
