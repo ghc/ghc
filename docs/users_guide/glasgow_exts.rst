@@ -4032,9 +4032,8 @@ Pattern synonyms
     Allow the definition of pattern synonyms.
 
 Pattern synonyms are enabled by the flag :ghc-flag:`-XPatternSynonyms`, which is
-required for defining them, but *not* for using them. More information
-and examples of view patterns can be found on the
-`Wiki page <PatternSynonyms>`.
+required for defining them, but *not* for using them. More information and
+examples of view patterns can be found on the `Wiki page <PatternSynonyms>`.
 
 Pattern synonyms enable giving names to parametrized pattern schemes.
 They can also be thought of as abstract constructors that don't have a
@@ -4301,21 +4300,21 @@ it is assigned a *pattern type* of the form ::
 
       pattern P :: CReq => CProv => t1 -> t2 -> ... -> tN -> t
 
-where ⟨CProv⟩ and ⟨CReq⟩ are type contexts, and ⟨t1⟩, ⟨t2⟩, ..., ⟨tN⟩
+where ⟨CReq⟩ and ⟨CProv⟩ are type contexts, and ⟨t1⟩, ⟨t2⟩, ..., ⟨tN⟩
 and ⟨t⟩ are types. Notice the unusual form of the type, with two
-contexts ⟨CProv⟩ and ⟨CReq⟩:
+contexts ⟨CReq⟩ and ⟨CProv⟩:
+
+-  ⟨CReq⟩ are the constraints *required* to match the pattern.
 
 -  ⟨CProv⟩ are the constraints *made available (provided)* by a
    successful pattern match.
-
--  ⟨CReq⟩ are the constraints *required* to match the pattern.
 
 For example, consider ::
 
     data T a where
       MkT :: (Show b) => a -> b -> T a
 
-    f1 :: (Eq a, Num a) => T a -> String
+    f1 :: (Num a, Eq a) => T a -> String
     f1 (MkT 42 x) = show x
 
     pattern ExNumPat :: (Num a, Eq a) => (Show b) => b -> T a
@@ -4338,8 +4337,13 @@ Exactly the same reasoning applies to ``ExNumPat``: matching against
 
 Note also the following points
 
--  In the common case where ``Prov`` is empty, ``()``, it can be omitted
-   altogether.
+-  In the common case where ``CProv`` is empty, (i.e., ``()``), it can be
+   omitted altogether in the above pattern type signature for ``P``.
+
+-  However, if ``CProv`` is non-empty, while ``CReq`` is, the above pattern type
+   signature for ``P`` must be specified as ::
+
+     P :: () => CProv => t1 -> t2 -> .. -> tN -> t
 
 -  You may specify an explicit *pattern signature*, as we did for
    ``ExNumPat`` above, to specify the type of a pattern, just as you can
@@ -4400,7 +4404,7 @@ Note also the following points
    then be rejected.
 
    In short, if you want GADT-like behaviour for pattern synonyms, then
-   (unlike unlike concrete data constructors like ``S1``) you must write
+   (unlike concrete data constructors like ``S1``) you must write
    its type with explicit provided equalities. For a concrete data
    constructor like ``S1`` you can write its type signature as either
    ``S1 :: Bool -> S Bool`` or ``S1 :: (b~Bool) => Bool -> S b``; the
