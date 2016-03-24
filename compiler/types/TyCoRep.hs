@@ -135,6 +135,7 @@ import {-# SOURCE #-} Type( isPredTy, isCoercionTy, mkAppTy
 
 import {-# SOURCE #-} Coercion
 import {-# SOURCE #-} ConLike ( ConLike(..) )
+import {-# SOURCE #-} TysWiredIn ( ptrRepLiftedTy )
 
 -- friends:
 import Var
@@ -2371,9 +2372,90 @@ maybeParen ctxt_prec inner_prec pretty
   | otherwise              = parens pretty
 
 ------------------
+
+{-
+Note [Defaulting RuntimeRep variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+RuntimeRep variables are considered by many (most?) users to be little more than
+syntactic noise. When the notion was introduced there was a signficant and
+understandable push-back from those with pedagogy in mind, which argued that
+RuntimeRep variables would throw a wrench into nearly any teach approach since
+they appear in even the lowly ($) function's type,
+
+    ($) :: forall (w :: RuntimeRep) a (b :: TYPE w). (a -> b) -> a -> b
+
+which is significantly less readable than its non RuntimeRep-polymorphic type of
+
+    ($) :: (a -> b) -> a -> b
+
+Moreover, unboxed types don't appear all that often in run-of-the-mill Haskell
+programs, so it makes little sense to make all users pay this syntactic
+overhead.
+
+For this reason it was decided that we would hide RuntimeRep variables for now
+(see #11549). We do this by defaulting all type variables of kind RuntimeRep to
+PtrLiftedRep. This is done in a pass right before pretty-printing
+(defaultRuntimeRepVars, controlled by -fprint-explicit-runtime-reps)
+-}
+
+-- | Default 'RuntimeRep' variables to 'LiftedPtr'. e.g.
+--
+-- @
+-- ($) :: forall (r :: GHC.Types.RuntimeRep) a (b :: TYPE r).
+--        (a -> b) -> a -> b
+-- @
+--
+-- turns in to,
+--
+-- @ ($) :: forall a (b :: *). (a -> b) -> a -> b @
+--
+-- We do this to prevent RuntimeRep variables from incurring a significant
+-- syntactic overhead in otherwise simple type signatures (e.g. ($)). See
+-- Note [Defaulting RuntimeRep variables] and #11549 for further discussion.
+--
+defaultRuntimeRepVars :: Type -> Type
+defaultRuntimeRepVars = defaultRuntimeRepVars' emptyVarSet
+
+defaultRuntimeRepVars' :: TyVarSet  -- ^ the binders which we should default
+                       -> Type -> Type
+-- TODO: Eventually we should just eliminate the Type pretty-printer
+-- entirely and simply use IfaceType; this task is tracked as #11660.
+defaultRuntimeRepVars' subs (ForAllTy (Named var vis) ty)
+  | isRuntimeRepVar var                        =
+    let subs' = extendVarSet subs var
+    in defaultRuntimeRepVars' subs' ty
+  | otherwise                                  =
+    let var' = var { varType = defaultRuntimeRepVars' subs (varType var) }
+    in ForAllTy (Named var' vis) (defaultRuntimeRepVars' subs ty)
+
+defaultRuntimeRepVars' subs (ForAllTy (Anon kind) ty) =
+    ForAllTy (Anon $ defaultRuntimeRepVars' subs kind)
+             (defaultRuntimeRepVars' subs ty)
+
+defaultRuntimeRepVars' subs (TyVarTy var)
+  | var `elemVarSet` subs                      = ptrRepLiftedTy
+
+defaultRuntimeRepVars' subs (TyConApp tc args) =
+    TyConApp tc $ map (defaultRuntimeRepVars' subs) args
+
+defaultRuntimeRepVars' subs (AppTy x y)        =
+    defaultRuntimeRepVars' subs x `AppTy` defaultRuntimeRepVars' subs y
+
+defaultRuntimeRepVars' subs (CastTy ty co)     =
+    CastTy (defaultRuntimeRepVars' subs ty) co
+
+defaultRuntimeRepVars' _    other              = other
+
+eliminateRuntimeRep :: (Type -> SDoc) -> Type -> SDoc
+eliminateRuntimeRep f ty = sdocWithDynFlags $ \dflags ->
+    if gopt Opt_PrintExplicitRuntimeReps dflags
+      then f ty
+      else f (defaultRuntimeRepVars ty)
+
 pprType, pprParendType :: Type -> SDoc
-pprType       ty = ppr_type TopPrec ty
-pprParendType ty = ppr_type TyConPrec ty
+pprType       ty = eliminateRuntimeRep (ppr_type TopPrec) ty
+pprParendType ty = eliminateRuntimeRep (ppr_type TyConPrec) ty
 
 pprTyLit :: TyLit -> SDoc
 pprTyLit = ppr_tylit TopPrec
@@ -2534,7 +2616,8 @@ ppr_fun_tail (ForAllTy (Anon ty1) ty2)
 ppr_fun_tail other_ty = [ppr_type TopPrec other_ty]
 
 pprSigmaType :: Type -> SDoc
-pprSigmaType ty = sdocWithDynFlags $ \dflags -> ppr_sigma_type dflags False ty
+pprSigmaType ty = sdocWithDynFlags $ \dflags ->
+    eliminateRuntimeRep (ppr_sigma_type dflags False) ty
 
 pprUserForAll :: [TyBinder] -> SDoc
 -- Print a user-level forall; see Note [When to print foralls]

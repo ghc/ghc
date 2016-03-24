@@ -13,6 +13,7 @@ constraintKind :: Kind
 
 runtimeRepTyCon, vecCountTyCon, vecElemTyCon :: TyCon
 runtimeRepTy :: Type
+ptrRepLiftedTy :: Type
 
 ptrRepUnliftedDataConTyCon, vecRepDataConTyCon :: TyCon
 

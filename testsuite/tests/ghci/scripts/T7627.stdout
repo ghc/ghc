@@ -28,12 +28,6 @@ instance (Monoid a, Monoid b) => Monoid (a, b)
 data (#,#) (c :: TYPE a) (d :: TYPE b) = (#,#) c d
   	-- Defined in ‘GHC.Prim’
 (,) :: a -> b -> (a, b)
-(#,#)
-  :: forall (a :: GHC.Types.RuntimeRep) (b :: GHC.Types.RuntimeRep) (c :: TYPE
-                                                                            a) (d :: TYPE b).
-     c -> d -> (# c, d #)
+(#,#) :: c -> d -> (# c, d #)
 (  ,  ) :: a -> b -> (a, b)
-(#  ,  #)
-  :: forall (a :: GHC.Types.RuntimeRep) (b :: GHC.Types.RuntimeRep) (c :: TYPE
-                                                                            a) (d :: TYPE b).
-     c -> d -> (# c, d #)
+(#  ,  #) :: c -> d -> (# c, d #)
