@@ -525,7 +525,9 @@ mkFunTys tys ty = foldr mkFunTy ty tys
 mkForAllTys :: [TyBinder] -> Type -> Type
 mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
 
--- | Does this type classify a core Coercion?
+-- | Does this type classify a core (unlifted) Coercion?
+-- At either role nominal or reprsentational
+--    (t1 ~# t2) or (t1 ~R# t2)
 isCoercionType :: Type -> Bool
 isCoercionType (TyConApp tc tys)
   | (tc `hasKey` eqPrimTyConKey) || (tc `hasKey` eqReprPrimTyConKey)

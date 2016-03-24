@@ -177,8 +177,10 @@ cseRhs env (id',rhs)
           | always_active -> (extendCSEnv env rhs' id', (zapped_id, rhs'))
           | otherwise     -> (env,                      (id', rhs'))
         Just id
-          | always_active -> (extendCSSubst env id' id, (id', mkTicks ticks $ varToCoreExpr id))
-          | otherwise     -> (env,                      (id', mkTicks ticks $ varToCoreExpr id))
+          | always_active -> (extendCSSubst env id' id_expr, (id', mkTicks ticks id_expr))
+          | otherwise     -> (env,                           (id', mkTicks ticks id_expr))
+          where
+            id_expr = varToCoreExpr id  -- Could be a CoVar
           -- In the Just case, we have
           --        x = rhs
           --        ...
@@ -252,10 +254,10 @@ cseAlts env scrut' bndr bndr' alts
     scrut'' = stripTicksTopE tickishFloatable scrut'
     (con_target, alt_env)
         = case scrut'' of
-            Var v' -> (v',     extendCSSubst env bndr v')    -- See Note [Case binders 1]
-                                                             -- map: bndr -> v'
+            Var v' -> (v', extendCSSubst env bndr scrut'') -- See Note [Case binders 1]
+                                                           -- map: bndr -> v'
 
-            _      ->  (bndr', extendCSEnv env scrut' bndr') -- See Note [Case binders 2]
+            _      -> (bndr', extendCSEnv env scrut' bndr') -- See Note [Case binders 2]
                                                              -- map: scrut' -> bndr'
 
     arg_tys = tyConAppArgs (idType bndr)
@@ -317,8 +319,8 @@ csEnvSubst = cs_subst
 lookupSubst :: CSEnv -> Id -> OutExpr
 lookupSubst (CS { cs_subst = sub}) x = lookupIdSubst (text "CSE.lookupSubst") sub x
 
-extendCSSubst :: CSEnv -> Id  -> Id -> CSEnv
-extendCSSubst cse x y = cse { cs_subst = extendIdSubst (cs_subst cse) x (Var y) }
+extendCSSubst :: CSEnv -> Id  -> CoreExpr -> CSEnv
+extendCSSubst cse x rhs = cse { cs_subst = extendSubst (cs_subst cse) x rhs }
 
 addBinder :: CSEnv -> Var -> (CSEnv, Var)
 addBinder cse v = (cse { cs_subst = sub' }, v')

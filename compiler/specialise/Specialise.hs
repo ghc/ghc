@@ -1220,7 +1220,7 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
               -> SpecM (Maybe ((Id,CoreExpr),     -- Specialised definition
                                UsageDetails,      -- Usage details from specialised body
                                CoreRule))         -- Info for the Id's SpecEnv
-    spec_call (CallKey call_ts, (call_ds, _))
+    spec_call _call_info@(CallKey call_ts, (call_ds, _))
       = ASSERT( call_ts `lengthIs` n_tyvars  && call_ds `lengthIs` n_dicts )
 
         -- Suppose f's defn is  f = /\ a b c -> \ d1 d2 -> rhs
@@ -1250,13 +1250,17 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
            ; let (rhs_env2, dx_binds, spec_dict_args)
                             = bindAuxiliaryDicts rhs_env rhs_dict_ids call_ds inst_dict_ids
                  ty_args    = mk_ty_args call_ts poly_tyvars
-                 rule_args  = ty_args ++ map Var inst_dict_ids
+                 rule_args  = ty_args ++ map varToCoreExpr inst_dict_ids
+                                -- varToCoreExpr does the right thing for CoVars
                  rule_bndrs = poly_tyvars ++ inst_dict_ids
 
            ; dflags <- getDynFlags
            ; if already_covered dflags rule_args then
                 return Nothing
-             else do
+             else -- pprTrace "spec_call" (vcat [ ppr _call_info, ppr fn, ppr rhs_dict_ids
+                  --                           , text "rhs_env2" <+> ppr (se_subst rhs_env2)
+                  --                           , ppr dx_binds ]) $
+                  do
            {    -- Figure out the type of the specialised function
              let body_ty = applyTypeToArgs rhs fn_type rule_args
                  (lam_args, app_args)           -- Add a dummy argument if body_ty is unlifted
@@ -1365,7 +1369,7 @@ bindAuxiliaryDicts env@(SE { se_subst = subst, se_interesting = interesting })
   = (env', dx_binds, spec_dict_args)
   where
     (dx_binds, spec_dict_args) = go call_ds inst_dict_ids
-    env' = env { se_subst = subst `CoreSubst.extendIdSubstList`
+    env' = env { se_subst = subst `CoreSubst.extendSubstList`
                                      (orig_dict_ids `zip` spec_dict_args)
                                   `CoreSubst.extendInScopeList` dx_ids
                , se_interesting = interesting `unionVarSet` interesting_dicts }
@@ -1905,6 +1909,8 @@ whole it's only a small win: 2.2% improvement in allocation for ansi,
 
 interestingDict :: SpecEnv -> CoreExpr -> Bool
 -- A dictionary argument is interesting if it has *some* structure
+-- NB: "dictionary" arguments include constraints of all sorts,
+--     including equality constraints; hence the Coercion case
 interestingDict env (Var v) =  hasSomeUnfolding (idUnfolding v)
                             || isDataConWorkId v
                             || v `elemVarSet` se_interesting env

@@ -231,3 +231,4 @@ test('T11155',
 test('T11232', normal, compile, ['-O2'])
 test('T11562', normal, compile, ['-O2'])
 test('T11742', normal, compile, ['-O2'])
+test('T11644', normal, compile, ['-O2'])
