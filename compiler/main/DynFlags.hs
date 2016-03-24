@@ -527,6 +527,8 @@ data GeneralFlag
    | Opt_KeepTmpFiles
    | Opt_KeepRawTokenStream
    | Opt_KeepLlvmFiles
+   | Opt_KeepHiFiles
+   | Opt_KeepOFiles
 
    | Opt_BuildDynamicToo
 
@@ -2505,6 +2507,22 @@ dynamic_flags_deps = [
      -- This only makes sense as plural
   , make_ord_flag defGhcFlag "keep-tmp-files"
         (NoArg (setGeneralFlag Opt_KeepTmpFiles))
+  , make_ord_flag defGhcFlag "keep-hi-file"
+        (NoArg (setGeneralFlag Opt_KeepHiFiles))
+  , make_ord_flag defGhcFlag "no-keep-hi-file"
+        (NoArg (unSetGeneralFlag Opt_KeepHiFiles))
+  , make_ord_flag defGhcFlag "keep-hi-files"
+        (NoArg (setGeneralFlag Opt_KeepHiFiles))
+  , make_ord_flag defGhcFlag "no-keep-hi-files"
+        (NoArg (unSetGeneralFlag Opt_KeepHiFiles))
+  , make_ord_flag defGhcFlag "keep-o-file"
+        (NoArg (setGeneralFlag Opt_KeepOFiles))
+  , make_ord_flag defGhcFlag "no-keep-o-file"
+        (NoArg (unSetGeneralFlag Opt_KeepOFiles))
+  , make_ord_flag defGhcFlag "keep-o-files"
+        (NoArg (setGeneralFlag Opt_KeepOFiles))
+  , make_ord_flag defGhcFlag "no-keep-o-files"
+        (NoArg (unSetGeneralFlag Opt_KeepOFiles))
 
         ------- Miscellaneous ----------------------------------------------
   , make_ord_flag defGhcFlag "no-auto-link-packages"
@@ -3615,6 +3633,8 @@ defaultFlags settings
       Opt_GhciHistory,
       Opt_GhciSandbox,
       Opt_HelpfulErrors,
+      Opt_KeepHiFiles,
+      Opt_KeepOFiles,
       Opt_OmitYields,
       Opt_PrintBindContents,
       Opt_ProfCountEntries,

@@ -137,6 +137,12 @@ compileOne' m_tc_result mHscMessage
                         m_tc_result mHscMessage
                         hsc_env summary source_modified mb_old_iface (mod_index, nmods)
 
+   let flags = hsc_dflags hsc_env0
+     in do unless (gopt Opt_KeepHiFiles flags) $
+               addFilesToClean flags [ml_hi_file $ ms_location summary]
+           unless (gopt Opt_KeepOFiles flags) $
+               addFilesToClean flags [ml_obj_file $ ms_location summary]
+
    case (status, hsc_lang) of
         (HscUpToDate, _) ->
             ASSERT( isJust maybe_old_linkable || isNoLink (ghcLink dflags) )

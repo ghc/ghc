@@ -372,6 +372,11 @@ test('spacesInArgs',
      compile_and_run,
      [''])
 
+test( 'T4114a', normal, compile_and_run, ['-cpp'])
+test( 'T4114b', normal, compile_and_run, ['-no-keep-hi-files'])
+test( 'T4114c', normal, compile_and_run, ['-no-keep-o-files'])
+test( 'T4114d', normal, compile_and_run, ['-hisuf .myhi -osuf .myo -no-keep-o-files'])
+
 test('T5584',
      extra_clean(['T5584_in/A.hi-boot', 'T5584_out/T5584/A.o-boot']),
      run_command, ['$MAKE -s --no-print-directory T5584'])
