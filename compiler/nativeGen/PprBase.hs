@@ -89,6 +89,7 @@ doubleToBytes d
 pprSectionHeader :: Platform -> Section -> SDoc
 pprSectionHeader platform (Section t suffix) =
  case platformOS platform of
+   OSAIX    -> pprXcoffSectionHeader t
    OSDarwin -> pprDarwinSectionHeader t
    _        -> pprGNUSectionHeader t suffix
 
@@ -108,6 +109,19 @@ pprGNUSectionHeader t suffix = sdocWithDynFlags $ \dflags ->
       ReadOnlyData16 -> sLit ".rodata.cst16"
       OtherSection _ ->
         panic "PprBase.pprGNUSectionHeader: unknown section type"
+
+-- XCOFF doesn't support relocating label-differences, so we place all
+-- RO sections into .text[PR] sections
+pprXcoffSectionHeader :: SectionType -> SDoc
+pprXcoffSectionHeader t = text $ case t of
+     Text                    -> ".csect .text[PR]"
+     Data                    -> ".csect .data[RW]"
+     ReadOnlyData            -> ".csect .text[PR] # ReadOnlyData"
+     RelocatableReadOnlyData -> ".csect .text[PR] # RelocatableReadOnlyData"
+     ReadOnlyData16          -> ".csect .text[PR] # ReadOnlyData16"
+     UninitialisedData       -> ".csect .data[BS]"
+     OtherSection _          ->
+       panic "PprBase.pprXcoffSectionHeader: unknown section type"
 
 pprDarwinSectionHeader :: SectionType -> SDoc
 pprDarwinSectionHeader t =

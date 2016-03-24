@@ -229,6 +229,7 @@ allArgRegs = map regSingle [3..10]
 callClobberedRegs :: Platform -> [Reg]
 callClobberedRegs platform
   = case platformOS platform of
+    OSAIX    -> map regSingle (0:[2..12] ++ map fReg [0..13])
     OSDarwin -> map regSingle (0:[2..12] ++ map fReg [0..13])
     OSLinux  -> map regSingle (0:[2..13] ++ map fReg [0..13])
     _        -> panic "PPC.Regs.callClobberedRegs: not defined for this architecture"
@@ -260,6 +261,7 @@ showReg n
 allFPArgRegs :: Platform -> [Reg]
 allFPArgRegs platform
     = case platformOS platform of
+      OSAIX    -> map (regSingle . fReg) [1..13]
       OSDarwin -> map (regSingle . fReg) [1..13]
       OSLinux  -> map (regSingle . fReg) [1..8]
       _        -> panic "PPC.Regs.allFPArgRegs: not defined for this architecture"

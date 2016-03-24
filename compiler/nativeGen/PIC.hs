@@ -158,6 +158,15 @@ cmmMakePicReference dflags lbl
         -- everything gets relocated at runtime
         | OSMinGW32 <- platformOS $ targetPlatform dflags
         = CmmLit $ CmmLabel lbl
+
+        | OSAIX <- platformOS $ targetPlatform dflags
+        = CmmMachOp (MO_Add W32)
+                [ CmmReg (CmmGlobal PicBaseReg)
+                , CmmLit $ picRelative
+                                (platformArch   $ targetPlatform dflags)
+                                (platformOS     $ targetPlatform dflags)
+                                lbl ]
+
         -- both ABI versions default to medium code model
         | ArchPPC_64 _ <- platformArch $ targetPlatform dflags
         = CmmMachOp (MO_Add W32) -- code model medium
@@ -289,6 +298,17 @@ howToAccessLabel dflags arch OSDarwin this_mod _ lbl
         | otherwise
         = AccessDirectly
 
+
+----------------------------------------------------------------------------
+-- AIX
+
+-- quite simple (for now)
+howToAccessLabel _dflags _arch OSAIX _this_mod kind _lbl
+        = case kind of
+            DataReference -> AccessViaSymbolPtr
+            CallReference -> AccessDirectly
+            JumpReference -> AccessDirectly
+
 -- ELF (Linux)
 --
 -- ELF tries to pretend to the main application code that dynamic linking does
@@ -393,6 +413,11 @@ picRelative arch OSDarwin lbl
         | arch /= ArchX86_64
         = CmmLabelDiffOff lbl mkPicBaseLabel 0
 
+-- On AIX we use an indirect local TOC anchored by 'gotLabel'.
+-- This way we use up only one global TOC entry per compilation-unit
+-- (this is quite similiar to GCC's @-mminimal-toc@ compilation mode)
+picRelative _ OSAIX lbl
+        = CmmLabelDiffOff lbl gotLabel 0
 
 -- PowerPC Linux:
 -- The PIC base register points to our fake GOT. Use a label difference
@@ -434,6 +459,9 @@ needImportedSymbols :: DynFlags -> Arch -> OS -> Bool
 needImportedSymbols dflags arch os
         | os    == OSDarwin
         , arch  /= ArchX86_64
+        = True
+
+        | os    == OSAIX
         = True
 
         -- PowerPC Linux: -fPIC or -dynamic
@@ -482,6 +510,16 @@ pprGotDeclaration dflags ArchX86 OSDarwin
 
 pprGotDeclaration _ _ OSDarwin
         = empty
+
+-- Emit XCOFF TOC section
+pprGotDeclaration _ _ OSAIX
+        = vcat $ [ text ".toc"
+                 , text ".tc ghc_toc_table[TC],.LCTOC1"
+                 , text ".csect ghc_toc_table[RW]"
+                   -- See Note [.LCTOC1 in PPC PIC code]
+                 , text ".set .LCTOC1,$+0x8000"
+                 ]
+
 
 -- PPC 64 ELF v1needs a Table Of Contents (TOC) on Linux
 pprGotDeclaration _ (ArchPPC_64 ELF_V1) OSLinux
@@ -635,6 +673,24 @@ pprImportedSymbol dflags platform@(Platform { platformArch = ArchX86, platformOS
 pprImportedSymbol _ (Platform { platformOS = OSDarwin }) _
         = empty
 
+-- XCOFF / AIX
+--
+-- Similiar to PPC64 ELF v1, there's dedicated TOC register (r2). To
+-- workaround the limitation of a global TOC we use an indirect TOC
+-- with the label `ghc_toc_table`.
+--
+-- See also GCC's `-mminimal-toc` compilation mode or
+-- http://www.ibm.com/developerworks/rational/library/overview-toc-aix/
+--
+-- NB: No DSO-support yet
+
+pprImportedSymbol _ platform@(Platform { platformOS = OSAIX }) importedLbl
+        = case dynamicLinkerLabelInfo importedLbl of
+            Just (SymbolPtr, lbl)
+              -> vcat [
+                   text "LC.." <> pprCLabel platform lbl <> char ':',
+                   text "\t.long" <+> pprCLabel platform lbl ]
+            _ -> empty
 
 -- ELF / Linux
 --
