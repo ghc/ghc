@@ -121,9 +121,18 @@ xchg(StgPtr p, StgWord w)
         );
 #elif powerpc_HOST_ARCH
     __asm__ __volatile__ (
+# if aix_HOST_OS
+        /* IBM's assembler doesn't seem to support local labels so we use
+         * explicit relative numeric offsets to workaround this limitation
+         */
+        "       lwarx     %0, 0, %2\n"
+        "       stwcx.    %1, 0, %2\n"
+        "       bne-      $-8"
+# else // aix_HOST_OS
         "1:     lwarx     %0, 0, %2\n"
         "       stwcx.    %1, 0, %2\n"
         "       bne-      1b"
+# endif
         :"=&r" (result)
         :"r" (w), "r" (p)
     );
@@ -205,12 +214,23 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
 #elif powerpc_HOST_ARCH
     StgWord result;
     __asm__ __volatile__ (
+# if aix_HOST_OS
+        /* IBM's assembler doesn't seem to support local labels so we use
+         * explicit relative numeric offsets to workaround this limitation
+         */
+        "       lwarx     %0, 0, %3\n"
+        "       cmpw      %0, %1\n"
+        "       bne       $+12\n"
+        "       stwcx.    %2, 0, %3\n"
+        "       bne-      $-16\n"
+# else // aix_HOST_OS
         "1:     lwarx     %0, 0, %3\n"
         "       cmpw      %0, %1\n"
         "       bne       2f\n"
         "       stwcx.    %2, 0, %3\n"
         "       bne-      1b\n"
         "2:"
+# endif // !aix_HOST_OS
         :"=&r" (result)
         :"r" (o), "r" (n), "r" (p)
         :"cc", "memory"
