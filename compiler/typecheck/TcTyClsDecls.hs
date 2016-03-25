@@ -902,7 +902,7 @@ tcDataDefn rec_info     -- Knot-tied; don't look at this eagerly
                      , dd_cons = cons })
  =  do { (extra_tvs, extra_bndrs, real_res_kind) <- tcDataKindSig res_kind
        ; let final_bndrs  = tycon_binders `chkAppend` extra_bndrs
-             final_tvs    = tvs `chkAppend` extra_tvs
+             final_tvs    = tvs           `chkAppend` extra_tvs
              roles        = rti_roles rec_info tc_name
 
        ; stupid_tc_theta <- solveEqualities $ tcHsContext ctxt

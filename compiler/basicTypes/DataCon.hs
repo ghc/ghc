@@ -290,6 +290,12 @@ data DataCon
         --      dcOrigArgTys  = [x,y]
         --      dcRepTyCon       = T
 
+        -- In general, the dcUnivTyVars are NOT NECESSARILY THE SAME AS THE TYVARS
+        -- FOR THE PARENT TyCon. With GADTs the data con might not even have
+        -- the same number of type variables!
+        -- [This is a change (Oct05): previously, vanilla datacons guaranteed to
+        --  have the same type variables as their parent TyCon, but that seems ugly.]
+
         dcVanilla :: Bool,      -- True <=> This is a vanilla Haskell 98 data constructor
                                 --          Its type is of form
                                 --              forall a1..an . t1 -> ... tm -> T a1..an
@@ -300,25 +306,18 @@ data DataCon
                 --       syntax, provided its type looks like the above.
                 --       The declaration format is held in the TyCon (algTcGadtSyntax)
 
-        dcUnivTyVars   :: [TyVar],      -- Universally-quantified type vars [a,b,c]
-                                        -- INVARIANT: length matches arity of the dcRepTyCon
-                                        ---           result type of (rep) data con is exactly (T a b c)
-        dcUnivTyBinders :: [TyBinder],  -- Binders for universal tyvars. These will all
-                                        -- be Named, and all be Invisible or Specified.
-                                        -- Storing these separately from dcUnivTyVars
-                                        -- is solely because we usually don't need the
-                                        -- binders, and the extraction of the tyvars is
-                                        -- unnecessary work. See also
-                                        -- Note [TyBinders in DataCons]
+        -- Universally-quantified type vars [a,b,c]
+        dcUnivTyVars    :: [TyVar],     -- Two linked fields
+        dcUnivTyBinders :: [TyBinder],  -- see Note [TyBinders in DataCons]
 
-        dcExTyVars     :: [TyVar],    -- Existentially-quantified type vars
-                -- In general, the dcUnivTyVars are NOT NECESSARILY THE SAME AS THE TYVARS
-                -- FOR THE PARENT TyCon. With GADTs the data con might not even have
-                -- the same number of type variables.
-                -- [This is a change (Oct05): previously, vanilla datacons guaranteed to
-                --  have the same type variables as their parent TyCon, but that seems ugly.]
+            -- INVARIANT: length matches arity of the dcRepTyCon
+            --
+            -- INFARIANT: result type of (rep) data con is exactly (T a b c)
 
-        dcExTyBinders  :: [TyBinder],  -- see dcUnivTyBinders
+        -- Existentially-quantified type vars [x,y]
+        dcExTyVars     :: [TyVar],     -- Two linked fields
+        dcExTyBinders  :: [TyBinder],  -- see Note [TyBinders in DataCons]
+
 
         -- INVARIANT: the UnivTyVars and ExTyVars all have distinct OccNames
         -- Reason: less confusing, and easier to generate IfaceSyn
@@ -419,6 +418,41 @@ data DataCon
                                -- See Note [Promoted data constructors] in TyCon
   }
   deriving Data.Typeable.Typeable
+
+
+{- Note [TyBinders in DataCons]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+DataCons and PatSyns store their universal and existential type
+variables in a pair of fields, e.g.
+        dcUnivTyVars    :: [TyVar],
+        dcUnivTyBinders :: [TyBinder],
+and similarly dcExTyVars/dcExTyVarBinders
+
+Of these, the former is always redundant:
+  dcUnivTyVars = [ tv | Named tv _ <- dcUnivTyBinders ]
+
+Specifically:
+
+ * The two fields correspond 1-1
+
+ * Each TyBinder a Named (no Anons)
+
+ * The TyVar in each TyBinder is the same as the TyVar in
+   the corresponding tyvar in the TyVars list.
+
+ * Each Visibilty flag (va, vb, etc) is Invisible or Specified.
+   None are Visible. (See Note [No Visible TyBinder in terms];
+   a DataCon is a term-level function.)
+
+Why store these fields redundantly?  Purely convenience.  In most
+places in GHC, it's just the TyVars that are needed, so that's what's
+returned from, say, dataConFullSig.
+
+Why do we need the TyBinders?  So that we can construct the right
+type for the DataCon with its foralls attributed the correce visiblity.
+That in turn governs whether you can use visible type application
+at a call of the data constructor.
+-}
 
 data DataConRep
   = NoDataConRep              -- No wrapper
@@ -718,49 +752,11 @@ isMarkedStrict :: StrictnessMark -> Bool
 isMarkedStrict NotMarkedStrict = False
 isMarkedStrict _               = True   -- All others are strict
 
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
 \subsection{Construction}
 *                                                                      *
-************************************************************************
-
-Note [TyBinders in DataCons]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A DataCon needs to keep track of the visibility of its universals and
-existentials, so that visible type application can work properly. This
-is done by storing the universal and existential TyBinders, along with
-the TyVars. These TyBinders should all be Named and should all be
-Invisible or Specified; we don't have Visible or Anon type arguments.
-
-During construction of a DataCon, we often have the TyBinders of the
-parent TyCon. But those TyBinders are *different* than those of the
-DataCon. Here is an example:
-
-  data Proxy a = P
-
-The TyCon has these TyBinders:
-
-  [ Named (k :: *) Invisible, Anon k ]
-
-Note that Proxy's kind is forall k. k -> *. But the DataCon P should
-have (universal) TyBinders
-
-  [ Named (k :: *) Invisible, Named (a :: k) Specified ]
-
-So we want to take the TyCon's TyBinders and the TyCon's TyVars and
-merge them, pulling variable names from the TyVars but visibilities
-from the TyBinders, perserving Invisible but changing Visible to
-Specified. (The `a` in Proxy is indeed Visible, but the `a` in P should
-be Specified.) This merging operation is done in buildDataCon. In contrast,
-the TyBinders passed to mkDataCon are the real TyBinders stored in the
-DataCon. Note that passing the TyVars into mkDataCon is redundant, but
-convenient for both caller and the function's implementation.
-
-In most places in GHC, it's just the TyVars that are needed,
-so that's what's returned from, say, dataConFullSig.
-
--}
+********************************************************************* -}
 
 -- | Build a new data constructor
 mkDataCon :: Name

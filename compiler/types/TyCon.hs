@@ -307,7 +307,6 @@ This is important. In an instance declaration we expect
 
 Note [TyCon Role signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Every tycon has a role signature, assigning a role to each of the tyConTyVars
 (or of equal length to the tyConArity, if there are no tyConTyVars). An
 example demonstrates these best: say we have a tycon T, with parameters a at
@@ -342,7 +341,6 @@ datacon arity were the same.
 
 Note [Injective type families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 We allow injectivity annotations for type families (both open and closed):
 
   type family F (a :: k) (b :: k) = r | r -> a
@@ -397,19 +395,11 @@ data TyCon
 
         tyConName   :: Name,     -- ^ Name of the constructor
 
+        -- See Note [The binders/kind/arity fields of a TyCon]
         tyConBinders :: [TyBinder], -- ^ The TyBinders for this TyCon's kind.
-                                    -- length tyConBinders == tyConArity.
-                                    -- This is a cached value and is redundant with
-                                    -- the tyConKind.
-
-        tyConResKind :: Kind,       -- ^ Cached result kind
-
-        tyConKind   :: Kind,     -- ^ Kind of this TyCon (full kind, not just
-                                 -- the return kind)
-
-        tyConArity  :: Arity,    -- ^ Number of arguments this TyCon must
-                                 -- receive to be considered saturated
-                                 -- (including implicit kind variables)
+        tyConResKind :: Kind,       -- ^ Result kind
+        tyConKind   :: Kind,        -- ^ Kind of this TyCon
+        tyConArity  :: Arity,       -- ^ Arity
 
         tcRepName :: TyConRepName
     }
@@ -434,23 +424,16 @@ data TyCon
 
         tyConName    :: Name,    -- ^ Name of the constructor
 
+        -- See Note [The binders/kind/arity fields of a TyCon]
         tyConBinders :: [TyBinder], -- ^ The TyBinders for this TyCon's kind.
-                                    -- length tyConBinders == tyConArity.
-                                    -- This is a cached value and is redundant with
-                                    -- the tyConKind.
+        tyConResKind :: Kind,       -- ^ Result kind
+        tyConKind   :: Kind,        -- ^ Kind of this TyCon
+        tyConArity  :: Arity,       -- ^ Arity
 
-        tyConResKind :: Kind,       -- ^ Cached result kind
-
-        tyConKind    :: Kind,    -- ^ Kind of this TyCon (full kind, not just
-                                 -- the return kind)
-
-        tyConArity   :: Arity,   -- ^ Number of arguments this TyCon must
-                                 -- receive to be considered saturated
-                                 -- (including implicit kind variables)
-
+        -- See Note [tyConTyVars and tyConBinders]
         tyConTyVars  :: [TyVar], -- ^ The kind and type variables used in the
                                  -- type constructor.
-                                 -- Invariant: length tyvars = arity
+                                 -- Invariant: length tyConTyVars = tyConArity
                                  -- Precisely, this list scopes over:
                                  --
                                  -- 1. The 'algTcStupidTheta'
@@ -461,7 +444,7 @@ data TyCon
                                  -- constructors.
 
         tcRoles      :: [Role],  -- ^ The role for each type variable
-                                 -- This list has the same length as tyConTyVars
+                                 -- This list has length = tyConArity
                                  -- See also Note [TyCon Role signatures]
 
         tyConCType   :: Maybe CType,-- ^ The C type that should be used
@@ -504,26 +487,19 @@ data TyCon
 
         tyConName    :: Name,    -- ^ Name of the constructor
 
+        -- See Note [The binders/kind/arity fields of a TyCon]
         tyConBinders :: [TyBinder], -- ^ The TyBinders for this TyCon's kind.
-                                    -- length tyConBinders == tyConArity.
-                                    -- This is a cached value and is redundant with
-                                    -- the tyConKind.
+        tyConResKind :: Kind,       -- ^ Result kind
+        tyConKind   :: Kind,        -- ^ Kind of this TyCon
+        tyConArity  :: Arity,       -- ^ Arity
 
-        tyConResKind :: Kind,     -- ^ Cached result kind.
-
-        tyConKind    :: Kind,    -- ^ Kind of this TyCon (full kind, not just
-                                 -- the return kind)
-
-        tyConArity   :: Arity,   -- ^ Number of arguments this TyCon must
-                                 -- receive to be considered saturated
-                                 -- (including implicit kind variables)
-
+        -- See Note [tyConTyVars and tyConBinders]
         tyConTyVars  :: [TyVar], -- ^ List of type and kind variables in this
                                  -- TyCon. Includes implicit kind variables.
-                                 -- Invariant: length tyConTyVars = tyConArity
+                                 -- Scopes over: synTcRhs
 
         tcRoles      :: [Role],  -- ^ The role for each type variable
-                                 -- This list has the same length as tyConTyVars
+                                 -- This list has length = tyConArity
                                  -- See also Note [TyCon Role signatures]
 
         synTcRhs     :: Type     -- ^ Contains information about the expansion
@@ -539,31 +515,18 @@ data TyCon
 
         tyConName    :: Name,    -- ^ Name of the constructor
 
+        -- See Note [The binders/kind/arity fields of a TyCon]
         tyConBinders :: [TyBinder], -- ^ The TyBinders for this TyCon's kind.
-                                    -- length tyConBinders == tyConArity.
-                                    -- This is a cached value and is redundant with
-                                    -- the tyConKind.
+        tyConResKind :: Kind,       -- ^ Result kind
+        tyConKind   :: Kind,        -- ^ Kind of this TyCon
+        tyConArity  :: Arity,       -- ^ Arity
 
-        tyConResKind :: Kind,     -- ^ Cached result kind
-
-        tyConKind    :: Kind,    -- ^ Kind of this TyCon (full kind, not just
-                                 -- the return kind)
-
-        tyConArity   :: Arity,   -- ^ Number of arguments this TyCon must
-                                 -- receive to be considered saturated
-                                 -- (including implicit kind variables)
-
+        -- See Note [tyConTyVars and tyConBinders]
         tyConTyVars  :: [TyVar], -- ^ The kind and type variables used in the
                                  -- type constructor.
                                  -- Invariant: length tyvars = arity
-                                 -- Precisely, this list scopes over:
-                                 --
-                                 -- 1. The 'algTcStupidTheta'
-                                 -- 2. The cached types in 'algTyConRhs.NewTyCon'
-                                 -- 3. The family instance types if present
-                                 --
-                                 -- Note that it does /not/ scope over the data
-                                 -- constructors.
+            -- Needed to connect an associated family TyCon
+            -- with its parent class; see TcValidity.checkConsistentFamInst
 
         famTcResVar  :: Maybe Name,   -- ^ Name of result type variable, used
                                       -- for pretty-printing with --show-iface
@@ -593,22 +556,14 @@ data TyCon
 
         tyConName     :: Name,   -- ^ Name of the constructor
 
+        -- See Note [The binders/kind/arity fields of a TyCon]
         tyConBinders :: [TyBinder], -- ^ The TyBinders for this TyCon's kind.
-                                    -- length tyConBinders == tyConArity.
-                                    -- This is a cached value and is redundant with
-                                    -- the tyConKind.
-
-        tyConResKind   :: Kind,      -- ^ Cached result kind
-
-        tyConKind     :: Kind,   -- ^ Kind of this TyCon (full kind, not just
-                                 -- the return kind)
-
-        tyConArity    :: Arity,  -- ^ Number of arguments this TyCon must
-                                 -- receive to be considered saturated
-                                 -- (including implicit kind variables)
+        tyConResKind :: Kind,       -- ^ Result kind
+        tyConKind   :: Kind,        -- ^ Kind of this TyCon
+        tyConArity  :: Arity,       -- ^ Arity
 
         tcRoles       :: [Role], -- ^ The role for each type variable
-                                 -- This list has the same length as tyConTyVars
+                                 -- This list has length = tyConArity
                                  -- See also Note [TyCon Role signatures]
 
         isUnlifted   :: Bool,    -- ^ Most primitive tycons are unlifted (may
@@ -622,34 +577,32 @@ data TyCon
 
   -- | Represents promoted data constructor.
   | PromotedDataCon {          -- See Note [Promoted data constructors]
-        tyConUnique   :: Unique, -- ^ Same Unique as the data constructor
-        tyConName     :: Name,   -- ^ Same Name as the data constructor
-        tyConArity    :: Arity,
+        tyConUnique  :: Unique,     -- ^ Same Unique as the data constructor
+        tyConName    :: Name,       -- ^ Same Name as the data constructor
+
+        -- See Note [The binders/kind/arity fields of a TyCon]
         tyConBinders :: [TyBinder], -- ^ The TyBinders for this TyCon's kind.
-                                    -- length tyConBinders == tyConArity.
-                                    -- This is a cached value and is redundant with
-                                    -- the tyConKind.
-        tyConResKind   :: Kind,   -- ^ Cached result kind
-        tyConKind     :: Kind,   -- ^ Type of the data constructor
-        tcRoles       :: [Role], -- ^ Roles: N for kind vars, R for type vars
-        dataCon       :: DataCon,-- ^ Corresponding data constructor
+        tyConResKind :: Kind,       -- ^ Result kind
+        tyConKind   :: Kind,        -- ^ Kind of this TyCon
+        tyConArity  :: Arity,       -- ^ Arity
+
+        tcRoles       :: [Role],    -- ^ Roles: N for kind vars, R for type vars
+        dataCon       :: DataCon,   -- ^ Corresponding data constructor
         tcRepName     :: TyConRepName,
         promDcRepInfo :: RuntimeRepInfo  -- ^ See comments with 'RuntimeRepInfo'
     }
 
   -- | These exist only during a recursive type/class type-checking knot.
   | TcTyCon {
-      tyConUnique :: Unique,
-      tyConName   :: Name,
-      tyConUnsat  :: Bool,  -- ^ can this tycon be unsaturated?
-      tyConArity  :: Arity,
-      tyConBinders :: [TyBinder],   -- ^ The TyBinders for this TyCon's kind.
-                                    -- length tyConBinders == tyConArity.
-                                    -- This is a cached value and is redundant with
-                                    -- the tyConKind.
-      tyConResKind :: Kind,          -- ^ Cached result kind
+        tyConUnique :: Unique,
+        tyConName   :: Name,
+        tyConUnsat  :: Bool,  -- ^ can this tycon be unsaturated?
 
-      tyConKind   :: Kind
+        -- See Note [The binders/kind/arity fields of a TyCon]
+        tyConBinders :: [TyBinder], -- ^ The TyBinders for this TyCon's kind.
+        tyConResKind :: Kind,       -- ^ Result kind
+        tyConKind    :: Kind,       -- ^ Kind of this TyCon
+        tyConArity   :: Arity       -- ^ Arity
       }
   deriving Typeable
 
@@ -850,7 +803,49 @@ data FamTyConFlav
    -- | Built-in type family used by the TypeNats solver
    | BuiltInSynFamTyCon BuiltInSynFamily
 
-{-
+{- Note [The binders/kind/arity fields of a TyCon]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+All TyCons have this group of fields
+  tyConBinders :: [TyBinder]
+  tyConResKind :: Kind
+  tyConKind    :: Kind   -- Cached = mkForAllTys tyConBinders tyConResKind
+  tyConArity   :: Arity  -- Cached = length tyConBinders
+
+They fit together like so:
+
+* tyConBinders gives the telescope of Named (forall'd)
+  Anon (ordinary ->) binders
+
+* Note that tyConBinders /includes/ Anon arguments.  For example:
+    type App a (b :: k) = a b
+      -- App :: forall {k}; (k->*) -> k -> *
+  we get
+    tyConTyBinders = [ Named (k :: *) Invisible, Anon (k->*), Anon k ]
+
+* tyConKind is the full kind of the TyCon,
+  not just the result kind
+
+* tyConArity is the arguments this TyCon must be applied to, to be
+  considered saturated.  Here we mean "applied to in the actual Type",
+  not surface syntax; i.e. including implicit kind variables.
+
+Note [tyConBinders and tyConTyVars]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  type App a (b :: k) = a b
+    -- App :: forall {k}; (k->*) -> k -> *
+
+For App we get:
+  tyConTyVars    = [ k:*,                      a:k->*,      b:k]
+  tyConTyBinders = [ Named (k :: *) Invisible, Anon (k->*), Anon k ]
+
+The tyConBinder field is used to construct the kind of App, namely
+  App :: forall {k}; (k->*) -> k -> *
+The tyConTyVars field always corresponds 1-1 with tyConBinders, and
+records the names of the binders.  That is important for type synonyms,
+etc, where those names scope over some other field in the TyCon. In
+this case, 'a' and 'b' are mentioned in the RHS.
+
 Note [Closed type families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 * In an open type family you can add new instances later.  This is the

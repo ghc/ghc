@@ -64,16 +64,21 @@ data PatSyn
                                        -- record pat syn or same length as
                                        -- psArgs
 
-        psUnivTyVars  :: [TyVar],      -- Universially-quantified type variables
-        psUnivTyBinders :: [TyBinder], -- same, with visibility info
-        psReqTheta    :: ThetaType,    -- Required dictionaries
-                                       -- these constraints are very much like
-                                       -- stupid thetas (which is a useful
-                                       -- guideline when implementing)
-                                       -- but are actually needed.
-        psExTyVars    :: [TyVar],      -- Existentially-quantified type vars
-        psExTyBinders :: [TyBinder],   -- same, with visibility info
-        psProvTheta   :: ThetaType,    -- Provided dictionaries
+        -- Universially-quantified type variables
+        psUnivTyVars    :: [TyVar],    -- Two linked fields; see DataCon
+        psUnivTyBinders :: [TyBinder], -- Note [TyBinders in DataCons]
+
+        -- Required dictionaries (may mention psUnivTyVars)
+        psReqTheta    :: ThetaType,
+
+        -- Existentially-quantified type vars
+        psExTyVars    :: [TyVar],      -- Two linked fields; see DataCon
+        psExTyBinders :: [TyBinder],   -- Note [TyBinders in DataCons]
+
+        -- Provided dictionaries (may mention psUnivTyVars or psExTyVars)
+        psProvTheta   :: ThetaType,
+
+        -- Result type
         psOrigResTy   :: Type,         -- Mentions only psUnivTyVars
 
         -- See Note [Matchers and builders for pattern synonyms]

@@ -168,15 +168,18 @@ import Data.IORef ( IORef )   -- for CoercionHole
 import GHC.Stack (CallStack)
 #endif
 
-{-
-%************************************************************************
-%*                                                                      *
-\subsection{The data type}
-%*                                                                      *
-%************************************************************************
--}
+{- **********************************************************************
+*                                                                       *
+                        Type
+*                                                                       *
+********************************************************************** -}
 
 -- | The key representation of types within the compiler
+
+type KindOrType = Type -- See Note [Arguments to type constructors]
+
+-- | The key type representing kinds in the compiler.
+type Kind = Type
 
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in coreSyn/CoreLint.hs
@@ -241,64 +244,8 @@ data TyLit
   | StrTyLit FastString
   deriving (Eq, Ord, Data.Data, Data.Typeable)
 
--- | A 'TyBinder' represents an argument to a function. TyBinders can be dependent
--- ('Named') or nondependent ('Anon'). They may also be visible or not.
--- See also Note [TyBinder]
-data TyBinder
-  = Named TyVar VisibilityFlag  -- Always a TyVar (not CoVar or Id)
-  | Anon Type   -- Visibility is determined by the type (Constraint vs. *)
-    deriving (Data.Typeable, Data.Data)
-
--- | Is something required to appear in source Haskell ('Visible'),
--- permitted by request ('Specified') (visible type application), or
--- prohibited entirely from appearing in source Haskell ('Invisible')?
--- Examples in Note [VisibilityFlag]
-data VisibilityFlag = Visible | Specified | Invisible
-  deriving (Eq, Data.Typeable, Data.Data)
-
--- | Do these denote the same level of visibility? Except that
--- 'Specified' and 'Invisible' are considered the same. Used
--- for printing.
-sameVis :: VisibilityFlag -> VisibilityFlag -> Bool
-sameVis Visible Visible = True
-sameVis Visible _       = False
-sameVis _       Visible = False
-sameVis _       _       = True
-
-instance Binary VisibilityFlag where
-  put_ bh Visible   = putByte bh 0
-  put_ bh Specified = putByte bh 1
-  put_ bh Invisible = putByte bh 2
-
-  get bh = do
-    h <- getByte bh
-    case h of
-      0 -> return Visible
-      1 -> return Specified
-      _ -> return Invisible
-
-type KindOrType = Type -- See Note [Arguments to type constructors]
-
--- | The key type representing kinds in the compiler.
-type Kind = Type
-
-{-
-Note [TyBinder]
-~~~~~~~~~~~~~~~
-This represents the type of binders -- that is, the type of an argument
-to a Pi-type. GHC Core currently supports two different Pi-types:
-a non-dependent function, written with ->, and a dependent compile-time-only
-polytype, written with forall. Both Pi-types classify terms/types that
-take an argument. In other words, if `x` is either a function or a polytype,
-`x arg` makes sense (for an appropriate `arg`). It is thus often convenient
-to group Pi-types together. This is ForAllTy.
-
-The two constructors for TyBinder sort out the two different possibilities.
-`Named` builds a polytype, while `Anon` builds an ordinary function.
-(ForAllTy (Anon arg) res used to be called FunTy arg res.)
-
-Note [The kind invariant]
-~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [The kind invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The kinds
    #          UnliftedTypeKind
    OpenKind   super-kind of *, #
@@ -408,53 +355,207 @@ Another helpful principle with eqType is this:
 
 This principle also tells us that eqType must relate only types with the
 same kinds.
-
-Note [VisibilityFlag]
-~~~~~~~~~~~~~~~~~~~~~
-All named binders are equipped with a visibility flag, which says
-whether or not arguments for this binder should be visible (explicit)
-in source Haskell. Historically, all named binders (that is, polytype
-binders) have been Invisible. But now it's more complicated.
-
-Invisible:
- Argument does not ever appear in source Haskell. With visible type
- application, only GHC-generated polytypes have Invisible binders.
- This exactly corresponds to "generalized" variables from the
- Visible Type Applications paper (ESOP'16).
-
- Example: f x = x
- `f` will be inferred to have type `forall a. a -> a`, where `a` is
- Invisible. Note that there is no type annotation for `f`.
-
- Printing: With -fprint-explicit-foralls, Invisible binders are written
- in braces. Otherwise, they are printed like Specified binders.
-
-Specified:
- The argument for this binder may appear in source Haskell only with
- visible type application. Otherwise, it is omitted.
-
- Example: id :: forall a. a -> a
- `a` is a Specified binder, because you can say `id @Int` in source Haskell.
-
- Example: const :: a -> b -> a
- Both `a` and `b` are Specified binders, even though they are not bound
- by an explicit forall.
-
- Printing: a list of Specified binders are put between `forall` and `.`:
- const :: forall a b. a -> b -> a
-
-Visible:
- The argument must be given. Visible binders come up only with TypeInType.
-
- Example: data Proxy k (a :: k) = P
- The kind of Proxy is forall k -> k -> *, where k is a Visible binder.
-
- Printing: As in the example above, Visible binders are put between `forall`
- and `->`. This syntax is not parsed (yet), however.
-
--------------------------------------
-                Note [PredTy]
 -}
+
+{- **********************************************************************
+*                                                                       *
+                  TyBinder and VisibilityFlag
+*                                                                       *
+********************************************************************** -}
+
+-- | A 'TyBinder' represents an argument to a function. TyBinders can be dependent
+-- ('Named') or nondependent ('Anon'). They may also be visible or not.
+-- See Note [TyBinders]
+data TyBinder
+  = Named TyVar VisibilityFlag  -- Always a TyVar (not CoVar or Id)
+  | Anon Type   -- Visibility is determined by the type (Constraint vs. *)
+    deriving (Data.Typeable, Data.Data)
+
+-- | Is something required to appear in source Haskell ('Visible'),
+-- permitted by request ('Specified') (visible type application), or
+-- prohibited entirely from appearing in source Haskell ('Invisible')?
+-- See Note [TyBinders and VisibilityFlags]
+data VisibilityFlag = Visible | Specified | Invisible
+  deriving (Eq, Data.Typeable, Data.Data)
+
+-- | Do these denote the same level of visibility? Except that
+-- 'Specified' and 'Invisible' are considered the same. Used
+-- for printing.
+sameVis :: VisibilityFlag -> VisibilityFlag -> Bool
+sameVis Visible Visible = True
+sameVis Visible _       = False
+sameVis _       Visible = False
+sameVis _       _       = True
+
+{- Note [TyBinders]
+~~~~~~~~~~~~~~~~~~~
+A ForAllTy contains a TyBinder.
+
+A TyBinder represents the type of binders -- that is, the type of an
+argument to a Pi-type. GHC Core currently supports two different
+Pi-types:
+
+ * A non-dependent function,
+   written with ->, e.g. ty1 -> ty2
+   represented as ForAllTy (Anon ty1) ty2
+
+ * A dependent compile-time-only polytype,
+   written with forall, e.g.  forall (a:*). ty
+   represented as ForAllTy (Named a v) ty
+
+Both Pi-types classify terms/types that take an argument. In other
+words, if `x` is either a function or a polytype, `x arg` makes sense
+(for an appropriate `arg`). It is thus often convenient to group
+Pi-types together.  This is ForAllTy.
+
+The two constructors for TyBinder sort out the two different possibilities.
+`Named` builds a polytype, while `Anon` builds an ordinary function.
+(ForAllTy (Anon arg) res used to be called FunTy arg res.)
+
+Note [TyBinders and VisibilityFlags]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A ForAllTy contains a TyBinder.  Each Named TyBinders are equipped
+with a VisibilityFlag, which says whether or not arguments for this
+binder should be visible (explicit) in source Haskell.
+
+-----------------------------------------------------------------------
+                                            Occurrences look like this
+ TyBinder          GHC displays type as     in Haskell souce code
+-----------------------------------------------------------------------
+In the type of a term
+ Anon:             f :: type -> type         Arg required:     f x
+ Named Invisible:  f :: forall {a}. type     Arg not allowed:  f
+ Named Specified:  f :: forall a. type       Arg optional:     f  or  f @Int
+ Named Visible:         Illegal: See Note [No Visible TyBinder in terms]
+
+In the kind of a type
+ Anon:             T :: kind -> kind         Required:            T *
+ Named Invisible:  T :: forall {k}. kind     Arg not allowed:     T
+ Named Specified:  T :: forall k. kind       Arg not allowed[1]:  T
+ Named Visible:    T :: forall k -> kind     Required:            T *
+------------------------------------------------------------------------
+
+[1] In types, in the Specified case, it would make sense to allow
+    optional kind applications, thus (T @*), but we have not
+    yet implemented that
+
+---- Examples of where the different visiblities come from -----
+
+In term declarations:
+
+* Invisible.  Function defn, with no signature:  f1 x = x
+  We infer f1 :: forall {a}. a -> a, with 'a' Invisible
+  It's Invisible because it doesn't appear in any
+  user-written signature for f1
+
+* Specified.  Function defn, with signature (implicit forall):
+     f2 :: a -> a; f2 x = x
+  So f2 gets the type f2 :: forall a. a->a, with 'a' Specified
+  even though 'a' is not bound in the source code by an explicit forall
+
+* Specified.  Function defn, with signature (explicit forall):
+     f3 :: forall a. a -> a; f3 x = x
+  So f3 gets the type f3 :: forall a. a->a, with 'a' Specified
+
+* Invisible/Specified.  Function signature with inferred kind polymorphism.
+     f4 :: a b -> Int
+  So 'f4' get the type f4 :: forall {k} (a:k->*) (b:k). a b -> Int
+  Here 'k' is Invisible (it's not mentioned in the type),
+  but 'a' and 'b' are Specified.
+
+* Specified.  Function signature with explicit kind polymorphism
+     f5 :: a (b :: k) -> Int
+  This time 'k' is Specified, because it is mentioned explicitly,
+  so we get f5 :: forall (k:*) (a:k->*) (b:k). a b -> Int
+
+* Similarly pattern synonyms:
+  Invisible - from inferred types (e.g. no pattern type signature)
+            - or from inferred kind polymorphism
+
+In type declarations:
+
+* Invisible (k)
+     data T1 a b = MkT1 (a b)
+  Here T1's kind is  T1 :: forall {k:*}. (k->*) -> k -> *
+  The kind variable 'k' is Invisible, since it is not mentioned
+
+  Note that 'a' and 'b' correspond to /Anon/ TyBinders in T1's kind,
+  and Anon binders don't have a visibility flag. (Or you could think
+  of Anon having an implicit Visible flag.)
+
+* Specified (k)
+     data T2 (a::k->*) b = MkT (a b)
+  Here T's kind is  T :: forall (k:*). (k->*) -> k -> *
+  The kind vairable 'k' is Specified, since it is mentioned in
+  the signature.
+
+* Visible (k)
+     data T k (a::k->*) b = MkT (a b)
+  Here T's kind is  T :: forall k:* -> (k->*) -> k -> *
+  The kind Visible, since it bound in a positional way in T's declaration
+  Every use of T must be explicitly applied to a kind
+
+* Invisible (k1), Specified (k)
+     data T a b (c :: k) = MkT (a b) (Proxy c)
+  Here T's kind is  T :: forall {k1:*} (k:*). (k1->*) -> k1 -> k -> *
+  So 'k' is Specified, becuase it appears explicitly,
+  but 'k1' is Invisible, becuase it does not
+
+---- Printing -----
+
+ We print forall types with enough syntax to tell you their visiblity
+ flag.  But this is not source Haskell, and these types may not all
+ be parsable.
+
+ Specified: a list of Specified binders is written between `forall` and `.`:
+               const :: forall a b. a -> b -> a
+
+ Invisible: with -fprint-explicit-foralls, Invisible binders are written
+            in braces:
+               f :: forall {k} (a:k). S k a -> Int
+            Otherwise, they are printed like Specified binders.
+
+ Visible: binders are put between `forall` and `->`:
+              T :: forall k -> *
+
+---- Other points -----
+
+* In classic Haskell, all named binders (that is, the type variables in
+  a polymorphic function type f :: forall a. a -> a) have been Invisible.
+
+* Invisible variables correspond to "generalized" variables from the
+  Visible Type Applications paper (ESOP'16).
+
+Note [No Visible TyBinder in terms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We don't allow Visible foralls for term variables, including pattern
+synonyms and data constructors.  Why?  Because then an application
+would need a /compulsory/ type argument (possibly without an "@"?),
+thus (f Int); and we don't have concrete syntax for that.
+
+We could change this decision, but Visible, Named TyBinders are rare
+anyway.  (Most are Anons.)
+-}
+
+instance Binary VisibilityFlag where
+  put_ bh Visible   = putByte bh 0
+  put_ bh Specified = putByte bh 1
+  put_ bh Invisible = putByte bh 2
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> return Visible
+      1 -> return Specified
+      _ -> return Invisible
+
+
+{- **********************************************************************
+*                                                                       *
+                        PredType
+*                                                                       *
+********************************************************************** -}
+
 
 -- | A type of the form @p@ of kind @Constraint@ represents a value whose type is
 -- the Haskell predicate @p@, where a predicate is what occurs before
@@ -493,6 +594,7 @@ represented using
 The predicate really does turn into a real extra argument to the
 function.  If the argument has type (p :: Constraint) then the predicate p is
 represented by evidence of type p.
+
 
 %************************************************************************
 %*                                                                      *
