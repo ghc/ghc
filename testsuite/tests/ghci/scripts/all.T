@@ -247,3 +247,4 @@ test('T11389', req_interp, run_command, ['$MAKE -s --no-print-directory T11389']
 test('T11524a', normal, ghci_script, ['T11524a.script'])
 test('T11456', normal, ghci_script, ['T11456.script'])
 test('TypeAppData', normal, ghci_script, ['TypeAppData.script'])
+test('T11728', normal, ghci_script, ['T11728.script'])
