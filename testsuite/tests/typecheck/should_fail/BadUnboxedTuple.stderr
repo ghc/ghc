@@ -1,0 +1,6 @@
+
+BadUnboxedTuple.hs:10:5: error:
+    The type ‘F’ is not an unboxed tuple,
+    and yet its kind suggests that it has the representation
+    of an unboxed tuple. This is not allowed.
+    In a wildcard pattern
