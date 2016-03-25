@@ -9166,7 +9166,9 @@ the following pairs are equivalent: ::
                     h x y = y
                  in ...
 
-Notice that GHC does *not* find the inner-most possible quantification
+Notice that GHC always adds implicit quantfiers *at the outermost level*
+of a user-written type; it
+does *not* find the inner-most possible quantification
 point. For example: ::
 
       f :: (a -> a) -> Int
@@ -9177,13 +9179,12 @@ point. For example: ::
 
 
       g :: (Ord a => a -> a) -> Int
-               -- MEANS the illegal type
+               -- MEANS
       g :: forall a. (Ord a => a -> a) -> Int
                -- NOT
       g :: (forall a. Ord a => a -> a) -> Int
 
-The latter produces an illegal type, which you might think is silly, but
-at least the rule is simple. If you want the latter type, you can write
+If you want the latter type, you can write
 your ``forall``\s explicitly. Indeed, doing so is strongly advised for
 rank-2 types.
 
