@@ -507,7 +507,7 @@ simplifyExpr :: DynFlags -- includes spec of what core-to-core passes to do
 --
 -- Also used by Template Haskell
 simplifyExpr dflags expr
-  = withTiming (pure dflags) (text "Simplify [expr]") (const ()) $
+  = withTiming (return dflags) (text "Simplify [expr]") (const ()) $
     do  {
         ; us <-  mkSplitUniqSupply 's'
 

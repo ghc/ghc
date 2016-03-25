@@ -69,7 +69,11 @@ import Data.Time
 import Control.Monad
 import Control.Monad.IO.Class
 import System.IO
+#if MIN_VERSION_base(4,8,0)
 import GHC.Conc         ( getAllocationCounter )
+#else
+import GHC.Int          ( Int64 )
+#endif
 import System.CPUTime
 
 -------------------------
@@ -507,7 +511,7 @@ withTiming getDFlags what force_result action
                   alloc0 <- liftIO getAllocationCounter
                   start <- liftIO getCPUTime
                   !r <- action
-                  () <- pure $ force_result r
+                  () <- return $ force_result r
                   end <- liftIO getCPUTime
                   alloc1 <- liftIO getAllocationCounter
                   -- recall that allocation counter counts down
@@ -520,7 +524,7 @@ withTiming getDFlags what force_result action
                        <+> text "allocated"
                        <+> doublePrec 3 (realToFrac alloc / 1024 / 1024)
                        <+> text "megabytes")
-                  pure r
+                  return r
            else action
 
 debugTraceMsg :: DynFlags -> Int -> MsgDoc -> IO ()
