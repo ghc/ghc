@@ -4855,7 +4855,15 @@ makeDynFlagsConsistent dflags
 -- Do not use it if you can help it. You may get the wrong value, or this
 -- panic!
 
-GLOBAL_VAR(v_unsafeGlobalDynFlags, panic "v_unsafeGlobalDynFlags: not initialised", DynFlags)
+-- | This is the value that 'unsafeGlobalDynFlags' takes before it is
+-- initialized.
+defaultGlobalDynFlags :: DynFlags
+defaultGlobalDynFlags =
+    (defaultDynFlags settings) { verbosity = 2 }
+  where
+    settings = panic "v_unsafeGlobalDynFlags: not initialised"
+
+GLOBAL_VAR(v_unsafeGlobalDynFlags, defaultGlobalDynFlags, DynFlags)
 
 unsafeGlobalDynFlags :: DynFlags
 unsafeGlobalDynFlags = unsafePerformIO $ readIORef v_unsafeGlobalDynFlags
