@@ -2265,6 +2265,10 @@ def summary(t, file, short=False):
         file.write('Unexpected stat failures:\n')
         printFailingTestInfosSummary(file, t.unexpected_stat_failures)
 
+    if t.n_framework_failures > 0:
+        file.write('Test framework failures:\n')
+        printFrameworkFailureSummary(file, t.framework_failures)
+
     if config.check_files_written:
         checkForFilesWrittenProblems(file)
 
@@ -2308,6 +2312,16 @@ def printFailingTestInfosSummary(file, testInfos):
                file.write('   ' + directory.ljust(maxDirLen + 2) + test + \
                           ' [' + reason + ']' + \
                           ' (' + ','.join(testInfos[directory][test][reason]) + ')\n')
+    file.write('\n')
+
+def printFrameworkFailureSummary(file, testInfos):
+    names = list(testInfos.keys())
+    names.sort()
+    maxNameLen = max(len(n) for n in names)
+    for name in names:
+        ways = testInfos[name]
+        file.write('   ' + name.ljust(maxNameLen + 2) + \
+                   ' (' + ','.join(ways) + ')\n')
     file.write('\n')
 
 def modify_lines(s, f):
