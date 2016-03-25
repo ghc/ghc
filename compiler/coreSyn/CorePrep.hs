@@ -967,8 +967,13 @@ tryEtaReducePrep bndrs (Let bind@(NonRec _ r) body)
   where
     fvs = exprFreeVars r
 
-tryEtaReducePrep bndrs (Tick tickish e)
-  = fmap (mkTick tickish) $ tryEtaReducePrep bndrs e
+-- NB: do not attempt to eta-reduce across ticks
+-- Otherwise we risk reducing
+--       \x. (Tick (Breakpoint {x}) f x)
+--   ==> Tick (breakpoint {x}) f
+-- which is bogus (Trac #17228)
+-- tryEtaReducePrep bndrs (Tick tickish e)
+--   = fmap (mkTick tickish) $ tryEtaReducePrep bndrs e
 
 tryEtaReducePrep _ _ = Nothing
 
