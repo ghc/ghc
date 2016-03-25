@@ -129,51 +129,53 @@
  * EXTERN_INLINE is for functions that we want to inline sometimes
  * (we also compile a static version of the function; see Inlines.c)
  */
-#if defined(__GNUC__) || defined( __INTEL_COMPILER)
 
-# define INLINE_HEADER static inline
-# define INLINE_ME inline
-# define STATIC_INLINE INLINE_HEADER
+// We generally assume C99 semantics albeit these two definitions work fine even
+// when gnu90 semantics are active (i.e. when __GNUC_GNU_INLINE__ is defined or
+// when a GCC older than 4.2 is used)
+//
+// The problem, however, is with 'extern inline' whose semantics significantly
+// differs between gnu90 and C99
+#define INLINE_HEADER static inline
+#define INLINE_ME inline
+#define STATIC_INLINE static inline
 
-// The special "extern inline" behaviour is now only supported by gcc
-// when _GNUC_GNU_INLINE__ is defined, and you have to use
-// __attribute__((gnu_inline)).  So when we don't have this, we use
-// ordinary static inline.
-//
-// Apple's gcc defines __GNUC_GNU_INLINE__ without providing
-// gnu_inline, so we exclude MacOS X and fall through to the safe
-// version.
-//
-#if defined(__GNUC_GNU_INLINE__) && !defined(__APPLE__)
-#  if defined(KEEP_INLINES)
-#    define EXTERN_INLINE inline
-#  else
-#    define EXTERN_INLINE extern inline __attribute__((gnu_inline))
-#  endif
-#else
-#  if defined(KEEP_INLINES)
-#    define EXTERN_INLINE
-#  else
-#    define EXTERN_INLINE INLINE_HEADER
-#  endif
+// Figure out whether `__attributes__((gnu_inline))` is needed
+// to force gnu90-style 'external inline' semantics.
+#if defined(FORCE_GNU_INLINE)
+// disable auto-detection since HAVE_GNU_INLINE has been defined externally
+#elif __GNUC_GNU_INLINE__ && __GNUC__ == 4 && __GNUC_MINOR__ == 2
+// GCC 4.2.x didn't properly support C99 inline semantics (GCC 4.3 was the first
+// release to properly support C99 inline semantics), and therefore warned when
+// using 'extern inline' while in C99 mode unless `__attributes__((gnu_inline))`
+// was explicitly set.
+# define FORCE_GNU_INLINE 1
 #endif
 
-#elif defined(_MSC_VER)
-
-# define INLINE_HEADER __inline static
-# define INLINE_ME __inline
-# define STATIC_INLINE INLINE_HEADER
-
+#if FORCE_GNU_INLINE
+// Force compiler into gnu90 semantics
 # if defined(KEEP_INLINES)
-#  define EXTERN_INLINE __inline
+#  define EXTERN_INLINE inline __attribute__((gnu_inline))
 # else
-#  define EXTERN_INLINE __inline extern
+#  define EXTERN_INLINE extern inline __attribute__((gnu_inline))
 # endif
-
+#elif __GNUC_GNU_INLINE__
+// we're currently in gnu90 inline mode by default and
+// __attribute__((gnu_inline)) may not be supported, so better leave it off
+# if defined(KEEP_INLINES)
+#  define EXTERN_INLINE inline
+# else
+#  define EXTERN_INLINE extern inline
+# endif
 #else
-
-# error "Don't know how to inline functions with your C compiler."
-
+// Assume C99 semantics (yes, this curiously results in swapped definitions!)
+// This is the preferred branch, and at some point we may drop support for
+// compilers not supporting C99 semantics altogether.
+# if defined(KEEP_INLINES)
+#  define EXTERN_INLINE extern inline
+# else
+#  define EXTERN_INLINE inline
+# endif
 #endif
 
 
