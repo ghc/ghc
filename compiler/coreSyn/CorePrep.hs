@@ -436,8 +436,6 @@ cpePair top_lvl is_rec dmd is_unlifted env bndr rhs
 
        ; return (floats4, bndr', rhs4) }
   where
-    is_strict_or_unlifted = (isStrictDmd dmd) || is_unlifted
-
     platform = targetPlatform (cpe_dynFlags env)
 
     arity = idArity bndr        -- We must match this arity
@@ -445,14 +443,14 @@ cpePair top_lvl is_rec dmd is_unlifted env bndr rhs
     ---------------------
     float_from_rhs floats rhs
       | isEmptyFloats floats = return (emptyFloats, rhs)
-      | isTopLevel top_lvl    = float_top    floats rhs
-      | otherwise             = float_nested floats rhs
+      | isTopLevel top_lvl   = float_top    floats rhs
+      | otherwise            = float_nested floats rhs
 
     ---------------------
     float_nested floats rhs
-      | wantFloatNested is_rec is_strict_or_unlifted floats rhs
+      | wantFloatNested is_rec dmd is_unlifted floats rhs
                   = return (floats, rhs)
-      | otherwise = dont_float floats rhs
+      | otherwise = dontFloat floats rhs
 
     ---------------------
     float_top floats rhs        -- Urhgh!  See Note [CafInfo and floating]
@@ -465,16 +463,17 @@ cpePair top_lvl is_rec dmd is_unlifted env bndr rhs
       = return (floats', rhs')
 
       | otherwise
-      = dont_float floats rhs
+      = dontFloat floats rhs
 
-    ---------------------
-    dont_float floats rhs
-      -- Non-empty floats, but do not want to float from rhs
-      -- So wrap the rhs in the floats
-      -- But: rhs1 might have lambdas, and we can't
-      --      put them inside a wrapBinds
-      = do { body <- rhsToBodyNF rhs
-           ; return (emptyFloats, wrapBinds floats body) }
+dontFloat :: Floats -> CpeRhs -> UniqSM (Floats, CpeBody)
+-- Non-empty floats, but do not want to float from rhs
+-- So wrap the rhs in the floats
+-- But: rhs1 might have lambdas, and we can't
+--      put them inside a wrapBinds
+dontFloat floats1 rhs
+  = do { (floats2, body) <- rhsToBody rhs
+        ; return (emptyFloats, wrapBinds floats1 $
+                               wrapBinds floats2 body) }
 
 {- Note [Silly extra arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -618,11 +617,6 @@ cpeBody env expr
        ; return (floats1 `appendFloats` floats2, body) }
 
 --------
-rhsToBodyNF :: CpeRhs -> UniqSM CpeBody
-rhsToBodyNF rhs = do { (floats,body) <- rhsToBody rhs
-                     ; return (wrapBinds floats body) }
-
---------
 rhsToBody :: CpeRhs -> UniqSM (Floats, CpeBody)
 -- Remove top level lambdas by let-binding
 
@@ -763,8 +757,7 @@ cpeArg env dmd arg arg_ty
   = do { (floats1, arg1) <- cpeRhsE env arg     -- arg1 can be a lambda
        ; (floats2, arg2) <- if want_float floats1 arg1
                             then return (floats1, arg1)
-                            else do { body1 <- rhsToBodyNF arg1
-                                    ; return (emptyFloats, wrapBinds floats1 body1) }
+                            else dontFloat floats1 arg1
                 -- Else case: arg1 might have lambdas, and we can't
                 --            put them inside a wrapBinds
 
@@ -777,8 +770,7 @@ cpeArg env dmd arg arg_ty
        ; return (addFloat floats2 arg_float, varToCoreExpr v) } }
   where
     is_unlifted = isUnliftedType arg_ty
-    is_strict   = isStrictDmd dmd
-    want_float  = wantFloatNested NonRecursive (is_strict || is_unlifted)
+    want_float  = wantFloatNested NonRecursive dmd is_unlifted
 
 {-
 Note [Floating unlifted arguments]
@@ -1151,10 +1143,11 @@ canFloatFromNoCaf platform (Floats ok_to_spec fs) rhs
                          (\i -> pprPanic "rhsIsStatic" (integer i))
                          -- Integer literals should not show up
 
-wantFloatNested :: RecFlag -> Bool -> Floats -> CpeRhs -> Bool
-wantFloatNested is_rec strict_or_unlifted floats rhs
+wantFloatNested :: RecFlag -> Demand -> Bool -> Floats -> CpeRhs -> Bool
+wantFloatNested is_rec dmd is_unlifted floats rhs
   =  isEmptyFloats floats
-  || strict_or_unlifted
+  || isStrictDmd dmd
+  || is_unlifted
   || (allLazyNested is_rec floats && exprIsHNF rhs)
         -- Why the test for allLazyNested?
         --      v = f (x `divInt#` y)
