@@ -874,10 +874,11 @@ etaTyConAppCo_maybe tc (TyConAppCo _ tc2 cos2)
 
 etaTyConAppCo_maybe tc co
   | mightBeUnsaturatedTyCon tc
-  , Pair ty1 ty2     <- coercionKind co
-  , Just (tc1, tys1) <- splitTyConApp_maybe ty1
-  , Just (tc2, tys2) <- splitTyConApp_maybe ty2
+  , (Pair ty1 ty2, r) <- coercionKindRole co
+  , Just (tc1, tys1)  <- splitTyConApp_maybe ty1
+  , Just (tc2, tys2)  <- splitTyConApp_maybe ty2
   , tc1 == tc2
+  , isInjectiveTyCon tc r  -- See Note [NthCo and newtypes] in TyCoRep
   , let n = length tys1
   = ASSERT( tc == tc1 )
     ASSERT( n == length tys2 )
