@@ -9127,7 +9127,7 @@ argument of constructor ``T1`` and that tells GHC all it needs to know.
 Implicit quantification
 -----------------------
 
-GHC performs implicit quantification as follows. At the top level
+GHC performs implicit quantification as follows. At the outermost level
 (only) of user-written types, if and only if there is no explicit
 ``forall``, GHC finds all the type variables mentioned in the type that
 are not already in scope, and universally quantifies them. For example,
@@ -9166,6 +9166,18 @@ point. For example: ::
 If you want the latter type, you can write
 your ``forall``\s explicitly. Indeed, doing so is strongly advised for
 rank-2 types.
+
+Sometimes there *is* no "outermost level", in which case no
+implicit quanification happens: ::
+
+      data PackMap a b s t = PackMap (Monad f => (a -> f b) -> s -> f t)
+
+This is rejected because there is no "outermost level" for the types on the RHS
+(it would obviously be terrible to add extra parameters to ``PackMap``),
+so no implicit quantificaiton happens, and the declaration is rejected
+(with "``f`` is out of scope").  Solution: use an explicit ``forall``: ::
+
+      data PackMap a b s t = PackMap (forall f. Monad f => (a -> f b) -> s -> f t)
 
 .. _impredicative-polymorphism:
 
