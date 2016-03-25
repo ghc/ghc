@@ -82,9 +82,30 @@ may look nothing alike.
 
 So, we pass a kind coercion to the match/unify worker. This coercion witnesses
 the equality between the substed kind of the left-hand type and the substed
-kind of the right-hand type. To get this coercion, we first have to match/unify
+kind of the right-hand type. Note that we do not unify kinds at the leaves
+(as we did previously). We thus have
+
+INVARIANT: In the call
+    unify_ty ty1 ty2 kco
+it must be that subst(kco) :: subst(kind(ty1)) ~N subst(kind(ty2)), where
+`subst` is the ambient substitution in the UM monad.
+
+To get this coercion, we first have to match/unify
 the kinds before looking at the types. Happily, we need look only one level
 up, as all kinds are guaranteed to have kind *.
+
+When we're working with type applications (either TyConApp or AppTy) we
+need to worry about establishing INVARIANT, as the kinds of the function
+& arguments aren't (necessarily) included in the kind of the result.
+When unifying two TyConApps, this is easy, because the two TyCons are
+the same. Their kinds are thus the same. As long as we unify left-to-right,
+we'll be sure to unify types' kinds before the types themselves. (For example,
+think about Proxy :: forall k. k -> *. Unifying the first args matches up
+the kinds of the second args.)
+
+For AppTy, we must unify the kinds of the functions, but once these are
+unified, we can continue unifying arguments without worrying further about
+kinds.
 
 We thought, at one point, that this was all unnecessary: why should casts
 be in types in the first place? But they do. In
@@ -766,6 +787,7 @@ unify_ty_app ty1 ty1args ty2 ty2args
   | otherwise
   = do { let ki1 = typeKind ty1
              ki2 = typeKind ty2
+           -- See Note [Kind coercions in Unify]
        ; unify_ty ki1 ki2 (mkNomReflCo liftedTypeKind)
        ; unify_ty ty1 ty2 (mkNomReflCo ki1)
        ; unify_tys ty1args ty2args }
@@ -776,6 +798,7 @@ unify_tys orig_xs orig_ys
   where
     go []     []     = return ()
     go (x:xs) (y:ys)
+      -- See Note [Kind coercions in Unify]
       = do { unify_ty x y (mkNomReflCo $ typeKind x)
            ; go xs ys }
     go _ _ = maybeApart  -- See Note [Lists of different lengths are MaybeApart]
