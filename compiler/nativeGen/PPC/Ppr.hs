@@ -607,10 +607,16 @@ pprInstr (BCTR _ _) = hcat [
     ]
 pprInstr (BL lbl _) = do
     sdocWithPlatform $ \platform -> case platformOS platform of
-        OSAIX | isForeignLabel lbl ->
+        OSAIX ->
           -- On AIX, "printf" denotes a function-descriptor (for use
           -- by function pointers), whereas the actual entry-code
-          -- address is denoted by the dot-prefixed ".printf" label
+          -- address is denoted by the dot-prefixed ".printf" label.
+          -- Moreover, the PPC NCG only ever emits a BL instruction
+          -- for calling C ABI functions. Most of the time these calls
+          -- originate from FFI imports and have a 'ForeignLabel',
+          -- but when profiling the codegen inserts calls via
+          -- 'emitRtsCallGen' which are 'CmmLabel's even though
+          -- they'd technically be more like 'ForeignLabel's.
           hcat [
             text "\tbl\t.",
             ppr lbl
