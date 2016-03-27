@@ -137,7 +137,6 @@
 // The problem, however, is with 'extern inline' whose semantics significantly
 // differs between gnu90 and C99
 #define INLINE_HEADER static inline
-#define INLINE_ME inline
 #define STATIC_INLINE static inline
 
 // Figure out whether `__attributes__((gnu_inline))` is needed

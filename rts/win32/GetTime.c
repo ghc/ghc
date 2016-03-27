@@ -17,7 +17,7 @@
 
 /* Convert FILETIMEs into secs */
 
-static INLINE_ME Time
+static inline Time
 fileTimeToRtsTime(FILETIME ft)
 {
     Time t;
