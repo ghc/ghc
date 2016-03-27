@@ -539,9 +539,7 @@ AS_STAGE1       = $(AS)
 AS_STAGE2       = $(AS)
 AS_STAGE3       = $(AS)
 
-# We don't have an LD_STAGE0.  CC_STAGE0 is determined by asking "ghc
-# --info", and it doesn't report an LD.
-LD_STAGE0       = error-no-ld-stage0
+LD_STAGE0       = @LD_STAGE0@
 LD_STAGE1       = $(LD)
 LD_STAGE2       = $(LD)
 LD_STAGE3       = $(LD)
