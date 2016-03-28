@@ -656,6 +656,8 @@ n+k patterns
 
 .. ghc-flag:: -XNPlusKPatterns
 
+    :since: 6.12
+
     Enable use of ``n+k`` patterns.
 
 .. _recursive-do-notation:
@@ -1195,6 +1197,12 @@ Monad comprehensions
 .. index::
    single: monad comprehensions
 
+.. ghc-flag:: -XMonadComprehensions
+
+    :since: 7.2
+
+    Enable list comprehension syntax for arbitrary monads.
+
 Monad comprehensions generalise the list comprehension notation,
 including parallel comprehensions (:ref:`parallel-list-comprehensions`)
 and transform comprehensions (:ref:`generalised-list-comprehensions`) to
@@ -1262,7 +1270,7 @@ Monad comprehensions support:
                             return y)
           return (x+y)
 
-All these features are enabled by default if the ``MonadComprehensions``
+All these features are enabled by default if the :ghc-flag:`-XMonadComprehensions`
 extension is enabled. The types and more detailed examples on how to use
 comprehensions are explained in the previous chapters
 :ref:`generalised-list-comprehensions` and
@@ -1273,14 +1281,14 @@ comprehensions.
 .. note::
     Even though most of these examples are using the list monad, monad
     comprehensions work for any monad. The ``base`` package offers all
-    necessary instances for lists, which make ``MonadComprehensions``
+    necessary instances for lists, which make :ghc-flag:`-XMonadComprehensions`
     backward compatible to built-in, transform and parallel list
     comprehensions.
 
 More formally, the desugaring is as follows. We write ``D[ e | Q]`` to
 mean the desugaring of the monad comprehension ``[ e | Q]``:
 
-::
+.. code-block:: none
 
     Expressions: e
     Declarations: d
@@ -1482,6 +1490,8 @@ Tuple sections
 --------------
 
 .. ghc-flag:: -XTupleSections
+
+    :since: 6.12
 
     Allow the use of tuple section syntax
 
@@ -1745,6 +1755,8 @@ Safe imports
               -XTrustworthy
               -XUnsafe
     :noindex:
+
+    :since: 7.2
 
     Declare the Safe Haskell state of the current module.
 
@@ -2379,6 +2391,8 @@ Declaring data types with explicit constructor signatures
 ---------------------------------------------------------
 
 .. ghc-flag:: -XGADTSyntax
+
+    :since: 7.2
 
     Allow the use of GADT syntax in data type definitions (but not GADTs
     themselves; for this see :ghc-flag:`-XGADTs`)
@@ -3268,17 +3282,25 @@ Deriving instances of extra classes (``Data``, etc.)
 
 .. ghc-flag:: -XDeriveGeneric
 
+    :since: 7.2
+
     Allow automatic deriving of instances for the ``Generic`` typeclass.
 
 .. ghc-flag:: -XDeriveFunctor
+
+    :since: 6.12
 
     Allow automatic deriving of instances for the ``Functor`` typeclass.
 
 .. ghc-flag:: -XDeriveFoldable
 
+    :since: 6.12
+
     Allow automatic deriving of instances for the ``Foldable`` typeclass.
 
 .. ghc-flag:: -XDeriveTraversable
+
+    :since: 6.12
 
     :implies: :ghc-flag:`-XDeriveFoldable`, :ghc-flag:`-XDeriveFunctor`
 
@@ -4553,6 +4575,8 @@ Default method signatures
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. ghc-flag:: -XDefaultSignatures
+
+    :since: 7.2
 
     Allows the definition of default method signatures in class definitions.
 
@@ -7109,7 +7133,7 @@ See also :ghc-ticket:`7347`.
 Kind polymorphism and Type-in-Type
 ==================================
 
-.. ghc-flag: -XTypeInType
+.. ghc-flag:: -XTypeInType
 
     :implies: :ghc-flag:`-XPolyKinds`, :ghc-flag:`-XDataKinds`, :ghc-flag:`-XKindSignatures`
     :since: 8.0.1
@@ -8048,6 +8072,8 @@ Explicit universal quantification (forall)
 
 .. ghc-flag:: -XExplicitForAll
 
+    :since: 6.12
+
     Allow use of the ``forall`` keyword in places where universal quantification
     is implicit.
 
@@ -8587,6 +8613,8 @@ Let-generalisation
 
 .. ghc-flag:: -XMonoLocalBinds
 
+    :since: 6.12
+
     Infer less polymorphic types for local bindings by default.
 
 An ML-style language usually generalises the type of any ``let``\-bound or
@@ -8937,7 +8965,6 @@ Arbitrary-rank polymorphism
 ===========================
 
 .. ghc-flag:: -XRankNTypes
-
 
     :implies: :ghc-flag:`-XExplicitForAll`
 
@@ -9874,11 +9901,12 @@ Syntax
 .. ghc-flag:: -XTemplateHaskell
 
     :implies: :ghc-flag:`-XTemplateHaskellQuotes`
-    :since: 8.0.1
 
     Enable Template Haskell's splice and quotation syntax.
 
 .. ghc-flag:: -XTemplateHaskellQuotes
+
+    :since: 8.0.1
 
     Enable only Template Haskell's quotation syntax.
 
