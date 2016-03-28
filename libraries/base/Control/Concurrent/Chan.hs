@@ -14,6 +14,11 @@
 --
 -- Unbounded channels.
 --
+-- The channels are implemented with @MVar@s and therefore inherit all the
+-- caveats that apply to @MVar@s (possibility of races, deadlocks etc). The
+-- stm (software transactional memory) library has a more robust implementation
+-- of channels called @TChan@s.
+--
 -----------------------------------------------------------------------------
 
 module Control.Concurrent.Chan
