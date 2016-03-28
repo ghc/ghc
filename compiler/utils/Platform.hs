@@ -84,7 +84,6 @@ data OS
         | OSNetBSD
         | OSKFreeBSD
         | OSHaiku
-        | OSOsf3
         | OSQNXNTO
         | OSAndroid
         | OSAIX
@@ -136,8 +135,6 @@ osElfTarget OSiOS       = False
 osElfTarget OSMinGW32   = False
 osElfTarget OSKFreeBSD  = True
 osElfTarget OSHaiku     = True
-osElfTarget OSOsf3      = False -- I don't know if this is right, but as
-                                -- per comment below it's safe
 osElfTarget OSQNXNTO    = False
 osElfTarget OSAndroid   = True
 osElfTarget OSAIX       = False
