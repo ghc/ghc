@@ -514,6 +514,48 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsOptCommand)
 ])
 
+# Helper for cloning a shell variable's state
+AC_DEFUN([FP_COPY_SHELLVAR],
+[if test -n "${$1+set}"; then $2="$$1"; else unset $2; fi ])
+
+# FP_SET_CFLAGS_C99
+# ----------------------------------
+# figure out which CFLAGS are needed to place the compiler into C99 mode
+# $1 is name of CC variable (unmodified)
+# $2 is name of CC flags variable (augmented if needed)
+# $3 is name of CPP flags variable (augmented if needed)
+AC_DEFUN([FP_SET_CFLAGS_C99],
+[
+    dnl save current state of AC_PROG_CC_C99
+    FP_COPY_SHELLVAR([CC],[fp_save_CC])
+    FP_COPY_SHELLVAR([CFLAGS],[fp_save_CFLAGS])
+    FP_COPY_SHELLVAR([CPPFLAGS],[fp_save_CPPFLAGS])
+    FP_COPY_SHELLVAR([ac_cv_prog_cc_c99],[fp_save_cc_c99])
+    dnl set local state
+    CC="$$1"
+    CFLAGS="$$2"
+    CPPFLAGS="$$3"
+    unset ac_cv_prog_cc_c99
+    dnl perform detection
+    _AC_PROG_CC_C99
+    fp_cc_c99="$ac_cv_prog_cc_c99"
+    case "x$ac_cv_prog_cc_c99" in
+      x)   ;; # noop
+      xno) AC_MSG_ERROR([C99-compatible compiler needed]) ;;
+      *)   $2="$$2 $ac_cv_prog_cc_c99"
+           $3="$$3 $ac_cv_prog_cc_c99"
+           ;;
+    esac
+    dnl restore saved state
+    FP_COPY_SHELLVAR([fp_save_CC],[CC])
+    FP_COPY_SHELLVAR([fp_save_CFLAGS],[CFLAGS])
+    FP_COPY_SHELLVAR([fp_save_CPPFLAGS],[CPPFLAGS])
+    FP_COPY_SHELLVAR([fp_save_cc_c99],[ac_cv_prog_cc_c99])
+    dnl cleanup
+    unset fp_save_CC
+    unset fp_save_CFLAGS
+    unset fp_save_cc_c99
+])
 
 # FPTOOLS_SET_C_LD_FLAGS
 # ----------------------------------

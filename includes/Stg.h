@@ -26,6 +26,10 @@
 #ifndef STG_H
 #define STG_H
 
+#if !(__STDC_VERSION__ >= 199901L)
+# error __STDC_VERSION__ does not advertise C99 or later
+#endif
+
 /*
  * If we are compiling a .hc file, then we want all the register
  * variables.  This is the what happens if you #include "Stg.h" first:
