@@ -252,15 +252,6 @@ AC_ARG_ENABLE(unregisterised,
 )
 AC_SUBST(Unregisterised)
 
-AC_ARG_WITH(hc,
-[AC_HELP_STRING([--with-hc=ARG],
-        [Use ARG as the path to the compiler for compiling ordinary
-         Haskell code  (default= value of --with-ghc)])],
-[WithHc="$withval"],
-[WithHc=$WithGhc]
-)
-AC_SUBST(WithHc)
-
 # Requires FPTOOLS_SET_PLATFORM_VARS to be run first.
 FP_FIND_ROOT
 
