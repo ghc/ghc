@@ -4,7 +4,7 @@ module Main (main) where
 import T4114dSub
 
 keep, nokeep :: [FilePath]
-keep   = ["T4114d", "T4114dSub.myhi", "T4114d.myhi"]
+keep   = ["T4114dSub.myhi", "T4114d.myhi"]
 nokeep = ["T4114dSub.myo", "T4114d.myo"]
 
 
