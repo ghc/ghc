@@ -21,11 +21,11 @@
 # include <sys/times.h>
 #endif
 
-#if ! ((defined(HAVE_GETRUSAGE) && !irix_HOST_OS) || defined(HAVE_TIMES))
+#if ! (defined(HAVE_GETRUSAGE) || defined(HAVE_TIMES))
 #error No implementation for getProcessCPUTime() available.
 #endif
 
-#if defined(HAVE_GETTIMEOFDAY) && defined(HAVE_GETRUSAGE) && !irix_HOST_OS
+#if defined(HAVE_GETTIMEOFDAY) && defined(HAVE_GETRUSAGE)
 // we'll implement getProcessCPUTime() and getProcessElapsedTime()
 // separately, using getrusage() and gettimeofday() respectively
 
@@ -190,7 +190,7 @@ void getUnixEpochTime(StgWord64 *sec, StgWord32 *nsec)
 W_
 getPageFaults(void)
 {
-#if !defined(HAVE_GETRUSAGE) || irix_HOST_OS || haiku_HOST_OS
+#if !defined(HAVE_GETRUSAGE) || haiku_HOST_OS
     return 0;
 #else
     struct rusage t;

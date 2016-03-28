@@ -164,20 +164,7 @@ my_mmap (void *addr, W_ size, int operation)
     else
         flags = 0;
 
-#if defined(irix_HOST_OS)
-    {
-        if (operation & MEM_RESERVE)
-        {
-            int fd = open("/dev/zero",O_RDONLY);
-            ret = mmap(addr, size, prot, flags | MAP_PRIVATE, fd, 0);
-            close(fd);
-        }
-        else
-        {
-            ret = mmap(addr, size, prot, flags | MAP_PRIVATE, -1, 0);
-        }
-    }
-#elif hpux_HOST_OS
+#if hpux_HOST_OS
     ret = mmap(addr, size, prot, flags | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 #elif linux_HOST_OS
     ret = mmap(addr, size, prot, flags | MAP_ANON | MAP_PRIVATE, -1, 0);

@@ -111,7 +111,7 @@
 # include <mach/mach_time.h>
 #endif
 
-#if !defined(_WIN32) && !defined(irix_HOST_OS)
+#if !defined(_WIN32)
 # if HAVE_SYS_RESOURCE_H
 #  include <sys/resource.h>
 # endif

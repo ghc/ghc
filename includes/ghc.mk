@@ -143,11 +143,6 @@ $(includes_H_PLATFORM) : includes/Makefile | $$(dir $$@)/.
 	@echo "#define $(TargetOS_CPP)_HOST_OS  1" >> $@
 	@echo "#define BUILD_OS  \"$(HostOS_CPP)\"" >> $@
 	@echo "#define HOST_OS  \"$(TargetOS_CPP)\"" >> $@
-ifeq "$(HostOS_CPP)" "irix"
-	@echo "#ifndef $(IRIX_MAJOR)_HOST_OS" >> $@  
-	@echo "#define $(IRIX_MAJOR)_HOST_OS  1" >> $@  
-	@echo "#endif" >> $@  
-endif
 	@echo >> $@
 	@echo "#define $(HostVendor_CPP)_BUILD_VENDOR  1" >> $@
 	@echo "#define $(TargetVendor_CPP)_HOST_VENDOR  1" >> $@
