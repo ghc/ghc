@@ -27,8 +27,8 @@ considered a bug in the new versions. If you ever get failed parsing
 message, please report it.
 
 You must also specify an option for the output format. Currently only
-the :option:`-h` option for HTML and the :option:`--hoogle` option for outputting
-Hoogle data are functional.
+the :option:`--html` option for HTML and the :option:`--hoogle` option for
+outputting Hoogle data are functional.
 
 The packaging tool
 `Cabal <http://www.haskell.org/ghc/docs/latest/html/Cabal/index.html>`__
@@ -36,8 +36,6 @@ has Haddock support, and is often used instead of invoking Haddock
 directly.
 
 The following options are available:
-
-.. program:: haddock
 
 .. option:: -B <dir>
 
@@ -94,8 +92,7 @@ The following options are available:
    Haddock interface files are not the same as Haskell interface files,
    I just couldn't think of a better name.
 
-.. option:: -h
-            --html
+.. option:: --html, -h
 
     Generate documentation in HTML format. Several files will be
     generated into the current directory (or the specified directory if
@@ -156,6 +153,11 @@ The following options are available:
     command ``\usepackage{haddock}`` in the LaTeX source. If this option
     is given, then ``haddock.sty`` is not generated, and the command is
     instead ``\usepackage{style}``.
+
+.. option:: --hoogle
+
+    Generate an index file for the
+    `Hoogle <http://hackage.haskell.org/package/hoogle>`_ search engine.
 
 .. option:: --hyperlinked-source
 
@@ -455,4 +457,3 @@ Since Haddock uses GHC internally, both plain and literate Haskell
 sources are accepted without the need for the user to do anything. To
 use the C pre-processor, however, the user must pass the the :option:`-cpp`
 option to GHC using :option:`--optghc`.
-
