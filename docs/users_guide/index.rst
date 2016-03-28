@@ -7,7 +7,7 @@ Welcome to the GHC Users Guide
 Contents:
 
 .. toctree::
-   :maxdepth: 3
+   :maxdepth: 4
    :numbered:
 
    license
