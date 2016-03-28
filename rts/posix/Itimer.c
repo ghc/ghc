@@ -202,10 +202,15 @@ static void *itimer_thread_func(void *_handle_tick)
 
     while (1) {
         if (USE_TIMERFD_FOR_ITIMER) {
-            if (read(timerfd, &nticks, sizeof(nticks)) != sizeof(nticks))
-                sysErrorBelch("Itimer: read(timer_fd) failed");
+            if (read(timerfd, &nticks, sizeof(nticks)) != sizeof(nticks)) {
+                if (errno != EINTR) {
+                    sysErrorBelch("Itimer: read(timerfd) failed");
+                }
+            }
         } else {
-            usleep(TimeToUS(itimer_interval));
+            if (usleep(TimeToUS(itimer_interval)) != 0 && errno != EINTR) {
+                sysErrorBelch("usleep(TimeToUS(itimer_interval) failed");
+            }
         }
         switch (itimer_state) {
             case RUNNING:
@@ -222,7 +227,7 @@ static void *itimer_thread_func(void *_handle_tick)
                 return NULL;
         }
     }
-    return NULL;
+    return NULL; // Never reached.
 }
 #endif
 
