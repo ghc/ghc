@@ -88,8 +88,12 @@ rnHsSigWcTypeScoped :: HsDocContext -> LHsSigWcType RdrName
 --   - Signatures on binders in a RULE
 --   - Pattern type signatures
 -- Wildcards are allowed
+-- type signatures on binders only allowed with ScopedTypeVariables
 rnHsSigWcTypeScoped ctx sig_ty thing_inside
-  = rn_hs_sig_wc_type False ctx sig_ty thing_inside
+  = do { ty_sig_okay <- xoptM LangExt.ScopedTypeVariables
+       ; checkErr ty_sig_okay (unexpectedTypeSigErr sig_ty)
+       ; rn_hs_sig_wc_type False ctx sig_ty thing_inside
+       }
     -- False: for pattern type sigs and rules we /do/ want
     --        to bring those type variables into scope
     -- e.g  \ (x :: forall a. a-> b) -> e
@@ -1392,6 +1396,11 @@ ppr_opfix (op, fixity) = pp_op <+> brackets (ppr fixity)
                  Errors
 *                                                      *
 ***************************************************** -}
+
+unexpectedTypeSigErr :: LHsSigWcType RdrName -> SDoc
+unexpectedTypeSigErr ty
+  = hang (text "Illegal type signature:" <+> quotes (ppr ty))
+       2 (text "Type signatures are only allowed in patterns with ScopedTypeVariables")
 
 badKindBndrs :: HsDocContext -> [Located RdrName] -> SDoc
 badKindBndrs doc kvs
