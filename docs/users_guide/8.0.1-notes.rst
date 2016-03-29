@@ -205,6 +205,14 @@ Language
    result, :ghc-flag:`-XDeriveTraversable` now works on datatypes that contain
    arguments which have unlifted types.
 
+-  Note that the :ghc-flag:`-XImpredicativeTypes` extension, which has been
+   :ghc-wiki:`known <ImpredicativePolymorphism>` to be broken for many years, is even more
+   broken than usual in this release (see :ghc-ticket:`11319`,
+   :ghc-ticket:`11675`, and others). During pre-release testing we encountered
+   a number of projects that broke with confusing type errors due to (often
+   unnecessary) use of :ghc-flag:`-XImpredicativeTypes`. Users of
+   :ghc-flag:`-XImpredicativeTypes` do so at their own risk!
+
 Compiler
 ~~~~~~~~
 
