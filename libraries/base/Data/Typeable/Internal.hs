@@ -224,7 +224,7 @@ mkFunTy  :: TypeRep -> TypeRep -> TypeRep
 mkFunTy f a = mkTyConApp tcFun [f,a]
 
 -- | Splits a type constructor application.
--- Note that if the type construcotr is polymorphic, this will
+-- Note that if the type constructor is polymorphic, this will
 -- not return the kinds that were used.
 -- See 'splitPolyTyConApp' if you need all parts.
 splitTyConApp :: TypeRep -> (TyCon,[TypeRep])
