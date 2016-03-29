@@ -78,6 +78,9 @@
     `Data.Functor.Product`, and `Data.Functor.Sum` (previously provided by
     `transformers` package). (#11135)
 
+  * New instances for `Proxy`: `Eq1`, `Ord1`, `Show1`, `Read1`. All
+    of the classes are from `Data.Functor.Classes` (#11756).
+
   * New module `Control.Monad.Fail` providing new `MonadFail(fail)`
     class (#10751)
 

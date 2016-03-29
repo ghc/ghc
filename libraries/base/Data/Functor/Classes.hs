@@ -62,6 +62,7 @@ module Data.Functor.Classes (
 
 import Control.Applicative (Const(Const))
 import Data.Functor.Identity (Identity(Identity))
+import Data.Proxy (Proxy(Proxy))
 import Data.Monoid (mappend)
 import Text.Show (showListWith)
 
@@ -353,6 +354,23 @@ instance (Read a) => Read1 (Const a) where
     liftReadsPrec = liftReadsPrec2 readsPrec readList
 instance (Show a) => Show1 (Const a) where
     liftShowsPrec = liftShowsPrec2 showsPrec showList
+
+-- | @since 4.9.0.0
+instance Eq1 Proxy where
+  liftEq _ _ _ = True
+
+-- | @since 4.9.0.0
+instance Ord1 Proxy where
+  liftCompare _ _ _ = EQ
+
+-- | @since 4.9.0.0
+instance Show1 Proxy where
+  liftShowsPrec _ _ _ _ = showString "Proxy"
+
+-- | @since 4.9.0.0
+instance Read1 Proxy where
+  liftReadsPrec _ _ d =
+    readParen (d > 10) (\r -> [(Proxy, s) | ("Proxy",s) <- lex r ])
 
 -- Building blocks
 
