@@ -1,0 +1,16 @@
+
+T11663.hs:5:12: error:
+    Illegal type signature: ‘Int’
+      Type signatures are only allowed in patterns with ScopedTypeVariables
+
+T11663.hs:6:9: error:
+    Illegal type signature: ‘Int’
+      Type signatures are only allowed in patterns with ScopedTypeVariables
+
+T11663.hs:7:22: error:
+    Illegal type signature: ‘Int’
+      Type signatures are only allowed in patterns with ScopedTypeVariables
+
+T11663.hs:8:32: error:
+    Illegal type signature: ‘Int’
+      Type signatures are only allowed in patterns with ScopedTypeVariables
