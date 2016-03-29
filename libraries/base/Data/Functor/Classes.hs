@@ -355,6 +355,8 @@ instance (Read a) => Read1 (Const a) where
 instance (Show a) => Show1 (Const a) where
     liftShowsPrec = liftShowsPrec2 showsPrec showList
 
+-- Proxy unfortunately imports this module, hence these instances are placed
+-- here,
 -- | @since 4.9.0.0
 instance Eq1 Proxy where
   liftEq _ _ _ = True
