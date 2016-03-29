@@ -291,10 +291,9 @@ data DataCon
         --      dcRepTyCon       = T
 
         -- In general, the dcUnivTyVars are NOT NECESSARILY THE SAME AS THE TYVARS
-        -- FOR THE PARENT TyCon. With GADTs the data con might not even have
-        -- the same number of type variables!
-        -- [This is a change (Oct05): previously, vanilla datacons guaranteed to
-        --  have the same type variables as their parent TyCon, but that seems ugly.]
+        -- FOR THE PARENT TyCon. (This is a change (Oct05): previously, vanilla
+        -- datacons guaranteed to have the same type variables as their parent TyCon,
+        -- but that seems ugly.)
 
         dcVanilla :: Bool,      -- True <=> This is a vanilla Haskell 98 data constructor
                                 --          Its type is of form
@@ -307,12 +306,11 @@ data DataCon
                 --       The declaration format is held in the TyCon (algTcGadtSyntax)
 
         -- Universally-quantified type vars [a,b,c]
+        -- INVARIANT: length matches arity of the dcRepTyCon
+        -- INVARIANT: result type of data con worker is exactly (T a b c)
         dcUnivTyVars    :: [TyVar],     -- Two linked fields
         dcUnivTyBinders :: [TyBinder],  -- see Note [TyBinders in DataCons]
 
-            -- INVARIANT: length matches arity of the dcRepTyCon
-            --
-            -- INFARIANT: result type of (rep) data con is exactly (T a b c)
 
         -- Existentially-quantified type vars [x,y]
         dcExTyVars     :: [TyVar],     -- Two linked fields
@@ -441,8 +439,8 @@ Specifically:
    the corresponding tyvar in the TyVars list.
 
  * Each Visibilty flag (va, vb, etc) is Invisible or Specified.
-   None are Visible. (See Note [No Visible TyBinder in terms];
-   a DataCon is a term-level function.)
+   None are Visible. (A DataCon is a term-level function; see
+   Note [No Visible TyBinder in terms] in TyCoRep.)
 
 Why store these fields redundantly?  Purely convenience.  In most
 places in GHC, it's just the TyVars that are needed, so that's what's

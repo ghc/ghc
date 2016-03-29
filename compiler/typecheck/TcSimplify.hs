@@ -768,7 +768,7 @@ decideQuantification apply_mr sigs name_taus constraints
           -- to *. So, don't grow the kvs.
 
        ; constraints <- TcM.zonkTcTypes constraints
-                 -- quantiyTyVars turned some meta tyvars into
+                 -- quantifyTyVars turned some meta tyvars into
                  -- quantified skolems, so we have to zonk again
 
        ; let theta     = pickQuantifiablePreds (mkVarSet qtvs) constraints
