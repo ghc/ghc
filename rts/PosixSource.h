@@ -11,25 +11,21 @@
 
 #include <ghcplatform.h>
 
-#if defined(freebsd_HOST_OS) || defined(dragonfly_HOST_OS) || defined(solaris2_HOST_OS)
+/* We aim for C99 so we need to define following two defines in a consistent way
+   with what POSIX/XOPEN provide for C99. Some OSes are particularly picky about
+   the right versions defined here, e.g. Solaris
+   We also settle on lowest version of POSIX/XOPEN needed for proper C99 support
+   here which is POSIX.1-2001 compilation and Open Group Technical Standard,
+   Issue 6 (XPG6). XPG6 itself is a result of the merge of X/Open and POSIX
+   specification. It is also referred as IEEE Std. 1003.1-2001 or ISO/IEC
+   9945:2002 or UNIX 03 and SUSv3.
+   Please also see trac ticket #11757 for more information about switch
+   to C99/C11.
+*/
 #define _POSIX_C_SOURCE 200112L
 #define _XOPEN_SOURCE   600
-#else
-#define _POSIX_SOURCE   1
-#define _POSIX_C_SOURCE 199506L
-#define _XOPEN_SOURCE   500
-// FreeBSD takes a different approach to _ISOC99_SOURCE: on FreeBSD it
-// means "I want *just* C99 things", whereas on GNU libc and Solaris
-// it means "I also want C99 things".
-//
-// On both GNU libc and FreeBSD, _ISOC99_SOURCE is implied by
-// _XOPEN_SOURCE==600, but on Solaris it is an error to omit it.
-#define _ISOC99_SOURCE
-// Defining __USE_MINGW_ANSI_STDIO is the most portable way to tell
-// mingw that we want to use the standard %lld style format specifiers,
-// rather than the Windows %I64d style
+
 #define __USE_MINGW_ANSI_STDIO 1
-#endif
 
 #if defined(darwin_HOST_OS)
 /* If we don't define this the including sysctl breaks with things like
