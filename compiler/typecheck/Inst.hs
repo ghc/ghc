@@ -306,14 +306,16 @@ instDFunType :: DFunId -> [DFunInstType]
 -- See Note [DFunInstType: instantiating types] in InstEnv
 instDFunType dfun_id dfun_inst_tys
   = do { (subst, inst_tys) <- go emptyTCvSubst dfun_tvs dfun_inst_tys
-       ; return (inst_tys, substThetaUnchecked subst dfun_theta) }
+       ; return (inst_tys, substTheta subst dfun_theta) }
   where
     (dfun_tvs, dfun_theta, _) = tcSplitSigmaTy (idType dfun_id)
 
     go :: TCvSubst -> [TyVar] -> [DFunInstType] -> TcM (TCvSubst, [TcType])
     go subst [] [] = return (subst, [])
     go subst (tv:tvs) (Just ty : mb_tys)
-      = do { (subst', tys) <- go (extendTvSubst subst tv ty) tvs mb_tys
+      = do { (subst', tys) <- go (extendTvSubstAndInScope subst tv ty)
+                                 tvs
+                                 mb_tys
            ; return (subst', ty : tys) }
     go subst (tv:tvs) (Nothing : mb_tys)
       = do { (subst', tv') <- newMetaTyVarX subst tv
