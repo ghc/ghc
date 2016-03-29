@@ -449,6 +449,43 @@ Bugs in GHC
    libraries that come with GHC are probably built without this option,
    unless you built GHC yourself.
 
+-  The :ghc-flag:`state hack <-fstate-hack>` optimization can result in
+   non-obvious changes in evaluation ordering which may hide exceptions, even
+   with :ghc-flag:`-fpedantic-bottoms` (see, e.g., :ghc-ticket:`7411`). For
+   instance, ::
+
+     import Control.Exception
+     import Control.DeepSeq
+     main = do
+         evaluate (('a' : undefined) `deepseq` return () :: IO ())
+         putStrLn "Hello"
+
+   Compiling this program with ``-O`` results in ``Hello`` to be printed,
+   despite the fact that ``evaluate`` should have bottomed. Compiling
+   with ``-O -fno-state-hack`` results in the exception one would expect.
+
+-  Programs compiled with :ghc-flag:`-fdefer-type-errors` may fail a bit
+   more eagerly than one might expect. For instance, ::
+
+     {-# OPTIONS_GHC -fdefer-type-errors #-}
+     main = do
+       putStrLn "Hi there."
+       putStrLn True
+
+   Will emit no output, despite the fact that the ill-typed term appears
+   after the well-typed ``putStrLn "Hi there."``. See :ghc-ticket:`11197`.
+
+-  Despite appearances ``*`` and ``Constraint`` aren't really distinct kinds
+   in the compiler's internal representation and can be unified producing
+   unexpected results. See :ghc-ticket:`11715` for one example.
+
+-  :ghc-flag:`-XTypeInType` still has a few rough edges, especially where
+   it interacts with other advanced type-system features. For instance,
+   this definition causes the typechecker to loop (:ghc-ticket:`11559`), ::
+
+     data A :: Type where
+       B :: forall (a :: A). A
+
 -  There is known to be maleficent interactions between weak references and
    laziness. Particularly, it has been observed that placing a thunk containing
    a reference to a weak reference inside of another weak reference may cause
