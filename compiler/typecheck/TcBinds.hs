@@ -675,16 +675,7 @@ mkExport prag_fn qtvs theta
                         , mbi_sig       = mb_sig
                         , mbi_mono_id   = mono_id })
   = do  { mono_ty <- zonkTcType (idType mono_id)
-        ; poly_id <- case mb_sig of
-              Just sig | Just poly_id <- completeIdSigPolyId_maybe sig
-                       -> return poly_id
-              _other   -> checkNoErrs $
-                          mkInferredPolyId qtvs theta
-                                           poly_name mb_sig mono_ty
-              -- The checkNoErrs ensures that if the type is ambiguous
-              -- we don't carry on to the impedence matching, and generate
-              -- a duplicate ambiguity error.  There is a similar
-              -- checkNoErrs for complete type signatures too.
+        ; poly_id <- mkInferredPolyId qtvs theta poly_name mb_sig mono_ty
 
         -- NB: poly_id has a zonked type
         ; poly_id <- addInlinePrags poly_id prag_sigs
@@ -723,7 +714,16 @@ mkInferredPolyId :: [TyVar] -> TcThetaType
                  -> Name -> Maybe TcIdSigInfo -> TcType
                  -> TcM TcId
 mkInferredPolyId qtvs inferred_theta poly_name mb_sig mono_ty
-  = do { fam_envs <- tcGetFamInstEnvs
+  | Just sig     <- mb_sig
+  , Just poly_id <- completeIdSigPolyId_maybe sig
+  = return poly_id
+
+  | otherwise  -- Either no type sig or partial type sig
+  = checkNoErrs $  -- The checkNoErrs ensures that if the type is ambiguous
+                   -- we don't carry on to the impedence matching, and generate
+                   -- a duplicate ambiguity error.  There is a similar
+                   -- checkNoErrs for complete type signatures too.
+    do { fam_envs <- tcGetFamInstEnvs
        ; let (_co, mono_ty') = normaliseType fam_envs Nominal mono_ty
                -- Unification may not have normalised the type,
                -- (see Note [Lazy flattening] in TcFlatten) so do it
@@ -754,7 +754,8 @@ chooseInferredQuantifiers :: TcThetaType   -- inferred
                           -> Maybe TcIdSigInfo
                           -> TcM ([TcTyBinder], TcThetaType)
 chooseInferredQuantifiers inferred_theta tau_tvs qtvs Nothing
-  = do { let free_tvs = closeOverKinds (growThetaTyVars inferred_theta tau_tvs)
+  = -- No type signature for this binder
+    do { let free_tvs = closeOverKinds (growThetaTyVars inferred_theta tau_tvs)
                         -- Include kind variables!  Trac #7916
              my_theta = pickQuantifiablePreds free_tvs inferred_theta
              binders  = [ mkNamedBinder Invisible tv
@@ -805,7 +806,8 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
 
        ; return (mk_binders free_tvs, final_theta) }
 
-  | otherwise = pprPanic "chooseInferredQuantifiers" (ppr bndr_info)
+  | otherwise  -- A complete type signature is dealt with in mkInferredPolyId
+  = pprPanic "chooseInferredQuantifiers" (ppr bndr_info)
 
   where
     pts_hint = text "To use the inferred type, enable PartialTypeSignatures"
