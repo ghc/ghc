@@ -439,7 +439,7 @@ tcInstType inst_tyvars ty
                             return ([], theta, tau)
 
         (tyvars, rho) -> do { (subst, tyvars') <- inst_tyvars tyvars
-                            ; let (theta, tau) = tcSplitPhiTy (substTyUnchecked subst rho)
+                            ; let (theta, tau) = tcSplitPhiTy (substTyAddInScope subst rho)
                             ; return (tyvars', theta, tau) }
 
 tcSkolDFunType :: Type -> TcM ([TcTyVar], TcThetaType, TcType)
