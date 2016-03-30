@@ -1475,6 +1475,7 @@ mk/ghcconfig*_test___spaces_ghc*.exe.mk
 /tests/simplCore/should_run/T5997
 /tests/simplCore/should_run/T7101
 /tests/simplCore/should_run/T7924
+/tests/simplCore/should_run/T11731
 /tests/simplCore/should_run/T9128
 /tests/simplCore/should_run/T9390
 /tests/simplCore/should_run/runST
