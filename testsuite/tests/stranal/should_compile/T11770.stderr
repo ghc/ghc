@@ -1,0 +1,85 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core = {terms: 56, types: 25, coercions: 0}
+
+-- RHS size: {terms: 2, types: 0, coercions: 0}
+T11770.$trModule2 :: GHC.Types.TrName
+[GblId,
+ Caf=NoCafRefs,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 20}]
+T11770.$trModule2 = GHC.Types.TrNameS "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0}
+T11770.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Caf=NoCafRefs,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
+T11770.$trModule1 = GHC.Types.TrNameS "T11770"#
+
+-- RHS size: {terms: 3, types: 0, coercions: 0}
+T11770.$trModule :: GHC.Types.Module
+[GblId,
+ Caf=NoCafRefs,
+ Str=m,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
+T11770.$trModule =
+  GHC.Types.Module T11770.$trModule2 T11770.$trModule1
+
+Rec {
+-- RHS size: {terms: 32, types: 11, coercions: 0}
+T11770.$wfoo [InlPrag=[0], Occ=LoopBreaker]
+  :: GHC.Prim.Int# -> Int -> GHC.Prim.Int#
+[GblId, Arity=2, Caf=NoCafRefs, Str=<S,U><L,U(U)>]
+T11770.$wfoo =
+  \ (ww_s1Mj :: GHC.Prim.Int#) (w_s1Mg :: Int) ->
+    case ww_s1Mj of ds_X1Lc {
+      __DEFAULT ->
+        let {
+          bar_s1LA [InlPrag=NOINLINE] :: Int -> Int
+          [LclId, Arity=1, Str=<S(S),1*U(U)>m {axl-><S(S),1*U(U)>}]
+          bar_s1LA =
+            \ (n_axp :: Int) ->
+              GHC.Num.$fNumInt_$c+ n_axp w_s1Mg } in
+        case bar_s1LA (GHC.Types.I# ds_X1Lc)
+        of _ [Occ=Dead] { GHC.Types.I# x_a1Lp ->
+        case bar_s1LA (GHC.Types.I# (GHC.Prim.+# ds_X1Lc 1#))
+        of _ [Occ=Dead] { GHC.Types.I# ww2_X1MK ->
+        case T11770.$wfoo ww2_X1MK w_s1Mg of ww3_s1Mn { __DEFAULT ->
+        GHC.Prim.+# x_a1Lp ww3_s1Mn
+        }
+        }
+        };
+      10# -> 0#
+    }
+end Rec }
+
+-- RHS size: {terms: 12, types: 5, coercions: 0}
+foo [InlPrag=INLINE[0]] :: Int -> Int -> Int
+[GblId,
+ Arity=2,
+ Caf=NoCafRefs,
+ Str=<S(S),1*U(U)><L,U(U)>m,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (w_s1Mf [Occ=Once!] :: Int) (w1_s1Mg [Occ=Once] :: Int) ->
+                 case w_s1Mf of _ [Occ=Dead] { GHC.Types.I# ww1_s1Mj [Occ=Once] ->
+                 case T11770.$wfoo ww1_s1Mj w1_s1Mg of ww2_s1Mn { __DEFAULT ->
+                 GHC.Types.I# ww2_s1Mn
+                 }
+                 }}]
+foo =
+  \ (w_s1Mf :: Int) (w1_s1Mg :: Int) ->
+    case w_s1Mf of _ [Occ=Dead] { GHC.Types.I# ww1_s1Mj ->
+    case T11770.$wfoo ww1_s1Mj w1_s1Mg of ww2_s1Mn { __DEFAULT ->
+    GHC.Types.I# ww2_s1Mn
+    }
+    }
+
+
+
