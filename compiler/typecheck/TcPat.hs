@@ -398,8 +398,7 @@ tc_pat penv (ViewPat expr pat _) overall_pat_ty thing_inside
             -- expr_wrap1 :: expr'_inferred "->" (inf_arg_ty -> inf_res_ty)
 
          -- check that overall pattern is more polymorphic than arg type
-        ; let pat_origin = GivenOrigin (SigSkol GenSigCtxt overall_pat_ty)
-        ; expr_wrap2 <- tcSubTypeET pat_origin overall_pat_ty inf_arg_ty
+        ; expr_wrap2 <- tcSubTypeET (pe_orig penv) overall_pat_ty inf_arg_ty
             -- expr_wrap2 :: overall_pat_ty "->" inf_arg_ty
 
          -- pattern must have inf_res_ty

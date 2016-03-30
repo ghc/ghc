@@ -746,8 +746,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
         do { res_wrap <- tc_sub_type_ds eq_orig inst_orig ctxt act_res exp_res
            ; arg_wrap
                <- tc_sub_tc_type eq_orig (GivenOrigin
-                                          (SigSkol GenSigCtxt
-                                           (mkCheckExpType exp_arg)))
+                                          (SigSkol GenSigCtxt exp_arg))
                                  ctxt exp_arg act_arg
            ; return (mkWpFun arg_wrap res_wrap exp_arg exp_res) }
                -- arg_wrap :: exp_arg ~ act_arg
@@ -883,8 +882,7 @@ tcSkolemise ctxt expected_ty thing_inside
 
         -- Use the *instantiated* type in the SkolemInfo
         -- so that the names of displayed type variables line up
-        ; let skol_info = SigSkol ctxt (mkCheckExpType $
-                                        mkFunTys (map varType given) rho')
+        ; let skol_info = SigSkol ctxt (mkFunTys (map varType given) rho')
 
         ; (ev_binds, result) <- checkConstraints skol_info tvs' given $
                                 thing_inside tvs' rho'

@@ -1270,9 +1270,8 @@ zonkCtEvidence ctev@(CtDerived { ctev_pred = pred })
        ; return (ctev { ctev_pred = pred' }) }
 
 zonkSkolemInfo :: SkolemInfo -> TcM SkolemInfo
-zonkSkolemInfo (SigSkol cx ty)  = do { ty  <- readExpType ty
-                                     ; ty' <- zonkTcType ty
-                                     ; return (SigSkol cx (mkCheckExpType ty')) }
+zonkSkolemInfo (SigSkol cx ty)  = do { ty' <- zonkTcType ty
+                                     ; return (SigSkol cx ty') }
 zonkSkolemInfo (InferSkol ntys) = do { ntys' <- mapM do_one ntys
                                      ; return (InferSkol ntys') }
   where
@@ -1458,9 +1457,7 @@ tidyEvVar env var = setVarType var (tidyType env (varType var))
 ----------------
 tidySkolemInfo :: TidyEnv -> SkolemInfo -> SkolemInfo
 tidySkolemInfo env (DerivSkol ty)       = DerivSkol (tidyType env ty)
-tidySkolemInfo env (SigSkol cx ty)      = SigSkol cx (mkCheckExpType $
-                                                      tidyType env $
-                                                      checkingExpType "tidySkolemInfo" ty)
+tidySkolemInfo env (SigSkol cx ty)      = SigSkol cx (tidyType env ty)
 tidySkolemInfo env (InferSkol ids)      = InferSkol (mapSnd (tidyType env) ids)
 tidySkolemInfo env (UnifyForAllSkol ty) = UnifyForAllSkol (tidyType env ty)
 tidySkolemInfo _   info                 = info

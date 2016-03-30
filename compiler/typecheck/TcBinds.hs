@@ -585,7 +585,7 @@ tcPolyCheck rec_tc prag_fn
                       , sig_loc   = loc })
             bind
   = do { ev_vars <- newEvVars theta
-       ; let skol_info = SigSkol ctxt (mkCheckExpType $ mkPhiTy theta tau)
+       ; let skol_info = SigSkol ctxt (mkPhiTy theta tau)
              prag_sigs = lookupPragEnv prag_fn name
              skol_tvs  = map snd skol_prs
                  -- Find the location of the original source type sig, if
@@ -764,7 +764,7 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs Nothing
        ; return (binders, my_theta) }
 
 chooseInferredQuantifiers inferred_theta tau_tvs qtvs
-                          (Just (TISI { sig_bndr = bndr_info
+                          (Just (TISI { sig_bndr = bndr_info  -- Always PartialSig
                                       , sig_ctxt = ctxt
                                       , sig_theta = annotated_theta
                                       , sig_skols = annotated_tvs }))

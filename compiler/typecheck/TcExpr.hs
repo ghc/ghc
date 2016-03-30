@@ -1480,7 +1480,7 @@ tcExprSig expr sig@(TISI { sig_bndr  = s_bndr
 
   | otherwise = panic "tcExprSig"   -- Can't happen
   where
-    skol_info = SigSkol ExprSigCtxt (mkCheckExpType $ mkPhiTy theta tau)
+    skol_info = SigSkol ExprSigCtxt (mkPhiTy theta tau)
     skol_tvs = map snd skol_prs
 
 {- *********************************************************************

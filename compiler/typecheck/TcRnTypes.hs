@@ -2574,7 +2574,7 @@ pushErrCtxtSameOrigin err loc@(CtLoc { ctl_env = lcl })
 --   b) an implication constraint is generated
 data SkolemInfo
   = SigSkol UserTypeCtxt        -- A skolem that is created by instantiating
-            ExpType             -- a programmer-supplied type signature
+            TcType              -- a programmer-supplied type signature
                                 -- Location of the binding site is on the TyVar
 
   | PatSynSigSkol Name  -- Bound by a programmer-supplied type signature of a pattern
@@ -2653,7 +2653,7 @@ pprSkolInfo (PatSynSigSkol name) = text "the type signature of pattern synonym"
 -- For Insts, these cases should not happen
 pprSkolInfo UnkSkol = WARN( True, text "pprSkolInfo: UnkSkol" ) text "UnkSkol"
 
-pprSigSkolInfo :: UserTypeCtxt -> ExpType -> SDoc
+pprSigSkolInfo :: UserTypeCtxt -> TcType -> SDoc
 pprSigSkolInfo ctxt ty
   = case ctxt of
        FunSigCtxt f _ -> pp_sig f
