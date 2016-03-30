@@ -2056,13 +2056,14 @@ doCpp dflags raw input_fn output_fn = do
     let uids = explicitPackages (pkgState dflags)
         pkgs = catMaybes (map (lookupPackage dflags) uids)
     mb_macro_include <-
-        -- Only generate if we have (1) we have set -hide-all-packages
-        -- (so we don't generate a HUGE macro file of things we don't
-        -- care about but are exposed) and (2) we actually have packages
-        -- to write macros for!
-        if gopt Opt_HideAllPackages dflags && not (null pkgs)
+        if not (null pkgs)
             then do macro_stub <- newTempName dflags "h"
                     writeFile macro_stub (generatePackageVersionMacros pkgs)
+                    -- Include version macros for every *exposed* package.
+                    -- Without -hide-all-packages and with a package database
+                    -- size of 1000 packages, it takes cpp an estimated 2
+                    -- milliseconds to process this file. See Trac #10970
+                    -- comment 8.
                     return [SysTools.FileOption "-include" macro_stub]
             else return []
 
@@ -2110,8 +2111,8 @@ getBackendDefs _ =
 
 generatePackageVersionMacros :: [PackageConfig] -> String
 generatePackageVersionMacros pkgs = concat
-  [ "/* package " ++ sourcePackageIdString pkg ++ " */\n"
-  ++ generateMacros "" pkgname version
+  -- Do not add any C-style comments. See Trac #3389.
+  [ generateMacros "" pkgname version
   | pkg <- pkgs
   , let version = packageVersion pkg
         pkgname = map fixchar (packageNameString pkg)
