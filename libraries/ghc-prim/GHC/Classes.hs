@@ -90,8 +90,8 @@ the @(==)@ class operation rule may rewrite the predicate before our @break@
 rule has a chance to fire.
 
 For this reason, most of the primitive types in @base@ have 'Eq' instances
-defined in terms of helper functions with delayed inlinings. For instance,
-@Word8@\'s @Eq@ instance looks like,
+defined in terms of helper functions with inlinings delayed to phase 1. For
+instance, @Word8@\'s @Eq@ instance looks like,
 
 > instance Eq Word8 where
 >     (==) = eqWord8
@@ -176,6 +176,7 @@ instance Eq Word where
     (==) = eqWord
     (/=) = neWord
 
+-- See GHC.Classes#matching_overloaded_methods_in_rules
 {-# INLINE [1] eqWord #-}
 {-# INLINE [1] neWord #-}
 eqWord, neWord :: Word -> Word -> Bool
@@ -187,6 +188,7 @@ instance Eq Char where
     (==) = eqChar
     (/=) = neChar
 
+-- See GHC.Classes#matching_overloaded_methods_in_rules
 {-# INLINE [1] eqChar #-}
 {-# INLINE [1] neChar #-}
 eqChar, neChar :: Char -> Char -> Bool
@@ -196,6 +198,7 @@ eqChar, neChar :: Char -> Char -> Bool
 instance Eq Float where
     (==) = eqFloat
 
+-- See GHC.Classes#matching_overloaded_methods_in_rules
 {-# INLINE [1] eqFloat #-}
 eqFloat :: Float -> Float -> Bool
 (F# x) `eqFloat` (F# y) = isTrue# (x `eqFloat#` y)
@@ -203,6 +206,7 @@ eqFloat :: Float -> Float -> Bool
 instance Eq Double where
     (==) = eqDouble
 
+-- See GHC.Classes#matching_overloaded_methods_in_rules
 {-# INLINE [1] eqDouble #-}
 eqDouble :: Double -> Double -> Bool
 (D# x) `eqDouble` (D# y) = isTrue# (x ==## y)
@@ -211,6 +215,7 @@ instance Eq Int where
     (==) = eqInt
     (/=) = neInt
 
+-- See GHC.Classes#matching_overloaded_methods_in_rules
 {-# INLINE [1] eqInt #-}
 {-# INLINE [1] neInt #-}
 eqInt, neInt :: Int -> Int -> Bool
@@ -363,10 +368,11 @@ instance Ord Int where
     (>=)    = geInt
     (>)     = gtInt
 
-{-# INLINE gtInt #-}
-{-# INLINE geInt #-}
-{-# INLINE ltInt #-}
-{-# INLINE leInt #-}
+-- See GHC.Classes#matching_overloaded_methods_in_rules
+{-# INLINE [1] gtInt #-}
+{-# INLINE [1] geInt #-}
+{-# INLINE [1] ltInt #-}
+{-# INLINE [1] leInt #-}
 gtInt, geInt, ltInt, leInt :: Int -> Int -> Bool
 (I# x) `gtInt` (I# y) = isTrue# (x >#  y)
 (I# x) `geInt` (I# y) = isTrue# (x >=# y)
