@@ -1446,7 +1446,7 @@ peelManyCalls n (JD { sd = str, ud = abs })
     go_str n (SCall d') = go_str (n-1) d'
     go_str _ _          = Lazy
 
-    go_abs :: Int -> UseDmd -> Use () -- Many <=> unsaturated, or at least
+    go_abs :: Int -> UseDmd -> Use ()      -- Many <=> unsaturated, or at least
     go_abs 0 _              = Use One ()   --          one UCall Many in the demand
     go_abs n (UCall One d') = go_abs (n-1) d'
     go_abs _ _              = Use Many ()
@@ -1776,7 +1776,9 @@ argsOneShots (StrictSig (DmdType _ arg_ds _)) n_val_args
     cons [] [] = []
     cons a  as = a:as
 
-argOneShots :: OneShotInfo -> Demand -> [OneShotInfo]
+argOneShots :: OneShotInfo     -- OneShotLam or ProbOneShot,
+            -> Demand          -- depending on saturation
+            -> [OneShotInfo]
 argOneShots one_shot_info (JD { ud = usg })
   = case usg of
       Use _ arg_usg -> go arg_usg
