@@ -66,51 +66,6 @@ Unification is much tricker than you might think.
    where x is the template type variable.  Then we do not want to
    bind x to a/b!  This is a kind of occurs check.
    The necessary locals accumulate in the RnEnv2.
-
-Note [Kind coercions in Unify]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We wish to match/unify while ignoring casts. But, we can't just ignore
-them completely, or we'll end up with ill-kinded substitutions. For example,
-say we're matching `a` with `ty |> co`. If we just drop the cast, we'll
-return [a |-> ty], but `a` and `ty` might have different kinds. We can't
-just match/unify their kinds, either, because this might gratuitously
-fail. After all, `co` is the witness that the kinds are the same -- they
-may look nothing alike.
-
-So, we pass a kind coercion to the match/unify worker. This coercion witnesses
-the equality between the substed kind of the left-hand type and the substed
-kind of the right-hand type. Note that we do not unify kinds at the leaves
-(as we did previously). We thus have
-
-INVARIANT: In the call
-    unify_ty ty1 ty2 kco
-it must be that subst(kco) :: subst(kind(ty1)) ~N subst(kind(ty2)), where
-`subst` is the ambient substitution in the UM monad.
-
-To get this coercion, we first have to match/unify
-the kinds before looking at the types. Happily, we need look only one level
-up, as all kinds are guaranteed to have kind *.
-
-When we're working with type applications (either TyConApp or AppTy) we
-need to worry about establishing INVARIANT, as the kinds of the function
-& arguments aren't (necessarily) included in the kind of the result.
-When unifying two TyConApps, this is easy, because the two TyCons are
-the same. Their kinds are thus the same. As long as we unify left-to-right,
-we'll be sure to unify types' kinds before the types themselves. (For example,
-think about Proxy :: forall k. k -> *. Unifying the first args matches up
-the kinds of the second args.)
-
-For AppTy, we must unify the kinds of the functions, but once these are
-unified, we can continue unifying arguments without worrying further about
-kinds.
-
-We thought, at one point, that this was all unnecessary: why should casts
-be in types in the first place? But they do. In
-dependent/should_compile/KindEqualities2, we see, for example
-the constraint Num (Int |> (blah ; sym blah)).
-We naturally want to find a dictionary for that constraint, which
-requires dealing with coercions in this manner.
-
 -}
 
 -- | @tcMatchTy t1 t2@ produces a substitution (over fvs(t1))
@@ -533,12 +488,21 @@ niSubstTvSet tsubst tvs
 {-
 ************************************************************************
 *                                                                      *
-                The workhorse
+                unify_ty: the main workhorse
 *                                                                      *
 ************************************************************************
 
 Note [Specification of unification]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The pure unifier, unify_ty, defined in this module, tries to work out
+a substitution to make two types say True to eqType. NB: eqType is
+itself not purely syntactic; it accounts for CastTys;
+see Note [Non-trivial definitional equality] in TyCoRep
+
+Unlike the "impure unifers" in the typechecker (the eager unifier in
+TcUnify, and the constraint solver itself in TcCanonical), the pure
+unifier It does /not/ work up to ~.
+
 The algorithm implemented here is rather delicate, and we depend on it
 to uphold certain properties. This is a summary of these required
 properties. Any reference to "flattening" refers to the flattening
@@ -554,26 +518,27 @@ Notation:
  ≡    eqType
 
 (U1) Soundness.
-If (unify τ₁ τ₂) = Unifiable θ, then θ(τ₁) ≡ θ(τ₂). θ is a most general
-unifier for τ₁ and τ₂.
+     If (unify τ₁ τ₂) = Unifiable θ, then θ(τ₁) ≡ θ(τ₂).
+     θ is a most general unifier for τ₁ and τ₂.
 
 (U2) Completeness.
-If (unify ξ₁ ξ₂) = SurelyApart,
-then there exists no substitution θ such that θ(ξ₁) ≡ θ(ξ₂).
+     If (unify ξ₁ ξ₂) = SurelyApart,
+     then there exists no substitution θ such that θ(ξ₁) ≡ θ(ξ₂).
 
 These two properties are stated as Property 11 in the "Closed Type Families"
 paper (POPL'14). Below, this paper is called [CTF].
 
 (U3) Apartness under substitution.
-If (unify ξ τ♭) = SurelyApart, then (unify ξ θ(τ)♭) = SurelyApart, for
-any θ. (Property 12 from [CTF])
+     If (unify ξ τ♭) = SurelyApart, then (unify ξ θ(τ)♭) = SurelyApart,
+     for any θ. (Property 12 from [CTF])
 
 (U4) Apart types do not unify.
-If (unify ξ τ♭) = SurelyApart, then there exists no θ such that
-θ(ξ) = θ(τ). (Property 13 from [CTF])
+     If (unify ξ τ♭) = SurelyApart, then there exists no θ
+     such that θ(ξ) = θ(τ). (Property 13 from [CTF])
 
 THEOREM. Completeness w.r.t ~
-If (unify τ₁♭ τ₂♭) = SurelyApart, then there exists no proof that (τ₁ ~ τ₂).
+    If (unify τ₁♭ τ₂♭) = SurelyApart,
+    then there exists no proof that (τ₁ ~ τ₂).
 
 PROOF. See appendix of [CTF].
 
@@ -583,25 +548,26 @@ in the "Injective Type Families" paper (Haskell'15), called [ITF]. When run
 in this mode, it has the following properties.
 
 (I1) If (unify σ τ) = SurelyApart, then σ and τ are not unifiable, even
-after arbitrary type family reductions. Note that σ and τ are not flattened
-here.
+     after arbitrary type family reductions. Note that σ and τ are
+     not flattened here.
 
 (I2) If (unify σ τ) = MaybeApart θ, and if some
-φ exists such that φ(σ) ~ φ(τ), then φ extends θ.
+     φ exists such that φ(σ) ~ φ(τ), then φ extends θ.
 
 
 Furthermore, the RULES matching algorithm requires this property,
 but only when using this algorithm for matching:
 
-(M1) If (match σ τ) succeeds with θ, then all matchable tyvars in σ
-are bound in θ.
+(M1) If (match σ τ) succeeds with θ, then all matchable tyvars
+     in σ are bound in θ.
 
-Property M1 means that we must extend the substitution with, say
-(a ↦ a) when appropriate during matching.
-See also Note [Self-substitution when matching].
+     Property M1 means that we must extend the substitution with,
+     say (a ↦ a) when appropriate during matching.
+     See also Note [Self-substitution when matching].
 
 (M2) Completeness of matching.
-If θ(σ) = τ, then (match σ τ) = Unifiable φ, where θ is an extension of φ.
+     If θ(σ) = τ, then (match σ τ) = Unifiable φ,
+     where θ is an extension of φ.
 
 Sadly, property M2 and I2 conflict. Consider
 
@@ -621,7 +587,8 @@ this, but we musn't map a to anything else!)
 
 We thus must parameterize the algorithm over whether it's being used
 for an injectivity check (refrain from looking at non-injective arguments
-to type families) or not (do indeed look at those arguments).
+to type families) or not (do indeed look at those arguments).  This is
+implemented  by the uf_int_tf field of UmEnv.
 
 (It's all a question of whether or not to include equation (7) from Fig. 2
 of [ITF].)
@@ -672,13 +639,58 @@ value for the coercion. (See the desugared version:
 ) We never want this action to happen during *unification* though, when
 all bets are off.
 
+Note [Kind coercions in Unify]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We wish to match/unify while ignoring casts. But, we can't just ignore
+them completely, or we'll end up with ill-kinded substitutions. For example,
+say we're matching `a` with `ty |> co`. If we just drop the cast, we'll
+return [a |-> ty], but `a` and `ty` might have different kinds. We can't
+just match/unify their kinds, either, because this might gratuitously
+fail. After all, `co` is the witness that the kinds are the same -- they
+may look nothing alike.
+
+So, we pass a kind coercion to the match/unify worker. This coercion witnesses
+the equality between the substed kind of the left-hand type and the substed
+kind of the right-hand type. Note that we do not unify kinds at the leaves
+(as we did previously). We thus have
+
+INVARIANT: In the call
+    unify_ty ty1 ty2 kco
+it must be that subst(kco) :: subst(kind(ty1)) ~N subst(kind(ty2)), where
+`subst` is the ambient substitution in the UM monad.
+
+To get this coercion, we first have to match/unify
+the kinds before looking at the types. Happily, we need look only one level
+up, as all kinds are guaranteed to have kind *.
+
+When we're working with type applications (either TyConApp or AppTy) we
+need to worry about establishing INVARIANT, as the kinds of the function
+& arguments aren't (necessarily) included in the kind of the result.
+When unifying two TyConApps, this is easy, because the two TyCons are
+the same. Their kinds are thus the same. As long as we unify left-to-right,
+we'll be sure to unify types' kinds before the types themselves. (For example,
+think about Proxy :: forall k. k -> *. Unifying the first args matches up
+the kinds of the second args.)
+
+For AppTy, we must unify the kinds of the functions, but once these are
+unified, we can continue unifying arguments without worrying further about
+kinds.
+
+We thought, at one point, that this was all unnecessary: why should
+casts be in types in the first place? But they do. In
+dependent/should_compile/KindEqualities2, we see, for example the
+constraint Num (Int |> (blah ; sym blah)).  We naturally want to find
+a dictionary for that constraint, which requires dealing with
+coercions in this manner.
 -}
 
--- See Note [Specification of unification]
-unify_ty :: Type -> Type -> Coercion   -- Types to be unified and a co
-                                       -- between their kinds
-                                       -- See Note [Kind coercions in Unify]
+-------------- unify_ty: the main workhorse -----------
+
+unify_ty :: Type -> Type  -- Types to be unified and a co
+         -> Coercion      -- A coercion between their kinds
+                          -- See Note [Kind coercions in Unify]
          -> UM ()
+-- See Note [Specification of unification]
 -- Respects newtypes, PredTypes
 
 unify_ty ty1 ty2 kco
