@@ -32,7 +32,7 @@ import           Data.ByteString          (ByteString)
 import qualified Data.ByteString          as B
 import qualified Data.ByteString.Lazy     as BL
 
-import           GHC.Prim
+import           GHC.Base                 (Any)
 
 import qualified Language.Haskell.TH        as TH
 import qualified Language.Haskell.TH.Syntax as TH

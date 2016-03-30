@@ -39,7 +39,7 @@ import CoreUtils        ( exprType, eqExpr, mkTick, mkTicks,
 import PprCore          ( pprRules )
 import Type             ( Type, substTy, mkTCvSubst )
 import TcType           ( tcSplitTyConApp_maybe )
-import TysPrim          ( anyTypeOfKind )
+import TysWiredIn       ( anyTypeOfKind )
 import Coercion
 import CoreTidy         ( tidyRules )
 import Id

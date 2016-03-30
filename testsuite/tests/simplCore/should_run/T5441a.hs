@@ -1,7 +1,7 @@
 module T5441a where
 
 import Unsafe.Coerce (unsafeCoerce)
-import GHC.Prim (Any)
+import GHC.Base (Any)
 
 listmap :: (a -> b) -> [a] -> [b]
 listmap f []       = []

@@ -1,5 +1,6 @@
 {-# LANGUAGE MagicHash, NoImplicitPrelude, TypeFamilies, UnboxedTuples,
-             MultiParamTypeClasses, RoleAnnotations, CPP, TypeOperators #-}
+             MultiParamTypeClasses, RoleAnnotations, CPP, TypeOperators,
+             PolyKinds #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Types
@@ -29,6 +30,7 @@ module GHC.Types (
         isTrue#,
         SPEC(..),
         Nat, Symbol,
+        Any,
         type (~~), Coercible,
         TYPE, RuntimeRep(..), Type, type (*), type (★), Constraint,
           -- The historical type * should ideally be written as
@@ -78,6 +80,23 @@ data Nat
 -- | (Kind) This is the kind of type-level symbols.
 -- Declared here because class IP needs it
 data Symbol
+
+{- *********************************************************************
+*                                                                      *
+                  Any
+*                                                                      *
+********************************************************************* -}
+
+-- | The type constructor 'Any' is type to which you can unsafely coerce any
+-- lifted type, and back. More concretely, for a lifted type @t@ and
+-- value @x :: t@, -- @unsafeCoerce (unsafeCoerce x :: Any) :: t@ is equivalent
+-- to @x@.
+--
+type family Any :: k where { }
+-- See Note [Any types] in TysWiredIn. Also, for a bit of history on Any see
+-- #10886. Note that this must be a *closed* type family: we need to ensure
+-- that this can't reduce to a `data` type for the results discussed in
+-- Note [Any types].
 
 {- *********************************************************************
 *                                                                      *
