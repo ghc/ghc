@@ -1395,19 +1395,29 @@ markManyIf False uds = uds
 {-
 Note [Use one-shot information]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The occurrrence analyser propagates one-shot-lambda information in two situation
-  * Applications:  eg   build (\cn -> blah)
+The occurrrence analyser propagates one-shot-lambda information in two
+situations:
+
+  * Applications:  eg   build (\c n -> blah)
+
     Propagate one-shot info from the strictness signature of 'build' to
-    the \cn
+    the \c n.
+
+    This strictness signature can come from a module interface, in the case of
+    an imported function, or from a previous run of the demand analyser.
 
   * Let-bindings:  eg   let f = \c. let ... in \n -> blah
                         in (build f, build f)
+
     Propagate one-shot info from the demanand-info on 'f' to the
     lambdas in its RHS (which may not be syntactically at the top)
 
-Some of this is done by the demand analyser, but this way it happens
-much earlier, taking advantage of the strictness signature of
-imported functions.
+    This information must have come from a previous run of the demanand
+    analyser.
+
+Previously, the demand analyser would *also* set the one-shot information, but
+that code was buggy (see #11770), so doing it only in on place, namely here, is
+saner.
 
 Note [Binders in case alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1534,7 +1544,7 @@ oneShotGroup :: OccEnv -> [CoreBndr]
              -> ( OccEnv
                 , [CoreBndr] )
         -- The result binders have one-shot-ness set that they might not have had originally.
-        -- This happens in (build (\cn -> e)).  Here the occurrence analyser
+        -- This happens in (build (\c n -> e)).  Here the occurrence analyser
         -- linearity context knows that c,n are one-shot, and it records that fact in
         -- the binder. This is useful to guide subsequent float-in/float-out tranformations
 
@@ -1555,8 +1565,13 @@ oneShotGroup env@(OccEnv { occ_one_shots = ctxt }) bndrs
       = case ctxt of
           []                -> go []   bndrs (bndr : rev_bndrs)
           (one_shot : ctxt) -> go ctxt bndrs (bndr': rev_bndrs)
-                            where
-                               bndr' = updOneShotInfo bndr one_shot
+            where
+               bndr' = updOneShotInfo bndr one_shot
+               -- Use updOneShotInfo, not setOneShotInfo, as pre-existing
+               -- one-shot info might be better than what we can infer, e.g.
+               -- due to explicit use of the magic 'oneShot' function.
+               -- See Note [The oneShot function]
+
        | otherwise
       = go ctxt bndrs (bndr:rev_bndrs)
 

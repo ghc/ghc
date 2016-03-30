@@ -45,6 +45,6 @@ test('T9208', when(compiler_debugged(), expect_broken(9208)), compile, [''])
 # Hence the above expect_broken.  See comments in the Trac ticket
 
 test('T10694', [ grepCoreString(r'Str=') ],   compile, ['-dppr-cols=200 -ddump-simpl'])
-test('T11770', [ expect_broken(117700), checkCoreString("OneShot") ], compile, ['-ddump-simpl'])
+test('T11770', [ checkCoreString('OneShot') ], compile, ['-ddump-simpl'])
 
 
