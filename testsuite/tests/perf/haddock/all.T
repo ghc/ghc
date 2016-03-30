@@ -51,7 +51,7 @@ test('haddock.base',
 test('haddock.Cabal',
      [unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 11123698216, 5)
+          [(wordsize(64), 10941742184, 5)
             # 2012-08-14: 3255435248 (amd64/Linux)
             # 2012-08-29: 3324606664 (amd64/Linux, new codegen)
             # 2012-10-08: 3373401360 (amd64/Linux)
@@ -75,7 +75,8 @@ test('haddock.Cabal',
             # 2015-12-11: 8114833312 (amd64/Linux) - TypeInType (See #11196)
             # 2015-12-17: 9982130512 (amd64/Linux) - Update Haddock to master
             # 2015-12-22: 10519532424 (amd64/Linux) - Lots of new Semigroup instances in Cabal
-            # 2015-03-08: 11123698216 (amd64/Linux) - Cabal update
+            # 2016-03-29: 11517963232 (amd64/Linux) - not yet investigated
+            # 2016-03-30: 10941742184 (amd64/Linux) - defer inlining of Int* Ord methods
 
           ,(platform('i386-unknown-mingw32'), 3293415576, 5)
             # 2012-10-30:                     1733638168 (x86/Windows)

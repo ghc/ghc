@@ -7,8 +7,8 @@ Rule fired: Class op return
 Rule fired: Class op foldr
 Rule fired: Class op >>
 Rule fired: Class op return
-Rule fired: <#
-Rule fired: tagToEnum#
 Rule fired: Class op foldr
 Rule fired: fold/build
+Rule fired: <#
+Rule fired: tagToEnum#
 Rule fired: unpack-list
