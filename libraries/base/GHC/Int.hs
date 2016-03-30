@@ -24,11 +24,11 @@ module GHC.Int (
         uncheckedIShiftL64#, uncheckedIShiftRA64#,
         -- * Equality operators
         -- | See GHC.Classes#matching_overloaded_methods_in_rules
-        eqInt, neInt,
-        eqInt8, neInt8,
-        eqInt16, neInt16,
-        eqInt32, neInt32,
-        eqInt64, neInt64
+        eqInt, neInt, gtInt, geInt, ltInt, leInt,
+        eqInt8, neInt8, gtInt8, geInt8, ltInt8, leInt8,
+        eqInt16, neInt16, gtInt16, geInt16, ltInt16, leInt16,
+        eqInt32, neInt32, gtInt32, geInt32, ltInt32, leInt32,
+        eqInt64, neInt64, gtInt64, geInt64, ltInt64, leInt64
     ) where
 
 import Data.Bits
@@ -54,7 +54,7 @@ import GHC.Show
 -- Int8 is represented in the same way as Int. Operations may assume
 -- and must ensure that it holds only values from its logical range.
 
-data {-# CTYPE "HsInt8" #-} Int8 = I8# Int# deriving (Ord)
+data {-# CTYPE "HsInt8" #-} Int8 = I8# Int#
 -- ^ 8-bit signed integer type
 
 -- See GHC.Classes#matching_overloaded_methods_in_rules
@@ -67,6 +67,22 @@ eqInt8 (I8# x) (I8# y) = isTrue# (x ==# y)
 neInt8 (I8# x) (I8# y) = isTrue# (x /=# y)
 {-# INLINE [1] eqInt8 #-}
 {-# INLINE [1] neInt8 #-}
+
+instance Ord Int8 where
+    (<)  = ltInt8
+    (<=) = leInt8
+    (>=) = geInt8
+    (>)  = gtInt8
+
+{-# INLINE [1] gtInt8 #-}
+{-# INLINE [1] geInt8 #-}
+{-# INLINE [1] ltInt8 #-}
+{-# INLINE [1] leInt8 #-}
+gtInt8, geInt8, ltInt8, leInt8 :: Int8 -> Int8 -> Bool
+(I8# x) `gtInt8` (I8# y) = isTrue# (x >#  y)
+(I8# x) `geInt8` (I8# y) = isTrue# (x >=# y)
+(I8# x) `ltInt8` (I8# y) = isTrue# (x <#  y)
+(I8# x) `leInt8` (I8# y) = isTrue# (x <=# y)
 
 instance Show Int8 where
     showsPrec p x = showsPrec p (fromIntegral x :: Int)
@@ -226,7 +242,7 @@ instance FiniteBits Int8 where
 -- Int16 is represented in the same way as Int. Operations may assume
 -- and must ensure that it holds only values from its logical range.
 
-data {-# CTYPE "HsInt16" #-} Int16 = I16# Int# deriving (Ord)
+data {-# CTYPE "HsInt16" #-} Int16 = I16# Int#
 -- ^ 16-bit signed integer type
 
 -- See GHC.Classes#matching_overloaded_methods_in_rules
@@ -239,6 +255,22 @@ eqInt16 (I16# x) (I16# y) = isTrue# (x ==# y)
 neInt16 (I16# x) (I16# y) = isTrue# (x /=# y)
 {-# INLINE [1] eqInt16 #-}
 {-# INLINE [1] neInt16 #-}
+
+instance Ord Int16 where
+    (<)  = ltInt16
+    (<=) = leInt16
+    (>=) = geInt16
+    (>)  = gtInt16
+
+{-# INLINE [1] gtInt16 #-}
+{-# INLINE [1] geInt16 #-}
+{-# INLINE [1] ltInt16 #-}
+{-# INLINE [1] leInt16 #-}
+gtInt16, geInt16, ltInt16, leInt16 :: Int16 -> Int16 -> Bool
+(I16# x) `gtInt16` (I16# y) = isTrue# (x >#  y)
+(I16# x) `geInt16` (I16# y) = isTrue# (x >=# y)
+(I16# x) `ltInt16` (I16# y) = isTrue# (x <#  y)
+(I16# x) `leInt16` (I16# y) = isTrue# (x <=# y)
 
 instance Show Int16 where
     showsPrec p x = showsPrec p (fromIntegral x :: Int)
@@ -403,7 +435,7 @@ instance FiniteBits Int16 where
 -- from its logical range.
 #endif
 
-data {-# CTYPE "HsInt32" #-} Int32 = I32# Int# deriving (Ord)
+data {-# CTYPE "HsInt32" #-} Int32 = I32# Int#
 -- ^ 32-bit signed integer type
 
 -- See GHC.Classes#matching_overloaded_methods_in_rules
@@ -416,6 +448,22 @@ eqInt32 (I32# x) (I32# y) = isTrue# (x ==# y)
 neInt32 (I32# x) (I32# y) = isTrue# (x /=# y)
 {-# INLINE [1] eqInt32 #-}
 {-# INLINE [1] neInt32 #-}
+
+instance Ord Int32 where
+    (<)  = ltInt32
+    (<=) = leInt32
+    (>=) = geInt32
+    (>)  = gtInt32
+
+{-# INLINE [1] gtInt32 #-}
+{-# INLINE [1] geInt32 #-}
+{-# INLINE [1] ltInt32 #-}
+{-# INLINE [1] leInt32 #-}
+gtInt32, geInt32, ltInt32, leInt32 :: Int32 -> Int32 -> Bool
+(I32# x) `gtInt32` (I32# y) = isTrue# (x >#  y)
+(I32# x) `geInt32` (I32# y) = isTrue# (x >=# y)
+(I32# x) `ltInt32` (I32# y) = isTrue# (x <#  y)
+(I32# x) `leInt32` (I32# y) = isTrue# (x <=# y)
 
 instance Show Int32 where
     showsPrec p x = showsPrec p (fromIntegral x :: Int)
@@ -606,10 +654,20 @@ neInt64 (I64# x) (I64# y) = isTrue# (x `neInt64#` y)
 {-# INLINE [1] neInt64 #-}
 
 instance Ord Int64 where
-    (I64# x#) <  (I64# y#) = isTrue# (x# `ltInt64#` y#)
-    (I64# x#) <= (I64# y#) = isTrue# (x# `leInt64#` y#)
-    (I64# x#) >  (I64# y#) = isTrue# (x# `gtInt64#` y#)
-    (I64# x#) >= (I64# y#) = isTrue# (x# `geInt64#` y#)
+    (<)  = ltInt64
+    (<=) = leInt64
+    (>=) = geInt64
+    (>)  = gtInt64
+
+{-# INLINE [1] gtInt64 #-}
+{-# INLINE [1] geInt64 #-}
+{-# INLINE [1] ltInt64 #-}
+{-# INLINE [1] leInt64 #-}
+gtInt64, geInt64, ltInt64, leInt64 :: Int64 -> Int64 -> Bool
+(I64# x) `gtInt64` (I64# y) = isTrue# (x `gtInt64#` y)
+(I64# x) `geInt64` (I64# y) = isTrue# (x `geInt64#` y)
+(I64# x) `ltInt64` (I64# y) = isTrue# (x `ltInt64#` y)
+(I64# x) `leInt64` (I64# y) = isTrue# (x `leInt64#` y)
 
 instance Show Int64 where
     showsPrec p x = showsPrec p (toInteger x)
@@ -773,7 +831,7 @@ a `iShiftRA64#` b | isTrue# (b >=# 64#) = if isTrue# (a `ltInt64#` (intToInt64# 
 -- Operations may assume and must ensure that it holds only values
 -- from its logical range.
 
-data {-# CTYPE "HsInt64" #-} Int64 = I64# Int# deriving (Ord)
+data {-# CTYPE "HsInt64" #-} Int64 = I64# Int#
 -- ^ 64-bit signed integer type
 
 -- See GHC.Classes#matching_overloaded_methods_in_rules
@@ -786,6 +844,22 @@ eqInt64 (I64# x) (I64# y) = isTrue# (x ==# y)
 neInt64 (I64# x) (I64# y) = isTrue# (x /=# y)
 {-# INLINE [1] eqInt64 #-}
 {-# INLINE [1] neInt64 #-}
+
+instance Ord Int64 where
+    (<)  = ltInt64
+    (<=) = leInt64
+    (>=) = geInt64
+    (>)  = gtInt64
+
+{-# INLINE [1] gtInt64 #-}
+{-# INLINE [1] geInt64 #-}
+{-# INLINE [1] ltInt64 #-}
+{-# INLINE [1] leInt64 #-}
+gtInt64, geInt64, ltInt64, leInt64 :: Int64 -> Int64 -> Bool
+(I64# x) `gtInt64` (I64# y) = isTrue# (x >#  y)
+(I64# x) `geInt64` (I64# y) = isTrue# (x >=# y)
+(I64# x) `ltInt64` (I64# y) = isTrue# (x <#  y)
+(I64# x) `leInt64` (I64# y) = isTrue# (x <=# y)
 
 instance Show Int64 where
     showsPrec p x = showsPrec p (fromIntegral x :: Int)

@@ -44,6 +44,7 @@ module GHC.Classes(
     eqFloat, eqDouble,
     -- ** Monomorphic comparison operators
     gtInt, geInt, leInt, ltInt, compareInt, compareInt#,
+    gtWord, geWord, leWord, ltWord, compareWord, compareWord#,
 
     -- * Functions over Bool
     (&&), (||), not,
@@ -89,9 +90,9 @@ with a known @Word8@. As written, however, this rule will be quite fragile as
 the @(==)@ class operation rule may rewrite the predicate before our @break@
 rule has a chance to fire.
 
-For this reason, most of the primitive types in @base@ have 'Eq' instances
-defined in terms of helper functions with inlinings delayed to phase 1. For
-instance, @Word8@\'s @Eq@ instance looks like,
+For this reason, most of the primitive types in @base@ have 'Eq' and 'Ord'
+instances defined in terms of helper functions with inlinings delayed to phase
+1. For instance, @Word8@\'s @Eq@ instance looks like,
 
 > instance Eq Word8 where
 >     (==) = eqWord8
@@ -108,7 +109,8 @@ against @eqWord8@,
 
 > {-# RULES "break -> breakByte" forall a. break (`eqWord8` x) = breakByte x #-}
 
-Currently this is only done for '(==)' and '(/=)'.
+Currently this is only done for '(==)', '(/=)', '(<)', '(<=)', '(>)', and '(>=)'
+for the types in "GHC.Word" and "GHC.Int".
 -}
 
 -- | The 'Eq' class defines equality ('==') and inequality ('/=').
@@ -328,7 +330,6 @@ instance (Ord a) => Ord [a] where
 
 deriving instance Ord Bool
 deriving instance Ord Ordering
-deriving instance Ord Word
 
 -- We don't use deriving for Ord Char, because for Ord the derived
 -- instance defines only compare, which takes two primops.  Then
@@ -387,6 +388,33 @@ compareInt# x# y#
     | isTrue# (x# <#  y#) = LT
     | isTrue# (x# ==# y#) = EQ
     | True                = GT
+
+instance Ord Word where
+    compare = compareWord
+    (<)     = ltWord
+    (<=)    = leWord
+    (>=)    = geWord
+    (>)     = gtWord
+
+-- See GHC.Classes#matching_overloaded_methods_in_rules
+{-# INLINE [1] gtWord #-}
+{-# INLINE [1] geWord #-}
+{-# INLINE [1] ltWord #-}
+{-# INLINE [1] leWord #-}
+gtWord, geWord, ltWord, leWord :: Word -> Word -> Bool
+(W# x) `gtWord` (W# y) = isTrue# (x `gtWord#` y)
+(W# x) `geWord` (W# y) = isTrue# (x `geWord#` y)
+(W# x) `ltWord` (W# y) = isTrue# (x `ltWord#` y)
+(W# x) `leWord` (W# y) = isTrue# (x `leWord#` y)
+
+compareWord :: Word -> Word -> Ordering
+(W# x#) `compareWord` (W# y#) = compareWord# x# y#
+
+compareWord# :: Word# -> Word# -> Ordering
+compareWord# x# y#
+    | isTrue# (x# `ltWord#` y#) = LT
+    | isTrue# (x# `eqWord#` y#) = EQ
+    | True                      = GT
 
 -- OK, so they're technically not part of a class...:
 
