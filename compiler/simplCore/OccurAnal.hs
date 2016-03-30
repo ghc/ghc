@@ -117,7 +117,7 @@ occurAnalyseExpr' enable_binder_swap expr
 
 {- Note [Plugin rules]
 ~~~~~~~~~~~~~~~~~~~~~~
-Conal Eliot (Trac #11651) built a GHC plugin that added some
+Conal Elliott (Trac #11651) built a GHC plugin that added some
 BuiltinRules (for imported Ids) to the mg_rules field of ModGuts, to
 do some domain-specific transformations that could not be expressed
 with an ordinary pattern-matching CoreRule.  But then we can't extract

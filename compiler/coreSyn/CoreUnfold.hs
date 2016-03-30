@@ -785,7 +785,7 @@ buildSize :: ExprSize
 buildSize = SizeIs 0 emptyBag 40
         -- We really want to inline applications of build
         -- build t (\cn -> e) should cost only the cost of e (because build will be inlined later)
-        -- Indeed, we should add a result_discount becuause build is
+        -- Indeed, we should add a result_discount because build is
         -- very like a constructor.  We don't bother to check that the
         -- build is saturated (it usually is).  The "-2" discounts for the \c n,
         -- The "4" is rather arbitrary.

@@ -1764,7 +1764,7 @@ Note [Strictness information in worker binders]
 After having calculated the strictness annotation for the worker (see Note
 [Transfer strictness] above), we also want to have this information attached to
 the worker’s arguments, for the benefit of later passes. The function
-handOutStrictnessInformation decomposes the stricntess annotation calculated by
+handOutStrictnessInformation decomposes the strictness annotation calculated by
 calcSpecStrictness and attaches them to the variables.
 
 ************************************************************************

@@ -1146,7 +1146,7 @@ zap_demand_info v
 Note [Zapping the demand info]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 VERY IMPORTANT: we must zap the demand info if the thing is going to
-float out, becuause it may be less demanded than at its original
+float out, because it may be less demanded than at its original
 binding site.  Eg
    f :: Int -> Int
    f x = let v = 3*4 in v+x

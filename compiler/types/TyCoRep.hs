@@ -499,8 +499,8 @@ In type declarations:
 * Invisible (k1), Specified (k)
      data T a b (c :: k) = MkT (a b) (Proxy c)
   Here T's kind is  T :: forall {k1:*} (k:*). (k1->*) -> k1 -> k -> *
-  So 'k' is Specified, becuase it appears explicitly,
-  but 'k1' is Invisible, becuase it does not
+  So 'k' is Specified, because it appears explicitly,
+  but 'k1' is Invisible, because it does not
 
 ---- Printing -----
 

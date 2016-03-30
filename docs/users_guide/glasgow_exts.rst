@@ -4301,7 +4301,7 @@ all currently bundled constructors. For example, we could write: ::
 in which case, ``Example`` would export the type constructor ``MyNum`` with
 the data constructor ``MkNum`` and also the pattern synonym ``Zero``.
 
-Bundled patterns synoyms are type checked to ensure that they are of the same
+Bundled patterns synonyms are type checked to ensure that they are of the same
 type as the type constructor which they are bundled with. A pattern synonym
 ``P`` can not be bundled with a type constructor ``T`` if ``P``\'s type is visibly
 incompatible with ``T``.

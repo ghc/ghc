@@ -53,7 +53,7 @@ main = do
   -- anything xored with itself is 0
   print (I# (maxI# `xorI#` maxI#) == 0)
   print (I# (minI# `xorI#` minI#) == 0)
-  -- xoring with -1 is like bitwise negation (becuse -1 has all bits set to 1)
+  -- xoring with -1 is like bitwise negation (because -1 has all bits set to 1)
   print (I# (minI# `xorI#`   -1#) == maxI)
   print (I# (maxI# `xorI#`   -1#) == minI)
   print (I# (-1#   `xorI#` minI#) == maxI)

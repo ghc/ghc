@@ -139,7 +139,7 @@ application of a let-no-escape variable.
 \gram{\ottret}
 
 Values $v$ are functions (re-entrant closures) and constructors; thunks
-are not considered vaules.  Evaluation guarantees that a value will be
+are not considered values.  Evaluation guarantees that a value will be
 produced.
 
 Profiling also records allocation costs for creating objects on the heap:

@@ -1214,7 +1214,7 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
 tcArg :: LHsExpr Name                    -- The function (for error messages)
       -> LHsExpr Name                    -- Actual arguments
       -> TcRhoType                       -- expected arg type
-      -> Int                             -- # of arugment
+      -> Int                             -- # of argument
       -> TcM (LHsExpr TcId)             -- Resulting argument
 tcArg fun arg ty arg_no = addErrCtxt (funAppCtxt fun arg arg_no) $
                           tcPolyExprNC arg ty

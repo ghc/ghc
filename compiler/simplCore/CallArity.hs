@@ -353,7 +353,7 @@ We never eta-expand a thunk in a recursive group, on the grounds that if it is
 part of a recursive group, then it will be called multipe times.
 
 This is not necessarily true, e.g.  it would be safe to eta-expand t2 (but not
-t1) in the follwing code:
+t1) in the following code:
 
   let go x = t1
       t1 = if ... then t2 else ...

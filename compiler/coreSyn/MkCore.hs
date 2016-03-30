@@ -327,7 +327,7 @@ Usually we want the former, but occasionally the latter.
 mkCoreVarTup :: [Id] -> CoreExpr
 mkCoreVarTup ids = mkCoreTup (map Var ids)
 
--- | Bulid the type of a small tuple that holds the specified variables
+-- | Build the type of a small tuple that holds the specified variables
 -- One-tuples are flattened; see Note [Flattening of one-tuples]
 mkCoreVarTupTy :: [Id] -> Type
 mkCoreVarTupTy ids = mkBoxedTupleTy (map idType ids)

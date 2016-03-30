@@ -747,7 +747,7 @@ substTickish _subst other = other
 
 {- Note [Substitute lazily]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The functions that substitute over IdInfo must be pretty lazy, becuause
+The functions that substitute over IdInfo must be pretty lazy, because
 they are knot-tied by substRecBndrs.
 
 One case in point was Trac #10627 in which a rule for a function 'f'

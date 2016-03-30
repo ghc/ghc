@@ -1,7 +1,7 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
              FlexibleInstances, TypeSynonymInstances #-}
 
--- This one made GHC 6.4 loop becuause Unify.unify
+-- This one made GHC 6.4 loop because Unify.unify
 -- didn't deal correctly with unifying
 --	a :=: Foo a
 -- where

@@ -525,7 +525,7 @@ schemeE d s p (AnnCase scrut bndr _ [(DataAlt dc, [bind1, bind2], rhs)])
         --      case .... of x { (# V'd-thing, a #) -> ... }
         -- to
         --      case .... of a { DEFAULT -> ... }
-        -- becuse the return convention for both are identical.
+        -- because the return convention for both are identical.
         --
         -- Note that it does not matter losing the void-rep thing from the
         -- envt (it won't be bound now) because we never look such things up.

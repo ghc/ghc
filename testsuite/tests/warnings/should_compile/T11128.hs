@@ -35,7 +35,7 @@ instance M.Monad T1 where
     (>>)   = undefined
 
 ----------------------------------------------------------------------------
--- backward compat canonical defintion
+-- backward compat canonical definition
 
 data T2 a  = T2 a deriving Functor
 

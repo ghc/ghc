@@ -526,7 +526,7 @@ $tab          { warnTab }
 -- expressions and patterns use the same parser, and also because we want
 -- to allow type patterns within expression patterns.
 --
--- Disambiguation is accomplished by requiring *something* to appear betwen
+-- Disambiguation is accomplished by requiring *something* to appear between
 -- type application and the preceding token. This something must end with
 -- a character that cannot be the end of the variable bound in an as-pattern.
 -- Currently (June 2015), this means that the something cannot end with a
