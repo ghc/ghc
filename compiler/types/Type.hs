@@ -158,7 +158,6 @@ module Type (
         getTvSubstEnv, setTvSubstEnv,
         zapTCvSubst, getTCvInScope,
         extendTCvInScope, extendTCvInScopeList, extendTCvInScopeSet,
-        extendTCvInScopeInScope,
         extendTCvSubst, extendCvSubst,
         extendTvSubst, extendTvSubstList, extendTvSubstAndInScope,
         isInScope, composeTCvSubstEnv, composeTCvSubst, zipTyEnv, zipCoEnv,
