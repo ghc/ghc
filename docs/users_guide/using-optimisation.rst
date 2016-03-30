@@ -79,9 +79,6 @@ one reason to stick to no-optimisation when developing code.
     runtime or space *worse* if you're unlucky. They are normally turned
     on or off individually.
 
-    At the moment, ``-O2`` is *unlikely* to produce better code than
-    ``-O``.
-
 .. ghc-flag:: -Odph
 
     .. index::
