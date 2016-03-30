@@ -487,6 +487,7 @@ data GeneralFlag
    | Opt_Hpc
    | Opt_FlatCache
    | Opt_ExternalInterpreter
+   | Opt_VersionMacros
 
    -- PreInlining is on by default. The option is there just to see how
    -- bad things get if you turn it off!
@@ -3372,6 +3373,7 @@ fFlagsDeps = [
   flagSpec "unbox-strict-fields"              Opt_UnboxStrictFields,
   flagSpec "vectorisation-avoidance"          Opt_VectorisationAvoidance,
   flagSpec "vectorise"                        Opt_Vectorise,
+  flagSpec "version-macros"                   Opt_VersionMacros,
   flagSpec "worker-wrapper"                   Opt_WorkerWrapper,
   flagSpec "show-warning-groups"              Opt_ShowWarnGroups
   ]
@@ -3613,7 +3615,8 @@ defaultFlags settings
       Opt_ProfCountEntries,
       Opt_RPath,
       Opt_SharedImplib,
-      Opt_SimplPreInlining
+      Opt_SimplPreInlining,
+      Opt_VersionMacros
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]

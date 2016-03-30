@@ -569,6 +569,7 @@ mk/ghcconfig*_test___spaces_ghc*.exe.mk
 /tests/driver/T8526/A.inc
 /tests/driver/T8602/t8602.sh
 /tests/driver/T9562/Main
+/tests/driver/T11763
 /tests/driver/Test.081b
 /tests/driver/Test.081b.hs
 /tests/driver/Test_081a
