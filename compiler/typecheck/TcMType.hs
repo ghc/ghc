@@ -393,14 +393,18 @@ checkingExpType err et         = pprPanic "checkingExpType" (text err $$ ppr et)
 tauifyExpType :: ExpType -> TcM ExpType
 -- ^ Turn a (Infer hole) type into a (Check alpha),
 -- where alpha is a fresh unificaiton variable
-tauifyExpType exp_ty = do { ty <- expTypeToType exp_ty
-                          ; return (Check ty) }
+tauifyExpType (Check ty)              = return (Check ty)  -- No-op for (Check ty)
+tauifyExpType (Infer u tc_lvl ki ref) = do { ty <- inferTypeToType u tc_lvl ki ref
+                                           ; return (Check ty) }
 
 -- | Extracts the expected type if there is one, or generates a new
 -- TauTv if there isn't.
 expTypeToType :: ExpType -> TcM TcType
-expTypeToType (Check ty) = return ty
-expTypeToType (Infer u tc_lvl ki ref)
+expTypeToType (Check ty)              = return ty
+expTypeToType (Infer u tc_lvl ki ref) = inferTypeToType u tc_lvl ki ref
+
+inferTypeToType :: Unique -> TcLevel -> Kind -> IORef (Maybe TcType) -> TcM Type
+inferTypeToType u tc_lvl ki ref
   = do { uniq <- newUnique
        ; tv_ref <- newMutVar Flexi
        ; let details = MetaTv { mtv_info = TauTv
