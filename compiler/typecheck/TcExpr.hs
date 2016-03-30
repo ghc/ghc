@@ -230,8 +230,8 @@ tcExpr e@(HsOverLabel l) res_ty  -- See Note [Type-checking overloaded labels]
   origin = OverLabelOrigin l
 
 tcExpr (HsLam match) res_ty
-  = do  { (co_fn, _, match') <- tcMatchLambda herald match_ctxt match res_ty
-        ; return (mkHsWrap co_fn (HsLam match')) }
+  = do  { (match', wrap) <- tcMatchLambda herald match_ctxt match res_ty
+        ; return (mkHsWrap wrap (HsLam match')) }
   where
     match_ctxt = MC { mc_what = LambdaExpr, mc_body = tcBody }
     herald = sep [ text "The lambda expression" <+>
@@ -240,15 +240,16 @@ tcExpr (HsLam match) res_ty
                         -- The pprSetDepth makes the abstraction print briefly
                    text "has"]
 
-tcExpr e@(HsLamCase _ matches) res_ty
-  = do { (co_fn, ~[arg_ty], matches')
+tcExpr e@(HsLamCase matches) res_ty
+  = do { (matches', wrap)
            <- tcMatchLambda msg match_ctxt matches res_ty
            -- The laziness annotation is because we don't want to fail here
            -- if there are multiple arguments
-       ; return (mkHsWrap co_fn $ HsLamCase arg_ty matches') }
-  where msg = sep [ text "The function" <+> quotes (ppr e)
-                  , text "requires"]
-        match_ctxt = MC { mc_what = CaseAlt, mc_body = tcBody }
+       ; return (mkHsWrap wrap $ HsLamCase matches') }
+  where
+    msg = sep [ text "The function" <+> quotes (ppr e)
+              , text "requires"]
+    match_ctxt = MC { mc_what = CaseAlt, mc_body = tcBody }
 
 tcExpr e@(ExprWithTySig expr sig_ty) res_ty
   = do { sig_info <- checkNoErrs $  -- Avoid error cascade

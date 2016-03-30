@@ -194,7 +194,7 @@ data HsExpr id
 
        -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsLamCase (PostTc id Type) (MatchGroup id (LHsExpr id)) -- ^ Lambda-case
+  | HsLamCase (MatchGroup id (LHsExpr id)) -- ^ Lambda-case
        --
        -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLam',
        --           'ApiAnnotation.AnnCase','ApiAnnotation.AnnOpen',
@@ -751,7 +751,7 @@ ppr_expr (ExplicitTuple exprs boxity)
 ppr_expr (HsLam matches)
   = pprMatches (LambdaExpr :: HsMatchContext id) matches
 
-ppr_expr (HsLamCase _ matches)
+ppr_expr (HsLamCase matches)
   = sep [ sep [text "\\case {"],
           nest 2 (pprMatches (CaseAlt :: HsMatchContext id) matches <+> char '}') ]
 
@@ -1260,12 +1260,14 @@ isInfixMatch match = case m_fixity match of
 isEmptyMatchGroup :: MatchGroup id body -> Bool
 isEmptyMatchGroup (MG { mg_alts = ms }) = null $ unLoc ms
 
--- | Is there only one RHS in this group?
-isSingletonMatchGroup :: MatchGroup id body -> Bool
-isSingletonMatchGroup (MG { mg_alts = L _ [match] })
-  | L _ (Match { m_grhss = GRHSs { grhssGRHSs = [_] } }) <- match
+-- | Is there only one RHS in this list of matches?
+isSingletonMatchGroup :: [LMatch id body] -> Bool
+isSingletonMatchGroup matches
+  | [L _ match] <- matches
+  , Match { m_grhss = GRHSs { grhssGRHSs = [_] } } <- match
   = True
-isSingletonMatchGroup _ = False
+  | otherwise
+  = False
 
 matchGroupArity :: MatchGroup id body -> Arity
 -- Precondition: MatchGroup is non-empty

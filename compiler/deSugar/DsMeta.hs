@@ -1086,7 +1086,7 @@ repE e@(HsRecFld f) = case f of
 repE (HsOverLit l) = do { a <- repOverloadedLiteral l; repLit a }
 repE (HsLit l)     = do { a <- repLiteral l;           repLit a }
 repE (HsLam (MG { mg_alts = L _ [m] })) = repLambda m
-repE (HsLamCase _ (MG { mg_alts = L _ ms }))
+repE (HsLamCase (MG { mg_alts = L _ ms }))
                    = do { ms' <- mapM repMatchTup ms
                         ; core_ms <- coreList matchQTyConName ms'
                         ; repLamCase core_ms }

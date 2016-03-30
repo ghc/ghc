@@ -220,10 +220,9 @@ rnExpr (HsLam matches)
   = do { (matches', fvMatch) <- rnMatchGroup LambdaExpr rnLExpr matches
        ; return (HsLam matches', fvMatch) }
 
-rnExpr (HsLamCase _arg matches)
+rnExpr (HsLamCase matches)
   = do { (matches', fvs_ms) <- rnMatchGroup CaseAlt rnLExpr matches
-       -- ; return (HsLamCase arg matches', fvs_ms) }
-       ; return (HsLamCase placeHolderType matches', fvs_ms) }
+       ; return (HsLamCase matches', fvs_ms) }
 
 rnExpr (HsCase expr matches)
   = do { (new_expr, e_fvs) <- rnLExpr expr

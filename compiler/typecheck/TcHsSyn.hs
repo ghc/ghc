@@ -623,10 +623,9 @@ zonkExpr env (HsLam matches)
   = do new_matches <- zonkMatchGroup env zonkLExpr matches
        return (HsLam new_matches)
 
-zonkExpr env (HsLamCase arg matches)
-  = do new_arg <- zonkTcTypeToType env arg
-       new_matches <- zonkMatchGroup env zonkLExpr matches
-       return (HsLamCase new_arg new_matches)
+zonkExpr env (HsLamCase matches)
+  = do new_matches <- zonkMatchGroup env zonkLExpr matches
+       return (HsLamCase new_matches)
 
 zonkExpr env (HsApp e1 e2)
   = do new_e1 <- zonkLExpr env e1

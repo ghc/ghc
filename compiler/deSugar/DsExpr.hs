@@ -226,10 +226,9 @@ dsExpr (NegApp expr neg_expr)
 dsExpr (HsLam a_Match)
   = uncurry mkLams <$> matchWrapper LambdaExpr Nothing a_Match
 
-dsExpr (HsLamCase arg matches)
-  = do { arg_var <- newSysLocalDs arg
-       ; ([discrim_var], matching_code) <- matchWrapper CaseAlt Nothing matches
-       ; return $ Lam arg_var $ bindNonRec discrim_var (Var arg_var) matching_code }
+dsExpr (HsLamCase matches)
+  = do { ([discrim_var], matching_code) <- matchWrapper CaseAlt Nothing matches
+       ; return $ Lam discrim_var matching_code }
 
 dsExpr e@(HsApp fun arg)
   = mkCoreAppDs (text "HsApp" <+> ppr e) <$> dsLExpr fun <*> dsLExpr arg

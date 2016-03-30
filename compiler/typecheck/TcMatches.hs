@@ -90,8 +90,7 @@ tcMatchesFun fun_name matches exp_ty
                        <- matchExpectedFunTys herald arity exp_rho $
                           \ pat_tys rhs_ty ->
                      -- See Note [Case branches must never infer a non-tau type]
-                     do { rhs_ty:pat_tys <- tauifyMultipleMatches matches (rhs_ty:pat_tys)
-                        ; tcMatches match_ctxt pat_tys rhs_ty matches }
+                     do { tcMatches match_ctxt pat_tys rhs_ty matches }
                   ; return (wrap_fun, matches') }
         ; return (wrap_gen <.> wrap_fun, group) }
   where
@@ -115,24 +114,16 @@ tcMatchesCase :: (Outputable (body Name)) =>
                  -- wrapper goes from MatchGroup's ty to expected ty
 
 tcMatchesCase ctxt scrut_ty matches res_ty
-  = do { [res_ty] <- tauifyMultipleMatches matches [res_ty]
-       ; tcMatches ctxt [mkCheckExpType scrut_ty] res_ty matches }
+  = tcMatches ctxt [mkCheckExpType scrut_ty] res_ty matches
 
 tcMatchLambda :: SDoc -- see Note [Herald for matchExpectedFunTys] in TcUnify
               -> TcMatchCtxt HsExpr
               -> MatchGroup Name (LHsExpr Name)
               -> ExpRhoType   -- deeply skolemised
-              -> TcM (HsWrapper, [TcSigmaType], MatchGroup TcId (LHsExpr TcId))
-                     -- also returns the argument types
+              -> TcM (MatchGroup TcId (LHsExpr TcId), HsWrapper)
 tcMatchLambda herald match_ctxt match res_ty
-  = do { ((match', pat_tys), wrap)
-           <- matchExpectedFunTys herald n_pats res_ty $
-              \ pat_tys rhs_ty ->
-              do { rhs_ty:pat_tys <- tauifyMultipleMatches match (rhs_ty:pat_tys)
-                 ; match' <- tcMatches match_ctxt pat_tys rhs_ty match
-                 ; pat_tys <- mapM readExpType pat_tys
-                 ; return (match', pat_tys) }
-       ; return (wrap, pat_tys, match') }
+  = matchExpectedFunTys herald n_pats res_ty $ \ pat_tys rhs_ty ->
+    tcMatches match_ctxt pat_tys rhs_ty match
   where
     n_pats | isEmptyMatchGroup match = 1   -- must be lambda-case
            | otherwise               = matchGroupArity match
@@ -188,7 +179,7 @@ still gets assigned a polytype.
 -- | When the MatchGroup has multiple RHSs, convert an Infer ExpType in the
 -- expected type into TauTvs.
 -- See Note [Case branches must never infer a non-tau type]
-tauifyMultipleMatches :: MatchGroup id body
+tauifyMultipleMatches :: [LMatch id body]
                       -> [ExpType] -> TcM [ExpType]
 tauifyMultipleMatches group exp_tys
   | isSingletonMatchGroup group = return exp_tys
@@ -214,7 +205,8 @@ data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
 
 tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
                                   , mg_origin = origin })
-  = do { matches' <- mapM (tcMatch ctxt pat_tys rhs_ty) matches
+  = do { rhs_ty:pat_tys <- tauifyMultipleMatches matches (rhs_ty:pat_tys)
+       ; matches' <- mapM (tcMatch ctxt pat_tys rhs_ty) matches
        ; pat_tys  <- mapM readExpType pat_tys
        ; rhs_ty   <- readExpType rhs_ty
        ; return (MG { mg_alts = L l matches'
