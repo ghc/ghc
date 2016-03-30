@@ -2056,7 +2056,7 @@ doCpp dflags raw input_fn output_fn = do
     let uids = explicitPackages (pkgState dflags)
         pkgs = catMaybes (map (lookupPackage dflags) uids)
     mb_macro_include <-
-        if not (null pkgs)
+        if not (null pkgs) && gopt Opt_VersionMacros dflags
             then do macro_stub <- newTempName dflags "h"
                     writeFile macro_stub (generatePackageVersionMacros pkgs)
                     -- Include version macros for every *exposed* package.

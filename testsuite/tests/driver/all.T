@@ -475,6 +475,7 @@ test('T11381', normal, compile_fail, [''])
 test('T11429a', normal, compile, ['-Wunrecognised-warning-flags -Wfoobar'])
 test('T11429b', normal, compile, ['-Wno-unrecognised-warning-flags -Wfoobar'])
 test('T11429c', normal, compile_fail, ['-Wunrecognised-warning-flags -Werror -Wfoobar'])
+test('T11763', normal, compile_and_run, ['-fno-version-macros'])
 
 test('T10320',
      [ ignore_output
