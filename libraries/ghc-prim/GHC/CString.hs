@@ -24,7 +24,7 @@ import GHC.Types
 import GHC.Prim
 
 -----------------------------------------------------------------------------
--- Unpacking C strings}
+-- Unpacking C strings
 -----------------------------------------------------------------------------
 
 -- This code is needed for virtually all programs, since it's used for
@@ -34,11 +34,33 @@ import GHC.Prim
 -- stuff uses Strings in the representation, so to give representations for
 -- ghc-prim types we need unpackCString#
 
+{-
+Note [Inlining unpackCString#]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There's really no point in ever inlining things like unpackCString# as the loop
+doesn't specialise in an interesting way and we can't deforest the list
+constructors (we'd want to use unpackFoldrCString# for this). Moreover, it's
+pretty small, so there's a danger that it'll be inlined at every literal, which
+is a waste.
+
+Moreover, inlining early may interfere with a variety of rules that are supposed
+to match unpackCString#,
+
+ * BuiltInRules in PrelRules.hs; e.g.
+       eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2)
+          = s1 == s2
+
+ * unpacking rules; e.g. in GHC.Base,
+       unpackCString# a
+          = build (unpackFoldrCString# a)
+
+ * stream fusion rules; e.g. in the `text` library,
+       unstream (S.map safe (S.streamList (GHC.unpackCString# a)))
+          = unpackCString# a
+-}
+
 unpackCString# :: Addr# -> [Char]
 {-# NOINLINE unpackCString# #-}
-    -- There's really no point in inlining this, ever, as the loop doesn't
-    -- specialise in an interesting But it's pretty small, so there's a danger
-    -- that it'll be inlined at every literal, which is a waste
 unpackCString# addr
   = unpack 0#
   where
@@ -64,7 +86,7 @@ unpackFoldrCString# :: Addr# -> (Char  -> a -> a) -> a -> a
 
 -- Usually the unpack-list rule turns unpackFoldrCString# into unpackCString#
 
--- It also has a BuiltInRule in PrelRules.lhs:
+-- It also has a BuiltInRule in PrelRules.hs:
 --      unpackFoldrCString# "foo" c (unpackFoldrCString# "baz" c n)
 --        =  unpackFoldrCString# "foobaz" c n
 
@@ -85,7 +107,10 @@ unpackFoldrCString# addr f z
       where
         !ch = indexCharOffAddr# addr nh
 
+-- There's really no point in inlining this for the same reasons as
+-- unpackCString. See Note [Inlining unpackCString#] above for details.
 unpackCStringUtf8# :: Addr# -> [Char]
+{-# NOINLINE unpackCStringUtf8# #-}
 unpackCStringUtf8# addr
   = unpack 0#
   where
@@ -110,7 +135,10 @@ unpackCStringUtf8# addr
       where
         !ch = indexCharOffAddr# addr nh
 
+-- There's really no point in inlining this for the same reasons as
+-- unpackCString. See Note [Inlining unpackCString#] above for details.
 unpackNBytes# :: Addr# -> Int# -> [Char]
+{-# NOINLINE unpackNBytes# #-}
 unpackNBytes# _addr 0#   = []
 unpackNBytes#  addr len# = unpack [] (len# -# 1#)
     where
