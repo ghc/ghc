@@ -1272,16 +1272,22 @@ lintCoercion co@(AppCo co1 co2)
 lintCoercion (ForAllCo tv1 kind_co co)
   = do { (_, k2) <- lintStarCoercion kind_co
        ; let tv2 = setTyVarKind tv1 k2
-       ; (k3, k4, t1, t2, r) <- addInScopeVar tv1 $ lintCoercion co
+       ; addInScopeVar tv1 $
+    do {
+       ; (k3, k4, t1, t2, r) <- lintCoercion co
        ; in_scope <- getInScope
        ; let tyl = mkNamedForAllTy tv1 Invisible t1
-             subst = zipTvSubst [tv1] [TyVarTy tv2 `mkCastTy` mkSymCo kind_co]
-                     `extendTCvInScopeInScope` in_scope
-             -- We need free vars of `t2` in scope to satisfy
-             -- Note [The substitution invariant]
+             subst = mkTvSubst in_scope $
+                     -- We need both the free vars of the `t2` and the
+                     -- free vars of the range of the substitution in
+                     -- scope. All the free vars of `t2` and `kind_co` should
+                     -- already be in `in_scope`, because they've been
+                     -- linted and `tv2` has the same unique as `tv1`.
+                     -- See Note [The substitution invariant]
+                     unitVarEnv tv1 (TyVarTy tv2 `mkCastTy` mkSymCo kind_co)
              tyr = mkNamedForAllTy tv2 Invisible $
                    substTy subst t2
-       ; return (k3, k4, tyl, tyr, r) }
+       ; return (k3, k4, tyl, tyr, r) } }
 
 lintCoercion (CoVarCo cv)
   | not (isCoVar cv)

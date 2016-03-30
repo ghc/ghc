@@ -83,7 +83,6 @@ module TyCoRep (
         getCvSubstEnv, getTCvInScope, isInScope, notElemTCvSubst,
         setTvSubstEnv, setCvSubstEnv, zapTCvSubst,
         extendTCvInScope, extendTCvInScopeList, extendTCvInScopeSet,
-        extendTCvInScopeInScope,
         extendTCvSubst,
         extendCvSubst, extendCvSubstWithClone,
         extendTvSubst, extendTvSubstWithClone,
@@ -1668,10 +1667,6 @@ extendTCvInScopeList (TCvSubst in_scope tenv cenv) vars
 extendTCvInScopeSet :: TCvSubst -> VarSet -> TCvSubst
 extendTCvInScopeSet (TCvSubst in_scope tenv cenv) vars
   = TCvSubst (extendInScopeSetSet in_scope vars) tenv cenv
-
-extendTCvInScopeInScope :: TCvSubst -> InScopeSet -> TCvSubst
-extendTCvInScopeInScope (TCvSubst in_scope tenv cenv) in_scope'
-  = TCvSubst (unionInScope in_scope in_scope') tenv cenv
 
 extendTCvSubst :: TCvSubst -> TyCoVar -> Type -> TCvSubst
 extendTCvSubst subst v ty
