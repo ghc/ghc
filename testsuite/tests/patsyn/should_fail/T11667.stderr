@@ -2,11 +2,11 @@
 T11667.hs:12:22: error:
     • Could not deduce (Num a) arising from the literal ‘42’
       from the context: Eq a
-        bound by the type signature of pattern synonym ‘Pat1’
+        bound by the signature for pattern synonym ‘Pat1’
         at T11667.hs:12:9-12
       Possible fix:
-        add (Num a) to the context of
-          the type signature of pattern synonym ‘Pat1’
+        add (Num a) to the "required" context of
+          the signature for pattern synonym ‘Pat1’
     • In the pattern: 42
       In the pattern: Just 42
       In the declaration for pattern synonym ‘Pat1’
@@ -16,7 +16,7 @@ T11667.hs:18:28: error:
         arising from the "provided" constraints claimed by
           the signature of ‘Pat2’
       ‘b’ is a rigid type variable bound by
-        the type signature of pattern synonym ‘Pat2’ at T11667.hs:17:17
+        the signature for pattern synonym ‘Pat2’ at T11667.hs:17:17
     • In the declaration for pattern synonym ‘Pat2’
     • Relevant bindings include y :: b (bound at T11667.hs:18:21)
 
@@ -32,12 +32,10 @@ T11667.hs:24:24: error:
 T11667.hs:31:16: error:
     • Could not deduce (Num a) arising from a use of ‘MkS’
       from the context: (Eq a, Show a)
-        bound by the type signature for bidirectional pattern synonym ‘Pat4’
-                 when used in an expression context:
-                   (Eq a, Show a) => S a
+        bound by the signature for pattern synonym ‘Pat4’
         at T11667.hs:31:1-21
       Possible fix:
-        add (Num a) to the context of
-          the type signature of pattern synonym ‘Pat4’
+        add (Num a) to the "required" context of
+          the signature for pattern synonym ‘Pat4’
     • In the expression: MkS 42
       In an equation for ‘$bPat4’: $bPat4 = MkS 42

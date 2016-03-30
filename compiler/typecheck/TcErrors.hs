@@ -742,7 +742,7 @@ mkErrorReport ctxt tcl_env (Report important relevant_bindings)
             (errDoc important [context] relevant_bindings)
        }
 
-type UserGiven = ([EvVar], SkolemInfo, Bool, RealSrcSpan)
+type UserGiven = Implication
 
 getUserGivens :: ReportErrCtxt -> [UserGiven]
 -- One item for each enclosing implication
@@ -750,11 +750,7 @@ getUserGivens (CEC {cec_encl = implics}) = getUserGivensFromImplics implics
 
 getUserGivensFromImplics :: [Implication] -> [UserGiven]
 getUserGivensFromImplics implics
-  = reverse $
-    [ (givens, info, no_eqs, tcl_loc env)
-    | Implic { ic_given = givens, ic_env = env
-             , ic_no_eqs = no_eqs, ic_info = info } <- implics
-    , not (null givens) ]
+  = reverse (filterOut (null . ic_given) implics)
 
 {-
 Note [Always warn with -fdefer-type-errors]
@@ -1343,7 +1339,7 @@ misMatchOrCND ctxt ct oriented ty1 ty2
     ev      = ctEvidence ct
     eq_pred = ctEvPred ev
     orig    = ctEvOrigin ev
-    givens  = [ given | given@(_, _, no_eqs, _) <- getUserGivens ctxt, not no_eqs]
+    givens  = [ given | given <- getUserGivens ctxt, not (ic_no_eqs given)]
               -- Keep only UserGivens that have some equalities
 
 couldNotDeduce :: [UserGiven] -> (ThetaType, CtOrigin) -> SDoc
@@ -1358,10 +1354,11 @@ pp_givens givens
          (g:gs) ->      ppr_given (text "from the context:") g
                  : map (ppr_given (text "or from:")) gs
     where
-       ppr_given herald (gs, skol_info, _, loc)
+       ppr_given herald (Implic { ic_given = gs, ic_info = skol_info
+                                , ic_env = env })
            = hang (herald <+> pprEvVarTheta gs)
                 2 (sep [ text "bound by" <+> ppr skol_info
-                       , text "at" <+> ppr loc])
+                       , text "at" <+> ppr (tcl_loc env) ])
 
 extraTyVarInfo :: ReportErrCtxt -> TcTyVar -> TcType -> SDoc
 -- Add on extra info about skolem constants
@@ -1836,16 +1833,9 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
     (clas, tys)   = getClassPredTys pred
     ispecs        = [ispec | (ispec, _) <- matches]
     unsafe_ispecs = [ispec | (ispec, _) <- unsafe_overlapped]
-    givens        = getUserGivensFromImplics useful_implics
-    all_tyvars    = all isTyVarTy tys
-    useful_implics = filter is_useful_implic implics
-      -- See Note [Useful implications]
-
-    is_useful_implic implic
-      | (PatSynSigSkol name) <- ic_info implic
-      , ProvCtxtOrigin (PSB {psb_id = (L _ name')}) <- orig
-      , name == name' = False
-    is_useful_implic _ = True
+    useful_givens = discardProvCtxtGivens orig (getUserGivensFromImplics implics)
+         -- useful_givens are the enclosing implications with non-empty givens,
+         -- modulo the horrid discardProvCtxtGivens
 
     get_candidate_instances :: TcM [ClsInst]
     -- See Note [Report candidate instances]
@@ -1871,11 +1861,16 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
     cannot_resolve_msg ct candidate_insts binds_msg
       = vcat [ no_inst_msg
              , nest 2 extra_note
-             , vcat (pp_givens givens)
-             , in_other_words
-             , ppWhen (has_ambig_tvs && not (null unifiers && null givens))
+             , vcat (pp_givens useful_givens)
+             , mb_patsyn_prov `orElse` empty
+             , ppWhen (has_ambig_tvs && not (null unifiers && null useful_givens))
                (vcat [ ppUnless lead_with_ambig ambig_msg, binds_msg, potential_msg ])
-             , show_fixes (add_to_ctxt_fixes has_ambig_tvs ++ drv_fixes)
+
+             , ppWhen (isNothing mb_patsyn_prov) $
+                   -- Don't suggest fixes for the provided context of a pattern
+                   -- synonym; the right fix is to bind more in the pattern
+               show_fixes (ctxtFixes has_ambig_tvs pred implics
+                           ++ drv_fixes)
              , ppWhen (not (null candidate_insts))
                (hang (text "There are instances for similar types:")
                    2 (vcat (map ppr candidate_insts))) ]
@@ -1884,7 +1879,7 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
         orig = ctOrigin ct
         -- See Note [Highlighting ambiguous type variables]
         lead_with_ambig = has_ambig_tvs && not (any isRuntimeUnkSkol ambig_tvs)
-                        && not (null unifiers) && null givens
+                        && not (null unifiers) && null useful_givens
 
         (has_ambig_tvs, ambig_msg) = mkAmbigMsg lead_with_ambig ct
         ambig_tvs = uncurry (++) (getAmbigTkvs ct)
@@ -1895,7 +1890,7 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
               $$ text "prevents the constraint" <+>  quotes (pprParendType pred)
               <+> text "from being solved."
 
-          | null givens
+          | null useful_givens
           = addArising orig $ text "No instance for"
             <+> pprParendType pred
 
@@ -1916,32 +1911,19 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
                  , text "These potential instance" <> plural unifiers
                    <+> text "exist:"]
 
-        in_other_words
+        mb_patsyn_prov :: Maybe SDoc
+        mb_patsyn_prov
           | not lead_with_ambig
-          , ProvCtxtOrigin PSB{ psb_def = (L _ pat) } <- orig
-          = vcat [ text "In other words, a successful match on the pattern"
-                 , nest 2 $ ppr pat
-                 , text "does not provide the constraint" <+> pprParendType pred ]
-          | otherwise = empty
+          , ProvCtxtOrigin PSB{ psb_def = L _ pat } <- orig
+          = Just (vcat [ text "In other words, a successful match on the pattern"
+                       , nest 2 $ ppr pat
+                       , text "does not provide the constraint" <+> pprParendType pred ])
+          | otherwise = Nothing
 
     -- Report "potential instances" only when the constraint arises
     -- directly from the user's use of an overloaded function
     want_potential (TypeEqOrigin {}) = False
     want_potential _                 = True
-
-    add_to_ctxt_fixes has_ambig_tvs
-      | not has_ambig_tvs && all_tyvars
-      , (orig:origs) <- usefulContext useful_implics pred
-      = [sep [ text "add" <+> pprParendType pred
-               <+> text "to the context of"
-             , nest 2 $ ppr_skol orig $$
-                        vcat [ text "or" <+> ppr_skol orig
-                             | orig <- origs ] ] ]
-      | otherwise = []
-
-    ppr_skol (PatSkol (RealDataCon dc) _) = text "the data constructor" <+> quotes (ppr dc)
-    ppr_skol (PatSkol (PatSynCon ps)   _) = text "the pattern synonym"  <+> quotes (ppr ps)
-    ppr_skol skol_info = ppr skol_info
 
     extra_note | any isFunTy (filterOutInvisibleTypes (classTyCon clas) tys)
                = text "(maybe you haven't applied a function to enough arguments?)"
@@ -1987,7 +1969,7 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
                 -- simply report back the whole given
                 -- context. Accelerate Smart.hs showed this problem.
                   sep [ text "There exists a (perhaps superclass) match:"
-                      , nest 2 (vcat (pp_givens givens))]
+                      , nest 2 (vcat (pp_givens useful_givens))]
 
              ,  ppWhen (isSingleton matches) $
                 parens (vcat [ text "The choice depends on the instantiation of" <+>
@@ -1996,25 +1978,24 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
                                vcat [ text "To pick the first instance above, use IncoherentInstances"
                                     , text "when compiling the other instance declarations"]
                         ])]
-        where
-            givens = getUserGivens ctxt
-            matching_givens = mapMaybe matchable givens
 
-            matchable (evvars,skol_info,_,loc)
-              = case ev_vars_matching of
-                     [] -> Nothing
-                     _  -> Just $ hang (pprTheta ev_vars_matching)
-                                    2 (sep [ text "bound by" <+> ppr skol_info
-                                           , text "at" <+> ppr loc])
-                where ev_vars_matching = filter ev_var_matches (map evVarPred evvars)
-                      ev_var_matches ty = case getClassPredTys_maybe ty of
-                         Just (clas', tys')
-                           | clas' == clas
-                           , Just _ <- tcMatchTys tys tys'
-                           -> True
-                           | otherwise
-                           -> any ev_var_matches (immSuperClasses clas' tys')
-                         Nothing -> False
+    matching_givens = mapMaybe matchable useful_givens
+
+    matchable (Implic { ic_given = evvars, ic_info = skol_info, ic_env = env })
+      = case ev_vars_matching of
+             [] -> Nothing
+             _  -> Just $ hang (pprTheta ev_vars_matching)
+                            2 (sep [ text "bound by" <+> ppr skol_info
+                                   , text "at" <+> ppr (tcl_loc env) ])
+        where ev_vars_matching = filter ev_var_matches (map evVarPred evvars)
+              ev_var_matches ty = case getClassPredTys_maybe ty of
+                 Just (clas', tys')
+                   | clas' == clas
+                   , Just _ <- tcMatchTys tys tys'
+                   -> True
+                   | otherwise
+                   -> any ev_var_matches (immSuperClasses clas' tys')
+                 Nothing -> False
 
     -- Overlap error because of Safe Haskell (first
     -- match should be the most specific match)
@@ -2031,6 +2012,63 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
                    , nest 2 (vcat [pprInstances $ unsafe_ispecs])
                    ]
             ]
+
+
+ctxtFixes :: Bool -> PredType -> [Implication] -> [SDoc]
+ctxtFixes has_ambig_tvs pred implics
+  | not has_ambig_tvs
+  , isTyVarClassPred pred
+  , (skol:skols) <- usefulContext implics pred
+  , let what | null skols
+             , SigSkol (PatSynCtxt {}) _ <- skol
+             = text "\"required\""
+             | otherwise
+             = empty
+  = [sep [ text "add" <+> pprParendType pred
+           <+> text "to the" <+> what <+> text "context of"
+         , nest 2 $ ppr_skol skol $$
+                    vcat [ text "or" <+> ppr_skol skol
+                         | skol <- skols ] ] ]
+  | otherwise = []
+  where
+    ppr_skol (PatSkol (RealDataCon dc) _) = text "the data constructor" <+> quotes (ppr dc)
+    ppr_skol (PatSkol (PatSynCon ps)   _) = text "the pattern synonym"  <+> quotes (ppr ps)
+    ppr_skol skol_info = ppr skol_info
+
+discardProvCtxtGivens :: CtOrigin -> [UserGiven] -> [UserGiven]
+discardProvCtxtGivens orig givens  -- See Note [discardProvCtxtGivens]
+  | ProvCtxtOrigin (PSB {psb_id = L _ name}) <- orig
+  = filterOut (discard name) givens
+  | otherwise
+  = givens
+  where
+    discard n (Implic { ic_info = SigSkol (PatSynCtxt n') _ }) = n == n'
+    discard _ _                                                = False
+
+usefulContext :: [Implication] -> PredType -> [SkolemInfo]
+-- usefulContext picks out the implications whose context
+-- the programmer might plausibly augment to solve 'pred'
+usefulContext implics pred
+  = go implics
+  where
+    pred_tvs = tyCoVarsOfType pred
+    go [] = []
+    go (ic : ics)
+       | implausible ic = rest
+       | otherwise      = ic_info ic : rest
+       where
+          -- Stop when the context binds a variable free in the predicate
+          rest | any (`elemVarSet` pred_tvs) (ic_skols ic) = []
+               | otherwise                                 = go ics
+
+    implausible ic
+      | null (ic_skols ic)            = True
+      | implausible_info (ic_info ic) = True
+      | otherwise                     = False
+
+    implausible_info (SigSkol (InfSigCtxt {}) _) = True
+    implausible_info _                           = False
+    -- Do not suggest adding constraints to an *inferred* type signature
 
 {- Note [Report candidate instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2060,63 +2098,48 @@ from being solved:
 Once these conditions are satisfied, we can safely say that ambiguity prevents
 the constraint from being solved.
 
-Note [Useful implications]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [discardProvCtxtGivens]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In most situations we call all enclosing implications "useful". There is one
 exception, and that is when the constraint that causes the error is from the
-"provided" context of a pattern synonym declaration. Then we only call the
-enclosing implications that are /not/ from the "required" context of the
-declaration "useful".
+"provided" context of a pattern synonym declaration:
 
-The reason for this is that a "provided" constraint should be deducible from
-a successful pattern match, not from the "required" context. Constraints that
-are deducible from the "required" context are already available at every usage
-site of the pattern synonym.
+  pattern Pat :: (Num a, Eq a) => Show a   => a -> Maybe a
+             --  required      => provided => type
+  pattern Pat x <- (Just x, 4)
 
-This distinction between all and "useful" implications solves two problems.
-First, we never tell the user that we could not deduce a "provided"
-constraint from the "required" context. Second, we never give a possible fix
-that suggests to add a "provided" constraint to the "required" context.
+When checking the pattern RHS we must check that it does actually bind all
+the claimed "provided" constraints; in this case, does the pattern (Just x, 4)
+bind the (Show a) constraint.  Answer: no!
 
-For example, without this distinction the following code gives a bad error
+But the implication we generate for this will look like
+   forall a. (Num a, Eq a) => [W] Show a
+because when checking the pattern we must make the required
+constraints available, since they are needed to match the pattern (in
+this case the literal '4' needs (Num a, Eq a)).
+
+BUT we don't want to suggest adding (Show a) to the "required" constraints
+of the pattern synonym, thus:
+  pattern Pat :: (Num a, Eq a, Show a) => Show a => a -> Maybe a
+It would then typecheck but it's silly.  We want the /pattern/ to bind
+the alleged "provided" constraints, Show a.
+
+So we suppress that Implication in discardProvCtxtGivens.  It's
+painfully ad-hoc but the truth is that adding it to the "required"
+constraints would work.  Suprressing it solves two problems.  First,
+we never tell the user that we could not deduce a "provided"
+constraint from the "required" context. Second, we never give a
+possible fix that suggests to add a "provided" constraint to the
+"required" context.
+
+For example, without this distinction the above code gives a bad error
 message (showing both problems):
-
-  pattern Pat :: Eq a => Show a => a -> Maybe a
-  pattern Pat x <- Just x
 
   error: Could not deduce (Show a) ... from the context: (Eq a)
          ... Possible fix: add (Show a) to the context of
-         the type signature for pattern synonym `Pat' ...
+         the signature for pattern synonym `Pat' ...
 
 -}
-
-
-usefulContext :: [Implication] -> PredType -> [SkolemInfo]
-usefulContext implics pred
-  = go implics
-  where
-    pred_tvs = tyCoVarsOfType pred
-    go [] = []
-    go (ic : ics)
-       | implausible ic = rest
-       | otherwise      = correct_info (ic_info ic) : rest
-       where
-          -- Stop when the context binds a variable free in the predicate
-          rest | any (`elemVarSet` pred_tvs) (ic_skols ic) = []
-               | otherwise                                 = go ics
-
-    implausible ic
-      | null (ic_skols ic)            = True
-      | implausible_info (ic_info ic) = True
-      | otherwise                     = False
-
-    implausible_info (SigSkol (InfSigCtxt {}) _) = True
-    implausible_info _                           = False
-    -- Do not suggest adding constraints to an *inferred* type signature
-
-    correct_info (SigSkol (PatSynBuilderCtxt n) _) = PatSynSigSkol n
-    correct_info info                              = info
-    -- See example 4 in ticket #11667
 
 show_fixes :: [SDoc] -> SDoc
 show_fixes []     = empty
@@ -2274,9 +2297,7 @@ pprSkol implics tv
   = case skol_info of
       UnkSkol         -> pp_tv <+> text "is an unknown type variable"
       SigSkol ctxt ty -> ppr_rigid (pprSigSkolInfo ctxt
-                                      (mkCheckExpType $
-                                       mkSpecForAllTys skol_tvs
-                                         (checkingExpType "pprSkol" ty)))
+                                      (mkSpecForAllTys skol_tvs ty))
       _               -> ppr_rigid (pprSkolInfo skol_info)
   where
     pp_tv = quotes (ppr tv)

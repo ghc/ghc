@@ -2577,11 +2577,6 @@ data SkolemInfo
             TcType              -- a programmer-supplied type signature
                                 -- Location of the binding site is on the TyVar
 
-  | PatSynSigSkol Name  -- Bound by a programmer-supplied type signature of a pattern
-                        -- synonym. Here we cannot use a SigSkol, see
-                        -- Note [Patterns synonyms and the data type Type] in
-                        -- basicTypes\PatSyn.hs
-
   | ClsSkol Class       -- Bound at a class decl
 
   | DerivSkol Type      -- Bound by a 'deriving' clause;
@@ -2645,8 +2640,6 @@ pprSkolInfo (InferSkol ids)   = sep [ text "the inferred type of"
                                     , vcat [ ppr name <+> dcolon <+> ppr ty
                                            | (name,ty) <- ids ]]
 pprSkolInfo (UnifyForAllSkol ty) = text "the type" <+> ppr ty
-pprSkolInfo (PatSynSigSkol name) = text "the type signature of pattern synonym"
-                                   <+> quotes (ppr name)
 
 -- UnkSkol
 -- For type variables the others are dealt with by pprSkolTvBinding.
@@ -2657,6 +2650,7 @@ pprSigSkolInfo :: UserTypeCtxt -> TcType -> SDoc
 pprSigSkolInfo ctxt ty
   = case ctxt of
        FunSigCtxt f _ -> pp_sig f
+       PatSynCtxt {}  -> pprUserTypeCtxt ctxt  -- See Note [Skolem info for pattern synonyms]
        _              -> vcat [ pprUserTypeCtxt ctxt <> colon
                               , nest 2 (ppr ty) ]
   where
@@ -2677,7 +2671,17 @@ pprPatSkolInfo (PatSynCon ps)
         , nest 2 $ ppr ps <+> dcolon
                    <+> pprType (patSynType ps) <> comma ]
 
-{-
+{- Note [Skolem info for pattern synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For pattern synonym SkolemInfo we have
+   SigSkol (PatSynCtxt p) ty
+but the type 'ty' is not very helpful.  The full pattern-synonym type
+is has the provided and required pieces, which it is inconvenient to
+record and display here. So we simply don't display the type at all,
+contenting outselves with just the name of the pattern synonym, which
+is fine.  We could do more, but it doesn't seem worth it.
+
+
 ************************************************************************
 *                                                                      *
             CtOrigin

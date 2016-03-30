@@ -451,9 +451,9 @@ forAllAllowed _                         = False
 representationPolymorphismForbidden :: UserTypeCtxt -> Bool
 representationPolymorphismForbidden = go
   where
-    go (ConArgCtxt _)        = True     -- A rep-polymorphic datacon won't be useful
-    go (PatSynBuilderCtxt _) = True     -- Similar to previous case
-    go _                     = False    -- Other cases are caught by zonker
+    go (ConArgCtxt _) = True     -- A rep-polymorphic datacon won't be useful
+    go (PatSynCtxt _) = True     -- Similar to previous case
+    go _              = False    -- Other cases are caught by zonker
 
 ----------------------------------------
 -- | Fail with error message if the type is unlifted
@@ -880,7 +880,7 @@ okIPCtxt ThBrackCtxt            = True
 okIPCtxt GhciCtxt               = True
 okIPCtxt SigmaCtxt              = True
 okIPCtxt (DataTyCtxt {})        = True
-okIPCtxt (PatSynBuilderCtxt {}) = True
+okIPCtxt (PatSynCtxt {})        = True
 okIPCtxt (TySynCtxt {})         = True   -- e.g.   type Blah = ?x::Int
                                          -- Trac #11466
 

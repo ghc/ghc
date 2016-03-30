@@ -241,9 +241,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                       , patsig_ex_bndrs   = ex_bndrs,   patsig_req  = req_theta
                       , patsig_arg_tys    = arg_tys,    patsig_body_ty = pat_ty }
   = addPatSynCtxt lname $
-    do { let origin     = ProvCtxtOrigin psb
-             skol_info  = PatSynSigSkol name
-             decl_arity = length arg_names
+    do { let decl_arity = length arg_names
              ty_arity   = length arg_tys
              (arg_names, rec_fields, is_infix) = collectPatSynArgInfo details
 
@@ -274,16 +272,20 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                     -- Note [Checking against a pattern signature]
               ; traceTc "tcpatsyn1" (vcat [ ppr v <+> dcolon <+> ppr (tyVarKind v) | v <- ex_tvs])
               ; traceTc "tcpatsyn2" (vcat [ ppr v <+> dcolon <+> ppr (tyVarKind v) | v <- ex_tvs'])
-              ; prov_dicts <- mapM (emitWanted origin)
-                  (substTheta (extendTCvInScopeList subst univ_tvs) prov_theta)
-                  -- Add the free vars of 'prov_theta' to the in_scope set to
+              ; let prov_theta' = substTheta (extendTCvInScopeList subst univ_tvs) prov_theta
+                  -- Add univ_tvs to the in_scope set to
                   -- satisfy the substition invariant. There's no need to
                   -- add 'ex_tvs' as they are already in the domain of the
                   -- substitution.
                   -- See also Note [The substitution invariant] in TyCoRep.
+              ; prov_dicts <- mapM (emitWanted (ProvCtxtOrigin psb)) prov_theta'
               ; args'      <- zipWithM (tc_arg subst) arg_names arg_tys
               ; return (ex_tvs', prov_dicts, args') }
 
+       ; let skol_info = SigSkol (PatSynCtxt name) (mkPhiTy req_theta pat_ty)
+                         -- The type here is a bit bogus, but we do not print
+                         -- the type for PatSynCtxt, so it doesn't matter
+                         -- See TcRnTypes Note [Skolem info for pattern synonyms]
        ; (implics, ev_binds) <- buildImplicationFor tclvl skol_info univ_tvs req_dicts wanted
 
        -- Solve the constraints now, because we are about to make a PatSyn,
@@ -709,7 +711,7 @@ get_builder_sig sig_fun name builder_id need_dummy_arg
                  , sig_theta = req ++ prov
                  , sig_tau   = add_void need_dummy_arg $
                                mkFunTys arg_tys body_ty
-                 , sig_ctxt  = PatSynBuilderCtxt name
+                 , sig_ctxt  = PatSynCtxt name
                  , sig_loc   = getSrcSpan name })
   | otherwise
   = -- No signature, so fake up a TcIdSigInfo from the builder Id

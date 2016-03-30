@@ -2,7 +2,7 @@
 T11039.hs:8:15: error:
     • Couldn't match type ‘f’ with ‘A’
       ‘f’ is a rigid type variable bound by
-        the type signature of pattern synonym ‘Q’ at T11039.hs:7:14
+        the signature for pattern synonym ‘Q’ at T11039.hs:7:14
       Expected type: f a
         Actual type: A a
     • In the pattern: A a
