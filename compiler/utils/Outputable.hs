@@ -837,7 +837,12 @@ instance Outputable Extension where
 -- | 'BindingSite' is used to tell the thing that prints binder what
 -- language construct is binding the identifier.  This can be used
 -- to decide how much info to print.
-data BindingSite = LambdaBind | CaseBind | LetBind
+-- Also see Note [Binding-site specific printing] in PprCore
+data BindingSite
+    = LambdaBind  -- ^ The x in   (\x. e)
+    | CaseBind    -- ^ The x in   case scrut of x { (y,z) -> ... }
+    | CasePatBind -- ^ The y,z in case scrut of x { (y,z) -> ... }
+    | LetBind     -- ^ The x in   (let x = rhs in e)
 
 -- | When we print a binder, we often want to print its type too.
 -- The @OutputableBndr@ class encapsulates this idea.

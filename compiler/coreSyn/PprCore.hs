@@ -189,14 +189,15 @@ ppr_expr add_par (Case expr var ty [(con,args,rhs)])
              , pprCoreExpr rhs
              ]
     else add_par $
-         sep [sep [text "case" <+> pprCoreExpr expr,
-                   ifPprDebug (text "return" <+> ppr ty),
-                   sep [text "of" <+> ppr_bndr var,
-                        char '{' <+> ppr_case_pat con args <+> arrow]
-               ],
-              pprCoreExpr rhs,
-              char '}'
-         ]
+         sep [sep [sep [ text "case" <+> pprCoreExpr expr
+                       , ifPprDebug (text "return" <+> ppr ty)
+                       , text "of" <+> ppr_bndr var
+                       ]
+                  , char '{' <+> ppr_case_pat con args <+> arrow
+                  ]
+              , pprCoreExpr rhs
+              , char '}'
+              ]
   where
     ppr_bndr = pprBndr CaseBind
 
@@ -259,13 +260,13 @@ ppr_case_pat (DataAlt dc) args
   | Just sort <- tyConTuple_maybe tc
   = tupleParens sort (pprWithCommas ppr_bndr args)
   where
-    ppr_bndr = pprBndr CaseBind
+    ppr_bndr = pprBndr CasePatBind
     tc = dataConTyCon dc
 
 ppr_case_pat con args
   = ppr con <+> (fsep (map ppr_bndr args))
   where
-    ppr_bndr = pprBndr CaseBind
+    ppr_bndr = pprBndr CasePatBind
 
 
 -- | Pretty print the argument in a function application.
@@ -292,6 +293,21 @@ With -dppr-case-as-let we print them as such:
 
 Other printing bits-and-bobs used with the general @pprCoreBinding@
 and @pprCoreExpr@ functions.
+
+
+Note [Binding-site specific printing]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+pprCoreBinder and pprTypedLamBinder receive a BindingSite argument to adjust
+the information printed.
+
+Let-bound binders are printed with their full type and idInfo.
+
+Case-bound variables (both the case binder and pattern variables) are printed
+without a type and without their unfolding.
+
+Furthermore, a dead case-binder is completely ignored, while otherwise, dead
+binders are printed as "_".
 -}
 
 instance OutputableBndr Var where
@@ -321,12 +337,19 @@ pprTypedLamBinder bind_site debug_on var
   = sdocWithDynFlags $ \dflags ->
     case () of
     _
+      | not debug_on            -- Show case-bound wild bilders only if debug is on
+      , CaseBind <- bind_site
+      , isDeadBinder var        -> empty
+
       | not debug_on            -- Even dead binders can be one-shot
       , isDeadBinder var        -> char '_' <+> ppWhen (isId var)
                                                 (pprIdBndrInfo (idInfo var))
 
       | not debug_on            -- No parens, no kind info
       , CaseBind <- bind_site   -> pprUntypedBinder var
+
+      | not debug_on
+      , CasePatBind <- bind_site    -> pprUntypedBinder var
 
       | suppress_sigs dflags    -> pprUntypedBinder var
 

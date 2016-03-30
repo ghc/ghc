@@ -40,14 +40,12 @@ dr :: Double -> Double
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once!] :: Double) ->
-                 case x of _ [Occ=Dead] { GHC.Types.D# x1 ->
+                 case x of { GHC.Types.D# x1 ->
                  GHC.Types.D# (GHC.Prim.+## x1 x1)
                  }}]
 dr =
   \ (x :: Double) ->
-    case x of _ [Occ=Dead] { GHC.Types.D# x1 ->
-    GHC.Types.D# (GHC.Prim.+## x1 x1)
-    }
+    case x of { GHC.Types.D# x1 -> GHC.Types.D# (GHC.Prim.+## x1 x1) }
 
 -- RHS size: {terms: 1, types: 0, coercions: 0}
 dl :: Double -> Double
@@ -59,9 +57,7 @@ dl :: Double -> Double
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once!] :: Double) ->
-                 case x of _ [Occ=Dead] { GHC.Types.D# y ->
-                 GHC.Types.D# (GHC.Prim.+## y y)
-                 }}]
+                 case x of { GHC.Types.D# y -> GHC.Types.D# (GHC.Prim.+## y y) }}]
 dl = dr
 
 -- RHS size: {terms: 8, types: 3, coercions: 0}
@@ -74,12 +70,12 @@ fr :: Float -> Float
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once!] :: Float) ->
-                 case x of _ [Occ=Dead] { GHC.Types.F# x1 ->
+                 case x of { GHC.Types.F# x1 ->
                  GHC.Types.F# (GHC.Prim.plusFloat# x1 x1)
                  }}]
 fr =
   \ (x :: Float) ->
-    case x of _ [Occ=Dead] { GHC.Types.F# x1 ->
+    case x of { GHC.Types.F# x1 ->
     GHC.Types.F# (GHC.Prim.plusFloat# x1 x1)
     }
 
@@ -93,7 +89,7 @@ fl :: Float -> Float
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once!] :: Float) ->
-                 case x of _ [Occ=Dead] { GHC.Types.F# y ->
+                 case x of { GHC.Types.F# y ->
                  GHC.Types.F# (GHC.Prim.plusFloat# y y)
                  }}]
 fl = fr

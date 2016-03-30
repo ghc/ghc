@@ -19,9 +19,8 @@ foo [InlPrag=NOINLINE] :: Int -> ()
 [GblId, Arity=1, Caf=NoCafRefs, Str=<S(S),1*U(U)>]
 foo =
   \ (n :: Int) ->
-    case n of _ [Occ=Dead] { GHC.Types.I# y ->
-    case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# 0# y)
-    of _ [Occ=Dead] {
+    case n of { GHC.Types.I# y ->
+    case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# 0# y) of {
       False -> GHC.Tuple.();
       True -> $wxs y
     }

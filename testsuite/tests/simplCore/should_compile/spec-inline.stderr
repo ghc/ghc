@@ -56,14 +56,11 @@ Roman.foo_$s$wgo =
                 (GHC.Prim.+# (GHC.Prim.+# (GHC.Prim.+# sc sc) sc) sc) sc)
              sc)
           sc } in
-    case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<=# sc1 0#)
-    of _ [Occ=Dead] {
+    case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<=# sc1 0#) of {
       False ->
-        case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# sc1 100#)
-        of _ [Occ=Dead] {
+        case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# sc1 100#) of {
           False ->
-            case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# sc1 500#)
-            of _ [Occ=Dead] {
+            case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# sc1 500#) of {
               False -> Roman.foo_$s$wgo (GHC.Prim.+# m m) (GHC.Prim.-# sc1 1#);
               True -> Roman.foo_$s$wgo m (GHC.Prim.-# sc1 3#)
             };
@@ -82,10 +79,10 @@ Roman.$wgo [InlPrag=[0]] :: Maybe Int -> Maybe Int -> GHC.Prim.Int#
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 30] 256 0}]
 Roman.$wgo =
   \ (w :: Maybe Int) (w1 :: Maybe Int) ->
-    case w1 of _ [Occ=Dead] {
+    case w1 of {
       Nothing -> case Roman.foo3 of wild1 { };
       Just x ->
-        case x of _ [Occ=Dead] { GHC.Types.I# ipv ->
+        case x of { GHC.Types.I# ipv ->
         let {
           m :: GHC.Prim.Int#
           [LclId]
@@ -96,18 +93,15 @@ Roman.$wgo =
                     (GHC.Prim.+# (GHC.Prim.+# (GHC.Prim.+# ipv ipv) ipv) ipv) ipv)
                  ipv)
               ipv } in
-        case w of _ [Occ=Dead] {
+        case w of {
           Nothing -> Roman.foo_$s$wgo m 10#;
           Just n ->
-            case n of _ [Occ=Dead] { GHC.Types.I# x2 ->
-            case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<=# x2 0#)
-            of _ [Occ=Dead] {
+            case n of { GHC.Types.I# x2 ->
+            case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<=# x2 0#) of {
               False ->
-                case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# x2 100#)
-                of _ [Occ=Dead] {
+                case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# x2 100#) of {
                   False ->
-                    case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# x2 500#)
-                    of _ [Occ=Dead] {
+                    case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# x2 500#) of {
                       False -> Roman.foo_$s$wgo (GHC.Prim.+# m m) (GHC.Prim.-# x2 1#);
                       True -> Roman.foo_$s$wgo m (GHC.Prim.-# x2 3#)
                     };
@@ -167,7 +161,7 @@ foo :: Int -> Int
                  }}]
 foo =
   \ (n :: Int) ->
-    case n of _ [Occ=Dead] { GHC.Types.I# ipv ->
+    case n of { GHC.Types.I# ipv ->
     case Roman.foo_$s$wgo 6# ipv of ww { __DEFAULT -> GHC.Types.I# ww }
     }
 

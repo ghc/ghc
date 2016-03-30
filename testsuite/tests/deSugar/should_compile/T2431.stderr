@@ -19,7 +19,7 @@ T2431.$WRefl =
 -- RHS size: {terms: 4, types: 8, coercions: 0}
 absurd :: forall a. Int :~: Bool -> a
 [GblId, Arity=1, Caf=NoCafRefs, Str=<L,U>x]
-absurd = \ (@ a) (x :: Int :~: Bool) -> case x of _ [Occ=Dead] { }
+absurd = \ (@ a) (x :: Int :~: Bool) -> case x of { }
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
 $trModule1 :: GHC.Types.TrName

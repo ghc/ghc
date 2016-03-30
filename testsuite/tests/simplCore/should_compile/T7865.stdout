@@ -1,4 +1,4 @@
 expensive [InlPrag=NOINLINE] :: Int -> Int
 expensive =
-        case expensive sc1 of _ [Occ=Dead] { GHC.Types.I# x ->
-                (case expensive x of _ [Occ=Dead] { GHC.Types.I# x1 ->
+        case expensive sc1 of { GHC.Types.I# x ->
+                (case expensive x of { GHC.Types.I# x1 ->

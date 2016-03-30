@@ -525,7 +525,7 @@ ppr_monobind :: (OutputableBndr idL, OutputableBndr idR) => HsBindLR idL idR -> 
 ppr_monobind (PatBind { pat_lhs = pat, pat_rhs = grhss })
   = pprPatBind pat grhss
 ppr_monobind (VarBind { var_id = var, var_rhs = rhs })
-  = sep [pprBndr CaseBind var, nest 2 $ equals <+> pprExpr (unLoc rhs)]
+  = sep [pprBndr CasePatBind var, nest 2 $ equals <+> pprExpr (unLoc rhs)]
 ppr_monobind (FunBind { fun_id = fun,
                         fun_co_fn = wrap,
                         fun_matches = matches,

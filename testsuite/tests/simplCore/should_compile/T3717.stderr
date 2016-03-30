@@ -53,12 +53,12 @@ foo [InlPrag=INLINE[0]] :: Int -> Int
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (w [Occ=Once!] :: Int) ->
-                 case w of _ [Occ=Dead] { GHC.Types.I# ww1 [Occ=Once] ->
+                 case w of { GHC.Types.I# ww1 [Occ=Once] ->
                  case T3717.$wfoo ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }
                  }}]
 foo =
   \ (w :: Int) ->
-    case w of _ [Occ=Dead] { GHC.Types.I# ww1 ->
+    case w of { GHC.Types.I# ww1 ->
     case T3717.$wfoo ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }
     }
 

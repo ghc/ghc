@@ -37,13 +37,13 @@ T4930.$wfoo [InlPrag=[0], Occ=LoopBreaker]
 [GblId, Arity=1, Caf=NoCafRefs, Str=<S,U>]
 T4930.$wfoo =
   \ (ww :: GHC.Prim.Int#) ->
-    case case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# ww 5#)
-         of _ [Occ=Dead] {
+    case case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# ww 5#) of {
            False -> GHC.Types.I# (GHC.Prim.+# ww 2#);
            True ->
              case T4930.$wfoo ww of ww1 { __DEFAULT -> GHC.Types.I# ww1 }
          }
-    of _ [Occ=Dead] { GHC.Types.I# ipv ->
+    of
+    { GHC.Types.I# ipv ->
     GHC.Prim.+# ww 5#
     }
 end Rec }
@@ -58,12 +58,12 @@ foo [InlPrag=INLINE[0]] :: Int -> Int
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (w [Occ=Once!] :: Int) ->
-                 case w of _ [Occ=Dead] { GHC.Types.I# ww1 [Occ=Once] ->
+                 case w of { GHC.Types.I# ww1 [Occ=Once] ->
                  case T4930.$wfoo ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }
                  }}]
 foo =
   \ (w :: Int) ->
-    case w of _ [Occ=Dead] { GHC.Types.I# ww1 ->
+    case w of { GHC.Types.I# ww1 ->
     case T4930.$wfoo ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }
     }
 
