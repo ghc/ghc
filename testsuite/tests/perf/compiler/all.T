@@ -639,7 +639,7 @@ test('T9020',
 test('T9675',
      [ only_ways(['optasm']),
        compiler_stats_num_field('max_bytes_used', # Note [residency]
-          [(wordsize(64), 30837312, 15),
+          [(wordsize(64), 38776008, 15),
           # 2014-10-13    29596552
           # 2014-10-13    26570896   seq the DmdEnv in seqDmdType as well
           # 2014-10-13    18582472   different machines giving different results..
@@ -647,12 +647,13 @@ test('T9675',
           # 2015-06-21    28056344   switch to `+RTS -G1`, tighten bound to 15%
           # 2015-10-28    23776640   emit Typeable at definition site
           # 2015-12-11    30837312   TypeInType (see #11196)
+          # 2016-04-14    38776008   Final demand analyzer run
            (wordsize(32), 18043224, 15)
           # 2015-07-11    15341228   (x86/Linux, 64-bit machine) use +RTS -G1
           # 2016-04-06    18043224   (x86/Linux, 64-bit machine)
           ]),
        compiler_stats_num_field('peak_megabytes_allocated', # Note [residency]
-          [(wordsize(64), 113, 15),
+          [(wordsize(64), 144, 15),
           # 2014-10-13    66
           # 2014-10-13    58         seq the DmdEnv in seqDmdType as well
           # 2014-10-13    49         different machines giving different results...
@@ -661,6 +662,7 @@ test('T9675',
           # 2015-06-21    105        switch to `+RTS -G1`
           # 2015-12-04    88         new pattern checker (D1535)
           # 2015-12-11    113        TypeInType (see #11196)
+          # 2016-04-14    144        Final demand analyzer run
             (wordsize(32), 56, 15)
           # 2015-07-11    56         (x86/Linux, 64-bit machine) use +RTS -G1
           ]),
@@ -771,10 +773,11 @@ test('T9961',
 test('T9233',
     [ only_ways(['normal']),
       compiler_stats_num_field('bytes allocated',
-        [(wordsize(64), 999826288, 5),
-         # 2015-08-04   999826288     initial value
-         (wordsize(32), 515672240, 5)   # Put in your value here if you hit this
-         # 2016-04-06   515672240     (x86/Linux) initial value
+        [(wordsize(64), 1066246248, 5),
+         # 2015-08-04    999826288     initial value
+         # 2016-04-14   1066246248     Final demand analyzer run
+         (wordsize(32),  515672240, 5)   # Put in your value here if you hit this
+         # 2016-04-06    515672240     (x86/Linux) initial value
         ]),
       extra_clean(['T9233a.hi', 'T9233a.o'])
     ],
@@ -784,17 +787,19 @@ test('T9233',
 test('T10370',
      [ only_ways(['optasm']),
        compiler_stats_num_field('max_bytes_used', # Note [residency]
-          [(wordsize(64), 22823976, 15),
+          [(wordsize(64), 28256896, 15),
           # 2015-10-22    19548720
           # 2016-02-24    22823976   Changing Levity to RuntimeRep; not sure why this regresses though, even after some analysis
+          # 2016-04-14    28256896   final demand analyzer run
            (wordsize(32), 11371496, 15),
           # 2015-10-22    11371496
           ]),
        compiler_stats_num_field('peak_megabytes_allocated', # Note [residency]
-          [(wordsize(64), 76, 15),
-          # 2015-10-22    76
-           (wordsize(32), 39, 15),
-          # 2015-10-22    39
+          [(wordsize(64), 101, 15),
+          # 2015-10-22     76
+          # 2016-04-14    101 final demand analyzer run
+           (wordsize(32),  39, 15),
+          # 2015-10-22     39
           ]),
        # Use `+RTS -G1` for more stable residency measurements. Note [residency].
        extra_hc_opts('+RTS -G1 -RTS')

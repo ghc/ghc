@@ -43,7 +43,7 @@ Rec {
 -- RHS size: {terms: 55, types: 9, coercions: 0}
 Roman.foo_$s$wgo [Occ=LoopBreaker]
   :: GHC.Prim.Int# -> GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId, Arity=2, Caf=NoCafRefs, Str=<L,U><L,U>]
+[GblId, Arity=2, Caf=NoCafRefs, Str=<L,U><S,U>]
 Roman.foo_$s$wgo =
   \ (sc :: GHC.Prim.Int#) (sc1 :: GHC.Prim.Int#) ->
     let {
@@ -151,7 +151,7 @@ foo :: Int -> Int
 [GblId,
  Arity=1,
  Caf=NoCafRefs,
- Str=<S,1*U(U)>m,
+ Str=<S(S),1*U(U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)

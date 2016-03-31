@@ -47,8 +47,9 @@ module Id (
         setIdExported, setIdNotExported,
         globaliseId, localiseId,
         setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
-        zapLamIdInfo, zapIdDemandInfo, zapIdUsageInfo, zapFragileIdInfo,
-        zapIdStrictness,
+        zapLamIdInfo, zapIdDemandInfo, zapIdUsageInfo, zapIdUsageEnvInfo,
+        zapIdUsedOnceInfo,
+        zapFragileIdInfo, zapIdStrictness,
         transferPolyIdInfo,
 
         -- ** Predicates on Ids
@@ -784,6 +785,12 @@ zapIdDemandInfo = zapInfo zapDemandInfo
 
 zapIdUsageInfo :: Id -> Id
 zapIdUsageInfo = zapInfo zapUsageInfo
+
+zapIdUsageEnvInfo :: Id -> Id
+zapIdUsageEnvInfo = zapInfo zapUsageEnvInfo
+
+zapIdUsedOnceInfo :: Id -> Id
+zapIdUsedOnceInfo = zapInfo zapUsedOnceInfo
 
 {-
 Note [transferPolyIdInfo]

@@ -16,7 +16,6 @@ import IdInfo
 import UniqSupply
 import BasicTypes
 import DynFlags
-import VarEnv           ( isEmptyVarEnv )
 import Demand
 import WwLib
 import Util
@@ -107,7 +106,10 @@ wwExpr _      _ e@(Lit  {}) = return e
 wwExpr _      _ e@(Var  {}) = return e
 
 wwExpr dflags fam_envs (Lam binder expr)
-  = Lam binder <$> wwExpr dflags fam_envs expr
+  = Lam new_binder <$> wwExpr dflags fam_envs expr
+  where new_binder | isId binder = zapIdUsedOnceInfo binder
+                   | otherwise   = binder
+  -- See Note [Zapping Used Once info in WorkWrap]
 
 wwExpr dflags fam_envs (App f a)
   = App <$> wwExpr dflags fam_envs f <*> wwExpr dflags fam_envs a
@@ -125,11 +127,16 @@ wwExpr dflags fam_envs (Let bind expr)
 wwExpr dflags fam_envs (Case expr binder ty alts) = do
     new_expr <- wwExpr dflags fam_envs expr
     new_alts <- mapM ww_alt alts
-    return (Case new_expr binder ty new_alts)
+    let new_binder = zapIdUsedOnceInfo binder
+      -- See Note [Zapping Used Once info in WorkWrap]
+    return (Case new_expr new_binder ty new_alts)
   where
     ww_alt (con, binders, rhs) = do
         new_rhs <- wwExpr dflags fam_envs rhs
-        return (con, binders, new_rhs)
+        let new_binders = [ if isId b then zapIdUsedOnceInfo b else b
+                          | b <- binders ]
+           -- See Note [Zapping Used Once info in WorkWrap]
+        return (con, new_binders, new_rhs)
 
 {-
 ************************************************************************
@@ -279,9 +286,7 @@ tryWW dflags fam_envs is_rec fn_id rhs
         -- No point in worker/wrappering if the thing is never inlined!
         -- Because the no-inline prag will prevent the wrapper ever
         -- being inlined at a call site.
-        --
-        -- Furthermore, don't even expose strictness info
-  = return [ (fn_id, rhs) ]
+  = return [ (new_fn_id, rhs) ]
 
   | not loop_breaker
   , Just stable_unf <- certainlyWillInline dflags fn_unf
@@ -304,23 +309,57 @@ tryWW dflags fam_envs is_rec fn_id rhs
     fn_info      = idInfo fn_id
     inline_act   = inlinePragmaActivation (inlinePragInfo fn_info)
     fn_unf       = unfoldingInfo fn_info
+    (wrap_dmds, res_info) = splitStrictSig (strictnessInfo fn_info)
 
-        -- In practice it always will have a strictness
-        -- signature, even if it's a uninformative one
-    strict_sig  = strictnessInfo fn_info
-    StrictSig (DmdType env wrap_dmds res_info) = strict_sig
-
-        -- new_fn_id has the DmdEnv zapped.
-        --      (a) it is never used again
-        --      (b) it wastes space
-        --      (c) it becomes incorrect as things are cloned, because
-        --          we don't push the substitution into it
-    new_fn_id | isEmptyVarEnv env = fn_id
-              | otherwise         = fn_id `setIdStrictness`
-                                     mkClosedStrictSig wrap_dmds res_info
+    new_fn_id = zapIdUsedOnceInfo (zapIdUsageEnvInfo fn_id)
+        -- See Note [Zapping DmdEnv after Demand Analyzer] and
+        -- See Note [Zapping Used Once info in WorkWrap]
 
     is_fun    = notNull wrap_dmds
     is_thunk  = not is_fun && not (exprIsHNF rhs)
+
+{-
+Note [Zapping DmdEnv after Demand Analyzer]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In the worker-wrapper pass we zap the DmdEnv.
+
+Why?
+ (a) it is never used again
+ (b) it wastes space
+ (c) it becomes incorrect as things are cloned, because
+     we don't push the substitution into it
+
+Why here?
+ * Because we don’t want to do it in the Demand Analyzer, as we never know
+   there when we are doing the last pass.
+ * We want them to be still there at the end of DmdAnal, so that
+   -ddump-str-anal contains them.
+ * We don’t want a second pass just for that.
+ * WorkWrap looks at all bindings anyways.
+
+We also need to do it in TidyCore to clean up after the final,
+worker/wrapper-less run of the demand analyser.
+
+Note [Zapping Used Once info in WorkWrap]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In the worker-wrapper pass we zap the used once info in demands and in
+strictness signatures.
+
+Why?
+ * The simplifier may happen to transform code in a way that invalidates the
+   data (see #11731 for an example).
+ * It is not used in later passes, up to code generation.
+
+So as the data is useless and possibly wrong, we want to remove it. The most
+convenient place to do that is the worker wrapper phase, as it runs after every
+run of the demand analyser besides the very last one (which is the one where we
+want to _keep_ the info for the code generator).
+
+We do not do it in the demand analyser for the same reasons outlined in
+Note [Zapping DmdEnv after Demand Analyzer] above.
+-}
 
 
 ---------------------

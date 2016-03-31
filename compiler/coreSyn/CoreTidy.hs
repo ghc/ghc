@@ -18,6 +18,7 @@ import CoreSyn
 import CoreArity
 import Id
 import IdInfo
+import Demand ( zapUsageEnvSig )
 import Type( tidyType, tidyTyCoVarBndr )
 import Coercion( tidyCo )
 import Var
@@ -187,6 +188,8 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) (id,rhs)
         --
         -- Similarly for the demand info - on a let binder, this tells
         -- CorePrep to turn the let into a case.
+        -- But: Remove the usage demand here
+        --      (See Note [Zapping DmdEnv after Demand Analyzer] in WorkWrap)
         --
         -- Similarly arity info for eta expansion in CorePrep
         --
@@ -196,7 +199,7 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) (id,rhs)
         new_info = vanillaIdInfo
                     `setOccInfo`        occInfo old_info
                     `setArityInfo`      exprArity rhs
-                    `setStrictnessInfo` strictnessInfo old_info
+                    `setStrictnessInfo` zapUsageEnvSig (strictnessInfo old_info)
                     `setDemandInfo`     demandInfo old_info
                     `setInlinePragInfo` inlinePragInfo old_info
                     `setUnfoldingInfo`  new_unf

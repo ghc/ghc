@@ -24,7 +24,7 @@ module IdInfo (
 
         -- ** Zapping various forms of Info
         zapLamInfo, zapFragileInfo,
-        zapDemandInfo, zapUsageInfo,
+        zapDemandInfo, zapUsageInfo, zapUsageEnvInfo, zapUsedOnceInfo,
 
         -- ** The ArityInfo type
         ArityInfo,
@@ -469,6 +469,19 @@ zapDemandInfo info = Just (info {demandInfo = topDmd})
 -- | Remove usage (but not strictness) info on the 'IdInfo'
 zapUsageInfo :: IdInfo -> Maybe IdInfo
 zapUsageInfo info = Just (info {demandInfo = zapUsageDemand (demandInfo info)})
+
+-- | Remove usage environment info from the strictness signature on the 'IdInfo'
+zapUsageEnvInfo :: IdInfo -> Maybe IdInfo
+zapUsageEnvInfo info
+    | hasDemandEnvSig (strictnessInfo info)
+    = Just (info {strictnessInfo = zapUsageEnvSig (strictnessInfo info)})
+    | otherwise
+    = Nothing
+
+zapUsedOnceInfo :: IdInfo -> Maybe IdInfo
+zapUsedOnceInfo info
+    = Just $ info { strictnessInfo = zapUsedOnceSig    (strictnessInfo info)
+                  , demandInfo     = zapUsedOnceDemand (demandInfo     info) }
 
 zapFragileInfo :: IdInfo -> Maybe IdInfo
 -- ^ Zap info that depends on free variables

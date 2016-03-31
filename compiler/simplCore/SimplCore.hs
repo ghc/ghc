@@ -319,6 +319,11 @@ getCoreToDo dflags
             [simpl_phase 0 ["post-late-ww"] max_iter]
           ),
 
+        -- Final run of the demand_analyser, ensures that one-shot thunks are
+        -- really really one-shot thunks. Only needed if the demand analyser
+        -- has run at all. See Note [Final Demand Analyser run] in DmdAnal
+        runWhen (strictness || late_dmd_anal) CoreDoStrictness,
+
         maybe_rule_check (Phase 0)
      ]
 
