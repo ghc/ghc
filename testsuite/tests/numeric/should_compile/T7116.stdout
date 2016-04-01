@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 32, types: 17, coercions: 0}
+Result size of Tidy Core = {terms: 46, types: 23, coercions: 0}
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
 T7116.$trModule2 :: GHC.Types.TrName
@@ -47,7 +47,7 @@ dr =
   \ (x :: Double) ->
     case x of { GHC.Types.D# x1 -> GHC.Types.D# (GHC.Prim.+## x1 x1) }
 
--- RHS size: {terms: 1, types: 0, coercions: 0}
+-- RHS size: {terms: 8, types: 3, coercions: 0}
 dl :: Double -> Double
 [GblId,
  Arity=1,
@@ -58,7 +58,9 @@ dl :: Double -> Double
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once!] :: Double) ->
                  case x of { GHC.Types.D# y -> GHC.Types.D# (GHC.Prim.+## y y) }}]
-dl = dr
+dl =
+  \ (x :: Double) ->
+    case x of { GHC.Types.D# y -> GHC.Types.D# (GHC.Prim.+## y y) }
 
 -- RHS size: {terms: 8, types: 3, coercions: 0}
 fr :: Float -> Float
@@ -79,7 +81,7 @@ fr =
     GHC.Types.F# (GHC.Prim.plusFloat# x1 x1)
     }
 
--- RHS size: {terms: 1, types: 0, coercions: 0}
+-- RHS size: {terms: 8, types: 3, coercions: 0}
 fl :: Float -> Float
 [GblId,
  Arity=1,
@@ -92,7 +94,11 @@ fl :: Float -> Float
                  case x of { GHC.Types.F# y ->
                  GHC.Types.F# (GHC.Prim.plusFloat# y y)
                  }}]
-fl = fr
+fl =
+  \ (x :: Float) ->
+    case x of { GHC.Types.F# y ->
+    GHC.Types.F# (GHC.Prim.plusFloat# y y)
+    }
 
 
 

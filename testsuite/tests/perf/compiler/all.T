@@ -624,13 +624,14 @@ test('T9020',
           [(wordsize(32), 343005716, 10),
            # Original:    381360728
            # 2014-07-31:  343005716 (Windows) (general round of updates)
-           (wordsize(64), 698401736, 10)])
+           (wordsize(64), 852298336, 10)])
            # prev:        795469104
            # 2014-07-17:  728263536 (general round of updates)
            # 2014-09-10:  785871680 post-AMP-cleanup
            # 2014-11-03:  680162056 Further Applicative and Monad adjustments
            # 2015-10-21:  786189008 Make stronglyConnCompFromEdgedVertices deterministic
            # 2016-01-26:  698401736 improvement from using ExpTypes instead of ReturnTvs
+           # 2016-04-06:  852298336 Refactoring of CSE #11781
       ],
       compile,[''])
 
@@ -695,12 +696,13 @@ test('T9872a',
 test('T9872b',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 4918990352, 5),
+          [(wordsize(64), 4600233488, 5),
           # 2014-12-10    6483306280    Initally created
           # 2014-12-16    6892251912    Flattener parameterized over roles
           # 2014-12-18    3480212048    Reduce type families even more eagerly
           # 2015-12-11    5199926080    TypeInType (see #11196)
           # 2016-02-08    4918990352    Improved a bit by tyConRolesRepresentational
+          # 2016-04-06:   4600233488    Refactoring of CSE #11781
            (wordsize(32), 2422750696, 5)
           # was           1700000000
           # 2016-04-06    2422750696    x86/Linux
@@ -711,12 +713,13 @@ test('T9872b',
 test('T9872c',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 4454071184, 5),
+          [(wordsize(64), 4306667256, 5),
           # 2014-12-10    5495850096    Initally created
           # 2014-12-16    5842024784    Flattener parameterized over roles
           # 2014-12-18    2963554096    Reduce type families even more eagerly
           # 2015-12-11    4723613784    TypeInType (see #11196)
           # 2016-02-08    4454071184    Improved a bit by tyConRolesRepresentational
+          # 2016-04-06:   4306667256    Refactoring of CSE #11781
            (wordsize(32), 2257242896, 5)
           # was           1500000000
           # 2016-04-06    2257242896
