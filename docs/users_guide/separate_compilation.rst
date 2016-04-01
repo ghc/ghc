@@ -846,7 +846,7 @@ following to your ``Makefile``:
 .. code-block:: make
 
     depend :
-            ghc -M $(HC_OPTS) $(SRCS)
+            ghc -dep-suffix '' -M $(HC_OPTS) $(SRCS)
 
 Now, before you start compiling, and any time you change the ``imports``
 in your program, do ``make depend`` before you do ``make cool_pgm``. The command
