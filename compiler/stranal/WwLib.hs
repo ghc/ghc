@@ -25,7 +25,7 @@ import TysWiredIn       ( tupleDataCon )
 import Type
 import Coercion
 import FamInstEnv
-import BasicTypes       ( Boxity(..), OneShotInfo(..), worstOneShot )
+import BasicTypes       ( Boxity(..) )
 import Literal          ( absentLiteralOf )
 import TyCon
 import UniqSupply
@@ -111,7 +111,6 @@ mkWwBodies :: DynFlags
            -> Type                                  -- Type of original function
            -> [Demand]                              -- Strictness of original function
            -> DmdResult                             -- Info about function result
-           -> [OneShotInfo]                         -- One-shot-ness of the function, value args only
            -> UniqSM (Maybe ([Demand],              -- Demands for worker (value) args
                              Id -> CoreExpr,        -- Wrapper body, lacking only the worker Id
                              CoreExpr -> CoreExpr)) -- Worker body, lacking the original function rhs
@@ -127,22 +126,20 @@ mkWwBodies :: DynFlags
 --                        let x = (a,b) in
 --                        E
 
-mkWwBodies dflags fam_envs fun_ty demands res_info one_shots
-  = do  { let arg_info = demands `zip` (one_shots ++ repeat NoOneShotInfo)
-              all_one_shots = foldr (worstOneShot . snd) OneShotLam arg_info
-        ; (wrap_args, wrap_fn_args, work_fn_args, res_ty) <- mkWWargs emptyTCvSubst fun_ty arg_info
+mkWwBodies dflags fam_envs fun_ty demands res_info
+  = do  { (wrap_args, wrap_fn_args, work_fn_args, res_ty) <- mkWWargs emptyTCvSubst fun_ty demands
         ; (useful1, work_args, wrap_fn_str, work_fn_str) <- mkWWstr dflags fam_envs wrap_args
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
         ; (useful2, wrap_fn_cpr, work_fn_cpr, cpr_res_ty)
               <- mkWWcpr (gopt Opt_CprAnal dflags) fam_envs res_ty res_info
 
-        ; let (work_lam_args, work_call_args) = mkWorkerArgs dflags work_args all_one_shots cpr_res_ty
+        ; let (work_lam_args, work_call_args) = mkWorkerArgs dflags work_args cpr_res_ty
               worker_args_dmds = [idDemandInfo v | v <- work_call_args, isId v]
               wrapper_body = wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var
               worker_body = mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args
 
-        ; if useful1 && not (only_one_void_argument) || useful2
+        ; if useful1 && not only_one_void_argument || useful2
           then return (Just (worker_args_dmds, wrapper_body, worker_body))
           else return Nothing
         }
@@ -196,23 +193,19 @@ We use the state-token type which generates no code.
 -}
 
 mkWorkerArgs :: DynFlags -> [Var]
-             -> OneShotInfo  -- Whether all arguments are one-shot
              -> Type    -- Type of body
              -> ([Var], -- Lambda bound args
                  [Var]) -- Args at call site
-mkWorkerArgs dflags args all_one_shot res_ty
+mkWorkerArgs dflags args res_ty
     | any isId args || not needsAValueLambda
     = (args, args)
     | otherwise
-    = (args ++ [newArg], args ++ [voidPrimId])
+    = (args ++ [voidArgId], args ++ [voidPrimId])
     where
       needsAValueLambda =
         isUnliftedType res_ty
         || not (gopt Opt_FunToThunk dflags)
            -- see Note [Protecting the last value argument]
-
-      -- see Note [All One-Shot Arguments of a Worker]
-      newArg = setIdOneShotInfo voidArgId all_one_shot
 
 {-
 Note [Protecting the last value argument]
@@ -227,29 +220,6 @@ flag. However, this can create sharing, which may be bad in two ways. 1) It can
 create a space leak. 2) It can prevent inlining *under a lambda*. If w/w
 removes the last argument from a function f, then f now looks like a thunk, and
 so f can't be inlined *under a lambda*.
-
-Note [All One-Shot Arguments of a Worker]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Sometimes, derived join-points are just lambda-lifted thunks, whose
-only argument is of the unit type and is never used. This might
-interfere with the absence analysis, basing on which results these
-never-used arguments are eliminated in the worker. The additional
-argument `all_one_shot` of `mkWorkerArgs` is to prevent this.
-
-Example.  Suppose we have
-   foo = \p(one-shot) q(one-shot). y + 3
-Then we drop the unused args to give
-   foo   = \pq. $wfoo void#
-   $wfoo = \void(one-shot). y + 3
-
-But suppse foo didn't have all one-shot args:
-   foo = \p(not-one-shot) q(one-shot). expensive y + 3
-Then we drop the unused args to give
-   foo   = \pq. $wfoo void#
-   $wfoo = \void(not-one-shot). y + 3
-
-If we made the void-arg one-shot we might inline an expensive
-computation for y, which would be terrible!
 
 
 ************************************************************************
@@ -292,23 +262,23 @@ the \x to get what we want.
 mkWWargs :: TCvSubst            -- Freshening substitution to apply to the type
                                 --   See Note [Freshen type variables]
          -> Type                -- The type of the function
-         -> [(Demand,OneShotInfo)]     -- Demands and one-shot info for value arguments
+         -> [Demand]     -- Demands and one-shot info for value arguments
          -> UniqSM  ([Var],            -- Wrapper args
                      CoreExpr -> CoreExpr,      -- Wrapper fn
                      CoreExpr -> CoreExpr,      -- Worker fn
                      Type)                      -- Type of wrapper body
 
-mkWWargs subst fun_ty arg_info
-  | null arg_info
+mkWWargs subst fun_ty demands
+  | null demands
   = return ([], id, id, substTy subst fun_ty)
 
-  | ((dmd,one_shot):arg_info') <- arg_info
+  | (dmd:demands') <- demands
   , Just (arg_ty, fun_ty') <- splitFunTy_maybe fun_ty
   = do  { uniq <- getUniqueM
         ; let arg_ty' = substTy subst arg_ty
-              id = mk_wrap_arg uniq arg_ty' dmd one_shot
+              id = mk_wrap_arg uniq arg_ty' dmd
         ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
-              <- mkWWargs subst fun_ty' arg_info'
+              <- mkWWargs subst fun_ty' demands'
         ; return (id : wrap_args,
                   Lam id . wrap_fn_args,
                   work_fn_args . (`App` varToCoreExpr id),
@@ -319,7 +289,7 @@ mkWWargs subst fun_ty arg_info
                 -- This substTyVarBndr clones the type variable when necy
                 -- See Note [Freshen type variables]
         ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
-             <- mkWWargs subst' fun_ty' arg_info
+             <- mkWWargs subst' fun_ty' demands
         ; return (tv' : wrap_args,
                   Lam tv' . wrap_fn_args,
                   work_fn_args . (`mkTyApps` [mkTyVarTy tv']),
@@ -335,7 +305,7 @@ mkWWargs subst fun_ty arg_info
         -- simply coerces.
 
   = do { (wrap_args, wrap_fn_args, work_fn_args, res_ty)
-            <-  mkWWargs subst rep_ty arg_info
+            <-  mkWWargs subst rep_ty demands
         ; return (wrap_args,
                   \e -> Cast (wrap_fn_args e) (mkSymCo co),
                   \e -> work_fn_args (Cast e co),
@@ -348,11 +318,10 @@ mkWWargs subst fun_ty arg_info
 applyToVars :: [Var] -> CoreExpr -> CoreExpr
 applyToVars vars fn = mkVarApps fn vars
 
-mk_wrap_arg :: Unique -> Type -> Demand -> OneShotInfo -> Id
-mk_wrap_arg uniq ty dmd one_shot
+mk_wrap_arg :: Unique -> Type -> Demand -> Id
+mk_wrap_arg uniq ty dmd
   = mkSysLocalOrCoVar (fsLit "w") uniq ty
        `setIdDemandInfo` dmd
-       `setIdOneShotInfo` one_shot
 
 {-
 Note [Freshen type variables]
@@ -472,7 +441,7 @@ mkWWstr_one dflags fam_envs arg
       -- See Note [mkWWstr and unsafeCoerce]
   =  do { (uniq1:uniqs) <- getUniquesM
         ; let   unpk_args      = zipWith mk_ww_local uniqs inst_con_arg_tys
-                unpk_args_w_ds = zipWithEqual "mkWWstr" set_worker_arg_info unpk_args cs
+                unpk_args_w_ds = zipWithEqual "mkWWstr" setIdDemandInfo unpk_args cs
                 unbox_fn       = mkUnpackCase (Var arg) co uniq1
                                               data_con unpk_args
                 rebox_fn       = Let (NonRec arg con_app)
@@ -486,13 +455,6 @@ mkWWstr_one dflags fam_envs arg
 
   where
     dmd = idDemandInfo arg
-    one_shot = idOneShotInfo arg
-        -- If the wrapper argument is a one-shot lambda, then
-        -- so should (all) the corresponding worker arguments be
-        -- This bites when we do w/w on a case join point
-    set_worker_arg_info worker_arg demand
-      = worker_arg `setIdDemandInfo`  demand
-                   `setIdOneShotInfo` one_shot
 
 ----------------------
 nop_fn :: CoreExpr -> CoreExpr

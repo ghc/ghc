@@ -200,13 +200,9 @@ dmdAnal' env dmd (Lam var body)
   = let (body_dmd, defer_and_use) = peelCallDmd dmd
           -- body_dmd: a demand to analyze the body
 
-        one_shot         = useCount (getUseDmd defer_and_use)
-          -- one_shot: one-shotness of the lambda
-          --           hence, cardinality of its free vars
-
         env'             = extendSigsWithLam env var
         (body_ty, body') = dmdAnal env' body_dmd body
-        (lam_ty, var')   = annotateLamIdBndr env notArgOfDfun body_ty one_shot var
+        (lam_ty, var')   = annotateLamIdBndr env notArgOfDfun body_ty var
     in
     (postProcessUnsat defer_and_use lam_ty, Lam var' body')
 
@@ -260,16 +256,12 @@ dmdAnal' env dmd (Case scrut case_bndr ty alts)
     (res_ty, Case scrut' case_bndr' ty alts')
 
 dmdAnal' env dmd (Let (NonRec id rhs) body)
-  = (body_ty2, Let (NonRec id2 annotated_rhs) body')
+  = (body_ty2, Let (NonRec id2 rhs') body')
   where
     (sig, lazy_fv, id1, rhs') = dmdAnalRhs NotTopLevel Nothing env id rhs
     (body_ty, body')          = dmdAnal (extendAnalEnv NotTopLevel env id sig) dmd body
     (body_ty1, id2)           = annotateBndr env body_ty id1
     body_ty2                  = addLazyFVs body_ty1 lazy_fv
-
-    -- Annotate top-level lambdas at RHS basing on the aggregated demand info
-    -- See Note [Annotating lambdas at right-hand side]
-    annotated_rhs = annLamWithShotness (idDemandInfo id2) rhs'
 
         -- If the actual demand is better than the vanilla call
         -- demand, you might think that we might do better to re-analyse
@@ -306,25 +298,6 @@ io_hack_reqd scrut con bndrs
       _     -> True
   | otherwise
   = False
-
-annLamWithShotness :: Demand -> CoreExpr -> CoreExpr
-annLamWithShotness d e
-  | Just u <- cleanUseDmd_maybe d
-  = go u e
-  | otherwise = e
-  where
-    go u e
-      | Just (c, u') <- peelUseCall u
-      , Lam bndr body <- e
-      = if isTyVar bndr
-        then Lam bndr                    (go u  body)
-        else Lam (setOneShotness c bndr) (go u' body)
-      | otherwise
-      = e
-
-setOneShotness :: Count -> Id -> Id
-setOneShotness One  bndr = setOneShotLambda bndr
-setOneShotness Many bndr = bndr
 
 dmdAnalAlt :: AnalEnv -> CleanDemand -> Id -> Alt Var -> (DmdType, Alt Var)
 dmdAnalAlt env dmd case_bndr (con,bndrs,rhs)
@@ -431,23 +404,6 @@ used in one branch only), therefore lazy demand will be put on its
 free variable |y|. Conversely, if the demand on |h| is unleashed right
 on the spot, we will get the desired result, namely, that |f| is
 strict in |y|.
-
-Note [Annotating lambdas at right-hand side]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Let us take a look at the following example:
-
-g f = let x = 100
-          h = \y -> f x y
-       in h 5
-
-One can see that |h| is called just once, therefore the RHS of h can
-be annotated as a one-shot lambda. This is done by the function
-annLamWithShotness *a posteriori*, i.e., basing on the aggregated
-usage demand on |h| from the body of |let|-expression, which is C1(U)
-in this case.
-
-In other words, for locally-bound lambdas we can infer
-one-shotness.
 
 
 ************************************************************************
@@ -749,23 +705,22 @@ annotateLamBndrs :: AnalEnv -> DFunFlag -> DmdType -> [Var] -> (DmdType, [Var])
 annotateLamBndrs env args_of_dfun ty bndrs = mapAccumR annotate ty bndrs
   where
     annotate dmd_ty bndr
-      | isId bndr = annotateLamIdBndr env args_of_dfun dmd_ty Many bndr
+      | isId bndr = annotateLamIdBndr env args_of_dfun dmd_ty bndr
       | otherwise = (dmd_ty, bndr)
 
 annotateLamIdBndr :: AnalEnv
                   -> DFunFlag   -- is this lambda at the top of the RHS of a dfun?
                   -> DmdType    -- Demand type of body
-                  -> Count      -- One-shot-ness of the lambda
                   -> Id         -- Lambda binder
                   -> (DmdType,  -- Demand type of lambda
                       Id)       -- and binder annotated with demand
 
-annotateLamIdBndr env arg_of_dfun dmd_ty one_shot id
+annotateLamIdBndr env arg_of_dfun dmd_ty id
 -- For lambdas we add the demand to the argument demands
 -- Only called for Ids
   = ASSERT( isId id )
     -- pprTrace "annLamBndr" (vcat [ppr id, ppr _dmd_ty]) $
-    (final_ty, setOneShotness one_shot (setIdDemandInfo id dmd))
+    (final_ty, setIdDemandInfo id dmd)
   where
       -- Watch out!  See note [Lambda-bound unfoldings]
     final_ty = case maybeUnfoldingTemplate (idUnfolding id) of

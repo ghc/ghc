@@ -1651,7 +1651,7 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
 
 
                 -- Conditionally use result of new worker-wrapper transform
-              (spec_lam_args, spec_call_args) = mkWorkerArgs (sc_dflags env) qvars NoOneShotInfo body_ty
+              (spec_lam_args, spec_call_args) = mkWorkerArgs (sc_dflags env) qvars body_ty
                 -- Usual w/w hack to avoid generating
                 -- a spec_rhs of unlifted type and no args
 
