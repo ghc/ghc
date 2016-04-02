@@ -44,6 +44,7 @@ test('export-record-selector', normal, compile, [''])
 test('T10897', normal, multi_compile, ['T10897', [
                                        ('T10897a.hs','-c')
                                       ], '-v0'])
+test('T11213', normal, compile, [''])
 test('T11224b', normal, compile, [''])
 test('MoreEx', normal, compile, [''])
 test('T11283', normal, compile, [''])

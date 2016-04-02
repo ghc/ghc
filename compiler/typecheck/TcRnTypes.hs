@@ -139,7 +139,7 @@ import TyCon    ( TyCon )
 import Coercion ( Coercion, mkHoleCo )
 import ConLike  ( ConLike(..) )
 import DataCon  ( DataCon, dataConUserType, dataConOrigArgTys )
-import PatSyn   ( PatSyn, patSynType )
+import PatSyn   ( PatSyn, pprPatSynType )
 import Id       ( idName )
 import PrelNames ( callStackTyConKey, ipClassKey )
 import Unique ( hasKey )
@@ -2669,7 +2669,7 @@ pprPatSkolInfo (RealDataCon dc)
 pprPatSkolInfo (PatSynCon ps)
   = sep [ text "a pattern with pattern synonym:"
         , nest 2 $ ppr ps <+> dcolon
-                   <+> pprType (patSynType ps) <> comma ]
+                   <+> pprPatSynType ps <> comma ]
 
 {- Note [Skolem info for pattern synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
