@@ -36,7 +36,7 @@ import TyCon
 import Type
 import TyCoRep
 import TysPrim ( alphaTyVars, unliftedTypeKindTyConName )
-import TysWiredIn ( listTyConName, starKindTyConName )
+import TysWiredIn ( listTyConName, starKindTyConName, unitTy )
 import PrelNames ( hasKey, eqTyConKey, ipClassKey
                  , tYPETyConKey, ptrRepLiftedDataConKey, ptrRepUnliftedDataConKey )
 import Unique ( getUnique )
@@ -102,8 +102,7 @@ tyThingToLHsDecl t = case t of
     (synifySigWcType ImplicitizeForAll (dataConUserType dc)))
 
   AConLike (PatSynCon ps) ->
-    allOK . SigD $ PatSynSig (synifyName ps) (synifySigType WithinType
-                                  (patSynType ps))
+    allOK . SigD $ PatSynSig (synifyName ps) (synifyPatSynSigType ps)
   where
     withErrs e x = return (e, x)
     allOK x = return (mempty, x)
@@ -361,6 +360,10 @@ synifySigWcType :: SynifyTypeState -> Type -> LHsSigWcType Name
 -- Ditto (see synifySigType)
 synifySigWcType s ty = mkEmptyImplicitBndrs (mkEmptyWildCardBndrs (synifyType s ty))
 
+synifyPatSynSigType :: PatSyn -> LHsSigType Name
+-- Ditto (see synifySigType)
+synifyPatSynSigType ps = mkEmptyImplicitBndrs (synifyPatSynType ps)
+
 synifyType :: SynifyTypeState -> Type -> LHsType Name
 synifyType _ (TyVarTy tv) = noLoc $ HsTyVar $ noLoc (getName tv)
 synifyType _ (TyConApp tc tys)
@@ -421,6 +424,22 @@ synifyType s forallty@(ForAllTy _tv _ty) =
 synifyType _ (LitTy t) = noLoc $ HsTyLit $ synifyTyLit t
 synifyType s (CastTy t _) = synifyType s t
 synifyType _ (CoercionTy {}) = error "synifyType:Coercion"
+
+synifyPatSynType :: PatSyn -> LHsType Name
+synifyPatSynType ps = let
+  (univ_tvs, req_theta, ex_tvs, prov_theta, arg_tys, res_ty) = patSynSig ps
+  req_theta' | null req_theta && not (null prov_theta && null ex_tvs) = [unitTy]
+               -- HACK: a HsQualTy with theta = [unitTy] will be printed as "() =>",
+               -- i.e., an explicit empty context, which is what we need. This is not
+               -- possible by taking theta = [], as that will print no context at all
+             | otherwise = req_theta
+  sForAll []  s = s
+  sForAll tvs s = HsForAllTy { hst_bndrs = map synifyTyVar tvs
+                             , hst_body  = noLoc s }
+  sQual theta s = HsQualTy   { hst_ctxt  = synifyCtx theta
+                             , hst_body  = noLoc s }
+  sTau = unLoc $ synifyType WithinType $ mkFunTys arg_tys res_ty
+  in noLoc $ sForAll univ_tvs $ sQual req_theta' $ sForAll ex_tvs $ sQual prov_theta sTau
 
 synifyTyLit :: TyLit -> HsTyLit
 synifyTyLit (NumTyLit n) = HsNumTy mempty n
