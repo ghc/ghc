@@ -13,13 +13,13 @@ module PatSyn (
 
         -- ** Type deconstruction
         patSynName, patSynArity, patSynIsInfix,
-        patSynArgs, patSynType,
+        patSynArgs,
         patSynMatcher, patSynBuilder,
         patSynUnivTyBinders, patSynExTyVars, patSynExTyBinders, patSynSig,
         patSynInstArgTys, patSynInstResTy, patSynFieldLabels,
         patSynFieldType,
 
-        tidyPatSynIds
+        tidyPatSynIds, pprPatSynType
     ) where
 
 #include "HsVersions.h"
@@ -343,16 +343,6 @@ mkPatSyn name declared_infix
 patSynName :: PatSyn -> Name
 patSynName = psName
 
-patSynType :: PatSyn -> Type
--- The full pattern type, used only in error messages
--- See Note [Pattern synonym signatures]
-patSynType (MkPatSyn { psUnivTyVars = univ_tvs, psReqTheta = req_theta
-                     , psExTyVars   = ex_tvs,   psProvTheta = prov_theta
-                     , psArgs = orig_args, psOrigResTy = orig_res_ty })
-  = mkSpecSigmaTy univ_tvs req_theta $  -- use mkSpecSigmaTy because it
-    mkSpecSigmaTy ex_tvs prov_theta $   -- prints better
-    mkFunTys orig_args orig_res_ty
-
 -- | Should the 'PatSyn' be presented infix?
 patSynIsInfix :: PatSyn -> Bool
 patSynIsInfix = psInfix
@@ -430,3 +420,16 @@ patSynInstResTy (MkPatSyn { psName = name, psUnivTyVars = univ_tvs
   = ASSERT2( length univ_tvs == length inst_tys
            , text "patSynInstResTy" <+> ppr name $$ ppr univ_tvs $$ ppr inst_tys )
     substTyWith univ_tvs inst_tys res_ty
+
+-- | Print the type of a pattern synonym. The foralls are printed explicitly
+pprPatSynType :: PatSyn -> SDoc
+pprPatSynType (MkPatSyn { psUnivTyVars = univ_tvs,  psReqTheta  = req_theta
+                        , psExTyVars   = ex_tvs,    psProvTheta = prov_theta
+                        , psArgs       = orig_args, psOrigResTy = orig_res_ty })
+  = sep [ pprForAllImplicit univ_tvs
+        , pprThetaArrowTy req_theta
+        , ppWhen insert_empty_ctxt $ parens empty <+> darrow
+        , pprType sigma_ty ]
+  where
+    sigma_ty = mkSpecSigmaTy ex_tvs prov_theta $ mkFunTys orig_args orig_res_ty
+    insert_empty_ctxt = null req_theta && not (null prov_theta && null ex_tvs)

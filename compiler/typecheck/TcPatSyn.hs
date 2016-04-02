@@ -28,6 +28,8 @@ import Panic
 import Outputable
 import FastString
 import Var
+import VarEnv( emptyTidyEnv )
+import Type( tidyTyCoVarBndrs, tidyTypes, tidyType )
 import Id
 import IdInfo( RecSelParent(..))
 import TcBinds
@@ -414,12 +416,19 @@ tc_patsyn_finish lname dir is_infix lpat'
                  pat_ty field_labels
   = do { -- Zonk everything.  We are about to build a final PatSyn
          -- so there had better be no unification variables in there
-         univ_tvs     <- mapMaybeM zonkQuantifiedTyVar univ_tvs
-       ; ex_tvs       <- mapMaybeM zonkQuantifiedTyVar ex_tvs
-       ; prov_theta   <- zonkTcTypes prov_theta
-       ; req_theta    <- zonkTcTypes req_theta
-       ; pat_ty       <- zonkTcType pat_ty
-       ; arg_tys      <- zonkTcTypes arg_tys
+         univ_tvs'    <- mapMaybeM zonkQuantifiedTyVar univ_tvs
+       ; ex_tvs'      <- mapMaybeM zonkQuantifiedTyVar ex_tvs
+       ; prov_theta'  <- zonkTcTypes prov_theta
+       ; req_theta'   <- zonkTcTypes req_theta
+       ; pat_ty'      <- zonkTcType pat_ty
+       ; arg_tys'     <- zonkTcTypes arg_tys
+
+       ; let (env1, univ_tvs) = tidyTyCoVarBndrs emptyTidyEnv univ_tvs'
+             (env2, ex_tvs)   = tidyTyCoVarBndrs env1 ex_tvs'
+             req_theta  = tidyTypes env2 req_theta'
+             prov_theta = tidyTypes env2 prov_theta'
+             arg_tys    = tidyTypes env2 arg_tys'
+             pat_ty     = tidyType  env2 pat_ty'
 
           -- We need to update the univ and ex binders after zonking.
           -- But zonking may have defaulted some erstwhile binders,
