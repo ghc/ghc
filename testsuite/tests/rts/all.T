@@ -335,3 +335,9 @@ test('T10904', [ omit_ways(['ghci']), extra_run_opts('20000') ],
 
 test('T10728', [extra_run_opts('+RTS -maxN3 -RTS'), req_smp],
            compile_and_run, ['-threaded'])
+
+test('T10296a', [extra_clean(['T10296a.o','T10296a_c.o','T10296a'])],
+                run_command,
+                ['$MAKE -s --no-print-directory T10296a'])
+
+test('T10296b', [only_ways('threaded2')], compile_and_run, [''])
