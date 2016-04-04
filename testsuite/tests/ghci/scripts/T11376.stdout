@@ -1,0 +1,2 @@
+bar @Int :: Int -> b -> Int
+bar @Int :: forall {b}. Int -> b -> Int

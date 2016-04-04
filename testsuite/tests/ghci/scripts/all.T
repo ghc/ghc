@@ -4,10 +4,12 @@ test('ghci001', combined_output, ghci_script, ['ghci001.script'])
 test('ghci002', combined_output, ghci_script, ['ghci002.script'])
 test('ghci003', combined_output, ghci_script, ['ghci003.script'])
 test('ghci004', [ combined_output,
+		  when(arch('powerpc64'), expect_broken_for(11259,['ghci-ext'])),
                   unless(opsys('mingw32'),extra_ways(['ghci-ext'])) ],
                 ghci_script, ['ghci004.script'])
 test('ghci005', combined_output, ghci_script, ['ghci005.script'])
 test('ghci006', [ combined_output,
+                  when(arch('powerpc64'), expect_broken_for(11259,['ghci-ext'])),
                   unless(opsys('mingw32'),extra_ways(['ghci-ext'])) ],
                 ghci_script, ['ghci006.script'])
 test('ghci007', combined_output, ghci_script, ['ghci007.script'])
@@ -245,3 +247,4 @@ test('T11389', req_interp, run_command, ['$MAKE -s --no-print-directory T11389']
 test('T11524a', normal, ghci_script, ['T11524a.script'])
 test('T11456', normal, ghci_script, ['T11456.script'])
 test('TypeAppData', normal, ghci_script, ['TypeAppData.script'])
+test('T11376', normal, ghci_script, ['T11376.script'])

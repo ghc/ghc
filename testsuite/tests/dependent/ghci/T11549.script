@@ -3,12 +3,12 @@ import GHC.Exts
 
 putStrLn "-fno-print-explicit-runtime-reps"
 :set -fno-print-explicit-runtime-reps
-:ty ($)
+:info ($)
 :kind TYPE
-:ty error
+:info error
 
 putStrLn "\n-fprint-explicit-runtime-reps"
 :set -fprint-explicit-runtime-reps
-:ty ($)
+:info ($)
 :kind TYPE
-:ty error
+:info error
