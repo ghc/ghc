@@ -1,0 +1,6 @@
+:set -XTypeApplications
+let { bar :: Show a => a -> b -> a; bar = error "urk" }
+:type bar @Int
+:set -fprint-explicit-foralls
+:type bar @Int
+
