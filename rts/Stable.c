@@ -17,6 +17,8 @@
 #include "Trace.h"
 #include "Stable.h"
 
+#include <string.h>
+
 /* Comment from ADR's implementation in old RTS:
 
   This files (together with @ghc/runtime/storage/PerformIO.lhc@ and a
@@ -95,6 +97,23 @@ spEntry *stable_ptr_table = NULL;
 static spEntry *stable_ptr_free = NULL;
 static unsigned int SPT_size = 0;
 #define INIT_SPT_SIZE 64
+
+/* Each time the stable pointer table is enlarged, we temporarily retain the old
+ * version to ensure dereferences are thread-safe (see Note [Enlarging the
+ * stable pointer table]).  Since we double the size of the table each time, we
+ * can (theoretically) enlarge it at most N times on an N-bit machine.  Thus,
+ * there will never be more than N old versions of the table.
+ */
+#if SIZEOF_VOID_P == 4
+#define MAX_N_OLD_SPTS 32
+#elif SIZEOF_VOID_P == 8
+#define MAX_N_OLD_SPTS 64
+#else
+#error unknown SIZEOF_VOID_P
+#endif
+
+static spEntry *old_SPTs[MAX_N_OLD_SPTS];
+static nat n_old_SPTs = 0;
 
 #ifdef THREADED_RTS
 Mutex stable_mutex;
@@ -205,20 +224,62 @@ static void
 enlargeStablePtrTable(void)
 {
     nat old_SPT_size = SPT_size;
+    spEntry *new_stable_ptr_table;
 
     // 2nd and subsequent times
     SPT_size *= 2;
-    stable_ptr_table =
-        stgReallocBytes(stable_ptr_table,
-                        SPT_size * sizeof *stable_ptr_table,
-                        "enlargeStablePtrTable");
+
+    /* We temporarily retain the old version instead of freeing it; see Note
+     * [Enlarging the stable pointer table].
+     */
+    new_stable_ptr_table =
+        stgMallocBytes(SPT_size * sizeof *stable_ptr_table,
+                       "enlargeStablePtrTable");
+    memcpy(new_stable_ptr_table,
+           stable_ptr_table,
+           old_SPT_size * sizeof *stable_ptr_table);
+    ASSERT(n_old_SPTs < MAX_N_OLD_SPTS);
+    old_SPTs[n_old_SPTs++] = stable_ptr_table;
+
+    /* When using the threaded RTS, the update of stable_ptr_table is assumed to
+     * be atomic, so that another thread simultaneously dereferencing a stable
+     * pointer will always read a valid address.
+     */
+    stable_ptr_table = new_stable_ptr_table;
 
     initSpEntryFreeList(stable_ptr_table + old_SPT_size, old_SPT_size, NULL);
 }
 
+/* Note [Enlarging the stable pointer table]
+ *
+ * To enlarge the stable pointer table, we allocate a new table, copy the
+ * existing entries, and then store the old version of the table in old_SPTs
+ * until we free it during GC.  By not immediately freeing the old version
+ * (or equivalently by not growing the table using realloc()), we ensure that
+ * another thread simultaneously dereferencing a stable pointer using the old
+ * version can safely access the table without causing a segfault (see Trac
+ * #10296).
+ *
+ * Note that because the stable pointer table is doubled in size each time it is
+ * enlarged, the total memory needed to store the old versions is always less
+ * than that required to hold the current version.
+ */
+
+
 /* -----------------------------------------------------------------------------
  * Freeing entries and tables
  * -------------------------------------------------------------------------- */
+
+static void
+freeOldSPTs(void)
+{
+    nat i;
+
+    for (i = 0; i < n_old_SPTs; i++) {
+        stgFree(old_SPTs[i]);
+    }
+    n_old_SPTs = 0;
+}
 
 void
 exitStableTables(void)
@@ -236,6 +297,8 @@ exitStableTables(void)
         stgFree(stable_ptr_table);
     stable_ptr_table = NULL;
     SPT_size = 0;
+
+    freeOldSPTs();
 
 #ifdef THREADED_RTS
     closeMutex(&stable_mutex);
@@ -424,6 +487,11 @@ rememberOldStableNameAddresses(void)
 void
 markStableTables(evac_fn evac, void *user)
 {
+    /* Since no other thread can currently be dereferencing a stable pointer, it
+     * is safe to free the old versions of the table.
+     */
+    freeOldSPTs();
+
     markStablePtrTable(evac, user);
     rememberOldStableNameAddresses();
 }
