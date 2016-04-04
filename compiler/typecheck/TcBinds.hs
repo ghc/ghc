@@ -756,7 +756,7 @@ chooseInferredQuantifiers :: TcThetaType   -- inferred
 chooseInferredQuantifiers inferred_theta tau_tvs qtvs Nothing
   = do { let free_tvs = closeOverKinds (growThetaTyVars inferred_theta tau_tvs)
                         -- Include kind variables!  Trac #7916
-             my_theta = pickQuantifiablePreds free_tvs inferred_theta
+             my_theta = pickQuantifiablePreds free_tvs [] inferred_theta
              binders  = [ mkNamedBinder Invisible tv
                         | tv <- qtvs
                         , tv `elemVarSet` free_tvs ]
@@ -780,7 +780,7 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
   = do { annotated_theta <- zonkTcTypes annotated_theta
        ; let free_tvs = closeOverKinds (tyCoVarsOfTypes annotated_theta
                                         `unionVarSet` tau_tvs)
-             my_theta = pickQuantifiablePreds free_tvs inferred_theta
+             my_theta = pickQuantifiablePreds free_tvs annotated_theta inferred_theta
 
        -- Report the inferred constraints for an extra-constraints wildcard/hole as
        -- an error message, unless the PartialTypeSignatures flag is enabled. In this

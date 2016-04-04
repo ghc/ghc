@@ -70,7 +70,7 @@ module TcRnTypes(
         isCDictCan_Maybe, isCFunEqCan_maybe,
         isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt,
         isGivenCt, isHoleCt, isOutOfScopeCt, isExprHoleCt, isTypeHoleCt,
-        isUserTypeErrorCt, isCallStackDict, getUserTypeErrorMsg,
+        isUserTypeErrorCt, getUserTypeErrorMsg,
         ctEvidence, ctLoc, setCtLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
         mkTcEqPredLikeEv,
         mkNonCanonical, mkNonCanonicalCt,
@@ -141,8 +141,6 @@ import ConLike  ( ConLike(..) )
 import DataCon  ( DataCon, dataConUserType, dataConOrigArgTys )
 import PatSyn   ( PatSyn, pprPatSynType )
 import Id       ( idName )
-import PrelNames ( callStackTyConKey, ipClassKey )
-import Unique ( hasKey )
 import FieldLabel ( FieldLabel )
 import TcType
 import Annotations
@@ -1776,20 +1774,6 @@ isPendingScDict :: Ct -> Maybe Ct
 isPendingScDict ct@(CDictCan { cc_pend_sc = True })
                   = Just (ct { cc_pend_sc = False })
 isPendingScDict _ = Nothing
-
--- | Are we looking at an Implicit CallStack
--- (i.e. @IP "name" CallStack@)?
---
--- If so, returns @Just "name"@.
-isCallStackDict :: Class -> [Type] -> Maybe FastString
-isCallStackDict cls tys
-  | cls `hasKey` ipClassKey
-  , [ip_name_ty, ty] <- tys
-  , Just (tc, _) <- splitTyConApp_maybe ty
-  , tc `hasKey` callStackTyConKey
-  = isStrLitTy ip_name_ty
-isCallStackDict _ _
-  = Nothing
 
 superClassesMightHelp :: Ct -> Bool
 -- ^ True if taking superclasses of givens, or of wanteds (to perhaps

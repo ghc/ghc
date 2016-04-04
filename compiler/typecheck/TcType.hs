@@ -74,7 +74,7 @@ module TcType (
   pickyEqType, tcEqType, tcEqKind, tcEqTypeNoKindCheck, tcEqTypeVis,
   isSigmaTy, isRhoTy, isRhoExpTy, isOverloadedTy,
   isFloatingTy, isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
-  isIntegerTy, isBoolTy, isUnitTy, isCharTy,
+  isIntegerTy, isBoolTy, isUnitTy, isCharTy, isCallStackTy, isCallStackPred,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
   isPredTy, isTyVarClassPred, isTyVarExposed, isTyVarUnderDatatype,
   checkValidClsArgs, hasTyVarHead,
@@ -1699,11 +1699,12 @@ evVarPred var
 -- [Inheriting implicit parameters] and [Quantifying over equality constraints]
 pickQuantifiablePreds
   :: TyVarSet           -- Quantifying over these
+  -> TcThetaType        -- Context from PartialTypeSignatures
   -> TcThetaType        -- Proposed constraints to quantify
   -> TcThetaType        -- A subset that we can actually quantify
 -- This function decides whether a particular constraint shoudl be
 -- quantified over, given the type variables that are being quantified
-pickQuantifiablePreds qtvs theta
+pickQuantifiablePreds qtvs annotated_theta theta
   = let flex_ctxt = True in  -- Quantify over non-tyvar constraints, even without
                              -- -XFlexibleContexts: see Trac #10608, #10351
          -- flex_ctxt <- xoptM Opt_FlexibleContexts
@@ -1711,15 +1712,30 @@ pickQuantifiablePreds qtvs theta
   where
     pick_me flex_ctxt pred
       = case classifyPredType pred of
+
           ClassPred cls tys
-             | isIPClass cls    -> True -- See note [Inheriting implicit parameters]
-             | otherwise        -> pick_cls_pred flex_ctxt cls tys
+            | Just str <- isCallStackPred pred
+              -- NEVER infer a CallStack constraint, unless we were
+              -- given one in a partial type signatures.
+              -- Otherwise, we let the constraints bubble up to be
+              -- solved from the outer context, or be defaulted when we
+              -- reach the top-level.
+              -- see Note [Overview of implicit CallStacks]
+              -> str `elem` givenStks
+
+            | isIPClass cls    -> True -- See note [Inheriting implicit parameters]
+
+            | otherwise
+              -> pick_cls_pred flex_ctxt cls tys
 
           EqPred ReprEq ty1 ty2 -> pick_cls_pred flex_ctxt coercibleClass [ty1, ty2]
             -- representational equality is like a class constraint
 
           EqPred NomEq ty1 ty2  -> quant_fun ty1 || quant_fun ty2
           IrredPred ty          -> tyCoVarsOfType ty `intersectsVarSet` qtvs
+
+    givenStks = [ str | (str, ty) <- mapMaybe isIPPred_maybe annotated_theta
+                      , isCallStackTy ty ]
 
     pick_cls_pred flex_ctxt cls tys
       = tyCoVarsOfTypes tys `intersectsVarSet` qtvs
@@ -1892,6 +1908,25 @@ isStringTy ty
   = case tcSplitTyConApp_maybe ty of
       Just (tc, [arg_ty]) -> tc == listTyCon && isCharTy arg_ty
       _                   -> False
+
+-- | Is a type a 'CallStack'?
+isCallStackTy :: Type -> Bool
+isCallStackTy ty
+  | Just tc <- tyConAppTyCon_maybe ty
+  = tc `hasKey` callStackTyConKey
+  | otherwise
+  = False
+
+-- | Is a 'PredType' a 'CallStack' implicit parameter?
+--
+-- If so, return the name of the parameter.
+isCallStackPred :: PredType -> Maybe FastString
+isCallStackPred pred
+  | Just (str, ty) <- isIPPred_maybe pred
+  , isCallStackTy ty
+  = Just str
+  | otherwise
+  = Nothing
 
 is_tc :: Unique -> Type -> Bool
 -- Newtypes are opaque to this

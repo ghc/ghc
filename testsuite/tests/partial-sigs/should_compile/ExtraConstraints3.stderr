@@ -62,8 +62,7 @@ TYPE SIGNATURES
   enumFromThen :: forall a. Enum a => a -> a -> [a]
   enumFromThenTo :: forall a. Enum a => a -> a -> a -> [a]
   enumFromTo :: forall a. Enum a => a -> a -> [a]
-  error ::
-    forall a. (?callStack::GHC.Stack.Types.CallStack) => [Char] -> a
+  error :: forall a. [Char] -> a
   even :: forall a. Integral a => a -> Bool
   exp :: forall a. Floating a => a -> a
   exponent :: forall a. RealFloat a => a -> Int
@@ -213,7 +212,7 @@ TYPE SIGNATURES
   toRational :: forall a. Real a => a -> Rational
   truncate :: forall a b. (RealFrac a, Integral b) => a -> b
   uncurry :: forall a b c. (a -> b -> c) -> (a, b) -> c
-  undefined :: forall t. (?callStack::GHC.Stack.Types.CallStack) => t
+  undefined :: forall t. t
   unlines :: [String] -> String
   until :: forall a. (a -> Bool) -> (a -> a) -> a -> a
   unwords :: [String] -> String
@@ -232,4 +231,4 @@ TYPE CONSTRUCTORS
 COERCION AXIOMS
 Dependent modules: []
 Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,
-                     integer-gmp-1.0.0.0]
+                     integer-gmp-1.0.0.1]

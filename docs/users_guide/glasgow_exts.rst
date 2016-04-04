@@ -13346,8 +13346,10 @@ For example, we can define ::
 
    errorWithCallStack :: HasCallStack => String -> a
 
-as a variant of ``error`` that will get its call-site. We can access the
-call-stack inside ``errorWithCallStack`` with ``GHC.Stack.callStack``. ::
+as a variant of ``error`` that will get its call-site (as of GHC 8.0,
+``error`` already gets its call-site, but let's assume for the sake of
+demonstration that it does not). We can access the call-stack inside
+``errorWithCallStack`` with ``GHC.Stack.callStack``. ::
 
    errorWithCallStack :: HasCallStack => String -> a
    errorWithCallStack msg = error (msg ++ "\n" ++ prettyCallStack callStack)
@@ -13365,12 +13367,12 @@ alongside our error message.
 The ``CallStack`` will only extend as far as the types allow it, for
 example ::
 
-   head :: HasCallStack => [a] -> a
-   head []     = errorWithCallStack "empty"
-   head (x:xs) = x
+   myHead :: HasCallStack => [a] -> a
+   myHead []     = errorWithCallStack "empty"
+   myHead (x:xs) = x
 
    bad :: Int
-   bad = head []
+   bad = myHead []
 
 .. code-block:: none
 
@@ -13378,27 +13380,23 @@ example ::
    *** Exception: empty
    CallStack (from HasCallStack):
      errorWithCallStack, called at Bad.hs:8:15 in main:Bad
-     head, called at Bad.hs:12:7 in main:Bad
+     myHead, called at Bad.hs:12:7 in main:Bad
 
-includes the call-site of ``errorWithCallStack`` in ``head``,
-and of ``head`` in ``bad``,
-but not the call-site of ``bad`` at the GHCi prompt.
+includes the call-site of ``errorWithCallStack`` in ``myHead``, and of
+``myHead`` in ``bad``, but not the call-site of ``bad`` at the GHCi
+prompt.
 
-GHC solves ``HasCallStack`` constraints in three steps:
+GHC solves ``HasCallStack`` constraints in two steps:
 
-1. If there is a ``CallStack`` in scope -- i.e. the enclosing function
+1. If there is a ``CallStack`` in scope -- i.e. the enclosing definition
    has a ``HasCallStack`` constraint -- GHC will push the new call-site
    onto the existing ``CallStack``.
 
-2. If there is no ``CallStack`` in scope -- e.g. in the GHCi session
-   above -- and the enclosing definition does not have an explicit
-   type signature, GHC will infer a ``HasCallStack`` constraint for the
-   enclosing definition (subject to the monomorphism restriction).
+2. Otherwise GHC will solve the ``HasCallStack`` constraint for the
+   singleton ``CallStack`` containing just the current call-site.
 
-3. If there is no ``CallStack`` in scope and the enclosing definition
-   has an explicit type signature, GHC will solve the ``HasCallStack``
-   constraint for the singleton ``CallStack`` containing just the
-   current call-site.
+Importantly, GHC will **never** infer a ``HasCallStack`` constraint,
+you must request it explicitly.
 
 ``CallStack`` is kept abstract, but GHC provides a function ::
 
@@ -13412,20 +13410,20 @@ package, module, and file name, as well as the line and column numbers.
 allows users to freeze the current ``CallStack``, preventing any future push
 operations from having an effect. This can be used by library authors
 to prevent ``CallStack``\s from exposing unnecessary implementation
-details. Consider the ``head`` example above, the ``errorWithCallStack`` line in
+details. Consider the ``myHead`` example above, the ``errorWithCallStack`` line in
 the printed stack is not particularly enlightening, so we might choose
 to suppress it by freezing the ``CallStack`` that we pass to ``errorWithCallStack``. ::
 
-   head :: HasCallStack => [a] -> a
-   head []     = withFrozenCallStack (errorWithCallStack "empty")
-   head (x:xs) = x
+   myHead :: HasCallStack => [a] -> a
+   myHead []     = withFrozenCallStack (errorWithCallStack "empty")
+   myHead (x:xs) = x
 
 .. code-block:: none
 
-   ghci> head []
+   ghci> myHead []
    *** Exception: empty
    CallStack (from HasCallStack):
-     head, called at Bad.hs:12:7 in main:Bad
+     myHead, called at Bad.hs:12:7 in main:Bad
 
 **NOTE**: The intrepid user may notice that ``HasCallStack`` is just an
 alias for an implicit parameter ``?callStack :: CallStack``. This is an

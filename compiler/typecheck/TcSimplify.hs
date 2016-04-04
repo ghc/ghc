@@ -185,8 +185,7 @@ defaultCallStacks wanteds
     return (implic { ic_wanted = wanteds })
 
   defaultCallStack ct
-    | Just (cls, tys) <- getClassPredTys_maybe (ctPred ct)
-    , Just _ <- isCallStackDict cls tys
+    | Just _ <- isCallStackPred (ctPred ct)
     = do { solveCallStack (cc_ev ct) EvCsEmpty
          ; return Nothing }
 
@@ -781,7 +780,8 @@ decideQuantification apply_mr sigs name_taus constraints
                  -- quantiyTyVars turned some meta tyvars into
                  -- quantified skolems, so we have to zonk again
 
-       ; let theta     = pickQuantifiablePreds (mkVarSet qtvs) constraints
+       ; let theta     = pickQuantifiablePreds
+                           (mkVarSet qtvs) (concatMap sig_theta sigs) constraints
              min_theta = mkMinimalBySCs theta
                -- See Note [Minimize by Superclasses]
 
