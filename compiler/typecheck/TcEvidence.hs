@@ -606,6 +606,9 @@ in `g`, because `head` did not explicitly request a CallStack.
 Important Details:
 - GHC should NEVER report an insoluble CallStack constraint.
 
+- GHC should NEVER infer a CallStack constraint unless one was requested
+  with a partial type signature (See TcType.pickQuantifiablePreds).
+
 - A CallStack (defined in GHC.Stack.Types) is a [(String, SrcLoc)],
   where the String is the name of the binder that is used at the
   SrcLoc. SrcLoc is also defined in GHC.Stack.Types and contains the

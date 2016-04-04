@@ -1,5 +1,2 @@
-CallStack (from ImplicitParams):
-  y, called at T10845.hs:10:9 in main:Main
-  f1, called at T10845.hs:20:36 in main:Main
-CallStack (from ImplicitParams):
-  f2, called at T10845.hs:21:36 in main:Main
+CallStack (from HasCallStack):
+  f1, called at T10845.hs:13:38 in main:Main

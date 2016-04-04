@@ -74,9 +74,9 @@ errorWithStackTrace x = unsafeDupablePerformIO $ do
 -- @since 4.9.0.0
 popCallStack :: CallStack -> CallStack
 popCallStack stk = case stk of
-  EmptyCallStack       -> errorWithoutStackTrace "popCallStack: empty stack"
-  PushCallStack _ stk' -> stk'
-  FreezeCallStack _    -> stk
+  EmptyCallStack         -> errorWithoutStackTrace "popCallStack: empty stack"
+  PushCallStack _ _ stk' -> stk'
+  FreezeCallStack _      -> stk
 {-# INLINE popCallStack #-}
 
 -- | Return the current 'CallStack'.
