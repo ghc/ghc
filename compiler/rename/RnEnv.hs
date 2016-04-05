@@ -2107,22 +2107,23 @@ warnUnusedTypePatterns = check_unused Opt_WarnUnusedTypePatterns
 
 check_unused :: WarningFlag -> [Name] -> FreeVars -> RnM ()
 check_unused flag bound_names used_names
- = whenWOptM flag (warnUnusedLocals (filterOut (`elemNameSet` used_names) bound_names))
+  = whenWOptM flag (warnUnused flag (filterOut (`elemNameSet` used_names)
+                                               bound_names))
 
 -------------------------
 --      Helpers
 warnUnusedGREs :: [GlobalRdrElt] -> RnM ()
 warnUnusedGREs gres = mapM_ warnUnusedGRE gres
 
-warnUnusedLocals :: [Name] -> RnM ()
-warnUnusedLocals names = do
+warnUnused :: WarningFlag -> [Name] -> RnM ()
+warnUnused flag names = do
     fld_env <- mkFieldEnv <$> getGlobalRdrEnv
-    mapM_ (warnUnusedLocal fld_env) names
+    mapM_ (warnUnused1 flag fld_env) names
 
-warnUnusedLocal :: NameEnv (FieldLabelString, Name) -> Name -> RnM ()
-warnUnusedLocal fld_env name
+warnUnused1 :: WarningFlag -> NameEnv (FieldLabelString, Name) -> Name -> RnM ()
+warnUnused1 flag fld_env name
   = when (reportable name) $
-    addUnusedWarning Opt_WarnUnusedLocalBinds
+    addUnusedWarning flag
                      occ (nameSrcSpan name)
                      (text "Defined but not used")
   where
@@ -2133,7 +2134,7 @@ warnUnusedLocal fld_env name
 warnUnusedGRE :: GlobalRdrElt -> RnM ()
 warnUnusedGRE gre@(GRE { gre_name = name, gre_lcl = lcl, gre_imp = is })
   | lcl       = do fld_env <- mkFieldEnv <$> getGlobalRdrEnv
-                   warnUnusedLocal fld_env name
+                   warnUnused1 Opt_WarnUnusedTopBinds fld_env name
   | otherwise = when (reportable name) (mapM_ warn is)
   where
     occ = greOccName gre
