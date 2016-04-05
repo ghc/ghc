@@ -13,7 +13,7 @@ werror.hs:8:1: warning: [-Wtabs (in -Wdefault)]
     Tab character found here.
     Please use spaces instead.
 
-werror.hs:10:1: warning: [-Wunused-local-binds (in -Wextra, -Wunused-binds)]
+werror.hs:10:1: warning: [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
     Defined but not used: ‘f’
 
 werror.hs:10:1: warning: [-Wmissing-signatures (in -Wall)]

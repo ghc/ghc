@@ -1,5 +1,5 @@
 
-overloadedrecfldsfail05.hs:7:16: warning: [-Wunused-local-binds (in -Wextra, -Wunused-binds)]
+overloadedrecfldsfail05.hs:7:16: warning: [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
     Defined but not used: ‘foo’
 
 <no location info>: error: 

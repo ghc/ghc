@@ -1,5 +1,5 @@
 
-T17e.hs:8:1: warning: [-Wunused-local-binds (in -Wextra, -Wunused-binds)]
+T17e.hs:8:1: warning: [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
     Defined but not used: ‘top’
 
 T17e.hs:11:11: warning: [-Wunused-pattern-binds (in -Wextra, -Wunused-binds)]
