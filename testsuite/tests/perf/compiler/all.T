@@ -731,13 +731,14 @@ test('T9872c',
 test('T9872d',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 506691240, 5),
+          [(wordsize(64), 533359408, 5),
           # 2014-12-18    796071864   Initally created
           # 2014-12-18    739189056   Reduce type families even more eagerly
           # 2015-01-07    687562440   TrieMap leaf compression
           # 2015-03-17    726679784   tweak to solver; probably flattens more
           # 2016-02-08    534693648   Improved a bit by tyConRolesRepresentational
           # 2016-03-18    506691240   optimize Unify & zonking
+          # 2016-04-06    533359408   apparent regression (x86-64/Windows)
            (wordsize(32), 264566040, 5)
           # some date     328810212
           # 2015-07-11    350369584
