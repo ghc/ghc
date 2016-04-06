@@ -1084,9 +1084,9 @@ mkCastTy ty co | isReflexiveCo co = ty
 
 mkCastTy (CastTy ty co1) co2 = mkCastTy ty (co1 `mkTransCo` co2)
 -- See Note [Weird typing rule for ForAllTy]
-mkCastTy (ForAllTy (Named tv vis) inner_ty) co
+mkCastTy outer_ty@(ForAllTy (Named tv vis) inner_ty) co
   = -- have to make sure that pushing the co in doesn't capture the bound var
-    let fvs = tyCoVarsOfCo co
+    let fvs = tyCoVarsOfCo co `unionVarSet` tyCoVarsOfType outer_ty
         empty_subst = mkEmptyTCvSubst (mkInScopeSet fvs)
         (subst, tv') = substTyVarBndr empty_subst tv
     in
