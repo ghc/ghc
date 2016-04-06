@@ -31,7 +31,7 @@ $(call all-target,$1,)
 ifeq "$$(phase)" "final"
 ifeq "$$(BUILD_SPHINX_HTML)" "YES"
 $(call all-target,$1,html_$1)
-INSTALL_HTML_DOC_DIRS += $1/build-html/$2 $1/build-html/$2/_static $1/build-html/$2/_sources
+INSTALL_HTML_DOC_DIRS += $1/build-html/$2
 endif
 endif
 
