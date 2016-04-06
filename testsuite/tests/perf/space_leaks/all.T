@@ -12,9 +12,10 @@ test('space_leak_001',
                         # 417016 (x86/OS X)
                         # 415672 (x86/Windows)
                         # 481456 (unreg amd64/Linux)
-           (wordsize(32), 405650, 10)]),
+           (wordsize(32), 361400, 10)]),
              # 2013-02-10 372072 (x86/OSX)
              # 2013-02-10 439228 (x86/OSX)
+             # 2016-04-06 361400 (x86/Linux)
 
       stats_num_field('bytes allocated', 
            [ (wordsize(64), 11315747416, 5),
