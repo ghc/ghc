@@ -445,6 +445,14 @@ Template Haskell
    whether flags such as :ghc-flag:`-XStrictData` or
    :ghc-flag:`-funbox-strict-fields` are enabled.
 
+-  Previously, quoting a type signature like ``a -> a`` would produce the
+   abstract syntax for ``forall a. a -> a``. This behavior remains, but it
+   is extended to kinds, too, meaning that ``Proxy a -> Proxy a`` becomes
+   ``forall k (a :: k). Proxy a -> Proxy a``. This change is not intentional,
+   but is forced by the fact that GHC has a hard time telling kinds apart
+   from types. The effect of this change is that round-tripping kind-
+   polymorphic types will now require :ghc-flag:`-XTypeInType`.
+
 Runtime system
 ~~~~~~~~~~~~~~
 
