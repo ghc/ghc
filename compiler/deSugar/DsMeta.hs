@@ -872,12 +872,9 @@ repContext ctxt = do preds <- repList typeQTyConName repLTy ctxt
                      repCtxt preds
 
 repHsSigType :: LHsSigType Name -> DsM (Core TH.TypeQ)
-repHsSigType ty = repLTy (hsSigType ty)
-
-repHsSigWcType :: LHsSigWcType Name -> DsM (Core TH.TypeQ)
-repHsSigWcType (HsIB { hsib_vars = vars
-                     , hsib_body = sig1 })
-  | (explicit_tvs, ctxt, ty) <- splitLHsSigmaTy (hswc_body sig1)
+repHsSigType (HsIB { hsib_vars = vars
+                   , hsib_body = body })
+  | (explicit_tvs, ctxt, ty) <- splitLHsSigmaTy body
   = addTyVarBinds (HsQTvs { hsq_implicit = []
                           , hsq_explicit = map (noLoc . UserTyVar . noLoc) vars ++
                                            explicit_tvs
@@ -888,6 +885,10 @@ repHsSigWcType (HsIB { hsib_vars = vars
        ; if null vars && null explicit_tvs && null (unLoc ctxt)
          then return th_ty
          else repTForall th_tvs th_ctxt th_ty }
+
+repHsSigWcType :: LHsSigWcType Name -> DsM (Core TH.TypeQ)
+repHsSigWcType ib_ty@(HsIB { hsib_body = sig1 })
+  = repHsSigType (ib_ty { hsib_body = hswc_body sig1 })
 
 -- yield the representation of a list of types
 --
