@@ -51,7 +51,7 @@ test('haddock.base',
 test('haddock.Cabal',
      [unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 11542374816, 5)
+          [(wordsize(64), 10963514352, 5)
             # 2012-08-14: 3255435248 (amd64/Linux)
             # 2012-08-29: 3324606664 (amd64/Linux, new codegen)
             # 2012-10-08: 3373401360 (amd64/Linux)
@@ -78,6 +78,7 @@ test('haddock.Cabal',
             # 2016-03-29: 11517963232 (amd64/Linux) - not yet investigated
             # 2016-03-30: 10941742184 (amd64/Linux) - defer inlining of Int* Ord methods
             # 2016-04-06: 11542374816 (amd64/Linux) - CSE improvements and others
+            # 2016-04-07: 10963514352 (amd64/Linux) - Revert to what phabricator claims
 
           ,(platform('i386-unknown-mingw32'), 3293415576, 5)
             # 2012-10-30:                     1733638168 (x86/Windows)
