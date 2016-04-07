@@ -170,7 +170,6 @@ import DynFlags
 import Outputable
 import ListSetOps
 import FastString
-import GHC.Fingerprint
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad (ap, liftM, msum)
@@ -328,8 +327,6 @@ data DsGblEnv
                                                 -- exported entities of 'Data.Array.Parallel' iff
                                                 -- '-XParallelArrays' was given; otherwise, empty
         , ds_parr_bi :: PArrBuiltin             -- desugarar names for '-XParallelArrays'
-        , ds_static_binds :: IORef [(Fingerprint, (Id,CoreExpr))]
-          -- ^ Bindings resulted from floating static forms
         }
 
 instance ContainsModule DsGblEnv where

@@ -157,6 +157,9 @@
 
   * `CallStack` now has an `IsList` instance
 
+  * The field `spInfoName` of `GHC.StaticPtr.StaticPtrInfo` has been removed.
+    The value is no longer available when constructing the `StaticPtr`.
+
 ### Generalizations
 
   * Generalize `Debug.Trace.{traceM, traceShowM}` from `Monad` to `Applicative`

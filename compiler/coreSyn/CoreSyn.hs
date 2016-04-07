@@ -31,7 +31,7 @@ module CoreSyn (
 
         -- ** Simple 'Expr' access functions and predicates
         bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts,
-        collectBinders, collectTyAndValBinders,
+        collectBinders, collectTyBinders, collectTyAndValBinders,
         collectArgs, collectArgsTicks, flattenBinds,
 
         exprToType, exprToCoercion_maybe,

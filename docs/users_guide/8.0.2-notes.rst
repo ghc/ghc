@@ -1,0 +1,23 @@
+.. _release-8-0-2:
+
+Release notes for version 8.0.2
+===============================
+
+TODO FIXME
+
+Highlights
+----------
+
+TODO FIXME.
+
+Full details
+------------
+
+Language
+~~~~~~~~
+
+-  TODO FIXME.
+
+-  :ghc-flag:`-XStaticPointers` now allows the body of the ``static`` form to
+   refer to closed local bindings. For instance, this is now permitted:
+   ``f = static x where x = 'a'``.

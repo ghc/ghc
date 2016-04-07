@@ -11620,9 +11620,11 @@ The compiler includes entries in this table for all static forms found
 in the linked modules. The value can be obtained from the reference via
 :base-ref:`deRefStaticPtr <GHC-StaticPtr.html#v%3AdeRefStaticPtr>`.
 
-The body ``e`` of a ``static e`` expression must be a closed expression.
-That is, there can be no free variables occurring in ``e``, i.e. lambda-
-or let-bound variables bound locally in the context of the expression.
+The body ``e`` of a ``static e`` expression must be a closed expression. Where
+we say an expression is *closed* when all of its free (type) variables are
+closed. And a variable is *closed* if it is let-bound to a *closed* expression
+and its type is *closed* as well. And a type is *closed* if it has no free
+variables.
 
 All of the following are permissible: ::
 
@@ -11634,11 +11636,14 @@ All of the following are permissible: ::
     ref3 = static (inc 1)
     ref4 = static ((\x -> x + 1) (1 :: Int))
     ref5 y = static (let x = 1 in x)
+    ref6 y = let x = 1 in static x
 
 While the following definitions are rejected: ::
 
-    ref6 = let x = 1 in static x
-    ref7 y = static (let x = 1 in y)
+    ref7 y = let x = y in static x    -- x is not closed
+    ref8 y = static (let x = 1 in y)  -- y is not let-bound
+    ref8 (y :: a) = let x = undefined :: a
+                     in static x      -- x has a non-closed type
 
 .. _typechecking-static-pointers:
 

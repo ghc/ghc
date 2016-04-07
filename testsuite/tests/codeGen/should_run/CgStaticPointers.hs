@@ -15,14 +15,14 @@ main = do
   print $ deRefStaticPtr (static g)
   print $ deRefStaticPtr p0 'a'
   print $ deRefStaticPtr (static t_field) $ T 'b'
+ where
+  g :: String
+  g = "found"
 
 lookupKey :: StaticPtr a -> IO a
 lookupKey p = unsafeLookupStaticPtr (staticKey p) >>= \case
   Just p -> return $ deRefStaticPtr p
   Nothing -> error $ "couldn't find " ++ show (staticPtrInfo p)
-
-g :: String
-g = "found"
 
 p0 :: Typeable a => StaticPtr (a -> a)
 p0 = static (\x -> x)

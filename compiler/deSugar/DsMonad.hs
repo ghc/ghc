@@ -22,7 +22,7 @@ module DsMonad (
         mkPrintUnqualifiedDs,
         newUnique,
         UniqSupply, newUniqueSupply,
-        getGhcModeDs, dsGetFamInstEnvs, dsGetStaticBindsVar,
+        getGhcModeDs, dsGetFamInstEnvs,
         dsLookupGlobal, dsLookupGlobalId, dsDPHBuiltin, dsLookupTyCon, dsLookupDataCon,
 
         PArrBuiltin(..),
@@ -74,7 +74,6 @@ import ErrUtils
 import FastString
 import Maybes
 import Var (EvVar)
-import GHC.Fingerprint
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.IORef
@@ -148,12 +147,10 @@ initDs :: HscEnv
 
 initDs hsc_env mod rdr_env type_env fam_inst_env thing_inside
   = do  { msg_var <- newIORef (emptyBag, emptyBag)
-        ; static_binds_var <- newIORef []
         ; pm_iter_var      <- newIORef 0
         ; let dflags                   = hsc_dflags hsc_env
               (ds_gbl_env, ds_lcl_env) = mkDsEnvs dflags mod rdr_env type_env
                                                   fam_inst_env msg_var
-                                                  static_binds_var
                                                   pm_iter_var
 
         ; either_res <- initTcRnIf 'd' hsc_env ds_gbl_env ds_lcl_env $
@@ -229,13 +226,12 @@ initDsTc thing_inside
         ; tcg_env  <- getGblEnv
         ; msg_var  <- getErrsVar
         ; dflags   <- getDynFlags
-        ; static_binds_var <- liftIO $ newIORef []
         ; pm_iter_var      <- liftIO $ newIORef 0
         ; let type_env = tcg_type_env tcg_env
               rdr_env  = tcg_rdr_env tcg_env
               fam_inst_env = tcg_fam_inst_env tcg_env
               ds_envs  = mkDsEnvs dflags this_mod rdr_env type_env fam_inst_env
-                                  msg_var static_binds_var pm_iter_var
+                                  msg_var pm_iter_var
         ; setEnvs ds_envs thing_inside
         }
 
@@ -263,9 +259,8 @@ initTcDsForSolver thing_inside
          thing_inside }
 
 mkDsEnvs :: DynFlags -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
-         -> IORef Messages -> IORef [(Fingerprint, (Id, CoreExpr))]
-         -> IORef Int -> (DsGblEnv, DsLclEnv)
-mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var static_binds_var pmvar
+         -> IORef Messages -> IORef Int -> (DsGblEnv, DsLclEnv)
+mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var pmvar
   = let if_genv = IfGblEnv { if_rec_types = Just (mod, return type_env) }
         if_lenv = mkIfLclEnv mod (text "GHC error in desugarer lookup in" <+> ppr mod)
         real_span = realSrcLocSpan (mkRealSrcLoc (moduleNameFS (moduleName mod)) 1 1)
@@ -276,7 +271,6 @@ mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var static_binds_var pmvar
                            , ds_msgs    = msg_var
                            , ds_dph_env = emptyGlobalRdrEnv
                            , ds_parr_bi = panic "DsMonad: uninitialised ds_parr_bi"
-                           , ds_static_binds = static_binds_var
                            }
         lcl_env = DsLclEnv { dsl_meta    = emptyNameEnv
                            , dsl_loc     = real_span
@@ -516,10 +510,6 @@ dsLookupMetaEnv name = do { env <- getLclEnv; return (lookupNameEnv (dsl_meta en
 dsExtendMetaEnv :: DsMetaEnv -> DsM a -> DsM a
 dsExtendMetaEnv menv thing_inside
   = updLclEnv (\env -> env { dsl_meta = dsl_meta env `plusNameEnv` menv }) thing_inside
-
--- | Gets a reference to the SPT entries created so far.
-dsGetStaticBindsVar :: DsM (IORef [(Fingerprint, (Id,CoreExpr))])
-dsGetStaticBindsVar = fmap ds_static_binds getGblEnv
 
 discardWarningsDs :: DsM a -> DsM a
 -- Ignore warnings inside the thing inside;

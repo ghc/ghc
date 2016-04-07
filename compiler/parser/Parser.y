@@ -2244,7 +2244,7 @@ fexp    :: { LHsExpr RdrName }
         : fexp aexp                  { sLL $1 $> $ HsApp $1 $2 }
         | fexp TYPEAPP atype         {% ams (sLL $1 $> $ HsAppType $1 (mkHsWildCardBndrs $3))
                                             [mj AnnAt $2] }
-        | 'static' aexp              {% ams (sLL $1 $> $ HsStatic $2)
+        | 'static' aexp              {% ams (sLL $1 $> $ HsStatic placeHolderNames $2)
                                             [mj AnnStatic $1] }
         | aexp                       { $1 }
 

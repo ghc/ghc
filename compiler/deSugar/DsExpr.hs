@@ -57,8 +57,7 @@ import Outputable
 import FastString
 import PatSyn
 
-import IfaceEnv
-import Data.IORef       ( atomicModifyIORef', modifyIORef )
+import Data.IORef       ( atomicModifyIORef' )
 
 import Control.Monad
 import GHC.Fingerprint
@@ -412,30 +411,27 @@ dsExpr (PArrSeq _ _)
     -- shouldn't have let it through
 
 {-
-\noindent
-\underline{\bf Static Pointers}
-               ~~~~~~~~~~~~~~~
-\begin{verbatim}
+Static Pointers
+~~~~~~~~~~~~~~~
+
     g = ... static f ...
 ==>
-    sptEntry:N = StaticPtr
-        (fingerprintString "pkgKey:module.sptEntry:N")
-        (StaticPtrInfo "current pkg key" "current module" "sptEntry:0")
-        f
-    g = ... sptEntry:N
-\end{verbatim}
+    g = ... StaticPtr
+              w0 w1
+              (StaticPtrInfo "current pkg key" "current module" "N")
+              f
+        ...
+
+Where we obtain w0 and w1 from
+
+   Fingerprint w0 w1 = fingerprintString "pkgKey:module:N"
 -}
 
-dsExpr (HsStatic expr@(L loc _)) = do
+dsExpr (HsStatic _ expr@(L loc _)) = do
     expr_ds <- dsLExpr expr
     let ty = exprType expr_ds
-    n' <- mkSptEntryName loc
-    static_binds_var <- dsGetStaticBindsVar
-
-    staticPtrTyCon       <- dsLookupTyCon   staticPtrTyConName
     staticPtrInfoDataCon <- dsLookupDataCon staticPtrInfoDataConName
     staticPtrDataCon     <- dsLookupDataCon staticPtrDataConName
-    fingerprintDataCon   <- dsLookupDataCon fingerprintDataConName
 
     dflags <- getDynFlags
     let (line, col) = case loc of
@@ -447,42 +443,50 @@ dsExpr (HsStatic expr@(L loc _)) = do
                      [ Type intTy              , Type intTy
                      , mkIntExprInt dflags line, mkIntExprInt dflags col
                      ]
+    this_mod <- getModule
     info <- mkConApp staticPtrInfoDataCon <$>
             (++[srcLoc]) <$>
             mapM mkStringExprFS
-                 [ unitIdFS $ moduleUnitId $ nameModule n'
-                 , moduleNameFS $ moduleName $ nameModule n'
-                 , occNameFS    $ nameOccName n'
+                 [ unitIdFS $ moduleUnitId this_mod
+                 , moduleNameFS $ moduleName this_mod
                  ]
-    let tvars = tyCoVarsOfTypeWellScoped ty
-        speTy = ASSERT( all isTyVar tvars )  -- ty is top-level, so this is OK
-                mkInvForAllTys tvars $ mkTyConApp staticPtrTyCon [ty]
-        speId = mkExportedVanillaId n' speTy
-        fp@(Fingerprint w0 w1) = fingerprintName $ idName speId
-        fp_core = mkConApp fingerprintDataCon
-                    [ mkWord64LitWordRep dflags w0
-                    , mkWord64LitWordRep dflags w1
-                    ]
-        sp    = mkConApp staticPtrDataCon [Type ty, fp_core, info, expr_ds]
-    liftIO $ modifyIORef static_binds_var ((fp, (speId, mkLams tvars sp)) :)
-    putSrcSpanDs loc $ return $ mkTyApps (Var speId) (mkTyVarTys tvars)
+    Fingerprint w0 w1 <- mkStaticPtrFingerprint this_mod
+    putSrcSpanDs loc $ return $
+      mkConApp staticPtrDataCon [ Type ty
+                                , mkWord64LitWordRep dflags w0
+                                , mkWord64LitWordRep dflags w1
+                                , info
+                                , expr_ds
+                                ]
 
   where
-
     -- | Choose either 'Word64#' or 'Word#' to represent the arguments of the
     -- 'Fingerprint' data constructor.
     mkWord64LitWordRep dflags
       | platformWordSize (targetPlatform dflags) < 8 = mkWord64LitWord64
       | otherwise = mkWordLit dflags . toInteger
 
-    fingerprintName :: Name -> Fingerprint
-    fingerprintName n = fingerprintString $ unpackFS $ concatFS
-        [ unitIdFS $ moduleUnitId $ nameModule n
+    mkStaticPtrFingerprint :: Module -> DsM Fingerprint
+    mkStaticPtrFingerprint this_mod = do
+      n <- mkGenPerModuleNum this_mod
+      return $ fingerprintString $ unpackFS $ concatFS
+        [ unitIdFS $ moduleUnitId this_mod
         , fsLit ":"
-        , moduleNameFS (moduleName $ nameModule n)
-        , fsLit "."
-        , occNameFS $ occName n
+        , moduleNameFS $ moduleName this_mod
+        , fsLit ":"
+        , mkFastString $ show n
         ]
+
+    mkGenPerModuleNum :: Module -> DsM Int
+    mkGenPerModuleNum this_mod = do
+      dflags <- getDynFlags
+      let -- Note [Generating fresh names for ccall wrapper]
+          -- in compiler/typecheck/TcEnv.hs
+          wrapperRef = nextWrapperNum dflags
+      wrapperNum <- liftIO $ atomicModifyIORef' wrapperRef $ \mod_env ->
+        let num = lookupWithDefaultModuleEnv mod_env 0 this_mod
+         in (extendModuleEnv mod_env this_mod (num + 1), num)
+      return wrapperNum
 
 {-
 \noindent
@@ -1011,33 +1015,3 @@ badMonadBind rhs elt_ty
          , hang (text "Suppress this warning by saying")
               2 (quotes $ text "_ <-" <+> ppr rhs)
          ]
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Static pointers}
-*                                                                      *
-************************************************************************
--}
-
--- | Creates an name for an entry in the Static Pointer Table.
---
--- The name has the form @sptEntry:<N>@ where @<N>@ is generated from a
--- per-module counter.
---
-mkSptEntryName :: SrcSpan -> DsM Name
-mkSptEntryName loc = do
-    mod  <- getModule
-    occ  <- mkWrapperName "sptEntry"
-    newGlobalBinder mod occ loc
-  where
-    mkWrapperName what
-      = do dflags <- getDynFlags
-           thisMod <- getModule
-           let -- Note [Generating fresh names for ccall wrapper]
-               -- in compiler/typecheck/TcEnv.hs
-               wrapperRef = nextWrapperNum dflags
-           wrapperNum <- liftIO $ atomicModifyIORef' wrapperRef $ \mod_env ->
-               let num = lookupWithDefaultModuleEnv mod_env 0 thisMod
-                in (extendModuleEnv mod_env thisMod (num+1), num)
-           return $ mkVarOcc $ what ++ ":" ++ show wrapperNum

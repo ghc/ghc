@@ -385,13 +385,17 @@ variables.  The action happens in TcBinds.mkExport.
 Note [Bind free vars]
 ~~~~~~~~~~~~~~~~~~~~~
 The bind_fvs field of FunBind and PatBind records the free variables
-of the definition.  It is used for two purposes
+of the definition.  It is used for the following purposes
 
 a) Dependency analysis prior to type checking
     (see TcBinds.tc_group)
 
 b) Deciding whether we can do generalisation of the binding
     (see TcBinds.decideGeneralisationPlan)
+
+c) Deciding whether the binding can be used in static forms
+    (see TcExpr.checkClosedInStaticForm for the HsStatic case and
+     TcBinds.isClosedBndrGroup).
 
 Specifically,
 

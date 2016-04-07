@@ -4,7 +4,7 @@
 \section{Tidying up Core}
 -}
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, ViewPatterns #-}
 
 module TidyPgm (
        mkBootModDetailsTc, tidyProgram, globaliseAndTidyId
@@ -24,10 +24,12 @@ import CoreUtils        (rhsIsStatic)
 import CoreStats        (coreBindsStats, CoreStats(..))
 import CoreLint
 import Literal
+import PrelNames
 import Rules
 import PatSyn
 import ConLike
 import CoreArity        ( exprArity, exprBotStrictness_maybe )
+import StaticPtrTable
 import VarEnv
 import VarSet
 import Var
@@ -233,7 +235,8 @@ First we figure out which Ids are "external" Ids.  An
 "external" Id is one that is visible from outside the compilation
 unit.  These are
   a) the user exported ones
-  b) ones mentioned in the unfoldings, workers,
+  b) the ones bound to static forms
+  c) ones mentioned in the unfoldings, workers,
      rules of externally-visible ones ,
      or vectorised versions of externally-visible ones
 
@@ -405,7 +408,8 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
         ; return (CgGuts { cg_module   = mod,
                            cg_tycons   = alg_tycons,
                            cg_binds    = all_tidy_binds,
-                           cg_foreign  = foreign_stubs,
+                           cg_foreign  = foreign_stubs `appendStubC`
+                                           sptModuleInitCode mod all_tidy_binds,
                            cg_dep_pkgs = map fst $ dep_pkgs deps,
                            cg_hpc_info = hpc_info,
                            cg_modBreaks = modBreaks },
@@ -635,17 +639,29 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
   -- bindings, which are ordered non-deterministically.
   init_work_list = zip init_ext_ids init_ext_ids
   init_ext_ids   = sortBy (compare `on` getOccName) $
-                   filter is_external binders
+                   map fst $ filter is_external flatten_binds
 
   -- An Id should be external if either (a) it is exported,
   -- (b) it appears in the RHS of a local rule for an imported Id, or
-  -- (c) it is the vectorised version of an imported Id
+  -- (c) it is the vectorised version of an imported Id, or
+  -- (d) it is a static pointer (see notes in StaticPtrTable.hs).
   -- See Note [Which rules to expose]
-  is_external id = isExportedId id || id `elemVarSet` rule_rhs_vars || id `elemVarSet` vect_var_vs
+  is_external (id, e) = isExportedId id || id `elemVarSet` rule_rhs_vars
+                      || id `elemVarSet` vect_var_vs
+                      || isStaticPtrApp e
+
+  isStaticPtrApp :: CoreExpr -> Bool
+  isStaticPtrApp (collectTyBinders -> (_, e))
+      | (Var v, _) <- collectArgs e
+      , Just con <- isDataConId_maybe v
+      =  dataConName con == staticPtrDataConName
+  isStaticPtrApp _ = False
+
   rule_rhs_vars  = mapUnionVarSet ruleRhsFreeVars imp_id_rules
   vect_var_vs    = mkVarSet [var_v | (var, var_v) <- nameEnvElts vect_vars, isGlobalId var]
 
-  binders          = bindersOfBinds binds
+  flatten_binds    = flattenBinds binds
+  binders          = map fst flatten_binds
   implicit_binders = bindersOfBinds implicit_binds
   binder_set       = mkVarSet binders
 

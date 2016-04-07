@@ -66,8 +66,10 @@ import Control.Monad
 import qualified Control.Monad.Fail as MonadFail
 #endif
 import MonadUtils
+import Data.Function (fix)
 import Data.Maybe
 import Pair
+import qualified GHC.LanguageExtensions as LangExt
 
 {-
 Note [GHC Formalism]
@@ -370,7 +372,8 @@ lintCoreBindings dflags pass local_in_scope binds
        ; mapM lint_bind binds }
   where
     flags = LF { lf_check_global_ids = check_globals
-               , lf_check_inline_loop_breakers = check_lbs }
+               , lf_check_inline_loop_breakers = check_lbs
+               , lf_check_static_ptrs = check_static_ptrs }
 
     -- See Note [Checking for global Ids]
     check_globals = case pass of
@@ -383,6 +386,14 @@ lintCoreBindings dflags pass local_in_scope binds
                       CoreDesugar    -> False
                       CoreDesugarOpt -> False
                       _              -> True
+
+    -- See Note [Checking StaticPtrs]
+    check_static_ptrs = xopt LangExt.StaticPointers dflags &&
+                        case pass of
+                          CoreDoFloatOutwards _ -> True
+                          CoreTidy              -> True
+                          CorePrep              -> True
+                          _                     -> False
 
     binders = bindersOfBinds binds
     (_, dups) = removeDups compare binders
@@ -460,7 +471,7 @@ lintSingleBinding :: TopLevelFlag -> RecFlag -> (Id, CoreExpr) -> LintM ()
 lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
   = addLoc (RhsOf binder) $
          -- Check the rhs
-    do { ty <- lintCoreExpr rhs
+    do { ty <- lintRhs rhs
        ; lintBinder binder -- Check match to RHS type
        ; binder_ty <- applySubstTy (idType binder)
        ; ensureEqTys binder_ty ty (mkRhsMsg binder (text "RHS") ty)
@@ -529,6 +540,32 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
     -- See Note [GHC Formalism]
     lintBinder var | isId var  = lintIdBndr var $ \_ -> (return ())
                    | otherwise = return ()
+
+-- | Checks the RHS of top-level bindings. It only differs from 'lintCoreExpr'
+-- in that it doesn't reject applications of the data constructor @StaticPtr@
+-- when they appear at the top level.
+--
+-- See Note [Checking StaticPtrs].
+lintRhs :: CoreExpr -> LintM OutType
+-- Allow applications of the data constructor @StaticPtr@ at the top
+-- but produce errors otherwise.
+lintRhs rhs
+    | (binders0, rhs') <- collectTyBinders rhs
+    , (fun@(Var b), args) <- collectArgs rhs'
+    , Just con <- isDataConId_maybe b
+    , dataConName con == staticPtrDataConName
+    , length args == 5
+    = flip fix binders0 $ \loopBinders binders -> case binders of
+        -- imitate @lintCoreExpr (Lam ...)@
+        var : vars -> addLoc (LambdaBodyOf var) $ lintBinder var $ \var' -> do
+          body_ty <- loopBinders vars
+          return $ mkPiType var' body_ty
+        -- imitate @lintCoreExpr (App ...)@
+        [] -> do
+          fun_ty <- lintCoreExpr fun
+          addLoc (AnExpr rhs') $ foldM lintCoreArg fun_ty args
+-- Rejects applications of the data constructor @StaticPtr@ if it finds any.
+lintRhs rhs = lintCoreExpr rhs
 
 lintIdUnfolding :: Id -> Type -> Unfolding -> LintM ()
 lintIdUnfolding bndr bndr_ty (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
@@ -644,9 +681,21 @@ lintCoreExpr (Let (Rec pairs) body)
     (_, dups) = removeDups compare bndrs
 
 lintCoreExpr e@(App _ _)
-    = do { fun_ty <- lintCoreExpr fun
-         ; addLoc (AnExpr e) $ foldM lintCoreArg fun_ty args }
+    = do lf <- getLintFlags
+         -- Check for a nested occurrence of the StaticPtr constructor.
+         -- See Note [Checking StaticPtrs].
+         case fun of
+           Var b | lf_check_static_ptrs lf
+                 , Just con <- isDataConId_maybe b
+                 , dataConName con == staticPtrDataConName
+                 -> do
+              failWithL $ text "Found StaticPtr nested in an expression: " <+>
+                          ppr e
+           _     -> go
   where
+    go = do { fun_ty <- lintCoreExpr fun
+            ; addLoc (AnExpr e) $ foldM lintCoreArg fun_ty args }
+
     (fun, args) = collectArgs e
 
 lintCoreExpr (Lam var expr)
@@ -1563,11 +1612,14 @@ data LintEnv
 data LintFlags
   = LF { lf_check_global_ids           :: Bool -- See Note [Checking for global Ids]
        , lf_check_inline_loop_breakers :: Bool -- See Note [Checking for INLINE loop breakers]
+       , lf_check_static_ptrs          :: Bool -- See Note [Checking StaticPtrs]
     }
 
 defaultLintFlags :: LintFlags
 defaultLintFlags = LF { lf_check_global_ids = False
-                      , lf_check_inline_loop_breakers = True }
+                      , lf_check_inline_loop_breakers = True
+                      , lf_check_static_ptrs = False
+                      }
 
 newtype LintM a =
    LintM { unLintM ::
@@ -1581,6 +1633,13 @@ type WarnsAndErrs = (Bag MsgDoc, Bag MsgDoc)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Before CoreTidy, all locally-bound Ids must be LocalIds, even
 top-level ones. See Note [Exported LocalIds] and Trac #9857.
+
+Note [Checking StaticPtrs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Every occurrence of the data constructor @StaticPtr@ should be moved to the top
+level by the FloatOut pass. The linter is checking that no occurrence is left
+nested within an expression.
 
 Note [Type substitution]
 ~~~~~~~~~~~~~~~~~~~~~~~~

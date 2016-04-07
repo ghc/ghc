@@ -377,6 +377,7 @@ lvlCase env scrut_fvs scrut' case_bndr ty alts
   | [(con@(DataAlt {}), bs, body)] <- alts
   , exprOkForSpeculation scrut'   -- See Note [Check the output scrutinee for okForSpec]
   , not (isTopLvl dest_lvl)       -- Can't have top-level cases
+  , not (floatTopLvlOnly env)     -- Can float anywhere
   =     -- See Note [Floating cases]
         -- Always float the case if possible
         -- Unlike lets we don't insist that it escapes a value lambda
@@ -475,7 +476,9 @@ lvlMFE True env e@(_, AnnCase {})
   = lvlExpr env e     -- Don't share cases
 
 lvlMFE strict_ctxt env ann_expr
-  |  isUnliftedType (exprType expr)
+  |  floatTopLvlOnly env && not (isTopLvl dest_lvl)
+         -- Only floating to the top level is allowed.
+  || isUnliftedType (exprType expr)
          -- Can't let-bind it; see Note [Unlifted MFEs]
          -- This includes coercions, which we don't want to float anyway
          -- NB: no need to substitute cos isUnliftedType doesn't change
@@ -730,7 +733,9 @@ lvlBind env (AnnNonRec bndr rhs)
     is_bot     = exprIsBottom (deAnnotate rhs)
 
 lvlBind env (AnnRec pairs)
-  | not (profitableFloat env dest_lvl)
+  |  floatTopLvlOnly env && not (isTopLvl dest_lvl)
+         -- Only floating to the top level is allowed.
+  || not (profitableFloat env dest_lvl)
   = do { let bind_lvl = incMinorLvl (le_ctxt_lvl env)
              (env', bndrs') = substAndLvlBndrs Recursive env bind_lvl bndrs
        ; rhss' <- mapM (lvlExpr env') rhss
@@ -978,6 +983,9 @@ floatConsts le = floatOutConstants (le_switches le)
 
 floatOverSat :: LevelEnv -> Bool
 floatOverSat le = floatOutOverSatApps (le_switches le)
+
+floatTopLvlOnly :: LevelEnv -> Bool
+floatTopLvlOnly le = floatToTopLevelOnly (le_switches le)
 
 setCtxtLvl :: LevelEnv -> Level -> LevelEnv
 setCtxtLvl env lvl = env { le_ctxt_lvl = lvl }

@@ -797,7 +797,7 @@ cvtl e = wrapL (cvt e)
                                   <- mapM (cvtFld (mkAmbiguousFieldOcc . noLoc))
                                            flds
                               ; return $ mkRdrRecordUpd e' flds' }
-    cvt (StaticE e)      = fmap HsStatic $ cvtl e
+    cvt (StaticE e)      = fmap (HsStatic placeHolderNames) $ cvtl e
     cvt (UnboundVarE s)  = do { s' <- vName s; return $ HsVar (noLoc s') }
 
 {- Note [Dropping constructors]

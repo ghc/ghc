@@ -566,7 +566,7 @@ tcExpr (HsProc pat cmd) res_ty
         ; return $ mkHsWrapCo coi (HsProc pat' cmd') }
 
 -- Typechecks the static form and wraps it with a call to 'fromStaticPtr'.
-tcExpr (HsStatic expr) res_ty
+tcExpr (HsStatic fvs expr) res_ty
   = do  { res_ty          <- expTypeToType res_ty
         ; (co, (p_ty, expr_ty)) <- matchExpectedAppTy res_ty
         ; (expr', lie)    <- captureConstraints $
@@ -574,6 +574,9 @@ tcExpr (HsStatic expr) res_ty
                              2 (ppr expr)
                        ) $
             tcPolyExprNC expr expr_ty
+        -- Check that the free variables of the static form are closed.
+        ; mapM_ checkClosedInStaticForm fvs
+
         -- Require the type of the argument to be Typeable.
         -- The evidence is not used, but asking the constraint ensures that
         -- the current implementation is as restrictive as future versions
@@ -591,7 +594,7 @@ tcExpr (HsStatic expr) res_ty
         ; let wrap = mkWpTyApps [expr_ty]
         ; loc <- getSrcSpanM
         ; return $ mkHsWrapCo co $ HsApp (L loc $ mkHsWrap wrap fromStaticPtr)
-                                         (L loc (HsStatic expr'))
+                                         (L loc (HsStatic fvs expr'))
         }
 
 {-
@@ -2478,3 +2481,20 @@ badOverloadedUpdate = text "Record update is ambiguous, and requires a type sign
 fieldNotInType :: RecSelParent -> RdrName -> SDoc
 fieldNotInType p rdr
   = unknownSubordinateErr (text "field of type" <+> quotes (ppr p)) rdr
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{Static Pointers}
+*                                                                      *
+************************************************************************
+-}
+
+checkClosedInStaticForm :: Name -> TcM ()
+checkClosedInStaticForm name = do
+    thing <- tcLookup name
+    case thing of
+      ATcId { tct_closed = NotTopLevel } ->
+         addErrTc $ quotes (ppr name) <+>
+                    text "is used in a static form but it is not closed."
+      _ -> return ()

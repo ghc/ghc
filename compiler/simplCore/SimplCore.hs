@@ -53,6 +53,7 @@ import Maybes
 import UniqSupply       ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
 import Outputable
 import Control.Monad
+import qualified GHC.LanguageExtensions as LangExt
 
 #ifdef GHCI
 import DynamicLoading   ( loadPlugins )
@@ -128,6 +129,7 @@ getCoreToDo dflags
     rules_on      = gopt Opt_EnableRewriteRules           dflags
     eta_expand_on = gopt Opt_DoLambdaEtaExpansion         dflags
     ww_on         = gopt Opt_WorkerWrapper                dflags
+    static_ptrs   = xopt LangExt.StaticPointers           dflags
 
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
 
@@ -201,8 +203,15 @@ getCoreToDo dflags
 
     core_todo =
      if opt_level == 0 then
-       [ vectorisation
-       , CoreDoSimplify max_iter
+       [ vectorisation,
+         -- Static forms are moved to the top level with the FloatOut pass.
+         -- See Note [Grand plan for static forms].
+         runWhen static_ptrs $ CoreDoFloatOutwards FloatOutSwitches {
+                                 floatOutLambdas   = Just 0,
+                                 floatOutConstants = True,
+                                 floatOutOverSatApps = False,
+                                 floatToTopLevelOnly = True },
+         CoreDoSimplify max_iter
              (base_mode { sm_phase = Phase 0
                         , sm_names = ["Non-opt simplification"] })
        ]
@@ -230,7 +239,8 @@ getCoreToDo dflags
            CoreDoFloatOutwards FloatOutSwitches {
                                  floatOutLambdas   = Just 0,
                                  floatOutConstants = True,
-                                 floatOutOverSatApps = False },
+                                 floatOutOverSatApps = False,
+                                 floatToTopLevelOnly = False },
                 -- Was: gentleFloatOutSwitches
                 --
                 -- I have no idea why, but not floating constants to
@@ -281,7 +291,8 @@ getCoreToDo dflags
            CoreDoFloatOutwards FloatOutSwitches {
                                  floatOutLambdas     = floatLamArgs dflags,
                                  floatOutConstants   = True,
-                                 floatOutOverSatApps = True },
+                                 floatOutOverSatApps = True,
+                                 floatToTopLevelOnly = False },
                 -- nofib/spectral/hartel/wang doubles in speed if you
                 -- do full laziness late in the day.  It only happens
                 -- after fusion and other stuff, so the early pass doesn't
@@ -977,3 +988,29 @@ transferIdInfo exported_id local_id
                                (ruleInfo local_info)
         -- Remember to set the function-name field of the
         -- rules as we transfer them from one function to another
+
+
+-- Note [Grand plan for static forms]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Static forms go through the compilation phases as follows:
+--
+-- The renamer looks for out-of-scope names in the body of the static form.
+-- If all names are in scope, the free variables of the body are stored in AST
+-- at the location of the static form.
+--
+-- The typechecker verifies that all free variables occurring in the static form
+-- are closed (see Note [Bindings with closed types] in TcRnTypes).
+--
+-- The desugarer replaces the static form with an application of the data
+-- constructor 'StaticPtr' (defined in module GHC.StaticPtr of base).
+--
+-- The simplifier runs the FloatOut pass which moves the applications of
+-- 'StaticPtr' to the top level. Thus the FloatOut pass is always executed,
+-- event when optimizations are disabled.
+--
+-- The CoreTidy pass produces a C function which inserts all the floated
+-- 'StaticPtr' in the static pointer table (See StaticPtrTable.hs).
+-- This pass also exports the Ids of floated 'StaticPtr's so they can be linked
+-- with the C function.
+--

@@ -589,7 +589,7 @@ addTickHsExpr (ExplicitPArr ty es) =
                 (return ty)
                 (mapM (addTickLHsExpr) es)
 
-addTickHsExpr (HsStatic e) = HsStatic <$> addTickLHsExpr e
+addTickHsExpr (HsStatic fvs e) = HsStatic fvs <$> addTickLHsExpr e
 
 addTickHsExpr expr@(RecordCon { rcon_flds = rec_binds })
   = do { rec_binds' <- addTickHsRecordBinds rec_binds

@@ -30,6 +30,7 @@ import CoreSyn
 import Var
 import DynFlags ( gopt, GeneralFlag(Opt_PrintExplicitCoercions) )
 import Name
+import NameSet
 import RdrName  ( GlobalRdrEnv )
 import BasicTypes
 import ConLike
@@ -562,7 +563,8 @@ data HsExpr id
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnStatic',
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsStatic    (LHsExpr id)
+  | HsStatic (PostRn id NameSet) -- Free variables of the body
+             (LHsExpr id)        -- Body
 
   ---------------------------------------
   -- The following are commands, not expressions proper
@@ -920,7 +922,7 @@ ppr_expr (HsTcBracketOut e ps) = ppr e $$ text "pending(tc)" <+> ppr ps
 ppr_expr (HsProc pat (L _ (HsCmdTop cmd _ _ _)))
   = hsep [text "proc", ppr pat, ptext (sLit "->"), ppr cmd]
 
-ppr_expr (HsStatic e)
+ppr_expr (HsStatic _ e)
   = hsep [text "static", pprParendLExpr e]
 
 ppr_expr (HsTick tickish exp)
