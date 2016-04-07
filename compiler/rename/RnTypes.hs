@@ -25,6 +25,7 @@ module RnTypes (
         -- Binding related stuff
         bindLHsTyVarBndr,
         bindSigTyVarsFV, bindHsQTyVars, bindLRdrNames,
+        extractFilteredRdrTyVars,
         extractHsTyRdrTyVars, extractHsTysRdrTyVars,
         extractHsTysRdrTyVarsDups, rmDupsInRdrTyVars,
         extractRdrKindSigVars, extractDataDefnKindVars,
@@ -108,7 +109,7 @@ rn_hs_sig_wc_type :: Bool   -- see rnImplicitBndrs
 rn_hs_sig_wc_type no_implicit_if_forall ctxt
                   (HsIB { hsib_body = wc_ty }) thing_inside
   = do { let hs_ty = hswc_body wc_ty
-       ; free_vars <- extract_filtered_rdr_ty_vars hs_ty
+       ; free_vars <- extractFilteredRdrTyVars hs_ty
        ; (free_vars', nwc_rdrs) <- partition_nwcs free_vars
        ; rnImplicitBndrs no_implicit_if_forall free_vars' hs_ty $ \ vars ->
     do { rn_hs_wc_type ctxt wc_ty nwc_rdrs $ \ wc_ty' ->
@@ -117,7 +118,7 @@ rn_hs_sig_wc_type no_implicit_if_forall ctxt
 
 rnHsWcType :: HsDocContext -> LHsWcType RdrName -> RnM (LHsWcType Name, FreeVars)
 rnHsWcType ctxt wc_ty@(HsWC { hswc_body = hs_ty })
-  = do { free_vars <- extract_filtered_rdr_ty_vars hs_ty
+  = do { free_vars <- extractFilteredRdrTyVars hs_ty
        ; (_, nwc_rdrs) <- partition_nwcs free_vars
        ; rn_hs_wc_type ctxt wc_ty nwc_rdrs $ \ wc_ty' ->
          return (wc_ty', emptyFVs) }
@@ -152,7 +153,7 @@ rnWcSigTy :: RnTyKiEnv -> LHsType RdrName
 -- wildcard.  Some code duplication, but no big deal.
 rnWcSigTy env (L loc hs_ty@(HsForAllTy { hst_bndrs = tvs, hst_body = hs_tau }))
   = bindLHsTyVarBndrs (rtke_ctxt env) (Just $ inTypeDoc hs_ty)
-                      Nothing [] tvs $ \ _ tvs' _ ->
+                      Nothing [] tvs $ \ _ tvs' _ _ ->
     do { (hs_tau', fvs) <- rnWcSigTy env hs_tau
        ; let hs_ty' = HsForAllTy { hst_bndrs = tvs', hst_body = hswc_body hs_tau' }
              awcs_bndrs = collectAnonWildCardsBndrs tvs'
@@ -201,13 +202,13 @@ rnWcSigContext env (L loc hs_ctxt)
     rn_top_constraint = rnLHsTyKi (env { rtke_what = RnTopConstraint })
 
 
--- | extract_filtered finds free type and kind variables in a type,
+-- | Finds free type and kind variables in a type,
 --     without duplicates, and
 --     without variables that are already in scope in LocalRdrEnv
 --   NB: this includes named wildcards, which look like perfectly
 --       ordinary type variables at this point
-extract_filtered_rdr_ty_vars :: LHsType RdrName -> RnM FreeKiTyVars
-extract_filtered_rdr_ty_vars hs_ty
+extractFilteredRdrTyVars :: LHsType RdrName -> RnM FreeKiTyVars
+extractFilteredRdrTyVars hs_ty
   = do { rdr_env <- getLocalRdrEnv
        ; filterInScope rdr_env <$> extractHsTyRdrTyVars hs_ty }
 
@@ -252,7 +253,7 @@ rnHsSigType :: HsDocContext -> LHsSigType RdrName
 -- Used for source-language type signatures
 -- that cannot have wildcards
 rnHsSigType ctx (HsIB { hsib_body = hs_ty })
-  = do { vars <- extract_filtered_rdr_ty_vars hs_ty
+  = do { vars <- extractFilteredRdrTyVars hs_ty
        ; rnImplicitBndrs True vars hs_ty $ \ vars ->
     do { (body', fvs) <- rnLHsType ctx hs_ty
        ; return (HsIB { hsib_vars = vars
@@ -458,7 +459,7 @@ rnHsTyKi :: RnTyKiEnv -> HsType RdrName -> RnM (HsType Name, FreeVars)
 rnHsTyKi env ty@(HsForAllTy { hst_bndrs = tyvars, hst_body  = tau })
   = do { checkTypeInType env ty
        ; bindLHsTyVarBndrs (rtke_ctxt env) (Just $ inTypeDoc ty)
-                           Nothing [] tyvars $ \ _ tyvars' _ ->
+                           Nothing [] tyvars $ \ _ tyvars' _ _ ->
     do { (tau',  fvs) <- rnLHsTyKi env tau
        ; return ( HsForAllTy { hst_bndrs = tyvars', hst_body =  tau' }
                 , fvs) } }
@@ -844,7 +845,10 @@ bindHsQTyVars :: forall a b.
               -> [Located RdrName]       -- Kind variables from scope, in l-to-r
                                          -- order, but not from ...
               -> (LHsQTyVars RdrName)     -- ... these user-written tyvars
-              -> (LHsQTyVars Name -> RnM (b, FreeVars))
+              -> (LHsQTyVars Name -> NameSet -> RnM (b, FreeVars))
+                  -- also returns all names used in kind signatures, for the
+                  -- TypeInType clause of Note [Complete user-supplied kind
+                  -- signatures] in HsDecls
               -> RnM (b, FreeVars)
 -- (a) Bring kind variables into scope
 --     both (i)  passed in (kv_bndrs)
@@ -853,10 +857,10 @@ bindHsQTyVars :: forall a b.
 bindHsQTyVars doc mb_in_doc mb_assoc kv_bndrs tv_bndrs thing_inside
   = do { bindLHsTyVarBndrs doc mb_in_doc
                            mb_assoc kv_bndrs (hsQTvExplicit tv_bndrs) $
-         \ rn_kvs rn_bndrs dep_var_set ->
+         \ rn_kvs rn_bndrs dep_var_set all_dep_vars ->
          thing_inside (HsQTvs { hsq_implicit = rn_kvs
                               , hsq_explicit = rn_bndrs
-                              , hsq_dependent = dep_var_set }) }
+                              , hsq_dependent = dep_var_set }) all_dep_vars }
 
 bindLHsTyVarBndrs :: forall a b.
                      HsDocContext
@@ -871,6 +875,7 @@ bindLHsTyVarBndrs :: forall a b.
                       -> NameSet -- which names, from the preceding list,
                                  -- are used dependently within that list
                                  -- See Note [Dependent LHsQTyVars] in TcHsType
+                      -> NameSet -- all names used in kind signatures
                       -> RnM (b, FreeVars))
                   -> RnM (b, FreeVars)
 bindLHsTyVarBndrs doc mb_in_doc mb_assoc kv_bndrs tv_bndrs thing_inside
@@ -914,7 +919,7 @@ bindLHsTyVarBndrs doc mb_in_doc mb_assoc kv_bndrs tv_bndrs thing_inside
                                                ppr all_rn_kvs $$
                                                ppr all_rn_tvs $$
                                                ppr exp_dep_vars))
-           ; thing_inside all_rn_kvs all_rn_tvs exp_dep_vars }
+           ; thing_inside all_rn_kvs all_rn_tvs exp_dep_vars all_dep_vars }
 
     warn_unused tv_bndr fvs = case mb_in_doc of
       Just in_doc -> warnUnusedForAll in_doc tv_bndr fvs

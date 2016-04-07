@@ -892,6 +892,8 @@ return type) default to *.
  - Additionally, if -XTypeInType is on, then a data definition with a top-level
    :: must explicitly bind all kind variables to the right of the ::.
    See test dependent/should_compile/KindLevels, which requires this case.
+   (Naturally, any kind variable mentioned before the :: should not be bound
+   after it.)
 -}
 
 instance (OutputableBndr name) => Outputable (FamilyDecl name) where
