@@ -237,9 +237,15 @@ getNumberOfProcessors (void)
         nproc = sysconf(_SC_NPROCESSORS_ONLN);
 #elif defined(HAVE_SYSCONF) && defined(_SC_NPROCESSORS_CONF)
         nproc = sysconf(_SC_NPROCESSORS_CONF);
-#elif defined(darwin_HOST_OS) || defined(freebsd_HOST_OS)
+#elif defined(darwin_HOST_OS)
         size_t size = sizeof(nat);
-        if(0 != sysctlbyname("hw.ncpu",&nproc,&size,NULL,0))
+        if(sysctlbyname("hw.logicalcpu",&nproc,&size,NULL,0) != 0) {
+            if(sysctlbyname("hw.ncpu",&nproc,&size,NULL,0) != 0)
+                nproc = 1;
+        }
+#elif defined(freebsd_HOST_OS)
+        size_t size = sizeof(nat);
+        if(sysctlbyname("hw.ncpu",&nproc,&size,NULL,0) != 0)
             nproc = 1;
 #else
         nproc = 1;
