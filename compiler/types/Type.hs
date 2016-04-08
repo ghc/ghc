@@ -1857,8 +1857,13 @@ typeSize (CoercionTy co)  = coercionSize co
 ************************************************************************
 -}
 
--- | Do a topological sort on a list of tyvars. This is a deterministic
--- sorting operation (that is, doesn't depend on Uniques).
+-- | Do a topological sort on a list of tyvars,
+--   so that binders occur before occurrences
+-- E.g. given  [ a::k, k::*, b::k ]
+-- it'll return a well-scoped list [ k::*, a::k, b::k ]
+--
+-- This is a deterministic sorting operation
+-- (that is, doesn't depend on Uniques).
 toposortTyVars :: [TyVar] -> [TyVar]
 toposortTyVars tvs = reverse $
                      [ tv | (tv, _, _) <- topologicalSortG $
