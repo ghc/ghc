@@ -1515,7 +1515,7 @@ dataConInstPat :: [FastString]          -- A long enough list of FSs to use for 
                -> DataCon
                -> [Type]                -- Types to instantiate the universally quantified tyvars
                -> ([TyVar], [Id])       -- Return instantiated variables
--- dataConInstPat arg_fun fss us con inst_tys returns a triple
+-- dataConInstPat arg_fun fss us con inst_tys returns a tuple
 -- (ex_tvs, arg_ids),
 --
 --   ex_tvs are intended to be used as binders for existential type args
