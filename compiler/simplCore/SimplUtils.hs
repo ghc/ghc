@@ -21,7 +21,7 @@ module SimplUtils (
         isSimplified,
         contIsDupable, contResultType, contHoleType,
         contIsTrivial, contArgs,
-        countValArgs, countArgs,
+        countArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop, contIsRhsOrArg,
         interestingCallContext,
 
@@ -359,13 +359,6 @@ contHoleType (Select { sc_dup = d, sc_bndr =  b, sc_env = se })
   = perhapsSubstTy d se (idType b)
 
 -------------------
-countValArgs :: SimplCont -> Int
--- Count value arguments excluding coercions
-countValArgs (ApplyToVal { sc_arg = arg, sc_cont = cont })
-  | Coercion {} <- arg = countValArgs cont
-  | otherwise          = 1 + countValArgs cont
-countValArgs _         = 0
-
 countArgs :: SimplCont -> Int
 -- Count all arguments, including types, coercions, and other values
 countArgs (ApplyToTy  { sc_cont = cont }) = 1 + countArgs cont
