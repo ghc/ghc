@@ -182,10 +182,6 @@ filterFB c p x r | p x       = x `c` r
 --
 -- The list must be finite.
 
--- We write foldl as a non-recursive thing, so that it
--- can be inlined, and then (often) strictness-analysed,
--- and hence the classic space leak on foldl (+) 0 xs
-
 foldl :: forall a b. (b -> a -> b) -> b -> [a] -> b
 {-# INLINE foldl #-}
 foldl k z0 xs =
