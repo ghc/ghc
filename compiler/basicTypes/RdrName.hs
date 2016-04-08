@@ -357,8 +357,17 @@ extendLocalRdrEnvList lre@(LRE { lre_env = env, lre_in_scope = ns }) names
         , lre_in_scope = extendNameSetList ns names }
 
 lookupLocalRdrEnv :: LocalRdrEnv -> RdrName -> Maybe Name
-lookupLocalRdrEnv (LRE { lre_env = env }) (Unqual occ) = lookupOccEnv env occ
-lookupLocalRdrEnv _                       _            = Nothing
+lookupLocalRdrEnv (LRE { lre_env = env, lre_in_scope = ns }) rdr
+  | Unqual occ <- rdr
+  = lookupOccEnv env occ
+
+  -- See Note [Local bindings with Exact Names]
+  | Exact name <- rdr
+  , name `elemNameSet` ns
+  = Just name
+
+  | otherwise
+  = Nothing
 
 lookupLocalRdrOcc :: LocalRdrEnv -> OccName -> Maybe Name
 lookupLocalRdrOcc (LRE { lre_env = env }) occ = lookupOccEnv env occ
