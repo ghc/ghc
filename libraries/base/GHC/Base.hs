@@ -1086,9 +1086,9 @@ instance  Functor IO where
 instance Applicative IO where
     {-# INLINE pure #-}
     {-# INLINE (*>) #-}
-    pure   = returnIO
-    m *> k = m >>= \ _ -> k
-    (<*>)  = ap
+    pure  = returnIO
+    (*>)  = thenIO
+    (<*>) = ap
 
 instance  Monad IO  where
     {-# INLINE (>>)   #-}
