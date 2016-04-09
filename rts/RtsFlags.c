@@ -236,6 +236,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ParFlags.parGcLoadBalancingEnabled = rtsTrue;
     RtsFlags.ParFlags.parGcLoadBalancingGen = 1;
     RtsFlags.ParFlags.parGcNoSyncWithIdle   = 0;
+    RtsFlags.ParFlags.parGcThreads      = 0; /* defaults to -N */
     RtsFlags.ParFlags.setAffinity       = 0;
 #endif
 
@@ -398,6 +399,7 @@ usage_text[] = {
 "            (default: 0, -qg alone turns off parallel GC)",
 "  -qb[<n>]  Use load-balancing in the parallel GC only for generations >= <n>",
 "            (default: 1, -qb alone turns off load-balancing)",
+"  -qn<n>    Use <n> threads for parallel GC (defaults to value of -N)",
 "  -qa       Use the OS to set thread affinity (experimental)",
 "  -qm       Don't automatically migrate threads between CPUs",
 "  -qi<n>    If a processor has been idle for the last <n> GCs, do not",
@@ -1140,6 +1142,17 @@ error = rtsTrue;
                         RtsFlags.ParFlags.parGcNoSyncWithIdle
                             = strtol(rts_argv[arg]+3, (char **) NULL, 10);
                         break;
+                    case 'n': {
+                        int threads;
+                        threads = strtol(rts_argv[arg]+3, (char **) NULL, 10);
+                        if (threads <= 0) {
+                            errorBelch("-qn must be 1 or greater");
+                            error = rtsTrue;
+                        } else {
+                            RtsFlags.ParFlags.parGcThreads = threads;
+                        }
+                        break;
+                    }
                     case 'a':
                         RtsFlags.ParFlags.setAffinity = rtsTrue;
                         break;
@@ -1380,6 +1393,13 @@ static void normaliseRtsOpts (void)
                    "of the stack chunk size (-kc)");
         errorUsage();
     }
+
+#ifdef THREADED_RTS
+    if (RtsFlags.ParFlags.parGcThreads > RtsFlags.ParFlags.nNodes) {
+        errorBelch("GC threads (-qn) must be between 1 and the value of -N");
+        errorUsage();
+    }
+#endif
 }
 
 static void errorUsage (void)

@@ -619,8 +619,7 @@ GarbageCollect (nat collect_gen,
     live_words  += genLiveWords(gen);
     live_blocks += genLiveBlocks(gen);
 
-    // add in the partial blocks in the gen_workspaces, but ignore gen 0
-    // if this is a local GC (we can't count another capability's part_list)
+    // add in the partial blocks in the gen_workspaces
     {
         nat i;
         for (i = 0; i < n_capabilities; i++) {
@@ -1070,7 +1069,6 @@ waitForGcThreads (Capability *cap USED_IF_THREADS)
     rtsBool retry = rtsTrue;
 
     stat_startGCSync(gc_threads[cap->no]);
-
 
     while(retry) {
         for (i=0; i < n_threads; i++) {

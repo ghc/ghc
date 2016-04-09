@@ -125,18 +125,16 @@ typedef struct Task_ {
     rtsBool wakeup;
 #endif
 
-    // This points to the Capability that the Task "belongs" to.  If
-    // the Task owns a Capability, then task->cap points to it.  If
-    // the task does not own a Capability, then either (a) if the task
-    // is a worker, then task->cap points to the Capability it belongs
-    // to, or (b) it is returning from a foreign call, then task->cap
-    // points to the Capability with the returning_worker queue that this
-    // this Task is on.
+    // If the task owns a Capability, task->cap points to it.  (occasionally a
+    // task may own multiple capabilities, in which case task->cap may point to
+    // any of them.  We must be careful to set task->cap to the appropriate one
+    // when using Capability APIs.)
     //
-    // When a task goes to sleep, it may be migrated to a different
-    // Capability.  Hence, we always check task->cap on wakeup.  To
-    // syncrhonise between the migrater and the migratee, task->lock
-    // must be held when modifying task->cap.
+    // If the task is a worker, task->cap points to the Capability on which it
+    // is queued.
+    //
+    // If the task is in an unsafe foreign call, then task->cap can be used to
+    // retrieve the capability (see rts_unsafeGetMyCapability()).
     struct Capability_ *cap;
 
     // The current top-of-stack InCall
