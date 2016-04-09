@@ -922,7 +922,7 @@ any_work (void)
         return rtsTrue;
     }
 
-    // Check for global work in any step.  We don't need to check for
+    // Check for global work in any gen.  We don't need to check for
     // local work, because we have already exited scavenge_loop(),
     // which means there is no local work for this thread.
     for (g = 0; g < (int)RtsFlags.GcFlags.generations; g++) {

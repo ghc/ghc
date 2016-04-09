@@ -89,7 +89,8 @@ typedef struct bdescr_ {
 
     StgPtr start;              // [READ ONLY] start addr of memory
 
-    StgPtr free;               // first free byte of memory.
+    StgPtr free;               // First free byte of memory.
+                               // allocGroup() sets this to the value of start.
                                // NB. during use this value should lie
                                // between start and start + blocks *
                                // BLOCK_SIZE.  Values outside this

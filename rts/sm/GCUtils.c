@@ -51,29 +51,28 @@ allocGroup_sync(nat n)
 }
 
 
-#if 0
-static void
-allocBlocks_sync(nat n, bdescr **hd, bdescr **tl,
-                 nat gen_no, step *stp,
-                 StgWord32 flags)
+static nat
+allocBlocks_sync(nat n, bdescr **hd)
 {
     bdescr *bd;
     nat i;
     ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
-    bd = allocGroup(n);
+    bd = allocLargeChunk(1,n);
+    // NB. allocLargeChunk, rather than allocGroup(n), to allocate in a
+    // fragmentation-friendly way.
+    n = bd->blocks;
     for (i = 0; i < n; i++) {
         bd[i].blocks = 1;
-        bd[i].gen_no = gen_no;
-        bd[i].step = stp;
-        bd[i].flags = flags;
         bd[i].link = &bd[i+1];
-        bd[i].u.scan = bd[i].free = bd[i].start;
+        bd[i].free = bd[i].start;
     }
-    *hd = bd;
-    *tl = &bd[n-1];
+    bd[n-1].link = NULL;
+    // We have to hold the lock until we've finished fiddling with the metadata,
+    // otherwise the block allocator can get confused.
     RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+    *hd = bd;
+    return n;
 }
-#endif
 
 void
 freeChain_sync(bdescr *bd)
@@ -312,26 +311,22 @@ alloc_todo_block (gen_workspace *ws, nat size)
     }
     else
     {
-        // blocks in to-space get the BF_EVACUATED flag.
-
-//        allocBlocks_sync(16, &hd, &tl,
-//                         ws->step->gen_no, ws->step, BF_EVACUATED);
-//
-//        tl->link = ws->part_list;
-//        ws->part_list = hd->link;
-//        ws->n_part_blocks += 15;
-//
-//        bd = hd;
-
         if (size > BLOCK_SIZE_W) {
             bd = allocGroup_sync((W_)BLOCK_ROUND_UP(size*sizeof(W_))
                                  / BLOCK_SIZE);
         } else {
-            bd = allocBlock_sync();
+            if (gct->free_blocks) {
+                bd = gct->free_blocks;
+                gct->free_blocks = bd->link;
+            } else {
+                allocBlocks_sync(16, &bd);
+                gct->free_blocks = bd->link;
+            }
         }
-        initBdescr(bd, ws->gen, ws->gen->to);
+        // blocks in to-space get the BF_EVACUATED flag.
         bd->flags = BF_EVACUATED;
-        bd->u.scan = bd->free = bd->start;
+        bd->u.scan = bd->start;
+        initBdescr(bd, ws->gen, ws->gen->to);
     }
 
     bd->link = NULL;

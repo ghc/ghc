@@ -770,6 +770,7 @@ findMemoryLeak (void)
     }
 
     for (i = 0; i < n_capabilities; i++) {
+        markBlocks(gc_threads[i]->free_blocks);
         markBlocks(capabilities[i]->pinned_object_block);
     }
 
@@ -841,7 +842,7 @@ memInventory (rtsBool show)
   nat g, i;
   W_ gen_blocks[RtsFlags.GcFlags.generations];
   W_ nursery_blocks, retainer_blocks,
-       arena_blocks, exec_blocks;
+      arena_blocks, exec_blocks, gc_free_blocks = 0;
   W_ live_blocks = 0, free_blocks = 0;
   rtsBool leak;
 
@@ -864,6 +865,7 @@ memInventory (rtsBool show)
       nursery_blocks += nurseries[i].n_blocks;
   }
   for (i = 0; i < n_capabilities; i++) {
+      gc_free_blocks += countBlocks(gc_threads[i]->free_blocks);
       if (capabilities[i]->pinned_object_block != NULL) {
           nursery_blocks += capabilities[i]->pinned_object_block->blocks;
       }
@@ -891,7 +893,7 @@ memInventory (rtsBool show)
       live_blocks += gen_blocks[g];
   }
   live_blocks += nursery_blocks +
-               + retainer_blocks + arena_blocks + exec_blocks;
+               + retainer_blocks + arena_blocks + exec_blocks + gc_free_blocks;
 
 #define MB(n) (((double)(n) * BLOCK_SIZE_W) / ((1024*1024)/sizeof(W_)))
 
@@ -916,6 +918,8 @@ memInventory (rtsBool show)
                  arena_blocks, MB(arena_blocks));
       debugBelch("  exec         : %5" FMT_Word " blocks (%6.1lf MB)\n",
                  exec_blocks, MB(exec_blocks));
+      debugBelch("  GC free pool : %5" FMT_Word " blocks (%6.1lf MB)\n",
+                 gc_free_blocks, MB(gc_free_blocks));
       debugBelch("  free         : %5" FMT_Word " blocks (%6.1lf MB)\n",
                  free_blocks, MB(free_blocks));
       debugBelch("  total        : %5" FMT_Word " blocks (%6.1lf MB)\n",
