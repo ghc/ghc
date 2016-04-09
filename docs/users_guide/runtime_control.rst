@@ -437,6 +437,30 @@ performance.
     program it is sometimes beneficial to disable load-balancing
     entirely with ``-qb``.
 
+.. rts-flag:: -qn <x>
+
+    :default: the value of ``-N``
+    :since: 8.2.1
+
+    .. index::
+       single: GC threads, setting the number of
+
+    By default, all of the capabilities participate in parallel
+    garbage collection.  If we want to use a very large ``-N`` value,
+    however, this can reduce the performance of the GC.  For this
+    reason, the ``-qn`` flag can be used to specify a lower number for
+    the threads that should participate in GC.  During GC, if there
+    are more than this number of workers active, some of them will
+    sleep for the duration of the GC.
+
+    The ``-qn`` flag may be useful when running with a large ``-A`` value
+    (so that GC is infrequent), and a large ``-N`` value (so as to make
+    use of hyperthreaded cores, for example).  For example, on a
+    24-core machine with 2 hyperthreads per core, we might use
+    ``-N48 -qn24 -A128m`` to specify that the mutator should use
+    hyperthreads but the GC should only use real cores.  Note that
+    this configuration would use 6GB for the allocation area.
+
 .. rts-flag:: -H [⟨size⟩]
 
     :default: 0

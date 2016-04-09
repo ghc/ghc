@@ -225,14 +225,29 @@ INLINE_HEADER void releaseCapability_ (Capability* cap STG_UNUSED,
 extern Capability **capabilities;
 
 //
+// Types of global synchronisation
+//
+typedef enum {
+    SYNC_OTHER,
+    SYNC_GC_SEQ,
+    SYNC_GC_PAR
+} SyncType;
+
+//
+// Details about a global synchronisation
+//
+typedef struct {
+    SyncType type;              // The kind of synchronisation
+    rtsBool *idle;
+    Task *task;                 // The Task performing the sync
+} PendingSync;
+
+//
 // Indicates that the RTS wants to synchronise all the Capabilities
 // for some reason.  All Capabilities should stop and return to the
 // scheduler.
 //
-#define SYNC_GC_SEQ 1
-#define SYNC_GC_PAR 2
-#define SYNC_OTHER  3
-extern volatile StgWord pending_sync;
+extern PendingSync * volatile pending_sync;
 
 // Acquires a capability at a return point.  If *cap is non-NULL, then
 // this is taken as a preference for the Capability we wish to
