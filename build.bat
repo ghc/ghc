@@ -6,6 +6,7 @@
              -fno-warn-name-shadowing ^
              -XRecordWildCards        ^
              src/Main.hs              ^
+             -threaded                ^
              -isrc                    ^
              -rtsopts                 ^
              -with-rtsopts=-I0        ^

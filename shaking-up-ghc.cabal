@@ -127,4 +127,7 @@ executable ghc-shake
                        , shake                == 0.15.*
                        , transformers         >= 0.4 && < 0.6
                        , unordered-containers == 0.2.*
-    ghc-options:         -Wall -fno-warn-name-shadowing -rtsopts -with-rtsopts=-I0
+    ghc-options:         -Wall
+                         -fno-warn-name-shadowing
+                         -rtsopts -with-rtsopts=-I0
+                         -threaded

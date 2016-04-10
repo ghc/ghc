@@ -40,6 +40,7 @@ ghc                           \
     -i"$root/src"             \
     -rtsopts                  \
     -with-rtsopts=-I0         \
+    -threaded                 \
     -outputdir="$root/.shake" \
     -j -O                     \
     -o "$root/.shake/build"
