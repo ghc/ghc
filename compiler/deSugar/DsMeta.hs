@@ -1179,8 +1179,8 @@ repE (ArithSeq _ _ aseq) =
 
 repE (HsSpliceE splice)    = repSplice splice
 repE (HsStatic e)          = repLE e >>= rep2 staticEName . (:[]) . unC
-repE (HsUnboundVar name)   = do
-                               occ   <- occNameLit name
+repE (HsUnboundVar uv)     = do
+                               occ   <- occNameLit (unboundVarOcc uv)
                                sname <- repNameS occ
                                repUnboundVar sname
 

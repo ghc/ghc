@@ -610,9 +610,12 @@ tc_rn_src_decls ds
           }
 #else
             -- If there's a splice, we must carry on
-          ; Just (SpliceDecl (L _ splice) _, rest_ds) ->
-            do { -- Rename the splice expression, and get its supporting decls
-                 (spliced_decls, splice_fvs) <- checkNoErrs (rnTopSpliceDecls splice)
+          ; Just (SpliceDecl (L loc splice) _, rest_ds) ->
+            do { recordTopLevelSpliceLoc loc
+
+                 -- Rename the splice expression, and get its supporting decls
+               ; (spliced_decls, splice_fvs) <- checkNoErrs (rnTopSpliceDecls
+                                                             splice)
 
                  -- Glue them on the front of the remaining decls and loop
                ; setGblEnv (tcg_env `addTcgDUs` usesOnly splice_fvs) $

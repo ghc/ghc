@@ -90,7 +90,11 @@ rnUnboundVar v
         then -- Treat this as a "hole"
              -- Do not fail right now; instead, return HsUnboundVar
              -- and let the type checker report the error
-             return (HsUnboundVar (rdrNameOcc v), emptyFVs)
+             do { let occ = rdrNameOcc v
+                ; uv <- if startsWithUnderscore occ
+                        then return (TrueExprHole occ)
+                        else OutOfScope occ <$> getGlobalRdrEnv
+                ; return (HsUnboundVar uv, emptyFVs) }
 
         else -- Fail immediately (qualified name)
              do { n <- reportUnboundName v
@@ -400,7 +404,7 @@ rnExpr other = pprPanic "rnExpr: unexpected expression" (ppr other)
         -- HsWrap
 
 hsHoleExpr :: HsExpr id
-hsHoleExpr = HsUnboundVar (mkVarOcc "_")
+hsHoleExpr = HsUnboundVar (TrueExprHole (mkVarOcc "_"))
 
 arrowFail :: HsExpr RdrName -> RnM (HsExpr Name, FreeVars)
 arrowFail e

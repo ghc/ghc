@@ -123,7 +123,8 @@ module TcRnTypes(
         pprEvVars, pprEvVarWithType,
 
         -- Misc other types
-        TcId, TcIdSet, HoleSort(..)
+        TcId, TcIdSet,
+        Hole(..), holeOcc
 
   ) where
 
@@ -175,6 +176,7 @@ import Control.Monad (ap, liftM, msum)
 #if __GLASGOW_HASKELL__ > 710
 import qualified Control.Monad.Fail as MonadFail
 #endif
+import Data.Set      ( Set )
 
 #ifdef GHCI
 import Data.Map      ( Map )
@@ -465,6 +467,10 @@ data TcGblEnv
           -- ^ @True@ <=> A Template Haskell splice was used.
           --
           -- Splices disable recompilation avoidance (see #481)
+
+        tcg_th_top_level_locs :: TcRef (Set RealSrcSpan),
+          -- ^ Locations of the top-level splices; used for providing details on
+          -- scope in error messages for out-of-scope variables
 
         tcg_dfun_n  :: TcRef OccSet,
           -- ^ Allows us to choose unique DFun names.
@@ -1434,13 +1440,19 @@ data Ct
        -- Treated as an "insoluble" constraint
        -- See Note [Insoluble constraints]
       cc_ev   :: CtEvidence,
-      cc_occ  :: OccName,   -- The name of this hole
-      cc_hole :: HoleSort   -- The sort of this hole (expr, type, ...)
+      cc_hole :: Hole
     }
 
--- | Used to indicate which sort of hole we have.
-data HoleSort = ExprHole  -- ^ A hole in an expression (TypedHoles)
-              | TypeHole  -- ^ A hole in a type (PartialTypeSignatures)
+-- | An expression or type hole
+data Hole = ExprHole UnboundVar
+            -- ^ Either an out-of-scope variable or a "true" hole in an
+            -- expression (TypedHoles)
+          | TypeHole OccName
+            -- ^ A hole in a type (PartialTypeSignatures)
+
+holeOcc :: Hole -> OccName
+holeOcc (ExprHole uv)  = unboundVarOcc uv
+holeOcc (TypeHole occ) = occ
 
 {-
 Note [Hole constraints]
@@ -1448,7 +1460,7 @@ Note [Hole constraints]
 CHoleCan constraints are used for two kinds of holes,
 distinguished by cc_hole:
 
-  * For holes in expressions
+  * For holes in expressions (including variables not in scope)
     e.g.   f x = g _ x
 
   * For holes in type signatures
@@ -1546,7 +1558,7 @@ instance Outputable Ct where
             | pend_sc   -> text "CDictCan(psc)"
             | otherwise -> text "CDictCan"
          CIrredEvCan {}   -> text "CIrredEvCan"
-         CHoleCan { cc_occ = occ } -> text "CHoleCan:" <+> ppr occ
+         CHoleCan { cc_hole = hole } -> text "CHoleCan:" <+> ppr (holeOcc hole)
 
 {-
 ************************************************************************
@@ -1737,18 +1749,17 @@ isHoleCt (CHoleCan {}) = True
 isHoleCt _ = False
 
 isOutOfScopeCt :: Ct -> Bool
--- A Hole that does not have a leading underscore is
--- simply an out-of-scope variable, and we treat that
--- a bit differently when it comes to error reporting
-isOutOfScopeCt (CHoleCan { cc_occ = occ }) = not (startsWithUnderscore occ)
+-- We treat expression holes representing out-of-scope variables a bit
+-- differently when it comes to error reporting
+isOutOfScopeCt (CHoleCan { cc_hole = ExprHole (OutOfScope {}) }) = True
 isOutOfScopeCt _ = False
 
 isExprHoleCt :: Ct -> Bool
-isExprHoleCt (CHoleCan { cc_hole = ExprHole }) = True
+isExprHoleCt (CHoleCan { cc_hole = ExprHole {} }) = True
 isExprHoleCt _ = False
 
 isTypeHoleCt :: Ct -> Bool
-isTypeHoleCt (CHoleCan { cc_hole = TypeHole }) = True
+isTypeHoleCt (CHoleCan { cc_hole = TypeHole {} }) = True
 isTypeHoleCt _ = False
 
 -- | The following constraints are considered to be a custom type error:
@@ -1946,14 +1957,17 @@ insolubleWC tc_lvl (WC { wc_impl = implics, wc_insol = insols })
   || anyBag insolubleImplic implics
 
 trulyInsoluble :: TcLevel -> Ct -> Bool
--- The constraint is in the wc_insol set,
--- but we do not treat as truly isoluble
---  a) type-holes, arising from PartialTypeSignatures,
---     (except out-of-scope variables masquerading as type-holes)
+-- Constraints in the wc_insol set which ARE NOT
+-- treated as truly insoluble:
+--   a) type holes, arising from PartialTypeSignatures,
+--   b) "true" expression holes arising from TypedHoles
+--
+-- Out-of-scope variables masquerading as expression holes
+-- ARE treated as truly insoluble.
 -- Yuk!
 trulyInsoluble _tc_lvl insol
-  | CHoleCan {} <- insol = isOutOfScopeCt insol
-  | otherwise            = True
+  | isHoleCt insol = isOutOfScopeCt insol
+  | otherwise      = True
 
 instance Outputable WantedConstraints where
   ppr (WC {wc_simple = s, wc_impl = i, wc_insol = n})
@@ -2798,7 +2812,7 @@ ctoHerald = ptext (sLit "arising from")
 -- | Extract a suitable CtOrigin from a HsExpr
 exprCtOrigin :: HsExpr Name -> CtOrigin
 exprCtOrigin (HsVar (L _ name)) = OccurrenceOf name
-exprCtOrigin (HsUnboundVar occ) = UnboundOccurrenceOf occ
+exprCtOrigin (HsUnboundVar uv)  = UnboundOccurrenceOf (unboundVarOcc uv)
 exprCtOrigin (HsRecFld f)       = OccurrenceOfRecSel (rdrNameAmbiguousFieldOcc f)
 exprCtOrigin (HsOverLabel l)    = OverLabelOrigin l
 exprCtOrigin (HsIPVar ip)       = IPOccOrigin ip

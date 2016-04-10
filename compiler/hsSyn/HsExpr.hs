@@ -30,6 +30,7 @@ import CoreSyn
 import Var
 import DynFlags ( gopt, GeneralFlag(Opt_PrintExplicitCoercions) )
 import Name
+import RdrName  ( GlobalRdrEnv )
 import BasicTypes
 import ConLike
 import SrcLoc
@@ -166,17 +167,109 @@ is Less Cool because
     typecheck do-notation with (>>=) :: m1 a -> (a -> m2 b) -> m2 b.)
 -}
 
+-- | An unbound variable; used for treating out-of-scope variables as
+-- expression holes
+data UnboundVar
+  = OutOfScope OccName GlobalRdrEnv  -- ^ An (unqualified) out-of-scope
+                                     -- variable, together with the GlobalRdrEnv
+                                     -- with respect to which it is unbound
+
+                                     -- See Note [OutOfScope and GlobalRdrEnv]
+
+  | TrueExprHole OccName             -- ^ A "true" expression hole (_ or _x)
+
+  deriving (Data, Typeable)
+
+instance Outputable UnboundVar where
+    ppr = ppr . unboundVarOcc
+
+unboundVarOcc :: UnboundVar -> OccName
+unboundVarOcc (OutOfScope occ _) = occ
+unboundVarOcc (TrueExprHole occ) = occ
+
+{-
+Note [OutOfScope and GlobalRdrEnv]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To understand why we bundle a GlobalRdrEnv with an out-of-scope variable,
+consider the following module:
+
+    module A where
+
+    foo :: ()
+    foo = bar
+
+    bat :: [Double]
+    bat = [1.2, 3.4]
+
+    $(return [])
+
+    bar = ()
+    bad = False
+
+When A is compiled, the renamer determines that `bar` is not in scope in the
+declaration of `foo` (since `bar` is declared in the following inter-splice
+group).  Once it has finished typechecking the entire module, the typechecker
+then generates the associated error message, which specifies both the type of
+`bar` and a list of possible in-scope alternatives:
+
+    A.hs:6:7: error:
+        • Variable not in scope: bar :: ()
+        • ‘bar’ (line 13) is not in scope before the splice on line 11
+          Perhaps you meant ‘bat’ (line 9)
+
+When it calls RnEnv.unknownNameSuggestions to identify these alternatives, the
+typechecker must provide a GlobalRdrEnv.  If it provided the current one, which
+contains top-level declarations for the entire module, the error message would
+incorrectly suggest the out-of-scope `bar` and `bad` as possible alternatives
+for `bar` (see Trac #11680).  Instead, the typechecker must use the same
+GlobalRdrEnv the renamer used when it determined that `bar` is out-of-scope.
+
+To obtain this GlobalRdrEnv, can the typechecker simply use the out-of-scope
+`bar`'s location to either reconstruct it (from the current GlobalRdrEnv) or to
+look it up in some global store?  Unfortunately, no.  The problem is that
+location information is not always sufficient for this task.  This is most
+apparent when dealing with the TH function addTopDecls, which adds its
+declarations to the FOLLOWING inter-splice group.  Consider these declarations:
+
+    ex9 = cat               -- cat is NOT in scope here
+
+    $(do -------------------------------------------------------------
+        ds <- [d| f = cab   -- cat and cap are both in scope here
+                  cat = ()
+                |]
+        addTopDecls ds
+        [d| g = cab         -- only cap is in scope here
+            cap = True
+          |])
+
+    ex10 = cat              -- cat is NOT in scope here
+
+    $(return []) -----------------------------------------------------
+
+    ex11 = cat              -- cat is in scope
+
+Here, both occurrences of `cab` are out-of-scope, and so the typechecker needs
+the GlobalRdrEnvs which were used when they were renamed.  These GlobalRdrEnvs
+are different (`cat` is present only in the GlobalRdrEnv for f's `cab'), but the
+locations of the two `cab`s are the same (they are both created in the same
+splice).  Thus, we must include some additional information with each `cab` to
+allow the typechecker to obtain the correct GlobalRdrEnv.  Clearly, the simplest
+information to use is the GlobalRdrEnv itself.
+-}
+
 -- | A Haskell expression.
 data HsExpr id
   = HsVar     (Located id)   -- ^ Variable
 
                              -- See Note [Located RdrNames]
 
-  | HsUnboundVar OccName     -- ^ Unbound variable; also used for "holes" _, or _x.
-                             -- Turned from HsVar to HsUnboundVar by the renamer, when
-                             --   it finds an out-of-scope variable
-                             -- Turned into HsVar by type checker, to support deferred
-                             --   type errors.  (The HsUnboundVar only has an OccName.)
+  | HsUnboundVar UnboundVar  -- ^ Unbound variable; also used for "holes"
+                             --   (_ or _x).
+                             -- Turned from HsVar to HsUnboundVar by the
+                             --   renamer, when it finds an out-of-scope
+                             --   variable or hole.
+                             -- Turned into HsVar by type checker, to support
+                             --   deferred type errors.
 
   | HsRecFld (AmbiguousFieldOcc id) -- ^ Variable pointing to record selector
 
@@ -684,7 +777,7 @@ ppr_lexpr e = ppr_expr (unLoc e)
 
 ppr_expr :: forall id. OutputableBndr id => HsExpr id -> SDoc
 ppr_expr (HsVar (L _ v))  = pprPrefixOcc v
-ppr_expr (HsUnboundVar v) = pprPrefixOcc v
+ppr_expr (HsUnboundVar uv)= pprPrefixOcc (unboundVarOcc uv)
 ppr_expr (HsIPVar v)      = ppr v
 ppr_expr (HsOverLabel l)  = char '#' <> ppr l
 ppr_expr (HsLit lit)      = ppr lit
