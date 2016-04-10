@@ -70,6 +70,9 @@ The highlights, since the 7.10 branch, are:
 
 - Support for Windows XP and earlier has been dropped.
 
+- GHC RTS No longer re-exports POSIX functions under their deprecated
+  names on Windows.
+
 Full details
 ------------
 
@@ -444,6 +447,12 @@ Runtime system
 - :rts-flag:`-maxN⟨x⟩ <-maxN>` flag added to complement :rts-flag:`-N`. It will
   choose to use at most ⟨x⟩ capabilities, limited by the number of processors
   as :rts-flag:`-N` is.
+
+- The runtime linker is no longer greedy and will load only the needed objects
+  from archives. This means particularly on Windows packages requiring e.g. C99
+  support will now function properly. As part of this the RTS on Windows
+  no longer re-exports deprecated posix functions under the undeprecated names
+  (see :ghc-ticket:`11223`).
 
 Build system
 ~~~~~~~~~~~~
