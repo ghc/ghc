@@ -16,6 +16,8 @@
 #include <dwarf.h>
 #include <unistd.h>
 
+const int max_backtrace_depth = 5000;
+
 static BacktraceChunk *backtraceAllocChunk(BacktraceChunk *next) {
     BacktraceChunk *chunk = stgMallocBytes(sizeof(BacktraceChunk),
                                            "backtraceAllocChunk");
@@ -57,7 +59,10 @@ void backtraceFree(Backtrace *bt) {
 
 struct LibdwSession_ {
     Dwfl *dwfl;
-    Backtrace *cur_bt; // The current backtrace we are collecting (if any)
+
+    // The current backtrace we are collecting (if any)
+    Backtrace *cur_bt;
+    int max_depth;
 };
 
 static const Dwfl_Thread_Callbacks thread_cbs;
@@ -230,8 +235,12 @@ static int getBacktraceFrameCb(Dwfl_Frame *frame, void *arg) {
             pc -= 1; // TODO: is this right?
         backtracePush(session->cur_bt, (StgPtr) (uintptr_t) pc);
     }
-
-    return DWARF_CB_OK;
+    session->max_depth--;
+    if (session->max_depth == 0) {
+        return DWARF_CB_ABORT;
+    } else {
+        return DWARF_CB_OK;
+    }
 }
 
 Backtrace *libdwGetBacktrace(LibdwSession *session) {
@@ -242,6 +251,7 @@ Backtrace *libdwGetBacktrace(LibdwSession *session) {
 
     Backtrace *bt = backtraceAlloc();
     session->cur_bt = bt;
+    session->max_depth = max_backtrace_depth;
 
     int pid = getpid();
     int ret = dwfl_getthread_frames(session->dwfl, pid,
