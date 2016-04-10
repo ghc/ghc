@@ -1576,7 +1576,7 @@ static rtsBool read_heap_profiling_flag(const char *arg_in)
     // However, for sanity we want to guarantee const-correctness and parsing
     // really ought to be an immutable operation. To avoid rewriting the parser
     // we just operate on a temporary copy of the argument.
-    const char *arg = strdup(arg_in);
+    char *arg = strdup(arg_in);
     rtsBool error = rtsFalse;
     switch (arg[2]) {
     case '\0':
