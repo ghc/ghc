@@ -56,6 +56,8 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Exception
 import Data.IORef
 import Control.Monad
+import Data.Set ( Set )
+import qualified Data.Set as Set
 
 #ifdef GHCI
 import qualified Data.Map as Map
@@ -87,6 +89,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
         used_gre_var <- newIORef [] ;
         th_var       <- newIORef False ;
         th_splice_var<- newIORef False ;
+        th_locs_var  <- newIORef Set.empty ;
         infer_var    <- newIORef (True, emptyBag) ;
         lie_var      <- newIORef emptyWC ;
         dfun_n_var   <- newIORef emptyOccSet ;
@@ -137,6 +140,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_ann_env        = emptyAnnEnv,
                 tcg_th_used        = th_var,
                 tcg_th_splice_used = th_splice_var,
+                tcg_th_top_level_locs
+                                   = th_locs_var,
                 tcg_exports        = [],
                 tcg_imports        = emptyImportAvails,
                 tcg_used_gres     = used_gre_var,
@@ -1345,8 +1350,7 @@ emitWildCardHoleConstraints wcs
              ty     = mkTyVarTy tv
              can    = CHoleCan { cc_ev   = CtDerived { ctev_pred = ty
                                                      , ctev_loc  = ctLoc' }
-                               , cc_occ  = occName name
-                               , cc_hole = TypeHole }
+                               , cc_hole = TypeHole (occName name) }
        ; emitInsoluble can } }
 
 {-
@@ -1362,6 +1366,22 @@ recordThUse = do { env <- getGblEnv; writeTcRef (tcg_th_used env) True }
 
 recordThSpliceUse :: TcM ()
 recordThSpliceUse = do { env <- getGblEnv; writeTcRef (tcg_th_splice_used env) True }
+
+-- | When generating an out-of-scope error message for a variable matching a
+-- binding in a later inter-splice group, the typechecker uses the splice
+-- locations to provide details in the message about the scope of that binding.
+recordTopLevelSpliceLoc :: SrcSpan -> TcM ()
+recordTopLevelSpliceLoc (RealSrcSpan real_loc)
+  = do { env <- getGblEnv
+       ; let locs_var = tcg_th_top_level_locs env
+       ; locs0 <- readTcRef locs_var
+       ; writeTcRef locs_var (Set.insert real_loc locs0) }
+recordTopLevelSpliceLoc (UnhelpfulSpan _) = return ()
+
+getTopLevelSpliceLocs :: TcM (Set RealSrcSpan)
+getTopLevelSpliceLocs
+  = do { env <- getGblEnv
+       ; readTcRef (tcg_th_top_level_locs env) }
 
 keepAlive :: Name -> TcRn ()     -- Record the name in the keep-alive set
 keepAlive name
