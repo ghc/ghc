@@ -324,11 +324,7 @@ INLINE_HEADER TaskId serialiseTaskId (OSThreadId taskID) {
 // Get a serialisable Id for the Task's OS thread
 // Needed mainly for logging since the OSThreadId is an opaque type
 INLINE_HEADER TaskId
-serialisableTaskId (Task *task
-#if !defined(THREADED_RTS)
-                               STG_UNUSED
-#endif
-                                         )
+serialisableTaskId (Task *task)
 {
 #if defined(THREADED_RTS)
     return serialiseTaskId(task->id);
