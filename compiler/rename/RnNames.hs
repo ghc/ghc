@@ -685,13 +685,20 @@ getLocalNonValBinders fixity_env
 
 newRecordSelector :: Bool -> [Name] -> LFieldOcc RdrName -> RnM FieldLabel
 newRecordSelector _ [] _ = error "newRecordSelector: datatype has no constructors!"
-newRecordSelector overload_ok (dc:_) (L loc (FieldOcc (L _ fld) _)) =
-  do { sel_name <- newTopSrcBinder $ L loc $ mkRdrUnqual sel_occ
-     ; return $ fl { flSelector = sel_name } }
+newRecordSelector overload_ok (dc:_) (L loc (FieldOcc (L _ fld) _))
+  = do { selName <- newTopSrcBinder $ L loc $ field
+       ; return $ qualFieldLbl { flSelector = selName } }
   where
-    lbl     = occNameFS $ rdrNameOcc fld
-    fl      = mkFieldLabelOccs lbl (nameOccName dc) overload_ok
-    sel_occ = flSelector fl
+    fieldOccName = occNameFS $ rdrNameOcc fld
+    qualFieldLbl = mkFieldLabelOccs fieldOccName (nameOccName dc) overload_ok
+    field | isExact fld = fld
+              -- use an Exact RdrName as is to preserve the bindings
+              -- of an already renamer-resolved field and its use
+              -- sites. This is needed to correctly support record
+              -- selectors in Template Haskell. See Note [Binders in
+              -- Template Haskell] in Convert.hs and Note [Looking up
+              -- Exact RdrNames] in RnEnv.hs.
+          | otherwise   = mkRdrUnqual (flSelector qualFieldLbl)
 
 {-
 Note [Looking up family names in family instances]

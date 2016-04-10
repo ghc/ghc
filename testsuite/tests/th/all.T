@@ -391,9 +391,9 @@ test('T10819',
 test('T10820', normal, compile_and_run, ['-v0'])
 test('T11341', normal, compile, ['-v0 -dsuppress-uniques'])
 test('T11345', normal, compile_and_run, ['-v0 -dsuppress-uniques'])
-
 test('TH_finalizer', normal, compile, ['-v0'])
 test('T10603', normal, compile, ['-ddump-splices -dsuppress-uniques'])
 test('T11452', normal, compile_fail, ['-v0'])
 test('T9022', normal, compile_and_run, ['-v0'])
 test('T11145', normal, compile_fail, ['-v0 -dsuppress-uniques'])
+test('T11809', normal, compile, ['-v0'])
