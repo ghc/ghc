@@ -705,6 +705,55 @@ an instance   $df :: forall (x:*->*). Functor x => Functor (P * (x:*->*))
 and similarly for C.  Notice the modified kind of x, both at binding
 and occurrence sites.
 
+This can lead to some surprising results when *visible* kind binder is
+unified (in contrast to the above examples, in which only non-visible kind
+binders were considered). Consider this example from Trac #11732:
+
+    data T k (a :: k) = MkT deriving Functor
+
+Since unification yields k:=*, this results in a generated instance of:
+
+    instance Functor (T *) where ...
+
+which looks odd at first glance, since one might expect the instance head
+to be of the form Functor (T k). Indeed, one could envision an alternative
+generated instance of:
+
+    instance (k ~ *) => Functor (T k) where
+
+But this does not typecheck as the result of a -XTypeInType design decision:
+kind equalities are not allowed to be bound in types, only terms. But in
+essence, the two instance declarations are entirely equivalent, since even
+though (T k) matches any kind k, the only possibly value for k is *, since
+anything else is ill-typed. As a result, we can just as comfortably use (T *).
+
+Another way of thinking about is: deriving clauses often infer constraints.
+For example:
+
+    data S a = S a deriving Eq
+
+infers an (Eq a) constraint in the derived instance. By analogy, when we
+are deriving Functor, we might infer an equality constraint (e.g., k ~ *).
+The only distinction is that GHC instantiates equality constraints directly
+during the deriving process.
+
+Another quirk of this design choice manifests when typeclasses have visible
+kind parameters. Consider this code (also from Trac #11732):
+
+    class Cat k (cat :: k -> k -> *) where
+      catId   :: cat a a
+      catComp :: cat b c -> cat a b -> cat a c
+
+    instance Cat * (->) where
+      catId   = id
+      catComp = (.)
+
+    newtype Fun a b = Fun (a -> b) deriving (Cat k)
+
+Even though we requested an derived instance of the form (Cat k Fun), the
+kind unification will actually generate (Cat * Fun) (i.e., the same thing as if
+the user wrote deriving (Cat *)).
+
 Note [Eta-reducing type synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 One can instantiate a type in a data family instance with a type synonym that
@@ -857,7 +906,7 @@ mkDataTypeEqn :: DynFlags
 
 mkDataTypeEqn dflags overlap_mode tvs cls cls_tys
               tycon tc_args rep_tc rep_tc_args mtheta
-  = case checkSideConditions dflags mtheta cls cls_tys rep_tc rep_tc_args of
+  = case checkSideConditions dflags mtheta cls cls_tys rep_tc of
         -- NB: pass the *representation* tycon to checkSideConditions
         NonDerivableClass   msg -> bale_out (nonStdErr cls $$ msg)
         DerivableClassError msg -> bale_out msg
@@ -1098,11 +1147,11 @@ data DerivStatus = CanDerive                 -- Standard class, can derive
 -- to generate code for, such as Eq, Ord, Ix, etc.
 
 checkSideConditions :: DynFlags -> DerivContext -> Class -> [TcType]
-                    -> TyCon -> [Type] -- tycon and its parameters
+                    -> TyCon -- tycon
                     -> DerivStatus
-checkSideConditions dflags mtheta cls cls_tys rep_tc rep_tc_args
+checkSideConditions dflags mtheta cls cls_tys rep_tc
   | Just cond <- sideConditions mtheta cls
-  = case (cond (dflags, rep_tc, rep_tc_args)) of
+  = case (cond (dflags, rep_tc)) of
         NotValid err -> DerivableClassError err  -- Class-specific error
         IsValid  | null cls_tys -> CanDerive     -- All derivable classes are unary, so
                                                  -- cls_tys (the type args other than last)
@@ -1189,11 +1238,8 @@ canDeriveAnyClass dflags _tycon clas
 typeToTypeKind :: Kind
 typeToTypeKind = liftedTypeKind `mkFunTy` liftedTypeKind
 
-type Condition = (DynFlags, TyCon, [Type]) -> Validity
-        -- first Bool is whether or not we are allowed to derive Data and Typeable
-        -- second Bool is whether or not we are allowed to derive Functor
+type Condition = (DynFlags, TyCon) -> Validity
         -- TyCon is the *representation* tycon if the data type is an indexed one
-        -- [Type] are the type arguments to the (representation) TyCon
         -- Nothing => OK
 
 orCond :: Condition -> Condition -> Condition
@@ -1216,7 +1262,7 @@ cond_stdOK (Just _) _ _
   = IsValid     -- Don't check these conservative conditions for
                 -- standalone deriving; just generate the code
                 -- and let the typechecker handle the result
-cond_stdOK Nothing permissive (_, rep_tc, _)
+cond_stdOK Nothing permissive (_, rep_tc)
   | null data_cons
   , not permissive      = NotValid (no_cons_why rep_tc $$ suggestion)
   | not (null con_whys) = NotValid (vcat con_whys $$ suggestion)
@@ -1240,10 +1286,10 @@ no_cons_why rep_tc = quotes (pprSourceTyCon rep_tc) <+>
                      text "must have at least one data constructor"
 
 cond_RepresentableOk :: Condition
-cond_RepresentableOk (dflags, tc, tc_args) = canDoGenerics dflags tc tc_args
+cond_RepresentableOk (_, tc) = canDoGenerics tc
 
 cond_Representable1Ok :: Condition
-cond_Representable1Ok (dflags, tc, tc_args) = canDoGenerics1 dflags tc tc_args
+cond_Representable1Ok (_, tc) = canDoGenerics1 tc
 
 cond_enumOrProduct :: Class -> Condition
 cond_enumOrProduct cls = cond_isEnumeration `orCond`
@@ -1252,7 +1298,7 @@ cond_enumOrProduct cls = cond_isEnumeration `orCond`
 cond_args :: Class -> Condition
 -- For some classes (eg Eq, Ord) we allow unlifted arg types
 -- by generating specialised code.  For others (eg Data) we don't.
-cond_args cls (_, tc, _)
+cond_args cls (_, tc)
   = case bad_args of
       []     -> IsValid
       (ty:_) -> NotValid (hang (text "Don't know how to derive" <+> quotes (ppr cls))
@@ -1276,7 +1322,7 @@ cond_args cls (_, tc, _)
 
 
 cond_isEnumeration :: Condition
-cond_isEnumeration (_, rep_tc, _)
+cond_isEnumeration (_, rep_tc)
   | isEnumerationTyCon rep_tc = IsValid
   | otherwise                 = NotValid why
   where
@@ -1286,7 +1332,7 @@ cond_isEnumeration (_, rep_tc, _)
                   -- See Note [Enumeration types] in TyCon
 
 cond_isProduct :: Condition
-cond_isProduct (_, rep_tc, _)
+cond_isProduct (_, rep_tc)
   | isProductTyCon rep_tc = IsValid
   | otherwise             = NotValid why
   where
@@ -1300,7 +1346,7 @@ cond_functorOK :: Bool -> Bool -> Condition
 --            (c) don't use argument in the wrong place, e.g. data T a = T (X a a)
 --            (d) optionally: don't use function types
 --            (e) no "stupid context" on data type
-cond_functorOK allowFunctions allowExQuantifiedLastTyVar (_, rep_tc, _)
+cond_functorOK allowFunctions allowExQuantifiedLastTyVar (_, rep_tc)
   | null tc_tvs
   = NotValid (text "Data type" <+> quotes (ppr rep_tc)
               <+> text "must have some type parameters")
@@ -1348,7 +1394,7 @@ cond_functorOK allowFunctions allowExQuantifiedLastTyVar (_, rep_tc, _)
     wrong_arg   = text "must use the type variable only as the last argument of a data type"
 
 checkFlag :: LangExt.Extension -> Condition
-checkFlag flag (dflags, _, _)
+checkFlag flag (dflags, _)
   | xopt flag dflags = IsValid
   | otherwise        = NotValid why
   where
@@ -1443,7 +1489,6 @@ Here there *is* no argument field, but we must nevertheless generate
 a context for the Data instances:
         instance Typable a => Data (T a) where ...
 
-
 ************************************************************************
 *                                                                      *
                 Deriving newtypes
@@ -1482,7 +1527,7 @@ mkNewTypeEqn dflags overlap_mode tvs
             , ds_overlap = overlap_mode
             , ds_newtype = Just rep_inst_ty }
   | otherwise
-  = case checkSideConditions dflags mtheta cls cls_tys rep_tycon rep_tc_args of
+  = case checkSideConditions dflags mtheta cls cls_tys rep_tycon of
       -- Error with standard class
       DerivableClassError msg
         | might_derive_via_coercible -> bale_out (msg $$ suggest_gnd)
@@ -2088,7 +2133,10 @@ genDerivStuff loc clas dfun_name tycon inst_tys tyvars
   = let gk = if ck == genClassKey then Gen0 else Gen1
         -- TODO NSF: correctly identify when we're building Both instead of One
     in do
-      (binds, faminst) <- gen_Generic_binds gk tycon (nameModule dfun_name)
+      let inst_ty = ASSERT(not $ null inst_tys)
+                          head inst_tys
+      (binds, faminst) <- gen_Generic_binds gk tycon inst_ty
+                                            (nameModule dfun_name)
       return (binds, unitBag (DerivFamInst faminst))
 
   -- Not deriving Generic(1), so we first check if the compiler has built-in

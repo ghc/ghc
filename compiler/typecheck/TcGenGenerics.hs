@@ -18,7 +18,6 @@ import Type
 import TcType
 import TcGenDeriv
 import DataCon
-import DynFlags    ( DynFlags, GeneralFlag(Opt_PrintExplicitKinds), gopt )
 import TyCon
 import FamInstEnv       ( FamInst, FamFlavor(..), mkSingleCoAxiom )
 import FamInst
@@ -37,7 +36,8 @@ import HscTypes
 import ErrUtils( Validity(..), andValid )
 import SrcLoc
 import Bag
-import VarSet (elemVarSet)
+import VarEnv
+import VarSet (elemVarSet, partitionVarSet)
 import Outputable
 import FastString
 import Util
@@ -63,10 +63,10 @@ For the generic representation we need to generate:
 \end{itemize}
 -}
 
-gen_Generic_binds :: GenericKind -> TyCon -> Module
+gen_Generic_binds :: GenericKind -> TyCon -> Type -> Module
                  -> TcM (LHsBinds RdrName, FamInst)
-gen_Generic_binds gk tc mod = do
-  repTyInsts <- tc_mkRepFamInsts gk tc mod
+gen_Generic_binds gk tc inst_ty mod = do
+  repTyInsts <- tc_mkRepFamInsts gk tc inst_ty mod
   return (mkBindsRep gk tc, repTyInsts)
 
 {-
@@ -96,31 +96,31 @@ expressions.
 (Generic T) and (Rep T) are derivable for some type expression T if the
 following constraints are satisfied.
 
-  (a) T = (D v1 ... vn) with free variables v1, v2, ..., vn where n >= 0 v1
-      ... vn are distinct type variables. Cf #5939.
-
-  (b) D is a type constructor *value*. In other words, D is either a type
+  (a) D is a type constructor *value*. In other words, D is either a type
       constructor or it is equivalent to the head of a data family instance (up to
       alpha-renaming).
 
-  (c) D cannot have a "stupid context".
+  (b) D cannot have a "stupid context".
 
-  (d) The right-hand side of D cannot include unboxed types, existential types,
-      or universally quantified types.
+  (c) The right-hand side of D cannot include existential types, universally
+      quantified types, or "exotic" unlifted types. An exotic unlifted type
+      is one which is not listed in the definition of allowedUnliftedTy
+      (i.e., one for which we have no representation type).
+      See Note [Generics and unlifted types]
 
-  (e) T :: *.
+  (d) T :: *.
 
 (Generic1 T) and (Rep1 T) are derivable for some type expression T if the
 following constraints are satisfied.
 
-  (a),(b),(c),(d) As above.
+  (a),(b),(c) As above.
 
-  (f) T must expect arguments, and its last parameter must have kind *.
+  (d) T must expect arguments, and its last parameter must have kind *.
 
       We use `a' to denote the parameter of D that corresponds to the last
       parameter of T.
 
-  (g) For any type-level application (Tfun Targ) in the right-hand side of D
+  (e) For any type-level application (Tfun Targ) in the right-hand side of D
       where the head of Tfun is not a tuple constructor:
 
       (b1) `a' must not occur in Tfun.
@@ -129,51 +129,31 @@ following constraints are satisfied.
 
 -}
 
-canDoGenerics :: DynFlags -> TyCon -> [Type] -> Validity
--- canDoGenerics rep_tc tc_args determines if Generic/Rep can be derived for a
--- type expression (rep_tc tc_arg0 tc_arg1 ... tc_argn).
+canDoGenerics :: TyCon -> Validity
+-- canDoGenerics determines if Generic/Rep can be derived.
 --
--- Check (b) from Note [Requirements for deriving Generic and Rep] is taken
+-- Check (a) from Note [Requirements for deriving Generic and Rep] is taken
 -- care of because canDoGenerics is applied to rep tycons.
 --
 -- It returns Nothing if deriving is possible. It returns (Just reason) if not.
-canDoGenerics dflags tc tc_args
+canDoGenerics tc
   = mergeErrors (
-          -- Check (c) from Note [Requirements for deriving Generic and Rep].
+          -- Check (b) from Note [Requirements for deriving Generic and Rep].
               (if (not (null (tyConStupidTheta tc)))
                 then (NotValid (tc_name <+> text "must not have a datatype context"))
-                else IsValid) :
-          -- Check (a) from Note [Requirements for deriving Generic and Rep].
-          --
-          -- Data family indices can be instantiated; the `tc_args` here are
-          -- the representation tycon args
-          --
-          -- NB: Use user_tc here. In the case of a data *instance*, the
-          -- user_tc is the family tc, which has the right visibility settings.
-          -- (For a normal datatype, user_tc == tc.) Getting this wrong
-          -- led to #11357.
-              (if (all isTyVarTy (filterOutInvisibleTypes user_tc tc_args))
-                then IsValid
-                else NotValid (tc_name <+> text "must not be instantiated;" <+>
-                               text "try deriving `" <> tc_name <+> tc_tys <>
-                               text "' instead"))
+                else IsValid)
           -- See comment below
             : (map bad_con (tyConDataCons tc)))
   where
     -- The tc can be a representation tycon. When we want to display it to the
     -- user (in an error message) we should print its parent
-    (user_tc, tc_name, tc_tys) = case tyConFamInst_maybe tc of
-        Just (ptc, tys) -> (ptc, ppr ptc, hsep (map ppr (filter_kinds $ tys ++ drop (length tys) tc_args)))
-        _               -> (tc, ppr tc, hsep (map ppr (filter_kinds $ mkTyVarTys $ tyConTyVars tc)))
+    tc_name = ppr $ case tyConFamInst_maybe tc of
+        Just (ptc, _) -> ptc
+        _             -> tc
 
-    filter_kinds | gopt Opt_PrintExplicitKinds dflags
-                 = id
-                 | otherwise
-                 = filterOutInvisibleTypes user_tc
-
-        -- Check (d) from Note [Requirements for deriving Generic and Rep].
+        -- Check (c) from Note [Requirements for deriving Generic and Rep].
         --
-        -- If any of the constructors has an unboxed type as argument,
+        -- If any of the constructors has an exotic unlifted type as argument,
         -- then we can't build the embedding-projection pair, because
         -- it relies on instantiating *polymorphic* sum and product types
         -- at the argument types of the constructors
@@ -189,6 +169,10 @@ canDoGenerics dflags tc tc_args
     bad_arg_type ty = (isUnliftedType ty && not (allowedUnliftedTy ty))
                       || not (isTauTy ty)
 
+-- Returns True the Type argument is an unlifted type which has a
+-- corresponding generic representation type. For example,
+-- (allowedUnliftedTy Int#) would return True since there is the UInt
+-- representation type.
 allowedUnliftedTy :: Type -> Bool
 allowedUnliftedTy = isJust . unboxedRepRDRs
 
@@ -232,19 +216,18 @@ explicitly, even though foldDataConArgs is also doing this internally.
 
 -}
 
--- canDoGenerics1 rep_tc tc_args determines if a Generic1/Rep1 can be derived
--- for a type expression (rep_tc tc_arg0 tc_arg1 ... tc_argn).
+-- canDoGenerics1 determines if a Generic1/Rep1 can be derived.
 --
--- Checks (a) through (d) from Note [Requirements for deriving Generic and Rep]
+-- Checks (a) through (c) from Note [Requirements for deriving Generic and Rep]
 -- are taken care of by the call to canDoGenerics.
 --
 -- It returns Nothing if deriving is possible. It returns (Just reason) if not.
-canDoGenerics1 :: DynFlags -> TyCon -> [Type] -> Validity
-canDoGenerics1 dflags rep_tc tc_args =
-  canDoGenerics dflags rep_tc tc_args `andValid` additionalChecks
+canDoGenerics1 :: TyCon -> Validity
+canDoGenerics1 rep_tc =
+  canDoGenerics rep_tc `andValid` additionalChecks
   where
     additionalChecks
-        -- check (f) from Note [Requirements for deriving Generic and Rep]
+        -- check (d) from Note [Requirements for deriving Generic and Rep]
       | null (tyConTyVars rep_tc) = NotValid $
           text "Data type" <+> quotes (ppr rep_tc)
       <+> text "must have some type parameters"
@@ -267,7 +250,8 @@ canDoGenerics1 dflags rep_tc tc_args =
     bmbad con s = CCDG1 True $ NotValid $ bad con s
     bmplus (CCDG1 b1 m1) (CCDG1 b2 m2) = CCDG1 (b1 || b2) (m1 `andValid` m2)
 
-    -- check (g) from Note [degenerate use of FFoldType]
+    -- check (e) from Note [Requirements for deriving Generic and Rep]
+    -- See also Note [degenerate use of FFoldType]
     ft_check :: DataCon -> FFoldType Check_for_CanDoGenerics1
     ft_check con = FT
       { ft_triv = bmzero
@@ -365,9 +349,11 @@ mkBindsRep gk tycon =
 
 tc_mkRepFamInsts :: GenericKind     -- Gen0 or Gen1
                -> TyCon           -- The type to generate representation for
+               -> Type            -- The above TyCon applied to its type
+                                  -- arguments in the generated instance
                -> Module          -- Used as the location of the new RepTy
                -> TcM (FamInst)   -- Generated representation0 coercion
-tc_mkRepFamInsts gk tycon mod =
+tc_mkRepFamInsts gk tycon inst_ty mod =
        -- Consider the example input tycon `D`, where data D a b = D_ a
        -- Also consider `R:DInt`, where { data family D x y :: * -> *
        --                               ; data instance D Int a b = D_ a }
@@ -376,28 +362,22 @@ tc_mkRepFamInsts gk tycon mod =
          Gen0 -> tcLookupTyCon repTyConName
          Gen1 -> tcLookupTyCon rep1TyConName
 
+     ; fam_envs <- tcGetFamInstEnvs
+
+     ; let mbFamInst         = tyConFamInst_maybe tycon
+           -- If we're examining a data family instance, we grab the parent
+           -- TyCon (ptc) and use it to determine the type arguments
+           -- (inst_args) for the data family *instance*'s type variables.
+           ptc               = maybe tycon fst mbFamInst
+           (_, inst_args, _) = tcLookupDataFamInst fam_envs ptc $ snd
+                                 $ tcSplitTyConApp inst_ty
+
      ; let -- `tyvars` = [a,b]
            (tyvars, gk_) = case gk of
              Gen0 -> (all_tyvars, Gen0_)
              Gen1 -> ASSERT(not $ null all_tyvars)
                      (init all_tyvars, Gen1_ $ last all_tyvars)
              where all_tyvars = tyConTyVars tycon
-
-           tyvar_args = mkTyVarTys tyvars
-
-           appT :: [Type]
-           appT = case tyConFamInst_maybe tycon of
-                     -- `appT` = D Int a b (data families case)
-                     Just (famtycon, apps) ->
-                       -- `fam` = D
-                       -- `apps` = [Int, a, b]
-                       let allApps = case gk of
-                                       Gen0 -> apps
-                                       Gen1 -> ASSERT(not $ null apps)
-                                               init apps
-                       in [mkTyConApp famtycon allApps]
-                     -- `appT` = D a b (normal case)
-                     Nothing -> [mkTyConApp tycon tyvar_args]
 
        -- `repTy` = D1 ... (C1 ... (S1 ... (Rec0 a))) :: * -> *
      ; repTy <- tc_mkRepTy gk_ tycon
@@ -407,7 +387,21 @@ tc_mkRepFamInsts gk tycon mod =
                    in newGlobalBinder mod (mkGen (nameOccName (tyConName tycon)))
                         (nameSrcSpan (tyConName tycon))
 
-     ; let axiom = mkSingleCoAxiom Nominal rep_name tyvars [] fam_tc appT repTy
+       -- We make sure to substitute the tyvars with their user-supplied
+       -- type arguments before generating the Rep/Rep1 instance, since some
+       -- of the tyvars might have been instantiated when deriving.
+       -- See Note [Generating a correctly typed Rep instance].
+     ; let env      = zipTyEnv tyvars inst_args
+           in_scope = mkInScopeSet (tyCoVarsOfType inst_ty)
+           subst    = mkTvSubst in_scope env
+           repTy'   = substTy  subst repTy
+           tcv_set' = tyCoVarsOfType inst_ty
+           (tv_set', cv_set') = partitionVarSet isTyVar tcv_set'
+           tvs'     = varSetElemsWellScoped tv_set'
+           cvs'     = varSetElemsWellScoped cv_set'
+           axiom    = mkSingleCoAxiom Nominal rep_name tvs' cvs'
+                                      fam_tc [inst_ty] repTy'
+
      ; newFamInst SynFamilyInst axiom  }
 
 --------------------------------------------------------------------------------
@@ -835,4 +829,42 @@ data family instance; if so, we generate that instead.
 
 See wiki:Commentary/Compiler/GenericDeriving#Handlingunliftedtypes for more
 details on why URec is implemented the way it is.
+
+Note [Generating a correctly typed Rep instance]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tc_mkRepTy derives the RHS of the Rep(1) type family instance when deriving
+Generic(1). That is, it derives the ellipsis in the following:
+
+    instance Generic Foo where
+      type Rep Foo = ...
+
+However, tc_mkRepTy only has knowledge of the *TyCon* of the type for which
+a Generic(1) instance is being derived, not the fully instantiated type. As a
+result, tc_mkRepTy builds the most generalized Rep(1) instance possible using
+the type variables it learns from the TyCon (i.e., it uses tyConTyVars). This
+can cause problems when the instance has instantiated type variables
+(see Trac #11732). As an example:
+
+    data T a = MkT a
+    deriving instance Generic (T Int)
+    ==>
+    instance Generic (T Int) where
+      type Rep (T Int) = (... (Rec0 a)) -- wrong!
+
+-XStandaloneDeriving is one way for the type variables to become instantiated.
+Another way is when Generic1 is being derived for a datatype with a visible
+kind binder, e.g.,
+
+   data P k (a :: k) = MkP k deriving Generic1
+   ==>
+   instance Generic1 (P *) where
+     type Rep1 (P *) = (... (Rec0 k)) -- wrong!
+
+See Note [Unify kinds in deriving] in TcDeriv.
+
+In any such scenario, we must prevent a discrepancy between the LHS and RHS of
+a Rep(1) instance. To do so, we create a type variable substitution that maps
+the tyConTyVars of the TyCon to their counterparts in the fully instantiated
+type. (For example, using T above as example, you'd map a :-> Int.) We then
+apply the substitution to the RHS before generating the instance.
 -}

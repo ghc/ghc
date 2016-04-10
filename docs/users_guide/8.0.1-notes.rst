@@ -83,7 +83,7 @@ Language
    kinds, along with kind families and type-level GADTs. Support is still
    experimental, and it is expected to improve over the next several
    releases. See :ref:`type-in-type` for the details.
-   
+
 -  The parser now supports Haddock comments on GADT data constructors.
    For example ::
 
@@ -327,6 +327,13 @@ Compiler
 
 -  :ghc-flag:`-ddump-strsigs` has been renamed to
    :ghc-flag:`-ddump-str-signatures`.
+
+-  :ghc-flag:`-XDeriveGeneric` is now less picky about instantiating type
+   arguments when deriving (:ghc-ticket:`11732`). As a consequence, the
+   following code is now legal (whereas before it would have been rejected). ::
+
+     data T a b = T a b
+     deriving instance Generic (T Int b)
 
 GHCi
 ~~~~
