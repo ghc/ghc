@@ -299,7 +299,7 @@ INLINE int
 __hscore_setmode( int fd, HsBool toBin )
 {
 #if defined(_WIN32)
-  return setmode(fd,(toBin == HS_BOOL_TRUE) ? _O_BINARY : _O_TEXT);
+  return _setmode(fd,(toBin == HS_BOOL_TRUE) ? _O_BINARY : _O_TEXT);
 #else
   return 0;
 #endif
