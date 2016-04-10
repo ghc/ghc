@@ -1,8 +1,12 @@
 -- (c) The University of Glasgow 2006
 
 {-# LANGUAGE CPP #-}
- -- This module used to take 10GB of memory to compile with the new
- -- (Nov '15) pattern-match checker.
+
+-- The default iteration limit is a bit too low for the definitions
+-- in this module.
+#if __GLASGOW_HASKELL__ >= 800
+{-# OPTIONS_GHC -fmax-pmcheck-iterations=10000000 #-}
+#endif
 
 module OptCoercion ( optCoercion, checkAxInstCo ) where
 
