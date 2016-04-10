@@ -8,8 +8,6 @@ matrix:
               apt:
                   packages:
                       - ghc-7.10.3
-                      - alex-3.1.4
-                      - happy-1.19.5
                       - cabal-install-1.22
                       - zlib1g-dev
                   sources: hvr-ghc
@@ -19,6 +17,7 @@ matrix:
               - PATH="$HOME/.cabal/bin:$PATH"
               - export PATH
               - cabal update
+              - cabal install alex happy
 
         - os: osx
           env: TARGET=utils/ghc-pkg/stage1/build/tmp/ghc-pkg
