@@ -10,7 +10,9 @@
 #
 # -----------------------------------------------------------------------------
 
+ifeq "$$(BUILD_SPHINX_HTML)" "YES"
 INSTALL_HTML_DOC_DIRS += utils/haddock/doc/haddock
+endif
 
 html : html_utils/haddock/doc
 
