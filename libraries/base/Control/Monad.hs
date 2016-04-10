@@ -104,7 +104,12 @@ infixr 1 <=<, >=>
 (>=>)       :: Monad m => (a -> m b) -> (b -> m c) -> (a -> m c)
 f >=> g     = \x -> f x >>= g
 
--- | Right-to-left Kleisli composition of monads. @('>=>')@, with the arguments flipped
+-- | Right-to-left Kleisli composition of monads. @('>=>')@, with the arguments flipped.
+--
+-- Note how this operator resembles function composition @('.')@:
+--
+-- > (.)   ::            (b ->   c) -> (a ->   b) -> a ->   c
+-- > (<=<) :: Monad m => (b -> m c) -> (a -> m b) -> a -> m c
 (<=<)       :: Monad m => (b -> m c) -> (a -> m b) -> (a -> m c)
 (<=<)       = flip (>=>)
 
