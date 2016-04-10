@@ -30,6 +30,7 @@ module TcHsSyn (
         emptyZonkEnv, mkEmptyZonkEnv,
         zonkTcTypeToType, zonkTcTypeToTypes, zonkTyVarOcc,
         zonkCoToCo, zonkTcKindToKind,
+        zonkEvBinds,
 
         -- * Validity checking
         checkForRepresentationPolymorphism
