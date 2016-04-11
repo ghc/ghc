@@ -413,11 +413,7 @@ markWeakPtrList ( void )
 
             evacuate((StgClosure **)last_w);
             w = *last_w;
-            if (w->header.info == &stg_DEAD_WEAK_info) {
-                last_w = &(w->link);
-            } else {
-                last_w = &(w->link);
-            }
+            last_w = &(w->link);
         }
     }
 }
