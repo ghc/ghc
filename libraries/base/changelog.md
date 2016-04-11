@@ -131,9 +131,9 @@
 
   * `Identity` now has `Semigroup` and `Monoid` instances
 
-  * `Identity` and `Const` now have `Bounded`, `Enum` and `Ix` instances
-
-  * `Identity` and `Const` now have `Storable` instances
+  * `Identity` and `Const` now have `Bits`, `Bounded`, `Enum`, `FiniteBits`,
+    `Floating`, `Fractional`, `Integral`, `IsString`, `Ix`, `Num`, `Real`,
+    `RealFloat`, `RealFrac` and `Storable` instances. (#11210, #11790)
 
   * `()` now has a `Storable` instance
 
