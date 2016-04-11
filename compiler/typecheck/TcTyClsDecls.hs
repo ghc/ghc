@@ -1070,12 +1070,16 @@ proper tcMatchTys here.)  -}
 
 -------------------------
 kcTyFamInstEqn :: FamTyConShape -> LTyFamInstEqn Name -> TcM ()
-kcTyFamInstEqn fam_tc_shape
-    (L loc (TyFamEqn { tfe_pats = pats, tfe_rhs = hs_ty }))
+kcTyFamInstEqn fam_tc_shape@(fam_tc_name,_,_,_)
+    (L loc (TyFamEqn { tfe_tycon = L _ eqn_tc_name
+                     , tfe_pats  = pats
+                     , tfe_rhs   = hs_ty }))
   = setSrcSpan loc $
-    discardResult $
-    tc_fam_ty_pats fam_tc_shape Nothing -- not an associated type
-                   pats (discardResult . (tcCheckLHsType hs_ty))
+    do { checkTc (fam_tc_name == eqn_tc_name)
+                 (wrongTyFamName fam_tc_name eqn_tc_name)
+       ; discardResult $
+         tc_fam_ty_pats fam_tc_shape Nothing -- not an associated type
+                        pats (discardResult . (tcCheckLHsType hs_ty)) }
 
 tcTyFamInstEqn :: FamTyConShape -> Maybe ClsInfo -> LTyFamInstEqn Name -> TcM CoAxBranch
 -- Needs to be here, not in TcInstDcls, because closed families
@@ -1084,12 +1088,11 @@ tcTyFamInstEqn fam_tc_shape@(fam_tc_name,_,_,_) mb_clsinfo
     (L loc (TyFamEqn { tfe_tycon = L _ eqn_tc_name
                      , tfe_pats  = pats
                      , tfe_rhs   = hs_ty }))
-  = setSrcSpan loc $
+  = ASSERT( fam_tc_name == eqn_tc_name )
+    setSrcSpan loc $
     tcFamTyPats fam_tc_shape mb_clsinfo pats (discardResult . (tcCheckLHsType hs_ty)) $
        \tvs' pats' res_kind ->
-    do { checkTc (fam_tc_name == eqn_tc_name)
-                 (wrongTyFamName fam_tc_name eqn_tc_name)
-       ; rhs_ty <- solveEqualities $ tcCheckLHsType hs_ty res_kind
+    do { rhs_ty <- solveEqualities $ tcCheckLHsType hs_ty res_kind
        ; rhs_ty <- zonkTcTypeToType emptyZonkEnv rhs_ty
        ; traceTc "tcTyFamInstEqn" (ppr fam_tc_name <+> pprTvBndrs tvs')
           -- don't print out the pats here, as they might be zonked inside the knot
@@ -1206,7 +1209,7 @@ tc_fam_ty_pats (name, _, binders, res_kind) mb_clsinfo
     too_many_args hs_ty n
       = hang (text "Too many parameters to" <+> ppr name <> colon)
            2 (vcat [ ppr hs_ty <+> text "is unexpected;"
-                   , text "expected only" <+>
+                   , text (if n == 1 then "expected" else "expected only") <+>
                      speakNOf (n-1) (text "parameter") ])
 
 -- See Note [tc_fam_ty_pats vs tcFamTyPats]
