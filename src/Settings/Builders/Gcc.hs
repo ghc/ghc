@@ -2,6 +2,7 @@ module Settings.Builders.Gcc (gccBuilderArgs, gccMBuilderArgs) where
 
 import Development.Shake.FilePath
 import Expression
+import Oracles.Config.Setting
 import Oracles.PackageData
 import Predicates (stagedBuilder)
 import Settings
@@ -30,4 +31,5 @@ gccMBuilderArgs = stagedBuilder GccM ? do
 
 commonGccArgs :: Args
 commonGccArgs = mconcat [ append =<< getPkgDataList CcArgs
+                        , append =<< getSettingList . ConfCcArgs =<< getStage
                         , cIncludeArgs ]
