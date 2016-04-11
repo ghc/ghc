@@ -2,7 +2,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE Safe #-}
-{-# LANGUAGE StandaloneDeriving #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Functor.Compose
@@ -36,11 +35,7 @@ infixr 9 `Compose`
 -- The composition of applicative functors is always applicative,
 -- but the composition of monads is not always a monad.
 newtype Compose f g a = Compose { getCompose :: f (g a) }
-  deriving (Data, Generic)
-
--- We must use standalone deriving here due to a bad interaction between
--- PolyKinds and GHC generics
-deriving instance Functor f => Generic1 (Compose f g)
+  deriving (Data, Generic, Generic1)
 
 -- Instances of lifted Prelude classes
 
