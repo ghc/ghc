@@ -10,7 +10,7 @@
 --
 -- Internals of the `GHC.ExecutionStack` module
 --
--- /Since: 4.9.0.0/
+-- @since 4.9.0.0
 -----------------------------------------------------------------------------
 
 #include "HsFFI.h"
