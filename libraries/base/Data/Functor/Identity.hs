@@ -36,11 +36,13 @@ module Data.Functor.Identity (
 
 import Control.Monad.Fix
 import Control.Monad.Zip
+import Data.Bits (Bits, FiniteBits)
 import Data.Coerce
 import Data.Data (Data)
 import Data.Foldable
 import Data.Ix (Ix)
 import Data.Semigroup (Semigroup)
+import Data.String (IsString)
 import Foreign.Storable (Storable)
 import GHC.Generics (Generic, Generic1)
 
@@ -48,8 +50,9 @@ import GHC.Generics (Generic, Generic1)
 --
 -- @since 4.8.0.0
 newtype Identity a = Identity { runIdentity :: a }
-    deriving ( Bounded, Enum, Eq, Ix, Ord, Data, Monoid, Semigroup
-             , Storable, Traversable, Generic, Generic1)
+    deriving ( Bits, Bounded, Data, Enum, Eq, FiniteBits, Floating, Fractional
+             , Generic, Generic1, Integral, IsString, Ix, Monoid, Num, Ord
+             , Real, RealFrac, RealFloat , Semigroup, Storable, Traversable)
 
 -- | This instance would be equivalent to the derived instances of the
 -- 'Identity' newtype if the 'runIdentity' field were removed

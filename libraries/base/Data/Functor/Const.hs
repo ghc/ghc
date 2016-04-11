@@ -1,9 +1,9 @@
-{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -21,20 +21,25 @@
 
 module Data.Functor.Const (Const(..)) where
 
+import Data.Bits (Bits, FiniteBits)
 import Data.Foldable (Foldable(foldMap))
 import Foreign.Storable (Storable)
 
 import GHC.Arr (Ix)
 import GHC.Base
 import GHC.Enum (Bounded, Enum)
+import GHC.Float (Floating, RealFloat)
 import GHC.Generics (Generic, Generic1)
+import GHC.Num (Num)
+import GHC.Real (Fractional, Integral, Real, RealFrac)
 import GHC.Read (Read(readsPrec), readParen, lex)
 import GHC.Show (Show(showsPrec), showParen, showString)
 
 -- | The 'Const' functor.
 newtype Const a b = Const { getConst :: a }
-                  deriving ( Generic, Generic1, Bounded, Enum, Eq, Ix, Ord
-                           , Monoid, Storable)
+    deriving ( Bits, Bounded, Enum, Eq, FiniteBits, Floating, Fractional
+             , Generic, Generic1, Integral, Ix, Monoid, Num, Ord, Real
+             , RealFrac, RealFloat , Storable)
 
 -- | This instance would be equivalent to the derived instances of the
 -- 'Const' newtype if the 'runConst' field were removed
