@@ -1649,11 +1649,13 @@ reifyKind  ki
 
 reify_kc_app :: TyCon -> [TyCoRep.Kind] -> TcM TH.Kind
 reify_kc_app kc kis
-  = fmap (mkThAppTs r_kc) (mapM reifyKind kis)
+  = fmap (mkThAppTs r_kc) (mapM reifyKind vis_kis)
   where
     r_kc | isTupleTyCon kc          = TH.TupleT (tyConArity kc)
          | kc `hasKey` listTyConKey = TH.ListT
          | otherwise                = TH.ConT (reifyName kc)
+
+    vis_kis = filterOutInvisibleTypes kc kis
 
 reifyCxt :: [PredType] -> TcM [TH.Pred]
 reifyCxt   = mapM reifyPred
