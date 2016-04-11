@@ -208,6 +208,16 @@ typedef struct _RtsSymbolInfo {
    When a new declaration or statement is performed ultimately lookupSymbol is called
    without doing a re-link.
 
+   The goal of these different phases is to allow the linker to be able to perform
+   "lazy loading" of ObjectCode. The reason for this is that we want to only link
+   in symbols that are actually required for the link. This reduces:
+
+   1) Dependency chains, if A.o required a .o in libB but A.o isn't required to link
+      then we don't need to load libB. This means the dependency chain for libraries
+      such as mingw32 and mingwex can be broken down.
+
+   2) The number of duplicate symbols, since now only symbols that are
+      true duplicates will display the error.
  */
 static /*Str*/HashTable *symhash;
 
@@ -2711,6 +2721,9 @@ int ocTryLoad (ObjectCode* oc) {
 
         This call is intended to have no side-effects when a non-duplicate
         symbol is re-inserted.
+
+        TODO: SymbolInfo can be moved into ObjectCode in order to be more
+              memory efficient. See Trac #11816
     */
     int x;
     SymbolInfo symbol;
