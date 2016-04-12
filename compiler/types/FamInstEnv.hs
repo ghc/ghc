@@ -515,7 +515,8 @@ compatibleBranches (CoAxBranch { cab_lhs = lhs1, cab_rhs = rhs1 })
   = case tcUnifyTysFG (const BindMe) lhs1 lhs2 of
       SurelyApart -> True
       Unifiable subst
-        | Type.substTy subst rhs1 `eqType` Type.substTy subst rhs2
+        | Type.substTyAddInScope subst rhs1 `eqType`
+          Type.substTyAddInScope subst rhs2
         -> True
       _ -> False
 
