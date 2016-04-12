@@ -133,9 +133,7 @@ builderPath builder = case builderProvenance builder of
             then return ""
             else putError $ "Builder '" ++ builderKey ++ "' is not specified in"
                 ++ " system.config file. Cannot proceed without it."
-        else do
-            path' <- lookupInPath path
-            fixAbsolutePathOnWindows $ path' -<.> exe
+        else fixAbsolutePathOnWindows =<< lookupInPath path
 
 getBuilderPath :: Builder -> ReaderT a Action FilePath
 getBuilderPath = lift . builderPath
