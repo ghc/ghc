@@ -1183,13 +1183,14 @@ W_ genLiveBlocks (generation *gen)
 
 W_ gcThreadLiveWords (nat i, nat g)
 {
-    W_ words;
+    W_ a, b, c;
 
-    words   = countOccupied(gc_threads[i]->gens[g].todo_bd);
-    words  += countOccupied(gc_threads[i]->gens[g].part_list);
-    words  += countOccupied(gc_threads[i]->gens[g].scavd_list);
+    a = countOccupied(gc_threads[i]->gens[g].todo_bd);
+    b = gc_threads[i]->gens[g].n_part_words;
+    c = gc_threads[i]->gens[g].n_scavd_words;
 
-    return words;
+//    debugBelch("cap %d, g%d, %ld %ld %ld\n", i, g, a, b, c);
+    return a + b + c;
 }
 
 W_ gcThreadLiveBlocks (nat i, nat g)

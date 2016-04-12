@@ -146,6 +146,7 @@ push_scanned_block (bdescr *bd, gen_workspace *ws)
         bd->link = ws->part_list;
         ws->part_list = bd;
         ws->n_part_blocks += bd->blocks;
+        ws->n_part_words += bd->free - bd->start;
         IF_DEBUG(sanity,
                  ASSERT(countBlocks(ws->part_list) == ws->n_part_blocks));
     }
@@ -155,6 +156,7 @@ push_scanned_block (bdescr *bd, gen_workspace *ws)
         bd->link = ws->scavd_list;
         ws->scavd_list = bd;
         ws->n_scavd_blocks += bd->blocks;
+        ws->n_scavd_words += bd->free - bd->start;
         IF_DEBUG(sanity,
                  ASSERT(countBlocks(ws->scavd_list) == ws->n_scavd_blocks));
     }
@@ -306,6 +308,7 @@ alloc_todo_block (gen_workspace *ws, nat size)
     {
         ws->part_list = bd->link;
         ws->n_part_blocks -= bd->blocks;
+        ws->n_part_words -= bd->free - bd->start;
     }
     else
     {

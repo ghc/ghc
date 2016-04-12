@@ -94,13 +94,15 @@ typedef struct gen_workspace_ {
 
     // Objects that have already been scavenged.
     bdescr *     scavd_list;
-    nat          n_scavd_blocks;     // count of blocks in this list
+    StgWord      n_scavd_blocks;     // count of blocks in this list
+    StgWord      n_scavd_words;
 
     // Partially-full, scavenged, blocks
     bdescr *     part_list;
-    unsigned int n_part_blocks;      // count of above
+    StgWord      n_part_blocks;      // count of above
+    StgWord      n_part_words;
 
-    StgWord pad[3];
+    StgWord pad[1];
 
 } gen_workspace ATTRIBUTE_ALIGNED(64);
 // align so that computing gct->gens[n] is a shift, not a multiply
