@@ -820,9 +820,11 @@ new_gc_thread (nat n, gc_thread *t)
 
         ws->part_list = NULL;
         ws->n_part_blocks = 0;
+        ws->n_part_words = 0;
 
         ws->scavd_list = NULL;
         ws->n_scavd_blocks = 0;
+        ws->n_scavd_words = 0;
     }
 }
 
@@ -1219,9 +1221,11 @@ prepare_collected_gen (generation *gen)
         }
         ws->part_list = NULL;
         ws->n_part_blocks = 0;
+        ws->n_part_words = 0;
 
         ASSERT(ws->scavd_list == NULL);
         ASSERT(ws->n_scavd_blocks == 0);
+        ASSERT(ws->n_scavd_words == 0);
 
         if (ws->todo_free != ws->todo_bd->start) {
             ws->todo_bd->free = ws->todo_free;
@@ -1346,7 +1350,6 @@ collect_gct_blocks (void)
 
             prev = NULL;
             for (bd = ws->scavd_list; bd != NULL; bd = bd->link) {
-                ws->gen->n_words += bd->free - bd->start;
                 prev = bd;
             }
             if (prev != NULL) {
@@ -1354,9 +1357,11 @@ collect_gct_blocks (void)
                 ws->gen->blocks = ws->scavd_list;
             }
             ws->gen->n_blocks += ws->n_scavd_blocks;
+            ws->gen->n_words += ws->n_scavd_words;
 
             ws->scavd_list = NULL;
             ws->n_scavd_blocks = 0;
+            ws->n_scavd_words = 0;
 
             RELEASE_SPIN_LOCK(&ws->gen->sync);
         }
