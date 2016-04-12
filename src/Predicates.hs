@@ -21,9 +21,7 @@ builder b = (b ==) <$> getBuilder
 
 -- | Is a certain builder used in the current stage?
 stagedBuilder :: (Stage -> Builder) -> Predicate
-stagedBuilder stageBuilder = do
-    s <- getStage
-    builder (stageBuilder s)
+stagedBuilder stageBuilder = builder . stageBuilder =<< getStage
 
 -- | Are we building with GCC?
 builderGcc :: Predicate

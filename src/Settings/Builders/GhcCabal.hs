@@ -131,7 +131,7 @@ with b = specified b ? do
     append [withBuilderKey b ++ top -/- path]
 
 withStaged :: (Stage -> Builder) -> Args
-withStaged sb = (with . sb) =<< getStage
+withStaged sb = with . sb =<< getStage
 
 needDll0 :: Stage -> Package -> Action Bool
 needDll0 stage pkg = do

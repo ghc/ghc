@@ -51,10 +51,10 @@ argSetting :: Setting -> Args
 argSetting = argM . setting
 
 argSettingList :: SettingList -> Args
-argSettingList = (append =<<) . lift . settingList
+argSettingList = (append =<<) . getSettingList
 
 argStagedSettingList :: (Stage -> SettingList) -> Args
-argStagedSettingList ss = (argSettingList . ss) =<< getStage
+argStagedSettingList ss = argSettingList . ss =<< getStage
 
 argStagedBuilderPath :: (Stage -> Builder) -> Args
-argStagedBuilderPath sb = (argM . builderPath . sb) =<< getStage
+argStagedBuilderPath sb = argM . builderPath . sb =<< getStage
