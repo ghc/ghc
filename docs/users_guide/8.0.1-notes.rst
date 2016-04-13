@@ -219,6 +219,11 @@ Language
 Compiler
 ~~~~~~~~
 
+-  The LLVM code generator now supports only LLVM 3.7. This is in contrast to our
+   previous policy where GHC would try to support a range of LLVM versions
+   concurrently. We hope that by supporting a narrower range of versions we can
+   provide more reliable support for each.
+
 -  Warnings can now be controlled with ``-W(no-)...`` flags in addition to
    the old ``-f(no-)warn...`` ones. This was done as the first part of a
    rewrite of the warning system to provide better control over warnings,
