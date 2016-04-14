@@ -348,19 +348,9 @@ addLoc extra_loc m = LintM $ \loc scope errs
 
 addInScopeVars :: [Id] -> LintM a -> LintM a
 addInScopeVars ids m = LintM $ \loc scope errs
- -> -- We check if these "new" ids are already
-    -- in scope, i.e., we have *shadowing* going on.
-    -- For now, it's just a "trace"; we may make
-    -- a real error out of it...
-    let
+ -> let
         new_set = mkVarSet ids
-    in
---  After adding -fliberate-case, Simon decided he likes shadowed
---  names after all.  WDP 94/07
---  (if isEmptyVarSet shadowed
---  then id
---  else pprTrace "Shadowed vars:" (ppr (varSetElems shadowed))) $
-    unLintM m loc (scope `unionVarSet` new_set) errs
+    in unLintM m loc (scope `unionVarSet` new_set) errs
 
 {-
 Checking function applications: we only check that the type has the
