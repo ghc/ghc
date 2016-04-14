@@ -37,7 +37,7 @@ gmpPatches = (gmpBase -/-) <$> ["gmpsrc.patch", "tarball/gmp-5.0.4.patch"]
 -- TODO: See Libffi.hs about removing code duplication.
 configureEnvironment :: Action [CmdOption]
 configureEnvironment = do
-    sequence [ builderEnv "CC" $ Gcc Stage1
+    sequence [ builderEnv "CC" $ Cc Stage1
              , builderEnv "AR" Ar
              , builderEnv "NM" Nm ]
   where

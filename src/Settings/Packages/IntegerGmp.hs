@@ -3,7 +3,7 @@ module Settings.Packages.IntegerGmp (integerGmpPackageArgs, gmpBuildPath) where
 import Base
 import Expression
 import GHC (integerGmp)
-import Predicates (builder, builderGcc, package)
+import Predicates (builder, builderCc, package)
 import Settings.Paths
 import Oracles.Config.Setting
 
@@ -24,4 +24,4 @@ integerGmpPackageArgs = package integerGmp ? do
               , appendSub "--configure-option=CFLAGS" [includeGmp]
               , appendSub "--gcc-options"             [includeGmp] ]
 
-            , builderGcc ? arg includeGmp ]
+            , builderCc ? arg includeGmp ]

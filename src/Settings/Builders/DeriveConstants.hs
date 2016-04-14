@@ -20,7 +20,7 @@ deriveConstantsBuilderArgs = builder DeriveConstants ? do
         , file "//GHCConstantsHaskellExports.hs"  ? arg "--gen-haskell-exports"
         , arg "-o", arg output
         , arg "--tmpdir", arg tempDir
-        , arg "--gcc-program", arg =<< getBuilderPath (Gcc Stage1)
+        , arg "--gcc-program", arg =<< getBuilderPath (Cc Stage1)
         , append . concat $ map (\a -> ["--gcc-flag", a]) cFlags
         , arg "--nm-program", arg =<< getBuilderPath Nm
         , specified Objdump ? mconcat [ arg "--objdump-program"

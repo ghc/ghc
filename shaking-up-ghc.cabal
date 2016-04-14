@@ -71,8 +71,8 @@ executable ghc-shake
                        , Settings.Builders.Alex
                        , Settings.Builders.Ar
                        , Settings.Builders.Common
+                       , Settings.Builders.Cc
                        , Settings.Builders.DeriveConstants
-                       , Settings.Builders.Gcc
                        , Settings.Builders.GenApply
                        , Settings.Builders.GenPrimopCode
                        , Settings.Builders.Ghc

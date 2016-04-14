@@ -1,4 +1,4 @@
-module Settings.Builders.Gcc (gccBuilderArgs, gccMBuilderArgs) where
+module Settings.Builders.Cc (ccBuilderArgs, ccMBuilderArgs) where
 
 import Development.Shake.FilePath
 import Expression
@@ -8,19 +8,19 @@ import Predicates (stagedBuilder)
 import Settings
 import Settings.Builders.Common (cIncludeArgs)
 
-gccBuilderArgs :: Args
-gccBuilderArgs = stagedBuilder Gcc ?
-    mconcat [ commonGccArgs
+ccBuilderArgs :: Args
+ccBuilderArgs = stagedBuilder Cc ?
+    mconcat [ commonCcArgs
             , arg "-c", arg =<< getInput
             , arg "-o", arg =<< getOutput ]
 
 -- TODO: handle custom $1_$2_MKDEPENDC_OPTS and
-gccMBuilderArgs :: Args
-gccMBuilderArgs = stagedBuilder GccM ? do
+ccMBuilderArgs :: Args
+ccMBuilderArgs = stagedBuilder CcM ? do
     output <- getOutput
     mconcat [ arg "-E"
             , arg "-MM"
-            , commonGccArgs
+            , commonCcArgs
             , arg "-MF"
             , arg output
             , arg "-MT"
@@ -29,7 +29,7 @@ gccMBuilderArgs = stagedBuilder GccM ? do
             , arg "c"
             , arg =<< getInput ]
 
-commonGccArgs :: Args
-commonGccArgs = mconcat [ append =<< getPkgDataList CcArgs
-                        , append =<< getSettingList . ConfCcArgs =<< getStage
-                        , cIncludeArgs ]
+commonCcArgs :: Args
+commonCcArgs = mconcat [ append =<< getPkgDataList CcArgs
+                       , append =<< getSettingList . ConfCcArgs =<< getStage
+                       , cIncludeArgs ]

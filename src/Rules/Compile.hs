@@ -34,7 +34,7 @@ compilePackage rs context@Context {..} = do
         if ("//*.c" ?== src)
         then do
             need $ src : deps
-            build $ Target context (Gcc stage) [src] [obj]
+            build $ Target context (Cc stage) [src] [obj]
         else do
             if compileInterfaceFilesSeparately && "//*.hs" ?== src
             then need $ (obj -<.> hisuf way) : src : deps

@@ -1,6 +1,6 @@
 -- | Convenient predicates
 module Predicates (
-    stage, package, builder, stagedBuilder, builderGcc, builderGhc, file, way,
+    stage, package, builder, stagedBuilder, builderCc, builderGhc, file, way,
     stage0, stage1, stage2, notStage0, notPackage
     ) where
 
@@ -24,8 +24,8 @@ stagedBuilder :: (Stage -> Builder) -> Predicate
 stagedBuilder stageBuilder = builder . stageBuilder =<< getStage
 
 -- | Are we building with GCC?
-builderGcc :: Predicate
-builderGcc = stagedBuilder Gcc ||^ stagedBuilder GccM
+builderCc :: Predicate
+builderCc = stagedBuilder Cc ||^ stagedBuilder CcM
 
 -- | Are we building with GHC?
 builderGhc :: Predicate

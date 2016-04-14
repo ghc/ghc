@@ -7,7 +7,7 @@ import Expression
 import GHC (rts, rtsContext)
 import Oracles.Config.Flag
 import Oracles.Config.Setting
-import Predicates (builder, builderGcc, builderGhc, package, file)
+import Predicates (builder, builderCc, builderGhc, package, file)
 import Settings
 import Settings.Builders.Common
 
@@ -52,7 +52,7 @@ rtsPackageArgs = package rts ? do
     ffiIncludeDir  <- getSetting FfiIncludeDir
     ffiLibraryDir  <- getSetting FfiLibDir
     mconcat
-        [ builderGcc ? mconcat
+        [ builderCc ? mconcat
           [ arg "-Irts"
           , arg $ "-I" ++ path
           , arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""

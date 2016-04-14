@@ -5,7 +5,7 @@ import Expression
 import Settings.Builders.Alex
 import Settings.Builders.Ar
 import Settings.Builders.DeriveConstants
-import Settings.Builders.Gcc
+import Settings.Builders.Cc
 import Settings.Builders.GenApply
 import Settings.Builders.GenPrimopCode
 import Settings.Builders.Ghc
@@ -50,9 +50,9 @@ defaultBuilderArgs :: Args
 defaultBuilderArgs = mconcat
     [ alexBuilderArgs
     , arBuilderArgs
+    , ccBuilderArgs
+    , ccMBuilderArgs
     , deriveConstantsBuilderArgs
-    , gccBuilderArgs
-    , gccMBuilderArgs
     , genApplyBuilderArgs
     , genPrimopCodeBuilderArgs
     , ghcBuilderArgs

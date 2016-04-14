@@ -10,4 +10,4 @@ import Predicates (stagedBuilder, package)
 -- only file which requires special treatment when using GCC.
 directoryPackageArgs :: Args
 directoryPackageArgs = package directory ?
-    stagedBuilder Gcc ? arg "-D__GLASGOW_HASKELL__"
+    stagedBuilder Cc ? arg "-D__GLASGOW_HASKELL__"

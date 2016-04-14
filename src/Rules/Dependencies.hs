@@ -20,7 +20,7 @@ buildPackageDependencies rs context@Context {..} =
             [ "//*.c.deps", "//*.cmm.deps", "//*.S.deps" ] |%> \out -> do
                 let src = dep2src context out
                 need [src]
-                build $ Target context (GccM stage) [src] [out]
+                build $ Target context (CcM stage) [src] [out]
 
         hDepFile %> \out -> do
             srcs <- haskellSources context

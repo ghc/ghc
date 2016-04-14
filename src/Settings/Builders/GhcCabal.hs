@@ -32,7 +32,7 @@ ghcCabalBuilderArgs = builder GhcCabal ? do
             , with HsColour
             , configureArgs
             , packageConstraints
-            , withStaged Gcc
+            , withStaged Cc
             , notStage0 ? with Ld
             , with Ar
             , with Alex
@@ -85,7 +85,7 @@ configureArgs = do
         , conf "--with-gmp-includes"      $ argSetting GmpIncludeDir
         , conf "--with-gmp-libraries"     $ argSetting GmpLibDir
         , crossCompiling ? (conf "--host" $ argSetting TargetPlatformFull)
-        , conf "--with-cc" $ argStagedBuilderPath Gcc ]
+        , conf "--with-cc" $ argStagedBuilderPath Cc ]
 
 newtype PackageDbKey = PackageDbKey Stage
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
@@ -114,7 +114,7 @@ withBuilderKey :: Builder -> String
 withBuilderKey b = case b of
     Ar       -> "--with-ar="
     Ld       -> "--with-ld="
-    Gcc _    -> "--with-gcc="
+    Cc _     -> "--with-gcc="
     Ghc _    -> "--with-ghc="
     Alex     -> "--with-alex="
     Happy    -> "--with-happy="
@@ -122,7 +122,7 @@ withBuilderKey b = case b of
     HsColour -> "--with-hscolour="
     _        -> error "withBuilderKey: not supported builder"
 
--- Expression 'with Gcc' appends "--with-gcc=/path/to/gcc" and needs Gcc.
+-- Expression 'with Alex' appends "--with-alex=/path/to/alex" and needs Alex.
 with :: Builder -> Args
 with b = specified b ? do
     top  <- getTopDirectory

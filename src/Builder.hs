@@ -21,14 +21,14 @@ import Stage
 -- @GhcPkg Stage0@ is the bootstrapping @GhcPkg@
 -- @GhcPkg StageN@, N > 0, is the one built in Stage0 (TODO: need only Stage1?)
 -- TODO: Do we really need HsCpp builder? Can't we use a generic Cpp
---       builder instead? It would also be used instead of GccM.
--- TODO: rename Gcc to CCompiler? We sometimes use gcc and sometimes clang.
--- TODO: why are Gcc/GccM staged?
+--       builder instead? It would also be used instead of CcM.
+-- TODO: why are Cc/CcM staged?
+-- TODO: use Cc CcMode, where CcMode = Compile | FindDeps instead of Cc & CcM.
 data Builder = Alex
              | Ar
              | DeriveConstants
-             | Gcc Stage
-             | GccM Stage         -- synonym for 'Gcc -MM'
+             | Cc Stage
+             | CcM Stage          -- synonym for 'Cc -MM'
              | GenApply
              | GenPrimopCode
              | Ghc Stage
@@ -79,12 +79,12 @@ isInternal = isJust . builderProvenance
 
 isStaged :: Builder -> Bool
 isStaged = \case
-    (Gcc    _) -> True
-    (GccM   _) -> True
-    (Ghc    _) -> True
-    (GhcM   _) -> True
-    (GhcPkg _) -> True
-    _          -> False
+    (Cc  _) -> True
+    (CcM _) -> True
+    (Ghc        _) -> True
+    (GhcM       _) -> True
+    (GhcPkg     _) -> True
+    _              -> False
 
 -- TODO: Some builders are required only on certain platforms. For example,
 -- Objdump is only required on OpenBSD and AIX, as mentioned in #211. Add
@@ -103,26 +103,26 @@ builderPath builder = case builderProvenance builder of
     Just context -> return . fromJust $ programPath context
     Nothing -> do
         let builderKey = case builder of
-                Alex          -> "alex"
-                Ar            -> "ar"
-                Gcc Stage0    -> "system-gcc"
-                Gcc _         -> "gcc"
-                GccM Stage0   -> "system-gcc"
-                GccM _        -> "gcc"
-                Ghc Stage0    -> "system-ghc"
-                GhcM Stage0   -> "system-ghc"
-                GhcPkg Stage0 -> "system-ghc-pkg"
-                Happy         -> "happy"
-                HsColour      -> "hscolour"
-                HsCpp         -> "hs-cpp"
-                Ld            -> "ld"
-                Make          -> "make"
-                Nm            -> "nm"
-                Objdump       -> "objdump"
-                Patch         -> "patch"
-                Perl          -> "perl"
-                Ranlib        -> "ranlib"
-                Tar           -> "tar"
+                Alex              -> "alex"
+                Ar                -> "ar"
+                Cc Stage0  -> "system-cc"
+                Cc _       -> "cc"
+                CcM Stage0 -> "system-cc"
+                CcM _      -> "cc"
+                Ghc Stage0        -> "system-ghc"
+                GhcM Stage0       -> "system-ghc"
+                GhcPkg Stage0     -> "system-ghc-pkg"
+                Happy             -> "happy"
+                HsColour          -> "hscolour"
+                HsCpp             -> "hs-cpp"
+                Ld                -> "ld"
+                Make              -> "make"
+                Nm                -> "nm"
+                Objdump           -> "objdump"
+                Patch             -> "patch"
+                Perl              -> "perl"
+                Ranlib            -> "ranlib"
+                Tar               -> "tar"
                 _ -> error $ "Cannot determine builderKey for " ++ show builder
         path <- askConfigWithDefault builderKey . putError $
             "\nCannot find path to '" ++ builderKey

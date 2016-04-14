@@ -7,7 +7,7 @@
 
 alex           = @AlexCmd@
 ar             = @ArCmd@
-gcc            = @WhatGccIsCalled@
+cc             = @WhatGccIsCalled@
 happy          = @HappyCmd@
 hs-cpp         = @HaskellCPPCmd@
 hscolour       = @HSCOLOUR@
@@ -16,7 +16,7 @@ make           = @MakeCmd@
 nm             = @NmCmd@
 objdump        = @ObjdumpCmd@
 ranlib         = @REAL_RANLIB_CMD@
-system-gcc     = @CC_STAGE0@
+system-cc      = @CC_STAGE0@
 system-ghc     = @WithGhc@
 system-ghc-pkg = @GhcPkgCmd@
 tar            = @TarCmd@

@@ -18,7 +18,7 @@ templateHsc = "inplace/lib/template-hsc.h"
 hsc2hsBuilderArgs :: Args
 hsc2hsBuilderArgs = builder Hsc2Hs ? do
     stage   <- getStage
-    ccPath  <- lift . builderPath $ Gcc stage
+    ccPath  <- getBuilderPath $ Cc stage
     gmpDir  <- getSetting GmpIncludeDir
     cFlags  <- getCFlags
     lFlags  <- getLFlags
