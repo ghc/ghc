@@ -1636,7 +1636,7 @@ mkNewTypeEqn dflags overlap_mode tvs
         -- Here is the plan for newtype derivings.  We see
         --        newtype T a1...an = MkT (t ak+1...an) deriving (.., C s1 .. sm, ...)
         -- where t is a type,
-        --       ak+1...an is a suffix of a1..an, and are all tyars
+        --       ak+1...an is a suffix of a1..an, and are all tyvars
         --       ak+1...an do not occur free in t, nor in the s1..sm
         --       (C s1 ... sm) is a  *partial applications* of class C
         --                      with the last parameter missing

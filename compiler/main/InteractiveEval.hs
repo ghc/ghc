@@ -575,7 +575,7 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
 
    newTyVars :: UniqSupply -> TcTyVarSet -> TCvSubst
      -- Similarly, clone the type variables mentioned in the types
-     -- we have here, *and* make them all RuntimeUnk tyars
+     -- we have here, *and* make them all RuntimeUnk tyvars
    newTyVars us tvs
      = mkTvSubstPrs [ (tv, mkTyVarTy (mkRuntimeUnkTyVar name (tyVarKind tv)))
                     | (tv, uniq) <- varSetElems tvs `zip` uniqsFromSupply us
