@@ -288,7 +288,7 @@ schemeR fvs (nm, rhs)
 {-
    | trace (showSDoc (
               (char ' '
-               $$ (ppr.filter (not.isTyVar).varSetElems.fst) rhs
+               $$ (ppr.filter (not.isTyVar).dVarSetElems.fst) rhs
                $$ pprCoreExpr (deAnnotate rhs)
                $$ char ' '
               ))) False
