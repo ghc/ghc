@@ -6975,7 +6975,7 @@ ocGetNames_MachO(ObjectCode* oc)
                     else
                     {
                             IF_DEBUG(linker, debugBelch("ocGetNames_MachO: inserting %s\n", nm));
-                            char* addr = image
+                            void* addr = image
                                        + sections[nlist[i].n_sect - 1].offset
                                        - sections[nlist[i].n_sect - 1].addr
                                        + nlist[i].n_value;
@@ -6987,7 +6987,7 @@ ocGetNames_MachO(ObjectCode* oc)
                                                  , HS_BOOL_FALSE
                                                  , oc);
 
-                            oc->symbols[curSymbol].name = nm;
+                            oc->symbols[curSymbol].name   = nm;
                             oc->symbols[curSymbol].addr   = addr;
                             oc->symbols[curSymbol].isWeak = HS_BOOL_FALSE;
                             curSymbol++;

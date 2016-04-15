@@ -106,7 +106,7 @@ typedef struct _SymbolInfo {
     char*          name;
 
     /* The address of the symbol. */
-    unsigned char* addr;
+    void* addr;
 
     /* Indicates if the symbol is weak */
     HsBool isWeak;
