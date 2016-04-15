@@ -26,7 +26,7 @@ import TcBinds
 import TcUnify
 import TcHsType
 import TcMType
-import Type     ( getClassPredTys_maybe, varSetElemsWellScoped, piResultTys )
+import Type     ( getClassPredTys_maybe, piResultTys )
 import TcType
 import TcRnMonad
 import BuildTyCl( TcMethInfo )
@@ -41,7 +41,6 @@ import NameEnv
 import NameSet
 import Var
 import VarEnv
-import VarSet
 import Outputable
 import SrcLoc
 import TyCon
@@ -53,7 +52,7 @@ import BooleanFormula
 import Util
 
 import Control.Monad
-import Data.List ( mapAccumL )
+import Data.List ( mapAccumL, partition )
 
 {-
 Dictionary handling
@@ -454,10 +453,10 @@ tcATDefault emit_warn loc inst_subst defined_ats (ATI fam_tc defs)
   = do { let (subst', pat_tys') = mapAccumL subst_tv inst_subst
                                             (tyConTyVars fam_tc)
              rhs'     = substTyUnchecked subst' rhs_ty
-             tcv_set' = tyCoVarsOfTypes pat_tys'
-             (tv_set', cv_set') = partitionVarSet isTyVar tcv_set'
-             tvs'     = varSetElemsWellScoped tv_set'
-             cvs'     = varSetElemsWellScoped cv_set'
+             tcv' = tyCoVarsOfTypesList pat_tys'
+             (tv', cv') = partition isTyVar tcv'
+             tvs'     = toposortTyVars tv'
+             cvs'     = toposortTyVars cv'
        ; rep_tc_name <- newFamInstTyConName (L loc (tyConName fam_tc)) pat_tys'
        ; let axiom = mkSingleCoAxiom Nominal rep_tc_name tvs' cvs'
                                      fam_tc pat_tys' rhs'
