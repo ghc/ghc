@@ -48,7 +48,7 @@ import Exception
 import Numeric
 import Data.Array
 import Data.IORef
-import System.CPUTime
+import Data.Time
 import System.Environment
 import System.IO
 import Control.Monad
@@ -348,18 +348,18 @@ timeIt getAllocs action
   = do b <- lift $ isOptionSet ShowTiming
        if not b
           then action
-          else do time1   <- liftIO $ getCPUTime
+          else do time1   <- liftIO $ getCurrentTime
                   a <- action
                   let allocs = getAllocs a
-                  time2   <- liftIO $ getCPUTime
+                  time2   <- liftIO $ getCurrentTime
                   dflags  <- getDynFlags
-                  liftIO $ printTimes dflags allocs (time2 - time1)
+                  let period = time2 `diffUTCTime` time1
+                  liftIO $ printTimes dflags allocs (realToFrac period)
                   return a
 
-printTimes :: DynFlags -> Maybe Integer -> Integer -> IO ()
-printTimes dflags mallocs psecs
-   = do let secs = (fromIntegral psecs / (10^(12::Integer))) :: Float
-            secs_str = showFFloat (Just 2) secs
+printTimes :: DynFlags -> Maybe Integer -> Double -> IO ()
+printTimes dflags mallocs secs
+   = do let secs_str = showFFloat (Just 2) secs
         putStrLn (showSDoc dflags (
                  parens (text (secs_str "") <+> text "secs" <> comma <+>
                          case mallocs of
