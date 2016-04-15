@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 -- | Convenient predicates
 module Predicates (
     stage, package, builder, stagedBuilder, builderCc, builderGhc, file, way,
@@ -19,17 +20,23 @@ package p = (p ==) <$> getPackage
 builder :: Builder -> Predicate
 builder b = (b ==) <$> getBuilder
 
+-- TODO: Use type classes to unify various builder predicates (also needBuilder,
+-- builderPath, etc).
 -- | Is a certain builder used in the current stage?
 stagedBuilder :: (Stage -> Builder) -> Predicate
 stagedBuilder stageBuilder = builder . stageBuilder =<< getStage
 
--- | Are we building with GCC?
+-- | Are we building with a C compiler?
 builderCc :: Predicate
-builderCc = stagedBuilder Cc ||^ stagedBuilder CcM
+builderCc = getBuilder >>= \case
+    Cc _ _ -> return True
+    _      -> return False
 
 -- | Are we building with GHC?
 builderGhc :: Predicate
-builderGhc = stagedBuilder Ghc ||^ stagedBuilder GhcM
+builderGhc = getBuilder >>= \case
+    Ghc _ _ -> return True
+    _       -> return False
 
 -- | Does any of the output files match a given pattern?
 file :: FilePattern -> Predicate

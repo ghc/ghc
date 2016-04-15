@@ -25,14 +25,14 @@ ghcCabalBuilderArgs = builder GhcCabal ? do
             , arg path
             , arg dir
             , dll0Args
-            , withStaged Ghc
+            , withStaged $ Ghc Compile
             , withStaged GhcPkg
             , bootPackageDbArgs
             , libraryArgs
             , with HsColour
             , configureArgs
             , packageConstraints
-            , withStaged Cc
+            , withStaged $ Cc Compile
             , notStage0 ? with Ld
             , with Ar
             , with Alex
@@ -85,7 +85,7 @@ configureArgs = do
         , conf "--with-gmp-includes"      $ argSetting GmpIncludeDir
         , conf "--with-gmp-libraries"     $ argSetting GmpLibDir
         , crossCompiling ? (conf "--host" $ argSetting TargetPlatformFull)
-        , conf "--with-cc" $ argStagedBuilderPath Cc ]
+        , conf "--with-cc" $ argStagedBuilderPath (Cc Compile) ]
 
 newtype PackageDbKey = PackageDbKey Stage
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
@@ -114,8 +114,8 @@ withBuilderKey :: Builder -> String
 withBuilderKey b = case b of
     Ar       -> "--with-ar="
     Ld       -> "--with-ld="
-    Cc _     -> "--with-gcc="
-    Ghc _    -> "--with-ghc="
+    Cc  _ _  -> "--with-gcc="
+    Ghc _ _  -> "--with-ghc="
     Alex     -> "--with-alex="
     Happy    -> "--with-happy="
     GhcPkg _ -> "--with-ghc-pkg="

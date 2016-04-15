@@ -51,7 +51,6 @@ defaultBuilderArgs = mconcat
     [ alexBuilderArgs
     , arBuilderArgs
     , ccBuilderArgs
-    , ccMBuilderArgs
     , deriveConstantsBuilderArgs
     , genApplyBuilderArgs
     , genPrimopCodeBuilderArgs

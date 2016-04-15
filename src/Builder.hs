@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric, LambdaCase #-}
 module Builder (
-    Builder (..), isStaged, builderPath, getBuilderPath, specified, needBuilder
+    CompilerMode (..), Builder (..),
+    isStaged, builderPath, getBuilderPath, specified, needBuilder
     ) where
 
 import Control.Monad.Trans.Reader
@@ -14,27 +15,28 @@ import Oracles.LookupInPath
 import Oracles.WindowsPath
 import Stage
 
+-- TODO: Add Link mode?
+-- | A C or Haskell compiler can be used in two modes: for compiling sources
+-- into object files, or for extracting source dependencies, e.g. by passing -M
+-- command line option.
+data CompilerMode = Compile | FindDependencies deriving (Show, Eq, Generic)
+
+-- TODO: Do we really need HsCpp builder? Can't we use Cc instead?
 -- | A 'Builder' is an external command invoked in separate process using 'Shake.cmd'
 --
 -- @Ghc Stage0@ is the bootstrapping compiler
 -- @Ghc StageN@, N > 0, is the one built on stage (N - 1)
 -- @GhcPkg Stage0@ is the bootstrapping @GhcPkg@
 -- @GhcPkg StageN@, N > 0, is the one built in Stage0 (TODO: need only Stage1?)
--- TODO: Do we really need HsCpp builder? Can't we use a generic Cpp
---       builder instead? It would also be used instead of CcM.
--- TODO: why are Cc/CcM staged?
--- TODO: use Cc CcMode, where CcMode = Compile | FindDeps instead of Cc & CcM.
 data Builder = Alex
              | Ar
              | DeriveConstants
-             | Cc Stage
-             | CcM Stage          -- synonym for 'Cc -MM'
+             | Cc CompilerMode Stage
              | GenApply
              | GenPrimopCode
-             | Ghc Stage
+             | Ghc CompilerMode Stage
              | GhcCabal
              | GhcCabalHsColour   -- synonym for 'GhcCabal hscolour'
-             | GhcM Stage         -- synonym for 'Ghc -M'
              | GhcPkg Stage
              | Haddock
              | Happy
@@ -61,8 +63,8 @@ builderProvenance = \case
     DeriveConstants  -> context Stage0 deriveConstants
     GenApply         -> context Stage0 genapply
     GenPrimopCode    -> context Stage0 genprimopcode
-    Ghc stage        -> if stage == Stage0 then Nothing else context (pred stage) ghc
-    GhcM stage       -> builderProvenance $ Ghc stage
+    Ghc _ Stage0     -> Nothing
+    Ghc _ stage      -> context (pred stage) ghc
     GhcCabal         -> context Stage0 ghcCabal
     GhcCabalHsColour -> builderProvenance $ GhcCabal
     GhcPkg stage     -> if stage > Stage0 then context Stage0 ghcPkg else Nothing
@@ -79,12 +81,10 @@ isInternal = isJust . builderProvenance
 
 isStaged :: Builder -> Bool
 isStaged = \case
-    (Cc  _) -> True
-    (CcM _) -> True
-    (Ghc        _) -> True
-    (GhcM       _) -> True
-    (GhcPkg     _) -> True
-    _              -> False
+    (Cc   _ _) -> True
+    (Ghc  _ _) -> True
+    (GhcPkg _) -> True
+    _          -> False
 
 -- TODO: Some builders are required only on certain platforms. For example,
 -- Objdump is only required on OpenBSD and AIX, as mentioned in #211. Add
@@ -103,26 +103,23 @@ builderPath builder = case builderProvenance builder of
     Just context -> return . fromJust $ programPath context
     Nothing -> do
         let builderKey = case builder of
-                Alex              -> "alex"
-                Ar                -> "ar"
-                Cc Stage0  -> "system-cc"
-                Cc _       -> "cc"
-                CcM Stage0 -> "system-cc"
-                CcM _      -> "cc"
-                Ghc Stage0        -> "system-ghc"
-                GhcM Stage0       -> "system-ghc"
-                GhcPkg Stage0     -> "system-ghc-pkg"
-                Happy             -> "happy"
-                HsColour          -> "hscolour"
-                HsCpp             -> "hs-cpp"
-                Ld                -> "ld"
-                Make              -> "make"
-                Nm                -> "nm"
-                Objdump           -> "objdump"
-                Patch             -> "patch"
-                Perl              -> "perl"
-                Ranlib            -> "ranlib"
-                Tar               -> "tar"
+                Alex          -> "alex"
+                Ar            -> "ar"
+                Cc  _  Stage0 -> "system-cc"
+                Cc  _  _      -> "cc"
+                Ghc _  Stage0 -> "system-ghc"
+                GhcPkg Stage0 -> "system-ghc-pkg"
+                Happy         -> "happy"
+                HsColour      -> "hscolour"
+                HsCpp         -> "hs-cpp"
+                Ld            -> "ld"
+                Make          -> "make"
+                Nm            -> "nm"
+                Objdump       -> "objdump"
+                Patch         -> "patch"
+                Perl          -> "perl"
+                Ranlib        -> "ranlib"
+                Tar           -> "tar"
                 _ -> error $ "Cannot determine builderKey for " ++ show builder
         path <- askConfigWithDefault builderKey . putError $
             "\nCannot find path to '" ++ builderKey
@@ -155,11 +152,14 @@ needBuilder laxDependencies builder = when (isInternal builder) $ do
   where
     allowOrderOnlyDependency :: Builder -> Bool
     allowOrderOnlyDependency = \case
-        Ghc  _ -> True
-        GhcM _ -> True
-        _      -> False
+        Ghc _ _ -> True
+        _       -> False
 
 -- Instances for storing in the Shake database
+instance Binary CompilerMode
+instance Hashable CompilerMode
+instance NFData CompilerMode
+
 instance Binary Builder
 instance Hashable Builder
 instance NFData Builder

@@ -99,7 +99,8 @@ buildBinary rs context@(Context stage package _) bin = do
                   then [ pkgPath package -/- src <.> "hs" | src <- hSrcs ]
                   else objs
     need $ binDeps ++ libs
-    buildWithResources rs $ Target context (Ghc stage) binDeps [bin]
+    -- TODO: Use Link mode instead of Compile.
+    buildWithResources rs $ Target context (Ghc Compile stage) binDeps [bin]
     synopsis <- interpretInContext context $ getPkgData Synopsis
     putSuccess $ renderProgram
         ("'" ++ pkgNameString package ++ "' (" ++ show stage ++ ").")

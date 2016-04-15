@@ -18,7 +18,7 @@ import Settings.Builders.Common (cIncludeArgs)
 --     $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno
 --     $$(addsuffix .$$(dyn_osuf)-boot,$$(basename $$@)))
 ghcBuilderArgs :: Args
-ghcBuilderArgs = stagedBuilder Ghc ? do
+ghcBuilderArgs = stagedBuilder (Ghc Compile) ? do
     output <- getOutput
     stage  <- getStage
     way    <- getWay
@@ -61,7 +61,7 @@ splitObjectsArgs = splitObjects ? do
     arg "-split-objs"
 
 ghcMBuilderArgs :: Args
-ghcMBuilderArgs = stagedBuilder GhcM ? do
+ghcMBuilderArgs = stagedBuilder (Ghc FindDependencies) ? do
     ways <- getLibraryWays
     mconcat [ arg "-M"
             , commonGhcArgs

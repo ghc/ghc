@@ -20,14 +20,15 @@ buildPackageDependencies rs context@Context {..} =
             [ "//*.c.deps", "//*.cmm.deps", "//*.S.deps" ] |%> \out -> do
                 let src = dep2src context out
                 need [src]
-                build $ Target context (CcM stage) [src] [out]
+                build $ Target context (Cc FindDependencies stage) [src] [out]
 
         hDepFile %> \out -> do
             srcs <- haskellSources context
             need srcs
             if srcs == []
             then writeFileChanged out ""
-            else buildWithResources rs $ Target context (GhcM stage) srcs [out]
+            else buildWithResources rs $
+                Target context (Ghc FindDependencies stage) srcs [out]
             removeFileIfExists $ out <.> "bak"
 
         -- TODO: don't accumulate *.deps into .dependencies

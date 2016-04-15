@@ -15,7 +15,7 @@ import Settings.User
 testRules :: Rules ()
 testRules = do
     "validate" ~> do
-        needBuilder False $ Ghc Stage2 -- TODO: get rid of False parameters
+        needBuilder False $ Ghc Compile Stage2 -- TODO: get rid of False
         needBuilder False $ GhcPkg Stage1
         needBuilder False $ Hpc
         runMakeVerbose "testsuite/tests" ["fast"]
@@ -28,7 +28,7 @@ testRules = do
                     | pkg <- pkgs, isLibrary pkg, pkg /= rts, pkg /= libffi ]
         windows  <- windowsHost
         top      <- topDirectory
-        compiler <- builderPath $ Ghc Stage2
+        compiler <- builderPath $ Ghc Compile Stage2
         ghcPkg   <- builderPath $ GhcPkg Stage1
         haddock  <- builderPath Haddock
         threads  <- shakeThreads <$> getShakeOptions

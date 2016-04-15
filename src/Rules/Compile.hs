@@ -17,7 +17,7 @@ compilePackage rs context@Context {..} = do
         then do
             (src, deps) <- dependencies path $ hi -<.> osuf way
             need $ src : deps
-            buildWithResources rs $ Target context (Ghc stage) [src] [hi]
+            buildWithResources rs $ Target context (Ghc Compile stage) [src] [hi]
         else need [ hi -<.> osuf way ]
 
     path <//> "*" <.> hibootsuf way %> \hiboot ->
@@ -25,7 +25,7 @@ compilePackage rs context@Context {..} = do
         then do
             (src, deps) <- dependencies path $ hiboot -<.> obootsuf way
             need $ src : deps
-            buildWithResources rs $ Target context (Ghc stage) [src] [hiboot]
+            buildWithResources rs $ Target context (Ghc Compile stage) [src] [hiboot]
         else need [ hiboot -<.> obootsuf way ]
 
     -- TODO: add dependencies for #include of .h and .hs-incl files (gcc -MM?)
@@ -34,12 +34,12 @@ compilePackage rs context@Context {..} = do
         if ("//*.c" ?== src)
         then do
             need $ src : deps
-            build $ Target context (Cc stage) [src] [obj]
+            build $ Target context (Cc Compile stage) [src] [obj]
         else do
             if compileInterfaceFilesSeparately && "//*.hs" ?== src
             then need $ (obj -<.> hisuf way) : src : deps
             else need $ src : deps
-            buildWithResources rs $ Target context (Ghc stage) [src] [obj]
+            buildWithResources rs $ Target context (Ghc Compile stage) [src] [obj]
 
     -- TODO: get rid of these special cases
     path <//> "*" <.> obootsuf way %> \obj -> do
@@ -47,4 +47,4 @@ compilePackage rs context@Context {..} = do
         if compileInterfaceFilesSeparately
         then need $ (obj -<.> hibootsuf way) : src : deps
         else need $ src : deps
-        buildWithResources rs $ Target context (Ghc stage) [src] [obj]
+        buildWithResources rs $ Target context (Ghc Compile stage) [src] [obj]
