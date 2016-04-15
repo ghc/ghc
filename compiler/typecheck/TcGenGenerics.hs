@@ -37,13 +37,13 @@ import ErrUtils( Validity(..), andValid )
 import SrcLoc
 import Bag
 import VarEnv
-import VarSet (elemVarSet, partitionVarSet)
+import VarSet (elemVarSet)
 import Outputable
 import FastString
 import Util
 
 import Control.Monad (mplus)
-import Data.List (zip4)
+import Data.List (zip4, partition)
 import Data.Maybe (isJust)
 
 #include "HsVersions.h"
@@ -395,10 +395,10 @@ tc_mkRepFamInsts gk tycon inst_ty mod =
            in_scope = mkInScopeSet (tyCoVarsOfType inst_ty)
            subst    = mkTvSubst in_scope env
            repTy'   = substTy  subst repTy
-           tcv_set' = tyCoVarsOfType inst_ty
-           (tv_set', cv_set') = partitionVarSet isTyVar tcv_set'
-           tvs'     = varSetElemsWellScoped tv_set'
-           cvs'     = varSetElemsWellScoped cv_set'
+           tcv' = tyCoVarsOfTypeList inst_ty
+           (tv', cv') = partition isTyVar tcv'
+           tvs'     = toposortTyVars tv'
+           cvs'     = toposortTyVars cv'
            axiom    = mkSingleCoAxiom Nominal rep_name tvs' cvs'
                                       fam_tc [inst_ty] repTy'
 

@@ -1586,7 +1586,7 @@ mkNewTypeEqn dflags overlap_mode tvs
        case mtheta of
         Just theta -> return $ GivenTheta $ DS
             { ds_loc = loc
-            , ds_name = dfun_name, ds_tvs = varSetElemsWellScoped dfun_tvs
+            , ds_name = dfun_name, ds_tvs = dfun_tvs
             , ds_cls = cls, ds_tys = inst_tys
             , ds_tc = rep_tycon
             , ds_theta = theta
@@ -1594,7 +1594,7 @@ mkNewTypeEqn dflags overlap_mode tvs
             , ds_newtype = Just rep_inst_ty }
         Nothing -> return $ InferTheta $ DS
             { ds_loc = loc
-            , ds_name = dfun_name, ds_tvs = varSetElemsWellScoped dfun_tvs
+            , ds_name = dfun_name, ds_tvs = dfun_tvs
             , ds_cls = cls, ds_tys = inst_tys
             , ds_tc = rep_tycon
             , ds_theta = all_preds
@@ -1689,7 +1689,7 @@ mkNewTypeEqn dflags overlap_mode tvs
         -- Next we figure out what superclass dictionaries to use
         -- See Note [Newtype deriving superclasses] above
         cls_tyvars = classTyVars cls
-        dfun_tvs   = tyCoVarsOfTypes inst_tys
+        dfun_tvs   = tyCoVarsOfTypesWellScoped inst_tys
         inst_ty    = mkTyConApp tycon tc_args
         inst_tys   = cls_tys ++ [inst_ty]
         sc_theta   = mkThetaOrigin DerivOrigin TypeLevel $
@@ -1701,7 +1701,7 @@ mkNewTypeEqn dflags overlap_mode tvs
         -- newtype type; precisely the constraints required for the
         -- calls to coercible that we are going to generate.
         coercible_constraints =
-            [ let (Pair t1 t2) = mkCoerceClassMethEqn cls (varSetElemsWellScoped dfun_tvs) inst_tys rep_inst_ty meth
+            [ let (Pair t1 t2) = mkCoerceClassMethEqn cls dfun_tvs inst_tys rep_inst_ty meth
               in mkPredOrigin (DerivOriginCoerce meth t1 t2) TypeLevel
                               (mkReprPrimEqPred t1 t2)
             | meth <- classMethods cls ]
