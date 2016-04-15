@@ -1,3 +1,7 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE KindSignatures #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -22,6 +26,12 @@ import Control.Monad
 import Control.Monad.Trans.Maybe
 import Control.Exception (catch, SomeException(..))
 import Data.Maybe
+#if __GLASGOW_HASKELL__ >= 800
+import GHC.Stack
+#else
+import GHC.Exts (Constraint)
+type HasCallStack = (() :: Constraint)
+#endif
 
 infixr 4 `orElse`
 
@@ -41,7 +51,7 @@ firstJust a b = firstJusts [a, b]
 firstJusts :: [Maybe a] -> Maybe a
 firstJusts = msum
 
-expectJust :: String -> Maybe a -> a
+expectJust :: HasCallStack => String -> Maybe a -> a
 {-# INLINE expectJust #-}
 expectJust _   (Just x) = x
 expectJust err Nothing  = error ("expectJust " ++ err)
