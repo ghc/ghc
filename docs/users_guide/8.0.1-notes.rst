@@ -195,6 +195,31 @@ Language
    In previous versions of GHC, this required a workaround via an
    explicit export list in ``Bar``.
 
+-  GHC has grown a :ghc-flag:`-XUndecidableSuperClasses` language extension,
+   which relaxes GHC's recursive superclass check (see :ghc-ticket:`11318`).
+   This allows class definitions which have mutually recursive superclass
+   constraints at the expense of potential non-termination in the solver.
+
+-  The compiler is now a bit more conservative in solving constraints previously
+   provided by superclasses (see :ghc-ticket:`11762`). For instance, consider
+   this program,::
+
+     {-# LANGUAGE FlexibleInstances #-}
+     {-# LANGUAGE UndecidableInstances #-}
+
+     class Super a
+     class (Super a) => Left a
+     class (Super a) => Right a
+     instance (Left a) => Right a    -- this is now an error
+
+   GHC now rejects this instance, claiming it cannot deduce the ``Super a``
+   superclass constraint of the ``Right`` typeclass. This stands in contrast to
+   previous releases, which would accept this declaration, using the ``Super a``
+   constraint implied by the ``Left a`` constraint. To fix this simply add the
+   needed superclass constraint explicitly, ::
+
+     instance (Left a, Super a) => Right a
+
 -  :ghc-flag:`-XDeriveFoldable` and :ghc-flag:`-XDeriveTraversable` now
    generate code without superfluous ``mempty`` or ``pure`` expressions. As a
    result, :ghc-flag:`-XDeriveTraversable` now works on datatypes that contain
