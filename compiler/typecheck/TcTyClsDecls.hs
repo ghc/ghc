@@ -2377,9 +2377,12 @@ checkValidClass cls
           (_,theta2,_)    = tcSplitSigmaTy tau1
 
           check_constraint :: TcPredType -> TcM ()
-          check_constraint pred
-            = when (tyCoVarsOfType pred `subVarSet` cls_tv_set)
+          check_constraint pred -- See Note [Class method constraints]
+            = when (not (isEmptyVarSet pred_tvs) &&
+                    pred_tvs `subVarSet` cls_tv_set)
                    (addErrTc (badMethPred sel_id pred))
+            where
+              pred_tvs = tyCoVarsOfType pred
 
     check_at (ATI fam_tc m_dflt_rhs)
       = do { checkTc (cls_arity == 0 || any (`elemVarSet` cls_tv_set) fam_tvs)
@@ -2420,7 +2423,21 @@ checkFamFlag tc_name
     err_msg = hang (text "Illegal family declaration for" <+> quotes (ppr tc_name))
                  2 (text "Use TypeFamilies to allow indexed type families")
 
-{-
+{- Note [Class method constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Haskell 2010 is supposed to reject
+  class C a where
+    op :: Eq a => a -> a
+where the method type costrains only the class variable(s).  (The extension
+-XConstrainedClassMethods switches off this check.)  But regardless
+we should not reject
+  class C a where
+    op :: (?x::Int) => a -> a
+as pointed out in Trac #11793. So the test here rejects the program if
+  * -XConstrainedClassMethods is off
+  * the tyvars of the constraint are non-empty
+  * all the tyvars are class tyvars, none are locally quantified
+
 Note [Abort when superclass cycle is detected]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We must avoid doing the ambiguity check for the methods (in
