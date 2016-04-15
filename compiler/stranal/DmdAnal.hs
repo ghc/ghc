@@ -1335,28 +1335,30 @@ field of the AnalEnv.
 
 Note [Final Demand Analyser run]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Some of the information that the demand analyser determines is not always
-preserved by the simplifier, for example, the simplifier will happily rewrite
+preserved by the simplifier.  For example, the simplifier will happily rewrite
   \y [Demand=1*U] let x = y in x + x
 to
   \y [Demand=1*U] y + y
 which is quite a lie.
 
-The once-used information is (currently) only used by the code generator, though. So we
- * do not bother keeping this information up-to-date in the simplifier, or
-   removing it after the demand analyser is done (keeping in mind not to
-   critically rely on this information in, say, the simplifier).
-   It should still be fine to use this as in heuristics, e.g. when deciding to
-   inline things, as the data will usually be correct.
- * Just before TidyCore, we add a pass of the demand analyse, without
-   subsequent worker/wrapper and simplifier, right before TidyCore.
-   This way, correct information  finds its way into the module interface
+The once-used information is (currently) only used by the code
+generator, though.  So:
+
+ * We zap the used-once info in the woker-wrapper;
+   see Note [Zapping Used Once info in WorkWrap] in WorkWrap. If it's
+   not reliable, it's better not to have it at all.
+
+ * Just before TidyCore, we add a pass of the demand analyser,
+      but WITHOUT subsequent worker/wrapper and simplifier,
+   right before TidyCore.  See SimplCore.getCoreToDo.
+
+   This way, correct information finds its way into the module interface
    (strictness signatures!) and the code generator (single-entry thunks!)
 
-Note that the single-call information (C1(..)) can be relied upon, as the
-simplifier tends to be very careful about not duplicating actual function
-calls.
+Note that, in contrast, the single-call information (C1(..)) /can/ be
+relied upon, as the simplifier tends to be very careful about not
+duplicating actual function calls.
 
 Also see #11731.
 -}

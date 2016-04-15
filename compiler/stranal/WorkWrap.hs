@@ -321,10 +321,7 @@ tryWW dflags fam_envs is_rec fn_id rhs
 {-
 Note [Zapping DmdEnv after Demand Analyzer]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-In the worker-wrapper pass we zap the DmdEnv.
-
-Why?
+In the worker-wrapper pass we zap the DmdEnv.  Why?
  (a) it is never used again
  (b) it wastes space
  (c) it becomes incorrect as things are cloned, because
@@ -336,14 +333,14 @@ Why here?
  * We want them to be still there at the end of DmdAnal, so that
    -ddump-str-anal contains them.
  * We don’t want a second pass just for that.
- * WorkWrap looks at all bindings anyways.
+ * WorkWrap looks at all bindings anyway.
 
-We also need to do it in TidyCore to clean up after the final,
-worker/wrapper-less run of the demand analyser.
+We also need to do it in TidyCore.tidyLetBndr to clean up after the
+final, worker/wrapper-less run of the demand analyser (see
+Note [Final Demand Analyser run] in DmdAnal).
 
 Note [Zapping Used Once info in WorkWrap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 In the worker-wrapper pass we zap the used once info in demands and in
 strictness signatures.
 
