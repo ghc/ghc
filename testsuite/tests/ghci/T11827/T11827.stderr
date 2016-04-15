@@ -1,0 +1,2 @@
+
+A.hs:6:3: error: Not in scope: data constructor ‘C’
