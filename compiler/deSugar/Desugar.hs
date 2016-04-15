@@ -30,7 +30,7 @@ import InstEnv
 import Class
 import Avail
 import CoreSyn
-import CoreFVs( exprsSomeFreeVars )
+import CoreFVs( exprsSomeFreeVarsList )
 import CoreSubst
 import PprCore
 import DsMonad
@@ -574,7 +574,9 @@ dsRule (L loc (HsRule name rule_act vars lhs _tv_lhs rhs _fv_rhs))
               fn_name   = idName fn_id
               final_rhs = simpleOptExpr rhs''    -- De-crap it
               rule_name = snd (unLoc name)
-              arg_ids = varSetElems (exprsSomeFreeVars isId args `delVarSetList` final_bndrs)
+              final_bndrs_set = mkVarSet final_bndrs
+              arg_ids = filterOut (`elemVarSet` final_bndrs_set) $
+                        exprsSomeFreeVarsList isId args
 
         ; dflags <- getDynFlags
         ; rule <- dsMkUserRule this_mod is_local

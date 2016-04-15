@@ -672,8 +672,8 @@ irClass cls
     cls_tv_set = mkVarSet cls_tvs
 
     ir_at at_tc
-      = mapM_ (updateRole Nominal) (varSetElems nvars)
-      where nvars = (mkVarSet $ tyConTyVars at_tc) `intersectVarSet` cls_tv_set
+      = mapM_ (updateRole Nominal) nvars
+      where nvars = filter (`elemVarSet` cls_tv_set) $ tyConTyVars at_tc
 
 -- See Note [Role inference]
 irDataCon :: DataCon -> RoleM ()

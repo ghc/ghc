@@ -33,7 +33,7 @@ import Module           ( Module, ModuleSet, elemModuleSet )
 import CoreSubst
 import OccurAnal        ( occurAnalyseExpr )
 import CoreFVs          ( exprFreeVars, exprsFreeVars, bindFreeVars
-                        , rulesFreeVarsDSet, exprsOrphNames )
+                        , rulesFreeVarsDSet, exprsOrphNames, exprFreeVarsList )
 import CoreUtils        ( exprType, eqExpr, mkTick, mkTicks,
                           stripTicksTopT, stripTicksTopE )
 import PprCore          ( pprRules )
@@ -898,7 +898,7 @@ match_tmpl_var :: RuleMatchEnv
 match_tmpl_var renv@(RV { rv_lcl = rn_env, rv_fltR = flt_env })
                subst@(RS { rs_id_subst = id_subst, rs_bndrs = let_bndrs })
                v1' e2
-  | any (inRnEnvR rn_env) (varSetElems (exprFreeVars e2))
+  | any (inRnEnvR rn_env) (exprFreeVarsList e2)
   = Nothing     -- Occurs check failure
                 -- e.g. match forall a. (\x-> a x) against (\y. y y)
 

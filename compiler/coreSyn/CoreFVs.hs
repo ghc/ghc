@@ -12,7 +12,9 @@ module CoreFVs (
         -- * Free variables of expressions and binding groups
         exprFreeVars,
         exprFreeVarsDSet,
+        exprFreeVarsList,
         exprFreeIds,
+        exprsFreeIdsList,
         exprsFreeVars,
         exprsFreeVarsList,
         bindFreeVars,
@@ -20,6 +22,7 @@ module CoreFVs (
         -- * Selective free variables of expressions
         InterestingVarFun,
         exprSomeFreeVars, exprsSomeFreeVars,
+        exprsSomeFreeVarsList,
 
         -- * Free variables of Rules, Vars and Ids
         varTypeTyCoVars,
@@ -30,7 +33,7 @@ module CoreFVs (
         idRuleVars, idRuleRhsVars, stableUnfoldingVars,
         ruleRhsFreeVars, ruleFreeVars, rulesFreeVars,
         rulesFreeVarsDSet,
-        ruleLhsFreeIds,
+        ruleLhsFreeIds, ruleLhsFreeIdsList,
         vectsFreeVars,
 
         expr_fvs,
@@ -109,9 +112,19 @@ exprFreeVarsAcc = filterFV isLocalVar . expr_fvs
 exprFreeVarsDSet :: CoreExpr -> DVarSet
 exprFreeVarsDSet = runFVDSet . exprFreeVarsAcc
 
+-- | Find all locally-defined free Ids or type variables in an expression
+-- returning a deterministically ordered list.
+exprFreeVarsList :: CoreExpr -> [Var]
+exprFreeVarsList = runFVList . exprFreeVarsAcc
+
 -- | Find all locally-defined free Ids in an expression
 exprFreeIds :: CoreExpr -> IdSet        -- Find all locally-defined free Ids
 exprFreeIds = exprSomeFreeVars isLocalId
+
+-- | Find all locally-defined free Ids in an expression
+-- returning a deterministically ordered list.
+exprsFreeIdsList :: [CoreExpr] -> [Id]   -- Find all locally-defined free Ids
+exprsFreeIdsList = exprsSomeFreeVarsList isLocalId
 
 -- | Find all locally-defined free Ids or type variables in several expressions
 -- returning a non-deterministic set.
@@ -148,6 +161,14 @@ exprsSomeFreeVars :: InterestingVarFun  -- Says which 'Var's are interesting
                   -> VarSet
 exprsSomeFreeVars fv_cand es =
   runFVSet $ filterFV fv_cand $ mapUnionFV expr_fvs es
+
+-- | Finds free variables in several expressions selected by a predicate
+-- returning a deterministically ordered list.
+exprsSomeFreeVarsList :: InterestingVarFun  -- Says which 'Var's are interesting
+                      -> [CoreExpr]
+                      -> [Var]
+exprsSomeFreeVarsList fv_cand es =
+  runFVList $ filterFV fv_cand $ mapUnionFV expr_fvs es
 
 --      Comment about obselete code
 -- We used to gather the free variables the RULES at a variable occurrence
@@ -422,9 +443,20 @@ rulesFreeVars rules = mapUnionVarSet ruleFreeVars rules
 
 ruleLhsFreeIds :: CoreRule -> VarSet
 -- ^ This finds all locally-defined free Ids on the left hand side of a rule
-ruleLhsFreeIds (BuiltinRule {}) = noFVs
-ruleLhsFreeIds (Rule { ru_bndrs = bndrs, ru_args = args })
-  = runFVSet $ filterFV isLocalId $ addBndrs bndrs (exprs_fvs args)
+-- and returns them as a non-deterministic set
+ruleLhsFreeIds = runFVSet . ruleLhsFreeIdsAcc
+
+ruleLhsFreeIdsList :: CoreRule -> [Var]
+-- ^ This finds all locally-defined free Ids on the left hand side of a rule
+-- and returns them as a determinisitcally ordered list
+ruleLhsFreeIdsList = runFVList . ruleLhsFreeIdsAcc
+
+ruleLhsFreeIdsAcc :: CoreRule -> FV
+-- ^ This finds all locally-defined free Ids on the left hand side of a rule
+-- and returns an FV computation
+ruleLhsFreeIdsAcc (BuiltinRule {}) = noVars
+ruleLhsFreeIdsAcc (Rule { ru_bndrs = bndrs, ru_args = args })
+  = filterFV isLocalId $ addBndrs bndrs (exprs_fvs args)
 
 {-
 Note [Rule free var hack]  (Not a hack any more)
