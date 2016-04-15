@@ -2068,8 +2068,6 @@ retainerProfile(void)
 static nat
 sanityCheckHeapClosure( StgClosure *c )
 {
-    StgInfoTable *info;
-
     ASSERT(LOOKS_LIKE_GHC_INFO(c->header.info));
     ASSERT(!closure_STATIC(c));
     ASSERT(LOOKS_LIKE_PTR(c));
