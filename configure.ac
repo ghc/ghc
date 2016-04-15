@@ -1068,7 +1068,14 @@ if test "$use_large_address_space" = "yes" ; then
    AC_DEFINE([USE_LARGE_ADDRESS_SPACE], [1], [Enable single heap address space support])
 fi
 
-AC_CHECK_LIB(dw, dwfl_begin, [HaveLibdw=YES], [HaveLibdw=NO])
+dnl ** Have libdw?
+dnl --------------------------------------------------------------
+AC_ARG_ENABLE(libdw,
+    [AC_HELP_STRING([--enable-dwarf-unwind],
+        [Enable DWARF unwinding support in the runtime system via elfutils' libdw [default=no]])],
+    [AC_CHECK_LIB(dw, dwfl_attach_state, [HaveLibdw=YES], [HaveLibdw=NO])],
+    [HaveLibdw=NO]
+)
 AC_SUBST(HaveLibdw)
 
 if test -n "$SPHINXBUILD"; then

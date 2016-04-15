@@ -93,8 +93,14 @@ AC_SUBST([LdCmd])
 
 dnl ** Have libdw?
 dnl --------------------------------------------------------------
-AC_CHECK_LIB(dw, dwfl_begin, [HaveLibdw=YES], [HaveLibdw=NO])
-AC_SUBST(HaveLibdw)
+dnl Check for a usable version of libdw/elfutils
+dnl Currently we need 0.158 or newer.
+BinDistNeedsLibdw=@HaveLibdw@
+if test "x$BinDistNeedsLibdw" = "xyes" ; then
+    AC_CHECK_LIB(dw, dwfl_attach_state, [HaveLibdw=YES],
+        [AC_MSG_ERROR([Binary distribution was built with libdw support but target system doesn't have supported libdw version (needs at least 0.158)])]
+    )];
+fi
 
 FP_GCC_VERSION
 AC_PROG_CPP
