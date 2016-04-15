@@ -300,7 +300,7 @@ test('T3064',
             # 2014-12-22: 122836340 (Windows) Death to silent superclasses
             # 2016-04-06: 153261024 (x86/Linux) probably wildcard refactor
 
-           (wordsize(64), 304344936, 5)]),
+           (wordsize(64), 287460128, 5)]),
             # (amd64/Linux) (28/06/2011):  73259544
             # (amd64/Linux) (07/02/2013): 224798696
             # (amd64/Linux) (02/08/2013): 236404384, increase from roles
@@ -321,6 +321,8 @@ test('T3064',
             #                                        Tracked as #11151.
             # (amd64/Linux) (11/12/2015): 304344936, Regression due to TypeInType
             #                                        Tracked as #11196
+            # (amd64/Linux) (15/4/2016): 287460128   Improvement due to using coercionKind instead
+            #                                        of zonkTcType (Trac #11882)
 
 ###################################
 # deactivated for now, as this metric became too volatile recently

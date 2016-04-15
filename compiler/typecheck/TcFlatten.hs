@@ -815,7 +815,7 @@ input to the flattener) might not be zonked. After zonking everything,
 (co :: xi ~ ty) will be true, however. It is for this reason that we
 occasionally have to explicitly zonk, when (co :: xi ~ ty) is important
 even before we zonk the whole program. (In particular, this is why the
-zonk in flatten_tyvar3 is necessary.)
+zonk in flattenTyVar is necessary.)
 
 Flattening a type also means flattening its kind. In the case of a type
 variable whose kind mentions a type family, this might mean that the result
@@ -916,23 +916,7 @@ flatten_one xi@(LitTy {})
        ; return (xi, mkReflCo role xi) }
 
 flatten_one (TyVarTy tv)
-  = do { mb_yes <- flatten_tyvar tv
-       ; role <- getRole
-       ; case mb_yes of
-           FTRCasted tv' kco -> -- Done
-                       do { -- traceFlat "flattenTyVar1"
-                            --   (pprTvBndr tv' $$
-                            --    ppr kco <+> dcolon <+> ppr (coercionKind kco))
-                          ; return (ty', mkReflCo role ty
-                                         `mkCoherenceLeftCo` mkSymCo kco) }
-                    where
-                       ty  = mkTyVarTy tv'
-                       ty' = ty `mkCastTy` mkSymCo kco
-
-           FTRFollowed ty1 co1  -- Recur
-                    -> do { (ty2, co2) <- flatten_one ty1
-                          -- ; traceFlat "flattenTyVar2" (ppr tv $$ ppr ty2)
-                          ; return (ty2, co2 `mkTransCo` co1) } }
+  = flattenTyVar tv
 
 flatten_one (AppTy ty1 ty2)
   = do { (xi1,co1) <- flatten_one ty1
@@ -1270,25 +1254,56 @@ have any knowledge as to *why* these facts are true.
 
 -- | The result of flattening a tyvar "one step".
 data FlattenTvResult
-  = FTRCasted TyVar Coercion
-      -- ^ Flattening the tyvar's kind produced a cast.
-      -- co :: new kind ~N old kind;
-      -- The 'TyVar' in there might have a new, zonked kind
+  = FTRNotFollowed
+      -- ^ The inert set doesn't make the tyvar equal to anything else
+
   | FTRFollowed TcType Coercion
       -- ^ The tyvar flattens to a not-necessarily flat other type.
       -- co :: new type ~r old type, where the role is determined by
       -- the FlattenEnv
 
-flatten_tyvar :: TcTyVar -> FlatM FlattenTvResult
+flattenTyVar :: TyVar -> FlatM (Xi, Coercion)
+flattenTyVar tv
+  = do { mb_yes <- flatten_tyvar1 tv
+       ; case mb_yes of
+           FTRFollowed ty1 co1  -- Recur
+             -> do { (ty2, co2) <- flatten_one ty1
+                   -- ; traceFlat "flattenTyVar2" (ppr tv $$ ppr ty2)
+                   ; return (ty2, co2 `mkTransCo` co1) }
+
+           FTRNotFollowed   -- Done
+             -> do { let orig_kind = tyVarKind tv
+                   ; (_new_kind, kind_co) <- setMode FM_SubstOnly $
+                                             flattenKinds $
+                                             flatten_one orig_kind
+                     ; let Pair _ zonked_kind = coercionKind kind_co
+             -- NB: kind_co :: _new_kind ~ zonked_kind
+             -- But zonked_kind is not necessarily the same as orig_kind
+             -- because that may have filled-in metavars.
+             -- Moreover the returned Xi type must be well-kinded
+             -- (e.g. in canEqTyVarTyVar we use getCastedTyVar_maybe)
+             -- If you remove it, then e.g. dependent/should_fail/T11407 panics
+             -- See also Note [Flattening]
+             -- An alternative would to use (zonkTcType orig_kind),
+             -- but some simple measurements suggest that's a little slower
+                    ; let tv'    = setTyVarKind tv zonked_kind
+                          tv_ty' = mkTyVarTy tv'
+                          ty'    = tv_ty' `mkCastTy` mkSymCo kind_co
+
+                    ; role <- getRole
+                    ; return (ty', mkReflCo role tv_ty'
+                                   `mkCoherenceLeftCo` mkSymCo kind_co) } }
+
+flatten_tyvar1 :: TcTyVar -> FlatM FlattenTvResult
 -- "Flattening" a type variable means to apply the substitution to it
 -- Specifically, look up the tyvar in
 --   * the internal MetaTyVar box
 --   * the inerts
 -- See also the documentation for FlattenTvResult
 
-flatten_tyvar tv
+flatten_tyvar1 tv
   | not (isTcTyVar tv)             -- Happens when flatten under a (forall a. ty)
-  = flatten_tyvar3 tv
+  = return FTRNotFollowed
           -- So ty contains references to the non-TcTyVar a
 
   | otherwise
@@ -1312,7 +1327,7 @@ flatten_tyvar2 tv fr@(flavour, eq_rel)
            Just (CTyEqCan { cc_rhs = rhs })
              -> return (FTRFollowed rhs (pprPanic "flatten_tyvar2" (ppr tv $$ ppr rhs)))
                               -- Evidence is irrelevant for Derived contexts
-           _ -> flatten_tyvar3 tv }
+           _ -> return FTRNotFollowed }
 
   | otherwise   -- For non-derived equalities, consult the inert_eqs (only)
   = do { ieqs <- liftTcS $ getInertEqs
@@ -1336,28 +1351,7 @@ flatten_tyvar2 tv fr@(flavour, eq_rel)
                     -- we are not going to touch the returned coercion
                     -- so ctEvCoercion is fine.
 
-           _other -> flatten_tyvar3 tv }
-
-flatten_tyvar3 :: TcTyVar -> FlatM FlattenTvResult
--- Always returns FTRCasted!
-flatten_tyvar3 tv
-  = -- Done, but make sure the kind is zonked
-    do { let kind = tyVarKind tv
-       ; (_new_kind, kind_co)
-           <- setMode FM_SubstOnly $
-              flattenKinds $
-              flatten_one kind
---       ; traceFlat "flattenTyVarFinal"
---           (vcat [ ppr tv <+> dcolon <+> ppr (tyVarKind tv)
---                 , ppr _new_kind
---                 , ppr kind_co <+> dcolon <+> ppr (coercionKind kind_co) ])
-       ; orig_kind <- liftTcS $ zonkTcType kind
-             -- NB: orig_kind is *not* the kind returned from flatten
-             -- This zonk is necessary because we might later see the tv's kind
-             -- in canEqTyVarTyVar (where we use getCastedTyVar_maybe).
-             -- If you remove it, then e.g. dependent/should_fail/T11407 panics
-             -- See also Note [Flattening]
-       ; return (FTRCasted (setTyVarKind tv orig_kind) kind_co) }
+           _other -> return FTRNotFollowed }
 
 {-
 Note [An alternative story for the inert substitution]

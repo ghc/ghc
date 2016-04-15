@@ -599,8 +599,11 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel
  = do { let (bndrs1,body1) = tcSplitNamedPiTys s1
             (bndrs2,body2) = tcSplitNamedPiTys s2
       ; if not (equalLength bndrs1 bndrs2)
-           || not (map binderVisibility bndrs1 == map binderVisibility bndrs2)
-        then canEqHardFailure ev s1 s2
+        then do { traceTcS "Forall failure" $
+                     vcat [ ppr s1, ppr s2, ppr bndrs1, ppr bndrs2
+                          , ppr (map binderVisibility bndrs1)
+                          , ppr (map binderVisibility bndrs2) ]
+                ; canEqHardFailure ev s1 s2 }
         else
           do { traceTcS "Creating implication for polytype equality" $ ppr ev
              ; kind_cos <- zipWithM (unifyWanted loc Nominal)
