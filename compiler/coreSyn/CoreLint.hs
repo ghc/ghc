@@ -339,7 +339,7 @@ interactiveInScope :: HscEnv -> [Var]
 --
 -- See Trac #8215 for an example
 interactiveInScope hsc_env
-  = varSetElems tyvars ++ ids
+  = tyvars ++ ids
   where
     -- C.f. TcRnDriver.setInteractiveContext, Desugar.deSugarExpr
     ictxt                   = hsc_IC hsc_env
@@ -347,7 +347,7 @@ interactiveInScope hsc_env
     te1    = mkTypeEnvWithImplicits (ic_tythings ictxt)
     te     = extendTypeEnvWithIds te1 (map instanceDFunId cls_insts)
     ids    = typeEnvIds te
-    tyvars = mapUnionVarSet (tyCoVarsOfType . idType) ids
+    tyvars = tyCoVarsOfTypesList $ map idType ids
               -- Why the type variables?  How can the top level envt have free tyvars?
               -- I think it's because of the GHCi debugger, which can bind variables
               --   f :: [t] -> [t]

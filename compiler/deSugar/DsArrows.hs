@@ -937,7 +937,7 @@ dsRecCmd ids local_vars stmts later_ids later_rets rec_ids rec_rets = do
     core_rec_rets <- mapM dsExpr rec_rets
     let
         -- possibly polymorphic version of vars of later_ids and rec_ids
-        out_ids = varSetElems (unionVarSets (map exprFreeIds (core_later_rets ++ core_rec_rets)))
+        out_ids = exprsFreeIdsList (core_later_rets ++ core_rec_rets)
         out_ty = mkBigCoreVarTupTy out_ids
 
         later_tuple = mkBigCoreTup core_later_rets

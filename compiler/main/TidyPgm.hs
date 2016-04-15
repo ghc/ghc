@@ -950,7 +950,7 @@ findExternalRules omit_prags binds imp_id_rules unfold_env
 
     expose_rule rule
         | omit_prags = False
-        | otherwise  = all is_external_id (varSetElems (ruleLhsFreeIds rule))
+        | otherwise  = all is_external_id (ruleLhsFreeIdsList rule)
                 -- Don't expose a rule whose LHS mentions a locally-defined
                 -- Id that is completely internal (i.e. not visible to an
                 -- importing module).  NB: ruleLhsFreeIds only returns LocalIds.

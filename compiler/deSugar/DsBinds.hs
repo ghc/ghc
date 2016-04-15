@@ -780,7 +780,9 @@ decomposeRuleLhs orig_bndrs orig_lhs
         -- Add extra dict binders: Note [Free dictionaries]
    mk_extra_dict_bndrs fn_id args
      = [ mkLocalId (localiseName (idName d)) (idType d)
-       | d <- varSetElems (exprsFreeVars args `delVarSetList` (fn_id : orig_bndrs))
+       | d <- exprsFreeVarsList args
+       , not (d `elemVarSet` orig_bndr_set)
+       , not (d == fn_id)
               -- fn_id: do not quantify over the function itself, which may
               -- itself be a dictionary (in pathological cases, Trac #10251)
        , isDictId d ]

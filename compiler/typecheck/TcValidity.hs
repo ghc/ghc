@@ -1725,8 +1725,9 @@ checkZonkValidTelescope hs_tvs orig_tvs extra
         -- over it in kindGeneralize, as we should.
 
     go errs in_scope  (tv:tvs)
-      = let bad_tvs = tyCoVarsOfType (tyVarKind tv) `minusVarSet` in_scope in
-        go (varSetElems bad_tvs ++ errs) (in_scope `extendVarSet` tv) tvs
+      = let bad_tvs = filterOut (`elemVarSet` in_scope) $
+                      tyCoVarsOfTypeList (tyVarKind tv)
+        in go (bad_tvs ++ errs) (in_scope `extendVarSet` tv) tvs
 
 -- | After inferring kinds of type variables, check to make sure that the
 -- inferred kinds any of the type variables bound in a smaller scope.

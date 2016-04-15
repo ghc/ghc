@@ -570,7 +570,8 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
                                --     hence "incl_derivs"
 
               else do { let quant_cand = approximateWC wanted_transformed
-                            meta_tvs   = filter isMetaTyVar (varSetElems (tyCoVarsOfCts quant_cand))
+                            meta_tvs   = filter isMetaTyVar $
+                                         tyCoVarsOfCtsList quant_cand
 
                       ; gbl_tvs <- tcGetGlobalTyCoVars
                             -- Miminise quant_cand.  We are not interested in any evidence
@@ -1785,7 +1786,7 @@ floatEqualities skols no_given_eqs
   | otherwise
   = do { outer_tclvl <- TcS.getTcLevel
        ; mapM_ (promoteTyVarTcS outer_tclvl)
-               (varSetElems (tyCoVarsOfCts float_eqs))
+               (tyCoVarsOfCtsList float_eqs)
            -- See Note [Promoting unification variables]
 
        ; traceTcS "floatEqualities" (vcat [ text "Skols =" <+> ppr skols

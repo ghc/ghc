@@ -516,8 +516,7 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
 
        (ids, offsets) = unzip pointers
 
-       free_tvs = mapUnionVarSet (tyCoVarsOfType . idType) ids
-                  `unionVarSet` tyCoVarsOfType result_ty
+       free_tvs = tyCoVarsOfTypesList (result_ty:map idType ids)
 
    -- It might be that getIdValFromApStack fails, because the AP_STACK
    -- has been accidentally evaluated, or something else has gone wrong.
@@ -563,12 +562,12 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
      = do { name <- newInteractiveBinder hsc_env occ (getSrcSpan old_id)
           ; return (Id.mkVanillaGlobalWithInfo name ty (idInfo old_id)) }
 
-   newTyVars :: UniqSupply -> TcTyVarSet -> TCvSubst
+   newTyVars :: UniqSupply -> [TcTyVar] -> TCvSubst
      -- Similarly, clone the type variables mentioned in the types
      -- we have here, *and* make them all RuntimeUnk tyars
    newTyVars us tvs
      = mkTvSubstPrs [ (tv, mkTyVarTy (mkRuntimeUnkTyVar name (tyVarKind tv)))
-                    | (tv, uniq) <- varSetElems tvs `zip` uniqsFromSupply us
+                    | (tv, uniq) <- tvs `zip` uniqsFromSupply us
                     , let name = setNameUnique (tyVarName tv) uniq ]
 
 rttiEnvironment :: HscEnv -> IO HscEnv
