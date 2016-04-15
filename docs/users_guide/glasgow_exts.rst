@@ -943,6 +943,11 @@ then the expression will only require ``Applicative``. Otherwise, the expression
 will require ``Monad``. The block may return a pure expression ``E`` depending
 upon the results ``p1...pn`` with either ``return`` or ``pure``.
 
+Note: the final statement really must be of the form ``return E`` or
+``pure E``, otherwise you get a ``Monad`` constraint.  In particular,
+``return $ E`` is not of the form ``return E``, and will therefore
+incur a ``Monad`` constraint.
+
 When the statements of a ``do`` expression have dependencies between
 them, and ``ApplicativeDo`` cannot infer an ``Applicative`` type, it
 uses a heuristic algorithm to try to use ``<*>`` as much as possible.
