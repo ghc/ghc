@@ -296,8 +296,12 @@ haskellise "" = ""
 
 wanteds :: String -> Wanteds
 wanteds os = concat
-          [-- Closure header sizes.
-           constantWord Both "STD_HDR_SIZE"
+          [-- Control group constant for integrity check; this
+           -- round-tripped constant is used for testing that
+           -- derivedConstant works as expected
+           constantWord Both "CONTROL_GROUP_CONST_291" "0x123"
+           -- Closure header sizes.
+          ,constantWord Both "STD_HDR_SIZE"
                              -- grrr.. PROFILING is on so we need to
                              -- subtract sizeofW(StgProfHeader)
                              "sizeofW(StgHeader) - sizeofW(StgProfHeader)"
@@ -682,6 +686,14 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
              m = Map.fromList $ case os of
                  "aix" -> parseAixObjdump ls
                  _     -> catMaybes $ map parseNmLine ls
+
+         case Map.lookup "CONTROL_GROUP_CONST_291" m of
+             Just 292   -> return () -- OK
+             Nothing    -> die "CONTROL_GROUP_CONST_291 missing!"
+             Just 0x292 -> die $ "broken 'nm' detected, see https://ghc.haskell.org/ticket/11744.\n"
+                              ++ "Workaround: You may want to pass '--with-nm=nm-classic' to 'configure'."
+             Just x     -> die ("unexpected value round-tripped for CONTROL_GROUP_CONST_291: " ++ show x)
+
          rs <- mapM (lookupResult m) (wanteds os)
          return rs
     where headers = ["#define IN_STG_CODE 0",
