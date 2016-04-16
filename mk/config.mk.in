@@ -509,11 +509,10 @@ SUPPORTS_THIS_UNIT_ID = @SUPPORTS_THIS_UNIT_ID@
 #-----------------------------------------------------------------------------
 # C compiler
 #
-# NB. Don't override $(WhatGccIsCalled) using build.mk,  re-configure using
-# the flag --with-gcc=<blah> instead.  The reason is that the configure script
+# NB. Don't override $(CC) using build.mk,  re-configure using
+# the flag CC=<blah> instead.  The reason is that the configure script
 # needs to know which gcc you're using in order to perform its tests.
 
-WhatGccIsCalled       = @WhatGccIsCalled@
 GccVersion            = @GccVersion@
 ifeq "$(phase)" "0"
 CrossCompilePrefix    =
@@ -527,18 +526,19 @@ GccLT34         = @GccLT34@
 GccLT46         = @GccLT46@
 GccIsClang      = @GccIsClang@
 
-CC              = $(WhatGccIsCalled)
+CC              = @CC@
 CC_STAGE0       = @CC_STAGE0@
 CC_STAGE1       = $(CC)
 CC_STAGE2       = $(CC)
 CC_STAGE3       = $(CC)
 
-AS              = $(WhatGccIsCalled)
+AS              = @CC@
 AS_STAGE0       = @CC_STAGE0@
 AS_STAGE1       = $(AS)
 AS_STAGE2       = $(AS)
 AS_STAGE3       = $(AS)
 
+# why no LD=@LD@ ?
 LD_STAGE0       = @LD_STAGE0@
 LD_STAGE1       = $(LD)
 LD_STAGE2       = $(LD)

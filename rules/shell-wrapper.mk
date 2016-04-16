@@ -46,7 +46,7 @@ $$($1_$2_INPLACE_WRAPPER): $$($1_$2_INPLACE)
 	echo 'datadir="$$(TOP)/$$(INPLACE_LIB)"'                             >> $$@
 	echo 'bindir="$$(TOP)/$$(INPLACE_BIN)"'                              >> $$@
 	echo 'topdir="$$(TOP)/$$(INPLACE_TOPDIR)"'                           >> $$@
-	echo 'pgmgcc="$$(WhatGccIsCalled)"'                                  >> $$@
+	echo 'pgmgcc="$$(CC)"'                                               >> $$@
 	$$($1_$2_SHELL_WRAPPER_EXTRA)
 	$$($1_$2_INPLACE_SHELL_WRAPPER_EXTRA)
 ifeq "$$(DYNAMIC_GHC_PROGRAMS)" "YES"

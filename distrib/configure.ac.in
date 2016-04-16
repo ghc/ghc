@@ -59,9 +59,7 @@ XCODE_VERSION()
 
 dnl ** Which gcc to use?
 dnl --------------------------------------------------------------
-FIND_GCC([WhatGccIsCalled], [gcc], [gcc])
-CC="$WhatGccIsCalled"
-export CC
+AC_PROG_CC([gcc clang])
 
 # --with-hs-cpp/--with-hs-cpp-flags
 FP_CPP_CMD_WITH_ARGS(HaskellCPPCmd, HaskellCPPArgs)

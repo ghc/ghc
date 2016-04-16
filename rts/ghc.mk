@@ -538,7 +538,7 @@ ifeq "$(TargetOS_CPP)" "darwin"
 # Darwin has a flag to tell dtrace which cpp to use.
 # Unfortunately, this isn't supported on Solaris (See Solaris Dynamic Tracing
 # Guide, Chapter 16, for the configuration variables available on Solaris)
-DTRACE_FLAGS = -x cpppath=$(WhatGccIsCalled)
+DTRACE_FLAGS = -x cpppath=$(CC)
 endif
 
 DTRACEPROBES_SRC = rts/RtsProbes.d

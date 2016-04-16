@@ -33,6 +33,11 @@ fi
 
 AC_SUBST([CONFIGURE_ARGS], [$ac_configure_args])
 
+dnl this makes sure `./configure --target=<cross-compile-target>`
+dnl works as expected, since we're slightly modifying how Autoconf
+dnl interprets build/host/target and how this interacts with $CC tests
+test -n "$target_alias" && ac_tool_prefix=$target_alias-
+
 dnl ----------------------------------------------------------
 dnl ** Find unixy sort and find commands,
 dnl ** which are needed by FP_SETUP_PROJECT_VERSION
@@ -107,6 +112,11 @@ AC_ARG_ENABLE(tarballs-autodownload,
         TarballsAutodownload=YES,
         TarballsAutodownload=NO
 )
+
+dnl CC_STAGE0 is like the "previous" variable CC (inherited by CC_STAGE[123])
+dnl but instead used by stage0 for bootstrapping stage1
+AC_ARG_VAR(CC_STAGE0, [C compiler command (bootstrap)])
+
 if test "$WithGhc" != ""; then
   FPTOOLS_GHC_VERSION([GhcVersion], [GhcMajVersion], [GhcMinVersion], [GhcPatchLevel])dnl
 
@@ -121,7 +131,11 @@ if test "$WithGhc" != ""; then
   GhcMinVersion2=`echo "$GhcMinVersion" | sed 's/^\\(.\\)$/0\\1/'`
   GhcCanonVersion="$GhcMajVersion$GhcMinVersion2"
 
-  BOOTSTRAPPING_GHC_INFO_FIELD([CC_STAGE0],[C compiler command])
+  dnl infer CC_STAGE0 from `ghc --info` unless explicitly set by user
+  if test -z "$CC_STAGE0"; then
+    BOOTSTRAPPING_GHC_INFO_FIELD([CC_STAGE0],[C compiler command])
+  fi
+
   BOOTSTRAPPING_GHC_INFO_FIELD([LD_STAGE0],[ld command])
   BOOTSTRAPPING_GHC_INFO_FIELD([AR_STAGE0],[ar command])
   BOOTSTRAPPING_GHC_INFO_FIELD([AR_OPTS_STAGE0],[ar flags])
@@ -432,13 +446,19 @@ AC_SUBST(TargetPlatformFull)
 
 dnl ** Which gcc to use?
 dnl --------------------------------------------------------------
-FIND_GCC([WhatGccIsCalled], [gcc], [gcc])
-CC="$WhatGccIsCalled"
-export CC
 
-# If --with-gcc was used, and we're not cross-compiling, then it also
-# applies to the stage0 compiler.
-MAYBE_OVERRIDE_STAGE0([gcc],[CC_STAGE0])
+AC_ARG_WITH([gcc],
+        AS_HELP_STRING([--with-gcc=ARG], [Use ARG as the path to gcc (obsolete, use CC=ARG instead) [default=autodetect]]),
+        AC_MSG_ERROR([--with-gcc=$withval is obsolete (use './configure CC=$withval' or 'CC=$withval ./configure' instead)]))
+
+AC_ARG_WITH([clang],
+        AS_HELP_STRING([--with-clang=ARG], [Use ARG as the path to gcc (obsolete, use CC=ARG instead) [default=autodetect]]),
+        AC_MSG_ERROR([--with-clang=$withval is obsolete (use './configure CC=$withval' or 'CC=$withval ./configure' instead)]))
+
+dnl detect compiler (prefer gcc over clang) and set $CC (unless CC already set),
+dnl later CC is copied to CC_STAGE{1,2,3}
+AC_PROG_CC([gcc clang])
+
 MAYBE_OVERRIDE_STAGE0([ar],[AR_STAGE0])
 
 dnl make extensions visible to allow feature-tests to detect them lateron
@@ -1155,7 +1175,8 @@ else
 fi
 
 echo ["\
-   Using $CompilerName       : $WhatGccIsCalled
+   Using (for bootstrapping) : $CC_STAGE0
+   Using $CompilerName       : $CC
       which is version       : $GccVersion
    Building a cross compiler : $CrossCompiling
    hs-cpp       : $HaskellCPPCmd

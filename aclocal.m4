@@ -471,7 +471,7 @@ AC_DEFUN([FP_SETTINGS],
         SettingsWindresCommand="\$topdir/../${mingw_bin_prefix}windres.exe"
         SettingsTouchCommand='$topdir/bin/touchy.exe'
     else
-        SettingsCCompilerCommand="$WhatGccIsCalled"
+        SettingsCCompilerCommand="$CC"
         SettingsHaskellCPPCommand="$HaskellCPPCmd"
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
         SettingsLdCommand="$LdCmd"
@@ -2067,38 +2067,6 @@ AC_DEFUN([FIND_GHC_BOOTSTRAP_PROG],[
 ])
 
 
-# FIND_GCC()
-# --------------------------------
-# Finds where gcc is
-#
-# $1 = the variable to set
-# $2 = the with option name
-# $3 = the command to look for
-AC_DEFUN([FIND_GCC],[
-    if test "$windows" = YES
-    then
-        $1="$CC"
-    else
-        FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([$1], [$2], [$3])
-        # fallback to CC if set and no --with-$2=... was used
-        if test -z "$With_$2" -a -n "$CC"
-        then
-            With_$2="$CC"
-            $1="$CC"
-        # From Xcode 5 on/, OS X command line tools do not include gcc
-        # anymore. Use clang.
-        elif test -z "$$1"
-        then
-            FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([$1], [clang], [clang])
-        fi
-        if test -z "$$1"
-        then
-            AC_MSG_ERROR([cannot find $3 nor clang in your PATH])
-        fi
-    fi
-    AC_SUBST($1)
-])
-
 AC_DEFUN([MAYBE_OVERRIDE_STAGE0],[
   if test ! -z "$With_$1" -a "$CrossCompiling" != "YES"; then
       AC_MSG_NOTICE([Not cross-compiling, so --with-$1 also sets $2])
@@ -2132,13 +2100,13 @@ AC_ARG_WITH(hs-cpp,
 
     # We can't use $CPP here, since HS_CPP_CMD is expected to be a single
     # command (no flags), and AC_PROG_CPP defines CPP as "/usr/bin/gcc -E".
-    HS_CPP_CMD=$WhatGccIsCalled
+    HS_CPP_CMD=$CC
 
     SOLARIS_GCC_CPP_BROKEN=NO
     SOLARIS_FOUND_GOOD_CPP=NO
     case $host in
         i386-*-solaris2)
-        GCC_MAJOR_MINOR=`$WhatGccIsCalled --version|grep "gcc (GCC)"|cut -d ' ' -f 3-3|cut -d '.' -f 1-2`
+        GCC_MAJOR_MINOR=`$CC --version|grep "gcc (GCC)"|cut -d ' ' -f 3-3|cut -d '.' -f 1-2`
         if test "$GCC_MAJOR_MINOR" != "3.4"; then
           # this is not 3.4.x release so with broken CPP
           SOLARIS_GCC_CPP_BROKEN=YES
