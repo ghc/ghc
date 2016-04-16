@@ -31,7 +31,8 @@ module Haddock.Backends.Xhtml.Layout (
   subConstructors,
   subEquations,
   subFields,
-  subInstances, subOrphanInstances, subInstHead, subInstDetails,
+  subInstances, subOrphanInstances,
+  subInstHead, subInstDetails, subFamInstDetails,
   subMethods,
   subMinimal,
 
@@ -179,7 +180,6 @@ subAssociatedTypes = divSubDecls "associated-types" "Associated Types" . subBloc
 subConstructors :: Qualification -> [SubDecl] -> Html
 subConstructors qual = divSubDecls "constructors" "Constructors" . subTable qual
 
-
 subFields :: Qualification -> [SubDecl] -> Html
 subFields qual = divSubDecls "fields" "Fields" . subDlist qual
 
@@ -226,10 +226,18 @@ subInstDetails :: String -- ^ Instance unique id (for anchor generation)
                -> [Html] -- ^ Method contents (pretty-printed signatures)
                -> Html
 subInstDetails iid ats mets =
-    section << (subAssociatedTypes ats <+> subMethods mets)
-  where
-    section = thediv ! collapseSection (instAnchorId iid) False "inst-details"
+    subInstSection iid << (subAssociatedTypes ats <+> subMethods mets)
 
+subFamInstDetails :: String -- ^ Instance unique id (for anchor generation)
+                  -> Html   -- ^ Type or data family instance
+                  -> Html
+subFamInstDetails iid fi =
+    subInstSection iid << thediv ! [theclass "src"] << fi
+
+subInstSection :: String -- ^ Instance unique id (for anchor generation)
+               -> Html
+               -> Html
+subInstSection iid = thediv ! collapseSection (instAnchorId iid) False "inst-details"
 
 instAnchorId :: String -> String
 instAnchorId iid = makeAnchorId $ "i:" ++ iid

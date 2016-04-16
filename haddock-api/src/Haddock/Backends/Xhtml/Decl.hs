@@ -607,20 +607,26 @@ ppInstHead links splice unicode qual mdoc origin orphan no ihd@(InstHead {..}) =
             , [subInstDetails iid ats sigs]
             )
           where
-            iid = instanceId origin no orphan ihd
             sigs = ppInstanceSigs links splice unicode qual clsiSigs
             ats = ppInstanceAssocTys links splice unicode qual clsiAssocTys
         TypeInst rhs ->
-            (ptype, mdoc, [])
+            ( subInstHead iid ptype
+            , mdoc
+            , [subFamInstDetails iid prhs]
+            )
           where
-            ptype = keyword "type" <+> typ <+> prhs
-            prhs = maybe noHtml (\t -> equals <+> ppType unicode qual t) rhs
+            ptype = keyword "type" <+> typ
+            prhs = ptype <+> maybe noHtml
+                                   (\t -> equals <+> ppType unicode qual t) rhs
         DataInst dd ->
-            (pdata, mdoc, [])
+            ( subInstHead iid pdata
+            , mdoc
+            , [subFamInstDetails iid pdecl])
           where
-            pdata = keyword "data" <+> typ <+> pdecl
-            pdecl = ppShortDataDecl False True dd unicode qual
+            pdata = keyword "data" <+> typ
+            pdecl = pdata <+> ppShortDataDecl False True dd unicode qual
   where
+    iid = instanceId origin no orphan ihd
     typ = ppAppNameTypes ihdClsName ihdKinds ihdTypes unicode qual
 
 
