@@ -33,6 +33,9 @@ Flags:
 
     THREADS=1 ./validate
 
+  You can set the 'config_args' environment variable to pass flags to
+  'configure'.
+
   You can also use environment variables to pass extra options to the
   testsuite. For example:
 
