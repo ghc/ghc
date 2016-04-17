@@ -290,7 +290,8 @@ ppr_dec _ (NewtypeD ctxt t xs ksig c decs)
 ppr_dec _  (ClassD ctxt c xs fds ds)
   = text "class" <+> pprCxt ctxt <+> ppr c <+> hsep (map ppr xs) <+> ppr fds
     $$ where_clause ds
-ppr_dec _ (InstanceD ctxt i ds) = text "instance" <+> pprCxt ctxt <+> ppr i
+ppr_dec _ (InstanceD o ctxt i ds) =
+        text "instance" <+> maybe empty ppr_overlap o <+> pprCxt ctxt <+> ppr i
                                   $$ where_clause ds
 ppr_dec _ (SigD f t)    = pprPrefixOcc f <+> dcolon <+> ppr t
 ppr_dec _ (ForeignD f)  = ppr f
@@ -338,6 +339,15 @@ ppr_dec _ (StandaloneDerivD cxt ty)
 
 ppr_dec _ (DefaultSigD n ty)
   = hsep [ text "default", pprPrefixOcc n, dcolon, ppr ty ]
+
+
+ppr_overlap :: Overlap -> Doc
+ppr_overlap o = text $
+  case o of
+    Overlaps      -> "{-# OVERLAPS #-}"
+    Overlappable  -> "{-# OVERLAPPABLE #-}"
+    Overlapping   -> "{-# OVERLAPPING #-}"
+    Incoherent    -> "{-# INCOHERENT #-}"
 
 ppr_data :: Doc -> Cxt -> Name -> Doc -> Maybe Kind -> [Con] -> Cxt -> Doc
 ppr_data maybeInst ctxt t argsDoc ksig cs decs

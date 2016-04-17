@@ -429,7 +429,9 @@ repInstD (L loc (ClsInstD { cid_inst = cls_decl }))
 repClsInstD :: ClsInstDecl Name -> DsM (Core TH.DecQ)
 repClsInstD (ClsInstDecl { cid_poly_ty = ty, cid_binds = binds
                          , cid_sigs = prags, cid_tyfam_insts = ats
-                         , cid_datafam_insts = adts })
+                         , cid_datafam_insts = adts
+                         , cid_overlap_mode = overlap
+                         })
   = addSimpleTyVarBinds tvs $
             -- We must bring the type variables into scope, so their
             -- occurrences don't fail, even though the binders don't
@@ -447,7 +449,8 @@ repClsInstD (ClsInstDecl { cid_poly_ty = ty, cid_binds = binds
                ; ats1 <- mapM (repTyFamInstD . unLoc) ats
                ; adts1 <- mapM (repDataFamInstD . unLoc) adts
                ; decls <- coreList decQTyConName (ats1 ++ adts1 ++ binds1 ++ prags1)
-               ; repInst cxt1 inst_ty1 decls }
+               ; rOver <- repOverlap (fmap unLoc overlap)
+               ; repInst rOver cxt1 inst_ty1 decls }
  where
    (tvs, cxt, inst_ty) = splitLHsInstDeclTy ty
 
@@ -1865,8 +1868,26 @@ repTySyn :: Core TH.Name -> Core [TH.TyVarBndr]
 repTySyn (MkC nm) (MkC tvs) (MkC rhs)
   = rep2 tySynDName [nm, tvs, rhs]
 
-repInst :: Core TH.CxtQ -> Core TH.TypeQ -> Core [TH.DecQ] -> DsM (Core TH.DecQ)
-repInst (MkC cxt) (MkC ty) (MkC ds) = rep2 instanceDName [cxt, ty, ds]
+repInst :: Core (Maybe TH.Overlap) ->
+           Core TH.CxtQ -> Core TH.TypeQ -> Core [TH.DecQ] -> DsM (Core TH.DecQ)
+repInst (MkC o) (MkC cxt) (MkC ty) (MkC ds) = rep2 instanceWithOverlapDName
+                                                              [o, cxt, ty, ds]
+
+repOverlap :: Maybe OverlapMode -> DsM (Core (Maybe TH.Overlap))
+repOverlap mb =
+  case mb of
+    Nothing -> nothing
+    Just o ->
+      case o of
+        NoOverlap _    -> nothing
+        Overlappable _ -> just =<< dataCon overlappableDataConName
+        Overlapping _  -> just =<< dataCon overlappingDataConName
+        Overlaps _     -> just =<< dataCon overlapsDataConName
+        Incoherent _   -> just =<< dataCon incoherentDataConName
+  where
+  nothing = coreNothing overlapTyConName
+  just    = coreJust overlapTyConName
+
 
 repClass :: Core TH.CxtQ -> Core TH.Name -> Core [TH.TyVarBndr]
          -> Core [TH.FunDep] -> Core [TH.DecQ]

@@ -1525,8 +1525,9 @@ data Dec
   | TySynD Name [TyVarBndr] Type  -- ^ @{ type T x = (x,x) }@
   | ClassD Cxt Name [TyVarBndr]
          [FunDep] [Dec]           -- ^ @{ class Eq a => Ord a where ds }@
-  | InstanceD Cxt Type [Dec]      -- ^ @{ instance Show w => Show [w]
-                                  --       where ds }@
+  | InstanceD (Maybe Overlap) Cxt Type [Dec]
+                                  -- ^ @{ instance {\-\# OVERLAPS \#-\}
+                                  --        Show w => Show [w] where ds }@
   | SigD Name Type                -- ^ @{ length :: [a] -> Int }@
   | ForeignD Foreign              -- ^ @{ foreign import ... }
                                   --{ foreign export ... }@
@@ -1562,6 +1563,15 @@ data Dec
   | RoleAnnotD Name [Role]        -- ^ @{ type role T nominal representational }@
   | StandaloneDerivD Cxt Type     -- ^ @{ deriving instance Ord a => Ord (Foo a) }@
   | DefaultSigD Name Type         -- ^ @{ default size :: Data a => a -> Int }@
+  deriving( Show, Eq, Ord, Data, Typeable, Generic )
+
+-- | Properties for overlapping instances.
+data Overlap = Overlappable   -- ^ May be overlapped by more specific instances
+             | Overlapping    -- ^ May overlap a more general instance
+             | Overlaps       -- ^ Both 'Overlapping' and 'Overlappable'
+             | Incoherent     -- ^ Both 'Overlappable' and 'Overlappable', and
+                              -- pick an arbitrary one if multiple choices are
+                              -- avaialble.
   deriving( Show, Eq, Ord, Data, Typeable, Generic )
 
 -- | Common elements of 'OpenTypeFamilyD' and 'ClosedTypeFamilyD'.

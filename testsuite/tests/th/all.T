@@ -26,6 +26,8 @@ test('TH_repGuard', normal, compile, ['-v0'])
 test('TH_repGuardOutput', normal, compile_and_run, [''])
 test('TH_repPatSig', normal, compile_fail, [''])
 
+test('TH_overlaps', normal, compile, ['-v0'])
+
 test('TH_spliceE5',
      extra_clean(['TH_spliceE5_Lib.hi', 'TH_spliceE5_Lib.o']),
      multimod_compile_and_run,

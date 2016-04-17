@@ -142,7 +142,9 @@ module Language.Haskell.TH(
     -- **** Data
     valD, funD, tySynD, dataD, newtypeD,
     -- **** Class
-    classD, instanceD, sigD, standaloneDerivD, defaultSigD,
+    classD, instanceD, instanceWithOverlapD, Overlap(..),
+    sigD, standaloneDerivD, defaultSigD,
+
     -- **** Role annotations
     roleAnnotD,
     -- **** Type Family / Data Family

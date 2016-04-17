@@ -8,7 +8,7 @@ class C a where
 
 mkC :: Name -> Q [Dec]
 mkC n = return
-  [InstanceD [] (AppT (ConT ''C) (ConT n))
+  [InstanceD Nothing [] (AppT (ConT ''C) (ConT n))
     [ FunD 'inlinable [Clause [WildP] (NormalB (ConE '())) []],
       PragmaD (InlineP 'inlinable Inline FunLike AllPhases)    
     ] 

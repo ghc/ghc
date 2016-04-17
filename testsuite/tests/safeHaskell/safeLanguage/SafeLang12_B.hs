@@ -12,6 +12,6 @@ mkSimpleClass name = do
 	TyConI (DataD [] dname [] Nothing cs _) <- reify name
 	((NormalC conname []):_) <- return cs
 	ClassI (ClassD [] cname [_] [] [SigD mname _]) _ <- reify ''Class
-	return [InstanceD [] (AppT (ConT cname) (ConT dname)) [FunD mname
+	return [InstanceD Nothing [] (AppT (ConT cname) (ConT dname)) [FunD mname
             [Clause [] (NormalB (ConE conname)) []]]]
 

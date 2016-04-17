@@ -257,7 +257,7 @@ cvtDec (ClassD ctxt cl tvs fds decs)
                         Right def     -> return def
                         Left (_, msg) -> failWith msg
 
-cvtDec (InstanceD ctxt ty decs)
+cvtDec (InstanceD o ctxt ty decs)
   = do  { let doc = text "an instance declaration"
         ; (binds', sigs', fams', ats', adts') <- cvt_ci_decs doc decs
         ; unless (null fams') (failWith (mkBadDecMsg doc fams'))
@@ -269,7 +269,17 @@ cvtDec (InstanceD ctxt ty decs)
                       , cid_binds = binds'
                       , cid_sigs = Hs.mkClassOpSigs sigs'
                       , cid_tyfam_insts = ats', cid_datafam_insts = adts'
-                      , cid_overlap_mode = Nothing } }
+                      , cid_overlap_mode = fmap (L loc . overlap) o } }
+  where
+  overlap pragma =
+    case pragma of
+      TH.Overlaps      -> Hs.Overlaps     "OVERLAPS"
+      TH.Overlappable  -> Hs.Overlappable "OVERLAPPABLE"
+      TH.Overlapping   -> Hs.Overlapping  "OVERLAPPING"
+      TH.Incoherent    -> Hs.Incoherent   "INCOHERENT"
+
+
+
 
 cvtDec (ForeignD ford)
   = do { ford' <- cvtForD ford
