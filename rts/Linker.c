@@ -1880,15 +1880,7 @@ static void freeOcStablePtrs (ObjectCode *oc)
 static void
 freePreloadObjectFile (ObjectCode *oc)
 {
-#if USE_MMAP
-
-    if (oc->imageMapped) {
-        munmap(oc->image, oc->fileSize);
-    } else {
-        stgFree(oc->image);
-    }
-
-#elif defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
 
     VirtualFree(oc->image - PEi386_IMAGE_OFFSET, 0, MEM_RELEASE);
 
@@ -1903,7 +1895,12 @@ freePreloadObjectFile (ObjectCode *oc)
 
 #else
 
-    stgFree(oc->image);
+    if (USE_MMAP && oc->imageMapped) {
+        munmap(oc->image, oc->fileSize);
+    }
+    else {
+        stgFree(oc->image);
+    }
 
 #endif
 
@@ -1956,14 +1953,15 @@ void freeObjectCode (ObjectCode *oc)
     /* Free symbol_extras.  On x86_64 Windows, symbol_extras are allocated
      * alongside the image, so we don't need to free. */
 #if NEED_SYMBOL_EXTRAS && (!defined(x86_64_HOST_ARCH) || !defined(mingw32_HOST_OS))
-#if USE_MMAP
-    if (!USE_CONTIGUOUS_MMAP && oc->symbol_extras != NULL)
-    {
-        m32_free(oc->symbol_extras, sizeof(SymbolExtra) * oc->n_symbol_extras);
+    if (USE_MMAP) {
+        if (!USE_CONTIGUOUS_MMAP && oc->symbol_extras != NULL) {
+            m32_free(oc->symbol_extras,
+                    sizeof(SymbolExtra) * oc->n_symbol_extras);
+        }
     }
-#else // !USE_MMAP
-    stgFree(oc->symbol_extras);
-#endif
+    else {
+        stgFree(oc->symbol_extras);
+    }
 #endif
 
     stgFree(oc->fileName);
@@ -2391,14 +2389,15 @@ static HsInt loadArchive_ (pathchar *path)
 #endif
                memberSize);
 #elif defined(darwin_HOST_OS)
-#if USE_MMAP
-            image = mmapForLinker(memberSize, MAP_ANONYMOUS, -1, 0);
-#else
-            /* See loadObj() */
-            misalignment = machoGetMisalignment(f);
-            image = stgMallocBytes(memberSize + misalignment, "loadArchive(image)");
-            image += misalignment;
-#endif // USE_MMAP
+            if (USE_MMAP)
+                image = mmapForLinker(memberSize, MAP_ANONYMOUS, -1, 0);
+            else {
+                /* See loadObj() */
+                misalignment = machoGetMisalignment(f);
+                image = stgMallocBytes(memberSize + misalignment,
+                                        "loadArchive(image)");
+                image += misalignment;
+            }
 
 #else // not windows or darwin
             image = stgMallocBytes(memberSize, "loadArchive(image)");
@@ -3060,16 +3059,13 @@ static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
 {
   StgWord n;
 
-#if USE_MMAP
-  if (USE_CONTIGUOUS_MMAP)
-  {
+  if (USE_MMAP && USE_CONTIGUOUS_MMAP) {
       n = roundUpToPage(oc->fileSize);
 
       /* Keep image and symbol_extras contiguous */
       void *new = mmapForLinker(n + (sizeof(SymbolExtra) * count),
                                 MAP_ANONYMOUS, -1, 0);
-      if (new)
-      {
+      if (new) {
           memcpy(new, oc->image, oc->fileSize);
           if (oc->imageMapped) {
               munmap(oc->image, n);
@@ -3084,32 +3080,28 @@ static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
           return 0;
       }
   }
-  else
-#endif
+  else if( count > 0 ) {
+    if (USE_MMAP) {
+        n = roundUpToPage(oc->fileSize);
 
-  if( count > 0 )
-  {
-#if USE_MMAP
-    n = roundUpToPage(oc->fileSize);
-
-    oc->symbol_extras = m32_alloc(&allocator,
+        oc->symbol_extras = m32_alloc(&allocator,
                                   sizeof(SymbolExtra) * count, 8);
-    if (oc->symbol_extras == NULL) return 0;
-#else
-    // round up to the nearest 4
-    int aligned = (oc->fileSize + 3) & ~3;
+        if (oc->symbol_extras == NULL) return 0;
+    }
+    else {
+        // round up to the nearest 4
+        int aligned = (oc->fileSize + 3) & ~3;
+        int misalignment = oc->misalignment;
 
-    int misalignment = oc->misalignment;
-
-    oc->image -= misalignment;
-    oc->image = stgReallocBytes( oc->image,
+        oc->image -= misalignment;
+        oc->image = stgReallocBytes( oc->image,
                                  misalignment +
                                  aligned + sizeof (SymbolExtra) * count,
                                  "ocAllocateSymbolExtras" );
-    oc->image += misalignment;
+        oc->image += misalignment;
 
-    oc->symbol_extras = (SymbolExtra *) (oc->image + aligned);
-#endif /* USE_MMAP */
+        oc->symbol_extras = (SymbolExtra *) (oc->image + aligned);
+    }
   }
 
   if (oc->symbol_extras != NULL) {
@@ -7010,16 +7002,18 @@ ocGetNames_MachO(ObjectCode* oc)
             continue;
         }
 
-        if((sections[i].flags & SECTION_TYPE) == S_ZEROFILL)
-        {
-#if USE_MMAP
-            char * zeroFillArea = mmapForLinker(sections[i].size, MAP_ANONYMOUS, -1, 0);
-            if (zeroFillArea == NULL) return 0;
-            memset(zeroFillArea, 0, sections[i].size);
-#else
-            char * zeroFillArea = stgCallocBytes(1,sections[i].size,
+        if((sections[i].flags & SECTION_TYPE) == S_ZEROFILL) {
+            char * zeroFillArea;
+            if (USE_MMAP) {
+                zeroFillArea = mmapForLinker(sections[i].size, MAP_ANONYMOUS,
+                                            -1, 0);
+                if (zeroFillArea == NULL) return 0;
+                memset(zeroFillArea, 0, sections[i].size);
+            }
+            else {
+                zeroFillArea = stgCallocBytes(1,sections[i].size,
                                       "ocGetNames_MachO(common symbols)");
-#endif
+            }
             sections[i].offset = zeroFillArea - image;
         }
 
