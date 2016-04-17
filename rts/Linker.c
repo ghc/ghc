@@ -259,6 +259,9 @@ static ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
 #define struct_stat struct _stat
 #define open wopen
 #define WSTR(s) L##s
+#define pathprintf swprintf
+#define pathsplit _wsplitpath_s
+#define pathsize sizeof(wchar_t)
 #else
 #define pathcmp strcmp
 #define pathlen strlen
@@ -266,6 +269,9 @@ static ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
 #define pathstat stat
 #define struct_stat struct stat
 #define WSTR(s) s
+#define pathprintf snprintf
+#define pathsplit _splitpath_s
+#define pathsize sizeof(char)
 #endif
 
 static pathchar* pathdup(pathchar *path)
@@ -290,7 +296,7 @@ static pathchar* mkPath(char* path)
     {
         barf("mkPath failed converting char* to wchar_t*");
     }
-
+    ret[required] = '\0';
     return ret;
 #else
     return pathdup(path);
@@ -349,6 +355,33 @@ static void machoInitSymbolsWithoutUnderscore( void );
 #endif
 
 #if defined(OBJFORMAT_PEi386)
+/* string utility function */
+static HsBool endsWithPath(pathchar* base, pathchar* str) {
+    int blen = pathlen(base);
+    int slen = pathlen(str);
+    return (blen >= slen) && (0 == pathcmp(base + blen - slen, str));
+}
+
+static int checkAndLoadImportLibrary(
+    pathchar* arch_name,
+    char* member_name,
+    FILE* f);
+
+static int findAndLoadImportLibrary(
+    ObjectCode* oc
+    );
+
+static UChar *myindex(
+    int scale,
+    void* base,
+    int index);
+static UChar *cstring_from_COFF_symbol_name(
+    UChar* name,
+    UChar* strtab);
+static char *cstring_from_section_name(
+    UChar* name,
+    UChar* strtab);
+
 
 /* Add ld symbol for PE image base. */
 #if defined(__GNUC__)
@@ -1375,7 +1408,7 @@ static void* lookupSymbol_ (char *lbl)
            See Note [runtime-linker-phases] */
         if (oc && oc->status == OBJECT_LOADED) {
             oc->status = OBJECT_NEEDED;
-            IF_DEBUG(linker, debugBelch("lookupSymbol: on-demand loaded symbol '%s'\n", lbl));
+            IF_DEBUG(linker, debugBelch("lookupSymbol: on-demand loading symbol '%s'\n", lbl));
             r = ocTryLoad(oc);
 
             if (!r) {
@@ -1942,10 +1975,11 @@ void freeObjectCode (ObjectCode *oc)
 * Sets the initial status of a fresh ObjectCode
 */
 static void setOcInitialStatus(ObjectCode* oc) {
-    if (oc->archiveMemberName == NULL) {
+    if (oc->isImportLib == HS_BOOL_TRUE) {
+        oc->status = OBJECT_DONT_RESOLVE;
+    } else if (oc->archiveMemberName == NULL) {
         oc->status = OBJECT_NEEDED;
-    }
-    else {
+    } else {
         oc->status = OBJECT_LOADED;
     }
 }
@@ -2028,7 +2062,7 @@ static HsInt loadArchive_ (pathchar *path)
     size_t thisFileNameSize;
     char *fileName;
     size_t fileNameSize;
-    int isObject, isGnuIndex, isThin;
+    int isObject, isGnuIndex, isThin, isImportLib;
     char tmp[20];
     char *gnuFileIndex;
     int gnuFileIndexSize;
@@ -2075,10 +2109,11 @@ static HsInt loadArchive_ (pathchar *path)
     fileName = stgMallocBytes(fileNameSize, "loadArchive(fileName)");
 
     isThin = 0;
+    isImportLib = 0;
 
     f = pathopen(path, WSTR("rb"));
     if (!f)
-        barf("loadObj: can't read `%s'", path);
+        barf("loadObj: can't read `%" PATH_FMT "'", path);
 
     /* Check if this is an archive by looking for the magic "!<arch>\n"
      * string.  Usually, if this fails, we barf and quit.  On Darwin however,
@@ -2101,7 +2136,7 @@ static HsInt loadArchive_ (pathchar *path)
 
     n = fread ( tmp, 1, 8, f );
     if (n != 8)
-        barf("loadArchive: Failed reading header from `%s'", path);
+        barf("loadArchive: Failed reading header from `%" PATH_FMT "'", path);
     if (strncmp(tmp, "!<arch>\n", 8) == 0) {}
 #if !defined(mingw32_HOST_OS)
     /* See Note [thin archives on Windows] */
@@ -2151,13 +2186,14 @@ static HsInt loadArchive_ (pathchar *path)
     }
 #else
     else {
-        barf("loadArchive: Not an archive: `%s'", path);
+        barf("loadArchive: Not an archive: `%" PATH_FMT "'", path);
     }
 #endif
 
     IF_DEBUG(linker, debugBelch("loadArchive: loading archive contents\n"));
 
-    while(1) {
+    while (1) {
+        IF_DEBUG(linker, debugBelch("loadArchive: reading at %ld\n", ftell(f)));
         n = fread ( fileName, 1, 16, f );
         if (n != 16) {
             if (feof(f)) {
@@ -2165,7 +2201,7 @@ static HsInt loadArchive_ (pathchar *path)
                 break;
             }
             else {
-                barf("loadArchive: Failed reading file name from `%s'", path);
+                barf("loadArchive: Failed reading file name from `%" PATH_FMT "'", path);
             }
         }
 
@@ -2178,19 +2214,19 @@ static HsInt loadArchive_ (pathchar *path)
 
         n = fread ( tmp, 1, 12, f );
         if (n != 12)
-            barf("loadArchive: Failed reading mod time from `%s'", path);
+            barf("loadArchive: Failed reading mod time from `%" PATH_FMT "'", path);
         n = fread ( tmp, 1, 6, f );
         if (n != 6)
-            barf("loadArchive: Failed reading owner from `%s'", path);
+            barf("loadArchive: Failed reading owner from `%" PATH_FMT "'", path);
         n = fread ( tmp, 1, 6, f );
         if (n != 6)
-            barf("loadArchive: Failed reading group from `%s'", path);
+            barf("loadArchive: Failed reading group from `%" PATH_FMT "'", path);
         n = fread ( tmp, 1, 8, f );
         if (n != 8)
-            barf("loadArchive: Failed reading mode from `%s'", path);
+            barf("loadArchive: Failed reading mode from `%" PATH_FMT "'", path);
         n = fread ( tmp, 1, 10, f );
         if (n != 10)
-            barf("loadArchive: Failed reading size from `%s'", path);
+            barf("loadArchive: Failed reading size from `%" PATH_FMT "'", path);
         tmp[10] = '\0';
         for (n = 0; isdigit(tmp[n]); n++);
         tmp[n] = '\0';
@@ -2199,9 +2235,9 @@ static HsInt loadArchive_ (pathchar *path)
         IF_DEBUG(linker, debugBelch("loadArchive: size of this archive member is %d\n", memberSize));
         n = fread ( tmp, 1, 2, f );
         if (n != 2)
-            barf("loadArchive: Failed reading magic from `%s'", path);
+            barf("loadArchive: Failed reading magic from `%" PATH_FMT "'", path);
         if (strncmp(tmp, "\x60\x0A", 2) != 0)
-            barf("loadArchive: Failed reading magic from `%s' at %ld. Got %c%c",
+            barf("loadArchive: Failed reading magic from `%" PATH_FMT "' at %ld. Got %c%c",
                  path, ftell(f), tmp[0], tmp[1]);
 
         isGnuIndex = 0;
@@ -2221,7 +2257,7 @@ static HsInt loadArchive_ (pathchar *path)
                 }
                 n = fread ( fileName, 1, thisFileNameSize, f );
                 if (n != (int)thisFileNameSize) {
-                    barf("loadArchive: Failed reading filename from `%s'",
+                    barf("loadArchive: Failed reading filename from `%" PATH_FMT "'",
                          path);
                 }
                 fileName[thisFileNameSize] = 0;
@@ -2311,15 +2347,32 @@ static HsInt loadArchive_ (pathchar *path)
         IF_DEBUG(linker,
                  debugBelch("loadArchive: Found member file `%s'\n", fileName));
 
-        isObject =
-               (thisFileNameSize >= 2 &&
-                fileName[thisFileNameSize - 2] == '.' &&
-                fileName[thisFileNameSize - 1] == 'o')
-            || (thisFileNameSize >= 4 &&
-                fileName[thisFileNameSize - 4] == '.' &&
-                fileName[thisFileNameSize - 3] == 'p' &&
-                fileName[thisFileNameSize - 2] == '_' &&
-                fileName[thisFileNameSize - 1] == 'o');
+        isObject = (thisFileNameSize >= 2 && strncmp(fileName + thisFileNameSize - 2, ".o"  , 2) == 0)
+                || (thisFileNameSize >= 4 && strncmp(fileName + thisFileNameSize - 4, ".p_o", 4) == 0);
+
+#if defined(OBJFORMAT_PEi386)
+        /*
+        * Note [MSVC import files (ext .lib)]
+        * MSVC compilers store the object files in
+        * the import libraries with extension .dll
+        * so on Windows we should look for those too.
+        * The PE COFF format doesn't specify any specific file name
+        * for sections. So on windows, just try to load it all.
+        *
+        * Linker members (e.g. filename / are skipped since they are not needed)
+        */
+        isImportLib = thisFileNameSize >= 4 && strncmp(fileName + thisFileNameSize - 4, ".dll", 4) == 0;
+
+        /*
+         * Note [GCC import files (ext .dll.a)]
+         * GCC stores import information in the same binary format
+         * as the object file normally has. The only difference is that
+         * all the information are put in .idata sections. The only real
+         * way to tell if we're dealing with an import lib is by looking
+         * at the file extension.
+         */
+        isImportLib = isImportLib || endsWithPath(path, WSTR(".dll.a"));
+#endif // windows
 
         IF_DEBUG(linker, debugBelch("loadArchive: \tthisFileNameSize = %d\n", (int)thisFileNameSize));
         IF_DEBUG(linker, debugBelch("loadArchive: \tisObject = %d\n", isObject));
@@ -2330,8 +2383,8 @@ static HsInt loadArchive_ (pathchar *path)
             IF_DEBUG(linker, debugBelch("loadArchive: Member is an object file...loading...\n"));
 
 #if defined(mingw32_HOST_OS)
-        // TODO: We would like to use allocateExec here, but allocateExec
-        //       cannot currently allocate blocks large enough.
+            // TODO: We would like to use allocateExec here, but allocateExec
+            //       cannot currently allocate blocks large enough.
             image = allocateImageAndTrampolines(path, fileName,
 #if defined(x86_64_HOST_ARCH)
                f,
@@ -2395,7 +2448,7 @@ static HsInt loadArchive_ (pathchar *path)
             {
                 n = fread ( image, 1, memberSize, f );
                 if (n != memberSize) {
-                    barf("loadArchive: error whilst reading `%s'", path);
+                    barf("loadArchive: error whilst reading `%" PATH_FMT "'", path);
                 }
             }
 
@@ -2414,8 +2467,20 @@ static HsInt loadArchive_ (pathchar *path)
                 fclose(f);
                 return 0;
             } else {
-                oc->next = objects;
-                objects = oc;
+#if defined(OBJFORMAT_PEi386)
+                if (isImportLib)
+                {
+                    findAndLoadImportLibrary(oc);
+                    stgFree(oc);
+                    oc = NULL;
+                    break;
+                } else {
+#endif
+                    oc->next = objects;
+                    objects = oc;
+#if defined(OBJFORMAT_PEi386)
+                }
+#endif
             }
         }
         else if (isGnuIndex) {
@@ -2430,10 +2495,24 @@ static HsInt loadArchive_ (pathchar *path)
 #endif
             n = fread ( gnuFileIndex, 1, memberSize, f );
             if (n != memberSize) {
-                barf("loadArchive: error whilst reading `%s'", path);
+                barf("loadArchive: error whilst reading `%" PATH_FMT "'", path);
             }
             gnuFileIndex[memberSize] = '/';
             gnuFileIndexSize = memberSize;
+        }
+        else if (isImportLib) {
+#if defined(OBJFORMAT_PEi386)
+            if (checkAndLoadImportLibrary(path, fileName, f)) {
+                IF_DEBUG(linker, debugBelch("loadArchive: Member is an import file section... Corresponding DLL has been loaded...\n"));
+            }
+            else {
+                IF_DEBUG(linker, debugBelch("loadArchive: Member is not a valid import file section... Skipping...\n"));
+                n = fseek(f, memberSize, SEEK_CUR);
+                if (n != 0)
+                    barf("loadArchive: error whilst seeking by %d in `%" PATH_FMT "'",
+                    memberSize, path);
+            }
+#endif
         }
         else {
             IF_DEBUG(linker, debugBelch("loadArchive: '%s' does not appear to be an object file\n", fileName));
@@ -2455,7 +2534,7 @@ static HsInt loadArchive_ (pathchar *path)
                     break;
                 }
                 else {
-                    barf("loadArchive: Failed reading padding from `%s'", path);
+                    barf("loadArchive: Failed reading padding from `%" PATH_FMT "'", path);
                 }
             }
             IF_DEBUG(linker, debugBelch("loadArchive: successfully read one pad byte\n"));
@@ -3270,103 +3349,6 @@ ocFlushInstructionCache( ObjectCode *oc )
 
 #if defined(OBJFORMAT_PEi386)
 
-
-
-typedef unsigned char          UChar;
-typedef unsigned short         UInt16;
-typedef unsigned int           UInt32;
-typedef          int           Int32;
-typedef unsigned long long int UInt64;
-
-
-typedef
-   struct {
-      UInt16 Machine;
-      UInt16 NumberOfSections;
-      UInt32 TimeDateStamp;
-      UInt32 PointerToSymbolTable;
-      UInt32 NumberOfSymbols;
-      UInt16 SizeOfOptionalHeader;
-      UInt16 Characteristics;
-   }
-   COFF_header;
-
-#define sizeof_COFF_header 20
-
-
-typedef
-   struct {
-      UChar  Name[8];
-      UInt32 VirtualSize;
-      UInt32 VirtualAddress;
-      UInt32 SizeOfRawData;
-      UInt32 PointerToRawData;
-      UInt32 PointerToRelocations;
-      UInt32 PointerToLinenumbers;
-      UInt16 NumberOfRelocations;
-      UInt16 NumberOfLineNumbers;
-      UInt32 Characteristics;
-   }
-   COFF_section;
-
-#define sizeof_COFF_section 40
-
-
-typedef
-   struct {
-      UChar  Name[8];
-      UInt32 Value;
-      UInt16 SectionNumber;
-      UInt16 Type;
-      UChar  StorageClass;
-      UChar  NumberOfAuxSymbols;
-   }
-   COFF_symbol;
-
-#define sizeof_COFF_symbol 18
-
-
-typedef
-   struct {
-      UInt32 VirtualAddress;
-      UInt32 SymbolTableIndex;
-      UInt16 Type;
-   }
-   COFF_reloc;
-
-#define sizeof_COFF_reloc 10
-
-/* From PE spec doc, section 3.3.2 */
-/* Note use of MYIMAGE_* since IMAGE_* are already defined in
-   windows.h -- for the same purpose, but I want to know what I'm
-   getting, here. */
-#define MYIMAGE_FILE_RELOCS_STRIPPED        0x0001
-#define MYIMAGE_FILE_EXECUTABLE_IMAGE       0x0002
-#define MYIMAGE_FILE_DLL                    0x2000
-#define MYIMAGE_FILE_SYSTEM                 0x1000
-#define MYIMAGE_FILE_BYTES_REVERSED_HI      0x8000
-#define MYIMAGE_FILE_BYTES_REVERSED_LO      0x0080
-#define MYIMAGE_FILE_32BIT_MACHINE          0x0100
-
-/* From PE spec doc, section 5.4.2 and 5.4.4 */
-#define MYIMAGE_SYM_CLASS_EXTERNAL          2
-#define MYIMAGE_SYM_CLASS_STATIC            3
-#define MYIMAGE_SYM_UNDEFINED               0
-#define MYIMAGE_SYM_CLASS_WEAK_EXTERNAL     105
-
-/* From PE spec doc, section 3.1 */
-#define MYIMAGE_SCN_CNT_CODE                0x00000020
-#define MYIMAGE_SCN_CNT_INITIALIZED_DATA    0x00000040
-#define MYIMAGE_SCN_CNT_UNINITIALIZED_DATA  0x00000080
-#define MYIMAGE_SCN_LNK_COMDAT              0x00001000
-#define MYIMAGE_SCN_LNK_NRELOC_OVFL         0x01000000
-#define MYIMAGE_SCN_LNK_REMOVE              0x00000800
-#define MYIMAGE_SCN_MEM_DISCARDABLE         0x02000000
-
-/* From PE spec doc, section 5.2.1 */
-#define MYIMAGE_REL_I386_DIR32              0x0006
-#define MYIMAGE_REL_I386_REL32              0x0014
-
 static int verifyCOFFHeader ( COFF_header *hdr, pathchar *filename);
 
 /* We assume file pointer is right at the
@@ -3422,6 +3404,134 @@ allocateImageAndTrampolines (
    }
 
    return image + PEi386_IMAGE_OFFSET;
+}
+
+static int findAndLoadImportLibrary(ObjectCode* oc)
+{
+    int i;
+
+    COFF_header*  hdr;
+    COFF_section* sectab;
+    COFF_symbol*  symtab;
+    UChar*        strtab;
+
+    hdr = (COFF_header*)(oc->image);
+    sectab = (COFF_section*)(
+        ((UChar*)(oc->image))
+        + sizeof_COFF_header + hdr->SizeOfOptionalHeader
+        );
+
+    symtab = (COFF_symbol*)(
+        ((UChar*)(oc->image))
+        + hdr->PointerToSymbolTable
+        );
+
+    strtab = ((UChar*)symtab)
+        + hdr->NumberOfSymbols * sizeof_COFF_symbol;
+
+    for (i = 0; i < oc->n_sections; i++)
+    {
+        COFF_section* sectab_i
+            = (COFF_section*)myindex(sizeof_COFF_section, sectab, i);
+
+        char *secname = cstring_from_section_name(sectab_i->Name, strtab);
+
+        // Find the first entry containing a valid .idata$7 section.
+        if (strcmp(secname, ".idata$7") == 0) {
+            /* First load the containing DLL if not loaded. */
+            Section section = oc->sections[i];
+
+            pathchar* dirName = stgMallocBytes(pathsize * pathlen(oc->fileName), "findAndLoadImportLibrary(oc)");
+            pathsplit(oc->fileName, NULL, 0, dirName, pathsize * pathlen(oc->fileName), NULL, 0, NULL, 0);
+            HsPtr token = addLibrarySearchPath(dirName);
+            char* dllName = (char*)section.start;
+
+            if (strlen(dllName) == 0 || dllName[0] == ' ')
+            {
+                continue;
+            }
+
+            IF_DEBUG(linker, debugBelch("lookupSymbol: on-demand '%ls' => `%s'\n", oc->fileName, dllName));
+
+            pathchar* dll = mkPath(dllName);
+            removeLibrarySearchPath(token);
+
+            const char* result = addDLL(dll);
+            stgFree(dll);
+
+            if (result != NULL) {
+                errorBelch("Could not load `%s'. Reason: %s\n", (char*)dllName, result);
+                return 0;
+            }
+
+            break;
+        }
+
+        stgFree(secname);
+    }
+
+    return 1;
+}
+
+static int checkAndLoadImportLibrary( pathchar* arch_name, char* member_name, FILE* f)
+{
+    char* image;
+    static HsBool load_dll_warn = HS_BOOL_FALSE;
+
+    if (load_dll_warn) { return 0; }
+
+    /* Based on Import Library specification. PE Spec section 7.1 */
+
+    COFF_import_header hdr;
+    size_t n;
+
+    n = fread(&hdr, 1, sizeof_COFF_import_Header, f);
+    if (n != sizeof(COFF_header)) {
+        errorBelch("getNumberOfSymbols: error whilst reading `%s' header in `%" PATH_FMT "'\n",
+            member_name, arch_name);
+        return 0;
+    }
+
+    if (hdr.Sig1 != 0x0 || hdr.Sig2 != 0xFFFF) {
+        fseek(f, -sizeof_COFF_import_Header, SEEK_CUR);
+        IF_DEBUG(linker, debugBelch("loadArchive: Object `%s` is not an import lib. Skipping...\n", member_name));
+        return 0;
+    }
+
+    IF_DEBUG(linker, debugBelch("loadArchive: reading %d bytes at %ld\n", hdr.SizeOfData, ftell(f)));
+
+    image = malloc(hdr.SizeOfData);
+    n = fread(image, 1, hdr.SizeOfData, f);
+    if (n != hdr.SizeOfData) {
+        errorBelch("loadArchive: error whilst reading `%s' header in `%" PATH_FMT "'. Did not read enough bytes.\n",
+            member_name, arch_name);
+    }
+
+    char* symbol  = strtok(image, "\0");
+    int symLen    = strlen(symbol) + 1;
+    int nameLen   = n - symLen;
+    char* dllName = malloc(sizeof(char) * nameLen);
+    dllName       = strncpy(dllName, image + symLen, nameLen);
+    pathchar* dll = malloc(sizeof(wchar_t) * nameLen);
+    mbstowcs(dll, dllName, nameLen);
+    free(dllName);
+
+    IF_DEBUG(linker, debugBelch("loadArchive: read symbol %s from lib `%ls'\n", symbol, dll));
+    const char* result = addDLL(dll);
+
+    free(image);
+
+    if (result != NULL) {
+        errorBelch("Could not load `%ls'. Reason: %s\n", dll, result);
+        load_dll_warn = HS_BOOL_TRUE;
+
+        free(dll);
+        fseek(f, -(n + sizeof_COFF_import_Header), SEEK_CUR);
+        return 0;
+    }
+
+    free(dll);
+    return 1;
 }
 
 /* We use myindex to calculate array addresses, rather than
@@ -3967,7 +4077,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
        symtab_i = (COFF_symbol*)
            myindex ( sizeof_COFF_symbol, symtab, i );
        if (symtab_i->SectionNumber == MYIMAGE_SYM_UNDEFINED
-           && symtab_i->Value > 0) {
+           && symtab_i->Value > 0
+           && symtab_i->StorageClass != MYIMAGE_SYM_CLASS_SECTION) {
            globalBssSize += symtab_i->Value;
        }
        i += symtab_i->NumberOfAuxSymbols;
@@ -3995,7 +4106,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
 
       addr  = NULL;
       HsBool isWeak = HS_BOOL_FALSE;
-      if (symtab_i->SectionNumber != MYIMAGE_SYM_UNDEFINED) {
+      if (   symtab_i->SectionNumber != MYIMAGE_SYM_UNDEFINED
+          && symtab_i->SectionNumber > 0) {
          /* This symbol is global and defined, viz, exported */
          /* for MYIMAGE_SYMCLASS_EXTERNAL
                 && !MYIMAGE_SYM_UNDEFINED,
@@ -4006,7 +4118,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
             = (COFF_section*) myindex ( sizeof_COFF_section,
                                         sectab,
                                         symtab_i->SectionNumber-1 );
-         if (  symtab_i->StorageClass == MYIMAGE_SYM_CLASS_EXTERNAL
+         if (symtab_i->StorageClass == MYIMAGE_SYM_CLASS_EXTERNAL
             || (   symtab_i->StorageClass == MYIMAGE_SYM_CLASS_STATIC
                 && sectabent->Characteristics & MYIMAGE_SCN_LNK_COMDAT)
             ) {
@@ -4249,6 +4361,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
          switch (reltab_j->Type) {
 #if defined(i386_HOST_ARCH)
             case MYIMAGE_REL_I386_DIR32:
+            case MYIMAGE_REL_I386_DIR32NB:
                *(UInt32 *)pP = ((UInt32)S) + A;
                break;
             case MYIMAGE_REL_I386_REL32:
@@ -4327,7 +4440,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
                }
 #endif
             default:
-               debugBelch("%" PATH_FMT ": unhandled PEi386 relocation type %d",
+               debugBelch("%" PATH_FMT ": unhandled PEi386 relocation type %d\n",
                      oc->fileName, reltab_j->Type);
                return 0;
          }
