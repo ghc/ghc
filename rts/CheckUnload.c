@@ -23,6 +23,7 @@
 //   - info pointers in heap objects and stack frames
 //   - pointers to static objects from the heap
 //   - StablePtrs to static objects
+//   - pointers to cost centres from the cost centre tree
 //
 // We can find live static objects after a major GC, so we don't have
 // to look at every closure pointer in the heap.  However, we do have
@@ -245,6 +246,25 @@ static void searchHeapBlocks (HashTable *addrs, bdescr *bd)
     }
 }
 
+#ifdef PROFILING
+//
+// Do not unload the object if the CCS tree refers to a CCS or CC which
+// originates in the object.
+//
+static void searchCostCentres (HashTable *addrs, CostCentreStack *ccs)
+{
+    IndexTable *i;
+
+    checkAddress(addrs, ccs);
+    checkAddress(addrs, ccs->cc);
+    for (i = ccs->indexTable; i != NULL; i = i->next) {
+        if (!i->back_edge) {
+            searchCostCentres(addrs, i->ccs);
+        }
+    }
+}
+#endif
+
 //
 // Check whether we can unload any object code.  This is called at the
 // appropriate point during a GC, where all the heap data is nice and
@@ -303,6 +323,17 @@ void checkUnload (StgClosure *static_objects)
           searchHeapBlocks(addrs, ws->scavd_list);
       }
   }
+
+#ifdef PROFILING
+  /* Traverse the cost centre tree, calling checkAddress on each CCS/CC */
+  searchCostCentres(addrs, CCS_MAIN);
+
+  /* Also check each cost centre in the CC_LIST */
+  CostCentre *cc;
+  for (cc = CC_LIST; cc != NULL; cc = cc->link) {
+      checkAddress(addrs, cc);
+  }
+#endif /* PROFILING */
 
   // Look through the unloadable objects, and any object that is still
   // marked as unreferenced can be physically unloaded, because we
