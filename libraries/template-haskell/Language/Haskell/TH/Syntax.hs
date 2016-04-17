@@ -1565,13 +1565,13 @@ data Dec
   | DefaultSigD Name Type         -- ^ @{ default size :: Data a => a -> Int }@
   deriving( Show, Eq, Ord, Data, Typeable, Generic )
 
--- | Properties for overlapping instances.
+-- | Varieties of allowed instance overlap.
 data Overlap = Overlappable   -- ^ May be overlapped by more specific instances
              | Overlapping    -- ^ May overlap a more general instance
              | Overlaps       -- ^ Both 'Overlapping' and 'Overlappable'
              | Incoherent     -- ^ Both 'Overlappable' and 'Overlappable', and
                               -- pick an arbitrary one if multiple choices are
-                              -- avaialble.
+                              -- available.
   deriving( Show, Eq, Ord, Data, Typeable, Generic )
 
 -- | Common elements of 'OpenTypeFamilyD' and 'ClosedTypeFamilyD'.
