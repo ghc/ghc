@@ -50,6 +50,7 @@ libraries/bytestring_dist-install_EXTRA_HC_OPTS += -Wno-inline-rule-shadowing
 # Turn off import warnings for bad unused imports
 utils/haddock_dist_EXTRA_HC_OPTS += -Wno-unused-imports
 libraries/vector_dist-install_EXTRA_HC_OPTS += -Wno-unused-imports
+libraries/directory_dist-install_EXTRA_HC_OPTS += -Wno-unused-imports
 
 # haddock's attoparsec uses deprecated `inlinePerformIO`
 utils/haddock_dist_EXTRA_HC_OPTS += -Wno-deprecations
