@@ -34,3 +34,13 @@ test('T10458',
      pre_cmd('$MAKE -s --no-print-directory compile_libT10458'),
      extra_hc_opts('-L$PWD/T10458dir -lAS')],
      ghci_script, ['T10458.script'])
+
+test('T11072gcc',
+     [unless(doing_ghci, skip), unless(opsys('mingw32'), skip), extra_clean(['bin_impl_gcc/*', 'bin_impl_gcc'])],
+     run_command,
+     ['$MAKE -s --no-print-directory compile_libAS_impl_gcc'])
+
+test('T11072msvc',
+     [unless(doing_ghci, skip), unless(opsys('mingw32'), skip), extra_clean(['bin_impl_msvc/*', 'bin_impl_msvc'])],
+     run_command,
+     ['$MAKE -s --no-print-directory compile_libAS_impl_msvc'])
