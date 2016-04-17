@@ -1256,6 +1256,8 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
     flag_u = exhaustive dflags kind
     flag_u_reason = maybe NoReason Reason (exhaustiveWarningFlag kind)
 
+    maxPatterns = maxUncoveredPatterns dflags
+
     -- Print a single clause (for redundant/with-inaccessible-rhs)
     pprEqn q txt = pp_context True ctx (text txt) $ \f -> ppr_eqn f kind q
 
@@ -1266,7 +1268,8 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
                     -> text "Guards do not cover entire pattern space"
            _missing -> let us = map ppr qs
                        in  hang (text "Patterns not matched:") 4
-                                (vcat (take maximum_output us) $$ dots us)
+                                (vcat (take maxPatterns us)
+                                 $$ dots maxPatterns us)
 
 -- | Issue a warning when the predefined number of iterations is exceeded
 -- for the pattern match checker
@@ -1285,9 +1288,10 @@ warnPmIters dflags (DsMatchContext kind loc)
     flag_i = wopt Opt_WarnOverlappingPatterns dflags
     flag_u = exhaustive dflags kind
 
-dots :: [a] -> SDoc
-dots qs | qs `lengthExceeds` maximum_output = text "..."
-        | otherwise                         = empty
+dots :: Int -> [a] -> SDoc
+dots maxPatterns qs
+    | qs `lengthExceeds` maxPatterns = text "..."
+    | otherwise                      = empty
 
 -- | Check whether the exhaustiveness checker should run (exhaustiveness only)
 exhaustive :: DynFlags -> HsMatchContext id -> Bool
@@ -1346,12 +1350,6 @@ ppr_uncovered (expr_vec, complex)
   where
     sdoc_vec = mapM pprPmExprWithParens expr_vec
     (vec,cs) = runPmPprM sdoc_vec (filterComplex complex)
-
--- | This variable shows the maximum number of lines of output generated for
--- warnings. It will limit the number of patterns/equations displayed to
--- maximum_output. (TODO: add command-line option?)
-maximum_output :: Int
-maximum_output = 4
 
 {- Note [Representation of Term Equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

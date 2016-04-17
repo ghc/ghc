@@ -178,6 +178,12 @@ optimizationsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-fno-max-relevant-bindings"
          }
+  , flag { flagName = "-fmax-uncovered-patterns=⟨n⟩"
+         , flagDescription =
+           "*default: 4.* Set the maximum number of patterns to display in "++
+           "warnings about non-exhaustive ones."
+         , flagType = DynamicFlag
+         }
   , flag { flagName = "-fmax-simplifier-iterations=⟨n⟩"
          , flagDescription =
            "*default: 4.* Set the max iterations for the simplifier."
