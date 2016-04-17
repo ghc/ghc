@@ -64,7 +64,8 @@ templateHaskellNames = [
     bindSName, letSName, noBindSName, parSName,
     -- Dec
     funDName, valDName, dataDName, newtypeDName, tySynDName,
-    classDName, instanceDName, standaloneDerivDName, sigDName, forImpDName,
+    classDName, instanceWithOverlapDName,
+    standaloneDerivDName, sigDName, forImpDName,
     pragInlDName, pragSpecDName, pragSpecInlDName, pragSpecInstDName,
     pragRuleDName, pragAnnDName, defaultSigDName,
     dataFamilyDName, openTypeFamilyDName, closedTypeFamilyDName,
@@ -73,6 +74,7 @@ templateHaskellNames = [
     roleAnnotDName,
     -- Cxt
     cxtName,
+
     -- SourceUnpackedness
     noSourceUnpackednessName, sourceNoUnpackName, sourceUnpackName,
     -- SourceStrictness
@@ -115,6 +117,9 @@ templateHaskellNames = [
     conLikeDataConName, funLikeDataConName,
     -- Phases
     allPhasesDataConName, fromPhaseDataConName, beforePhaseDataConName,
+    -- Overlap
+    overlappableDataConName, overlappingDataConName, overlapsDataConName,
+    incoherentDataConName,
     -- TExp
     tExpDataConName,
     -- RuleBndr
@@ -140,6 +145,7 @@ templateHaskellNames = [
     patQTyConName, fieldPatQTyConName, fieldExpQTyConName, funDepTyConName,
     predQTyConName, decsQTyConName, ruleBndrQTyConName, tySynEqnQTyConName,
     roleTyConName, tExpTyConName, injAnnTyConName, kindTyConName,
+    overlapTyConName,
 
     -- Quasiquoting
     quoteDecName, quoteTypeName, quoteExpName, quotePatName]
@@ -168,7 +174,8 @@ liftClassName = thCls (fsLit "Lift") liftClassKey
 qTyConName, nameTyConName, fieldExpTyConName, patTyConName,
     fieldPatTyConName, expTyConName, decTyConName, typeTyConName,
     tyVarBndrTyConName, matchTyConName, clauseTyConName, funDepTyConName,
-    predTyConName, tExpTyConName, injAnnTyConName, kindTyConName :: Name
+    predTyConName, tExpTyConName, injAnnTyConName, kindTyConName,
+    overlapTyConName :: Name
 qTyConName        = thTc (fsLit "Q")              qTyConKey
 nameTyConName     = thTc (fsLit "Name")           nameTyConKey
 fieldExpTyConName = thTc (fsLit "FieldExp")       fieldExpTyConKey
@@ -185,7 +192,7 @@ predTyConName     = thTc (fsLit "Pred")           predTyConKey
 tExpTyConName     = thTc (fsLit "TExp")           tExpTyConKey
 injAnnTyConName   = thTc (fsLit "InjectivityAnn") injAnnTyConKey
 kindTyConName     = thTc (fsLit "Kind")           kindTyConKey
-
+overlapTyConName  = thTc (fsLit "Overlap")        overlapTyConKey
 
 returnQName, bindQName, sequenceQName, newNameName, liftName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName,
@@ -315,7 +322,8 @@ parSName    = libFun (fsLit "parS")    parSIdKey
 
 -- data Dec = ...
 funDName, valDName, dataDName, newtypeDName, tySynDName, classDName,
-    instanceDName, sigDName, forImpDName, pragInlDName, pragSpecDName,
+    instanceWithOverlapDName, sigDName, forImpDName, pragInlDName,
+    pragSpecDName,
     pragSpecInlDName, pragSpecInstDName, pragRuleDName, pragAnnDName,
     standaloneDerivDName, defaultSigDName,
     dataInstDName, newtypeInstDName, tySynInstDName,
@@ -327,7 +335,9 @@ dataDName            = libFun (fsLit "dataD")             dataDIdKey
 newtypeDName         = libFun (fsLit "newtypeD")          newtypeDIdKey
 tySynDName           = libFun (fsLit "tySynD")            tySynDIdKey
 classDName           = libFun (fsLit "classD")            classDIdKey
-instanceDName        = libFun (fsLit "instanceD")         instanceDIdKey
+instanceWithOverlapDName
+                     = libFun (fsLit "instanceWithOverlapD")
+                                                      instanceWithOverlapDIdKey
 standaloneDerivDName = libFun (fsLit "standaloneDerivD")  standaloneDerivDIdKey
 sigDName             = libFun (fsLit "sigD")              sigDIdKey
 defaultSigDName      = libFun (fsLit "defaultSigD")       defaultSigDIdKey
@@ -537,6 +547,16 @@ allPhasesDataConName   = thCon (fsLit "AllPhases")   allPhasesDataConKey
 fromPhaseDataConName   = thCon (fsLit "FromPhase")   fromPhaseDataConKey
 beforePhaseDataConName = thCon (fsLit "BeforePhase") beforePhaseDataConKey
 
+-- data Overlap = ...
+overlappableDataConName,
+  overlappingDataConName,
+  overlapsDataConName,
+  incoherentDataConName :: Name
+overlappableDataConName = thCon (fsLit "Overlappable") overlappableDataConKey
+overlappingDataConName  = thCon (fsLit "Overlapping")  overlappingDataConKey
+overlapsDataConName     = thCon (fsLit "Overlaps")     overlapsDataConKey
+incoherentDataConName   = thCon (fsLit "Incoherent")   incoherentDataConKey
+
 
 {- *********************************************************************
 *                                                                      *
@@ -566,7 +586,8 @@ expTyConKey, matchTyConKey, clauseTyConKey, qTyConKey, expQTyConKey,
     fieldExpTyConKey, fieldPatTyConKey, nameTyConKey, patQTyConKey,
     fieldPatQTyConKey, fieldExpQTyConKey, funDepTyConKey, predTyConKey,
     predQTyConKey, decsQTyConKey, ruleBndrQTyConKey, tySynEqnQTyConKey,
-    roleTyConKey, tExpTyConKey, injAnnTyConKey, kindTyConKey :: Unique
+    roleTyConKey, tExpTyConKey, injAnnTyConKey, kindTyConKey,
+    overlapTyConKey :: Unique
 expTyConKey             = mkPreludeTyConUnique 200
 matchTyConKey           = mkPreludeTyConUnique 201
 clauseTyConKey          = mkPreludeTyConUnique 202
@@ -600,6 +621,7 @@ roleTyConKey            = mkPreludeTyConUnique 229
 tExpTyConKey            = mkPreludeTyConUnique 230
 injAnnTyConKey          = mkPreludeTyConUnique 231
 kindTyConKey            = mkPreludeTyConUnique 232
+overlapTyConKey         = mkPreludeTyConUnique 233
 
 {- *********************************************************************
 *                                                                      *
@@ -630,6 +652,17 @@ beforePhaseDataConKey = mkPreludeDataConUnique 107
 -- newtype TExp a = ...
 tExpDataConKey :: Unique
 tExpDataConKey = mkPreludeDataConUnique 108
+
+-- data Overlap = ..
+overlappableDataConKey,
+  overlappingDataConKey,
+  overlapsDataConKey,
+  incoherentDataConKey :: Unique
+overlappableDataConKey = mkPreludeDataConUnique 109
+overlappingDataConKey  = mkPreludeDataConUnique 110
+overlapsDataConKey     = mkPreludeDataConUnique 111
+incoherentDataConKey   = mkPreludeDataConUnique 112
+
 
 
 {- *********************************************************************
@@ -770,7 +803,8 @@ parSIdKey        = mkPreludeMiscIdUnique 323
 
 -- data Dec = ...
 funDIdKey, valDIdKey, dataDIdKey, newtypeDIdKey, tySynDIdKey,
-    classDIdKey, instanceDIdKey, sigDIdKey, forImpDIdKey, pragInlDIdKey,
+    classDIdKey, instanceWithOverlapDIdKey, sigDIdKey, forImpDIdKey,
+    pragInlDIdKey,
     pragSpecDIdKey, pragSpecInlDIdKey, pragSpecInstDIdKey, pragRuleDIdKey,
     pragAnnDIdKey, defaultSigDIdKey, dataFamilyDIdKey, openTypeFamilyDIdKey,
     closedTypeFamilyDIdKey, dataInstDIdKey, newtypeInstDIdKey, tySynInstDIdKey,
@@ -782,7 +816,7 @@ dataDIdKey             = mkPreludeMiscIdUnique 332
 newtypeDIdKey          = mkPreludeMiscIdUnique 333
 tySynDIdKey            = mkPreludeMiscIdUnique 334
 classDIdKey            = mkPreludeMiscIdUnique 335
-instanceDIdKey         = mkPreludeMiscIdUnique 336
+instanceWithOverlapDIdKey = mkPreludeMiscIdUnique 336
 sigDIdKey              = mkPreludeMiscIdUnique 337
 forImpDIdKey           = mkPreludeMiscIdUnique 338
 pragInlDIdKey          = mkPreludeMiscIdUnique 339

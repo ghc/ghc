@@ -369,12 +369,17 @@ classD ctxt cls tvs fds decs =
     return $ ClassD ctxt1 cls tvs fds decs1
 
 instanceD :: CxtQ -> TypeQ -> [DecQ] -> DecQ
-instanceD ctxt ty decs =
+instanceD = instanceWithOverlapD Nothing
+
+instanceWithOverlapD :: Maybe Overlap -> CxtQ -> TypeQ -> [DecQ] -> DecQ
+instanceWithOverlapD o ctxt ty decs =
   do
     ctxt1 <- ctxt
     decs1 <- sequence decs
     ty1   <- ty
-    return $ InstanceD ctxt1 ty1 decs1
+    return $ InstanceD o ctxt1 ty1 decs1
+
+
 
 sigD :: Name -> TypeQ -> DecQ
 sigD fun ty = liftM (SigD fun) $ ty

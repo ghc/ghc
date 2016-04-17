@@ -9,8 +9,8 @@ class D (f :: * -> *)
 instance C ((,) Int)
 
 $(do { ClassI _ [inst_dec] <- reify ''C
-     ; let InstanceD cxt (AppT _ ty) _ = inst_dec
-     ; return [InstanceD cxt
+     ; let InstanceD o cxt (AppT _ ty) _ = inst_dec
+     ; return [InstanceD o cxt
                          (foldl AppT (ConT ''D) [ty]) 
                          []
               ] })

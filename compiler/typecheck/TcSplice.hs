@@ -1543,11 +1543,17 @@ reifyClassInstance is_poly_tvs i
        ; thtypes <- reifyTypes vis_types
        ; annot_thtypes <- zipWith3M annotThType is_poly_tvs vis_types thtypes
        ; let head_ty = mkThAppTs (TH.ConT (reifyName cls)) annot_thtypes
-       ; return $ (TH.InstanceD cxt head_ty []) }
+       ; return $ (TH.InstanceD over cxt head_ty []) }
   where
      (_tvs, theta, cls, types) = tcSplitDFunTy (idType dfun)
      cls_tc   = classTyCon cls
      dfun     = instanceDFunId i
+     over     = case overlapMode (is_flag i) of
+                  NoOverlap _     -> Nothing
+                  Overlappable _  -> Just TH.Overlappable
+                  Overlapping _   -> Just TH.Overlapping
+                  Overlaps _      -> Just TH.Overlaps
+                  Incoherent _    -> Just TH.Incoherent
 
 ------------------------------
 reifyFamilyInstances :: TyCon -> [FamInst] -> TcM [TH.Dec]

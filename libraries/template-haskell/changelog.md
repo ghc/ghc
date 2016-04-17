@@ -47,6 +47,8 @@
 
   * TODO: document API changes and important bugfixes
 
+  * Add support for OVERLAP(S/PED/PING) pragmas on instances
+
 
 ## 2.10.0.0  *Mar 2015*
 
