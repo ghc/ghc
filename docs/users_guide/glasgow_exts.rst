@@ -5524,7 +5524,7 @@ This means that the usual string syntax can be used, e.g., for
 ``ByteString``, ``Text``, and other variations of string like types.
 String literals behave very much like integer literals, i.e., they can
 be used in both expressions and patterns. If used in a pattern the
-literal with be replaced by an equality test, in the same way as an
+literal will be replaced by an equality test, in the same way as an
 integer literal is.
 
 The class ``IsString`` is defined as: ::
