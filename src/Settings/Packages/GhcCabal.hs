@@ -20,6 +20,9 @@ ghcCabalBootArgs = stage0 ? do
     path <- getBuildPath
     let cabalMacros     = path -/- "autogen/cabal_macros.h"
         cabalMacrosBoot = pkgPath ghcCabal -/- "cabal_macros_boot.h"
+    -- Note: We could have computed 'cabalDeps' instead of hard-coding it
+    -- but this doesn't worth the effort, since we plan to drop ghc-cabal
+    -- altogether at some point. See #18.
     cabalDeps <- fromDiffExpr $ mconcat
         [ append [ array, base, bytestring, containers, deepseq, directory
                  , pretty, process, time ]
