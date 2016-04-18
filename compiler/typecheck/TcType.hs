@@ -36,7 +36,7 @@ module TcType (
   -- MetaDetails
   UserTypeCtxt(..), pprUserTypeCtxt, pprSigCtxt, isSigMaybe,
   TcTyVarDetails(..), pprTcTyVarDetails, vanillaSkolemTv, superSkolemTv,
-  MetaDetails(Flexi, Indirect), MetaInfo(..), TauTvFlavour(..),
+  MetaDetails(Flexi, Indirect), MetaInfo(..),
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
   isSigTyVar, isOverlappableTyVar,  isTyConableTyVar,
   isFskTyVar, isFmvTyVar, isFlattenTyVar,
@@ -228,7 +228,7 @@ import Data.Functor.Identity
 {-
 ************************************************************************
 *                                                                      *
-\subsection{Types}
+              Types
 *                                                                      *
 ************************************************************************
 
@@ -285,6 +285,13 @@ type TcTyCoVarSet   = TyCoVarSet
 type TcDTyVarSet    = DTyVarSet
 type TcDTyCoVarSet  = DTyCoVarSet
 
+
+{- *********************************************************************
+*                                                                      *
+          ExpType: an "expected type" in the type checker
+*                                                                      *
+********************************************************************* -}
+
 -- | An expected type to check against during type-checking.
 -- See Note [ExpType] in TcMType, where you'll also find manipulators.
 data ExpType = Check TcType
@@ -305,6 +312,13 @@ instance Outputable ExpType where
 -- | Make an 'ExpType' suitable for checking.
 mkCheckExpType :: TcType -> ExpType
 mkCheckExpType = Check
+
+
+{- *********************************************************************
+*                                                                      *
+          SyntaxOpType
+*                                                                      *
+********************************************************************* -}
 
 -- | What to expect for an argument to a rebindable-syntax operator.
 -- Quite like 'Type', but allows for holes to be filled in by tcSyntaxOp.
@@ -350,7 +364,7 @@ A TcRhoType has no foralls or contexts at the top, or to the right of an arrow
 
 ************************************************************************
 *                                                                      *
-\subsection{TyVarDetails}
+        TyVarDetails, MetaDetails, MetaInfo
 *                                                                      *
 ************************************************************************
 
@@ -428,14 +442,6 @@ data MetaDetails
   = Flexi  -- Flexi type variables unify to become Indirects
   | Indirect TcType
 
-instance Outputable MetaDetails where
-  ppr Flexi         = text "Flexi"
-  ppr (Indirect ty) = text "Indirect" <+> ppr ty
-
-data TauTvFlavour
-  = VanillaTau
-  | WildcardTau    -- ^ A tyvar that originates from a type wildcard.
-
 data MetaInfo
    = TauTv         -- This MetaTv is an ordinary unification variable
                    -- A TauTv is always filled in with a tau-type, which
@@ -451,6 +457,31 @@ data MetaInfo
    | FlatMetaTv    -- A flatten meta-tyvar
                    -- It is a meta-tyvar, but it is always untouchable, with level 0
                    -- See Note [The flattening story] in TcFlatten
+
+instance Outputable MetaDetails where
+  ppr Flexi         = text "Flexi"
+  ppr (Indirect ty) = text "Indirect" <+> ppr ty
+
+pprTcTyVarDetails :: TcTyVarDetails -> SDoc
+-- For debugging
+pprTcTyVarDetails (SkolemTv True)  = text "ssk"
+pprTcTyVarDetails (SkolemTv False) = text "sk"
+pprTcTyVarDetails (RuntimeUnk {})  = text "rt"
+pprTcTyVarDetails (FlatSkol {})    = text "fsk"
+pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
+  = pp_info <> colon <> ppr tclvl
+  where
+    pp_info = case info of
+                TauTv      -> text "tau"
+                SigTv      -> text "sig"
+                FlatMetaTv -> text "fuv"
+
+
+{- *********************************************************************
+*                                                                      *
+          UserTypeCtxt
+*                                                                      *
+********************************************************************* -}
 
 -------------------------------------
 -- UserTypeCtxt describes the origin of the polymorphic type
@@ -509,6 +540,50 @@ data UserTypeCtxt
 --
 -- With gla-exts that's right, but for H98 we should complain.
 -}
+
+
+pprUserTypeCtxt :: UserTypeCtxt -> SDoc
+pprUserTypeCtxt (FunSigCtxt n _)  = text "the type signature for" <+> quotes (ppr n)
+pprUserTypeCtxt (InfSigCtxt n)    = text "the inferred type for" <+> quotes (ppr n)
+pprUserTypeCtxt (RuleSigCtxt n)   = text "a RULE for" <+> quotes (ppr n)
+pprUserTypeCtxt ExprSigCtxt       = text "an expression type signature"
+pprUserTypeCtxt TypeAppCtxt       = text "a type argument"
+pprUserTypeCtxt (ConArgCtxt c)    = text "the type of the constructor" <+> quotes (ppr c)
+pprUserTypeCtxt (TySynCtxt c)     = text "the RHS of the type synonym" <+> quotes (ppr c)
+pprUserTypeCtxt ThBrackCtxt       = text "a Template Haskell quotation [t|...|]"
+pprUserTypeCtxt PatSigCtxt        = text "a pattern type signature"
+pprUserTypeCtxt ResSigCtxt        = text "a result type signature"
+pprUserTypeCtxt (ForSigCtxt n)    = text "the foreign declaration for" <+> quotes (ppr n)
+pprUserTypeCtxt DefaultDeclCtxt   = text "a type in a `default' declaration"
+pprUserTypeCtxt InstDeclCtxt      = text "an instance declaration"
+pprUserTypeCtxt SpecInstCtxt      = text "a SPECIALISE instance pragma"
+pprUserTypeCtxt GenSigCtxt        = text "a type expected by the context"
+pprUserTypeCtxt GhciCtxt          = text "a type in a GHCi command"
+pprUserTypeCtxt (ClassSCCtxt c)   = text "the super-classes of class" <+> quotes (ppr c)
+pprUserTypeCtxt SigmaCtxt         = text "the context of a polymorphic type"
+pprUserTypeCtxt (DataTyCtxt tc)   = text "the context of the data type declaration for" <+> quotes (ppr tc)
+pprUserTypeCtxt (PatSynCtxt n)    = text "the signature for pattern synonym" <+> quotes (ppr n)
+
+pprSigCtxt :: UserTypeCtxt -> SDoc -> SDoc -> SDoc
+-- (pprSigCtxt ctxt <extra> <type>)
+-- prints    In <extra> the type signature for 'f':
+--              f :: <type>
+-- The <extra> is either empty or "the ambiguity check for"
+pprSigCtxt ctxt extra pp_ty
+  | Just n <- isSigMaybe ctxt
+  = vcat [ text "In" <+> extra <+> ptext (sLit "the type signature:")
+         , nest 2 (pprPrefixOcc n <+> dcolon <+> pp_ty) ]
+
+  | otherwise
+  = hang (text "In" <+> extra <+> pprUserTypeCtxt ctxt <> colon)
+       2 pp_ty
+
+isSigMaybe :: UserTypeCtxt -> Maybe Name
+isSigMaybe (FunSigCtxt n _) = Just n
+isSigMaybe (ConArgCtxt n)   = Just n
+isSigMaybe (ForSigCtxt n)   = Just n
+isSigMaybe (PatSynCtxt n)   = Just n
+isSigMaybe _                = Nothing
 
 
 {- *********************************************************************
@@ -629,76 +704,10 @@ checkTcLevelInvariant (TcLevel ctxt_tclvl) (TcLevel tv_tclvl)
 instance Outputable TcLevel where
   ppr (TcLevel us) = ppr us
 
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
-                Pretty-printing
-*                                                                      *
-************************************************************************
--}
-
-pprTcTyVarDetails :: TcTyVarDetails -> SDoc
--- For debugging
-pprTcTyVarDetails (SkolemTv True)  = text "ssk"
-pprTcTyVarDetails (SkolemTv False) = text "sk"
-pprTcTyVarDetails (RuntimeUnk {})  = text "rt"
-pprTcTyVarDetails (FlatSkol {})    = text "fsk"
-pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
-  = pp_info <> colon <> ppr tclvl
-  where
-    pp_info = case info of
-                TauTv      -> text "tau"
-                SigTv      -> text "sig"
-                FlatMetaTv -> text "fuv"
-
-pprUserTypeCtxt :: UserTypeCtxt -> SDoc
-pprUserTypeCtxt (FunSigCtxt n _)  = text "the type signature for" <+> quotes (ppr n)
-pprUserTypeCtxt (InfSigCtxt n)    = text "the inferred type for" <+> quotes (ppr n)
-pprUserTypeCtxt (RuleSigCtxt n)   = text "a RULE for" <+> quotes (ppr n)
-pprUserTypeCtxt ExprSigCtxt       = text "an expression type signature"
-pprUserTypeCtxt TypeAppCtxt       = text "a type argument"
-pprUserTypeCtxt (ConArgCtxt c)    = text "the type of the constructor" <+> quotes (ppr c)
-pprUserTypeCtxt (TySynCtxt c)     = text "the RHS of the type synonym" <+> quotes (ppr c)
-pprUserTypeCtxt ThBrackCtxt       = text "a Template Haskell quotation [t|...|]"
-pprUserTypeCtxt PatSigCtxt        = text "a pattern type signature"
-pprUserTypeCtxt ResSigCtxt        = text "a result type signature"
-pprUserTypeCtxt (ForSigCtxt n)    = text "the foreign declaration for" <+> quotes (ppr n)
-pprUserTypeCtxt DefaultDeclCtxt   = text "a type in a `default' declaration"
-pprUserTypeCtxt InstDeclCtxt      = text "an instance declaration"
-pprUserTypeCtxt SpecInstCtxt      = text "a SPECIALISE instance pragma"
-pprUserTypeCtxt GenSigCtxt        = text "a type expected by the context"
-pprUserTypeCtxt GhciCtxt          = text "a type in a GHCi command"
-pprUserTypeCtxt (ClassSCCtxt c)   = text "the super-classes of class" <+> quotes (ppr c)
-pprUserTypeCtxt SigmaCtxt         = text "the context of a polymorphic type"
-pprUserTypeCtxt (DataTyCtxt tc)   = text "the context of the data type declaration for" <+> quotes (ppr tc)
-pprUserTypeCtxt (PatSynCtxt n)    = text "the signature for pattern synonym" <+> quotes (ppr n)
-
-pprSigCtxt :: UserTypeCtxt -> SDoc -> SDoc -> SDoc
--- (pprSigCtxt ctxt <extra> <type>)
--- prints    In <extra> the type signature for 'f':
---              f :: <type>
--- The <extra> is either empty or "the ambiguity check for"
-pprSigCtxt ctxt extra pp_ty
-  | Just n <- isSigMaybe ctxt
-  = vcat [ text "In" <+> extra <+> ptext (sLit "the type signature:")
-         , nest 2 (pprPrefixOcc n <+> dcolon <+> pp_ty) ]
-
-  | otherwise
-  = hang (text "In" <+> extra <+> pprUserTypeCtxt ctxt <> colon)
-       2 pp_ty
-
-isSigMaybe :: UserTypeCtxt -> Maybe Name
-isSigMaybe (FunSigCtxt n _) = Just n
-isSigMaybe (ConArgCtxt n)   = Just n
-isSigMaybe (ForSigCtxt n)   = Just n
-isSigMaybe (PatSynCtxt n)   = Just n
-isSigMaybe _                = Nothing
-
-{-
-************************************************************************
-*                  *
     Finding type family instances
-*                  *
+*                                                                      *
 ************************************************************************
 -}
 
@@ -728,11 +737,12 @@ tcTyFamInsts (AppTy ty1 ty2)    = tcTyFamInsts ty1 ++ tcTyFamInsts ty2
 tcTyFamInsts (CastTy ty _)      = tcTyFamInsts ty
 tcTyFamInsts (CoercionTy _)     = []  -- don't count tyfams in coercions,
                                       -- as they never get normalized, anyway
+
 {-
 ************************************************************************
-*                  *
+*                                                                      *
           The "exact" free variables of a type
-*                  *
+*                                                                      *
 ************************************************************************
 
 Note [Silly type synonym]
@@ -808,13 +818,11 @@ exactTyCoVarsOfType ty
 exactTyCoVarsOfTypes :: [Type] -> TyVarSet
 exactTyCoVarsOfTypes tys = mapUnionVarSet exactTyCoVarsOfType tys
 
-{-
-************************************************************************
-*                  *
+{- *********************************************************************
+*                                                                      *
           Bound variables in a type
-*                  *
-************************************************************************
--}
+*                                                                      *
+********************************************************************* -}
 
 -- | Find all variables bound anywhere in a type.
 -- See also Note [Scope-check inferred kinds] in TcHsType
@@ -837,15 +845,6 @@ allBoundVariables ty = runFVSet $ go ty
 allBoundVariabless :: [Type] -> TyVarSet
 allBoundVariabless = mapUnionVarSet allBoundVariables
 
-{-
-************************************************************************
-*                                                                      *
-                Predicates
-*                                                                      *
-************************************************************************
--}
-
-isTouchableOrFmv :: TcLevel -> TcTyVar -> Bool
 {- *********************************************************************
 *                                                                      *
           Type and kind variables in a type
@@ -939,6 +938,15 @@ split_dep_vars = go
                go ty1 `mappend` go ty2
 
 
+{-
+************************************************************************
+*                                                                      *
+                Predicates
+*                                                                      *
+************************************************************************
+-}
+
+isTouchableOrFmv :: TcLevel -> TcTyVar -> Bool
 isTouchableOrFmv ctxt_tclvl tv
   = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
