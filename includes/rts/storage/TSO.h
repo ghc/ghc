@@ -191,7 +191,7 @@ typedef struct StgStack_ {
     StgWord32  stack_size;     // stack size in *words*
     StgWord32  dirty;          // non-zero => dirty
     StgPtr     sp;             // current stack pointer
-    StgWord    stack[FLEXIBLE_ARRAY];
+    StgWord    stack[];
 } StgStack;
 
 // Calculate SpLim from a TSO (reads tso->stackobj, but no fields from

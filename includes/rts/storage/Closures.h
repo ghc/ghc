@@ -79,12 +79,12 @@ typedef struct {
 
 typedef struct StgClosure_ {
     StgHeader   header;
-    struct StgClosure_ *payload[FLEXIBLE_ARRAY];
+    struct StgClosure_ *payload[];
 } *StgClosurePtr; // StgClosure defined in rts/Types.h
 
 typedef struct {
     StgThunkHeader  header;
-    struct StgClosure_ *payload[FLEXIBLE_ARRAY];
+    struct StgClosure_ *payload[];
 } StgThunk;
 
 typedef struct {
@@ -97,7 +97,7 @@ typedef struct {
     StgHalfWord arity;          /* zero if it is an AP */
     StgHalfWord n_args;
     StgClosure *fun;            /* really points to a fun */
-    StgClosure *payload[FLEXIBLE_ARRAY];
+    StgClosure *payload[];
 } StgPAP;
 
 typedef struct {
@@ -105,14 +105,14 @@ typedef struct {
     StgHalfWord arity;          /* zero if it is an AP */
     StgHalfWord n_args;
     StgClosure *fun;            /* really points to a fun */
-    StgClosure *payload[FLEXIBLE_ARRAY];
+    StgClosure *payload[];
 } StgAP;
 
 typedef struct {
     StgThunkHeader   header;
     StgWord     size;                    /* number of words in payload */
     StgClosure *fun;
-    StgClosure *payload[FLEXIBLE_ARRAY]; /* contains a chunk of *stack* */
+    StgClosure *payload[]; /* contains a chunk of *stack* */
 } StgAP_STACK;
 
 typedef struct {
@@ -138,21 +138,21 @@ typedef struct StgBlockingQueue_ {
 typedef struct {
     StgHeader  header;
     StgWord    bytes;
-    StgWord    payload[FLEXIBLE_ARRAY];
+    StgWord    payload[];
 } StgArrBytes;
 
 typedef struct {
     StgHeader   header;
     StgWord     ptrs;
     StgWord     size; // ptrs plus card table
-    StgClosure *payload[FLEXIBLE_ARRAY];
+    StgClosure *payload[];
     // see also: StgMutArrPtrs macros in ClosureMacros.h
 } StgMutArrPtrs;
 
 typedef struct {
     StgHeader   header;
     StgWord     ptrs;
-    StgClosure *payload[FLEXIBLE_ARRAY];
+    StgClosure *payload[];
 } StgSmallMutArrPtrs;
 
 typedef struct {
@@ -241,7 +241,7 @@ typedef struct {
     StgMutArrPtrs *ptrs;        /* a pointer to a  MutArrPtrs */
     StgHalfWord   arity;        /* arity of this BCO */
     StgHalfWord   size;         /* size of this BCO (in words) */
-    StgWord       bitmap[FLEXIBLE_ARRAY];  /* an StgLargeBitmap */
+    StgWord       bitmap[];  /* an StgLargeBitmap */
 } StgBCO;
 
 #define BCO_BITMAP(bco)      ((StgLargeBitmap *)((StgBCO *)(bco))->bitmap)
@@ -261,7 +261,7 @@ typedef struct {
     const StgInfoTable* info;
     StgWord        size;
     StgClosure *   fun;
-    StgClosure *   payload[FLEXIBLE_ARRAY];
+    StgClosure *   payload[];
 } StgRetFun;
 
 /* Concurrent communication objects */

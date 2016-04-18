@@ -125,7 +125,7 @@ extern StgWord16 closure_flags[];
  */
 typedef struct {
   StgWord size;
-  StgWord bitmap[FLEXIBLE_ARRAY];
+  StgWord bitmap[];
 } StgLargeBitmap;
 
 /* -----------------------------------------------------------------------------
@@ -206,7 +206,7 @@ typedef struct StgInfoTable_ {
        */
 
 #ifdef TABLES_NEXT_TO_CODE
-    StgCode         code[FLEXIBLE_ARRAY];
+    StgCode         code[];
 #endif
 } *StgInfoTablePtr;
 
