@@ -50,8 +50,8 @@ type MaybeSyn a = Id a
 type family L a = r | r -> a
 type instance L a = MaybeSyn a
 
--- These should fail because given the RHS kind there is no way to determine LHS
--- kind
+-- These should fail because given the RHS kind
+-- there is no way to determine LHS kind
 class PolyKindVarsC a where
     type PolyKindVarsF a = (r :: k) | r -> a
 

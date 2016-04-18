@@ -19,7 +19,7 @@ import DynFlags
 import TcRnMonad
 import FamInst
 import TcErrors( reportAllUnsolved )
-import TcValidity( validDerivPred )
+import TcValidity( validDerivPred, allDistinctTyVars )
 import TcClassDcl( tcATDefault, tcMkDeclCtxt )
 import TcEnv
 import TcGenDeriv                       -- Deriv stuff
@@ -639,11 +639,6 @@ deriveTyData tvs tc tc_args deriv_pred
               (tc_args_to_keep, args_to_drop)
                               = splitAt n_args_to_keep tc_args
               inst_ty_kind    = typeKind (mkTyConApp tc tc_args_to_keep)
-              -- Use exactTyCoVarsOfTypes, not tyCoVarsOfTypes, so that we
-              -- don't mistakenly grab a type variable mentioned in a type
-              -- synonym that drops it.
-              -- See Note [Eta-reducing type synonyms].
-              dropped_tvs     = exactTyCoVarsOfTypes args_to_drop
 
               -- Match up the kinds, and apply the resulting kind substitution
               -- to the types.  See Note [Unify kinds in deriving]
@@ -672,8 +667,7 @@ deriveTyData tvs tc tc_args deriv_pred
 
         ; traceTc "derivTyData2" (vcat [ ppr tkvs ])
 
-        ; checkTc (allDistinctTyVars args_to_drop &&              -- (a) and (b)
-                   not (any (`elemVarSet` dropped_tvs) tkvs))     -- (c)
+        ; checkTc (allDistinctTyVars (mkVarSet tkvs) args_to_drop)     -- (a, b, c)
                   (derivingEtaErr cls final_cls_tys (mkTyConApp tc final_tc_args))
                 -- Check that
                 --  (a) The args to drop are all type variables; eg reject:
@@ -822,6 +816,12 @@ where this was first noticed).
 For this reason, we call exactTyCoVarsOfTypes on the eta-reduced types so that
 we only consider the type variables that remain after expanding through type
 synonyms.
+
+              -- Use exactTyCoVarsOfTypes, not tyCoVarsOfTypes, so that we
+              -- don't mistakenly grab a type variable mentioned in a type
+              -- synonym that drops it.
+              -- See Note [Eta-reducing type synonyms].
+              dropped_tvs     = exactTyCoVarsOfTypes args_to_drop
 -}
 
 mkEqnHelp :: Maybe OverlapMode

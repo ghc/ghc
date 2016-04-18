@@ -1081,7 +1081,7 @@ kcTyFamInstEqn fam_tc_shape@(fam_tc_name,_,_,_)
          tc_fam_ty_pats fam_tc_shape Nothing -- not an associated type
                         pats (discardResult . (tcCheckLHsType hs_ty)) }
 
-tcTyFamInstEqn :: FamTyConShape -> Maybe ClsInfo -> LTyFamInstEqn Name -> TcM CoAxBranch
+tcTyFamInstEqn :: FamTyConShape -> Maybe ClsInstInfo -> LTyFamInstEqn Name -> TcM CoAxBranch
 -- Needs to be here, not in TcInstDcls, because closed families
 -- (typechecked here) have TyFamInstEqns
 tcTyFamInstEqn fam_tc_shape@(fam_tc_name,_,_,_) mb_clsinfo
@@ -1171,7 +1171,7 @@ famTyConShape fam_tc
     , tyConResKind fam_tc )
 
 tc_fam_ty_pats :: FamTyConShape
-               -> Maybe ClsInfo
+               -> Maybe ClsInstInfo
                -> HsTyPats Name       -- Patterns
                -> (TcKind -> TcM ())  -- Kind checker for RHS
                                       -- result is ignored
@@ -1194,7 +1194,7 @@ tc_fam_ty_pats (name, _, binders, res_kind) mb_clsinfo
          -- See Note [Quantifying over family patterns]
          (_, (insted_res_kind, typats)) <- tcImplicitTKBndrs tv_names $
          do { (insting_subst, _leftover_binders, args, leftovers, n)
-                <- tcInferArgs name binders (snd <$> mb_clsinfo) arg_pats
+                <- tcInferArgs name binders (thdOf3 <$> mb_clsinfo) arg_pats
             ; case leftovers of
                 hs_ty:_ -> addErrTc $ too_many_args hs_ty n
                 _       -> return ()
@@ -1214,7 +1214,7 @@ tc_fam_ty_pats (name, _, binders, res_kind) mb_clsinfo
 
 -- See Note [tc_fam_ty_pats vs tcFamTyPats]
 tcFamTyPats :: FamTyConShape
-            -> Maybe ClsInfo
+            -> Maybe ClsInstInfo
             -> HsTyPats Name          -- patterns
             -> (TcKind -> TcM ())    -- kind-checker for RHS
             -> (   [TyVar]           -- Kind and type variables
@@ -2352,6 +2352,8 @@ checkValidClass cls
     cls_arity = length $ filterOutInvisibleTyVars (classTyCon cls) tyvars
        -- Ignore invisible variables
     cls_tv_set = mkVarSet tyvars
+    mini_env   = zipVarEnv tyvars (mkTyVarTys tyvars)
+    mb_cls     = Just (cls, tyvars, mini_env)
 
     check_op constrained_class_methods (sel_id, dm)
       = setSrcSpan (getSrcSpan sel_id) $
@@ -2394,11 +2396,10 @@ checkValidClass cls
 
              -- Check that any default declarations for associated types are valid
            ; whenIsJust m_dflt_rhs $ \ (rhs, loc) ->
-             checkValidTyFamEqn (Just (cls, mini_env)) fam_tc
+             checkValidTyFamEqn mb_cls fam_tc
                                 fam_tvs [] (mkTyVarTys fam_tvs) rhs loc }
         where
           fam_tvs = tyConTyVars fam_tc
-    mini_env = zipVarEnv tyvars (mkTyVarTys tyvars)
 
     check_dm :: UserTypeCtxt -> DefMethInfo -> TcM ()
     -- Check validity of the /top-level/ generic-default type

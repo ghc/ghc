@@ -20,6 +20,6 @@ class ( m ~ Outer m (Inner m) ) => BugC (m :: * -> *) where
 
 instance BugC (IdT m) where
     type Inner (IdT m) = m
-    type Outer (IdT _) = IdT
+    type Outer (IdT m) = IdT
 
     bug f = IdC f

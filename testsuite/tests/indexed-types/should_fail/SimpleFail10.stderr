@@ -1,0 +1,11 @@
+
+SimpleFail10.hs:14:3: error:
+    • Polymorphic type indexes of associated type ‘S8’
+        (i.e. ones independent of the class type variables)
+        must be distinct type variables
+      Expected: S8 Bool <tv>
+      Actual:   S8 Bool Char
+      where the `<tv>' arguments are type variables,
+      distinct from each other and from the instance variables
+    • In the data instance declaration for ‘S8’
+      In the instance declaration for ‘C8 Bool’

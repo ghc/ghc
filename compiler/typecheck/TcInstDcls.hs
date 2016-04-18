@@ -531,7 +531,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
         ; (tyvars, theta, clas, inst_tys) <- tcHsClsInstType InstDeclCtxt poly_ty
         ; let mini_env   = mkVarEnv (classTyVars clas `zip` inst_tys)
               mini_subst = mkTvSubst (mkInScopeSet (mkVarSet tyvars)) mini_env
-              mb_info    = Just (clas, mini_env)
+              mb_info    = Just (clas, tyvars, mini_env)
 
         -- Next, process any associated types.
         ; traceTc "tcLocalInstDecl" (ppr poly_ty)
@@ -582,7 +582,7 @@ lot of kinding and type checking code with ordinary algebraic data types (and
 GADTs).
 -}
 
-tcFamInstDeclCombined :: Maybe ClsInfo
+tcFamInstDeclCombined :: Maybe ClsInstInfo
                       -> Located Name -> TcM TyCon
 tcFamInstDeclCombined mb_clsinfo fam_tc_lname
   = do { -- Type family instances require -XTypeFamilies
@@ -602,7 +602,7 @@ tcFamInstDeclCombined mb_clsinfo fam_tc_lname
 
        ; return fam_tc }
 
-tcTyFamInstDecl :: Maybe ClsInfo
+tcTyFamInstDecl :: Maybe ClsInstInfo
                 -> LTyFamInstDecl Name -> TcM FamInst
   -- "type instance"
 tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
@@ -627,7 +627,7 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
        ; let axiom = mkUnbranchedCoAxiom rep_tc_name fam_tc co_ax_branch
        ; newFamInst SynFamilyInst axiom }
 
-tcDataFamInstDecl :: Maybe ClsInfo
+tcDataFamInstDecl :: Maybe ClsInstInfo
                   -> LDataFamInstDecl Name -> TcM (FamInst, Maybe DerivInfo)
   -- "newtype instance" and "data instance"
 tcDataFamInstDecl mb_clsinfo

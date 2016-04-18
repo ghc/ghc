@@ -95,7 +95,6 @@ module Type (
         funTyCon,
 
         -- ** Predicates on types
-        allDistinctTyVars,
         isTyVarTy, isFunTy, isDictTy, isPredTy, isVoidTy, isCoercionTy,
         isCoercionTy_maybe, isCoercionType, isForAllTy,
         isPiTy,
@@ -121,7 +120,6 @@ module Type (
         tyCoVarsOfTypeDSet,
         coVarsOfType,
         coVarsOfTypes, closeOverKinds,
-        splitDepVarsOfType, splitDepVarsOfTypes,
         splitVisVarsOfType, splitVisVarsOfTypes,
         expandTypeSynonyms,
         typeSize,
@@ -584,16 +582,6 @@ getCastedTyVar_maybe _                            = Nothing
 repGetTyVar_maybe :: Type -> Maybe TyVar
 repGetTyVar_maybe (TyVarTy tv) = Just tv
 repGetTyVar_maybe _            = Nothing
-
-allDistinctTyVars :: [KindOrType] -> Bool
-allDistinctTyVars tkvs = go emptyVarSet tkvs
-  where
-    go _      [] = True
-    go so_far (ty : tys)
-       = case getTyVar_maybe ty of
-             Nothing -> False
-             Just tv | tv `elemVarSet` so_far -> False
-                     | otherwise -> go (so_far `extendVarSet` tv) tys
 
 {-
 ---------------------------------------------------------------------

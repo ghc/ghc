@@ -11,13 +11,16 @@ module TcValidity (
   checkValidTheta, checkValidFamPats,
   checkValidInstance, validDerivPred,
   checkInstTermination,
-  ClsInfo, checkValidCoAxiom, checkValidCoAxBranch,
+  ClsInstInfo, checkValidCoAxiom, checkValidCoAxBranch,
   checkValidTyFamEqn,
   arityErr, badATErr,
-  checkValidTelescope, checkZonkValidTelescope, checkValidInferredKinds
+  checkValidTelescope, checkZonkValidTelescope, checkValidInferredKinds,
+  allDistinctTyVars
   ) where
 
 #include "HsVersions.h"
+
+import Maybes
 
 -- friends:
 import TcUnify    ( tcSubType_NC )
@@ -28,7 +31,6 @@ import TcMType
 import PrelNames
 import Type
 import Coercion
-import Unify( tcMatchTyX )
 import Kind
 import CoAxiom
 import Class
@@ -45,6 +47,7 @@ import FamInst     ( makeInjectivityErrors )
 import Name
 import VarEnv
 import VarSet
+import Var         ( mkTyVar )
 import ErrUtils
 import DynFlags
 import Util
@@ -53,10 +56,10 @@ import SrcLoc
 import Outputable
 import BasicTypes
 import Module
+import Unique      ( mkAlphaTyVarUnique )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
-import Data.Maybe
 import Data.List        ( (\\) )
 
 {-
@@ -1316,14 +1319,58 @@ for (T ty Int) elsewhere, because it's an *associated* type.
 
 Note [Checking consistent instantiation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See Trac #11450 for background discussion on this check.
+
   class C a b where
     type T a x b
 
-  instance C [p] Int
-    type T [p] y Int = (p,y,y)  -- Induces the family instance TyCon
-                                --    type TR p y = (p,y,y)
+With this class decl, if we have an instance decl
+  instance C ty1 ty2 where ...
+then the type instance must look like
+     type T ty1 v ty2 = ...
+with exactly 'ty1' for 'a', 'ty2' for 'b', and a variable for 'x'.
+For example:
 
-So we
+  instance C [p] Int
+    type T [p] y Int = (p,y,y)
+
+Note that
+
+* We used to allow completely different bound variables in the
+  associated type instance; e.g.
+    instance C [p] Int
+      type T [q] y Int = ...
+  But from GHC 8.2 onwards, we don't.  It's much simpler this way.
+  See Trac #11450.
+
+* When the class variable isn't used on the RHS of the type instance,
+  it's tempting to allow wildcards, thus
+    instance C [p] Int
+      type T [_] y Int = (y,y)
+  But it's awkward to do the test, and it doesn't work if the
+  variable is repeated:
+    instance C (p,p) Int
+      type T (_,_) y Int = (y,y)
+  Even though 'p' is not used on the RHS, we still need to use 'p'
+  on the LHS to establish the repeated pattern.  So to keep it simple
+  we just require equality.
+
+* We also check that any non-class-tyvars are instantiated with
+  distinct tyvars.  That rules out
+    instance C [p] Int where
+      type T [p] Bool Int = p  -- Note Bool
+      type T [p] Char Int = p  -- Note Char
+
+  and
+     instance C [p] Int where
+      type T [p] p Int = p     -- Note repeated 'p' on LHS
+  It's consistent to do this because we don't allow this kind of
+  instantiation for the class-tyvar arguments of the family.
+
+  Overall, we can have exactly one type instance for each
+  associated type.  If you wantmore, use an auxiliary family.
+
+Implementation
   * Form the mini-envt from the class type variables a,b
     to the instance decl types [p],Int:   [a->[p], b->Int]
 
@@ -1333,30 +1380,8 @@ So we
   * Apply the mini-evnt to them, and check that the result is
     consistent with the instance types [p] y Int
 
-We do *not* assume (at this point) the the bound variables of
-the associated type instance decl are the same as for the parent
-instance decl. So, for example,
-
-  instance C [p] Int
-    type T [q] y Int = ...
-
-would work equally well. Reason: making the *kind* variables line
-up is much harder. Example (Trac #7282):
-  class Foo (xs :: [k]) where
-     type Bar xs :: *
-
-   instance Foo '[] where
-     type Bar '[] = Int
-Here the instance decl really looks like
-   instance Foo k ('[] k) where
-     type Bar k ('[] k) = Int
-but the k's are not scoped, and hence won't match Uniques.
-
-So instead we just match structure, with tcMatchTyX, and check
-that distinct type variables match 1-1 with distinct type variables.
-
-HOWEVER, we *still* make the instance type variables scope over the
-type instances, to pick up non-obvious kinds.  Eg
+We make all the instance type variables scope over the
+type instances, of course, which picks up non-obvious kinds.  Eg
    class Foo (a :: k) where
       type F a
    instance Foo (b :: k -> k) where
@@ -1367,13 +1392,28 @@ But if the 'b' didn't scope, we would make F's instance too
 poly-kinded.
 -}
 
--- | Extra information needed when type-checking associated types. The 'Class' is
--- the enclosing class, and the @VarEnv Type@ maps class variables to their
--- instance types.
-type ClsInfo       = (Class, VarEnv Type)
+-- | Extra information about the parent instance declaration, needed
+-- when type-checking associated types. The 'Class' is the enclosing
+-- class, the [TyVar] are the type variable of the instance decl,
+-- and and the @VarEnv Type@ maps class variables to their instance
+-- types.
+type ClsInstInfo = (Class, [TyVar], VarEnv Type)
+
+type AssocInstArgShape = (Maybe Type, Type)
+  -- AssocInstArgShape is used only for associated family instances
+  --    (mb_exp, actual)
+  -- mb_exp = Just ty  => this arg corresponds to a class variable
+  --        = Nothing  => it doesn't correspond to a class variable
+  -- e.g.  class C b where
+  --          type F a b c
+  --       instance C [x] where
+  --          type F p [x] q
+  -- We get [AssocInstArgShape] = [ (Nothing,  p)
+  --                              , (Just [x], [x])
+  --                              , (Nothing,  q)]
 
 checkConsistentFamInst
-               :: Maybe ClsInfo
+               :: Maybe ClsInstInfo
                -> TyCon              -- ^ Family tycon
                -> [TyVar]            -- ^ Type variables of the family instance
                -> [Type]             -- ^ Type patterns from instance
@@ -1381,84 +1421,72 @@ checkConsistentFamInst
 -- See Note [Checking consistent instantiation]
 
 checkConsistentFamInst Nothing _ _ _ = return ()
-checkConsistentFamInst (Just (clas, mini_env)) fam_tc at_tvs at_tys
+checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc _at_tvs at_tys
   = do { -- Check that the associated type indeed comes from this class
          checkTc (Just clas == tyConAssoc_maybe fam_tc)
                  (badATErr (className clas) (tyConName fam_tc))
 
-         -- See Note [Checking consistent instantiation]
-         -- Check right to left, so that we spot type variable
-         -- inconsistencies before (more confusing) kind variables
-       ; checkTc (check_args emptyTCvSubst (fam_tc_tvs `zip` at_tys))
-                 (wrongATArgErr fam_tc expected_args at_tys) }
+       -- Check type args first (more comprehensible)
+       ; checkTc (all check_arg type_shapes)   pp_wrong_at_arg
+       ; checkTc (check_poly_args type_shapes) pp_wrong_at_tyvars
+
+       -- And now kind args
+       ; checkTc (all check_arg kind_shapes)
+                 (pp_wrong_at_arg $$ ppSuggestExplicitKinds)
+       ; checkTc (check_poly_args kind_shapes)
+                 (pp_wrong_at_tyvars $$ ppSuggestExplicitKinds)
+
+       ; traceTc "cfi" (vcat [ ppr inst_tvs
+                             , ppr arg_shapes
+                             , ppr mini_env ]) }
   where
-    fam_tc_tvs  = tyConTyVars fam_tc
-    expected_args = zipWith pick fam_tc_tvs at_tys
-    pick fam_tc_tv at_ty = case lookupVarEnv mini_env fam_tc_tv of
-                              Just inst_ty -> inst_ty
-                              Nothing      -> at_ty
+    arg_shapes :: [AssocInstArgShape]
+    arg_shapes = [ (lookupVarEnv mini_env fam_tc_tv, at_ty)
+                 | (fam_tc_tv, at_ty) <- tyConTyVars fam_tc `zip` at_tys ]
 
-    check_args :: TCvSubst -> [(TyVar,Type)] -> Bool
-    check_args subst ((fam_tc_tv, at_ty) : rest)
-      | Just inst_ty <- lookupVarEnv mini_env fam_tc_tv
-      = case tcMatchTyX subst at_ty inst_ty of
-           Just subst -> check_args subst rest
-           Nothing    -> False
+    (kind_shapes, type_shapes) = partitionInvisibles fam_tc snd arg_shapes
 
-      | otherwise
-      = check_args subst rest
+    check_arg :: AssocInstArgShape -> Bool
+    check_arg (Just exp_ty, at_ty) = exp_ty `tcEqType` at_ty
+    check_arg (Nothing,     _    ) = True -- Arg position does not correspond
+                                          -- to a class variable
+    check_poly_args :: [(Maybe Type,Type)] -> Bool
+    check_poly_args arg_shapes
+      = allDistinctTyVars (mkVarSet inst_tvs)
+                          [ at_ty | (Nothing, at_ty) <- arg_shapes ]
 
-    check_args subst []
-      = check_tvs subst [] at_tvs
+    pp_wrong_at_arg
+      = vcat [ text "Type indexes must match class instance head"
+             , pp_exp_act ]
 
-    check_tvs :: TCvSubst -> [TyVar] -> [TyVar] -> Bool
-    check_tvs _     _   [] = True   -- OK!!
-    check_tvs subst acc (tv:tvs)
-       | Just ty <- lookupTyVar subst tv
-       = case tcGetTyVar_maybe ty of
-           Nothing -> False
-           Just tv' | tv' `elem` acc -> False
-                    | otherwise      -> check_tvs subst (tv' : acc) tvs
-       | otherwise
-       = check_tvs subst acc tvs
+    pp_wrong_at_tyvars
+      = vcat [ text "Polymorphic type indexes of associated type" <+> quotes (ppr fam_tc)
+             , nest 2 $ vcat [ text "(i.e. ones independent of the class type variables)"
+                             , text "must be distinct type variables" ]
+             , pp_exp_act ]
 
-{-
-    check_arg :: (TyVar, Type) -> TCvSubst -> TcM TCvSubst
-    check_arg (fam_tc_tv, at_ty) subst
-      | Just inst_ty <- lookupVarEnv mini_env fam_tc_tv
-      = case tcMatchTyX subst at_ty inst_ty of
-           Just subst -> return subst
-           Nothing    -> failWithTc $ wrongATArgErr at_ty inst_ty
-                -- No need to instantiate here, because the axiom
-                -- uses the same type variables as the assocated class
-      | otherwise
-      = return subst   -- Allow non-type-variable instantiation
-                       -- See Note [Associated type instances]
+    pp_exp_act
+      = vcat [ text "Expected:" <+> ppr (mkTyConApp fam_tc expected_args)
+             , text "  Actual:" <+> ppr (mkTyConApp fam_tc at_tys)
+             , sdocWithDynFlags $ \dflags ->
+               ppWhen (has_poly_args dflags) $
+               vcat [ text "where the `<tv>' arguments are type variables,"
+                    , text "distinct from each other and from the instance variables" ] ]
 
-    check_distinct :: TCvSubst -> TcM ()
-    -- True if all the variables mapped the substitution
-    -- map to *distinct* type *variables*
-    check_distinct subst = go [] at_tvs
-       where
-         go _   []       = return ()
-         go acc (tv:tvs) = case lookupTyVar subst tv of
-                             Nothing -> go acc tvs
-                             Just ty | Just tv' <- tcGetTyVar_maybe ty
-                                     , tv' `notElem` acc
-                                     -> go (tv' : acc) tvs
-                             _other -> addErrTc (dupTyVar tv)
--}
+    expected_args = [ exp_ty `orElse` mk_tv at_ty | (exp_ty, at_ty) <- arg_shapes ]
+    mk_tv at_ty   = mkTyVarTy (mkTyVar tv_name (typeKind at_ty))
+    tv_name = mkInternalName (mkAlphaTyVarUnique 1) (mkTyVarOcc "<tv>") noSrcSpan
+
+    has_poly_args dflags = any (isNothing . fst) shapes
+      where
+        shapes | gopt Opt_PrintExplicitKinds dflags = arg_shapes
+               | otherwise                          = type_shapes
 
 badATErr :: Name -> Name -> SDoc
 badATErr clas op
   = hsep [text "Class", quotes (ppr clas),
           text "does not have an associated type", quotes (ppr op)]
 
-wrongATArgErr :: TyCon -> [Type] -> [Type] -> SDoc
-wrongATArgErr fam_tc expected_args actual_args
-  = vcat [ text "Type indexes must match class instance head"
-         , text "Expected:" <+> ppr (mkTyConApp fam_tc expected_args)
-         , text "Actual:  " <+> ppr (mkTyConApp fam_tc actual_args) ]
 
 {-
 ************************************************************************
@@ -1523,7 +1551,7 @@ checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
 -- Check that a "type instance" is well-formed (which includes decidability
 -- unless -XUndecidableInstances is given).
 --
-checkValidCoAxBranch :: Maybe ClsInfo
+checkValidCoAxBranch :: Maybe ClsInstInfo
                      -> TyCon -> CoAxBranch -> TcM ()
 checkValidCoAxBranch mb_clsinfo fam_tc
                     (CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
@@ -1534,7 +1562,7 @@ checkValidCoAxBranch mb_clsinfo fam_tc
 -- | Do validity checks on a type family equation, including consistency
 -- with any enclosing class instance head, termination, and lack of
 -- polytypes.
-checkValidTyFamEqn :: Maybe ClsInfo
+checkValidTyFamEqn :: Maybe ClsInstInfo
                    -> TyCon   -- ^ of the type family
                    -> [TyVar] -- ^ bound tyvars in the equation
                    -> [CoVar] -- ^ bound covars in the equation
@@ -1583,7 +1611,7 @@ checkFamInstRhs lhsTys famInsts
         what    = text "type family application" <+> quotes (pprType (TyConApp tc tys))
         bad_tvs = fvTypes tys \\ fvs
 
-checkValidFamPats :: Maybe ClsInfo -> TyCon -> [TyVar] -> [CoVar] -> [Type] -> TcM ()
+checkValidFamPats :: Maybe ClsInstInfo -> TyCon -> [TyVar] -> [CoVar] -> [Type] -> TcM ()
 -- Patterns in a 'type instance' or 'data instance' decl should
 -- a) contain no type family applications
 --    (vanilla synonyms are fine, though)
@@ -1887,3 +1915,16 @@ isTerminatingClass cls
 -- | Tidy before printing a type
 ppr_tidy :: TidyEnv -> Type -> SDoc
 ppr_tidy env ty = pprType (tidyType env ty)
+
+allDistinctTyVars :: TyVarSet -> [KindOrType] -> Bool
+-- (allDistinctTyVars tvs tys) returns True if tys are
+-- a) all tyvars
+-- b) all distinct
+-- c) disjoint from tvs
+allDistinctTyVars _    [] = True
+allDistinctTyVars tkvs (ty : tys)
+  = case getTyVar_maybe ty of
+      Nothing -> False
+      Just tv | tv `elemVarSet` tkvs -> False
+              | otherwise -> allDistinctTyVars (tkvs `extendVarSet` tv) tys
+

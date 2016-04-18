@@ -8,7 +8,7 @@ import Language.Haskell.TH.Ppr
 import System.IO
 
 class C a where
-        data F a (b :: k) :: *
+        data F a b :: *
 
 instance C Int where
         data F Int x = FInt x

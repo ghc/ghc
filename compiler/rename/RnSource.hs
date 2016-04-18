@@ -709,7 +709,10 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
              --     to remove the context).
 
 rnFamInstDecl :: HsDocContext
-              -> Maybe (Name, [Name])
+              -> Maybe (Name, [Name])   -- Nothing => not associated
+                                        -- Just (cls,tvs) => associated,
+                                        --   and gives class and tyvars of the
+                                        --   parent instance delc
               -> Located RdrName
               -> HsTyPats RdrName
               -> rhs
@@ -743,10 +746,17 @@ rnFamInstDecl doc mb_cls tycon (HsIB { hsib_body = pats }) payload rnPayload
                                    freeKiTyVarsAllVars pat_kity_vars_with_dups
                     ; tv_nms_dups <- mapM (lookupOccRn . unLoc) $
                                      [ tv | (tv:_:_) <- groups ]
-                          -- Add to the used variables any variables that
-                          -- appear *more than once* on the LHS
-                          -- e.g.   F a Int a = Bool
-                    ; let tv_nms_used = extendNameSetList rhs_fvs tv_nms_dups
+                          -- Add to the used variables
+                          --  a) any variables that appear *more than once* on the LHS
+                          --     e.g.   F a Int a = Bool
+                          --  b) for associated instances, the variables
+                          --     of the instance decl.  See
+                          --     Note [Unused type variables in family instances]
+                    ; let tv_nms_used = extendNameSetList rhs_fvs $
+                                        inst_tvs ++ tv_nms_dups
+                          inst_tvs = case mb_cls of
+                                       Nothing            -> []
+                                       Just (_, inst_tvs) -> inst_tvs
                     ; warnUnusedTypePatterns var_names tv_nms_used
 
                          -- See Note [Renaming associated types]
@@ -757,8 +767,8 @@ rnFamInstDecl doc mb_cls tycon (HsIB { hsib_body = pats }) payload rnPayload
 
                           is_bad cls_tkv = cls_tkv `elemNameSet` rhs_fvs
                                         && not (cls_tkv `elemNameSet` var_name_set)
-
                     ; unless (null bad_tvs) (badAssocRhs bad_tvs)
+
                     ; return ((pats', payload'), rhs_fvs `plusFV` pat_fvs) }
 
        ; let anon_wcs = concatMap collectAnonWildCards pats'
@@ -872,14 +882,24 @@ fresh meta-variables whereas the former generate fresh skolems.
 
 Note [Unused type variables in family instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When the flag -fwarn-unused-type-patterns is on, the compiler reports warnings
-about unused type variables. (rnFamInstDecl) A type variable is considered
-used
- * when it is either occurs on the RHS of the family instance, or
+When the flag -fwarn-unused-type-patterns is on, the compiler reports
+warnings about unused type variables in type-family instances. A
+tpye variable is considered used (i.e. cannot be turned into a wildcard)
+when
+
+ * it occurs on the RHS of the family instance
    e.g.   type instance F a b = a    -- a is used on the RHS
 
  * it occurs multiple times in the patterns on the LHS
    e.g.   type instance F a a = Int  -- a appears more than once on LHS
+
+ * it is one of the instance-decl variables, for associated types
+   e.g.   instance C (a,b) where
+            type T (a,b) = a
+   Here the type pattern in the type instance must be the same as that
+   for the class instance, so
+            type T (a,_) = a
+   would be rejected.  So we should not complain about an unused variable b
 
 As usual, the warnings are not reported for for type variables with names
 beginning with an underscore.
