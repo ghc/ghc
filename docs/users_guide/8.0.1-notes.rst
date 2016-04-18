@@ -18,6 +18,14 @@ performance improvements over the 7.10 branch.
     package key (with GHC's :ghc-flag:`-this-package-key` argument), GHC 8.0 and
     later uses installed package IDs in place of package keys.
 
+.. note::
+
+    Users compiling GHC on Mac OS X with XCode 7.3 will need to tell the build
+    system to use the ``nm-classic`` command instead of Apple's new ``nm``
+    implementation as the latter breaks POSIX compliance (see
+    :ghc-ticket:`11744`). This can be done by passing something like
+    ``--with-nm=/Library/Developer/CommandLineTools/usr/bin/nm-classic`` to
+    ``configure``.
 
 Highlights
 ----------
