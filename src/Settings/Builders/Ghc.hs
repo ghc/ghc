@@ -5,6 +5,7 @@ module Settings.Builders.Ghc (
 import Base
 import Expression
 import GHC
+import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Oracles.PackageData
 import Predicates hiding (way, stage)
@@ -114,11 +115,16 @@ packageGhcArgs = do
     lift . when (isLibrary pkg) $ do
         conf <- pkgConfFile context
         need [conf]
+    -- FIXME: Get rid of to-be-deprecated -this-package-key.
+    thisArg <- do
+        not0 <- notStage0
+        unit <- getFlag SupportsThisUnitId
+        return $ if not0 || unit then "-this-unit-id " else "-this-package-key "
     mconcat
         [ arg "-hide-all-packages"
         , arg "-no-user-package-db"
         , bootPackageDbArgs
-        , isLibrary pkg ? (arg $ "-this-package-key " ++ compId)
+        , isLibrary pkg ? (arg $ thisArg ++ compId)
         , append $ map ("-package-id " ++) pkgDepIds ]
 
 -- TODO: Improve handling of "cabal_macros.h"

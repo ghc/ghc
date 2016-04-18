@@ -70,6 +70,8 @@ ghc-major-version     = @GhcMajVersion@
 ghc-minor-version     = @GhcMinVersion@
 ghc-patch-level       = @GhcPatchLevel@
 
+supports-this-unit-id = @SUPPORTS_THIS_UNIT_ID@
+
 project-name          = @ProjectName@
 project-version       = @ProjectVersion@
 project-version-int   = @ProjectVersionInt@
