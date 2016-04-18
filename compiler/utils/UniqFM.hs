@@ -67,7 +67,7 @@ module UniqFM (
         eltsUFM, keysUFM, splitUFM,
         ufmToSet_Directly,
         ufmToList,
-        joinUFM, pprUniqFM
+        joinUFM, pprUniqFM, pprUFM, pluralUFM
     ) where
 
 import Unique           ( Uniquable(..), Unique, getKey )
@@ -327,3 +327,21 @@ pprUniqFM ppr_elt ufm
   = brackets $ fsep $ punctuate comma $
     [ ppr uq <+> text ":->" <+> ppr_elt elt
     | (uq, elt) <- ufmToList ufm ]
+
+-- | Pretty-print a non-deterministic set.
+-- The order of variables is non-deterministic and for pretty-printing that
+-- shouldn't be a problem.
+-- Having this function helps contain the non-determinism created with
+-- eltsUFM.
+pprUFM :: ([a] -> SDoc) -- ^ The pretty printing function to use on the elements
+       -> UniqFM a      -- ^ The things to be pretty printed
+       -> SDoc          -- ^ 'SDoc' where the things have been pretty
+                        -- printed
+pprUFM pp ufm = pp (eltsUFM ufm)
+
+-- | Determines the pluralisation suffix appropriate for the length of a set
+-- in the same way that plural from Outputable does for lists.
+pluralUFM :: UniqFM a -> SDoc
+pluralUFM ufm
+  | sizeUFM ufm == 1 = empty
+  | otherwise = char 's'

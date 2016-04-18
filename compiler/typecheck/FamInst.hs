@@ -562,12 +562,12 @@ unusedInjectiveVarsErr (Pair invis_vars vis_vars) errorBuilder tyfamEqn
   = errorBuilder (injectivityErrorHerald True $$ msg)
                  [tyfamEqn]
     where
-      tvs = varSetElemsWellScoped (invis_vars `unionVarSet` vis_vars)
+      tvs = invis_vars `unionVarSet` vis_vars
       has_types = not $ isEmptyVarSet vis_vars
       has_kinds = not $ isEmptyVarSet invis_vars
 
       doc = sep [ what <+> text "variable" <>
-                  plural tvs <+> pprQuotedList tvs
+                  pluralVarSet tvs <+> pprVarSet (pprQuotedList . toposortTyVars) tvs
                 , text "cannot be inferred from the right-hand side." ]
       what = case (has_types, has_kinds) of
                (True, True)   -> text "Type and kind"

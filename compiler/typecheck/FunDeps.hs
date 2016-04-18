@@ -387,7 +387,7 @@ checkInstCoverage be_liberal clas theta inst_taus
          liberal_undet_tvs = (`minusVarSet` closed_ls_tvs) <$> rs_tvs
          conserv_undet_tvs = (`minusVarSet` ls_tvs)        <$> rs_tvs
 
-         undet_list = varSetElemsWellScoped (fold undetermined_tvs)
+         undet_set = fold undetermined_tvs
 
          msg = vcat [ -- text "ls_tvs" <+> ppr ls_tvs
                       -- , text "closed ls_tvs" <+> ppr (closeOverKinds ls_tvs)
@@ -407,8 +407,8 @@ checkInstCoverage be_liberal clas theta inst_taus
                              else text "do not jointly")
                             <+> text "determine rhs type"<>plural rs
                             <+> pprQuotedList rs ]
-                    , text "Un-determined variable" <> plural undet_list <> colon
-                            <+> pprWithCommas ppr undet_list
+                    , text "Un-determined variable" <> pluralVarSet undet_set <> colon
+                            <+> pprVarSet (pprWithCommas ppr) undet_set
                     , ppWhen (isEmptyVarSet $ pSnd undetermined_tvs) $
                       text "(Use -fprint-explicit-kinds to see the kind variables in the types)"
                     , ppWhen (not be_liberal &&
