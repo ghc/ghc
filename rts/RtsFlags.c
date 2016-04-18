@@ -1607,7 +1607,7 @@ static rtsBool read_heap_profiling_flag(const char *arg_in)
                 if (!right)
                     right = arg + strlen(arg);
 
-                char *selector = strndup(left, right - left);
+                char *selector = stgStrndup(left, right - left + 1);
 
                 switch (arg[2]) {
                 case 'c': // cost centre label select
