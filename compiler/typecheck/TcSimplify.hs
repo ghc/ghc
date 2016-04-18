@@ -25,7 +25,6 @@ import ListSetOps
 import Maybes
 import Name
 import Outputable
-import Pair
 import PrelInfo
 import PrelNames
 import TcErrors
@@ -49,7 +48,6 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad ( when, unless )
 import Data.List     ( partition )
-import Data.Foldable    ( fold )
 
 #if __GLASGOW_HASKELL__ < 709
 import Data.Traversable ( traverse )
@@ -623,14 +621,12 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
          -- we don't quantify over beta (since it is fixed by envt)
          -- so we must promote it!  The inferred type is just
          --   f :: beta -> beta
-       ; outer_tclvl    <- TcM.getTcLevel
-       ; zonked_tau_tvs <- fold <$>
-                           traverse TcM.zonkTyCoVarsAndFV zonked_tau_tkvs
+       ; zonked_tau_tvs <- TcM.zonkTyCoVarsAndFV (dv_tvs zonked_tau_tkvs)
               -- decideQuantification turned some meta tyvars into
               -- quantified skolems, so we have to zonk again
 
-       ; let phi_tvs     = tyCoVarsOfTypes bound_theta
-                           `unionVarSet` zonked_tau_tvs
+       ; let phi_tvs = tyCoVarsOfTypes bound_theta
+                       `unionVarSet` zonked_tau_tvs
 
              promote_tvs = closeOverKinds phi_tvs `delVarSetList` qtvs
        ; MASSERT2( closeOverKinds promote_tvs `subVarSet` promote_tvs
@@ -641,6 +637,7 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
            -- we really don't want a type to be promoted when its kind isn't!
 
            -- promoteTyVar ignores coercion variables
+       ; outer_tclvl <- TcM.getTcLevel
        ; mapM_ (promoteTyVar outer_tclvl) (varSetElems promote_tvs)
 
            -- Emit an implication constraint for the
@@ -739,18 +736,19 @@ decideQuantification
   -> [TcIdSigInfo]
   -> [(Name, TcTauType)]   -- variables to be generalised (for errors only)
   -> [PredType]            -- candidate theta
-  -> Pair TcTyCoVarSet     -- dependent (kind) variables & type variables
+  -> TcDepVars
   -> TcM ( [TcTyVar]       -- Quantify over these (skolems)
          , [PredType] )    -- and this context (fully zonked)
 -- See Note [Deciding quantification]
 decideQuantification apply_mr sigs name_taus constraints
-                     zonked_pair@(Pair zonked_tau_kvs zonked_tau_tvs)
+                     zonked_dvs@(DV { dv_kvs = zonked_tau_kvs, dv_tvs = zonked_tau_tvs })
   | apply_mr     -- Apply the Monomorphism restriction
   = do { gbl_tvs <- tcGetGlobalTyCoVars
-       ; let constrained_tvs = tyCoVarsOfTypes constraints `unionVarSet`
+       ; let zonked_tkvs = zonked_tau_kvs `unionVarSet` zonked_tau_tvs
+             constrained_tvs = tyCoVarsOfTypes constraints `unionVarSet`
                                filterVarSet isCoVar zonked_tkvs
              mono_tvs = gbl_tvs `unionVarSet` constrained_tvs
-       ; qtvs <- quantify_tvs sigs mono_tvs zonked_pair
+       ; qtvs <- quantify_tvs sigs mono_tvs zonked_dvs
 
            -- Warn about the monomorphism restriction
        ; warn_mono <- woptM Opt_WarnMonomorphism
@@ -771,7 +769,8 @@ decideQuantification apply_mr sigs name_taus constraints
   = do { gbl_tvs <- tcGetGlobalTyCoVars
        ; let mono_tvs     = growThetaTyVars equality_constraints gbl_tvs
              tau_tvs_plus = growThetaTyVars constraints zonked_tau_tvs
-       ; qtvs <- quantify_tvs sigs mono_tvs (Pair zonked_tau_kvs tau_tvs_plus)
+             dvs_plus     = DV { dv_kvs = zonked_tau_kvs, dv_tvs = tau_tvs_plus }
+       ; qtvs <- quantify_tvs sigs mono_tvs dvs_plus
           -- We don't grow the kvs, as there's no real need to. Recall
           -- that quantifyTyVars uses the separation between kvs and tvs
           -- only for defaulting, and we don't want (ever) to default a tv
@@ -796,23 +795,21 @@ decideQuantification apply_mr sigs name_taus constraints
                  , text "min_theta:"    <+> ppr min_theta ])
        ; return (qtvs, min_theta) }
   where
-    zonked_tkvs = zonked_tau_kvs `unionVarSet` zonked_tau_tvs
     bndrs    = map fst name_taus
     pp_bndrs = pprWithCommas (quotes . ppr) bndrs
     equality_constraints = filter isEqPred constraints
 
 quantify_tvs :: [TcIdSigInfo]
              -> TcTyVarSet   -- the monomorphic tvs
-             -> Pair TcTyVarSet   -- kvs, tvs to quantify
+             -> TcDepVars
              -> TcM [TcTyVar]
 -- See Note [Which type variables to quantify]
-quantify_tvs sigs mono_tvs (Pair tau_kvs tau_tvs)
+quantify_tvs sigs mono_tvs dep_tvs@(DV { dv_tvs = tau_tvs })
    -- NB: don't use quantifyZonkedTyVars because the sig stuff might
    -- be unzonked
   = quantifyTyVars (mono_tvs `delVarSetList` sig_qtvs)
-                   (Pair tau_kvs
-                         (tau_tvs `extendVarSetList` sig_qtvs
-                                  `extendVarSetList` sig_wcs))
+                   (dep_tvs { dv_tvs = tau_tvs `extendVarSetList` sig_qtvs
+                                               `extendVarSetList` sig_wcs })
                    -- NB: quantifyTyVars zonks its arguments
   where
     sig_qtvs = [ skol | sig <- sigs, (_, skol) <- sig_skols sig ]

@@ -121,7 +121,6 @@ module Type (
         tyCoVarsOfTypeDSet,
         coVarsOfType,
         coVarsOfTypes, closeOverKinds, closeOverKindsList,
-        splitDepVarsOfType, splitDepVarsOfTypes,
         splitVisVarsOfType, splitVisVarsOfTypes,
         expandTypeSynonyms,
         typeSize,
@@ -2306,47 +2305,6 @@ tyConsOfType ty
 -- but they'd always return '*', so we never need to ask
 synTyConResKind :: TyCon -> Kind
 synTyConResKind tycon = piResultTys (tyConKind tycon) (mkTyVarTys (tyConTyVars tycon))
-
--- | Retrieve the free variables in this type, splitting them based
--- on whether the variable was used in a dependent context.
--- (This isn't the most precise analysis, because
--- it's used in the typechecking knot. It might list some dependent
--- variables as also non-dependent.)
-splitDepVarsOfType :: Type -> Pair TyCoVarSet
-splitDepVarsOfType ty = Pair dep_vars final_nondep_vars
-  where
-    Pair dep_vars nondep_vars = split_dep_vars ty
-    final_nondep_vars = nondep_vars `minusVarSet` dep_vars
-
--- | Like 'splitDepVarsOfType', but over a list of types
-splitDepVarsOfTypes :: [Type] -> Pair TyCoVarSet
-splitDepVarsOfTypes tys = Pair dep_vars final_nondep_vars
-  where
-    Pair dep_vars nondep_vars = foldMap split_dep_vars tys
-    final_nondep_vars = nondep_vars `minusVarSet` dep_vars
-
--- | Worker for 'splitDepVarsOfType'. This might output the same var
--- in both sets, if it's used in both a type and a kind.
-split_dep_vars :: Type -> Pair TyCoVarSet
-split_dep_vars = go
-  where
-    go (TyVarTy tv)              = Pair (tyCoVarsOfType $ tyVarKind tv)
-                                        (unitVarSet tv)
-    go (AppTy t1 t2)             = go t1 `mappend` go t2
-    go (TyConApp _ tys)          = foldMap go tys
-    go (ForAllTy (Anon arg) res) = go arg `mappend` go res
-    go (ForAllTy (Named tv _) ty)
-      = let Pair kvs tvs = go ty in
-        Pair (kvs `delVarSet` tv `unionVarSet` tyCoVarsOfType (tyVarKind tv))
-             (tvs `delVarSet` tv)
-    go (LitTy {})                = mempty
-    go (CastTy ty co)            = go ty `mappend` Pair (tyCoVarsOfCo co)
-                                                        emptyVarSet
-    go (CoercionTy co)           = go_co co
-
-    go_co co = let Pair ty1 ty2 = coercionKind co in
-               go ty1 `mappend` go ty2  -- NB: the Pairs separate along different
-                                        -- dimensions here. Be careful!
 
 -- | Retrieve the free variables in this type, splitting them based
 -- on whether they are used visibly or invisibly. Invisible ones come

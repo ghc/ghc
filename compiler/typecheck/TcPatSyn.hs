@@ -14,7 +14,7 @@ module TcPatSyn ( tcPatSynSig, tcInferPatSynDecl, tcCheckPatSynDecl
 import HsSyn
 import TcPat
 import TcHsType( tcImplicitTKBndrs, tcExplicitTKBndrs
-               , tcHsContext, tcHsLiftedType, tcHsOpenType )
+               , tcHsContext, tcHsLiftedType, tcHsOpenType, kindGeneralize )
 import TcRnMonad
 import TcEnv
 import TcMType
@@ -29,7 +29,6 @@ import Outputable
 import FastString
 import Var
 import VarEnv( emptyTidyEnv )
-import Type( tidyTyCoVarBndrs, tidyTypes, tidyType )
 import Id
 import IdInfo( RecSelParent(..))
 import TcBinds
@@ -50,7 +49,6 @@ import Util
 import ErrUtils
 import Control.Monad ( unless, zipWithM )
 import Data.List( partition )
-import Pair( Pair(..) )
 #if __GLASGOW_HASKELL__ < 709
 import Data.Monoid( mconcat, mappend, mempty )
 import Data.Traversable( mapM )
@@ -127,16 +125,14 @@ tcPatSynSig name sig_ty
                  ; return ( (univ_tvs, req, ex_tvs, prov, arg_tys, body_ty)
                           , bound_tvs) }
 
-       -- Kind generalisation; c.f. kindGeneralise
-       ; free_kvs <- zonkTcTypeAndFV $
-                     mkSpecForAllTys (implicit_tvs ++ univ_tvs) $
-                     mkFunTys req $
-                     mkSpecForAllTys ex_tvs $
-                     mkFunTys prov $
-                     mkFunTys arg_tys $
-                     body_ty
-
-       ; kvs <- quantifyZonkedTyVars emptyVarSet (Pair free_kvs emptyVarSet)
+       -- Kind generalisation
+       ; kvs <- kindGeneralize $
+                mkSpecForAllTys (implicit_tvs ++ univ_tvs) $
+                mkFunTys req $
+                mkSpecForAllTys ex_tvs $
+                mkFunTys prov $
+                mkFunTys arg_tys $
+                body_ty
 
        -- These are /signatures/ so we zonk to squeeze out any kind
        -- unification variables.  Do this after quantifyTyVars which may

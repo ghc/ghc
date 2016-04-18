@@ -100,6 +100,7 @@ module TcType (
 
   -- * Finding "exact" (non-dead) type variables
   exactTyCoVarsOfType, exactTyCoVarsOfTypes,
+  splitDepVarsOfType, splitDepVarsOfTypes, TcDepVars(..), depVarsTyVars,
 
   -- * Extracting bound variables
   allBoundVariables, allBoundVariabless,
@@ -223,6 +224,8 @@ import qualified GHC.LanguageExtensions as LangExt
 import Data.IORef
 import Control.Monad (liftM, ap)
 #if __GLASGOW_HASKELL__ < 709
+import Data.Monoid (mempty, mappend)
+import Data.Foldable (foldMap)
 import Control.Applicative (Applicative(..), (<$>) )
 #endif
 import Data.Functor.Identity
@@ -842,6 +845,99 @@ allBoundVariabless = mapUnionVarSet allBoundVariables
 -}
 
 isTouchableOrFmv :: TcLevel -> TcTyVar -> Bool
+{- *********************************************************************
+*                                                                      *
+          Type and kind variables in a type
+*                                                                      *
+********************************************************************* -}
+
+data TcDepVars  -- See note [Dependent type variables]
+  = DV { dv_kvs :: TyCoVarSet  -- "kind" variables (dependent)
+       , dv_tvs :: TyVarSet    -- "type" variables (non-dependent)
+                               -- The two are disjoint sets
+    }
+
+depVarsTyVars :: TcDepVars -> TyVarSet
+depVarsTyVars = dv_tvs
+
+instance Outputable TcDepVars where
+  ppr (DV {dv_kvs = kvs, dv_tvs = tvs })
+    = text "DV" <+> braces (sep [ text "dv_kvs =" <+> ppr kvs
+                                , text "dv_tvs =" <+> ppr tvs ])
+
+{- Note [Dependent type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In Haskell type inference we quantify over type variables; but we only
+quantify over /kind/ variables when -XPolyKinds is on. So when
+collecting the free vars of a type, prior to quantifying, we must keep
+the type and kind veraibles separate.  But what does that mean in a
+system where kind variables /are/ type variables? It's a fairly
+arbitrary distinction based on how the variables appear:
+
+  - "Kind variables" appear in the kind of some other free variable
+     PLUS any free coercion variables
+
+  - "Type variables" are all free vars that are not kind variables
+
+E.g.  In the type    T k (a::k)
+      'k' is a kind variable, because it occurs in the kind of 'a',
+          even though it also appears at "top level" of the type
+      'a' is a type variable, becuase it doesn't
+
+Note that
+
+* We include any coercion variables in the "dependent",
+  "kind-variable" set because we never quantify over them.
+
+* Both sets are un-ordered, of course.
+
+* The "kind variables" might depend on each other; e.g
+     (k1 :: k2), (k2 :: *)
+  The "type variables" do not depend on each other; if
+  one did, it'd be classified as a kind variable!
+-}
+
+splitDepVarsOfType :: Type -> TcDepVars
+-- See Note [Dependent type variables]
+splitDepVarsOfType ty
+  = DV { dv_kvs = dep_vars
+       , dv_tvs = nondep_vars `minusVarSet` dep_vars }
+  where
+    Pair dep_vars nondep_vars = split_dep_vars ty
+
+-- | Like 'splitDepVarsOfType', but over a list of types
+splitDepVarsOfTypes :: [Type] -> TcDepVars
+-- See Note [Dependent type variables]
+splitDepVarsOfTypes tys
+  = DV { dv_kvs = dep_vars
+       , dv_tvs = nondep_vars `minusVarSet` dep_vars }
+  where
+    Pair dep_vars nondep_vars = foldMap split_dep_vars tys
+
+-- | Worker for 'splitDepVarsOfType'. This might output the same var
+-- in both sets, if it's used in both a type and a kind.
+split_dep_vars :: Type -> Pair TyCoVarSet   -- Pair kvs tvs
+split_dep_vars = go
+  where
+    go (TyVarTy tv)              = Pair (tyCoVarsOfType $ tyVarKind tv)
+                                        (unitVarSet tv)
+    go (AppTy t1 t2)             = go t1 `mappend` go t2
+    go (TyConApp _ tys)          = foldMap go tys
+    go (ForAllTy (Anon arg) res) = go arg `mappend` go res
+    go (ForAllTy (Named tv _) ty)
+      = let Pair kvs tvs = go ty in
+        Pair (kvs `delVarSet` tv `unionVarSet` tyCoVarsOfType (tyVarKind tv))
+             (tvs `delVarSet` tv)
+    go (LitTy {})                = mempty
+    go (CastTy ty co)            = go ty `mappend` Pair (tyCoVarsOfCo co)
+                                                        emptyVarSet
+    go (CoercionTy co)           = go_co co
+
+    go_co co = let Pair ty1 ty2 = coercionKind co in
+                   -- co :: ty1 ~ ty2
+               go ty1 `mappend` go ty2
+
+
 isTouchableOrFmv ctxt_tclvl tv
   = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of

@@ -80,7 +80,6 @@ import UniqSupply
 import Outputable
 import FastString
 import PrelNames hiding ( wildCardName )
-import Pair
 import qualified GHC.LanguageExtensions as LangExt
 
 import Maybes
@@ -192,8 +191,13 @@ tcHsSigType ctxt sig_ty
               -- of kind * in a Template Haskell quote eg [t| Maybe |]
 
        ; ty <- tc_hs_sig_type sig_ty kind
+
           -- Generalise here: see Note [Kind generalisation]
-       ; ty <- maybeKindGeneralizeType ty -- also zonks
+       ; do_kind_gen <- decideKindGeneralisationPlan ty
+       ; ty <- if do_kind_gen
+               then kindGeneralizeType ty
+               else zonkTcType ty
+
        ; checkValidType ctxt ty
        ; return ty }
 
@@ -318,7 +322,7 @@ tcLHsType :: LHsType Name -> TcM (TcType, TcKind)
 tcLHsType ty = addTypeCtxt ty (tc_infer_lhs_type typeLevelMode ty)
 
 ---------------------------
--- | Should we generalise the kind of this type?
+-- | Should we generalise the kind of this type signature?
 -- We *should* generalise if the type is mentions no scoped type variables
 -- or if NoMonoLocalBinds is set. Otherwise, nope.
 decideKindGeneralisationPlan :: Type -> TcM Bool
@@ -332,13 +336,6 @@ decideKindGeneralisationPlan ty
                  , text "ftvs:" <+> ppr fvs
                  , text "should gen?" <+> ppr should_gen ])
        ; return should_gen }
-
-maybeKindGeneralizeType :: TcType -> TcM Type
-maybeKindGeneralizeType ty
-  = do { should_gen <- decideKindGeneralisationPlan ty
-       ; if should_gen
-         then kindGeneralizeType ty
-         else zonkTcType ty }
 
 {-
 ************************************************************************
@@ -1439,10 +1436,14 @@ kindGeneralizeType ty
        ; zonkTcType (mkInvForAllTys kvs ty) }
 
 kindGeneralize :: TcType -> TcM [KindVar]
-kindGeneralize ty
-  = do { gbl_tvs <- tcGetGlobalTyCoVars -- Already zonked
-       ; kvs <- zonkTcTypeAndFV ty
-       ; quantifyZonkedTyVars gbl_tvs (Pair kvs emptyVarSet) }
+-- Quantify the free kind variables of a kind or type
+-- In the latter case the type is closed, so it has no free
+-- type variables.  So in both cases, all the free vars are kind vars
+kindGeneralize kind_or_type
+  = do { kvs <- zonkTcTypeAndFV kind_or_type
+       ; let dvs = DV { dv_kvs = kvs, dv_tvs = emptyVarSet }
+       ; gbl_tvs <- tcGetGlobalTyCoVars -- Already zonked
+       ; quantifyZonkedTyVars gbl_tvs dvs }
 
 {-
 Note [Kind generalisation]
