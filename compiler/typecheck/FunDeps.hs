@@ -404,7 +404,7 @@ checkInstCoverage be_liberal clas theta inst_taus
                     , text "Un-determined variable" <> plural undet_list <> colon
                             <+> pprWithCommas ppr undet_list
                     , ppWhen (isEmptyVarSet $ pSnd undetermined_tvs) $
-                      text "(Use -fprint-explicit-kinds to see the kind variables in the types)"
+                      ppSuggestExplicitKinds
                     , ppWhen (not be_liberal &&
                               and (isEmptyVarSet <$> liberal_undet_tvs)) $
                       text "Using UndecidableInstances might help" ]

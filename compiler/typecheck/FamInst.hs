@@ -569,10 +569,7 @@ unusedInjectiveVarsErr (Pair invis_vars vis_vars) errorBuilder tyfamEqn
                (True, False)  -> text "Type"
                (False, True)  -> text "Kind"
                (False, False) -> pprPanic "mkUnusedInjectiveVarsErr" $ ppr tvs
-      print_kinds_info = sdocWithDynFlags $ \ dflags ->
-                         if has_kinds && not (gopt Opt_PrintExplicitKinds dflags)
-                         then text "(enabling -fprint-explicit-kinds might help)"
-                         else empty
+      print_kinds_info = ppWhen has_kinds ppSuggestExplicitKinds
       msg = doc $$ print_kinds_info $$
             text "In the type family equation:"
 

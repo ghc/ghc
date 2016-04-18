@@ -58,7 +58,7 @@ module TyCoRep (
         pprKind, pprParendKind, pprTyLit,
         TyPrec(..), maybeParen, pprTcAppCo, pprTcAppTy,
         pprPrefixApp, pprArrowChain, ppr_type,
-        pprDataCons,
+        pprDataCons, ppSuggestExplicitKinds,
 
         -- * Free variables
         tyCoVarsOfType, tyCoVarsOfTypeDSet, tyCoVarsOfTypes, tyCoVarsOfTypesDSet,
@@ -3087,6 +3087,14 @@ pprArrowChain :: TyPrec -> [SDoc] -> SDoc
 pprArrowChain _ []         = empty
 pprArrowChain p (arg:args) = maybeParen p FunPrec $
                              sep [arg, sep (map (arrow <+>) args)]
+
+ppSuggestExplicitKinds :: SDoc
+-- Print a helpful suggstion about -fprint-explicit-kinds,
+-- if it is not already on
+ppSuggestExplicitKinds
+  = sdocWithDynFlags $ \ dflags ->
+    ppUnless (gopt Opt_PrintExplicitKinds dflags) $
+    text "Use -fprint-explicit-kinds to see the kind arguments"
 
 {-
 %************************************************************************

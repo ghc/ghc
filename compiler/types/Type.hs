@@ -175,7 +175,7 @@ module Type (
         -- * Pretty-printing
         pprType, pprParendType, pprTypeApp, pprTyThingCategory, pprTyThing,
         pprTvBndr, pprTvBndrs, pprForAll, pprForAllImplicit, pprUserForAll,
-        pprSigmaType,
+        pprSigmaType, ppSuggestExplicitKinds,
         pprTheta, pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprSourceTyCon,
         TyPrec(..), maybeParen,

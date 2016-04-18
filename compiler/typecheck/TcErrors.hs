@@ -1452,11 +1452,7 @@ mkEqInfoMsg ct ty1 ty2
 
     invis_msg | Just vis <- tcEqTypeVis act_ty exp_ty
               , vis /= Visible
-              = sdocWithDynFlags $ \dflags ->
-                if gopt Opt_PrintExplicitKinds dflags
-                then empty
-                else text "Use -fprint-explicit-kinds to see the kind arguments"
-
+              = ppSuggestExplicitKinds
               | otherwise
               = empty
 
@@ -2427,8 +2423,9 @@ mkAmbigMsg prepend_msg ct
         = pp_ambig (text "type") ambig_tvs
 
         | otherwise  -- All ambiguous kind variabes; suggest -fprint-explicit-kinds
+                     -- See Note [Suggest -fprint-explicit-kinds]
         = vcat [ pp_ambig (text "kind") ambig_kvs
-               , sdocWithDynFlags suggest_explicit_kinds ]
+               , ppSuggestExplicitKinds ]
 
     pp_ambig what tkvs
       | prepend_msg -- "Ambiguous type variable 't0'"
@@ -2441,10 +2438,6 @@ mkAmbigMsg prepend_msg ct
 
     is_or_are [_] = text "is"
     is_or_are _   = text "are"
-
-    suggest_explicit_kinds dflags  -- See Note [Suggest -fprint-explicit-kinds]
-      | gopt Opt_PrintExplicitKinds dflags = empty
-      | otherwise = text "Use -fprint-explicit-kinds to see the kind arguments"
 
 pprSkol :: [Implication] -> TcTyVar -> SDoc
 pprSkol implics tv
