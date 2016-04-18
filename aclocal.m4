@@ -831,6 +831,16 @@ m4_popdef([fp_Cache])[]dnl
 ])# FP_CHECK_ALIGNMENT
 
 
+
+# FP_CHECK_SIZEOF_AND_ALIGNMENT(TYPE)
+# ------------------------------------------------------------------
+# Combines AC_CHECK_SIZEOF and FP_CHECK_ALIGNMENT.
+AC_DEFUN([FP_CHECK_SIZEOF_AND_ALIGNMENT],
+[AC_CHECK_SIZEOF([$1])
+FP_CHECK_ALIGNMENT([$1])
+])# FP_CHECK_SIZEOF_AND_ALIGNMENT
+
+
 # FP_LEADING_UNDERSCORE
 # ---------------------
 # Test for determining whether symbol names have a leading underscore. We assume

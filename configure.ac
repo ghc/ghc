@@ -796,47 +796,37 @@ dnl ** do we have long longs?
 AC_CHECK_TYPES([long long])
 
 dnl ** what are the sizes of various types
-AC_CHECK_SIZEOF(char,               1)
-AC_CHECK_SIZEOF(double,             8)
-AC_CHECK_SIZEOF(float,              4)
-AC_CHECK_SIZEOF(int,                4)
-AC_CHECK_SIZEOF(long,               4)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(char)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(double)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(float)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(int)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(long)
 if test "$ac_cv_type_long_long" = yes; then
-AC_CHECK_SIZEOF(long long,          8)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(long long)
 fi
-AC_CHECK_SIZEOF(short,              2)
-AC_CHECK_SIZEOF(unsigned char,      1)
-AC_CHECK_SIZEOF(unsigned int,       4)
-AC_CHECK_SIZEOF(unsigned long,      4)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(short)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(unsigned char)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(unsigned int)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(unsigned long)
 if test "$ac_cv_type_long_long" = yes; then
-AC_CHECK_SIZEOF(unsigned long long, 8)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(unsigned long long)
 fi
-AC_CHECK_SIZEOF(unsigned short,     2)
-AC_CHECK_SIZEOF(void *,             4)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(unsigned short)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(void *)
+
+FP_CHECK_SIZEOF_AND_ALIGNMENT(int8_t)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(uint8_t)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(int16_t)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(uint16_t)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(int32_t)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(uint32_t)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(int64_t)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(uint64_t)
+
 
 dnl for use in settings.in
 WordSize=$ac_cv_sizeof_void_p
 AC_SUBST(WordSize)
-
-dnl ** what are alignment constraints on various types
-FP_CHECK_ALIGNMENT(char)
-FP_CHECK_ALIGNMENT(double)
-FP_CHECK_ALIGNMENT(float)
-FP_CHECK_ALIGNMENT(int)
-FP_CHECK_ALIGNMENT(long)
-if test "$ac_cv_type_long_long" = yes; then
-FP_CHECK_ALIGNMENT(long long)
-fi
-FP_CHECK_ALIGNMENT(short)
-FP_CHECK_ALIGNMENT(unsigned char)
-FP_CHECK_ALIGNMENT(unsigned int)
-FP_CHECK_ALIGNMENT(unsigned long)
-if test "$ac_cv_type_long_long" = yes; then
-FP_CHECK_ALIGNMENT(unsigned long long)
-fi
-FP_CHECK_ALIGNMENT(unsigned short)
-FP_CHECK_ALIGNMENT(void *)
-
 FP_CHECK_FUNC([WinExec],
   [@%:@include <windows.h>], [WinExec("",0)])
 
