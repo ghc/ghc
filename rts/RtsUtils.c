@@ -112,6 +112,18 @@ stgCallocBytes (int n, int m, char *msg)
     return space;
 }
 
+/* borrowed from the MUSL libc project */
+char *stgStrndup(const char *s, size_t n)
+{
+    size_t l = strnlen(s, n);
+    char *d = stgMallocBytes(l+1, "stgStrndup");
+    if (!d) return NULL;
+    memcpy(d, s, l);
+    d[l] = 0;
+    return d;
+}
+
+
 /* To simplify changing the underlying allocator used
  * by stgMallocBytes(), provide stgFree() as well.
  */

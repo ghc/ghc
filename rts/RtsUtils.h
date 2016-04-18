@@ -26,6 +26,8 @@ void *stgReallocBytes(void *p, int n, char *msg);
 void *stgCallocBytes(int n, int m, char *msg)
      GNUC3_ATTRIBUTE(__malloc__);
 
+char *stgStrndup(const char *s, size_t n);
+
 void stgFree(void* p);
 
 /* -----------------------------------------------------------------------------
