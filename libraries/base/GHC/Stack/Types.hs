@@ -4,6 +4,7 @@
 {-# LANGUAGE KindSignatures    #-}
 {-# LANGUAGE PolyKinds         #-}
 {-# LANGUAGE RankNTypes        #-}
+{-# LANGUAGE Trustworthy       #-}
 
 {-# OPTIONS_HADDOCK hide #-}
 -- we hide this module from haddock to enforce GHC.Stack as the main
@@ -49,7 +50,7 @@ import cycle,
 -}
 
 import GHC.Classes (Eq)
-import GHC.Types
+import GHC.Types (Char, Int)
 
 -- Make implicit dependency known to build system
 import GHC.Tuple ()
