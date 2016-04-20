@@ -402,8 +402,10 @@ resumeExec canLogSpan step
 
         -- remove any bindings created since the breakpoint from the
         -- linker's environment
-        let new_names = map getName (filter (`notElem` resume_tmp_te)
-                                           (ic_tythings ic))
+        let old_names = map getName resume_tmp_te
+            new_names = [ n | thing <- ic_tythings ic
+                            , let n = getName thing
+                            , not (n `elem` old_names) ]
         liftIO $ Linker.deleteFromLinkEnv new_names
 
         case r of

@@ -77,7 +77,7 @@ import VarSet
 import BasicTypes
 import DataCon
 import TyCon
-import {-# SOURCE #-} PatSyn
+import PatSyn
 import ForeignCall
 import Outputable
 import Module

@@ -25,7 +25,6 @@ module PatSyn (
 #include "HsVersions.h"
 
 import Type
-import TcType( mkSpecSigmaTy )
 import Name
 import Outputable
 import Unique
@@ -436,5 +435,7 @@ pprPatSynType (MkPatSyn { psUnivTyVars = univ_tvs,  psReqTheta  = req_theta
         , ppWhen insert_empty_ctxt $ parens empty <+> darrow
         , pprType sigma_ty ]
   where
-    sigma_ty = mkSpecSigmaTy ex_tvs prov_theta $ mkFunTys orig_args orig_res_ty
+    sigma_ty = mkForAllTys (mkNamedBinders Specified ex_tvs) $
+               mkFunTys prov_theta $
+               mkFunTys orig_args orig_res_ty
     insert_empty_ctxt = null req_theta && not (null prov_theta && null ex_tvs)

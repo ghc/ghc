@@ -110,7 +110,7 @@ module TyCon(
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} TyCoRep ( Kind, Type, PredType, TyBinder, mkForAllTys )
+import {-# SOURCE #-} TyCoRep ( Kind, Type, PredType, TyBinder, pprType, mkForAllTys )
 import {-# SOURCE #-} TysWiredIn  ( runtimeRepTyCon, constraintKind
                                   , vecCountTyCon, vecElemTyCon, liftedTypeKind )
 import {-# SOURCE #-} DataCon ( DataCon, dataConExTyVars, dataConFieldLabels )
@@ -750,8 +750,8 @@ instance Outputable AlgTyConFlav where
     ppr (VanillaAlgTyCon {})        = text "Vanilla ADT"
     ppr (UnboxedAlgTyCon {})        = text "Unboxed ADT"
     ppr (ClassTyCon cls _)          = text "Class parent" <+> ppr cls
-    ppr (DataFamInstTyCon _ tc tys) =
-        text "Family parent (family instance)" <+> ppr tc <+> sep (map ppr tys)
+    ppr (DataFamInstTyCon _ tc tys) = text "Family parent (family instance)"
+                                      <+> ppr tc <+> sep (map pprType tys)
 
 -- | Checks the invariants of a 'AlgTyConFlav' given the appropriate type class
 -- name, if any

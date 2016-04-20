@@ -16,7 +16,5 @@ type role Pat nominal
 data Pat (i :: *)
 type LPat i = Located (Pat i)
 
-instance Typeable Pat
-
 instance (DataId id) => Data (Pat id)
 instance (OutputableBndr name) => Outputable (Pat name)

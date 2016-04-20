@@ -24,7 +24,7 @@ module Class (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TyCon     ( TyCon, tyConName, tyConUnique )
-import {-# SOURCE #-} TyCoRep   ( Type, PredType )
+import {-# SOURCE #-} TyCoRep   ( Type, PredType, pprType )
 import Var
 import Name
 import BasicTypes
@@ -301,7 +301,7 @@ pprDefMethInfo :: DefMethInfo -> SDoc
 pprDefMethInfo Nothing                  = empty   -- No default method
 pprDefMethInfo (Just (n, VanillaDM))    = text "Default method" <+> ppr n
 pprDefMethInfo (Just (n, GenericDM ty)) = text "Generic default method"
-                                          <+> ppr n <+> dcolon <+> ppr ty
+                                          <+> ppr n <+> dcolon <+> pprType ty
 
 pprFundeps :: Outputable a => [FunDep a] -> SDoc
 pprFundeps []  = empty

@@ -70,7 +70,7 @@ module Var (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}   TyCoRep( Type, Kind )
+import {-# SOURCE #-}   TyCoRep( Type, Kind, pprKind )
 import {-# SOURCE #-}   TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTv )
 import {-# SOURCE #-}   IdInfo( IdDetails, IdInfo, coVarDetails, isCoVarDetails, vanillaIdInfo, pprIdDetails )
 
@@ -237,7 +237,7 @@ instance Outputable Var where
             getPprStyle $ \ppr_style ->
             if |  debugStyle ppr_style && (not (gopt Opt_SuppressVarKinds dflags))
                  -> parens (ppr (varName var) <+> ppr_debug var ppr_style <+>
-                          dcolon <+> ppr (tyVarKind var))
+                          dcolon <+> pprKind (tyVarKind var))
                |  otherwise
                  -> ppr (varName var) <> ppr_debug var ppr_style
 
@@ -349,7 +349,7 @@ mkTcTyVar name kind details
 tcTyVarDetails :: TyVar -> TcTyVarDetails
 tcTyVarDetails (TcTyVar { tc_tv_details = details }) = details
 tcTyVarDetails (TyVar {})                            = vanillaSkolemTv
-tcTyVarDetails var = pprPanic "tcTyVarDetails" (ppr var <+> dcolon <+> ppr (tyVarKind var))
+tcTyVarDetails var = pprPanic "tcTyVarDetails" (ppr var <+> dcolon <+> pprKind (tyVarKind var))
 
 setTcTyVarDetails :: TyVar -> TcTyVarDetails -> TyVar
 setTcTyVarDetails tv details = tv { tc_tv_details = details }

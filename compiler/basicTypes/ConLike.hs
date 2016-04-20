@@ -36,7 +36,6 @@ import TyCoRep (Type, ThetaType)
 import Var
 import Type (mkTyConApp)
 
-import Data.Function (on)
 import qualified Data.Data as Data
 import qualified Data.Typeable
 
@@ -62,8 +61,10 @@ data ConLike = RealDataCon DataCon
 -}
 
 instance Eq ConLike where
-    (==) = (==) `on` getUnique
-    (/=) = (/=) `on` getUnique
+    (==) = eqConLike
+
+eqConLike :: ConLike -> ConLike -> Bool
+eqConLike x y = getUnique x == getUnique y
 
 -- There used to be an Ord ConLike instance here that used Unique for ordering.
 -- It was intentionally removed to prevent determinism problems.

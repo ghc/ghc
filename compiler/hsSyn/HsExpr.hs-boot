@@ -26,12 +26,6 @@ data MatchGroup (a :: *) (body :: *)
 data GRHSs (a :: *) (body :: *)
 data SyntaxExpr (i :: *)
 
-instance Typeable HsSplice
-instance Typeable HsExpr
-instance Typeable MatchGroup
-instance Typeable GRHSs
-instance Typeable SyntaxExpr
-
 instance (DataId id) => Data (HsSplice id)
 instance (DataId id) => Data (HsExpr id)
 instance (DataId id) => Data (HsCmd id)

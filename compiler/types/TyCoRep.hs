@@ -134,7 +134,7 @@ import {-# SOURCE #-} Type( isPredTy, isCoercionTy, mkAppTy
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
 import {-# SOURCE #-} Coercion
-import {-# SOURCE #-} ConLike ( ConLike(..) )
+import {-# SOURCE #-} ConLike ( ConLike(..), conLikeName )
 import {-# SOURCE #-} TysWiredIn ( ptrRepLiftedTy )
 
 -- friends:
@@ -1563,7 +1563,6 @@ data TyThing
   | AConLike ConLike
   | ATyCon   TyCon       -- TyCons and classes; see Note [ATyCon for classes]
   | ACoAxiom (CoAxiom Branched)
-  deriving (Eq)
 
 instance Outputable TyThing where
   ppr = pprTyThing
@@ -1585,7 +1584,7 @@ instance NamedThing TyThing where       -- Can't put this with the type
   getName (AnId id)     = getName id    -- decl, because the DataCon instance
   getName (ATyCon tc)   = getName tc    -- isn't visible there
   getName (ACoAxiom cc) = getName cc
-  getName (AConLike cl) = getName cl
+  getName (AConLike cl) = conLikeName cl
 
 {-
 %************************************************************************

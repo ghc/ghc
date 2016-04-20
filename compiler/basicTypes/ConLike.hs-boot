@@ -1,17 +1,9 @@
 module ConLike where
-import Data.Typeable
-import Name (NamedThing)
 import {-# SOURCE #-} DataCon (DataCon)
 import {-# SOURCE #-} PatSyn (PatSyn)
-import Outputable
-import Data.Data (Data)
+import Name ( Name )
 
 data ConLike = RealDataCon DataCon
              | PatSynCon PatSyn
 
-instance Eq ConLike
-instance Typeable ConLike
-instance NamedThing ConLike
-instance Data ConLike
-instance Outputable ConLike
-instance OutputableBndr ConLike
+conLikeName :: ConLike -> Name

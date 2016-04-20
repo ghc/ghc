@@ -29,7 +29,7 @@ module CoAxiom (
        BuiltInSynFamily(..), trivialBuiltInFamily
        ) where
 
-import {-# SOURCE #-} TyCoRep ( Type )
+import {-# SOURCE #-} TyCoRep ( Type, pprType )
 import {-# SOURCE #-} TyCon ( TyCon )
 import Outputable
 import FastString
@@ -414,8 +414,9 @@ instance Outputable CoAxBranch where
   ppr (CoAxBranch { cab_loc = loc
                   , cab_lhs = lhs
                   , cab_rhs = rhs }) =
-    text "CoAxBranch" <+> parens (ppr loc) <> colon <+> ppr lhs <+>
-    text "=>" <+> ppr rhs
+    text "CoAxBranch" <+> parens (ppr loc) <> colon
+      <+> brackets (fsep (punctuate comma (map pprType lhs)))
+      <+> text "=>" <+> pprType rhs
 
 {-
 ************************************************************************
