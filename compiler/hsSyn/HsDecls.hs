@@ -22,7 +22,8 @@ module HsDecls (
 
   -- ** Class or type declarations
   TyClDecl(..), LTyClDecl,
-  TyClGroup(..), tyClGroupConcat, mkTyClGroup,
+  TyClGroup(..), mkTyClGroup, emptyTyClGroup,
+  tyClGroupTyClDecls, tyClGroupInstDecls, tyClGroupRoleDecls,
   isClassDecl, isDataDecl, isSynDecl, tcdName,
   isFamilyDecl, isTypeFamilyDecl, isDataFamilyDecl,
   isOpenTypeFamilyInfo, isClosedTypeFamilyInfo,
@@ -79,7 +80,7 @@ module HsDecls (
   resultVariableName,
 
   -- * Grouping
-  HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups
+  HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups, hsGroupInstDecls
 
     ) where
 
@@ -166,13 +167,10 @@ data HsGroup id
         hs_splcds :: [LSpliceDecl id],
 
         hs_tyclds :: [TyClGroup id],
-                -- A list of mutually-recursive groups
-                -- No family-instances here; they are in hs_instds
+                -- A list of mutually-recursive groups;
+                -- This includes `InstDecl`s as well;
                 -- Parser generates a singleton list;
                 -- renamer does dependency analysis
-
-        hs_instds  :: [LInstDecl id],
-                -- Both class and family instance declarations in here
 
         hs_derivds :: [LDerivDecl id],
 
@@ -195,7 +193,10 @@ emptyGroup, emptyRdrGroup, emptyRnGroup :: HsGroup a
 emptyRdrGroup = emptyGroup { hs_valds = emptyValBindsIn }
 emptyRnGroup  = emptyGroup { hs_valds = emptyValBindsOut }
 
-emptyGroup = HsGroup { hs_tyclds = [], hs_instds = [],
+hsGroupInstDecls :: HsGroup id -> [LInstDecl id]
+hsGroupInstDecls = (=<<) group_instds . hs_tyclds
+
+emptyGroup = HsGroup { hs_tyclds = [],
                        hs_derivds = [],
                        hs_fixds = [], hs_defds = [], hs_annds = [],
                        hs_fords = [], hs_warnds = [], hs_ruleds = [], hs_vects = [],
@@ -209,7 +210,6 @@ appendGroups
         hs_valds  = val_groups1,
         hs_splcds = spliceds1,
         hs_tyclds = tyclds1,
-        hs_instds = instds1,
         hs_derivds = derivds1,
         hs_fixds  = fixds1,
         hs_defds  = defds1,
@@ -223,7 +223,6 @@ appendGroups
         hs_valds  = val_groups2,
         hs_splcds = spliceds2,
         hs_tyclds = tyclds2,
-        hs_instds = instds2,
         hs_derivds = derivds2,
         hs_fixds  = fixds2,
         hs_defds  = defds2,
@@ -238,7 +237,6 @@ appendGroups
         hs_valds  = val_groups1 `plusHsValBinds` val_groups2,
         hs_splcds = spliceds1 ++ spliceds2,
         hs_tyclds = tyclds1 ++ tyclds2,
-        hs_instds = instds1 ++ instds2,
         hs_derivds = derivds1 ++ derivds2,
         hs_fixds  = fixds1 ++ fixds2,
         hs_annds  = annds1 ++ annds2,
@@ -268,7 +266,6 @@ instance OutputableBndr name => Outputable (HsDecl name) where
 instance OutputableBndr name => Outputable (HsGroup name) where
     ppr (HsGroup { hs_valds  = val_decls,
                    hs_tyclds = tycl_decls,
-                   hs_instds = inst_decls,
                    hs_derivds = deriv_decls,
                    hs_fixds  = fix_decls,
                    hs_warnds = deprec_decls,
@@ -285,8 +282,8 @@ instance OutputableBndr name => Outputable (HsGroup name) where
              if isEmptyValBinds val_decls
                 then Nothing
                 else Just (ppr val_decls),
-             ppr_ds (tyClGroupConcat tycl_decls),
-             ppr_ds inst_decls,
+             ppr_ds (tyClGroupTyClDecls tycl_decls),
+             ppr_ds (tyClGroupInstDecls tycl_decls),
              ppr_ds deriv_decls,
              ppr_ds foreign_decls]
         where
@@ -318,14 +315,12 @@ instance OutputableBndr name => Outputable (SpliceDecl name) where
 {-
 ************************************************************************
 *                                                                      *
-\subsection[SynDecl]{@data@, @newtype@ or @type@ (synonym) type declaration}
+            Type and class declarations
 *                                                                      *
 ************************************************************************
 
-                --------------------------------
-                        THE NAMING STORY
-                --------------------------------
-
+Note [The Naming story]
+~~~~~~~~~~~~~~~~~~~~~~~
 Here is the story about the implicit names that go with type, class,
 and instance decls.  It's a bit tricky, so pay attention!
 
@@ -530,22 +525,6 @@ data TyClDecl name
   deriving (Typeable)
 deriving instance (DataId id) => Data (TyClDecl id)
 
- -- This is used in TcTyClsDecls to represent
- -- strongly connected components of decls
- -- No familiy instances in here
- -- The role annotations must be grouped with their decls for the
- -- type-checker to infer roles correctly
-data TyClGroup name
-  = TyClGroup { group_tyclds :: [LTyClDecl name]
-              , group_roles  :: [LRoleAnnotDecl name] }
-    deriving (Typeable)
-deriving instance (DataId id) => Data (TyClGroup id)
-
-tyClGroupConcat :: [TyClGroup name] -> [LTyClDecl name]
-tyClGroupConcat = concatMap group_tyclds
-
-mkTyClGroup :: [LTyClDecl name] -> TyClGroup name
-mkTyClGroup decls = TyClGroup { group_tyclds = decls, group_roles = [] }
 
 -- Simple classifiers for TyClDecl
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -677,9 +656,14 @@ instance OutputableBndr name
                      <+> pprFundeps (map unLoc fds)
 
 instance OutputableBndr name => Outputable (TyClGroup name) where
-  ppr (TyClGroup { group_tyclds = tyclds, group_roles = roles })
+  ppr (TyClGroup { group_tyclds = tyclds
+                 , group_roles = roles
+                 , group_instds = instds
+                 }
+      )
     = ppr tyclds $$
-      ppr roles
+      ppr roles $$
+      ppr instds
 
 pp_vanilla_decl_head :: OutputableBndr name
    => Located name
@@ -698,73 +682,165 @@ pprTyClDeclFlavour (DataDecl { tcdDataDefn = HsDataDefn { dd_ND = nd } })
   = ppr nd
 
 
+{- Note [Complete user-supplied kind signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We kind-check declarations differently if they have a complete, user-supplied
+kind signature (CUSK). This is because we can safely generalise a CUSKed
+declaration before checking all of the others, supporting polymorphic recursion.
+See ghc.haskell.org/trac/ghc/wiki/GhcKinds/KindInference#Proposednewstrategy
+and #9200 for lots of discussion of how we got here.
+
+A declaration has a CUSK if we can know its complete kind without doing any
+inference, at all. Here are the rules:
+
+ - A class or datatype is said to have a CUSK if and only if all of its type
+variables are annotated. Its result kind is, by construction, Constraint or *
+respectively.
+
+ - A type synonym has a CUSK if and only if all of its type variables and its
+RHS are annotated with kinds.
+
+ - A closed type family is said to have a CUSK if and only if all of its type
+variables and its return type are annotated.
+
+ - An open type family always has a CUSK -- unannotated type variables (and
+return type) default to *.
+
+ - Additionally, if -XTypeInType is on, then a data definition with a top-level
+   :: must explicitly bind all kind variables to the right of the ::.
+   See test dependent/should_compile/KindLevels, which requires this case.
+   (Naturally, any kind variable mentioned before the :: should not be bound
+   after it.)
+-}
+
+
+{- *********************************************************************
+*                                                                      *
+                         TyClGroup
+        Strongly connected components of
+      type, class, instance, and role declarations
+*                                                                      *
+********************************************************************* -}
+
+{- Note [TyClGroups and dependency analysis]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A TyClGroup represents a strongly connected components of type/class/instance
+decls, together with the role annotations for the type/class declarations.
+
+The hs_tyclds :: [TyClGroup] field of a HsGroup is a dependency-order
+sequence of strongly-connected components.
+
+Invariants
+ * The type and class declarations, group_tyclds, may depend on each
+   other, or earlier TyClGroups, but not on later ones
+
+ * The role annotations, group_roles, are role-annotations for some or
+   all of the types and classes in group_tyclds (only).
+
+ * The instance declarations, group_instds, may (and usually will)
+   depend on group_tyclds, or on earlier TyClGroups, but not on later
+   ones.
+
+See Note [Dependency analsis of type, class, and instance decls]
+in RnSource for more info.
+-}
+
+data TyClGroup name  -- See Note [TyClGroups and dependency analysis]
+  = TyClGroup { group_tyclds :: [LTyClDecl name]
+              , group_roles  :: [LRoleAnnotDecl name]
+              , group_instds :: [LInstDecl name] }
+    deriving (Typeable)
+deriving instance (DataId id) => Data (TyClGroup id)
+
+emptyTyClGroup :: TyClGroup name
+emptyTyClGroup = TyClGroup [] [] []
+
+tyClGroupTyClDecls :: [TyClGroup name] -> [LTyClDecl name]
+tyClGroupTyClDecls = concatMap group_tyclds
+
+tyClGroupInstDecls :: [TyClGroup name] -> [LInstDecl name]
+tyClGroupInstDecls = concatMap group_instds
+
+tyClGroupRoleDecls :: [TyClGroup name] -> [LRoleAnnotDecl name]
+tyClGroupRoleDecls = concatMap group_roles
+
+mkTyClGroup :: [LTyClDecl name] -> [LInstDecl name] -> TyClGroup name
+mkTyClGroup decls instds = TyClGroup
+  { group_tyclds = decls
+  , group_roles = []
+  , group_instds = instds
+  }
+
+
+
 {- *********************************************************************
 *                                                                      *
                Data and type family declarations
 *                                                                      *
 ********************************************************************* -}
 
--- Note [FamilyResultSig]
--- ~~~~~~~~~~~~~~~~~~~~~~
---
--- This data type represents the return signature of a type family.  Possible
--- values are:
---
---  * NoSig - the user supplied no return signature:
---       type family Id a where ...
---
---  * KindSig - the user supplied the return kind:
---       type family Id a :: * where ...
---
---  * TyVarSig - user named the result with a type variable and possibly
---    provided a kind signature for that variable:
---       type family Id a = r where ...
---       type family Id a = (r :: *) where ...
---
---    Naming result of a type family is required if we want to provide
---    injectivity annotation for a type family:
---       type family Id a = r | r -> a where ...
---
--- See also: Note [Injectivity annotation]
+{- Note [FamilyResultSig]
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
--- Note [Injectivity annotation]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
--- A user can declare a type family to be injective:
---
---    type family Id a = r | r -> a where ...
---
---  * The part after the "|" is called "injectivity annotation".
---  * "r -> a" part is called "injectivity condition"; at the moment terms
---    "injectivity annotation" and "injectivity condition" are synonymous
---    because we only allow a single injectivity condition.
---  * "r" is the "LHS of injectivity condition". LHS can only contain the
---    variable naming the result of a type family.
+This data type represents the return signature of a type family.  Possible
+values are:
 
---  * "a" is the "RHS of injectivity condition". RHS contains space-separated
---    type and kind variables representing the arguments of a type
---    family. Variables can be omitted if a type family is not injective in
---    these arguments. Example:
---          type family Foo a b c = d | d -> a c where ...
---
--- Note that:
---  a) naming of type family result is required to provide injectivity
---     annotation
---  b) for associated types if the result was named then injectivity annotation
---     is mandatory. Otherwise result type variable is indistinguishable from
---     associated type default.
---
--- It is possible that in the future this syntax will be extended to support
--- more complicated injectivity annotations. For example we could declare that
--- if we know the result of Plus and one of its arguments we can determine the
--- other argument:
---
---    type family Plus a b = (r :: Nat) | r a -> b, r b -> a where ...
---
--- Here injectivity annotation would consist of two comma-separated injectivity
--- conditions.
---
--- See also Note [Injective type families] in TyCon
+ * NoSig - the user supplied no return signature:
+      type family Id a where ...
+
+ * KindSig - the user supplied the return kind:
+      type family Id a :: * where ...
+
+ * TyVarSig - user named the result with a type variable and possibly
+   provided a kind signature for that variable:
+      type family Id a = r where ...
+      type family Id a = (r :: *) where ...
+
+   Naming result of a type family is required if we want to provide
+   injectivity annotation for a type family:
+      type family Id a = r | r -> a where ...
+
+See also: Note [Injectivity annotation]
+
+Note [Injectivity annotation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A user can declare a type family to be injective:
+
+   type family Id a = r | r -> a where ...
+
+ * The part after the "|" is called "injectivity annotation".
+ * "r -> a" part is called "injectivity condition"; at the moment terms
+   "injectivity annotation" and "injectivity condition" are synonymous
+   because we only allow a single injectivity condition.
+ * "r" is the "LHS of injectivity condition". LHS can only contain the
+   variable naming the result of a type family.
+
+ * "a" is the "RHS of injectivity condition". RHS contains space-separated
+   type and kind variables representing the arguments of a type
+   family. Variables can be omitted if a type family is not injective in
+   these arguments. Example:
+         type family Foo a b c = d | d -> a c where ...
+
+Note that:
+ (a) naming of type family result is required to provide injectivity
+     annotation
+ (b) for associated types if the result was named then injectivity annotation
+     is mandatory. Otherwise result type variable is indistinguishable from
+     associated type default.
+
+It is possible that in the future this syntax will be extended to support
+more complicated injectivity annotations. For example we could declare that
+if we know the result of Plus and one of its arguments we can determine the
+other argument:
+
+   type family Plus a b = (r :: Nat) | r a -> b, r b -> a where ...
+
+Here injectivity annotation would consist of two comma-separated injectivity
+conditions.
+
+See also Note [Injective type families] in TyCon
+-}
 
 type LFamilyResultSig name = Located (FamilyResultSig name)
 data FamilyResultSig name = -- see Note [FamilyResultSig]
@@ -858,38 +934,6 @@ hasReturnKindSignature _                              = True
 resultVariableName :: FamilyResultSig a -> Maybe a
 resultVariableName (TyVarSig sig) = Just $ hsLTyVarName sig
 resultVariableName _              = Nothing
-
-{-
-Note [Complete user-supplied kind signatures]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We kind-check declarations differently if they have a complete, user-supplied
-kind signature (CUSK). This is because we can safely generalise a CUSKed
-declaration before checking all of the others, supporting polymorphic recursion.
-See ghc.haskell.org/trac/ghc/wiki/GhcKinds/KindInference#Proposednewstrategy
-and #9200 for lots of discussion of how we got here.
-
-A declaration has a CUSK if we can know its complete kind without doing any
-inference, at all. Here are the rules:
-
- - A class or datatype is said to have a CUSK if and only if all of its type
-variables are annotated. Its result kind is, by construction, Constraint or *
-respectively.
-
- - A type synonym has a CUSK if and only if all of its type variables and its
-RHS are annotated with kinds.
-
- - A closed type family is said to have a CUSK if and only if all of its type
-variables and its return type are annotated.
-
- - An open type family always has a CUSK -- unannotated type variables (and
-return type) default to *.
-
- - Additionally, if -XTypeInType is on, then a data definition with a top-level
-   :: must explicitly bind all kind variables to the right of the ::.
-   See test dependent/should_compile/KindLevels, which requires this case.
-   (Naturally, any kind variable mentioned before the :: should not be bound
-   after it.)
--}
 
 instance (OutputableBndr name) => Outputable (FamilyDecl name) where
   ppr = pprFamilyDecl TopLevel

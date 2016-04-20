@@ -37,6 +37,10 @@ module RnEnv (
         bindLocatedLocalsFV, bindLocatedLocalsRn,
         extendTyVarEnvFVRn,
 
+        -- Role annotations
+        RoleAnnotEnv, emptyRoleAnnotEnv, mkRoleAnnotEnv,
+        lookupRoleAnnot, getRoleAnnots,
+
         checkDupRdrNames, checkShadowedRdrNames,
         checkDupNames, checkDupAndShadowedNames, dupNamesErr,
         checkTupSize,
@@ -1533,6 +1537,35 @@ lookupFieldFixityRn (Ambiguous   (L _ rdr) _) = get_ambiguous_fixity rdr
 
     format_ambig (elt, fix) = hang (ppr fix)
                                  2 (pprNameProvenance elt)
+
+
+{- *********************************************************************
+*                                                                      *
+                        Role annotations
+*                                                                      *
+********************************************************************* -}
+
+type RoleAnnotEnv = NameEnv (LRoleAnnotDecl Name)
+
+mkRoleAnnotEnv :: [LRoleAnnotDecl Name] -> RoleAnnotEnv
+mkRoleAnnotEnv role_annot_decls
+ = mkNameEnv [ (name, ra_decl)
+             | ra_decl <- role_annot_decls
+             , let name = roleAnnotDeclName (unLoc ra_decl)
+             , not (isUnboundName name) ]
+       -- Some of the role annots will be unbound;
+       -- we don't wish to include these
+
+emptyRoleAnnotEnv :: RoleAnnotEnv
+emptyRoleAnnotEnv = emptyNameEnv
+
+lookupRoleAnnot :: RoleAnnotEnv -> Name -> Maybe (LRoleAnnotDecl Name)
+lookupRoleAnnot = lookupNameEnv
+
+getRoleAnnots :: [Name] -> RoleAnnotEnv -> ([LRoleAnnotDecl Name], RoleAnnotEnv)
+getRoleAnnots bndrs role_env
+  = ( mapMaybe (lookupRoleAnnot role_env) bndrs
+    , delListFromNameEnv role_env bndrs )
 
 
 {-

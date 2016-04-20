@@ -16,9 +16,6 @@ module TcTyDecls(
         calcSynCycles,
         checkClassCycles,
 
-        -- * Roles
-        RoleAnnots, extractRoleAnnots, emptyRoleAnnots, lookupRoleAnnots,
-
         -- * Implicits
         tcAddImplicits,
 
@@ -31,6 +28,7 @@ module TcTyDecls(
 import TcRnMonad
 import TcEnv
 import TcBinds( tcRecSelBinds )
+import RnEnv( RoleAnnotEnv, lookupRoleAnnot )
 import TyCoRep( Type(..), TyBinder(..), delBinderVar )
 import TcType
 import TysWiredIn( unitTy )
@@ -363,7 +361,7 @@ data RecTyInfo = RTI { rti_roles      :: Name -> [Role]
                      , rti_is_rec     :: Name -> RecFlag }
 
 calcRecFlags :: SelfBootInfo -> Bool  -- hs-boot file?
-             -> RoleAnnots -> [TyCon] -> RecTyInfo
+             -> RoleAnnotEnv -> [TyCon] -> RecTyInfo
 -- The 'boot_names' are the things declared in M.hi-boot, if M is the current module.
 -- Any type constructors in boot_names are automatically considered loop breakers
 -- Recursion of newtypes/data types can happen via
@@ -456,27 +454,6 @@ findLoopBreakers deps
     go edges = [ name
                | CyclicSCC ((tc,_,_) : edges') <- stronglyConnCompFromEdgedVerticesR edges,
                  name <- tyConName tc : go edges']
-
-{-
-************************************************************************
-*                                                                      *
-        Role annotations
-*                                                                      *
-************************************************************************
--}
-
-type RoleAnnots = NameEnv (LRoleAnnotDecl Name)
-
-extractRoleAnnots :: TyClGroup Name -> RoleAnnots
-extractRoleAnnots (TyClGroup { group_roles = roles })
-  = mkNameEnv [ (tycon, role_annot)
-              | role_annot@(L _ (RoleAnnotDecl (L _ tycon) _)) <- roles ]
-
-emptyRoleAnnots :: RoleAnnots
-emptyRoleAnnots = emptyNameEnv
-
-lookupRoleAnnots :: RoleAnnots -> Name -> Maybe (LRoleAnnotDecl Name)
-lookupRoleAnnots = lookupNameEnv
 
 {-
 ************************************************************************
@@ -588,12 +565,12 @@ we want to totally ignore coercions when doing role inference. This includes omi
 any type variables that appear in nominal positions but only within coercions.
 -}
 
-type RoleEnv    = NameEnv [Role]        -- from tycon names to roles
+type RoleEnv = NameEnv [Role]        -- from tycon names to roles
 
 -- This, and any of the functions it calls, must *not* look at the roles
 -- field of a tycon we are inferring roles about!
 -- See Note [Role inference]
-inferRoles :: Bool -> RoleAnnots -> [TyCon] -> Name -> [Role]
+inferRoles :: Bool -> RoleAnnotEnv -> [TyCon] -> Name -> [Role]
 inferRoles is_boot annots tycons
   = let role_env  = initialRoleEnv is_boot annots tycons
         role_env' = irGroup role_env tycons in
@@ -601,11 +578,11 @@ inferRoles is_boot annots tycons
       Just roles -> roles
       Nothing    -> pprPanic "inferRoles" (ppr name)
 
-initialRoleEnv :: Bool -> RoleAnnots -> [TyCon] -> RoleEnv
+initialRoleEnv :: Bool -> RoleAnnotEnv -> [TyCon] -> RoleEnv
 initialRoleEnv is_boot annots = extendNameEnvList emptyNameEnv .
                                 map (initialRoleEnv1 is_boot annots)
 
-initialRoleEnv1 :: Bool -> RoleAnnots -> TyCon -> (Name, [Role])
+initialRoleEnv1 :: Bool -> RoleAnnotEnv -> TyCon -> (Name, [Role])
 initialRoleEnv1 is_boot annots_env tc
   | isFamilyTyCon tc      = (name, map (const Nominal) bndrs)
   | isAlgTyCon tc         = (name, default_roles)
@@ -619,7 +596,7 @@ initialRoleEnv1 is_boot annots_env tc
           -- if the number of annotations in the role annotation decl
           -- is wrong, just ignore it. We check this in the validity check.
         role_annots
-          = case lookupNameEnv annots_env name of
+          = case lookupRoleAnnot annots_env name of
               Just (L _ (RoleAnnotDecl _ annots))
                 | annots `lengthIs` num_exps -> map unLoc annots
               _                              -> replicate num_exps Nothing

@@ -472,21 +472,21 @@ tcRnImports hsc_env import_decls
 tcRnSrcDecls :: Bool  -- False => no 'module M(..) where' header at all
              -> [LHsDecl RdrName]               -- Declarations
              -> TcM TcGblEnv
-        -- Returns the variables free in the decls
-        -- Reason: solely to report unused imports and bindings
 tcRnSrcDecls explicit_mod_hdr decls
  = do { -- Do all the declarations
       ; ((tcg_env, tcl_env), lie) <- captureConstraints $
               do { (tcg_env, tcl_env) <- tc_rn_src_decls decls ;
+
+                   -- Check for the 'main' declaration
+                   -- Must do this inside the captureConstraints
                  ; tcg_env <- setEnvs (tcg_env, tcl_env) $
                               checkMain explicit_mod_hdr
                  ; return (tcg_env, tcl_env) }
-      ; setEnvs (tcg_env, tcl_env) $ do {
 
         -- Emit Typeable bindings
       ; tcg_env <- setGblEnv tcg_env mkTypeableBinds
 
-      ; setGblEnv tcg_env $ do {
+      ; setEnvs (tcg_env, tcl_env) $ do {
 
 #ifdef GHCI
       ; finishTH
@@ -495,12 +495,7 @@ tcRnSrcDecls explicit_mod_hdr decls
         -- wanted constraints from static forms
       ; stWC <- tcg_static_wc <$> getGblEnv >>= readTcRef
 
-             --         Finish simplifying class constraints
-             --
-             -- simplifyTop deals with constant or ambiguous InstIds.
-             -- How could there be ambiguous ones?  They can only arise if a
-             -- top-level decl falls under the monomorphism restriction
-             -- and no subsequent decl instantiates its type.
+             --         Simplify constraints
              --
              -- We do this after checkMain, so that we use the type info
              -- that checkMain adds
@@ -546,7 +541,7 @@ tcRnSrcDecls explicit_mod_hdr decls
 
       ; setGlobalTypeEnv tcg_env' final_type_env
 
-   } } }
+   } }
 
 tc_rn_src_decls :: [LHsDecl RdrName]
                 -> TcM (TcGblEnv, TcLclEnv)
@@ -640,7 +635,6 @@ tcRnHsBootDecls hsc_src decls
 
                 -- Rename the declarations
         ; (tcg_env, HsGroup { hs_tyclds = tycl_decls
-                            , hs_instds = inst_decls
                             , hs_derivds = deriv_decls
                             , hs_fords  = for_decls
                             , hs_defds  = def_decls
@@ -666,7 +660,7 @@ tcRnHsBootDecls hsc_src decls
                 -- Typecheck type/class/instance decls
         ; traceTc "Tc2 (boot)" empty
         ; (tcg_env, inst_infos, _deriv_binds)
-             <- tcTyClsInstDecls tycl_decls inst_decls deriv_decls val_binds
+             <- tcTyClsInstDecls tycl_decls deriv_decls val_binds
         ; setGblEnv tcg_env     $ do {
 
                 -- Typecheck value declarations
@@ -1143,7 +1137,6 @@ rnTopSrcDecls group
 
 tcTopSrcDecls :: HsGroup Name -> TcM (TcGblEnv, TcLclEnv)
 tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
-                         hs_instds = inst_decls,
                          hs_derivds = deriv_decls,
                          hs_fords  = foreign_decls,
                          hs_defds  = default_decls,
@@ -1159,7 +1152,8 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                 -- and import the supporting declarations
         traceTc "Tc3" empty ;
         (tcg_env, inst_infos, ValBindsOut deriv_binds deriv_sigs)
-            <- tcTyClsInstDecls tycl_decls inst_decls deriv_decls val_binds ;
+            <- tcTyClsInstDecls tycl_decls deriv_decls val_binds ;
+
         setGblEnv tcg_env       $ do {
 
                 -- Generate Applicative/Monad proposal (AMP) warnings
@@ -1193,7 +1187,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                 -- Second pass over class and instance declarations,
                 -- now using the kind-checked decls
         traceTc "Tc6" empty ;
-        inst_binds <- tcInstDecls2 (tyClGroupConcat tycl_decls) inst_infos ;
+        inst_binds <- tcInstDecls2 (tyClGroupTyClDecls tycl_decls) inst_infos ;
 
                 -- Foreign exports
         traceTc "Tc7" empty ;
@@ -1427,7 +1421,6 @@ tcMissingParentClassWarn warnFlag isName shouldName
 
 ---------------------------
 tcTyClsInstDecls :: [TyClGroup Name]
-                 -> [LInstDecl Name]
                  -> [LDerivDecl Name]
                  -> [(RecFlag, LHsBinds Name)]
                  -> TcM (TcGblEnv,            -- The full inst env
@@ -1435,13 +1428,26 @@ tcTyClsInstDecls :: [TyClGroup Name]
                                               -- contains all dfuns for this module
                           HsValBinds Name)    -- Supporting bindings for derived instances
 
-tcTyClsInstDecls tycl_decls inst_decls deriv_decls binds
- = tcAddDataFamConPlaceholders inst_decls           $
+tcTyClsInstDecls tycl_decls deriv_decls binds
+ = tcAddDataFamConPlaceholders (tycl_decls >>= group_instds) $
    tcAddPatSynPlaceholders (getPatSynBinds binds) $
-   do { tcg_env <- tcTyAndClassDecls tycl_decls ;
-      ; setGblEnv tcg_env $
-        tcInstDecls1 tycl_decls inst_decls deriv_decls }
-
+   do { (tcg_env, inst_info, datafam_deriv_info)
+          <- tcTyAndClassDecls tycl_decls ;
+      ; setGblEnv tcg_env $ do {
+          -- With the @TyClDecl@s and @InstDecl@s checked we're ready to
+          -- process the deriving clauses, including data family deriving
+          -- clauses discovered in @tcTyAndClassDecls@.
+          --
+          -- Careful to quit now in case there were instance errors, so that
+          -- the deriving errors don't pile up as well.
+          ; failIfErrsM
+          ; let tyclds = tycl_decls >>= group_tyclds
+          ; (tcg_env', inst_info', val_binds)
+              <- tcInstDeclsDeriv datafam_deriv_info tyclds deriv_decls
+          ; setGblEnv tcg_env' $ do {
+                failIfErrsM
+              ; pure (tcg_env', inst_info' ++ inst_info, val_binds)
+      }}}
 
 {- *********************************************************************
 *                                                                      *

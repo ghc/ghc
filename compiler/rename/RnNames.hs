@@ -526,7 +526,7 @@ extendGlobalRdrEnvRn avails new_fixities
     getLocalDeclBindersd@ returns the names for an HsDecl
              It's used for source code.
 
-        *** See "THE NAMING STORY" in HsDecls ****
+        *** See Note [The Naming story] in HsDecls ****
 *                                                                      *
 ********************************************************************* -}
 
@@ -544,12 +544,13 @@ getLocalNonValBinders :: MiniFixityEnv -> HsGroup RdrName
 getLocalNonValBinders fixity_env
      (HsGroup { hs_valds  = binds,
                 hs_tyclds = tycl_decls,
-                hs_instds = inst_decls,
                 hs_fords  = foreign_decls })
   = do  { -- Process all type/class decls *except* family instances
+        ; let inst_decls = tycl_decls >>= group_instds
         ; overload_ok <- xoptM LangExt.DuplicateRecordFields
-        ; (tc_avails, tc_fldss) <- fmap unzip $ mapM (new_tc overload_ok)
-                                                     (tyClGroupConcat tycl_decls)
+        ; (tc_avails, tc_fldss)
+            <- fmap unzip $ mapM (new_tc overload_ok)
+                                 (tyClGroupTyClDecls tycl_decls)
         ; traceRn (text "getLocalNonValBinders 1" <+> ppr tc_avails)
         ; envs <- extendGlobalRdrEnvRn tc_avails fixity_env
         ; setEnvs envs $ do {

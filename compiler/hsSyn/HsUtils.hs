@@ -80,6 +80,7 @@ module HsUtils(
 
   hsLTyClDeclBinders, hsTyClForeignBinders, hsPatSynBinders,
   hsForeignDeclsBinders, hsGroupBinders, hsDataFamInstBinders,
+  hsDataDefnBinders,
 
   -- Collecting implicit binders
   lStmtsImplicits, hsValBindsImplicits, lPatImplicits
@@ -883,18 +884,21 @@ So in mkSelectorBinds in DsUtils, we want just m,n as the variables bound.
 
 hsGroupBinders :: HsGroup Name -> [Name]
 hsGroupBinders (HsGroup { hs_valds = val_decls, hs_tyclds = tycl_decls,
-                          hs_instds = inst_decls, hs_fords = foreign_decls })
+                          hs_fords = foreign_decls })
   =  collectHsValBinders val_decls
-  ++ hsTyClForeignBinders tycl_decls inst_decls foreign_decls
+  ++ hsTyClForeignBinders tycl_decls foreign_decls
 
-hsTyClForeignBinders :: [TyClGroup Name] -> [LInstDecl Name]
-                     -> [LForeignDecl Name] -> [Name]
+hsTyClForeignBinders :: [TyClGroup Name]
+                     -> [LForeignDecl Name]
+                     -> [Name]
 -- We need to look at instance declarations too,
 -- because their associated types may bind data constructors
-hsTyClForeignBinders tycl_decls inst_decls foreign_decls
-  = map unLoc (hsForeignDeclsBinders foreign_decls)
-    ++ getSelectorNames (foldMap (foldMap hsLTyClDeclBinders . group_tyclds) tycl_decls
-                        `mappend` foldMap hsLInstDeclBinders inst_decls)
+hsTyClForeignBinders tycl_decls foreign_decls
+  =    map unLoc (hsForeignDeclsBinders foreign_decls)
+    ++ getSelectorNames
+         (foldMap (foldMap hsLTyClDeclBinders . group_tyclds) tycl_decls
+         `mappend`
+         foldMap (foldMap hsLInstDeclBinders . group_instds) tycl_decls)
   where
     getSelectorNames :: ([Located Name], [LFieldOcc Name]) -> [Name]
     getSelectorNames (ns, fs) = map unLoc ns ++ map (selectorFieldOcc.unLoc) fs
@@ -902,6 +906,7 @@ hsTyClForeignBinders tycl_decls inst_decls foreign_decls
 -------------------
 hsLTyClDeclBinders :: Located (TyClDecl name) -> ([Located name], [LFieldOcc name])
 -- ^ Returns all the /binding/ names of the decl.  The first one is
+
 -- guaranteed to be the name of the decl. The first component
 -- represents all binding names except record fields; the second
 -- represents field occurrences. For record fields mentioned in

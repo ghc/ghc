@@ -118,7 +118,7 @@ import Data.Data       ( dataTypeOf, fromConstr, dataTypeConstrs )
 
 -- Similarly for mkConDecl, mkClassOpSig and default-method names.
 
---         *** See "THE NAMING STORY" in HsDecls ****
+--         *** See Note [The Naming story] in HsDecls ****
 
 mkTyClD :: LTyClDecl n -> LHsDecl n
 mkTyClD (L loc d) = L loc (TyClD d)

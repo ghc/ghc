@@ -340,11 +340,9 @@ data DerivInfo = DerivInfo { di_rep_tc :: TyCon
                            }
 
 -- | Extract `deriving` clauses of proper data type (skips data families)
-mkDerivInfos :: [TyClGroup Name] -> TcM [DerivInfo]
-mkDerivInfos tycls = concatMapM mk_derivs tycls
+mkDerivInfos :: [LTyClDecl Name] -> TcM [DerivInfo]
+mkDerivInfos decls = concatMapM (mk_deriv . unLoc) decls
   where
-    mk_derivs (TyClGroup { group_tyclds = decls })
-      = concatMapM (mk_deriv . unLoc) decls
 
     mk_deriv decl@(DataDecl { tcdLName = L _ data_name
                             , tcdDataDefn =
@@ -2167,7 +2165,6 @@ genInst spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon
                  , ds_name = dfun_name, ds_cls = clas, ds_loc = loc })
   | Just rhs_ty <- is_newtype   -- See Note [Bindings for Generalised Newtype Deriving]
   = do { inst_spec <- newDerivClsInst theta spec
-       ; traceTc "genInst/is_newtype" (vcat [ppr loc, ppr clas, ppr tvs, ppr tys, ppr rhs_ty])
        ; return ( InstInfo
                     { iSpec   = inst_spec
                     , iBinds  = InstBindings

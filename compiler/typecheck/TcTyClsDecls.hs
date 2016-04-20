@@ -30,11 +30,14 @@ import TcValidity
 import TcHsSyn
 import TcTyDecls
 import TcClassDcl
+import {-# SOURCE #-} TcInstDcls
+import TcDeriv (DerivInfo)
 import TcUnify
 import TcHsType
 import TcMType
 import TysWiredIn ( unitTy )
 import TcType
+import RnEnv( RoleAnnotEnv, mkRoleAnnotEnv, lookupRoleAnnot )
 import FamInst
 import FamInstEnv
 import Coercion
@@ -105,25 +108,72 @@ Thus, we take two passes over the resulting tycons, first checking for general
 validity and then checking for valid role annotations.
 -}
 
-tcTyAndClassDecls :: [TyClGroup Name]   -- Mutually-recursive groups in dependency order
-                  -> TcM TcGblEnv       -- Input env extended by types and classes
-                                        -- and their implicit Ids,DataCons
+tcTyAndClassDecls :: [TyClGroup Name]       -- Mutually-recursive groups in
+                                            -- dependency order
+                  -> TcM ( TcGblEnv         -- Input env extended by types and
+                                            -- classes
+                                            -- and their implicit Ids,DataCons
+                         , [InstInfo Name]  -- Source-code instance decls info
+                         , [DerivInfo]      -- data family deriving info
+                         )
 -- Fails if there are any errors
 tcTyAndClassDecls tyclds_s
-  = checkNoErrs $       -- The code recovers internally, but if anything gave rise to
-                        -- an error we'd better stop now, to avoid a cascade
-    fold_env tyclds_s   -- Type check each group in dependency order folding the global env
+  -- The code recovers internally, but if anything gave rise to
+  -- an error we'd better stop now, to avoid a cascade
+  -- Type check each group in dependency order folding the global env
+  = checkNoErrs $ fold_env [] [] tyclds_s
   where
-    fold_env :: [TyClGroup Name] -> TcM TcGblEnv
-    fold_env [] = getGblEnv
-    fold_env (tyclds:tyclds_s)
-      = do { tcg_env <- tcTyClGroup tyclds
-           ; setGblEnv tcg_env $ fold_env tyclds_s }
-             -- remaining groups are typecheck in the extended global env
+    fold_env :: [InstInfo Name]
+             -> [DerivInfo]
+             -> [TyClGroup Name]
+             -> TcM (TcGblEnv, [InstInfo Name], [DerivInfo])
+    fold_env inst_info deriv_info []
+      = do { gbl_env <- getGblEnv
+           ; return (gbl_env, inst_info, deriv_info) }
+    fold_env inst_info deriv_info (tyclds:tyclds_s)
+      = do { (tcg_env, inst_info', deriv_info') <- tcTyClGroup tyclds
+           ; setGblEnv tcg_env $
+               -- remaining groups are typechecked in the extended global env.
+             fold_env (inst_info' ++ inst_info)
+                      (deriv_info' ++ deriv_info)
+                      tyclds_s }
 
-tcTyClGroup :: TyClGroup Name -> TcM TcGblEnv
--- Typecheck one strongly-connected component of type and class decls
-tcTyClGroup tyclds
+tcTyClGroup :: TyClGroup Name
+            -> TcM (TcGblEnv, [InstInfo Name], [DerivInfo])
+-- Typecheck one strongly-connected component of type, class, and instance decls
+tcTyClGroup (TyClGroup { group_tyclds = tyclds
+                       , group_roles  = roles
+                       , group_instds = instds })
+  = do { let role_annots = mkRoleAnnotEnv roles
+
+           -- Step 1: Typecheck the type/class declarations
+       ; tyclss <- tcTyClDecls tyclds role_annots
+
+           -- Step 2: Perform the validity check on those types/classes
+           -- We can do this now because we are done with the recursive knot
+           -- Do it before Step 3 (adding implicit things) because the latter
+           -- expects well-formed TyCons
+       ; traceTc "Starting validity check" (ppr tyclss)
+       ; tyclss <- mapM checkValidTyCl tyclss
+       ; traceTc "Done validity check" (ppr tyclss)
+       ; mapM_ (recoverM (return ()) . checkValidRoleAnnots role_annots) tyclss
+           -- See Note [Check role annotations in a second pass]
+
+           -- Step 3: Add the implicit things;
+           -- we want them in the environment because
+           -- they may be mentioned in interface files
+       ; tcExtendTyConEnv tyclss $
+    do { gbl_env <- tcAddImplicits tyclss
+       ; setGblEnv gbl_env $
+    do {
+            -- Step 4: check instance declarations
+       ; (gbl_env, inst_info, datafam_deriv_info) <- tcInstDecls1 instds
+
+       ; return (gbl_env, inst_info, datafam_deriv_info) } } }
+
+
+tcTyClDecls :: [LTyClDecl Name] -> RoleAnnotEnv -> TcM [TyCon]
+tcTyClDecls tyclds role_annots
   = do {    -- Step 1: kind-check this group and returns the final
             -- (possibly-polymorphic) kind of each TyCon and Class
             -- See Note [Kind checking for type and class decls]
@@ -132,9 +182,7 @@ tcTyClGroup tyclds
 
             -- Step 2: type-check all groups together, returning
             -- the final TyCons and Classes
-       ; let role_annots = extractRoleAnnots tyclds
-             decls = group_tyclds tyclds
-       ; tyclss <- fixM $ \ ~rec_tyclss -> do
+       ; fixM $ \ ~rec_tyclss -> do
            { is_boot   <- tcIsHsBootOrSig
            ; self_boot <- tcSelfBootInfo
            ; let rec_flags = calcRecFlags self_boot is_boot
@@ -152,23 +200,8 @@ tcTyClGroup tyclds
              tcExtendKindEnv2 (map mkTcTyConPair tc_tycons)              $
 
                  -- Kind and type check declarations for this group
-             mapM (tcTyClDecl rec_flags) decls }
-
-           -- Step 3: Perform the validity check
-           -- We can do this now because we are done with the recursive knot
-           -- Do it before Step 4 (adding implicit things) because the latter
-           -- expects well-formed TyCons
-       ; traceTc "Starting validity check" (ppr tyclss)
-       ; tyclss <- mapM checkValidTyCl tyclss
-       ; traceTc "Done validity check" (ppr tyclss)
-       ; mapM_ (recoverM (return ()) . checkValidRoleAnnots role_annots) tyclss
-           -- See Note [Check role annotations in a second pass]
-
-           -- Step 4: Add the implicit things;
-           -- we want them in the environment because
-           -- they may be mentioned in interface files
-       ; tcExtendTyConEnv tyclss $
-         tcAddImplicits tyclss }
+               mapM (tcTyClDecl rec_flags) tyclds
+           } }
   where
     ppr_tc_tycon tc = parens (sep [ ppr (tyConName tc) <> comma
                                   , ppr (tyConBinders tc) <> comma
@@ -264,13 +297,13 @@ See also Note [Kind checking recursive type and class declarations]
 
 -}
 
-kcTyClGroup :: TyClGroup Name -> TcM [TcTyCon]
+kcTyClGroup :: [LTyClDecl Name] -> TcM [TcTyCon]
 -- Kind check this group, kind generalize, and return the resulting local env
 -- This bindds the TyCons and Classes of the group, but not the DataCons
 -- See Note [Kind checking for type and class decls]
 -- Third return value is Nothing if the tycon be unsaturated; otherwise,
 -- the arity
-kcTyClGroup (TyClGroup { group_tyclds = decls })
+kcTyClGroup decls
   = do  { mod <- getModule
         ; traceTc "kcTyClGroup" (text "module" <+> ppr mod $$ vcat (map ppr decls))
 
@@ -2023,21 +2056,41 @@ checkValidTyCl :: TyCon -> TcM TyCon
 checkValidTyCl tc
   = setSrcSpan (getSrcSpan tc) $
     addTyConCtxt tc $
-    recoverM (do { traceTc "Aborted validity for tycon" (ppr tc)
-                 ; return (makeTyConAbstract tc) })
+    recoverM recovery_code
              (do { traceTc "Starting validity for tycon" (ppr tc)
                  ; checkValidTyCon tc
                  ; traceTc "Done validity for tycon" (ppr tc)
                  ; return tc })
-    -- We recover, which allows us to report multiple validity errors
-    -- In the failure case we return a TyCon of the right kind, but
-    -- with no interesting behaviour (makeTyConAbstract). Why?
-    -- Suppose we have
-    --    type T a = Fun
-    -- where Fun is a type family of arity 1.  The RHS is invalid, but we
-    -- want to go on checking validity of subsequent type declarations.
-    -- So we replace T with an abstract TyCon which will do no harm.
-    -- See indexed-types/should_fail/BadSock ande Trac #10896
+  where
+    recovery_code -- See Note [Recover from validity error]
+      = do { traceTc "Aborted validity for tycon" (ppr tc)
+           ; return fake_tc }
+    fake_tc | isFamilyTyCon tc || isTypeSynonymTyCon tc
+            = makeTyConAbstract tc
+            | otherwise
+            = tc
+
+{- Note [Recover from validity error]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We recover from a validity error in a type or class, which allows us
+to report multiple validity errors. In the failure case we return a
+TyCon of the right kind, but with no interesting behaviour
+(makeTyConAbstract). Why?  Suppose we have
+   type T a = Fun
+where Fun is a type family of arity 1.  The RHS is invalid, but we
+want to go on checking validity of subsequent type declarations.
+So we replace T with an abstract TyCon which will do no harm.
+See indexed-types/should_fail/BadSock and Trac #10896
+
+Painfully, though, we *don't* want to do this for classes.
+Consider tcfail041:
+   class (?x::Int) => C a where ...
+   instance C Int
+The class is invalid because of the superclass constraint.  But
+we still want it to look like a /class/, else the instance bleats
+that the instance is mal-formed because it hasn't got a class in
+the head.
+-}
 
 -------------------------
 -- For data types declared with record syntax, we require
@@ -2060,7 +2113,8 @@ checkValidTyCon tc
   = return ()
 
   | otherwise
-  = do { checkValidTyConTyVars tc
+  = do { traceTc "checkValidTyCon" (ppr tc $$ ppr (tyConClass_maybe tc))
+       ; checkValidTyConTyVars tc
        ; if | Just cl <- tyConClass_maybe tc
               -> checkValidClass cl
 
@@ -2460,7 +2514,7 @@ This fixes Trac #9415, #9739
 ************************************************************************
 -}
 
-checkValidRoleAnnots :: RoleAnnots -> TyCon -> TcM ()
+checkValidRoleAnnots :: RoleAnnotEnv -> TyCon -> TcM ()
 checkValidRoleAnnots role_annots tc
   | isTypeSynonymTyCon tc = check_no_roles
   | isFamilyTyCon tc      = check_no_roles
@@ -2476,7 +2530,7 @@ checkValidRoleAnnots role_annots tc
     (vis_roles, vis_vars)  = unzip $ snd $
                              partitionInvisibles tc (mkTyVarTy . snd) $
                              zip roles tyvars
-    role_annot_decl_maybe  = lookupRoleAnnots role_annots name
+    role_annot_decl_maybe  = lookupRoleAnnot role_annots name
 
     check_roles
       = whenIsJust role_annot_decl_maybe $

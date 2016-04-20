@@ -256,7 +256,8 @@ boundValues mod group =
                        , bind <- bagToList binds
                        , x <- boundThings mod bind ]
                _other -> error "boundValues"
-      tys = [ n | ns <- map (fst . hsLTyClDeclBinders) (tyClGroupConcat (hs_tyclds group))
+      tys = [ n | ns <- map (fst . hsLTyClDeclBinders)
+                            (hs_tyclds group >>= group_tyclds)
                 , n <- map found ns ]
       fors = concat $ map forBound (hs_fords group)
              where forBound lford = case unLoc lford of

@@ -8,7 +8,7 @@ TcInstDecls: Typechecking instance declarations
 
 {-# LANGUAGE CPP #-}
 
-module TcInstDcls ( tcInstDecls1, tcInstDecls2 ) where
+module TcInstDcls ( tcInstDecls1, tcInstDeclsDeriv, tcInstDecls2 ) where
 
 #include "HsVersions.h"
 
@@ -51,7 +51,6 @@ import BasicTypes
 import DynFlags
 import ErrUtils
 import FastString
-import HscTypes ( isHsBootOrSig )
 import Id
 import MkId
 import Name
@@ -64,8 +63,6 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Maybes
-import Data.List  ( partition )
-
 
 
 {-
@@ -361,102 +358,45 @@ Gather up the instance declarations from their various sources
 -}
 
 tcInstDecls1    -- Deal with both source-code and imported instance decls
-   :: [TyClGroup Name]          -- For deriving stuff
-   -> [LInstDecl Name]          -- Source code instance decls
-   -> [LDerivDecl Name]         -- Source code stand-alone deriving decls
+   :: [LInstDecl Name]          -- Source code instance decls
    -> TcM (TcGblEnv,            -- The full inst env
            [InstInfo Name],     -- Source-code instance decls to process;
                                 -- contains all dfuns for this module
-           HsValBinds Name)     -- Supporting bindings for derived instances
+           [DerivInfo])         -- From data family instances
 
-tcInstDecls1 tycl_decls inst_decls deriv_decls
-  = checkNoErrs $
-    do {    -- Stop if addInstInfos etc discovers any errors
-            -- (they recover, so that we get more than one error each
-            -- round)
-
-            -- Do class and family instance declarations
+tcInstDecls1 inst_decls
+  = do {    -- Do class and family instance declarations
        ; stuff <- mapAndRecoverM tcLocalInstDecl inst_decls
+
        ; let (local_infos_s, fam_insts_s, datafam_deriv_infos) = unzip3 stuff
-             fam_insts    = concat fam_insts_s
-             local_infos' = concat local_infos_s
-             -- Handwritten instances of the poly-kinded Typeable class are
-             -- forbidden, so we handle those separately
-             (typeable_instances, local_infos)
-                = partition bad_typeable_instance local_infos'
+             fam_insts   = concat fam_insts_s
+             local_infos = concat local_infos_s
 
-       ; addClsInsts local_infos $
-         addFamInsts fam_insts   $
-    do {    -- Compute instances from "deriving" clauses;
-            -- This stuff computes a context for the derived instance
-            -- decl, so it needs to know about all the instances possible
-            -- NB: class instance declarations can contain derivings as
-            --     part of associated data type declarations
-         failIfErrsM    -- If the addInsts stuff gave any errors, don't
-                        -- try the deriving stuff, because that may give
-                        -- more errors still
-
-       ; traceTc "tcDeriving" Outputable.empty
-       ; th_stage <- getStage   -- See Note [Deriving inside TH brackets ]
-       ; (gbl_env, deriv_inst_info, deriv_binds)
-              <- if isBrackStage th_stage
-                 then do { gbl_env <- getGblEnv
-                         ; return (gbl_env, emptyBag, emptyValBindsOut) }
-                 else do { data_deriv_infos <- mkDerivInfos tycl_decls
-                         ; let deriv_infos = concat datafam_deriv_infos ++
-                                             data_deriv_infos
-                         ; tcDeriving deriv_infos deriv_decls }
-
-       -- Fail if there are any handwritten instance of poly-kinded Typeable
-       ; mapM_ typeable_err typeable_instances
-
-       -- Check that if the module is compiled with -XSafe, there are no
-       -- hand written instances of old Typeable as then unsafe casts could be
-       -- performed. Derived instances are OK.
-       ; dflags <- getDynFlags
-       ; when (safeLanguageOn dflags) $ forM_ local_infos $ \x -> case x of
-             _ | genInstCheck x -> addErrAt (getSrcSpan $ iSpec x) (genInstErr x)
-             _ -> return ()
-
-       -- As above but for Safe Inference mode.
-       ; when (safeInferOn dflags) $ forM_ local_infos $ \x -> case x of
-             _ | genInstCheck x -> recordUnsafeInfer emptyBag
-             _ -> return ()
+       ; gbl_env <- addClsInsts local_infos $
+                    addFamInsts fam_insts   $
+                    getGblEnv
 
        ; return ( gbl_env
-                , bagToList deriv_inst_info ++ local_infos
-                , deriv_binds )
-    }}
-  where
-    -- Separate the Typeable instances from the rest
-    bad_typeable_instance i
-      = typeableClassName == is_cls_nm (iSpec i)
+                , local_infos
+                , concat datafam_deriv_infos ) }
 
-    -- Check for hand-written Generic instances (disallowed in Safe Haskell)
-    genInstCheck ty = is_cls_nm (iSpec ty) `elem` genericClassNames
-    genInstErr i = hang (text ("Generic instances can only be "
-                            ++ "derived in Safe Haskell.") $+$
-                         text "Replace the following instance:")
-                     2 (pprInstanceHdr (iSpec i))
-
-    -- Report an error or a warning for a Typeable instances.
-    -- If we are working on an .hs-boot file, we just report a warning,
-    -- and ignore the instance.  We do this, to give users a chance to fix
-    -- their code.
-    typeable_err i =
-      setSrcSpan (getSrcSpan (iSpec i)) $
-        do env <- getGblEnv
-           if isHsBootOrSig (tcg_src env)
-             then
-               do warn <- woptM Opt_WarnDerivingTypeable
-                  when warn $ addWarnTc (Reason Opt_WarnDerivingTypeable) $ vcat
-                    [ ppTypeable <+> text "instances in .hs-boot files are ignored"
-                    , text "This warning will become an error in future versions of the compiler"
-                    ]
-             else addErrTc $ text "Class" <+> ppTypeable
-                             <+> text "does not support user-specified instances"
-    ppTypeable :: SDoc
-    ppTypeable = quotes (ppr typeableClassName)
+-- | Use DerivInfo for data family instances (produced by tcInstDecls1),
+--   datatype declarations (TyClDecl), and standalone deriving declarations
+--   (DerivDecl) to check and process all derived class instances.
+tcInstDeclsDeriv
+  :: [DerivInfo]
+  -> [LTyClDecl Name]
+  -> [LDerivDecl Name]
+  -> TcM (TcGblEnv, [InstInfo Name], HsValBinds Name)
+tcInstDeclsDeriv datafam_deriv_infos tyclds derivds
+  = do th_stage <- getStage -- See Note [Deriving inside TH brackets]
+       if isBrackStage th_stage
+       then do { gbl_env <- getGblEnv
+               ; return (gbl_env, bagToList emptyBag, emptyValBindsOut) }
+       else do { data_deriv_infos <- mkDerivInfos tyclds
+               ; let deriv_infos = datafam_deriv_infos ++ data_deriv_infos
+               ; (tcg_env, info_bag, valbinds) <- tcDeriving deriv_infos derivds
+               ; return (tcg_env, bagToList info_bag, valbinds) }
 
 addClsInsts :: [InstInfo Name] -> TcM a -> TcM a
 addClsInsts infos thing_inside
@@ -517,18 +457,14 @@ tcLocalInstDecl (L loc (ClsInstD { cid_inst = decl }))
 
 tcClsInstDecl :: LClsInstDecl Name
               -> TcM ([InstInfo Name], [FamInst], [DerivInfo])
--- the returned DerivInfos are for any associated data families
+-- The returned DerivInfos are for any associated data families
 tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
                                   , cid_sigs = uprags, cid_tyfam_insts = ats
                                   , cid_overlap_mode = overlap_mode
                                   , cid_datafam_insts = adts }))
   = setSrcSpan loc                      $
     addErrCtxt (instDeclCtxt1 poly_ty)  $
-    do  { is_boot <- tcIsHsBootOrSig
-        ; checkTc (not is_boot || (isEmptyLHsBinds binds && null uprags))
-                  badBootDeclErr
-
-        ; (tyvars, theta, clas, inst_tys) <- tcHsClsInstType InstDeclCtxt poly_ty
+    do  { (tyvars, theta, clas, inst_tys) <- tcHsClsInstType InstDeclCtxt poly_ty
         ; let mini_env   = mkVarEnv (classTyVars clas `zip` inst_tys)
               mini_subst = mkTvSubst (mkInScopeSet (mkVarSet tyvars)) mini_env
               mb_info    = Just (clas, tyvars, mini_env)
@@ -557,6 +493,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
 
         ; ispec <- newClsInst (fmap unLoc overlap_mode) dfun_name tyvars theta
                               clas inst_tys
+
         ; let inst_info = InstInfo { iSpec  = ispec
                                    , iBinds = InstBindings
                                      { ib_binds = binds
@@ -565,9 +502,47 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
                                      , ib_extensions = []
                                      , ib_derived = False } }
 
+        ; doClsInstErrorChecks inst_info
+
         ; return ( [inst_info], tyfam_insts0 ++ concat tyfam_insts1 ++ datafam_insts
                  , deriv_infos ) }
 
+
+doClsInstErrorChecks :: InstInfo Name -> TcM ()
+doClsInstErrorChecks inst_info
+ = do { traceTc "doClsInstErrorChecks" (ppr ispec)
+      ; dflags <- getDynFlags
+      ; is_boot <- tcIsHsBootOrSig
+
+         -- In hs-boot files there should be no bindings
+      ; failIfTc (is_boot && not no_binds) badBootDeclErr
+
+         -- Handwritten instances of the poly-kinded Typeable
+         -- class are always forbidden
+      ; failIfTc (clas_nm == typeableClassName) typeable_err
+
+         -- Check for hand-written Generic instances (disallowed in Safe Haskell)
+      ; when (clas_nm `elem` genericClassNames) $
+        do { failIfTc (safeLanguageOn dflags) gen_inst_err
+           ; when (safeInferOn dflags) (recordUnsafeInfer emptyBag) }
+  }
+  where
+    ispec    = iSpec inst_info
+    binds    = iBinds inst_info
+    no_binds = isEmptyLHsBinds (ib_binds binds) && null (ib_pragmas binds)
+    clas_nm  = is_cls_nm ispec
+
+    gen_inst_err = hang (text ("Generic instances can only be "
+                            ++ "derived in Safe Haskell.") $+$
+                         text "Replace the following instance:")
+                      2 (pprInstanceHdr ispec)
+
+    -- Report an error or a warning for a Typeable instances.
+    -- If we are working on an .hs-boot file, we just report a warning,
+    -- and ignore the instance.  We do this, to give users a chance to fix
+    -- their code.
+    typeable_err = text "Class" <+> quotes (ppr clas_nm)
+                    <+> text "does not support user-specified instances"
 
 {-
 ************************************************************************

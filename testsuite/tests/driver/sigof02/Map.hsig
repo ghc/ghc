@@ -14,7 +14,6 @@ infixl 9 !,\\
 type role Map nominal representational
 data Map k a
 
-instance Typeable Map
 instance Functor (Map k)
 instance Foldable (Map k)
 instance Traversable (Map k)

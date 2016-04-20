@@ -110,7 +110,6 @@ repTopDs :: HsGroup Name -> DsM (Core (TH.Q [TH.Dec]))
 repTopDs group@(HsGroup { hs_valds   = valds
                         , hs_splcds  = splcds
                         , hs_tyclds  = tyclds
-                        , hs_instds  = instds
                         , hs_derivds = derivds
                         , hs_fixds   = fixds
                         , hs_defds   = defds
@@ -121,7 +120,8 @@ repTopDs group@(HsGroup { hs_valds   = valds
                         , hs_vects   = vects
                         , hs_docs    = docs })
  = do { let { tv_bndrs = hsSigTvBinders valds
-            ; bndrs = tv_bndrs ++ hsGroupBinders group } ;
+            ; bndrs = tv_bndrs ++ hsGroupBinders group
+            ; instds = tyclds >>= group_instds } ;
         ss <- mkGenSyms bndrs ;
 
         -- Bind all the names mainly to avoid repeated use of explicit strings.
@@ -134,7 +134,7 @@ repTopDs group@(HsGroup { hs_valds   = valds
         decls <- addBinds ss (
                   do { val_ds   <- rep_val_binds valds
                      ; _        <- mapM no_splice splcds
-                     ; tycl_ds  <- mapM repTyClD (tyClGroupConcat tyclds)
+                     ; tycl_ds  <- mapM repTyClD (tyClGroupTyClDecls tyclds)
                      ; role_ds  <- mapM repRoleD (concatMap group_roles tyclds)
                      ; inst_ds  <- mapM repInstD instds
                      ; deriv_ds <- mapM repStandaloneDerivD derivds

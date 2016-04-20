@@ -62,7 +62,7 @@ T6018fail.hs:59:10: error:
         (i.e. ones independent of the class type variables)
         must be distinct type variables
       Expected: PolyKindVarsF '[]
-      Actual:   PolyKindVarsF '[]
+        Actual: PolyKindVarsF '[]
       Use -fprint-explicit-kinds to see the kind arguments
     • In the type instance declaration for ‘PolyKindVarsF’
       In the instance declaration for ‘PolyKindVarsC '[]’
@@ -91,10 +91,10 @@ T6018fail.hs:70:15: error:
       forall k (a :: k) (b :: k).
         Gc a b = Int -- Defined at T6018fail.hs:70:15
 
-T6018fail.hs:75:15: error:
+T6018fail.hs:74:15: error:
     Type family equations violate injectivity annotation:
-      F1 (Maybe a) = Maybe (GF2 a) -- Defined at T6018fail.hs:75:15
       F1 [a] = Maybe (GF1 a) -- Defined at T6018fail.hs:74:15
+      F1 (Maybe a) = Maybe (GF2 a) -- Defined at T6018fail.hs:75:15
 
 T6018fail.hs:87:15: error:
     Type family equation violates injectivity annotation.
