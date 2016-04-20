@@ -1370,6 +1370,7 @@ tyCoVarsOfTypeList ty = fvVarList $ tyCoFVsOfType ty
 -- See Note [FV naming conventions] in FV.
 --
 -- Eta-expanded because that makes it run faster (apparently)
+-- See Note [FV eta expansion] in FV for explanation.
 tyCoFVsOfType :: Type -> FV
 -- See Note [Free variables of types]
 tyCoFVsOfType (TyVarTy v)        a b c = (unitFV v `unionFV` tyCoFVsOfType (tyVarKind v)) a b c
