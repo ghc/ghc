@@ -65,7 +65,7 @@ module Coercion (
 
         -- ** Free variables
         tyCoVarsOfCo, tyCoVarsOfCos, coVarsOfCo,
-        tyCoVarsOfCoAcc, tyCoVarsOfCosAcc, tyCoVarsOfCoDSet,
+        tyCoFVsOfCo, tyCoFVsOfCos, tyCoVarsOfCoDSet,
         coercionSize,
 
         -- ** Substitution

@@ -786,7 +786,7 @@ lvlBind env (AnnRec pairs)
         -- Finding the free vars of the binding group is annoying
     bind_fvs = ((unionDVarSets [ freeVarsOf rhs | (_, rhs) <- pairs])
                 `unionDVarSet`
-                (runFVDSet $ unionsFV [ idFreeVarsAcc bndr
+                (fvDVarSet $ unionsFV [ idFVs bndr
                                       | (bndr, (_,_)) <- pairs]))
                `delDVarSetList`
                 bndrs
@@ -1054,7 +1054,7 @@ abstractVars dest_lvl (LE { le_subst = subst, le_lvl_env = lvl_env }) in_fvs
                              -- Result includes the input variable itself
     close v = foldDVarSet (unionDVarSet . close)
                           (unitDVarSet v)
-                          (runFVDSet $ varTypeTyCoVarsAcc v)
+                          (fvDVarSet $ varTypeTyCoFVs v)
 
 type LvlM result = UniqSM result
 
