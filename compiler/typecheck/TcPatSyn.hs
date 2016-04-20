@@ -15,6 +15,8 @@ import HsSyn
 import TcPat
 import TcHsType( tcImplicitTKBndrs, tcExplicitTKBndrs
                , tcHsContext, tcHsLiftedType, tcHsOpenType, kindGeneralize )
+import Type( binderVar, mkNamedBinders, binderVisibility
+           , tidyTyCoVarBndrs, tidyTypes, tidyType )
 import TcRnMonad
 import TcEnv
 import TcMType
@@ -36,7 +38,6 @@ import BasicTypes
 import TcSimplify
 import TcUnify
 import TcType
-import Type
 import TcEvidence
 import BuildTyCl
 import VarSet

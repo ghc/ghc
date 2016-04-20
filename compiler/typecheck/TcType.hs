@@ -209,7 +209,8 @@ import Name -- hiding (varName)
 import NameSet
 import VarEnv
 import PrelNames
-import TysWiredIn
+import TysWiredIn( coercibleClass, unitTyCon, unitTyConKey
+                 , listTyCon, constraintKind )
 import BasicTypes
 import Util
 import Bag

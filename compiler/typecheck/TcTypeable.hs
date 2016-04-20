@@ -103,9 +103,11 @@ mkTypeableBinds
        ; tcg_env <- setGblEnv tcg_env mkPrimTypeableBinds
          -- Then we produce bindings for the user-defined types in this module.
        ; setGblEnv tcg_env $
-             let tycons = filter needs_typeable_binds (tcg_tcs tcg_env)
-             in mkTypeableTyConBinds tycons
-       }
+
+    do { let tycons = filter needs_typeable_binds (tcg_tcs tcg_env)
+       ; traceTc "mkTypeableBinds" (ppr tycons)
+       ; mkTypeableTyConBinds tycons
+       } }
   where
     needs_typeable_binds tc =
           (not (isFamInstTyCon tc) && isAlgTyCon tc)
