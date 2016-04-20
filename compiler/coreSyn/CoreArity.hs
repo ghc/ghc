@@ -633,7 +633,7 @@ when saturated" so we don't want to be too gung-ho about saturating!
 -}
 
 arityLam :: Id -> ArityType -> ArityType
-arityLam id (ATop as) = ATop (idOneShotInfo id : as)
+arityLam id (ATop as) = ATop (idStateHackOneShotInfo id : as)
 arityLam _  (ABot n)  = ABot (n+1)
 
 floatIn :: Bool -> ArityType -> ArityType

@@ -74,7 +74,7 @@ module Id (
         idInlineActivation, setInlineActivation, idRuleMatchInfo,
 
         -- ** One-shot lambdas
-        isOneShotBndr, isOneShotLambda, isProbablyOneShotLambda,
+        isOneShotBndr, isProbablyOneShotLambda,
         setOneShotLambda, clearOneShotLambda,
         updOneShotInfo, setIdOneShotInfo,
         isStateHackType, stateHackOneShot, typeOneShot,
@@ -85,7 +85,7 @@ module Id (
         idUnfolding, realIdUnfolding,
         idSpecialisation, idCoreRules, idHasRules,
         idCafInfo,
-        idOneShotInfo,
+        idOneShotInfo, idStateHackOneShotInfo,
         idOccInfo,
 
         -- ** Writing 'IdInfo' fields
@@ -250,8 +250,7 @@ mkVanillaGlobalWithInfo = mkGlobalId VanillaId
 
 -- | For an explanation of global vs. local 'Id's, see "Var#globalvslocal"
 mkLocalId :: Name -> Type -> Id
-mkLocalId name ty = mkLocalIdWithInfo name ty
-                         (vanillaIdInfo `setOneShotInfo` typeOneShot ty)
+mkLocalId name ty = mkLocalIdWithInfo name ty vanillaIdInfo
  -- It's tempting to ASSERT( not (isCoercionType ty) ), but don't. Sometimes,
  -- the type is a panic. (Search invented_id)
 
@@ -259,7 +258,7 @@ mkLocalId name ty = mkLocalIdWithInfo name ty
 mkLocalCoVar :: Name -> Type -> CoVar
 mkLocalCoVar name ty
   = ASSERT( isCoercionType ty )
-    Var.mkLocalVar CoVarId name ty (vanillaIdInfo `setOneShotInfo` typeOneShot ty)
+    Var.mkLocalVar CoVarId name ty vanillaIdInfo
 
 -- | Like 'mkLocalId', but checks the type to see if it should make a covar
 mkLocalIdOrCoVar :: Name -> Type -> Id
@@ -687,14 +686,23 @@ isConLikeId id = isDataConWorkId id || isConLike (idRuleMatchInfo id)
 idOneShotInfo :: Id -> OneShotInfo
 idOneShotInfo id = oneShotInfo (idInfo id)
 
+-- | Like 'idOneShotInfo', but taking the Horrible State Hack in to account
+-- See Note [The state-transformer hack] in CoreArity
+idStateHackOneShotInfo :: Id -> OneShotInfo
+idStateHackOneShotInfo id
+    | isStateHackType (idType id) = stateHackOneShot
+    | otherwise                   = idOneShotInfo id
+
 -- | Returns whether the lambda associated with the 'Id' is certainly applied at most once
 -- This one is the "business end", called externally.
 -- It works on type variables as well as Ids, returning True
 -- Its main purpose is to encapsulate the Horrible State Hack
+-- See Note [The state-transformer hack] in CoreArity
 isOneShotBndr :: Var -> Bool
 isOneShotBndr var
-  | isTyVar var = True
-  | otherwise   = isOneShotLambda var
+  | isTyVar var                              = True
+  | OneShotLam <- idStateHackOneShotInfo var = True
+  | otherwise                                = False
 
 -- | Should we apply the state hack to values of this 'Type'?
 stateHackOneShot :: OneShotInfo
@@ -731,16 +739,8 @@ isStateHackType ty
         -- Another good example is in fill_in in PrelPack.hs.  We should be able to
         -- spot that fill_in has arity 2 (and when Keith is done, we will) but we can't yet.
 
-
--- | Returns whether the lambda associated with the 'Id' is certainly applied at most once.
--- You probably want to use 'isOneShotBndr' instead
-isOneShotLambda :: Id -> Bool
-isOneShotLambda id = case idOneShotInfo id of
-                       OneShotLam -> True
-                       _          -> False
-
 isProbablyOneShotLambda :: Id -> Bool
-isProbablyOneShotLambda id = case idOneShotInfo id of
+isProbablyOneShotLambda id = case idStateHackOneShotInfo id of
                                OneShotLam    -> True
                                ProbOneShot   -> True
                                NoOneShotInfo -> False
