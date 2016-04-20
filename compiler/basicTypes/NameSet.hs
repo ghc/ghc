@@ -20,6 +20,7 @@ module NameSet (
         -- ** Manipulating sets of free variables
         isEmptyFVs, emptyFVs, plusFVs, plusFV,
         mkFVs, addOneFV, unitFV, delFV, delFVs,
+        intersectFVs,
 
         -- * Defs and uses
         Defs, Uses, DefUse, DefUses,
@@ -104,6 +105,7 @@ plusFVs  :: [FreeVars] -> FreeVars
 mkFVs    :: [Name] -> FreeVars
 delFV    :: Name -> FreeVars -> FreeVars
 delFVs   :: [Name] -> FreeVars -> FreeVars
+intersectFVs :: FreeVars -> FreeVars -> FreeVars
 
 isEmptyFVs :: NameSet -> Bool
 isEmptyFVs  = isEmptyNameSet
@@ -115,6 +117,7 @@ addOneFV    = extendNameSet
 unitFV      = unitNameSet
 delFV n s   = delFromNameSet s n
 delFVs ns s = delListFromNameSet s ns
+intersectFVs = intersectNameSet
 
 {-
 ************************************************************************
