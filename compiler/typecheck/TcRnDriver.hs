@@ -653,7 +653,6 @@ tcRnHsBootDecls hsc_src decls
         -- See Note [Extra dependencies from .hs-boot files] in RnSource
         ; (gbl_env, lie) <- captureConstraints $ setGblEnv tcg_env $ do {
 
-
                 -- Check for illegal declarations
         ; case group_tail of
              Just (SpliceDecl d _, _) -> badBootDecl hsc_src "splice" d
@@ -668,6 +667,10 @@ tcRnHsBootDecls hsc_src decls
         ; (tcg_env, inst_infos, _deriv_binds)
              <- tcTyClsInstDecls tycl_decls inst_decls deriv_decls val_binds
         ; setGblEnv tcg_env     $ do {
+
+                -- Emit Typeable declarations
+        ; tcg_env <- setGblEnv tcg_env mkTypeableBinds
+        ; setGblEnv tcg_env $ do {
 
                 -- Typecheck value declarations
         ; traceTc "Tc5" empty
@@ -691,7 +694,7 @@ tcRnHsBootDecls hsc_src decls
               }
 
         ; setGlobalTypeEnv gbl_env type_env2
-   }}
+   }}}
    ; traceTc "boot" (ppr lie); return gbl_env }
 
 badBootDecl :: HscSource -> String -> Located decl -> TcM ()
