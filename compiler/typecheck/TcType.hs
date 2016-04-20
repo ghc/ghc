@@ -931,12 +931,7 @@ split_dep_vars = go
     go (LitTy {})                = mempty
     go (CastTy ty co)            = go ty `mappend` Pair (tyCoVarsOfCo co)
                                                         emptyVarSet
-    go (CoercionTy co)           = go_co co
-
-    go_co co = let Pair ty1 ty2 = coercionKind co in
-                   -- co :: ty1 ~ ty2
-               go ty1 `mappend` go ty2
-
+    go (CoercionTy co)           = Pair (tyCoVarsOfCo co) emptyVarSet
 
 isTouchableOrFmv ctxt_tclvl tv
   = ASSERT2( isTcTyVar tv, ppr tv )

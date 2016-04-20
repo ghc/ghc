@@ -604,10 +604,10 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
 
        -- Decide what type variables and constraints to quantify
        ; zonked_taus <- mapM (TcM.zonkTcType . snd) name_taus
-       ; let zonked_tau_tkvs = splitDepVarsOfTypes zonked_taus
+       ; let zonked_tau_dvs = splitDepVarsOfTypes zonked_taus
        ; (qtvs, bound_theta)
            <- decideQuantification apply_mr sigs name_taus
-                                   quant_pred_candidates zonked_tau_tkvs
+                                   quant_pred_candidates zonked_tau_dvs
 
          -- Promote any type variables that are free in the inferred type
          -- of the function:
@@ -621,24 +621,25 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
          -- we don't quantify over beta (since it is fixed by envt)
          -- so we must promote it!  The inferred type is just
          --   f :: beta -> beta
-       ; zonked_tau_tvs <- TcM.zonkTyCoVarsAndFV (dv_tvs zonked_tau_tkvs)
+       ; zonked_tau_tkvs <- TcM.zonkTyCoVarsAndFV $
+                            dv_kvs zonked_tau_dvs `unionVarSet` dv_tvs zonked_tau_dvs
               -- decideQuantification turned some meta tyvars into
               -- quantified skolems, so we have to zonk again
 
-       ; let phi_tvs = tyCoVarsOfTypes bound_theta
-                       `unionVarSet` zonked_tau_tvs
+       ; let phi_tkvs = tyCoVarsOfTypes bound_theta  -- Already zonked
+                        `unionVarSet` zonked_tau_tkvs
+             promote_tkvs = closeOverKinds phi_tkvs `delVarSetList` qtvs
 
-             promote_tvs = closeOverKinds phi_tvs `delVarSetList` qtvs
-       ; MASSERT2( closeOverKinds promote_tvs `subVarSet` promote_tvs
-                 , ppr phi_tvs $$
-                   ppr (closeOverKinds phi_tvs) $$
-                   ppr promote_tvs $$
-                   ppr (closeOverKinds promote_tvs) )
+       ; MASSERT2( closeOverKinds promote_tkvs `subVarSet` promote_tkvs
+                 , ppr phi_tkvs $$
+                   ppr (closeOverKinds phi_tkvs) $$
+                   ppr promote_tkvs $$
+                   ppr (closeOverKinds promote_tkvs) )
            -- we really don't want a type to be promoted when its kind isn't!
 
            -- promoteTyVar ignores coercion variables
        ; outer_tclvl <- TcM.getTcLevel
-       ; mapM_ (promoteTyVar outer_tclvl) (varSetElems promote_tvs)
+       ; mapM_ (promoteTyVar outer_tclvl) (varSetElems promote_tkvs)
 
            -- Emit an implication constraint for the
            -- remaining constraints from the RHS
@@ -664,8 +665,8 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
        ; traceTc "} simplifyInfer/produced residual implication for quantification" $
          vcat [ text "quant_pred_candidates =" <+> ppr quant_pred_candidates
               , text "zonked_taus" <+> ppr zonked_taus
-              , text "zonked_tau_tvs=" <+> ppr zonked_tau_tvs
-              , text "promote_tvs=" <+> ppr promote_tvs
+              , text "zonked_tau_dvs=" <+> ppr zonked_tau_dvs
+              , text "promote_tvs=" <+> ppr promote_tkvs
               , text "bound_theta =" <+> ppr bound_theta
               , text "qtvs =" <+> ppr qtvs
               , text "implic =" <+> ppr implic ]
