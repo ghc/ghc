@@ -63,6 +63,7 @@ import Outputable
 import FastString
 import Bag
 import Pair
+import FV (runFVList, unionFV, someVars)
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
@@ -651,9 +652,11 @@ deriveTyData tvs tc tc_args deriv_pred
               mb_match        = tcUnifyTy inst_ty_kind cls_arg_kind
               Just kind_subst = mb_match
 
-              all_tkvs        = varSetElemsWellScoped $
-                                mkVarSet deriv_tvs `unionVarSet`
-                                tyCoVarsOfTypes tc_args_to_keep
+              all_tkvs        = toposortTyVars $
+                                runFVList $ unionFV
+                                  (tyCoVarsOfTypesAcc tc_args_to_keep)
+                                  (someVars deriv_tvs)
+
               unmapped_tkvs   = filter (`notElemTCvSubst` kind_subst) all_tkvs
               (subst, tkvs)   = mapAccumL substTyVarBndr
                                           kind_subst unmapped_tkvs
