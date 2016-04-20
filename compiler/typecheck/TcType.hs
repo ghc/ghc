@@ -168,7 +168,7 @@ module TcType (
 
   tyCoVarsOfType, tyCoVarsOfTypes, closeOverKinds,
   tyCoVarsOfTelescope,
-  tyCoVarsOfTypeAcc, tyCoVarsOfTypesAcc,
+  tyCoFVsOfType, tyCoFVsOfTypes,
   tyCoVarsOfTypeDSet, tyCoVarsOfTypesDSet, closeOverKindsDSet,
   tyCoVarsOfTypeList, tyCoVarsOfTypesList,
 
@@ -815,18 +815,18 @@ exactTyCoVarsOfTypes tys = mapUnionVarSet exactTyCoVarsOfType tys
 -- | Find all variables bound anywhere in a type.
 -- See also Note [Scope-check inferred kinds] in TcHsType
 allBoundVariables :: Type -> TyVarSet
-allBoundVariables ty = runFVSet $ go ty
+allBoundVariables ty = fvVarSet $ go ty
   where
     go :: Type -> FV
     go (TyVarTy tv)     = go (tyVarKind tv)
     go (TyConApp _ tys) = mapUnionFV go tys
     go (AppTy t1 t2)    = go t1 `unionFV` go t2
     go (ForAllTy (Anon t1) t2) = go t1 `unionFV` go t2
-    go (ForAllTy (Named tv _) t2) = oneVar tv `unionFV`
+    go (ForAllTy (Named tv _) t2) = FV.unitFV tv `unionFV`
                                     go (tyVarKind tv) `unionFV` go t2
-    go (LitTy {})       = noVars
+    go (LitTy {})       = emptyFV
     go (CastTy ty _)    = go ty
-    go (CoercionTy {})  = noVars
+    go (CoercionTy {})  = emptyFV
       -- any types mentioned in a coercion should also be mentioned in
       -- a type.
 

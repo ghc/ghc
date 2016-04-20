@@ -63,7 +63,7 @@ import Outputable
 import FastString
 import Bag
 import Pair
-import FV (runFVList, unionFV, someVars)
+import FV (fvVarList, unionFV, mkFVs)
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
@@ -404,7 +404,7 @@ tcDeriving deriv_infos deriv_decls
 
         ; gbl_env <- tcExtendLocalFamInstEnv (bagToList famInsts) $
                      tcExtendLocalInstEnv (map iSpec (bagToList inst_info)) getGblEnv
-        ; let all_dus = rn_dus `plusDU` usesOnly (mkFVs $ catMaybes maybe_fvs)
+        ; let all_dus = rn_dus `plusDU` usesOnly (NameSet.mkFVs $ catMaybes maybe_fvs)
         ; return (addTcgDUs gbl_env all_dus, inst_info, rn_binds) }
   where
     ddump_deriving :: Bag (InstInfo Name) -> HsValBinds Name
@@ -653,9 +653,9 @@ deriveTyData tvs tc tc_args deriv_pred
               Just kind_subst = mb_match
 
               all_tkvs        = toposortTyVars $
-                                runFVList $ unionFV
-                                  (tyCoVarsOfTypesAcc tc_args_to_keep)
-                                  (someVars deriv_tvs)
+                                fvVarList $ unionFV
+                                  (tyCoFVsOfTypes tc_args_to_keep)
+                                  (FV.mkFVs deriv_tvs)
 
               unmapped_tkvs   = filter (`notElemTCvSubst` kind_subst) all_tkvs
               (subst, tkvs)   = mapAccumL substTyVarBndr

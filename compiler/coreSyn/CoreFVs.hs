@@ -26,10 +26,10 @@ module CoreFVs (
 
         -- * Free variables of Rules, Vars and Ids
         varTypeTyCoVars,
-        varTypeTyCoVarsAcc,
+        varTypeTyCoFVs,
         idUnfoldingVars, idFreeVars, dIdFreeVars,
         idRuleAndUnfoldingVars, idRuleAndUnfoldingVarsDSet,
-        idFreeVarsAcc,
+        idFVs,
         idRuleVars, idRuleRhsVars, stableUnfoldingVars,
         ruleRhsFreeVars, ruleFreeVars, rulesFreeVars,
         rulesFreeVarsDSet,
@@ -99,23 +99,23 @@ but not those that are free in the type of variable occurrence.
 -- | Find all locally-defined free Ids or type variables in an expression
 -- returning a non-deterministic set.
 exprFreeVars :: CoreExpr -> VarSet
-exprFreeVars = runFVSet . exprFreeVarsAcc
+exprFreeVars = fvVarSet . exprFVs
 
 -- | Find all locally-defined free Ids or type variables in an expression
 -- returning a composable FV computation. See Note [FV naming coventions] in FV
 -- for why export it.
-exprFreeVarsAcc :: CoreExpr -> FV
-exprFreeVarsAcc = filterFV isLocalVar . expr_fvs
+exprFVs :: CoreExpr -> FV
+exprFVs = filterFV isLocalVar . expr_fvs
 
 -- | Find all locally-defined free Ids or type variables in an expression
 -- returning a deterministic set.
 exprFreeVarsDSet :: CoreExpr -> DVarSet
-exprFreeVarsDSet = runFVDSet . exprFreeVarsAcc
+exprFreeVarsDSet = fvDVarSet . exprFVs
 
 -- | Find all locally-defined free Ids or type variables in an expression
 -- returning a deterministically ordered list.
 exprFreeVarsList :: CoreExpr -> [Var]
-exprFreeVarsList = runFVList . exprFreeVarsAcc
+exprFreeVarsList = fvVarList . exprFVs
 
 -- | Find all locally-defined free Ids in an expression
 exprFreeIds :: CoreExpr -> IdSet        -- Find all locally-defined free Ids
@@ -129,23 +129,23 @@ exprsFreeIdsList = exprsSomeFreeVarsList isLocalId
 -- | Find all locally-defined free Ids or type variables in several expressions
 -- returning a non-deterministic set.
 exprsFreeVars :: [CoreExpr] -> VarSet
-exprsFreeVars = runFVSet . exprsFreeVarsAcc
+exprsFreeVars = fvVarSet . exprsFVs
 
 -- | Find all locally-defined free Ids or type variables in several expressions
 -- returning a composable FV computation. See Note [FV naming coventions] in FV
 -- for why export it.
-exprsFreeVarsAcc :: [CoreExpr] -> FV
-exprsFreeVarsAcc exprs = mapUnionFV exprFreeVarsAcc exprs
+exprsFVs :: [CoreExpr] -> FV
+exprsFVs exprs = mapUnionFV exprFVs exprs
 
 -- | Find all locally-defined free Ids or type variables in several expressions
 -- returning a deterministically ordered list.
 exprsFreeVarsList :: [CoreExpr] -> [Var]
-exprsFreeVarsList = runFVList . exprsFreeVarsAcc
+exprsFreeVarsList = fvVarList . exprsFVs
 
 -- | Find all locally defined free Ids in a binding group
 bindFreeVars :: CoreBind -> VarSet
-bindFreeVars (NonRec b r) = runFVSet $ filterFV isLocalVar $ rhs_fvs (b,r)
-bindFreeVars (Rec prs)    = runFVSet $ filterFV isLocalVar $
+bindFreeVars (NonRec b r) = fvVarSet $ filterFV isLocalVar $ rhs_fvs (b,r)
+bindFreeVars (Rec prs)    = fvVarSet $ filterFV isLocalVar $
                                 addBndrs (map fst prs)
                                      (mapUnionFV rhs_fvs prs)
 
@@ -153,14 +153,14 @@ bindFreeVars (Rec prs)    = runFVSet $ filterFV isLocalVar $
 exprSomeFreeVars :: InterestingVarFun   -- ^ Says which 'Var's are interesting
                  -> CoreExpr
                  -> VarSet
-exprSomeFreeVars fv_cand e = runFVSet $ filterFV fv_cand $ expr_fvs e
+exprSomeFreeVars fv_cand e = fvVarSet $ filterFV fv_cand $ expr_fvs e
 
 -- | Finds free variables in several expressions selected by a predicate
 exprsSomeFreeVars :: InterestingVarFun  -- Says which 'Var's are interesting
                   -> [CoreExpr]
                   -> VarSet
 exprsSomeFreeVars fv_cand es =
-  runFVSet $ filterFV fv_cand $ mapUnionFV expr_fvs es
+  fvVarSet $ filterFV fv_cand $ mapUnionFV expr_fvs es
 
 -- | Finds free variables in several expressions selected by a predicate
 -- returning a deterministically ordered list.
@@ -168,7 +168,7 @@ exprsSomeFreeVarsList :: InterestingVarFun  -- Says which 'Var's are interesting
                       -> [CoreExpr]
                       -> [Var]
 exprsSomeFreeVarsList fv_cand es =
-  runFVList $ filterFV fv_cand $ mapUnionFV expr_fvs es
+  fvVarList $ filterFV fv_cand $ mapUnionFV expr_fvs es
 
 --      Comment about obselete code
 -- We used to gather the free variables the RULES at a variable occurrence
@@ -200,7 +200,7 @@ exprsSomeFreeVarsList fv_cand es =
 
 addBndr :: CoreBndr -> FV -> FV
 addBndr bndr fv fv_cand in_scope acc
-  = (varTypeTyCoVarsAcc bndr `unionFV`
+  = (varTypeTyCoFVs bndr `unionFV`
         -- Include type variables in the binder's type
         --      (not just Ids; coercion variables too!)
      FV.delFV bndr fv) fv_cand in_scope acc
@@ -210,11 +210,11 @@ addBndrs bndrs fv = foldr addBndr fv bndrs
 
 expr_fvs :: CoreExpr -> FV
 expr_fvs (Type ty) fv_cand in_scope acc =
-  tyCoVarsOfTypeAcc ty fv_cand in_scope acc
+  tyCoFVsOfType ty fv_cand in_scope acc
 expr_fvs (Coercion co) fv_cand in_scope acc =
-  tyCoVarsOfCoAcc co fv_cand in_scope acc
-expr_fvs (Var var) fv_cand in_scope acc = oneVar var fv_cand in_scope acc
-expr_fvs (Lit _) fv_cand in_scope acc = noVars fv_cand in_scope acc
+  tyCoFVsOfCo co fv_cand in_scope acc
+expr_fvs (Var var) fv_cand in_scope acc = FV.unitFV var fv_cand in_scope acc
+expr_fvs (Lit _) fv_cand in_scope acc = emptyFV fv_cand in_scope acc
 expr_fvs (Tick t expr) fv_cand in_scope acc =
   (tickish_fvs t `unionFV` expr_fvs expr) fv_cand in_scope acc
 expr_fvs (App fun arg) fv_cand in_scope acc =
@@ -222,10 +222,10 @@ expr_fvs (App fun arg) fv_cand in_scope acc =
 expr_fvs (Lam bndr body) fv_cand in_scope acc =
   addBndr bndr (expr_fvs body) fv_cand in_scope acc
 expr_fvs (Cast expr co) fv_cand in_scope acc =
-  (expr_fvs expr `unionFV` tyCoVarsOfCoAcc co) fv_cand in_scope acc
+  (expr_fvs expr `unionFV` tyCoFVsOfCo co) fv_cand in_scope acc
 
 expr_fvs (Case scrut bndr ty alts) fv_cand in_scope acc
-  = (expr_fvs scrut `unionFV` tyCoVarsOfTypeAcc ty `unionFV` addBndr bndr
+  = (expr_fvs scrut `unionFV` tyCoFVsOfType ty `unionFV` addBndr bndr
       (mapUnionFV alt_fvs alts)) fv_cand in_scope acc
   where
     alt_fvs (_, bndrs, rhs) = addBndrs bndrs (expr_fvs rhs)
@@ -242,7 +242,7 @@ expr_fvs (Let (Rec pairs) body) fv_cand in_scope acc
 ---------
 rhs_fvs :: (Id, CoreExpr) -> FV
 rhs_fvs (bndr, rhs) = expr_fvs rhs `unionFV`
-                      bndrRuleAndUnfoldingVarsAcc bndr
+                      bndrRuleAndUnfoldingFVs bndr
         -- Treat any RULES as extra RHSs of the binding
 
 ---------
@@ -250,8 +250,8 @@ exprs_fvs :: [CoreExpr] -> FV
 exprs_fvs exprs = mapUnionFV expr_fvs exprs
 
 tickish_fvs :: Tickish Id -> FV
-tickish_fvs (Breakpoint _ ids) = someVars ids
-tickish_fvs _ = noVars
+tickish_fvs (Breakpoint _ ids) = FV.mkFVs ids
+tickish_fvs _ = emptyFV
 
 {-
 ************************************************************************
@@ -395,33 +395,33 @@ orphNamesOfFamInst fam_inst = orphNamesOfAxiom (famInstAxiom fam_inst)
 ruleRhsFreeVars :: CoreRule -> VarSet
 ruleRhsFreeVars (BuiltinRule {}) = noFVs
 ruleRhsFreeVars (Rule { ru_fn = _, ru_bndrs = bndrs, ru_rhs = rhs })
-  = runFVSet $ filterFV isLocalVar $ addBndrs bndrs (expr_fvs rhs)
+  = fvVarSet $ filterFV isLocalVar $ addBndrs bndrs (expr_fvs rhs)
       -- See Note [Rule free var hack]
 
 -- | Those variables free in the both the left right hand sides of a rule
 -- returned as a non-deterministic set
 ruleFreeVars :: CoreRule -> VarSet
-ruleFreeVars = runFVSet . ruleFreeVarsAcc
+ruleFreeVars = fvVarSet . ruleFVs
 
 -- | Those variables free in the both the left right hand sides of a rule
 -- returned as FV computation
-ruleFreeVarsAcc :: CoreRule -> FV
-ruleFreeVarsAcc (BuiltinRule {}) = noVars
-ruleFreeVarsAcc (Rule { ru_fn = _do_not_include
-                          -- See Note [Rule free var hack]
-                      , ru_bndrs = bndrs
-                      , ru_rhs = rhs, ru_args = args })
+ruleFVs :: CoreRule -> FV
+ruleFVs (BuiltinRule {}) = emptyFV
+ruleFVs (Rule { ru_fn = _do_not_include
+                  -- See Note [Rule free var hack]
+              , ru_bndrs = bndrs
+              , ru_rhs = rhs, ru_args = args })
   = filterFV isLocalVar $ addBndrs bndrs (exprs_fvs (rhs:args))
 
 -- | Those variables free in the both the left right hand sides of rules
 -- returned as FV computation
-rulesFreeVarsAcc :: [CoreRule] -> FV
-rulesFreeVarsAcc = mapUnionFV ruleFreeVarsAcc
+rulesFVs :: [CoreRule] -> FV
+rulesFVs = mapUnionFV ruleFVs
 
 -- | Those variables free in the both the left right hand sides of rules
 -- returned as a deterministic set
 rulesFreeVarsDSet :: [CoreRule] -> DVarSet
-rulesFreeVarsDSet rules = runFVDSet $ rulesFreeVarsAcc rules
+rulesFreeVarsDSet rules = fvDVarSet $ rulesFVs rules
 
 idRuleRhsVars :: (Activation -> Bool) -> Id -> VarSet
 -- Just the variables free on the *rhs* of a rule
@@ -434,7 +434,7 @@ idRuleRhsVars is_active id
             -- See Note [Finding rule RHS free vars] in OccAnal.hs
       = delFromUFM fvs fn        -- Note [Rule free var hack]
       where
-        fvs = runFVSet $ filterFV isLocalVar $ addBndrs bndrs (expr_fvs rhs)
+        fvs = fvVarSet $ filterFV isLocalVar $ addBndrs bndrs (expr_fvs rhs)
     get_fvs _ = noFVs
 
 -- | Those variables free in the right hand side of several rules
@@ -444,18 +444,18 @@ rulesFreeVars rules = mapUnionVarSet ruleFreeVars rules
 ruleLhsFreeIds :: CoreRule -> VarSet
 -- ^ This finds all locally-defined free Ids on the left hand side of a rule
 -- and returns them as a non-deterministic set
-ruleLhsFreeIds = runFVSet . ruleLhsFreeIdsAcc
+ruleLhsFreeIds = fvVarSet . ruleLhsFVIds
 
 ruleLhsFreeIdsList :: CoreRule -> [Var]
 -- ^ This finds all locally-defined free Ids on the left hand side of a rule
 -- and returns them as a determinisitcally ordered list
-ruleLhsFreeIdsList = runFVList . ruleLhsFreeIdsAcc
+ruleLhsFreeIdsList = fvVarList . ruleLhsFVIds
 
-ruleLhsFreeIdsAcc :: CoreRule -> FV
+ruleLhsFVIds :: CoreRule -> FV
 -- ^ This finds all locally-defined free Ids on the left hand side of a rule
 -- and returns an FV computation
-ruleLhsFreeIdsAcc (BuiltinRule {}) = noVars
-ruleLhsFreeIdsAcc (Rule { ru_bndrs = bndrs, ru_args = args })
+ruleLhsFVIds (BuiltinRule {}) = emptyFV
+ruleLhsFVIds (Rule { ru_bndrs = bndrs, ru_args = args })
   = filterFV isLocalId $ addBndrs bndrs (exprs_fvs args)
 
 {-
@@ -475,7 +475,7 @@ breaker, which is perfectly inlinable.
 vectsFreeVars :: [CoreVect] -> VarSet
 vectsFreeVars = mapUnionVarSet vectFreeVars
   where
-    vectFreeVars (Vect   _ rhs)   = runFVSet $ filterFV isLocalId $ expr_fvs rhs
+    vectFreeVars (Vect   _ rhs)   = fvVarSet $ filterFV isLocalId $ expr_fvs rhs
     vectFreeVars (NoVect _)       = noFVs
     vectFreeVars (VectType _ _ _) = noFVs
     vectFreeVars (VectClass _)    = noFVs
@@ -581,48 +581,48 @@ delBinderFV b s = (s `delDVarSet` b) `unionFVs` dVarTypeTyCoVars b
 
 varTypeTyCoVars :: Var -> TyCoVarSet
 -- Find the type/kind variables free in the type of the id/tyvar
-varTypeTyCoVars var = runFVSet $ varTypeTyCoVarsAcc var
+varTypeTyCoVars var = fvVarSet $ varTypeTyCoFVs var
 
 dVarTypeTyCoVars :: Var -> DTyCoVarSet
 -- Find the type/kind/coercion variables free in the type of the id/tyvar
-dVarTypeTyCoVars var = runFVDSet $ varTypeTyCoVarsAcc var
+dVarTypeTyCoVars var = fvDVarSet $ varTypeTyCoFVs var
 
-varTypeTyCoVarsAcc :: Var -> FV
-varTypeTyCoVarsAcc var = tyCoVarsOfTypeAcc (varType var)
+varTypeTyCoFVs :: Var -> FV
+varTypeTyCoFVs var = tyCoFVsOfType (varType var)
 
 idFreeVars :: Id -> VarSet
-idFreeVars id = ASSERT( isId id) runFVSet $ idFreeVarsAcc id
+idFreeVars id = ASSERT( isId id) fvVarSet $ idFVs id
 
 dIdFreeVars :: Id -> DVarSet
-dIdFreeVars id = runFVDSet $ idFreeVarsAcc id
+dIdFreeVars id = fvDVarSet $ idFVs id
 
-idFreeVarsAcc :: Id -> FV
+idFVs :: Id -> FV
 -- Type variables, rule variables, and inline variables
-idFreeVarsAcc id = ASSERT( isId id)
-                   varTypeTyCoVarsAcc id `unionFV`
-                   idRuleAndUnfoldingVarsAcc id
+idFVs id = ASSERT( isId id)
+           varTypeTyCoFVs id `unionFV`
+           idRuleAndUnfoldingFVs id
 
-bndrRuleAndUnfoldingVarsAcc :: Var -> FV
-bndrRuleAndUnfoldingVarsAcc v | isTyVar v = noVars
-                              | otherwise = idRuleAndUnfoldingVarsAcc v
+bndrRuleAndUnfoldingFVs :: Var -> FV
+bndrRuleAndUnfoldingFVs v | isTyVar v = emptyFV
+                          | otherwise = idRuleAndUnfoldingFVs v
 
 idRuleAndUnfoldingVars :: Id -> VarSet
-idRuleAndUnfoldingVars id = runFVSet $ idRuleAndUnfoldingVarsAcc id
+idRuleAndUnfoldingVars id = fvVarSet $ idRuleAndUnfoldingFVs id
 
 idRuleAndUnfoldingVarsDSet :: Id -> DVarSet
-idRuleAndUnfoldingVarsDSet id = runFVDSet $ idRuleAndUnfoldingVarsAcc id
+idRuleAndUnfoldingVarsDSet id = fvDVarSet $ idRuleAndUnfoldingFVs id
 
-idRuleAndUnfoldingVarsAcc :: Id -> FV
-idRuleAndUnfoldingVarsAcc id = ASSERT( isId id)
-                               idRuleVarsAcc id `unionFV` idUnfoldingVarsAcc id
+idRuleAndUnfoldingFVs :: Id -> FV
+idRuleAndUnfoldingFVs id = ASSERT( isId id)
+                           idRuleFVs id `unionFV` idUnfoldingFVs id
 
 
 idRuleVars ::Id -> VarSet  -- Does *not* include CoreUnfolding vars
-idRuleVars id = runFVSet $ idRuleVarsAcc id
+idRuleVars id = fvVarSet $ idRuleFVs id
 
-idRuleVarsAcc :: Id -> FV
-idRuleVarsAcc id = ASSERT( isId id)
-  someVars (dVarSetElems $ ruleInfoFreeVars (idSpecialisation id))
+idRuleFVs :: Id -> FV
+idRuleFVs id = ASSERT( isId id)
+  FV.mkFVs (dVarSetElems $ ruleInfoFreeVars (idSpecialisation id))
 
 idUnfoldingVars :: Id -> VarSet
 -- Produce free vars for an unfolding, but NOT for an ordinary
@@ -630,16 +630,16 @@ idUnfoldingVars :: Id -> VarSet
 -- and we'll get exponential behaviour if we look at both unf and rhs!
 -- But do look at the *real* unfolding, even for loop breakers, else
 -- we might get out-of-scope variables
-idUnfoldingVars id = runFVSet $ idUnfoldingVarsAcc id
+idUnfoldingVars id = fvVarSet $ idUnfoldingFVs id
 
-idUnfoldingVarsAcc :: Id -> FV
-idUnfoldingVarsAcc id = stableUnfoldingVarsAcc (realIdUnfolding id) `orElse` noVars
+idUnfoldingFVs :: Id -> FV
+idUnfoldingFVs id = stableUnfoldingFVs (realIdUnfolding id) `orElse` emptyFV
 
 stableUnfoldingVars :: Unfolding -> Maybe VarSet
-stableUnfoldingVars unf = runFVSet `fmap` stableUnfoldingVarsAcc unf
+stableUnfoldingVars unf = fvVarSet `fmap` stableUnfoldingFVs unf
 
-stableUnfoldingVarsAcc :: Unfolding -> Maybe FV
-stableUnfoldingVarsAcc unf
+stableUnfoldingFVs :: Unfolding -> Maybe FV
+stableUnfoldingFVs unf
   = case unf of
       CoreUnfolding { uf_tmpl = rhs, uf_src = src }
          | isStableSource src
@@ -721,8 +721,8 @@ freeVars = go
     go (Let (NonRec binder rhs) body)
       = ( FVAnn { fva_fvs    = freeVarsOf rhs2
                                `unionFVs` body_fvs
-                               `unionFVs` runFVDSet
-                                            (bndrRuleAndUnfoldingVarsAcc binder)
+                               `unionFVs` fvDVarSet
+                                            (bndrRuleAndUnfoldingFVs binder)
                                -- Remember any rules; cf rhs_fvs above
                 , fva_ty_fvs = freeVarsOfType body2
                 , fva_ty     = exprTypeFV body2 }
@@ -742,7 +742,7 @@ freeVars = go
 
         rhss2        = map go rhss
         rhs_body_fvs = foldr (unionFVs . freeVarsOf) body_fvs rhss2
-        binders_fvs  = runFVDSet $ mapUnionFV idRuleAndUnfoldingVarsAcc binders
+        binders_fvs  = fvDVarSet $ mapUnionFV idRuleAndUnfoldingFVs binders
         all_fvs      = rhs_body_fvs `unionFVs` binders_fvs
             -- The "delBinderFV" happens after adding the idSpecVars,
             -- since the latter may add some of the binders as fvs

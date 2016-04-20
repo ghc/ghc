@@ -1572,39 +1572,41 @@ instance Outputable Ct where
 
 -- | Returns free variables of constraints as a non-deterministic set
 tyCoVarsOfCt :: Ct -> TcTyCoVarSet
-tyCoVarsOfCt = runFVSet . tyCoVarsOfCtAcc
+tyCoVarsOfCt = fvVarSet . tyCoFVsOfCt
 
 -- | Returns free variables of constraints as a deterministically ordered.
 -- list. See Note [Deterministic FV] in FV.
 tyCoVarsOfCtList :: Ct -> [TcTyCoVar]
-tyCoVarsOfCtList = runFVList . tyCoVarsOfCtAcc
+tyCoVarsOfCtList = fvVarList . tyCoFVsOfCt
 
 -- | Returns free variables of constraints as a composable FV computation.
 -- See Note [Deterministic FV] in FV.
-tyCoVarsOfCtAcc :: Ct -> FV
-tyCoVarsOfCtAcc (CTyEqCan { cc_tyvar = tv, cc_rhs = xi })
-  = tyCoVarsOfTypeAcc xi `unionFV` oneVar tv `unionFV` tyCoVarsOfTypeAcc (tyVarKind tv)
-tyCoVarsOfCtAcc (CFunEqCan { cc_tyargs = tys, cc_fsk = fsk })
-  = tyCoVarsOfTypesAcc tys `unionFV` oneVar fsk `unionFV` tyCoVarsOfTypeAcc (tyVarKind fsk)
-tyCoVarsOfCtAcc (CDictCan { cc_tyargs = tys }) = tyCoVarsOfTypesAcc tys
-tyCoVarsOfCtAcc (CIrredEvCan { cc_ev = ev }) = tyCoVarsOfTypeAcc (ctEvPred ev)
-tyCoVarsOfCtAcc (CHoleCan { cc_ev = ev }) = tyCoVarsOfTypeAcc (ctEvPred ev)
-tyCoVarsOfCtAcc (CNonCanonical { cc_ev = ev }) = tyCoVarsOfTypeAcc (ctEvPred ev)
+tyCoFVsOfCt :: Ct -> FV
+tyCoFVsOfCt (CTyEqCan { cc_tyvar = tv, cc_rhs = xi })
+  = tyCoFVsOfType xi `unionFV` FV.unitFV tv
+                     `unionFV` tyCoFVsOfType (tyVarKind tv)
+tyCoFVsOfCt (CFunEqCan { cc_tyargs = tys, cc_fsk = fsk })
+  = tyCoFVsOfTypes tys `unionFV` FV.unitFV fsk
+                       `unionFV` tyCoFVsOfType (tyVarKind fsk)
+tyCoFVsOfCt (CDictCan { cc_tyargs = tys }) = tyCoFVsOfTypes tys
+tyCoFVsOfCt (CIrredEvCan { cc_ev = ev }) = tyCoFVsOfType (ctEvPred ev)
+tyCoFVsOfCt (CHoleCan { cc_ev = ev }) = tyCoFVsOfType (ctEvPred ev)
+tyCoFVsOfCt (CNonCanonical { cc_ev = ev }) = tyCoFVsOfType (ctEvPred ev)
 
 -- | Returns free variables of a bag of constraints as a non-deterministic
 -- set. See Note [Deterministic FV] in FV.
 tyCoVarsOfCts :: Cts -> TcTyCoVarSet
-tyCoVarsOfCts = runFVSet . tyCoVarsOfCtsAcc
+tyCoVarsOfCts = fvVarSet . tyCoFVsOfCts
 
 -- | Returns free variables of a bag of constraints as a deterministically
 -- odered list. See Note [Deterministic FV] in FV.
 tyCoVarsOfCtsList :: Cts -> [TcTyCoVar]
-tyCoVarsOfCtsList = runFVList . tyCoVarsOfCtsAcc
+tyCoVarsOfCtsList = fvVarList . tyCoFVsOfCts
 
 -- | Returns free variables of a bag of constraints as a composable FV
 -- computation. See Note [Deterministic FV] in FV.
-tyCoVarsOfCtsAcc :: Cts -> FV
-tyCoVarsOfCtsAcc = foldrBag (unionFV . tyCoVarsOfCtAcc) noVars
+tyCoFVsOfCts :: Cts -> FV
+tyCoFVsOfCts = foldrBag (unionFV . tyCoFVsOfCt) emptyFV
 
 tyCoVarsOfWC :: WantedConstraints -> TyCoVarSet
 -- Only called on *zonked* things, hence no need to worry about flatten-skolems

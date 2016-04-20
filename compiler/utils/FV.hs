@@ -12,12 +12,12 @@ module FV (
         FV, InterestingVarFun,
 
         -- * Running the computations
-        runFV, runFVList, runFVSet, runFVDSet,
+        fvVarListVarSet, fvVarList, fvVarSet, fvDVarSet,
 
         -- ** Manipulating those computations
-        oneVar,
-        noVars,
-        someVars,
+        unitFV,
+        emptyFV,
+        mkFVs,
         unionFV,
         unionsFV,
         delFV,
@@ -59,48 +59,49 @@ type FV = InterestingVarFun
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- To get the performance and determinism that FV provides, FV computations
 -- need to built up from smaller FV computations and then evaluated with
--- one of `runFVList`, `runFVDSet`, `runFV`. That means the functions
+-- one of `fvVarList`, `fvDVarSet`, `fvVarListVarSet`. That means the functions
 -- returning FV need to be exported.
 --
 -- The conventions are:
 --
 -- a) non-deterministic functions:
---   * x - a function that returns VarSet
---         e.g. `tyVarsOfType`
+--   * a function that returns VarSet
+--       e.g. `tyVarsOfType`
 -- b) deterministic functions:
---   * xAcc - a worker that returns FV
---            e.g. `tyVarsOfTypeAcc`
---   * xList - a function that returns [Var]
---             e.g. `tyVarsOfTypeList`
---   * xDSet - a function that returns DVarSet
---             e.g. `tyVarsOfTypeDSet`
+--   * a worker that returns FV
+--       e.g. `tyFVsOfType`
+--   * a function that returns [Var]
+--       e.g. `tyVarsOfTypeList`
+--   * a function that returns DVarSet
+--       e.g. `tyVarsOfTypeDSet`
 --
--- Where x, xList, xDSet are implemented in terms of the worker evaluated with
--- runFVSet, runFVList, runFVDSet respectively.
+-- Where tyVarsOfType, tyVarsOfTypeList, tyVarsOfTypeDSet are implemented
+-- in terms of the worker evaluated with fvVarSet, fvVarList, fvDVarSet
+-- respectively.
 
 -- | Run a free variable computation, returning a list of distinct free
 -- variables in deterministic order and a non-deterministic set containing
 -- those variables.
-runFV :: FV ->  ([Var], VarSet)
-runFV fv = fv (const True) emptyVarSet ([], emptyVarSet)
+fvVarListVarSet :: FV ->  ([Var], VarSet)
+fvVarListVarSet fv = fv (const True) emptyVarSet ([], emptyVarSet)
 
 -- | Run a free variable computation, returning a list of distinct free
 -- variables in deterministic order.
-runFVList :: FV -> [Var]
-runFVList = fst . runFV
+fvVarList :: FV -> [Var]
+fvVarList = fst . fvVarListVarSet
 
 -- | Run a free variable computation, returning a deterministic set of free
 -- variables. Note that this is just a wrapper around the version that
 -- returns a deterministic list. If you need a list you should use
--- `runFVList`.
-runFVDSet :: FV -> DVarSet
-runFVDSet = mkDVarSet . fst . runFV
+-- `fvVarList`.
+fvDVarSet :: FV -> DVarSet
+fvDVarSet = mkDVarSet . fst . fvVarListVarSet
 
 -- | Run a free variable computation, returning a non-deterministic set of
 -- free variables. Don't use if the set will be later converted to a list
 -- and the order of that list will impact the generated code.
-runFVSet :: FV -> VarSet
-runFVSet = snd . runFV
+fvVarSet :: FV -> VarSet
+fvVarSet = snd . fvVarListVarSet
 
 -- Note [FV eta expansion]
 -- ~~~~~~~~~~~~~~~~~~~~~~~
@@ -141,18 +142,18 @@ runFVSet = snd . runFV
 
 -- | Add a variable - when free, to the returned free variables.
 -- Ignores duplicates and respects the filtering function.
-oneVar :: Id -> FV
-oneVar var fv_cand in_scope acc@(have, haveSet)
+unitFV :: Id -> FV
+unitFV var fv_cand in_scope acc@(have, haveSet)
   | var `elemVarSet` in_scope = acc
   | var `elemVarSet` haveSet = acc
   | fv_cand var = (var:have, extendVarSet haveSet var)
   | otherwise = acc
-{-# INLINE oneVar #-}
+{-# INLINE unitFV #-}
 
 -- | Return no free variables.
-noVars :: FV
-noVars _ _ acc = acc
-{-# INLINE noVars #-}
+emptyFV :: FV
+emptyFV _ _ acc = acc
+{-# INLINE emptyFV #-}
 
 -- | Union two free variable computations.
 unionFV :: FV -> FV -> FV
@@ -192,7 +193,7 @@ unionsFV fvs fv_cand in_scope acc = mapUnionFV id fvs fv_cand in_scope acc
 
 -- | Add multiple variables - when free, to the returned free variables.
 -- Ignores duplicates and respects the filtering function.
-someVars :: [Var] -> FV
-someVars vars fv_cand in_scope acc =
-  mapUnionFV oneVar vars fv_cand in_scope acc
-{-# INLINE someVars #-}
+mkFVs :: [Var] -> FV
+mkFVs vars fv_cand in_scope acc =
+  mapUnionFV unitFV vars fv_cand in_scope acc
+{-# INLINE mkFVs #-}

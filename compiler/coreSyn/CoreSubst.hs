@@ -735,7 +735,7 @@ substDVarSet subst fvs
   where
   subst_fv subst fv acc
      | isId fv = expr_fvs (lookupIdSubst (text "substDVarSet") subst fv) isLocalVar emptyVarSet $! acc
-     | otherwise = tyCoVarsOfTypeAcc (lookupTCvSubst subst fv) (const True) emptyVarSet $! acc
+     | otherwise = tyCoFVsOfType (lookupTCvSubst subst fv) (const True) emptyVarSet $! acc
 
 ------------------
 substTickish :: Subst -> Tickish Id -> Tickish Id
