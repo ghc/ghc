@@ -47,6 +47,8 @@ utils/haddock_dist_DATA_FILES += html/Ocean.std-theme/minus.gif
 utils/haddock_dist_DATA_FILES += html/Ocean.std-theme/ocean.css
 utils/haddock_dist_DATA_FILES += html/Ocean.std-theme/plus.gif
 utils/haddock_dist_DATA_FILES += html/Ocean.std-theme/synopsis.png
+utils/haddock_dist_DATA_FILES += html/solarized.css
+utils/haddock_dist_DATA_FILES += html/highlight.js
 utils/haddock_dist_DATA_FILES += latex/haddock.sty
 
 ifeq "$(HADDOCK_DOCS)" "YES"
