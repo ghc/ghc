@@ -30,14 +30,15 @@ import TcValidity
 import TcHsSyn
 import TcTyDecls
 import TcClassDcl
-import {-# SOURCE #-} TcInstDcls
+import {-# SOURCE #-} TcInstDcls( tcInstDecls1 )
 import TcDeriv (DerivInfo)
 import TcUnify
 import TcHsType
 import TcMType
 import TysWiredIn ( unitTy )
 import TcType
-import RnEnv( RoleAnnotEnv, mkRoleAnnotEnv, lookupRoleAnnot )
+import RnEnv( RoleAnnotEnv, mkRoleAnnotEnv, lookupRoleAnnot
+            , lookupConstructorFields )
 import FamInst
 import FamInstEnv
 import Coercion
@@ -56,7 +57,6 @@ import Module
 import Name
 import NameSet
 import NameEnv
-import RnEnv
 import Outputable
 import Maybes
 import Unify
