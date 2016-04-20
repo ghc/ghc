@@ -395,12 +395,12 @@ mkFixMap group_ = M.fromList [ (n,f)
 -- | Take all declarations except pragmas, infix decls, rules from an 'HsGroup'.
 ungroup :: HsGroup Name -> [LHsDecl Name]
 ungroup group_ =
-  mkDecls (tyClGroupConcat . hs_tyclds) TyClD  group_ ++
+  mkDecls (tyClGroupTyClDecls . hs_tyclds) TyClD  group_ ++
   mkDecls hs_derivds             DerivD group_ ++
   mkDecls hs_defds               DefD   group_ ++
   mkDecls hs_fords               ForD   group_ ++
   mkDecls hs_docs                DocD   group_ ++
-  mkDecls hs_instds              InstD  group_ ++
+  mkDecls (tyClGroupInstDecls . hs_tyclds) InstD  group_ ++
   mkDecls (typesigs . hs_valds)  SigD   group_ ++
   mkDecls (valbinds . hs_valds)  ValD   group_
   where
