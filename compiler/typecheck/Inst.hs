@@ -640,10 +640,9 @@ newClsInst overlap_mode dfun_name tvs theta clas tys
              -- but it'll do fine
        ; oflag <- getOverlapFlag overlap_mode
        ; let inst = mkLocalInstance dfun oflag tvs' clas tys'
-       ; dflags <- getDynFlags
        ; warnIf (Reason Opt_WarnOrphans)
-             (isOrphan (is_orphan inst) && wopt Opt_WarnOrphans dflags)
-             (instOrphWarn inst)
+                (isOrphan (is_orphan inst))
+                (instOrphWarn inst)
        ; return inst }
 
 instOrphWarn :: ClsInst -> SDoc

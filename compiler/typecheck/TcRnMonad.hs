@@ -724,11 +724,6 @@ checkErr :: Bool -> MsgDoc -> TcRn ()
 -- Add the error if the bool is False
 checkErr ok msg = unless ok (addErr msg)
 
--- | Display a warning if a condition is met.
-warnIf :: WarnReason -> Bool -> MsgDoc -> TcRn ()
-warnIf reason True  msg = addWarn reason msg
-warnIf _      False _   = return ()
-
 addMessages :: Messages -> TcRn ()
 addMessages msgs1
   = do { errs_var <- getErrsVar ;
@@ -1086,6 +1081,16 @@ failIfTcM True  err = failWithTcM err
 
 
 --         Warnings have no 'M' variant, nor failure
+
+-- | Display a warning if a condition is met.
+--   and the warning is enabled
+warnIf :: WarnReason -> Bool -> MsgDoc -> TcRn ()
+warnIf reason is_bad msg
+  = do { warn_on <- case reason of
+                       NoReason         -> return True
+                       Reason warn_flag -> woptM warn_flag
+       ; when (warn_on && is_bad) $
+         addWarn reason msg }
 
 -- | Display a warning if a condition is met.
 warnTc :: WarnReason -> Bool -> MsgDoc -> TcM ()
