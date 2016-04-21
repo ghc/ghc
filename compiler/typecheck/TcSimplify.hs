@@ -384,13 +384,25 @@ How is this implemented? It's complicated! So we'll step through it all:
  7) `HscMain.tcRnModule'` -- Reads `tcg_safeInfer` after type-checking, calling
     `HscMain.markUnsafeInfer` (passing the reason along) when safe-inferrence
     failed.
+
+Note [No defaulting in the ambiguity check]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When simplifying constraints for the ambiguity check, we use
+solveWantedsAndDrop, not simpl_top, so that we do no defaulting.
+Trac #11947 was an example:
+   f :: Num a => Int -> Int
+This is ambiguous of course, but we don't want to default the
+(Num alpha) constraint to (Num Int)!  Doing so gives a defaulting
+warning, but no error.
 -}
 
 ------------------
 simplifyAmbiguityCheck :: Type -> WantedConstraints -> TcM ()
 simplifyAmbiguityCheck ty wanteds
   = do { traceTc "simplifyAmbiguityCheck {" (text "type = " <+> ppr ty $$ text "wanted = " <+> ppr wanteds)
-       ; (final_wc, _) <- runTcS $ simpl_top wanteds
+       ; (final_wc, _) <- runTcS $ solveWantedsAndDrop wanteds
+             -- NB: no defaulting!  See Note [No defaulting in the ambiguity check]
+
        ; traceTc "End simplifyAmbiguityCheck }" empty
 
        -- Normally report all errors; but with -XAllowAmbiguousTypes
