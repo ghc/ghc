@@ -1635,14 +1635,14 @@ zonkTvCollecting :: TyVarSet -> TcRef TyVarSet -> UnboundTyVarZonker
 -- Works on both types and kinds
 zonkTvCollecting kind_vars unbound_tv_set tv
   = do { poly_kinds <- xoptM LangExt.PolyKinds
-       ; if tv `elemVarSet` kind_vars && not poly_kinds then defaultKindVar tv else do
-       { ty_or_tv <- zonkQuantifiedTyVarOrType tv
+       ; let default_kind = tv `elemVarSet` kind_vars && not poly_kinds
+       ; ty_or_tv <- zonkQuantifiedTyVarOrType default_kind tv
        ; case ty_or_tv of
            Right ty -> return ty
            Left tv' -> do
              { tv_set <- readMutVar unbound_tv_set
              ; writeMutVar unbound_tv_set (extendVarSet tv_set tv')
-             ; return (mkTyVarTy tv') } } }
+             ; return (mkTyVarTy tv') } }
 
 zonkTypeZapping :: UnboundTyVarZonker
 -- This variant is used for everything except the LHS of rules
