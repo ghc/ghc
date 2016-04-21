@@ -128,7 +128,7 @@ import {-# SOURCE #-} DataCon( dataConTyCon, dataConFullSig
                               , dataConUnivTyBinders, dataConExTyBinders
                               , DataCon, filterEqSpec )
 import {-# SOURCE #-} Type( isPredTy, isCoercionTy, mkAppTy
-                          , tyCoVarsOfTypesWellScoped, varSetElemsWellScoped
+                          , tyCoVarsOfTypesWellScoped
                           , partitionInvisibles, coreView, typeKind
                           , eqType )
    -- Transitively pulls in a LOT of stuff, better to break the loop
@@ -3046,7 +3046,7 @@ tidyFreeTyCoVars :: TidyEnv -> TyCoVarSet -> TidyEnv
 -- ^ Add the free 'TyVar's to the env in tidy form,
 -- so that we can tidy the type they are free in
 tidyFreeTyCoVars (full_occ_env, var_env) tyvars
-  = fst (tidyOpenTyCoVars (full_occ_env, var_env) (varSetElemsWellScoped tyvars))
+  = fst (tidyOpenTyCoVars (full_occ_env, var_env) (varSetElems tyvars))
 
         ---------------
 tidyOpenTyCoVars :: TidyEnv -> [TyCoVar] -> (TidyEnv, [TyCoVar])
