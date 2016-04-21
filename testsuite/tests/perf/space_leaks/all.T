@@ -60,8 +60,9 @@ test('T4029',
           [(wordsize(64), 66, 10)]),
             # 2016-02-26: 66 (amd64/Linux)           INITIAL
       stats_num_field('max_bytes_used',
-          [(wordsize(64), 24071720, 5)])
+          [(wordsize(64), 25542832, 5)])
             # 2016-02-26: 24071720 (amd64/Linux)     INITIAL
+            # 2016-04-21: 25542832 (amd64/Linux)
       ],
      ghci_script,
      ['T4029.script'])
