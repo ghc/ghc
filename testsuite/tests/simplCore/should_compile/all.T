@@ -232,3 +232,7 @@ test('T11232', normal, compile, ['-O2'])
 test('T11562', normal, compile, ['-O2'])
 test('T11742', normal, compile, ['-O2'])
 test('T11644', normal, compile, ['-O2'])
+test('T3990',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T3990'])

@@ -2,6 +2,11 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
+T3990:
+	$(RM) -f T3990.o T3990.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl T3990.hs | grep 'test_case'
+        # Grep output should show an unpacked constructor
+
 T8832:
 	$(RM) -f T8832.o T8832.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) $(T8832_WORDSIZE_OPTS) -O -c -ddump-simpl T8832.hs | grep '^[a-zA-Z0-9]\+ ='
