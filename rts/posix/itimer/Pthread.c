@@ -105,7 +105,10 @@ static void *itimer_thread_func(void *_handle_tick)
     if (!TFD_CLOEXEC) {
       fcntl(timerfd, F_SETFD, FD_CLOEXEC);
     }
-    int ret = timerfd_settime(timerfd, 0, &it, NULL);
+    if (timerfd_settime(timerfd, 0, &it, NULL)) {
+        sysErrorBelch("timerfd_settime");
+        stg_exit(EXIT_FAILURE);
+    }
 #endif
 
     while (1) {
