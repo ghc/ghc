@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+{-# OPTIONS_GHC -Wno-redundant-constraints -Wno-simplifiable-class-constraints #-}
 {-# LANGUAGE
      FlexibleContexts
    , FlexibleInstances
@@ -23,6 +23,7 @@ data K x a = K x
 instance Het (A a) (A [a]) where het = het1
 
 het1 :: (GHet (K a) (K b)) => m (f c) -> a -> m b
+-- Weird test case: (GHet (K a) (K b)) is simplifiable
 het1 = undefined
 
 

@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+{-# OPTIONS_GHC -Wno-redundant-constraints -Wno-simplifiable-class-constraints #-}
 {-# LANGUAGE RankNTypes, FlexibleContexts, ImplicitParams, TemplateHaskell #-}
 
 -- This test makes sure TH understands types where
@@ -12,6 +12,7 @@ module T3100 where
 import Language.Haskell.TH
 
 flop :: Ord Int => Int -> Int
+-- Weird test case: (Ord Int) is simplifiable and redundant
 flop x = x
 
 $(do { t <- reify 'flop; return [] })

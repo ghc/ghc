@@ -1,17 +1,18 @@
-{-# LANGUAGE RankNTypes, GADTs, FlexibleContexts #-}
-{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+{-# OPTIONS_GHC -Wno-redundant-constraints -Wno-simplifiable-class-constraints #-}
 {-# OPTIONS_GHC -O2 #-}
+{-# LANGUAGE RankNTypes, GADTs, FlexibleContexts #-}
 
--- This one make SpecConstr generate bogus code (hence -O2), 
+-- This one make SpecConstr generate bogus code (hence -O2),
 -- with a lint error, in GHC 6.4.1
 -- C.f. http://ghc.haskell.org/trac/ghc/ticket/737
 
 module ShouldCompile where
 
  data IHandler st where
-     IHandler :: forall st ev res. 
-		 Serialize (TxContext ev) => String -> IO ev 
+     IHandler :: forall st ev res.
+		 Serialize (TxContext ev) => String -> IO ev
 		 -> (res -> IO ()) -> Ev st ev res -> IHandler st
+     -- Weird test case: (Serialize (TxContext ev)) is simplifiable
 
  data Ev st ev res  = Ev
  data TxContext evt = TxContext

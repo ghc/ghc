@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+{-# OPTIONS_GHC -Wno-redundant-constraints -Wno-simplifiable-class-constraints #-}
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
              FlexibleInstances,
              UndecidableInstances #-}
@@ -17,6 +17,7 @@ instance (Show a, Wuggle b) => Concrete a b where
 	bar = error "urk"
 
 wib :: Concrete a b => a -> String
+-- Weird test case: (Concrete a b) is simplifiable
 wib x = bar x
 
 -- Uncommenting this solves the problem:

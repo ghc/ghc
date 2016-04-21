@@ -1,7 +1,7 @@
+{-# OPTIONS_GHC -Wno-redundant-constraints -Wno-simplifiable-class-constraints #-}
 {-# LANGUAGE MultiParamTypeClasses, TypeFamilies, GADTs,
              ConstraintKinds, DataKinds, KindSignatures,
              FlexibleInstances #-}
-{-# OPTIONS -fno-warn-redundant-constraints #-}
 
 module T10195 where
 
@@ -16,6 +16,7 @@ class Bar m m'
 instance (BarFamily m m' ~ 'True) => Bar m m'
 
 magic :: (Bar m m') => c m zp -> Foo m zp (c m' zq)
+-- Wierd test case: (Bar m m') is simplifiable
 magic = undefined
 
 getDict :: a -> Dict (Num a)
@@ -25,6 +26,7 @@ fromScalar = undefined
 
 foo :: (Bar m m')
   => c m zp -> Foo m zp (c m' zq) -> Foo m zp (c m' zq)
+-- Wierd test case: (Bar m m') is simplifiable
 foo b (Foo sc) =
   let scinv = fromScalar sc
   in case getDict scinv of

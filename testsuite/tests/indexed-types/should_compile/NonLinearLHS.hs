@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+{-# OPTIONS_GHC -Wno-redundant-constraints -Wno-simplifiable-class-constraints #-}
 {-# LANGUAGE TypeFamilies, EmptyDataDecls, FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances, UndecidableInstances #-}
@@ -12,7 +12,7 @@ foo :: E [Int] (E Int Int) -> Int
 foo = sum . concat
 
 data family F a b
-data instance F a a = MkF [a] 
+data instance F a a = MkF [a]
 
 goo :: F Int Int -> F Bool Bool
 goo (MkF xs) = MkF $ map odd xs
@@ -33,7 +33,9 @@ instance (result ~ True) => Proxy True result
 instance (result ~ False) => Proxy notTrue result
 
 testTrue :: EqTyP Int Int r => r
+-- Weird test case: (EqTyP Int Int) is simplifiable
 testTrue = undefined
 
 testFalse :: EqTyP Int Bool r => r
+-- Weird test case: (EqTyP Int Bool) is simplifiable
 testFalse = undefined

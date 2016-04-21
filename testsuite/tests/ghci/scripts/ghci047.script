@@ -1,5 +1,6 @@
 --Testing GADTs, type families as well as a ton of crazy type stuff
-:set -fno-warn-redundant-constraints
+:set -Wno-redundant-constraints
+:set -Wno-simplifiable-class-constraints
 :set -XGADTs
 :set -XTypeFamilies
 :set -XFunctionalDependencies
@@ -33,6 +34,7 @@ type instance Or HFalse HTrue  = HTrue
 type instance Or HFalse HFalse = HFalse
 
 let f :: (Or a c ~ HTrue, TypeEq t A a, TypeEq t C c) => ABorC t -> Int ;    f x = 1
+-- Weird test case: (TypeEq t C c) and (TypeEq t C c) are both simplifiable
 f $ Foo 1
 f $ Bar True
 f $ Baz 'a'

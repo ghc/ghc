@@ -40,7 +40,9 @@ import TyCon
 import HsSyn            -- HsType
 import TcRnMonad        -- TcType, amongst others
 import TcHsSyn     ( checkForRepresentationPolymorphism )
+import TcEnv       ( tcGetInstEnvs )
 import FunDeps
+import InstEnv     ( ClsInst, lookupInstEnv, isOverlappable )
 import FamInstEnv  ( isDominatedBy, injectiveBranches,
                      InjectivityCheckResult(..) )
 import FamInst     ( makeInjectivityErrors )
@@ -853,19 +855,55 @@ check_class_pred env dflags ctxt pred cls tys
 
   | otherwise
   = do { check_arity
-       ; checkTcM arg_tys_ok (env, predTyVarErr (tidyType env pred)) }
+       ; check_simplifiable_class_constraint
+       ; checkTcM arg_tys_ok (predTyVarErr env pred) }
   where
     check_arity = checkTc (classArity cls == length tys)
                           (tyConArityErr (classTyCon cls) tys)
+
+    -- Check the arguments of a class constraint
     flexible_contexts = xopt LangExt.FlexibleContexts     dflags
     undecidable_ok    = xopt LangExt.UndecidableInstances dflags
-
     arg_tys_ok = case ctxt of
         SpecInstCtxt -> True    -- {-# SPECIALISE instance Eq (T Int) #-} is fine
         InstDeclCtxt -> checkValidClsArgs (flexible_contexts || undecidable_ok) cls tys
                                 -- Further checks on head and theta
                                 -- in checkInstTermination
         _            -> checkValidClsArgs flexible_contexts cls tys
+
+    -- See Note [Simplifiable given constraints]
+    check_simplifiable_class_constraint
+       | DataTyCtxt {} <- ctxt   -- Don't do this check for the "stupid theta"
+       = return ()               -- of a data type declaration
+       | otherwise
+       = do { instEnvs <- tcGetInstEnvs
+            ; let (matches, _, _) = lookupInstEnv False instEnvs cls tys
+                  bad_matches = [ inst | (inst,_) <- matches
+                                       , not (isOverlappable inst) ]
+            ; warnIf (Reason Opt_WarnSimplifiableClassConstraints)
+                     (not (null bad_matches))
+                     (simplifiable_constraint_warn bad_matches) }
+
+    simplifiable_constraint_warn :: [ClsInst] -> SDoc
+    simplifiable_constraint_warn (match : _)
+     = vcat [ hang (text "The constraint" <+> quotes (ppr (tidyType env pred)))
+                 2 (text "matches an instance declaration")
+            , ppr match
+            , hang (text "This makes type inference very fragile;")
+                 2 (text "try simplifying it using the instance") ]
+    simplifiable_constraint_warn [] = pprPanic "check_class_pred" (ppr pred)
+
+{- Note [Simplifiable given constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A type signature like
+   f :: Eq [(a,b)] => a -> b
+is very fragile, for reasons described at length in TcInteract
+
+Note [Instance and Given overlap].  So this warning discourages uses
+from writing simplifiable class constraints, at least unless the
+top-level instance is explicitly declared as OVERLAPPABLE.
+Trac #11948 provoked me to do this.
+-}
 
 -------------------------
 okIPCtxt :: UserTypeCtxt -> Bool
@@ -892,11 +930,6 @@ okIPCtxt (InstDeclCtxt {}) = False
 okIPCtxt (SpecInstCtxt {}) = False
 okIPCtxt (RuleSigCtxt {})  = False
 okIPCtxt DefaultDeclCtxt   = False
-
-badIPPred :: TidyEnv -> PredType -> (TidyEnv, SDoc)
-badIPPred env pred
-  = ( env
-    , text "Illegal implicit parameter" <+> quotes (ppr_tidy env pred) )
 
 {-
 Note [Kind polymorphic type classes]
@@ -944,11 +977,17 @@ predSuperClassErr env pred
             <+> text "in a superclass context")
          2 (parens undecidableMsg) )
 
-predTyVarErr :: PredType -> SDoc   -- type is already tidied!
-predTyVarErr pred
-  = vcat [ hang (text "Non type-variable argument")
-              2 (text "in the constraint:" <+> ppr pred)
-         , parens (text "Use FlexibleContexts to permit this") ]
+predTyVarErr :: TidyEnv -> PredType -> (TidyEnv, SDoc)
+predTyVarErr env pred
+  = (env
+    , vcat [ hang (text "Non type-variable argument")
+                2 (text "in the constraint:" <+> ppr_tidy env pred)
+           , parens (text "Use FlexibleContexts to permit this") ])
+
+badIPPred :: TidyEnv -> PredType -> (TidyEnv, SDoc)
+badIPPred env pred
+  = ( env
+    , text "Illegal implicit parameter" <+> quotes (ppr_tidy env pred) )
 
 constraintSynErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
 constraintSynErr env kind

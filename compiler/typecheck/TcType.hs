@@ -527,7 +527,7 @@ data UserTypeCtxt
   | ClassSCCtxt Name    -- Superclasses of a class
   | SigmaCtxt           -- Theta part of a normal for-all type
                         --      f :: <S> => a -> a
-  | DataTyCtxt Name     -- Theta part of a data decl
+  | DataTyCtxt Name     -- The "stupid theta" part of a data decl
                         --      data <S> => T a = MkT a
 
 {-

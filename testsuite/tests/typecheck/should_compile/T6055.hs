@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+{-# OPTIONS_GHC -Wno-redundant-constraints -Wno-simplifiable-class-constraints #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -24,7 +24,7 @@ instance Succ y z => Add' D1 y z
 
 class (Add' x y z) => Add x y z | x y -> z
 instance (Add' D1 y z) => Add D1 y z
-
+-- Weird test case: (Add' D1 y z) is simplifiable
 
 class IsSized a s | a -> s where
 

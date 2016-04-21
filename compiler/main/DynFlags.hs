@@ -607,6 +607,7 @@ data WarningFlag =
    | Opt_WarnNonCanonicalMonoidInstances  -- since 8.0
    | Opt_WarnMissingPatternSynonymSignatures -- since 8.0
    | Opt_WarnUnrecognisedWarningFlags     -- since 8.0
+   | Opt_WarnSimplifiableClassConstraints -- Since 8.2
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -3289,6 +3290,7 @@ wWarningFlagsDeps = [
   flagSpec "wrong-do-bind"               Opt_WarnWrongDoBind,
   flagSpec "missing-pattern-synonym-signatures"
                                     Opt_WarnMissingPatternSynonymSignatures,
+  flagSpec "simplifiable-class-constraints" Opt_WarnSimplifiableClassConstraints,
   flagSpec "unrecognised-warning-flags"  Opt_WarnUnrecognisedWarningFlags ]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
@@ -3887,7 +3889,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnAlternativeLayoutRuleTransitional,
         Opt_WarnUnsupportedLlvmVersion,
         Opt_WarnTabs,
-        Opt_WarnUnrecognisedWarningFlags
+        Opt_WarnUnrecognisedWarningFlags,
+        Opt_WarnSimplifiableClassConstraints
       ]
 
 -- | Things you get with -W

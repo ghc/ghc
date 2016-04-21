@@ -71,6 +71,7 @@ endif
 libraries/haskeline_dist-install_EXTRA_HC_OPTS += -Wno-deprecations
 libraries/haskeline_dist-install_EXTRA_HC_OPTS += -Wno-unused-imports
 libraries/haskeline_dist-install_EXTRA_HC_OPTS += -Wno-redundant-constraints
+libraries/haskeline_dist-install_EXTRA_HC_OPTS += -Wno-simplifiable-class-constraints
 
 
 # temporarily turn off unused-imports warnings for pretty

@@ -713,6 +713,28 @@ of ``-W(no-)*``.
     second pattern overlaps it. More often than not, redundant patterns
     is a programmer mistake/error, so this option is enabled by default.
 
+.. ghc-flag:: -Wsimplifiable-class-constraints
+
+    :since: 8.2
+
+    .. index::
+       single: simplifiable class constraints, warning
+
+    Warn about class constraints in a type signature that can be simplified
+    using a top-level instance declaration.  For example: ::
+
+       f :: Eq [a] => a -> a
+
+    Here the ``Eq [a]`` in the signature overlaps with the top-level
+    instance for ``Eq [a]``.  GHC goes to some efforts to use the former,
+    but if it should use the latter, it would then have an
+    insoluble ``Eq a`` constraint.  Best avoided by instead writing: ::
+
+       f :: Eq a => a -> a
+
+    This option is on by default. As usual you can suppress it on a
+    per-module basis with :ghc-flag:`-Wno-simplifiable-class-constraints`.
+
 .. ghc-flag:: -Wtabs
 
     .. index::

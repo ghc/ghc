@@ -42,7 +42,7 @@ module BasicTypes(
         TopLevelFlag(..), isTopLevel, isNotTopLevel,
 
         OverlapFlag(..), OverlapMode(..), setOverlapModeMaybe,
-        hasOverlappingFlag, hasOverlappableFlag,
+        hasOverlappingFlag, hasOverlappableFlag, hasIncoherentFlag,
 
         Boxity(..), isBoxed,
 
@@ -491,6 +491,12 @@ data OverlapFlag = OverlapFlag
 setOverlapModeMaybe :: OverlapFlag -> Maybe OverlapMode -> OverlapFlag
 setOverlapModeMaybe f Nothing  = f
 setOverlapModeMaybe f (Just m) = f { overlapMode = m }
+
+hasIncoherentFlag :: OverlapMode -> Bool
+hasIncoherentFlag mode =
+  case mode of
+    Incoherent   _ -> True
+    _              -> False
 
 hasOverlappableFlag :: OverlapMode -> Bool
 hasOverlappableFlag mode =

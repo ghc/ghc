@@ -8,7 +8,10 @@ Stephanie Weirich, Richard Eisenberg, and Dimitrios Vytiniotis, 2016. -}
              ScopedTypeVariables, GADTs, FlexibleInstances,
              UndecidableInstances, RebindableSyntax,
              DataKinds, MagicHash, AutoDeriveTypeable, TypeInType  #-}
-{-# OPTIONS_GHC -fno-warn-missing-methods -fno-warn-redundant-constraints #-}
+{-# OPTIONS_GHC -Wno-missing-methods -Wno-redundant-constraints #-}
+{-# OPTIONS_GHC -Wno-simplifiable-class-constraints #-}
+  -- Because we define a local Typeable class and have
+  --   instance Data.Typeable.Typeable a => Typeable a
 
 module Dynamic where
 
