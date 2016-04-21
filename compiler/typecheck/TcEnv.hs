@@ -955,7 +955,10 @@ notFound name
   = do { lcl_env <- getLclEnv
        ; let stage = tcl_th_ctxt lcl_env
        ; case stage of   -- See Note [Out of scope might be a staging error]
-           Splice {} -> stageRestrictionError (quotes (ppr name))
+           Splice {}
+             | isUnboundName name -> failM  -- If the name really isn't in scope
+                                            -- don't report it again (Trac #11941)
+             | otherwise -> stageRestrictionError (quotes (ppr name))
            _ -> failWithTc $
                 vcat[text "GHC internal error:" <+> quotes (ppr name) <+>
                      text "is not in scope during type checking, but it passed the renamer",
@@ -975,12 +978,13 @@ wrongThingErr expected thing name
   = failWithTc (pprTcTyThingCategory thing <+> quotes (ppr name) <+>
                 text "used as a" <+> text expected)
 
-{-
-Note [Out of scope might be a staging error]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Out of scope might be a staging error]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
   x = 3
   data T = MkT $(foo x)
+
+where 'foo' is is imported from somewhere.
 
 This is really a staging error, because we can't run code involving 'x'.
 But in fact the type checker processes types first, so 'x' won't even be
