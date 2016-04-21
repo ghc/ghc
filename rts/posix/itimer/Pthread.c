@@ -39,7 +39,6 @@
 #include "Rts.h"
 
 #include "Ticker.h"
-#include "posix/Itimer.h"
 #include "Proftimer.h"
 #include "Schedule.h"
 #include "posix/Clock.h"

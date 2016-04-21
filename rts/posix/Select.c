@@ -17,7 +17,6 @@
 #include "Prelude.h"
 #include "RaiseAsync.h"
 #include "RtsUtils.h"
-#include "Itimer.h"
 #include "Capability.h"
 #include "Select.h"
 #include "AwaitEvent.h"
