@@ -6540,7 +6540,7 @@ completely covers the cases covered by the instance head.
    cannot give any *subsequent* instances for ``(GMap Flob ...)``,
    this facility was not very useful, except perhaps when the free
    indexed parameter has a fixed number of alternatives
-   (e.g. ``Bool`). But in that case it is better to define an auxiliary
+   (e.g. ``Bool``). But in that case it is better to define an auxiliary
    closed type function like this: ::
 
        class C a where
