@@ -1312,7 +1312,8 @@ flatten_tyvar1 tv
        ; case mb_ty of
            Just ty -> do { traceFlat "Following filled tyvar" (ppr tv <+> equals <+> ppr ty)
                          ; return (FTRFollowed ty (mkReflCo role ty)) } ;
-           Nothing -> do { fr <- getFlavourRole
+           Nothing -> do { traceFlat "Unfilled tyvar" (ppr tv)
+                         ; fr <- getFlavourRole
                          ; flatten_tyvar2  tv fr } }
 
 flatten_tyvar2 :: TcTyVar -> CtFlavourRole -> FlatM FlattenTvResult
