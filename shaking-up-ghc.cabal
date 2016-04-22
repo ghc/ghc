@@ -124,7 +124,7 @@ executable ghc-shake
                        , extra                == 1.4.*
                        , mtl                  == 2.2.*
                        , QuickCheck           >= 2.6 && < 2.9
-                       , shake                == 0.15.6
+                       , shake                >= 0.15.6
                        , transformers         >= 0.4 && < 0.6
                        , unordered-containers == 0.2.*
     ghc-options:         -Wall
