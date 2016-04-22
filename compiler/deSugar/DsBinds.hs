@@ -756,14 +756,14 @@ decomposeRuleLhs orig_bndrs orig_lhs
   = Left (vcat (map dead_msg unbound))
 
   | Just (fn_id, args) <- decompose fun2 args2
-  , let extra_dict_bndrs = mk_extra_dict_bndrs fn_id args
+  , let extra_bndrs = mk_extra_bndrs fn_id args
   = -- pprTrace "decmposeRuleLhs" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
     --                                  , text "orig_lhs:" <+> ppr orig_lhs
     --                                  , text "lhs1:"     <+> ppr lhs1
     --                                  , text "extra_dict_bndrs:" <+> ppr extra_dict_bndrs
     --                                  , text "fn_id:" <+> ppr fn_id
     --                                  , text "args:"   <+> ppr args]) $
-    Right (orig_bndrs ++ extra_dict_bndrs, fn_id, args)
+    Right (orig_bndrs ++ extra_bndrs, fn_id, args)
 
   | otherwise
   = Left bad_shape_msg
@@ -777,15 +777,19 @@ decomposeRuleLhs orig_bndrs orig_lhs
 
    orig_bndr_set = mkVarSet orig_bndrs
 
-        -- Add extra dict binders: Note [Free dictionaries]
-   mk_extra_dict_bndrs fn_id args
-     = [ mkLocalId (localiseName (idName d)) (idType d)
-       | d <- exprsFreeVarsList args
-       , not (d `elemVarSet` orig_bndr_set)
-       , not (d == fn_id)
-              -- fn_id: do not quantify over the function itself, which may
-              -- itself be a dictionary (in pathological cases, Trac #10251)
-       , isDictId d ]
+        -- Add extra tyvar binders: Note [Free tyvars in rule LHS]
+        -- and extra dict binders: Note [Free dictionaries in rule LHS]
+   mk_extra_bndrs fn_id args
+     = toposortTyVars unbound_tvs ++ unbound_dicts
+     where
+       unbound_tvs   = [ v | v <- unbound_vars, isTyVar v ]
+       unbound_dicts = [ mkLocalId (localiseName (idName d)) (idType d)
+                       | d <- unbound_vars, isDictId d ]
+       unbound_vars  = [ v | v <- exprsFreeVarsList args
+                           , not (v `elemVarSet` orig_bndr_set)
+                           , not (v == fn_id) ]
+         -- fn_id: do not quantify over the function itself, which may
+         -- itself be a dictionary (in pathological cases, Trac #10251)
 
    decompose (Var fn_id) args
       | not (fn_id `elemVarSet` orig_bndr_set)
@@ -846,6 +850,54 @@ There are several things going on here.
 * drop_dicts: see Note [Drop dictionary bindings on rule LHS]
 * simpleOptExpr: see Note [Simplify rule LHS]
 * extra_dict_bndrs: see Note [Free dictionaries]
+
+Note [Free tyvars on rule LHS]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  data T a = C
+
+  foo :: T a -> Int
+  foo C = 1
+
+  {-# RULES "myrule"  foo C = 1 #-}
+
+After type checking the LHS becomes (foo alpha (C alpha)), where alpha
+is an unbound meta-tyvar.  The zonker in TcHsSyn is careful not to
+turn the free alpha into Any (as it usually does).  Instead it turns it
+into a skolem 'a'.  See TcHsSyn Note [Zonking the LHS of a RULE].
+
+Now we must quantify over that 'a'.  It's /really/ inconvenient to do that
+in the zonker, because the HsExpr data type is very large.  But it's /easy/
+to do it here in the desugarer.
+
+Moreover, we have to do something rather similar for dictionaries;
+see Note [Free dictionaries on rule LHS].   So that's why we look for
+type variables free on the LHS, and quantify over them.
+
+Note [Free dictionaries on rule LHS]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When the LHS of a specialisation rule, (/\as\ds. f es) has a free dict,
+which is presumably in scope at the function definition site, we can quantify
+over it too.  *Any* dict with that type will do.
+
+So for example when you have
+        f :: Eq a => a -> a
+        f = <rhs>
+        ... SPECIALISE f :: Int -> Int ...
+
+Then we get the SpecPrag
+        SpecPrag (f Int dInt)
+
+And from that we want the rule
+
+        RULE forall dInt. f Int dInt = f_spec
+        f_spec = let f = <rhs> in f Int dInt
+
+But be careful!  That dInt might be GHC.Base.$fOrdInt, which is an External
+Name, and you can't bind them in a lambda or forall without getting things
+confused.   Likewise it might have an InlineRule or something, which would be
+utterly bogus. So we really make a fresh Id, with the same unique and type
+as the old one, but with an Internal name and no IdInfo.
 
 Note [Drop dictionary bindings on rule LHS]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -945,31 +997,6 @@ not bound on the LHS!  But it's a silly specialisation anyway, because
 the constraint is unused.  We could bind 'd' to (error "unused")
 but it seems better to reject the program because it's almost certainly
 a mistake.  That's what the isDeadBinder call detects.
-
-Note [Free dictionaries]
-~~~~~~~~~~~~~~~~~~~~~~~~
-When the LHS of a specialisation rule, (/\as\ds. f es) has a free dict,
-which is presumably in scope at the function definition site, we can quantify
-over it too.  *Any* dict with that type will do.
-
-So for example when you have
-        f :: Eq a => a -> a
-        f = <rhs>
-        ... SPECIALISE f :: Int -> Int ...
-
-Then we get the SpecPrag
-        SpecPrag (f Int dInt)
-
-And from that we want the rule
-
-        RULE forall dInt. f Int dInt = f_spec
-        f_spec = let f = <rhs> in f Int dInt
-
-But be careful!  That dInt might be GHC.Base.$fOrdInt, which is an External
-Name, and you can't bind them in a lambda or forall without getting things
-confused.   Likewise it might have an InlineRule or something, which would be
-utterly bogus. So we really make a fresh Id, with the same unique and type
-as the old one, but with an Internal name and no IdInfo.
 
 ************************************************************************
 *                                                                      *

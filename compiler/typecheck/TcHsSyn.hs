@@ -62,7 +62,6 @@ import SrcLoc
 import Bag
 import Outputable
 import Util
-import qualified GHC.LanguageExtensions as LangExt
 
 #if __GLASGOW_HASKELL__ < 709
 import Data.Traversable ( traverse )
@@ -188,14 +187,20 @@ type UnboundTyVarZonker = TcTyVar -> TcM Type
 -- | A ZonkEnv carries around several bits.
 -- The UnboundTyVarZonker just zaps unbouned meta-tyvars to Any (as
 -- defined in zonkTypeZapping), except on the LHS of rules. See
--- Note [Zonking the LHS of a RULE]. The (TyCoVarEnv TyVar) and is just
--- an optimisation: when binding a tyvar or covar, we zonk the kind right away
--- and add a mapping to the env. This prevents re-zonking the kind at
--- every occurrence. But this is *just* an optimisation.
--- The final (IdEnv Var) optimises zonking for
--- Ids. It is knot-tied. We must be careful never to put coercion variables
--- (which are Ids, after all) in the knot-tied env, because coercions can
--- appear in types, and we sometimes inspect a zonked type in this module.
+-- Note [Zonking the LHS of a RULE].
+--
+-- The (TyCoVarEnv TyVar) and is just an optimisation: when binding a
+-- tyvar or covar, we zonk the kind right away and add a mapping to
+-- the env. This prevents re-zonking the kind at every occurrence. But
+-- this is *just* an optimisation.
+--
+-- The final (IdEnv Var) optimises zonking for Ids. It is
+-- knot-tied. We must be careful never to put coercion variables
+-- (which are Ids, after all) in the knot-tied env, because coercions
+-- can appear in types, and we sometimes inspect a zonked type in this
+-- module.
+--
+-- Confused by zonking? See Note [What is zonking?] in TcMType.
 data ZonkEnv
   = ZonkEnv
       UnboundTyVarZonker
@@ -1314,25 +1319,15 @@ zonkRules env rs = mapM (wrapLocM (zonkRule env)) rs
 
 zonkRule :: ZonkEnv -> RuleDecl TcId -> TcM (RuleDecl Id)
 zonkRule env (HsRule name act (vars{-::[RuleBndr TcId]-}) lhs fv_lhs rhs fv_rhs)
-  = do { unbound_tkv_set <- newMutVar emptyVarSet
-       ; let kind_var_set = identify_kind_vars vars
-             env_rule = setZonkType env (zonkTvCollecting kind_var_set unbound_tkv_set)
+  = do { (env_inside, new_bndrs) <- mapAccumLM zonk_bndr env vars
+
+       ; let env_lhs = setZonkType env_inside zonkTvSkolemising
               -- See Note [Zonking the LHS of a RULE]
 
-       ; (env_inside, new_bndrs) <- mapAccumLM zonk_bndr env_rule vars
-
-       ; new_lhs <- zonkLExpr env_inside lhs
+       ; new_lhs <- zonkLExpr env_lhs    lhs
        ; new_rhs <- zonkLExpr env_inside rhs
 
-       ; unbound_tkvs <- readMutVar unbound_tkv_set
-
-       ; let final_bndrs :: [LRuleBndr Var]
-             final_bndrs = map (noLoc . RuleBndr . noLoc)
-                               (varSetElemsWellScoped unbound_tkvs)
-                           ++ new_bndrs
-
-       ; return $
-         HsRule name act final_bndrs new_lhs fv_lhs new_rhs fv_rhs }
+       ; return (HsRule name act new_bndrs new_lhs fv_lhs new_rhs fv_rhs) }
   where
    zonk_bndr env (L l (RuleBndr (L loc v)))
       = do { (env', v') <- zonk_it env v
@@ -1347,18 +1342,6 @@ zonkRule env (HsRule name act (vars{-::[RuleBndr TcId]-}) lhs fv_lhs rhs fv_rhs)
                     -- DV: used to be return (env,v) but that is plain
                     -- wrong because we may need to go inside the kind
                     -- of v and zonk there!
-
-     -- returns the set of type variables mentioned in the kind of another
-     -- type. This is used only when -XPolyKinds is not set.
-   identify_kind_vars :: [LRuleBndr TcId] -> TyVarSet
-   identify_kind_vars rule_bndrs
-     = let vars = map strip_rulebndr rule_bndrs in
-       unionVarSets (map (\v -> if isTyVar v
-                                then tyCoVarsOfType (tyVarKind v)
-                                else emptyVarSet) vars)
-
-   strip_rulebndr (L _ (RuleBndr (L _ v))) = v
-   strip_rulebndr (L _ (RuleBndrSig {}))   = panic "strip_rulebndr zonkRule"
 
 zonkVects :: ZonkEnv -> [LVectDecl TcId] -> TcM [LVectDecl Id]
 zonkVects env = mapM (wrapLocM (zonkVect env))
@@ -1483,31 +1466,6 @@ zonkEvBind env bind@(EvBind { eb_lhs = var, eb_rhs = term })
 *                                                                      *
 ************************************************************************
 
-Note [Zonking the LHS of a RULE]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We need to gather the type variables mentioned on the LHS so we can
-quantify over them.  Example:
-  data T a = C
-
-  foo :: T a -> Int
-  foo C = 1
-
-  {-# RULES "myrule"  foo C = 1 #-}
-
-After type checking the LHS becomes (foo a (C a))
-and we do not want to zap the unbound tyvar 'a' to (), because
-that limits the applicability of the rule.  Instead, we
-want to quantify over it!
-
-It's easiest to get zonkTvCollecting to gather the free tyvars
-here. Attempts to do so earlier are tiresome, because (a) the data
-type is big and (b) finding the free type vars of an expression is
-necessarily monadic operation. (consider /\a -> f @ b, where b is
-side-effected to a)
-
-And that in turn is why ZonkEnv carries the function to use for
-type variables!
-
 Note [Zonking mutable unbound type or kind variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In zonkTypeZapping, we zonk mutable but unbound type or kind variables to an
@@ -1627,23 +1585,17 @@ zonkTcKindToKind binders res_kind
 zonkCoToCo :: ZonkEnv -> Coercion -> TcM Coercion
 zonkCoToCo = mapCoercion zonk_tycomapper
 
-zonkTvCollecting :: TyVarSet -> TcRef TyVarSet -> UnboundTyVarZonker
--- This variant collects unbound type variables in a mutable variable
--- Works on both types and kinds
-zonkTvCollecting kind_vars unbound_tv_set tv
-  = do { poly_kinds <- xoptM LangExt.PolyKinds
-       ; if tv `elemVarSet` kind_vars && not poly_kinds then defaultKindVar tv else do
-       { ty_or_tv <- zonkQuantifiedTyVarOrType tv
-       ; case ty_or_tv of
-           Right ty -> return ty
-           Left tv' -> do
-             { tv_set <- readMutVar unbound_tv_set
-             ; writeMutVar unbound_tv_set (extendVarSet tv_set tv')
-             ; return (mkTyVarTy tv') } } }
+zonkTvSkolemising :: UnboundTyVarZonker
+-- This variant is used for the LHS of rules
+-- See Note [Zonking the LHS of a RULE].
+zonkTvSkolemising tv
+  = do { tv' <- skolemiseUnboundMetaTyVar tv vanillaSkolemTv
+       ; return (mkTyVarTy tv') }
 
 zonkTypeZapping :: UnboundTyVarZonker
 -- This variant is used for everything except the LHS of rules
--- It zaps unbound type variables to (), or some other arbitrary type
+-- It zaps unbound type variables to Any, except for RuntimeRep
+-- vars which it zonks to PtrRepLIfted
 -- Works on both types and kinds
 zonkTypeZapping tv
   = do { let ty | isRuntimeRepVar tv = ptrRepLiftedTy
@@ -1652,7 +1604,37 @@ zonkTypeZapping tv
        ; return ty }
 
 ---------------------------------------
-{-
+{- Note [Zonking the LHS of a RULE]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See also DsBinds Note [Free tyvars on rule LHS]
+
+We need to gather the type variables mentioned on the LHS so we can
+quantify over them.  Example:
+  data T a = C
+
+  foo :: T a -> Int
+  foo C = 1
+
+  {-# RULES "myrule"  foo C = 1 #-}
+
+After type checking the LHS becomes (foo alpha (C alpah)) and we do
+not want to zap the unbound meta-tyvar 'alpha' to Any, because that
+limits the applicability of the rule.  Instead, we want to quantify
+over it!
+
+We do this in two stages.
+
+* During zonking, we skolemise 'alpha' to 'a'.  We do this by using
+  zonkTvSkolemising as the UnboundTyVarZonker in the ZonkEnv.
+  (This is the whole reason that the ZonkEnv has a UnboundTyVarZonker.)
+
+* In DsBinds, we quantify over it.  See DsBinds
+  Note [Free tyvars on rule LHS]
+
+Quantifying here is awkward because (a) the data type is big and (b)
+finding the free type vars of an expression is necessarily monadic
+operation. (consider /\a -> f @ b, where b is side-effected to a)
+
 Note [Unboxed tuples in representation polymorphism check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Recall that all types that have values (that is, lifted and unlifted
