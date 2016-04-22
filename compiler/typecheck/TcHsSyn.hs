@@ -1618,7 +1618,7 @@ quantify over them.  Example:
 
   {-# RULES "myrule"  foo C = 1 #-}
 
-After type checking the LHS becomes (foo alpha (C alpah)) and we do
+After type checking the LHS becomes (foo alpha (C alpha)) and we do
 not want to zap the unbound meta-tyvar 'alpha' to Any, because that
 limits the applicability of the rule.  Instead, we want to quantify
 over it!

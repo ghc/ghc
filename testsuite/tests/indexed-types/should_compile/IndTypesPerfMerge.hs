@@ -86,8 +86,8 @@ Another solve path:
   ty := beta
   gamma := MergerType alpha beta
 
-  UnmergedLeft (MergerType alpah beta) ~ alpha
-  UnmergedRight (MergerType alpah beta) ~ beta
+  UnmergedLeft (MergerType alpha beta) ~ alpha
+  UnmergedRight (MergerType alpha beta) ~ beta
   Merger (MergerType alpha beta)
   Mergeable alpha beta
 
