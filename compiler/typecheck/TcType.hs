@@ -871,7 +871,7 @@ instance Outputable TcDepVars where
 In Haskell type inference we quantify over type variables; but we only
 quantify over /kind/ variables when -XPolyKinds is on. So when
 collecting the free vars of a type, prior to quantifying, we must keep
-the type and kind veraibles separate.  But what does that mean in a
+the type and kind variables separate.  But what does that mean in a
 system where kind variables /are/ type variables? It's a fairly
 arbitrary distinction based on how the variables appear:
 
