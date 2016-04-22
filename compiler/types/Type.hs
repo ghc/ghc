@@ -119,7 +119,7 @@ module Type (
         tyCoVarsOfType, tyCoVarsOfTypes, tyCoFVsOfType,
         tyCoVarsOfTypeDSet,
         coVarsOfType,
-        coVarsOfTypes, closeOverKinds,
+        coVarsOfTypes, closeOverKinds, closeOverKindsList,
         splitVisVarsOfType, splitVisVarsOfTypes,
         expandTypeSynonyms,
         typeSize,
