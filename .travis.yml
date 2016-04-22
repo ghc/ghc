@@ -20,7 +20,7 @@ matrix:
               - cabal install alex happy
 
         - os: osx
-          env: TARGET=utils/ghc-pkg/stage1/build/tmp/ghc-pkg
+          env: TARGET=
           before_install:
               - brew update
               - brew install ghc cabal-install
