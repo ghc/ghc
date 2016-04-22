@@ -1573,10 +1573,10 @@ abstractFloats main_tvs body_env body
         rhs' = CoreSubst.substExpr (text "abstract_floats2") subst rhs
 
         -- tvs_here: see Note [Which type variables to abstract over]
-        tvs_here = varSetElemsWellScoped       $
-                   intersectVarSet main_tv_set $
-                   closeOverKinds              $
-                   exprSomeFreeVars isTyVar rhs'
+        tvs_here = toposortTyVars $
+                   filter (`elemVarSet` main_tv_set) $
+                   closeOverKindsList $
+                   exprSomeFreeVarsList isTyVar rhs'
 
     abstract subst (Rec prs)
        = do { (poly_ids, poly_apps) <- mapAndUnzipM (mk_poly tvs_here) ids

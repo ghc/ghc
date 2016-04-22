@@ -64,7 +64,7 @@ module TyCoRep (
         tyCoVarsOfType, tyCoVarsOfTypeDSet, tyCoVarsOfTypes, tyCoVarsOfTypesDSet,
         tyCoFVsBndr, tyCoFVsOfType, tyCoVarsOfTypeList,
         tyCoFVsOfTypes, tyCoVarsOfTypesList,
-        closeOverKindsDSet, closeOverKindsFV,
+        closeOverKindsDSet, closeOverKindsFV, closeOverKindsList,
         coVarsOfType, coVarsOfTypes,
         coVarsOfCo, coVarsOfCos,
         tyCoVarsOfCo, tyCoVarsOfCos,
@@ -1403,6 +1403,11 @@ closeOverKinds = fvVarSet . closeOverKindsFV . varSetElems
 closeOverKindsFV :: [TyVar] -> FV
 closeOverKindsFV tvs =
   mapUnionFV (tyCoFVsOfType . tyVarKind) tvs `unionFV` mkFVs tvs
+
+-- | Add the kind variables free in the kinds of the tyvars in the given set.
+-- Returns a deterministically ordered list.
+closeOverKindsList :: [TyVar] -> [TyVar]
+closeOverKindsList tvs = fvVarList $ closeOverKindsFV tvs
 
 -- | Add the kind variables free in the kinds of the tyvars in the given set.
 -- Returns a deterministic set.

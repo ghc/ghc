@@ -22,7 +22,7 @@ module CoreFVs (
         -- * Selective free variables of expressions
         InterestingVarFun,
         exprSomeFreeVars, exprsSomeFreeVars,
-        exprsSomeFreeVarsList,
+        exprSomeFreeVarsList, exprsSomeFreeVarsList,
 
         -- * Free variables of Rules, Vars and Ids
         varTypeTyCoVars,
@@ -154,6 +154,13 @@ exprSomeFreeVars :: InterestingVarFun   -- ^ Says which 'Var's are interesting
                  -> CoreExpr
                  -> VarSet
 exprSomeFreeVars fv_cand e = fvVarSet $ filterFV fv_cand $ expr_fvs e
+
+-- | Finds free variables in an expression selected by a predicate
+-- returning a deterministically ordered list.
+exprSomeFreeVarsList :: InterestingVarFun -- ^ Says which 'Var's are interesting
+                     -> CoreExpr
+                     -> [Var]
+exprSomeFreeVarsList fv_cand e = fvVarList $ filterFV fv_cand $ expr_fvs e
 
 -- | Finds free variables in several expressions selected by a predicate
 exprsSomeFreeVars :: InterestingVarFun  -- Says which 'Var's are interesting
