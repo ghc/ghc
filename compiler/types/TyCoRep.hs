@@ -72,7 +72,6 @@ module TyCoRep (
         tyCoFVsOfCo, tyCoFVsOfCos,
         tyCoVarsOfCoList, tyCoVarsOfProv,
         closeOverKinds,
-        tyCoVarsOfTelescope,
 
         -- * Substitutions
         TCvSubst(..), TvSubstEnv, CvSubstEnv,
@@ -1527,13 +1526,6 @@ closeOverKindsFV tvs =
 -- Returns a deterministic set.
 closeOverKindsDSet :: DTyVarSet -> DTyVarSet
 closeOverKindsDSet = fvDVarSet . closeOverKindsFV . dVarSetElems
-
--- | Gets the free vars of a telescope, scoped over a given free var set.
-tyCoVarsOfTelescope :: [Var] -> TyCoVarSet -> TyCoVarSet
-tyCoVarsOfTelescope [] fvs = fvs
-tyCoVarsOfTelescope (v:vs) fvs = tyCoVarsOfTelescope vs fvs
-                                 `delVarSet` v
-                                 `unionVarSet` tyCoVarsOfType (varType v)
 
 {-
 %************************************************************************

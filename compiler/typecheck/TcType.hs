@@ -168,7 +168,6 @@ module TcType (
   coreView,
 
   tyCoVarsOfType, tyCoVarsOfTypes, closeOverKinds,
-  tyCoVarsOfTelescope,
   tyCoFVsOfType, tyCoFVsOfTypes,
   tyCoVarsOfTypeDSet, tyCoVarsOfTypesDSet, closeOverKindsDSet,
   tyCoVarsOfTypeList, tyCoVarsOfTypesList,
