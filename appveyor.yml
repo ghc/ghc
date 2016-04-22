@@ -35,7 +35,7 @@ install:
     - stack --version
     - alex  --version
     - happy --version
-    - ghc-pkg list
+    - stack exec -- ghc-pkg list
 
 build_script:
     - cd C:\msys64\home\ghc\shake-build
