@@ -165,7 +165,7 @@ solveSimpleWanteds simples
       | n `intGtLimit` limit
       = failTcS (hang (text "solveSimpleWanteds: too many iterations"
                        <+> parens (text "limit =" <+> ppr limit))
-                    2 (vcat [ text "Set limit with -fsolver-iterations=n; n=0 for no limit"
+                    2 (vcat [ text "Set limit with -fconstraint-solver-iterations=n; n=0 for no limit"
                             , text "Simples =" <+> ppr simples
                             , text "WC ="      <+> ppr wc ]))
 
