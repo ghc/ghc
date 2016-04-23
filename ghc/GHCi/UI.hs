@@ -299,6 +299,8 @@ defFullHelpText =
   "   :run function [<arguments> ...] run the function with the given arguments\n" ++
   "   :script <file>              run the script <file>\n" ++
   "   :type <expr>                show the type of <expr>\n" ++
+  "   :type +d <expr>             show the type of <expr>, defaulting type variables\n" ++
+  "   :type +v <expr>             show the type of <expr>, with its specified tyvars\n" ++
   "   :undef <cmd>                undefine user-defined command :<cmd>\n" ++
   "   :!<command>                 run the shell command <command>\n" ++
   "\n" ++
@@ -1811,12 +1813,16 @@ exceptT :: Applicative m => Either e a -> ExceptT e m a
 exceptT = ExceptT . pure
 
 -----------------------------------------------------------------------------
--- | @:type@ command
+-- | @:type@ command. See also Note [TcRnExprMode] in TcRnDriver.
 
 typeOfExpr :: String -> InputT GHCi ()
 typeOfExpr str = handleSourceError GHC.printException $ do
-    ty <- GHC.exprType str
-    printForUser $ sep [text str, nest 2 (dcolon <+> pprTypeForUser ty)]
+    let (mode, expr_str) = case break isSpace str of
+          ("+d", rest) -> (GHC.TM_Default, dropWhile isSpace rest)
+          ("+v", rest) -> (GHC.TM_NoInst,  dropWhile isSpace rest)
+          _            -> (GHC.TM_Inst,    str)
+    ty <- GHC.exprType mode expr_str
+    printForUser $ sep [text expr_str, nest 2 (dcolon <+> pprTypeForUser ty)]
 
 -----------------------------------------------------------------------------
 -- | @:type-at@ command

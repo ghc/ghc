@@ -710,15 +710,16 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
              <- pushLevelAndCaptureConstraints  $
                 tcMonoBinds rec_tc tc_sig_fn LetLclBndr bind_list
 
-       ; let name_taus = [ (mbi_poly_name info, idType (mbi_mono_id info))
-                         | info <- mono_infos ]
-             sigs      = [ sig | MBI { mbi_sig = Just sig } <- mono_infos ]
+       ; let name_taus  = [ (mbi_poly_name info, idType (mbi_mono_id info))
+                          | info <- mono_infos ]
+             sigs       = [ sig | MBI { mbi_sig = Just sig } <- mono_infos ]
+             infer_mode = if mono then ApplyMR else NoRestrictions
 
        ; mapM_ (checkOverloadedSig mono) sigs
 
        ; traceTc "simplifyInfer call" (ppr tclvl $$ ppr name_taus $$ ppr wanted)
        ; (qtvs, givens, ev_binds)
-                 <- simplifyInfer tclvl mono sigs name_taus wanted
+                 <- simplifyInfer tclvl infer_mode sigs name_taus wanted
 
        ; let inferred_theta = map evVarPred givens
        ; exports <- checkNoErrs $

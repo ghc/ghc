@@ -1,0 +1,9 @@
+:set -fprint-explicit-foralls
+:type mapM
+:type +v mapM
+:t +v mapM
+let foo :: (Show a, Num b) => a -> b; foo = undefined
+:set -XTypeApplications
+:type foo @Int
+:type +v foo @Int
+:t +v foo @Int

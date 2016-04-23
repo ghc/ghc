@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 
 module TcSimplify(
-       simplifyInfer,
+       simplifyInfer, InferMode(..),
        growThetaTyVars,
        simplifyAmbiguityCheck,
        simplifyDefault,
@@ -514,8 +514,22 @@ the let binding.
 
 -}
 
+-- | How should we choose which constraints to quantify over?
+data InferMode = ApplyMR          -- ^ Apply the monomorphism restriction,
+                                  -- never quantifying over any constraints
+               | EagerDefaulting  -- ^ See Note [TcRnExprMode] in TcRnDriver,
+                                  -- the :type +d case; this mode refuses
+                                  -- to quantify over any defaultable constraint
+               | NoRestrictions   -- ^ Quantify over any constraint that
+                                  -- satisfies TcType.pickQuantifiablePreds
+
+instance Outputable InferMode where
+  ppr ApplyMR         = text "ApplyMR"
+  ppr EagerDefaulting = text "EagerDefaulting"
+  ppr NoRestrictions  = text "NoRestrictions"
+
 simplifyInfer :: TcLevel               -- Used when generating the constraints
-              -> Bool                  -- Apply monomorphism restriction
+              -> InferMode
               -> [TcIdSigInst]         -- Any signatures (possibly partial)
               -> [(Name, TcTauType)]   -- Variables to be generalised,
                                        -- and their tau-types
@@ -523,7 +537,7 @@ simplifyInfer :: TcLevel               -- Used when generating the constraints
               -> TcM ([TcTyVar],    -- Quantify over these type variables
                       [EvVar],      -- ... and these constraints (fully zonked)
                       TcEvBinds)    -- ... binding these evidence variables
-simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
+simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
   | isEmptyWC wanteds
   = do { gbl_tvs <- tcGetGlobalTyCoVars
        ; dep_vars <- zonkTcTypesAndSplitDepVars (map snd name_taus)
@@ -536,7 +550,7 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
              [ text "sigs =" <+> ppr sigs
              , text "binds =" <+> ppr name_taus
              , text "rhs_tclvl =" <+> ppr rhs_tclvl
-             , text "apply_mr =" <+> ppr apply_mr
+             , text "infer_mode =" <+> ppr infer_mode
              , text "(unzonked) wanted =" <+> ppr wanteds
              ]
 
@@ -616,7 +630,7 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
        -- Decide what type variables and constraints to quantify
        -- NB: bound_theta are constraints we want to quantify over,
        --     /apart from/ the psig_theta, which we always quantify over
-       ; (qtvs, bound_theta) <- decideQuantification apply_mr name_taus psig_theta
+       ; (qtvs, bound_theta) <- decideQuantification infer_mode name_taus psig_theta
                                                      quant_pred_candidates
 
          -- Promote any type variables that are free in the inferred type
@@ -763,23 +777,31 @@ including all covars -- and the quantified constraints are empty/insoluble.
 -}
 
 decideQuantification
-  :: Bool                  -- try the MR restriction?
+  :: InferMode
   -> [(Name, TcTauType)]   -- Variables to be generalised
   -> [PredType]            -- All annotated constraints from signatures
   -> [PredType]            -- Candidate theta
   -> TcM ( [TcTyVar]       -- Quantify over these (skolems)
          , [PredType] )    -- and this context (fully zonked)
 -- See Note [Deciding quantification]
-decideQuantification apply_mr name_taus psig_theta candidates
+decideQuantification infer_mode name_taus psig_theta candidates
   = do { gbl_tvs <- tcGetGlobalTyCoVars
        ; zonked_taus <- mapM TcM.zonkTcType (psig_theta ++ taus)
                         -- psig_theta: see Note [Quantification and partial signatures]
-       ; let DV { dv_kvs = zkvs, dv_tvs = ztvs} = splitDepVarsOfTypes zonked_taus
+       ; ovl_strings <- xoptM LangExt.OverloadedStrings
+       ; let DV {dv_kvs = zkvs, dv_tvs = ztvs} = splitDepVarsOfTypes zonked_taus
              (gbl_cand, quant_cand)  -- gbl_cand   = do not quantify me
-                = case apply_mr of   -- quant_cand = try to quantify me
-                    True  -> (candidates, [])
-                    False -> ([], candidates)
-             zonked_tkvs     = dVarSetToVarSet zkvs `unionVarSet` dVarSetToVarSet ztvs
+                = case infer_mode of   -- quant_cand = try to quantify me
+                    ApplyMR         -> (candidates, [])
+                    NoRestrictions  -> ([], candidates)
+                    EagerDefaulting -> partition is_interactive_ct candidates
+                      where
+                        is_interactive_ct ct
+                          | Just (cls, _) <- getClassPredTys_maybe ct
+                          = isInteractiveClass ovl_strings cls
+                          | otherwise
+                          = False
+
              eq_constraints  = filter isEqPred quant_cand
              constrained_tvs = tyCoVarsOfTypes gbl_cand
              mono_tvs        = growThetaTyVars eq_constraints $
@@ -804,7 +826,10 @@ decideQuantification apply_mr name_taus psig_theta candidates
 
            -- Warn about the monomorphism restriction
        ; warn_mono <- woptM Opt_WarnMonomorphism
-       ; let mr_bites = constrained_tvs `intersectsVarSet` zonked_tkvs
+       ; let mr_bites | ApplyMR <- infer_mode
+                      = constrained_tvs `intersectsVarSet` tcDepVarSet dvs_plus
+                      | otherwise
+                      = False
        ; warnTc (Reason Opt_WarnMonomorphism) (warn_mono && mr_bites) $
          hang (text "The Monomorphism Restriction applies to the binding"
                <> plural bndrs <+> text "for" <+> pp_bndrs)
@@ -812,8 +837,9 @@ decideQuantification apply_mr name_taus psig_theta candidates
                 <+> if isSingleton bndrs then pp_bndrs
                                          else text "these binders")
 
-       ; traceTc "decideQuantification 2"
-           (vcat [ text "gbl_cand:"     <+> ppr gbl_cand
+       ; traceTc "decideQuantification"
+           (vcat [ text "infer_mode:"   <+> ppr infer_mode
+                 , text "gbl_cand:"     <+> ppr gbl_cand
                  , text "quant_cand:"   <+> ppr quant_cand
                  , text "gbl_tvs:"      <+> ppr gbl_tvs
                  , text "mono_tvs:"     <+> ppr mono_tvs
@@ -1676,7 +1702,7 @@ approximateWC to produce a list of candidate constraints.  Then we MUST
      approximateWC, to restore invariant (MetaTvInv) described in
      Note [TcLevel and untouchable type variables] in TcType.
 
-  b) Default the kind of any meta-tyyvars that are not mentioned in
+  b) Default the kind of any meta-tyvars that are not mentioned in
      in the environment.
 
 To see (b), suppose the constraint is (C ((a :: OpenKind) -> Int)), and we
@@ -1994,22 +2020,13 @@ findDefaultableGroups (default_tys, (ovl_strings, extended_defaults)) wanteds
           in b1 && b2
 
     defaultable_classes clss
-        | extended_defaults = any isInteractiveClass clss
-        | otherwise         = all is_std_class clss && (any is_num_class clss)
+        | extended_defaults = any (isInteractiveClass ovl_strings) clss
+        | otherwise         = all is_std_class clss && (any (isNumClass ovl_strings) clss)
 
-    -- In interactive mode, or with -XExtendedDefaultRules,
-    -- we default Show a to Show () to avoid graututious errors on "show []"
-    isInteractiveClass cls
-        = is_num_class cls || (classKey cls `elem` [showClassKey, eqClassKey
-                                                   , ordClassKey, foldableClassKey
-                                                   , traversableClassKey])
-
-    is_num_class cls = isNumericClass cls || (ovl_strings && (cls `hasKey` isStringClassKey))
-    -- is_num_class adds IsString to the standard numeric classes,
+    -- is_std_class adds IsString to the standard numeric classes,
     -- when -foverloaded-strings is enabled
-
-    is_std_class cls = isStandardClass cls || (ovl_strings && (cls `hasKey` isStringClassKey))
-    -- Similarly is_std_class
+    is_std_class cls = isStandardClass cls ||
+                       (ovl_strings && (cls `hasKey` isStringClassKey))
 
 ------------------------------
 disambigGroup :: [Type]            -- The default types
@@ -2060,6 +2077,20 @@ disambigGroup (default_ty:default_tys) group@(the_tv, wanteds)
       -- E.g. suppose the only constraint was (Typeable k (a::k))
       -- With the addition of polykinded defaulting we also want to reject
       -- ill-kinded defaulting attempts like (Eq []) or (Foldable Int) here.
+
+-- In interactive mode, or with -XExtendedDefaultRules,
+-- we default Show a to Show () to avoid graututious errors on "show []"
+isInteractiveClass :: Bool   -- -XOverloadedStrings?
+                   -> Class -> Bool
+isInteractiveClass ovl_strings cls
+    = isNumClass ovl_strings cls || (classKey cls `elem` interactiveClassKeys)
+
+    -- isNumClass adds IsString to the standard numeric classes,
+    -- when -foverloaded-strings is enabled
+isNumClass :: Bool   -- -XOverloadedStrings?
+           -> Class -> Bool
+isNumClass ovl_strings cls
+  = isNumericClass cls || (ovl_strings && (cls `hasKey` isStringClassKey))
 
 
 {-

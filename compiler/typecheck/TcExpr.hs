@@ -29,7 +29,7 @@ import BasicTypes
 import Inst
 import TcBinds          ( chooseInferredQuantifiers, tcLocalBinds )
 import TcSigs           ( tcUserTypeSig, tcInstSig )
-import TcSimplify       ( simplifyInfer )
+import TcSimplify       ( simplifyInfer, InferMode(..) )
 import FamInst          ( tcGetFamInstEnvs, tcLookupDataFamInst )
 import FamInstEnv       ( FamInstEnvs )
 import RnEnv            ( addUsedGRE, addNameClashErrRn
@@ -1472,10 +1472,13 @@ tcExprSig expr sig@(PartialSig { psig_name = name, sig_loc = loc })
                    ; return (expr', sig_inst) }
        -- See Note [Partial expression signatures]
        ; let tau = sig_inst_tau sig_inst
-             mr  = null (sig_inst_theta sig_inst) &&
-                   isNothing (sig_inst_wcx sig_inst)
+             infer_mode | null (sig_inst_theta sig_inst)
+                        , isNothing (sig_inst_wcx sig_inst)
+                        = ApplyMR
+                        | otherwise
+                        = NoRestrictions
        ; (qtvs, givens, ev_binds)
-                 <- simplifyInfer tclvl mr [sig_inst] [(name, tau)] wanted
+                 <- simplifyInfer tclvl infer_mode [sig_inst] [(name, tau)] wanted
        ; tau <- zonkTcType tau
        ; let inferred_theta = map evVarPred givens
              tau_tvs        = tyCoVarsOfType tau

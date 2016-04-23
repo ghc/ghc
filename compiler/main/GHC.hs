@@ -116,7 +116,7 @@ module GHC (
         isModuleInterpreted,
 
         -- ** Inspecting types and kinds
-        exprType,
+        exprType, TcRnExprMode(..),
         typeKind,
 
         -- ** Looking up a Name

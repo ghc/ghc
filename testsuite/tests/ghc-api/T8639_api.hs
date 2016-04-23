@@ -22,6 +22,6 @@ main
            execStmt "putStrLn (show 3)" execOptions
            execStmt "hFlush stdout" execOptions
 
-           ty <- exprType "T8639_api_a.it"
+           ty <- exprType TM_Inst "T8639_api_a.it"
            liftIO (putStrLn (showPpr flags ty))
        ; hFlush stdout }

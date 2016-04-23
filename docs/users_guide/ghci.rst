@@ -977,6 +977,10 @@ Type defaulting in GHCi
    single: Type defaulting; in GHCi
    single: Show class
 
+.. ghc-flag:: -XExtendedDefaultRules
+
+    Allow defaulting to take place for more than just numeric classes.
+
 Consider this GHCi session:
 
 .. code-block:: none
@@ -1014,7 +1018,7 @@ is given, the following additional differences apply:
    single-parameter type classes.
 
 -  Rule 3 above is relaxed this: At least one of the classes ``Ci`` is
-   numeric, or is ``Show``, ``Eq``, ``Ord``, ``Foldable`` or ``Traversable``.
+   an *interactive class* (defined below).
 
 -  The unit type ``()`` and the list type ``[]`` are added to the start of
    the standard list of types which are tried when doing type defaulting.
@@ -1043,6 +1047,38 @@ printf.
 
 See also :ref:`actions-at-prompt` for how the monad of a computational
 expression defaults to ``IO`` if possible.
+
+Interactive classes
+^^^^^^^^^^^^^^^^^^^
+
+.. index::
+   single: Interactive classes
+
+The interactive classes (only relevant when :ghc-flag:`-XExtendedDefaultRules`
+is in effect) are: any numeric class, ``Show``, ``Eq``, ``Ord``,
+``Foldable`` or ``Traversable``.
+
+As long as a type variable is constrained by one of these classes, defaulting
+will occur, as outlined above.
+
+Extended rules around ``default`` declarations
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. index::
+   single: default declarations
+
+Since the rules for defaulting are relaxed under
+:ghc-flag:`-XExtendedDefaultRules`, the rules for ``default`` declarations
+are also relaxed. According to Section 4.3.4 of the Haskell 2010 Report,
+a ``default`` declaration looks like ``default (t1, ..., tn)`` where, for
+each ``ti``, ``Num ti`` must hold. This is relaxed to say that for each
+``ti``, there must exist an interactive class ``C`` such that ``C ti`` holds.
+This means that type *constructors* can be allowed in these lists.
+For example, the following works if you wish your ``Foldable`` constraints
+to default to ``Maybe`` but your ``Num`` constraints to still default
+to ``Integer`` or ``Double``: ::
+
+    default (Maybe, Integer, Double)
 
 .. _ghci-interactive-print:
 
@@ -2625,10 +2661,48 @@ commonly used commands.
 .. ghci-cmd:: :type; ⟨expression⟩
 
     Infers and prints the type of ⟨expression⟩, including explicit
-    forall quantifiers for polymorphic types. The monomorphism
-    restriction is *not* applied to the expression during type
-    inference.
+    forall quantifiers for polymorphic types.
+    The type reported is the type that would be inferred
+    for a variable assigned to the expression, but without the
+    monomorphism restriction applied.
 
+    .. code-block:: none
+
+	*X> :type length
+	length :: Foldable t => t a -> Int
+
+.. ghci-cmd:: :type +v ⟨expression⟩
+
+    Infers and prints the type of ⟨expression⟩, but without fiddling
+    with type variables or class constraints. This is useful when you
+    are using :ghc-flag:`-XTypeApplications` and care about the distinction
+    between specified type variables (available for type application)
+    and inferred type variables (not available). This mode sometimes prints
+    constraints (such as ``Show Int``) that could readily be solved, but
+    solving these constraints may affect the type variables, so GHC refrains.
+
+    .. code-block:: none
+
+	*X> :set -fprint-explicit-foralls
+	*X> :type +v length
+	length :: forall (t :: * -> *). Foldable t => forall a. t a -> Int
+    
+.. ghci-cmd:: :type +d ⟨expression⟩
+
+    Infers and prints the type of ⟨expression⟩, defaulting type variables
+    if possible. In this mode, if the inferred type is constrained by
+    any interactive class (``Num``, ``Show``, ``Eq``, ``Ord``, ``Foldable``,
+    or ``Traversable``), the constrained type variable(s) are defaulted
+    according to the rules described under :ghc-flag:`-XExtendedDefaultRules`.
+    This mode is quite useful when the inferred type is quite general (such
+    as for ``foldr``) and it may be helpful to see a more concrete
+    instantiation.
+
+    .. code-block:: none
+
+	*X> :type +d length
+	length :: [a] -> Int
+	      
 .. ghci-cmd:: :type-at; ⟨module⟩ ⟨line⟩ ⟨col⟩ ⟨end-line⟩ ⟨end-col⟩ [⟨name⟩]
 
     Reports the inferred type at the given span/position in the module, e.g.:

@@ -13,7 +13,7 @@ https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/TypeChecker
 
 module TcRnDriver (
 #ifdef GHCI
-        tcRnStmt, tcRnExpr, tcRnType,
+        tcRnStmt, tcRnExpr, TcRnExprMode(..), tcRnType,
         tcRnImportDecls,
         tcRnLookupRdrName,
         getModuleInterface,
@@ -1972,13 +1972,17 @@ isGHCiMonad hsc_env ty
             Just _  -> failWithTc $ text "Ambiguous type!"
             Nothing -> failWithTc $ text ("Can't find type:" ++ ty)
 
--- tcRnExpr just finds the type of an expression
+-- | How should we infer a type? See Note [TcRnExprMode]
+data TcRnExprMode = TM_Inst    -- ^ Instantiate the type fully (:type)
+                  | TM_NoInst  -- ^ Do not instantiate the type (:type +v)
+                  | TM_Default -- ^ Default the type eagerly (:type +d)
 
+-- | tcRnExpr just finds the type of an expression
 tcRnExpr :: HscEnv
+         -> TcRnExprMode
          -> LHsExpr RdrName
          -> IO (Messages, Maybe Type)
--- Type checks the expression and returns its most general type
-tcRnExpr hsc_env rdr_expr
+tcRnExpr hsc_env mode rdr_expr
   = runTcInteractive hsc_env $
     do {
 
@@ -1993,15 +1997,15 @@ tcRnExpr hsc_env rdr_expr
     (tclvl, lie, res_ty)
           <- pushLevelAndCaptureConstraints $
              do { (_tc_expr, expr_ty) <- tcInferSigma rn_expr
-                ; (_wrap, res_ty)   <- deeplyInstantiate orig expr_ty
-                     -- See [Note Deeply instantiate in :type]
-                ; return res_ty } ;
+                ; if inst
+                  then snd <$> deeplyInstantiate orig expr_ty
+                  else return expr_ty } ;
 
     -- Generalise
     ((qtvs, dicts, _), lie_top) <- captureConstraints $
                                    {-# SCC "simplifyInfer" #-}
                                    simplifyInfer tclvl
-                                                 False {- No MR for now -}
+                                                 infer_mode
                                                  []    {- No sig vars -}
                                                  [(fresh_it, res_ty)]
                                                  lie ;
@@ -2009,7 +2013,8 @@ tcRnExpr hsc_env rdr_expr
     stWC <- tcg_static_wc <$> getGblEnv >>= readTcRef ;
 
     -- Ignore the dictionary bindings
-    _ <- simplifyInteractive (andWC stWC lie_top) ;
+    _ <- perhaps_disable_default_warnings $
+         simplifyInteractive (andWC stWC lie_top) ;
 
     let { all_expr_ty = mkInvForAllTys qtvs (mkLamTypes dicts res_ty) } ;
     ty <- zonkTcType all_expr_ty ;
@@ -2022,6 +2027,12 @@ tcRnExpr hsc_env rdr_expr
     -- irrelevant
     return (snd (normaliseType fam_envs Nominal ty))
     }
+  where
+    -- See Note [Deeply instantiate in :type]
+    (inst, infer_mode, perhaps_disable_default_warnings) = case mode of
+      TM_Inst    -> (True,  NoRestrictions, id)
+      TM_NoInst  -> (False, NoRestrictions, id)
+      TM_Default -> (True,  EagerDefaulting, unsetWOptM Opt_WarnTypeDefaults)
 
 --------------------------
 tcRnImportDecls :: HscEnv
@@ -2038,7 +2049,6 @@ tcRnImportDecls hsc_env import_decls
     zap_rdr_env gbl_env = gbl_env { tcg_rdr_env = emptyGlobalRdrEnv }
 
 -- tcRnType just finds the kind of a type
-
 tcRnType :: HscEnv
          -> Bool        -- Normalise the returned type
          -> LHsType RdrName
@@ -2073,20 +2083,63 @@ tcRnType hsc_env normalise rdr_type
 
        ; return (ty', mkInvForAllTys kvs (typeKind ty')) }
 
-{- Note [Deeply instantiate in :type]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose (Trac #11376)
-  bar :: forall a b. Show a => a -> b -> a
-What should `:t bar @Int` show?
+{- Note [TcRnExprMode]
+~~~~~~~~~~~~~~~~~~~~~~
+How should we infer a type when a user asks for the type of an expression e
+at the GHCi prompt? We offer 3 different possibilities, described below. Each
+considers this example, with -fprint-explicit-foralls enabled:
 
- 1. forall b. Show Int => Int -> b -> Int
- 2. forall b. Int -> b -> Int
- 3. forall {b}. Int -> b -> Int
- 4. Int -> b -> Int
+  foo :: forall a f b. (Show a, Num b, Foldable f) => a -> f b -> String
+  :type{,-spec,-def} foo @Int
 
-We choose (3), which is the effect of deeply instantiating and
-re-generalising.  All the others seem deeply confusing.  That is
-why we deeply instantiate here.
+:type / TM_Inst
+
+  In this mode, we report the type that would be inferred if a variable
+  were assigned to expression e, without applying the monomorphism restriction.
+  This means we deeply instantiate the type and then regeneralize, as discussed
+  in #11376.
+
+  > :type foo @Int
+  forall {b} {f :: * -> *}. (Foldable f, Num b) => Int -> f b -> String
+
+  Note that the variables and constraints are reordered here, because this
+  is possible during regeneralization. Also note that the variables are
+  reported as Invisible instead of Specified.
+
+:type +v / TM_NoInst
+
+  This mode is for the benefit of users using TypeApplications. It does no
+  instantiation whatsoever, sometimes meaning that class constraints are not
+  solved.
+
+  > :type +v foo @Int
+  forall f b. (Show Int, Num b, Foldable f) => Int -> f b -> String
+
+  Note that Show Int is still reported, because the solver never got a chance
+  to see it.
+
+:type +d / TM_Default
+
+  This mode is for the benefit of users who wish to see instantiations of
+  generalized types, and in particular to instantiate Foldable and Traversable.
+  In this mode, any type variable that can be defaulted is defaulted. Because
+  GHCi uses -XExtendedDefaultRules, this means that Foldable and Traversable are
+  defaulted.
+
+  > :type +d foo @Int
+  Int -> [Integer] -> String
+
+  Note that this mode can sometimes lead to a type error, if a type variable is
+  used with a defaultable class but cannot actually be defaulted:
+
+  bar :: (Num a, Monoid a) => a -> a
+  > :type +d bar
+  ** error **
+
+  The error arises because GHC tries to default a but cannot find a concrete
+  type in the defaulting list that is both Num and Monoid. (If this list is
+  modified to include an element that is both Num and Monoid, the defaulting
+  would succeed, of course.)
 
 Note [Kind-generalise in tcRnType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
