@@ -436,7 +436,7 @@ simplifyInteractive wanteds
 simplifyDefault :: ThetaType    -- Wanted; has no type variables in it
                 -> TcM ()       -- Succeeds if the constraint is soluble
 simplifyDefault theta
-  = do { traceTc "simplifyInteractive" empty
+  = do { traceTc "simplifyDefault" empty
        ; wanted <- newWanteds DefaultOrigin theta
        ; unsolved <- simplifyWantedsTcM wanted
 
