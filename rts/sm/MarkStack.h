@@ -15,6 +15,7 @@
 #define SM_MARKSTACK_H
 
 #include "BeginPrivate.h"
+#include "GCUtils.h"
 
 INLINE_HEADER void
 push_mark_stack(StgPtr p)

@@ -37,6 +37,9 @@ extra-libraries:
 #ifdef HAVE_LIBFFI
                               , "ffi"
 #endif
+#ifdef HAVE_LIBNUMA
+                              , "numa"
+#endif
 #ifdef mingw32_HOST_OS
                               ,"wsock32"    /* for the linker */
                               ,"gdi32"      /* for the linker */
@@ -179,4 +182,3 @@ framework-dirs:
 
 haddock-interfaces:
 haddock-html:
-

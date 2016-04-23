@@ -179,7 +179,11 @@ Capability *rts_unsafeGetMyCapability (void);
 // Note that the thread may still be migrated by the RTS scheduler, but that
 // will only happen if there are multiple threads running on one Capability and
 // another Capability is free.
-void setInCallCapability (int preferred_capability);
+//
+// If affinity is non-zero, the current thread will be bound to
+// specific CPUs according to the prevailing affinity policy for the
+// specified capability, set by either +RTS -qa or +RTS --numa.
+void rts_setInCallCapability (int preferred_capability, int affinity);
 
 /* ----------------------------------------------------------------------------
    Building Haskell objects from C datatypes.

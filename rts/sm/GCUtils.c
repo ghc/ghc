@@ -30,34 +30,33 @@
 SpinLock gc_alloc_block_sync;
 #endif
 
-bdescr *
-allocBlock_sync(void)
+bdescr* allocGroup_sync(uint32_t n)
 {
     bdescr *bd;
+    uint32_t node = capNoToNumaNode(gct->thread_index);
     ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
-    bd = allocBlock();
+    bd = allocGroupOnNode(node,n);
     RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
     return bd;
 }
 
-static bdescr *
-allocGroup_sync(uint32_t n)
+bdescr* allocGroupOnNode_sync(uint32_t node, uint32_t n)
 {
     bdescr *bd;
     ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
-    bd = allocGroup(n);
+    bd = allocGroupOnNode(node,n);
     RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
     return bd;
 }
-
 
 static uint32_t
 allocBlocks_sync(uint32_t n, bdescr **hd)
 {
     bdescr *bd;
     uint32_t i;
+    uint32_t node = capNoToNumaNode(gct->thread_index);
     ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
-    bd = allocLargeChunk(1,n);
+    bd = allocLargeChunkOnNode(node,1,n);
     // NB. allocLargeChunk, rather than allocGroup(n), to allocate in a
     // fragmentation-friendly way.
     n = bd->blocks;

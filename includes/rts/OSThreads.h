@@ -200,7 +200,9 @@ void  setThreadLocalVar (ThreadLocalKey *key, void *value);
 void  freeThreadLocalKey (ThreadLocalKey *key);
 
 // Processors and affinity
-void setThreadAffinity     (uint32_t n, uint32_t m);
+void setThreadAffinity (uint32_t n, uint32_t m);
+void setThreadNode (uint32_t node);
+void releaseThreadNode (void);
 #endif // !CMINUSMINUS
 
 #else

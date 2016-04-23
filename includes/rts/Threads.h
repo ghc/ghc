@@ -58,7 +58,9 @@ pid_t  forkProcess     (HsStablePtr *entry)
 
 HsBool rtsSupportsBoundThreads (void);
 
-// The number of Capabilities
+// The number of Capabilities.
+// ToDo: I would like this to be private to the RTS and instead expose a
+// function getNumCapabilities(), but it is used in compiler/cbits/genSym.c
 extern unsigned int n_capabilities;
 
 // The number of Capabilities that are not disabled

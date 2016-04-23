@@ -802,7 +802,8 @@ new_gc_thread (uint32_t n, gc_thread *t)
         // but can't, because it uses gct which isn't set up at this point.
         // Hence, allocate a block for todo_bd manually:
         {
-            bdescr *bd = allocBlock(); // no lock, locks aren't initialised yet
+            bdescr *bd = allocBlockOnNode(capNoToNumaNode(n));
+                // no lock, locks aren't initialised yet
             initBdescr(bd, ws->gen, ws->gen->to);
             bd->flags = BF_EVACUATED;
             bd->u.scan = bd->free = bd->start;
@@ -1182,7 +1183,8 @@ prepare_collected_gen (generation *gen)
     if (g != 0) {
         for (i = 0; i < n_capabilities; i++) {
             freeChain(capabilities[i]->mut_lists[g]);
-            capabilities[i]->mut_lists[g] = allocBlock();
+            capabilities[i]->mut_lists[g] =
+                allocBlockOnNode(capNoToNumaNode(i));
         }
     }
 
@@ -1296,7 +1298,7 @@ static void
 stash_mut_list (Capability *cap, uint32_t gen_no)
 {
     cap->saved_mut_lists[gen_no] = cap->mut_lists[gen_no];
-    cap->mut_lists[gen_no] = allocBlock_sync();
+    cap->mut_lists[gen_no] = allocBlockOnNode_sync(cap->node);
 }
 
 /* ----------------------------------------------------------------------------

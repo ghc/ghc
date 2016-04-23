@@ -23,6 +23,7 @@
 
 #include "Cmm.h"
 #include "MachDeps.h"
+#include "SMPClosureOps.h"
 
 #ifdef __PIC__
 import pthread_mutex_lock;

@@ -300,6 +300,9 @@ interruptOSThread (OSThreadId id)
     CloseHandle(hdl);
 }
 
+void setThreadNode (uint32_t node STG_UNUSED) { /* nothing */ }
+void releaseThreadNode (void) { /* nothing */ }
+
 #else /* !defined(THREADED_RTS) */
 
 int

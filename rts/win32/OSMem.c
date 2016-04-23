@@ -482,3 +482,25 @@ void osReleaseHeapMemory (void)
 }
 
 #endif
+
+rtsBool osNumaAvailable(void)
+{
+    return rtsFalse;
+}
+
+uint32_t osNumaNodes(void)
+{
+    return 1;
+}
+
+StgWord osNumaMask(void)
+{
+    return 1;
+}
+
+void osBindMBlocksToNode(
+    void *addr STG_UNUSED,
+    StgWord size STG_UNUSED,
+    uint32_t node STG_UNUSED)
+{
+}

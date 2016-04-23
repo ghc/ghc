@@ -9,6 +9,7 @@
 #include "PosixSource.h"
 #include "Rts.h"
 
+#include "Capability.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "Profiling.h"

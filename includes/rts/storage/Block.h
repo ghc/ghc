@@ -111,7 +111,7 @@ typedef struct bdescr_ {
 
     StgWord16 gen_no;          // gen->no, cached
     StgWord16 dest_no;         // number of destination generation
-    StgWord16 _pad1;
+    StgWord16 node;            // which memory node does this block live on?
 
     StgWord16 flags;           // block flags, see below
 
@@ -280,11 +280,27 @@ extern void initBlockAllocator(void);
 /* Allocation -------------------------------------------------------------- */
 
 bdescr *allocGroup(W_ n);
-bdescr *allocBlock(void);
+
+EXTERN_INLINE bdescr* allocBlock(void);
+EXTERN_INLINE bdescr* allocBlock(void)
+{
+    return allocGroup(1);
+}
+
+bdescr *allocGroupOnNode(uint32_t node, W_ n);
+
+EXTERN_INLINE bdescr* allocBlockOnNode(uint32_t node);
+EXTERN_INLINE bdescr* allocBlockOnNode(uint32_t node)
+{
+    return allocGroupOnNode(node,1);
+}
 
 // versions that take the storage manager lock for you:
 bdescr *allocGroup_lock(W_ n);
 bdescr *allocBlock_lock(void);
+
+bdescr *allocGroupOnNode_lock(uint32_t node, W_ n);
+bdescr *allocBlockOnNode_lock(uint32_t node);
 
 /* De-Allocation ----------------------------------------------------------- */
 

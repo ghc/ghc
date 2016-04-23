@@ -70,6 +70,10 @@
 # include <signal.h>
 #endif
 
+#ifdef HAVE_NUMA_H
+#include <numa.h>
+#endif
+
 /*
  * This (allegedly) OS threads independent layer was initially
  * abstracted away from code that used Pthreads, so the functions
@@ -308,10 +312,32 @@ setThreadAffinity(uint32_t n, uint32_t m)
 
 #else
 void
-setThreadAffinity (uint32_t n GNUC3_ATTRIBUTE(__unused__),
-                   uint32_t m GNUC3_ATTRIBUTE(__unused__))
+setThreadAffinity (uint32_t n STG_UNUSED,
+                   uint32_t m STG_UNUSED)
 {
 }
+#endif
+
+#ifdef HAVE_NUMA_H
+void setThreadNode (uint32_t node)
+{
+    ASSERT(node < RtsFlags.GcFlags.nNumaNodes);
+    if (numa_run_on_node(node) == -1) {
+        sysErrorBelch("numa_run_on_node");
+        stg_exit(1);
+    }
+}
+
+void releaseThreadNode (void)
+{
+    if (numa_run_on_node(-1) == -1) {
+        sysErrorBelch("numa_run_on_node");
+        stg_exit(1);
+    }
+}
+#else
+void setThreadNode (uint32_t node STG_UNUSED) { /* nothing */ }
+void releaseThreadNode (void) { /* nothing */ }
 #endif
 
 void

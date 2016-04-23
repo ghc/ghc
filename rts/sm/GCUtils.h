@@ -18,7 +18,19 @@
 
 #include "GCTDecl.h"
 
-bdescr *allocBlock_sync(void);
+bdescr* allocGroup_sync(uint32_t n);
+bdescr* allocGroupOnNode_sync(uint32_t node, uint32_t n);
+
+INLINE_HEADER bdescr *allocBlock_sync(void)
+{
+    return allocGroup_sync(1);
+}
+
+INLINE_HEADER bdescr *allocBlockOnNode_sync(uint32_t node)
+{
+    return allocGroupOnNode_sync(node,1);
+}
+
 void    freeChain_sync(bdescr *bd);
 
 void    push_scanned_block   (bdescr *bd, gen_workspace *ws);

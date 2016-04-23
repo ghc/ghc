@@ -273,7 +273,7 @@ initEventLogging(void)
      */
 #ifdef THREADED_RTS
     // XXX n_capabilities hasn't been initislised yet
-    n_caps = RtsFlags.ParFlags.nNodes;
+    n_caps = RtsFlags.ParFlags.nCapabilities;
 #else
     n_caps = 1;
 #endif

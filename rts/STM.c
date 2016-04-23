@@ -92,6 +92,7 @@
 #include "Trace.h"
 #include "Threads.h"
 #include "sm/Storage.h"
+#include "SMPClosureOps.h"
 
 #include <stdio.h>
 

@@ -115,6 +115,12 @@ typedef struct Task_ {
 #if defined(THREADED_RTS)
     OSThreadId id;              // The OS Thread ID of this task
 
+    // The NUMA node this Task belongs to.  If this is a worker thread, then the
+    // OS thread will be bound to this node (see workerStart()).  If this is an
+    // external thread calling into Haskell, it can be bound to a node using
+    // rts_setInCallCapability().
+    uint32_t node;
+
     Condition cond;             // used for sleeping & waking up this task
     Mutex lock;                 // lock for the condition variable
 

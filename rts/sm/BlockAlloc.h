@@ -12,6 +12,7 @@
 #include "BeginPrivate.h"
 
 bdescr *allocLargeChunk (W_ min, W_ max);
+bdescr *allocLargeChunkOnNode (uint32_t node, W_ min, W_ max);
 
 /* Debugging  -------------------------------------------------------------- */
 

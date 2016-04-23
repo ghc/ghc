@@ -643,6 +643,56 @@ performance.
     ``-F`` parameter will be reduced in order to avoid exceeding the
     maximum heap size.
 
+.. rts-flag:: --numa
+              --numa=<mask>
+
+    .. index::
+       single: NUMA, enabling in the runtime
+
+    Enable NUMA-aware memory allocation in the runtime (only available
+    with ``-threaded``, and only on Linux currently).
+
+    Background: some systems have a Non-Uniform Memory Architecture,
+    whereby main memory is split into banks which are "local" to
+    specific CPU cores.  Accessing local memory is faster than
+    accessing remote memory.  The OS provides APIs for allocating
+    local memory and binding threads to particular CPU cores, so that
+    we can ensure certain memory accesses are using local memory.
+
+    The ``--numa`` option tells the RTS to tune its memory usage to
+    maximize local memory accesses.  In particular, the RTS will:
+
+       - Determine the number of NUMA nodes (N) by querying the OS.
+       - Manage separate memory pools for each node.
+       - Map capabilities to NUMA nodes.  Capability C is mapped to
+         NUMA node C mod N.
+       - Bind worker threads on a capability to the appropriate node.
+       - Allocate the nursery from node-local memory.
+       - Perform other memory allocation, including in the GC, from
+         node-local memory.
+       - When load-balancing, we prefer to migrate threads to another
+         Capability on the same node.
+
+    The ``--numa`` flag is typically beneficial when a program is
+    using all cores of a large multi-core NUMA system, with a large
+    allocation area (``-A``).  All memory accesses to the allocation
+    area will go to local memory, which can save a significant amount
+    of remote memory access.  A runtime speedup on the order of 10%
+    is typical, but can vary a lot depending on the hardware and the
+    memory behaviour of the program.
+
+    Note that the RTS will not set CPU affinity for bound threads and
+    threads entering Haskell from C/C++, so if your program uses bound
+    threads you should ensure that each bound thread calls the RTS API
+    `rts_setInCallCapability(c,1)` from C/C++ before calling into
+    Haskell.  Otherwise there could be a mismatch between the CPU that
+    the thread is running on and the memory it is using while running
+    Haskell code, which will negate any benefits of ``--numa``.
+
+    If given an explicit <mask>, the <mask> is interpreted as a bitmap
+    that indicates the NUMA nodes on which to run the program.  For
+    example, ``--numa=3`` would run the program on NUMA nodes 0 and 1.
+
 .. _rts-options-statistics:
 
 RTS options to produce runtime statistics

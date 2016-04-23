@@ -18,6 +18,7 @@ void sendMessage    (Capability *from_cap, Capability *to_cap, Message *msg);
 
 #include "Capability.h"
 #include "Updates.h" // for DEBUG_FILL_SLOP
+#include "SMPClosureOps.h"
 
 INLINE_HEADER void
 doneWithMsgThrowTo (MessageThrowTo *m)

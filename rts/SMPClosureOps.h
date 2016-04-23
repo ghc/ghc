@@ -9,6 +9,8 @@
 #ifndef RTS_STORAGE_SMPCLOSUREOPS_H
 #define RTS_STORAGE_SMPCLOSUREOPS_H
 
+#include "BeginPrivate.h"
+
 #ifdef CMINUSMINUS
 
 /* Lock closure, equivalent to ccall lockClosure but the condition is inlined.
@@ -121,5 +123,7 @@ INLINE_HEADER void unlockTSO(StgTSO *tso)
 { unlockClosure((StgClosure*)tso, (const StgInfoTable *)&stg_TSO_info); }
 
 #endif /* CMINUSMINUS */
+
+#include "EndPrivate.h"
 
 #endif /* RTS_STORAGE_SMPCLOSUREOPS_H */

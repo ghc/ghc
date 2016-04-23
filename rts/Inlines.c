@@ -7,3 +7,4 @@
 #include "Schedule.h"
 #include "Capability.h"
 #include "WSDeque.h"
+#include "SMPClosureOps.h"

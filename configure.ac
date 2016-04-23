@@ -1103,6 +1103,13 @@ if test $UseLibdw = "YES" ; then
 fi
 AC_DEFINE_UNQUOTED([USE_LIBDW], [$USE_LIBDW], [Set to 1 to use libdw])
 
+dnl ** Have libnuma?
+dnl --------------------------------------------------------------
+AC_CHECK_HEADERS([numa.h numaif.h])
+AC_CHECK_LIB(numa, numa_available,
+        [AC_DEFINE([HAVE_LIBNUMA], [1], [Define to 1 if you have libnuma.])]
+        [])
+
 dnl ** Documentation
 dnl --------------------------------------------------------------
 if test -n "$SPHINXBUILD"; then

@@ -220,6 +220,7 @@ newTask (rtsBool worker)
     initCondition(&task->cond);
     initMutex(&task->lock);
     task->wakeup = rtsFalse;
+    task->node = 0;
 #endif
 
     task->next = NULL;
@@ -427,6 +428,9 @@ workerStart(Task *task)
     if (RtsFlags.ParFlags.setAffinity) {
         setThreadAffinity(cap->no, n_capabilities);
     }
+    if (RtsFlags.GcFlags.numa && !RtsFlags.DebugFlags.numa) {
+        setThreadNode(RtsFlags.GcFlags.numaMap[task->node]);
+    }
 
     // set the thread-local pointer to the Task:
     setMyTask(task);
@@ -457,6 +461,7 @@ startWorkerTask (Capability *cap)
   // We don't emit a task creation event here, but in workerStart,
   // where the kernel thread id is known.
   task->cap = cap;
+  task->node = cap->node;
 
   // Give the capability directly to the worker; we can't let anyone
   // else get in, because the new worker Task has nowhere to go to
@@ -490,13 +495,27 @@ interruptWorkerTask (Task *task)
 
 #endif /* THREADED_RTS */
 
-void
-setInCallCapability (int preferred_capability)
+void rts_setInCallCapability (
+    int preferred_capability,
+    int affinity USED_IF_THREADS)
 {
     Task *task = allocTask();
     task->preferred_capability = preferred_capability;
-}
 
+#ifdef THREADED_RTS
+    if (affinity) {
+        if (RtsFlags.ParFlags.setAffinity) {
+            setThreadAffinity(preferred_capability, n_capabilities);
+        }
+        if (RtsFlags.GcFlags.numa) {
+            task->node = capNoToNumaNode(preferred_capability);
+            if (!DEBUG_IS_ON || !RtsFlags.DebugFlags.numa) { // faking NUMA
+                setThreadNode(RtsFlags.GcFlags.numaMap[task->node]);
+            }
+        }
+    }
+#endif
+}
 
 #ifdef DEBUG
 
@@ -525,4 +544,3 @@ printAllTasks(void)
 }
 
 #endif
-

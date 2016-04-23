@@ -51,7 +51,7 @@ Capability **capabilities = NULL;
 // an in-call has a chance of quickly finding a free Capability.
 // Maintaining a global free list of Capabilities would require global
 // locking, so we don't do that.
-static Capability *last_free_capability = NULL;
+static Capability *last_free_capability[MAX_NUMA_NODES];
 
 /*
  * Indicates that the RTS wants to synchronise all the Capabilities
@@ -230,11 +230,12 @@ popReturningTask (Capability *cap)
  * ------------------------------------------------------------------------- */
 
 static void
-initCapability( Capability *cap, uint32_t i )
+initCapability (Capability *cap, uint32_t i)
 {
     uint32_t g;
 
     cap->no = i;
+    cap->node = capNoToNumaNode(i);
     cap->in_haskell        = rtsFalse;
     cap->idle              = 0;
     cap->disabled          = rtsFalse;
@@ -316,9 +317,10 @@ initCapability( Capability *cap, uint32_t i )
  *            controlled by the user via the RTS flag -N.
  *
  * ------------------------------------------------------------------------- */
-void
-initCapabilities( void )
+void initCapabilities (void)
 {
+    uint32_t i;
+
     /* Declare a couple capability sets representing the process and
        clock domain. Each capability will get added to these capsets. */
     traceCapsetCreate(CAPSET_OSPROCESS_DEFAULT, CapsetTypeOsProcess);
@@ -328,21 +330,22 @@ initCapabilities( void )
 
 #ifndef REG_Base
     // We can't support multiple CPUs if BaseReg is not a register
-    if (RtsFlags.ParFlags.nNodes > 1) {
+    if (RtsFlags.ParFlags.nCapabilities > 1) {
         errorBelch("warning: multiple CPUs not supported in this build, reverting to 1");
-        RtsFlags.ParFlags.nNodes = 1;
+        RtsFlags.ParFlags.nCapabilities = 1;
     }
 #endif
 
     n_capabilities = 0;
-    moreCapabilities(0, RtsFlags.ParFlags.nNodes);
-    n_capabilities = RtsFlags.ParFlags.nNodes;
+    moreCapabilities(0, RtsFlags.ParFlags.nCapabilities);
+    n_capabilities = RtsFlags.ParFlags.nCapabilities;
 
 #else /* !THREADED_RTS */
 
     n_capabilities = 1;
     capabilities = stgMallocBytes(sizeof(Capability*), "initCapabilities");
     capabilities[0] = &MainCapability;
+
     initCapability(&MainCapability, 0);
 
 #endif
@@ -352,7 +355,9 @@ initCapabilities( void )
     // There are no free capabilities to begin with.  We will start
     // a worker Task to each Capability, which will quickly put the
     // Capability on the free list when it finds nothing to do.
-    last_free_capability = capabilities[0];
+    for (i = 0; i < RtsFlags.GcFlags.nNumaNodes; i++) {
+        last_free_capability[i] = capabilities[0];
+    }
 }
 
 void
@@ -532,7 +537,7 @@ releaseCapability_ (Capability* cap,
 #ifdef PROFILING
     cap->r.rCCCS = CCS_IDLE;
 #endif
-    last_free_capability = cap;
+    last_free_capability[cap->node] = cap;
     debugTrace(DEBUG_sched, "freeing capability %d", cap->no);
 }
 
@@ -711,6 +716,7 @@ void waitForCapability (Capability **pCap, Task *task)
     *pCap = &MainCapability;
 
 #else
+    uint32_t i;
     Capability *cap = *pCap;
 
     if (cap == NULL) {
@@ -719,12 +725,14 @@ void waitForCapability (Capability **pCap, Task *task)
                                enabled_capabilities];
         } else {
             // Try last_free_capability first
-            cap = last_free_capability;
+            cap = last_free_capability[task->node];
             if (cap->running_task) {
-                uint32_t i;
-                // otherwise, search for a free capability
+                // Otherwise, search for a free capability on this node.
                 cap = NULL;
-                for (i = 0; i < n_capabilities; i++) {
+                for (i = task->node; i < enabled_capabilities;
+                     i += RtsFlags.GcFlags.nNumaNodes) {
+                    // visits all the capabilities on this node, because
+                    // cap[i]->node == i % RtsFlags.GcFlags.nNumaNodes
                     if (!capabilities[i]->running_task) {
                         cap = capabilities[i];
                         break;
@@ -732,7 +740,7 @@ void waitForCapability (Capability **pCap, Task *task)
                 }
                 if (cap == NULL) {
                     // Can't find a free one, use last_free_capability.
-                    cap = last_free_capability;
+                    cap = last_free_capability[task->node];
                 }
             }
         }

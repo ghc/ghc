@@ -566,7 +566,7 @@ void releaseFreeMemory(void)
 void *
 getMBlock(void)
 {
-  return getMBlocks(1);
+    return getMBlocks(1);
 }
 
 // The external interface: allocate 'n' mblocks, and return the
@@ -585,6 +585,23 @@ getMBlocks(uint32_t n)
     peak_mblocks_allocated = stg_max(peak_mblocks_allocated, mblocks_allocated);
 
     return ret;
+}
+
+void *
+getMBlocksOnNode(uint32_t node, uint32_t n)
+{
+    void *addr = getMBlocks(n);
+#ifdef DEBUG
+    if (RtsFlags.DebugFlags.numa) return addr; // faking NUMA
+#endif
+    osBindMBlocksToNode(addr, n * MBLOCK_SIZE, RtsFlags.GcFlags.numaMap[node]);
+    return addr;
+}
+
+void *
+getMBlockOnNode(uint32_t node)
+{
+    return getMBlocksOnNode(node, 1);
 }
 
 void

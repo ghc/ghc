@@ -12,6 +12,7 @@
 
 #include "Cmm.h"
 #include "Updates.h"
+#include "SMPClosureOps.h"
 
 #ifdef __PIC__
 import pthread_mutex_unlock;
