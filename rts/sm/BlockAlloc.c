@@ -199,24 +199,15 @@ initGroup(bdescr *head)
   }
 }
 
-// There are quicker non-loopy ways to do log_2, but we expect n to be
-// usually small, and MAX_FREE_LIST is also small, so the loop version
-// might well be the best choice here.
-STATIC_INLINE nat
-log_2_ceil(W_ n)
-{
-    W_ i, x;
-    x = 1;
-    for (i=0; i < MAX_FREE_LIST; i++) {
-        if (x >= n) return i;
-        x = x << 1;
-    }
-    return MAX_FREE_LIST;
-}
-
+// log base 2 (floor), needs to support up to 2^MAX_FREE_LIST
 STATIC_INLINE nat
 log_2(W_ n)
 {
+#if defined(__GNUC__)
+    return __builtin_clzl(n) ^ (sizeof(StgWord)*8 - 1);
+    // generates good code on x86.  __builtin_clz() compiles to bsr+xor, but
+    // we want just bsr, so the xor here cancels out gcc's xor.
+#else
     W_ i, x;
     x = n;
     for (i=0; i < MAX_FREE_LIST; i++) {
@@ -224,6 +215,25 @@ log_2(W_ n)
         if (x == 0) return i;
     }
     return MAX_FREE_LIST;
+#endif
+}
+
+// log base 2 (ceiling), needs to support up to 2^MAX_FREE_LIST
+STATIC_INLINE nat
+log_2_ceil(W_ n)
+{
+#if defined(__GNUC__)
+    nat r = log_2(n);
+    return (n & (n-1)) ? r+1 : r;
+#else
+    W_ i, x;
+    x = 1;
+    for (i=0; i < MAX_FREE_LIST; i++) {
+        if (x >= n) return i;
+        x = x << 1;
+    }
+    return MAX_FREE_LIST;
+#endif
 }
 
 STATIC_INLINE void
