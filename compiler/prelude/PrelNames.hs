@@ -2245,6 +2245,18 @@ derivableClassKeys
   = [ eqClassKey, ordClassKey, enumClassKey, ixClassKey,
       boundedClassKey, showClassKey, readClassKey ]
 
+
+-- These are the "interactive classes" that are consulted when doing
+-- defaulting. Does not include Num or IsString, which have special
+-- handling.
+interactiveClassNames :: [Name]
+interactiveClassNames
+  = [ showClassName, eqClassName, ordClassName, foldableClassName
+    , traversableClassName ]
+
+interactiveClassKeys :: [Unique]
+interactiveClassKeys = map getUnique interactiveClassNames
+
 {-
 ************************************************************************
 *                                                                      *
