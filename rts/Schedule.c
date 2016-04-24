@@ -695,7 +695,8 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 #if defined(THREADED_RTS)
 
     Capability *free_caps[n_capabilities], *cap0;
-    nat i, n_free_caps;
+    nat i, n_wanted_caps, n_free_caps;
+    StgTSO *t;
 
     // migration can be turned off with +RTS -qm
     if (!RtsFlags.ParFlags.migrate) return;
@@ -709,8 +710,22 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
             sparkPoolSizeCap(cap) < 1) return;
     }
 
-    // First grab as many free Capabilities as we can.
-    for (i=0, n_free_caps=0; i < n_capabilities; i++) {
+    // Figure out how many capabilities we want to wake up.  We need at least
+    // sparkPoolSize(cap) plus the number of spare threads we have.
+    t = cap->run_queue_hd;
+    n_wanted_caps = sparkPoolSizeCap(cap);
+    if (t != END_TSO_QUEUE) {
+        do {
+            t = t->_link;
+            if (t == END_TSO_QUEUE) break;
+            n_wanted_caps++;
+        } while (n_wanted_caps < n_capabilities-1);
+    }
+
+    // Grab free capabilities, starting from cap->no+1.
+    for (i = (cap->no + 1) % n_capabilities, n_free_caps=0;
+         n_free_caps < n_wanted_caps && i != cap->no;
+         i = (i + 1) % n_capabilities) {
         cap0 = capabilities[i];
         if (cap != cap0 && !cap0->disabled && tryGrabCapability(cap0,task)) {
             if (!emptyRunQueue(cap0)
@@ -820,10 +835,13 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
         // release the capabilities
         for (i = 0; i < n_free_caps; i++) {
             task->cap = free_caps[i];
-            // The idea behind waking up the capability unconditionally is that
-            // it might be able to steal sparks.  Perhaps we should only do this
-            // if there were sparks to steal?
-            releaseAndWakeupCapability(free_caps[i]);
+            if (sparkPoolSizeCap(cap) > 0) {
+                // If we have sparks to steal, wake up a worker on the
+                // capability, even if it has no threads to run.
+                releaseAndWakeupCapability(free_caps[i]);
+            } else {
+                releaseCapability(free_caps[i]);
+            }
         }
     }
     task->cap = cap; // reset to point to our Capability.
