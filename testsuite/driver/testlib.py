@@ -270,11 +270,8 @@ def _extra_hc_opts( name, opts, v ):
 # -----
 
 def extra_clean( files ):
-    assert not isinstance(files, str), files
-    return lambda name, opts, v=files: _extra_clean(name, opts, v);
-
-def _extra_clean( name, opts, v ):
-    opts.clean_files = v
+    # TODO. Remove all calls to extra_clean.
+    return lambda _name, _opts: None
 
 def extra_files(files):
     return lambda name, opts: _extra_files(name, opts, files)
@@ -425,10 +422,8 @@ def _pre_cmd( name, opts, cmd ):
 # ----
 
 def clean_cmd( cmd ):
-    return lambda name, opts, c=cmd: _clean_cmd(name, opts, cmd)
-
-def _clean_cmd( name, opts, cmd ):
-    opts.clean_cmd = cmd
+    # TODO. Remove all calls to clean_cmd.
+    return lambda _name, _opts: None
 
 # ----
 
@@ -732,60 +727,18 @@ def test_common_work (name, opts, func, args):
             else:
                 files.add(filename)
 
-        if not config.clean_only:
-            # Run the required tests...
-            for way in do_ways:
-                if stopping():
-                    break
-                do_test(name, way, func, args, files)
+        # Run the required tests...
+        for way in do_ways:
+            if stopping():
+                break
+            do_test(name, way, func, args, files)
 
-            for way in all_ways:
-                if way not in do_ways:
-                    skiptest (name,way)
+        for way in all_ways:
+            if way not in do_ways:
+                skiptest (name,way)
 
-        if config.cleanup and (config.clean_only or do_ways):
+        if config.cleanup and do_ways:
             cleanup()
-        elif False: # TODO. Delete this code.
-            pretest_cleanup(name)
-            clean([name + suff for suff in [
-                       '', '.exe', '.exe.manifest', '.genscript',
-                       '.stderr.normalised',        '.stdout.normalised',
-                       '.run.stderr.normalised',    '.run.stdout.normalised',
-                       '.comp.stderr.normalised',   '.comp.stdout.normalised',
-                       '.interp.stderr.normalised', '.interp.stdout.normalised',
-                       '.stats', '.comp.stats',
-                       '.hi', '.o', '.prof', '.exe.prof', '.hc',
-                       '_stub.h', '_stub.c', '_stub.o',
-                       '.hp', '.exe.hp', '.ps', '.aux', '.hcr', '.eventlog']])
-
-            if func == multi_compile or func == multi_compile_fail:
-                    extra_mods = args[1]
-                    clean([replace_suffix(fx[0],'o') for fx in extra_mods])
-                    clean([replace_suffix(fx[0], 'hi') for fx in extra_mods])
-
-
-            clean(getTestOpts().clean_files)
-
-            if getTestOpts().outputdir != None:
-                odir = in_testdir(getTestOpts().outputdir)
-                try:
-                    shutil.rmtree(odir)
-                except:
-                    pass
-
-            try:
-                shutil.rmtree(in_testdir('.hpc.' + name))
-            except:
-                pass
-
-            try:
-                cleanCmd = getTestOpts().clean_cmd
-                if cleanCmd != None:
-                    result = runCmdFor(name, 'cd ' + getTestOpts().testdir + ' && ' + cleanCmd)
-                    if result != 0:
-                        framework_fail(name, 'cleaning', 'clean-command failed: ' + str(result))
-            except:
-                framework_fail(name, 'cleaning', 'clean-command exception')
 
         package_conf_cache_file_end_timestamp = get_package_cache_timestamp();
 
@@ -804,35 +757,6 @@ def test_common_work (name, opts, func, args):
             pass
     except Exception as e:
         framework_fail(name, 'runTest', 'Unhandled exception: ' + str(e))
-
-def clean(strs):
-    return # TODO. Delete this function.
-    for str in strs:
-        if (str.endswith('.package.conf') or
-            str.startswith('package.conf.') and not str.endswith('/*')):
-            # Package confs are directories now.
-            str += '/*'
-
-        for name in glob.glob(in_testdir(str)):
-            clean_full_path(name)
-
-def clean_full_path(name):
-        try:
-            # Remove files...
-            os.remove(name)
-        except OSError as e1:
-            try:
-                # ... and empty directories
-                os.rmdir(name)
-            except OSError as e2:
-                # We don't want to fail here, but we do want to know
-                # what went wrong, so print out the exceptions.
-                # ENOENT isn't a problem, though, as we clean files
-                # that don't necessarily exist.
-                if e1.errno != errno.ENOENT:
-                    print(e1)
-                if e2.errno != errno.ENOENT:
-                    print(e2)
 
 def do_test(name, way, func, args, files):
     opts = getTestOpts()
@@ -1115,7 +1039,6 @@ def multi_compile_fail( name, way, top_mod, extra_mods, extra_hc_opts ):
 
 def do_compile( name, way, should_fail, top_mod, extra_mods, extra_hc_opts, override_flags = None ):
     # print 'Compile only, extra args = ', extra_hc_opts
-    pretest_cleanup(name)
 
     result = extras_build( way, extra_mods, extra_hc_opts )
     if badResult(result):
@@ -1149,7 +1072,6 @@ def do_compile( name, way, should_fail, top_mod, extra_mods, extra_hc_opts, over
 
 def compile_cmp_asm( name, way, extra_hc_opts ):
     print('Compile only, extra args = ', extra_hc_opts)
-    pretest_cleanup(name)
     result = simple_build( name + '.cmm', way, '-keep-s-files -O ' + extra_hc_opts, 0, '', 0, 0, 0)
 
     if badResult(result):
@@ -1175,7 +1097,6 @@ def compile_cmp_asm( name, way, extra_hc_opts ):
 
 def compile_and_run__( name, way, top_mod, extra_mods, extra_hc_opts ):
     # print 'Compile and run, extra args = ', extra_hc_opts
-    pretest_cleanup(name)
 
     result = extras_build( way, extra_mods, extra_hc_opts )
     if badResult(result):
@@ -1284,22 +1205,14 @@ def extras_build( way, extra_mods, extra_hc_opts ):
 def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, noforce, override_flags = None ):
     opts = getTestOpts()
     errname = add_suffix(name, 'comp.stderr')
-    rm_no_fail( qualify(errname, '') )
 
     if top_mod != '':
         srcname = top_mod
-        rm_no_fail( qualify(name, '') )
         base, suf = os.path.splitext(top_mod)
-        rm_no_fail( qualify(base, '') )
-        rm_no_fail( qualify(base, 'exe') )
     elif addsuf:
         srcname = add_hs_lhs_suffix(name)
-        rm_no_fail( qualify(name, '') )
     else:
         srcname = name
-        rm_no_fail( qualify(name, 'o') )
-
-    rm_no_fail( qualify(replace_suffix(srcname, "o"), '') )
 
     to_do = ''
     if top_mod != '':
@@ -1384,12 +1297,6 @@ def simple_run(name, way, prog, extra_run_opts):
     run_stdout = add_suffix(name,'run.stdout')
     run_stderr = add_suffix(name,'run.stderr')
 
-    rm_no_fail(qualify(name,'run.stdout'))
-    rm_no_fail(qualify(name,'run.stderr'))
-    rm_no_fail(qualify(name, 'hp'))
-    rm_no_fail(qualify(name,'ps'))
-    rm_no_fail(qualify(name, 'prof'))
-
     my_rts_flags = rts_flags(way)
 
     stats_file = name + '.stats'
@@ -1473,9 +1380,6 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     outname = add_suffix(name, 'interp.stdout')
     errname = add_suffix(name, 'interp.stderr')
-    rm_no_fail(outname)
-    rm_no_fail(errname)
-    rm_no_fail(name)
 
     if (top_mod == ''):
         srcname = add_hs_lhs_suffix(name)
@@ -1484,7 +1388,6 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     scriptname = add_suffix(name, 'genscript')
     qscriptname = in_testdir(scriptname)
-    rm_no_fail(qscriptname)
 
     delimiter = '===== program output begins here\n'
 
@@ -1998,7 +1901,6 @@ def runCmdFor( name, cmd, timeout_multiplier=1.0 ):
                                "-e", "creat,open,chdir,clone,vfork",
                      strip_quotes(config.timeout_prog), str(timeout), cmd])
             addTestFilesWritten(name, fn)
-            rm_no_fail(fn)
         else:
             r = rawSystemWithTimeout([config.timeout_prog, str(timeout), cmd])
     else:
@@ -2222,13 +2124,6 @@ if config.have_profiling:
   else:
     gsNotWorking();
 
-def rm_no_fail( file ):
-   return # TODO. Delete this function.
-   try:
-       os.remove( file )
-   finally:
-       return
-
 def add_suffix( name, suffix ):
     if suffix == '':
         return name
@@ -2256,9 +2151,6 @@ def replace_suffix( name, suffix ):
 def in_testdir(name, suffix=''):
     return os.path.join(getTestOpts().testdir, add_suffix(name, suffix))
 
-def qualify( name, suff ):
-    return in_testdir(add_suffix(name, suff))
-
 def in_srcdir(name, suffix=''):
     return os.path.join(getTestOpts().srcdir, add_suffix(name, suffix))
 
@@ -2284,31 +2176,6 @@ def find_expected_file(name, suff):
             return (platformSpecific,f)
 
     return (0, basename)
-
-# Clean up prior to the test, so that we can't spuriously conclude
-# that it passed on the basis of old run outputs.
-def pretest_cleanup(name):
-   return # TODO. Delete this function.
-   if getTestOpts().outputdir != None:
-       odir = in_testdir(getTestOpts().outputdir)
-       try:
-           shutil.rmtree(odir)
-       except:
-           pass
-       os.mkdir(odir)
-
-   rm_no_fail(qualify(name,'interp.stderr'))
-   rm_no_fail(qualify(name,'interp.stdout'))
-   rm_no_fail(qualify(name,'comp.stderr'))
-   rm_no_fail(qualify(name,'comp.stdout'))
-   rm_no_fail(qualify(name,'run.stderr'))
-   rm_no_fail(qualify(name,'run.stdout'))
-   rm_no_fail(qualify(name,'tix'))
-   rm_no_fail(qualify(name,'exe.tix'))
-   # simple_build zaps the following:
-   # rm_nofail(qualify("o"))
-   # rm_nofail(qualify(""))
-   # not interested in the return code
 
 def cleanup():
     shutil.rmtree(getTestOpts().testdir, ignore_errors=True)

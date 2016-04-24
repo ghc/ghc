@@ -197,12 +197,6 @@ else
 RUNTEST_OPTS += -e cleanup=True
 endif
 
-ifneq "$(CLEAN_ONLY)" ""
-RUNTEST_OPTS += -e clean_only=True
-else
-RUNTEST_OPTS += -e clean_only=False
-endif
-
 ifneq "$(CHECK_FILES_WRITTEN)" ""
 RUNTEST_OPTS += --check-files-written
 endif
