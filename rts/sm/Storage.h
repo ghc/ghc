@@ -2,7 +2,7 @@
  *
  * (c) The GHC Team, 1998-2009
  *
- * External Storage Manger Interface
+ * Storage Manger Interface
  *
  * ---------------------------------------------------------------------------*/
 
@@ -26,34 +26,20 @@ void freeStorage(rtsBool free_heap);
 void storageAddCapabilities (nat from, nat to);
 
 /* -----------------------------------------------------------------------------
-   Storage manager state
+   Should we GC?
    -------------------------------------------------------------------------- */
 
-INLINE_HEADER rtsBool
-doYouWantToGC( Capability *cap )
+INLINE_HEADER
+rtsBool doYouWantToGC(Capability *cap)
 {
-  return (cap->r.rCurrentNursery->link == NULL ||
-          g0->n_new_large_words >= large_alloc_lim);
+    return (cap->r.rCurrentNursery->link == NULL ||
+            g0->n_new_large_words >= large_alloc_lim);
 }
 
-/* for splitting blocks groups in two */
-bdescr * splitLargeBlock (bdescr *bd, W_ blocks);
-
 /* -----------------------------------------------------------------------------
-   Generational garbage collection support
-
-   updateWithIndirection(p1,p2)  Updates the object at p1 with an
-                                 indirection pointing to p2.  This is
-                                 normally called for objects in an old
-                                 generation (>0) when they are updated.
-
-   updateWithPermIndirection(p1,p2)  As above but uses a permanent indir.
-
+   The storage manager mutex
    -------------------------------------------------------------------------- */
 
-/*
- * Storage manager mutex
- */
 #if defined(THREADED_RTS)
 extern Mutex sm_mutex;
 #endif
@@ -82,12 +68,12 @@ void dirty_TVAR(Capability *cap, StgTVar *p);
 extern nursery *nurseries;
 extern nat n_nurseries;
 
-void     resetNurseries       ( void );
-void     clearNursery         ( Capability *cap );
-void     resizeNurseries      ( W_ blocks );
-void     resizeNurseriesFixed ( void );
-W_       countNurseryBlocks   ( void );
-rtsBool  getNewNursery        ( Capability *cap );
+void     resetNurseries       (void);
+void     clearNursery         (Capability *cap);
+void     resizeNurseries      (StgWord blocks);
+void     resizeNurseriesFixed (void);
+StgWord  countNurseryBlocks   (void);
+rtsBool  getNewNursery        (Capability *cap);
 
 /* -----------------------------------------------------------------------------
    Allocation accounting
@@ -114,15 +100,15 @@ StgWord calcTotalAllocated   (void);
    Stats 'n' DEBUG stuff
    -------------------------------------------------------------------------- */
 
-W_    countLargeAllocated  (void);
-W_    countOccupied        (bdescr *bd);
-W_    calcNeeded           (rtsBool force_major, W_ *blocks_needed);
+StgWord countLargeAllocated (void);
+StgWord countOccupied       (bdescr *bd);
+StgWord calcNeeded          (rtsBool force_major, StgWord *blocks_needed);
 
-W_    gcThreadLiveWords  (nat i, nat g);
-W_    gcThreadLiveBlocks (nat i, nat g);
+StgWord gcThreadLiveWords  (nat i, nat g);
+StgWord gcThreadLiveBlocks (nat i, nat g);
 
-W_    genLiveWords  (generation *gen);
-W_    genLiveBlocks (generation *gen);
+StgWord genLiveWords  (generation *gen);
+StgWord genLiveBlocks (generation *gen);
 
 /* ----------------------------------------------------------------------------
    Storage manager internal APIs and globals
@@ -130,7 +116,7 @@ W_    genLiveBlocks (generation *gen);
 
 extern bdescr *exec_block;
 
-void move_STACK  (StgStack *src, StgStack *dest);
+void move_STACK (StgStack *src, StgStack *dest);
 
 /* -----------------------------------------------------------------------------
    Note [STATIC_LINK fields]
