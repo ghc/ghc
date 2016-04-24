@@ -179,8 +179,11 @@ initStorage (void)
   debug_caf_list = (StgIndStatic*)END_OF_CAF_LIST;
   revertible_caf_list = (StgIndStatic*)END_OF_CAF_LIST;
    
-  /* initialise the allocate() interface */
-  large_alloc_lim = RtsFlags.GcFlags.minAllocAreaSize * BLOCK_SIZE_W;
+  if (RtsFlags.GcFlags.largeAllocLim > 0) {
+      large_alloc_lim = RtsFlags.GcFlags.largeAllocLim * BLOCK_SIZE_W;
+  } else {
+      large_alloc_lim = RtsFlags.GcFlags.minAllocAreaSize * BLOCK_SIZE_W;
+  }
 
   exec_block = NULL;
 

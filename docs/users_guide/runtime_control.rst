@@ -285,6 +285,34 @@ performance.
     allocation area will be resized according to the amount of data in the heap
     (see :rts-flag:`-F`, below).
 
+.. rts-flag:: -AL ⟨size⟩
+
+    :default: ``-A`` value
+    :since: 8.2.1
+
+    .. index::
+       single: allocation area for large objects, size
+
+    Sets the limit on the total size of "large objects" (objects
+    larger than about 3KB) that can be allocated before a GC is
+    triggered.  By default this limit is the same as the ``-A`` value.
+
+    Large objects are not allocated from the normal allocation area
+    set by the ``-A`` flag, which is why there is a separate limit for
+    these.  Large objects tend to be much rarer than small objects, so
+    most programs hit the ``-A`` limit before the ``-AL`` limit.  However,
+    the ``-A`` limit is per-capability, whereas the ``-AL`` limit is global,
+    so as ``-N`` gets larger it becomes more likely that we hit the
+    ``-AL`` limit first.  To counteract this, it might be necessary to
+    use a larger ``-AL`` limit when using a large ``-N``.
+
+    To see whether you're making good use of all the memory reseverd
+    for the allocation area (``-A`` times ``-N``), look at the output of
+    ``+RTS -S`` and check whether the amount of memory allocated between
+    GCs is equal to ``-A`` times ``-N``. If not, there are two possible
+    remedies: use ``-n`` to set a nursery chunk size, or use ``-AL`` to
+    increase the limit for large objects.
+
 .. rts-flag:: -O ⟨size⟩
 
     :default: 1m
