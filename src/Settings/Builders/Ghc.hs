@@ -2,6 +2,8 @@ module Settings.Builders.Ghc (
     ghcBuilderArgs, ghcMBuilderArgs, commonGhcArgs
     ) where
 
+import Control.Monad.Trans.Reader
+
 import Base
 import Expression
 import GHC
@@ -20,11 +22,7 @@ import Settings.Builders.Common (cIncludeArgs)
 --     $$(addsuffix .$$(dyn_osuf)-boot,$$(basename $$@)))
 ghcBuilderArgs :: Args
 ghcBuilderArgs = (stagedBuilder (Ghc Compile) ||^ stagedBuilder (Ghc Link)) ? do
-    output <- getOutput
-    stage  <- getStage
-    way    <- getWay
-    when (stage > Stage0) . lift $ needTouchy
-    let buildObj = any (\s -> ("//*." ++ s way) ?== output) [ osuf,  obootsuf]
+    needTouchy
     mconcat [ commonGhcArgs
             , arg "-H32m"
             , stage0    ? arg "-O"
@@ -32,8 +30,8 @@ ghcBuilderArgs = (stagedBuilder (Ghc Compile) ||^ stagedBuilder (Ghc Link)) ? do
             , arg "-Wall"
             , arg "-fwarn-tabs"
             , splitObjectsArgs
-            , not buildObj ? ghcLinkArgs
-            , buildObj ? arg "-c"
+            , ghcLinkArgs
+            , stagedBuilder (Ghc Compile) ? arg "-c"
             , append =<< getInputs
             , arg "-o", arg =<< getOutput ]
 
@@ -54,10 +52,15 @@ ghcLinkArgs = stagedBuilder (Ghc Link) ? do
             , append [ "-optl-l" ++ lib | lib <- libs ++ gmpLibs ]
             , append [ "-optl-L" ++ dir | dir <- libDirs ] ]
 
-needTouchy :: Action ()
-needTouchy =
-    whenM windowsHost $ need [fromJust $ programPath (vanillaContext Stage0 touchy)]
+-- TODO: Add Touchy builder and use needBuilder.
+needTouchy :: ReaderT Target Action ()
+needTouchy = do
+    stage   <- getStage
+    windows <- lift $ windowsHost
+    lift . when (stage > Stage0 && windows) $
+        need [fromJust $ programPath (vanillaContext Stage0 touchy)]
 
+-- TODO: Add GhcSplit builder and use needBuilder.
 splitObjectsArgs :: Args
 splitObjectsArgs = splitObjects ? do
     lift $ need [ghcSplit]
