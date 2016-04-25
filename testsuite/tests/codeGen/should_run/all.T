@@ -25,7 +25,7 @@ test('cgrun021', normal, compile_and_run, [''])
 test('cgrun022', normal, compile_and_run, [''])
 test('cgrun024', normal, compile_and_run, [''])
 test('cgrun025',
-     [reqlib('regex-compat'), extra_run_opts('cg025.hs'), exit_code(1)],
+     [reqlib('regex-compat'), extra_run_opts('cgrun025.hs'), exit_code(1)],
      compile_and_run, ['-package regex-compat'])
 test('cgrun026', normal, compile_and_run, [''])
 test('cgrun027', normal, compile_and_run, [''])

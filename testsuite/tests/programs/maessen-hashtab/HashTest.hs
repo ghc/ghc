@@ -34,7 +34,6 @@ instance Arbitrary Action where
                          (5, liftM2 Insert arbitrary arbitrary),
                          (3, liftM2 Update arbitrary arbitrary),
                          (1, fmap Delete arbitrary)]
-  coarbitrary = error "coarbitrary Action"
 
 simA :: [Action] -> [Either Bool [Int]]
 simA = fst . foldl sim ([],[])
@@ -94,12 +93,10 @@ instance Show a => Show (List a) where
 instance Arbitrary HashFun where
   arbitrary = frequency [(20,return (HF hashInt)),
                          (1,return (HF (const 0)))]
-  coarbitrary = error "coarbitrary HashFun"
 
 instance Arbitrary Empty where
   arbitrary = fmap mkE arbitrary
     where mkE (HF hf) = E {e = new (==) hf, hfe=HF hf}
-  coarbitrary = error "coarbitrary Empty"
 
 instance Arbitrary a => Arbitrary (List a) where
   arbitrary = do
@@ -107,7 +104,6 @@ instance Arbitrary a => Arbitrary (List a) where
                      (1,return (4096*2)),
                      (0, return (1024*1024))]
     resize sz $ fmap L $ sized vector
-  coarbitrary = error "coarbitrary (List a)"
 
 instance Arbitrary MkH where
   arbitrary = do
@@ -115,7 +111,6 @@ instance Arbitrary MkH where
     L list <- arbitrary
     let mkH act = H { h = act, hfh = hf }
     return (mkH . fromList (unHF hf) $ list)
-  coarbitrary = error "coarbitrary MkH"
 
 (==~) :: (Eq a) => IO a -> IO a -> Bool
 act1 ==~ act2 = unsafePerformIO act1 == unsafePerformIO act2
@@ -251,9 +246,7 @@ te :: (Testable a) => String -> a -> IO ()
 -- te name prop = putStrLn name >> verboseCheck prop
 te name prop = do
   putStr name
-  check (defaultConfig{configMaxTest = 500,
-                               configMaxFail = 10000,
-                               configEvery = \_ _ -> "" }) prop
+  quickCheckWith stdArgs { maxSuccess = 500, maxSize = 10000 } prop
 
 main :: IO ()
 main = do

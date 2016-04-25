@@ -24,7 +24,7 @@ module T3787 where
 
 import Control.Concurrent (forkIO)
 import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
-import Control.Monad (liftM, liftM2, when)
+import Control.Monad (liftM, liftM2, when, ap)
 import Control.Monad.Identity
 import Control.Monad.Trans (MonadTrans(..))
 
@@ -77,8 +77,15 @@ data TrampolineState s m r =
    -- | Computation is suspended, its remainder is embedded in the functor /s/.
  | Suspend! (s (Trampoline s m r))
 
+instance (Functor s, Monad m) => Functor (Trampoline s m) where
+   fmap = liftM
+
+instance (Functor s, Monad m) => Applicative (Trampoline s m) where
+   pure x = Trampoline (pure (Done x))
+   (<*>) = ap
+
 instance (Functor s, Monad m) => Monad (Trampoline s m) where
-   return x = Trampoline (return (Done x))
+   return = pure
    t >>= f = Trampoline (bounce t >>= apply f)
       where apply f (Done x) = bounce (f x)
             apply f (Suspend s) = return (Suspend (fmap (>>= f) s))

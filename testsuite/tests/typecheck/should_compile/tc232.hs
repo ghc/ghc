@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 
--- This one foxed the constraint solver (Lint error)
+-- This one fixed the constraint solver (Lint error)
 -- See Trac #1494
 
 module ShouldCompile where

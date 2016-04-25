@@ -5,6 +5,7 @@
 
 module Eval where
 
+import Control.Monad
 import Data.Array
 
 import Geometry
@@ -22,9 +23,16 @@ class Monad m => MonadEval m where
 
 newtype Pure a = Pure a deriving Show
 
+instance Functor Pure where
+    fmap = liftM
+
+instance Applicative Pure where
+    pure = Pure
+    (<*>) = ap
+
 instance Monad Pure where
     Pure x >>= k = k x
-    return       = Pure
+    return       = pure
     fail s       = error s
 
 instance MonadEval Pure where
@@ -286,11 +294,18 @@ newtype Abs a   = Abs { runAbs :: Int -> AbsState a }
 data AbsState a = AbsState a !Int
                 | AbsFail String
 
+instance Functor Abs where
+    fmap = liftM
+
+instance Applicative Abs where
+    pure x = Abs (\ n -> AbsState x n)
+    (<*>) = ap
+
 instance Monad Abs where
     (Abs fn) >>= k = Abs (\ s -> case fn s of
 			           AbsState r s' -> runAbs (k r) s'
                                    AbsFail m     -> AbsFail m)
-    return x     = Abs (\ n -> AbsState x n)
+    return       = pure
     fail s       = Abs (\ n -> AbsFail s)
 
 instance MonadEval Abs where

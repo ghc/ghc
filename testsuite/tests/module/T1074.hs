@@ -2,6 +2,7 @@
 module Test where
 
 import qualified Control.Monad (ap)
+-- Test that GHC warns about the following unused import:
 import qualified Control.Monad.Reader
 
 foo :: IO ()

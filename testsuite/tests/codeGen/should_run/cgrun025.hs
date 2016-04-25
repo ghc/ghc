@@ -1,15 +1,17 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 -- !!! test various I/O Requests
 --
 --
-import IO
-import System
+import Control.Exception
+import System.Environment
+import System.IO
 import Debug.Trace (trace)
 import Text.Regex
-import Maybe
+import Data.Maybe
 
 main = do
     prog <- getProgName
-    let Just (name:_) = matchRegex (mkRegex ".*(cg025)") prog
+    let Just (name:_) = matchRegex (mkRegex ".*(cgrun025)") prog
     hPutStr stderr (shows name "\n")
     args <- getArgs
     hPutStr stderr (shows args "\n")
@@ -20,4 +22,4 @@ main = do
     file_cts <- readFile (head args)
     hPutStr  stderr file_cts
     trace "hello, trace" $
-      catch (getEnv "__WURBLE__" >> return ()) (\ e -> error "hello, error")
+      catch (getEnv "__WURBLE__" >> return ()) (\ (e :: SomeException) -> error "hello, error")

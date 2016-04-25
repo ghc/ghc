@@ -2,7 +2,7 @@
 
 module Main where
 
-import Data.Generics
+import Data.Generics hiding (ext2Q)
 
 data MyMaybe a = MyNothing | MyJust a deriving (Data, Typeable)
 

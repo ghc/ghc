@@ -1,4 +1,4 @@
-import Debug.QuickCheck
+import Test.QuickCheck
 import System.IO.Unsafe
 import Control.Concurrent.Chan
 import Control.Concurrent

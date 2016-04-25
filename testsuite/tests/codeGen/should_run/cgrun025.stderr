@@ -1,14 +1,16 @@
 "cgrun025"
 ["cgrun025.hs"]
 GOT PATH
+{-# LANGUAGE ScopedTypeVariables #-}
 -- !!! test various I/O Requests
 --
 --
-import IO
-import System
+import Control.Exception
+import System.Environment
+import System.IO
 import Debug.Trace (trace)
 import Text.Regex
-import Maybe
+import Data.Maybe
 
 main = do
     prog <- getProgName
@@ -23,6 +25,8 @@ main = do
     file_cts <- readFile (head args)
     hPutStr  stderr file_cts
     trace "hello, trace" $
-      catch (getEnv "__WURBLE__" >> return ()) (\ e -> error "hello, error")
+      catch (getEnv "__WURBLE__" >> return ()) (\ (e :: SomeException) -> error "hello, error")
 hello, trace
 cgrun025: hello, error
+CallStack (from HasCallStack):
+  error, called at cgrun025.hs:25:75 in main:Main
