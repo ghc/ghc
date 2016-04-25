@@ -1,6 +1,6 @@
 
 T4875.hs:27:24: error:
-    • Expecting one fewer argument to ‘r’
+    • Expecting one fewer arguments to ‘r’
       Expected kind ‘* -> *’, but ‘r’ has kind ‘*’
     • In the type signature:
         multiplicities :: r c -> [c]

@@ -1695,22 +1695,19 @@ mkExpectedActualMsg ty1 ty2 (TypeEqOrigin { uo_actual = act
                    Just num_act_args -> num_act_args >= -n
                      -- don't report to strip off args that aren't there
                -> Just $ text "Expecting" <+> speakN (abs n) <+>
-                         more_or_fewer <+> plural_n (abs n) (text "argument")
-                                       <+> text "to" <+> quotes (ppr thing)
+                         more_or_fewer <+> quotes (ppr thing)
                where
-                 more_or_fewer | n < 0     = text "fewer"
-                               | otherwise = text "more"
+                 more_or_fewer
+                  | n < 0     = text "fewer arguments to"
+                  | n == 1    = text "more argument to"
+                  | otherwise = text "more arguments to"  -- n > 1
              _ -> Nothing
-
 
     maybe_num_args_msg = case num_args_msg of
       Nothing -> empty
       Just m  -> m
 
     count_args ty = count isVisibleBinder $ fst $ splitPiTys ty
-
-    plural_n 1 doc = doc
-    plural_n _ doc = doc <> char 's'
 
     expandedTys =
       ppUnless (expTy1 `pickyEqType` exp && expTy2 `pickyEqType` act) $ vcat

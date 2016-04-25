@@ -1,5 +1,5 @@
 
 T6039.hs:5:14: error:
-    • Expecting one fewer argument to ‘j’
+    • Expecting one fewer arguments to ‘j’
       Expected kind ‘* -> *’, but ‘j’ has kind ‘*’
     • In the kind ‘j k’

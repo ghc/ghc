@@ -1,6 +1,6 @@
 
 T7778.hs:3:7: error:
-    • Expecting one fewer argument to ‘Num Int => Num’
+    • Expecting one fewer arguments to ‘Num Int => Num’
       Expected kind ‘* -> Constraint’, but ‘Num Int => Num’ has kind ‘*’
     • In the type signature:
         v :: ((Num Int => Num) ()) => ()
