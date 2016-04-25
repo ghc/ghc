@@ -375,9 +375,6 @@ def compiler_profiled( ):
 def compiler_debugged( ):
     return config.compiler_debugged
 
-def tag( t ):
-    return t in config.compiler_tags
-
 # ---
 
 def high_memory_usage(name, opts):

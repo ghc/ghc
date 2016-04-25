@@ -172,10 +172,9 @@ def get_compiler_info():
 
     config.libdir = compilerInfoDict['LibDir']
 
-    v = compilerInfoDict["Project version"].split('-')
-    config.compiler_version = v[0]
-    config.compiler_maj_version = re.sub('^([0-9]+\.[0-9]+).*',r'\1', v[0])
-    config.compiler_tags = v[1:]
+    v = compilerInfoDict["Project version"]
+    config.compiler_version = v
+    config.compiler_maj_version = re.sub('^([0-9]+\.[0-9]+).*',r'\1', v)
 
     # -fno-ghci-history was added in 7.3
     if version_ge(config.compiler_version, '7.3'):
