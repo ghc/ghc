@@ -7,11 +7,11 @@ include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
 test.concio001:
-	$(TEST_HC) $(TEST_HC_OPTS) --make -fforce-recomp -v0 concio001 -o concio001 
+	"$(TEST_HC)" $(TEST_HC_OPTS) --make -fforce-recomp -v0 concio001 -o concio001 
 	(sleep 1; echo x) | ./concio001
 
 test.concio001.thr:
-	$(TEST_HC) $(TEST_HC_OPTS) --make -fforce-recomp -v0 -threaded concio001 -o concio001 
+	"$(TEST_HC)" $(TEST_HC_OPTS) --make -fforce-recomp -v0 -threaded concio001 -o concio001 
 	(sleep 1; echo x) | ./concio001
 
 # NB. utf8-test should *not* have a final newline.  The last char should be 'X'.

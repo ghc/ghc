@@ -107,8 +107,8 @@ test('countReaders001',
       extra_clean(['countReaders001.txt']),
       compile_and_run, [''])
 
-test('concio001', skip, run_command, ['$MAKE -s --no-print-directory test.concio001'])
-test('concio001.thr', skip, run_command, ['$MAKE -s --no-print-directory test.concio001.thr'])
+test('concio001', normal, run_command, ['$MAKE -s --no-print-directory test.concio001'])
+test('concio001.thr', normal, run_command, ['$MAKE -s --no-print-directory test.concio001.thr'])
 
 test('concio002', reqlib('process'), compile_and_run, [''])
 
