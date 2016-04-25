@@ -5,8 +5,6 @@ def f( name, opts ):
 
 setTestOpts(f)
 
-test('T5054', reqlib('hmatrix'), compile, ['-package hmatrix'])
-test('T5054_2', reqlib('hmatrix'), compile, ['-package hmatrix'])
 # test('T5486', reqlib('integer-gmp'), compile, [''])
 test('T5681', normal, compile, [''])
 test('T6158', [reqlib('vector'), reqlib('primitive')], compile, ['-package vector -package primitive'])
