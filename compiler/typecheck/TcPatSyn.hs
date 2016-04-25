@@ -412,6 +412,8 @@ tc_patsyn_finish lname dir is_infix lpat'
          -- so there had better be no unification variables in there
          univ_tvs'    <- mapMaybeM (zonkQuantifiedTyVar False) univ_tvs
        ; ex_tvs'      <- mapMaybeM (zonkQuantifiedTyVar False) ex_tvs
+                         -- ToDo: The False means that we behave here as if
+                         -- -XPolyKinds was always on, which isn't right.
        ; prov_theta'  <- zonkTcTypes prov_theta
        ; req_theta'   <- zonkTcTypes req_theta
        ; pat_ty'      <- zonkTcType pat_ty
