@@ -18,16 +18,13 @@ import Settings.Builders.Common (cIncludeArgs)
 --     $$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@
 --     $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno
 --     $$(addsuffix .$$(dyn_osuf)-boot,$$(basename $$@)))
--- TODO: Simplify
 ghcBuilderArgs :: Args
 ghcBuilderArgs = (stagedBuilder (Ghc Compile) ||^ stagedBuilder (Ghc Link)) ? do
     output <- getOutput
     stage  <- getStage
     way    <- getWay
     when (stage > Stage0) . lift $ needTouchy
-    let buildObj  = any (\s -> ("//*." ++ s way) ?== output) [ osuf,  obootsuf]
-        buildHi   = any (\s -> ("//*." ++ s way) ?== output) [hisuf, hibootsuf]
-        buildProg = not (buildObj || buildHi)
+    let buildObj = any (\s -> ("//*." ++ s way) ?== output) [ osuf,  obootsuf]
     mconcat [ commonGhcArgs
             , arg "-H32m"
             , stage0    ? arg "-O"
@@ -35,11 +32,10 @@ ghcBuilderArgs = (stagedBuilder (Ghc Compile) ||^ stagedBuilder (Ghc Link)) ? do
             , arg "-Wall"
             , arg "-fwarn-tabs"
             , splitObjectsArgs
-            , buildProg ? ghcLinkArgs
-            , not buildProg ? arg "-c"
+            , not buildObj ? ghcLinkArgs
+            , buildObj ? arg "-c"
             , append =<< getInputs
-            , buildHi ? append ["-fno-code", "-fwrite-interface"]
-            , not buildHi ? mconcat [ arg "-o", arg =<< getOutput ] ]
+            , arg "-o", arg =<< getOutput ]
 
 ghcLinkArgs :: Args
 ghcLinkArgs = stagedBuilder (Ghc Link) ? do

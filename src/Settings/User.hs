@@ -1,9 +1,8 @@
 module Settings.User (
-    buildRootPath, trackBuildSystem, compileInterfaceFilesSeparately,
-    userArgs, userPackages, userLibraryWays, userRtsWays, userKnownPackages,
-    integerLibrary, buildHaddock, validating, ghciWithDebugger, ghcProfiled,
-    ghcDebugged, dynamicGhcPrograms, laxDependencies, verboseCommands,
-    turnWarningsIntoErrors, splitObjects
+    buildRootPath, trackBuildSystem, userArgs, userPackages, userLibraryWays,
+    userRtsWays, userKnownPackages, integerLibrary, buildHaddock, validating,
+    ghciWithDebugger, ghcProfiled, ghcDebugged, dynamicGhcPrograms,
+    laxDependencies, verboseCommands, turnWarningsIntoErrors, splitObjects
     ) where
 
 import Base
@@ -94,7 +93,3 @@ verboseCommands = return False
 -- | To enable -Werror in Stage2 set turnWarningsIntoErrors = stage2.
 turnWarningsIntoErrors :: Predicate
 turnWarningsIntoErrors = return False
-
--- | Decouple the compilation of @*.hi@ and @*.o@ files by setting to True.
-compileInterfaceFilesSeparately :: Bool
-compileInterfaceFilesSeparately = False
