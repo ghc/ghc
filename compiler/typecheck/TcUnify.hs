@@ -16,7 +16,7 @@ module TcUnify (
   checkConstraints, buildImplicationFor,
 
   -- Various unifications
-  unifyType_, unifyType, unifyTheta, unifyKind, noThing,
+  unifyType, unifyTheta, unifyKind, noThing,
   uType, unifyExpType,
 
   --------------------------------
@@ -975,12 +975,6 @@ buildImplicationFor tclvl skol_info skol_tvs given wanted
 The exported functions are all defined as versions of some
 non-exported generic functions.
 -}
-
--- | Unify two types, discarding a resultant coercion. Any constraints
--- generated will still need to be solved, however.
-unifyType_ :: Outputable a => Maybe a  -- ^ If present, has type 'ty1'
-           -> TcTauType -> TcTauType -> TcM ()
-unifyType_ thing ty1 ty2 = void $ unifyType thing ty1 ty2
 
 unifyType :: Outputable a => Maybe a   -- ^ If present, has type 'ty1'
           -> TcTauType -> TcTauType -> TcM TcCoercionN
