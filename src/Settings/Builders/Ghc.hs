@@ -18,8 +18,9 @@ import Settings.Builders.Common (cIncludeArgs)
 --     $$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@
 --     $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno
 --     $$(addsuffix .$$(dyn_osuf)-boot,$$(basename $$@)))
+-- TODO: Simplify
 ghcBuilderArgs :: Args
-ghcBuilderArgs = stagedBuilder (Ghc Compile) ? do
+ghcBuilderArgs = (stagedBuilder (Ghc Compile) ||^ stagedBuilder (Ghc Link)) ? do
     output <- getOutput
     stage  <- getStage
     way    <- getWay
@@ -27,8 +28,24 @@ ghcBuilderArgs = stagedBuilder (Ghc Compile) ? do
     let buildObj  = any (\s -> ("//*." ++ s way) ?== output) [ osuf,  obootsuf]
         buildHi   = any (\s -> ("//*." ++ s way) ?== output) [hisuf, hibootsuf]
         buildProg = not (buildObj || buildHi)
+    mconcat [ commonGhcArgs
+            , arg "-H32m"
+            , stage0    ? arg "-O"
+            , notStage0 ? arg "-O2"
+            , arg "-Wall"
+            , arg "-fwarn-tabs"
+            , splitObjectsArgs
+            , buildProg ? ghcLinkArgs
+            , not buildProg ? arg "-c"
+            , append =<< getInputs
+            , buildHi ? append ["-fno-code", "-fwrite-interface"]
+            , not buildHi ? mconcat [ arg "-o", arg =<< getOutput ] ]
+
+ghcLinkArgs :: Args
+ghcLinkArgs = stagedBuilder (Ghc Link) ? do
+    stage   <- getStage
     libs    <- getPkgDataList DepExtraLibs
-    gmpLibs <- if stage > Stage0 && buildProg
+    gmpLibs <- if stage > Stage0
                then do -- TODO: get this data more gracefully
                    buildInfo <- lift $ readFileLines gmpBuildInfoPath
                    let extract s = case stripPrefix "extra-libraries: " s of
@@ -37,20 +54,9 @@ ghcBuilderArgs = stagedBuilder (Ghc Compile) ? do
                    return $ concatMap extract buildInfo
                else return []
     libDirs <- getPkgDataList DepLibDirs
-    mconcat [ commonGhcArgs
-            , arg "-H32m"
-            , stage0    ? arg "-O"
-            , notStage0 ? arg "-O2"
-            , arg "-Wall"
-            , arg "-fwarn-tabs"
-            , splitObjectsArgs
-            , buildProg ? arg "-no-auto-link-packages"
-            , buildProg ? append [ "-optl-l" ++ lib | lib <- libs ++ gmpLibs ]
-            , buildProg ? append [ "-optl-L" ++ dir | dir <- libDirs ]
-            , not buildProg ? arg "-c"
-            , append =<< getInputs
-            , buildHi ? append ["-fno-code", "-fwrite-interface"]
-            , not buildHi ? mconcat [ arg "-o", arg =<< getOutput ] ]
+    mconcat [ arg "-no-auto-link-packages"
+            , append [ "-optl-l" ++ lib | lib <- libs ++ gmpLibs ]
+            , append [ "-optl-L" ++ dir | dir <- libDirs ] ]
 
 needTouchy :: Action ()
 needTouchy =

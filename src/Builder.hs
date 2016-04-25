@@ -15,11 +15,14 @@ import Oracles.LookupInPath
 import Oracles.WindowsPath
 import Stage
 
--- TODO: Add Link mode?
--- | A C or Haskell compiler can be used in two modes: for compiling sources
--- into object files, or for extracting source dependencies, e.g. by passing -M
--- command line option.
-data CompilerMode = Compile | FindDependencies deriving (Show, Eq, Generic)
+-- | A compiler can typically be used in one of three modes:
+-- 1) Compiling sources into object files.
+-- 2) Extracting source dependencies, e.g. by passing -M command line argument.
+-- 3) Linking object files & static libraries into an executable.
+data CompilerMode = Compile
+                  | FindDependencies
+                  | Link
+                  deriving (Show, Eq, Generic)
 
 -- TODO: Do we really need HsCpp builder? Can't we use Cc instead?
 -- | A 'Builder' is an external command invoked in separate process using 'Shake.cmd'
@@ -138,8 +141,7 @@ getBuilderPath = lift . builderPath
 specified :: Builder -> Action Bool
 specified = fmap (not . null) . builderPath
 
--- TODO: split into two functions: needBuilder (without laxDependencies) and
--- unsafeNeedBuilder (with the laxDependencies parameter)
+-- TODO: Get rid of laxDependencies -- we no longer need it (use Shake's skip).
 -- | Make sure a builder exists on the given path and rebuild it if out of date.
 -- If 'laxDependencies' is True then we do not rebuild GHC even if it is out of
 -- date (can save a lot of build time when changing GHC).
