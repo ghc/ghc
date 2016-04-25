@@ -103,8 +103,6 @@ test('memo002',
       extra_clean(['Memo2.hi', 'Memo2.o'])],
 	multimod_compile_and_run, ['memo002',''])
 
-test('packedstring001', reqlib('packedstring'), compile_and_run, ['-package packedstring'])
-
 test('stableptr001',
      [when(fast(), skip), extra_run_opts('+RTS -K8m -RTS')],
      compile_and_run, [''])
