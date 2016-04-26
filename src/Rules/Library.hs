@@ -97,9 +97,5 @@ extraObjects :: Context -> Action [FilePath]
 extraObjects (Context _ package _)
     | package == integerGmp = do
         orderOnly [gmpLibraryH] -- TODO: move this dependency elsewhere, #113?
-        -- FIXME: simplify after Shake's getDirectoryFiles bug is fixed, #168
-        exists <- doesDirectoryExist gmpObjects
-        if exists
-        then map unifyPath <$> getDirectoryFiles "" [gmpObjects -/- "*.o"]
-        else return []
+        map unifyPath <$> getDirectoryFiles "" [gmpObjects -/- "*.o"]
     | otherwise         = return []
