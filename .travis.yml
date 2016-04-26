@@ -47,22 +47,22 @@ install:
     # of "ghc/". For this reason, we - rather hackily - move the GHC-Shake
     # ".git"  directory into the appropriate location, and perform a hard reset
     # in order to regenerate the GHC-Shake files.
-    - mkdir ghc/shake-build
-    - mv .git ghc/shake-build
-    - ( cd ghc/shake-build && git reset --hard HEAD )
+    - mkdir ghc/hadrian
+    - mv .git ghc/hadrian
+    - ( cd ghc/hadrian && git reset --hard HEAD )
 
-    - ( cd ghc/shake-build && cabal install --only-dependencies )
-    - ( cd ghc/shake-build && cabal configure )
+    - ( cd ghc/hadrian && cabal install --only-dependencies )
+    - ( cd ghc/hadrian && cabal configure )
 
     - ( cd ghc && ./boot )
     - ( cd ghc && ./configure )
-    - cat ghc/shake-build/cfg/system.config
+    - cat ghc/hadrian/cfg/system.config
     - ghc-pkg list
 
 script:
-    - ( cd ghc/shake-build && cabal haddock --internal )
-    - ./ghc/shake-build/build.sh selftest
-    - ./ghc/shake-build/build.sh -j --no-progress --profile=- --flavour=quick $TARGET
+    - ( cd ghc/hadrian && cabal haddock --internal )
+    - ./ghc/hadrian/build.sh selftest
+    - ./ghc/hadrian/build.sh -j --no-progress --profile=- --flavour=quick $TARGET
 
 cache:
     directories:
