@@ -207,9 +207,6 @@ class TestOptions:
        # expected exit code
        self.exit_code = 0
 
-       # should we clean up after ourselves?
-       self.cleanup = ''
-
        # extra files to clean afterward
        self.clean_files = []
 

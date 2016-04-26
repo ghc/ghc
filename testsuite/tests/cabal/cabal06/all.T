@@ -1,7 +1,7 @@
-if default_testopts.cleanup != '':
+if config.cleanup:
    cleanup = 'CLEANUP=1'
 else:
-   cleanup = ''
+   cleanup = 'CLEANUP=0'
 
 test('cabal06',
      normal,

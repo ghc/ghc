@@ -13,10 +13,10 @@ if config.have_shared_libs:
 else:
     dyn = '--disable-shared'
 
-if default_testopts.cleanup != '':
+if config.cleanup:
    cleanup = 'CLEANUP=1'
 else:
-   cleanup = ''
+   cleanup = 'CLEANUP=0'
 
 def ignoreLdOutput(str):
     return re.sub('Creating library file: dist.build.libHStest-1.0-ghc[0-9.]*.dll.a\n', '', str)

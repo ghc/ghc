@@ -13,10 +13,10 @@ if not config.compiler_profiled and config.have_shared_libs:
 else:
     dyn = '--disable-shared'
 
-if default_testopts.cleanup != '':
+if config.cleanup:
    cleanup = 'CLEANUP=1'
 else:
-   cleanup = ''
+   cleanup = 'CLEANUP=0'
 
 test('cabal04',
      normal,

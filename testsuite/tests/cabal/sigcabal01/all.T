@@ -1,7 +1,7 @@
-if default_testopts.cleanup != '':
+if config.cleanup:
    cleanup = 'CLEANUP=1'
 else:
-   cleanup = ''
+   cleanup = 'CLEANUP=0'
 
 test('sigcabal01',
      expect_broken(10622),

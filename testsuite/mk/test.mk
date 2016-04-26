@@ -189,6 +189,14 @@ ifeq "$(SKIP_PERF_TESTS)" "YES"
 RUNTEST_OPTS += --skip-perf-tests
 endif
 
+ifeq "$(CLEANUP)" "0"
+RUNTEST_OPTS += -e cleanup=False
+else ifeq "$(CLEANUP)" "NO"
+RUNTEST_OPTS += -e cleanup=False
+else
+RUNTEST_OPTS += -e cleanup=True
+endif
+
 ifneq "$(CLEAN_ONLY)" ""
 RUNTEST_OPTS += -e clean_only=True
 else
@@ -207,7 +215,6 @@ RUNTEST_OPTS +=  \
 	-e 'config.os="$(TargetOS_CPP)"' \
 	-e 'config.arch="$(TargetARCH_CPP)"' \
 	-e 'config.wordsize="$(WORDSIZE)"' \
-	-e 'default_testopts.cleanup="$(CLEANUP)"' \
 	-e 'config.timeout=int($(TIMEOUT)) or config.timeout' \
 	-e 'config.exeext="$(exeext)"' \
 	-e 'config.top="$(TOP_ABS)"'
@@ -326,15 +333,15 @@ list_broken:
 # From
 # https://www.gnu.org/software/make/manual/html_node/Variables_002fRecursion.html:
 #
-#     "The ‘-j’ option is a special case (see Parallel Execution). If you set
-#     it to some numeric value ‘N’ and your operating system supports it (most
-#     any UNIX system will; others typically won’t), the parent make and all the
-#     sub-makes will communicate to ensure that there are only ‘N’ jobs running
+#     "The '-j' option is a special case (see Parallel Execution). If you set
+#     it to some numeric value 'N' and your operating system supports it (most
+#     any UNIX system will; others typically won't), the parent make and all the
+#     sub-makes will communicate to ensure that there are only 'N' jobs running
 #     at the same time between them all."
 #
 # In our scenario, the user will actually see the following warning [2]:
 #
-#     ‘warning: jobserver unavailable: using -j1. Add `+' to parent make rule.’
+#     'warning: jobserver unavailable: using -j1. Add '+' to parent make rule.'
 #
 # The problem is that topmake and submake don't know about eachother, since
 # python is in between. To let them communicate, we have to use the '+'

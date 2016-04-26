@@ -694,7 +694,7 @@ def test_common_work (name, opts, func, args):
                 if way not in do_ways:
                     skiptest (name,way)
 
-        if getTestOpts().cleanup != '' and (config.clean_only or do_ways != []):
+        if config.cleanup and (config.clean_only or do_ways):
             pretest_cleanup(name)
             clean([name + suff for suff in [
                        '', '.exe', '.exe.manifest', '.genscript',
