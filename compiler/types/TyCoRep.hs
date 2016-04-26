@@ -45,7 +45,7 @@ module TyCoRep (
 
         -- Functions over binders
         binderType, delBinderVar, isInvisibleBinder, isVisibleBinder,
-        isNamedBinder, isAnonBinder,
+        isNamedBinder, isAnonBinder, delBinderVarFV,
 
         -- Functions over coercions
         pickLR,

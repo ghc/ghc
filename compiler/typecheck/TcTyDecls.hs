@@ -31,7 +31,7 @@ module TcTyDecls(
 import TcRnMonad
 import TcEnv
 import TcBinds( tcRecSelBinds )
-import TyCoRep( Type(..), TyBinder(..), delBinderVar )
+import TyCoRep( Type(..), TyBinder(..), delBinderVarFV )
 import TcType
 import TysWiredIn( unitTy )
 import MkCore( rEC_SEL_ERROR_ID )
@@ -61,6 +61,7 @@ import Maybes
 import Data.List
 import Bag
 import FastString
+import FV
 
 import Control.Monad
 
@@ -726,21 +727,21 @@ irExTyVars orig_tvs thing = go emptyVarSet orig_tvs
 
 markNominal :: TyVarSet   -- local variables
             -> Type -> RoleM ()
-markNominal lcls ty = let nvars = get_ty_vars ty `minusVarSet` lcls in
-                      mapM_ (updateRole Nominal) (varSetElems nvars)
+markNominal lcls ty = let nvars = fvVarList (FV.delFVs lcls $ get_ty_vars ty) in
+                      mapM_ (updateRole Nominal) nvars
   where
      -- get_ty_vars gets all the tyvars (no covars!) from a type *without*
      -- recurring into coercions. Recall: coercions are totally ignored during
      -- role inference. See [Coercions in role inference]
-    get_ty_vars (TyVarTy tv)     = unitVarSet tv
-    get_ty_vars (AppTy t1 t2)    = get_ty_vars t1 `unionVarSet` get_ty_vars t2
-    get_ty_vars (TyConApp _ tys) = foldr (unionVarSet . get_ty_vars) emptyVarSet tys
+    get_ty_vars (TyVarTy tv)     = FV.unitFV tv
+    get_ty_vars (AppTy t1 t2)    = get_ty_vars t1 `unionFV` get_ty_vars t2
+    get_ty_vars (TyConApp _ tys) = mapUnionFV get_ty_vars tys
     get_ty_vars (ForAllTy bndr ty)
-      = get_ty_vars ty `delBinderVar` bndr
-        `unionVarSet` (tyCoVarsOfType $ binderType bndr)
-    get_ty_vars (LitTy {})       = emptyVarSet
+      = delBinderVarFV bndr (get_ty_vars ty)
+        `unionFV` (tyCoFVsOfType $ binderType bndr)
+    get_ty_vars (LitTy {})       = emptyFV
     get_ty_vars (CastTy ty _)    = get_ty_vars ty
-    get_ty_vars (CoercionTy _)   = emptyVarSet
+    get_ty_vars (CoercionTy _)   = emptyFV
 
 -- like lookupRoles, but with Nominal tags at the end for oversaturated TyConApps
 lookupRolesX :: TyCon -> RoleM [Role]
