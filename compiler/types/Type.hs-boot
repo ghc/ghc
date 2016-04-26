@@ -1,7 +1,6 @@
 module Type where
 import TyCon
-import Var ( TyVar, TyCoVar )
-import VarSet ( TyCoVarSet )
+import Var ( TyVar )
 import {-# SOURCE #-} TyCoRep( Type, Kind )
 
 isPredTy :: Type -> Bool
@@ -20,4 +19,3 @@ partitionInvisibles :: TyCon -> (a -> Type) -> [a] -> ([a], [a])
 coreView :: Type -> Maybe Type
 
 tyCoVarsOfTypesWellScoped :: [Type] -> [TyVar]
-varSetElemsWellScoped :: TyCoVarSet -> [TyCoVar]

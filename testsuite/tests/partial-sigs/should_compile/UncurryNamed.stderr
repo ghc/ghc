@@ -1,5 +1,5 @@
 TYPE SIGNATURES
-  unc :: forall t a b. (a -> b -> t) -> (a, b) -> t
+  unc :: forall a b t. (a -> b -> t) -> (a, b) -> t
 TYPE CONSTRUCTORS
 COERCION AXIOMS
 Dependent modules: []

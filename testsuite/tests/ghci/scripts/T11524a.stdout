@@ -31,7 +31,7 @@ pattern Pue :: forall {t}. () => forall {a}. t -> a -> (t, Ex)
   	-- Defined at <interactive>:19:1
 pattern Pur :: forall {a}. (Num a, Eq a) => a -> [a]
   	-- Defined at <interactive>:20:1
-pattern Purp :: forall {a} {t}. (Num a, Eq a) => Show t => a
+pattern Purp :: forall {t} {a}. (Num a, Eq a) => Show t => a
                                                            -> t -> ([a], UnivProv t)
   	-- Defined at <interactive>:21:1
 pattern Pure :: forall {a}. (Num a, Eq a) => forall {a1}. a

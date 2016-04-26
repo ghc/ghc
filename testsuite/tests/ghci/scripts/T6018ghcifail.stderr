@@ -42,7 +42,7 @@
         (i.e. ones independent of the class type variables)
         must be distinct type variables
       Expected: PolyKindVarsF '[]
-      Actual:   PolyKindVarsF '[]
+        Actual: PolyKindVarsF '[]
       Use -fprint-explicit-kinds to see the kind arguments
     • In the type instance declaration for ‘PolyKindVarsF’
       In the instance declaration for ‘PolyKindVarsC '[]’
@@ -59,7 +59,7 @@
     Kind variable ‘k’ cannot be inferred from the right-hand side.
     Use -fprint-explicit-kinds to see the kind arguments
     In the type family equation:
-      forall k (a :: k) (b :: k).
+      forall k (b :: k) (a :: k).
         Fc a b = Int -- Defined at <interactive>:64:15
 
 <interactive>:68:15: error:
@@ -68,7 +68,7 @@
     cannot be inferred from the right-hand side.
     Use -fprint-explicit-kinds to see the kind arguments
     In the type family equation:
-      forall k (a :: k) (b :: k).
+      forall k (b :: k) (a :: k).
         Gc a b = Int -- Defined at <interactive>:68:15
 
 <interactive>:81:15: error:
