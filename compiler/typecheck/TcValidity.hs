@@ -1883,3 +1883,4 @@ isTerminatingClass cls
 -- | Tidy before printing a type
 ppr_tidy :: TidyEnv -> Type -> SDoc
 ppr_tidy env ty = pprType (tidyType env ty)
+
