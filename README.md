@@ -1,19 +1,17 @@
-Shaking up GHC
-==============
+Hadrian
+=======
 
 [![Linux & OS X status](https://img.shields.io/travis/snowleopard/shaking-up-ghc/master.svg?label=Linux%20%26%20OS%20X)](https://travis-ci.org/snowleopard/shaking-up-ghc) [![Windows status](https://img.shields.io/appveyor/ci/snowleopard/shaking-up-ghc/master.svg?label=Windows)](https://ci.appveyor.com/project/snowleopard/shaking-up-ghc)
 
-This is a new build system for the [Glasgow Haskell Compiler][ghc]. It is based
+Hadrian is a new build system for the [Glasgow Haskell Compiler][ghc]. It is based
 on [Shake][shake] and we hope that it will eventually replace the current
 [`make`-based build system][make]. If you are curious about the rationale and initial
 ideas behind the project you can find more details on the [wiki page][ghc-shake-wiki]
-and in this [blog post][blog-post-1].
+and in this [blog post][blog-post-1]. This project was formerly known as *Shaking-up-GHC*.
 
 The new build system can work side-by-side with the existing build system. Note, there is
 some interaction between them: they put (some) build results in the same directories,
-e.g. `inplace/bin/ghc-stage1`. 
-
-[Join us on #shaking-up-ghc on Freenode](irc://chat.freenode.net/#shaking-up-ghc).
+e.g. `inplace/bin/ghc-stage1`.
 
 Your first build
 ----------------
@@ -28,17 +26,17 @@ follow these steps:
 packages, which need to be installed: `ansi-terminal`, `mtl`, `shake`, `QuickCheck`.
 
 * Get the sources and run standard configuration scripts. It is important for the build
-system to be in the `shake-build` directory of the GHC source tree:
+system to be in the `hadrian` directory of the GHC source tree:
 
     ```bash
     git clone --recursive git://git.haskell.org/ghc.git
     cd ghc
-    git clone git://github.com/snowleopard/shaking-up-ghc shake-build
+    git clone git://github.com/snowleopard/hadrian
     ./boot
     ./configure # On Windows run ./configure --enable-tarballs-autodownload
     ```
     
-* Build GHC using `shake-build/build.sh` or `shake-build/build.bat` (on Windows) instead
+* Build GHC using `hadrian/build.sh` or `hadrian/build.bat` (on Windows) instead
 of `make`. You might want to enable parallelism with `-j`. We will further refer to the
 build script simply as `build`. If you are interested in building in a Cabal sandbox
 or using Stack, have a look at `build.cabal.sh` and `build.stack.sh` scripts. Also
@@ -133,20 +131,20 @@ helped me endure and enjoy the project.
 [make]: https://ghc.haskell.org/trac/ghc/wiki/Building/Architecture
 [ghc-shake-wiki]: https://ghc.haskell.org/trac/ghc/wiki/Building/Shake
 [blog-post-1]: https://blogs.ncl.ac.uk/andreymokhov/shaking-up-ghc
-[issues]: https://github.com/snowleopard/shaking-up-ghc/issues
+[issues]: https://github.com/snowleopard/hadrian/issues
 [ghc-preparation]: https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation
 [ghc-windows-quick-build]: https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation/Windows#AQuickBuild
-[windows-build]: https://github.com/snowleopard/shaking-up-ghc/blob/master/doc/windows.md
-[build-artefacts-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/113
+[windows-build]: https://github.com/snowleopard/hadrian/blob/master/doc/windows.md
+[build-artefacts-issue]: https://github.com/snowleopard/hadrian/issues/113
 [ghc-split-objs-bug]: https://ghc.haskell.org/trac/ghc/ticket/11315
-[user-settings]: https://github.com/snowleopard/shaking-up-ghc/blob/master/src/Settings/User.hs
-[test-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/197
-[dynamic-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/4
-[validation-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/187
-[flavours-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/188
-[cross-compilation-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/177
-[install-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/219
-[milestones]: https://github.com/snowleopard/shaking-up-ghc/milestones
-[comments-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/55
-[doc-issue]: https://github.com/snowleopard/shaking-up-ghc/issues/56
-[contributors]: https://github.com/snowleopard/shaking-up-ghc/graphs/contributors
+[user-settings]: https://github.com/snowleopard/hadrian/blob/master/src/Settings/User.hs
+[test-issue]: https://github.com/snowleopard/hadrian/issues/197
+[dynamic-issue]: https://github.com/snowleopard/hadrian/issues/4
+[validation-issue]: https://github.com/snowleopard/hadrian/issues/187
+[flavours-issue]: https://github.com/snowleopard/hadrian/issues/188
+[cross-compilation-issue]: https://github.com/snowleopard/hadrian/issues/177
+[install-issue]: https://github.com/snowleopard/hadrian/issues/219
+[milestones]: https://github.com/snowleopard/hadrian/milestones
+[comments-issue]: https://github.com/snowleopard/hadrian/issues/55
+[doc-issue]: https://github.com/snowleopard/hadrian/issues/56
+[contributors]: https://github.com/snowleopard/hadrian/graphs/contributors
