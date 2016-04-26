@@ -52,6 +52,7 @@ import StaticFlags      ( opt_PprStyle_Debug )
 import ListSetOps       ( equivClasses )
 import Maybes
 import qualified GHC.LanguageExtensions as LangExt
+import FV ( fvVarList, unionFV )
 
 import Control.Monad    ( when )
 import Data.List        ( partition, mapAccumL, nub, sortBy )
@@ -175,7 +176,7 @@ report_unsolved mb_binds_var err_as_warn type_errors expr_holes type_holes wante
              free_tvs = tyCoVarsOfWC wanted
 
        ; traceTc "reportUnsolved (after zonking and tidying):" $
-         vcat [ pprTvBndrs (varSetElems free_tvs)
+         vcat [ pprVarSet pprTvBndrs free_tvs
               , ppr wanted ]
 
        ; warn_redundant <- woptM Opt_WarnRedundantConstraints
@@ -1333,8 +1334,8 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
              interesting_tyvars
                = filter (not . isEmptyVarSet . tyCoVarsOfType . tyVarKind) $
                  filter isTyVar $
-                 varSetElems $
-                 tyCoVarsOfType ty1 `unionVarSet` tyCoVarsOfType ty2
+                 fvVarList $
+                 tyCoFVsOfType ty1 `unionFV` tyCoFVsOfType ty2
              extra3 = relevant_bindings $
                       ppWhen (not (null interesting_tyvars)) $
                       hang (text "Type variable kinds:") 2 $
@@ -2419,10 +2420,9 @@ getAmbigTkvs :: Ct -> ([Var],[Var])
 getAmbigTkvs ct
   = partition (`elemVarSet` dep_tkv_set) ambig_tkvs
   where
-    tkv_set       = tyCoVarsOfCt ct
-    ambig_tkv_set = filterVarSet isAmbiguousTyVar tkv_set
-    dep_tkv_set   = tyCoVarsOfTypes (map tyVarKind (varSetElems tkv_set))
-    ambig_tkvs    = varSetElems ambig_tkv_set
+    tkvs       = tyCoVarsOfCtList ct
+    ambig_tkvs = filter isAmbiguousTyVar tkvs
+    dep_tkv_set = tyCoVarsOfTypes (map tyVarKind tkvs)
 
 getSkolemInfo :: [Implication] -> TcTyVar -> ([TcTyVar], SkolemInfo)
 -- Get the skolem info for a type variable

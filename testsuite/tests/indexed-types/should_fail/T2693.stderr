@@ -1,7 +1,7 @@
 
 T2693.hs:12:15: error:
     • Couldn't match expected type ‘(a8, b1)’ with actual type ‘TFn a6’
-      The type variables ‘b1’, ‘a6’, ‘a8’ are ambiguous
+      The type variables ‘a6’, ‘a8’, ‘b1’ are ambiguous
     • In the first argument of ‘fst’, namely ‘x’
       In the first argument of ‘(+)’, namely ‘fst x’
       In the expression: fst x + fst x
@@ -9,7 +9,7 @@ T2693.hs:12:15: error:
 
 T2693.hs:12:23: error:
     • Couldn't match expected type ‘(a8, b2)’ with actual type ‘TFn a7’
-      The type variables ‘b2’, ‘a7’, ‘a8’ are ambiguous
+      The type variables ‘a7’, ‘a8’, ‘b2’ are ambiguous
     • In the first argument of ‘fst’, namely ‘x’
       In the second argument of ‘(+)’, namely ‘fst x’
       In the expression: fst x + fst x
@@ -17,7 +17,7 @@ T2693.hs:12:23: error:
 
 T2693.hs:19:15: error:
     • Couldn't match expected type ‘(a5, b0)’ with actual type ‘TFn a2’
-      The type variables ‘b0’, ‘a2’, ‘a5’ are ambiguous
+      The type variables ‘a2’, ‘a5’, ‘b0’ are ambiguous
     • In the first argument of ‘fst’, namely ‘x’
       In the first argument of ‘(+)’, namely ‘fst x’
       In the expression: fst x + snd x
@@ -25,7 +25,7 @@ T2693.hs:19:15: error:
 
 T2693.hs:19:23: error:
     • Couldn't match expected type ‘(a3, a5)’ with actual type ‘TFn a4’
-      The type variables ‘a3’, ‘a4’, ‘a5’ are ambiguous
+      The type variables ‘a4’, ‘a3’, ‘a5’ are ambiguous
     • In the first argument of ‘snd’, namely ‘x’
       In the second argument of ‘(+)’, namely ‘snd x’
       In the expression: fst x + snd x
