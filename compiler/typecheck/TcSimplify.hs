@@ -130,9 +130,8 @@ simpl_top wanteds
       | isEmptyWC wc
       = return wc
       | otherwise
-      = do { free_tvs <- TcS.zonkTyCoVarsAndFV (tyCoVarsOfWC wc)
-           ; let meta_tvs = varSetElems $
-                            filterVarSet (isTyVar <&&> isMetaTyVar) free_tvs
+      = do { free_tvs <- TcS.zonkTyCoVarsAndFVList (tyCoVarsOfWCList wc)
+           ; let meta_tvs = filter (isTyVar <&&> isMetaTyVar) free_tvs
                    -- zonkTyCoVarsAndFV: the wc_first_go is not yet zonked
                    -- filter isMetaTyVar: we might have runtime-skolems in GHCi,
                    -- and we definitely don't want to try to assign to those!

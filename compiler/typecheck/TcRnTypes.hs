@@ -85,6 +85,7 @@ module TcRnTypes(
         andWC, unionsWC, mkSimpleWC, mkImplicWC,
         addInsols, addSimples, addImplics,
         tyCoVarsOfWC, dropDerivedWC, dropDerivedSimples, dropDerivedInsols,
+        tyCoVarsOfWCList,
         isDroppableDerivedLoc, insolubleImplic,
         arisesFromGivens,
 
@@ -1608,22 +1609,38 @@ tyCoVarsOfCtsList = fvVarList . tyCoFVsOfCts
 tyCoFVsOfCts :: Cts -> FV
 tyCoFVsOfCts = foldrBag (unionFV . tyCoFVsOfCt) emptyFV
 
+-- | Returns free variables of WantedConstraints as a non-deterministic
+-- set. See Note [Deterministic FV] in FV.
 tyCoVarsOfWC :: WantedConstraints -> TyCoVarSet
 -- Only called on *zonked* things, hence no need to worry about flatten-skolems
-tyCoVarsOfWC (WC { wc_simple = simple, wc_impl = implic, wc_insol = insol })
-  = tyCoVarsOfCts simple `unionVarSet`
-    tyCoVarsOfBag tyCoVarsOfImplic implic `unionVarSet`
-    tyCoVarsOfCts insol
+tyCoVarsOfWC = fvVarSet . tyCoFVsOfWC
 
-tyCoVarsOfImplic :: Implication -> TyCoVarSet
+-- | Returns free variables of WantedConstraints as a deterministically
+-- ordered list. See Note [Deterministic FV] in FV.
+tyCoVarsOfWCList :: WantedConstraints -> [TyCoVar]
 -- Only called on *zonked* things, hence no need to worry about flatten-skolems
-tyCoVarsOfImplic (Implic { ic_skols = skols
-                         , ic_given = givens, ic_wanted = wanted })
-  = (tyCoVarsOfWC wanted `unionVarSet` tyCoVarsOfTypes (map evVarPred givens))
-    `delVarSetList` skols
+tyCoVarsOfWCList = fvVarList . tyCoFVsOfWC
 
-tyCoVarsOfBag :: (a -> TyCoVarSet) -> Bag a -> TyCoVarSet
-tyCoVarsOfBag tvs_of = foldrBag (unionVarSet . tvs_of) emptyVarSet
+-- | Returns free variables of WantedConstraints as a composable FV
+-- computation. See Note [Deterministic FV] in FV.
+tyCoFVsOfWC :: WantedConstraints -> FV
+-- Only called on *zonked* things, hence no need to worry about flatten-skolems
+tyCoFVsOfWC (WC { wc_simple = simple, wc_impl = implic, wc_insol = insol })
+  = tyCoFVsOfCts simple `unionFV`
+    tyCoFVsOfBag tyCoFVsOfImplic implic `unionFV`
+    tyCoFVsOfCts insol
+
+-- | Returns free variables of Implication as a composable FV computation.
+-- See Note [Deterministic FV] in FV.
+tyCoFVsOfImplic :: Implication -> FV
+-- Only called on *zonked* things, hence no need to worry about flatten-skolems
+tyCoFVsOfImplic (Implic { ic_skols = skols
+                         , ic_given = givens, ic_wanted = wanted })
+  = FV.delFVs (mkVarSet skols)
+      (tyCoFVsOfWC wanted `unionFV` tyCoFVsOfTypes (map evVarPred givens))
+
+tyCoFVsOfBag :: (a -> FV) -> Bag a -> FV
+tyCoFVsOfBag tvs_of = foldrBag (unionFV . tvs_of) emptyFV
 
 --------------------------
 dropDerivedSimples :: Cts -> Cts

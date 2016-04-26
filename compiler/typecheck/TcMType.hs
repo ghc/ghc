@@ -68,6 +68,7 @@ module TcMType (
   tidyEvVar, tidyCt, tidySkolemInfo,
   skolemiseUnboundMetaTyVar,
   zonkTcTyVar, zonkTcTyVars, zonkTyCoVarsAndFV, zonkTcTypeAndFV,
+  zonkTyCoVarsAndFVList,
   zonkTcTypeAndSplitDepVars, zonkTcTypesAndSplitDepVars,
   zonkQuantifiedTyVar, zonkQuantifiedTyVarOrType,
   quantifyTyVars, quantifyZonkedTyVars,
@@ -1201,6 +1202,12 @@ zonkTyCoVar tv | isTcTyVar tv = zonkTcTyVar tv
 
 zonkTyCoVarsAndFV :: TyCoVarSet -> TcM TyCoVarSet
 zonkTyCoVarsAndFV tycovars = tyCoVarsOfTypes <$> mapM zonkTyCoVar (varSetElems tycovars)
+
+-- Takes a list of TyCoVars, zonks them and returns a
+-- deterministically ordered list of their free variables.
+zonkTyCoVarsAndFVList :: [TyCoVar] -> TcM [TyCoVar]
+zonkTyCoVarsAndFVList tycovars =
+  tyCoVarsOfTypesList <$> mapM zonkTyCoVar tycovars
 
 -- Takes a deterministic set of TyCoVars, zonks them and returns a
 -- deterministic set of their free variables.
