@@ -40,7 +40,7 @@ if ! ( cabal sandbox hc-pkg list 2>&1 > /dev/null ); then
         --disable-shared
 fi
 
-cabal run ghc-shake --             \
+cabal run hadrian --               \
     --lint                         \
     --directory "$absoluteRoot/.." \
     --colour                       \

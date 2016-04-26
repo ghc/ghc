@@ -33,7 +33,7 @@ cd "$absoluteRoot"
 
 stack build --no-library-profiling
 
-stack exec ghc-shake --            \
+stack exec hadrian --              \
     --lint                         \
     --directory "$absoluteRoot/.." \
     --colour                       \

@@ -38,16 +38,16 @@ mkdir -p "$root/.shake"
 # Notes/Random thoughts:
 #
 # - if ghc.git had a top-level `cabal.project` file, we could maybe avoid the
-# boilerplate above, as we could simply say `cabal exec ghc-shake` from within
+# boilerplate above, as we could simply say `cabal exec hadrian` from within
 # any GHC folder not shadowed by a nearer shadowing `cabal.project` file.
 
 pushd "$root/"
 
-cabal new-build --disable-profiling --disable-documentation -j exe:ghc-shake
+cabal new-build --disable-profiling --disable-documentation -j exe:hadrian
 
-PKGVER="$(awk '/^version:/ { print $2 }' shaking-up-ghc.cabal)"
+PKGVER="$(awk '/^version:/ { print $2 }' hadrian.cabal)"
 
-cp -v "$root/dist-newstyle/build/shaking-up-ghc-${PKGVER}/build/ghc-shake/ghc-shake" \
+cp -v "$root/dist-newstyle/build/hadrian-${PKGVER}/build/hadrian/hadrian" \
       "$root/.shake/build"
 
 popd

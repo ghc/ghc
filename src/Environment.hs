@@ -13,7 +13,7 @@ setupEnvironment = do
 
     -- in MinGW if PWD is set to a Windows "C:\\" style path then configure
     -- `pwd` will return the Windows path, and then modifying $PATH will fail.
-    -- See https://github.com/snowleopard/shaking-up-ghc/issues/189 for details.
+    -- See https://github.com/snowleopard/hadrian/issues/189 for details.
     unsetEnv "PWD"
 
     -- On Windows, some path variables start a prefix like "C:\\" which may
