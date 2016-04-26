@@ -237,7 +237,8 @@ renderBox ls = tail $ concatMap ('\n' :) (boxTop : map renderLine ls ++ [boxBot]
     -- Minimum total width of the box in characters
     minimumBoxWidth = 32
 
-    -- FIXME: See Shake #364.
+    -- TODO: Make this setting configurable? Setting to True by default seems
+    -- to work poorly with many fonts.
     useUnicode = False
 
     -- Characters to draw the box
