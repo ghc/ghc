@@ -19,7 +19,7 @@ T11213.hs:23:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
 
 T11213.hs:24:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
     Top-level binding with no type signature:
-      Purp :: forall a t.
+      Purp :: forall t a.
               (Num a, Eq a) =>
               Show t => a -> t -> ([a], UnivProv t)
 

@@ -622,7 +622,9 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
          -- so we must promote it!  The inferred type is just
          --   f :: beta -> beta
        ; zonked_tau_tkvs <- TcM.zonkTyCoVarsAndFV $
-                            dv_kvs zonked_tau_dvs `unionVarSet` dv_tvs zonked_tau_dvs
+                            dVarSetToVarSet (dv_kvs zonked_tau_dvs)
+                            `unionVarSet`
+                            dVarSetToVarSet (dv_tvs zonked_tau_dvs)
               -- decideQuantification turned some meta tyvars into
               -- quantified skolems, so we have to zonk again
 
@@ -745,7 +747,8 @@ decideQuantification apply_mr sigs name_taus constraints
                      zonked_dvs@(DV { dv_kvs = zonked_tau_kvs, dv_tvs = zonked_tau_tvs })
   | apply_mr     -- Apply the Monomorphism restriction
   = do { gbl_tvs <- tcGetGlobalTyCoVars
-       ; let zonked_tkvs = zonked_tau_kvs `unionVarSet` zonked_tau_tvs
+       ; let zonked_tkvs = dVarSetToVarSet zonked_tau_kvs `unionVarSet`
+                           dVarSetToVarSet zonked_tau_tvs
              constrained_tvs = tyCoVarsOfTypes constraints `unionVarSet`
                                filterVarSet isCoVar zonked_tkvs
              mono_tvs = gbl_tvs `unionVarSet` constrained_tvs
@@ -769,7 +772,7 @@ decideQuantification apply_mr sigs name_taus constraints
   | otherwise
   = do { gbl_tvs <- tcGetGlobalTyCoVars
        ; let mono_tvs     = growThetaTyVars equality_constraints gbl_tvs
-             tau_tvs_plus = growThetaTyVars constraints zonked_tau_tvs
+             tau_tvs_plus = growThetaTyVarsDSet constraints zonked_tau_tvs
              dvs_plus     = DV { dv_kvs = zonked_tau_kvs, dv_tvs = tau_tvs_plus }
        ; qtvs <- quantify_tvs sigs mono_tvs dvs_plus
           -- We don't grow the kvs, as there's no real need to. Recall
@@ -809,8 +812,8 @@ quantify_tvs sigs mono_tvs dep_tvs@(DV { dv_tvs = tau_tvs })
    -- NB: don't use quantifyZonkedTyVars because the sig stuff might
    -- be unzonked
   = quantifyTyVars (mono_tvs `delVarSetList` sig_qtvs)
-                   (dep_tvs { dv_tvs = tau_tvs `extendVarSetList` sig_qtvs
-                                               `extendVarSetList` sig_wcs })
+                   (dep_tvs { dv_tvs = tau_tvs `extendDVarSetList` sig_qtvs
+                                               `extendDVarSetList` sig_wcs })
                    -- NB: quantifyTyVars zonks its arguments
   where
     sig_qtvs = [ skol | sig <- sigs, (_, skol) <- sig_skols sig ]
@@ -839,6 +842,32 @@ growThetaTyVars theta tvs
        | otherwise                          = tvs
        where
          pred_tvs = tyCoVarsOfType pred
+
+------------------
+growThetaTyVarsDSet :: ThetaType -> DTyCoVarSet -> DTyVarSet
+-- See Note [Growing the tau-tvs using constraints]
+-- NB: only returns tyvars, never covars
+-- It takes a deterministic set of TyCoVars and returns a deterministic set
+-- of TyVars.
+-- The implementation mirrors growThetaTyVars, the only difference is that
+-- it avoids unionDVarSet and uses more efficient extendDVarSetList.
+growThetaTyVarsDSet theta tvs
+  | null theta = tvs_only
+  | otherwise  = filterDVarSet isTyVar $
+                 transCloDVarSet mk_next seed_tvs
+  where
+    tvs_only = filterDVarSet isTyVar tvs
+    seed_tvs = tvs `extendDVarSetList` tyCoVarsOfTypesList ips
+    (ips, non_ips) = partition isIPPred theta
+                         -- See Note [Inheriting implicit parameters] in TcType
+
+    mk_next :: DVarSet -> DVarSet -- Maps current set to newly-grown ones
+    mk_next so_far = foldr (grow_one so_far) emptyDVarSet non_ips
+    grow_one so_far pred tvs
+       | any (`elemDVarSet` so_far) pred_tvs = tvs `extendDVarSetList` pred_tvs
+       | otherwise                           = tvs
+       where
+         pred_tvs = tyCoVarsOfTypeList pred
 
 {- Note [Which type variables to quantify]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

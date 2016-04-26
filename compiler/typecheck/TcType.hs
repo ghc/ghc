@@ -851,13 +851,14 @@ isTouchableOrFmv :: TcLevel -> TcTyVar -> Bool
 *                                                                      *
 ********************************************************************* -}
 
-data TcDepVars  -- See note [Dependent type variables]
-  = DV { dv_kvs :: TyCoVarSet  -- "kind" variables (dependent)
-       , dv_tvs :: TyVarSet    -- "type" variables (non-dependent)
-                               -- The two are disjoint sets
+data TcDepVars  -- See Note [Dependent type variables]
+                -- See Note [TcDepVars determinism]
+  = DV { dv_kvs :: DTyCoVarSet  -- "kind" variables (dependent)
+       , dv_tvs :: DTyVarSet    -- "type" variables (non-dependent)
+                                -- The two are disjoint sets
     }
 
-depVarsTyVars :: TcDepVars -> TyVarSet
+depVarsTyVars :: TcDepVars -> DTyVarSet
 depVarsTyVars = dv_tvs
 
 instance Outputable TcDepVars where
@@ -895,13 +896,26 @@ Note that
      (k1 :: k2), (k2 :: *)
   The "type variables" do not depend on each other; if
   one did, it'd be classified as a kind variable!
+
+Note [TcDepVars determinism]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we quantify over type variables we decide the order in which they
+appear in the final type. Because the order of type variables in the type
+can end up in the interface file and affects some optimizations like
+worker-wrapper we want this order to be deterministic.
+
+To achieve that we use deterministic sets of variables that can be converted to
+lists in a deterministic order.
+
+For more information about deterministic sets see
+Note [Deterministic UniqFM] in UniqDFM.
 -}
 
 splitDepVarsOfType :: Type -> TcDepVars
 -- See Note [Dependent type variables]
 splitDepVarsOfType ty
   = DV { dv_kvs = dep_vars
-       , dv_tvs = nondep_vars `minusVarSet` dep_vars }
+       , dv_tvs = nondep_vars `minusDVarSet` dep_vars }
   where
     Pair dep_vars nondep_vars = split_dep_vars ty
 
@@ -910,28 +924,30 @@ splitDepVarsOfTypes :: [Type] -> TcDepVars
 -- See Note [Dependent type variables]
 splitDepVarsOfTypes tys
   = DV { dv_kvs = dep_vars
-       , dv_tvs = nondep_vars `minusVarSet` dep_vars }
+       , dv_tvs = nondep_vars `minusDVarSet` dep_vars }
   where
     Pair dep_vars nondep_vars = foldMap split_dep_vars tys
 
 -- | Worker for 'splitDepVarsOfType'. This might output the same var
 -- in both sets, if it's used in both a type and a kind.
-split_dep_vars :: Type -> Pair TyCoVarSet   -- Pair kvs tvs
+-- See Note [TcDepVars determinism]
+split_dep_vars :: Type -> Pair DTyCoVarSet   -- Pair kvs tvs
 split_dep_vars = go
   where
-    go (TyVarTy tv)              = Pair (tyCoVarsOfType $ tyVarKind tv)
-                                        (unitVarSet tv)
+    go (TyVarTy tv)              = Pair (tyCoVarsOfTypeDSet $ tyVarKind tv)
+                                        (unitDVarSet tv)
     go (AppTy t1 t2)             = go t1 `mappend` go t2
     go (TyConApp _ tys)          = foldMap go tys
     go (ForAllTy (Anon arg) res) = go arg `mappend` go res
     go (ForAllTy (Named tv _) ty)
       = let Pair kvs tvs = go ty in
-        Pair (kvs `delVarSet` tv `unionVarSet` tyCoVarsOfType (tyVarKind tv))
-             (tvs `delVarSet` tv)
+        Pair (kvs `delDVarSet` tv
+                  `extendDVarSetList` tyCoVarsOfTypeList (tyVarKind tv))
+             (tvs `delDVarSet` tv)
     go (LitTy {})                = mempty
-    go (CastTy ty co)            = go ty `mappend` Pair (tyCoVarsOfCo co)
-                                                        emptyVarSet
-    go (CoercionTy co)           = Pair (tyCoVarsOfCo co) emptyVarSet
+    go (CastTy ty co)            = go ty `mappend` Pair (tyCoVarsOfCoDSet co)
+                                                        emptyDVarSet
+    go (CoercionTy co)           = Pair (tyCoVarsOfCoDSet co) emptyDVarSet
 
 isTouchableOrFmv ctxt_tclvl tv
   = ASSERT2( isTcTyVar tv, ppr tv )

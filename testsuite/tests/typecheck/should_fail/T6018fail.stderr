@@ -76,7 +76,7 @@ T6018fail.hs:66:15: error:
     Kind variable ‘k’ cannot be inferred from the right-hand side.
     (enabling -fprint-explicit-kinds might help)
     In the type family equation:
-      forall k (a :: k) (b :: k).
+      forall k (b :: k) (a :: k).
         Fc a b = Int -- Defined at T6018fail.hs:66:15
 
 T6018fail.hs:70:15: error:
@@ -85,7 +85,7 @@ T6018fail.hs:70:15: error:
     cannot be inferred from the right-hand side.
     (enabling -fprint-explicit-kinds might help)
     In the type family equation:
-      forall k (a :: k) (b :: k).
+      forall k (b :: k) (a :: k).
         Gc a b = Int -- Defined at T6018fail.hs:70:15
 
 T6018fail.hs:75:15: error:
@@ -142,7 +142,7 @@ T6018fail.hs:118:15: error:
     cannot be inferred from the right-hand side.
     (enabling -fprint-explicit-kinds might help)
     In the type family equation:
-      forall k a b (c :: k).
+      forall k (c :: k) b a.
         G7 a b c = [G7a a b c] -- Defined at T6018fail.hs:118:15
 
 T6018fail.hs:129:1: error:

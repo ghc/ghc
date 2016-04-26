@@ -126,7 +126,7 @@ module Type (
         typeSize,
 
         -- * Well-scoped lists of variables
-        varSetElemsWellScoped, toposortTyVars, tyCoVarsOfTypeWellScoped,
+        dVarSetElemsWellScoped, toposortTyVars, tyCoVarsOfTypeWellScoped,
         tyCoVarsOfTypesWellScoped,
 
         -- * Type comparison
@@ -1879,9 +1879,14 @@ toposortTyVars tvs = reverse $
                          (tyCoVarsOfTypeList (tyVarKind tv)) )
             | tv <- tvs ]
 
--- | Extract a well-scoped list of variables from a set of variables.
-varSetElemsWellScoped :: VarSet -> [Var]
-varSetElemsWellScoped = toposortTyVars . varSetElems
+-- | Extract a well-scoped list of variables from a deterministic set of
+-- variables. The result is deterministic.
+-- NB: There used to exist varSetElemsWellScoped :: VarSet -> [Var] which
+-- took a non-deterministic set and produced a non-deterministic
+-- well-scoped list. If you care about the list being well-scoped you also
+-- most likely care about it being in deterministic order.
+dVarSetElemsWellScoped :: DVarSet -> [Var]
+dVarSetElemsWellScoped = toposortTyVars . dVarSetElems
 
 -- | Get the free vars of a type in scoped order
 tyCoVarsOfTypeWellScoped :: Type -> [TyVar]

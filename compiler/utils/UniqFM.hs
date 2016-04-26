@@ -66,7 +66,7 @@ module UniqFM (
         lookupWithDefaultUFM, lookupWithDefaultUFM_Directly,
         eltsUFM, keysUFM, splitUFM,
         ufmToSet_Directly,
-        ufmToList,
+        ufmToList, ufmToIntMap,
         joinUFM, pprUniqFM, pprUFM, pluralUFM
     ) where
 
@@ -300,6 +300,9 @@ keysUFM (UFM m) = map getUnique $ M.keys m
 eltsUFM (UFM m) = M.elems m
 ufmToSet_Directly (UFM m) = M.keysSet m
 ufmToList (UFM m) = map (\(k, v) -> (getUnique k, v)) $ M.toList m
+
+ufmToIntMap :: UniqFM elt -> M.IntMap elt
+ufmToIntMap (UFM m) = m
 
 -- Hoopl
 joinUFM :: JoinFun v -> JoinFun (UniqFM v)

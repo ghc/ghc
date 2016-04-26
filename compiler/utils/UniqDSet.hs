@@ -19,7 +19,7 @@ module UniqDSet (
         mkUniqDSet,
         addOneToUniqDSet, addListToUniqDSet,
         unionUniqDSets, unionManyUniqDSets,
-        minusUniqDSet,
+        minusUniqDSet, uniqDSetMinusUniqSet,
         intersectUniqDSets,
         intersectsUniqDSets,
         foldUniqDSet,
@@ -33,6 +33,7 @@ module UniqDSet (
     ) where
 
 import UniqDFM
+import UniqSet
 import Unique
 
 type UniqDSet a = UniqDFM a
@@ -65,8 +66,11 @@ unionManyUniqDSets :: [UniqDSet a] -> UniqDSet a
 unionManyUniqDSets [] = emptyUniqDSet
 unionManyUniqDSets sets = foldr1 unionUniqDSets sets
 
-minusUniqDSet  :: UniqDSet a -> UniqDSet a -> UniqDSet a
+minusUniqDSet :: UniqDSet a -> UniqDSet a -> UniqDSet a
 minusUniqDSet = minusUDFM
+
+uniqDSetMinusUniqSet :: UniqDSet a -> UniqSet a -> UniqDSet a
+uniqDSetMinusUniqSet = udfmMinusUFM
 
 intersectUniqDSets :: UniqDSet a -> UniqDSet a -> UniqDSet a
 intersectUniqDSets = intersectUDFM

@@ -11,7 +11,7 @@ T10971a.hs:7:11: warning: [-Wtype-defaults (in -Wall)]
 
 T10971a.hs:8:1: warning: [-Wmissing-signatures (in -Wall)]
     Top-level binding with no type signature:
-      g :: forall a b. (a -> b) -> [a] -> [b]
+      g :: forall b a. (a -> b) -> [a] -> [b]
 
 T10971a.hs:8:6: warning: [-Wname-shadowing (in -Wall)]
     This binding for ‘f’ shadows the existing binding

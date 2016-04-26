@@ -828,6 +828,19 @@ has free vars {f,a}, but we must add 'k' as well! Hence step (3).
 * quantifyTyVars never quantifies over
     - a coercion variable
     - a runtime-rep variable
+
+Note [quantifyTyVars determinism]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The results of quantifyTyVars are wrapped in a forall and can end up in the
+interface file. One such example is inferred type signatures. They also affect
+the results of optimizations, for example worker-wrapper. This means that to
+get deterministic builds quantifyTyVars needs to be deterministic.
+
+To achieve this TcDepVars is backed by deterministic sets which allows them
+to be later converted to a list in a deterministic order.
+
+For more information about deterministic sets see
+Note [Deterministic UniqFM] in UniqDFM.
 -}
 
 quantifyTyVars, quantifyZonkedTyVars
@@ -841,25 +854,25 @@ quantifyTyVars, quantifyZonkedTyVars
 -- The zonked variant assumes everything is already zonked.
 
 quantifyTyVars gbl_tvs (DV { dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
-  = do { dep_tkvs    <- zonkTyCoVarsAndFV dep_tkvs
-       ; nondep_tkvs <- (`minusVarSet` dep_tkvs) <$>
-                        zonkTyCoVarsAndFV nondep_tkvs
+  = do { dep_tkvs    <- zonkTyCoVarsAndFVDSet dep_tkvs
+       ; nondep_tkvs <- (`minusDVarSet` dep_tkvs) <$>
+                        zonkTyCoVarsAndFVDSet nondep_tkvs
        ; gbl_tvs     <- zonkTyCoVarsAndFV gbl_tvs
        ; quantifyZonkedTyVars gbl_tvs (DV { dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs }) }
 
 quantifyZonkedTyVars gbl_tvs (DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
-  = do { let all_cvs = filterVarSet isCoVar dep_tkvs
-             dep_kvs = varSetElemsWellScoped $
-                       dep_tkvs `minusVarSet` gbl_tvs
-                                `minusVarSet` closeOverKinds all_cvs
-                 -- varSetElemsWellScoped: put the kind variables into
+  = do { let all_cvs = filterVarSet isCoVar $ dVarSetToVarSet dep_tkvs
+             dep_kvs = dVarSetElemsWellScoped $
+                       dep_tkvs `dVarSetMinusVarSet` gbl_tvs
+                                `dVarSetMinusVarSet` closeOverKinds all_cvs
+                 -- dVarSetElemsWellScoped: put the kind variables into
                  --    well-scoped order.
                  --    E.g.  [k, (a::k)] not the other way roud
                  -- closeOverKinds all_cvs: do not quantify over coercion
                  --    variables, or any any tvs that a covar depends on
 
-             nondep_tvs = varSetElems $
-                          nondep_tkvs `minusVarSet` gbl_tvs
+             nondep_tvs = dVarSetElems $
+                          nondep_tkvs `dVarSetMinusVarSet` gbl_tvs
                  -- No worry about dependent covars here; they are
                  --    all in dep_tkvs
                  -- No worry about scoping, becuase these are all
@@ -1153,7 +1166,7 @@ tcGetGlobalTyCoVars
 zonkTcTypeInKnot :: TcType -> TcM TcType
 zonkTcTypeInKnot = mapType (zonkTcTypeMapper { tcm_smart = False }) ()
 
-zonkTcTypeAndFV :: TcType -> TcM TyCoVarSet
+zonkTcTypeAndFV :: TcType -> TcM DTyCoVarSet
 -- Zonk a type and take its free variables
 -- With kind polymorphism it can be essential to zonk *first*
 -- so that we find the right set of free variables.  Eg
@@ -1163,7 +1176,7 @@ zonkTcTypeAndFV :: TcType -> TcM TyCoVarSet
 -- NB: This might be called from within the knot, so don't use
 -- smart constructors. See Note [Zonking within the knot] in TcHsType
 zonkTcTypeAndFV ty
-  = tyCoVarsOfType <$> zonkTcTypeInKnot ty
+  = tyCoVarsOfTypeDSet <$> zonkTcTypeInKnot ty
 
 -- | Zonk a type and call 'splitDepVarsOfType' on it.
 -- Works within the knot.
@@ -1188,6 +1201,13 @@ zonkTyCoVar tv | isTcTyVar tv = zonkTcTyVar tv
 
 zonkTyCoVarsAndFV :: TyCoVarSet -> TcM TyCoVarSet
 zonkTyCoVarsAndFV tycovars = tyCoVarsOfTypes <$> mapM zonkTyCoVar (varSetElems tycovars)
+
+-- Takes a deterministic set of TyCoVars, zonks them and returns a
+-- deterministic set of their free variables.
+-- See Note [quantifyTyVars determinism].
+zonkTyCoVarsAndFVDSet :: DTyCoVarSet -> TcM DTyCoVarSet
+zonkTyCoVarsAndFVDSet tycovars =
+  tyCoVarsOfTypesDSet <$> mapM zonkTyCoVar (dVarSetElems tycovars)
 
 zonkTcTyVars :: [TcTyVar] -> TcM [TcType]
 zonkTcTyVars tyvars = mapM zonkTcTyVar tyvars

@@ -34,9 +34,11 @@ module VarSet (
         intersectDVarSet, intersectsDVarSet, disjointDVarSet,
         isEmptyDVarSet, delDVarSet, delDVarSetList,
         minusDVarSet, foldDVarSet, filterDVarSet,
+        dVarSetMinusVarSet,
         transCloDVarSet,
         sizeDVarSet, seqDVarSet,
         partitionDVarSet,
+        dVarSetToVarSet,
     ) where
 
 #include "HsVersions.h"
@@ -47,7 +49,7 @@ import Name     ( Name )
 import UniqSet
 import UniqDSet
 import UniqFM( disjointUFM, pluralUFM, pprUFM )
-import UniqDFM( disjointUDFM )
+import UniqDFM( disjointUDFM, udfmToUfm )
 import Outputable (SDoc)
 
 -- | A non-deterministic set of variables.
@@ -248,6 +250,9 @@ delDVarSet = delOneFromUniqDSet
 minusDVarSet :: DVarSet -> DVarSet -> DVarSet
 minusDVarSet = minusUniqDSet
 
+dVarSetMinusVarSet :: DVarSet -> VarSet -> DVarSet
+dVarSetMinusVarSet = uniqDSetMinusUniqSet
+
 foldDVarSet :: (Var -> a -> a) -> a -> DVarSet -> a
 foldDVarSet = foldUniqDSet
 
@@ -271,6 +276,10 @@ seqDVarSet s = sizeDVarSet s `seq` ()
 -- | Add a list of variables to DVarSet
 extendDVarSetList :: DVarSet -> [Var] -> DVarSet
 extendDVarSetList = addListToUniqDSet
+
+-- | Convert a DVarSet to a VarSet by forgeting the order of insertion
+dVarSetToVarSet :: DVarSet -> VarSet
+dVarSetToVarSet = udfmToUfm
 
 -- | transCloVarSet for DVarSet
 transCloDVarSet :: (DVarSet -> DVarSet)

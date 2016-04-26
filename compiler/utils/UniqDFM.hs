@@ -14,6 +14,7 @@ See Note [Unique Determinism] in Unique for explanation why @Unique@ ordering
 is not deterministic.
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -44,6 +45,7 @@ module UniqDFM (
         intersectsUDFM,
         disjointUDFM,
         minusUDFM,
+        udfmMinusUFM,
         partitionUDFM,
 
         udfmToList,
@@ -59,7 +61,10 @@ import Data.Typeable
 import Data.Data
 import Data.List (sortBy)
 import Data.Function (on)
-import UniqFM (UniqFM, listToUFM_Directly, ufmToList)
+#if __GLASGOW_HASKELL__ < 709
+import Data.Monoid
+#endif
+import UniqFM (UniqFM, listToUFM_Directly, ufmToList, ufmToIntMap)
 
 -- Note [Deterministic UniqFM]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -239,6 +244,11 @@ minusUDFM (UDFM x i) (UDFM y _j) = UDFM (M.difference x y) i
   -- M.difference returns a subset of a left set, so `i` is a good upper
   -- bound.
 
+udfmMinusUFM :: UniqDFM elt1 -> UniqFM elt2 -> UniqDFM elt1
+udfmMinusUFM (UDFM x i) y = UDFM (M.difference x (ufmToIntMap y)) i
+  -- M.difference returns a subset of a left set, so `i` is a good upper
+  -- bound.
+
 -- | Partition UniqDFM into two UniqDFMs according to the predicate
 partitionUDFM :: (elt -> Bool) -> UniqDFM elt -> (UniqDFM elt, UniqDFM elt)
 partitionUDFM p (UDFM m i) =
@@ -282,6 +292,10 @@ alterUDFM f (UDFM m i) k =
 -- | Map a function over every value in a UniqDFM
 mapUDFM :: (elt1 -> elt2) -> UniqDFM elt1 -> UniqDFM elt2
 mapUDFM f (UDFM m i) = UDFM (M.map (fmap f) m) i
+
+instance Monoid (UniqDFM a) where
+  mempty = emptyUDFM
+  mappend = plusUDFM
 
 -- This should not be used in commited code, provided for convenience to
 -- make ad-hoc conversions when developing
