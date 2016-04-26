@@ -48,7 +48,7 @@ import System.IO
 
 -- Build system files and paths
 shakePath :: FilePath
-shakePath = "shake-build"
+shakePath = "hadrian"
 
 shakeFilesPath :: FilePath
 shakeFilesPath = shakePath -/- ".db"
