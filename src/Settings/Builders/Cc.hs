@@ -4,19 +4,19 @@ import Development.Shake.FilePath
 import Expression
 import Oracles.Config.Setting
 import Oracles.PackageData
-import Predicates (stagedBuilder)
+import Predicates (builder)
 import Settings
 import Settings.Builders.Common (cIncludeArgs)
 
 -- TODO: handle custom $1_$2_MKDEPENDC_OPTS and
 ccBuilderArgs :: Args
 ccBuilderArgs = mconcat
-    [ stagedBuilder (Cc Compile) ?
+    [ builder (Cc Compile) ?
         mconcat [ commonCcArgs
                 , arg "-c", arg =<< getInput
                 , arg "-o", arg =<< getOutput ]
 
-    , stagedBuilder (Cc FindDependencies) ? do
+    , builder (Cc FindDependencies) ? do
         output <- getOutput
         mconcat [ arg "-E"
                 , arg "-MM"

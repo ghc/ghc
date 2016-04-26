@@ -4,12 +4,12 @@ import Base
 import Expression
 import GHC
 import Oracles.Config.Setting
-import Predicates (builderGhc, package, stage0)
+import Predicates (builder, package, stage0)
 import Settings
 
 ghcCabalPackageArgs :: Args
 ghcCabalPackageArgs = package ghcCabal ? mconcat
-    [ builderGhc ?
+    [ builder Ghc ?
       mconcat [ ghcCabalBootArgs
               , remove ["-no-auto-link-packages"] ] ]
 

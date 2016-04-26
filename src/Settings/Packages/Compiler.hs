@@ -5,7 +5,7 @@ import Expression
 import GHC (compiler)
 import Oracles.Config.Setting
 import Oracles.Config.Flag
-import Predicates (builder, builderGhc, package, notStage0)
+import Predicates (builder, package, notStage0)
 import Settings
 
 compilerPackageArgs :: Args
@@ -15,7 +15,7 @@ compilerPackageArgs = package compiler ? do
     path    <- getBuildPath
     mconcat [ builder Alex ? arg "--latin1"
 
-            , builderGhc ? arg ("-I" ++ path)
+            , builder Ghc ? arg ("-I" ++ path)
 
             , builder GhcCabal ? mconcat
               [ arg $ "--ghc-option=-DSTAGE=" ++ show (fromEnum stage + 1)

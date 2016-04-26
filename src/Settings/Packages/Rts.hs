@@ -7,7 +7,7 @@ import Expression
 import GHC (rts, rtsContext)
 import Oracles.Config.Flag
 import Oracles.Config.Setting
-import Predicates (builder, builderCc, builderGhc, package, file)
+import Predicates (builder, package, file)
 import Settings
 import Settings.Builders.Common
 
@@ -52,7 +52,7 @@ rtsPackageArgs = package rts ? do
     ffiIncludeDir  <- getSetting FfiIncludeDir
     ffiLibraryDir  <- getSetting FfiLibDir
     mconcat
-        [ builderCc ? mconcat
+        [ builder Cc ? mconcat
           [ arg "-Irts"
           , arg $ "-I" ++ path
           , arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""
@@ -92,7 +92,7 @@ rtsPackageArgs = package rts ? do
             , file "//Evac_thr.*" ? append [ "-DPARALLEL_GC", "-Irts/sm" ]
             , file "//Scav_thr.*" ? append [ "-DPARALLEL_GC", "-Irts/sm" ] ]
 
-        , builderGhc ? (arg "-Irts" <> includesArgs)
+        , builder Ghc ? (arg "-Irts" <> includesArgs)
 
         , builder (GhcPkg Stage1) ? mconcat
           [ remove ["rts/stage1/inplace-pkg-config"] -- TODO: fix, see #113

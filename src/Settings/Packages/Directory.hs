@@ -2,7 +2,7 @@ module Settings.Packages.Directory (directoryPackageArgs) where
 
 import Expression
 import GHC (directory)
-import Predicates (builderCc, package)
+import Predicates (builder, package)
 
 -- TODO: I had to define symbol __GLASGOW_HASKELL__ as otherwise directory.c is
 -- effectively empty. I presume it was expected that GHC will be used for
@@ -10,4 +10,4 @@ import Predicates (builderCc, package)
 -- only file which requires special treatment when using GCC.
 directoryPackageArgs :: Args
 directoryPackageArgs = package directory ?
-    builderCc ? arg "-D__GLASGOW_HASKELL__"
+    builder Cc ? arg "-D__GLASGOW_HASKELL__"

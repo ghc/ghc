@@ -8,7 +8,7 @@ import Settings
 import Settings.Builders.GhcCabal
 
 ghcPkgBuilderArgs :: Args
-ghcPkgBuilderArgs = stagedBuilder GhcPkg ? (initArgs <> updateArgs)
+ghcPkgBuilderArgs = builder GhcPkg ? (initArgs <> updateArgs)
 
 initPredicate :: Predicate
 initPredicate = orM $ map (file . packageDbDirectory) [Stage0 ..]

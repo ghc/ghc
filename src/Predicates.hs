@@ -1,8 +1,7 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase, FlexibleInstances #-}
 -- | Convenient predicates
 module Predicates (
-    stage, package, builder, stagedBuilder, builderCc, builderGhc, file, way,
-    stage0, stage1, stage2, notStage0, notPackage
+    stage, package, builder, file, way, stage0, stage1, stage2, notStage0, notPackage
     ) where
 
 import Base
@@ -16,27 +15,19 @@ stage s = (s ==) <$> getStage
 package :: Package -> Predicate
 package p = (p ==) <$> getPackage
 
--- | Is an unstaged builder is being used such as /GhcCabal/?
-builder :: Builder -> Predicate
-builder b = (b ==) <$> getBuilder
+-- TODO: Also add needBuilder, builderPath, etc.
+-- | Is a particular builder being used?
+class BuilderLike a where
+    builder :: a -> Predicate
 
--- TODO: Use type classes to unify various builder predicates (also needBuilder,
--- builderPath, etc).
--- | Is a certain builder used in the current stage?
-stagedBuilder :: (Stage -> Builder) -> Predicate
-stagedBuilder stageBuilder = builder . stageBuilder =<< getStage
+instance BuilderLike Builder where
+    builder b = (b ==) <$> getBuilder
 
--- | Are we building with a C compiler?
-builderCc :: Predicate
-builderCc = getBuilder >>= \case
-    Cc _ _ -> return True
-    _      -> return False
+instance BuilderLike a => BuilderLike (Stage -> a) where
+    builder stagedBuilder = builder . stagedBuilder =<< getStage
 
--- | Are we building with GHC?
-builderGhc :: Predicate
-builderGhc = getBuilder >>= \case
-    Ghc _ _ -> return True
-    _       -> return False
+instance BuilderLike a => BuilderLike (CompilerMode -> a) where
+    builder compiler = anyM (builder . compiler) [Compile, FindDependencies, Link]
 
 -- | Does any of the output files match a given pattern?
 file :: FilePattern -> Predicate

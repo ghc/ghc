@@ -18,7 +18,7 @@ buildRootPath = ".build"
 
 -- Control user-specific settings
 userArgs :: Args
-userArgs = builderGhc ? remove ["-Wall", "-fwarn-tabs"]
+userArgs = builder Ghc ? remove ["-Wall", "-fwarn-tabs"]
 
 -- Control which packages get to be built
 userPackages :: Packages

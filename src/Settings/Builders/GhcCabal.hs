@@ -99,7 +99,7 @@ bootPackageDbArgs = do
     lift $ initialisePackageDb stage
     stage0 ? do
         path   <- getTopDirectory
-        prefix <- ifM builderGhc (return "-package-db ") (return "--package-db=")
+        prefix <- ifM (builder Ghc) (return "-package-db ") (return "--package-db=")
         arg $ prefix ++ path -/- packageDbDirectory Stage0
 
 packageConstraints :: Args
