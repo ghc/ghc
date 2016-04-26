@@ -20,7 +20,7 @@ module TcHsType (
         tcImplicitTKBndrs, tcImplicitTKBndrsType, tcExplicitTKBndrs,
 
                 -- Type checking type and class decls
-        kcLookupKind, kcTyClTyVars, tcTyClTyVars,
+        kcLookupTcTyCon, kcTyClTyVars, tcTyClTyVars,
         tcHsConArgType, tcDataKindSig,
 
         -- Kind-checking types
@@ -1200,18 +1200,17 @@ tcWildCardBinders wcs thing_inside
 -- HsDecls.
 --
 -- This function does not do telescope checking.
-kcHsTyVarBndrs :: Bool    -- ^ True <=> the decl being checked has a CUSK
+kcHsTyVarBndrs :: Name    -- ^ of the thing being checked
+               -> Bool    -- ^ True <=> the decl being checked has a CUSK
                -> Bool    -- ^ True <=> the decl is an open type/data family
                -> Bool    -- ^ True <=> all the hsq_implicit are *kind* vars
                           -- (will give these kind * if -XNoTypeInType)
                -> LHsQTyVars Name
                -> TcM (Kind, r)  -- ^ the result kind, possibly with other info
-               -> TcM ([TcTyBinder], TcKind, r)
-                     -- ^ The bound variables in the kind, the result kind,
-                     -- with the other info.
-                     -- Always returns Named binders; sort out Named vs. Anon
-                     -- yourself.
-kcHsTyVarBndrs cusk open_fam all_kind_vars
+               -> TcM (Bool -> TcTyCon, r)
+                     -- ^ a way to make a TcTyCon, with the other info.
+                     -- The Bool says whether the tycon can be unsaturated.
+kcHsTyVarBndrs name cusk open_fam all_kind_vars
   (HsQTvs { hsq_implicit = kv_ns, hsq_explicit = hs_tvs
           , hsq_dependent = dep_names }) thing_inside
   | cusk
@@ -1235,17 +1234,40 @@ kcHsTyVarBndrs cusk open_fam all_kind_vars
        ; when (not (null meta_tvs)) $
          report_non_cusk_tvs (qkvs ++ tvs)
 
-       ; return ( mkNamedBinders Specified good_tvs ++ binders
-                , res_kind, stuff ) }}
+          -- if any of the scoped_kvs aren't actually mentioned in a binder's
+          -- kind (or the return kind), then we're in the CUSK case from
+          -- Note [Free-floating kind vars]
+       ; let tycon_tyvars      = good_tvs ++ tvs
+             all_mentioned_tvs = mapUnionVarSet (tyCoVarsOfType . tyVarKind)
+                                                tycon_tyvars
+                                 `unionVarSet` tyCoVarsOfType res_kind
+             unmentioned_kvs   = filterOut (`elemVarSet` all_mentioned_tvs)
+                                           scoped_kvs
+       ; reportFloatingKvs name tycon_tyvars unmentioned_kvs
+
+       ; let final_binders      = mkNamedBinders Specified good_tvs ++ binders
+             mk_tctc unsat      = mkTcTyCon name tycon_tyvars
+                                            final_binders res_kind
+                                            unsat (scoped_kvs ++ tvs)
+                                -- the tvs contain the binders already
+                                -- in scope from an enclosing class, but
+                                -- re-adding tvs to the env't doesn't cause
+                                -- harm
+       ; return ( mk_tctc, stuff ) }}
 
   | otherwise
   = do { kv_kinds <- mk_kv_kinds
        ; scoped_kvs <- zipWithM newSigTyVar kv_ns kv_kinds
                      -- the names must line up in splitTelescopeTvs
-       ; (_, binders, res_kind, stuff)
+       ; (tvs, binders, res_kind, stuff)
            <- tcExtendTyVarEnv2 (kv_ns `zip` scoped_kvs) $
               bind_telescope hs_tvs thing_inside
-       ; return (binders, res_kind, stuff) }
+       ; let   -- NB: Don't add scoped_kvs to tyConTyVars, because they
+               -- must remain lined up with the binders
+             mk_tctc unsat = mkTcTyCon name tvs
+                                       binders res_kind unsat
+                                       (scoped_kvs ++ tvs)
+       ; return (mk_tctc, stuff) }
   where
       -- if -XNoTypeInType and we know all the implicits are kind vars,
       -- just give the kind *. This prevents test
@@ -1486,71 +1508,6 @@ look through unification variables!
 
 Hence using zonked_kinds when forming tvs'.
 
-Note [Typechecking telescopes]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The function tcTyClTyVars has to bind the scoped type and kind
-variables in a telescope. For example:
-
-class Foo k (t :: Proxy k -> k2) where ...
-
-By the time [kt]cTyClTyVars is called, we know *something* about the kind of Foo,
-at least that it has the form
-
-  Foo :: forall (k2 :: mk2). forall (k :: mk1) -> (Proxy mk1 k -> k2) -> Constraint
-
-if it has a CUSK (Foo does not, in point of fact) or
-
-  Foo :: forall (k :: mk1) -> (Proxy mk1 k -> k2) -> Constraint
-
-if it does not, where mk1 and mk2 are meta-kind variables (mk1, mk2 :: *).
-
-When calling tcTyClTyVars, this kind is further generalized w.r.t. any
-free variables appearing in mk1 or mk2. So, mk_tvs must handle
-that possibility. Perhaps we discover that mk1 := Maybe k3 and mk2 := *,
-so we have
-
-Foo :: forall (k3 :: *). forall (k2 :: *). forall (k :: Maybe k3) ->
-       (Proxy (Maybe k3) k -> k2) -> Constraint
-
-We now have several sorts of variables to think about:
-1) The variable k3 is not mentioned in the source at all. It is neither
-   explicitly bound nor ever used. It is *not* a scoped kind variable,
-   and should not be bound when type-checking the scope of the telescope.
-
-2) The variable k2 is mentioned in the source, but it is not explicitly
-   bound. It *is* a scoped kind variable, and will appear in the
-   hsq_implicit field of a LHsTyVarBndrs.
-
-   2a) In the non-CUSK case, these variables won't have been generalized
-       yet and don't appear in the looked-up kind. So we just return these
-       in a NameSet.
-
-3) The variable k is mentioned in the source with an explicit binding.
-   It *is* a scoped type variable, and will appear in the
-   hsq_explicit field of a LHsTyVarBndrs.
-
-4) The variable t is bound in the source, but it is never mentioned later
-   in the kind. It *is* a scoped variable (it can appear in the telescope
-   scope, even though it is non-dependent), and will appear in the
-   hsq_explicit field of a LHsTyVarBndrs.
-
-splitTelescopeTvs walks through the output of a splitPiTys on the
-telescope head's kind (Foo, in our example), creating a list of tyvars
-to be bound within the telescope scope. It must simultaneously walk
-through the hsq_implicit and hsq_explicit fields of a LHsTyVarBndrs.
-Comments in the code refer back to the cases in this Note.
-
-Cases (1) and (2) can be mixed together, but these cases must appear before
-cases (3) and (4) (the implicitly bound vars always precede the explicitly
-bound ones). So, we handle the lists in two stages (mk_tvs and
-mk_tvs2).
-
-As a further wrinkle, it's possible that the variables in case (2) have
-been reordered. This is because hsq_implicit is ordered by the renamer,
-but there may be dependency among the variables. Of course, the order in
-the kind must take dependency into account. So we use a NameSet to keep
-these straightened out.
-
 Note [Free-floating kind vars]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -1576,174 +1533,43 @@ of a tycon tyvar. But it isn't.
 Why accept S? Because kind inference tells us that a has kind k, so it's
 all OK.
 
-Here's the approach: in the first pass ("kind-checking") we just bring
-k into scope. In the second pass, we certainly hope that k has been
-integrated into the type's (generalized) kind, and so it should be found
-by splitTelescopeTvs. If it's not, then we must have a definition like
-T, and we reject. (But see Note [Tiresome kind checking] about some extra
-processing necessary in the second pass.)
+Our approach depends on whether or not the datatype has a CUSK.
 
-Note [Tiresome kind matching]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Because of the use of SigTvs in kind inference (see #11203, for example)
-sometimes kind variables come into tcTyClTyVars (the second, desugaring
-pass in TcTyClDecls) with the wrong names. The best way to fix this up
-is just to unify the kinds, again. So we return HsKind/Kind pairs from
-splitTelescopeTvs that can get unified in tcTyClTyVars, but only if there
-are kind vars the didn't link up in splitTelescopeTvs.
+Non-CUSK: In the first pass (kcTyClTyVars) we just bring
+k into scope. In the second pass (tcTyClTyVars),
+we check to make sure that k has been unified with some other variable
+(or generalized over, making k into a skolem). If it hasn't been, then
+it must be a free-floating kind var. Error.
+
+CUSK: When we determine the tycon's final, never-to-be-changed kind
+in kcHsTyVarBndrs, we check to make sure all implicitly-bound kind
+vars are indeed mentioned in a kind somewhere. If not, error.
 
 -}
 
 --------------------
 -- getInitialKind has made a suitably-shaped kind for the type or class
--- Unpack it, and attribute those kinds to the type variables
--- Extend the env with bindings for the tyvars, taken from
--- the kind of the tycon/class.  Give it to the thing inside, and
--- check the result kind matches
-kcLookupKind :: Name -> TcM ([TyBinder], Kind)
-kcLookupKind nm
+-- Look it up in the local environment. This is used only for tycons
+-- that we're currently type-checking, so we're sure to find a TcTyCon.
+kcLookupTcTyCon :: Name -> TcM TcTyCon
+kcLookupTcTyCon nm
   = do { tc_ty_thing <- tcLookup nm
-       ; case tc_ty_thing of
-           ATcTyCon tc         -> return (tyConBinders tc, tyConResKind tc)
-           AGlobal (ATyCon tc) -> return (tyConBinders tc, tyConResKind tc)
-           _                   -> pprPanic "kcLookupKind" (ppr tc_ty_thing) }
-
--- See Note [Typechecking telescopes]
-splitTelescopeTvs :: [TyBinder]   -- telescope binders
-                  -> LHsQTyVars Name
-                  -> ( [TyVar]    -- scoped type variables
-                     , NameSet    -- ungeneralized implicit variables (case 2a)
-                     , [TyVar]    -- implicit type variables (cases 1 & 2)
-                     , [TyVar]    -- explicit type variables (cases 3 & 4)
-                     , [(LHsKind Name, Kind)] ) -- see Note [Tiresome kind matching]
-splitTelescopeTvs bndrs tvbs@(HsQTvs { hsq_implicit = hs_kvs
-                                     , hsq_explicit = hs_tvs })
-  = let (scoped_tvs, non_cusk_imp_names, imp_tvs, exp_tvs, kind_matches)
-          = mk_tvs [] [] bndrs (mkNameSet hs_kvs) hs_tvs
-    in
-    (scoped_tvs, non_cusk_imp_names, imp_tvs, exp_tvs, kind_matches)
-  where
-    mk_tvs :: [TyVar]    -- scoped tv accum (reversed)
-           -> [TyVar]    -- implicit tv accum (reversed)
-           -> [TyBinder]
-           -> NameSet             -- implicit variables
-           -> [LHsTyVarBndr Name] -- explicit variables
-           -> ( [TyVar]           -- the tyvars to be lexically bound
-              , NameSet           -- Case 2a names
-              , [TyVar]           -- implicit tyvars
-              , [TyVar]           -- explicit tyvars
-              , [(LHsKind Name, Kind)] ) -- tiresome kind matches
-    mk_tvs scoped_tv_acc imp_tv_acc (bndr : bndrs) all_hs_kvs all_hs_tvs
-      | Just tv <- binderVar_maybe bndr
-      , isInvisibleBinder bndr
-      , let tv_name = getName tv
-      , tv_name `elemNameSet` all_hs_kvs
-      = mk_tvs (tv : scoped_tv_acc) (tv : imp_tv_acc)
-               bndrs (all_hs_kvs `delFromNameSet` tv_name) all_hs_tvs      -- Case (2)
-
-      | Just tv <- binderVar_maybe bndr
-      , isInvisibleBinder bndr
-      = mk_tvs scoped_tv_acc (tv : imp_tv_acc)
-               bndrs all_hs_kvs all_hs_tvs  -- Case (1)
-
-     -- there may actually still be some hs_kvs, if we're kind checking
-     -- a non-CUSK. The kinds *aren't* generalized, so we won't see them
-     -- here.
-    mk_tvs scoped_tv_acc imp_tv_acc all_bndrs all_hs_kvs all_hs_tvs
-      = let (scoped, exp_tvs, kind_matches)
-              = mk_tvs2 scoped_tv_acc [] [] all_bndrs all_hs_tvs in
-        (scoped, all_hs_kvs, reverse imp_tv_acc, exp_tvs, kind_matches)
-           -- no more Case (1) or (2)
-
-    -- This can't handle Case (1) or Case (2) from [Typechecking telescopes]
-    mk_tvs2 :: [TyVar]
-            -> [TyVar]   -- new parameter: explicit tv accum (reversed)
-            -> [(LHsKind Name, Kind)]  -- tiresome kind matches accum
-            -> [TyBinder]
-            -> [LHsTyVarBndr Name]
-            -> ( [TyVar]
-               , [TyVar]   -- explicit tvs only
-               , [(LHsKind Name, Kind)] )  -- tiresome kind matches
-    mk_tvs2 scoped_tv_acc exp_tv_acc kind_match_acc (bndr : bndrs) (hs_tv : hs_tvs)
-      | Just tv <- binderVar_maybe bndr
-      = ASSERT2( isVisibleBinder bndr, err_doc )
-        ASSERT( getName tv == hsLTyVarName hs_tv )
-        mk_tvs2 (tv : scoped_tv_acc) (tv : exp_tv_acc) kind_match_acc' bndrs hs_tvs
-            -- Case (3)
-
-      | otherwise
-      = ASSERT( isVisibleBinder bndr )
-        let tv = mkTyVar (hsLTyVarName hs_tv) (binderType bndr) in
-        mk_tvs2 (tv : scoped_tv_acc) (tv : exp_tv_acc) kind_match_acc' bndrs hs_tvs
-               -- Case (4)
-      where
-        err_doc = vcat [ ppr (bndr : bndrs)
-                       , ppr (hs_tv : hs_tvs)
-                       , ppr tvbs ]
-
-        kind_match_acc' = case hs_tv of
-          L _ (UserTyVar {})          -> kind_match_acc
-          L _ (KindedTyVar _ hs_kind) -> (hs_kind, kind) : kind_match_acc
-            where kind = binderType bndr
-
-    mk_tvs2 scoped_tv_acc exp_tv_acc kind_match_acc [] [] -- All done!
-      = ( reverse scoped_tv_acc
-        , reverse exp_tv_acc
-        , kind_match_acc )   -- no need to reverse; it's not ordered
-
-    mk_tvs2 _ _ _ all_bndrs all_hs_tvs
-      = pprPanic "splitTelescopeTvs 2" (vcat [ ppr all_bndrs
-                                             , ppr all_hs_tvs ])
-
+       ; return $ case tc_ty_thing of
+           ATcTyCon tc -> tc
+           _           -> pprPanic "kcLookupTcTyCon" (ppr tc_ty_thing) }
 
 -----------------------
--- | "Kind check" the tyvars to a tycon. This is used during the "kind-checking"
+-- | Bring tycon tyvars into scope. This is used during the "kind-checking"
 -- pass in TcTyClsDecls. (Never in getInitialKind, never in the
--- "type-checking"/desugaring pass.) It works only for LHsQTyVars associated
--- with a tycon, whose kind is known (partially) via getInitialKinds.
+-- "type-checking"/desugaring pass.)
 -- Never emits constraints, though the thing_inside might.
-kcTyClTyVars :: Name   -- ^ of the tycon
-             -> LHsQTyVars Name
-             -> TcM a -> TcM a
-kcTyClTyVars tycon hs_tvs thing_inside
-  = do { (binders, res_kind) <- kcLookupKind tycon
-       ; let (scoped_tvs, non_cusk_kv_name_set, all_kvs, all_tvs, _)
-               = splitTelescopeTvs binders hs_tvs
-       ; traceTc "kcTyClTyVars splitTelescopeTvs:"
-           (vcat [ text "Tycon:" <+> ppr tycon
-                 , text "Binders:" <+> ppr binders
-                 , text "res_kind:" <+> ppr res_kind
-                 , text "hs_tvs:" <+> ppr hs_tvs
-                 , text "scoped tvs:" <+> pprWithCommas pprTvBndr scoped_tvs
-                 , text "implicit tvs:" <+> pprWithCommas pprTvBndr all_kvs
-                 , text "explicit tvs:" <+> pprWithCommas pprTvBndr all_tvs
-                 , text "non-CUSK kvs:" <+> ppr non_cusk_kv_name_set ] )
+kcTyClTyVars :: Name -> TcM a -> TcM a
+kcTyClTyVars tycon_name thing_inside
+  = do { tycon <- kcLookupTcTyCon tycon_name
+       ; tcExtendTyVarEnv (tcTyConScopedTyVars tycon) $ thing_inside }
 
-            -- need to look up the non-cusk kvs in order to get their
-            -- kinds right, in case the kinds were informed by
-            -- the getInitialKinds pass
-       ; let non_cusk_kv_names = nameSetElems non_cusk_kv_name_set
-             free_kvs          = tyCoVarsOfTypes $
-                                 map tyVarKind (all_kvs ++ all_tvs)
-             mk_kv kv_name     = case lookupVarSetByName free_kvs kv_name of
-                                   Just kv -> return kv
-                                   Nothing ->
-                                     -- this kv isn't mentioned in the
-                                     -- LHsQTyVars at all. But maybe
-                                     -- it's mentioned in the body
-                                     -- In any case, just gin up a
-                                     -- meta-kind for it
-                                     do { kv_kind <- newMetaKindVar
-                                        ; return (new_skolem_tv kv_name kv_kind) }
-       ; non_cusk_kvs <- mapM mk_kv non_cusk_kv_names
-
-             -- The non_cusk_kvs are still scoped; they are mentioned by
-             -- name by the user
-       ; tcExtendTyVarEnv (non_cusk_kvs ++ scoped_tvs) $
-         thing_inside }
-
-tcTyClTyVars :: Name -> LHsQTyVars Name      -- LHS of the type or class decl
-             -> ([TyVar] -> [TyVar] -> [TyBinder] -> Kind -> TcM a) -> TcM a
+tcTyClTyVars :: Name
+             -> ([TyVar] -> [TyBinder] -> Kind -> TcM a) -> TcM a
 -- ^ Used for the type variables of a type or class decl
 -- on the second full pass (type-checking/desugaring) in TcTyClDecls.
 -- This is *not* used in the initial-kind run, nor in the "kind-checking" pass.
@@ -1752,7 +1578,7 @@ tcTyClTyVars :: Name -> LHsQTyVars Name      -- LHS of the type or class decl
 -- (tcTyClTyVars T [a,b] thing_inside)
 --   where T : forall k1 k2 (a:k1 -> *) (b:k1). k2 -> *
 --   calls thing_inside with arguments
---      [k1,k2] [a,b] [k1:*, k2:*, a:k1 -> *, b:k1] (k2 -> *)
+--      [k1,k2,a,b] [k1:*, k2:*, Anon (k1 -> *), Anon k1] (k2 -> *)
 --   having also extended the type environment with bindings
 --   for k1,k2,a,b
 --
@@ -1760,69 +1586,27 @@ tcTyClTyVars :: Name -> LHsQTyVars Name      -- LHS of the type or class decl
 --
 -- The LHsTyVarBndrs is always user-written, and the full, generalised
 -- kind of the tycon is available in the local env.
-tcTyClTyVars tycon hs_tvs thing_inside
-  = do { (binders, res_kind) <- kcLookupKind tycon
-       ; let ( scoped_tvs, float_kv_name_set, all_kvs
-               , all_tvs, kind_matches )
-                 = splitTelescopeTvs binders hs_tvs
-       ; traceTc "tcTyClTyVars splitTelescopeTvs:"
-           (vcat [ text "Tycon:" <+> ppr tycon
-                 , text "Binders:" <+> ppr binders
-                 , text "res_kind:" <+> ppr res_kind
-                 , text "hs_tvs.hsq_implicit:" <+> ppr (hsq_implicit hs_tvs)
-                 , text "hs_tvs.hsq_explicit:" <+> ppr (hsq_explicit hs_tvs)
-                 , text "scoped tvs:" <+> pprWithCommas pprTvBndr scoped_tvs
-                 , text "implicit tvs:" <+> pprWithCommas pprTvBndr all_kvs
-                 , text "explicit tvs:" <+> pprWithCommas pprTvBndr all_tvs
-                 , text "floating kvs:" <+> ppr float_kv_name_set
-                 , text "Tiresome kind matches:" <+> ppr kind_matches ] )
+tcTyClTyVars tycon_name thing_inside
+  = do { tycon <- kcLookupTcTyCon tycon_name
 
-       ; float_kvs <- deal_with_float_kvs float_kv_name_set kind_matches
-                                          scoped_tvs all_tvs
+       ; let scoped_tvs = tcTyConScopedTyVars tycon
 
-       ; tcExtendTyVarEnv (float_kvs ++ scoped_tvs) $
-           -- the float_kvs are already in the all_kvs
-         thing_inside all_kvs all_tvs binders res_kind }
+               -- these are all zonked:
+             tkvs       = tyConTyVars tycon
+             binders    = tyConBinders tycon
+             res_kind   = tyConResKind tycon
+
+          -- See Note [Free-floating kind vars]
+       ; zonked_scoped_tvs <- mapM zonkTcTyVarToTyVar scoped_tvs
+       ; let still_sig_tvs = filter isSigTyVar zonked_scoped_tvs
+       ; checkNoErrs $ reportFloatingKvs tycon_name
+                                         zonked_scoped_tvs still_sig_tvs
+
+          -- Add the *unzonked* tyvars to the env't, because those
+          -- are the ones mentioned in the source.
+       ; tcExtendTyVarEnv scoped_tvs $
+         thing_inside tkvs binders res_kind }
   where
-         -- See Note [Free-floating kind vars]
-    deal_with_float_kvs float_kv_name_set kind_matches scoped_tvs all_tvs
-      | isEmptyNameSet float_kv_name_set
-      = return []
-
-      | otherwise
-      = do { -- the floating kvs might just be renamed
-             -- see Note [Tiresome kind matching]
-           ; let float_kv_names = nameSetElems float_kv_name_set
-           ; float_kv_kinds <- mapM (const newMetaKindVar) float_kv_names
-           ; float_kvs <- zipWithM newSigTyVar float_kv_names float_kv_kinds
-           ; discardResult $
-             tcExtendTyVarEnv (float_kvs ++ scoped_tvs) $
-             solveEqualities $
-             forM kind_matches $ \ (hs_kind, kind) ->
-             do { tc_kind <- tcLHsKind hs_kind
-                ; unifyKind noThing tc_kind kind }
-
-           ; zonked_kvs <- mapM ((return . tcGetTyVar "tcTyClTyVars") <=< zonkTcTyVar)
-                                float_kvs
-           ; let (still_sigs, matched_up) = partition isSigTyVar zonked_kvs
-               -- the still_sigs didn't match with anything. They must be
-               -- "free-floating", as in Note [Free-floating kind vars]
-           ; checkNoErrs $ mapM_ (report_floating_kv all_tvs) still_sigs
-
-               -- the matched up kvs are proper scoped kvs.
-           ; return matched_up }
-
-    report_floating_kv all_tvs kv
-      = addErr $
-        vcat [ text "Kind variable" <+> quotes (ppr kv) <+>
-               text "is implicitly bound in datatype"
-             , quotes (ppr tycon) <> comma <+>
-               text "but does not appear as the kind of any"
-             , text "of its type variables. Perhaps you meant"
-             , text "to bind it (with TypeInType) explicitly somewhere?"
-             , if null all_tvs then empty else
-               hang (text "Type variables with inferred kinds:")
-                  2 (pprTvBndrs all_tvs) ]
 
 -----------------------------------
 tcDataKindSig :: Kind -> TcM ([TyVar], [TyBinder], Kind)
@@ -2151,3 +1935,34 @@ funAppCtxt fun arg arg_no
   = hang (hsep [ text "In the", speakNth arg_no, ptext (sLit "argument of"),
                     quotes (ppr fun) <> text ", namely"])
        2 (quotes (ppr arg))
+
+-- See Note [Free-floating kind vars]
+reportFloatingKvs :: Name        -- of the tycon
+                  -> [TcTyVar]   -- all tyvars, not necessarily zonked
+                  -> [TcTyVar]   -- floating tyvars
+                  -> TcM ()
+reportFloatingKvs tycon_name all_tvs bad_tvs
+  = unless (null bad_tvs) $  -- don't bother zonking if there's no error
+    do { all_tvs <- mapM zonkTcTyVarToTyVar all_tvs
+       ; bad_tvs <- mapM zonkTcTyVarToTyVar bad_tvs
+       ; let (tidy_env, tidy_all_tvs) = tidyOpenTyCoVars emptyTidyEnv all_tvs
+             tidy_bad_tvs             = map (tidyTyVarOcc tidy_env) bad_tvs
+       ; typeintype <- xoptM LangExt.TypeInType
+       ; mapM_ (report typeintype tidy_all_tvs) tidy_bad_tvs }
+  where
+    report typeintype tidy_all_tvs tidy_bad_tv
+      = addErr $
+        vcat [ text "Kind variable" <+> quotes (ppr tidy_bad_tv) <+>
+               text "is implicitly bound in datatype"
+             , quotes (ppr tycon_name) <> comma <+>
+               text "but does not appear as the kind of any"
+             , text "of its type variables. Perhaps you meant"
+             , text "to bind it" <+> ppWhen (not typeintype)
+                                            (text "(with TypeInType)") <+>
+                                 text "explicitly somewhere?"
+             , ppWhen (not (null tidy_all_tvs)) $
+                 hang (text "Type variables with inferred kinds:")
+                 2 (ppr_tv_bndrs tidy_all_tvs) ]
+
+    ppr_tv_bndrs tvs = sep (map pp_tv tvs)
+    pp_tv tv         = parens (ppr tv <+> dcolon <+> ppr (tyVarKind tv))

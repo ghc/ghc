@@ -1966,4 +1966,3 @@ allDistinctTyVars tkvs (ty : tys)
       Nothing -> False
       Just tv | tv `elemVarSet` tkvs -> False
               | otherwise -> allDistinctTyVars (tkvs `extendVarSet` tv) tys
-
