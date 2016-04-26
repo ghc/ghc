@@ -127,7 +127,7 @@ with :: Builder -> Args
 with b = specified b ? do
     top  <- getTopDirectory
     path <- getBuilderPath b
-    lift $ needBuilder laxDependencies b
+    lift $ needBuilder b
     append [withBuilderKey b ++ top -/- path]
 
 withStaged :: (Stage -> Builder) -> Args

@@ -2,7 +2,7 @@ module Settings.User (
     buildRootPath, trackBuildSystem, userArgs, userPackages, userLibraryWays,
     userRtsWays, userKnownPackages, integerLibrary, buildHaddock, validating,
     ghciWithDebugger, ghcProfiled, ghcDebugged, dynamicGhcPrograms,
-    laxDependencies, verboseCommands, turnWarningsIntoErrors, splitObjects
+    verboseCommands, turnWarningsIntoErrors, splitObjects
     ) where
 
 import Base
@@ -73,13 +73,6 @@ ghcProfiled = False
 -- TODO: do we need to be able to set this from command line?
 ghcDebugged :: Bool
 ghcDebugged = False
-
--- | When laxDependencies is set to True, dependencies on the GHC executable
--- are turned into order-only dependencies to avoid needless recompilation when
--- making changes to GHC's sources. In certain situations this can lead to build
--- failures, in which case you should reset the flag (at least temporarily).
-laxDependencies :: Bool
-laxDependencies = False
 
 buildHaddock :: Predicate
 buildHaddock = return cmdBuildHaddock

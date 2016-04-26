@@ -15,7 +15,6 @@ stage s = (s ==) <$> getStage
 package :: Package -> Predicate
 package p = (p ==) <$> getPackage
 
--- TODO: Also add needBuilder, builderPath, etc.
 -- | Is a particular builder being used?
 class BuilderLike a where
     builder :: a -> Predicate

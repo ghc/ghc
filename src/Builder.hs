@@ -141,21 +141,11 @@ getBuilderPath = lift . builderPath
 specified :: Builder -> Action Bool
 specified = fmap (not . null) . builderPath
 
--- TODO: Get rid of laxDependencies -- we no longer need it (use Shake's skip).
--- | Make sure a builder exists on the given path and rebuild it if out of date.
--- If 'laxDependencies' is True then we do not rebuild GHC even if it is out of
--- date (can save a lot of build time when changing GHC).
-needBuilder :: Bool -> Builder -> Action ()
-needBuilder laxDependencies builder = when (isInternal builder) $ do
+-- | Make sure a Builder exists on the given path and rebuild it if out of date.
+needBuilder :: Builder -> Action ()
+needBuilder builder = when (isInternal builder) $ do
     path <- builderPath builder
-    if laxDependencies && allowOrderOnlyDependency builder
-    then orderOnly [path]
-    else need      [path]
-  where
-    allowOrderOnlyDependency :: Builder -> Bool
-    allowOrderOnlyDependency = \case
-        Ghc _ _ -> True
-        _       -> False
+    need [path]
 
 -- Instances for storing in the Shake database
 instance Binary CompilerMode

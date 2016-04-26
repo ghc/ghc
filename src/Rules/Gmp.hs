@@ -42,7 +42,7 @@ configureEnvironment = do
              , builderEnv "NM" Nm ]
   where
     builderEnv var bld = do
-        needBuilder False bld
+        needBuilder bld
         path <- builderPath bld
         return $ AddEnv var path
 

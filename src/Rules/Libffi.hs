@@ -53,7 +53,7 @@ configureEnvironment = do
              , return . AddEnv "LDFLAGS" $ unwords ldFlags ++ " -w" ]
   where
     builderEnv var bld = do
-        needBuilder False bld
+        needBuilder bld
         path <- builderPath bld
         return $ AddEnv var path
 

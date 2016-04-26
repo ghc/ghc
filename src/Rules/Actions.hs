@@ -24,7 +24,7 @@ import Target
 -- built (that is, track changes in the build system).
 buildWithResources :: [(Resource, Int)] -> Target -> Action ()
 buildWithResources rs target@Target {..} = do
-    needBuilder laxDependencies builder
+    needBuilder builder
     path    <- builderPath builder
     argList <- interpret target getArgs
     verbose <- interpret target verboseCommands
@@ -140,14 +140,14 @@ applyPatch :: FilePath -> FilePath -> Action ()
 applyPatch dir patch = do
     let file = dir -/- patch
     need [file]
-    needBuilder False Patch -- TODO: add a specialised version ~needBuilderFalse?
+    needBuilder Patch
     path <- builderPath Patch
     putBuild $ "| Apply patch " ++ file
     quietly $ cmd Shell (EchoStdout False) [Cwd dir] [path, "-p0 <", patch]
 
 runBuilder :: Builder -> [String] -> Action ()
 runBuilder builder args = do
-    needBuilder laxDependencies builder
+    needBuilder builder
     path <- builderPath builder
     let note = if null args then "" else " (" ++ intercalate ", " args ++ ")"
     putBuild $ "| Run " ++ show builder ++ note
