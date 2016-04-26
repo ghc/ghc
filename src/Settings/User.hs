@@ -12,6 +12,7 @@ import Expression
 import Predicates
 import Settings.Default
 
+-- TODO: Rename to _build.
 -- | All build artefacts are stored in 'buildRootPath' directory.
 buildRootPath :: FilePath
 buildRootPath = ".build"
@@ -83,6 +84,7 @@ buildHaddock = return cmdBuildHaddock
 verboseCommands :: Predicate
 verboseCommands = return False
 
+-- TODO: Replace with stage2 ? arg "-Werror"?
 -- | To enable -Werror in Stage2 set turnWarningsIntoErrors = stage2.
 turnWarningsIntoErrors :: Predicate
 turnWarningsIntoErrors = return False
