@@ -9,11 +9,11 @@ The first step is to [install Stack](https://www.stackage.org/stack/windows-x86_
 	stack exec -- pacman -S gcc binutils git automake-wrapper tar make patch autoconf --noconfirm
 	stack exec -- git clone --recursive git://git.haskell.org/ghc.git
 	cd ghc
-	stack exec -- git clone git://github.com/snowleopard/shaking-up-ghc shake-build
-	stack build --stack-yaml=shake-build/stack.yaml --only-dependencies
+	stack exec -- git clone git://github.com/snowleopard/hadrian
+	stack build --stack-yaml=hadrian/stack.yaml --only-dependencies
 	stack exec -- perl boot
 	stack exec -- bash configure --enable-tarballs-autodownload
-	stack exec --stack-yaml=shake-build/stack.yaml -- shake-build/build.bat -j
+	stack exec --stack-yaml=hadrian/stack.yaml -- hadrian/build.bat -j
 
 The entire process should take about an hour.
 
@@ -21,6 +21,6 @@ The entire process should take about an hour.
 
 Here are some alternatives that have been considered, but not yet tested. Use the instructions above.
 
-* Use `shake-build/build.bat --setup` to replace `boot` and `configure`.
+* Use `hadrian/build.bat --setup` to replace `boot` and `configure`.
 * The `pacman` install of `gcc` is probably not necessary, but it does pull in a lot of tools, some of which probably are necessary. Ideally thin the list down.
 * Happy/Alex should be able to be installed by adding them as `build-tools` in the Cabal file.
