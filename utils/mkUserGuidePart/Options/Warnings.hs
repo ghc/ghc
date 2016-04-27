@@ -117,6 +117,11 @@ warningsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-Wno-incomplete-uni-patterns"
          }
+  , flag { flagName = "-Wmax-pmcheck-iterations=<N>"
+         , flagDescription =
+           "the iteration limit for the pattern match checker"
+         , flagType = DynamicFlag
+         }
   , flag { flagName = "-Wincomplete-record-updates"
          , flagDescription = "warn when a record update could fail"
          , flagType = DynamicFlag
