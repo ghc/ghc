@@ -344,7 +344,7 @@ Compiler
    the pattern match checker iterates. Since coverage checking is exponential
    in the general case, setting a default number of iterations prevents memory
    and performance blowups. By default, the number of iterations is set to
-   10000000 but it can be set to ``n`` with: ``-fmax-pmcheck-iterations=n``.
+   2000000 but it can be set with: ``-fmax-pmcheck-iterations=<n>``.
    If the set number of iterations is exceeded, an informative warning is
    issued.
 

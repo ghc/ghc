@@ -516,6 +516,18 @@ of ``-W(no-)*``.
         h = \[] -> 2
         Just k = f y
 
+.. ghc-flag:: -fmax-pmcheck-iterations=<N>
+
+    :default: 2000000
+
+    Sets how many iterations of the pattern-match checker will perform before
+    giving up. This limit is to catch cases where pattern-match checking might
+    be excessively costly (due to the exponential complexity of coverage
+    checking in the general case). It typically shouldn't be necessary to set
+    this unless GHC informs you that it has exceeded the pattern match checker's
+    iteration limit (in which case you may want to consider refactoring your
+    pattern match, for the sake of future readers of your code.
+
 .. ghc-flag:: -Wincomplete-record-updates
 
     .. index::
