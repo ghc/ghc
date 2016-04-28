@@ -183,6 +183,11 @@ pluralVarSet = pluralUFM
 -- shouldn't be a problem.
 -- Having this function helps contain the non-determinism created with
 -- varSetElems.
+-- Passing a list to the pretty-printing function allows the caller
+-- to decide on the order of Vars (eg. toposort them) without them having
+-- to use varSetElems at the call site. This prevents from let-binding
+-- non-deterministically ordered lists and reusing them where determinism
+-- matters.
 pprVarSet :: ([Var] -> SDoc) -- ^ The pretty printing function to use on the
                              -- elements
           -> VarSet          -- ^ The things to be pretty printed
