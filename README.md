@@ -1,7 +1,7 @@
 Hadrian
 =======
 
-[![Linux & OS X status](https://img.shields.io/travis/snowleopard/shaking-up-ghc/master.svg?label=Linux%20%26%20OS%20X)](https://travis-ci.org/snowleopard/shaking-up-ghc) [![Windows status](https://img.shields.io/appveyor/ci/snowleopard/shaking-up-ghc/master.svg?label=Windows)](https://ci.appveyor.com/project/snowleopard/shaking-up-ghc)
+[![Linux & OS X status](https://img.shields.io/travis/snowleopard/hadrian/master.svg?label=Linux%20%26%20OS%20X)](https://travis-ci.org/snowleopard/hadrian) [![Windows status](https://img.shields.io/appveyor/ci/snowleopard/hadrian/master.svg?label=Windows)](https://ci.appveyor.com/project/snowleopard/hadrian)
 
 Hadrian is a new build system for the [Glasgow Haskell Compiler][ghc]. It is based
 on [Shake][shake] and we hope that it will eventually replace the current
