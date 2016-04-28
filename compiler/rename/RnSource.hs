@@ -1420,8 +1420,7 @@ addBootDeps ds_w_fvs
                 | otherwise             = pr
 
              has_local_imports fvs
-                 = foldNameSet ((||) . nameIsHomePackageImport this_mod)
-                               False fvs
+                 = nameSetAny (nameIsHomePackageImport this_mod) fvs
        ; return (add_boot_deps ds_w_fvs) }
 
 

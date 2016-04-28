@@ -22,7 +22,7 @@ module UniqSet (
         unionUniqSets, unionManyUniqSets,
         minusUniqSet,
         intersectUniqSets,
-        foldUniqSet,
+        foldUniqSet, uniqSetAny, uniqSetAll,
         mapUniqSet,
         elementOfUniqSet,
         elemUniqSet_Directly,
@@ -113,3 +113,9 @@ sizeUniqSet = sizeUFM
 isEmptyUniqSet = isNullUFM
 lookupUniqSet = lookupUFM
 uniqSetToList = eltsUFM
+
+uniqSetAny :: (a -> Bool) -> UniqSet a -> Bool
+uniqSetAny = anyUFM
+
+uniqSetAll :: (a -> Bool) -> UniqSet a -> Bool
+uniqSetAll = allUFM

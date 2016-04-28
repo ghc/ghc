@@ -56,7 +56,7 @@ module UniqFM (
         intersectUFM,
         intersectUFM_C,
         disjointUFM,
-        foldUFM, foldUFM_Directly,
+        foldUFM, foldUFM_Directly, anyUFM, allUFM,
         mapUFM, mapUFM_Directly,
         elemUFM, elemUFM_Directly,
         filterUFM, filterUFM_Directly, partitionUFM,
@@ -275,6 +275,8 @@ intersectUFM_C f (UFM x) (UFM y) = UFM (M.intersectionWith f x y)
 disjointUFM (UFM x) (UFM y) = M.null (M.intersection x y)
 
 foldUFM k z (UFM m) = M.fold k z m
+
+
 foldUFM_Directly k z (UFM m) = M.foldWithKey (k . getUnique) z m
 mapUFM f (UFM m) = UFM (M.map f m)
 mapUFM_Directly f (UFM m) = UFM (M.mapWithKey (f . getUnique) m)
@@ -297,6 +299,12 @@ keysUFM (UFM m) = map getUnique $ M.keys m
 eltsUFM (UFM m) = M.elems m
 ufmToSet_Directly (UFM m) = M.keysSet m
 ufmToList (UFM m) = map (\(k, v) -> (getUnique k, v)) $ M.toList m
+
+anyUFM :: (elt -> Bool) -> UniqFM elt -> Bool
+anyUFM p (UFM m) = M.fold ((||) . p) False m
+
+allUFM :: (elt -> Bool) -> UniqFM elt -> Bool
+allUFM p (UFM m) = M.fold ((&&) . p) True m
 
 ufmToIntMap :: UniqFM elt -> M.IntMap elt
 ufmToIntMap (UFM m) = m

@@ -2328,7 +2328,7 @@ pprPotentials dflags sty herald insts
        -- are lexically in scope; these instances are likely
        -- to be more useful
     inst_in_scope :: ClsInst -> Bool
-    inst_in_scope cls_inst = foldNameSet ((&&) . name_in_scope) True $
+    inst_in_scope cls_inst = nameSetAll name_in_scope $
                              orphNamesOfTypes (is_tys cls_inst)
 
     name_in_scope name

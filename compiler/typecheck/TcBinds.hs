@@ -1973,7 +1973,7 @@ isClosedBndrGroup binds = do
     fvs _                           = emptyNameSet
 
     is_closed_ns :: TcTypeEnv -> NameSet -> Bool -> Bool
-    is_closed_ns type_env ns b = foldNameSet ((&&) . is_closed_id type_env) b ns
+    is_closed_ns type_env ns b = b && nameSetAll (is_closed_id type_env) ns
         -- ns are the Names referred to from the RHS of this bind
 
     is_closed_id :: TcTypeEnv -> Name -> Bool

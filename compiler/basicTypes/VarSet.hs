@@ -17,6 +17,7 @@ module VarSet (
         intersectVarSet, intersectsVarSet, disjointVarSet,
         isEmptyVarSet, delVarSet, delVarSetList, delVarSetByKey,
         minusVarSet, foldVarSet, filterVarSet,
+        varSetAny, varSetAll,
         transCloVarSet, fixVarSet,
         lookupVarSet, lookupVarSetByName,
         mapVarSet, sizeVarSet, seqVarSet,
@@ -133,6 +134,12 @@ mapUnionVarSet get_set xs = foldr (unionVarSet . get_set) emptyVarSet xs
 intersectsVarSet s1 s2 = not (s1 `disjointVarSet` s2)
 disjointVarSet   s1 s2 = disjointUFM s1 s2
 subVarSet        s1 s2 = isEmptyVarSet (s1 `minusVarSet` s2)
+
+varSetAny :: (Var -> Bool) -> VarSet -> Bool
+varSetAny = uniqSetAny
+
+varSetAll :: (Var -> Bool) -> VarSet -> Bool
+varSetAll = uniqSetAll
 
 fixVarSet :: (VarSet -> VarSet)   -- Map the current set to a new set
           -> VarSet -> VarSet

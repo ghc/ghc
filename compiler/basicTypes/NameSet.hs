@@ -13,6 +13,7 @@ module NameSet (
         minusNameSet, elemNameSet, nameSetElems, extendNameSet, extendNameSetList,
         delFromNameSet, delListFromNameSet, isEmptyNameSet, foldNameSet, filterNameSet,
         intersectsNameSet, intersectNameSet,
+        nameSetAny, nameSetAll,
 
         -- * Free variables
         FreeVars,
@@ -84,6 +85,12 @@ intersectNameSet  = intersectUniqSets
 delListFromNameSet set ns = foldl delFromNameSet set ns
 
 intersectsNameSet s1 s2 = not (isEmptyNameSet (s1 `intersectNameSet` s2))
+
+nameSetAny :: (Name -> Bool) -> NameSet -> Bool
+nameSetAny = uniqSetAny
+
+nameSetAll :: (Name -> Bool) -> NameSet -> Bool
+nameSetAll = uniqSetAll
 
 {-
 ************************************************************************

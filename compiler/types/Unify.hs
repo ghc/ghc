@@ -454,7 +454,7 @@ niFixTCvSubst tenv = f tenv
         | not_fixpoint = f (mapVarEnv (substTy subst') tenv)
         | otherwise    = subst
         where
-          not_fixpoint  = foldVarSet ((||) . in_domain) False range_tvs
+          not_fixpoint  = varSetAny in_domain range_tvs
           in_domain tv  = tv `elemVarEnv` tenv
 
           range_tvs     = foldVarEnv (unionVarSet . tyCoVarsOfType) emptyVarSet tenv
@@ -1140,7 +1140,7 @@ ty_co_match menv subst ty co lkco rkco
       = noneSet (\v -> elemVarEnv v env) set
 
     noneSet :: (Var -> Bool) -> VarSet -> Bool
-    noneSet f = foldVarSet (\v rest -> rest && (not $ f v)) True
+    noneSet f = varSetAll (not . f)
 
 ty_co_match menv subst ty co lkco rkco
   | CastTy ty' co' <- ty
