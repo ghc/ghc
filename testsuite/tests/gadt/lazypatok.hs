@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs #-}
 
--- It's not clear whether this one should succed or fail,
+-- It's not clear whether this one should succeed or fail,
 -- Arguably it should succeed because the type refinement on
 -- T1 should make (y::Int).  Currently, though, it fails.
 

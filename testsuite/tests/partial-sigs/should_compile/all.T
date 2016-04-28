@@ -29,7 +29,6 @@ test('HigherRank1', normal, compile, ['-ddump-types -fno-warn-partial-type-signa
 test('HigherRank2', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('LocalDefinitionBug', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('Meltdown', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
-# Bug
 test('MonoLocalBinds', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('NamedTyVar', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('NamedWildcardInDataFamilyInstanceLHS', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
