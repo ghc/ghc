@@ -12,10 +12,9 @@ import Expression
 import Predicates
 import Settings.Default
 
--- TODO: Rename to _build.
 -- | All build artefacts are stored in 'buildRootPath' directory.
 buildRootPath :: FilePath
-buildRootPath = ".build"
+buildRootPath = "_build"
 
 -- Control user-specific settings
 userArgs :: Args
