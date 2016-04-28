@@ -34,7 +34,7 @@ t_11223_simple_duplicate_lib:
 	"$(CC)" -c foo.c -o foo_dup_lib.o
 	"$(CC)" -c bar.c -o bar_dup_lib.o
 	"$(AR)" rs libfoo_dup_lib.a foo_dup_lib.o 2> /dev/null
-	echo main | "$(TEST_HC)" --interactive -v0 $(filter-out -rtsopts, $(TEST_HC_OPTS)) -ignore-dot-ghci bar_dup.o foo.hs -lfoo_dup_lib -L"$(PWD)"
+	echo main | "$(TEST_HC)" --interactive -v0 $(filter-out -rtsopts, $(TEST_HC_OPTS)) -ignore-dot-ghci bar_dup_lib.o foo.hs -lfoo_dup_lib -L"$(PWD)"
 
 .PHONY: t_11223_simple_unused_duplicate_lib
 t_11223_simple_unused_duplicate_lib:
@@ -42,7 +42,7 @@ t_11223_simple_unused_duplicate_lib:
 	"$(CC)" -c foo.c -o foo_dup_lib.o
 	"$(CC)" -c bar.c -o bar_dup_lib.o
 	"$(AR)" rs libbar_dup_lib.a bar_dup_lib.o 2> /dev/null
-	echo main | "$(TEST_HC)" --interactive -v0 $(filter-out -rtsopts, $(TEST_HC_OPTS)) -ignore-dot-ghci foo_dup.o foo.hs -lbar_dup_lib -L"$(PWD)"
+	echo main | "$(TEST_HC)" --interactive -v0 $(filter-out -rtsopts, $(TEST_HC_OPTS)) -ignore-dot-ghci foo_dup_lib.o foo.hs -lbar_dup_lib -L"$(PWD)"
 
 .PHONY: t_11223_link_order_a_b_succeed
 t_11223_link_order_a_b_succeed:

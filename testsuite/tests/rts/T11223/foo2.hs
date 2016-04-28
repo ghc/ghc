@@ -1,5 +1,5 @@
 module Main where
 
-foreign import ccall "a" c_exp :: Int
+foreign import ccall "a" a_exp :: Int
 
-main = print c_exp
+main = print a_exp
