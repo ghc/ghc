@@ -179,6 +179,9 @@ processNurseryForDead( void )
     StgPtr p;
     bdescr *bd;
 
+    if (MainCapability.r.rNursery == NULL)
+        return;
+
     for (bd = MainCapability.r.rNursery->blocks; bd != NULL; bd = bd->link) {
         p = bd->start;
         while (p < bd->free) {
