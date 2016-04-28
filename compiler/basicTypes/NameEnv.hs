@@ -16,7 +16,7 @@ module NameEnv (
         unitNameEnv, nameEnvElts, nameEnvUniqueElts,
         extendNameEnv_C, extendNameEnv_Acc, extendNameEnv,
         extendNameEnvList, extendNameEnvList_C,
-        foldNameEnv, filterNameEnv, anyNameEnv,
+        filterNameEnv, anyNameEnv,
         plusNameEnv, plusNameEnv_C, alterNameEnv,
         lookupNameEnv, lookupNameEnv_NF, delFromNameEnv, delListFromNameEnv,
         elemNameEnv, mapNameEnv, disjointNameEnv,
@@ -87,7 +87,6 @@ elemNameEnv        :: Name -> NameEnv a -> Bool
 unitNameEnv        :: Name -> a -> NameEnv a
 lookupNameEnv      :: NameEnv a -> Name -> Maybe a
 lookupNameEnv_NF   :: NameEnv a -> Name -> a
-foldNameEnv        :: (a -> b -> b) -> b -> NameEnv a -> b
 filterNameEnv      :: (elt -> Bool) -> NameEnv elt -> NameEnv elt
 anyNameEnv         :: (elt -> Bool) -> NameEnv elt -> Bool
 mapNameEnv         :: (elt1 -> elt2) -> NameEnv elt1 -> NameEnv elt2
@@ -103,7 +102,6 @@ lookupNameEnv x y     = lookupUFM x y
 alterNameEnv          = alterUFM
 mkNameEnv     l       = listToUFM l
 elemNameEnv x y          = elemUFM x y
-foldNameEnv a b c        = foldUFM a b c
 plusNameEnv x y          = plusUFM x y
 plusNameEnv_C f x y      = plusUFM_C f x y
 extendNameEnv_C f x y z  = addToUFM_C f x y z
