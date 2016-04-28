@@ -1491,7 +1491,7 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
           -> (a -> [Type])           -- get LHS of an axiom
           -> (a -> Type)             -- get RHS of an axiom
           -> (a -> Maybe CoAxBranch) -- Just => apartness check required
-          -> [( [Type], TCvSubst, TyVarSet, Maybe CoAxBranch )]
+          -> [( [Type], TCvSubst, [TyVar], Maybe CoAxBranch )]
              -- Result:
              -- ( [arguments of a matching axiom]
              -- , RHS-unifying substitution
@@ -1503,15 +1503,20 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
           , let ax_args = axiomLHS axiom
           , let ax_rhs  = axiomRHS axiom
           , Just subst <- [tcUnifyTyWithTFs False ax_rhs rhs_ty]
-          , let tvs           = tyCoVarsOfTypes ax_args
+          , let tvs           = tyCoVarsOfTypesList ax_args
                 notInSubst tv = not (tv `elemVarEnv` getTvSubstEnv subst)
-                unsubstTvs    = filterVarSet (notInSubst <&&> isTyVar) tvs ]
+                unsubstTvs    = filter (notInSubst <&&> isTyVar) tvs ]
 
       injImproveEqns :: [Bool]
-                     -> ([Type], TCvSubst, TyCoVarSet, Maybe CoAxBranch)
+                     -> ([Type], TCvSubst, [TyCoVar], Maybe CoAxBranch)
                      -> TcS [Eqn]
       injImproveEqns inj_args (ax_args, theta, unsubstTvs, cabr) = do
-        (theta', _) <- instFlexiTcS (varSetElems unsubstTvs)
+        (theta', _) <- instFlexiTcS unsubstTvs
+        -- The use of deterministically ordered list for `unsubstTvs`
+        -- is not strictly necessary here, we only use the substitution
+        -- part of the result of instFlexiTcS. If we used the second
+        -- part of the tuple, which is the range of the substitution then
+        -- the order could be important.
         let subst = theta `unionTCvSubst` theta'
         return [ Pair arg (substTyUnchecked subst ax_arg)
                | case cabr of
