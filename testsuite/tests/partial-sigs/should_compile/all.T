@@ -20,8 +20,7 @@ test('ExpressionSigNamed', normal, compile, ['-ddump-types -fno-warn-partial-typ
 test('ExtraConstraints1', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('ExtraConstraints2', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('ExtraConstraints3', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
-# Bug
-test('ExtraNumAMROn', expect_broken(9478), compile, ['-ddump-types -fno-warn-partial-type-signatures'])
+test('ExtraNumAMROn', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('ExtraNumAMROff', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('Forall1', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('GenNamed', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
