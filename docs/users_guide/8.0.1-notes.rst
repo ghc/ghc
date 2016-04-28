@@ -24,8 +24,7 @@ performance improvements over the 7.10 branch.
     system to use the ``nm-classic`` command instead of Apple's new ``nm``
     implementation as the latter breaks POSIX compliance (see
     :ghc-ticket:`11744`). This can be done by passing something like
-    ``--with-nm=/Library/Developer/CommandLineTools/usr/bin/nm-classic`` to
-    ``configure``.
+    ``--with-nm=$(xcrun --find nm-classic)`` to ``configure``.
 
 Highlights
 ----------
