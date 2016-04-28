@@ -20,7 +20,7 @@ module VarSet (
         varSetAny, varSetAll,
         transCloVarSet, fixVarSet,
         lookupVarSet, lookupVarSetByName,
-        mapVarSet, sizeVarSet, seqVarSet,
+        sizeVarSet, seqVarSet,
         elemVarSetByKey, partitionVarSet,
         pluralVarSet, pprVarSet,
 
@@ -87,7 +87,6 @@ lookupVarSet    :: VarSet -> Var -> Maybe Var
                         -- Returns the set element, which may be
                         -- (==) to the argument, but not the same as
 lookupVarSetByName :: VarSet -> Name -> Maybe Var
-mapVarSet       :: (Var -> Var) -> VarSet -> VarSet
 sizeVarSet      :: VarSet -> Int
 filterVarSet    :: (Var -> Bool) -> VarSet -> VarSet
 extendVarSet_C  :: (Var->Var->Var) -> VarSet -> Var -> VarSet
@@ -120,7 +119,6 @@ mkVarSet        = mkUniqSet
 foldVarSet      = foldUniqSet
 lookupVarSet    = lookupUniqSet
 lookupVarSetByName = lookupUniqSet
-mapVarSet       = mapUniqSet
 sizeVarSet      = sizeUniqSet
 filterVarSet    = filterUniqSet
 extendVarSet_C  = addOneToUniqSet_C
@@ -140,6 +138,9 @@ varSetAny = uniqSetAny
 
 varSetAll :: (Var -> Bool) -> VarSet -> Bool
 varSetAll = uniqSetAll
+
+-- There used to exist mapVarSet, see Note [Unsound mapUniqSet] in UniqSet for
+-- why it got removed.
 
 fixVarSet :: (VarSet -> VarSet)   -- Map the current set to a new set
           -> VarSet -> VarSet

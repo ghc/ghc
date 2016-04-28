@@ -136,12 +136,8 @@ slurpSpillCostInfo platform cmm
 
 -- | Take all the virtual registers from this set.
 takeVirtuals :: UniqSet Reg -> UniqSet VirtualReg
-takeVirtuals set
-        = mapUniqSet get_virtual
-        $ filterUniqSet isVirtualReg set
-        where
-                get_virtual (RegVirtual vr) = vr
-                get_virtual _ = panic "getVirt"
+takeVirtuals set = mkUniqSet
+  [ vr | RegVirtual vr <- uniqSetToList set ]
 
 
 -- | Choose a node to spill from this graph

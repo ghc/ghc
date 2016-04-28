@@ -23,7 +23,6 @@ module UniqSet (
         minusUniqSet,
         intersectUniqSets,
         foldUniqSet, uniqSetAny, uniqSetAll,
-        mapUniqSet,
         elementOfUniqSet,
         elemUniqSet_Directly,
         filterUniqSet,
@@ -63,7 +62,6 @@ minusUniqSet  :: UniqSet a -> UniqSet a -> UniqSet a
 intersectUniqSets :: UniqSet a -> UniqSet a -> UniqSet a
 
 foldUniqSet :: (a -> b -> b) -> b -> UniqSet a -> b
-mapUniqSet :: (a -> b) -> UniqSet a -> UniqSet b
 elementOfUniqSet :: Uniquable a => a -> UniqSet a -> Bool
 elemUniqSet_Directly :: Unique -> UniqSet a -> Bool
 filterUniqSet :: (a -> Bool) -> UniqSet a -> UniqSet a
@@ -81,6 +79,15 @@ uniqSetToList :: UniqSet a -> [a]
 *                                                                      *
 ************************************************************************
 -}
+
+-- Note [Unsound mapUniqSet]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~
+-- UniqSet has the following invariant:
+--   The keys in the map are the uniques of the values
+-- It means that to implement mapUniqSet you'd have to update
+-- both the keys and the values. There used to be an implementation
+-- that only updated the values and it's been removed, because it broke
+-- the invariant.
 
 type UniqSet a = UniqFM a
 
@@ -103,7 +110,6 @@ minusUniqSet = minusUFM
 intersectUniqSets = intersectUFM
 
 foldUniqSet = foldUFM
-mapUniqSet = mapUFM
 elementOfUniqSet = elemUFM
 elemUniqSet_Directly = elemUFM_Directly
 filterUniqSet = filterUFM
