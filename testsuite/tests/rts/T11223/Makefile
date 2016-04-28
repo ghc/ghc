@@ -6,7 +6,7 @@ include $(TOP)/mk/test.mk
 # Testing RTS linker object resolution
 #
 
-GCC=gcc
+CC=gcc
 
 .PHONY: t_11223_simple_link
 t_11223_simple_link:
@@ -87,40 +87,40 @@ t_11223_link_order_b_a_2_succeed:
 .PHONY: t_11223_weak_only_link_fail
 t_11223_weak_only_link_fail:
 	$(RM) -f power_w1.o power.hi power.o
-	"$(GCC)" -c power.c -DWEAK -o power_w1.o
+	"$(CC)" -c power.c -DWEAK -o power_w1.o
 	echo main | "$(TEST_HC)" --interactive -v0 $(filter-out -rtsopts, $(TEST_HC_OPTS)) -ignore-dot-ghci power.hs power_w1.o
 
 .PHONY: t_11223_weak_only_link_succeed
 t_11223_weak_only_link_succeed:
 	$(RM) -f power_w2.o power3.hi power3.o
-	"$(GCC)" -c power_slow.c -DWEAK -o power_w2.o
+	"$(CC)" -c power_slow.c -DWEAK -o power_w2.o
 	echo main | "$(TEST_HC)" --interactive -v0 $(filter-out -rtsopts, $(TEST_HC_OPTS)) -ignore-dot-ghci power3.hs power_w2.o
 
 .PHONY: t_11223_weak_both_link_order_a_b_succeed
 t_11223_weak_both_link_order_a_b_succeed:
 	$(RM) -f fast_power_w3.o slow_power_w3.o power3.hi power3.o
-	"$(GCC)" -c power_slow.c -DWEAK -o slow_power_w3.o
-	"$(GCC)" -c power.c -DWEAK -o fast_power_w3.o
+	"$(CC)" -c power_slow.c -DWEAK -o slow_power_w3.o
+	"$(CC)" -c power.c -DWEAK -o fast_power_w3.o
 	echo main | "$(TEST_HC)" --interactive -v0 $(filter-out -rtsopts, $(TEST_HC_OPTS)) -ignore-dot-ghci power3.hs fast_power_w3.o slow_power_w3.o
 
 .PHONY: t_11223_weak_both_link_order_b_a_succeed
 t_11223_weak_both_link_order_b_a_succeed:
 	$(RM) -f fast_power_w4.o slow_power_w4.o power3.hi power3.o
-	"$(GCC)" -c power_slow.c -DWEAK -o slow_power_w4.o
-	"$(GCC)" -c power.c -DWEAK -o fast_power_w4.o
+	"$(CC)" -c power_slow.c -DWEAK -o slow_power_w4.o
+	"$(CC)" -c power.c -DWEAK -o fast_power_w4.o
 	echo main | "$(TEST_HC)" --interactive -v0 $(filter-out -rtsopts, $(TEST_HC_OPTS)) -ignore-dot-ghci power3.hs slow_power_w4.o fast_power_w4.o
 
 .PHONY: t_11223_weak_single_link_order_a_b_succeed
 t_11223_weak_single_link_order_a_b_succeed:
 	$(RM) -f fast_power_w5.o slow_power_w5.o power3.hi power3.o
-	"$(GCC)" -c power_slow.c -o slow_power_w5.o
-	"$(GCC)" -c power.c -DWEAK -o fast_power_w5.o
+	"$(CC)" -c power_slow.c -o slow_power_w5.o
+	"$(CC)" -c power.c -DWEAK -o fast_power_w5.o
 	echo main | "$(TEST_HC)" --interactive -v0 $(filter-out -rtsopts, $(TEST_HC_OPTS)) -ignore-dot-ghci power3.hs fast_power_w5.o slow_power_w5.o
 
 .PHONY: t_11223_weak_single_link_order_b_a_succeed
 t_11223_weak_single_link_order_b_a_succeed:
 	$(RM) -f fast_power_w6.o slow_power_w6.o power3.hi power3.o
-	"$(GCC)" -c power_slow.c -DWEAK -o slow_power_w6.o
-	"$(GCC)" -c power.c -o fast_power_w6.o
+	"$(CC)" -c power_slow.c -DWEAK -o slow_power_w6.o
+	"$(CC)" -c power.c -o fast_power_w6.o
 	echo main | "$(TEST_HC)" --interactive -v0 $(filter-out -rtsopts, $(TEST_HC_OPTS)) -ignore-dot-ghci power3.hs slow_power_w6.o fast_power_w6.o
 
