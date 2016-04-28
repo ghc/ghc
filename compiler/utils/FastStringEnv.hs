@@ -15,7 +15,7 @@ module FastStringEnv (
         emptyFsEnv, unitFsEnv, fsEnvElts, fsEnvUniqueElts,
         extendFsEnv_C, extendFsEnv_Acc, extendFsEnv,
         extendFsEnvList, extendFsEnvList_C,
-        foldFsEnv, filterFsEnv,
+        filterFsEnv,
         plusFsEnv, plusFsEnv_C, alterFsEnv,
         lookupFsEnv, lookupFsEnv_NF, delFromFsEnv, delListFromFsEnv,
         elemFsEnv, mapFsEnv,
@@ -47,7 +47,6 @@ elemFsEnv          :: FastString -> FastStringEnv a -> Bool
 unitFsEnv          :: FastString -> a -> FastStringEnv a
 lookupFsEnv        :: FastStringEnv a -> FastString -> Maybe a
 lookupFsEnv_NF     :: FastStringEnv a -> FastString -> a
-foldFsEnv          :: (a -> b -> b) -> b -> FastStringEnv a -> b
 filterFsEnv        :: (elt -> Bool) -> FastStringEnv elt -> FastStringEnv elt
 mapFsEnv           :: (elt1 -> elt2) -> FastStringEnv elt1 -> FastStringEnv elt2
 
@@ -60,7 +59,6 @@ lookupFsEnv x y           = lookupUFM x y
 alterFsEnv                = alterUFM
 mkFsEnv     l             = listToUFM l
 elemFsEnv x y             = elemUFM x y
-foldFsEnv a b c           = foldUFM a b c
 plusFsEnv x y             = plusUFM x y
 plusFsEnv_C f x y         = plusUFM_C f x y
 extendFsEnv_C f x y z     = addToUFM_C f x y z
