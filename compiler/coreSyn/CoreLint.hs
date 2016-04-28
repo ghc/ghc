@@ -657,7 +657,8 @@ lintCoreExpr (Lam var expr)
 
 lintCoreExpr e@(Case scrut var alt_ty alts) =
        -- Check the scrutinee
-  do { scrut_ty <- lintCoreExpr scrut
+  do { let scrut_diverges = exprIsBottom scrut
+     ; scrut_ty <- lintCoreExpr scrut
      ; (alt_ty, _) <- lintInTy alt_ty
      ; (var_ty, _) <- lintInTy (idType var)
 
@@ -665,7 +666,7 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
      ; when (null alts) $
      do { checkL (not (exprIsHNF scrut))
           (text "No alternatives for a case scrutinee in head-normal form:" <+> ppr scrut)
-        ; checkL (exprIsBottom scrut)
+        ; checkL scrut_diverges
           (text "No alternatives for a case scrutinee not known to diverge for sure:" <+> ppr scrut)
         }
 
@@ -680,11 +681,12 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
 
      ; case tyConAppTyCon_maybe (idType var) of
          Just tycon
-              | debugIsOn &&
-                isAlgTyCon tycon &&
-                not (isFamilyTyCon tycon || isAbstractTyCon tycon) &&
-                null (tyConDataCons tycon) ->
-                  pprTrace "Lint warning: case binder's type has no constructors" (ppr var <+> ppr (idType var))
+              | debugIsOn
+              , isAlgTyCon tycon
+              , not (isAbstractTyCon tycon)
+              , null (tyConDataCons tycon)
+              , not scrut_diverges
+              -> pprTrace "Lint warning: case binder's type has no constructors" (ppr var <+> ppr (idType var))
                         -- This can legitimately happen for type families
                       $ return ()
          _otherwise -> return ()
