@@ -913,7 +913,7 @@ mkRecSelBind :: (TyCon, FieldLabel) -> (LSig Name, (RecFlag, LHsBinds Name))
 mkRecSelBind (tycon, fl)
   = mkOneRecordSelector all_cons (RecSelData tycon) fl
   where
-    all_cons     = map RealDataCon (tyConDataCons tycon)
+    all_cons = map RealDataCon (tyConDataCons tycon)
 
 mkOneRecordSelector :: [ConLike] -> RecSelParent -> FieldLabel
                     -> (LSig Name, (RecFlag, LHsBinds Name))

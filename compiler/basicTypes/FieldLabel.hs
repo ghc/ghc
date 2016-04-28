@@ -119,7 +119,8 @@ instance Binary a => Binary (FieldLbl a) where
 -- See Note [Why selector names include data constructors].
 mkFieldLabelOccs :: FieldLabelString -> OccName -> Bool -> FieldLbl OccName
 mkFieldLabelOccs lbl dc is_overloaded
-  = FieldLabel lbl is_overloaded sel_occ
+  = FieldLabel { flLabel = lbl, flIsOverloaded = is_overloaded
+               , flSelector = sel_occ }
   where
     str     = ":" ++ unpackFS lbl ++ ":" ++ occNameString dc
     sel_occ | is_overloaded = mkRecFldSelOcc str

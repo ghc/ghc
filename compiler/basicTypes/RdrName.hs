@@ -612,7 +612,8 @@ gresFromAvail prov_fn avail
           Just is -> GRE { gre_name = n, gre_par = mkParent n avail
                          , gre_lcl = False, gre_imp = [is] }
 
-    mk_fld_gre (FieldLabel lbl is_overloaded n)
+    mk_fld_gre (FieldLabel { flLabel = lbl, flIsOverloaded = is_overloaded
+                           , flSelector = n })
       = case prov_fn n of  -- Nothing => bound locally
                            -- Just is => imported from 'is'
           Nothing -> GRE { gre_name = n, gre_par = FldParent (availName avail) mb_lbl
@@ -676,12 +677,19 @@ mkParent n (AvailTC m _ _) | n == m    = NoParent
 availFromGRE :: GlobalRdrElt -> AvailInfo
 availFromGRE (GRE { gre_name = me, gre_par = parent })
   = case parent of
+      PatternSynonym              -> patSynAvail me
       ParentIs p                  -> AvailTC p [me] []
       NoParent   | isTyConName me -> AvailTC me [me] []
                  | otherwise      -> avail   me
-      FldParent p Nothing         -> AvailTC p [] [FieldLabel (occNameFS $ nameOccName me) False me]
-      FldParent p (Just lbl)      -> AvailTC p [] [FieldLabel lbl True me]
-      PatternSynonym              -> patSynAvail me
+      FldParent p mb_lbl -> AvailTC p [] [fld]
+        where
+         fld = case mb_lbl of
+                 Nothing  -> FieldLabel { flLabel = occNameFS (nameOccName me)
+                                        , flIsOverloaded = False
+                                        , flSelector = me }
+                 Just lbl -> FieldLabel { flLabel = lbl
+                                        , flIsOverloaded = True
+                                        , flSelector = me }
 
 emptyGlobalRdrEnv :: GlobalRdrEnv
 emptyGlobalRdrEnv = emptyOccEnv

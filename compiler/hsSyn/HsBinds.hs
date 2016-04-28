@@ -977,19 +977,25 @@ the distinction between the two names clear
 
 -}
 instance Functor RecordPatSynField where
-    fmap f (RecordPatSynField visible hidden) =
-      RecordPatSynField (f visible) (f hidden)
+    fmap f (RecordPatSynField { recordPatSynSelectorId = visible
+                              , recordPatSynPatVar = hidden })
+      = RecordPatSynField { recordPatSynSelectorId = f visible
+                          , recordPatSynPatVar = f hidden }
 
 instance Outputable a => Outputable (RecordPatSynField a) where
-    ppr (RecordPatSynField v _) = ppr v
+    ppr (RecordPatSynField { recordPatSynSelectorId = v }) = ppr v
 
 instance Foldable RecordPatSynField  where
-    foldMap f (RecordPatSynField visible hidden) =
-      f visible `mappend` f hidden
+    foldMap f (RecordPatSynField { recordPatSynSelectorId = visible
+                                 , recordPatSynPatVar = hidden })
+      = f visible `mappend` f hidden
 
 instance Traversable RecordPatSynField where
-    traverse f (RecordPatSynField visible hidden) =
-      RecordPatSynField <$> f visible <*> f hidden
+    traverse f (RecordPatSynField { recordPatSynSelectorId =visible
+                                  , recordPatSynPatVar = hidden })
+      = (\ sel_id pat_var -> RecordPatSynField { recordPatSynSelectorId = sel_id
+                                               , recordPatSynPatVar = pat_var })
+          <$> f visible <*> f hidden
 
 
 instance Functor HsPatSynDetails where

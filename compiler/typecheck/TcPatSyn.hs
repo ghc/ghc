@@ -467,8 +467,10 @@ tc_patsyn_finish lname dir is_infix lpat'
                                          arg_tys pat_ty
 
          -- TODO: Make this have the proper information
-       ; let mkFieldLabel name = FieldLabel (occNameFS (nameOccName name)) False name
-             field_labels' = (map mkFieldLabel field_labels)
+       ; let mkFieldLabel name = FieldLabel { flLabel = occNameFS (nameOccName name)
+                                            , flIsOverloaded = False
+                                            , flSelector = name }
+             field_labels' = map mkFieldLabel field_labels
 
 
        -- Make the PatSyn itself
@@ -481,13 +483,10 @@ tc_patsyn_finish lname dir is_infix lpat'
                         field_labels'
 
        -- Selectors
-       ; let (sigs, selector_binds) =
-                unzip (mkPatSynRecSelBinds patSyn (patSynFieldLabels patSyn))
-       ; let tything = AConLike (PatSynCon patSyn)
-       ; tcg_env <-
-          tcExtendGlobalEnv [tything] $
-            tcRecSelBinds
-              (ValBindsOut (zip (repeat NonRecursive) selector_binds) sigs)
+       ; let rn_rec_sel_binds = mkPatSynRecSelBinds patSyn (patSynFieldLabels patSyn)
+             tything = AConLike (PatSynCon patSyn)
+       ; tcg_env <- tcExtendGlobalEnv [tything] $
+                    tcRecSelBinds rn_rec_sel_binds
 
        ; traceTc "tc_patsyn_finish }" empty
        ; return (matcher_bind, tcg_env) }
@@ -586,14 +585,13 @@ tcPatSynMatcher (L loc name) lpat
        ; return ((matcher_id, is_unlifted), matcher_bind) }
 
 mkPatSynRecSelBinds :: PatSyn
-                    -> [FieldLabel]
-                    -- ^ Visible field labels
-                    -> [(LSig Name, LHsBinds Name)]
-mkPatSynRecSelBinds ps fields = map mkRecSel fields
+                    -> [FieldLabel]  -- ^ Visible field labels
+                    -> HsValBinds Name
+mkPatSynRecSelBinds ps fields
+  = ValBindsOut selector_binds sigs
   where
-    mkRecSel fld_lbl =
-      case mkOneRecordSelector [PatSynCon ps] (RecSelPatSyn ps) fld_lbl of
-        (name, (_rec_flag, binds)) -> (name, binds)
+    (sigs, selector_binds) = unzip (map mkRecSel fields)
+    mkRecSel fld_lbl = mkOneRecordSelector [PatSynCon ps] (RecSelPatSyn ps) fld_lbl
 
 isUnidirectional :: HsPatSynDir a -> Bool
 isUnidirectional Unidirectional          = True

@@ -639,10 +639,12 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L _ name
                RecordPatSyn vars ->
                    do { checkDupRdrNames (map recordPatSynSelectorId vars)
                       ; let rnRecordPatSynField
-                              (RecordPatSynField visible hidden) = do {
-                              ; visible' <- lookupLocatedTopBndrRn visible
-                              ; hidden'  <- lookupVar hidden
-                              ; return $ RecordPatSynField visible' hidden' }
+                              (RecordPatSynField { recordPatSynSelectorId = visible
+                                                 , recordPatSynPatVar = hidden })
+                              = do { visible' <- lookupLocatedTopBndrRn visible
+                                   ; hidden'  <- lookupVar hidden
+                                   ; return $ RecordPatSynField { recordPatSynSelectorId = visible'
+                                                                , recordPatSynPatVar = hidden' } }
                       ; names <- mapM rnRecordPatSynField  vars
                       ; return ( (pat', RecordPatSyn names)
                                , mkFVs (map (unLoc . recordPatSynPatVar) names)) }
