@@ -1099,9 +1099,9 @@ if grep '	' compiler/ghc.cabal.in 2>&1 >/dev/null; then
    AC_MSG_ERROR([compiler/ghc.cabal.in contains tab characters; please remove them])
 fi
 
-# Create the configuration for the Shake-based build system if it is present
-if test -e shake-build/cfg/system.config.in; then
-    AC_CONFIG_FILES([shake-build/cfg/system.config])
+# Create the configuration for the Hadrian build system if it is present
+if test -e hadrian/cfg/system.config.in; then
+    AC_CONFIG_FILES([hadrian/cfg/system.config])
 fi
 
 # We got caught by
