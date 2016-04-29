@@ -1812,7 +1812,7 @@ isPendingScDict _ = Nothing
 superClassesMightHelp :: Ct -> Bool
 -- ^ True if taking superclasses of givens, or of wanteds (to perhaps
 -- expose more equalities or functional dependencies) might help to
--- solve this constraint.  See Note [When superclases help]
+-- solve this constraint.  See Note [When superclasses help]
 superClassesMightHelp ct
   = isWantedCt ct && not (is_ip ct)
   where

@@ -446,7 +446,7 @@ tcCheckSatisfiability given_ids
        ; (res, _ev_binds) <- runTcS $
              do { traceTcS "checkSatisfiability {" (ppr given_ids)
                 ; given_cts <- mkGivensWithSuperClasses given_loc (bagToList given_ids)
-                     -- See Note [Superclases and satisfiability]
+                     -- See Note [Superclasses and satisfiability]
                 ; insols <- solveSimpleGivens given_cts
                 ; insols <- try_harder insols
                 ; traceTcS "checkSatisfiability }" (ppr insols)
@@ -465,7 +465,7 @@ tcCheckSatisfiability given_ids
            ; new_given <- makeSuperClasses pending_given
            ; solveSimpleGivens new_given }
 
-{- Note [Superclases and satisfiability]
+{- Note [Superclasses and satisfiability]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Expand superclasses before starting, because (Int ~ Bool), has
 (Int ~~ Bool) as a superclass, which in turn has (Int ~N# Bool)
