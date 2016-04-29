@@ -574,7 +574,7 @@ getRegister' dflags (CmmMachOp mop [x, y]) -- dyadic PrimOps
          -- (needed for PIC)
       MO_Add W32 ->
         case y of
-          CmmLit (CmmInt imm immrep) | Just _ <- makeImmediate W32 True (-imm)
+          CmmLit (CmmInt imm immrep) | Just _ <- makeImmediate W32 True imm
             -> trivialCode W32 True ADD x (CmmLit $ CmmInt imm immrep)
           CmmLit lit
             -> do
@@ -626,7 +626,16 @@ getRegister' dflags (CmmMachOp mop [x, y]) -- dyadic PrimOps
        | otherwise -> remainderCode rep DIVDU (extendSExpr dflags rep x)
                                               (extendSExpr dflags rep y)
 
-      MO_And rep   -> trivialCode rep False AND x y
+      MO_And rep   -> case y of
+        (CmmLit (CmmInt imm _)) | imm == -8 || imm == -4
+            -> do
+                (src, srcCode) <- getSomeReg x
+                let clear_mask = if imm == -4 then 2 else 3
+                    fmt = intFormat rep
+                    code dst = srcCode
+                               `appOL` unitOL (CLRRI fmt dst src clear_mask)
+                return (Any fmt code)
+        _ -> trivialCode rep False AND x y
       MO_Or rep    -> trivialCode rep False OR x y
       MO_Xor rep   -> trivialCode rep False XOR x y
 
@@ -912,14 +921,22 @@ getCondCode (CmmMachOp mop [x, y])
 getCondCode _ = panic "getCondCode(2)(powerpc)"
 
 
-
 -- @cond(Int|Flt)Code@: Turn a boolean expression into a condition, to be
 -- passed back up the tree.
 
 condIntCode, condFltCode :: Cond -> CmmExpr -> CmmExpr -> NatM CondCode
 
---  ###FIXME: I16 and I8!
--- TODO: Is this still an issue? All arguments are extend?Expr'd.
+-- optimize pointer tag checks. Operation andi. sets condition register
+-- so cmpi ..., 0 is redundant.
+condIntCode cond (CmmMachOp (MO_And _) [x, CmmLit (CmmInt imm rep)])
+                 (CmmLit (CmmInt 0 _))
+  | not $ condUnsigned cond,
+    Just src2 <- makeImmediate rep False imm
+  = do
+      (src1, code) <- getSomeReg x
+      let code' = code `snocOL` AND r0 src1 (RIImm src2)
+      return (CondCode False cond code')
+
 condIntCode cond x (CmmLit (CmmInt y rep))
   | Just src2 <- makeImmediate rep (not $ condUnsigned cond) y
   = do

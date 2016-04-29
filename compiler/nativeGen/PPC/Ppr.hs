@@ -791,6 +791,17 @@ pprInstr (RLWINM reg1 reg2 sh mb me) = hcat [
         int me
     ]
 
+pprInstr (CLRRI fmt reg1 reg2 n) = hcat [
+        text "\tclrr",
+        pprFormat fmt,
+        text "i ",
+        pprReg reg1,
+        text ", ",
+        pprReg reg2,
+        text ", ",
+        int n
+    ]
+
 pprInstr (FADD fmt reg1 reg2 reg3) = pprBinaryF (sLit "fadd") fmt reg1 reg2 reg3
 pprInstr (FSUB fmt reg1 reg2 reg3) = pprBinaryF (sLit "fsub") fmt reg1 reg2 reg3
 pprInstr (FMUL fmt reg1 reg2 reg3) = pprBinaryF (sLit "fmul") fmt reg1 reg2 reg3
