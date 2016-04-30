@@ -1752,7 +1752,7 @@ mkTCvSubst :: InScopeSet -> (TvSubstEnv, CvSubstEnv) -> TCvSubst
 mkTCvSubst in_scope (tenv, cenv) = TCvSubst in_scope tenv cenv
 
 mkTvSubst :: InScopeSet -> TvSubstEnv -> TCvSubst
--- ^ Mkae a TCvSubst with specified tyvar subst and empty covar subst
+-- ^ Make a TCvSubst with specified tyvar subst and empty covar subst
 mkTvSubst in_scope tenv = TCvSubst in_scope tenv emptyCvSubstEnv
 
 getTvSubstEnv :: TCvSubst -> TvSubstEnv

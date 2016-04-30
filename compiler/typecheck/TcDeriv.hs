@@ -2279,7 +2279,7 @@ a)) will be solved by the explicit Eq (N a) instance.  We do *not*
 create the superclasses by casting the superclass dictionaries for the
 representation type.
 
-See the paper "Safe zero-cost coercions for Hsakell".
+See the paper "Safe zero-cost coercions for Haskell".
 
 Note [DeriveAnyClass and default family instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
