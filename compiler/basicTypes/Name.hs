@@ -101,7 +101,7 @@ import Data.Data
 ************************************************************************
 -}
 
--- | A unique, unambigious name for something, containing information about where
+-- | A unique, unambiguous name for something, containing information about where
 -- that thing originated.
 data Name = Name {
                 n_sort :: NameSort,     -- What sort of name it is
