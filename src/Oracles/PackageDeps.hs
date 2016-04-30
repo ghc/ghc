@@ -1,9 +1,11 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
 module Oracles.PackageDeps (packageDeps, packageDepsOracle) where
 
-import Base
 import qualified Data.HashMap.Strict as Map
+
+import Base
 import Package
+import Settings.Paths
 
 newtype PackageDepsKey = PackageDepsKey PackageName
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)

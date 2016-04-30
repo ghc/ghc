@@ -16,8 +16,7 @@ module Base (
     module Development.Shake.FilePath,
 
     -- * Paths
-    shakeFilesPath, configPath, configFile, sourcePath, programInplacePath,
-    bootPackageConstraints, packageDependencies,
+    configPath, configFile, sourcePath, programInplacePath,
 
     -- * Output
     putColoured, putOracle, putBuild, putSuccess, putError,
@@ -50,10 +49,6 @@ import System.IO
 shakePath :: FilePath
 shakePath = "hadrian"
 
--- TODO: Move to buildRootPath.
-shakeFilesPath :: FilePath
-shakeFilesPath = shakePath -/- ".db"
-
 configPath :: FilePath
 configPath = shakePath -/- "cfg"
 
@@ -68,12 +63,6 @@ sourcePath = shakePath -/- "src"
 -- TODO: move to buildRootPath, see #113
 programInplacePath :: FilePath
 programInplacePath = "inplace/bin"
-
-bootPackageConstraints :: FilePath
-bootPackageConstraints = shakeFilesPath -/- "boot-package-constraints"
-
-packageDependencies :: FilePath
-packageDependencies = shakeFilesPath -/- "package-dependencies"
 
 -- Utility functions
 -- | Find and replace all occurrences of a value in a list

@@ -17,7 +17,7 @@ clean dir = do
 cleanRules :: Rules ()
 cleanRules = do
     "clean" ~> do
-        clean buildRootPath
+        forM_ [Stage0 ..] $ \stage -> clean (buildRootPath -/- stageString stage)
         clean programInplacePath
         clean "inplace/lib"
         clean derivedConstantsPath
@@ -29,6 +29,6 @@ cleanRules = do
             forM_ [Stage0 ..] $ \stage -> do
                 let dir = pkgPath pkg -/- contextDirectory (vanillaContext stage pkg)
                 removeDirectoryIfExists dir
-        putBuild $ "| Remove the Shake database " ++ shakeFilesPath ++ "..."
-        removeFilesAfter shakeFilesPath ["//*"]
+        putBuild $ "| Remove Hadrian files..."
+        removeFilesAfter buildRootPath ["//*"]
         putSuccess $ "| Done. "

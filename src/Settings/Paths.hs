@@ -1,7 +1,8 @@
 module Settings.Paths (
     contextDirectory, buildPath, pkgDataFile, pkgHaddockFile, pkgLibraryFile,
     pkgLibraryFile0, pkgGhciLibraryFile, gmpBuildPath, gmpBuildInfoPath,
-    packageDbDirectory, pkgConfFile
+    packageDbDirectory, pkgConfFile, shakeFilesPath, bootPackageConstraints,
+    packageDependencies
     ) where
 
 import Base
@@ -15,6 +16,15 @@ import Settings.User
 -- already been unified. See #218. TODO: Switch to 'newtype FilePath'.
 (~/~) :: FilePath -> FilePath -> FilePath
 x ~/~ y = x ++ '/' : y
+
+shakeFilesPath :: FilePath
+shakeFilesPath = buildRootPath -/- "hadrian/shake-files"
+
+bootPackageConstraints :: FilePath
+bootPackageConstraints = shakeFilesPath -/- "boot-package-constraints"
+
+packageDependencies :: FilePath
+packageDependencies = shakeFilesPath -/- "package-dependencies"
 
 -- | Path to the directory containing build artefacts of a given 'Context'.
 buildPath :: Context -> FilePath
