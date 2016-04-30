@@ -1510,7 +1510,7 @@ isDataTyCon _ = False
 -- (where X is the role passed in):
 --   If (T a1 b1 c1) ~X (T a2 b2 c2), then (a1 ~X1 a2), (b1 ~X2 b2), and (c1 ~X3 c2)
 -- (where X1, X2, and X3, are the roles given by tyConRolesX tc X)
--- See also Note [Decomposing equalities] in TcCanonical
+-- See also Note [Decomposing equality] in TcCanonical
 isInjectiveTyCon :: TyCon -> Role -> Bool
 isInjectiveTyCon _                             Phantom          = False
 isInjectiveTyCon (FunTyCon {})                 _                = True
@@ -1530,7 +1530,7 @@ isInjectiveTyCon tc@(TcTyCon {})               _
 -- | 'isGenerativeTyCon' is true of 'TyCon's for which this property holds
 -- (where X is the role passed in):
 --   If (T tys ~X t), then (t's head ~X T).
--- See also Note [Decomposing equalities] in TcCanonical
+-- See also Note [Decomposing equality] in TcCanonical
 isGenerativeTyCon :: TyCon -> Role -> Bool
 isGenerativeTyCon (FamilyTyCon { famTcFlav = DataFamilyTyCon _ }) Nominal = True
 isGenerativeTyCon (FamilyTyCon {}) _ = False
