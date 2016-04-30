@@ -9,17 +9,19 @@ import Settings.Paths
 import Settings.User
 import Stage
 
+clean :: FilePath -> Action ()
+clean dir = do
+    putBuild $ "| Remove files in " ++ dir ++ "..."
+    removeDirectoryIfExists dir
+
 cleanRules :: Rules ()
 cleanRules = do
     "clean" ~> do
-        putBuild $ "| Remove files in " ++ buildRootPath ++ "..."
-        liftIO $ removeFiles buildRootPath ["//*"]
-        putBuild $ "| Remove files in " ++ programInplacePath ++ "..."
-        liftIO $ removeFiles programInplacePath ["//*"]
-        putBuild $ "| Remove files in inplace/lib..."
-        liftIO $ removeFiles "inplace/lib" ["//*"]
-        putBuild $ "| Remove files in " ++ derivedConstantsPath ++ "..."
-        liftIO $ removeFiles derivedConstantsPath ["//*"]
+        forM_ [Stage0 ..] $ \stage -> clean (buildRootPath -/- stageString stage)
+        clean (buildRootPath -/- "hadrian")
+        clean programInplacePath
+        clean "inplace/lib"
+        clean derivedConstantsPath
         forM_ includesDependencies $ \file -> do
             putBuild $ "| Remove " ++ file
             removeFileIfExists file

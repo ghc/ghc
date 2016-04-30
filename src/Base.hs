@@ -50,6 +50,7 @@ import System.IO
 shakePath :: FilePath
 shakePath = "hadrian"
 
+-- TODO: Move to buildRootPath.
 shakeFilesPath :: FilePath
 shakeFilesPath = shakePath -/- ".db"
 

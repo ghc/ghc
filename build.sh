@@ -30,22 +30,22 @@ function rl {
 
 root="$(dirname "$(rl "$0")")"
 
-mkdir -p "$root/.shake"
+mkdir -p "$root/../_build"
 
-ghc                           \
-    "$root/src/Main.hs"       \
-    -Wall                     \
-    -fno-warn-name-shadowing  \
-    -XRecordWildCards         \
-    -i"$root/src"             \
-    -rtsopts                  \
-    -with-rtsopts=-I0         \
-    -threaded                 \
-    -outputdir="$root/.shake" \
-    -j -O                     \
-    -o "$root/.shake/build"
+ghc                                      \
+    "$root/src/Main.hs"                  \
+    -Wall                                \
+    -fno-warn-name-shadowing             \
+    -XRecordWildCards                    \
+    -i"$root/src"                        \
+    -rtsopts                             \
+    -with-rtsopts=-I0                    \
+    -threaded                            \
+    -outputdir="$root/../_build/hadrian" \
+    -j -O                                \
+    -o "$root/../_build/hadrian"
 
-"$root/.shake/build"       \
+"$root/../_build/hadrian"  \
     --lint                 \
     --directory "$root/.." \
     --colour               \

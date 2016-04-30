@@ -1,24 +1,24 @@
 @cd %~dp0
-@mkdir .shake 2> nul
+@mkdir ../_build 2> nul
 
-@set ghcArgs=--make                   ^
-             -Wall                    ^
-             -fno-warn-name-shadowing ^
-             -XRecordWildCards        ^
-             src/Main.hs              ^
-             -threaded                ^
-             -isrc                    ^
-             -rtsopts                 ^
-             -with-rtsopts=-I0        ^
-             -outputdir=.shake        ^
-             -j                       ^
-             -O                       ^
-             -o .shake/build
+@set ghcArgs=--make                       ^
+             -Wall                        ^
+             -fno-warn-name-shadowing     ^
+             -XRecordWildCards            ^
+             src/Main.hs                  ^
+             -threaded                    ^
+             -isrc                        ^
+             -rtsopts                     ^
+             -with-rtsopts=-I0            ^
+             -outputdir=../_build/hadrian ^
+             -j                           ^
+             -O                           ^
+             -o ../_build/hadrian
 
-@set shakeArgs=--lint      ^
-               --directory ^
-               ".."        ^
-               %*
+@set hadrianArgs=--lint      ^
+                 --directory ^
+                 ".."        ^
+                 %*
 
 
 @ghc %ghcArgs%
@@ -27,4 +27,4 @@
 
 @rem Unset GHC_PACKAGE_PATH variable, as otherwise ghc-cabal complains
 @set GHC_PACKAGE_PATH=
-@.shake\build %shakeArgs%
+@..\_build\hadrian %hadrianArgs%
