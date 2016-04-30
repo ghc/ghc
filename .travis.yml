@@ -48,6 +48,8 @@ install:
     # ".git"  directory into the appropriate location, and perform a hard reset
     # in order to regenerate the GHC-Shake files.
     - mkdir ghc/hadrian
+    - mkdir ghc/_build
+    - mkdir ghc/_build/hadrian
     - mv .git ghc/hadrian
     - ( cd ghc/hadrian && git reset --hard HEAD )
 
