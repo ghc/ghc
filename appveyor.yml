@@ -36,9 +36,6 @@ install:
     - alex  --version
     - happy --version
     - stack exec -- ghc-pkg list
-    - mkdir _build
-    - cd _build
-    - mkdir hadrian
 
 build_script:
     - cd C:\msys64\home\ghc\hadrian

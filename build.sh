@@ -30,7 +30,7 @@ function rl {
 
 root="$(dirname "$(rl "$0")")"
 
-mkdir -p "$root/../_build"
+mkdir -p "$root/../_build/hadrian"
 
 ghc                                      \
     "$root/src/Main.hs"                  \
@@ -43,9 +43,9 @@ ghc                                      \
     -threaded                            \
     -outputdir="$root/../_build/hadrian" \
     -j -O                                \
-    -o "$root/../_build/hadrian"
+    -o "$root/hadrian"
 
-"$root/../_build/hadrian"  \
+"$root/hadrian"            \
     --lint                 \
     --directory "$root/.." \
     --colour               \

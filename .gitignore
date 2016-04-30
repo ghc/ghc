@@ -1,6 +1,9 @@
-/.shake/
 /.db/
 cfg/system.config
+
+# build.bat and build.sh specific
+/hadrian
+/hadrian.exe
 
 # build.cabal.sh specific
 /dist/

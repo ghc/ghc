@@ -17,8 +17,7 @@ clean dir = do
 cleanRules :: Rules ()
 cleanRules = do
     "clean" ~> do
-        forM_ [Stage0 ..] $ \stage -> clean (buildRootPath -/- stageString stage)
-        clean (buildRootPath -/- "hadrian")
+        clean buildRootPath
         clean programInplacePath
         clean "inplace/lib"
         clean derivedConstantsPath

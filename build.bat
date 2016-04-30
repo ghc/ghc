@@ -1,5 +1,5 @@
 @cd %~dp0
-@mkdir ../_build 2> nul
+@mkdir ../_build/hadrian 2> nul
 
 @set ghcArgs=--make                       ^
              -Wall                        ^
@@ -13,7 +13,7 @@
              -outputdir=../_build/hadrian ^
              -j                           ^
              -O                           ^
-             -o ../_build/hadrian
+             -o hadrian
 
 @set hadrianArgs=--lint      ^
                  --directory ^
@@ -27,4 +27,4 @@
 
 @rem Unset GHC_PACKAGE_PATH variable, as otherwise ghc-cabal complains
 @set GHC_PACKAGE_PATH=
-@..\_build\hadrian %hadrianArgs%
+@hadrian %hadrianArgs%
