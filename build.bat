@@ -11,6 +11,7 @@
              -rtsopts                     ^
              -with-rtsopts=-I0            ^
              -outputdir=../_build/hadrian ^
+             -i../libraries/Cabal/Cabal   ^
              -j                           ^
              -O                           ^
              -o hadrian

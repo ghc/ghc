@@ -38,6 +38,7 @@ ghc                                      \
     -fno-warn-name-shadowing             \
     -XRecordWildCards                    \
     -i"$root/src"                        \
+    -i"$root/../libraries/Cabal/Cabal"   \
     -rtsopts                             \
     -with-rtsopts=-I0                    \
     -threaded                            \
