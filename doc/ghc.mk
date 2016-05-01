@@ -10,11 +10,11 @@
 #
 # -----------------------------------------------------------------------------
 
-ifeq "$$(BUILD_SPHINX_HTML)" "YES"
+ifeq "$(BUILD_SPHINX_HTML)" "YES"
 INSTALL_HTML_DOC_DIRS += utils/haddock/doc/haddock
-endif
 
 html : html_utils/haddock/doc
+endif
 
 html_utils/haddock/doc :
 	make -C utils/haddock/doc html SPHINX_BUILD=$(SPHINXBUILD)
