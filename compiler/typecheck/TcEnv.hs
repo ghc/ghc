@@ -33,7 +33,7 @@ module TcEnv(
         tcLookup, tcLookupLocated, tcLookupLocalIds,
         tcLookupId, tcLookupTyVar,
         tcLookupLcl_maybe,
-        getScopedTyVarBinds, getInLocalScope,
+        getInLocalScope,
         wrongThingErr, pprBinders,
 
         tcAddDataFamConPlaceholders, tcAddPatSynPlaceholders,
@@ -403,11 +403,6 @@ tcExtendTyVarEnv2 binds thing_inside
                 where
                   tyvar' = setTyVarName tyvar name'
                   name'  = tidyNameOcc name occ'
-
-getScopedTyVarBinds :: TcM [(Name, TcTyVar)]
-getScopedTyVarBinds
-  = do  { lcl_env <- getLclEnv
-        ; return [(name, tv) | ATyVar name tv <- nameEnvElts (tcl_env lcl_env)] }
 
 isTypeClosedLetBndr :: Id -> TopLevelFlag
 -- See Note [Bindings with closed types] in TcRnTypes
