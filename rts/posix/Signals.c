@@ -14,6 +14,7 @@
 #include "Signals.h"
 #include "RtsUtils.h"
 #include "Prelude.h"
+#include "Ticker.h"
 #include "Stable.h"
 #include "Libdw.h"
 
@@ -623,6 +624,34 @@ set_sigtstp_action (rtsBool handle)
     sigemptyset(&sa.sa_mask);
     if (sigaction(SIGTSTP, &sa, NULL) != 0) {
         sysErrorBelch("warning: failed to install SIGTSTP handler");
+    }
+}
+
+/* Used by ItimerTimerCreate and ItimerSetitimer implementations */
+void
+install_vtalrm_handler(int sig, TickProc handle_tick)
+{
+    struct sigaction action;
+
+    action.sa_handler = handle_tick;
+
+    sigemptyset(&action.sa_mask);
+
+#ifdef SA_RESTART
+    // specify SA_RESTART.  One consequence if we don't do this is
+    // that readline gets confused by the -threaded RTS.  It seems
+    // that if a SIGALRM handler is installed without SA_RESTART,
+    // readline installs its own SIGALRM signal handler (see
+    // readline's signals.c), and this somehow causes readline to go
+    // wrong when the input exceeds a single line (try it).
+    action.sa_flags = SA_RESTART;
+#else
+    action.sa_flags = 0;
+#endif
+
+    if (sigaction(sig, &action, NULL) == -1) {
+        sysErrorBelch("sigaction");
+        stg_exit(EXIT_FAILURE);
     }
 }
 
