@@ -81,8 +81,19 @@
 #endif
 
 static Time itimer_interval = DEFAULT_TICK_INTERVAL;
-enum ItimerState {STOPPED, RUNNING, STOPPING, EXITED};
-static volatile enum ItimerState itimer_state = STOPPED;
+
+// Should we be firing ticks?
+// Writers to this must hold the mutex below.
+static volatile HsBool stopped = 0;
+
+// should the ticker thread exit?
+// This can be set without holding the mutex.
+static volatile HsBool exited = 1;
+
+// Signaled when we want to (re)start the timer
+static Condition start_cond;
+static Mutex mutex;
+static OSThreadId thread;
 
 static void *itimer_thread_func(void *_handle_tick)
 {
@@ -110,7 +121,7 @@ static void *itimer_thread_func(void *_handle_tick)
     }
 #endif
 
-    while (1) {
+    while (!exited) {
         if (USE_TIMERFD_FOR_ITIMER) {
             if (read(timerfd, &nticks, sizeof(nticks)) != sizeof(nticks)) {
                 if (errno != EINTR) {
@@ -122,64 +133,86 @@ static void *itimer_thread_func(void *_handle_tick)
                 sysErrorBelch("usleep(TimeToUS(itimer_interval) failed");
             }
         }
-        switch (itimer_state) {
-            case RUNNING:
-                handle_tick(0);
-                break;
-            case STOPPED:
-                break;
-            case STOPPING:
-                itimer_state = STOPPED;
-                break;
-            case EXITED:
-                if (USE_TIMERFD_FOR_ITIMER)
-                    close(timerfd);
-                return NULL;
+
+        // first try a cheap test
+        if (stopped) {
+            ACQUIRE_LOCK(&mutex);
+            // should we really stop?
+            if (stopped) {
+                waitCondition(&start_cond, &mutex);
+            }
+            RELEASE_LOCK(&mutex);
+        } else {
+            handle_tick(0);
         }
     }
-    return NULL; // Never reached.
+
+    if (USE_TIMERFD_FOR_ITIMER)
+        close(timerfd);
+    closeMutex(&mutex);
+    closeCondition(&start_cond);
+    return NULL;
 }
 
 void
 initTicker (Time interval, TickProc handle_tick)
 {
     itimer_interval = interval;
+    stopped = 0;
+    exited = 0;
 
-    pthread_t tid;
-    int r = pthread_create(&tid, NULL, itimer_thread_func, (void*)handle_tick);
-    if (!r) {
-        pthread_detach(tid);
+    initCondition(&start_cond);
+    initMutex(&mutex);
+
+    /*
+     * We can't use the RTS's createOSThread here as we need to remain attached
+     * to the thread we create so we can later join to it if requested
+     */
+    if (! pthread_create(&thread, NULL, itimer_thread_func, (void*)handle_tick)) {
 #if HAVE_PTHREAD_SETNAME_NP
-        pthread_setname_np(tid, "ghc_ticker");
+        pthread_setname_np(thread, "ghc_ticker");
 #endif
+    } else {
+        sysErrorBelch("Itimer: Failed to spawn thread");
+        stg_exit(EXIT_FAILURE);
     }
 }
 
 void
 startTicker(void)
 {
-    // sanity check
-    if (itimer_state == EXITED) {
-        sysErrorBelch("ITimer: Tried to start a dead timer!\n");
-        stg_exit(EXIT_FAILURE);
-    }
-    itimer_state = RUNNING;
+    ACQUIRE_LOCK(&mutex);
+    stopped = 0;
+    signalCondition(&start_cond);
+    RELEASE_LOCK(&mutex);
 }
 
+/* There may be at most one additional tick fired after a call to this */
 void
 stopTicker(void)
 {
-    if (itimer_state == RUNNING) {
-        itimer_state = STOPPING;
-        // Note that the timer may fire once more, but that's okay;
-        // handle_tick is only called when itimer_state == RUNNING
-    }
+    ACQUIRE_LOCK(&mutex);
+    stopped = 1;
+    RELEASE_LOCK(&mutex);
 }
 
+/* There may be at most one additional tick fired after a call to this */
 void
-exitTicker (rtsBool wait STG_UNUSED)
+exitTicker (rtsBool wait)
 {
-    itimer_state = EXITED;
+    ASSERT(!exited);
+    exited = 1;
+    // ensure that ticker wakes up if stopped
+    startTicker();
+
+    // wait for ticker to terminate if necessary
+    if (wait) {
+        if (pthread_join(thread, NULL)) {
+            sysErrorBelch("Itimer: Failed to join");
+        }
+    } else {
+        pthread_detach(thread);
+    }
 }
 
 int

@@ -340,7 +340,12 @@ hs_exit_(rtsBool wait_foreign)
 
     /* stop the ticker */
     stopTimer();
-    exitTimer(wait_foreign);
+    /*
+     * it is quite important that we wait here as some timer implementations
+     * (e.g. pthread) may fire even after we exit, which may segfault as we've
+     * already freed the capabilities.
+     */
+    exitTimer(rtsTrue);
 
     // set the terminal settings back to what they were
 #if !defined(mingw32_HOST_OS)
