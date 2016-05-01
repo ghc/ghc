@@ -1504,9 +1504,9 @@ icExtendGblRdrEnv env tythings
        | is_sub_bndr thing
        = env
        | otherwise
-       = foldl extendGlobalRdrEnv env1 (localGREsFromAvail avail)
+       = foldl extendGlobalRdrEnv env1 (concatMap localGREsFromAvail avail)
        where
-          env1  = shadowNames env (availNames avail)
+          env1  = shadowNames env (concatMap availNames avail)
           avail = tyThingAvailInfo thing
 
     -- Ugh! The new_tythings may include record selectors, since they
@@ -1829,19 +1829,21 @@ tyThingsTyCoVars tts =
 
 -- | The Names that a TyThing should bring into scope.  Used to build
 -- the GlobalRdrEnv for the InteractiveContext.
-tyThingAvailInfo :: TyThing -> AvailInfo
+tyThingAvailInfo :: TyThing -> [AvailInfo]
 tyThingAvailInfo (ATyCon t)
    = case tyConClass_maybe t of
-        Just c  -> AvailTC n (n : map getName (classMethods c)
+        Just c  -> [AvailTC n (n : map getName (classMethods c)
                                  ++ map getName (classATs c))
-                             []
+                             [] ]
              where n = getName c
-        Nothing -> AvailTC n (n : map getName dcs) flds
+        Nothing -> [AvailTC n (n : map getName dcs) flds]
              where n    = getName t
                    dcs  = tyConDataCons t
                    flds = tyConFieldLabels t
+tyThingAvailInfo (AConLike (PatSynCon p))
+  = map patSynAvail ((getName p) : map flSelector (patSynFieldLabels p))
 tyThingAvailInfo t
-   = avail (getName t)
+   = [avail (getName t)]
 
 {-
 ************************************************************************
