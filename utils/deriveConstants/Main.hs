@@ -693,7 +693,7 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
              Just 0x292 -> die $ "broken 'nm' detected, see https://ghc.haskell.org/ticket/11744.\n"
                               ++ "\n"
                               ++ "Workaround: You may want to pass\n"
-                              ++ "    --with-nm=$(xcrun --find nm-classic\n"
+                              ++ "    --with-nm=$(xcrun --find nm-classic)\n"
                               ++ "to 'configure'.\n"
              Just x     -> die ("unexpected value round-tripped for CONTROL_GROUP_CONST_291: " ++ show x)
 
