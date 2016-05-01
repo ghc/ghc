@@ -177,6 +177,7 @@ static void install_vtalrm_handler(TickProc handle_tick)
 #if defined(USE_PTHREAD_FOR_ITIMER)
 enum ItimerState {STOPPED, RUNNING, STOPPING, EXITED};
 static volatile enum ItimerState itimer_state = STOPPED;
+
 static void *itimer_thread_func(void *_handle_tick)
 {
     TickProc handle_tick = _handle_tick;
@@ -189,7 +190,7 @@ static void *itimer_thread_func(void *_handle_tick)
     it.it_value.tv_nsec = TimeToNS(itimer_interval) % 1000000000;
     it.it_interval = it.it_value;
 
-    timerfd = timerfd_create(CLOCK_MONOTONIC,TFD_CLOEXEC);
+    timerfd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC);
     if (timerfd == -1) {
         sysErrorBelch("timerfd_create");
         stg_exit(EXIT_FAILURE);
@@ -197,7 +198,7 @@ static void *itimer_thread_func(void *_handle_tick)
     if (!TFD_CLOEXEC) {
       fcntl(timerfd, F_SETFD, FD_CLOEXEC);
     }
-    timerfd_settime(timerfd,0,&it,NULL);
+    int ret = timerfd_settime(timerfd, 0, &it, NULL);
 #endif
 
     while (1) {
@@ -270,6 +271,11 @@ void
 startTicker(void)
 {
 #if defined(USE_PTHREAD_FOR_ITIMER)
+    // sanity check
+    if (itimer_state == EXITED) {
+        sysErrorBelch("ITimer: Tried to start a dead timer!\n");
+        stg_exit(EXIT_FAILURE);
+    }
     itimer_state = RUNNING;
 #elif defined(USE_TIMER_CREATE)
     {
@@ -306,10 +312,8 @@ stopTicker(void)
 #if defined(USE_PTHREAD_FOR_ITIMER)
     if (itimer_state == RUNNING) {
         itimer_state = STOPPING;
-        /* Wait for the thread to confirm it won't generate another tick. */
-        write_barrier();
-        while (itimer_state != STOPPED)
-            sched_yield();
+        // Note that the timer may fire once more, but that's okay;
+        // handle_tick is only called when itimer_state == RUNNING
     }
 #elif defined(USE_TIMER_CREATE)
     struct itimerspec it;
