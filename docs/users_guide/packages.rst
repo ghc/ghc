@@ -1279,6 +1279,7 @@ Package environments
 
 .. index::
    single: package environments
+   single: environment file
 
 A *package environment file* is a file that tells ``ghc`` precisely which
 packages should be visible. It can be used to create environments for ``ghc``
