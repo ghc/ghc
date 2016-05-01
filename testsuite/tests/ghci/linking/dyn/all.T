@@ -6,9 +6,9 @@ test('load_short_name',
 
 test('T1407',
      [unless(doing_ghci, skip),
-     extra_clean(['libAS.*']),
-     pre_cmd('$MAKE -s --no-print-directory compile_libAS'),
-     extra_hc_opts('-L.')],
+     extra_clean(['T1407dir/libAS.*']),
+     pre_cmd('$MAKE -s --no-print-directory compile_libT1407'),
+     extra_hc_opts('-L$PWD/T1407dir')],
      run_command, ['$MAKE --no-print-directory -s T1407'])
 
 test('T3242',

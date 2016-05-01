@@ -26,6 +26,16 @@ endif
 
 MY_TEST_HC_OPTS = $(filter-out -rtsopts,$(TEST_HC_OPTS)) $(CFLAGS)
 
+# --------------------------------------------------------------
+# Note: libAS.def is not used directly in these tests but is
+#       included for completeness. libAS.def is the input to
+#       the Microsoft tool "lib.exe" that can be used to
+#       create the import libraries using the short format
+#       that the `compile_libAS_impl_msvc' target uses.
+#
+#       See #11072
+# --------------------------------------------------------------
+
 .PHONY: load_short_name
 load_short_name:
 	rm -rf bin_short
@@ -34,10 +44,12 @@ load_short_name:
 	rm -f bin_short/*.a
 	echo ":q" | "$(TEST_HC)" --interactive -ignore-dot-ghci -L"./bin_short" -lA -v0
 
-.PHONY: compile_libAS
-compile_libAS:
-	'$(TEST_HC)' $(MY_TEST_HC_OPTS) -shared A.c -o $(call DLL,AS)
-	rm -f libAS*.a
+.PHONY: compile_libT1407
+compile_libT1407:
+	rm -rf T1407dir
+	mkdir T1407dir
+	'$(TEST_HC)' $(MY_TEST_HC_OPTS) -odir "T1407dir" -shared A.c -o "T1407dir/$(call DLL,AS)"
+	rm -f T1407dir/libAS*.a
 
 .PHONY: compile_libT10458
 compile_libT10458:
@@ -82,7 +94,7 @@ compile_libAS_impl_msvc:
 
 .PHONY: T1407
 T1407:
-	cat T1407.script | LD_LIBRARY_PATH=. "$(TEST_HC)" $(TEST_HC_OPTS) -ignore-dot-ghci -v0 --interactive -L.
+	cat T1407.script | LD_LIBRARY_PATH=. "$(TEST_HC)" $(TEST_HC_OPTS) -ignore-dot-ghci -v0 --interactive -L"T1407dir"
 
 .PHONY: T3242
 	echo ":q" | '$(TEST_HC)' $(TEST_HC_OPTS) --interactive -ignore-dot-ghci -v0 -lm
