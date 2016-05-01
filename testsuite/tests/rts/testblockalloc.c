@@ -11,7 +11,7 @@ const int MAXALLOC = ((8 * 1024 * 1024) / BLOCK_SIZE - 1);
 //const int MAXALLOC = ((64 * 1024 * 1024) / BLOCK_SIZE - 1);
 const int SEED     = 0xf00f00;
 
-extern lnat mblocks_allocated;
+extern StgWord mblocks_allocated;
 
 int main (int argc, char *argv[])
 {
