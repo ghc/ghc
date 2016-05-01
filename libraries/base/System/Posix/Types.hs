@@ -11,7 +11,7 @@
 -- Module      :  System.Posix.Types
 -- Copyright   :  (c) The University of Glasgow 2002
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional
 -- Portability :  non-portable (requires POSIX)
@@ -67,6 +67,10 @@ module System.Posix.Types (
 #endif
 
   Fd(..),
+
+  -- See Note [Exporting constructors of marshallable foreign types]
+  -- in Foreign.Ptr for why the constructors for these newtypes are
+  -- exported.
 
 #if defined(HTYPE_NLINK_T)
   LinkCount,

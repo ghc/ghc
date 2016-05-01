@@ -1,5 +1,11 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## next *TBA*
+  * Bundled with GHC *TBA*
+
+  * `Foreign.Ptr` now exports the constructors for `IntPtr` and `WordPtr`
+    (#11983)
+
 ## 4.9.0.0  *TBA*
 
   * Bundled with GHC 8.0

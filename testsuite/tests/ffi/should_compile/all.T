@@ -30,3 +30,5 @@ test('T3742', normal, compile, [''])
 test('cc015', normal, compile, [''])
 test('cc016', normal, compile, [''])
 test('T10460', normal, compile, [''])
+test('T11983', [ omit_ways(['ghci']), extra_clean(['T11983.o']) ],
+               compile, ['T11983.c'])
