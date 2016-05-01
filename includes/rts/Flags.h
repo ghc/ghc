@@ -27,30 +27,30 @@
 /* See Note [Synchronization of flags and base APIs] */
 typedef struct _GC_FLAGS {
     FILE   *statsFile;
-    nat	    giveStats;
+    uint32_t  giveStats;
 #define NO_GC_STATS	 0
 #define COLLECT_GC_STATS 1
 #define ONELINE_GC_STATS 2
 #define SUMMARY_GC_STATS 3
 #define VERBOSE_GC_STATS 4
 
-    nat     maxStkSize;         /* in *words* */
-    nat     initialStkSize;     /* in *words* */
-    nat     stkChunkSize;       /* in *words* */
-    nat     stkChunkBufferSize; /* in *words* */
+    uint32_t     maxStkSize;         /* in *words* */
+    uint32_t     initialStkSize;     /* in *words* */
+    uint32_t     stkChunkSize;       /* in *words* */
+    uint32_t     stkChunkBufferSize; /* in *words* */
 
-    nat	    maxHeapSize;        /* in *blocks* */
-    nat     minAllocAreaSize;   /* in *blocks* */
-    nat     largeAllocLim;      /* in *blocks* */
-    nat     nurseryChunkSize;   /* in *blocks* */
-    nat     minOldGenSize;      /* in *blocks* */
-    nat     heapSizeSuggestion; /* in *blocks* */
+    uint32_t     maxHeapSize;        /* in *blocks* */
+    uint32_t     minAllocAreaSize;   /* in *blocks* */
+    uint32_t     largeAllocLim;      /* in *blocks* */
+    uint32_t     nurseryChunkSize;   /* in *blocks* */
+    uint32_t     minOldGenSize;      /* in *blocks* */
+    uint32_t     heapSizeSuggestion; /* in *blocks* */
     rtsBool heapSizeSuggestionAuto;
     double  oldGenFactor;
     double  pcFreeHeap;
 
-    nat     generations;
-    nat     steps;
+    uint32_t     generations;
+    uint32_t     steps;
     rtsBool squeezeUpdFrames;
 
     rtsBool compact;		/* True <=> "compact all the time" */
@@ -97,7 +97,7 @@ typedef struct _DEBUG_FLAGS {
 
 /* See Note [Synchronization of flags and base APIs] */
 typedef struct _COST_CENTRE_FLAGS {
-    nat	    doCostCentres;
+    uint32_t    doCostCentres;
 # define COST_CENTRES_NONE      0
 # define COST_CENTRES_SUMMARY	1
 # define COST_CENTRES_VERBOSE	2 /* incl. serial time profile */
@@ -110,7 +110,7 @@ typedef struct _COST_CENTRE_FLAGS {
 
 /* See Note [Synchronization of flags and base APIs] */
 typedef struct _PROFILING_FLAGS {
-    nat	doHeapProfile;
+    uint32_t doHeapProfile;
 # define NO_HEAP_PROFILING	0	/* N.B. Used as indexes into arrays */
 # define HEAP_BY_CCS		1
 # define HEAP_BY_MOD		2
@@ -121,16 +121,16 @@ typedef struct _PROFILING_FLAGS {
 
 # define HEAP_BY_CLOSURE_TYPE   8
 
-    Time                heapProfileInterval; /* time between samples */
-    nat                 heapProfileIntervalTicks; /* ticks between samples (derived) */
-    rtsBool             includeTSOs;
+    Time        heapProfileInterval; /* time between samples */
+    uint32_t    heapProfileIntervalTicks; /* ticks between samples (derived) */
+    rtsBool     includeTSOs;
 
 
     rtsBool		showCCSOnException;
 
-    nat                 maxRetainerSetSize;
+    uint32_t    maxRetainerSetSize;
 
-    nat                 ccsLength;
+    uint32_t    ccsLength;
 
     const char*         modSelector;
     const char*         descrSelector;
@@ -184,27 +184,27 @@ typedef struct _MISC_FLAGS {
 #ifdef THREADED_RTS
 /* See Note [Synchronization of flags and base APIs] */
 typedef struct _PAR_FLAGS {
-  nat            nNodes;         /* number of threads to run simultaneously */
+  uint32_t       nNodes;         /* number of threads to run simultaneously */
   rtsBool        migrate;        /* migrate threads between capabilities */
-  nat            maxLocalSparks;
+  uint32_t       maxLocalSparks;
   rtsBool        parGcEnabled;   /* enable parallel GC */
-  nat            parGcGen;       /* do parallel GC in this generation
+  uint32_t       parGcGen;       /* do parallel GC in this generation
                                   * and higher only */
-  rtsBool        parGcLoadBalancingEnabled; 
+  rtsBool        parGcLoadBalancingEnabled;
                                  /* enable load-balancing in the
                                   * parallel GC */
-  nat            parGcLoadBalancingGen;
+  uint32_t       parGcLoadBalancingGen;
                                  /* do load-balancing in this
                                   * generation and higher only */
 
-  nat            parGcNoSyncWithIdle;
+  uint32_t       parGcNoSyncWithIdle;
                                  /* if a Capability has been idle for
                                   * this many GCs, do not try to wake
                                   * it up when doing a
                                   * non-load-balancing parallel GC.
                                   * (zero disables) */
 
-  nat            parGcThreads;
+  uint32_t       parGcThreads;
                                  /* Use this many threads for parallel
                                   * GC (default: use all nNodes). */
 
@@ -249,7 +249,7 @@ extern RTS_FLAGS RtsFlags;
 /*
  * The printf formats are here, so we are less likely to make
  * overly-long filenames (with disastrous results).  No more than 128
- * chars, please!  
+ * chars, please!
  */
 
 #define STATS_FILENAME_MAXLEN	128

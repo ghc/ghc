@@ -55,7 +55,7 @@ generation *g0          = NULL; /* generation 0, for convenience */
 generation *oldest_gen  = NULL; /* oldest generation, for convenience */
 
 nursery *nurseries = NULL;     /* array of nurseries, size == n_capabilities */
-nat n_nurseries;
+uint32_t n_nurseries;
 volatile StgWord next_nursery = 0;
 
 #ifdef THREADED_RTS
@@ -66,8 +66,8 @@ volatile StgWord next_nursery = 0;
 Mutex sm_mutex;
 #endif
 
-static void allocNurseries (nat from, nat to);
-static void assignNurseriesToCapabilities (nat from, nat to);
+static void allocNurseries (uint32_t from, uint32_t to);
+static void assignNurseriesToCapabilities (uint32_t from, uint32_t to);
 
 static void
 initGeneration (generation *gen, int g)
@@ -104,7 +104,7 @@ initGeneration (generation *gen, int g)
 void
 initStorage (void)
 {
-  nat g;
+  uint32_t g;
 
   if (generations != NULL) {
       // multi-init protection
@@ -211,9 +211,9 @@ initStorage (void)
                      BLOCK_SIZE_W  * sizeof(W_));
 }
 
-void storageAddCapabilities (nat from, nat to)
+void storageAddCapabilities (uint32_t from, uint32_t to)
 {
-    nat n, g, i, new_n_nurseries;
+    uint32_t n, g, i, new_n_nurseries;
 
     if (RtsFlags.GcFlags.nurseryChunkSize == 0) {
         new_n_nurseries = to;
@@ -577,7 +577,7 @@ allocNursery (bdescr *tail, W_ blocks)
 }
 
 STATIC_INLINE void
-assignNurseryToCapability (Capability *cap, nat n)
+assignNurseryToCapability (Capability *cap, uint32_t n)
 {
     ASSERT(n < n_nurseries);
     cap->r.rNursery = &nurseries[n];
@@ -591,9 +591,9 @@ assignNurseryToCapability (Capability *cap, nat n)
  * here, everything must be stopped to call this function.
  */
 static void
-assignNurseriesToCapabilities (nat from, nat to)
+assignNurseriesToCapabilities (uint32_t from, uint32_t to)
 {
-    nat i;
+    uint32_t i;
 
     for (i = from; i < to; i++) {
         assignNurseryToCapability(capabilities[i], next_nursery++);
@@ -601,9 +601,9 @@ assignNurseriesToCapabilities (nat from, nat to)
 }
 
 static void
-allocNurseries (nat from, nat to)
+allocNurseries (uint32_t from, uint32_t to)
 { 
-    nat i;
+    uint32_t i;
     memcount n_blocks;
 
     if (RtsFlags.GcFlags.nurseryChunkSize) {
@@ -626,7 +626,7 @@ resetNurseries (void)
 
 #ifdef DEBUG
     bdescr *bd;
-    nat n;
+    uint32_t n;
     for (n = 0; n < n_nurseries; n++) {
         for (bd = nurseries[n].blocks; bd; bd = bd->link) {
             ASSERT(bd->gen_no == 0);
@@ -640,7 +640,7 @@ resetNurseries (void)
 W_
 countNurseryBlocks (void)
 {
-    nat i;
+    uint32_t i;
     W_ blocks = 0;
 
     for (i = 0; i < n_nurseries; i++) {
@@ -695,7 +695,7 @@ resizeNursery (nursery *nursery, W_ blocks)
 static void
 resizeNurseriesEach (W_ blocks)
 {
-    nat i;
+    uint32_t i;
 
     for (i = 0; i < n_nurseries; i++) {
         resizeNursery(&nurseries[i], blocks);
@@ -705,7 +705,7 @@ resizeNurseriesEach (W_ blocks)
 void
 resizeNurseriesFixed (void)
 {
-    nat blocks;
+    uint32_t blocks;
 
     if (RtsFlags.GcFlags.nurseryChunkSize) {
         blocks = RtsFlags.GcFlags.nurseryChunkSize;
@@ -1149,7 +1149,7 @@ calcTotalAllocated (void)
 void
 updateNurseriesStats (void)
 {
-    nat i;
+    uint32_t i;
     bdescr *bd;
 
     for (i = 0; i < n_capabilities; i++) {
@@ -1184,7 +1184,7 @@ W_ genLiveBlocks (generation *gen)
     return gen->n_blocks + gen->n_large_blocks;
 }
 
-W_ gcThreadLiveWords (nat i, nat g)
+W_ gcThreadLiveWords (uint32_t i, uint32_t g)
 {
     W_ a, b, c;
 
@@ -1196,7 +1196,7 @@ W_ gcThreadLiveWords (nat i, nat g)
     return a + b + c;
 }
 
-W_ gcThreadLiveBlocks (nat i, nat g)
+W_ gcThreadLiveBlocks (uint32_t i, uint32_t g)
 {
     W_ blocks;
 
@@ -1221,7 +1221,7 @@ extern W_
 calcNeeded (rtsBool force_major, memcount *blocks_needed)
 {
     W_ needed = 0, blocks;
-    nat g, N;
+    uint32_t g, N;
     generation *gen;
     
     if (force_major) {

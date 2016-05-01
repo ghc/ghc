@@ -17,7 +17,7 @@ bdescr *allocLargeChunk (W_ min, W_ max);
 
 extern W_ countBlocks       (bdescr *bd);
 extern W_ countAllocdBlocks (bdescr *bd);
-extern void returnMemoryToOS(nat n);
+extern void returnMemoryToOS(uint32_t n);
 
 #ifdef DEBUG
 void checkFreeListSanity(void);

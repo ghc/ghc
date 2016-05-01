@@ -34,7 +34,7 @@
  */
 
 static Pool *pool = NULL;
-static nat pool_size = 10; // TODO
+static uint32_t pool_size = 10; // TODO
 
 void libdwPoolInit(void) {
     pool = poolInit(pool_size, pool_size,

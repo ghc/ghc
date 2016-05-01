@@ -256,20 +256,20 @@ INLINE_HEADER rtsBool LOOKS_LIKE_CLOSURE_PTR (void *p)
    Macros for calculating the size of a closure
    -------------------------------------------------------------------------- */
 
-EXTERN_INLINE StgOffset PAP_sizeW   ( nat n_args );
-EXTERN_INLINE StgOffset PAP_sizeW   ( nat n_args )
+EXTERN_INLINE StgOffset PAP_sizeW   ( uint32_t n_args );
+EXTERN_INLINE StgOffset PAP_sizeW   ( uint32_t n_args )
 { return sizeofW(StgPAP) + n_args; }
 
-EXTERN_INLINE StgOffset AP_sizeW   ( nat n_args );
-EXTERN_INLINE StgOffset AP_sizeW   ( nat n_args )
+EXTERN_INLINE StgOffset AP_sizeW   ( uint32_t n_args );
+EXTERN_INLINE StgOffset AP_sizeW   ( uint32_t n_args )
 { return sizeofW(StgAP) + n_args; }
 
-EXTERN_INLINE StgOffset AP_STACK_sizeW ( nat size );
-EXTERN_INLINE StgOffset AP_STACK_sizeW ( nat size )
+EXTERN_INLINE StgOffset AP_STACK_sizeW ( uint32_t size );
+EXTERN_INLINE StgOffset AP_STACK_sizeW ( uint32_t size )
 { return sizeofW(StgAP_STACK) + size; }
 
-EXTERN_INLINE StgOffset CONSTR_sizeW( nat p, nat np );
-EXTERN_INLINE StgOffset CONSTR_sizeW( nat p, nat np )
+EXTERN_INLINE StgOffset CONSTR_sizeW( uint32_t p, uint32_t np );
+EXTERN_INLINE StgOffset CONSTR_sizeW( uint32_t p, uint32_t np )
 { return sizeofW(StgHeader) + p + np; }
 
 EXTERN_INLINE StgOffset THUNK_SELECTOR_sizeW ( void );
@@ -333,12 +333,12 @@ EXTERN_INLINE StgWord bco_sizeW ( StgBCO *bco )
 { return bco->size; }
 
 /*
- * TODO: Consider to switch return type from 'nat' to 'StgWord' #8742
+ * TODO: Consider to switch return type from 'uint32_t' to 'StgWord' #8742
  *
  * (Also for 'closure_sizeW' below)
  */
-EXTERN_INLINE nat closure_sizeW_ (StgClosure *p, StgInfoTable *info);
-EXTERN_INLINE nat
+EXTERN_INLINE uint32_t closure_sizeW_ (StgClosure *p, StgInfoTable *info);
+EXTERN_INLINE uint32_t
 closure_sizeW_ (StgClosure *p, StgInfoTable *info)
 {
     switch (info->type) {
@@ -399,8 +399,8 @@ closure_sizeW_ (StgClosure *p, StgInfoTable *info)
 }
 
 // The definitive way to find the size, in words, of a heap-allocated closure
-EXTERN_INLINE nat closure_sizeW (StgClosure *p);
-EXTERN_INLINE nat closure_sizeW (StgClosure *p)
+EXTERN_INLINE uint32_t closure_sizeW (StgClosure *p);
+EXTERN_INLINE uint32_t closure_sizeW (StgClosure *p)
 {
     return closure_sizeW_(p, get_itbl(p));
 }
@@ -505,13 +505,13 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
 #endif
 
 #ifdef PROFILING
-void LDV_recordDead (StgClosure *c, nat size);
+void LDV_recordDead (StgClosure *c, uint32_t size);
 #endif
 
 EXTERN_INLINE void overwritingClosure (StgClosure *p);
 EXTERN_INLINE void overwritingClosure (StgClosure *p)
 {
-    nat size, i;
+    uint32_t size, i;
 
 #if ZERO_SLOP_FOR_LDV_PROF && !ZERO_SLOP_FOR_SANITY_CHECK
     // see Note [zeroing slop], also #8402
@@ -537,10 +537,10 @@ EXTERN_INLINE void overwritingClosure (StgClosure *p)
 //
 // Note: As this calls LDV_recordDead() you have to call LDV_RECORD()
 //       on the final state of the closure at the call-site
-EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, nat offset);
-EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, nat offset)
+EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, uint32_t offset);
+EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, uint32_t offset)
 {
-    nat size, i;
+    uint32_t size, i;
 
 #if ZERO_SLOP_FOR_LDV_PROF && !ZERO_SLOP_FOR_SANITY_CHECK
     // see Note [zeroing slop], also #8402

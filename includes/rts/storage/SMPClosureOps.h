@@ -51,7 +51,7 @@ EXTERN_INLINE StgInfoTable *reallyLockClosure(StgClosure *p)
 {
     StgWord info;
     do {
-        nat i = 0;
+        uint32_t i = 0;
         do {
             info = xchg((P_)(void *)&p->header.info, (W_)&stg_WHITEHOLE_info);
             if (info != (W_)&stg_WHITEHOLE_info) return (StgInfoTable *)info;

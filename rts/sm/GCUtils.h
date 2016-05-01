@@ -22,12 +22,12 @@ bdescr *allocBlock_sync(void);
 void    freeChain_sync(bdescr *bd);
 
 void    push_scanned_block   (bdescr *bd, gen_workspace *ws);
-StgPtr  todo_block_full      (nat size, gen_workspace *ws);
-StgPtr  alloc_todo_block     (gen_workspace *ws, nat size);
+StgPtr  todo_block_full      (uint32_t size, gen_workspace *ws);
+StgPtr  alloc_todo_block     (gen_workspace *ws, uint32_t size);
 
 bdescr *grab_local_todo_block  (gen_workspace *ws);
 #if defined(THREADED_RTS)
-bdescr *steal_todo_block       (nat s);
+bdescr *steal_todo_block       (uint32_t s);
 #endif
 
 // Returns true if a block is partially full.  This predicate is used to try
@@ -48,7 +48,7 @@ void printMutableList (bdescr *bd);
 // mutable lists attached to the current gc_thread structure, which
 // are the same as the mutable lists on the Capability.
 INLINE_HEADER void
-recordMutableGen_GC (StgClosure *p, nat gen_no)
+recordMutableGen_GC (StgClosure *p, uint32_t gen_no)
 {
     bdescr *bd;
 

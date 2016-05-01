@@ -42,7 +42,7 @@ typedef StgWord SpinLock;
 INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)
 {
     StgWord32 r = 0;
-    nat i;
+    uint32_t i;
     do {
         for (i = 0; i < SPIN_COUNT; i++) {
             r = cas((StgVolatilePtr)&(p->lock), 1, 0);
@@ -75,7 +75,7 @@ INLINE_HEADER void initSpinLock(SpinLock * p)
 INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)
 {
     StgWord32 r = 0;
-    nat i;
+    uint32_t i;
     do {
         for (i = 0; i < SPIN_COUNT; i++) {
             r = cas((StgVolatilePtr)p, 1, 0);

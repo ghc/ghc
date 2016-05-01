@@ -27,10 +27,11 @@
 // Locks required: all_tasks_mutex.
 Task *all_tasks = NULL;
 
-nat taskCount; // current number of bound tasks + total number of worker tasks.
-nat workerCount;
-nat currentWorkerCount;
-nat peakWorkerCount;
+// current number of bound tasks + total number of worker tasks.
+uint32_t taskCount;
+uint32_t workerCount;
+uint32_t currentWorkerCount;
+uint32_t peakWorkerCount;
 
 static int tasksInitialized = 0;
 
@@ -80,11 +81,11 @@ initTaskManager (void)
     }
 }
 
-nat
+uint32_t
 freeTaskManager (void)
 {
     Task *task, *next;
-    nat tasksRunning = 0;
+    uint32_t tasksRunning = 0;
 
     ACQUIRE_LOCK(&all_tasks_mutex);
 

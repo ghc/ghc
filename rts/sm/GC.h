@@ -20,14 +20,14 @@
 
 void GarbageCollect (rtsBool force_major_gc,
                      rtsBool do_heap_census,
-                     nat gc_type, Capability *cap);
+                     uint32_t gc_type, Capability *cap);
 
 typedef void (*evac_fn)(void *user, StgClosure **root);
 
 StgClosure * isAlive      ( StgClosure *p );
 void         markCAFs     ( evac_fn evac, void *user );
 
-extern nat N;
+extern uint32_t N;
 extern rtsBool major_gc;
 
 extern bdescr *mark_stack_bd;
@@ -37,7 +37,7 @@ extern StgPtr mark_sp;
 extern rtsBool work_stealing;
 
 #ifdef DEBUG
-extern nat mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS, mutlist_OTHERS,
+extern uint32_t mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS, mutlist_OTHERS,
     mutlist_TVAR,
     mutlist_TVAR_WATCH_QUEUE,
     mutlist_TREC_CHUNK,
@@ -51,7 +51,7 @@ extern StgWord64 whitehole_spin;
 #endif
 
 void gcWorkerThread (Capability *cap);
-void initGcThreads (nat from, nat to);
+void initGcThreads (uint32_t from, uint32_t to);
 void freeGcThreads (void);
 
 #if defined(THREADED_RTS)

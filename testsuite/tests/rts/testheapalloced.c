@@ -12,7 +12,7 @@ extern void *getNextMBlock(void *mblock);
 #include <stdio.h>
 #include <string.h>
 
-extern bdescr *allocGroup_lock_lock(nat n);
+extern bdescr *allocGroup_lock_lock(uint32_t n);
 extern void freeGroup_lock(bdescr *p);
 
 const int ARRSIZE  = 2000;

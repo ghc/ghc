@@ -33,19 +33,19 @@
    Forward decls.
    -------------------------------------------------------------------------- */
 
-static void      checkSmallBitmap    ( StgPtr payload, StgWord bitmap, nat );
-static void      checkLargeBitmap    ( StgPtr payload, StgLargeBitmap*, nat );
-static void      checkClosureShallow ( StgClosure * );
-static void      checkSTACK          (StgStack *stack);
+static void  checkSmallBitmap    ( StgPtr payload, StgWord bitmap, uint32_t );
+static void  checkLargeBitmap    ( StgPtr payload, StgLargeBitmap*, uint32_t );
+static void  checkClosureShallow ( StgClosure * );
+static void  checkSTACK          (StgStack *stack);
 
 /* -----------------------------------------------------------------------------
    Check stack sanity
    -------------------------------------------------------------------------- */
 
 static void
-checkSmallBitmap( StgPtr payload, StgWord bitmap, nat size )
+checkSmallBitmap( StgPtr payload, StgWord bitmap, uint32_t size )
 {
-    nat i;
+    uint32_t i;
 
     for(i = 0; i < size; i++, bitmap >>= 1 ) {
         if ((bitmap & 1) == 0) {
@@ -55,10 +55,10 @@ checkSmallBitmap( StgPtr payload, StgWord bitmap, nat size )
 }
 
 static void
-checkLargeBitmap( StgPtr payload, StgLargeBitmap* large_bitmap, nat size )
+checkLargeBitmap( StgPtr payload, StgLargeBitmap* large_bitmap, uint32_t size )
 {
     StgWord bmp;
-    nat i, j;
+    uint32_t i, j;
 
     i = 0;
     for (bmp=0; i < size; bmp++) {
@@ -98,7 +98,7 @@ checkClosureShallow( StgClosure* p )
 StgOffset
 checkStackFrame( StgPtr c )
 {
-    nat size;
+    uint32_t size;
     const StgRetInfoTable* info;
 
     info = get_ret_itbl((StgClosure *)c);
@@ -123,7 +123,7 @@ checkStackFrame( StgPtr c )
 
     case RET_BCO: {
         StgBCO *bco;
-        nat size;
+        uint32_t size;
         bco = (StgBCO *)*(c+1);
         size = BCO_BITMAP_SIZE(bco);
         checkLargeBitmap((StgPtr)c + 2, BCO_BITMAP(bco), size);
@@ -257,7 +257,7 @@ checkClosure( StgClosure* p )
     case THUNK_0_2:
     case THUNK_2_0:
       {
-        nat i;
+        uint32_t i;
         for (i = 0; i < info->layout.payload.ptrs; i++) {
           ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgThunk *)p)->payload[i]));
         }
@@ -287,7 +287,7 @@ checkClosure( StgClosure* p )
     case THUNK_STATIC:
     case FUN_STATIC:
         {
-            nat i;
+            uint32_t i;
             for (i = 0; i < info->layout.payload.ptrs; i++) {
                 ASSERT(LOOKS_LIKE_CLOSURE_PTR(p->payload[i]));
             }
@@ -395,7 +395,7 @@ checkClosure( StgClosure* p )
     case MUT_ARR_PTRS_FROZEN0:
         {
             StgMutArrPtrs* a = (StgMutArrPtrs *)p;
-            nat i;
+            uint32_t i;
             for (i = 0; i < a->ptrs; i++) {
                 ASSERT(LOOKS_LIKE_CLOSURE_PTR(a->payload[i]));
             }
@@ -412,7 +412,7 @@ checkClosure( StgClosure* p )
 
     case TREC_CHUNK:
       {
-        nat i;
+        uint32_t i;
         StgTRecChunk *tc = (StgTRecChunk *)p;
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(tc->prev_chunk));
         for (i = 0; i < tc -> next_entry_idx; i ++) {
@@ -446,7 +446,7 @@ void checkHeapChain (bdescr *bd)
         if(!(bd->flags & BF_SWEPT)) {
             p = bd->start;
             while (p < bd->free) {
-                nat size = checkClosure((StgClosure *)p);
+                uint32_t size = checkClosure((StgClosure *)p);
                 /* This is the smallest size of closure that can live in the heap */
                 ASSERT( size >= MIN_PAYLOAD_SIZE + sizeofW(StgHeader) );
                 p += size;
@@ -463,7 +463,7 @@ void
 checkHeapChunk(StgPtr start, StgPtr end)
 {
   StgPtr p;
-  nat size;
+  uint32_t size;
 
   for (p=start; p<end; p+=size) {
     ASSERT(LOOKS_LIKE_INFO_PTR(*p));
@@ -542,7 +542,7 @@ void
 checkGlobalTSOList (rtsBool checkTSOs)
 {
   StgTSO *tso;
-  nat g;
+  uint32_t g;
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
       for (tso=generations[g].threads; tso != END_TSO_QUEUE;
@@ -585,7 +585,7 @@ checkGlobalTSOList (rtsBool checkTSOs)
    -------------------------------------------------------------------------- */
 
 static void
-checkMutableList( bdescr *mut_bd, nat gen )
+checkMutableList( bdescr *mut_bd, uint32_t gen )
 {
     bdescr *bd;
     StgPtr q;
@@ -610,9 +610,9 @@ checkMutableList( bdescr *mut_bd, nat gen )
 }
 
 static void
-checkLocalMutableLists (nat cap_no)
+checkLocalMutableLists (uint32_t cap_no)
 {
-    nat g;
+    uint32_t g;
     for (g = 1; g < RtsFlags.GcFlags.generations; g++) {
         checkMutableList(capabilities[cap_no]->mut_lists[g], g);
     }
@@ -621,7 +621,7 @@ checkLocalMutableLists (nat cap_no)
 static void
 checkMutableLists (void)
 {
-    nat i;
+    uint32_t i;
     for (i = 0; i < n_capabilities; i++) {
         checkLocalMutableLists(i);
     }
@@ -675,7 +675,7 @@ void
 checkNurserySanity (nursery *nursery)
 {
     bdescr *bd, *prev;
-    nat blocks = 0;
+    uint32_t blocks = 0;
 
     prev = NULL;
     for (bd = nursery->blocks; bd != NULL; bd = bd->link) {
@@ -691,7 +691,7 @@ checkNurserySanity (nursery *nursery)
 static void checkGeneration (generation *gen,
                              rtsBool after_major_gc USED_IF_THREADS)
 {
-    nat n;
+    uint32_t n;
     gen_workspace *ws;
 
     ASSERT(countBlocks(gen->blocks) == gen->n_blocks);
@@ -719,7 +719,7 @@ static void checkGeneration (generation *gen,
 /* Full heap sanity check. */
 static void checkFullHeap (rtsBool after_major_gc)
 {
-    nat g, n;
+    uint32_t g, n;
 
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         checkGeneration(&generations[g], after_major_gc);
@@ -753,7 +753,7 @@ void checkSanity (rtsBool after_gc, rtsBool major_gc)
 static void
 findMemoryLeak (void)
 {
-    nat g, i;
+    uint32_t g, i;
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         for (i = 0; i < n_capabilities; i++) {
             markBlocks(capabilities[i]->mut_lists[g]);
@@ -839,7 +839,7 @@ genBlocks (generation *gen)
 void
 memInventory (rtsBool show)
 {
-  nat g, i;
+  uint32_t g, i;
   W_ gen_blocks[RtsFlags.GcFlags.generations];
   W_ nursery_blocks, retainer_blocks,
       arena_blocks, exec_blocks, gc_free_blocks = 0;

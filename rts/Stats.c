@@ -163,7 +163,7 @@ initStats0(void)
 void
 initStats1 (void)
 {
-    nat i;
+    uint32_t i;
 
     if (RtsFlags.GcFlags.giveStats >= VERBOSE_GC_STATS) {
         statsPrintf("    Alloc    Copied     Live     GC     GC      TOT      TOT  Page Flts\n");
@@ -232,12 +232,12 @@ stat_startGCSync (gc_thread *gct)
    Called at the beginning of each GC
    -------------------------------------------------------------------------- */
 
-static nat rub_bell = 0;
+static uint32_t rub_bell = 0;
 
 void
 stat_startGC (Capability *cap, gc_thread *gct)
 {
-    nat bell = RtsFlags.GcFlags.ringBell;
+    uint32_t bell = RtsFlags.GcFlags.ringBell;
 
     if (bell) {
         if (bell > 1) {
@@ -272,8 +272,8 @@ stat_startGC (Capability *cap, gc_thread *gct)
 
 void
 stat_endGC (Capability *cap, gc_thread *gct,
-            W_ live, W_ copied, W_ slop, nat gen,
-            nat par_n_threads, W_ par_max_copied, W_ par_tot_copied)
+            W_ live, W_ copied, W_ slop, uint32_t gen,
+            uint32_t par_n_threads, W_ par_max_copied, W_ par_tot_copied)
 {
     W_ tot_alloc;
     W_ alloc;
@@ -420,9 +420,9 @@ stat_startRP(void)
 #ifdef PROFILING
 void
 stat_endRP(
-  nat retainerGeneration,
+  uint32_t retainerGeneration,
 #ifdef DEBUG_RETAINER
-  nat maxCStackSize,
+  uint32_t maxCStackSize,
   int maxStackSize,
 #endif
   double averageNumVisit)
@@ -540,7 +540,7 @@ stat_exit (void)
         char temp[BIG_STRING_LEN];
         Time tot_cpu;
         Time tot_elapsed;
-        nat i, g, total_collections = 0;
+        uint32_t i, g, total_collections = 0;
 
         getProcessTimes( &tot_cpu, &tot_elapsed );
         tot_elapsed -= start_init_elapsed;
@@ -643,7 +643,7 @@ stat_exit (void)
             statsPrintf("\n");
 
             {
-                nat i;
+                uint32_t i;
                 SparkCounters sparks = { 0, 0, 0, 0, 0, 0};
                 for (i = 0; i < n_capabilities; i++) {
                     sparks.created   += capabilities[i]->spark_stats.created;
@@ -713,7 +713,7 @@ stat_exit (void)
 
 #if defined(THREADED_RTS) && defined(PROF_SPIN)
             {
-                nat g;
+                uint32_t g;
 
                 statsPrintf("gc_alloc_block_sync: %"FMT_Word64"\n", gc_alloc_block_sync.spin);
                 statsPrintf("whitehole_spin: %"FMT_Word64"\n", whitehole_spin);
@@ -785,7 +785,7 @@ stat_exit (void)
 void
 statDescribeGens(void)
 {
-  nat g, mut, lge, i;
+  uint32_t g, mut, lge, i;
   W_ gen_slop;
   W_ tot_live, tot_slop;
   W_ gen_live, gen_blocks;
@@ -859,8 +859,8 @@ extern rtsBool getGCStatsEnabled( void )
 
 extern void getGCStats( GCStats *s )
 {
-    nat total_collections = 0;
-    nat g;
+    uint32_t total_collections = 0;
+    uint32_t g;
     Time gc_cpu = 0;
     Time gc_elapsed = 0;
     Time current_elapsed = 0;
@@ -904,7 +904,7 @@ extern void getGCStats( GCStats *s )
 // extern void getTaskStats( TaskStats **s ) {}
 #if 0
 extern void getSparkStats( SparkCounters *s ) {
-    nat i;
+    uint32_t i;
     s->created = 0;
     s->dud = 0;
     s->overflowed = 0;

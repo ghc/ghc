@@ -66,7 +66,7 @@ initProfTimer( void )
     startHeapProfTimer();
 }
 
-nat total_ticks = 0;
+uint32_t total_ticks = 0;
 
 void
 handleProfTick(void)
@@ -74,7 +74,7 @@ handleProfTick(void)
 #ifdef PROFILING
     total_ticks++;
     if (do_prof_ticks) {
-        nat n;
+        uint32_t n;
         for (n=0; n < n_capabilities; n++) {
             capabilities[n]->r.rCCCS->time_ticks++;
         }

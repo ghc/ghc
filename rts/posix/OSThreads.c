@@ -227,10 +227,10 @@ forkOS_createThread ( HsStablePtr entry )
     return result;
 }
 
-nat
+uint32_t
 getNumberOfProcessors (void)
 {
-    static nat nproc = 0;
+    static uint32_t nproc = 0;
 
     if (nproc == 0) {
 #if defined(HAVE_SYSCONF) && defined(_SC_NPROCESSORS_ONLN)
@@ -238,13 +238,13 @@ getNumberOfProcessors (void)
 #elif defined(HAVE_SYSCONF) && defined(_SC_NPROCESSORS_CONF)
         nproc = sysconf(_SC_NPROCESSORS_CONF);
 #elif defined(darwin_HOST_OS)
-        size_t size = sizeof(nat);
+        size_t size = sizeof(uint32_t);
         if(sysctlbyname("hw.logicalcpu",&nproc,&size,NULL,0) != 0) {
             if(sysctlbyname("hw.ncpu",&nproc,&size,NULL,0) != 0)
                 nproc = 1;
         }
 #elif defined(freebsd_HOST_OS)
-        size_t size = sizeof(nat);
+        size_t size = sizeof(uint32_t);
         if(sysctlbyname("hw.ncpu",&nproc,&size,NULL,0) != 0)
             nproc = 1;
 #else
@@ -260,11 +260,11 @@ getNumberOfProcessors (void)
 // number of physical CPUs, in which case, the thread will be allowed
 // to run on CPU n, n+m, n+2m etc.
 void
-setThreadAffinity (nat n, nat m)
+setThreadAffinity (uint32_t n, uint32_t m)
 {
-    nat nproc;
+    uint32_t nproc;
     cpu_set_t cs;
-    nat i;
+    uint32_t i;
 
     nproc = getNumberOfProcessors();
     CPU_ZERO(&cs);
@@ -277,7 +277,7 @@ setThreadAffinity (nat n, nat m)
 #elif defined(darwin_HOST_OS) && defined(THREAD_AFFINITY_POLICY)
 // Schedules the current thread in the affinity set identified by tag n.
 void
-setThreadAffinity (nat n, nat m GNUC3_ATTRIBUTE(__unused__))
+setThreadAffinity (uint32_t n, uint32_t m GNUC3_ATTRIBUTE(__unused__))
 {
     thread_affinity_policy_data_t policy;
 
@@ -290,11 +290,11 @@ setThreadAffinity (nat n, nat m GNUC3_ATTRIBUTE(__unused__))
 
 #elif defined(HAVE_SYS_CPUSET_H) /* FreeBSD 7.1+ */
 void
-setThreadAffinity(nat n, nat m)
+setThreadAffinity(uint32_t n, uint32_t m)
 {
-        nat nproc;
+        uint32_t nproc;
         cpuset_t cs;
-        nat i;
+        uint32_t i;
 
         nproc = getNumberOfProcessors();
         CPU_ZERO(&cs);
@@ -308,8 +308,8 @@ setThreadAffinity(nat n, nat m)
 
 #else
 void
-setThreadAffinity (nat n GNUC3_ATTRIBUTE(__unused__),
-                   nat m GNUC3_ATTRIBUTE(__unused__))
+setThreadAffinity (uint32_t n GNUC3_ATTRIBUTE(__unused__),
+                   uint32_t m GNUC3_ATTRIBUTE(__unused__))
 {
 }
 #endif
@@ -328,7 +328,7 @@ forkOS_createThread ( HsStablePtr entry STG_UNUSED )
     return -1;
 }
 
-nat getNumberOfProcessors (void)
+uint32_t getNumberOfProcessors (void)
 {
     return 1;
 }

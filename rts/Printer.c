@@ -421,9 +421,10 @@ void printGraph( StgClosure *obj )
 */
 
 static void
-printSmallBitmap( StgPtr spBottom, StgPtr payload, StgWord bitmap, nat size )
+printSmallBitmap( StgPtr spBottom, StgPtr payload, StgWord bitmap,
+                    uint32_t size )
 {
-    nat i;
+    uint32_t i;
 
     for(i = 0; i < size; i++, bitmap >>= 1 ) {
         debugBelch("   stk[%ld] (%p) = ", (long)(spBottom-(payload+i)), payload+i);
@@ -437,10 +438,11 @@ printSmallBitmap( StgPtr spBottom, StgPtr payload, StgWord bitmap, nat size )
 }
 
 static void
-printLargeBitmap( StgPtr spBottom, StgPtr payload, StgLargeBitmap* large_bitmap, nat size )
+printLargeBitmap( StgPtr spBottom, StgPtr payload, StgLargeBitmap* large_bitmap,
+                    uint32_t size )
 {
     StgWord bmp;
-    nat i, j;
+    uint32_t i, j;
 
     i = 0;
     for (bmp=0; i < size; bmp++) {
@@ -756,7 +758,7 @@ findPtrBlocks (StgPtr p, bdescr *bd, StgPtr arr[], int arr_size, int i)
 void
 findPtr(P_ p, int follow)
 {
-  nat g, n;
+  uint32_t g, n;
   bdescr *bd;
   const int arr_size = 1024;
   StgPtr arr[arr_size];
@@ -830,7 +832,7 @@ void prettyPrintClosure_ (StgClosure *obj)
         case CONSTR_STATIC:
         case CONSTR_NOCAF_STATIC:
         {
-           nat i;
+           uint32_t i;
            char *descriptor;
 
            /* find the con_info for the constructor */

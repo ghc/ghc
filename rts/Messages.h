@@ -8,7 +8,7 @@
 
 #include "BeginPrivate.h"
 
-nat messageBlackHole(Capability *cap, MessageBlackHole *msg);
+uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg);
 StgTSO * blackHoleOwner (StgClosure *bh);
 
 #ifdef THREADED_RTS

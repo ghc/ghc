@@ -19,7 +19,7 @@
 INLINE_HEADER void
 mark(StgPtr p, bdescr *bd)
 {
-    nat offset_within_block = p - bd->start; // in words
+    uint32_t offset_within_block = p - bd->start; // in words
     StgPtr bitmap_word = (StgPtr)bd->u.bitmap +
         (offset_within_block / (sizeof(W_)*BITS_PER_BYTE));
     StgWord bit_mask = (StgWord)1 << (offset_within_block & (sizeof(W_)*BITS_PER_BYTE - 1));
@@ -29,7 +29,7 @@ mark(StgPtr p, bdescr *bd)
 INLINE_HEADER void
 unmark(StgPtr p, bdescr *bd)
 {
-    nat offset_within_block = p - bd->start; // in words
+    uint32_t offset_within_block = p - bd->start; // in words
     StgPtr bitmap_word = (StgPtr)bd->u.bitmap +
         (offset_within_block / (sizeof(W_)*BITS_PER_BYTE));
     StgWord bit_mask = (StgWord)1 << (offset_within_block & (sizeof(W_)*BITS_PER_BYTE - 1));
@@ -39,7 +39,7 @@ unmark(StgPtr p, bdescr *bd)
 INLINE_HEADER StgWord
 is_marked(StgPtr p, bdescr *bd)
 {
-    nat offset_within_block = p - bd->start; // in words
+    uint32_t offset_within_block = p - bd->start; // in words
     StgPtr bitmap_word = (StgPtr)bd->u.bitmap +
         (offset_within_block / (sizeof(W_)*BITS_PER_BYTE));
     StgWord bit_mask = (StgWord)1 << (offset_within_block & (sizeof(W_)*BITS_PER_BYTE - 1));

@@ -281,11 +281,11 @@ disInstr ( StgBCO *bco, int pc )
 */
 void disassemble( StgBCO *bco )
 {
-   nat i, j;
-   StgWord16*     instrs    = (StgWord16*)(bco->instrs->payload);
-   StgMutArrPtrs* ptrs      = bco->ptrs;
-   nat            nbcs      = (int)(bco->instrs->bytes / sizeof(StgWord16));
-   nat            pc        = 1;
+   uint32_t i, j;
+   StgWord16*     instrs  = (StgWord16*)(bco->instrs->payload);
+   StgMutArrPtrs* ptrs    = bco->ptrs;
+   uint32_t       nbcs    = (uint32_t)(bco->instrs->bytes / sizeof(StgWord16));
+   uint32_t       pc      = 1;
 
    debugBelch("BCO\n" );
    pc = 0;

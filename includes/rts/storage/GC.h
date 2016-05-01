@@ -88,7 +88,7 @@ typedef struct nursery_ {
 // memory allocation is tracked.
 
 typedef struct generation_ {
-    nat            no;                  // generation number
+    uint32_t       no;                  // generation number
 
     bdescr *       blocks;              // blocks in this gen
     memcount       n_blocks;            // number of blocks
@@ -109,9 +109,9 @@ typedef struct generation_ {
     struct generation_ *to;             // destination gen for live objects
 
     // stats information
-    nat collections;
-    nat par_collections;
-    nat failed_promotions;
+    uint32_t collections;
+    uint32_t par_collections;
+    uint32_t failed_promotions;
 
     // ------------------------------------
     // Fields below are used during GC only

@@ -63,8 +63,8 @@ void  *
 arenaAlloc( Arena *arena, size_t size )
 {
     void *p;
-    nat size_w;
-    nat req_blocks;
+    uint32_t size_w;
+    uint32_t req_blocks;
     bdescr *bd;
 
     // round up to nearest alignment chunk.

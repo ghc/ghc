@@ -257,7 +257,7 @@ hs_hpc_module(char *modName,
               StgWord64 *tixArr)
 {
   HpcModuleInfo *tmpModule;
-  nat i;
+  uint32_t i;
 
   if (moduleHash == NULL) {
       moduleHash = allocStrHashTable();
@@ -332,12 +332,12 @@ writeTix(FILE *f) {
     }
     fprintf(f," TixModule \"%s\" %u %u [",
            tmpModule->modName,
-            (nat)tmpModule->hashNo,
-            (nat)tmpModule->tickCount);
+            (uint32_t)tmpModule->hashNo,
+            (uint32_t)tmpModule->tickCount);
     debugTrace(DEBUG_hpc,"%s: %u (hash=%u)\n",
                tmpModule->modName,
-               (nat)tmpModule->tickCount,
-               (nat)tmpModule->hashNo);
+               (uint32_t)tmpModule->tickCount,
+               (uint32_t)tmpModule->hashNo);
 
     inner_comma = 0;
     for(i = 0;i < tmpModule->tickCount;i++) {

@@ -89,7 +89,7 @@ static void searchHeapBlocks (HashTable *addrs, bdescr *bd)
 {
     StgPtr p;
     StgInfoTable *info;
-    nat size;
+    uint32_t size;
     rtsBool prim;
 
     for (; bd != NULL; bd = bd->link) {
@@ -275,7 +275,7 @@ static void searchCostCentres (HashTable *addrs, CostCentreStack *ccs)
 //
 void checkUnload (StgClosure *static_objects)
 {
-  nat g, n;
+  uint32_t g, n;
   HashTable *addrs;
   StgClosure* p;
   const StgInfoTable *info;

@@ -23,7 +23,7 @@ typedef void (*free_thing_fn)(void *);
 typedef struct Pool_ Pool;
 
 /* Create a pool of things. */
-Pool *poolInit(nat max_size, nat desired_size,
+Pool *poolInit(uint32_t max_size, uint32_t desired_size,
                alloc_thing_fn alloc_fn, free_thing_fn free_fn);
 
 /* Free a pool. Returns 0 on success or 1 on failure due to things
@@ -32,16 +32,16 @@ int poolFree(Pool *pool);
 
 /* Set the maximum size of a pool (0 indicates unbounded). desired_size will be
  * lowered if necessary. */
-void poolSetMaxSize(Pool *pool, nat size);
+void poolSetMaxSize(Pool *pool, uint32_t size);
 
 /* Get the maximum size of a pool */
-nat poolGetMaxSize(Pool *pool);
+uint32_t poolGetMaxSize(Pool *pool);
 
 /* Set the desired size of a pool */
-void poolSetDesiredSize(Pool *pool, nat size);
+void poolSetDesiredSize(Pool *pool, uint32_t size);
 
 /* Get the desired size of a pool */
-nat poolGetDesiredSize(Pool *pool);
+uint32_t poolGetDesiredSize(Pool *pool);
 
 /* Try to grab an available thing from a pool, returning NULL if no things
  * are available.

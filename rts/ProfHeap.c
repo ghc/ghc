@@ -37,7 +37,7 @@
  * store only up to (max_era - 1) as its creation or last use time.
  * -------------------------------------------------------------------------- */
 unsigned int era;
-static nat max_era;
+static uint32_t max_era;
 
 /* -----------------------------------------------------------------------------
  * Counters
@@ -50,7 +50,7 @@ static nat max_era;
 typedef struct _counter {
     void *identity;
     union {
-        nat resid;
+        uint32_t resid;
         struct {
             long prim;     // total size of 'inherently used' closures
             long not_used; // total size of 'never used' closures
@@ -87,7 +87,7 @@ typedef struct {
 } Census;
 
 static Census *censuses = NULL;
-static nat n_censuses = 0;
+static uint32_t n_censuses = 0;
 
 #ifdef PROFILING
 static void aggregateCensusInfo( void );
@@ -180,10 +180,10 @@ doingRetainerProfiling( void )
 
 #ifdef PROFILING
 void
-LDV_recordDead( StgClosure *c, nat size )
+LDV_recordDead( StgClosure *c, uint32_t size )
 {
     void *id;
-    nat t;
+    uint32_t t;
     counter *ctr;
 
     if (era > 0 && closureSatisfiesConstraints(c)) {
@@ -372,7 +372,7 @@ printSample(rtsBool beginSample, StgDouble sampleValue)
 /* --------------------------------------------------------------------------
  * Initialize the heap profilier
  * ----------------------------------------------------------------------- */
-nat
+uint32_t
 initHeapProfiling(void)
 {
     if (! RtsFlags.ProfFlags.doHeapProfile) {
@@ -455,7 +455,7 @@ endHeapProfiling(void)
 
 #ifdef PROFILING
     if (doingLDVProfiling()) {
-        nat t;
+        uint32_t t;
         LdvCensusKillAll();
         aggregateCensusInfo();
         for (t = 1; t < era; t++) {
@@ -466,7 +466,7 @@ endHeapProfiling(void)
 
 #ifdef PROFILING
     if (doingLDVProfiling()) {
-        nat t;
+        uint32_t t;
         if (RtsFlags.ProfFlags.bioSelector != NULL) {
             for (t = 1; t <= era; t++) {
                 freeEra( &censuses[t] );
@@ -505,7 +505,7 @@ buf_append(char *p, const char *q, char *end)
 }
 
 static void
-fprint_ccs(FILE *fp, CostCentreStack *ccs, nat max_length)
+fprint_ccs(FILE *fp, CostCentreStack *ccs, uint32_t max_length)
 {
     char buf[max_length+1], *p, *buf_end;
 
@@ -602,7 +602,7 @@ closureSatisfiesConstraints( StgClosure* p )
    }
    if (RtsFlags.ProfFlags.retainerSelector) {
        RetainerSet *rs;
-       nat i;
+       uint32_t i;
        // We must check that the retainer set is valid here.  One
        // reason it might not be valid is if this closure is a
        // a newly deceased weak pointer (i.e. a DEAD_WEAK), since
@@ -631,7 +631,7 @@ static void
 aggregateCensusInfo( void )
 {
     HashTable *acc;
-    nat t;
+    uint32_t t;
     counter *c, *d, *ctrs;
     Arena *arena;
 
@@ -835,7 +835,7 @@ dumpCensus( Census *census )
 }
 
 
-static void heapProfObject(Census *census, StgClosure *p, nat size,
+static void heapProfObject(Census *census, StgClosure *p, uint32_t size,
                            rtsBool prim
 #ifndef PROFILING
                            STG_UNUSED
@@ -843,7 +843,7 @@ static void heapProfObject(Census *census, StgClosure *p, nat size,
                            )
 {
     void *identity;
-    nat real_size;
+    uint32_t real_size;
     counter *ctr;
 
             identity = NULL;
@@ -920,7 +920,7 @@ heapCensusChain( Census *census, bdescr *bd )
 {
     StgPtr p;
     StgInfoTable *info;
-    nat size;
+    uint32_t size;
     rtsBool prim;
 
     for (; bd != NULL; bd = bd->link) {
@@ -1101,7 +1101,7 @@ heapCensusChain( Census *census, bdescr *bd )
 
 void heapCensus (Time t)
 {
-  nat g, n;
+  uint32_t g, n;
   Census *census;
   gen_workspace *ws;
 

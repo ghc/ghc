@@ -228,7 +228,7 @@ throwTo (Capability *cap,       // the Capability we hold
 }
 
 
-nat
+uint32_t
 throwToMsg (Capability *cap, MessageThrowTo *msg)
 {
     StgWord status;
@@ -781,7 +781,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
     StgRetInfoTable *info;
     StgPtr sp, frame;
     StgClosure *updatee;
-    nat i;
+    uint32_t i;
     StgStack *stack;
 
     debugTraceCap(DEBUG_sched, cap,
@@ -861,7 +861,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
         case UPDATE_FRAME:
         {
             StgAP_STACK * ap;
-            nat words;
+            uint32_t words;
 
             // First build an AP_STACK consisting of the stack chunk above the
             // current update frame, with the top word on the stack as the
@@ -873,7 +873,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
             ap->size = words;
             ap->fun  = (StgClosure *)sp[0];
             sp++;
-            for(i=0; i < (nat)words; ++i) {
+            for(i=0; i < words; ++i) {
                 ap->payload[i] = (StgClosure *)*sp++;
             }
 
@@ -912,7 +912,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
         case UNDERFLOW_FRAME:
         {
             StgAP_STACK * ap;
-            nat words;
+            uint32_t words;
 
             // First build an AP_STACK consisting of the stack chunk above the
             // current update frame, with the top word on the stack as the
@@ -924,7 +924,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
             ap->size = words;
             ap->fun  = (StgClosure *)sp[0];
             sp++;
-            for(i=0; i < (nat)words; ++i) {
+            for(i=0; i < words; ++i) {
                 ap->payload[i] = (StgClosure *)*sp++;
             }
 

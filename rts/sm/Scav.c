@@ -276,11 +276,11 @@ scavenge_AP (StgAP *ap)
 static void
 scavenge_large_srt_bitmap( StgLargeSRT *large_srt )
 {
-    nat i, j, size;
+    uint32_t i, j, size;
     StgWord bitmap;
     StgClosure **p;
 
-    size   = (nat)large_srt->l.size;
+    size   = (uint32_t)large_srt->l.size;
     p      = (StgClosure **)large_srt->srt;
 
     for (i = 0; i < size / BITS_IN(W_); i++) {
@@ -316,9 +316,9 @@ scavenge_large_srt_bitmap( StgLargeSRT *large_srt )
  * never dereference it.
  */
 STATIC_INLINE GNUC_ATTR_HOT void
-scavenge_srt (StgClosure **srt, nat srt_bitmap)
+scavenge_srt (StgClosure **srt, uint32_t srt_bitmap)
 {
-  nat bitmap;
+  uint32_t bitmap;
   StgClosure **p;
 
   bitmap = srt_bitmap;
@@ -359,7 +359,7 @@ STATIC_INLINE GNUC_ATTR_HOT void
 scavenge_thunk_srt(const StgInfoTable *info)
 {
     StgThunkInfoTable *thunk_info;
-    nat bitmap;
+    uint32_t bitmap;
 
     if (!major_gc) return;
 
@@ -376,7 +376,7 @@ STATIC_INLINE GNUC_ATTR_HOT void
 scavenge_fun_srt(const StgInfoTable *info)
 {
     StgFunInfoTable *fun_info;
-    nat bitmap;
+    uint32_t bitmap;
 
     if (!major_gc) return;
 
@@ -1559,7 +1559,7 @@ static void
 scavenge_mutable_list(bdescr *bd, generation *gen)
 {
     StgPtr p, q;
-    nat gen_no;
+    uint32_t gen_no;
 
     gen_no = gen->no;
     gct->evac_gen_no = gen_no;
@@ -1650,7 +1650,7 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
 void
 scavenge_capability_mut_lists (Capability *cap)
 {
-    nat g;
+    uint32_t g;
 
     /* Mutable lists from each generation > N
      * we want to *scavenge* these roots, not evacuate them: they're not
@@ -1765,7 +1765,7 @@ scavenge_static(void)
 static void
 scavenge_large_bitmap( StgPtr p, StgLargeBitmap *large_bitmap, StgWord size )
 {
-    nat i, j, b;
+    uint32_t i, j, b;
     StgWord bitmap;
 
     b = 0;

@@ -62,7 +62,7 @@ HsBool rtsSupportsBoundThreads (void);
 extern unsigned int n_capabilities;
 
 // The number of Capabilities that are not disabled
-extern nat enabled_capabilities;
+extern uint32_t enabled_capabilities;
 
 #if !IN_STG_CODE
 extern Capability MainCapability;
@@ -72,6 +72,6 @@ extern Capability MainCapability;
 // Change the number of capabilities (only supports increasing the
 // current value at the moment).
 //
-extern void setNumCapabilities (nat new_);
+extern void setNumCapabilities (uint32_t new_);
 
 #endif /* RTS_THREADS_H */

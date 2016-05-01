@@ -57,7 +57,7 @@
  * own and treat it as an immovable object during GC, expressed as a
  * fraction of BLOCK_SIZE.
  */
-#define LARGE_OBJECT_THRESHOLD ((nat)(BLOCK_SIZE * 8 / 10))
+#define LARGE_OBJECT_THRESHOLD ((uint32_t)(BLOCK_SIZE * 8 / 10))
 
 /*
  * Note [integer overflow]
@@ -295,7 +295,7 @@ void freeChain(bdescr *p);
 void freeGroup_lock(bdescr *p);
 void freeChain_lock(bdescr *p);
 
-bdescr * splitBlockGroup (bdescr *bd, nat blocks);
+bdescr * splitBlockGroup (bdescr *bd, uint32_t blocks);
 
 /* Round a value to megablocks --------------------------------------------- */
 

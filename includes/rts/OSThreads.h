@@ -200,7 +200,7 @@ void  setThreadLocalVar (ThreadLocalKey *key, void *value);
 void  freeThreadLocalKey (ThreadLocalKey *key);
 
 // Processors and affinity
-void setThreadAffinity     (nat n, nat m);
+void setThreadAffinity     (uint32_t n, uint32_t m);
 #endif // !CMINUSMINUS
 
 #else
@@ -221,7 +221,7 @@ int forkOS_createThread ( HsStablePtr entry );
 //
 // Returns the number of processor cores in the machine
 //
-nat getNumberOfProcessors (void);
+uint32_t getNumberOfProcessors (void);
 
 //
 // Support for getting at the kernel thread Id for tracing/profiling.

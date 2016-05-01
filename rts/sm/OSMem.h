@@ -12,8 +12,8 @@
 #include "BeginPrivate.h"
 
 void osMemInit(void);
-void *osGetMBlocks(nat n);
-void osFreeMBlocks(char *addr, nat n);
+void *osGetMBlocks(uint32_t n);
+void osFreeMBlocks(char *addr, uint32_t n);
 void osReleaseFreeMemory(void);
 void osFreeAllMBlocks(void);
 W_ getPageSize (void);

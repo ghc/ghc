@@ -168,7 +168,7 @@ INLINE_HEADER
 StgBool HEAP_ALLOCED(void *p)
 {
     StgWord mblock;
-    nat entry_no;
+    uint32_t entry_no;
     MbcCacheLine entry, value;
 
     mblock   = (StgWord)p >> MBLOCK_SHIFT;
@@ -196,7 +196,7 @@ INLINE_HEADER
 StgBool HEAP_ALLOCED_GC(void *p)
 {
     StgWord mblock;
-    nat entry_no;
+    uint32_t entry_no;
     MbcCacheLine entry, value;
     StgBool b;
 

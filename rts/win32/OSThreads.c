@@ -242,10 +242,10 @@ forkOS_createThread ( HsStablePtr entry )
                            (unsigned*)&pId) == 0);
 }
 
-nat
+uint32_t
 getNumberOfProcessors (void)
 {
-    static nat nproc = 0;
+    static uint32_t nproc = 0;
 
     if (nproc == 0) {
         SYSTEM_INFO si;
@@ -257,11 +257,11 @@ getNumberOfProcessors (void)
 }
 
 void
-setThreadAffinity (nat n, nat m) // cap N of M
+setThreadAffinity (uint32_t n, uint32_t m) // cap N of M
 {
     HANDLE hThread;
     DWORD_PTR mask, r;  // 64-bit win is required to handle more than 32 procs
-    nat nproc, i;
+    uint32_t nproc, i;
 
     hThread = GetCurrentThread();
 
@@ -308,7 +308,7 @@ forkOS_createThread ( HsStablePtr entry STG_UNUSED )
     return -1;
 }
 
-nat getNumberOfProcessors (void)
+uint32_t getNumberOfProcessors (void)
 {
     return 1;
 }

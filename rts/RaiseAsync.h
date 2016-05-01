@@ -44,7 +44,7 @@ MessageThrowTo *throwTo (Capability *cap,      // the Capability we hold
                          StgTSO *target,
                          StgClosure *exception); // the exception closure
 
-nat throwToMsg (Capability *cap,
+uint32_t throwToMsg (Capability *cap,
                 MessageThrowTo *msg);
 
 int  maybePerformBlockedException (Capability *cap, StgTSO *tso);

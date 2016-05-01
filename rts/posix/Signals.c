@@ -65,7 +65,7 @@ HsInt nocldstop = 0;
 StgInt *signal_handlers = NULL; /* Dynamically grown array of signal handlers */
 static StgInt nHandlers = 0;    /* Size of handlers array */
 
-static nat n_haskell_handlers = 0;
+static uint32_t n_haskell_handlers = 0;
 
 static sigset_t userSignals;
 static sigset_t savedSignals;
@@ -185,7 +185,7 @@ void
 ioManagerDie (void)
 {
     StgWord8 byte = (StgWord8)IO_MANAGER_DIE;
-    nat i;
+    uint32_t i;
     int fd;
     int r;
 

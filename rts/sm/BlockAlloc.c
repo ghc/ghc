@@ -7,7 +7,7 @@
  * This is the architecture independent part of the block allocator.
  * It requires only the following support from the operating system:
  *
- *    void *getMBlock(nat n);
+ *    void *getMBlock(uint32_t n);
  *
  * returns the address of an n*MBLOCK_SIZE region of memory, aligned on
  * an MBLOCK_SIZE boundary.  There are no other restrictions on the
@@ -140,7 +140,7 @@ static void  initMBlock(void *mblock);
 
    Be very careful with integer overflow here.  If you have an
    expression like (n_blocks * BLOCK_SIZE), and n_blocks is an int or
-   a nat, then it will very likely overflow on a 64-bit platform.
+   a uint32_t, then it will very likely overflow on a 64-bit platform.
    Always cast to StgWord (or W_ for short) first: ((W_)n_blocks * BLOCK_SIZE).
 
   --------------------------------------------------------------------------- */
@@ -170,7 +170,7 @@ W_ hw_alloc_blocks;  // high-water allocated blocks
 
 void initBlockAllocator(void)
 {
-    nat i;
+    uint32_t i;
     for (i=0; i < NUM_FREE_LISTS; i++) {
         free_list[i] = NULL;
     }
@@ -209,7 +209,7 @@ initGroup(bdescr *head)
 #endif
 
 // log base 2 (floor), needs to support up to (2^NUM_FREE_LISTS)-1
-STATIC_INLINE nat
+STATIC_INLINE uint32_t
 log_2(W_ n)
 {
     ASSERT(n > 0 && n < (1<<NUM_FREE_LISTS));
@@ -229,12 +229,12 @@ log_2(W_ n)
 }
 
 // log base 2 (ceiling), needs to support up to (2^NUM_FREE_LISTS)-1
-STATIC_INLINE nat
+STATIC_INLINE uint32_t
 log_2_ceil(W_ n)
 {
     ASSERT(n > 0 && n < (1<<NUM_FREE_LISTS));
 #if defined(__GNUC__)
-    nat r = log_2(n);
+    uint32_t r = log_2(n);
     return (n & (n-1)) ? r+1 : r;
 #else
     W_ i, x;
@@ -250,7 +250,7 @@ log_2_ceil(W_ n)
 STATIC_INLINE void
 free_list_insert (bdescr *bd)
 {
-    nat ln;
+    uint32_t ln;
 
     ASSERT(bd->blocks < BLOCKS_PER_MBLOCK);
     ln = log_2(bd->blocks);
@@ -284,7 +284,7 @@ setup_tail (bdescr *bd)
 // Take a free block group bd, and split off a group of size n from
 // it.  Adjust the free list as necessary, and return the new group.
 static bdescr *
-split_free_block (bdescr *bd, W_ n, nat ln)
+split_free_block (bdescr *bd, W_ n, uint32_t ln)
 {
     bdescr *fg; // free group
 
@@ -732,7 +732,7 @@ countAllocdBlocks(bdescr *bd)
     return n;
 }
 
-void returnMemoryToOS(nat n /* megablocks */)
+void returnMemoryToOS(uint32_t n /* megablocks */)
 {
     static bdescr *bd;
     StgWord size;

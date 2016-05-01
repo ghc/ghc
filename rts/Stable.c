@@ -113,7 +113,7 @@ static unsigned int SPT_size = 0;
 #endif
 
 static spEntry *old_SPTs[MAX_N_OLD_SPTS];
-static nat n_old_SPTs = 0;
+static uint32_t n_old_SPTs = 0;
 
 #ifdef THREADED_RTS
 Mutex stable_mutex;
@@ -153,7 +153,7 @@ stableUnlock(void)
  * -------------------------------------------------------------------------- */
 
 STATIC_INLINE void
-initSnEntryFreeList(snEntry *table, nat n, snEntry *free)
+initSnEntryFreeList(snEntry *table, uint32_t n, snEntry *free)
 {
   snEntry *p;
   for (p = table + n - 1; p >= table; p--) {
@@ -166,7 +166,7 @@ initSnEntryFreeList(snEntry *table, nat n, snEntry *free)
 }
 
 STATIC_INLINE void
-initSpEntryFreeList(spEntry *table, nat n, spEntry *free)
+initSpEntryFreeList(spEntry *table, uint32_t n, spEntry *free)
 {
   spEntry *p;
   for (p = table + n - 1; p >= table; p--) {
@@ -208,7 +208,7 @@ initStableTables(void)
 static void
 enlargeStableNameTable(void)
 {
-    nat old_SNT_size = SNT_size;
+    uint32_t old_SNT_size = SNT_size;
 
     // 2nd and subsequent times
     SNT_size *= 2;
@@ -223,7 +223,7 @@ enlargeStableNameTable(void)
 static void
 enlargeStablePtrTable(void)
 {
-    nat old_SPT_size = SPT_size;
+    uint32_t old_SPT_size = SPT_size;
     spEntry *new_stable_ptr_table;
 
     // 2nd and subsequent times
@@ -273,7 +273,7 @@ enlargeStablePtrTable(void)
 static void
 freeOldSPTs(void)
 {
-    nat i;
+    uint32_t i;
 
     for (i = 0; i < n_old_SPTs; i++) {
         stgFree(old_SPTs[i]);

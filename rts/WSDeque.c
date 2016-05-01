@@ -69,7 +69,7 @@ roundUp2(StgWord val)
 }
 
 WSDeque *
-newWSDeque (nat size)
+newWSDeque (uint32_t size)
 {
     StgWord realsize;
     WSDeque *q;

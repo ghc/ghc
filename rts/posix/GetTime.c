@@ -140,7 +140,7 @@ Time getProcessElapsedTime(void)
 
 void getProcessTimes(Time *user, Time *elapsed)
 {
-    static nat ClockFreq = 0;
+    static uint32_t ClockFreq = 0;
 
     if (ClockFreq == 0) {
 #if defined(HAVE_SYSCONF)

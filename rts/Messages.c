@@ -80,7 +80,7 @@ loop:
     else if (i == &stg_MSG_THROWTO_info)
     {
         MessageThrowTo *t = (MessageThrowTo *)m;
-        nat r;
+        uint32_t r;
         const StgInfoTable *i;
 
         i = lockClosure((StgClosure*)m);
@@ -113,7 +113,7 @@ loop:
     }
     else if (i == &stg_MSG_BLACKHOLE_info)
     {
-        nat r;
+        uint32_t r;
         MessageBlackHole *b = (MessageBlackHole*)m;
 
         r = messageBlackHole(cap, b);
@@ -158,7 +158,7 @@ loop:
 
    ------------------------------------------------------------------------- */
 
-nat messageBlackHole(Capability *cap, MessageBlackHole *msg)
+uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg)
 {
     const StgInfoTable *info;
     StgClosure *p;

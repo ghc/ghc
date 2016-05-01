@@ -50,10 +50,10 @@ W_ mpc_misses = 0;
   be used in an interation fashion. Pass NULL if @state is not
   interesting,or pass a pointer to NULL if you don't have a state.
 
-  void *getCommittedMBlocks(nat n)
+  void *getCommittedMBlocks(uint32_t n)
       return @n new mblocks, ready to be used (reserved and committed)
 
-  void *decommitMBlocks(char *addr, nat n)
+  void *decommitMBlocks(char *addr, uint32_t n)
       release memory for @n mblocks, starting at the given address
 
   void releaseFreeMemory()
@@ -152,7 +152,7 @@ void * getNextMBlock(void **state STG_UNUSED, void *mblock)
     return getAllocatedMBlock(casted_state, (W_)mblock + MBLOCK_SIZE);
 }
 
-static void *getReusableMBlocks(nat n)
+static void *getReusableMBlocks(uint32_t n)
 {
     struct free_list *iter;
     W_ size = MBLOCK_SIZE * (W_)n;
@@ -190,7 +190,7 @@ static void *getReusableMBlocks(nat n)
     return NULL;
 }
 
-static void *getFreshMBlocks(nat n)
+static void *getFreshMBlocks(uint32_t n)
 {
     W_ size = MBLOCK_SIZE * (W_)n;
     void *addr = (void*)mblock_high_watermark;
@@ -207,7 +207,7 @@ static void *getFreshMBlocks(nat n)
     return addr;
 }
 
-static void *getCommittedMBlocks(nat n)
+static void *getCommittedMBlocks(uint32_t n)
 {
     void *p;
 
@@ -220,7 +220,7 @@ static void *getCommittedMBlocks(nat n)
     return p;
 }
 
-static void decommitMBlocks(char *addr, nat n)
+static void decommitMBlocks(char *addr, uint32_t n)
 {
     struct free_list *iter, *prev;
     W_ size = MBLOCK_SIZE * (W_)n;
@@ -354,14 +354,14 @@ setHeapAlloced(void *p, StgWord8 i)
 
 MBlockMap **mblock_maps = NULL;
 
-nat mblock_map_count = 0;
+uint32_t mblock_map_count = 0;
 
 MbcCacheLine mblock_cache[MBC_ENTRIES];
 
 static MBlockMap *
 findMBlockMap(void *p)
 {
-    nat i;
+    uint32_t i;
     StgWord32 hi = (StgWord32) (((StgWord)p) >> 32);
     for( i = 0; i < mblock_map_count; i++ )
     {
@@ -377,7 +377,7 @@ StgBool HEAP_ALLOCED_miss(StgWord mblock, void *p)
 {
     MBlockMap *map;
     MBlockMapLine value;
-    nat entry_no;
+    uint32_t entry_no;
 
     entry_no = mblock & (MBC_ENTRIES-1);
 
@@ -416,7 +416,7 @@ setHeapAlloced(void *p, StgWord8 i)
 
     {
         StgWord mblock;
-        nat entry_no;
+        uint32_t entry_no;
 
         mblock   = (StgWord)p >> MBLOCK_SHIFT;
         entry_no = mblock & (MBC_ENTRIES-1);
@@ -441,14 +441,14 @@ markHeapUnalloced(void *p)
 #if SIZEOF_VOID_P == 4
 
 STATIC_INLINE
-void * mapEntryToMBlock(nat i)
+void * mapEntryToMBlock(uint32_t i)
 {
     return (void *)((StgWord)i << MBLOCK_SHIFT);
 }
 
 void * getFirstMBlock(void **state STG_UNUSED)
 {
-    nat i;
+    uint32_t i;
 
     for (i = 0; i < MBLOCK_MAP_SIZE; i++) {
         if (mblock_map[i]) return mapEntryToMBlock(i);
@@ -458,7 +458,7 @@ void * getFirstMBlock(void **state STG_UNUSED)
 
 void * getNextMBlock(void **state STG_UNUSED, void *mblock)
 {
-    nat i;
+    uint32_t i;
 
     for (i = MBLOCK_MAP_ENTRY(mblock) + 1; i < MBLOCK_MAP_SIZE; i++) {
         if (mblock_map[i]) return mapEntryToMBlock(i);
@@ -471,8 +471,8 @@ void * getNextMBlock(void **state STG_UNUSED, void *mblock)
 void * getNextMBlock(void **state STG_UNUSED, void *p)
 {
     MBlockMap *map;
-    nat off, j;
-    nat line_no;
+    uint32_t off, j;
+    uint32_t line_no;
     MBlockMapLine line;
 
     for (j = 0; j < mblock_map_count; j++)  {
@@ -508,7 +508,7 @@ void * getNextMBlock(void **state STG_UNUSED, void *p)
 void * getFirstMBlock(void **state STG_UNUSED)
 {
     MBlockMap *map = mblock_maps[0];
-    nat line_no, off;
+    uint32_t line_no, off;
     MbcCacheLine line;
 
     for (line_no = 0; line_no < MBLOCK_MAP_ENTRIES; line_no++) {
@@ -528,11 +528,11 @@ void * getFirstMBlock(void **state STG_UNUSED)
 
 #endif // SIZEOF_VOID_P == 8
 
-static void *getCommittedMBlocks(nat n)
+static void *getCommittedMBlocks(uint32_t n)
 {
     // The OS layer returns committed memory directly
     void *ret = osGetMBlocks(n);
-    nat i;
+    uint32_t i;
 
     // fill in the table
     for (i = 0; i < n; i++) {
@@ -542,10 +542,10 @@ static void *getCommittedMBlocks(nat n)
     return ret;
 }
 
-static void decommitMBlocks(void *p, nat n)
+static void decommitMBlocks(void *p, uint32_t n)
 {
     osFreeMBlocks(p, n);
-    nat i;
+    uint32_t i;
 
     for (i = 0; i < n; i++) {
         markHeapUnalloced( (StgWord8*)p + i * MBLOCK_SIZE );
@@ -573,7 +573,7 @@ getMBlock(void)
 // address.
 
 void *
-getMBlocks(nat n)
+getMBlocks(uint32_t n)
 {
     void *ret;
 
@@ -588,7 +588,7 @@ getMBlocks(nat n)
 }
 
 void
-freeMBlocks(void *addr, nat n)
+freeMBlocks(void *addr, uint32_t n)
 {
     debugTrace(DEBUG_gc, "freeing %d megablock(s) at %p",n,addr);
 
@@ -622,7 +622,7 @@ freeAllMBlocks(void)
     osFreeAllMBlocks();
 
 #if SIZEOF_VOID_P == 8
-    nat n;
+    uint32_t n;
     for (n = 0; n < mblock_map_count; n++) {
         stgFree(mblock_maps[n]);
     }

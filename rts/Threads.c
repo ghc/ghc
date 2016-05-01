@@ -59,7 +59,7 @@ createThread(Capability *cap, W_ size)
 {
     StgTSO *tso;
     StgStack *stack;
-    nat stack_size;
+    uint32_t stack_size;
 
     /* sched_mutex is *not* required */
 
@@ -701,7 +701,7 @@ threadStackUnderflow (Capability *cap, StgTSO *tso)
 {
     StgStack *new_stack, *old_stack;
     StgUnderflowFrame *frame;
-    nat retvals;
+    uint32_t retvals;
 
     debugTraceCap(DEBUG_sched, cap, "stack underflow");
 
@@ -831,7 +831,7 @@ void
 printAllThreads(void)
 {
   StgTSO *t, *next;
-  nat i, g;
+  uint32_t i, g;
   Capability *cap;
 
   debugBelch("all threads:\n");
@@ -859,7 +859,7 @@ printAllThreads(void)
 void
 printThreadQueue(StgTSO *t)
 {
-    nat i = 0;
+    uint32_t i = 0;
     for (; t != END_TSO_QUEUE; t = t->_link) {
         printThreadStatus(t);
         i++;

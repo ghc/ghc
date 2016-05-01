@@ -17,8 +17,8 @@ extern W_ mblocks_allocated;
 
 extern void initMBlocks(void);
 extern void * getMBlock(void);
-extern void * getMBlocks(nat n);
-extern void freeMBlocks(void *addr, nat n);
+extern void * getMBlocks(uint32_t n);
+extern void freeMBlocks(void *addr, uint32_t n);
 extern void releaseFreeMemory(void);
 extern void freeAllMBlocks(void);
 

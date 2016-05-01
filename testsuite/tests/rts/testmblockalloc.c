@@ -16,7 +16,7 @@ int main (int argc, char *argv[])
     int i, j, b;
 
     void *a[ARRSIZE];
-    nat sizes[ARRSIZE];
+    uint32_t sizes[ARRSIZE];
 
     srand(SEED);
 

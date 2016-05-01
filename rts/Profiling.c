@@ -114,17 +114,17 @@ static  CostCentreStack * actualPush_     ( CostCentreStack *ccs, CostCentre *cc
 static  rtsBool           ignoreCCS       ( CostCentreStack *ccs );
 static  void              countTickss     ( CostCentreStack *ccs );
 static  void              inheritCosts    ( CostCentreStack *ccs );
-static  nat               numDigits       ( StgInt i );
+static  uint32_t           numDigits       ( StgInt i );
 static  void              findCCSMaxLens  ( CostCentreStack *ccs,
-                                            nat indent,
-                                            nat *max_label_len,
-                                            nat *max_module_len,
-                                            nat *max_id_len );
+                                            uint32_t indent,
+                                            uint32_t *max_label_len,
+                                            uint32_t *max_module_len,
+                                            uint32_t *max_id_len );
 static  void              logCCS          ( CostCentreStack *ccs,
-                                            nat indent,
-                                            nat max_label_len,
-                                            nat max_module_len,
-                                            nat max_id_len );
+                                            uint32_t indent,
+                                            uint32_t max_label_len,
+                                            uint32_t max_module_len,
+                                            uint32_t max_id_len );
 static  void              reportCCS       ( CostCentreStack *ccs );
 static  CostCentreStack * checkLoop       ( CostCentreStack *ccs,
                                             CostCentre *cc );
@@ -149,7 +149,7 @@ void initProfiling (void)
 
     /* for the benefit of allocate()... */
     {
-        nat n;
+        uint32_t n;
         for (n=0; n < n_capabilities; n++) {
             capabilities[n]->r.rCCCS = CCS_SYSTEM;
         }
@@ -393,7 +393,7 @@ void enterFunCCS (StgRegTable *reg, CostCentreStack *ccsfn)
 
     // uncommon case 4: ccsapp is deeper than ccsfn
     if (ccsapp->depth > ccsfn->depth) {
-        nat i, n;
+        uint32_t i, n;
         CostCentreStack *tmp = ccsapp;
         n = ccsapp->depth - ccsfn->depth;
         for (i = 0; i < n; i++) {
@@ -747,10 +747,10 @@ insertCCInSortedList( CostCentre *new_cc )
     *prev = new_cc;
 }
 
-static nat
+static uint32_t
 strlen_utf8 (char *s)
 {
-    nat n = 0;
+    uint32_t n = 0;
     unsigned char c;
 
     for (; *s != '\0'; s++) {
@@ -764,7 +764,7 @@ static void
 reportPerCCCosts( void )
 {
     CostCentre *cc, *next;
-    nat max_label_len, max_module_len;
+    uint32_t max_label_len, max_module_len;
 
     aggregateCCCosts(CCS_MAIN);
     sorted_cc_list = NULL;
@@ -822,7 +822,8 @@ reportPerCCCosts( void )
    -------------------------------------------------------------------------- */
 
 static void
-fprintHeader( nat max_label_len, nat max_module_len, nat max_id_len )
+fprintHeader( uint32_t max_label_len, uint32_t max_module_len,
+                uint32_t max_id_len )
 {
     fprintf(prof_file, "%-*s %-*s %-*s %11s  %12s   %12s\n",
             max_label_len, "",
@@ -848,7 +849,7 @@ fprintHeader( nat max_label_len, nat max_module_len, nat max_id_len )
 void
 reportCCSProfiling( void )
 {
-    nat count;
+    uint32_t count;
     char temp[128]; /* sigh: magic constant */
 
     stopProfTimer();
@@ -892,9 +893,9 @@ reportCCSProfiling( void )
     reportCCS(pruneCCSTree(CCS_MAIN));
 }
 
-static nat
+static uint32_t
 numDigits(StgInt i) {
-    nat result;
+    uint32_t result;
 
     result = 1;
 
@@ -909,8 +910,8 @@ numDigits(StgInt i) {
 }
 
 static void
-findCCSMaxLens(CostCentreStack *ccs, nat indent,
-        nat *max_label_len, nat *max_module_len, nat *max_id_len) {
+findCCSMaxLens(CostCentreStack *ccs, uint32_t indent, uint32_t *max_label_len,
+        uint32_t *max_module_len, uint32_t *max_id_len) {
     CostCentre *cc;
     IndexTable *i;
 
@@ -929,8 +930,8 @@ findCCSMaxLens(CostCentreStack *ccs, nat indent,
 }
 
 static void
-logCCS(CostCentreStack *ccs, nat indent,
-        nat max_label_len, nat max_module_len, nat max_id_len)
+logCCS(CostCentreStack *ccs, uint32_t indent,
+        uint32_t max_label_len, uint32_t max_module_len, uint32_t max_id_len)
 {
     CostCentre *cc;
     IndexTable *i;
@@ -976,7 +977,7 @@ logCCS(CostCentreStack *ccs, nat indent,
 static void
 reportCCS(CostCentreStack *ccs)
 {
-    nat max_label_len, max_module_len, max_id_len;
+    uint32_t max_label_len, max_module_len, max_id_len;
 
     max_label_len = 11; // no shorter than "COST CENTRE" header
     max_module_len = 6; // no shorter than "MODULE" header
@@ -1102,8 +1103,8 @@ fprintCCS_stderr (CostCentreStack *ccs, StgClosure *exception, StgTSO *tso)
     StgPtr frame;
     StgStack *stack;
     CostCentreStack *prev_ccs;
-    nat depth = 0;
-    const nat MAX_DEPTH = 10; // don't print gigantic chains of stacks
+    uint32_t depth = 0;
+    const uint32_t MAX_DEPTH = 10; // don't print gigantic chains of stacks
 
     {
         char *desc;

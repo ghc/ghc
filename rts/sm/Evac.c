@@ -52,7 +52,7 @@ STATIC_INLINE void evacuate_large(StgPtr p);
    -------------------------------------------------------------------------- */
 
 STATIC_INLINE StgPtr
-alloc_for_copy (nat size, nat gen_no)
+alloc_for_copy (uint32_t size, uint32_t gen_no)
 {
     StgPtr to;
     gen_workspace *ws;
@@ -91,10 +91,10 @@ alloc_for_copy (nat size, nat gen_no)
 
 STATIC_INLINE GNUC_ATTR_HOT void
 copy_tag(StgClosure **p, const StgInfoTable *info,
-         StgClosure *src, nat size, nat gen_no, StgWord tag)
+         StgClosure *src, uint32_t size, uint32_t gen_no, StgWord tag)
 {
     StgPtr to, from;
-    nat i;
+    uint32_t i;
 
     to = alloc_for_copy(size,gen_no);
 
@@ -146,10 +146,10 @@ copy_tag(StgClosure **p, const StgInfoTable *info,
 #if defined(PARALLEL_GC) && !defined(PROFILING)
 STATIC_INLINE void
 copy_tag_nolock(StgClosure **p, const StgInfoTable *info,
-         StgClosure *src, nat size, nat gen_no, StgWord tag)
+         StgClosure *src, uint32_t size, uint32_t gen_no, StgWord tag)
 {
     StgPtr to, from;
-    nat i;
+    uint32_t i;
 
     to = alloc_for_copy(size,gen_no);
 
@@ -182,11 +182,11 @@ copy_tag_nolock(StgClosure **p, const StgInfoTable *info,
  * used to optimise evacuation of TSOs.
  */
 static rtsBool
-copyPart(StgClosure **p, StgClosure *src, nat size_to_reserve,
-         nat size_to_copy, nat gen_no)
+copyPart(StgClosure **p, StgClosure *src, uint32_t size_to_reserve,
+         uint32_t size_to_copy, uint32_t gen_no)
 {
     StgPtr to, from;
-    nat i;
+    uint32_t i;
     StgWord info;
 
 #if defined(PARALLEL_GC)
@@ -235,7 +235,7 @@ spin:
 /* Copy wrappers that don't tag the closure after copying */
 STATIC_INLINE GNUC_ATTR_HOT void
 copy(StgClosure **p, const StgInfoTable *info,
-     StgClosure *src, nat size, nat gen_no)
+     StgClosure *src, uint32_t size, uint32_t gen_no)
 {
     copy_tag(p,info,src,size,gen_no,0);
 }
@@ -256,7 +256,7 @@ evacuate_large(StgPtr p)
 {
   bdescr *bd;
   generation *gen, *new_gen;
-  nat gen_no, new_gen_no;
+  uint32_t gen_no, new_gen_no;
   gen_workspace *ws;
 
   bd = Bdescr(p);
@@ -401,7 +401,7 @@ REGPARM1 GNUC_ATTR_HOT void
 evacuate(StgClosure **p)
 {
   bdescr *bd = NULL;
-  nat gen_no;
+  uint32_t gen_no;
   StgClosure *q;
   const StgInfoTable *info;
   StgWord tag;
@@ -809,7 +809,7 @@ static void
 eval_thunk_selector (StgClosure **q, StgSelector * p, rtsBool evac)
                  // NB. for legacy reasons, p & q are swapped around :(
 {
-    nat field;
+    uint32_t field;
     StgInfoTable *info;
     StgWord info_ptr;
     StgClosure *selectee;

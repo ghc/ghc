@@ -45,7 +45,7 @@ static StgStablePtr store[MaxStoreKey];
 void
 initGlobalStore(void)
 {
-    nat i;
+    uint32_t i;
     for (i=0; i < MaxStoreKey; i++) {
         store[i] = 0;
     }
@@ -57,7 +57,7 @@ initGlobalStore(void)
 void
 exitGlobalStore(void)
 {
-    nat i;
+    uint32_t i;
 #ifdef THREADED_RTS
     closeMutex(&globalStoreLock);
 #endif

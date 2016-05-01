@@ -260,7 +260,7 @@ gen_map_mblocks (W_ size)
 }
 
 void *
-osGetMBlocks(nat n)
+osGetMBlocks(uint32_t n)
 {
   caddr_t ret;
   W_ size = MBLOCK_SIZE * (W_)n;
@@ -294,7 +294,7 @@ osGetMBlocks(nat n)
   return ret;
 }
 
-void osFreeMBlocks(char *addr, nat n)
+void osFreeMBlocks(char *addr, uint32_t n)
 {
     munmap(addr, n * MBLOCK_SIZE);
 }

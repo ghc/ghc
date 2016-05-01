@@ -14,7 +14,7 @@
 
 #include "ProfHeap.h"
 
-RTS_PRIVATE void LdvCensusForDead ( nat );
+RTS_PRIVATE void LdvCensusForDead ( uint32_t );
 RTS_PRIVATE void LdvCensusKillAll ( void );
 
 // Creates a 0-filled slop of size 'howManyBackwards' backwards from the

@@ -28,7 +28,7 @@ void initTracing (void);
 void endTracing  (void);
 void freeTracing (void);
 void resetTracing (void);
-void tracingAddCapapilities (nat from, nat to);
+void tracingAddCapapilities (uint32_t from, uint32_t to);
 
 #endif /* TRACING */
 
@@ -136,7 +136,7 @@ void traceHeapEvent_ (Capability   *cap,
                       W_          info1);
 
 void traceEventHeapInfo_ (CapsetID    heap_capset,
-                          nat         gens,
+                          uint32_t  gens,
                           W_        maxHeapSize,
                           W_        allocAreaSize,
                           W_        mblockSize,
@@ -144,11 +144,11 @@ void traceEventHeapInfo_ (CapsetID    heap_capset,
 
 void traceEventGcStats_  (Capability *cap,
                           CapsetID    heap_capset,
-                          nat         gen,
+                          uint32_t  gen,
                           W_        copied,
                           W_        slop,
                           W_        fragmentation,
-                          nat         par_n_threads,
+                          uint32_t  par_n_threads,
                           W_        par_max_copied,
                           W_        par_tot_copied);
 
@@ -519,7 +519,7 @@ INLINE_HEADER void traceEventStopThread(Capability          *cap    STG_UNUSED,
 
 INLINE_HEADER void traceEventMigrateThread(Capability *cap     STG_UNUSED,
                                            StgTSO     *tso     STG_UNUSED,
-                                           nat         new_cap STG_UNUSED)
+                                           uint32_t    new_cap STG_UNUSED)
 {
     traceSchedEvent(cap, EVENT_MIGRATE_THREAD, tso, new_cap);
     dtraceMigrateThread((EventCapNo)cap->no, (EventThreadID)tso->id,
@@ -552,7 +552,7 @@ INLINE_HEADER void traceCapDisable(Capability *cap STG_UNUSED)
 
 INLINE_HEADER void traceEventThreadWakeup(Capability *cap       STG_UNUSED,
                                           StgTSO     *tso       STG_UNUSED,
-                                          nat         other_cap STG_UNUSED)
+                                          uint32_t    other_cap STG_UNUSED)
 {
     traceSchedEvent(cap, EVENT_THREAD_WAKEUP, tso, other_cap);
     dtraceThreadWakeup((EventCapNo)cap->no, (EventThreadID)tso->id,
@@ -633,11 +633,11 @@ INLINE_HEADER void traceEventGcGlobalSync(Capability *cap STG_UNUSED)
 
 INLINE_HEADER void traceEventGcStats(Capability *cap            STG_UNUSED,
                                      CapsetID    heap_capset    STG_UNUSED,
-                                     nat         gen            STG_UNUSED,
+                                     uint32_t    gen            STG_UNUSED,
                                      W_        copied         STG_UNUSED,
                                      W_        slop           STG_UNUSED,
                                      W_        fragmentation  STG_UNUSED,
-                                     nat         par_n_threads  STG_UNUSED,
+                                     uint32_t  par_n_threads  STG_UNUSED,
                                      W_        par_max_copied STG_UNUSED,
                                      W_        par_tot_copied STG_UNUSED)
 {
@@ -652,7 +652,7 @@ INLINE_HEADER void traceEventGcStats(Capability *cap            STG_UNUSED,
 }
 
 INLINE_HEADER void traceEventHeapInfo(CapsetID    heap_capset   STG_UNUSED,
-                                      nat         gens          STG_UNUSED,
+                                      uint32_t  gens          STG_UNUSED,
                                       W_        maxHeapSize   STG_UNUSED,
                                       W_        allocAreaSize STG_UNUSED,
                                       W_        mblockSize    STG_UNUSED,
@@ -706,14 +706,14 @@ INLINE_HEADER void traceCapsetDelete(CapsetID capset STG_UNUSED)
 }
 
 INLINE_HEADER void traceCapsetAssignCap(CapsetID capset STG_UNUSED,
-                                        nat      capno  STG_UNUSED)
+                                        uint32_t capno  STG_UNUSED)
 {
     traceCapsetEvent(EVENT_CAPSET_ASSIGN_CAP, capset, capno);
     dtraceCapsetAssignCap(capset, capno);
 }
 
 INLINE_HEADER void traceCapsetRemoveCap(CapsetID capset STG_UNUSED,
-                                        nat      capno  STG_UNUSED)
+                                        uint32_t capno  STG_UNUSED)
 {
     traceCapsetEvent(EVENT_CAPSET_REMOVE_CAP, capset, capno);
     dtraceCapsetRemoveCap(capset, capno);
@@ -781,7 +781,7 @@ INLINE_HEADER void traceEventSparkRun(Capability *cap STG_UNUSED)
 }
 
 INLINE_HEADER void traceEventSparkSteal(Capability *cap STG_UNUSED,
-                                        nat         victim_cap STG_UNUSED)
+                                        uint32_t    victim_cap STG_UNUSED)
 {
     traceSparkEvent2(cap, EVENT_SPARK_STEAL, victim_cap);
     dtraceSparkSteal((EventCapNo)cap->no, (EventCapNo)victim_cap);

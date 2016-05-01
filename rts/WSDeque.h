@@ -67,7 +67,7 @@ typedef struct WSDeque_ {
  * -------------------------------------------------------------------------- */
 
 // Allocation, deallocation
-WSDeque * newWSDeque  (nat size);
+WSDeque * newWSDeque  (uint32_t size);
 void      freeWSDeque (WSDeque *q);
 
 // Take an element from the "write" end of the pool.  Can be called

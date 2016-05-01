@@ -140,8 +140,8 @@ singleton(retainer r)
 RetainerSet *
 addElement(retainer r, RetainerSet *rs)
 {
-    nat i;
-    nat nl;             // Number of retainers in *rs Less than r
+    uint32_t i;
+    uint32_t nl;        // Number of retainers in *rs Less than r
     RetainerSet *nrs;   // New Retainer Set
     StgWord hk;         // Hash Key
 
@@ -249,11 +249,11 @@ printRetainer(FILE *f, retainer cc)
 #if defined(RETAINER_SCHEME_INFO)
 // Retainer scheme 1: retainer = info table
 void
-printRetainerSetShort(FILE *f, RetainerSet *rs, nat max_length)
+printRetainerSetShort(FILE *f, RetainerSet *rs, uint32_t max_length)
 {
     char tmp[max_length + 1];
     int size;
-    nat j;
+    uint32_t j;
 
     ASSERT(rs->id < 0);
 
@@ -285,21 +285,21 @@ printRetainerSetShort(FILE *f, RetainerSet *rs, nat max_length)
 #elif defined(RETAINER_SCHEME_CC)
 // Retainer scheme 3: retainer = cost centre
 void
-printRetainerSetShort(FILE *f, RetainerSet *rs, nat max_length)
+printRetainerSetShort(FILE *f, RetainerSet *rs, uint32_t max_length)
 {
     char tmp[max_length + 1];
     int size;
-    nat j;
+    uint32_t j;
 
 }
 #elif defined(RETAINER_SCHEME_CCS)
 // Retainer scheme 2: retainer = cost centre stack
 void
-printRetainerSetShort(FILE *f, RetainerSet *rs, nat max_length)
+printRetainerSetShort(FILE *f, RetainerSet *rs, uint32_t max_length)
 {
     char tmp[max_length + 1];
-    nat size;
-    nat j;
+    uint32_t size;
+    uint32_t j;
 
     ASSERT(rs->id < 0);
 
@@ -331,11 +331,11 @@ printRetainerSetShort(FILE *f, RetainerSet *rs, nat max_length)
 #elif defined(RETAINER_SCHEME_CC)
 // Retainer scheme 3: retainer = cost centre
 static void
-printRetainerSetShort(FILE *f, retainerSet *rs, nat max_length)
+printRetainerSetShort(FILE *f, retainerSet *rs, uint32_t max_length)
 {
     char tmp[max_length + 1];
     int size;
-    nat j;
+    uint32_t j;
 
     ASSERT(rs->id < 0);
 
@@ -372,7 +372,7 @@ printRetainerSetShort(FILE *f, retainerSet *rs, nat max_length)
   //    printing one natural number (plus '(' and ')').
   char tmp[32];
   int size, ts;
-  nat j;
+  uint32_t j;
 
   ASSERT(rs->id < 0);
 
@@ -415,8 +415,8 @@ printRetainerSetShort(FILE *f, retainerSet *rs, nat max_length)
 void
 outputAllRetainerSet(FILE *prof_file)
 {
-    nat i, j;
-    nat numSet;
+    uint32_t i, j;
+    uint32_t numSet;
     RetainerSet *rs, **rsArray, *tmp;
 
     // find out the number of retainer sets which have had a non-zero cost at

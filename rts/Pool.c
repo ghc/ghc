@@ -22,12 +22,12 @@ typedef struct PoolEntry_ {
 
 struct Pool_ {
     /* the maximum number of allocated resources in the pool */
-    nat max_size;
+    uint32_t max_size;
     /* the number of allocated resources to keep in the pool when idle */
-    nat desired_size;
+    uint32_t desired_size;
     /* how many things are currently allocated? (sum of lengths of available and
      * taken lists) */
-    nat current_size;
+    uint32_t current_size;
 #ifdef THREADED_RTS
     /* signaled when a thing is released */
     Condition cond;
@@ -43,10 +43,10 @@ struct Pool_ {
 #endif
 };
 
-Pool *poolInit(nat max_size, nat desired_size,
+Pool *poolInit(uint32_t max_size, uint32_t desired_size,
                alloc_thing_fn alloc_fn, free_thing_fn free_fn) {
     Pool *pool = stgMallocBytes(sizeof(Pool), "pool_init");
-    pool->max_size = max_size == 0 ? (nat) -1 : max_size;
+    pool->max_size = max_size == 0 ? (uint32_t) -1 : max_size;
     pool->desired_size = desired_size;
     pool->current_size = 0;
     pool->alloc_fn = alloc_fn;
@@ -74,7 +74,7 @@ int poolFree(Pool *pool) {
 }
 
 /* free available entries such that current_size <= size */
-static void free_available(Pool *pool, nat size) {
+static void free_available(Pool *pool, uint32_t size) {
     while (pool->current_size > size && pool->available != NULL) {
         PoolEntry *ent = pool->available;
         pool->free_fn(ent->thing);
@@ -84,17 +84,17 @@ static void free_available(Pool *pool, nat size) {
     }
 }
 
-void poolSetDesiredSize(Pool *pool, nat size) {
+void poolSetDesiredSize(Pool *pool, uint32_t size) {
     ACQUIRE_LOCK(&pool->mutex);
     pool->desired_size = size;
     free_available(pool, size);
     RELEASE_LOCK(&pool->mutex);
 }
 
-void poolSetMaxSize(Pool *pool, nat size) {
+void poolSetMaxSize(Pool *pool, uint32_t size) {
     ACQUIRE_LOCK(&pool->mutex);
     if (size == 0)
-        size = (nat) -1;
+        size = (uint32_t) -1;
     pool->max_size = size;
     if (pool->desired_size > pool->max_size) {
         pool->desired_size = size;
@@ -103,11 +103,11 @@ void poolSetMaxSize(Pool *pool, nat size) {
     RELEASE_LOCK(&pool->mutex);
 }
 
-nat poolGetMaxSize(Pool *pool) {
+uint32_t poolGetMaxSize(Pool *pool) {
     return pool->max_size;
 }
 
-nat poolGetDesiredSize(Pool *pool) {
+uint32_t poolGetDesiredSize(Pool *pool) {
     return pool->desired_size;
 }
 

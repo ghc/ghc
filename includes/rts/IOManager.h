@@ -26,7 +26,7 @@ void     sendIOManagerEvent (HsWord32 event);
 
 #else
 
-void     setIOManagerControlFd   (nat cap_no, int fd);
+void     setIOManagerControlFd   (uint32_t cap_no, int fd);
 void     setTimerManagerControlFd(int fd);
 void     setIOManagerWakeupFd   (int fd);
 

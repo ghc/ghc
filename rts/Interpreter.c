@@ -234,7 +234,7 @@ interpretBCO (Capability* cap)
     register StgPtr       Sp;    // local state -- stack pointer
     register StgPtr       SpLim; // local state -- stack lim pointer
     register StgClosure   *tagged_obj = 0, *obj;
-    nat n, m;
+    uint32_t n, m;
 
     LOAD_THREAD_STATE();
 
@@ -363,7 +363,7 @@ eval_obj:
 
     case AP:    /* Copied from stg_AP_entry. */
     {
-        nat i, words;
+        uint32_t i, words;
         StgAP *ap;
 
         ap = (StgAP*)obj;
@@ -643,7 +643,7 @@ do_apply:
 
         case PAP: {
             StgPAP *pap;
-            nat i, arity;
+            uint32_t i, arity;
 
             pap = (StgPAP *)obj;
 
@@ -722,7 +722,7 @@ do_apply:
         }
 
         case BCO: {
-            nat arity, i;
+            uint32_t arity, i;
 
             Sp++;
             arity = ((StgBCO *)obj)->arity;
@@ -748,7 +748,7 @@ do_apply:
             else /* arity > n */ {
                 // build a PAP and return it.
                 StgPAP *pap;
-                nat i;
+                uint32_t i;
                 pap = (StgPAP *)allocate(cap, PAP_sizeW(m));
                 SET_HDR(pap, &stg_PAP_info,cap->r.rCCCS);
                 pap->arity = arity - n;
@@ -1558,9 +1558,9 @@ run_BCO:
 #define ROUND_UP_WDS(p)  ((((StgWord)(p)) + sizeof(W_)-1)/sizeof(W_))
 
             ffi_cif *cif = (ffi_cif *)marshall_fn;
-            nat nargs = cif->nargs;
-            nat ret_size;
-            nat i;
+            uint32_t nargs = cif->nargs;
+            uint32_t ret_size;
+            uint32_t i;
             int j;
             StgPtr p;
             W_ ret[2];                  // max needed

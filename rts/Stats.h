@@ -29,15 +29,15 @@ void      stat_endInit(void);
 
 void      stat_startGCSync(struct gc_thread_ *_gct);
 void      stat_startGC(Capability *cap, struct gc_thread_ *_gct);
-void      stat_endGC  (Capability *cap, struct gc_thread_ *_gct,
-                       W_ live, W_ copied, W_ slop, nat gen,
-                       nat n_gc_threads, W_ par_max_copied, W_ par_tot_copied);
+void      stat_endGC  (Capability *cap, struct gc_thread_ *_gct, W_ live,
+                       W_ copied, W_ slop, uint32_t gen, uint32_t n_gc_threads,
+                       W_ par_max_copied, W_ par_tot_copied);
 
 #ifdef PROFILING
 void      stat_startRP(void);
-void      stat_endRP(nat, 
+void      stat_endRP(uint32_t,
 #ifdef DEBUG_RETAINER
-                            nat, int, 
+                            uint32_t, int,
 #endif
                             double);
 #endif /* PROFILING */

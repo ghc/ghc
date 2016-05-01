@@ -1521,12 +1521,12 @@ static StgWord roundDownToPage (StgWord size)
 //
 // Returns NULL on failure.
 //
-static void * mmapForLinker (size_t bytes, nat flags, int fd, int offset)
+static void * mmapForLinker (size_t bytes, uint32_t flags, int fd, int offset)
 {
    void *map_addr = NULL;
    void *result;
    StgWord size;
-   static nat fixed = 0;
+   static uint32_t fixed = 0;
 
    IF_DEBUG(linker, debugBelch("mmapForLinker: start\n"));
    size = roundUpToPage(bytes);
@@ -5335,12 +5335,12 @@ end:
 // TODO: These likely belong in a library somewhere
 
 // Signed extend a number to a 32-bit int.
-static inline StgInt32 sign_extend32(nat bits, StgWord32 x) {
+static inline StgInt32 sign_extend32(uint32_t bits, StgWord32 x) {
     return ((StgInt32) (x << (32 - bits))) >> (32 - bits);
 }
 
 // Does the given signed integer fit into the given bit width?
-static inline StgBool is_int(nat bits, StgInt32 x) {
+static inline StgBool is_int(uint32_t bits, StgInt32 x) {
     return bits > 32 || (-(1 << (bits-1)) <= x
                          && x < (1 << (bits-1)));
 }
@@ -7231,7 +7231,7 @@ static int ocRunInit_MachO ( ObjectCode *oc )
     struct load_command *lc = (struct load_command*) (image + sizeof(struct mach_header));
     struct segment_command *segLC = NULL;
     struct section *sections;
-    nat i;
+    uint32_t i;
 
     for (i = 0; i < header->ncmds; i++) {
         if (lc->cmd == LC_SEGMENT || lc->cmd == LC_SEGMENT_64) {

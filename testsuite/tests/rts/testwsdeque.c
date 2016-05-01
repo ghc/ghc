@@ -31,7 +31,7 @@ StgWord last_v[THREADS][BUF];
 #define CASTOP(addr,old,new) ((old) == cas(((StgPtr)addr),(old),(new)))
 
 void *
-myStealWSDeque_ (WSDeque *q, nat n)
+myStealWSDeque_ (WSDeque *q, uint32_t n)
 {
     void * stolen;
     StgWord b,t; 
@@ -75,7 +75,7 @@ myStealWSDeque_ (WSDeque *q, nat n)
 }
 
 void *
-myStealWSDeque (WSDeque *q, nat n)
+myStealWSDeque (WSDeque *q, uint32_t n)
 {
     void *stolen;
     
@@ -88,8 +88,8 @@ myStealWSDeque (WSDeque *q, nat n)
 
 void dump(void)
 {
-    nat n;
-    nat i;
+    uint32_t n;
+    uint32_t i;
     for (n = 0; n < THREADS; n++) {
         debugBelch("\nthread %d:\n", n);
         for (i = bufs[n]; i >= stg_max(bufs[n]-20,0); i--) {
@@ -102,7 +102,7 @@ void dump(void)
 
 // -----------------------------------------------------------------------------
 
-void work(void *p, nat n)
+void work(void *p, uint32_t n)
 {
     StgWord val;
 
@@ -120,7 +120,7 @@ void OSThreadProcAttr thief(void *info)
 {
     void *p;
     StgWord n;
-    nat count = 0;
+    uint32_t count = 0;
 
     n = (StgWord)info;
 
@@ -138,7 +138,7 @@ void OSThreadProcAttr thief(void *info)
 int main(int argc, char*argv[])
 {
     int n;
-    nat count = 0;
+    uint32_t count = 0;
     void *p;
 
     q = newWSDeque(1024);

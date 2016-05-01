@@ -34,7 +34,7 @@ struct Capability_ {
     StgFunTable f;
     StgRegTable r;
 
-    nat no;  // capability number.
+    uint32_t no;  // capability number.
 
     // The Task currently holding this Capability.  This task has
     // exclusive access to the contents of this Capability (apart from
@@ -47,7 +47,7 @@ struct Capability_ {
     rtsBool in_haskell;
 
     // Has there been any activity on this Capability since the last GC?
-    nat idle;
+    uint32_t idle;
 
     rtsBool disabled;
 
@@ -105,7 +105,7 @@ struct Capability_ {
 #if defined(THREADED_RTS)
     // Worker Tasks waiting in the wings.  Singly-linked.
     Task *spare_workers;
-    nat n_spare_workers; // count of above
+    uint32_t n_spare_workers; // count of above
 
     // This lock protects:
     //    running_task
@@ -141,7 +141,7 @@ struct Capability_ {
     StgInvariantCheckQueue *free_invariant_check_queues;
     StgTRecChunk *free_trec_chunks;
     StgTRecHeader *free_trec_headers;
-    nat transaction_tokens;
+    uint32_t transaction_tokens;
 } // typedef Capability is defined in RtsAPI.h
   // We never want a Capability to overlap a cache line with anything
   // else, so round it up to a cache line size:
@@ -192,7 +192,7 @@ void initCapabilities (void);
 
 // Add and initialise more Capabilities
 //
-void moreCapabilities (nat from, nat to);
+void moreCapabilities (uint32_t from, uint32_t to);
 
 // Release a capability.  This is called by a Task that is exiting
 // Haskell to make a foreign call, or in various other cases when we
@@ -217,8 +217,8 @@ INLINE_HEADER void releaseCapability_ (Capability* cap STG_UNUSED,
 // extern Capability MainCapability;
 
 // declared in includes/rts/Threads.h:
-// extern nat n_capabilities;
-// extern nat enabled_capabilities;
+// extern uint32_t n_capabilities;
+// extern uint32_t enabled_capabilities;
 
 // Array of all the capabilities
 //
@@ -260,7 +260,8 @@ extern PendingSync * volatile pending_sync;
 //
 void waitForCapability (Capability **cap/*in/out*/, Task *task);
 
-EXTERN_INLINE void recordMutableCap (StgClosure *p, Capability *cap, nat gen);
+EXTERN_INLINE void recordMutableCap (StgClosure *p, Capability *cap,
+                                        uint32_t gen);
 
 EXTERN_INLINE void recordClosureMutated (Capability *cap, StgClosure *p);
 
@@ -302,7 +303,7 @@ StgClosure *findSpark (Capability *cap);
 rtsBool anySparks (void);
 
 INLINE_HEADER rtsBool emptySparkPoolCap (Capability *cap);
-INLINE_HEADER nat     sparkPoolSizeCap  (Capability *cap);
+INLINE_HEADER uint32_t sparkPoolSizeCap  (Capability *cap);
 INLINE_HEADER void    discardSparksCap  (Capability *cap);
 
 #else // !THREADED_RTS
@@ -353,7 +354,7 @@ INLINE_HEADER rtsBool emptyInbox(Capability *cap);
  * -------------------------------------------------------------------------- */
 
 EXTERN_INLINE void
-recordMutableCap (StgClosure *p, Capability *cap, nat gen)
+recordMutableCap (StgClosure *p, Capability *cap, uint32_t gen)
 {
     bdescr *bd;
 
@@ -385,7 +386,7 @@ INLINE_HEADER rtsBool
 emptySparkPoolCap (Capability *cap)
 { return looksEmpty(cap->sparks); }
 
-INLINE_HEADER nat
+INLINE_HEADER uint32_t
 sparkPoolSizeCap (Capability *cap)
 { return sparkPoolSize(cap->sparks); }
 

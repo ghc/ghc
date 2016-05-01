@@ -91,7 +91,7 @@ static int  openStatsFile (
     char *filename, const char *FILENAME_FMT, FILE **file_ret);
 
 static StgWord64 decodeSize (
-    const char *flag, nat offset, StgWord64 min, StgWord64 max);
+    const char *flag, uint32_t offset, StgWord64 min, StgWord64 max);
 
 static void bad_option (const char *s);
 
@@ -491,9 +491,9 @@ static void errorRtsOptsDisabled(const char *s)
 
 void setupRtsFlags (int *argc, char *argv[], RtsConfig rts_config)
 {
-    nat mode;
-    nat total_arg;
-    nat arg, rts_argc0;
+    uint32_t mode;
+    uint32_t total_arg;
+    uint32_t arg, rts_argc0;
 
     rtsConfig = rts_config;
 
@@ -869,7 +869,7 @@ error = rtsTrue;
 #if defined(PROFILING)
                     RtsFlags.ParFlags.nNodes = 1;
 #else
-                    RtsFlags.ParFlags.nNodes = (nat)nNodes;
+                    RtsFlags.ParFlags.nNodes = (uint32_t)nNodes;
 #endif
                   ) break;
                 } else {
@@ -900,15 +900,16 @@ error = rtsTrue;
                   if (rts_argv[arg][2] == '\0') {
                       RtsFlags.GcFlags.heapSizeSuggestionAuto = rtsTrue;
                   } else {
-                      RtsFlags.GcFlags.heapSizeSuggestion =
-                          (nat)(decodeSize(rts_argv[arg], 2, BLOCK_SIZE, HS_WORD_MAX) / BLOCK_SIZE);
+                      RtsFlags.GcFlags.heapSizeSuggestion = (uint32_t)
+                          (decodeSize(rts_argv[arg], 2, BLOCK_SIZE, HS_WORD_MAX)
+                          / BLOCK_SIZE);
                   }
                   break;
 
               case 'O':
                   OPTION_UNSAFE;
                   RtsFlags.GcFlags.minOldGenSize =
-                      (nat)(decodeSize(rts_argv[arg], 2, BLOCK_SIZE,
+                      (uint32_t)(decodeSize(rts_argv[arg], 2, BLOCK_SIZE,
                                        HS_WORD_MAX)
                             / BLOCK_SIZE);
                   break;
@@ -1089,7 +1090,7 @@ error = rtsTrue;
                       errorRtsOptsDisabled("Using large values for -N is not allowed by default. %s");
                       stg_exit(EXIT_FAILURE);
                     }
-                    RtsFlags.ParFlags.nNodes = (nat)nNodes;
+                    RtsFlags.ParFlags.nNodes = (uint32_t)nNodes;
                 }
                 ) break;
 
@@ -1483,7 +1484,7 @@ static void initStatsFile (FILE *f)
 -------------------------------------------------------------------------- */
 
 static StgWord64
-decodeSize(const char *flag, nat offset, StgWord64 min, StgWord64 max)
+decodeSize(const char *flag, uint32_t offset, StgWord64 min, StgWord64 max)
 {
     char c;
     const char *s;

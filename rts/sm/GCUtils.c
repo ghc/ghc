@@ -41,7 +41,7 @@ allocBlock_sync(void)
 }
 
 static bdescr *
-allocGroup_sync(nat n)
+allocGroup_sync(uint32_t n)
 {
     bdescr *bd;
     ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
@@ -51,11 +51,11 @@ allocGroup_sync(nat n)
 }
 
 
-static nat
-allocBlocks_sync(nat n, bdescr **hd)
+static uint32_t
+allocBlocks_sync(uint32_t n, bdescr **hd)
 {
     bdescr *bd;
-    nat i;
+    uint32_t i;
     ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
     bd = allocLargeChunk(1,n);
     // NB. allocLargeChunk, rather than allocGroup(n), to allocate in a
@@ -112,9 +112,9 @@ grab_local_todo_block (gen_workspace *ws)
 
 #if defined(THREADED_RTS)
 bdescr *
-steal_todo_block (nat g)
+steal_todo_block (uint32_t g)
 {
-    nat n;
+    uint32_t n;
     bdescr *bd;
 
     // look for work to steal
@@ -191,7 +191,7 @@ push_scanned_block (bdescr *bd, gen_workspace *ws)
 */
 
 StgPtr
-todo_block_full (nat size, gen_workspace *ws)
+todo_block_full (uint32_t size, gen_workspace *ws)
 {
     rtsBool urgent_to_push, can_extend;
     StgPtr p;
@@ -296,7 +296,7 @@ todo_block_full (nat size, gen_workspace *ws)
 }
 
 StgPtr
-alloc_todo_block (gen_workspace *ws, nat size)
+alloc_todo_block (gen_workspace *ws, uint32_t size)
 {
     bdescr *bd/*, *hd, *tl */;
 

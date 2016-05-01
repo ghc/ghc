@@ -293,7 +293,7 @@ hs_add_root(void (*init_root)(void) STG_UNUSED)
 static void
 hs_exit_(rtsBool wait_foreign)
 {
-    nat g, i;
+    uint32_t g, i;
 
     if (hs_init_count <= 0) {
         errorBelch("warning: too many hs_exit()s");

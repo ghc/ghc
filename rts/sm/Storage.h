@@ -23,7 +23,7 @@ void freeStorage(rtsBool free_heap);
 
 // Adding more Capabilities later: this function allocates nurseries
 // and initialises other storage-related things.
-void storageAddCapabilities (nat from, nat to);
+void storageAddCapabilities (uint32_t from, uint32_t to);
 
 /* -----------------------------------------------------------------------------
    Should we GC?
@@ -66,7 +66,7 @@ void dirty_TVAR(Capability *cap, StgTVar *p);
    -------------------------------------------------------------------------- */
 
 extern nursery *nurseries;
-extern nat n_nurseries;
+extern uint32_t n_nurseries;
 
 void     resetNurseries       (void);
 void     clearNursery         (Capability *cap);
@@ -104,8 +104,8 @@ StgWord countLargeAllocated (void);
 StgWord countOccupied       (bdescr *bd);
 StgWord calcNeeded          (rtsBool force_major, StgWord *blocks_needed);
 
-StgWord gcThreadLiveWords  (nat i, nat g);
-StgWord gcThreadLiveBlocks (nat i, nat g);
+StgWord gcThreadLiveWords  (uint32_t i, uint32_t g);
+StgWord gcThreadLiveBlocks (uint32_t i, uint32_t g);
 
 StgWord genLiveWords  (generation *gen);
 StgWord genLiveBlocks (generation *gen);
@@ -153,7 +153,7 @@ void move_STACK (StgStack *src, StgStack *dest);
 
 // The previous and current values of the static flag.  These flip
 // between STATIC_FLAG_A and STATIC_FLAG_B at each major GC.
-extern nat prev_static_flag, static_flag;
+extern uint32_t prev_static_flag, static_flag;
 
 // In the chain of static objects built up during GC, all the link
 // fields are tagged with the current static_flag value.  How to mark

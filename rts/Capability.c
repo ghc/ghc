@@ -37,8 +37,8 @@
 // builds, and for +RTS -N1
 Capability MainCapability;
 
-nat n_capabilities = 0;
-nat enabled_capabilities = 0;
+uint32_t n_capabilities = 0;
+uint32_t enabled_capabilities = 0;
 
 // The array of Capabilities.  It's important that when we need
 // to allocate more Capabilities we don't have to move the existing
@@ -90,7 +90,7 @@ findSpark (Capability *cap)
   Capability *robbed;
   StgClosurePtr spark;
   rtsBool retry;
-  nat i = 0;
+  uint32_t i = 0;
 
   if (!emptyRunQueue(cap) || cap->returning_tasks_hd != NULL) {
       // If there are other threads, don't try to run any new
@@ -175,7 +175,7 @@ findSpark (Capability *cap)
 rtsBool
 anySparks (void)
 {
-    nat i;
+    uint32_t i;
 
     for (i=0; i < n_capabilities; i++) {
         if (!emptySparkPoolCap(capabilities[i])) {
@@ -230,9 +230,9 @@ popReturningTask (Capability *cap)
  * ------------------------------------------------------------------------- */
 
 static void
-initCapability( Capability *cap, nat i )
+initCapability( Capability *cap, uint32_t i )
 {
-    nat g;
+    uint32_t g;
 
     cap->no = i;
     cap->in_haskell        = rtsFalse;
@@ -356,10 +356,10 @@ initCapabilities( void )
 }
 
 void
-moreCapabilities (nat from USED_IF_THREADS, nat to USED_IF_THREADS)
+moreCapabilities (uint32_t from USED_IF_THREADS, uint32_t to USED_IF_THREADS)
 {
 #if defined(THREADED_RTS)
-    nat i;
+    uint32_t i;
     Capability **old_capabilities = capabilities;
 
     capabilities = stgMallocBytes(to * sizeof(Capability*), "moreCapabilities");
@@ -399,7 +399,7 @@ moreCapabilities (nat from USED_IF_THREADS, nat to USED_IF_THREADS)
 
 void contextSwitchAllCapabilities(void)
 {
-    nat i;
+    uint32_t i;
     for (i=0; i < n_capabilities; i++) {
         contextSwitchCapability(capabilities[i]);
     }
@@ -407,7 +407,7 @@ void contextSwitchAllCapabilities(void)
 
 void interruptAllCapabilities(void)
 {
-    nat i;
+    uint32_t i;
     for (i=0; i < n_capabilities; i++) {
         interruptCapability(capabilities[i]);
     }
@@ -721,7 +721,7 @@ void waitForCapability (Capability **pCap, Task *task)
             // Try last_free_capability first
             cap = last_free_capability;
             if (cap->running_task) {
-                nat i;
+                uint32_t i;
                 // otherwise, search for a free capability
                 cap = NULL;
                 for (i = 0; i < n_capabilities; i++) {
@@ -960,7 +960,7 @@ shutdownCapability (Capability *cap USED_IF_THREADS,
                     rtsBool safe USED_IF_THREADS)
 {
 #if defined(THREADED_RTS)
-    nat i;
+    uint32_t i;
 
     task->cap = cap;
 
@@ -1057,7 +1057,7 @@ shutdownCapability (Capability *cap USED_IF_THREADS,
 void
 shutdownCapabilities(Task *task, rtsBool safe)
 {
-    nat i;
+    uint32_t i;
     for (i=0; i < n_capabilities; i++) {
         ASSERT(task->incall->tso == NULL);
         shutdownCapability(capabilities[i], task, safe);
@@ -1084,7 +1084,7 @@ void
 freeCapabilities (void)
 {
 #if defined(THREADED_RTS)
-    nat i;
+    uint32_t i;
     for (i=0; i < n_capabilities; i++) {
         freeCapability(capabilities[i]);
         if (capabilities[i] != &MainCapability)
@@ -1138,7 +1138,7 @@ markCapability (evac_fn evac, void *user, Capability *cap,
 void
 markCapabilities (evac_fn evac, void *user)
 {
-    nat n;
+    uint32_t n;
     for (n = 0; n < n_capabilities; n++) {
         markCapability(evac, user, capabilities[n], rtsFalse);
     }
@@ -1149,7 +1149,7 @@ rtsBool checkSparkCountInvariant (void)
 {
     SparkCounters sparks = { 0, 0, 0, 0, 0, 0 };
     StgWord64 remaining = 0;
-    nat i;
+    uint32_t i;
 
     for (i = 0; i < n_capabilities; i++) {
         sparks.created   += capabilities[i]->spark_stats.created;
@@ -1176,7 +1176,8 @@ rtsBool checkSparkCountInvariant (void)
 #endif
 
 #if !defined(mingw32_HOST_OS)
-void setIOManagerControlFd(nat cap_no USED_IF_THREADS, int fd USED_IF_THREADS) {
+void
+setIOManagerControlFd(uint32_t cap_no USED_IF_THREADS, int fd USED_IF_THREADS) {
 #if defined(THREADED_RTS)
     if (cap_no < n_capabilities) {
         capabilities[cap_no]->io_manager_control_wr_fd = fd;

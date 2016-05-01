@@ -63,7 +63,7 @@ typedef CostCentre *retainer;
  */
 
 typedef struct _RetainerSet {
-  nat num;                      // number of elements
+  uint32_t num;                 // number of elements
   StgWord hashKey;              // hash key for this retainer set
   struct _RetainerSet *link;    // link to the next retainer set in the bucket
   int id;   // unique id of this retainer set (used when printing)
@@ -132,7 +132,7 @@ extern RetainerSet rs_MANY;
 INLINE_HEADER rtsBool
 isMember(retainer r, RetainerSet *rs)
 {
-  int i, left, right;       // must be int, not nat (because -1 can appear)
+  int i, left, right;       // must be int, not uint32_t (because -1 can appear)
   retainer ri;
 
   if (rs == &rs_MANY) { return rtsTrue; }
@@ -162,12 +162,12 @@ RetainerSet *addElement(retainer, RetainerSet *);
 
 #ifdef SECOND_APPROACH
 // Prints a single retainer set.
-void printRetainerSetShort(FILE *, RetainerSet *, nat);
+void printRetainerSetShort(FILE *, RetainerSet *, uint32_t);
 #endif
 
 // Print the statistics on all the retainer sets.
 // store the sum of all costs and the number of all retainer sets.
-void outputRetainerSet(FILE *, nat *, nat *);
+void outputRetainerSet(FILE *, uint32_t *, uint32_t *);
 
 #ifdef SECOND_APPROACH
 // Print all retainer sets at the exit of the program.

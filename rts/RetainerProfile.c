@@ -46,10 +46,11 @@
  * Declarations...
  * -------------------------------------------------------------------------- */
 
-static nat retainerGeneration;  // generation
+static uint32_t retainerGeneration;  // generation
 
-static nat numObjectVisited;    // total number of objects visited
-static nat timesAnyObjectVisited; // number of times any objects are visited
+static uint32_t numObjectVisited;    // total number of objects visited
+static uint32_t timesAnyObjectVisited;  // number of times any objects are
+                                        // visited
 
 /*
   The rs field in the profile header of any object points to its retainer
@@ -79,18 +80,18 @@ static void belongToHeap(StgPtr p);
   Invariants:
     cStackSize <= maxCStackSize
  */
-static nat cStackSize, maxCStackSize;
+static uint32_t cStackSize, maxCStackSize;
 
-static nat sumOfNewCost;        // sum of the cost of each object, computed
+static uint32_t sumOfNewCost;        // sum of the cost of each object, computed
                                 // when the object is first visited
-static nat sumOfNewCostExtra;   // for those objects not visited during
+static uint32_t sumOfNewCostExtra;   // for those objects not visited during
                                 // retainer profiling, e.g., MUT_VAR
-static nat costArray[N_CLOSURE_TYPES];
+static uint32_t costArray[N_CLOSURE_TYPES];
 
-nat sumOfCostLinear;            // sum of the costs of all object, computed
+uint32_t sumOfCostLinear;            // sum of the costs of all object, computed
                                 // when linearly traversing the heap after
                                 // retainer profiling
-nat costArrayLinear[N_CLOSURE_TYPES];
+uint32_t costArrayLinear[N_CLOSURE_TYPES];
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -301,7 +302,7 @@ isOnBoundary( void )
  *   payload[] begins with ptrs pointers followed by non-pointers.
  * -------------------------------------------------------------------------- */
 static INLINE void
-init_ptrs( stackPos *info, nat ptrs, StgPtr payload )
+init_ptrs( stackPos *info, uint32_t ptrs, StgPtr payload )
 {
     info->type              = posTypePtrs;
     info->next.ptrs.pos     = 0;
@@ -388,7 +389,7 @@ find_srt( stackPos *info )
     }
     else {
         // Large SRT bitmap
-        nat i = info->next.large_srt.offset;
+        uint32_t i = info->next.large_srt.offset;
         StgWord bitmap;
 
         // Follow the pattern from GC.c:scavenge_large_srt_bitmap().
@@ -836,8 +837,8 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
             // which field, and the rest of the bits indicate the
             // entry number (starting from zero).
             TRecEntry *entry;
-            nat entry_no = se->info.next.step >> 2;
-            nat field_no = se->info.next.step & 3;
+            uint32_t entry_no = se->info.next.step >> 2;
+            uint32_t field_no = se->info.next.step & 3;
             if (entry_no == ((StgTRecChunk *)se->c)->next_entry_idx) {
                 *c = NULL;
                 popOff();
@@ -1162,10 +1163,10 @@ associate( StgClosure *c, RetainerSet *s )
    -------------------------------------------------------------------------- */
 
 static void
-retain_large_bitmap (StgPtr p, StgLargeBitmap *large_bitmap, nat size,
+retain_large_bitmap (StgPtr p, StgLargeBitmap *large_bitmap, uint32_t size,
                      StgClosure *c, retainer c_child_r)
 {
-    nat i, b;
+    uint32_t i, b;
     StgWord bitmap;
 
     b = 0;
@@ -1186,7 +1187,7 @@ retain_large_bitmap (StgPtr p, StgLargeBitmap *large_bitmap, nat size,
 }
 
 static INLINE StgPtr
-retain_small_bitmap (StgPtr p, nat size, StgWord bitmap,
+retain_small_bitmap (StgPtr p, uint32_t size, StgWord bitmap,
                      StgClosure *c, retainer c_child_r)
 {
     while (size > 0) {
@@ -1207,7 +1208,7 @@ retain_small_bitmap (StgPtr p, nat size, StgWord bitmap,
 static void
 retain_large_srt_bitmap (StgLargeSRT *srt, StgClosure *c, retainer c_child_r)
 {
-    nat i, b, size;
+    uint32_t i, b, size;
     StgWord bitmap;
     StgClosure **p;
 
@@ -1231,9 +1232,10 @@ retain_large_srt_bitmap (StgLargeSRT *srt, StgClosure *c, retainer c_child_r)
 }
 
 static INLINE void
-retainSRT (StgClosure **srt, nat srt_bitmap, StgClosure *c, retainer c_child_r)
+retainSRT (StgClosure **srt, uint32_t srt_bitmap, StgClosure *c,
+            retainer c_child_r)
 {
-  nat bitmap;
+  uint32_t bitmap;
   StgClosure **p;
 
   bitmap = srt_bitmap;
@@ -1288,7 +1290,7 @@ retainStack( StgClosure *c, retainer c_child_r,
     StgPtr p;
     StgRetInfoTable *info;
     StgWord bitmap;
-    nat size;
+    uint32_t size;
 
 #ifdef DEBUG_RETAINER
     cStackSize++;
@@ -1764,7 +1766,7 @@ computeRetainerSet( void )
 {
     StgWeak *weak;
     RetainerSet *rtl;
-    nat g, n;
+    uint32_t g, n;
     StgPtr ml;
     bdescr *bd;
 #ifdef DEBUG_RETAINER
@@ -1870,7 +1872,7 @@ void
 resetStaticObjectForRetainerProfiling( StgClosure *static_objects )
 {
 #ifdef DEBUG_RETAINER
-    nat count;
+    uint32_t count;
 #endif
     StgClosure *p;
 
@@ -1926,8 +1928,8 @@ void
 retainerProfile(void)
 {
 #ifdef DEBUG_RETAINER
-  nat i;
-  nat totalHeapSize;        // total raw heap size (computed by linear scanning)
+  uint32_t i;
+  uint32_t totalHeapSize;   // total raw heap size (computed by linear scanning)
 #endif
 
 #ifdef DEBUG_RETAINER
@@ -2065,7 +2067,7 @@ retainerProfile(void)
         ((HEAP_ALLOCED(r) && ((Bdescr((P_)r)->flags & BF_FREE) == 0)))) && \
         ((StgWord)(*(StgPtr)r)!=(StgWord)0xaaaaaaaaaaaaaaaaULL))
 
-static nat
+static uint32_t
 sanityCheckHeapClosure( StgClosure *c )
 {
     ASSERT(LOOKS_LIKE_GHC_INFO(c->header.info));
@@ -2092,11 +2094,11 @@ sanityCheckHeapClosure( StgClosure *c )
     return closure_sizeW(c);
 }
 
-static nat
+static uint32_t
 heapCheck( bdescr *bd )
 {
     StgPtr p;
-    static nat costSum, size;
+    static uint32_t costSum, size;
 
     costSum = 0;
     while (bd != NULL) {
@@ -2116,12 +2118,12 @@ heapCheck( bdescr *bd )
     return costSum;
 }
 
-static nat
+static uint32_t
 smallObjectPoolCheck(void)
 {
     bdescr *bd;
     StgPtr p;
-    static nat costSum, size;
+    static uint32_t costSum, size;
 
     bd = g0s0->blocks;
     costSum = 0;
@@ -2157,10 +2159,10 @@ smallObjectPoolCheck(void)
     return costSum;
 }
 
-static nat
+static uint32_t
 chainCheck(bdescr *bd)
 {
-    nat costSum, size;
+    uint32_t costSum, size;
 
     costSum = 0;
     while (bd != NULL) {
@@ -2177,10 +2179,10 @@ chainCheck(bdescr *bd)
     return costSum;
 }
 
-static nat
+static uint32_t
 checkHeapSanityForRetainerProfiling( void )
 {
-    nat costSum, g, s;
+    uint32_t costSum, g, s;
 
     costSum = 0;
     debugBelch("START: sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
@@ -2221,7 +2223,7 @@ findPointer(StgPtr p)
 {
     StgPtr q, r, e;
     bdescr *bd;
-    nat g, s;
+    uint32_t g, s;
 
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         for (s = 0; s < generations[g].n_steps; s++) {
@@ -2257,7 +2259,7 @@ static void
 belongToHeap(StgPtr p)
 {
     bdescr *bd;
-    nat g, s;
+    uint32_t g, s;
 
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         for (s = 0; s < generations[g].n_steps; s++) {

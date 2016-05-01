@@ -26,7 +26,7 @@ static HANDLE io_manager_event = INVALID_HANDLE_VALUE;
 #define EVENT_BUFSIZ 256
 Mutex event_buf_mutex;
 StgWord32 event_buf[EVENT_BUFSIZ];
-nat next_event;
+uint32_t next_event;
 
 #endif
 

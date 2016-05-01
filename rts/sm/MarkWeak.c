@@ -89,7 +89,7 @@ static void    tidyThreadList (generation *gen);
 void
 initWeakForGC(void)
 {
-    nat g;
+    uint32_t g;
 
     for (g = 0; g <= N; g++) {
         generation *gen = &generations[g];
@@ -118,7 +118,7 @@ traverseWeakPtrList(void)
        * become garbage, we wake them up and administer an exception.
        */
   {
-      nat g;
+      uint32_t g;
 
       for (g = 0; g <= N; g++) {
           tidyThreadList(&generations[g]);
@@ -156,7 +156,7 @@ traverseWeakPtrList(void)
 
   case WeakPtrs:
   {
-      nat g;
+      uint32_t g;
 
       // resurrecting threads might have made more weak pointers
       // alive, so traverse those lists again:
@@ -365,7 +365,7 @@ static void checkWeakPtrSanity(StgWeak *hd, StgWeak *tl)
 
 void collectFreshWeakPtrs()
 {
-    nat i;
+    uint32_t i;
     generation *gen = &generations[0];
     // move recently allocated weak_ptr_list to the old list as well
     for (i = 0; i < n_capabilities; i++) {
@@ -390,7 +390,7 @@ void collectFreshWeakPtrs()
 void
 markWeakPtrList ( void )
 {
-    nat g;
+    uint32_t g;
 
     for (g = 0; g <= N; g++) {
         generation *gen = &generations[g];

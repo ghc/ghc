@@ -113,7 +113,7 @@ typedef struct IndexTable_ {
     CostCentre *cc;
     CostCentreStack *ccs;
     struct IndexTable_ *next;
-    nat back_edge;
+    uint32_t back_edge;
 } IndexTable;
 
 

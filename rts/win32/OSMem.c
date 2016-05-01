@@ -48,7 +48,7 @@ osMemInit(void)
 
 static
 alloc_rec*
-allocNew(nat n) {
+allocNew(uint32_t n) {
     alloc_rec* rec;
     rec = (alloc_rec*)stgMallocBytes(sizeof(alloc_rec),"getMBlocks: allocNew");
     rec->size = ((W_)n+1)*MBLOCK_SIZE;
@@ -117,7 +117,7 @@ insertFree(char* alloc_base, W_ alloc_size) {
 
 static
 void*
-findFreeBlocks(nat n) {
+findFreeBlocks(uint32_t n) {
     void* ret=0;
     block_rec* it;
     block_rec temp;
@@ -186,7 +186,7 @@ commitBlocks(char* base, W_ size) {
 }
 
 void *
-osGetMBlocks(nat n) {
+osGetMBlocks(uint32_t n) {
     void* ret;
     ret = findFreeBlocks(n);
     if(ret==0) {
@@ -246,7 +246,7 @@ static void decommitBlocks(char *addr, W_ nBytes)
     }
 }
 
-void osFreeMBlocks(char *addr, nat n)
+void osFreeMBlocks(char *addr, uint32_t n)
 {
     W_ nBytes = (W_)n * MBLOCK_SIZE;
 

@@ -82,7 +82,7 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
     StgTSO *t;
     StgMutArrPtrs *arr;
     StgWord size;
-    nat n, i;
+    uint32_t n, i;
     Task *task;
 
     task = myTask();
