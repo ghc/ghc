@@ -1301,7 +1301,7 @@ See section 9.2 (Finding fixpoints) of the paper.
 
 Our basic plan is to initialise the strictness of each Id in a
 recursive group to "bottom", and find a fixpoint from there.  However,
-this group B might be inside an *enclosing* recursiveb group A, in
+this group B might be inside an *enclosing* recursive group A, in
 which case we'll do the entire fixpoint shebang on for each iteration
 of A. This can be illustrated by the following example:
 
@@ -1345,7 +1345,7 @@ which is quite a lie.
 The once-used information is (currently) only used by the code
 generator, though.  So:
 
- * We zap the used-once info in the woker-wrapper;
+ * We zap the used-once info in the worker-wrapper;
    see Note [Zapping Used Once info in WorkWrap] in WorkWrap. If it's
    not reliable, it's better not to have it at all.
 
