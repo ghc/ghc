@@ -2469,16 +2469,50 @@ commonly used commands.
        single: GHCi prompt; setting
 
     Sets the string to be used as the prompt in GHCi. Inside ⟨prompt⟩,
-    the sequence ``%s`` is replaced by the names of the modules
-    currently in scope, ``%l`` is replaced by the line number (as
-    referenced in compiler messages) of the current prompt, and ``%%``
-    is replaced by ``%``. If ⟨prompt⟩ starts with ``"`` then it is parsed as
-    a Haskell String; otherwise it is treated as a literal string.
+    the next sequences are replaced:
+    
+    - ``%s`` by the names of the modules currently in scope.     
+    - ``%l`` by the line number (as referenced in compiler messages) of the
+      current prompt.
+    - ``%d`` by the date in "Weekday Month Date" format (e.g., "Tue May 26") .
+    - ``%t`` by the current time in 24-hour HH:MM:SS format.
+    - ``%T`` by the current time in 12-hour HH:MM:SS format. 
+    - ``%@`` by the current time in 12-hour am/pm format. 
+    - ``%A`` by the current time in 24-hour HH:MM format. 
+    - ``%u`` by the username of the current user. 
+    - ``%w`` by the current working directory.
+    - ``%o`` by the operating system.
+    - ``%a`` by the machine architecture. 
+    - ``%N`` by the compiler name.
+    - ``%V`` by the compiler version.
+    - ``%call(cmd [args])`` by the result of calling ``cmd args``.     
+    - ``%%`` by ``%``. 
 
-.. ghci-cmd:: :set prompt2; ⟨prompt⟩
+    If ⟨prompt⟩ starts with ``"`` then it is parsed as a Haskell String;
+    otherwise it is treated as a literal string.
+
+.. ghci-cmd:: :set prompt-cont; ⟨prompt⟩
 
     Sets the string to be used as the continuation prompt (used when
     using the :ghci-cmd:`:{` command) in GHCi.
+
+.. ghci-cmd:: :set prompt-function; <prompt-function>
+
+    .. index::
+       single: GHCi prompt function; setting
+
+    Sets the function to be used for the prompt displaying in GHCi. The 
+    function should be of the type ``[String] -> Int -> IO String``. This 
+    function is called each time the prompt is being made. The first argument
+    stands for the names of the modules currently in scope(the name of the 
+    "topmost" module  will begin with a ``*``; see  :ref:`ghci-scope` for 
+    more information). The second arguments is the line number (as referenced
+    in compiler  messages) of the current prompt.
+
+.. ghci-cmd:: :set prompt-cont-function; <prompt-function>
+
+   Sets the function to be used for the continuation prompt (used when
+   using the :ghci-cmd:`:{` command) displaying in GHCi.
 
 .. ghci-cmd:: :set stop; ⟨num⟩ ⟨cmd⟩
 

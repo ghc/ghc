@@ -15,6 +15,7 @@ module GHCi.UI.Monad (
         GHCiState(..), setGHCiState, getGHCiState, modifyGHCiState,
         GHCiOption(..), isOptionSet, setOption, unsetOption,
         Command(..),
+        PromptFunction,
         BreakLocation(..),
         TickArray,
         getDynFlags,
@@ -67,8 +68,8 @@ data GHCiState = GHCiState
         progname       :: String,
         args           :: [String],
         evalWrapper    :: ForeignHValue, -- ^ of type @IO a -> IO a@
-        prompt         :: String,
-        prompt2        :: String,
+        prompt         :: PromptFunction,
+        prompt_cont    :: PromptFunction,
         editor         :: String,
         stop           :: String,
         options        :: [GHCiOption],
@@ -136,6 +137,10 @@ data Command
    , cmdCompletionFunc :: CompletionFunc GHCi
      -- ^ 'CompletionFunc' for arguments
    }
+
+type PromptFunction = [String]
+                   -> Int
+                   -> GHCi SDoc
 
 data GHCiOption
         = ShowTiming            -- show time/allocs after evaluation
