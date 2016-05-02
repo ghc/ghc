@@ -8,8 +8,7 @@
 {-# LANGUAGE CPP, FlexibleInstances, TypeSynonymInstances, RecordWildCards #-}
 
 module Demand (
-        StrDmd, UseDmd(..), Count(..),
-        countOnce, countMany,   -- cardinality
+        StrDmd, UseDmd(..), Count,
 
         Demand, CleanDemand, getStrDmd, getUseDmd,
         mkProdDmd, mkOnceUsedDmd, mkManyUsedDmd, mkHeadStrict, oneifyDmd,
@@ -377,11 +376,6 @@ instance Outputable UseDmd where
 instance Outputable Count where
   ppr One  = char '1'
   ppr Many = text ""
-
--- Well-formedness preserving constructors for the Absence domain
-countOnce, countMany :: Count
-countOnce = One
-countMany = Many
 
 useBot, useTop :: ArgUse
 useBot     = Abs
