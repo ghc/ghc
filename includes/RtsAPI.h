@@ -90,7 +90,7 @@ typedef struct {
     void (* outOfHeapHook) (W_ request_size, W_ heap_size);
 
     // Called when malloc() fails, before exiting
-    void (* mallocFailHook) (W_ request_size /* in bytes */, char *msg);
+    void (* mallocFailHook) (W_ request_size /* in bytes */, const char *msg);
 
     // Called for every GC
     void (* gcDoneHook) (unsigned int gen,
