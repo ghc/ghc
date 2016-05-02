@@ -46,7 +46,7 @@ customBuild rs opts target@Target {..} = do
     -- The line below forces the rule to be rerun if the args hash has changed
     checkArgsHash target
     withResources rs $ do
-        unless verbose $ putInfo target
+        putInfo target
         quietlyUnlessVerbose $ case builder of
             Ar -> do
                 output <- interpret target getOutput
@@ -59,6 +59,7 @@ customBuild rs opts target@Target {..} = do
 
             Configure dir -> do
                 need [dir -/- "configure"]
+                -- Inject /bin/bash into `libtool`, instead of /bin/sh
                 let env = AddEnv "CONFIG_SHELL" "/bin/bash"
                 cmd Shell (EchoStdout False) [Cwd dir] [path] (env:opts) argList
 

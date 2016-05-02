@@ -81,7 +81,7 @@ buildHaddock = return cmdBuildHaddock
 -- this is a Predicate, hence you can enable verbose output for a chosen package
 -- only, e.g.: verboseCommands = package ghcPrim
 verboseCommands :: Predicate
-verboseCommands = builder Configure
+verboseCommands = return False
 
 -- TODO: Replace with stage2 ? arg "-Werror"?
 -- | To enable -Werror in Stage2 set turnWarningsIntoErrors = stage2.
