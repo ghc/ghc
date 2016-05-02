@@ -103,8 +103,7 @@ gmpRules = do
 
             copyFile (libPath -/- "gmp.h") gmpLibraryInTreeH
             copyFile (libPath -/- "gmp.h") gmpLibraryH
-            -- TODO: why copy library, can we move it instead?
-            copyFile (libPath -/- ".libs/libgmp.a") gmpLibrary
+            moveFile (libPath -/- ".libs/libgmp.a") gmpLibrary
 
             createDirectory gmpObjects
             build $ Target gmpContext Ar [gmpLibrary] [gmpObjects]

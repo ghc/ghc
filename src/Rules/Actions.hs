@@ -1,7 +1,8 @@
 module Rules.Actions (
-    build, buildWithResources, buildWithCmdOptions, copyFile, createDirectory,
-    removeDirectory, copyDirectory, moveDirectory, applyPatch, fixFile, runMake,
-    runMakeVerbose, renderLibrary, renderProgram, runBuilder, makeExecutable
+    build, buildWithResources, buildWithCmdOptions, copyFile, moveFile,
+    createDirectory, removeDirectory, copyDirectory, moveDirectory,
+    applyPatch, fixFile, runMake, runMakeVerbose, renderLibrary, renderProgram,
+    runBuilder, makeExecutable
     ) where
 
 import qualified System.Directory       as IO
@@ -86,6 +87,12 @@ copyFile source target = do
     need [source] -- Guarantee source is built before printing progress info.
     putProgressInfo $ renderAction "Copy file" source target
     copyFileChanged source target
+
+-- Note, moveFile cannot track the source, because it is moved.
+moveFile :: FilePath -> FilePath -> Action ()
+moveFile source target = do
+    putProgressInfo $ renderAction "Move file" source target
+    liftIO $ IO.renameFile source target
 
 createDirectory :: FilePath -> Action ()
 createDirectory dir = do
