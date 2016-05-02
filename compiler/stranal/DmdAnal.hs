@@ -510,7 +510,7 @@ dmdFix top_lvl env orig_pairs
           = ((env', lazy_fv'), (id', rhs'))
           where
             (sig, lazy_fv1, id', rhs') = dmdAnalRhs top_lvl (Just bndrs) env id rhs
-            lazy_fv'                   = plusVarEnv_C bothDmd lazy_fv lazy_fv1
+            lazy_fv'                   = plusVarEnv_C (bothDmd "fix") lazy_fv lazy_fv1
             env'                       = extendAnalEnv top_lvl env id sig
 
     same_sig sigs sigs' var = lookup sigs var == lookup sigs' var
@@ -528,7 +528,7 @@ dmdAnalRhs :: TopLevelFlag
 dmdAnalRhs top_lvl rec_flag env id rhs
   | Just fn <- unpackTrivial rhs   -- See Note [Demand analysis for trivial right-hand sides]
   , let fn_str = getStrictness env fn
-        fn_fv | isLocalId fn = unitVarEnv fn topDmd
+        fn_fv | isLocalId fn = unitVarEnv fn (boringTopDmd "fn_fv")
               | otherwise    = emptyDmdEnv
         -- Note [Remember to demand the function itself]
         -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -560,7 +560,7 @@ dmdAnalRhs top_lvl rec_flag env id rhs
     -- See Note [Lazy and unleashable free variables]
     -- See Note [Aggregated demand for cardinality]
     rhs_fv1 = case rec_flag of
-                Just bs -> reuseEnv (delVarEnvList rhs_fv bs)
+                Just bs -> reuseEnv "fix" (delVarEnvList rhs_fv bs)
                 Nothing -> rhs_fv
 
     (lazy_fv, sig_fv) = splitFVs is_thunk rhs_fv1
@@ -641,12 +641,12 @@ unitDmdType :: DmdEnv -> DmdType
 unitDmdType dmd_env = DmdType dmd_env [] topRes
 
 coercionDmdEnv :: Coercion -> DmdEnv
-coercionDmdEnv co = mapVarEnv (const topDmd) (coVarsOfCo co)
+coercionDmdEnv co = mapVarEnv (const (boringTopDmd "coercion")) (coVarsOfCo co)
                     -- The VarSet from coVarsOfCo is really a VarEnv Var
 
 addVarDmd :: DmdType -> Var -> Demand -> DmdType
 addVarDmd (DmdType fv ds res) var dmd
-  = DmdType (extendVarEnv_C bothDmd fv var dmd) ds res
+  = DmdType (extendVarEnv_C (bothDmd "dmdTransformFix") fv var dmd) ds res
 
 addLazyFVs :: DmdType -> DmdEnv -> DmdType
 addLazyFVs dmd_ty lazy_fvs
@@ -1057,7 +1057,7 @@ addDataConStrictness con ds
   where
     strs = dataConRepStrictness con
     add dmd str | isMarkedStrict str
-                , not (isAbsDmd dmd) = dmd `bothDmd` seqDmd
+                , not (isAbsDmd dmd) = bothDmd "strdatacon" dmd seqDmd
                 | otherwise          = dmd
 
 findBndrsDmds :: AnalEnv -> DmdType -> [Var] -> (DmdType, [Demand])

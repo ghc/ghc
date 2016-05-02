@@ -291,7 +291,7 @@ mkRhsClosure    dflags bndr _cc _bi
     -- will evaluate to.
     --
     -- srt is discarded; it must be empty
-    let lf_info = mkSelectorLFInfo bndr offset_into_int (isUpdatable upd_flag)
+    let lf_info = mkSelectorLFInfo bndr offset_into_int (isUpdatable upd_flag) (isBoring upd_flag)
     in cgRhsStdThunk bndr lf_info [StgVarArg the_fv]
 
 ---------- Note [Ap thunks] ------------------
@@ -411,7 +411,10 @@ cgRhsStdThunk bndr lf_info payload
        }
  where
  gen_code reg  -- AHA!  A STANDARD-FORM THUNK
-  = withNewTickyCounterStdThunk (lfUpdatable lf_info) (idName bndr) $
+  = withNewTickyCounterStdThunk
+        (lfUpdatable lf_info)
+        (lfBoring lf_info)
+        (idName bndr) $
     do
   {     -- LAY OUT THE OBJECT
     mod_name <- getModuleName
@@ -488,6 +491,7 @@ closureCodeBody top_lvl bndr cl_info cc _args arity body fv_details _entry_ctr_o
   = withNewTickyCounterThunk
         (isStaticClosure cl_info)
         (closureUpdReqd cl_info)
+        (closureBoring cl_info)
         (closureName cl_info) $
     emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl [] $
       \(_, node, _) -> thunkCode cl_info fv_details cc node arity body

@@ -392,7 +392,7 @@ cpeBind top_lvl env (NonRec bndr rhs)
 cpeBind top_lvl env (Rec pairs)
   = do { let (bndrs,rhss) = unzip pairs
        ; (env', bndrs1) <- cpCloneBndrs env (map fst pairs)
-       ; stuff <- zipWithM (cpePair top_lvl Recursive topDmd False env') bndrs1 rhss
+       ; stuff <- zipWithM (cpePair top_lvl Recursive (boringTopDmd "cpe") False env') bndrs1 rhss
 
        ; let (floats_s, bndrs2, rhss2) = unzip3 stuff
              all_pairs = foldrOL add_float (bndrs2 `zip` rhss2)
@@ -424,7 +424,7 @@ cpePair top_lvl is_rec dmd is_unlifted env bndr rhs
                else WARN(True, text "CorePrep: silly extra arguments:" <+> ppr bndr)
                                -- Note [Silly extra arguments]
                     (do { v <- newVar (idType bndr)
-                        ; let float = mkFloat topDmd False v rhs2
+                        ; let float = mkFloat (boringTopDmd "cpe") False v rhs2
                         ; return ( addFloat floats2 float
                                  , cpeEtaExpand arity (Var v)) })
 
@@ -713,9 +713,9 @@ cpeApp env expr
       = do { (fun',hd,fun_ty,floats,ss) <- collect_args fun (depth+1)
            ; let (ss1, ss_rest)  -- See Note [lazyId magic] in MkId
                     = case (ss, isLazyExpr arg) of
-                        (_   : ss_rest, True)  -> (topDmd, ss_rest)
+                        (_   : ss_rest, True)  -> ((boringTopDmd "cpe"), ss_rest)
                         (ss1 : ss_rest, False) -> (ss1,    ss_rest)
-                        ([],            _)     -> (topDmd, [])
+                        ([],            _)     -> ((boringTopDmd "cpe"), [])
                  (arg_ty, res_ty) = expectJust "cpeBody:collect_args" $
                                     splitFunTy_maybe fun_ty
 

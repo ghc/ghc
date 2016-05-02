@@ -151,6 +151,7 @@ data TickyClosureType
     | TickyCon
     | TickyThunk
         Bool -- True <-> updateable
+        [String] -- Why updateable?
         Bool -- True <-> standard thunk (AP or selector), has no entry counter
     | TickyLNE
 
@@ -165,25 +166,27 @@ withNewTickyCounterLNE nm args code = do
 withNewTickyCounterThunk
   :: Bool -- ^ static
   -> Bool -- ^ updateable
+  -> [String] -- ^ manyReasons
   -> Name
   -> FCode a
   -> FCode a
-withNewTickyCounterThunk isStatic isUpdatable name code = do
+withNewTickyCounterThunk isStatic isUpdatable isBoring name code = do
     b <- tickyDynThunkIsOn
     if isStatic || not b -- ignore static thunks
       then code
-      else withNewTickyCounter (TickyThunk isUpdatable False) name [] code
+      else withNewTickyCounter (TickyThunk isUpdatable isBoring False) name [] code
 
 withNewTickyCounterStdThunk
   :: Bool -- ^ updateable
+  -> [String] -- ^ manyReasons
   -> Name
   -> FCode a
   -> FCode a
-withNewTickyCounterStdThunk isUpdatable name code = do
+withNewTickyCounterStdThunk isUpdatable isBoring name code = do
     b <- tickyDynThunkIsOn
     if not b
       then code
-      else withNewTickyCounter (TickyThunk isUpdatable True) name [] code
+      else withNewTickyCounter (TickyThunk isUpdatable isBoring True) name [] code
 
 withNewTickyCounterCon
   :: Name
@@ -219,10 +222,14 @@ emitTickyCounter cloType name args
                 let n = ppr name
                     ext = case cloType of
                               TickyFun single_entry -> parens $ hcat $ punctuate comma $
-                                  [text "fun"] ++ [text "se"|single_entry]
+                                  [text "fun"] ++
+                                  [text "se"|single_entry]
                               TickyCon -> parens (text "con")
-                              TickyThunk upd std -> parens $ hcat $ punctuate comma $
-                                  [text "thk"] ++ [text "se"|not upd] ++ [text "std"|std]
+                              TickyThunk upd mr std -> parens $ hcat $ punctuate comma $
+                                  [text "thk"] ++
+                                  [text "se"|not upd] ++
+                                  (if null mr then [] else [ parens $ hcat $ punctuate comma $ map text mr]) ++
+                                  [text "std"|std]
                               TickyLNE | isInternalName name -> parens (text "LNE")
                                        | otherwise -> panic "emitTickyCounter: how is this an external LNE?"
                     p = case hasHaskellName parent of

@@ -24,7 +24,7 @@ module StgCmmClosure (
         mkLFThunk, mkLFReEntrant, mkConLFInfo, mkSelectorLFInfo,
         mkApLFInfo, mkLFImported, mkLFArgument, mkLFLetNoEscape,
         lfDynTag,
-        maybeIsLFCon, isLFThunk, isLFReEntrant, lfUpdatable,
+        maybeIsLFCon, isLFThunk, isLFReEntrant, lfUpdatable, lfBoring,
 
         -- * Used by other modules
         CgLoc(..), SelfLoopInfo, CallMethod(..),
@@ -45,7 +45,7 @@ module StgCmmClosure (
 
         -- ** Predicates
         -- These are really just functions on LambdaFormInfo
-        closureUpdReqd, closureSingleEntry,
+        closureUpdReqd, closureBoring, closureSingleEntry,
         closureReEntrant, closureFunInfo,
         isToplevClosure,
 
@@ -157,6 +157,7 @@ data LambdaFormInfo
         TopLevelFlag
         !Bool           -- True <=> no free vars
         !Bool           -- True <=> updatable (i.e., *not* single-entry)
+        [String]        -- [] <=> boring
         StandardFormInfo
         !Bool           -- True <=> *might* be a function type
 
@@ -241,6 +242,7 @@ mkLFThunk thunk_ty top fvs upd_flag
   = ASSERT( not (isUpdatable upd_flag) || not (isUnliftedType thunk_ty) )
     LFThunk top (null fvs)
             (isUpdatable upd_flag)
+            (isBoring upd_flag)
             NonStandardThunk
             (might_be_a_function thunk_ty)
 
@@ -261,15 +263,15 @@ mkConLFInfo :: DataCon -> LambdaFormInfo
 mkConLFInfo con = LFCon con
 
 -------------
-mkSelectorLFInfo :: Id -> Int -> Bool -> LambdaFormInfo
-mkSelectorLFInfo id offset updatable
-  = LFThunk NotTopLevel False updatable (SelectorThunk offset)
+mkSelectorLFInfo :: Id -> Int -> Bool -> [String] -> LambdaFormInfo
+mkSelectorLFInfo id offset updatable boring
+  = LFThunk NotTopLevel False updatable boring (SelectorThunk offset)
         (might_be_a_function (idType id))
 
 -------------
 mkApLFInfo :: Id -> UpdateFlag -> Arity -> LambdaFormInfo
 mkApLFInfo id upd_flag arity
-  = LFThunk NotTopLevel (arity == 0) (isUpdatable upd_flag) (ApThunk arity)
+  = LFThunk NotTopLevel (arity == 0) (isUpdatable upd_flag) (isBoring upd_flag) (ApThunk arity)
         (might_be_a_function (idType id))
 
 -------------
@@ -366,7 +368,7 @@ lfClosureType :: LambdaFormInfo -> ClosureTypeInfo
 lfClosureType (LFReEntrant _ _ arity _ argd) = Fun arity argd
 lfClosureType (LFCon con)                    = Constr (dataConTagZ con)
                                                     (dataConIdentity con)
-lfClosureType (LFThunk _ _ _ is_sel _)       = thunkClosureType is_sel
+lfClosureType (LFThunk _ _ _ _ is_sel _)     = thunkClosureType is_sel
 lfClosureType _                              = panic "lfClosureType"
 
 thunkClosureType :: StandardFormInfo -> ClosureTypeInfo
@@ -394,7 +396,7 @@ nodeMustPointToIt _ (LFReEntrant top _ _ no_fvs _)
         -- non-inherited (i.e. non-top-level) function.
         -- The isNotTopLevel test above ensures this is ok.
 
-nodeMustPointToIt dflags (LFThunk top no_fvs updatable NonStandardThunk _)
+nodeMustPointToIt dflags (LFThunk top no_fvs updatable _boring NonStandardThunk _)
   =  not no_fvs            -- Self parameter
   || isNotTopLevel top     -- Note [GC recovery]
   || updatable             -- Need to push update frame
@@ -537,7 +539,7 @@ getCallMethod _ _name _ (LFCon _) n_args _v_args _cg_loc _self_loop_info
     -- n_args=0 because it'd be ill-typed to apply a saturated
     --          constructor application to anything
 
-getCallMethod dflags name id (LFThunk _ _ updatable std_form_info is_fun)
+getCallMethod dflags name id (LFThunk _ _ updatable _ std_form_info is_fun)
               n_args _v_args _cg_loc _self_loop_info
   | is_fun      -- it *might* be a function, so we must "call" it (which is always safe)
   = SlowCall    -- We cannot just enter it [in eval/apply, the entry code
@@ -768,7 +770,7 @@ blackHoleOnEntry cl_info
   = case closureLFInfo cl_info of
       LFReEntrant {}            -> False
       LFLetNoEscape             -> False
-      LFThunk _ _no_fvs upd _ _ -> upd   -- See Note [Black-holing non-updatable thunks]
+      LFThunk _ _no_fvs upd _ _ _ -> upd   -- See Note [Black-holing non-updatable thunks]
       _other -> panic "blackHoleOnEntry"
 
 {- Note [Black-holing non-updatable thunks]
@@ -844,12 +846,19 @@ isStaticClosure cl_info = isStaticRep (closureSMRep cl_info)
 closureUpdReqd :: ClosureInfo -> Bool
 closureUpdReqd ClosureInfo{ closureLFInfo = lf_info } = lfUpdatable lf_info
 
+closureBoring :: ClosureInfo -> [String]
+closureBoring ClosureInfo{ closureLFInfo = lf_info } = lfBoring lf_info
+
 lfUpdatable :: LambdaFormInfo -> Bool
-lfUpdatable (LFThunk _ _ upd _ _)  = upd
+lfUpdatable (LFThunk _ _ upd _ _ _)  = upd
 lfUpdatable _ = False
 
+lfBoring :: LambdaFormInfo -> [String]
+lfBoring (LFThunk _ _ _ bor _ _)  = bor
+lfBoring _ = []
+
 closureSingleEntry :: ClosureInfo -> Bool
-closureSingleEntry (ClosureInfo { closureLFInfo = LFThunk _ _ upd _ _}) = not upd
+closureSingleEntry (ClosureInfo { closureLFInfo = LFThunk _ _ upd _ _ _}) = not upd
 closureSingleEntry (ClosureInfo { closureLFInfo = LFReEntrant _ OneShotLam _ _ _}) = True
 closureSingleEntry _ = False
 
@@ -872,7 +881,7 @@ isToplevClosure :: ClosureInfo -> Bool
 isToplevClosure (ClosureInfo { closureLFInfo = lf_info })
   = case lf_info of
       LFReEntrant TopLevel _ _ _ _ -> True
-      LFThunk TopLevel _ _ _ _     -> True
+      LFThunk TopLevel _ _ _ _ _   -> True
       _other                       -> False
 
 --------------------------------------
@@ -893,10 +902,10 @@ closureLocalEntryLabel dflags
 mkClosureInfoTableLabel :: Id -> LambdaFormInfo -> CLabel
 mkClosureInfoTableLabel id lf_info
   = case lf_info of
-        LFThunk _ _ upd_flag (SelectorThunk offset) _
+        LFThunk _ _ upd_flag _ (SelectorThunk offset) _
                       -> mkSelectorInfoLabel upd_flag offset
 
-        LFThunk _ _ upd_flag (ApThunk arity) _
+        LFThunk _ _ upd_flag _ (ApThunk arity) _
                       -> mkApInfoTableLabel upd_flag arity
 
         LFThunk{}     -> std_mk_lbl name cafs

@@ -270,7 +270,7 @@ vanillaIdInfo
             oneShotInfo         = NoOneShotInfo,
             inlinePragInfo      = defaultInlinePragma,
             occInfo             = NoOccInfo,
-            demandInfo          = topDmd,
+            demandInfo          = boringTopDmd "vanilla",
             strictnessInfo      = nopSig,
             callArityInfo     = unknownArity
            }
@@ -453,7 +453,7 @@ zapLamInfo info@(IdInfo {occInfo = occ, demandInfo = demand})
   | is_safe_occ occ && is_safe_dmd demand
   = Nothing
   | otherwise
-  = Just (info {occInfo = safe_occ, demandInfo = topDmd})
+  = Just (info {occInfo = safe_occ, demandInfo = boringTopDmd "zap"})
   where
         -- The "unsafe" occ info is the ones that say I'm not in a lambda
         -- because that might not be true for an unsaturated lambda
@@ -468,7 +468,7 @@ zapLamInfo info@(IdInfo {occInfo = occ, demandInfo = demand})
 
 -- | Remove all demand info on the 'IdInfo'
 zapDemandInfo :: IdInfo -> Maybe IdInfo
-zapDemandInfo info = Just (info {demandInfo = topDmd})
+zapDemandInfo info = Just (info {demandInfo = boringTopDmd "zap"})
 
 -- | Remove usage (but not strictness) info on the 'IdInfo'
 zapUsageInfo :: IdInfo -> Maybe IdInfo

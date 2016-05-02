@@ -13,7 +13,7 @@ module Demand (
         Demand, CleanDemand, getStrDmd, getUseDmd,
         mkProdDmd, mkOnceUsedDmd, mkManyUsedDmd, mkHeadStrict, oneifyDmd,
         toCleanDmd,
-        absDmd, topDmd, botDmd, seqDmd,
+        absDmd, topDmd, boringTopDmd, botDmd, seqDmd,
         lubDmd, bothDmd,
         lazyApply1Dmd, lazyApply2Dmd, strictApply1Dmd,
         catchArgDmd,
@@ -50,7 +50,7 @@ module Demand (
         argOneShots, argsOneShots, saturatedByOneShots,
         trimToType, TypeShape(..),
 
-        useCount, isUsedOnce, reuseEnv,
+        useCount, isUsedOnce, isBoringDemand, reuseEnv,
         killUsageDemand, killUsageSig, zapUsageDemand, zapUsageEnvSig,
         zapUsedOnceDemand, zapUsedOnceSig,
         strictifyDictDmd
@@ -58,6 +58,8 @@ module Demand (
      ) where
 
 #include "HsVersions.h"
+
+import Data.List (nub, sort)
 
 import DynFlags
 import Outputable
@@ -357,15 +359,25 @@ data Use u
   | Use Count u     -- May be used with some cardinality
   deriving ( Eq, Show )
 
+-- Lets be lazy here and use strings, instead of a proper data type
+type ManyReasons = [String]
+
+normManyReasons :: ManyReasons -> ManyReasons
+normManyReasons = nub . sort
+
+lubManyReasons :: ManyReasons -> ManyReasons -> ManyReasons
+lubManyReasons mr1 mr2 = normManyReasons $ mr1 ++ mr2
+
 -- Abstract counting of usages
-data Count = One | Many
+-- Bool argument: True <=> Many for a good reason
+data Count = One | Many ManyReasons
   deriving ( Eq, Show )
 
 -- Pretty-printing
 instance Outputable ArgUse where
-  ppr Abs           = char 'A'
-  ppr (Use Many a)   = ppr a
-  ppr (Use One  a)   = char '1' <> char '*' <> ppr a
+  ppr Abs              = char 'A'
+  ppr (Use (Many _) a) = ppr a
+  ppr (Use One  a)     = char '1' <> char '*' <> ppr a
 
 instance Outputable UseDmd where
   ppr Used           = char 'U'
@@ -375,11 +387,11 @@ instance Outputable UseDmd where
 
 instance Outputable Count where
   ppr One  = char '1'
-  ppr Many = text ""
+  ppr (Many _) = text ""
 
 useBot, useTop :: ArgUse
 useBot     = Abs
-useTop     = Use Many Used
+useTop     = Use (Many ["top"]) Used
 
 mkUCall :: Count -> UseDmd -> UseDmd
 --mkUCall c Used = Used c
@@ -391,8 +403,9 @@ mkUProd ux
   | otherwise          = UProd ux
 
 lubCount :: Count -> Count -> Count
-lubCount _ Many = Many
-lubCount Many _ = Many
+lubCount (Many r1) (Many r2) = Many (r1 `lubManyReasons` r2)
+lubCount _ (Many r) = Many r
+lubCount (Many r) _ = Many r
 lubCount x _    = x
 
 lubArgUse :: ArgUse -> ArgUse -> ArgUse
@@ -420,30 +433,35 @@ lubUse Used _                      = Used  -- Note [Used should win]
 --  cardinality `Many` (except for the inner demands of UCall demand -- [TODO] explain).
 --  Also,  x `bothUse` x /= x (for anything but Abs).
 
-bothArgUse :: ArgUse -> ArgUse -> ArgUse
-bothArgUse Abs x                   = x
-bothArgUse x Abs                   = x
-bothArgUse (Use _ a1) (Use _ a2)   = Use Many (bothUse a1 a2)
+bothCount :: String -> Count -> Count -> Count
+bothCount r One One = Many [r]
+bothCount r One (Many mr) = Many  (mr `lubManyReasons` [r])
+bothCount r (Many mr) One = Many  (mr `lubManyReasons` [r])
+bothCount r (Many mr1) (Many mr2) = Many  (mr1 `lubManyReasons` mr2 `lubManyReasons` [r])
 
+bothArgUse :: String -> ArgUse -> ArgUse -> ArgUse
+bothArgUse _ Abs x                    = x
+bothArgUse _ x Abs                    = x
+bothArgUse r (Use c1 a1) (Use c2 a2)  = Use (bothCount r c1 c2) (bothUse r a1 a2)
 
-bothUse :: UseDmd -> UseDmd -> UseDmd
-bothUse UHead       u               = u
-bothUse (UCall c u) UHead           = UCall c u
+bothUse :: String -> UseDmd -> UseDmd -> UseDmd
+bothUse _ UHead       u               = u
+bothUse _ (UCall c u) UHead           = UCall c u
 
 -- Exciting special treatment of inner demand for call demands:
 --    use `lubUse` instead of `bothUse`!
-bothUse (UCall _ u1) (UCall _ u2)   = UCall Many (u1 `lubUse` u2)
+bothUse r (UCall _ u1) (UCall _ u2)   = UCall (Many [r]) (u1 `lubUse` u2)
 
-bothUse (UCall {}) _                = Used
-bothUse (UProd ux) UHead            = UProd ux
-bothUse (UProd ux1) (UProd ux2)
-      | length ux1 == length ux2    = UProd $ zipWith bothArgUse ux1 ux2
+bothUse _ (UCall {}) _                = Used
+bothUse _ (UProd ux) UHead            = UProd ux
+bothUse r (UProd ux1) (UProd ux2)
+      | length ux1 == length ux2    = UProd $ zipWith (bothArgUse r) ux1 ux2
       | otherwise                   = Used
-bothUse (UProd {}) (UCall {})       = Used
+bothUse _ (UProd {}) (UCall {})       = Used
 -- bothUse (UProd {}) Used             = Used  -- Note [Used should win]
-bothUse Used (UProd ux)             = UProd (map (`bothArgUse` useTop) ux)
-bothUse (UProd ux) Used             = UProd (map (`bothArgUse` useTop) ux)
-bothUse Used _                      = Used  -- Note [Used should win]
+bothUse r Used (UProd ux)             = UProd (map (\x -> bothArgUse r x useTop) ux)
+bothUse r (UProd ux) Used             = UProd (map (\x -> bothArgUse r x useTop) ux)
+bothUse _ Used _                      = Used  -- Note [Used should win]
 
 peelUseCall :: UseDmd -> Maybe (Count, UseDmd)
 peelUseCall (UCall c u)   = Just (c,u)
@@ -456,7 +474,7 @@ addCaseBndrDmd :: Demand    -- On the case binder
 addCaseBndrDmd (JD { sd = ms, ud = mu }) alt_dmds
   = case mu of
      Abs     -> alt_dmds
-     Use _ u -> zipWith bothDmd alt_dmds (mkJointDmds ss us)
+     Use _ u -> zipWith (bothDmd "caseBndr") alt_dmds (mkJointDmds ss us)
              where
                 Just ss = splitArgStrProdDmd arity ms  -- Guaranteed not to be a call
                 Just us = splitUseProdDmd      arity u   -- Ditto
@@ -542,20 +560,24 @@ Compare with: (C) making Used win for both, but UProd win for lub
 
 -- If a demand is used multiple times (i.e. reused), than any use-once
 -- mentioned there, that is not protected by a UCall, can happen many times.
-markReusedDmd :: ArgUse -> ArgUse
-markReusedDmd Abs         = Abs
-markReusedDmd (Use _ a)   = Use Many (markReused a)
+markReusedDmd :: ManyReasons -> ArgUse -> ArgUse
+markReusedDmd _ Abs         = Abs
+markReusedDmd r (Use c a)   = Use (addReason r c) (markReused r a)
 
-markReused :: UseDmd -> UseDmd
-markReused (UCall _ u)      = UCall Many u   -- No need to recurse here
-markReused (UProd ux)       = UProd (map markReusedDmd ux)
-markReused u                = u
+addReason :: ManyReasons -> Count -> Count
+addReason r One = Many r
+addReason r (Many mr) = Many (mr `lubManyReasons` r)
+
+markReused :: ManyReasons -> UseDmd -> UseDmd
+markReused r (UCall c u)      = UCall (addReason r c) u   -- No need to recurse here
+markReused r (UProd ux)       = UProd (map (markReusedDmd r) ux)
+markReused _ u                = u
 
 isUsedMU :: ArgUse -> Bool
 -- True <=> markReusedDmd d = d
 isUsedMU Abs          = True
 isUsedMU (Use One _)  = False
-isUsedMU (Use Many u) = isUsedU u
+isUsedMU (Use (Many _) u) = isUsedU u
 
 isUsedU :: UseDmd -> Bool
 -- True <=> markReused d = d
@@ -563,7 +585,7 @@ isUsedU Used           = True
 isUsedU UHead          = True
 isUsedU (UProd us)     = all isUsedMU us
 isUsedU (UCall One _)  = False
-isUsedU (UCall Many _) = True  -- No need to recurse
+isUsedU (UCall (Many _) _) = True  -- No need to recurse
 
 -- Squashing usage demand demands
 seqUseDmd :: UseDmd -> ()
@@ -581,7 +603,7 @@ seqArgUse _          = ()
 
 -- Splitting polymorphic Maybe-Used demands
 splitUseProdDmd :: Int -> UseDmd -> Maybe [ArgUse]
-splitUseProdDmd n Used        = Just (replicate n useTop)
+splitUseProdDmd n Used        = Just (replicate n (Use (Many ["splitUse"]) Used))
 splitUseProdDmd n UHead       = Just (replicate n Abs)
 splitUseProdDmd n (UProd ds)  = ASSERT2( ds `lengthIs` n, text "splitUseProdDmd" $$ ppr n $$ ppr ds )
                                 Just ds
@@ -590,9 +612,8 @@ splitUseProdDmd _ (UCall _ _) = Nothing
       -- and we don't then want to crash the compiler (Trac #9208)
 
 useCount :: Use u -> Count
-useCount Abs         = One
-useCount (Use One _) = One
-useCount _           = Many
+useCount Abs       = One
+useCount (Use c _) = c
 
 
 {-
@@ -641,18 +662,19 @@ type CleanDemand = JointDmd StrDmd UseDmd
 
 bothCleanDmd :: CleanDemand -> CleanDemand -> CleanDemand
 bothCleanDmd (JD { sd = s1, ud = a1}) (JD { sd = s2, ud = a2})
-  = JD { sd = s1 `bothStr` s2, ud = a1 `bothUse` a2 }
+  = JD { sd = s1 `bothStr` s2, ud = a1 `bothUse'` a2 }
+  where bothUse' = bothUse "bothCleanDmd"
 
 mkHeadStrict :: CleanDemand -> CleanDemand
 mkHeadStrict cd = cd { sd = HeadStr }
 
 mkOnceUsedDmd, mkManyUsedDmd :: CleanDemand -> Demand
 mkOnceUsedDmd (JD {sd = s,ud = a}) = JD { sd = Str VanStr s, ud = Use One a }
-mkManyUsedDmd (JD {sd = s,ud = a}) = JD { sd = Str VanStr s, ud = Use Many a }
+mkManyUsedDmd (JD {sd = s,ud = a}) = JD { sd = Str VanStr s, ud = Use (Many ["mkManyUsedDmd"]) a }
 
 evalDmd :: Demand
 -- Evaluated strictly, and used arbitrarily deeply
-evalDmd = JD { sd = Str VanStr HeadStr, ud = useTop }
+evalDmd = JD { sd = Str VanStr HeadStr, ud = Use (Many ["evalDmd"]) Used }
 
 mkProdDmd :: [Demand] -> CleanDemand
 mkProdDmd dx
@@ -673,7 +695,7 @@ cleanEvalDmd :: CleanDemand
 cleanEvalDmd = JD { sd = HeadStr, ud = Used }
 
 cleanEvalProdDmd :: Arity -> CleanDemand
-cleanEvalProdDmd n = JD { sd = HeadStr, ud = UProd (replicate n useTop) }
+cleanEvalProdDmd n = JD { sd = HeadStr, ud = UProd (replicate n (Use (Many ["cleanEval"]) Used)) }
 
 
 {-
@@ -691,15 +713,16 @@ lubDmd (JD {sd = s1, ud = a1}) (JD {sd = s2, ud = a2})
  = JD { sd = s1 `lubArgStr` s2
       , ud = a1 `lubArgUse` a2 }
 
-bothDmd :: Demand -> Demand -> Demand
-bothDmd (JD {sd = s1, ud = a1}) (JD {sd = s2, ud = a2})
+bothDmd :: String -> Demand -> Demand -> Demand
+bothDmd r (JD {sd = s1, ud = a1}) (JD {sd = s2, ud = a2})
  = JD { sd = s1 `bothArgStr` s2
-      , ud = a1 `bothArgUse` a2 }
+      , ud = a1 `bothArgUse'` a2 }
+  where bothArgUse' = bothArgUse r
 
 lazyApply1Dmd, lazyApply2Dmd, strictApply1Dmd, catchArgDmd :: Demand
 
 strictApply1Dmd = JD { sd = Str VanStr (SCall HeadStr)
-                     , ud = Use Many (UCall One Used) }
+                     , ud = Use (Many ["strictApply1Dmd"]) (UCall One Used) }
 
 -- First argument of catch#:
 --    uses its arg once, applies it once
@@ -720,7 +743,10 @@ absDmd :: Demand
 absDmd = JD { sd = Lazy, ud = Abs }
 
 topDmd :: Demand
-topDmd = JD { sd = Lazy, ud = useTop }
+topDmd = JD { sd = Lazy, ud = Use (Many ["topDmd"]) Used }
+
+boringTopDmd :: String -> Demand
+boringTopDmd r = JD { sd = Lazy, ud =  Use (Many [r]) Used }
 
 botDmd :: Demand
 botDmd = JD { sd = strBot, ud = useBot }
@@ -734,8 +760,8 @@ oneifyDmd jd                            = jd
 
 isTopDmd :: Demand -> Bool
 -- Used to suppress pretty-printing of an uninformative demand
-isTopDmd (JD {sd = Lazy, ud = Use Many Used}) = True
-isTopDmd _                                    = False
+isTopDmd (JD {sd = Lazy, ud = Use (Many _) Used}) = True
+isTopDmd _                                        = False
 
 isAbsDmd :: Demand -> Bool
 isAbsDmd (JD {ud = Abs}) = True   -- The strictness part can be HyperStr
@@ -748,7 +774,12 @@ isSeqDmd _                                                = False
 isUsedOnce :: Demand -> Bool
 isUsedOnce (JD { ud = a }) = case useCount a of
                                One  -> True
-                               Many -> False
+                               Many _ -> False
+
+isBoringDemand :: Demand -> ManyReasons
+isBoringDemand (JD { ud = a }) = case useCount a of
+                               One  -> []
+                               Many b -> b
 
 -- More utility functions for strictness
 seqDemand :: Demand -> ()
@@ -1027,7 +1058,7 @@ resTypeArgDmd :: Termination r -> Demand
 --      TopRes === (Top -> TopRes) === ...
 -- This function makes that concrete
 -- Also see Note [defaultDmd vs. resTypeArgDmd]
-resTypeArgDmd (Dunno _) = topDmd
+resTypeArgDmd (Dunno _) = boringTopDmd "unsat"
 resTypeArgDmd _         = botDmd   -- Diverges or ThrowsExn
 
 {-
@@ -1240,9 +1271,10 @@ bothDmdType (DmdType fv1 ds1 r1) (fv2, t2)
     -- See Note [Asymmetry of 'both' for DmdType and DmdResult]
     -- 'both' takes the argument/result info from its *first* arg,
     -- using its second arg just for its free-var info.
-  = DmdType (plusVarEnv_CD bothDmd fv1 (defaultDmd r1) fv2 (defaultDmd t2))
+  = DmdType (plusVarEnv_CD bothDmd' fv1 (defaultDmd r1) fv2 (defaultDmd t2))
             ds1
             (r1 `bothDmdResult` t2)
+  where bothDmd' = bothDmd "bothDmdType"
 
 instance Outputable DmdType where
   ppr (DmdType fv ds res)
@@ -1395,9 +1427,9 @@ postProcessDmdEnv ds@(JD { sd = ss, ud = us }) env
   -- We only processed the thing at all to analyse the body
   -- See Note [Always analyse in virgin pass]
 
-reuseEnv :: DmdEnv -> DmdEnv
-reuseEnv = mapVarEnv (postProcessDmd
-                        (JD { sd = Str VanStr (), ud = Use Many () }))
+reuseEnv :: String -> DmdEnv -> DmdEnv
+reuseEnv r = mapVarEnv (postProcessDmd
+                        (JD { sd = Str VanStr (), ud = Use (Many [r]) () }))
 
 postProcessUnsat :: DmdShell -> DmdType -> DmdType
 postProcessUnsat ds@(JD { sd = ss }) (DmdType fv args res_ty)
@@ -1414,9 +1446,9 @@ postProcessDmd (JD { sd = ss, ud = us }) (JD { sd = s, ud = a})
            Str ExnStr _ -> markExnStr s
            Str VanStr _ -> s
     a' = case us of
-           Abs        -> Abs
-           Use Many _ -> markReusedDmd a
-           Use One  _ -> a
+           Abs            -> Abs
+           Use (Many r) _ -> markReusedDmd r a
+           Use One  _     -> a
 
 markExnStr :: ArgStr -> ArgStr
 markExnStr (Str VanStr s) = Str ExnStr s
@@ -1436,8 +1468,8 @@ peelCallDmd (JD {sd = s, ud = u})
                  HyperStr -> (HyperStr, Str VanStr ())
                  _        -> (HeadStr,  Lazy)
     (u', us) = case u of
-                 UCall c u' -> (u',   Use c    ())
-                 _          -> (Used, Use Many ())
+                 UCall c u' -> (u',   Use c            ())
+                 _          -> (Used, Use (Many ["peel"]) ())
        -- The _ cases for usage includes UHead which seems a bit wrong
        -- because the body isn't used at all!
        -- c.f. the Abs case in toCleanDmd
@@ -1458,7 +1490,7 @@ peelManyCalls n (JD { sd = str, ud = abs })
     go_abs :: Int -> UseDmd -> Use ()      -- Many <=> unsaturated, or at least
     go_abs 0 _              = Use One ()   --          one UCall Many in the demand
     go_abs n (UCall One d') = go_abs (n-1) d'
-    go_abs _ _              = Use Many ()
+    go_abs _ _              = Use (Many ["peel"]) ()
 
 {-
 Note [Demands from unsaturated function calls]
@@ -1810,8 +1842,8 @@ argOneShots one_shot_info (JD { ud = usg })
       Use _ arg_usg -> go arg_usg
       _             -> []
   where
-    go (UCall One  u) = one_shot_info : go u
-    go (UCall Many u) = NoOneShotInfo : go u
+    go (UCall One      u) = one_shot_info : go u
+    go (UCall (Many _) u) = NoOneShotInfo : go u
     go _              = []
 
 {- Note [Computing one-shot info, and ProbOneShot]
@@ -1926,15 +1958,15 @@ kill_usage kfs (JD {sd = s, ud = u}) = JD {sd = s, ud = zap_musg kfs u}
 
 zap_musg :: KillFlags -> ArgUse -> ArgUse
 zap_musg kfs Abs
-  | kf_abs kfs = useTop
+  | kf_abs kfs = Use (Many ["zap"]) Used
   | otherwise  = Abs
 zap_musg kfs (Use c u)
-  | kf_used_once kfs = Use Many (zap_usg kfs u)
-  | otherwise        = Use c    (zap_usg kfs u)
+  | kf_used_once kfs = Use (Many ["zap"]) (zap_usg kfs u)
+  | otherwise        = Use c              (zap_usg kfs u)
 
 zap_usg :: KillFlags -> UseDmd -> UseDmd
 zap_usg kfs (UCall c u)
-    | kf_called_once kfs = UCall Many (zap_usg kfs u)
+    | kf_called_once kfs = UCall (Many ["zap"]) (zap_usg kfs u)
     | otherwise          = UCall c    (zap_usg kfs u)
 zap_usg kfs (UProd us)   = UProd (map (zap_musg kfs) us)
 zap_usg _   u            = u
@@ -1950,7 +1982,7 @@ strictifyDictDmd ty dmd = case getUseDmd dmd of
     Just (tycon, _arg_tys, _data_con, inst_con_arg_tys)
       <- splitDataProductType_maybe ty,
     not (isNewTyCon tycon), isClassTyCon tycon -- is a non-newtype dictionary
-    -> seqDmd `bothDmd` -- main idea: ensure it's strict
+    -> bothDmd "strictify" seqDmd $
        case splitProdDmd_maybe dmd of
          -- superclass cycles should not be a problem, since the demand we are
          -- consuming would also have to be infinite in order for us to diverge
@@ -2034,12 +2066,12 @@ instance Binary ArgStr where
 
 instance Binary Count where
     put_ bh One  = do putByte bh 0
-    put_ bh Many = do putByte bh 1
+    put_ bh (Many _) = do putByte bh 1
 
     get  bh = do h <- getByte bh
                  case h of
                    0 -> return One
-                   _ -> return Many
+                   _ -> return (Many ["iface"])
 
 instance Binary ArgUse where
     put_ bh Abs          = do

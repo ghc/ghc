@@ -18,7 +18,7 @@ module StgSyn (
         GenStgBinding(..), GenStgExpr(..), GenStgRhs(..),
         GenStgAlt, AltType(..),
 
-        UpdateFlag(..), isUpdatable,
+        UpdateFlag(..), isUpdatable, isBoring,
 
         StgBinderInfo,
         noBinderInfo, stgSatOcc, stgUnsatOcc, satCallsOnly,
@@ -575,18 +575,24 @@ closure will only be entered once, and so need not be updated but may
 safely be blackholed.
 -}
 
-data UpdateFlag = ReEntrant | Updatable | SingleEntry
+-- Bool: True <=> Boring
+data UpdateFlag = ReEntrant | Updatable [String] | SingleEntry
 
 instance Outputable UpdateFlag where
     ppr u = char $ case u of
                        ReEntrant   -> 'r'
-                       Updatable   -> 'u'
+                       Updatable _ -> 'u'
                        SingleEntry -> 's'
 
 isUpdatable :: UpdateFlag -> Bool
 isUpdatable ReEntrant   = False
 isUpdatable SingleEntry = False
-isUpdatable Updatable   = True
+isUpdatable (Updatable _)  = True
+
+isBoring :: UpdateFlag -> [String]
+isBoring ReEntrant   = []
+isBoring SingleEntry = []
+isBoring (Updatable b)  = b
 
 {-
 ************************************************************************

@@ -133,7 +133,7 @@ statRhs top (_, StgRhsClosure _ _ fv u _ body)
     countOne (
       case u of
         ReEntrant   -> ReEntrantBinds   top
-        Updatable   -> UpdatableBinds   top
+        Updatable _ -> UpdatableBinds   top
         SingleEntry -> SingleEntryBinds top
     )
 

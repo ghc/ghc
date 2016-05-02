@@ -405,7 +405,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
             -- See Note [Demand on the Worker]
             single_call = saturatedByOneShots arity (demandInfo fn_info)
             worker_demand | single_call = mkWorkerDemand work_arity
-                          | otherwise   = topDmd
+                          | otherwise   = boringTopDmd "worker"
 
                                 -- arity is consistent with the demand type goes through
 
