@@ -4556,7 +4556,14 @@ Constrained class method types
 
 .. ghc-flag:: -XConstrainedClassMethods
 
-@ -4562,7 +4562,20 @@ class type variable, thus: ::
+    Allows the definition of further constraints on individual class methods.
+
+Haskell 98 prohibits class method types to mention constraints on the
+class type variable, thus: ::
+
+      class Seq s a where
+        fromList :: [a] -> s a
+        elem     :: Eq a => a -> s a -> Bool
 
 The type of ``elem`` is illegal in Haskell 98, because it contains the
 constraint ``Eq a``, which constrains only the class type variable (in
