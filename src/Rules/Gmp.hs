@@ -46,14 +46,6 @@ configureEnvironment = do
         path <- builderPath bld
         return $ AddEnv var path
 
-configureArguments :: Action [String]
-configureArguments = do
-    hostPlatform  <- setting HostPlatform
-    buildPlatform <- setting BuildPlatform
-    return [ "--enable-shared=no"
-           , "--host=" ++ hostPlatform
-           , "--build=" ++ buildPlatform]
-
 -- TODO: we rebuild gmp every time.
 gmpRules :: Rules ()
 gmpRules = do
@@ -98,11 +90,14 @@ gmpRules = do
                 putError $ "gmpRules: expected suffix " ++ suffix
                          ++ " (found: " ++ filename ++ ")."
             let libName = take (length filename - length suffix) filename
-                libPath = gmpBuildPath -/- libName
+                libPath = gmpBuildPath -/- "lib"
 
-            envs <- configureEnvironment
-            args <- configureArguments
-            runConfigure libPath envs args
+            moveDirectory (gmpBuildPath -/- libName) libPath
+
+            env <- configureEnvironment
+            buildWithCmdOptions env $
+                Target gmpContext (Configure libPath)
+                       [libPath -/- "Makefile.in"] [libPath -/- "Makefile"]
 
             runMake libPath ["MAKEFLAGS="]
 

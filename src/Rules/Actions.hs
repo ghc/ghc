@@ -1,6 +1,6 @@
 module Rules.Actions (
-    build, buildWithResources, copyFile, createDirectory, removeDirectory,
-    copyDirectory, moveDirectory, applyPatch, fixFile, runConfigure, runMake,
+    build, buildWithResources, buildWithCmdOptions, copyFile, createDirectory,
+    removeDirectory, copyDirectory, moveDirectory, applyPatch, fixFile, runMake,
     runMakeVerbose, renderLibrary, renderProgram, runBuilder, makeExecutable
     ) where
 
@@ -19,11 +19,25 @@ import Settings.Args
 import Settings.Builders.Ar
 import Target
 
--- Build a given target using an appropriate builder and acquiring necessary
--- resources. Force a rebuilt if the argument list has changed since the last
--- built (that is, track changes in the build system).
+-- | Build a 'Target' with the right 'Builder' and command line arguments.
+-- Force a rebuild if the argument list has changed since the last build.
+build :: Target -> Action ()
+build = customBuild [] []
+
+-- | Build a 'Target' with the right 'Builder' and command line arguments,
+-- acquiring necessary resources. Force a rebuild if the argument list has
+-- changed since the last build.
 buildWithResources :: [(Resource, Int)] -> Target -> Action ()
-buildWithResources rs target@Target {..} = do
+buildWithResources rs = customBuild rs []
+
+-- | Build a 'Target' with the right 'Builder' and command line arguments,
+-- using given options when executing the build command. Force a rebuild if
+-- the argument list has changed since the last build.
+buildWithCmdOptions :: [CmdOption] -> Target -> Action ()
+buildWithCmdOptions = customBuild []
+
+customBuild :: [(Resource, Int)] -> [CmdOption] -> Target -> Action ()
+customBuild rs opts target@Target {..} = do
     needBuilder builder
     path    <- builderPath builder
     argList <- interpret target getArgs
@@ -41,7 +55,12 @@ buildWithResources rs target@Target {..} = do
                 else do
                     input <- interpret target getInput
                     top   <- topDirectory
-                    cmd [path] [Cwd output] "x" (top -/- input)
+                    cmd [Cwd output] [path] "x" (top -/- input)
+
+            Configure dir -> do
+                need [dir -/- "configure"]
+                let env = AddEnv "CONFIG_SHELL" "/bin/bash"
+                cmd Shell (EchoStdout False) [Cwd dir] [path] (env:opts) argList
 
             HsCpp    -> captureStdout target path argList
             GenApply -> captureStdout target path argList
@@ -54,10 +73,6 @@ buildWithResources rs target@Target {..} = do
                 writeFileChanged file output
 
             _  -> cmd [path] argList
-
--- Most targets are built without explicitly acquiring resources
-build :: Target -> Action ()
-build = buildWithResources []
 
 captureStdout :: Target -> FilePath -> [String] -> Action ()
 captureStdout target path argList = do
@@ -103,22 +118,6 @@ fixFile file f = do
         IO.evaluate $ rnf new
         return new
     liftIO $ writeFile file contents
-
-runConfigure :: FilePath -> [CmdOption] -> [String] -> Action ()
-runConfigure dir opts args = do
-    need [dir -/- "configure"]
-    let args' = filter (not . null) args
-        note  = if null args' then "" else " (" ++ intercalate ", " args' ++ ")"
-        -- Always configure with bash.
-        -- This also injects /bin/bash into `libtool`, instead of /bin/sh
-        opts' = opts ++ [AddEnv "CONFIG_SHELL" "/bin/bash"]
-    if dir == "."
-    then do
-        putBuild $ "| Run configure" ++ note ++ "..."
-        quietly $ cmd Shell (EchoStdout False) "bash configure" opts' args'
-    else do
-        putBuild $ "| Run configure" ++ note ++ " in " ++ dir ++ "..."
-        quietly $ cmd Shell (EchoStdout False) [Cwd dir] "bash configure" opts' args'
 
 runMake :: FilePath -> [String] -> Action ()
 runMake = runMakeWithVerbosity False

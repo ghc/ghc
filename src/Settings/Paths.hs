@@ -2,7 +2,7 @@ module Settings.Paths (
     contextDirectory, buildPath, pkgDataFile, pkgHaddockFile, pkgLibraryFile,
     pkgLibraryFile0, pkgGhciLibraryFile, gmpBuildPath, gmpBuildInfoPath,
     packageDbDirectory, pkgConfFile, shakeFilesPath, bootPackageConstraints,
-    packageDependencies
+    packageDependencies, libffiBuildPath
     ) where
 
 import Base
@@ -66,6 +66,10 @@ pkgFile context prefix suffix = do
     let path = buildPath context
     componentId <- pkgData $ ComponentId path
     return $ path ~/~ prefix ++ componentId ++ suffix
+
+-- | Build directory for in-tree libffi library.
+libffiBuildPath :: FilePath
+libffiBuildPath = buildRootPath -/- "stage1/libffi"
 
 -- | Build directory for in-tree GMP library.
 gmpBuildPath :: FilePath

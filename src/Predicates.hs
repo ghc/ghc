@@ -19,14 +19,27 @@ package p = (p ==) <$> getPackage
 class BuilderLike a where
     builder :: a -> Predicate
 
+-- TODO: Move this elsewhere to avoid orhpan instances
 instance BuilderLike Builder where
     builder b = (b ==) <$> getBuilder
 
 instance BuilderLike a => BuilderLike (Stage -> a) where
-    builder stagedBuilder = builder . stagedBuilder =<< getStage
+    builder s2b = builder . s2b =<< getStage
 
 instance BuilderLike a => BuilderLike (CompilerMode -> a) where
-    builder compiler = anyM (builder . compiler) [Compile, FindDependencies, Link]
+    builder c2b = do
+        b <- getBuilder
+        case b of
+            Cc  c _ -> builder $ c2b c
+            Ghc c _ -> builder $ c2b c
+            _       -> return False
+
+instance BuilderLike a => BuilderLike (FilePath -> a) where
+    builder f2b = do
+        b <- getBuilder
+        case b of
+            Configure f -> builder $ f2b f
+            _           -> return False
 
 -- | Does any of the output files match a given pattern?
 file :: FilePattern -> Predicate

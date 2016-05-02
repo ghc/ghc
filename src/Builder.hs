@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric, LambdaCase #-}
 module Builder (
     CompilerMode (..), Builder (..),
-    isStaged, builderPath, getBuilderPath, specified, needBuilder
+    builderPath, getBuilderPath, specified, needBuilder
     ) where
 
 import Control.Monad.Trans.Reader
@@ -35,6 +35,7 @@ data Builder = Alex
              | Ar
              | DeriveConstants
              | Cc CompilerMode Stage
+             | Configure FilePath
              | GenApply
              | GenPrimopCode
              | Ghc CompilerMode Stage
@@ -82,13 +83,6 @@ builderProvenance = \case
 isInternal :: Builder -> Bool
 isInternal = isJust . builderProvenance
 
-isStaged :: Builder -> Bool
-isStaged = \case
-    (Cc   _ _) -> True
-    (Ghc  _ _) -> True
-    (GhcPkg _) -> True
-    _          -> False
-
 -- TODO: Some builders are required only on certain platforms. For example,
 -- Objdump is only required on OpenBSD and AIX, as mentioned in #211. Add
 -- support for platform-specific optional builders as soon as we can reliably
@@ -100,38 +94,40 @@ isOptional = \case
     _        -> False
 
 -- TODO: get rid of fromJust
--- | Determine the location of a 'Builder'
+-- | Determine the location of a 'Builder'.
 builderPath :: Builder -> Action FilePath
 builderPath builder = case builderProvenance builder of
     Just context -> return . fromJust $ programPath context
-    Nothing -> do
-        let builderKey = case builder of
-                Alex          -> "alex"
-                Ar            -> "ar"
-                Cc  _  Stage0 -> "system-cc"
-                Cc  _  _      -> "cc"
-                Ghc _  Stage0 -> "system-ghc"
-                GhcPkg Stage0 -> "system-ghc-pkg"
-                Happy         -> "happy"
-                HsColour      -> "hscolour"
-                HsCpp         -> "hs-cpp"
-                Ld            -> "ld"
-                Make          -> "make"
-                Nm            -> "nm"
-                Objdump       -> "objdump"
-                Patch         -> "patch"
-                Perl          -> "perl"
-                Ranlib        -> "ranlib"
-                Tar           -> "tar"
-                _ -> error $ "Cannot determine builderKey for " ++ show builder
-        path <- askConfigWithDefault builderKey . putError $
-            "\nCannot find path to '" ++ builderKey
-            ++ "' in system.config file. Have you forgot to run configure?"
+    Nothing -> case builder of
+        Alex          -> fromKey "alex"
+        Ar            -> fromKey "ar"
+        Cc  _  Stage0 -> fromKey "system-cc"
+        Cc  _  _      -> fromKey "cc"
+        -- We can't ask configure for the path to configure!
+        Configure _   -> return "bash configure"
+        Ghc _  Stage0 -> fromKey "system-ghc"
+        GhcPkg Stage0 -> fromKey "system-ghc-pkg"
+        Happy         -> fromKey "happy"
+        HsColour      -> fromKey "hscolour"
+        HsCpp         -> fromKey "hs-cpp"
+        Ld            -> fromKey "ld"
+        Make          -> fromKey "make"
+        Nm            -> fromKey "nm"
+        Objdump       -> fromKey "objdump"
+        Patch         -> fromKey "patch"
+        Perl          -> fromKey "perl"
+        Ranlib        -> fromKey "ranlib"
+        Tar           -> fromKey "tar"
+        _ -> error $ "Cannot determine builderPath for " ++ show builder
+  where
+    fromKey key = do
+        path <- askConfigWithDefault key . putError $ "\nCannot find path to '"
+            ++ key ++ "' in system.config file. Did you forget to run configure?"
         if null path
         then do
             if isOptional builder
             then return ""
-            else putError $ "Builder '" ++ builderKey ++ "' is not specified in"
+            else putError $ "Builder '" ++ key ++ "' is not specified in"
                 ++ " system.config file. Cannot proceed without it."
         else fixAbsolutePathOnWindows =<< lookupInPath path
 
@@ -143,9 +139,11 @@ specified = fmap (not . null) . builderPath
 
 -- | Make sure a Builder exists on the given path and rebuild it if out of date.
 needBuilder :: Builder -> Action ()
-needBuilder builder = when (isInternal builder) $ do
-    path <- builderPath builder
-    need [path]
+needBuilder = \case
+    Configure dir -> need [dir -/- "configure"]
+    builder       -> when (isInternal builder) $ do
+        path <- builderPath builder
+        need [path]
 
 -- Instances for storing in the Shake database
 instance Binary CompilerMode

@@ -6,6 +6,7 @@ import Settings.Builders.Alex
 import Settings.Builders.Ar
 import Settings.Builders.DeriveConstants
 import Settings.Builders.Cc
+import Settings.Builders.Configure
 import Settings.Builders.GenApply
 import Settings.Builders.GenPrimopCode
 import Settings.Builders.Ghc
@@ -51,6 +52,7 @@ defaultBuilderArgs = mconcat
     [ alexBuilderArgs
     , arBuilderArgs
     , ccBuilderArgs
+    , configureArgs
     , deriveConstantsBuilderArgs
     , genApplyBuilderArgs
     , genPrimopCodeBuilderArgs

@@ -5,7 +5,6 @@ import Expression
 import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
-import Oracles.WindowsPath
 import Rules.Actions
 import Settings.Builders.Common
 import Settings.Packages.Rts
@@ -24,11 +23,11 @@ libffiDependencies = (rtsBuildPath -/-) <$> [ "ffi.h", "ffitarget.h" ]
 libffiContext :: Context
 libffiContext = vanillaContext Stage1 libffi
 
-libffiBuild :: FilePath
-libffiBuild = buildRootPath -/- "stage1/libffi"
-
 libffiLibrary :: FilePath
-libffiLibrary = libffiBuild -/- "inst/lib/libffi.a"
+libffiLibrary = libffiBuildPath -/- "inst/lib/libffi.a"
+
+libffiMakefile :: FilePath
+libffiMakefile = libffiBuildPath -/- "Makefile"
 
 fixLibffiMakefile :: String -> String
 fixLibffiMakefile =
@@ -37,14 +36,15 @@ fixLibffiMakefile =
     . replace "@INSTALL@" "$(subst ../install-sh,C:/msys/home/chEEtah/ghc/install-sh,@INSTALL@)"
 
 -- TODO: remove code duplication (see Settings/Builders/GhcCabal.hs)
+-- TODO: check code duplication w.r.t. ConfCcArgs
 configureEnvironment :: Action [CmdOption]
 configureEnvironment = do
     cFlags  <- interpretInContext libffiContext . fromDiffExpr $ mconcat
                [ cArgs
                , argStagedSettingList ConfCcArgs ]
     ldFlags <- interpretInContext libffiContext $ fromDiffExpr ldArgs
-    sequence [ builderEnv "CC" $ Cc Compile Stage0
-             , builderEnv "CXX" $ Cc Compile Stage0
+    sequence [ builderEnv "CC" $ Cc Compile Stage1
+             , builderEnv "CXX" $ Cc Compile Stage1
              , builderEnv "LD" Ld
              , builderEnv "AR" Ar
              , builderEnv "NM" Nm
@@ -52,20 +52,10 @@ configureEnvironment = do
              , return . AddEnv  "CFLAGS" $ unwords  cFlags ++ " -w"
              , return . AddEnv "LDFLAGS" $ unwords ldFlags ++ " -w" ]
   where
-    builderEnv var bld = do
-        needBuilder bld
-        path <- builderPath bld
+    builderEnv var b = do
+        needBuilder b
+        path <- builderPath b
         return $ AddEnv var path
-
-configureArguments :: Action [String]
-configureArguments = do
-    top            <- topDirectory
-    targetPlatform <- setting TargetPlatform
-    return [ "--prefix=" ++ top -/- libffiBuild -/- "inst"
-           , "--libdir=" ++ top -/- libffiBuild -/- "inst/lib"
-           , "--enable-static=yes"
-           , "--enable-shared=no" -- TODO: add support for yes
-           , "--host=" ++ targetPlatform ]
 
 -- TODO: remove code duplication (need sourcePath)
 -- TODO: split into multiple rules
@@ -82,7 +72,7 @@ libffiRules = do
                 copyFile (ffiIncludeDir -/- file) (rtsBuildPath -/- file)
             putSuccess $ "| Successfully copied system FFI library header files"
         else do
-            removeDirectory libffiBuild
+            removeDirectory libffiBuildPath
             createDirectory $ buildRootPath -/- stageString Stage0
 
             tarballs <- getDirectoryFiles "" ["libffi-tarballs/libffi*.tar.gz"]
@@ -97,22 +87,23 @@ libffiRules = do
             -- TODO: Simplify.
             actionFinally (do
                 build $ Target libffiContext Tar tarballs [buildRootPath]
-                moveDirectory (buildRootPath -/- libname) libffiBuild) $
+                moveDirectory (buildRootPath -/- libname) libffiBuildPath) $
                     removeFiles buildRootPath [libname <//> "*"]
 
-            fixFile (libffiBuild -/- "Makefile.in") fixLibffiMakefile
+            fixFile (libffiMakefile <.> "in") fixLibffiMakefile
 
             forM_ ["config.guess", "config.sub"] $ \file ->
-                copyFile file (libffiBuild -/- file)
+                copyFile file (libffiBuildPath -/- file)
 
-            envs <- configureEnvironment
-            args <- configureArguments
-            runConfigure libffiBuild envs args
+            env <- configureEnvironment
+            buildWithCmdOptions env $
+                Target libffiContext (Configure libffiBuildPath)
+                       [libffiMakefile <.> "in"] [libffiMakefile]
 
-            runMake libffiBuild ["MAKEFLAGS="]
-            runMake libffiBuild ["MAKEFLAGS=", "install"]
+            runMake libffiBuildPath ["MAKEFLAGS="]
+            runMake libffiBuildPath ["MAKEFLAGS=", "install"]
 
-            let ffiHDir = libffiBuild -/- "inst/lib" -/- libname -/- "include"
+            let ffiHDir = libffiBuildPath -/- "inst/lib" -/- libname -/- "include"
             forM_ ["ffi.h", "ffitarget.h"] $ \file -> do
                 copyFile (ffiHDir -/- file) (rtsBuildPath -/- file)
 
