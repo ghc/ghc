@@ -1178,6 +1178,15 @@ It checks for three things
     So if they are the same, there must be no constructors.  But there
     might be applications thus (f (g x)).
 
+    Note that tys only includes the visible arguments of the class type
+    constructor. Including the non-vivisble arguments can cause the following,
+    perfectly valid instance to be rejected:
+       class Category (cat :: k -> k -> *) where ...
+       newtype T (c :: * -> * -> *) a b = MkT (c a b)
+       instance Category c => Category (T c) where ...
+    since the first argument to Category is a non-visible *, which sizeTypes
+    would count as a constructor! See Trac #11833.
+
   * Also check for a bizarre corner case, when the derived instance decl
     would look like
        instance C a b => D (T a) where ...
@@ -1198,19 +1207,20 @@ validDerivPred :: TyVarSet -> PredType -> Bool
 -- See Note [Valid 'deriving' predicate]
 validDerivPred tv_set pred
   = case classifyPredType pred of
-       ClassPred cls _ -> cls `hasKey` typeableClassKey
+       ClassPred cls tys -> cls `hasKey` typeableClassKey
                 -- Typeable constraints are bigger than they appear due
                 -- to kind polymorphism, but that's OK
-                       || check_tys
+                       || check_tys cls tys
        EqPred {}       -> False  -- reject equality constraints
        _               -> True   -- Non-class predicates are ok
   where
-    check_tys = hasNoDups fvs
+    check_tys cls tys
+              = hasNoDups fvs
                    -- use sizePred to ignore implicit args
                 && sizePred pred == fromIntegral (length fvs)
                 && all (`elemVarSet` tv_set) fvs
-
-    fvs = fvType pred
+      where tys' = filterOutInvisibleTypes (classTyCon cls) tys
+            fvs  = fvTypes tys'
 
 {-
 ************************************************************************
@@ -1937,7 +1947,7 @@ sizePred ty = goClass ty
 
     go (ClassPred cls tys')
       | isTerminatingClass cls = 0
-      | otherwise              = sizeTypes tys'
+      | otherwise = sizeTypes (filterOutInvisibleTypes (classTyCon cls) tys')
     go (EqPred {})        = 0
     go (IrredPred ty)     = sizeType ty
 
