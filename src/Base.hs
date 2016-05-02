@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -fno-warn-dodgy-imports #-} -- for Development.Shake.parallel
 module Base (
     -- * General utilities
     module Control.Applicative,
