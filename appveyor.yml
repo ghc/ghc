@@ -24,6 +24,11 @@ install:
     - git config --global url."git@github.com:/ghc/packages-".insteadOf      git@github.com:/ghc/packages/
     - git clone https://github.com/ghc/ghc --recurse-submodules --depth 1 C:\msys64\home\ghc\tmp
 
+    - ghc   --version
+    - stack --version
+    - alex  --version
+    - happy --version
+    - stack exec -- ghc-pkg list
     - bash -lc "mv /home/ghc/tmp/* /home/ghc"
     - cd C:\msys64\home\ghc
     - stack exec -- perl boot
@@ -31,11 +36,6 @@ install:
     - bash -lc "cd /home/ghc; mkdir -p ghc-tarballs/perl/"
     - bash -lc "cd /home/ghc; exec 0</dev/null; ./configure --enable-tarballs-autodownload"
     - bash -lc "cat /home/ghc/hadrian/cfg/system.config"
-    - ghc   --version
-    - stack --version
-    - alex  --version
-    - happy --version
-    - stack exec -- ghc-pkg list
 
 build_script:
     - cd C:\msys64\home\ghc\hadrian
