@@ -145,18 +145,21 @@ static void  initMBlock(void *mblock);
 
   --------------------------------------------------------------------------- */
 
-#define MAX_FREE_LIST 9
-
-// In THREADED_RTS mode, the free list is protected by sm_mutex.
-
-static bdescr *free_list[MAX_FREE_LIST];
-static bdescr *free_mblock_list;
-
 // free_list[i] contains blocks that are at least size 2^i, and at
 // most size 2^(i+1) - 1.
 //
 // To find the free list in which to place a block, use log_2(size).
 // To find a free block of the right size, use log_2_ceil(size).
+//
+// The largest free list (free_list[NUM_FREE_LISTS-1]) needs to contain sizes
+// from half a megablock up to (but not including) a full megablock.
+
+#define NUM_FREE_LISTS (MBLOCK_SHIFT-BLOCK_SHIFT)
+
+// In THREADED_RTS mode, the free list is protected by sm_mutex.
+
+static bdescr *free_list[NUM_FREE_LISTS];
+static bdescr *free_mblock_list;
 
 W_ n_alloc_blocks;   // currently allocated blocks
 W_ hw_alloc_blocks;  // high-water allocated blocks
@@ -168,7 +171,7 @@ W_ hw_alloc_blocks;  // high-water allocated blocks
 void initBlockAllocator(void)
 {
     nat i;
-    for (i=0; i < MAX_FREE_LIST; i++) {
+    for (i=0; i < NUM_FREE_LISTS; i++) {
         free_list[i] = NULL;
     }
     free_mblock_list = NULL;
@@ -205,10 +208,11 @@ initGroup(bdescr *head)
 #define CLZW(n) (__builtin_clzll(n))
 #endif
 
-// log base 2 (floor), needs to support up to 2^MAX_FREE_LIST
+// log base 2 (floor), needs to support up to (2^NUM_FREE_LISTS)-1
 STATIC_INLINE nat
 log_2(W_ n)
 {
+    ASSERT(n > 0 && n < (1<<NUM_FREE_LISTS));
 #if defined(__GNUC__)
     return CLZW(n) ^ (sizeof(StgWord)*8 - 1);
     // generates good code on x86.  __builtin_clz() compiles to bsr+xor, but
@@ -216,18 +220,19 @@ log_2(W_ n)
 #else
     W_ i, x;
     x = n;
-    for (i=0; i < MAX_FREE_LIST; i++) {
+    for (i=0; i < NUM_FREE_LISTS; i++) {
         x = x >> 1;
         if (x == 0) return i;
     }
-    return MAX_FREE_LIST;
+    return NUM_FREE_LISTS;
 #endif
 }
 
-// log base 2 (ceiling), needs to support up to 2^MAX_FREE_LIST
+// log base 2 (ceiling), needs to support up to (2^NUM_FREE_LISTS)-1
 STATIC_INLINE nat
 log_2_ceil(W_ n)
 {
+    ASSERT(n > 0 && n < (1<<NUM_FREE_LISTS));
 #if defined(__GNUC__)
     nat r = log_2(n);
     return (n & (n-1)) ? r+1 : r;
@@ -378,11 +383,11 @@ allocGroup (W_ n)
 
     ln = log_2_ceil(n);
 
-    while (ln < MAX_FREE_LIST && free_list[ln] == NULL) {
+    while (ln < NUM_FREE_LISTS && free_list[ln] == NULL) {
         ln++;
     }
 
-    if (ln == MAX_FREE_LIST) {
+    if (ln == NUM_FREE_LISTS) {
 #if 0  /* useful for debugging fragmentation */
         if ((W_)mblocks_allocated * BLOCKS_PER_MBLOCK * BLOCK_SIZE_W
              - (W_)((n_alloc_blocks - n) * BLOCK_SIZE_W) > (2*1024*1024)/sizeof(W_)) {
@@ -454,12 +459,12 @@ allocLargeChunk (W_ min, W_ max)
     }
 
     ln = log_2_ceil(min);
-    lnmax = log_2_ceil(max); // tops out at MAX_FREE_LIST
+    lnmax = log_2_ceil(max);
 
-    while (ln < lnmax && free_list[ln] == NULL) {
+    while (ln < NUM_FREE_LISTS && ln < lnmax && free_list[ln] == NULL) {
         ln++;
     }
-    if (ln == lnmax) {
+    if (ln == NUM_FREE_LISTS || ln == lnmax) {
         return allocGroup(max);
     }
     bd = free_list[ln];
@@ -795,7 +800,7 @@ checkFreeListSanity(void)
 
 
     min = 1;
-    for (ln = 0; ln < MAX_FREE_LIST; ln++) {
+    for (ln = 0; ln < NUM_FREE_LISTS; ln++) {
         IF_DEBUG(block_alloc,
                  debugBelch("free block list [%" FMT_Word "]:\n", ln));
 
@@ -865,7 +870,7 @@ countFreeList(void)
   W_ total_blocks = 0;
   StgWord ln;
 
-  for (ln=0; ln < MAX_FREE_LIST; ln++) {
+  for (ln=0; ln < NUM_FREE_LISTS; ln++) {
       for (bd = free_list[ln]; bd != NULL; bd = bd->link) {
           total_blocks += bd->blocks;
       }
