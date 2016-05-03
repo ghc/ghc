@@ -1835,18 +1835,53 @@ isTypeHoleCt :: Ct -> Bool
 isTypeHoleCt (CHoleCan { cc_hole = TypeHole {} }) = True
 isTypeHoleCt _ = False
 
--- | The following constraints are considered to be a custom type error:
---    1. TypeError msg a b c
---    2. TypeError msg a b c ~ Something (and the other way around)
---    4. C (TypeError msg a b c)         (for any parameter of class constraint)
+
+{- Note [Custom type errors in constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When GHC reports a type-error about an unsolved-constraint, we check
+to see if the constraint contains any custom-type errors, and if so
+we report them.  Here are some examples of constraints containing type
+errors:
+
+TypeError msg           -- The actual constraint is a type error
+
+TypError msg ~ Int      -- Some type was supposed to be Int, but ended up
+                        -- being a type error instead
+
+Eq (TypeError msg)      -- A class constraint is stuck due to a type error
+
+F (TypeError msg) ~ a   -- A type function failed to evaluate due to a type err
+
+It is also possible to have constraints where the type error is nested deeper,
+for example see #11990, and also:
+
+Eq (F (TypeError msg))  -- Here the type error is nested under a type-function
+                        -- call, which failed to evaluate because of it,
+                        -- and so the `Eq` constraint was unsolved.
+                        -- This may happen when one function calls another
+                        -- and the called function produced a custom type error.
+-}
+
+-- | A constraint is considered to be a custom type error, if it contains
+-- custom type errors anywhere in it.
+-- See Note [Custom type errors in constraints]
 getUserTypeErrorMsg :: Ct -> Maybe Type
-getUserTypeErrorMsg ct
-  | Just (_,t1,t2) <- getEqPredTys_maybe ctT    = oneOf [t1,t2]
-  | Just (_,ts)    <- getClassPredTys_maybe ctT = oneOf ts
-  | otherwise                                   = userTypeError_maybe ctT
+getUserTypeErrorMsg ct = findUserTypeError (ctPred ct)
   where
-  ctT       = ctPred ct
-  oneOf xs  = msum (map userTypeError_maybe xs)
+  findUserTypeError t = msum ( userTypeError_maybe t
+                             : map findUserTypeError (subTys t)
+                             )
+
+  subTys t            = case splitAppTys t of
+                          (t,[]) ->
+                            case splitTyConApp_maybe t of
+                              Nothing     -> []
+                              Just (_,ts) -> ts
+                          (t,ts) -> t : ts
+
+
+
 
 isUserTypeErrorCt :: Ct -> Bool
 isUserTypeErrorCt ct = case getUserTypeErrorMsg ct of
