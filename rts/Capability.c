@@ -428,7 +428,7 @@ void interruptAllCapabilities(void)
  * ------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
-STATIC_INLINE void
+static void
 giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
 {
     ASSERT_LOCK_HELD(&cap->lock);
