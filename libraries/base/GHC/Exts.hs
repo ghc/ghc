@@ -46,6 +46,9 @@ module GHC.Exts
         -- * Ids with special behaviour
         lazy, inline, oneShot,
 
+        -- * Running 'RealWorld' state transformers
+        runRW#,
+
         -- * Safe coercions
         --
         -- | These are available from the /Trustworthy/ module "Data.Coerce" as well
