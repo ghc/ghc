@@ -44,7 +44,7 @@ module GHC.Exts
         breakpoint, breakpointCond,
 
         -- * Ids with special behaviour
-        lazy, inline,
+        lazy, inline, oneShot,
 
         -- * Safe coercions
         --
