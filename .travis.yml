@@ -54,15 +54,12 @@ install:
     - ( cd ghc/hadrian && cabal install --only-dependencies )
     - ( cd ghc/hadrian && cabal configure )
 
-    - ( cd ghc && ./boot )
-    - ( cd ghc && ./configure )
-    - cat ghc/hadrian/cfg/system.config
     - ghc-pkg list
 
 script:
     - ( cd ghc/hadrian && cabal haddock --internal )
     - ./ghc/hadrian/build.sh selftest
-    - ./ghc/hadrian/build.sh -j --skip-configure --no-progress --profile=- --flavour=quick $TARGET
+    - ./ghc/hadrian/build.sh -j --no-progress --profile=- --flavour=quick $TARGET
 
 cache:
     directories:
