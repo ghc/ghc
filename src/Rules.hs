@@ -6,19 +6,19 @@ import Base
 import Context
 import Expression
 import GHC
-import Rules.Compile
-import Rules.Data
-import Rules.Dependencies
-import Rules.Documentation
-import Rules.Generate
-import Rules.Cabal
-import Rules.Configure
-import Rules.Gmp
-import Rules.Libffi
-import Rules.Library
-import Rules.Perl
-import Rules.Program
-import Rules.Register
+import qualified Rules.Compile
+import qualified Rules.Data
+import qualified Rules.Dependencies
+import qualified Rules.Documentation
+import qualified Rules.Generate
+import qualified Rules.Cabal
+import qualified Rules.Configure
+import qualified Rules.Gmp
+import qualified Rules.Libffi
+import qualified Rules.Library
+import qualified Rules.Perl
+import qualified Rules.Program
+import qualified Rules.Register
 import Settings
 
 allStages :: [Stage]
@@ -66,25 +66,25 @@ packageRules = do
         vanillaContexts = liftM2 vanillaContext allStages knownPackages
 
     for_ contexts $ mconcat
-        [ compilePackage readPackageDb
-        , buildPackageLibrary ]
+        [ Rules.Compile.compilePackage readPackageDb
+        , Rules.Library.buildPackageLibrary ]
 
     for_ vanillaContexts $ mconcat
-        [ buildPackageData
-        , buildPackageDependencies readPackageDb
-        , buildPackageDocumentation
-        , buildPackageGhciLibrary
-        , generatePackageCode
-        , buildProgram readPackageDb
-        , registerPackage writePackageDb ]
+        [ Rules.Data.buildPackageData
+        , Rules.Dependencies.buildPackageDependencies readPackageDb
+        , Rules.Documentation.buildPackageDocumentation
+        , Rules.Library.buildPackageGhciLibrary
+        , Rules.Generate.generatePackageCode
+        , Rules.Program.buildProgram readPackageDb
+        , Rules.Register.registerPackage writePackageDb ]
 
 buildRules :: Rules ()
 buildRules = do
-    cabalRules
-    configureRules
-    generateRules
-    copyRules
-    gmpRules
-    libffiRules
-    perlScriptRules
+    Rules.Cabal.cabalRules
+    Rules.Configure.configureRules
+    Rules.Generate.copyRules
+    Rules.Generate.generateRules
+    Rules.Gmp.gmpRules
+    Rules.Libffi.libffiRules
     packageRules
+    Rules.Perl.perlScriptRules
