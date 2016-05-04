@@ -25,7 +25,7 @@ import Name
 import Type
 import TyCoRep
 import Var
-import UniqFM
+import UniqDFM
 import Unique( Unique )
 import FastString(FastString)
 
@@ -129,13 +129,81 @@ instance Ord k => TrieMap (Map.Map k) where
   foldTM k m z = Map.fold k z m
   mapTM f m = Map.map f m
 
-instance TrieMap UniqFM where
-  type Key UniqFM = Unique
-  emptyTM = emptyUFM
-  lookupTM k m = lookupUFM m k
-  alterTM k f m = alterUFM f m k
-  foldTM k m z = foldUFM k z m
-  mapTM f m = mapUFM f m
+
+{-
+Note [foldTM determinism]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+We want foldTM to be deterministic, which is why we have an instance of
+TrieMap for UniqDFM, but not for UniqFM. Here's an example of some things that
+go wrong if foldTM is nondeterministic. Consider:
+
+  f a b = return (a <> b)
+
+Depending on the order that the typechecker generates constraints you
+get either:
+
+  f :: (Monad m, Monoid a) => a -> a -> m a
+
+or:
+
+  f :: (Monoid a, Monad m) => a -> a -> m a
+
+The generated code will be different after desugaring as the dictionaries
+will be bound in different orders, leading to potential ABI incompatibility.
+
+One way to solve this would be to notice that the typeclasses could be
+sorted alphabetically.
+
+Unfortunately that doesn't quite work with this example:
+
+  f a b = let x = a <> a; y = b <> b in x
+
+where you infer:
+
+  f :: (Monoid m, Monoid m1) => m1 -> m -> m1
+
+or:
+
+  f :: (Monoid m1, Monoid m) => m1 -> m -> m1
+
+Here you could decide to take the order of the type variables in the type
+according to depth first traversal and use it to order the constraints.
+
+The real trouble starts when the user enables incoherent instances and
+the compiler has to make an arbitrary choice. Consider:
+
+  class T a b where
+    go :: a -> b -> String
+
+  instance (Show b) => T Int b where
+    go a b = show a ++ show b
+
+  instance (Show a) => T a Bool where
+    go a b = show a ++ show b
+
+  f = go 10 True
+
+GHC is free to choose either dictionary to implement f, but for the sake of
+determinism we'd like it to be consistent when compiling the same sources
+with the same flags.
+
+inert_dicts :: DictMap is implemented with a TrieMap. In getUnsolvedInerts it
+gets converted to a bag of (Wanted) Cts using a fold. Then in
+solve_simple_wanteds it's merged with other WantedConstraints. We want the
+conversion to a bag to be deterministic. For that purpose we use UniqDFM
+instead of UniqFM to implement the TrieMap.
+
+See Note [Deterministic UniqFM] in UniqDFM for more details on how it's made
+deterministic.
+-}
+
+instance TrieMap UniqDFM where
+  type Key UniqDFM = Unique
+  emptyTM = emptyUDFM
+  lookupTM k m = lookupUDFM m k
+  alterTM k f m = alterUDFM f m k
+  foldTM k m z = foldUDFM k z m
+  mapTM f m = mapUDFM f m
 
 {-
 ************************************************************************
@@ -220,11 +288,11 @@ foldMaybe k (Just a) b = k a b
 ************************************************************************
 -}
 
-lkNamed :: NamedThing n => n -> NameEnv a -> Maybe a
-lkNamed n env = lookupNameEnv env (getName n)
+lkDNamed :: NamedThing n => n -> DNameEnv a -> Maybe a
+lkDNamed n env = lookupDNameEnv env (getName n)
 
-xtNamed :: NamedThing n => n -> XT a -> NameEnv a -> NameEnv a
-xtNamed tc f m = alterNameEnv f m (getName tc)
+xtDNamed :: NamedThing n => n -> XT a -> DNameEnv a -> DNameEnv a
+xtDNamed tc f m = alterDNameEnv f m (getName tc)
 
 ------------------------
 type LiteralMap  a = Map.Map Literal a
@@ -591,13 +659,13 @@ xtTickish = alterTM
 ------------------------
 data AltMap a   -- A single alternative
   = AM { am_deflt :: CoreMapG a
-       , am_data  :: NameEnv (CoreMapG a)
+       , am_data  :: DNameEnv (CoreMapG a)
        , am_lit   :: LiteralMap (CoreMapG a) }
 
 instance TrieMap AltMap where
    type Key AltMap = CoreAlt
    emptyTM  = AM { am_deflt = emptyTM
-                 , am_data = emptyNameEnv
+                 , am_data = emptyDNameEnv
                  , am_lit  = emptyLiteralMap }
    lookupTM = lkA emptyCME
    alterTM  = xtA emptyCME
@@ -618,13 +686,13 @@ instance Eq (DeBruijn CoreAlt) where
 mapA :: (a->b) -> AltMap a -> AltMap b
 mapA f (AM { am_deflt = adeflt, am_data = adata, am_lit = alit })
   = AM { am_deflt = mapTM f adeflt
-       , am_data = mapNameEnv (mapTM f) adata
+       , am_data = mapTM (mapTM f) adata
        , am_lit = mapTM (mapTM f) alit }
 
 lkA :: CmEnv -> CoreAlt -> AltMap a -> Maybe a
 lkA env (DEFAULT,    _, rhs)  = am_deflt >.> lkG (D env rhs)
 lkA env (LitAlt lit, _, rhs)  = am_lit >.> lkLit lit >=> lkG (D env rhs)
-lkA env (DataAlt dc, bs, rhs) = am_data >.> lkNamed dc
+lkA env (DataAlt dc, bs, rhs) = am_data >.> lkDNamed dc
                                         >=> lkG (D (extendCMEs env bs) rhs)
 
 xtA :: CmEnv -> CoreAlt -> XT a -> AltMap a -> AltMap a
@@ -633,7 +701,7 @@ xtA env (DEFAULT, _, rhs)    f m =
 xtA env (LitAlt l, _, rhs)   f m =
     m { am_lit   = am_lit m   |> xtLit l |>> xtG (D env rhs) f }
 xtA env (DataAlt d, bs, rhs) f m =
-    m { am_data  = am_data m  |> xtNamed d
+    m { am_data  = am_data m  |> xtDNamed d
                              |>> xtG (D (extendCMEs env bs) rhs) f }
 
 fdA :: (a -> b -> b) -> AltMap a -> b -> b
@@ -706,7 +774,7 @@ type TypeMapG = GenMap TypeMapX
 data TypeMapX a
   = TM { tm_var    :: VarMap a
        , tm_app    :: TypeMapG (TypeMapG a)
-       , tm_tycon  :: NameEnv a
+       , tm_tycon  :: DNameEnv a
        , tm_forall :: TypeMapG (BndrMap a) -- See Note [Binders]
        , tm_tylit  :: TyLitMap a
        , tm_coerce :: Maybe a
@@ -768,7 +836,7 @@ instance Outputable a => Outputable (TypeMapG a) where
 emptyT :: TypeMapX a
 emptyT = TM { tm_var  = emptyTM
             , tm_app  = EmptyMap
-            , tm_tycon  = emptyNameEnv
+            , tm_tycon  = emptyDNameEnv
             , tm_forall = EmptyMap
             , tm_tylit  = emptyTyLitMap
             , tm_coerce = Nothing }
@@ -779,7 +847,7 @@ mapT f (TM { tm_var  = tvar, tm_app = tapp, tm_tycon = ttycon
            , tm_coerce = tcoerce })
   = TM { tm_var    = mapTM f tvar
        , tm_app    = mapTM (mapTM f) tapp
-       , tm_tycon  = mapNameEnv f ttycon
+       , tm_tycon  = mapTM f ttycon
        , tm_forall = mapTM (mapTM f) tforall
        , tm_tylit  = mapTM f tlit
        , tm_coerce = fmap f tcoerce }
@@ -792,7 +860,7 @@ lkT (D env ty) m = go ty m
     go (TyVarTy v)                 = tm_var    >.> lkVar env v
     go (AppTy t1 t2)               = tm_app    >.> lkG (D env t1)
                                                >=> lkG (D env t2)
-    go (TyConApp tc [])            = tm_tycon  >.> lkNamed tc
+    go (TyConApp tc [])            = tm_tycon  >.> lkDNamed tc
     go ty@(TyConApp _ (_:_))       = pprPanic "lkT TyConApp" (ppr ty)
     go (LitTy l)                   = tm_tylit  >.> lkTyLit l
     go (ForAllTy (Named tv _) ty)  = tm_forall >.> lkG (D (extendCME env tv) ty)
@@ -808,7 +876,7 @@ xtT (D env ty) f m | Just ty' <- trieMapView ty = xtT (D env ty') f m
 xtT (D env (TyVarTy v))       f m = m { tm_var    = tm_var m |> xtVar env v f }
 xtT (D env (AppTy t1 t2))     f m = m { tm_app    = tm_app m |> xtG (D env t1)
                                                             |>> xtG (D env t2) f }
-xtT (D _   (TyConApp tc []))  f m = m { tm_tycon  = tm_tycon m |> xtNamed tc f }
+xtT (D _   (TyConApp tc []))  f m = m { tm_tycon  = tm_tycon m |> xtDNamed tc f }
 xtT (D _   (LitTy l))         f m = m { tm_tylit  = tm_tylit m |> xtTyLit l f }
 xtT (D env (CastTy t _))      f m = xtT (D env t) f m
 xtT (D _   (CoercionTy {}))   f m = m { tm_coerce = tm_coerce m |> f }
@@ -981,11 +1049,11 @@ xtBndr env v f = xtG (D env (varType v)) f
 
 --------- Variable occurrence -------------
 data VarMap a = VM { vm_bvar   :: BoundVarMap a  -- Bound variable
-                   , vm_fvar   :: VarEnv a }      -- Free variable
+                   , vm_fvar   :: DVarEnv a }      -- Free variable
 
 instance TrieMap VarMap where
    type Key VarMap = Var
-   emptyTM  = VM { vm_bvar = IntMap.empty, vm_fvar = emptyVarEnv }
+   emptyTM  = VM { vm_bvar = IntMap.empty, vm_fvar = emptyDVarEnv }
    lookupTM = lkVar emptyCME
    alterTM  = xtVar emptyCME
    foldTM   = fdVar
@@ -993,24 +1061,24 @@ instance TrieMap VarMap where
 
 mapVar :: (a->b) -> VarMap a -> VarMap b
 mapVar f (VM { vm_bvar = bv, vm_fvar = fv })
-  = VM { vm_bvar = mapTM f bv, vm_fvar = mapVarEnv f fv }
+  = VM { vm_bvar = mapTM f bv, vm_fvar = mapTM f fv }
 
 lkVar :: CmEnv -> Var -> VarMap a -> Maybe a
 lkVar env v
   | Just bv <- lookupCME env v = vm_bvar >.> lookupTM bv
-  | otherwise                  = vm_fvar >.> lkFreeVar v
+  | otherwise                  = vm_fvar >.> lkDFreeVar v
 
 xtVar :: CmEnv -> Var -> XT a -> VarMap a -> VarMap a
 xtVar env v f m
-  | Just bv <- lookupCME env v = m { vm_bvar = vm_bvar m |> xtInt bv f }
-  | otherwise                  = m { vm_fvar = vm_fvar m |> xtFreeVar v f }
+  | Just bv <- lookupCME env v = m { vm_bvar = vm_bvar m |> alterTM bv f }
+  | otherwise                  = m { vm_fvar = vm_fvar m |> xtDFreeVar v f }
 
 fdVar :: (a -> b -> b) -> VarMap a -> b -> b
 fdVar k m = foldTM k (vm_bvar m)
           . foldTM k (vm_fvar m)
 
-lkFreeVar :: Var -> VarEnv a -> Maybe a
-lkFreeVar var env = lookupVarEnv env var
+lkDFreeVar :: Var -> DVarEnv a -> Maybe a
+lkDFreeVar var env = lookupDVarEnv env var
 
-xtFreeVar :: Var -> XT a -> VarEnv a -> VarEnv a
-xtFreeVar v f m = alterVarEnv f m v
+xtDFreeVar :: Var -> XT a -> DVarEnv a -> DVarEnv a
+xtDFreeVar v f m = alterDVarEnv f m v

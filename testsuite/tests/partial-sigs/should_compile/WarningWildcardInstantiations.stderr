@@ -10,7 +10,7 @@ Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,
 WarningWildcardInstantiations.hs:5:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_a’ standing for ‘a’
       Where: ‘a’ is a rigid type variable bound by
-               the inferred type of foo :: (Show a, Enum a) => a -> String
+               the inferred type of foo :: (Enum a, Show a) => a -> String
                at WarningWildcardInstantiations.hs:6:1
     • In the type signature:
         foo :: (Show _a, _) => _a -> _

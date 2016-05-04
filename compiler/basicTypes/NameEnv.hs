@@ -21,6 +21,12 @@ module NameEnv (
         lookupNameEnv, lookupNameEnv_NF, delFromNameEnv, delListFromNameEnv,
         elemNameEnv, mapNameEnv, disjointNameEnv,
 
+        DNameEnv,
+
+        emptyDNameEnv,
+        lookupDNameEnv,
+        mapDNameEnv,
+        alterDNameEnv,
         -- ** Dependency analysis
         depAnal
     ) where
@@ -31,6 +37,7 @@ import Digraph
 import Name
 import Unique
 import UniqFM
+import UniqDFM
 import Maybes
 
 {-
@@ -118,3 +125,20 @@ anyNameEnv f x          = foldUFM ((||) . f) False x
 disjointNameEnv x y     = isNullUFM (intersectUFM x y)
 
 lookupNameEnv_NF env n = expectJust "lookupNameEnv_NF" (lookupNameEnv env n)
+
+-- Deterministic NameEnv
+-- See Note [Deterministic UniqFM] in UniqDFM for explanation why we need
+-- DNameEnv.
+type DNameEnv a = UniqDFM a
+
+emptyDNameEnv :: DNameEnv a
+emptyDNameEnv = emptyUDFM
+
+lookupDNameEnv :: DNameEnv a -> Name -> Maybe a
+lookupDNameEnv = lookupUDFM
+
+mapDNameEnv :: (a -> b) -> DNameEnv a -> DNameEnv b
+mapDNameEnv = mapUDFM
+
+alterDNameEnv :: (Maybe a -> Maybe a) -> DNameEnv a -> Name -> DNameEnv a
+alterDNameEnv = alterUDFM

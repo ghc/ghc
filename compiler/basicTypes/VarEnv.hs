@@ -31,6 +31,8 @@ module VarEnv (
         extendDVarEnv,
         lookupDVarEnv,
         foldDVarEnv,
+        mapDVarEnv,
+        alterDVarEnv,
 
         -- * The InScopeSet type
         InScopeSet,
@@ -511,3 +513,9 @@ lookupDVarEnv = lookupUDFM
 
 foldDVarEnv :: (a -> b -> b) -> b -> DVarEnv a -> b
 foldDVarEnv = foldUDFM
+
+mapDVarEnv :: (a -> b) -> DVarEnv a -> DVarEnv b
+mapDVarEnv = mapUDFM
+
+alterDVarEnv :: (Maybe a -> Maybe a) -> DVarEnv a -> Var -> DVarEnv a
+alterDVarEnv = alterUDFM
