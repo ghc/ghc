@@ -12,13 +12,13 @@ import Rules.Dependencies
 import Rules.Documentation
 import Rules.Generate
 import Rules.Cabal
+import Rules.Configure
 import Rules.Gmp
 import Rules.Libffi
 import Rules.Library
 import Rules.Perl
 import Rules.Program
 import Rules.Register
-import Rules.Setup
 import Settings
 
 allStages :: [Stage]
@@ -81,10 +81,10 @@ packageRules = do
 buildRules :: Rules ()
 buildRules = do
     cabalRules
+    configureRules
     generateRules
     copyRules
     gmpRules
     libffiRules
     perlScriptRules
-    setupRules
     packageRules

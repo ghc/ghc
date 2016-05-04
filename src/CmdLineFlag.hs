@@ -1,6 +1,6 @@
 module CmdLineFlag (
-    putCmdLineFlags, cmdFlags, cmdBuildHaddock, cmdSetup, Setup (..),
-    cmdFlavour, Flavour (..), cmdProgressInfo, ProgressInfo (..), cmdSplitObjects
+    putCmdLineFlags, cmdFlags, cmdBuildHaddock, cmdFlavour, Flavour (..),
+    cmdProgressInfo, ProgressInfo (..), cmdSkipConfigure, cmdSplitObjects
     ) where
 
 import Data.List.Extra
@@ -11,28 +11,27 @@ import System.IO.Unsafe (unsafePerformIO)
 
 -- Command line flags
 data ProgressInfo = None | Brief | Normal | Unicorn deriving (Eq, Show)
-data Setup        = SkipSetup | RunSetup String deriving (Eq, Show)
 data Flavour      = Default | Quick deriving (Eq, Show)
 
 -- | 'CmdLineFlag.Untracked' is a collection of flags that can be passed via the
 -- command line. These flags are not tracked, that is they do not force any
 -- build rules to be rurun.
 data Untracked = Untracked
-    { buildHaddock :: Bool
-    , flavour      :: Flavour
-    , progressInfo :: ProgressInfo
-    , setup        :: Setup
-    , splitObjects :: Bool }
+    { buildHaddock  :: Bool
+    , flavour       :: Flavour
+    , progressInfo  :: ProgressInfo
+    , skipConfigure :: Bool
+    , splitObjects  :: Bool }
     deriving (Eq, Show)
 
 -- | Default values for 'CmdLineFlag.Untracked'.
 defaultUntracked :: Untracked
 defaultUntracked = Untracked
-    { buildHaddock = False
-    , flavour      = Default
-    , progressInfo = Normal
-    , setup        = SkipSetup
-    , splitObjects = False }
+    { buildHaddock  = False
+    , flavour       = Default
+    , progressInfo  = Normal
+    , skipConfigure = False
+    , splitObjects  = False }
 
 readBuildHaddock :: Either String (Untracked -> Untracked)
 readBuildHaddock = Right $ \flags -> flags { buildHaddock = True }
@@ -61,15 +60,8 @@ readProgressInfo ms =
     set :: ProgressInfo -> Untracked -> Untracked
     set flag flags = flags { progressInfo = flag }
 
-readSetup :: Maybe String -> Either String (Untracked -> Untracked)
-readSetup ms =
-    maybe (Left "Cannot parse setup") (Right . set) (go $ lower <$> ms)
-  where
-    go :: Maybe String -> Maybe Setup
-    go (Just args) = Just $ RunSetup args
-    go Nothing     = Just $ RunSetup ""
-    set :: Setup -> Untracked -> Untracked
-    set flag flags = flags { setup = flag }
+readSkipConfigure :: Either String (Untracked -> Untracked)
+readSkipConfigure = Right $ \flags -> flags { skipConfigure = True }
 
 readSplitObjects :: Either String (Untracked -> Untracked)
 readSplitObjects = Right $ \flags -> flags { splitObjects = True }
@@ -82,8 +74,8 @@ cmdFlags =
       "Generate Haddock documentation."
     , Option [] ["progress-info"] (OptArg readProgressInfo "STYLE")
       "Progress info style (None, Brief, Normal, or Unicorn)."
-    , Option [] ["setup"] (OptArg readSetup "CONFIGURE_ARGS")
-      "Setup the build system, pass CONFIGURE_ARGS to ./configure."
+    , Option [] ["skip-configure"] (NoArg readSkipConfigure)
+      "Skip the boot and configure scripts (if you want to run them manually)."
     , Option [] ["split-objects"] (NoArg readSplitObjects)
       "Generate split objects (requires a full clean rebuild)." ]
 
@@ -109,8 +101,8 @@ cmdFlavour = flavour getCmdLineFlags
 cmdProgressInfo :: ProgressInfo
 cmdProgressInfo = progressInfo getCmdLineFlags
 
-cmdSetup :: Setup
-cmdSetup = setup getCmdLineFlags
-
 cmdSplitObjects :: Bool
 cmdSplitObjects = splitObjects getCmdLineFlags
+
+cmdSkipConfigure :: Bool
+cmdSkipConfigure = skipConfigure getCmdLineFlags

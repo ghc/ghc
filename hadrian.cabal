@@ -42,6 +42,7 @@ executable hadrian
                        , Rules.Cabal
                        , Rules.Clean
                        , Rules.Compile
+                       , Rules.Configure
                        , Rules.Data
                        , Rules.Dependencies
                        , Rules.Documentation
@@ -62,7 +63,6 @@ executable hadrian
                        , Rules.Program
                        , Rules.Register
                        , Rules.Selftest
-                       , Rules.Setup
                        , Rules.Test
                        , Rules.Wrappers.Ghc
                        , Rules.Wrappers.GhcPkg

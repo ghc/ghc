@@ -1,7 +1,6 @@
 module Settings.Builders.Configure (configureArgs) where
 
 import Base
-import CmdLineFlag
 import Expression
 import Oracles.Config.Setting
 import Predicates (builder)
@@ -9,11 +8,7 @@ import Settings
 
 configureArgs :: Args
 configureArgs = mconcat
-    [ builder (Configure ".") ? case cmdSetup of
-                                    RunSetup setup -> arg setup
-                                    _              -> mempty
-
-    , builder (Configure libffiBuildPath) ? do
+    [ builder (Configure libffiBuildPath) ? do
         top            <- getTopDirectory
         targetPlatform <- getSetting TargetPlatform
         mconcat [ arg $ "--prefix=" ++ top -/- libffiBuildPath -/- "inst"
