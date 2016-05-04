@@ -139,9 +139,9 @@ import ByteCodeTypes
 import InteractiveEvalTypes ( Resume )
 import GHCi.Message         ( Pipe )
 import GHCi.RemoteTypes
-import UniqFM
 #endif
 
+import UniqFM
 import HsSyn
 import RdrName
 import Avail

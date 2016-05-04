@@ -83,6 +83,11 @@ test('haddock.Cabal',
             # 2016-05-22: 11805238152 (amd64/Linux) - Make Generic1 poly-kinded
             # 2016-06-05: 10997887320 (amd64/Linux) - Refactor derived Generic instances to reduce allocations
             # 2016-06-21: 10070330520 (amd64/Linux) - D2350: Make checkFamInstConsistency less expensive
+            # 2016-08-07: 16001233464 (amd64/Linux) - Cabal update
+            #   It's worth noting that allocations scale up with the number
+            #   of modules in Cabal.  This Cabal update added a large number
+            #   of new modules; if you exclude them from the haddock run
+            #   the stats are comparable.
 
           ,(platform('i386-unknown-mingw32'), 3293415576, 5)
             # 2012-10-30:                     1733638168 (x86/Windows)

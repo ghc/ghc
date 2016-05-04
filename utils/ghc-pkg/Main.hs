@@ -1079,7 +1079,7 @@ type PackageCacheFormat = GhcPkg.InstalledPackageInfo
                             PackageName
                             UnitId
                             ModuleName
-                            OriginalModule
+                            Module
 
 convertPackageInfoToCacheFormat :: InstalledPackageInfo -> PackageCacheFormat
 convertPackageInfoToCacheFormat pkg =
@@ -1132,9 +1132,9 @@ instance GhcPkg.BinaryStringRep String where
   fromStringRep = fromUTF8 . BS.unpack
   toStringRep   = BS.pack . toUTF8
 
-instance GhcPkg.DbModuleRep UnitId ModuleName OriginalModule where
-  fromDbModule (GhcPkg.DbModule uid mod_name) = OriginalModule uid mod_name
-  toDbModule (OriginalModule uid mod_name) = GhcPkg.DbModule uid mod_name
+instance GhcPkg.DbModuleRep UnitId ModuleName Module where
+  fromDbModule (GhcPkg.DbModule uid mod_name) = Module uid mod_name
+  toDbModule (Module uid mod_name) = GhcPkg.DbModule uid mod_name
 
 -- -----------------------------------------------------------------------------
 -- Exposing, Hiding, Trusting, Distrusting, Unregistering are all similar
@@ -1741,7 +1741,7 @@ checkExposedModules db_stack pkg =
   where
     checkExposedModule (ExposedModule modl reexport) = do
       let checkOriginal = checkModuleFile pkg modl
-          checkReexport = checkOriginalModule "module reexport" db_stack pkg
+          checkReexport = checkModule "module reexport" db_stack pkg
       maybe checkOriginal checkReexport reexport
 
 -- | Validates the existence of an appropriate @hi@ file associated with
@@ -1779,13 +1779,13 @@ checkDuplicateModules pkg
 -- implementation, then we should also check that the original module in
 -- question is NOT a signature (however, if it is a reexport, then it's fine
 -- for the original module to be a signature.)
-checkOriginalModule :: String
+checkModule :: String
                     -> PackageDBStack
                     -> InstalledPackageInfo
-                    -> OriginalModule
+                    -> Module
                     -> Validate ()
-checkOriginalModule field_name db_stack pkg
-    (OriginalModule definingPkgId definingModule) =
+checkModule field_name db_stack pkg
+    (Module definingPkgId definingModule) =
   let mpkg = if definingPkgId == installedUnitId pkg
               then Just pkg
               else PackageIndex.lookupUnitId ipix definingPkgId

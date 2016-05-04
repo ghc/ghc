@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 
 module Main (main) where
 
@@ -150,16 +151,14 @@ doCopy directory distDir
       noGhcPrimHook f pd lbi us flags
               = let pd'
                      | packageName pd == PackageName "ghc-prim" =
-                        case libraries pd of
-                        [lib] ->
+                        case library pd of
+                        Just lib ->
                             let ghcPrim = fromJust (simpleParse "GHC.Prim")
                                 ems = filter (ghcPrim /=) (exposedModules lib)
                                 lib' = lib { exposedModules = ems }
-                            in pd { libraries = [lib'] }
-                        [] ->
+                            in pd { library = Just lib' }
+                        Nothing ->
                             error "Expected a library, but none found"
-                        _ ->
-                            error "Expected a single library, but multiple found"
                      | otherwise = pd
                 in f pd' lbi us flags
       modHook relocatableBuild f pd lbi us flags
@@ -326,7 +325,7 @@ generate directory distdir dll0Modules config_args
           comp = compiler lbi
           libBiModules lib = (libBuildInfo lib, libModules lib)
           exeBiModules exe = (buildInfo exe, ModuleName.main : exeModules exe)
-          biModuless = (map libBiModules $ libraries pd)
+          biModuless = (map libBiModules . maybeToList $ library pd)
                     ++ (map exeBiModules $ executables pd)
           buildableBiModuless = filter isBuildable biModuless
               where isBuildable (bi', _) = buildable bi'

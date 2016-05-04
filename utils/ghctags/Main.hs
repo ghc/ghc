@@ -23,6 +23,8 @@ import Distribution.Simple.Configure ( getPersistBuildConfig )
 import Distribution.Simple.Program.GHC ( renderGhcOptions )
 import Distribution.PackageDescription ( libBuildInfo )
 import Distribution.Simple.LocalBuildInfo
+import Distribution.Types.LocalBuildInfo ( componentNameTargets' )
+import Distribution.Types.TargetInfo
 import qualified Distribution.Verbosity as V
 
 import Control.Monad hiding (mapM)
@@ -179,14 +181,16 @@ flagsFromCabal :: FilePath -> IO [String]
 flagsFromCabal distPref = do
   lbi <- getPersistBuildConfig distPref
   let pd = localPkgDescr lbi
-  case maybeGetDefaultLibraryLocalBuildInfo lbi of
-    Just clbi ->
-      let CLib lib = getComponent pd (componentLocalName clbi)
+  case componentNameTargets' pd lbi CLibName of
+    [target] ->
+      let clbi = targetCLBI target
+          CLib lib = getComponent pd (componentLocalName clbi)
           bi = libBuildInfo lib
           odir = buildDir lbi
           opts = componentGhcOptions V.normal lbi bi clbi odir
       in return $ renderGhcOptions (compiler lbi) (hostPlatform lbi) opts
-    _ -> error "no library"
+    [] -> error "no library"
+    _ -> error "more libraries than we know how to handle"
 
 ----------------------------------------------------------------
 --- LOADING HASKELL SOURCE
