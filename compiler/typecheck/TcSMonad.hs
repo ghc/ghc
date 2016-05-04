@@ -149,6 +149,7 @@ import TcRnTypes
 
 import Unique
 import UniqFM
+import UniqDFM
 import Maybes
 
 import StaticFlags( opt_PprStyle_Debug )
@@ -2071,37 +2072,38 @@ not match the requsted info exactly!
 
 -}
 
-type TcAppMap a = UniqFM (ListMap LooseTypeMap a)
+type TcAppMap a = UniqDFM (ListMap LooseTypeMap a)
     -- Indexed by tycon then the arg types, using "loose" matching, where
     -- we don't require kind equality. This allows, for example, (a |> co)
     -- to match (a).
     -- See Note [Use loose types in inert set]
-    -- Used for types and classes; hence UniqFM
+    -- Used for types and classes; hence UniqDFM
+    -- See Note [foldTM determinism] for why we use UniqDFM here
 
 isEmptyTcAppMap :: TcAppMap a -> Bool
-isEmptyTcAppMap m = isNullUFM m
+isEmptyTcAppMap m = isNullUDFM m
 
 emptyTcAppMap :: TcAppMap a
-emptyTcAppMap = emptyUFM
+emptyTcAppMap = emptyUDFM
 
 findTcApp :: TcAppMap a -> Unique -> [Type] -> Maybe a
-findTcApp m u tys = do { tys_map <- lookupUFM m u
+findTcApp m u tys = do { tys_map <- lookupUDFM m u
                        ; lookupTM tys tys_map }
 
 delTcApp :: TcAppMap a -> Unique -> [Type] -> TcAppMap a
-delTcApp m cls tys = adjustUFM (deleteTM tys) m cls
+delTcApp m cls tys = adjustUDFM (deleteTM tys) m cls
 
 insertTcApp :: TcAppMap a -> Unique -> [Type] -> a -> TcAppMap a
-insertTcApp m cls tys ct = alterUFM alter_tm m cls
+insertTcApp m cls tys ct = alterUDFM alter_tm m cls
   where
     alter_tm mb_tm = Just (insertTM tys ct (mb_tm `orElse` emptyTM))
 
 -- mapTcApp :: (a->b) -> TcAppMap a -> TcAppMap b
--- mapTcApp f = mapUFM (mapTM f)
+-- mapTcApp f = mapUDFM (mapTM f)
 
 filterTcAppMap :: (Ct -> Bool) -> TcAppMap Ct -> TcAppMap Ct
 filterTcAppMap f m
-  = mapUFM do_tm m
+  = mapUDFM do_tm m
   where
     do_tm tm = foldTM insert_mb tm emptyTM
     insert_mb ct tm
@@ -2117,7 +2119,7 @@ tcAppMapToBag :: TcAppMap a -> Bag a
 tcAppMapToBag m = foldTcAppMap consBag m emptyBag
 
 foldTcAppMap :: (a -> b -> b) -> TcAppMap a -> b -> b
-foldTcAppMap k m z = foldUFM (foldTM k) z m
+foldTcAppMap k m z = foldUDFM (foldTM k) z m
 
 
 {- *********************************************************************
@@ -2139,7 +2141,7 @@ findDict m cls tys = findTcApp m (getUnique cls) tys
 
 findDictsByClass :: DictMap a -> Class -> Bag a
 findDictsByClass m cls
-  | Just tm <- lookupUFM m cls = foldTM consBag tm emptyBag
+  | Just tm <- lookupUDFM m cls = foldTM consBag tm emptyBag
   | otherwise                  = emptyBag
 
 delDict :: DictMap a -> Class -> [Type] -> DictMap a
@@ -2150,7 +2152,7 @@ addDict m cls tys item = insertTcApp m (getUnique cls) tys item
 
 addDictsByClass :: DictMap Ct -> Class -> Bag Ct -> DictMap Ct
 addDictsByClass m cls items
-  = addToUFM m cls (foldrBag add emptyTM items)
+  = addToUDFM m cls (foldrBag add emptyTM items)
   where
     add ct@(CDictCan { cc_tyargs = tys }) tm = insertTM tys ct tm
     add ct _ = pprPanic "addDictsByClass" (ppr ct)
@@ -2203,7 +2205,7 @@ findFunEqsByTyCon :: FunEqMap a -> TyCon -> [a]
 -- We use this to check for derived interactions with built-in type-function
 -- constructors.
 findFunEqsByTyCon m tc
-  | Just tm <- lookupUFM m tc = foldTM (:) tm []
+  | Just tm <- lookupUDFM m tc = foldTM (:) tm []
   | otherwise                 = []
 
 foldFunEqs :: (a -> b -> b) -> FunEqMap a -> b -> b
