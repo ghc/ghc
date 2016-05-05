@@ -6,6 +6,7 @@ import Development.Shake
 import Test.QuickCheck
 
 import Base
+import Oracles.ModuleFiles (decodeModule, encodeModule)
 import Settings.Builders.Ar (chunksOfSize)
 import Way
 

@@ -22,8 +22,7 @@ module Base (
 
     -- * Miscellaneous utilities
     minusOrd, intersectOrd, lookupAll, replaceEq, quote, replaceSeparators,
-    decodeModule, encodeModule, unifyPath, (-/-), versionToInt,
-    matchVersionedFilePath
+    unifyPath, (-/-), versionToInt, matchVersionedFilePath
     ) where
 
 import Control.Applicative
@@ -83,21 +82,6 @@ versionToInt :: String -> Int
 versionToInt s = major * 1000 + minor * 10 + patch
   where
     [major, minor, patch] = map read . words $ replaceEq '.' ' ' s
-
--- | Given a module name extract the directory and file name, e.g.:
---
--- > decodeModule "Data.Functor.Identity" == ("Data/Functor/", "Identity")
--- > decodeModule "Prelude"               == ("./", "Prelude")
-decodeModule :: String -> (FilePath, String)
-decodeModule = splitFileName . replaceEq '.' '/'
-
--- | Given the directory and file name find the corresponding module name, e.g.:
---
--- > encodeModule "Data/Functor/" "Identity.hs" == "Data.Functor.Identity"
--- > encodeModule "./" "Prelude"                == "Prelude"
--- > uncurry encodeModule (decodeModule name)   == name
-encodeModule :: FilePath -> String -> String
-encodeModule dir file = replaceEq '/' '.' $ dir -/- takeBaseName file
 
 -- | Normalise a path and convert all path separators to @/@, even on Windows.
 unifyPath :: FilePath -> FilePath

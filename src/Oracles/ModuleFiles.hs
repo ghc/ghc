@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
 module Oracles.ModuleFiles (
-    findGenerator, haskellSources, moduleFilesOracle
+    decodeModule, encodeModule, findGenerator, haskellSources, moduleFilesOracle
     ) where
 
 import qualified Data.HashMap.Strict as Map
@@ -25,6 +25,21 @@ determineBuilder file = case takeExtension file of
     ".ly"  -> Just Happy
     ".hsc" -> Just Hsc2Hs
     _      -> Nothing
+
+-- | Given a module name extract the directory and file name, e.g.:
+--
+-- > decodeModule "Data.Functor.Identity" == ("Data/Functor/", "Identity")
+-- > decodeModule "Prelude"               == ("./", "Prelude")
+decodeModule :: String -> (FilePath, String)
+decodeModule = splitFileName . replaceEq '.' '/'
+
+-- | Given the directory and file name find the corresponding module name, e.g.:
+--
+-- > encodeModule "Data/Functor/" "Identity.hs" == "Data.Functor.Identity"
+-- > encodeModule "./" "Prelude"                == "Prelude"
+-- > uncurry encodeModule (decodeModule name)   == name
+encodeModule :: FilePath -> String -> String
+encodeModule dir file = replaceEq '/' '.' $ dir -/- takeBaseName file
 
 -- | Find the generator for a given 'Context' and a source file. For example:
 -- findGenerator (Context Stage1 compiler vanilla)
