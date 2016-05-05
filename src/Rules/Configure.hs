@@ -24,7 +24,7 @@ configureRules = do
             -- We cannot use windowsHost here due to a cyclic dependency.
             when (System.os == "mingw32") $ do
                 putBuild "| Checking for Windows tarballs..."
-                quietly $ cmd ["bash mk/get-win32-tarballs.sh download", System.arch]
+                quietly $ cmd ["bash", "mk/get-win32-tarballs.sh", "download", System.arch]
             let srcs    = map (<.> "in") outs
                 context = vanillaContext Stage0 compiler
             need srcs
