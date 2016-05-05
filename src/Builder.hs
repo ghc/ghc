@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric, LambdaCase #-}
 module Builder (
     CompilerMode (..), Builder (..),
-    builderPath, getBuilderPath, specified, needBuilder
+    builderPath, getBuilderPath, builderEnvironment, specified, needBuilder
     ) where
 
 import Control.Monad.Trans.Reader
@@ -133,6 +133,13 @@ builderPath builder = case builderProvenance builder of
 
 getBuilderPath :: Builder -> ReaderT a Action FilePath
 getBuilderPath = lift . builderPath
+
+-- | Write a Builder's path into a given environment variable.
+builderEnvironment :: String -> Builder -> Action CmdOption
+builderEnvironment variable builder = do
+    needBuilder builder
+    path <- builderPath builder
+    return $ AddEnv variable path
 
 specified :: Builder -> Action Bool
 specified = fmap (not . null) . builderPath

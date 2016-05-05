@@ -1,6 +1,7 @@
 module Rules.Libffi (rtsBuildPath, libffiRules, libffiDependencies) where
 
 import Base
+import Builder
 import Expression
 import GHC
 import Oracles.Config.Flag
@@ -43,19 +44,14 @@ configureEnvironment = do
                [ cArgs
                , argStagedSettingList ConfCcArgs ]
     ldFlags <- interpretInContext libffiContext $ fromDiffExpr ldArgs
-    sequence [ builderEnv "CC" $ Cc Compile Stage1
-             , builderEnv "CXX" $ Cc Compile Stage1
-             , builderEnv "LD" Ld
-             , builderEnv "AR" Ar
-             , builderEnv "NM" Nm
-             , builderEnv "RANLIB" Ranlib
+    sequence [ builderEnvironment "CC" $ Cc Compile Stage1
+             , builderEnvironment "CXX" $ Cc Compile Stage1
+             , builderEnvironment "LD" Ld
+             , builderEnvironment "AR" Ar
+             , builderEnvironment "NM" Nm
+             , builderEnvironment "RANLIB" Ranlib
              , return . AddEnv  "CFLAGS" $ unwords  cFlags ++ " -w"
              , return . AddEnv "LDFLAGS" $ unwords ldFlags ++ " -w" ]
-  where
-    builderEnv var b = do
-        needBuilder b
-        path <- builderPath b
-        return $ AddEnv var path
 
 -- TODO: remove code duplication (need sourcePath)
 -- TODO: split into multiple rules

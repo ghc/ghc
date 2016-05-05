@@ -1,6 +1,7 @@
 module Rules.Gmp (gmpRules) where
 
 import Base
+import Builder
 import Expression
 import GHC
 import Oracles.Config.Setting
@@ -11,31 +12,22 @@ import Settings.Paths
 import Target
 
 gmpBase :: FilePath
-gmpBase = "libraries/integer-gmp/gmp"
+gmpBase = pkgPath integerGmp -/- "gmp"
 
 gmpContext :: Context
 gmpContext = vanillaContext Stage1 integerGmp
 
+-- TODO: Noone needs this file, but we build it. Why?
 gmpLibraryInTreeH :: FilePath
 gmpLibraryInTreeH = gmpBuildPath -/- "include/gmp.h"
-
-gmpLibraryFakeH :: FilePath
-gmpLibraryFakeH = gmpBase -/- "ghc-gmp.h"
 
 gmpPatches :: [FilePath]
 gmpPatches = (gmpBase -/-) <$> ["gmpsrc.patch", "tarball/gmp-5.0.4.patch"]
 
--- TODO: See Libffi.hs about removing code duplication.
 configureEnvironment :: Action [CmdOption]
-configureEnvironment = do
-    sequence [ builderEnv "CC" $ Cc Compile Stage1
-             , builderEnv "AR" Ar
-             , builderEnv "NM" Nm ]
-  where
-    builderEnv var bld = do
-        needBuilder bld
-        path <- builderPath bld
-        return $ AddEnv var path
+configureEnvironment = sequence [ builderEnvironment "CC" $ Cc Compile Stage1
+                                , builderEnvironment "AR" Ar
+                                , builderEnvironment "NM" Nm ]
 
 -- TODO: we rebuild gmp every time.
 gmpRules :: Rules ()
@@ -53,7 +45,7 @@ gmpRules = do
         then do
             putBuild "| GMP library/framework detected and will be used"
             createDirectory $ takeDirectory gmpLibraryH
-            copyFile gmpLibraryFakeH gmpLibraryH
+            copyFile (gmpBase -/- "ghc-gmp.h") gmpLibraryH
         else do
             putBuild "| No GMP library/framework detected; in tree GMP will be built"
 
