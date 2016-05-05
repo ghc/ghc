@@ -17,7 +17,7 @@ configureArgs = mconcat
                 , arg $ "--enable-shared=no" -- TODO: add support for yes
                 , arg $ "--host=" ++ targetPlatform ]
 
-    , builder (Configure $ gmpBuildPath -/- "lib") ? do
+    , builder (Configure gmpBuildPath) ? do
         hostPlatform  <- getSetting HostPlatform
         buildPlatform <- getSetting BuildPlatform
         mconcat [ arg $ "--enable-shared=no"

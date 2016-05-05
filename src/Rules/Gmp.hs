@@ -52,8 +52,7 @@ gmpRules = do
     -- TODO: split into multiple rules
     gmpLibraryH %> \_ -> do
         when trackBuildSystem $ need [sourcePath -/- "Rules/Gmp.hs"]
-        liftIO $ removeFiles gmpBuildPath ["//*"]
-        createDirectory $ takeDirectory gmpLibraryH
+        removeDirectoryIfExists gmpBuildPath
 
         -- We don't use system GMP on Windows. TODO: fix?
         windows  <- windowsHost
@@ -62,6 +61,7 @@ gmpRules = do
             [ "HaveFrameworkGMP = YES", "HaveLibGmp = YES" ]
         then do
             putBuild "| GMP library/framework detected and will be used"
+            createDirectory $ takeDirectory gmpLibraryH
             copyFile gmpLibraryFakeH gmpLibraryH
         else do
             putBuild "| No GMP library/framework detected; in tree GMP will be built"
@@ -76,34 +76,38 @@ gmpRules = do
                          ++ "(found: " ++ show tarballs ++ ")."
 
             need tarballs
-            build $ Target gmpContext Tar tarballs [gmpBuildPath]
+            withTempDir $ \dir -> do
+                let tmp = unifyPath dir
+                build $ Target gmpContext Tar tarballs [tmp]
 
-            forM_ gmpPatches $ \src -> do
-                let patch     = takeFileName src
-                    patchPath = gmpBuildPath -/- patch
-                copyFile src patchPath
-                applyPatch gmpBuildPath patch
+                forM_ gmpPatches $ \src -> do
+                    let patch     = takeFileName src
+                        patchPath = tmp -/- patch
+                    copyFile src patchPath
+                    applyPatch tmp patch
 
-            let filename = dropExtension . dropExtension . takeFileName $ head tarballs
-                suffix   = "-nodoc-patched"
-            unless (suffix `isSuffixOf` filename) $
-                putError $ "gmpRules: expected suffix " ++ suffix
-                         ++ " (found: " ++ filename ++ ")."
-            let libName = take (length filename - length suffix) filename
-                libPath = gmpBuildPath -/- "lib"
+                let filename = dropExtension . dropExtension . takeFileName
+                             $ head tarballs
+                    suffix   = "-nodoc-patched"
+                unless (suffix `isSuffixOf` filename) $
+                    putError $ "gmpRules: expected suffix " ++ suffix
+                        ++ " (found: " ++ filename ++ ")."
+                let libName = take (length filename - length suffix) filename
 
-            moveDirectory (gmpBuildPath -/- libName) libPath
+                moveDirectory (tmp -/- libName) gmpBuildPath
 
             env <- configureEnvironment
             buildWithCmdOptions env $
-                Target gmpContext (Configure libPath)
-                       [libPath -/- "Makefile.in"] [libPath -/- "Makefile"]
+                Target gmpContext (Configure gmpBuildPath)
+                       [gmpBuildPath -/- "Makefile.in"]
+                       [gmpBuildPath -/- "Makefile"]
 
-            runMake libPath ["MAKEFLAGS="]
+            runMake gmpBuildPath ["MAKEFLAGS="]
 
-            copyFile (libPath -/- "gmp.h") gmpLibraryInTreeH
-            copyFile (libPath -/- "gmp.h") gmpLibraryH
-            moveFile (libPath -/- ".libs/libgmp.a") gmpLibrary
+            createDirectory $ takeDirectory gmpLibraryH
+            copyFile (gmpBuildPath -/- "gmp.h") gmpLibraryH
+            copyFile (gmpBuildPath -/- "gmp.h") gmpLibraryInTreeH
+            moveFile (gmpBuildPath -/- ".libs/libgmp.a") gmpLibrary
 
             createDirectory gmpObjects
             build $ Target gmpContext Ar [gmpLibrary] [gmpObjects]
