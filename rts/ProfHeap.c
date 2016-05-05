@@ -50,13 +50,14 @@ static uint32_t max_era;
 typedef struct _counter {
     void *identity;
     union {
-        uint32_t resid;
+        ssize_t resid;
         struct {
-            long prim;     // total size of 'inherently used' closures
-            long not_used; // total size of 'never used' closures
-            long used;     // total size of 'used at least once' closures
-            long void_total;  // current total size of 'destroyed without being used' closures
-            long drag_total;  // current total size of 'used at least once and waiting to die'
+            // Total sizes of:
+            ssize_t prim;     // 'inherently used' closures
+            ssize_t not_used; // 'never used' closures
+            ssize_t used;     // 'used at least once' closures
+            ssize_t void_total;  // 'destroyed without being used' closures
+            ssize_t drag_total;  // 'used at least once and waiting to die'
         } ldv;
     } c;
     struct _counter *next;
@@ -79,11 +80,11 @@ typedef struct {
     Arena     * arena;
 
     // for LDV profiling, when just displaying by LDV
-    long       prim;
-    long       not_used;
-    long       used;
-    long       void_total;
-    long       drag_total;
+    ssize_t    prim;
+    ssize_t    not_used;
+    ssize_t    used;
+    ssize_t    void_total;
+    ssize_t    drag_total;
 } Census;
 
 static Census *censuses = NULL;
@@ -193,14 +194,14 @@ LDV_recordDead( StgClosure *c, uint32_t size )
             t = (LDVW((c)) & LDV_CREATE_MASK) >> LDV_SHIFT;
             if (t < era) {
                 if (RtsFlags.ProfFlags.bioSelector == NULL) {
-                    censuses[t].void_total   += (long)size;
-                    censuses[era].void_total -= (long)size;
+                    censuses[t].void_total   += size;
+                    censuses[era].void_total -= size;
                     ASSERT(censuses[t].void_total < censuses[t].not_used);
                 } else {
                     id = closureIdentity(c);
                     ctr = lookupHashTable(censuses[t].hash, (StgWord)id);
                     ASSERT( ctr != NULL );
-                    ctr->c.ldv.void_total += (long)size;
+                    ctr->c.ldv.void_total += size;
                     ctr = lookupHashTable(censuses[era].hash, (StgWord)id);
                     if (ctr == NULL) {
                         ctr = arenaAlloc(censuses[era].arena, sizeof(counter));
@@ -210,7 +211,7 @@ LDV_recordDead( StgClosure *c, uint32_t size )
                         ctr->next = censuses[era].ctrs;
                         censuses[era].ctrs = ctr;
                     }
-                    ctr->c.ldv.void_total -= (long)size;
+                    ctr->c.ldv.void_total -= size;
                 }
             }
         } else {
@@ -224,7 +225,7 @@ LDV_recordDead( StgClosure *c, uint32_t size )
                     id = closureIdentity(c);
                     ctr = lookupHashTable(censuses[t+1].hash, (StgWord)id);
                     ASSERT( ctr != NULL );
-                    ctr->c.ldv.drag_total += (long)size;
+                    ctr->c.ldv.drag_total += size;
                     ctr = lookupHashTable(censuses[era].hash, (StgWord)id);
                     if (ctr == NULL) {
                         ctr = arenaAlloc(censuses[era].arena, sizeof(counter));
@@ -234,7 +235,7 @@ LDV_recordDead( StgClosure *c, uint32_t size )
                         ctr->next = censuses[era].ctrs;
                         censuses[era].ctrs = ctr;
                     }
-                    ctr->c.ldv.drag_total -= (long)size;
+                    ctr->c.ldv.drag_total -= size;
                 }
             }
         }
@@ -739,7 +740,7 @@ static void
 dumpCensus( Census *census )
 {
     counter *ctr;
-    long count;
+    ssize_t count;
 
     printSample(rtsTrue, census->time);
 
@@ -835,7 +836,7 @@ dumpCensus( Census *census )
 }
 
 
-static void heapProfObject(Census *census, StgClosure *p, uint32_t size,
+static void heapProfObject(Census *census, StgClosure *p, size_t size,
                            rtsBool prim
 #ifndef PROFILING
                            STG_UNUSED
@@ -843,7 +844,7 @@ static void heapProfObject(Census *census, StgClosure *p, uint32_t size,
                            )
 {
     void *identity;
-    uint32_t real_size;
+    size_t real_size;
     counter *ctr;
 
             identity = NULL;
@@ -920,7 +921,7 @@ heapCensusChain( Census *census, bdescr *bd )
 {
     StgPtr p;
     StgInfoTable *info;
-    uint32_t size;
+    size_t size;
     rtsBool prim;
 
     for (; bd != NULL; bd = bd->link) {
