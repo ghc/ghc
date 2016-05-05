@@ -1,8 +1,8 @@
 module Settings.Paths (
     contextDirectory, buildPath, pkgDataFile, pkgHaddockFile, pkgLibraryFile,
-    pkgLibraryFile0, pkgGhciLibraryFile, gmpBuildPath, gmpBuildInfoPath,
-    packageDbDirectory, pkgConfFile, shakeFilesPath, bootPackageConstraints,
-    packageDependencies, libffiBuildPath
+    pkgLibraryFile0, pkgGhciLibraryFile, gmpBuildPath, gmpLibrary, gmpObjects,
+    gmpLibraryH, gmpBuildInfoPath, libffiBuildPath, shakeFilesPath, pkgConfFile,
+    packageDbDirectory, bootPackageConstraints, packageDependencies
     ) where
 
 import Base
@@ -67,17 +67,29 @@ pkgFile context prefix suffix = do
     componentId <- pkgData $ ComponentId path
     return $ path ~/~ prefix ++ componentId ++ suffix
 
--- | Build directory for in-tree libffi library.
-libffiBuildPath :: FilePath
-libffiBuildPath = buildRootPath -/- "stage1/libffi"
-
 -- | Build directory for in-tree GMP library.
 gmpBuildPath :: FilePath
 gmpBuildPath = buildRootPath ~/~ "stage1/gmp"
 
+-- | Path to the GMP library.
+gmpLibrary :: FilePath
+gmpLibrary = gmpBuildPath -/- "libgmp.a"
+
+-- | Path to the GMP library header.
+gmpLibraryH :: FilePath
+gmpLibraryH = gmpBuildPath -/- "include/ghc-gmp.h"
+
+-- | Path to the GMP library object files.
+gmpObjects :: FilePath
+gmpObjects = gmpBuildPath -/- "objs"
+
 -- | Path to the GMP library buildinfo file.
 gmpBuildInfoPath :: FilePath
 gmpBuildInfoPath = pkgPath integerGmp ~/~ "integer-gmp.buildinfo"
+
+-- | Build directory for in-tree libffi library.
+libffiBuildPath :: FilePath
+libffiBuildPath = buildRootPath -/- "stage1/libffi"
 
 -- TODO: move to buildRootPath, see #113
 -- StageN, N > 0, share the same packageDbDirectory

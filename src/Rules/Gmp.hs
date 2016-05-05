@@ -1,4 +1,4 @@
-module Rules.Gmp (gmpRules, gmpBuildPath, gmpObjects, gmpLibraryH) where
+module Rules.Gmp (gmpRules) where
 
 import Base
 import Expression
@@ -16,17 +16,8 @@ gmpBase = "libraries/integer-gmp/gmp"
 gmpContext :: Context
 gmpContext = vanillaContext Stage1 integerGmp
 
-gmpObjects :: FilePath
-gmpObjects = gmpBuildPath -/- "objs"
-
-gmpLibrary :: FilePath
-gmpLibrary = gmpBuildPath -/- "libgmp.a"
-
 gmpLibraryInTreeH :: FilePath
 gmpLibraryInTreeH = gmpBuildPath -/- "include/gmp.h"
-
-gmpLibraryH :: FilePath
-gmpLibraryH = gmpBuildPath -/- "include/ghc-gmp.h"
 
 gmpLibraryFakeH :: FilePath
 gmpLibraryFakeH = gmpBase -/- "ghc-gmp.h"

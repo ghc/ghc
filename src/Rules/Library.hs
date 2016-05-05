@@ -11,7 +11,6 @@ import Expression
 import GHC
 import Oracles.PackageData
 import Rules.Actions
-import Rules.Gmp
 import Settings
 import Target
 

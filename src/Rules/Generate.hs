@@ -18,7 +18,6 @@ import Rules.Generators.GhcVersionH
 import Rules.Generators.VersionHs
 import Oracles.ModuleFiles
 import Rules.Actions
-import Rules.Gmp
 import Rules.Libffi
 import Settings
 import Target hiding (builder, context)
