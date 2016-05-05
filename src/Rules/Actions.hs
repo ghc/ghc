@@ -124,7 +124,7 @@ copyDirectory source target = do
 moveDirectory :: FilePath -> FilePath -> Action ()
 moveDirectory source target = do
     putProgressInfo $ renderAction "Move directory" source target
-    liftIO $ IO.renameDirectory source target
+    quietly $ cmd (EchoStdout False) ["mv", source, target]
 
 -- | Transform a given file by applying a function to its contents.
 fixFile :: FilePath -> (String -> String) -> Action ()
