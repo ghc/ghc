@@ -673,7 +673,9 @@ qcname_ext :: { Located RdrName }
                                             [mj AnnType $1,mj AnnVal $2] }
 
 qcname  :: { Located RdrName }  -- Variable or type constructor
-        :  qvar                 { $1 }
+        :  qvar                 { $1 } -- Things which look like functions
+                                       -- Note: This includes record selectors but
+                                       -- also (-.->), see #11432
         |  oqtycon_no_varcon    { $1 } -- see Note [Type constructors in export list]
 
 -----------------------------------------------------------------------------
@@ -2866,17 +2868,22 @@ oqtycon_no_varcon :: { Located RdrName }  -- Type constructor which cannot be mi
 
 {- Note [Type constructors in export list]
 ~~~~~~~~~~~~~~~~~~~~~
-Mixing type constructors and variable constructors in export lists introduces
+Mixing type constructors and data constructors in export lists introduces
 ambiguity in grammar: e.g. (*) may be both a type constructor and a function.
 
 -XExplicitNamespaces allows to disambiguate by explicitly prefixing type
 constructors with 'type' keyword.
 
 This ambiguity causes reduce/reduce conflicts in parser, which are always
-resolved in favour of variable constructors. To get rid of conflicts we demand
+resolved in favour of data constructors. To get rid of conflicts we demand
 that ambiguous type constructors (those, which are formed by the same
 productions as variable constructors) are always prefixed with 'type' keyword.
 Unambiguous type constructors may occur both with or without 'type' keyword.
+
+Note that in the parser we still parse data constructors as type
+constructors. As such, they still end up in the type constructor namespace
+until after renaming when we resolve the proper namespace for each exported
+child.
 -}
 
 qtyconop :: { Located RdrName } -- Qualified or unqualified
