@@ -45,11 +45,11 @@ import System.IO
 -- TODO: reexport Stage, etc.?
 
 -- Build system files and paths
-shakePath :: FilePath
-shakePath = "hadrian"
+hadrianPath :: FilePath
+hadrianPath = "hadrian"
 
 configPath :: FilePath
-configPath = shakePath -/- "cfg"
+configPath = hadrianPath -/- "cfg"
 
 configFile :: FilePath
 configFile = configPath -/- "system.config"
@@ -57,7 +57,7 @@ configFile = configPath -/- "system.config"
 -- | Path to source files of the build system, e.g. this file is located at
 -- sourcePath -/- "Base.hs". We use this to `need` some of the source files.
 sourcePath :: FilePath
-sourcePath = shakePath -/- "src"
+sourcePath = hadrianPath -/- "src"
 
 -- TODO: move to buildRootPath, see #113
 programInplacePath :: FilePath
