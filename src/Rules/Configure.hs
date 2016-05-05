@@ -1,6 +1,6 @@
 module Rules.Configure (configureRules) where
 
-import qualified System.Info
+import qualified System.Info as System
 
 import Base
 import Builder
@@ -22,12 +22,9 @@ configureRules = do
                 ++ "--skip-configure flag."
         else do
             -- We cannot use windowsHost here due to a cyclic dependency.
-            when (System.Info.os == "mingw32") $ do
+            when (System.os == "mingw32") $ do
                 putBuild "| Checking for Windows tarballs..."
-                quietly $ cmd [ "bash"
-                              , "mk/get-win32-tarballs.sh"
-                              , "download"
-                              , System.Info.arch ]
+                quietly $ cmd ["bash mk/get-win32-tarballs.sh download", System.arch]
             let srcs    = map (<.> "in") outs
                 context = vanillaContext Stage0 compiler
             need srcs
@@ -41,4 +38,4 @@ configureRules = do
         else do
             need ["configure.ac"]
             putBuild "| Running boot..."
-            quietly $ cmd (EchoStdout False) "perl boot"
+            quietly $ cmd "perl boot"

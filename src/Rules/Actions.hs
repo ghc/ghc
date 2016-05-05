@@ -62,7 +62,7 @@ customBuild rs opts target@Target {..} = do
                 need [dir -/- "configure"]
                 -- Inject /bin/bash into `libtool`, instead of /bin/sh
                 let env = AddEnv "CONFIG_SHELL" "/bin/bash"
-                cmd Shell (EchoStdout False) [Cwd dir] [path] (env:opts) argList
+                cmd Shell [Cwd dir] [path] (env:opts) argList
 
             HsCpp    -> captureStdout target path argList
             GenApply -> captureStdout target path argList
