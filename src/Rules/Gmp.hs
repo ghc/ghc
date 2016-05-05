@@ -71,14 +71,15 @@ gmpRules = do
             -- That's because the doc/ directory contents are under the GFDL,
             -- which causes problems for Debian.
             tarballs <- getDirectoryFiles "" [gmpBase -/- "tarball/gmp*.tar.bz2"]
-            when (length tarballs /= 1) $
-                putError $ "gmpRules: exactly one tarball expected"
-                         ++ "(found: " ++ show tarballs ++ ")."
+            tarball  <- case tarballs of
+                [file] -> return $ unifyPath file
+                _      -> putError $ "gmpRules: exactly one tarball expected"
+                          ++ "(found: " ++ show tarballs ++ ")."
 
-            need tarballs
             withTempDir $ \dir -> do
                 let tmp = unifyPath dir
-                build $ Target gmpContext Tar tarballs [tmp]
+                need [tarball]
+                build $ Target gmpContext Tar [tarball] [tmp]
 
                 forM_ gmpPatches $ \src -> do
                     let patch     = takeFileName src
@@ -86,13 +87,11 @@ gmpRules = do
                     copyFile src patchPath
                     applyPatch tmp patch
 
-                let filename = dropExtension . dropExtension . takeFileName
-                             $ head tarballs
-                    suffix   = "-nodoc-patched"
-                unless (suffix `isSuffixOf` filename) $
-                    putError $ "gmpRules: expected suffix " ++ suffix
-                        ++ " (found: " ++ filename ++ ")."
-                let libName = take (length filename - length suffix) filename
+                let name = dropExtension . dropExtension $ takeFileName tarball
+                libName <- case stripSuffix "-nodoc-patched" name of
+                    Just rest -> return rest
+                    Nothing   -> putError $ "gmpRules: expected suffix "
+                        ++ "-nodoc-patched (found: " ++ name ++ ")."
 
                 moveDirectory (tmp -/- libName) gmpBuildPath
 
