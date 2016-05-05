@@ -146,7 +146,6 @@ runMakeWithVerbosity verbose dir args = do
 applyPatch :: FilePath -> FilePath -> Action ()
 applyPatch dir patch = do
     let file = dir -/- patch
-    need [file]
     needBuilder Patch
     path <- builderPath Patch
     putBuild $ "| Apply patch " ++ file
