@@ -44,7 +44,7 @@ customBuild rs opts target@Target {..} = do
     argList <- interpret target getArgs
     verbose <- interpret target verboseCommands
     let quietlyUnlessVerbose = if verbose then withVerbosity Loud else quietly
-    -- The line below forces the rule to be rerun if the args hash has changed
+    -- The line below forces the rule to be rerun if the args hash has changed.
     checkArgsHash target
     withResources rs $ do
         putInfo target
@@ -76,19 +76,21 @@ customBuild rs opts target@Target {..} = do
 
             _  -> cmd [path] argList
 
+-- | Run a builder, capture the standard output, and write it to a given file.
 captureStdout :: Target -> FilePath -> [String] -> Action ()
 captureStdout target path argList = do
     file <- interpret target getOutput
     Stdout output <- cmd [path] argList
     writeFileChanged file output
 
+-- | Copy a file tracking the source.
 copyFile :: FilePath -> FilePath -> Action ()
 copyFile source target = do
     need [source] -- Guarantee source is built before printing progress info.
     putProgressInfo $ renderAction "Copy file" source target
     copyFileChanged source target
 
--- Note, moveFile cannot track the source, because it is moved.
+-- | Move a file; we cannot track the source, because it is moved.
 moveFile :: FilePath -> FilePath -> Action ()
 moveFile source target = do
     putProgressInfo $ renderAction "Move file" source target
@@ -100,6 +102,7 @@ removeFile file = do
     putBuild $ "| Remove file " ++ file
     liftIO . whenM (IO.doesFileExist file) $ IO.removeFile file
 
+-- | Create a directory if it does not already exist.
 createDirectory :: FilePath -> Action ()
 createDirectory dir = do
     putBuild $ "| Create directory " ++ dir
@@ -111,19 +114,19 @@ removeDirectory dir = do
     putBuild $ "| Remove directory " ++ dir
     liftIO . whenM (IO.doesDirectoryExist dir) $ IO.removeDirectoryRecursive dir
 
--- Note, the source directory is untracked
+-- | Copy a directory. The contents of the source directory is untracked.
 copyDirectory :: FilePath -> FilePath -> Action ()
 copyDirectory source target = do
     putProgressInfo $ renderAction "Copy directory" source target
     quietly $ cmd (EchoStdout False) ["cp", "-r", source, target]
 
--- Note, the source directory is untracked
+-- | Move a directory. The contents of the source directory is untracked.
 moveDirectory :: FilePath -> FilePath -> Action ()
 moveDirectory source target = do
     putProgressInfo $ renderAction "Move directory" source target
     liftIO $ IO.renameDirectory source target
 
--- Transform a given file by applying a function to its contents
+-- | Transform a given file by applying a function to its contents.
 fixFile :: FilePath -> (String -> String) -> Action ()
 fixFile file f = do
     putBuild $ "| Fix " ++ file
@@ -171,7 +174,7 @@ makeExecutable file = do
     putBuild $ "| Make '" ++ file ++ "' executable."
     quietly $ cmd "chmod +x " [file]
 
--- Print out key information about the command being executed
+-- | Print out information about the command being executed.
 putInfo :: Target -> Action ()
 putInfo Target {..} = putProgressInfo $ renderAction
     ("Run " ++ show builder ++ contextInfo) (digest inputs) (digest outputs)
