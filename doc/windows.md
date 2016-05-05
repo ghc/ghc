@@ -11,9 +11,9 @@ The first step is to [install Stack](https://www.stackage.org/stack/windows-x86_
 	cd ghc
 	stack exec -- git clone git://github.com/snowleopard/hadrian
 	stack build --stack-yaml=hadrian/stack.yaml --only-dependencies
-	stack exec --stack-yaml=hadrian/stack.yaml -- hadrian/build.bat -j
+	stack exec --stack-yaml=hadrian/stack.yaml -- hadrian/build.bat -j --flavour=quick
 
-The entire process should take about an hour.
+The entire process should take about 20 minutes. Note, this will build GHC without optimisations. If you need an optimised GHC, drop the `--flavour=quick` flag from the last command line (this will slow down the build to about an hour).
 
 #### Future ideas
 
