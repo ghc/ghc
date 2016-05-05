@@ -97,7 +97,7 @@ libffiRules = do
                 Target libffiContext (Configure libffiBuildPath)
                        [libffiMakefile <.> "in"] [libffiMakefile]
 
-            runMake libffiBuildPath ["MAKEFLAGS="]
+            --runMake libffiBuildPath ["MAKEFLAGS="]
             runMake libffiBuildPath ["MAKEFLAGS=", "install"]
 
             let ffiHDir = libffiBuildPath -/- "inst/lib" -/- libname -/- "include"
