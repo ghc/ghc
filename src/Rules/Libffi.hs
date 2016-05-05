@@ -76,17 +76,18 @@ libffiRules = do
             createDirectory $ buildRootPath -/- stageString Stage0
 
             tarballs <- getDirectoryFiles "" ["libffi-tarballs/libffi*.tar.gz"]
-            when (length tarballs /= 1) $
-                 putError $ "libffiRules: exactly one libffi tarball expected"
-                              ++ "(found: " ++ show tarballs ++ ")."
+            tarball  <- case tarballs of
+                [file] -> return $ unifyPath file
+                _      -> putError $ "libffiRules: exactly one tarball expected"
+                          ++ "(found: " ++ show tarballs ++ ")."
 
-            need tarballs
-            let libname = dropExtension . dropExtension . takeFileName $ head tarballs
+            need [tarball]
+            let libname = dropExtension . dropExtension $ takeFileName tarball
 
             removeDirectory (buildRootPath -/- libname)
             -- TODO: Simplify.
             actionFinally (do
-                build $ Target libffiContext Tar tarballs [buildRootPath]
+                build $ Target libffiContext Tar [tarball] [buildRootPath]
                 moveDirectory (buildRootPath -/- libname) libffiBuildPath) $
                     removeFiles buildRootPath [libname <//> "*"]
 
