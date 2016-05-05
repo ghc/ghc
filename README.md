@@ -32,8 +32,6 @@ system to be in the `hadrian` directory of the GHC source tree:
     git clone --recursive git://git.haskell.org/ghc.git
     cd ghc
     git clone git://github.com/snowleopard/hadrian
-    ./boot
-    ./configure # On Windows run ./configure --enable-tarballs-autodownload
     ```
     
 * Build GHC using `hadrian/build.sh` or `hadrian/build.bat` (on Windows) instead
@@ -45,7 +43,7 @@ see [instructions for building GHC on Windows using Stack][windows-build].
 Using the build system
 ----------------------
 Once your first build is successful, simply run `build` to rebuild. Most build artefacts
-are placed into `.build` and `inplace` directories ([#113][build-artefacts-issue]).
+are placed into `_build` and `inplace` directories ([#113][build-artefacts-issue]).
 
 #### Command line flags
 
@@ -58,13 +56,17 @@ profiling, which speeds up builds by 3-4x).
 * `--progress-info=STYLE`: choose how build progress info is printed. There are four
 settings: `none`, `brief` (one line per build command), `normal` (typically a box per
 build command; this is the default setting), and `unicorn` (when `normal` just won't do).
-* `--setup[=CONFIGURE_ARGS]`: setup the build system by running the `configure` script 
-with `CONFIGURE_ARGS` arguments; also run the `boot` script to create the `configure`
-script if necessary. On Windows, download the required tarballs by executing
-`mk/get-win32-tarballs.sh` with appropriate parameters. You do not have to
-use this functionality of the new build system; feel free to run `boot` and `configure`
-scripts manually, as you do when using `make`. Beware: `--setup` uses network I/O 
-which may sometimes be undesirable.
+* `--skip-configure`: use this flag to suppress the default behaviour of Hadrian that
+runs the `boot` and `configure` scripts automatically if need be, so that you don't have
+to remember to run them manually. With `--skip-configure` you will need to manually run:
+
+    ```bash
+    ./boot
+    ./configure # On Windows run ./configure --enable-tarballs-autodownload
+    ```
+as you normally do when using `make`. Beware, by default Hadrian may do network I/O on
+Windows to download necessary tarballs, which may sometimes be undesirable; `--skip-configure`
+is your friend in such cases. 
 * `--split-objects`: generate split objects, which are switched off by default. Due to
 a GHC [bug][ghc-split-objs-bug], you need a full clean rebuild when using this flag.
 
