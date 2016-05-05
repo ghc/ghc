@@ -17,6 +17,6 @@ packageDbOracle = void $
         let dir  = packageDbDirectory stage
             file = dir -/- "package.cache"
         unlessM (liftIO $ IO.doesFileExist file) $ do
-            removeDirectoryIfExists dir
+            removeDirectory dir
             build $ Target (vanillaContext stage ghcPkg) (GhcPkg stage) [] [dir]
             putSuccess $ "| Successfully initialised " ++ dir

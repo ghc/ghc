@@ -3,24 +3,20 @@ module Rules.Clean (cleanRules) where
 import Base
 import Context
 import Package
+import Rules.Actions
 import Rules.Generate
 import Settings.Packages
 import Settings.Paths
 import Settings.User
 import Stage
 
-clean :: FilePath -> Action ()
-clean dir = do
-    putBuild $ "| Remove files in " ++ dir ++ "..."
-    removeDirectoryIfExists dir
-
 cleanRules :: Rules ()
 cleanRules = do
     "clean" ~> do
-        forM_ [Stage0 ..] $ \stage -> clean (buildRootPath -/- stageString stage)
-        clean programInplacePath
-        clean "inplace/lib"
-        clean derivedConstantsPath
+        forM_ [Stage0 ..] $ removeDirectory . (buildRootPath -/-) . stageString
+        removeDirectory programInplacePath
+        removeDirectory "inplace/lib"
+        removeDirectory derivedConstantsPath
         forM_ includesDependencies $ \file -> do
             putBuild $ "| Remove " ++ file
             removeFileIfExists file
@@ -28,7 +24,7 @@ cleanRules = do
         forM_ knownPackages $ \pkg ->
             forM_ [Stage0 ..] $ \stage -> do
                 let dir = pkgPath pkg -/- contextDirectory (vanillaContext stage pkg)
-                removeDirectoryIfExists dir
+                quietly $ removeDirectory dir
         putBuild $ "| Remove Hadrian files..."
         removeFilesAfter buildRootPath ["//*"]
         putSuccess $ "| Done. "

@@ -99,10 +99,11 @@ createDirectory dir = do
     putBuild $ "| Create directory " ++ dir
     liftIO $ IO.createDirectoryIfMissing True dir
 
+-- | Remove a directory that doesn't necessarily exist.
 removeDirectory :: FilePath -> Action ()
 removeDirectory dir = do
     putBuild $ "| Remove directory " ++ dir
-    removeDirectoryIfExists dir
+    liftIO . whenM (IO.doesDirectoryExist dir) $ IO.removeDirectoryRecursive dir
 
 -- Note, the source directory is untracked
 copyDirectory :: FilePath -> FilePath -> Action ()

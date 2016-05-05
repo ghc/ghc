@@ -23,7 +23,7 @@ module Base (
     -- * Miscellaneous utilities
     minusOrd, intersectOrd, lookupAll, replaceEq, quote, replaceSeparators,
     decodeModule, encodeModule, unifyPath, (-/-), versionToInt,
-    removeFileIfExists, removeDirectoryIfExists, matchVersionedFilePath
+    removeFileIfExists, matchVersionedFilePath
     ) where
 
 import Control.Applicative
@@ -175,11 +175,6 @@ lookupAll (x:xs) (y:ys) = case compare x (fst y) of
 -- | Remove a file that doesn't necessarily exist
 removeFileIfExists :: FilePath -> Action ()
 removeFileIfExists f = liftIO . whenM (IO.doesFileExist f) $ IO.removeFile f
-
--- | Remove a directory that doesn't necessarily exist
-removeDirectoryIfExists :: FilePath -> Action ()
-removeDirectoryIfExists d =
-    liftIO . whenM (IO.doesDirectoryExist d) $ IO.removeDirectoryRecursive d
 
 -- | Given a @prefix@ and a @suffix@ check whether a @filePath@ matches the
 -- template @prefix ++ version ++ suffix@ where @version@ is an arbitrary string
