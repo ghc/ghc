@@ -23,7 +23,7 @@ module Base (
     -- * Miscellaneous utilities
     minusOrd, intersectOrd, lookupAll, replaceEq, quote, replaceSeparators,
     decodeModule, encodeModule, unifyPath, (-/-), versionToInt,
-    removeFileIfExists, matchVersionedFilePath
+    matchVersionedFilePath
     ) where
 
 import Control.Applicative
@@ -39,7 +39,6 @@ import Development.Shake hiding (parallel, unit, (*>), Normal)
 import Development.Shake.Classes
 import Development.Shake.FilePath
 import System.Console.ANSI
-import qualified System.Directory as IO
 import System.IO
 
 -- TODO: reexport Stage, etc.?
@@ -171,10 +170,6 @@ lookupAll (x:xs) (y:ys) = case compare x (fst y) of
     LT -> Nothing      : lookupAll xs (y:ys)
     EQ -> Just (snd y) : lookupAll xs (y:ys)
     GT -> lookupAll (x:xs) ys
-
--- | Remove a file that doesn't necessarily exist
-removeFileIfExists :: FilePath -> Action ()
-removeFileIfExists f = liftIO . whenM (IO.doesFileExist f) $ IO.removeFile f
 
 -- | Given a @prefix@ and a @suffix@ check whether a @filePath@ matches the
 -- template @prefix ++ version ++ suffix@ where @version@ is an arbitrary string

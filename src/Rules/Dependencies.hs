@@ -29,7 +29,7 @@ buildPackageDependencies rs context@Context {..} =
             then writeFileChanged out ""
             else buildWithResources rs $
                 Target context (Ghc FindDependencies stage) srcs [out]
-            removeFileIfExists $ out <.> "bak"
+            removeFile $ out <.> "bak"
 
         -- TODO: don't accumulate *.deps into .dependencies
         path -/- ".dependencies" %> \out -> do

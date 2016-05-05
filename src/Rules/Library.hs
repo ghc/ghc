@@ -22,7 +22,7 @@ buildPackageLibrary context@Context {..} = do
 
     -- TODO: handle dynamic libraries
     matchVersionedFilePath libPrefix (waySuffix way <.> "a") ?> \a -> do
-        removeFileIfExists a
+        removeFile a
         cSrcs <- cSources context
         hSrcs <- hSources context
 

@@ -1,6 +1,6 @@
 module Rules.Actions (
     build, buildWithResources, buildWithCmdOptions, copyFile, moveFile,
-    createDirectory, removeDirectory, copyDirectory, moveDirectory,
+    removeFile, createDirectory, removeDirectory, copyDirectory, moveDirectory,
     applyPatch, fixFile, runMake, runMakeVerbose, renderLibrary, renderProgram,
     runBuilder, makeExecutable
     ) where
@@ -93,6 +93,12 @@ moveFile :: FilePath -> FilePath -> Action ()
 moveFile source target = do
     putProgressInfo $ renderAction "Move file" source target
     liftIO $ IO.renameFile source target
+
+-- | Remove a file that doesn't necessarily exist.
+removeFile :: FilePath -> Action ()
+removeFile file = do
+    putBuild $ "| Remove file " ++ file
+    liftIO . whenM (IO.doesFileExist file) $ IO.removeFile file
 
 createDirectory :: FilePath -> Action ()
 createDirectory dir = do
