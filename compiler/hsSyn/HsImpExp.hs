@@ -228,8 +228,8 @@ instance (HasOccName name, OutputableBndr name) => Outputable (IE name) where
     ppr (IEThingAll      thing) = hcat [pprImpExp (unLoc thing), text "(..)"]
     ppr (IEThingWith thing wc withs flds)
         = pprImpExp (unLoc thing) <> parens (fsep (punctuate comma
-                                              ppWiths ++
-                                              map (ppr . flLabel . unLoc) flds))
+                                              (ppWiths ++
+                                              map (ppr . flLabel . unLoc) flds)))
       where
         ppWiths =
           case wc of
