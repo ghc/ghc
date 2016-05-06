@@ -471,6 +471,12 @@ tcSuperSkolTyVar subst tv
 tcInstSkolTyVarsLoc :: SrcSpan -> [TyVar] -> TcRnIf gbl lcl (TCvSubst, [TcTyVar])
 tcInstSkolTyVarsLoc loc = instSkolTyCoVars (mkTcSkolTyVar loc False)
 
+-- | Given a list of @['TyVar']@, skolemize the type variables,
+-- returning a substitution mapping the original tyvars to the
+-- skolems, and the list of newly bound skolems.  See also
+-- tcInstSkolTyVars' for a precondition.  The resulting
+-- skolems are non-overlappable; see Note [Overlap and deriving]
+-- for an example where this matters.
 tcInstSkolTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
 tcInstSkolTyVars = tcInstSkolTyVars' False emptyTCvSubst
 

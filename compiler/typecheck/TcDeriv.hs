@@ -130,6 +130,8 @@ type DerivContext = Maybe ThetaType
    -- Nothing    <=> Vanilla deriving; infer the context of the instance decl
    -- Just theta <=> Standalone deriving: context supplied by programmer
 
+-- | A 'PredType' annotated with the origin of the constraint 'CtOrigin',
+-- and whether or the constraint deals in types or kinds.
 data PredOrigin = PredOrigin PredType CtOrigin TypeOrKind
 type ThetaOrigin = [PredOrigin]
 
@@ -1950,13 +1952,14 @@ extendLocalInstEnv dfuns thing_inside
 ***********************************************************************************
 -}
 
-simplifyDeriv :: PredType
-              -> [TyVar]
-              -> ThetaOrigin      -- Wanted
-              -> TcM ThetaType  -- Needed
--- Given  instance (wanted) => C inst_ty
--- Simplify 'wanted' as much as possibles
--- Fail if not possible
+-- | Given @instance (wanted) => C inst_ty@, simplify 'wanted' as much
+-- as possible. Fail if not possible.
+simplifyDeriv :: PredType -- ^ @C inst_ty@, head of the instance we are
+                          -- deriving.  Only used for SkolemInfo.
+              -> [TyVar]  -- ^ The tyvars bound by @inst_ty@.
+              -> ThetaOrigin   -- ^ @wanted@ constraints, i.e. @['PredOrigin']@.
+              -> TcM ThetaType -- ^ Needed constraints (after simplification),
+                               -- i.e. @['PredType']@.
 simplifyDeriv pred tvs theta
   = do { (skol_subst, tvs_skols) <- tcInstSkolTyVars tvs -- Skolemize
                 -- The constraint solving machinery
@@ -1970,31 +1973,38 @@ simplifyDeriv pred tvs theta
              mk_ct (PredOrigin t o t_or_k)
                  = newWanted o (Just t_or_k) (substTy skol_subst t)
 
+       -- Generate the wanted constraints with the skolemized variables
        ; (wanted, tclvl) <- pushTcLevelM (mapM mk_ct theta)
 
-       ; traceTc "simplifyDeriv" $
+       ; traceTc "simplifyDeriv inputs" $
          vcat [ pprTvBndrs tvs $$ ppr theta $$ ppr wanted, doc ]
+       -- Simplify the constraints
        ; residual_wanted <- simplifyWantedsTcM wanted
             -- Result is zonked
 
+       -- Split the resulting constraints into bad and good constraints,
+       -- building an @unsolved :: WantedConstraints@ representing all
+       -- the constraints we can't just shunt to the predicates.
+       -- See Note [Exotic derived instance contexts]
        ; let residual_simple = wc_simple residual_wanted
-             (good, bad) = partitionBagWith get_good residual_simple
+             (bad, good) = partitionBagWith get_good residual_simple
              unsolved    = residual_wanted { wc_simple = bad }
 
                          -- See Note [Exotic derived instance contexts]
 
-             get_good :: Ct -> Either PredType Ct
+             get_good :: Ct -> Either Ct PredType
              get_good ct | validDerivPred skol_set p
                          , isWantedCt ct
-                         = Left p
-                          -- NB: residual_wanted may contain unsolved
-                          -- Derived and we stick them into the bad set
-                          -- so that reportUnsolved may decide what to do with them
+                         = Right p
+                          -- NB re 'isWantedCt': residual_wanted may contain
+                          -- unsolved CtDerived and we stick them into the
+                          -- bad set so that reportUnsolved may decide what
+                          -- to do with them
                          | otherwise
-                         = Right ct
+                         = Left ct
                            where p = ctPred ct
 
-       ; traceTc "simplifyDeriv 2" $
+       ; traceTc "simplifyDeriv outputs" $
          vcat [ ppr tvs_skols, ppr residual_simple, ppr good, ppr bad ]
 
        -- If we are deferring type errors, simply ignore any insoluble
@@ -2005,9 +2015,11 @@ simplifyDeriv pred tvs theta
                    -- The buildImplicationFor is just to bind the skolems,
                    -- in case they are mentioned in error messages
                    -- See Trac #11347
+       -- Report the (bad) unsolved constraints
        ; unless defer (reportAllUnsolved (mkImplicWC implic))
 
 
+       -- Return the good unsolved constraints (unskolemizing on the way out.)
        ; let min_theta  = mkMinimalBySCs (bagToList good)
              subst_skol = zipTvSubst tvs_skols $ mkTyVarTys tvs
                           -- The reverse substitution (sigh)
