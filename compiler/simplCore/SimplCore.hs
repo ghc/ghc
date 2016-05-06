@@ -990,27 +990,41 @@ transferIdInfo exported_id local_id
         -- rules as we transfer them from one function to another
 
 
--- Note [Grand plan for static forms]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
--- Static forms go through the compilation phases as follows:
---
--- The renamer looks for out-of-scope names in the body of the static form.
--- If all names are in scope, the free variables of the body are stored in AST
--- at the location of the static form.
---
--- The typechecker verifies that all free variables occurring in the static form
--- are closed (see Note [Bindings with closed types] in TcRnTypes).
---
--- The desugarer replaces the static form with an application of the data
--- constructor 'StaticPtr' (defined in module GHC.StaticPtr of base).
---
--- The simplifier runs the FloatOut pass which moves the applications of
--- 'StaticPtr' to the top level. Thus the FloatOut pass is always executed,
--- event when optimizations are disabled.
---
--- The CoreTidy pass produces a C function which inserts all the floated
--- 'StaticPtr' in the static pointer table (See StaticPtrTable.hs).
--- This pass also exports the Ids of floated 'StaticPtr's so they can be linked
--- with the C function.
---
+{- Note [Grand plan for static forms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Static forms go through the compilation phases as follows.
+Here is a running example:
+
+   f x = let k = map toUpper
+         in ...(static k)...
+
+* The renamer looks for out-of-scope names in the body of the static
+  form, as always If all names are in scope, the free variables of the
+  body are stored in AST at the location of the static form.
+
+* The typechecker verifies that all free variables occurring in the
+  static form are closed (see Note [Bindings with closed types] in
+  TcRnTypes).  In our example, 'k' is closed, even though it is bound
+  in a nested let, we are fine.
+
+* The desugarer replaces the static form with an application of the
+  data constructor 'StaticPtr' (defined in module GHC.StaticPtr of
+  base).  So we get
+
+   f x = let k = map toUpper
+         in ...(StaticPtr <fingerprint> k)...
+
+* The simplifier runs the FloatOut pass which moves the applications
+  of 'StaticPtr' to the top level. Thus the FloatOut pass is always
+  executed, even when optimizations are disabled.  So we get
+
+   k = map toUpper
+   lvl = StaticPtr <fingerprint> k
+   f x = ...lvl...
+
+* The CoreTidy pass produces a C function which inserts all the
+  floated 'StaticPtr' in the static pointer table (see the call to
+  StaticPtrTable.sptModuleInitCode in TidyPgm). CoreTidy pass also
+  exports the Ids of floated 'StaticPtr's so they can be linked with
+  the C function.
+-}

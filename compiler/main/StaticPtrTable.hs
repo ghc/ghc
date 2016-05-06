@@ -48,6 +48,8 @@
 {-# LANGUAGE ViewPatterns #-}
 module StaticPtrTable (sptModuleInitCode) where
 
+-- See SimplCore Note [Grand plan for static forms]
+
 import CLabel
 import CoreSyn
 import DataCon

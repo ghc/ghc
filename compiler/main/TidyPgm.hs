@@ -375,7 +375,10 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
               -- See Note [Injecting implicit bindings]
               ; all_tidy_binds = implicit_binds ++ tidy_binds
 
-              -- get the TyCons to generate code for.  Careful!  We must use
+              -- See SimplCore Note [Grand plan for static forms]
+              ; spt_init_code = sptModuleInitCode mod all_tidy_binds
+
+              -- Get the TyCons to generate code for.  Careful!  We must use
               -- the untidied TypeEnv here, because we need
               --  (a) implicit TyCons arising from types and classes defined
               --      in this module
@@ -409,7 +412,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                            cg_tycons   = alg_tycons,
                            cg_binds    = all_tidy_binds,
                            cg_foreign  = foreign_stubs `appendStubC`
-                                           sptModuleInitCode mod all_tidy_binds,
+                                         spt_init_code,
                            cg_dep_pkgs = map fst $ dep_pkgs deps,
                            cg_hpc_info = hpc_info,
                            cg_modBreaks = modBreaks },

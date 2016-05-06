@@ -1636,18 +1636,32 @@ top-level ones. See Note [Exported LocalIds] and Trac #9857.
 
 Note [Checking StaticPtrs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
+See SimplCore Note [Grand plan for static forms] for an overview.
 
-Every occurrence of the data constructor @StaticPtr@ should be moved to the top
-level by the FloatOut pass. The linter is checking that no occurrence is left
-nested within an expression.
+Every occurrence of the data constructor @StaticPtr@ should be moved
+to the top level by the FloatOut pass.  It's vital that we don't have
+nested StaticPtr uses after CorePrep, because we populate the Static
+Pointer Table from the top-level bindings. See SimplCore Note [Grand
+plan for static forms].
 
-The check is enabled only if the module uses the StaticPointers language
-extension. This optimization arose from the need to compile "GHC.StaticPtr",
-which otherwise would be rejected because the following binding
+The linter checks that no occurrence is left behind, nested within an
+expression. The check is enabled only:
+
+* After the FloatOut, CorePrep, and CoreTidy passes.
+  We could check more often, but the condition doesn't hold until
+  after the first FloatOut pass.
+
+* When the module uses the StaticPointers language extension. This is
+  a little hack.  This optimization arose from the need to compile
+  GHC.StaticPtr, which otherwise would be rejected because of the
+  following binding for the StaticPtr data constructor itself:
 
     StaticPtr = \a b1 b2 b3 b4 -> StaticPtr a b1 b2 b3 b4
 
-contains an application of `StaticPtr` nested within the lambda abstractions.
+  which contains an application of `StaticPtr` nested within the
+  lambda abstractions.  This binding is injected by CorePrep.
+
+  Note that GHC.StaticPtr is itself compiled without -XStaticPointers.
 
 Note [Type substitution]
 ~~~~~~~~~~~~~~~~~~~~~~~~
