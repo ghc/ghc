@@ -731,8 +731,9 @@ tcInstDecls2 tycl_decls inst_decls
           -- (b) instance declarations
         ; let dm_ids = collectHsBindsBinders dm_binds
               -- Add the default method Ids (again)
+              -- (they were arready added in TcTyDecls.tcAddImplicits)
               -- See Note [Default methods and instances]
-        ; inst_binds_s <- tcExtendLetEnv TopLevel TopLevel dm_ids $
+        ; inst_binds_s <- tcExtendGlobalValEnv dm_ids $
                           mapM tcInstDecl2 inst_decls
 
           -- Done
@@ -742,7 +743,7 @@ tcInstDecls2 tycl_decls inst_decls
 See Note [Default methods and instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The default method Ids are already in the type environment (see Note
-[Default method Ids and Template Haskell] in TcTyClsDcls), BUT they
+[Default method Ids and Template Haskell] in TcTyDcls), BUT they
 don't have their InlinePragmas yet.  Usually that would not matter,
 because the simplifier propagates information from binding site to
 use.  But, unusually, when compiling instance decls we *copy* the
