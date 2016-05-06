@@ -1641,6 +1641,14 @@ Every occurrence of the data constructor @StaticPtr@ should be moved to the top
 level by the FloatOut pass. The linter is checking that no occurrence is left
 nested within an expression.
 
+The check is enabled only if the module uses the StaticPointers language
+extension. This optimization arose from the need to compile "GHC.StaticPtr",
+which otherwise would be rejected because the following binding
+
+    StaticPtr = \a b1 b2 b3 b4 -> StaticPtr a b1 b2 b3 b4
+
+contains an application of `StaticPtr` nested within the lambda abstractions.
+
 Note [Type substitution]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Why do we need a type substitution?  Consider
