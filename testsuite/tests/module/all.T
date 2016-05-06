@@ -3,12 +3,12 @@
 #
 # I used something like this to partly-automate the transition:
 #
-# for i in mod*.hs; do 
-#   if ! test -f ${i%.hs}.output; then 
+# for i in mod*.hs; do
+#   if ! test -f ${i%.hs}.output; then
 #      echo "test('${i%.hs}', normal, compile, [''])"
 #   else if grep error ${i%.hs}.output >/dev/null; then
 #      echo "test('${i%.hs}', normal, compile_fail, [''])"
-#   else 
+#   else
 #      echo "test('${i%.hs}', normal, compile, [''])"
 #   fi fi
 # done
@@ -148,19 +148,19 @@ test('mod110', normal, compile_fail, [''])
 test('mod111', normal, compile, [''])
 test('mod112', normal, compile, [''])
 test('mod113', normal, compile, [''])
-test('mod114', extra_clean(['Mod114_Help.hi', 'Mod114_Help.o']), 
+test('mod114', extra_clean(['Mod114_Help.hi', 'Mod114_Help.o']),
      multimod_compile_fail, ['mod114', '-v0'])
 
-test('mod115', 
-     extra_clean(['Mod115_A.hi', 'Mod115_A.o', 'Mod115_B.hi', 'Mod115_B.o']), 
+test('mod115',
+     extra_clean(['Mod115_A.hi', 'Mod115_A.o', 'Mod115_B.hi', 'Mod115_B.o']),
      multimod_compile, ['mod115', '-v0'])
 
 test('mod116', normal, compile_fail, [''])
-test('mod117', 
-     extra_clean(['Mod117_A.hi', 'Mod117_A.o', 'Mod117_B.hi', 'Mod117_B.o']), 
+test('mod117',
+     extra_clean(['Mod117_A.hi', 'Mod117_A.o', 'Mod117_B.hi', 'Mod117_B.o']),
      multimod_compile, ['mod117', '-v0'])
 
-test('mod118', 
+test('mod118',
      extra_clean(['Mod118_A.hi', 'Mod118_A.o', 'Mod118_B.hi', 'Mod118_B.o']),
      multimod_compile, ['mod118', '-v0'])
 
@@ -247,7 +247,7 @@ test('mod144', extra_clean(['Mod144_A.hi', 'Mod144_A.o']),
 test('mod145', extra_clean(['Mod145_A.hi', 'Mod145_A.o']),
      multimod_compile_fail, ['mod145', '-v0'])
 
-test('mod146', 
+test('mod146',
      extra_clean(['Mod145_A.mod146_hi', 'Mod145_A.mod146_o', 'mod146.mod146_o', 'mod146.mod146_hi']),
      run_command, ['$MAKE -s --no-print-directory mod146'])
 
@@ -263,7 +263,7 @@ test('mod153', normal, compile_fail, [''])
 test('mod154', normal, compile, [''])
 test('mod155', normal, compile_fail, [''])
 test('mod156', normal, compile, [''])
-test('mod157', 
+test('mod157',
      extra_clean(['Mod157_A.hi', 'Mod157_A.o', 'Mod157_B.hi', 'Mod157_B.o',
        'Mod157_C.hi', 'Mod157_C.o', 'Mod157_D.hi', 'Mod157_D.o']),
      multimod_compile, ['mod157', '-v0'])
