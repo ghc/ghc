@@ -29,7 +29,7 @@ performance improvements over the 7.10 branch.
 Highlights
 ----------
 
-The highlights, since the 7.10 branch, are:
+The highlights, since the 7.10 series, are:
 
 - The new :ghc-flag:`-XTypeInType` allows promotion of all types into
   kinds, allowing kind synonyms, kind families, promoted GADTs, and other
@@ -69,7 +69,8 @@ The highlights, since the 7.10 branch, are:
   :ghc-flag:`-fexternal-interpreter` and :ghc-flag:`-prof` (see
   :ref:`ghci-stack-traces`).
 
-- A native code generator for powerpc64 and powerpc64le architectures
+- A native code generator for powerpc64 and powerpc64le architectures, support
+  for AIX targets, and significantly improved support on ARM.
 
 - The reworked users guide you are now reading
 
@@ -502,8 +503,11 @@ Runtime system
 - The runtime linker is no longer greedy and will load only the needed objects
   from archives. This means particularly on Windows packages requiring e.g. C99
   support will now function properly. As part of this the RTS on Windows
-  no longer re-exports deprecated posix functions under the undeprecated names
+  no longer re-exports deprecated POSIX functions under the undeprecated names
   (see :ghc-ticket:`11223`).
+
+- A number of subtle but serious issues in the runtime linker were resolved on
+  ARM (summarized in :ghc-ticket:`11206`).
 
 Build system
 ~~~~~~~~~~~~
