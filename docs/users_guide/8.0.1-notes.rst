@@ -31,8 +31,6 @@ Highlights
 
 The highlights, since the 7.10 branch, are:
 
-- TODO FIXME
-
 - The new :ghc-flag:`-XTypeInType` allows promotion of all types into
   kinds, allowing kind synonyms, kind families, promoted GADTs, and other
   goodies.
@@ -85,8 +83,6 @@ Full details
 
 Language
 ~~~~~~~~
-
--  TODO FIXME.
 
 -  :ghc-flag:`-XTypeInType` supports universal type promotion and merges
    the type and kind language. This allows, for example, higher-rank
@@ -502,12 +498,12 @@ Runtime system
 Build system
 ~~~~~~~~~~~~
 
--  TODO FIXME.
+-  Nothing changed here.
 
 Package system
 ~~~~~~~~~~~~~~
 
--  TODO FIXME.
+-  Various internal changes but nothing user-facing.
 
 hsc2hs
 ~~~~~~
@@ -543,7 +539,7 @@ Libraries
 array
 ~~~~~
 
--  Version number XXXXX (was 0.5.0.0)
+-  Version number 0.5.1.1 (was 0.5.0.0)
 
 
 .. _lib-base:
@@ -622,42 +618,40 @@ See ``changelog.md`` in the ``base`` package for full release notes.
 binary
 ~~~~~~
 
--  Version number XXXXX (was 0.7.1.0)
+-  Version number 0.8.3.0 (was 0.7.1.0)
 
 bytestring
 ~~~~~~~~~~
 
--  Version number XXXXX (was 0.10.4.0)
+-  Version number 0.10.8.0 (was 0.10.4.0)
 
 Cabal
 ~~~~~
 
--  Version number XXXXX (was 1.18.1.3)
+-  Version number 1.24.0 (was 1.18.1.3)
 
 containers
 ~~~~~~~~~~
 
--  Version number XXXXX (was 0.5.4.0)
+-  Version number 0.5.7.1 (was 0.5.4.0)
 
 deepseq
 ~~~~~~~
 
--  Version number XXXXX (was 1.3.0.2)
+-  Version number 1.4.2.0 (was 1.3.0.2)
 
 directory
 ~~~~~~~~~
 
--  Version number XXXXX (was 1.2.0.2)
+-  Version number 1.2.6.2 (was 1.2.0.2)
 
 filepath
 ~~~~~~~~
 
--  Version number XXXXX (was 1.3.0.2)
+-  Version number 1.4.1.0 (was 1.3.0.2)
 
 ghc
 ~~~
-
--  TODO FIXME.
 
 -  The ``HsBang`` type has been removed in favour of ``HsSrcBang`` and
    ``HsImplBang``. Data constructors now always carry around their
@@ -683,6 +677,8 @@ ghc-boot
 
 -  This is an internal package. Use with caution.
 
+-  Version number 8.0.1
+
 -  This package was renamed from ``bin-package-db`` to reflect its new purpose
    of containing intra-GHC functionality that needs to be shared across
    multiple GHC boot libraries.
@@ -698,7 +694,7 @@ ghc-boot
 ghc-prim
 ~~~~~~~~
 
--  Version number XXXXX (was 0.3.1.0)
+-  Version number 0.5.0.0 (was 0.3.1.0)
 
 haskell98
 ~~~~~~~~~
@@ -713,17 +709,17 @@ haskell2010
 hoopl
 ~~~~~
 
--  Version number XXXXX (was 3.10.0.0)
+-  Version number 3.10.2.1 (was 3.10.0.0)
 
 hpc
 ~~~
 
--  Version number XXXXX (was 0.6.0.1)
+-  Version number 0.6.0.3 (was 0.6.0.1)
 
 integer-gmp
 ~~~~~~~~~~~
 
--  Version number XXXXX (was 0.5.1.0)
+-  Version number 1.0.0.1 (was 0.5.1.0)
 
 old-locale
 ~~~~~~~~~~
@@ -738,12 +734,12 @@ old-time
 process
 ~~~~~~~
 
--  Version number XXXXX (was 1.2.0.0)
+-  Version number 1.4.2.0 (was 1.2.0.0)
 
 template-haskell
 ~~~~~~~~~~~~~~~~
 
--  Version number XXXXX (was 2.9.0.0)
+-  Version number 2.11.0.0 (was 2.9.0.0)
 
 -  The ``Lift`` type class for lifting values into Template Haskell
    splices now has a default signature ``lift :: Data a => a -> Q Exp``,
@@ -761,19 +757,19 @@ template-haskell
 time
 ~~~~
 
--  Version number XXXXX (was 1.4.1)
+-  Version number 1.6.0.1 (was 1.4.1)
 
 unix
 ~~~~
 
--  Version number XXXXX (was 2.7.0.0)
+-  Version number 2.7.2.0 (was 2.7.0.0)
 
 Win32
 ~~~~~
 
--  Version number XXXXX (was 2.3.0.1)
+-  Version number 2.3.1.1 (was 2.3.0.1)
 
 Known bugs
 ----------
 
--  TODO FIXME
+-  None
