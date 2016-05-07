@@ -262,13 +262,6 @@ Compiler
    code that does not exist in the .hs file and a comment for the splice
    location in the original file.
 
--  After a long hiatus (see :ghc-ticket:`10935`) the
-   :ghc-flag:`-Wmonomorphism-restriction` (formerly
-   :ghc-flag:`-fwarn-monomorphism-restriction`) flag has returned.
-   The functionality of this flag was inadvertently removed by a commit in 2010;
-   this has been fixed and the flag should now issue warnings as it
-   previously did.
-
 -  Added the option :ghc-flag:`-fprint-expanded-types`. When enabled, GHC also
    prints type-synonym-expanded types in type errors.
 
@@ -283,68 +276,15 @@ Compiler
    Enabling :ghc-flag:`-fworker-wrapper` while strictness analysis is disabled (by
    :ghc-flag:`-fno-strictness`) has no effect.
 
--  Added the options :ghc-flag:`-Wmissed-specialisations` and
-   :ghc-flag:`-Wall-missed-specialisations`. When enabled, the simplifier will
-   produce a warning when a overloaded imported function cannot be
-   specialised (typically due to a missing ``INLINEABLE`` pragma). This
-   is intended to alert users to cases where they apply ``INLINEABLE`` but
-   may not get the speed-up they expect.
+-  :ghc-flag:`-ddump-strsigs` has been renamed to
+   :ghc-flag:`-ddump-str-signatures`.
 
--  Added the option :ghc-flag:`-Wnoncanonical-monad-instances` and
-   :ghc-flag:`-Wnoncanonical-monadfail-instances` which help detect noncanonical
-   ``Applicative``/``Monad``/``MonadFail`` instance definitions.
-   See flag description in :ref:`options-sanity` for more details.
+-  :ghc-flag:`-XDeriveGeneric` is now less picky about instantiating type
+   arguments when deriving (:ghc-ticket:`11732`). As a consequence, the
+   following code is now legal (whereas before it would have been rejected). ::
 
--  When printing an out-of-scope error message, GHC will give helpful advice if
-   the error might be caused by too restrictive imports.
-
--  Added the :ghc-flag:`-Weverything` warning group, along with its opposite
-   :ghc-flag:`-Wno-everything`. This group includes all warnings supported by
-   GHC. This is in contrast to `-Wall` which excludes some stylistic or
-   otherwise controversial warnings.
-
--  Added the :ghc-flag:`-Wdefault` warning group, along with its opposite
-   :ghc-flag:`-Wno-default`. This group is defined to be the set of warnings
-   which ``ghc`` enables by default (e.g. when no additional ``-W`` flags are
-   used).
-
--  Added the :ghc-flag:`-Wcompat` warning group, along with its opposite
-   :ghc-flag:`-Wno-compat`. Turns on warnings that will be enabled by default in the
-   future, but remain off in normal compilations for the time being. This
-   allows library authors eager to make their code future compatible to adapt
-   to new features before they even generate warnings.
-
--  Added the :ghc-flag:`-Wmissing-monadfail-instances` flag. When enabled, this
-   will issue a warning if a failable pattern is used in a context that does
-   not have a ``MonadFail`` constraint. This flag represents phase 1 of the
-   `MonadFail Proposal (MFP)
-   <https://prime.haskell.org/wiki/Libraries/Proposals/MonadFail>`__.
-
--  Added the :ghc-flag:`-Wsemigroup` flag. When enabled, this
-   will issue a warning if a type is an instance of ``Monoid`` but not
-   ``Semigroup``, and when a custom definition ``(<>)`` is made. Fixing these
-   warnings makes sure the definition of ``Semigroup`` as a superclass of
-   ``Monoid`` does not break any code.
-
--  Added the :ghc-flag:`-Wmissing-pattern-synonym-signatures`
-   flag. When enabled, this will issue a warning when a pattern
-   synonym definition doesn't have a type signature.  It is turned off
-   by default but enabled by :ghc-flag:`-Wall`.
-
--  Added the :ghc-flag:`-Wunused-type-patterns` flag to report unused
-   type variables in data and type family instances. This flag is not implied
-   by :ghc-flag:`-Wall`, since :ghc-flag:`-Wunused-type-patterns` will
-   warn about unused type variables even if the types themselves are intended
-   to be used as documentation. If :ghc-flag:`-Wunused-type-patterns` is
-   enabled, one can prefix or replace unused type variables with underscores to
-   avoid warnings.
-
--  Split off the new flag :ghc-flag:`-Wunused-foralls` from the previously
-   existing flag :ghc-flag:`-Wunused-matches`. :ghc-flag:`-Wunused-foralls`
-   emits a warning in the specific case that a user writes explicit ``forall``
-   syntax with unused type variables, while :ghc-flag:`-Wunused-matches` only
-   warns in the case of unused term-level patterns. Both flags are implied by
-   :ghc-flag:`-W`.
+     data T a b = T a b
+     deriving instance Generic (T Int b)
 
 -  Added the :ghc-flag:`-fmax-pmcheck-iterations` to control how many times
    the pattern match checker iterates. Since coverage checking is exponential
@@ -366,21 +306,90 @@ Compiler
    typecheck, ``Control.Exception.TypeError`` will now be thrown instead of
    ``Control.Exception.ErrorCall``.
 
+Warnings
+^^^^^^^^
+
+-  When printing an out-of-scope error message, GHC will give helpful advice if
+   the error might be caused by too restrictive imports.
+
+-  Warning messages now mention the name of the warning flag which the message is
+   controlled by (:ghc-ticket:`10752`) If the flag was implied via a warning
+   group then the name of the group will also be shown if
+   :ghc-flag:`-fshow-warning-groups` is used.
+
+-  Added the :ghc-flag:`-Weverything` warning group, along with its opposite
+   :ghc-flag:`-Wno-everything`. This group includes all warnings supported by
+   GHC. This is in contrast to `-Wall` which excludes some stylistic or
+   otherwise controversial warnings.
+
+-  Added the :ghc-flag:`-Wdefault` warning group, along with its opposite
+   :ghc-flag:`-Wno-default`. This group is defined to be the set of warnings
+   which ``ghc`` enables by default (e.g. when no additional ``-W`` flags are
+   used).
+
+-  Added the :ghc-flag:`-Wcompat` warning group (:ghc-ticket:`11000`), along with its opposite
+   :ghc-flag:`-Wno-compat`. Turns on warnings that will be enabled by default in the
+   future, but remain off in normal compilations for the time being. This
+   allows library authors eager to make their code future compatible to adapt
+   to new features before they even generate warnings.
+
+-  Added the :ghc-flag:`-Wmissing-monadfail-instances` flag. When enabled, this
+   will issue a warning if a failable pattern is used in a context that does
+   not have a ``MonadFail`` constraint. This flag represents phase 1 of the
+   `MonadFail Proposal (MFP)
+   <https://prime.haskell.org/wiki/Libraries/Proposals/MonadFail>`__.
+
+-  Added the :ghc-flag:`-Wsemigroup` flag. When enabled, this
+   will issue a warning if a type is an instance of ``Monoid`` but not
+   ``Semigroup``, and when a custom definition ``(<>)`` is made. Fixing these
+   warnings makes sure the definition of ``Semigroup`` as a superclass of
+   ``Monoid`` does not break any code.
+
+-  After a long hiatus (see :ghc-ticket:`10935`) the
+   :ghc-flag:`-Wmonomorphism-restriction` (formerly
+   :ghc-flag:`-fwarn-monomorphism-restriction`) flag has returned.
+   The functionality of this flag was inadvertently removed by a commit in 2010;
+   this has been fixed and the flag should now issue warnings as it
+   previously did.
+
+-  Added the options :ghc-flag:`-Wmissed-specialisations` and
+   :ghc-flag:`-Wall-missed-specialisations`. When enabled, the simplifier will
+   produce a warning when a overloaded imported function cannot be
+   specialised (typically due to a missing ``INLINEABLE`` pragma). This
+   is intended to alert users to cases where they apply ``INLINEABLE`` but
+   may not get the speed-up they expect.
+
+-  Added the option :ghc-flag:`-Wnoncanonical-monad-instances` and
+   :ghc-flag:`-Wnoncanonical-monadfail-instances` which help detect noncanonical
+   ``Applicative``/``Monad``/``MonadFail`` instance definitions.
+   See flag description in :ref:`options-sanity` for more details.
+
+
+-  Added the :ghc-flag:`-Wmissing-pattern-synonym-signatures`
+   flag. When enabled, this will issue a warning when a pattern
+   synonym definition doesn't have a type signature.  It is turned off
+   by default but enabled by :ghc-flag:`-Wall`.
+
+-  Added the :ghc-flag:`-Wunused-type-patterns` flag to report unused
+   type variables in data and type family instances. This flag is not implied
+   by :ghc-flag:`-Wall`, since :ghc-flag:`-Wunused-type-patterns` will
+   warn about unused type variables even if the types themselves are intended
+   to be used as documentation. If :ghc-flag:`-Wunused-type-patterns` is
+   enabled, one can prefix or replace unused type variables with underscores to
+   avoid warnings.
+
+-  Split off the new flag :ghc-flag:`-Wunused-foralls` from the previously
+   existing flag :ghc-flag:`-Wunused-matches`. :ghc-flag:`-Wunused-foralls`
+   emits a warning in the specific case that a user writes explicit ``forall``
+   syntax with unused type variables, while :ghc-flag:`-Wunused-matches` only
+   warns in the case of unused term-level patterns. Both flags are implied by
+   :ghc-flag:`-W`.
+
 -  :ghc-flag:`-Wmissing-local-sigs` is now deprecated in favor of
    :ghc-flag:`-Wmissing-local-signatures`.
 
 -  :ghc-flag:`-Wmissing-exported-sigs` is now deprecated in favor of
    :ghc-flag:`-Wmissing-exported-signatures`.
-
--  :ghc-flag:`-ddump-strsigs` has been renamed to
-   :ghc-flag:`-ddump-str-signatures`.
-
--  :ghc-flag:`-XDeriveGeneric` is now less picky about instantiating type
-   arguments when deriving (:ghc-ticket:`11732`). As a consequence, the
-   following code is now legal (whereas before it would have been rejected). ::
-
-     data T a b = T a b
-     deriving instance Generic (T Int b)
 
 GHCi
 ~~~~
