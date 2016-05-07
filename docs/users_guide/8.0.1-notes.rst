@@ -297,6 +297,16 @@ Compiler
 -  When printing an out-of-scope error message, GHC will give helpful advice if
    the error might be caused by too restrictive imports.
 
+-  Added the :ghc-flag:`-Weverything` warning group, along with its opposite
+   :ghc-flag:`-Wno-everything`. This group includes all warnings supported by
+   GHC. This is in contrast to `-Wall` which excludes some stylistic or
+   otherwise controversial warnings.
+
+-  Added the :ghc-flag:`-Wdefault` warning group, along with its opposite
+   :ghc-flag:`-Wno-default`. This group is defined to be the set of warnings
+   which ``ghc`` enables by default (e.g. when no additional ``-W`` flags are
+   used).
+
 -  Added the :ghc-flag:`-Wcompat` warning group, along with its opposite
    :ghc-flag:`-Wno-compat`. Turns on warnings that will be enabled by default in the
    future, but remain off in normal compilations for the time being. This
