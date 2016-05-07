@@ -12,7 +12,7 @@
   * `New modules `Data.Bifoldable` and `Data.Bitraversable` (previously defined
     in the `bifunctors` package) (#10448)
 
-## 4.9.0.0  *TBA*
+## 4.9.0.0  *May 2016*
 
   * Bundled with GHC 8.0
 
