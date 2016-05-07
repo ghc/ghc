@@ -699,12 +699,13 @@ ghc-prim
 haskell98
 ~~~~~~~~~
 
--  Version number XXXXX (was 2.0.0.3)
+-  No longer shipped
 
 haskell2010
 ~~~~~~~~~~~
 
--  Version number XXXXX (was 1.1.1.1)
+-  No longer shipped. We hope that this package or something like it will be
+   restored in a future GHC release.
 
 hoopl
 ~~~~~
@@ -722,14 +723,14 @@ integer-gmp
 -  Version number 1.0.0.1 (was 0.5.1.0)
 
 old-locale
-~~~~~~~~~~
+----------
 
--  Version number XXXXX (was 1.0.0.6)
+-  No longer shipped
 
 old-time
 ~~~~~~~~
 
--  Version number XXXXX (was 1.1.0.2)
+-  No longer shipped
 
 process
 ~~~~~~~
