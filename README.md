@@ -25,8 +25,8 @@ follow these steps:
 * This build system is written in Haskell (obviously) and depends on the following Haskell
 packages, which need to be installed: `ansi-terminal`, `mtl`, `shake`, `QuickCheck`.
 
-* Get the sources and run standard configuration scripts. It is important for the build
-system to be in the `hadrian` directory of the GHC source tree:
+* Get the sources. It is important for the build system to be in the `hadrian` directory
+of the GHC source tree:
 
     ```bash
     git clone --recursive git://git.haskell.org/ghc.git
@@ -38,7 +38,10 @@ system to be in the `hadrian` directory of the GHC source tree:
 of `make`. You might want to enable parallelism with `-j`. We will further refer to the
 build script simply as `build`. If you are interested in building in a Cabal sandbox
 or using Stack, have a look at `build.cabal.sh` and `build.stack.sh` scripts. Also
-see [instructions for building GHC on Windows using Stack][windows-build].
+see [instructions for building GHC on Windows using Stack][windows-build]. Note, Hadrian
+runs the `boot` and `configure` scripts automatically on the first build, so that you don't
+need to. Use `--skip-configure` to suppress this behaviour (see overview of command line
+flags below).
 
 Using the build system
 ----------------------
@@ -52,10 +55,13 @@ currently supports several others:
 * `--flavour=FLAVOUR`: choose a build flavour. Two settings are currently supported:
 `default` and `quick` (adds `-O0` flag to all GHC invocations and disables library
 profiling, which speeds up builds by 3-4x).
+
 * `--haddock`: build Haddock documentation.
+
 * `--progress-info=STYLE`: choose how build progress info is printed. There are four
 settings: `none`, `brief` (one line per build command), `normal` (typically a box per
 build command; this is the default setting), and `unicorn` (when `normal` just won't do).
+
 * `--skip-configure`: use this flag to suppress the default behaviour of Hadrian that
 runs the `boot` and `configure` scripts automatically if need be, so that you don't have
 to remember to run them manually. With `--skip-configure` you will need to manually run:
@@ -66,7 +72,8 @@ to remember to run them manually. With `--skip-configure` you will need to manua
     ```
 as you normally do when using `make`. Beware, by default Hadrian may do network I/O on
 Windows to download necessary tarballs, which may sometimes be undesirable; `--skip-configure`
-is your friend in such cases. 
+is your friend in such cases.
+
 * `--split-objects`: generate split objects, which are switched off by default. Due to
 a GHC [bug][ghc-split-objs-bug], you need a full clean rebuild when using this flag.
 
