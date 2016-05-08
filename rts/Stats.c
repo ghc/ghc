@@ -331,7 +331,7 @@ stat_endGC (Capability *cap, gc_thread *gct,
         if (RtsFlags.GcFlags.giveStats == VERBOSE_GC_STATS) {
             W_ faults = getPageFaults();
 
-            statsPrintf("%9" FMT_SizeT " %9" FMT_SizeT " %9" FMT_SizeT,
+            statsPrintf("%9" FMT_Word " %9" FMT_Word " %9" FMT_Word,
                     alloc*sizeof(W_), copied*sizeof(W_),
                         live*sizeof(W_));
             statsPrintf(" %6.3f %6.3f %8.3f %8.3f %4" FMT_Word " %4" FMT_Word "  (Gen: %2d)\n",
@@ -560,7 +560,7 @@ stat_exit (void)
         if (tot_elapsed == 0.0) tot_elapsed = 1;
 
         if (RtsFlags.GcFlags.giveStats >= VERBOSE_GC_STATS) {
-            statsPrintf("%9" FMT_SizeT " %9.9s %9.9s", (W_)alloc*sizeof(W_), "", "");
+            statsPrintf("%9" FMT_Word " %9.9s %9.9s", (W_)alloc*sizeof(W_), "", "");
             statsPrintf(" %6.3f %6.3f\n\n", 0.0, 0.0);
         }
 
@@ -836,7 +836,7 @@ statDescribeGens(void)
       tot_slop += gen_slop;
   }
   debugBelch("----------------------------------------------------------\n");
-  debugBelch("%41s%8" FMT_SizeT " %8" FMT_SizeT "\n",
+  debugBelch("%41s%8" FMT_Word " %8" FMT_Word "\n",
              "",tot_live*sizeof(W_),tot_slop*sizeof(W_));
   debugBelch("----------------------------------------------------------\n");
   debugBelch("\n");

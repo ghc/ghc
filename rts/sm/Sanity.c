@@ -821,7 +821,7 @@ void findSlop(bdescr *bd)
     for (; bd != NULL; bd = bd->link) {
         slop = (bd->blocks * BLOCK_SIZE_W) - (bd->free - bd->start);
         if (slop > (1024/sizeof(W_))) {
-            debugBelch("block at %p (bdescr %p) has %" FMT_SizeT "KB slop\n",
+            debugBelch("block at %p (bdescr %p) has %" FMT_Word "KB slop\n",
                        bd->start, bd, slop / (1024/sizeof(W_)));
         }
     }

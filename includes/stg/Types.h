@@ -21,6 +21,16 @@
 #ifndef STGTYPES_H
 #define STGTYPES_H
 
+/* ISO C 99 says:
+ * "C++ implementations should define these macros only when
+ * __STDC_LIMIT_MACROS is defined before <stdint.h> is included."
+ *
+ * C++11 does not require it anymore. Remove once we upgrade to C++11 or newer.
+ */
+#define __STDC_LIMIT_MACROS
+#import <inttypes.h>
+
+
 /*
  * This module should define types *only*, all beginning with "Stg".
  *
@@ -45,43 +55,41 @@
  * First, platform-dependent definitions of size-specific integers.
  */
 
-typedef signed   char            StgInt8;
-typedef unsigned char            StgWord8;
+typedef int8_t                   StgInt8;
+typedef uint8_t                  StgWord8;
 
-typedef signed   short           StgInt16;
-typedef unsigned short           StgWord16;
+#define STG_INT8_MIN             INT8_MIN
+#define STG_INT8_MAX             INT8_MAX
+#define STG_WORD8_MAX            UINT8_MAX
 
-#if SIZEOF_INT == 4
-typedef signed   int             StgInt32;
-typedef unsigned int             StgWord32;
-#define FMT_Word32    "u"
-#define FMT_HexWord32 "x"
-#define FMT_Int32     "d"
-#elif SIZEOF_LONG == 4
-typedef signed   long            StgInt32;
-typedef unsigned long            StgWord32;
-#define FMT_Word32    "lu"
-#define FMT_HexWord32 "lx"
-#define FMT_Int32     "ld"
-#else
-#error GHC untested on this architecture: sizeof(int) != 4
-#endif
+typedef int16_t                  StgInt16;
+typedef uint16_t                 StgWord16;
 
-#if SIZEOF_LONG == 8
-typedef signed   long          StgInt64;
-typedef unsigned long          StgWord64;
-#define FMT_Word64    "lu"
-#define FMT_HexWord64 "lx"
-#define FMT_Int64     "ld"
-#elif SIZEOF_LONG_LONG == 8
-typedef signed long long int   StgInt64;
-typedef unsigned long long int StgWord64;
-#define FMT_Word64    "llu"
-#define FMT_HexWord64 "llx"
-#define FMT_Int64     "lld"
-#else
-#error cannot find a way to define StgInt64
-#endif
+#define STG_INT16_MIN            INT16_MIN
+#define STG_INT16_MAX            INT16_MAX
+#define STG_WORD16_MAX           UINT16_MAX
+
+typedef int32_t                  StgInt32;
+typedef uint32_t                 StgWord32;
+
+#define STG_INT32_MIN            INT32_MIN
+#define STG_INT32_MAX            INT32_MAX
+#define STG_WORD32_MAX           UINT32_MAX
+
+#define FMT_Word32               PRIu32
+#define FMT_HexWord32            PRIx32
+#define FMT_Int32                PRId32
+
+typedef int64_t                  StgInt64;
+typedef uint64_t                 StgWord64;
+
+#define STG_INT64_MIN            INT64_MIN
+#define STG_INT64_MAX            INT64_MAX
+#define STG_WORD64_MAX           UINT64_MAX
+
+#define FMT_Word64               PRIu64
+#define FMT_HexWord64            PRIx64
+#define FMT_Int64                PRId64
 
 typedef struct { StgWord64 h; StgWord64 l; } StgWord128;
 
@@ -90,30 +98,42 @@ typedef struct { StgWord128 h; StgWord128 l; } StgWord256;
 typedef struct { StgWord256 h; StgWord256 l; } StgWord512;
 
 /*
- * Define the standard word size we'll use on this machine: make it
- * big enough to hold a pointer.
+ * Stg{Int,Word} are defined such that they have the exact same size as a
+ * void pointer.
  */
 
 #if SIZEOF_VOID_P == 8
-typedef StgInt64           StgInt;
-typedef StgWord64          StgWord;
-typedef StgInt32           StgHalfInt;
-typedef StgWord32          StgHalfWord;
-#define FMT_Word     FMT_Word64
-#define FMT_HexWord  FMT_HexWord64
-#define FMT_Int      FMT_Int64
-#else
-#if SIZEOF_VOID_P == 4
-typedef StgInt32           StgInt;
-typedef StgWord32          StgWord;
-typedef StgInt16           StgHalfInt;
-typedef StgWord16          StgHalfWord;
-#define FMT_Word     FMT_Word32
-#define FMT_HexWord  FMT_HexWord32
-#define FMT_Int      FMT_Int32
+typedef int64_t            StgInt;
+typedef uint64_t           StgWord;
+
+typedef int32_t            StgHalfInt;
+typedef uint32_t           StgHalfWord;
+
+#define STG_INT_MIN        INT64_MIN
+#define STG_INT_MAX        INT64_MAX
+#define STG_WORD_MAX       UINT64_MAX
+
+#define FMT_Word           FMT_Word64
+#define FMT_HexWord        FMT_HexWord64
+#define FMT_Int            FMT_Int64
+
+#elif SIZEOF_VOID_P == 4
+typedef int32_t            StgInt;
+typedef uint32_t           StgWord;
+
+typedef int16_t            StgHalfInt;
+typedef uint16_s           StgHalfWord;
+
+#define STG_INT_MIN        INT32_MIN
+#define STG_INT_MAX        INT32_MAX
+#define STG_WORD_MAX       UINT32_MAX
+
+#define FMT_Word           FMT_Word32
+#define FMT_HexWord        FMT_HexWord32
+#define FMT_Int            FMT_Int32
+
 #else
 #error GHC untested on this architecture: sizeof(void *) != 4 or 8
-#endif
 #endif
 
 #define W_MASK  (sizeof(W_)-1)

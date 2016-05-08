@@ -829,7 +829,7 @@ dumpCensus( Census *census )
         }
 #endif
 
-        fprintf(hp_file, "\t%" FMT_SizeT "\n", (W_)count * sizeof(W_));
+        fprintf(hp_file, "\t%" FMT_Word "\n", (W_)count * sizeof(W_));
     }
 
     printSample(rtsFalse, census->time);
