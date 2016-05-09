@@ -36,7 +36,7 @@ test('NamedWildcardsAsTyVars', normal, compile, [''])
 test('ParensAroundContext', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('PatBind', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 # Bug
-test('PatBind2', expect_broken(9478), compile, ['-ddump-types -fno-warn-partial-type-signatures'])
+test('PatBind2', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('PatternSig', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('Recursive', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('ScopedNamedWildcards', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])

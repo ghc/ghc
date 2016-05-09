@@ -158,29 +158,43 @@ lookupPragEnv prag_fn n = lookupNameEnv prag_fn n `orElse` []
 *                                                                      *
 ********************************************************************* -}
 
-tcPatBndr :: PatEnv -> Name -> ExpSigmaType -> TcM (TcCoercionN, TcId)
+tcPatBndr :: PatEnv -> Name -> ExpSigmaType -> TcM (HsWrapper, TcId)
 -- (coi, xp) = tcPatBndr penv x pat_ty
 -- Then coi : pat_ty ~ typeof(xp)
 --
-tcPatBndr (PE { pe_ctxt = LetPat lookup_sig no_gen}) bndr_name pat_ty
+tcPatBndr (PE { pe_ctxt = LetPat lookup_sig no_gen
+              , pe_orig = orig }) bndr_name pat_ty
           -- See Note [Typing patterns in pattern bindings]
   | LetGblBndr prags   <- no_gen
-  , Just (TcIdSig sig) <- lookup_sig bndr_name
+  , Just (TcIdSig sig) <- mb_sig
   , Just poly_id <- completeIdSigPolyId_maybe sig
   = do { bndr_id <- addInlinePrags poly_id (lookupPragEnv prags bndr_name)
        ; traceTc "tcPatBndr(gbl,sig)" (ppr bndr_id $$ ppr (idType bndr_id))
        ; co <- unifyPatType bndr_id (idType bndr_id) pat_ty
-       ; return (co, bndr_id) }
+       ; return (mkWpCastN co, bndr_id) }
+
+  -- See Note [Partial signatures for pattern bindings]
+  | LetLclBndr         <- no_gen
+  , Just (TcIdSig sig) <- mb_sig
+  = do { mono_name <- newLocalName bndr_name
+       ; (subst, _) <- newMetaSigTyVars (map snd (sig_skols sig))
+       ; let tau     = substTy subst (sig_tau sig)
+             mono_id = mkLocalId mono_name tau
+       ; wrap <- tcSubTypeET orig pat_ty tau
+       ; traceTc "tcPatBndr(lsl,sig)" (ppr mono_id $$ ppr tau $$ ppr pat_ty)
+       ; return (wrap, mono_id) }
 
   | otherwise
   = do { pat_ty <- expTypeToType pat_ty
        ; bndr_id <- newNoSigLetBndr no_gen bndr_name pat_ty
        ; traceTc "tcPatBndr(no-sig)" (ppr bndr_id $$ ppr (idType bndr_id))
-       ; return (mkTcNomReflCo pat_ty, bndr_id) }
+       ; return (idHsWrapper, bndr_id) }
+  where
+    mb_sig = lookup_sig bndr_name
 
 tcPatBndr (PE { pe_ctxt = _lam_or_proc }) bndr_name pat_ty
   = do { pat_ty <- expTypeToType pat_ty
-       ; return (mkTcNomReflCo pat_ty, mkLocalId bndr_name pat_ty) }
+       ; return (idHsWrapper, mkLocalId bndr_name pat_ty) }
                -- whether or not there is a sig is irrelevant, as this
                -- is local
 
@@ -226,7 +240,63 @@ addInlinePrags poly_id prags
 
     pp_inl (L loc prag) = ppr prag <+> parens (ppr loc)
 
-{-
+{- Note [Partial signatures for pattern bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a function binding and a pattern binding, both
+with a partial type signature
+
+   f1 :: (True, _) -> Char
+   f1 = \x -> x
+
+   f2 :: (True, _) -> Char
+   Just f2 = Just (\x->x)
+
+Obviously, both should be rejected.  That happens naturally for the
+function binding, f1, because we typecheck the RHS with "expected"
+type '(True, apha) -> Char', which correctly fails.
+
+But what of the pattern binding for f2?  We infer the type of the
+pattern, and check tha the RHS has that type.  So we must feed in the
+type of f2 when inferring the type of the pattern!  We do this right
+here, in tcPatBndr, for a LetLclBndr. The signature already has fresh
+unification variables for the wildcards (if any).
+
+Extra notes
+
+* For /complete/ type signatures, we could im principle ignore all this
+  and just infer the most general type for f2, and check (in
+  TcBinds.mkExport) whether it has the claimed type.
+
+  But not so for /partial/ signatures; to get the wildcard unification
+  variables into the game we really must inject them here. If we don't
+  we never get /any/ value assigned to the wildcards; and programs that
+  are bogus, like f2, are accepted.
+
+  Moreover, by feeding in the expected type we do less fruitless
+  creation of unification variables, and improve error messages.
+
+* We need to take care with the skolems.  Consider
+      data T a = MkT a a
+      f :: forall a. a->a
+      g :: forall b. b->b
+      MkT f g = MkT (\x->x) (\y->y)
+  Here we'll infer a type from the pattern of 'T a', but if we feed in
+  the signature types for f and g, we'll end up unifying 'a' and 'b'.
+  So we instantiate the skolems with SigTvs; hence newMetaSigTyVars.
+
+  All we are doing here is getting the "shapes" right.  In tcExport
+  we'll check that the Id really does have the claimed type, with
+  the claimed polymorphism.
+
+* We need to do a subsumption, not equality, check.  If
+      data T = MkT (forall a. a->a)
+      f :: forall b. [b]->[b]
+      MkT f = blah
+  Since 'blah' returns a value of type T, its payload is a polymorphic
+  function of type (forall a. a->a).  And that's enough to bind the
+  less-polymorphic function 'f', but we need some impedence matching
+  to witness the instantiation.
+
 Note [Typing patterns in pattern bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we are typing a pattern binding
@@ -331,10 +401,10 @@ tc_pat  :: PatEnv
                 a)              -- Result of thing inside
 
 tc_pat penv (VarPat (L l name)) pat_ty thing_inside
-  = do  { (co, id) <- tcPatBndr penv name pat_ty
+  = do  { (wrap, id) <- tcPatBndr penv name pat_ty
         ; res <- tcExtendIdEnv1 name id thing_inside
         ; pat_ty <- readExpType pat_ty
-        ; return (mkHsWrapPatCo co (VarPat (L l id)) pat_ty, res) }
+        ; return (mkHsWrapPat wrap (VarPat (L l id)) pat_ty, res) }
 
 tc_pat penv (ParPat pat) pat_ty thing_inside
   = do  { (pat', res) <- tc_lpat pat pat_ty penv thing_inside
@@ -370,7 +440,7 @@ tc_pat _ (WildPat _) pat_ty thing_inside
         ; return (WildPat pat_ty, res) }
 
 tc_pat penv (AsPat (L nm_loc name) pat) pat_ty thing_inside
-  = do  { (co, bndr_id) <- setSrcSpan nm_loc (tcPatBndr penv name pat_ty)
+  = do  { (wrap, bndr_id) <- setSrcSpan nm_loc (tcPatBndr penv name pat_ty)
         ; (pat', res) <- tcExtendIdEnv1 name bndr_id $
                          tc_lpat pat (mkCheckExpType $ idType bndr_id)
                                  penv thing_inside
@@ -382,7 +452,7 @@ tc_pat penv (AsPat (L nm_loc name) pat) pat_ty thing_inside
             --
             -- If you fix it, don't forget the bindInstsOfPatIds!
         ; pat_ty <- readExpType pat_ty
-        ; return (mkHsWrapPatCo co (AsPat (L nm_loc bndr_id) pat') pat_ty, res) }
+        ; return (mkHsWrapPat wrap (AsPat (L nm_loc bndr_id) pat') pat_ty, res) }
 
 tc_pat penv (ViewPat expr pat _) overall_pat_ty thing_inside
   = do  {
@@ -579,12 +649,12 @@ tc_pat penv (NPlusKPat (L nm_loc name) (L loc lit) _ ge minus _) pat_ty thing_in
             <- tcSyntaxOpGen orig minus [synKnownType pat_ty, SynRho] SynAny $
                \ [lit2_ty, var_ty] ->
                do { lit2' <- newOverloadedLit lit (mkCheckExpType lit2_ty)
-                  ; (co, bndr_id) <- setSrcSpan nm_loc $
+                  ; (wrap, bndr_id) <- setSrcSpan nm_loc $
                                      tcPatBndr penv name (mkCheckExpType var_ty)
                            -- co :: var_ty ~ idType bndr_id
 
                            -- minus_wrap is applicable to minus'
-                  ; return (lit2', mkWpCastN co, bndr_id) }
+                  ; return (lit2', wrap, bndr_id) }
 
         -- The Report says that n+k patterns must be in Integral
         -- but it's silly to insist on this in the RebindableSyntax case
