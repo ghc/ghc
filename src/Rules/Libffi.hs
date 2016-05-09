@@ -99,7 +99,7 @@ libffiRules = do
 
             -- The old build system did runMake libffiBuildPath ["MAKEFLAGS="]
             -- TODO: Find out why. It seems redundant, so I removed it.
-            runMake libffiBuildPath ["MAKEFLAGS=", "install"]
+            build $ Target libffiContext (Make libffiBuildPath) [] []
 
             let ffiHDir = libffiBuildPath -/- "inst/lib" -/- libname -/- "include"
             forM_ ["ffi.h", "ffitarget.h"] $ \file -> do

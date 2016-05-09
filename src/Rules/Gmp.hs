@@ -84,7 +84,7 @@ gmpRules = do
                        [gmpBuildPath -/- "Makefile.in"]
                        [gmpBuildPath -/- "Makefile"]
 
-            runMake gmpBuildPath ["MAKEFLAGS="]
+            build $ Target gmpContext (Make gmpBuildPath) [] []
 
             createDirectory $ takeDirectory gmpLibraryH
             copyFile (gmpBuildPath -/- "gmp.h") gmpLibraryH

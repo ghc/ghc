@@ -3,13 +3,14 @@ module Rules.Test (testRules) where
 import Base
 import Builder
 import Expression
-import GHC (rts, libffi)
+import GHC (compiler, rts, libffi)
 import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Oracles.WindowsPath
 import Rules.Actions
 import Settings.Packages
 import Settings.User
+import Target
 
 -- TODO: clean up after testing
 testRules :: Rules ()
@@ -18,7 +19,7 @@ testRules = do
         needBuilder $ Ghc Compile Stage2
         needBuilder $ GhcPkg Stage1
         needBuilder Hpc
-        runMake "testsuite/tests" ["fast"]
+        build $ Target (vanillaContext Stage2 compiler) (Make "testsuite/tests") [] []
 
     "test" ~> do
         let yesNo x = show $ if x then "YES" else "NO"

@@ -1,8 +1,7 @@
 module Rules.Actions (
-    build, buildWithResources, buildWithCmdOptions, copyFile, moveFile,
-    removeFile, createDirectory, removeDirectory, copyDirectory, moveDirectory,
-    applyPatch, fixFile, runMake, renderLibrary, renderProgram, runBuilder,
-    makeExecutable
+    build, buildWithCmdOptions, buildWithResources, copyFile, fixFile, moveFile,
+    removeFile, copyDirectory, createDirectory, moveDirectory, removeDirectory,
+    applyPatch, renderLibrary, renderProgram, runBuilder, makeExecutable
     ) where
 
 import qualified System.Directory       as IO
@@ -74,6 +73,10 @@ customBuild rs opts target@Target {..} = do
                 Stdout output <- cmd (Stdin input) [path] argList
                 writeFileChanged file output
 
+            Make dir -> do
+                need [dir -/- "Makefile"]
+                cmd Shell cmdEcho path ["-C", dir] argList
+
             _  -> cmd [path] argList
 
 cmdEcho :: CmdOption
@@ -139,14 +142,6 @@ fixFile file f = do
         IO.evaluate $ rnf new
         return new
     liftIO $ writeFile file contents
-
-runMake :: FilePath -> [String] -> Action ()
-runMake dir args = do
-    need [dir -/- "Makefile"]
-    path <- builderPath Make
-    let note = if null args then "" else " (" ++ intercalate ", " args ++ ")"
-    putBuild $ "| Run make" ++ note ++ " in " ++ dir ++ "..."
-    quietly $ cmd Shell cmdEcho path ["-C", dir] args
 
 applyPatch :: FilePath -> FilePath -> Action ()
 applyPatch dir patch = do

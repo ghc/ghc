@@ -17,6 +17,7 @@ import Settings.Builders.Happy
 import Settings.Builders.Hsc2Hs
 import Settings.Builders.HsCpp
 import Settings.Builders.Ld
+import Settings.Builders.Make
 import Settings.Builders.Tar
 import Settings.Flavours.Quick
 import Settings.Packages.Base
@@ -66,6 +67,7 @@ defaultBuilderArgs = mconcat
     , hsc2hsBuilderArgs
     , hsCppBuilderArgs
     , ldBuilderArgs
+    , makeBuilderArgs
     , tarBuilderArgs ]
 
 defaultPackageArgs :: Args

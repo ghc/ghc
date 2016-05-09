@@ -49,7 +49,7 @@ data Builder = Alex
              | HsCpp
              | Hsc2Hs
              | Ld
-             | Make
+             | Make FilePath
              | Nm
              | Objdump
              | Patch
@@ -111,7 +111,7 @@ builderPath builder = case builderProvenance builder of
         HsColour      -> fromKey "hscolour"
         HsCpp         -> fromKey "hs-cpp"
         Ld            -> fromKey "ld"
-        Make          -> fromKey "make"
+        Make _        -> fromKey "make"
         Nm            -> fromKey "nm"
         Objdump       -> fromKey "objdump"
         Patch         -> fromKey "patch"
