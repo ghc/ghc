@@ -1454,10 +1454,13 @@ tcExprSig expr sig@(TISI { sig_bndr  = s_bndr
                          <.> mkWpLet  ev_binds
        ; return (mkLHsWrap poly_wrap expr', idType poly_id) }
 
-  | PartialSig { sig_name = name } <- s_bndr
-  = do { (tclvl, wanted, expr') <- pushLevelAndCaptureConstraints  $
-                                   tcExtendTyVarEnvFromSig sig $
-                                   tcPolyExprNC expr tau
+  | PartialSig { sig_name = name, sig_wcs = wc_prs, sig_hs_ty = hs_ty } <- s_bndr
+  = do { (tclvl, wanted, expr')
+             <- pushLevelAndCaptureConstraints  $
+                tcExtendTyVarEnvFromSig sig $
+                do { addErrCtxt (pprSigCtxt ExprSigCtxt (ppr hs_ty)) $
+                     emitWildCardHoleConstraints wc_prs
+                   ; tcPolyExprNC expr tau }
        ; (qtvs, givens, ev_binds)
                  <- simplifyInfer tclvl False [sig] [(name, tau)] wanted
        ; tau <- zonkTcType tau

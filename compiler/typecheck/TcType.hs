@@ -564,18 +564,18 @@ pprUserTypeCtxt SigmaCtxt         = text "the context of a polymorphic type"
 pprUserTypeCtxt (DataTyCtxt tc)   = text "the context of the data type declaration for" <+> quotes (ppr tc)
 pprUserTypeCtxt (PatSynCtxt n)    = text "the signature for pattern synonym" <+> quotes (ppr n)
 
-pprSigCtxt :: UserTypeCtxt -> SDoc -> SDoc -> SDoc
+pprSigCtxt :: UserTypeCtxt -> SDoc -> SDoc
 -- (pprSigCtxt ctxt <extra> <type>)
--- prints    In <extra> the type signature for 'f':
+-- prints    In the type signature for 'f':
 --              f :: <type>
 -- The <extra> is either empty or "the ambiguity check for"
-pprSigCtxt ctxt extra pp_ty
+pprSigCtxt ctxt pp_ty
   | Just n <- isSigMaybe ctxt
-  = vcat [ text "In" <+> extra <+> ptext (sLit "the type signature:")
-         , nest 2 (pprPrefixOcc n <+> dcolon <+> pp_ty) ]
+  = hang (text "In the type signature:")
+       2 (pprPrefixOcc n <+> dcolon <+> pp_ty)
 
   | otherwise
-  = hang (text "In" <+> extra <+> pprUserTypeCtxt ctxt <> colon)
+  = hang (text "In" <+> pprUserTypeCtxt ctxt <> colon)
        2 pp_ty
 
 isSigMaybe :: UserTypeCtxt -> Maybe Name
@@ -1823,7 +1823,7 @@ pickQuantifiablePreds
   -> TcThetaType        -- Context from PartialTypeSignatures
   -> TcThetaType        -- Proposed constraints to quantify
   -> TcThetaType        -- A subset that we can actually quantify
--- This function decides whether a particular constraint shoudl be
+-- This function decides whether a particular constraint should be
 -- quantified over, given the type variables that are being quantified
 pickQuantifiablePreds qtvs annotated_theta theta
   = let flex_ctxt = True in  -- Quantify over non-tyvar constraints, even without

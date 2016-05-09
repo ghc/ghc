@@ -153,7 +153,7 @@ funsSigCtxt []              = panic "funSigCtxt"
 addSigCtxt :: UserTypeCtxt -> LHsType Name -> TcM a -> TcM a
 addSigCtxt ctxt sig_ty thing_inside
   = setSrcSpan (getLoc sig_ty) $
-    addErrCtxt (pprSigCtxt ctxt empty (ppr sig_ty)) $
+    addErrCtxt (pprSigCtxt ctxt (ppr sig_ty)) $
     thing_inside
 
 tcHsSigWcType :: UserTypeCtxt -> LHsSigWcType Name -> TcM Type
