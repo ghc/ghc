@@ -565,6 +565,11 @@ data ShowHowMuch
                           -- May 14: the list is max 1 element long at the moment
   | ShowIface    -- Everything including GHC-internal information (used in --show-iface)
 
+instance Outputable ShowHowMuch where
+  ppr ShowHeader      = text "ShowHeader"
+  ppr ShowIface       = text "ShowIface"
+  ppr (ShowSome occs) = text "ShowSome" <+> ppr occs
+
 showAll :: ShowSub
 showAll = ShowSub { ss_how_much = ShowIface, ss_ppr_bndr = ppr }
 
