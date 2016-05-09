@@ -1,48 +1,46 @@
 
 TidyClash2.hs:13:20: error:
-    • Found type wildcard ‘_’ standing for ‘t1’
-      Where: ‘t1’ is a rigid type variable bound by
-               the inferred type of barry :: t1 -> t2 -> t at TidyClash2.hs:14:1
-      To use the inferred type, enable PartialTypeSignatures
-    • In the type signature:
-        barry :: forall t. _ -> _ -> t
-    • Relevant bindings include
-        barry :: t1 -> t2 -> t (bound at TidyClash2.hs:14:1)
-
-TidyClash2.hs:13:25: error:
     • Found type wildcard ‘_’ standing for ‘t2’
       Where: ‘t2’ is a rigid type variable bound by
-               the inferred type of barry :: t1 -> t2 -> t at TidyClash2.hs:14:1
+               the inferred type of barry :: t2 -> t1 -> t at TidyClash2.hs:14:1
       To use the inferred type, enable PartialTypeSignatures
-    • In the type signature:
-        barry :: forall t. _ -> _ -> t
+    • In the type signature: barry :: forall t. _ -> _ -> t
     • Relevant bindings include
-        barry :: t1 -> t2 -> t (bound at TidyClash2.hs:14:1)
+        barry :: t2 -> t1 -> t (bound at TidyClash2.hs:14:1)
 
-TidyClash2.hs:14:13: error:
+TidyClash2.hs:13:25: error:
     • Found type wildcard ‘_’ standing for ‘t1’
       Where: ‘t1’ is a rigid type variable bound by
-               the inferred type of barry :: t1 -> t2 -> t at TidyClash2.hs:14:1
+               the inferred type of barry :: t2 -> t1 -> t at TidyClash2.hs:14:1
+      To use the inferred type, enable PartialTypeSignatures
+    • In the type signature: barry :: forall t. _ -> _ -> t
+    • Relevant bindings include
+        barry :: t2 -> t1 -> t (bound at TidyClash2.hs:14:1)
+
+TidyClash2.hs:14:13: error:
+    • Found type wildcard ‘_’ standing for ‘t2’
+      Where: ‘t2’ is a rigid type variable bound by
+               the inferred type of barry :: t2 -> t1 -> t at TidyClash2.hs:14:1
       To use the inferred type, enable PartialTypeSignatures
     • In a pattern type signature: _
       In the pattern: x :: _
       In an equation for ‘barry’:
           barry (x :: _) (y :: _) = undefined :: _
     • Relevant bindings include
-        barry :: t1 -> t2 -> t (bound at TidyClash2.hs:14:1)
+        barry :: t2 -> t1 -> t (bound at TidyClash2.hs:14:1)
 
 TidyClash2.hs:14:22: error:
-    • Found type wildcard ‘_’ standing for ‘t2’
-      Where: ‘t2’ is a rigid type variable bound by
-               the inferred type of barry :: t1 -> t2 -> t at TidyClash2.hs:14:1
+    • Found type wildcard ‘_’ standing for ‘t1’
+      Where: ‘t1’ is a rigid type variable bound by
+               the inferred type of barry :: t2 -> t1 -> t at TidyClash2.hs:14:1
       To use the inferred type, enable PartialTypeSignatures
     • In a pattern type signature: _
       In the pattern: y :: _
       In an equation for ‘barry’:
           barry (x :: _) (y :: _) = undefined :: _
     • Relevant bindings include
-        x :: t1 (bound at TidyClash2.hs:14:8)
-        barry :: t1 -> t2 -> t (bound at TidyClash2.hs:14:1)
+        x :: t2 (bound at TidyClash2.hs:14:8)
+        barry :: t2 -> t1 -> t (bound at TidyClash2.hs:14:1)
 
 TidyClash2.hs:14:40: error:
     • Found type wildcard ‘_’ standing for ‘t3’
@@ -54,6 +52,6 @@ TidyClash2.hs:14:40: error:
       In an equation for ‘barry’:
           barry (x :: _) (y :: _) = undefined :: _
     • Relevant bindings include
-        y :: t2 (bound at TidyClash2.hs:14:17)
-        x :: t1 (bound at TidyClash2.hs:14:8)
-        barry :: t1 -> t2 -> t (bound at TidyClash2.hs:14:1)
+        y :: t1 (bound at TidyClash2.hs:14:17)
+        x :: t2 (bound at TidyClash2.hs:14:8)
+        barry :: t2 -> t1 -> t (bound at TidyClash2.hs:14:1)

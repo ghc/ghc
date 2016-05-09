@@ -8,4 +8,4 @@ NamedExtraConstraintsWildcard.hs:5:1: error:
     • In the ambiguity check for the inferred type for ‘foo’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the inferred type
-        foo :: forall a (t :: Constraint). (Eq a, t) => a -> a
+        foo :: forall (t :: Constraint) a. (Eq a, t) => a -> a

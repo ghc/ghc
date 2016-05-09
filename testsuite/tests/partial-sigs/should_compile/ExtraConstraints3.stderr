@@ -14,13 +14,13 @@ TYPE SIGNATURES
   < :: forall a. Ord a => a -> a -> Bool
   <= :: forall a. Ord a => a -> a -> Bool
   =<< ::
-    forall (m :: * -> *) b a. Monad m => (a -> m b) -> m a -> m b
+    forall b (m :: * -> *) a. Monad m => (a -> m b) -> m a -> m b
   == :: forall a. Eq a => a -> a -> Bool
   > :: forall a. Ord a => a -> a -> Bool
   >= :: forall a. Ord a => a -> a -> Bool
-  >> :: forall b (m :: * -> *) a. Monad m => m a -> m b -> m b
+  >> :: forall b a (m :: * -> *). Monad m => m a -> m b -> m b
   >>= ::
-    forall b (m :: * -> *) a. Monad m => m a -> (a -> m b) -> m b
+    forall b a (m :: * -> *). Monad m => m a -> (a -> m b) -> m b
   ^ :: forall b a. (Num a, Integral b) => a -> b -> a
   ^^ :: forall b a. (Integral b, Fractional a) => a -> b -> a
   abs :: forall a. Num a => a -> a
@@ -47,7 +47,7 @@ TYPE SIGNATURES
   const :: forall b a. a -> b -> a
   cos :: forall a. Floating a => a -> a
   cosh :: forall a. Floating a => a -> a
-  curry :: forall c a b. ((a, b) -> c) -> a -> b -> c
+  curry :: forall b a c. ((a, b) -> c) -> a -> b -> c
   cycle :: forall a. [a] -> [a]
   decodeFloat :: forall a. RealFloat a => a -> (Integer, Int)
   div :: forall a. Integral a => a -> a -> a
@@ -66,7 +66,7 @@ TYPE SIGNATURES
   even :: forall a. Integral a => a -> Bool
   exp :: forall a. Floating a => a -> a
   exponent :: forall a. RealFloat a => a -> Int
-  fail :: forall (m :: * -> *) a. Monad m => String -> m a
+  fail :: forall a (m :: * -> *). Monad m => String -> m a
   filter :: forall a. (a -> Bool) -> [a] -> [a]
   flip :: forall c b a. (a -> b -> c) -> b -> a -> c
   floatDigits :: forall a. RealFloat a => a -> Int
@@ -91,7 +91,7 @@ TYPE SIGNATURES
   fromInteger :: forall a. Num a => Integer -> a
   fromIntegral :: forall b a. (Num b, Integral a) => a -> b
   fromRational :: forall a. Fractional a => Rational -> a
-  fst :: forall a b. (a, b) -> a
+  fst :: forall b a. (a, b) -> a
   gcd :: forall a. Integral a => a -> a -> a
   getChar :: IO Char
   getContents :: IO String
@@ -109,7 +109,7 @@ TYPE SIGNATURES
   iterate :: forall a. (a -> a) -> a -> [a]
   last :: forall a. [a] -> a
   lcm :: forall a. Integral a => a -> a -> a
-  length :: forall (t :: * -> *) a. P.Foldable t => t a -> Int
+  length :: forall a (t :: * -> *). P.Foldable t => t a -> Int
   lex :: ReadS String
   lines :: String -> [String]
   log :: forall a. Floating a => a -> a
@@ -117,11 +117,11 @@ TYPE SIGNATURES
   lookup :: forall b a. Eq a => a -> [(a, b)] -> Maybe b
   map :: forall b a. (a -> b) -> [a] -> [b]
   mapM ::
-    forall (t :: * -> *) (m :: * -> *) b a.
+    forall (t :: * -> *) b (m :: * -> *) a.
     (Monad m, P.Traversable t) =>
     (a -> m b) -> t a -> m (t b)
   mapM_ ::
-    forall (t :: * -> *) (m :: * -> *) b a.
+    forall (t :: * -> *) b (m :: * -> *) a.
     (Monad m, P.Foldable t) =>
     (a -> m b) -> t a -> m ()
   max :: forall a. Ord a => a -> a -> a
@@ -138,7 +138,7 @@ TYPE SIGNATURES
   not :: Bool -> Bool
   notElem ::
     forall (t :: * -> *) a. (Eq a, P.Foldable t) => a -> t a -> Bool
-  null :: forall (t :: * -> *) a. P.Foldable t => t a -> Bool
+  null :: forall a (t :: * -> *). P.Foldable t => t a -> Bool
   odd :: forall a. Integral a => a -> Bool
   or :: forall (t :: * -> *). P.Foldable t => t Bool -> Bool
   otherwise :: Bool
@@ -177,11 +177,11 @@ TYPE SIGNATURES
   scanr1 :: forall a. (a -> a -> a) -> [a] -> [a]
   seq :: forall b a. a -> b -> b
   sequence ::
-    forall (t :: * -> *) (m :: * -> *) a.
+    forall a (m :: * -> *) (t :: * -> *).
     (Monad m, P.Traversable t) =>
     t (m a) -> m (t a)
   sequence_ ::
-    forall (t :: * -> *) (m :: * -> *) a.
+    forall a (t :: * -> *) (m :: * -> *).
     (Monad m, P.Foldable t) =>
     t (m a) -> m ()
   show :: forall a. Show a => a -> String
@@ -216,8 +216,8 @@ TYPE SIGNATURES
   unlines :: [String] -> String
   until :: forall a. (a -> Bool) -> (a -> a) -> a -> a
   unwords :: [String] -> String
-  unzip :: forall a b. [(a, b)] -> ([a], [b])
-  unzip3 :: forall a b c. [(a, b, c)] -> ([a], [b], [c])
+  unzip :: forall b a. [(a, b)] -> ([a], [b])
+  unzip3 :: forall c b a. [(a, b, c)] -> ([a], [b], [c])
   userError :: String -> IOError
   words :: String -> [String]
   writeFile :: FilePath -> String -> IO ()

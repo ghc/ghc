@@ -1,10 +1,10 @@
 
 tcfail198.hs:6:36: error:
-    • Couldn't match expected type ‘a2’ with actual type ‘a’
-        because type variable ‘a2’ would escape its scope
+    • Couldn't match expected type ‘a1’ with actual type ‘a’
+        because type variable ‘a1’ would escape its scope
       This (rigid, skolem) type variable is bound by
         an expression type signature:
-          a2
+          a1
         at tcfail198.hs:6:36-41
     • In the expression: x :: a
       In the second argument of ‘(++)’, namely ‘[x :: a]’
