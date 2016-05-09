@@ -1,8 +1,8 @@
 module Rules.Actions (
     build, buildWithResources, buildWithCmdOptions, copyFile, moveFile,
     removeFile, createDirectory, removeDirectory, copyDirectory, moveDirectory,
-    applyPatch, fixFile, runMake, runMakeVerbose, renderLibrary, renderProgram,
-    runBuilder, makeExecutable
+    applyPatch, fixFile, runMake, renderLibrary, renderProgram, runBuilder,
+    makeExecutable
     ) where
 
 import qualified System.Directory       as IO
@@ -62,7 +62,7 @@ customBuild rs opts target@Target {..} = do
                 need [dir -/- "configure"]
                 -- Inject /bin/bash into `libtool`, instead of /bin/sh
                 let env = AddEnv "CONFIG_SHELL" "/bin/bash"
-                cmd Shell [Cwd dir] [path] (env:opts) argList
+                cmd Shell cmdEcho env [Cwd dir] [path] opts argList
 
             HsCpp    -> captureStdout target path argList
             GenApply -> captureStdout target path argList
@@ -75,6 +75,9 @@ customBuild rs opts target@Target {..} = do
                 writeFileChanged file output
 
             _  -> cmd [path] argList
+
+cmdEcho :: CmdOption
+cmdEcho = EchoStdout $ cmdProgressInfo `elem` [Normal, Unicorn]
 
 -- | Run a builder, capture the standard output, and write it to a given file.
 captureStdout :: Target -> FilePath -> [String] -> Action ()
@@ -118,13 +121,13 @@ removeDirectory dir = do
 copyDirectory :: FilePath -> FilePath -> Action ()
 copyDirectory source target = do
     putProgressInfo $ renderAction "Copy directory" source target
-    quietly $ cmd (EchoStdout False) ["cp", "-r", source, target]
+    quietly $ cmd cmdEcho ["cp", "-r", source, target]
 
 -- | Move a directory. The contents of the source directory is untracked.
 moveDirectory :: FilePath -> FilePath -> Action ()
 moveDirectory source target = do
     putProgressInfo $ renderAction "Move directory" source target
-    quietly $ cmd (EchoStdout False) ["mv", source, target]
+    quietly $ cmd cmdEcho ["mv", source, target]
 
 -- | Transform a given file by applying a function to its contents.
 fixFile :: FilePath -> (String -> String) -> Action ()
@@ -138,20 +141,12 @@ fixFile file f = do
     liftIO $ writeFile file contents
 
 runMake :: FilePath -> [String] -> Action ()
-runMake = runMakeWithVerbosity False
-
-runMakeVerbose :: FilePath -> [String] -> Action ()
-runMakeVerbose = runMakeWithVerbosity True
-
-runMakeWithVerbosity :: Bool -> FilePath -> [String] -> Action ()
-runMakeWithVerbosity verbose dir args = do
+runMake dir args = do
     need [dir -/- "Makefile"]
     path <- builderPath Make
     let note = if null args then "" else " (" ++ intercalate ", " args ++ ")"
     putBuild $ "| Run make" ++ note ++ " in " ++ dir ++ "..."
-    if verbose
-    then           cmd Shell                    path ["-C", dir] args
-    else quietly $ cmd Shell (EchoStdout False) path ["-C", dir] args
+    quietly $ cmd Shell cmdEcho path ["-C", dir] args
 
 applyPatch :: FilePath -> FilePath -> Action ()
 applyPatch dir patch = do
@@ -159,7 +154,7 @@ applyPatch dir patch = do
     needBuilder Patch
     path <- builderPath Patch
     putBuild $ "| Apply patch " ++ file
-    quietly $ cmd Shell (EchoStdout False) [Cwd dir] [path, "-p0 <", patch]
+    quietly $ cmd Shell cmdEcho [Cwd dir] [path, "-p0 <", patch]
 
 runBuilder :: Builder -> [String] -> Action ()
 runBuilder builder args = do

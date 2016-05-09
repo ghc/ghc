@@ -18,7 +18,7 @@ testRules = do
         needBuilder $ Ghc Compile Stage2
         needBuilder $ GhcPkg Stage1
         needBuilder Hpc
-        runMakeVerbose "testsuite/tests" ["fast"]
+        runMake "testsuite/tests" ["fast"]
 
     "test" ~> do
         let yesNo x = show $ if x then "YES" else "NO"
