@@ -866,13 +866,13 @@ quantifyTyVars, quantifyZonkedTyVars
 
 quantifyTyVars gbl_tvs (DV { dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
   = do { dep_tkvs    <- zonkTyCoVarsAndFVDSet dep_tkvs
-       ; nondep_tkvs <- (`minusDVarSet` dep_tkvs) <$>
-                        zonkTyCoVarsAndFVDSet nondep_tkvs
+       ; nondep_tkvs <- zonkTyCoVarsAndFVDSet nondep_tkvs
        ; gbl_tvs     <- zonkTyCoVarsAndFV gbl_tvs
        ; quantifyZonkedTyVars gbl_tvs (DV { dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs }) }
 
-quantifyZonkedTyVars gbl_tvs (DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
-  = do { let all_cvs = filterVarSet isCoVar $ dVarSetToVarSet dep_tkvs
+quantifyZonkedTyVars gbl_tvs dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
+  = do { traceTc "quantifyZonkedTyVars" (vcat [ppr dvs, ppr gbl_tvs])
+       ; let all_cvs = filterVarSet isCoVar $ dVarSetToVarSet dep_tkvs
              dep_kvs = dVarSetElemsWellScoped $
                        dep_tkvs `dVarSetMinusVarSet` gbl_tvs
                                 `dVarSetMinusVarSet` closeOverKinds all_cvs
@@ -883,12 +883,17 @@ quantifyZonkedTyVars gbl_tvs (DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
                  --    variables, or any any tvs that a covar depends on
 
              nondep_tvs = dVarSetElems $
-                          nondep_tkvs `dVarSetMinusVarSet` gbl_tvs
-                 -- No worry about dependent covars here; they are
-                 --    all in dep_tkvs
+                          (nondep_tkvs `minusDVarSet` dep_tkvs)
+                           `dVarSetMinusVarSet` gbl_tvs
+                 -- See Note [Dependent type variables] in TcType
+                 -- The `minus` dep_tkvs removes any kind-level vars
+                 --    e.g. T k (a::k)   Since k appear in a kind it'll
+                 --    be in dv_kvs, and is dependent. So remove it from
+                 --    dv_tvs which will also contain k
+                 -- No worry about dependent covars here;
+                 --    they are all in dep_tkvs
                  -- No worry about scoping, becuase these are all
                  --    type variables
-                 --    See Note [Dependent type variables] in TcType
                  -- NB kinds of tvs are zonked by zonkTyCoVarsAndFV
 
              -- In the non-PolyKinds case, default the kind variables

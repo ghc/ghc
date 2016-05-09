@@ -214,7 +214,7 @@ import BasicTypes
 import Util
 import Bag
 import Maybes
-import Pair
+import Pair( pFst )
 import Outputable
 import FastString
 import ErrUtils( Validity(..), MsgDoc, isValid )
@@ -855,11 +855,21 @@ data TcDepVars  -- See Note [Dependent type variables]
                 -- See Note [TcDepVars determinism]
   = DV { dv_kvs :: DTyCoVarSet  -- "kind" variables (dependent)
        , dv_tvs :: DTyVarSet    -- "type" variables (non-dependent)
-                                -- The two are disjoint sets
+         -- A variable may appear in both sets
+         -- E.g.   T k (x::k)    The first occurence of k makes it
+         --                      show up in dv_tvs, the second in dv_kvs
+         -- See Note [Dependent type variables]
     }
 
 depVarsTyVars :: TcDepVars -> DTyVarSet
 depVarsTyVars = dv_tvs
+
+instance Monoid TcDepVars where
+   mempty = DV { dv_kvs = emptyDVarSet, dv_tvs = emptyDVarSet }
+   mappend (DV { dv_kvs = kv1, dv_tvs = tv1 })
+           (DV { dv_kvs = kv2, dv_tvs = tv2 })
+          = DV { dv_kvs = kv1 `unionDVarSet` kv2
+               , dv_tvs = tv1 `unionDVarSet` tv2}
 
 instance Outputable TcDepVars where
   ppr (DV {dv_kvs = kvs, dv_tvs = tvs })
@@ -885,7 +895,19 @@ E.g.  In the type    T k (a::k)
           even though it also appears at "top level" of the type
       'a' is a type variable, becuase it doesn't
 
+We gather these variables using a TcDepVars record:
+  DV { dv_kvs: Variables free in the kind of a free type variable
+               or of a forall-bound type variable
+     , dv_tvs: Variables sytactically free in the type }
+
+So:  dv_kvs            are the kind variables of the type
+     (dv_tvs - dv_kvs) are the type variable of the type
+
 Note that
+
+* A variable can occur in both.
+      T k (x::k)    The first occurence of k makes it
+                    show up in dv_tvs, the second in dv_kvs
 
 * We include any coercion variables in the "dependent",
   "kind-variable" set because we never quantify over them.
@@ -911,43 +933,33 @@ For more information about deterministic sets see
 Note [Deterministic UniqFM] in UniqDFM.
 -}
 
-splitDepVarsOfType :: Type -> TcDepVars
--- See Note [Dependent type variables]
-splitDepVarsOfType ty
-  = DV { dv_kvs = dep_vars
-       , dv_tvs = nondep_vars `minusDVarSet` dep_vars }
-  where
-    Pair dep_vars nondep_vars = split_dep_vars ty
-
 -- | Like 'splitDepVarsOfType', but over a list of types
 splitDepVarsOfTypes :: [Type] -> TcDepVars
--- See Note [Dependent type variables]
-splitDepVarsOfTypes tys
-  = DV { dv_kvs = dep_vars
-       , dv_tvs = nondep_vars `minusDVarSet` dep_vars }
-  where
-    Pair dep_vars nondep_vars = foldMap split_dep_vars tys
+splitDepVarsOfTypes = foldMap splitDepVarsOfType
 
 -- | Worker for 'splitDepVarsOfType'. This might output the same var
 -- in both sets, if it's used in both a type and a kind.
 -- See Note [TcDepVars determinism]
-split_dep_vars :: Type -> Pair DTyCoVarSet   -- Pair kvs tvs
-split_dep_vars = go
+-- See Note [Dependent type variables]
+splitDepVarsOfType :: Type -> TcDepVars
+splitDepVarsOfType = go
   where
-    go (TyVarTy tv)              = Pair (tyCoVarsOfTypeDSet $ tyVarKind tv)
-                                        (unitDVarSet tv)
+    go (TyVarTy tv)              = DV { dv_kvs =tyCoVarsOfTypeDSet $ tyVarKind tv
+                                      , dv_tvs = unitDVarSet tv }
     go (AppTy t1 t2)             = go t1 `mappend` go t2
     go (TyConApp _ tys)          = foldMap go tys
     go (ForAllTy (Anon arg) res) = go arg `mappend` go res
-    go (ForAllTy (Named tv _) ty)
-      = let Pair kvs tvs = go ty in
-        Pair (kvs `delDVarSet` tv
-                  `extendDVarSetList` tyCoVarsOfTypeList (tyVarKind tv))
-             (tvs `delDVarSet` tv)
     go (LitTy {})                = mempty
-    go (CastTy ty co)            = go ty `mappend` Pair (tyCoVarsOfCoDSet co)
-                                                        emptyDVarSet
-    go (CoercionTy co)           = Pair (tyCoVarsOfCoDSet co) emptyDVarSet
+    go (CastTy ty co)            = go ty `mappend` go_co co
+    go (CoercionTy co)           = go_co co
+    go (ForAllTy (Named tv _) ty)
+      = let DV { dv_kvs = kvs, dv_tvs = tvs } = go ty in
+        DV { dv_kvs = (kvs `delDVarSet` tv)
+                      `extendDVarSetList` tyCoVarsOfTypeList (tyVarKind tv)
+           , dv_tvs = tvs `delDVarSet` tv }
+
+    go_co co = DV { dv_kvs = tyCoVarsOfCoDSet co
+                  , dv_tvs = emptyDVarSet }
 
 {-
 ************************************************************************
