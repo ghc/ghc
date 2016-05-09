@@ -1060,6 +1060,8 @@ arithSeqEltType (Just fl) res_ty
 
 type LHsExprArgIn  = Either (LHsExpr Name) (LHsWcType Name)
 type LHsExprArgOut = Either (LHsExpr TcId) (LHsWcType Name)
+   -- Left e   => argument expression
+   -- Right ty => visible type application
 
 tcApp1 :: HsExpr Name  -- either HsApp or HsAppType
        -> ExpRhoType -> TcM (HsExpr TcId)
