@@ -1483,15 +1483,15 @@ tcMonoBinds _ sig_fn no_gen binds
 
         -- Bring the monomorphic Ids, into scope for the RHSs
         ; let mono_infos = getMonoBindInfo tc_binds
-              rhs_id_env = [(name, mono_id) | MBI { mbi_poly_name = name
-                                                  , mbi_sig       = mb_sig
-                                                  , mbi_mono_id   = mono_id }
-                                                    <- mono_infos
-                                            , case mb_sig of
-                                                Just sig -> isPartialSig sig
-                                                Nothing  -> True ]
-                    -- A monomorphic binding for each term variable that lacks
-                    -- a type sig.  (Ones with a sig are already in scope.)
+              rhs_id_env = [ (name, mono_id)
+                           | MBI { mbi_poly_name = name
+                                 , mbi_sig       = mb_sig
+                                 , mbi_mono_id   = mono_id } <- mono_infos
+                           , case mb_sig of
+                               Just sig -> isPartialSig sig
+                               Nothing  -> True ]
+                -- A monomorphic binding for each term variable that lacks
+                -- a complete type sig.  (Ones with a sig are already in scope.)
 
         ; traceTc "tcMonoBinds" $ vcat [ ppr n <+> ppr id <+> ppr (idType id)
                                        | (n,id) <- rhs_id_env]
