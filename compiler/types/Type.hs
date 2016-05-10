@@ -225,6 +225,7 @@ import ListSetOps
 import Digraph
 
 import Maybes           ( orElse )
+import Data.Foldable    ( foldl' )
 import Data.Maybe       ( isJust, mapMaybe )
 import Control.Monad    ( guard )
 import Control.Arrow    ( first, second )
@@ -630,7 +631,7 @@ mkAppTy ty1               ty2 = AppTy ty1 ty2
 mkAppTys :: Type -> [Type] -> Type
 mkAppTys ty1                []   = ty1
 mkAppTys (TyConApp tc tys1) tys2 = mkTyConApp tc (tys1 ++ tys2)
-mkAppTys ty1                tys2 = foldl AppTy ty1 tys2
+mkAppTys ty1                tys2 = foldl' AppTy ty1 tys2
 
 -------------
 splitAppTy_maybe :: Type -> Maybe (Type, Type)

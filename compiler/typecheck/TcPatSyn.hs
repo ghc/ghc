@@ -49,7 +49,7 @@ import Bag
 import Util
 import ErrUtils
 import Control.Monad ( unless, zipWithM )
-import Data.List( partition )
+import Data.List( partition, foldl' )
 
 #include "HsVersions.h"
 
@@ -539,7 +539,7 @@ tcPatSynMatcher (L loc name) lpat
                              -- See Note [Exported LocalIds] in Id
 
              inst_wrap = mkWpEvApps prov_dicts <.> mkWpTyApps ex_tys
-             cont' = foldl nlHsApp (mkLHsWrap inst_wrap (nlHsVar cont)) cont_args
+             cont' = foldl' nlHsApp (mkLHsWrap inst_wrap (nlHsVar cont)) cont_args
 
              fail' = nlHsApps fail [nlHsVar voidPrimId]
 
@@ -764,8 +764,8 @@ tcPatToExpr args pat = go pat
     mkPrefixConExpr :: Located Name -> [LPat Name] -> Either MsgDoc (HsExpr Name)
     mkPrefixConExpr lcon@(L loc _) pats
       = do { exprs <- mapM go pats
-           ; return (foldl (\x y -> HsApp (L loc x) y)
-                           (HsVar lcon) exprs) }
+           ; return (foldl' (\x y -> HsApp (L loc x) y)
+                            (HsVar lcon) exprs) }
 
     mkRecordConExpr :: Located Name -> HsRecFields Name (LPat Name)
                     -> Either MsgDoc (HsExpr Name)

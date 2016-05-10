@@ -3,7 +3,7 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-{-# LANGUAGE CPP, TupleSections, ViewPatterns #-}
+{-# LANGUAGE CPP, TupleSections, ViewPatterns, BangPatterns #-}
 
 module TcValidity (
   Rank, UserTypeCtxt(..), checkValidType, checkValidMonoType,
@@ -62,7 +62,7 @@ import Unique      ( mkAlphaTyVarUnique )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
-import Data.List        ( (\\) )
+import Data.List        ( (\\), foldl' )
 
 {-
 ************************************************************************
@@ -1575,14 +1575,14 @@ checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
     check_injectivity prev_branches cur_branch
       | Injective inj <- injectivity
       = do { let conflicts =
-                     fst $ foldl (gather_conflicts inj prev_branches cur_branch)
-                                 ([], 0) prev_branches
+                     fst $ foldl' (gather_conflicts inj prev_branches cur_branch)
+                                  ([], 0) prev_branches
            ; mapM_ (\(err, span) -> setSrcSpan span $ addErr err)
                    (makeInjectivityErrors ax cur_branch inj conflicts) }
       | otherwise
       = return ()
 
-    gather_conflicts inj prev_branches cur_branch (acc, n) branch
+    gather_conflicts inj prev_branches cur_branch (!acc, !n) branch
                -- n is 0-based index of branch in prev_branches
       = case injectiveBranches inj cur_branch branch of
           InjectivityUnified ax1 ax2

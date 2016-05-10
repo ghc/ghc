@@ -964,8 +964,8 @@ exprIsWorkFree e = go 0 e
     go _ (Type {})                    = True
     go _ (Coercion {})                = True
     go n (Cast e _)                   = go n e
-    go n (Case scrut _ _ alts)        = foldl (&&) (exprIsWorkFree scrut)
-                                              [ go n rhs | (_,_,rhs) <- alts ]
+    go n (Case scrut _ _ alts)        = exprIsWorkFree scrut
+                                     && and [ go n rhs | (_,_,rhs) <- alts ]
          -- See Note [Case expressions are work-free]
     go _ (Let {})                     = False
     go n (Var v)                      = isCheapApp v n

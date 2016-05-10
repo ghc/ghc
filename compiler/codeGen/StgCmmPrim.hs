@@ -1030,7 +1030,7 @@ genericWordMul2Op [res_h, res_l] [arg_x, arg_y]
           toTopHalf x = CmmMachOp (MO_Shl (wordWidth dflags)) [x, hww]
           bottomHalf x = CmmMachOp (MO_And (wordWidth dflags)) [x, hwm]
           add x y = CmmMachOp (MO_Add (wordWidth dflags)) [x, y]
-          sum = foldl1 add
+          sum = foldl1' add
           mul x y = CmmMachOp (MO_Mul (wordWidth dflags)) [x, y]
           or x y = CmmMachOp (MO_Or (wordWidth dflags)) [x, y]
           hww = CmmLit (CmmInt (fromIntegral (widthInBits (halfWordWidth dflags)))

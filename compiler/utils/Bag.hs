@@ -30,7 +30,7 @@ import Util
 import MonadUtils
 import Control.Monad
 import Data.Data
-import Data.List ( partition, mapAccumL )
+import Data.List ( partition, mapAccumL, foldl' )
 import qualified Data.Foldable as Foldable
 
 infixr 3 `consBag`
@@ -197,7 +197,7 @@ foldlBag :: (r -> a -> r) -> r
 foldlBag _ z EmptyBag        = z
 foldlBag k z (UnitBag x)     = k z x
 foldlBag k z (TwoBags b1 b2) = foldlBag k (foldlBag k z b1) b2
-foldlBag k z (ListBag xs)    = foldl k z xs
+foldlBag k z (ListBag xs)    = foldl' k z xs
 
 foldrBagM :: (Monad m) => (a -> b -> m b) -> b -> Bag a -> m b
 foldrBagM _ z EmptyBag        = return z

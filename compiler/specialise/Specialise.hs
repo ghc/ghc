@@ -40,6 +40,7 @@ import Control.Monad
 #if __GLASGOW_HASKELL__ > 710
 import qualified Control.Monad.Fail as MonadFail
 #endif
+import Data.Foldable     ( foldl' )
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified FiniteMap as Map
@@ -1942,7 +1943,7 @@ mkDB bind = (bind, bind_fvs bind)
 -- | Identify the free variables of a 'CoreBind'
 bind_fvs :: CoreBind -> VarSet
 bind_fvs (NonRec bndr rhs) = pair_fvs (bndr,rhs)
-bind_fvs (Rec prs)         = foldl delVarSet rhs_fvs bndrs
+bind_fvs (Rec prs)         = foldl' delVarSet rhs_fvs bndrs
                            where
                              bndrs = map fst prs
                              rhs_fvs = unionVarSets (map pair_fvs prs)

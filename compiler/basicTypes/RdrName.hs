@@ -78,7 +78,7 @@ import Util
 import StaticFlags( opt_PprStyle_Debug )
 
 import Data.Data
-import Data.List( sortBy )
+import Data.List( sortBy, foldl' )
 
 {-
 ************************************************************************
@@ -913,7 +913,7 @@ extendGlobalRdrEnv env gre
                      (greOccName gre) gre
 
 shadowNames :: GlobalRdrEnv -> [Name] -> GlobalRdrEnv
-shadowNames = foldl shadowName
+shadowNames = foldl' shadowName
 
 {- Note [GlobalRdrEnv shadowing]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -222,6 +222,7 @@ import FV
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.IORef
+import Data.Foldable ( foldl' )
 import Control.Monad (liftM, ap)
 import Data.Functor.Identity
 
@@ -1191,7 +1192,7 @@ mkNakedAppTys :: Type -> [Type] -> Type
 -- See Note [Type-checking inside the knot] in TcHsType
 mkNakedAppTys ty1                []   = ty1
 mkNakedAppTys (TyConApp tc tys1) tys2 = mkNakedTyConApp tc (tys1 ++ tys2)
-mkNakedAppTys ty1                tys2 = foldl AppTy ty1 tys2
+mkNakedAppTys ty1                tys2 = foldl' AppTy ty1 tys2
 
 mkNakedAppTy :: Type -> Type -> Type
 -- See Note [Type-checking inside the knot] in TcHsType

@@ -29,6 +29,7 @@ import UniqDFM
 import Unique( Unique )
 import FastString(FastString)
 
+import Data.Foldable ( foldl' )
 import qualified Data.Map    as Map
 import qualified Data.IntMap as IntMap
 import VarEnv
@@ -792,7 +793,7 @@ data TypeMapX a
 -- to nested AppTys. Why the last one? See Note [Equality on AppTys] in Type
 trieMapView :: Type -> Maybe Type
 trieMapView ty | Just ty' <- coreViewOneStarKind ty = Just ty'
-trieMapView (TyConApp tc tys@(_:_)) = Just $ foldl AppTy (TyConApp tc []) tys
+trieMapView (TyConApp tc tys@(_:_)) = Just $ foldl' AppTy (TyConApp tc []) tys
 trieMapView (ForAllTy (Anon arg) res)
   = Just ((TyConApp funTyCon [] `AppTy` arg) `AppTy` res)
 trieMapView _ = Nothing
@@ -1008,7 +1009,7 @@ extendCME (CME { cme_next = bv, cme_env = env }) v
   = CME { cme_next = bv+1, cme_env = extendVarEnv env v bv }
 
 extendCMEs :: CmEnv -> [Var] -> CmEnv
-extendCMEs env vs = foldl extendCME env vs
+extendCMEs env vs = foldl' extendCME env vs
 
 lookupCME :: CmEnv -> Var -> Maybe BoundVar
 lookupCME (CME { cme_env = env }) v = lookupVarEnv env v

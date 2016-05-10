@@ -36,7 +36,7 @@ import Util
 import Pair             ( Pair(..) )
 import Data.List        ( nubBy )
 import Data.Maybe
-import Data.Foldable    ( fold )
+import Data.Foldable    ( fold, foldl' )
 
 {-
 ************************************************************************
@@ -500,7 +500,7 @@ oclose preds fixed_tvs
   | null tv_fds = fixed_tvs -- Fast escape hatch for common case.
   | otherwise   = fixVarSet extend fixed_tvs
   where
-    extend fixed_tvs = foldl add fixed_tvs tv_fds
+    extend fixed_tvs = foldl' add fixed_tvs tv_fds
        where
           add fixed_tvs (ls,rs)
             | ls `subVarSet` fixed_tvs = fixed_tvs `unionVarSet` closeOverKinds rs

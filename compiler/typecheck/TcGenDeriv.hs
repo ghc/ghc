@@ -69,7 +69,7 @@ import TcEnv (InstInfo)
 import StaticFlags( opt_PprStyle_Debug )
 
 import ListSetOps ( assocMaybe )
-import Data.List  ( partition, intersperse )
+import Data.List  ( partition, intersperse, foldl' )
 import Data.Maybe ( catMaybes, isJust )
 
 type BagDerivStuff = Bag DerivStuff
@@ -244,7 +244,7 @@ gen_Eq_binds loc tycon
       where
         nested_eq_expr []  [] [] = true_Expr
         nested_eq_expr tys as bs
-          = foldl1 and_Expr (zipWith3Equal "nested_eq" nested_eq tys as bs)
+          = foldl1' and_Expr (zipWith3Equal "nested_eq" nested_eq tys as bs)
           where
             nested_eq ty a b = nlHsPar (eq_Expr tycon ty (nlHsVar a) (nlHsVar b))
 
@@ -860,7 +860,7 @@ gen_Ix_binds loc tycon
       = mk_easy_FunBind loc inRange_RDR
                 [nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed,
                  con_pat cs_needed] $
-          foldl1 and_Expr (zipWith3Equal "single_con_inRange" in_range as_needed bs_needed cs_needed)
+          foldl1' and_Expr (zipWith3Equal "single_con_inRange" in_range as_needed bs_needed cs_needed)
       where
         in_range a b c = nlHsApps inRange_RDR [mkLHsVarTuple [a,b], nlHsVar c]
 
@@ -1325,7 +1325,7 @@ gen_Data_binds dflags loc rep_tc
 
     gfoldl_eqn con
       = ([nlVarPat k_RDR, nlVarPat z_RDR, nlConVarPat con_name as_needed],
-                       foldl mk_k_app (nlHsVar z_RDR `nlHsApp` nlHsVar con_name) as_needed)
+                       foldl' mk_k_app (nlHsVar z_RDR `nlHsApp` nlHsVar con_name) as_needed)
                    where
                      con_name ::  RdrName
                      con_name = getRdrName con
@@ -2026,7 +2026,7 @@ gen_Traversable_binds loc tycon
         -- fmap (\b1 b2 ... -> Con b1 b2 ...) x1 <*> x2 <*> ..
         mkApCon :: LHsExpr RdrName -> [LHsExpr RdrName] -> LHsExpr RdrName
         mkApCon con [] = nlHsApps pure_RDR [con]
-        mkApCon con (x:xs) = foldl appAp (nlHsApps fmap_RDR [con,x]) xs
+        mkApCon con (x:xs) = foldl' appAp (nlHsApps fmap_RDR [con,x]) xs
           where appAp x y = nlHsApps ap_RDR [x,y]
 
 {-
@@ -2108,7 +2108,7 @@ gen_Lift_binds loc tycon
 
             lift_Expr
               | is_infix  = nlHsApps infixApp_RDR [a1, conE_Expr, a2]
-              | otherwise = foldl mk_appE_app conE_Expr lifted_as
+              | otherwise = foldl' mk_appE_app conE_Expr lifted_as
             (a1:a2:_) = lifted_as
 
 mk_appE_app :: LHsExpr RdrName -> LHsExpr RdrName -> LHsExpr RdrName

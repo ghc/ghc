@@ -33,6 +33,7 @@ module NameSet (
 
 #include "HsVersions.h"
 
+import Data.Foldable (foldl')
 import Name
 import UniqSet
 
@@ -82,7 +83,7 @@ foldNameSet       = foldUniqSet
 filterNameSet     = filterUniqSet
 intersectNameSet  = intersectUniqSets
 
-delListFromNameSet set ns = foldl delFromNameSet set ns
+delListFromNameSet set ns = foldl' delFromNameSet set ns
 
 intersectsNameSet s1 s2 = not (isEmptyNameSet (s1 `intersectNameSet` s2))
 

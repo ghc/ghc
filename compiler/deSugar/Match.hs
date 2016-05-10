@@ -47,6 +47,7 @@ import Name
 import Outputable
 import BasicTypes ( isGenerated )
 
+import Data.Foldable ( foldl' )
 import Control.Monad( when, unless )
 import qualified Data.Map as Map
 
@@ -815,7 +816,7 @@ subGroup :: Ord a => [(a, EquationInfo)] -> [[EquationInfo]]
 -- Each sub-list in the result has the same PatGroup
 -- See Note [Take care with pattern order]
 subGroup group
-    = map reverse $ Map.elems $ foldl accumulate Map.empty group
+    = map reverse $ Map.elems $ foldl' accumulate Map.empty group
   where
     accumulate pg_map (pg, eqn)
       = case Map.lookup pg pg_map of

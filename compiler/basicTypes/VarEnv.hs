@@ -62,6 +62,7 @@ module VarEnv (
         emptyTidyEnv
     ) where
 
+import Data.Foldable (foldl')
 import OccName
 import Var
 import VarSet
@@ -120,8 +121,8 @@ extendInScopeSet (InScope in_scope n) v = InScope (extendVarEnv in_scope v v) (n
 
 extendInScopeSetList :: InScopeSet -> [Var] -> InScopeSet
 extendInScopeSetList (InScope in_scope n) vs
-   = InScope (foldl (\s v -> extendVarEnv s v v) in_scope vs)
-                    (n + length vs)
+   = InScope (foldl' (\s v -> extendVarEnv s v v) in_scope vs)
+                     (n + length vs)
 
 extendInScopeSetSet :: InScopeSet -> VarEnv Var -> InScopeSet
 extendInScopeSetSet (InScope in_scope n) vs

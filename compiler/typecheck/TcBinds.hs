@@ -60,6 +60,7 @@ import PrelNames( mkUnboundName, gHC_PRIM, ipClassName )
 import TcValidity (checkValidType)
 import qualified GHC.LanguageExtensions as LangExt
 
+import Data.Foldable ( foldl' )
 import Control.Monad
 
 #include "HsVersions.h"
@@ -1102,7 +1103,7 @@ Some wrinkles
 
 mkPragEnv :: [LSig Name] -> LHsBinds Name -> TcPragEnv
 mkPragEnv sigs binds
-  = foldl extendPragEnv emptyNameEnv prs
+  = foldl' extendPragEnv emptyNameEnv prs
   where
     prs = mapMaybe get_sig sigs
 

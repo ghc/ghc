@@ -608,9 +608,9 @@ checkStability
         -> ([ModuleName],     -- stableObject
             [ModuleName])     -- stableBCO
 
-checkStability hpt sccs all_home_mods = foldl checkSCC ([],[]) sccs
+checkStability hpt sccs all_home_mods = foldl' checkSCC ([],[]) sccs
   where
-   checkSCC (stable_obj, stable_bco) scc0
+   checkSCC (!stable_obj, !stable_bco) scc0
      | stableObjects = (scc_mods ++ stable_obj, stable_bco)
      | stableBCOs    = (stable_obj, scc_mods ++ stable_bco)
      | otherwise     = (stable_obj, stable_bco)
@@ -1011,7 +1011,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags cleanup par_sem
                         , this_build_mod `notElem` loop ]
 
 
-    let all_deps = foldl1 Set.union [textual_deps, int_loop_deps, ext_loop_deps]
+    let all_deps = foldl1' Set.union [textual_deps, int_loop_deps, ext_loop_deps]
 
     -- All of the module's home-module dependencies.
     let home_deps_with_idx =

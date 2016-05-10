@@ -20,6 +20,7 @@ import CoreUtils ( exprIsHNF, exprIsTrivial )
 import UnVarGraph
 import Demand
 
+import Data.Foldable ( foldl' )
 import Control.Arrow ( first, second )
 
 
@@ -725,4 +726,4 @@ lubArityEnv :: VarEnv Arity -> VarEnv Arity -> VarEnv Arity
 lubArityEnv = plusVarEnv_C min
 
 lubRess :: [CallArityRes] -> CallArityRes
-lubRess = foldl lubRes emptyArityRes
+lubRess = foldl' lubRes emptyArityRes

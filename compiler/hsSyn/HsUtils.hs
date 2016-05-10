@@ -188,7 +188,7 @@ mkHsLams tyvars dicts expr = mkLHsWrap (mkWpTyLams tyvars
 mkHsConApp :: DataCon -> [Type] -> [HsExpr Id] -> LHsExpr Id
 -- Used for constructing dictionary terms etc, so no locations
 mkHsConApp data_con tys args
-  = foldl mk_app (nlHsTyApp (dataConWrapId data_con) tys) args
+  = foldl' mk_app (nlHsTyApp (dataConWrapId data_con) tys) args
   where
     mk_app f a = noLoc (HsApp f (noLoc a))
 
@@ -201,7 +201,7 @@ nlHsTyApp :: name -> [Type] -> LHsExpr name
 nlHsTyApp fun_id tys = noLoc (HsWrap (mkWpTyApps tys) (HsVar (noLoc fun_id)))
 
 nlHsTyApps :: name -> [Type] -> [LHsExpr name] -> LHsExpr name
-nlHsTyApps fun_id tys xs = foldl nlHsApp (nlHsTyApp fun_id tys) xs
+nlHsTyApps fun_id tys xs = foldl' nlHsApp (nlHsTyApp fun_id tys) xs
 
 --------- Adding parens ---------
 mkLHsPar :: LHsExpr name -> LHsExpr name
@@ -385,20 +385,20 @@ nlHsSyntaxApps (SyntaxExpr { syn_expr      = fun
                            , syn_res_wrap  = res_wrap }) args
   | [] <- arg_wraps   -- in the noSyntaxExpr case
   = ASSERT( isIdHsWrapper res_wrap )
-    foldl nlHsApp (noLoc fun) args
+    foldl' nlHsApp (noLoc fun) args
 
   | otherwise
-  = mkLHsWrap res_wrap (foldl nlHsApp (noLoc fun) (zipWithEqual "nlHsSyntaxApps"
+  = mkLHsWrap res_wrap (foldl' nlHsApp (noLoc fun) (zipWithEqual "nlHsSyntaxApps"
                                                      mkLHsWrap arg_wraps args))
 
 nlHsIntLit :: Integer -> LHsExpr id
 nlHsIntLit n = noLoc (HsLit (HsInt (show n) n))
 
 nlHsApps :: id -> [LHsExpr id] -> LHsExpr id
-nlHsApps f xs = foldl nlHsApp (nlHsVar f) xs
+nlHsApps f xs = foldl' nlHsApp (nlHsVar f) xs
 
 nlHsVarApps :: id -> [id] -> LHsExpr id
-nlHsVarApps f xs = noLoc (foldl mk (HsVar (noLoc f)) (map (HsVar . noLoc) xs))
+nlHsVarApps f xs = noLoc (foldl' mk (HsVar (noLoc f)) (map (HsVar . noLoc) xs))
                  where
                    mk f a = HsApp (noLoc f) (noLoc a)
 
@@ -463,7 +463,7 @@ nlHsTyVar x             = noLoc (HsTyVar (noLoc x))
 nlHsFunTy a b           = noLoc (HsFunTy a b)
 
 nlHsTyConApp :: name -> [LHsType name] -> LHsType name
-nlHsTyConApp tycon tys  = foldl nlHsAppTy (nlHsTyVar tycon) tys
+nlHsTyConApp tycon tys  = foldl' nlHsAppTy (nlHsTyVar tycon) tys
 
 {-
 Tuples.  All these functions are *pre-typechecker* because they lack

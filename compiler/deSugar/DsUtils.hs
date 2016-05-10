@@ -77,6 +77,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import TcEvidence
 
+import Data.Foldable ( foldl' )
 import Control.Monad    ( zipWithM )
 
 {-
@@ -552,7 +553,7 @@ mkCoreAppDs _ (Var f `App` Type ty1 `App` Type ty2 `App` arg1) arg2
 mkCoreAppDs s fun arg = mkCoreApp s fun arg  -- The rest is done in MkCore
 
 mkCoreAppsDs :: SDoc -> CoreExpr -> [CoreExpr] -> CoreExpr
-mkCoreAppsDs s fun args = foldl (mkCoreAppDs s) fun args
+mkCoreAppsDs s fun args = foldl' (mkCoreAppDs s) fun args
 
 mkCastDs :: CoreExpr -> Coercion -> CoreExpr
 -- We define a desugarer-specific version of CoreUtils.mkCast,

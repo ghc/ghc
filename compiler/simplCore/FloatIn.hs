@@ -30,7 +30,7 @@ import VarSet
 import Util
 import DynFlags
 import Outputable
-import Data.List( mapAccumL )
+import Data.List        ( mapAccumL, foldl' )
 
 {-
 Top-level interface function, @floatInwards@.  Note that we do not
@@ -426,9 +426,9 @@ fiExpr dflags to_drop (_, AnnCase scrut case_bndr ty alts)
     alts_ty_fvs     = map alt_ty_fvs alts
     all_alts_ty_fvs = unionDVarSets alts_ty_fvs
     alt_fvs (_con, args, rhs)
-      = foldl delDVarSet (freeVarsOf rhs)     (case_bndr:args)
+      = foldl' delDVarSet (freeVarsOf rhs)     (case_bndr:args)
     alt_ty_fvs (_con, args, rhs)
-      = foldl delDVarSet (freeVarsOfType rhs) (case_bndr:args)
+      = foldl' delDVarSet (freeVarsOfType rhs) (case_bndr:args)
                                 -- Delete case_bndr and args from free vars of rhs
                                 -- to get free vars of alt
 

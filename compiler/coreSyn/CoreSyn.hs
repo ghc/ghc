@@ -108,6 +108,7 @@ import SrcLoc     ( RealSrcSpan, containsSpan )
 import Binary
 
 import Data.Data hiding (TyCon)
+import Data.Foldable ( foldl' )
 import Data.Int
 import Data.Word
 
@@ -1457,12 +1458,12 @@ mkVarApps :: Expr b -> [Var] -> Expr b
 -- use 'MkCore.mkCoreConApps' if possible
 mkConApp      :: DataCon -> [Arg b] -> Expr b
 
-mkApps    f args = foldl App                       f args
-mkCoApps  f args = foldl (\ e a -> App e (Coercion a)) f args
-mkVarApps f vars = foldl (\ e a -> App e (varToCoreExpr a)) f vars
+mkApps    f args = foldl' App                       f args
+mkCoApps  f args = foldl' (\ e a -> App e (Coercion a)) f args
+mkVarApps f vars = foldl' (\ e a -> App e (varToCoreExpr a)) f vars
 mkConApp con args = mkApps (Var (dataConWorkId con)) args
 
-mkTyApps  f args = foldl (\ e a -> App e (typeOrCoercion a)) f args
+mkTyApps  f args = foldl' (\ e a -> App e (typeOrCoercion a)) f args
   where
     typeOrCoercion ty
       | Just co <- isCoercionTy_maybe ty = Coercion co

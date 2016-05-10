@@ -312,7 +312,7 @@ finishNativeGen dflags modLoc bufh@(BufHandle _ _ h) us ngs
 
           -- build the global register conflict graph
           let graphGlobal
-                  = foldl Color.union Color.initGraph
+                  = foldl' Color.union Color.initGraph
                   $ [ Color.raGraph stat
                           | stat@Color.RegAllocStatsStart{} <- stats]
 
@@ -863,8 +863,8 @@ build_mapping ncgImpl (CmmProc info lbl live (ListGraph (head:blocks)))
     -- find all the blocks that just consist of a jump that can be
     -- shorted.
     -- Don't completely eliminate loops here -- that can leave a dangling jump!
-    (_, shortcut_blocks, others) = foldl split (emptyBlockSet, [], []) blocks
-    split (s, shortcut_blocks, others) b@(BasicBlock id [insn])
+    (_, shortcut_blocks, others) = foldl' split (emptyBlockSet, [], []) blocks
+    split (!s, !shortcut_blocks, !others) b@(BasicBlock id [insn])
         | Just jd <- canShortcut ncgImpl insn,
           Just dest <- getJumpDestBlockId ncgImpl jd,
           not (has_info id),
@@ -880,8 +880,7 @@ build_mapping ncgImpl (CmmProc info lbl live (ListGraph (head:blocks)))
     has_info l = mapMember l info
 
     -- build a mapping from BlockId to JumpDest for shorting branches
-    mapping = foldl add emptyUFM shortcut_blocks
-    add ufm (id,dest) = addToUFM ufm id dest
+    mapping = listToUFM shortcut_blocks
 
 apply_mapping :: NcgImpl statics instr jumpDest
               -> UniqFM jumpDest

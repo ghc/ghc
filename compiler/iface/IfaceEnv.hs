@@ -38,7 +38,7 @@ import SrcLoc
 import Util
 
 import Outputable
-import Data.List     ( partition )
+import Data.List     ( partition, foldl' )
 
 {-
 *********************************************************
@@ -246,7 +246,7 @@ initNameCache us names
                 nsNames = initOrigNames names }
 
 initOrigNames :: [Name] -> OrigNameCache
-initOrigNames names = foldl extendOrigNameCache emptyModuleEnv names
+initOrigNames names = foldl' extendOrigNameCache emptyModuleEnv names
 
 {-
 ************************************************************************

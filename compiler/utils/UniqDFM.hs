@@ -58,7 +58,7 @@ import Outputable
 import qualified Data.IntMap as M
 import Data.Typeable
 import Data.Data
-import Data.List (sortBy)
+import Data.List (sortBy, foldl')
 import Data.Function (on)
 import UniqFM (UniqFM, listToUFM_Directly, ufmToList, ufmToIntMap)
 
@@ -145,7 +145,7 @@ addToUDFM_Directly (UDFM m i) u v =
   UDFM (M.insert (getKey u) (TaggedVal v i) m) (i + 1)
 
 addListToUDFM_Directly :: UniqDFM elt -> [(Unique,elt)] -> UniqDFM elt
-addListToUDFM_Directly = foldl (\m (k, v) -> addToUDFM_Directly m k v)
+addListToUDFM_Directly = foldl' (\m (k, v) -> addToUDFM_Directly m k v)
 
 delFromUDFM :: Uniquable key => UniqDFM elt -> key -> UniqDFM elt
 delFromUDFM (UDFM m i) k = UDFM (M.delete (getKey $ getUnique k) m) i
@@ -253,7 +253,7 @@ partitionUDFM p (UDFM m i) =
 
 -- | Delete a list of elements from a UniqDFM
 delListFromUDFM  :: Uniquable key => UniqDFM elt -> [key] -> UniqDFM elt
-delListFromUDFM = foldl delFromUDFM
+delListFromUDFM = foldl' delFromUDFM
 
 -- | This allows for lossy conversion from UniqDFM to UniqFM
 udfmToUfm :: UniqDFM elt -> UniqFM elt
@@ -261,7 +261,7 @@ udfmToUfm (UDFM m _i) =
   listToUFM_Directly [(getUnique k, taggedFst tv) | (k, tv) <- M.toList m]
 
 listToUDFM_Directly :: [(Unique, elt)] -> UniqDFM elt
-listToUDFM_Directly = foldl (\m (u, v) -> addToUDFM_Directly m u v) emptyUDFM
+listToUDFM_Directly = foldl' (\m (u, v) -> addToUDFM_Directly m u v) emptyUDFM
 
 -- | Apply a function to a particular element
 adjustUDFM :: Uniquable key => (elt -> elt) -> UniqDFM elt -> key -> UniqDFM elt

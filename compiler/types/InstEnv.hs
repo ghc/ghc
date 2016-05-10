@@ -44,6 +44,7 @@ import BasicTypes
 import UniqFM
 import Util
 import Id
+import Data.Foldable    ( foldl' )
 import Data.Data        ( Data, Typeable )
 import Data.Maybe       ( isJust, isNothing )
 
@@ -400,7 +401,7 @@ memberInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm } ) =
           (lookupUFM inst_env cls_nm)
 
 extendInstEnvList :: InstEnv -> [ClsInst] -> InstEnv
-extendInstEnvList inst_env ispecs = foldl extendInstEnv inst_env ispecs
+extendInstEnvList inst_env ispecs = foldl' extendInstEnv inst_env ispecs
 
 extendInstEnv :: InstEnv -> ClsInst -> InstEnv
 extendInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm })

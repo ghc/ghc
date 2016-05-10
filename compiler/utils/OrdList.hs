@@ -16,6 +16,7 @@ module OrdList (
         mapOL, fromOL, toOL, foldrOL, foldlOL
 ) where
 
+import Data.Foldable ( foldl' )
 import Outputable
 
 #if __GLASGOW_HASKELL__ > 710
@@ -115,7 +116,7 @@ foldlOL k z (One x)     = k z x
 foldlOL k z (Cons x xs) = foldlOL k (k z x) xs
 foldlOL k z (Snoc xs x) = k (foldlOL k z xs) x
 foldlOL k z (Two b1 b2) = foldlOL k (foldlOL k z b1) b2
-foldlOL k z (Many xs)   = foldl k z xs
+foldlOL k z (Many xs)   = foldl' k z xs
 
 toOL :: [a] -> OrdList a
 toOL [] = None

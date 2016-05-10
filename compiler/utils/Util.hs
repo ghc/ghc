@@ -1001,7 +1001,7 @@ readRational__ r = do
 
      readDec s = do
         (ds,r) <- nonnull isDigit s
-        return (foldl1 (\n d -> n * 10 + d) [ ord d - ord '0' | d <- ds ],
+        return (foldl1' (\n d -> n * 10 + d) [ ord d - ord '0' | d <- ds ],
                 r)
 
      lexDecDigits = nonnull isDigit

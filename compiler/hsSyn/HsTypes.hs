@@ -89,6 +89,7 @@ import Maybes( isJust )
 
 import Data.Data hiding ( Fixity )
 import Data.Maybe ( fromMaybe )
+import Data.Foldable ( foldl' )
 import Control.Monad ( unless )
 #if __GLASGOW_HASKELL > 710
 import Data.Semigroup   ( Semigroup )
@@ -894,7 +895,7 @@ mkHsAppTy :: LHsType name -> LHsType name -> LHsType name
 mkHsAppTy t1 t2 = addCLoc t1 t2 (HsAppTy t1 t2)
 
 mkHsAppTys :: LHsType name -> [LHsType name] -> LHsType name
-mkHsAppTys = foldl mkHsAppTy
+mkHsAppTys = foldl' mkHsAppTy
 
 
 {-

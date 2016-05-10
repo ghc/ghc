@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, DisambiguateRecordFields #-}
+{-# LANGUAGE GADTs, DisambiguateRecordFields, BangPatterns #-}
 
 module CmmProcPoint
     ( ProcPointSet, Status(..)
@@ -19,7 +19,7 @@ import CmmUtils
 import CmmInfo
 import CmmLive (cmmGlobalLiveness)
 import CmmSwitch
-import Data.List (sortBy)
+import Data.List (sortBy, foldl')
 import Maybes
 import Control.Monad
 import Outputable
@@ -215,7 +215,7 @@ extendPPSet platform g blocks procPoints =
        case newPoints of
            []  -> return procPoints'
            pps -> extendPPSet g blocks
-                    (foldl extendBlockSet procPoints' pps)
+                    (foldl' extendBlockSet procPoints' pps)
 -}
        case newPoint of
          Just id ->
@@ -276,8 +276,8 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
                       where block_lbl = blockLbl pp
 
          procLabels :: LabelMap (CLabel, Maybe CLabel)
-         procLabels = foldl add_label mapEmpty
-                            (filter (flip mapMember (toBlockMap g)) (setElems procPoints))
+         procLabels = foldl' add_label mapEmpty
+                             (filter (flip mapMember (toBlockMap g)) (setElems procPoints))
 
      -- In each new graph, add blocks jumping off to the new procedures,
      -- and replace branches to procpoints with branches to the jump-off blocks
@@ -318,7 +318,7 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
                   -- replace branches to procpoints with branches to jumps
                   blockEnv'' = toBlockMap $ replaceBranches jumpEnv $ ofBlockMap ppId blockEnv'
                   -- add the jump blocks to the graph
-                  blockEnv''' = foldl (flip insertBlock) blockEnv'' jumpBlocks
+                  blockEnv''' = foldl' (flip insertBlock) blockEnv'' jumpBlocks
               let g' = ofBlockMap ppId blockEnv'''
               -- pprTrace "g' pre jumps" (ppr g') $ do
               return (mapInsert ppId g' newGraphEnv)
@@ -360,8 +360,8 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
      -- The C back end expects to see return continuations before the
      -- call sites.  Here, we sort them in reverse order -- it gets
      -- reversed later.
-     let (_, block_order) = foldl add_block_num (0::Int, emptyBlockMap) (postorderDfs g)
-         add_block_num (i, map) block = (i+1, mapInsert (entryLabel block) i map)
+     let (_, block_order) = foldl' add_block_num (0::Int, emptyBlockMap) (postorderDfs g)
+         add_block_num (!i, !map) block = (i+1, mapInsert (entryLabel block) i map)
          sort_fn (bid, _) (bid', _) =
            compare (expectJust "block_order" $ mapLookup bid  block_order)
                    (expectJust "block_order" $ mapLookup bid' block_order)

@@ -54,7 +54,7 @@ import Data.Either      ( partitionEithers, isRight, rights )
 import Data.Map         ( Map )
 import qualified Data.Map as Map
 import Data.Ord         ( comparing )
-import Data.List        ( partition, (\\), find, sortBy )
+import Data.List        ( partition, (\\), find, sortBy, foldl' )
 -- import qualified Data.Set as Set
 import System.FilePath  ((</>))
 import System.IO
@@ -482,7 +482,7 @@ extendGlobalRdrEnvRn avails new_fixities
 
         ; rdr_env2 <- foldlM add_gre rdr_env1 new_gres
 
-        ; let fix_env' = foldl extend_fix_env fix_env new_gres
+        ; let fix_env' = foldl' extend_fix_env fix_env new_gres
               gbl_env' = gbl_env { tcg_rdr_env = rdr_env2, tcg_fix_env = fix_env' }
 
         ; traceRn (text "extendGlobalRdrEnvRn 2" <+> (pprGlobalRdrEnv True rdr_env2))
@@ -1105,7 +1105,7 @@ classifyGRE gre = case gre_par gre of
 -- will give Ix(Ix,index,range) and Ix(index)
 -- We want to combine these; addAvail does that
 nubAvails :: [AvailInfo] -> [AvailInfo]
-nubAvails avails = nameEnvElts (foldl add emptyNameEnv avails)
+nubAvails avails = nameEnvElts (foldl' add emptyNameEnv avails)
   where
     add env avail = extendNameEnv_C plusAvail env (availName avail) avail
 

@@ -45,6 +45,8 @@ import Name
 import StgSyn
 import Outputable
 
+import Data.Foldable ( foldl' )
+
 -------------------------------------
 --        Non-void types
 -------------------------------------
@@ -130,9 +132,9 @@ addBindC stuff_to_bind = do
 addBindsC :: [CgIdInfo] -> FCode ()
 addBindsC new_bindings = do
         binds <- getBinds
-        let new_binds = foldl (\ binds info -> extendVarEnv binds (cg_id info) info)
-                              binds
-                              new_bindings
+        let new_binds = foldl' (\ binds info -> extendVarEnv binds (cg_id info) info)
+                               binds
+                               new_bindings
         setBinds new_binds
 
 getCgIdInfo :: Id -> FCode CgIdInfo

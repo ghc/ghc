@@ -1067,7 +1067,7 @@ tcApp1 :: HsExpr Name  -- either HsApp or HsAppType
        -> ExpRhoType -> TcM (HsExpr TcId)
 tcApp1 e res_ty
   = do { (wrap, fun, args) <- tcApp Nothing (noLoc e) [] res_ty
-       ; return (mkHsWrap wrap $ unLoc $ foldl mk_hs_app fun args) }
+       ; return (mkHsWrap wrap $ unLoc $ foldl' mk_hs_app fun args) }
   where
     mk_hs_app f (Left a)  = mkHsApp f a
     mk_hs_app f (Right a) = mkHsAppTypeOut f a
@@ -1120,7 +1120,7 @@ tcApp m_herald orig_fun orig_args res_ty
                 -- up to call that function
            ; wrap_res <- addFunResCtxt True (unLoc fun) actual_res_ty res_ty $
                          tcSubTypeDS_NC_O orig GenSigCtxt
-                           (Just $ foldl mk_hs_app fun args)
+                           (Just $ foldl' mk_hs_app fun args)
                            actual_res_ty res_ty
 
            ; return (wrap_res, mkLHsWrap wrap_fun fun1, args1) }
@@ -2471,7 +2471,7 @@ missingFields con fields
   = text "Fields of" <+> quotes (ppr con) <+> ptext (sLit "not initialised:")
         <+> pprWithCommas ppr fields
 
--- callCtxt fun args = text "In the call" <+> parens (ppr (foldl mkHsApp fun args))
+-- callCtxt fun args = text "In the call" <+> parens (ppr (foldl' mkHsApp fun args))
 
 noPossibleParents :: [LHsRecUpdField Name] -> SDoc
 noPossibleParents rbinds

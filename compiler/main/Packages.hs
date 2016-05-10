@@ -305,7 +305,7 @@ searchPackageId dflags pid = filter ((pid ==) . sourcePackageId)
 extendPackageConfigMap
    :: PackageConfigMap -> [PackageConfig] -> PackageConfigMap
 extendPackageConfigMap pkg_map new_pkgs
-  = foldl add pkg_map new_pkgs
+  = foldl' add pkg_map new_pkgs
   where add pkg_map p = addToUFM pkg_map (packageConfigId p) p
 
 -- | Looks up the package with the given id in the package state, panicing if it is

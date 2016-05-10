@@ -16,7 +16,7 @@ import DynFlags
 import UniqFM
 import PprCmm ()
 
-import Data.List (partition)
+import Data.List (partition, foldl')
 import qualified Data.Set as Set
 import Data.Maybe
 
@@ -211,7 +211,7 @@ cmmSink dflags graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
 
             live_rhs = foldRegsUsed dflags extendRegSet emptyRegSet rhs
 
-      final_middle = foldl blockSnoc middle' dropped_last
+      final_middle = foldl' blockSnoc middle' dropped_last
 
       sunk' = mapUnion sunk $
                  mapFromList [ (l, filterAssignments dflags (getLive l) assigs'')
@@ -321,7 +321,7 @@ walk dflags nodes assigs = go nodes emptyBlock assigs
       (dropped, as') = dropAssignmentsSimple dflags
                           (\a -> conflicts dflags a node2) as1
 
-      block' = foldl blockSnoc block dropped `blockSnoc` node2
+      block' = foldl' blockSnoc block dropped `blockSnoc` node2
 
 
 --

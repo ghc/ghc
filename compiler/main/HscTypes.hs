@@ -191,6 +191,7 @@ import Util
 import GHC.Serialized   ( Serialized )
 
 import Foreign
+import Data.Foldable    ( foldl' )
 import Control.Monad    ( guard, liftM, when, ap )
 import Data.IORef
 import Data.Time
@@ -1504,7 +1505,7 @@ icExtendGblRdrEnv env tythings
        | is_sub_bndr thing
        = env
        | otherwise
-       = foldl extendGlobalRdrEnv env1 (concatMap localGREsFromAvail avail)
+       = foldl' extendGlobalRdrEnv env1 (concatMap localGREsFromAvail avail)
        where
           env1  = shadowNames env (concatMap availNames avail)
           avail = tyThingAvailInfo thing

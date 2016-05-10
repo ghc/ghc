@@ -31,7 +31,7 @@ import qualified Data.Set as Set
 import Control.Monad.Fix
 import Data.Array as Array
 import Data.Bits
-import Data.List (nub)
+import Data.List (nub, foldl')
 import Control.Monad (liftM)
 
 import Prelude hiding ((<*>))
@@ -274,7 +274,7 @@ layout dflags procpoints liveness entry entry_args final_stackmaps final_sp_high
        --    Sp = Sp + sp_off -- Sp adjustment goes here
        --    last1            -- the last node
        --
-       let middle_pre = blockToList $ foldl blockSnoc middle1 middle2
+       let middle_pre = blockToList $ foldl' blockSnoc middle1 middle2
 
            final_blocks = manifestSp dflags final_stackmaps stack0 sp0 final_sp_high entry0
                               middle_pre sp_off last1 fixup_blocks

@@ -171,7 +171,7 @@ buildSRT dflags topSRT cafs =
                  do localSRTs <- procpointSRT dflags (lbl topSRT) (elt_map topSRT) cafs
                     return (topSRT, localSRTs)
            in if length cafs > maxBmpSize dflags then
-                mkSRT (foldl add_if_missing topSRT cafs)
+                mkSRT (foldl' add_if_missing topSRT cafs)
               else -- make sure all the cafs are near the bottom of the srt
                 mkSRT (add_if_too_far topSRT cafs)
          add_if_missing srt caf =
@@ -264,14 +264,14 @@ localCAFInfo cafEnv proc@(CmmProc _ top_l _ (CmmGraph {g_entry=entry})) =
 -- To do this replacement efficiently, we gather strongly connected
 -- components, then we sort the components in topological order.
 mkTopCAFInfo :: [(CAFSet, Maybe CLabel)] -> Map CLabel CAFSet
-mkTopCAFInfo localCAFs = foldl addToTop Map.empty g
+mkTopCAFInfo localCAFs = foldl' addToTop Map.empty g
   where
         addToTop env (AcyclicSCC (l, cafset)) =
           Map.insert l (flatten env cafset) env
         addToTop env (CyclicSCC nodes) =
           let (lbls, cafsets) = unzip nodes
-              cafset  = foldr Set.delete (foldl Set.union Set.empty cafsets) lbls
-          in foldl (\env l -> Map.insert l (flatten env cafset) env) env lbls
+              cafset  = foldr Set.delete (Set.unions cafsets) lbls
+          in foldl' (\env l -> Map.insert l (flatten env cafset) env) env lbls
 
         g = stronglyConnCompFromEdgedVertices
               [ ((l,cafs), l, Set.elems cafs) | (cafs, Just l) <- localCAFs ]

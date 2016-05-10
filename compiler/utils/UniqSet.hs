@@ -33,6 +33,7 @@ module UniqSet (
         partitionUniqSet
     ) where
 
+import Data.Foldable ( foldl' )
 import UniqFM
 import Unique
 
@@ -93,11 +94,11 @@ type UniqSet a = UniqFM a
 
 emptyUniqSet = emptyUFM
 unitUniqSet x = unitUFM x x
-mkUniqSet = foldl addOneToUniqSet emptyUniqSet
+mkUniqSet = foldl' addOneToUniqSet emptyUniqSet
 
 addOneToUniqSet set x = addToUFM set x x
 addOneToUniqSet_C f set x = addToUFM_C f set x x
-addListToUniqSet = foldl addOneToUniqSet
+addListToUniqSet = foldl' addOneToUniqSet
 
 delOneFromUniqSet = delFromUFM
 delOneFromUniqSet_Directly = delFromUFM_Directly

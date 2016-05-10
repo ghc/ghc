@@ -2641,7 +2641,7 @@ ppr_type p (AppTy t1 t2)
     split_app_tys head            args = (head, args)
 
     mk_app_tys (TyConApp tc tys1) tys2 = TyConApp tc (tys1 ++ tys2)
-    mk_app_tys ty1                tys2 = foldl AppTy ty1 tys2
+    mk_app_tys ty1                tys2 = foldl' AppTy ty1 tys2
 
 ppr_type p (CastTy ty co)
   = if_print_coercions

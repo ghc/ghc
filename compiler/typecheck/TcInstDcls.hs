@@ -61,6 +61,7 @@ import Util
 import BooleanFormula ( isUnsatisfied, pprBooleanFormulaNice )
 import qualified GHC.LanguageExtensions as LangExt
 
+import Data.Foldable ( foldl' )
 import Control.Monad
 import Maybes
 
@@ -829,7 +830,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                        -- NB: We *can* have covars in inst_tys, in the case of
                        -- promoted GADT constructors.
 
-             con_app_args = foldl app_to_meth con_app_tys sc_meth_ids
+             con_app_args = foldl' app_to_meth con_app_tys sc_meth_ids
 
              app_to_meth :: HsExpr Id -> Id -> HsExpr Id
              app_to_meth fun meth_id = L loc fun `HsApp` L loc (wrapId arg_wrapper meth_id)

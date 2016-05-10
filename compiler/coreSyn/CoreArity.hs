@@ -34,6 +34,7 @@ import Outputable
 import FastString
 import Pair
 import Util     ( debugIsOn )
+import Data.Foldable ( foldl' )
 
 {-
 ************************************************************************
@@ -884,7 +885,7 @@ etaExpand n orig_expr
           -- See Note [Eta expansion and source notes]
           (expr', args) = collectArgs expr
           (ticks, expr'') = stripTicksTop tickishFloatable expr'
-          sexpr = foldl App expr'' args
+          sexpr = foldl' App expr'' args
           retick expr = foldr mkTick expr ticks
 
                                 -- Wrapper    Unwrapper

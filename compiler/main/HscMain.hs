@@ -209,8 +209,8 @@ allKnownKeyNames                -- where templateHaskellNames are defined
     all_names = knownKeyNames
                 ++ templateHaskellNames
 
-    namesEnv      = foldl (\m n -> extendNameEnv_Acc (:) singleton m n n)
-                          emptyUFM all_names
+    namesEnv      = foldl' (\m n -> extendNameEnv_Acc (:) singleton m n n)
+                           emptyUFM all_names
     badNamesEnv   = filterNameEnv (\ns -> length ns > 1) namesEnv
     badNamesPairs = nameEnvUniqueElts badNamesEnv
     badNamesStrs  = map pairToStr badNamesPairs

@@ -115,6 +115,7 @@ import Binary
 import Module
 import Data.Char
 import Data.Data
+import Data.Foldable (foldl')
 
 {-
 ************************************************************************
@@ -831,7 +832,7 @@ emptyTidyOccEnv :: TidyOccEnv
 emptyTidyOccEnv = emptyUFM
 
 initTidyOccEnv :: [OccName] -> TidyOccEnv       -- Initialise with names to avoid!
-initTidyOccEnv = foldl add emptyUFM
+initTidyOccEnv = foldl' add emptyUFM
   where
     add env (OccName _ fs) = addToUFM env fs 1
 

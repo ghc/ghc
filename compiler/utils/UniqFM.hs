@@ -79,6 +79,7 @@ import qualified Data.IntMap as M
 import qualified Data.IntSet as S
 import qualified Data.Foldable as Foldable
 import qualified Data.Traversable as Traversable
+import Data.Foldable ( foldl' )
 import Data.Typeable
 import Data.Data
 #if __GLASGOW_HASKELL__ > 710
@@ -231,14 +232,14 @@ emptyUFM = UFM M.empty
 isNullUFM (UFM m) = M.null m
 unitUFM k v = UFM (M.singleton (getKey $ getUnique k) v)
 unitDirectlyUFM u v = UFM (M.singleton (getKey u) v)
-listToUFM = foldl (\m (k, v) -> addToUFM m k v) emptyUFM
-listToUFM_Directly = foldl (\m (u, v) -> addToUFM_Directly m u v) emptyUFM
-listToUFM_C f = foldl (\m (k, v) -> addToUFM_C f m k v) emptyUFM
+listToUFM = foldl' (\m (k, v) -> addToUFM m k v) emptyUFM
+listToUFM_Directly = foldl' (\m (u, v) -> addToUFM_Directly m u v) emptyUFM
+listToUFM_C f = foldl' (\m (k, v) -> addToUFM_C f m k v) emptyUFM
 
 alterUFM f (UFM m) k = UFM (M.alter f (getKey $ getUnique k) m)
 addToUFM (UFM m) k v   = UFM (M.insert (getKey $ getUnique k) v m)
-addListToUFM = foldl (\m (k, v) -> addToUFM m k v)
-addListToUFM_Directly = foldl (\m (k, v) -> addToUFM_Directly m k v)
+addListToUFM = foldl' (\m (k, v) -> addToUFM m k v)
+addListToUFM_Directly = foldl' (\m (k, v) -> addToUFM_Directly m k v)
 addToUFM_Directly (UFM m) u v = UFM (M.insert (getKey u) v m)
 
 -- Arguments of combining function of M.insertWith and addToUFM_C are flipped.
@@ -246,15 +247,15 @@ addToUFM_C f (UFM m) k v =
   UFM (M.insertWith (flip f) (getKey $ getUnique k) v m)
 addToUFM_Acc exi new (UFM m) k v =
   UFM (M.insertWith (\_new old -> exi v old) (getKey $ getUnique k) (new v) m)
-addListToUFM_C f = foldl (\m (k, v) -> addToUFM_C f m k v)
+addListToUFM_C f = foldl' (\m (k, v) -> addToUFM_C f m k v)
 
 adjustUFM f (UFM m) k = UFM (M.adjust f (getKey $ getUnique k) m)
 adjustUFM_Directly f (UFM m) u = UFM (M.adjust f (getKey u) m)
 
 delFromUFM (UFM m) k = UFM (M.delete (getKey $ getUnique k) m)
-delListFromUFM = foldl delFromUFM
+delListFromUFM = foldl' delFromUFM
 delFromUFM_Directly (UFM m) u = UFM (M.delete (getKey u) m)
-delListFromUFM_Directly = foldl delFromUFM_Directly
+delListFromUFM_Directly = foldl' delFromUFM_Directly
 
 -- M.union is left-biased, plusUFM should be right-biased.
 plusUFM (UFM x) (UFM y) = UFM (M.union y x)

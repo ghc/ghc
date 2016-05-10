@@ -543,7 +543,7 @@ dmdAnalRhs top_lvl rec_flag env id rhs
   = (sig_ty, lazy_fv, id', mkLams bndrs' body')
   where
     (bndrs, body)    = collectBinders rhs
-    env_body         = foldl extendSigsWithLam env bndrs
+    env_body         = foldl' extendSigsWithLam env bndrs
     (body_ty, body') = dmdAnal env_body body_dmd body
     body_ty'         = removeDmdTyArgs body_ty -- zap possible deep CPR info
     (DmdType rhs_fv rhs_dmds rhs_res, bndrs')
@@ -1028,7 +1028,7 @@ extendSigsWithLam env id
 extendEnvForProdAlt :: AnalEnv -> CoreExpr -> Id -> DataCon -> [Var] -> AnalEnv
 -- See Note [CPR in a product case alternative]
 extendEnvForProdAlt env scrut case_bndr dc bndrs
-  = foldl do_con_arg env1 ids_w_strs
+  = foldl' do_con_arg env1 ids_w_strs
   where
     env1 = extendAnalEnv NotTopLevel env case_bndr case_bndr_sig
 

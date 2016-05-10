@@ -7,6 +7,7 @@ Utility functions on @Core@ syntax
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
 module CoreSubst (
         -- * Main data types
         Subst(..), -- Implementation exported for supercompiler's Renaming.hs only
@@ -898,9 +899,9 @@ simpleOptPgm dflags this_mod binds rules vects
   where
     occ_anald_binds  = occurAnalysePgm this_mod (\_ -> False) {- No rules active -}
                                        rules vects emptyVarEnv binds
-    (subst', binds') = foldl do_one (emptySubst, []) occ_anald_binds
+    (subst', binds') = foldl' do_one (emptySubst, []) occ_anald_binds
 
-    do_one (subst, binds') bind
+    do_one (!subst, !binds') bind
       = case simple_opt_bind subst bind of
           (subst', Nothing)    -> (subst', binds')
           (subst', Just bind') -> (subst', bind':binds')
@@ -1006,7 +1007,7 @@ simple_app subst (Tick t e) as
   | t `tickishScopesLike` SoftScope
   = mkTick t $ simple_app subst e as
 simple_app subst e as
-  = foldl App (simple_opt_expr subst e) as
+  = foldl' App (simple_opt_expr subst e) as
 
 ----------------------
 simple_opt_bind,simple_opt_bind' :: Subst -> CoreBind -> (Subst, Maybe CoreBind)
@@ -1018,8 +1019,8 @@ simple_opt_bind' subst (Rec prs)
   where
     res_bind            = Just (Rec (reverse rev_prs'))
     (subst', bndrs')    = subst_opt_bndrs subst (map fst prs)
-    (subst'', rev_prs') = foldl do_pr (subst', []) (prs `zip` bndrs')
-    do_pr (subst, prs) ((b,r), b')
+    (subst'', rev_prs') = foldl' do_pr (subst', []) (prs `zip` bndrs')
+    do_pr (!subst, !prs) ((b,r), b')
        = case maybe_substitute subst b r2 of
            Just subst' -> (subst', prs)
            Nothing     -> (subst,  (b2,r2):prs)
