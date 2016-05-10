@@ -161,7 +161,7 @@ Language
    synonym ``P`` and a type constructor ``T``, ``P`` can be bundled with ``T``
    so that when ``T`` is imported ``P`` is also imported. With this change
    a library author can provide either real data constructors or pattern
-   synonyms in an opaque manner. See :ref:`pattern-synonyms` for details. ::
+   synonyms in an opaque manner. See :ref:`patsyn-impexp` for details. ::
 
       -- Foo.hs
       module Foo ( T(P) ) where
@@ -796,4 +796,6 @@ Win32
 Known bugs
 ----------
 
--  None
+- The Haddock release shipped with the release currently does not show
+  :ref:`bundled pattern synonyms <patsyn-impexp>` in generated documentation
+  (:ghc-ticket:`111955`).
