@@ -575,7 +575,7 @@ base
 
 See ``changelog.md`` in the ``base`` package for full release notes.
 
--  Version number 4.9.0.0 (was 4.7.0.0)
+-  Version number 4.9.0.0 (was 4.8.2.0)
 
 -  :base-ref:`GHC.Stack <GHC-Stack.html>` exports two new types ``SrcLoc`` and ``CallStack``. A
    ``SrcLoc`` contains package, module, and file names, as well as start
