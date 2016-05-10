@@ -801,4 +801,4 @@ Known bugs
 
 - The Haddock release shipped with the release currently does not show
   :ref:`bundled pattern synonyms <patsyn-impexp>` in generated documentation
-  (:ghc-ticket:`111955`).
+  (:ghc-ticket:`11955`).
