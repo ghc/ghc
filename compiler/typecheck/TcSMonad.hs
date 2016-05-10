@@ -679,13 +679,13 @@ Note [inert_model: the inert model]
      any solution.
 
    * Domain of the model = skolems + untouchables.
-     A touchable unification variable wouuld have been unified first.
+     A touchable unification variable would have been unified first.
 
    * The inert_eqs are all Given/Wanted.  The Derived ones are in the
      inert_model only.
 
    * However inert_dicts, inert_funeqs, inert_irreds
-     may well contain derived costraints.
+     may well contain derived constraints.
 
 Note [inert_eqs: the inert equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
