@@ -25,10 +25,12 @@
  * "C++ implementations should define these macros only when
  * __STDC_LIMIT_MACROS is defined before <stdint.h> is included."
  *
- * C++11 does not require it anymore. Remove once we upgrade to C++11 or newer.
+ * So we need to define it for now to compile with C++ compilers.
+ * However, C++11 does not require it anymore so we can remove this once we
+ * upgrade to requiring C++11 or newer.
  */
 #define __STDC_LIMIT_MACROS
-#import <inttypes.h>
+#include <inttypes.h>
 
 
 /*
@@ -122,7 +124,7 @@ typedef int32_t            StgInt;
 typedef uint32_t           StgWord;
 
 typedef int16_t            StgHalfInt;
-typedef uint16_s           StgHalfWord;
+typedef uint16_t           StgHalfWord;
 
 #define STG_INT_MIN        INT32_MIN
 #define STG_INT_MAX        INT32_MAX
