@@ -22,6 +22,7 @@ data ProcessConfig = ProcessConfig
     , pcStdOut :: Maybe Handle
     , pcStdErr :: Maybe Handle
     }
+    deriving (Show)
 
 
 processConfig :: ProcessConfig
