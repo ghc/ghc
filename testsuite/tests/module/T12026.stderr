@@ -1,4 +1,3 @@
 
 T12026.hs:3:17: error:
-    Expecting a type constructor but found a variable.
-    If  ‘map’ is a type constructor then enable ExplicitNamespaces and use the 'type' keyword.
+    Expecting a type constructor but found a variable, ‘map’.
