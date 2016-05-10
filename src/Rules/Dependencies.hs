@@ -49,8 +49,8 @@ buildPackageDependencies rs context@Context {..} =
 
 -- Given a 'Context' and a 'FilePath' to a source file, compute the 'FilePath'
 -- to its dependencies. For example, in vanillaContext Stage1 rts:
--- * "Task.c"                          -> ".build/stage1/rts/Task.c.deps"
--- * ".build/stage1/rts/AutoApply.cmm" -> ".build/stage1/rts/AutoApply.cmm.deps"
+-- * "Task.c"                          -> "_build/stage1/rts/Task.c.deps"
+-- * "_build/stage1/rts/AutoApply.cmm" -> "_build/stage1/rts/AutoApply.cmm.deps"
 src2dep :: Context -> FilePath -> FilePath
 src2dep context src
     | buildRootPath `isPrefixOf` src = src <.> "deps"
@@ -58,8 +58,8 @@ src2dep context src
 
 -- Given a 'Context' and a 'FilePath' to a file with dependencies, compute the
 -- 'FilePath' to the source file. For example, in vanillaContext Stage1 rts:
--- * ".build/stage1/rts/Task.c.deps"        -> "Task.c"
--- * ".build/stage1/rts/AutoApply.cmm.deps" -> ".build/stage1/rts/AutoApply.cmm"
+-- * "_build/stage1/rts/Task.c.deps"        -> "Task.c"
+-- * "_build/stage1/rts/AutoApply.cmm.deps" -> "_build/stage1/rts/AutoApply.cmm"
 dep2src :: Context -> FilePath -> FilePath
 dep2src context@Context {..} dep
     | takeBaseName dep `elem` [ "AutoApply.cmm", "Evac_thr.c", "Scav_thr.c" ] = src

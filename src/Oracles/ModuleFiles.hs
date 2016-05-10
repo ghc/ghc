@@ -45,10 +45,10 @@ encodeModule dir file
 
 -- | Find the generator for a given 'Context' and a source file. For example:
 -- findGenerator (Context Stage1 compiler vanilla)
---               ".build/stage1/compiler/build/Lexer.hs"
+--               "_build/stage1/compiler/build/Lexer.hs"
 -- == Just ("compiler/parser/Lexer.x", Alex)
 -- findGenerator (Context Stage1 base vanilla)
---               ".build/stage1/base/build/Prelude.hs"
+--               "_build/stage1/base/build/Prelude.hs"
 -- == Nothing
 findGenerator :: Context -> FilePath -> Action (Maybe (FilePath, Builder))
 findGenerator Context {..} file = do

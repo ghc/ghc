@@ -31,28 +31,28 @@ pkgDataFile :: Context -> FilePath
 pkgDataFile context = buildPath context -/- "package-data.mk"
 
 -- | Path to the haddock file of a given 'Context', e.g.:
--- ".build/stage1/libraries/array/doc/html/array/array.haddock".
+-- "_build/stage1/libraries/array/doc/html/array/array.haddock".
 pkgHaddockFile :: Context -> FilePath
 pkgHaddockFile context@Context {..} =
     buildPath context -/- "doc/html" -/- name -/- name <.> "haddock"
   where name = pkgNameString package
 
 -- | Path to the library file of a given 'Context', e.g.:
--- ".build/stage1/libraries/array/build/libHSarray-0.5.1.0.a".
+-- "_build/stage1/libraries/array/build/libHSarray-0.5.1.0.a".
 pkgLibraryFile :: Context -> Action FilePath
 pkgLibraryFile context@Context {..} = do
     extension <- libsuf way
     pkgFile context "libHS" extension
 
 -- | Path to the auxiliary library file of a given 'Context', e.g.:
--- ".build/stage1/compiler/build/libHSghc-8.1-0.a".
+-- "_build/stage1/compiler/build/libHSghc-8.1-0.a".
 pkgLibraryFile0 :: Context -> Action FilePath
 pkgLibraryFile0 context@Context {..} = do
     extension <- libsuf way
     pkgFile context "libHS" ("-0" ++ extension)
 
 -- | Path to the GHCi library file of a given 'Context', e.g.:
--- ".build/stage1/libraries/array/build/HSarray-0.5.1.0.o".
+-- "_build/stage1/libraries/array/build/HSarray-0.5.1.0.o".
 pkgGhciLibraryFile :: Context -> Action FilePath
 pkgGhciLibraryFile context = pkgFile context "HS" ".o"
 

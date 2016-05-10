@@ -76,8 +76,8 @@ buildPackageGhciLibrary context@Context {..} = priority 2 $ do
 -- TODO: Get rid of code duplication and simplify. See also src2dep.
 -- Given a 'Context' and a 'FilePath' to a source file, compute the 'FilePath'
 -- to its object file. For example, in Context Stage1 rts threaded:
--- * "Task.c"                          -> ".build/stage1/rts/Task.thr_o"
--- * ".build/stage1/rts/sm/Evac_thr.c" -> ".build/stage1/rts/sm/Evac_thr.thr_o"
+-- * "Task.c"                          -> "_build/stage1/rts/Task.thr_o"
+-- * "_build/stage1/rts/sm/Evac_thr.c" -> "_build/stage1/rts/sm/Evac_thr.thr_o"
 objFile :: Context -> FilePath -> FilePath
 objFile context@Context {..} src
     | buildRootPath `isPrefixOf` src = src -<.> osuf way
