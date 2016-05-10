@@ -23,7 +23,7 @@ module Unique (
         Unique, Uniquable(..),
 
         -- ** Constructors, destructors and operations on 'Unique's
-        hasKey, cmpByUnique,
+        hasKey,
 
         pprUnique,
 
@@ -35,6 +35,7 @@ module Unique (
         deriveUnique,                   -- Ditto
         newTagUnique,                   -- Used in CgCase
         initTyVarUnique,
+        nonDetCmpUnique,
 
         -- ** Making built-in uniques
 
@@ -168,9 +169,6 @@ instance Uniquable FastString where
 instance Uniquable Int where
  getUnique i = mkUniqueGrimily i
 
-cmpByUnique :: Uniquable a => a -> a -> Ordering
-cmpByUnique x y = (getUnique x) `cmpUnique` (getUnique y)
-
 {-
 ************************************************************************
 *                                                                      *
@@ -204,8 +202,11 @@ eqUnique (MkUnique u1) (MkUnique u2) = u1 == u2
 ltUnique (MkUnique u1) (MkUnique u2) = u1 <  u2
 leUnique (MkUnique u1) (MkUnique u2) = u1 <= u2
 
-cmpUnique :: Unique -> Unique -> Ordering
-cmpUnique (MkUnique u1) (MkUnique u2)
+-- Provided here to make it explicit at the call-site that it can
+-- introduce non-determinism.
+-- See Note [Unique Determinism]
+nonDetCmpUnique :: Unique -> Unique -> Ordering
+nonDetCmpUnique (MkUnique u1) (MkUnique u2)
   = if u1 == u2 then EQ else if u1 < u2 then LT else GT
 
 instance Eq Unique where
@@ -217,7 +218,7 @@ instance Ord Unique where
     a <= b = leUnique a b
     a  > b = not (leUnique a b)
     a >= b = not (ltUnique a b)
-    compare a b = cmpUnique a b
+    compare a b = nonDetCmpUnique a b
 
 -----------------
 instance Uniquable Unique where

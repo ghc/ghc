@@ -1862,6 +1862,29 @@ this by simplifying the RHS to a form in which
         - the list is sorted by tyvar (major key) and then class (minor key)
         - no duplicates, of course
 
+Note [Deterministic simplifyInstanceContexts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Canonicalisation uses cmpType which is nondeterministic. Sorting
+with cmpType puts the returned lists in a nondeterministic order.
+If we were to return them, we'd get class constraints in
+nondeterministic order.
+
+Consider:
+
+  data ADT a b = Z a b deriving Eq
+
+The generated code could be either:
+
+  instance (Eq a, Eq b) => Eq (Z a b) where
+
+Or:
+
+  instance (Eq b, Eq a) => Eq (Z a b) where
+
+To prevent the order from being nondeterministic we only
+canonicalize when comparing and return them in the same order as
+simplifyDeriv returned them.
+See also Note [cmpType nondeterminism]
 -}
 
 
@@ -1909,8 +1932,10 @@ simplifyInstanceContexts infer_specs
              else
                 iterate_deriv (n+1) new_solns }
 
-    eqSolution = eqListBy (eqListBy eqType)
-
+    eqSolution a b = eqListBy (eqListBy eqType) (canSolution a) (canSolution b)
+       -- Canonicalise for comparison
+       -- See Note [Deterministic simplifyInstanceContexts]
+    canSolution = map (sortBy cmpType)
     ------------------------------------------------------------------
     gen_soln :: DerivSpec ThetaOrigin -> TcM ThetaType
     gen_soln (DS { ds_loc = loc, ds_tvs = tyvars
@@ -1925,7 +1950,7 @@ simplifyInstanceContexts infer_specs
                 -- Claim: the result instance declaration is guaranteed valid
                 -- Hence no need to call:
                 --   checkValidInstance tyvars theta clas inst_tys
-           ; return (sortBy cmpType theta) }    -- Canonicalise before returning the solution
+           ; return theta }
       where
         the_pred = mkClassPred clas inst_tys
 
