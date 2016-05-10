@@ -75,7 +75,7 @@ classifyTyCons convStatus parTyCons tcs = classify [] [] [] [] convStatus parTyC
         can_convert  = (isNullUFM (filterUniqSet ((`elemNameSet` pts) . tyConName) (refs `minusUFM` cs))
                         && all convertable tcs)
                        || isShowClass tcs
-        must_convert = foldUFM (||) False (intersectUFM_C const cs refs)
+        must_convert = anyUFM id (intersectUFM_C const cs refs)
                        && (not . isShowClass $ tcs)
 
         -- We currently admit Haskell 2011-style data and newtype declarations as well as type
