@@ -1,4 +1,4 @@
-module Settings.Builders.Configure (configureArgs) where
+module Settings.Builders.Configure (configureBuilderArgs) where
 
 import Base
 import Expression
@@ -6,8 +6,8 @@ import Oracles.Config.Setting
 import Predicates (builder)
 import Settings
 
-configureArgs :: Args
-configureArgs = mconcat
+configureBuilderArgs :: Args
+configureBuilderArgs = mconcat
     [ builder (Configure libffiBuildPath) ? do
         top            <- getTopDirectory
         targetPlatform <- getSetting TargetPlatform
