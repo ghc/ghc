@@ -539,6 +539,9 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
              , text "(unzonked) wanted =" <+> ppr wanteds
              ]
 
+       ; let partial_sigs  = filter isPartialSig sigs
+             psig_theta    = concatMap sig_theta partial_sigs
+
        -- First do full-blown solving
        -- NB: we must gather up all the bindings from doing
        -- this solving; hence (runTcSWithEvBinds ev_binds_var).
@@ -547,20 +550,26 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
        -- bindings, so we can't just revert to the input
        -- constraint.
 
-       ; ev_binds_var <- TcM.newTcEvBinds
-       ; wanted_transformed_incl_derivs <- setTcLevel rhs_tclvl $
-           do { sig_derived <- concatMapM mkSigDerivedWanteds sigs
-                  -- the False says we don't really need to solve all Deriveds
-              ; runTcSWithEvBinds False (Just ev_binds_var) $
-                solveWanteds (wanteds `addSimples` listToBag sig_derived) }
+       ; tc_lcl_env      <- TcM.getLclEnv
+       ; ev_binds_var    <- TcM.newTcEvBinds
+       ; psig_theta_vars <- mapM TcM.newEvVar psig_theta
+       ; wanted_transformed_incl_derivs
+            <- setTcLevel rhs_tclvl $
+               runTcSWithEvBinds False (Just ev_binds_var) $
+               do { let loc = mkGivenLoc rhs_tclvl UnkSkol tc_lcl_env
+                  ; psig_givens <- mkGivensWithSuperClasses loc psig_theta_vars
+                  ; _ <- solveSimpleGivens psig_givens
+                         -- See Note [Add signature contexts as givens]
+                  ; solveWanteds wanteds }
        ; wanted_transformed_incl_derivs <- TcM.zonkWC wanted_transformed_incl_derivs
 
        -- Find quant_pred_candidates, the predicates that
        -- we'll consider quantifying over
-       -- NB: We do not do any defaulting when inferring a type, this can lead
-       -- to less polymorphic types, see Note [Default while Inferring]
+       -- NB1: wanted_transformed does not include anything provable from
+       --      the psig_theta; it's just the extra bit
+       -- NB2: We do not do any defaulting when inferring a type, this can lead
+       --      to less polymorphic types, see Note [Default while Inferring]
 
-       ; tc_lcl_env <- TcM.getLclEnv
        ; let wanted_transformed = dropDerivedWC wanted_transformed_incl_derivs
        ; quant_pred_candidates   -- Fully zonked
            <- if insolubleWC rhs_tclvl wanted_transformed_incl_derivs
@@ -604,15 +613,10 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
        -- NB: quant_pred_candidates is already fully zonked
 
        -- Decide what type variables and constraints to quantify
-       ; let (bndrs, taus) = unzip name_taus
-             partial_sigs  = filter isPartialSig sigs
-             psig_theta    = concatMap sig_theta partial_sigs
-             -- psig_theta: see Note [Quantification and partial signatures]
-       ; zonked_taus <- mapM TcM.zonkTcType (psig_theta ++ taus)
-       ; let zonked_tau_dvs = splitDepVarsOfTypes zonked_taus
-       ; (qtvs, bound_theta)
-           <- decideQuantification apply_mr bndrs psig_theta
-                                   quant_pred_candidates zonked_tau_dvs
+       -- NB: bound_theta are constraints we want to quantify over,
+       --     /apart from/ the psig_theta, which we always quantify over
+       ; (qtvs, bound_theta) <- decideQuantification apply_mr name_taus psig_theta
+                                                     quant_pred_candidates
 
          -- Promote any type variables that are free in the inferred type
          -- of the function:
@@ -626,15 +630,12 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
          -- we don't quantify over beta (since it is fixed by envt)
          -- so we must promote it!  The inferred type is just
          --   f :: beta -> beta
-       ; zonked_tau_tkvs <- TcM.zonkTyCoVarsAndFV $
-                            dVarSetToVarSet (dv_kvs zonked_tau_dvs)
-                            `unionVarSet`
-                            dVarSetToVarSet (dv_tvs zonked_tau_dvs)
+       ; zonked_taus <- mapM (TcM.zonkTcType . snd) name_taus
               -- decideQuantification turned some meta tyvars into
               -- quantified skolems, so we have to zonk again
 
        ; let phi_tkvs = tyCoVarsOfTypes bound_theta  -- Already zonked
-                        `unionVarSet` zonked_tau_tkvs
+                        `unionVarSet` tyCoVarsOfTypes zonked_taus
              promote_tkvs = closeOverKinds phi_tkvs `delVarSetList` qtvs
 
        ; MASSERT2( closeOverKinds promote_tkvs `subVarSet` promote_tkvs
@@ -651,7 +652,10 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
            -- Emit an implication constraint for the
            -- remaining constraints from the RHS
        ; bound_theta_vars <- mapM TcM.newEvVar bound_theta
-       ; let skol_info   = InferSkol [ (name, mkSigmaTy [] bound_theta ty)
+       ; psig_theta_vars  <- mapM zonkId psig_theta_vars
+       ; let full_theta      = psig_theta      ++ bound_theta
+             full_theta_vars = psig_theta_vars ++ bound_theta_vars
+             skol_info   = InferSkol [ (name, mkSigmaTy [] full_theta ty)
                                      | (name, ty) <- name_taus ]
                         -- Don't add the quantified variables here, because
                         -- they are also bound in ic_skols and we want them
@@ -665,7 +669,7 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
              implic = Implic { ic_tclvl    = rhs_tclvl
                              , ic_skols    = extra_qtvs ++ qtvs
                              , ic_no_eqs   = False
-                             , ic_given    = bound_theta_vars
+                             , ic_given    = full_theta_vars
                              , ic_wanted   = wanted_transformed
                              , ic_status   = IC_Unsolved
                              , ic_binds    = Just ev_binds_var
@@ -676,40 +680,40 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
          -- All done!
        ; traceTc "} simplifyInfer/produced residual implication for quantification" $
          vcat [ text "quant_pred_candidates =" <+> ppr quant_pred_candidates
-              , text "zonked_taus" <+> ppr zonked_taus
-              , text "zonked_tau_dvs=" <+> ppr zonked_tau_dvs
               , text "promote_tvs=" <+> ppr promote_tkvs
+              , text "psig_theta =" <+> ppr psig_theta
               , text "bound_theta =" <+> ppr bound_theta
+              , text "full_theta =" <+> ppr full_theta
               , text "qtvs =" <+> ppr qtvs
               , text "implic =" <+> ppr implic ]
 
-       ; return ( qtvs, bound_theta_vars, TcEvBinds ev_binds_var ) }
+       ; return ( qtvs, full_theta_vars, TcEvBinds ev_binds_var ) }
 
-mkSigDerivedWanteds :: TcIdSigInfo -> TcM [Ct]
--- See Note [Add deriveds for signature contexts]
-mkSigDerivedWanteds (TISI { sig_bndr = PartialSig { sig_name = name }
-                          , sig_theta = theta, sig_tau = tau })
- = do { let skol_info = InferSkol [(name, mkSigmaTy [] theta tau)]
-      ; loc <- getCtLocM (GivenOrigin skol_info) (Just TypeLevel)
-      ; return [ mkNonCanonical (CtDerived { ctev_pred = pred
-                                           , ctev_loc = loc })
-               | pred <- theta ] }
-mkSigDerivedWanteds _ = return []
-
-{- Note [Add deriveds for signature contexts]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Add signature contexts as givens]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this (Trac #11016):
   f2 :: (?x :: Int) => _
   f2 = ?x
-We'll use plan InferGen because there are holes in the type.  But we want
-to have the (?x :: Int) constraint floating around so that the functional
-dependencies kick in.  Otherwise the occurrence of ?x on the RHS produces
-constraint (?x :: alpha), and we wont unify alpha:=Int.
+or this
+  f3 :: a ~ Bool => (a, _)
+  f3 = (True, False)
+or theis
+  f4 :: (Ord a, _) => a -> Bool
+  f4 x = x==x
+
+We'll use plan InferGen because there are holes in the type.  But:
+ * For f2 we want to have the (?x :: Int) constraint floating around
+   so that the functional dependencies kick in.  Otherwise the
+   occurrence of ?x on the RHS produces constraint (?x :: alpha), and
+   we won't unify alpha:=Int.
+ * For f3 we want the (a ~ Bool) available to solve the wanted (a ~ Bool)
+   in the RHS
+ * For f4 we want to use the (Ord a) in the signature to solve the Eq a
+   constraint.
 
 Solution: in simplifyInfer, just before simplifying the constraints
-gathered from the RHS, add Derived constraints for the context of any
-type signatures.  This is rare; if there is a type signature we'll usually
-be doing CheckGen.  But it happens for signatures with holes.
+gathered from the RHS, add Given constraints for the context of any
+type signatures.
 
 ************************************************************************
 *                                                                      *
@@ -746,22 +750,23 @@ including all covars -- and the quantified constraints are empty/insoluble.
 
 decideQuantification
   :: Bool                  -- try the MR restriction?
-  -> [Name]                -- variables to be generalised (for errors only)
+  -> [(Name, TcTauType)]   -- Variables to be generalised
   -> [PredType]            -- All annotated constraints from signatures
   -> [PredType]            -- Candidate theta
-  -> TcDepVars
   -> TcM ( [TcTyVar]       -- Quantify over these (skolems)
          , [PredType] )    -- and this context (fully zonked)
 -- See Note [Deciding quantification]
-decideQuantification apply_mr bndrs ann_theta constraints
-                     zonked_dvs@(DV { dv_kvs = zonked_tau_kvs, dv_tvs = zonked_tau_tvs })
+decideQuantification apply_mr name_taus psig_theta constraints
   | apply_mr     -- Apply the Monomorphism restriction
   = do { gbl_tvs <- tcGetGlobalTyCoVars
-       ; let zonked_tkvs = dVarSetToVarSet zonked_tau_kvs `unionVarSet`
-                           dVarSetToVarSet zonked_tau_tvs
+       ; zonked_taus <- mapM TcM.zonkTcType (psig_theta ++ taus)
+                        -- psig_theta: see Note [Quantification and partial signatures]
+       ; let zonked_dvs      = splitDepVarsOfTypes zonked_taus
+             zonked_tkvs     = tcDepVarSet zonked_dvs
              constrained_tvs = tyCoVarsOfTypes constraints `unionVarSet`
                                filterVarSet isCoVar zonked_tkvs
              mono_tvs = gbl_tvs `unionVarSet` constrained_tvs
+
        ; qtvs <- quantifyZonkedTyVars mono_tvs zonked_dvs
 
            -- Warn about the monomorphism restriction
@@ -781,9 +786,12 @@ decideQuantification apply_mr bndrs ann_theta constraints
 
   | otherwise
   = do { gbl_tvs <- tcGetGlobalTyCoVars
-       ; let mono_tvs     = growThetaTyVars equality_constraints gbl_tvs
-             tau_tvs_plus = growThetaTyVarsDSet constraints zonked_tau_tvs
-             dvs_plus     = DV { dv_kvs = zonked_tau_kvs, dv_tvs = tau_tvs_plus }
+       ; zonked_taus <- mapM TcM.zonkTcType (psig_theta ++ taus)
+                        -- psig_theta: see Note [Quantification and partial signatures]
+       ; let DV { dv_kvs = zkvs, dv_tvs = ztvs} = splitDepVarsOfTypes zonked_taus
+             mono_tvs     = growThetaTyVars equality_constraints gbl_tvs
+             tau_tvs_plus = growThetaTyVarsDSet constraints ztvs
+             dvs_plus     = DV { dv_kvs = zkvs, dv_tvs = tau_tvs_plus }
        ; qtvs <- quantifyZonkedTyVars mono_tvs dvs_plus
           -- We don't grow the kvs, as there's no real need to. Recall
           -- that quantifyTyVars uses the separation between kvs and tvs
@@ -794,8 +802,8 @@ decideQuantification apply_mr bndrs ann_theta constraints
                  -- quantifyTyVars turned some meta tyvars into
                  -- quantified skolems, so we have to zonk again
 
-       ; let qtv_set = mkVarSet qtvs
-             theta   = pickQuantifiablePreds qtv_set ann_theta constraints
+       ; let qtv_set   = mkVarSet qtvs
+             theta     = pickQuantifiablePreds qtv_set constraints
              min_theta = mkMinimalBySCs theta
                -- See Note [Minimize by Superclasses]
 
@@ -803,7 +811,6 @@ decideQuantification apply_mr bndrs ann_theta constraints
            (vcat [ text "constraints:"  <+> ppr constraints
                  , text "gbl_tvs:"      <+> ppr gbl_tvs
                  , text "mono_tvs:"     <+> ppr mono_tvs
-                 , text "zonked_kvs:"   <+> ppr zonked_tau_kvs
                  , text "tau_tvs_plus:" <+> ppr tau_tvs_plus
                  , text "qtvs:"         <+> ppr qtvs
                  , text "min_theta:"    <+> ppr min_theta ])
@@ -811,6 +818,7 @@ decideQuantification apply_mr bndrs ann_theta constraints
   where
     pp_bndrs = pprWithCommas (quotes . ppr) bndrs
     equality_constraints = filter isEqPred constraints
+    (bndrs, taus) = unzip name_taus
 
 ------------------
 growThetaTyVars :: ThetaType -> TyCoVarSet -> TyVarSet

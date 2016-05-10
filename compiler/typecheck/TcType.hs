@@ -91,7 +91,7 @@ module TcType (
   ---------------------------------
   -- Predicate types
   mkMinimalBySCs, transSuperClasses,
-  pickQuantifiablePreds,
+  pickQuantifiablePreds, pickCapturedPreds,
   immSuperClasses,
   isImprovementPred,
 
@@ -100,7 +100,7 @@ module TcType (
 
   -- * Finding "exact" (non-dead) type variables
   exactTyCoVarsOfType, exactTyCoVarsOfTypes,
-  splitDepVarsOfType, splitDepVarsOfTypes, TcDepVars(..), depVarsTyVars,
+  splitDepVarsOfType, splitDepVarsOfTypes, TcDepVars(..), tcDepVarSet,
 
   -- * Extracting bound variables
   allBoundVariables, allBoundVariabless,
@@ -861,8 +861,10 @@ data TcDepVars  -- See Note [Dependent type variables]
          -- See Note [Dependent type variables]
     }
 
-depVarsTyVars :: TcDepVars -> DTyVarSet
-depVarsTyVars = dv_tvs
+tcDepVarSet :: TcDepVars -> TyVarSet
+-- Actually can contain CoVars, but never mind
+tcDepVarSet (DV { dv_kvs = kvs, dv_tvs = tvs })
+  = dVarSetToVarSet kvs `unionVarSet` dVarSetToVarSet tvs
 
 instance Monoid TcDepVars where
    mempty = DV { dv_kvs = emptyDVarSet, dv_tvs = emptyDVarSet }
@@ -1832,12 +1834,11 @@ evVarPred var
 -- [Inheriting implicit parameters] and [Quantifying over equality constraints]
 pickQuantifiablePreds
   :: TyVarSet           -- Quantifying over these
-  -> TcThetaType        -- Context from PartialTypeSignatures
   -> TcThetaType        -- Proposed constraints to quantify
   -> TcThetaType        -- A subset that we can actually quantify
 -- This function decides whether a particular constraint should be
 -- quantified over, given the type variables that are being quantified
-pickQuantifiablePreds qtvs annotated_theta theta
+pickQuantifiablePreds qtvs theta
   = let flex_ctxt = True in  -- Quantify over non-tyvar constraints, even without
                              -- -XFlexibleContexts: see Trac #10608, #10351
          -- flex_ctxt <- xoptM Opt_FlexibleContexts
@@ -1847,14 +1848,13 @@ pickQuantifiablePreds qtvs annotated_theta theta
       = case classifyPredType pred of
 
           ClassPred cls tys
-            | Just str <- isCallStackPred pred
-              -- NEVER infer a CallStack constraint, unless we were
-              -- given one in a partial type signatures.
+            | Just {} <- isCallStackPred pred
+              -- NEVER infer a CallStack constraint
               -- Otherwise, we let the constraints bubble up to be
               -- solved from the outer context, or be defaulted when we
               -- reach the top-level.
               -- see Note [Overview of implicit CallStacks]
-              -> str `elem` givenStks
+              -> False
 
             | isIPClass cls    -> True -- See note [Inheriting implicit parameters]
 
@@ -1866,9 +1866,6 @@ pickQuantifiablePreds qtvs annotated_theta theta
 
           EqPred NomEq ty1 ty2  -> quant_fun ty1 || quant_fun ty2
           IrredPred ty          -> tyCoVarsOfType ty `intersectsVarSet` qtvs
-
-    givenStks = [ str | (str, ty) <- mapMaybe isIPPred_maybe annotated_theta
-                      , isCallStackTy ty ]
 
     pick_cls_pred flex_ctxt cls tys
       = tyCoVarsOfTypes tys `intersectsVarSet` qtvs
@@ -1882,6 +1879,19 @@ pickQuantifiablePreds qtvs annotated_theta theta
           Just (tc, tys) | isTypeFamilyTyCon tc
                          -> tyCoVarsOfTypes tys `intersectsVarSet` qtvs
           _ -> False
+
+pickCapturedPreds
+  :: TyVarSet           -- Quantifying over these
+  -> TcThetaType        -- Proposed constraints to quantify
+  -> TcThetaType        -- A subset that we can actually quantify
+-- A simpler version of pickQuantifiablePreds, used to winnow down
+-- the inferred constrains of a group of bindings, into those for
+-- one particular identifier
+pickCapturedPreds qtvs theta
+  = filter captured theta
+  where
+    captured pred = isIPPred pred || (tyCoVarsOfType pred `intersectsVarSet` qtvs)
+
 
 -- Superclasses
 

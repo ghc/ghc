@@ -777,10 +777,10 @@ chooseInferredQuantifiers :: TcThetaType   -- inferred
                           -> Maybe TcIdSigInfo
                           -> TcM ([TcTyBinder], TcThetaType)
 chooseInferredQuantifiers inferred_theta tau_tvs qtvs Nothing
-  = -- No type signature for this binder
+  = -- No type signature (partial or complete) for this binder,
     do { let free_tvs = closeOverKinds (growThetaTyVars inferred_theta tau_tvs)
                         -- Include kind variables!  Trac #7916
-             my_theta = pickQuantifiablePreds free_tvs [] inferred_theta
+             my_theta = pickCapturedPreds free_tvs inferred_theta
              binders  = [ mkNamedBinder Invisible tv
                         | tv <- qtvs
                         , tv `elemVarSet` free_tvs ]
@@ -804,16 +804,15 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
   = do { annotated_theta <- zonkTcTypes annotated_theta
        ; let free_tvs = closeOverKinds (tyCoVarsOfTypes annotated_theta
                                         `unionVarSet` tau_tvs)
-             my_theta = pickQuantifiablePreds free_tvs annotated_theta inferred_theta
+             my_theta = pickCapturedPreds free_tvs inferred_theta
 
        -- Report the inferred constraints for an extra-constraints wildcard/hole as
        -- an error message, unless the PartialTypeSignatures flag is enabled. In this
        -- case, the extra inferred constraints are accepted without complaining.
-       -- Returns the annotated constraints combined with the inferred constraints.
+       -- NB: inferred_theta already includes all the annotated constraints
              inferred_diff = [ pred
                              | pred <- my_theta
                              , all (not . (`eqType` pred)) annotated_theta ]
-             final_theta   = annotated_theta ++ inferred_diff
        ; partial_sigs      <- xoptM LangExt.PartialTypeSignatures
        ; warn_partial_sigs <- woptM Opt_WarnPartialTypeSignatures
        ; msg <- mkLongErrAt loc (mk_msg inferred_diff partial_sigs hs_ty) empty
@@ -827,7 +826,7 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
                 | otherwise         -> return ()
            False                    -> reportError msg
 
-       ; return (mk_binders free_tvs, final_theta) }
+       ; return (mk_binders free_tvs, my_theta) }
 
   | otherwise  -- A complete type signature is dealt with in mkInferredPolyId
   = pprPanic "chooseInferredQuantifiers" (ppr bndr_info)
