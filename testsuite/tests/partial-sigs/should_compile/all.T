@@ -14,7 +14,7 @@ test('Either', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures
 test('Every', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('EveryNamed', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 # Bug
-test('EqualityConstraint', expect_broken(9478), compile, ['-ddump-types -fno-warn-partial-type-signatures'])
+test('EqualityConstraint', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('ExpressionSig', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('ExpressionSigNamed', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('ExtraConstraints1', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
