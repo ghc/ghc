@@ -19,13 +19,9 @@ extra-source-files:
   CHANGES
   README
   doc/Makefile
-  doc/README
-  doc/aclocal.m4
-  doc/config.mk.in
-  doc/configure.ac
-  doc/docbook-xml.mk
-  doc/fptools.css
-  doc/haddock.xml
+  doc/README.md
+  doc/*.rst
+  doc/conf.py
   haddock-api/src/haddock.sh
   html-test/src/*.hs
   html-test/ref/*.html
