@@ -1412,25 +1412,30 @@ static void stopAllCapabilities (Capability **pCap, Task *task)
 
 #if defined(THREADED_RTS)
 static rtsBool requestSync (
-    Capability **pcap, Task *task, PendingSync *sync,
+    Capability **pcap, Task *task, PendingSync *new_sync,
     SyncType *prev_sync_type)
 {
-    PendingSync *prev_sync;
+    PendingSync *sync;
 
-    prev_sync = (PendingSync*)cas((StgVolatilePtr)&pending_sync,
-                                  (StgWord)NULL,
-                                  (StgWord)sync);
+    sync = (PendingSync*)cas((StgVolatilePtr)&pending_sync,
+                             (StgWord)NULL,
+                             (StgWord)new_sync);
 
-    if (prev_sync)
+    if (sync != NULL)
     {
+        // sync is valid until we have called yieldCapability().
+        // After the sync is completed, we cannot read that struct any
+        // more because it has been freed.
+        *prev_sync_type = sync->type;
         do {
             debugTrace(DEBUG_sched, "someone else is trying to sync (%d)...",
-                       prev_sync->type);
+                       sync->type);
             ASSERT(*pcap);
             yieldCapability(pcap,task,rtsTrue);
-        } while (pending_sync);
+            sync = pending_sync;
+        } while (sync != NULL);
+
         // NOTE: task->cap might have changed now
-        *prev_sync_type = prev_sync->type;
         return rtsTrue;
     }
     else
