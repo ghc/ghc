@@ -1,10 +1,4 @@
 
-T11432.hs:7:16:
-    Not in scope: ‘-.->’
-    Note: use ‘type’ keyword to export type constructor ‘-.->’
-      defined at T11432.hs:9:1
-      (requires TypeOperators extension)
-
-T11432.hs:7:16:
-    The export item ‘(-.->)(..)’
-    attempts to export constructors or class methods that are not visible here
+T11432.hs:7:16: error:
+    Expecting a type constructor but found a variable.
+    If  ‘-.->’ is a type constructor then enable ExplicitNamespaces and use the 'type' keyword.
