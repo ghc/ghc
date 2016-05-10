@@ -529,9 +529,9 @@ mkSkolReporter ctxt cts
           (yeses, noes) = partition (group_with ct) cts
 
      group_with ct1 ct2
-       | EQ <- cmp_loc      ct1 ct2 = True
-       | EQ <- cmp_lhs_type ct1 ct2 = True
-       | otherwise                  = False
+       | EQ <- cmp_loc ct1 ct2 = True
+       | eq_lhs_type   ct1 ct2 = True
+       | otherwise             = False
 
 mkHoleReporter :: Reporter
 -- Reports errors one at a time
@@ -563,11 +563,11 @@ mkGroupReporter mk_err ctxt cts
   = mapM_ (reportGroup mk_err ctxt) (equivClasses cmp_loc cts)
   where
 
-cmp_lhs_type :: Ct -> Ct -> Ordering
-cmp_lhs_type ct1 ct2
+eq_lhs_type :: Ct -> Ct -> Bool
+eq_lhs_type ct1 ct2
   = case (classifyPredType (ctPred ct1), classifyPredType (ctPred ct2)) of
        (EqPred eq_rel1 ty1 _, EqPred eq_rel2 ty2 _) ->
-         (eq_rel1 `compare` eq_rel2) `thenCmp` (ty1 `cmpType` ty2)
+         (eq_rel1 == eq_rel2) && (ty1 `eqType` ty2)
        _ -> pprPanic "mkSkolReporter" (ppr ct1 $$ ppr ct2)
 
 cmp_loc :: Ct -> Ct -> Ordering
