@@ -1825,16 +1825,24 @@ using double quotes: <a href="#"
 	>Auxiliary stuff</h1
 	><div class="doc"
 	><p
-	  >This is some documentation that is attached to a name ($aux1)</p
+	  >This is some documentation that is attached to a name ($aux1)
+ rather than a source declaration.  The documentation may be
+ referred to in the export list using its name.</p
+	  ><pre
+	  > code block in named doc</pre
 	  ></div
 	><div class="doc"
 	><p
 	  >This is some documentation that is attached to a name ($aux2)</p
 	  ></div
-	><div class="doc empty"
-	></div
-	><div class="doc empty"
-	></div
+	><div class="doc"
+	><pre
+	  > code block on its own in named doc</pre
+	  ></div
+	><div class="doc"
+	><pre
+	  > code block on its own in named doc (after newline)</pre
+	  ></div
 	><div class="doc"
 	><p
 	  >a nested, named doc comment</p
@@ -1892,8 +1900,12 @@ test4</pre
 test2
 </pre
 	  ></div
-	><div class="doc empty"
-	></div
+	><div class="doc"
+	><pre
+	  >foo</pre
+	  ><pre
+	  >bar</pre
+	  ></div
 	><div class="doc"
 	><p
 	  >This is some inline documentation in the export list</p
