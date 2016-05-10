@@ -364,6 +364,9 @@ Warnings
    ``Applicative``/``Monad``/``MonadFail`` instance definitions.
    See flag description in :ref:`options-sanity` for more details.
 
+-  Added the option :ghc-flag:`-Wnoncanonical-semigroup-instances` which
+   warns of ``Monoid`` instances where ``mappend`` is not defined in term of
+   ``Semigroup``'s ``(<>)`` operation.
 
 -  Added the :ghc-flag:`-Wmissing-pattern-synonym-signatures`
    flag. When enabled, this will issue a warning when a pattern
