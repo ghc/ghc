@@ -30,7 +30,7 @@ extra-source-files:
   html-test/src/*.hs
   html-test/ref/*.html
   hypsrc-test/src/*.hs
-  hypsrc-test/ref/*.html
+  hypsrc-test/ref/src/*.html
   latex-test/src/Simple/*.hs
   latex-test/ref/Simple/*.tex
   latex-test/ref/Simple/*.sty
