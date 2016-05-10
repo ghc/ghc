@@ -300,10 +300,6 @@ tcRnModuleTcRnM hsc_env hsc_src
                 -- We do this now so that the boot_names can be passed
                 -- to tcTyAndClassDecls, because the boot_names are
                 -- automatically considered to be loop breakers
-                --
-                -- Do this *after* tcRnImports, so that we know whether
-                -- a module that we import imports us; and hence whether to
-                -- look for a hi-boot file
         boot_info <- tcHiBootIface hsc_src this_mod ;
         setGblEnv (tcg_env { tcg_self_boot = boot_info }) $ do {
 
