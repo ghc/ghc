@@ -223,6 +223,7 @@ import FastString
 import Pair
 import ListSetOps
 import Digraph
+import Unique ( nonDetCmpUnique )
 
 import Maybes           ( orElse )
 import Data.Maybe       ( isJust, mapMaybe )
@@ -2098,6 +2099,16 @@ eqVarBndrs _ _ _= Nothing
 
 -- Now here comes the real worker
 
+{-
+Note [cmpType nondeterminism]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+cmpType is implemented in terms of cmpTypeX. cmpTypeX uses cmpTc which
+compares TyCons by their Unique value. Using Uniques for ordering leads
+to nondeterminism. We hit the same problem in the TyVarTy case, comparing
+type variables is nondeterministic, note the call to nonDetCmpVar in cmpTypeX.
+See Note [Unique Determinism] for more details.
+-}
+
 cmpType :: Type -> Type -> Ordering
 cmpType t1 t2
   -- we know k1 and k2 have the same kind, because they both have kind *.
@@ -2160,7 +2171,7 @@ cmpTypeX env orig_t1 orig_t2 =
       | Just t2' <- coreViewOneStarKind t2 = go env t1 t2'
 
     go env (TyVarTy tv1)       (TyVarTy tv2)
-      = liftOrdering $ rnOccL env tv1 `compare` rnOccR env tv2
+      = liftOrdering $ rnOccL env tv1 `nonDetCmpVar` rnOccR env tv2
     go env (ForAllTy (Named tv1 _) t1) (ForAllTy (Named tv2 _) t2)
       = go env (tyVarKind tv1) (tyVarKind tv2)
         `thenCmpTy` go (rnBndr2 env tv1 tv2) t1 t2
@@ -2211,10 +2222,11 @@ cmpTypesX _   _         []        = GT
 -- | Compare two 'TyCon's. NB: This should /never/ see the "star synonyms",
 -- as recognized by Kind.isStarKindSynonymTyCon. See Note
 -- [Kind Constraint and kind *] in Kind.
+-- See Note [cmpType nondeterminism]
 cmpTc :: TyCon -> TyCon -> Ordering
 cmpTc tc1 tc2
   = ASSERT( not (isStarKindSynonymTyCon tc1) && not (isStarKindSynonymTyCon tc2) )
-    u1 `compare` u2
+    u1 `nonDetCmpUnique` u2
   where
     u1  = tyConUnique tc1
     u2  = tyConUnique tc2
