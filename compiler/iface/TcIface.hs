@@ -144,7 +144,10 @@ typecheckIface iface
 
                 -- Finished
         ; traceIf (vcat [text "Finished typechecking interface for" <+> ppr (mi_module iface),
-                         text "Type envt:" <+> ppr type_env])
+                         -- Careful! If we tug on the TyThing thunks too early
+                         -- we'll infinite loop with hs-boot.  See #10083 for
+                         -- an example where this would cause non-termination.
+                         text "Type envt:" <+> ppr (map fst names_w_things)])
         ; return $ ModDetails { md_types     = type_env
                               , md_insts     = insts
                               , md_fam_insts = fam_insts
