@@ -1387,10 +1387,10 @@ mkModuleImpExp n@(L l name) subs =
   case subs of
     ImpExpAbs
       | isVarNameSpace (rdrNameSpace name) -> return $ IEVar  n
-      | otherwise                          -> return $ IEThingAbs  (L l name)
-    ImpExpAll                              -> return $ IEThingAll  (L l name)
+      | otherwise                          -> IEThingAbs . L l <$> nameT
+    ImpExpAll                              -> IEThingAll . L l <$> nameT
     ImpExpList xs                          ->
-      return $ IEThingWith (L l name) NoIEWildcard xs []
+      (\newName -> IEThingWith (L l newName) NoIEWildcard xs []) <$> nameT
     ImpExpAllWith xs                       ->
       do allowed <- extension patternSynonymsEnabled
          if allowed
@@ -1399,9 +1399,19 @@ mkModuleImpExp n@(L l name) subs =
                 pos   = maybe NoIEWildcard IEWildcard
                           (findIndex isNothing withs)
                 ies   = [L l n | L l (Just n) <- xs]
-            in return (IEThingWith (L l name) pos ies [])
+            in (\newName -> IEThingWith (L l newName) pos ies []) <$> nameT
           else parseErrorSDoc l
             (text "Illegal export form (use PatternSynonyms to enable)")
+  where
+    nameT =
+      if isVarNameSpace (rdrNameSpace name)
+        then parseErrorSDoc l
+              (text "Expecting a type constructor but found a variable."
+              $$ if isSymOcc $ rdrNameOcc name
+                   then text "If" <+> quotes (ppr name) <+> text "is a type constructor"
+                   else empty
+              <+> text "then enable ExplicitNamespaces and use the 'type' keyword.")
+        else return $ name
 
 mkTypeImpExp :: Located RdrName   -- TcCls or Var name space
              -> P (Located RdrName)
