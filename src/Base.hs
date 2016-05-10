@@ -87,9 +87,9 @@ versionToInt s = major * 1000 + minor * 10 + patch
 unifyPath :: FilePath -> FilePath
 unifyPath = toStandard . normaliseEx
 
--- | Combine paths using '</>' and apply 'unifyPath' to the result
+-- | Combine paths with a forward slash regardless of platform.
 (-/-) :: FilePath -> FilePath -> FilePath
-a -/- b = unifyPath $ a </> b
+a -/- b = a ++ '/' : b
 
 infixr 6 -/-
 

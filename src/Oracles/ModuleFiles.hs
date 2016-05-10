@@ -39,7 +39,9 @@ decodeModule = splitFileName . replaceEq '.' '/'
 -- > encodeModule "./" "Prelude"                == "Prelude"
 -- > uncurry encodeModule (decodeModule name)   == name
 encodeModule :: FilePath -> String -> String
-encodeModule dir file = replaceEq '/' '.' $ dir -/- takeBaseName file
+encodeModule dir file
+    | dir == "./" = replaceEq '/' '.' $        takeBaseName file
+    | otherwise   = replaceEq '/' '.' $ dir ++ takeBaseName file
 
 -- | Find the generator for a given 'Context' and a source file. For example:
 -- findGenerator (Context Stage1 compiler vanilla)

@@ -25,7 +25,7 @@ fixAbsolutePathOnWindows path = do
     then do
         let (dir, file) = splitFileName path
         winDir <- askOracle $ WindowsPath dir
-        return $ winDir -/- file
+        return $ winDir ++ file
     else
         return path
 

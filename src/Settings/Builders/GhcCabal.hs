@@ -128,7 +128,7 @@ with b = specified b ? do
     top  <- getTopDirectory
     path <- getBuilderPath b
     lift $ needBuilder b
-    append [withBuilderKey b ++ top -/- path]
+    arg $ withBuilderKey b ++ unifyPath (top </> path)
 
 withStaged :: (Stage -> Builder) -> Args
 withStaged sb = with . sb =<< getStage
