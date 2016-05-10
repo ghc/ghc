@@ -1410,11 +1410,12 @@ mkModuleImpExp n@(L l name) subs =
     nameT =
       if isVarNameSpace (rdrNameSpace name)
         then parseErrorSDoc l
-              (text "Expecting a type constructor but found a variable."
+              (text "Expecting a type constructor but found a variable,"
+               <+> quotes (ppr name) <> text "."
               $$ if isSymOcc $ rdrNameOcc name
                    then text "If" <+> quotes (ppr name) <+> text "is a type constructor"
-                   else empty
-              <+> text "then enable ExplicitNamespaces and use the 'type' keyword.")
+                    <+> text "then enable ExplicitNamespaces and use the 'type' keyword."
+                   else empty)
         else return $ name
 
 mkTypeImpExp :: Located RdrName   -- TcCls or Var name space
