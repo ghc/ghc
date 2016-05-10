@@ -22,10 +22,7 @@ of arguments of combining function.
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# OPTIONS_GHC -Wall #-}
 
 module UniqFM (
@@ -64,7 +61,7 @@ module UniqFM (
         isNullUFM,
         lookupUFM, lookupUFM_Directly,
         lookupWithDefaultUFM, lookupWithDefaultUFM_Directly,
-        eltsUFM, keysUFM, splitUFM,
+        nonDetEltsUFM, eltsUFM, keysUFM, splitUFM,
         ufmToSet_Directly,
         ufmToList, ufmToIntMap,
         joinUFM, pprUniqFM, pprUFM, pluralUFM
@@ -77,8 +74,6 @@ import Compiler.Hoopl   hiding (Unique)
 
 import qualified Data.IntMap as M
 import qualified Data.IntSet as S
-import qualified Data.Foldable as Foldable
-import qualified Data.Traversable as Traversable
 import Data.Typeable
 import Data.Data
 #if __GLASGOW_HASKELL__ > 710
@@ -221,11 +216,13 @@ instance Monoid (UniqFM a) where
 ************************************************************************
 -}
 
-newtype UniqFM ele = UFM (M.IntMap ele)
-  deriving (Data, Eq, Functor, Traversable.Traversable,
-            Typeable)
 
-deriving instance Foldable.Foldable UniqFM
+newtype UniqFM ele = UFM (M.IntMap ele)
+  deriving (Data, Eq, Functor, Typeable)
+  -- We used to derive Traversable and Foldable, but they were nondeterministic
+  -- and not obvious at the call site. You can use explicit nonDetEltsUFM
+  -- and fold a list if needed.
+  -- See Note [Deterministic UniqFM] in UniqDFM to learn about determinism.
 
 emptyUFM = UFM M.empty
 isNullUFM (UFM m) = M.null m
@@ -306,6 +303,10 @@ anyUFM p (UFM m) = M.fold ((||) . p) False m
 allUFM :: (elt -> Bool) -> UniqFM elt -> Bool
 allUFM p (UFM m) = M.fold ((&&) . p) True m
 
+-- See Note [Deterministic UniqFM] to learn about nondeterminism
+nonDetEltsUFM :: UniqFM elt -> [elt]
+nonDetEltsUFM (UFM m) = M.elems m
+
 ufmToIntMap :: UniqFM elt -> M.IntMap elt
 ufmToIntMap (UFM m) = m
 
@@ -345,7 +346,7 @@ pprUFM :: ([a] -> SDoc) -- ^ The pretty printing function to use on the elements
        -> UniqFM a      -- ^ The things to be pretty printed
        -> SDoc          -- ^ 'SDoc' where the things have been pretty
                         -- printed
-pprUFM pp ufm = pp (eltsUFM ufm)
+pprUFM pp ufm = pp (nonDetEltsUFM ufm)
 
 -- | Determines the pluralisation suffix appropriate for the length of a set
 -- in the same way that plural from Outputable does for lists.

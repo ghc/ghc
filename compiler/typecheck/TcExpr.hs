@@ -69,6 +69,7 @@ import Outputable
 import FastString
 import Control.Monad
 import Class(classTyCon)
+import UniqFM ( nonDetEltsUFM )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Function
@@ -575,7 +576,9 @@ tcExpr (HsStatic fvs expr) res_ty
                        ) $
             tcPolyExprNC expr expr_ty
         -- Check that the free variables of the static form are closed.
-        ; mapM_ checkClosedInStaticForm fvs
+        -- It's OK to use nonDetEltsUFM here as the only side effects of
+        -- checkClosedInStaticForm are error messages.
+        ; mapM_ checkClosedInStaticForm $ nonDetEltsUFM fvs
 
         -- Require the type of the argument to be Typeable.
         -- The evidence is not used, but asking the constraint ensures that
