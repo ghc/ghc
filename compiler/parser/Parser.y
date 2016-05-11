@@ -1727,9 +1727,9 @@ inst_type :: { LHsSigType RdrName }
         : sigtype                       { mkLHsSigType $1 }
 
 deriv_types :: { [LHsSigType RdrName] }
-        : type                          { [mkLHsSigType $1] }
+        : typedoc                       { [mkLHsSigType $1] }
 
-        | type ',' deriv_types          {% addAnnotation (gl $1) AnnComma (gl $2)
+        | typedoc ',' deriv_types       {% addAnnotation (gl $1) AnnComma (gl $2)
                                            >> return (mkLHsSigType $1 : $3) }
 
 comma_types0  :: { [LHsType RdrName] }  -- Zero or more:  ty,ty,ty
@@ -1936,10 +1936,9 @@ fielddecl :: { LConDeclField RdrName }
 -- know the rightmost extremity of the 'deriving' clause
 deriving :: { Located (HsDeriving RdrName) }
         : {- empty -}             { noLoc Nothing }
-        | 'deriving' qtycon       {% let { L tv_loc tv = $2
-                                         ; full_loc = comb2 $1 $> }
+        | 'deriving' qtycondoc    {% let { full_loc = comb2 $1 $> }
                                       in ams (L full_loc $ Just $ L full_loc $
-                                                 [mkLHsSigType (L tv_loc (HsTyVar $2))])
+                                                 [mkLHsSigType $2])
                                              [mj AnnDeriving $1] }
 
         | 'deriving' '(' ')'      {% let { full_loc = comb2 $1 $> }
@@ -2895,6 +2894,10 @@ qtyconop :: { Located RdrName } -- Qualified or unqualified
 qtycon :: { Located RdrName }   -- Qualified or unqualified
         : QCONID            { sL1 $1 $! mkQual tcClsName (getQCONID $1) }
         | tycon             { $1 }
+
+qtycondoc :: { LHsType RdrName } -- Qualified or unqualified
+        : qtycon            { sL1 $1                     (HsTyVar $1)      }
+        | qtycon docprev    { sLL $1 $> (HsDocTy (sL1 $1 (HsTyVar $1)) $2) }
 
 tycon   :: { Located RdrName }  -- Unqualified
         : CONID                   { sL1 $1 $! mkUnqual tcClsName (getCONID $1) }
