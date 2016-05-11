@@ -89,7 +89,7 @@ import LoadIface
 import Class
 import TyCon
 import CoAxiom
-import PatSyn ( patSynName )
+import PatSyn
 import ConLike
 import DataCon
 import TcEvidence( TcEvBinds(..) )
@@ -1272,8 +1272,11 @@ reifyThing (AGlobal (AConLike (RealDataCon dc)))
         ; return (TH.DataConI (reifyName name) ty
                               (reifyName (dataConOrigTyCon dc)))
         }
+
 reifyThing (AGlobal (AConLike (PatSynCon ps)))
-  = noTH (sLit "pattern synonyms") (ppr $ patSynName ps)
+  = do { let name = reifyName ps
+       ; ty <- reifyPatSynType (patSynSig ps)
+       ; return (TH.PatSynI name ty) }
 
 reifyThing (ATcId {tct_id = id})
   = do  { ty1 <- zonkTcType (idType id) -- Make use of all the info we have, even
@@ -1635,6 +1638,20 @@ reifyTyLit (StrTyLit s) = return (TH.StrTyLit (unpackFS s))
 
 reifyTypes :: [Type] -> TcM [TH.Type]
 reifyTypes = mapM reifyType
+
+reifyPatSynType
+  :: ([TyVar], ThetaType, [TyVar], ThetaType, [Type], Type) -> TcM TH.Type
+-- reifies a pattern synonym's type and returns its *complete* type
+-- signature; see NOTE [Pattern synonym signatures and Template
+-- Haskell]
+reifyPatSynType (univTyVars, req, exTyVars, prov, argTys, resTy)
+  = do { univTyVars' <- reifyTyVars univTyVars Nothing
+       ; req'        <- reifyCxt req
+       ; exTyVars'   <- reifyTyVars exTyVars Nothing
+       ; prov'       <- reifyCxt prov
+       ; tau'        <- reifyType (mkFunTys argTys resTy)
+       ; return $ TH.ForallT univTyVars' req'
+                $ TH.ForallT exTyVars' prov' tau' }
 
 reifyKind :: Kind -> TcM TH.Kind
 reifyKind  ki

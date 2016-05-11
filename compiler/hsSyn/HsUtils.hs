@@ -78,7 +78,7 @@ module HsUtils(
   collectLStmtsBinders, collectStmtsBinders,
   collectLStmtBinders, collectStmtBinders,
 
-  hsLTyClDeclBinders, hsTyClForeignBinders, hsPatSynBinders,
+  hsLTyClDeclBinders, hsTyClForeignBinders, hsPatSynSelectors,
   hsForeignDeclsBinders, hsGroupBinders, hsDataFamInstBinders,
   hsDataDefnBinders,
 
@@ -784,8 +784,9 @@ collect_bind _ (AbsBinds { abs_exports = dbinds }) acc = map abe_poly dbinds ++ 
         -- The only time we collect binders from a typechecked
         -- binding (hence see AbsBinds) is in zonking in TcHsSyn
 collect_bind _ (AbsBindsSig { abs_sig_export = poly }) acc = poly : acc
-collect_bind omitPatSyn (PatSynBind (PSB { psb_id = L _ ps })) acc =
-    if omitPatSyn then acc else ps : acc
+collect_bind omitPatSyn (PatSynBind (PSB { psb_id = L _ ps })) acc
+  | omitPatSyn                  = acc
+  | otherwise                   = ps : acc
 
 collectMethodBinders :: LHsBindsLR RdrName idR -> [Located RdrName]
 -- Used exclusively for the bindings of an instance decl which are all FunBinds
@@ -935,26 +936,19 @@ hsForeignDeclsBinders foreign_decls
     | L decl_loc (ForeignImport { fd_name = L _ n }) <- foreign_decls]
 
 
-
 -------------------
-hsPatSynBinders :: HsValBinds RdrName
-                -> ([Located RdrName], [Located RdrName])
--- Collect pattern-synonym binders only, not Ids
--- See Note [SrcSpan for binders]
-hsPatSynBinders (ValBindsIn binds _) = foldrBag addPatSynBndr ([],[]) binds
-hsPatSynBinders _ = panic "hsPatSynBinders"
+hsPatSynSelectors :: HsValBinds id -> [id]
+-- Collects record pattern-synonym selectors only; the pattern synonym
+-- names are collected by collectHsValBinders.
+hsPatSynSelectors (ValBindsIn _ _) = panic "hsPatSynSelectors"
+hsPatSynSelectors (ValBindsOut binds _)
+  = foldrBag addPatSynSelector [] . unionManyBags $ map snd binds
 
-addPatSynBndr :: LHsBindLR id id -> ([Located id], [Located id])
-                -> ([Located id], [Located id]) -- (selectors, other)
--- See Note [SrcSpan for binders]
-addPatSynBndr bind (sels, pss)
-  | L bind_loc (PatSynBind (PSB { psb_id = L _ n
-                                , psb_args = RecordPatSyn as })) <- bind
-  = (map recordPatSynSelectorId as ++ sels, L bind_loc n : pss)
-  | L bind_loc (PatSynBind (PSB { psb_id = L _ n})) <- bind
-  = (sels, L bind_loc n : pss)
-  | otherwise
-  = (sels, pss)
+addPatSynSelector:: LHsBind id -> [id] -> [id]
+addPatSynSelector bind sels
+  | L _ (PatSynBind (PSB { psb_args = RecordPatSyn as })) <- bind
+  = map (unLoc . recordPatSynSelectorId) as ++ sels
+  | otherwise = sels
 
 -------------------
 hsLInstDeclBinders :: LInstDecl name -> ([Located name], [LFieldOcc name])

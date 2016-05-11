@@ -137,7 +137,7 @@ instance Show Name where
   show (Name occ (NameU u))    = occString occ ++ "_" ++ show (I# u)
   show (Name occ NameS)        = occString occ
   show (Name occ (NameG ns m)) = modString m ++ "." ++ occString occ
-      
+
 data Name = Name OccName NameFlavour
 
 data NameFlavour

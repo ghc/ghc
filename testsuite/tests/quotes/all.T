@@ -13,7 +13,7 @@ test('T5721', normal, compile, ['-v0'])
 test('T6062', normal, compile, ['-v0'])
 test('T8455', normal, compile, ['-v0'])
 test('T8633', normal, compile_and_run, [''])
-test('T8759a', normal, compile_fail, ['-v0'])
+test('T8759a', normal, compile, ['-v0'])
 test('T9824', normal, compile, ['-v0'])
 test('T10384', normal, compile_fail, [''])
 

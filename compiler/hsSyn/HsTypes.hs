@@ -984,22 +984,17 @@ splitHsAppTys f                   as = (f,as)
 
 --------------------------------
 splitLHsPatSynTy :: LHsType name
-                 -> ( [LHsTyVarBndr name]
-                    , LHsContext name        -- Required
-                    , LHsContext name        -- Provided
-                    , LHsType name)          -- Body
-splitLHsPatSynTy ty
-  | L _ (HsQualTy { hst_ctxt = req, hst_body = ty2 }) <- ty1
-  , L _ (HsQualTy { hst_ctxt = prov,  hst_body = ty3 }) <- ty2
-  = (tvs, req, prov, ty3)
-
-  | L _ (HsQualTy { hst_ctxt = req, hst_body = ty2 }) <- ty1
-  = (tvs, req, noLoc [], ty2)
-
-  | otherwise
-  = (tvs, noLoc [], noLoc [], ty1)
+                 -> ( [LHsTyVarBndr name]    -- universals
+                    , LHsContext name        -- required constraints
+                    , [LHsTyVarBndr name]    -- existentials
+                    , LHsContext name        -- provided constraints
+                    , LHsType name)          -- body type
+splitLHsPatSynTy ty = (univs, reqs, exis, provs, ty4)
   where
-    (tvs, ty1) = splitLHsForAllTy ty
+    (univs, ty1) = splitLHsForAllTy ty
+    (reqs,  ty2) = splitLHsQualTy ty1
+    (exis,  ty3) = splitLHsForAllTy ty2
+    (provs, ty4) = splitLHsQualTy ty3
 
 splitLHsSigmaTy :: LHsType name -> ([LHsTyVarBndr name], LHsContext name, LHsType name)
 splitLHsSigmaTy ty

@@ -1,1 +1,1 @@
-"Constructor from Ghci1.Option: Ghci1.Some :: forall (a_0 :: *) . a_0 ->\n                                                                 Ghci1.Option a_0"
+"Constructor from Ghci1.Option: Ghci1.Some :: forall (a_0 :: *) .\n                                             a_0 -> Ghci1.Option a_0"

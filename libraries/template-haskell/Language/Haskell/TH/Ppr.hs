@@ -19,10 +19,10 @@ nestDepth = 4
 
 type Precedence = Int
 appPrec, unopPrec, opPrec, noPrec :: Precedence
-appPrec = 3    -- Argument of a function application
-opPrec  = 2    -- Argument of an infix operator
-unopPrec = 1   -- Argument of an unresolved infix operator
-noPrec  = 0    -- Others
+appPrec  = 3    -- Argument of a function application
+opPrec   = 2    -- Argument of an infix operator
+unopPrec = 1    -- Argument of an unresolved infix operator
+noPrec   = 0    -- Others
 
 parensIf :: Bool -> Doc -> Doc
 parensIf True d = parens d
@@ -59,6 +59,7 @@ instance Ppr Info where
       = text "Class op from" <+> ppr cls <> colon <+> ppr_sig v ty
     ppr (DataConI v ty tc)
       = text "Constructor from" <+> ppr tc <> colon <+> ppr_sig v ty
+    ppr (PatSynI nm ty) = pprPatSynSig nm ty
     ppr (TyVarI v ty)
       = text "Type variable" <+> ppr v <+> equals <+> ppr ty
     ppr (VarI v ty mb_d)
@@ -75,6 +76,24 @@ pprFixity v (Fixity i d) = ppr_fix d <+> int i <+> ppr v
           ppr_fix InfixL = text "infixl"
           ppr_fix InfixN = text "infix"
 
+-- | Pretty prints a pattern synonym type signature
+pprPatSynSig :: Name -> PatSynType -> Doc
+pprPatSynSig nm ty
+  = text "pattern" <+> pprPrefixOcc nm <+> dcolon <+> pprPatSynType ty
+
+-- | Pretty prints a pattern synonym's type; follows the usual
+-- conventions to print a pattern synonym type compactly, yet
+-- unambiguously. See the note on 'PatSynType' and the section on
+-- pattern synonyms in the GHC users guide for more information.
+pprPatSynType :: PatSynType -> Doc
+pprPatSynType ty@(ForallT uniTys reqs ty'@(ForallT exTys provs ty''))
+  | null exTys,  null provs = ppr (ForallT uniTys reqs ty'')
+  | null uniTys, null reqs  = noreqs <+> ppr ty'
+  | null reqs               = forall uniTys <+> noreqs <+> ppr ty'
+  | otherwise               = ppr ty
+  where noreqs     = text "() =>"
+        forall tvs = text "forall" <+> (hsep (map ppr tvs)) <+> text "."
+pprPatSynType ty            = ppr ty
 
 ------------------------------
 instance Ppr Module where
@@ -330,15 +349,22 @@ ppr_dec _ (ClosedTypeFamilyD tfhead@(TypeFamilyHead tc _ _ _) eqns)
   where
     ppr_eqn (TySynEqn lhs rhs)
       = ppr tc <+> sep (map pprParendType lhs) <+> text "=" <+> ppr rhs
-
 ppr_dec _ (RoleAnnotD name roles)
   = hsep [ text "type role", ppr name ] <+> hsep (map ppr roles)
-
 ppr_dec _ (StandaloneDerivD cxt ty)
   = hsep [ text "deriving instance", pprCxt cxt, ppr ty ]
-
 ppr_dec _ (DefaultSigD n ty)
   = hsep [ text "default", pprPrefixOcc n, dcolon, ppr ty ]
+ppr_dec _ (PatSynD name args dir pat)
+  = text "pattern" <+> pprNameArgs <+> ppr dir <+> pprPatRHS
+  where
+    pprNameArgs | InfixPatSyn a1 a2 <- args = ppr a1 <+> ppr name <+> ppr a2
+                | otherwise                 = ppr name <+> ppr args
+    pprPatRHS   | ExplBidir cls <- dir = hang (ppr pat <+> text "where")
+                                           nestDepth (ppr name <+> ppr cls)
+                | otherwise            = ppr pat
+ppr_dec _ (PatSynSigD name ty)
+  = pprPatSynSig name ty
 
 
 ppr_overlap :: Overlap -> Doc
@@ -533,13 +559,28 @@ instance Ppr Con where
     ppr (RecGadtC c vsts ty)
         = commaSepApplied c <+> dcolon <+> pprRecFields vsts ty
 
+instance Ppr PatSynDir where
+  ppr Unidir        = text "<-"
+  ppr ImplBidir     = text "="
+  ppr (ExplBidir _) = text "<-"
+    -- the ExplBidir's clauses are pretty printed together with the
+    -- entire pattern synonym; so only print the direction here.
+
+instance Ppr PatSynArgs where
+  ppr (PrefixPatSyn args) = sep $ map ppr args
+  ppr (InfixPatSyn a1 a2) = ppr a1 <+> ppr a2
+  ppr (RecordPatSyn sels) = braces $ sep (punctuate comma (map ppr sels))
+
 commaSepApplied :: [Name] -> Doc
 commaSepApplied = commaSepWith (pprName' Applied)
 
 pprForall :: [TyVarBndr] -> Cxt -> Doc
-pprForall ns ctxt
-    = text "forall" <+> hsep (map ppr ns)
-  <+> char '.' <+> pprCxt ctxt
+pprForall tvs cxt
+  -- even in the case without any tvs, there could be a non-empty
+  -- context cxt (e.g., in the case of pattern synonyms, where there
+  -- are multiple forall binders and contexts).
+  | [] <- tvs = pprCxt cxt
+  | otherwise = text "forall" <+> hsep (map ppr tvs) <+> char '.' <+> pprCxt cxt
 
 pprRecFields :: [(Name, Strict, Type)] -> Type -> Doc
 pprRecFields vsts ty
@@ -639,9 +680,7 @@ pprUInfixT (UInfixT x n y) = pprUInfixT x <+> pprName' Infix n <+> pprUInfixT y
 pprUInfixT t               = ppr t
 
 instance Ppr Type where
-    ppr (ForallT tvars ctxt ty)
-      = text "forall" <+> hsep (map ppr tvars) <+> text "."
-                      <+> sep [pprCxt ctxt, ppr ty]
+    ppr (ForallT tvars ctxt ty) = sep [pprForall tvars ctxt, ppr ty]
     ppr ty = pprTyApp (split ty)
        -- Works, in a degnerate way, for SigT, and puts parens round (ty :: kind)
        -- See Note [Pretty-printing kind signatures]

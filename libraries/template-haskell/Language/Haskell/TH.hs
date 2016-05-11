@@ -73,20 +73,22 @@ module Language.Haskell.TH(
         Inline(..), RuleMatch(..), Phases(..), RuleBndr(..), AnnTarget(..),
         FunDep(..), FamFlavour(..), TySynEqn(..), TypeFamilyHead(..),
         Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
+        PatSynDir(..), PatSynArgs(..),
     -- ** Expressions
         Exp(..), Match(..), Body(..), Guard(..), Stmt(..), Range(..), Lit(..),
     -- ** Patterns
         Pat(..), FieldExp, FieldPat,
     -- ** Types
         Type(..), TyVarBndr(..), TyLit(..), Kind, Cxt, Pred, Syntax.Role(..),
-        FamilyResultSig(..), Syntax.InjectivityAnn(..),
+        FamilyResultSig(..), Syntax.InjectivityAnn(..), PatSynType,
 
     -- * Library functions
     -- ** Abbreviations
         InfoQ, ExpQ, DecQ, DecsQ, ConQ, TypeQ, TyLitQ, CxtQ, PredQ, MatchQ,
         ClauseQ, BodyQ, GuardQ, StmtQ, RangeQ, SourceStrictnessQ,
         SourceUnpackednessQ, BangTypeQ, VarBangTypeQ, StrictTypeQ,
-        VarStrictTypeQ, PatQ, FieldPatQ, RuleBndrQ, TySynEqnQ,
+        VarStrictTypeQ, PatQ, FieldPatQ, RuleBndrQ, TySynEqnQ, PatSynDirQ,
+        PatSynArgsQ,
 
     -- ** Constructors lifted to 'Q'
     -- *** Literals
@@ -160,7 +162,11 @@ module Language.Haskell.TH(
     pragInlD, pragSpecD, pragSpecInlD, pragSpecInstD, pragRuleD, pragAnnD,
     pragLineD,
 
-        -- * Pretty-printer
+    -- **** Pattern Synonyms
+    patSynD, patSynSigD, unidir, implBidir, explBidir, prefixPatSyn,
+    infixPatSyn, recordPatSyn,
+
+    -- * Pretty-printer
     Ppr(..), pprint, pprExp, pprLit, pprPat, pprParendType
 
    ) where

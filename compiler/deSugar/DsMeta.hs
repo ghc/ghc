@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, TypeFamilies #-}
 
 -----------------------------------------------------------------------------
 --
@@ -119,8 +119,9 @@ repTopDs group@(HsGroup { hs_valds   = valds
                         , hs_ruleds  = ruleds
                         , hs_vects   = vects
                         , hs_docs    = docs })
- = do { let { tv_bndrs = hsSigTvBinders valds
-            ; bndrs = tv_bndrs ++ hsGroupBinders group
+ = do { let { bndrs  = hsSigTvBinders valds
+                       ++ hsGroupBinders group
+                       ++ hsPatSynSelectors valds
             ; instds = tyclds >>= group_instds } ;
         ss <- mkGenSyms bndrs ;
 
@@ -196,7 +197,6 @@ hsSigTvBinders binds
     sigs = case binds of
              ValBindsIn  _ sigs -> sigs
              ValBindsOut _ sigs -> sigs
-
 
 {- Notes
 
@@ -700,7 +700,7 @@ rep_sigs' sigs = do { sigs1 <- mapM rep_sig sigs ;
 
 rep_sig :: LSig Name -> DsM [(SrcSpan, Core TH.DecQ)]
 rep_sig (L loc (TypeSig nms ty))      = mapM (rep_wc_ty_sig sigDName loc ty) nms
-rep_sig (L _   (PatSynSig {}))        = notHandled "Pattern type signatures" empty
+rep_sig (L loc (PatSynSig nm ty))     = (:[]) <$> rep_patsyn_ty_sig loc ty nm
 rep_sig (L loc (ClassOpSig is_deflt nms ty))
   | is_deflt                          = mapM (rep_ty_sig defaultSigDName loc ty) nms
   | otherwise                         = mapM (rep_ty_sig sigDName loc ty) nms
@@ -708,7 +708,7 @@ rep_sig d@(L _ (IdSig {}))            = pprPanic "rep_sig IdSig" (ppr d)
 rep_sig (L _   (FixSig {}))           = return [] -- fixity sigs at top level
 rep_sig (L loc (InlineSig nm ispec))  = rep_inline nm ispec loc
 rep_sig (L loc (SpecSig nm tys ispec))
-   = concatMapM (\t -> rep_specialise nm t ispec loc) tys
+  = concatMapM (\t -> rep_specialise nm t ispec loc) tys
 rep_sig (L loc (SpecInstSig _ ty))    = rep_specialiseInst ty loc
 rep_sig (L _   (MinimalSig {}))       = notHandled "MINIMAL pragmas" empty
 
@@ -718,6 +718,16 @@ rep_ty_sig mk_sig loc sig_ty nm
   = do { nm1 <- lookupLOcc nm
        ; ty1 <- repHsSigType sig_ty
        ; sig <- repProto mk_sig nm1 ty1
+       ; return (loc, sig) }
+
+rep_patsyn_ty_sig :: SrcSpan -> LHsSigType Name -> Located Name
+                  -> DsM (SrcSpan, Core TH.DecQ)
+-- represents a pattern synonym type signature; see NOTE [Pattern
+-- synonym signatures and Template Haskell]
+rep_patsyn_ty_sig loc sig_ty nm
+  = do { nm1 <- lookupLOcc nm
+       ; ty1 <- repHsPatSynSigType sig_ty
+       ; sig <- repProto patSynSigDName nm1 ty1
        ; return (loc, sig) }
 
 rep_wc_ty_sig :: Name -> SrcSpan -> LHsSigWcType Name -> Located Name
@@ -889,17 +899,32 @@ repHsSigType (HsIB { hsib_vars = vars
          then return th_ty
          else repTForall th_tvs th_ctxt th_ty }
 
+repHsPatSynSigType :: LHsSigType Name -> DsM (Core TH.TypeQ)
+repHsPatSynSigType (HsIB { hsib_vars = implicit_tvs
+                         , hsib_body = body })
+  = addTyVarBinds (newTvs (impls ++ univs)) $ \th_univs ->
+      addTyVarBinds (newTvs exis) $ \th_exis ->
+    do { th_reqs  <- repLContext reqs
+       ; th_provs <- repLContext provs
+       ; th_ty    <- repLTy ty
+       ; repTForall th_univs th_reqs =<< (repTForall th_exis th_provs th_ty) }
+  where
+    impls = map (noLoc . UserTyVar . noLoc) implicit_tvs
+    newTvs tvs = HsQTvs
+      { hsq_implicit  = []
+      , hsq_explicit  = tvs
+      , hsq_dependent = emptyNameSet }
+    (univs, reqs, exis, provs, ty) = splitLHsPatSynTy body
+
 repHsSigWcType :: LHsSigWcType Name -> DsM (Core TH.TypeQ)
 repHsSigWcType ib_ty@(HsIB { hsib_body = sig1 })
   = repHsSigType (ib_ty { hsib_body = hswc_body sig1 })
 
 -- yield the representation of a list of types
---
 repLTys :: [LHsType Name] -> DsM [Core TH.TypeQ]
 repLTys tys = mapM repLTy tys
 
 -- represent a type
---
 repLTy :: LHsType Name -> DsM (Core TH.TypeQ)
 repLTy (L _ ty) = repTy ty
 
@@ -1073,11 +1098,11 @@ repE :: HsExpr Name -> DsM (Core TH.ExpQ)
 repE (HsVar (L _ x))            =
   do { mb_val <- dsLookupMetaEnv x
      ; case mb_val of
-        Nothing          -> do { str <- globalVar x
-                               ; repVarOrCon x str }
+        Nothing            -> do { str <- globalVar x
+                                 ; repVarOrCon x str }
         Just (DsBound y)   -> repVarOrCon x (coreVar y)
         Just (DsSplice e)  -> do { e' <- dsExpr e
-                               ; return (MkC e') } }
+                                 ; return (MkC e') } }
 repE e@(HsIPVar _) = notHandled "Implicit parameters" (ppr e)
 repE e@(HsOverLabel _) = notHandled "Overloaded labels" (ppr e)
 
@@ -1415,7 +1440,87 @@ rep_bind (L _ (VarBind { var_id = v, var_rhs = e}))
 
 rep_bind (L _ (AbsBinds {}))  = panic "rep_bind: AbsBinds"
 rep_bind (L _ (AbsBindsSig {})) = panic "rep_bind: AbsBindsSig"
-rep_bind (L _ dec@(PatSynBind {})) = notHandled "pattern synonyms" (ppr dec)
+rep_bind (L loc (PatSynBind (PSB { psb_id   = syn
+                                 , psb_fvs  = _fvs
+                                 , psb_args = args
+                                 , psb_def  = pat
+                                 , psb_dir  = dir })))
+  = do { syn'      <- lookupLBinder syn
+       ; dir'      <- repPatSynDir dir
+       ; ss        <- mkGenArgSyms args
+       ; patSynD'  <- addBinds ss (
+         do { args'  <- repPatSynArgs args
+            ; pat'   <- repLP pat
+            ; repPatSynD syn' args' dir' pat' })
+       ; patSynD'' <- wrapGenArgSyms args ss patSynD'
+       ; return (loc, patSynD'') }
+  where
+    mkGenArgSyms :: HsPatSynDetails (Located Name) -> DsM [GenSymBind]
+    -- for Record Pattern Synonyms we want to conflate the selector
+    -- and the pattern-only names in order to provide a nicer TH
+    -- API. Whereas inside GHC, record pattern synonym selectors and
+    -- their pattern-only bound right hand sides have different names,
+    -- we want to treat them the same in TH. This is the reason why we
+    -- need an adjusted mkGenArgSyms in the `RecordPatSyn` case below.
+    mkGenArgSyms (PrefixPatSyn args)     = mkGenSyms (map unLoc args)
+    mkGenArgSyms (InfixPatSyn arg1 arg2) = mkGenSyms [unLoc arg1, unLoc arg2]
+    mkGenArgSyms (RecordPatSyn fields)
+      = do { let pats = map (unLoc . recordPatSynPatVar) fields
+                 sels = map (unLoc . recordPatSynSelectorId) fields
+           ; ss <- mkGenSyms sels
+           ; return $ replaceNames (zip sels pats) ss }
+
+    replaceNames selsPats genSyms
+      = [ (pat, id) | (sel, id) <- genSyms, (sel', pat) <- selsPats
+                    , sel == sel' ]
+
+    wrapGenArgSyms :: HsPatSynDetails (Located Name)
+                   -> [GenSymBind] -> Core TH.DecQ -> DsM (Core TH.DecQ)
+    wrapGenArgSyms (RecordPatSyn _) _  dec = return dec
+    wrapGenArgSyms _                ss dec = wrapGenSyms ss dec
+
+repPatSynD :: Core TH.Name
+           -> Core TH.PatSynArgsQ
+           -> Core TH.PatSynDirQ
+           -> Core TH.PatQ
+           -> DsM (Core TH.DecQ)
+repPatSynD (MkC syn) (MkC args) (MkC dir) (MkC pat)
+  = rep2 patSynDName [syn, args, dir, pat]
+
+repPatSynArgs :: HsPatSynDetails (Located Name) -> DsM (Core TH.PatSynArgsQ)
+repPatSynArgs (PrefixPatSyn args)
+  = do { args' <- repList nameTyConName lookupLOcc args
+       ; repPrefixPatSynArgs args' }
+repPatSynArgs (InfixPatSyn arg1 arg2)
+  = do { arg1' <- lookupLOcc arg1
+       ; arg2' <- lookupLOcc arg2
+       ; repInfixPatSynArgs arg1' arg2' }
+repPatSynArgs (RecordPatSyn fields)
+  = do { sels' <- repList nameTyConName lookupLOcc sels
+       ; repRecordPatSynArgs sels' }
+  where sels = map recordPatSynSelectorId fields
+
+repPrefixPatSynArgs :: Core [TH.Name] -> DsM (Core TH.PatSynArgsQ)
+repPrefixPatSynArgs (MkC nms) = rep2 prefixPatSynName [nms]
+
+repInfixPatSynArgs :: Core TH.Name -> Core TH.Name -> DsM (Core TH.PatSynArgsQ)
+repInfixPatSynArgs (MkC nm1) (MkC nm2) = rep2 infixPatSynName [nm1, nm2]
+
+repRecordPatSynArgs :: Core [TH.Name]
+                    -> DsM (Core TH.PatSynArgsQ)
+repRecordPatSynArgs (MkC sels) = rep2 recordPatSynName [sels]
+
+repPatSynDir :: HsPatSynDir Name -> DsM (Core TH.PatSynDirQ)
+repPatSynDir Unidirectional        = rep2 unidirPatSynName []
+repPatSynDir ImplicitBidirectional = rep2 implBidirPatSynName []
+repPatSynDir (ExplicitBidirectional (MG { mg_alts = L _ clauses }))
+  = do { clauses' <- mapM repClauseTup clauses
+       ; repExplBidirPatSynDir (nonEmptyCoreList clauses') }
+
+repExplBidirPatSynDir :: Core [TH.ClauseQ] -> DsM (Core TH.PatSynDirQ)
+repExplBidirPatSynDir (MkC cls) = rep2 explBidirPatSynName [cls]
+
+
 -----------------------------------------------------------------------------
 -- Since everything in a Bind is mutually recursive we need rename all
 -- all the variables simultaneously. For example:

@@ -350,6 +350,33 @@ cvtDec (TH.DefaultSigD nm typ)
   = do { nm' <- vNameL nm
        ; ty' <- cvtType typ
        ; returnJustL $ Hs.SigD $ ClassOpSig True [nm'] (mkLHsSigType ty') }
+
+cvtDec (TH.PatSynD nm args dir pat)
+  = do { nm'   <- cNameL nm
+       ; args' <- cvtArgs args
+       ; dir'  <- cvtDir dir
+       ; pat'  <- cvtPat pat
+       ; returnJustL $ Hs.ValD $ PatSynBind $
+           PSB nm' placeHolderType args' pat' dir' }
+  where
+    cvtArgs (TH.PrefixPatSyn args) = Hs.PrefixPatSyn <$> mapM vNameL args
+    cvtArgs (TH.InfixPatSyn a1 a2) = Hs.InfixPatSyn <$> vNameL a1 <*> vNameL a2
+    cvtArgs (TH.RecordPatSyn sels)
+      = do { sels' <- mapM vNameL sels
+           ; vars' <- mapM (vNameL . mkNameS . nameBase) sels
+           ; return $ Hs.RecordPatSyn $ zipWith RecordPatSynField sels' vars' }
+
+    cvtDir Unidir          = return Unidirectional
+    cvtDir ImplBidir       = return ImplicitBidirectional
+    cvtDir (ExplBidir cls) =
+      do { ms <- mapM cvtClause cls
+         ; return $ ExplicitBidirectional $ mkMatchGroup FromSource ms }
+
+cvtDec (TH.PatSynSigD nm ty)
+  = do { nm' <- cNameL nm
+       ; ty' <- cvtPatSynSigTy ty
+       ; returnJustL $ Hs.SigD $ PatSynSig nm' (mkLHsSigType ty') }
+
 ----------------
 cvtTySynEqn :: Located RdrName -> TySynEqn -> CvtM (LTyFamInstEqn RdrName)
 cvtTySynEqn tc (TySynEqn lhs rhs)
@@ -725,9 +752,9 @@ cvtl e = wrapL (cvt e)
       | overloadedLit l = do { l' <- cvtOverLit l; return $ HsOverLit l' }
       | otherwise       = do { l' <- cvtLit l;     return $ HsLit l' }
     cvt (AppE x@(LamE _ _) y) = do { x' <- cvtl x; y' <- cvtl y
-                              ; return $ HsApp (mkLHsPar x') y' }
+                                   ; return $ HsApp (mkLHsPar x') y' }
     cvt (AppE x y)            = do { x' <- cvtl x; y' <- cvtl y
-                              ; return $ HsApp x' y' }
+                                   ; return $ HsApp x' y' }
     cvt (LamE ps e)    = do { ps' <- cvtPats ps; e' <- cvtl e
                             ; return $ HsLam (mkMatchGroup FromSource [mkSimpleMatch ps' e']) }
     cvt (LamCaseE ms)  = do { ms' <- mapM cvtMatch ms
@@ -1276,6 +1303,27 @@ cvtInjectivityAnnotation (TH.InjectivityAnn annLHS annRHS)
        ; annRHS' <- mapM tNameL annRHS
        ; returnL (Hs.InjectivityAnn annLHS' annRHS') }
 
+cvtPatSynSigTy :: TH.Type -> CvtM (LHsType RdrName)
+-- pattern synonym types are of peculiar shapes, which is why we treat
+-- them separately from regular types; see NOTE [Pattern synonym
+-- signatures and Template Haskell]
+cvtPatSynSigTy (ForallT univs reqs (ForallT exis provs ty))
+  | null exis, null provs = cvtType (ForallT univs reqs ty)
+  | null univs, null reqs = do { l   <- getL
+                               ; ty' <- cvtType (ForallT exis provs ty)
+                               ; return $ L l (HsQualTy { hst_ctxt = L l []
+                                                        , hst_body = ty' }) }
+  | null reqs             = do { l      <- getL
+                               ; univs' <- hsQTvExplicit <$> cvtTvs univs
+                               ; ty'    <- cvtType (ForallT exis provs ty)
+                               ; let forTy = HsForAllTy { hst_bndrs = univs'
+                                                        , hst_body = L l cxtTy }
+                                     cxtTy = HsQualTy { hst_ctxt = L l []
+                                                      , hst_body = ty' }
+                               ; return $ L l forTy }
+  | otherwise             = cvtType (ForallT univs reqs (ForallT exis provs ty))
+cvtPatSynSigTy ty         = cvtType ty
+
 -----------------------------------------------------------
 cvtFixity :: TH.Fixity -> Hs.Fixity
 cvtFixity (TH.Fixity prec dir) = Hs.Fixity (show prec) prec (cvt_dir dir)
@@ -1473,4 +1521,60 @@ the way System Names are printed.
 
 There's a small complication of course; see Note [Looking up Exact
 RdrNames] in RnEnv.
+-}
+
+{-
+Note [Pattern synonym type signatures and Template Haskell]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In general, the type signature of a pattern synonym
+
+  pattern P x1 x2 .. xn = <some-pattern>
+
+is of the form
+
+   forall univs. reqs => forall exis. provs => t1 -> t2 -> ... -> tn -> t
+
+with the following parts:
+
+   1) the (possibly empty lists of) universally quantified type
+      variables `univs` and required constraints `reqs` on them.
+   2) the (possibly empty lists of) existentially quantified type
+      variables `exis` and the provided constraints `provs` on them.
+   3) the types `t1`, `t2`, .., `tn` of the pattern synonym's arguments x1,
+      x2, .., xn, respectively
+   4) the type `t` of <some-pattern>, mentioning only universals from `univs`.
+
+Due to the two forall quantifiers and constraint contexts (either of
+which might be empty), pattern synonym type signatures are treated
+specially in `deSugar/DsMeta.hs`, `hsSyn/Convert.hs`, and
+`typecheck/TcSplice.hs`:
+
+   (a) When desugaring a pattern synonym from HsSyn to TH.Dec in
+       `deSugar/DsMeta.hs`, we represent its *full* type signature in TH, i.e.:
+
+           ForallT univs reqs (ForallT exis provs ty)
+              (where ty is the AST representation of t1 -> t2 -> ... -> tn -> t)
+
+   (b) When converting pattern synonyms from TH.Dec to HsSyn in
+       `hsSyn/Convert.hs`, we convert their TH type signatures back to an
+       appropriate Haskell pattern synonym type of the form
+
+         forall univs. reqs => forall exis. provs => t1 -> t2 -> ... -> tn -> t
+
+       where initial empty `univs` type variables or an empty `reqs`
+       constraint context are represented *explicitly* as `() =>`.
+
+   (c) When reifying a pattern synonym in `typecheck/TcSplice.hs`, we always
+       return its *full* type, i.e.:
+
+           ForallT univs reqs (ForallT exis provs ty)
+              (where ty is the AST representation of t1 -> t2 -> ... -> tn -> t)
+
+The key point is to always represent a pattern synonym's *full* type
+in cases (a) and (c) to make it clear which of the two forall
+quantifiers and/or constraint contexts are specified, and which are
+not. See GHC's users guide on pattern synonyms for more information
+about pattern synonym type signatures.
+
 -}

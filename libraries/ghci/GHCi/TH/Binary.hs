@@ -59,6 +59,8 @@ instance Binary TH.Clause
 instance Binary TH.InjectivityAnn
 instance Binary TH.FamilyResultSig
 instance Binary TH.TypeFamilyHead
+instance Binary TH.PatSynDir
+instance Binary TH.PatSynArgs
 
 -- We need Binary TypeRep for serializing annotations
 

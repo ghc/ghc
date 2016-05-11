@@ -71,7 +71,7 @@ templateHaskellNames = [
     dataFamilyDName, openTypeFamilyDName, closedTypeFamilyDName,
     dataInstDName, newtypeInstDName, tySynInstDName,
     infixLDName, infixRDName, infixNDName,
-    roleAnnotDName,
+    roleAnnotDName, patSynDName, patSynSigDName,
     -- Cxt
     cxtName,
 
@@ -87,6 +87,10 @@ templateHaskellNames = [
     bangTypeName,
     -- VarBangType
     varBangTypeName,
+    -- PatSynDir (for pattern synonyms)
+    unidirPatSynName, implBidirPatSynName, explBidirPatSynName,
+    -- PatSynArgs (for pattern synonyms)
+    prefixPatSynName, infixPatSynName, recordPatSynName,
     -- Type
     forallTName, varTName, conTName, appTName, equalityTName,
     tupleTName, unboxedTupleTName, arrowTName, listTName, sigTName, litTName,
@@ -325,10 +329,10 @@ funDName, valDName, dataDName, newtypeDName, tySynDName, classDName,
     instanceWithOverlapDName, sigDName, forImpDName, pragInlDName,
     pragSpecDName,
     pragSpecInlDName, pragSpecInstDName, pragRuleDName, pragAnnDName,
-    standaloneDerivDName, defaultSigDName,
-    dataInstDName, newtypeInstDName, tySynInstDName,
-    dataFamilyDName, openTypeFamilyDName, closedTypeFamilyDName,
-    infixLDName, infixRDName, infixNDName, roleAnnotDName :: Name
+    standaloneDerivDName, defaultSigDName, dataInstDName, newtypeInstDName,
+    tySynInstDName, dataFamilyDName, openTypeFamilyDName, closedTypeFamilyDName,
+    infixLDName, infixRDName, infixNDName, roleAnnotDName, patSynDName,
+    patSynSigDName :: Name
 funDName             = libFun (fsLit "funD")              funDIdKey
 valDName             = libFun (fsLit "valD")              valDIdKey
 dataDName            = libFun (fsLit "dataD")             dataDIdKey
@@ -336,8 +340,7 @@ newtypeDName         = libFun (fsLit "newtypeD")          newtypeDIdKey
 tySynDName           = libFun (fsLit "tySynD")            tySynDIdKey
 classDName           = libFun (fsLit "classD")            classDIdKey
 instanceWithOverlapDName
-                     = libFun (fsLit "instanceWithOverlapD")
-                                                      instanceWithOverlapDIdKey
+  = libFun (fsLit "instanceWithOverlapD")              instanceWithOverlapDIdKey
 standaloneDerivDName = libFun (fsLit "standaloneDerivD")  standaloneDerivDIdKey
 sigDName             = libFun (fsLit "sigD")              sigDIdKey
 defaultSigDName      = libFun (fsLit "defaultSigD")       defaultSigDIdKey
@@ -358,6 +361,8 @@ infixLDName          = libFun (fsLit "infixLD")           infixLDIdKey
 infixRDName          = libFun (fsLit "infixRD")           infixRDIdKey
 infixNDName          = libFun (fsLit "infixND")           infixNDIdKey
 roleAnnotDName       = libFun (fsLit "roleAnnotD")        roleAnnotDIdKey
+patSynDName          = libFun (fsLit "patSynD")           patSynDIdKey
+patSynSigDName       = libFun (fsLit "patSynSigD")        patSynSigDIdKey
 
 -- type Ctxt = ...
 cxtName :: Name
@@ -395,6 +400,18 @@ bangTypeName = libFun (fsLit "bangType") bangTKey
 -- type VarBangType = ...
 varBangTypeName :: Name
 varBangTypeName = libFun (fsLit "varBangType") varBangTKey
+
+-- data PatSynDir = ...
+unidirPatSynName, implBidirPatSynName, explBidirPatSynName :: Name
+unidirPatSynName    = libFun (fsLit "unidir")    unidirPatSynIdKey
+implBidirPatSynName = libFun (fsLit "implBidir") implBidirPatSynIdKey
+explBidirPatSynName = libFun (fsLit "explBidir") explBidirPatSynIdKey
+
+-- data PatSynArgs = ...
+prefixPatSynName, infixPatSynName, recordPatSynName :: Name
+prefixPatSynName = libFun (fsLit "prefixPatSyn") prefixPatSynIdKey
+infixPatSynName  = libFun (fsLit "infixPatSyn")  infixPatSynIdKey
+recordPatSynName = libFun (fsLit "recordPatSyn") recordPatSynIdKey
 
 -- data Type = ...
 forallTName, varTName, conTName, tupleTName, unboxedTupleTName, arrowTName,
@@ -557,7 +574,6 @@ overlappingDataConName  = thCon (fsLit "Overlapping")  overlappingDataConKey
 overlapsDataConName     = thCon (fsLit "Overlaps")     overlapsDataConKey
 incoherentDataConName   = thCon (fsLit "Incoherent")   incoherentDataConKey
 
-
 {- *********************************************************************
 *                                                                      *
                      Class keys
@@ -663,8 +679,6 @@ overlappingDataConKey  = mkPreludeDataConUnique 110
 overlapsDataConKey     = mkPreludeDataConUnique 111
 incoherentDataConKey   = mkPreludeDataConUnique 112
 
-
-
 {- *********************************************************************
 *                                                                      *
                      Id keys
@@ -713,8 +727,9 @@ liftStringIdKey :: Unique
 liftStringIdKey     = mkPreludeMiscIdUnique 230
 
 -- data Pat = ...
-litPIdKey, varPIdKey, tupPIdKey, unboxedTupPIdKey, conPIdKey, infixPIdKey, tildePIdKey, bangPIdKey,
-    asPIdKey, wildPIdKey, recPIdKey, listPIdKey, sigPIdKey, viewPIdKey :: Unique
+litPIdKey, varPIdKey, tupPIdKey, unboxedTupPIdKey, conPIdKey, infixPIdKey,
+  tildePIdKey, bangPIdKey, asPIdKey, wildPIdKey, recPIdKey, listPIdKey,
+  sigPIdKey, viewPIdKey :: Unique
 litPIdKey         = mkPreludeMiscIdUnique 240
 varPIdKey         = mkPreludeMiscIdUnique 241
 tupPIdKey         = mkPreludeMiscIdUnique 242
@@ -782,99 +797,114 @@ unboundVarEIdKey  = mkPreludeMiscIdUnique 297
 
 -- type FieldExp = ...
 fieldExpIdKey :: Unique
-fieldExpIdKey       = mkPreludeMiscIdUnique 310
+fieldExpIdKey       = mkPreludeMiscIdUnique 305
 
 -- data Body = ...
 guardedBIdKey, normalBIdKey :: Unique
-guardedBIdKey     = mkPreludeMiscIdUnique 311
-normalBIdKey      = mkPreludeMiscIdUnique 312
+guardedBIdKey     = mkPreludeMiscIdUnique 306
+normalBIdKey      = mkPreludeMiscIdUnique 307
 
 -- data Guard = ...
 normalGEIdKey, patGEIdKey :: Unique
-normalGEIdKey     = mkPreludeMiscIdUnique 313
-patGEIdKey        = mkPreludeMiscIdUnique 314
+normalGEIdKey     = mkPreludeMiscIdUnique 308
+patGEIdKey        = mkPreludeMiscIdUnique 309
 
 -- data Stmt = ...
 bindSIdKey, letSIdKey, noBindSIdKey, parSIdKey :: Unique
-bindSIdKey       = mkPreludeMiscIdUnique 320
-letSIdKey        = mkPreludeMiscIdUnique 321
-noBindSIdKey     = mkPreludeMiscIdUnique 322
-parSIdKey        = mkPreludeMiscIdUnique 323
+bindSIdKey       = mkPreludeMiscIdUnique 310
+letSIdKey        = mkPreludeMiscIdUnique 311
+noBindSIdKey     = mkPreludeMiscIdUnique 312
+parSIdKey        = mkPreludeMiscIdUnique 313
 
 -- data Dec = ...
-funDIdKey, valDIdKey, dataDIdKey, newtypeDIdKey, tySynDIdKey,
-    classDIdKey, instanceWithOverlapDIdKey, sigDIdKey, forImpDIdKey,
-    pragInlDIdKey,
-    pragSpecDIdKey, pragSpecInlDIdKey, pragSpecInstDIdKey, pragRuleDIdKey,
-    pragAnnDIdKey, defaultSigDIdKey, dataFamilyDIdKey, openTypeFamilyDIdKey,
-    closedTypeFamilyDIdKey, dataInstDIdKey, newtypeInstDIdKey, tySynInstDIdKey,
-    standaloneDerivDIdKey, infixLDIdKey, infixRDIdKey, infixNDIdKey,
-    roleAnnotDIdKey :: Unique
-funDIdKey              = mkPreludeMiscIdUnique 330
-valDIdKey              = mkPreludeMiscIdUnique 331
-dataDIdKey             = mkPreludeMiscIdUnique 332
-newtypeDIdKey          = mkPreludeMiscIdUnique 333
-tySynDIdKey            = mkPreludeMiscIdUnique 334
-classDIdKey            = mkPreludeMiscIdUnique 335
-instanceWithOverlapDIdKey = mkPreludeMiscIdUnique 336
-sigDIdKey              = mkPreludeMiscIdUnique 337
-forImpDIdKey           = mkPreludeMiscIdUnique 338
-pragInlDIdKey          = mkPreludeMiscIdUnique 339
-pragSpecDIdKey         = mkPreludeMiscIdUnique 340
-pragSpecInlDIdKey      = mkPreludeMiscIdUnique 341
-pragSpecInstDIdKey     = mkPreludeMiscIdUnique 342
-pragRuleDIdKey         = mkPreludeMiscIdUnique 343
-pragAnnDIdKey          = mkPreludeMiscIdUnique 344
-dataFamilyDIdKey       = mkPreludeMiscIdUnique 345
-openTypeFamilyDIdKey   = mkPreludeMiscIdUnique 346
-dataInstDIdKey         = mkPreludeMiscIdUnique 347
-newtypeInstDIdKey      = mkPreludeMiscIdUnique 348
-tySynInstDIdKey        = mkPreludeMiscIdUnique 349
-closedTypeFamilyDIdKey = mkPreludeMiscIdUnique 350
-infixLDIdKey           = mkPreludeMiscIdUnique 352
-infixRDIdKey           = mkPreludeMiscIdUnique 353
-infixNDIdKey           = mkPreludeMiscIdUnique 354
-roleAnnotDIdKey        = mkPreludeMiscIdUnique 355
-standaloneDerivDIdKey  = mkPreludeMiscIdUnique 356
-defaultSigDIdKey       = mkPreludeMiscIdUnique 357
+funDIdKey, valDIdKey, dataDIdKey, newtypeDIdKey, tySynDIdKey, classDIdKey,
+    instanceWithOverlapDIdKey, instanceDIdKey, sigDIdKey, forImpDIdKey,
+    pragInlDIdKey, pragSpecDIdKey, pragSpecInlDIdKey, pragSpecInstDIdKey,
+    pragRuleDIdKey, pragAnnDIdKey, defaultSigDIdKey, dataFamilyDIdKey,
+    openTypeFamilyDIdKey, closedTypeFamilyDIdKey, dataInstDIdKey,
+    newtypeInstDIdKey, tySynInstDIdKey, standaloneDerivDIdKey, infixLDIdKey,
+    infixRDIdKey, infixNDIdKey, roleAnnotDIdKey, patSynDIdKey,
+    patSynSigDIdKey :: Unique
+funDIdKey                 = mkPreludeMiscIdUnique 320
+valDIdKey                 = mkPreludeMiscIdUnique 321
+dataDIdKey                = mkPreludeMiscIdUnique 322
+newtypeDIdKey             = mkPreludeMiscIdUnique 323
+tySynDIdKey               = mkPreludeMiscIdUnique 324
+classDIdKey               = mkPreludeMiscIdUnique 325
+instanceWithOverlapDIdKey = mkPreludeMiscIdUnique 326
+instanceDIdKey            = mkPreludeMiscIdUnique 327
+sigDIdKey                 = mkPreludeMiscIdUnique 328
+forImpDIdKey              = mkPreludeMiscIdUnique 329
+pragInlDIdKey             = mkPreludeMiscIdUnique 330
+pragSpecDIdKey            = mkPreludeMiscIdUnique 331
+pragSpecInlDIdKey         = mkPreludeMiscIdUnique 332
+pragSpecInstDIdKey        = mkPreludeMiscIdUnique 333
+pragRuleDIdKey            = mkPreludeMiscIdUnique 334
+pragAnnDIdKey             = mkPreludeMiscIdUnique 335
+dataFamilyDIdKey          = mkPreludeMiscIdUnique 336
+openTypeFamilyDIdKey      = mkPreludeMiscIdUnique 337
+dataInstDIdKey            = mkPreludeMiscIdUnique 338
+newtypeInstDIdKey         = mkPreludeMiscIdUnique 339
+tySynInstDIdKey           = mkPreludeMiscIdUnique 340
+closedTypeFamilyDIdKey    = mkPreludeMiscIdUnique 341
+infixLDIdKey              = mkPreludeMiscIdUnique 342
+infixRDIdKey              = mkPreludeMiscIdUnique 343
+infixNDIdKey              = mkPreludeMiscIdUnique 344
+roleAnnotDIdKey           = mkPreludeMiscIdUnique 345
+standaloneDerivDIdKey     = mkPreludeMiscIdUnique 346
+defaultSigDIdKey          = mkPreludeMiscIdUnique 347
+patSynDIdKey              = mkPreludeMiscIdUnique 348
+patSynSigDIdKey           = mkPreludeMiscIdUnique 349
 
 -- type Cxt = ...
 cxtIdKey :: Unique
-cxtIdKey            = mkPreludeMiscIdUnique 360
+cxtIdKey               = mkPreludeMiscIdUnique 350
 
 -- data SourceUnpackedness = ...
 noSourceUnpackednessKey, sourceNoUnpackKey, sourceUnpackKey :: Unique
-noSourceUnpackednessKey = mkPreludeMiscIdUnique 361
-sourceNoUnpackKey       = mkPreludeMiscIdUnique 362
-sourceUnpackKey         = mkPreludeMiscIdUnique 363
+noSourceUnpackednessKey = mkPreludeMiscIdUnique 351
+sourceNoUnpackKey       = mkPreludeMiscIdUnique 352
+sourceUnpackKey         = mkPreludeMiscIdUnique 353
 
 -- data SourceStrictness = ...
 noSourceStrictnessKey, sourceLazyKey, sourceStrictKey :: Unique
-noSourceStrictnessKey   = mkPreludeMiscIdUnique 364
-sourceLazyKey           = mkPreludeMiscIdUnique 365
-sourceStrictKey         = mkPreludeMiscIdUnique 366
+noSourceStrictnessKey   = mkPreludeMiscIdUnique 354
+sourceLazyKey           = mkPreludeMiscIdUnique 355
+sourceStrictKey         = mkPreludeMiscIdUnique 356
 
 -- data Con = ...
 normalCIdKey, recCIdKey, infixCIdKey, forallCIdKey, gadtCIdKey,
   recGadtCIdKey :: Unique
-normalCIdKey      = mkPreludeMiscIdUnique 370
-recCIdKey         = mkPreludeMiscIdUnique 371
-infixCIdKey       = mkPreludeMiscIdUnique 372
-forallCIdKey      = mkPreludeMiscIdUnique 373
-gadtCIdKey        = mkPreludeMiscIdUnique 374
-recGadtCIdKey     = mkPreludeMiscIdUnique 375
+normalCIdKey      = mkPreludeMiscIdUnique 357
+recCIdKey         = mkPreludeMiscIdUnique 358
+infixCIdKey       = mkPreludeMiscIdUnique 359
+forallCIdKey      = mkPreludeMiscIdUnique 360
+gadtCIdKey        = mkPreludeMiscIdUnique 361
+recGadtCIdKey     = mkPreludeMiscIdUnique 362
 
 -- data Bang = ...
 bangIdKey :: Unique
-bangIdKey         = mkPreludeMiscIdUnique 376
+bangIdKey         = mkPreludeMiscIdUnique 363
 
 -- type BangType = ...
 bangTKey :: Unique
-bangTKey          = mkPreludeMiscIdUnique 377
+bangTKey          = mkPreludeMiscIdUnique 364
 
 -- type VarBangType = ...
 varBangTKey :: Unique
-varBangTKey       = mkPreludeMiscIdUnique 378
+varBangTKey       = mkPreludeMiscIdUnique 365
+
+-- data PatSynDir = ...
+unidirPatSynIdKey, implBidirPatSynIdKey, explBidirPatSynIdKey :: Unique
+unidirPatSynIdKey    = mkPreludeMiscIdUnique 366
+implBidirPatSynIdKey = mkPreludeMiscIdUnique 367
+explBidirPatSynIdKey = mkPreludeMiscIdUnique 368
+
+-- data PatSynArgs = ...
+prefixPatSynIdKey, infixPatSynIdKey, recordPatSynIdKey :: Unique
+prefixPatSynIdKey = mkPreludeMiscIdUnique 369
+infixPatSynIdKey  = mkPreludeMiscIdUnique 370
+recordPatSynIdKey = mkPreludeMiscIdUnique 371
 
 -- data Type = ...
 forallTIdKey, varTIdKey, conTIdKey, tupleTIdKey, unboxedTupleTIdKey, arrowTIdKey,
