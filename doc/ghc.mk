@@ -11,11 +11,11 @@
 # -----------------------------------------------------------------------------
 
 ifeq "$(BUILD_SPHINX_HTML)" "YES"
-INSTALL_HTML_DOC_DIRS += utils/haddock/doc/haddock
-
 html : html_utils/haddock/doc
 
 $(eval $(call clean-target,utils/haddock/doc,sphinx,utils/haddock/doc/haddock utils/haddock/doc/.build-*))
+$(eval $(call all-target,utils/haddock/doc,html_utils/haddock/doc))
+INSTALL_HTML_DOC_DIRS += utils/haddock/doc/haddock
 endif
 
 html_utils/haddock/doc :
