@@ -48,6 +48,7 @@ import VarSet
 import SrcLoc
 import ListSetOps( assocDefault )
 import Data.List
+import Util
 
 data DsCmdEnv = DsCmdEnv {
         arr_id, compose_id, first_id, app_id, choice_id, loop_id :: CoreExpr
@@ -786,7 +787,7 @@ dsCmdStmt ids local_vars out_ids (BindStmt pat cmd _ _ _) env_ids = do
     (core_cmd, fv_cmd, env_ids1) <- dsfixCmd ids local_vars unitTy pat_ty cmd
     let pat_vars = mkVarSet (collectPatBinders pat)
     let
-        env_ids2 = varSetElems (mkVarSet out_ids `minusVarSet` pat_vars)
+        env_ids2 = filterOut (`elemVarSet` pat_vars) out_ids
         env_ty2 = mkBigCoreVarTupTy env_ids2
 
     -- multiplexing function
@@ -863,8 +864,9 @@ dsCmdStmt ids local_vars out_ids
                  , recS_later_rets = later_rets, recS_rec_rets = rec_rets })
         env_ids = do
     let
-        env2_id_set = mkVarSet out_ids `minusVarSet` mkVarSet later_ids
-        env2_ids = varSetElems env2_id_set
+        later_ids_set = mkVarSet later_ids
+        env2_ids = filterOut (`elemVarSet` later_ids_set) out_ids
+        env2_id_set = mkVarSet env2_ids
         env2_ty = mkBigCoreVarTupTy env2_ids
 
     -- post_loop_fn = \((later_ids),(env2_ids)) -> (out_ids)
