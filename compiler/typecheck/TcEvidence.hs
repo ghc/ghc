@@ -62,6 +62,7 @@ import Outputable
 import FastString
 import SrcLoc
 import Data.IORef( IORef )
+import UniqFM
 
 {-
 Note [TcCoercions]
@@ -695,8 +696,11 @@ sccEvBinds bs = stronglyConnCompFromEdgedVertices edges
 
     mk_node :: EvBind -> (EvBind, EvVar, [EvVar])
     mk_node b@(EvBind { eb_lhs = var, eb_rhs = term })
-      = (b, var, varSetElems (evVarsOfTerm term `unionVarSet`
-                              coVarsOfType (varType var)))
+      = (b, var, nonDetEltsUFM (evVarsOfTerm term `unionVarSet`
+                                coVarsOfType (varType var)))
+      -- It's OK to use nonDetEltsUFM here as stronglyConnCompFromEdgedVertices
+      -- is still deterministic even if the edges are in nondeterministic order
+      -- as explained in Note [Deterministic SCC] in Digraph.
 
 evVarsOfCallStack :: EvCallStack -> VarSet
 evVarsOfCallStack cs = case cs of

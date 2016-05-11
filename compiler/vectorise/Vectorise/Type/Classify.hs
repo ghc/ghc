@@ -98,8 +98,12 @@ type TyConGroup = ([TyCon], UniqSet TyCon)
 tyConGroups :: [TyCon] -> [TyConGroup]
 tyConGroups tcs = map mk_grp (stronglyConnCompFromEdgedVertices edges)
   where
-    edges = [((tc, ds), tc, uniqSetToList ds) | tc <- tcs
+    edges = [((tc, ds), tc, nonDetEltsUFM ds) | tc <- tcs
                                 , let ds = tyConsOfTyCon tc]
+            -- It's OK to use nonDetEltsUFM here as
+            -- stronglyConnCompFromEdgedVertices is still deterministic even
+            -- if the edges are in nondeterministic order as explained in
+            -- Note [Deterministic SCC] in Digraph.
 
     mk_grp (AcyclicSCC (tc, ds)) = ([tc], ds)
     mk_grp (CyclicSCC els)       = (tcs, unionManyUniqSets dss)

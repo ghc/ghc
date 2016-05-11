@@ -61,7 +61,7 @@ module UniqFM (
         isNullUFM,
         lookupUFM, lookupUFM_Directly,
         lookupWithDefaultUFM, lookupWithDefaultUFM_Directly,
-        nonDetEltsUFM, eltsUFM, keysUFM, splitUFM,
+        nonDetEltsUFM, eltsUFM, nonDetKeysUFM, keysUFM, splitUFM,
         ufmToSet_Directly,
         ufmToList, ufmToIntMap,
         joinUFM, pprUniqFM, pprUFM, pluralUFM
@@ -303,9 +303,17 @@ anyUFM p (UFM m) = M.fold ((||) . p) False m
 allUFM :: (elt -> Bool) -> UniqFM elt -> Bool
 allUFM p (UFM m) = M.fold ((&&) . p) True m
 
--- See Note [Deterministic UniqFM] to learn about nondeterminism
+-- See Note [Deterministic UniqFM] to learn about nondeterminism.
+-- If you use this please provide a justification why it doesn't introduce
+-- nondeterminism.
 nonDetEltsUFM :: UniqFM elt -> [elt]
 nonDetEltsUFM (UFM m) = M.elems m
+
+-- See Note [Deterministic UniqFM] to learn about nondeterminism.
+-- If you use this please provide a justification why it doesn't introduce
+-- nondeterminism.
+nonDetKeysUFM :: UniqFM elt -> [Unique]
+nonDetKeysUFM (UFM m) = map getUnique $ M.keys m
 
 ufmToIntMap :: UniqFM elt -> M.IntMap elt
 ufmToIntMap (UFM m) = m

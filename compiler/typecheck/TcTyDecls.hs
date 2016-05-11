@@ -60,6 +60,7 @@ import Data.List
 import Bag
 import FastString
 import FV
+import UniqFM
 
 import Control.Monad
 
@@ -130,9 +131,13 @@ synonymTyConsOfType ty
 -}
 
 mkSynEdges :: [LTyClDecl Name] -> [(LTyClDecl Name, Name, [Name])]
-mkSynEdges syn_decls = [ (ldecl, name, nameSetElems fvs)
+mkSynEdges syn_decls = [ (ldecl, name, nonDetEltsUFM fvs)
                        | ldecl@(L _ (SynDecl { tcdLName = L _ name
                                              , tcdFVs = fvs })) <- syn_decls ]
+            -- It's OK to use nonDetEltsUFM here as
+            -- stronglyConnCompFromEdgedVertices is still deterministic even
+            -- if the edges are in nondeterministic order as explained in
+            -- Note [Deterministic SCC] in Digraph.
 
 calcSynCycles :: [LTyClDecl Name] -> [SCC (LTyClDecl Name)]
 calcSynCycles = stronglyConnCompFromEdgedVertices . mkSynEdges
@@ -419,8 +424,10 @@ calcRecFlags boot_details is_boot mrole_env all_tycons
     nt_edges = [(t, mk_nt_edges t) | t <- new_tycons]
 
     mk_nt_edges nt      -- Invariant: nt is a newtype
-        = [ tc | tc <- nameEnvElts (tyConsOfType (new_tc_rhs nt))
+        = [ tc | tc <- nonDetEltsUFM (tyConsOfType (new_tc_rhs nt))
                         -- tyConsOfType looks through synonyms
+                        -- It's OK to use nonDetEltsUFM here, see
+                        -- Note [findLoopBreakers determinism].
                , tc `elem` new_tycons ]
            -- If not (tc `elem` new_tycons) we know that either it's a local *data* type,
            -- or it's imported.  Either way, it can't form part of a newtype cycle
@@ -433,7 +440,9 @@ calcRecFlags boot_details is_boot mrole_env all_tycons
     mk_prod_edges tc    -- Invariant: tc is a product tycon
         = concatMap (mk_prod_edges1 tc) (dataConOrigArgTys (head (tyConDataCons tc)))
 
-    mk_prod_edges1 ptc ty = concatMap (mk_prod_edges2 ptc) (nameEnvElts (tyConsOfType ty))
+    mk_prod_edges1 ptc ty = concatMap (mk_prod_edges2 ptc) (nonDetEltsUFM (tyConsOfType ty))
+                                      -- It's OK to use nonDetEltsUFM here, see
+                                      -- Note [findLoopBreakers determinism].
 
     mk_prod_edges2 ptc tc
         | tc `elem` prod_tycons   = [tc]                -- Local product
@@ -446,6 +455,14 @@ calcRecFlags boot_details is_boot mrole_env all_tycons
 
 new_tc_rhs :: TyCon -> Type
 new_tc_rhs tc = snd (newTyConRhs tc)    -- Ignore the type variables
+
+{-
+Note [findLoopBreakers determinism]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The order of edges doesn't matter for determinism here as explained in
+Note [Deterministic SCC] in Digraph. It's enough for the order of nodes
+to be deterministic.
+-}
 
 findLoopBreakers :: [(TyCon, [TyCon])] -> [Name]
 -- Finds a set of tycons that cut all loops

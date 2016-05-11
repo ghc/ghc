@@ -58,6 +58,7 @@ import Outputable
 import Type(mkStrLitTy, tidyOpenType)
 import PrelNames( mkUnboundName, gHC_PRIM, ipClassName )
 import TcValidity (checkValidType)
+import UniqFM
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
@@ -498,10 +499,13 @@ type BKey = Int -- Just number off the bindings
 mkEdges :: TcSigFun -> LHsBinds Name -> [Node BKey (LHsBind Name)]
 -- See Note [Polymorphic recursion] in HsBinds.
 mkEdges sig_fn binds
-  = [ (bind, key, [key | n <- nameSetElems (bind_fvs (unLoc bind)),
+  = [ (bind, key, [key | n <- nonDetEltsUFM (bind_fvs (unLoc bind)),
                          Just key <- [lookupNameEnv key_map n], no_sig n ])
     | (bind, key) <- keyd_binds
     ]
+    -- It's OK to use nonDetEltsUFM here as stronglyConnCompFromEdgedVertices
+    -- is still deterministic even if the edges are in nondeterministic order
+    -- as explained in Note [Deterministic SCC] in Digraph.
   where
     no_sig :: Name -> Bool
     no_sig n = noCompleteSig (sig_fn n)

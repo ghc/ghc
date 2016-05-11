@@ -50,6 +50,7 @@ import Util             ( debugIsOn, partitionWith )
 import HscTypes         ( HscEnv, hsc_dflags )
 import ListSetOps       ( findDupsEq, removeDups, equivClasses )
 import Digraph          ( SCC, flattenSCC, flattenSCCs, stronglyConnCompFromEdgedVertices )
+import UniqFM
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
@@ -1339,8 +1340,12 @@ depAnalTyClDecls :: GlobalRdrEnv
 depAnalTyClDecls rdr_env ds_w_fvs
   = stronglyConnCompFromEdgedVertices edges
   where
-    edges = [ (d, tcdName (unLoc d), map (getParent rdr_env) (nameSetElems fvs))
+    edges = [ (d, tcdName (unLoc d), map (getParent rdr_env) (nonDetEltsUFM fvs))
             | (d, fvs) <- ds_w_fvs ]
+            -- It's OK to use nonDetEltsUFM here as
+            -- stronglyConnCompFromEdgedVertices is still deterministic
+            -- even if the edges are in nondeterministic order as explained
+            -- in Note [Deterministic SCC] in Digraph.
 
 toParents :: GlobalRdrEnv -> NameSet -> NameSet
 toParents rdr_env ns

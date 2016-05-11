@@ -2479,8 +2479,12 @@ checkForCyclicBinds ev_binds
     is_co_bind (EvBind { eb_lhs = b }) = isEqPred (varType b)
 
     edges :: [(EvBind, EvVar, [EvVar])]
-    edges = [ (bind, bndr, varSetElems (evVarsOfTerm rhs))
+    edges = [ (bind, bndr, nonDetEltsUFM (evVarsOfTerm rhs))
             | bind@(EvBind { eb_lhs = bndr, eb_rhs = rhs}) <- bagToList ev_binds ]
+            -- It's OK to use nonDetEltsUFM here as
+            -- stronglyConnCompFromEdgedVertices is still deterministic even
+            -- if the edges are in nondeterministic order as explained in
+            -- Note [Deterministic SCC] in Digraph.
 #endif
 
 nestImplicTcS :: Maybe EvBindsVar -> TyCoVarSet -- bound in this implication

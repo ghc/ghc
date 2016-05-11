@@ -691,7 +691,10 @@ instance Outputable Details where
 
 makeNode :: OccEnv -> ImpRuleEdges -> VarSet -> (Var, CoreExpr) -> Node Details
 makeNode env imp_rule_edges bndr_set (bndr, rhs)
-  = (details, varUnique bndr, keysUFM node_fvs)
+  = (details, varUnique bndr, nonDetKeysUFM node_fvs)
+    -- It's OK to use nonDetKeysUFM here as stronglyConnCompFromEdgedVerticesR
+    -- is still deterministic with edges in nondeterministic order as
+    -- explained in Note [Deterministic SCC] in Digraph.
   where
     details = ND { nd_bndr = bndr
                  , nd_rhs  = rhs'
@@ -800,7 +803,11 @@ occAnalRec (CyclicSCC nodes) (body_uds, binds)
         -- See Note [Choosing loop breakers] for loop_breaker_edges
     loop_breaker_edges = map mk_node tagged_nodes
     mk_node (details@(ND { nd_inl = inl_fvs }), k, _)
-      = (details, k, keysUFM (extendFvs_ rule_fv_env inl_fvs))
+      = (details, k, nonDetKeysUFM (extendFvs_ rule_fv_env inl_fvs))
+        -- It's OK to use nonDetKeysUFM here as
+        -- stronglyConnCompFromEdgedVerticesR is still deterministic with edges
+        -- in nondeterministic order as explained in
+        -- Note [Deterministic SCC] in Digraph.
 
     ------------------------------------
     rule_fv_env :: IdEnv IdSet

@@ -94,6 +94,7 @@ type Node key payload = (payload, key, [key])
 emptyGraph :: Graph a
 emptyGraph = Graph (array (1, 0) []) (error "emptyGraph") (const Nothing)
 
+-- See Note [Deterministic SCC]
 graphFromEdgedVertices
         :: Ord key                      -- We only use Ord for efficiency,
                                         -- it doesn't effect the result, so
@@ -200,6 +201,18 @@ depend on earlier ones, but not vice versa i.e. later components only have
 edges going from them to earlier ones.
 -}
 
+{-
+Note [Deterministic SCC]
+~~~~~~~~~~~~~~~~~~~~~~~~
+stronglyConnCompFromEdgedVertices and stronglyConnCompFromEdgedVerticesR
+provide a following guarantee:
+Given a deterministically ordered list of nodes it returns a deterministically
+ordered list of strongly connected components, where the list of vertices
+in an SCC is also deterministically ordered.
+Note that the order of edges doesn't need to be deterministic for this to work.
+We use the order of nodes to normalize the order of edges.
+-}
+
 stronglyConnCompG :: Graph node -> [SCC node]
 stronglyConnCompG graph = decodeSccs graph forest
   where forest = {-# SCC "Digraph.scc" #-} scc (gr_int_graph graph)
@@ -216,6 +229,7 @@ decodeSccs Graph { gr_int_graph = graph, gr_vertex_to_node = vertex_fn } forest
 
 
 -- The following two versions are provided for backwards compatability:
+-- See Note [Deterministic SCC]
 stronglyConnCompFromEdgedVertices
         :: Ord key
         => [Node key payload]
@@ -226,6 +240,7 @@ stronglyConnCompFromEdgedVertices
 
 -- The "R" interface is used when you expect to apply SCC to
 -- (some of) the result of SCC, so you dont want to lose the dependency info
+-- See Note [Deterministic SCC]
 stronglyConnCompFromEdgedVerticesR
         :: Ord key
         => [Node key payload]

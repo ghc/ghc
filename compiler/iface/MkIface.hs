@@ -106,6 +106,7 @@ import Maybes
 import Binary
 import Fingerprint
 import Exception
+import UniqFM
 
 import Control.Monad
 import Data.Function
@@ -396,7 +397,12 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
        name_module n = ASSERT2( isExternalName n, ppr n ) nameModule n
        localOccs = map (getUnique . getParent . getOccName)
                         . filter ((== this_mod) . name_module)
-                        . nameSetElems
+                        . nonDetEltsUFM
+                   -- It's OK to use nonDetEltsUFM as localOccs is only
+                   -- used to construct the edges and
+                   -- stronglyConnCompFromEdgedVertices is deterministic
+                   -- even with non-deterministic order of edges as
+                   -- explained in Note [Deterministic SCC] in Digraph.
           where getParent occ = lookupOccEnv parent_map occ `orElse` occ
 
         -- maps OccNames to their parents in the current module.
