@@ -1,7 +1,8 @@
 {-# LANGUAGE LambdaCase, FlexibleInstances #-}
 -- | Convenient predicates
 module Predicates (
-    stage, package, builder, file, way, stage0, stage1, stage2, notStage0, notPackage
+    stage, stage0, stage1, stage2, notStage0,
+    package, notPackage, builder, input, output, way
     ) where
 
 import Base
@@ -41,9 +42,13 @@ instance BuilderLike a => BuilderLike (FilePath -> a) where
             Configure f -> builder $ f2b f
             _           -> return False
 
+-- | Does any of the input files match a given pattern?
+input :: FilePattern -> Predicate
+input f = any (f ?==) <$> getInputs
+
 -- | Does any of the output files match a given pattern?
-file :: FilePattern -> Predicate
-file f = any (f ?==) <$> getOutputs
+output :: FilePattern -> Predicate
+output f = any (f ?==) <$> getOutputs
 
 -- | Is the current build 'Way' equal to a certain value?
 way :: Way -> Predicate

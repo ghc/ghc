@@ -7,7 +7,7 @@ import Expression
 import GHC (rts, rtsContext)
 import Oracles.Config.Flag
 import Oracles.Config.Setting
-import Predicates (builder, package, file)
+import Predicates (builder, package, input)
 import Settings
 import Settings.Builders.Common
 
@@ -66,10 +66,10 @@ rtsPackageArgs = package rts ? do
 
           , way == threaded ? arg "-DTHREADED_RTS"
 
-          , (file "//RtsMessages.*" ||^ file "//Trace.*") ?
+          , (input "//RtsMessages.c" ||^ input "//Trace.c") ?
             arg ("-DProjectVersion=" ++ quote projectVersion)
 
-          , file "//RtsUtils.*" ? append
+          , input "//RtsUtils.c" ? append
             [ "-DProjectVersion="            ++ quote projectVersion
             , "-DHostPlatform="              ++ quote hostPlatform
             , "-DHostArch="                  ++ quote hostArch
@@ -86,11 +86,11 @@ rtsPackageArgs = package rts ? do
             , "-DGhcUnregisterised="         ++ quote ghcUnreg
             , "-DGhcEnableTablesNextToCode=" ++ quote ghcEnableTNC ]
 
-            , file "//Evac.*"     ? arg "-funroll-loops"
-            , file "//Evac_thr.*" ? arg "-funroll-loops"
+            , input "//Evac.c"     ? arg "-funroll-loops"
+            , input "//Evac_thr.c" ? arg "-funroll-loops"
 
-            , file "//Evac_thr.*" ? append [ "-DPARALLEL_GC", "-Irts/sm" ]
-            , file "//Scav_thr.*" ? append [ "-DPARALLEL_GC", "-Irts/sm" ] ]
+            , input "//Evac_thr.c" ? append [ "-DPARALLEL_GC", "-Irts/sm" ]
+            , input "//Scav_thr.c" ? append [ "-DPARALLEL_GC", "-Irts/sm" ] ]
 
         , builder Ghc ? (arg "-Irts" <> includesArgs)
 

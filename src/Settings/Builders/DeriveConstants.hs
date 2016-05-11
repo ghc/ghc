@@ -4,21 +4,21 @@ import Base
 import Expression
 import Oracles.Config.Flag
 import Oracles.Config.Setting
-import Predicates (builder, file)
+import Predicates (builder, output)
 import Settings.Builders.Common
 
 -- TODO: do we need to support `includes_CC_OPTS += -DDYNAMIC_BY_DEFAULT`?
 deriveConstantsBuilderArgs :: Args
 deriveConstantsBuilderArgs = builder DeriveConstants ? do
     cFlags            <- fromDiffExpr includeCcArgs
-    [output, tempDir] <- getOutputs
+    [outputFile, tempDir] <- getOutputs
     mconcat
-        [ file "//DerivedConstants.h"             ? arg "--gen-header"
-        , file "//GHCConstantsHaskellType.hs"     ? arg "--gen-haskell-type"
-        , file "//platformConstants"              ? arg "--gen-haskell-value"
-        , file "//GHCConstantsHaskellWrappers.hs" ? arg "--gen-haskell-wrappers"
-        , file "//GHCConstantsHaskellExports.hs"  ? arg "--gen-haskell-exports"
-        , arg "-o", arg output
+        [ output "//DerivedConstants.h"             ? arg "--gen-header"
+        , output "//GHCConstantsHaskellType.hs"     ? arg "--gen-haskell-type"
+        , output "//platformConstants"              ? arg "--gen-haskell-value"
+        , output "//GHCConstantsHaskellWrappers.hs" ? arg "--gen-haskell-wrappers"
+        , output "//GHCConstantsHaskellExports.hs"  ? arg "--gen-haskell-exports"
+        , arg "-o", arg outputFile
         , arg "--tmpdir", arg tempDir
         , arg "--gcc-program", arg =<< getBuilderPath (Cc Compile Stage1)
         , append . concat $ map (\a -> ["--gcc-flag", a]) cFlags
