@@ -63,10 +63,10 @@ For the generic representation we need to generate:
 \end{itemize}
 -}
 
-gen_Generic_binds :: GenericKind -> TyCon -> Type -> Module
+gen_Generic_binds :: GenericKind -> TyCon -> [Type] -> Module
                  -> TcM (LHsBinds RdrName, FamInst)
-gen_Generic_binds gk tc inst_ty mod = do
-  repTyInsts <- tc_mkRepFamInsts gk tc inst_ty mod
+gen_Generic_binds gk tc inst_tys mod = do
+  repTyInsts <- tc_mkRepFamInsts gk tc inst_tys mod
   return (mkBindsRep gk tc, repTyInsts)
 
 {-
@@ -347,13 +347,13 @@ mkBindsRep gk tycon =
 --       type Rep_D a b = ...representation type for D ...
 --------------------------------------------------------------------------------
 
-tc_mkRepFamInsts :: GenericKind     -- Gen0 or Gen1
-               -> TyCon           -- The type to generate representation for
-               -> Type            -- The above TyCon applied to its type
-                                  -- arguments in the generated instance
-               -> Module          -- Used as the location of the new RepTy
-               -> TcM (FamInst)   -- Generated representation0 coercion
-tc_mkRepFamInsts gk tycon inst_ty mod =
+tc_mkRepFamInsts :: GenericKind -- Gen0 or Gen1
+               -> TyCon         -- The type to generate representation for
+               -> [Type]        -- The type(s) to which Generic(1) is applied
+                                -- in the generated instance
+               -> Module        -- Used as the location of the new RepTy
+               -> TcM (FamInst) -- Generated representation0 coercion
+tc_mkRepFamInsts gk tycon inst_tys mod =
        -- Consider the example input tycon `D`, where data D a b = D_ a
        -- Also consider `R:DInt`, where { data family D x y :: * -> *
        --                               ; data instance D Int a b = D_ a }
@@ -363,6 +363,20 @@ tc_mkRepFamInsts gk tycon inst_ty mod =
          Gen1 -> tcLookupTyCon rep1TyConName
 
      ; fam_envs <- tcGetFamInstEnvs
+
+     ; let -- If the derived instance is
+           --   instance Generic (Foo x)
+           -- then:
+           --   `arg_ki` = *, `inst_ty` = Foo x :: *
+           --
+           -- If the derived instance is
+           --   instance Generic1 (Bar x :: k -> *)
+           -- then:
+           --   `arg_k` = k, `inst_ty` = Bar x :: k -> *
+           (arg_ki, inst_ty) = case (gk, inst_tys) of
+             (Gen0, [inst_t])        -> (liftedTypeKind, inst_t)
+             (Gen1, [arg_k, inst_t]) -> (arg_k,          inst_t)
+             _ -> pprPanic "tc_mkRepFamInsts" (ppr inst_tys)
 
      ; let mbFamInst         = tyConFamInst_maybe tycon
            -- If we're examining a data family instance, we grab the parent
@@ -380,7 +394,7 @@ tc_mkRepFamInsts gk tycon inst_ty mod =
              where all_tyvars = tyConTyVars tycon
 
        -- `repTy` = D1 ... (C1 ... (S1 ... (Rec0 a))) :: * -> *
-     ; repTy <- tc_mkRepTy gk_ tycon
+     ; repTy <- tc_mkRepTy gk_ tycon arg_ki
 
        -- `rep_name` is a name we generate for the synonym
      ; rep_name <- let mkGen = case gk of Gen0 -> mkGenR; Gen1 -> mkGen1R
@@ -392,7 +406,7 @@ tc_mkRepFamInsts gk tycon inst_ty mod =
        -- of the tyvars might have been instantiated when deriving.
        -- See Note [Generating a correctly typed Rep instance].
      ; let env      = zipTyEnv tyvars inst_args
-           in_scope = mkInScopeSet (tyCoVarsOfType inst_ty)
+           in_scope = mkInScopeSet (tyCoVarsOfTypes inst_tys)
            subst    = mkTvSubst in_scope env
            repTy'   = substTy  subst repTy
            tcv' = tyCoVarsOfTypeList inst_ty
@@ -400,7 +414,7 @@ tc_mkRepFamInsts gk tycon inst_ty mod =
            tvs'     = toposortTyVars tv'
            cvs'     = toposortTyVars cv'
            axiom    = mkSingleCoAxiom Nominal rep_name tvs' cvs'
-                                      fam_tc [inst_ty] repTy'
+                                      fam_tc inst_tys repTy'
 
      ; newFamInst SynFamilyInst axiom  }
 
@@ -477,9 +491,12 @@ tc_mkRepTy ::  -- Gen0_ or Gen1_, for Rep or Rep1
                GenericKind_
               -- The type to generate representation for
             -> TyCon
+              -- The kind of the representation type's argument
+              -- See Note [Handling kinds in a Rep instance]
+            -> Kind
                -- Generated representation0 type
             -> TcM Type
-tc_mkRepTy gk_ tycon =
+tc_mkRepTy gk_ tycon k =
   do
     d1      <- tcLookupTyCon d1TyConName
     c1      <- tcLookupTyCon c1TyConName
@@ -521,27 +538,30 @@ tc_mkRepTy gk_ tycon =
 
     fix_env <- getFixityEnv
 
-    let mkSum' a b = mkTyConApp plus  [a,b]
-        mkProd a b = mkTyConApp times [a,b]
-        mkComp a b = mkTyConApp comp  [a,b]
-        mkRec0 a   = mkBoxTy uAddr uChar uDouble uFloat uInt uWord rec0 a
-        mkRec1 a   = mkTyConApp rec1  [a]
+    let mkSum' a b = mkTyConApp plus  [k,a,b]
+        mkProd a b = mkTyConApp times [k,a,b]
+        -- The second kind variable of (:.:) must always be *.
+        -- See Note [Handling kinds in a Rep instance]
+        mkComp a b = mkTyConApp comp  [k,liftedTypeKind,a,b]
+        mkRec0 a   = mkBoxTy uAddr uChar uDouble uFloat uInt uWord rec0 k a
+        mkRec1 a   = mkTyConApp rec1  [k,a]
         mkPar1     = mkTyConTy  par1
-        mkD    a   = mkTyConApp d1 [ metaDataTy, sumP (tyConDataCons a) ]
-        mkC      a = mkTyConApp c1 [ metaConsTy a
+        mkD    a   = mkTyConApp d1 [ k, metaDataTy, sumP (tyConDataCons a) ]
+        mkC      a = mkTyConApp c1 [ k
+                                   , metaConsTy a
                                    , prod (dataConInstOrigArgTys a
                                             . mkTyVarTys . tyConTyVars $ tycon)
                                           (dataConSrcBangs    a)
                                           (dataConImplBangs   a)
                                           (dataConFieldLabels a)]
-        mkS mlbl su ss ib a = mkTyConApp s1 [metaSelTy mlbl su ss ib, a]
+        mkS mlbl su ss ib a = mkTyConApp s1 [k, metaSelTy mlbl su ss ib, a]
 
         -- Sums and products are done in the same way for both Rep and Rep1
-        sumP [] = mkTyConTy v1
+        sumP [] = mkTyConApp v1 [k]
         sumP l  = foldBal mkSum' . map mkC  $ l
         -- The Bool is True if this constructor has labelled fields
         prod :: [Type] -> [HsSrcBang] -> [HsImplBang] -> [FieldLabel] -> Type
-        prod [] _  _  _  = mkTyConTy u1
+        prod [] _  _  _  = mkTyConApp u1 [k]
         prod l  sb ib fl = foldBal mkProd
                                    [ ASSERT(null fl || length fl > j)
                                      arg t sb' ib' (if null fl
@@ -631,16 +651,17 @@ mkBoxTy :: TyCon -- UAddr
         -> TyCon -- UInt
         -> TyCon -- UWord
         -> TyCon -- Rec0
+        -> Kind  -- What to instantiate Rec0's kind variable with
         -> Type
         -> Type
-mkBoxTy uAddr uChar uDouble uFloat uInt uWord rec0 ty
-  | ty `eqType` addrPrimTy   = mkTyConTy uAddr
-  | ty `eqType` charPrimTy   = mkTyConTy uChar
-  | ty `eqType` doublePrimTy = mkTyConTy uDouble
-  | ty `eqType` floatPrimTy  = mkTyConTy uFloat
-  | ty `eqType` intPrimTy    = mkTyConTy uInt
-  | ty `eqType` wordPrimTy   = mkTyConTy uWord
-  | otherwise                = mkTyConApp rec0 [ty]
+mkBoxTy uAddr uChar uDouble uFloat uInt uWord rec0 k ty
+  | ty `eqType` addrPrimTy   = mkTyConApp uAddr   [k]
+  | ty `eqType` charPrimTy   = mkTyConApp uChar   [k]
+  | ty `eqType` doublePrimTy = mkTyConApp uDouble [k]
+  | ty `eqType` floatPrimTy  = mkTyConApp uFloat  [k]
+  | ty `eqType` intPrimTy    = mkTyConApp uInt    [k]
+  | ty `eqType` wordPrimTy   = mkTyConApp uWord   [k]
+  | otherwise                = mkTyConApp rec0    [k,ty]
 
 --------------------------------------------------------------------------------
 -- Dealing with sums
@@ -867,4 +888,33 @@ a Rep(1) instance. To do so, we create a type variable substitution that maps
 the tyConTyVars of the TyCon to their counterparts in the fully instantiated
 type. (For example, using T above as example, you'd map a :-> Int.) We then
 apply the substitution to the RHS before generating the instance.
+
+Note [Handling kinds in a Rep instance]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Because Generic1 is poly-kinded, the representation types were generalized to
+be kind-polymorphic as well. As a result, tc_mkRepTy must explicitly apply
+the kind of the instance being derived to all the representation type
+constructors. For instance, if you have
+
+    data Empty (a :: k) = Empty deriving Generic1
+
+Then the generated code is now approximately (with -fprint-explicit-kinds
+syntax):
+
+    instance Generic1 k (Empty k) where
+      type Rep1 k (Empty k) = U1 k
+
+Most representation types have only one kind variable, making them easy to deal
+with. The only non-trivial case is (:.:), which is only used in Generic1
+instances:
+
+    newtype (:.:) (f :: k2 -> *) (g :: k1 -> k2) (p :: k1) =
+        Comp1 { unComp1 :: f (g p) }
+
+Here, we do something a bit counter-intuitive: we make k1 be the kind of the
+instance being derived, and we always make k2 be *. Why *? It's because
+the code that GHC generates using (:.:) is always of the form x :.: Rec1 y
+for some types x and y. In other words, the second type to which (:.:) is
+applied always has kind k -> *, for some kind k, so k2 cannot possibly be
+anything other than * in a generated Generic1 instance.
 -}

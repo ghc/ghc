@@ -6,6 +6,9 @@
   * `Foreign.Ptr` now exports the constructors for `IntPtr` and `WordPtr`
     (#11983)
 
+  * `Generic1`, as well as the associated datatypes and typeclasses in
+    `GHC.Generics`, are now poly-kinded (#10604)
+
 ## 4.9.0.0  *TBA*
 
   * Bundled with GHC 8.0

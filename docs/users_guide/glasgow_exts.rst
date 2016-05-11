@@ -7429,7 +7429,7 @@ signature" for a type constructor? These are the forms:
 
 -  An associated type or data family declaration has a CUSK precisely if
    its enclosing class has a CUSK. ::
-       
+
        class C a where                -- no CUSK
          type AT a b                  -- no CUSK, b is defaulted
 
@@ -7545,7 +7545,7 @@ Explicit kind quantification
 
 Enabled by :ghc-flag:`-XTypeInType`, GHC now supports explicit kind quantification,
 as in these examples: ::
-  
+
   data Proxy :: forall k. k -> *
   f :: (forall k (a :: k). Proxy a -> ()) -> Int
 
@@ -7705,7 +7705,7 @@ Here is an example of this in action: ::
 
 In the last line, we use the promoted constructor ``'MkCompose``, which has
 kind ::
-  
+
   forall (a :: *) (b :: *) (f :: b -> *) (g :: a -> b) (x :: a).
     f (g x) -> Compose f g x
 
@@ -7728,7 +7728,7 @@ these flags, especially :ghc-flag:`-fprint-explicit-kinds`.
 .. index::
    single: TYPE
    single: representation polymorphism
-   
+
 .. _runtime-rep:
 
 Runtime representation polymorphism
@@ -7755,7 +7755,7 @@ Here are the key definitions, all available from ``GHC.Exts``: ::
                   | PtrRepUnlifted   -- for things like `Array#`
                   | IntRep           -- for things like `Int#`
                   | ...
-  
+
   type * = TYPE PtrRepLifted    -- * is just an ordinary type synonym
 
 The idea is that we have a new fundamental type constant ``TYPE``, which
@@ -11113,7 +11113,7 @@ bang it would be lazy. Bang patterns can be nested of course: ::
 
     f2 (!x, y) = [x,y]
 
-Here, ``f2`` is strict in ``x`` but not in ``y``. 
+Here, ``f2`` is strict in ``x`` but not in ``y``.
 
 Note the following points:
 
@@ -13019,16 +13019,20 @@ datatypes and their internal representation as a sum-of-products: ::
       -- Convert from the representation to the datatype
       to    :: (Rep a) x -> a
 
-    class Generic1 f where
-      type Rep1 f :: * -> *
+    class Generic1 (f :: k -> *) where
+      type Rep1 f :: k -> *
 
       from1  :: f a -> Rep1 f a
       to1    :: Rep1 f a -> f a
 
 ``Generic1`` is used for functions that can only be defined over type
-containers, such as ``map``. Instances of these classes can be derived
-by GHC with the :ghc-flag:`-XDeriveGeneric`, and are
-necessary to be able to define generic instances automatically.
+containers, such as ``map``. Note that ``Generic1`` ranges over types of kind
+``* -> *`` by default, but if the :ghc-flag:`-XPolyKinds` extension is enabled,
+then it can range of types of kind ``k -> *``, for any kind ``k``.
+
+Instances of these classes can be derived by GHC with the
+:ghc-flag:`-XDeriveGeneric` extension, and are necessary to be able to define
+generic instances automatically.
 
 For example, a user-defined datatype of trees ::
 

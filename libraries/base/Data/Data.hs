@@ -1632,7 +1632,8 @@ comp1Constr = mkConstr comp1DataType "Comp1" [] Prefix
 comp1DataType :: DataType
 comp1DataType = mkDataType "GHC.Generics.:.:" [comp1Constr]
 
-instance (Typeable f, Typeable g, Data p, Data (f (g p)))
+instance (Typeable (f :: * -> *), Typeable (g :: * -> *),
+          Data p, Data (f (g p)))
     => Data ((f :.: g) p) where
   gfoldl k z (Comp1 c) = z Comp1 `k` c
   toConstr (Comp1 _) = m1Constr
