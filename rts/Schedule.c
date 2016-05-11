@@ -1626,11 +1626,14 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
             if (was_syncing) {
                 stgFree(idle_cap);
             }
-            if (was_syncing && (prev_sync == SYNC_GC_SEQ ||
-                                prev_sync == SYNC_GC_PAR)) {
+            if (was_syncing &&
+                (prev_sync == SYNC_GC_SEQ || prev_sync == SYNC_GC_PAR) &&
+                !(sched_state == SCHED_INTERRUPTING && force_major)) {
                 // someone else had a pending sync request for a GC, so
                 // let's assume GC has been done and we don't need to GC
                 // again.
+                // Exception to this: if SCHED_INTERRUPTING, then we still
+                // need to do the final GC.
                 return;
             }
             if (sched_state == SCHED_SHUTTING_DOWN) {
