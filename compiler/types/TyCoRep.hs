@@ -79,7 +79,8 @@ module TyCoRep (
         emptyTCvSubst, mkEmptyTCvSubst, isEmptyTCvSubst,
         mkTCvSubst, mkTvSubst,
         getTvSubstEnv,
-        getCvSubstEnv, getTCvInScope, isInScope, notElemTCvSubst,
+        getCvSubstEnv, getTCvInScope, getTCvSubstRangeFVs,
+        isInScope, notElemTCvSubst,
         setTvSubstEnv, setCvSubstEnv, zapTCvSubst,
         extendTCvInScope, extendTCvInScopeList, extendTCvInScopeSet,
         extendTCvSubst,
@@ -1765,6 +1766,15 @@ getCvSubstEnv (TCvSubst _ _ env) = env
 
 getTCvInScope :: TCvSubst -> InScopeSet
 getTCvInScope (TCvSubst in_scope _ _) = in_scope
+
+-- | Returns the free variables of the types in the range of a substitution as
+-- a non-deterministic set.
+getTCvSubstRangeFVs :: TCvSubst -> VarSet
+getTCvSubstRangeFVs (TCvSubst _ tenv cenv)
+    = unionVarSet tenvFVs cenvFVs
+  where
+    tenvFVs = tyCoVarsOfTypes $ varEnvElts tenv
+    cenvFVs = tyCoVarsOfCos   $ varEnvElts cenv
 
 isInScope :: Var -> TCvSubst -> Bool
 isInScope v (TCvSubst in_scope _ _) = v `elemInScopeSet` in_scope

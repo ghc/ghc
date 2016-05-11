@@ -154,7 +154,7 @@ module Type (
         mkTCvSubst, zipTvSubst, mkTvSubstPrs,
         notElemTCvSubst,
         getTvSubstEnv, setTvSubstEnv,
-        zapTCvSubst, getTCvInScope,
+        zapTCvSubst, getTCvInScope, getTCvSubstRangeFVs,
         extendTCvInScope, extendTCvInScopeList, extendTCvInScopeSet,
         extendTCvSubst, extendCvSubst,
         extendTvSubst, extendTvSubstList, extendTvSubstAndInScope,

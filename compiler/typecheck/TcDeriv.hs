@@ -646,17 +646,23 @@ deriveTyData tvs tc tc_args deriv_pred
               -- We are assuming the tycon tyvars and the class tyvars are distinct
               mb_match        = tcUnifyTy inst_ty_kind cls_arg_kind
               Just kind_subst = mb_match
+              ki_subst_range  = getTCvSubstRangeFVs kind_subst
 
               all_tkvs        = toposortTyVars $
                                 fvVarList $ unionFV
                                   (tyCoFVsOfTypes tc_args_to_keep)
                                   (FV.mkFVs deriv_tvs)
 
-              unmapped_tkvs   = filter (`notElemTCvSubst` kind_subst) all_tkvs
-              (subst, tkvs)   = mapAccumL substTyVarBndr
+              -- See Note [Unification of two kind variables in deriving]
+              unmapped_tkvs   = filter (\v -> v `notElemTCvSubst` kind_subst
+                                      && not (v `elemVarSet` ki_subst_range))
+                                       all_tkvs
+              (subst, _)      = mapAccumL substTyVarBndr
                                           kind_subst unmapped_tkvs
               final_tc_args   = substTys subst tc_args_to_keep
               final_cls_tys   = substTys subst cls_tys
+              tkvs            = tyCoVarsOfTypesWellScoped $
+                                final_cls_tys ++ final_tc_args
 
         ; traceTc "derivTyData1" (vcat [ pprTvBndrs tvs, ppr tc, ppr tc_args, ppr deriv_pred
                                        , pprTvBndrs (tyCoVarsOfTypesList tc_args)
@@ -793,6 +799,46 @@ kind parameters. Consider this code (also from Trac #11732):
 Even though we requested an derived instance of the form (Cat k Fun), the
 kind unification will actually generate (Cat * Fun) (i.e., the same thing as if
 the user wrote deriving (Cat *)).
+
+Note [Unification of two kind variables in deriving]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As a special case of the Note above, it is possible to derive an instance of
+a poly-kinded typeclass for a poly-kinded datatype. For example:
+
+    class Category (cat :: k -> k -> *) where
+    newtype T (c :: k -> k -> *) a b = MkT (c a b) deriving Category
+
+This case is suprisingly tricky. To see why, let's write out what instance GHC
+will attempt to derive (using -fprint-explicit-kinds syntax):
+
+    instance Category k1 (T k2 c) where ...
+
+GHC will attempt to unify k1 and k2, which produces a substitution (kind_subst)
+that looks like [k2 :-> k1]. Importantly, we need to apply this substitution to
+the type variable binder for c, since its kind is (k2 -> k2 -> *).
+
+We used to accomplish this by doing the following:
+
+    unmapped_tkvs = filter (`notElemTCvSubst` kind_subst) all_tkvs
+    (subst, _)    = mapAccumL substTyVarBndr kind_subst unmapped_tkvs
+
+Where all_tkvs contains all kind variables in the class and instance types (in
+this case, all_tkvs = [k1,k2]). But since kind_subst only has one mapping,
+this results in unmapped_tkvs being [k1], and as a consequence, k1 gets mapped
+to another kind variable in subst! That is, subst = [k2 :-> k1, k1 :-> k_new].
+This is bad, because applying that substitution yields the following instance:
+
+   instance Category k_new (T k1 c) where ...
+
+In other words, keeping k1 in unmapped_tvks taints the substitution, resulting
+in an ill-kinded instance (this caused Trac #11837).
+
+To prevent this, we need to filter out any variable from all_tkvs which either
+
+1. Appears in the domain of kind_subst. notElemTCvSubst checks this.
+2. Appears in the range of kind_subst. To do this, we compute the free
+   variable set of the range of kind_subst with getTCvSubstRangeFVs, and check
+   if a kind variable appears in that set.
 
 Note [Eta-reducing type synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1070,11 +1116,15 @@ inferConstraints tvs main_cls cls_tys inst_ty rep_tc rep_tc_args mkTheta
             -- (which is the case for functor-like constraints), then we
             -- explicitly unify the subtype's kinds with (* -> *).
             -- See Note [Inferring the instance context]
-            subst = foldl' composeTCvSubst emptyTCvSubst (catMaybes mbSubsts)
-            unmapped_tvs   = filter (`notElemTCvSubst` subst) tvs
-            (subst', tvs') = mapAccumL substTyVarBndr subst unmapped_tvs
+            subst          = foldl' composeTCvSubst
+                                    emptyTCvSubst (catMaybes mbSubsts)
+            subst_range    = getTCvSubstRangeFVs subst
+            unmapped_tvs   = filter (\v -> v `notElemTCvSubst` subst
+                                   && not (v `elemVarSet` subst_range)) tvs
+            (subst', _)    = mapAccumL substTyVarBndr subst unmapped_tvs
             preds'         = substThetaOrigin subst' preds
             inst_tys'      = substTys subst' inst_tys
+            tvs'           = tyCoVarsOfTypesWellScoped inst_tys'
         in mkTheta preds' tvs' inst_tys'
 
     -- is_functor_like: see Note [Inferring the instance context]
