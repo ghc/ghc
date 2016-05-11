@@ -3799,9 +3799,12 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
    IF_DEBUG(linker, i=1);
    if (i == 0) return 1;
 
-   debugBelch( "sectab offset = %" FMT_Int "\n", ((UChar*)sectab) - ((UChar*)hdr) );
-   debugBelch( "symtab offset = %" FMT_Int "\n", ((UChar*)symtab) - ((UChar*)hdr) );
-   debugBelch( "strtab offset = %" FMT_Int "\n", ((UChar*)strtab) - ((UChar*)hdr) );
+   debugBelch("sectab offset = %" FMT_SizeT "\n",
+              ((UChar*)sectab) - ((UChar*)hdr) );
+   debugBelch("symtab offset = %" FMT_SizeT "\n",
+              ((UChar*)symtab) - ((UChar*)hdr) );
+   debugBelch("strtab offset = %" FMT_SizeT "\n",
+              ((UChar*)strtab) - ((UChar*)hdr) );
 
    debugBelch("\n" );
    debugBelch( "Machine:           0x%x\n", (UInt32)(hdr->Machine) );

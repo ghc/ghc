@@ -424,18 +424,19 @@ void traceCapsetEvent (EventTypeNum tag,
         tracePreface();
         switch (tag) {
         case EVENT_CAPSET_CREATE:   // (capset, capset_type)
-            debugBelch("created capset %" FMT_Word " of type %d\n", (W_)capset, (int)info);
+            debugBelch("created capset %" FMT_Word32 " of type %d\n", capset,
+                       (int)info);
             break;
         case EVENT_CAPSET_DELETE:   // (capset)
-            debugBelch("deleted capset %" FMT_Word "\n", (W_)capset);
+            debugBelch("deleted capset %" FMT_Word32 "\n", capset);
             break;
         case EVENT_CAPSET_ASSIGN_CAP:  // (capset, capno)
-            debugBelch("assigned cap %" FMT_Word " to capset %" FMT_Word "\n",
-                       (W_)info, (W_)capset);
+            debugBelch("assigned cap %" FMT_Word " to capset %" FMT_Word32 "\n",
+                       info, capset);
             break;
         case EVENT_CAPSET_REMOVE_CAP:  // (capset, capno)
-            debugBelch("removed cap %" FMT_Word " from capset %" FMT_Word "\n",
-                       (W_)info, (W_)capset);
+            debugBelch("removed cap %" FMT_Word " from capset %" FMT_Word32
+                       "\n", info, capset);
             break;
         }
         RELEASE_LOCK(&trace_utx);

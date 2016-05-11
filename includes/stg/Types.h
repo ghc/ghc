@@ -21,6 +21,11 @@
 #ifndef STGTYPES_H
 #define STGTYPES_H
 
+#if defined(mingw32_HOST_OS)
+/* Inform mingw we want the ISO rather than Windows printf format specifiers. */
+#define __USE_MINGW_ANSI_STDIO 1
+#endif
+
 /* ISO C 99 says:
  * "C++ implementations should define these macros only when
  * __STDC_LIMIT_MACROS is defined before <stdint.h> is included."
