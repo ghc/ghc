@@ -183,6 +183,9 @@ pre {
 .keyword { font-weight: normal; }
 .def { font-weight: bold; }
 
+@media print {
+  #footer { display: none; }
+}
 
 /* @end */
 
