@@ -25,6 +25,8 @@
 #include "Storage.h"
 #include "Threads.h"
 
+#include "sm/GCUtils.h"
+#include "sm/MarkWeak.h"
 #include "sm/Sanity.h"
 
 /* -----------------------------------------------------------------------------
@@ -265,10 +267,25 @@ static rtsBool tidyWeakList(generation *gen)
 
                 new_gen = Bdescr((P_)w)->gen;
                 gct->evac_gen_no = new_gen->no;
+                gct->failed_to_evac = rtsFalse;
 
                 // evacuate the value and finalizer
-                evacuate(&w->value);
-                evacuate(&w->finalizer);
+                //
+                // This WEAK object will not be considered by tidyWeakList
+                // during this collection because it is in a generation >= N,
+                // but it is on the mutable list so we must evacuate all of its
+                // pointers because some of them may point into a younger
+                // generation.
+                scavengeLiveWeak(w);
+
+                if (gct->failed_to_evac) {
+                    debugTrace(DEBUG_weak,
+                               "putting weak pointer %p into mutable list",
+                               w);
+                    gct->failed_to_evac = rtsFalse;
+                    recordMutableGen_GC((StgClosure *)w, new_gen->no);
+                }
+
                 // remove this weak ptr from the old_weak_ptr list
                 *last_w = w->link;
                 next_w  = w->link;
@@ -422,3 +439,19 @@ markWeakPtrList ( void )
     }
 }
 
+/* -----------------------------------------------------------------------------
+   Fully scavenge a known-to-be-alive weak pointer.
+
+   In scavenge_block, we only partially scavenge a weak pointer because it may
+   turn out to be dead. This function should be called when we decide that the
+   weak pointer is alive after this GC.
+   -------------------------------------------------------------------------- */
+
+void
+scavengeLiveWeak(StgWeak *w)
+{
+    evacuate(&w->value);
+    evacuate(&w->key);
+    evacuate(&w->finalizer);
+    evacuate(&w->cfinalizers);
+}

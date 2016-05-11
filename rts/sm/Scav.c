@@ -28,6 +28,8 @@
 #include "Capability.h"
 #include "LdvProfile.h"
 
+#include "sm/MarkWeak.h"
+
 static void scavenge_stack (StgPtr p, StgPtr stack_end);
 
 static void scavenge_large_bitmap (StgPtr p,
@@ -1293,7 +1295,6 @@ scavenge_one(StgPtr p)
     case CONSTR_1_1:
     case CONSTR_0_2:
     case CONSTR_2_0:
-    case WEAK:
     case PRIM:
     case IND_PERM:
     {
@@ -1305,6 +1306,10 @@ scavenge_one(StgPtr p)
         }
         break;
     }
+
+    case WEAK:
+        scavengeLiveWeak((StgWeak *)p);
+        break;
 
     case MUT_VAR_CLEAN:
     case MUT_VAR_DIRTY: {
