@@ -104,8 +104,9 @@ test('allocLimit4', [ extra_run_opts('+RTS -xq300k -RTS'),
                       omit_ways(['ghci']) ],
                     compile_and_run, [''])
 
-test('performGC', [ only_ways(['threaded1','threaded2']), req_smp
-                  , extra_run_opts('400 +RTS -qg -RTS') ],
+test('performGC', [ only_ways(['threaded1','threaded2']), req_smp,
+                    reqlib('random'),
+                    extra_run_opts('400 +RTS -qg -RTS') ],
                     compile_and_run, [''])
 
 # -----------------------------------------------------------------------------

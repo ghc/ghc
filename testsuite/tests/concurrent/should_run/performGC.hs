@@ -6,7 +6,7 @@ import System.Environment
 import Control.Concurrent
 import Control.Exception
 import Control.Monad
-import RandomPGC
+import System.Random
 import System.Mem
 import qualified Data.Set as Set
 
