@@ -54,6 +54,7 @@ ppDecl summ links (L loc decl) (mbDoc, fnArgsDoc) instances fixities subdocs spl
                                          ty fixities splice unicode qual
   ForD d                         -> ppFor summ links loc (mbDoc, fnArgsDoc) d fixities splice unicode qual
   InstD _                        -> noHtml
+  DerivD _                       -> noHtml
   _                              -> error "declaration not supported by ppDecl"
 
 

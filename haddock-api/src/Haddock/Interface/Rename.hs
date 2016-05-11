@@ -328,6 +328,9 @@ renameDecl decl = case decl of
   InstD d -> do
     d' <- renameInstD d
     return (InstD d')
+  DerivD d -> do
+    d' <- renameDerivD d
+    return (DerivD d')
   _ -> error "renameDecl"
 
 renameLThing :: (a Name -> RnM (a DocName)) -> Located (a Name) -> RnM (Located (a DocName))
@@ -502,6 +505,13 @@ renameInstD (TyFamInstD { tfid_inst = d }) = do
 renameInstD (DataFamInstD { dfid_inst = d }) = do
   d' <- renameDataFamInstD d
   return (DataFamInstD { dfid_inst = d' })
+
+renameDerivD :: DerivDecl Name -> RnM (DerivDecl DocName)
+renameDerivD (DerivDecl { deriv_type = ty
+                        , deriv_overlap_mode = omode }) = do
+  ty' <- renameLSigType ty
+  return (DerivDecl { deriv_type = ty'
+                    , deriv_overlap_mode = omode })
 
 renameClsInstD :: ClsInstDecl Name -> RnM (ClsInstDecl DocName)
 renameClsInstD (ClsInstDecl { cid_overlap_mode = omode

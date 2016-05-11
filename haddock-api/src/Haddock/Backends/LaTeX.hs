@@ -300,6 +300,7 @@ ppDecl (L loc decl) (doc, fnArgsDoc) instances subdocs _fixities = case decl of
       ppLPatSig loc (doc, fnArgsDoc) lname ty unicode
   ForD d                         -> ppFor loc (doc, fnArgsDoc) d unicode
   InstD _                        -> empty
+  DerivD _                       -> empty
   _                              -> error "declaration not supported by ppDecl"
   where
     unicode = False
