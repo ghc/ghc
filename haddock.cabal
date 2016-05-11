@@ -1,5 +1,5 @@
 name:                 haddock
-version:              2.17.0
+version:              2.17.1
 synopsis:             A documentation-generation tool for Haskell libraries
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries
@@ -19,18 +19,14 @@ extra-source-files:
   CHANGES
   README
   doc/Makefile
-  doc/README
-  doc/aclocal.m4
-  doc/config.mk.in
-  doc/configure.ac
-  doc/docbook-xml.mk
-  doc/fptools.css
-  doc/haddock.xml
+  doc/README.md
+  doc/*.rst
+  doc/conf.py
   haddock-api/src/haddock.sh
   html-test/src/*.hs
   html-test/ref/*.html
   hypsrc-test/src/*.hs
-  hypsrc-test/ref/*.html
+  hypsrc-test/ref/src/*.html
   latex-test/src/Simple/*.hs
   latex-test/ref/Simple/*.tex
   latex-test/ref/Simple/*.sty

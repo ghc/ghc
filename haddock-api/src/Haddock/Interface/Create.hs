@@ -533,7 +533,7 @@ mkExportItems
           let declNames = getMainDeclBinder (unL decl)
           in case () of
             _
-              -- temp hack: we filter out separately exported ATs, since we haven't decided how
+              -- TODO: temp hack: we filter out separately exported ATs, since we haven't decided how
               -- to handle them yet. We should really give an warning message also, and filter the
               -- name out in mkVisibleNames...
               | t `elem` declATs (unL decl)        -> return []

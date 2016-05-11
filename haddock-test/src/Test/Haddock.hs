@@ -79,15 +79,16 @@ runHaddock cfg@(Config { .. }) = do
     putStrLn "Generating documentation..."
     forM_ cfgPackages $ \tpkg -> do
         haddockStdOut <- openFile cfgHaddockStdOut WriteMode
-        handle <- runProcess' cfgHaddockPath $ processConfig
-            { pcArgs = concat
-                [ cfgHaddockArgs
-                , pure $ "--odir=" ++ outDir cfgDirConfig tpkg
-                , tpkgFiles tpkg
-                ]
-            , pcEnv = Just $ cfgEnv
-            , pcStdOut = Just $ haddockStdOut
-            }
+        let pc = processConfig
+                    { pcArgs = concat
+                        [ cfgHaddockArgs
+                        , pure $ "--odir=" ++ outDir cfgDirConfig tpkg
+                        , tpkgFiles tpkg
+                        ]
+                    , pcEnv = Just $ cfgEnv
+                    , pcStdOut = Just $ haddockStdOut
+                    }
+        handle <- runProcess' cfgHaddockPath pc
         waitForSuccess "Failed to run Haddock on specified test files" handle
 
 
