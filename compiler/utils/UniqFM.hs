@@ -349,12 +349,12 @@ pprUniqFM ppr_elt ufm
 -- The order of variables is non-deterministic and for pretty-printing that
 -- shouldn't be a problem.
 -- Having this function helps contain the non-determinism created with
--- eltsUFM.
-pprUFM :: ([a] -> SDoc) -- ^ The pretty printing function to use on the elements
-       -> UniqFM a      -- ^ The things to be pretty printed
+-- nonDetEltsUFM.
+pprUFM :: UniqFM a      -- ^ The things to be pretty printed
+       -> ([a] -> SDoc) -- ^ The pretty printing function to use on the elements
        -> SDoc          -- ^ 'SDoc' where the things have been pretty
                         -- printed
-pprUFM pp ufm = pp (nonDetEltsUFM ufm)
+pprUFM ufm pp = pp (nonDetEltsUFM ufm)
 
 -- | Determines the pluralisation suffix appropriate for the length of a set
 -- in the same way that plural from Outputable does for lists.

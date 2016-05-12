@@ -402,7 +402,7 @@ checkInstCoverage be_liberal clas theta inst_taus
                             <+> text "determine rhs type"<>plural rs
                             <+> pprQuotedList rs ]
                     , text "Un-determined variable" <> pluralVarSet undet_set <> colon
-                            <+> pprVarSet (pprWithCommas ppr) undet_set
+                            <+> pprVarSet undet_set (pprWithCommas ppr)
                     , ppWhen (isEmptyVarSet $ pSnd undetermined_tvs) $
                       ppSuggestExplicitKinds
                     , ppWhen (not be_liberal &&

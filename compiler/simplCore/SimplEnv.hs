@@ -132,10 +132,11 @@ pprSimplEnv env
   = vcat [text "TvSubst:" <+> ppr (seTvSubst env),
           text "CvSubst:" <+> ppr (seCvSubst env),
           text "IdSubst:" <+> ppr (seIdSubst env),
-          text "InScope:" <+> vcat (map ppr_one in_scope_vars)
+          text "InScope:" <+> in_scope_vars_doc
     ]
   where
-   in_scope_vars = varEnvElts (getInScopeVars (seInScope env))
+   in_scope_vars_doc = pprVarSet (getInScopeVars (seInScope env))
+                                 (vcat . map ppr_one)
    ppr_one v | isId v = ppr v <+> ppr (idUnfolding v)
              | otherwise = ppr v
 

@@ -65,6 +65,7 @@ import SrcLoc
 import Bag
 import Outputable
 import Util
+import UniqFM
 
 import Control.Monad
 import Data.List  ( partition )
@@ -214,7 +215,7 @@ data ZonkEnv
         -- Is only consulted lazily; hence knot-tying
 
 instance Outputable ZonkEnv where
-  ppr (ZonkEnv _ _ty_env var_env) = vcat (map ppr (varEnvElts var_env))
+  ppr (ZonkEnv _ _ty_env var_env) = pprUFM var_env (vcat . map ppr)
 
 
 -- The EvBinds have to already be zonked, but that's usually the case.

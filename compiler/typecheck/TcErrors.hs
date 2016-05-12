@@ -178,7 +178,7 @@ report_unsolved mb_binds_var err_as_warn type_errors expr_holes type_holes wante
              free_tvs = tyCoVarsOfWC wanted
 
        ; traceTc "reportUnsolved (after zonking and tidying):" $
-         vcat [ pprVarSet pprTvBndrs free_tvs
+         vcat [ pprVarSet free_tvs pprTvBndrs
               , ppr wanted ]
 
        ; warn_redundant <- woptM Opt_WarnRedundantConstraints

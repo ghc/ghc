@@ -562,7 +562,7 @@ unusedInjectiveVarsErr (Pair invis_vars vis_vars) errorBuilder tyfamEqn
       has_kinds = not $ isEmptyVarSet invis_vars
 
       doc = sep [ what <+> text "variable" <>
-                  pluralVarSet tvs <+> pprVarSet (pprQuotedList . toposortTyVars) tvs
+                  pluralVarSet tvs <+> pprVarSet tvs (pprQuotedList . toposortTyVars)
                 , text "cannot be inferred from the right-hand side." ]
       what = case (has_types, has_kinds) of
                (True, True)   -> text "Type and kind"

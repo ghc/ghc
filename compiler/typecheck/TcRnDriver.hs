@@ -2428,7 +2428,7 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
          , vcat (map ppr rules)
          , vcat (map ppr vects)
          , text "Dependent modules:" <+>
-                ppr (sortBy cmp_mp $ eltsUFM (imp_dep_mods imports))
+                pprUFM (imp_dep_mods imports) (ppr . sortBy cmp_mp)
          , text "Dependent packages:" <+>
                 ppr (sortBy stableUnitIdCmp $ imp_dep_pkgs imports)]
   where         -- The two uses of sortBy are just to reduce unnecessary

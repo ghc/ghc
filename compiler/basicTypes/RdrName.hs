@@ -74,6 +74,7 @@ import FastString
 import FieldLabel
 import Outputable
 import Unique
+import UniqFM
 import Util
 import StaticFlags( opt_PprStyle_Debug )
 
@@ -333,7 +334,7 @@ instance Outputable LocalRdrEnv where
     = hang (text "LocalRdrEnv {")
          2 (vcat [ text "env =" <+> pprOccEnv ppr_elt env
                  , text "in_scope ="
-                    <+> braces (pprWithCommas ppr (nameSetElems ns))
+                    <+> pprUFM ns (braces . pprWithCommas ppr)
                  ] <+> char '}')
     where
       ppr_elt name = parens (ppr (getUnique (nameOccName name))) <+> ppr name

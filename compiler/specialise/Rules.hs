@@ -50,6 +50,7 @@ import VarSet
 import Name             ( Name, NamedThing(..), nameIsLocalOrFrom )
 import NameSet
 import NameEnv
+import UniqFM
 import Unify            ( ruleMatchTyX )
 import BasicTypes       ( Activation, CompilerPhase, isActive, pprRuleName )
 import StaticFlags      ( opt_PprStyle_Debug )
@@ -357,8 +358,9 @@ extendRuleBase rule_base rule
   = extendNameEnv_Acc (:) singleton rule_base (ruleIdName rule) rule
 
 pprRuleBase :: RuleBase -> SDoc
-pprRuleBase rules = vcat [ pprRules (tidyRules emptyTidyEnv rs)
-                         | rs <- nameEnvElts rules ]
+pprRuleBase rules = pprUFM rules $ \rss ->
+  vcat [ pprRules (tidyRules emptyTidyEnv rs)
+       | rs <- rss ]
 
 {-
 ************************************************************************

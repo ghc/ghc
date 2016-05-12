@@ -196,9 +196,9 @@ pluralVarSet = pluralUFM
 -- to use varSetElems at the call site. This prevents from let-binding
 -- non-deterministically ordered lists and reusing them where determinism
 -- matters.
-pprVarSet :: ([Var] -> SDoc) -- ^ The pretty printing function to use on the
+pprVarSet :: VarSet          -- ^ The things to be pretty printed
+          -> ([Var] -> SDoc) -- ^ The pretty printing function to use on the
                              -- elements
-          -> VarSet          -- ^ The things to be pretty printed
           -> SDoc            -- ^ 'SDoc' where the things have been pretty
                              -- printed
 pprVarSet = pprUFM

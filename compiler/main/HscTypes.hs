@@ -486,10 +486,10 @@ emptyPackageIfaceTable = emptyModuleEnv
 
 pprHPT :: HomePackageTable -> SDoc
 -- A bit aribitrary for now
-pprHPT hpt
-  = vcat [ hang (ppr (mi_module (hm_iface hm)))
+pprHPT hpt = pprUFM hpt $ \hms ->
+    vcat [ hang (ppr (mi_module (hm_iface hm)))
               2 (ppr (md_types (hm_details hm)))
-         | hm <- eltsUFM hpt ]
+         | hm <- hms ]
 
 lookupHptByModule :: HomePackageTable -> Module -> Maybe HomeModInfo
 -- The HPT is indexed by ModuleName, not Module,
