@@ -269,13 +269,7 @@ static rtsBool tidyWeakList(generation *gen)
                 gct->evac_gen_no = new_gen->no;
                 gct->failed_to_evac = rtsFalse;
 
-                // evacuate the value and finalizer
-                //
-                // This WEAK object will not be considered by tidyWeakList
-                // during this collection because it is in a generation >= N,
-                // but it is on the mutable list so we must evacuate all of its
-                // pointers because some of them may point into a younger
-                // generation.
+                // evacuate the fields of the weak ptr
                 scavengeLiveWeak(w);
 
                 if (gct->failed_to_evac) {

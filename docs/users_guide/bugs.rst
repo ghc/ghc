@@ -486,11 +486,6 @@ Bugs in GHC
      data A :: Type where
        B :: forall (a :: A). A
 
--  There is known to be maleficent interactions between weak references and
-   laziness. Particularly, it has been observed that placing a thunk containing
-   a reference to a weak reference inside of another weak reference may cause
-   runtime crashes. See :ghc-ticket:`11108` for details.
-
 .. _bugs-ghci:
 
 Bugs in GHCi (the interactive GHC)
