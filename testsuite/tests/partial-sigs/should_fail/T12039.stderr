@@ -1,0 +1,4 @@
+
+T12039.hs:5:11: error:
+    Wildcard ‘_’ not allowed
+      in the declaration for class ‘B’
