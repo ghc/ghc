@@ -35,7 +35,7 @@
 
 static void  checkSmallBitmap    ( StgPtr payload, StgWord bitmap, uint32_t );
 static void  checkLargeBitmap    ( StgPtr payload, StgLargeBitmap*, uint32_t );
-static void  checkClosureShallow ( StgClosure * );
+static void  checkClosureShallow ( const StgClosure * );
 static void  checkSTACK          (StgStack *stack);
 
 /* -----------------------------------------------------------------------------
@@ -79,9 +79,9 @@ checkLargeBitmap( StgPtr payload, StgLargeBitmap* large_bitmap, uint32_t size )
  */
 
 static void
-checkClosureShallow( StgClosure* p )
+checkClosureShallow( const StgClosure* p )
 {
-    StgClosure *q;
+    const StgClosure *q;
 
     q = UNTAG_CLOSURE(p);
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));

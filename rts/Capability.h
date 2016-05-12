@@ -260,7 +260,7 @@ extern PendingSync * volatile pending_sync;
 //
 void waitForCapability (Capability **cap/*in/out*/, Task *task);
 
-EXTERN_INLINE void recordMutableCap (StgClosure *p, Capability *cap,
+EXTERN_INLINE void recordMutableCap (const StgClosure *p, Capability *cap,
                                         uint32_t gen);
 
 EXTERN_INLINE void recordClosureMutated (Capability *cap, StgClosure *p);
@@ -354,7 +354,7 @@ INLINE_HEADER rtsBool emptyInbox(Capability *cap);
  * -------------------------------------------------------------------------- */
 
 EXTERN_INLINE void
-recordMutableCap (StgClosure *p, Capability *cap, uint32_t gen)
+recordMutableCap (const StgClosure *p, Capability *cap, uint32_t gen)
 {
     bdescr *bd;
 

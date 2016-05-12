@@ -194,13 +194,13 @@ INLINE_HEADER P_ INTLIKE_CLOSURE(int n) {
    ------------------------------------------------------------------------- */
 
 static inline StgWord
-GET_CLOSURE_TAG(StgClosure * p)
+GET_CLOSURE_TAG(const StgClosure * p)
 {
     return (StgWord)p & TAG_MASK;
 }
 
 static inline StgClosure *
-UNTAG_CLOSURE(StgClosure * p)
+UNTAG_CLOSURE(const StgClosure * p)
 {
     return (StgClosure*)((StgWord)p & ~TAG_MASK);
 }
@@ -247,7 +247,7 @@ INLINE_HEADER rtsBool LOOKS_LIKE_INFO_PTR (StgWord p)
     return (p && (IS_FORWARDING_PTR(p) || LOOKS_LIKE_INFO_PTR_NOT_NULL(p))) ? rtsTrue : rtsFalse;
 }
 
-INLINE_HEADER rtsBool LOOKS_LIKE_CLOSURE_PTR (void *p)
+INLINE_HEADER rtsBool LOOKS_LIKE_CLOSURE_PTR (const void *p)
 {
     return LOOKS_LIKE_INFO_PTR((StgWord)(UNTAG_CLOSURE((StgClosure *)(p)))->header.info);
 }
@@ -337,9 +337,9 @@ EXTERN_INLINE StgWord bco_sizeW ( StgBCO *bco )
  *
  * (Also for 'closure_sizeW' below)
  */
-EXTERN_INLINE uint32_t closure_sizeW_ (StgClosure *p, StgInfoTable *info);
+EXTERN_INLINE uint32_t closure_sizeW_ (const StgClosure *p, StgInfoTable *info);
 EXTERN_INLINE uint32_t
-closure_sizeW_ (StgClosure *p, StgInfoTable *info)
+closure_sizeW_ (const StgClosure *p, StgInfoTable *info)
 {
     switch (info->type) {
     case THUNK_0_1:
@@ -399,8 +399,8 @@ closure_sizeW_ (StgClosure *p, StgInfoTable *info)
 }
 
 // The definitive way to find the size, in words, of a heap-allocated closure
-EXTERN_INLINE uint32_t closure_sizeW (StgClosure *p);
-EXTERN_INLINE uint32_t closure_sizeW (StgClosure *p)
+EXTERN_INLINE uint32_t closure_sizeW (const StgClosure *p);
+EXTERN_INLINE uint32_t closure_sizeW (const StgClosure *p)
 {
     return closure_sizeW_(p, get_itbl(p));
 }
@@ -505,7 +505,7 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
 #endif
 
 #ifdef PROFILING
-void LDV_recordDead (StgClosure *c, uint32_t size);
+void LDV_recordDead (const StgClosure *c, uint32_t size);
 #endif
 
 EXTERN_INLINE void overwritingClosure (StgClosure *p);

@@ -96,7 +96,7 @@ static void aggregateCensusInfo( void );
 
 static void dumpCensus( Census *census );
 
-static rtsBool closureSatisfiesConstraints( StgClosure* p );
+static rtsBool closureSatisfiesConstraints( const StgClosure* p );
 
 /* ----------------------------------------------------------------------------
  * Find the "closure identity", which is a unique pointer representing
@@ -104,7 +104,7 @@ static rtsBool closureSatisfiesConstraints( StgClosure* p );
  * heap profile.
  * ------------------------------------------------------------------------- */
 static void *
-closureIdentity( StgClosure *p )
+closureIdentity( const StgClosure *p )
 {
     switch (RtsFlags.ProfFlags.doHeapProfile) {
 
@@ -181,7 +181,7 @@ doingRetainerProfiling( void )
 
 #ifdef PROFILING
 void
-LDV_recordDead( StgClosure *c, uint32_t size )
+LDV_recordDead( const StgClosure *c, uint32_t size )
 {
     void *id;
     uint32_t t;
@@ -576,7 +576,7 @@ strMatchesSelector( const char* str, const char* sel )
  * testing against all the specified constraints.
  * -------------------------------------------------------------------------- */
 static rtsBool
-closureSatisfiesConstraints( StgClosure* p )
+closureSatisfiesConstraints( const StgClosure* p )
 {
 #if !defined(PROFILING)
     (void)p;   /* keep gcc -Wall happy */

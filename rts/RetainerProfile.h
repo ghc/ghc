@@ -33,7 +33,7 @@ extern StgWord flip;
   ((((StgWord)(c)->header.prof.hp.rs & 1) ^ flip) == 0)
 
 static inline RetainerSet *
-retainerSetOf( StgClosure *c )
+retainerSetOf( const StgClosure *c )
 {
     ASSERT( isRetainerSetFieldValid(c) );
     // StgWord has the same size as pointers, so the following type

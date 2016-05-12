@@ -28,7 +28,7 @@
  * header portion, so that the caller can find the next closure.
  * ----------------------------------------------------------------------- */
 STATIC_INLINE uint32_t
-processHeapClosureForDead( StgClosure *c )
+processHeapClosureForDead( const StgClosure *c )
 {
     uint32_t size;
     const StgInfoTable *info;

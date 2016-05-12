@@ -359,7 +359,7 @@ uint32_t mblock_map_count = 0;
 MbcCacheLine mblock_cache[MBC_ENTRIES];
 
 static MBlockMap *
-findMBlockMap(void *p)
+findMBlockMap(const void *p)
 {
     uint32_t i;
     StgWord32 hi = (StgWord32) (((StgWord)p) >> 32);
@@ -373,7 +373,7 @@ findMBlockMap(void *p)
     return NULL;
 }
 
-StgBool HEAP_ALLOCED_miss(StgWord mblock, void *p)
+StgBool HEAP_ALLOCED_miss(StgWord mblock, const void *p)
 {
     MBlockMap *map;
     MBlockMapLine value;
