@@ -183,8 +183,9 @@ mkBootTypeEnv exports ids tcs fam_insts
         -- Do make sure that we keep Ids that are already Global.
         -- When typechecking an .hs-boot file, the Ids come through as
         -- GlobalIds.
-    final_ids = [ if isLocalId id then globaliseAndTidyId id
-                                  else id
+    final_ids = [ (if isLocalId id then globaliseAndTidyId id
+                                   else id)
+                        `setIdUnfolding` BootUnfolding
                 | id <- ids
                 , keep_it id ]
 

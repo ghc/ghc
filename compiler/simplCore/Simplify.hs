@@ -2911,6 +2911,7 @@ simplUnfolding :: SimplEnv-> TopLevelFlag -> InId -> Unfolding -> SimplM Unfoldi
 simplUnfolding env top_lvl id unf
   = case unf of
       NoUnfolding -> return unf
+      BootUnfolding -> return unf
       OtherCon {} -> return unf
 
       DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = args }

@@ -323,6 +323,7 @@ liftSimple aexpr
 isToplevel :: Var -> Bool
 isToplevel v | isId v    = case realIdUnfolding v of
                              NoUnfolding                     -> False
+                             BootUnfolding                   -> False
                              OtherCon      {}                -> True
                              DFunUnfolding {}                -> True
                              CoreUnfolding {uf_is_top = top} -> top

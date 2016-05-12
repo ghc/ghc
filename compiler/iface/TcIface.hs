@@ -146,7 +146,7 @@ knots are tied through the EPS.  No problem!
 typecheckIface :: ModIface      -- Get the decls from here
                -> IfG ModDetails
 typecheckIface iface
-  = initIfaceLcl (mi_module iface) (text "typecheckIface") $ do
+  = initIfaceLcl (mi_module iface) (text "typecheckIface") (mi_boot iface) $ do
         {       -- Get the right set of decls and rules.  If we are compiling without -O
                 -- we discard pragmas before typechecking, so that we don't "see"
                 -- information that we shouldn't.  From a versioning point of view
@@ -1241,16 +1241,18 @@ tcIdDetails _ (IfRecSelId tc naughty)
     tyThingPatSyn _ = panic "tcIdDetails: expecting patsyn"
 
 tcIdInfo :: Bool -> Name -> Type -> IfaceIdInfo -> IfL IdInfo
-tcIdInfo ignore_prags name ty info
-  | ignore_prags = return vanillaIdInfo
-  | otherwise    = case info of
-                        NoInfo       -> return vanillaIdInfo
-                        HasInfo info -> foldlM tcPrag init_info info
-  where
+tcIdInfo ignore_prags name ty info = do
+    lcl_env <- getLclEnv
     -- Set the CgInfo to something sensible but uninformative before
     -- we start; default assumption is that it has CAFs
-    init_info = vanillaIdInfo
-
+    let init_info | if_boot lcl_env = vanillaIdInfo `setUnfoldingInfo` BootUnfolding
+                  | otherwise       = vanillaIdInfo
+    if ignore_prags
+        then return init_info
+        else case info of
+                NoInfo -> return init_info
+                HasInfo info -> foldlM tcPrag init_info info
+  where
     tcPrag :: IdInfo -> IfaceInfoItem -> IfL IdInfo
     tcPrag info HsNoCafRefs        = return (info `setCafInfo`   NoCafRefs)
     tcPrag info (HsArity arity)    = return (info `setArityInfo` arity)

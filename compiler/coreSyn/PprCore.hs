@@ -484,6 +484,7 @@ instance Outputable UnfoldingSource where
 
 instance Outputable Unfolding where
   ppr NoUnfolding                = text "No unfolding"
+  ppr BootUnfolding              = text "No unfolding (from boot)"
   ppr (OtherCon cs)              = text "OtherCon" <+> ppr cs
   ppr (DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = args })
        = hang (text "DFun:" <+> ptext (sLit "\\")

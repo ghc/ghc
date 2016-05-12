@@ -49,7 +49,7 @@ module CoreSyn (
         Unfolding(..),  UnfoldingGuidance(..), UnfoldingSource(..),
 
         -- ** Constructing 'Unfolding's
-        noUnfolding, evaldUnfolding, mkOtherCon,
+        noUnfolding, bootUnfolding, evaldUnfolding, mkOtherCon,
         unSaturatedOk, needSaturated, boringCxtOk, boringCxtNotOk,
 
         -- ** Predicates and deconstruction on 'Unfolding'
@@ -59,6 +59,7 @@ module CoreSyn (
         isExpandableUnfolding, isConLikeUnfolding, isCompulsoryUnfolding,
         isStableUnfolding, hasStableCoreUnfolding_maybe,
         isClosedUnfolding, hasSomeUnfolding,
+        isBootUnfolding,
         canUnfold, neverUnfoldGuidance, isStableSource,
 
         -- * Annotated expression data types
@@ -975,7 +976,10 @@ The @Unfolding@ type is declared here to avoid numerous loops
 -- identifier would have if we substituted its definition in for the identifier.
 -- This type should be treated as abstract everywhere except in "CoreUnfold"
 data Unfolding
-  = NoUnfolding        -- ^ We have no information about the unfolding
+  = NoUnfolding        -- ^ We have no information about the unfolding.
+
+  | BootUnfolding      -- ^ We have no information about the unfolding, because
+                       -- this 'Id' came from an @hi-boot@ file.
 
   | OtherCon [AltCon]  -- ^ It ain't one of these constructors.
                        -- @OtherCon xs@ also indicates that something has been evaluated
@@ -1160,6 +1164,11 @@ evaldUnfolding :: Unfolding
 noUnfolding    = NoUnfolding
 evaldUnfolding = OtherCon []
 
+-- | There is no known 'Unfolding', because this came from an
+-- hi-boot file.
+bootUnfolding :: Unfolding
+bootUnfolding = BootUnfolding
+
 mkOtherCon :: [AltCon] -> Unfolding
 mkOtherCon = OtherCon
 
@@ -1260,8 +1269,13 @@ isClosedUnfolding _                  = True
 
 -- | Only returns False if there is no unfolding information available at all
 hasSomeUnfolding :: Unfolding -> Bool
-hasSomeUnfolding NoUnfolding = False
-hasSomeUnfolding _           = True
+hasSomeUnfolding NoUnfolding   = False
+hasSomeUnfolding BootUnfolding = False
+hasSomeUnfolding _             = True
+
+isBootUnfolding :: Unfolding -> Bool
+isBootUnfolding BootUnfolding = True
+isBootUnfolding _             = False
 
 neverUnfoldGuidance :: UnfoldingGuidance -> Bool
 neverUnfoldGuidance UnfNever = True

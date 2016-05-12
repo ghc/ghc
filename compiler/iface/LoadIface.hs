@@ -423,7 +423,7 @@ loadInterface doc_str mod from
         let
             loc_doc = text file_path
         in
-        initIfaceLcl mod loc_doc $ do
+        initIfaceLcl mod loc_doc (mi_boot iface) $ do
 
         --      Load the new ModIface into the External Package State
         -- Even home-package interfaces loaded by loadInterface

@@ -1600,9 +1600,11 @@ setLocalRdrEnv rdr_env thing_inside
 ************************************************************************
 -}
 
-mkIfLclEnv :: Module -> SDoc -> IfLclEnv
-mkIfLclEnv mod loc = IfLclEnv { if_mod     = mod,
+mkIfLclEnv :: Module -> SDoc -> Bool -> IfLclEnv
+mkIfLclEnv mod loc boot
+                   = IfLclEnv { if_mod     = mod,
                                 if_loc     = loc,
+                                if_boot    = boot,
                                 if_tv_env  = emptyFsEnv,
                                 if_id_env  = emptyFsEnv }
 
@@ -1644,9 +1646,9 @@ initIfaceCheck doc hsc_env do_this
                     }
       initTcRnIf 'i' hsc_env gbl_env () do_this
 
-initIfaceLcl :: Module -> SDoc -> IfL a -> IfM lcl a
-initIfaceLcl mod loc_doc thing_inside
-  = setLclEnv (mkIfLclEnv mod loc_doc) thing_inside
+initIfaceLcl :: Module -> SDoc -> Bool -> IfL a -> IfM lcl a
+initIfaceLcl mod loc_doc hi_boot_file thing_inside
+  = setLclEnv (mkIfLclEnv mod loc_doc hi_boot_file) thing_inside
 
 getIfModule :: IfL Module
 getIfModule = do { env <- getLclEnv; return (if_mod env) }

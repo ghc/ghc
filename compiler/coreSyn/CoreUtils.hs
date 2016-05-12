@@ -1836,6 +1836,7 @@ diffIdInfo env bndr1 bndr2
 -- redundant, and can lead to an exponential blow-up in complexity.
 diffUnfold :: RnEnv2 -> Unfolding -> Unfolding -> [SDoc]
 diffUnfold _   NoUnfolding    NoUnfolding                 = []
+diffUnfold _   BootUnfolding  BootUnfolding               = []
 diffUnfold _   (OtherCon cs1) (OtherCon cs2) | cs1 == cs2 = []
 diffUnfold env (DFunUnfolding bs1 c1 a1)
                (DFunUnfolding bs2 c2 a2)

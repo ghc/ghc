@@ -1065,6 +1065,7 @@ callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
                                     is_wf is_exp guidance
           | otherwise -> traceInline dflags "Inactive unfolding:" (ppr id) Nothing
         NoUnfolding      -> Nothing
+        BootUnfolding    -> Nothing
         OtherCon {}      -> Nothing
         DFunUnfolding {} -> Nothing     -- Never unfold a DFun
 

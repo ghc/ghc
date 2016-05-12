@@ -748,6 +748,7 @@ wantSpecImport :: DynFlags -> Unfolding -> Bool
 wantSpecImport dflags unf
  = case unf of
      NoUnfolding      -> False
+     BootUnfolding    -> False
      OtherCon {}      -> False
      DFunUnfolding {} -> True
      CoreUnfolding { uf_src = src, uf_guidance = _guidance }
