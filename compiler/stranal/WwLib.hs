@@ -757,7 +757,14 @@ mk_absent_let dflags arg
   where
     arg_ty  = idType arg
     abs_rhs = mkRuntimeErrorApp aBSENT_ERROR_ID arg_ty msg
-    msg     = showSDoc dflags (ppr arg <+> ppr (idType arg))
+    msg     = showSDoc (gopt_set dflags Opt_SuppressUniques)
+                       (ppr arg <+> ppr (idType arg))
+              -- We need to suppress uniques here because otherwise they'd
+              -- end up in the generated code as strings. This is bad for
+              -- determinism, because with different uniques the strings
+              -- will have different lengths and hence different costs for
+              -- the inliner leading to different inlining.
+              -- See also Note [Unique Determinism] in Unique
 
 mk_seq_case :: Id -> CoreExpr -> CoreExpr
 mk_seq_case arg body = Case (Var arg) (sanitiseCaseBndr arg) (exprType body) [(DEFAULT, [], body)]
