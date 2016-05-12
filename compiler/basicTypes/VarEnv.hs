@@ -24,15 +24,20 @@ module VarEnv (
         partitionVarEnv,
 
         -- * Deterministic Var environments (maps)
-        DVarEnv,
+        DVarEnv, DIdEnv,
 
         -- ** Manipulating these environments
         emptyDVarEnv,
+        dVarEnvElts,
         extendDVarEnv,
         lookupDVarEnv,
         foldDVarEnv,
         mapDVarEnv,
         alterDVarEnv,
+        plusDVarEnv_C,
+        unitDVarEnv,
+        delDVarEnv,
+        delDVarEnvList,
 
         -- * The InScopeSet type
         InScopeSet,
@@ -500,10 +505,14 @@ modifyVarEnv_Directly mangle_fn env key
 -- See Note [Deterministic UniqFM] in UniqDFM for explanation why we need
 -- DVarEnv.
 
-type DVarEnv elt   = UniqDFM elt
+type DVarEnv elt = UniqDFM elt
+type DIdEnv elt = DVarEnv elt
 
 emptyDVarEnv :: DVarEnv a
 emptyDVarEnv = emptyUDFM
+
+dVarEnvElts :: DVarEnv a -> [a]
+dVarEnvElts = eltsUDFM
 
 extendDVarEnv :: DVarEnv a -> Var -> a -> DVarEnv a
 extendDVarEnv = addToUDFM
@@ -519,3 +528,15 @@ mapDVarEnv = mapUDFM
 
 alterDVarEnv :: (Maybe a -> Maybe a) -> DVarEnv a -> Var -> DVarEnv a
 alterDVarEnv = alterUDFM
+
+plusDVarEnv_C :: (a -> a -> a) -> DVarEnv a -> DVarEnv a -> DVarEnv a
+plusDVarEnv_C = plusUDFM_C
+
+unitDVarEnv :: Var -> a -> DVarEnv a
+unitDVarEnv = unitUDFM
+
+delDVarEnv :: DVarEnv a -> Var -> DVarEnv a
+delDVarEnv = delFromUDFM
+
+delDVarEnvList :: DVarEnv a -> [Var] -> DVarEnv a
+delDVarEnvList = delListFromUDFM
