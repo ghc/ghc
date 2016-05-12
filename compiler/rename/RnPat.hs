@@ -595,14 +595,14 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                    -- ignoring the record field itself
                    -- Eg.  data R = R { x,y :: Int }
                    --      f x = R { .. }   -- Should expand to R {x=x}, not R{x=x,y=y}
-                 arg_in_scope lbl
+                 arg_in_scope lbl sel_name
                    = rdr `elemLocalRdrEnv` lcl_env
                    || notNull [ gre | gre <- lookupGRE_RdrName rdr rdr_env
                                     , case gre_par gre of
                                         ParentIs p     -> Just p /= parent_tc
                                         FldParent p _  -> Just p /= parent_tc
-                                        PatternSynonym -> False
-                                        NoParent       -> True ]
+                                        NoParent       -> True
+                                    , gre_name gre /= sel_name ]
                    where
                      rdr = mkVarUnqual lbl
 
@@ -614,7 +614,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                 , let gres = lookupGRE_Field_Name rdr_env sel lbl
                                 , not (null gres)  -- Check selector is in scope
                                 , case ctxt of
-                                    HsRecFieldCon {} -> arg_in_scope lbl
+                                    HsRecFieldCon {} -> arg_in_scope lbl sel
                                     _other           -> True ]
 
            ; addUsedGREs (map thdOf3 dot_dot_gres)

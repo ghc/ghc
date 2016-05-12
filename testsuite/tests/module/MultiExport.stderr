@@ -1,0 +1,3 @@
+
+MultiExport.hs:2:14: warning: [-Wduplicate-exports (in -Wdefault)]
+    ‘x’ is exported by ‘A(x, x)’ and ‘A(x, x)’

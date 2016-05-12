@@ -1,0 +1,12 @@
+
+T11970.hs:6:40: error:
+    • The type constructor ‘C’ is not the parent of the data constructor ‘B’.
+      Data constructors can only be exported with their parent type constructor.
+      Parent: B
+    • In the export: C(C, P, x, Q, B, recSel)
+
+T11970.hs:6:40: error:
+    • The type constructor ‘C’ is not the parent of the record selector ‘recSel’.
+      Record selectors can only be exported with their parent type constructor.
+      Parent: B
+    • In the export: C(C, P, x, Q, B, recSel)

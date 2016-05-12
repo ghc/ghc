@@ -350,3 +350,6 @@ test('T10233', extra_clean(['T01233a.hi', 'T01233a.o']),
 test('T11432', normal, compile_fail, [''])
 test('T11432a', normal, compile_fail, [''])
 test('T12026', normal, compile_fail, [''])
+test('T11970', normal, compile_fail, [''])
+test('T11970A', [], multimod_compile, ['T11970A','-Wunused-imports'])
+test('MultiExport', normal, compile, [''])

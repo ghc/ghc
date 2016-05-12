@@ -875,7 +875,7 @@ mkIfaceExports exports
   = sortBy stableAvailCmp (map sort_subs exports)
   where
     sort_subs :: AvailInfo -> AvailInfo
-    sort_subs (Avail b n) = Avail b n
+    sort_subs (Avail n) = Avail n
     sort_subs (AvailTC n [] fs) = AvailTC n [] (sort_flds fs)
     sort_subs (AvailTC n (m:ms) fs)
        | n==m      = AvailTC n (m:sortBy stableNameCmp ms) (sort_flds fs)
