@@ -117,14 +117,9 @@ typedef union {
 
     // layout.payload
     struct {
-    // See StgClosureInfo in InfoTables.h
-#if SIZEOF_VOID_P == 8
-        StgWord32 pos;
-        StgWord32 ptrs;
-#else
-        StgWord16 pos;
-        StgWord16 ptrs;
-#endif
+        // See StgClosureInfo in InfoTables.h
+        StgHalfWord pos;
+        StgHalfWord ptrs;
         StgPtr payload;
     } ptrs;
 
