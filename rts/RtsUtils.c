@@ -57,13 +57,11 @@ extern char *ctime_r(const time_t *, char *);
    -------------------------------------------------------------------------- */
 
 void *
-stgMallocBytes (int n, char *msg)
+stgMallocBytes (size_t n, char *msg)
 {
-    char *space;
-    size_t n2;
+    void *space;
 
-    n2 = (size_t) n;
-    if ((space = (char *) malloc(n2)) == NULL) {
+    if ((space = malloc(n)) == NULL) {
       /* Quoting POSIX.1-2008 (which says more or less the same as ISO C99):
        *
        *   "Upon successful completion with size not equal to 0, malloc() shall
@@ -85,13 +83,11 @@ stgMallocBytes (int n, char *msg)
 }
 
 void *
-stgReallocBytes (void *p, int n, char *msg)
+stgReallocBytes (void *p, size_t n, char *msg)
 {
-    char *space;
-    size_t n2;
+    void *space;
 
-    n2 = (size_t) n;
-    if ((space = (char *) realloc(p, (size_t) n2)) == NULL) {
+    if ((space = realloc(p, n)) == NULL) {
       /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
       rtsConfig.mallocFailHook((W_) n, msg); /*msg*/
       stg_exit(EXIT_INTERNAL_ERROR);
@@ -100,11 +96,11 @@ stgReallocBytes (void *p, int n, char *msg)
 }
 
 void *
-stgCallocBytes (int n, int m, char *msg)
+stgCallocBytes (size_t n, size_t m, char *msg)
 {
-    char *space;
+    void *space;
 
-    if ((space = (char *) calloc((size_t) n, (size_t) m)) == NULL) {
+    if ((space = calloc(n, m)) == NULL) {
       /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
       rtsConfig.mallocFailHook((W_) n*m, msg); /*msg*/
       stg_exit(EXIT_INTERNAL_ERROR);
