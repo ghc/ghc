@@ -35,6 +35,7 @@ import Util
 import Outputable
 import FastString
 import State
+import UniqDFM
 
 import Control.Monad
 #if __GLASGOW_HASKELL__ > 710
@@ -653,7 +654,7 @@ specImports dflags this_mod top_env done callers rule_base cds
     return ([], [])
 
   | otherwise =
-    do { let import_calls = varEnvElts cds
+    do { let import_calls = dVarEnvElts cds
        ; (rules, spec_binds) <- go rule_base import_calls
        ; return (rules, spec_binds) }
   where
@@ -1720,10 +1721,13 @@ type DictBind = (CoreBind, VarSet)
 type DictExpr = CoreExpr
 
 emptyUDs :: UsageDetails
-emptyUDs = MkUD { ud_binds = emptyBag, ud_calls = emptyVarEnv }
+emptyUDs = MkUD { ud_binds = emptyBag, ud_calls = emptyDVarEnv }
 
 ------------------------------------------------------------
-type CallDetails  = IdEnv CallInfoSet
+type CallDetails  = DIdEnv CallInfoSet
+  -- The order of specialized binds and rules depends on how we linearize
+  -- CallDetails, so to get determinism we must use a deterministic set here.
+  -- See Note [Deterministic UniqFM] in UniqDFM
 newtype CallKey   = CallKey [Maybe Type]                        -- Nothing => unconstrained type argument
 
 -- CallInfo uses a Map, thereby ensuring that
@@ -1768,13 +1772,16 @@ instance Ord CallKey where
                   cmp (Just t1) (Just t2) = cmpType t1 t2
 
 unionCalls :: CallDetails -> CallDetails -> CallDetails
-unionCalls c1 c2 = plusVarEnv_C unionCallInfoSet c1 c2
+unionCalls c1 c2 = plusDVarEnv_C unionCallInfoSet c1 c2
 
 unionCallInfoSet :: CallInfoSet -> CallInfoSet -> CallInfoSet
 unionCallInfoSet (CIS f calls1) (CIS _ calls2) = CIS f (calls1 `Map.union` calls2)
 
 callDetailsFVs :: CallDetails -> VarSet
-callDetailsFVs calls = foldVarEnv (unionVarSet . callInfoFVs) emptyVarSet calls
+callDetailsFVs calls =
+  nonDetFoldUDFM (unionVarSet . callInfoFVs) emptyVarSet calls
+  -- It's OK to use nonDetFoldUDFM here because we forget the ordering
+  -- immediately by converting to a nondeterministic set.
 
 callInfoFVs :: CallInfoSet -> VarSet
 callInfoFVs (CIS _ call_info) = Map.foldRight (\(_,fv) vs -> unionVarSet fv vs) emptyVarSet call_info
@@ -1783,7 +1790,7 @@ callInfoFVs (CIS _ call_info) = Map.foldRight (\(_,fv) vs -> unionVarSet fv vs) 
 singleCall :: Id -> [Maybe Type] -> [DictExpr] -> UsageDetails
 singleCall id tys dicts
   = MkUD {ud_binds = emptyBag,
-          ud_calls = unitVarEnv id $ CIS id $
+          ud_calls = unitDVarEnv id $ CIS id $
                      Map.singleton (CallKey tys) (dicts, call_fvs) }
   where
     call_fvs = exprsFreeVars dicts `unionVarSet` tys_fvs
@@ -2033,8 +2040,9 @@ callsForMe fn (MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
     --                 text "Calls for me =" <+> ppr calls_for_me]) $
     (uds_without_me, calls_for_me)
   where
-    uds_without_me = MkUD { ud_binds = orig_dbs, ud_calls = delVarEnv orig_calls fn }
-    calls_for_me = case lookupVarEnv orig_calls fn of
+    uds_without_me = MkUD { ud_binds = orig_dbs
+                          , ud_calls = delDVarEnv orig_calls fn }
+    calls_for_me = case lookupDVarEnv orig_calls fn of
                         Nothing -> []
                         Just (CIS _ calls) -> filter_dfuns (Map.toList calls)
 
@@ -2070,7 +2078,7 @@ splitDictBinds dbs bndr_set
 deleteCallsMentioning :: VarSet -> CallDetails -> CallDetails
 -- Remove calls *mentioning* bs
 deleteCallsMentioning bs calls
-  = mapVarEnv filter_calls calls
+  = mapDVarEnv filter_calls calls
   where
     filter_calls :: CallInfoSet -> CallInfoSet
     filter_calls (CIS f calls) = CIS f (Map.filter keep_call calls)
@@ -2078,7 +2086,7 @@ deleteCallsMentioning bs calls
 
 deleteCallsFor :: [Id] -> CallDetails -> CallDetails
 -- Remove calls *for* bs
-deleteCallsFor bs calls = delVarEnvList calls bs
+deleteCallsFor bs calls = delDVarEnvList calls bs
 
 {-
 ************************************************************************
