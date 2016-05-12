@@ -61,11 +61,11 @@ testMatchVersionedFilePath = do
 testModuleNames :: Action ()
 testModuleNames = do
     putBuild $ "==== Encode/decode module name"
-    test $ encodeModule "Data/Functor/" "Identity.hs" == "Data.Functor.Identity"
-    test $ encodeModule "./" "Prelude"                == "Prelude"
+    test $ encodeModule "Data/Functor" "Identity.hs" == "Data.Functor.Identity"
+    test $ encodeModule "" "Prelude"                 == "Prelude"
 
-    test $ decodeModule "Data.Functor.Identity" == ("Data/Functor/", "Identity")
-    test $ decodeModule "Prelude"               == ("./", "Prelude")
+    test $ decodeModule "Data.Functor.Identity" == ("Data/Functor", "Identity")
+    test $ decodeModule "Prelude"               == ("", "Prelude")
 
     test $ forAll names $ \n -> uncurry encodeModule (decodeModule n) == n
   where

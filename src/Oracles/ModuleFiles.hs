@@ -28,20 +28,22 @@ determineBuilder file = case takeExtension file of
 
 -- | Given a module name extract the directory and file name, e.g.:
 --
--- > decodeModule "Data.Functor.Identity" == ("Data/Functor/", "Identity")
--- > decodeModule "Prelude"               == ("./", "Prelude")
+-- > decodeModule "Data.Functor.Identity" == ("Data/Functor", "Identity")
+-- > decodeModule "Prelude"               == ("", "Prelude")
 decodeModule :: String -> (FilePath, String)
-decodeModule = splitFileName . replaceEq '.' '/'
+decodeModule modName = (intercalate "/" (init xs), last xs)
+  where
+    xs = words $ replaceEq '.' ' ' modName
 
 -- | Given the directory and file name find the corresponding module name, e.g.:
 --
--- > encodeModule "Data/Functor/" "Identity.hs" == "Data.Functor.Identity"
--- > encodeModule "./" "Prelude"                == "Prelude"
--- > uncurry encodeModule (decodeModule name)   == name
+-- > encodeModule "Data/Functor" "Identity.hs" == "Data.Functor.Identity"
+-- > encodeModule "" "Prelude"                 == "Prelude"
+-- > uncurry encodeModule (decodeModule name)  == name
 encodeModule :: FilePath -> String -> String
 encodeModule dir file
-    | dir == "./" = replaceEq '/' '.' $        takeBaseName file
-    | otherwise   = replaceEq '/' '.' $ dir ++ takeBaseName file
+    | dir == "" =                                takeBaseName file
+    | otherwise = replaceEq '/' '.' dir ++ '.' : takeBaseName file
 
 -- | Find the generator for a given 'Context' and a source file. For example:
 -- findGenerator (Context Stage1 compiler vanilla)
@@ -102,7 +104,7 @@ moduleFilesOracle = void $ do
         result <- fmap concat . forM dirs $ \dir -> do
             todo <- filterM (doesDirectoryExist . (dir -/-) . fst) modDirFiles
             forM todo $ \(mDir, mFiles) -> do
-                let fullDir = dir -/- mDir
+                let fullDir = unifyPath $ dir -/- mDir
                 files <- getDirectoryFiles fullDir ["*"]
                 let noBoot   = filter (not . (isSuffixOf "-boot")) files
                     cmp fe f = compare (dropExtension fe) f

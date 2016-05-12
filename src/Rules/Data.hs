@@ -44,7 +44,8 @@ buildPackageData context@Context {..} = do
         copyFile inTreeMk mk
         autogenFiles <- getDirectoryFiles (oldPath -/- "build") ["autogen/*"]
         createDirectory $ buildPath context -/- "autogen"
-        forM_ autogenFiles $ \file -> do
+        forM_ autogenFiles $ \file' -> do
+            let file = unifyPath file'
             copyFile (oldPath -/- "build" -/- file) (buildPath context -/- file)
         let haddockPrologue = "haddock-prologue.txt"
         copyFile (oldPath -/- haddockPrologue) (buildPath context -/- haddockPrologue)
@@ -111,7 +112,8 @@ buildPackageData context@Context {..} = do
                           ++ [ "posix" | not windows ]
                           ++ [ "win32" |     windows ]
                 -- TODO: adding cmm/S sources to C_SRCS is a hack; rethink after #18
-                cSrcs   <- getDirectoryFiles (pkgPath package) (map (-/- "*.c") dirs)
+                cSrcs   <- map unifyPath <$>
+                           getDirectoryFiles (pkgPath package) (map (-/- "*.c") dirs)
                 cmmSrcs <- getDirectoryFiles (pkgPath package) ["*.cmm"]
                 buildAdjustor   <- anyTargetArch ["i386", "powerpc", "powerpc64"]
                 buildStgCRunAsm <- anyTargetArch ["powerpc64le"]
