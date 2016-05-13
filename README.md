@@ -123,7 +123,8 @@ The best way to contribute is to try the new build system, report the issues
 you found, and attempt to fix them. Please note the codebase is very unstable
 at present and we expect a lot of further refactoring. The documentation is
 currently non-existent, but we are working on it: [#55][comments-issue],
-[#56][doc-issue].
+[#56][doc-issue]. See also [#239](https://github.com/snowleopard/hadrian/issues/239)
+for a list of issues on the critical path.
 
 Acknowledgements
 ----------------
