@@ -801,17 +801,25 @@ test('T9233',
 test('T10370',
      [ only_ways(['optasm']),
        compiler_stats_num_field('max_bytes_used', # Note [residency]
-          [(wordsize(64), 28256896, 15),
+          [(wordsize(64), 33049168, 15),
           # 2015-10-22    19548720
           # 2016-02-24    22823976   Changing Levity to RuntimeRep; not sure why this regresses though, even after some analysis
           # 2016-04-14    28256896   final demand analyzer run
+          # 2016-08-08    33049304
+          #     This change happened because we changed the behavior
+          #     of inlining across hs-boot files, so that we don't
+          #     inline if something comes from a boot file.  This
+          #     affected stats on bootstrapped GHC.  However,
+          #     when I set -i0.01 with profiling, the heap profiles
+          #     were identical, so I think it's just GC noise.
            (wordsize(32), 11371496, 15),
           # 2015-10-22    11371496
           ]),
        compiler_stats_num_field('peak_megabytes_allocated', # Note [residency]
-          [(wordsize(64), 101, 15),
+          [(wordsize(64), 121, 15),
           # 2015-10-22     76
           # 2016-04-14    101 final demand analyzer run
+          # 2016-08-08    121 see above
            (wordsize(32),  39, 15),
           # 2015-10-22     39
           ]),

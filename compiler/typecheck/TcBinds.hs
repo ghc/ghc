@@ -279,53 +279,6 @@ time by defaulting.  No no no.
 
 However [Oct 10] this is all handled automatically by the
 untouchable-range idea.
-
-Note [Inlining and hs-boot files]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this example (Trac #10083):
-
-    ---------- RSR.hs-boot ------------
-    module RSR where
-      data RSR
-      eqRSR :: RSR -> RSR -> Bool
-
-    ---------- SR.hs ------------
-    module SR where
-      import {-# SOURCE #-} RSR
-      data SR = MkSR RSR
-      eqSR (MkSR r1) (MkSR r2) = eqRSR r1 r2
-
-    ---------- RSR.hs ------------
-    module RSR where
-      import SR
-      data RSR = MkRSR SR -- deriving( Eq )
-      eqRSR (MkRSR s1) (MkRSR s2) = (eqSR s1 s2)
-      foo x y = not (eqRSR x y)
-
-When compiling RSR we get this code
-
-    RSR.eqRSR :: RSR -> RSR -> Bool
-    RSR.eqRSR = \ (ds1 :: RSR.RSR) (ds2 :: RSR.RSR) ->
-                case ds1 of _ { RSR.MkRSR s1 ->
-                case ds2 of _ { RSR.MkRSR s2 ->
-                SR.eqSR s1 s2 }}
-
-    RSR.foo :: RSR -> RSR -> Bool
-    RSR.foo = \ (x :: RSR) (y :: RSR) -> not (RSR.eqRSR x y)
-
-Now, when optimising foo:
-    Inline eqRSR (small, non-rec)
-    Inline eqSR  (small, non-rec)
-but the result of inlining eqSR from SR is another call to eqRSR, so
-everything repeats.  Neither eqSR nor eqRSR are (apparently) loop
-breakers.
-
-Solution: when compiling RSR, add a NOINLINE pragma to every function
-exported by the boot-file for RSR (if it exists).
-
-ALAS: doing so makes the boostrappted GHC itself slower by 8% overall
-      (on Trac #9872a-d, and T1969.  So I un-did this change, and
-      parked it for now.  Sigh.
 -}
 
 tcValBinds :: TopLevelFlag
@@ -340,19 +293,7 @@ tcValBinds top_lvl binds sigs thing_inside
         ; (poly_ids, sig_fn) <- tcAddPatSynPlaceholders patsyns $
                                 tcTySigs sigs
 
-        ; _self_boot <- tcSelfBootInfo
         ; let prag_fn = mkPragEnv sigs (foldr (unionBags . snd) emptyBag binds)
-
--- -------  See Note [Inlining and hs-boot files] (change parked) --------
---              prag_fn | isTopLevel top_lvl   -- See Note [Inlining and hs-boot files]
---                      , SelfBoot { sb_ids = boot_id_names } <- self_boot
---                      = foldNameSet add_no_inl prag_fn1 boot_id_names
---                      | otherwise
---                      = prag_fn1
---              add_no_inl boot_id_name prag_fn
---                = extendPragEnv prag_fn (boot_id_name, no_inl_sig boot_id_name)
---              no_inl_sig name = L boot_loc (InlineSig (L boot_loc name) neverInlinePragma)
---              boot_loc = mkGeneralSrcSpan (fsLit "The hs-boot file for this module")
 
                 -- Extend the envt right away with all the Ids
                 -- declared with complete type signatures

@@ -220,7 +220,7 @@ test('T10602', only_ways(['optasm']), multimod_compile, ['T10602','-v0'])
 test('T10627', only_ways(['optasm']), compile, [''])
 test('T10181', [expect_broken(10181), only_ways(['optasm'])], compile, [''])
 test('T10083',
-     expect_broken(10083),
+     normal,
      run_command,
      ['$MAKE -s --no-print-directory T10083'])
 test('T10689', normal, compile, [''])
