@@ -57,6 +57,7 @@ import SysTools
 import UniqFM
 import Util
 import qualified GHC.LanguageExtensions as LangExt
+import NameEnv
 
 import Data.Either ( rights, partitionEithers )
 import qualified Data.Map as Map
@@ -1139,10 +1140,23 @@ upsweep old_hpt stable_mods cleanup sccs = do
         -- Remove unwanted tmp files between compilations
         liftIO (cleanup hsc_env)
 
+        -- Get ready to tie the knot
+        type_env_var <- liftIO $ newIORef emptyNameEnv
+        let hsc_env1 = hsc_env { hsc_type_env_var =
+                                    Just (ms_mod mod, type_env_var) }
+        setSession hsc_env1
+
+        -- Lazily reload the HPT modules participating in the loop.
+        -- See Note [Tying the knot]--if we don't throw out the old HPT
+        -- and reinitalize the knot-tying process, anything that was forced
+        -- while we were previously typechecking won't get updated.
+        hsc_env2 <- liftIO $ reTypecheckLoop hsc_env1 mod done
+        setSession hsc_env2
+
         mb_mod_info
             <- handleSourceError
                    (\err -> do logger mod (Just err); return Nothing) $ do
-                 mod_info <- liftIO $ upsweep_mod hsc_env old_hpt stable_mods
+                 mod_info <- liftIO $ upsweep_mod hsc_env2 old_hpt stable_mods
                                                   mod mod_index nmods
                  logger mod Nothing -- log warnings
                  return (Just mod_info)
@@ -1153,8 +1167,8 @@ upsweep old_hpt stable_mods cleanup sccs = do
                 let this_mod = ms_mod_name mod
 
                         -- Add new info to hsc_env
-                    hpt1     = addToHpt (hsc_HPT hsc_env) this_mod mod_info
-                    hsc_env1 = hsc_env { hsc_HPT = hpt1 }
+                    hpt1     = addToHpt (hsc_HPT hsc_env2) this_mod mod_info
+                    hsc_env3 = hsc_env2 { hsc_HPT = hpt1, hsc_type_env_var = Nothing }
 
                         -- Space-saving: delete the old HPT entry
                         -- for mod BUT if mod is a hs-boot
@@ -1169,9 +1183,12 @@ upsweep old_hpt stable_mods cleanup sccs = do
                     done' = mod:done
 
                         -- fixup our HomePackageTable after we've finished compiling
-                        -- a mutually-recursive loop.  See reTypecheckLoop, below.
-                hsc_env2 <- liftIO $ reTypecheckLoop hsc_env1 mod done'
-                setSession hsc_env2
+                        -- a mutually-recursive loop.  We have to do this again
+                        -- to make sure we have the final unfoldings, which may
+                        -- not have been computed accurately in the previous
+                        -- retypecheck.
+                hsc_env4 <- liftIO $ reTypecheckLoop hsc_env3 mod done'
+                setSession hsc_env4
 
                 upsweep' old_hpt1 done' mods (mod_index+1) nmods
 
@@ -1399,7 +1416,10 @@ Following this fix, GHC can compile itself with --make -O2.
 reTypecheckLoop :: HscEnv -> ModSummary -> ModuleGraph -> IO HscEnv
 reTypecheckLoop hsc_env ms graph
   | Just loop <- getModLoop ms graph
-  , let non_boot = filter (not.isBootSummary) loop
+  -- SOME hs-boot files should still
+  -- get used, just not the loop-closer.
+  , let non_boot = filter (\l -> not (isBootSummary l &&
+                                 ms_mod l == ms_mod ms)) loop
   = typecheckLoop (hsc_dflags hsc_env) hsc_env (map ms_mod_name non_boot)
   | otherwise
   = return hsc_env

@@ -649,7 +649,10 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
     -- See also Note [hsc_type_env_var hack]
     type_env_var <- newIORef emptyNameEnv
     let mod = ms_mod mod_summary
-        hsc_env = hsc_env'{ hsc_type_env_var = Just (mod, type_env_var) }
+        hsc_env | isOneShot (ghcMode (hsc_dflags hsc_env'))
+                = hsc_env' { hsc_type_env_var = Just (mod, type_env_var) }
+                | otherwise
+                = hsc_env'
 
     -- NB: enter Hsc monad here so that we don't bail out early with
     -- -Werror on typechecker warnings; we also want to run the desugarer
