@@ -241,3 +241,5 @@ test('T12076', extra_clean(['T12076a.hi', 'T12076a.o']), multimod_compile, ['T12
 test('T12076lit', normal, compile, ['-O'])
 test('T12076sat', normal, compile, ['-O'])
 test('T12212', normal, compile, ['-O'])
+
+test('noinline01', only_ways(['optasm']), compile, ['-ddump-stg -dsuppress-uniques -O'])

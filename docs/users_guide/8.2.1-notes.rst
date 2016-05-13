@@ -157,6 +157,9 @@ ghc-prim
 
 -  Added new ``isByteArrayPinned#`` and ``isMutableByteArrayPinned#`` operation.
 
+-  New function ``noinline`` in ``GHC.Magic`` lets you mark that a function
+   should not be inlined.  It is optimized away after the simplifier runs.
+
 haskell98
 ~~~~~~~~~
 

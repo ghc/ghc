@@ -21,7 +21,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Magic ( inline, lazy, oneShot, runRW# ) where
+module GHC.Magic ( inline, noinline, lazy, oneShot, runRW# ) where
 
 import GHC.Prim
 import GHC.CString ()
@@ -44,6 +44,13 @@ import GHC.CString ()
 {-# NOINLINE[0] inline #-}
 inline :: a -> a
 inline x = x
+
+-- | The call @noinline f@ arranges that 'f' will not be inlined.
+-- It is removed during CorePrep so that its use imposes no overhead
+-- (besides the fact that it blocks inlining.)
+{-# NOINLINE noinline #-}
+noinline :: a -> a
+noinline x = x
 
 -- | The 'lazy' function restrains strictness analysis a little. The
 -- call @lazy e@ means the same as 'e', but 'lazy' has a magical

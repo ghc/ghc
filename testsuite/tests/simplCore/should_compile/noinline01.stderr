@@ -1,0 +1,29 @@
+
+==================== STG syntax: ====================
+Noinline01.f [InlPrag=INLINE (sat-args=1)]
+  :: forall t. t -> GHC.Types.Bool
+[GblId, Arity=1, Caf=NoCafRefs, Str=<L,A>, Unf=OtherCon []] =
+    \r [eta] GHC.Types.True [];
+
+Noinline01.g1 :: GHC.Types.Bool -> GHC.Types.Bool
+[GblId, Unf=OtherCon []] =
+    \u [] Noinline01.f;
+
+Noinline01.g :: GHC.Types.Bool
+[GblId] =
+    \u [] Noinline01.g1 GHC.Types.False;
+
+Noinline01.$trModule2 :: GHC.Types.TrName
+[GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []] =
+    NO_CCS GHC.Types.TrNameS! ["main"#];
+
+Noinline01.$trModule1 :: GHC.Types.TrName
+[GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []] =
+    NO_CCS GHC.Types.TrNameS! ["Noinline01"#];
+
+Noinline01.$trModule :: GHC.Types.Module
+[GblId, Caf=NoCafRefs, Str=m, Unf=OtherCon []] =
+    NO_CCS GHC.Types.Module! [Noinline01.$trModule2
+                              Noinline01.$trModule1];
+
+

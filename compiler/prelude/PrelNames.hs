@@ -2034,8 +2034,9 @@ breakpointJumpIdKey           = mkPreludeMiscIdUnique 113
 breakpointCondJumpIdKey       = mkPreludeMiscIdUnique 114
 breakpointAutoJumpIdKey       = mkPreludeMiscIdUnique 115
 
-inlineIdKey :: Unique
+inlineIdKey, noinlineIdKey :: Unique
 inlineIdKey                   = mkPreludeMiscIdUnique 120
+-- see below
 
 mapIdKey, groupWithIdKey, dollarIdKey :: Unique
 mapIdKey              = mkPreludeMiscIdUnique 121
@@ -2044,6 +2045,8 @@ dollarIdKey           = mkPreludeMiscIdUnique 123
 
 coercionTokenIdKey :: Unique
 coercionTokenIdKey    = mkPreludeMiscIdUnique 124
+
+noinlineIdKey                 = mkPreludeMiscIdUnique 125
 
 rationalToFloatIdKey, rationalToDoubleIdKey :: Unique
 rationalToFloatIdKey   = mkPreludeMiscIdUnique 130

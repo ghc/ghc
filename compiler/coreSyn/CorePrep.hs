@@ -110,6 +110,7 @@ The goal of this pass is to prepare for code generation.
     aren't inlined by some caller.
 
 9.  Replace (lazy e) by e.  See Note [lazyId magic] in MkId.hs
+    Also replace (noinline e) by e.
 
 10. Convert (LitInteger i t) into the core representation
     for the Integer i. Normally this uses mkInteger, but if
@@ -517,7 +518,8 @@ cpeRhsE _env expr@(Lit {}) = return (emptyFloats, expr)
 cpeRhsE env expr@(Var {})  = cpeApp env expr
 
 cpeRhsE env (Var f `App` _{-type-} `App` arg)
-  | f `hasKey` lazyIdKey          -- Replace (lazy a) by a
+  | f `hasKey` lazyIdKey          -- Replace (lazy a) with a, and
+ || f `hasKey` noinlineIdKey      -- Replace (noinline a) with a
   = cpeRhsE env arg               -- See Note [lazyId magic] in MkId
 
 cpeRhsE env (Var f `App` _runtimeRep `App` _type `App` arg)
