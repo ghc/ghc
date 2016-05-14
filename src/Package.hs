@@ -15,11 +15,8 @@ import GHC.Generics (Generic)
 import Data.String
 
 -- | The name of a Cabal package
-newtype PackageName = PackageName { getPackageName :: String }
+newtype PackageName = PackageName { fromPackageName :: String }
     deriving (Eq, Ord, IsString, Generic, Binary, Hashable, Typeable, NFData)
-
-instance Show PackageName where
-    show (PackageName name) = name
 
 -- TODO: Make PackageType more precise, #12
 -- TODO: Turn Program to Program FilePath thereby getting rid of programPath
@@ -37,23 +34,23 @@ data Package = Package
 
 -- | Prettyprint Package name.
 pkgNameString :: Package -> String
-pkgNameString = getPackageName . pkgName
+pkgNameString = fromPackageName . pkgName
 
 -- | Relative path to cabal file, e.g.: "libraries/Cabal/Cabal/Cabal.cabal"
 pkgCabalFile :: Package -> FilePath
-pkgCabalFile pkg = pkgPath pkg -/- getPackageName (pkgName pkg) <.> "cabal"
+pkgCabalFile pkg = pkgPath pkg -/- pkgNameString pkg <.> "cabal"
 
 -- | Smart constructor for a top-level package, e.g. 'compiler'.
 topLevel :: PackageName -> Package
-topLevel name = Package name (getPackageName name) Library
+topLevel name = Package name (fromPackageName name) Library
 
 -- | Smart constructor for a library package, e.g. 'array'.
 library :: PackageName -> Package
-library name = Package name ("libraries" -/- getPackageName name) Library
+library name = Package name ("libraries" -/- fromPackageName name) Library
 
 -- | Smart constructor for a utility package, e.g. 'haddock'.
 utility :: PackageName -> Package
-utility name = Package name ("utils" -/- getPackageName name) Program
+utility name = Package name ("utils" -/- fromPackageName name) Program
 
 -- | Amend package path. Useful when a package name doesn't match its path.
 setPath :: Package -> FilePath -> Package
@@ -65,17 +62,17 @@ setType pkg ty = pkg { pkgType = ty }
 
 -- | Check whether a package is a library.
 isLibrary :: Package -> Bool
-isLibrary (Package {pkgType=Library}) = True
+isLibrary (Package _ _ Library) = True
 isLibrary _ = False
 
 -- | Check whether a package is a program.
 isProgram :: Package -> Bool
-isProgram (Package {pkgType=Program}) = True
+isProgram (Package _ _ Program) = True
 isProgram _ = False
 
 -- TODO: Get rid of non-derived Show instances.
 instance Show Package where
-    show = show . pkgName
+    show = pkgNameString
 
 instance Eq Package where
     (==) = (==) `on` pkgName

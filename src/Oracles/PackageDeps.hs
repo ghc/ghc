@@ -7,7 +7,7 @@ import Base
 import Package
 import Settings.Paths
 
-newtype PackageDepsKey = PackageDepsKey PackageName
+newtype PackageDepsKey = PackageDepsKey String
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
 -- @packageDeps name@ is an action that given a 'Package' looks up its
@@ -15,8 +15,8 @@ newtype PackageDepsKey = PackageDepsKey PackageName
 -- computed by scanning package cabal files (see Rules.Cabal).
 packageDeps :: Package -> Action [PackageName]
 packageDeps pkg = do
-    res <- askOracle . PackageDepsKey . pkgName $ pkg
-    return . fromMaybe [] $ res
+    res <- askOracle . PackageDepsKey $ pkgNameString pkg
+    return . map PackageName $ fromMaybe [] res
 
 -- Oracle for the package dependencies file
 packageDepsOracle :: Rules ()
@@ -25,6 +25,6 @@ packageDepsOracle = do
         putOracle $ "Reading package dependencies..."
         contents <- readFileLines packageDependencies
         return . Map.fromList $
-            [ (p, ps) | line <- contents, let p:ps = map PackageName $ words line ]
+            [ (p, ps) | line <- contents, let p:ps = words line ]
     _ <- addOracle $ \(PackageDepsKey pkg) -> Map.lookup pkg <$> deps ()
     return ()
