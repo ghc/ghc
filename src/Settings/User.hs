@@ -16,30 +16,30 @@ import Settings.Default
 buildRootPath :: FilePath
 buildRootPath = "_build"
 
--- Control user-specific settings
+-- | Control user-specific command line arguments.
 userArgs :: Args
 userArgs = builder Ghc ? remove ["-Wall", "-fwarn-tabs"]
 
--- Control which packages get to be built
+-- | Control which packages get to be built.
 userPackages :: Packages
 userPackages = mempty
 
--- Add new user-defined packages
+-- | Add new user-defined packages.
 userKnownPackages :: [Package]
 userKnownPackages = []
 
--- | Control which ways library packages are built
+-- | Choose the integer library: integerGmp or integerSimple.
+integerLibrary :: Package
+integerLibrary = integerGmp
+
+-- | Control which ways library packages are built.
 -- FIXME: skip dynamic since it's currently broken #4
 userLibraryWays :: Ways
 userLibraryWays = remove [dynamic]
 
--- | Control which ways the 'rts' package is built
+-- | Control which ways the 'rts' package is built.
 userRtsWays :: Ways
 userRtsWays = mempty
-
--- | Choose the integer library: integerGmp or integerSimple
-integerLibrary :: Package
-integerLibrary = integerGmp
 
 -- | User-defined flags. Note the following type semantics:
 -- * Bool: a plain Boolean flag whose value is known at compile time
@@ -79,7 +79,7 @@ buildHaddock = return cmdBuildHaddock
 
 -- | Set to True to print full command lines during the build process. Note,
 -- this is a Predicate, hence you can enable verbose output for a chosen package
--- only, e.g.: verboseCommands = package ghcPrim
+-- only, e.g.: verboseCommands = package ghcPrim.
 verboseCommands :: Predicate
 verboseCommands = return False
 
