@@ -53,6 +53,7 @@ userRtsWays = mempty
 trackBuildSystem :: Bool
 trackBuildSystem = True
 
+-- TODO: This should be set automatically when validating.
 validating :: Bool
 validating = False
 
@@ -61,6 +62,12 @@ validating = False
 splitObjects :: Predicate
 splitObjects = (return cmdSplitObjects) &&^ defaultSplitObjects
 
+-- | Control when to build documentation.
+buildHaddock :: Predicate
+buildHaddock = return cmdBuildHaddock
+
+-- TODO: Do we need to be able to set these from command line?
+-- TODO: Turn below into ghcWays?
 dynamicGhcPrograms :: Bool
 dynamicGhcPrograms = False
 
@@ -70,12 +77,8 @@ ghciWithDebugger = False
 ghcProfiled :: Bool
 ghcProfiled = False
 
--- TODO: do we need to be able to set this from command line?
 ghcDebugged :: Bool
 ghcDebugged = False
-
-buildHaddock :: Predicate
-buildHaddock = return cmdBuildHaddock
 
 -- | Set to True to print full command lines during the build process. Note,
 -- this is a Predicate, hence you can enable verbose output for a chosen package
