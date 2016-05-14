@@ -19,6 +19,6 @@ INSTALL_HTML_DOC_DIRS += utils/haddock/doc/haddock
 endif
 
 html_utils/haddock/doc :
-	make -C utils/haddock/doc html SPHINX_BUILD=$(SPHINXBUILD)
+	$(MAKE) -C utils/haddock/doc html SPHINX_BUILD=$(SPHINXBUILD)
 	cp -R utils/haddock/doc/.build-html utils/haddock/doc/haddock
 
