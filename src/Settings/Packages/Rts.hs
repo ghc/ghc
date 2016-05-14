@@ -96,13 +96,13 @@ rtsPackageArgs = package rts ? do
 
         , builder (GhcPkg Stage1) ? mconcat
           [ remove ["rts/stage1/inplace-pkg-config"] -- TODO: fix, see #113
-          , arg $ rtsConf ]
+          , arg rtsConf ]
 
-        , builder HsCpp ? mconcat
-          [ arg ("-DTOP=" ++ quote top)
-          , arg ("-DFFI_INCLUDE_DIR=" ++ quote ffiIncludeDir)
-          , arg ("-DFFI_LIB_DIR=" ++ quote ffiLibraryDir)
-          , arg $ "-DFFI_LIB=" ++ quote libffiName ] ]
+        , builder HsCpp ? append
+          [ "-DTOP="             ++ quote top
+          , "-DFFI_INCLUDE_DIR=" ++ quote ffiIncludeDir
+          , "-DFFI_LIB_DIR="     ++ quote ffiLibraryDir
+          , "-DFFI_LIB="         ++ quote libffiName ] ]
 
 
 -- # If we're compiling on windows, enforce that we only support XP+
