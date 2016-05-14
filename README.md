@@ -80,8 +80,8 @@ a GHC [bug][ghc-split-objs-bug], you need a full clean rebuild when using this f
 #### User settings
 
 The `make`-based build system uses `mk/build.mk` to specify user build settings. We
-use [`src/Settings/User.hs`][user-settings] for the same purpose. Feel free to
-experiment following the Haddock comments.
+use [`src/Settings/User.hs`][user-settings] for the same purpose, see
+[documentation](doc/user-settings.md).
 
 #### Clean and full rebuild
 
