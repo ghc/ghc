@@ -123,7 +123,7 @@ verboseCommands = builder (Ghc Link)
 verboseCommands = builder (Gcc Compile) &&^ package compiler
 
 -- Use patterns when matching files:
-verboseCommands = file "//rts/sm/*" &&^ way threaded
+verboseCommands = output "//rts/sm/*" &&^ way threaded
 
 -- Print all commands:
 verboseCommands = return True
