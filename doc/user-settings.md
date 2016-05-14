@@ -41,10 +41,10 @@ userArgs = mconcat
 The above example also demostrates the use of `append` for adding more than one
 argument and `remove` for removing arguments that Hadrian uses by default. You
 can match any combination of the `builder`, `stage`, `package`, `way`, `input`
-and `output` when specifying custom command line arguments. File patterns such as
-`"//Prelude.*"` can be used when matching input and output files where `//`
-matches an arbitrary number of path components and `*` matches an entire path
-component, excluding any separators.
+and `output` predicates when specifying custom command line arguments. File
+patterns such as `"//Prelude.*"` can be used when matching input and output files,
+where `//` matches an arbitrary number of path components and `*` matches an entire
+path component, excluding any separators.
 
 ## Packages
 
@@ -69,7 +69,7 @@ userKnownPackages = [myPackage]
 myPackage :: Package
 myPackage = library "my-package"
 ```
-Note, you will also need to add it to a specific build stage by modifying
+Note, you will also need to add `myPackage` to a specific build stage by modifying
 `userPackages` as otherwise it will not be built.
 
 You can choose which integer library to use when builing GHC by setting
