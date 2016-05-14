@@ -8,7 +8,7 @@ You can customise Hadrian by specifying user build settings in file
 Hadrian puts build results into `_build` directory by default, which is
 specified by `buildRootPath`:
 ```haskell
--- | All build artefacts are stored in 'buildRootPath' directory.
+-- | All build results are put into 'buildRootPath' directory.
 buildRootPath :: FilePath
 buildRootPath = "_build"
 ```
@@ -22,7 +22,7 @@ affected build rules during the next build, without requiring a full rebuild.
 For example, here is how to pass an extra argument `-O0` to all invocations of
 GHC when compiling package `cabal`:
 ```haskell
--- | Control user-specific command line arguments.
+-- | Modify default build command line arguments.
 userArgs :: Args
 userArgs = builder Ghc ? package cabal ? arg "-O0"
 ```
@@ -33,7 +33,7 @@ are currently built as part of the GHC are defined in `src/GHC.hs`. See also
 You can combine several custom command line settings using `mconcat`:
 ```haskell
 userArgs :: Args
-userArgs = mconcat 
+userArgs = mconcat
     [ builder Ghc ? package cabal ? arg "-O0"
     , package rts ? input "//Evac_thr.c" ? append [ "-DPARALLEL_GC", "-Irts/sm" ]
     , builder Ghc ? output "//Prelude.*" ? remove ["-Wall", "-fwarn-tabs"] ]
@@ -52,7 +52,7 @@ To add or remove a package from a particular build stage, use `userPackages`. As
 an example, below we add package `base` to Stage0 and remove package `haskeline`
 from Stage1:
 ```haskell
--- | Control which packages get to be built.
+-- | Modify the set of packages that are built by default in each stage.
 userPackages :: Packages
 userPackages = mconcat
     [ stage0 ? append [base]
@@ -61,7 +61,7 @@ userPackages = mconcat
 If you are working on a new GHC package you need to let Hadrian know about it
 by setting `userKnownPackages`:
 ```haskell
--- | Add new user-defined packages.
+-- | Add user defined packages. Don't forget to add them to 'userPackages' too.
 userKnownPackages :: [Package]
 userKnownPackages = [myPackage]
 
@@ -73,38 +73,38 @@ Note, you will also need to add `myPackage` to a specific build stage by modifyi
 `userPackages` as otherwise it will not be built.
 
 You can choose which integer library to use when builing GHC by setting
-`integerLibrary`:
+`integerLibrary`. Possible values are: `integerGmp` (default) and `integerSimple`.
 ```haskell
--- | Choose the integer library: integerGmp or integerSimple.
+-- | Choose the integer library: 'integerGmp' or 'integerSimple'.
 integerLibrary :: Package
 integerLibrary = integerGmp
 ```
 ## Build ways
 
-Packages can be built in a number of ways, such as `vanilla`, `profiling` (with 
+Packages can be built in a number of ways, such as `vanilla`, `profiling` (with
 profiling information enabled), and many others as defined in `src/Way.hs`. You
 can change the default build ways using `userLibraryWays` and `userRtsWays` settings.
 As an example, below we remove `dynamic` from the list of library ways but keep
 `rts` package ways unchanged:
 ```haskell
--- | Control which ways library packages are built.
+-- | Modify the set of ways in which library packages are built.
 userLibraryWays :: Ways
 userLibraryWays = remove [dynamic]
 
--- | Control which ways the 'rts' package is built.
+-- | Modify the set of ways in which the 'rts' package is built.
 userRtsWays :: Ways
 userRtsWays = mempty
 ```
 
-## Verbose command lines 
+## Verbose command lines
 
 By default Hadrian does not print full command lines during the build process
 and instead prints short human readable digests for each executed command. You
 can suppress this behaviour completely or partially using `verboseCommands` setting:
 ```haskell
 -- | Set to True to print full command lines during the build process. Note,
--- this is a Predicate, hence you can enable verbose output for a chosen package
--- only, e.g.: verboseCommands = package ghcPrim
+-- this is a Predicate, hence you can enable verbose output only for certain
+-- targets, e.g.: @verboseCommands = package ghcPrim@.
 verboseCommands :: Predicate
 verboseCommands = return False
 ```
@@ -120,7 +120,7 @@ Below are a few other examples:
 verboseCommands = builder (Ghc Link)
 
 -- Print command lines when compiling files in package compiler using Gcc:
-verboseCommands = builder (Gcc Compile) &&^ package compiler 
+verboseCommands = builder (Gcc Compile) &&^ package compiler
 
 -- Use patterns when matching files:
 verboseCommands = file "//rts/sm/*" &&^ way threaded
@@ -140,7 +140,7 @@ to building split objects and Haddock documentation.
 splitObjects :: Predicate
 splitObjects = (return cmdSplitObjects) &&^ defaultSplitObjects
 
--- | Control when to build documentation.
+-- | Control when to build Haddock documentation.
 buildHaddock :: Predicate
 buildHaddock = return cmdBuildHaddock
 ```
