@@ -81,11 +81,11 @@ integerLibrary = integerGmp
 ```
 ## Build ways
 
-Libraries can be built in a number of ways, such as `vanilla`, `profiling` (with 
-profiling information enabled), and many others as defined in `src/Way.hs`. To
-control which ways particular ways are built, set `userLibraryWays` and
-`userRtsWays`. As an example, below we remove `dynamic` from the list of library
-ways and keep `rts` package ways unchanged:
+Packages can be built in a number of ways, such as `vanilla`, `profiling` (with 
+profiling information enabled), and many others as defined in `src/Way.hs`. You
+can change the default build ways using `userLibraryWays` and `userRtsWays` settings.
+As an example, below we remove `dynamic` from the list of library ways but keep
+`rts` package ways unchanged:
 ```haskell
 -- | Control which ways library packages are built.
 userLibraryWays :: Ways
@@ -99,9 +99,8 @@ userRtsWays = mempty
 ## Verbose command lines 
 
 By default Hadrian does not print full command lines during the build process
-and instead prints short human readable digests for each executed command. It is
-possible to suppress this behaviour completely or partially using
-`verboseCommands` setting:
+and instead prints short human readable digests for each executed command. You
+can suppress this behaviour completely or partially using `verboseCommands` setting:
 ```haskell
 -- | Set to True to print full command lines during the build process. Note,
 -- this is a Predicate, hence you can enable verbose output for a chosen package
@@ -128,4 +127,20 @@ verboseCommands = file "//rts/sm/*" &&^ way threaded
 
 -- Print all commands:
 verboseCommands = return True
+```
+
+## Miscellaneous
+
+Use the following settings to change the default behaviour of Hadrian with respect
+to building split objects and Haddock documentation.
+
+```haskell
+-- | Control when split objects are generated. Note, due to the GHC bug #11315
+-- it is necessary to do a full clean rebuild when changing this option.
+splitObjects :: Predicate
+splitObjects = (return cmdSplitObjects) &&^ defaultSplitObjects
+
+-- | Control when to build documentation.
+buildHaddock :: Predicate
+buildHaddock = return cmdBuildHaddock
 ```
