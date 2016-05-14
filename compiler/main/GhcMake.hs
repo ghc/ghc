@@ -1048,9 +1048,18 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags cleanup par_sem
                 let lcl_mod = localize_mod mod
                 let lcl_hsc_env = localize_hsc_env hsc_env
 
+                -- Re-typecheck the loop
+                type_env_var <- liftIO $ newIORef emptyNameEnv
+                let lcl_hsc_env' = lcl_hsc_env { hsc_type_env_var =
+                                    Just (ms_mod lcl_mod, type_env_var) }
+                lcl_hsc_env'' <- case finish_loop of
+                    Nothing   -> return lcl_hsc_env'
+                    Just loop -> typecheckLoop lcl_dflags lcl_hsc_env' $
+                                 map (moduleName . fst) loop
+
                 -- Compile the module.
-                mod_info <- upsweep_mod lcl_hsc_env old_hpt stable_mods lcl_mod
-                                        mod_index num_mods
+                mod_info <- upsweep_mod lcl_hsc_env'' old_hpt stable_mods
+                                        lcl_mod mod_index num_mods
                 return (Just mod_info)
 
         case mb_mod_info of
