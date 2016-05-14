@@ -1,6 +1,6 @@
 Changes in version 2.17.2
 
- * TODO
+ * Fix portability of documentation building within GHC
 
 Changes in version 2.17.1
 
