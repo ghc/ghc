@@ -418,3 +418,5 @@ test('T11947a', normal, compile_fail, [''])
 test('T11948', normal, compile_fail, [''])
 test('T11990a', normal, compile_fail, [''])
 test('T11990b', normal, compile_fail, [''])
+test('T12063', [ expect_broken(12063), extra_clean(['T12063.hi-boot', 'T12063.o-boot', 'T12063a.hi', 'T12063a.o']) ],
+     multimod_compile_fail, ['T12063', '-v0'])
