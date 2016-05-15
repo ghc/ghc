@@ -76,7 +76,7 @@ parseKey :: String -> String -> Maybe (String,String)
 parseKey key toParse0 =
    do
       let
-         (spaces0,toParse1) = extractLeadingSpaces toParse0
+         (spaces0,toParse1) = extractLeadingSpaces (dropWhile (`elem` ['\r', '\n']) toParse0)
 
          indentation = spaces0
       afterKey0 <- extractPrefix key toParse1
