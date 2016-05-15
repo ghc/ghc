@@ -363,7 +363,7 @@ tcRnModuleTcRnM hsc_env hsc_src
             Nothing -> return tcg_env) ;
 
         -- The new type env is already available to stuff slurped from
-        -- interface files, via TcEnv.updateGlobalTypeEnv
+        -- interface files, via TcEnv.setGlobalTypeEnv
         -- It's important that this includes the stuff in checkHiBootIface,
         -- because the latter might add new bindings for boot_dfuns,
         -- which may be mentioned in imported unfoldings
