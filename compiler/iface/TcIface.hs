@@ -147,7 +147,10 @@ typecheckIface iface
 
                 -- Finished
         ; traceIf (vcat [text "Finished typechecking interface for" <+> ppr (mi_module iface),
-                         text "Type envt:" <+> ppr type_env])
+                         -- Careful! If we tug on the TyThing thunks too early
+                         -- we'll infinite loop with hs-boot.  See #10083 for
+                         -- an example where this would cause non-termination.
+                         text "Type envt:" <+> ppr (map fst names_w_things)])
         ; return $ ModDetails { md_types     = type_env
                               , md_insts     = insts
                               , md_fam_insts = fam_insts
@@ -189,7 +192,7 @@ tcHiBootIface hsc_src mod
                 -- And that's fine, because if M's ModInfo is in the HPT, then
                 -- it's been compiled once, and we don't need to check the boot iface
           then do { hpt <- getHpt
-                 ; case lookupUFM hpt (moduleName mod) of
+                 ; case lookupHptByModule hpt mod of
                       Just info | mi_boot (hm_iface info)
                                 -> return (mkSelfBootInfo (hm_details info))
                       _ -> return NoSelfBoot }
@@ -426,20 +429,23 @@ tc_iface_decl _parent ignore_prags
    tc_sig :: IfaceClassOp -> IfL TcMethInfo
    tc_sig (IfaceClassOp occ rdr_ty dm)
      = do { op_name <- lookupIfaceTop occ
-          ; ~(op_ty, dm') <- forkM (mk_op_doc op_name rdr_ty) $
-                             do { ty <- tcIfaceType rdr_ty
-                                ; dm' <- tc_dm dm
-                                ; return (ty, dm') }
+          ; let doc = mk_op_doc op_name rdr_ty
+          ; op_ty <- forkM (doc <+> text "ty") $ tcIfaceType rdr_ty
                 -- Must be done lazily for just the same reason as the
                 -- type of a data con; to avoid sucking in types that
                 -- it mentions unless it's necessary to do so
+          ; dm'   <- tc_dm doc dm
           ; return (op_name, op_ty, dm') }
 
-   tc_dm :: Maybe (DefMethSpec IfaceType) -> IfL (Maybe (DefMethSpec (SrcSpan, Type)))
-   tc_dm Nothing               = return Nothing
-   tc_dm (Just VanillaDM)      = return (Just VanillaDM)
-   tc_dm (Just (GenericDM ty)) = do { ty' <- tcIfaceType ty
-                                    ; return (Just (GenericDM (noSrcSpan, ty'))) }
+   tc_dm :: SDoc
+         -> Maybe (DefMethSpec IfaceType)
+         -> IfL (Maybe (DefMethSpec (SrcSpan, Type)))
+   tc_dm _   Nothing               = return Nothing
+   tc_dm _   (Just VanillaDM)      = return (Just VanillaDM)
+   tc_dm doc (Just (GenericDM ty))
+        = do { -- Must be done lazily to avoid sucking in types
+             ; ty' <- forkM (doc <+> text "dm") $ tcIfaceType ty
+             ; return (Just (GenericDM (noSrcSpan, ty'))) }
 
    tc_at cls (IfaceAT tc_decl if_def)
      = do ATyCon tc <- tc_iface_decl (Just cls) ignore_prags tc_decl
@@ -1277,7 +1283,7 @@ tcPragExpr name expr
   where
     doc = text "Unfolding of" <+> ppr name
 
-    get_in_scope :: IfL [Var] -- Totally disgusting; but just for linting
+    get_in_scope :: IfL VarSet -- Totally disgusting; but just for linting
     get_in_scope
         = do { (gbl_env, lcl_env) <- getEnvs
              ; rec_ids <- case if_rec_types gbl_env of
@@ -1285,9 +1291,14 @@ tcPragExpr name expr
                             Just (_, get_env) -> do
                                { type_env <- setLclEnv () get_env
                                ; return (typeEnvIds type_env) }
-             ; return (varEnvElts (if_tv_env lcl_env) ++
-                       varEnvElts (if_id_env lcl_env) ++
-                       rec_ids) }
+             ; return (bindingsVars (if_tv_env lcl_env) `unionVarSet`
+                       bindingsVars (if_id_env lcl_env) `unionVarSet`
+                       mkVarSet rec_ids) }
+
+    bindingsVars :: FastStringEnv Var -> VarSet
+    bindingsVars ufm = mkVarSet $ nonDetEltsUFM ufm
+      -- It's OK to use nonDetEltsUFM here because we immediately forget
+      -- the ordering by creating a set
 
 {-
 ************************************************************************
