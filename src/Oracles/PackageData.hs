@@ -5,17 +5,10 @@ module Oracles.PackageData (
     ) where
 
 import Development.Shake.Config
-import Base
 import qualified Data.HashMap.Strict as Map
 
--- For each (PackageData path) the file 'path/package-data.mk' contains
--- a line of the form 'path_VERSION = 1.2.3.4'.
--- pkgData $ PackageData path is an action that consults the file and
--- returns "1.2.3.4".
---
--- PackageDataList is used for multiple string options separated by spaces,
--- such as 'path_MODULES = Data.Array Data.Array.Base ...'.
--- pkgListData Modules therefore returns ["Data.Array", "Data.Array.Base", ...]
+import Base
+
 data PackageData = BuildGhciLib FilePath
                  | ComponentId  FilePath
                  | Synopsis     FilePath
@@ -51,8 +44,10 @@ askPackageData path key = do
     case maybeValue of
         Nothing    -> return ""
         Just value -> return value
-        -- Nothing    -> putError $ "No key '" ++ key ++ "' in " ++ file ++ "."
 
+-- | For each @PackageData path@ the file 'path/package-data.mk' contains a line
+-- of the form 'path_VERSION = 1.2.3.4'. @pkgData (PackageData path)@ is an
+-- Action that consults the file and returns "1.2.3.4".
 pkgData :: PackageData -> Action String
 pkgData packageData = case packageData of
     BuildGhciLib path -> askPackageData path "BUILD_GHCI_LIB"
@@ -60,6 +55,9 @@ pkgData packageData = case packageData of
     Synopsis     path -> askPackageData path "SYNOPSIS"
     Version      path -> askPackageData path "VERSION"
 
+-- | @PackageDataList path@ is used for multiple string options separated by
+-- spaces, such as @path_MODULES = Data.Array Data.Array.Base ...@.
+-- @pkgListData Modules@ therefore returns ["Data.Array", "Data.Array.Base", ...]
 pkgDataList :: PackageDataList -> Action [String]
 pkgDataList packageData = fmap (map unquote . words) $ case packageData of
     CcArgs             path -> askPackageData path "CC_OPTS"
@@ -83,7 +81,7 @@ pkgDataList packageData = fmap (map unquote . words) $ case packageData of
   where
     unquote = dropWhile (== '\'') . dropWhileEnd (== '\'')
 
--- Oracle for 'package-data.mk' files
+-- | Oracle for 'package-data.mk' files.
 packageDataOracle :: Rules ()
 packageDataOracle = do
     keys <- newCache $ \file -> do
