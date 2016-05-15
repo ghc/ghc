@@ -49,5 +49,4 @@ ghc                                      \
 "$root/hadrian"            \
     --lint                 \
     --directory "$root/.." \
-    --colour               \
     "$@"

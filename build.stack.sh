@@ -36,5 +36,4 @@ stack build --no-library-profiling
 stack exec hadrian --              \
     --lint                         \
     --directory "$absoluteRoot/.." \
-    --colour                       \
     "$@"

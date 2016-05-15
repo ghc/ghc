@@ -55,5 +55,4 @@ popd
 "$root/.shake/build"       \
     --lint                 \
     --directory "$root/.." \
-    --colour               \
     "$@"
