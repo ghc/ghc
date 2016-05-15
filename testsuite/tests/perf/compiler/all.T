@@ -804,6 +804,14 @@ test('T10370',
      compile,
      [''])
 
+test('T10547',
+     [ compiler_stats_num_field('bytes allocated',
+          [(wordsize(64), 39165544, 20),
+          ]),
+     ],
+     compile_fail,
+     ['-fprint-expanded-synonyms'])
+
 test('T12227',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
@@ -815,4 +823,5 @@ test('T12227',
      compile,
      # Use `-M1G` to prevent memory thrashing with ghc-8.0.1.
      ['-O2 -ddump-hi -ddump-to-file +RTS -M1G'])
+
 
