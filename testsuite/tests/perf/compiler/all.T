@@ -809,3 +809,11 @@ test('T10370',
      ],
      compile,
      [''])
+
+test('T10547',
+     [ compiler_stats_num_field('bytes allocated',
+          [(wordsize(64), 39165544, 20),
+          ]),
+     ],
+     compile_fail,
+     ['-fprint-expanded-synonyms'])
