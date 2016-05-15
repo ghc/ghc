@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Settings.Builders.GhcCabal (
     ghcCabalBuilderArgs, ghcCabalHsColourBuilderArgs, bootPackageDbArgs,
     PackageDbKey (..), cppArgs, needDll0

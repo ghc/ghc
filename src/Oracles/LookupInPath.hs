@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Oracles.LookupInPath (lookupInPath, lookupInPathOracle) where
 
 import System.Directory

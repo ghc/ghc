@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Oracles.WindowsPath (
     fixAbsolutePathOnWindows, topDirectory, windowsPathOracle
     ) where

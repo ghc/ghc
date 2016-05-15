@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Oracles.ModuleFiles (
     decodeModule, encodeModule, findGenerator, haskellSources, moduleFilesOracle
     ) where

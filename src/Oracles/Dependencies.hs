@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Oracles.Dependencies (dependencies, dependenciesOracle) where
 
 import Control.Monad.Trans.Maybe

@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Oracles.PackageDeps (packageDeps, packageDepsOracle) where
 
 import qualified Data.HashMap.Strict as Map

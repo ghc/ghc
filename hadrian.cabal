@@ -112,8 +112,7 @@ executable hadrian
 
     default-language:    Haskell2010
     default-extensions:  RecordWildCards
-    other-extensions:    DeriveDataTypeable
-                       , DeriveGeneric
+    other-extensions:    DeriveGeneric
                        , FlexibleInstances
                        , GeneralizedNewtypeDeriving
                        , LambdaCase
