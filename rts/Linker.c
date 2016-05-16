@@ -52,29 +52,13 @@
 #include <dlfcn.h>
 #endif
 
-#if (defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS)) \
- || (!defined(powerpc_HOST_ARCH) && \
-    (   defined(linux_HOST_OS)     || defined(freebsd_HOST_OS) || \
-        defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS ) || \
-        defined(openbsd_HOST_OS  ) || defined(darwin_HOST_OS ) || \
-        defined(kfreebsdgnu_HOST_OS) || defined(gnu_HOST_OS  ) || \
-        defined(solaris2_HOST_OS)))
-/* Don't use mmap on powerpc/darwin as the mmap there doesn't support
- * reallocating but we need to allocate jump islands just after each
- * object images. Otherwise relative branches to jump islands can fail
- * due to 24-bits displacement overflow.
- */
-#define USE_MMAP 1
+#if RTS_LINKER_USE_MMAP
 #include <fcntl.h>
 #include <sys/mman.h>
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
-
-#else
-
-#define USE_MMAP 0
 
 #endif
 
@@ -90,7 +74,7 @@
 #define SHORT_REL_BRANCH 1
 #endif
 
-#if (USE_MMAP && defined(SHORT_REL_BRANCH) && defined(linux_HOST_OS))
+#if (RTS_LINKER_USE_MMAP && defined(SHORT_REL_BRANCH) && defined(linux_HOST_OS))
 #define USE_CONTIGUOUS_MMAP 1
 #else
 #define USE_CONTIGUOUS_MMAP 0
@@ -397,7 +381,7 @@ typedef WINBOOL(WINAPI *LPRemoveDLLDirectory)(DLL_DIRECTORY_COOKIE Cookie);
 
 static void freeProddableBlocks (ObjectCode *oc);
 
-#if USE_MMAP
+#if RTS_LINKER_USE_MMAP
 /**
  * An allocated page being filled by the allocator
  */
@@ -825,7 +809,7 @@ initLinker_ (int retain_cafs)
     addDLLHandle(WSTR("*.exe"), GetModuleHandle(NULL));
 #endif
 
-#if USE_MMAP
+#if RTS_LINKER_USE_MMAP
     m32_allocator_init(&allocator);
 #endif
 
@@ -1493,7 +1477,7 @@ void ghci_enquire ( char* addr )
 }
 #endif
 
-#if USE_MMAP
+#if RTS_LINKER_USE_MMAP
 #define ROUND_UP(x,size) ((x + size - 1) & ~(size - 1))
 #define ROUND_DOWN(x,size) (x & ~(size - 1))
 
@@ -1834,7 +1818,7 @@ m32_alloc(m32_allocator m32, unsigned int size,
  * END (M32 ALLOCATOR)
  ***************************************************************************/
 
-#endif // USE_MMAP
+#endif // RTS_LINKER_USE_MMAP
 
 /*
  * Remove symbols from the symbol table, and free oc->symbols.
@@ -1892,7 +1876,7 @@ freePreloadObjectFile (ObjectCode *oc)
 
 #else
 
-    if (USE_MMAP && oc->imageMapped) {
+    if (RTS_LINKER_USE_MMAP && oc->imageMapped) {
         munmap(oc->image, oc->fileSize);
     }
     else {
@@ -1924,7 +1908,7 @@ void freeObjectCode (ObjectCode *oc)
         for (i=0; i < oc->n_sections; i++) {
             if (oc->sections[i].start != NULL) {
                 switch(oc->sections[i].alloc){
-#if USE_MMAP
+#if RTS_LINKER_USE_MMAP
                 case SECTION_MMAP:
                     munmap(oc->sections[i].mapped_start,
                            oc->sections[i].mapped_size);
@@ -1950,7 +1934,7 @@ void freeObjectCode (ObjectCode *oc)
     /* Free symbol_extras.  On x86_64 Windows, symbol_extras are allocated
      * alongside the image, so we don't need to free. */
 #if NEED_SYMBOL_EXTRAS && (!defined(x86_64_HOST_ARCH) || !defined(mingw32_HOST_OS))
-    if (USE_MMAP) {
+    if (RTS_LINKER_USE_MMAP) {
         if (!USE_CONTIGUOUS_MMAP && oc->symbol_extras != NULL) {
             m32_free(oc->symbol_extras,
                     sizeof(SymbolExtra) * oc->n_symbol_extras);
@@ -2386,7 +2370,7 @@ static HsInt loadArchive_ (pathchar *path)
 #endif
                memberSize);
 #elif defined(darwin_HOST_OS)
-            if (USE_MMAP)
+            if (RTS_LINKER_USE_MMAP)
                 image = mmapForLinker(memberSize, MAP_ANONYMOUS, -1, 0);
             else {
                 /* See loadObj() */
@@ -2484,7 +2468,7 @@ static HsInt loadArchive_ (pathchar *path)
                 barf("loadArchive: GNU-variant index found, but already have an index, while reading filename from `%s'", path);
             }
             IF_DEBUG(linker, debugBelch("loadArchive: Found GNU-variant file index\n"));
-#if USE_MMAP
+#if RTS_LINKER_USE_MMAP
             gnuFileIndex = mmapForLinker(memberSize + 1, MAP_ANONYMOUS, -1, 0);
 #else
             gnuFileIndex = stgMallocBytes(memberSize + 1, "loadArchive(image)");
@@ -2542,14 +2526,14 @@ static HsInt loadArchive_ (pathchar *path)
 
     stgFree(fileName);
     if (gnuFileIndex != NULL) {
-#if USE_MMAP
+#if RTS_LINKER_USE_MMAP
         munmap(gnuFileIndex, gnuFileIndexSize + 1);
 #else
         stgFree(gnuFileIndex);
 #endif
     }
 
-#if USE_MMAP
+#if RTS_LINKER_USE_MMAP
     m32_allocator_flush(&allocator);
 #endif
 
@@ -2588,7 +2572,7 @@ preloadObjectFile (pathchar *path)
 
    fileSize = st.st_size;
 
-#if USE_MMAP
+#if RTS_LINKER_USE_MMAP
    int fd;
 
    /* On many architectures malloc'd memory isn't executable, so we need to use
@@ -2609,7 +2593,7 @@ preloadObjectFile (pathchar *path)
        // not 32-bit yet, we'll remap later
    close(fd);
 
-#else /* !USE_MMAP */
+#else /* !RTS_LINKER_USE_MMAP */
    FILE *f;
 
    /* load the image into memory */
@@ -2664,7 +2648,7 @@ preloadObjectFile (pathchar *path)
        return NULL;
    }
 
-#endif /* USE_MMAP */
+#endif /* RTS_LINKER_USE_MMAP */
 
    oc = mkOc(path, image, fileSize, rtsTrue, NULL, misalignment);
 
@@ -3056,7 +3040,7 @@ static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
 {
   StgWord n;
 
-  if (USE_MMAP && USE_CONTIGUOUS_MMAP) {
+  if (RTS_LINKER_USE_MMAP && USE_CONTIGUOUS_MMAP) {
       n = roundUpToPage(oc->fileSize);
 
       /* Keep image and symbol_extras contiguous */
@@ -3078,7 +3062,7 @@ static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
       }
   }
   else if( count > 0 ) {
-    if (USE_MMAP) {
+    if (RTS_LINKER_USE_MMAP) {
         n = roundUpToPage(oc->fileSize);
 
         oc->symbol_extras = m32_alloc(&allocator,
@@ -7004,7 +6988,7 @@ ocGetNames_MachO(ObjectCode* oc)
 
         if((sections[i].flags & SECTION_TYPE) == S_ZEROFILL) {
             char * zeroFillArea;
-            if (USE_MMAP) {
+            if (RTS_LINKER_USE_MMAP) {
                 zeroFillArea = mmapForLinker(sections[i].size, MAP_ANONYMOUS,
                                             -1, 0);
                 if (zeroFillArea == NULL) return 0;

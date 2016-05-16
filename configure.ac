@@ -1062,6 +1062,34 @@ if test "$use_large_address_space" = "yes" ; then
    AC_DEFINE([USE_LARGE_ADDRESS_SPACE], [1], [Enable single heap address space support])
 fi
 
+dnl ** Use MMAP in the runtime linker?
+dnl --------------------------------------------------------------
+
+case ${TargetOS} in
+    linux|freebsd|dragonfly|netbsd|openbsd|kfreebsdgnu|gnu|solaris2)
+        RtsLinkerUseMmap=1
+        ;;
+    darwin)
+        # Don't use mmap on powerpc/darwin as the mmap there doesn't support
+        # reallocating. Reallocating is needed to allocate jump islands just
+        # after each object image. Jumps to these jump islands use relative
+        # branches which are limited to offsets that can be represented in
+        # 24-bits.
+        if test "$TargetArch" != "powerpc" ; then
+            RtsLinkerUseMmap=1
+        else
+            RtsLinkerUseMmap=0
+        fi
+        ;;
+    *)
+        # Windows (which doesn't have mmap) and everything else.
+        RtsLinkerUseMmap=0
+        ;;
+    esac
+
+AC_DEFINE_UNQUOTED([RTS_LINKER_USE_MMAP], [$RtsLinkerUseMmap],
+                   [Use mmap in the runtime linker])
+
 dnl ** Have libdw?
 dnl --------------------------------------------------------------
 AC_ARG_ENABLE(libdw,
