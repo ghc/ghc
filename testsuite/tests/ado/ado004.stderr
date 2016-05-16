@@ -2,23 +2,23 @@ TYPE SIGNATURES
   test1 ::
     forall (f :: * -> *). Applicative f => (Int -> f Int) -> f Int
   test2 ::
-    forall (f :: * -> *) b t.
-    (Applicative f, Num t, Num b) =>
+    forall t b (f :: * -> *).
+    (Num b, Num t, Applicative f) =>
     (t -> f b) -> f b
   test3 ::
-    forall (m :: * -> *) a t t1.
-    (Num t, Monad m) =>
-    (t -> m t1) -> (t1 -> t1 -> m a) -> m a
+    forall a t (m :: * -> *) t1.
+    (Num t1, Monad m) =>
+    (t1 -> m t) -> (t -> t -> m a) -> m a
   test4 ::
-    forall (m :: * -> *) a a1 t.
+    forall a a1 (m :: * -> *) t.
     (Num t, Monad m) =>
     (t -> m a1) -> (a1 -> a1 -> m a) -> m a
   test5 ::
-    forall (m :: * -> *) a a1 t.
+    forall a a1 (m :: * -> *) t.
     (Num t, Monad m) =>
     (t -> m a1) -> (a1 -> a1 -> m a) -> m a
   test6 ::
-    forall t (m :: * -> *) a.
+    forall a (m :: * -> *) t.
     (Num (m a), Monad m) =>
     (m a -> m (m a)) -> t -> m a
 TYPE CONSTRUCTORS

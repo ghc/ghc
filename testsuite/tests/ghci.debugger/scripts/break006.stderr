@@ -5,7 +5,7 @@
       Use :print or :force to determine these types
       Relevant bindings include it :: t (bound at <interactive>:4:1)
       These potential instances exist:
-        instance (Show a, Show b) => Show (Either a b)
+        instance (Show b, Show a) => Show (Either a b)
           -- Defined in ‘Data.Either’
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show Integer -- Defined in ‘GHC.Show’
@@ -20,7 +20,7 @@
       Use :print or :force to determine these types
       Relevant bindings include it :: t (bound at <interactive>:6:1)
       These potential instances exist:
-        instance (Show a, Show b) => Show (Either a b)
+        instance (Show b, Show a) => Show (Either a b)
           -- Defined in ‘Data.Either’
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show Integer -- Defined in ‘GHC.Show’

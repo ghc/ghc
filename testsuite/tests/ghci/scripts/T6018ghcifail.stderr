@@ -56,7 +56,7 @@
     Kind variable ‘k’ cannot be inferred from the right-hand side.
     (enabling -fprint-explicit-kinds might help)
     In the type family equation:
-      forall k (a :: k) (b :: k).
+      forall k (b :: k) (a :: k).
         Fc a b = Int -- Defined at <interactive>:64:15
 
 <interactive>:68:15: error:
@@ -65,7 +65,7 @@
     cannot be inferred from the right-hand side.
     (enabling -fprint-explicit-kinds might help)
     In the type family equation:
-      forall k (a :: k) (b :: k).
+      forall k (b :: k) (a :: k).
         Gc a b = Int -- Defined at <interactive>:68:15
 
 <interactive>:81:15: error:
