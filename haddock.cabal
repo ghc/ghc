@@ -17,7 +17,7 @@ stability:            experimental
 
 extra-source-files:
   CHANGES
-  README
+  README.md
   doc/Makefile
   doc/README.md
   doc/*.rst
