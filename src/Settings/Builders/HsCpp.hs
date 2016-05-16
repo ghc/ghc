@@ -1,6 +1,5 @@
 module Settings.Builders.HsCpp (hsCppBuilderArgs) where
 
-import Expression
 import GHC
 import Oracles.Config.Setting
 import Predicates

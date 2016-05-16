@@ -1,7 +1,6 @@
 module Settings.Packages.Hp2ps (hp2psPackageArgs) where
 
 import Base
-import Expression
 import GHC
 import Predicates
 import Settings

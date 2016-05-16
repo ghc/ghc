@@ -1,6 +1,5 @@
 module Settings.Packages.Directory (directoryPackageArgs) where
 
-import Expression
 import GHC
 import Predicates
 

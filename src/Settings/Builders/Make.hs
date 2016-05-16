@@ -1,6 +1,5 @@
 module Settings.Builders.Make (makeBuilderArgs) where
 
-import Expression
 import Predicates
 import Settings
 

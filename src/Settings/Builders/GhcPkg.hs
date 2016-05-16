@@ -2,7 +2,6 @@ module Settings.Builders.GhcPkg (ghcPkgBuilderArgs) where
 
 import Base
 import Builder
-import Expression
 import Predicates
 import Settings
 import Settings.Builders.GhcCabal

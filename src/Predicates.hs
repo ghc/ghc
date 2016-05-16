@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase, FlexibleInstances #-}
 -- | Convenient predicates
 module Predicates (
+    module Expression,
     stage, stage0, stage1, stage2, notStage0,
     package, notPackage, builder, input, output, way
     ) where

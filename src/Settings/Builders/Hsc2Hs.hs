@@ -1,10 +1,6 @@
 module Settings.Builders.Hsc2Hs (hsc2hsBuilderArgs) where
 
-import Control.Monad.Extra
-import Control.Monad.Trans.Class
-
 import Base
-import Expression
 import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Oracles.PackageData

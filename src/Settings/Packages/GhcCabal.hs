@@ -1,7 +1,6 @@
 module Settings.Packages.GhcCabal (ghcCabalPackageArgs) where
 
 import Base
-import Expression
 import GHC
 import Oracles.Config.Setting
 import Predicates

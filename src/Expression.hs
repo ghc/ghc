@@ -19,6 +19,7 @@ module Expression (
     getInput, getOutput,
 
     -- * Re-exports
+    module Control.Monad.Trans.Reader,
     module Data.Monoid,
     module Builder,
     module Package,

@@ -1,6 +1,5 @@
 module Settings.Packages.IservBin (iservBinPackageArgs) where
 
-import Expression
 import GHC
 import Predicates
 

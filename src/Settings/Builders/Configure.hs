@@ -1,7 +1,6 @@
 module Settings.Builders.Configure (configureBuilderArgs) where
 
 import Base
-import Expression
 import Oracles.Config.Setting
 import Predicates
 import Settings

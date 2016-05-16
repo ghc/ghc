@@ -8,7 +8,6 @@ module Settings.User (
 import Base
 import CmdLineFlag
 import GHC
-import Expression
 import Predicates
 import Settings.Default
 

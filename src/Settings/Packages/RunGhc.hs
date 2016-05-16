@@ -1,6 +1,5 @@
 module Settings.Packages.RunGhc (runGhcPackageArgs) where
 
-import Expression
 import GHC
 import Oracles.Config.Setting
 import Predicates

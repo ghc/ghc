@@ -1,6 +1,5 @@
 module Settings.Packages.GhcPrim (ghcPrimPackageArgs) where
 
-import Expression
 import GHC
 import Predicates
 

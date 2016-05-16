@@ -6,7 +6,6 @@ module Settings.Builders.GhcCabal (
 
 import Base
 import Builder
-import Expression
 import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting

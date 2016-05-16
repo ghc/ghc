@@ -1,8 +1,7 @@
 module Settings.Builders.Ld (ldBuilderArgs) where
 
-import Expression
 import Oracles.Config.Setting
-import Predicates (builder)
+import Predicates
 
 ldBuilderArgs :: Args
 ldBuilderArgs = builder Ld ? do

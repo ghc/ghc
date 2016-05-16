@@ -1,6 +1,5 @@
 module Settings.Builders.Alex (alexBuilderArgs) where
 
-import Expression
 import Predicates
 
 alexBuilderArgs :: Args

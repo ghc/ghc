@@ -1,6 +1,5 @@
 module Settings.Builders.Happy (happyBuilderArgs) where
 
-import Expression
 import Predicates
 
 happyBuilderArgs :: Args

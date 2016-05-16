@@ -1,7 +1,6 @@
 module Settings.Builders.Ar (arBuilderArgs, arCmd, chunksOfSize) where
 
 import Base
-import Expression
 import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Predicates

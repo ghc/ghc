@@ -2,9 +2,8 @@ module Settings.Builders.Haddock (haddockBuilderArgs) where
 
 import Base
 import GHC
-import Package
-import Expression
 import Oracles.PackageData
+import Package
 import Predicates
 import Settings
 import Settings.Builders.Ghc

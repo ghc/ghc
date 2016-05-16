@@ -1,7 +1,6 @@
 module Settings.Packages.Compiler (compilerPackageArgs) where
 
 import Base
-import Expression
 import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting

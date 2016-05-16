@@ -1,7 +1,6 @@
 module Settings.Builders.Cc (ccBuilderArgs) where
 
 import Base
-import Expression
 import Oracles.Config.Setting
 import Oracles.PackageData
 import Predicates

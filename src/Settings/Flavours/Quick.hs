@@ -1,6 +1,5 @@
 module Settings.Flavours.Quick (quickFlavourArgs, quickFlavourWays) where
 
-import Expression
 import Predicates
 
 quickFlavourArgs :: Args

@@ -1,6 +1,5 @@
 module Settings.Packages.Haddock (haddockPackageArgs) where
 
-import Expression
 import GHC
 import Predicates
 

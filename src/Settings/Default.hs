@@ -1,10 +1,9 @@
 module Settings.Default (defaultSplitObjects) where
 
 import Base
-import Expression
 import GHC
 import Oracles.Config.Flag
-import Predicates (notStage0)
+import Predicates
 
 defaultSplitObjects :: Predicate
 defaultSplitObjects = do

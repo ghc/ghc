@@ -1,9 +1,6 @@
 module Settings.Builders.Ghc (ghcBuilderArgs, ghcMBuilderArgs, commonGhcArgs) where
 
-import Control.Monad.Trans.Reader
-
 import Base
-import Expression
 import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting

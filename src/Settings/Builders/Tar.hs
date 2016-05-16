@@ -1,7 +1,6 @@
 module Settings.Builders.Tar (tarBuilderArgs) where
 
 import Base
-import Expression
 import Predicates
 
 tarBuilderArgs :: Args

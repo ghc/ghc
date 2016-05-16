@@ -1,7 +1,6 @@
 module Settings.Packages (getPackages, knownPackages, findKnownPackage) where
 
 import Base
-import Expression
 import GHC
 import Predicates
 import Oracles.Config.Setting

@@ -1,7 +1,6 @@
 module Settings.Packages.Unlit (unlitPackageArgs) where
 
 import Base
-import Expression
 import GHC
 import Predicates
 import Settings
