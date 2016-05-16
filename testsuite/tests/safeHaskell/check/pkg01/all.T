@@ -42,7 +42,9 @@ test('ImpSafe01', normal, compile_fail, ['-fpackage-trust -distrust base'])
 test('ImpSafe02', normal, compile, ['-distrust base'])
 
 # Fail since we don't trust base of bytestring
-test('ImpSafe03', normal, multi_compile_fail,
+test('ImpSafe03',
+  [normalise_version("bytestring")],
+  multi_compile_fail,
   ['ImpSafe03 -trust base -distrust bytestring', [
    ('ImpSafe03_A.hs', ' -trust base -trust bytestring')
   ], '-fpackage-trust' ])
