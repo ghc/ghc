@@ -2,11 +2,11 @@
 module GHC (
     array, base, binary, bytestring, cabal, compiler, containers, compareSizes,
     deepseq, deriveConstants, directory, dllSplit, filepath, genapply,
-    genprimopcode, ghc, ghcBoot, ghcCabal, ghci, ghcPkg, ghcPrim, ghcTags,
-    ghcSplit, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
-    integerSimple, iservBin, libffi, mkUserGuidePart, parallel, pretty,
-    primitive, process, rts, runGhc, stm, templateHaskell, terminfo, time,
-    touchy, transformers, unlit, unix, win32, xhtml,
+    genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal, ghci, ghcPkg, ghcPrim,
+    ghcTags, ghcSplit, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin,
+    integerGmp, integerSimple, iservBin, libffi, mkUserGuidePart, parallel,
+    pretty, primitive, process, rts, runGhc, stm, templateHaskell, terminfo,
+    time, touchy, transformers, unlit, unix, win32, xhtml,
 
     defaultKnownPackages, programPath, contextDirectory, rtsContext
     ) where
@@ -25,7 +25,7 @@ defaultKnownPackages :: [Package]
 defaultKnownPackages =
     [ array, base, binary, bytestring, cabal, compiler, containers, compareSizes
     , deepseq, deriveConstants, directory, dllSplit, filepath, genapply
-    , genprimopcode, ghc, ghcBoot, ghcCabal, ghci, ghcPkg, ghcPrim
+    , genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal, ghci, ghcPkg, ghcPrim
     , ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp
     , integerSimple, iservBin, libffi, mkUserGuidePart, parallel, pretty
     , primitive, process, rts, runGhc, stm, templateHaskell, terminfo, time
@@ -34,8 +34,8 @@ defaultKnownPackages =
 -- | Package definitions, see 'Package'.
 array, base, binary, bytestring, cabal, compiler, containers, compareSizes,
     deepseq, deriveConstants, directory, dllSplit, filepath, genapply,
-    genprimopcode, ghc, ghcBoot, ghcCabal, ghci, ghcPkg, ghcPrim, ghcTags,
-    haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
+    genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal, ghci, ghcPkg, ghcPrim,
+    ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
     integerSimple, iservBin, libffi, mkUserGuidePart, parallel, pretty,
     primitive, process, rts, runGhc, stm, templateHaskell, terminfo, time,
     touchy, transformers, unlit, unix, win32, xhtml :: Package
@@ -57,6 +57,7 @@ genapply        = utility  "genapply"
 genprimopcode   = utility  "genprimopcode"
 ghc             = topLevel "ghc-bin"        `setPath` "ghc"   `setType` Program
 ghcBoot         = library  "ghc-boot"
+ghcBootTh       = library  "ghc-boot-th"
 ghcCabal        = utility  "ghc-cabal"
 ghci            = library  "ghci"
 ghcPkg          = utility  "ghc-pkg"

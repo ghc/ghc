@@ -20,8 +20,8 @@ defaultPackages = mconcat
 
 packagesStage0 :: Packages
 packagesStage0 = mconcat
-    [ append [ binary, cabal, compiler, ghc, ghcBoot, ghcCabal, ghcPkg
-             , hsc2hs, hoopl, hpc, templateHaskell, transformers ]
+    [ append [ binary, cabal, compiler, ghc, ghcBoot, ghcBootTh, ghcCabal
+             , ghcPkg, hsc2hs, hoopl, hpc, templateHaskell, transformers ]
     -- the stage0 predicate makes sure these packages are built only in Stage0
     , stage0 ? append [ deriveConstants, dllSplit, genapply, genprimopcode
                       , hp2ps, unlit ]
