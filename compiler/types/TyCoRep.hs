@@ -2881,11 +2881,13 @@ pprTcApp_help :: (a -> Type) -> TyPrec -> (TyPrec -> a -> SDoc)
               -> TyCon -> [a] -> DynFlags -> PprStyle -> SDoc
 -- This one has accss to the DynFlags
 pprTcApp_help to_type p pp tc tys dflags style
-  | is_equality
-  = print_equality
-
-  | print_prefix
+  | not (isSymOcc (nameOccName tc_name)) -- Print prefix
   = pprPrefixApp p pp_tc (map (pp TyConPrec) tys_wo_kinds)
+
+  | Just args <- mb_saturated_equality
+  = print_equality args
+
+  -- So we have an operator symbol of some kind
 
   | [ty1,ty2] <- tys_wo_kinds  -- Infix, two arguments;
                                -- we know nothing of precedence though
@@ -2896,66 +2898,57 @@ pprTcApp_help to_type p pp tc tys dflags style
   || tc_name `hasKey` unliftedTypeKindTyConKey
   = pp_tc   -- Do not wrap *, # in parens
 
-  | otherwise
+  | otherwise  -- Unsaturated operator
   = pprPrefixApp p (parens (pp_tc)) (map (pp TyConPrec) tys_wo_kinds)
   where
-    tc_name = tyConName tc
+    tc_name      = tyConName tc
+    pp_tc        = ppr tc
+    tys_wo_kinds = suppressInvisibles to_type dflags tc tys
 
-    is_equality = tc `hasKey` eqPrimTyConKey ||
-                  tc `hasKey` heqTyConKey ||
-                  tc `hasKey` eqReprPrimTyConKey ||
-                  tc `hasKey` eqTyConKey
-                  -- don't include Coercible here, which should be printed
-                  -- normally
+    mb_saturated_equality
+      | hetero_eq_tc
+      , [k1, k2, t1, t2] <- tys
+      = Just (k1, k2, t1, t2)
+      | homo_eq_tc
+      , [k, t1, t2] <- tys  -- we must have (~)
+      = Just (k, k, t1, t2)
+      | otherwise
+      = Nothing
+
+    homo_eq_tc   =  tc `hasKey` eqTyConKey             -- ~
+    hetero_eq_tc =  tc `hasKey` eqPrimTyConKey         -- ~#
+                 || tc `hasKey` eqReprPrimTyConKey     -- ~R#
+                 || tc `hasKey` heqTyConKey            -- ~~
 
       -- This is all a bit ad-hoc, trying to print out the best representation
       -- of equalities. If you see a better design, go for it.
-    print_equality = case either_op_msg of
-      Left op ->
-        sep [ parens (pp TyOpPrec ty1 <+> dcolon <+> pp TyOpPrec ki1)
-            , op
-            , parens (pp TyOpPrec ty2 <+> dcolon <+> pp TyOpPrec ki2)]
-      Right msg ->
-        msg
+
+    print_equality (ki1, ki2, ty1, ty2)
+      | print_eqs
+      = ppr_infix_eq pp_tc
+
+      | hetero_eq_tc
+      , print_kinds || not (to_type ki1 `eqType` to_type ki2)
+      = ppr_infix_eq $ if tc `hasKey` eqPrimTyConKey
+                       then text "~~"
+                       else pp_tc
+
+      | otherwise
+      = if tc `hasKey` eqReprPrimTyConKey
+        then text "Coercible" <+> (sep [ pp TyConPrec ty1
+                                       , pp TyConPrec ty2 ])
+        else sep [pp TyOpPrec ty1, text "~", pp TyOpPrec ty2]
+
       where
-        hetero_tc =  tc `hasKey` eqPrimTyConKey
-                  || tc `hasKey` eqReprPrimTyConKey
-                  || tc `hasKey` heqTyConKey
+        ppr_infix_eq eq_op
+           = sep [ parens (pp TyOpPrec ty1 <+> dcolon <+> pp TyOpPrec ki1)
+                 , eq_op
+                 , parens (pp TyOpPrec ty2 <+> dcolon <+> pp TyOpPrec ki2)]
 
-        print_kinds   = gopt Opt_PrintExplicitKinds dflags
-        print_eqs     = gopt Opt_PrintEqualityRelations dflags ||
-                        dumpStyle style ||
-                        debugStyle style
-
-        (ki1, ki2, ty1, ty2)
-          | hetero_tc
-          , [k1, k2, t1, t2] <- tys
-          = (k1, k2, t1, t2)
-          | [k, t1, t2] <- tys  -- we must have (~)
-          = (k, k, t1, t2)
-          | otherwise
-          = pprPanic "print_equality" pp_tc
-
-         -- if "Left", print hetero equality; if "Right" just print that msg
-        either_op_msg
-          | print_eqs
-          = Left pp_tc
-
-          | hetero_tc
-          , print_kinds || not (to_type ki1 `eqType` to_type ki2)
-          = Left $ if tc `hasKey` eqPrimTyConKey
-                   then text "~~"
-                   else pp_tc
-
-          | otherwise
-          = Right $ if tc `hasKey` eqReprPrimTyConKey
-                    then text "Coercible" <+> (sep [ pp TyConPrec ty1
-                                                   , pp TyConPrec ty2 ])
-                    else sep [pp TyOpPrec ty1, text "~", pp TyOpPrec ty2]
-
-    print_prefix = not (isSymOcc (nameOccName tc_name))
-    tys_wo_kinds = suppressInvisibles to_type dflags tc tys
-    pp_tc        = ppr tc
+    print_kinds = gopt Opt_PrintExplicitKinds dflags
+    print_eqs   = gopt Opt_PrintEqualityRelations dflags ||
+                  dumpStyle style ||
+                  debugStyle style
 
 ------------------
 -- | Given a 'TyCon',and the args to which it is applied,
