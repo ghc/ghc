@@ -494,9 +494,10 @@ pprInstr (STU fmt reg addr) = hcat [
         char '\t',
         text "st",
         pprFormat fmt,
-        text "u\t",
+        char 'u',
         case addr of AddrRegImm _ _ -> empty
                      AddrRegReg _ _ -> char 'x',
+        char '\t',
         pprReg reg,
         text ", ",
         pprAddr addr
