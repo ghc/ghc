@@ -1,3 +1,0 @@
-[submodule "doc/alabaster"]
-	path = doc/alabaster
-	url = git://github.com/bitprophet/alabaster.git
