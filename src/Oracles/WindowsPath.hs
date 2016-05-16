@@ -3,7 +3,8 @@ module Oracles.WindowsPath (
     fixAbsolutePathOnWindows, topDirectory, windowsPathOracle
     ) where
 
-import Data.Char (isSpace)
+import Data.Char
+
 import Base
 import Oracles.Config.Setting
 
@@ -25,7 +26,7 @@ fixAbsolutePathOnWindows path = do
     then do
         let (dir, file) = splitFileName path
         winDir <- askOracle $ WindowsPath dir
-        return $ winDir ++ file
+        return $ winDir -/- file
     else
         return path
 
