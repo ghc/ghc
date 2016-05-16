@@ -3,7 +3,7 @@ module Settings.Default (defaultSplitObjects) where
 import Base
 import GHC
 import Oracles.Config.Flag
-import Predicates
+import Predicate
 
 defaultSplitObjects :: Predicate
 defaultSplitObjects = do

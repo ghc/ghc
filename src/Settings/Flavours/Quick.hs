@@ -1,6 +1,6 @@
 module Settings.Flavours.Quick (quickFlavourArgs, quickFlavourWays) where
 
-import Predicates
+import Predicate
 
 quickFlavourArgs :: Args
 quickFlavourArgs = builder Ghc ? arg "-O0"

@@ -1,7 +1,7 @@
 module Settings.Builders.Tar (tarBuilderArgs) where
 
 import Base
-import Predicates
+import Predicate
 
 tarBuilderArgs :: Args
 tarBuilderArgs = builder Tar ? do

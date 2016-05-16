@@ -2,7 +2,7 @@ module Settings.Packages (getPackages, knownPackages, findKnownPackage) where
 
 import Base
 import GHC
-import Predicates
+import Predicate
 import Oracles.Config.Setting
 import Settings.User
 

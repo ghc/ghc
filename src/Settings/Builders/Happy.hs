@@ -1,6 +1,6 @@
 module Settings.Builders.Happy (happyBuilderArgs) where
 
-import Predicates
+import Predicate
 
 happyBuilderArgs :: Args
 happyBuilderArgs = builder Happy ? mconcat [ arg "-agc"

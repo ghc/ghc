@@ -1,6 +1,6 @@
 module Settings.Builders.Make (makeBuilderArgs) where
 
-import Predicates
+import Predicate
 import Settings
 
 makeBuilderArgs :: Args

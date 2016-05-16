@@ -2,7 +2,7 @@ module Settings.Packages.Base (basePackageArgs) where
 
 import Base
 import GHC
-import Predicates
+import Predicate
 import Settings
 
 basePackageArgs :: Args

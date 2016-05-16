@@ -2,7 +2,7 @@ module Settings.Packages.Touchy (touchyPackageArgs) where
 
 import Base
 import GHC
-import Predicates
+import Predicate
 import Settings
 
 touchyPackageArgs :: Args

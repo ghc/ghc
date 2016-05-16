@@ -4,7 +4,7 @@ import Base
 import GHC
 import Oracles.PackageData
 import Package
-import Predicates
+import Predicate
 import Settings
 import Settings.Builders.Ghc
 

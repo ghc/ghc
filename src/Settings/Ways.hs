@@ -3,7 +3,7 @@ module Settings.Ways (getLibraryWays, getRtsWays) where
 import Base
 import CmdLineFlag
 import Oracles.Config.Flag
-import Predicates
+import Predicate
 import Settings.Flavours.Quick
 import Settings.User
 

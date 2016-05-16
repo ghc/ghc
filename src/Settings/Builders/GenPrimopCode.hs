@@ -1,6 +1,6 @@
 module Settings.Builders.GenPrimopCode (genPrimopCodeBuilderArgs) where
 
-import Predicates
+import Predicate
 
 -- Stdin/stdout are handled in a special way. See Rules/Actions.hs.
 genPrimopCodeBuilderArgs :: Args

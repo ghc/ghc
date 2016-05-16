@@ -1,7 +1,7 @@
 module Settings.Packages.GhcPrim (ghcPrimPackageArgs) where
 
 import GHC
-import Predicates
+import Predicate
 
 ghcPrimPackageArgs :: Args
 ghcPrimPackageArgs = package ghcPrim ?

@@ -2,7 +2,7 @@ module Settings.Packages.Ghc (ghcPackageArgs) where
 
 import GHC
 import Oracles.Config.Setting
-import Predicates
+import Predicate
 import Settings.Paths
 
 ghcPackageArgs :: Args

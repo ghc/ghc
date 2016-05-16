@@ -9,7 +9,7 @@ import Builder
 import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
-import Predicates hiding (stage)
+import Predicate hiding (stage)
 import Settings
 import Settings.Builders.Common
 

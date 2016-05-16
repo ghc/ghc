@@ -3,7 +3,7 @@ module Settings.Builders.Ar (arBuilderArgs, arCmd, chunksOfSize) where
 import Base
 import Oracles.Config.Flag
 import Oracles.Config.Setting
-import Predicates
+import Predicate
 
 -- | Default arguments for 'Ar' builder.
 arBuilderArgs :: Args

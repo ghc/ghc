@@ -2,7 +2,7 @@ module Settings.Packages.Hp2ps (hp2psPackageArgs) where
 
 import Base
 import GHC
-import Predicates
+import Predicate
 import Settings
 
 hp2psPackageArgs :: Args

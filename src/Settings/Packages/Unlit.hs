@@ -2,7 +2,7 @@ module Settings.Packages.Unlit (unlitPackageArgs) where
 
 import Base
 import GHC
-import Predicates
+import Predicate
 import Settings
 
 unlitPackageArgs :: Args

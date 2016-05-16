@@ -3,7 +3,7 @@ module Settings.Packages.GhcCabal (ghcCabalPackageArgs) where
 import Base
 import GHC
 import Oracles.Config.Setting
-import Predicates
+import Predicate
 import Settings
 
 ghcCabalPackageArgs :: Args

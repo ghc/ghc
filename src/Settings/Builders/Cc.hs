@@ -3,7 +3,7 @@ module Settings.Builders.Cc (ccBuilderArgs) where
 import Base
 import Oracles.Config.Setting
 import Oracles.PackageData
-import Predicates
+import Predicate
 import Settings
 import Settings.Builders.Common
 

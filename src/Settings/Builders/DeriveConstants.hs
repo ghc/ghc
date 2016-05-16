@@ -3,7 +3,7 @@ module Settings.Builders.DeriveConstants (deriveConstantsBuilderArgs) where
 import Base
 import Oracles.Config.Flag
 import Oracles.Config.Setting
-import Predicates
+import Predicate
 import Settings.Builders.Common
 
 -- TODO: do we need to support `includes_CC_OPTS += -DDYNAMIC_BY_DEFAULT`?

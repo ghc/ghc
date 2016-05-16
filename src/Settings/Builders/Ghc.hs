@@ -5,7 +5,7 @@ import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Oracles.PackageData
-import Predicates hiding (way, stage)
+import Predicate hiding (way, stage)
 import Settings
 import Settings.Builders.Common
 import Settings.Builders.GhcCabal
