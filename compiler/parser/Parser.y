@@ -1642,7 +1642,7 @@ btype :: { LHsType RdrName }
 -- Used for parsing Haskell98-style data constructors,
 -- in order to forbid the blasphemous
 -- > data Foo = Int :+ Char :* Bool
--- See also Note [Parsing data constructors is hard].
+-- See also Note [Parsing data constructors is hard] in RdrHsSyn
 btype_no_ops :: { LHsType RdrName }
         : btype_no_ops atype            { sLL $1 $> $ HsAppTy $1 $2 }
         | atype                         { $1 }
@@ -1898,22 +1898,11 @@ forall :: { Located ([AddAnn], Maybe [LHsTyVarBndr RdrName]) }
         | {- empty -}                 { noLoc ([], Nothing) }
 
 constr_stuff :: { Located (Located RdrName, HsConDeclDetails RdrName) }
-    -- see Note [Parsing data constructors is hard]
+    -- See Note [Parsing data constructors is hard] in RdrHsSyn
         : btype_no_ops                         {% do { c <- splitCon $1
                                                      ; return $ sLL $1 $> c } }
         | btype_no_ops conop btype_no_ops      {% do { ty <- splitTilde $1
                                                      ; return $ sLL $1 $> ($2, InfixCon ty $3) } }
-
-{- Note [Parsing data constructors is hard]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We parse the constructor declaration
-     C t1 t2
-as a btype_no_ops (treating C as a type constructor) and then convert C to be
-a data constructor.  Reason: it might continue like this:
-     C t1 t2 :% D Int
-in which case C really would be a type constructor.  We can't resolve this
-ambiguity till we come across the constructor oprerator :% (or not, more usually)
--}
 
 fielddecls :: { [LConDeclField RdrName] }
         : {- empty -}     { [] }
