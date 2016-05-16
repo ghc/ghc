@@ -29,6 +29,7 @@ pygments_style = 'tango'
 
 # -- Options for HTML output ----------------------------------------------
 
+html_theme_path = ['./alabaster']
 html_theme = 'alabaster'
 htmlhelp_basename = 'Haddockdoc'
 
