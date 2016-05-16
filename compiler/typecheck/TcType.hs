@@ -1570,7 +1570,6 @@ See also Note [occurCheckExpand] in TcCanonical
 data OccCheckResult a
   = OC_OK a
   | OC_Forall
-  | OC_NonTyVar
   | OC_Occurs
 
 instance Functor OccCheckResult where
@@ -1583,7 +1582,6 @@ instance Applicative OccCheckResult where
 instance Monad OccCheckResult where
   OC_OK x       >>= k = k x
   OC_Forall     >>= _ = OC_Forall
-  OC_NonTyVar   >>= _ = OC_NonTyVar
   OC_Occurs     >>= _ = OC_Occurs
 
 occurCheckExpand :: DynFlags -> TcTyVar -> Type -> OccCheckResult Type
@@ -1591,30 +1589,25 @@ occurCheckExpand :: DynFlags -> TcTyVar -> Type -> OccCheckResult Type
 -- Check whether
 --   a) the given variable occurs in the given type.
 --   b) there is a forall in the type (unless we have -XImpredicativeTypes)
---   c) if it's a SigTv, ty should be a tyvar
 --
 -- We may have needed to do some type synonym unfolding in order to
 -- get rid of the variable (or forall), so we also return the unfolded
 -- version of the type, which is guaranteed to be syntactically free
 -- of the given type variable.  If the type is already syntactically
 -- free of the variable, then the same type is returned.
+--
+-- NB: in the past we also rejected a SigTv matched with a non-tyvar
+--     But it is wrong to reject that for Givens;
+--     and SigTv is in any case handled separately by
+--        - TcUnify.checkTauTvUpdate (on-the-fly unifier)
+--        - TcInteract.canSolveByUnification (main constraint solver)
 occurCheckExpand dflags tv ty
-  | MetaTv { mtv_info = SigTv } <- details
-                  = go_sig_tv ty
   | fast_check ty = return ty
   | otherwise     = go emptyVarEnv ty
   where
     details = tcTyVarDetails tv
 
     impredicative = canUnifyWithPolyType dflags details
-
-    -- Check 'ty' is a tyvar, or can be expanded into one
-    go_sig_tv ty@(TyVarTy tv')
-      | fast_check (tyVarKind tv') = return ty
-      | otherwise                  = do { k' <- go emptyVarEnv (tyVarKind tv')
-                                        ; return (mkTyVarTy (setTyVarKind tv' k')) }
-    go_sig_tv ty | Just ty' <- coreView ty = go_sig_tv ty'
-    go_sig_tv _                            = OC_NonTyVar
 
     -- True => fine
     fast_check (LitTy {})          = True
