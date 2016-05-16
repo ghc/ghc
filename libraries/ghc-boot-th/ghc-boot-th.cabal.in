@@ -20,6 +20,8 @@ description:    This library contains various bits shared between the @ghc@ and
 cabal-version:  >=1.10
 build-type:     Simple
 extra-source-files: changelog.md
+exposed:        False
+-- Since this is re-exported by ghc-boot
 
 source-repository head
     type:     git
