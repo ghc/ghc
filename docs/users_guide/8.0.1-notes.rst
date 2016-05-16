@@ -709,6 +709,16 @@ ghc-boot
    of containing intra-GHC functionality that needs to be shared across
    multiple GHC boot libraries.
 
+ghc-boot-th
+~~~~~~~~~~~
+
+-  This is an internal package. Use with caution.
+
+-  Version number 8.0.1
+
+-  This package was created to share types and utilities between the ``ghc`` and
+   ``template-haskell`` packages
+
 -  Added ``GHC.Lexeme``, which contains functions for determining if a
    character can be the first letter of a variable or data constructor in
    Haskell, as defined by GHC. (These functions were moved from ``Lexeme``
