@@ -22,7 +22,7 @@ description:    This library is shared between GHC, ghc-pkg, and other boot
                 The package database format and this library are constructed in
                 such a way that while ghc-pkg depends on Cabal, the GHC library
                 and program do not have to depend on Cabal.
-cabal-version:  >=1.10
+cabal-version:  >=1.22
 build-type:     Simple
 extra-source-files: changelog.md
 
@@ -36,14 +36,17 @@ Library
     other-extensions: DeriveGeneric, RankNTypes, ScopedTypeVariables
 
     exposed-modules:
-            GHC.Lexeme
-            GHC.PackageDb
             GHC.LanguageExtensions
+            GHC.PackageDb
             GHC.Serialized
+
+    reexported-modules:
+            GHC.LanguageExtensions.Type,
+            GHC.Lexeme
 
     build-depends: base       >= 4.7 && < 4.10,
                    binary     == 0.8.*,
                    bytestring == 0.10.*,
                    directory  == 1.2.*,
-                   filepath   >= 1.3 && < 1.5
-
+                   filepath   >= 1.3 && < 1.5,
+                   ghc-boot-th == @ProjectVersionMunged@

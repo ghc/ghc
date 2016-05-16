@@ -49,9 +49,9 @@ Library
         Language.Haskell.TH.Lib.Map
 
     build-depends:
-        base       >= 4.8 && < 4.10,
-        ghc-boot   == 8.1,
-        pretty     == 1.1.*
+        base        >= 4.8 && < 4.10,
+        ghc-boot-th == 8.1,
+        pretty      == 1.1.*
 
     -- We need to set the unit ID to template-haskell (without a
     -- version number) as it's magic.

@@ -129,6 +129,9 @@ _darcs/
 /libraries/ghc-boot/GNUmakefile
 /libraries/ghc-boot/ghc-boot.cabal
 /libraries/ghc-boot/ghc.mk
+/libraries/ghc-boot-th/GNUmakefile
+/libraries/ghc-boot-th/ghc-boot-th.cabal
+/libraries/ghc-boot-th/ghc.mk
 /libraries/ghci/ghci.cabal
 /libraries/ghci/ghc.mk
 /libraries/haddock-util.js

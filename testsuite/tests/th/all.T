@@ -287,7 +287,8 @@ test('T8028',
      ['T8028', '-v0 ' + config.ghc_th_way_flags])
 
 test('TH_Roles1', normal, compile_fail, ['-v0'])
-test('TH_Roles2', normalise_version('array', 'base', 'deepseq', 'ghc-prim', 'ghc-boot',
+test('TH_Roles2', normalise_version('array', 'base', 'deepseq', 'ghc-prim',
+                                    'ghc-boot', 'ghc-boot-th',
                                     'integer-gmp', 'pretty', 'template-haskell',
                                     'binary', 'bytestring', 'containers'
                                     ), compile, ['-v0 -ddump-tc'])
