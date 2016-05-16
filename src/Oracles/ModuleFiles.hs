@@ -12,19 +12,31 @@ import Oracles.PackageData
 import Settings.Paths
 
 newtype ModuleFilesKey = ModuleFilesKey (Stage, Package)
-    deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
+    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
 
 newtype Generator = Generator (Stage, Package, FilePath)
-    deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
+    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
 
--- The following generators and corresponding source extensions are supported:
+-- | We scan for the following Haskell source extensions when looking for module
+-- files. Note, we do not list "*.(l)hs-boot" files here, as they can never
+-- appear by themselves and always have accompanying "*.(l)hs" master files.
+haskellExtensions :: [String]
+haskellExtensions = [".hs", ".lhs"]
+
+-- | Non-Haskell source extensions and corresponding builders.
+otherExtensions :: [(String, Builder)]
+otherExtensions = [ (".x"  , Alex  )
+                  , (".y"  , Happy )
+                  , (".ly" , Happy )
+                  , (".hsc", Hsc2Hs) ]
+
+-- | We match the following file patterns when looking for module files.
+moduleFilePatterns :: [FilePattern]
+moduleFilePatterns = map ("*" ++) $ haskellExtensions ++ map fst otherExtensions
+
+-- | Given a FilePath determine the corresponding builder.
 determineBuilder :: FilePath -> Maybe Builder
-determineBuilder file = case takeExtension file of
-    ".x"   -> Just Alex
-    ".y"   -> Just Happy
-    ".ly"  -> Just Happy
-    ".hsc" -> Just Hsc2Hs
-    _      -> Nothing
+determineBuilder file = lookup (takeExtension file) otherExtensions
 
 -- | Given a module name extract the directory and file name, e.g.:
 --
@@ -69,14 +81,16 @@ haskellSources context = do
     let modFile ("GHC.Prim", _) = autogen -/- "GHC/Prim.hs"
         modFile (m, Nothing   ) = generatedFile context m
         modFile (m, Just file )
-            | takeExtension file `elem` [".hs", ".lhs"] = file
+            | takeExtension file `elem` haskellExtensions = file
             | otherwise = generatedFile context m
     map modFile <$> contextFiles context
 
+-- | Generated module files live in the 'Context' specific build directory.
 generatedFile :: Context -> String -> FilePath
 generatedFile context moduleName =
     buildPath context -/- replaceEq '.' '/' moduleName <.> "hs"
 
+-- | Module files for a given 'Context'.
 contextFiles :: Context -> Action [(String, Maybe FilePath)]
 contextFiles context@Context {..} = do
     modules <- fmap sort . pkgDataList . Modules $ buildPath context
@@ -95,7 +109,7 @@ contextFiles context@Context {..} = do
 -- Just "compiler/parser/Lexer.x"]. The oracle ignores @.(l)hs-boot@ files.
 moduleFilesOracle :: Rules ()
 moduleFilesOracle = void $ do
-    void $ addOracle $ \(ModuleFilesKey (stage, package)) -> do
+    void . addOracle $ \(ModuleFilesKey (stage, package)) -> do
         let path = buildPath $ vanillaContext stage package
         srcDirs <-             pkgDataList $ SrcDirs path
         modules <- fmap sort . pkgDataList $ Modules path
@@ -105,10 +119,9 @@ moduleFilesOracle = void $ do
             todo <- filterM (doesDirectoryExist . (dir -/-) . fst) modDirFiles
             forM todo $ \(mDir, mFiles) -> do
                 let fullDir = unifyPath $ dir -/- mDir
-                files <- getDirectoryFiles fullDir ["*"]
-                let noBoot   = filter (not . (isSuffixOf "-boot")) files
-                    cmp fe f = compare (dropExtension fe) f
-                    found    = intersectOrd cmp noBoot mFiles
+                files <- getDirectoryFiles fullDir moduleFilePatterns
+                let cmp fe f = compare (dropExtension fe) f
+                    found    = intersectOrd cmp files mFiles
                 return (map (fullDir -/-) found, mDir)
         let pairs = sort [ (encodeModule d f, f) | (fs, d) <- result, f <- fs ]
             multi = [ (m, f1, f2) | (m, f1):(n, f2):_ <- tails pairs, m == n ]
@@ -118,14 +131,14 @@ moduleFilesOracle = void $ do
                 ++ f1 ++ " and " ++ f2 ++ "."
         return $ lookupAll modules pairs
 
-    -- Optimisation: we discard .(l)hs files here, because they are never used
+    -- Optimisation: we discard Haskell files here, because they are never used
     -- as generators, and hence would be discarded in 'findGenerator' anyway.
     generators <- newCache $ \(stage, package) -> do
         let context = vanillaContext stage package
         files <- contextFiles context
         return $ Map.fromList [ (generatedFile context modName, src)
                               | (modName, Just src) <- files
-                              , takeExtension src `notElem` [".hs", ".lhs"] ]
+                              , takeExtension src `notElem` haskellExtensions ]
 
     addOracle $ \(Generator (stage, package, file)) ->
         Map.lookup file <$> generators (stage, package)
