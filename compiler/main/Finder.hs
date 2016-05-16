@@ -141,7 +141,11 @@ findExactModule hsc_env mod =
 -- -----------------------------------------------------------------------------
 -- Helpers
 
-orIfNotFound :: IO FindResult -> IO FindResult -> IO FindResult
+-- | Given a monadic actions @this@ and @or_this@, first execute
+-- @this@.  If the returned 'FindResult' is successful, return
+-- it; otherwise, execute @or_this@.  If both failed, this function
+-- also combines their failure messages in a reasonable way.
+orIfNotFound :: Monad m => m FindResult -> m FindResult -> m FindResult
 orIfNotFound this or_this = do
   res <- this
   case res of
