@@ -47,6 +47,7 @@ import FieldLabel
 import Bag
 import Util
 import ErrUtils
+import FV
 import Control.Monad ( unless, zipWithM )
 import Data.List( partition )
 #if __GLASGOW_HASKELL__ < 709
@@ -219,9 +220,8 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
 
        ; (qtvs, req_dicts, ev_binds) <- simplifyInfer tclvl False [] named_taus wanted
 
-       ; let (ex_vars, prov_dicts) = tcCollectEx lpat'
+       ; let ((ex_tvs, ex_vars), prov_dicts) = tcCollectEx lpat'
              univ_tvs   = filter (not . (`elemVarSet` ex_vars)) qtvs
-             ex_tvs     = varSetElems ex_vars
              prov_theta = map evVarPred prov_dicts
              req_theta  = map evVarPred req_dicts
 
@@ -948,34 +948,44 @@ nonBidirectionalErr name = failWithTc $
 -- These are used in computing the type of a pattern synonym and also
 -- in generating matcher functions, since success continuations need
 -- to be passed these pattern-bound evidences.
-tcCollectEx :: LPat Id -> (TyVarSet, [EvVar])
-tcCollectEx pat = go pat
+tcCollectEx
+  :: LPat Id
+  -> ( ([Var], VarSet) -- Existentially-bound type variables as a
+                       -- deterministically ordered list and a set.
+                       -- See Note [Deterministic FV] in FV
+     , [EvVar]
+     )
+tcCollectEx pat = let (fv, evs) = go pat in (fvVarListVarSet fv, evs)
   where
-    go :: LPat Id -> (TyVarSet, [EvVar])
+    go :: LPat Id -> (FV, [EvVar])
     go = go1 . unLoc
 
-    go1 :: Pat Id -> (TyVarSet, [EvVar])
+    go1 :: Pat Id -> (FV, [EvVar])
     go1 (LazyPat p)         = go p
     go1 (AsPat _ p)         = go p
     go1 (ParPat p)          = go p
     go1 (BangPat p)         = go p
-    go1 (ListPat ps _ _)    = mconcat . map go $ ps
-    go1 (TuplePat ps _ _)   = mconcat . map go $ ps
-    go1 (PArrPat ps _)      = mconcat . map go $ ps
+    go1 (ListPat ps _ _)    = mergeMany . map go $ ps
+    go1 (TuplePat ps _ _)   = mergeMany . map go $ ps
+    go1 (PArrPat ps _)      = mergeMany . map go $ ps
     go1 (ViewPat _ p _)     = go p
-    go1 con@ConPatOut{}     = mappend (mkVarSet (pat_tvs con), pat_dicts con) $
+    go1 con@ConPatOut{}     = merge (FV.mkFVs (pat_tvs con), pat_dicts con) $
                                  goConDetails $ pat_args con
     go1 (SigPatOut p _)     = go p
     go1 (CoPat _ p _)       = go1 p
     go1 (NPlusKPat n k _ geq subtract _)
       = pprPanic "TODO: NPlusKPat" $ ppr n $$ ppr k $$ ppr geq $$ ppr subtract
-    go1 _                   = mempty
+    go1 _                   = empty
 
-    goConDetails :: HsConPatDetails Id -> (TyVarSet, [EvVar])
-    goConDetails (PrefixCon ps) = mconcat . map go $ ps
-    goConDetails (InfixCon p1 p2) = go p1 `mappend` go p2
+    goConDetails :: HsConPatDetails Id -> (FV, [EvVar])
+    goConDetails (PrefixCon ps) = mergeMany . map go $ ps
+    goConDetails (InfixCon p1 p2) = go p1 `merge` go p2
     goConDetails (RecCon HsRecFields{ rec_flds = flds })
-      = mconcat . map goRecFd $ flds
+      = mergeMany . map goRecFd $ flds
 
-    goRecFd :: LHsRecField Id (LPat Id) -> (TyVarSet, [EvVar])
+    goRecFd :: LHsRecField Id (LPat Id) -> (FV, [EvVar])
     goRecFd (L _ HsRecField{ hsRecFieldArg = p }) = go p
+
+    merge (vs1, evs1) (vs2, evs2) = (vs1 `unionFV` vs2, evs1 ++ evs2)
+    mergeMany = foldr merge empty
+    empty = (emptyFV, [])
