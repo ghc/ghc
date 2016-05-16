@@ -30,9 +30,9 @@ import Control.Monad.Trans.Reader
 import Data.Monoid
 
 import Base
+import Builder
 import Context
 import Package
-import Builder
 import Stage
 import Target
 import Way

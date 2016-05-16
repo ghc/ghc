@@ -2,8 +2,8 @@ module Settings.Packages.Touchy (touchyPackageArgs) where
 
 import Base
 import Expression
-import GHC (touchy)
-import Predicates (builder, package)
+import GHC
+import Predicates
 import Settings
 
 touchyPackageArgs :: Args

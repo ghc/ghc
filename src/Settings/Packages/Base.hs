@@ -2,8 +2,8 @@ module Settings.Packages.Base (basePackageArgs) where
 
 import Base
 import Expression
-import GHC (base)
-import Predicates (builder, package)
+import GHC
+import Predicates
 import Settings
 
 basePackageArgs :: Args

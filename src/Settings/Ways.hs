@@ -1,19 +1,20 @@
 module Settings.Ways (getLibraryWays, getRtsWays) where
 
-import CmdLineFlag
 import Base
+import CmdLineFlag
 import Expression
 import Oracles.Config.Flag
 import Predicates
 import Settings.Flavours.Quick
 import Settings.User
 
--- | Combine default ways with user modifications
+-- | Combine default library ways with user modifications.
 getLibraryWays :: Expr [Way]
 getLibraryWays = fromDiffExpr $ mconcat [ defaultLibraryWays
                                         , userLibraryWays
                                         , flavourLibraryWays ]
 
+-- | Combine default RTS ways with user modifications.
 getRtsWays :: Expr [Way]
 getRtsWays = fromDiffExpr $ defaultRtsWays <> userRtsWays
 

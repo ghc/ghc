@@ -3,15 +3,10 @@ module CmdLineFlag (
     cmdProgressInfo, ProgressInfo (..), cmdSkipConfigure, cmdSplitObjects
     ) where
 
+import Data.IORef
 import Data.List.Extra
 import System.Console.GetOpt
-
-import Data.IORef
 import System.IO.Unsafe (unsafePerformIO)
-
--- Command line flags
-data ProgressInfo = None | Brief | Normal | Unicorn deriving (Eq, Show)
-data Flavour      = Default | Quick deriving (Eq, Show)
 
 -- | 'CmdLineFlag.Untracked' is a collection of flags that can be passed via the
 -- command line. These flags are not tracked, that is they do not force any
@@ -23,6 +18,9 @@ data Untracked = Untracked
     , skipConfigure :: Bool
     , splitObjects  :: Bool }
     deriving (Eq, Show)
+
+data ProgressInfo = None | Brief | Normal | Unicorn deriving (Eq, Show)
+data Flavour      = Default | Quick deriving (Eq, Show)
 
 -- | Default values for 'CmdLineFlag.Untracked'.
 defaultUntracked :: Untracked
@@ -79,7 +77,7 @@ cmdFlags =
     , Option [] ["split-objects"] (NoArg readSplitObjects)
       "Generate split objects (requires a full clean rebuild)." ]
 
--- TODO: Avoid unsafePerformIO by using shakeExtra (awaiting Shake's release)
+-- TODO: Avoid unsafePerformIO by using shakeExtra.
 {-# NOINLINE cmdLineFlags #-}
 cmdLineFlags :: IORef Untracked
 cmdLineFlags = unsafePerformIO $ newIORef defaultUntracked
@@ -87,7 +85,7 @@ cmdLineFlags = unsafePerformIO $ newIORef defaultUntracked
 putCmdLineFlags :: [Untracked -> Untracked] -> IO ()
 putCmdLineFlags flags = modifyIORef cmdLineFlags (\f -> foldl (flip id) f flags)
 
--- TODO: Avoid unsafePerformIO by using shakeExtra (awaiting Shake's release)
+-- TODO: Avoid unsafePerformIO by using shakeExtra.
 {-# NOINLINE getCmdLineFlags #-}
 getCmdLineFlags :: Untracked
 getCmdLineFlags = unsafePerformIO $ readIORef cmdLineFlags

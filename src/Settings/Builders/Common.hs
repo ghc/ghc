@@ -11,7 +11,7 @@ import Oracles.PackageData
 import Settings
 
 includes :: [FilePath]
-includes = [ "includes", "includes/dist-derivedconstants/header" ]
+includes = ["includes", "includes/dist-derivedconstants/header"]
 
 includesArgs :: Args
 includesArgs = append $ map ("-I" ++) includes

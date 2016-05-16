@@ -9,9 +9,10 @@ module Way (
     wayPrefix, waySuffix, hisuf, osuf, hcsuf, obootsuf, hibootsuf, ssuf, libsuf
     ) where
 
-import Base hiding (unit)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as Set
+
+import Base hiding (unit)
 import Oracles.Config.Setting
 
 -- Note: order of constructors is important for compatibility with the old build

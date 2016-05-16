@@ -10,9 +10,10 @@ module Package (
     setPath, topLevel, library, utility, setType, isLibrary, isProgram
     ) where
 
-import Base
-import GHC.Generics (Generic)
 import Data.String
+import GHC.Generics (Generic)
+
+import Base
 
 -- | The name of a Cabal package
 newtype PackageName = PackageName { fromPackageName :: String }

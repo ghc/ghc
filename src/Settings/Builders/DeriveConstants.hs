@@ -4,7 +4,7 @@ import Base
 import Expression
 import Oracles.Config.Flag
 import Oracles.Config.Setting
-import Predicates (builder, output)
+import Predicates
 import Settings.Builders.Common
 
 -- TODO: do we need to support `includes_CC_OPTS += -DDYNAMIC_BY_DEFAULT`?

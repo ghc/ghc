@@ -1,11 +1,12 @@
 module Rules.Cabal (cabalRules) where
 
-import Base
 import Data.Version
 import Distribution.Package as DP
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse
 import Distribution.Verbosity
+
+import Base
 import Expression
 import GHC
 import Settings

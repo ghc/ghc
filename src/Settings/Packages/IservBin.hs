@@ -1,9 +1,8 @@
 module Settings.Packages.IservBin (iservBinPackageArgs) where
 
 import Expression
-import GHC (iservBin)
-import Predicates (builder, package)
+import GHC
+import Predicates
 
 iservBinPackageArgs :: Args
-iservBinPackageArgs = package iservBin ? do
-    mconcat [ builder Ghc ? arg "-no-hs-main" ]
+iservBinPackageArgs = package iservBin ? builder Ghc ? arg "-no-hs-main"

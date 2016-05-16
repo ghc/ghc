@@ -1,7 +1,7 @@
 module Settings.Builders.Happy (happyBuilderArgs) where
 
 import Expression
-import Predicates (builder)
+import Predicates
 
 happyBuilderArgs :: Args
 happyBuilderArgs = builder Happy ? mconcat [ arg "-agc"

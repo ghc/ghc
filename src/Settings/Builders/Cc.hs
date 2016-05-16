@@ -1,12 +1,12 @@
 module Settings.Builders.Cc (ccBuilderArgs) where
 
-import Development.Shake.FilePath
+import Base
 import Expression
 import Oracles.Config.Setting
 import Oracles.PackageData
-import Predicates (builder)
+import Predicates
 import Settings
-import Settings.Builders.Common (cIncludeArgs)
+import Settings.Builders.Common
 
 -- TODO: handle custom $1_$2_MKDEPENDC_OPTS and
 ccBuilderArgs :: Args

@@ -2,7 +2,7 @@ module Settings.Builders.Tar (tarBuilderArgs) where
 
 import Base
 import Expression
-import Predicates (builder)
+import Predicates
 
 tarBuilderArgs :: Args
 tarBuilderArgs = builder Tar ? do

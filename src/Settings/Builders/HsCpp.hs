@@ -3,7 +3,7 @@ module Settings.Builders.HsCpp (hsCppBuilderArgs) where
 import Expression
 import GHC
 import Oracles.Config.Setting
-import Predicates (builder)
+import Predicates
 import Settings.Builders.GhcCabal
 import Settings.Paths
 

@@ -5,14 +5,11 @@ module Settings.Builders.GhcCabal (
     ) where
 
 import Base
-import Oracles.Config.Setting
-import Oracles.Config.Flag
-import GHC
-import Package
-import Way
 import Builder
-import Stage
 import Expression
+import GHC
+import Oracles.Config.Flag
+import Oracles.Config.Setting
 import Predicates hiding (stage)
 import Settings
 import Settings.Builders.Common

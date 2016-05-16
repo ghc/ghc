@@ -7,8 +7,8 @@ import GHC
 import Oracles.Config.Setting
 import Rules.Actions
 import Settings.Packages.IntegerGmp
-import Settings.User
 import Settings.Paths
+import Settings.User
 import Target
 
 gmpBase :: FilePath

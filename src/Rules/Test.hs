@@ -3,7 +3,7 @@ module Rules.Test (testRules) where
 import Base
 import Builder
 import Expression
-import GHC (compiler, rts, libffi)
+import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Oracles.WindowsPath

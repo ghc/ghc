@@ -1,7 +1,7 @@
 module Settings.Builders.Make (makeBuilderArgs) where
 
 import Expression
-import Predicates (builder)
+import Predicates
 import Settings
 
 makeBuilderArgs :: Args

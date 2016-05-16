@@ -4,9 +4,9 @@ import Base
 import Expression
 import Oracles.Config.Flag
 import Oracles.Config.Setting
-import Predicates (builder)
+import Predicates
 
--- | Default arguments for 'Ar' builder
+-- | Default arguments for 'Ar' builder.
 arBuilderArgs :: Args
 arBuilderArgs = builder Ar ? mconcat [ arg "q"
                                      , arg =<< getOutput

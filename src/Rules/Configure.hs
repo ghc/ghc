@@ -4,9 +4,9 @@ import qualified System.Info as System
 
 import Base
 import Builder
-import CmdLineFlag (cmdSkipConfigure)
+import CmdLineFlag
 import Context
-import GHC (compiler)
+import GHC
 import Rules.Actions
 import Rules.Generators.GhcAutoconfH
 import Stage

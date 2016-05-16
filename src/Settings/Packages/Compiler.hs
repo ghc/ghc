@@ -2,10 +2,10 @@ module Settings.Packages.Compiler (compilerPackageArgs) where
 
 import Base
 import Expression
-import GHC (compiler)
-import Oracles.Config.Setting
+import GHC
 import Oracles.Config.Flag
-import Predicates (builder, package, notStage0)
+import Oracles.Config.Setting
+import Predicates
 import Settings
 
 compilerPackageArgs :: Args

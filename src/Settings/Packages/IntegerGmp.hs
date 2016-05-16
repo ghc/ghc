@@ -2,10 +2,10 @@ module Settings.Packages.IntegerGmp (integerGmpPackageArgs, gmpBuildPath) where
 
 import Base
 import Expression
-import GHC (integerGmp)
-import Predicates (builder, package)
-import Settings.Paths
+import GHC
 import Oracles.Config.Setting
+import Predicates
+import Settings.Paths
 
 -- TODO: move build artefacts to buildRootPath, see #113
 -- TODO: Is this needed?

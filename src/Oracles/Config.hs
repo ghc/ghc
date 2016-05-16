@@ -1,9 +1,10 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Oracles.Config (askConfig, askConfigWithDefault, configOracle) where
 
-import Base
 import qualified Data.HashMap.Strict as Map
 import Development.Shake.Config
+
+import Base
 
 newtype ConfigKey = ConfigKey String
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)

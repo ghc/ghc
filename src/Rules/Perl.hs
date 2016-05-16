@@ -2,7 +2,7 @@ module Rules.Perl (perlScriptRules) where
 
 import Base
 import Expression
-import Rules.Actions (runBuilder)
+import Rules.Actions
 
 -- TODO: get rid of perl scripts
 -- | Generate perl scripts the build system requires, such as @ghc-split@,

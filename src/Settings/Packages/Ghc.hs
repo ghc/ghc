@@ -1,9 +1,9 @@
 module Settings.Packages.Ghc (ghcPackageArgs) where
 
 import Expression
-import GHC (ghc, compiler)
+import GHC
 import Oracles.Config.Setting
-import Predicates (builder, package, notStage0)
+import Predicates
 import Settings.Paths
 
 ghcPackageArgs :: Args

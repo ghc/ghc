@@ -1,8 +1,8 @@
 module Settings.Packages.Directory (directoryPackageArgs) where
 
 import Expression
-import GHC (directory)
-import Predicates (builder, package)
+import GHC
+import Predicates
 
 -- TODO: I had to define symbol __GLASGOW_HASKELL__ as otherwise directory.c is
 -- effectively empty. I presume it was expected that GHC will be used for

@@ -9,6 +9,8 @@ import Base
 import Context hiding (stage)
 import Expression
 import GHC
+import Oracles.ModuleFiles
+import Rules.Actions
 import Rules.Generators.ConfigHs
 import Rules.Generators.GhcAutoconfH
 import Rules.Generators.GhcBootPlatformH
@@ -16,8 +18,6 @@ import Rules.Generators.GhcPlatformH
 import Rules.Generators.GhcSplit
 import Rules.Generators.GhcVersionH
 import Rules.Generators.VersionHs
-import Oracles.ModuleFiles
-import Rules.Actions
 import Rules.Libffi
 import Settings
 import Target hiding (builder, context)

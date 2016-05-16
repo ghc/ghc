@@ -1,8 +1,8 @@
 module Settings.Packages.GhcPrim (ghcPrimPackageArgs) where
 
 import Expression
-import GHC (ghcPrim)
-import Predicates (builder, package)
+import GHC
+import Predicates
 
 ghcPrimPackageArgs :: Args
 ghcPrimPackageArgs = package ghcPrim ?

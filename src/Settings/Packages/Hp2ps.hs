@@ -2,8 +2,8 @@ module Settings.Packages.Hp2ps (hp2psPackageArgs) where
 
 import Base
 import Expression
-import GHC (hp2ps)
-import Predicates (builder, package)
+import GHC
+import Predicates
 import Settings
 
 hp2psPackageArgs :: Args

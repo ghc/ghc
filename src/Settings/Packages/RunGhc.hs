@@ -1,9 +1,9 @@
 module Settings.Packages.RunGhc (runGhcPackageArgs) where
 
 import Expression
-import GHC (runGhc)
+import GHC
 import Oracles.Config.Setting
-import Predicates (builder, input, package)
+import Predicates
 
 runGhcPackageArgs :: Args
 runGhcPackageArgs = package runGhc ? do

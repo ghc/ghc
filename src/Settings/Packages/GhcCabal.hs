@@ -4,7 +4,7 @@ import Base
 import Expression
 import GHC
 import Oracles.Config.Setting
-import Predicates (builder, package, stage0)
+import Predicates
 import Settings
 
 ghcCabalPackageArgs :: Args

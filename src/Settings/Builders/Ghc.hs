@@ -1,6 +1,4 @@
-module Settings.Builders.Ghc (
-    ghcBuilderArgs, ghcMBuilderArgs, commonGhcArgs
-    ) where
+module Settings.Builders.Ghc (ghcBuilderArgs, ghcMBuilderArgs, commonGhcArgs) where
 
 import Control.Monad.Trans.Reader
 
@@ -12,8 +10,8 @@ import Oracles.Config.Setting
 import Oracles.PackageData
 import Predicates hiding (way, stage)
 import Settings
-import Settings.Builders.GhcCabal (bootPackageDbArgs)
-import Settings.Builders.Common (cIncludeArgs)
+import Settings.Builders.Common
+import Settings.Builders.GhcCabal
 
 -- TODO: add support for -dyno
 -- $1/$2/build/%.$$($3_o-bootsuf) : $1/$4/%.hs-boot

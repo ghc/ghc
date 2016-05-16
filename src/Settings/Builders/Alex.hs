@@ -1,7 +1,7 @@
 module Settings.Builders.Alex (alexBuilderArgs) where
 
 import Expression
-import Predicates (builder)
+import Predicates
 
 alexBuilderArgs :: Args
 alexBuilderArgs = builder Alex ? mconcat [ arg "-g"

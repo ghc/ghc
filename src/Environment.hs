@@ -1,7 +1,8 @@
 module Environment (setupEnvironment) where
 
-import Base
 import System.Environment
+
+import Base
 
 -- | The build system invokes many external builders whose behaviour is
 -- influenced by the environment variables. We need to modify some of them

@@ -4,10 +4,10 @@ module Settings.Packages.Rts (
 
 import Base
 import Expression
-import GHC (rts, rtsContext)
+import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
-import Predicates (builder, package, input)
+import Predicates
 import Settings
 import Settings.Builders.Common
 

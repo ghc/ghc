@@ -1,6 +1,5 @@
 module Settings.Builders.Haddock (haddockBuilderArgs) where
 
-import Development.Shake.FilePath
 import Base
 import GHC
 import Package

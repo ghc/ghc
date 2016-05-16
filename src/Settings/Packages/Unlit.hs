@@ -2,8 +2,8 @@ module Settings.Packages.Unlit (unlitPackageArgs) where
 
 import Base
 import Expression
-import GHC (unlit)
-import Predicates (builder, package)
+import GHC
+import Predicates
 import Settings
 
 unlitPackageArgs :: Args

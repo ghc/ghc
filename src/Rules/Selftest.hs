@@ -6,8 +6,8 @@ import Development.Shake
 import Test.QuickCheck
 
 import Base
-import Oracles.ModuleFiles (decodeModule, encodeModule)
-import Settings.Builders.Ar (chunksOfSize)
+import Oracles.ModuleFiles
+import Settings.Builders.Ar
 import Way
 
 instance Arbitrary Way where

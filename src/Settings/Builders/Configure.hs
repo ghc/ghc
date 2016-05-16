@@ -3,7 +3,7 @@ module Settings.Builders.Configure (configureBuilderArgs) where
 import Base
 import Expression
 import Oracles.Config.Setting
-import Predicates (builder)
+import Predicates
 import Settings
 
 configureBuilderArgs :: Args

@@ -5,11 +5,11 @@ module Builder (
     ) where
 
 import Control.Monad.Trans.Reader
+import GHC.Generics (Generic)
 
 import Base
 import Context
 import GHC
-import GHC.Generics (Generic)
 import Oracles.Config
 import Oracles.LookupInPath
 import Oracles.WindowsPath
