@@ -119,31 +119,8 @@ xchg(StgPtr p, StgWord w)
           :"+r" (result), "+m" (*p)
           : /* no input-only operands */
         );
-#elif powerpc_HOST_ARCH
-    __asm__ __volatile__ (
-# if aix_HOST_OS
-        /* IBM's assembler doesn't seem to support local labels so we use
-         * explicit relative numeric offsets to workaround this limitation
-         */
-        "       lwarx     %0, 0, %2\n"
-        "       stwcx.    %1, 0, %2\n"
-        "       bne-      $-8"
-# else // aix_HOST_OS
-        "1:     lwarx     %0, 0, %2\n"
-        "       stwcx.    %1, 0, %2\n"
-        "       bne-      1b"
-# endif
-        :"=&r" (result)
-        :"r" (w), "r" (p)
-    );
-#elif powerpc64_HOST_ARCH || powerpc64le_HOST_ARCH
-    __asm__ __volatile__ (
-        "1:     ldarx     %0, 0, %2\n"
-        "       stdcx.    %1, 0, %2\n"
-        "       bne-      1b"
-        :"=&r" (result)
-        :"r" (w), "r" (p)
-    );
+#elif powerpc_HOST_ARCH || powerpc64_HOST_ARCH || powerpc64le_HOST_ARCH
+    result = __sync_lock_test_and_set(p, w);
 #elif sparc_HOST_ARCH
     result = w;
     __asm__ __volatile__ (
@@ -211,45 +188,8 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
           :"=a"(o), "+m" (*(volatile unsigned int *)p)
           :"0" (o), "r" (n));
     return o;
-#elif powerpc_HOST_ARCH
-    StgWord result;
-    __asm__ __volatile__ (
-# if aix_HOST_OS
-        /* IBM's assembler doesn't seem to support local labels so we use
-         * explicit relative numeric offsets to workaround this limitation
-         */
-        "       lwarx     %0, 0, %3\n"
-        "       cmpw      %0, %1\n"
-        "       bne       $+12\n"
-        "       stwcx.    %2, 0, %3\n"
-        "       bne-      $-16\n"
-# else // aix_HOST_OS
-        "1:     lwarx     %0, 0, %3\n"
-        "       cmpw      %0, %1\n"
-        "       bne       2f\n"
-        "       stwcx.    %2, 0, %3\n"
-        "       bne-      1b\n"
-        "2:"
-# endif // !aix_HOST_OS
-        :"=&r" (result)
-        :"r" (o), "r" (n), "r" (p)
-        :"cc", "memory"
-    );
-    return result;
-#elif powerpc64_HOST_ARCH || powerpc64le_HOST_ARCH
-    StgWord result;
-    __asm__ __volatile__ (
-        "1:     ldarx     %0, 0, %3\n"
-        "       cmpd      %0, %1\n"
-        "       bne       2f\n"
-        "       stdcx.    %2, 0, %3\n"
-        "       bne-      1b\n"
-        "2:"
-        :"=&r" (result)
-        :"r" (o), "r" (n), "r" (p)
-        :"cc", "memory"
-    );
-    return result;
+#elif powerpc_HOST_ARCH || powerpc64_HOST_ARCH || powerpc64le_HOST_ARCH
+    return __sync_val_compare_and_swap(p, o, n);
 #elif sparc_HOST_ARCH
     __asm__ __volatile__ (
         "cas [%1], %2, %0"
@@ -310,6 +250,7 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
 
 // RRN: Generalized to arbitrary increments to enable fetch-and-add in
 // Haskell code (fetchAddIntArray#).
+// PT: add-and-fetch, returns new value
 EXTERN_INLINE StgWord
 atomic_inc(StgVolatilePtr p, StgWord incr)
 {
@@ -321,6 +262,8 @@ atomic_inc(StgVolatilePtr p, StgWord incr)
             "+r" (r), "+m" (*p):
     );
     return r + incr;
+#elif powerpc_HOST_ARCH || powerpc64_HOST_ARCH || powerpc64le_HOST_ARCH
+    return __sync_add_and_fetch(p, incr);
 #else
     StgWord old, new_;
     do {
@@ -342,6 +285,8 @@ atomic_dec(StgVolatilePtr p)
             "+r" (r), "+m" (*p):
     );
     return r-1;
+#elif powerpc_HOST_ARCH || powerpc64_HOST_ARCH || powerpc64le_HOST_ARCH
+    return __sync_sub_and_fetch(p, (StgWord) 1);
 #else
     StgWord old, new_;
     do {

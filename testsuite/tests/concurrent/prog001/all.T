@@ -14,7 +14,6 @@
 
 test('concprog001',
      [when(fast(), skip),
-      when(arch('powerpc64'), expect_broken(11259)),
       only_ways(['threaded2']),
       extra_clean(['Arithmetic.hi', 'Arithmetic.o',
                    'Converter.hi',  'Converter.o',
