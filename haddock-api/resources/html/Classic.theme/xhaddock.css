@@ -116,6 +116,10 @@ ul.links li {
   cursor: pointer;
 }
 
+@media print {
+  #footer { display: none; }
+}
+
 #package-header {
 	color: #ffffff;
 	padding: 5px 5px 5px 31px;
