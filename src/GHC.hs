@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module GHC (
     array, base, binary, bytestring, cabal, compiler, containers, compareSizes,
     deepseq, deriveConstants, directory, dllSplit, filepath, genapply,
@@ -18,7 +19,7 @@ import Stage
 
 -- | These are all GHC packages we know about. Build rules will be generated for
 -- all of them. However, not all of these packages will be built. For example,
--- package /win32/ is built only on Windows.
+-- package 'win32' is built only on Windows.
 -- "Packages" defines default conditions for building each package, which can
 -- be overridden in "Settings.User".
 defaultKnownPackages :: [Package]
@@ -32,14 +33,6 @@ defaultKnownPackages =
     , touchy, transformers, unlit, unix, win32, xhtml ]
 
 -- | Package definitions, see 'Package'.
-array, base, binary, bytestring, cabal, compiler, containers, compareSizes,
-    deepseq, deriveConstants, directory, dllSplit, filepath, genapply,
-    genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal, ghci, ghcPkg, ghcPrim,
-    ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp,
-    integerSimple, iservBin, libffi, mkUserGuidePart, parallel, pretty,
-    primitive, process, rts, runGhc, stm, templateHaskell, terminfo, time,
-    touchy, transformers, unlit, unix, win32, xhtml :: Package
-
 array           = library  "array"
 base            = library  "base"
 binary          = library  "binary"
@@ -126,6 +119,7 @@ programPath context@Context {..}
     installProgram name = pkgPath package -/- contextDirectory context
                                           -/- "build/tmp" -/- name <.> exe
 
+-- TODO: Move this elsewhere.
 rtsContext :: Context
 rtsContext = vanillaContext Stage1 rts
 
