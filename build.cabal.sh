@@ -43,5 +43,4 @@ fi
 cabal run hadrian --               \
     --lint                         \
     --directory "$absoluteRoot/.." \
-    --colour                       \
     "$@"
