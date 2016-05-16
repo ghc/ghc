@@ -29,7 +29,6 @@ pygments_style = 'tango'
 
 # -- Options for HTML output ----------------------------------------------
 
-html_theme = 'alabaster'
 htmlhelp_basename = 'Haddockdoc'
 
 
