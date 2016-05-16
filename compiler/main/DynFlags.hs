@@ -243,8 +243,8 @@ import qualified GHC.LanguageExtensions as LangExt
 --
 --  * Adding the extension to GHC.LanguageExtensions
 --
---    The Extension type in libraries/ghc-boot/GHC/LanguageExtensions.hs is
---    the canonical list of language extensions known by GHC.
+--    The Extension type in libraries/ghc-boot-th/GHC/LanguageExtensions/Type.hs
+--    is the canonical list of language extensions known by GHC.
 --
 --  * Adding a flag to DynFlags.xFlags
 --

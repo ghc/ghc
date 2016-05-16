@@ -19,4 +19,4 @@ module Language.Haskell.TH.LanguageExtensions
 -- This module exists primarily to avoid inserting a massive list of language
 -- extensions into the already quite large Haddocks for Language.Haskell.TH
 
-import GHC.LanguageExtensions (Extension(..))
+import GHC.LanguageExtensions.Type (Extension(..))
