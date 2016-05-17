@@ -81,19 +81,35 @@ INLINE_HEADER StgThunkInfoTable *itbl_to_thunk_itbl(const StgInfoTable *i) {retu
 INLINE_HEADER StgConInfoTable *itbl_to_con_itbl(const StgInfoTable *i) {return (StgConInfoTable *)i;}
 #endif
 
-EXTERN_INLINE StgInfoTable *get_itbl(const StgClosure *c);
-EXTERN_INLINE StgInfoTable *get_itbl(const StgClosure *c) {return INFO_PTR_TO_STRUCT(c->header.info);}
+EXTERN_INLINE const StgInfoTable *get_itbl(const StgClosure *c);
+EXTERN_INLINE const StgInfoTable *get_itbl(const StgClosure *c)
+{
+   return INFO_PTR_TO_STRUCT(c->header.info);
+}
 
-EXTERN_INLINE StgRetInfoTable *get_ret_itbl(const StgClosure *c);
-EXTERN_INLINE StgRetInfoTable *get_ret_itbl(const StgClosure *c) {return RET_INFO_PTR_TO_STRUCT(c->header.info);}
+EXTERN_INLINE const StgRetInfoTable *get_ret_itbl(const StgClosure *c);
+EXTERN_INLINE const StgRetInfoTable *get_ret_itbl(const StgClosure *c)
+{
+   return RET_INFO_PTR_TO_STRUCT(c->header.info);
+}
 
-INLINE_HEADER StgFunInfoTable *get_fun_itbl(const StgClosure *c) {return FUN_INFO_PTR_TO_STRUCT(c->header.info);}
+INLINE_HEADER const StgFunInfoTable *get_fun_itbl(const StgClosure *c)
+{
+   return FUN_INFO_PTR_TO_STRUCT(c->header.info);
+}
 
-INLINE_HEADER StgThunkInfoTable *get_thunk_itbl(const StgClosure *c) {return THUNK_INFO_PTR_TO_STRUCT(c->header.info);}
+INLINE_HEADER const StgThunkInfoTable *get_thunk_itbl(const StgClosure *c)
+{
+   return THUNK_INFO_PTR_TO_STRUCT(c->header.info);
+}
 
-INLINE_HEADER StgConInfoTable *get_con_itbl(const StgClosure *c) {return CON_INFO_PTR_TO_STRUCT((c)->header.info);}
+INLINE_HEADER const StgConInfoTable *get_con_itbl(const StgClosure *c)
+{
+   return CON_INFO_PTR_TO_STRUCT((c)->header.info);
+}
 
-INLINE_HEADER StgHalfWord GET_TAG(const StgClosure *con) {
+INLINE_HEADER StgHalfWord GET_TAG(const StgClosure *con)
+{
     return get_itbl(con)->srt_bitmap;
 }
 
@@ -200,9 +216,15 @@ GET_CLOSURE_TAG(const StgClosure * p)
 }
 
 static inline StgClosure *
-UNTAG_CLOSURE(const StgClosure * p)
+UNTAG_CLOSURE(StgClosure * p)
 {
     return (StgClosure*)((StgWord)p & ~TAG_MASK);
+}
+
+static inline const StgClosure *
+UNTAG_CONST_CLOSURE(const StgClosure * p)
+{
+    return (const StgClosure*)((StgWord)p & ~TAG_MASK);
 }
 
 static inline StgClosure *
@@ -249,7 +271,8 @@ INLINE_HEADER rtsBool LOOKS_LIKE_INFO_PTR (StgWord p)
 
 INLINE_HEADER rtsBool LOOKS_LIKE_CLOSURE_PTR (const void *p)
 {
-    return LOOKS_LIKE_INFO_PTR((StgWord)(UNTAG_CLOSURE((StgClosure *)(p)))->header.info);
+    return LOOKS_LIKE_INFO_PTR((StgWord)
+            (UNTAG_CONST_CLOSURE((const StgClosure *)(p)))->header.info);
 }
 
 /* -----------------------------------------------------------------------------
@@ -337,9 +360,10 @@ EXTERN_INLINE StgWord bco_sizeW ( StgBCO *bco )
  *
  * (Also for 'closure_sizeW' below)
  */
-EXTERN_INLINE uint32_t closure_sizeW_ (const StgClosure *p, StgInfoTable *info);
 EXTERN_INLINE uint32_t
-closure_sizeW_ (const StgClosure *p, StgInfoTable *info)
+closure_sizeW_ (const StgClosure *p, const StgInfoTable *info);
+EXTERN_INLINE uint32_t
+closure_sizeW_ (const StgClosure *p, const StgInfoTable *info)
 {
     switch (info->type) {
     case THUNK_0_1:
@@ -412,7 +436,7 @@ EXTERN_INLINE uint32_t closure_sizeW (const StgClosure *p)
 EXTERN_INLINE StgWord stack_frame_sizeW( StgClosure *frame );
 EXTERN_INLINE StgWord stack_frame_sizeW( StgClosure *frame )
 {
-    StgRetInfoTable *info;
+    const StgRetInfoTable *info;
 
     info = get_ret_itbl(frame);
     switch (info->i.type) {

@@ -195,7 +195,7 @@ scavenge_small_bitmap (StgPtr p, StgWord size, StgWord bitmap)
    -------------------------------------------------------------------------- */
 
 STATIC_INLINE StgPtr
-scavenge_arg_block (StgFunInfoTable *fun_info, StgClosure **args)
+scavenge_arg_block (const StgFunInfoTable *fun_info, StgClosure **args)
 {
     StgPtr p;
     StgWord bitmap;
@@ -227,9 +227,9 @@ scavenge_PAP_payload (StgClosure *fun, StgClosure **payload, StgWord size)
 {
     StgPtr p;
     StgWord bitmap;
-    StgFunInfoTable *fun_info;
+    const StgFunInfoTable *fun_info;
 
-    fun_info = get_fun_itbl(UNTAG_CLOSURE(fun));
+    fun_info = get_fun_itbl(UNTAG_CONST_CLOSURE(fun));
     ASSERT(fun_info->i.type != PAP);
     p = (StgPtr)payload;
 
@@ -407,7 +407,7 @@ static GNUC_ATTR_HOT void
 scavenge_block (bdescr *bd)
 {
   StgPtr p, q;
-  StgInfoTable *info;
+  const StgInfoTable *info;
   rtsBool saved_eager_promotion;
   gen_workspace *ws;
 
@@ -847,7 +847,7 @@ static void
 scavenge_mark_stack(void)
 {
     StgPtr p, q;
-    StgInfoTable *info;
+    const StgInfoTable *info;
     rtsBool saved_eager_promotion;
 
     gct->evac_gen_no = oldest_gen->no;
@@ -1916,7 +1916,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
     case RET_FUN:
     {
         StgRetFun *ret_fun = (StgRetFun *)p;
-        StgFunInfoTable *fun_info;
+        const StgFunInfoTable *fun_info;
 
         evacuate(&ret_fun->fun);
         fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));

@@ -1107,9 +1107,9 @@ fprintCCS_stderr (CostCentreStack *ccs, StgClosure *exception, StgTSO *tso)
     const uint32_t MAX_DEPTH = 10; // don't print gigantic chains of stacks
 
     {
-        char *desc;
-        StgInfoTable *info;
-        info = get_itbl(UNTAG_CLOSURE(exception));
+        const char *desc;
+        const StgInfoTable *info;
+        info = get_itbl(UNTAG_CONST_CLOSURE(exception));
         switch (info->type) {
         case CONSTR:
         case CONSTR_1_0:

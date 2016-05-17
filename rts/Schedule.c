@@ -2790,7 +2790,7 @@ raiseExceptionHelper (StgRegTable *reg, StgTSO *tso, StgClosure *exception)
     Capability *cap = regTableToCapability(reg);
     StgThunk *raise_closure = NULL;
     StgPtr p, next;
-    StgRetInfoTable *info;
+    const StgRetInfoTable *info;
     //
     // This closure represents the expression 'raise# E' where E
     // is the exception raise.  It is used to overwrite all the
@@ -2899,12 +2899,12 @@ raiseExceptionHelper (StgRegTable *reg, StgTSO *tso, StgClosure *exception)
 StgWord
 findRetryFrameHelper (Capability *cap, StgTSO *tso)
 {
-  StgPtr           p, next;
-  StgRetInfoTable *info;
+  const StgRetInfoTable *info;
+  StgPtr    p, next;
 
   p = tso->stackobj->sp;
   while (1) {
-    info = get_ret_itbl((StgClosure *)p);
+    info = get_ret_itbl((const StgClosure *)p);
     next = p + stack_frame_sizeW((StgClosure *)p);
     switch (info->i.type) {
 

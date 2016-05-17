@@ -363,9 +363,9 @@ rts_getFunPtr (HaskellObj p)
 HsBool
 rts_getBool (HaskellObj p)
 {
-    StgInfoTable *info;
+    const StgInfoTable *info;
 
-    info = get_itbl((StgClosure *)UNTAG_CLOSURE(p));
+    info = get_itbl((const StgClosure *)UNTAG_CONST_CLOSURE(p));
     if (info->srt_bitmap == 0) { // srt_bitmap is the constructor tag
         return 0;
     } else {

@@ -192,7 +192,7 @@ void
 threadPaused(Capability *cap, StgTSO *tso)
 {
     StgClosure *frame;
-    StgRetInfoTable *info;
+    const StgRetInfoTable *info;
     const StgInfoTable *bh_info;
     const StgInfoTable *cur_bh_info USED_IF_THREADS;
     StgClosure *bh;

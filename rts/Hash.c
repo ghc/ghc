@@ -29,7 +29,7 @@
 /* Linked list of (key, data) pairs for separate chaining */
 typedef struct hashlist {
     StgWord key;
-    void *data;
+    const void *data;
     struct hashlist *next;  /* Next cell in bucket chain (same hash value) */
 } HashList;
 
@@ -200,7 +200,7 @@ lookupHashTable(const HashTable *table, StgWord key)
 
     for (hl = table->dir[segment][index]; hl != NULL; hl = hl->next)
         if (table->compare(hl->key, key))
-            return hl->data;
+            return (void *) hl->data;
 
     /* It's not there */
     return NULL;
@@ -274,7 +274,7 @@ freeHashList (HashTable *table, HashList *hl)
 }
 
 void
-insertHashTable(HashTable *table, StgWord key, void *data)
+insertHashTable(HashTable *table, StgWord key, const void *data)
 {
     int bucket;
     int segment;
@@ -323,7 +323,7 @@ removeHashTable(HashTable *table, StgWord key, void *data)
                 prev->next = hl->next;
             freeHashList(table,hl);
             table->kcount--;
-            return hl->data;
+            return (void *) hl->data;
         }
         prev = hl;
     }
@@ -357,7 +357,7 @@ freeHashTable(HashTable *table, void (*freeDataFun)(void *) )
             for (hl = table->dir[segment][index]; hl != NULL; hl = next) {
                 next = hl->next;
                 if (freeDataFun != NULL)
-                    (*freeDataFun)(hl->data);
+                    (*freeDataFun)((void *) hl->data);
             }
             index--;
         }

@@ -106,7 +106,8 @@ static StgWord64 expectWord64(void) {
 static void
 readTix(void) {
   unsigned int i;
-  HpcModuleInfo *tmpModule, *lookup;
+  HpcModuleInfo *tmpModule;
+  const HpcModuleInfo *lookup;
 
   ws();
   expect('T');

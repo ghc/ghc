@@ -169,7 +169,8 @@ loop:
     case 1:
     {
         StgWord r = *(StgPtr)(q-1);
-        ASSERT(LOOKS_LIKE_INFO_PTR((StgWord)UNTAG_CLOSURE((StgClosure *)r)));
+        ASSERT(LOOKS_LIKE_INFO_PTR((StgWord)
+               UNTAG_CONST_CLOSURE((StgClosure *)r)));
         return r;
     }
     case 2:
@@ -539,7 +540,7 @@ update_fwd_large( bdescr *bd )
 
 // ToDo: too big to inline
 static /* STATIC_INLINE */ StgPtr
-thread_obj (StgInfoTable *info, StgPtr p)
+thread_obj (const StgInfoTable *info, StgPtr p)
 {
     switch (info->type) {
     case THUNK_0_1:
@@ -738,7 +739,7 @@ update_fwd( bdescr *blocks )
 {
     StgPtr p;
     bdescr *bd;
-    StgInfoTable *info;
+    const StgInfoTable *info;
 
     bd = blocks;
 
@@ -848,7 +849,7 @@ update_bkwd_compact( generation *gen )
     StgWord m;
 #endif
     bdescr *bd, *free_bd;
-    StgInfoTable *info;
+    const StgInfoTable *info;
     StgWord size;
     W_ free_blocks;
     StgWord iptr;

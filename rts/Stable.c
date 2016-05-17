@@ -377,7 +377,7 @@ StgWord
 lookupStableName (StgPtr p)
 {
   StgWord sn;
-  void* sn_tmp;
+  const void* sn_tmp;
 
   stableLock();
 

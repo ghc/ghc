@@ -38,7 +38,7 @@
 // object as referenced so that it won't get unloaded in this round.
 //
 
-static void checkAddress (HashTable *addrs, void *addr)
+static void checkAddress (HashTable *addrs, const void *addr)
 {
     ObjectCode *oc;
     int i;
@@ -73,7 +73,7 @@ static void searchStackChunk (HashTable *addrs, StgPtr sp, StgPtr stack_end)
         switch (info->i.type) {
         case RET_SMALL:
         case RET_BIG:
-            checkAddress(addrs, (void*)info);
+            checkAddress(addrs, (const void*)info);
             break;
 
         default:
@@ -88,7 +88,7 @@ static void searchStackChunk (HashTable *addrs, StgPtr sp, StgPtr stack_end)
 static void searchHeapBlocks (HashTable *addrs, bdescr *bd)
 {
     StgPtr p;
-    StgInfoTable *info;
+    const StgInfoTable *info;
     uint32_t size;
     rtsBool prim;
 

@@ -73,7 +73,8 @@ typedef struct {
 
 extern StgWord16 closure_flags[];
 
-#define closureFlags(c)         (closure_flags[get_itbl(UNTAG_CLOSURE(c))->type])
+#define closureFlags(c)         (closure_flags[get_itbl \
+                                    (UNTAG_CONST_CLOSURE(c))->type])
 
 #define closure_HNF(c)          (  closureFlags(c) & _HNF)
 #define closure_BITMAP(c)       (  closureFlags(c) & _BTM)
@@ -343,9 +344,10 @@ typedef struct StgConInfoTable_ {
  * info must be a StgConInfoTable*.
  */
 #ifdef TABLES_NEXT_TO_CODE
-#define GET_CON_DESC(info) ((char *)((StgWord)((info)+1) + (info->con_desc)))
+#define GET_CON_DESC(info) \
+            ((const char *)((StgWord)((info)+1) + (info->con_desc)))
 #else
-#define GET_CON_DESC(info) ((info)->con_desc)
+#define GET_CON_DESC(info) ((const char *)(info)->con_desc)
 #endif
 
 /*

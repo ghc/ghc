@@ -83,7 +83,7 @@ checkClosureShallow( const StgClosure* p )
 {
     const StgClosure *q;
 
-    q = UNTAG_CLOSURE(p);
+    q = UNTAG_CONST_CLOSURE(p);
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));
 
     /* Is it a static closure? */
@@ -137,11 +137,11 @@ checkStackFrame( StgPtr c )
 
     case RET_FUN:
     {
-        StgFunInfoTable *fun_info;
+        const StgFunInfoTable *fun_info;
         StgRetFun *ret_fun;
 
         ret_fun = (StgRetFun *)c;
-        fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
+        fun_info = get_fun_itbl(UNTAG_CONST_CLOSURE(ret_fun->fun));
         size = ret_fun->size;
         switch (fun_info->f.fun_type) {
         case ARG_GEN:
@@ -182,10 +182,10 @@ checkStackChunk( StgPtr sp, StgPtr stack_end )
 static void
 checkPAP (StgClosure *tagged_fun, StgClosure** payload, StgWord n_args)
 {
-    StgClosure *fun;
-    StgFunInfoTable *fun_info;
+    const StgClosure *fun;
+    const StgFunInfoTable *fun_info;
 
-    fun = UNTAG_CLOSURE(tagged_fun);
+    fun = UNTAG_CONST_CLOSURE(tagged_fun);
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(fun));
     fun_info = get_fun_itbl(fun);
 
@@ -217,13 +217,13 @@ checkPAP (StgClosure *tagged_fun, StgClosure** payload, StgWord n_args)
 
 
 StgOffset
-checkClosure( StgClosure* p )
+checkClosure( const StgClosure* p )
 {
     const StgInfoTable *info;
 
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
 
-    p = UNTAG_CLOSURE(p);
+    p = UNTAG_CONST_CLOSURE(p);
     /* Is it a static closure (i.e. in the data segment)? */
     if (!HEAP_ALLOCED(p)) {
         ASSERT(closure_STATIC(p));
@@ -634,7 +634,7 @@ void
 checkStaticObjects ( StgClosure* static_objects )
 {
   StgClosure *p = static_objects;
-  StgInfoTable *info;
+  const StgInfoTable *info;
 
   while (p != END_OF_STATIC_OBJECT_LIST) {
     p = UNTAG_STATIC_LIST_PTR(p);
@@ -643,8 +643,9 @@ checkStaticObjects ( StgClosure* static_objects )
     switch (info->type) {
     case IND_STATIC:
       {
-        StgClosure *indirectee = UNTAG_CLOSURE(((StgIndStatic *)p)->indirectee);
+        const StgClosure *indirectee;
 
+        indirectee = UNTAG_CONST_CLOSURE(((StgIndStatic *)p)->indirectee);
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(indirectee));
         ASSERT(LOOKS_LIKE_INFO_PTR((StgWord)indirectee->header.info));
         p = *IND_STATIC_LINK((StgClosure *)p);

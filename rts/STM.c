@@ -353,7 +353,7 @@ static void unlock_inv(StgAtomicInvariant *inv) {
 
 static StgBool watcher_is_tso(StgTVarWatchQueue *q) {
   StgClosure *c = q -> closure;
-  StgInfoTable *info = get_itbl(c);
+  const StgInfoTable *info = get_itbl(c);
   return (info -> type) == TSO;
 }
 

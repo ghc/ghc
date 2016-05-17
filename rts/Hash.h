@@ -13,10 +13,15 @@
 
 typedef struct hashtable HashTable; /* abstract */
 
-/* Hash table access where the keys are StgWords */
+/* Hash table access where the keys are StgWords.
+ * Values are passed into the hash table and stored as `const void *` values,
+ * but when the value is looked up or removed, the value is returned without the
+ * `const` so that calling function can mutate what the pointer points to if it
+ * needs to.
+ */
 HashTable * allocHashTable    ( void );
+void        insertHashTable ( HashTable *table, StgWord key, const void *data );
 void *      lookupHashTable ( const HashTable *table, StgWord key );
-void        insertHashTable ( HashTable *table, StgWord key, void *data );
 void *      removeHashTable ( HashTable *table, StgWord key, void *data );
 
 int keyCountHashTable (HashTable *table);

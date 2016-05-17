@@ -778,7 +778,7 @@ StgTSO *
 raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
            rtsBool stop_at_atomically, StgUpdateFrame *stop_here)
 {
-    StgRetInfoTable *info;
+    const StgRetInfoTable *info;
     StgPtr sp, frame;
     StgClosure *updatee;
     uint32_t i;

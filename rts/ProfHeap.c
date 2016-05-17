@@ -48,7 +48,7 @@ static uint32_t max_era;
  * lag/drag/void counters for each identity.
  * -------------------------------------------------------------------------- */
 typedef struct _counter {
-    void *identity;
+    const void *identity;
     union {
         ssize_t resid;
         struct {
@@ -103,7 +103,7 @@ static rtsBool closureSatisfiesConstraints( const StgClosure* p );
  * the band to which this closure's heap space is attributed in the
  * heap profile.
  * ------------------------------------------------------------------------- */
-static void *
+static const void *
 closureIdentity( const StgClosure *p )
 {
     switch (RtsFlags.ProfFlags.doHeapProfile) {
@@ -128,7 +128,7 @@ closureIdentity( const StgClosure *p )
 #else
     case HEAP_BY_CLOSURE_TYPE:
     {
-        StgInfoTable *info;
+        const StgInfoTable *info;
         info = get_itbl(p);
         switch (info->type) {
         case CONSTR:
@@ -183,7 +183,7 @@ doingRetainerProfiling( void )
 void
 LDV_recordDead( const StgClosure *c, uint32_t size )
 {
-    void *id;
+    const void *id;
     uint32_t t;
     counter *ctr;
 
@@ -221,7 +221,7 @@ LDV_recordDead( const StgClosure *c, uint32_t size )
                     censuses[t+1].drag_total += size;
                     censuses[era].drag_total -= size;
                 } else {
-                    void *id;
+                    const void *id;
                     id = closureIdentity(c);
                     ctr = lookupHashTable(censuses[t+1].hash, (StgWord)id);
                     ASSERT( ctr != NULL );
@@ -843,7 +843,7 @@ static void heapProfObject(Census *census, StgClosure *p, size_t size,
 #endif
                            )
 {
-    void *identity;
+    const void *identity;
     size_t real_size;
     counter *ctr;
 
@@ -871,7 +871,7 @@ static void heapProfObject(Census *census, StgClosure *p, size_t size,
                     identity = closureIdentity((StgClosure *)p);
 
                     if (identity != NULL) {
-                        ctr = lookupHashTable( census->hash, (StgWord)identity );
+                        ctr = lookupHashTable(census->hash, (StgWord)identity);
                         if (ctr != NULL) {
 #ifdef PROFILING
                             if (RtsFlags.ProfFlags.bioSelector != NULL) {
@@ -920,7 +920,7 @@ static void
 heapCensusChain( Census *census, bdescr *bd )
 {
     StgPtr p;
-    StgInfoTable *info;
+    const StgInfoTable *info;
     size_t size;
     rtsBool prim;
 
@@ -953,7 +953,7 @@ heapCensusChain( Census *census, bdescr *bd )
         }
 
         while (p < bd->free) {
-            info = get_itbl((StgClosure *)p);
+            info = get_itbl((const StgClosure *)p);
             prim = rtsFalse;
 
             switch (info->type) {
