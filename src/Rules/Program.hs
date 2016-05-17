@@ -5,7 +5,7 @@ import Data.Char
 import Base
 import Context
 import Expression
-import GHC hiding (ghci)
+import GHC
 import Oracles.Config.Setting
 import Oracles.PackageData
 import Rules.Actions

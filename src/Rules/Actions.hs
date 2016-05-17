@@ -1,7 +1,7 @@
 module Rules.Actions (
     build, buildWithCmdOptions, buildWithResources, copyFile, fixFile, moveFile,
     removeFile, copyDirectory, createDirectory, moveDirectory, removeDirectory,
-    applyPatch, renderLibrary, renderProgram, runBuilder, makeExecutable
+    applyPatch, runBuilder, makeExecutable, renderProgram, renderLibrary
     ) where
 
 import qualified System.Directory       as IO

@@ -22,7 +22,7 @@ packageDeps pkg = do
 packageDepsOracle :: Rules ()
 packageDepsOracle = do
     deps <- newCache $ \_ -> do
-        putOracle $ "Reading package dependencies..."
+        putLoud $ "Reading package dependencies..."
         contents <- readFileLines packageDependencies
         return . Map.fromList $
             [ (p, ps) | line <- contents, let p:ps = words line ]

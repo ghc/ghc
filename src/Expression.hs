@@ -211,4 +211,4 @@ getSingleton expr msg = do
     xs <- expr
     case xs of
         [res] -> return res
-        _     -> lift $ putError msg
+        _     -> error msg

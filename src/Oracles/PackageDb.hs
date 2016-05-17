@@ -3,12 +3,13 @@ module Oracles.PackageDb (packageDbOracle) where
 import qualified System.Directory as IO
 
 import Base
-import Context hiding (stage)
+import Context
 import Builder
 import GHC
 import Rules.Actions
 import Settings.Builders.GhcCabal
 import Settings.Paths
+import Settings.User
 import Target
 
 packageDbOracle :: Rules ()

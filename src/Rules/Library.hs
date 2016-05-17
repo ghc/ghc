@@ -5,7 +5,7 @@ module Rules.Library (
 import Data.Char
 import qualified System.Directory as IO
 
-import Base hiding (split, splitPath)
+import Base
 import Context
 import Expression
 import GHC

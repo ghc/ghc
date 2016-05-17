@@ -20,6 +20,6 @@ lookupInPathOracle = void $
         maybePath <- liftIO $ findExecutable name
         path <- case maybePath of
             Just value -> return $ unifyPath value
-            Nothing    -> putError $ "Cannot find executable '" ++ name ++ "'."
-        putOracle $ "Executable found: " ++ name ++ " => " ++ path
+            Nothing    -> error $ "Cannot find executable '" ++ name ++ "'."
+        putLoud $ "Executable found: " ++ name ++ " => " ++ path
         return path

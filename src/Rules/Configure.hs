@@ -9,6 +9,7 @@ import Context
 import GHC
 import Rules.Actions
 import Rules.Generators.GhcAutoconfH
+import Settings.User
 import Stage
 import Target
 
@@ -17,7 +18,7 @@ configureRules = do
     [configFile, "settings", configH] &%> \outs -> do
         if cmdSkipConfigure
         then unlessM (doesFileExist configFile) $
-            putError $ "Configuration file " ++ configFile ++ " is missing."
+            error $ "Configuration file " ++ configFile ++ " is missing."
                 ++ "\nRun the configure script manually or do not use the "
                 ++ "--skip-configure flag."
         else do
@@ -33,7 +34,7 @@ configureRules = do
     ["configure", configH <.> "in"] &%> \_ -> do
         if cmdSkipConfigure
         then unlessM (doesFileExist "configure") $
-            putError $ "The configure script is missing.\nRun the boot script"
+            error $ "The configure script is missing.\nRun the boot script"
                 ++ " manually or do not use the --skip-configure flag."
         else do
             need ["configure.ac"]

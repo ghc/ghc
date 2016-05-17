@@ -10,7 +10,7 @@ newtype ConfigKey = ConfigKey String
     deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
 
 askConfig :: String -> Action String
-askConfig key = askConfigWithDefault key . putError
+askConfig key = askConfigWithDefault key . error
     $ "Cannot find key '" ++ key ++ "' in configuration files."
 
 askConfigWithDefault :: String -> Action String -> Action String
@@ -25,7 +25,7 @@ configOracle :: Rules ()
 configOracle = do
     cfg <- newCache $ \() -> do
         need [configFile]
-        putOracle $ "Reading " ++ configFile ++ "..."
+        putLoud $ "Reading " ++ configFile ++ "..."
         liftIO $ readConfigFile configFile
     _ <- addOracle $ \(ConfigKey key) -> Map.lookup key <$> cfg ()
     return ()

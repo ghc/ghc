@@ -38,9 +38,9 @@ flag f = do
         SupportsThisUnitId -> "supports-this-unit-id"
         WithLibdw          -> "with-libdw"
         UseSystemFfi       -> "use-system-ffi"
-    value <- askConfigWithDefault key . putError
+    value <- askConfigWithDefault key . error
         $ "\nFlag '" ++ key ++ "' not set in configuration files."
-    unless (value == "YES" || value == "NO" || value == "") . putError
+    unless (value == "YES" || value == "NO" || value == "") . error
         $ "\nFlag '" ++ key ++ "' is set to '" ++ value
         ++ "' instead of 'YES' or 'NO'."
     return $ value == "YES"

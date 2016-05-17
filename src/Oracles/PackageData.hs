@@ -86,7 +86,7 @@ packageDataOracle :: Rules ()
 packageDataOracle = do
     keys <- newCache $ \file -> do
         need [file]
-        putOracle $ "Reading " ++ file ++ "..."
+        putLoud $ "Reading " ++ file ++ "..."
         liftIO $ readConfigFile file
     _ <- addOracle $ \(PackageDataKey (file, key)) -> Map.lookup key <$> keys file
     return ()

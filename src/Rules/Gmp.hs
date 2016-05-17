@@ -56,7 +56,7 @@ gmpRules = do
             tarballs <- getDirectoryFiles "" [gmpBase -/- "tarball/gmp*.tar.bz2"]
             tarball  <- case tarballs of
                 [file] -> return $ unifyPath file
-                _      -> putError $ "gmpRules: exactly one tarball expected"
+                _      -> error $ "gmpRules: exactly one tarball expected"
                           ++ "(found: " ++ show tarballs ++ ")."
 
             withTempDir $ \dir -> do
@@ -73,7 +73,7 @@ gmpRules = do
                 let name = dropExtension . dropExtension $ takeFileName tarball
                 libName <- case stripSuffix "-nodoc-patched" name of
                     Just rest -> return rest
-                    Nothing   -> putError $ "gmpRules: expected suffix "
+                    Nothing   -> error $ "gmpRules: expected suffix "
                         ++ "-nodoc-patched (found: " ++ name ++ ")."
 
                 moveDirectory (tmp -/- libName) gmpBuildPath

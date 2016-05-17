@@ -127,7 +127,7 @@ moduleFilesOracle = void $ do
             multi = [ (m, f1, f2) | (m, f1):(n, f2):_ <- tails pairs, m == n ]
         unless (null multi) $ do
             let (m, f1, f2) = head multi
-            putError $ "Module " ++ m ++ " has more than one source file: "
+            error $ "Module " ++ m ++ " has more than one source file: "
                 ++ f1 ++ " and " ++ f2 ++ "."
         return $ lookupAll modules pairs
 

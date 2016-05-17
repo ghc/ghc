@@ -74,7 +74,7 @@ libffiRules = do
             tarballs <- getDirectoryFiles "" ["libffi-tarballs/libffi*.tar.gz"]
             tarball  <- case tarballs of
                 [file] -> return $ unifyPath file
-                _      -> putError $ "libffiRules: exactly one tarball expected"
+                _      -> error $ "libffiRules: exactly one tarball expected"
                           ++ "(found: " ++ show tarballs ++ ")."
 
             need [tarball]

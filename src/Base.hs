@@ -17,12 +17,9 @@ module Base (
     -- * Paths
     configPath, configFile, sourcePath, programInplacePath,
 
-    -- * Output
-    putColoured, putOracle, putBuild, putSuccess, putError,
-
     -- * Miscellaneous utilities
     minusOrd, intersectOrd, lookupAll, replaceEq, quote, replaceSeparators,
-    unifyPath, (-/-), versionToInt, matchVersionedFilePath
+    unifyPath, (-/-), versionToInt, matchVersionedFilePath, putColoured
     ) where
 
 import Control.Applicative
@@ -38,8 +35,8 @@ import Development.Shake hiding (parallel, unit, (*>), Normal)
 import Development.Shake.Classes
 import Development.Shake.FilePath
 import System.Console.ANSI
-import qualified System.Info as Info
 import System.IO
+import System.Info
 
 -- TODO: reexport Stage, etc.?
 
@@ -62,23 +59,22 @@ sourcePath = hadrianPath -/- "src"
 programInplacePath :: FilePath
 programInplacePath = "inplace/bin"
 
--- Utility functions
--- | Find and replace all occurrences of a value in a list
+-- | Find and replace all occurrences of a value in a list.
 replaceEq :: Eq a => a -> a -> [a] -> [a]
 replaceEq from = replaceWhen (== from)
 
--- | Find and replace all occurrences of path separators in a String with a Char
+-- | Find and replace all occurrences of path separators in a String with a Char.
 replaceSeparators :: Char -> String -> String
 replaceSeparators = replaceWhen isPathSeparator
 
 replaceWhen :: (a -> Bool) -> a -> [a] -> [a]
 replaceWhen p to = map (\from -> if p from then to else from)
 
--- | Add quotes to a String
+-- | Add quotes around a String.
 quote :: String -> String
 quote s = "\"" ++ s ++ "\""
 
--- | Given a version string such as "2.16.2" produce an integer equivalent
+-- | Given a version string such as "2.16.2" produce an integer equivalent.
 versionToInt :: String -> Int
 versionToInt s = major * 1000 + minor * 10 + patch
   where
@@ -96,39 +92,6 @@ a  -/- b
     | otherwise     = a ++ '/' : b
 
 infixr 6 -/-
-
--- | A more colourful version of Shake's putNormal
-putColoured :: Color -> String -> Action ()
-putColoured colour msg = do
-    liftIO $ set [SetColor Foreground Vivid colour]
-    putNormal msg
-    liftIO $ set []
-    liftIO $ hFlush stdout
-  where
-    set a = do
-        supported <- hSupportsANSI stdout
-        when (win || supported) $ setSGR a
-    -- An ugly hack to always try to print colours when on mingw and cygwin.
-    -- See: https://github.com/snowleopard/hadrian/pull/253
-    win = "mingw" `isPrefixOf` Info.os || "cygwin" `isPrefixOf` Info.os
-
--- | Make oracle output more distinguishable
-putOracle :: String -> Action ()
-putOracle = putColoured Blue
-
--- | Make build output more distinguishable
-putBuild :: String -> Action ()
-putBuild = putColoured White
-
--- | A more colourful version of success message
-putSuccess :: String -> Action ()
-putSuccess = putColoured Green
-
--- | A more colourful version of error message
-putError :: String -> Action a
-putError msg = do
-    putColoured Red msg
-    error $ "GHC build system error: " ++ msg
 
 -- Explicit definition to avoid dependency on Data.List.Ordered
 -- | Difference of two ordered lists.
@@ -182,3 +145,18 @@ matchVersionedFilePath prefix suffix filePath =
     case stripPrefix prefix filePath >>= stripSuffix suffix of
         Nothing      -> False
         Just version -> all (\c -> isDigit c || c == '-' || c == '.') version
+
+-- | A more colourful version of Shake's putNormal.
+putColoured :: ColorIntensity -> Color -> String -> Action ()
+putColoured intensity colour msg = do
+    liftIO $ set [SetColor Foreground intensity colour]
+    putNormal msg
+    liftIO $ set []
+    liftIO $ hFlush stdout
+  where
+    set a = do
+        supported <- hSupportsANSI stdout
+        when (win || supported) $ setSGR a
+    -- An ugly hack to always try to print colours when on mingw and cygwin.
+    -- See: https://github.com/snowleopard/hadrian/pull/253
+    win = "mingw" `isPrefixOf` os || "cygwin" `isPrefixOf` os

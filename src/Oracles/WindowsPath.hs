@@ -36,5 +36,5 @@ windowsPathOracle = void $
     addOracle $ \(WindowsPath path) -> do
         Stdout out <- quietly $ cmd ["cygpath", "-m", path]
         let windowsPath = unifyPath $ dropWhileEnd isSpace out
-        putOracle $ "Windows path mapping: " ++ path ++ " => " ++ windowsPath
+        putLoud $ "Windows path mapping: " ++ path ++ " => " ++ windowsPath
         return windowsPath

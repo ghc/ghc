@@ -6,7 +6,7 @@ module Rules.Generate (
 import qualified System.Directory as IO
 
 import Base
-import Context hiding (stage)
+import Context
 import Expression
 import GHC
 import Oracles.ModuleFiles
@@ -20,7 +20,7 @@ import Rules.Generators.GhcVersionH
 import Rules.Generators.VersionHs
 import Rules.Libffi
 import Settings
-import Target hiding (builder, context)
+import Target
 
 installTargets :: [FilePath]
 installTargets = [ "inplace/lib/ghc-usage.txt"
@@ -109,7 +109,7 @@ generatePackageCode context@(Context stage pkg _) =
         generated ?> \file -> do
             maybeValue <- findGenerator context file
             (src, builder) <- case maybeValue of
-                Nothing    -> putError $ "No generator for " ++ file ++ "."
+                Nothing    -> error $ "No generator for " ++ file ++ "."
                 Just value -> return value
             need [src]
             build $ Target context builder [src] [file]

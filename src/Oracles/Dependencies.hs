@@ -23,15 +23,15 @@ dependencies path obj = do
            $ map (\obj' -> MaybeT $ askOracle $ DependenciesKey (depFile, obj'))
                  [obj, obj -<.> "o"]
     case res of
-        Nothing -> putError $ "No dependencies found for '" ++ obj ++ "'."
-        Just [] -> putError $ "Empty dependency list for '" ++ obj ++ "'."
+        Nothing -> error $ "No dependencies found for '" ++ obj ++ "'."
+        Just [] -> error $ "Empty dependency list for '" ++ obj ++ "'."
         Just (src:depFiles) -> return (src, depFiles)
 
 -- Oracle for 'path/dist/.dependencies' files
 dependenciesOracle :: Rules ()
 dependenciesOracle = void $ do
     deps <- newCache $ \file -> do
-        putOracle $ "Reading dependencies from " ++ file ++ "..."
+        putLoud $ "Reading dependencies from " ++ file ++ "..."
         contents <- map words <$> readFileLines file
         return . Map.fromList $ map (\(x:xs) -> (x, xs)) contents
     addOracle $ \(DependenciesKey (file, obj)) -> Map.lookup obj <$> deps file

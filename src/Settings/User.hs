@@ -2,8 +2,10 @@ module Settings.User (
     buildRootPath, trackBuildSystem, userArgs, userPackages, userLibraryWays,
     userRtsWays, userKnownPackages, integerLibrary, buildHaddock, validating,
     ghciWithDebugger, ghcProfiled, ghcDebugged, dynamicGhcPrograms,
-    verboseCommands, turnWarningsIntoErrors, splitObjects
+    turnWarningsIntoErrors, splitObjects, verboseCommands, putBuild, putSuccess
     ) where
+
+import System.Console.ANSI
 
 import Base
 import CmdLineFlag
@@ -83,13 +85,21 @@ ghcProfiled = False
 ghcDebugged :: Bool
 ghcDebugged = False
 
+-- TODO: Replace with stage2 ? arg "-Werror"? Also see #251.
+-- | To enable -Werror in Stage2 set turnWarningsIntoErrors = stage2.
+turnWarningsIntoErrors :: Predicate
+turnWarningsIntoErrors = return False
+
 -- | Set to True to print full command lines during the build process. Note,
 -- this is a Predicate, hence you can enable verbose output only for certain
 -- targets, e.g.: @verboseCommands = package ghcPrim@.
 verboseCommands :: Predicate
 verboseCommands = return False
 
--- TODO: Replace with stage2 ? arg "-Werror"? Also see #251.
--- | To enable -Werror in Stage2 set turnWarningsIntoErrors = stage2.
-turnWarningsIntoErrors :: Predicate
-turnWarningsIntoErrors = return False
+-- | Customise build progress messages (e.g. executing a build command).
+putBuild :: String -> Action ()
+putBuild = putColoured Vivid White
+
+-- | Customise build success messages (e.g. a package is built successfully).
+putSuccess :: String -> Action ()
+putSuccess = putColoured Vivid Green
