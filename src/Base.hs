@@ -18,8 +18,8 @@ module Base (
     configPath, configFile, sourcePath, programInplacePath,
 
     -- * Miscellaneous utilities
-    minusOrd, intersectOrd, lookupAll, replaceEq, quote, replaceSeparators,
-    unifyPath, (-/-), matchVersionedFilePath, putColoured
+    minusOrd, intersectOrd, lookupAll, replaceEq, replaceSeparators, unifyPath,
+    (-/-), matchVersionedFilePath, putColoured
     ) where
 
 import Control.Applicative
@@ -40,10 +40,11 @@ import System.Info
 
 -- TODO: reexport Stage, etc.?
 
--- Build system files and paths
+-- | Hadrian lives in 'hadrianPath' directory of the GHC tree.
 hadrianPath :: FilePath
 hadrianPath = "hadrian"
 
+-- TODO: Move this to build directory?
 configPath :: FilePath
 configPath = hadrianPath -/- "cfg"
 
@@ -69,10 +70,6 @@ replaceSeparators = replaceWhen isPathSeparator
 
 replaceWhen :: (a -> Bool) -> a -> [a] -> [a]
 replaceWhen p to = map (\from -> if p from then to else from)
-
--- | Add quotes around a String.
-quote :: String -> String
-quote s = "\"" ++ s ++ "\""
 
 -- | Normalise a path and convert all path separators to @/@, even on Windows.
 unifyPath :: FilePath -> FilePath

@@ -14,6 +14,6 @@ generateVersionHs = do
     return $ unlines
         [ "module Version where"
         , "version, targetOS, targetARCH :: String"
-        , "version    = " ++ quote projectVersion
-        , "targetOS   = " ++ quote targetOs
-        , "targetARCH = " ++ quote targetArch ]
+        , "version    = " ++ show projectVersion
+        , "targetOS   = " ++ show targetOs
+        , "targetARCH = " ++ show targetArch ]

@@ -30,26 +30,26 @@ generateGhcPlatformH = do
         , ""
         , "#define " ++ hostArch   ++ "_BUILD_ARCH 1"
         , "#define " ++ targetArch ++ "_HOST_ARCH 1"
-        , "#define BUILD_ARCH " ++ quote hostArch
-        , "#define HOST_ARCH "  ++ quote targetArch
+        , "#define BUILD_ARCH " ++ show hostArch
+        , "#define HOST_ARCH "  ++ show targetArch
         , ""
         , "#define " ++ hostOs   ++ "_BUILD_OS 1"
         , "#define " ++ targetOs ++ "_HOST_OS 1"
-        , "#define BUILD_OS " ++ quote hostOs
-        , "#define HOST_OS "  ++ quote targetOs
+        , "#define BUILD_OS " ++ show hostOs
+        , "#define HOST_OS "  ++ show targetOs
         , ""
         , "#define " ++ hostVendor   ++ "_BUILD_VENDOR 1"
         , "#define " ++ targetVendor ++ "_HOST_VENDOR 1"
-        , "#define BUILD_VENDOR " ++ quote hostVendor
-        , "#define HOST_VENDOR "  ++ quote targetVendor
+        , "#define BUILD_VENDOR " ++ show hostVendor
+        , "#define HOST_VENDOR "  ++ show targetVendor
         , ""
         , "/* These TARGET macros are for backwards compatibility... DO NOT USE! */"
         , "#define TargetPlatform_TYPE " ++ cppify targetPlatform
         , "#define " ++ cppify targetPlatform ++ "_TARGET 1"
         , "#define " ++ targetArch ++ "_TARGET_ARCH 1"
-        , "#define TARGET_ARCH " ++ quote targetArch
+        , "#define TARGET_ARCH " ++ show targetArch
         , "#define " ++ targetOs ++ "_TARGET_OS 1"
-        , "#define TARGET_OS " ++ quote targetOs
+        , "#define TARGET_OS " ++ show targetOs
         , "#define " ++ targetVendor ++ "_TARGET_VENDOR 1" ]
         ++
         [ "#define UnregisterisedCompiler 1" | ghcUnreg ]

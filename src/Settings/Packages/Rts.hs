@@ -66,24 +66,24 @@ rtsPackageArgs = package rts ? do
           , way == threaded ? arg "-DTHREADED_RTS"
 
           , (input "//RtsMessages.c" ||^ input "//Trace.c") ?
-            arg ("-DProjectVersion=" ++ quote projectVersion)
+            arg ("-DProjectVersion=" ++ show projectVersion)
 
           , input "//RtsUtils.c" ? append
-            [ "-DProjectVersion="            ++ quote projectVersion
-            , "-DHostPlatform="              ++ quote hostPlatform
-            , "-DHostArch="                  ++ quote hostArch
-            , "-DHostOS="                    ++ quote hostOs
-            , "-DHostVendor="                ++ quote hostVendor
-            , "-DBuildPlatform="             ++ quote buildPlatform
-            , "-DBuildArch="                 ++ quote buildArch
-            , "-DBuildOS="                   ++ quote buildOs
-            , "-DBuildVendor="               ++ quote buildVendor
-            , "-DTargetPlatform="            ++ quote targetPlatform
-            , "-DTargetArch="                ++ quote targetArch
-            , "-DTargetOS="                  ++ quote targetOs
-            , "-DTargetVendor="              ++ quote targetVendor
-            , "-DGhcUnregisterised="         ++ quote ghcUnreg
-            , "-DGhcEnableTablesNextToCode=" ++ quote ghcEnableTNC ]
+            [ "-DProjectVersion="            ++ show projectVersion
+            , "-DHostPlatform="              ++ show hostPlatform
+            , "-DHostArch="                  ++ show hostArch
+            , "-DHostOS="                    ++ show hostOs
+            , "-DHostVendor="                ++ show hostVendor
+            , "-DBuildPlatform="             ++ show buildPlatform
+            , "-DBuildArch="                 ++ show buildArch
+            , "-DBuildOS="                   ++ show buildOs
+            , "-DBuildVendor="               ++ show buildVendor
+            , "-DTargetPlatform="            ++ show targetPlatform
+            , "-DTargetArch="                ++ show targetArch
+            , "-DTargetOS="                  ++ show targetOs
+            , "-DTargetVendor="              ++ show targetVendor
+            , "-DGhcUnregisterised="         ++ show ghcUnreg
+            , "-DGhcEnableTablesNextToCode=" ++ show ghcEnableTNC ]
 
             , input "//Evac.c"     ? arg "-funroll-loops"
             , input "//Evac_thr.c" ? arg "-funroll-loops"
@@ -98,10 +98,10 @@ rtsPackageArgs = package rts ? do
           , arg rtsConf ]
 
         , builder HsCpp ? append
-          [ "-DTOP="             ++ quote top
-          , "-DFFI_INCLUDE_DIR=" ++ quote ffiIncludeDir
-          , "-DFFI_LIB_DIR="     ++ quote ffiLibraryDir
-          , "-DFFI_LIB="         ++ quote libffiName ] ]
+          [ "-DTOP="             ++ show top
+          , "-DFFI_INCLUDE_DIR=" ++ show ffiIncludeDir
+          , "-DFFI_LIB_DIR="     ++ show ffiLibraryDir
+          , "-DFFI_LIB="         ++ show libffiName ] ]
 
 
 -- # If we're compiling on windows, enforce that we only support XP+

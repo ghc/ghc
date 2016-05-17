@@ -26,9 +26,9 @@ generateGhcBootPlatformH = do
         [ "#ifndef __PLATFORM_H__"
         , "#define __PLATFORM_H__"
         , ""
-        , "#define BuildPlatform_NAME  " ++ quote buildPlatform
-        , "#define HostPlatform_NAME   " ++ quote hostPlatform
-        , "#define TargetPlatform_NAME " ++ quote targetPlatform
+        , "#define BuildPlatform_NAME  " ++ show buildPlatform
+        , "#define HostPlatform_NAME   " ++ show hostPlatform
+        , "#define TargetPlatform_NAME " ++ show targetPlatform
         , ""
         , "#define " ++ cppify buildPlatform  ++ "_BUILD 1"
         , "#define " ++ cppify hostPlatform   ++ "_HOST 1"
@@ -37,22 +37,22 @@ generateGhcBootPlatformH = do
         , "#define " ++ buildArch  ++ "_BUILD_ARCH 1"
         , "#define " ++ hostArch   ++ "_HOST_ARCH 1"
         , "#define " ++ targetArch ++ "_TARGET_ARCH 1"
-        , "#define BUILD_ARCH "  ++ quote buildArch
-        , "#define HOST_ARCH "   ++ quote hostArch
-        , "#define TARGET_ARCH " ++ quote targetArch
+        , "#define BUILD_ARCH "  ++ show buildArch
+        , "#define HOST_ARCH "   ++ show hostArch
+        , "#define TARGET_ARCH " ++ show targetArch
         , ""
         , "#define " ++ buildOs  ++ "_BUILD_OS 1"
         , "#define " ++ hostOs   ++ "_HOST_OS 1"
         , "#define " ++ targetOs ++ "_TARGET_OS 1"
-        , "#define BUILD_OS "  ++ quote buildOs
-        , "#define HOST_OS "   ++ quote hostOs
-        , "#define TARGET_OS " ++ quote targetOs
+        , "#define BUILD_OS "  ++ show buildOs
+        , "#define HOST_OS "   ++ show hostOs
+        , "#define TARGET_OS " ++ show targetOs
         , ""
         , "#define " ++ buildVendor  ++ "_BUILD_VENDOR 1"
         , "#define " ++ hostVendor   ++ "_HOST_VENDOR 1"
         , "#define " ++ targetVendor ++ "_TARGET_VENDOR  1"
-        , "#define BUILD_VENDOR "  ++ quote buildVendor
-        , "#define HOST_VENDOR "   ++ quote hostVendor
-        , "#define TARGET_VENDOR " ++ quote targetVendor
+        , "#define BUILD_VENDOR "  ++ show buildVendor
+        , "#define HOST_VENDOR "   ++ show hostVendor
+        , "#define TARGET_VENDOR " ++ show targetVendor
         , ""
         , "#endif /* __PLATFORM_H__ */" ]

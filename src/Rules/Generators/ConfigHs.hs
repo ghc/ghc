@@ -52,45 +52,45 @@ generateConfigHs = do
         , "cTargetPlatformString = TargetPlatform_NAME"
         , ""
         , "cProjectName          :: String"
-        , "cProjectName          = " ++ quote cProjectName
+        , "cProjectName          = " ++ show cProjectName
         , "cProjectGitCommitId   :: String"
-        , "cProjectGitCommitId   = " ++ quote cProjectGitCommitId
+        , "cProjectGitCommitId   = " ++ show cProjectGitCommitId
         , "cProjectVersion       :: String"
-        , "cProjectVersion       = " ++ quote cProjectVersion
+        , "cProjectVersion       = " ++ show cProjectVersion
         , "cProjectVersionInt    :: String"
-        , "cProjectVersionInt    = " ++ quote cProjectVersionInt
+        , "cProjectVersionInt    = " ++ show cProjectVersionInt
         , "cProjectPatchLevel    :: String"
-        , "cProjectPatchLevel    = " ++ quote cProjectPatchLevel
+        , "cProjectPatchLevel    = " ++ show cProjectPatchLevel
         , "cProjectPatchLevel1   :: String"
-        , "cProjectPatchLevel1   = " ++ quote cProjectPatchLevel1
+        , "cProjectPatchLevel1   = " ++ show cProjectPatchLevel1
         , "cProjectPatchLevel2   :: String"
-        , "cProjectPatchLevel2   = " ++ quote cProjectPatchLevel2
+        , "cProjectPatchLevel2   = " ++ show cProjectPatchLevel2
         , "cBooterVersion        :: String"
-        , "cBooterVersion        = " ++ quote cBooterVersion
+        , "cBooterVersion        = " ++ show cBooterVersion
         , "cStage                :: String"
         , "cStage                = show (STAGE :: Int)"
         , "cIntegerLibrary       :: String"
-        , "cIntegerLibrary       = " ++ quote (pkgNameString integerLibrary)
+        , "cIntegerLibrary       = " ++ show (pkgNameString integerLibrary)
         , "cIntegerLibraryType   :: IntegerLibrary"
         , "cIntegerLibraryType   = " ++ cIntegerLibraryType
         , "cSupportsSplitObjs    :: String"
-        , "cSupportsSplitObjs    = " ++ quote cSupportsSplitObjs
+        , "cSupportsSplitObjs    = " ++ show cSupportsSplitObjs
         , "cGhcWithInterpreter   :: String"
-        , "cGhcWithInterpreter   = " ++ quote cGhcWithInterpreter
+        , "cGhcWithInterpreter   = " ++ show cGhcWithInterpreter
         , "cGhcWithNativeCodeGen :: String"
-        , "cGhcWithNativeCodeGen = " ++ quote cGhcWithNativeCodeGen
+        , "cGhcWithNativeCodeGen = " ++ show cGhcWithNativeCodeGen
         , "cGhcWithSMP           :: String"
-        , "cGhcWithSMP           = " ++ quote cGhcWithSMP
+        , "cGhcWithSMP           = " ++ show cGhcWithSMP
         , "cGhcRTSWays           :: String"
-        , "cGhcRTSWays           = " ++ quote cGhcRTSWays
+        , "cGhcRTSWays           = " ++ show cGhcRTSWays
         , "cGhcEnableTablesNextToCode :: String"
-        , "cGhcEnableTablesNextToCode = " ++ quote cGhcEnableTablesNextToCode
+        , "cGhcEnableTablesNextToCode = " ++ show cGhcEnableTablesNextToCode
         , "cLeadingUnderscore    :: String"
-        , "cLeadingUnderscore    = " ++ quote cLeadingUnderscore
+        , "cLeadingUnderscore    = " ++ show cLeadingUnderscore
         , "cGHC_UNLIT_PGM        :: String"
-        , "cGHC_UNLIT_PGM        = " ++ quote cGHC_UNLIT_PGM
+        , "cGHC_UNLIT_PGM        = " ++ show cGHC_UNLIT_PGM
         , "cGHC_SPLIT_PGM        :: String"
-        , "cGHC_SPLIT_PGM        = " ++ quote "ghc-split"
+        , "cGHC_SPLIT_PGM        = " ++ show "ghc-split"
         , "cLibFFI               :: Bool"
         , "cLibFFI               = " ++ show cLibFFI
         , "cGhcThreaded :: Bool"

@@ -17,8 +17,8 @@ generateGhcSplit = do
     contents       <- lift $ readFileLines ghcSplitSource
     return . unlines $
         [ "#!" ++ perlPath
-        , "$TARGETPLATFORM = " ++ quote targetPlatform ++ ";"
+        , "$TARGETPLATFORM = " ++ show targetPlatform ++ ";"
         -- I don't see where the ghc-split tool uses TNC, but
         -- it's in the build-perl macro.
-        , "$TABLES_NEXT_TO_CODE = " ++ quote ghcEnableTNC ++ ";"
+        , "$TABLES_NEXT_TO_CODE = " ++ show ghcEnableTNC ++ ";"
         ] ++ contents
