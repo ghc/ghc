@@ -11,7 +11,8 @@ Alexander Lukyanov      <alex.dontexist@gmail.com>          # Ticket #9360.
 Alexander Vershilov     <alexander.vershilov@gmail.com>     <alexander.vershilov@tweag.io>
 Alexey Rodriguez        <mrchebas@gmail.com>
 Alexey Rodriguez        <mrchebas@gmail.com>                mrchebas@gmail.com <unknown>
-Andrew Farmer           <afarmer@ittc.ku.edu>               <anfarmer@ku.edu>
+Andrew Farmer           <anfarmer@fb.com>                   <anfarmer@ku.edu>
+Andrew Farmer           <anfarmer@fb.com>                   <afarmer@ittc.ku.edu>
 Andrew Pimlott          <andrew.pimlott.ctr@metnet.navy.mil> andrew.pimlott.ctr@metnet.navy.mil <unknown>
 Andrew Tolmach          <apt@cs.pdx.edu>                    apt <unknown>
 André Santos            <alms@di.ufpe.br>                   andre <unknown>
@@ -75,7 +76,8 @@ David Himmelstrup       <lemmih@gmail.com>                  # http://www.haskell
 David M Peixotto        <dmp@rice.edu>                      dmp@rice.edu <unknown>
 David Terei             <code@davidterei.com>               <davidt@davidt-vm-32.scs.stanford.edu> # Ticket #5785.
 David Terei             <code@davidterei.com>               <davidterei@gmail.com>
-David Turner            <dnt@dcs.gla.ac.uk>                 dnt <unknown> # Same domain as Will Partain, who mentions "(from dnt)"
+David C. Turner         <dave.c.turner@gmail.com>
+David N. Turner         <dnt@dcs.gla.ac.uk>                 dnt <unknown> # Same domain as Will Partain, who mentions "(from dnt)"
 David Waern             <davve@dtek.chalmers.se>
 David Waern             <davve@dtek.chalmers.se>            <david.waern@gmail.com>
 David Waern             <davve@dtek.chalmers.se>            <waern@ubuntu.(none)>
@@ -182,6 +184,7 @@ Nathan Huesken          <nathan.huesken@posteo.de>
 Neil Mitchell           <ndmitchell@gmail.com>              <http://www.cs.york.ac.uk/~ndm/>
 Neil Mitchell           <ndmitchell@gmail.com>              Neil Mitchell <unknown>
 Nicholas Nethercote     <njn25@cam.ac.uk>                   njn <unknown>
+Nikita Sazanovich       <nikitasazanovich@gmail.com>
 Niklas Larsson          <niklas@mm.st>                      # Commit 664063.
 Norman Ramsey           <nr@eecs.harvard.edu>               nr@eecs.harvard.edu <unknown>
 Orphi                   <MathematicalOrchid@hotmail.com>    # Uses this name online.
@@ -223,6 +226,7 @@ Simon Marlow            <marlowsd@gmail.com>                <smarlow@fb.com>
 Simon Marlow            <marlowsd@gmail.com>                simonm <unknown>
 Simon Marlow            <marlowsd@gmail.com>                simonmar <unknown>
 Simon Marlow            <marlowsd@gmail.com>                simonmar@microsoft.com <unknown>
+Simon Marlow            <marlowsd@gmail.com>                <smarlow@SIMONMARLOW-PC.TheFacebook.com>
 Simon Marlow            <marlowsd@gmail.com>                uid245 <unknown> # See Note [uid245]
 Simon Peyton Jones      <simonpj@microsoft.com>
 Simon Peyton Jones      <simonpj@microsoft.com>             <simonpj@.europe.corp.microsoft.com>
@@ -265,6 +269,7 @@ Yuri de Wit             <admin@rodlogic.net>                # Commit 37d64a.
 Yusuke Matsushita       <y.skm24t@gmail.com>                # https://github.com/Kinokkory
 Zejun Wu                <watashi@watashi.ws>                <zejun.wu@gmail.com>
 gwern                   <gwern0@gmail.com>                  gwern0@gmail.com <unknown> # Uses this name online.
+mniip                   <mniip@mniip.com>                   # Uses this name online.
 shelarcy                <shelarcy@gmail.com>                # Uses this name online.
 Ömer Sinan Ağacan       <omeragacan@gmail.com>              # https://github.com/osa1
 
