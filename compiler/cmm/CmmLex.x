@@ -25,6 +25,7 @@ module CmmLex (
 import CmmExpr
 
 import Lexer
+import CmmMonad
 import SrcLoc
 import UniqFM
 import StringBuffer
@@ -182,13 +183,13 @@ data CmmToken
 -- -----------------------------------------------------------------------------
 -- Lexer actions
 
-type Action = RealSrcSpan -> StringBuffer -> Int -> P (RealLocated CmmToken)
+type Action = RealSrcSpan -> StringBuffer -> Int -> PD (RealLocated CmmToken)
 
 begin :: Int -> Action
-begin code _span _str _len = do pushLexState code; lexToken
+begin code _span _str _len = do liftP (pushLexState code); lexToken
 
 pop :: Action
-pop _span _buf _len = popLexState >> lexToken
+pop _span _buf _len = liftP popLexState >> lexToken
 
 special_char :: Action
 special_char span buf _len = return (L span (CmmT_SpecChar (currentChar buf)))
@@ -286,45 +287,47 @@ tok_string str = CmmT_String (read str)
 setLine :: Int -> Action
 setLine code span buf len = do
   let line = parseUnsignedInteger buf len 10 octDecDigit
-  setSrcLoc (mkRealSrcLoc (srcSpanFile span) (fromIntegral line - 1) 1)
-        -- subtract one: the line number refers to the *following* line
-  -- trace ("setLine "  ++ show line) $ do
-  popLexState >> pushLexState code
+  liftP $ do
+    setSrcLoc (mkRealSrcLoc (srcSpanFile span) (fromIntegral line - 1) 1)
+          -- subtract one: the line number refers to the *following* line
+    -- trace ("setLine "  ++ show line) $ do
+    popLexState >> pushLexState code
   lexToken
 
 setFile :: Int -> Action
 setFile code span buf len = do
   let file = lexemeToFastString (stepOn buf) (len-2)
-  setSrcLoc (mkRealSrcLoc file (srcSpanEndLine span) (srcSpanEndCol span))
-  popLexState >> pushLexState code
+  liftP $ do
+    setSrcLoc (mkRealSrcLoc file (srcSpanEndLine span) (srcSpanEndCol span))
+    popLexState >> pushLexState code
   lexToken
 
 -- -----------------------------------------------------------------------------
 -- This is the top-level function: called from the parser each time a
 -- new token is to be read from the input.
 
-cmmlex :: (Located CmmToken -> P a) -> P a
+cmmlex :: (Located CmmToken -> PD a) -> PD a
 cmmlex cont = do
   (L span tok) <- lexToken
   --trace ("token: " ++ show tok) $ do
   cont (L (RealSrcSpan span) tok)
 
-lexToken :: P (RealLocated CmmToken)
+lexToken :: PD (RealLocated CmmToken)
 lexToken = do
   inp@(loc1,buf) <- getInput
-  sc <- getLexState
+  sc <- liftP getLexState
   case alexScan inp sc of
     AlexEOF -> do let span = mkRealSrcSpan loc1 loc1
-                  setLastToken span 0
+                  liftP (setLastToken span 0)
                   return (L span CmmT_EOF)
-    AlexError (loc2,_) -> do failLocMsgP loc1 loc2 "lexical error"
+    AlexError (loc2,_) -> liftP $ failLocMsgP loc1 loc2 "lexical error"
     AlexSkip inp2 _ -> do
         setInput inp2
         lexToken
     AlexToken inp2@(end,_buf2) len t -> do
         setInput inp2
         let span = mkRealSrcSpan loc1 end
-        span `seq` setLastToken span len
+        span `seq` liftP (setLastToken span len)
         t span buf len
 
 -- -----------------------------------------------------------------------------
@@ -352,9 +355,9 @@ alexGetByte (loc,s)
         loc' = advanceSrcLoc loc c
         s'   = stepOn s
 
-getInput :: P AlexInput
-getInput = P $ \s@PState{ loc=l, buffer=b } -> POk s (l,b)
+getInput :: PD AlexInput
+getInput = PD $ \_ s@PState{ loc=l, buffer=b } -> POk s (l,b)
 
-setInput :: AlexInput -> P ()
-setInput (l,b) = P $ \s -> POk s{ loc=l, buffer=b } ()
+setInput :: AlexInput -> PD ()
+setInput (l,b) = PD $ \_ s -> POk s{ loc=l, buffer=b } ()
 }

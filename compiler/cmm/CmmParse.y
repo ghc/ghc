@@ -228,6 +228,7 @@ import CmmLex
 import CLabel
 import SMRep
 import Lexer
+import CmmMonad
 
 import CostCentre
 import ForeignCall
@@ -339,7 +340,7 @@ import qualified Data.Map as M
         INT             { L _ (CmmT_Int         $$) }
         FLOAT           { L _ (CmmT_Float       $$) }
 
-%monad { P } { >>= } { return }
+%monad { PD } { >>= } { return }
 %lexer { cmmlex } { L _ CmmT_EOF }
 %name cmmParse cmm
 %tokentype { Located CmmToken }
@@ -368,7 +369,7 @@ cmmtop  :: { CmmParse () }
         | cmmdata                       { $1 }
         | decl                          { $1 } 
         | 'CLOSURE' '(' NAME ',' NAME lits ')' ';'  
-                {% withThisPackage $ \pkg -> 
+                {% liftP . withThisPackage $ \pkg ->
                    do lits <- sequence $6;
                       staticClosure pkg $3 $5 (map getLit lits) }
 
@@ -389,7 +390,7 @@ cmmdata :: { CmmParse () }
 
 data_label :: { CmmParse CLabel }
     : NAME ':'  
-                {% withThisPackage $ \pkg -> 
+                {% liftP . withThisPackage $ \pkg ->
                    return (mkCmmDataLabel pkg $1) }
 
 statics :: { [CmmParse [CmmStatic]] }
@@ -448,14 +449,14 @@ maybe_body :: { CmmParse () }
 
 info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
         : NAME
-                {% withThisPackage $ \pkg ->
+                {% liftP . withThisPackage $ \pkg ->
                    do   newFunctionName $1 pkg
                         return (mkCmmCodeLabel pkg $1, Nothing, []) }
 
 
         | 'INFO_TABLE' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
                 -- ptrs, nptrs, closure type, description, type
-                {% withThisPackage $ \pkg ->
+                {% liftP . withThisPackage $ \pkg ->
                    do dflags <- getDynFlags
                       let prof = profilingInfo dflags $11 $13
                           rep  = mkRTSRep (fromIntegral $9) $
@@ -471,7 +472,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
         
         | 'INFO_TABLE_FUN' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ',' INT ')'
                 -- ptrs, nptrs, closure type, description, type, fun type
-                {% withThisPackage $ \pkg -> 
+                {% liftP . withThisPackage $ \pkg ->
                    do dflags <- getDynFlags
                       let prof = profilingInfo dflags $11 $13
                           ty   = Fun 0 (ArgSpec (fromIntegral $15))
@@ -489,7 +490,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
 
         | 'INFO_TABLE_CONSTR' '(' NAME ',' INT ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
                 -- ptrs, nptrs, tag, closure type, description, type
-                {% withThisPackage $ \pkg ->
+                {% liftP . withThisPackage $ \pkg ->
                    do dflags <- getDynFlags
                       let prof = profilingInfo dflags $13 $15
                           ty  = Constr (fromIntegral $9)  -- Tag
@@ -508,7 +509,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
         
         | 'INFO_TABLE_SELECTOR' '(' NAME ',' INT ',' INT ',' STRING ',' STRING ')'
                 -- selector, closure type, description, type
-                {% withThisPackage $ \pkg ->
+                {% liftP . withThisPackage $ \pkg ->
                    do dflags <- getDynFlags
                       let prof = profilingInfo dflags $9 $11
                           ty  = ThunkSelector (fromIntegral $5)
@@ -522,7 +523,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
 
         | 'INFO_TABLE_RET' '(' NAME ',' INT ')'
                 -- closure type (no live regs)
-                {% withThisPackage $ \pkg ->
+                {% liftP . withThisPackage $ \pkg ->
                    do let prof = NoProfilingInfo
                           rep  = mkRTSRep (fromIntegral $5) $ mkStackRep []
                       return (mkCmmRetLabel pkg $3,
@@ -533,7 +534,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
 
         | 'INFO_TABLE_RET' '(' NAME ',' INT ',' formals0 ')'
                 -- closure type, live regs
-                {% withThisPackage $ \pkg ->
+                {% liftP . withThisPackage $ \pkg ->
                    do dflags <- getDynFlags
                       live <- sequence $7
                       let prof = NoProfilingInfo
@@ -871,13 +872,13 @@ getLit (CmmLit l) = l
 getLit (CmmMachOp (MO_S_Neg _) [CmmLit (CmmInt i r)])  = CmmInt (negate i) r
 getLit _ = panic "invalid literal" -- TODO messy failure
 
-nameToMachOp :: FastString -> P (Width -> MachOp)
+nameToMachOp :: FastString -> PD (Width -> MachOp)
 nameToMachOp name =
   case lookupUFM machOps name of
         Nothing -> fail ("unknown primitive " ++ unpackFS name)
         Just m  -> return m
 
-exprOp :: FastString -> [CmmParse CmmExpr] -> P (CmmParse CmmExpr)
+exprOp :: FastString -> [CmmParse CmmExpr] -> PD (CmmParse CmmExpr)
 exprOp name args_code = do
   dflags <- getDynFlags
   case lookupUFM (exprMacros dflags) name of
@@ -1007,13 +1008,13 @@ callishMachOps = listToUFM $
         -- in the MO_* constructor. In order to do this, however, we
         -- must intercept the arguments in primCall.
 
-parseSafety :: String -> P Safety
+parseSafety :: String -> PD Safety
 parseSafety "safe"   = return PlaySafe
 parseSafety "unsafe" = return PlayRisky
 parseSafety "interruptible" = return PlayInterruptible
 parseSafety str      = fail ("unrecognised safety: " ++ str)
 
-parseCmmHint :: String -> P ForeignHint
+parseCmmHint :: String -> PD ForeignHint
 parseCmmHint "ptr"    = return AddrHint
 parseCmmHint "signed" = return SignedHint
 parseCmmHint str      = fail ("unrecognised hint: " ++ str)
@@ -1034,13 +1035,13 @@ isPtrGlobalReg CurrentNursery        = True
 isPtrGlobalReg (VanillaReg _ VGcPtr) = True
 isPtrGlobalReg _                     = False
 
-happyError :: P a
-happyError = srcParseFail
+happyError :: PD a
+happyError = PD $ \_ s -> unP srcParseFail s
 
 -- -----------------------------------------------------------------------------
 -- Statement-level macros
 
-stmtMacro :: FastString -> [CmmParse CmmExpr] -> P (CmmParse ())
+stmtMacro :: FastString -> [CmmParse CmmExpr] -> PD (CmmParse ())
 stmtMacro fun args_code = do
   case lookupUFM stmtMacros fun of
     Nothing -> fail ("unknown macro: " ++ unpackFS fun)
@@ -1140,7 +1141,7 @@ foreignCall
         -> [CmmParse (CmmExpr, ForeignHint)]
         -> Safety
         -> CmmReturnInfo
-        -> P (CmmParse ())
+        -> PD (CmmParse ())
 foreignCall conv_string results_code expr_code args_code safety ret
   = do  conv <- case conv_string of
           "C" -> return CCallConv
@@ -1218,7 +1219,7 @@ primCall
         :: [CmmParse (CmmFormal, ForeignHint)]
         -> FastString
         -> [CmmParse CmmExpr]
-        -> P (CmmParse ())
+        -> PD (CmmParse ())
 primCall results_code name args_code
   = case lookupUFM callishMachOps name of
         Nothing -> fail ("unknown primitive " ++ unpackFS name)
@@ -1382,7 +1383,7 @@ parseCmmFile dflags filename = withTiming (pure dflags) (text "ParseCmm"<+>brack
         init_state = (mkPState dflags buf init_loc) { lex_state = [0] }
                 -- reset the lex_state: the Lexer monad leaves some stuff
                 -- in there we don't want.
-  case unP cmmParse init_state of
+  case unPD cmmParse dflags init_state of
     PFailed span err -> do
         let msg = mkPlainErrMsg dflags span err
         return ((emptyBag, unitBag msg), Nothing)
@@ -1390,7 +1391,7 @@ parseCmmFile dflags filename = withTiming (pure dflags) (text "ParseCmm"<+>brack
         st <- initC
         let fcode = getCmm $ unEC code "global" (initEnv dflags) [] >> return ()
             (cmm,_) = runC dflags no_module st fcode
-        let ms = getMessages pst
+        let ms = getMessages pst dflags
         if (errorsFound dflags ms)
          then return (ms, Nothing)
          else do

@@ -361,7 +361,7 @@ hscParse' mod_summary = {-# SCC "Parser" #-}
             liftIO $ throwOneError (mkPlainErrMsg dflags span err)
 
         POk pst rdr_module -> do
-            logWarningsReportErrors (getMessages pst)
+            logWarningsReportErrors (getMessages pst dflags)
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" $
                                    ppr rdr_module
             liftIO $ dumpIfSet_dyn dflags Opt_D_source_stats "Source Statistics" $
@@ -1674,7 +1674,7 @@ hscParseThingWithLocation source linenumber parser str
             throwErrors $ unitBag msg
 
         POk pst thing -> do
-            logWarningsReportErrors (getMessages pst)
+            logWarningsReportErrors (getMessages pst dflags)
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr thing)
             return thing
 

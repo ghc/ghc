@@ -3323,14 +3323,14 @@ fileSrcSpan = do
 -- Hint about the MultiWayIf extension
 hintMultiWayIf :: SrcSpan -> P ()
 hintMultiWayIf span = do
-  mwiEnabled <- liftM ((LangExt.MultiWayIf `xopt`) . dflags) getPState
+  mwiEnabled <- liftM ((LangExt.MultiWayIf `extopt`) . options) getPState
   unless mwiEnabled $ parseErrorSDoc span $
     text "Multi-way if-expressions need MultiWayIf turned on"
 
 -- Hint about if usage for beginners
 hintIf :: SrcSpan -> String -> P (LHsExpr RdrName)
 hintIf span msg = do
-  mwiEnabled <- liftM ((LangExt.MultiWayIf `xopt`) . dflags) getPState
+  mwiEnabled <- liftM ((LangExt.MultiWayIf `extopt`) . options) getPState
   if mwiEnabled
     then parseErrorSDoc span $ text $ "parse error in if statement"
     else parseErrorSDoc span $ text $ "parse error in if statement: "++msg

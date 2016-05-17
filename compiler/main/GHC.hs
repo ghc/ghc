@@ -1495,5 +1495,5 @@ parser str dflags filename =
          Left (unitBag (mkPlainErrMsg dflags span err))
 
      POk pst rdr_module ->
-         let (warns,_) = getMessages pst in
+         let (warns,_) = getMessages pst dflags in
          Right (warns, rdr_module)

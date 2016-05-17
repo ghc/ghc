@@ -81,7 +81,6 @@ import TysWiredIn       ( cTupleTyConName, tupleTyCon, tupleDataCon,
                           starKindTyConName, unicodeStarKindTyConName )
 import ForeignCall
 import PrelNames        ( forall_tv_RDR, eqTyCon_RDR, allNameStrings )
-import DynFlags
 import SrcLoc
 import Unique           ( hasKey )
 import OrdList          ( OrdList, fromOL )
@@ -787,7 +786,7 @@ checkPat msg loc e _
 checkAPat :: SDoc -> SrcSpan -> HsExpr RdrName -> P (Pat RdrName)
 checkAPat msg loc e0 = do
  pState <- getPState
- let dynflags = dflags pState
+ let opts = options pState
  case e0 of
    EWildPat -> return (WildPat placeHolderType)
    HsVar x  -> return (VarPat x)
@@ -819,7 +818,7 @@ checkAPat msg loc e0 = do
    -- n+k patterns
    OpApp (L nloc (HsVar (L _ n))) (L _ (HsVar (L _ plus))) _
          (L lloc (HsOverLit lit@(OverLit {ol_val = HsIntegral {}})))
-                      | xopt LangExt.NPlusKPatterns dynflags && (plus == plus_RDR)
+                      | extopt LangExt.NPlusKPatterns opts && (plus == plus_RDR)
                       -> return (mkNPlusKPat (L nloc n) (L lloc lit))
 
    OpApp l op _fix r  -> do l <- checkLPat msg l
@@ -973,7 +972,7 @@ checkDoAndIfThenElse :: LHsExpr RdrName
 checkDoAndIfThenElse guardExpr semiThen thenExpr semiElse elseExpr
  | semiThen || semiElse
     = do pState <- getPState
-         unless (xopt LangExt.DoAndIfThenElse (dflags pState)) $ do
+         unless (extopt LangExt.DoAndIfThenElse (options pState)) $ do
              parseErrorSDoc (combineLocs guardExpr elseExpr)
                             (text "Unexpected semi-colons in conditional:"
                           $$ nest 4 expr
@@ -1109,7 +1108,7 @@ splitTildeApps (t : rest) = do
 checkMonadComp :: P (HsStmtContext Name)
 checkMonadComp = do
     pState <- getPState
-    return $ if xopt LangExt.MonadComprehensions (dflags pState)
+    return $ if extopt LangExt.MonadComprehensions (options pState)
                 then MonadComp
                 else ListComp
 

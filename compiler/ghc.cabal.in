@@ -213,6 +213,7 @@ Library
         CmmLint
         CmmLive
         CmmMachOp
+        CmmMonad
         CmmSwitch
         CmmNode
         CmmOpt
