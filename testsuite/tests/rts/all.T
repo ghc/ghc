@@ -260,6 +260,8 @@ test('T9078', [ omit_ways(threaded_ways) ], compile_and_run, ['-with-rtsopts="-D
 test('T10017', [ when(opsys('mingw32'), skip)
                , only_ways(threaded_ways), extra_run_opts('+RTS -N2 -RTS') ], compile_and_run, [''])
 
+test('T11108', normal, compile_and_run, [''])
+
 test('rdynamic', [ unless(opsys('linux') or opsys('mingw32'), skip)
                  # this needs runtime infrastructure to do in ghci:
                  #  '-rdynamic' ghc, load modules only via dlopen(RTLD_BLOBAL) and more.
