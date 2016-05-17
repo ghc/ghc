@@ -24,6 +24,7 @@ module CoreUtils (
         -- * Properties of expressions
         exprType, coreAltType, coreAltsType,
         exprIsDupable, exprIsTrivial, getIdFromTrivialExpr, exprIsBottom,
+        getIdFromTrivialExpr_maybe,
         exprIsCheap, exprIsExpandable, exprIsCheap', CheapAppFun,
         exprIsHNF, exprOkForSpeculation, exprOkForSideEffects, exprIsWorkFree,
         exprIsBig, exprIsConLike,
@@ -806,20 +807,36 @@ exprIsTrivial (Case e _ _ [])  = exprIsTrivial e  -- See Note [Empty case is tri
 exprIsTrivial _                = False
 
 {-
+Note [getIdFromTrivialExpr]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When substituting in a breakpoint we need to strip away the type cruft
 from a trivial expression and get back to the Id.  The invariant is
 that the expression we're substituting was originally trivial
-according to exprIsTrivial.
+according to exprIsTrivial, AND the expression is not a literal.
+See Note [substTickish] for how breakpoint substitution preserves
+this extra invariant.
+
+We also need this functionality in CorePrep to extract out Id of a
+function which we are saturating.  However, in this case we don't know
+if the variable actually refers to a literal; thus we use
+'getIdFromTrivialExpr_maybe' to handle this case.  See test
+T12076lit for an example where this matters.
 -}
 
 getIdFromTrivialExpr :: CoreExpr -> Id
-getIdFromTrivialExpr e = go e
-  where go (Var v) = v
+getIdFromTrivialExpr e
+    = fromMaybe (pprPanic "getIdFromTrivialExpr" (ppr e))
+                (getIdFromTrivialExpr_maybe e)
+
+getIdFromTrivialExpr_maybe :: CoreExpr -> Maybe Id
+-- See Note [getIdFromTrivialExpr]
+getIdFromTrivialExpr_maybe e = go e
+  where go (Var v) = Just v
         go (App f t) | not (isRuntimeArg t) = go f
         go (Tick t e) | not (tickishIsCode t) = go e
         go (Cast e _) = go e
         go (Lam b e) | not (isRuntimeVar b) = go e
-        go e = pprPanic "getIdFromTrivialExpr" (ppr e)
+        go _ = Nothing
 
 {-
 exprIsBottom is a very cheap and cheerful function; it may return

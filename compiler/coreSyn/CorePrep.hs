@@ -377,12 +377,17 @@ cpeBind top_lvl env (NonRec bndr rhs)
                                           dmd
                                           is_unlifted
                                           env bndr1 rhs
+       -- See Note [Inlining in CorePrep]
+       ; if cpe_ExprIsTrivial rhs2 && isNotTopLevel top_lvl
+            then return (extendCorePrepEnvExpr env bndr rhs2, floats)
+            else do {
+
        ; let new_float = mkFloat dmd is_unlifted bndr2 rhs2
 
         -- We want bndr'' in the envt, because it records
         -- the evaluated-ness of the binder
        ; return (extendCorePrepEnv env bndr bndr2,
-                 addFloat floats new_float) }
+                 addFloat floats new_float) }}
 
 cpeBind top_lvl env (Rec pairs)
   = do { let (bndrs,rhss) = unzip pairs
@@ -551,7 +556,8 @@ cpeRhsE env (Tick tickish expr)
        ; return (emptyFloats, mkTick tickish' body) }
   where
     tickish' | Breakpoint n fvs <- tickish
-             = Breakpoint n (map (lookupCorePrepEnv env) fvs)
+             -- See also 'substTickish'
+             = Breakpoint n (map (getIdFromTrivialExpr . lookupCorePrepEnv env) fvs)
              | otherwise
              = tickish
 
@@ -604,12 +610,26 @@ cvtLitInteger dflags mk_integer _ i
 --              CpeBody: produces a result satisfying CpeBody
 -- ---------------------------------------------------------------------------
 
+-- | Convert a 'CoreExpr' so it satisfies 'CpeBody', without
+-- producing any floats (any generated floats are immediately
+-- let-bound using 'wrapBinds').  Generally you want this, esp.
+-- when you've reached a binding form (e.g., a lambda) and
+-- floating any further would be incorrect.
 cpeBodyNF :: CorePrepEnv -> CoreExpr -> UniqSM CpeBody
 cpeBodyNF env expr
   = do { (floats, body) <- cpeBody env expr
        ; return (wrapBinds floats body) }
 
---------
+-- | Convert a 'CoreExpr' so it satisfies 'CpeBody'; also produce
+-- a list of 'Floats' which are being propagated upwards.  In
+-- fact, this function is used in only two cases: to
+-- implement 'cpeBodyNF' (which is what you usually want),
+-- and in the case when a let-binding is in a case scrutinee--here,
+-- we can always float out:
+--
+--      case (let x = y in z) of ...
+--      ==> let x = y in case z of ...
+--
 cpeBody :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeBody)
 cpeBody env expr
   = do { (floats1, rhs) <- cpeRhsE env expr
@@ -704,8 +724,15 @@ cpeApp env expr
 
     collect_args (Var v) depth
       = do { v1 <- fiddleCCall v
-           ; let v2 = lookupCorePrepEnv env v1
-           ; return (Var v2, Just (v2, depth), idType v2, emptyFloats, stricts) }
+           ; let e2 = lookupCorePrepEnv env v1
+                 mb_v2 = getIdFromTrivialExpr_maybe e2
+                 hd = fmap (\v2 -> (v2, depth)) mb_v2
+           -- NB: current depth is right, because e2 is a trivial expression
+           -- and thus its embedded Id *must* be at the same depth as any
+           -- Apps it is under are type applications only (c.f.
+           -- cpe_ExprIsTrivial).  But note that we need the type of the
+           -- expression, not the id.
+           ; return (e2, hd, exprType e2, emptyFloats, stricts) }
         where
           stricts = case idStrictness v of
                             StrictSig (DmdType _ demands _)
@@ -856,6 +883,7 @@ of the scope of a `seq`, or dropped the `seq` altogether.
 
 cpe_ExprIsTrivial :: CoreExpr -> Bool
 -- Version that doesn't consider an scc annotation to be trivial.
+-- See also 'exprIsTrivial'
 cpe_ExprIsTrivial (Var _)         = True
 cpe_ExprIsTrivial (Type _)        = True
 cpe_ExprIsTrivial (Coercion _)    = True
@@ -1175,9 +1203,80 @@ allLazyNested is_rec (Floats IfUnboxedOk _) = isNonRec is_rec
 --                      The environment
 -- ---------------------------------------------------------------------------
 
+-- Note [Inlining in CorePrep]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- There is a subtle but important invariant that must be upheld in the output
+-- of CorePrep: there are no "trivial" updatable thunks.  Thus, this Core
+-- is impermissible:
+--
+--      let x :: ()
+--          x = y
+--
+-- (where y is a reference to a GLOBAL variable).  Thunks like this are silly:
+-- they can always be profitably replaced by inlining x with y. Consequently,
+-- the code generator/runtime does not bother implementing this properly
+-- (specifically, there is no implementation of stg_ap_0_upd_info, which is the
+-- stack frame that would be used to update this thunk.  The "0" means it has
+-- zero free variables.)
+--
+-- In general, the inliner is good at eliminating these let-bindings.  However,
+-- there is one case where these trivial updatable thunks can arise: when
+-- we are optimizing away 'lazy' (see Note [lazyId magic], and also
+-- 'cpeRhsE'.)  Then, we could have started with:
+--
+--      let x :: ()
+--          x = lazy @ () y
+--
+-- which is a perfectly fine, non-trivial thunk, but then CorePrep will
+-- drop 'lazy', giving us 'x = y' which is trivial and impermissible.
+-- The solution is CorePrep to have a miniature inlining pass which deals
+-- with cases like this.  We can then drop the let-binding altogether.
+--
+-- Why does the removal of 'lazy' have to occur in CorePrep?
+-- The gory details are in Note [lazyId magic] in MkId, but the
+-- main reason is that lazy must appear in unfoldings (optimizer
+-- output) and it must prevent call-by-value for catch# (which
+-- is implemented by CorePrep.)
+--
+-- An alternate strategy for solving this problem is to have the
+-- inliner treat 'lazy e' as a trivial expression if 'e' is trivial.
+-- We decided not to adopt this solution to keep the definition
+-- of 'exprIsTrivial' simple.
+--
+-- There is ONE caveat however: for top-level bindings we have
+-- to preserve the binding so that we float the (hacky) non-recursive
+-- binding for data constructors; see Note [Data constructor workers].
+--
+-- Note [CorePrep inlines trivial CoreExpr not Id]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Why does cpe_env need to be an IdEnv CoreExpr, as opposed to an
+-- IdEnv Id?  Naively, we might conjecture that trivial updatable thunks
+-- as per Note [Inlining in CorePrep] always have the form
+-- 'lazy @ SomeType gbl_id'.  But this is not true: the following is
+-- perfectly reasonable Core:
+--
+--      let x :: ()
+--          x = lazy @ (forall a. a) y @ Bool
+--
+-- When we inline 'x' after eliminating 'lazy', we need to replace
+-- occurences of 'x' with 'y @ bool', not just 'y'.  Situations like
+-- this can easily arise with higher-rank types; thus, cpe_env must
+-- map to CoreExprs, not Ids.
+
 data CorePrepEnv
   = CPE { cpe_dynFlags        :: DynFlags
-        , cpe_env             :: IdEnv Id   -- Clone local Ids
+        , cpe_env             :: IdEnv CoreExpr   -- Clone local Ids
+        -- ^ This environment is used for three operations:
+        --
+        --      1. To support cloning of local Ids so that they are
+        --      all unique (see item (6) of CorePrep overview).
+        --
+        --      2. To support beta-reduction of runRW, see
+        --      Note [runRW magic] and Note [runRW arg].
+        --
+        --      3. To let us inline trivial RHSs of non top-level let-bindings,
+        --      see Note [lazyId magic], Note [Inlining in CorePrep]
+        --      and Note [CorePrep inlines trivial CoreExpr not Id] (#12076)
         , cpe_mkIntegerId     :: Id
         , cpe_integerSDataCon :: Maybe DataCon
     }
@@ -1215,17 +1314,22 @@ mkInitialCorePrepEnv dflags hsc_env
 
 extendCorePrepEnv :: CorePrepEnv -> Id -> Id -> CorePrepEnv
 extendCorePrepEnv cpe id id'
-    = cpe { cpe_env = extendVarEnv (cpe_env cpe) id id' }
+    = cpe { cpe_env = extendVarEnv (cpe_env cpe) id (Var id') }
+
+extendCorePrepEnvExpr :: CorePrepEnv -> Id -> CoreExpr -> CorePrepEnv
+extendCorePrepEnvExpr cpe id expr
+    = cpe { cpe_env = extendVarEnv (cpe_env cpe) id expr }
 
 extendCorePrepEnvList :: CorePrepEnv -> [(Id,Id)] -> CorePrepEnv
 extendCorePrepEnvList cpe prs
-    = cpe { cpe_env = extendVarEnvList (cpe_env cpe) prs }
+    = cpe { cpe_env = extendVarEnvList (cpe_env cpe)
+                        (map (\(id, id') -> (id, Var id')) prs) }
 
-lookupCorePrepEnv :: CorePrepEnv -> Id -> Id
+lookupCorePrepEnv :: CorePrepEnv -> Id -> CoreExpr
 lookupCorePrepEnv cpe id
   = case lookupVarEnv (cpe_env cpe) id of
-        Nothing  -> id
-        Just id' -> id'
+        Nothing  -> Var id
+        Just exp -> exp
 
 getMkIntegerId :: CorePrepEnv -> Id
 getMkIntegerId = cpe_mkIntegerId
