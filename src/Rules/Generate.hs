@@ -134,7 +134,7 @@ generatePackageCode context@(Context stage pkg _) =
                     newFile = oldPath ++ (drop (length path) file)
                 createDirectory $ takeDirectory newFile
                 liftIO $ IO.copyFile file newFile
-                putSuccess $ "| Duplicate file " ++ file ++ " -> " ++ newFile
+                putBuild $ "| Duplicate file " ++ file ++ " -> " ++ newFile
 
         when (pkg == rts) $ path -/- "AutoApply.cmm" %> \file -> do
             build $ Target context GenApply [] [file]
