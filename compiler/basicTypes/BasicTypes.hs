@@ -110,6 +110,7 @@ import Data.Function (on)
 -- "real work". So:
 --  fib 100     has arity 0
 --  \x -> fib x has arity 1
+-- See also Note [Definition of arity] in CoreArity
 type Arity = Int
 
 -- | The number of represented arguments that can be applied to a value before it does

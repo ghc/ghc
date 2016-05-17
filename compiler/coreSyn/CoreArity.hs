@@ -841,12 +841,12 @@ to re-add floats on the top.
 
 -}
 
--- | @etaExpand n us e ty@ returns an expression with
+-- | @etaExpand n e@ returns an expression with
 -- the same meaning as @e@, but with arity @n@.
 --
 -- Given:
 --
--- > e' = etaExpand n us e ty
+-- > e' = etaExpand n e
 --
 -- We should have that:
 --
