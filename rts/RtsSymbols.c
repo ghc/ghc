@@ -329,7 +329,10 @@
       SymI_HasProto(RET_NEW_ctr)                        \
       SymI_HasProto(RET_OLD_ctr)                        \
       SymI_HasProto(RET_UNBOXED_TUP_ctr)                \
-      SymI_HasProto(RET_SEMI_loads_avoided)
+      SymI_HasProto(RET_SEMI_loads_avoided)             \
+      SymI_HasProto(RET_NEW_hst)                        \
+      SymI_HasProto(RET_OLD_hst)                        \
+      SymI_HasProto(RET_UNBOXED_TUP_hst)
 
 
 // On most platforms, the garbage collector rewrites references
