@@ -1,7 +1,7 @@
 
 T9017.hs:8:7: error:
-    • Couldn't match kind ‘k’ with ‘*’
-      ‘k’ is a rigid type variable bound by
+    • Couldn't match kind ‘k1’ with ‘*’
+      ‘k1’ is a rigid type variable bound by
         the type signature for:
           foo :: forall k k1 (a :: k1 -> k -> *) (b :: k1) (m :: k1 -> k).
                  a b (m b)

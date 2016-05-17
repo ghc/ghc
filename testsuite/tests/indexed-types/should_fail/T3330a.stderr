@@ -1,7 +1,8 @@
 
 T3330a.hs:19:34: error:
-    • Couldn't match type ‘s’ with ‘(->) (s0 ix0 -> ix1)’
-      ‘s’ is a rigid type variable bound by
+    • Couldn't match type ‘ix’
+                     with ‘r ix1 -> Writer [AnyF s] (r'0 ix1)’
+      ‘ix’ is a rigid type variable bound by
         the type signature for:
           children :: forall (s :: * -> *) ix (r :: * -> *).
                       s ix -> PF s r ix -> [AnyF s]

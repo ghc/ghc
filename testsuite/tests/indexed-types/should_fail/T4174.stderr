@@ -1,7 +1,7 @@
 
 T4174.hs:42:12: error:
-    • Couldn't match type ‘a’ with ‘SmStep’
-      ‘a’ is a rigid type variable bound by
+    • Couldn't match type ‘b’ with ‘RtsSpinLock’
+      ‘b’ is a rigid type variable bound by
         the type signature for:
           testcase :: forall (m :: * -> *) minor n t p a b.
                       Monad m =>
