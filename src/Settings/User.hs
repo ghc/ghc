@@ -102,4 +102,4 @@ putBuild = putColoured Vivid White
 
 -- | Customise build success messages (e.g. a package is built successfully).
 putSuccess :: String -> Action ()
-putSuccess = withVerbosity Loud . putColoured Vivid Green
+putSuccess = putColoured Vivid Green
