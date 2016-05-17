@@ -11,7 +11,6 @@
  *
  * -------------------------------------------------------------------------- */
 
-
 #ifndef TICKYCOUNTERS_H
 #define TICKYCOUNTERS_H
 
@@ -180,8 +179,16 @@ EXTERN StgInt RET_OLD_ctr INIT(0);
 EXTERN StgInt RET_UNBOXED_TUP_ctr INIT(0);
 
 EXTERN StgInt RET_SEMI_loads_avoided INIT(0);
-
 /* End of counter declarations. */
+
+/* How many bins in ticky's histograms */
+#define TICKY_BIN_COUNT 9
+
+/* Histogram declarations */
+EXTERN StgInt RET_NEW_hst[TICKY_BIN_COUNT] INIT({0});
+EXTERN StgInt RET_OLD_hst[TICKY_BIN_COUNT] INIT({0});
+EXTERN StgInt RET_UNBOXED_TUP_hst[TICKY_BIN_COUNT] INIT({0});
+/* End of histogram declarations */
 
 /* This is ugly, but the story is:
    We got rid of StgTicky.h, which was previously

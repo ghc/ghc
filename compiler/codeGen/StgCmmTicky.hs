@@ -96,7 +96,7 @@ module StgCmmTicky (
 
   tickyUpdateBhCaf,
   tickyBlackHole,
-  tickyUnboxedTupleReturn, tickyVectoredReturn,
+  tickyUnboxedTupleReturn,
   tickyReturnOldCon, tickyReturnNewCon,
 
   tickyKnownCallTooFewArgs, tickyKnownCallExact, tickyKnownCallExtraArgs,
@@ -343,11 +343,6 @@ tickyUnboxedTupleReturn arity
   = ifTicky $ do { bumpTickyCounter (fsLit "RET_UNBOXED_TUP_ctr")
                  ; bumpHistogram    (fsLit "RET_UNBOXED_TUP_hst") arity }
 
-tickyVectoredReturn :: Int -> FCode ()
-tickyVectoredReturn family_size
-  = ifTicky $ do { bumpTickyCounter (fsLit "VEC_RETURN_ctr")
-                 ; bumpHistogram    (fsLit "RET_VEC_RETURN_hst") family_size }
-
 -- -----------------------------------------------------------------------------
 -- Ticky calls
 
@@ -582,26 +577,15 @@ bumpTickyLitByE lhs e = do
   emit (addToMemE (bWord dflags) (CmmLit lhs) e)
 
 bumpHistogram :: FastString -> Int -> FCode ()
-bumpHistogram _lbl _n
---  = bumpHistogramE lbl (CmmLit (CmmInt (fromIntegral n) cLongWidth))
-    = return ()    -- TEMP SPJ Apr 07
-                   -- six years passed - still temp? JS Aug 2013
-
-{-
-bumpHistogramE :: LitString -> CmmExpr -> FCode ()
-bumpHistogramE lbl n
-  = do  t <- newTemp cLong
-        emitAssign (CmmLocal t) n
-        emit (mkCmmIfThen (CmmMachOp (MO_U_Le cLongWidth) [CmmReg (CmmLocal t), eight])
-                          (mkAssign (CmmLocal t) eight))
-        emit (addToMem cLong
-                       (cmmIndexExpr cLongWidth
-                                (CmmLit (CmmLabel (mkRtsDataLabel lbl)))
-                                (CmmReg (CmmLocal t)))
-                       1)
-  where
-   eight = CmmLit (CmmInt 8 cLongWidth)
--}
+bumpHistogram lbl n = do
+    dflags <- getDynFlags
+    let offset = n `min` (tICKY_BIN_COUNT dflags - 1)
+    emit (addToMem (cLong dflags)
+           (cmmIndexExpr dflags
+                (cLongWidth dflags)
+                (CmmLit (CmmLabel (mkCmmDataLabel rtsUnitId lbl)))
+                (CmmLit (CmmInt (fromIntegral offset) (cLongWidth dflags))))
+           1)
 
 ------------------------------------------------------------------
 -- Showing the "type category" for ticky-ticky profiling
@@ -638,7 +622,7 @@ showTypeCategory ty
   | otherwise = case tcSplitTyConApp_maybe ty of
   Nothing -> '.'
   Just (tycon, _) ->
-    (if isUnliftedTyCon tycon then Data.Char.toLower else \x -> x) $
+    (if isUnliftedTyCon tycon then Data.Char.toLower else id) $
     let anyOf us = getUnique tycon `elem` us in
     case () of
       _ | anyOf [funTyConKey] -> '>'

@@ -682,6 +682,7 @@ cgConApp con stg_args
                 -- it only affects profiling (hence the False)
 
         ; emit =<< fcode_init
+        ; tickyReturnNewCon (length stg_args)
         ; emitReturn [idInfoToAmode idinfo] }
 
 cgIdApp :: Id -> [StgArg] -> FCode ReturnKind

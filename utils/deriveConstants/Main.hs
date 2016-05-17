@@ -315,6 +315,9 @@ wanteds os = concat
           ,constantWord Both "BLOCKS_PER_MBLOCK" "BLOCKS_PER_MBLOCK"
            -- could be derived, but better to save doing the calculation twice
 
+          ,constantWord Both "TICKY_BIN_COUNT" "TICKY_BIN_COUNT"
+           -- number of bins for histograms used in ticky code
+
           ,fieldOffset Both "StgRegTable" "rR1"
           ,fieldOffset Both "StgRegTable" "rR2"
           ,fieldOffset Both "StgRegTable" "rR3"
