@@ -6,6 +6,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE CPP #-}
+
 module CLabel (
         CLabel, -- abstract type
         ForeignLabelSource(..),
@@ -113,6 +115,8 @@ module CLabel (
         pprCLabel
     ) where
 
+#include "HsVersions.h"
+
 import IdInfo
 import BasicTypes
 import Packages
@@ -127,6 +131,7 @@ import FastString
 import DynFlags
 import Platform
 import UniqSet
+import Util
 import PprCore ( {- instances -} )
 
 -- -----------------------------------------------------------------------------
@@ -1062,28 +1067,36 @@ pprCLbl (CmmLabel _ str CmmPrimCall)    = ftext str
 pprCLbl (RtsLabel (RtsApFast str))   = ftext str <> text "_fast"
 
 pprCLbl (RtsLabel (RtsSelectorInfoTable upd_reqd offset))
-  = hcat [text "stg_sel_", text (show offset),
+  = sdocWithDynFlags $ \dflags ->
+    ASSERT(offset >= 0 && offset <= mAX_SPEC_SELECTEE_SIZE dflags)
+    hcat [text "stg_sel_", text (show offset),
           ptext (if upd_reqd
                  then (sLit "_upd_info")
                  else (sLit "_noupd_info"))
         ]
 
 pprCLbl (RtsLabel (RtsSelectorEntry upd_reqd offset))
-  = hcat [text "stg_sel_", text (show offset),
+  = sdocWithDynFlags $ \dflags ->
+    ASSERT(offset >= 0 && offset <= mAX_SPEC_SELECTEE_SIZE dflags)
+    hcat [text "stg_sel_", text (show offset),
                 ptext (if upd_reqd
                         then (sLit "_upd_entry")
                         else (sLit "_noupd_entry"))
         ]
 
 pprCLbl (RtsLabel (RtsApInfoTable upd_reqd arity))
-  = hcat [text "stg_ap_", text (show arity),
+  = sdocWithDynFlags $ \dflags ->
+    ASSERT(arity > 0 && arity <= mAX_SPEC_AP_SIZE dflags)
+    hcat [text "stg_ap_", text (show arity),
                 ptext (if upd_reqd
                         then (sLit "_upd_info")
                         else (sLit "_noupd_info"))
         ]
 
 pprCLbl (RtsLabel (RtsApEntry upd_reqd arity))
-  = hcat [text "stg_ap_", text (show arity),
+  = sdocWithDynFlags $ \dflags ->
+    ASSERT(arity > 0 && arity <= mAX_SPEC_AP_SIZE dflags)
+    hcat [text "stg_ap_", text (show arity),
                 ptext (if upd_reqd
                         then (sLit "_upd_entry")
                         else (sLit "_noupd_entry"))
