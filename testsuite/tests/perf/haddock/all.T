@@ -37,13 +37,14 @@ test('haddock.base',
             # 2014-12-01:                     4202377432 (x86/Windows, 64bit machine)
             # 2015-01-20:                     4434804940 (x86/Windows, 64bit machine)
 
-          ,(wordsize(32), 5509757068, 5)])
+          ,(wordsize(32), 5876620892, 5)])
             # 2012-08-14: 3046487920 (x86/OSX)
             # 2012-10-30: 2955470952 (x86/Windows)
             # 2013-02-10: 3146596848 (x86/OSX)
-            # 2014-02-22: 3554624600 (x86/Linux - new haddock)
+            # 2014-02-22: 3554624600 (x86/Linux, new haddock)
             # 2014-06-29: 3799130400 (x86/Linux)
             # 2016-04-06: 5509757068 (x86/Linux)
+            # 2016-05-17: 5876620892 (x86/Linux, haddock changes)
       ],
      stats,
      ['../../../../libraries/base/dist-install/haddock.t'])
