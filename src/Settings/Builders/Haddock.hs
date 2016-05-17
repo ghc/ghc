@@ -8,6 +8,12 @@ import Predicate
 import Settings
 import Settings.Builders.Ghc
 
+-- | Given a version string such as "2.16.2" produce an integer equivalent.
+versionToInt :: String -> Int
+versionToInt s = major * 1000 + minor * 10 + patch
+  where
+    [major, minor, patch] = map read . words $ replaceEq '.' ' ' s
+
 haddockBuilderArgs :: Args
 haddockBuilderArgs = builder Haddock ? do
     output   <- getOutput

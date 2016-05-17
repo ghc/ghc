@@ -19,7 +19,7 @@ module Base (
 
     -- * Miscellaneous utilities
     minusOrd, intersectOrd, lookupAll, replaceEq, quote, replaceSeparators,
-    unifyPath, (-/-), versionToInt, matchVersionedFilePath, putColoured
+    unifyPath, (-/-), matchVersionedFilePath, putColoured
     ) where
 
 import Control.Applicative
@@ -73,12 +73,6 @@ replaceWhen p to = map (\from -> if p from then to else from)
 -- | Add quotes around a String.
 quote :: String -> String
 quote s = "\"" ++ s ++ "\""
-
--- | Given a version string such as "2.16.2" produce an integer equivalent.
-versionToInt :: String -> Int
-versionToInt s = major * 1000 + minor * 10 + patch
-  where
-    [major, minor, patch] = map read . words $ replaceEq '.' ' ' s
 
 -- | Normalise a path and convert all path separators to @/@, even on Windows.
 unifyPath :: FilePath -> FilePath
