@@ -1312,7 +1312,7 @@ flatten_tyvar2 :: TcTyVar -> CtFlavourRole -> FlatM FlattenTvResult
 flatten_tyvar2 tv fr@(flavour, eq_rel)
   | Derived <- flavour  -- For derived equalities, consult the inert_model (only)
   = do { model <- liftTcS $ getInertModel
-       ; case lookupVarEnv model tv of
+       ; case lookupDVarEnv model tv of
            Just (CTyEqCan { cc_rhs = rhs })
              -> return (FTRFollowed rhs (pprPanic "flatten_tyvar2" (ppr tv $$ ppr rhs)))
                               -- Evidence is irrelevant for Derived contexts
@@ -1320,7 +1320,7 @@ flatten_tyvar2 tv fr@(flavour, eq_rel)
 
   | otherwise   -- For non-derived equalities, consult the inert_eqs (only)
   = do { ieqs <- liftTcS $ getInertEqs
-       ; case lookupVarEnv ieqs tv of
+       ; case lookupDVarEnv ieqs tv of
            Just (ct:_)   -- If the first doesn't work,
                          -- the subsequent ones won't either
              | CTyEqCan { cc_ev = ctev, cc_tyvar = tv, cc_rhs = rhs_ty } <- ct

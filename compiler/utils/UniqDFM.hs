@@ -28,6 +28,7 @@ module UniqDFM (
         emptyUDFM,
         unitUDFM,
         addToUDFM,
+        addToUDFM_C,
         delFromUDFM,
         delListFromUDFM,
         adjustUDFM,
@@ -44,10 +45,11 @@ module UniqDFM (
         sizeUDFM,
         intersectUDFM,
         intersectsUDFM,
-        disjointUDFM,
+        disjointUDFM, disjointUdfmUfm,
         minusUDFM,
         udfmMinusUFM,
         partitionUDFM,
+        anyUDFM,
 
         udfmToList,
         udfmToUfm,
@@ -156,6 +158,18 @@ addToUDFM_Directly_C f (UDFM m i) u v =
   UDFM (M.insertWith tf (getKey u) (TaggedVal v i) m) (i + 1)
   where
   tf (TaggedVal a j) (TaggedVal b _) = TaggedVal (f a b) j
+
+addToUDFM_C
+  :: Uniquable key => (elt -> elt -> elt) -- old -> new -> result
+  -> UniqDFM elt -- old
+  -> key -> elt -- new
+  -> UniqDFM elt -- result
+addToUDFM_C f (UDFM m i) k v =
+  UDFM (M.insertWith tf (getKey $ getUnique k) (TaggedVal v i) m) (i + 1)
+  where
+  tf (TaggedVal a j) (TaggedVal b _) = TaggedVal (f b a) j
+                                       -- Flip the arguments, just like
+                                       -- addToUFM_C does.
 
 addListToUDFM_Directly :: UniqDFM elt -> [(Unique,elt)] -> UniqDFM elt
 addListToUDFM_Directly = foldl (\m (k, v) -> addToUDFM_Directly m k v)
@@ -271,6 +285,9 @@ intersectsUDFM x y = isNullUDFM (x `intersectUDFM` y)
 disjointUDFM :: UniqDFM elt -> UniqDFM elt -> Bool
 disjointUDFM (UDFM x _i) (UDFM y _j) = M.null (M.intersection x y)
 
+disjointUdfmUfm :: UniqDFM elt -> UniqFM elt2 -> Bool
+disjointUdfmUfm (UDFM x _i) y = M.null (M.intersection x (ufmToIntMap y))
+
 minusUDFM :: UniqDFM elt1 -> UniqDFM elt2 -> UniqDFM elt1
 minusUDFM (UDFM x i) (UDFM y _j) = UDFM (M.difference x y) i
   -- M.difference returns a subset of a left set, so `i` is a good upper
@@ -324,6 +341,9 @@ alterUDFM f (UDFM m i) k =
 -- | Map a function over every value in a UniqDFM
 mapUDFM :: (elt1 -> elt2) -> UniqDFM elt1 -> UniqDFM elt2
 mapUDFM f (UDFM m i) = UDFM (M.map (fmap f) m) i
+
+anyUDFM :: (elt -> Bool) -> UniqDFM elt -> Bool
+anyUDFM p (UDFM m _i) = M.fold ((||) . p . taggedFst) False m
 
 instance Monoid (UniqDFM a) where
   mempty = emptyUDFM

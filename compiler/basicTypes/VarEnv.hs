@@ -24,20 +24,23 @@ module VarEnv (
         partitionVarEnv,
 
         -- * Deterministic Var environments (maps)
-        DVarEnv, DIdEnv,
+        DVarEnv, DIdEnv, DTyVarEnv,
 
         -- ** Manipulating these environments
         emptyDVarEnv,
         dVarEnvElts,
-        extendDVarEnv,
+        extendDVarEnv, extendDVarEnv_C,
         lookupDVarEnv,
-        foldDVarEnv,
+        isEmptyDVarEnv, foldDVarEnv,
         mapDVarEnv,
+        modifyDVarEnv,
         alterDVarEnv,
         plusDVarEnv_C,
         unitDVarEnv,
         delDVarEnv,
         delDVarEnvList,
+        partitionDVarEnv,
+        anyDVarEnv,
 
         -- * The InScopeSet type
         InScopeSet,
@@ -507,6 +510,7 @@ modifyVarEnv_Directly mangle_fn env key
 
 type DVarEnv elt = UniqDFM elt
 type DIdEnv elt = DVarEnv elt
+type DTyVarEnv elt = DVarEnv elt
 
 emptyDVarEnv :: DVarEnv a
 emptyDVarEnv = emptyUDFM
@@ -540,3 +544,21 @@ delDVarEnv = delFromUDFM
 
 delDVarEnvList :: DVarEnv a -> [Var] -> DVarEnv a
 delDVarEnvList = delListFromUDFM
+
+isEmptyDVarEnv :: DVarEnv a -> Bool
+isEmptyDVarEnv = isNullUDFM
+
+extendDVarEnv_C :: (a -> a -> a) -> DVarEnv a -> Var -> a -> DVarEnv a
+extendDVarEnv_C = addToUDFM_C
+
+modifyDVarEnv :: (a -> a) -> DVarEnv a -> Var -> DVarEnv a
+modifyDVarEnv mangle_fn env key
+  = case (lookupDVarEnv env key) of
+      Nothing -> env
+      Just xx -> extendDVarEnv env key (mangle_fn xx)
+
+partitionDVarEnv :: (a -> Bool) -> DVarEnv a -> (DVarEnv a, DVarEnv a)
+partitionDVarEnv = partitionUDFM
+
+anyDVarEnv :: (a -> Bool) -> DVarEnv a -> Bool
+anyDVarEnv = anyUDFM

@@ -923,7 +923,7 @@ improveLocalFunEqs loc inerts fam_tc args fsk
 lookupFlattenTyVar :: InertModel -> TcTyVar -> TcType
 -- See Note [lookupFlattenTyVar]
 lookupFlattenTyVar model ftv
-  = case lookupVarEnv model ftv of
+  = case lookupDVarEnv model ftv of
       Just (CTyEqCan { cc_rhs = rhs, cc_eq_rel = NomEq }) -> rhs
       _                                                   -> mkTyVarTy ftv
 

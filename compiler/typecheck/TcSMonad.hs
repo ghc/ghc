@@ -369,13 +369,13 @@ instance Outputable InertSet where
 emptyInert :: InertSet
 emptyInert
   = IS { inert_cans = IC { inert_count    = 0
-                         , inert_eqs      = emptyVarEnv
+                         , inert_eqs      = emptyDVarEnv
                          , inert_dicts    = emptyDicts
                          , inert_safehask = emptyDicts
                          , inert_funeqs   = emptyFunEqs
                          , inert_irreds   = emptyCts
                          , inert_insols   = emptyCts
-                         , inert_model    = emptyVarEnv }
+                         , inert_model    = emptyDVarEnv }
        , inert_flat_cache    = emptyExactFunEqs
        , inert_solved_dicts  = emptyDictMap }
 
@@ -551,7 +551,7 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
   = IC { inert_model :: InertModel
               -- See Note [inert_model: the inert model]
 
-       , inert_eqs :: TyVarEnv EqualCtList
+       , inert_eqs :: DTyVarEnv EqualCtList
               -- See Note [inert_eqs: the inert equalities]
               -- All Given/Wanted CTyEqCans; index is the LHS tyvar
 
@@ -591,7 +591,7 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
               -- When non-zero, keep trying to solved
        }
 
-type InertModel  = TyVarEnv Ct
+type InertModel  = DTyVarEnv Ct
      -- If a -> ct, then ct is a
      --    nominal, Derived, canonical CTyEqCan for [D] (a ~N rhs)
      -- The index of the TyVarEnv is the 'a'
@@ -1066,9 +1066,9 @@ instance Outputable InertCans where
           , inert_safehask = safehask, inert_irreds = irreds
           , inert_insols = insols, inert_count = count })
     = braces $ vcat
-      [ ppUnless (isEmptyVarEnv eqs) $
+      [ ppUnless (isEmptyDVarEnv eqs) $
         text "Equalities:"
-          <+> pprCts (foldVarEnv (\eqs rest -> listToBag eqs `andCts` rest) emptyCts eqs)
+          <+> pprCts (foldDVarEnv (\eqs rest -> listToBag eqs `andCts` rest) emptyCts eqs)
       , ppUnless (isEmptyTcAppMap funeqs) $
         text "Type-function equalities =" <+> pprCts (funEqsToBag funeqs)
       , ppUnless (isEmptyTcAppMap dicts) $
@@ -1079,8 +1079,8 @@ instance Outputable InertCans where
         text "Irreds =" <+> pprCts irreds
       , ppUnless (isEmptyCts insols) $
         text "Insolubles =" <+> pprCts insols
-      , ppUnless (isEmptyVarEnv model) $
-        text "Model =" <+> pprCts (foldVarEnv consCts emptyCts model)
+      , ppUnless (isEmptyDVarEnv model) $
+        text "Model =" <+> pprCts (foldDVarEnv consCts emptyCts model)
       , text "Unsolved goals =" <+> int count
       ]
 
@@ -1216,7 +1216,7 @@ add_inert_eq ics@(IC { inert_count = n
 
   | isDerived ev
   = do { emitDerivedShadows ics tv
-       ; return (ics { inert_model = extendVarEnv old_model tv ct }) }
+       ; return (ics { inert_model = extendDVarEnv old_model tv ct }) }
 
   | otherwise   -- Given/Wanted Nominal equality [W] tv ~N ty
   = do { emitNewDerived loc pred
@@ -1304,7 +1304,7 @@ See Trac #11379 for a case of this.
 modelCanRewrite :: InertModel -> TcTyCoVarSet -> Bool
 -- See Note [Emitting shadow constraints]
 -- True if there is any intersection between dom(model) and tvs
-modelCanRewrite model tvs = not (disjointUFM model tvs)
+modelCanRewrite model tvs = not (disjointUdfmUfm model tvs)
      -- The low-level use of disjointUFM might e surprising.
      -- InertModel = TyVarEnv Ct, and we want to see if its domain
      -- is disjoint from that of a TcTyCoVarSet.  So we drop down
@@ -1402,7 +1402,7 @@ kickOutRewritable new_fr new_tv ics@(IC { inert_eqs      = tv_eqs
                                              `andCts` insols_out)
                     , wl_implics = emptyBag }
 
-    (tv_eqs_out, tv_eqs_in) = foldVarEnv kick_out_eqs ([], emptyVarEnv) tv_eqs
+    (tv_eqs_out, tv_eqs_in) = foldDVarEnv kick_out_eqs ([], emptyDVarEnv) tv_eqs
     (feqs_out,   feqs_in)   = partitionFunEqs  kick_out_fe funeqmap
     (dicts_out,  dicts_in)  = partitionDicts   kick_out_ct dictmap
     (irs_out,    irs_in)    = partitionBag     kick_out_ct irreds
@@ -1429,12 +1429,12 @@ kickOutRewritable new_fr new_tv ics@(IC { inert_eqs      = tv_eqs
             && new_tv `elemVarSet` tyCoVarsOfTypes tys)
     kick_out_fe ct = pprPanic "kick_out_fe" (ppr ct)
 
-    kick_out_eqs :: EqualCtList -> ([Ct], TyVarEnv EqualCtList)
-                 -> ([Ct], TyVarEnv EqualCtList)
+    kick_out_eqs :: EqualCtList -> ([Ct], DTyVarEnv EqualCtList)
+                 -> ([Ct], DTyVarEnv EqualCtList)
     kick_out_eqs eqs (acc_out, acc_in)
       = (eqs_out ++ acc_out, case eqs_in of
                                []      -> acc_in
-                               (eq1:_) -> extendVarEnv acc_in (cc_tyvar eq1) eqs_in)
+                               (eq1:_) -> extendDVarEnv acc_in (cc_tyvar eq1) eqs_in)
       where
         (eqs_in, eqs_out) = partition keep_eq eqs
 
@@ -1486,9 +1486,9 @@ kickOutAfterUnification new_tv
 
 kickOutModel :: TcTyVar -> InertCans -> (WorkList, InertCans)
 kickOutModel new_tv ics@(IC { inert_model = model, inert_eqs = eqs })
-  = (foldVarEnv add emptyWorkList der_out, ics { inert_model = new_model })
+  = (foldDVarEnv add emptyWorkList der_out, ics { inert_model = new_model })
   where
-    (der_out, new_model) = partitionVarEnv kick_out_der model
+    (der_out, new_model) = partitionDVarEnv kick_out_der model
 
     kick_out_der :: Ct -> Bool
     kick_out_der (CTyEqCan { cc_tyvar = tv, cc_rhs = rhs })
@@ -1662,7 +1662,7 @@ updInertIrreds :: (Cts -> Cts) -> TcS ()
 updInertIrreds upd_fn
   = updInertCans $ \ ics -> ics { inert_irreds = upd_fn (inert_irreds ics) }
 
-getInertEqs :: TcS (TyVarEnv EqualCtList)
+getInertEqs :: TcS (DTyVarEnv EqualCtList)
 getInertEqs = do { inert <- getInertCans; return (inert_eqs inert) }
 
 getInertModel :: TcS InertModel
@@ -1675,7 +1675,7 @@ getInertGivens
   = do { inerts <- getInertCans
        ; let all_cts = foldDicts (:) (inert_dicts inerts)
                      $ foldFunEqs (:) (inert_funeqs inerts)
-                     $ concat (varEnvElts (inert_eqs inerts))
+                     $ concat (dVarEnvElts (inert_eqs inerts))
        ; return (filter isGivenCt all_cts) }
 
 getPendingScDicts :: TcS [Ct]
@@ -1721,7 +1721,7 @@ getUnsolvedInerts
            , inert_model  = model } <- getInertCans
       ; keep_derived <- keepSolvingDeriveds
 
-      ; let der_tv_eqs       = foldVarEnv (add_der_eq keep_derived tv_eqs)
+      ; let der_tv_eqs       = foldDVarEnv (add_der_eq keep_derived tv_eqs)
                                           emptyCts model
             unsolved_tv_eqs  = foldTyEqs add_if_unsolved tv_eqs der_tv_eqs
             unsolved_fun_eqs = foldFunEqs add_if_unsolved fun_eqs emptyCts
@@ -1754,10 +1754,10 @@ getUnsolvedInerts
 
     is_unsolved ct = not (isGivenCt ct)   -- Wanted or Derived
 
-isInInertEqs :: TyVarEnv EqualCtList -> TcTyVar -> TcType -> Bool
+isInInertEqs :: DTyVarEnv EqualCtList -> TcTyVar -> TcType -> Bool
 -- True if (a ~N ty) is in the inert set, in either Given or Wanted
 isInInertEqs eqs tv rhs
-  = case lookupVarEnv eqs tv of
+  = case lookupDVarEnv eqs tv of
       Nothing  -> False
       Just cts -> any (same_pred rhs) cts
   where
@@ -1777,7 +1777,7 @@ getNoGivenEqs tclvl skol_tvs
        ; let local_fsks = foldFunEqs add_fsk funeqs emptyVarSet
 
              has_given_eqs = foldrBag ((||) . ev_given_here . ctEvidence)  False iirreds
-                          || foldVarEnv ((||) . eqs_given_here local_fsks) False ieqs
+                          || anyDVarEnv (eqs_given_here local_fsks) ieqs
 
        ; traceTcS "getNoGivenEqs" (vcat [ppr has_given_eqs, ppr inerts])
        ; return (not has_given_eqs) }
@@ -2032,19 +2032,19 @@ type EqualCtList = [Ct]
    - Any number of Wanteds and/or Deriveds
 -}
 
-addTyEq :: TyVarEnv EqualCtList -> TcTyVar -> Ct -> TyVarEnv EqualCtList
-addTyEq old_list tv it = extendVarEnv_C (\old_eqs _new_eqs -> it : old_eqs)
+addTyEq :: DTyVarEnv EqualCtList -> TcTyVar -> Ct -> DTyVarEnv EqualCtList
+addTyEq old_list tv it = extendDVarEnv_C (\old_eqs _new_eqs -> it : old_eqs)
                                         old_list tv [it]
 
-foldTyEqs :: (Ct -> b -> b) -> TyVarEnv EqualCtList -> b -> b
+foldTyEqs :: (Ct -> b -> b) -> DTyVarEnv EqualCtList -> b -> b
 foldTyEqs k eqs z
-  = foldVarEnv (\cts z -> foldr k z cts) z eqs
+  = foldDVarEnv (\cts z -> foldr k z cts) z eqs
 
 findTyEqs :: InertCans -> TyVar -> EqualCtList
-findTyEqs icans tv = lookupVarEnv (inert_eqs icans) tv `orElse` []
+findTyEqs icans tv = lookupDVarEnv (inert_eqs icans) tv `orElse` []
 
-delTyEq :: TyVarEnv EqualCtList -> TcTyVar -> TcType -> TyVarEnv EqualCtList
-delTyEq m tv t = modifyVarEnv (filter (not . isThisOne)) m tv
+delTyEq :: DTyVarEnv EqualCtList -> TcTyVar -> TcType -> DTyVarEnv EqualCtList
+delTyEq m tv t = modifyDVarEnv (filter (not . isThisOne)) m tv
   where isThisOne (CTyEqCan { cc_rhs = t1 }) = eqType t t1
         isThisOne _                          = False
 
