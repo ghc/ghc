@@ -144,3 +144,20 @@ splitObjects = (return cmdSplitObjects) &&^ defaultSplitObjects
 buildHaddock :: Predicate
 buildHaddock = return cmdBuildHaddock
 ```
+
+Hadrian prints various progress info during the build. You can customise how this
+info is printed by overriding `putBuild` and `putSuccess` commands:
+
+```haskell
+-- | Customise build progress messages (e.g. executing a build command).
+putBuild :: String -> Action ()
+putBuild = putColoured Vivid White
+
+-- | Customise build success messages (e.g. a package is built successfully).
+putSuccess :: String -> Action ()
+putSuccess = putColoured Vivid Green
+```
+
+You can tune colours for your favourite terminal and also change the verbosity
+level, e.g. by setting `putSuccess = putLoud`, which will hide success messages
+unless Hadrian is called with `--verbose` flag.
