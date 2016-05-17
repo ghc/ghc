@@ -121,13 +121,13 @@ builderPath builder = case builderProvenance builder of
         _ -> error $ "Cannot determine builderPath for " ++ show builder
   where
     fromKey key = do
-        path <- askConfigWithDefault key . error $ "\nCannot find path to '"
-            ++ key ++ "' in system.config file. Did you forget to run configure?"
+        path <- askConfigWithDefault key . error $ "\nCannot find path to "
+            ++ quote key ++ " in system.config file. Did you skip configure?"
         if null path
         then do
             if isOptional builder
             then return ""
-            else error $ "Builder '" ++ key ++ "' is not specified in"
+            else error $ "Builder " ++ quote key ++ " is not specified in"
                 ++ " system.config file. Cannot proceed without it."
         else fixAbsolutePathOnWindows =<< lookupInPath path
 

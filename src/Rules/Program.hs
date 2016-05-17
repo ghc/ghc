@@ -64,8 +64,8 @@ buildWrapper context@Context {..} wrapper wrapperPath binPath = do
     contents <- interpretInContext context $ wrapper binPath
     writeFileChanged wrapperPath contents
     makeExecutable wrapperPath
-    putSuccess $ "| Successfully created wrapper for '" ++ pkgNameString package
-               ++ "' (" ++ show stage ++ ")."
+    putSuccess $ "| Successfully created wrapper for " ++
+        quote (pkgNameString package) ++ " (" ++ show stage ++ ")."
 
 -- TODO: Get rid of the Paths_hsc2hs.o hack.
 -- TODO: Do we need to consider other ways when building programs?
@@ -102,6 +102,6 @@ buildBinary rs context@(Context stage package _) bin = do
     buildWithResources rs $ Target context (Ghc Link stage) binDeps [bin]
     synopsis <- interpretInContext context $ getPkgData Synopsis
     putSuccess $ renderProgram
-        ("'" ++ pkgNameString package ++ "' (" ++ show stage ++ ").")
+        (quote (pkgNameString package) ++ " (" ++ show stage ++ ").")
         bin
         (dropWhileEnd isPunctuation synopsis)

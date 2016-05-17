@@ -98,7 +98,7 @@ generate :: FilePath -> Context -> Expr String -> Action ()
 generate file context expr = do
     contents <- interpretInContext context expr
     writeFileChanged file contents
-    putSuccess $ "| Successfully generated '" ++ file ++ "'."
+    putSuccess $ "| Successfully generated " ++ file ++ "."
 
 generatePackageCode :: Context -> Rules ()
 generatePackageCode context@(Context stage pkg _) =
@@ -157,7 +157,7 @@ generatePackageCode context@(Context stage pkg _) =
 
             when (pkg == runGhc) $ path -/- "Main.hs" %> \file -> do
                 copyFileChanged (pkgPath pkg -/- "runghc.hs") file
-                putSuccess $ "| Successfully generated '" ++ file ++ "'."
+                putSuccess $ "| Successfully generated " ++ file ++ "."
 
 copyRules :: Rules ()
 copyRules = do

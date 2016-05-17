@@ -39,10 +39,10 @@ flag f = do
         WithLibdw          -> "with-libdw"
         UseSystemFfi       -> "use-system-ffi"
     value <- askConfigWithDefault key . error
-        $ "\nFlag '" ++ key ++ "' not set in configuration files."
+        $ "\nFlag " ++ quote key ++ " not set in configuration files."
     unless (value == "YES" || value == "NO" || value == "") . error
-        $ "\nFlag '" ++ key ++ "' is set to '" ++ value
-        ++ "' instead of 'YES' or 'NO'."
+        $ "\nFlag " ++ quote key ++ " is set to " ++ quote value
+        ++ " instead of 'YES' or 'NO'."
     return $ value == "YES"
 
 getFlag :: Flag -> ReaderT a Action Bool

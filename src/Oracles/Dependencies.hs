@@ -23,8 +23,8 @@ dependencies path obj = do
            $ map (\obj' -> MaybeT $ askOracle $ DependenciesKey (depFile, obj'))
                  [obj, obj -<.> "o"]
     case res of
-        Nothing -> error $ "No dependencies found for '" ++ obj ++ "'."
-        Just [] -> error $ "Empty dependency list for '" ++ obj ++ "'."
+        Nothing -> error $ "No dependencies found for " ++ obj
+        Just [] -> error $ "Empty dependency list for " ++ obj
         Just (src:depFiles) -> return (src, depFiles)
 
 -- Oracle for 'path/dist/.dependencies' files

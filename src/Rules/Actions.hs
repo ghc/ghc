@@ -161,7 +161,7 @@ runBuilder builder args = do
 
 makeExecutable :: FilePath -> Action ()
 makeExecutable file = do
-    putBuild $ "| Make '" ++ file ++ "' executable."
+    putBuild $ "| Make " ++ quote file ++ " executable."
     quietly $ cmd "chmod +x " [file]
 
 -- | Print out information about the command being executed.

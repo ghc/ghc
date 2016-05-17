@@ -19,7 +19,7 @@ module Base (
 
     -- * Miscellaneous utilities
     minusOrd, intersectOrd, lookupAll, replaceEq, replaceSeparators, unifyPath,
-    (-/-), matchVersionedFilePath, putColoured
+    quote, (-/-), matchVersionedFilePath, putColoured
     ) where
 
 import Control.Applicative
@@ -70,6 +70,10 @@ replaceSeparators = replaceWhen isPathSeparator
 
 replaceWhen :: (a -> Bool) -> a -> [a] -> [a]
 replaceWhen p to = map (\from -> if p from then to else from)
+
+-- | Add single quotes around a String.
+quote :: String -> String
+quote s = "'" ++ s ++ "'"
 
 -- | Normalise a path and convert all path separators to @/@, even on Windows.
 unifyPath :: FilePath -> FilePath

@@ -68,7 +68,7 @@ buildPackageData context@Context {..} = do
                     , "DEP_EXTRA_LIBS = m"
                     , "CC_OPTS = " ++ unwords includes ]
             writeFileChanged mk contents
-            putSuccess $ "| Successfully generated '" ++ mk ++ "'."
+            putSuccess $ "| Successfully generated " ++ mk
 
         when (package == unlit) $ dataFile %> \mk -> do
             orderOnly $ generatedDependencies stage package
@@ -78,7 +78,7 @@ buildPackageData context@Context {..} = do
                     , "C_SRCS = unlit.c"
                     , "SYNOPSIS = Literate script filter." ]
             writeFileChanged mk contents
-            putSuccess $ "| Successfully generated '" ++ mk ++ "'."
+            putSuccess $ "| Successfully generated " ++ mk
 
         when (package == touchy) $ dataFile %> \mk -> do
             orderOnly $ generatedDependencies stage package
@@ -87,7 +87,7 @@ buildPackageData context@Context {..} = do
                     [ "PROGNAME = touchy"
                     , "C_SRCS = touchy.c" ]
             writeFileChanged mk contents
-            putSuccess $ "| Successfully generated '" ++ mk ++ "'."
+            putSuccess $ "| Successfully generated " ++ mk
 
         -- Bootstrapping `ghcCabal`: although `ghcCabal` is a proper cabal
         -- package, we cannot generate the corresponding `package-data.mk` file
@@ -101,7 +101,7 @@ buildPackageData context@Context {..} = do
                     , "SYNOPSIS = Bootstrapped ghc-cabal utility."
                     , "HS_SRC_DIRS = ." ]
             writeFileChanged mk contents
-            putSuccess $ "| Successfully generated '" ++ mk ++ "'."
+            putSuccess $ "| Successfully generated " ++ mk
 
         when (package == rts && stage == Stage1) $ do
             dataFile %> \mk -> do
@@ -128,7 +128,7 @@ buildPackageData context@Context {..} = do
                         , "CC_OPTS = " ++ unwords includes
                         , "COMPONENT_ID = rts" ]
                 writeFileChanged mk contents
-                putSuccess $ "| Successfully generated '" ++ mk ++ "'."
+                putSuccess $ "| Successfully generated " ++ mk
 
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:
 -- 1) Drop lines containing '$'

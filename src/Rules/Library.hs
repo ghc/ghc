@@ -53,7 +53,7 @@ buildPackageLibrary context@Context {..} = do
 
         synopsis <- interpretInContext context $ getPkgData Synopsis
         unless isLib0 . putSuccess $ renderLibrary
-            ("'" ++ pkgNameString package ++ "' (" ++ show stage ++ ", way "++ show way ++ ").")
+            (quote (pkgNameString package) ++ " (" ++ show stage ++ ", way " ++ show way ++ ").")
             a
             (dropWhileEnd isPunctuation synopsis)
 

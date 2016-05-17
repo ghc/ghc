@@ -11,7 +11,7 @@ newtype ConfigKey = ConfigKey String
 
 askConfig :: String -> Action String
 askConfig key = askConfigWithDefault key . error
-    $ "Cannot find key '" ++ key ++ "' in configuration files."
+    $ "Cannot find key " ++ quote key ++ " in configuration files."
 
 askConfigWithDefault :: String -> Action String -> Action String
 askConfigWithDefault key defaultAction = do
