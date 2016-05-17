@@ -127,6 +127,8 @@ ghc-prim
 
 -  Version number XXXXX (was 0.3.1.0)
 
+-  Added new ``isPinnedbyteArray#`` operation.
+
 haskell98
 ~~~~~~~~~
 

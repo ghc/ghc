@@ -391,6 +391,7 @@ wanteds os = concat
           ,structField Both "bdescr" "blocks"
           ,structField C    "bdescr" "gen_no"
           ,structField C    "bdescr" "link"
+          ,structField C    "bdescr" "flags"
 
           ,structSize C  "generation"
           ,structField C "generation" "n_new_large_words"

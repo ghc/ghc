@@ -1,4 +1,14 @@
+## 0.6.0.0
+
+- Shipped with GHC 8.2.1
+
+- Added to `GHC.Prim`:
+
+        isPinnedByteArray# :: MutableByteArray# s -> Int#
+
 ## 0.5.0.0
+
+- Shipped with GHC 8.0.1
 
 - `GHC.Classes`: new `class IP (a :: Symbol) b | a -> b`
 
