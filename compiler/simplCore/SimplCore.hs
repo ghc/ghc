@@ -51,6 +51,7 @@ import Module
 
 import Maybes
 import UniqSupply       ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
+import UniqFM
 import Outputable
 import Control.Monad
 import qualified GHC.LanguageExtensions as LangExt
@@ -901,7 +902,10 @@ shortOutIndirections binds
   where
     ind_env            = makeIndEnv binds
     -- These exported Ids are the subjects  of the indirection-elimination
-    exp_ids            = map fst $ varEnvElts ind_env
+    exp_ids            = map fst $ nonDetEltsUFM ind_env
+      -- It's OK to use nonDetEltsUFM here because we forget the ordering
+      -- by immediately converting to a set or check if all the elements
+      -- satisfy a predicate.
     exp_id_set         = mkVarSet exp_ids
     no_need_to_flatten = all (null . ruleInfoRules . idSpecialisation) exp_ids
     binds'             = concatMap zap binds
