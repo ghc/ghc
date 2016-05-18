@@ -30,8 +30,8 @@ import Var
 import Name
 import Avail
 import Module
-import UniqFM
 import FastString
+import FastStringEnv
 import IfaceType
 import UniqSupply
 import SrcLoc
@@ -259,7 +259,7 @@ initOrigNames names = foldl extendOrigNameCache emptyModuleEnv names
 tcIfaceLclId :: FastString -> IfL Id
 tcIfaceLclId occ
   = do  { lcl <- getLclEnv
-        ; case (lookupUFM (if_id_env lcl) occ) of
+        ; case (lookupFsEnv (if_id_env lcl) occ) of
             Just ty_var -> return ty_var
             Nothing     -> failIfM (text "Iface id out of scope: " <+> ppr occ)
         }
@@ -267,7 +267,7 @@ tcIfaceLclId occ
 extendIfaceIdEnv :: [Id] -> IfL a -> IfL a
 extendIfaceIdEnv ids thing_inside
   = do  { env <- getLclEnv
-        ; let { id_env' = addListToUFM (if_id_env env) pairs
+        ; let { id_env' = extendFsEnvList (if_id_env env) pairs
               ; pairs   = [(occNameFS (getOccName id), id) | id <- ids] }
         ; setLclEnv (env { if_id_env = id_env' }) thing_inside }
 
@@ -275,7 +275,7 @@ extendIfaceIdEnv ids thing_inside
 tcIfaceTyVar :: FastString -> IfL TyVar
 tcIfaceTyVar occ
   = do  { lcl <- getLclEnv
-        ; case (lookupUFM (if_tv_env lcl) occ) of
+        ; case (lookupFsEnv (if_tv_env lcl) occ) of
             Just ty_var -> return ty_var
             Nothing     -> failIfM (text "Iface type variable out of scope: " <+> ppr occ)
         }
@@ -283,20 +283,20 @@ tcIfaceTyVar occ
 lookupIfaceTyVar :: IfaceTvBndr -> IfL (Maybe TyVar)
 lookupIfaceTyVar (occ, _)
   = do  { lcl <- getLclEnv
-        ; return (lookupUFM (if_tv_env lcl) occ) }
+        ; return (lookupFsEnv (if_tv_env lcl) occ) }
 
 lookupIfaceVar :: IfaceBndr -> IfL (Maybe TyCoVar)
 lookupIfaceVar (IfaceIdBndr (occ, _))
   = do  { lcl <- getLclEnv
-        ; return (lookupUFM (if_id_env lcl) occ) }
+        ; return (lookupFsEnv (if_id_env lcl) occ) }
 lookupIfaceVar (IfaceTvBndr (occ, _))
   = do  { lcl <- getLclEnv
-        ; return (lookupUFM (if_tv_env lcl) occ) }
+        ; return (lookupFsEnv (if_tv_env lcl) occ) }
 
 extendIfaceTyVarEnv :: [TyVar] -> IfL a -> IfL a
 extendIfaceTyVarEnv tyvars thing_inside
   = do  { env <- getLclEnv
-        ; let { tv_env' = addListToUFM (if_tv_env env) pairs
+        ; let { tv_env' = extendFsEnvList (if_tv_env env) pairs
               ; pairs   = [(occNameFS (getOccName tv), tv) | tv <- tyvars] }
         ; setLclEnv (env { if_tv_env = tv_env' }) thing_inside }
 

@@ -42,7 +42,6 @@ import NameSet
 import Bag
 import Outputable
 import UniqSupply
-import UniqFM
 import DynFlags
 import StaticFlags
 import FastString
@@ -1459,8 +1458,8 @@ setLocalRdrEnv rdr_env thing_inside
 mkIfLclEnv :: Module -> SDoc -> IfLclEnv
 mkIfLclEnv mod loc = IfLclEnv { if_mod     = mod,
                                 if_loc     = loc,
-                                if_tv_env  = emptyUFM,
-                                if_id_env  = emptyUFM }
+                                if_tv_env  = emptyFsEnv,
+                                if_id_env  = emptyFsEnv }
 
 -- | Run an 'IfG' (top-level interface monad) computation inside an existing
 -- 'TcRn' (typecheck-renaming monad) computation by initializing an 'IfGblEnv'

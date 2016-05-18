@@ -283,8 +283,8 @@ data IfLclEnv
                 --      .hi file, or GHCi state, or ext core
                 -- plus which bit is currently being examined
 
-        if_tv_env  :: UniqFM TyVar,     -- Nested tyvar bindings
-        if_id_env  :: UniqFM Id         -- Nested id binding
+        if_tv_env  :: FastStringEnv TyVar,     -- Nested tyvar bindings
+        if_id_env  :: FastStringEnv Id         -- Nested id binding
     }
 
 {-
