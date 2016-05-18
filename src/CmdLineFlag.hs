@@ -1,35 +1,39 @@
 module CmdLineFlag (
     putCmdLineFlags, cmdFlags, cmdBuildHaddock, cmdFlavour, Flavour (..),
-    cmdProgressInfo, ProgressInfo (..), cmdSkipConfigure, cmdSplitObjects
+    cmdProgressColour, ProgressColour (..), cmdProgressInfo, ProgressInfo (..),
+    cmdSkipConfigure, cmdSplitObjects
     ) where
 
 import Data.IORef
 import Data.List.Extra
 import System.Console.GetOpt
-import System.IO.Unsafe (unsafePerformIO)
+import System.IO.Unsafe
 
 -- | 'CmdLineFlag.Untracked' is a collection of flags that can be passed via the
 -- command line. These flags are not tracked, that is they do not force any
 -- build rules to be rurun.
 data Untracked = Untracked
-    { buildHaddock  :: Bool
-    , flavour       :: Flavour
-    , progressInfo  :: ProgressInfo
-    , skipConfigure :: Bool
-    , splitObjects  :: Bool }
+    { buildHaddock   :: Bool
+    , flavour        :: Flavour
+    , progressColour :: ProgressColour
+    , progressInfo   :: ProgressInfo
+    , skipConfigure  :: Bool
+    , splitObjects   :: Bool }
     deriving (Eq, Show)
 
-data ProgressInfo = None | Brief | Normal | Unicorn deriving (Eq, Show)
-data Flavour      = Default | Quick deriving (Eq, Show)
+data Flavour        = Default | Quick deriving (Eq, Show)
+data ProgressColour = Never | Auto | Always deriving (Eq, Show)
+data ProgressInfo   = None | Brief | Normal | Unicorn deriving (Eq, Show)
 
 -- | Default values for 'CmdLineFlag.Untracked'.
 defaultUntracked :: Untracked
 defaultUntracked = Untracked
-    { buildHaddock  = False
-    , flavour       = Default
-    , progressInfo  = Normal
-    , skipConfigure = False
-    , splitObjects  = False }
+    { buildHaddock   = False
+    , flavour        = Default
+    , progressColour = Auto
+    , progressInfo   = Normal
+    , skipConfigure  = False
+    , splitObjects   = False }
 
 readBuildHaddock :: Either String (Untracked -> Untracked)
 readBuildHaddock = Right $ \flags -> flags { buildHaddock = True }
@@ -44,6 +48,18 @@ readFlavour ms =
     go _         = Nothing
     set :: Flavour -> Untracked -> Untracked
     set flag flags = flags { flavour = flag }
+
+readProgressColour :: Maybe String -> Either String (Untracked -> Untracked)
+readProgressColour ms =
+    maybe (Left "Cannot parse progress-colour") (Right . set) (go =<< lower <$> ms)
+  where
+    go :: String -> Maybe ProgressColour
+    go "never"   = Just Never
+    go "auto"    = Just Auto
+    go "always"  = Just Always
+    go _         = Nothing
+    set :: ProgressColour -> Untracked -> Untracked
+    set flag flags = flags { progressColour = flag }
 
 readProgressInfo :: Maybe String -> Either String (Untracked -> Untracked)
 readProgressInfo ms =
@@ -70,8 +86,10 @@ cmdFlags =
       "Build flavour (Default or Quick)."
     , Option [] ["haddock"] (NoArg readBuildHaddock)
       "Generate Haddock documentation."
+    , Option [] ["progress-colour"] (OptArg readProgressColour "MODE")
+      "Use colours in progress info (Never, Auto or Always)."
     , Option [] ["progress-info"] (OptArg readProgressInfo "STYLE")
-      "Progress info style (None, Brief, Normal, or Unicorn)."
+      "Progress info style (None, Brief, Normal or Unicorn)."
     , Option [] ["skip-configure"] (NoArg readSkipConfigure)
       "Skip the boot and configure scripts (if you want to run them manually)."
     , Option [] ["split-objects"] (NoArg readSplitObjects)
@@ -95,6 +113,9 @@ cmdBuildHaddock = buildHaddock getCmdLineFlags
 
 cmdFlavour :: Flavour
 cmdFlavour = flavour getCmdLineFlags
+
+cmdProgressColour :: ProgressColour
+cmdProgressColour = progressColour getCmdLineFlags
 
 cmdProgressInfo :: ProgressInfo
 cmdProgressInfo = progressInfo getCmdLineFlags

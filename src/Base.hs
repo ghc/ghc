@@ -38,6 +38,8 @@ import System.Console.ANSI
 import System.IO
 import System.Info
 
+import CmdLineFlag
+
 -- TODO: reexport Stage, etc.?
 
 -- | Hadrian lives in 'hadrianPath' directory of the GHC tree.
@@ -144,14 +146,19 @@ matchVersionedFilePath prefix suffix filePath =
 -- | A more colourful version of Shake's putNormal.
 putColoured :: ColorIntensity -> Color -> String -> Action ()
 putColoured intensity colour msg = do
-    liftIO $ set [SetColor Foreground intensity colour]
+    c <- useColour
+    when c . liftIO $ setSGR [SetColor Foreground intensity colour]
     putNormal msg
-    liftIO $ set []
-    liftIO $ hFlush stdout
-  where
-    set a = do
-        supported <- hSupportsANSI stdout
-        when (win || supported) $ setSGR a
-    -- An ugly hack to always try to print colours when on mingw and cygwin.
-    -- See: https://github.com/snowleopard/hadrian/pull/253
-    win = "mingw" `isPrefixOf` os || "cygwin" `isPrefixOf` os
+    when c . liftIO $ do
+        setSGR []
+        hFlush stdout
+
+useColour :: Action Bool
+useColour = case cmdProgressColour of
+    Never  -> return False
+    Always -> return True
+    Auto   -> do
+        supported <- liftIO $ hSupportsANSI stdout
+        -- An ugly hack to always try to print colours when on mingw and cygwin.
+        let windows = any (`isPrefixOf` os) ["mingw", "cygwin"]
+        return $ windows || supported
