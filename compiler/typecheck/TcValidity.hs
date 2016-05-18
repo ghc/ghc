@@ -349,7 +349,7 @@ checkValidType ctxt ty
                  _              -> panic "checkValidType"
                                           -- Can't happen; not used for *user* sigs
 
-       ; env <- tcInitOpenTidyEnv (tyCoVarsOfType ty)
+       ; env <- tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
 
         -- Check the internal validity of the type itself
        ; check_type env ctxt rank ty
@@ -371,7 +371,7 @@ checkValidType ctxt ty
 checkValidMonoType :: Type -> TcM ()
 -- Assumes arguemt is fully zonked
 checkValidMonoType ty
-  = do { env <- tcInitOpenTidyEnv (tyCoVarsOfType ty)
+  = do { env <- tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
        ; check_type env SigmaCtxt MustBeMonoType ty }
 
 check_kind :: TidyEnv -> UserTypeCtxt -> TcType -> TcM ()
@@ -471,7 +471,7 @@ kind system should check for uses of unlifted types.  So I've
 removed the check.  See Trac #11120 comment:19.
 
 check_lifted ty
-  = do { env <- tcInitOpenTidyEnv (tyCoVarsOfType ty)
+  = do { env <- tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
        ; checkTcM (not (isUnliftedType ty)) (unliftedArgErr env ty) }
 
 unliftedArgErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
@@ -707,7 +707,7 @@ applying the instance decl would show up two uses of ?x.  Trac #8912.
 checkValidTheta :: UserTypeCtxt -> ThetaType -> TcM ()
 -- Assumes arguemt is fully zonked
 checkValidTheta ctxt theta
-  = do { env <- tcInitOpenTidyEnv (tyCoVarsOfTypes theta)
+  = do { env <- tcInitOpenTidyEnv (tyCoVarsOfTypesList theta)
        ; addErrCtxtM (checkThetaCtxt ctxt theta) $
          check_valid_theta env ctxt theta }
 

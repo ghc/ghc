@@ -1,7 +1,7 @@
 
 tcfail001.hs:9:2: error:
     • Couldn't match expected type ‘[a]’
-                  with actual type ‘[t0] -> [t1]’
+                  with actual type ‘[t1] -> [t0]’
     • The equation(s) for ‘op’ have one argument,
       but its type ‘[a]’ has none
       In the instance declaration for ‘A [a]’
