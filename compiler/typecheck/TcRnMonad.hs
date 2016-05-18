@@ -1143,7 +1143,7 @@ tcInitTidyEnv
 
 -- | Get a 'TidyEnv' that includes mappings for all vars free in the given
 -- type. Useful when tidying open types.
-tcInitOpenTidyEnv :: TyCoVarSet -> TcM TidyEnv
+tcInitOpenTidyEnv :: [TyCoVar] -> TcM TidyEnv
 tcInitOpenTidyEnv tvs
   = do { env1 <- tcInitTidyEnv
        ; let env2 = tidyFreeTyCoVars env1 tvs

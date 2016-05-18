@@ -24,8 +24,8 @@ T2693.hs:19:15: error:
     • Relevant bindings include n :: a5 (bound at T2693.hs:19:7)
 
 T2693.hs:19:23: error:
-    • Couldn't match expected type ‘(a3, a5)’ with actual type ‘TFn a4’
-      The type variables ‘a4’, ‘a3’, ‘a5’ are ambiguous
+    • Couldn't match expected type ‘(a4, a5)’ with actual type ‘TFn a3’
+      The type variables ‘a3’, ‘a4’, ‘a5’ are ambiguous
     • In the first argument of ‘snd’, namely ‘x’
       In the second argument of ‘(+)’, namely ‘snd x’
       In the expression: fst x + snd x

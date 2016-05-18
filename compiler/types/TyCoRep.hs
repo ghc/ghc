@@ -3047,11 +3047,11 @@ tidyTyBinders :: TidyEnv -> [TyBinder] -> (TidyEnv, [TyBinder])
 tidyTyBinders = mapAccumL tidyTyBinder
 
 ---------------
-tidyFreeTyCoVars :: TidyEnv -> TyCoVarSet -> TidyEnv
+tidyFreeTyCoVars :: TidyEnv -> [TyCoVar] -> TidyEnv
 -- ^ Add the free 'TyVar's to the env in tidy form,
 -- so that we can tidy the type they are free in
 tidyFreeTyCoVars (full_occ_env, var_env) tyvars
-  = fst (tidyOpenTyCoVars (full_occ_env, var_env) (varSetElems tyvars))
+  = fst (tidyOpenTyCoVars (full_occ_env, var_env) tyvars)
 
         ---------------
 tidyOpenTyCoVars :: TidyEnv -> [TyCoVar] -> (TidyEnv, [TyCoVar])
@@ -3066,8 +3066,8 @@ tidyOpenTyCoVar env@(_, subst) tyvar
   = case lookupVarEnv subst tyvar of
         Just tyvar' -> (env, tyvar')              -- Already substituted
         Nothing     ->
-          let env' = tidyFreeTyCoVars env (tyCoVarsOfType (tyVarKind tyvar)) in
-          tidyTyCoVarBndr env' tyvar  -- Treat it as a binder
+          let env' = tidyFreeTyCoVars env (tyCoVarsOfTypeList (tyVarKind tyvar))
+          in tidyTyCoVarBndr env' tyvar  -- Treat it as a binder
 
 ---------------
 tidyTyVarOcc :: TidyEnv -> TyVar -> TyVar

@@ -173,10 +173,10 @@ report_unsolved mb_binds_var err_as_warn type_errors expr_holes type_holes wante
             -- If we are deferring we are going to need /all/ evidence around,
             -- including the evidence produced by unflattening (zonkWC)
        ; let tidy_env = tidyFreeTyCoVars env0 free_tvs
-             free_tvs = tyCoVarsOfWC wanted
+             free_tvs = tyCoVarsOfWCList wanted
 
        ; traceTc "reportUnsolved (after zonking and tidying):" $
-         vcat [ pprVarSet pprTvBndrs free_tvs
+         vcat [ pprTvBndrs free_tvs
               , ppr wanted ]
 
        ; warn_redundant <- woptM Opt_WarnRedundantConstraints
@@ -2558,7 +2558,7 @@ warnDefaulting wanteds default_ty
   = do { warn_default <- woptM Opt_WarnTypeDefaults
        ; env0 <- tcInitTidyEnv
        ; let tidy_env = tidyFreeTyCoVars env0 $
-                        foldr (unionVarSet . tyCoVarsOfCt) emptyVarSet wanteds
+                        tyCoVarsOfCtsList (listToBag wanteds)
              tidy_wanteds = map (tidyCt tidy_env) wanteds
              (loc, ppr_wanteds) = pprWithArising tidy_wanteds
              warn_msg =
@@ -2590,7 +2590,7 @@ solverDepthErrorTcS loc ty
   = setCtLocM loc $
     do { ty <- zonkTcType ty
        ; env0 <- tcInitTidyEnv
-       ; let tidy_env     = tidyFreeTyCoVars env0 (tyCoVarsOfType ty)
+       ; let tidy_env     = tidyFreeTyCoVars env0 (tyCoVarsOfTypeList ty)
              tidy_ty      = tidyType tidy_env ty
              msg
                = vcat [ text "Reduction stack overflow; size =" <+> ppr depth
