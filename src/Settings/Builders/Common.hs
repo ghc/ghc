@@ -25,7 +25,7 @@ cIncludeArgs = do
     mconcat [ arg $ "-I" ++ path
             , arg $ "-I" ++ path -/- "autogen"
             , append [ "-I" ++ pkgPath pkg -/- dir | dir <- incDirs ]
-            , append [ "-I" ++                 dir | dir <- depDirs ] ]
+            , append [ "-I" ++       unifyPath dir | dir <- depDirs ] ]
 
 ldArgs :: Args
 ldArgs = mempty

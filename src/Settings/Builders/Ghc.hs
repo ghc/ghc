@@ -44,8 +44,8 @@ ghcLinkArgs = builder (Ghc Link) ? do
                else return []
     libDirs <- getPkgDataList DepLibDirs
     mconcat [ arg "-no-auto-link-packages"
-            , append [ "-optl-l" ++ lib | lib <- libs ++ gmpLibs ]
-            , append [ "-optl-L" ++ dir | dir <- libDirs ] ]
+            , append [ "-optl-l" ++           lib | lib <- libs ++ gmpLibs ]
+            , append [ "-optl-L" ++ unifyPath dir | dir <- libDirs ] ]
 
 -- TODO: Add Touchy builder and use needBuilder.
 needTouchy :: ReaderT Target Action ()
