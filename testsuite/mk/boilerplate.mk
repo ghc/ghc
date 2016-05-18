@@ -244,7 +244,7 @@ $(ghc-config-mk) : $(TOP)/mk/ghc-config
 
 # Note: $(CLEANING) is not defined in the testsuite.
 ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
-include $(ghc-config-mk)
+-include $(ghc-config-mk)
 endif
 
 # Note [WayFlags]
