@@ -22,7 +22,7 @@ typedef struct hashtable HashTable; /* abstract */
 HashTable * allocHashTable    ( void );
 void        insertHashTable ( HashTable *table, StgWord key, const void *data );
 void *      lookupHashTable ( const HashTable *table, StgWord key );
-void *      removeHashTable ( HashTable *table, StgWord key, void *data );
+void *      removeHashTable ( HashTable *table, StgWord key, const void *data );
 
 int keyCountHashTable (HashTable *table);
 

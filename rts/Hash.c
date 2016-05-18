@@ -303,7 +303,7 @@ insertHashTable(HashTable *table, StgWord key, const void *data)
 }
 
 void *
-removeHashTable(HashTable *table, StgWord key, void *data)
+removeHashTable(HashTable *table, StgWord key, const void *data)
 {
     int bucket;
     int segment;
