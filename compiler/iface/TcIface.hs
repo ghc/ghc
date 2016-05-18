@@ -1277,7 +1277,7 @@ tcPragExpr name expr
   where
     doc = text "Unfolding of" <+> ppr name
 
-    get_in_scope :: IfL [Var] -- Totally disgusting; but just for linting
+    get_in_scope :: IfL VarSet -- Totally disgusting; but just for linting
     get_in_scope
         = do { (gbl_env, lcl_env) <- getEnvs
              ; rec_ids <- case if_rec_types gbl_env of
@@ -1285,9 +1285,14 @@ tcPragExpr name expr
                             Just (_, get_env) -> do
                                { type_env <- setLclEnv () get_env
                                ; return (typeEnvIds type_env) }
-             ; return (varEnvElts (if_tv_env lcl_env) ++
-                       varEnvElts (if_id_env lcl_env) ++
-                       rec_ids) }
+             ; return (bindingsVars (if_tv_env lcl_env) `unionVarSet`
+                       bindingsVars (if_id_env lcl_env) `unionVarSet`
+                       mkVarSet rec_ids) }
+
+    bindingsVars :: FastStringEnv Var -> VarSet
+    bindingsVars ufm = mkVarSet $ nonDetEltsUFM ufm
+      -- It's OK to use nonDetEltsUFM here because we immediately forget
+      -- the ordering by creating a set
 
 {-
 ************************************************************************
