@@ -6057,15 +6057,6 @@ instance for ``GMap`` is ::
 In this example, the declaration has only one variant. In general, it
 can be any number.
 
-When the name of a type argument of a data or newtype instance
-declaration doesn't matter, it can be replaced with an underscore
-(``_``). This is the same as writing a type variable with a unique name. ::
-
-    data family F a b :: *
-    data instance F Int _ = Int
-    -- Equivalent to
-    data instance F Int b = Int
-
 When the flag :ghc-flag:`-Wunused-type-patterns` is enabled, type
 variables that are mentioned in the patterns on the left hand side, but not
 used on the right hand side are reported. Variables that occur multiple times
@@ -6430,6 +6421,37 @@ the above mentioned paper for details.
 If the option :ghc-flag:`-XUndecidableInstances` is passed to the compiler, the
 above restrictions are not enforced and it is on the programmer to ensure
 termination of the normalisation of type families during type inference.
+
+.. _type-wildcards-lhs:
+
+Wildcards on the LHS of data and type family instances
+------------------------------------------------------
+
+When the name of a type argument of a data or type instance
+declaration doesn't matter, it can be replaced with an underscore
+(``_``). This is the same as writing a type variable with a unique name. ::
+
+    data family F a b :: *
+    data instance F Int _ = Int
+    -- Equivalent to  data instance F Int b = Int
+
+    type family T a :: *
+    type instance T (a,_) = a
+    -- Equivalent to  type instance T (a,b) = a
+
+This use of underscore for wildcard in a type pattern is exactly like
+pattern matching in the term language, but is rather different to the
+use of a underscore in a partial type signature (see :ref:`type-wildcards`).
+
+A type variable beginning with an underscore is not treated specially in a
+type or data instance declaration.  For example: ::
+
+   data instance F Bool _a = _a -> Int
+   -- Equivalent to  data instance F Bool a = a -> Int
+
+Contrast this with the special treatment of named wildcards in
+type signatures (:ref:`named-wildcards`).
+
 
 .. _assoc-decl:
 
@@ -9674,11 +9696,9 @@ Where can they occur?
 ---------------------
 
 Partial type signatures are allowed for bindings, pattern and expression
-signatures. In all other contexts, e.g. type class or type family
-declarations, they are disallowed. In the following example a wildcard
-is used in each of the three possible contexts. Extra-constraints
+signatures, except that extra-constraints
 wildcards are not supported in pattern or expression signatures.
-
+In the following example a wildcard is used in each of the three possible contexts.
 ::
 
     {-# LANGUAGE ScopedTypeVariables #-}
@@ -9686,10 +9706,16 @@ wildcards are not supported in pattern or expression signatures.
     foo (x :: _) = (x :: _)
     -- Inferred: forall w_. w_ -> w_
 
-Anonymous and named wildcards *can* occur in type or data instance
-declarations. However, these declarations are not partial type signatures
-and different rules apply. See :ref:`data-instance-declarations` for more
-details.
+Anonymous and named wildcards *can* occur on the left hand side of a
+type or data instance declaration;
+see :ref:`type-wildcards-lhs`.
+
+In all other contexts, type wildcards are disallowed, and a named wildcard is treated
+as an ordinary type variable.  For example: ::
+
+   class C _ where ...          -- Illegal
+   instance Eq (T _)            -- Illegal (currently; would actually make sense)
+   instance Eq _a => Eq (T _a)  -- Perfectly fine, same as  Eq a => Eq (T a)
 
 Partial type signatures can also be used in :ref:`template-haskell`
 splices.
