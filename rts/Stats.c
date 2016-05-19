@@ -299,7 +299,7 @@ stat_endGC (Capability *cap, gc_thread *gct,
                           slop   * sizeof(W_),
                           /* current loss due to fragmentation */
                           (mblocks_allocated * BLOCKS_PER_MBLOCK - n_alloc_blocks)
-                                 * BLOCK_SIZE_W * sizeof(W_),
+                                 * BLOCK_SIZE,
                           par_n_threads,
                           par_max_copied * sizeof(W_),
                           par_tot_copied * sizeof(W_));
@@ -355,7 +355,7 @@ stat_endGC (Capability *cap, gc_thread *gct,
                                  copied*sizeof(W_),
                                  par_max_copied * sizeof(W_),
                                  mblocks_allocated * BLOCKS_PER_MBLOCK
-                                   * BLOCK_SIZE_W * sizeof(W_),
+                                   * BLOCK_SIZE,
                                  slop   * sizeof(W_),
                                  TimeToNS(gc_sync_elapsed),
                                  TimeToNS(gc_elapsed),

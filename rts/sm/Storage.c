@@ -205,10 +205,10 @@ initStorage (void)
 
   traceEventHeapInfo(CAPSET_HEAP_DEFAULT,
                      RtsFlags.GcFlags.generations,
-                     RtsFlags.GcFlags.maxHeapSize * BLOCK_SIZE_W * sizeof(W_),
-                     RtsFlags.GcFlags.minAllocAreaSize * BLOCK_SIZE_W * sizeof(W_),
-                     MBLOCK_SIZE_W * sizeof(W_),
-                     BLOCK_SIZE_W  * sizeof(W_));
+                     RtsFlags.GcFlags.maxHeapSize * BLOCK_SIZE,
+                     RtsFlags.GcFlags.minAllocAreaSize * BLOCK_SIZE,
+                     MBLOCK_SIZE,
+                     BLOCK_SIZE);
 }
 
 void storageAddCapabilities (uint32_t from, uint32_t to)
