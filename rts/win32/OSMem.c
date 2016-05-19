@@ -246,7 +246,7 @@ static void decommitBlocks(char *addr, W_ nBytes)
     }
 }
 
-void osFreeMBlocks(char *addr, uint32_t n)
+void osFreeMBlocks(void *addr, uint32_t n)
 {
     W_ nBytes = (W_)n * MBLOCK_SIZE;
 

@@ -13,7 +13,7 @@
 
 void osMemInit(void);
 void *osGetMBlocks(uint32_t n);
-void osFreeMBlocks(char *addr, uint32_t n);
+void osFreeMBlocks(void *addr, uint32_t n);
 void osReleaseFreeMemory(void);
 void osFreeAllMBlocks(void);
 W_ getPageSize (void);

@@ -294,7 +294,7 @@ osGetMBlocks(uint32_t n)
   return ret;
 }
 
-void osFreeMBlocks(char *addr, uint32_t n)
+void osFreeMBlocks(void *addr, uint32_t n)
 {
     munmap(addr, n * MBLOCK_SIZE);
 }
