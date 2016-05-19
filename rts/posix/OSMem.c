@@ -39,11 +39,11 @@
 #include <sys/sysctl.h>
 #endif
 
-static caddr_t next_request = 0;
+static void *next_request = 0;
 
 void osMemInit(void)
 {
-    next_request = (caddr_t)RtsFlags.GcFlags.heapBase;
+    next_request = (void *)RtsFlags.GcFlags.heapBase;
 }
 
 /* -----------------------------------------------------------------------------
@@ -262,7 +262,7 @@ gen_map_mblocks (W_ size)
 void *
 osGetMBlocks(uint32_t n)
 {
-  caddr_t ret;
+  void *ret;
   W_ size = MBLOCK_SIZE * (W_)n;
 
   if (next_request == 0) {
@@ -289,7 +289,7 @@ osGetMBlocks(uint32_t n)
   }
   // Next time, we'll try to allocate right after the block we just got.
   // ToDo: check that we haven't already grabbed the memory at next_request
-  next_request = ret + size;
+  next_request = (char *)ret + size;
 
   return ret;
 }
