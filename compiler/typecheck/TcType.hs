@@ -1329,20 +1329,24 @@ tcSplitFunTy_maybe _                                    = Nothing
         --
         --      g = f () ()
 
-tcSplitFunTysN
-        :: TcRhoType
-        -> Arity                -- N: Number of desired args
-        -> ([TcSigmaType],      -- Arg types (N or fewer)
-            TcSigmaType)        -- The rest of the type
-
-tcSplitFunTysN ty n_args
-  | n_args == 0
-  = ([], ty)
-  | Just (arg,res) <- tcSplitFunTy_maybe ty
-  = case tcSplitFunTysN res (n_args - 1) of
-        (args, res) -> (arg:args, res)
-  | otherwise
-  = ([], ty)
+tcSplitFunTysN :: Arity                      -- N: Number of desired args
+               -> TcRhoType
+               -> Either Arity               -- Number of missing arrows
+                        ([TcSigmaType],      -- Arg types (N or fewer)
+                         TcSigmaType)        -- The rest of the type
+-- ^ Split off exactly the specified number argument types
+-- Returns
+--  (Left m) if there are 'm' missing arrows in the type
+--  (Right (tys,res)) if the type looks like t1 -> ... -> tn -> res
+tcSplitFunTysN n ty
+ | n == 0
+ = Right ([], ty)
+ | Just (arg,res) <- tcSplitFunTy_maybe ty
+ = case tcSplitFunTysN (n-1) res of
+     Left m            -> Left m
+     Right (args,body) -> Right (arg:args, body)
+ | otherwise
+ = Left n
 
 tcSplitFunTy :: Type -> (Type, Type)
 tcSplitFunTy  ty = expectJust "tcSplitFunTy" (tcSplitFunTy_maybe ty)

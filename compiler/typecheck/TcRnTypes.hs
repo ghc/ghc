@@ -1211,13 +1211,15 @@ data TcIdSigBndr   -- See Note [Complete and partial type signatures]
 
 data TcPatSynInfo
   = TPSI {
-        patsig_name       :: Name,
-        patsig_univ_bndrs :: [TcTyBinder],
-        patsig_req        :: TcThetaType,
-        patsig_ex_bndrs   :: [TcTyBinder],
-        patsig_prov       :: TcThetaType,
-        patsig_arg_tys    :: [TcSigmaType],
-        patsig_body_ty    :: TcSigmaType
+        patsig_name           :: Name,
+        patsig_implicit_bndrs :: [TyBinder],    -- Implicitly-bound kind vars (Invisible) and
+                                                -- implicitly-bound type vars (Specified)
+          -- See Note [The pattern-synonym signature splitting rule] in TcPatSyn
+        patsig_univ_bndrs     :: [TyVar],       -- Bound by explicit user forall
+        patsig_req            :: TcThetaType,
+        patsig_ex_bndrs       :: [TyVar],       -- Bound by explicit user forall
+        patsig_prov           :: TcThetaType,
+        patsig_body_ty        :: TcSigmaType
     }
 
 findScopedTyVars  -- See Note [Binding scoped type variables]

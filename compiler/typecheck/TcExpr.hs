@@ -621,7 +621,7 @@ tcExpr expr@(RecordCon { rcon_con_name = L loc con_name
               -- a shallow instantiation should really be enough for
               -- a data constructor.
         ; let arity = conLikeArity con_like
-              (arg_tys, actual_res_ty) = tcSplitFunTysN con_tau arity
+              Right (arg_tys, actual_res_ty) = tcSplitFunTysN arity con_tau
         ; case conLikeWrapId_maybe con_like of
                Nothing -> nonBidirectionalErr (conLikeName con_like)
                Just con_id -> do {

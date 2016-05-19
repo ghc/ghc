@@ -49,7 +49,7 @@ import Bag
 import Util
 import ErrUtils
 import FV
-import Control.Monad ( unless, zipWithM )
+import Control.Monad ( zipWithM )
 import Data.List( partition )
 
 #include "HsVersions.h"
@@ -65,16 +65,16 @@ Note [Pattern synonym signatures]
 Pattern synonym signatures are surprisingly tricky (see Trac #11224 for example).
 In general they look like this:
 
-   pattern P :: forall univ_tvs. req
-             => forall ex_tvs. prov
-             => arg1 -> .. -> argn -> body_ty
+   pattern P :: forall univ_tvs. req_theta
+             => forall ex_tvs. prov_theta
+             => arg1 -> .. -> argn -> res_ty
 
 For parsing and renaming we treat the signature as an ordinary LHsSigType.
 
 Once we get to type checking, we decompose it into its parts, in tcPatSynSig.
 
-* Note that 'forall univ_tvs' and 'req =>'
-        and 'forall ex_tvs'   and 'prov =>'
+* Note that 'forall univ_tvs' and 'req_theta =>'
+        and 'forall ex_tvs'   and 'prov_theta =>'
   are all optional.  We gather the pieces at the the top of tcPatSynSig
 
 * Initially the implicitly-bound tyvars (added by the renamer) include both
@@ -82,46 +82,71 @@ Once we get to type checking, we decompose it into its parts, in tcPatSynSig.
 
 * After we kind-check the pieces and convert to Types, we do kind generalisation.
 
-* Note [Splitting the implicit tyvars in a pattern synonym]
-  Now the tricky bit: we must split
-     the implicitly-bound variables, and
-     the kind-generalised variables
-  into universal and existential.  We do so as follows:
+Note [The pattern-synonym signature splitting rule]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Given a pattern signature, we must split
+     the kind-generalised variables, and
+     the implicitly-bound variables
+into universal and existential.  The rule is this
+(see discussion on Trac #11224):
 
-     Note [The pattern-synonym signature splitting rule]
-     the universals are the ones mentioned in
-          - univ_tvs (and the kinds thereof)
-          - req
-          - body_ty
-     the existentials are the rest
+     The universal tyvars are the ones mentioned in
+          - univ_tvs: the user-specified (forall'd) universals
+          - req_theta
+          - res_ty
+     The existential tyvars are all the rest
 
-* Moreover see Note
+For example
+
+   pattern P :: () => b -> T a
+   pattern P x = ...
+
+Here 'a' is universal, and 'b' is existential.  But there is a wrinkle:
+how do we split the arg_tys from req_ty?  Consider
+
+   pattern Q :: () => b -> S c -> T a
+   pattern Q x = ...
+
+This is an odd example because Q has only one syntactic argument, and
+so presumably is defined by a view pattern matching a function.  But
+it can happen (Trac #11977, #12108).
+
+We don't know Q's arity from the pattern signature, so we have to wait
+until we see the pattern declaration itself before deciding res_ty is,
+and hence which variables are existential and which are universal.
+
+And that in turn is why TcPatSynInfo has a separate field,
+patsig_implicit_bndrs, to capture the implicitly bound type variables,
+because we don't yet know how to split them up.
+
+It's a slight compromise, because it means we don't really know the
+pattern synonym's real signature until we see its declaration.  So,
+for example, in hs-boot file, we may need to think what to do...
+(eg don't have any implicitly-bound variables).
 -}
 
 tcPatSynSig :: Name -> LHsSigType Name -> TcM TcPatSynInfo
 tcPatSynSig name sig_ty
   | HsIB { hsib_vars = implicit_hs_tvs
          , hsib_body = hs_ty }  <- sig_ty
-  , (univ_hs_tvs, hs_req,  hs_ty1) <- splitLHsSigmaTy hs_ty
-  , (ex_hs_tvs,   hs_prov, hs_ty2) <- splitLHsSigmaTy hs_ty1
-  , (hs_arg_tys, hs_body_ty)       <- splitHsFunType  hs_ty2
-  = do { (implicit_tvs, (univ_tvs, req, ex_tvs, prov, arg_tys, body_ty))
+  , (univ_hs_tvs, hs_req,  hs_ty1)     <- splitLHsSigmaTy hs_ty
+  , (ex_hs_tvs,   hs_prov, hs_body_ty) <- splitLHsSigmaTy hs_ty1
+  = do { (implicit_tvs, (univ_tvs, req, ex_tvs, prov, body_ty))
            <- solveEqualities $
               tcImplicitTKBndrs implicit_hs_tvs $
               tcExplicitTKBndrs univ_hs_tvs  $ \ univ_tvs ->
               tcExplicitTKBndrs ex_hs_tvs    $ \ ex_tvs   ->
               do { req     <- tcHsContext hs_req
                  ; prov    <- tcHsContext hs_prov
-                 ; arg_tys <- mapM tcHsOpenType (hs_arg_tys :: [LHsType Name])
-                 -- A (literal) pattern can be unlifted;
-                 -- -- e.g. pattern Zero <- 0#   (Trac #12094)
                  ; body_ty <- tcHsOpenType hs_body_ty
+                     -- A (literal) pattern can be unlifted;
+                     -- e.g. pattern Zero <- 0#   (Trac #12094)
                  ; let bound_tvs
                          = unionVarSets [ allBoundVariabless req
                                         , allBoundVariabless prov
-                                        , allBoundVariabless (body_ty : arg_tys)
+                                        , allBoundVariables body_ty
                                         ]
-                 ; return ( (univ_tvs, req, ex_tvs, prov, arg_tys, body_ty)
+                 ; return ( (univ_tvs, req, ex_tvs, prov, body_ty)
                           , bound_tvs) }
 
        -- Kind generalisation
@@ -130,7 +155,6 @@ tcPatSynSig name sig_ty
                 mkFunTys req $
                 mkSpecForAllTys ex_tvs $
                 mkFunTys prov $
-                mkFunTys arg_tys $
                 body_ty
 
        -- These are /signatures/ so we zonk to squeeze out any kind
@@ -143,45 +167,24 @@ tcPatSynSig name sig_ty
        ; ex_tvs       <- mapM zonkTcTyCoVarBndr ex_tvs
        ; req          <- zonkTcTypes req
        ; prov         <- zonkTcTypes prov
-       ; arg_tys      <- zonkTcTypes arg_tys
        ; body_ty      <- zonkTcType  body_ty
 
-       -- Complain about:  pattern P :: () => forall x. x -> P x
-       -- The renamer thought it was fine, but the existential 'x'
-       -- should not appear in the result type
-       ; let bad_tvs = filter (`elemVarSet` tyCoVarsOfType body_ty) ex_tvs
-       ; unless (null bad_tvs) $ addErr $
-         hang (text "The result type" <+> quotes (ppr body_ty))
-            2 (text "mentions existential type variable" <> plural bad_tvs
-               <+> pprQuotedList bad_tvs)
-
-         -- Split [Splitting the implicit tyvars in a pattern synonym]
-       ; let univ_fvs = closeOverKinds $
-                        (tyCoVarsOfTypes (body_ty : req) `extendVarSetList` univ_tvs)
-             (extra_univ, extra_ex) = partition ((`elemVarSet` univ_fvs) .
-                                                 binderVar "tcPatSynSig") $
-                                      mkNamedBinders Invisible kvs ++
-                                      mkNamedBinders Specified implicit_tvs
        ; traceTc "tcTySig }" $
          vcat [ text "implicit_tvs" <+> ppr_tvs implicit_tvs
               , text "kvs" <+> ppr_tvs kvs
-              , text "extra_univ" <+> ppr extra_univ
               , text "univ_tvs" <+> ppr_tvs univ_tvs
               , text "req" <+> ppr req
-              , text "extra_ex" <+> ppr extra_ex
               , text "ex_tvs" <+> ppr_tvs ex_tvs
               , text "prov" <+> ppr prov
-              , text "arg_tys" <+> ppr arg_tys
               , text "body_ty" <+> ppr body_ty ]
        ; return (TPSI { patsig_name = name
-                      , patsig_univ_bndrs = extra_univ ++
-                                            mkNamedBinders Specified univ_tvs
-                      , patsig_req        = req
-                      , patsig_ex_bndrs   = extra_ex   ++
-                                            mkNamedBinders Specified ex_tvs
-                      , patsig_prov       = prov
-                      , patsig_arg_tys    = arg_tys
-                      , patsig_body_ty    = body_ty }) }
+                      , patsig_implicit_bndrs = mkNamedBinders Invisible kvs ++
+                                                mkNamedBinders Specified implicit_tvs
+                      , patsig_univ_bndrs     = univ_tvs
+                      , patsig_req            = req
+                      , patsig_ex_bndrs       = ex_tvs
+                      , patsig_prov           = prov
+                      , patsig_body_ty        = body_ty }) }
   where
 
 ppr_tvs :: [TyVar] -> SDoc
@@ -238,25 +241,43 @@ tcCheckPatSynDecl :: PatSynBind Name Name
                   -> TcM (LHsBinds Id, TcGblEnv)
 tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                          , psb_def = lpat, psb_dir = dir }
-                  TPSI{ patsig_univ_bndrs = univ_bndrs, patsig_prov = prov_theta
-                      , patsig_ex_bndrs   = ex_bndrs,   patsig_req  = req_theta
-                      , patsig_arg_tys    = arg_tys,    patsig_body_ty = pat_ty }
+                  TPSI{ patsig_implicit_bndrs = implicit_tvs
+                      , patsig_univ_bndrs = explicit_univ_tvs, patsig_prov = prov_theta
+                      , patsig_ex_bndrs   = explicit_ex_tvs,   patsig_req  = req_theta
+                      , patsig_body_ty    = sig_body_ty }
   = addPatSynCtxt lname $
     do { let decl_arity = length arg_names
-             ty_arity   = length arg_tys
              (arg_names, rec_fields, is_infix) = collectPatSynArgInfo details
 
-             univ_tvs   = map (binderVar "tcCheckPatSynDecl 1") univ_bndrs
-             ex_tvs     = map (binderVar "tcCheckPatSynDecl 2") ex_bndrs
-
        ; traceTc "tcCheckPatSynDecl" $
-         vcat [ ppr univ_bndrs, ppr req_theta, ppr ex_bndrs
-              , ppr prov_theta, ppr arg_tys, ppr pat_ty ]
-
-       ; checkTc (decl_arity == ty_arity)
-                 (wrongNumberOfParmsErr name decl_arity ty_arity)
+         vcat [ ppr implicit_tvs, ppr explicit_univ_tvs, ppr req_theta
+              , ppr explicit_ex_tvs, ppr prov_theta, ppr sig_body_ty ]
 
        ; tcCheckPatSynPat lpat
+
+       ; (arg_tys, pat_ty) <- case tcSplitFunTysN decl_arity sig_body_ty of
+                                 Right stuff  -> return stuff
+                                 Left missing -> wrongNumberOfParmsErr name decl_arity missing
+
+       -- Complain about:  pattern P :: () => forall x. x -> P x
+       -- The existential 'x' should not appear in the result type
+       -- Can't check this until we know P's arity
+       ; let bad_tvs = filter (`elemVarSet` tyCoVarsOfType pat_ty) explicit_ex_tvs
+       ; checkTc (null bad_tvs) $
+         hang (sep [ text "The result type of the signature for" <+> quotes (ppr name) <> comma
+                   , text "namely" <+> quotes (ppr pat_ty) ])
+            2 (text "mentions existential type variable" <> plural bad_tvs
+               <+> pprQuotedList bad_tvs)
+
+         -- See Note [The pattern-synonym signature splitting rule]
+       ; let get_tv = binderVar "tcCheckPatSynDecl"
+             univ_fvs = closeOverKinds $
+                        (tyCoVarsOfTypes (pat_ty : req_theta) `extendVarSetList` explicit_univ_tvs)
+             (extra_univ, extra_ex) = partition ((`elemVarSet` univ_fvs) . get_tv) implicit_tvs
+             univ_bndrs = extra_univ ++ mkNamedBinders Specified explicit_univ_tvs
+             ex_bndrs   = extra_ex   ++ mkNamedBinders Specified explicit_ex_tvs
+             univ_tvs   = map get_tv univ_bndrs
+             ex_tvs     = map get_tv ex_bndrs
 
        -- Right!  Let's check the pattern against the signature
        -- See Note [Checking against a pattern signature]
@@ -386,11 +407,12 @@ addPatSynCtxt (L loc name) thing_inside
                 <+> quotes (ppr name)) $
     thing_inside
 
-wrongNumberOfParmsErr :: Name -> Arity -> Arity -> SDoc
-wrongNumberOfParmsErr name decl_arity ty_arity
-  = hang (text "Pattern synonym" <+> quotes (ppr name) <+> ptext (sLit "has")
+wrongNumberOfParmsErr :: Name -> Arity -> Arity -> TcM a
+wrongNumberOfParmsErr name decl_arity missing
+  = failWithTc $
+    hang (text "Pattern synonym" <+> quotes (ppr name) <+> ptext (sLit "has")
           <+> speakNOf decl_arity (text "argument"))
-       2 (text "but its type signature has" <+> speakN ty_arity)
+       2 (text "but its type signature has" <+> int missing <+> text "fewer arrows")
 
 -------------------------
 -- Shared by both tcInferPatSyn and tcCheckPatSyn
@@ -700,11 +722,11 @@ tcPatSynBuilderBind sig_fun PSB{ psb_id = L loc name, psb_def = lpat
 get_builder_sig :: TcSigFun -> Name -> Id -> Bool -> TcM TcIdSigInfo
 get_builder_sig sig_fun name builder_id need_dummy_arg
   | Just (TcPatSynSig sig) <- sig_fun name
-  , TPSI { patsig_univ_bndrs = univ_bndrs
+  , TPSI { patsig_implicit_bndrs = implicit_bndrs
+         , patsig_univ_bndrs = univ_bndrs
          , patsig_req        = req
          , patsig_ex_bndrs   = ex_bndrs
          , patsig_prov       = prov
-         , patsig_arg_tys    = arg_tys
          , patsig_body_ty    = body_ty } <- sig
   = -- Constuct a TcIdSigInfo from a TcPatSynInfo
     -- This does unfortunately mean that we have to know how to
@@ -714,11 +736,10 @@ get_builder_sig sig_fun name builder_id need_dummy_arg
     -- the actual sigature, so this is really the Right Thing
     return (TISI { sig_bndr  = CompleteSig builder_id
                  , sig_skols = [ (tyVarName tv, tv)
-                               | bndr <- univ_bndrs ++ ex_bndrs
-                               , let tv = binderVar "get_builder_sig" bndr ]
+                               | tv <- map (binderVar "get_builder_sig") implicit_bndrs
+                                       ++ univ_bndrs ++ ex_bndrs ]
                  , sig_theta = req ++ prov
-                 , sig_tau   = add_void need_dummy_arg $
-                               mkFunTys arg_tys body_ty
+                 , sig_tau   = add_void need_dummy_arg body_ty
                  , sig_ctxt  = PatSynCtxt name
                  , sig_loc   = getSrcSpan name })
   | otherwise
