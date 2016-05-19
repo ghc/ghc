@@ -67,13 +67,12 @@ buildPackageGhciLibrary context@Context {..} = priority 2 $ do
             cSrcs <- cSources context
             hSrcs <- hSources context
 
+            eObjs <- extraObjects context
             let cObjs = map (objFile context) cSrcs
                 hObjs = [ path -/- src <.> osuf way | src <- hSrcs ]
-                gObjs = [ gmpObjects -/- "*.o" | package == integerGmp ]
-                objs  = cObjs ++ hObjs
-            when (package == integerGmp) $ orderOnly [gmpLibraryH]
+                objs  = cObjs ++ hObjs ++ eObjs
             need objs
-            build $ Target context Ld (objs ++ gObjs) [obj]
+            build $ Target context Ld objs [obj]
 
 -- TODO: Get rid of code duplication and simplify. See also src2dep.
 -- Given a 'Context' and a 'FilePath' to a source file, compute the 'FilePath'
