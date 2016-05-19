@@ -93,6 +93,8 @@ newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
 *                                                                      *
 ************************************************************************
 
+Note [Checking family instance consistency]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For any two family instance modules that we import directly or indirectly, we
 check whether the instances in the two modules are consistent, *unless* we can
 be certain that the instances of the two modules have already been checked for
@@ -143,6 +145,7 @@ listToSet :: [ModulePair] -> ModulePairSet
 listToSet l = Map.fromList (zip l (repeat ()))
 
 checkFamInstConsistency :: [Module] -> [Module] -> TcM ()
+-- See Note [Checking family instance consistency]
 checkFamInstConsistency famInstMods directlyImpMods
   = do { dflags     <- getDynFlags
        ; (eps, hpt) <- getEpsAndHpt
