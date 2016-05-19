@@ -1322,7 +1322,8 @@ mkLiftedPrimTyCon :: Name -> [TyBinder]
                   -> Kind   -- ^ /result/ kind
                   -> [Role] -> TyCon
 mkLiftedPrimTyCon name binders res_kind roles
-  = mkPrimTyCon' name binders res_kind roles False Nothing
+  = mkPrimTyCon' name binders res_kind roles False (Just rep_nm)
+  where rep_nm = mkPrelTyConRepName name
 
 mkPrimTyCon' :: Name -> [TyBinder]
              -> Kind    -- ^ /result/ kind
