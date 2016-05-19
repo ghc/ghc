@@ -71,6 +71,7 @@ buildPackageGhciLibrary context@Context {..} = priority 2 $ do
                 hObjs = [ path -/- src <.> osuf way | src <- hSrcs ]
                 gObjs = [ gmpObjects -/- "*.o" | package == integerGmp ]
                 objs  = cObjs ++ hObjs
+            when (package == integerGmp) $ orderOnly [gmpLibraryH]
             need objs
             build $ Target context Ld (objs ++ gObjs) [obj]
 
