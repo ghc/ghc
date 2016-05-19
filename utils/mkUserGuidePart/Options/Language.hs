@@ -637,6 +637,13 @@ languageOptions =
          , flagReverse = "-XNoStandaloneDeriving"
          , flagSince = "6.8.1"
          }
+  , flag { flagName = "-XStaticPointers"
+         , flagDescription =
+           "Enable :ref:`static pointers <static-pointers>`."
+         , flagType = DynamicFlag
+         , flagReverse = "-XNoStaticPointers"
+         , flagSince = "7.10.1"
+         }
   , flag { flagName = "-XStrictData"
          , flagDescription =
            "Enable :ref:`default strict datatype fields <strict-data>`."
