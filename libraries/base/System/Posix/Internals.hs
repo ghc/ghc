@@ -404,24 +404,24 @@ foreign import ccall unsafe "HsBase.h _dup2"
 foreign import ccall unsafe "HsBase.h _isatty"
    c_isatty :: CInt -> IO CInt
 
--- See Note: CSsize
+-- See Note: Windows types
 foreign import capi unsafe "HsBase.h _read"
-   c_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
+   c_read :: CInt -> Ptr Word8 -> CUInt -> IO CInt
 
--- See Note: CSsize
+-- See Note: Windows types
 foreign import capi safe "HsBase.h _read"
-   c_safe_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
+   c_safe_read :: CInt -> Ptr Word8 -> CUInt -> IO CInt
 
 foreign import ccall unsafe "HsBase.h _umask"
    c_umask :: CMode -> IO CMode
 
--- See Note: CSsize
+-- See Note: Windows types
 foreign import capi unsafe "HsBase.h _write"
-   c_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
+   c_write :: CInt -> Ptr Word8 -> CUInt -> IO CInt
 
--- See Note: CSsize
+-- See Note: Windows types
 foreign import capi safe "HsBase.h _write"
-   c_safe_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
+   c_safe_write :: CInt -> Ptr Word8 -> CUInt -> IO CInt
 
 foreign import ccall unsafe "HsBase.h _unlink"
    c_unlink :: CString -> IO CInt
@@ -462,22 +462,22 @@ foreign import ccall unsafe "HsBase.h dup2"
 foreign import ccall unsafe "HsBase.h isatty"
    c_isatty :: CInt -> IO CInt
 
--- See Note: CSsize
+-- See Note: Windows types
 foreign import capi unsafe "HsBase.h read"
    c_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
--- See Note: CSsize
+-- See Note: Windows types
 foreign import capi safe "HsBase.h read"
    c_safe_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
 foreign import ccall unsafe "HsBase.h umask"
    c_umask :: CMode -> IO CMode
 
--- See Note: CSsize
+-- See Note: Windows types
 foreign import capi unsafe "HsBase.h write"
    c_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
--- See Note: CSsize
+-- See Note: Windows types
 foreign import capi safe "HsBase.h write"
    c_safe_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
@@ -619,14 +619,13 @@ foreign import capi  unsafe "stdio.h value SEEK_SET" sEEK_SET :: CInt
 foreign import capi  unsafe "stdio.h value SEEK_END" sEEK_END :: CInt
 
 {-
-Note: CSsize
+Note: Windows types
 
-On Win64, ssize_t is 64 bit, but functions like read return 32 bit
-ints. The CAPI wrapper means the C compiler takes care of doing all
-the necessary casting.
-
-When using ccall instead, when the functions failed with -1, we thought
-they were returning with 4294967295, and so didn't throw an exception.
-This lead to a segfault in echo001(ghci).
+Windows' _read and _write have types that differ from POSIX. They take an
+unsigned int for lengh and return a signed int where POSIX uses size_t and
+ssize_t. Those are different on x86_64 and equivalent on x86. We import them
+with the types in Microsoft's documentation which means that c_read,
+c_safe_read, c_write and c_safe_write have different Haskell types depending on
+the OS.
 -}
 
