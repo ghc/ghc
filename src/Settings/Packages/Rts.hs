@@ -89,7 +89,8 @@ rtsPackageArgs = package rts ? do
             , input "//Evac_thr.c" ? arg "-funroll-loops"
 
             , input "//Evac_thr.c" ? append [ "-DPARALLEL_GC", "-Irts/sm" ]
-            , input "//Scav_thr.c" ? append [ "-DPARALLEL_GC", "-Irts/sm" ] ]
+            , input "//Scav_thr.c" ? append [ "-DPARALLEL_GC", "-Irts/sm" ]
+            ]
 
         , builder Ghc ? (arg "-Irts" <> includesArgs)
 
@@ -101,7 +102,8 @@ rtsPackageArgs = package rts ? do
           [ "-DTOP="             ++ show top
           , "-DFFI_INCLUDE_DIR=" ++ show ffiIncludeDir
           , "-DFFI_LIB_DIR="     ++ show ffiLibraryDir
-          , "-DFFI_LIB="         ++ show libffiName ] ]
+          , "-DFFI_LIB="         ++ show libffiName ]
+        ]
 
 
 -- # If we're compiling on windows, enforce that we only support XP+

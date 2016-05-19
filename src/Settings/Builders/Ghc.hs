@@ -5,7 +5,7 @@ import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Oracles.PackageData
-import Predicate hiding (way, stage)
+import Predicate
 import Settings
 import Settings.Builders.Common
 import Settings.Builders.GhcCabal
@@ -120,12 +120,11 @@ packageGhcArgs = do
         not0 <- notStage0
         unit <- getFlag SupportsThisUnitId
         return $ if not0 || unit then "-this-unit-id " else "-this-package-key "
-    mconcat
-        [ arg "-hide-all-packages"
-        , arg "-no-user-package-db"
-        , bootPackageDbArgs
-        , isLibrary pkg ? (arg $ thisArg ++ compId)
-        , append $ map ("-package-id " ++) pkgDepIds ]
+    mconcat [ arg "-hide-all-packages"
+            , arg "-no-user-package-db"
+            , bootPackageDbArgs
+            , isLibrary pkg ? (arg $ thisArg ++ compId)
+            , append $ map ("-package-id " ++) pkgDepIds ]
 
 -- TODO: Improve handling of "cabal_macros.h"
 includeGhcArgs :: Args

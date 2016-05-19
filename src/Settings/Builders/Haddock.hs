@@ -3,7 +3,6 @@ module Settings.Builders.Haddock (haddockBuilderArgs) where
 import Base
 import GHC
 import Oracles.PackageData
-import Package
 import Predicate
 import Settings
 import Settings.Builders.Ghc

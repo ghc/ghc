@@ -1,7 +1,6 @@
 module Settings.Builders.GhcPkg (ghcPkgBuilderArgs) where
 
 import Base
-import Builder
 import Predicate
 import Settings
 import Settings.Builders.GhcCabal
@@ -13,9 +12,7 @@ initPredicate :: Predicate
 initPredicate = orM $ map (output . packageDbDirectory) [Stage0 ..]
 
 initArgs :: Args
-initArgs = initPredicate ? do
-    mconcat [ arg "init"
-            , arg =<< getOutput ]
+initArgs = initPredicate ? mconcat [ arg "init", arg =<< getOutput ]
 
 -- TODO: move inplace-pkg-config to buildRootPath, see #113.
 updateArgs :: Args

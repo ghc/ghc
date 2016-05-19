@@ -5,11 +5,10 @@ module Settings.Builders.GhcCabal (
     ) where
 
 import Base
-import Builder
 import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
-import Predicate hiding (stage)
+import Predicate
 import Settings
 import Settings.Builders.Common
 
@@ -38,9 +37,7 @@ ghcCabalHsColourBuilderArgs :: Args
 ghcCabalHsColourBuilderArgs = builder GhcCabalHsColour ? do
     path <- getPackagePath
     dir  <- getContextDirectory
-    mconcat [ arg "hscolour"
-            , arg path
-            , arg dir ]
+    append [ "hscolour", path, dir ]
 
 -- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
 -- TODO: Need compiler_stage1_CONFIGURE_OPTS += --disable-library-for-ghci?

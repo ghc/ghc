@@ -9,7 +9,7 @@ import Settings.Builders.Common
 -- TODO: do we need to support `includes_CC_OPTS += -DDYNAMIC_BY_DEFAULT`?
 deriveConstantsBuilderArgs :: Args
 deriveConstantsBuilderArgs = builder DeriveConstants ? do
-    cFlags            <- fromDiffExpr includeCcArgs
+    cFlags                <- fromDiffExpr includeCcArgs
     [outputFile, tempDir] <- getOutputs
     mconcat
         [ output "//DerivedConstants.h"             ? arg "--gen-header"
@@ -29,12 +29,11 @@ deriveConstantsBuilderArgs = builder DeriveConstants ? do
 includeCcArgs :: Args
 includeCcArgs = do
     confCcArgs <- getSettingList $ ConfCcArgs Stage1
-    mconcat
-        [ cArgs
-        , cWarnings
-        , append confCcArgs
-        , flag GhcUnregisterised ? arg "-DUSE_MINIINTERPRETER"
-        , includesArgs
-        , arg "-Irts"
-        , notM ghcWithSMP ? arg "-DNOSMP"
-        , arg "-fcommon" ]
+    mconcat [ cArgs
+            , cWarnings
+            , append confCcArgs
+            , flag GhcUnregisterised ? arg "-DUSE_MINIINTERPRETER"
+            , includesArgs
+            , arg "-Irts"
+            , notM ghcWithSMP ? arg "-DNOSMP"
+            , arg "-fcommon" ]

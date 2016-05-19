@@ -13,4 +13,5 @@ ghcPackageArgs = package ghc ? do
               , arg "-no-hs-main" ]
 
             , builder GhcCabal ?
-              ghcWithInterpreter ? notStage0 ? arg "--flags=ghci" ]
+              ghcWithInterpreter ? notStage0 ? arg "--flags=ghci"
+            ]
