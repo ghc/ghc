@@ -1588,15 +1588,10 @@ static void read_debug_flags(const char* arg)
 
 #ifdef PROFILING
 // Parse a "-h" flag, returning whether the parse resulted in an error.
-static rtsBool read_heap_profiling_flag(const char *arg_in)
+static rtsBool read_heap_profiling_flag(const char *arg)
 {
     // Already parsed "-h"
 
-    // For historical reasons the parser here mutates the arguments.
-    // However, for sanity we want to guarantee const-correctness and parsing
-    // really ought to be an immutable operation. To avoid rewriting the parser
-    // we just operate on a temporary copy of the argument.
-    char *arg = strdup(arg_in);
     rtsBool error = rtsFalse;
     switch (arg[2]) {
     case '\0':
@@ -1703,7 +1698,6 @@ static rtsBool read_heap_profiling_flag(const char *arg_in)
         error = rtsTrue;
     }
 
-    free(arg);
     return error;
 }
 #endif
