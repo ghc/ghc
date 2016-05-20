@@ -1,13 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module GHC (
-    array, base, binary, bytestring, cabal, compiler, containers, compareSizes,
-    deepseq, deriveConstants, directory, dllSplit, filepath, genapply,
-    genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal, ghci, ghcPkg, ghcPrim,
-    ghcTags, ghcSplit, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin,
-    integerGmp, integerSimple, iservBin, libffi, mkUserGuidePart, parallel,
-    pretty, primitive, process, rts, runGhc, stm, templateHaskell, terminfo,
-    time, touchy, transformers, unlit, unix, win32, xhtml,
+    array, base, binary, bytestring, cabal, checkApiAnnotations, compiler,
+    containers, compareSizes, deepseq, deriveConstants, directory, dllSplit,
+    filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal, ghci,
+    ghcPkg, ghcPrim, ghcTags, ghcSplit, haddock, haskeline, hsc2hs, hoopl, hp2ps,
+    hpc, hpcBin, integerGmp, integerSimple, iservBin, libffi, mkUserGuidePart,
+    parallel, pretty, primitive, process, rts, runGhc, stm, templateHaskell,
+    terminfo, time, touchy, transformers, unlit, unix, win32, xhtml,
 
     defaultKnownPackages, programPath, contextDirectory, rtsContext
     ) where
@@ -24,66 +24,67 @@ import Stage
 -- be overridden in "Settings.User".
 defaultKnownPackages :: [Package]
 defaultKnownPackages =
-    [ array, base, binary, bytestring, cabal, compiler, containers, compareSizes
-    , deepseq, deriveConstants, directory, dllSplit, filepath, genapply
-    , genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal, ghci, ghcPkg, ghcPrim
-    , ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp
-    , integerSimple, iservBin, libffi, mkUserGuidePart, parallel, pretty
-    , primitive, process, rts, runGhc, stm, templateHaskell, terminfo, time
-    , touchy, transformers, unlit, unix, win32, xhtml ]
+    [ array, base, binary, bytestring, cabal, checkApiAnnotations, compiler
+    , containers, compareSizes, deepseq, deriveConstants, directory, dllSplit
+    , filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal, ghci
+    , ghcPkg, ghcPrim, ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps, hpc
+    , hpcBin, integerGmp, integerSimple, iservBin, libffi, mkUserGuidePart
+    , parallel, pretty, primitive, process, rts, runGhc, stm, templateHaskell
+    , terminfo, time, touchy, transformers, unlit, unix, win32, xhtml ]
 
 -- | Package definitions, see 'Package'.
-array           = library  "array"
-base            = library  "base"
-binary          = library  "binary"
-bytestring      = library  "bytestring"
-cabal           = library  "Cabal"          `setPath` "libraries/Cabal/Cabal"
-compiler        = topLevel "ghc"            `setPath` "compiler"
-containers      = library  "containers"
-compareSizes    = utility  "compareSizes"   `setPath` "utils/compare_sizes"
-deepseq         = library  "deepseq"
-deriveConstants = utility  "deriveConstants"
-directory       = library  "directory"
-dllSplit        = utility  "dll-split"
-filepath        = library  "filepath"
-genapply        = utility  "genapply"
-genprimopcode   = utility  "genprimopcode"
-ghc             = topLevel "ghc-bin"        `setPath` "ghc"   `setType` Program
-ghcBoot         = library  "ghc-boot"
-ghcBootTh       = library  "ghc-boot-th"
-ghcCabal        = utility  "ghc-cabal"
-ghci            = library  "ghci"
-ghcPkg          = utility  "ghc-pkg"
-ghcPrim         = library  "ghc-prim"
-ghcTags         = utility  "ghctags"
-haddock         = utility  "haddock"
-haskeline       = library  "haskeline"
-hsc2hs          = utility  "hsc2hs"
-hoopl           = library  "hoopl"
-hp2ps           = utility  "hp2ps"
-hpc             = library  "hpc"
-hpcBin          = utility  "hpc-bin"        `setPath` "utils/hpc"
-integerGmp      = library  "integer-gmp"
-integerSimple   = library  "integer-simple"
-iservBin        = topLevel "iserv-bin"      `setPath` "iserv" `setType` Program
-libffi          = topLevel "libffi"
-mkUserGuidePart = utility  "mkUserGuidePart"
-parallel        = library  "parallel"
-pretty          = library  "pretty"
-primitive       = library  "primitive"
-process         = library  "process"
-rts             = topLevel "rts"
-runGhc          = utility  "runghc"
-stm             = library  "stm"
-templateHaskell = library  "template-haskell"
-terminfo        = library  "terminfo"
-time            = library  "time"
-touchy          = utility  "touchy"
-transformers    = library  "transformers"
-unlit           = utility  "unlit"
-unix            = library  "unix"
-win32           = library  "Win32"
-xhtml           = library  "xhtml"
+array               = library  "array"
+base                = library  "base"
+binary              = library  "binary"
+bytestring          = library  "bytestring"
+cabal               = library  "Cabal"        `setPath` "libraries/Cabal/Cabal"
+checkApiAnnotations = utility  "check-api-annotations"
+compiler            = topLevel "ghc"          `setPath` "compiler"
+containers          = library  "containers"
+compareSizes        = utility  "compareSizes" `setPath` "utils/compare_sizes"
+deepseq             = library  "deepseq"
+deriveConstants     = utility  "deriveConstants"
+directory           = library  "directory"
+dllSplit            = utility  "dll-split"
+filepath            = library  "filepath"
+genapply            = utility  "genapply"
+genprimopcode       = utility  "genprimopcode"
+ghc                 = topLevel "ghc-bin"      `setPath` "ghc"   `setType` Program
+ghcBoot             = library  "ghc-boot"
+ghcBootTh           = library  "ghc-boot-th"
+ghcCabal            = utility  "ghc-cabal"
+ghci                = library  "ghci"
+ghcPkg              = utility  "ghc-pkg"
+ghcPrim             = library  "ghc-prim"
+ghcTags             = utility  "ghctags"
+haddock             = utility  "haddock"
+haskeline           = library  "haskeline"
+hsc2hs              = utility  "hsc2hs"
+hoopl               = library  "hoopl"
+hp2ps               = utility  "hp2ps"
+hpc                 = library  "hpc"
+hpcBin              = utility  "hpc-bin"      `setPath` "utils/hpc"
+integerGmp          = library  "integer-gmp"
+integerSimple       = library  "integer-simple"
+iservBin            = topLevel "iserv-bin"    `setPath` "iserv" `setType` Program
+libffi              = topLevel "libffi"
+mkUserGuidePart     = utility  "mkUserGuidePart"
+parallel            = library  "parallel"
+pretty              = library  "pretty"
+primitive           = library  "primitive"
+process             = library  "process"
+rts                 = topLevel "rts"
+runGhc              = utility  "runghc"
+stm                 = library  "stm"
+templateHaskell     = library  "template-haskell"
+terminfo            = library  "terminfo"
+time                = library  "time"
+touchy              = utility  "touchy"
+transformers        = library  "transformers"
+unlit               = utility  "unlit"
+unix                = library  "unix"
+win32               = library  "Win32"
+xhtml               = library  "xhtml"
 
 -- | ghc-split is a perl script used by GHC with @-split-objs@ flag. It is
 -- generated in "Rules.Generators.GhcSplit".
@@ -101,9 +102,9 @@ ghcSplit = "inplace/lib/bin/ghc-split"
 programPath :: Context -> Maybe FilePath
 programPath context@Context {..}
     | package == ghc = Just . inplaceProgram $ "ghc-stage" ++ show (fromEnum stage + 1)
-    | package `elem` [ghcTags, haddock, mkUserGuidePart] = case stage of
-        Stage2 -> Just . inplaceProgram $ pkgNameString package
-        _      -> Nothing
+    | package `elem` [checkApiAnnotations, ghcTags, haddock, mkUserGuidePart] =
+        case stage of Stage2 -> Just . inplaceProgram $ pkgNameString package
+                      _      -> Nothing
     | package `elem` [touchy, unlit] = case stage of
         Stage0 -> Just $ "inplace/lib/bin" -/- pkgNameString package <.> exe
         _      -> Nothing

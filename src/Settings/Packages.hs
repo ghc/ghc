@@ -43,7 +43,7 @@ packagesStage1 = mconcat
 -- in Stage2 and Stage3. Can we check this in compile time?
 packagesStage2 :: Packages
 packagesStage2 = mconcat
-    [ append [ghcTags, mkUserGuidePart]
+    [ append [checkApiAnnotations, ghcTags, mkUserGuidePart]
     , buildHaddock ? append [haddock] ]
 
 -- TODO: switch to Set Package as the order of packages should not matter?
