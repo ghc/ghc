@@ -82,6 +82,9 @@ is your friend in such cases.
 * `--split-objects`: generate split objects, which are switched off by default. Due to
 a GHC [bug][ghc-split-objs-bug], you need a full clean rebuild when using this flag.
 
+* `--verbose`: run Hadrian in verbose mode. In particular this prints diagnostic messages
+by Shake oracles.
+
 #### User settings
 
 The `make`-based build system uses `mk/build.mk` to specify user build settings. We
