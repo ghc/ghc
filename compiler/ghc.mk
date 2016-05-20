@@ -491,6 +491,7 @@ compiler_stage2_dll0_MODULES = \
 	Lexeme \
 	ListSetOps \
 	Literal \
+	LZ4 \
 	Maybes \
 	MkCore \
 	MkId \

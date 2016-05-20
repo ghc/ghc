@@ -129,6 +129,7 @@ Library
         parser/cutils.c
         ghci/keepCAFsForGHCi.c
         cbits/genSym.c
+        cbits/lz4.c
 
     hs-source-dirs:
         basicTypes
@@ -465,6 +466,7 @@ Library
         GraphPpr
         IOEnv
         ListSetOps
+        LZ4
         Maybes
         MonadUtils
         OrdList
