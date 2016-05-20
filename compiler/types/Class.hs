@@ -300,7 +300,7 @@ pprFundeps []  = empty
 pprFundeps fds = hsep (vbar : punctuate comma (map pprFunDep fds))
 
 pprFunDep :: Outputable a => FunDep a -> SDoc
-pprFunDep (us, vs) = hsep [interppSP us, text "->", interppSP vs]
+pprFunDep (us, vs) = hsep [interppSP us, arrow, interppSP vs]
 
 instance Data.Data Class where
     -- don't traverse?
