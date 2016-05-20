@@ -58,6 +58,11 @@ profiling, which speeds up builds by 3-4x).
 
 * `--haddock`: build Haddock documentation.
 
+* `--progress-colour=MODE`: choose whether to use colours when printing build progress
+info. There are three settings: `never` (do not use colours), `auto` (attempt to detect
+whether the console supports colours; this is the default setting), and `always` (use
+colours).
+
 * `--progress-info=STYLE`: choose how build progress info is printed. There are four
 settings: `none`, `brief` (one line per build command), `normal` (typically a box per
 build command; this is the default setting), and `unicorn` (when `normal` just won't do).
