@@ -529,11 +529,13 @@ unliftedCompare :: RdrName -> RdrName
                 -> LHsExpr RdrName
 -- Return (if a < b then lt else if a == b then eq else gt)
 unliftedCompare lt_op eq_op a_expr b_expr lt eq gt
-  = nlHsIf (genPrimOpApp a_expr lt_op b_expr) lt $
+  = nlHsIf (ascribeBool $ genPrimOpApp a_expr lt_op b_expr) lt $
                         -- Test (<) first, not (==), because the latter
                         -- is true less often, so putting it first would
                         -- mean more tests (dynamically)
-        nlHsIf (genPrimOpApp a_expr eq_op b_expr) eq gt
+        nlHsIf (ascribeBool $ genPrimOpApp a_expr eq_op b_expr) eq gt
+  where
+    ascribeBool e = nlExprWithTySig e (toLHsSigWcType boolTy)
 
 nlConWildPat :: DataCon -> LPat RdrName
 -- The pattern (K {})
@@ -2182,8 +2184,8 @@ gen_Newtype_binds loc cls inst_tvs cls_tys rhs_ty
         -- variables refer to the ones bound in the user_ty
         (_, _, tau_ty')  = tcSplitSigmaTy tau_ty
 
-    nlExprWithTySig :: LHsExpr RdrName -> LHsSigWcType RdrName -> LHsExpr RdrName
-    nlExprWithTySig e s = noLoc (ExprWithTySig e s)
+nlExprWithTySig :: LHsExpr RdrName -> LHsSigWcType RdrName -> LHsExpr RdrName
+nlExprWithTySig e s = noLoc (ExprWithTySig e s)
 
 {-
 ************************************************************************

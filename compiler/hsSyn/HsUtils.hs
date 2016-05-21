@@ -454,7 +454,12 @@ nlList   :: [LHsExpr RdrName] -> LHsExpr RdrName
 
 nlHsLam match          = noLoc (HsLam (mkMatchGroup Generated [match]))
 nlHsPar e              = noLoc (HsPar e)
-nlHsIf cond true false = noLoc (mkHsIf cond true false)
+
+-- Note [Rebindable nlHsIf]
+-- nlHsIf should generate if-expressions which are NOT subject to
+-- RebindableSyntax, so the first field of HsIf is Nothing. (#12080)
+nlHsIf cond true false = noLoc (HsIf Nothing cond true false)
+
 nlHsCase expr matches  = noLoc (HsCase expr (mkMatchGroup Generated matches))
 nlList exprs           = noLoc (ExplicitList placeHolderType Nothing exprs)
 
