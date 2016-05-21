@@ -1,10 +1,11 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Settings.Builders.GhcCabal (
     ghcCabalBuilderArgs, ghcCabalHsColourBuilderArgs, bootPackageDbArgs,
-    PackageDbKey (..), cppArgs, needDll0
+    PackageDbKey (..), cppArgs, buildDll0
     ) where
 
 import Base
+import Context
 import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
@@ -126,19 +127,18 @@ with b = specified b ? do
 withStaged :: (Stage -> Builder) -> Args
 withStaged sb = with . sb =<< getStage
 
-needDll0 :: Stage -> Package -> Action Bool
-needDll0 stage pkg = do
+buildDll0 :: Context -> Action Bool
+buildDll0 Context {..} = do
     windows <- windowsHost
-    return $ windows && pkg == compiler && stage == Stage1
+    return $ windows && stage == Stage1 && package == compiler
 
 -- This is a positional argument, hence:
 -- * if it is empty, we need to emit one empty string argument;
 -- * otherwise, we must collapse it into one space-separated string.
 dll0Args :: Args
 dll0Args = do
-    stage    <- getStage
-    pkg      <- getPackage
-    dll0     <- lift $ needDll0 stage pkg
+    context  <- getContext
+    dll0     <- lift $ buildDll0 context
     withGhci <- lift ghcWithInterpreter
     arg . unwords . concat $ [ modules     | dll0             ]
                           ++ [ ghciModules | dll0 && withGhci ] -- see #9552

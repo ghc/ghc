@@ -1,11 +1,8 @@
 {-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving #-}
-
 module Package (
     Package (..), PackageName (..), PackageType (..),
     -- * Queries
-    pkgNameString,
-    pkgCabalFile,
-    matchPackageNames,
+    pkgNameString, pkgCabalFile,
     -- * Helpers for constructing and using 'Package's
     setPath, topLevel, library, utility, setType, isLibrary, isProgram
     ) where
@@ -15,25 +12,24 @@ import GHC.Generics (Generic)
 
 import Base
 
--- | The name of a Cabal package
+-- | The name of a Cabal package.
 newtype PackageName = PackageName { fromPackageName :: String }
-    deriving (Eq, Ord, IsString, Generic, Binary, Hashable, Typeable, NFData)
+    deriving (Binary, Eq, Generic, Hashable, IsString, NFData, Ord, Typeable)
 
--- TODO: Make PackageType more precise, #12
+-- TODO: Make PackageType more precise, #12.
 -- TODO: Turn Program to Program FilePath thereby getting rid of programPath
--- | We regard packages as either being libraries or programs. This is
--- bit of a convenient lie as Cabal packages can be both, but it works
--- for now.
-data PackageType = Program | Library deriving Generic
+-- | We regard packages as either being libraries or programs. This is bit of a
+-- convenient lie as Cabal packages can be both, but it works for now.
+data PackageType = Library | Program deriving Generic
 
 data Package = Package
-    { pkgName :: PackageName -- ^ Examples: "ghc", "Cabal"
-    , pkgPath :: FilePath    -- ^ pkgPath is the path to the source code relative to the root.
-                             -- e.g. "compiler", "libraries/Cabal/Cabal"
-    , pkgType :: PackageType
+    { pkgName :: PackageName -- ^ Examples: "ghc", "Cabal".
+    , pkgPath :: FilePath    -- ^ pkgPath is the path to the source code relative
+                             -- to the root, e.g. "compiler", "libraries/Cabal/Cabal".
+    , pkgType :: PackageType -- ^ A library or a program.
     } deriving Generic
 
--- | Prettyprint Package name.
+-- | Prettyprint 'Package' name.
 pkgNameString :: Package -> String
 pkgNameString = fromPackageName . pkgName
 
@@ -81,12 +77,7 @@ instance Eq Package where
 instance Ord Package where
     compare = compare `on` pkgName
 
--- | Given a sorted list of packages and a sorted list of package names, returns
--- packages whose names appear in the list of names.
-matchPackageNames :: [Package] -> [PackageName] -> [Package]
-matchPackageNames = intersectOrd (\pkg name -> compare (pkgName pkg) name)
-
--- Instances for storing in the Shake database
+-- | Instances for storing in the Shake database.
 instance Binary Package
 instance Hashable Package where
     hashWithSalt salt = hashWithSalt salt . show

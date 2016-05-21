@@ -1,7 +1,6 @@
 module Oracles.Config.Flag (
-    Flag (..), flag, getFlag,
-    crossCompiling, platformSupportsSharedLibs, ghcWithSMP,
-    ghcWithNativeCodeGen, supportsSplitObjects
+    Flag (..), flag, getFlag, crossCompiling, platformSupportsSharedLibs,
+    ghcWithSMP, ghcWithNativeCodeGen, supportsSplitObjects
     ) where
 
 import Control.Monad.Trans.Reader

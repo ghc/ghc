@@ -86,9 +86,9 @@ gmpBuildInfoPath = pkgPath integerGmp -/- "integer-gmp.buildinfo"
 libffiBuildPath :: FilePath
 libffiBuildPath = buildRootPath -/- "stage1/libffi"
 
--- TODO: move to buildRootPath, see #113
--- StageN, N > 0, share the same packageDbDirectory
--- | Path to package database directory of a given 'Stage'.
+-- TODO: Move to buildRootPath, see #113.
+-- | Path to package database directory of a given 'Stage'. Note: StageN, N > 0,
+-- share the same packageDbDirectory.
 packageDbDirectory :: Stage -> FilePath
 packageDbDirectory Stage0 = buildRootPath -/- "stage0/bootstrapping.conf"
 packageDbDirectory _      = "inplace/lib/package.conf.d"

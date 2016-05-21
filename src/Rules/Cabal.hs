@@ -13,7 +13,7 @@ import Settings
 
 cabalRules :: Rules ()
 cabalRules = do
-    -- Cache boot package constraints (to be used in cabalArgs)
+    -- Cache boot package constraints (to be used in cabalArgs).
     bootPackageConstraints %> \out -> do
         bootPkgs <- interpretInContext (stageContext Stage0) getPackages
         let pkgs = filter (\p -> p /= compiler && isLibrary p) bootPkgs
@@ -26,11 +26,10 @@ cabalRules = do
             return $ name ++ " == " ++ version
         writeFileChanged out . unlines $ constraints
 
-    -- Cache package dependencies
+    -- Cache package dependencies.
     packageDependencies %> \out -> do
-        let pkgs = knownPackages \\ [hp2ps, libffi, touchy, unlit]
-        pkgDeps <- forM (sort pkgs) $ \pkg ->
-            if pkg == rts
+        pkgDeps <- forM (sort knownPackages) $ \pkg ->
+            if pkg `elem` [hp2ps, libffi, rts, touchy, unlit]
             then return $ pkgNameString pkg
             else do
                 need [pkgCabalFile pkg]

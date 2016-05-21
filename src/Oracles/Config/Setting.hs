@@ -1,7 +1,6 @@
 module Oracles.Config.Setting (
-    Setting (..), SettingList (..),
-    setting, settingList, getSetting, getSettingList,
-    anyTargetPlatform, anyTargetOs, anyTargetArch, anyHostOs,
+    Setting (..), SettingList (..), setting, settingList, getSetting,
+    getSettingList, anyTargetPlatform, anyTargetOs, anyTargetArch, anyHostOs,
     ghcWithInterpreter, ghcEnableTablesNextToCode, useLibFFIForAdjustors,
     ghcCanonVersion, cmdLineLengthLimit, iosHost, osxHost, windowsHost
     ) where
@@ -12,13 +11,12 @@ import Base
 import Oracles.Config
 import Stage
 
--- TODO: reduce the variety of similar flags (e.g. CPP and non-CPP versions).
--- Each Setting comes from the system.config file, e.g. 'target-os = mingw32'.
--- setting TargetOs looks up the config file and returns "mingw32".
---
--- SettingList is used for multiple string values separated by spaces, such
--- as 'gmp-include-dirs = a b'.
--- settingList GmpIncludeDirs therefore returns a list of strings ["a", "b"].
+-- TODO: Reduce the variety of similar flags (e.g. CPP and non-CPP versions).
+-- | Each 'Setting' comes from @system.config@ file, e.g. 'target-os = mingw32'.
+-- @setting TargetOs@ looks up the config file and returns "mingw32".
+-- 'SettingList' is used for multiple string values separated by spaces, such
+-- as @gmp-include-dirs = a b@.
+-- @settingList GmpIncludeDirs@ therefore returns a list of strings ["a", "b"].
 data Setting = BuildArch
              | BuildOs
              | BuildPlatform
@@ -150,7 +148,7 @@ ghcEnableTablesNextToCode = notM $ anyTargetArch ["ia64", "powerpc64", "powerpc6
 useLibFFIForAdjustors :: Action Bool
 useLibFFIForAdjustors = notM $ anyTargetArch ["i386", "x86_64"]
 
--- Canonicalised GHC version number, used for integer version comparisons. We
+-- | Canonicalised GHC version number, used for integer version comparisons. We
 -- expand GhcMinorVersion to two digits by adding a leading zero if necessary.
 ghcCanonVersion :: Action String
 ghcCanonVersion = do
@@ -159,7 +157,7 @@ ghcCanonVersion = do
     let leadingZero = [ '0' | length ghcMinorVersion == 1 ]
     return $ ghcMajorVersion ++ leadingZero ++ ghcMinorVersion
 
--- Command lines have limited size on Windows. Since Windows 7 the limit is
+-- | Command lines have limited size on Windows. Since Windows 7 the limit is
 -- 32768 characters (theoretically). In practice we use 31000 to leave some
 -- breathing space for the builder's path & name, auxiliary flags, and other
 -- overheads. Use this function to set limits for other OSs if necessary.
@@ -168,11 +166,10 @@ cmdLineLengthLimit = do
     windows <- windowsHost
     osx     <- osxHost
     return $ case (windows, osx) of
-        -- windows
+        -- Windows:
         (True, False) -> 31000
-        -- osx 262144 is ARG_MAX
-        -- yet when using `xargs` on osx this is reduced by over 20 000.
-        -- 200 000 seems like a sensible limit.
+        -- On Mac OSX ARG_MAX is 262144, yet when using @xargs@ on OSX this is
+        -- reduced by over 20 000. Hence, 200 000 seems like a sensible limit.
         (False, True) -> 200000
         -- On all other systems, we try this:
-        _             -> 4194304 -- Cabal needs a bit more than 2MB!
+        _             -> 4194304 -- Cabal library needs a bit more than 2MB!

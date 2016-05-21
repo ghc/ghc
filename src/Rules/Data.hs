@@ -5,7 +5,7 @@ import Context
 import Expression
 import GHC
 import Oracles.Config.Setting
-import Oracles.PackageDeps
+import Oracles.Dependencies
 import Rules.Actions
 import Rules.Generate
 import Rules.Libffi
@@ -13,7 +13,7 @@ import Settings
 import Settings.Builders.Common
 import Target
 
--- Build package-data.mk by using GhcCabal to process pkgCabal file
+-- | Build @package-data.mk@ by using ghc-cabal utility to process .cabal files.
 buildPackageData :: Context -> Rules ()
 buildPackageData context@Context {..} = do
     let cabalFile = pkgCabalFile package
@@ -23,25 +23,19 @@ buildPackageData context@Context {..} = do
         inTreeMk  = oldPath -/- takeFileName dataFile -- TODO: remove, #113
 
     inTreeMk %> \mk -> do
-        -- The first thing we do with any package is make sure all generated
-        -- dependencies are in place before proceeding.
+        -- Make sure all generated dependencies are in place before proceeding.
         orderOnly $ generatedDependencies stage package
 
-        -- GhcCabal may run the configure script, so we depend on it
+        -- GhcCabal may run the configure script, so we depend on it.
         whenM (doesFileExist $ configure <.> "ac") $ need [configure]
 
-        -- Before we configure a package its dependencies need to be registered
-        let depStage   = min stage Stage1 -- dependencies come from Stage0/1
-            depContext = vanillaContext depStage
-        deps <- packageDeps package
-        pkgs <- interpretInContext (depContext package) getPackages
-        let depPkgs = matchPackageNames (sort pkgs) deps
-        need =<< traverse (pkgConfFile . depContext) depPkgs
+        -- Before we configure a package its dependencies need to be registered.
+        need =<< mapM pkgConfFile =<< contextDependencies context
 
         need [cabalFile]
         build $ Target context GhcCabal [cabalFile] [mk]
 
-    -- TODO: get rid of this, see #113
+    -- TODO: Get rid of this, see #113.
     dataFile %> \mk -> do
         copyFile inTreeMk mk
         autogenFiles <- getDirectoryFiles (oldPath -/- "build") ["autogen/*"]
@@ -53,7 +47,7 @@ buildPackageData context@Context {..} = do
         copyFile (oldPath -/- haddockPrologue) (buildPath context -/- haddockPrologue)
         postProcessPackageData context mk
 
-    -- TODO: PROGNAME was $(CrossCompilePrefix)hp2ps
+    -- TODO: PROGNAME was $(CrossCompilePrefix)hp2ps.
     priority 2.0 $ do
         when (package == hp2ps) $ dataFile %> \mk -> do
             orderOnly $ generatedDependencies stage package
@@ -111,9 +105,8 @@ buildPackageData context@Context {..} = do
                 windows <- windowsHost
                 let prefix = fixKey (buildPath context) ++ "_"
                     dirs   = [ ".", "hooks", "sm", "eventlog" ]
-                          ++ [ "posix" | not windows ]
-                          ++ [ "win32" |     windows ]
-                -- TODO: adding cmm/S sources to C_SRCS is a hack; rethink after #18
+                          ++ [ if windows then "win32" else "posix" ]
+                -- TODO: Adding cmm/S sources to C_SRCS is a hack -- refactor.
                 cSrcs   <- map unifyPath <$>
                            getDirectoryFiles (pkgPath package) (map (-/- "*.c") dirs)
                 cmmSrcs <- getDirectoryFiles (pkgPath package) ["*.cmm"]
@@ -153,6 +146,6 @@ postProcessPackageData context@Context {..} file = fixFile file fixPackageData
         fixedPrefix = takeDirectory file ++ drop len prefix
         len         = length (pkgPath package -/- contextDirectory context)
 
--- TODO: remove, see #113
+-- TODO: Remove, see #113.
 fixKey :: String -> String
 fixKey = replaceSeparators '_'

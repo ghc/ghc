@@ -1,6 +1,5 @@
 module Rules.Generators.GhcPlatformH (generateGhcPlatformH) where
 
-import Base
 import Expression
 import Oracles.Config.Flag
 import Oracles.Config.Setting

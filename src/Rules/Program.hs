@@ -7,24 +7,24 @@ import Context
 import Expression
 import GHC
 import Oracles.Config.Setting
+import Oracles.Dependencies
 import Oracles.PackageData
 import Rules.Actions
 import Rules.Library
 import Rules.Wrappers.Ghc
 import Rules.Wrappers.GhcPkg
 import Settings
-import Settings.Builders.GhcCabal
 import Target
 
--- TODO: move to buildRootPath, see #113
--- Directory for wrapped binaries
+-- TODO: Move to buildRootPath, see #113.
+-- | Directory for wrapped binaries.
 programInplaceLibPath :: FilePath
 programInplaceLibPath = "inplace/lib/bin"
 
--- Wrapper is parameterised by the path to the wrapped binary
+-- | Wrapper is parameterised by the path to the wrapped binary.
 type Wrapper = FilePath -> Expr String
 
--- List of wrappers we build
+-- | List of wrappers we build.
 wrappers :: [(Context, Wrapper)]
 wrappers = [ (vanillaContext Stage0 ghc   , ghcWrapper   )
            , (vanillaContext Stage1 ghc   , ghcWrapper   )
@@ -54,7 +54,7 @@ buildProgram rs context@Context {..} = do
 
     matchWrapped ?> \bin -> buildBinary rs context bin
 
--- Replace programInplacePath with programInplaceLibPath in a given path
+-- | Replace 'programInplacePath' with 'programInplaceLibPath' in a given path.
 computeWrappedPath :: FilePath -> Maybe FilePath
 computeWrappedPath =
     fmap (programInplaceLibPath ++) . stripPrefix programInplacePath
@@ -70,35 +70,21 @@ buildWrapper context@Context {..} wrapper wrapperPath binPath = do
 -- TODO: Get rid of the Paths_hsc2hs.o hack.
 -- TODO: Do we need to consider other ways when building programs?
 buildBinary :: [(Resource, Int)] -> Context -> FilePath -> Action ()
-buildBinary rs context@(Context stage package _) bin = do
-    let path = buildPath context
-    cSrcs <- cSources context -- TODO: remove code duplication (Library.hs)
-    hSrcs <- hSources context
-    let cObjs = [ path -/- src -<.> osuf vanilla | src <- cSrcs   ]
-        hObjs = [ path -/- src  <.> osuf vanilla | src <- hSrcs   ]
-             ++ [ path -/- "Paths_hsc2hs.o"      | package == hsc2hs  ]
-             ++ [ path -/- "Paths_haddock.o"     | package == haddock ]
-        objs  = cObjs ++ hObjs
-    ways     <- interpretInContext context getLibraryWays
-    depNames <- interpretInContext context $ getPkgDataList TransitiveDepNames
-    let libStage   = min stage Stage1 -- libraries are built only in Stage0/1
-        libContext = vanillaContext libStage package
-    pkgs <- interpretInContext libContext getPackages
-    let deps = matchPackageNames (sort pkgs) (map PackageName $ sort depNames)
-    libs <- fmap concat . forM deps $ \dep -> do
-        let depContext = vanillaContext libStage dep
-        ghciFlag <- interpretInContext depContext $ getPkgData BuildGhciLib
-        libFiles <- fmap concat . forM ways $ \way -> do
-            libFile  <- pkgLibraryFile  $ Context libStage dep way
-            lib0File <- pkgLibraryFile0 $ Context libStage dep way
-            dll0     <- needDll0 libStage dep
-            return $ libFile : [ lib0File | dll0 ]
-        ghciLib <- pkgGhciLibraryFile $ vanillaContext libStage dep
-        return $ libFiles ++ [ ghciLib | ghciFlag == "YES" && stage == Stage1 ]
-    let binDeps = if package == ghcCabal && stage == Stage0
-                  then [ pkgPath package -/- src <.> "hs" | src <- hSrcs ]
-                  else objs
-    need $ binDeps ++ libs
+buildBinary rs context@Context {..} bin = do
+    hSrcs   <- hSources context
+    binDeps <- if stage == Stage0 && package == ghcCabal
+        then return [ pkgPath package -/- src <.> "hs" | src <- hSrcs ]
+        else do
+            ways <- interpretInContext context getLibraryWays
+            deps <- contextDependencies context
+            needContext [ dep { way = w } | dep <- deps, w <- ways ]
+            cSrcs <- cSources context -- TODO: Drop code duplication (Library.hs).
+            let path = buildPath context
+            return $ [ path -/- src -<.> osuf vanilla | src <- cSrcs       ]
+                  ++ [ path -/- src  <.> osuf vanilla | src <- hSrcs       ]
+                  ++ [ path -/- "Paths_hsc2hs.o"      | package == hsc2hs  ]
+                  ++ [ path -/- "Paths_haddock.o"     | package == haddock ]
+    need binDeps
     buildWithResources rs $ Target context (Ghc Link stage) binDeps [bin]
     synopsis <- interpretInContext context $ getPkgData Synopsis
     putSuccess $ renderProgram

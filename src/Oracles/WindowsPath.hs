@@ -9,12 +9,11 @@ import Base
 import Oracles.Config.Setting
 
 newtype WindowsPath = WindowsPath FilePath
-    deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
+    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
 
+-- | Path to the GHC source tree.
 topDirectory :: Action FilePath
-topDirectory = do
-    ghcSourcePath <- setting GhcSourcePath
-    fixAbsolutePathOnWindows ghcSourcePath
+topDirectory = fixAbsolutePathOnWindows =<< setting GhcSourcePath
 
 -- | Fix an absolute path on Windows:
 -- * "/c/" => "C:/"

@@ -6,7 +6,7 @@ import System.Directory
 import Base
 
 newtype LookupInPath = LookupInPath String
-    deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
+    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
 
 -- | Lookup an executable in @PATH@.
 lookupInPath :: FilePath -> Action FilePath

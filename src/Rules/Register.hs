@@ -21,7 +21,7 @@ registerPackage rs context@Context {..} = do
         -- This produces inplace-pkg-config. TODO: Add explicit tracking.
         need [pkgDataFile context]
 
-        -- Post-process inplace-pkg-config. TODO: remove, see #113, #148
+        -- Post-process inplace-pkg-config. TODO: remove, see #113, #148.
         let pkgConfig    = oldPath -/- "inplace-pkg-config"
             oldBuildPath = oldPath -/- "build"
             fixPkgConf   = unlines

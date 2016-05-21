@@ -1,6 +1,5 @@
 module Rules.Generators.VersionHs (generateVersionHs) where
 
-import Base
 import Expression
 import Oracles.Config.Setting
 import Rules.Generators.Common

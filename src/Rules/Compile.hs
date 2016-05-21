@@ -16,19 +16,26 @@ compilePackage rs context@Context {..} = do
 
     path <//> "*" <.> hibootsuf way %> \hiboot -> need [ hiboot -<.> obootsuf way ]
 
-    -- TODO: add dependencies for #include of .h and .hs-incl files (gcc -MM?)
+    -- TODO: Add dependencies for #include of .h and .hs-incl files (gcc -MM?).
     path <//> "*" <.> osuf way %> \obj -> do
-        (src, deps) <- dependencies path obj
+        (src, deps) <- fileDependencies context obj
         if ("//*.c" ?== src)
         then do
             need $ src : deps
             build $ Target context (Cc Compile stage) [src] [obj]
         else do
             need $ src : deps
+            needCompileDependencies context
             buildWithResources rs $ Target context (Ghc Compile stage) [src] [obj]
 
-    -- TODO: get rid of these special cases
+    -- TODO: Get rid of these special cases.
     path <//> "*" <.> obootsuf way %> \obj -> do
-        (src, deps) <- dependencies path obj
+        (src, deps) <- fileDependencies context obj
         need $ src : deps
+        needCompileDependencies context
         buildWithResources rs $ Target context (Ghc Compile stage) [src] [obj]
+
+needCompileDependencies :: Context -> Action ()
+needCompileDependencies context@Context {..} = do
+    when (isLibrary package) $ need =<< return <$> pkgConfFile context
+    needContext =<< contextDependencies context

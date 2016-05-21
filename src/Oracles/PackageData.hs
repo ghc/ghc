@@ -34,7 +34,7 @@ data PackageDataList = CcArgs             FilePath
                      | TransitiveDepNames FilePath
 
 newtype PackageDataKey = PackageDataKey (FilePath, String)
-    deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
+    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
 
 askPackageData :: FilePath -> String -> Action String
 askPackageData path key = do

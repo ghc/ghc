@@ -10,7 +10,7 @@ import Settings
 import Settings.Builders.Common
 import Settings.Builders.GhcCabal
 
--- TODO: add support for -dyno
+-- TODO: Add support for -dyno.
 -- $1/$2/build/%.$$($3_o-bootsuf) : $1/$4/%.hs-boot
 --     $$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@
 --     $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno
@@ -71,7 +71,7 @@ ghcMBuilderArgs = builder (Ghc FindDependencies) ? do
             , append $ concat [ ["-dep-suffix", wayPrefix w] | w <- ways ]
             , append =<< getInputs ]
 
--- This is included into ghcBuilderArgs, ghcMBuilderArgs and haddockBuilderArgs
+-- This is included into ghcBuilderArgs, ghcMBuilderArgs and haddockBuilderArgs.
 commonGhcArgs :: Args
 commonGhcArgs = do
     way     <- getWay
@@ -91,7 +91,7 @@ commonGhcArgs = do
             , arg "-stubdir" , arg path
             , arg "-rtsopts" ] -- TODO: ifeq "$(HC_VERSION_GE_6_13)" "YES"
 
--- TODO: do '-ticky' in all debug ways?
+-- TODO: Do '-ticky' in all debug ways?
 wayGhcArgs :: Args
 wayGhcArgs = do
     way <- getWay
@@ -105,16 +105,12 @@ wayGhcArgs = do
             , (way == debug || way == debugDynamic) ?
               append ["-ticky", "-DTICKY_TICKY"] ]
 
--- TODO: Improve handling of "-hide-all-packages"
+-- TODO: Improve handling of "-hide-all-packages".
 packageGhcArgs :: Args
 packageGhcArgs = do
-    context   <- getContext
     pkg       <- getPackage
     compId    <- getPkgData ComponentId
     pkgDepIds <- getPkgDataList DepIds
-    lift . when (isLibrary pkg) $ do
-        conf <- pkgConfFile context
-        need [conf]
     -- FIXME: Get rid of to-be-deprecated -this-package-key.
     thisArg <- do
         not0 <- notStage0
@@ -123,10 +119,10 @@ packageGhcArgs = do
     mconcat [ arg "-hide-all-packages"
             , arg "-no-user-package-db"
             , bootPackageDbArgs
-            , isLibrary pkg ? (arg $ thisArg ++ compId)
+            , isLibrary pkg ? arg (thisArg ++ compId)
             , append $ map ("-package-id " ++) pkgDepIds ]
 
--- TODO: Improve handling of "cabal_macros.h"
+-- TODO: Improve handling of "cabal_macros.h".
 includeGhcArgs :: Args
 includeGhcArgs = do
     pkg     <- getPackage
