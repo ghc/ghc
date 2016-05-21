@@ -28,7 +28,7 @@ cabalRules = do
 
     -- Cache package dependencies
     packageDependencies %> \out -> do
-        pkgs <- interpretInContext (stageContext Stage1) getPackages
+        let pkgs = knownPackages \\ [hp2ps, libffi, touchy, unlit]
         pkgDeps <- forM (sort pkgs) $ \pkg ->
             if pkg == rts
             then return $ pkgNameString pkg

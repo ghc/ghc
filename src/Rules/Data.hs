@@ -31,10 +31,12 @@ buildPackageData context@Context {..} = do
         whenM (doesFileExist $ configure <.> "ac") $ need [configure]
 
         -- Before we configure a package its dependencies need to be registered
+        let depStage   = min stage Stage1 -- dependencies come from Stage0/1
+            depContext = vanillaContext depStage
         deps <- packageDeps package
-        pkgs <- interpretInContext context getPackages
+        pkgs <- interpretInContext (depContext package) getPackages
         let depPkgs = matchPackageNames (sort pkgs) deps
-        need =<< traverse (pkgConfFile . vanillaContext stage) depPkgs
+        need =<< traverse (pkgConfFile . depContext) depPkgs
 
         need [cabalFile]
         build $ Target context GhcCabal [cabalFile] [mk]
