@@ -135,19 +135,19 @@ PrintTickyInfo(void)
         PC(INTAVG(tot_returns_of_new,tot_returns)));
 
 
-  fprintf(tf, "\nRET_NEW:         %11ld: ", RET_NEW_ctr);
+  fprintf(tf, "\nRET_NEW:         %11" FMT_Int ": ", RET_NEW_ctr);
   for (i = 0; i < TICKY_BIN_COUNT; i++) {
     fprintf(tf, "%5.1f%%", PC(INTAVG(RET_NEW_hst[i], RET_NEW_ctr)));
   }
   fprintf(tf, "\n");
 
-  fprintf(tf, "RET_OLD:         %11ld: ", RET_OLD_ctr);
+  fprintf(tf, "RET_OLD:         %11" FMT_Int ": ", RET_OLD_ctr);
   for (i = 0; i < TICKY_BIN_COUNT; i++) {
     fprintf(tf, "%5.1f%%", PC(INTAVG(RET_OLD_hst[i], RET_OLD_ctr)));
   }
   fprintf(tf, "\n");
 
-  fprintf(tf, "RET_UNBOXED_TUP: %11ld: ", RET_UNBOXED_TUP_ctr);
+  fprintf(tf, "RET_UNBOXED_TUP: %11" FMT_Int ": ", RET_UNBOXED_TUP_ctr);
   for (i = 0; i < TICKY_BIN_COUNT; i++) {
     fprintf(tf, "%5.1f%%", PC(INTAVG(RET_UNBOXED_TUP_hst[i],
                            RET_UNBOXED_TUP_ctr)));
@@ -311,7 +311,7 @@ PrintTickyInfo(void)
   PR_CTR(RET_UNBOXED_TUP_ctr);
 
 #define PR_HST_BINS(hst) for (i = 0; i < TICKY_BIN_COUNT; i++) \
-  { fprintf(tf,"%11ld " #hst "_%lu\n", hst[i], i); }
+  { fprintf(tf,"%11" FMT_Int " " #hst "_%lu\n", hst[i], i); }
 
   PR_HST_BINS(RET_NEW_hst);
   PR_HST_BINS(RET_OLD_hst);
