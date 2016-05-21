@@ -200,7 +200,7 @@ Language
    explicit export list in ``Bar``.
 
 -  GHC has grown a :ghc-flag:`-XUndecidableSuperClasses` language extension,
-   which relaxes GHC's recursive superclass check (see :ghc-ticket:`11318`).
+   which relaxes GHC's recursive superclass check (see :ghc-ticket:`10318`).
    This allows class definitions which have mutually recursive superclass
    constraints at the expense of potential non-termination in the solver.
 
