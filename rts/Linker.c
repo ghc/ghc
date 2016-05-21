@@ -4034,7 +4034,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
 
       if (kind != SECTIONKIND_OTHER && end >= start) {
           addSection(&sections[i], kind, SECTION_NOMEM, start, sz, 0, 0, 0);
-          addProddableBlock(oc, start, end - start + 1);
+          addProddableBlock(oc, start, sz);
       }
 
       stgFree(secname);
@@ -5756,7 +5756,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 
       IF_DEBUG(linker,debugBelch("Reloc: P = %p   S = %p   A = %p\n",
                                         (void*)P, (void*)S, (void*)A ));
-      /* checkProddableBlock ( oc, (void*)P ); */
+      checkProddableBlock(oc, (void*)P, sizeof(Elf_Word));
 
 #if defined(sparc_HOST_ARCH) || defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
       value = S + A;
