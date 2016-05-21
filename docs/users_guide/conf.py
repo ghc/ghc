@@ -66,6 +66,7 @@ latex_elements = {
     'utf8extra': '',
     'preamble': '''
 \usepackage{fontspec}
+\usepackage{makeidx}
 \setsansfont{DejaVu Sans}
 \setromanfont{DejaVu Serif}
 \setmonofont{DejaVu Sans Mono}
