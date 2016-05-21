@@ -405,4 +405,5 @@ test('T11809', normal, compile, ['-v0'])
 test('T11797', normal, compile, ['-v0 -dsuppress-uniques'])
 test('T11941', normal, compile_fail, ['-v0'])
 test('T11484', normal, compile, ['-v0'])
-test('T8761', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
+test('T8761', unless(ghc_dynamic(), expect_broken(12077)), compile,
+     ['-v0 -ddump-splices -dsuppress-uniques'])
