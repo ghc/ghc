@@ -20,8 +20,6 @@ description:    This library contains various bits shared between the @ghc@ and
 cabal-version:  >=1.10
 build-type:     Simple
 extra-source-files: changelog.md
-exposed:        False
--- Since this is re-exported by ghc-boot
 
 source-repository head
     type:     git
@@ -31,6 +29,9 @@ source-repository head
 Library
     default-language: Haskell2010
     other-extensions: DeriveGeneric
+
+    -- Since this is re-exported by ghc-boot
+    exposed: False
 
     exposed-modules:
             GHC.LanguageExtensions.Type
