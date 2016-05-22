@@ -50,7 +50,7 @@ contextDependencies context@Context {..} = do
 -- | Coarse-grain 'need': make sure given contexts are fully built.
 needContext :: [Context] -> Action ()
 needContext cs = do
-    libs <- fmap concat . forM cs $ \context -> do
+    libs <- concatForM cs $ \context -> do
         libFile  <- pkgLibraryFile     context
         lib0File <- pkgLibraryFile0    context
         lib0     <- buildDll0          context

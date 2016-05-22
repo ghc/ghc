@@ -36,7 +36,7 @@ buildPackageLibrary context@Context {..} = do
 
         split <- interpretInContext context splitObjects
         splitObjs <- if not split then return hObjs else -- TODO: make clearer!
-            fmap concat $ forM hSrcs $ \src -> do
+            concatForM hSrcs $ \src -> do
                 let splitPath = path -/- src ++ "_" ++ osuf way ++ "_split"
                 contents <- liftIO $ IO.getDirectoryContents splitPath
                 return . map (splitPath -/-)

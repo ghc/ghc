@@ -115,7 +115,7 @@ moduleFilesOracle = void $ do
         modules <- fmap sort . pkgDataList $ Modules path
         let dirs = (path -/- "autogen") : map (pkgPath package -/-) srcDirs
             modDirFiles = groupSort $ map decodeModule modules
-        result <- fmap concat . forM dirs $ \dir -> do
+        result <- concatForM dirs $ \dir -> do
             todo <- filterM (doesDirectoryExist . (dir -/-) . fst) modDirFiles
             forM todo $ \(mDir, mFiles) -> do
                 let fullDir = unifyPath $ dir -/- mDir
