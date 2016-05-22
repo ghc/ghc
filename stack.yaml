@@ -9,7 +9,7 @@ packages:
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
-- shake-0.15.6
+- extra-1.4.7
 
 # Override default flag values for local packages and extra-deps
 flags: {}
