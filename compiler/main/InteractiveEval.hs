@@ -246,7 +246,7 @@ runDeclsWithLocation source linenumber expr =
     setSession $ hsc_env { hsc_IC = ic }
     hsc_env <- getSession
     hsc_env' <- liftIO $ rttiEnvironment hsc_env
-    modifySession (\_ -> hsc_env')
+    setSession hsc_env'
     return $ filter (not . isDerivedOccName . nameOccName)
              -- For this filter, see Note [What to show to users]
            $ map getName tyThings
@@ -356,7 +356,7 @@ handleRunStatus step expr bindings final_ids status history
              , resumeHistoryIx = 0 }
            hsc_env2 = pushResume hsc_env1 resume
 
-         modifySession (\_ -> hsc_env2)
+         setSession hsc_env2
          return (ExecBreak names bp)
 
     -- Completed successfully
@@ -366,7 +366,7 @@ handleRunStatus step expr bindings final_ids status history
              final_names = map getName final_ids
          liftIO $ Linker.extendLinkEnv (zip final_names hvals)
          hsc_env' <- liftIO $ rttiEnvironment hsc_env{hsc_IC=final_ic}
-         modifySession (\_ -> hsc_env')
+         setSession hsc_env'
          return (ExecComplete (Right final_names) allocs)
 
     -- Completed with an exception
@@ -398,7 +398,7 @@ resumeExec canLogSpan step
             ic' = ic { ic_tythings = resume_tmp_te,
                        ic_rn_gbl_env = resume_rdr_env,
                        ic_resume   = rs }
-        modifySession (\_ -> hsc_env{ hsc_IC = ic' })
+        setSession hsc_env{ hsc_IC = ic' }
 
         -- remove any bindings created since the breakpoint from the
         -- linker's environment
@@ -455,7 +455,7 @@ moveHist fn = do
                 r' = r { resumeHistoryIx = new_ix }
                 ic' = ic { ic_resume = r':rs }
 
-            modifySession (\_ -> hsc_env1{ hsc_IC = ic' })
+            setSession hsc_env1{ hsc_IC = ic' }
 
             return (names, new_ix, span, decl)
 
@@ -634,7 +634,7 @@ abandon = do
    case resume of
       []    -> return False
       r:rs  -> do
-         modifySession $ \_ -> hsc_env{ hsc_IC = ic { ic_resume = rs } }
+         setSession hsc_env{ hsc_IC = ic { ic_resume = rs } }
          liftIO $ abandonStmt hsc_env (resumeContext r)
          return True
 
@@ -646,7 +646,7 @@ abandonAll = do
    case resume of
       []  -> return False
       rs  -> do
-         modifySession $ \_ -> hsc_env{ hsc_IC = ic { ic_resume = [] } }
+         setSession hsc_env{ hsc_IC = ic { ic_resume = [] } }
          liftIO $ mapM_ (abandonStmt hsc_env. resumeContext) rs
          return True
 
@@ -697,7 +697,7 @@ setContext imports
            Right all_env -> do {
        ; let old_ic         = hsc_IC hsc_env
              !final_rdr_env = all_env `icExtendGblRdrEnv` ic_tythings old_ic
-       ; modifySession $ \_ ->
+       ; setSession
          hsc_env{ hsc_IC = old_ic { ic_imports    = imports
                                   , ic_rn_gbl_env = final_rdr_env }}}}
   where

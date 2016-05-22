@@ -121,7 +121,7 @@ bindSuspensions t = do
           new_ic = extendInteractiveContextWithIds ictxt ids
       fhvs <- liftIO $ mapM (mkFinalizedHValue hsc_env <=< mkRemoteRef) hvals
       liftIO $ extendLinkEnv (zip names fhvs)
-      modifySession $ \_ -> hsc_env {hsc_IC = new_ic }
+      setSession hsc_env {hsc_IC = new_ic }
       return t'
      where
 

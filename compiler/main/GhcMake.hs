@@ -122,7 +122,7 @@ depanal excluded_mods allow_dup_roots = do
     mod_graphE <- liftIO $ downsweep hsc_env old_graph
                                      excluded_mods allow_dup_roots
     mod_graph <- reportImportErrors mod_graphE
-    modifySession $ \_ -> hsc_env { hsc_mod_graph = mod_graph }
+    setSession hsc_env { hsc_mod_graph = mod_graph }
     return mod_graph
 
 -- | Describes which modules of the module graph need to be loaded.
