@@ -95,17 +95,17 @@ PrintTickyInfo(void)
   fprintf(tf,"\nSTACK USAGE:\n"); /* NB: some bits are direction sensitive */
 
 
-  fprintf(tf,"\nENTERS: %ld  of which %ld (%.1f%%) direct to the entry code\n\t\t  [the rest indirected via Node's info ptr]\n",
+  fprintf(tf,"\nENTERS: %lu  of which %lu (%.1f%%) direct to the entry code\n\t\t  [the rest indirected via Node's info ptr]\n",
         tot_enters,
         jump_direct_enters,
         PC(INTAVG(jump_direct_enters,tot_enters)));
-  fprintf(tf,"%11ld (%5.1f%%) thunks\n",
+  fprintf(tf,"%11lu (%5.1f%%) thunks\n",
         tot_thk_enters,
         PC(INTAVG(tot_thk_enters,tot_enters)));
-  fprintf(tf,"%11ld (%5.1f%%) data values\n",
+  fprintf(tf, "%11lu (%5.1f%%) data values\n",
         tot_con_enters,
         PC(INTAVG(tot_con_enters,tot_enters)));
-  fprintf(tf,"%11ld (%5.1f%%) normal indirections\n",
+  fprintf(tf, "%11lu (%5.1f%%) normal indirections\n",
         tot_ind_enters,
         PC(INTAVG(tot_ind_enters,tot_enters)));
   fprintf(tf,"%11" FMT_Int " (%5.1f%%) permanent indirections\n",
@@ -113,9 +113,9 @@ PrintTickyInfo(void)
         PC(INTAVG(ENT_PERM_IND_ctr,tot_enters)));
 
 
-  fprintf(tf,"\nFUNCTION ENTRIES: %ld\n", tot_fun_direct_enters);
+  fprintf(tf, "\nFUNCTION ENTRIES: %lu\n", tot_fun_direct_enters);
 
-  fprintf(tf, "\nTAIL CALLS: %ld, of which %ld (%.lf%%) were to known functions\n",
+  fprintf(tf, "\nTAIL CALLS: %lu, of which %lu (%.lf%%) were to known functions\n",
           tot_tail_calls, tot_known_calls,
           PC(INTAVG(tot_known_calls,tot_tail_calls)));
 
@@ -129,8 +129,8 @@ PrintTickyInfo(void)
           SLOW_CALL_PAP_TOO_FEW_ctr, SLOW_CALL_PAP_CORRECT_ctr, SLOW_CALL_PAP_TOO_MANY_ctr);
   fprintf(tf, "\n");
 
-  fprintf(tf,"\nRETURNS: %ld\n", tot_returns);
-  fprintf(tf,"%11ld (%5.1f%%) from entering a new constructor\n\t\t  [the rest from entering an existing constructor]\n",
+  fprintf(tf, "\nRETURNS: %lu\n", tot_returns);
+  fprintf(tf, "%11lu (%5.1f%%) from entering a new constructor\n\t\t  [the rest from entering an existing constructor]\n",
         tot_returns_of_new,
         PC(INTAVG(tot_returns_of_new,tot_returns)));
 
@@ -167,12 +167,12 @@ PrintTickyInfo(void)
   }
 
   fprintf(tf,"\nUPDATES: %ld\n", tot_updates);
-  fprintf(tf,"%11ld (%5.1f%%) data values\n\t\t  [%" FMT_Int " in place, %" FMT_Int " allocated new space]\n",
+  fprintf(tf, "%11lu (%5.1f%%) data values\n\t\t  [%" FMT_Int " in place, %" FMT_Int " allocated new space]\n",
         con_updates,
         PC(INTAVG(con_updates,tot_updates)),
         UPD_CON_IN_PLACE_ctr, UPD_CON_IN_NEW_ctr);
 
-  fprintf(tf,"%11ld (%5.1f%%) partial applications\n\t\t  [%" FMT_Int " in place, %" FMT_Int " allocated new space]\n",
+  fprintf(tf, "%11lu (%5.1f%%) partial applications\n\t\t  [%" FMT_Int " in place, %" FMT_Int " allocated new space]\n",
         pap_updates,
         PC(INTAVG(pap_updates,tot_updates)),
         UPD_PAP_IN_PLACE_ctr, UPD_PAP_IN_NEW_ctr);
@@ -182,10 +182,10 @@ PrintTickyInfo(void)
         PC(INTAVG(UPD_SQUEEZED_ctr, tot_updates)));
 
   if (tot_gengc_updates != 0) {
-      fprintf(tf,"\nNEW GEN UPDATES: %9ld (%5.1f%%)\n",
+      fprintf(tf, "\nNEW GEN UPDATES: %9lu (%5.1f%%)\n",
               tot_new_updates,
               PC(INTAVG(tot_new_updates,tot_gengc_updates)));
-      fprintf(tf,"OLD GEN UPDATES: %9ld (%5.1f%%)\n",
+      fprintf(tf, "OLD GEN UPDATES: %9lu (%5.1f%%)\n",
               tot_old_updates,
               PC(INTAVG(tot_old_updates,tot_gengc_updates)));
   }
@@ -207,7 +207,7 @@ PrintTickyInfo(void)
     if (b) { fprintf(tf,"%11" FMT_Int " " #ctr "\n", ctr); } else { fprintf(tf,"%11" FMT_Int " " msg "\n", ctr); }
 
 #define PR_HST(hst,i) \
-  do { fprintf(tf,"%11ld " #hst "_" #i "\n", hst[i]); } while(0)
+  do { fprintf(tf,"%11" FMT_Int " " #hst "_" #i "\n", hst[i]); } while(0)
 
   ALLOC_HEAP_ctr = (StgInt)ALLOC_HEAP_ctr + (StgInt)ALLOC_RTS_ctr;
   ALLOC_HEAP_tot = (StgInt)ALLOC_HEAP_tot + (StgInt)ALLOC_RTS_tot;
