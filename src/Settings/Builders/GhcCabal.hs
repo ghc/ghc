@@ -114,7 +114,7 @@ withBuilderKey b = case b of
     Happy    -> "--with-happy="
     GhcPkg _ -> "--with-ghc-pkg="
     HsColour -> "--with-hscolour="
-    _        -> error "withBuilderKey: not supported builder"
+    _        -> error $ "withBuilderKey: not supported builder " ++ show b
 
 -- Expression 'with Alex' appends "--with-alex=/path/to/alex" and needs Alex.
 with :: Builder -> Args

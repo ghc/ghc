@@ -78,7 +78,7 @@ haskellSources context = do
     let autogen = buildPath context -/- "autogen"
     -- Generated source files live in buildPath and have extension "hs", except
     -- for GHC/Prim.hs that lives in autogen. TODO: fix the inconsistency?
-    let modFile ("GHC.Prim", _) = autogen -/- "GHC/Prim.hs"
+        modFile ("GHC.Prim", _) = autogen -/- "GHC/Prim.hs"
         modFile (m, Nothing   ) = generatedFile context m
         modFile (m, Just file )
             | takeExtension file `elem` haskellExtensions = file

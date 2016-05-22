@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances, LambdaCase #-}
 module Expression (
     -- * Expressions
     Expr, DiffExpr, fromDiffExpr,
@@ -207,8 +207,6 @@ getOutput = do
         "getOutput: exactly one output file expected in target " ++ show target
 
 getSingleton :: Expr [a] -> String -> Expr a
-getSingleton expr msg = do
-    xs <- expr
-    case xs of
-        [res] -> return res
-        _     -> error msg
+getSingleton expr msg = expr >>= \case
+    [res] -> return res
+    _     -> error msg

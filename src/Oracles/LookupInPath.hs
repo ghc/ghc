@@ -17,9 +17,7 @@ lookupInPath name
 lookupInPathOracle :: Rules ()
 lookupInPathOracle = void $
     addOracle $ \(LookupInPath name) -> do
-        maybePath <- liftIO $ findExecutable name
-        path <- case maybePath of
-            Just value -> return $ unifyPath value
-            Nothing    -> error $ "Cannot find executable '" ++ name ++ "'."
+        let unpack = fromMaybe . error $ "Cannot find executable " ++ quote name
+        path <- unifyPath <$> unpack <$> liftIO (findExecutable name)
         putLoud $ "Executable found: " ++ name ++ " => " ++ path
         return path

@@ -72,7 +72,7 @@ libffiRules = do
             createDirectory $ buildRootPath -/- stageString Stage0
 
             tarballs <- getDirectoryFiles "" ["libffi-tarballs/libffi*.tar.gz"]
-            tarball  <- case tarballs of
+            tarball  <- case tarballs of -- TODO: Drop code duplication.
                 [file] -> return $ unifyPath file
                 _      -> error $ "libffiRules: exactly one tarball expected"
                           ++ "(found: " ++ show tarballs ++ ")."

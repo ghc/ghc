@@ -22,7 +22,7 @@ import Stage
 data CompilerMode = Compile
                   | FindDependencies
                   | Link
-                  deriving (Show, Eq, Generic)
+                  deriving (Eq, Generic, Show)
 
 -- TODO: Do we really need HsCpp builder? Can't we use Cc instead?
 -- | A 'Builder' is an external command invoked in separate process using 'Shake.cmd'
@@ -57,7 +57,7 @@ data Builder = Alex
              | Ranlib
              | Tar
              | Unlit
-             deriving (Show, Eq, Generic)
+             deriving (Eq, Generic, Show)
 
 -- | Some builders are built by this very build system, in which case
 -- 'builderProvenance' returns the corresponding build 'Context' (which includes
@@ -93,7 +93,7 @@ isOptional = \case
     Objdump  -> True
     _        -> False
 
--- TODO: get rid of fromJust
+-- TODO: Get rid of fromJust.
 -- | Determine the location of a 'Builder'.
 builderPath :: Builder -> Action FilePath
 builderPath builder = case builderProvenance builder of
@@ -121,14 +121,14 @@ builderPath builder = case builderProvenance builder of
         _ -> error $ "Cannot determine builderPath for " ++ show builder
   where
     fromKey key = do
-        path <- askConfigWithDefault key . error $ "\nCannot find path to "
-            ++ quote key ++ " in system.config file. Did you skip configure?"
+        let unpack = fromMaybe . error $ "Cannot find path to builder "
+                ++ quote key ++ " in system.config file. Did you skip configure?"
+        path <- unpack <$> askConfig key
         if null path
         then do
-            if isOptional builder
-            then return ""
-            else error $ "Builder " ++ quote key ++ " is not specified in"
-                ++ " system.config file. Cannot proceed without it."
+            unless (isOptional builder) . error $ "Non optional builder "
+                ++ quote key ++ " is not specified in system.config file."
+            return "" -- TODO: Use a safe interface.
         else fixAbsolutePathOnWindows =<< lookupInPath path
 
 getBuilderPath :: Builder -> ReaderT a Action FilePath
@@ -141,6 +141,7 @@ builderEnvironment variable builder = do
     path <- builderPath builder
     return $ AddEnv variable path
 
+-- | Was the path to a given 'Builder' specified in configuration files?
 specified :: Builder -> Action Bool
 specified = fmap (not . null) . builderPath
 
@@ -152,7 +153,7 @@ needBuilder = \case
         path <- builderPath builder
         need [path]
 
--- Instances for storing in the Shake database
+-- | Instances for storing in the Shake database.
 instance Binary CompilerMode
 instance Hashable CompilerMode
 instance NFData CompilerMode

@@ -107,10 +107,8 @@ generatePackageCode context@(Context stage pkg _) =
         file <~ gen = generate file context gen
     in do
         generated ?> \file -> do
-            maybeValue <- findGenerator context file
-            (src, builder) <- case maybeValue of
-                Nothing    -> error $ "No generator for " ++ file ++ "."
-                Just value -> return value
+            let unpack = fromMaybe . error $ "No generator for " ++ file ++ "."
+            (src, builder) <- unpack <$> findGenerator context file
             need [src]
             build $ Target context builder [src] [file]
             let srcBoot = src -<.> "hs-boot"

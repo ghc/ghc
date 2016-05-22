@@ -41,18 +41,11 @@ newtype PkgDepsKey = PkgDepsKey String
 -- compute package dependencies we scan package cabal files, see "Rules.Cabal".
 contextDependencies :: Context -> Action [Context]
 contextDependencies context@Context {..} = do
-    maybeDeps <- askOracle . PkgDepsKey $ pkgNameString package
-    deps <- case maybeDeps of
-        Nothing -> error $ "Context dependencies not found for " ++ show context
-        Just ds -> return $ map PackageName ds
     let pkgContext = \pkg -> Context (min stage Stage1) pkg way
-    pkgs <- interpretInContext (pkgContext package) getPackages
-    return . map pkgContext $ matchPackageNames (sort pkgs) deps
-
--- | Given a sorted list of packages and a sorted list of package names, returns
--- packages whose names appear in the list of names.
-matchPackageNames :: [Package] -> [PackageName] -> [Package]
-matchPackageNames = intersectOrd (\pkg name -> compare (pkgName pkg) name)
+        unpack     = fromMaybe . error $ "No dependencies for " ++ show context
+    deps <- unpack <$> askOracle (PkgDepsKey $ pkgNameString package)
+    pkgs <- sort <$> interpretInContext (pkgContext package) getPackages
+    return . map pkgContext $ intersectOrd (compare . pkgNameString) pkgs deps
 
 -- | Coarse-grain 'need': make sure given contexts are fully built.
 needContext :: [Context] -> Action ()
@@ -71,14 +64,13 @@ needContext cs = do
 -- | Oracles for the package dependencies and 'path/dist/.dependencies' files.
 dependenciesOracles :: Rules ()
 dependenciesOracles = do
-    deps <- newCache $ \file -> do
-        putLoud $ "Reading dependencies from " ++ file ++ "..."
-        contents <- map words <$> readFileLines file
-        return . Map.fromList $ map (\(x:xs) -> (x, xs)) contents
+    deps <- newCache readDependencies
     void $ addOracle $ \(ObjDepsKey (file, obj)) -> Map.lookup obj <$> deps file
 
-    pkgDeps <- newCache $ \_ -> do
-        putLoud $ "Reading package dependencies..."
-        contents <- readFileLines packageDependencies
-        return $ Map.fromList [ (p, ps) | s <- contents, let p:ps = words s ]
+    pkgDeps <- newCache $ \_ -> readDependencies packageDependencies
     void $ addOracle $ \(PkgDepsKey pkg) -> Map.lookup pkg <$> pkgDeps ()
+  where
+    readDependencies file = do
+        putLoud $ "Reading dependencies from " ++ file ++ "..."
+        contents <- map words <$> readFileLines file
+        return $ Map.fromList [ (key, values) | (key:values) <- contents ]

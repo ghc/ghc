@@ -1,5 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Oracles.Config (askConfig, askConfigWithDefault, configOracle) where
+module Oracles.Config (askConfig, unsafeAskConfig, configOracle) where
 
 import qualified Data.HashMap.Strict as Map
 import Development.Shake.Config
@@ -9,23 +9,19 @@ import Base
 newtype ConfigKey = ConfigKey String
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
 
-askConfig :: String -> Action String
-askConfig key = askConfigWithDefault key . error
-    $ "Cannot find key " ++ quote key ++ " in configuration files."
+unsafeAskConfig :: String -> Action String
+unsafeAskConfig key = (fromMaybe $ error msg) <$> askConfig key
+  where
+    msg = "Key " ++ quote key ++ " not found in configuration files."
 
-askConfigWithDefault :: String -> Action String -> Action String
-askConfigWithDefault key defaultAction = do
-    maybeValue <- askOracle $ ConfigKey key
-    case maybeValue of
-        Just value -> return value
-        Nothing    -> defaultAction
+askConfig :: String -> Action (Maybe String)
+askConfig = askOracle . ConfigKey
 
 -- Oracle for configuration files
 configOracle :: Rules ()
-configOracle = do
+configOracle = void $ do
     cfg <- newCache $ \() -> do
         need [configFile]
         putLoud $ "Reading " ++ configFile ++ "..."
         liftIO $ readConfigFile configFile
-    _ <- addOracle $ \(ConfigKey key) -> Map.lookup key <$> cfg ()
-    return ()
+    addOracle $ \(ConfigKey key) -> Map.lookup key <$> cfg ()

@@ -25,23 +25,21 @@ data Flag = ArSupportsAtFile
 -- fragile, but some flags do behave like this, e.g. GccIsClang.
 flag :: Flag -> Action Bool
 flag f = do
-    key <- return $ case f of
-        ArSupportsAtFile   -> "ar-supports-at-file"
-        CrossCompiling     -> "cross-compiling"
-        GccIsClang         -> "gcc-is-clang"
-        GccLt46            -> "gcc-lt-46"
-        GhcUnregisterised  -> "ghc-unregisterised"
-        LeadingUnderscore  -> "leading-underscore"
-        SolarisBrokenShld  -> "solaris-broken-shld"
-        SplitObjectsBroken -> "split-objects-broken"
-        SupportsThisUnitId -> "supports-this-unit-id"
-        WithLibdw          -> "with-libdw"
-        UseSystemFfi       -> "use-system-ffi"
-    value <- askConfigWithDefault key . error
-        $ "\nFlag " ++ quote key ++ " not set in configuration files."
-    unless (value == "YES" || value == "NO" || value == "") . error
-        $ "\nFlag " ++ quote key ++ " is set to " ++ quote value
-        ++ " instead of 'YES' or 'NO'."
+    let key = case f of
+            ArSupportsAtFile   -> "ar-supports-at-file"
+            CrossCompiling     -> "cross-compiling"
+            GccIsClang         -> "gcc-is-clang"
+            GccLt46            -> "gcc-lt-46"
+            GhcUnregisterised  -> "ghc-unregisterised"
+            LeadingUnderscore  -> "leading-underscore"
+            SolarisBrokenShld  -> "solaris-broken-shld"
+            SplitObjectsBroken -> "split-objects-broken"
+            SupportsThisUnitId -> "supports-this-unit-id"
+            WithLibdw          -> "with-libdw"
+            UseSystemFfi       -> "use-system-ffi"
+    value <- unsafeAskConfig key
+    when (value `notElem` ["YES", "NO", ""]) . error $ "Configuration flag "
+        ++ quote (key ++ " = " ++ value) ++ "cannot be parsed."
     return $ value == "YES"
 
 getFlag :: Flag -> ReaderT a Action Bool

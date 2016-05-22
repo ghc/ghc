@@ -59,7 +59,7 @@ data SettingList = ConfCcArgs Stage
                  | HsCppArgs
 
 setting :: Setting -> Action String
-setting key = askConfig $ case key of
+setting key = unsafeAskConfig $ case key of
     BuildArch          -> "build-arch"
     BuildOs            -> "build-os"
     BuildPlatform      -> "build-platform"
@@ -96,7 +96,7 @@ setting key = askConfig $ case key of
     IconvLibDir        -> "iconv-lib-dir"
 
 settingList :: SettingList -> Action [String]
-settingList key = fmap words $ askConfig $ case key of
+settingList key = fmap words $ unsafeAskConfig $ case key of
     ConfCcArgs        stage -> "conf-cc-args-"         ++ stageString stage
     ConfCppArgs       stage -> "conf-cpp-args-"        ++ stageString stage
     ConfGccLinkerArgs stage -> "conf-gcc-linker-args-" ++ stageString stage

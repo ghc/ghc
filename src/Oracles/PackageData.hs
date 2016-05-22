@@ -38,10 +38,7 @@ askPackageData :: FilePath -> String -> Action String
 askPackageData path key = do
     let fullKey = replaceSeparators '_' $ path ++ "_" ++ key
         file    = path -/- "package-data.mk"
-    maybeValue <- askOracle $ PackageDataKey (file, fullKey)
-    case maybeValue of
-        Nothing    -> return ""
-        Just value -> return value
+    fromMaybe "" <$> askOracle (PackageDataKey (file, fullKey))
 
 -- | For each @PackageData path@ the file 'path/package-data.mk' contains a line
 -- of the form 'path_VERSION = 1.2.3.4'. @pkgData (PackageData path)@ is an
