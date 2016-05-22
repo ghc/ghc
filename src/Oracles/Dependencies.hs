@@ -24,8 +24,7 @@ fileDependencies :: Context -> FilePath -> Action (FilePath, [FilePath])
 fileDependencies context obj = do
     let path = buildPath context -/- ".dependencies"
     -- If no dependencies found, try to drop the way suffix (for *.c sources).
-    deps <- listToMaybe . catMaybes <$>
-            mapM (askOracle . ObjDepsKey . (,) path) [obj, obj -<.> "o"]
+    deps <- firstJustM (askOracle . ObjDepsKey . (,) path) [obj, obj -<.> "o"]
     case deps of
         Nothing -> error $ "No dependencies found for file " ++ obj
         Just [] -> error $ "No source file found for file " ++ obj
