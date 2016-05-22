@@ -7,10 +7,9 @@ import Foreign.Marshal.Alloc
 import GHC.IO.FD
 import System.Exit
 
--- HsBase includes WinSock on Windows, on POSIX we need to explicitly ask for
--- sockets.
-#include "HsBase.h"
-#ifndef _WIN32
+#ifdef _WIN32
+#include <winsock.h>
+#else
 #include <sys/socket.h>
 #endif
 
