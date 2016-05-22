@@ -36,7 +36,6 @@ import Control.Arrow (second)
 import Control.DeepSeq
 import Control.Monad
 import Data.Function (on)
-import qualified Data.Foldable as F
 
 import qualified Packages
 import qualified Module
@@ -50,7 +49,7 @@ import TcRnTypes
 import FastString (concatFS)
 import BasicTypes ( StringLiteral(..) )
 import qualified Outputable as O
-import HsDecls ( gadtDeclDetails,getConDetails )
+import HsDecls ( getConDetails )
 
 -- | Use a 'TypecheckedModule' to produce an 'Interface'.
 -- To do this, we need access to already processed modules in the topological
