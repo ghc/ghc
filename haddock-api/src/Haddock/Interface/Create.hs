@@ -783,8 +783,13 @@ extractDecl name mdl decl
   | otherwise  =
     case unLoc decl of
       TyClD d@ClassDecl {} ->
-        let matches = [ sig | sig <- tcdSigs d, name `elem` sigName sig,
-                        isTypeLSig sig ] -- TODO: document fixity
+        let matches = [ lsig
+                      | lsig <- tcdSigs d
+                      , ClassOpSig False _ _ <- pure $ unLoc lsig
+                        -- Note: exclude `default` declarations (see #505)
+                      , name `elem` sigName lsig
+                      ]
+            -- TODO: document fixity
         in case matches of
           [s0] -> let (n, tyvar_names) = (tcdName d, tyClDeclTyVars d)
                       L pos sig = addClassContext n tyvar_names s0
