@@ -14,7 +14,7 @@ module TcPatSyn ( tcPatSynSig, tcInferPatSynDecl, tcCheckPatSynDecl
 import HsSyn
 import TcPat
 import TcHsType( tcImplicitTKBndrs, tcExplicitTKBndrs
-               , tcHsContext, tcHsLiftedType, tcHsOpenType, kindGeneralize )
+               , tcHsContext, tcHsOpenType, kindGeneralize )
 import TcRnMonad
 import TcEnv
 import TcMType
@@ -117,7 +117,9 @@ tcPatSynSig name sig_ty
               do { req     <- tcHsContext hs_req
                  ; prov    <- tcHsContext hs_prov
                  ; arg_tys <- mapM tcHsOpenType (hs_arg_tys :: [LHsType Name])
-                 ; body_ty <- tcHsLiftedType hs_body_ty
+                 -- A (literal) pattern can be unlifted;
+                 -- -- e.g. pattern Zero <- 0#   (Trac #12094)
+                 ; body_ty <- tcHsOpenType hs_body_ty
                  ; let bound_tvs
                          = unionVarSets [ allBoundVariabless req
                                         , allBoundVariabless prov
