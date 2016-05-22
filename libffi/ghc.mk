@@ -111,7 +111,8 @@ $(libffi_STAMP_CONFIGURE): $(TOUCH_DEP)
 	"$(TOUCH_CMD)" $@
 
 $(libffi_STAMP_BUILD): $(libffi_STAMP_CONFIGURE) $(TOUCH_DEP)
-	$(MAKE) -C libffi/build MAKEFLAGS=
+	# Use 'sync' as a temporary solution for #11960 (parallelisation bug).
+	sync; $(MAKE) -C libffi/build MAKEFLAGS=
 	"$(TOUCH_CMD)" $@
 
 $(libffi_STAMP_INSTALL): $(libffi_STAMP_BUILD) $(TOUCH_DEP)
