@@ -8,9 +8,9 @@ import qualified System.Directory as IO
 import Base
 import Context
 import Expression
-import GHC
 import Oracles.PackageData
 import Rules.Actions
+import Rules.Gmp
 import Settings
 import Target
 
@@ -75,7 +75,7 @@ buildPackageGhciLibrary context@Context {..} = priority 2 $ do
             build $ Target context Ld objs [obj]
 
 -- TODO: Get rid of code duplication and simplify. See also src2dep.
--- Given a 'Context' and a 'FilePath' to a source file, compute the 'FilePath'
+-- | Given a 'Context' and a 'FilePath' to a source file, compute the 'FilePath'
 -- to its object file. For example, in Context Stage1 rts threaded:
 -- * "Task.c"                          -> "_build/stage1/rts/Task.thr_o"
 -- * "_build/stage1/rts/sm/Evac_thr.c" -> "_build/stage1/rts/sm/Evac_thr.thr_o"
@@ -90,12 +90,12 @@ cSources context = interpretInContext context $ getPkgDataList CSrcs
 hSources :: Context -> Action [FilePath]
 hSources context = do
     modules <- interpretInContext context $ getPkgDataList Modules
-    -- GHC.Prim is special: we do not build it
+    -- GHC.Prim is special: we do not build it.
     return . map (replaceEq '.' '/') . filter (/= "GHC.Prim") $ modules
 
 extraObjects :: Context -> Action [FilePath]
-extraObjects (Context _ package _)
-    | package == integerGmp = do
-        orderOnly [gmpLibraryH] -- TODO: move this dependency elsewhere, #113?
+extraObjects context
+    | context == gmpContext = do
+        need [gmpLibraryH] -- TODO: Move this dependency elsewhere, #113?
         map unifyPath <$> getDirectoryFiles "" [gmpObjects -/- "*.o"]
     | otherwise         = return []

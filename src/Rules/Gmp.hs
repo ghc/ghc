@@ -1,4 +1,4 @@
-module Rules.Gmp (gmpRules) where
+module Rules.Gmp (gmpRules, gmpContext) where
 
 import Base
 import Builder
