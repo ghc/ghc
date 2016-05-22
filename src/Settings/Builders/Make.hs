@@ -11,4 +11,4 @@ makeBuilderArgs = do
     mconcat
         [ builder (Make gmpBuildPath     ) ? append ["MAKEFLAGS=" ++ j]
         , builder (Make libffiBuildPath  ) ? append ["MAKEFLAGS=" ++ j, "install"]
-        , builder (Make "testsuite/tests") ? arg "fast" ]
+        , builder (Make "testsuite/tests") ? append ["THREADS=" ++ show threads, "fast"]  ]
