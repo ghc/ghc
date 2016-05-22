@@ -118,7 +118,7 @@ packageGhcArgs = do
         return $ if not0 || unit then "-this-unit-id " else "-this-package-key "
     mconcat [ arg "-hide-all-packages"
             , arg "-no-user-package-db"
-            , bootPackageDbArgs
+            , bootPackageDatabaseArgs
             , isLibrary pkg ? arg (thisArg ++ compId)
             , append $ map ("-package-id " ++) pkgDepIds ]
 

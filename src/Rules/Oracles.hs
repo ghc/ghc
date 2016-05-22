@@ -1,14 +1,14 @@
 module Rules.Oracles (oracleRules) where
 
 import Base
+import qualified Oracles.ArgsHash
 import qualified Oracles.Config
 import qualified Oracles.Dependencies
 import qualified Oracles.LookupInPath
-import qualified Oracles.PackageData
-import qualified Oracles.WindowsPath
-import qualified Oracles.ArgsHash
 import qualified Oracles.ModuleFiles
-import qualified Oracles.PackageDb
+import qualified Oracles.PackageData
+import qualified Oracles.PackageDatabase
+import qualified Oracles.WindowsPath
 
 oracleRules :: Rules ()
 oracleRules = do
@@ -18,5 +18,5 @@ oracleRules = do
     Oracles.LookupInPath.lookupInPathOracle
     Oracles.ModuleFiles.moduleFilesOracle
     Oracles.PackageData.packageDataOracle
-    Oracles.PackageDb.packageDbOracle
+    Oracles.PackageDatabase.packageDatabaseOracle
     Oracles.WindowsPath.windowsPathOracle

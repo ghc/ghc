@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Settings.Builders.GhcCabal (
-    ghcCabalBuilderArgs, ghcCabalHsColourBuilderArgs, bootPackageDbArgs,
-    PackageDbKey (..), cppArgs, buildDll0
+    ghcCabalBuilderArgs, ghcCabalHsColourBuilderArgs, bootPackageDatabaseArgs,
+    PackageDatabaseKey (..), cppArgs, buildDll0
     ) where
 
 import Base
@@ -23,7 +23,7 @@ ghcCabalBuilderArgs = builder GhcCabal ? do
             , dll0Args
             , withStaged $ Ghc Compile
             , withStaged GhcPkg
-            , bootPackageDbArgs
+            , bootPackageDatabaseArgs
             , libraryArgs
             , with HsColour
             , configureArgs
@@ -81,16 +81,16 @@ configureArgs = do
         , crossCompiling ? (conf "--host" $ argSetting TargetPlatformFull)
         , conf "--with-cc" $ argStagedBuilderPath (Cc Compile) ]
 
-newtype PackageDbKey = PackageDbKey Stage
-    deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
+newtype PackageDatabaseKey = PackageDatabaseKey Stage
+    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
 
-initialisePackageDb :: Stage -> Action ()
-initialisePackageDb stage = askOracle $ PackageDbKey stage
+initialisePackageDatabase :: Stage -> Action ()
+initialisePackageDatabase = askOracle . PackageDatabaseKey
 
-bootPackageDbArgs :: Args
-bootPackageDbArgs = do
+bootPackageDatabaseArgs :: Args
+bootPackageDatabaseArgs = do
     stage <- getStage
-    lift $ initialisePackageDb stage
+    lift $ initialisePackageDatabase stage
     stage0 ? do
         path   <- getTopDirectory
         prefix <- ifM (builder Ghc) (return "-package-db ") (return "--package-db=")

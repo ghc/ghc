@@ -1,4 +1,4 @@
-module Oracles.PackageDb (packageDbOracle) where
+module Oracles.PackageDatabase (packageDatabaseOracle) where
 
 import qualified System.Directory as IO
 
@@ -12,9 +12,9 @@ import Settings.Paths
 import Settings.User
 import Target
 
-packageDbOracle :: Rules ()
-packageDbOracle = void $
-    addOracle $ \(PackageDbKey stage) -> do
+packageDatabaseOracle :: Rules ()
+packageDatabaseOracle = void $
+    addOracle $ \(PackageDatabaseKey stage) -> do
         let dir  = packageDbDirectory stage
             file = dir -/- "package.cache"
         unlessM (liftIO $ IO.doesFileExist file) $ do

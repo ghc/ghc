@@ -14,12 +14,12 @@ initPredicate = orM $ map (output . packageDbDirectory) [Stage0 ..]
 initArgs :: Args
 initArgs = initPredicate ? mconcat [ arg "init", arg =<< getOutput ]
 
--- TODO: move inplace-pkg-config to buildRootPath, see #113.
+-- TODO: Move inplace-pkg-config to buildRootPath, see #113.
 updateArgs :: Args
 updateArgs = notM initPredicate ? do
     pkg <- getPackage
     dir <- getContextDirectory
     mconcat [ arg "update"
             , arg "--force"
-            , bootPackageDbArgs
+            , bootPackageDatabaseArgs
             , arg $ pkgPath pkg -/- dir -/- "inplace-pkg-config" ]

@@ -32,7 +32,7 @@ executable hadrian
                        , Oracles.LookupInPath
                        , Oracles.ModuleFiles
                        , Oracles.PackageData
-                       , Oracles.PackageDb
+                       , Oracles.PackageDatabase
                        , Oracles.WindowsPath
                        , Package
                        , Predicate
