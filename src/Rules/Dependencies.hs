@@ -36,7 +36,7 @@ buildPackageDependencies rs context@Context {..} =
             cSrcs <- pkgDataList $ CSrcs path
             let cDepFiles = map (src2dep context) cSrcs
             need $ hDepFile : cDepFiles -- need all for more parallelism
-            cDeps <- fmap concat $ traverse readFile' cDepFiles
+            cDeps <- concatMapM readFile' cDepFiles
             hDeps <- readFile' hDepFile
             let result = unlines
                        . map (\(src, deps) -> unwords $ src : deps)

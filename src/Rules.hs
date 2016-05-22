@@ -45,7 +45,7 @@ topLevelTargets = do
                 if isLibrary pkg
                 then do -- build a library
                     ways <- interpretInContext context getLibraryWays
-                    libs <- traverse (pkgLibraryFile . Context stage pkg) ways
+                    libs <- mapM (pkgLibraryFile . Context stage pkg) ways
                     docs <- interpretInContext context buildHaddock
                     need $ libs ++ [ pkgHaddockFile context | docs && stage == Stage1 ]
                 else do -- otherwise build a program
