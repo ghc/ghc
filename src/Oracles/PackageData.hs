@@ -1,7 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Oracles.PackageData (
-    PackageData (..), PackageDataList (..),
-    pkgData, pkgDataList, packageDataOracle
+    PackageData (..), PackageDataList (..), pkgData, pkgDataList, packageDataOracle
     ) where
 
 import Development.Shake.Config
@@ -31,7 +30,6 @@ data PackageDataList = CcArgs             FilePath
                      | LdArgs             FilePath
                      | Modules            FilePath
                      | SrcDirs            FilePath
-                     | TransitiveDepNames FilePath
 
 newtype PackageDataKey = PackageDataKey (FilePath, String)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
@@ -77,16 +75,14 @@ pkgDataList packageData = fmap (map unquote . words) $ case packageData of
     LdArgs             path -> askPackageData path "LD_OPTS"
     Modules            path -> askPackageData path "MODULES"
     SrcDirs            path -> askPackageData path "HS_SRC_DIRS"
-    TransitiveDepNames path -> askPackageData path "TRANSITIVE_DEP_NAMES"
   where
     unquote = dropWhile (== '\'') . dropWhileEnd (== '\'')
 
 -- | Oracle for 'package-data.mk' files.
 packageDataOracle :: Rules ()
-packageDataOracle = do
+packageDataOracle = void $ do
     keys <- newCache $ \file -> do
         need [file]
         putLoud $ "Reading " ++ file ++ "..."
         liftIO $ readConfigFile file
-    _ <- addOracle $ \(PackageDataKey (file, key)) -> Map.lookup key <$> keys file
-    return ()
+    addOracle $ \(PackageDataKey (file, key)) -> Map.lookup key <$> keys file
