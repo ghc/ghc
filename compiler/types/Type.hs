@@ -25,8 +25,7 @@ module Type (
         splitAppTy_maybe, repSplitAppTy_maybe, tcRepSplitAppTy_maybe,
 
         mkFunTy, mkFunTys, splitFunTy, splitFunTy_maybe,
-        splitFunTys, splitFunTysN,
-        funResultTy, funArgTy,
+        splitFunTys, funResultTy, funArgTy,
 
         mkTyConApp, mkTyConTy,
         tyConAppTyCon_maybe, tyConAppTyConPicky_maybe,
@@ -808,14 +807,6 @@ splitFunTys ty = split [] ty ty
     split args orig_ty ty | Just ty' <- coreView ty = split args orig_ty ty'
     split args _       (ForAllTy (Anon arg) res) = split (arg:args) res res
     split args orig_ty _                         = (reverse args, orig_ty)
-
-splitFunTysN :: Int -> Type -> ([Type], Type)
--- ^ Split off exactly the given number argument types, and panics if that is not possible
-splitFunTysN 0 ty = ([], ty)
-splitFunTysN n ty = ASSERT2( isFunTy ty, int n <+> ppr ty )
-                    case splitFunTy ty of { (arg, res) ->
-                    case splitFunTysN (n-1) res of { (args, res) ->
-                    (arg:args, res) }}
 
 funResultTy :: Type -> Type
 -- ^ Extract the function result type and panic if that is not possible
