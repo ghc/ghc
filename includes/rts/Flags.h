@@ -50,7 +50,6 @@ typedef struct _GC_FLAGS {
     double  pcFreeHeap;
 
     uint32_t     generations;
-    uint32_t     steps;
     rtsBool squeezeUpdFrames;
 
     rtsBool compact;		/* True <=> "compact all the time" */
@@ -59,7 +58,6 @@ typedef struct _GC_FLAGS {
     rtsBool sweep;		/* use "mostly mark-sweep" instead of copying
                                  * for the oldest generation */
     rtsBool ringBell;
-    rtsBool frontpanel;
 
     Time    idleGCDelayTime;    /* units: TIME_RESOLUTION */
     rtsBool doIdleGC;
@@ -187,7 +185,6 @@ typedef struct _MISC_FLAGS {
                                   * for the linker, NULL ==> off */
 } MISC_FLAGS;
 
-#ifdef THREADED_RTS
 /* See Note [Synchronization of flags and base APIs] */
 typedef struct _PAR_FLAGS {
   uint32_t       nCapabilities;  /* number of threads to run simultaneously */
@@ -216,7 +213,6 @@ typedef struct _PAR_FLAGS {
 
   rtsBool        setAffinity;    /* force thread affinity with CPUs */
 } PAR_FLAGS;
-#endif /* THREADED_RTS */
 
 /* See Note [Synchronization of flags and base APIs] */
 typedef struct _TICKY_FLAGS {
@@ -237,10 +233,7 @@ typedef struct _RTS_FLAGS {
     PROFILING_FLAGS   ProfFlags;
     TRACE_FLAGS       TraceFlags;
     TICKY_FLAGS	      TickyFlags;
-
-#if defined(THREADED_RTS)
     PAR_FLAGS	      ParFlags;
-#endif
 } RTS_FLAGS;
 
 #ifdef COMPILING_RTS_MAIN

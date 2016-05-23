@@ -323,7 +323,6 @@ Library
         cbits/inputReady.c
         cbits/md5.c
         cbits/primFloat.c
-        cbits/rts.c
         cbits/sysconf.c
 
     include-dirs: include

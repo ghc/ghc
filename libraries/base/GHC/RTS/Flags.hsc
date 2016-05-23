@@ -10,7 +10,6 @@
 --
 module GHC.RTS.Flags
   ( RtsTime
-  , RtsNat
   , RTSFlags (..)
   , GiveGCStats (..)
   , GCFlags (..)
@@ -24,6 +23,7 @@ module GHC.RTS.Flags
   , DoTrace (..)
   , TraceFlags (..)
   , TickyFlags (..)
+  , ParFlags (..)
   , getRTSFlags
   , getGCFlags
   , getConcFlags
@@ -33,6 +33,7 @@ module GHC.RTS.Flags
   , getProfFlags
   , getTraceFlags
   , getTickyFlags
+  , getParFlags
   ) where
 
 #include "Rts.h"
@@ -41,27 +42,19 @@ module GHC.RTS.Flags
 import Control.Applicative
 import Control.Monad
 
-import Foreign.C.String    (peekCString)
-import Foreign.C.Types     (CChar, CInt)
-import Foreign.Ptr         (Ptr, nullPtr)
-import Foreign.Storable    (peekByteOff)
+import Foreign
+import Foreign.C
 
 import GHC.Base
 import GHC.Enum
 import GHC.IO
 import GHC.Real
 import GHC.Show
-import GHC.Word
 
 -- | @'Time'@ is defined as a @'StgWord64'@ in @stg/Types.h@
 --
 -- @since 4.8.2.0
 type RtsTime = Word64
-
--- | @'nat'@ defined in @rts/Types.h@
---
--- @since 4.8.2.0
-type RtsNat = #{type unsigned int}
 
 -- | Should we produce a summary of the garbage collector statistics after the
 -- program has exited?
@@ -96,30 +89,32 @@ instance Enum GiveGCStats where
 data GCFlags = GCFlags
     { statsFile             :: Maybe FilePath
     , giveStats             :: GiveGCStats
-    , maxStkSize            :: RtsNat
-    , initialStkSize        :: RtsNat
-    , stkChunkSize          :: RtsNat
-    , stkChunkBufferSize    :: RtsNat
-    , maxHeapSize           :: RtsNat
-    , minAllocAreaSize      :: RtsNat
-    , minOldGenSize         :: RtsNat
-    , heapSizeSuggestion    :: RtsNat
+    , maxStkSize            :: Word32
+    , initialStkSize        :: Word32
+    , stkChunkSize          :: Word32
+    , stkChunkBufferSize    :: Word32
+    , maxHeapSize           :: Word32
+    , minAllocAreaSize      :: Word32
+    , largeAllocLim         :: Word32
+    , nurseryChunkSize      :: Word32
+    , minOldGenSize         :: Word32
+    , heapSizeSuggestion    :: Word32
     , heapSizeSuggestionAuto :: Bool
     , oldGenFactor          :: Double
     , pcFreeHeap            :: Double
-    , generations           :: RtsNat
-    , steps                 :: RtsNat
+    , generations           :: Word32
     , squeezeUpdFrames      :: Bool
     , compact               :: Bool -- ^ True <=> "compact all the time"
     , compactThreshold      :: Double
     , sweep                 :: Bool
       -- ^ use "mostly mark-sweep" instead of copying for the oldest generation
     , ringBell              :: Bool
-    , frontpanel            :: Bool
     , idleGCDelayTime       :: RtsTime
     , doIdleGC              :: Bool
     , heapBase              :: Word -- ^ address to ask the OS for memory
     , allocLimitGrace       :: Word
+    , numa                  :: Bool
+    , nNumaNodes            :: Word32
     } deriving (Show)
 
 -- | Parameters concerning context switching
@@ -294,6 +289,23 @@ data TickyFlags = TickyFlags
     , tickyFile      :: Maybe FilePath
     } deriving (Show)
 
+-- | Parameters pertaining to parallelism
+--
+-- @since 4.8.0.0
+data ParFlags = ParFlags
+    { nCapabilities :: Word32
+    , migrate :: Bool
+    , maxLocalSparks :: Word32
+    , parGcEnabled :: Bool
+    , parGcGen :: Word32
+    , parGcLoadBalancingEnabled :: Bool
+    , parGcLoadBalancingGen :: Word32
+    , parGcNoSyncWithIdle :: Word32
+    , parGcThreads :: Word32
+    , setAffinity :: Bool
+    }
+    deriving (Show)
+
 -- | Parameters of the runtime system
 --
 -- @since 4.8.0.0
@@ -306,30 +318,10 @@ data RTSFlags = RTSFlags
     , profilingFlags  :: ProfFlags
     , traceFlags      :: TraceFlags
     , tickyFlags      :: TickyFlags
+    , parFlags        :: ParFlags
     } deriving (Show)
 
-foreign import ccall safe "getGcFlags"
-  getGcFlagsPtr :: IO (Ptr ())
-
-foreign import ccall safe "getConcFlags"
-  getConcFlagsPtr :: IO (Ptr ())
-
-foreign import ccall safe "getMiscFlags"
-  getMiscFlagsPtr :: IO (Ptr ())
-
-foreign import ccall safe "getDebugFlags"
-  getDebugFlagsPtr :: IO (Ptr ())
-
-foreign import ccall safe "getCcFlags"
-  getCcFlagsPtr :: IO (Ptr ())
-
-foreign import ccall safe "getProfFlags" getProfFlagsPtr :: IO (Ptr ())
-
-foreign import ccall safe "getTraceFlags"
-  getTraceFlagsPtr :: IO (Ptr ())
-
-foreign import ccall safe "getTickyFlags"
-  getTickyFlagsPtr :: IO (Ptr ())
+foreign import ccall "&RtsFlags" rtsFlagsPtr :: Ptr RTSFlags
 
 getRTSFlags :: IO RTSFlags
 getRTSFlags = do
@@ -341,6 +333,7 @@ getRTSFlags = do
            <*> getProfFlags
            <*> getTraceFlags
            <*> getTickyFlags
+           <*> getParFlags
 
 peekFilePath :: Ptr () -> IO (Maybe FilePath)
 peekFilePath ptr
@@ -355,43 +348,60 @@ peekCStringOpt ptr
 
 getGCFlags :: IO GCFlags
 getGCFlags = do
-  ptr <- getGcFlagsPtr
+  let ptr = (#ptr RTS_FLAGS, GcFlags) rtsFlagsPtr
   GCFlags <$> (peekFilePath =<< #{peek GC_FLAGS, statsFile} ptr)
           <*> (toEnum . fromIntegral <$>
-                (#{peek GC_FLAGS, giveStats} ptr :: IO RtsNat))
+                (#{peek GC_FLAGS, giveStats} ptr :: IO Word32))
           <*> #{peek GC_FLAGS, maxStkSize} ptr
           <*> #{peek GC_FLAGS, initialStkSize} ptr
           <*> #{peek GC_FLAGS, stkChunkSize} ptr
           <*> #{peek GC_FLAGS, stkChunkBufferSize} ptr
           <*> #{peek GC_FLAGS, maxHeapSize} ptr
           <*> #{peek GC_FLAGS, minAllocAreaSize} ptr
+          <*> #{peek GC_FLAGS, largeAllocLim} ptr
+          <*> #{peek GC_FLAGS, nurseryChunkSize} ptr
           <*> #{peek GC_FLAGS, minOldGenSize} ptr
           <*> #{peek GC_FLAGS, heapSizeSuggestion} ptr
           <*> #{peek GC_FLAGS, heapSizeSuggestionAuto} ptr
           <*> #{peek GC_FLAGS, oldGenFactor} ptr
           <*> #{peek GC_FLAGS, pcFreeHeap} ptr
           <*> #{peek GC_FLAGS, generations} ptr
-          <*> #{peek GC_FLAGS, steps} ptr
           <*> #{peek GC_FLAGS, squeezeUpdFrames} ptr
           <*> #{peek GC_FLAGS, compact} ptr
           <*> #{peek GC_FLAGS, compactThreshold} ptr
           <*> #{peek GC_FLAGS, sweep} ptr
           <*> #{peek GC_FLAGS, ringBell} ptr
-          <*> #{peek GC_FLAGS, frontpanel} ptr
           <*> #{peek GC_FLAGS, idleGCDelayTime} ptr
           <*> #{peek GC_FLAGS, doIdleGC} ptr
           <*> #{peek GC_FLAGS, heapBase} ptr
           <*> #{peek GC_FLAGS, allocLimitGrace} ptr
+          <*> #{peek GC_FLAGS, numa} ptr
+          <*> #{peek GC_FLAGS, nNumaNodes} ptr
+
+getParFlags :: IO ParFlags
+getParFlags = do
+  let ptr = (#ptr RTS_FLAGS, ParFlags) rtsFlagsPtr
+  ParFlags
+    <$> #{peek PAR_FLAGS, nCapabilities} ptr
+    <*> #{peek PAR_FLAGS, migrate} ptr
+    <*> #{peek PAR_FLAGS, maxLocalSparks} ptr
+    <*> #{peek PAR_FLAGS, parGcEnabled} ptr
+    <*> #{peek PAR_FLAGS, parGcGen} ptr
+    <*> #{peek PAR_FLAGS, parGcLoadBalancingEnabled} ptr
+    <*> #{peek PAR_FLAGS, parGcLoadBalancingGen} ptr
+    <*> #{peek PAR_FLAGS, parGcNoSyncWithIdle} ptr
+    <*> #{peek PAR_FLAGS, parGcThreads} ptr
+    <*> #{peek PAR_FLAGS, setAffinity} ptr
 
 getConcFlags :: IO ConcFlags
 getConcFlags = do
-  ptr <- getConcFlagsPtr
+  let ptr = (#ptr RTS_FLAGS, ConcFlags) rtsFlagsPtr
   ConcFlags <$> #{peek CONCURRENT_FLAGS, ctxtSwitchTime} ptr
             <*> #{peek CONCURRENT_FLAGS, ctxtSwitchTicks} ptr
 
 getMiscFlags :: IO MiscFlags
 getMiscFlags = do
-  ptr <- getMiscFlagsPtr
+  let ptr = (#ptr RTS_FLAGS, MiscFlags) rtsFlagsPtr
   MiscFlags <$> #{peek MISC_FLAGS, tickInterval} ptr
             <*> #{peek MISC_FLAGS, install_signal_handlers} ptr
             <*> #{peek MISC_FLAGS, machineReadable} ptr
@@ -399,7 +409,7 @@ getMiscFlags = do
 
 getDebugFlags :: IO DebugFlags
 getDebugFlags = do
-  ptr <- getDebugFlagsPtr
+  let ptr = (#ptr RTS_FLAGS, DebugFlags) rtsFlagsPtr
   DebugFlags <$> #{peek DEBUG_FLAGS, scheduler} ptr
              <*> #{peek DEBUG_FLAGS, interpreter} ptr
              <*> #{peek DEBUG_FLAGS, weak} ptr
@@ -418,15 +428,15 @@ getDebugFlags = do
 
 getCCFlags :: IO CCFlags
 getCCFlags = do
-  ptr <- getCcFlagsPtr
+  let ptr = (#ptr RTS_FLAGS, GcFlags) rtsFlagsPtr
   CCFlags <$> (toEnum . fromIntegral
-                <$> (#{peek COST_CENTRE_FLAGS, doCostCentres} ptr :: IO RtsNat))
+                <$> (#{peek COST_CENTRE_FLAGS, doCostCentres} ptr :: IO Word32))
           <*> #{peek COST_CENTRE_FLAGS, profilerTicks} ptr
           <*> #{peek COST_CENTRE_FLAGS, msecsPerTick} ptr
 
 getProfFlags :: IO ProfFlags
 getProfFlags = do
-  ptr <- getProfFlagsPtr
+  let ptr = (#ptr RTS_FLAGS, ProfFlags) rtsFlagsPtr
   ProfFlags <$> (toEnum <$> #{peek PROFILING_FLAGS, doHeapProfile} ptr)
             <*> #{peek PROFILING_FLAGS, heapProfileInterval} ptr
             <*> #{peek PROFILING_FLAGS, heapProfileIntervalTicks} ptr
@@ -444,7 +454,7 @@ getProfFlags = do
 
 getTraceFlags :: IO TraceFlags
 getTraceFlags = do
-  ptr <- getTraceFlagsPtr
+  let ptr = (#ptr RTS_FLAGS, TraceFlags) rtsFlagsPtr
   TraceFlags <$> (toEnum . fromIntegral
                    <$> (#{peek TRACE_FLAGS, tracing} ptr :: IO CInt))
              <*> #{peek TRACE_FLAGS, timestamp} ptr
@@ -456,6 +466,6 @@ getTraceFlags = do
 
 getTickyFlags :: IO TickyFlags
 getTickyFlags = do
-  ptr <- getTickyFlagsPtr
+  let ptr = (#ptr RTS_FLAGS, TickyFlags) rtsFlagsPtr
   TickyFlags <$> #{peek TICKY_FLAGS, showTickyStats} ptr
              <*> (peekFilePath =<< #{peek TICKY_FLAGS, tickyFile} ptr)
