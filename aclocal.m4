@@ -1252,6 +1252,7 @@ then
   AC_MSG_ERROR([gcc is required])
 fi
 GccLT34=NO
+GccLT44=NO
 GccLT46=NO
 AC_CACHE_CHECK([version of gcc], [fp_cv_gcc_version],
 [
@@ -1262,10 +1263,12 @@ AC_CACHE_CHECK([version of gcc], [fp_cv_gcc_version],
     # isn't a very good reason for that, but for now just make configure
     # fail.
     FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [3.4], GccLT34=YES)
+    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.4], GccLT44=YES)
     FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.6], GccLT46=YES)
 ])
 AC_SUBST([GccVersion], [$fp_cv_gcc_version])
 AC_SUBST(GccLT34)
+AC_SUBST(GccLT44)
 AC_SUBST(GccLT46)
 ])# FP_GCC_VERSION
 

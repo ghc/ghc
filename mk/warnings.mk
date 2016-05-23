@@ -25,6 +25,11 @@ endif
 SRC_CC_WARNING_OPTS += -Wno-error=inline
 endif
 
+ifeq "$(GccLT44)" "NO"
+# Suppress the warning about __sync_fetch_and_nand (#9678).
+libraries/ghc-prim/cbits/atomic_CC_OPTS += -Wno-sync-nand
+endif
+
 else
 
 # Don't warn about unknown GCC pragmas when using clang

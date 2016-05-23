@@ -525,6 +525,7 @@ endif
 # the necessary format to pass to libffi's configure.
 TargetPlatformFull    = @TargetPlatformFull@
 GccLT34         = @GccLT34@
+GccLT44         = @GccLT44@
 GccLT46         = @GccLT46@
 GccIsClang      = @GccIsClang@
 
