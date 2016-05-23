@@ -57,12 +57,15 @@ test('T4018',
 
 test('T4029',
      [stats_num_field('peak_megabytes_allocated',
-          [(wordsize(64), 66, 10)]),
+          [(wordsize(64), 82, 10)]),
             # 2016-02-26: 66 (amd64/Linux)           INITIAL
+            # 2016-05-23: 82 (amd64/Linux)           Use -G1
       stats_num_field('max_bytes_used',
-          [(wordsize(64), 25542832, 5)])
+          [(wordsize(64), 25247216, 5)]),
             # 2016-02-26: 24071720 (amd64/Linux)     INITIAL
             # 2016-04-21: 25542832 (amd64/Linux)
+            # 2016-05-23: 25247216 (amd64/Linux)     Use -G1
+      extra_hc_opts('+RTS -G1 -RTS' ),
       ],
      ghci_script,
      ['T4029.script'])
