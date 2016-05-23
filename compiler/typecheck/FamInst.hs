@@ -275,7 +275,7 @@ tcTopNormaliseNewTypeTF_maybe faminsts rdr_env ty
     stepper = unwrap_newtype `composeSteppers` unwrap_newtype_instance
 
     -- For newtype instances we take a double step or nothing, so that
-    -- we don't return the reprsentation type of the newtype instance,
+    -- we don't return the representation type of the newtype instance,
     -- which would lead to terrible error messages
     unwrap_newtype_instance rec_nts tc tys
       | Just (tc', tys', co) <- tcLookupDataFamInst_maybe faminsts tc tys
