@@ -25,8 +25,7 @@ Language
 Compiler
 ~~~~~~~~
 
-- GHC now compresses interface files with a fast compression
-  algorithm, meaning compiled artifacts should use less disk space.
+-  TODO FIXME.
 
 GHCi
 ~~~~

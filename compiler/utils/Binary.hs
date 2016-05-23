@@ -66,19 +66,18 @@ import FastMutInt
 import Fingerprint
 import BasicTypes
 import SrcLoc
-import qualified LZ4 as LZ4
 
 import Foreign
 import Data.Array
 import Data.ByteString (ByteString)
-import qualified Data.ByteString          as B
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
 import Data.IORef
 import Data.Char                ( ord, chr )
 import Data.Time
 import Data.Typeable
-import Control.Monad            ( when, liftM )
+import Control.Monad            ( when )
+import System.IO as IO
 import System.IO.Unsafe         ( unsafeInterleaveIO )
 import System.IO.Error          ( mkIOError, eofErrorType )
 import GHC.Real                 ( Ratio(..) )
@@ -177,27 +176,29 @@ isEOFBin (BinMem _ ix_r sz_r _) = do
 
 writeBinMem :: BinHandle -> FilePath -> IO ()
 writeBinMem (BinMem _ ix_r _ arr_r) fn = do
+  h <- openBinaryFile fn WriteMode
   arr <- readIORef arr_r
   ix  <- readFastMutInt ix_r
-  let bs = LZ4.compress $ BS.fromForeignPtr arr 0 ix
-  case bs of
-    Nothing -> error "Binary.writeBinMem: compression failed"
-    Just x  -> B.writeFile fn x
+  withForeignPtr arr $ \p -> hPutBuf h p ix
+  hClose h
 
 readBinMem :: FilePath -> IO BinHandle
 -- Return a BinHandle with a totally undefined State
 readBinMem filename = do
-  bs <- liftM LZ4.decompress (B.readFile filename)
-  case bs of
-    Nothing -> error "Binary.readBinMem: decompression failed"
-    Just x  -> do
-      let (arr, ix, size) = BS.toForeignPtr x
-      arr_r <- newIORef arr
-      ix_r <- newFastMutInt
-      writeFastMutInt ix_r ix
-      sz_r <- newFastMutInt
-      writeFastMutInt sz_r size
-      return (BinMem noUserData ix_r sz_r arr_r)
+  h <- openBinaryFile filename ReadMode
+  filesize' <- hFileSize h
+  let filesize = fromIntegral filesize'
+  arr <- mallocForeignPtrBytes (filesize*2)
+  count <- withForeignPtr arr $ \p -> hGetBuf h p filesize
+  when (count /= filesize) $
+       error ("Binary.readBinMem: only read " ++ show count ++ " bytes")
+  hClose h
+  arr_r <- newIORef arr
+  ix_r <- newFastMutInt
+  writeFastMutInt ix_r 0
+  sz_r <- newFastMutInt
+  writeFastMutInt sz_r filesize
+  return (BinMem noUserData ix_r sz_r arr_r)
 
 fingerprintBinMem :: BinHandle -> IO Fingerprint
 fingerprintBinMem (BinMem _ ix_r _ arr_r) = do
