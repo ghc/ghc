@@ -14,7 +14,7 @@ module TcPatSyn ( tcPatSynSig, tcInferPatSynDecl, tcCheckPatSynDecl
 import HsSyn
 import TcPat
 import TcHsType( tcImplicitTKBndrs, tcExplicitTKBndrs
-               , tcHsContext, tcHsLiftedType, tcHsOpenType, kindGeneralize )
+               , tcHsContext, tcHsOpenType, kindGeneralize )
 import Type( binderVar, mkNamedBinders, binderVisibility
            , tidyTyCoVarBndrs, tidyTypes, tidyType )
 import TcRnMonad
