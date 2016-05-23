@@ -12,7 +12,8 @@ f (x :: (# Int, Bool #)) = f x + f (# 1, True #)
 f (x1 :: Int) (x2 :: Bool) = f x1 x2 + f 1 True
 
 It is important that we do this at the STG level and NOT at the core level
-because it would be very hard to make this pass Core-type-preserving.
+because it would be very hard to make this pass Core-type-preserving. In
+this example the type of 'f' changes, for example.
 
 STG fed to the code generators *must* be unarised because the code generators do
 not support unboxed tuple binders natively.
