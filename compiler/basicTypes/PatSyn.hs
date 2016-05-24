@@ -245,7 +245,7 @@ This means that when typechecking an occurrence of P in an expression,
 we must remember that the builder has this void argument. This is
 done by TcPatSyn.patSynBuilderOcc.
 
-Note [Patterns synonyms and the data type Type]
+Note [Pattern synonyms and the data type Type]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The type of a pattern synonym is of the form (See Note
 [Pattern synonym signatures]):
