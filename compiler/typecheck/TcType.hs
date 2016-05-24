@@ -895,7 +895,7 @@ arbitrary distinction based on how the variables appear:
 E.g.  In the type    T k (a::k)
       'k' is a kind variable, because it occurs in the kind of 'a',
           even though it also appears at "top level" of the type
-      'a' is a type variable, becuase it doesn't
+      'a' is a type variable, because it doesn't
 
 We gather these variables using a TcDepVars record:
   DV { dv_kvs: Variables free in the kind of a free type variable

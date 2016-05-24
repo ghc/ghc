@@ -224,7 +224,7 @@ This is a vanishingly strange corner case, but we still have
 to check.
 
 We do the check in cseRhs, but it can't fire when cseRhs is called
-from a let-binding, becuase they are always ok-for-speculation.  Never
+from a let-binding, because they are always ok-for-speculation.  Never
 mind!
 
 

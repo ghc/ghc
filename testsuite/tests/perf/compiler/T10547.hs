@@ -1,4 +1,4 @@
--- Reported by sjcjoosten in T10547, this was taking forever becuase of a bug in
+-- Reported by sjcjoosten in T10547, this was taking forever because of a bug in
 -- the implementation. See bottom of the file for some notes.
 
 module Test where

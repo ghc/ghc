@@ -893,7 +893,7 @@ quantifyZonkedTyVars gbl_tvs dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
                  --    dv_tvs which will also contain k
                  -- No worry about dependent covars here;
                  --    they are all in dep_tkvs
-                 -- No worry about scoping, becuase these are all
+                 -- No worry about scoping, because these are all
                  --    type variables
                  -- NB kinds of tvs are zonked by zonkTyCoVarsAndFV
 
