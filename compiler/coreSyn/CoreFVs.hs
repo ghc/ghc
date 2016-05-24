@@ -14,6 +14,9 @@ module CoreFVs (
         exprFreeVarsDSet,
         exprFreeVarsList,
         exprFreeIds,
+        exprFreeIdsDSet,
+        exprFreeIdsList,
+        exprsFreeIdsDSet,
         exprsFreeIdsList,
         exprsFreeVars,
         exprsFreeVarsList,
@@ -122,6 +125,21 @@ exprFreeIds :: CoreExpr -> IdSet        -- Find all locally-defined free Ids
 exprFreeIds = exprSomeFreeVars isLocalId
 
 -- | Find all locally-defined free Ids in an expression
+-- returning a deterministic set.
+exprFreeIdsDSet :: CoreExpr -> DIdSet -- Find all locally-defined free Ids
+exprFreeIdsDSet = exprSomeFreeVarsDSet isLocalId
+
+-- | Find all locally-defined free Ids in an expression
+-- returning a deterministically ordered list.
+exprFreeIdsList :: CoreExpr -> [Id] -- Find all locally-defined free Ids
+exprFreeIdsList = exprSomeFreeVarsList isLocalId
+
+-- | Find all locally-defined free Ids in several expressions
+-- returning a deterministic set.
+exprsFreeIdsDSet :: [CoreExpr] -> DIdSet -- Find all locally-defined free Ids
+exprsFreeIdsDSet = exprsSomeFreeVarsDSet isLocalId
+
+-- | Find all locally-defined free Ids in several expressions
 -- returning a deterministically ordered list.
 exprsFreeIdsList :: [CoreExpr] -> [Id]   -- Find all locally-defined free Ids
 exprsFreeIdsList = exprsSomeFreeVarsList isLocalId
@@ -162,6 +180,13 @@ exprSomeFreeVarsList :: InterestingVarFun -- ^ Says which 'Var's are interesting
                      -> [Var]
 exprSomeFreeVarsList fv_cand e = fvVarList $ filterFV fv_cand $ expr_fvs e
 
+-- | Finds free variables in an expression selected by a predicate
+-- returning a deterministic set.
+exprSomeFreeVarsDSet :: InterestingVarFun -- ^ Says which 'Var's are interesting
+                     -> CoreExpr
+                     -> DVarSet
+exprSomeFreeVarsDSet fv_cand e = fvDVarSet $ filterFV fv_cand $ expr_fvs e
+
 -- | Finds free variables in several expressions selected by a predicate
 exprsSomeFreeVars :: InterestingVarFun  -- Says which 'Var's are interesting
                   -> [CoreExpr]
@@ -176,6 +201,14 @@ exprsSomeFreeVarsList :: InterestingVarFun  -- Says which 'Var's are interesting
                       -> [Var]
 exprsSomeFreeVarsList fv_cand es =
   fvVarList $ filterFV fv_cand $ mapUnionFV expr_fvs es
+
+-- | Finds free variables in several expressions selected by a predicate
+-- returning a deterministic set.
+exprsSomeFreeVarsDSet :: InterestingVarFun -- ^ Says which 'Var's are interesting
+                      -> [CoreExpr]
+                      -> DVarSet
+exprsSomeFreeVarsDSet fv_cand e =
+  fvDVarSet $ filterFV fv_cand $ mapUnionFV expr_fvs e
 
 --      Comment about obselete code
 -- We used to gather the free variables the RULES at a variable occurrence
