@@ -329,7 +329,7 @@ have to modify their corresponding structures.
 runtime system. 
 First, @nofib/real/symalg@ ends up with a division-by-zero
 exception if we add a new field. 
-Second, the runtime system option @-auto-all@ clashes in some test files
+Second, the runtime system option @-fprof-auto@ clashes in some test files
 in the @nofib@ testing suite (e.g., @spectral/expert@).
 
 \subsection{Initialization code}
@@ -920,13 +920,13 @@ Since cost centre stacks are used as retainer identity, a source program
 must be given proper cost centre annotations by programmers. 
 Alternatively,
 we can ask the compiler to automatically insert cost centre annotations.
-For instance, the compiler option @-auto-all@ inserts a cost centre
+For instance, the compiler option @-fprof-auto@ inserts a cost centre
 annotation around every top-level function as shown below 
 (the @-p@ option is a must
 because we must build the executable file in a profiling way):
 
 \begin{code}
-$ ghc-inplace -o Foo.out -p -auto-all Foo.hs
+$ ghc-inplace -o Foo.out -p -fprof-auto Foo.hs
 \end{code}
 
 The runtime system option @-hR@ tells the executable program to

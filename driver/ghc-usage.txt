@@ -50,7 +50,7 @@ Other commonly-used options are:
     -O		    An `optimising' package of compiler flags, for faster code
 
     -prof	    Compile for cost-centre profiling
-		     (add -auto-all for automagic cost-centres on all
+		     (add -fprof-auto for automagic cost-centres on all
 		      top-level functions)
 
     -H14m	    Increase compiler's heap size (might make compilation

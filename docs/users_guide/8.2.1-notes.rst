@@ -27,6 +27,10 @@ Compiler
 
 -  TODO FIXME.
 
+- Old profiling flags -auto-all -auto -caf-all are deprecated
+  and their usage provokes a compile-time warning.
+  
+
 GHCi
 ~~~~
 

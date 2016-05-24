@@ -2915,18 +2915,24 @@ dynamic_flags_deps = [
         ------ Profiling ----------------------------------------------------
 
         -- OLD profiling flags
-  , make_ord_flag defGhcFlag "auto-all"    (noArg (\d ->
-                                                 d { profAuto = ProfAutoAll } ))
-  , make_ord_flag defGhcFlag "no-auto-all" (noArg (\d ->
-                                                  d { profAuto = NoProfAuto } ))
-  , make_ord_flag defGhcFlag "auto"        (noArg (\d ->
-                                             d { profAuto = ProfAutoExports } ))
-  , make_ord_flag defGhcFlag "no-auto"     (noArg (\d ->
-                                                  d { profAuto = NoProfAuto } ))
-  , make_ord_flag defGhcFlag "caf-all"
-      (NoArg (setGeneralFlag Opt_AutoSccsOnIndividualCafs))
-  , make_ord_flag defGhcFlag "no-caf-all"
-      (NoArg (unSetGeneralFlag Opt_AutoSccsOnIndividualCafs))
+  , make_dep_flag defGhcFlag "auto-all"
+                    (noArg (\d -> d { profAuto = ProfAutoAll } ))
+                    "Use -fprof-auto instead"
+  , make_dep_flag defGhcFlag "no-auto-all"
+                    (noArg (\d -> d { profAuto = NoProfAuto } ))
+                    "Use -fno-prof-auto instead"
+  , make_dep_flag defGhcFlag "auto"
+                    (noArg (\d -> d { profAuto = ProfAutoExports } ))
+                    "Use -fprof-auto-exported instead"
+  , make_dep_flag defGhcFlag "no-auto"
+            (noArg (\d -> d { profAuto = NoProfAuto } ))
+                    "Use -fno-prof-auto instead"
+  , make_dep_flag defGhcFlag "caf-all"
+            (NoArg (setGeneralFlag Opt_AutoSccsOnIndividualCafs))
+                    "Use -fprof-cafs instead"
+  , make_dep_flag defGhcFlag "no-caf-all"
+            (NoArg (unSetGeneralFlag Opt_AutoSccsOnIndividualCafs))
+                    "Use -fno-prof-cafs instead"
 
         -- NEW profiling flags
   , make_ord_flag defGhcFlag "fprof-auto"

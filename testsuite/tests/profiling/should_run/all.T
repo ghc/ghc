@@ -94,7 +94,7 @@ test('callstack001', [expect_broken_for_10037],
 test('callstack002', [], compile_and_run,
      ['-fprof-auto-calls -fno-full-laziness -fno-state-hack'])
 
-# Should not stack overflow with -prof -auto-all
+# Should not stack overflow with -prof -fprof-auto
 test('T5363', [], compile_and_run, [''])
 
 test('profinline001', [], compile_and_run, [''])

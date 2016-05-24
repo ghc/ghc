@@ -8,11 +8,13 @@ Pre-code-generator-ish
 
 * Automagic insertion of _sccs_ on...
 
-  - If -auto is specified, add _scc_ on each *exported* top-level definition. 
+  - If -fprof-auto-exported is specified, add _scc_ on each *exported* top-level definition. 
     NB this includes CAFs.  Done by addAutoCostCentres (Core-to-Core pass).
 
-  - If -auto-all is specified, add _scc_ on *all* top-level definitions.
+  - If -fprof-auto-top is specified, add _scc_ on *all* top-level definitions.
     Done by same pass.
+
+  - If -fprof-auto is specified, add _scc_ on *all* definitions.
 
   - Always: just before code generation of module M, onto any CAF
     which hasn't already got an explicit cost centre attached, pin

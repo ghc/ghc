@@ -315,7 +315,7 @@ Redirecting the compilation output(s)
 
     .. code-block:: none
 
-        ghc ... -osuf prof.o -hisuf prof.hi -prof -auto-all
+        ghc ... -osuf prof.o -hisuf prof.hi -prof -fprof-auto
 
     to get the profiled version.
 
