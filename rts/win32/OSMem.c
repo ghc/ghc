@@ -381,17 +381,17 @@ osFreeAllMBlocks(void)
     }
 }
 
-W_ getPageSize (void)
+size_t getPageSize (void)
 {
-    static W_ pagesize = 0;
-    if (pagesize) {
-        return pagesize;
-    } else {
+    static size_t pagesize = 0;
+
+    if (pagesize == 0) {
         SYSTEM_INFO sSysInfo;
         GetSystemInfo(&sSysInfo);
         pagesize = sSysInfo.dwPageSize;
-        return pagesize;
     }
+
+    return pagesize;
 }
 
 /* Returns 0 if physical memory size cannot be identified */

@@ -37,7 +37,7 @@ $(eval $(call all-target,rts,$(ALL_RTS_LIBS)))
 # -----------------------------------------------------------------------------
 # Defining the sources
 
-ALL_DIRS = hooks sm eventlog
+ALL_DIRS = hooks sm eventlog linker
 
 ifeq "$(HostOS_CPP)" "mingw32"
 ALL_DIRS += win32

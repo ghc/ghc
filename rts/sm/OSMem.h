@@ -16,9 +16,24 @@ void *osGetMBlocks(uint32_t n);
 void osFreeMBlocks(void *addr, uint32_t n);
 void osReleaseFreeMemory(void);
 void osFreeAllMBlocks(void);
-W_ getPageSize (void);
+size_t getPageSize (void);
 StgWord64 getPhysicalMemorySize (void);
 void setExecutable (void *p, W_ len, rtsBool exec);
+
+INLINE_HEADER size_t
+roundDownToPage (size_t x)
+{
+    size_t size = getPageSize();
+    return (x & ~(size - 1));
+}
+
+INLINE_HEADER size_t
+roundUpToPage (size_t x)
+{
+    size_t size = getPageSize();
+    return ((x + size - 1) & ~(size - 1));
+}
+
 
 #ifdef USE_LARGE_ADDRESS_SPACE
 
