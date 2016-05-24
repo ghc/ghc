@@ -17,6 +17,7 @@ import ConLike (ConLike)
 import FieldLabel
 import SrcLoc (Located)
 import TcEvidence ( HsWrapper )
+import Outputable ( OutputableBndr )
 
 import Data.Data hiding ( Fixity )
 import BasicTypes       (Fixity)
@@ -97,9 +98,18 @@ In terms of actual usage, we have the following
   PostRn id NameSet
 
 TcId and Var are synonyms for Id
+
+Unfortunately the type checker termination checking conditions fail for the
+DataId constraint type based on this, so even though it is safe the
+UndecidableInstances pragma is required where this is used.
 -}
 
 type DataId id =
+  ( DataIdPost id
+  , DataIdPost (NameOrRdrName id)
+  )
+
+type DataIdPost id =
   ( Data id
   , Data (PostRn id NameSet)
   , Data (PostRn id Fixity)
@@ -107,7 +117,7 @@ type DataId id =
   , Data (PostRn id Name)
   , Data (PostRn id (Located Name))
   , Data (PostRn id [Name])
---  , Data (PostRn id [id])
+
   , Data (PostRn id id)
   , Data (PostTc id Type)
   , Data (PostTc id Coercion)
@@ -117,4 +127,19 @@ type DataId id =
   , Data (PostTc id [ConLike])
   , Data (PostTc id HsWrapper)
   , Data (PostTc id [FieldLabel])
+  )
+
+
+-- |Follow the @id@, but never beyond Name. This is used in a 'HsMatchContext',
+-- for printing messages related to a 'Match'
+type family NameOrRdrName id where
+  NameOrRdrName Id      = Name
+  NameOrRdrName Name    = Name
+  NameOrRdrName RdrName = RdrName
+
+-- |Constraint type to bundle up the requirement for 'OutputableBndr' on both
+-- the @id@ and the 'NameOrRdrName' type for it
+type OutputableBndrId id =
+  ( OutputableBndr id
+  , OutputableBndr (NameOrRdrName id)
   )

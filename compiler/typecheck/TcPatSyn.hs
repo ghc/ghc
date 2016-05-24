@@ -6,6 +6,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module TcPatSyn ( tcPatSynSig, tcInferPatSynDecl, tcCheckPatSynDecl
                 , tcPatSynBuilderBind, tcPatSynBuilderOcc, nonBidirectionalErr
@@ -570,9 +571,9 @@ tcPatSynMatcher (L loc name) lpat
              args = map nlVarPat [scrutinee, cont, fail]
              lwpat = noLoc $ WildPat pat_ty
              cases = if isIrrefutableHsPat lpat
-                     then [mkSimpleHsAlt lpat  cont']
-                     else [mkSimpleHsAlt lpat  cont',
-                           mkSimpleHsAlt lwpat fail']
+                     then [mkHsCaseAlt lpat  cont']
+                     else [mkHsCaseAlt lpat  cont',
+                           mkHsCaseAlt lwpat fail']
              body = mkLHsWrap (mkWpLet req_ev_binds) $
                     L (getLoc lpat) $
                     HsCase (nlHsVar scrutinee) $
@@ -583,12 +584,15 @@ tcPatSynMatcher (L loc name) lpat
                       }
              body' = noLoc $
                      HsLam $
-                     MG{ mg_alts = noLoc [mkSimpleMatch args body]
+                     MG{ mg_alts = noLoc [mkSimpleMatch LambdaExpr
+                                                        args body]
                        , mg_arg_tys = [pat_ty, cont_ty, res_ty]
                        , mg_res_ty = res_ty
                        , mg_origin = Generated
                        }
-             match = mkMatch [] (mkHsLams (rr_tv:res_tv:univ_tvs) req_dicts body')
+             match = mkMatch (FunRhs (L loc name) Prefix) []
+                             (mkHsLams (rr_tv:res_tv:univ_tvs)
+                             req_dicts body')
                              (noLoc EmptyLocalBinds)
              mg = MG{ mg_alts = L (getLoc match) [match]
                     , mg_arg_tys = []
@@ -705,7 +709,9 @@ tcPatSynBuilderBind sig_fun PSB{ psb_id = L loc name, psb_def = lpat
     mk_mg body = mkMatchGroupName Generated [builder_match]
              where
                builder_args  = [L loc (VarPat (L loc n)) | L loc n <- args]
-               builder_match = mkMatch builder_args body (noLoc EmptyLocalBinds)
+               builder_match = mkMatch (FunRhs (L loc name) Prefix)
+                                       builder_args body
+                                       (noLoc EmptyLocalBinds)
 
     args = case details of
               PrefixPatSyn args     -> args
@@ -717,7 +723,7 @@ tcPatSynBuilderBind sig_fun PSB{ psb_id = L loc name, psb_def = lpat
     add_dummy_arg mg@(MG { mg_alts = L l [L loc match@(Match { m_pats = pats })] })
       = mg { mg_alts = L l [L loc (match { m_pats = nlWildPatName : pats })] }
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
-                             pprMatches (PatSyn :: HsMatchContext Name) other_mg
+                             pprMatches other_mg
 
 get_builder_sig :: TcSigFun -> Name -> Id -> Bool -> TcM TcIdSigInfo
 get_builder_sig sig_fun name builder_id need_dummy_arg
@@ -940,19 +946,19 @@ tcCheckPatSynPat = go
     go1   SigPatOut{}         = panic "SigPatOut in output of renamer"
     go1   CoPat{}             = panic "CoPat in output of renamer"
 
-asPatInPatSynErr :: OutputableBndr name => Pat name -> TcM a
+asPatInPatSynErr :: (OutputableBndrId name) => Pat name -> TcM a
 asPatInPatSynErr pat
   = failWithTc $
     hang (text "Pattern synonym definition cannot contain as-patterns (@):")
        2 (ppr pat)
 
-thInPatSynErr :: OutputableBndr name => Pat name -> TcM a
+thInPatSynErr :: (OutputableBndrId name) => Pat name -> TcM a
 thInPatSynErr pat
   = failWithTc $
     hang (text "Pattern synonym definition cannot contain Template Haskell:")
        2 (ppr pat)
 
-nPlusKPatInPatSynErr :: OutputableBndr name => Pat name -> TcM a
+nPlusKPatInPatSynErr :: (OutputableBndrId name) => Pat name -> TcM a
 nPlusKPatInPatSynErr pat
   = failWithTc $
     hang (text "Pattern synonym definition cannot contain n+k-pattern:")

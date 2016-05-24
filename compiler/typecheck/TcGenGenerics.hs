@@ -323,8 +323,8 @@ mkBindsRep gk tycon =
   `unionBags`
     unitBag (mkRdrFunBind (L loc to01_RDR) to_matches)
       where
-        from_matches  = [mkSimpleHsAlt pat rhs | (pat,rhs) <- from_alts]
-        to_matches    = [mkSimpleHsAlt pat rhs | (pat,rhs) <- to_alts  ]
+        from_matches  = [mkHsCaseAlt pat rhs | (pat,rhs) <- from_alts]
+        to_matches    = [mkHsCaseAlt pat rhs | (pat,rhs) <- to_alts  ]
         loc           = srcLocSpan (getSrcLoc tycon)
         datacons      = tyConDataCons tycon
 

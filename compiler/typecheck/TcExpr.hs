@@ -7,6 +7,7 @@
 -}
 
 {-# LANGUAGE CPP, TupleSections, ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module TcExpr ( tcPolyExpr, tcMonoExpr, tcMonoExprNC,
                 tcInferSigma, tcInferSigmaNC, tcInferRho, tcInferRhoNC,
@@ -237,7 +238,7 @@ tcExpr (HsLam match) res_ty
     match_ctxt = MC { mc_what = LambdaExpr, mc_body = tcBody }
     herald = sep [ text "The lambda expression" <+>
                    quotes (pprSetDepth (PartWay 1) $
-                           pprMatches (LambdaExpr :: HsMatchContext Name) match),
+                           pprMatches match),
                         -- The pprSetDepth makes the abstraction print briefly
                    text "has"]
 

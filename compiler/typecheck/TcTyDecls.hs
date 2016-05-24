@@ -974,9 +974,11 @@ mkOneRecordSelector all_cons idDetails fl
     --    where cons_w_field = [C2,C7]
     sel_bind = mkTopFunBind Generated sel_lname alts
       where
-        alts | is_naughty = [mkSimpleMatch [] unit_rhs]
+        alts | is_naughty = [mkSimpleMatch (FunRhs sel_lname Prefix)
+                                           [] unit_rhs]
              | otherwise =  map mk_match cons_w_field ++ deflt
-    mk_match con = mkSimpleMatch [L loc (mk_sel_pat con)]
+    mk_match con = mkSimpleMatch (FunRhs sel_lname Prefix)
+                                 [L loc (mk_sel_pat con)]
                                  (L loc (HsVar (L loc field_var)))
     mk_sel_pat con = ConPatIn (L loc (getName con)) (RecCon rec_fields)
     rec_fields = HsRecFields { rec_flds = [rec_field], rec_dotdot = Nothing }
@@ -992,7 +994,8 @@ mkOneRecordSelector all_cons idDetails fl
     -- We do this explicitly so that we get a nice error message that
     -- mentions this particular record selector
     deflt | all dealt_with all_cons = []
-          | otherwise = [mkSimpleMatch [L loc (WildPat placeHolderType)]
+          | otherwise = [mkSimpleMatch CaseAlt
+                            [L loc (WildPat placeHolderType)]
                             (mkHsApp (L loc (HsVar
                                             (L loc (getName rEC_SEL_ERROR_ID))))
                                      (L loc (HsLit msg_lit)))]

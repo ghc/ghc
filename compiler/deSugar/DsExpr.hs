@@ -149,13 +149,14 @@ dsUnliftedBind (AbsBindsSig { abs_tvs         = []
        ; body' <- dsUnliftedBind (bind { fun_id = noLoc poly }) body
        ; return (mkCoreLets ds_binds body') }
 
-dsUnliftedBind (FunBind { fun_id = L _ fun
+dsUnliftedBind (FunBind { fun_id = L l fun
                         , fun_matches = matches
                         , fun_co_fn = co_fn
                         , fun_tick = tick }) body
                -- Can't be a bang pattern (that looks like a PatBind)
                -- so must be simply unboxed
-  = do { (args, rhs) <- matchWrapper (FunRhs (idName fun)) Nothing matches
+  = do { (args, rhs) <- matchWrapper (FunRhs (L l $ idName fun) Prefix)
+                                     Nothing matches
        ; MASSERT( null args ) -- Functions aren't lifted
        ; MASSERT( isIdHsWrapper co_fn )
        ; let rhs' = mkOptTickBox tick rhs
@@ -685,7 +686,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                                          , pat_args = PrefixCon $ map nlVarPat arg_ids
                                          , pat_arg_tys = in_inst_tys
                                          , pat_wrap = req_wrap }
-           ; return (mkSimpleMatch [pat] wrapped_rhs) }
+           ; return (mkSimpleMatch RecUpd [pat] wrapped_rhs) }
 
 -- Here is where we desugar the Template Haskell brackets and escapes
 
@@ -909,7 +910,8 @@ dsDo stmts
            ; let body' = noLoc $ HsDo DoExpr (noLoc stmts) body_ty
 
            ; let fun = L noSrcSpan $ HsLam $
-                   MG { mg_alts = noLoc [mkSimpleMatch pats body']
+                   MG { mg_alts = noLoc [mkSimpleMatch LambdaExpr pats
+                                                       body']
                       , mg_arg_tys = arg_tys
                       , mg_res_ty = body_ty
                       , mg_origin = Generated }
@@ -940,7 +942,9 @@ dsDo stmts
         rets         = map noLoc rec_rets
         mfix_app     = nlHsSyntaxApps mfix_op [mfix_arg]
         mfix_arg     = noLoc $ HsLam
-                           (MG { mg_alts = noLoc [mkSimpleMatch [mfix_pat] body]
+                           (MG { mg_alts = noLoc [mkSimpleMatch
+                                                    LambdaExpr
+                                                    [mfix_pat] body]
                                , mg_arg_tys = [tup_ty], mg_res_ty = body_ty
                                , mg_origin = Generated })
         mfix_pat     = noLoc $ LazyPat $ mkBigLHsPatTupId rec_tup_pats

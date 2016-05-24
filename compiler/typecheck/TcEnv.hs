@@ -1,7 +1,10 @@
 -- (c) The University of Glasgow 2006
 {-# LANGUAGE CPP, FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an
                                        -- orphan
+{-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
+                                      -- in module PlaceHolder
 
 module TcEnv(
         TyThing(..), TcTyThing(..), TcId,
@@ -823,10 +826,10 @@ data InstBindings a
            --          Used only to improve error messages
       }
 
-instance OutputableBndr a => Outputable (InstInfo a) where
+instance (OutputableBndrId a) => Outputable (InstInfo a) where
     ppr = pprInstInfoDetails
 
-pprInstInfoDetails :: OutputableBndr a => InstInfo a -> SDoc
+pprInstInfoDetails :: (OutputableBndrId a) => InstInfo a -> SDoc
 pprInstInfoDetails info
    = hang (pprInstanceHdr (iSpec info) <+> text "where")
         2 (details (iBinds info))

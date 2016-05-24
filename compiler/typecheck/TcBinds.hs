@@ -6,6 +6,7 @@
 -}
 
 {-# LANGUAGE CPP, RankNTypes, ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module TcBinds ( tcLocalBinds, tcTopBinds, tcRecSelBinds,
                  tcValBinds, tcHsBootSigs, tcPolyCheck,
@@ -1462,7 +1463,7 @@ tcMonoBinds is_rec sig_fn no_gen
                   -- We extend the error context even for a non-recursive
                   -- function so that in type error messages we show the
                   -- type of the thing whose rhs we are type checking
-               tcMatchesFun name matches rhs_ty
+               tcMatchesFun (L nm_loc name) matches rhs_ty
         ; rhs_ty  <- readExpType rhs_ty
 
         -- Deeply instantiate the inferred type
@@ -1593,7 +1594,7 @@ tcRhs (TcFunBind info@(MBI { mbi_sig = mb_sig, mbi_mono_id = mono_id })
   = tcExtendIdBinderStackForRhs [info]  $
     tcExtendTyVarEnvForRhs mb_sig       $
     do  { traceTc "tcRhs: fun bind" (ppr mono_id $$ ppr (idType mono_id))
-        ; (co_fn, matches') <- tcMatchesFun (idName mono_id)
+        ; (co_fn, matches') <- tcMatchesFun (noLoc $ idName mono_id)
                                  matches (mkCheckExpType $ idType mono_id)
         ; emitWildCardHoles info
         ; return ( FunBind { fun_id = L loc mono_id
@@ -2114,7 +2115,8 @@ the common case.) -}
 
 -- This one is called on LHS, when pat and grhss are both Name
 -- and on RHS, when pat is TcId and grhss is still Name
-patMonoBindsCtxt :: (OutputableBndr id, Outputable body) => LPat id -> GRHSs Name body -> SDoc
+patMonoBindsCtxt :: (OutputableBndrId id, Outputable body)
+                 => LPat id -> GRHSs Name body -> SDoc
 patMonoBindsCtxt pat grhss
   = hang (text "In a pattern binding:") 2 (pprPatBind pat grhss)
 

@@ -20,7 +20,7 @@ which deal with the instantiated versions are located elsewhere:
 
 module HsUtils(
   -- Terms
-  mkHsPar, mkHsApp, mkHsAppType, mkHsAppTypeOut, mkHsConApp, mkSimpleHsAlt,
+  mkHsPar, mkHsApp, mkHsAppType, mkHsAppTypeOut, mkHsConApp, mkHsCaseAlt,
   mkSimpleMatch, unguardedGRHSs, unguardedRHS,
   mkMatchGroup, mkMatchGroupName, mkMatch, mkHsLam, mkHsIf,
   mkHsWrap, mkLHsWrap, mkHsWrapCo, mkHsWrapCoR, mkLHsWrapCo,
@@ -133,10 +133,12 @@ just attach noSrcSpan to everything.
 mkHsPar :: LHsExpr id -> LHsExpr id
 mkHsPar e = L (getLoc e) (HsPar e)
 
-mkSimpleMatch :: [LPat id] -> Located (body id) -> LMatch id (Located (body id))
-mkSimpleMatch pats rhs
+mkSimpleMatch :: HsMatchContext (NameOrRdrName id)
+              -> [LPat id] -> Located (body id)
+              -> LMatch id (Located (body id))
+mkSimpleMatch ctxt pats rhs
   = L loc $
-    Match NonFunBindMatch pats Nothing (unguardedGRHSs rhs)
+    Match ctxt pats Nothing (unguardedGRHSs rhs)
   where
     loc = case pats of
                 []      -> getLoc rhs
@@ -178,8 +180,9 @@ mkHsAppTypeOut e t = addCLoc e (hswc_body t) (HsAppTypeOut e t)
 
 mkHsLam :: [LPat RdrName] -> LHsExpr RdrName -> LHsExpr RdrName
 mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam matches))
-        where
-          matches = mkMatchGroup Generated [mkSimpleMatch pats body]
+  where
+    matches = mkMatchGroup Generated
+                           [mkSimpleMatch LambdaExpr pats body]
 
 mkHsLams :: [TyVar] -> [EvVar] -> LHsExpr Id -> LHsExpr Id
 mkHsLams tyvars dicts expr = mkLHsWrap (mkWpTyLams tyvars
@@ -192,10 +195,11 @@ mkHsConApp data_con tys args
   where
     mk_app f a = noLoc (HsApp f (noLoc a))
 
-mkSimpleHsAlt :: LPat id -> (Located (body id)) -> LMatch id (Located (body id))
--- A simple lambda with a single pattern, no binds, no guards; pre-typechecking
-mkSimpleHsAlt pat expr
-  = mkSimpleMatch [pat] expr
+-- |A simple case alternative with a single pattern, no binds, no guards;
+-- pre-typechecking
+mkHsCaseAlt :: LPat id -> (Located (body id)) -> LMatch id (Located (body id))
+mkHsCaseAlt pat expr
+  = mkSimpleMatch CaseAlt [pat] expr
 
 nlHsTyApp :: name -> [Type] -> LHsExpr name
 nlHsTyApp fun_id tys = noLoc (HsWrap (mkWpTyApps tys) (HsVar (noLoc fun_id)))
@@ -709,13 +713,15 @@ isInfixFunBind _ = False
 mk_easy_FunBind :: SrcSpan -> RdrName -> [LPat RdrName]
                 -> LHsExpr RdrName -> LHsBind RdrName
 mk_easy_FunBind loc fun pats expr
-  = L loc $ mkFunBind (L loc fun) [mkMatch pats expr (noLoc emptyLocalBinds)]
+  = L loc $ mkFunBind (L loc fun)
+              [mkMatch (FunRhs (L loc fun) Prefix) pats expr
+                       (noLoc emptyLocalBinds)]
 
 ------------
-mkMatch :: [LPat id] -> LHsExpr id -> Located (HsLocalBinds id)
-        -> LMatch id (LHsExpr id)
-mkMatch pats expr lbinds
-  = noLoc (Match NonFunBindMatch (map paren pats) Nothing
+mkMatch :: HsMatchContext (NameOrRdrName id) -> [LPat id] -> LHsExpr id
+        -> Located (HsLocalBinds id) -> LMatch id (LHsExpr id)
+mkMatch ctxt pats expr lbinds
+  = noLoc (Match ctxt (map paren pats) Nothing
                  (GRHSs (unguardedRHS noSrcSpan expr) lbinds))
   where
     paren lp@(L l p) | hsPatNeedsParens p = L l (ParPat lp)

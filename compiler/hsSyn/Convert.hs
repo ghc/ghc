@@ -142,7 +142,7 @@ cvtDec :: TH.Dec -> CvtM (Maybe (LHsDecl RdrName))
 cvtDec (TH.ValD pat body ds)
   | TH.VarP s <- pat
   = do  { s' <- vNameL s
-        ; cl' <- cvtClause (Clause [] body ds)
+        ; cl' <- cvtClause (FunRhs s' Prefix) (Clause [] body ds)
         ; returnJustL $ Hs.ValD $ mkFunBind s' [cl'] }
 
   | otherwise
@@ -161,7 +161,7 @@ cvtDec (TH.FunD nm cls)
                  <+> text "has no equations")
   | otherwise
   = do  { nm' <- vNameL nm
-        ; cls' <- mapM cvtClause cls
+        ; cls' <- mapM (cvtClause (FunRhs nm' Prefix)) cls
         ; returnJustL $ Hs.ValD $ mkFunBind nm' cls' }
 
 cvtDec (TH.SigD nm typ)
@@ -354,7 +354,7 @@ cvtDec (TH.DefaultSigD nm typ)
 cvtDec (TH.PatSynD nm args dir pat)
   = do { nm'   <- cNameL nm
        ; args' <- cvtArgs args
-       ; dir'  <- cvtDir dir
+       ; dir'  <- cvtDir nm' dir
        ; pat'  <- cvtPat pat
        ; returnJustL $ Hs.ValD $ PatSynBind $
            PSB nm' placeHolderType args' pat' dir' }
@@ -366,10 +366,10 @@ cvtDec (TH.PatSynD nm args dir pat)
            ; vars' <- mapM (vNameL . mkNameS . nameBase) sels
            ; return $ Hs.RecordPatSyn $ zipWith RecordPatSynField sels' vars' }
 
-    cvtDir Unidir          = return Unidirectional
-    cvtDir ImplBidir       = return ImplicitBidirectional
-    cvtDir (ExplBidir cls) =
-      do { ms <- mapM cvtClause cls
+    cvtDir _ Unidir          = return Unidirectional
+    cvtDir _ ImplBidir       = return ImplicitBidirectional
+    cvtDir n (ExplBidir cls) =
+      do { ms <- mapM (cvtClause (FunRhs n Prefix)) cls
          ; return $ ExplicitBidirectional $ mkMatchGroup FromSource ms }
 
 cvtDec (TH.PatSynSigD nm ty)
@@ -730,12 +730,13 @@ cvtLocalDecs doc ds
        ; unless (null bads) (failWith (mkBadDecMsg doc bads))
        ; return (HsValBinds (ValBindsIn (listToBag binds) sigs)) }
 
-cvtClause :: TH.Clause -> CvtM (Hs.LMatch RdrName (LHsExpr RdrName))
-cvtClause (Clause ps body wheres)
+cvtClause :: HsMatchContext RdrName
+          -> TH.Clause -> CvtM (Hs.LMatch RdrName (LHsExpr RdrName))
+cvtClause ctxt (Clause ps body wheres)
   = do  { ps' <- cvtPats ps
         ; g'  <- cvtGuard body
         ; ds' <- cvtLocalDecs (text "a where clause") wheres
-        ; returnL $ Hs.Match NonFunBindMatch ps' Nothing
+        ; returnL $ Hs.Match ctxt ps' Nothing
                              (GRHSs g' (noLoc ds')) }
 
 
@@ -756,8 +757,9 @@ cvtl e = wrapL (cvt e)
     cvt (AppE x y)            = do { x' <- cvtl x; y' <- cvtl y
                                    ; return $ HsApp x' y' }
     cvt (LamE ps e)    = do { ps' <- cvtPats ps; e' <- cvtl e
-                            ; return $ HsLam (mkMatchGroup FromSource [mkSimpleMatch ps' e']) }
-    cvt (LamCaseE ms)  = do { ms' <- mapM cvtMatch ms
+                            ; return $ HsLam (mkMatchGroup FromSource
+                                             [mkSimpleMatch LambdaExpr ps' e'])}
+    cvt (LamCaseE ms)  = do { ms' <- mapM (cvtMatch LambdaExpr) ms
                             ; return $ HsLamCase (mkMatchGroup FromSource ms')
                             }
     cvt (TupE [e])     = do { e' <- cvtl e; return $ HsPar e' }
@@ -777,7 +779,7 @@ cvtl e = wrapL (cvt e)
                             ; return $ HsMultiIf placeHolderType alts' }
     cvt (LetE ds e)    = do { ds' <- cvtLocalDecs (text "a let expression") ds
                             ; e' <- cvtl e; return $ HsLet (noLoc ds') e' }
-    cvt (CaseE e ms)   = do { e' <- cvtl e; ms' <- mapM cvtMatch ms
+    cvt (CaseE e ms)   = do { e' <- cvtl e; ms' <- mapM (cvtMatch CaseAlt) ms
                             ; return $ HsCase e' (mkMatchGroup FromSource ms') }
     cvt (DoE ss)       = cvtHsDo DoExpr ss
     cvt (CompE ss)     = cvtHsDo ListComp ss
@@ -950,12 +952,13 @@ cvtStmt (TH.ParS dss)  = do { dss' <- mapM cvt_one dss; returnL $ ParStmt dss' n
                        where
                          cvt_one ds = do { ds' <- cvtStmts ds; return (ParStmtBlock ds' undefined noSyntaxExpr) }
 
-cvtMatch :: TH.Match -> CvtM (Hs.LMatch RdrName (LHsExpr RdrName))
-cvtMatch (TH.Match p body decs)
+cvtMatch :: HsMatchContext RdrName
+         -> TH.Match -> CvtM (Hs.LMatch RdrName (LHsExpr RdrName))
+cvtMatch ctxt (TH.Match p body decs)
   = do  { p' <- cvtPat p
         ; g' <- cvtGuard body
         ; decs' <- cvtLocalDecs (text "a where clause") decs
-        ; returnL $ Hs.Match NonFunBindMatch [p'] Nothing
+        ; returnL $ Hs.Match ctxt [p'] Nothing
                              (GRHSs g' (noLoc decs')) }
 
 cvtGuard :: TH.Body -> CvtM [LGRHS RdrName (LHsExpr RdrName)]

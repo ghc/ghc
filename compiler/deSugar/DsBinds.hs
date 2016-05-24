@@ -124,7 +124,9 @@ dsHsBind dflags
 dsHsBind dflags
          (FunBind { fun_id = L _ fun, fun_matches = matches
                   , fun_co_fn = co_fn, fun_tick = tick })
- = do   { (args, body) <- matchWrapper (FunRhs (idName fun)) Nothing matches
+ = do   { (args, body) <- matchWrapper
+                           (FunRhs (noLoc $ idName fun) Prefix)
+                           Nothing matches
         ; let body' = mkOptTickBox tick body
         ; rhs <- dsHsWrapper co_fn (mkLams args body')
         ; let core_binds@(id,_) = makeCorePair dflags fun False 0 rhs
@@ -313,7 +315,9 @@ dsHsBind dflags (AbsBindsSig { abs_tvs = tyvars, abs_ev_vars = dicts
   = putSrcSpanDs bind_loc $
     addDictsDs (toTcTypeBag (listToBag dicts)) $
              -- addDictsDs: push type constraints deeper for pattern match check
-    do { (args, body) <- matchWrapper (FunRhs (idName global)) Nothing matches
+    do { (args, body) <- matchWrapper
+                           (FunRhs (noLoc $ idName global) Prefix)
+                           Nothing matches
        ; let body' = mkOptTickBox tick body
        ; fun_rhs <- dsHsWrapper co_fn $
                     mkLams args body'

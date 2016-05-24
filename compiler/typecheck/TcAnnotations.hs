@@ -6,6 +6,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module TcAnnotations ( tcAnnotations, annCtxt ) where
 
@@ -64,6 +65,6 @@ annProvenanceToTarget _   (TypeAnnProvenance (L _ name))  = NamedTarget name
 annProvenanceToTarget mod ModuleAnnProvenance             = ModuleTarget mod
 #endif
 
-annCtxt :: OutputableBndr id => AnnDecl id -> SDoc
+annCtxt :: (OutputableBndrId id) => AnnDecl id -> SDoc
 annCtxt ann
   = hang (text "In the annotation:") 2 (ppr ann)
