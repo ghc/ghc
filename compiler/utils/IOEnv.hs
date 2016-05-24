@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE CPP #-}
 
 --
@@ -39,7 +38,6 @@ import Panic
 
 import Data.IORef       ( IORef, newIORef, readIORef, writeIORef, modifyIORef,
                           atomicModifyIORef, atomicModifyIORef' )
-import Data.Typeable
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import System.IO        ( fixIO )
 import Control.Monad
@@ -95,7 +93,6 @@ failWithM :: String -> IOEnv env a
 failWithM s = IOEnv (\ _ -> ioError (userError s))
 
 data IOEnvFailure = IOEnvFailure
-    deriving Typeable
 
 instance Show IOEnvFailure where
     show IOEnvFailure = "IOEnv failure"

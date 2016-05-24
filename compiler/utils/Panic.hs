@@ -8,7 +8,7 @@ It's hard to put these functions anywhere else without causing
 some unnecessary loops in the module dependency graph.
 -}
 
-{-# LANGUAGE CPP, DeriveDataTypeable, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, ScopedTypeVariables #-}
 
 module Panic (
      GhcException(..), showGhcException,
@@ -33,7 +33,6 @@ import Config
 import Exception
 
 import Control.Concurrent
-import Data.Dynamic
 import Debug.Trace        ( trace )
 import System.IO.Unsafe
 import System.Environment
@@ -86,7 +85,6 @@ data GhcException
   -- | An error in the user's code, probably.
   | ProgramError    String
   | PprProgramError String SDoc
-  deriving (Typeable)
 
 instance Exception GhcException
 

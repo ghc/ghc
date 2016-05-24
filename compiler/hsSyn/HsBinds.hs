@@ -74,7 +74,6 @@ data HsLocalBindsLR idL idR
   | HsIPBinds  (HsIPBinds idR)
 
   | EmptyLocalBinds
-  deriving (Typeable)
 
 deriving instance (DataId idL, DataId idR)
   => Data (HsLocalBindsLR idL idR)
@@ -98,7 +97,6 @@ data HsValBindsLR idL idR
   | ValBindsOut
         [(RecFlag, LHsBinds idL)]
         [LSig Name]
-  deriving (Typeable)
 
 deriving instance (DataId idL, DataId idR)
   => Data (HsValBindsLR idL idR)
@@ -227,7 +225,6 @@ data HsBindLR idL idR
 
         -- For details on above see note [Api annotations] in ApiAnnotation
 
-  deriving (Typeable)
 deriving instance (DataId idL, DataId idR)
   => Data (HsBindLR idL idR)
 
@@ -249,7 +246,7 @@ data ABExport id
         , abe_wrap      :: HsWrapper    -- ^ See Note [ABExport wrapper]
              -- Shape: (forall abs_tvs. abs_ev_vars => abe_mono) ~ abe_poly
         , abe_prags     :: TcSpecPrags  -- ^ SPECIALISE pragmas
-  } deriving (Data, Typeable)
+  } deriving Data
 
 -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnPattern',
 --             'ApiAnnotation.AnnEqual','ApiAnnotation.AnnLarrow'
@@ -263,7 +260,7 @@ data PatSynBind idL idR
           psb_args :: HsPatSynDetails (Located idR), -- ^ Formal parameter names
           psb_def  :: LPat idR,                      -- ^ Right-hand side
           psb_dir  :: HsPatSynDir idR                -- ^ Directionality
-  } deriving (Typeable)
+  }
 deriving instance (DataId idL, DataId idR)
   => Data (PatSynBind idL idR)
 
@@ -620,7 +617,6 @@ data HsIPBinds id
         [LIPBind id]
         TcEvBinds       -- Only in typechecker output; binds
                         -- uses of the implicit parameters
-  deriving (Typeable)
 deriving instance (DataId id) => Data (HsIPBinds id)
 
 isEmptyIPBinds :: HsIPBinds id -> Bool
@@ -644,7 +640,6 @@ type LIPBind id = Located (IPBind id)
 -- For details on above see note [Api annotations] in ApiAnnotation
 data IPBind id
   = IPBind (Either (Located HsIPName) id) (LHsExpr id)
-  deriving (Typeable)
 deriving instance (DataId name) => Data (IPBind name)
 
 instance (OutputableBndr id) => Outputable (HsIPBinds id) where
@@ -794,20 +789,19 @@ data Sig name
   | MinimalSig SourceText (LBooleanFormula (Located name))
                -- Note [Pragma source text] in BasicTypes
 
-  deriving (Typeable)
 deriving instance (DataId name) => Data (Sig name)
 
 
 type LFixitySig name = Located (FixitySig name)
 data FixitySig name = FixitySig [Located name] Fixity
-  deriving (Data, Typeable)
+  deriving Data
 
 -- | TsSpecPrags conveys pragmas from the type checker to the desugarer
 data TcSpecPrags
   = IsDefaultMethod     -- ^ Super-specialised: a default method should
                         -- be macro-expanded at every call site
   | SpecPrags [LTcSpecPrag]
-  deriving (Data, Typeable)
+  deriving Data
 
 type LTcSpecPrag = Located TcSpecPrag
 
@@ -818,7 +812,7 @@ data TcSpecPrag
         InlinePragma
   -- ^ The Id to be specialised, an wrapper that specialises the
   -- polymorphic function, and inlining spec for the specialised function
-  deriving (Data, Typeable)
+  deriving Data
 
 noSpecPrags :: TcSpecPrags
 noSpecPrags = SpecPrags []
@@ -945,7 +939,7 @@ data HsPatSynDetails a
   = InfixPatSyn a a
   | PrefixPatSyn [a]
   | RecordPatSyn [RecordPatSynField a]
-  deriving (Typeable, Data)
+  deriving Data
 
 
 -- See Note [Record PatSyn Fields]
@@ -955,7 +949,7 @@ data RecordPatSynField a
       , recordPatSynPatVar :: a
       -- Filled in by renamer, the name used internally
       -- by the pattern
-      } deriving (Typeable, Data)
+      } deriving Data
 
 
 
@@ -1043,5 +1037,4 @@ data HsPatSynDir id
   = Unidirectional
   | ImplicitBidirectional
   | ExplicitBidirectional (MatchGroup id (LHsExpr id))
-  deriving (Typeable)
 deriving instance (DataId id) => Data (HsPatSynDir id)

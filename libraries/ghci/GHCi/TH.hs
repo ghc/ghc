@@ -42,7 +42,7 @@ runModFinalizers = go =<< getState
 newtype GHCiQ a = GHCiQ { runGHCiQ :: QState -> IO (a, QState) }
 
 data GHCiQException = GHCiQException QState String
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception GHCiQException
 

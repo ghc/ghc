@@ -6,7 +6,7 @@
 Bag: an unordered collection with duplicates
 -}
 
-{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables, CPP #-}
+{-# LANGUAGE ScopedTypeVariables, CPP #-}
 
 module Bag (
         Bag, -- abstract type
@@ -41,7 +41,6 @@ data Bag a
   | UnitBag a
   | TwoBags (Bag a) (Bag a) -- INVARIANT: neither branch is empty
   | ListBag [a]             -- INVARIANT: the list is non-empty
-    deriving Typeable
 
 emptyBag :: Bag a
 emptyBag = EmptyBag

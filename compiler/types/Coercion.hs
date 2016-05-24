@@ -2,7 +2,7 @@
 (c) The University of Glasgow 2006
 -}
 
-{-# LANGUAGE RankNTypes, CPP, DeriveDataTypeable, MultiWayIf #-}
+{-# LANGUAGE RankNTypes, CPP, MultiWayIf #-}
 
 -- | Module for (a) type kinds and (b) type coercions,
 -- as used in System FC. See 'CoreSyn.Expr' for

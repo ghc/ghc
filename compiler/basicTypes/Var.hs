@@ -5,7 +5,7 @@
 \section{@Vars@: Variables}
 -}
 
-{-# LANGUAGE CPP, DeriveDataTypeable, MultiWayIf #-}
+{-# LANGUAGE CPP, MultiWayIf #-}
 
 -- |
 -- #name_types#
@@ -186,7 +186,6 @@ data Var
         idScope    :: IdScope,
         id_details :: IdDetails,        -- Stable, doesn't change
         id_info    :: IdInfo }          -- Unstable, updated by simplifier
-    deriving Typeable
 
 data IdScope    -- See Note [GlobalId/LocalId]
   = GlobalId

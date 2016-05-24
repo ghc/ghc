@@ -5,7 +5,7 @@
 \section[ConLike]{@ConLike@: Constructor-like things}
 -}
 
-{-# LANGUAGE CPP, DeriveDataTypeable #-}
+{-# LANGUAGE CPP #-}
 
 module ConLike (
           ConLike(..)
@@ -37,7 +37,6 @@ import Var
 import Type (mkTyConApp)
 
 import qualified Data.Data as Data
-import qualified Data.Typeable
 
 {-
 ************************************************************************
@@ -50,7 +49,6 @@ import qualified Data.Typeable
 -- | A constructor-like thing
 data ConLike = RealDataCon DataCon
              | PatSynCon PatSyn
-  deriving Data.Typeable.Typeable
 
 {-
 ************************************************************************

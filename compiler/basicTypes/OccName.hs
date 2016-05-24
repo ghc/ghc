@@ -227,7 +227,6 @@ data OccName = OccName
     { occNameSpace  :: !NameSpace
     , occNameFS     :: !FastString
     }
-    deriving Typeable
 
 instance Eq OccName where
     (OccName sp1 s1) == (OccName sp2 s2) = s1 == s2 && sp1 == sp2
@@ -386,7 +385,7 @@ instance Uniquable OccName where
   getUnique (OccName TcClsName fs) = mkTcOccUnique   fs
 
 newtype OccEnv a = A (UniqFM a)
-  deriving (Data, Typeable)
+  deriving Data
 
 emptyOccEnv :: OccEnv a
 unitOccEnv  :: OccName -> a -> OccEnv a

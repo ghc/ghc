@@ -228,7 +228,6 @@ data Pat id
                 Type                    -- Type of whole pattern, t1
         -- During desugaring a (CoPat co pat) turns into a cast with 'co' on
         -- the scrutinee, followed by a match on 'pat'
-  deriving (Typeable)
 deriving instance (DataId id) => Data (Pat id)
 
 type HsConPatDetails id = HsConDetails (LPat id) (HsRecFields id (LPat id))
@@ -246,7 +245,7 @@ data HsRecFields id arg         -- A bunch of record fields
         -- Used for both expressions and patterns
   = HsRecFields { rec_flds   :: [LHsRecField id arg],
                   rec_dotdot :: Maybe Int }  -- Note [DotDot fields]
-  deriving (Typeable, Functor, Foldable, Traversable)
+  deriving (Functor, Foldable, Traversable)
 deriving instance (DataId id, Data arg) => Data (HsRecFields id arg)
 
 
@@ -278,7 +277,7 @@ data HsRecField' id arg = HsRecField {
         hsRecFieldLbl :: Located id,
         hsRecFieldArg :: arg,           -- ^ Filled in by renamer when punning
         hsRecPun      :: Bool           -- ^ Note [Punning]
-  } deriving (Data, Typeable, Functor, Foldable, Traversable)
+  } deriving (Data, Functor, Foldable, Traversable)
 
 
 -- Note [Punning]

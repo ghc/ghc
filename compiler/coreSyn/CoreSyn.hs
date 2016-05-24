@@ -263,7 +263,7 @@ data Expr b
   | Tick  (Tickish Id) (Expr b)
   | Type  Type
   | Coercion Coercion
-  deriving (Data, Typeable)
+  deriving Data
 
 -- | Type synonym for expressions that occur in function argument positions.
 -- Only 'Arg' should contain a 'Type' at top level, general 'Expr' should not
@@ -290,7 +290,7 @@ data AltCon
                       -- See Note [Literal alternatives]
 
   | DEFAULT           -- ^ Trivial alternative: @case e of { _ -> ... }@
-   deriving (Eq, Ord, Data, Typeable)
+   deriving (Eq, Ord, Data)
 
 -- | Binding, used for top level bindings in a module and local bindings in a @let@.
 
@@ -298,7 +298,7 @@ data AltCon
 -- See Note [GHC Formalism] in coreSyn/CoreLint.hs
 data Bind b = NonRec b (Expr b)
             | Rec [(b, (Expr b))]
-  deriving (Data, Typeable)
+  deriving Data
 
 {-
 Note [Shadowing]
@@ -508,7 +508,7 @@ data Tickish id =
                                 --   (uses same names as CCs)
     }
 
-  deriving (Eq, Ord, Data, Typeable)
+  deriving (Eq, Ord, Data)
 
 -- | A "counting tick" (where tickishCounts is True) is one that
 -- counts evaluations in some way.  We cannot discard a counting tick,
@@ -729,7 +729,7 @@ data IsOrphan
   | NotOrphan OccName -- The OccName 'n' witnesses the instance's non-orphanhood
                       -- In that case, the instance is fingerprinted as part
                       -- of the definition of 'n's definition
-    deriving (Data, Typeable)
+    deriving Data
 
 -- | Returns true if 'IsOrphan' is orphan.
 isOrphan :: IsOrphan -> Bool

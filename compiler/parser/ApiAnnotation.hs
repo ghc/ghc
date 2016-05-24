@@ -278,7 +278,7 @@ data AnnKeywordId
     | AnnRarrowtail -- ^ '>>-'
     | AnnRarrowtailU -- ^ '>>-', unicode variant
     | AnnEofPos
-    deriving (Eq, Ord, Data, Typeable, Show)
+    deriving (Eq, Ord, Data, Show)
 
 instance Outputable AnnKeywordId where
   ppr x = text (show x)
@@ -294,7 +294,7 @@ data AnnotationComment =
   | AnnDocOptions      String     -- ^ doc options (prune, ignore-exports, etc)
   | AnnLineComment     String     -- ^ comment starting by "--"
   | AnnBlockComment    String     -- ^ comment in {- -}
-    deriving (Eq, Ord, Data, Typeable, Show)
+    deriving (Eq, Ord, Data, Show)
 -- Note: these are based on the Token versions, but the Token type is
 -- defined in Lexer.x and bringing it in here would create a loop
 
@@ -314,7 +314,7 @@ type LRdrName = Located RdrName
 -- original source representation can be reproduced in the corresponding
 -- 'ApiAnnotation'
 data IsUnicodeSyntax = UnicodeSyntax | NormalSyntax
-    deriving (Eq, Ord, Data, Typeable, Show)
+    deriving (Eq, Ord, Data, Show)
 
 -- | Convert a normal annotation into its unicode equivalent one
 unicodeAnn :: AnnKeywordId -> AnnKeywordId
@@ -338,4 +338,4 @@ unicodeAnn ann           = ann
 --
 -- This type indicates whether the 'e' is present or not.
 data HasE = HasE | NoE
-     deriving (Eq, Ord, Data, Typeable, Show)
+     deriving (Eq, Ord, Data, Show)

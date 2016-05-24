@@ -44,7 +44,7 @@ import BasicTypes
 import UniqFM
 import Util
 import Id
-import Data.Data        ( Data, Typeable )
+import Data.Data        ( Data )
 import Data.Maybe       ( isJust, isNothing )
 
 {-
@@ -76,7 +76,7 @@ data ClsInst
                                         -- the decl of BasicTypes.OverlapFlag
              , is_orphan :: IsOrphan
     }
-  deriving (Data, Typeable)
+  deriving Data
 
 -- | A fuzzy comparison function for class instances, intended for sorting
 -- instances before displaying them to the user.

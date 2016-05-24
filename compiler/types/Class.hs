@@ -3,7 +3,7 @@
 --
 -- The @Class@ datatype
 
-{-# LANGUAGE CPP, DeriveDataTypeable #-}
+{-# LANGUAGE CPP #-}
 
 module Class (
         Class,
@@ -36,7 +36,6 @@ import PrelNames    ( eqTyConKey, coercibleTyConKey, typeableClassKey,
 import Outputable
 import BooleanFormula (BooleanFormula)
 
-import Data.Typeable (Typeable)
 import qualified Data.Data as Data
 
 {-
@@ -79,7 +78,6 @@ data Class
         -- Minimal complete definition
         classMinimalDef :: ClassMinimalDef
      }
-  deriving Typeable
 
 --  | e.g.
 --

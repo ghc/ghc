@@ -2,8 +2,6 @@
 -- (c) The University of Glasgow
 --
 
-{-# LANGUAGE DeriveDataTypeable #-}
-
 module Avail (
     Avails,
     AvailInfo(..),

@@ -5,7 +5,7 @@
 \section[PatSyn]{@PatSyn@: Pattern synonyms}
 -}
 
-{-# LANGUAGE CPP, DeriveDataTypeable #-}
+{-# LANGUAGE CPP #-}
 
 module PatSyn (
         -- * Main data types
@@ -34,7 +34,6 @@ import Var
 import FieldLabel
 
 import qualified Data.Data as Data
-import qualified Data.Typeable
 import Data.Function
 import Data.List
 
@@ -108,7 +107,6 @@ data PatSyn
              --                       =>  arg_tys -> res_ty
              -- See Note [Builder for pattern synonyms with unboxed type]
   }
-  deriving Data.Typeable.Typeable
 
 {- Note [Pattern synonym signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

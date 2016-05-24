@@ -60,7 +60,6 @@ import Unique           ( Uniquable(..), Unique, getKey )
 import Outputable
 
 import qualified Data.IntMap as M
-import Data.Typeable
 import Data.Data
 import Data.List (sortBy)
 import Data.Function (on)
@@ -109,7 +108,7 @@ data TaggedVal val =
   TaggedVal
     val
     {-# UNPACK #-} !Int -- ^ insertion time
-  deriving (Data, Typeable)
+  deriving Data
 
 taggedFst :: TaggedVal val -> val
 taggedFst (TaggedVal v _) = v
@@ -132,7 +131,7 @@ data UniqDFM ele =
                                 -- be distinct within a single map
     {-# UNPACK #-} !Int         -- Upper bound on the values' insertion
                                 -- time. See Note [Overflow on plusUDFM]
-  deriving (Data, Typeable, Functor)
+  deriving (Data, Functor)
 
 emptyUDFM :: UniqDFM elt
 emptyUDFM = UDFM M.empty 0

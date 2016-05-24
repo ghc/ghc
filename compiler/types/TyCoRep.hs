@@ -234,7 +234,7 @@ data Type
                     -- in the list of a TyConApp, when applying a promoted
                     -- GADT data constructor
 
-  deriving (Data.Data, Data.Typeable)
+  deriving Data.Data
 
 
 -- NOTE:  Other parts of the code assume that type literals do not contain
@@ -242,7 +242,7 @@ data Type
 data TyLit
   = NumTyLit Integer
   | StrTyLit FastString
-  deriving (Eq, Ord, Data.Data, Data.Typeable)
+  deriving (Eq, Ord, Data.Data)
 
 {- Note [The kind invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -369,14 +369,14 @@ same kinds.
 data TyBinder
   = Named TyVar VisibilityFlag  -- Always a TyVar (not CoVar or Id)
   | Anon Type   -- Visibility is determined by the type (Constraint vs. *)
-    deriving (Data.Typeable, Data.Data)
+    deriving Data.Data
 
 -- | Is something required to appear in source Haskell ('Visible'),
 -- permitted by request ('Specified') (visible type application), or
 -- prohibited entirely from appearing in source Haskell ('Invisible')?
 -- See Note [TyBinders and VisibilityFlags]
 data VisibilityFlag = Visible | Specified | Invisible
-  deriving (Eq, Data.Typeable, Data.Data)
+  deriving (Eq, Data.Data)
 
 -- | Do these denote the same level of visibility? Except that
 -- 'Specified' and 'Invisible' are considered the same. Used
@@ -820,7 +820,7 @@ data Coercion
   | SubCo CoercionN                  -- Turns a ~N into a ~R
     -- :: N -> R
 
-  deriving (Data.Data, Data.Typeable)
+  deriving Data.Data
 
 type CoercionN = Coercion       -- always nominal
 type CoercionR = Coercion       -- always representational
@@ -830,7 +830,7 @@ type KindCoercion = CoercionN   -- always nominal
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in coreSyn/CoreLint.hs
 data LeftOrRight = CLeft | CRight
-                 deriving( Eq, Data.Data, Data.Typeable )
+                 deriving( Eq, Data.Data )
 
 instance Binary LeftOrRight where
    put_ bh CLeft  = putByte bh 0
@@ -1193,7 +1193,7 @@ data UnivCoProvenance
                        --   is sound. The string is for the use of the plugin.
 
   | HoleProv CoercionHole  -- ^ See Note [Coercion holes]
-  deriving (Data.Data, Data.Typeable)
+  deriving Data.Data
 
 instance Outputable UnivCoProvenance where
   ppr UnsafeCoerceProv   = text "(unsafeCoerce#)"
@@ -1207,7 +1207,6 @@ data CoercionHole
   = CoercionHole { chUnique   :: Unique   -- ^ used only for debugging
                  , chCoercion :: IORef (Maybe Coercion)
                  }
-  deriving (Data.Typeable)
 
 instance Data.Data CoercionHole where
   -- don't traverse?

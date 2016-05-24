@@ -61,7 +61,7 @@ import Data.Int
 import Data.Ratio
 import Data.Word
 import Data.Char
-import Data.Data ( Data, Typeable )
+import Data.Data ( Data )
 import Numeric ( fromRat )
 
 {-
@@ -116,7 +116,7 @@ data Literal
 
   | LitInteger Integer Type --  ^ Integer literals
                             -- See Note [Integer literals]
-  deriving (Data, Typeable)
+  deriving Data
 
 {-
 Note [Integer literals]

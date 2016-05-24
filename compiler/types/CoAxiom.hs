@@ -124,16 +124,13 @@ type BranchIndex = Int  -- The index of the branch in the list of branches
 -- promoted data type
 data BranchFlag = Branched | Unbranched
 type Branched = 'Branched
-deriving instance Typeable 'Branched
 type Unbranched = 'Unbranched
-deriving instance Typeable 'Unbranched
 -- By using type synonyms for the promoted constructors, we avoid needing
 -- DataKinds and the promotion quote in client modules. This also means that
 -- we don't need to export the term-level constructors, which should never be used.
 
 newtype Branches (br :: BranchFlag)
   = MkBranches { unMkBranches :: Array BranchIndex CoAxBranch }
-  deriving Typeable
 type role Branches nominal
 
 manyBranches :: [CoAxBranch] -> Branches Branched
@@ -216,7 +213,6 @@ data CoAxiom br
                                       -- See Note [Implicit axioms]
          -- INVARIANT: co_ax_implicit == True implies length co_ax_branches == 1.
     }
-  deriving Typeable
 
 data CoAxBranch
   = CoAxBranch
@@ -235,7 +231,7 @@ data CoAxBranch
     , cab_incomps  :: [CoAxBranch]  -- The previous incompatible branches
                                     -- See Note [Storing compatibility]
     }
-  deriving ( Data.Data, Data.Typeable )
+  deriving Data.Data
 
 toBranchedAxiom :: CoAxiom br -> CoAxiom Branched
 toBranchedAxiom (CoAxiom unique name role tc branches implicit)
@@ -431,7 +427,7 @@ Roles are defined here to avoid circular dependencies.
 -- See Note [Roles] in Coercion
 -- defined here to avoid cyclic dependency with Coercion
 data Role = Nominal | Representational | Phantom
-  deriving (Eq, Ord, Data.Data, Data.Typeable)
+  deriving (Eq, Ord, Data.Data)
 
 -- These names are slurped into the parser code. Changing these strings
 -- will change the **surface syntax** that GHC accepts! If you want to
@@ -487,7 +483,7 @@ data CoAxiomRule = CoAxiomRule
         -- the supplied arguments.  When this happens in a coercion
         -- that means that the coercion is ill-formed, and Core Lint
         -- checks for that.
-  } deriving Typeable
+  }
 
 instance Data.Data CoAxiomRule where
   -- don't traverse?

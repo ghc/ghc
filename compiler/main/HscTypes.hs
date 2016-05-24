@@ -4,7 +4,7 @@
 \section[HscTypes]{Types for the per-module compiler}
 -}
 
-{-# LANGUAGE CPP, DeriveDataTypeable, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, ScopedTypeVariables #-}
 
 -- | Types for the per-module compiler
 module HscTypes (
@@ -194,7 +194,6 @@ import Foreign
 import Control.Monad    ( guard, liftM, when, ap )
 import Data.IORef
 import Data.Time
-import Data.Typeable    ( Typeable )
 import Exception
 import System.FilePath
 #ifdef GHCI
@@ -286,7 +285,6 @@ throwOneError err = liftIO $ throwIO $ mkSrcErr $ unitBag err
 -- See 'printExceptionAndWarnings' for more information on what to take care
 -- of when writing a custom error handler.
 newtype SourceError = SourceError ErrorMessages
-  deriving Typeable
 
 instance Show SourceError where
   show (SourceError msgs) = unlines . map show . bagToList $ msgs
@@ -304,7 +302,6 @@ handleSourceError handler act =
 
 -- | An error thrown if the GHC API is used in an incorrect fashion.
 newtype GhcApiError = GhcApiError String
-  deriving Typeable
 
 instance Show GhcApiError where
   show (GhcApiError msg) = msg

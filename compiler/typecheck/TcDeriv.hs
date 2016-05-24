@@ -1625,10 +1625,10 @@ be satisfied too.  But not always; consider:
 
 The derived instance for (Ord (T a)) must have a (Num a) constraint!
 Similarly consider:
-        data T a = MkT deriving( Data, Typeable )
+        data T a = MkT deriving( Data )
 Here there *is* no argument field, but we must nevertheless generate
 a context for the Data instances:
-        instance Typable a => Data (T a) where ...
+        instance Typeable a => Data (T a) where ...
 
 ************************************************************************
 *                                                                      *

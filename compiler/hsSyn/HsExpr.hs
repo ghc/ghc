@@ -95,7 +95,6 @@ noPostTcTable = []
 data SyntaxExpr id = SyntaxExpr { syn_expr      :: HsExpr id
                                 , syn_arg_wraps :: [HsWrapper]
                                 , syn_res_wrap  :: HsWrapper }
-  deriving (Typeable)
 deriving instance (DataId id) => Data (SyntaxExpr id)
 
 -- | This is used for rebindable-syntax pieces that are too polymorphic
@@ -179,7 +178,7 @@ data UnboundVar
 
   | TrueExprHole OccName             -- ^ A "true" expression hole (_ or _x)
 
-  deriving (Data, Typeable)
+  deriving Data
 
 instance Outputable UnboundVar where
     ppr = ppr . unboundVarOcc
@@ -658,7 +657,6 @@ data HsExpr id
   |  HsWrap     HsWrapper    -- TRANSLATION
                 (HsExpr id)
 
-  deriving (Typeable)
 deriving instance (DataId id) => Data (HsExpr id)
 
 -- | HsTupArg is used for tuple sections
@@ -671,7 +669,6 @@ type LHsTupArg id = Located (HsTupArg id)
 data HsTupArg id
   = Present (LHsExpr id)     -- ^ The argument
   | Missing (PostTc id Type) -- ^ The argument is missing, but this is its type
-  deriving (Typeable)
 deriving instance (DataId id) => Data (HsTupArg id)
 
 tupArgPresent :: LHsTupArg id -> Bool
@@ -1143,11 +1140,10 @@ data HsCmd id
                 (HsCmd id)     -- If   cmd :: arg1 --> res
                                --      wrap :: arg1 "->" arg2
                                -- Then (HsCmdWrap wrap cmd) :: arg2 --> res
-  deriving (Typeable)
 deriving instance (DataId id) => Data (HsCmd id)
 
 data HsArrAppType = HsHigherOrderApp | HsFirstOrderApp
-  deriving (Data, Typeable)
+  deriving Data
 
 
 {- | Top-level command, introducing a new arrow.
@@ -1162,7 +1158,6 @@ data HsCmdTop id
              (PostTc id Type)   -- Nested tuple of inputs on the command's stack
              (PostTc id Type)   -- return type of the command
              (CmdSyntaxTable id) -- See Note [CmdSyntaxTable]
-  deriving (Typeable)
 deriving instance (DataId id) => Data (HsCmdTop id)
 
 instance OutputableBndr id => Outputable (HsCmd id) where
@@ -1291,7 +1286,6 @@ data MatchGroup id body
      -- The type is the type of the entire group
      --      t1 -> ... -> tn -> tr
      -- where there are n patterns
-  deriving (Typeable)
 deriving instance (Data body,DataId id) => Data (MatchGroup id body)
 
 type LMatch id body = Located (Match id body)
@@ -1309,7 +1303,7 @@ data Match id body
                                  -- Nothing after typechecking
                                  -- NB: No longer supported
         m_grhss :: (GRHSs id body)
-  } deriving (Typeable)
+  }
 deriving instance (Data body,DataId id) => Data (Match id body)
 
 {-
@@ -1344,7 +1338,6 @@ data MatchFixity id
   = NonFunBindMatch
   | FunBindMatch (Located id) -- of the Id
                  Bool         -- is infix
-  deriving (Typeable)
 deriving instance (DataId id) => Data (MatchFixity id)
 
 isInfixMatch :: Match id body -> Bool
@@ -1386,7 +1379,7 @@ data GRHSs id body
   = GRHSs {
       grhssGRHSs :: [LGRHS id body],       -- ^ Guarded RHSs
       grhssLocalBinds :: Located (HsLocalBinds id) -- ^ The where clause
-    } deriving (Typeable)
+    }
 deriving instance (Data body,DataId id) => Data (GRHSs id body)
 
 type LGRHS id body = Located (GRHS id body)
@@ -1394,7 +1387,6 @@ type LGRHS id body = Located (GRHS id body)
 -- | Guarded Right Hand Side.
 data GRHS id body = GRHS [GuardLStmt id] -- Guards
                          body            -- Right hand side
-  deriving (Typeable)
 deriving instance (Data body,DataId id) => Data (GRHS id body)
 
 -- We know the list must have at least one @Match@ in it.
@@ -1623,21 +1615,19 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
                                    -- With rebindable syntax the type might not
                                    -- be quite as simple as (m (tya, tyb, tyc)).
       }
-  deriving (Typeable)
 deriving instance (Data body, DataId idL, DataId idR)
   => Data (StmtLR idL idR body)
 
 data TransForm   -- The 'f' below is the 'using' function, 'e' is the by function
   = ThenForm     -- then f               or    then f by e             (depending on trS_by)
   | GroupForm    -- then group using f   or    then group by e using f (depending on trS_by)
-  deriving (Data, Typeable)
+  deriving Data
 
 data ParStmtBlock idL idR
   = ParStmtBlock
         [ExprLStmt idL]
         [idR]              -- The variables to be returned
         (SyntaxExpr idR)   -- The return operator
-  deriving( Typeable )
 deriving instance (DataId idL, DataId idR) => Data (ParStmtBlock idL idR)
 
 data ApplicativeArg idL idR
@@ -1648,7 +1638,6 @@ data ApplicativeArg idL idR
       [ExprLStmt idL]            -- stmts
       (HsExpr idL)               -- return (v1,..,vn), or just (v1,..,vn)
       (LPat idL)                 -- (v1,...,vn)
-  deriving( Typeable )
 deriving instance (DataId idL, DataId idR) => Data (ApplicativeArg idL idR)
 
 {-
@@ -1930,7 +1919,6 @@ data HsSplice id
         id               -- Quoter
         SrcSpan          -- The span of the enclosed string
         FastString       -- The enclosed string
-  deriving (Typeable )
 
 deriving instance (DataId id) => Data (HsSplice id)
 
@@ -1943,18 +1931,18 @@ type SplicePointName = Name
 
 data PendingRnSplice
   = PendingRnSplice UntypedSpliceFlavour SplicePointName (LHsExpr Name)
-  deriving (Data, Typeable)
+  deriving Data
 
 data UntypedSpliceFlavour
   = UntypedExpSplice
   | UntypedPatSplice
   | UntypedTypeSplice
   | UntypedDeclSplice
-  deriving( Data, Typeable )
+  deriving Data
 
 data PendingTcSplice
   = PendingTcSplice SplicePointName (LHsExpr Id)
-  deriving( Data, Typeable )
+  deriving Data
 
 
 {-
@@ -2058,7 +2046,6 @@ data HsBracket id = ExpBr (LHsExpr id)   -- [|  expr  |]
                   | VarBr Bool id        -- True: 'x, False: ''T
                                          -- (The Bool flag is used only in pprHsBracket)
                   | TExpBr (LHsExpr id)  -- [||  expr  ||]
-  deriving (Typeable)
 deriving instance (DataId id) => Data (HsBracket id)
 
 isTypedBracket :: HsBracket id -> Bool
@@ -2109,7 +2096,6 @@ data ArithSeqInfo id
   | FromThenTo      (LHsExpr id)
                     (LHsExpr id)
                     (LHsExpr id)
-  deriving (Typeable)
 deriving instance (DataId id) => Data (ArithSeqInfo id)
 
 instance OutputableBndr id => Outputable (ArithSeqInfo id) where
@@ -2148,7 +2134,7 @@ data HsMatchContext id  -- Context of a Match
   | ThPatSplice                 -- A Template Haskell pattern splice
   | ThPatQuote                  -- A Template Haskell pattern quotation [p| (a,b) |]
   | PatSyn                      -- A pattern synonym declaration
-  deriving (Data, Typeable)
+  deriving Data
 
 data HsStmtContext id
   = ListComp
@@ -2163,7 +2149,7 @@ data HsStmtContext id
   | PatGuard (HsMatchContext id)         -- Pattern guard for specified thing
   | ParStmtCtxt (HsStmtContext id)       -- A branch of a parallel stmt
   | TransStmtCtxt (HsStmtContext id)     -- A branch of a transform stmt
-  deriving (Data, Typeable)
+  deriving Data
 
 isListCompExpr :: HsStmtContext id -> Bool
 -- Uses syntax [ e | quals ]

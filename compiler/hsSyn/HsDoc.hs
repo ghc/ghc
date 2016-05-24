@@ -15,7 +15,7 @@ import FastString
 import Data.Data
 
 newtype HsDocString = HsDocString FastString
-  deriving (Eq, Show, Data, Typeable)
+  deriving (Eq, Show, Data)
 
 type LHsDocString = Located HsDocString
 

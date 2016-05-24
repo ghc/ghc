@@ -251,7 +251,6 @@ data LHsQTyVars name   -- See Note [HsType binders]
                -- which explicit vars are dependent
                -- See Note [Dependent LHsQTyVars] in TcHsType
     }
-  deriving( Typeable )
 
 deriving instance (DataId name) => Data (LHsQTyVars name)
 
@@ -282,7 +281,6 @@ data HsImplicitBndrs name thing   -- See Note [HsType binders]
   = HsIB { hsib_vars :: PostRn name [Name] -- Implicitly-bound kind & type vars
          , hsib_body :: thing              -- Main payload (type or list of types)
     }
-  deriving (Typeable)
 
 data HsWildCardBndrs name thing
     -- See Note [HsType binders]
@@ -300,7 +298,6 @@ data HsWildCardBndrs name thing
 
          , hswc_body :: thing  -- Main payload (type or list of types)
     }
-  deriving( Typeable )
 
 deriving instance (Data name, Data thing, Data (PostRn name [Name]))
   => Data (HsImplicitBndrs name thing)
@@ -372,7 +369,7 @@ mkEmptyWildCardBndrs x = HsWC { hswc_body = x
 -- | These names are used early on to store the names of implicit
 -- parameters.  They completely disappear after type-checking.
 newtype HsIPName = HsIPName FastString
-  deriving( Eq, Data, Typeable )
+  deriving( Eq, Data )
 
 hsIPNameFS :: HsIPName -> FastString
 hsIPNameFS (HsIPName n) = n
@@ -398,7 +395,6 @@ data HsTyVarBndr name
         --          'ApiAnnotation.AnnDcolon', 'ApiAnnotation.AnnClose'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-  deriving (Typeable)
 deriving instance (DataId name) => Data (HsTyVarBndr name)
 
 -- | Does this 'HsTyVarBndr' come with an explicit kind annotation?
@@ -565,7 +561,6 @@ data HsType name
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
       -- For details on above see note [Api annotations] in ApiAnnotation
-  deriving (Typeable)
 deriving instance (DataId name) => Data (HsType name)
 
 -- Note [Literal source text] in BasicTypes for SourceText fields in
@@ -573,13 +568,12 @@ deriving instance (DataId name) => Data (HsType name)
 data HsTyLit
   = HsNumTy SourceText Integer
   | HsStrTy SourceText FastString
-    deriving (Data, Typeable)
+    deriving Data
 
 newtype HsWildCardInfo name      -- See Note [The wildcard story for types]
     = AnonWildCard (PostRn name (Located Name))
       -- A anonymous wild card ('_'). A fresh Name is generated for
       -- each individual anonymous wildcard during renaming
-    deriving (Typeable)
 deriving instance (DataId name) => Data (HsWildCardInfo name)
 
 type LHsAppType name = Located (HsAppType name)
@@ -588,7 +582,6 @@ type LHsAppType name = Located (HsAppType name)
 data HsAppType name
   = HsAppInfix (Located name)       -- either a symbol or an id in backticks
   | HsAppPrefix (LHsType name)      -- anything else, including things like (+)
-  deriving (Typeable)
 deriving instance (DataId name) => Data (HsAppType name)
 
 instance OutputableBndr name => Outputable (HsAppType name) where
@@ -705,7 +698,7 @@ data HsTupleSort = HsUnboxedTuple
                  | HsBoxedTuple
                  | HsConstraintTuple
                  | HsBoxedOrConstraintTuple
-                 deriving (Data, Typeable)
+                 deriving Data
 
 type LConDeclField name = Located (ConDeclField name)
       -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma' when
@@ -720,7 +713,6 @@ data ConDeclField name  -- Record fields have Haddoc docs on them
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
 
       -- For details on above see note [Api annotations] in ApiAnnotation
-  deriving (Typeable)
 deriving instance (DataId name) => Data (ConDeclField name)
 
 instance (OutputableBndr name) => Outputable (ConDeclField name) where
@@ -732,7 +724,7 @@ data HsConDetails arg rec
   = PrefixCon [arg]             -- C p1 p2 p3
   | RecCon    rec               -- C { x = p1, y = p2 }
   | InfixCon  arg arg           -- p1 `C` p2
-  deriving (Data, Typeable)
+  deriving Data
 
 instance (Outputable arg, Outputable rec)
          => Outputable (HsConDetails arg rec) where
@@ -1050,7 +1042,6 @@ data FieldOcc name = FieldOcc { rdrNameFieldOcc  :: Located RdrName
                                  -- ^ See Note [Located RdrNames] in HsExpr
                               , selectorFieldOcc :: PostRn name name
                               }
-  deriving Typeable
 deriving instance Eq (PostRn name name) => Eq (FieldOcc name)
 deriving instance Ord (PostRn name name) => Ord (FieldOcc name)
 deriving instance (Data name, Data (PostRn name name)) => Data (FieldOcc name)
@@ -1075,7 +1066,6 @@ mkFieldOcc rdr = FieldOcc rdr PlaceHolder
 data AmbiguousFieldOcc name
   = Unambiguous (Located RdrName) (PostRn name name)
   | Ambiguous   (Located RdrName) (PostTc name name)
-  deriving (Typeable)
 deriving instance ( Data name
                   , Data (PostRn name name)
                   , Data (PostTc name name))

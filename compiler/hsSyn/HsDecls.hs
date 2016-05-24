@@ -142,7 +142,6 @@ data HsDecl id
   | SpliceD     (SpliceDecl id)   -- Includes quasi-quotes
   | DocD        (DocDecl)
   | RoleAnnotD  (RoleAnnotDecl id)
-  deriving (Typeable)
 deriving instance (DataId id) => Data (HsDecl id)
 
 
@@ -186,7 +185,7 @@ data HsGroup id
         hs_vects  :: [LVectDecl id],
 
         hs_docs   :: [LDocDecl]
-  } deriving (Typeable)
+  }
 deriving instance (DataId id) => Data (HsGroup id)
 
 emptyGroup, emptyRdrGroup, emptyRnGroup :: HsGroup a
@@ -299,14 +298,13 @@ instance OutputableBndr name => Outputable (HsGroup name) where
 
 data SpliceExplicitFlag = ExplicitSplice | -- <=> $(f x y)
                           ImplicitSplice   -- <=> f x y,  i.e. a naked top level expression
-    deriving (Data, Typeable)
+    deriving Data
 
 type LSpliceDecl name = Located (SpliceDecl name)
 data SpliceDecl id
   = SpliceDecl                  -- Top level splice
         (Located (HsSplice id))
         SpliceExplicitFlag
-    deriving (Typeable)
 deriving instance (DataId id) => Data (SpliceDecl id)
 
 instance OutputableBndr name => Outputable (SpliceDecl name) where
@@ -522,7 +520,6 @@ data TyClDecl name
 
         -- For details on above see note [Api annotations] in ApiAnnotation
 
-  deriving (Typeable)
 deriving instance (DataId id) => Data (TyClDecl id)
 
 
@@ -749,7 +746,6 @@ data TyClGroup name  -- See Note [TyClGroups and dependency analysis]
   = TyClGroup { group_tyclds :: [LTyClDecl name]
               , group_roles  :: [LRoleAnnotDecl name]
               , group_instds :: [LInstDecl name] }
-    deriving (Typeable)
 deriving instance (DataId id) => Data (TyClGroup id)
 
 emptyTyClGroup :: TyClGroup name
@@ -863,7 +859,6 @@ data FamilyResultSig name = -- see Note [FamilyResultSig]
 
   -- For details on above see note [Api annotations] in ApiAnnotation
 
-  deriving ( Typeable )
 deriving instance (DataId name) => Data (FamilyResultSig name)
 
 type LFamilyDecl name = Located (FamilyDecl name)
@@ -882,7 +877,6 @@ data FamilyDecl name = FamilyDecl
   --             'ApiAnnotation.AnnVbar'
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  deriving ( Typeable )
 
 deriving instance (DataId id) => Data (FamilyDecl id)
 
@@ -902,7 +896,7 @@ data InjectivityAnn name
   --             'ApiAnnotation.AnnRarrow', 'ApiAnnotation.AnnVbar'
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  deriving ( Data, Typeable )
+  deriving Data
 
 data FamilyInfo name
   = DataFamily
@@ -910,7 +904,6 @@ data FamilyInfo name
      -- | 'Nothing' if we're in an hs-boot file and the user
      -- said "type family Foo x where .."
   | ClosedTypeFamily (Maybe [LTyFamInstEqn name])
-  deriving( Typeable )
 deriving instance (DataId name) => Data (FamilyInfo name)
 
 -- | Does this family declaration have a complete, user-supplied kind signature?
@@ -1015,7 +1008,6 @@ data HsDataDefn name   -- The payload of a data type defn
 
              -- For details on above see note [Api annotations] in ApiAnnotation
    }
-    deriving( Typeable )
 deriving instance (DataId id) => Data (HsDataDefn id)
 
 type HsDeriving name = Maybe (Located [LHsSigType name])
@@ -1039,7 +1031,7 @@ type HsDeriving name = Maybe (Located [LHsSigType name])
 data NewOrData
   = NewType                     -- ^ @newtype Blah ...@
   | DataType                    -- ^ @data Blah ...@
-  deriving( Eq, Data, Typeable )                -- Needed because Demand derives Eq
+  deriving( Eq, Data )                -- Needed because Demand derives Eq
 
 type LConDecl name = Located (ConDecl name)
       -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi' when
@@ -1097,7 +1089,7 @@ data ConDecl name
 
       , con_doc       :: Maybe LHsDocString
           -- ^ A possible Haddock comment.
-      } deriving (Typeable)
+      }
 deriving instance (DataId name) => Data (ConDecl name)
 
 type HsConDeclDetails name
@@ -1281,7 +1273,6 @@ data TyFamEqn name pats
     --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnEqual'
 
     -- For details on above see note [Api annotations] in ApiAnnotation
-  deriving( Typeable )
 deriving instance (DataId name, Data pats) => Data (TyFamEqn name pats)
 
 type LTyFamInstDecl name = Located (TyFamInstDecl name)
@@ -1294,7 +1285,6 @@ data TyFamInstDecl name
     --           'ApiAnnotation.AnnInstance',
 
     -- For details on above see note [Api annotations] in ApiAnnotation
-  deriving( Typeable )
 deriving instance (DataId name) => Data (TyFamInstDecl name)
 
 ----------------- Data family instances -------------
@@ -1314,7 +1304,6 @@ data DataFamInstDecl name
     --           'ApiAnnotation.AnnClose'
 
     -- For details on above see note [Api annotations] in ApiAnnotation
-  deriving( Typeable )
 deriving instance (DataId name) => Data (DataFamInstDecl name)
 
 
@@ -1342,7 +1331,6 @@ data ClsInstDecl name
     --           'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose',
 
     -- For details on above see note [Api annotations] in ApiAnnotation
-  deriving (Typeable)
 deriving instance (DataId id) => Data (ClsInstDecl id)
 
 
@@ -1356,7 +1344,6 @@ data InstDecl name  -- Both class and family instances
       { dfid_inst :: DataFamInstDecl name }
   | TyFamInstD              -- type family instance
       { tfid_inst :: TyFamInstDecl name }
-  deriving (Typeable)
 deriving instance (DataId id) => Data (InstDecl id)
 
 instance (OutputableBndr name) => Outputable (TyFamInstDecl name) where
@@ -1471,7 +1458,6 @@ data DerivDecl name = DerivDecl
 
   -- For details on above see note [Api annotations] in ApiAnnotation
         }
-  deriving (Typeable)
 deriving instance (DataId name) => Data (DerivDecl name)
 
 instance (OutputableBndr name) => Outputable (DerivDecl name) where
@@ -1498,7 +1484,6 @@ data DefaultDecl name
         --          'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-  deriving (Typeable)
 deriving instance (DataId name) => Data (DefaultDecl name)
 
 instance (OutputableBndr name)
@@ -1541,7 +1526,6 @@ data ForeignDecl name
         --           'ApiAnnotation.AnnDcolon'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-  deriving (Typeable)
 
 deriving instance (DataId name) => Data (ForeignDecl name)
 {-
@@ -1582,7 +1566,7 @@ data ForeignImport = -- import of a C entity
                               CImportSpec          -- details of the C entity
                               (Located SourceText) -- original source text for
                                                    -- the C entity
-  deriving (Data, Typeable)
+  deriving Data
 
 -- details of an external C entity
 --
@@ -1590,7 +1574,7 @@ data CImportSpec = CLabel    CLabelString     -- import address of a C label
                  | CFunction CCallTarget      -- static or dynamic function
                  | CWrapper                   -- wrapper to expose closures
                                               -- (former f.e.d.)
-  deriving (Data, Typeable)
+  deriving Data
 
 -- specification of an externally exported entity in dependence on the calling
 -- convention
@@ -1599,7 +1583,7 @@ data ForeignExport = CExport  (Located CExportSpec) -- contains the calling
                                                     -- convention
                               (Located SourceText)  -- original source text for
                                                     -- the C entity
-  deriving (Data, Typeable)
+  deriving Data
 
 -- pretty printing of foreign declarations
 --
@@ -1649,7 +1633,6 @@ type LRuleDecls name = Located (RuleDecls name)
   -- Note [Pragma source text] in BasicTypes
 data RuleDecls name = HsRules { rds_src   :: SourceText
                               , rds_rules :: [LRuleDecl name] }
-  deriving (Typeable)
 deriving instance (DataId name) => Data (RuleDecls name)
 
 type LRuleDecl name = Located (RuleDecl name)
@@ -1674,7 +1657,6 @@ data RuleDecl name
         --           'ApiAnnotation.AnnEqual',
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-  deriving (Typeable)
 deriving instance (DataId name) => Data (RuleDecl name)
 
 flattenRuleDecls :: [LRuleDecls name] -> [LRuleDecl name]
@@ -1689,7 +1671,6 @@ data RuleBndr name
         --     'ApiAnnotation.AnnDcolon','ApiAnnotation.AnnClose'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-  deriving (Typeable)
 deriving instance (DataId name) => Data (RuleBndr name)
 
 collectRuleBndrSigTys :: [RuleBndr name] -> [LHsSigWcType name]
@@ -1777,7 +1758,6 @@ data VectDecl name
       (LHsSigType name)
   | HsVectInstOut               -- post type-checking (always SCALAR) !!!FIXME: should be superfluous now
       ClsInst
-  deriving (Typeable)
 deriving instance (DataId name) => Data (VectDecl name)
 
 lvectDeclName :: NamedThing name => LVectDecl name -> Name
@@ -1844,7 +1824,7 @@ data DocDecl
   | DocCommentPrev HsDocString
   | DocCommentNamed String HsDocString
   | DocGroup Int HsDocString
-  deriving (Data, Typeable)
+  deriving Data
 
 -- Okay, I need to reconstruct the document comments, but for now:
 instance Outputable DocDecl where
@@ -1873,13 +1853,13 @@ type LWarnDecls name = Located (WarnDecls name)
 data WarnDecls name = Warnings { wd_src :: SourceText
                                , wd_warnings :: [LWarnDecl name]
                                }
-  deriving (Data, Typeable)
+  deriving Data
 
 
 type LWarnDecl name = Located (WarnDecl name)
 
 data WarnDecl name = Warning [Located name] WarningTxt
-  deriving (Data, Typeable)
+  deriving Data
 
 instance OutputableBndr name => Outputable (WarnDecls name) where
     ppr (Warnings _ decls) = ppr decls
@@ -1907,7 +1887,6 @@ data AnnDecl name = HsAnnotation
       --           'ApiAnnotation.AnnClose'
 
       -- For details on above see note [Api annotations] in ApiAnnotation
-  deriving (Typeable)
 deriving instance (DataId name) => Data (AnnDecl name)
 
 instance (OutputableBndr name) => Outputable (AnnDecl name) where
@@ -1917,7 +1896,7 @@ instance (OutputableBndr name) => Outputable (AnnDecl name) where
 data AnnProvenance name = ValueAnnProvenance (Located name)
                         | TypeAnnProvenance (Located name)
                         | ModuleAnnProvenance
-  deriving (Data, Typeable, Functor)
+  deriving (Data, Functor)
 deriving instance Foldable    AnnProvenance
 deriving instance Traversable AnnProvenance
 
@@ -1952,7 +1931,7 @@ data RoleAnnotDecl name
       --           'ApiAnnotation.AnnRole'
 
       -- For details on above see note [Api annotations] in ApiAnnotation
-  deriving (Data, Typeable)
+  deriving Data
 
 instance OutputableBndr name => Outputable (RoleAnnotDecl name) where
   ppr (RoleAnnotDecl ltycon roles)

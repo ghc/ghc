@@ -6,7 +6,7 @@
 The @TyCon@ datatype
 -}
 
-{-# LANGUAGE CPP, DeriveDataTypeable #-}
+{-# LANGUAGE CPP #-}
 
 module TyCon(
         -- * Main TyCon data types
@@ -137,7 +137,6 @@ import UniqSet
 import Module
 
 import qualified Data.Data as Data
-import Data.Typeable (Typeable)
 
 {-
 -----------------------------------------------
@@ -609,7 +608,6 @@ data TyCon
         tcTyConScopedTyVars :: [TyVar] -- ^ Scoped tyvars over the
                                        -- tycon's body. See Note [TcTyCon]
       }
-  deriving Typeable
 
 
 -- | Represents right-hand-sides of 'TyCon's for algebraic types

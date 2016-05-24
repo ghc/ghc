@@ -62,7 +62,7 @@ data Safety
 
   | PlayRisky           -- None of the above can happen; the call will return
                         -- without interacting with the runtime system at all
-  deriving ( Eq, Show, Data, Typeable )
+  deriving ( Eq, Show, Data )
         -- Show used just for Show Lex.Token, I think
   {-! derive: Binary !-}
 
@@ -94,7 +94,7 @@ data CExportSpec
                                 -- See note [Pragma source text] in BasicTypes
         CLabelString            -- C Name of exported function
         CCallConv
-  deriving (Data, Typeable)
+  deriving Data
   {-! derive: Binary !-}
 
 data CCallSpec
@@ -129,7 +129,7 @@ data CCallTarget
                                         -- allowed in CAPI imports
   | DynamicTarget
 
-  deriving( Eq, Data, Typeable )
+  deriving( Eq, Data )
   {-! derive: Binary !-}
 
 isDynamicTarget :: CCallTarget -> Bool
@@ -150,7 +150,7 @@ See: http://www.programmersheaven.com/2/Calling-conventions
 
 -- any changes here should be replicated in  the CallConv type in template haskell
 data CCallConv = CCallConv | CApiConv | StdCallConv | PrimCallConv | JavaScriptCallConv
-  deriving (Eq, Data, Typeable)
+  deriving (Eq, Data)
   {-! derive: Binary !-}
 
 instance Outputable CCallConv where
@@ -224,7 +224,7 @@ instance Outputable CCallSpec where
 -- The filename for a C header file
 -- Note [Pragma source text] in BasicTypes
 data Header = Header SourceText FastString
-    deriving (Eq, Data, Typeable)
+    deriving (Eq, Data)
 
 instance Outputable Header where
     ppr (Header _ h) = quotes $ ppr h
@@ -239,7 +239,7 @@ instance Outputable Header where
 data CType = CType SourceText -- Note [Pragma source text] in BasicTypes
                    (Maybe Header) -- header to include for this type
                    (SourceText,FastString) -- the type itself
-    deriving (Eq, Data, Typeable)
+    deriving (Eq, Data)
 
 instance Outputable CType where
     ppr (CType _ mh (_,ct)) = hDoc <+> ftext ct

@@ -290,7 +290,7 @@ instance Semigroup (NonEmpty a) where
 
 
 newtype Min a = Min { getMin :: a }
-  deriving (Eq, Ord, Show, Read, Data, Typeable, Generic, Generic1)
+  deriving (Eq, Ord, Show, Read, Data, Generic, Generic1)
 
 instance Bounded a => Bounded (Min a) where
   minBound = Min minBound
@@ -347,7 +347,7 @@ instance Num a => Num (Min a) where
   fromInteger    = Min . fromInteger
 
 newtype Max a = Max { getMax :: a }
-  deriving (Eq, Ord, Show, Read, Data, Typeable, Generic, Generic1)
+  deriving (Eq, Ord, Show, Read, Data, Generic, Generic1)
 
 instance Bounded a => Bounded (Max a) where
   minBound = Max minBound
@@ -405,7 +405,7 @@ instance Num a => Num (Max a) where
 -- | 'Arg' isn't itself a 'Semigroup' in its own right, but it can be
 -- placed inside 'Min' and 'Max' to compute an arg min or arg max.
 data Arg a b = Arg a b deriving
-  (Show, Read, Data, Typeable, Generic, Generic1)
+  (Show, Read, Data, Generic, Generic1)
 
 type ArgMin a b = Min (Arg a b)
 type ArgMax a b = Max (Arg a b)
@@ -437,7 +437,7 @@ instance Bifunctor Arg where
 -- | Use @'Option' ('First' a)@ to get the behavior of
 -- 'Data.Monoid.First' from "Data.Monoid".
 newtype First a = First { getFirst :: a } deriving
-  (Eq, Ord, Show, Read, Data, Typeable, Generic, Generic1)
+  (Eq, Ord, Show, Read, Data, Generic, Generic1)
 
 instance Bounded a => Bounded (First a) where
   minBound = First minBound
@@ -482,7 +482,7 @@ instance MonadFix First where
 -- | Use @'Option' ('Last' a)@ to get the behavior of
 -- 'Data.Monoid.Last' from "Data.Monoid"
 newtype Last a = Last { getLast :: a } deriving
-  (Eq, Ord, Show, Read, Data, Typeable, Generic, Generic1)
+  (Eq, Ord, Show, Read, Data, Generic, Generic1)
 
 instance Bounded a => Bounded (Last a) where
   minBound = Last minBound
@@ -527,7 +527,7 @@ instance MonadFix Last where
 
 -- | Provide a Semigroup for an arbitrary Monoid.
 newtype WrappedMonoid m = WrapMonoid { unwrapMonoid :: m }
-  deriving (Eq, Ord, Show, Read, Data, Typeable, Generic, Generic1)
+  deriving (Eq, Ord, Show, Read, Data, Generic, Generic1)
 
 instance Monoid m => Semigroup (WrappedMonoid m) where
   (<>) = coerce (mappend :: m -> m -> m)
@@ -570,7 +570,7 @@ mtimesDefault n x
 -- Ideally, this type would not exist at all and we would just fix the
 -- 'Monoid' instance of 'Maybe'
 newtype Option a = Option { getOption :: Maybe a }
-  deriving (Eq, Ord, Show, Read, Data, Typeable, Generic, Generic1)
+  deriving (Eq, Ord, Show, Read, Data, Generic, Generic1)
 
 instance Functor Option where
   fmap f (Option a) = Option (fmap f a)

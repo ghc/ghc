@@ -35,7 +35,7 @@ import BasicTypes       (Fixity)
 
 -- | used as place holder in PostTc and PostRn values
 data PlaceHolder = PlaceHolder
-  deriving (Data,Typeable)
+  deriving (Data)
 
 -- | Types that are not defined until after type checking
 type family PostTc id ty  -- Note [Pass sensitive types]

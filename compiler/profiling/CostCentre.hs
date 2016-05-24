@@ -60,12 +60,12 @@ data CostCentre
                 cc_mod  :: Module,      -- Name of module defining this CC.
                 cc_loc  :: SrcSpan
     }
-  deriving (Data, Typeable)
+  deriving Data
 
 type CcName = FastString
 
 data IsCafCC = NotCafCC | CafCC
-  deriving (Eq, Ord, Data, Typeable)
+  deriving (Eq, Ord, Data)
 
 
 instance Eq CostCentre where

@@ -57,7 +57,7 @@ data HsLit
                                        --   done with HsOverLit)
   | HsFloatPrim     FractionalLit      -- Unboxed Float
   | HsDoublePrim    FractionalLit      -- Unboxed Double
-  deriving (Data, Typeable)
+  deriving Data
 
 instance Eq HsLit where
   (HsChar _ x1)       == (HsChar _ x2)       = x1==x2
@@ -81,7 +81,6 @@ data HsOverLit id       -- An overloaded literal
         ol_rebindable :: PostRn id Bool, -- Note [ol_rebindable]
         ol_witness :: HsExpr id,     -- Note [Overloaded literal witnesses]
         ol_type :: PostTc id Type }
-  deriving (Typeable)
 deriving instance (DataId id) => Data (HsOverLit id)
 
 -- Note [Literal source text] in BasicTypes for SourceText fields in
@@ -90,7 +89,7 @@ data OverLitVal
   = HsIntegral   !SourceText !Integer    -- Integer-looking literals;
   | HsFractional !FractionalLit          -- Frac-looking literals
   | HsIsString   !SourceText !FastString -- String-looking literals
-  deriving (Data, Typeable)
+  deriving Data
 
 overLitType :: HsOverLit a -> PostTc a Type
 overLitType = ol_type

@@ -9,7 +9,6 @@ These are Uniquable, hence we can build Maps with Modules as
 the keys.
 -}
 
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
@@ -234,7 +233,6 @@ addBootSuffixLocn locn
 
 -- | A ModuleName is essentially a simple string, e.g. @Data.List@.
 newtype ModuleName = ModuleName FastString
-    deriving Typeable
 
 instance Uniquable ModuleName where
   getUnique (ModuleName nm) = getUnique nm
@@ -320,7 +318,7 @@ data Module = Module {
    moduleUnitId :: !UnitId,  -- pkg-1.0
    moduleName      :: !ModuleName  -- A.B.C
   }
-  deriving (Eq, Ord, Typeable)
+  deriving (Eq, Ord)
 
 instance Uniquable Module where
   getUnique (Module p n) = getUnique (unitIdFS p `appendFS` moduleNameFS n)
@@ -388,7 +386,7 @@ instance DbModuleRep UnitId ModuleName Module where
 -- it is just the package name, but for user compiled packages, it is a hash.
 -- ToDo: when the key is a hash, we can do more clever things than store
 -- the hex representation and hash-cons those strings.
-newtype UnitId = PId FastString deriving( Eq, Typeable )
+newtype UnitId = PId FastString deriving Eq
     -- here to avoid module loops with PackageConfig
 
 instance Uniquable UnitId where
