@@ -464,11 +464,11 @@ output it generates.
  DOCSECTION     { L _ (ITdocSection _ _) }
 
 -- Template Haskell
-'[|'            { L _ (ITopenExpQuote _) }
+'[|'            { L _ (ITopenExpQuote _ _) }
 '[p|'           { L _ ITopenPatQuote  }
 '[t|'           { L _ ITopenTypQuote  }
 '[d|'           { L _ ITopenDecQuote  }
-'|]'            { L _ ITcloseQuote    }
+'|]'            { L _ (ITcloseQuote _) }
 '[||'           { L _ (ITopenTExpQuote _) }
 '||]'           { L _ ITcloseTExpQuote  }
 TH_ID_SPLICE    { L _ (ITidEscape _)  }     -- $x
@@ -3206,20 +3206,24 @@ getCTYPEs             (L _ (ITctype             src)) = src
 getStringLiteral l = StringLiteral (getSTRINGs l) (getSTRING l)
 
 isUnicode :: Located Token -> Bool
-isUnicode (L _ (ITforall     iu)) = iu == UnicodeSyntax
-isUnicode (L _ (ITdarrow     iu)) = iu == UnicodeSyntax
-isUnicode (L _ (ITdcolon     iu)) = iu == UnicodeSyntax
-isUnicode (L _ (ITlarrow     iu)) = iu == UnicodeSyntax
-isUnicode (L _ (ITrarrow     iu)) = iu == UnicodeSyntax
-isUnicode (L _ (ITrarrow     iu)) = iu == UnicodeSyntax
-isUnicode (L _ (ITlarrowtail iu)) = iu == UnicodeSyntax
-isUnicode (L _ (ITrarrowtail iu)) = iu == UnicodeSyntax
-isUnicode (L _ (ITLarrowtail iu)) = iu == UnicodeSyntax
-isUnicode (L _ (ITRarrowtail iu)) = iu == UnicodeSyntax
-isUnicode _                       = False
+isUnicode (L _ (ITforall         iu)) = iu == UnicodeSyntax
+isUnicode (L _ (ITdarrow         iu)) = iu == UnicodeSyntax
+isUnicode (L _ (ITdcolon         iu)) = iu == UnicodeSyntax
+isUnicode (L _ (ITlarrow         iu)) = iu == UnicodeSyntax
+isUnicode (L _ (ITrarrow         iu)) = iu == UnicodeSyntax
+isUnicode (L _ (ITrarrow         iu)) = iu == UnicodeSyntax
+isUnicode (L _ (ITlarrowtail     iu)) = iu == UnicodeSyntax
+isUnicode (L _ (ITrarrowtail     iu)) = iu == UnicodeSyntax
+isUnicode (L _ (ITLarrowtail     iu)) = iu == UnicodeSyntax
+isUnicode (L _ (ITRarrowtail     iu)) = iu == UnicodeSyntax
+isUnicode (L _ (IToparenbar      iu)) = iu == UnicodeSyntax
+isUnicode (L _ (ITcparenbar      iu)) = iu == UnicodeSyntax
+isUnicode (L _ (ITopenExpQuote _ iu)) = iu == UnicodeSyntax
+isUnicode (L _ (ITcloseQuote     iu)) = iu == UnicodeSyntax
+isUnicode _                           = False
 
 hasE :: Located Token -> Bool
-hasE (L _ (ITopenExpQuote HasE))  = True
+hasE (L _ (ITopenExpQuote HasE _))  = True
 hasE (L _ (ITopenTExpQuote HasE)) = True
 hasE _                            = False
 

@@ -27,4 +27,4 @@ test('T7671', normal, compile, [''])
 test('T10907', normal, compile, [''])
 test('T7650', normal, compile, [''])
 
-test('arrowsyntax', normal, compile, [''])
+test('brackets', normal, compile, [''])

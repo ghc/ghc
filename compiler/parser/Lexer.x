@@ -366,14 +366,17 @@ $tab          { warnTab }
 }
 
 <0> {
-  "[|"        / { ifExtension thQuotesEnabled } { token (ITopenExpQuote NoE) }
+  "[|"        / { ifExtension thQuotesEnabled } { token (ITopenExpQuote NoE
+                                                                NormalSyntax) }
   "[||"       / { ifExtension thQuotesEnabled } { token (ITopenTExpQuote NoE) }
-  "[e|"       / { ifExtension thQuotesEnabled } { token (ITopenExpQuote HasE) }
+  "[e|"       / { ifExtension thQuotesEnabled } { token (ITopenExpQuote HasE
+                                                                NormalSyntax) }
   "[e||"      / { ifExtension thQuotesEnabled } { token (ITopenTExpQuote HasE) }
   "[p|"       / { ifExtension thQuotesEnabled } { token ITopenPatQuote }
   "[d|"       / { ifExtension thQuotesEnabled } { layout_token ITopenDecQuote }
   "[t|"       / { ifExtension thQuotesEnabled } { token ITopenTypQuote }
-  "|]"        / { ifExtension thQuotesEnabled } { token ITcloseQuote }
+  "|]"        / { ifExtension thQuotesEnabled } { token (ITcloseQuote
+                                                                NormalSyntax) }
   "||]"       / { ifExtension thQuotesEnabled } { token ITcloseTExpQuote }
   \$ @varid   / { ifExtension thEnabled } { skip_one_varid ITidEscape }
   "$$" @varid / { ifExtension thEnabled } { skip_two_varid ITidTyEscape }
@@ -386,6 +389,15 @@ $tab          { warnTab }
   -- qualified quasi-quote (#5555)
   "[" @qvarid "|"  / { ifExtension qqEnabled }
                      { lex_qquasiquote_tok }
+
+  $unigraphic -- ⟦
+    / { ifCurrentChar '⟦' `alexAndPred`
+        ifExtension (\i -> unicodeSyntaxEnabled i && thQuotesEnabled i) }
+    { token (ITopenExpQuote NoE UnicodeSyntax) }
+  $unigraphic -- ⟧
+    / { ifCurrentChar '⟧' `alexAndPred`
+        ifExtension (\i -> unicodeSyntaxEnabled i && thQuotesEnabled i) }
+    { token (ITcloseQuote UnicodeSyntax) }
 }
 
   -- See Note [Lexing type applications]
@@ -692,18 +704,18 @@ data Token
   | ITprimdouble FractionalLit
 
   -- Template Haskell extension tokens
-  | ITopenExpQuote HasE         --  [| or [e|
-  | ITopenPatQuote              --  [p|
-  | ITopenDecQuote              --  [d|
-  | ITopenTypQuote              --  [t|
-  | ITcloseQuote                --  |]
-  | ITopenTExpQuote HasE        --  [|| or [e||
-  | ITcloseTExpQuote            --  ||]
-  | ITidEscape   FastString     --  $x
-  | ITparenEscape               --  $(
-  | ITidTyEscape   FastString   --  $$x
-  | ITparenTyEscape             --  $$(
-  | ITtyQuote                   --  ''
+  | ITopenExpQuote HasE IsUnicodeSyntax --  [| or [e|
+  | ITopenPatQuote                      --  [p|
+  | ITopenDecQuote                      --  [d|
+  | ITopenTypQuote                      --  [t|
+  | ITcloseQuote IsUnicodeSyntax        --  |]
+  | ITopenTExpQuote HasE                --  [|| or [e||
+  | ITcloseTExpQuote                    --  ||]
+  | ITidEscape   FastString             --  $x
+  | ITparenEscape                       --  $(
+  | ITidTyEscape   FastString           --  $$x
+  | ITparenTyEscape                     --  $$(
+  | ITtyQuote                           --  ''
   | ITquasiQuote (FastString,FastString,RealSrcSpan)
     -- ITquasiQuote(quoter, quote, loc)
     -- represents a quasi-quote of the form
