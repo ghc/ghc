@@ -44,6 +44,7 @@ import Control.Monad
 import Name
 import StgSyn
 import Outputable
+import UniqFM
 
 -------------------------------------
 --        Non-void types
@@ -158,7 +159,8 @@ cgLookupPanic id
         pprPanic "StgCmmEnv: variable not found"
                 (vcat [ppr id,
                 text "local binds for:",
-                vcat [ ppr (cg_id info) | info <- varEnvElts local_binds ]
+                pprUFM local_binds $ \infos ->
+                  vcat [ ppr (cg_id info) | info <- infos ]
               ])
 
 

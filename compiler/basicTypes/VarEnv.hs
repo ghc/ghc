@@ -9,7 +9,7 @@ module VarEnv (
 
         -- ** Manipulating these environments
         emptyVarEnv, unitVarEnv, mkVarEnv, mkVarEnv_Directly,
-        elemVarEnv, varEnvElts, varEnvKeys, varEnvToList,
+        elemVarEnv, varEnvElts,
         extendVarEnv, extendVarEnv_C, extendVarEnv_Acc, extendVarEnv_Directly,
         extendVarEnvList,
         plusVarEnv, plusVarEnv_C, plusVarEnv_CD, alterVarEnv,
@@ -18,7 +18,7 @@ module VarEnv (
         lookupVarEnv, lookupVarEnv_NF, lookupWithDefaultVarEnv,
         mapVarEnv, zipVarEnv,
         modifyVarEnv, modifyVarEnv_Directly,
-        isEmptyVarEnv, foldVarEnv, foldVarEnv_Directly,
+        isEmptyVarEnv,
         elemVarEnvByKey, lookupVarEnv_Directly,
         filterVarEnv, filterVarEnv_Directly, restrictVarEnv,
         partitionVarEnv,
@@ -435,8 +435,6 @@ plusVarEnv_CD     :: (a -> a -> a) -> VarEnv a -> a -> VarEnv a -> a -> VarEnv a
 mapVarEnv         :: (a -> b) -> VarEnv a -> VarEnv b
 modifyVarEnv      :: (a -> a) -> VarEnv a -> Var -> VarEnv a
 varEnvElts        :: VarEnv a -> [a]
-varEnvKeys        :: VarEnv a -> [Unique]
-varEnvToList      :: VarEnv a -> [(Unique, a)]
 
 isEmptyVarEnv     :: VarEnv a -> Bool
 lookupVarEnv      :: VarEnv a -> Var -> Maybe a
@@ -445,8 +443,6 @@ lookupVarEnv_NF   :: VarEnv a -> Var -> a
 lookupWithDefaultVarEnv :: VarEnv a -> a -> Var -> a
 elemVarEnv        :: Var -> VarEnv a -> Bool
 elemVarEnvByKey   :: Unique -> VarEnv a -> Bool
-foldVarEnv        :: (a -> b -> b) -> b -> VarEnv a -> b
-foldVarEnv_Directly :: (Unique -> a -> b -> b) -> b -> VarEnv a -> b
 
 elemVarEnv       = elemUFM
 elemVarEnvByKey  = elemUFM_Directly
@@ -471,12 +467,8 @@ mkVarEnv         = listToUFM
 mkVarEnv_Directly= listToUFM_Directly
 emptyVarEnv      = emptyUFM
 varEnvElts       = eltsUFM
-varEnvKeys       = keysUFM
-varEnvToList     = ufmToList
 unitVarEnv       = unitUFM
 isEmptyVarEnv    = isNullUFM
-foldVarEnv       = foldUFM
-foldVarEnv_Directly = foldUFM_Directly
 lookupVarEnv_Directly = lookupUFM_Directly
 filterVarEnv_Directly = filterUFM_Directly
 delVarEnv_Directly    = delFromUFM_Directly

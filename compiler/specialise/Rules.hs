@@ -568,7 +568,9 @@ matchN (in_scope, id_unf) rule_name tmpl_vars tmpl_es target_es
           kind = Type.substTy (mkTCvSubst in_scope (tv_subst, cv_subst))
                               (tyVarKind tmpl_var)
 
-          to_co_env env = foldVarEnv_Directly to_co emptyVarEnv env
+          to_co_env env = nonDetFoldUFM_Directly to_co emptyVarEnv env
+            -- It's OK to use nonDetFoldUFM_Directly because we forget the
+            -- order immediately by creating a new env
           to_co uniq expr env
             | Just co <- exprToCoercion_maybe expr
             = extendVarEnv_Directly env uniq co

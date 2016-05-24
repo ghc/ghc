@@ -11,7 +11,7 @@ module NameSet (
         -- ** Manipulating these sets
         emptyNameSet, unitNameSet, mkNameSet, unionNameSet, unionNameSets,
         minusNameSet, elemNameSet, nameSetElems, extendNameSet, extendNameSetList,
-        delFromNameSet, delListFromNameSet, isEmptyNameSet, foldNameSet, filterNameSet,
+        delFromNameSet, delListFromNameSet, isEmptyNameSet, filterNameSet,
         intersectsNameSet, intersectNameSet,
         nameSetAny, nameSetAll,
 
@@ -59,7 +59,6 @@ nameSetElems      :: NameSet -> [Name]
 isEmptyNameSet     :: NameSet -> Bool
 delFromNameSet     :: NameSet -> Name -> NameSet
 delListFromNameSet :: NameSet -> [Name] -> NameSet
-foldNameSet        :: (Name -> b -> b) -> b -> NameSet -> b
 filterNameSet      :: (Name -> Bool) -> NameSet -> NameSet
 intersectNameSet   :: NameSet -> NameSet -> NameSet
 intersectsNameSet  :: NameSet -> NameSet -> Bool
@@ -78,7 +77,6 @@ minusNameSet      = minusUniqSet
 elemNameSet       = elementOfUniqSet
 nameSetElems     = uniqSetToList
 delFromNameSet    = delOneFromUniqSet
-foldNameSet       = foldUniqSet
 filterNameSet     = filterUniqSet
 intersectNameSet  = intersectUniqSets
 

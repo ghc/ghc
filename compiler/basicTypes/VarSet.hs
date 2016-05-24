@@ -16,7 +16,7 @@ module VarSet (
         unionVarSet, unionVarSets, mapUnionVarSet,
         intersectVarSet, intersectsVarSet, disjointVarSet,
         isEmptyVarSet, delVarSet, delVarSetList, delVarSetByKey,
-        minusVarSet, foldVarSet, filterVarSet,
+        minusVarSet, filterVarSet,
         varSetAny, varSetAll,
         transCloVarSet, fixVarSet,
         lookupVarSet, lookupVarSetByName,
@@ -82,7 +82,6 @@ delVarSetList   :: VarSet -> [Var] -> VarSet
 minusVarSet     :: VarSet -> VarSet -> VarSet
 isEmptyVarSet   :: VarSet -> Bool
 mkVarSet        :: [Var] -> VarSet
-foldVarSet      :: (Var -> a -> a) -> a -> VarSet -> a
 lookupVarSet    :: VarSet -> Var -> Maybe Var
                         -- Returns the set element, which may be
                         -- (==) to the argument, but not the same as
@@ -116,7 +115,6 @@ delVarSet       = delOneFromUniqSet
 delVarSetList   = delListFromUniqSet
 isEmptyVarSet   = isEmptyUniqSet
 mkVarSet        = mkUniqSet
-foldVarSet      = foldUniqSet
 lookupVarSet    = lookupUniqSet
 lookupVarSetByName = lookupUniqSet
 sizeVarSet      = sizeUniqSet

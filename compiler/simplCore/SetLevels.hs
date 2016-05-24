@@ -84,7 +84,7 @@ import UniqSupply
 import Util
 import Outputable
 import FastString
-import UniqDFM (udfmToUfm)
+import UniqDFM
 import FV
 
 {-
@@ -911,7 +911,8 @@ isFunction (_, AnnLam b e) | isId b    = True
 isFunction _                           = False
 
 countFreeIds :: DVarSet -> Int
-countFreeIds = foldVarSet add 0 . udfmToUfm
+countFreeIds = nonDetFoldUDFM add 0
+  -- It's OK to use nonDetFoldUDFM here because we're just counting things.
   where
     add :: Var -> Int -> Int
     add v n | isId v    = n+1

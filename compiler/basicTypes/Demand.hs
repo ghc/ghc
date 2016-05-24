@@ -780,7 +780,10 @@ cleanUseDmd_maybe _                     = Nothing
 splitFVs :: Bool   -- Thunk
          -> DmdEnv -> (DmdEnv, DmdEnv)
 splitFVs is_thunk rhs_fvs
-  | is_thunk  = foldUFM_Directly add (emptyVarEnv, emptyVarEnv) rhs_fvs
+  | is_thunk  = nonDetFoldUFM_Directly add (emptyVarEnv, emptyVarEnv) rhs_fvs
+                -- It's OK to use nonDetFoldUFM_Directly because we
+                -- immediately forget the ordering by putting the elements
+                -- in the envs again
   | otherwise = partitionVarEnv isWeakDmd rhs_fvs
   where
     add uniq dmd@(JD { sd = s, ud = u }) (lazy_fv, sig_fv)
@@ -1198,7 +1201,10 @@ We
 -- Equality needed for fixpoints in DmdAnal
 instance Eq DmdType where
   (==) (DmdType fv1 ds1 res1)
-       (DmdType fv2 ds2 res2) =  ufmToList fv1 == ufmToList fv2
+       (DmdType fv2 ds2 res2) = nonDetUFMToList fv1 == nonDetUFMToList fv2
+         -- It's OK to use nonDetUFMToList here because we're testing for
+         -- equality and even though the lists will be in some arbitrary
+         -- Unique order, it is the same order for both
                               && ds1 == ds2 && res1 == res2
 
 lubDmdType :: DmdType -> DmdType -> DmdType
@@ -1251,7 +1257,9 @@ instance Outputable DmdType where
             else braces (fsep (map pp_elt fv_elts))]
     where
       pp_elt (uniq, dmd) = ppr uniq <> text "->" <> ppr dmd
-      fv_elts = ufmToList fv
+      fv_elts = nonDetUFMToList fv
+        -- It's OK to use nonDetUFMToList here because we only do it for
+        -- pretty printing
 
 emptyDmdEnv :: VarEnv Demand
 emptyDmdEnv = emptyVarEnv

@@ -69,7 +69,6 @@ import FieldLabel
 import Class
 import Name
 import PrelNames
-import NameEnv
 import Var
 import Outputable
 import ListSetOps
@@ -78,6 +77,7 @@ import BasicTypes
 import FastString
 import Module
 import Binary
+import UniqFM
 
 import qualified Data.Data as Data
 import qualified Data.Typeable
@@ -1181,8 +1181,7 @@ isLegacyPromotableDataCon dc
   =  null (dataConEqSpec dc)  -- no GADTs
   && null (dataConTheta dc)   -- no context
   && not (isFamInstTyCon (dataConTyCon dc))   -- no data instance constructors
-  && all isLegacyPromotableTyCon (nameEnvElts $
-                                  tyConsOfType (dataConUserType dc))
+  && allUFM isLegacyPromotableTyCon (tyConsOfType (dataConUserType dc))
 
 -- | Was this tycon promotable before GHC 8.0? That is, is it promotable
 -- without -XTypeInType

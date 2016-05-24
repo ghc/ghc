@@ -42,6 +42,7 @@ import Unify         ( tcMatchTy )
 import Util
 import Var
 import VarSet
+import UniqFM
 import BasicTypes    ( IntWithInf, intGtLimit )
 import ErrUtils      ( emptyMessages )
 import qualified GHC.LanguageExtensions as LangExt
@@ -1367,7 +1368,9 @@ neededEvVars ev_binds initial_seeds
 
    also_needs :: VarSet -> VarSet
    also_needs needs
-     = foldVarSet add emptyVarSet needs
+     = nonDetFoldUFM add emptyVarSet needs
+     -- It's OK to use nonDetFoldUFM here because we immediately forget
+     -- about the ordering by creating a set
      where
        add v needs
         | Just ev_bind <- lookupEvBind ev_binds v

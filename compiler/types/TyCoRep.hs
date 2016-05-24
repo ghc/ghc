@@ -2107,7 +2107,9 @@ checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
              text "needInScope" <+> ppr needInScope )
     a
   where
-  substDomain = varEnvKeys tenv ++ varEnvKeys cenv
+  substDomain = nonDetKeysUFM tenv ++ nonDetKeysUFM cenv
+    -- It's OK to use nonDetKeysUFM here, because we only use this list to
+    -- remove some elements from a set
   needInScope = (tyCoVarsOfTypes tys `unionVarSet` tyCoVarsOfCos cos)
                   `delListFromUFM_Directly` substDomain
   tysCosFVsInScope = needInScope `varSetInScope` in_scope

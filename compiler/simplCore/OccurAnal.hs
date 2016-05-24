@@ -1129,7 +1129,8 @@ occAnalNonRecRhs env bndr rhs
     not_stable = not (isStableUnfolding (idUnfolding bndr))
 
 addIdOccs :: UsageDetails -> VarSet -> UsageDetails
-addIdOccs usage id_set = foldVarSet addIdOcc usage id_set
+addIdOccs usage id_set = nonDetFoldUFM addIdOcc usage id_set
+  -- It's OK to use nonDetFoldUFM here because addIdOcc commutes
 
 addIdOcc :: Id -> UsageDetails -> UsageDetails
 addIdOcc v u | isId v    = addOneOcc u v NoOccInfo
@@ -1594,7 +1595,9 @@ transClosureFV env
   | no_change = env
   | otherwise = transClosureFV (listToUFM new_fv_list)
   where
-    (no_change, new_fv_list) = mapAccumL bump True (ufmToList env)
+    (no_change, new_fv_list) = mapAccumL bump True (nonDetUFMToList env)
+      -- It's OK to use nonDetUFMToList here because we'll forget the
+      -- ordering by creating a new set with listToUFM
     bump no_change (b,fvs)
       | no_change_here = (no_change, (b,fvs))
       | otherwise      = (False,     (b,new_fvs))
@@ -1615,7 +1618,8 @@ extendFvs env s
   = (s `unionVarSet` extras, extras `subVarSet` s)
   where
     extras :: VarSet    -- env(s)
-    extras = foldUFM unionVarSet emptyVarSet $
+    extras = nonDetFoldUFM unionVarSet emptyVarSet $
+      -- It's OK to use nonDetFoldUFM here because unionVarSet commutes
              intersectUFM_C (\x _ -> x) env s
 
 {-

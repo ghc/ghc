@@ -36,6 +36,7 @@ import TyCoRep hiding ( getTvSubstEnv, getCvSubstEnv )
 import Util
 import Pair
 import Outputable
+import UniqFM
 
 import Control.Monad
 #if __GLASGOW_HASKELL__ > 710
@@ -457,7 +458,9 @@ niFixTCvSubst tenv = f tenv
           not_fixpoint  = varSetAny in_domain range_tvs
           in_domain tv  = tv `elemVarEnv` tenv
 
-          range_tvs     = foldVarEnv (unionVarSet . tyCoVarsOfType) emptyVarSet tenv
+          range_tvs     = nonDetFoldUFM (unionVarSet . tyCoVarsOfType) emptyVarSet tenv
+                          -- It's OK to use nonDetFoldUFM here because we
+                          -- forget the order immediately by creating a set
           subst         = mkTvSubst (mkInScopeSet range_tvs) tenv
 
              -- env' extends env by replacing any free type with
@@ -467,7 +470,10 @@ niFixTCvSubst tenv = f tenv
                                                  setTyVarKind rtv $
                                                  substTy subst $
                                                  tyVarKind rtv)
-                                         | rtv <- varSetElems range_tvs
+                                         | rtv <- nonDetEltsUFM range_tvs
+                                         -- It's OK to use nonDetEltsUFM here
+                                         -- because we forget the order
+                                         -- immediatedly by putting it in VarEnv
                                          , not (in_domain rtv) ]
           subst' = mkTvSubst (mkInScopeSet range_tvs) tenv'
 
@@ -476,7 +482,9 @@ niSubstTvSet :: TvSubstEnv -> TyCoVarSet -> TyCoVarSet
 -- remembering that the substitution isn't necessarily idempotent
 -- This is used in the occurs check, before extending the substitution
 niSubstTvSet tsubst tvs
-  = foldVarSet (unionVarSet . get) emptyVarSet tvs
+  = nonDetFoldUFM (unionVarSet . get) emptyVarSet tvs
+  -- It's OK to nonDetFoldUFM here because we immediately forget the
+  -- ordering by creating a set.
   where
     get tv
       | Just ty <- lookupVarEnv tsubst tv

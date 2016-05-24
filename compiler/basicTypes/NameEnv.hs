@@ -13,7 +13,7 @@ module NameEnv (
         -- ** Manipulating these environments
         mkNameEnv,
         emptyNameEnv, isEmptyNameEnv,
-        unitNameEnv, nameEnvElts, nameEnvUniqueElts,
+        unitNameEnv, nameEnvElts,
         extendNameEnv_C, extendNameEnv_Acc, extendNameEnv,
         extendNameEnvList, extendNameEnvList_C,
         filterNameEnv, anyNameEnv,
@@ -35,7 +35,6 @@ module NameEnv (
 
 import Digraph
 import Name
-import Unique
 import UniqFM
 import UniqDFM
 import Maybes
@@ -89,7 +88,6 @@ emptyNameEnv       :: NameEnv a
 isEmptyNameEnv     :: NameEnv a -> Bool
 mkNameEnv          :: [(Name,a)] -> NameEnv a
 nameEnvElts        :: NameEnv a -> [a]
-nameEnvUniqueElts  :: NameEnv a -> [(Unique, a)]
 alterNameEnv       :: (Maybe a-> Maybe a) -> NameEnv a -> Name -> NameEnv a
 extendNameEnv_C    :: (a->a->a) -> NameEnv a -> Name -> a -> NameEnv a
 extendNameEnv_Acc  :: (a->b->b) -> (a->b) -> NameEnv b -> Name -> a -> NameEnv b
@@ -123,7 +121,6 @@ plusNameEnv x y          = plusUFM x y
 plusNameEnv_C f x y      = plusUFM_C f x y
 extendNameEnv_C f x y z  = addToUFM_C f x y z
 mapNameEnv f x           = mapUFM f x
-nameEnvUniqueElts x      = ufmToList x
 extendNameEnv_Acc x y z a b  = addToUFM_Acc x y z a b
 extendNameEnvList_C x y z = addListToUFM_C x y z
 delFromNameEnv x y      = delFromUFM x y

@@ -122,6 +122,7 @@ import PrelNames
 import TysPrim          ( eqPhantPrimTyCon )
 import ListSetOps
 import Maybes
+import UniqFM
 
 import Control.Monad (foldM)
 import Control.Arrow ( first )
@@ -1614,7 +1615,10 @@ liftEnvSubst :: (forall a. Pair a -> a) -> TCvSubst -> LiftCoEnv -> TCvSubst
 liftEnvSubst selector subst lc_env
   = composeTCvSubst (TCvSubst emptyInScopeSet tenv cenv) subst
   where
-    pairs            = varEnvToList lc_env
+    pairs            = nonDetUFMToList lc_env
+                       -- It's OK to use nonDetUFMToList here because we
+                       -- immediately forget the ordering by creating
+                       -- a VarEnv
     (tpairs, cpairs) = partitionWith ty_or_co pairs
     tenv             = mkVarEnv_Directly tpairs
     cenv             = mkVarEnv_Directly cpairs

@@ -212,7 +212,9 @@ allKnownKeyNames                -- where templateHaskellNames are defined
     namesEnv      = foldl (\m n -> extendNameEnv_Acc (:) singleton m n n)
                           emptyUFM all_names
     badNamesEnv   = filterNameEnv (\ns -> length ns > 1) namesEnv
-    badNamesPairs = nameEnvUniqueElts badNamesEnv
+    badNamesPairs = nonDetUFMToList badNamesEnv
+      -- It's OK to use nonDetUFMToList here because the ordering only affects
+      -- the message when we get a panic
     badNamesStrs  = map pairToStr badNamesPairs
     badNamesStr   = unlines badNamesStrs
 

@@ -1349,7 +1349,9 @@ depAnalTyClDecls rdr_env ds_w_fvs
 
 toParents :: GlobalRdrEnv -> NameSet -> NameSet
 toParents rdr_env ns
-  = foldNameSet add emptyNameSet ns
+  = nonDetFoldUFM add emptyNameSet ns
+  -- It's OK to use nonDetFoldUFM because we immediately forget the
+  -- ordering by creating a set
   where
     add n s = extendNameSet s (getParent rdr_env n)
 

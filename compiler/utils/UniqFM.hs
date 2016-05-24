@@ -53,7 +53,8 @@ module UniqFM (
         intersectUFM,
         intersectUFM_C,
         disjointUFM,
-        foldUFM, foldUFM_Directly, anyUFM, allUFM,
+        nonDetFoldUFM, foldUFM, nonDetFoldUFM_Directly,
+        anyUFM, allUFM,
         mapUFM, mapUFM_Directly,
         elemUFM, elemUFM_Directly,
         filterUFM, filterUFM_Directly, partitionUFM,
@@ -61,16 +62,14 @@ module UniqFM (
         isNullUFM,
         lookupUFM, lookupUFM_Directly,
         lookupWithDefaultUFM, lookupWithDefaultUFM_Directly,
-        nonDetEltsUFM, eltsUFM, nonDetKeysUFM, keysUFM, splitUFM,
+        nonDetEltsUFM, eltsUFM, nonDetKeysUFM,
         ufmToSet_Directly,
-        ufmToList, ufmToIntMap,
-        joinUFM, pprUniqFM, pprUFM, pluralUFM
+        nonDetUFMToList, ufmToList, ufmToIntMap,
+        pprUniqFM, pprUFM, pluralUFM
     ) where
 
 import Unique           ( Uniquable(..), Unique, getKey )
 import Outputable
-
-import Compiler.Hoopl   hiding (Unique)
 
 import qualified Data.IntMap as M
 import qualified Data.IntSet as S
@@ -165,7 +164,6 @@ intersectUFM_C  :: (elt1 -> elt2 -> elt3)
 disjointUFM     :: UniqFM elt1 -> UniqFM elt2 -> Bool
 
 foldUFM         :: (elt -> a -> a) -> a -> UniqFM elt -> a
-foldUFM_Directly:: (Unique -> elt -> a -> a) -> a -> UniqFM elt -> a
 mapUFM          :: (elt1 -> elt2) -> UniqFM elt1 -> UniqFM elt2
 mapUFM_Directly :: (Unique -> elt1 -> elt2) -> UniqFM elt1 -> UniqFM elt2
 filterUFM       :: (elt -> Bool) -> UniqFM elt -> UniqFM elt
@@ -177,8 +175,6 @@ sizeUFM         :: UniqFM elt -> Int
 elemUFM         :: Uniquable key => key -> UniqFM elt -> Bool
 elemUFM_Directly:: Unique -> UniqFM elt -> Bool
 
-splitUFM        :: Uniquable key => UniqFM elt -> key -> (UniqFM elt, Maybe elt, UniqFM elt)
-                   -- Splits a UFM into things less than, equal to, and greater than the key
 lookupUFM       :: Uniquable key => UniqFM elt -> key -> Maybe elt
 lookupUFM_Directly  -- when you've got the Unique already
                 :: UniqFM elt -> Unique -> Maybe elt
@@ -186,7 +182,6 @@ lookupWithDefaultUFM
                 :: Uniquable key => UniqFM elt -> elt -> key -> elt
 lookupWithDefaultUFM_Directly
                 :: UniqFM elt -> elt -> Unique -> elt
-keysUFM         :: UniqFM elt -> [Unique]       -- Get the keys
 eltsUFM         :: UniqFM elt -> [elt]
 ufmToSet_Directly :: UniqFM elt -> S.IntSet
 ufmToList       :: UniqFM elt -> [(Unique, elt)]
@@ -274,7 +269,6 @@ disjointUFM (UFM x) (UFM y) = M.null (M.intersection x y)
 foldUFM k z (UFM m) = M.fold k z m
 
 
-foldUFM_Directly k z (UFM m) = M.foldWithKey (k . getUnique) z m
 mapUFM f (UFM m) = UFM (M.map f m)
 mapUFM_Directly f (UFM m) = UFM (M.mapWithKey (f . getUnique) m)
 filterUFM p (UFM m) = UFM (M.filter p m)
@@ -286,13 +280,10 @@ sizeUFM (UFM m) = M.size m
 elemUFM k (UFM m) = M.member (getKey $ getUnique k) m
 elemUFM_Directly u (UFM m) = M.member (getKey u) m
 
-splitUFM (UFM m) k = case M.splitLookup (getKey $ getUnique k) m of
-                       (less, equal, greater) -> (UFM less, equal, UFM greater)
 lookupUFM (UFM m) k = M.lookup (getKey $ getUnique k) m
 lookupUFM_Directly (UFM m) u = M.lookup (getKey u) m
 lookupWithDefaultUFM (UFM m) v k = M.findWithDefault v (getKey $ getUnique k) m
 lookupWithDefaultUFM_Directly (UFM m) v u = M.findWithDefault v (getKey u) m
-keysUFM (UFM m) = map getUnique $ M.keys m
 eltsUFM (UFM m) = M.elems m
 ufmToSet_Directly (UFM m) = M.keysSet m
 ufmToList (UFM m) = map (\(k, v) -> (getUnique k, v)) $ M.toList m
@@ -315,18 +306,26 @@ nonDetEltsUFM (UFM m) = M.elems m
 nonDetKeysUFM :: UniqFM elt -> [Unique]
 nonDetKeysUFM (UFM m) = map getUnique $ M.keys m
 
+-- See Note [Deterministic UniqFM] to learn about nondeterminism.
+-- If you use this please provide a justification why it doesn't introduce
+-- nondeterminism.
+nonDetFoldUFM :: (elt -> a -> a) -> a -> UniqFM elt -> a
+nonDetFoldUFM k z (UFM m) = M.fold k z m
+
+-- See Note [Deterministic UniqFM] to learn about nondeterminism.
+-- If you use this please provide a justification why it doesn't introduce
+-- nondeterminism.
+nonDetFoldUFM_Directly:: (Unique -> elt -> a -> a) -> a -> UniqFM elt -> a
+nonDetFoldUFM_Directly k z (UFM m) = M.foldWithKey (k . getUnique) z m
+
+-- See Note [Deterministic UniqFM] to learn about nondeterminism.
+-- If you use this please provide a justification why it doesn't introduce
+-- nondeterminism.
+nonDetUFMToList :: UniqFM elt -> [(Unique, elt)]
+nonDetUFMToList (UFM m) = map (\(k, v) -> (getUnique k, v)) $ M.toList m
+
 ufmToIntMap :: UniqFM elt -> M.IntMap elt
 ufmToIntMap (UFM m) = m
-
--- Hoopl
-joinUFM :: JoinFun v -> JoinFun (UniqFM v)
-joinUFM eltJoin l (OldFact old) (NewFact new) = foldUFM_Directly add (NoChange, old) new
-    where add k new_v (ch, joinmap) =
-            case lookupUFM_Directly joinmap k of
-                Nothing -> (SomeChange, addToUFM_Directly joinmap k new_v)
-                Just old_v -> case eltJoin l (OldFact old_v) (NewFact new_v) of
-                                (SomeChange, v') -> (SomeChange, addToUFM_Directly joinmap k v')
-                                (NoChange, _) -> (ch, joinmap)
 
 {-
 ************************************************************************
@@ -343,7 +342,9 @@ pprUniqFM :: (a -> SDoc) -> UniqFM a -> SDoc
 pprUniqFM ppr_elt ufm
   = brackets $ fsep $ punctuate comma $
     [ ppr uq <+> text ":->" <+> ppr_elt elt
-    | (uq, elt) <- ufmToList ufm ]
+    | (uq, elt) <- nonDetUFMToList ufm ]
+  -- It's OK to use nonDetUFMToList here because we only use it for
+  -- pretty-printing.
 
 -- | Pretty-print a non-deterministic set.
 -- The order of variables is non-deterministic and for pretty-printing that

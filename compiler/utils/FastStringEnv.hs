@@ -12,7 +12,7 @@ module FastStringEnv (
 
         -- ** Manipulating these environments
         mkFsEnv,
-        emptyFsEnv, unitFsEnv, fsEnvElts, fsEnvUniqueElts,
+        emptyFsEnv, unitFsEnv, fsEnvElts,
         extendFsEnv_C, extendFsEnv_Acc, extendFsEnv,
         extendFsEnvList, extendFsEnvList_C,
         filterFsEnv,
@@ -21,7 +21,6 @@ module FastStringEnv (
         elemFsEnv, mapFsEnv,
     ) where
 
-import Unique
 import UniqFM
 import Maybes
 import FastString
@@ -32,7 +31,6 @@ type FastStringEnv a = UniqFM a  -- Domain is FastString
 emptyFsEnv         :: FastStringEnv a
 mkFsEnv            :: [(FastString,a)] -> FastStringEnv a
 fsEnvElts          :: FastStringEnv a -> [a]
-fsEnvUniqueElts    :: FastStringEnv a -> [(Unique, a)]
 alterFsEnv         :: (Maybe a-> Maybe a) -> FastStringEnv a -> FastString -> FastStringEnv a
 extendFsEnv_C      :: (a->a->a) -> FastStringEnv a -> FastString -> a -> FastStringEnv a
 extendFsEnv_Acc    :: (a->b->b) -> (a->b) -> FastStringEnv b -> FastString -> a -> FastStringEnv b
@@ -63,7 +61,6 @@ plusFsEnv x y             = plusUFM x y
 plusFsEnv_C f x y         = plusUFM_C f x y
 extendFsEnv_C f x y z     = addToUFM_C f x y z
 mapFsEnv f x              = mapUFM f x
-fsEnvUniqueElts x         = ufmToList x
 extendFsEnv_Acc x y z a b = addToUFM_Acc x y z a b
 extendFsEnvList_C x y z   = addListToUFM_C x y z
 delFromFsEnv x y          = delFromUFM x y
