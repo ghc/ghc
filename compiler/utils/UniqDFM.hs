@@ -43,7 +43,7 @@ module UniqDFM (
         filterUDFM,
         isNullUDFM,
         sizeUDFM,
-        intersectUDFM,
+        intersectUDFM, udfmIntersectUFM,
         intersectsUDFM,
         disjointUDFM, disjointUdfmUfm,
         minusUDFM,
@@ -276,6 +276,11 @@ sizeUDFM (UDFM m _i) = M.size m
 
 intersectUDFM :: UniqDFM elt -> UniqDFM elt -> UniqDFM elt
 intersectUDFM (UDFM x i) (UDFM y _j) = UDFM (M.intersection x y) i
+  -- M.intersection is left biased, that means the result will only have
+  -- a subset of elements from the left set, so `i` is a good upper bound.
+
+udfmIntersectUFM :: UniqDFM elt -> UniqFM elt -> UniqDFM elt
+udfmIntersectUFM (UDFM x i) y = UDFM (M.intersection x (ufmToIntMap y)) i
   -- M.intersection is left biased, that means the result will only have
   -- a subset of elements from the left set, so `i` is a good upper bound.
 
