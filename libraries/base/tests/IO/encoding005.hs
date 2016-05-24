@@ -44,9 +44,9 @@ test_latin1 cfm enc = do
     ErrorOnCodingFailure -> Nothing
     IgnoreCodingFailure -> Just [0xfe,0xff,0xff,0xfe]
     TransliterateCodingFailure -> Just [0xfe,0xff,0x3f,0x3f,0x3f,0xff,0xfe]
-    -- N.B. The argument "LATIN1//TRANSLIT" to mkTextEncoding does not
-    -- correspond to "LATIN1//TRANSLIT" in iconv! Instead GHC asks iconv
-    -- to encode to "LATIN1" and uses its own "evil hack" to insert '?'
+    -- N.B. The argument "latin1//TRANSLIT" to mkTextEncoding does not
+    -- correspond to "latin1//TRANSLIT" in iconv! Instead GHC asks iconv
+    -- to encode to "latin1" and uses its own "evil hack" to insert '?'
     -- (ASCII 0x3f) in place of failures. See GHC.IO.Encoding.recoverEncode.
     --
     -- U+0100 is LATIN CAPITAL LETTER A WITH MACRON, which iconv would
@@ -108,8 +108,8 @@ main = do
   test_ascii TransliterateCodingFailure =<< mkTextEncoding "ASCII//TRANSLIT"
   test_ascii RoundtripFailure =<< mkTextEncoding "ASCII//ROUNDTRIP"
 
-  putStrLn "mkTextEncoding LATIN1 tests"
-  test_latin1 ErrorOnCodingFailure =<< mkTextEncoding "LATIN1"
-  test_latin1 IgnoreCodingFailure =<< mkTextEncoding "LATIN1//IGNORE"
-  test_latin1 TransliterateCodingFailure =<< mkTextEncoding "LATIN1//TRANSLIT"
-  test_latin1 RoundtripFailure =<< mkTextEncoding "LATIN1//ROUNDTRIP"
+  putStrLn "mkTextEncoding latin1 tests"
+  test_latin1 ErrorOnCodingFailure =<< mkTextEncoding "latin1"
+  test_latin1 IgnoreCodingFailure =<< mkTextEncoding "latin1//IGNORE"
+  test_latin1 TransliterateCodingFailure =<< mkTextEncoding "latin1//TRANSLIT"
+  test_latin1 RoundtripFailure =<< mkTextEncoding "latin1//ROUNDTRIP"

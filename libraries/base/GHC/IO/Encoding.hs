@@ -245,8 +245,16 @@ mkTextEncoding' cfm enc =
     "UTF32"   -> return $ UTF32.mkUTF32 cfm
     "UTF32LE" -> return $ UTF32.mkUTF32le cfm
     "UTF32BE" -> return $ UTF32.mkUTF32be cfm
-  -- ISO8859-1 we can handle ourselves as well
-    "ISO88591" -> return $ Latin1.mkLatin1 cfm
+    -- On AIX, we want to avoid iconv, because it is either
+    -- a) totally broken, or b) non-reentrant, or c) actually works.
+    -- Detecting b) is difficult as you'd have to trigger the reentrancy
+    -- corruption.
+    -- Therefore, on AIX, we handle the popular ASCII and latin1 encodings
+    -- ourselves. For consistency, we do the same on other platforms.
+    -- We use `mkLatin1_checked` instead of `mkLatin1`, since the latter
+    -- completely ignores the CodingFailureMode (TEST=encoding005).
+    _ | isAscii -> return (Latin1.mkAscii cfm)
+    _ | isLatin1 -> return (Latin1.mkLatin1_checked cfm)
 #if defined(mingw32_HOST_OS)
     'C':'P':n | [(cp,"")] <- reads n -> return $ CodePage.mkCodePageEncoding cfm cp
     _ -> unknownEncodingErr (enc ++ codingFailureModeSuffix cfm)
@@ -256,25 +264,21 @@ mkTextEncoding' cfm enc =
     -- Unfortunately there is no good way to determine whether iconv is actually
     -- functional without telling it to do something.
     _ -> do res <- Iconv.mkIconvEncoding cfm enc
-            let isAscii = any (== enc) ansiEncNames
             case res of
               Just e -> return e
-              -- At this point we know that we can't count on iconv to work
-              -- (see, for instance, Trac #10298). However, we still want to do
-              --  what we can to work with what we have. For instance, ASCII is
-              -- easy. We match on ASCII encodings directly using several
-              -- possible aliases (specified by RFC 1345 & Co) and for this use
-              -- the 'ascii' encoding
-              Nothing
-                | isAscii   -> return (Latin1.mkAscii cfm)
-                | otherwise ->
-                    unknownEncodingErr (enc ++ codingFailureModeSuffix cfm)
+              Nothing -> unknownEncodingErr (enc ++ codingFailureModeSuffix cfm)
+#endif
   where
-    ansiEncNames = -- ASCII aliases
+    isAscii = enc `elem` asciiEncNames
+    isLatin1 = enc `elem` latin1EncNames
+    asciiEncNames = -- ASCII aliases specified by RFC 1345 and RFC 3808.
       [ "ANSI_X3.4-1968", "iso-ir-6", "ANSI_X3.4-1986", "ISO_646.irv:1991"
       , "US-ASCII", "us", "IBM367", "cp367", "csASCII", "ASCII", "ISO646-US"
       ]
-#endif
+    latin1EncNames = -- latin1 aliases specified by RFC 1345 and RFC 3808.
+      [ "ISO_8859-1:1987", "iso-ir-100", "ISO_8859-1", "ISO-8859-1", "latin1",
+        "l1", "IBM819", "CP819", "csISOLatin1"
+      ]
 
 
 latin1_encode :: CharBuffer -> Buffer Word8 -> IO (CharBuffer, Buffer Word8)
