@@ -10,11 +10,11 @@ import SrcLoc( Located )
 
 import Data.Data hiding (Fixity)
 import Outputable
-import PlaceHolder      ( DataId )
+import PlaceHolder      ( DataId, OutputableBndrId )
 
 type role Pat nominal
 data Pat (i :: *)
 type LPat i = Located (Pat i)
 
 instance (DataId id) => Data (Pat id)
-instance (OutputableBndr name) => Outputable (Pat name)
+instance (OutputableBndrId name) => Outputable (Pat name)

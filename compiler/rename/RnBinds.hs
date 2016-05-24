@@ -467,7 +467,7 @@ rnBind sig_fn bind@(FunBind { fun_id = name
 
         ; (matches', rhs_fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
                                 -- bindSigTyVars tests for LangExt.ScopedTyVars
-                                 rnMatchGroup (FunRhs plain_name)
+                                 rnMatchGroup (FunRhs name Prefix)
                                               rnLExpr matches
         ; let is_infix = isInfixFunBind bind
         ; when is_infix $ checkPrecMatch plain_name matches'
@@ -612,7 +612,7 @@ dupFixityDecl loc rdr_name
 rnPatSynBind :: (Name -> [Name])                -- Signature tyvar function
              -> PatSynBind Name RdrName
              -> RnM (PatSynBind Name Name, [Name], Uses)
-rnPatSynBind sig_fn bind@(PSB { psb_id = L _ name
+rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
                               , psb_args = details
                               , psb_def = pat
                               , psb_dir = dir })
@@ -657,7 +657,8 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L _ name
             ImplicitBidirectional -> return (ImplicitBidirectional, emptyFVs)
             ExplicitBidirectional mg ->
                 do { (mg', fvs) <- bindSigTyVarsFV sig_tvs $
-                                   rnMatchGroup PatSyn rnLExpr mg
+                                   rnMatchGroup (FunRhs (L l name) Prefix)
+                                                rnLExpr mg
                    ; return (ExplicitBidirectional mg', fvs) }
 
         ; mod <- getModule
@@ -1031,23 +1032,23 @@ rnMatch' :: Outputable (body RdrName) => HsMatchContext Name
          -> (Located (body RdrName) -> RnM (Located (body Name), FreeVars))
          -> Match RdrName (Located (body RdrName))
          -> RnM (Match Name (Located (body Name)), FreeVars)
-rnMatch' ctxt rnBody match@(Match { m_fixity = mf, m_pats = pats
+rnMatch' ctxt rnBody match@(Match { m_ctxt = mf, m_pats = pats
                                   , m_type = maybe_rhs_sig, m_grhss = grhss })
   = do  {       -- Result type signatures are no longer supported
           case maybe_rhs_sig of
                 Nothing -> return ()
-                Just (L loc ty) -> addErrAt loc (resSigErr ctxt match ty)
+                Just (L loc ty) -> addErrAt loc (resSigErr match ty)
 
-        ; let isinfix = isInfixMatch match
+        ; let fixity = if isInfixMatch match then Infix else Prefix
                -- Now the main event
                -- Note that there are no local fixity decls for matches
         ; rnPats ctxt pats      $ \ pats' -> do
         { (grhss', grhss_fvs) <- rnGRHSs ctxt rnBody grhss
         ; let mf' = case (ctxt,mf) of
-                      (FunRhs funid,FunBindMatch (L lf _) _)
-                                            -> FunBindMatch (L lf funid) isinfix
-                      _                     -> NonFunBindMatch
-        ; return (Match { m_fixity = mf', m_pats = pats'
+                      (FunRhs (L _ funid) _,FunRhs (L lf _) _)
+                                            -> FunRhs (L lf funid) fixity
+                      _                     -> ctxt
+        ; return (Match { m_ctxt = mf', m_pats = pats'
                         , m_type = Nothing, m_grhss = grhss'}, grhss_fvs ) }}
 
 emptyCaseErr :: HsMatchContext Name -> SDoc
@@ -1061,12 +1062,12 @@ emptyCaseErr ctxt = hang (text "Empty list of alternatives in" <+> pp_ctxt)
 
 
 resSigErr :: Outputable body
-          => HsMatchContext Name -> Match RdrName body -> HsType RdrName -> SDoc
-resSigErr ctxt match ty
+          => Match RdrName body -> HsType RdrName -> SDoc
+resSigErr match ty
    = vcat [ text "Illegal result type signature" <+> quotes (ppr ty)
           , nest 2 $ ptext (sLit
                  "Result signatures are no longer supported in pattern matches")
-          , pprMatchInCtxt ctxt match ]
+          , pprMatchInCtxt match ]
 
 {-
 ************************************************************************

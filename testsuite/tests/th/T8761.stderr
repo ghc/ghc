@@ -50,7 +50,7 @@ T8761.hs:(48,1)-(52,21): Splicing declarations
     [d| pattern x :*: y <- ((x, _), [y])
         pattern x :+: y = (x, y)
         pattern x :~: y <- (x, y) where
-                          (:~:) x y = (x, y) |]
+                          x :~: y = (x, y) |]
   ======>
     pattern x :*: y <- ((x, _), [y])
     pattern x :+: y = (x, y)

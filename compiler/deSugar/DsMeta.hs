@@ -1553,7 +1553,7 @@ repLambda (L _ (Match _ ps _ (GRHSs [L _ (GRHS [] e)] (L _ EmptyLocalBinds))))
                 do { xs <- repLPs ps; body <- repLE e; repLam xs body })
       ; wrapGenSyms ss lam }
 
-repLambda (L _ m) = notHandled "Guarded labmdas" (pprMatch (LambdaExpr :: HsMatchContext Name) m)
+repLambda (L _ m) = notHandled "Guarded labmdas" (pprMatch m)
 
 
 -----------------------------------------------------------------------------

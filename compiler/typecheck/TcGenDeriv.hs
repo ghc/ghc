@@ -407,13 +407,14 @@ gen_Ord_binds loc tycon
       | otherwise                -- Mixed nullary and non-nullary
       = nlHsCase (nlHsVar a_RDR) $
         (map (mkOrdOpAlt op) non_nullary_cons
-         ++ [mkSimpleHsAlt nlWildPat (mkTagCmp op)])
+         ++ [mkHsCaseAlt nlWildPat (mkTagCmp op)])
 
 
     mkOrdOpAlt :: OrdOp -> DataCon -> LMatch RdrName (LHsExpr RdrName)
     -- Make the alternative  (Ki a1 a2 .. av ->
     mkOrdOpAlt op data_con
-      = mkSimpleHsAlt (nlConVarPat data_con_RDR as_needed) (mkInnerRhs op data_con)
+      = mkHsCaseAlt (nlConVarPat data_con_RDR as_needed)
+                    (mkInnerRhs op data_con)
       where
         as_needed    = take (dataConSourceArity data_con) as_RDRs
         data_con_RDR = getRdrName data_con
@@ -424,33 +425,35 @@ gen_Ord_binds loc tycon
 
       | tag == first_tag
       = nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt op data_con
-                                 , mkSimpleHsAlt nlWildPat (ltResult op) ]
+                                 , mkHsCaseAlt nlWildPat (ltResult op) ]
       | tag == last_tag
       = nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt op data_con
-                                 , mkSimpleHsAlt nlWildPat (gtResult op) ]
+                                 , mkHsCaseAlt nlWildPat (gtResult op) ]
 
       | tag == first_tag + 1
-      = nlHsCase (nlHsVar b_RDR) [ mkSimpleHsAlt (nlConWildPat first_con) (gtResult op)
+      = nlHsCase (nlHsVar b_RDR) [ mkHsCaseAlt (nlConWildPat first_con)
+                                             (gtResult op)
                                  , mkInnerEqAlt op data_con
-                                 , mkSimpleHsAlt nlWildPat (ltResult op) ]
+                                 , mkHsCaseAlt nlWildPat (ltResult op) ]
       | tag == last_tag - 1
-      = nlHsCase (nlHsVar b_RDR) [ mkSimpleHsAlt (nlConWildPat last_con) (ltResult op)
+      = nlHsCase (nlHsVar b_RDR) [ mkHsCaseAlt (nlConWildPat last_con)
+                                             (ltResult op)
                                  , mkInnerEqAlt op data_con
-                                 , mkSimpleHsAlt nlWildPat (gtResult op) ]
+                                 , mkHsCaseAlt nlWildPat (gtResult op) ]
 
       | tag > last_tag `div` 2  -- lower range is larger
       = untag_Expr tycon [(b_RDR, bh_RDR)] $
         nlHsIf (genPrimOpApp (nlHsVar bh_RDR) ltInt_RDR tag_lit)
                (gtResult op) $  -- Definitely GT
         nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt op data_con
-                                 , mkSimpleHsAlt nlWildPat (ltResult op) ]
+                                 , mkHsCaseAlt nlWildPat (ltResult op) ]
 
       | otherwise               -- upper range is larger
       = untag_Expr tycon [(b_RDR, bh_RDR)] $
         nlHsIf (genPrimOpApp (nlHsVar bh_RDR) gtInt_RDR tag_lit)
                (ltResult op) $  -- Definitely LT
         nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt op data_con
-                                 , mkSimpleHsAlt nlWildPat (gtResult op) ]
+                                 , mkHsCaseAlt nlWildPat (gtResult op) ]
       where
         tag     = get_tag data_con
         tag_lit = noLoc (HsLit (HsIntPrim "" (toInteger tag)))
@@ -459,7 +462,7 @@ gen_Ord_binds loc tycon
     -- First argument 'a' known to be built with K
     -- Returns a case alternative  Ki b1 b2 ... bv -> compare (a1,a2,...) with (b1,b2,...)
     mkInnerEqAlt op data_con
-      = mkSimpleHsAlt (nlConVarPat data_con_RDR bs_needed) $
+      = mkHsCaseAlt (nlConVarPat data_con_RDR bs_needed) $
         mkCompareFields tycon op (dataConOrigArgTys data_con)
       where
         data_con_RDR = getRdrName data_con
@@ -495,9 +498,9 @@ mkCompareFields tycon op tys
       = unliftedCompare lt_op eq_op a_expr b_expr lt eq gt
       | otherwise
       = nlHsCase (nlHsPar (nlHsApp (nlHsApp (nlHsVar compare_RDR) a_expr) b_expr))
-          [mkSimpleHsAlt (nlNullaryConPat ltTag_RDR) lt,
-           mkSimpleHsAlt (nlNullaryConPat eqTag_RDR) eq,
-           mkSimpleHsAlt (nlNullaryConPat gtTag_RDR) gt]
+          [mkHsCaseAlt (nlNullaryConPat ltTag_RDR) lt,
+           mkHsCaseAlt (nlNullaryConPat eqTag_RDR) eq,
+           mkHsCaseAlt (nlNullaryConPat gtTag_RDR) gt]
       where
         a_expr = nlHsVar a
         b_expr = nlHsVar b
@@ -782,7 +785,7 @@ gen_Ix_binds loc tycon
            in
            nlHsCase
              (genOpApp (nlHsVar dh_RDR) minusInt_RDR (nlHsVar ah_RDR))
-             [mkSimpleHsAlt (nlVarPat c_RDR) rhs]
+             [mkHsCaseAlt (nlVarPat c_RDR) rhs]
            ))
         )
 
@@ -1345,7 +1348,7 @@ gen_Data_binds dflags loc rep_tc
         | otherwise  = nlHsCase (nlHsVar conIndex_RDR `nlHsApp` c_Expr)
                                 (map gunfold_alt data_cons)
 
-    gunfold_alt dc = mkSimpleHsAlt (mk_unfold_pat dc) (mk_unfold_rhs dc)
+    gunfold_alt dc = mkHsCaseAlt (mk_unfold_pat dc) (mk_unfold_rhs dc)
     mk_unfold_rhs dc = foldr nlHsApp
                            (nlHsVar z_RDR `nlHsApp` nlHsVar (getRdrName dc))
                            (replicate (dataConSourceArity dc) (nlHsVar k_RDR))
@@ -1552,13 +1555,15 @@ gen_Functor_binds loc tycon
   = (unitBag fmap_bind, emptyBag)
   where
     data_cons = tyConDataCons tycon
-    fmap_bind = mkRdrFunBind (L loc fmap_RDR) eqns
+    fun_name = L loc fmap_RDR
+    fmap_bind = mkRdrFunBind fun_name eqns
 
     fmap_eqn con = evalState (match_for_con [f_Pat] con =<< parts) bs_RDRs
       where
         parts = sequence $ foldDataConArgs ft_fmap con
 
-    eqns | null data_cons = [mkSimpleMatch [nlWildPat, nlWildPat]
+    eqns | null data_cons = [mkSimpleMatch (FunRhs fun_name Prefix)
+                                           [nlWildPat, nlWildPat]
                                            (error_Expr "Void fmap")]
          | otherwise      = map fmap_eqn data_cons
 
@@ -1586,7 +1591,7 @@ gen_Functor_binds loc tycon
     -- Con a1 a2 ... -> Con (f1 a1) (f2 a2) ...
     match_for_con :: [LPat RdrName] -> DataCon -> [LHsExpr RdrName]
                   -> State [RdrName] (LMatch RdrName (LHsExpr RdrName))
-    match_for_con = mkSimpleConMatch $
+    match_for_con = mkSimpleConMatch CaseAlt $
         \con_name xs -> return $ nlHsApps con_name xs  -- Con x1 x2 ..
 
 {-
@@ -1719,17 +1724,19 @@ mkSimpleLam2 lam = do
 -- constructor @con@ and its arguments. The RHS folds (with @fold@) over @con@
 -- and its arguments, applying an expression (from @insides@) to each of the
 -- respective arguments of @con@.
-mkSimpleConMatch :: Monad m => (RdrName -> [LHsExpr RdrName] -> m (LHsExpr RdrName))
+mkSimpleConMatch :: Monad m => HsMatchContext RdrName
+                 -> (RdrName -> [LHsExpr RdrName] -> m (LHsExpr RdrName))
                  -> [LPat RdrName]
                  -> DataCon
                  -> [LHsExpr RdrName]
                  -> m (LMatch RdrName (LHsExpr RdrName))
-mkSimpleConMatch fold extra_pats con insides = do
+mkSimpleConMatch ctxt fold extra_pats con insides = do
     let con_name = getRdrName con
     let vars_needed = takeList insides as_RDRs
     let pat = nlConVarPat con_name vars_needed
     rhs <- fold con_name (zipWith nlHsApp insides (map nlHsVar vars_needed))
-    return $ mkMatch (extra_pats ++ [pat]) rhs (noLoc emptyLocalBinds)
+    return $ mkMatch ctxt (extra_pats ++ [pat]) rhs
+                     (noLoc emptyLocalBinds)
 
 -- "Con a1 a2 a3 -> fmap (\b2 -> Con a1 b2 a3) (traverse f a2)"
 --
@@ -1749,13 +1756,14 @@ mkSimpleConMatch fold extra_pats con insides = do
 --
 -- See Note [Generated code for DeriveFoldable and DeriveTraversable]
 mkSimpleConMatch2 :: Monad m
-                  => (LHsExpr RdrName -> [LHsExpr RdrName]
+                  => HsMatchContext RdrName
+                  -> (LHsExpr RdrName -> [LHsExpr RdrName]
                                       -> m (LHsExpr RdrName))
                   -> [LPat RdrName]
                   -> DataCon
                   -> [Maybe (LHsExpr RdrName)]
                   -> m (LMatch RdrName (LHsExpr RdrName))
-mkSimpleConMatch2 fold extra_pats con insides = do
+mkSimpleConMatch2 ctxt fold extra_pats con insides = do
     let con_name = getRdrName con
         vars_needed = takeList insides as_RDRs
         pat = nlConVarPat con_name vars_needed
@@ -1780,7 +1788,8 @@ mkSimpleConMatch2 fold extra_pats con insides = do
               in mkHsLam (map nlVarPat bs) (nlHsApps con_name vars)
 
     rhs <- fold con_expr exps
-    return $ mkMatch (extra_pats ++ [pat]) rhs (noLoc emptyLocalBinds)
+    return $ mkMatch ctxt (extra_pats ++ [pat]) rhs
+                     (noLoc emptyLocalBinds)
 
 -- "case x of (a1,a2,a3) -> fold [x1 a1, x2 a2, x3 a3]"
 mkSimpleTupleCase :: Monad m => ([LPat RdrName] -> DataCon -> [a]
@@ -1907,7 +1916,7 @@ gen_Foldable_binds loc tycon
                 -> DataCon
                 -> [Maybe (LHsExpr RdrName)]
                 -> State [RdrName] (LMatch RdrName (LHsExpr RdrName))
-    match_foldr z = mkSimpleConMatch2 $ \_ xs -> return (mkFoldr xs)
+    match_foldr z = mkSimpleConMatch2 LambdaExpr $ \_ xs -> return (mkFoldr xs)
       where
         -- g1 v1 (g2 v2 (.. z))
         mkFoldr :: [LHsExpr RdrName] -> LHsExpr RdrName
@@ -1936,7 +1945,7 @@ gen_Foldable_binds loc tycon
                   -> DataCon
                   -> [Maybe (LHsExpr RdrName)]
                   -> State [RdrName] (LMatch RdrName (LHsExpr RdrName))
-    match_foldMap = mkSimpleConMatch2 $ \_ xs -> return (mkFoldMap xs)
+    match_foldMap = mkSimpleConMatch2 CaseAlt $ \_ xs -> return (mkFoldMap xs)
       where
         -- mappend v1 (mappend v2 ..)
         mkFoldMap :: [LHsExpr RdrName] -> LHsExpr RdrName
@@ -2023,7 +2032,8 @@ gen_Traversable_binds loc tycon
                   -> DataCon
                   -> [Maybe (LHsExpr RdrName)]
                   -> State [RdrName] (LMatch RdrName (LHsExpr RdrName))
-    match_for_con = mkSimpleConMatch2 $ \con xs -> return (mkApCon con xs)
+    match_for_con = mkSimpleConMatch2 CaseAlt $
+                                             \con xs -> return (mkApCon con xs)
       where
         -- fmap (\b1 b2 ... -> Con b1 b2 ...) x1 <*> x2 <*> ..
         mkApCon :: LHsExpr RdrName -> [LHsExpr RdrName] -> LHsExpr RdrName
@@ -2066,8 +2076,9 @@ makeG_d.
 gen_Lift_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
 gen_Lift_binds loc tycon
   | null data_cons = (unitBag (L loc $ mkFunBind (L loc lift_RDR)
-                       [mkMatch [nlWildPat] errorMsg_Expr
-                                            (noLoc emptyLocalBinds)])
+                       [mkMatch (FunRhs (L loc lift_RDR) Prefix)
+                                        [nlWildPat] errorMsg_Expr
+                                        (noLoc emptyLocalBinds)])
                      , emptyBag)
   | otherwise = (unitBag lift_bind, emptyBag)
   where
@@ -2176,7 +2187,9 @@ gen_Newtype_binds loc cls inst_tvs cls_tys rhs_ty
 
     mk_bind :: Id -> LHsBind RdrName
     mk_bind meth_id
-      = mkRdrFunBind (L loc meth_RDR) [mkSimpleMatch [] rhs_expr]
+      = mkRdrFunBind (L loc meth_RDR) [mkSimpleMatch
+                                         (FunRhs (L loc meth_RDR) Prefix)
+                                         [] rhs_expr]
       where
         Pair from_ty to_ty = mkCoerceClassMethEqn cls inst_tvs cls_tys rhs_ty meth_id
 
@@ -2351,7 +2364,9 @@ mk_HRFunBind :: Arity -> SrcSpan -> RdrName
 mk_HRFunBind arity loc fun pats_and_exprs
   = mkHRRdrFunBind arity (L loc fun) matches
   where
-    matches = [mkMatch p e (noLoc emptyLocalBinds) | (p,e) <-pats_and_exprs]
+    matches = [mkMatch (FunRhs (L loc fun) Prefix) p e
+                               (noLoc emptyLocalBinds)
+              | (p,e) <-pats_and_exprs]
 
 mkRdrFunBind :: Located RdrName -> [LMatch RdrName (LHsExpr RdrName)] -> LHsBind RdrName
 mkRdrFunBind = mkHRRdrFunBind 0
@@ -2365,7 +2380,8 @@ mkHRRdrFunBind arity fun@(L loc fun_rdr) matches = L loc (mkFunBind fun matches'
    -- which can happen with -XEmptyDataDecls
    -- See Trac #4302
    matches' = if null matches
-              then [mkMatch (replicate arity nlWildPat)
+              then [mkMatch (FunRhs fun Prefix)
+                            (replicate arity nlWildPat)
                             (error_Expr str) (noLoc emptyLocalBinds)]
               else matches
    str = "Void " ++ occNameString (rdrNameOcc fun_rdr)
@@ -2481,7 +2497,7 @@ untag_Expr :: TyCon -> [( RdrName,  RdrName)] -> LHsExpr RdrName -> LHsExpr RdrN
 untag_Expr _ [] expr = expr
 untag_Expr tycon ((untag_this, put_tag_here) : more) expr
   = nlHsCase (nlHsPar (nlHsVarApps (con2tag_RDR tycon) [untag_this])) {-of-}
-      [mkSimpleHsAlt (nlVarPat put_tag_here) (untag_Expr tycon more expr)]
+      [mkHsCaseAlt (nlVarPat put_tag_here) (untag_Expr tycon more expr)]
 
 enum_from_to_Expr
         :: LHsExpr RdrName -> LHsExpr RdrName

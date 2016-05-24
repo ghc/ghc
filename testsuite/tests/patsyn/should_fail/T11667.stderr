@@ -38,4 +38,4 @@ T11667.hs:31:16: error:
         add (Num a) to the "required" context of
           the signature for pattern synonym ‘Pat4’
     • In the expression: MkS 42
-      In an equation for ‘$bPat4’: $bPat4 = MkS 42
+      In an equation for ‘Pat4’: Pat4 = MkS 42

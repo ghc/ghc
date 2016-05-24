@@ -14,7 +14,7 @@ checker.
 module TcHsSyn (
         mkHsConApp, mkHsDictLet, mkHsApp,
         hsLitType, hsLPatType, hsPatType,
-        mkHsAppTy, mkSimpleHsAlt,
+        mkHsAppTy, mkHsCaseAlt,
         nlHsIntLit,
         shortCutLit, hsOverLitName,
         conLikeResTy,

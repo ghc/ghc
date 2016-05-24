@@ -1557,8 +1557,9 @@ mkGenericDefMethBind clas inst_tys sel_id dm_name
                    (vcat [ppr clas <+> ppr inst_tys,
                           nest 2 (ppr sel_id <+> equals <+> ppr rhs)]))
 
-        ; return (noLoc $ mkTopFunBind Generated (noLoc (idName sel_id))
-                                       [mkSimpleMatch [] rhs]) }
+        ; let fn = noLoc (idName sel_id)
+        ; return (noLoc $ mkTopFunBind Generated fn
+                                    [mkSimpleMatch (FunRhs fn Prefix) [] rhs]) }
   where
     rhs = nlHsVar dm_name
 

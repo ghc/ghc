@@ -22,7 +22,7 @@ import {-# SOURCE #-} HsExpr ( pprExpr, LHsExpr,
                                GRHSs, pprPatBind )
 import {-# SOURCE #-} HsPat  ( LPat )
 
-import PlaceHolder ( PostTc,PostRn,DataId )
+import PlaceHolder ( PostTc,PostRn,DataId,OutputableBndrId )
 import HsTypes
 import PprCore ()
 import CoreSyn
@@ -405,12 +405,14 @@ Specifically,
     it's just an error thunk
 -}
 
-instance (OutputableBndr idL, OutputableBndr idR) => Outputable (HsLocalBindsLR idL idR) where
+instance (OutputableBndrId idL, OutputableBndrId idR)
+        => Outputable (HsLocalBindsLR idL idR) where
   ppr (HsValBinds bs) = ppr bs
   ppr (HsIPBinds bs)  = ppr bs
   ppr EmptyLocalBinds = empty
 
-instance (OutputableBndr idL, OutputableBndr idR) => Outputable (HsValBindsLR idL idR) where
+instance (OutputableBndrId idL, OutputableBndrId idR)
+        => Outputable (HsValBindsLR idL idR) where
   ppr (ValBindsIn binds sigs)
    = pprDeclList (pprLHsBindsForUser binds sigs)
 
@@ -425,12 +427,14 @@ instance (OutputableBndr idL, OutputableBndr idR) => Outputable (HsValBindsLR id
      pp_rec Recursive    = text "rec"
      pp_rec NonRecursive = text "nonrec"
 
-pprLHsBinds :: (OutputableBndr idL, OutputableBndr idR) => LHsBindsLR idL idR -> SDoc
+pprLHsBinds :: (OutputableBndrId idL, OutputableBndrId idR)
+            => LHsBindsLR idL idR -> SDoc
 pprLHsBinds binds
   | isEmptyLHsBinds binds = empty
   | otherwise = pprDeclList (map ppr (bagToList binds))
 
-pprLHsBindsForUser :: (OutputableBndr idL, OutputableBndr idR, OutputableBndr id2)
+pprLHsBindsForUser :: (OutputableBndrId idL, OutputableBndrId idR,
+                       OutputableBndrId id2)
                    => LHsBindsLR idL idR -> [LSig id2] -> [SDoc]
 --  pprLHsBindsForUser is different to pprLHsBinds because
 --  a) No braces: 'let' and 'where' include a list of HsBindGroups
@@ -491,7 +495,6 @@ plusHsValBinds (ValBindsOut ds1 sigs1) (ValBindsOut ds2 sigs2)
 plusHsValBinds _ _
   = panic "HsBinds.plusHsValBinds"
 
-
 {-
 What AbsBinds means
 ~~~~~~~~~~~~~~~~~~~
@@ -518,10 +521,12 @@ So the desugarer tries to do a better job:
                                       in (fm,gm)
 -}
 
-instance (OutputableBndr idL, OutputableBndr idR) => Outputable (HsBindLR idL idR) where
+instance (OutputableBndrId idL, OutputableBndrId idR)
+         => Outputable (HsBindLR idL idR) where
     ppr mbind = ppr_monobind mbind
 
-ppr_monobind :: (OutputableBndr idL, OutputableBndr idR) => HsBindLR idL idR -> SDoc
+ppr_monobind :: (OutputableBndrId idL, OutputableBndrId idR)
+             => HsBindLR idL idR -> SDoc
 
 ppr_monobind (PatBind { pat_lhs = pat, pat_rhs = grhss })
   = pprPatBind pat grhss
@@ -534,7 +539,7 @@ ppr_monobind (FunBind { fun_id = fun,
   = pprTicks empty (if null ticks then empty
                     else text "-- ticks = " <> ppr ticks)
     $$  ifPprDebug (pprBndr LetBind (unLoc fun))
-    $$  pprFunBind (unLoc fun) matches
+    $$  pprFunBind  matches
     $$  ifPprDebug (ppr wrap)
 ppr_monobind (PatSynBind psb) = ppr psb
 ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
@@ -574,8 +579,10 @@ instance (OutputableBndr id) => Outputable (ABExport id) where
            , nest 2 (pprTcSpecPrags prags)
            , nest 2 (text "wrap:" <+> ppr wrap)]
 
-instance (OutputableBndr idL, OutputableBndr idR) => Outputable (PatSynBind idL idR) where
-  ppr (PSB{ psb_id = L _ psyn, psb_args = details, psb_def = pat, psb_dir = dir })
+instance (OutputableBndr idL, OutputableBndrId idR)
+          => Outputable (PatSynBind idL idR) where
+  ppr (PSB{ psb_id = (L _ psyn), psb_args = details, psb_def = pat,
+            psb_dir = dir })
       = ppr_lhs <+> ppr_rhs
     where
       ppr_lhs = text "pattern" <+> ppr_details
@@ -592,7 +599,7 @@ instance (OutputableBndr idL, OutputableBndr idR) => Outputable (PatSynBind idL 
           Unidirectional           -> ppr_simple (text "<-")
           ImplicitBidirectional    -> ppr_simple equals
           ExplicitBidirectional mg -> ppr_simple (text "<-") <+> ptext (sLit "where") $$
-                                      (nest 2 $ pprFunBind psyn mg)
+                                      (nest 2 $ pprFunBind mg)
 
 pprTicks :: SDoc -> SDoc -> SDoc
 -- Print stuff about ticks only when -dppr-debug is on, to avoid
@@ -642,11 +649,11 @@ data IPBind id
   = IPBind (Either (Located HsIPName) id) (LHsExpr id)
 deriving instance (DataId name) => Data (IPBind name)
 
-instance (OutputableBndr id) => Outputable (HsIPBinds id) where
+instance (OutputableBndrId id) => Outputable (HsIPBinds id) where
   ppr (IPBinds bs ds) = pprDeeperList vcat (map ppr bs)
                         $$ ifPprDebug (ppr ds)
 
-instance (OutputableBndr id) => Outputable (IPBind id) where
+instance (OutputableBndrId id) => Outputable (IPBind id) where
   ppr (IPBind lr rhs) = name <+> equals <+> pprExpr (unLoc rhs)
     where name = case lr of
                    Left (L _ ip) -> pprBndr LetBind ip
@@ -878,10 +885,10 @@ signatures. Since some of the signatures contain a list of names, testing for
 equality is not enough -- we have to check if they overlap.
 -}
 
-instance (OutputableBndr name) => Outputable (Sig name) where
+instance (OutputableBndrId name) => Outputable (Sig name) where
     ppr sig = ppr_sig sig
 
-ppr_sig :: OutputableBndr name => Sig name -> SDoc
+ppr_sig :: (OutputableBndrId name) => Sig name -> SDoc
 ppr_sig (TypeSig vars ty)    = pprVarSig (map unLoc vars) (ppr ty)
 ppr_sig (ClassOpSig is_deflt vars ty)
   | is_deflt                 = text "default" <+> pprVarSig (map unLoc vars) (ppr ty)

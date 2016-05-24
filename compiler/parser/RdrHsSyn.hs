@@ -502,9 +502,10 @@ mkPatSynMatchGroup (L loc patsyn_name) (L _ decls) =
         do { unless (name == patsyn_name) $
                wrongNameBindingErr loc decl
            ; match <- case details of
-               PrefixCon pats -> return $ Match (FunBindMatch ln False) pats Nothing rhs
+               PrefixCon pats ->
+                        return $ Match (FunRhs ln Prefix) pats Nothing rhs
                InfixCon pat1 pat2 ->
-                         return $ Match (FunBindMatch ln True) [pat1, pat2] Nothing rhs
+                       return $ Match (FunRhs ln Infix) [pat1, pat2] Nothing rhs
                RecCon{} -> recordPatSynErr loc pat
            ; return $ L loc match }
     fromDecl (L loc decl) = extraDeclErr loc decl
@@ -919,7 +920,7 @@ checkFunBind :: SDoc
              -> [AddAnn]
              -> SrcSpan
              -> Located RdrName
-             -> Bool
+             -> FunctionFixity
              -> [LHsExpr RdrName]
              -> Maybe (LHsType RdrName)
              -> Located (GRHSs RdrName (LHsExpr RdrName))
@@ -930,7 +931,7 @@ checkFunBind msg ann lhs_loc fun is_infix pats opt_sig (L rhs_span grhss)
         -- Add back the annotations stripped from any HsPar values in the lhs
         -- mapM_ (\a -> a match_span) ann
         return (ann, makeFunBind fun
-                  [L match_span (Match { m_fixity = FunBindMatch fun is_infix
+                  [L match_span (Match { m_ctxt = FunRhs fun is_infix
                                        , m_pats = ps
                                        , m_type = opt_sig
                                        , m_grhss = grhss })])
@@ -1024,7 +1025,7 @@ splitBang (L _ (OpApp l_arg bang@(L _ (HsVar (L _ op))) _ r_arg))
 splitBang _ = Nothing
 
 isFunLhs :: LHsExpr RdrName
-         -> P (Maybe (Located RdrName, Bool, [LHsExpr RdrName],[AddAnn]))
+      -> P (Maybe (Located RdrName, FunctionFixity, [LHsExpr RdrName],[AddAnn]))
 -- A variable binding is parsed as a FunBind.
 -- Just (fun, is_infix, arg_pats) if e is a function LHS
 --
@@ -1040,7 +1041,7 @@ isFunLhs :: LHsExpr RdrName
 isFunLhs e = go e [] []
  where
    go (L loc (HsVar (L _ f))) es ann
-        | not (isRdrDataCon f)       = return (Just (L loc f, False, es, ann))
+        | not (isRdrDataCon f)       = return (Just (L loc f, Prefix, es, ann))
    go (L _ (HsApp f e)) es       ann = go f (e:es) ann
    go (L l (HsPar e))   es@(_:_) ann = go e es (ann ++ mkParensApiAnn l)
 
@@ -1061,15 +1062,15 @@ isFunLhs e = go e [] []
         | Just (e',es') <- splitBang e
         = do { bang_on <- extension bangPatEnabled
              ; if bang_on then go e' (es' ++ es) ann
-               else return (Just (L loc' op, True, (l:r:es), ann)) }
+               else return (Just (L loc' op, Infix, (l:r:es), ann)) }
                 -- No bangs; behave just like the next case
         | not (isRdrDataCon op)         -- We have found the function!
-        = return (Just (L loc' op, True, (l:r:es), ann))
+        = return (Just (L loc' op, Infix, (l:r:es), ann))
         | otherwise                     -- Infix data con; keep going
         = do { mb_l <- go l es ann
              ; case mb_l of
-                 Just (op', True, j : k : es', ann')
-                   -> return (Just (op', True, j : op_app : es', ann'))
+                 Just (op', Infix, j : k : es', ann')
+                   -> return (Just (op', Infix, j : op_app : es', ann'))
                    where
                      op_app = L loc (OpApp k (L loc' (HsVar (L loc' op))) fix r)
                  _ -> return Nothing }

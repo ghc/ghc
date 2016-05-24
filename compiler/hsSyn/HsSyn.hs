@@ -107,7 +107,7 @@ data HsModule name
      -- For details on above see note [Api annotations] in ApiAnnotation
 deriving instance (DataId name) => Data (HsModule name)
 
-instance (OutputableBndr name, HasOccName name)
+instance (OutputableBndrId name, HasOccName name)
         => Outputable (HsModule name) where
 
     ppr (HsModule Nothing _ imports decls _ mbDoc)

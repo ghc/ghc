@@ -2131,7 +2131,7 @@ infixexp :: { LHsExpr RdrName }
 exp10 :: { LHsExpr RdrName }
         : '\\' apat apats opt_asig '->' exp
                    {% ams (sLL $1 $> $ HsLam (mkMatchGroup FromSource
-                            [sLL $1 $> $ Match { m_fixity = NonFunBindMatch
+                            [sLL $1 $> $ Match { m_ctxt = LambdaExpr
                                                , m_pats = $2:$3
                                                , m_type = snd $4
                                                , m_grhss = unguardedGRHSs $6 }]))
@@ -2550,7 +2550,7 @@ alts1   :: { Located ([AddAnn],[LMatch RdrName (LHsExpr RdrName)]) }
         | alt                   { sL1 $1 ([],[$1]) }
 
 alt     :: { LMatch RdrName (LHsExpr RdrName) }
-        : pat opt_asig alt_rhs  {%ams (sLL $1 $> (Match { m_fixity = NonFunBindMatch
+        : pat opt_asig alt_rhs  {%ams (sLL $1 $> (Match { m_ctxt = CaseAlt
                                                         , m_pats = [$1]
                                                         , m_type = snd $2
                                                         , m_grhss = snd $ unLoc $3 }))

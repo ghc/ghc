@@ -1790,7 +1790,8 @@ tcUserStmt (L loc (BodyStmt expr _ _ _))
         ; uniq <- newUnique
         ; interPrintName <- getInteractivePrintName
         ; let fresh_it  = itName uniq loc
-              matches   = [mkMatch [] rn_expr (noLoc emptyLocalBinds)]
+              matches   = [mkMatch (FunRhs (L loc fresh_it) Prefix) [] rn_expr
+                                   (noLoc emptyLocalBinds)]
               -- [it = expr]
               the_bind  = L loc $ (mkTopFunBind FromSource (L loc fresh_it) matches) { bind_fvs = fvs }
                           -- Care here!  In GHCi the expression might have
