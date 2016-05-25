@@ -104,7 +104,7 @@ buildPackageData context@Context {..} = do
                 orderOnly $ generatedDependencies stage package
                 windows <- windowsHost
                 let prefix = fixKey (buildPath context) ++ "_"
-                    dirs   = [ ".", "hooks", "sm", "eventlog" ]
+                    dirs   = [ ".", "hooks", "sm", "eventlog", "linker" ]
                           ++ [ if windows then "win32" else "posix" ]
                 -- TODO: Adding cmm/S sources to C_SRCS is a hack -- refactor.
                 cSrcs   <- map unifyPath <$>
