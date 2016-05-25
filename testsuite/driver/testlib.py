@@ -1057,7 +1057,7 @@ def do_compile( name, way, should_fail, top_mod, extra_mods, extra_hc_opts, over
     # of whether we expected the compilation to fail or not (successful
     # compilations may generate warnings).
 
-    (_, expected_stderr_file) = find_expected_file(name, 'stderr')
+    expected_stderr_file = find_expected_file(name, 'stderr')
     actual_stderr_file = add_suffix(name, 'comp.stderr')
 
     if not compare_outputs(way, 'stderr',
@@ -1081,7 +1081,7 @@ def compile_cmp_asm( name, way, extra_hc_opts ):
     # of whether we expected the compilation to fail or not (successful
     # compilations may generate warnings).
 
-    (_, expected_asm_file) = find_expected_file(name, 'asm')
+    expected_asm_file = find_expected_file(name, 'asm')
     actual_asm_file = add_suffix(name, 's')
 
     if not compare_outputs(way, 'asm',
@@ -1506,15 +1506,9 @@ def get_compiler_flags(override_flags, noforce):
 
 def check_stdout_ok(name, way):
    actual_stdout_file = add_suffix(name, 'run.stdout')
-   (platform_specific, expected_stdout_file) = find_expected_file(name, 'stdout')
+   expected_stdout_file = find_expected_file(name, 'stdout')
 
-   def norm(str):
-      if platform_specific:
-         return str
-      else:
-         return normalise_output(str)
-
-   extra_norm = join_normalisers(norm, getTestOpts().extra_normaliser)
+   extra_norm = join_normalisers(normalise_output, getTestOpts().extra_normaliser)
 
    check_stdout = getTestOpts().check_stdout
    if check_stdout:
@@ -1530,16 +1524,10 @@ def dump_stdout( name ):
 
 def check_stderr_ok(name, way):
    actual_stderr_file = add_suffix(name, 'run.stderr')
-   (platform_specific, expected_stderr_file) = find_expected_file(name, 'stderr')
-
-   def norm(str):
-      if platform_specific:
-         return str
-      else:
-         return normalise_errmsg(str)
+   expected_stderr_file = find_expected_file(name, 'stderr')
 
    return compare_outputs(way, 'stderr',
-                          join_normalisers(norm, getTestOpts().extra_errmsg_normaliser), \
+                          join_normalisers(normalise_errmsg, getTestOpts().extra_errmsg_normaliser), \
                           expected_stderr_file, actual_stderr_file,
                           whitespace_normaliser=normalise_whitespace)
 
@@ -1590,7 +1578,7 @@ def check_hp_ok(name):
         return(False)
 
 def check_prof_ok(name, way):
-    (_, expected_prof_file) = find_expected_file(name, 'prof.sample')
+    expected_prof_file = find_expected_file(name, 'prof.sample')
     expected_prof_path = in_testdir(expected_prof_file)
 
     # Check actual prof file only if we have an expected prof file to
@@ -1987,20 +1975,18 @@ def find_expected_file(name, suff):
     basename = add_suffix(name, suff)
     basepath = in_srcdir(basename)
 
-    files = [(platformSpecific, basename + ws + plat)
-             for (platformSpecific, plat) in [(1, '-' + config.platform),
-                                              (1, '-' + config.os),
-                                              (0, '')]
+    files = [basename + ws + plat
+             for plat in ['-' + config.platform, '-' + config.os, '']
              for ws in ['-ws-' + config.wordsize, '']]
 
     dir = glob.glob(basepath + '*')
     dir = [normalise_slashes_(d) for d in dir]
 
-    for (platformSpecific, f) in files:
+    for f in files:
        if in_srcdir(f) in dir:
-            return (platformSpecific,f)
+            return f
 
-    return (0, basename)
+    return basename
 
 def cleanup():
     shutil.rmtree(getTestOpts().testdir, ignore_errors=True)
