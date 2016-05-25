@@ -721,9 +721,9 @@ As you can guess ``justOnes`` will evaluate to ``Just [-1,-1,-1,...``.
 
 GHC's implementation the mdo-notation closely follows the original
 translation as described in the paper `A recursive do for
-Haskell <https://sites.google.com/site/leventerkok/recdo.pdf>`__, which
+Haskell <http://leventerkok.github.io/papers/recdo.pdf>`__, which
 in turn is based on the work `Value Recursion in Monadic
-Computations <http://sites.google.com/site/leventerkok/erkok-thesis.pdf>`__.
+Computations <http://leventerkok.github.io/papers/erkok-thesis.pdf>`__.
 Furthermore, GHC extends the syntax described in the former paper with a
 lower level syntax flagged by the ``rec`` keyword, as we describe next.
 
@@ -784,7 +784,7 @@ can be rather delicate: in particular, we would like the knots to be
 wrapped around as minimal groups as possible. This process is known as
 *segmentation*, and is described in detail in Section 3.2 of `A
 recursive do for
-Haskell <https://sites.google.com/site/leventerkok/recdo.pdf>`__.
+Haskell <http://leventerkok.github.io/papers/recdo.pdf>`__.
 Segmentation improves polymorphism and reduces the size of the recursive
 knot. Most importantly, it avoids unnecessary interference caused by a
 fundamental issue with the so-called *right-shrinking* axiom for monadic
@@ -793,7 +793,7 @@ recursion. In brief, most monads of interest (IO, strict state, etc.) do
 performing segmentation can cause unnecessary interference, changing the
 termination behavior of the resulting translation. (Details can be found
 in Sections 3.1 and 7.2.2 of `Value Recursion in Monadic
-Computations <http://sites.google.com/site/leventerkok/erkok-thesis.pdf>`__.)
+Computations <http://leventerkok.github.io/papers/erkok-thesis.pdf>`__.)
 
 The ``mdo`` notation removes the burden of placing explicit ``rec``
 blocks in the code. Unlike an ordinary ``do`` expression, in which
