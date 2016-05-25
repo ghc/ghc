@@ -59,5 +59,5 @@ T10408:
 T11389:
 	# Test that "Loaded GHCi configuration" message is printed by default
 	# (without -v0)
-	'$(TEST_HC)' $(TEST_HC_OPTS) --interactive -ignore-dot-ghci \
+	'$(TEST_HC)' $(filter-out -v0,$(TEST_HC_OPTS_INTERACTIVE)) \
             -ghci-script T11389.script < /dev/null | grep 'configuration'

@@ -13,7 +13,7 @@ ghcilink001 :
 	mkdir dir001
 	"$(TEST_HC)" -c f.c -o dir001/foo.o
 	"$(AR)" cqs dir001/libfoo.a dir001/foo.o
-	echo "test" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -Ldir001 -lfoo TestLink.hs
+	echo "test" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -Ldir001 -lfoo TestLink.hs
 
 # Test 2: ghci -Ldir -lfoo
 #   with dir/libfoo.so
@@ -32,7 +32,7 @@ ghcilink002 :
 	mkdir dir002
 	"$(TEST_HC)" -c -dynamic f.c -o dir002/foo.o
 	"$(TEST_HC)" -no-auto-link-packages -shared -v0 -o dir002/$(call DLL,foo) dir002/foo.o
-	echo "test" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -Ldir002 -lfoo TestLink.hs
+	echo "test" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -Ldir002 -lfoo TestLink.hs
 
 # Test 3: ghci -lstdc++
 #    where libstdc++.so is normally found in a directory private to gcc,
@@ -41,9 +41,9 @@ ghcilink002 :
 .PHONY: ghcilink003
 ghcilink003 :
 ifeq "$(WINDOWS)" "YES"
-	echo ":q" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -lstdc++-6
+	echo ":q" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -lstdc++-6
 else
-	echo ":q" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -lstdc++
+	echo ":q" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -lstdc++
 endif
 
 # Test 4: 
@@ -72,7 +72,7 @@ ghcilink004 :
 	#
 	"$(TEST_HC)" -c f.c -o dir004/foo.o
 	"$(AR)" cqs dir004/libfoo.a dir004/foo.o
-	echo "test" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -package-db $(LOCAL_PKGCONF004) -package test TestLink.hs
+	echo "test" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -package-db $(LOCAL_PKGCONF004) -package test TestLink.hs
 
 # Test 5: 
 #   package P
@@ -100,7 +100,7 @@ ghcilink005 :
 	#
 	"$(TEST_HC)" -c -dynamic f.c -o dir005/foo.o
 	"$(TEST_HC)" -no-auto-link-packages -shared -o dir005/$(call DLL,foo) dir005/foo.o
-	echo "test" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -package-db $(LOCAL_PKGCONF005) -package test TestLink.hs
+	echo "test" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -package-db $(LOCAL_PKGCONF005) -package test TestLink.hs
 
 # Test 6: 
 #   package P
@@ -126,9 +126,9 @@ endif
 	'$(GHC_PKG)' init $(LOCAL_PKGCONF006)
 	'$(GHC_PKG)' --no-user-package-db -f $(LOCAL_PKGCONF006) register $(PKG006) -v0
 	#
-	echo ":q" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -package-db $(LOCAL_PKGCONF006) -package test
+	echo ":q" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -package-db $(LOCAL_PKGCONF006) -package test
 
 .PHONY: T3333
 T3333:
 	"$(TEST_HC)" -c T3333.c -o T3333.o
-	echo "weak_test 10" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 T3333.hs T3333.o
+	echo "weak_test 10" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) T3333.hs T3333.o

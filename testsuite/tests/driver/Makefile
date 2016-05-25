@@ -432,16 +432,20 @@ T2566::
 #     ghc: <stdout>: hFlush: resource vanished (Broken pipe)
 # on OS X
 mode001:
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --make --help        | sed '2,$$d'
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --help --make        | sed '2,$$d'
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --interactive --help -ignore-dot-ghci | sed '2,$$d'
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --help --interactive -ignore-dot-ghci | sed '2,$$d'
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --version --help     | sed "s/, version.*//"
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --help --version        | sed '2,$$d'
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --interactive --version -ignore-dot-ghci | sed "s/, version.*//"
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --version --interactive -ignore-dot-ghci | sed "s/, version.*//"
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --interactive --show-options -ignore-dot-ghci | grep -- --interactive | sed '2,$$d'
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --show-options --interactive -ignore-dot-ghci | grep -- --interactive | sed '2,$$d'
+	"$(TEST_HC)" $(TEST_HC_OPTS) --make --help              | sed '2,$$d'
+	"$(TEST_HC)" $(TEST_HC_OPTS) --help --make              | sed '2,$$d'
+
+	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) --help         | sed '2,$$d'
+	"$(TEST_HC)" --help $(TEST_HC_OPTS_INTERACTIVE)         | sed '2,$$d'
+
+	"$(TEST_HC)" $(TEST_HC_OPTS) --version --help           | sed "s/, version.*//"
+	"$(TEST_HC)" $(TEST_HC_OPTS) --help --version           | sed '2,$$d'
+
+	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) --version      | sed "s/, version.*//"
+	"$(TEST_HC)" --version $(TEST_HC_OPTS_INTERACTIVE)      | sed "s/, version.*//"
+
+	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) --show-options | grep -- --show-options | sed '2,$$d'
+	"$(TEST_HC)" --show-options $(TEST_HC_OPTS_INTERACTIVE) | grep -- --show-options | sed '2,$$d'
 
 # Test for building DLLs with ghc -shared, see #2745
 shared001:
@@ -503,7 +507,7 @@ T706:
 	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) $(ghciWayFlags) -c T706.hs
 	cp T706b.hs T706.hs
 	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) $(ghciWayFlags) -c T706.hs
-	echo "test" | "$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) --interactive -ignore-dot-ghci -v0 T706
+	echo "test" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) T706
 
 .PHONY: T5584
 T5584:
