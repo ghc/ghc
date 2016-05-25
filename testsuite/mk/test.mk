@@ -281,7 +281,7 @@ $(TIMEOUT_PROGRAM) :
 # communicate with the topmake.
 # See Note [Communicating options and variables to a submake]
 test: $(TIMEOUT_PROGRAM)
-	+$(PYTHON) $(RUNTESTS) $(RUNTEST_OPTS) \
+	+PYTHON="$(PYTHON)" "$(PYTHON)" $(RUNTESTS) $(RUNTEST_OPTS) \
 		$(patsubst %, --only=%, $(TEST)) \
 		$(patsubst %, --only=%, $(TESTS)) \
 		$(patsubst %, --way=%, $(WAY)) \

@@ -1,5 +1,5 @@
 -- !!! Testing the Word Enum instances.
-{-# OPTIONS_GHC -F -pgmF ./enum_processor.py #-}
+{-# OPTIONS_GHC -F -pgmF ./enum_processor.bat #-}
 -- The processor is a non-CPP-based equivalent of
 -- #define printTest(x) (do{ putStr ( "    " ++ "x" ++ " = " ) ; print (x) })
 -- which is not portable to clang

@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # The rough equivalent of the traditional CPP:
 #   #define printTest(x) (do{ putStr ( "    " ++ "x" ++ " = " ) ; print (x) })
 # which is not portable to clang.

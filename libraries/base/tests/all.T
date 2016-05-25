@@ -78,7 +78,7 @@ test('dynamic003',      extra_run_opts('+RTS -K32m -RTS'), compile_and_run, ['']
 test('dynamic004',      omit_ways(['normal', 'threaded1', 'ghci']), compile_and_run, [''])
 test('dynamic005',      normal, compile_and_run, [''])
 
-enum_setups = [when(fast(), skip), when(opsys('mingw32'), expect_broken(9399))]
+enum_setups = [when(fast(), skip)]
 test('enum01',          enum_setups, compile_and_run, [''])
 test('enum02',          enum_setups, compile_and_run, [''])
 test('enum03',          enum_setups, compile_and_run, [''])
