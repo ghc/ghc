@@ -36,6 +36,8 @@ endif
 # in nested Makefiles
 TEST_HC_OPTS = -fforce-recomp -dcore-lint -dcmm-lint -dno-debug-output -no-user-$(GhcPackageDbFlag) -rtsopts $(EXTRA_HC_OPTS)
 
+TEST_HC_OPTS_INTERACTIVE = $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci
+
 # The warning suppression flag below is a temporary kludge. While working with
 # tests that contain tabs, please de-tab them so this flag can be eventually
 # removed. See

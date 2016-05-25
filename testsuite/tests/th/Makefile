@@ -45,7 +45,7 @@ TH_Depends:
 
 
 T8333:
-	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) --interactive -v0 -ignore-dot-ghci T8333.hs < /dev/null
+	'$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) $(ghcThWayFlags) T8333.hs < /dev/null
 
 # This was an easy way to re-use the stdout testing
 # to check the contents of a generated file.

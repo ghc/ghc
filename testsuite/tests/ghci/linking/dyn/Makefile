@@ -82,7 +82,7 @@ compile_libAS_impl_gcc:
 	mkdir bin_impl_gcc
 	'$(TEST_HC)' $(MY_TEST_HC_OPTS) -odir "bin_impl_gcc" -shared A.c -o "bin_impl_gcc/$(call DLL,ASimpL)"
 	mv bin_impl_gcc/libASimpL.dll.a bin_impl_gcc/libASx.dll.a
-	echo "main" | '$(TEST_HC)' $(TEST_HC_OPTS) --interactive -ignore-dot-ghci -v0 T11072.hs -lASx -L./bin_impl_gcc
+	echo "main" | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) T11072.hs -lASx -L./bin_impl_gcc
 
 .PHONY: compile_libAS_impl_msvc
 compile_libAS_impl_msvc:
@@ -90,11 +90,11 @@ compile_libAS_impl_msvc:
 	mkdir bin_impl_msvc
 	'$(TEST_HC)' $(MY_TEST_HC_OPTS) -odir "bin_impl_msvc" -shared A.c -o "bin_impl_msvc/$(call DLL,ASimpL)"
 	rm -f bin_impl_msvc/libAS*.a
-	echo "main" | '$(TEST_HC)' $(TEST_HC_OPTS) --interactive -ignore-dot-ghci -v0 T11072.hs -lAS -L./bin_impl_msvc -L"./$(shell uname -m)"
+	echo "main" | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) T11072.hs -lAS -L./bin_impl_msvc -L"./$(shell uname -m)"
 
 .PHONY: T1407
 T1407:
-	cat T1407.script | LD_LIBRARY_PATH=. "$(TEST_HC)" $(TEST_HC_OPTS) -ignore-dot-ghci -v0 --interactive -L"T1407dir"
+	cat T1407.script | LD_LIBRARY_PATH=. "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -L"T1407dir"
 
 .PHONY: T3242
-	echo ":q" | '$(TEST_HC)' $(TEST_HC_OPTS) --interactive -ignore-dot-ghci -v0 -lm
+	echo ":q" | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -lm

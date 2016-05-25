@@ -5,32 +5,32 @@ include $(TOP)/mk/test.mk
 ghci024:
 	@echo "~~~~~~~~~~ Testing :set"
 	printf ":set\n" \
-	    | '$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci
+	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE)
 	@echo "~~~~~~~~~~ Testing :set -a"
 	printf ":set -a\n" \
-	    | '$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci \
+	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) \
 	    | grep -E "^([^ ]|  -fno-print-explicit-foralls|  -Wno-implicit-prelude)"
 	@echo "~~~~~~~~~~ Testing :show languages"
 	printf ":show languages\n" \
-	    | '$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci
+	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE)
 	@echo "~~~~~~~~~~ Testing :show languages, with -XMagicHash"
 	printf ":set -XMagicHash\n:show languages\n" \
-	    | '$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci
+	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE)
 	@echo "~~~~~~~~~~ Testing :show packages"
 	printf ":show packages\n" \
-	    | '$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci \
+	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) \
 	    | grep -E "^([^ ]|  -package|base|ghc-prim|integer|rts|Cabal)" \
 	    | sed "s/Cabal-[0-9.]*/Cabal-VERSION/"
 	@echo "~~~~~~~~~~ Testing :show packages, including the ghc package"
 	printf ":set -package ghc\n:show packages\n" \
-	    | '$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci \
+	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) \
 	    | grep -E "^([^ ]|  -package|base|ghc-prim|integer|rts|Cabal)" \
 	    | sed "s/Cabal-[0-9.]*/Cabal-VERSION/"
 
 .PHONY: ghci037
 ghci037:
-	'$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci                   < ghci037.script
-	'$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci -fno-ghci-sandbox < ghci037.script
+	'$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE)                   < ghci037.script
+	'$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -fno-ghci-sandbox < ghci037.script
 
 ghci056_setup:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c ghci056_c.c
@@ -41,7 +41,7 @@ T6106_prep:
 
 .PHONY: T9367
 T9367:
-	'$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci                   < T9367.script > T9367-raw.run.stdout
+	'$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE)                   < T9367.script > T9367-raw.run.stdout
 	cmp T9367-raw.run.stdout T9367-raw.stdout
 
 .PHONY: T9762_prep
@@ -52,7 +52,7 @@ T9762_prep:
 T10408:
 	# `-ghci-script`s should be executed in the order they are specified,
 	# and not be ignored when `-ignore-dot-ghci` is specified.
-	'$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci \
+	'$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) \
 	    -ghci-script T10408A.script -ghci-script T10408B.script < /dev/null
 
 .PHONY: T11389
