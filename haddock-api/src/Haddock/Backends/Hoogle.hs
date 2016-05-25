@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Backends.Hoogle
@@ -84,7 +85,8 @@ dropHsDocTy = f
         f (HsDocTy a _) = f $ unL a
         f x = x
 
-outHsType :: OutputableBndr a => DynFlags -> HsType a -> String
+outHsType :: (OutputableBndr a, OutputableBndr (NameOrRdrName a))
+          => DynFlags -> HsType a -> String
 outHsType dflags = out dflags . dropHsDocTy
 
 
