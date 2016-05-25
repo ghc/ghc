@@ -21,10 +21,9 @@ module Haddock.Utils (
   -- * Filename utilities
   moduleHtmlFile, moduleHtmlFile',
   contentsHtmlFile, indexHtmlFile,
-  frameIndexHtmlFile,
   moduleIndexFrameName, mainFrameName, synopsisFrameName,
   subIndexHtmlFile,
-  jsFile, framesFile,
+  jsFile,
 
   -- * Anchor and URL utilities
   moduleNameUrl, moduleNameUrl', moduleUrl,
@@ -262,12 +261,6 @@ contentsHtmlFile = "index.html"
 indexHtmlFile = "doc-index.html"
 
 
--- | The name of the module index file to be displayed inside a frame.
--- Modules are display in full, but without indentation.  Clicking opens in
--- the main window.
-frameIndexHtmlFile :: String
-frameIndexHtmlFile = "index-frames.html"
-
 
 moduleIndexFrameName, mainFrameName, synopsisFrameName :: String
 moduleIndexFrameName = "modules"
@@ -333,9 +326,8 @@ makeAnchorId (f:r) = escape isAlpha f ++ concatMap (escape isLegal) r
 -------------------------------------------------------------------------------
 
 
-jsFile, framesFile :: String
+jsFile :: String
 jsFile    = "haddock-util.js"
-framesFile = "frames.html"
 
 
 -------------------------------------------------------------------------------

@@ -36,14 +36,13 @@ import Haddock.GhcUtils
 
 import Control.Monad         ( when, unless )
 import Data.Char             ( toUpper )
-import Data.List             ( sortBy, groupBy, intercalate, isPrefixOf )
+import Data.List             ( sortBy, intercalate, isPrefixOf )
 import Data.Maybe
 import System.FilePath hiding ( (</>) )
 import System.Directory
 import Data.Map              ( Map )
 import qualified Data.Map as Map hiding ( Map )
 import qualified Data.Set as Set hiding ( Set )
-import Data.Function
 import Data.Ord              ( comparing )
 
 import DynFlags (Language(..))
@@ -105,7 +104,8 @@ copyHtmlBits odir libdir themes = do
     copyCssFile f = copyFile f (combine odir (takeFileName f))
     copyLibFile f = copyFile (joinPath [libhtmldir, f]) (joinPath [odir, f])
   mapM_ copyCssFile (cssFiles themes)
-  mapM_ copyLibFile [ jsFile, framesFile ]
+  copyLibFile jsFile
+  return ()
 
 
 headHtml :: String -> Maybe String -> Themes -> Maybe String -> Html
@@ -268,9 +268,6 @@ ppHtmlContents dflags odir doctitle _maybe_package
   createDirectoryIfMissing True odir
   writeFile (joinPath [odir, contentsHtmlFile]) (renderToString debug html)
 
-  -- XXX: think of a better place for this?
-  ppHtmlContentsFrame odir doctitle themes mathjax_url ifaces debug
-
 
 ppPrologue :: Qualification -> String -> Maybe (MDoc GHC.RdrName) -> Html
 ppPrologue _ _ Nothing = noHtml
@@ -320,39 +317,6 @@ mkNode qual ss p (Node s leaf pkg srcPkg short ts) =
 
     subtree = mkNodeList qual (s:ss) p ts ! collapseSection p True ""
 
-
--- | Turn a module tree into a flat list of full module names.  E.g.,
--- @
---  A
---  +-B
---  +-C
--- @
--- becomes
--- @["A", "A.B", "A.B.C"]@
-flatModuleTree :: [InstalledInterface] -> [Html]
-flatModuleTree ifaces =
-    map (uncurry ppModule' . head)
-            . groupBy ((==) `on` fst)
-            . sortBy (comparing fst)
-            $ mods
-  where
-    mods = [ (moduleString mdl, mdl) | mdl <- map instMod ifaces ]
-    ppModule' txt mdl =
-      anchor ! [href (moduleHtmlFile mdl), target mainFrameName]
-        << toHtml txt
-
-
-ppHtmlContentsFrame :: FilePath -> String -> Themes -> Maybe String
-  -> [InstalledInterface] -> Bool -> IO ()
-ppHtmlContentsFrame odir doctitle themes maybe_mathjax_url ifaces debug = do
-  let mods = flatModuleTree ifaces
-      html =
-        headHtml doctitle Nothing themes maybe_mathjax_url +++
-        miniBody << divModuleList <<
-          (sectionName << "Modules" +++
-           ulist << [ li ! [theclass "module"] << m | m <- mods ])
-  createDirectoryIfMissing True odir
-  writeFile (joinPath [odir, frameIndexHtmlFile]) (renderToString debug html)
 
 
 --------------------------------------------------------------------------------
