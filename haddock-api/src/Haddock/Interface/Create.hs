@@ -36,7 +36,6 @@ import Control.Arrow (second)
 import Control.DeepSeq
 import Control.Monad
 import Data.Function (on)
-import qualified Data.Foldable as F
 
 import qualified Packages
 import qualified Module
@@ -50,7 +49,7 @@ import TcRnTypes
 import FastString (concatFS)
 import BasicTypes ( StringLiteral(..) )
 import qualified Outputable as O
-import HsDecls ( gadtDeclDetails,getConDetails )
+import HsDecls ( getConDetails )
 
 -- | Use a 'TypecheckedModule' to produce an 'Interface'.
 -- To do this, we need access to already processed modules in the topological
@@ -784,13 +783,21 @@ extractDecl name mdl decl
   | otherwise  =
     case unLoc decl of
       TyClD d@ClassDecl {} ->
-        let matches = [ sig | sig <- tcdSigs d, name `elem` sigName sig,
-                        isTypeLSig sig ] -- TODO: document fixity
+        let matches = [ lsig
+                      | lsig <- tcdSigs d
+                      , ClassOpSig False _ _ <- pure $ unLoc lsig
+                        -- Note: exclude `default` declarations (see #505)
+                      , name `elem` sigName lsig
+                      ]
+            -- TODO: document fixity
         in case matches of
           [s0] -> let (n, tyvar_names) = (tcdName d, tyClDeclTyVars d)
                       L pos sig = addClassContext n tyvar_names s0
                   in L pos (SigD sig)
-          _ -> error "internal: extractDecl (ClassDecl)"
+          _ -> O.pprPanic "extractDecl" (O.text "Ambiguous decl for" O.<+> O.ppr name O.<+> O.text "in class:"
+                                         O.$$ O.nest 4 (O.ppr d)
+                                         O.$$ O.text "Matches:"
+                                         O.$$ O.nest 4 (O.ppr matches))
       TyClD d@DataDecl {} ->
         let (n, tyvar_tys) = (tcdName d, lHsQTyVarsToTypes (tyClDeclTyVars d))
         in SigD <$> extractRecSel name mdl n tyvar_tys (dd_cons (tcdDataDefn d))
