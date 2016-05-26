@@ -582,7 +582,6 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
                    tag_expr = cmmConstrTag1 dflags (CmmReg bndr_reg)
                    branches' = [(tag+1,branch) | (tag,branch) <- branches]
                 emitSwitch tag_expr branches' mb_deflt 1 fam_sz
-                return AssignedDirectly
 
            else         -- No, get tag from info table
                 do dflags <- getDynFlags
@@ -591,7 +590,8 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
                        untagged_ptr = cmmRegOffB bndr_reg (-1)
                        tag_expr = getConstrTag dflags (untagged_ptr)
                    emitSwitch tag_expr branches mb_deflt 0 (fam_sz - 1)
-                   return AssignedDirectly }
+
+        ; return AssignedDirectly }
 
 cgAlts _ _ _ _ = panic "cgAlts"
         -- UbxTupAlt and PolyAlt have only one alternative
