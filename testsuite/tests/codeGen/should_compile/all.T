@@ -34,3 +34,4 @@ test('T9964', normal, compile, ['-O'])
 test('T10518', [cmm_src], compile, [''])
 test('T10667', [ when(arch('powerpc64'), expect_broken(11261)) ],
      compile, ['-g'])
+test('T12115', normal, compile, [''])

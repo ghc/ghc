@@ -264,6 +264,13 @@ Nor can we abstract over a type variable with any of these kinds.
 
 So a type variable can only be abstracted kk.
 
+Note [AppTy rep]
+~~~~~~~~~~~~~~~~
+Types of the form 'f a' must be of kind *, not #, so we are guaranteed
+that they are represented by pointers.  The reason is that f must have
+kind (kk -> kk) and kk cannot be unlifted; see Note [The kind invariant]
+in TyCoRep.
+
 Note [Arguments to type constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Because of kind polymorphism, in addition to type application we now
