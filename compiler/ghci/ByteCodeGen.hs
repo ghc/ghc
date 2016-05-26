@@ -31,6 +31,7 @@ import Literal
 import PrimOp
 import CoreFVs
 import Type
+import Kind            ( isLiftedTypeKind )
 import DataCon
 import TyCon
 import Util
@@ -486,35 +487,47 @@ schemeE d s p (AnnLet binds (_,body)) = do
      thunk_codes <- sequence compile_binds
      return (alloc_code `appOL` concatOL thunk_codes `appOL` body_code)
 
--- introduce a let binding for a ticked case expression. This rule
+-- Introduce a let binding for a ticked case expression. This rule
 -- *should* only fire when the expression was not already let-bound
 -- (the code gen for let bindings should take care of that).  Todo: we
 -- call exprFreeVars on a deAnnotated expression, this may not be the
 -- best way to calculate the free vars but it seemed like the least
 -- intrusive thing to do
 schemeE d s p exp@(AnnTick (Breakpoint _id _fvs) _rhs)
-   = if isUnliftedType ty
-        then do
-          -- If the result type is unlifted, then we must generate
+   | isLiftedTypeKind (typeKind ty)
+   = do   id <- newId ty
+          -- Todo: is emptyVarSet correct on the next line?
+          let letExp = AnnLet (AnnNonRec id (fvs, exp)) (emptyDVarSet, AnnVar id)
+          schemeE d s p letExp
+
+   | otherwise
+   = do   -- If the result type is not definitely lifted, then we must generate
           --   let f = \s . tick<n> e
           --   in  f realWorld#
           -- When we stop at the breakpoint, _result will have an unlifted
           -- type and hence won't be bound in the environment, but the
           -- breakpoint will otherwise work fine.
+          --
+          -- NB (Trac #12007) this /also/ applies for if (ty :: TYPE r), where
+          --    r :: RuntimeRep is a variable. This can happen in the
+          --    continuations for a pattern-synonym matcher
+          --    match = /\(r::RuntimeRep) /\(a::TYPE r).
+          --            \(k :: Int -> a) \(v::T).
+          --            case v of MkV n -> k n
+          -- Here (k n) :: a :: Type r, so we don't know if it's lifted
+          -- or not; but that should be fine provided we add that void arg.
+
           id <- newId (mkFunTy realWorldStatePrimTy ty)
           st <- newId realWorldStatePrimTy
           let letExp = AnnLet (AnnNonRec id (fvs, AnnLam st (emptyDVarSet, exp)))
                               (emptyDVarSet, (AnnApp (emptyDVarSet, AnnVar id)
                                                     (emptyDVarSet, AnnVar realWorldPrimId)))
           schemeE d s p letExp
-        else do
-          id <- newId ty
-          -- Todo: is emptyVarSet correct on the next line?
-          let letExp = AnnLet (AnnNonRec id (fvs, exp)) (emptyDVarSet, AnnVar id)
-          schemeE d s p letExp
-   where exp' = deAnnotate' exp
-         fvs  = exprFreeVarsDSet exp'
-         ty   = exprType exp'
+
+   where
+     exp' = deAnnotate' exp
+     fvs  = exprFreeVarsDSet exp'
+     ty   = exprType exp'
 
 -- ignore other kinds of tick
 schemeE d s p (AnnTick _ (_, rhs)) = schemeE d s p rhs
