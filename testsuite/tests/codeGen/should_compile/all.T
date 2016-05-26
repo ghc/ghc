@@ -32,3 +32,4 @@ test('debug', extra_clean(['debug.cmm']),
 test('T9964', normal, compile, ['-O'])
 test('T10518', [cmm_src], compile, [''])
 test('T10667', normal, compile, ['-g'])
+test('T12115', normal, compile, [''])

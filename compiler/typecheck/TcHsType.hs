@@ -700,7 +700,7 @@ finish_tuple tup_sort tau_tys tau_kinds exp_kind
   where
     arity = length tau_tys
     res_kind = case tup_sort of
-                 UnboxedTuple    -> tYPE unboxedTupleRepDataConTy
+                 UnboxedTuple    -> unboxedTupleKind
                  BoxedTuple      -> liftedTypeKind
                  ConstraintTuple -> constraintKind
 

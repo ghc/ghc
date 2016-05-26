@@ -70,7 +70,7 @@ module TysWiredIn (
         -- * Kinds
         typeNatKindCon, typeNatKind, typeSymbolKindCon, typeSymbolKind,
         isLiftedTypeKindTyConName, liftedTypeKind, constraintKind,
-        starKindTyCon, starKindTyConName,
+        starKindTyCon, starKindTyConName, unboxedTupleKind,
         unicodeStarKindTyCon, unicodeStarKindTyConName,
         liftedTypeKindTyCon, constraintKindTyCon,
 
@@ -459,10 +459,10 @@ constraintKindTyCon :: TyCon
 constraintKindTyCon = pcTyCon False NonRecursive constraintKindTyConName
                               Nothing [] []
 
-liftedTypeKind, constraintKind :: Kind
+liftedTypeKind, constraintKind, unboxedTupleKind :: Kind
 liftedTypeKind   = tYPE ptrRepLiftedTy
 constraintKind   = mkTyConApp constraintKindTyCon []
-
+unboxedTupleKind = tYPE unboxedTupleRepDataConTy
 
 {-
 ************************************************************************
@@ -668,15 +668,12 @@ mk_tuple boxity arity = (tycon, tuple_con)
                    -- NB: This must be one call to mkTemplateTyVars, to make
                    -- sure that all the uniques are different
                 (rr_tvs, open_tvs) = splitAt arity all_tvs
-                res_rep | arity == 0 = voidRepDataConTy
-                              -- See Note [Nullary unboxed tuple] in Type
-                        | otherwise  = unboxedTupleRepDataConTy
             in
             ( UnboxedTuple
             , gHC_PRIM
             , mkNamedBinders Specified rr_tvs ++
               map (mkAnonBinder . tyVarKind) open_tvs
-            , tYPE res_rep
+            , unboxedTupleKind
             , arity * 2
             , all_tvs
             , mkTyVarTys open_tvs

@@ -1179,129 +1179,6 @@ The reason is that we then get better (shorter) type signatures in
 interfaces.  Notably this plays a role in tcTySigs in TcBinds.hs.
 
 
-                Representation types
-                ~~~~~~~~~~~~~~~~~~~~
-
-Note [Nullary unboxed tuple]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We represent the nullary unboxed tuple as the unary (but void) type
-Void#.  The reason for this is that the ReprArity is never
-less than the Arity (as it would otherwise be for a function type like
-(# #) -> Int).
-
-As a result, ReprArity is always strictly positive if Arity is. This
-is important because it allows us to distinguish at runtime between a
-thunk and a function takes a nullary unboxed tuple as an argument!
--}
-
-type UnaryType = Type
-
-data RepType = UbxTupleRep [UnaryType] -- INVARIANT: never an empty list (see Note [Nullary unboxed tuple])
-             | UnaryRep UnaryType
-
-instance Outputable RepType where
-  ppr (UbxTupleRep tys) = text "UbxTupleRep" <+> ppr tys
-  ppr (UnaryRep ty)     = text "UnaryRep"    <+> ppr ty
-
-flattenRepType :: RepType -> [UnaryType]
-flattenRepType (UbxTupleRep tys) = tys
-flattenRepType (UnaryRep ty)     = [ty]
-
--- | Looks through:
---
---      1. For-alls
---      2. Synonyms
---      3. Predicates
---      4. All newtypes, including recursive ones, but not newtype families
---      5. Casts
---
--- It's useful in the back end of the compiler.
-repType :: Type -> RepType
-repType ty
-  = go initRecTc ty
-  where
-    go :: RecTcChecker -> Type -> RepType
-    go rec_nts ty                       -- Expand predicates and synonyms
-      | Just ty' <- coreView ty
-      = go rec_nts ty'
-
-    go rec_nts (ForAllTy (Named {}) ty2)  -- Drop type foralls
-      = go rec_nts ty2
-
-    go rec_nts (TyConApp tc tys)        -- Expand newtypes
-      | isNewTyCon tc
-      , tys `lengthAtLeast` tyConArity tc
-      , Just rec_nts' <- checkRecTc rec_nts tc   -- See Note [Expanding newtypes] in TyCon
-      = go rec_nts' (newTyConInstRhs tc tys)
-
-      | isUnboxedTupleTyCon tc
-      = if null tys
-         then UnaryRep voidPrimTy -- See Note [Nullary unboxed tuple]
-         else UbxTupleRep (concatMap (flattenRepType . go rec_nts) non_rr_tys)
-      where
-          -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
-        non_rr_tys = dropRuntimeRepArgs tys
-
-    go rec_nts (CastTy ty _)
-      = go rec_nts ty
-
-    go _ ty@(CoercionTy _)
-      = pprPanic "repType" (ppr ty)
-
-    go _ ty = UnaryRep ty
-
--- ToDo: this could be moved to the code generator, using splitTyConApp instead
--- of inspecting the type directly.
-
--- | Discovers the primitive representation of a more abstract 'UnaryType'
-typePrimRep :: UnaryType -> PrimRep
-typePrimRep ty = kindPrimRep (typeKind ty)
-
--- | Find the primitive representation of a 'TyCon'. Defined here to
--- avoid module loops. Call this only on unlifted tycons.
-tyConPrimRep :: TyCon -> PrimRep
-tyConPrimRep tc = kindPrimRep res_kind
-  where
-    res_kind = tyConResKind tc
-
--- | Take a kind (of shape @TYPE rr@) and produce the 'PrimRep' of values
--- of types of this kind.
-kindPrimRep :: Kind -> PrimRep
-kindPrimRep ki | Just ki' <- coreViewOneStarKind ki = kindPrimRep ki'
-kindPrimRep (TyConApp typ [runtime_rep])
-  = ASSERT( typ `hasKey` tYPETyConKey )
-    go runtime_rep
-  where
-    go rr | Just rr' <- coreView rr = go rr'
-    go (TyConApp rr_dc args)
-      | RuntimeRep fun <- tyConRuntimeRepInfo rr_dc
-      = fun args
-    go rr = pprPanic "kindPrimRep.go" (ppr rr)
-kindPrimRep ki = WARN( True
-                     , text "kindPrimRep defaulting to PtrRep on" <+> ppr ki )
-                 PtrRep  -- this can happen legitimately for, e.g., Any
-
-typeRepArity :: Arity -> Type -> RepArity
-typeRepArity 0 _ = 0
-typeRepArity n ty = case repType ty of
-  UnaryRep (ForAllTy bndr ty) -> length (flattenRepType (repType (binderType bndr))) + typeRepArity (n - 1) ty
-  _                           -> pprPanic "typeRepArity: arity greater than type can handle" (ppr (n, ty, repType ty))
-
-isVoidTy :: Type -> Bool
--- True if the type has zero width
-isVoidTy ty = case repType ty of
-                UnaryRep (TyConApp tc _) -> isUnliftedTyCon tc &&
-                                            isVoidRep (tyConPrimRep tc)
-                _                        -> False
-
-{-
-Note [AppTy rep]
-~~~~~~~~~~~~~~~~
-Types of the form 'f a' must be of kind *, not #, so we are guaranteed
-that they are represented by pointers.  The reason is that f must have
-kind (kk -> kk) and kk cannot be unlifted; see Note [The kind invariant]
-in TyCoRep.
-
 ---------------------------------------------------------------------
                                 ForAllTy
                                 ~~~~~~~~
@@ -1855,6 +1732,137 @@ typeSize (ForAllTy b t)   = typeSize (binderType b) + typeSize t
 typeSize (TyConApp _ ts)  = 1 + sum (map typeSize ts)
 typeSize (CastTy ty co)   = typeSize ty + coercionSize co
 typeSize (CoercionTy co)  = coercionSize co
+
+
+{- **********************************************************************
+*                                                                       *
+                Representation types
+*                                                                       *
+********************************************************************** -}
+
+{- Note [Nullary unboxed tuple]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At runtime we represent the nullary unboxed tuple as the type Void#.
+To see why, consider
+    f2 :: (# Int, Int #) -> Int
+    f1 :: (# Int #) -> Int
+    f0 :: (# #) -> Int
+
+When we "unarise" to eliminate unboxed tuples (this is done at the STG level),
+we'll transform to
+    f2 :: Int -> Int -> Int
+    f1 :: Int -> Int
+    f0 :: ??
+
+We do not want to give f0 zero arguments, otherwise a lambda will
+turn into a thunk! So we want to get
+    f0 :: Void# -> Int
+-}
+
+type UnaryType = Type
+
+data RepType
+  = UbxTupleRep [UnaryType] -- Represented by multiple values
+                            -- INVARIANT: never an empty list
+                            -- (see Note [Nullary unboxed tuple])
+  | UnaryRep UnaryType      -- Represented by a single value
+
+instance Outputable RepType where
+  ppr (UbxTupleRep tys) = text "UbxTupleRep" <+> ppr tys
+  ppr (UnaryRep ty)     = text "UnaryRep"    <+> ppr ty
+
+flattenRepType :: RepType -> [UnaryType]
+flattenRepType (UbxTupleRep tys) = tys
+flattenRepType (UnaryRep ty)     = [ty]
+
+-- | 'repType' figure out how a type will be represented
+--   at runtime.  It looks through
+--
+--      1. For-alls
+--      2. Synonyms
+--      3. Predicates
+--      4. All newtypes, including recursive ones, but not newtype families
+--      5. Casts
+--
+repType :: Type -> RepType
+repType ty
+  = go initRecTc ty
+  where
+    go :: RecTcChecker -> Type -> RepType
+    go rec_nts ty                       -- Expand predicates and synonyms
+      | Just ty' <- coreView ty
+      = go rec_nts ty'
+
+    go rec_nts (ForAllTy (Named {}) ty2)  -- Drop type foralls
+      = go rec_nts ty2
+
+    go rec_nts (TyConApp tc tys)        -- Expand newtypes
+      | isNewTyCon tc
+      , tys `lengthAtLeast` tyConArity tc
+      , Just rec_nts' <- checkRecTc rec_nts tc   -- See Note [Expanding newtypes] in TyCon
+      = go rec_nts' (newTyConInstRhs tc tys)
+
+      | isUnboxedTupleTyCon tc
+      = if null tys
+         then UnaryRep voidPrimTy -- See Note [Nullary unboxed tuple]
+         else UbxTupleRep (concatMap (flattenRepType . go rec_nts) non_rr_tys)
+      where
+          -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+        non_rr_tys = dropRuntimeRepArgs tys
+
+    go rec_nts (CastTy ty _)
+      = go rec_nts ty
+
+    go _ ty@(CoercionTy _)
+      = pprPanic "repType" (ppr ty)
+
+    go _ ty = UnaryRep ty
+
+-- ToDo: this could be moved to the code generator, using splitTyConApp instead
+-- of inspecting the type directly.
+
+-- | Discovers the primitive representation of a more abstract 'UnaryType'
+typePrimRep :: UnaryType -> PrimRep
+typePrimRep ty = kindPrimRep (typeKind ty)
+
+-- | Find the primitive representation of a 'TyCon'. Defined here to
+-- avoid module loops. Call this only on unlifted tycons.
+tyConPrimRep :: TyCon -> PrimRep
+tyConPrimRep tc = kindPrimRep res_kind
+  where
+    res_kind = tyConResKind tc
+
+-- | Take a kind (of shape @TYPE rr@) and produce the 'PrimRep' of values
+-- of types of this kind.
+kindPrimRep :: Kind -> PrimRep
+kindPrimRep ki | Just ki' <- coreViewOneStarKind ki = kindPrimRep ki'
+kindPrimRep (TyConApp typ [runtime_rep])
+  = ASSERT( typ `hasKey` tYPETyConKey )
+    go runtime_rep
+  where
+    go rr | Just rr' <- coreView rr = go rr'
+    go (TyConApp rr_dc args)
+      | RuntimeRep fun <- tyConRuntimeRepInfo rr_dc
+      = fun args
+    go rr = pprPanic "kindPrimRep.go" (ppr rr)
+kindPrimRep ki = WARN( True
+                     , text "kindPrimRep defaulting to PtrRep on" <+> ppr ki )
+                 PtrRep  -- this can happen legitimately for, e.g., Any
+
+typeRepArity :: Arity -> Type -> RepArity
+typeRepArity 0 _ = 0
+typeRepArity n ty = case repType ty of
+  UnaryRep (ForAllTy bndr ty) -> length (flattenRepType (repType (binderType bndr)))
+                                 + typeRepArity (n - 1) ty
+  _ -> pprPanic "typeRepArity: arity greater than type can handle" (ppr (n, ty, repType ty))
+
+isVoidTy :: Type -> Bool
+-- True if the type has zero width
+isVoidTy ty = case repType ty of
+                UnaryRep (TyConApp tc _) -> isUnliftedTyCon tc &&
+                                            isVoidRep (tyConPrimRep tc)
+                _                        -> False
+
 
 {-
 %************************************************************************
