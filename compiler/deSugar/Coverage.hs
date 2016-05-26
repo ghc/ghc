@@ -71,11 +71,8 @@ addTicksToBinds
 addTicksToBinds hsc_env mod mod_loc exports tyCons binds
   | let dflags = hsc_dflags hsc_env
         passes = coveragePasses dflags, not (null passes),
-    Just orig_file <- ml_hs_file mod_loc = do
-
-     if "boot" `isSuffixOf` orig_file
-         then return (binds, emptyHpcInfo False, Nothing)
-         else do
+    Just orig_file <- ml_hs_file mod_loc,
+    not ("boot" `isSuffixOf` orig_file) = do
 
      us <- mkSplitUniqSupply 'C' -- for cost centres
      let  orig_file2 = guessSourceFile binds orig_file
