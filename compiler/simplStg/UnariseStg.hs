@@ -4,8 +4,8 @@
 
 Note [Unarisation]
 ~~~~~~~~~~~~~~~~~~
-
-The idea of this pass is to translate away *all* unboxed-tuple binders. So for example:
+The idea of this pass is to translate away *all* unboxed-tuple binders.
+So for example:
 
 f (x :: (# Int, Bool #)) = f x + f (# 1, True #)
  ==>
@@ -17,10 +17,55 @@ because it would be very hard to make this pass Core-type-preserving.
 STG fed to the code generators *must* be unarised because the code generators do
 not support unboxed tuple binders natively.
 
+In more detail:
+
+Suppose that a variable x : (# t1, t2 #).
+
+  * At the binding site for x, make up fresh vars  x1:t1, x2:t2
+
+  * Extend the UniariseEnv   x :-> [x1,x2]
+
+  * Replace the binding with a curried binding for x1,x2
+       Lambda:   \x.e                ==>   \x1 x2. e
+       Case alt: MkT a b x c d -> e  ==>   MkT a b x1 x2 c d -> e
+
+  * Replace argument occurrences with a sequence of args
+    via a lookup in UnariseEnv
+       f a b x c d   ==>   f a b x1 x2 c d
+
+  * Replace tail-call occurrences with an unboxed tuple
+    via a lookup in UnariseEnv
+       x  ==>  (# x1, x2 #)
+    So, for example
+       f x = x    ==>   f x1 x2 = (# x1, x2 #)
+
+    This applies to case scrutinees too
+       case x of (# a,b #) -> e   ==>   case (# x1,x2 #) of (# a,b #) -> e
+    I think we rely on the code generator to short-circuit this
+    case without generating any actual code.
+
+Of course all this applies recursively, so that we flattn out nested tuples.
+
+Note [Unarisation and nullary tuples]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The above scheme has a special cases for nullary unboxed tuples, x :: (# #)
+
+  * Extend the UnariseEnv with   x :-> [voidPrimId]
+
+  * Replace bindings with a binding for void:Void#
+       \x. e  =>  \void. e
+    and similarly case alternatives
+
+  * If we find (# #) as an argument all by itself
+       f ...(# #)...
+    it looks like an Id, so we look up in UnariseEnv. We want to replace it
+    with voidPrimId, so the convenient thing is to initalise the UniariseEnv
+    with   (# #) :-> [voidPrimId]
+
+See also Note [Nullary unboxed tuple] in Type.hs.
 
 Note [Unarisation and arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Because of unarisation, the arity that will be recorded in the generated info table
 for an Id may be larger than the idArity. Instead we record what we call the RepArity,
 which is the Arity taking into account any expanded arguments, and corresponds to
@@ -38,7 +83,7 @@ import StgSyn
 import VarEnv
 import UniqSupply
 import Id
-import MkId (realWorldPrimId)
+import MkId ( voidPrimId, voidArgId )
 import Type
 import TysWiredIn
 import DataCon
@@ -58,13 +103,12 @@ import BasicTypes
 -- the domain of the mapping at all.
 type UnariseEnv = VarEnv [Id]
 
-ubxTupleId0 :: Id
-ubxTupleId0 = dataConWorkId (tupleDataCon Unboxed 0)
-
 unarise :: UniqSupply -> [StgBinding] -> [StgBinding]
 unarise us binds = zipWith (\us -> unariseBinding us init_env) (listSplitUniqSupply us) binds
-  where -- See Note [Nullary unboxed tuple] in Type.hs
-        init_env = unitVarEnv ubxTupleId0 [realWorldPrimId]
+  where
+     -- See Note [Unarisation and nullary tuples]
+     nullary_tup = dataConWorkId unboxedUnitDataCon
+     init_env = unitVarEnv nullary_tup [voidPrimId]
 
 unariseBinding :: UniqSupply -> UnariseEnv -> StgBinding -> StgBinding
 unariseBinding us rho bind = case bind of
@@ -181,7 +225,7 @@ unariseIds rho = concatMap (unariseId rho)
 unariseId :: UnariseEnv -> Id -> [Id]
 unariseId rho x
   | Just ys <- lookupVarEnv rho x
-  = ASSERT2( case repType (idType x) of UbxTupleRep _ -> True; _ -> x == ubxTupleId0
+  = ASSERT2( case repType (idType x) of UbxTupleRep _ -> True; _ -> False
            , text "unariseId: not unboxed tuple" <+> ppr x )
     ys
 
@@ -201,13 +245,24 @@ unariseUsedIdBinders us rho xs uses
 unariseIdBinders :: UniqSupply -> UnariseEnv -> [Id] -> (UniqSupply, UnariseEnv, [Id])
 unariseIdBinders us rho xs = third3 concat $ mapAccumL2 unariseIdBinder us rho xs
 
-unariseIdBinder :: UniqSupply -> UnariseEnv -> Id -> (UniqSupply, UnariseEnv, [Id])
+unariseIdBinder :: UniqSupply -> UnariseEnv
+                -> Id                -- Binder
+                -> (UniqSupply,
+                    UnariseEnv,      -- What to expand to at occurrence sites
+                    [Id])            -- What to expand to at binding site
 unariseIdBinder us rho x = case repType (idType x) of
-    UnaryRep _      -> (us, rho, [x])
-    UbxTupleRep tys -> let (us0, us1) = splitUniqSupply us
-                           ys   = unboxedTupleBindersFrom us0 x tys
-                           rho' = extendVarEnv rho x ys
-                       in (us1, rho', ys)
+    UnaryRep {} -> (us, rho, [x])
+
+    UbxTupleRep tys
+      | null tys  -> -- See Note [Unarisation and nullary tuples]
+                     let ys = [voidPrimId]
+                         rho' = extendVarEnv rho x ys
+                     in (us, rho', [voidArgId])
+
+      | otherwise -> let (us0, us1) = splitUniqSupply us
+                         ys   = unboxedTupleBindersFrom us0 x tys
+                         rho' = extendVarEnv rho x ys
+                      in (us1, rho', ys)
 
 unboxedTupleBindersFrom :: UniqSupply -> Id -> [UnaryType] -> [Id]
 unboxedTupleBindersFrom us x tys = zipWith (mkSysLocalOrCoVar fs) (uniqsFromSupply us) tys
