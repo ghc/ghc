@@ -301,7 +301,7 @@ ppr_co_ax_branch ppr_rhs
                           , cab_rhs = rhs
                           , cab_loc = loc })
   = foldr1 (flip hangNotEmpty 2)
-        [ pprUserForAll (mkNamedBinders Invisible (tvs ++ cvs))
+        [ pprUserForAll (mkTyVarBinders Invisible (tvs ++ cvs))
         , pprTypeApp fam_tc lhs <+> equals <+> ppr_rhs fam_tc rhs
         , text "-- Defined" <+> pprLoc loc ]
   where
@@ -686,7 +686,7 @@ mkForAllCo :: TyVar -> Coercion -> Coercion -> Coercion
 mkForAllCo tv kind_co co
   | Refl r ty <- co
   , Refl {} <- kind_co
-  = Refl r (mkNamedForAllTy tv Invisible ty)
+  = Refl r (mkInvForAllTy tv ty)
   | otherwise
   = ForAllCo tv kind_co co
 
@@ -1517,9 +1517,8 @@ ty_co_subst lc role ty
                              liftCoSubstTyVar lc r tv
     go r (AppTy ty1 ty2)   = mkAppCo (go r ty1) (go Nominal ty2)
     go r (TyConApp tc tys) = mkTyConAppCo r tc (zipWith go (tyConRolesX r tc) tys)
-    go r (ForAllTy (Anon ty1) ty2)
-                           = mkFunCo r (go r ty1) (go r ty2)
-    go r (ForAllTy (Named v _) ty)
+    go r (FunTy ty1 ty2)   = mkFunCo r (go r ty1) (go r ty2)
+    go r (ForAllTy (TvBndr v _) ty)
                            = let (lc', v', h) = liftCoSubstVarBndr lc v in
                              mkForAllCo v' h $! ty_co_subst lc' r ty
     go r ty@(LitTy {})     = ASSERT( r == Nominal )
@@ -1727,7 +1726,7 @@ coercionKind co = go co
             -- from Note [The substitution invariant]
             -- This is doing repeated substitutions and probably doesn't
             -- need to, see #11735
-        mkNamedForAllTy <$> Pair tv1 tv2 <*> pure Invisible <*> Pair ty1 ty2'
+        mkInvForAllTy <$> Pair tv1 tv2 <*> Pair ty1 ty2'
     go (CoVarCo cv)         = toPair $ coVarTypes cv
     go (AxiomInstCo ax ind cos)
       | CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
@@ -1807,7 +1806,7 @@ coercionKindRole = go
             -- from Note [The substitution invariant]
             -- This is doing repeated substitutions and probably doesn't
             -- need to, see #11735
-        (mkNamedForAllTy <$> Pair tv1 tv2 <*> pure Invisible <*> Pair ty1 ty2', r)
+        (mkInvForAllTy <$> Pair tv1 tv2 <*> Pair ty1 ty2', r)
     go (CoVarCo cv) = (toPair $ coVarTypes cv, coVarRole cv)
     go co@(AxiomInstCo ax _ _) = (coercionKind co, coAxiomRole ax)
     go (UnivCo _ r ty1 ty2)  = (Pair ty1 ty2, r)

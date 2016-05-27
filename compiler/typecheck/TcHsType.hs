@@ -57,6 +57,7 @@ import TcSimplify ( solveEqualities )
 import TcType
 import Inst   ( tcInstBinders, tcInstBindersX )
 import Type
+import TyCoRep( TyBinder(..) )
 import Kind
 import RdrName( lookupLocalRdrOcc )
 import Var
@@ -521,7 +522,7 @@ tc_hs_type mode (HsForAllTy { hst_bndrs = hs_tvs, hst_body = ty }) exp_kind
     -- Why exp_kind?  See Note [Body kind of HsForAllTy]
     do { ty' <- tc_lhs_type mode ty exp_kind
        ; let bound_vars = allBoundVariables ty'
-             bndrs      = mkNamedBinders Specified tvs'
+             bndrs      = mkTyVarBinders Specified tvs'
        ; return (mkForAllTys bndrs ty', bound_vars) }
 
 tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_body = ty }) exp_kind
@@ -788,10 +789,10 @@ tc_infer_args mode orig_ty binders mb_kind_info orig_args n0
       = ASSERT( isVisibleBinder binder )
         do { traceTc "tc_infer_args 2" (ppr binder $$ ppr arg)
            ; arg' <- addErrCtxt (funAppCtxt orig_ty arg n) $
-                     tc_lhs_type mode arg (substTyUnchecked subst $ binderType binder)
-           ; let subst' = case binderVar_maybe binder of
-                   Just tv -> extendTvSubst subst tv arg'
-                   Nothing -> subst
+                     tc_lhs_type mode arg (substTyUnchecked subst $ tyBinderType binder)
+           ; let subst' = case binder of
+                   Named bndr -> extendTvSubst subst (binderVar bndr) arg'
+                   Anon {}    -> subst
            ; go subst' binders args (n+1) (arg' : acc) }
 
     go subst [] all_args n acc
@@ -816,7 +817,7 @@ tcInferApps mode orig_ty ty ki args = go ty ki args 1
       = do { (subst, leftover_binders, args', leftover_args, n')
                 <- tc_infer_args mode orig_ty binders Nothing args n
            ; let fun_kind' = substTyUnchecked subst $
-                             mkForAllTys leftover_binders res_kind
+                             mkPiTys leftover_binders res_kind
            ; go (mkNakedAppTys fun args') fun_kind' leftover_args n' }
 
     go fun fun_kind all_args@(arg:args) n
@@ -875,7 +876,7 @@ instantiateTyN n ty ki
     in
     if num_to_inst <= 0 then return (ty, ki) else
     do { (subst, inst_args) <- tcInstBinders inst_bndrs
-       ; let rebuilt_ki = mkForAllTys leftover_bndrs inner_ki
+       ; let rebuilt_ki = mkPiTys leftover_bndrs inner_ki
              ki'        = substTy subst rebuilt_ki
        ; return (mkNakedAppTys ty inst_args, ki') }
 
@@ -1008,7 +1009,7 @@ So we must be careful not to use "smart constructors" for types that
 look at the TyCon or Class involved.
 
   * Hence the use of mkNakedXXX functions. These do *not* enforce
-    the invariants (for example that we use (ForAllTy (Anon s) t) rather
+    the invariants (for example that we use (FunTy s t) rather
     than (TyConApp (->) [s,t])).
 
   * The zonking functions establish invariants (even zonkTcType, a change from
@@ -1247,12 +1248,12 @@ kcHsTyVarBndrs name cusk open_fam all_kind_vars
            -- kind vars, in dependency order.
        ; binders  <- mapM zonkTcTyBinder binders
        ; res_kind <- zonkTcType res_kind
-       ; let qkvs = tyCoVarsOfTypeWellScoped (mkForAllTys binders res_kind)
+       ; let qkvs = tyCoVarsOfTypeWellScoped (mkPiTys binders res_kind)
                    -- the visibility of tvs doesn't matter here; we just
                    -- want the free variables not to include the tvs
 
-          -- if there are any meta-tvs left, the user has lied about having
-          -- a CUSK. Error.
+          -- If there are any meta-tvs left, the user has
+          -- lied about having a CUSK. Error.
        ; let (meta_tvs, good_tvs) = partition isMetaTyVar qkvs
        ; when (not (null meta_tvs)) $
          report_non_cusk_tvs (qkvs ++ tvs)
@@ -1268,7 +1269,7 @@ kcHsTyVarBndrs name cusk open_fam all_kind_vars
                                            scoped_kvs
        ; reportFloatingKvs name tycon_tyvars unmentioned_kvs
 
-       ; let final_binders      = mkNamedBinders Specified good_tvs ++ binders
+       ; let final_binders      = mkNamedTyBinders Specified good_tvs ++ binders
              mk_tctc unsat      = mkTcTyCon name tycon_tyvars
                                             final_binders res_kind
                                             unsat (scoped_kvs ++ tvs)
@@ -1318,7 +1319,7 @@ kcHsTyVarBndrs name cusk open_fam all_kind_vars
                                                 thing
                   -- See Note [Dependent LHsQTyVars]
            ; let new_binder | hsTyVarName hs_tv `elemNameSet` dep_names
-                            = mkNamedBinder Visible tv
+                            = mkNamedBinder (mkTyVarBinder Visible tv)
                             | otherwise
                             = mkAnonBinder (tyVarKind tv)
            ; return ( tv : tvs
@@ -1681,13 +1682,13 @@ tcDataKindSig kind
             -- NB: Use the tv from a binder if there is one. Otherwise,
             -- we end up inventing a new Unique for it, and any other tv
             -- that mentions the first ends up with the wrong kind.
-        ; return ( [ tv
-                   | ((bndr, occ), uniq) <- bndrs `zip` occs `zip` uniqs
-                   , let tv | Just bndr_tv <- binderVar_maybe bndr
-                            = bndr_tv
-                            | otherwise
-                            = mk_tv span uniq occ (binderType bndr) ]
-                 , bndrs, res_kind ) }
+              tvs = [ tv
+                    | (bndr, occ, uniq) <- zip3 bndrs occs uniqs
+                    , let tv = case bndr of
+                                 Named tvb -> binderVar tvb
+                                 Anon kind -> mk_tv span uniq occ kind ]
+
+        ; return (tvs, bndrs, res_kind) }
   where
     (bndrs, res_kind) = splitPiTys kind
     mk_tv loc uniq occ kind

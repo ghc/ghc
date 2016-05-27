@@ -1375,8 +1375,10 @@ zonkTcTyCoVarBndr tyvar
 
 -- | Zonk a TyBinder
 zonkTcTyBinder :: TcTyBinder -> TcM TcTyBinder
-zonkTcTyBinder (Anon ty)      = Anon <$> zonkTcType ty
-zonkTcTyBinder (Named tv vis) = Named <$> zonkTcTyCoVarBndr tv <*> pure vis
+zonkTcTyBinder (Anon ty)   = Anon <$> zonkTcType ty
+zonkTcTyBinder (Named (TvBndr tv vis))
+  = do { tv' <- zonkTcTyCoVarBndr tv
+       ; return (Named (TvBndr tv' vis)) }
 
 zonkTcTyVar :: TcTyVar -> TcM TcType
 -- Simply look through all Flexis

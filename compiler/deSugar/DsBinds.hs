@@ -624,7 +624,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
              spec_name = mkInternalName uniq spec_occ (getSrcSpan poly_name)
        ; (bndrs, ds_lhs) <- liftM collectBinders
                                   (dsHsWrapper spec_co (Var poly_id))
-       ; let spec_ty = mkPiTypes bndrs (exprType ds_lhs)
+       ; let spec_ty = mkLamTypes bndrs (exprType ds_lhs)
        ; -- pprTrace "dsRule" (vcat [ text "Id:" <+> ppr poly_id
          --                         , text "spec_co:" <+> ppr spec_co
          --                         , text "ds_rhs:" <+> ppr ds_lhs ]) $

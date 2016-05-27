@@ -103,7 +103,7 @@ exprType (Let bind body)
 exprType (Case _ _ ty _)     = ty
 exprType (Cast _ co)         = pSnd (coercionKind co)
 exprType (Tick _ e)          = exprType e
-exprType (Lam binder expr)   = mkPiType binder (exprType expr)
+exprType (Lam binder expr)   = mkLamType binder (exprType expr)
 exprType e@(App _ _)
   = case collectArgs e of
         (fun, args) -> applyTypeToArgs e (exprType fun) args

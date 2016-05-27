@@ -195,15 +195,9 @@ dsFCall :: Id -> Coercion -> ForeignCall -> Maybe Header
         -> DsM ([(Id, Expr TyVar)], SDoc, SDoc)
 dsFCall fn_id co fcall mDeclHeader = do
     let
-        ty                     = pFst $ coercionKind co
-        (all_bndrs, io_res_ty) = tcSplitPiTys ty
-        (named_bndrs, arg_tys) = partitionBindersIntoBinders all_bndrs
-        tvs                    = ASSERT( fst (span isNamedBinder all_bndrs)
-                                         `equalLength` named_bndrs )
-                                   -- ensure that the named binders all come first
-                                 map (binderVar "dsFCall") named_bndrs
-                -- Must use tcSplit* functions because we want to
-                -- see that (IO t) in the corner
+        ty                   = pFst $ coercionKind co
+        (tv_bndrs, rho)      = tcSplitForAllTyVarBndrs ty
+        (arg_tys, io_res_ty) = tcSplitFunTys rho
 
     args <- newSysLocalsDs arg_tys
     (val_args, arg_wrappers) <- mapAndUnzipM unboxArg (map Var args)
@@ -266,7 +260,8 @@ dsFCall fn_id co fcall mDeclHeader = do
                   return (fcall, empty)
     let
         -- Build the worker
-        worker_ty     = mkForAllTys named_bndrs (mkFunTys (map idType work_arg_ids) ccall_result_ty)
+        worker_ty     = mkForAllTys tv_bndrs (mkFunTys (map idType work_arg_ids) ccall_result_ty)
+        tvs           = map binderVar tv_bndrs
         the_ccall_app = mkFCall dflags ccall_uniq fcall' val_args ccall_result_ty
         work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)
         work_id       = mkSysLocal (fsLit "$wccall") work_uniq worker_ty
@@ -300,12 +295,9 @@ dsPrimCall :: Id -> Coercion -> ForeignCall
 dsPrimCall fn_id co fcall = do
     let
         ty                   = pFst $ coercionKind co
-        (bndrs, io_res_ty)   = tcSplitPiTys ty
-        (tvs, arg_tys)       = partitionBinders bndrs
-                -- Must use tcSplit* functions because we want to
-                -- see that (IO t) in the corner
+        (tvs, fun_ty)        = tcSplitForAllTys ty
+        (arg_tys, io_res_ty) = tcSplitFunTys fun_ty
 
-    MASSERT( fst (span isNamedBinder bndrs) `equalLength` tvs )
     args <- newSysLocalsDs arg_tys
 
     ccall_uniq <- newUnique
@@ -416,8 +408,6 @@ dsFExportDynamic :: Id
                  -> CCallConv
                  -> DsM ([Binding], SDoc, SDoc)
 dsFExportDynamic id co0 cconv = do
-    MASSERT( fst (span isNamedBinder bndrs) `equalLength` tvs )
-      -- make sure that the named binders all come first
     fe_id <-  newSysLocalDs ty
     mod <- getModule
     dflags <- getDynFlags
@@ -481,8 +471,8 @@ dsFExportDynamic id co0 cconv = do
 
  where
   ty                       = pFst (coercionKind co0)
-  (bndrs, fn_res_ty)       = tcSplitPiTys ty
-  (tvs, [arg_ty])          = partitionBinders bndrs
+  (tvs,sans_foralls)       = tcSplitForAllTys ty
+  ([arg_ty], fn_res_ty)    = tcSplitFunTys sans_foralls
   Just (io_tc, res_ty)     = tcSplitIOType_maybe fn_res_ty
         -- Must have an IO type; hence Just
 

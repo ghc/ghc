@@ -33,7 +33,7 @@ import Control.Monad
 paDictArgType :: TyVar -> VM (Maybe Type)
 paDictArgType tv = go (mkTyVarTy tv) (tyVarKind tv)
   where
-    go ty (ForAllTy (Anon k1) k2)
+    go ty (FunTy k1 k2)
       = do
           tv   <- if isCoercionType k1
                   then newCoVar (fsLit "c") k1
@@ -42,7 +42,7 @@ paDictArgType tv = go (mkTyVarTy tv) (tyVarKind tv)
           case mty1 of
             Just ty1 -> do
                           mty2 <- go (mkAppTy ty (mkTyVarTy tv)) k2
-                          return $ fmap (mkNamedForAllTy tv Invisible . mkFunTy ty1) mty2
+                          return $ fmap (mkInvForAllTy tv . mkFunTy ty1) mty2
             Nothing  -> go ty k2
 
     go ty k

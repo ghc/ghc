@@ -35,6 +35,7 @@ import FamInstEnv( normaliseType )
 import FamInst( tcGetFamInstEnvs )
 import TyCon
 import TcType
+import Type( mkStrLitTy, tidyOpenType, TyVarBinder, mkTyVarBinder )
 import TysPrim
 import TysWiredIn( cTupleTyConName )
 import Id
@@ -54,7 +55,6 @@ import Maybes
 import Util
 import BasicTypes
 import Outputable
-import Type(mkStrLitTy, tidyOpenType)
 import PrelNames( gHC_PRIM, ipClassName )
 import TcValidity (checkValidType)
 import UniqFM
@@ -835,13 +835,13 @@ chooseInferredQuantifiers :: TcThetaType   -- inferred
                           -> TcTyVarSet    -- tvs free in tau type
                           -> [TcTyVar]     -- inferred quantified tvs
                           -> Maybe TcIdSigInst
-                          -> TcM ([TcTyBinder], TcThetaType)
+                          -> TcM ([TyVarBinder], TcThetaType)
 chooseInferredQuantifiers inferred_theta tau_tvs qtvs Nothing
   = -- No type signature (partial or complete) for this binder,
     do { let free_tvs = closeOverKinds (growThetaTyVars inferred_theta tau_tvs)
                         -- Include kind variables!  Trac #7916
              my_theta = pickCapturedPreds free_tvs inferred_theta
-             binders  = [ mkNamedBinder Invisible tv
+             binders  = [ mkTyVarBinder Invisible tv
                         | tv <- qtvs
                         , tv `elemVarSet` free_tvs ]
        ; return (binders, my_theta) }
@@ -886,7 +886,7 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
   where
     spec_tv_set = mkVarSet $ map snd annotated_tvs
     mk_binders free_tvs
-      = [ mkNamedBinder vis tv
+      = [ mkTyVarBinder vis tv
         | tv <- qtvs
         , tv `elemVarSet` free_tvs
         , let vis | tv `elemVarSet` spec_tv_set = Specified

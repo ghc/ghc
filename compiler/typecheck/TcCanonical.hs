@@ -594,10 +594,10 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1 _ ty2 _
   = canTyConApp ev eq_rel tc1 tys1 tc2 tys2
 
 can_eq_nc' _flat _rdr_env _envs ev eq_rel
-           s1@(ForAllTy (Named {}) _) _ s2@(ForAllTy (Named {}) _) _
+           s1@(ForAllTy {}) _ s2@(ForAllTy {}) _
  | CtWanted { ctev_loc = loc, ctev_dest = orig_dest } <- ev
- = do { let (bndrs1,body1) = tcSplitNamedPiTys s1
-            (bndrs2,body2) = tcSplitNamedPiTys s2
+ = do { let (bndrs1,body1) = tcSplitForAllTyVarBndrs s1
+            (bndrs2,body2) = tcSplitForAllTyVarBndrs s2
       ; if not (equalLength bndrs1 bndrs2)
         then do { traceTcS "Forall failure" $
                      vcat [ ppr s1, ppr s2, ppr bndrs1, ppr bndrs2
@@ -1138,7 +1138,7 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
       -- in error messages
     bndrs      = tyConBinders tc
     kind_loc   = toKindLoc loc
-    is_kinds   = map isNamedBinder bndrs
+    is_kinds   = map isNamedTyBinder bndrs
     new_locs | Just KindLevel <- ctLocTypeOrKind_maybe loc
              = repeat loc
              | otherwise
@@ -1896,7 +1896,7 @@ unifyWanted loc role orig_ty1 orig_ty2
     go ty1 ty2 | Just ty1' <- coreView ty1 = go ty1' ty2
     go ty1 ty2 | Just ty2' <- coreView ty2 = go ty1 ty2'
 
-    go (ForAllTy (Anon s1) t1) (ForAllTy (Anon s2) t2)
+    go (FunTy s1 t1) (FunTy s2 t2)
       = do { co_s <- unifyWanted loc role s1 s2
            ; co_t <- unifyWanted loc role t1 t2
            ; return (mkTyConAppCo role funTyCon [co_s,co_t]) }
@@ -1945,7 +1945,7 @@ unify_derived loc role    orig_ty1 orig_ty2
     go ty1 ty2 | Just ty1' <- coreView ty1 = go ty1' ty2
     go ty1 ty2 | Just ty2' <- coreView ty2 = go ty1 ty2'
 
-    go (ForAllTy (Anon s1) t1) (ForAllTy (Anon s2) t2)
+    go (FunTy s1 t1) (FunTy s2 t2)
       = do { unify_derived loc role s1 s2
            ; unify_derived loc role t1 t2 }
     go (TyConApp tc1 tys1) (TyConApp tc2 tys2)

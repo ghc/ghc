@@ -753,7 +753,7 @@ unify_ty ty1 (AppTy ty2a ty2b) _kco
 
 unify_ty (LitTy x) (LitTy y) _kco | x == y = return ()
 
-unify_ty (ForAllTy (Named tv1 _) ty1) (ForAllTy (Named tv2 _) ty2) kco
+unify_ty (ForAllTy (TvBndr tv1 _) ty1) (ForAllTy (TvBndr tv2 _) ty2) kco
   = do { unify_ty (tyVarKind tv1) (tyVarKind tv2) (mkNomReflCo liftedTypeKind)
        ; umRnBndr2 tv1 tv2 $ unify_ty ty1 ty2 kco }
 
@@ -1194,10 +1194,10 @@ ty_co_match menv subst ty1 (AppCo co2 arg2) _lkco _rkco
 
 ty_co_match menv subst (TyConApp tc1 tys) (TyConAppCo _ tc2 cos) _lkco _rkco
   = ty_co_match_tc menv subst tc1 tys tc2 cos
-ty_co_match menv subst (ForAllTy (Anon ty1) ty2) (TyConAppCo _ tc cos) _lkco _rkco
+ty_co_match menv subst (FunTy ty1 ty2) (TyConAppCo _ tc cos) _lkco _rkco
   = ty_co_match_tc menv subst funTyCon [ty1, ty2] tc cos
 
-ty_co_match menv subst (ForAllTy (Named tv1 _) ty1)
+ty_co_match menv subst (ForAllTy (TvBndr tv1 _) ty1)
                        (ForAllCo tv2 kind_co2 co2)
                        lkco rkco
   = do { subst1 <- ty_co_match menv subst (tyVarKind tv1) kind_co2
@@ -1258,11 +1258,11 @@ ty_co_match_args _    _     _        _          _ _ = Nothing
 pushRefl :: Coercion -> Maybe Coercion
 pushRefl (Refl Nominal (AppTy ty1 ty2))
   = Just (AppCo (Refl Nominal ty1) (mkNomReflCo ty2))
-pushRefl (Refl r (ForAllTy (Anon ty1) ty2))
+pushRefl (Refl r (FunTy ty1 ty2))
   = Just (TyConAppCo r funTyCon [mkReflCo r ty1, mkReflCo r ty2])
 pushRefl (Refl r (TyConApp tc tys))
   = Just (TyConAppCo r tc (zipWith mkReflCo (tyConRolesX r tc) tys))
-pushRefl (Refl r (ForAllTy (Named tv _) ty))
+pushRefl (Refl r (ForAllTy (TvBndr tv _) ty))
   = Just (mkHomoForAllCos_NoRefl [tv] (Refl r ty))
     -- NB: NoRefl variant. Otherwise, we get a loop!
 pushRefl (Refl r (CastTy ty co))  = Just (castCoercionKind (Refl r ty) co co)

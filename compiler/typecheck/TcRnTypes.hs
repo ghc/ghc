@@ -918,7 +918,7 @@ data PromotionErr
   | NoTypeInTypeDC   -- -XTypeInType not enabled (for a datacon)
 
 instance Outputable TcTyThing where     -- Debugging only
-   ppr (AGlobal g)      = pprTyThing g
+   ppr (AGlobal g)      = ppr g
    ppr elt@(ATcId {})   = text "Identifier" <>
                           brackets (ppr (tct_id elt) <> dcolon
                                  <> ppr (varType (tct_id elt)) <> comma

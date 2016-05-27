@@ -16,6 +16,7 @@ import HsSyn
 import TcPat
 import Type( binderVar, mkNamedBinders, binderVisibility, mkEmptyTCvSubst
            , tidyTyCoVarBndrs, tidyTypes, tidyType )
+           , tcHsContext, tcHsLiftedType, tcHsOpenType, kindGeneralize )
 import TcRnMonad
 import TcSigs( emptyPragEnv, completeSigFromId )
 import TcEnv
@@ -90,9 +91,9 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
 
        ; traceTc "tcInferPatSynDecl }" $ ppr name
        ; tc_patsyn_finish lname dir is_infix lpat'
-                          (univ_tvs, mkNamedBinders Invisible univ_tvs
+                          (mkTyVarBinders Invisible univ_tvs
                             , req_theta,  ev_binds, req_dicts)
-                          (ex_tvs,   mkNamedBinders Invisible ex_tvs
+                          (mkTyVarBinders Invisible ex_tvs
                             , mkTyVarTys ex_tvs, prov_theta, map EvId prov_dicts)
                           (map nlHsVar args, map idType args)
                           pat_ty rec_fields }
@@ -185,8 +186,8 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
 
        ; traceTc "tcCheckPatSynDecl }" $ ppr name
        ; tc_patsyn_finish lname dir is_infix lpat'
-                          (univ_tvs, univ_bndrs, req_theta, ev_binds, req_dicts)
-                          (ex_tvs, ex_bndrs, mkTyVarTys ex_tvs', prov_theta, prov_dicts)
+                          (univ_bndrs, req_theta, ev_binds, req_dicts)
+                          (ex_bndrs, mkTyVarTys ex_tvs', prov_theta, prov_dicts)
                           (args', arg_tys)
                           pat_ty rec_fields }
   where
@@ -284,74 +285,54 @@ tc_patsyn_finish :: Located Name  -- ^ PatSyn Name
                  -> HsPatSynDir Name  -- ^ PatSyn type (Uni/Bidir/ExplicitBidir)
                  -> Bool              -- ^ Whether infix
                  -> LPat Id           -- ^ Pattern of the PatSyn
-                 -> ([TcTyVar], [TcTyBinder], [PredType], TcEvBinds, [EvVar])
-                 -> ([TcTyVar], [TcTyBinder], [TcType], [PredType], [EvTerm])
+                 -> ([TcTyVarBinder], [PredType], TcEvBinds, [EvVar])
+                 -> ([TcTyVarBinder], [TcType], [PredType], [EvTerm])
                  -> ([LHsExpr TcId], [TcType])   -- ^ Pattern arguments and types
                  -> TcType              -- ^ Pattern type
                  -> [Name]              -- ^ Selector names
                  -- ^ Whether fields, empty if not record PatSyn
                  -> TcM (LHsBinds Id, TcGblEnv)
 tc_patsyn_finish lname dir is_infix lpat'
-                 (univ_tvs, univ_bndrs, req_theta, req_ev_binds, req_dicts)
-                 (ex_tvs, ex_bndrs, ex_tys, prov_theta, prov_dicts)
+                 (univ_bndrs, req_theta, req_ev_binds, req_dicts)
+                 (ex_bndrs, ex_tys, prov_theta, prov_dicts)
                  (args, arg_tys)
                  pat_ty field_labels
   = do { -- Zonk everything.  We are about to build a final PatSyn
          -- so there had better be no unification variables in there
-         univ_tvs'    <- mapMaybeM (zonkQuantifiedTyVar False) univ_tvs
-       ; ex_tvs'      <- mapMaybeM (zonkQuantifiedTyVar False) ex_tvs
-                         -- ToDo: The False means that we behave here as if
-                         -- -XPolyKinds was always on, which isn't right.
+         univ_tvs'    <- mapMaybeM zonk_qtv univ_bndrs
+       ; ex_tvs'      <- mapMaybeM zonk_qtv ex_bndrs
        ; prov_theta'  <- zonkTcTypes prov_theta
        ; req_theta'   <- zonkTcTypes req_theta
        ; pat_ty'      <- zonkTcType pat_ty
        ; arg_tys'     <- zonkTcTypes arg_tys
 
-       ; let (env1, univ_tvs) = tidyTyCoVarBndrs emptyTidyEnv univ_tvs'
-             (env2, ex_tvs)   = tidyTyCoVarBndrs env1 ex_tvs'
+       ; let (env1, univ_tvs) = tidyTyVarBinders emptyTidyEnv univ_tvs'
+             (env2, ex_tvs)   = tidyTyVarBinders env1 ex_tvs'
              req_theta  = tidyTypes env2 req_theta'
              prov_theta = tidyTypes env2 prov_theta'
              arg_tys    = tidyTypes env2 arg_tys'
              pat_ty     = tidyType  env2 pat_ty'
 
-          -- We need to update the univ and ex binders after zonking.
-          -- But zonking may have defaulted some erstwhile binders,
-          -- so we need to make sure the tyvars and tybinders remain
-          -- lined up
-       ; let update_binders :: [TyVar] -> [TcTyBinder] -> [TyBinder]
-             update_binders [] _ = []
-             update_binders all_tvs@(tv:tvs) (bndr:bndrs)
-               | tv == bndr_var
-               = mkNamedBinder (binderVisibility bndr) tv : update_binders tvs bndrs
-               | otherwise
-               = update_binders all_tvs bndrs
-               where
-                 bndr_var = binderVar "tc_patsyn_finish" bndr
-             update_binders tvs _ = pprPanic "tc_patsyn_finish" (ppr lname $$ ppr tvs)
-
-             univ_bndrs' = update_binders univ_tvs univ_bndrs
-             ex_bndrs'   = update_binders ex_tvs   ex_bndrs
-
        ; traceTc "tc_patsyn_finish {" $
            ppr (unLoc lname) $$ ppr (unLoc lpat') $$
-           ppr (univ_tvs, univ_bndrs', req_theta, req_ev_binds, req_dicts) $$
-           ppr (ex_tvs, ex_bndrs', prov_theta, prov_dicts) $$
+           ppr (univ_tvs, req_theta, req_ev_binds, req_dicts) $$
+           ppr (ex_tvs, prov_theta, prov_dicts) $$
            ppr args $$
            ppr arg_tys $$
            ppr pat_ty
 
        -- Make the 'matcher'
        ; (matcher_id, matcher_bind) <- tcPatSynMatcher lname lpat'
-                                         (univ_tvs, req_theta, req_ev_binds, req_dicts)
-                                         (ex_tvs, ex_tys, prov_theta, prov_dicts)
+                                         (map binderVar univ_tvs, req_theta, req_ev_binds, req_dicts)
+                                         (map binderVar ex_tvs, ex_tys, prov_theta, prov_dicts)
                                          (args, arg_tys)
                                          pat_ty
 
 
        -- Make the 'builder'
        ; builder_id <- mkPatSynBuilderId dir lname
-                                         univ_bndrs' req_theta
-                                         ex_bndrs'   prov_theta
+                                         univ_tvs req_theta
+                                         ex_tvs   prov_theta
                                          arg_tys pat_ty
 
          -- TODO: Make this have the proper information
@@ -360,11 +341,10 @@ tc_patsyn_finish lname dir is_infix lpat'
                                             , flSelector = name }
              field_labels' = map mkFieldLabel field_labels
 
-
        -- Make the PatSyn itself
        ; let patSyn = mkPatSyn (unLoc lname) is_infix
-                        (univ_tvs, univ_bndrs', req_theta)
-                        (ex_tvs, ex_bndrs', prov_theta)
+                        (univ_tvs, req_theta)
+                        (ex_tvs, prov_theta)
                         arg_tys
                         pat_ty
                         matcher_id builder_id
@@ -378,6 +358,14 @@ tc_patsyn_finish lname dir is_infix lpat'
 
        ; traceTc "tc_patsyn_finish }" empty
        ; return (matcher_bind, tcg_env) }
+  where
+    -- This is a bit of an odd functions; why does it not occur elsewhere
+    zonk_qtv :: TcTyVarBinder -> TcM (Maybe TcTyVarBinder)
+    zonk_qtv (TvBndr tv vis)
+      = do { mb_tv' <- zonkQuantifiedTyVar False tv
+                    -- ToDo: The False means that we behave here as if
+                    -- -XPolyKinds was always on, which isn't right.
+           ; return (fmap (\tv' -> TvBndr tv' vis) mb_tv') }
 
 {-
 ************************************************************************
@@ -496,8 +484,8 @@ isUnidirectional ExplicitBidirectional{} = False
 -}
 
 mkPatSynBuilderId :: HsPatSynDir a -> Located Name
-                  -> [TyBinder] -> ThetaType
-                  -> [TyBinder] -> ThetaType
+                  -> [TyVarBinder] -> ThetaType
+                  -> [TyVarBinder] -> ThetaType
                   -> [Type] -> Type
                   -> TcM (Maybe (Id, Bool))
 mkPatSynBuilderId dir (L _ name)

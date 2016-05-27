@@ -352,8 +352,10 @@ orphNamesOfType (TyVarTy _)          = emptyNameSet
 orphNamesOfType (LitTy {})           = emptyNameSet
 orphNamesOfType (TyConApp tycon tys) = orphNamesOfTyCon tycon
                                        `unionNameSet` orphNamesOfTypes tys
-orphNamesOfType (ForAllTy bndr res)  = unitNameSet funTyConName    -- NB!  See Trac #8535
-                                       `unionNameSet` orphNamesOfType (binderType bndr)
+orphNamesOfType (ForAllTy bndr res)  = orphNamesOfType (binderType bndr)
+                                       `unionNameSet` orphNamesOfType res
+orphNamesOfType (FunTy arg res)      = unitNameSet funTyConName    -- NB!  See Trac #8535
+                                       `unionNameSet` orphNamesOfType arg
                                        `unionNameSet` orphNamesOfType res
 orphNamesOfType (AppTy fun arg)      = orphNamesOfType fun `unionNameSet` orphNamesOfType arg
 orphNamesOfType (CastTy ty co)       = orphNamesOfType ty `unionNameSet` orphNamesOfCo co

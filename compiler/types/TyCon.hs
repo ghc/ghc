@@ -111,7 +111,7 @@ module TyCon(
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} TyCoRep ( Kind, Type, PredType, TyBinder, pprType, mkForAllTys )
+import {-# SOURCE #-} TyCoRep ( Kind, Type, PredType, TyBinder, pprType, mkPiTys )
 import {-# SOURCE #-} TysWiredIn  ( runtimeRepTyCon, constraintKind
                                   , vecCountTyCon, vecElemTyCon, liftedTypeKind )
 import {-# SOURCE #-} DataCon ( DataCon, dataConExTyVars, dataConFieldLabels )
@@ -365,6 +365,15 @@ See also:
 \subsection{The data type}
 *                                                                      *
 ************************************************************************
+-}
+
+{- Note [TyCon binders]
+~~~~~~~~~~~~~~~~~~~~~~~
+
+data TyConBinder = TCB TyVar TcConBinderVis
+
+data TyConBinderVis = NamedTCB VisiblityFlag
+                    | AnonTCB
 -}
 
 -- | TyCons represent type constructors. Type constructors are introduced by
@@ -811,7 +820,7 @@ data FamTyConFlav
 All TyCons have this group of fields
   tyConBinders :: [TyBinder]
   tyConResKind :: Kind
-  tyConKind    :: Kind   -- Cached = mkForAllTys tyConBinders tyConResKind
+  tyConKind    :: Kind   -- Cached = mkPiTys tyConBinders tyConResKind
   tyConArity   :: Arity  -- Cached = length tyConBinders
 
 They fit together like so:
@@ -832,8 +841,8 @@ They fit together like so:
   considered saturated.  Here we mean "applied to in the actual Type",
   not surface syntax; i.e. including implicit kind variables.
 
-Note [tyConBinders and tyConTyVars]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [tyConTyVars and tyConBinders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
   type App a (b :: k) = a b
     -- App :: forall {k}; (k->*) -> k -> *
@@ -1238,7 +1247,7 @@ mkFunTyCon name binders rep_nm
         tyConName    = name,
         tyConBinders = binders,
         tyConResKind = liftedTypeKind,
-        tyConKind    = mkForAllTys binders liftedTypeKind,
+        tyConKind    = mkPiTys binders liftedTypeKind,
         tyConArity   = 2,
         tcRepName    = rep_nm
     }
@@ -1269,7 +1278,7 @@ mkAlgTyCon name binders res_kind tyvars roles cType stupid rhs parent is_rec gad
         tyConUnique      = nameUnique name,
         tyConBinders     = binders,
         tyConResKind     = res_kind,
-        tyConKind        = mkForAllTys binders res_kind,
+        tyConKind        = mkPiTys binders res_kind,
         tyConArity       = length tyvars,
         tyConTyVars      = tyvars,
         tcRoles          = roles,
@@ -1306,7 +1315,7 @@ mkTupleTyCon name binders res_kind arity tyvars con sort parent
         tyConUnique      = nameUnique name,
         tyConBinders     = binders,
         tyConResKind     = res_kind,
-        tyConKind        = mkForAllTys binders res_kind,
+        tyConKind        = mkPiTys binders res_kind,
         tyConArity       = arity,
         tyConTyVars      = tyvars,
         tcRoles          = replicate arity Representational,
@@ -1337,7 +1346,7 @@ mkTcTyCon name tvs binders res_kind unsat scoped_tvs
             , tyConTyVars  = tvs
             , tyConBinders = binders
             , tyConResKind = res_kind
-            , tyConKind    = mkForAllTys binders res_kind
+            , tyConKind    = mkPiTys binders res_kind
             , tyConUnsat   = unsat
             , tyConArity   = length binders
             , tcTyConScopedTyVars = scoped_tvs }
@@ -1376,7 +1385,7 @@ mkPrimTyCon' name binders res_kind roles is_unlifted rep_nm
         tyConUnique  = nameUnique name,
         tyConBinders = binders,
         tyConResKind = res_kind,
-        tyConKind    = mkForAllTys binders res_kind,
+        tyConKind    = mkPiTys binders res_kind,
         tyConArity   = length roles,
         tcRoles      = roles,
         isUnlifted   = is_unlifted,
@@ -1392,7 +1401,7 @@ mkSynonymTyCon name binders res_kind tyvars roles rhs
         tyConUnique  = nameUnique name,
         tyConBinders = binders,
         tyConResKind = res_kind,
-        tyConKind    = mkForAllTys binders res_kind,
+        tyConKind    = mkPiTys binders res_kind,
         tyConArity   = length tyvars,
         tyConTyVars  = tyvars,
         tcRoles      = roles,
@@ -1409,7 +1418,7 @@ mkFamilyTyCon name binders res_kind tyvars resVar flav parent inj
       , tyConName    = name
       , tyConBinders = binders
       , tyConResKind = res_kind
-      , tyConKind    = mkForAllTys binders res_kind
+      , tyConKind    = mkPiTys binders res_kind
       , tyConArity   = length tyvars
       , tyConTyVars  = tyvars
       , famTcResVar  = resVar
@@ -1433,7 +1442,7 @@ mkPromotedDataCon con name rep_name binders res_kind roles rep_info
         tcRoles       = roles,
         tyConBinders  = binders,
         tyConResKind  = res_kind,
-        tyConKind     = mkForAllTys binders res_kind,
+        tyConKind     = mkPiTys binders res_kind,
         dataCon       = con,
         tcRepName     = rep_name,
         promDcRepInfo = rep_info

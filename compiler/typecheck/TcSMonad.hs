@@ -3101,8 +3101,8 @@ See TcSMonad.deferTcSForAllEq
 deferTcSForAllEq :: Role -- Nominal or Representational
                  -> CtLoc  -- Original wanted equality flavor
                  -> [Coercion]        -- among the kinds of the binders
-                 -> ([TyBinder],TcType)   -- ForAll tvs1 body1
-                 -> ([TyBinder],TcType)   -- ForAll tvs2 body2
+                 -> ([TyVarBinder],TcType)   -- ForAll tvs1 body1
+                 -> ([TyVarBinder],TcType)   -- ForAll tvs2 body2
                  -> TcS Coercion
 deferTcSForAllEq role loc kind_cos (bndrs1,body1) (bndrs2,body2)
  = do { let tvs1'  = zipWithEqual "deferTcSForAllEq"
@@ -3132,5 +3132,5 @@ deferTcSForAllEq role loc kind_cos (bndrs1,body1) (bndrs2,body2)
       ; let cobndrs    = zip skol_tvs kind_cos
       ; return $ mkForAllCos cobndrs hole_co }
    where
-     tvs1 = map (binderVar "deferTcSForAllEq") bndrs1
-     tvs2 = map (binderVar "deferTcSForAllEq") bndrs2
+     tvs1 = map binderVar bndrs1
+     tvs2 = map binderVar bndrs2

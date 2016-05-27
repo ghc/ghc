@@ -85,8 +85,8 @@ buildPDataDataCon orig_name vect_tc repr_tc repr
                             (map (const no_bang) comp_tys)
                             (Just $ map (const HsLazy) comp_tys)
                             []                     -- no field labels
-                            tvs (mkNamedBinders Specified tvs)
-                            [] []                  -- no existentials
+                            tvs (map (mkNamedBinder . mkTyVarBinder Specified) tvs)
+                            []                     -- no existentials
                             []                     -- no eq spec
                             []                     -- no context
                             comp_tys
@@ -129,8 +129,8 @@ buildPDatasDataCon orig_name vect_tc repr_tc repr
                             (map (const no_bang) comp_tys)
                             (Just $ map (const HsLazy) comp_tys)
                             []                     -- no field labels
-                            tvs (mkNamedBinders Specified tvs)
-                            [] []                  -- no existentials
+                            tvs (map (mkNamedBinder . mkTyVarBinder Specified) tvs)
+                            []                     -- no existentials
                             []                     -- no eq spec
                             []                     -- no context
                             comp_tys

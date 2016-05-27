@@ -1266,7 +1266,7 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
                    | isUnliftedType body_ty     -- C.f. WwLib.mkWorkerArgs
                    = (poly_tyvars ++ [voidArgId], poly_tyvars ++ [voidPrimId])
                    | otherwise = (poly_tyvars, poly_tyvars)
-                 spec_id_ty = mkPiTypes lam_args body_ty
+                 spec_id_ty = mkLamTypes lam_args body_ty
 
            ; spec_f <- newSpecIdSM fn spec_id_ty
            ; (spec_rhs, rhs_uds) <- specExpr rhs_env2 (mkLams lam_args body)

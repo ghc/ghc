@@ -972,21 +972,21 @@ flatten_one (TyConApp tc tys)
 --                   _ -> fmode
   = flatten_ty_con_app tc tys
 
-flatten_one (ForAllTy (Anon ty1) ty2)
+flatten_one (FunTy ty1 ty2)
   = do { (xi1,co1) <- flatten_one ty1
        ; (xi2,co2) <- flatten_one ty2
        ; role <- getRole
        ; return (mkFunTy xi1 xi2, mkFunCo role co1 co2) }
 
-flatten_one ty@(ForAllTy (Named {}) _)
+flatten_one ty@(ForAllTy {})
 -- TODO (RAE): This is inadequate, as it doesn't flatten the kind of
 -- the bound tyvar. Doing so will require carrying around a substitution
 -- and the usual substTyVarBndr-like silliness. Argh.
 
 -- We allow for-alls when, but only when, no type function
 -- applications inside the forall involve the bound type variables.
-  = do { let (bndrs, rho) = splitNamedPiTys ty
-             tvs          = map (binderVar "flatten") bndrs
+  = do { let (bndrs, rho) = splitForAllTyVarBndrs ty
+             tvs          = map binderVar bndrs
        ; (rho', co) <- setMode FM_SubstOnly $ flatten_one rho
                          -- Substitute only under a forall
                          -- See Note [Flattening under a forall]

@@ -473,12 +473,12 @@ unusedInjTvsInRHS tycon injList lhs rhs =
         | otherwise            = mapUnionVarSet collectInjVars tys
       collectInjVars (LitTy {})
         = emptyVarSet
-      collectInjVars (ForAllTy (Anon arg) res)
+      collectInjVars (FunTy arg res)
         = collectInjVars arg `unionVarSet` collectInjVars res
       collectInjVars (AppTy fun arg)
         = collectInjVars fun `unionVarSet` collectInjVars arg
       -- no forall types in the RHS of a type family
-      collectInjVars (ForAllTy _ _)    =
+      collectInjVars (ForAllTy {})    =
           panic "unusedInjTvsInRHS.collectInjVars"
       collectInjVars (CastTy ty _)   = collectInjVars ty
       collectInjVars (CoercionTy {}) = emptyVarSet

@@ -1189,13 +1189,14 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
       = do { (wrap1, upsilon_ty) <- topInstantiateInferred fun_orig fun_ty
                -- wrap1 :: fun_ty "->" upsilon_ty
            ; case tcSplitForAllTy_maybe upsilon_ty of
-               Just (binder, inner_ty)
-                 | Just tv <- binderVar_maybe binder ->
-                 ASSERT2( binderVisibility binder == Specified
-                        , (vcat [ ppr fun_ty, ppr upsilon_ty, ppr binder
+               Just (tvb, inner_ty) ->
+                 do { let tv   = binderVar tvb
+                          vis  = binderVisibility tvb
+                          kind = tyVarKind tv
+                    ; MASSERT2( vis == Specified
+                        , (vcat [ ppr fun_ty, ppr upsilon_ty, ppr tvb
                                 , ppr inner_ty, pprTvBndr tv
-                                , ppr (binderVisibility binder) ]) )
-                 do { let kind = tyVarKind tv
+                                , ppr vis ]) )
                     ; ty_arg <- tcHsTypeApp hs_ty_arg kind
                     ; let insted_ty = substTyWithUnchecked [tv] [ty_arg] inner_ty
                     ; (inner_wrap, args', res_ty)

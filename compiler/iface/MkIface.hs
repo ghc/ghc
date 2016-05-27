@@ -1321,10 +1321,10 @@ patSynToIfaceDecl ps
                 }
   where
     (_univ_tvs, req_theta, _ex_tvs, prov_theta, args, rhs_ty) = patSynSig ps
-    univ_bndrs = patSynUnivTyBinders ps
-    ex_bndrs   = patSynExTyBinders ps
-    (env1, univ_bndrs') = tidyTyBinders emptyTidyEnv univ_bndrs
-    (env2, ex_bndrs')   = tidyTyBinders env1 ex_bndrs
+    univ_bndrs = patSynUnivTyVarBinders ps
+    ex_bndrs   = patSynExTyVarBinders ps
+    (env1, univ_bndrs') = tidyTyVarBinders emptyTidyEnv univ_bndrs
+    (env2, ex_bndrs')   = tidyTyVarBinders env1 ex_bndrs
     to_if_pr (id, needs_dummy) = (idName id, needs_dummy)
 
 --------------------------
@@ -1415,12 +1415,15 @@ tyConToIfaceDecl env tycon
                   ifParent  = parent })
 
   | otherwise  -- FunTyCon, PrimTyCon, promoted TyCon/DataCon
-  -- For pretty printing purposes only.
+  -- We only convert these TyCons to IfaceTyCons when we are
+  -- just about to pretty-print them, not because we are going
+  -- to put them into interface files
   = ( env
     , IfaceData { ifName       = getOccName tycon,
                   ifBinders    = if_degenerate_binders,
                   ifResKind    = if_degenerate_res_kind,
-                    -- These don't have `tyConTyVars`, hence "degenerate"
+                    -- FunTyCon, PrimTyCon etc don't have
+                    -- `tyConTyVars`, hence "degenerate"
                   ifCType      = Nothing,
                   ifRoles      = tyConRoles tycon,
                   ifCtxt       = [],
@@ -1438,7 +1441,7 @@ tyConToIfaceDecl env tycon
     if_syn_type ty = tidyToIfaceType tc_env1 ty
     if_res_var     = getOccFS `fmap` tyConFamilyResVar_maybe tycon
 
-      -- use these when you don't have tyConTyVars
+      -- Use these when you don't have tyConTyVars
     (degenerate_binders, degenerate_res_kind)
       = splitPiTys (tidyType env (tyConKind tycon))
     if_degenerate_binders  = toDegenerateBinders degenerate_binders
@@ -1492,7 +1495,7 @@ tyConToIfaceDecl env tycon
         where
           (univ_tvs, _ex_tvs, eq_spec, theta, arg_tys, _)
             = dataConFullSig data_con
-          ex_bndrs = dataConExTyBinders data_con
+          ex_bndrs = dataConExTyVarBinders data_con
 
           -- Tidy the univ_tvs of the data constructor to be identical
           -- to the tyConTyVars of the type constructor.  This means
@@ -1504,8 +1507,8 @@ tyConToIfaceDecl env tycon
           con_env1 = (fst tc_env1, mkVarEnv (zipEqual "ifaceConDecl" univ_tvs tc_tyvars))
                      -- A bit grimy, perhaps, but it's simple!
 
-          (con_env2, ex_bndrs') = tidyTyBinders con_env1 ex_bndrs
-          to_eq_spec (tv,ty)  = (toIfaceTyVar (tidyTyVar con_env2 tv), tidyToIfaceType con_env2 ty)
+          (con_env2, ex_bndrs') = tidyTyVarBinders con_env1 ex_bndrs
+          to_eq_spec (tv,ty) = (toIfaceTyVar (tidyTyVar con_env2 tv), tidyToIfaceType con_env2 ty)
 
     ifaceOverloaded flds = case dFsEnvElts flds of
                              fl:_ -> flIsOverloaded fl

@@ -1,6 +1,6 @@
 
 VtaFail.hs:7:16: error:
-    • Cannot apply expression of type ‘t1 -> t0 -> (t1, t0)’
+    • Cannot apply expression of type ‘t0 -> t1 -> (t0, t1)’
       to a visible type argument ‘Int’
     • In the expression: pairup_nosig @Int @Bool 5 True
       In an equation for ‘answer_nosig’:

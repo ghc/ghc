@@ -29,7 +29,7 @@ import TcRnMonad
 import TcEnv
 import TcBinds( tcRecSelBinds )
 import RnEnv( RoleAnnotEnv, lookupRoleAnnot )
-import TyCoRep( Type(..), TyBinder(..), delBinderVarFV )
+import TyCoRep( Type(..) )
 import TcType
 import TysWiredIn( unitTy )
 import MkCore( rEC_SEL_ERROR_ID )
@@ -47,7 +47,8 @@ import Id
 import IdInfo
 import VarEnv
 import VarSet
-import NameSet
+import NameSet  ( NameSet, unitNameSet, emptyNameSet, unionNameSet
+                , extendNameSet, mkNameSet, nameSetElems, elemNameSet )
 import Coercion ( ltRole )
 import Digraph
 import BasicTypes
@@ -608,7 +609,7 @@ initialRoleEnv1 is_boot annots_env tc
   | otherwise             = pprPanic "initialRoleEnv1" (ppr tc)
   where name         = tyConName tc
         bndrs        = tyConBinders tc
-        visflags     = map binderVisibility $ take (tyConArity tc) bndrs
+        visflags     = map tyBinderVisibility $ take (tyConArity tc) bndrs
         num_exps     = count (== Visible) visflags
 
           -- if the number of annotations in the role annotation decl
@@ -690,11 +691,11 @@ irType = go
     go lcls (AppTy t1 t2)      = go lcls t1 >> markNominal lcls t2
     go lcls (TyConApp tc tys)  = do { roles <- lookupRolesX tc
                                     ; zipWithM_ (go_app lcls) roles tys }
-    go lcls (ForAllTy (Named tv _) ty)
-      = let lcls' = extendVarSet lcls tv in
-        markNominal lcls (tyVarKind tv) >> go lcls' ty
-    go lcls (ForAllTy (Anon arg) res)
-      = go lcls arg >> go lcls res
+    go lcls (ForAllTy tvb ty)  = do { let tv = binderVar tvb
+                                          lcls' = extendVarSet lcls tv
+                                    ; markNominal lcls (tyVarKind tv)
+                                    ; go lcls' ty }
+    go lcls (FunTy arg res)    = go lcls arg >> go lcls res
     go _    (LitTy {})         = return ()
       -- See Note [Coercions in role inference]
     go lcls (CastTy ty _)      = go lcls ty
@@ -727,15 +728,15 @@ markNominal lcls ty = let nvars = fvVarList (FV.delFVs lcls $ get_ty_vars ty) in
      -- get_ty_vars gets all the tyvars (no covars!) from a type *without*
      -- recurring into coercions. Recall: coercions are totally ignored during
      -- role inference. See [Coercions in role inference]
-    get_ty_vars (TyVarTy tv)     = FV.unitFV tv
-    get_ty_vars (AppTy t1 t2)    = get_ty_vars t1 `unionFV` get_ty_vars t2
-    get_ty_vars (TyConApp _ tys) = mapUnionFV get_ty_vars tys
-    get_ty_vars (ForAllTy bndr ty)
-      = delBinderVarFV bndr (get_ty_vars ty)
-        `unionFV` (tyCoFVsOfType $ binderType bndr)
-    get_ty_vars (LitTy {})       = emptyFV
-    get_ty_vars (CastTy ty _)    = get_ty_vars ty
-    get_ty_vars (CoercionTy _)   = emptyFV
+    get_ty_vars :: Type -> FV
+    get_ty_vars (TyVarTy tv)      = unitFV tv
+    get_ty_vars (AppTy t1 t2)     = get_ty_vars t1 `unionFV` get_ty_vars t2
+    get_ty_vars (FunTy t1 t2)     = get_ty_vars t1 `unionFV` get_ty_vars t2
+    get_ty_vars (TyConApp _ tys)  = mapUnionFV get_ty_vars tys
+    get_ty_vars (ForAllTy tvb ty) = tyCoFVsBndr tvb (get_ty_vars ty)
+    get_ty_vars (LitTy {})        = emptyFV
+    get_ty_vars (CastTy ty _)     = get_ty_vars ty
+    get_ty_vars (CoercionTy _)    = emptyFV
 
 -- like lookupRoles, but with Nominal tags at the end for oversaturated TyConApps
 lookupRolesX :: TyCon -> RoleM [Role]

@@ -71,6 +71,7 @@ isConstraintKind _               = False
 -- ends in @*@ and @Maybe a -> [a]@ ends in @[]@.
 returnsTyCon :: Unique -> Type -> Bool
 returnsTyCon tc_u (ForAllTy _ ty)  = returnsTyCon tc_u ty
+returnsTyCon tc_u (FunTy    _ ty)  = returnsTyCon tc_u ty
 returnsTyCon tc_u (TyConApp tc' _) = tc' `hasKey` tc_u
 returnsTyCon _  _                  = False
 

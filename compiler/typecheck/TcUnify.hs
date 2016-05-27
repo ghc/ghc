@@ -132,7 +132,7 @@ matchExpectedFunTys herald arity orig_ty thing_inside
     go acc_arg_tys n ty
       | Just ty' <- coreView ty = go acc_arg_tys n ty'
 
-    go acc_arg_tys n (ForAllTy (Anon arg_ty) res_ty)
+    go acc_arg_tys n (FunTy arg_ty res_ty)
       = ASSERT( not (isPredTy arg_ty) )
         do { (result, wrap_res) <- go (mkCheckExpType arg_ty : acc_arg_tys)
                                       (n-1) res_ty
@@ -258,7 +258,7 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
     go n acc_args ty
       | Just ty' <- coreView ty = go n acc_args ty'
 
-    go n acc_args (ForAllTy (Anon arg_ty) res_ty)
+    go n acc_args (FunTy arg_ty res_ty)
       = ASSERT( not (isPredTy arg_ty) )
         do { (wrap_res, tys, ty_r) <- go (n-1) (arg_ty : acc_args) res_ty
            ; return ( mkWpFun idHsWrapper wrap_res arg_ty ty_r
@@ -739,7 +739,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
                  |  otherwise
                  -> inst_and_unify }
 
-    go (ForAllTy (Anon act_arg) act_res) (ForAllTy (Anon exp_arg) exp_res)
+    go (FunTy act_arg act_res) (FunTy exp_arg exp_res)
       | not (isPredTy act_arg)
       , not (isPredTy exp_arg)
       = -- See Note [Co/contra-variance of subsumption checking]
@@ -1147,7 +1147,7 @@ uType origin t_or_k orig_ty1 orig_ty2
            ; return (mkCoherenceRightCo co_tys co2) }
 
         -- Functions (or predicate functions) just check the two parts
-    go (ForAllTy (Anon fun1) arg1) (ForAllTy (Anon fun2) arg2)
+    go (FunTy fun1 arg1) (FunTy fun2 arg2)
       = do { co_l <- uType origin t_or_k fun1 fun2
            ; co_r <- uType origin t_or_k arg1 arg2
            ; return $ mkFunCo Nominal co_l co_r }
@@ -1459,7 +1459,8 @@ checkTauTvUpdate dflags origin t_or_k tv ty
     defer_me (TyConApp tc tys) = isTypeFamilyTyCon tc || any defer_me tys
                                  || not (impredicative || isTauTyCon tc)
     defer_me (ForAllTy bndr t) = defer_me (binderType bndr) || defer_me t
-                                 || (isNamedBinder bndr && not impredicative)
+                                 || not impredicative
+    defer_me (FunTy fun arg)   = defer_me fun || defer_me arg
     defer_me (AppTy fun arg)   = defer_me fun || defer_me arg
     defer_me (CastTy ty co)    = defer_me ty || defer_me_co co
     defer_me (CoercionTy co)   = defer_me_co co
@@ -1630,10 +1631,8 @@ matchExpectedFunKind num_args_remaining ty = go
                 Indirect fun_kind -> go fun_kind
                 Flexi ->             defer k }
 
-    go k@(ForAllTy (Anon arg) res)
-      = return (mkNomReflCo k, arg, res)
-
-    go other = defer other
+    go k@(FunTy arg res) = return (mkNomReflCo k, arg, res)
+    go other             = defer other
 
     defer k
       = do { arg_kind <- newMetaKindVar

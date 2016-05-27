@@ -493,16 +493,16 @@ tc_iface_decl _ _ (IfacePatSyn{ ifName = occ_name
        ; traceIf (text "tc_iface_decl" <+> ppr name)
        ; matcher <- tc_pr if_matcher
        ; builder <- fmapMaybeM tc_pr if_builder
-       ; bindIfaceForAllBndrs univ_bndrs $ \univ_tvs univ_bndrs -> do
-       { bindIfaceForAllBndrs ex_bndrs $ \ex_tvs ex_bndrs -> do
+       ; bindIfaceForAllBndrs univ_bndrs $ \univ_tvs -> do
+       { bindIfaceForAllBndrs ex_bndrs $ \ex_tvs -> do
        { patsyn <- forkM (mk_doc name) $
              do { prov_theta <- tcIfaceCtxt prov_ctxt
                 ; req_theta  <- tcIfaceCtxt req_ctxt
                 ; pat_ty     <- tcIfaceType pat_ty
                 ; arg_tys    <- mapM tcIfaceType args
                 ; return $ buildPatSyn name is_infix matcher builder
-                                       (univ_tvs, univ_bndrs, req_theta)
-                                       (ex_tvs, ex_bndrs, prov_theta)
+                                       (univ_tvs, req_theta)
+                                       (ex_tvs, prov_theta)
                                        arg_tys pat_ty field_labels }
        ; return $ AConLike . PatSynCon $ patsyn }}}
   where
@@ -553,7 +553,7 @@ tcIfaceDataCons tycon_name tycon tc_tyvars tc_tybinders if_cons
                          ifConSrcStricts = if_src_stricts})
      = -- Universally-quantified tyvars are shared with
        -- parent TyCon, and are alrady in scope
-       bindIfaceForAllBndrs ex_bndrs    $ \ ex_tvs ex_binders' -> do
+       bindIfaceForAllBndrs ex_bndrs    $ \ ex_tvs -> do
         { traceIf (text "Start interface-file tc_con_decl" <+> ppr occ)
         ; dc_name  <- lookupIfaceTop occ
 
@@ -595,7 +595,7 @@ tcIfaceDataCons tycon_name tycon tc_tyvars tc_tybinders if_cons
                        -- worker.
                        -- See Note [Bangs on imported data constructors] in MkId
                        lbl_names
-                       tc_tyvars tc_tybinders ex_tvs ex_binders'
+                       tc_tyvars tc_tybinders ex_tvs
                        eq_spec theta
                        arg_tys orig_res_ty tycon
         ; traceIf (text "Done interface-file tc_con_decl" <+> ppr dc_name)
@@ -890,15 +890,16 @@ tcIfaceType = go
     go (IfaceTyVar n)         = TyVarTy <$> tcIfaceTyVar n
     go (IfaceAppTy t1 t2)     = AppTy <$> go t1 <*> go t2
     go (IfaceLitTy l)         = LitTy <$> tcIfaceTyLit l
-    go (IfaceFunTy t1 t2)     = ForAllTy <$> (Anon <$> go t1) <*> go t2
-    go (IfaceDFunTy t1 t2)    = ForAllTy <$> (Anon <$> go t1) <*> go t2
+    go (IfaceFunTy t1 t2)     = FunTy <$> go t1 <*> go t2
+    go (IfaceDFunTy t1 t2)    = FunTy <$> go t1 <*> go t2
     go (IfaceTupleTy s i tks) = tcIfaceTupleTy s i tks
     go (IfaceTyConApp tc tks)
       = do { tc' <- tcIfaceTyCon tc
            ; tks' <- mapM go (tcArgsIfaceTypes tks)
            ; return (mkTyConApp tc' tks') }
     go (IfaceForAllTy bndr t)
-      = bindIfaceForAllBndr bndr $ \ tv' vis -> mkNamedForAllTy tv' vis <$> go t
+      = bindIfaceForAllBndr bndr $ \ tv' vis ->
+        ForAllTy (TvBndr tv' vis) <$> go t
     go (IfaceCastTy ty co)   = CastTy <$> go ty <*> tcIfaceCo co
     go (IfaceCoercionTy co)  = CoercionTy <$> tcIfaceCo co
 
@@ -1436,12 +1437,12 @@ bindIfaceBndrs (b:bs) thing_inside
     thing_inside (b':bs')
 
 -----------------------
-bindIfaceForAllBndrs :: [IfaceForAllBndr] -> ([TyVar] -> [TyBinder] -> IfL a) -> IfL a
-bindIfaceForAllBndrs [] thing_inside = thing_inside [] []
+bindIfaceForAllBndrs :: [IfaceForAllBndr] -> ([TyVarBinder] -> IfL a) -> IfL a
+bindIfaceForAllBndrs [] thing_inside = thing_inside []
 bindIfaceForAllBndrs (bndr:bndrs) thing_inside
   = bindIfaceForAllBndr bndr $ \tv vis ->
-    bindIfaceForAllBndrs bndrs $ \tvs bndrs' ->
-    thing_inside (tv:tvs) (mkNamedBinder vis tv : bndrs')
+    bindIfaceForAllBndrs bndrs $ \bndrs' ->
+    thing_inside (mkTyVarBinder vis tv : bndrs')
 
 bindIfaceForAllBndr :: IfaceForAllBndr -> (TyVar -> VisibilityFlag -> IfL a) -> IfL a
 bindIfaceForAllBndr (IfaceTv tv vis) thing_inside
@@ -1488,9 +1489,9 @@ bindIfaceTyConBinders_AT (b : bs) thing_inside
 bindIfaceTyConBinderX :: (IfaceTvBndr -> (TyVar -> IfL a) -> IfL a)
                       -> IfaceTyConBinder
                       -> (TyVar -> TyBinder -> IfL a) -> IfL a
-bindIfaceTyConBinderX bind_tv (IfaceAnon name ki) thing_inside
-  = bind_tv (name, ki) $ \ tv' ->
+bindIfaceTyConBinderX bind_tv (IfaceAnon tv) thing_inside
+  = bind_tv tv $ \ tv' ->
     thing_inside tv' (Anon (tyVarKind tv'))
 bindIfaceTyConBinderX bind_tv (IfaceNamed (IfaceTv tv vis)) thing_inside
   = bind_tv tv $ \tv' ->
-    thing_inside tv' (Named tv' vis)
+    thing_inside tv' (Named (mkTyVarBinder vis tv'))

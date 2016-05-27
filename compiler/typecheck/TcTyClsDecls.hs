@@ -351,7 +351,7 @@ kcTyClGroup decls
                  kc_binders  = tyConBinders tc
                  kc_res_kind = tyConResKind tc
                  kc_tyvars   = tyConTyVars tc
-           ; kvs <- kindGeneralize (mkForAllTys kc_binders kc_res_kind)
+           ; kvs <- kindGeneralize (mkPiTys kc_binders kc_res_kind)
            ; (kc_binders', kc_res_kind') <- zonkTcKindToKind kc_binders kc_res_kind
            ; kc_tyvars <- mapM zonkTcTyVarToTyVar kc_tyvars
 
@@ -362,7 +362,7 @@ kcTyClGroup decls
                   , ppr kc_tyvars, ppr (tcTyConScopedTyVars tc)]
 
            ; return (mkTcTyCon name (kvs ++ kc_tyvars)
-                               (mkNamedBinders Invisible kvs ++ kc_binders')
+                               (mkNamedTyBinders Invisible kvs ++ kc_binders')
                                kc_res_kind'
                                (mightBeUnsaturatedTyCon tc)
                                (tcTyConScopedTyVars tc)) }
@@ -1491,9 +1491,8 @@ tcConDecl new_or_data rep_tycon tmpl_tvs tmpl_bndrs res_tmpl
        -- Can't print univ_tvs, arg_tys etc, because we are inside the knot here
        ; traceTc "tcConDecl 2" (ppr name $$ ppr field_lbls)
        ; let
-           ex_tvs     = qkvs ++ user_qtvs
-           ex_binders = mkNamedBinders Invisible qkvs ++
-                        mkNamedBinders Specified user_qtvs
+           ex_tvs = mkTyVarBinders Invisible qkvs ++
+                    mkTyVarBinders Specified user_qtvs
            buildOneDataCon (L _ name) = do
              { is_infix <- tcConIsInfixH98 name hs_details
              ; rep_nm   <- newTyConRepName name
@@ -1501,7 +1500,7 @@ tcConDecl new_or_data rep_tycon tmpl_tvs tmpl_bndrs res_tmpl
              ; buildDataCon fam_envs name is_infix rep_nm
                             stricts Nothing field_lbls
                             tmpl_tvs tmpl_bndrs
-                            ex_tvs ex_binders
+                            ex_tvs
                             [{- no eq_preds -}] ctxt arg_tys
                             res_tmpl rep_tycon
                   -- NB:  we put data_tc, the type constructor gotten from the
@@ -1538,8 +1537,8 @@ tcConDecl _new_or_data rep_tycon tmpl_tvs _tmpl_bndrs res_tmpl
              -- See Note [Checking GADT return types]
 
              -- See Note [Wrong visibility for GADTs]
-             univ_bndrs = mkNamedBinders Specified univ_tvs
-             ex_bndrs   = mkNamedBinders Specified ex_tvs
+             univ_bndrs = mkNamedTyBinders Specified univ_tvs
+             ex_bndrs   = mkTyVarBinders Specified ex_tvs
 
        ; fam_envs <- tcGetFamInstEnvs
 
@@ -1553,7 +1552,7 @@ tcConDecl _new_or_data rep_tycon tmpl_tvs _tmpl_bndrs res_tmpl
              ; buildDataCon fam_envs name is_infix
                             rep_nm
                             stricts Nothing field_lbls
-                            univ_tvs univ_bndrs ex_tvs ex_bndrs eq_preds
+                            univ_tvs univ_bndrs ex_bndrs eq_preds
                             (substTys arg_subst ctxt)
                             (substTys arg_subst arg_tys)
                             (substTy  arg_subst res_ty')
@@ -2608,11 +2607,11 @@ checkValidRoles tc
       =  check_ty_roles env role    ty1
       >> check_ty_roles env Nominal ty2
 
-    check_ty_roles env role (ForAllTy (Anon ty1) ty2)
+    check_ty_roles env role (FunTy ty1 ty2)
       =  check_ty_roles env role ty1
       >> check_ty_roles env role ty2
 
-    check_ty_roles env role (ForAllTy (Named tv _) ty)
+    check_ty_roles env role (ForAllTy (TvBndr tv _) ty)
       =  check_ty_roles env Nominal (tyVarKind tv)
       >> check_ty_roles (extendVarEnv env tv Nominal) role ty
 

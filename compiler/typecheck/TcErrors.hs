@@ -1800,17 +1800,17 @@ expandSynonymsToMatch ty1 ty2 = (ty1_ret, ty2_ret)
           (t1_2', t2_2') = go t1_2 t2_2
        in (mkAppTy t1_1' t1_2', mkAppTy t2_1' t2_2')
 
-    go (ForAllTy (Anon t1_1) t1_2) (ForAllTy (Anon t2_1) t2_2) =
+    go (FunTy t1_1 t1_2) (FunTy t2_1 t2_2) =
       let (t1_1', t2_1') = go t1_1 t2_1
           (t1_2', t2_2') = go t1_2 t2_2
        in (mkFunTy t1_1' t1_2', mkFunTy t2_1' t2_2')
 
-    go (ForAllTy (Named tv1 vis1) t1) (ForAllTy (Named tv2 vis2) t2) =
+    go (ForAllTy b1 t1) (ForAllTy b2 t2) =
       -- NOTE: We may have a bug here, but we just can't reproduce it easily.
       -- See D1016 comments for details and our attempts at producing a test
       -- case. Short version: We probably need RnEnv2 to really get this right.
       let (t1', t2') = go t1 t2
-       in (ForAllTy (Named tv1 vis1) t1', ForAllTy (Named tv2 vis2) t2')
+       in (ForAllTy b1 t1', ForAllTy b2 t2')
 
     go (CastTy ty1 _) ty2 = go ty1 ty2
     go ty1 (CastTy ty2 _) = go ty1 ty2
@@ -1864,13 +1864,13 @@ expandSynonymsToMatch ty1 ty2 = (ty1_ret, ty2_ret)
       | otherwise = followExpansions tss
 
     sameShapes :: Type -> Type -> Bool
-    sameShapes AppTy{}              AppTy{}              = True
-    sameShapes (TyConApp tc1 _)     (TyConApp tc2 _)     = tc1 == tc2
-    sameShapes (ForAllTy Anon{} _)  (ForAllTy Anon{} _)  = True
-    sameShapes (ForAllTy Named{} _) (ForAllTy Named{} _) = True
-    sameShapes (CastTy ty1 _)       ty2                  = sameShapes ty1 ty2
-    sameShapes ty1                  (CastTy ty2 _)       = sameShapes ty1 ty2
-    sameShapes _                    _                    = False
+    sameShapes AppTy{}          AppTy{}          = True
+    sameShapes (TyConApp tc1 _) (TyConApp tc2 _) = tc1 == tc2
+    sameShapes (FunTy {})       (FunTy {})       = True
+    sameShapes (ForAllTy {})    (ForAllTy {})    = True
+    sameShapes (CastTy ty1 _)   ty2              = sameShapes ty1 ty2
+    sameShapes ty1              (CastTy ty2 _)   = sameShapes ty1 ty2
+    sameShapes _                _                = False
 
 sameOccExtra :: TcType -> TcType -> SDoc
 -- See Note [Disambiguating (X ~ X) errors]

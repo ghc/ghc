@@ -15,7 +15,7 @@ module PatSyn (
         patSynName, patSynArity, patSynIsInfix,
         patSynArgs,
         patSynMatcher, patSynBuilder,
-        patSynUnivTyBinders, patSynExTyVars, patSynExTyBinders, patSynSig,
+        patSynUnivTyVarBinders, patSynExTyVars, patSynExTyVarBinders, patSynSig,
         patSynInstArgTys, patSynInstResTy, patSynFieldLabels,
         patSynFieldType,
 
@@ -63,15 +63,13 @@ data PatSyn
                                        -- psArgs
 
         -- Universially-quantified type variables
-        psUnivTyVars    :: [TyVar],    -- Two linked fields; see DataCon
-        psUnivTyBinders :: [TyBinder], -- Note [TyBinders in DataCons]
+        psUnivTyVars  :: [TyVarBinder],
 
         -- Required dictionaries (may mention psUnivTyVars)
         psReqTheta    :: ThetaType,
 
         -- Existentially-quantified type vars
-        psExTyVars    :: [TyVar],      -- Two linked fields; see DataCon
-        psExTyBinders :: [TyBinder],   -- Note [TyBinders in DataCons]
+        psExTyVars    :: [TyVarBinder],
 
         -- Provided dictionaries (may mention psUnivTyVars or psExTyVars)
         psProvTheta   :: ThetaType,
@@ -300,11 +298,9 @@ instance Data.Data PatSyn where
 -- | Build a new pattern synonym
 mkPatSyn :: Name
          -> Bool                 -- ^ Is the pattern synonym declared infix?
-         -> ([TyVar], [TyBinder], ThetaType)
-                                 -- ^ Universially-quantified type variables
+         -> ([TyVarBinder], ThetaType) -- ^ Universially-quantified type variables
                                  --   and required dicts
-         -> ([TyVar], [TyBinder], ThetaType)
-                                 -- ^ Existentially-quantified type variables
+         -> ([TyVarBinder], ThetaType) -- ^ Existentially-quantified type variables
                                  --   and provided dicts
          -> [Type]               -- ^ Original arguments
          -> Type                 -- ^ Original result type
@@ -316,14 +312,14 @@ mkPatSyn :: Name
  -- NB: The univ and ex vars are both in TyBinder form and TyVar form for
  -- convenience. All the TyBinders should be Named!
 mkPatSyn name declared_infix
-         (univ_tvs, univ_bndrs, req_theta)
-         (ex_tvs, ex_bndrs, prov_theta)
+         (univ_tvs, req_theta)
+         (ex_tvs, prov_theta)
          orig_args
          orig_res_ty
          matcher builder field_labels
     = MkPatSyn {psName = name, psUnique = getUnique name,
-                psUnivTyVars = univ_tvs, psUnivTyBinders = univ_bndrs,
-                psExTyVars = ex_tvs, psExTyBinders = ex_bndrs,
+                psUnivTyVars = univ_tvs,
+                psExTyVars = ex_tvs,
                 psProvTheta = prov_theta, psReqTheta = req_theta,
                 psInfix = declared_infix,
                 psArgs = orig_args,
@@ -359,20 +355,20 @@ patSynFieldType ps label
       Just (_, ty) -> ty
       Nothing -> pprPanic "dataConFieldType" (ppr ps <+> ppr label)
 
-patSynUnivTyBinders :: PatSyn -> [TyBinder]
-patSynUnivTyBinders = psUnivTyBinders
+patSynUnivTyVarBinders :: PatSyn -> [TyVarBinder]
+patSynUnivTyVarBinders = psUnivTyVars
 
 patSynExTyVars :: PatSyn -> [TyVar]
-patSynExTyVars = psExTyVars
+patSynExTyVars ps = map binderVar (psExTyVars ps)
 
-patSynExTyBinders :: PatSyn -> [TyBinder]
-patSynExTyBinders = psExTyBinders
+patSynExTyVarBinders :: PatSyn -> [TyVarBinder]
+patSynExTyVarBinders = psExTyVars
 
 patSynSig :: PatSyn -> ([TyVar], ThetaType, [TyVar], ThetaType, [Type], Type)
 patSynSig (MkPatSyn { psUnivTyVars = univ_tvs, psExTyVars = ex_tvs
                     , psProvTheta = prov, psReqTheta = req
                     , psArgs = arg_tys, psOrigResTy = res_ty })
-  = (univ_tvs, req, ex_tvs, prov, arg_tys, res_ty)
+  = (map binderVar univ_tvs, req, map binderVar ex_tvs, prov, arg_tys, res_ty)
 
 patSynMatcher :: PatSyn -> (Id,Bool)
 patSynMatcher = psMatcher
@@ -401,7 +397,7 @@ patSynInstArgTys (MkPatSyn { psName = name, psUnivTyVars = univ_tvs
           , text "patSynInstArgTys" <+> ppr name $$ ppr tyvars $$ ppr inst_tys )
     map (substTyWith tyvars inst_tys) arg_tys
   where
-    tyvars = univ_tvs ++ ex_tvs
+    tyvars = map binderVar (univ_tvs ++ ex_tvs)
 
 patSynInstResTy :: PatSyn -> [Type] -> Type
 -- Return the type of whole pattern
@@ -414,19 +410,19 @@ patSynInstResTy (MkPatSyn { psName = name, psUnivTyVars = univ_tvs
                 inst_tys
   = ASSERT2( length univ_tvs == length inst_tys
            , text "patSynInstResTy" <+> ppr name $$ ppr univ_tvs $$ ppr inst_tys )
-    substTyWith univ_tvs inst_tys res_ty
+    substTyWith (map binderVar univ_tvs) inst_tys res_ty
 
 -- | Print the type of a pattern synonym. The foralls are printed explicitly
 pprPatSynType :: PatSyn -> SDoc
 pprPatSynType (MkPatSyn { psUnivTyVars = univ_tvs,  psReqTheta  = req_theta
                         , psExTyVars   = ex_tvs,    psProvTheta = prov_theta
                         , psArgs       = orig_args, psOrigResTy = orig_res_ty })
-  = sep [ pprForAllImplicit univ_tvs
+  = sep [ pprForAll univ_tvs
         , pprThetaArrowTy req_theta
         , ppWhen insert_empty_ctxt $ parens empty <+> darrow
         , pprType sigma_ty ]
   where
-    sigma_ty = mkForAllTys (mkNamedBinders Specified ex_tvs) $
+    sigma_ty = mkForAllTys ex_tvs  $
                mkFunTys prov_theta $
                mkFunTys orig_args orig_res_ty
     insert_empty_ctxt = null req_theta && not (null prov_theta && null ex_tvs)

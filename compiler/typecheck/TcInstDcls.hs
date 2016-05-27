@@ -983,7 +983,7 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds _fam_envs sc_t
            ; sc_top_name  <- newName (mkSuperDictAuxOcc n (getOccName cls))
            ; sc_ev_id     <- newEvVar sc_pred
            ; addTcEvBind ev_binds_var $ mkWantedEvBind sc_ev_id sc_ev_tm
-           ; let sc_top_ty = mkInvForAllTys tyvars (mkPiTypes dfun_evs sc_pred)
+           ; let sc_top_ty = mkInvForAllTys tyvars (mkLamTypes dfun_evs sc_pred)
                  sc_top_id = mkLocalId sc_top_name sc_top_ty
                  export = ABE { abe_wrap = idHsWrapper
                               , abe_poly = sc_top_id

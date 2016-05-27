@@ -1314,8 +1314,8 @@ freeNamesIfForAllBndr :: IfaceForAllBndr -> NameSet
 freeNamesIfForAllBndr (IfaceTv tv _) = freeNamesIfTvBndr tv
 
 freeNamesIfTyBinder :: IfaceTyConBinder -> NameSet
-freeNamesIfTyBinder (IfaceAnon _ ty) = freeNamesIfType ty
-freeNamesIfTyBinder (IfaceNamed b)   = freeNamesIfForAllBndr b
+freeNamesIfTyBinder (IfaceAnon b)  = freeNamesIfTvBndr b
+freeNamesIfTyBinder (IfaceNamed b) = freeNamesIfForAllBndr b
 
 freeNamesIfTyBinders :: [IfaceTyConBinder] -> NameSet
 freeNamesIfTyBinders = fnList freeNamesIfTyBinder

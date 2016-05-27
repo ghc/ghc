@@ -48,7 +48,7 @@ import TcEvidence
 import TysPrim
 import TysWiredIn
 import Type
-import TyCoRep  ( TyBinder(..) )
+import TyCoRep  ( TyBinder(..), TyVarBinder(..) )
 import TyCon
 import Coercion
 import ConLike
@@ -345,9 +345,9 @@ zonkTyBinders = mapAccumLM zonkTyBinder
 
 zonkTyBinder :: ZonkEnv -> TcTyBinder -> TcM (ZonkEnv, TyBinder)
 zonkTyBinder env (Anon ty) = (env, ) <$> (Anon <$> zonkTcTypeToType env ty)
-zonkTyBinder env (Named tv vis)
+zonkTyBinder env (Named (TvBndr tv vis))
   = do { (env', tv') <- zonkTyBndrX env tv
-       ; return (env', Named tv' vis) }
+       ; return (env', Named (TvBndr tv' vis)) }
 
 zonkTopExpr :: HsExpr TcId -> TcM (HsExpr Id)
 zonkTopExpr e = zonkExpr emptyZonkEnv e

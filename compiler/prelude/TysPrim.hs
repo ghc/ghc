@@ -682,7 +682,7 @@ mkProxyPrimTy k ty = TyConApp proxyPrimTyCon [k, ty]
 
 proxyPrimTyCon :: TyCon
 proxyPrimTyCon = mkPrimTyCon proxyPrimTyConName binders res_kind [Nominal,Nominal]
-  where binders  = [ Named kv Specified
+  where binders  = [ Named (TvBndr kv Specified)
                    , Anon k ]
         res_kind = tYPE voidRepDataConTy
         kv       = kKiVar
@@ -699,8 +699,8 @@ proxyPrimTyCon = mkPrimTyCon proxyPrimTyConName binders res_kind [Nominal,Nomina
 eqPrimTyCon :: TyCon  -- The representation type for equality predicates
                       -- See Note [The equality types story]
 eqPrimTyCon  = mkPrimTyCon eqPrimTyConName binders res_kind roles
-  where binders = [ Named kv1 Specified
-                  , Named kv2 Specified
+  where binders = [ Named (TvBndr kv1 Specified)
+                  , Named (TvBndr kv2 Specified)
                   , Anon k1
                   , Anon k2 ]
         res_kind = tYPE voidRepDataConTy
@@ -714,8 +714,8 @@ eqPrimTyCon  = mkPrimTyCon eqPrimTyConName binders res_kind roles
 -- interpreted in coercionRole
 eqReprPrimTyCon :: TyCon   -- See Note [The equality types story]
 eqReprPrimTyCon = mkPrimTyCon eqReprPrimTyConName binders res_kind roles
-  where binders = [ Named kv1 Specified
-                  , Named kv2 Specified
+  where binders = [ Named (TvBndr kv1 Specified)
+                  , Named (TvBndr kv2 Specified)
                   , Anon k1
                   , Anon k2 ]
         res_kind = tYPE voidRepDataConTy
@@ -730,8 +730,8 @@ eqReprPrimTyCon = mkPrimTyCon eqReprPrimTyConName binders res_kind roles
 eqPhantPrimTyCon :: TyCon
 eqPhantPrimTyCon = mkPrimTyCon eqPhantPrimTyConName binders res_kind
                                [Nominal, Nominal, Phantom, Phantom]
-  where binders = [ Named kv1 Specified
-                  , Named kv2 Specified
+  where binders = [ Named (TvBndr kv1 Specified)
+                  , Named (TvBndr kv2 Specified)
                   , Anon k1
                   , Anon k2 ]
         res_kind = tYPE voidRepDataConTy

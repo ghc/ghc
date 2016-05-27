@@ -558,9 +558,10 @@ lintRhs rhs
     , length args == 5
     = flip fix binders0 $ \loopBinders binders -> case binders of
         -- imitate @lintCoreExpr (Lam ...)@
-        var : vars -> addLoc (LambdaBodyOf var) $ lintBinder var $ \var' -> do
-          body_ty <- loopBinders vars
-          return $ mkPiType var' body_ty
+        var : vars -> addLoc (LambdaBodyOf var) $
+                      lintBinder var $ \var' ->
+                      do { body_ty <- loopBinders vars
+                         ; return $ mkLamType var' body_ty }
         -- imitate @lintCoreExpr (App ...)@
         [] -> do
           fun_ty <- lintCoreExpr fun
@@ -703,7 +704,7 @@ lintCoreExpr (Lam var expr)
   = addLoc (LambdaBodyOf var) $
     lintBinder var $ \ var' ->
     do { body_ty <- lintCoreExpr expr
-       ; return $ mkPiType var' body_ty }
+       ; return $ mkLamType var' body_ty }
 
 lintCoreExpr e@(Case scrut var alt_ty alts) =
        -- Check the scrutinee
@@ -1097,12 +1098,12 @@ lintType ty@(TyConApp tc tys)
 
 -- arrows can related *unlifted* kinds, so this has to be separate from
 -- a dependent forall.
-lintType ty@(ForAllTy (Anon t1) t2)
+lintType ty@(FunTy t1 t2)
   = do { k1 <- lintType t1
        ; k2 <- lintType t2
        ; lintArrow (text "type or kind" <+> quotes (ppr ty)) k1 k2 }
 
-lintType t@(ForAllTy (Named tv _vis) ty)
+lintType t@(ForAllTy (TvBndr tv _vis) ty)
   = do { lintL (isTyVar tv) (text "Covar bound in type:" <+> ppr t)
        ; lintTyBndr tv $ \tv' ->
           do { k <- lintType ty
@@ -1192,11 +1193,11 @@ lint_app doc kfn kas
       | Just kfn' <- coreView kfn
       = go_app in_scope kfn' ka
 
-    go_app _ (ForAllTy (Anon kfa) kfb) (_,ka)
+    go_app _ (FunTy kfa kfb) (_,ka)
       = do { unless (ka `eqType` kfa) (addErrL fail_msg)
            ; return kfb }
 
-    go_app in_scope (ForAllTy (Named kv _vis) kfn) (ta,ka)
+    go_app in_scope (ForAllTy (TvBndr kv _vis) kfn) (ta,ka)
       = do { unless (ka `eqType` tyVarKind kv) (addErrL fail_msg)
            ; return (substTyWithInScope in_scope [kv] [ta] kfn) }
 
@@ -1346,7 +1347,7 @@ lintCoercion (ForAllCo tv1 kind_co co)
     do {
        ; (k3, k4, t1, t2, r) <- lintCoercion co
        ; in_scope <- getInScope
-       ; let tyl = mkNamedForAllTy tv1 Invisible t1
+       ; let tyl = mkInvForAllTy tv1 t1
              subst = mkTvSubst in_scope $
                      -- We need both the free vars of the `t2` and the
                      -- free vars of the range of the substitution in
@@ -1355,7 +1356,7 @@ lintCoercion (ForAllCo tv1 kind_co co)
                      -- linted and `tv2` has the same unique as `tv1`.
                      -- See Note [The substitution invariant]
                      unitVarEnv tv1 (TyVarTy tv2 `mkCastTy` mkSymCo kind_co)
-             tyr = mkNamedForAllTy tv2 Invisible $
+             tyr = mkInvForAllTy tv2 $
                    substTy subst t2
        ; return (k3, k4, tyl, tyr, r) } }
 

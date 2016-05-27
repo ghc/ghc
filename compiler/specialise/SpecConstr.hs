@@ -1643,7 +1643,7 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
 --        return ()
 
                 -- And build the results
-        ; let spec_id    = mkLocalIdOrCoVar spec_name (mkPiTypes spec_lam_args body_ty)
+        ; let spec_id    = mkLocalIdOrCoVar spec_name (mkLamTypes spec_lam_args body_ty)
                              -- See Note [Transfer strictness]
                              `setIdStrictness` spec_str
                              `setIdArity` count isId spec_lam_args

@@ -793,7 +793,7 @@ data TypeMapX a
 trieMapView :: Type -> Maybe Type
 trieMapView ty | Just ty' <- coreViewOneStarKind ty = Just ty'
 trieMapView (TyConApp tc tys@(_:_)) = Just $ foldl AppTy (TyConApp tc []) tys
-trieMapView (ForAllTy (Anon arg) res)
+trieMapView (FunTy arg res)
   = Just ((TyConApp funTyCon [] `AppTy` arg) `AppTy` res)
 trieMapView _ = Nothing
 
@@ -824,13 +824,13 @@ instance Eq (DeBruijn Type) where
             -> D env t1 == D env' t1' && D env t2 == D env' t2'
         (s, AppTy t1' t2') | Just (t1, t2) <- repSplitAppTy_maybe s
             -> D env t1 == D env' t1' && D env t2 == D env' t2'
-        (ForAllTy (Anon t1) t2, ForAllTy (Anon t1') t2')
+        (FunTy t1 t2, FunTy t1' t2')
             -> D env t1 == D env' t1' && D env t2 == D env' t2'
         (TyConApp tc tys, TyConApp tc' tys')
             -> tc == tc' && D env tys == D env' tys'
         (LitTy l, LitTy l')
             -> l == l'
-        (ForAllTy (Named tv _) ty, ForAllTy (Named tv' _) ty')
+        (ForAllTy (TvBndr tv _) ty, ForAllTy (TvBndr tv' _) ty')
             -> D env (tyVarKind tv)    == D env' (tyVarKind tv') &&
                D (extendCME env tv) ty == D (extendCME env' tv') ty'
         (CoercionTy {}, CoercionTy {})
@@ -870,9 +870,9 @@ lkT (D env ty) m = go ty m
     go (TyConApp tc [])            = tm_tycon  >.> lkDNamed tc
     go ty@(TyConApp _ (_:_))       = pprPanic "lkT TyConApp" (ppr ty)
     go (LitTy l)                   = tm_tylit  >.> lkTyLit l
-    go (ForAllTy (Named tv _) ty)  = tm_forall >.> lkG (D (extendCME env tv) ty)
+    go (ForAllTy (TvBndr tv _) ty) = tm_forall >.> lkG (D (extendCME env tv) ty)
                                                >=> lkBndr env tv
-    go ty@(ForAllTy (Anon _) _)    = pprPanic "lkT FunTy" (ppr ty)
+    go ty@(FunTy {})               = pprPanic "lkT FunTy" (ppr ty)
     go (CastTy t _)                = go t
     go (CoercionTy {})             = tm_coerce
 
@@ -887,11 +887,11 @@ xtT (D _   (TyConApp tc []))  f m = m { tm_tycon  = tm_tycon m |> xtDNamed tc f 
 xtT (D _   (LitTy l))         f m = m { tm_tylit  = tm_tylit m |> xtTyLit l f }
 xtT (D env (CastTy t _))      f m = xtT (D env t) f m
 xtT (D _   (CoercionTy {}))   f m = m { tm_coerce = tm_coerce m |> f }
-xtT (D env (ForAllTy (Named tv _) ty))  f m
+xtT (D env (ForAllTy (TvBndr tv _) ty))  f m
   = m { tm_forall = tm_forall m |> xtG (D (extendCME env tv) ty)
                                 |>> xtBndr env tv f }
-xtT (D _   ty@(TyConApp _ (_:_)))    _ _ = pprPanic "xtT TyConApp" (ppr ty)
-xtT (D _   ty@(ForAllTy (Anon _) _)) _ _ = pprPanic "xtT FunTy" (ppr ty)
+xtT (D _   ty@(TyConApp _ (_:_))) _ _ = pprPanic "xtT TyConApp" (ppr ty)
+xtT (D _   ty@(FunTy {}))         _ _ = pprPanic "xtT FunTy" (ppr ty)
 
 fdT :: (a -> b -> b) -> TypeMapX a -> b -> b
 fdT k m = foldTM k (tm_var m)

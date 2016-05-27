@@ -1974,23 +1974,23 @@ lookupTypeHscEnv hsc_env name = do
 -- | Get the 'TyCon' from a 'TyThing' if it is a type constructor thing. Panics otherwise
 tyThingTyCon :: TyThing -> TyCon
 tyThingTyCon (ATyCon tc) = tc
-tyThingTyCon other       = pprPanic "tyThingTyCon" (pprTyThing other)
+tyThingTyCon other       = pprPanic "tyThingTyCon" (ppr other)
 
 -- | Get the 'CoAxiom' from a 'TyThing' if it is a coercion axiom thing. Panics otherwise
 tyThingCoAxiom :: TyThing -> CoAxiom Branched
 tyThingCoAxiom (ACoAxiom ax) = ax
-tyThingCoAxiom other         = pprPanic "tyThingCoAxiom" (pprTyThing other)
+tyThingCoAxiom other         = pprPanic "tyThingCoAxiom" (ppr other)
 
 -- | Get the 'DataCon' from a 'TyThing' if it is a data constructor thing. Panics otherwise
 tyThingDataCon :: TyThing -> DataCon
 tyThingDataCon (AConLike (RealDataCon dc)) = dc
-tyThingDataCon other                       = pprPanic "tyThingDataCon" (pprTyThing other)
+tyThingDataCon other                       = pprPanic "tyThingDataCon" (ppr other)
 
 -- | Get the 'Id' from a 'TyThing' if it is a id *or* data constructor thing. Panics otherwise
 tyThingId :: TyThing -> Id
 tyThingId (AnId id)                   = id
 tyThingId (AConLike (RealDataCon dc)) = dataConWrapId dc
-tyThingId other                       = pprPanic "tyThingId" (pprTyThing other)
+tyThingId other                       = pprPanic "tyThingId" (ppr other)
 
 {-
 ************************************************************************

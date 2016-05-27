@@ -1305,16 +1305,16 @@ normalise_type
       = do { (co,  nty1) <- go ty1
            ; (arg, nty2) <- withRole Nominal $ go ty2
            ; return (mkAppCo co arg, mkAppTy nty1 nty2) }
-    go (ForAllTy (Anon ty1) ty2)
+    go (FunTy ty1 ty2)
       = do { (co1, nty1) <- go ty1
            ; (co2, nty2) <- go ty2
            ; r <- getRole
            ; return (mkFunCo r co1 co2, mkFunTy nty1 nty2) }
-    go (ForAllTy (Named tyvar vis) ty)
+    go (ForAllTy (TvBndr tyvar vis) ty)
       = do { (lc', tv', h, ki') <- normalise_tyvar_bndr tyvar
            ; (co, nty)          <- withLC lc' $ normalise_type ty
            ; let tv2 = setTyVarKind tv' ki'
-           ; return (mkForAllCo tv' h co, mkNamedForAllTy tv2 vis nty) }
+           ; return (mkForAllCo tv' h co, ForAllTy (TvBndr tv2 vis) nty) }
     go (TyVarTy tv)    = normalise_tyvar tv
     go (CastTy ty co)
       = do { (nco, nty) <- go ty
@@ -1475,14 +1475,14 @@ coreFlattenTy = go
       = let (env', tys') = coreFlattenTys env tys in
         (env', mkTyConApp tc tys')
 
-    go env (ForAllTy (Anon ty1) ty2) = let (env1, ty1') = go env  ty1
-                                           (env2, ty2') = go env1 ty2 in
-                                       (env2, mkFunTy ty1' ty2')
+    go env (FunTy ty1 ty2) = let (env1, ty1') = go env  ty1
+                                 (env2, ty2') = go env1 ty2 in
+                             (env2, mkFunTy ty1' ty2')
 
-    go env (ForAllTy (Named tv vis) ty)
+    go env (ForAllTy (TvBndr tv vis) ty)
       = let (env1, tv') = coreFlattenVarBndr env tv
             (env2, ty') = go env1 ty in
-        (env2, mkNamedForAllTy tv' vis ty')
+        (env2, ForAllTy (TvBndr tv' vis) ty')
 
     go env ty@(LitTy {}) = (env, ty)
 
@@ -1556,12 +1556,13 @@ allTyVarsInTy :: Type -> VarSet
 allTyVarsInTy = go
   where
     go (TyVarTy tv)      = unitVarSet tv
-    go (AppTy ty1 ty2)   = (go ty1) `unionVarSet` (go ty2)
     go (TyConApp _ tys)  = allTyVarsInTys tys
-    go (ForAllTy bndr ty) =
-      caseBinder bndr (\tv -> unitVarSet tv) (const emptyVarSet)
-      `unionVarSet` go (binderType bndr) `unionVarSet` go ty
-        -- don't remove the tv from the set!
+    go (AppTy ty1 ty2)   = (go ty1) `unionVarSet` (go ty2)
+    go (FunTy ty1 ty2)   = (go ty1) `unionVarSet` (go ty2)
+    go (ForAllTy (TvBndr tv _) ty) = unitVarSet tv     `unionVarSet`
+                                     go (tyVarKind tv) `unionVarSet`
+                                     go ty
+                                     -- Don't remove the tv from the set!
     go (LitTy {})        = emptyVarSet
     go (CastTy ty co)    = go ty `unionVarSet` go_co co
     go (CoercionTy co)   = go_co co

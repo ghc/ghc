@@ -130,7 +130,6 @@ import Type
 import DataCon
 import {-# SOURCE #-} ConLike
 import TyCon
-import TyCoRep          ( TyBinder(..) )
 import Class            ( Class, mkClass )
 import RdrName
 import Name
@@ -353,7 +352,7 @@ anyTyCon = mkFamilyTyCon anyTyConName binders res_kind [kKiVar] Nothing
                          Nothing
                          NotInjective
   where
-    binders  = [Named kKiVar Specified]
+    binders  = [mkNamedBinder (mkTyVarBinder Specified kKiVar)]
     res_kind = mkTyVarTy kKiVar
 
 anyTy :: Type
@@ -496,8 +495,8 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri tyvars ex_tyvars arg_tys
     data_con = mkDataCon dc_name declared_infix prom_info
                 (map (const no_bang) arg_tys)
                 []      -- No labelled fields
-                tyvars    (mkNamedBinders Specified tyvars)
-                ex_tyvars (mkNamedBinders Specified ex_tyvars)
+                (mkTyVarBinders Specified tyvars)
+                (mkTyVarBinders Specified ex_tyvars)
                 []      -- No equality spec
                 []      -- No theta
                 arg_tys (mkTyConApp tycon (mkTyVarTys tyvars))
@@ -758,7 +757,7 @@ mk_tuple boxity arity = (tycon, tuple_con)
             in
             ( UnboxedTuple
             , gHC_PRIM
-            , mkNamedBinders Specified rr_tvs ++
+            , map (mkNamedBinder . mkTyVarBinder Specified) rr_tvs ++
               map (mkAnonBinder . tyVarKind) open_tvs
             , unboxedTupleKind
             , arity * 2
@@ -819,8 +818,8 @@ heqSCSelId, coercibleSCSelId :: Id
     klass     = mkClass tvs [] [sc_pred] [sc_sel_id] [] [] (mkAnd []) tycon
     datacon   = pcDataCon heqDataConName tvs [sc_pred] tycon
 
-    binders   = [ mkNamedBinder Specified kv1
-                , mkNamedBinder Specified kv2
+    binders   = [ mkNamedBinder (mkTyVarBinder Specified kv1)
+                , mkNamedBinder (mkTyVarBinder Specified kv2)
                 , mkAnonBinder k1
                 , mkAnonBinder k2 ]
     kv1:kv2:_ = drop 9 alphaTyVars -- gets "j" and "k"
@@ -843,7 +842,7 @@ heqSCSelId, coercibleSCSelId :: Id
     klass     = mkClass tvs [] [sc_pred] [sc_sel_id] [] [] (mkAnd []) tycon
     datacon   = pcDataCon coercibleDataConName tvs [sc_pred] tycon
 
-    binders   = [ mkNamedBinder Specified kKiVar
+    binders   = [ mkNamedBinder (mkTyVarBinder Specified kKiVar)
                 , mkAnonBinder k
                 , mkAnonBinder k ]
     k         = mkTyVarTy kKiVar

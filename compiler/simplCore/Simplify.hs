@@ -2525,8 +2525,8 @@ mkDupableAlt env case_bndr (con, bndrs', rhs') = do
                     else do { rw_id <- newId (fsLit "w") voidPrimTy
                             ; return ([setOneShotLambda rw_id], [Var voidPrimId]) }
 
-        ; join_bndr <- newId (fsLit "$j") (mkPiTypes final_bndrs' rhs_ty')
-                -- Note [Funky mkPiTypes]
+        ; join_bndr <- newId (fsLit "$j") (mkLamTypes final_bndrs' rhs_ty')
+                -- Note [Funky mkLamTypes]
 
         ; let   -- We make the lambdas into one-shot-lambdas.  The
                 -- join point is sure to be applied at most once, and doing so
@@ -2643,9 +2643,9 @@ but we only have one env shared between all the alts.
 (Remember we must zap the subst-env before re-simplifying something).
 Rather than do this we simply agree to re-simplify the original (small) thing later.
 
-Note [Funky mkPiTypes]
+Note [Funky mkLamTypes]
 ~~~~~~~~~~~~~~~~~~~~~~
-Notice the funky mkPiTypes.  If the contructor has existentials
+Notice the funky mkLamTypes.  If the contructor has existentials
 it's possible that the join point will be abstracted over
 type variables as well as term variables.
  Example:  Suppose we have

@@ -274,13 +274,13 @@ mkDictSelId name clas
     sel_names      = map idName (classAllSelIds clas)
     new_tycon      = isNewTyCon tycon
     [data_con]     = tyConDataCons tycon
-    binders        = dataConUnivTyBinders data_con
-    tyvars         = dataConUnivTyVars data_con
+    tyvars         = dataConUnivTyVarBinders data_con
+    n_ty_args      = length tyvars
     arg_tys        = dataConRepArgTys data_con  -- Includes the dictionary superclasses
     val_index      = assoc "MkId.mkDictSelId" (sel_names `zip` [0..]) name
 
-    sel_ty = mkForAllTys binders $
-             mkFunTy (mkClassPred clas (mkTyVarTys tyvars)) $
+    sel_ty = mkForAllTys tyvars $
+             mkFunTy (mkClassPred clas (mkTyVarTys (map binderVar tyvars))) $
              getNth arg_tys val_index
 
     base_info = noCafIdInfo
@@ -298,8 +298,6 @@ mkDictSelId name clas
                    -- Add a magic BuiltinRule, but no unfolding
                    -- so that the rule is always available to fire.
                    -- See Note [ClassOp/DFun selection] in TcInstDcls
-
-    n_ty_args = length tyvars
 
     -- This is the built-in rule that goes
     --      op (dfT d1 d2) --->  opT d1 d2
@@ -971,10 +969,9 @@ mkFCallId dflags uniq fcall ty
            `setArityInfo`         arity
            `setStrictnessInfo`    strict_sig
 
-    (bndrs, _)        = tcSplitPiTys ty
-    arity             = count isIdLikeBinder bndrs
-
-    strict_sig      = mkClosedStrictSig (replicate arity topDmd) topRes
+    (bndrs, _) = tcSplitPiTys ty
+    arity      = count isAnonTyBinder bndrs
+    strict_sig = mkClosedStrictSig (replicate arity topDmd) topRes
     -- the call does not claim to be strict in its arguments, since they
     -- may be lifted (foreign import prim) and the called code doesn't
     -- necessarily force them. See Trac #11076.

@@ -106,10 +106,11 @@ typeArity ty
   = go initRecTc ty
   where
     go rec_nts ty
-      | Just (bndr, ty')  <- splitPiTy_maybe ty
-      = if isIdLikeBinder bndr
-        then typeOneShot (binderType bndr) : go rec_nts ty'
-        else go rec_nts ty'
+      | Just (_, ty')  <- splitForAllTy_maybe ty
+      = go rec_nts ty'
+
+      | Just (arg,res) <- splitFunTy_maybe ty
+      = typeOneShot arg : go rec_nts res
 
       | Just (tc,tys) <- splitTyConApp_maybe ty
       , Just (ty', _) <- instNewTyCon_maybe tc tys
@@ -970,13 +971,15 @@ mkEtaWW orig_n orig_expr in_scope orig_ty
        | n == 0
        = (getTCvInScope subst, reverse eis)
 
-       | Just (bndr,ty') <- splitPiTy_maybe ty
-       = let ((subst', eta_id'), new_n) = caseBinder bndr
-               (\tv -> (Type.substTyVarBndr subst tv, n))
-               (\arg_ty -> (freshEtaVar n subst arg_ty, n-1))
-         in
-            -- Avoid free vars of the original expression
-         go new_n subst' ty' (EtaVar eta_id' : eis)
+       | Just (tv,ty') <- splitForAllTy_maybe ty
+       , let (subst', tv') = Type.substTyVarBndr subst tv
+           -- Avoid free vars of the original expression
+       = go n subst' ty' (EtaVar tv' : eis)
+
+       | Just (arg_ty, res_ty) <- splitFunTy_maybe ty
+       , let (subst', eta_id') = freshEtaId n subst arg_ty
+           -- Avoid free vars of the original expression
+       = go (n-1) subst' res_ty (EtaVar eta_id' : eis)
 
        | Just (co, ty') <- topNormaliseNewType_maybe ty
        =        -- Given this:
@@ -1009,7 +1012,7 @@ subst_bind = substBindSC
 
 
 --------------
-freshEtaVar :: Int -> TCvSubst -> Type -> (TCvSubst, Var)
+freshEtaId :: Int -> TCvSubst -> Type -> (TCvSubst, Id)
 -- Make a fresh Id, with specified type (after applying substitution)
 -- It should be "fresh" in the sense that it's not in the in-scope set
 -- of the TvSubstEnv; and it should itself then be added to the in-scope
@@ -1017,7 +1020,7 @@ freshEtaVar :: Int -> TCvSubst -> Type -> (TCvSubst, Var)
 --
 -- The Int is just a reasonable starting point for generating a unique;
 -- it does not necessarily have to be unique itself.
-freshEtaVar n subst ty
+freshEtaId n subst ty
       = (subst', eta_id')
       where
         ty'     = Type.substTy subst ty

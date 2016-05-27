@@ -78,7 +78,7 @@ import Literal          ( litIsTrivial )
 import Demand           ( StrictSig )
 import Name             ( getOccName, mkSystemVarName )
 import OccName          ( occNameString )
-import Type             ( isUnliftedType, Type, mkPiTypes )
+import Type             ( isUnliftedType, Type, mkLamTypes )
 import BasicTypes       ( Arity, RecFlag(..) )
 import UniqSupply
 import Util
@@ -1092,7 +1092,7 @@ newPolyBndrs dest_lvl
                              mkSysLocalOrCoVar (mkFastString str) uniq poly_ty
                            where
                              str     = "poly_" ++ occNameString (getOccName bndr)
-                             poly_ty = mkPiTypes abs_vars (substTy subst (idType bndr))
+                             poly_ty = mkLamTypes abs_vars (substTy subst (idType bndr))
 
 newLvlVar :: LevelledExpr        -- The RHS of the new binding
           -> Bool                -- Whether it is bottom

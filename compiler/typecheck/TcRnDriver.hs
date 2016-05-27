@@ -53,6 +53,7 @@ import TcExpr
 import TcRnMonad
 import TcEvidence
 import PprTyThing( pprTyThing )
+import MkIface( tyThingToIfaceDecl )
 import Coercion( pprCoAxiom )
 import CoreFVs( orphNamesOfFamInst )
 import FamInst
@@ -69,7 +70,6 @@ import TcInstDcls
 import TcIface
 import TcMType
 import TcType
-import MkIface
 import TcSimplify
 import TcTyClsDecls
 import TcTypeable ( mkTypeableBinds )
@@ -2011,7 +2011,7 @@ tcRnExpr hsc_env rdr_expr
     -- Ignore the dictionary bindings
     _ <- simplifyInteractive (andWC stWC lie_top) ;
 
-    let { all_expr_ty = mkInvForAllTys qtvs (mkPiTypes dicts res_ty) } ;
+    let { all_expr_ty = mkInvForAllTys qtvs (mkLamTypes dicts res_ty) } ;
     ty <- zonkTcType all_expr_ty ;
 
     -- We normalise type families, so that the type of an expression is the
@@ -2484,10 +2484,13 @@ ppr_sigs ids
 
 ppr_tydecls :: [TyCon] -> SDoc
 ppr_tydecls tycons
-        -- Print type constructor info; sort by OccName
-  = vcat (map ppr_tycon (sortBy (comparing getOccName) tycons))
-  where
-    ppr_tycon tycon = vcat [ ppr (tyThingToIfaceDecl (ATyCon tycon)) ]
+  -- Print type constructor info for debug purposes
+  -- Sort by OccName to reduce unnecessary changes
+  = vcat [ ppr (tyThingToIfaceDecl (ATyCon tc))
+         | tc <- sortBy (comparing getOccName) tycons ]
+    -- The Outputable instance for IfaceDecl uses
+    -- showAll, which is what we want here, whereas
+    -- pprTyThing uses ShowSome.
 
 {-
 ********************************************************************************
