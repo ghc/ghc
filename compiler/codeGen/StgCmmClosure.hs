@@ -169,7 +169,7 @@ data LambdaFormInfo
                         -- Imported things which we *do* know something about use
                         -- one of the other LF constructors (eg LFReEntrant for
                         -- known functions)
-        !Bool                -- True <=> *might* be a function type
+        !Bool           -- True <=> *might* be a function type
                         --      The False case is good when we want to enter it,
                         --        because then we know the entry code will do
                         --        For a function, the entry code is the fast entry point
@@ -212,9 +212,9 @@ data StandardFormInfo
 
 mkLFArgument :: Id -> LambdaFormInfo
 mkLFArgument id
-  | isUnliftedType ty             = LFUnlifted
+  | isUnliftedType ty      = LFUnlifted
   | might_be_a_function ty = LFUnknown True
-  | otherwise                    = LFUnknown False
+  | otherwise              = LFUnknown False
   where
     ty = idType id
 
@@ -534,6 +534,8 @@ getCallMethod _ _name _ LFUnlifted n_args _v_args _cg_loc _self_loop_info
 
 getCallMethod _ _name _ (LFCon _) n_args _v_args _cg_loc _self_loop_info
   = ASSERT( n_args == 0 ) ReturnIt
+    -- n_args=0 because it'd be ill-typed to apply a saturated
+    --          constructor application to anything
 
 getCallMethod dflags name id (LFThunk _ _ updatable std_form_info is_fun)
               n_args _v_args _cg_loc _self_loop_info
