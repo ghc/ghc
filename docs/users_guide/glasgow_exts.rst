@@ -3814,16 +3814,26 @@ Generalising the deriving clause
 GHC now permits such instances to be derived instead, using the flag
 :ghc-flag:`-XGeneralizedNewtypeDeriving`, so one can write ::
 
-      newtype Dollars = Dollars Int deriving (Eq,Show,Num)
+      newtype Dollars = Dollars { getDollars :: Int } deriving (Eq,Show,Num)
 
 and the implementation uses the *same* ``Num`` dictionary for
-``Dollars`` as for ``Int``. Notionally, the compiler derives an instance
-declaration of the form ::
+``Dollars`` as for ``Int``. In other words, GHC will generate something that
+resembles the following code ::
 
       instance Num Int => Num Dollars
 
-which just adds or removes the ``newtype`` constructor according to the
-type.
+and then attempt to simplify the ``Num Int`` context as much as possible.
+GHC knows that there is a ``Num Int`` instance in scope, so it is able to
+discharge the ``Num Int`` constraint, leaving the code that GHC actually
+generates ::
+
+      instance Num Dollars
+
+One can think of this instance being implementated with the same code as the
+``Num Int`` instance, but with ``Dollars`` and ``getDollars`` added wherever
+necessary in order to make it typecheck. (In practice, GHC uses a somewhat
+different approach to code generation. See the :ref:`precise-gnd-specification`
+section below for more details.)
 
 We can also derive instances of constructor classes in a similar way.
 For example, suppose we have implemented state and failure monad
@@ -3875,6 +3885,8 @@ As a result of this extension, all derived instances in newtype
 declarations are treated uniformly (and implemented just by reusing the
 dictionary for the representation type), *except* ``Show`` and ``Read``,
 which really behave differently for the newtype and its representation.
+
+.. _precise-gnd-specification:
 
 A more precise specification
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
