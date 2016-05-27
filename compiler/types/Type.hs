@@ -141,7 +141,7 @@ module Type (
         tyConsOfType,
 
         -- * Type representation for the code generator
-        typePrimRep, typeRepArity, kindPrimRep, tyConPrimRep,
+        typePrimRep, typeRepArity, tyConPrimRep,
 
         -- * Main type substitution data types
         TvSubstEnv,     -- Representation widely visible
@@ -1715,7 +1715,7 @@ typeSize (CoercionTy co)  = coercionSize co
 ********************************************************************** -}
 
 {- Note [Nullary unboxed tuple]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 At runtime we represent the nullary unboxed tuple as the type Void#.
 To see why, consider
     f2 :: (# Int, Int #) -> Int
@@ -1731,6 +1731,8 @@ we'll transform to
 We do not want to give f0 zero arguments, otherwise a lambda will
 turn into a thunk! So we want to get
     f0 :: Void# -> Int
+
+See Note [Unarisation and nullary tuples] in UnariseStg for more detail.
 -}
 
 type UnaryType = Type
@@ -1777,9 +1779,7 @@ repType ty
       = go rec_nts' (newTyConInstRhs tc tys)
 
       | isUnboxedTupleTyCon tc
-      = if null tys
-         then UnaryRep voidPrimTy -- See Note [Nullary unboxed tuple]
-         else UbxTupleRep (concatMap (flattenRepType . go rec_nts) non_rr_tys)
+      = UbxTupleRep (concatMap (flattenRepType . go rec_nts) non_rr_tys)
       where
           -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
         non_rr_tys = dropRuntimeRepArgs tys
