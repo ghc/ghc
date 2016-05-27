@@ -24,7 +24,7 @@ Suppose that a variable x : (# t1, t2 #).
 
   * At the binding site for x, make up fresh vars  x1:t1, x2:t2
 
-  * Extend the UniariseEnv   x :-> [x1,x2]
+  * Extend the UnariseEnv   x :-> [x1,x2]
 
   * Replace the binding with a curried binding for x1,x2
        Lambda:   \x.e                ==>   \x1 x2. e
@@ -45,7 +45,7 @@ Suppose that a variable x : (# t1, t2 #).
     I think we rely on the code generator to short-circuit this
     case without generating any actual code.
 
-Of course all this applies recursively, so that we flattn out nested tuples.
+Of course all this applies recursively, so that we flatten out nested tuples.
 
 Note [Unarisation and nullary tuples]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -60,7 +60,7 @@ The above scheme has a special cases for nullary unboxed tuples, x :: (# #)
   * If we find (# #) as an argument all by itself
        f ...(# #)...
     it looks like an Id, so we look up in UnariseEnv. We want to replace it
-    with voidPrimId, so the convenient thing is to initalise the UniariseEnv
+    with voidPrimId, so the convenient thing is to initalise the UnariseEnv
     with   (# #) :-> [voidPrimId]
 
 See also Note [Nullary unboxed tuple] in Type.hs.
