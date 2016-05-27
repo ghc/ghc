@@ -296,7 +296,10 @@ deSugar hsc_env
                      (text "Desugar"<+>brackets (ppr mod))
                      (const ()) $
      do { -- Desugar the program
-        ; let export_set = availsToNameSet exports
+        ; let export_set =
+                -- Used to be 'availsToNameSet', but we now export selectors
+                -- only when necessary. See #12125.
+                availsToNameSetWithSelectors exports
               target     = hscTarget dflags
               hpcInfo    = emptyHpcInfo other_hpc_info
 
