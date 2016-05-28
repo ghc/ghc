@@ -1609,8 +1609,8 @@ static rtsBool read_heap_profiling_flag(const char *arg)
     case 'b':
         if (arg[2] != '\0' && arg[3] != '\0') {
             {
-                char *left  = strchr(arg, '{');
-                char *right = strrchr(arg, '}');
+                const char *left  = strchr(arg, '{');
+                const char *right = strrchr(arg, '}');
 
                 // curly braces are optional, for
                 // backwards compat.
