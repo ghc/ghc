@@ -349,8 +349,9 @@ subordinates instMap decl = case decl of
                   , L _ (ConDeclField ns _ doc) <- (unLoc flds)
                   , L _ n <- ns ]
         derivs  = [ (instName, [unL doc], M.empty)
-                  | Just (L _ tys) <- [dd_derivs dd]
-                  , HsIB { hsib_body = L l (HsDocTy _ doc) } <- tys
+                  | HsIB { hsib_body = L l (HsDocTy _ doc) }
+                      <- concatMap (unLoc . deriv_clause_tys . unLoc) $
+                           unLoc $ dd_derivs dd
                   , Just instName <- [M.lookup l instMap] ]
 
 -- | Extract function argument docs from inside types.

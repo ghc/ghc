@@ -416,7 +416,8 @@ renameDataDefn (HsDataDefn { dd_ND = nd, dd_ctxt = lcontext, dd_cType = cType
     cons'     <- mapM (mapM renameCon) cons
     -- I don't think we need the derivings, so we return Nothing
     return (HsDataDefn { dd_ND = nd, dd_ctxt = lcontext', dd_cType = cType
-                       , dd_kindSig = k', dd_cons = cons', dd_derivs = Nothing })
+                       , dd_kindSig = k', dd_cons = cons'
+                       , dd_derivs = noLoc [] })
 
 renameCon :: ConDecl Name -> RnM (ConDecl DocName)
 renameCon decl@(ConDeclH98 { con_name = lname, con_qvars = ltyvars
@@ -509,9 +510,11 @@ renameInstD (DataFamInstD { dfid_inst = d }) = do
 
 renameDerivD :: DerivDecl Name -> RnM (DerivDecl DocName)
 renameDerivD (DerivDecl { deriv_type = ty
+                        , deriv_strategy = strat
                         , deriv_overlap_mode = omode }) = do
   ty' <- renameLSigType ty
   return (DerivDecl { deriv_type = ty'
+                    , deriv_strategy = strat
                     , deriv_overlap_mode = omode })
 
 renameClsInstD :: ClsInstDecl Name -> RnM (ClsInstDecl DocName)

@@ -153,7 +153,7 @@ synifyTyCon _coax tc
                                       , dd_kindSig = Just (synifyKindSig (tyConKind tc))
                                                -- we have their kind accurately:
                                       , dd_cons = []  -- No constructors
-                                      , dd_derivs = Nothing }
+                                      , dd_derivs = noLoc [] }
            , tcdDataCusk = False
            , tcdFVs = placeHolderNamesTc }
 
@@ -224,7 +224,7 @@ synifyTyCon coax tc
   consRaw = map (synifyDataCon use_gadt_syntax) (tyConDataCons tc)
   cons = rights consRaw
   -- "deriving" doesn't affect the signature, no need to specify any.
-  alg_deriv = Nothing
+  alg_deriv = noLoc []
   defn = HsDataDefn { dd_ND      = alg_nd
                     , dd_ctxt    = alg_ctx
                     , dd_cType   = Nothing
