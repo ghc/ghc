@@ -266,7 +266,8 @@ mkDsEnvs :: DynFlags -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
          -> IORef Messages -> IORef [(Fingerprint, (Id, CoreExpr))]
          -> IORef Int -> (DsGblEnv, DsLclEnv)
 mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var static_binds_var pmvar
-  = let if_genv = IfGblEnv { if_rec_types = Just (mod, return type_env) }
+  = let if_genv = IfGblEnv { if_doc       = text "mkDsEnvs",
+                             if_rec_types = Just (mod, return type_env) }
         if_lenv = mkIfLclEnv mod (text "GHC error in desugarer lookup in" <+> ppr mod)
         real_span = realSrcLocSpan (mkRealSrcLoc (moduleNameFS (moduleName mod)) 1 1)
         gbl_env = DsGblEnv { ds_mod     = mod

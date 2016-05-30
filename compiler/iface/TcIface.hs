@@ -1314,9 +1314,11 @@ tcIfaceGlobal name
                 -> do           -- It's defined in the module being compiled
                 { type_env <- setLclEnv () get_type_env         -- yuk
                 ; case lookupNameEnv type_env name of
-                        Just thing -> return thing
-                        Nothing   -> pprPanic "tcIfaceGlobal (local): not found:"
-                                                (ppr name $$ ppr type_env) }
+                    Just thing -> return thing
+                    Nothing   ->
+                      pprPanic "tcIfaceGlobal (local): not found"
+                               (ifKnotErr name (if_doc env) type_env)
+                }
 
           ; _ -> do
 
@@ -1332,11 +1334,25 @@ tcIfaceGlobal name
             Succeeded thing -> return thing
     }}}}}
 
+ifKnotErr :: Name -> SDoc -> TypeEnv -> SDoc
+ifKnotErr name env_doc type_env = vcat
+  [ text "You are in a maze of twisty little passages, all alike."
+  , text "While forcing the thunk for TyThing" <+> ppr name
+  , text "which was lazily initialized by" <+> env_doc <> text ","
+  , text "I tried to tie the knot, but I couldn't find" <+> ppr name
+  , text "in the current type environment."
+  , text "If you are developing GHC, please read Note [Tying the knot]"
+  , text "and Note [Type-checking inside the knot]."
+  , text "Consider rebuilding GHC with profiling for a better stack trace."
+  , hang (text "Contents of current type environment:")
+       2 (ppr type_env)
+  ]
+
 -- Note [Tying the knot]
 -- ~~~~~~~~~~~~~~~~~~~~~
 -- The if_rec_types field is used in two situations:
 --
--- a) Compiling M.hs, which indiretly imports Foo.hi, which mentions M.T
+-- a) Compiling M.hs, which indirectly imports Foo.hi, which mentions M.T
 --    Then we look up M.T in M's type environment, which is splatted into if_rec_types
 --    after we've built M's type envt.
 --
