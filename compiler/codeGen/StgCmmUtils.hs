@@ -396,7 +396,7 @@ emitMultiAssign []    []    = return ()
 emitMultiAssign [reg] [rhs] = emitAssign (CmmLocal reg) rhs
 emitMultiAssign regs rhss   = do
   dflags <- getDynFlags
-  ASSERT( equalLength regs rhss )
+  ASSERT2( equalLength regs rhss, ppr regs $$ ppr rhss )
     unscramble dflags ([1..] `zip` (regs `zip` rhss))
 
 unscramble :: DynFlags -> [Vrtx] -> FCode ()
