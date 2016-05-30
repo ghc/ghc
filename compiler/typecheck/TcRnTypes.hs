@@ -254,6 +254,9 @@ instance ContainsModule gbl => ContainsModule (Env gbl lcl) where
 
 data IfGblEnv
   = IfGblEnv {
+        -- Some information about where this environment came from;
+        -- useful for debugging.
+        if_doc :: SDoc,
         -- The type environment for the module being compiled,
         -- in case the interface refers back to it via a reference that
         -- was originally a hi-boot file.
