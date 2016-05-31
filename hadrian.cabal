@@ -16,7 +16,8 @@ source-repository head
 
 executable hadrian
     main-is:             Main.hs
-    hs-source-dirs:      src
+    hs-source-dirs:      .
+                       , src
     other-modules:       Base
                        , Builder
                        , CmdLineFlag

@@ -88,7 +88,7 @@ by Shake oracles.
 #### User settings
 
 The `make`-based build system uses `mk/build.mk` to specify user build settings. We
-use [`src/Settings/User.hs`][user-settings] for the same purpose, see
+use `./UserSettings.hs` for the same purpose, see
 [documentation](doc/user-settings.md).
 
 #### Clean and full rebuild
@@ -155,7 +155,6 @@ helped me endure and enjoy the project.
 [windows-build]: https://github.com/snowleopard/hadrian/blob/master/doc/windows.md
 [build-artefacts-issue]: https://github.com/snowleopard/hadrian/issues/113
 [ghc-split-objs-bug]: https://ghc.haskell.org/trac/ghc/ticket/11315
-[user-settings]: https://github.com/snowleopard/hadrian/blob/master/src/Settings/User.hs
 [test-issue]: https://github.com/snowleopard/hadrian/issues/197
 [dynamic-issue]: https://github.com/snowleopard/hadrian/issues/4
 [validation-issue]: https://github.com/snowleopard/hadrian/issues/187

@@ -15,3 +15,6 @@ cabal.sandbox.config
 
 # build.stack.sh specific
 /.stack-work/
+
+# the user settings
+/UserSettings.hs
