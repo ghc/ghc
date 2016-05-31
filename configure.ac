@@ -1092,14 +1092,22 @@ AC_DEFINE_UNQUOTED([RTS_LINKER_USE_MMAP], [$RtsLinkerUseMmap],
 
 dnl ** Have libdw?
 dnl --------------------------------------------------------------
-AC_ARG_ENABLE(libdw,
+UseLibdw=NO
+USE_LIBDW=0
+AC_ARG_ENABLE(dwarf-unwind,
     [AC_HELP_STRING([--enable-dwarf-unwind],
         [Enable DWARF unwinding support in the runtime system via elfutils' libdw [default=no]])],
-    [AC_CHECK_LIB(dw, dwfl_attach_state, [HaveLibdw=YES], [HaveLibdw=NO])],
-    [HaveLibdw=NO]
+    [AC_CHECK_LIB(dw, dwfl_attach_state, [UseLibdw=YES], [UseLibdw=NO])],
+    [UseLibdw=NO]
 )
-AC_SUBST(HaveLibdw)
+AC_SUBST(UseLibdw)
+if test $UseLibdw = "YES" ; then
+	USE_LIBDW=1
+fi
+AC_DEFINE_UNQUOTED([USE_LIBDW], [$USE_LIBDW], [Set to 1 to use libdw])
 
+dnl ** Documentation
+dnl --------------------------------------------------------------
 if test -n "$SPHINXBUILD"; then
     BUILD_MAN=YES
     BUILD_SPHINX_HTML=YES

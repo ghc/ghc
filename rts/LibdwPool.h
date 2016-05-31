@@ -14,7 +14,7 @@
 #include "Rts.h"
 #include "Libdw.h"
 
-#ifdef USE_LIBDW
+#if USE_LIBDW
 
 /* Initialize the pool */
 void libdwPoolInit(void);

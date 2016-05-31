@@ -10,7 +10,7 @@
 #include "RtsUtils.h"
 #include "Libdw.h"
 
-#ifdef USE_LIBDW
+#if USE_LIBDW
 
 #include <elfutils/libdwfl.h>
 #include <dwarf.h>

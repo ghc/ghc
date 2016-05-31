@@ -536,7 +536,7 @@ shutdown_handler(int sig STG_UNUSED)
 static void
 backtrace_handler(int sig STG_UNUSED)
 {
-#ifdef USE_LIBDW
+#if USE_LIBDW
     LibdwSession *session = libdwInit();
     Backtrace *bt = libdwGetBacktrace(session);
     libdwPrintBacktrace(session, stderr, bt);

@@ -93,9 +93,9 @@ dnl ** Have libdw?
 dnl --------------------------------------------------------------
 dnl Check for a usable version of libdw/elfutils
 dnl Currently we need 0.158 or newer.
-BinDistNeedsLibdw=@HaveLibdw@
+BinDistNeedsLibdw=@UseLibdw@
 if test "x$BinDistNeedsLibdw" = "xyes" ; then
-    AC_CHECK_LIB(dw, dwfl_attach_state, [HaveLibdw=YES],
+    AC_CHECK_LIB(dw, dwfl_attach_state, [UseLibdw=YES],
         [AC_MSG_ERROR([Binary distribution was built with libdw support but target system doesn't have supported libdw version (needs at least 0.158)])]
     )];
 fi

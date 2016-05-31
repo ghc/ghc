@@ -61,7 +61,7 @@ unresolved symbols. */
                               ,"mingwex"
 # endif
 #endif
-#ifdef USE_LIBDW
+#if USE_LIBDW
                              , "elf"
                              , "dw"             /* for backtraces */
 #endif

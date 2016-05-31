@@ -10,7 +10,7 @@
 #include "RtsUtils.h"
 #include "LibdwPool.h"
 
-#ifdef USE_LIBDW
+#if USE_LIBDW
 
 #include <unistd.h>
 

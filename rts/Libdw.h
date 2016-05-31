@@ -16,7 +16,7 @@
 
 #include "BeginPrivate.h"
 
-#ifdef USE_LIBDW
+#if USE_LIBDW
 
 /* Begin a libdw session. A session is tied to a particular capability */
 LibdwSession *libdwInit(void);
