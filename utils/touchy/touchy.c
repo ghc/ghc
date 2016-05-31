@@ -14,6 +14,11 @@
 #include <windows.h>
 
 /*
+touch is used by GHC both during building and during compilation of
+Haskell files. Unfortunately this means we need a 'touch' like program
+in the GHC bindist. Since touch is not standard on Windows and msys2
+doesn't include a mingw-w64 build of coreutils we need touchy for now.
+
 With Windows 7 in a virtual box VM on OS X, some very odd things happen
 with dates and time stamps when SSHing into cygwin. e.g. here the
 "Change" time is in the past:
