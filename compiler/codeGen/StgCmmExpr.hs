@@ -11,7 +11,6 @@
 
 module StgCmmExpr ( cgExpr ) where
 
-#define FAST_STRING_NOT_NEEDED
 #include "HsVersions.h"
 
 import {-# SOURCE #-} StgCmmBind ( cgBind )

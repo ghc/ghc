@@ -61,7 +61,6 @@ module StgCmmClosure (
 
 #include "../includes/MachDeps.h"
 
-#define FAST_STRING_NOT_NEEDED
 #include "HsVersions.h"
 
 import StgSyn
