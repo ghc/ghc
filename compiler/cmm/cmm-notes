@@ -6,6 +6,7 @@ More notes (Aug 11)
 * Why is FCode a lazy monad?  That makes it inefficient.
   We want laziness to get code out one procedure at a time,
   but not at the instruction level.
+  UPDATE (31/5/2016): FCode is strict since 09afcc9b.
 
 Things we did
   * Remove CmmCvt.graphToZgraph (Conversion from old to new Cmm reps)
