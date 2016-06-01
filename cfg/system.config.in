@@ -115,4 +115,4 @@ ffi-lib-dir       = @FFILibDir@
 # Optional Dependencies:
 #=======================
 
-with-libdw         = @HaveLibdw@
+with-libdw = @UseLibdw@
