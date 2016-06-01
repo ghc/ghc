@@ -26,7 +26,7 @@ import MkIface ( tyThingToIfaceDecl )
 import Type ( tidyOpenType )
 import IfaceSyn ( pprIfaceDecl, ShowSub(..), ShowHowMuch(..) )
 import FamInstEnv( FamInst( .. ), FamFlavor(..) )
-import TcType
+import Type( Type, pprTypeApp, pprSigmaType )
 import Name
 import VarEnv( emptyTidyEnv )
 import Outputable
