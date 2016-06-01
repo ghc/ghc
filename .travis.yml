@@ -60,6 +60,7 @@ script:
     - ( cd ghc/hadrian && cabal haddock --internal )
     - ./ghc/hadrian/build.sh selftest
     - ./ghc/hadrian/build.sh -j --verbose --no-progress --progress-colour=never --profile=- --flavour=quick $TARGET
+    - ./ghc/inplace/bin/ghc-stage2 -e 1+2
 
 cache:
     directories:
