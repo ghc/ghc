@@ -1529,7 +1529,7 @@ modules), we get better error messages, too.
 ----------------------------------------------------------
 -- | 'InstDeclFreeVarsMap is an association of an
 --   @InstDecl@ with @FreeVars@. The @FreeVars@ are
---   the names that are
+--   the tycon names that are both
 --     a) free in the instance declaration
 --     b) bound by this group of type/class/instance decls
 type InstDeclFreeVarsMap = [(LInstDecl Name, FreeVars)]
@@ -1546,6 +1546,12 @@ mkInstDeclFreeVarsMap rdr_env tycl_bndrs inst_ds_fvs
 
 -- | Get the @LInstDecl@s which have empty @FreeVars@ sets, and the
 --   @InstDeclFreeVarsMap@ with these entries removed.
+-- We call (getInsts tcs instd_map) when we've completed the declarations
+-- for 'tcs'.  The call returns (inst_decls, instd_map'), where
+--   inst_decls are the instance declarations all of
+--              whose free vars are now defined
+--   instd_map' is the inst-decl map with 'tcs' removed from
+--               the free-var set
 getInsts :: [Name] -> InstDeclFreeVarsMap -> ([LInstDecl Name], InstDeclFreeVarsMap)
 getInsts bndrs inst_decl_map
   = partitionWith pick_me inst_decl_map

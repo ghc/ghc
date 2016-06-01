@@ -493,7 +493,7 @@ In type declarations:
 * Specified (k)
      data T2 (a::k->*) b = MkT (a b)
   Here T's kind is  T :: forall (k:*). (k->*) -> k -> *
-  The kind vairable 'k' is Specified, since it is mentioned in
+  The kind variable 'k' is Specified, since it is mentioned in
   the signature.
 
 * Visible (k)
