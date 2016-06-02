@@ -195,7 +195,7 @@ findUses dus uses
         = rhs_uses `unionNameSet` uses
     get (Just defs, rhs_uses) uses
         | defs `intersectsNameSet` uses         -- Used
-        || any (startsWithUnderscore . nameOccName) (nameSetElems defs)
+        || nameSetAny (startsWithUnderscore . nameOccName) defs
                 -- At least one starts with an "_",
                 -- so treat the group as used
         = rhs_uses `unionNameSet` uses
