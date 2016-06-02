@@ -13,7 +13,7 @@ module NameSet (
         minusNameSet, elemNameSet, nameSetElems, extendNameSet, extendNameSetList,
         delFromNameSet, delListFromNameSet, isEmptyNameSet, filterNameSet,
         intersectsNameSet, intersectNameSet,
-        nameSetAny, nameSetAll,
+        nameSetAny, nameSetAll, nameSetElemsStable,
 
         -- * Free variables
         FreeVars,
@@ -35,6 +35,8 @@ module NameSet (
 
 import Name
 import UniqSet
+import UniqFM
+import Data.List (sortBy)
 
 {-
 ************************************************************************
@@ -89,6 +91,14 @@ nameSetAny = uniqSetAny
 
 nameSetAll :: (Name -> Bool) -> NameSet -> Bool
 nameSetAll = uniqSetAll
+
+-- | Get the elements of a NameSet with some stable ordering.
+-- See Note [Deterministic UniqFM] to learn about nondeterminism
+nameSetElemsStable :: NameSet -> [Name]
+nameSetElemsStable ns =
+  sortBy stableNameCmp $ nonDetEltsUFM ns
+  -- It's OK to use nonDetEltsUFM here because we immediately sort
+  -- with stableNameCmp
 
 {-
 ************************************************************************
