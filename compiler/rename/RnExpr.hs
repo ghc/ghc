@@ -441,7 +441,7 @@ rnCmdTop = wrapLocFstM rnCmdTop'
   rnCmdTop' (HsCmdTop cmd _ _ _)
    = do { (cmd', fvCmd) <- rnLCmd cmd
         ; let cmd_names = [arrAName, composeAName, firstAName] ++
-                          nameSetElems (methodNamesCmd (unLoc cmd'))
+                          nameSetElemsStable (methodNamesCmd (unLoc cmd'))
         -- Generate the rebindable syntax for the monad
         ; (cmd_names', cmd_fvs) <- lookupSyntaxNames cmd_names
 
