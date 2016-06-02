@@ -37,7 +37,6 @@ import Finder
 import HscTypes
 import Name
 import NameEnv
-import NameSet
 import UniqFM
 import Module
 import ListSetOps
@@ -50,6 +49,7 @@ import ErrUtils
 import SrcLoc
 import qualified Maybes
 import UniqSet
+import UniqDSet
 import FastString
 import Platform
 import SysTools
@@ -504,7 +504,7 @@ linkExpr hsc_env span root_ul_bco
    ; return (pls, fhv)
    }}}
    where
-     free_names = nameSetElems (bcoFreeNames root_ul_bco)
+     free_names = uniqDSetToList (bcoFreeNames root_ul_bco)
 
      needed_mods :: [Module]
      needed_mods = [ nameModule n | n <- free_names,
@@ -730,7 +730,8 @@ linkDecls hsc_env span cbc@CompiledByteCode{..} = do
                    , itbl_env    = ie }
     return (pls2, ())
   where
-    free_names =  concatMap (nameSetElems . bcoFreeNames) bc_bcos
+    free_names = uniqDSetToList $
+      foldr (unionUniqDSets . bcoFreeNames) emptyUniqDSet bc_bcos
 
     needed_mods :: [Module]
     needed_mods = [ nameModule n | n <- free_names,

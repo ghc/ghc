@@ -34,6 +34,7 @@ import Outputable
 import Platform
 import Util
 import Unique
+import UniqDSet
 
 -- From iserv
 import SizedSeq
@@ -65,14 +66,14 @@ import qualified Data.Map as Map
 
 -- | Finds external references.  Remember to remove the names
 -- defined by this group of BCOs themselves
-bcoFreeNames :: UnlinkedBCO -> NameSet
+bcoFreeNames :: UnlinkedBCO -> UniqDSet Name
 bcoFreeNames bco
-  = bco_refs bco `minusNameSet` mkNameSet [unlinkedBCOName bco]
+  = bco_refs bco `uniqDSetMinusUniqSet` mkNameSet [unlinkedBCOName bco]
   where
     bco_refs (UnlinkedBCO _ _ _ _ nonptrs ptrs)
-        = unionNameSets (
-             mkNameSet [ n | BCOPtrName n <- ssElts ptrs ] :
-             mkNameSet [ n | BCONPtrItbl n <- ssElts nonptrs ] :
+        = unionManyUniqDSets (
+             mkUniqDSet [ n | BCOPtrName n <- ssElts ptrs ] :
+             mkUniqDSet [ n | BCONPtrItbl n <- ssElts nonptrs ] :
              map bco_refs [ bco | BCOPtrBCO bco <- ssElts ptrs ]
           )
 
