@@ -88,8 +88,7 @@ by Shake oracles.
 #### User settings
 
 The `make`-based build system uses `mk/build.mk` to specify user build settings. We
-use `./UserSettings.hs` for the same purpose, see
-[documentation](doc/user-settings.md).
+use `hadrian/UserSettings.hs` for the same purpose, see [documentation](doc/user-settings.md).
 
 #### Clean and full rebuild
 
