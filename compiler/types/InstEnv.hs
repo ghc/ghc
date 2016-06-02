@@ -255,7 +255,7 @@ mkLocalInstance dfun oflag tvs cls tys
     do_one (_ltvs, rtvs) = choose_one [ns | (tv,ns) <- cls_tvs `zip` arg_names
                                             , not (tv `elem` rtvs)]
 
-    choose_one nss = chooseOrphanAnchor (nameSetElems (unionNameSets nss))
+    choose_one nss = chooseOrphanAnchor (unionNameSets nss)
 
 mkImportedInstance :: Name
                    -> [Maybe Name]

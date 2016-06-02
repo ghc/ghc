@@ -95,6 +95,7 @@ import Var
 import Type
 import Coercion
 import Name
+import NameSet
 import NameEnv( NameEnv, emptyNameEnv )
 import Literal
 import DataCon
@@ -104,6 +105,7 @@ import BasicTypes
 import DynFlags
 import Outputable
 import Util
+import UniqFM
 import SrcLoc     ( RealSrcSpan, containsSpan )
 import Binary
 
@@ -741,7 +743,7 @@ notOrphan :: IsOrphan -> Bool
 notOrphan NotOrphan{} = True
 notOrphan _ = False
 
-chooseOrphanAnchor :: [Name] -> IsOrphan
+chooseOrphanAnchor :: NameSet -> IsOrphan
 -- Something (rule, instance) is relate to all the Names in this
 -- list. Choose one of them to be an "anchor" for the orphan.  We make
 -- the choice deterministic to avoid gratuitious changes in the ABI
@@ -751,10 +753,11 @@ chooseOrphanAnchor :: [Name] -> IsOrphan
 -- NB: 'minimum' use Ord, and (Ord OccName) works lexicographically
 --
 chooseOrphanAnchor local_names
-  | null local_names = IsOrphan
-  | otherwise        = NotOrphan (minimum occs)
+  | isEmptyNameSet local_names = IsOrphan
+  | otherwise                  = NotOrphan (minimum occs)
   where
-    occs = map nameOccName local_names
+    occs = map nameOccName $ nonDetEltsUFM local_names
+    -- It's OK to use nonDetEltsUFM here, see comments above
 
 instance Binary IsOrphan where
     put_ bh IsOrphan = putByte bh 0

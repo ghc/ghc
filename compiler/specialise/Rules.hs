@@ -181,13 +181,13 @@ mkRule this_mod is_auto is_local name act fn bndrs args rhs
         -- Compute orphanhood.  See Note [Orphans] in InstEnv
         -- A rule is an orphan only if none of the variables
         -- mentioned on its left-hand side are locally defined
-    lhs_names = nameSetElems (extendNameSet (exprsOrphNames args) fn)
+    lhs_names = extendNameSet (exprsOrphNames args) fn
 
         -- Since rules get eventually attached to one of the free names
         -- from the definition when compiling the ABI hash, we should make
         -- it deterministic. This chooses the one with minimal OccName
         -- as opposed to uniq value.
-    local_lhs_names = filter (nameIsLocalOrFrom this_mod) lhs_names
+    local_lhs_names = filterNameSet (nameIsLocalOrFrom this_mod) lhs_names
     orph = chooseOrphanAnchor local_lhs_names
 
 --------------

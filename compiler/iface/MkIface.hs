@@ -1641,7 +1641,7 @@ famInstToIfaceFamInst (FamInst { fi_axiom    = axiom,
     orph | is_local fam_decl
          = NotOrphan (nameOccName fam_decl)
          | otherwise
-         = chooseOrphanAnchor $ nameSetElems lhs_names
+         = chooseOrphanAnchor lhs_names
 
 --------------------------
 toIfaceLetBndr :: Id -> IfaceLetBndr
