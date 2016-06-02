@@ -64,7 +64,7 @@ module UniqFM (
         isNullUFM,
         lookupUFM, lookupUFM_Directly,
         lookupWithDefaultUFM, lookupWithDefaultUFM_Directly,
-        eltsUFM, keysUFM, splitUFM,
+        eltsUFM, keysUFM, splitUFM, nonDetEltsUFM,
         ufmToSet_Directly,
         ufmToList, ufmToIntMap,
         joinUFM, pprUniqFM, pprUFM, pluralUFM
@@ -303,6 +303,10 @@ ufmToList (UFM m) = map (\(k, v) -> (getUnique k, v)) $ M.toList m
 
 ufmToIntMap :: UniqFM elt -> M.IntMap elt
 ufmToIntMap (UFM m) = m
+
+-- See Note [Deterministic UniqFM] to learn about nondeterminism
+nonDetEltsUFM :: UniqFM elt -> [elt]
+nonDetEltsUFM (UFM m) = M.elems m
 
 -- Hoopl
 joinUFM :: JoinFun v -> JoinFun (UniqFM v)

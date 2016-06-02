@@ -13,6 +13,7 @@ module NameSet (
         minusNameSet, elemNameSet, nameSetElems, extendNameSet, extendNameSetList,
         delFromNameSet, delListFromNameSet, isEmptyNameSet, foldNameSet, filterNameSet,
         intersectsNameSet, intersectNameSet,
+        nameSetElemsStable,
 
         -- * Free variables
         FreeVars,
@@ -33,6 +34,8 @@ module NameSet (
 
 import Name
 import UniqSet
+import UniqFM
+import Data.List (sortBy)
 
 {-
 ************************************************************************
@@ -83,6 +86,14 @@ intersectNameSet  = intersectUniqSets
 delListFromNameSet set ns = foldl delFromNameSet set ns
 
 intersectsNameSet s1 s2 = not (isEmptyNameSet (s1 `intersectNameSet` s2))
+
+-- | Get the elements of a NameSet with some stable ordering.
+-- See Note [Deterministic UniqFM] to learn about nondeterminism
+nameSetElemsStable :: NameSet -> [Name]
+nameSetElemsStable ns =
+  sortBy stableNameCmp $ nonDetEltsUFM ns
+  -- It's OK to use nonDetEltsUFM here because we immediately sort
+  -- with stableNameCmp
 
 {-
 ************************************************************************
