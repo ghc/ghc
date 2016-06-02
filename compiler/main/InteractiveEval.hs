@@ -785,7 +785,7 @@ getInfo allInfo name
     plausible rdr_env names
           -- Dfun involving only names that are in ic_rn_glb_env
         = allInfo
-       || all ok (nameSetElems names)
+       || nameSetAll ok names
         where   -- A name is ok if it's in the rdr_env,
                 -- whether qualified or not
           ok n | n == name              = True
