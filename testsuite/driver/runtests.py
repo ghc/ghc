@@ -276,25 +276,11 @@ else:
     # set stdout to unbuffered (is this the best way to do it?)
     sys.stdout = os.fdopen(sys.__stdout__.fileno(), "w", 0)
 
-# Create a unique temporary directory inside '/tmp/ghctest'.
-ghctestdir = os.path.join(tempfile.gettempdir(), 'ghctest')
-# Don't start from scratch (i.e. don't rmtree(ghctestdir)). Running
-# 'make test' while another 'make test' hasn't completed yet should work.
-#shutil.rmtree(ghctestdir, ignore_errors=True)
-mkdirp(ghctestdir)
-tempdir = normalise_slashes_(tempfile.mkdtemp('', '', dir=ghctestdir))
+tempdir = normalise_slashes_(tempfile.mkdtemp('', 'ghctest-'))
 
 def cleanup_and_exit(exitcode):
     if config.cleanup:
         shutil.rmtree(tempdir, ignore_errors=True)
-        try:
-            os.rmdir(ghctestdir)
-        except OSError as e:
-            if e.errno == errno.ENOTEMPTY:
-                # Only delete ghctestdir if it is empty.
-                pass
-            else:
-                raise
     exit(exitcode)
 
 # First collect all the tests to be run
