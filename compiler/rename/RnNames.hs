@@ -1655,7 +1655,7 @@ findImportUsage imports used_gres
       = foldr extendImportMap Map.empty used_gres
 
     unused_decl decl@(L loc (ImportDecl { ideclHiding = imps }))
-      = (decl, nubAvails used_avails, nameSetElems unused_imps)
+      = (decl, nubAvails used_avails, nameSetElemsStable unused_imps)
       where
         used_avails = Map.lookup (srcSpanEnd loc) import_usage `orElse` []
                       -- srcSpanEnd: see Note [The ImportMap]
