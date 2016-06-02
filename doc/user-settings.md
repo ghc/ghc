@@ -1,8 +1,9 @@
 # User settings
 
-You can customise Hadrian by copying the file ./src/UserSettings.hs to
-./UserSettings.hs and specifying user build settings in
-`./UserSettings.hs`. Here we document currently supported settings.
+You can customise Hadrian by copying the file `hadrian/src/UserSettings.hs` to
+`hadrian/UserSettings.hs` and overriding the default build settings (if you don't
+copy the file your changes will be tracked by `git` and you can accidentally commit
+them). Here we document currently supported settings.
 
 ## Build directory
 
