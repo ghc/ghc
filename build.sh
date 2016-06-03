@@ -30,6 +30,15 @@ function rl {
 
 root="$(dirname "$(rl "$0")")"
 
+if type cabal > /dev/null 2>&1; then
+    CABVERSTR=$(cabal --numeric-version)
+    CABVER=( ${CABVERSTR//./ } )
+    if [ "${CABVER[0]}" -eq 1 -a "${CABVER[1]}" -ge 24 ]; then
+        echo "** Cabal 1.24 or later detected. Please consider using the 'build.cabal.sh' script **"
+        echo ""
+    fi
+fi
+
 mkdir -p "$root/../_build/hadrian"
 
 ghc                                      \
