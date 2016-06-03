@@ -171,8 +171,12 @@ def checkDynAsm(actual_file, normaliser):
 # These should have extra_clean() arguments, but I need
 # to somehow extract out the name of DLLs to do that
 
-test('T5435_v_asm', when(arch('powerpc64'), expect_broken(11259)), run_command, ['$MAKE -s --no-print-directory T5435_v_asm'])
-test('T5435_v_gcc', when(arch('powerpc64'), expect_broken(11259)), run_command, ['$MAKE -s --no-print-directory T5435_v_gcc'])
+test('T5435_v_asm', when(arch('powerpc64') or arch('powerpc64le'),
+     expect_broken(11259)), 
+     run_command, ['$MAKE -s --no-print-directory T5435_v_asm'])
+test('T5435_v_gcc', when(arch('powerpc64') or arch('powerpc64le'),
+     expect_broken(11259)),
+     run_command, ['$MAKE -s --no-print-directory T5435_v_gcc'])
 test('T5435_dyn_asm', check_stdout(checkDynAsm), run_command, ['$MAKE -s --no-print-directory T5435_dyn_asm'])
 test('T5435_dyn_gcc', normal , run_command, ['$MAKE -s --no-print-directory T5435_dyn_gcc'])
 
@@ -229,7 +233,7 @@ test('T7919',
 test('T8035', normal, compile_and_run, [''])
 
 test('linker_unload',
-     [ when(arch('powerpc64'), expect_broken(11259)),
+     [ when(arch('powerpc64') or arch('powerpc64le'), expect_broken(11259)),
        extra_clean(['Test.o','Test.hi', 'linker_unload']) ],
      run_command,
      ['$MAKE -s --no-print-directory linker_unload'])

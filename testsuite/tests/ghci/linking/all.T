@@ -20,7 +20,7 @@ test('ghcilink003',
 
 test('ghcilink004',
      [unless(doing_ghci, skip),
-      when(arch('powerpc64'), expect_broken(11259)),
+      when(arch('powerpc64') or arch('powerpc64le'), expect_broken(11259)),
       extra_clean(['dir004/local.package.conf/*', 'dir004/*', 'dir004'])
      ],
      run_command,
