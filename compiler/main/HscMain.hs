@@ -665,9 +665,8 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
                 hm_iface = iface,
                 hm_linkable = Nothing
             })
-        Right (result, mb_old_hash) -> do
-            (status, hmi, no_change) <- case result of
-                FrontendTypecheck tc_result ->
+        Right (FrontendTypecheck tc_result, mb_old_hash) -> do
+            (status, hmi, no_change) <-
                     if hscTarget dflags /= HscNothing &&
                        ms_hsc_src mod_summary == HsSrcFile
                        then finish              hsc_env mod_summary tc_result mb_old_hash
