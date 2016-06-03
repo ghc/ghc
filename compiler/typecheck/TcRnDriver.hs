@@ -1169,15 +1169,20 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
         default_tys <- tcDefaults default_decls ;
         updGblEnv (\gbl -> gbl { tcg_default = default_tys }) $ do {
 
+                -- Value declarations next.
+                -- It is important that we check the top-level value bindings
+                -- before the GHC-generated derived bindings, since the latter
+                -- may be defined in terms of the former. (For instance,
+                -- the bindings produced in a Data instance.)
+        traceTc "Tc5" empty ;
+        tc_envs <- tcTopBinds val_binds val_sigs;
+        setEnvs tc_envs $ do {
+
                 -- Now GHC-generated derived bindings, generics, and selectors
                 -- Do not generate warnings from compiler-generated code;
                 -- hence the use of discardWarnings
-        tc_envs <- discardWarnings (tcTopBinds deriv_binds deriv_sigs) ;
-        setEnvs tc_envs $ do {
-
-                -- Value declarations next
-        traceTc "Tc5" empty ;
-        tc_envs@(tcg_env, tcl_env) <- tcTopBinds val_binds val_sigs;
+        tc_envs@(tcg_env, tcl_env)
+            <- discardWarnings (tcTopBinds deriv_binds deriv_sigs) ;
         setEnvs tc_envs $ do {  -- Environment doesn't change now
 
                 -- Second pass over class and instance declarations,
