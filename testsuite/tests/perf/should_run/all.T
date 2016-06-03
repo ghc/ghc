@@ -204,9 +204,10 @@ test('T5549',
                     # expected value: 3362958676 (Windows)
                     # 2014-12-01:     4096606332 (Windows) integer-gmp2
 
-                       (wordsize(64), 8193140752, 5)]),
+                       (wordsize(64), 5793140200, 5)]),
                     # expected value: 6725846120 (amd64/Linux)
                     #                 8193140752 (amd64/Linux) integer-gmp2
+                    #                 5793140200 (amd64/Linux) integer-gmp2
       only_ways(['normal'])
       ],
      compile_and_run,

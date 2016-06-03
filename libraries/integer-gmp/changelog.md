@@ -1,5 +1,9 @@
 # Changelog for [`integer-gmp` package](http://hackage.haskell.org/package/integer-gmp)
 
+## 1.0.0.2 *TBA*
+
+  * Optimize `minusInteger`
+
 ## 1.0.0.1  *Feb 2016*
 
   * Bundled with GHC 8.0.1

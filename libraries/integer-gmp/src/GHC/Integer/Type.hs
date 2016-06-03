@@ -418,10 +418,44 @@ plusInteger (Jp# x) (Jn# y)
       GT -> bigNatToInteger (minusBigNat x y)
 {-# CONSTANT_FOLDED plusInteger #-}
 
--- TODO
--- | Subtract two 'Integer's from each other.
+-- | Subtract one 'Integer' from another.
 minusInteger :: Integer -> Integer -> Integer
-minusInteger x y = inline plusInteger x (inline negateInteger y)
+minusInteger x       (S# 0#)            = x
+minusInteger (S# 0#) (S# INT_MINBOUND#) = Jp# (wordToBigNat ABS_INT_MINBOUND##)
+minusInteger (S# 0#) (S# y#)            = S# (negateInt# y#)
+minusInteger (S# x#) (S# y#)
+  = case subIntC# x# y# of
+    (# z#, 0# #) -> S# z#
+    (# 0#, _  #) -> Jn# (wordToBigNat2 1## 0##)
+    (# z#, _  #)
+      | isTrue# (z# ># 0#) -> Jn# (wordToBigNat ( (int2Word# (negateInt# z#))))
+      | True               -> Jp# (wordToBigNat ( (int2Word# z#)))
+minusInteger (S# x#) (Jp# y)
+  | isTrue# (x# >=# 0#) = bigNatToNegInteger (minusBigNatWord y (int2Word# x#))
+  | True                = Jn# (plusBigNatWord y (int2Word# (negateInt# x#)))
+minusInteger (S# x#) (Jn# y)
+  | isTrue# (x# >=# 0#) = Jp# (plusBigNatWord y (int2Word# x#))
+  | True                = bigNatToInteger (minusBigNatWord y (int2Word#
+                                                              (negateInt# x#)))
+minusInteger (Jp# x) (Jp# y)
+    = case compareBigNat x y of
+      LT -> bigNatToNegInteger (minusBigNat y x)
+      EQ -> S# 0#
+      GT -> bigNatToInteger (minusBigNat x y)
+minusInteger (Jp# x) (Jn# y) = Jp# (plusBigNat x y)
+minusInteger (Jn# x) (Jp# y) = Jn# (plusBigNat x y)
+minusInteger (Jn# x) (Jn# y)
+    = case compareBigNat x y of
+      LT -> bigNatToInteger (minusBigNat y x)
+      EQ -> S# 0#
+      GT -> bigNatToNegInteger (minusBigNat x y)
+minusInteger (Jp# x) (S# y#)
+  | isTrue# (y# >=# 0#) = bigNatToInteger (minusBigNatWord x (int2Word# y#))
+  | True                = Jp# (plusBigNatWord x (int2Word# (negateInt# y#)))
+minusInteger (Jn# x) (S# y#)
+  | isTrue# (y# >=# 0#) = Jn# (plusBigNatWord x (int2Word# y#))
+  | True                = bigNatToNegInteger (minusBigNatWord x
+                                              (int2Word# (negateInt# y#)))
 {-# CONSTANT_FOLDED minusInteger #-}
 
 -- | Multiply two 'Integer's
