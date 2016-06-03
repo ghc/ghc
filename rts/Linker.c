@@ -24,6 +24,7 @@
 #include "GetEnv.h"
 #include "Stable.h"
 #include "RtsSymbols.h"
+#include "RtsSymbolInfo.h"
 #include "Profiling.h"
 #include "sm/OSMem.h"
 #include "linker/M32Alloc.h"
@@ -108,9 +109,14 @@
 /* SymbolInfo tracks a symbol's address, the object code from which
    it originated, and whether or not it's weak.
 
-   Refactoring idea: For the sake of memory efficiency it might be worthwhile
-   dropping the `weak` field, instead keeping a list of weak symbols in
-   ObjectCode. This is task #11816.
+   RtsSymbolInfo is used to track the state of the symbols currently
+   loaded or to be loaded by the Linker.
+
+   Where the information in the `ObjectCode` is used to track the
+   original status of the symbol inside the `ObjectCode`.
+
+   A weak symbol that has been used will still be marked as weak
+   in the `ObjectCode` but in the `RtsSymbolInfo` it won't be.
 */
 typedef struct _RtsSymbolInfo {
     void *value;
@@ -1407,7 +1413,7 @@ void ghci_enquire ( char* addr );
 void ghci_enquire ( char* addr )
 {
    int   i;
-   SymbolInfo sym;
+   char* sym;
    RtsSymbolInfo* a;
    const int DELTA = 64;
    ObjectCode* oc;
@@ -1415,10 +1421,10 @@ void ghci_enquire ( char* addr )
    for (oc = objects; oc; oc = oc->next) {
       for (i = 0; i < oc->n_symbols; i++) {
          sym = oc->symbols[i];
-         if (sym.name == NULL) continue;
+         if (sym == NULL) continue;
          a = NULL;
          if (a == NULL) {
-             ghciLookupSymbolInfo(symhash, sym.name, &a);
+             ghciLookupSymbolInfo(symhash, sym, &a);
          }
          if (a == NULL) {
              // debugBelch("ghci_enquire: can't find %s\n", sym);
@@ -1426,7 +1432,7 @@ void ghci_enquire ( char* addr )
          else if (   a->value
                   && addr-DELTA <= (char*)a->value
                   && (char*)a->value <= addr+DELTA) {
-             debugBelch("%p + %3d  ==  `%s'\n", addr, (int)((char*)a->value - addr), sym.name);
+             debugBelch("%p + %3d  ==  `%s'\n", addr, (int)((char*)a->value - addr), sym);
          }
       }
    }
@@ -1540,8 +1546,8 @@ static void removeOcSymbols (ObjectCode *oc)
     // Remove all the mappings for the symbols within this object..
     int i;
     for (i = 0; i < oc->n_symbols; i++) {
-        if (oc->symbols[i].name != NULL) {
-            ghciRemoveSymbolTable(symhash, oc->symbols[i].name, oc);
+        if (oc->symbols[i] != NULL) {
+            ghciRemoveSymbolTable(symhash, oc->symbols[i], oc);
         }
     }
 
@@ -1612,6 +1618,11 @@ void freeObjectCode (ObjectCode *oc)
         oc->symbols = NULL;
     }
 
+    if (oc->extraInfos != NULL) {
+        freeHashTable(oc->extraInfos, NULL);
+        oc->extraInfos = NULL;
+    }
+
     if (oc->sections != NULL) {
         int i;
         for (i=0; i < oc->n_sections; i++) {
@@ -1656,6 +1667,7 @@ void freeObjectCode (ObjectCode *oc)
 
     stgFree(oc->fileName);
     stgFree(oc->archiveMemberName);
+
     stgFree(oc);
 }
 
@@ -1715,6 +1727,7 @@ mkOc( pathchar *path, char *image, int imageSize,
    oc->imageMapped       = mapped;
 
    oc->misalignment      = misalignment;
+   oc->extraInfos        = NULL;
 
    /* chain it onto the list of objects */
    oc->next              = NULL;
@@ -2489,16 +2502,15 @@ int ocTryLoad (ObjectCode* oc) {
         This call is intended to have no side-effects when a non-duplicate
         symbol is re-inserted.
 
-        TODO: SymbolInfo can be moved into ObjectCode in order to be more
-              memory efficient. See Trac #11816
+        We set the Address to NULL since that is not used to distinguish
+        symbols. Duplicate symbols are distinguished by name and oc.
     */
     int x;
-    SymbolInfo symbol;
+    char* symbol;
     for (x = 0; x < oc->n_symbols; x++) {
         symbol = oc->symbols[x];
-        if (   symbol.name
-            && symbol.addr
-            && !ghciInsertSymbolTable(oc->fileName, symhash, symbol.name, symbol.addr, symbol.isWeak, oc)){
+        if (   symbol
+            && !ghciInsertSymbolTable(oc->fileName, symhash, symbol, NULL, isSymbolWeak(oc, symbol), oc)) {
             return 0;
         }
     }
@@ -3750,7 +3762,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
    /* Copy exported symbols into the ObjectCode. */
 
    oc->n_symbols = hdr->NumberOfSymbols;
-   oc->symbols   = stgCallocBytes(sizeof(SymbolInfo), oc->n_symbols,
+   oc->symbols   = stgCallocBytes(sizeof(char*), oc->n_symbols,
                                   "ocGetNames_PEi386(oc->symbols)");
 
    /* Work out the size of the global BSS section */
@@ -3825,21 +3837,27 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           IF_DEBUG(linker, debugBelch("bss symbol @ %p %u\n", addr, symtab_i->Value));
       }
 
+      sname = cstring_from_COFF_symbol_name(symtab_i->Name, strtab);
       if (addr != NULL || isWeak == HS_BOOL_TRUE) {
-        sname = cstring_from_COFF_symbol_name(symtab_i->Name, strtab);
 
          /* debugBelch("addSymbol %p `%s' Weak:%lld \n", addr, sname, isWeak); */
          IF_DEBUG(linker, debugBelch("addSymbol %p `%s'\n", addr,sname);)
          ASSERT(i >= 0 && i < oc->n_symbols);
          /* cstring_from_COFF_symbol_name always succeeds. */
-         oc->symbols[i].name   = (char*)sname;
-         oc->symbols[i].addr   = addr;
-         oc->symbols[i].isWeak = isWeak;
+         oc->symbols[i] = (char*)sname;
+         if (isWeak == HS_BOOL_TRUE) {
+             setWeakSymbol(oc, sname);
+         }
+
          if (! ghciInsertSymbolTable(oc->fileName, symhash, (char*)sname, addr,
                                      isWeak, oc)) {
              return 0;
          }
       } else {
+          /* We're skipping the symbol, but if we ever load this
+          object file we'll want to skip it then too. */
+          oc->symbols[i] = NULL;
+
 #        if 0
          debugBelch(
                    "IGNORING symbol %d\n"
@@ -4887,7 +4905,7 @@ ocGetNames_ELF ( ObjectCode* oc )
       nent = shdr[i].sh_size / sizeof(Elf_Sym);
 
       oc->n_symbols = nent;
-      oc->symbols = stgCallocBytes(oc->n_symbols, sizeof(SymbolInfo),
+      oc->symbols = stgCallocBytes(oc->n_symbols, sizeof(char*),
                                    "ocGetNames_ELF(oc->symbols)");
       // Note calloc: if we fail partway through initializing symbols, we need
       // to undo the additions to the symbol table so far. We know which ones
@@ -4980,34 +4998,43 @@ ocGetNames_ELF ( ObjectCode* oc )
 
          /* And the decision is ... */
 
-         oc->symbols[j].name = nm;
+         oc->symbols[j] = nm;
+
          if (ad != NULL) {
             ASSERT(nm != NULL);
             /* Acquire! */
             if (isLocal) {
-               /* Ignore entirely. */
+                /* Ignore entirely. */
+                oc->symbols[j] = NULL;
             } else {
+
+                if (isWeak == HS_BOOL_TRUE) {
+                    setWeakSymbol(oc, nm);
+                }
+
                 if (! ghciInsertSymbolTable(oc->fileName, symhash,
                                             nm, ad, isWeak, oc)) {
                     goto fail;
                 }
-                oc->symbols[j].addr   = ad;
-                oc->symbols[j].isWeak = isWeak;
             }
          } else {
             /* Skip. */
             IF_DEBUG(linker,debugBelch( "skipping `%s'\n",
-                                   strtab + stab[j].st_name ));
+                                   nm ));
+
+            /* We're skipping the symbol, but if we ever load this
+               object file we'll want to skip it then too. */
+            oc->symbols[j] = NULL;
+
             /*
             debugBelch(
                     "skipping   bind = %d,  type = %d,  secno = %d   `%s'\n",
                     (int)ELF_ST_BIND(stab[j].st_info),
                     (int)ELF_ST_TYPE(stab[j].st_info),
                     (int)secno,
-                    strtab + stab[j].st_name
+                    nm
                    );
             */
-            oc->symbols[j].addr = NULL;
          }
 
       }
@@ -6755,7 +6782,7 @@ ocGetNames_MachO(ObjectCode* oc)
         }
     }
     IF_DEBUG(linker, debugBelch("ocGetNames_MachO: %d external symbols\n", oc->n_symbols));
-    oc->symbols = stgMallocBytes(oc->n_symbols * sizeof(SymbolInfo),
+    oc->symbols = stgMallocBytes(oc->n_symbols * sizeof(char*),
                                    "ocGetNames_MachO(oc->symbols)");
 
     if(symLC)
@@ -6788,9 +6815,7 @@ ocGetNames_MachO(ObjectCode* oc)
                                                  , HS_BOOL_FALSE
                                                  , oc);
 
-                            oc->symbols[curSymbol].name   = nm;
-                            oc->symbols[curSymbol].addr   = addr;
-                            oc->symbols[curSymbol].isWeak = HS_BOOL_FALSE;
+                            oc->symbols[curSymbol] = nm;
                             curSymbol++;
                     }
                 }
@@ -6823,9 +6848,7 @@ ocGetNames_MachO(ObjectCode* oc)
                 IF_DEBUG(linker, debugBelch("ocGetNames_MachO: inserting common symbol: %s\n", nm));
                 ghciInsertSymbolTable(oc->fileName, symhash, nm,
                                        (void*)commonCounter, HS_BOOL_FALSE, oc);
-                oc->symbols[curSymbol].name = nm;
-                oc->symbols[curSymbol].addr   = (void*)commonCounter;
-                oc->symbols[curSymbol].isWeak = HS_BOOL_FALSE;
+                oc->symbols[curSymbol] = nm;
                 curSymbol++;
 
                 commonCounter += sz;

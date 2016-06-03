@@ -10,6 +10,7 @@
 #define LINKERINTERNALS_H
 
 #include "Rts.h"
+#include "Hash.h"
 
 /* See Linker.c Note [runtime-linker-phases] */
 typedef enum {
@@ -99,20 +100,6 @@ typedef struct {
 } SymbolExtra;
 
 
-/* Top-level structure for an symbols in object module.  One of these is allocated
-* for each symbol in an object in use.
-*/
-typedef struct _SymbolInfo {
-    /* The name of the symbol. */
-    char*          name;
-
-    /* The address of the symbol. */
-    void* addr;
-
-    /* Indicates if the symbol is weak */
-    HsBool isWeak;
-} SymbolInfo;
-
 /* Top-level structure for an object module.  One of these is allocated
  * for each object file in use.
  */
@@ -131,8 +118,8 @@ typedef struct _ObjectCode {
        this object into the global symbol hash table.  This is so that
        we know which parts of the latter mapping to nuke when this
        object is removed from the system. */
-    SymbolInfo* symbols;
-    int         n_symbols;
+    char** symbols;
+    int    n_symbols;
 
     /* ptr to mem containing the object file image */
     char*      image;
@@ -177,6 +164,10 @@ typedef struct _ObjectCode {
        an import library. In which case we shouldn't
        execute code from it. */
     HsBool isImportLib;
+
+    /* Holds the list of symbols in the .o file which
+       require extra information.*/
+    HashTable *extraInfos;
 
 } ObjectCode;
 
