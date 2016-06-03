@@ -131,7 +131,7 @@ ghc-prim
 
 -  Version number XXXXX (was 0.3.1.0)
 
--  Added new ``isPinnedbyteArray#`` operation.
+-  Added new ``isByteArrayPinned#`` and ``isMutableByteArrayPinned#`` operation.
 
 haskell98
 ~~~~~~~~~

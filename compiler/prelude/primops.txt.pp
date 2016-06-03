@@ -1077,9 +1077,15 @@ primop  NewAlignedPinnedByteArrayOp_Char "newAlignedPinnedByteArray#" GenPrimOp
    with out_of_line = True
         has_side_effects = True
 
-primop  ByteArrayIsPinnedOp "isPinnedByteArray#" GenPrimOp
+primop  MutableByteArrayIsPinnedOp "isMutableByteArrayPinned#" GenPrimOp
    MutableByteArray# s -> Int#
-   {Determine whether a {\tt MutableByteArray\#} is guaranteed not to move.}
+   {Determine whether a {\tt MutableByteArray\#} is guaranteed not to move
+   during GC.}
+   with out_of_line = True
+
+primop  ByteArrayIsPinnedOp "isByteArrayPinned#" GenPrimOp
+   ByteArray# -> Int#
+   {Determine whether a {\tt ByteArray\#} is guaranteed not to move during GC.}
    with out_of_line = True
 
 primop  ByteArrayContents_Char "byteArrayContents#" GenPrimOp

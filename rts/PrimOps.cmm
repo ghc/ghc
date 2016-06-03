@@ -141,15 +141,21 @@ stg_newAlignedPinnedByteArrayzh ( W_ n, W_ alignment )
     return (p);
 }
 
-stg_isPinnedByteArrayzh ( gcptr mba )
-// MutableByteArray# s -> Int#
+stg_isByteArrayPinnedzh ( gcptr ba )
+// ByteArray# s -> Int#
 {
     W_ bd, flags;
-    bd = Bdescr(mba);
+    bd = Bdescr(ba);
     // pinned byte arrays live in blocks with the BF_PINNED flag set.
     // See the comment in Storage.c:allocatePinned.
     flags = TO_W_(bdescr_flags(bd));
     return (flags & BF_PINNED != 0);
+}
+
+stg_isMutableByteArrayPinnedzh ( gcptr mba )
+// MutableByteArray# s -> Int#
+{
+    jump stg_isByteArrayPinnedzh(mba);
 }
 
 // shrink size of MutableByteArray in-place
