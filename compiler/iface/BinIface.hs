@@ -254,7 +254,9 @@ binaryInterfaceMagic dflags
 putSymbolTable :: BinHandle -> Int -> UniqFM (Int,Name) -> IO ()
 putSymbolTable bh next_off symtab = do
     put_ bh next_off
-    let names = elems (array (0,next_off-1) (eltsUFM symtab))
+    let names = elems (array (0,next_off-1) (nonDetEltsUFM symtab))
+      -- It's OK to use nonDetEltsUFM here because the elements have
+      -- indices that array uses to create order
     mapM_ (\n -> serialiseName bh n symtab) names
 
 getSymbolTable :: BinHandle -> NameCacheUpdater -> IO SymbolTable
