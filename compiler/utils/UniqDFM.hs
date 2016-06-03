@@ -46,6 +46,7 @@ module UniqDFM (
         intersectsUDFM,
         disjointUDFM, disjointUdfmUfm,
         minusUDFM,
+        listToUDFM,
         udfmMinusUFM,
         partitionUDFM,
         anyUDFM,
@@ -312,6 +313,9 @@ delListFromUDFM = foldl delFromUDFM
 udfmToUfm :: UniqDFM elt -> UniqFM elt
 udfmToUfm (UDFM m _i) =
   listToUFM_Directly [(getUnique k, taggedFst tv) | (k, tv) <- M.toList m]
+
+listToUDFM :: Uniquable key => [(key,elt)] -> UniqDFM elt
+listToUDFM = foldl (\m (k, v) -> addToUDFM m k v) emptyUDFM
 
 listToUDFM_Directly :: [(Unique, elt)] -> UniqDFM elt
 listToUDFM_Directly = foldl (\m (u, v) -> addToUDFM_Directly m u v) emptyUDFM

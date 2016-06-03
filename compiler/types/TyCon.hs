@@ -1195,20 +1195,20 @@ primRepIsFloat  _            = Just False
 
 -- | The labels for the fields of this particular 'TyCon'
 tyConFieldLabels :: TyCon -> [FieldLabel]
-tyConFieldLabels tc = fsEnvElts $ tyConFieldLabelEnv tc
+tyConFieldLabels tc = dFsEnvElts $ tyConFieldLabelEnv tc
 
 -- | The labels for the fields of this particular 'TyCon'
 tyConFieldLabelEnv :: TyCon -> FieldLabelEnv
 tyConFieldLabelEnv tc
   | isAlgTyCon tc = algTcFields tc
-  | otherwise     = emptyFsEnv
+  | otherwise     = emptyDFsEnv
 
 
 -- | Make a map from strings to FieldLabels from all the data
 -- constructors of this algebraic tycon
 fieldsOfAlgTcRhs :: AlgTyConRhs -> FieldLabelEnv
-fieldsOfAlgTcRhs rhs = mkFsEnv [ (flLabel fl, fl)
-                               | fl <- dataConsFields (visibleDataCons rhs) ]
+fieldsOfAlgTcRhs rhs = mkDFsEnv [ (flLabel fl, fl)
+                                | fl <- dataConsFields (visibleDataCons rhs) ]
   where
     -- Duplicates in this list will be removed by 'mkFsEnv'
     dataConsFields dcs = concatMap dataConFieldLabels dcs
@@ -1314,7 +1314,7 @@ mkTupleTyCon name binders res_kind arity tyvars con sort parent
         algTcStupidTheta = [],
         algTcRhs         = TupleTyCon { data_con = con,
                                         tup_sort = sort },
-        algTcFields      = emptyFsEnv,
+        algTcFields      = emptyDFsEnv,
         algTcParent      = parent,
         algTcRec         = NonRecursive,
         algTcGadtSyntax  = False

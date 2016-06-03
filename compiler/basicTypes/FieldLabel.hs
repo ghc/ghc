@@ -73,6 +73,7 @@ import OccName
 import Name
 
 import FastString
+import FastStringEnv
 import Outputable
 import Binary
 
@@ -83,7 +84,7 @@ import Data.Data
 type FieldLabelString = FastString
 
 -- | A map from labels to all the auxiliary information
-type FieldLabelEnv = FastStringEnv FieldLabel
+type FieldLabelEnv = DFastStringEnv FieldLabel
 
 
 type FieldLabel = FieldLbl Name

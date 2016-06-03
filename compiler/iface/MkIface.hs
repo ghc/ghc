@@ -1506,17 +1506,10 @@ tyConToIfaceDecl env tycon
           (con_env2, ex_bndrs') = tidyTyBinders con_env1 ex_bndrs
           to_eq_spec (tv,ty)  = (toIfaceTyVar (tidyTyVar con_env2 tv), tidyToIfaceType con_env2 ty)
 
-    ifaceOverloaded flds = case fsEnvElts flds of
+    ifaceOverloaded flds = case dFsEnvElts flds of
                              fl:_ -> flIsOverloaded fl
                              []   -> False
-    ifaceFields flds = sort $ map flLabel $ fsEnvElts flds
-                       -- We need to sort the labels because they come out
-                       -- of FastStringEnv in arbitrary order, because
-                       -- FastStringEnv is keyed on Uniques.
-                       -- Sorting FastString is ok here, because Uniques
-                       -- are only used for equality checks in the Ord
-                       -- instance for FastString.
-                       -- See Note [Unique Determinism] in Unique.
+    ifaceFields flds = map flLabel $ dFsEnvElts flds
 
 toIfaceBang :: TidyEnv -> HsImplBang -> IfaceBang
 toIfaceBang _    HsLazy              = IfNoBang
