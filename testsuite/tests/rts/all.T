@@ -83,6 +83,8 @@ test('stack003', [ omit_ways('ghci'), # uses unboxed tuples
                  compile_and_run, [''])
 
 test('atomicinc', [ c_src, only_ways(['normal','threaded1', 'threaded2']) ], compile_and_run, [''])
+test('atomicxchg', [ c_src, only_ways(['threaded1', 'threaded2']) ],
+compile_and_run, [''])
 
 test('T3424', # it's slow:
               [ when(fast(), skip), only_ways(['normal','threaded1','ghci']) ],

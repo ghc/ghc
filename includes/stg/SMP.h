@@ -35,8 +35,8 @@ void arm_atomic_spin_unlock(void);
  * The atomic exchange operation: xchg(p,w) exchanges the value
  * pointed to by p with the value w, returning the old value.
  *
- * Used for locking closures during updates (see lockClosure() below)
- * and the MVar primops.
+ * Used for locking closures during updates (see lockClosure()
+ * in includes/rts/storage/SMPClosureOps.h) and the MVar primops.
  */
 EXTERN_INLINE StgWord xchg(StgPtr p, StgWord w);
 
@@ -103,69 +103,30 @@ EXTERN_INLINE void load_load_barrier(void);
 
 #if !IN_STG_CODE || IN_STGCRUN
 
+/*
+ * Exchange the value pointed to by p with w and return the former. This
+ * function is used to acquire a lock. An acquire memory barrier is sufficient
+ * for a lock operation because corresponding unlock operation issues a
+ * store-store barrier (write_barrier()) immediately before releasing the lock.
+ */
 EXTERN_INLINE StgWord
 xchg(StgPtr p, StgWord w)
 {
-    StgWord result;
-#if defined(NOSMP)
-    result = *p;
-    *p = w;
-#elif i386_HOST_ARCH || x86_64_HOST_ARCH
-    result = w;
-    __asm__ __volatile__ (
-        // NB: the xchg instruction is implicitly locked, so we do not
-        // need a lock prefix here.
-          "xchg %1,%0"
-          :"+r" (result), "+m" (*p)
-          : /* no input-only operands */
-        );
-#elif powerpc_HOST_ARCH || powerpc64_HOST_ARCH || powerpc64le_HOST_ARCH
-    result = __sync_lock_test_and_set(p, w);
-#elif sparc_HOST_ARCH
-    result = w;
-    __asm__ __volatile__ (
-        "swap %1,%0"
-        : "+r" (result), "+m" (*p)
-        : /* no input-only operands */
-      );
-#elif arm_HOST_ARCH && defined(arm_HOST_ARCH_PRE_ARMv6)
-    __asm__ __volatile__ ("swp %0, %1, [%2]"
-                         : "=&r" (result)
-                         : "r" (w), "r" (p) : "memory");
-#elif arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv6)
-    // swp instruction which is used in pre-ARMv6 code above
-    // is deprecated in AMRv6 and later. ARM, Ltd. *highly* recommends
-    // to use ldrex/strex instruction pair for the same purpose
-    // see chapter: Synchronization and semaphores in ARM Architecture
-    // Reference manual
-    StgWord tmp;
-    __asm__ __volatile__ (
-                          "1:    ldrex  %0, [%3]\n"
-                          "      strex  %1, %2, [%3]\n"
-                          "      teq    %1, #1\n"
-                          "      beq    1b\n"
-#if !defined(arm_HOST_ARCH_PRE_ARMv7)
-                          "      dmb\n"
-#endif
-                          : "=&r" (result), "=&r" (tmp)
-                          : "r" (w), "r" (p)
-                          : "memory"
-                          );
-#elif aarch64_HOST_ARCH
-    StgWord tmp; 
-    __asm__ __volatile__ (
-                          "1:    ldaxr  %0, [%3]\n"
-                          "      stlxr  %w1, %2, [%3]\n"
-                          "      cbnz   %w1, 1b\n"
-                          "      dmb sy\n"
-                          : "=&r" (result), "=&r" (tmp)
-                          : "r" (w), "r" (p)
-                          : "memory"
-                          );
-#else
-#error xchg() unimplemented on this architecture
-#endif
-    return result;
+    // When porting GHC to a new platform check that
+    // __sync_lock_test_and_set() actually stores w in *p.
+    // Use test rts/atomicxchg to verify that the correct value is stored.
+    // From the gcc manual:
+    // (https://gcc.gnu.org/onlinedocs/gcc-4.4.3/gcc/Atomic-Builtins.html)
+    // This built-in function, as described by Intel, is not
+    // a traditional test-and-set operation, but rather an atomic
+    // exchange operation.
+    // [...]
+    // Many targets have only minimal support for such locks,
+    // and do not support a full exchange operation. In this case,
+    // a target may support reduced functionality here by which the
+    // only valid value to store is the immediate constant 1. The
+    // exact value actually stored in *ptr is implementation defined.
+    return __sync_lock_test_and_set(p, w);
 }
 
 /*
@@ -175,77 +136,7 @@ xchg(StgPtr p, StgWord w)
 EXTERN_INLINE StgWord
 cas(StgVolatilePtr p, StgWord o, StgWord n)
 {
-#if defined(NOSMP)
-    StgWord result;
-    result = *p;
-    if (result == o) {
-        *p = n;
-    }
-    return result;
-#elif i386_HOST_ARCH || x86_64_HOST_ARCH
-    __asm__ __volatile__ (
-          "lock\ncmpxchg %3,%1"
-          :"=a"(o), "+m" (*(volatile unsigned int *)p)
-          :"0" (o), "r" (n));
-    return o;
-#elif powerpc_HOST_ARCH || powerpc64_HOST_ARCH || powerpc64le_HOST_ARCH
     return __sync_val_compare_and_swap(p, o, n);
-#elif sparc_HOST_ARCH
-    __asm__ __volatile__ (
-        "cas [%1], %2, %0"
-        : "+r" (n)
-        : "r" (p), "r" (o)
-        : "memory"
-    );
-    return n;
-#elif arm_HOST_ARCH && defined(arm_HOST_ARCH_PRE_ARMv6)
-    StgWord r;
-    arm_atomic_spin_lock();
-    r  = *p;
-    if (r == o) { *p = n; }
-    arm_atomic_spin_unlock();
-    return r;
-#elif arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv6)
-    StgWord result,tmp;
-
-    __asm__ __volatile__(
-        "1:     ldrex   %1, [%2]\n"
-        "       mov     %0, #0\n"
-        "       teq     %1, %3\n"
-        "       it      eq\n"
-        "       strexeq %0, %4, [%2]\n"
-        "       teq     %0, #1\n"
-        "       it      eq\n"
-        "       beq     1b\n"
-#if !defined(arm_HOST_ARCH_PRE_ARMv7)
-        "       dmb\n"
-#endif
-                : "=&r"(tmp), "=&r"(result)
-                : "r"(p), "r"(o), "r"(n)
-                : "cc","memory");
-
-    return result;
-#elif aarch64_HOST_ARCH
-    // Don't think we actually use tmp here, but leaving
-    // it for consistent numbering
-    StgWord result,tmp;
-
-    __asm__ __volatile__(
-        "1:     ldxr %1, [%2]\n"
-        "       mov %w0, #0\n"
-        "       cmp %1, %3\n"
-        "       b.ne 2f\n"
-        "       stxr %w0, %4, [%2]\n"
-        "       cbnz %w0, 1b\n"
-        "2:     dmb sy\n"
-                : "=&r"(tmp), "=&r"(result)
-                : "r"(p), "r"(o), "r"(n)
-                : "cc","memory");
-
-    return result;
-#else
-#error cas() unimplemented on this architecture
-#endif
 }
 
 // RRN: Generalized to arbitrary increments to enable fetch-and-add in
@@ -254,47 +145,13 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
 EXTERN_INLINE StgWord
 atomic_inc(StgVolatilePtr p, StgWord incr)
 {
-#if defined(i386_HOST_ARCH) || defined(x86_64_HOST_ARCH)
-    StgWord r;
-    r = incr;
-    __asm__ __volatile__ (
-        "lock\nxadd %0,%1":
-            "+r" (r), "+m" (*p):
-    );
-    return r + incr;
-#elif powerpc_HOST_ARCH || powerpc64_HOST_ARCH || powerpc64le_HOST_ARCH
     return __sync_add_and_fetch(p, incr);
-#else
-    StgWord old, new_;
-    do {
-        old = *p;
-        new_ = old + incr;
-    } while (cas(p, old, new_) != old);
-    return new_;
-#endif
 }
 
 EXTERN_INLINE StgWord
 atomic_dec(StgVolatilePtr p)
 {
-#if defined(i386_HOST_ARCH) || defined(x86_64_HOST_ARCH)
-    StgWord r;
-    r = (StgWord)-1;
-    __asm__ __volatile__ (
-        "lock\nxadd %0,%1":
-            "+r" (r), "+m" (*p):
-    );
-    return r-1;
-#elif powerpc_HOST_ARCH || powerpc64_HOST_ARCH || powerpc64le_HOST_ARCH
     return __sync_sub_and_fetch(p, (StgWord) 1);
-#else
-    StgWord old, new_;
-    do {
-        old = *p;
-        new_ = old - 1;
-    } while (cas(p, old, new_) != old);
-    return new_;
-#endif
 }
 
 /*
