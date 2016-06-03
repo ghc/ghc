@@ -357,7 +357,7 @@ of compilation (i.e. at the Core level).
 Note [Scrutinising VoidRep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have this STG code:
-   f = \[s : State# RealWorld] -> 
+   f = \[s : State# RealWorld] ->
        case s of _ -> blah
 This is very odd.  Why are we scrutinising a state token?  But it
 can arise with bizarre NOINLINE pragmas (Trac #9964)
@@ -368,7 +368,7 @@ can arise with bizarre NOINLINE pragmas (Trac #9964)
 
 Now the trouble is that 's' has VoidRep, and we do not bind void
 arguments in the environment; they don't live anywhere.  See the
-calls to nonVoidIds in various places.  So we must not look up 
+calls to nonVoidIds in various places.  So we must not look up
 's' in the environment.  Instead, just evaluate the RHS!  Simple.
 -}
 
@@ -379,7 +379,7 @@ cgCase (StgApp v []) _ (PrimAlt _) alts
 
 {- Note [Dodgy unsafeCoerce 1]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider 
+Consider
     case (x :: HValue) |> co of (y :: MutVar# Int)
         DEFAULT -> ...
 We want to gnerate an assignment
