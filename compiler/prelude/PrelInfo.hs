@@ -85,19 +85,20 @@ knownKeyNames
 
            , concatMap tycon_kk_names typeNatTyCons
 
-           , concatMap (rep_names . tupleTyCon Boxed) [2..mAX_TUPLE_SIZE]  -- Yuk
+           , concatMap (tycon_kk_names . tupleTyCon Boxed) [2..mAX_TUPLE_SIZE]  -- Yuk
 
            , cTupleTyConNames
              -- Constraint tuples are known-key but not wired-in
              -- They can't show up in source code, but can appear
-             -- in intreface files
+             -- in interface files
 
            , map idName wiredInIds
            , map (idName . primOpId) allThePrimOps
            , basicKnownKeyNames ]
 
   where
-    -- "kk" short for "known-key"
+  -- All of the names associated with a known-key thing.
+  -- This includes TyCons, DataCons and promoted TyCons.
   tycon_kk_names :: TyCon -> [Name]
   tycon_kk_names tc = tyConName tc : (rep_names tc ++ concatMap thing_kk_names (implicitTyConThings tc))
 
