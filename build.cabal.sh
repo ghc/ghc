@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+CABAL=cabal
+
 set -euo pipefail
 
 # readlink on os x, doesn't support -f, to prevent the
@@ -31,16 +33,42 @@ function rl {
 absoluteRoot="$(dirname "$(rl "$0")")"
 cd "$absoluteRoot"
 
-# Initialize sandbox if necessary
-if ! ( cabal sandbox hc-pkg list 2>&1 > /dev/null ); then
-    cabal sandbox init
-    cabal install                   \
-        --dependencies-only         \
-        --disable-library-profiling \
-        --disable-shared
+if ! type "$CABAL" > /dev/null; then
+    echo "Please make sure 'cabal' is in your PATH"
+    exit 2
 fi
 
-cabal run hadrian --               \
-    --lint                         \
-    --directory "$absoluteRoot/.." \
-    "$@"
+CABVERSTR=$("$CABAL" --numeric-version)
+
+CABVER=( ${CABVERSTR//./ } )
+
+if [ "${CABVER[0]}" -eq 1 -a "${CABVER[1]}" -ge 24 ]; then
+    # New enough cabal version detected, so
+    # let's use the superior 'cabal new-build' mode
+
+    # there's no 'cabal new-run' yet, but it's easy to emulate
+    "$CABAL" new-build --disable-profiling --disable-documentation -j exe:hadrian
+    PKGVER="$(awk '/^version:/ { print $2 }' hadrian.cabal)"
+    "./dist-newstyle/build/hadrian-${PKGVER}/build/hadrian/hadrian" \
+        --lint                         \
+        --directory "$absoluteRoot/.." \
+        "$@"
+
+else
+    # The logic below is quite fragile, but it's better than nothing for pre-1.24 cabals
+    echo "Old pre cabal 1.24 version detected. Falling back to legacy 'cabal sandbox' mode."
+
+    # Initialize sandbox if necessary
+    if ! ( "$CABAL" sandbox hc-pkg list > /dev/null 2>&1); then
+        "$CABAL" sandbox init
+        "$CABAL" install                \
+            --dependencies-only         \
+            --disable-library-profiling \
+            --disable-shared
+    fi
+
+    "$CABAL" run hadrian --            \
+        --lint                         \
+        --directory "$absoluteRoot/.." \
+        "$@"
+fi
