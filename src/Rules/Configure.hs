@@ -9,9 +9,9 @@ import Context
 import GHC
 import Rules.Actions
 import Rules.Generators.GhcAutoconfH
-import Settings.User
 import Stage
 import Target
+import UserSettings
 
 configureRules :: Rules ()
 configureRules = do

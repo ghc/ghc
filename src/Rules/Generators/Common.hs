@@ -2,10 +2,10 @@ module Rules.Generators.Common (trackSource, yesNo, cppify) where
 
 import Base
 import Expression
-import Settings.User
+import UserSettings
 
 -- | Track a given source file when constructing an expression if the user
--- enabled 'trackBuildSystem' in "Settings.User".
+-- enabled 'trackBuildSystem' in @hadrian/src/UserSettings.hs@.
 trackSource :: FilePath -> Expr ()
 trackSource file = lift $ when trackBuildSystem $ need [ sourcePath -/- file ]
 

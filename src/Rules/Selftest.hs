@@ -8,7 +8,7 @@ import Test.QuickCheck
 import Base
 import Oracles.ModuleFiles
 import Settings.Builders.Ar
-import Settings.User
+import UserSettings
 import Way
 
 instance Arbitrary Way where

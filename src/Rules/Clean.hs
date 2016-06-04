@@ -7,8 +7,8 @@ import Rules.Actions
 import Rules.Generate
 import Settings.Packages
 import Settings.Paths
-import Settings.User
 import Stage
+import UserSettings
 
 cleanRules :: Rules ()
 cleanRules = do

@@ -1,7 +1,7 @@
---
--- If you want to customize your build you should copy this file from
--- ./src/UserSettings.hs to ./UserSettings.hs and only edit your copy.
---
+-- If you want to customise your build you should copy this file from
+-- hadrian/src/UserSettings.hs to hadrian/UserSettings.hs and edit your copy.
+-- If you don't copy the file your changes will be tracked by git and you can
+-- accidentally commit them.
 module UserSettings (
     buildRootPath, trackBuildSystem, userArgs, userPackages, userLibraryWays,
     userRtsWays, userKnownPackages, integerLibrary, buildHaddock, validating,
@@ -69,7 +69,7 @@ validating = False
 -- | Control when split objects are generated. Note, due to the GHC bug #11315
 -- it is necessary to do a full clean rebuild when changing this option.
 splitObjects :: Predicate
-splitObjects = (return cmdSplitObjects) &&^ defaultSplitObjects
+splitObjects = return cmdSplitObjects &&^ defaultSplitObjects
 
 -- | Control when to build Haddock documentation.
 buildHaddock :: Predicate

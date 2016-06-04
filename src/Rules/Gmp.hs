@@ -8,8 +8,8 @@ import Oracles.Config.Setting
 import Rules.Actions
 import Settings.Packages.IntegerGmp
 import Settings.Paths
-import Settings.User
 import Target
+import UserSettings
 
 gmpBase :: FilePath
 gmpBase = pkgPath integerGmp -/- "gmp"

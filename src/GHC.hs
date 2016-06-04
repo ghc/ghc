@@ -21,7 +21,7 @@ import Stage
 -- all of them. However, not all of these packages will be built. For example,
 -- package 'win32' is built only on Windows.
 -- "Packages" defines default conditions for building each package, which can
--- be overridden in "Settings.User".
+-- be overridden in @hadrian/src/UserSettings.hs@.
 defaultKnownPackages :: [Package]
 defaultKnownPackages =
     [ array, base, binary, bytestring, cabal, checkApiAnnotations, compiler

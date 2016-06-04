@@ -9,8 +9,8 @@ import Oracles.Config.Setting
 import Oracles.WindowsPath
 import Rules.Actions
 import Settings.Packages
-import Settings.User
 import Target
+import UserSettings
 
 -- TODO: clean up after testing
 testRules :: Rules ()

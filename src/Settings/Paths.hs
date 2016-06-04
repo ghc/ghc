@@ -10,7 +10,7 @@ import Context
 import Expression
 import GHC
 import Oracles.PackageData
-import Settings.User
+import UserSettings
 
 shakeFilesPath :: FilePath
 shakeFilesPath = buildRootPath -/- "hadrian/shake-files"

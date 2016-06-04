@@ -9,8 +9,8 @@ import GHC
 import Rules.Actions
 import Settings.Builders.GhcCabal
 import Settings.Paths
-import Settings.User
 import Target
+import UserSettings
 
 packageDatabaseOracle :: Rules ()
 packageDatabaseOracle = void $

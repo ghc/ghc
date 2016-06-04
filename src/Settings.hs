@@ -1,8 +1,8 @@
 module Settings (
     module Settings.Packages,
     module Settings.Paths,
-    module Settings.User,
     module Settings.Ways,
+    module UserSettings,
     getPkgData, getPkgDataList, getTopDirectory, isLibrary,
     getPackagePath, getContextDirectory, getBuildPath
     ) where
@@ -13,8 +13,8 @@ import Oracles.PackageData
 import Oracles.WindowsPath
 import Settings.Packages
 import Settings.Paths
-import Settings.User
 import Settings.Ways
+import UserSettings
 
 getPackagePath :: Expr FilePath
 getPackagePath = pkgPath <$> getPackage

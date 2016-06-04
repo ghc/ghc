@@ -1,6 +1,6 @@
-# This file is processed by the configure script
-# See 'src/Settings/User.hs' for user-defined settings
-#=====================================================
+# This file is processed by the configure script.
+# See hadrian/src/UserSettings.hs for user-defined settings.
+#===========================================================
 
 # Paths to builders:
 #===================

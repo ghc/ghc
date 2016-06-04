@@ -4,7 +4,7 @@ import Base
 import GHC
 import Predicate
 import Oracles.Config.Setting
-import Settings.User
+import UserSettings
 
 -- Combining default list of packages with user modifications
 getPackages :: Expr [Package]

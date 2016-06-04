@@ -104,10 +104,10 @@ executable hadrian
                        , Settings.Packages.Touchy
                        , Settings.Packages.Unlit
                        , Settings.Paths
-                       , Settings.User
                        , Settings.Ways
                        , Stage
                        , Target
+                       , UserSettings
                        , Way
 
     default-language:    Haskell2010

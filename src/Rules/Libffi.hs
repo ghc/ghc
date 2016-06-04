@@ -10,8 +10,8 @@ import Rules.Actions
 import Settings.Builders.Common
 import Settings.Packages.Rts
 import Settings.Paths
-import Settings.User
 import Target
+import UserSettings
 
 -- TODO: this should be moved elsewhere
 rtsBuildPath :: FilePath

@@ -5,7 +5,7 @@ import CmdLineFlag
 import Oracles.Config.Flag
 import Predicate
 import Settings.Flavours.Quick
-import Settings.User
+import UserSettings
 
 -- | Combine default library ways with user modifications.
 getLibraryWays :: Expr [Way]

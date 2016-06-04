@@ -34,7 +34,7 @@ import Settings.Packages.Rts
 import Settings.Packages.RunGhc
 import Settings.Packages.Touchy
 import Settings.Packages.Unlit
-import Settings.User
+import UserSettings
 
 getArgs :: Expr [String]
 getArgs = fromDiffExpr $ mconcat [ defaultBuilderArgs
