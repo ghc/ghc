@@ -29,7 +29,7 @@ import GHC.Enum
 import GHC.Arr
 
 -- | A concrete, poly-kinded proxy type
-data Proxy t = Proxy
+data Proxy t = Proxy deriving Bounded
 
 -- | A concrete, promotable proxy type, for use at the kind level
 -- There are no instances for this because it is intended at the kind level only
@@ -69,10 +69,6 @@ instance Ix (Proxy s) where
     rangeSize _       = 1
     unsafeIndex _ _   = 0
     unsafeRangeSize _ = 1
-
-instance Bounded (Proxy s) where
-    minBound = Proxy
-    maxBound = Proxy
 
 instance Monoid (Proxy s) where
     mempty = Proxy

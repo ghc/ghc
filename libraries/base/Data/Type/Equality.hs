@@ -131,9 +131,7 @@ instance a ~ b => Enum (a :~: b) where
 
   fromEnum Refl = 0
 
-instance a ~ b => Bounded (a :~: b) where
-  minBound = Refl
-  maxBound = Refl
+deriving instance a ~ b => Bounded (a :~: b)
 
 -- | This class contains types where you can learn the equality of two types
 -- from information contained in /terms/. Typically, only singleton types should

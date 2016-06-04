@@ -81,9 +81,7 @@ instance Coercible a b => Enum (Coercion a b) where
 
   fromEnum Coercion = 0
 
-instance Coercible a b => Bounded (Coercion a b) where
-  minBound = Coercion
-  maxBound = Coercion
+deriving instance Coercible a b => Bounded (Coercion a b)
 
 -- | This class contains types where you can learn the equality of two types
 -- from information contained in /terms/. Typically, only singleton types should

@@ -290,11 +290,7 @@ instance Semigroup (NonEmpty a) where
 
 
 newtype Min a = Min { getMin :: a }
-  deriving (Eq, Ord, Show, Read, Data, Generic, Generic1)
-
-instance Bounded a => Bounded (Min a) where
-  minBound = Min minBound
-  maxBound = Min maxBound
+  deriving (Bounded, Eq, Ord, Show, Read, Data, Generic, Generic1)
 
 instance Enum a => Enum (Min a) where
   succ (Min a) = Min (succ a)
@@ -347,11 +343,7 @@ instance Num a => Num (Min a) where
   fromInteger    = Min . fromInteger
 
 newtype Max a = Max { getMax :: a }
-  deriving (Eq, Ord, Show, Read, Data, Generic, Generic1)
-
-instance Bounded a => Bounded (Max a) where
-  minBound = Max minBound
-  maxBound = Max maxBound
+  deriving (Bounded, Eq, Ord, Show, Read, Data, Generic, Generic1)
 
 instance Enum a => Enum (Max a) where
   succ (Max a) = Max (succ a)
@@ -437,11 +429,7 @@ instance Bifunctor Arg where
 -- | Use @'Option' ('First' a)@ to get the behavior of
 -- 'Data.Monoid.First' from "Data.Monoid".
 newtype First a = First { getFirst :: a } deriving
-  (Eq, Ord, Show, Read, Data, Generic, Generic1)
-
-instance Bounded a => Bounded (First a) where
-  minBound = First minBound
-  maxBound = First maxBound
+  (Bounded, Eq, Ord, Show, Read, Data, Generic, Generic1)
 
 instance Enum a => Enum (First a) where
   succ (First a) = First (succ a)
@@ -482,11 +470,7 @@ instance MonadFix First where
 -- | Use @'Option' ('Last' a)@ to get the behavior of
 -- 'Data.Monoid.Last' from "Data.Monoid"
 newtype Last a = Last { getLast :: a } deriving
-  (Eq, Ord, Show, Read, Data, Generic, Generic1)
-
-instance Bounded a => Bounded (Last a) where
-  minBound = Last minBound
-  maxBound = Last maxBound
+  (Bounded, Eq, Ord, Show, Read, Data, Generic, Generic1)
 
 instance Enum a => Enum (Last a) where
   succ (Last a) = Last (succ a)
@@ -527,7 +511,7 @@ instance MonadFix Last where
 
 -- | Provide a Semigroup for an arbitrary Monoid.
 newtype WrappedMonoid m = WrapMonoid { unwrapMonoid :: m }
-  deriving (Eq, Ord, Show, Read, Data, Generic, Generic1)
+  deriving (Bounded, Eq, Ord, Show, Read, Data, Generic, Generic1)
 
 instance Monoid m => Semigroup (WrappedMonoid m) where
   (<>) = coerce (mappend :: m -> m -> m)
@@ -535,10 +519,6 @@ instance Monoid m => Semigroup (WrappedMonoid m) where
 instance Monoid m => Monoid (WrappedMonoid m) where
   mempty = WrapMonoid mempty
   mappend = (<>)
-
-instance Bounded a => Bounded (WrappedMonoid a) where
-  minBound = WrapMonoid minBound
-  maxBound = WrapMonoid maxBound
 
 instance Enum a => Enum (WrappedMonoid a) where
   succ (WrapMonoid a) = WrapMonoid (succ a)
