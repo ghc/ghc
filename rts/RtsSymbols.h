@@ -17,12 +17,12 @@
 #define MAYBE_LEADING_UNDERSCORE_STR(s) (s)
 #endif
 
-typedef char* SymbolName;
-typedef void* SymbolAddr;
+typedef char SymbolName;
+typedef void SymbolAddr;
 
 typedef struct _RtsSymbolVal {
-    const SymbolName lbl;
-    SymbolAddr addr;
+    const SymbolName* lbl;
+    SymbolAddr* addr;
 } RtsSymbolVal;
 
 
