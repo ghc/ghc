@@ -7,8 +7,8 @@ import Settings
 makeBuilderArgs :: Args
 makeBuilderArgs = do
     threads <- shakeThreads <$> lift getShakeOptions
-    let j = "-j" ++ show threads
+    let t = show threads
     mconcat
-        [ builder (Make gmpBuildPath     ) ? append ["MAKEFLAGS=" ++ j]
-        , builder (Make libffiBuildPath  ) ? append ["MAKEFLAGS=" ++ j, "install"]
-        , builder (Make "testsuite/tests") ? append ["THREADS=" ++ show threads, "fast"]  ]
+        [ builder (Make gmpBuildPath     ) ? append ["MAKEFLAGS=-j" ++ t]
+        , builder (Make libffiBuildPath  ) ? append ["MAKEFLAGS=-j" ++ t, "install"]
+        , builder (Make "testsuite/tests") ? append ["THREADS=" ++ t, "fast"] ]
