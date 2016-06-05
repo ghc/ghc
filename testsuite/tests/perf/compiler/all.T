@@ -742,13 +742,13 @@ test('T9872d',
           # 2014-12-18    739189056   Reduce type families even more eagerly
           # 2015-01-07    687562440   TrieMap leaf compression
           # 2015-03-17    726679784   tweak to solver; probably flattens more
+          # 2015-12-11    566134504   TypeInType; see #11196
           # 2016-02-08    534693648   Improved a bit by tyConRolesRepresentational
           # 2016-03-18    506691240   optimize Unify & zonking
            (wordsize(32), 264566040, 5)
           # some date     328810212
           # 2015-07-11    350369584
-          # 2015-12-11    566134504   TypeInType; see #11196
-          # 2016-04-06    264566040   x86/Linux, no idea, opened #11800
+          # 2016-04-06    264566040   x86/Linux
           ]),
       ],
      compile,
