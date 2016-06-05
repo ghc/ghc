@@ -5968,7 +5968,13 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
           *(Elf64_Sword *)P = (Elf64_Sword)value;
 #endif
           break;
-
+/* These two relocations were introduced in glibc 2.23 and binutils 2.26.
+    But in order to use them the system which compiles the bindist for GHC needs
+    to have glibc >= 2.23. So only use them if they're defined. */
+#if defined(R_X86_64_REX_GOTPCRELX) && defined(R_X86_64_GOTPCRELX)
+      case R_X86_64_REX_GOTPCRELX:
+      case R_X86_64_GOTPCRELX:
+#endif
       case R_X86_64_GOTPCREL:
       {
           StgInt64 gotAddress = (StgInt64) &makeSymbolExtra(oc, ELF_R_SYM(info), S)->addr;
