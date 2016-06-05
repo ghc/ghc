@@ -482,3 +482,9 @@ test('T10320',
      , extra_clean(['T10320', 'T10320.o', 'T10320.hi'])],
      run_command,
      ['$MAKE -s --no-print-directory T10320'])
+
+test('T12135',
+     [expect_broken(12135),
+      extra_clean(['T12135.o', 'T12135.hi', 'T12135', 'T12135a/T12135.h', 'T12135b/T12135.h'])],
+     run_command,
+     ['$MAKE -s --no-print-directory T12135'])

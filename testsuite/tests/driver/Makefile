@@ -621,3 +621,14 @@ T10320:
 	[ -s T10320.dump-rule-rewrites ]
 	"$(TEST_HC)" $(TEST_HC_OPTS) -ddump-to-file -ddump-rule-rewrites T10320.hs
 	[ -f T10320.dump-rule-rewrites ] && [ ! -s T10320.dump-rule-rewrites ]
+
+.PHONY: T12135
+T12135:
+	$(RM) -rf T12135.o T12135.hi T12135 T12135a T12135b
+	mkdir T12135a T12135b
+	cp T12135a.h T12135a/T12135.h
+	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) -IT12135b -IT12135a --make T12135.hs
+	./T12135
+	cp T12135b.h T12135b/T12135.h
+	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) -IT12135b -IT12135a --make T12135.hs
+	./T12135
