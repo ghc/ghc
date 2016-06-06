@@ -33,6 +33,7 @@ import GHC.IO
 newtype IORef a = IORef (STRef RealWorld a)
 
 -- explicit instance because Haddock can't figure out a derived one
+-- | @since 4.1.0.0
 instance Eq (IORef a) where
   IORef x == IORef y = x == y
 

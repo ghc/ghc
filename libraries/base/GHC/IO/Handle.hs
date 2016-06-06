@@ -316,9 +316,11 @@ hFlushAll handle = withHandle_ "hFlushAll" handle flushBuffer
 
 data HandlePosn = HandlePosn Handle HandlePosition
 
+-- | @since 4.1.0.0
 instance Eq HandlePosn where
     (HandlePosn h1 p1) == (HandlePosn h2 p2) = p1==p2 && h1==h2
 
+-- | @since 4.1.0.0
 instance Show HandlePosn where
    showsPrec p (HandlePosn h pos) =
         showsPrec p h . showString " at position " . shows pos

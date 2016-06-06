@@ -163,6 +163,7 @@ castPtrToFunPtr (Ptr addr) = FunPtr addr
 ------------------------------------------------------------------------
 -- Show instances for Ptr and FunPtr
 
+-- | @since 2.01
 instance Show (Ptr a) where
    showsPrec _ (Ptr a) rs = pad_out (showHex (wordToInteger(int2Word#(addr2Int# a))) "")
      where
@@ -170,5 +171,6 @@ instance Show (Ptr a) where
        pad_out ls =
           '0':'x':(replicate (2*SIZEOF_HSPTR - length ls) '0') ++ ls ++ rs
 
+-- | @since 2.01
 instance Show (FunPtr a) where
    showsPrec p = showsPrec p . castFunPtrToPtr

@@ -182,6 +182,7 @@ hopelessIndexError :: Int -- Try to use 'indexError' instead!
 hopelessIndexError = errorWithoutStackTrace "Error in array index"
 
 ----------------------------------------------------------------------
+-- | @since 2.01
 instance  Ix Char  where
     {-# INLINE range #-}
     range (m,n) = [m..n]
@@ -197,6 +198,7 @@ instance  Ix Char  where
     inRange (m,n) i     =  m <= i && i <= n
 
 ----------------------------------------------------------------------
+-- | @since 2.01
 instance  Ix Int  where
     {-# INLINE range #-}
         -- The INLINE stops the build in the RHS from getting inlined,
@@ -214,12 +216,14 @@ instance  Ix Int  where
     {-# INLINE inRange #-}
     inRange (I# m,I# n) (I# i) =  isTrue# (m <=# i) && isTrue# (i <=# n)
 
+-- | @since 4.6.0.0
 instance Ix Word where
     range (m,n)         = [m..n]
     unsafeIndex (m,_) i = fromIntegral (i - m)
     inRange (m,n) i     = m <= i && i <= n
 
 ----------------------------------------------------------------------
+-- | @since 2.01
 instance  Ix Integer  where
     {-# INLINE range #-}
     range (m,n) = [m..n]
@@ -235,6 +239,7 @@ instance  Ix Integer  where
     inRange (m,n) i     =  m <= i && i <= n
 
 ----------------------------------------------------------------------
+-- | @since 2.01
 instance Ix Bool where -- as derived
     {-# INLINE range #-}
     range (m,n) = [m..n]
@@ -250,6 +255,7 @@ instance Ix Bool where -- as derived
     inRange (l,u) i = fromEnum i >= fromEnum l && fromEnum i <= fromEnum u
 
 ----------------------------------------------------------------------
+-- | @since 2.01
 instance Ix Ordering where -- as derived
     {-# INLINE range #-}
     range (m,n) = [m..n]
@@ -265,6 +271,7 @@ instance Ix Ordering where -- as derived
     inRange (l,u) i = fromEnum i >= fromEnum l && fromEnum i <= fromEnum u
 
 ----------------------------------------------------------------------
+-- | @since 2.01
 instance Ix () where
     {-# INLINE range #-}
     range   ((), ())    = [()]
@@ -277,6 +284,7 @@ instance Ix () where
     index b i = unsafeIndex b i
 
 ----------------------------------------------------------------------
+-- | @since 2.01
 instance (Ix a, Ix b) => Ix (a, b) where -- as derived
     {-# SPECIALISE instance Ix (Int,Int) #-}
 
@@ -295,6 +303,7 @@ instance (Ix a, Ix b) => Ix (a, b) where -- as derived
     -- Default method for index
 
 ----------------------------------------------------------------------
+-- | @since 2.01
 instance  (Ix a1, Ix a2, Ix a3) => Ix (a1,a2,a3)  where
     {-# SPECIALISE instance Ix (Int,Int,Int) #-}
 
@@ -315,6 +324,7 @@ instance  (Ix a1, Ix a2, Ix a3) => Ix (a1,a2,a3)  where
     -- Default method for index
 
 ----------------------------------------------------------------------
+-- | @since 2.01
 instance  (Ix a1, Ix a2, Ix a3, Ix a4) => Ix (a1,a2,a3,a4)  where
     range ((l1,l2,l3,l4),(u1,u2,u3,u4)) =
       [(i1,i2,i3,i4) | i1 <- range (l1,u1),
@@ -333,7 +343,7 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4) => Ix (a1,a2,a3,a4)  where
       inRange (l3,u3) i3 && inRange (l4,u4) i4
 
     -- Default method for index
-
+-- | @since 2.01
 instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5) => Ix (a1,a2,a3,a4,a5)  where
     range ((l1,l2,l3,l4,l5),(u1,u2,u3,u4,u5)) =
       [(i1,i2,i3,i4,i5) | i1 <- range (l1,u1),
@@ -390,6 +400,7 @@ type role Array nominal representational
 type role STArray nominal nominal representational
 
 -- Just pointer equality on mutable arrays:
+-- | @since 2.01
 instance Eq (STArray s i e) where
     STArray _ _ _ arr1# == STArray _ _ _ arr2# =
         isTrue# (sameMutableArray# arr1# arr2#)
@@ -788,15 +799,19 @@ cmpIntArray arr1@(Array l1 u1 n1 _) arr2@(Array l2 u2 n2 _) =
 ----------------------------------------------------------------------
 -- Array instances
 
+-- | @since 2.01
 instance Functor (Array i) where
     fmap = amap
 
+-- | @since 2.01
 instance (Ix i, Eq e) => Eq (Array i e) where
     (==) = eqArray
 
+-- | @since 2.01
 instance (Ix i, Ord e) => Ord (Array i e) where
     compare = cmpArray
 
+-- | @since 2.01
 instance (Ix a, Show a, Show b) => Show (Array a b) where
     showsPrec p a =
         showParen (p > appPrec) $

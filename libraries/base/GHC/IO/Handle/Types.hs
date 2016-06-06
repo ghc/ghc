@@ -112,6 +112,7 @@ data Handle
 --    * A 'FileHandle' is seekable.  A 'DuplexHandle' may or may not be
 --      seekable.
 
+-- | @since 4.1.0.0
 instance Eq Handle where
  (FileHandle _ h1)     == (FileHandle _ h2)     = h1 == h2
  (DuplexHandle _ h1 _) == (DuplexHandle _ h2 _) = h1 == h2
@@ -407,6 +408,7 @@ noNewlineTranslation  = NewlineMode { inputNL  = LF, outputNL = LF }
 -- we provide a more user-friendly Show instance for it
 -- than the derived one.
 
+-- | @since 4.1.0.0
 instance Show HandleType where
   showsPrec _ t =
     case t of
@@ -417,6 +419,7 @@ instance Show HandleType where
       AppendHandle      -> showString "writable (append)"
       ReadWriteHandle   -> showString "read-writable"
 
+-- | @since 4.1.0.0
 instance Show Handle where
   showsPrec _ (FileHandle   file _)   = showHandle file
   showsPrec _ (DuplexHandle file _ _) = showHandle file

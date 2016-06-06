@@ -24,6 +24,7 @@ import Numeric (showHex)
 data Fingerprint = Fingerprint {-# UNPACK #-} !Word64 {-# UNPACK #-} !Word64
   deriving (Eq, Ord)
 
+-- | @since 4.7.0.0
 instance Show Fingerprint where
   show (Fingerprint w1 w2) = hex16 w1 ++ hex16 w2
     where

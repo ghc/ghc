@@ -32,5 +32,6 @@ class (Monad m) => MonadIO m where
     -- | Lift a computation from the 'IO' monad.
     liftIO :: IO a -> m a
 
+-- | @since 4.9.0.0
 instance MonadIO IO where
     liftIO = id

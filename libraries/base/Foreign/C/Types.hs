@@ -188,6 +188,7 @@ ARITHMETIC_TYPE(CTime,HTYPE_TIME_T)
 -- | Haskell type representing the C @useconds_t@ type.
 --
 -- @since 4.4.0.0
+
 ARITHMETIC_TYPE(CUSeconds,HTYPE_USECONDS_T)
 -- | Haskell type representing the C @suseconds_t@ type.
 --

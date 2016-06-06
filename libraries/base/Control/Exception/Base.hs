@@ -299,9 +299,11 @@ bracketOnError before after thing =
 -- source location of the pattern.
 newtype PatternMatchFail = PatternMatchFail String
 
+-- | @since 4.0
 instance Show PatternMatchFail where
     showsPrec _ (PatternMatchFail err) = showString err
 
+-- | @since 4.0
 instance Exception PatternMatchFail
 
 -----
@@ -313,9 +315,11 @@ instance Exception PatternMatchFail
 -- location of the record selector.
 newtype RecSelError = RecSelError String
 
+-- | @since 4.0
 instance Show RecSelError where
     showsPrec _ (RecSelError err) = showString err
 
+-- | @since 4.0
 instance Exception RecSelError
 
 -----
@@ -325,9 +329,11 @@ instance Exception RecSelError
 -- constructed.
 newtype RecConError = RecConError String
 
+-- | @since 4.0
 instance Show RecConError where
     showsPrec _ (RecConError err) = showString err
 
+-- | @since 4.0
 instance Exception RecConError
 
 -----
@@ -339,9 +345,11 @@ instance Exception RecConError
 -- location of the record update.
 newtype RecUpdError = RecUpdError String
 
+-- | @since 4.0
 instance Show RecUpdError where
     showsPrec _ (RecUpdError err) = showString err
 
+-- | @since 4.0
 instance Exception RecUpdError
 
 -----
@@ -351,9 +359,11 @@ instance Exception RecUpdError
 -- @String@ gives information about which method it was.
 newtype NoMethodError = NoMethodError String
 
+-- | @since 4.0
 instance Show NoMethodError where
     showsPrec _ (NoMethodError err) = showString err
 
+-- | @since 4.0
 instance Exception NoMethodError
 
 -----
@@ -365,9 +375,11 @@ instance Exception NoMethodError
 -- @since 4.9.0.0
 newtype TypeError = TypeError String
 
+-- | @since 4.9.0.0
 instance Show TypeError where
     showsPrec _ (TypeError err) = showString err
 
+-- | @since 4.9.0.0
 instance Exception TypeError
 
 -----
@@ -378,9 +390,11 @@ instance Exception TypeError
 -- guaranteed to terminate or not.
 data NonTermination = NonTermination
 
+-- | @since 4.0
 instance Show NonTermination where
     showsPrec _ NonTermination = showString "<<loop>>"
 
+-- | @since 4.0
 instance Exception NonTermination
 
 -----
@@ -389,9 +403,11 @@ instance Exception NonTermination
 -- package, inside another call to @atomically@.
 data NestedAtomically = NestedAtomically
 
+-- | @since 4.0
 instance Show NestedAtomically where
     showsPrec _ NestedAtomically = showString "Control.Concurrent.STM.atomically was nested"
 
+-- | @since 4.0
 instance Exception NestedAtomically
 
 -----

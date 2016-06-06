@@ -397,7 +397,9 @@ popCountDefault = go 0
 {-# INLINABLE popCountDefault #-}
 
 
--- Interpret 'Bool' as 1-bit bit-field; @since 4.7.0.0
+-- | Interpret 'Bool' as 1-bit bit-field
+--
+--  @since 4.7.0.0
 instance Bits Bool where
     (.&.) = (&&)
 
@@ -427,11 +429,13 @@ instance Bits Bool where
     popCount False = 0
     popCount True  = 1
 
+-- | @since 4.7.0.0
 instance FiniteBits Bool where
     finiteBitSize _ = 1
     countTrailingZeros x = if x then 0 else 1
     countLeadingZeros  x = if x then 0 else 1
 
+-- | @since 2.01
 instance Bits Int where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
@@ -468,11 +472,13 @@ instance Bits Int where
 
     isSigned _             = True
 
+-- | @since 4.6.0.0
 instance FiniteBits Int where
     finiteBitSize _ = WORD_SIZE_IN_BITS
     countLeadingZeros  (I# x#) = I# (word2Int# (clz# (int2Word# x#)))
     countTrailingZeros (I# x#) = I# (word2Int# (ctz# (int2Word# x#)))
 
+-- | @since 2.01
 instance Bits Word where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
@@ -503,11 +509,13 @@ instance Bits Word where
     bit                      = bitDefault
     testBit                  = testBitDefault
 
+-- | @since 4.6.0.0
 instance FiniteBits Word where
     finiteBitSize _ = WORD_SIZE_IN_BITS
     countLeadingZeros  (W# x#) = I# (word2Int# (clz# x#))
     countTrailingZeros (W# x#) = I# (word2Int# (ctz# x#))
 
+-- | @since 2.01
 instance Bits Integer where
    (.&.) = andInteger
    (.|.) = orInteger

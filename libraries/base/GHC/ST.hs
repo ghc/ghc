@@ -52,11 +52,13 @@ default ()
 newtype ST s a = ST (STRep s a)
 type STRep s a = State# s -> (# State# s, a #)
 
+-- | @since 2.01
 instance Functor (ST s) where
     fmap f (ST m) = ST $ \ s ->
       case (m s) of { (# new_s, r #) ->
       (# new_s, f r #) }
 
+-- | @since 4.4.0.0
 instance Applicative (ST s) where
     {-# INLINE pure #-}
     {-# INLINE (*>)   #-}
@@ -64,6 +66,7 @@ instance Applicative (ST s) where
     m *> k = m >>= \ _ -> k
     (<*>) = ap
 
+-- | @since 2.01
 instance Monad (ST s) where
     {-# INLINE (>>=)  #-}
     (>>) = (*>)
@@ -99,6 +102,7 @@ fixST k = ST $ \ s ->
     in
     case ans of STret s' x -> (# s', x #)
 
+-- | @since 2.01
 instance  Show (ST s a)  where
     showsPrec _ _  = showString "<<ST action>>"
     showList       = showList__ (showsPrec 0)

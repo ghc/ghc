@@ -85,6 +85,7 @@ makeStableName a = IO $ \ s ->
 hashStableName :: StableName a -> Int
 hashStableName (StableName sn) = I# (stableNameToInt# sn)
 
+-- | @since 2.01
 instance Eq (StableName a) where
     (StableName sn1) == (StableName sn2) =
        case eqStableName# sn1 sn2 of

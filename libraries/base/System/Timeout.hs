@@ -37,10 +37,12 @@ import Data.Unique         (Unique, newUnique)
 
 newtype Timeout = Timeout Unique deriving (Eq)
 
+-- | @since 3.0
 instance Show Timeout where
     show _ = "<<timeout>>"
 
 -- Timeout is a child of SomeAsyncException
+-- | @since 4.7.0.0
 instance Exception Timeout where
   toException = asyncExceptionToException
   fromException = asyncExceptionFromException

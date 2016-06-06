@@ -180,9 +180,11 @@ data TypeRep = TypeRep {-# UNPACK #-} !Fingerprint TyCon [KindRep] [TypeRep]
 type KindRep = TypeRep
 
 -- Compare keys for equality
+-- | @since 2.01
 instance Eq TypeRep where
   TypeRep x _ _ _ == TypeRep y _ _ _ = x == y
 
+-- | @since 4.4.0.0
 instance Ord TypeRep where
   TypeRep x _ _ _ <= TypeRep y _ _ _ = x <= y
 
@@ -349,6 +351,7 @@ type Typeable7 (a :: * -> * -> * -> * -> * -> * -> * -> *) = Typeable a
 
 ----------------- Showing TypeReps --------------------
 
+-- | @since 2.01
 instance Show TypeRep where
   showsPrec p (TypeRep _ tycon kinds tys) =
     case tys of

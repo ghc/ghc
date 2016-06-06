@@ -44,6 +44,7 @@ newtype IOArray i e = IOArray (STArray RealWorld i e)
 type role IOArray nominal representational
 
 -- explicit instance because Haddock can't figure out a derived one
+-- | @since 4.1.0.0
 instance Eq (IOArray i e) where
   IOArray x == IOArray y = x == y
 

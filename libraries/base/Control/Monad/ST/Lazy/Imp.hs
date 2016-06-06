@@ -62,6 +62,7 @@ import GHC.Base
 newtype ST s a = ST (State s -> (a, State s))
 data State s = S# (State# s)
 
+-- | @since 2.01
 instance Functor (ST s) where
     fmap f m = ST $ \ s ->
       let
@@ -70,10 +71,12 @@ instance Functor (ST s) where
       in
       (f r,new_s)
 
+-- | @since 2.01
 instance Applicative (ST s) where
     pure a = ST $ \ s -> (a,s)
     (<*>) = ap
 
+-- | @since 2.01
 instance Monad (ST s) where
 
         fail s   = errorWithoutStackTrace s
@@ -104,6 +107,7 @@ fixST m = ST (\ s ->
                 in
                    (r,s'))
 
+-- | @since 2.01
 instance MonadFix (ST s) where
         mfix = fixST
 

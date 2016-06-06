@@ -142,6 +142,7 @@ data Event = KEvent {
 event :: Fd -> Filter -> Flag -> FFlag -> Event
 event fd filt flag fflag = KEvent (fromIntegral fd) filt flag fflag 0 nullPtr
 
+-- | @since 4.3.1.0
 instance Storable Event where
     sizeOf _ = #size struct kevent
     alignment _ = alignment (undefined :: CInt)
@@ -202,6 +203,7 @@ data TimeSpec = TimeSpec {
     , tv_nsec :: {-# UNPACK #-} !CLong
     }
 
+-- | @since 4.3.1.0
 instance Storable TimeSpec where
     sizeOf _ = #size struct timespec
     alignment _ = alignment (undefined :: CInt)

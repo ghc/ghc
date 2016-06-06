@@ -479,6 +479,7 @@ infixr 5 <>
 seqToList :: Sequ a -> [a]
 seqToList (Sequ x) = x []
 
+-- | @since 4.3.1.0
 instance Show a => Show (Sequ a) where
     showsPrec d a = showsPrec d (seqToList a)
 

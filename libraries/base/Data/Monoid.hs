@@ -70,17 +70,21 @@ infixr 6 <>
 newtype Dual a = Dual { getDual :: a }
         deriving (Eq, Ord, Read, Show, Bounded, Generic, Generic1)
 
+-- | @since 2.01
 instance Monoid a => Monoid (Dual a) where
         mempty = Dual mempty
         Dual x `mappend` Dual y = Dual (y `mappend` x)
 
+-- | @since 4.8.0.0
 instance Functor Dual where
     fmap     = coerce
 
+-- | @since 4.8.0.0
 instance Applicative Dual where
     pure     = Dual
     (<*>)    = coerce
 
+-- | @since 4.8.0.0
 instance Monad Dual where
     m >>= k  = k (getDual m)
 
@@ -88,6 +92,7 @@ instance Monad Dual where
 newtype Endo a = Endo { appEndo :: a -> a }
                deriving (Generic)
 
+-- | @since 2.01
 instance Monoid (Endo a) where
         mempty = Endo id
         Endo f `mappend` Endo g = Endo (f . g)
@@ -96,6 +101,7 @@ instance Monoid (Endo a) where
 newtype All = All { getAll :: Bool }
         deriving (Eq, Ord, Read, Show, Bounded, Generic)
 
+-- | @since 2.01
 instance Monoid All where
         mempty = All True
         All x `mappend` All y = All (x && y)
@@ -104,6 +110,7 @@ instance Monoid All where
 newtype Any = Any { getAny :: Bool }
         deriving (Eq, Ord, Read, Show, Bounded, Generic)
 
+-- | @since 2.01
 instance Monoid Any where
         mempty = Any False
         Any x `mappend` Any y = Any (x || y)
@@ -112,18 +119,22 @@ instance Monoid Any where
 newtype Sum a = Sum { getSum :: a }
         deriving (Eq, Ord, Read, Show, Bounded, Generic, Generic1, Num)
 
+-- | @since 2.01
 instance Num a => Monoid (Sum a) where
         mempty = Sum 0
         mappend = coerce ((+) :: a -> a -> a)
 --        Sum x `mappend` Sum y = Sum (x + y)
 
+-- | @since 4.8.0.0
 instance Functor Sum where
     fmap     = coerce
 
+-- | @since 4.8.0.0
 instance Applicative Sum where
     pure     = Sum
     (<*>)    = coerce
 
+-- | @since 4.8.0.0
 instance Monad Sum where
     m >>= k  = k (getSum m)
 
@@ -131,18 +142,22 @@ instance Monad Sum where
 newtype Product a = Product { getProduct :: a }
         deriving (Eq, Ord, Read, Show, Bounded, Generic, Generic1, Num)
 
+-- | @since 2.01
 instance Num a => Monoid (Product a) where
         mempty = Product 1
         mappend = coerce ((*) :: a -> a -> a)
 --        Product x `mappend` Product y = Product (x * y)
 
+-- | @since 4.8.0.0
 instance Functor Product where
     fmap     = coerce
 
+-- | @since 4.8.0.0
 instance Applicative Product where
     pure     = Product
     (<*>)    = coerce
 
+-- | @since 4.8.0.0
 instance Monad Product where
     m >>= k  = k (getProduct m)
 
@@ -186,6 +201,7 @@ newtype First a = First { getFirst :: Maybe a }
         deriving (Eq, Ord, Read, Show, Generic, Generic1,
                   Functor, Applicative, Monad)
 
+-- | @since 2.01
 instance Monoid (First a) where
         mempty = First Nothing
         First Nothing `mappend` r = r
@@ -199,6 +215,7 @@ newtype Last a = Last { getLast :: Maybe a }
         deriving (Eq, Ord, Read, Show, Generic, Generic1,
                   Functor, Applicative, Monad)
 
+-- | @since 2.01
 instance Monoid (Last a) where
         mempty = Last Nothing
         l `mappend` Last Nothing = l
@@ -211,6 +228,7 @@ newtype Alt f a = Alt {getAlt :: f a}
   deriving (Generic, Generic1, Read, Show, Eq, Ord, Num, Enum,
             Monad, MonadPlus, Applicative, Alternative, Functor)
 
+-- | @since 4.8.0.0
 instance Alternative f => Monoid (Alt f a) where
         mempty = Alt empty
         mappend = coerce ((<|>) :: f a -> f a -> f a)

@@ -39,18 +39,23 @@ data KProxy (t :: *) = KProxy
 -- interchangeably, so all of these instances are hand-written to be
 -- lazy in Proxy arguments.
 
+-- | @since 4.7.0.0
 instance Eq (Proxy s) where
   _ == _ = True
 
+-- | @since 4.7.0.0
 instance Ord (Proxy s) where
   compare _ _ = EQ
 
+-- | @since 4.7.0.0
 instance Show (Proxy s) where
   showsPrec _ _ = showString "Proxy"
 
+-- | @since 4.7.0.0
 instance Read (Proxy s) where
   readsPrec d = readParen (d > 10) (\r -> [(Proxy, s) | ("Proxy",s) <- lex r ])
 
+-- | @since 4.7.0.0
 instance Enum (Proxy s) where
     succ _               = errorWithoutStackTrace "Proxy.succ"
     pred _               = errorWithoutStackTrace "Proxy.pred"
@@ -62,6 +67,7 @@ instance Enum (Proxy s) where
     enumFromThenTo _ _ _ = [Proxy]
     enumFromTo _ _       = [Proxy]
 
+-- | @since 4.7.0.0
 instance Ix (Proxy s) where
     range _           = [Proxy]
     index _ _         = 0
@@ -70,31 +76,37 @@ instance Ix (Proxy s) where
     unsafeIndex _ _   = 0
     unsafeRangeSize _ = 1
 
+-- | @since 4.7.0.0
 instance Monoid (Proxy s) where
     mempty = Proxy
     mappend _ _ = Proxy
     mconcat _ = Proxy
 
+-- | @since 4.7.0.0
 instance Functor Proxy where
     fmap _ _ = Proxy
     {-# INLINE fmap #-}
 
+-- | @since 4.7.0.0
 instance Applicative Proxy where
     pure _ = Proxy
     {-# INLINE pure #-}
     _ <*> _ = Proxy
     {-# INLINE (<*>) #-}
 
+-- | @since 4.9.0.0
 instance Alternative Proxy where
     empty = Proxy
     {-# INLINE empty #-}
     _ <|> _ = Proxy
     {-# INLINE (<|>) #-}
 
+-- | @since 4.7.0.0
 instance Monad Proxy where
     _ >>= _ = Proxy
     {-# INLINE (>>=) #-}
 
+-- | @since 4.9.0.0
 instance MonadPlus Proxy
 
 -- | 'asProxyTypeOf' is a type-restricted version of 'const'.

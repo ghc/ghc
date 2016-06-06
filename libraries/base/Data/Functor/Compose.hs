@@ -39,13 +39,16 @@ newtype Compose f g a = Compose { getCompose :: f (g a) }
 
 -- Instances of lifted Prelude classes
 
+-- | @since 4.9.0.0
 instance (Eq1 f, Eq1 g) => Eq1 (Compose f g) where
     liftEq eq (Compose x) (Compose y) = liftEq (liftEq eq) x y
 
+-- | @since 4.9.0.0
 instance (Ord1 f, Ord1 g) => Ord1 (Compose f g) where
     liftCompare comp (Compose x) (Compose y) =
         liftCompare (liftCompare comp) x y
 
+-- | @since 4.9.0.0
 instance (Read1 f, Read1 g) => Read1 (Compose f g) where
     liftReadsPrec rp rl = readsData $
         readsUnaryWith (liftReadsPrec rp' rl') "Compose" Compose
@@ -53,6 +56,7 @@ instance (Read1 f, Read1 g) => Read1 (Compose f g) where
         rp' = liftReadsPrec rp rl
         rl' = liftReadList rp rl
 
+-- | @since 4.9.0.0
 instance (Show1 f, Show1 g) => Show1 (Compose f g) where
     liftShowsPrec sp sl d (Compose x) =
         showsUnaryWith (liftShowsPrec sp' sl') "Compose" d x
@@ -62,33 +66,42 @@ instance (Show1 f, Show1 g) => Show1 (Compose f g) where
 
 -- Instances of Prelude classes
 
+-- | @since 4.9.0.0
 instance (Eq1 f, Eq1 g, Eq a) => Eq (Compose f g a) where
     (==) = eq1
 
+-- | @since 4.9.0.0
 instance (Ord1 f, Ord1 g, Ord a) => Ord (Compose f g a) where
     compare = compare1
 
+-- | @since 4.9.0.0
 instance (Read1 f, Read1 g, Read a) => Read (Compose f g a) where
     readsPrec = readsPrec1
 
+-- | @since 4.9.0.0
 instance (Show1 f, Show1 g, Show a) => Show (Compose f g a) where
     showsPrec = showsPrec1
 
 -- Functor instances
 
+-- | @since 4.9.0.0
 instance (Functor f, Functor g) => Functor (Compose f g) where
     fmap f (Compose x) = Compose (fmap (fmap f) x)
 
+-- | @since 4.9.0.0
 instance (Foldable f, Foldable g) => Foldable (Compose f g) where
     foldMap f (Compose t) = foldMap (foldMap f) t
 
+-- | @since 4.9.0.0
 instance (Traversable f, Traversable g) => Traversable (Compose f g) where
     traverse f (Compose t) = Compose <$> traverse (traverse f) t
 
+-- | @since 4.9.0.0
 instance (Applicative f, Applicative g) => Applicative (Compose f g) where
     pure x = Compose (pure (pure x))
     Compose f <*> Compose x = Compose ((<*>) <$> f <*> x)
 
+-- | @since 4.9.0.0
 instance (Alternative f, Applicative g) => Alternative (Compose f g) where
     empty = Compose empty
     Compose x <|> Compose y = Compose (x <|> y)

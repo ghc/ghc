@@ -66,13 +66,16 @@ import GHC.Show (Show)
 newtype WrappedMonad m a = WrapMonad { unwrapMonad :: m a }
                          deriving (Generic, Generic1, Monad)
 
+-- | @since 2.01
 instance Monad m => Functor (WrappedMonad m) where
     fmap f (WrapMonad v) = WrapMonad (liftM f v)
 
+-- | @since 2.01
 instance Monad m => Applicative (WrappedMonad m) where
     pure = WrapMonad . pure
     WrapMonad f <*> WrapMonad v = WrapMonad (f `ap` v)
 
+-- | @since 2.01
 instance MonadPlus m => Alternative (WrappedMonad m) where
     empty = WrapMonad mzero
     WrapMonad u <|> WrapMonad v = WrapMonad (u `mplus` v)
@@ -80,13 +83,16 @@ instance MonadPlus m => Alternative (WrappedMonad m) where
 newtype WrappedArrow a b c = WrapArrow { unwrapArrow :: a b c }
                            deriving (Generic, Generic1)
 
+-- | @since 2.01
 instance Arrow a => Functor (WrappedArrow a b) where
     fmap f (WrapArrow a) = WrapArrow (a >>> arr f)
 
+-- | @since 2.01
 instance Arrow a => Applicative (WrappedArrow a b) where
     pure x = WrapArrow (arr (const x))
     WrapArrow f <*> WrapArrow v = WrapArrow (f &&& v >>> arr (uncurry id))
 
+-- | @since 2.01
 instance (ArrowZero a, ArrowPlus a) => Alternative (WrappedArrow a b) where
     empty = WrapArrow zeroArrow
     WrapArrow u <|> WrapArrow v = WrapArrow (u <+> v)
@@ -100,6 +106,7 @@ newtype ZipList a = ZipList { getZipList :: [a] }
                            , Foldable, Generic, Generic1)
 -- See Data.Traversable for Traversabel instance due to import loops
 
+-- | @since 2.01
 instance Applicative ZipList where
     pure x = ZipList (repeat x)
     ZipList fs <*> ZipList xs = ZipList (zipWith id fs xs)

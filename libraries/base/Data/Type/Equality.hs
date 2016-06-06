@@ -67,6 +67,7 @@ class a ~~ b => (a :: k) ~ (b :: k)
   -- necessary because the functional-dependency coverage check looks
   -- through superclasses, and (~#) is handled in that check.
 
+-- | @since 4.9.0.0
 instance {-# INCOHERENT #-} a ~~ b => a ~ b
   -- See Note [The equality types story] in TysPrim
   -- If we have a Wanted (t1 ~ t2), we want to immediately
@@ -122,15 +123,18 @@ deriving instance Eq   (a :~: b)
 deriving instance Show (a :~: b)
 deriving instance Ord  (a :~: b)
 
+-- | @since 4.7.0.0
 instance a ~ b => Read (a :~: b) where
   readsPrec d = readParen (d > 10) (\r -> [(Refl, s) | ("Refl",s) <- lex r ])
 
+-- | @since 4.7.0.0
 instance a ~ b => Enum (a :~: b) where
   toEnum 0 = Refl
   toEnum _ = errorWithoutStackTrace "Data.Type.Equality.toEnum: bad argument"
 
   fromEnum Refl = 0
 
+-- | @since 4.7.0.0
 deriving instance a ~ b => Bounded (a :~: b)
 
 -- | This class contains types where you can learn the equality of two types
@@ -140,6 +144,7 @@ class TestEquality f where
   -- | Conditionally prove the equality of @a@ and @b@.
   testEquality :: f a -> f b -> Maybe (a :~: b)
 
+-- | @since 4.7.0.0
 instance TestEquality ((:~:) a) where
   testEquality Refl Refl = Just Refl
 

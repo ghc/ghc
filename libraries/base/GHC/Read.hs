@@ -314,6 +314,7 @@ choose sps = foldr ((+++) . try_one) pfail sps
 
 deriving instance Read GeneralCategory
 
+-- | @since 2.01
 instance Read Char where
   readPrec =
     parens
@@ -331,6 +332,7 @@ instance Read Char where
 
   readList = readListDefault
 
+-- | @since 2.01
 instance Read Bool where
   readPrec =
     parens
@@ -344,6 +346,7 @@ instance Read Bool where
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+-- | @since 2.01
 instance Read Ordering where
   readPrec =
     parens
@@ -385,6 +388,7 @@ parenthesis-like objects such as (...) and [...] can be an argument to
 'Just'.
 -}
 
+-- | @since 2.01
 instance Read a => Read (Maybe a) where
   readPrec =
     parens
@@ -400,6 +404,7 @@ instance Read a => Read (Maybe a) where
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+-- | @since 2.01
 instance Read a => Read [a] where
   {-# SPECIALISE instance Read [String] #-}
   {-# SPECIALISE instance Read [Char] #-}
@@ -408,6 +413,7 @@ instance Read a => Read [a] where
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+-- | @since 2.01
 instance  (Ix a, Read a, Read b) => Read (Array a b)  where
     readPrec = parens $ prec appPrec $
                do expectP (L.Ident "array")
@@ -418,6 +424,7 @@ instance  (Ix a, Read a, Read b) => Read (Array a b)  where
     readListPrec = readListPrecDefault
     readList     = readListDefault
 
+-- | @since 2.01
 instance Read L.Lexeme where
   readPrec     = lexP
   readListPrec = readListPrecDefault
@@ -455,29 +462,35 @@ convertFrac (L.Number n) = let resRange = floatRange (undefined :: a)
                               Just rat -> return $ fromRational rat
 convertFrac _            = pfail
 
+-- | @since 2.01
 instance Read Int where
   readPrec     = readNumber convertInt
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+-- | @since 4.5.0.0
 instance Read Word where
     readsPrec p s = [(fromInteger x, r) | (x, r) <- readsPrec p s]
 
+-- | @since 2.01
 instance Read Integer where
   readPrec     = readNumber convertInt
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+-- | @since 2.01
 instance Read Float where
   readPrec     = readNumber convertFrac
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+-- | @since 2.01
 instance Read Double where
   readPrec     = readNumber convertFrac
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+-- | @since 2.01
 instance (Integral a, Read a) => Read (Ratio a) where
   readPrec =
     parens
@@ -497,6 +510,7 @@ instance (Integral a, Read a) => Read (Ratio a) where
 -- Tuple instances of Read, up to size 15
 ------------------------------------------------------------------------
 
+-- | @since 2.01
 instance Read () where
   readPrec =
     parens
@@ -508,6 +522,7 @@ instance Read () where
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+-- | @since 2.01
 instance (Read a, Read b) => Read (a,b) where
   readPrec = wrap_tup read_tup2
   readListPrec = readListPrecDefault
@@ -541,6 +556,7 @@ read_tup8 = do  (a,b,c,d) <- read_tup4
                 return (a,b,c,d,e,f,g,h)
 
 
+-- | @since 2.01
 instance (Read a, Read b, Read c) => Read (a, b, c) where
   readPrec = wrap_tup (do { (a,b) <- read_tup2; read_comma
                           ; c <- readPrec
@@ -548,11 +564,13 @@ instance (Read a, Read b, Read c) => Read (a, b, c) where
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+-- | @since 2.01
 instance (Read a, Read b, Read c, Read d) => Read (a, b, c, d) where
   readPrec = wrap_tup read_tup4
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+-- | @since 2.01
 instance (Read a, Read b, Read c, Read d, Read e) => Read (a, b, c, d, e) where
   readPrec = wrap_tup (do { (a,b,c,d) <- read_tup4; read_comma
                           ; e <- readPrec
@@ -560,6 +578,7 @@ instance (Read a, Read b, Read c, Read d, Read e) => Read (a, b, c, d, e) where
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+-- | @since 2.01
 instance (Read a, Read b, Read c, Read d, Read e, Read f)
         => Read (a, b, c, d, e, f) where
   readPrec = wrap_tup (do { (a,b,c,d) <- read_tup4; read_comma
@@ -568,6 +587,7 @@ instance (Read a, Read b, Read c, Read d, Read e, Read f)
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+-- | @since 2.01
 instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g)
         => Read (a, b, c, d, e, f, g) where
   readPrec = wrap_tup (do { (a,b,c,d) <- read_tup4; read_comma
@@ -577,12 +597,14 @@ instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g)
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+-- | @since 2.01
 instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h)
         => Read (a, b, c, d, e, f, g, h) where
   readPrec     = wrap_tup read_tup8
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+-- | @since 2.01
 instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
           Read i)
         => Read (a, b, c, d, e, f, g, h, i) where
@@ -592,6 +614,7 @@ instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+-- | @since 2.01
 instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
           Read i, Read j)
         => Read (a, b, c, d, e, f, g, h, i, j) where
@@ -601,6 +624,7 @@ instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+-- | @since 2.01
 instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
           Read i, Read j, Read k)
         => Read (a, b, c, d, e, f, g, h, i, j, k) where
@@ -611,6 +635,7 @@ instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+-- | @since 2.01
 instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
           Read i, Read j, Read k, Read l)
         => Read (a, b, c, d, e, f, g, h, i, j, k, l) where
@@ -620,6 +645,7 @@ instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+-- | @since 2.01
 instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
           Read i, Read j, Read k, Read l, Read m)
         => Read (a, b, c, d, e, f, g, h, i, j, k, l, m) where
@@ -630,6 +656,7 @@ instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+-- | @since 2.01
 instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
           Read i, Read j, Read k, Read l, Read m, Read n)
         => Read (a, b, c, d, e, f, g, h, i, j, k, l, m, n) where
@@ -640,6 +667,7 @@ instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+-- | @since 2.01
 instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
           Read i, Read j, Read k, Read l, Read m, Read n, Read o)
         => Read (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) where

@@ -96,14 +96,17 @@ data ArgDescr a
    | ReqArg (String       -> a) String -- ^   option requires argument
    | OptArg (Maybe String -> a) String -- ^   optional argument
 
+-- | @since 4.6.0.0
 instance Functor ArgOrder where
     fmap _ RequireOrder      = RequireOrder
     fmap _ Permute           = Permute
     fmap f (ReturnInOrder g) = ReturnInOrder (f . g)
 
+-- | @since 4.6.0.0
 instance Functor OptDescr where
     fmap f (Option a b argDescr c) = Option a b (fmap f argDescr) c
 
+-- | @since 4.6.0.0
 instance Functor ArgDescr where
     fmap f (NoArg a)    = NoArg (f a)
     fmap f (ReqArg g s) = ReqArg (f . g) s

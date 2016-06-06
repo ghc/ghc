@@ -67,12 +67,15 @@ class Monad m => MonadFail m where
     fail :: String -> m a
 
 
+-- | @since 4.9.0.0
 instance MonadFail Maybe where
     fail _ = Nothing
 
+-- | @since 4.9.0.0
 instance MonadFail [] where
     {-# INLINE fail #-}
     fail _ = []
 
+-- | @since 4.9.0.0
 instance MonadFail IO where
     fail = failIO

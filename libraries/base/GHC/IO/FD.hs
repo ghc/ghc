@@ -88,15 +88,18 @@ fdIsSocket :: FD -> Bool
 fdIsSocket fd = fdIsSocket_ fd /= 0
 #endif
 
+-- | @since 4.1.0.0
 instance Show FD where
   show fd = show (fdFD fd)
 
+-- | @since 4.1.0.0
 instance GHC.IO.Device.RawIO FD where
   read             = fdRead
   readNonBlocking  = fdReadNonBlocking
   write            = fdWrite
   writeNonBlocking = fdWriteNonBlocking
 
+-- | @since 4.1.0.0
 instance GHC.IO.Device.IODevice FD where
   ready         = ready
   close         = close
@@ -120,6 +123,7 @@ instance GHC.IO.Device.IODevice FD where
 dEFAULT_FD_BUFFER_SIZE :: Int
 dEFAULT_FD_BUFFER_SIZE = 8096
 
+-- | @since 4.1.0.0
 instance BufferedIO FD where
   newBuffer _dev state = newByteBuffer dEFAULT_FD_BUFFER_SIZE state
   fillReadBuffer    fd buf = readBuf' fd buf

@@ -282,6 +282,7 @@ class HPrintfType t where
 instance PrintfType String where
     spr fmt args = uprintf fmt (reverse args)
 -}
+-- | @since 2.01
 instance (IsChar c) => PrintfType [c] where
     spr fmts args = map fromChar (uprintf fmts (reverse args))
 
@@ -289,18 +290,22 @@ instance (IsChar c) => PrintfType [c] where
 -- type system won't readily let us say that without
 -- bringing the GADTs. So we go conditional for these defs.
 
+-- | @since 4.7.0.0
 instance (a ~ ()) => PrintfType (IO a) where
     spr fmts args =
         putStr $ map fromChar $ uprintf fmts $ reverse args
 
+-- | @since 4.7.0.0
 instance (a ~ ()) => HPrintfType (IO a) where
     hspr hdl fmts args = do
         hPutStr hdl (uprintf fmts (reverse args))
 
+-- | @since 2.01
 instance (PrintfArg a, PrintfType r) => PrintfType (a -> r) where
     spr fmts args = \ a -> spr fmts
                              ((parseFormat a, formatArg a) : args)
 
+-- | @since 2.01
 instance (PrintfArg a, HPrintfType r) => HPrintfType (a -> r) where
     hspr hdl fmts args = \ a -> hspr hdl fmts
                                   ((parseFormat a, formatArg a) : args)
@@ -318,64 +323,80 @@ class PrintfArg a where
     parseFormat _ (c : cs) = FormatParse "" c cs
     parseFormat _ "" = errorShortFormat
 
+-- | @since 2.01
 instance PrintfArg Char where
     formatArg = formatChar
     parseFormat _ cf = parseIntFormat (undefined :: Int) cf
 
+-- | @since 2.01
 instance (IsChar c) => PrintfArg [c] where
     formatArg = formatString
 
+-- | @since 2.01
 instance PrintfArg Int where
     formatArg = formatInt
     parseFormat = parseIntFormat
 
+-- | @since 2.01
 instance PrintfArg Int8 where
     formatArg = formatInt
     parseFormat = parseIntFormat
 
+-- | @since 2.01
 instance PrintfArg Int16 where
     formatArg = formatInt
     parseFormat = parseIntFormat
 
+-- | @since 2.01
 instance PrintfArg Int32 where
     formatArg = formatInt
     parseFormat = parseIntFormat
 
+-- | @since 2.01
 instance PrintfArg Int64 where
     formatArg = formatInt
     parseFormat = parseIntFormat
 
+-- | @since 2.01
 instance PrintfArg Word where
     formatArg = formatInt
     parseFormat = parseIntFormat
 
+-- | @since 2.01
 instance PrintfArg Word8 where
     formatArg = formatInt
     parseFormat = parseIntFormat
 
+-- | @since 2.01
 instance PrintfArg Word16 where
     formatArg = formatInt
     parseFormat = parseIntFormat
 
+-- | @since 2.01
 instance PrintfArg Word32 where
     formatArg = formatInt
     parseFormat = parseIntFormat
 
+-- | @since 2.01
 instance PrintfArg Word64 where
     formatArg = formatInt
     parseFormat = parseIntFormat
 
+-- | @since 2.01
 instance PrintfArg Integer where
     formatArg = formatInteger
     parseFormat = parseIntFormat
 
+-- | @since 4.8.0.0
 instance PrintfArg Natural where
     formatArg = formatInteger . toInteger
     parseFormat = parseIntFormat
 
+-- | @since 2.01
 instance PrintfArg Float where
     formatArg = formatRealFloat
 
+-- | @since 2.01
 instance PrintfArg Double where
     formatArg = formatRealFloat
 
@@ -389,6 +410,7 @@ class IsChar c where
     -- | @since 4.7.0.0
     fromChar :: Char -> c
 
+-- | @since 2.01
 instance IsChar Char where
     toChar c = c
     fromChar c = c

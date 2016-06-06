@@ -27,6 +27,7 @@ newtype UniqueSource = US (TVar Int64)
 newtype Unique = Unique { asInt64 :: Int64 }
     deriving (Eq, Ord, Num)
 
+-- | @since 4.3.1.0
 instance Show Unique where
     show = show . asInt64
 

@@ -136,6 +136,7 @@ data Event = Event {
     , eventFd    :: Fd
     } deriving (Show)
 
+-- | @since 4.3.1.0
 instance Storable Event where
     sizeOf    _ = #size struct epoll_event
     alignment _ = alignment (undefined :: CInt)

@@ -50,6 +50,7 @@ encapsulated in a @SomeException@.
 -}
 data SomeException = forall e . Exception e => SomeException e
 
+-- | @since 3.0
 instance Show SomeException where
     showsPrec p (SomeException e) = showsPrec p e
 
@@ -154,6 +155,7 @@ class (Typeable e, Show e) => Exception e where
     displayException :: e -> String
     displayException = show
 
+-- | @since 3.0
 instance Exception SomeException where
     toException se = se
     fromException = Just
@@ -173,8 +175,10 @@ pattern ErrorCall :: String -> ErrorCall
 pattern ErrorCall err <- ErrorCallWithLocation err _ where
   ErrorCall err = ErrorCallWithLocation err ""
 
+-- | @since 4.0.0.0
 instance Exception ErrorCall
 
+-- | @since 4.0.0.0
 instance Show ErrorCall where
   showsPrec _ (ErrorCallWithLocation err "") = showString err
   showsPrec _ (ErrorCallWithLocation err loc) = showString (err ++ '\n' : loc)
@@ -239,8 +243,10 @@ divZeroException        = toException DivideByZero
 overflowException       = toException Overflow
 ratioZeroDenomException = toException RatioZeroDenominator
 
+-- | @since 4.0.0.0
 instance Exception ArithException
 
+-- | @since 4.0.0.0
 instance Show ArithException where
   showsPrec _ Overflow        = showString "arithmetic overflow"
   showsPrec _ Underflow       = showString "arithmetic underflow"

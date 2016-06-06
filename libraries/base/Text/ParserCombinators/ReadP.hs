@@ -104,12 +104,15 @@ data P a
 
 -- Monad, MonadPlus
 
+-- | @since 4.5.0.0
 instance Applicative P where
   pure x = Result x Fail
   (<*>) = ap
 
+-- | @since 2.01
 instance MonadPlus P
 
+-- | @since 2.01
 instance Monad P where
   (Get f)      >>= k = Get (\c -> f c >>= k)
   (Look f)     >>= k = Look (\s -> f s >>= k)
@@ -119,9 +122,11 @@ instance Monad P where
 
   fail _ = Fail
 
+-- | @since 4.9.0.0
 instance MonadFail P where
   fail _ = Fail
 
+-- | @since 4.5.0.0
 instance Alternative P where
   empty = Fail
 
@@ -158,24 +163,30 @@ newtype ReadP a = R (forall b . (a -> P b) -> P b)
 
 -- Functor, Monad, MonadPlus
 
+-- | @since 2.01
 instance Functor ReadP where
   fmap h (R f) = R (\k -> f (k . h))
 
+-- | @since 4.6.0.0
 instance Applicative ReadP where
     pure x = R (\k -> k x)
     (<*>) = ap
 
+-- | @since 2.01
 instance Monad ReadP where
   fail _    = R (\_ -> Fail)
   R m >>= f = R (\k -> m (\a -> let R m' = f a in m' k))
 
+-- | @since 4.9.0.0
 instance MonadFail ReadP where
   fail _    = R (\_ -> Fail)
 
+-- | @since 4.6.0.0
 instance Alternative ReadP where
   empty = pfail
   (<|>) = (+++)
 
+-- | @since 2.01
 instance MonadPlus ReadP
 
 -- ---------------------------------------------------------------------------

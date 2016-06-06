@@ -142,15 +142,18 @@ class Semigroup a where
 cycle1 :: Semigroup m => m -> m
 cycle1 xs = xs' where xs' = xs <> xs'
 
+-- | @since 4.9.0.0
 instance Semigroup () where
   _ <> _ = ()
   sconcat _ = ()
   stimes _ _ = ()
 
+-- | @since 4.9.0.0
 instance Semigroup b => Semigroup (a -> b) where
   f <> g = \a -> f a <> g a
   stimes n f e = stimes n (f e)
 
+-- | @since 4.9.0.0
 instance Semigroup [a] where
   (<>) = (++)
   stimes n x
@@ -160,6 +163,7 @@ instance Semigroup [a] where
       rep 0 = []
       rep i = x ++ rep (i - 1)
 
+-- | @since 4.9.0.0
 instance Semigroup a => Semigroup (Maybe a) where
   Nothing <> b       = b
   a       <> Nothing = a
@@ -170,57 +174,69 @@ instance Semigroup a => Semigroup (Maybe a) where
     EQ -> Nothing
     GT -> Just (stimes n a)
 
+-- | @since 4.9.0.0
 instance Semigroup (Either a b) where
   Left _ <> b = b
   a      <> _ = a
   stimes = stimesIdempotent
 
+-- | @since 4.9.0.0
 instance (Semigroup a, Semigroup b) => Semigroup (a, b) where
   (a,b) <> (a',b') = (a<>a',b<>b')
   stimes n (a,b) = (stimes n a, stimes n b)
 
+-- | @since 4.9.0.0
 instance (Semigroup a, Semigroup b, Semigroup c) => Semigroup (a, b, c) where
   (a,b,c) <> (a',b',c') = (a<>a',b<>b',c<>c')
   stimes n (a,b,c) = (stimes n a, stimes n b, stimes n c)
 
+-- | @since 4.9.0.0
 instance (Semigroup a, Semigroup b, Semigroup c, Semigroup d)
          => Semigroup (a, b, c, d) where
   (a,b,c,d) <> (a',b',c',d') = (a<>a',b<>b',c<>c',d<>d')
   stimes n (a,b,c,d) = (stimes n a, stimes n b, stimes n c, stimes n d)
 
+-- | @since 4.9.0.0
 instance (Semigroup a, Semigroup b, Semigroup c, Semigroup d, Semigroup e)
          => Semigroup (a, b, c, d, e) where
   (a,b,c,d,e) <> (a',b',c',d',e') = (a<>a',b<>b',c<>c',d<>d',e<>e')
   stimes n (a,b,c,d,e) =
       (stimes n a, stimes n b, stimes n c, stimes n d, stimes n e)
 
+-- | @since 4.9.0.0
 instance Semigroup Ordering where
   LT <> _ = LT
   EQ <> y = y
   GT <> _ = GT
   stimes = stimesIdempotentMonoid
 
+-- | @since 4.9.0.0
 instance Semigroup a => Semigroup (Dual a) where
   Dual a <> Dual b = Dual (b <> a)
   stimes n (Dual a) = Dual (stimes n a)
 
+-- | @since 4.9.0.0
 instance Semigroup (Endo a) where
   (<>) = coerce ((.) :: (a -> a) -> (a -> a) -> (a -> a))
   stimes = stimesMonoid
 
+-- | @since 4.9.0.0
 instance Semigroup All where
   (<>) = coerce (&&)
   stimes = stimesIdempotentMonoid
 
+-- | @since 4.9.0.0
 instance Semigroup Any where
   (<>) = coerce (||)
   stimes = stimesIdempotentMonoid
 
 
+-- | @since 4.9.0.0
 instance Num a => Semigroup (Sum a) where
   (<>) = coerce ((+) :: a -> a -> a)
   stimes n (Sum a) = Sum (fromIntegral n * a)
 
+-- | @since 4.9.0.0
 instance Num a => Semigroup (Product a) where
   (<>) = coerce ((*) :: a -> a -> a)
   stimes n (Product a) = Product (a ^ n)
@@ -263,28 +279,34 @@ stimesIdempotent n x
   | n <= 0 = errorWithoutStackTrace "stimesIdempotent: positive multiplier expected"
   | otherwise = x
 
+-- | @since 4.9.0.0
 instance Semigroup a => Semigroup (Const a b) where
   (<>) = coerce ((<>) :: a -> a -> a)
   stimes n (Const a) = Const (stimes n a)
 
+-- | @since 4.9.0.0
 instance Semigroup (Monoid.First a) where
   Monoid.First Nothing <> b = b
   a                    <> _ = a
   stimes = stimesIdempotentMonoid
 
+-- | @since 4.9.0.0
 instance Semigroup (Monoid.Last a) where
   a <> Monoid.Last Nothing = a
   _ <> b                   = b
   stimes = stimesIdempotentMonoid
 
+-- | @since 4.9.0.0
 instance Alternative f => Semigroup (Alt f a) where
   (<>) = coerce ((<|>) :: f a -> f a -> f a)
   stimes = stimesMonoid
 
+-- | @since 4.9.0.0
 instance Semigroup Void where
   a <> _ = a
   stimes = stimesIdempotent
 
+-- | @since 4.9.0.0
 instance Semigroup (NonEmpty a) where
   (a :| as) <> ~(b :| bs) = a :| (as ++ b : bs)
 
@@ -292,6 +314,7 @@ instance Semigroup (NonEmpty a) where
 newtype Min a = Min { getMin :: a }
   deriving (Bounded, Eq, Ord, Show, Read, Data, Generic, Generic1)
 
+-- | @since 4.9.0.0
 instance Enum a => Enum (Min a) where
   succ (Min a) = Min (succ a)
   pred (Min a) = Min (pred a)
@@ -303,36 +326,45 @@ instance Enum a => Enum (Min a) where
   enumFromThenTo (Min a) (Min b) (Min c) = Min <$> enumFromThenTo a b c
 
 
+-- | @since 4.9.0.0
 instance Ord a => Semigroup (Min a) where
   (<>) = coerce (min :: a -> a -> a)
   stimes = stimesIdempotent
 
+-- | @since 4.9.0.0
 instance (Ord a, Bounded a) => Monoid (Min a) where
   mempty = maxBound
   mappend = (<>)
 
+-- | @since 4.9.0.0
 instance Functor Min where
   fmap f (Min x) = Min (f x)
 
+-- | @since 4.9.0.0
 instance Foldable Min where
   foldMap f (Min a) = f a
 
+-- | @since 4.9.0.0
 instance Traversable Min where
   traverse f (Min a) = Min <$> f a
 
+-- | @since 4.9.0.0
 instance Applicative Min where
   pure = Min
   a <* _ = a
   _ *> a = a
   Min f <*> Min x = Min (f x)
 
+-- | @since 4.9.0.0
 instance Monad Min where
   (>>) = (*>)
   Min a >>= f = f a
 
+-- | @since 4.9.0.0
 instance MonadFix Min where
   mfix f = fix (f . getMin)
 
+-- | @since 4.9.0.0
 instance Num a => Num (Min a) where
   (Min a) + (Min b) = Min (a + b)
   (Min a) * (Min b) = Min (a * b)
@@ -345,6 +377,7 @@ instance Num a => Num (Min a) where
 newtype Max a = Max { getMax :: a }
   deriving (Bounded, Eq, Ord, Show, Read, Data, Generic, Generic1)
 
+-- | @since 4.9.0.0
 instance Enum a => Enum (Max a) where
   succ (Max a) = Max (succ a)
   pred (Max a) = Max (pred a)
@@ -355,36 +388,45 @@ instance Enum a => Enum (Max a) where
   enumFromTo (Max a) (Max b) = Max <$> enumFromTo a b
   enumFromThenTo (Max a) (Max b) (Max c) = Max <$> enumFromThenTo a b c
 
+-- | @since 4.9.0.0
 instance Ord a => Semigroup (Max a) where
   (<>) = coerce (max :: a -> a -> a)
   stimes = stimesIdempotent
 
+-- | @since 4.9.0.0
 instance (Ord a, Bounded a) => Monoid (Max a) where
   mempty = minBound
   mappend = (<>)
 
+-- | @since 4.9.0.0
 instance Functor Max where
   fmap f (Max x) = Max (f x)
 
+-- | @since 4.9.0.0
 instance Foldable Max where
   foldMap f (Max a) = f a
 
+-- | @since 4.9.0.0
 instance Traversable Max where
   traverse f (Max a) = Max <$> f a
 
+-- | @since 4.9.0.0
 instance Applicative Max where
   pure = Max
   a <* _ = a
   _ *> a = a
   Max f <*> Max x = Max (f x)
 
+-- | @since 4.9.0.0
 instance Monad Max where
   (>>) = (*>)
   Max a >>= f = f a
 
+-- | @since 4.9.0.0
 instance MonadFix Max where
   mfix f = fix (f . getMax)
 
+-- | @since 4.9.0.0
 instance Num a => Num (Max a) where
   (Max a) + (Max b) = Max (a + b)
   (Max a) * (Max b) = Max (a * b)
@@ -402,18 +444,23 @@ data Arg a b = Arg a b deriving
 type ArgMin a b = Min (Arg a b)
 type ArgMax a b = Max (Arg a b)
 
+-- | @since 4.9.0.0
 instance Functor (Arg a) where
   fmap f (Arg x a) = Arg x (f a)
 
+-- | @since 4.9.0.0
 instance Foldable (Arg a) where
   foldMap f (Arg _ a) = f a
 
+-- | @since 4.9.0.0
 instance Traversable (Arg a) where
   traverse f (Arg x a) = Arg x <$> f a
 
+-- | @since 4.9.0.0
 instance Eq a => Eq (Arg a b) where
   Arg a _ == Arg b _ = a == b
 
+-- | @since 4.9.0.0
 instance Ord a => Ord (Arg a b) where
   Arg a _ `compare` Arg b _ = compare a b
   min x@(Arg a _) y@(Arg b _)
@@ -423,6 +470,7 @@ instance Ord a => Ord (Arg a b) where
     | a >= b    = x
     | otherwise = y
 
+-- | @since 4.9.0.0
 instance Bifunctor Arg where
   bimap f g (Arg a b) = Arg (f a) (g b)
 
@@ -431,6 +479,7 @@ instance Bifunctor Arg where
 newtype First a = First { getFirst :: a } deriving
   (Bounded, Eq, Ord, Show, Read, Data, Generic, Generic1)
 
+-- | @since 4.9.0.0
 instance Enum a => Enum (First a) where
   succ (First a) = First (succ a)
   pred (First a) = First (pred a)
@@ -441,29 +490,36 @@ instance Enum a => Enum (First a) where
   enumFromTo (First a) (First b) = First <$> enumFromTo a b
   enumFromThenTo (First a) (First b) (First c) = First <$> enumFromThenTo a b c
 
+-- | @since 4.9.0.0
 instance Semigroup (First a) where
   a <> _ = a
   stimes = stimesIdempotent
 
+-- | @since 4.9.0.0
 instance Functor First where
   fmap f (First x) = First (f x)
 
+-- | @since 4.9.0.0
 instance Foldable First where
   foldMap f (First a) = f a
 
+-- | @since 4.9.0.0
 instance Traversable First where
   traverse f (First a) = First <$> f a
 
+-- | @since 4.9.0.0
 instance Applicative First where
   pure x = First x
   a <* _ = a
   _ *> a = a
   First f <*> First x = First (f x)
 
+-- | @since 4.9.0.0
 instance Monad First where
   (>>) = (*>)
   First a >>= f = f a
 
+-- | @since 4.9.0.0
 instance MonadFix First where
   mfix f = fix (f . getFirst)
 
@@ -472,6 +528,7 @@ instance MonadFix First where
 newtype Last a = Last { getLast :: a } deriving
   (Bounded, Eq, Ord, Show, Read, Data, Generic, Generic1)
 
+-- | @since 4.9.0.0
 instance Enum a => Enum (Last a) where
   succ (Last a) = Last (succ a)
   pred (Last a) = Last (pred a)
@@ -482,30 +539,37 @@ instance Enum a => Enum (Last a) where
   enumFromTo (Last a) (Last b) = Last <$> enumFromTo a b
   enumFromThenTo (Last a) (Last b) (Last c) = Last <$> enumFromThenTo a b c
 
+-- | @since 4.9.0.0
 instance Semigroup (Last a) where
   _ <> b = b
   stimes = stimesIdempotent
 
+-- | @since 4.9.0.0
 instance Functor Last where
   fmap f (Last x) = Last (f x)
   a <$ _ = Last a
 
+-- | @since 4.9.0.0
 instance Foldable Last where
   foldMap f (Last a) = f a
 
+-- | @since 4.9.0.0
 instance Traversable Last where
   traverse f (Last a) = Last <$> f a
 
+-- | @since 4.9.0.0
 instance Applicative Last where
   pure = Last
   a <* _ = a
   _ *> a = a
   Last f <*> Last x = Last (f x)
 
+-- | @since 4.9.0.0
 instance Monad Last where
   (>>) = (*>)
   Last a >>= f = f a
 
+-- | @since 4.9.0.0
 instance MonadFix Last where
   mfix f = fix (f . getLast)
 
@@ -513,13 +577,16 @@ instance MonadFix Last where
 newtype WrappedMonoid m = WrapMonoid { unwrapMonoid :: m }
   deriving (Bounded, Eq, Ord, Show, Read, Data, Generic, Generic1)
 
+-- | @since 4.9.0.0
 instance Monoid m => Semigroup (WrappedMonoid m) where
   (<>) = coerce (mappend :: m -> m -> m)
 
+-- | @since 4.9.0.0
 instance Monoid m => Monoid (WrappedMonoid m) where
   mempty = WrapMonoid mempty
   mappend = (<>)
 
+-- | @since 4.9.0.0
 instance Enum a => Enum (WrappedMonoid a) where
   succ (WrapMonoid a) = WrapMonoid (succ a)
   pred (WrapMonoid a) = WrapMonoid (pred a)
@@ -552,9 +619,11 @@ mtimesDefault n x
 newtype Option a = Option { getOption :: Maybe a }
   deriving (Eq, Ord, Show, Read, Data, Generic, Generic1)
 
+-- | @since 4.9.0.0
 instance Functor Option where
   fmap f (Option a) = Option (fmap f a)
 
+-- | @since 4.9.0.0
 instance Applicative Option where
   pure a = Option (Just a)
   Option a <*> Option b = Option (a <*> b)
@@ -562,25 +631,31 @@ instance Applicative Option where
   Option Nothing  *>  _ = Option Nothing
   _               *>  b = b
 
+-- | @since 4.9.0.0
 instance Monad Option where
   Option (Just a) >>= k = k a
   _               >>= _ = Option Nothing
   (>>) = (*>)
 
+-- | @since 4.9.0.0
 instance Alternative Option where
   empty = Option Nothing
   Option Nothing <|> b = b
   a <|> _ = a
 
+-- | @since 4.9.0.0
 instance MonadPlus Option
 
+-- | @since 4.9.0.0
 instance MonadFix Option where
   mfix f = Option (mfix (getOption . f))
 
+-- | @since 4.9.0.0
 instance Foldable Option where
   foldMap f (Option (Just m)) = f m
   foldMap _ (Option Nothing)  = mempty
 
+-- | @since 4.9.0.0
 instance Traversable Option where
   traverse f (Option (Just a)) = Option . Just <$> f a
   traverse _ (Option Nothing)  = pure (Option Nothing)
@@ -589,6 +664,7 @@ instance Traversable Option where
 option :: b -> (a -> b) -> Option a -> b
 option n j (Option m) = maybe n j m
 
+-- | @since 4.9.0.0
 instance Semigroup a => Semigroup (Option a) where
   (<>) = coerce ((<>) :: Maybe a -> Maybe a -> Maybe a)
 
@@ -598,6 +674,7 @@ instance Semigroup a => Semigroup (Option a) where
     EQ -> Option Nothing
     GT -> Option (Just (stimes n a))
 
+-- | @since 4.9.0.0
 instance Semigroup a => Monoid (Option a) where
   mempty = Option Nothing
   mappend = (<>)
@@ -606,6 +683,7 @@ instance Semigroup a => Monoid (Option a) where
 diff :: Semigroup m => m -> Endo m
 diff = Endo . (<>)
 
+-- | @since 4.9.0.0
 instance Semigroup (Proxy s) where
   _ <> _ = Proxy
   sconcat _ = Proxy

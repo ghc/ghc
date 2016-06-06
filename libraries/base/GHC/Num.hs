@@ -64,6 +64,7 @@ class  Num a  where
 subtract :: (Num a) => a -> a -> a
 subtract x y = y - x
 
+-- | @since 2.01
 instance  Num Int  where
     I# x + I# y = I# (x +# y)
     I# x - I# y = I# (x -# y)
@@ -78,6 +79,7 @@ instance  Num Int  where
     {-# INLINE fromInteger #-}   -- Just to be sure!
     fromInteger i = I# (integerToInt i)
 
+-- | @since 2.01
 instance Num Word where
     (W# x#) + (W# y#)      = W# (x# `plusWord#` y#)
     (W# x#) - (W# y#)      = W# (x# `minusWord#` y#)
@@ -88,6 +90,7 @@ instance Num Word where
     signum _               = 1
     fromInteger i          = W# (integerToWord i)
 
+-- | @since 2.01
 instance  Num Integer  where
     (+) = plusInteger
     (-) = minusInteger

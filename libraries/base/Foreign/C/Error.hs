@@ -111,6 +111,7 @@ import GHC.Base
 
 newtype Errno = Errno CInt
 
+-- | @since 2.01
 instance Eq Errno where
   errno1@(Errno no1) == errno2@(Errno no2)
     | isValidErrno errno1 && isValidErrno errno2 = no1 == no2

@@ -237,16 +237,20 @@ theTypes = [ "data ConvArray a = ConvArray Addr#"
 class (Ord a, Enum a, Bounded a, Show a) => Embed a where
     mkHex :: a -> String
 
+-- | @since 4.2.0.0
 instance Embed Word8 where
     mkHex = showHex'
 
+-- | @since 4.2.0.0
 instance Embed Word16 where
     mkHex = repDualByte
 
+-- | @since 4.2.0.0
 instance Embed Char where
     mkHex = repDualByte
 
 -- this is used for the indices of the compressed array.
+-- | @since 4.2.0.0
 instance Embed Int where
     mkHex = repDualByte
 

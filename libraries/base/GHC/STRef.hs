@@ -45,5 +45,6 @@ writeSTRef (STRef var#) val = ST $ \s1# ->
     (# s2#, () #) }
 
 -- Just pointer equality on mutable references:
+-- | @since 2.01
 instance Eq (STRef s a) where
     STRef v1# == STRef v2# = isTrue# (sameMutVar# v1# v2#)

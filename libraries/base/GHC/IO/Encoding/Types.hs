@@ -117,6 +117,7 @@ data TextEncoding
                    -- be shared between several character sequences or simultaneously across threads
   }
 
+-- | @since 4.3.0.0
 instance Show TextEncoding where
   -- | Returns the value of 'textEncodingName'
   show te = textEncodingName te

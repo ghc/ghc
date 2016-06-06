@@ -140,6 +140,7 @@ import GHC.IO (interruptible)
 -- | You need this when using 'catches'.
 data Handler a = forall e . Exception e => Handler (e -> IO a)
 
+-- | @since 4.6.0.0
 instance Functor Handler where
      fmap f (Handler h) = Handler (fmap f . h)
 

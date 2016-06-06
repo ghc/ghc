@@ -214,53 +214,64 @@ showsPrec2 = liftShowsPrec2 showsPrec showList showsPrec showList
 
 -- Instances for Prelude type constructors
 
+-- | @since 4.9.0.0
 instance Eq1 Maybe where
     liftEq _ Nothing Nothing = True
     liftEq _ Nothing (Just _) = False
     liftEq _ (Just _) Nothing = False
     liftEq eq (Just x) (Just y) = eq x y
 
+-- | @since 4.9.0.0
 instance Ord1 Maybe where
     liftCompare _ Nothing Nothing = EQ
     liftCompare _ Nothing (Just _) = LT
     liftCompare _ (Just _) Nothing = GT
     liftCompare comp (Just x) (Just y) = comp x y
 
+-- | @since 4.9.0.0
 instance Read1 Maybe where
     liftReadsPrec rp _ d =
          readParen False (\ r -> [(Nothing,s) | ("Nothing",s) <- lex r])
          `mappend`
          readsData (readsUnaryWith rp "Just" Just) d
 
+-- | @since 4.9.0.0
 instance Show1 Maybe where
     liftShowsPrec _ _ _ Nothing = showString "Nothing"
     liftShowsPrec sp _ d (Just x) = showsUnaryWith sp "Just" d x
 
+-- | @since 4.9.0.0
 instance Eq1 [] where
     liftEq _ [] [] = True
     liftEq _ [] (_:_) = False
     liftEq _ (_:_) [] = False
     liftEq eq (x:xs) (y:ys) = eq x y && liftEq eq xs ys
 
+-- | @since 4.9.0.0
 instance Ord1 [] where
     liftCompare _ [] [] = EQ
     liftCompare _ [] (_:_) = LT
     liftCompare _ (_:_) [] = GT
     liftCompare comp (x:xs) (y:ys) = comp x y `mappend` liftCompare comp xs ys
 
+-- | @since 4.9.0.0
 instance Read1 [] where
     liftReadsPrec _ rl _ = rl
 
+-- | @since 4.9.0.0
 instance Show1 [] where
     liftShowsPrec _ sl _ = sl
 
+-- | @since 4.9.0.0
 instance Eq2 (,) where
     liftEq2 e1 e2 (x1, y1) (x2, y2) = e1 x1 x2 && e2 y1 y2
 
+-- | @since 4.9.0.0
 instance Ord2 (,) where
     liftCompare2 comp1 comp2 (x1, y1) (x2, y2) =
         comp1 x1 x2 `mappend` comp2 y1 y2
 
+-- | @since 4.9.0.0
 instance Read2 (,) where
     liftReadsPrec2 rp1 _ rp2 _ _ = readParen False $ \ r ->
         [((x,y), w) | ("(",s) <- lex r,
@@ -269,89 +280,114 @@ instance Read2 (,) where
                       (y,v)   <- rp2 0 u,
                       (")",w) <- lex v]
 
+-- | @since 4.9.0.0
 instance Show2 (,) where
     liftShowsPrec2 sp1 _ sp2 _ _ (x, y) =
         showChar '(' . sp1 0 x . showChar ',' . sp2 0 y . showChar ')'
 
+-- | @since 4.9.0.0
 instance (Eq a) => Eq1 ((,) a) where
     liftEq = liftEq2 (==)
 
+-- | @since 4.9.0.0
 instance (Ord a) => Ord1 ((,) a) where
     liftCompare = liftCompare2 compare
 
+-- | @since 4.9.0.0
 instance (Read a) => Read1 ((,) a) where
     liftReadsPrec = liftReadsPrec2 readsPrec readList
 
+-- | @since 4.9.0.0
 instance (Show a) => Show1 ((,) a) where
     liftShowsPrec = liftShowsPrec2 showsPrec showList
 
+-- | @since 4.9.0.0
 instance Eq2 Either where
     liftEq2 e1 _ (Left x) (Left y) = e1 x y
     liftEq2 _ _ (Left _) (Right _) = False
     liftEq2 _ _ (Right _) (Left _) = False
     liftEq2 _ e2 (Right x) (Right y) = e2 x y
 
+-- | @since 4.9.0.0
 instance Ord2 Either where
     liftCompare2 comp1 _ (Left x) (Left y) = comp1 x y
     liftCompare2 _ _ (Left _) (Right _) = LT
     liftCompare2 _ _ (Right _) (Left _) = GT
     liftCompare2 _ comp2 (Right x) (Right y) = comp2 x y
 
+-- | @since 4.9.0.0
 instance Read2 Either where
     liftReadsPrec2 rp1 _ rp2 _ = readsData $
          readsUnaryWith rp1 "Left" Left `mappend`
          readsUnaryWith rp2 "Right" Right
 
+-- | @since 4.9.0.0
 instance Show2 Either where
     liftShowsPrec2 sp1 _ _ _ d (Left x) = showsUnaryWith sp1 "Left" d x
     liftShowsPrec2 _ _ sp2 _ d (Right x) = showsUnaryWith sp2 "Right" d x
 
+-- | @since 4.9.0.0
 instance (Eq a) => Eq1 (Either a) where
     liftEq = liftEq2 (==)
 
+-- | @since 4.9.0.0
 instance (Ord a) => Ord1 (Either a) where
     liftCompare = liftCompare2 compare
 
+-- | @since 4.9.0.0
 instance (Read a) => Read1 (Either a) where
     liftReadsPrec = liftReadsPrec2 readsPrec readList
 
+-- | @since 4.9.0.0
 instance (Show a) => Show1 (Either a) where
     liftShowsPrec = liftShowsPrec2 showsPrec showList
 
 -- Instances for other functors defined in the base package
 
+-- | @since 4.9.0.0
 instance Eq1 Identity where
     liftEq eq (Identity x) (Identity y) = eq x y
 
+-- | @since 4.9.0.0
 instance Ord1 Identity where
     liftCompare comp (Identity x) (Identity y) = comp x y
 
+-- | @since 4.9.0.0
 instance Read1 Identity where
     liftReadsPrec rp _ = readsData $
          readsUnaryWith rp "Identity" Identity
 
+-- | @since 4.9.0.0
 instance Show1 Identity where
     liftShowsPrec sp _ d (Identity x) = showsUnaryWith sp "Identity" d x
 
+-- | @since 4.9.0.0
 instance Eq2 Const where
     liftEq2 eq _ (Const x) (Const y) = eq x y
 
+-- | @since 4.9.0.0
 instance Ord2 Const where
     liftCompare2 comp _ (Const x) (Const y) = comp x y
 
+-- | @since 4.9.0.0
 instance Read2 Const where
     liftReadsPrec2 rp _ _ _ = readsData $
          readsUnaryWith rp "Const" Const
 
+-- | @since 4.9.0.0
 instance Show2 Const where
     liftShowsPrec2 sp _ _ _ d (Const x) = showsUnaryWith sp "Const" d x
 
+-- | @since 4.9.0.0
 instance (Eq a) => Eq1 (Const a) where
     liftEq = liftEq2 (==)
+-- | @since 4.9.0.0
 instance (Ord a) => Ord1 (Const a) where
     liftCompare = liftCompare2 compare
+-- | @since 4.9.0.0
 instance (Read a) => Read1 (Const a) where
     liftReadsPrec = liftReadsPrec2 readsPrec readList
+-- | @since 4.9.0.0
 instance (Show a) => Show1 (Const a) where
     liftShowsPrec = liftShowsPrec2 showsPrec showList
 

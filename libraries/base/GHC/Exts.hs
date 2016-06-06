@@ -187,6 +187,7 @@ class IsList l where
   --   It should satisfy fromList . toList = id.
   toList :: l -> [Item l]
 
+-- | @since 4.7.0.0
 instance IsList [a] where
   type (Item [a]) = a
   fromList = id

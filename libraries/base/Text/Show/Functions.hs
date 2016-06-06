@@ -21,6 +21,7 @@
 
 module Text.Show.Functions () where
 
+-- | @since 2.01
 instance Show (a -> b) where
         showsPrec _ _ = showString "<function>"
 

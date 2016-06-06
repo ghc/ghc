@@ -90,12 +90,15 @@ data ForeignPtrContents
   | MallocPtr      (MutableByteArray# RealWorld) !(IORef Finalizers)
   | PlainPtr       (MutableByteArray# RealWorld)
 
+-- | @since 2.01
 instance Eq (ForeignPtr a) where
     p == q  =  unsafeForeignPtrToPtr p == unsafeForeignPtrToPtr q
 
+-- | @since 2.01
 instance Ord (ForeignPtr a) where
     compare p q  =  compare (unsafeForeignPtrToPtr p) (unsafeForeignPtrToPtr q)
 
+-- | @since 2.01
 instance Show (ForeignPtr a) where
     showsPrec p f = showsPrec p (unsafeForeignPtrToPtr f)
 

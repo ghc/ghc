@@ -75,31 +75,40 @@ class Bifunctor p where
     second = bimap id
 
 
+-- | @since 4.8.0.0
 instance Bifunctor (,) where
     bimap f g ~(a, b) = (f a, g b)
 
+-- | @since 4.8.0.0
 instance Bifunctor ((,,) x1) where
     bimap f g ~(x1, a, b) = (x1, f a, g b)
 
+-- | @since 4.8.0.0
 instance Bifunctor ((,,,) x1 x2) where
     bimap f g ~(x1, x2, a, b) = (x1, x2, f a, g b)
 
+-- | @since 4.8.0.0
 instance Bifunctor ((,,,,) x1 x2 x3) where
     bimap f g ~(x1, x2, x3, a, b) = (x1, x2, x3, f a, g b)
 
+-- | @since 4.8.0.0
 instance Bifunctor ((,,,,,) x1 x2 x3 x4) where
     bimap f g ~(x1, x2, x3, x4, a, b) = (x1, x2, x3, x4, f a, g b)
 
+-- | @since 4.8.0.0
 instance Bifunctor ((,,,,,,) x1 x2 x3 x4 x5) where
     bimap f g ~(x1, x2, x3, x4, x5, a, b) = (x1, x2, x3, x4, x5, f a, g b)
 
 
+-- | @since 4.8.0.0
 instance Bifunctor Either where
     bimap f _ (Left a) = Left (f a)
     bimap _ g (Right b) = Right (g b)
 
+-- | @since 4.8.0.0
 instance Bifunctor Const where
     bimap f _ (Const a) = Const (f a)
 
+-- | @since 4.9.0.0
 instance Bifunctor (K1 i) where
     bimap f _ (K1 c) = K1 (f c)

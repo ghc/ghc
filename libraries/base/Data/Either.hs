@@ -124,15 +124,18 @@ Left "parse error"
 data  Either a b  =  Left a | Right b
   deriving (Eq, Ord, Read, Show)
 
+-- | @since 3.0
 instance Functor (Either a) where
     fmap _ (Left x) = Left x
     fmap f (Right y) = Right (f y)
 
+-- | @since 3.0
 instance Applicative (Either e) where
     pure          = Right
     Left  e <*> _ = Left e
     Right f <*> r = fmap f r
 
+-- | @since 4.4.0.0
 instance Monad (Either e) where
     Left  l >>= _ = Left l
     Right r >>= k = k r

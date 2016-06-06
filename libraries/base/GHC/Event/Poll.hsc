@@ -187,6 +187,7 @@ toEvent e = remap (pollIn .|. pollErr .|. pollHup)  E.evtRead `mappend`
             | e .&. evt /= 0 = to
             | otherwise      = mempty
 
+-- | @since 4.3.1.0
 instance Storable PollFd where
     sizeOf _    = #size struct pollfd
     alignment _ = alignment (undefined :: CInt)

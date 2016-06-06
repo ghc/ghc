@@ -64,6 +64,7 @@ data CPINFO = CPINFO {
     leadByte    :: [BYTE]  -- ^ Always of length mAX_LEADBYTES
   }
 
+-- | @since 4.7.0.0
 instance Storable CPINFO where
     sizeOf    _ = sizeOf (undefined :: UINT) + (mAX_DEFAULTCHAR + mAX_LEADBYTES) * sizeOf (undefined :: BYTE)
     alignment _ = alignment (undefined :: CInt)

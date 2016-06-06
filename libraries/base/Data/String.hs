@@ -75,9 +75,13 @@ A test case (should_run/overloadedstringsrun01.hs) has been added to
 ensure the good behavior of the above example remains in the future.
 -}
 
+-- | @(a ~ Char)@ context was introduced in @4.9.0.0@
+--
+-- @since 2.01
 instance (a ~ Char) => IsString [a] where
          -- See Note [IsString String]
     fromString xs = xs
 
+-- | @since 4.9.0.0
 instance IsString a => IsString (Const a b) where
     fromString = Const . fromString

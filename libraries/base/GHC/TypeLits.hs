@@ -117,15 +117,19 @@ someSymbolVal n   = withSSymbol SomeSymbol (SSymbol n) Proxy
 
 
 
+-- | @since 4.7.0.0
 instance Eq SomeNat where
   SomeNat x == SomeNat y = natVal x == natVal y
 
+-- | @since 4.7.0.0
 instance Ord SomeNat where
   compare (SomeNat x) (SomeNat y) = compare (natVal x) (natVal y)
 
+-- | @since 4.7.0.0
 instance Show SomeNat where
   showsPrec p (SomeNat x) = showsPrec p (natVal x)
 
+-- | @since 4.7.0.0
 instance Read SomeNat where
   readsPrec p xs = do (a,ys) <- readsPrec p xs
                       case someNatVal a of
@@ -133,15 +137,19 @@ instance Read SomeNat where
                         Just n  -> [(n,ys)]
 
 
+-- | @since 4.7.0.0
 instance Eq SomeSymbol where
   SomeSymbol x == SomeSymbol y = symbolVal x == symbolVal y
 
+-- | @since 4.7.0.0
 instance Ord SomeSymbol where
   compare (SomeSymbol x) (SomeSymbol y) = compare (symbolVal x) (symbolVal y)
 
+-- | @since 4.7.0.0
 instance Show SomeSymbol where
   showsPrec p (SomeSymbol x) = showsPrec p (symbolVal x)
 
+-- | @since 4.7.0.0
 instance Read SomeSymbol where
   readsPrec p xs = [ (someSymbolVal a, ys) | (a,ys) <- readsPrec p xs ]
 

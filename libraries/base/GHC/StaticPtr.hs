@@ -96,6 +96,7 @@ foreign import ccall unsafe hs_spt_lookup :: Ptr () -> IO (Ptr a)
 class IsStatic p where
     fromStaticPtr :: StaticPtr a -> p a
 
+-- | @since 4.9.0.0
 instance IsStatic StaticPtr where
     fromStaticPtr = id
 

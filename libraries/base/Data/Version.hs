@@ -98,11 +98,13 @@ data Version =
 {-# DEPRECATED versionTags "See GHC ticket #2496" #-}
 -- TODO. Remove all references to versionTags in GHC 8.0 release.
 
+-- | @since 2.01
 instance Eq Version where
   v1 == v2  =  versionBranch v1 == versionBranch v2
                 && sort (versionTags v1) == sort (versionTags v2)
                 -- tags may be in any order
 
+-- | @since 2.01
 instance Ord Version where
   v1 `compare` v2 = versionBranch v1 `compare` versionBranch v2
 

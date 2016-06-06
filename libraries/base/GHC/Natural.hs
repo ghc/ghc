@@ -150,14 +150,17 @@ isValidNatural (NatJ# bn) = isTrue# (isValidBigNat# bn)
   #-}
 #endif
 
+-- | @since 4.8.0.0
 instance Show Natural where
     showsPrec p (NatS# w#)  = showsPrec p (W# w#)
     showsPrec p (NatJ# bn)  = showsPrec p (Jp# bn)
 
+-- | @since 4.8.0.0
 instance Read Natural where
     readsPrec d = map (\(n, s) -> (fromInteger n, s))
                   . filter ((>= 0) . (\(x,_)->x)) . readsPrec d
 
+-- | @since 4.8.0.0
 instance Num Natural where
     fromInteger (S# i#) | I# i# >= 0  = NatS# (int2Word# i#)
     fromInteger (Jp# bn)              = bigNatToNatural bn
@@ -175,6 +178,7 @@ instance Num Natural where
     negate (NatS# 0##)   = NatS# 0##
     negate _             = throw Underflow
 
+-- | @since 4.8.0.0
 instance Real Natural where
     toRational (NatS# w)  = toRational (W# w)
     toRational (NatJ# bn) = toRational (Jp# bn)
@@ -206,6 +210,7 @@ lcmNatural x y           = (x `quot` (gcdNatural x y)) * y
 
 #endif
 
+-- | @since 4.8.0.0
 instance Enum Natural where
     succ n = n `plusNatural`  NatS# 1##
     pred n = n `minusNatural` NatS# 1##
@@ -248,6 +253,7 @@ enumNegDeltaToNatural x0 ndelta lim = go x0
 
 ----------------------------------------------------------------------------
 
+-- | @since 4.8.0.0
 instance Integral Natural where
     toInteger (NatS# w)  = wordToInteger w
     toInteger (NatJ# bn) = Jp# bn
@@ -280,6 +286,7 @@ instance Integral Natural where
     rem   (NatJ# n) (NatS# d) = NatS# (remBigNatWord n d)
     rem   (NatJ# n) (NatJ# d) = bigNatToNatural (remBigNat n d)
 
+-- | @since 4.8.0.0
 instance Ix Natural where
     range (m,n) = [m..n]
     inRange (m,n) i = m <= i && i <= n
@@ -288,6 +295,7 @@ instance Ix Natural where
               | otherwise   = indexError b i "Natural"
 
 
+-- | @since 4.8.0.0
 instance Bits Natural where
     NatS# n .&. NatS# m = wordToNatural (W# n .&. W# m)
     NatS# n .&. NatJ# m = wordToNatural (W# n .&. W# (bigNatToWord m))
@@ -444,13 +452,16 @@ newtype Natural = Natural Integer -- ^ __Invariant__: non-negative 'Integer'
 isValidNatural :: Natural -> Bool
 isValidNatural (Natural i) = i >= 0
 
+-- | @since 4.8.0.0
 instance Read Natural where
     readsPrec d = map (\(n, s) -> (Natural n, s))
                   . filter ((>= 0) . (\(x,_)->x)) . readsPrec d
 
+-- | @since 4.8.0.0
 instance Show Natural where
     showsPrec d (Natural i) = showsPrec d i
 
+-- | @since 4.8.0.0
 instance Num Natural where
   Natural n + Natural m = Natural (n + m)
   {-# INLINE (+) #-}
@@ -477,6 +488,7 @@ minusNaturalMaybe x y
   | x >= y    = Just (x - y)
   | otherwise = Nothing
 
+-- | @since 4.8.0.0
 instance Bits Natural where
   Natural n .&. Natural m = Natural (n .&. m)
   {-# INLINE (.&.) #-}
@@ -518,10 +530,12 @@ instance Bits Natural where
   {-# INLINE popCount #-}
   zeroBits = Natural 0
 
+-- | @since 4.8.0.0
 instance Real Natural where
   toRational (Natural a) = toRational a
   {-# INLINE toRational #-}
 
+-- | @since 4.8.0.0
 instance Enum Natural where
   pred (Natural 0) = errorWithoutStackTrace "Natural.pred: 0"
   pred (Natural n) = Natural (pred n)
@@ -543,6 +557,7 @@ instance Enum Natural where
   enumFromThenTo
     = coerce (enumFromThenTo :: Integer -> Integer -> Integer -> [Integer])
 
+-- | @since 4.8.0.0
 instance Integral Natural where
   quot (Natural a) (Natural b) = Natural (quot a b)
   {-# INLINE quot #-}
@@ -593,6 +608,7 @@ naturalToWordMaybe (Natural i)
 naturalType :: DataType
 naturalType = mkIntType "Numeric.Natural.Natural"
 
+-- | @since 4.8.0.0
 instance Data Natural where
   toConstr x = mkIntegralConstr naturalType x
   gunfold _ z c = case constrRep c of

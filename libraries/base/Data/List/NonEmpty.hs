@@ -122,15 +122,18 @@ infixr 5 :|, <|
 data NonEmpty a = a :| [a]
   deriving ( Eq, Ord, Show, Read, Data, Generic, Generic1 )
 
+-- | @since 4.9.0.0
 instance Exts.IsList (NonEmpty a) where
   type Item (NonEmpty a) = a
   fromList               = fromList
   toList                 = toList
 
+-- | @since 4.9.0.0
 instance MonadFix NonEmpty where
   mfix f = case fix (f . head) of
              ~(x :| _) -> x :| mfix (tail . f)
 
+-- | @since 4.9.0.0
 instance MonadZip NonEmpty where
   mzip     = zip
   mzipWith = zipWith
@@ -175,22 +178,27 @@ unfoldr f a = case f a of
     go c = case f c of
       (d, me) -> d : maybe [] go me
 
+-- | @since 4.9.0.0
 instance Functor NonEmpty where
   fmap f ~(a :| as) = f a :| fmap f as
   b <$ ~(_ :| as)   = b   :| (b <$ as)
 
+-- | @since 4.9.0.0
 instance Applicative NonEmpty where
   pure a = a :| []
   (<*>) = ap
 
+-- | @since 4.9.0.0
 instance Monad NonEmpty where
   ~(a :| as) >>= f = b :| (bs ++ bs')
     where b :| bs = f a
           bs' = as >>= toList . f
 
+-- | @since 4.9.0.0
 instance Traversable NonEmpty where
   traverse f ~(a :| as) = (:|) <$> f a <*> traverse f as
 
+-- | @since 4.9.0.0
 instance Foldable NonEmpty where
   foldr f z ~(a :| as) = f a (foldr f z as)
   foldl f z ~(a :| as) = foldl f (f z a) as

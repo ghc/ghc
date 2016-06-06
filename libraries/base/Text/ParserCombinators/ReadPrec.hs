@@ -73,22 +73,28 @@ newtype ReadPrec a = P (Prec -> ReadP a)
 
 -- Functor, Monad, MonadPlus
 
+-- | @since 2.01
 instance Functor ReadPrec where
   fmap h (P f) = P (\n -> fmap h (f n))
 
+-- | @since 4.6.0.0
 instance Applicative ReadPrec where
     pure x  = P (\_ -> pure x)
     (<*>) = ap
 
+-- | @since 2.01
 instance Monad ReadPrec where
   fail s    = P (\_ -> fail s)
   P f >>= k = P (\n -> do a <- f n; let P f' = k a in f' n)
 
+-- | @since 4.9.0.0
 instance MonadFail.MonadFail ReadPrec where
   fail s    = P (\_ -> MonadFail.fail s)
 
+-- | @since 2.01
 instance MonadPlus ReadPrec
 
+-- | @since 4.6.0.0
 instance Alternative ReadPrec where
   empty = pfail
   (<|>) = (+++)

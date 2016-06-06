@@ -62,6 +62,7 @@ evtClose = Event 4
 eventIs :: Event -> Event -> Bool
 eventIs (Event a) (Event b) = a .&. b /= 0
 
+-- | @since 4.3.1.0
 instance Show Event where
     show e = '[' : (intercalate "," . filter (not . null) $
                     [evtRead `so` "evtRead",
@@ -70,6 +71,7 @@ instance Show Event where
         where ev `so` disp | e `eventIs` ev = disp
                            | otherwise      = ""
 
+-- | @since 4.3.1.0
 instance Monoid Event where
     mempty  = evtNothing
     mappend = evtCombine
@@ -98,6 +100,8 @@ elSupremum _       _       = MultiShot
 {-# INLINE elSupremum #-}
 
 -- | @mappend@ == @elSupremum@
+--
+-- @since 4.8.0.0
 instance Monoid Lifetime where
     mempty = OneShot
     mappend = elSupremum
@@ -109,6 +113,7 @@ instance Monoid Lifetime where
 newtype EventLifetime = EL Int
                       deriving (Show, Eq)
 
+-- | @since 4.8.0.0
 instance Monoid EventLifetime where
     mempty = EL 0
     EL a `mappend` EL b = EL (a .|. b)

@@ -268,6 +268,7 @@ class Foldable t where
 
 -- instances for Prelude types
 
+-- | @since 2.01
 instance Foldable Maybe where
     foldr _ z Nothing = z
     foldr f z (Just x) = f x z
@@ -275,6 +276,7 @@ instance Foldable Maybe where
     foldl _ z Nothing = z
     foldl f z (Just x) = f z x
 
+-- | @since 2.01
 instance Foldable [] where
     elem    = List.elem
     foldl   = List.foldl
@@ -290,6 +292,7 @@ instance Foldable [] where
     sum     = List.sum
     toList  = id
 
+-- | @since 4.7.0.0
 instance Foldable (Either a) where
     foldMap _ (Left _) = mempty
     foldMap f (Right y) = f y
@@ -302,11 +305,13 @@ instance Foldable (Either a) where
 
     null             = isLeft
 
+-- | @since 4.7.0.0
 instance Foldable ((,) a) where
     foldMap f (_, y) = f y
 
     foldr f z (_, y) = f y z
 
+-- | @since 4.8.0.0
 instance Foldable (Array i) where
     foldr = foldrElems
     foldl = foldlElems
@@ -318,6 +323,7 @@ instance Foldable (Array i) where
     length = numElements
     null a = numElements a == 0
 
+-- | @since 4.7.0.0
 instance Foldable Proxy where
     foldMap _ _ = mempty
     {-# INLINE foldMap #-}
@@ -335,6 +341,7 @@ instance Foldable Proxy where
     sum _      = 0
     product _  = 1
 
+-- | @since 4.8.0.0
 instance Foldable Dual where
     foldMap            = coerce
 
@@ -353,6 +360,7 @@ instance Foldable Dual where
     sum                = getDual
     toList (Dual x)    = [x]
 
+-- | @since 4.8.0.0
 instance Foldable Sum where
     foldMap            = coerce
 
@@ -371,6 +379,7 @@ instance Foldable Sum where
     sum                = getSum
     toList (Sum x)     = [x]
 
+-- | @since 4.8.0.0
 instance Foldable Product where
     foldMap               = coerce
 
@@ -389,9 +398,11 @@ instance Foldable Product where
     sum                   = getProduct
     toList (Product x)    = [x]
 
+-- | @since 4.8.0.0
 instance Foldable First where
     foldMap f = foldMap f . getFirst
 
+-- | @since 4.8.0.0
 instance Foldable Last where
     foldMap f = foldMap f . getLast
 
@@ -404,6 +415,7 @@ instance Foldable Last where
 newtype Max a = Max {getMax :: Maybe a}
 newtype Min a = Min {getMin :: Maybe a}
 
+-- | @since 4.8.0.0
 instance Ord a => Monoid (Max a) where
   mempty = Max Nothing
 
@@ -414,6 +426,7 @@ instance Ord a => Monoid (Max a) where
     | x >= y    = Max m
     | otherwise = Max n
 
+-- | @since 4.8.0.0
 instance Ord a => Monoid (Min a) where
   mempty = Min Nothing
 
@@ -425,6 +438,7 @@ instance Ord a => Monoid (Min a) where
     | otherwise = Min n
 
 -- Instances for GHC.Generics
+-- | @since 4.9.0.0
 instance Foldable U1 where
     foldMap _ _ = mempty
     {-# INLINE foldMap #-}

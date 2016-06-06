@@ -75,6 +75,7 @@ data GiveGCStats
     | VerboseGCStats
     deriving (Show)
 
+-- | @since 4.8.0.0
 instance Enum GiveGCStats where
     fromEnum NoGCStats      = #{const NO_GC_STATS}
     fromEnum CollectGCStats = #{const COLLECT_GC_STATS}
@@ -173,6 +174,7 @@ data DoCostCentres
     | CostCentresXML
     deriving (Show)
 
+-- | @since 4.8.0.0
 instance Enum DoCostCentres where
     fromEnum CostCentresNone    = #{const COST_CENTRES_NONE}
     fromEnum CostCentresSummary = #{const COST_CENTRES_SUMMARY}
@@ -210,6 +212,7 @@ data DoHeapProfile
     | HeapByClosureType
     deriving (Show)
 
+-- | @since 4.8.0.0
 instance Enum DoHeapProfile where
     fromEnum NoHeapProfiling   = #{const NO_HEAP_PROFILING}
     fromEnum HeapByCCS         = #{const HEAP_BY_CCS}
@@ -259,6 +262,7 @@ data DoTrace
     | TraceStderr    -- ^ send tracing events to @stderr@
     deriving (Show)
 
+-- | @since 4.8.0.0
 instance Enum DoTrace where
     fromEnum TraceNone     = #{const TRACE_NONE}
     fromEnum TraceEventLog = #{const TRACE_EVENTLOG}

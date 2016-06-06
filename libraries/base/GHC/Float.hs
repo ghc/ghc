@@ -239,6 +239,7 @@ class  (RealFrac a, Floating a) => RealFloat a  where
 -- Float
 ------------------------------------------------------------------------
 
+-- | @since 2.01
 instance  Num Float  where
     (+)         x y     =  plusFloat x y
     (-)         x y     =  minusFloat x y
@@ -254,6 +255,7 @@ instance  Num Float  where
     {-# INLINE fromInteger #-}
     fromInteger i = F# (floatFromInteger i)
 
+-- | @since 2.01
 instance  Real Float  where
     toRational (F# x#)  =
         case decodeFloat_Int# x# of
@@ -266,6 +268,7 @@ instance  Real Float  where
             | otherwise                                         ->
                     smallInteger m# :% shiftLInteger 1 (negateInt# e#)
 
+-- | @since 2.01
 instance  Fractional Float  where
     (/) x y             =  divideFloat x y
     {-# INLINE fromRational #-}
@@ -299,6 +302,7 @@ rationalToFloat n d
 "ceiling/Float->Int"                ceiling = ceilingFloatInt
 "round/Float->Int"                  round = roundFloatInt
   #-}
+-- | @since 2.01
 instance  RealFrac Float  where
 
         -- ceiling, floor, and truncate are all small
@@ -342,6 +346,7 @@ instance  RealFrac Float  where
     floor x     = case properFraction x of
                     (n,r) -> if r < 0.0 then n - 1 else n
 
+-- | @since 2.01
 instance  Floating Float  where
     pi                  =  3.141592653589793238
     exp x               =  expFloat x
@@ -376,6 +381,7 @@ instance  Floating Float  where
       | otherwise = a
     {-# INLINE log1pexp #-}
 
+-- | @since 2.01
 instance  RealFloat Float  where
     floatRadix _        =  FLT_RADIX        -- from float.h
     floatDigits _       =  FLT_MANT_DIG     -- ditto
@@ -406,6 +412,7 @@ instance  RealFloat Float  where
     isNegativeZero x = 0 /= isFloatNegativeZero x
     isIEEE _         = True
 
+-- | @since 2.01
 instance  Show Float  where
     showsPrec   x = showSignedFloat showFloat x
     showList = showList__ (showsPrec 0)
@@ -414,6 +421,7 @@ instance  Show Float  where
 -- Double
 ------------------------------------------------------------------------
 
+-- | @since 2.01
 instance  Num Double  where
     (+)         x y     =  plusDouble x y
     (-)         x y     =  minusDouble x y
@@ -431,6 +439,7 @@ instance  Num Double  where
     fromInteger i = D# (doubleFromInteger i)
 
 
+-- | @since 2.01
 instance  Real Double  where
     toRational (D# x#)  =
         case decodeDoubleInteger x# of
@@ -443,6 +452,7 @@ instance  Real Double  where
             | otherwise                                            ->
                 m :% shiftLInteger 1 (negateInt# e#)
 
+-- | @since 2.01
 instance  Fractional Double  where
     (/) x y             =  divideDouble x y
     {-# INLINE fromRational #-}
@@ -463,6 +473,7 @@ rationalToDouble n d
         minEx       = DBL_MIN_EXP
         mantDigs    = DBL_MANT_DIG
 
+-- | @since 2.01
 instance  Floating Double  where
     pi                  =  3.141592653589793238
     exp x               =  expDouble x
@@ -510,6 +521,7 @@ instance  Floating Double  where
 "ceiling/Double->Int"               ceiling = ceilingDoubleInt
 "round/Double->Int"                 round = roundDoubleInt
   #-}
+-- | @since 2.01
 instance  RealFrac Double  where
 
         -- ceiling, floor, and truncate are all small
@@ -546,6 +558,7 @@ instance  RealFrac Double  where
     floor x     = case properFraction x of
                     (n,r) -> if r < 0.0 then n - 1 else n
 
+-- | @since 2.01
 instance  RealFloat Double  where
     floatRadix _        =  FLT_RADIX        -- from float.h
     floatDigits _       =  DBL_MANT_DIG     -- ditto
@@ -577,6 +590,7 @@ instance  RealFloat Double  where
     isNegativeZero x    = 0 /= isDoubleNegativeZero x
     isIEEE _            = True
 
+-- | @since 2.01
 instance  Show Double  where
     showsPrec   x = showSignedFloat showFloat x
     showList = showList__ (showsPrec 0)
@@ -601,6 +615,7 @@ a `non-lossy' conversion to and from Ints. Instead we make use of the
 for these (@numericEnumFromTo@ and @numericEnumFromThenTo@ below.)
 -}
 
+-- | @since 2.01
 instance  Enum Float  where
     succ x         = x + 1
     pred x         = x - 1
@@ -611,6 +626,7 @@ instance  Enum Float  where
     enumFromThen   = numericEnumFromThen
     enumFromThenTo = numericEnumFromThenTo
 
+-- | @since 2.01
 instance  Enum Double  where
     succ x         = x + 1
     pred x         = x - 1

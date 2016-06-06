@@ -58,6 +58,7 @@ data {-# CTYPE "HsInt8" #-} Int8 = I8# Int#
 -- ^ 8-bit signed integer type
 
 -- See GHC.Classes#matching_overloaded_methods_in_rules
+-- | @since 2.01
 instance Eq Int8 where
     (==) = eqInt8
     (/=) = neInt8
@@ -68,6 +69,7 @@ neInt8 (I8# x) (I8# y) = isTrue# (x /=# y)
 {-# INLINE [1] eqInt8 #-}
 {-# INLINE [1] neInt8 #-}
 
+-- | @since 2.01
 instance Ord Int8 where
     (<)  = ltInt8
     (<=) = leInt8
@@ -84,9 +86,11 @@ gtInt8, geInt8, ltInt8, leInt8 :: Int8 -> Int8 -> Bool
 (I8# x) `ltInt8` (I8# y) = isTrue# (x <#  y)
 (I8# x) `leInt8` (I8# y) = isTrue# (x <=# y)
 
+-- | @since 2.01
 instance Show Int8 where
     showsPrec p x = showsPrec p (fromIntegral x :: Int)
 
+-- | @since 2.01
 instance Num Int8 where
     (I8# x#) + (I8# y#)    = I8# (narrow8Int# (x# +# y#))
     (I8# x#) - (I8# y#)    = I8# (narrow8Int# (x# -# y#))
@@ -99,9 +103,11 @@ instance Num Int8 where
     signum _               = -1
     fromInteger i          = I8# (narrow8Int# (integerToInt i))
 
+-- | @since 2.01
 instance Real Int8 where
     toRational x = toInteger x % 1
 
+-- | @since 2.01
 instance Enum Int8 where
     succ x
         | x /= maxBound = x + 1
@@ -117,6 +123,7 @@ instance Enum Int8 where
     enumFrom            = boundedEnumFrom
     enumFromThen        = boundedEnumFromThen
 
+-- | @since 2.01
 instance Integral Int8 where
     quot    x@(I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
@@ -150,18 +157,22 @@ instance Integral Int8 where
                                             I8# (narrow8Int# m))
     toInteger (I8# x#)               = smallInteger x#
 
+-- | @since 2.01
 instance Bounded Int8 where
     minBound = -0x80
     maxBound =  0x7F
 
+-- | @since 2.01
 instance Ix Int8 where
     range (m,n)         = [m..n]
     unsafeIndex (m,_) i = fromIntegral i - fromIntegral m
     inRange (m,n) i     = m <= i && i <= n
 
+-- | @since 2.01
 instance Read Int8 where
     readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
 
+-- | @since 2.01
 instance Bits Int8 where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
@@ -194,6 +205,7 @@ instance Bits Int8 where
     bit                       = bitDefault
     testBit                   = testBitDefault
 
+-- | @since 4.6.0.0
 instance FiniteBits Int8 where
     finiteBitSize _ = 8
     countLeadingZeros  (I8# x#) = I# (word2Int# (clz8# (int2Word# x#)))
@@ -246,6 +258,7 @@ data {-# CTYPE "HsInt16" #-} Int16 = I16# Int#
 -- ^ 16-bit signed integer type
 
 -- See GHC.Classes#matching_overloaded_methods_in_rules
+-- | @since 2.01
 instance Eq Int16 where
     (==) = eqInt16
     (/=) = neInt16
@@ -256,6 +269,7 @@ neInt16 (I16# x) (I16# y) = isTrue# (x /=# y)
 {-# INLINE [1] eqInt16 #-}
 {-# INLINE [1] neInt16 #-}
 
+-- | @since 2.01
 instance Ord Int16 where
     (<)  = ltInt16
     (<=) = leInt16
@@ -272,9 +286,11 @@ gtInt16, geInt16, ltInt16, leInt16 :: Int16 -> Int16 -> Bool
 (I16# x) `ltInt16` (I16# y) = isTrue# (x <#  y)
 (I16# x) `leInt16` (I16# y) = isTrue# (x <=# y)
 
+-- | @since 2.01
 instance Show Int16 where
     showsPrec p x = showsPrec p (fromIntegral x :: Int)
 
+-- | @since 2.01
 instance Num Int16 where
     (I16# x#) + (I16# y#)  = I16# (narrow16Int# (x# +# y#))
     (I16# x#) - (I16# y#)  = I16# (narrow16Int# (x# -# y#))
@@ -287,9 +303,11 @@ instance Num Int16 where
     signum _               = -1
     fromInteger i          = I16# (narrow16Int# (integerToInt i))
 
+-- | @since 2.01
 instance Real Int16 where
     toRational x = toInteger x % 1
 
+-- | @since 2.01
 instance Enum Int16 where
     succ x
         | x /= maxBound = x + 1
@@ -305,6 +323,7 @@ instance Enum Int16 where
     enumFrom            = boundedEnumFrom
     enumFromThen        = boundedEnumFromThen
 
+-- | @since 2.01
 instance Integral Int16 where
     quot    x@(I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
@@ -338,18 +357,22 @@ instance Integral Int16 where
                                             I16# (narrow16Int# m))
     toInteger (I16# x#)              = smallInteger x#
 
+-- | @since 2.01
 instance Bounded Int16 where
     minBound = -0x8000
     maxBound =  0x7FFF
 
+-- | @since 2.01
 instance Ix Int16 where
     range (m,n)         = [m..n]
     unsafeIndex (m,_) i = fromIntegral i - fromIntegral m
     inRange (m,n) i     = m <= i && i <= n
 
+-- | @since 2.01
 instance Read Int16 where
     readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
 
+-- | @since 2.01
 instance Bits Int16 where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
@@ -382,6 +405,7 @@ instance Bits Int16 where
     bit                        = bitDefault
     testBit                    = testBitDefault
 
+-- | @since 4.6.0.0
 instance FiniteBits Int16 where
     finiteBitSize _ = 16
     countLeadingZeros  (I16# x#) = I# (word2Int# (clz16# (int2Word# x#)))
@@ -439,6 +463,7 @@ data {-# CTYPE "HsInt32" #-} Int32 = I32# Int#
 -- ^ 32-bit signed integer type
 
 -- See GHC.Classes#matching_overloaded_methods_in_rules
+-- | @since 2.01
 instance Eq Int32 where
     (==) = eqInt32
     (/=) = neInt32
@@ -449,6 +474,7 @@ neInt32 (I32# x) (I32# y) = isTrue# (x /=# y)
 {-# INLINE [1] eqInt32 #-}
 {-# INLINE [1] neInt32 #-}
 
+-- | @since 2.01
 instance Ord Int32 where
     (<)  = ltInt32
     (<=) = leInt32
@@ -465,9 +491,11 @@ gtInt32, geInt32, ltInt32, leInt32 :: Int32 -> Int32 -> Bool
 (I32# x) `ltInt32` (I32# y) = isTrue# (x <#  y)
 (I32# x) `leInt32` (I32# y) = isTrue# (x <=# y)
 
+-- | @since 2.01
 instance Show Int32 where
     showsPrec p x = showsPrec p (fromIntegral x :: Int)
 
+-- | @since 2.01
 instance Num Int32 where
     (I32# x#) + (I32# y#)  = I32# (narrow32Int# (x# +# y#))
     (I32# x#) - (I32# y#)  = I32# (narrow32Int# (x# -# y#))
@@ -480,6 +508,7 @@ instance Num Int32 where
     signum _               = -1
     fromInteger i          = I32# (narrow32Int# (integerToInt i))
 
+-- | @since 2.01
 instance Enum Int32 where
     succ x
         | x /= maxBound = x + 1
@@ -499,6 +528,7 @@ instance Enum Int32 where
     enumFrom            = boundedEnumFrom
     enumFromThen        = boundedEnumFromThen
 
+-- | @since 2.01
 instance Integral Int32 where
     quot    x@(I32# x#) y@(I32# y#)
         | y == 0                     = divZeroError
@@ -540,9 +570,11 @@ instance Integral Int32 where
                                             I32# (narrow32Int# m))
     toInteger (I32# x#)              = smallInteger x#
 
+-- | @since 2.01
 instance Read Int32 where
     readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
 
+-- | @since 2.01
 instance Bits Int32 where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
@@ -576,6 +608,7 @@ instance Bits Int32 where
     bit                        = bitDefault
     testBit                    = testBitDefault
 
+-- | @since 4.6.0.0
 instance FiniteBits Int32 where
     finiteBitSize _ = 32
     countLeadingZeros  (I32# x#) = I# (word2Int# (clz32# (int2Word# x#)))
@@ -621,13 +654,16 @@ instance FiniteBits Int32 where
     round    = (fromIntegral :: Int -> Int32) . (round  :: Double -> Int)
   #-}
 
+-- | @since 2.01
 instance Real Int32 where
     toRational x = toInteger x % 1
 
+-- | @since 2.01
 instance Bounded Int32 where
     minBound = -0x80000000
     maxBound =  0x7FFFFFFF
 
+-- | @since 2.01
 instance Ix Int32 where
     range (m,n)         = [m..n]
     unsafeIndex (m,_) i = fromIntegral i - fromIntegral m
@@ -643,6 +679,7 @@ data {-# CTYPE "HsInt64" #-} Int64 = I64# Int64#
 -- ^ 64-bit signed integer type
 
 -- See GHC.Classes#matching_overloaded_methods_in_rules
+-- | @since 2.01
 instance Eq Int64 where
     (==) = eqInt64
     (/=) = neInt64
@@ -653,6 +690,7 @@ neInt64 (I64# x) (I64# y) = isTrue# (x `neInt64#` y)
 {-# INLINE [1] eqInt64 #-}
 {-# INLINE [1] neInt64 #-}
 
+-- | @since 2.01
 instance Ord Int64 where
     (<)  = ltInt64
     (<=) = leInt64
@@ -669,9 +707,11 @@ gtInt64, geInt64, ltInt64, leInt64 :: Int64 -> Int64 -> Bool
 (I64# x) `ltInt64` (I64# y) = isTrue# (x `ltInt64#` y)
 (I64# x) `leInt64` (I64# y) = isTrue# (x `leInt64#` y)
 
+-- | @since 2.01
 instance Show Int64 where
     showsPrec p x = showsPrec p (toInteger x)
 
+-- | @since 2.01
 instance Num Int64 where
     (I64# x#) + (I64# y#)  = I64# (x# `plusInt64#`  y#)
     (I64# x#) - (I64# y#)  = I64# (x# `minusInt64#` y#)
@@ -684,6 +724,7 @@ instance Num Int64 where
     signum _               = -1
     fromInteger i          = I64# (integerToInt64 i)
 
+-- | @since 2.01
 instance Enum Int64 where
     succ x
         | x /= maxBound = x + 1
@@ -701,6 +742,7 @@ instance Enum Int64 where
     enumFromTo          = integralEnumFromTo
     enumFromThenTo      = integralEnumFromThenTo
 
+-- | @since 2.01
 instance Integral Int64 where
     quot    x@(I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
@@ -762,9 +804,11 @@ x# `modInt64#` y#
     !zero = intToInt64# 0#
     !r# = x# `remInt64#` y#
 
+-- | @since 2.01
 instance Read Int64 where
     readsPrec p s = [(fromInteger x, r) | (x, r) <- readsPrec p s]
 
+-- | @since 2.01
 instance Bits Int64 where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
@@ -835,6 +879,7 @@ data {-# CTYPE "HsInt64" #-} Int64 = I64# Int#
 -- ^ 64-bit signed integer type
 
 -- See GHC.Classes#matching_overloaded_methods_in_rules
+-- | @since 2.01
 instance Eq Int64 where
     (==) = eqInt64
     (/=) = neInt64
@@ -845,6 +890,7 @@ neInt64 (I64# x) (I64# y) = isTrue# (x /=# y)
 {-# INLINE [1] eqInt64 #-}
 {-# INLINE [1] neInt64 #-}
 
+-- | @since 2.01
 instance Ord Int64 where
     (<)  = ltInt64
     (<=) = leInt64
@@ -861,9 +907,11 @@ gtInt64, geInt64, ltInt64, leInt64 :: Int64 -> Int64 -> Bool
 (I64# x) `ltInt64` (I64# y) = isTrue# (x <#  y)
 (I64# x) `leInt64` (I64# y) = isTrue# (x <=# y)
 
+-- | @since 2.01
 instance Show Int64 where
     showsPrec p x = showsPrec p (fromIntegral x :: Int)
 
+-- | @since 2.01
 instance Num Int64 where
     (I64# x#) + (I64# y#)  = I64# (x# +# y#)
     (I64# x#) - (I64# y#)  = I64# (x# -# y#)
@@ -876,6 +924,7 @@ instance Num Int64 where
     signum _               = -1
     fromInteger i          = I64# (integerToInt i)
 
+-- | @since 2.01
 instance Enum Int64 where
     succ x
         | x /= maxBound = x + 1
@@ -888,6 +937,7 @@ instance Enum Int64 where
     enumFrom            = boundedEnumFrom
     enumFromThen        = boundedEnumFromThen
 
+-- | @since 2.01
 instance Integral Int64 where
     quot    x@(I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
@@ -927,9 +977,11 @@ instance Integral Int64 where
                                            (I64# d, I64# m)
     toInteger (I64# x#)              = smallInteger x#
 
+-- | @since 2.01
 instance Read Int64 where
     readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
 
+-- | @since 2.01
 instance Bits Int64 where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
@@ -1004,6 +1056,7 @@ uncheckedIShiftRA64# :: Int# -> Int# -> Int#
 uncheckedIShiftRA64# = uncheckedIShiftRA#
 #endif
 
+-- | @since 4.6.0.0
 instance FiniteBits Int64 where
     finiteBitSize _ = 64
 #if WORD_SIZE_IN_BITS < 64
@@ -1014,13 +1067,16 @@ instance FiniteBits Int64 where
     countTrailingZeros (I64# x#) = I# (word2Int# (ctz64# (int2Word# x#)))
 #endif
 
+-- | @since 2.01
 instance Real Int64 where
     toRational x = toInteger x % 1
 
+-- | @since 2.01
 instance Bounded Int64 where
     minBound = -0x8000000000000000
     maxBound =  0x7FFFFFFFFFFFFFFF
 
+-- | @since 2.01
 instance Ix Int64 where
     range (m,n)         = [m..n]
     unsafeIndex (m,_) i = fromIntegral i - fromIntegral m

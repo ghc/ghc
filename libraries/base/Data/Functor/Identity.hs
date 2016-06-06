@@ -56,12 +56,16 @@ newtype Identity a = Identity { runIdentity :: a }
 
 -- | This instance would be equivalent to the derived instances of the
 -- 'Identity' newtype if the 'runIdentity' field were removed
+--
+-- @since 4.8.0.0
 instance (Read a) => Read (Identity a) where
     readsPrec d = readParen (d > 10) $ \ r ->
         [(Identity x,t) | ("Identity",s) <- lex r, (x,t) <- readsPrec 11 s]
 
 -- | This instance would be equivalent to the derived instances of the
 -- 'Identity' newtype if the 'runIdentity' field were removed
+--
+-- @since 4.8.0.0
 instance (Show a) => Show (Identity a) where
     showsPrec d (Identity x) = showParen (d > 10) $
         showString "Identity " . showsPrec 11 x
@@ -69,6 +73,7 @@ instance (Show a) => Show (Identity a) where
 -- ---------------------------------------------------------------------------
 -- Identity instances for Functor and Monad
 
+-- | @since 4.8.0.0
 instance Foldable Identity where
     foldMap                = coerce
 
@@ -87,19 +92,24 @@ instance Foldable Identity where
     sum                    = runIdentity
     toList (Identity x)    = [x]
 
+-- | @since 4.8.0.0
 instance Functor Identity where
     fmap     = coerce
 
+-- | @since 4.8.0.0
 instance Applicative Identity where
     pure     = Identity
     (<*>)    = coerce
 
+-- | @since 4.8.0.0
 instance Monad Identity where
     m >>= k  = k (runIdentity m)
 
+-- | @since 4.8.0.0
 instance MonadFix Identity where
     mfix f   = Identity (fix (runIdentity . f))
 
+-- | @since 4.8.0.0
 instance MonadZip Identity where
     mzipWith = coerce
     munzip   = coerce

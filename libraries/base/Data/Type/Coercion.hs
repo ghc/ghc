@@ -72,15 +72,18 @@ deriving instance Eq   (Coercion a b)
 deriving instance Show (Coercion a b)
 deriving instance Ord  (Coercion a b)
 
+-- | @since 4.7.0.0
 instance Coercible a b => Read (Coercion a b) where
   readsPrec d = readParen (d > 10) (\r -> [(Coercion, s) | ("Coercion",s) <- lex r ])
 
+-- | @since 4.7.0.0
 instance Coercible a b => Enum (Coercion a b) where
   toEnum 0 = Coercion
   toEnum _ = errorWithoutStackTrace "Data.Type.Coercion.toEnum: bad argument"
 
   fromEnum Coercion = 0
 
+-- | @since 4.7.0.0
 deriving instance Coercible a b => Bounded (Coercion a b)
 
 -- | This class contains types where you can learn the equality of two types
@@ -90,8 +93,10 @@ class TestCoercion f where
   -- | Conditionally prove the representational equality of @a@ and @b@.
   testCoercion :: f a -> f b -> Maybe (Coercion a b)
 
+-- | @since 4.7.0.0
 instance TestCoercion ((Eq.:~:) a) where
   testCoercion Eq.Refl Eq.Refl = Just Coercion
 
+-- | @since 4.7.0.0
 instance TestCoercion (Coercion a) where
   testCoercion Coercion Coercion = Just Coercion

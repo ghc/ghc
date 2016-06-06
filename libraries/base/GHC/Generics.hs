@@ -756,42 +756,53 @@ deriving instance Show (V1 p)
 data U1 (p :: k) = U1
   deriving (Generic, Generic1)
 
+-- | @since 4.9.0.0
 instance Eq (U1 p) where
   _ == _ = True
 
+-- | @since 4.9.0.0
 instance Ord (U1 p) where
   compare _ _ = EQ
 
+-- | @since 4.9.0.0
 instance Read (U1 p) where
   readsPrec d = readParen (d > 10) (\r -> [(U1, s) | ("U1",s) <- lex r ])
 
+-- | @since 4.9.0.0
 instance Show (U1 p) where
   showsPrec _ _ = showString "U1"
 
+-- | @since 4.9.0.0
 instance Functor U1 where
   fmap _ _ = U1
 
+-- | @since 4.9.0.0
 instance Applicative U1 where
   pure _ = U1
   _ <*> _ = U1
 
+-- | @since 4.9.0.0
 instance Alternative U1 where
   empty = U1
   _ <|> _ = U1
 
+-- | @since 4.9.0.0
 instance Monad U1 where
   _ >>= _ = U1
 
+-- | @since 4.9.0.0
 instance MonadPlus U1
 
 -- | Used for marking occurrences of the parameter
 newtype Par1 p = Par1 { unPar1 :: p }
   deriving (Eq, Ord, Read, Show, Functor, Generic, Generic1)
 
+-- | @since 4.9.0.0
 instance Applicative Par1 where
   pure a = Par1 a
   Par1 f <*> Par1 x = Par1 (f x)
 
+-- | @since 4.9.0.0
 instance Monad Par1 where
   Par1 x >>= f = f x
 
@@ -800,34 +811,42 @@ instance Monad Par1 where
 newtype Rec1 (f :: k -> *) (p :: k) = Rec1 { unRec1 :: f p }
   deriving (Eq, Ord, Read, Show, Functor, Generic, Generic1)
 
+-- | @since 4.9.0.0
 instance Applicative f => Applicative (Rec1 f) where
   pure a = Rec1 (pure a)
   Rec1 f <*> Rec1 x = Rec1 (f <*> x)
 
+-- | @since 4.9.0.0
 instance Alternative f => Alternative (Rec1 f) where
   empty = Rec1 empty
   Rec1 l <|> Rec1 r = Rec1 (l <|> r)
 
+-- | @since 4.9.0.0
 instance Monad f => Monad (Rec1 f) where
   Rec1 x >>= f = Rec1 (x >>= \a -> unRec1 (f a))
 
+-- | @since 4.9.0.0
 instance MonadPlus f => MonadPlus (Rec1 f)
 
 -- | Constants, additional parameters and recursion of kind @*@
 newtype K1 (i :: *) c (p :: k) = K1 { unK1 :: c }
   deriving (Eq, Ord, Read, Show, Functor, Generic, Generic1)
 
+-- | @since 4.9.0.0
 instance Applicative f => Applicative (M1 i c f) where
   pure a = M1 (pure a)
   M1 f <*> M1 x = M1 (f <*> x)
 
+-- | @since 4.9.0.0
 instance Alternative f => Alternative (M1 i c f) where
   empty = M1 empty
   M1 l <|> M1 r = M1 (l <|> r)
 
+-- | @since 4.9.0.0
 instance Monad f => Monad (M1 i c f) where
   M1 x >>= f = M1 (x >>= \a -> unM1 (f a))
 
+-- | @since 4.9.0.0
 instance MonadPlus f => MonadPlus (M1 i c f)
 
 -- | Meta-information (constructor names, etc.)
@@ -844,20 +863,24 @@ infixr 6 :*:
 data (:*:) (f :: k -> *) (g :: k -> *) (p :: k) = f p :*: g p
   deriving (Eq, Ord, Read, Show, Functor, Generic, Generic1)
 
+-- | @since 4.9.0.0
 instance (Applicative f, Applicative g) => Applicative (f :*: g) where
   pure a = pure a :*: pure a
   (f :*: g) <*> (x :*: y) = (f <*> x) :*: (g <*> y)
 
+-- | @since 4.9.0.0
 instance (Alternative f, Alternative g) => Alternative (f :*: g) where
   empty = empty :*: empty
   (x1 :*: y1) <|> (x2 :*: y2) = (x1 <|> x2) :*: (y1 <|> y2)
 
+-- | @since 4.9.0.0
 instance (Monad f, Monad g) => Monad (f :*: g) where
   (m :*: n) >>= f = (m >>= \a -> fstP (f a)) :*: (n >>= \a -> sndP (f a))
     where
       fstP (a :*: _) = a
       sndP (_ :*: b) = b
 
+-- | @since 4.9.0.0
 instance (MonadPlus f, MonadPlus g) => MonadPlus (f :*: g)
 
 -- | Composition of functors
@@ -866,10 +889,12 @@ newtype (:.:) (f :: k2 -> *) (g :: k1 -> k2) (p :: k1) =
     Comp1 { unComp1 :: f (g p) }
   deriving (Eq, Ord, Read, Show, Functor, Generic, Generic1)
 
+-- | @since 4.9.0.0
 instance (Applicative f, Applicative g) => Applicative (f :.: g) where
   pure x = Comp1 (pure (pure x))
   Comp1 f <*> Comp1 x = Comp1 (fmap (<*>) f <*> x)
 
+-- | @since 4.9.0.0
 instance (Alternative f, Applicative g) => Alternative (f :.: g) where
   empty = Comp1 empty
   Comp1 x <|> Comp1 y = Comp1 (x <|> y)
@@ -923,18 +948,22 @@ type UAddr   = URec (Ptr ())
 --
 -- @since 4.9.0.0
 type UChar   = URec Char
+
 -- | Type synonym for @'URec' 'Double#'@
 --
 -- @since 4.9.0.0
 type UDouble = URec Double
+
 -- | Type synonym for @'URec' 'Float#'@
 --
 -- @since 4.9.0.0
 type UFloat  = URec Float
+
 -- | Type synonym for @'URec' 'Int#'@
 --
 -- @since 4.9.0.0
 type UInt    = URec Int
+
 -- | Type synonym for @'URec' 'Word#'@
 --
 -- @since 4.9.0.0
@@ -978,6 +1007,7 @@ class Datatype d where
   isNewtype    :: t d (f :: k -> *) (a :: k) -> Bool
   isNewtype _ = False
 
+-- | @since 4.9.0.0
 instance (KnownSymbol n, KnownSymbol m, KnownSymbol p, SingI nt)
     => Datatype ('MetaData n m p nt) where
   datatypeName _ = symbolVal (Proxy :: Proxy n)
@@ -998,6 +1028,7 @@ class Constructor c where
   conIsRecord :: t c (f :: k -> *) (a :: k) -> Bool
   conIsRecord _ = False
 
+-- | @since 4.9.0.0
 instance (KnownSymbol n, SingI f, SingI r)
     => Constructor ('MetaCons n f r) where
   conName     _ = symbolVal (Proxy :: Proxy n)
@@ -1103,6 +1134,7 @@ class Selector s where
   -- @since 4.9.0.0
   selDecidedStrictness :: t s (f :: k -> *) (a :: k) -> DecidedStrictness
 
+-- | @since 4.9.0.0
 instance (SingI mn, SingI su, SingI ss, SingI ds)
     => Selector ('MetaSel mn su ss ds) where
   selName _ = fromMaybe "" (fromSing (sing :: Sing mn))
@@ -1216,8 +1248,10 @@ class (kparam ~ 'KProxy) => SingKind (kparam :: KProxy k) where
 data instance Sing (s :: Symbol) where
   SSym :: KnownSymbol s => Sing s
 
+-- | @since 4.9.0.0
 instance KnownSymbol a => SingI a where sing = SSym
 
+-- | @since 4.9.0.0
 instance SingKind ('KProxy :: KProxy Symbol) where
   type DemoteRep ('KProxy :: KProxy Symbol) = String
   fromSing (SSym :: Sing s) = symbolVal (Proxy :: Proxy s)
@@ -1227,9 +1261,13 @@ data instance Sing (a :: Bool) where
   STrue  :: Sing 'True
   SFalse :: Sing 'False
 
+-- | @since 4.9.0.0
 instance SingI 'True  where sing = STrue
+
+-- | @since 4.9.0.0
 instance SingI 'False where sing = SFalse
 
+-- | @since 4.9.0.0
 instance SingKind ('KProxy :: KProxy Bool) where
   type DemoteRep ('KProxy :: KProxy Bool) = Bool
   fromSing STrue  = True
@@ -1240,9 +1278,13 @@ data instance Sing (b :: Maybe a) where
   SNothing :: Sing 'Nothing
   SJust    :: Sing a -> Sing ('Just a)
 
+-- | @since 4.9.0.0
 instance            SingI 'Nothing  where sing = SNothing
+
+-- | @since 4.9.0.0
 instance SingI a => SingI ('Just a) where sing = SJust sing
 
+-- | @since 4.9.0.0
 instance SingKind ('KProxy :: KProxy a) =>
     SingKind ('KProxy :: KProxy (Maybe a)) where
   type DemoteRep ('KProxy :: KProxy (Maybe a)) =
@@ -1255,10 +1297,14 @@ data instance Sing (a :: FixityI) where
   SPrefix :: Sing 'PrefixI
   SInfix  :: Sing a -> Integer -> Sing ('InfixI a n)
 
+-- | @since 4.9.0.0
 instance SingI 'PrefixI where sing = SPrefix
+
+-- | @since 4.9.0.0
 instance (SingI a, KnownNat n) => SingI ('InfixI a n) where
   sing = SInfix (sing :: Sing a) (natVal (Proxy :: Proxy n))
 
+-- | @since 4.9.0.0
 instance SingKind ('KProxy :: KProxy FixityI) where
   type DemoteRep ('KProxy :: KProxy FixityI) = Fixity
   fromSing SPrefix      = Prefix
@@ -1270,10 +1316,16 @@ data instance Sing (a :: Associativity) where
   SRightAssociative :: Sing 'RightAssociative
   SNotAssociative   :: Sing 'NotAssociative
 
+-- | @since 4.9.0.0
 instance SingI 'LeftAssociative  where sing = SLeftAssociative
+
+-- | @since 4.9.0.0
 instance SingI 'RightAssociative where sing = SRightAssociative
+
+-- | @since 4.9.0.0
 instance SingI 'NotAssociative   where sing = SNotAssociative
 
+-- | @since 4.0.0.0
 instance SingKind ('KProxy :: KProxy Associativity) where
   type DemoteRep ('KProxy :: KProxy Associativity) = Associativity
   fromSing SLeftAssociative  = LeftAssociative
@@ -1286,10 +1338,16 @@ data instance Sing (a :: SourceUnpackedness) where
   SSourceNoUnpack       :: Sing 'SourceNoUnpack
   SSourceUnpack         :: Sing 'SourceUnpack
 
+-- | @since 4.9.0.0
 instance SingI 'NoSourceUnpackedness where sing = SNoSourceUnpackedness
+
+-- | @since 4.9.0.0
 instance SingI 'SourceNoUnpack       where sing = SSourceNoUnpack
+
+-- | @since 4.9.0.0
 instance SingI 'SourceUnpack         where sing = SSourceUnpack
 
+-- | @since 4.9.0.0
 instance SingKind ('KProxy :: KProxy SourceUnpackedness) where
   type DemoteRep ('KProxy :: KProxy SourceUnpackedness) = SourceUnpackedness
   fromSing SNoSourceUnpackedness = NoSourceUnpackedness
@@ -1302,10 +1360,16 @@ data instance Sing (a :: SourceStrictness) where
   SSourceLazy         :: Sing 'SourceLazy
   SSourceStrict       :: Sing 'SourceStrict
 
+-- | @since 4.9.0.0
 instance SingI 'NoSourceStrictness where sing = SNoSourceStrictness
+
+-- | @since 4.9.0.0
 instance SingI 'SourceLazy         where sing = SSourceLazy
+
+-- | @since 4.9.0.0
 instance SingI 'SourceStrict       where sing = SSourceStrict
 
+-- | @since 4.9.0.0
 instance SingKind ('KProxy :: KProxy SourceStrictness) where
   type DemoteRep ('KProxy :: KProxy SourceStrictness) = SourceStrictness
   fromSing SNoSourceStrictness = NoSourceStrictness
@@ -1318,10 +1382,16 @@ data instance Sing (a :: DecidedStrictness) where
   SDecidedStrict :: Sing 'DecidedStrict
   SDecidedUnpack :: Sing 'DecidedUnpack
 
+-- | @since 4.9.0.0
 instance SingI 'DecidedLazy   where sing = SDecidedLazy
+
+-- | @since 4.9.0.0
 instance SingI 'DecidedStrict where sing = SDecidedStrict
+
+-- | @since 4.9.0.0
 instance SingI 'DecidedUnpack where sing = SDecidedUnpack
 
+-- | @since 4.9.0.0
 instance SingKind ('KProxy :: KProxy DecidedStrictness) where
   type DemoteRep ('KProxy :: KProxy DecidedStrictness) = DecidedStrictness
   fromSing SDecidedLazy   = DecidedLazy

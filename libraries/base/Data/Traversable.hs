@@ -177,25 +177,31 @@ class (Functor t, Foldable t) => Traversable t where
 
 -- instances for Prelude types
 
+-- | @since 2.01
 instance Traversable Maybe where
     traverse _ Nothing = pure Nothing
     traverse f (Just x) = Just <$> f x
 
+-- | @since 2.01
 instance Traversable [] where
     {-# INLINE traverse #-} -- so that traverse can fuse
     traverse f = List.foldr cons_f (pure [])
       where cons_f x ys = (:) <$> f x <*> ys
 
+-- | @since 4.7.0.0
 instance Traversable (Either a) where
     traverse _ (Left x) = pure (Left x)
     traverse f (Right y) = Right <$> f y
 
+-- | @since 4.7.0.0
 instance Traversable ((,) a) where
     traverse f (x, y) = (,) x <$> f y
 
+-- | @since 2.01
 instance Ix i => Traversable (Array i) where
     traverse f arr = listArray (bounds arr) `fmap` traverse f (elems arr)
 
+-- | @since 4.7.0.0
 instance Traversable Proxy where
     traverse _ _ = pure Proxy
     {-# INLINE traverse #-}
@@ -206,28 +212,36 @@ instance Traversable Proxy where
     sequence _ = pure Proxy
     {-# INLINE sequence #-}
 
+-- | @since 4.7.0.0
 instance Traversable (Const m) where
     traverse _ (Const m) = pure $ Const m
 
+-- | @since 4.8.0.0
 instance Traversable Dual where
     traverse f (Dual x) = Dual <$> f x
 
+-- | @since 4.8.0.0
 instance Traversable Sum where
     traverse f (Sum x) = Sum <$> f x
 
+-- | @since 4.8.0.0
 instance Traversable Product where
     traverse f (Product x) = Product <$> f x
 
+-- | @since 4.8.0.0
 instance Traversable First where
     traverse f (First x) = First <$> traverse f x
 
+-- | @since 4.8.0.0
 instance Traversable Last where
     traverse f (Last x) = Last <$> traverse f x
 
+-- | @since 4.9.0.0
 instance Traversable ZipList where
     traverse f (ZipList x) = ZipList <$> traverse f x
 
 -- Instances for GHC.Generics
+-- | @since 4.9.0.0
 instance Traversable U1 where
     traverse _ _ = pure U1
     {-# INLINE traverse #-}
@@ -270,9 +284,11 @@ forM = flip mapM
 -- left-to-right state transformer
 newtype StateL s a = StateL { runStateL :: s -> (s, a) }
 
+-- | @since 4.0
 instance Functor (StateL s) where
     fmap f (StateL k) = StateL $ \ s -> let (s', v) = k s in (s', f v)
 
+-- | @since 4.0
 instance Applicative (StateL s) where
     pure x = StateL (\ s -> (s, x))
     StateL kf <*> StateL kv = StateL $ \ s ->
@@ -290,9 +306,11 @@ mapAccumL f s t = runStateL (traverse (StateL . flip f) t) s
 -- right-to-left state transformer
 newtype StateR s a = StateR { runStateR :: s -> (s, a) }
 
+-- | @since 4.0
 instance Functor (StateR s) where
     fmap f (StateR k) = StateR $ \ s -> let (s', v) = k s in (s', f v)
 
+-- | @since 4.0
 instance Applicative (StateR s) where
     pure x = StateR (\ s -> (s, x))
     StateR kf <*> StateR kv = StateR $ \ s ->
@@ -324,9 +342,11 @@ foldMapDefault f = getConst . traverse (Const . f)
 
 newtype Id a = Id { getId :: a }
 
+-- | @since 2.01
 instance Functor Id where
     fmap f (Id x) = Id (f x)
 
+-- | @since 2.01
 instance Applicative Id where
     pure = Id
     Id f <*> Id x = Id (f x)
