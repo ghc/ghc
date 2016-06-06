@@ -647,6 +647,27 @@ rnArithSeq (FromThenTo expr1 expr2 expr3)
 ************************************************************************
 -}
 
+{-
+Note [Deterministic ApplicativeDo and RecursiveDo desugaring]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Both ApplicativeDo and RecursiveDo need to create tuples not
+present in the source text.
+
+For ApplicativeDo we create:
+
+  (a,b,c) <- (\c b a -> (a,b,c)) <$>
+
+For RecursiveDo we create:
+
+  mfix (\ ~(a,b,c) -> do ...; return (a',b',c'))
+
+The order of the components in those tuples needs to be stable
+across recompilations, otherwise they can get optimized differently
+and we end up with incompatible binaries.
+To get a stable order we use nameSetElemsStable.
+See Note [Deterministic UniqFM] to learn more about nondeterminism.
+-}
+
 -- | Rename some Stmts
 rnStmts :: Outputable (body RdrName)
         => HsStmtContext Name
@@ -828,8 +849,11 @@ rnStmt ctxt rnBody (L loc (RecStmt { recS_stmts = rec_stmts })) thing_inside
         -- (This set may not be empty, because we're in a recursive
         -- context.)
         ; rnRecStmtsAndThen rnBody rec_stmts   $ \ segs -> do
-        { let bndrs = nameSetElems $ foldr (unionNameSet . (\(ds,_,_,_) -> ds))
-                                            emptyNameSet segs
+        { let bndrs = nameSetElemsStable $
+                        foldr (unionNameSet . (\(ds,_,_,_) -> ds))
+                              emptyNameSet
+                              segs
+          -- See Note [Deterministic ApplicativeDo and RecursiveDo desugaring]
         ; (thing, fvs_later) <- thing_inside bndrs
         ; let (rec_stmts', fvs) = segmentRecStmts loc ctxt empty_rec_stmt segs fvs_later
         -- We aren't going to try to group RecStmts with
@@ -1186,8 +1210,11 @@ segmentRecStmts loc ctxt empty_rec_stmt segs fvs_later
   | otherwise
   = ([ L loc $
        empty_rec_stmt { recS_stmts = ss
-                      , recS_later_ids = nameSetElems (defs `intersectNameSet` fvs_later)
-                      , recS_rec_ids   = nameSetElems (defs `intersectNameSet` uses) }]
+                      , recS_later_ids = nameSetElemsStable
+                                           (defs `intersectNameSet` fvs_later)
+                      , recS_rec_ids   = nameSetElemsStable
+                                           (defs `intersectNameSet` uses) }]
+          -- See Note [Deterministic ApplicativeDo and RecursiveDo desugaring]
     , uses `plusFV` fvs_later)
 
   where
@@ -1312,8 +1339,9 @@ segsToStmts empty_rec_stmt ((defs, uses, fwds, ss) : segs) fvs_later
     new_stmt | non_rec   = head ss
              | otherwise = L (getLoc (head ss)) rec_stmt
     rec_stmt = empty_rec_stmt { recS_stmts     = ss
-                              , recS_later_ids = nameSetElems used_later
-                              , recS_rec_ids   = nameSetElems fwds }
+                              , recS_later_ids = nameSetElemsStable used_later
+                              , recS_rec_ids   = nameSetElemsStable fwds }
+          -- See Note [Deterministic ApplicativeDo and RecursiveDo desugaring]
     non_rec    = isSingleton ss && isEmptyNameSet fwds
     used_later = defs `intersectNameSet` later_uses
                                 -- The ones needed after the RecStmt
@@ -1595,7 +1623,8 @@ stmtTreeToStmts ctxt (StmtTreeApplicative trees) tail tail_fvs = do
      let stmts = flattenStmtTree tree
          pvarset = mkNameSet (concatMap (collectStmtBinders.unLoc.fst) stmts)
                      `intersectNameSet` tail_fvs
-         pvars = nameSetElems pvarset
+         pvars = nameSetElemsStable pvarset
+           -- See Note [Deterministic ApplicativeDo and RecursiveDo desugaring]
          pat = mkBigLHsVarPatTup pvars
          tup = mkBigLHsVarTup pvars
      (stmts',fvs2) <- stmtTreeToStmts ctxt tree [] pvarset

@@ -412,8 +412,10 @@ mkLocalisedOccName this_mod mk_occ name = mk_occ origin (nameOccName name)
 cmpName :: Name -> Name -> Ordering
 cmpName n1 n2 = n_uniq n1 `compare` n_uniq n2
 
+-- | Compare Names lexicographically
+-- This only works for Names that originate in the source code or have been
+-- tidied.
 stableNameCmp :: Name -> Name -> Ordering
--- Compare lexicographically
 stableNameCmp (Name { n_sort = s1, n_occ = occ1 })
               (Name { n_sort = s2, n_occ = occ2 })
   = (s1 `sort_cmp` s2) `thenCmp` (occ1 `compare` occ2)

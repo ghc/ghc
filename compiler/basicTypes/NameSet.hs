@@ -88,6 +88,8 @@ delListFromNameSet set ns = foldl delFromNameSet set ns
 intersectsNameSet s1 s2 = not (isEmptyNameSet (s1 `intersectNameSet` s2))
 
 -- | Get the elements of a NameSet with some stable ordering.
+-- This only works for Names that originate in the source code or have been
+-- tidied.
 -- See Note [Deterministic UniqFM] to learn about nondeterminism
 nameSetElemsStable :: NameSet -> [Name]
 nameSetElemsStable ns =
