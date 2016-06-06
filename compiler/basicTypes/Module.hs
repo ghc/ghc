@@ -72,7 +72,7 @@ module Module
         foldModuleEnv, extendModuleEnvWith, filterModuleEnv,
 
         -- * ModuleName mappings
-        ModuleNameEnv,
+        ModuleNameEnv, DModuleNameEnv,
 
         -- * Sets of Modules
         ModuleSet,
@@ -83,6 +83,7 @@ import Config
 import Outputable
 import Unique
 import UniqFM
+import UniqDFM
 import FastString
 import Binary
 import Util
@@ -600,3 +601,8 @@ UniqFM.
 
 -- | A map keyed off of 'ModuleName's (actually, their 'Unique's)
 type ModuleNameEnv elt = UniqFM elt
+
+
+-- | A map keyed off of 'ModuleName's (actually, their 'Unique's)
+-- Has deterministic folds and can be deterministically converted to a list
+type DModuleNameEnv elt = UniqDFM elt

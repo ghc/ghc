@@ -37,7 +37,6 @@ import Finder
 import HscTypes
 import Name
 import NameEnv
-import UniqFM
 import Module
 import ListSetOps
 import DynFlags
@@ -658,7 +657,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
         -- This one is a build-system bug
 
     get_linkable osuf mod_name      -- A home-package module
-        | Just mod_info <- lookupUFM hpt mod_name
+        | Just mod_info <- lookupHpt hpt mod_name
         = adjust_linkable (Maybes.expectJust "getLinkDeps" (hm_linkable mod_info))
         | otherwise
         = do    -- It's not in the HPT because we are in one shot mode,

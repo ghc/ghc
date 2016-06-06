@@ -189,7 +189,7 @@ tcHiBootIface hsc_src mod
                 -- And that's fine, because if M's ModInfo is in the HPT, then
                 -- it's been compiled once, and we don't need to check the boot iface
           then do { hpt <- getHpt
-                 ; case lookupUFM hpt (moduleName mod) of
+                 ; case lookupHpt hpt (moduleName mod) of
                       Just info | mi_boot (hm_iface info)
                                 -> return (mkSelfBootInfo (hm_details info))
                       _ -> return NoSelfBoot }

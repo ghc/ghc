@@ -46,7 +46,6 @@ import Finder
 import HscTypes hiding ( Hsc )
 import Outputable
 import Module
-import UniqFM           ( eltsUFM )
 import ErrUtils
 import DynFlags
 import Config
@@ -353,7 +352,7 @@ link' dflags batch_attempt_linking hpt
                           LinkStaticLib -> True
                           _ -> platformBinariesAreStaticLibs (targetPlatform dflags)
 
-            home_mod_infos = eltsUFM hpt
+            home_mod_infos = eltsHpt hpt
 
             -- the packages we depend on
             pkg_deps  = concatMap (map fst . dep_pkgs . mi_deps . hm_iface) home_mod_infos

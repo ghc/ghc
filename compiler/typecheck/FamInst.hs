@@ -27,7 +27,6 @@ import CoAxiom
 import DynFlags
 import Module
 import Outputable
-import UniqFM
 import Util
 import RdrName
 import DataCon ( dataConName )
@@ -161,7 +160,7 @@ checkFamInstConsistency famInstMods directlyImpMods
              ; hmiFamInstEnv = extendFamInstEnvList emptyFamInstEnv
                                . md_fam_insts . hm_details
              ; hpt_fam_insts = mkModuleEnv [ (hmiModule hmi, hmiFamInstEnv hmi)
-                                           | hmi <- eltsUFM hpt]
+                                           | hmi <- eltsHpt hpt]
              ; groups        = map (dep_finsts . mi_deps . modIface)
                                    directlyImpMods
              ; okPairs       = listToSet $ concatMap allPairs groups

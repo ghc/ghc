@@ -222,7 +222,7 @@ load how_much = do
     -- Unload any modules which are going to be re-linked this time around.
     let stable_linkables = [ linkable
                            | m <- stable_obj++stable_bco,
-                             Just hmi <- [lookupUFM pruned_hpt m],
+                             Just hmi <- [lookupHpt pruned_hpt m],
                              Just linkable <- [hm_linkable hmi] ]
     liftIO $ unload hsc_env stable_linkables
 
@@ -370,9 +370,9 @@ load how_much = do
           -- there should be no Nothings where linkables should be, now
           let just_linkables =
                     isNoLink (ghcLink dflags)
-                 || all (isJust.hm_linkable)
-                        (filter ((== HsSrcFile).mi_hsc_src.hm_iface)
-                                (eltsUFM hpt4))
+                 || allHpt (isJust.hm_linkable)
+                        (filterHpt ((== HsSrcFile).mi_hsc_src.hm_iface)
+                                hpt4)
           ASSERT( just_linkables ) do
 
           -- Link everything together
@@ -498,7 +498,7 @@ pruneHomePackageTable :: HomePackageTable
                       -> ([ModuleName],[ModuleName])
                       -> HomePackageTable
 pruneHomePackageTable hpt summ (stable_obj, stable_bco)
-  = mapUFM prune hpt
+  = mapHpt prune hpt
   where prune hmi
           | is_stable modl = hmi'
           | otherwise      = hmi'{ hm_details = emptyModDetails }
@@ -639,7 +639,7 @@ checkStability hpt sccs all_home_mods = foldl checkSCC ([],[]) sccs
                                          && same_as_prev t
           | otherwise = False
           where
-             same_as_prev t = case lookupUFM hpt (ms_mod_name ms) of
+             same_as_prev t = case lookupHpt hpt (ms_mod_name ms) of
                                 Just hmi  | Just l <- hm_linkable hmi
                                  -> isObjectLinkable l && t == linkableTime l
                                 _other  -> True
@@ -655,7 +655,7 @@ checkStability hpt sccs all_home_mods = foldl checkSCC ([],[]) sccs
 
         bco_ok ms
           | gopt Opt_ForceRecomp (ms_hspp_opts ms) = False
-          | otherwise = case lookupUFM hpt (ms_mod_name ms) of
+          | otherwise = case lookupHpt hpt (ms_mod_name ms) of
                 Just hmi  | Just l <- hm_linkable hmi ->
                         not (isObjectLinkable l) &&
                         linkableTime l >= ms_hs_date ms
@@ -1060,12 +1060,13 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags cleanup par_sem
                 -- Prune the old HPT unless this is an hs-boot module.
                 unless (isBootSummary mod) $
                     atomicModifyIORef' old_hpt_var $ \old_hpt ->
-                        (delFromUFM old_hpt this_mod, ())
+                        (delFromHpt old_hpt this_mod, ())
 
                 -- Update and fetch the global HscEnv.
                 lcl_hsc_env' <- modifyMVar hsc_env_var $ \hsc_env -> do
-                    let hsc_env' = hsc_env { hsc_HPT = addToUFM (hsc_HPT hsc_env)
-                                                                this_mod mod_info }
+                    let hsc_env' = hsc_env
+                                     { hsc_HPT = addToHpt (hsc_HPT hsc_env)
+                                                           this_mod mod_info }
                     -- If this module is a loop finisher, now is the time to
                     -- re-typecheck the loop.
                     hsc_env'' <- case finish_loop of
@@ -1152,7 +1153,7 @@ upsweep old_hpt stable_mods cleanup sccs = do
                 let this_mod = ms_mod_name mod
 
                         -- Add new info to hsc_env
-                    hpt1     = addToUFM (hsc_HPT hsc_env) this_mod mod_info
+                    hpt1     = addToHpt (hsc_HPT hsc_env) this_mod mod_info
                     hsc_env1 = hsc_env { hsc_HPT = hpt1 }
 
                         -- Space-saving: delete the old HPT entry
@@ -1163,7 +1164,7 @@ upsweep old_hpt stable_mods cleanup sccs = do
                         -- would force the real module to be recompiled
                         -- every time.
                     old_hpt1 | isBootSummary mod = old_hpt
-                             | otherwise = delFromUFM old_hpt this_mod
+                             | otherwise = delFromHpt old_hpt this_mod
 
                     done' = mod:done
 
@@ -1204,7 +1205,7 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
             is_stable_obj = this_mod_name `elem` stable_obj
             is_stable_bco = this_mod_name `elem` stable_bco
 
-            old_hmi = lookupUFM old_hpt this_mod_name
+            old_hmi = lookupHpt old_hpt this_mod_name
 
             -- We're using the dflags for this module now, obtained by
             -- applying any options in its LANGUAGE & OPTIONS_GHC pragmas.
@@ -1360,9 +1361,9 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
 -- Filter modules in the HPT
 retainInTopLevelEnvs :: [ModuleName] -> HomePackageTable -> HomePackageTable
 retainInTopLevelEnvs keep_these hpt
-   = listToUFM   [ (mod, expectJust "retain" mb_mod_info)
+   = listToHpt   [ (mod, expectJust "retain" mb_mod_info)
                  | mod <- keep_these
-                 , let mb_mod_info = lookupUFM hpt mod
+                 , let mb_mod_info = lookupHpt hpt mod
                  , isJust mb_mod_info ]
 
 -- ---------------------------------------------------------------------------
@@ -1423,14 +1424,14 @@ typecheckLoop dflags hsc_env mods = do
       let new_hsc_env = hsc_env{ hsc_HPT = new_hpt }
       mds <- initIfaceCheck new_hsc_env $
                 mapM (typecheckIface . hm_iface) hmis
-      let new_hpt = addListToUFM old_hpt
+      let new_hpt = addListToHpt old_hpt
                         (zip mods [ hmi{ hm_details = details }
                                   | (hmi,details) <- zip hmis mds ])
       return new_hpt
   return hsc_env{ hsc_HPT = new_hpt }
   where
     old_hpt = hsc_HPT hsc_env
-    hmis    = map (expectJust "typecheckLoop" . lookupUFM old_hpt) mods
+    hmis    = map (expectJust "typecheckLoop" . lookupHpt old_hpt) mods
 
 reachableBackwards :: ModuleName -> [ModSummary] -> [ModSummary]
 reachableBackwards mod summaries

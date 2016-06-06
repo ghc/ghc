@@ -28,6 +28,7 @@ module UniqDFM (
         unitUDFM,
         addToUDFM,
         addToUDFM_C,
+        addListToUDFM,
         delFromUDFM,
         delListFromUDFM,
         adjustUDFM,
@@ -35,7 +36,7 @@ module UniqDFM (
         mapUDFM,
         plusUDFM,
         plusUDFM_C,
-        lookupUDFM,
+        lookupUDFM, lookupUDFM_Directly,
         elemUDFM,
         foldUDFM,
         eltsUDFM,
@@ -49,7 +50,8 @@ module UniqDFM (
         listToUDFM,
         udfmMinusUFM,
         partitionUDFM,
-        anyUDFM,
+        anyUDFM, allUDFM,
+        pprUDFM,
 
         udfmToList,
         udfmToUfm,
@@ -155,6 +157,9 @@ addToUDFM_Directly_C f (UDFM m i) u v =
   where
   tf (TaggedVal a j) (TaggedVal b _) = TaggedVal (f a b) j
 
+addListToUDFM :: Uniquable key => UniqDFM elt -> [(key,elt)] -> UniqDFM elt
+addListToUDFM = foldl (\m (k, v) -> addToUDFM m k v)
+
 addToUDFM_C
   :: Uniquable key => (elt -> elt -> elt) -- old -> new -> result
   -> UniqDFM elt -- old
@@ -234,6 +239,9 @@ insertUDFMIntoLeft_C f udfml udfmr =
 
 lookupUDFM :: Uniquable key => UniqDFM elt -> key -> Maybe elt
 lookupUDFM (UDFM m _i) k = taggedFst `fmap` M.lookup (getKey $ getUnique k) m
+
+lookupUDFM_Directly :: UniqDFM elt -> Unique -> Maybe elt
+lookupUDFM_Directly (UDFM m _i) k = taggedFst `fmap` M.lookup (getKey k) m
 
 elemUDFM :: Uniquable key => key -> UniqDFM elt -> Bool
 elemUDFM k (UDFM m _i) = M.member (getKey $ getUnique k) m
@@ -349,6 +357,9 @@ mapUDFM f (UDFM m i) = UDFM (M.map (fmap f) m) i
 anyUDFM :: (elt -> Bool) -> UniqDFM elt -> Bool
 anyUDFM p (UDFM m _i) = M.fold ((||) . p . taggedFst) False m
 
+allUDFM :: (elt -> Bool) -> UniqDFM elt -> Bool
+allUDFM p (UDFM m _i) = M.fold ((&&) . p . taggedFst) True m
+
 instance Monoid (UniqDFM a) where
   mempty = emptyUDFM
   mappend = plusUDFM
@@ -368,3 +379,9 @@ pprUniqDFM ppr_elt ufm
   = brackets $ fsep $ punctuate comma $
     [ ppr uq <+> text ":->" <+> ppr_elt elt
     | (uq, elt) <- udfmToList ufm ]
+
+pprUDFM :: UniqDFM a    -- ^ The things to be pretty printed
+       -> ([a] -> SDoc) -- ^ The pretty printing function to use on the elements
+       -> SDoc          -- ^ 'SDoc' where the things have been pretty
+                        -- printed
+pprUDFM ufm pp = pp (eltsUDFM ufm)
