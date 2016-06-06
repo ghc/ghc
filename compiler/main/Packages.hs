@@ -57,6 +57,7 @@ import PackageConfig
 import DynFlags
 import Name             ( Name, nameModule_maybe )
 import UniqFM
+import UniqDFM
 import Module
 import Util
 import Panic
@@ -233,7 +234,7 @@ originEmpty (ModOrigin Nothing [] [] False) = True
 originEmpty _ = False
 
 -- | 'UniqFM' map from 'UnitId'
-type UnitIdMap = UniqFM
+type UnitIdMap = UniqDFM
 
 -- | 'UniqFM' map from 'UnitId' to 'PackageConfig'
 type PackageConfigMap = UnitIdMap PackageConfig
@@ -279,7 +280,7 @@ data PackageState = PackageState {
 
 emptyPackageState :: PackageState
 emptyPackageState = PackageState {
-    pkgIdMap = emptyUFM,
+    pkgIdMap = emptyPackageConfigMap,
     preloadPackages = [],
     explicitPackages = [],
     moduleToPkgConfAll = Map.empty,
@@ -290,14 +291,14 @@ type InstalledPackageIndex = Map UnitId PackageConfig
 
 -- | Empty package configuration map
 emptyPackageConfigMap :: PackageConfigMap
-emptyPackageConfigMap = emptyUFM
+emptyPackageConfigMap = emptyUDFM
 
 -- | Find the package we know about with the given key (e.g. @foo_HASH@), if any
 lookupPackage :: DynFlags -> UnitId -> Maybe PackageConfig
 lookupPackage dflags = lookupPackage' (pkgIdMap (pkgState dflags))
 
 lookupPackage' :: PackageConfigMap -> UnitId -> Maybe PackageConfig
-lookupPackage' = lookupUFM
+lookupPackage' = lookupUDFM
 
 -- | Search for packages with a given package ID (e.g. \"foo-0.1\")
 searchPackageId :: DynFlags -> SourcePackageId -> [PackageConfig]
@@ -309,7 +310,7 @@ extendPackageConfigMap
    :: PackageConfigMap -> [PackageConfig] -> PackageConfigMap
 extendPackageConfigMap pkg_map new_pkgs
   = foldl add pkg_map new_pkgs
-  where add pkg_map p = addToUFM pkg_map (packageConfigId p) p
+  where add pkg_map p = addToUDFM pkg_map (packageConfigId p) p
 
 -- | Looks up the package with the given id in the package state, panicing if it is
 -- not found
@@ -322,7 +323,7 @@ getPackageDetails dflags pid =
 -- does not imply that the exposed-modules of the package are available
 -- (they may have been thinned or renamed).
 listPackageConfigMap :: DynFlags -> [PackageConfig]
-listPackageConfigMap dflags = eltsUFM (pkgIdMap (pkgState dflags))
+listPackageConfigMap dflags = eltsUDFM (pkgIdMap (pkgState dflags))
 
 -- ----------------------------------------------------------------------------
 -- Loading the package db files and building up the package state
@@ -552,7 +553,7 @@ applyPackageFlag dflags unusable no_hide_others pkgs vm flag =
          Right (p:_,_) -> return vm'
           where
            n = fsPackageName p
-           vm' = addToUFM_C edit vm_cleared (packageConfigId p) (b, rns, n)
+           vm' = addToUDFM_C edit vm_cleared (packageConfigId p) (b, rns, n)
            edit (b, rns, n) (b', rns', _) = (b || b', rns ++ rns', n)
            -- In the old days, if you said `ghc -package p-0.1 -package p-0.2`
            -- (or if p-0.1 was registered in the pkgdb as exposed: True),
@@ -575,7 +576,7 @@ applyPackageFlag dflags unusable no_hide_others pkgs vm flag =
            -- -hide-all-packages/-hide-all-plugin-packages depending on what
            -- flag is in question.
            vm_cleared | no_hide_others = vm
-                      | otherwise = filterUFM_Directly
+                      | otherwise = filterUDFM_Directly
                             (\k (_,_,n') -> k == getUnique (packageConfigId p)
                                                 || n /= n') vm
          _ -> panic "applyPackageFlag"
@@ -584,7 +585,7 @@ applyPackageFlag dflags unusable no_hide_others pkgs vm flag =
        case selectPackages (matchingStr str) pkgs unusable of
          Left ps       -> packageFlagErr dflags flag ps
          Right (ps,_) -> return vm'
-          where vm' = delListFromUFM vm (map packageConfigId ps)
+          where vm' = delListFromUDFM vm (map packageConfigId ps)
 
 selectPackages :: (PackageConfig -> Bool) -> [PackageConfig]
                -> UnusablePackages
@@ -713,7 +714,7 @@ findWiredInPackages dflags pkgs vis_map = do
            let all_ps = [ p | p <- pkgs, p `matches` wired_pkg ]
                all_exposed_ps =
                     [ p | p <- all_ps
-                        , elemUFM (packageConfigId p) vis_map ] in
+                        , elemUDFM (packageConfigId p) vis_map ] in
            case all_exposed_ps of
             [] -> case all_ps of
                        []   -> notfound
@@ -789,9 +790,9 @@ findWiredInPackages dflags pkgs vis_map = do
 
 updateVisibilityMap :: WiredPackagesMap -> VisibilityMap -> VisibilityMap
 updateVisibilityMap wiredInMap vis_map = foldl' f vis_map (Map.toList wiredInMap)
-  where f vm (from, to) = case lookupUFM vis_map from of
+  where f vm (from, to) = case lookupUDFM vis_map from of
                     Nothing -> vm
-                    Just r -> addToUFM vm to r
+                    Just r -> addToUDFM vm to r
 
 
 -- ----------------------------------------------------------------------------
@@ -1019,16 +1020,16 @@ mkPackageState dflags0 dbs preload0 = do
         case comparing packageVersion pkg pkg' of
             GT -> pkg
             _  -> pkg'
-      calcInitial m pkg = addToUFM_C preferLater m (fsPackageName pkg) pkg
+      calcInitial m pkg = addToUDFM_C preferLater m (fsPackageName pkg) pkg
       initial = if gopt Opt_HideAllPackages dflags
-                    then emptyUFM
-                    else foldl' calcInitial emptyUFM pkgs1
-      vis_map1 = foldUFM (\p vm ->
+                    then emptyUDFM
+                    else foldl' calcInitial emptyUDFM pkgs1
+      vis_map1 = foldUDFM (\p vm ->
                             if exposed p
-                               then addToUFM vm (packageConfigId p)
-                                             (True, [], fsPackageName p)
+                               then addToUDFM vm (packageConfigId p)
+                                              (True, [], fsPackageName p)
                                else vm)
-                         emptyUFM initial
+                         emptyUDFM initial
 
   --
   -- Compute a visibility map according to the command-line flags (-package,
@@ -1054,9 +1055,9 @@ mkPackageState dflags0 dbs preload0 = do
     case pluginPackageFlags dflags of
         -- common case; try to share the old vis_map
         [] | not hide_plugin_pkgs -> return vis_map
-           | otherwise -> return emptyUFM
+           | otherwise -> return emptyUDFM
         _ -> do let plugin_vis_map1
-                        | hide_plugin_pkgs = emptyUFM
+                        | hide_plugin_pkgs = emptyUDFM
                         -- Use the vis_map PRIOR to wired in,
                         -- because otherwise applyPackageFlag
                         -- won't work.
@@ -1100,7 +1101,7 @@ mkPackageState dflags0 dbs preload0 = do
       -- add base & rts to the preload packages
       basicLinkedPackages
        | gopt Opt_AutoLinkPackages dflags
-          = filter (flip elemUFM pkg_db)
+          = filter (flip elemUDFM pkg_db)
                 [baseUnitId, rtsUnitId]
        | otherwise = []
       -- but in any case remove the current package from the set of
@@ -1116,8 +1117,8 @@ mkPackageState dflags0 dbs preload0 = do
   -- Force pstate to avoid leaking the dflags0 passed to mkPackageState
   let !pstate = PackageState{
     preloadPackages     = dep_preload,
-    explicitPackages    = foldUFM (\pkg xs ->
-                            if elemUFM (packageConfigId pkg) vis_map
+    explicitPackages    = foldUDFM (\pkg xs ->
+                            if elemUDFM (packageConfigId pkg) vis_map
                                 then packageConfigId pkg : xs
                                 else xs) [] pkg_db,
     pkgIdMap            = pkg_db,
@@ -1136,7 +1137,7 @@ mkModuleToPkgConfAll
   -> VisibilityMap
   -> ModuleToPkgConfAll
 mkModuleToPkgConfAll dflags pkg_db vis_map =
-    foldl' extend_modmap emptyMap (eltsUFM pkg_db)
+    foldl' extend_modmap emptyMap (eltsUDFM pkg_db)
  where
   emptyMap = Map.empty
   sing pk m _ = Map.singleton (mkModule pk m)
@@ -1146,7 +1147,7 @@ mkModuleToPkgConfAll dflags pkg_db vis_map =
   extend_modmap modmap pkg = addListTo modmap theBindings
    where
     theBindings :: [(ModuleName, Map Module ModuleOrigin)]
-    theBindings | Just (b,rns,_) <- lookupUFM vis_map (packageConfigId pkg)
+    theBindings | Just (b,rns,_) <- lookupUDFM vis_map (packageConfigId pkg)
                               = newBindings b rns
                 | otherwise   = newBindings False []
 

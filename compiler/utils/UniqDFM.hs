@@ -40,7 +40,7 @@ module UniqDFM (
         elemUDFM,
         foldUDFM,
         eltsUDFM,
-        filterUDFM,
+        filterUDFM, filterUDFM_Directly,
         isNullUDFM,
         sizeUDFM,
         intersectUDFM, udfmIntersectUFM,
@@ -260,6 +260,11 @@ eltsUDFM (UDFM m _i) =
 
 filterUDFM :: (elt -> Bool) -> UniqDFM elt -> UniqDFM elt
 filterUDFM p (UDFM m i) = UDFM (M.filter (\(TaggedVal v _) -> p v) m) i
+
+filterUDFM_Directly :: (Unique -> elt -> Bool) -> UniqDFM elt -> UniqDFM elt
+filterUDFM_Directly p (UDFM m i) = UDFM (M.filterWithKey p' m) i
+  where
+  p' k (TaggedVal v _) = p (getUnique k) v
 
 -- | Converts `UniqDFM` to a list, with elements in deterministic order.
 -- It's O(n log n) while the corresponding function on `UniqFM` is O(n).
