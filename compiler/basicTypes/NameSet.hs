@@ -93,6 +93,8 @@ nameSetAll :: (Name -> Bool) -> NameSet -> Bool
 nameSetAll = uniqSetAll
 
 -- | Get the elements of a NameSet with some stable ordering.
+-- This only works for Names that originate in the source code or have been
+-- tidied.
 -- See Note [Deterministic UniqFM] to learn about nondeterminism
 nameSetElemsStable :: NameSet -> [Name]
 nameSetElemsStable ns =
