@@ -198,6 +198,10 @@ pprIdDetails other     = brackets (pp other)
 -- Most of the 'IdInfo' gives information about the value, or definition, of
 -- the 'Id', independent of its usage. Exceptions to this
 -- are 'demandInfo', 'occInfo', 'oneShotInfo' and 'callArityInfo'.
+--
+-- Performance note: when we update 'IdInfo', we have to reallocate this
+-- entire record, so it is a good idea not to let this data structure get
+-- too big.
 data IdInfo
   = IdInfo {
         arityInfo       :: !ArityInfo,          -- ^ 'Id' arity
