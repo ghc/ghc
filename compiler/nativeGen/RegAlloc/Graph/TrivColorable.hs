@@ -225,8 +225,8 @@ trivColorable classN conflicts exclusions
                 RcFloat         -> (cd,   cf+1)
                 _               -> panic "Regs.trivColorable: reg class not handled"
 
-        tmp                     = foldUniqSet acc (0, 0) conflicts
-        (countInt,  countFloat) = foldUniqSet acc tmp    exclusions
+        tmp                     = nonDetFoldUFM acc (0, 0) conflicts
+        (countInt,  countFloat) = nonDetFoldUFM acc tmp    exclusions
 
         squeese         = worst countInt   classN RcInteger
                         + worst countFloat classN RcFloat

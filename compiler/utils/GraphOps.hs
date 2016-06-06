@@ -58,18 +58,24 @@ addNode :: Uniquable k
 addNode k node graph
  = let
         -- add back conflict edges from other nodes to this one
-        map_conflict
-                = foldUniqSet
-                        (adjustUFM_C (\n -> n { nodeConflicts = addOneToUniqSet (nodeConflicts n) k}))
-                        (graphMap graph)
-                        (nodeConflicts node)
+        map_conflict =
+          nonDetFoldUFM
+            -- It's OK to use nonDetFoldUFM here because the
+            -- operation is commutative
+            (adjustUFM_C (\n -> n { nodeConflicts =
+                                      addOneToUniqSet (nodeConflicts n) k}))
+            (graphMap graph)
+            (nodeConflicts node)
 
         -- add back coalesce edges from other nodes to this one
-        map_coalesce
-                = foldUniqSet
-                        (adjustUFM_C (\n -> n { nodeCoalesce = addOneToUniqSet (nodeCoalesce n) k}))
-                        map_conflict
-                        (nodeCoalesce node)
+        map_coalesce =
+          nonDetFoldUFM
+            -- It's OK to use nonDetFoldUFM here because the
+            -- operation is commutative
+            (adjustUFM_C (\n -> n { nodeCoalesce =
+                                      addOneToUniqSet (nodeCoalesce n) k}))
+            map_conflict
+            (nodeCoalesce node)
 
   in    graph
         { graphMap      = addToUFM map_coalesce k node}
@@ -462,7 +468,9 @@ freezeNode k
                 else node       -- panic "GraphOps.freezeNode: edge to freeze wasn't in the coalesce set"
                                 -- If the edge isn't actually in the coelesce set then just ignore it.
 
-        fm2     = foldUniqSet (adjustUFM_C (freezeEdge k)) fm1
+        fm2     = nonDetFoldUFM (adjustUFM_C (freezeEdge k)) fm1
+                    -- It's OK to use nonDetFoldUFM here because the operation
+                    -- is commutative
                         $ nodeCoalesce node
 
     in  fm2

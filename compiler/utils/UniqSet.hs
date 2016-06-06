@@ -22,7 +22,7 @@ module UniqSet (
         unionUniqSets, unionManyUniqSets,
         minusUniqSet,
         intersectUniqSets,
-        foldUniqSet, uniqSetAny, uniqSetAll,
+        uniqSetAny, uniqSetAll,
         elementOfUniqSet,
         elemUniqSet_Directly,
         filterUniqSet,
@@ -61,7 +61,6 @@ unionManyUniqSets :: [UniqSet a] -> UniqSet a
 minusUniqSet  :: UniqSet a -> UniqSet a -> UniqSet a
 intersectUniqSets :: UniqSet a -> UniqSet a -> UniqSet a
 
-foldUniqSet :: (a -> b -> b) -> b -> UniqSet a -> b
 elementOfUniqSet :: Uniquable a => a -> UniqSet a -> Bool
 elemUniqSet_Directly :: Unique -> UniqSet a -> Bool
 filterUniqSet :: (a -> Bool) -> UniqSet a -> UniqSet a
@@ -109,7 +108,6 @@ unionManyUniqSets sets = foldr1 unionUniqSets sets
 minusUniqSet = minusUFM
 intersectUniqSets = intersectUFM
 
-foldUniqSet = foldUFM
 elementOfUniqSet = elemUFM
 elemUniqSet_Directly = elemUFM_Directly
 filterUniqSet = filterUFM
