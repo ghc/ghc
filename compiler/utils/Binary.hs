@@ -650,7 +650,9 @@ type Dictionary = Array Int FastString -- The dictionary
 putDictionary :: BinHandle -> Int -> UniqFM (Int,FastString) -> IO ()
 putDictionary bh sz dict = do
   put_ bh sz
-  mapM_ (putFS bh) (elems (array (0,sz-1) (eltsUFM dict)))
+  mapM_ (putFS bh) (elems (array (0,sz-1) (nonDetEltsUFM dict)))
+    -- It's OK to use nonDetEltsUFM here because the elements have indices
+    -- that array uses to create order
 
 getDictionary :: BinHandle -> IO Dictionary
 getDictionary bh = do
