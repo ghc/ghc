@@ -30,6 +30,7 @@ import NameSet
 import Name
 import NameEnv
 import FastString
+import UniqDFM
 
 
 import Data.Maybe
@@ -86,7 +87,7 @@ data GlobalEnv
           -- ^Mapping from global variables to their vectorised versions — aka the /vectorisation
           -- map/.
 
-        , global_parallel_vars        :: VarSet
+        , global_parallel_vars        :: DVarSet
           -- ^The domain of 'global_vars'.
           --
           -- This information is not redundant as it is impossible to extract the domain from a
@@ -208,8 +209,8 @@ modVectInfo env mg_ids mg_tyCons vectDecls info
     { vectInfoVar            = mk_env ids      (global_vars     env)
     , vectInfoTyCon          = mk_env tyCons   (global_tycons   env)
     , vectInfoDataCon        = mk_env dataCons (global_datacons env)
-    , vectInfoParallelVars   = (global_parallel_vars   env `minusVarSet`  vectInfoParallelVars   info)
-                               `intersectVarSet` (mkVarSet ids)
+    , vectInfoParallelVars   = (global_parallel_vars   env `minusDVarSet`  vectInfoParallelVars   info)
+                               `udfmIntersectUFM` (mkVarSet ids)
     , vectInfoParallelTyCons =  global_parallel_tycons env `minusNameSet` vectInfoParallelTyCons info
     }
   where

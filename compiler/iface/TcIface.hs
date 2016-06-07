@@ -779,7 +779,7 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
                   { vectInfoVar            = mkVarEnv  vVars `extendVarEnvList` concat vScSels
                   , vectInfoTyCon          = mkNameEnv vTyCons
                   , vectInfoDataCon        = mkNameEnv (concat vDataCons)
-                  , vectInfoParallelVars   = mkVarSet  vParallelVars
+                  , vectInfoParallelVars   = mkDVarSet vParallelVars
                   , vectInfoParallelTyCons = parallelTyConsSet
                   }
        }
