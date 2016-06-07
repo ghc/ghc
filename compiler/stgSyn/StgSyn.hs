@@ -65,6 +65,7 @@ import Type        ( Type )
 import Type        ( typePrimRep )
 import UniqSet
 import Unique      ( Unique )
+import UniqFM
 import Util
 
 {-
@@ -760,7 +761,7 @@ pprStgLVs lvs
     if userStyle sty || isEmptyUniqSet lvs then
         empty
     else
-        hcat [text "{-lvs:", interpp'SP (uniqSetToList lvs), text "-}"]
+        hcat [text "{-lvs:", pprUFM lvs interpp'SP, text "-}"]
 
 pprStgRhs :: (OutputableBndr bndr, Outputable bdee, Ord bdee)
           => GenStgRhs bndr bdee -> SDoc
