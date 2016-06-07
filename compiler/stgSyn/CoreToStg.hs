@@ -856,10 +856,12 @@ data HowBound
         Arity           -- Its arity (local Ids don't have arity info at this point)
 
   | LambdaBound         -- Used for both lambda and case
+  deriving (Eq)
 
 data LetInfo
   = TopLet              -- top level things
   | NestedLet
+  deriving (Eq)
 
 isLetBound :: HowBound -> Bool
 isLetBound (LetBound _ _) = True
@@ -1010,20 +1012,8 @@ plusFVInfo :: (Var, HowBound, StgBinderInfo)
            -> (Var, HowBound, StgBinderInfo)
            -> (Var, HowBound, StgBinderInfo)
 plusFVInfo (id1,hb1,info1) (id2,hb2,info2)
-  = ASSERT(id1 == id2 && hb1 `check_eq_how_bound` hb2)
+  = ASSERT(id1 == id2 && hb1 == hb2)
     (id1, hb1, combineStgBinderInfo info1 info2)
-
--- The HowBound info for a variable in the FVInfo should be consistent
-check_eq_how_bound :: HowBound -> HowBound -> Bool
-check_eq_how_bound ImportBound        ImportBound        = True
-check_eq_how_bound LambdaBound        LambdaBound        = True
-check_eq_how_bound (LetBound li1 ar1) (LetBound li2 ar2) = ar1 == ar2 && check_eq_li li1 li2
-check_eq_how_bound _                  _                  = False
-
-check_eq_li :: LetInfo -> LetInfo -> Bool
-check_eq_li NestedLet NestedLet = True
-check_eq_li TopLet    TopLet    = True
-check_eq_li _         _         = False
 
 -- Misc.
 
