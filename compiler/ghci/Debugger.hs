@@ -26,6 +26,7 @@ import IfaceEnv( newInteractiveBinder )
 import Name
 import Var hiding ( varName )
 import VarSet
+import UniqFM
 import Type
 import Kind
 import GHC
@@ -99,7 +100,9 @@ pprintClosureCommand bindThings force str = do
          my_tvs       = termTyCoVars t
          tvs          = env_tvs `minusVarSet` my_tvs
          tyvarOccName = nameOccName . tyVarName
-         tidyEnv      = (initTidyOccEnv (map tyvarOccName (varSetElems tvs))
+         tidyEnv      = (initTidyOccEnv (map tyvarOccName (nonDetEltsUFM tvs))
+           -- It's OK to use nonDetEltsUFM here because initTidyOccEnv
+           -- forgets the ordering immediately by creating an env
                         , env_tvs `intersectVarSet` my_tvs)
      return$ mapTermType (snd . tidyOpenType tidyEnv) t
 
