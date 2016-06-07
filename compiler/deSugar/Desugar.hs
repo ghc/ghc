@@ -61,11 +61,11 @@ import Util
 import MonadUtils
 import OrdList
 import UniqFM
+import UniqDFM
 import ListSetOps
 import Fingerprint
 import Maybes
 
-import Data.Function
 import Data.List
 import Data.IORef
 import Control.Monad( when )
@@ -83,7 +83,8 @@ mkDependencies
  = do
       -- Template Haskell used?
       th_used <- readIORef th_var
-      let dep_mods = eltsUFM (delFromUFM (imp_dep_mods imports) (moduleName mod))
+      let dep_mods = eltsUDFM (delFromUDFM (imp_dep_mods imports)
+                                           (moduleName mod))
                 -- M.hi-boot can be in the imp_dep_mods, but we must remove
                 -- it before recording the modules on which this one depends!
                 -- (We want to retain M.hi-boot in imp_dep_mods so that
@@ -100,7 +101,7 @@ mkDependencies
           trust_pkgs  = imp_trust_pkgs imports
           dep_pkgs'   = map (\x -> (x, x `elem` trust_pkgs)) sorted_pkgs
 
-      return Deps { dep_mods   = sortBy (stableModuleNameCmp `on` fst) dep_mods,
+      return Deps { dep_mods   = dep_mods,
                     dep_pkgs   = dep_pkgs',
                     dep_orphs  = sortBy stableModuleCmp (imp_orphs  imports),
                     dep_finsts = sortBy stableModuleCmp (imp_finsts imports) }

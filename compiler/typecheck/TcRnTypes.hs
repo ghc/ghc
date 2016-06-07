@@ -163,6 +163,7 @@ import SrcLoc
 import VarSet
 import ErrUtils
 import UniqFM
+import UniqDFM
 import UniqSupply
 import BasicTypes
 import Bag
@@ -1042,7 +1043,7 @@ data ImportAvails
           -- different packages. (currently not the case, but might be in the
           -- future).
 
-        imp_dep_mods :: ModuleNameEnv (ModuleName, IsBootInterface),
+        imp_dep_mods :: DModuleNameEnv (ModuleName, IsBootInterface),
           -- ^ Home-package modules needed by the module being compiled
           --
           -- It doesn't matter whether any of these dependencies
@@ -1084,14 +1085,14 @@ data ImportAvails
       }
 
 mkModDeps :: [(ModuleName, IsBootInterface)]
-          -> ModuleNameEnv (ModuleName, IsBootInterface)
-mkModDeps deps = foldl add emptyUFM deps
+          -> DModuleNameEnv (ModuleName, IsBootInterface)
+mkModDeps deps = foldl add emptyUDFM deps
                where
-                 add env elt@(m,_) = addToUFM env m elt
+                 add env elt@(m,_) = addToUDFM env m elt
 
 emptyImportAvails :: ImportAvails
 emptyImportAvails = ImportAvails { imp_mods          = emptyModuleEnv,
-                                   imp_dep_mods      = emptyUFM,
+                                   imp_dep_mods      = emptyUDFM,
                                    imp_dep_pkgs      = [],
                                    imp_trust_pkgs    = [],
                                    imp_trust_own_pkg = False,
@@ -1114,7 +1115,7 @@ plusImportAvails
                   imp_trust_pkgs = tpkgs2, imp_trust_own_pkg = tself2,
                   imp_orphs = orphs2, imp_finsts = finsts2 })
   = ImportAvails { imp_mods          = plusModuleEnv_C (++) mods1 mods2,
-                   imp_dep_mods      = plusUFM_C plus_mod_dep dmods1 dmods2,
+                   imp_dep_mods      = plusUDFM_C plus_mod_dep dmods1 dmods2,
                    imp_dep_pkgs      = dpkgs1 `unionLists` dpkgs2,
                    imp_trust_pkgs    = tpkgs1 `unionLists` tpkgs2,
                    imp_trust_own_pkg = tself1 || tself2,

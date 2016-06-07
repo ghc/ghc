@@ -83,7 +83,7 @@ import Id
 import IdInfo
 import VarEnv
 import Module
-import UniqFM
+import UniqDFM
 import Name
 import NameEnv
 import NameSet
@@ -400,7 +400,7 @@ tcRnImports hsc_env import_decls
   = do  { (rn_imports, rdr_env, imports, hpc_info) <- rnImports import_decls ;
 
         ; this_mod <- getModule
-        ; let { dep_mods :: ModuleNameEnv (ModuleName, IsBootInterface)
+        ; let { dep_mods :: DModuleNameEnv (ModuleName, IsBootInterface)
               ; dep_mods = imp_dep_mods imports
 
                 -- We want instance declarations from all home-package
@@ -411,7 +411,7 @@ tcRnImports hsc_env import_decls
                 -- modules batch (@--make@) compiled before this one, but
                 -- which are not below this one.
               ; want_instances :: ModuleName -> Bool
-              ; want_instances mod = mod `elemUFM` dep_mods
+              ; want_instances mod = mod `elemUDFM` dep_mods
                                    && mod /= moduleName this_mod
               ; (home_insts, home_fam_insts) = hptInstances hsc_env
                                                             want_instances
@@ -420,7 +420,7 @@ tcRnImports hsc_env import_decls
                 -- Record boot-file info in the EPS, so that it's
                 -- visible to loadHiBootInterface in tcRnSrcDecls,
                 -- and any other incrementally-performed imports
-        ; updateEps_ (\eps -> eps { eps_is_boot = dep_mods }) ;
+        ; updateEps_ (\eps -> eps { eps_is_boot = udfmToUfm dep_mods }) ;
 
                 -- Update the gbl env
         ; updGblEnv ( \ gbl ->
@@ -2434,15 +2434,11 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
          , vcat (map ppr rules)
          , vcat (map ppr vects)
          , text "Dependent modules:" <+>
-                pprUFM (imp_dep_mods imports) (ppr . sortBy cmp_mp)
+                pprUDFM (imp_dep_mods imports) ppr
          , text "Dependent packages:" <+>
                 ppr (sortBy stableUnitIdCmp $ imp_dep_pkgs imports)]
-  where         -- The two uses of sortBy are just to reduce unnecessary
+  where         -- The use of sortBy is just to reduce unnecessary
                 -- wobbling in testsuite output
-    cmp_mp (mod_name1, is_boot1) (mod_name2, is_boot2)
-        = (mod_name1 `stableModuleNameCmp` mod_name2)
-                  `thenCmp`
-          (is_boot1 `compare` is_boot2)
 
 ppr_types :: TypeEnv -> SDoc
 ppr_types type_env
