@@ -42,6 +42,7 @@ import FastString
 import Outputable
 import Platform
 import UniqSet
+import UniqFM
 import Unique
 import Util
 
@@ -984,7 +985,7 @@ is_cishCC JavaScriptCallConv = False
 --
 pprTempAndExternDecls :: [CmmBlock] -> (SDoc{-temps-}, SDoc{-externs-})
 pprTempAndExternDecls stmts
-  = (vcat (map pprTempDecl (uniqSetToList temps)),
+  = (pprUFM temps (vcat . map pprTempDecl),
      vcat (map (pprExternDecl False{-ToDo-}) (Map.keys lbls)))
   where (temps, lbls) = runTE (mapM_ te_BB stmts)
 

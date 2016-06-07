@@ -47,7 +47,6 @@ import Util
 import ErrUtils
 import SrcLoc
 import qualified Maybes
-import UniqSet
 import UniqDSet
 import FastString
 import Platform
@@ -576,7 +575,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
         -- 1.  Find the dependent home-pkg-modules/packages from each iface
         -- (omitting modules from the interactive package, which is already linked)
       ; (mods_s, pkgs_s) <- follow_deps (filterOut isInteractiveModule mods)
-                                        emptyUniqSet emptyUniqSet;
+                                        emptyUniqDSet emptyUniqDSet;
 
       ; let {
         -- 2.  Exclude ones already linked
@@ -604,11 +603,11 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
         -- dependencies of that.  Hence we need to traverse the dependency
         -- tree recursively.  See bug #936, testcase ghci/prog007.
     follow_deps :: [Module]             -- modules to follow
-                -> UniqSet ModuleName         -- accum. module dependencies
-                -> UniqSet UnitId          -- accum. package dependencies
+                -> UniqDSet ModuleName         -- accum. module dependencies
+                -> UniqDSet UnitId          -- accum. package dependencies
                 -> IO ([ModuleName], [UnitId]) -- result
     follow_deps []     acc_mods acc_pkgs
-        = return (uniqSetToList acc_mods, uniqSetToList acc_pkgs)
+        = return (uniqDSetToList acc_mods, uniqDSetToList acc_pkgs)
     follow_deps (mod:mods) acc_mods acc_pkgs
         = do
           mb_iface <- initIfaceCheck hsc_env $
@@ -628,12 +627,12 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
                     where is_boot (m,True)  = Left m
                           is_boot (m,False) = Right m
 
-            boot_deps' = filter (not . (`elementOfUniqSet` acc_mods)) boot_deps
-            acc_mods'  = addListToUniqSet acc_mods (moduleName mod : mod_deps)
-            acc_pkgs'  = addListToUniqSet acc_pkgs $ map fst pkg_deps
+            boot_deps' = filter (not . (`elementOfUniqDSet` acc_mods)) boot_deps
+            acc_mods'  = addListToUniqDSet acc_mods (moduleName mod : mod_deps)
+            acc_pkgs'  = addListToUniqDSet acc_pkgs $ map fst pkg_deps
           --
           if pkg /= this_pkg
-             then follow_deps mods acc_mods (addOneToUniqSet acc_pkgs' pkg)
+             then follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' pkg)
              else follow_deps (map (mkModule this_pkg) boot_deps' ++ mods)
                               acc_mods' acc_pkgs'
         where
