@@ -44,7 +44,6 @@ import Outputable
 import FastString
 import DynFlags
 import Util
-import UniqDFM (udfmToUfm)
 #if __GLASGOW_HASKELL__ < 709
 import MonadUtils
 #endif
@@ -294,7 +293,7 @@ liftSimpleAndCase aexpr = liftSimple aexpr
 
 liftSimple :: CoreExprWithVectInfo -> VM CoreExprWithVectInfo
 liftSimple ((fvs, vi), AnnVar v)
-  | v `elemVarSet` fvs                -- special case to avoid producing: (\v -> v) v
+  | v `elemDVarSet` fvs               -- special case to avoid producing: (\v -> v) v
   && not (isToplevel v)               --   NB: if 'v' not free or is toplevel, we must get the 'VIEncaps'
   = return $ ((fvs, vi), AnnVar v)
 liftSimple aexpr@((fvs_orig, VISimple), expr)
@@ -306,13 +305,13 @@ liftSimple aexpr@((fvs_orig, VISimple), expr)
     ; return $ liftedExpr
     }
   where
-    vars = varSetElems fvs
-    fvs  = filterVarSet (not . isToplevel) fvs_orig -- only include 'Id's that are not toplevel
+    vars = dVarSetElems fvs
+    fvs  = filterDVarSet (not . isToplevel) fvs_orig -- only include 'Id's that are not toplevel
 
-    mkAnnLams :: [Var] -> VarSet -> AnnExpr' Var (VarSet, VectAvoidInfo) -> CoreExprWithVectInfo
-    mkAnnLams []     fvs expr = ASSERT(isEmptyVarSet fvs)
-                                ((emptyVarSet, VIEncaps), expr)
-    mkAnnLams (v:vs) fvs expr = mkAnnLams vs (fvs `delVarSet` v) (AnnLam v ((fvs, VIEncaps), expr))
+    mkAnnLams :: [Var] -> DVarSet -> AnnExpr' Var (DVarSet, VectAvoidInfo) -> CoreExprWithVectInfo
+    mkAnnLams []     fvs expr = ASSERT(isEmptyDVarSet fvs)
+                                ((emptyDVarSet, VIEncaps), expr)
+    mkAnnLams (v:vs) fvs expr = mkAnnLams vs (fvs `delDVarSet` v) (AnnLam v ((fvs, VIEncaps), expr))
 
     mkAnnApps :: CoreExprWithVectInfo -> [Var] -> CoreExprWithVectInfo
     mkAnnApps aexpr []     = aexpr
@@ -320,7 +319,7 @@ liftSimple aexpr@((fvs_orig, VISimple), expr)
 
     mkAnnApp :: CoreExprWithVectInfo -> Var -> CoreExprWithVectInfo
     mkAnnApp aexpr@((fvs, _vi), _expr) v
-      = ((fvs `extendVarSet` v, VISimple), AnnApp aexpr ((unitVarSet v, VISimple), AnnVar v))
+      = ((fvs `extendDVarSet` v, VISimple), AnnApp aexpr ((unitDVarSet v, VISimple), AnnVar v))
 liftSimple aexpr
   = pprPanic "Vectorise.Exp.liftSimple: not simple" $ ppr (deAnnotate aexpr)
 
@@ -766,7 +765,7 @@ vectLam inline loop_breaker expr@((fvs, _vi), AnnLam _ _)
           -- collect and vectorise all /local/ free variables
       ; vfvs <- readLEnv $ \env ->
                   [ (var, fromJust mb_vv)
-                  | var <- varSetElems fvs
+                  | var <- dVarSetElems fvs
                   , let mb_vv = lookupVarEnv (local_vars env) var
                   , isJust mb_vv         -- its local == is in local var env
                   ]
@@ -932,7 +931,7 @@ vectAlgCase tycon _ty_args scrut bndr ty alts
           vect_dc <- maybeV dataConErr (lookupDataCon dc)
           let ntag = dataConTagZ vect_dc
               tag  = mkDataConTag dflags vect_dc
-              fvs  = fvs_body `delVarSetList` bndrs
+              fvs  = fvs_body `delDVarSetList` bndrs
 
           sel_tags  <- liftM (`App` sel) (builtin (selTags arity))
           lc        <- builtin liftingContext
@@ -944,7 +943,7 @@ vectAlgCase tycon _ty_args scrut bndr ty alts
              $ do
                { binds    <- mapM (pack_var (Var lc) sel_tags tag)
                            . filter isLocalId
-                           $ varSetElems fvs
+                           $ dVarSetElems fvs
                ; traceVt "case alternative:" (ppr . deAnnotate $ body)
                ; (ve, le) <- vectExpr body
                ; return (ve, Case (elems `App` sel) lc lty
@@ -995,7 +994,7 @@ data VectAvoidInfo = VIParr       -- tree contains parallel computations
 
 -- Core expression annotated with free variables and vectorisation-specific information.
 --
-type CoreExprWithVectInfo = AnnExpr Id (VarSet, VectAvoidInfo)
+type CoreExprWithVectInfo = AnnExpr Id (DVarSet, VectAvoidInfo)
 
 -- Yield the type of an annotated core expression.
 --
@@ -1051,7 +1050,7 @@ vectAvoidInfo pvs ce@(_, AnnVar v)
         traceVt "  reason:" $ if v `elemVarSet` pvs  then text "local"  else
                               if v `elemVarSet` gpvs then text "global" else text "parallel type"
 
-    ; return ((udfmToUfm fvs, vi), AnnVar v)
+    ; return ((fvs, vi), AnnVar v)
     }
   where
     fvs = freeVarsOf ce
@@ -1060,7 +1059,7 @@ vectAvoidInfo _pvs ce@(_, AnnLit lit)
   = do
     { vi <- vectAvoidInfoTypeOf ce
     ; viTrace ce vi []
-    ; return ((udfmToUfm fvs, vi), AnnLit lit)
+    ; return ((fvs, vi), AnnLit lit)
     }
   where
     fvs = freeVarsOf ce
@@ -1072,7 +1071,7 @@ vectAvoidInfo pvs ce@(_, AnnApp e1 e2)
     ; eVI2 <- vectAvoidInfo pvs e2
     ; let vi = ceVI `unlessVIParrExpr` eVI1 `unlessVIParrExpr` eVI2
     -- ; viTrace ce vi [eVI1, eVI2]
-    ; return ((udfmToUfm fvs, vi), AnnApp eVI1 eVI2)
+    ; return ((fvs, vi), AnnApp eVI1 eVI2)
     }
   where
     fvs = freeVarsOf ce
@@ -1083,7 +1082,7 @@ vectAvoidInfo pvs ce@(_, AnnLam var body)
     ; varVI  <- vectAvoidInfoType $ varType var
     ; let vi = vectAvoidInfoOf bodyVI `unlessVIParr` varVI
     -- ; viTrace ce vi [bodyVI]
-    ; return ((udfmToUfm fvs, vi), AnnLam var bodyVI)
+    ; return ((fvs, vi), AnnLam var bodyVI)
     }
   where
     fvs = freeVarsOf ce
@@ -1103,7 +1102,7 @@ vectAvoidInfo pvs ce@(_, AnnLet (AnnNonRec var e) body)
         ; return (bodyVI, ceVI `unlessVIParrExpr` bodyVI)
         }
     -- ; viTrace ce vi [eVI, bodyVI]
-    ; return ((udfmToUfm fvs, vi), AnnLet (AnnNonRec var eVI) bodyVI)
+    ; return ((fvs, vi), AnnLet (AnnNonRec var eVI) bodyVI)
     }
   where
     fvs = freeVarsOf ce
@@ -1120,13 +1119,13 @@ vectAvoidInfo pvs ce@(_, AnnLet (AnnRec bnds) body)
         ; bndsVI <- mapM (vectAvoidInfoBnd extendedPvs) bnds
         ; bodyVI <- vectAvoidInfo extendedPvs body
         -- ; viTrace ce VIParr (map snd bndsVI ++ [bodyVI])
-        ; return ((udfmToUfm fvs, VIParr), AnnLet (AnnRec bndsVI) bodyVI)
+        ; return ((fvs, VIParr), AnnLet (AnnRec bndsVI) bodyVI)
         }
       else do         -- demanded bindings cannot trigger parallelism
         { bodyVI <- vectAvoidInfo pvs body
         ; let vi = ceVI `unlessVIParrExpr` bodyVI
         -- ; viTrace ce vi (map snd bndsVI ++ [bodyVI])
-        ; return ((udfmToUfm fvs, vi), AnnLet (AnnRec bndsVI) bodyVI)
+        ; return ((fvs, vi), AnnLet (AnnRec bndsVI) bodyVI)
         }
     }
   where
@@ -1147,7 +1146,7 @@ vectAvoidInfo pvs ce@(_, AnnCase e var ty alts)
     ; let alteVIs = [eVI | (_, _, eVI) <- altsVI]
           vi      =  foldl unlessVIParrExpr ceVI (eVI:alteVIs)  -- NB: same effect as in the paper
     -- ; viTrace ce vi (eVI : alteVIs)
-    ; return ((udfmToUfm fvs, vi), AnnCase eVI var ty altsVI)
+    ; return ((fvs, vi), AnnCase eVI var ty altsVI)
     }
   where
     fvs = freeVarsOf ce
@@ -1162,7 +1161,7 @@ vectAvoidInfo pvs ce@(_, AnnCase e var ty alts)
 vectAvoidInfo pvs ce@(_, AnnCast e (fvs_ann, ann))
   = do
     { eVI <- vectAvoidInfo pvs e
-    ; return ((udfmToUfm fvs, vectAvoidInfoOf eVI), AnnCast eVI ((udfmToUfm $ freeVarsOfAnn fvs_ann, VISimple), ann))
+    ; return ((fvs, vectAvoidInfoOf eVI), AnnCast eVI ((freeVarsOfAnn fvs_ann, VISimple), ann))
     }
   where
     fvs = freeVarsOf ce
@@ -1170,18 +1169,18 @@ vectAvoidInfo pvs ce@(_, AnnCast e (fvs_ann, ann))
 vectAvoidInfo pvs ce@(_, AnnTick tick e)
   = do
     { eVI <- vectAvoidInfo pvs e
-    ; return ((udfmToUfm fvs, vectAvoidInfoOf eVI), AnnTick tick eVI)
+    ; return ((fvs, vectAvoidInfoOf eVI), AnnTick tick eVI)
     }
   where
     fvs = freeVarsOf ce
 
 vectAvoidInfo _pvs ce@(_, AnnType ty)
-  = return ((udfmToUfm fvs, VISimple), AnnType ty)
+  = return ((fvs, VISimple), AnnType ty)
   where
     fvs = freeVarsOf ce
 
 vectAvoidInfo _pvs ce@(_, AnnCoercion coe)
-  = return ((udfmToUfm fvs, VISimple), AnnCoercion coe)
+  = return ((fvs, VISimple), AnnCoercion coe)
   where
     fvs = freeVarsOf ce
 
@@ -1248,8 +1247,8 @@ allScalarVarType vs = and <$> mapM isScalarOrToplevel vs
 
 -- Are the types of all variables in the set in the 'Scalar' class or toplevel variables?
 --
-allScalarVarTypeSet :: VarSet -> VM Bool
-allScalarVarTypeSet = allScalarVarType . varSetElems
+allScalarVarTypeSet :: DVarSet -> VM Bool
+allScalarVarTypeSet = allScalarVarType . dVarSetElems
 
 -- Debugging support
 --
