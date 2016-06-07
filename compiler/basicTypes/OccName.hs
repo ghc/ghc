@@ -91,7 +91,7 @@ module OccName (
         -- * The 'OccSet' type
         OccSet, emptyOccSet, unitOccSet, mkOccSet, extendOccSet,
         extendOccSetList,
-        unionOccSets, unionManyOccSets, minusOccSet, elemOccSet, occSetElts,
+        unionOccSets, unionManyOccSets, minusOccSet, elemOccSet,
         isEmptyOccSet, intersectOccSet, intersectsOccSet,
         filterOccSet,
 
@@ -443,7 +443,6 @@ unionOccSets      :: OccSet -> OccSet -> OccSet
 unionManyOccSets  :: [OccSet] -> OccSet
 minusOccSet       :: OccSet -> OccSet -> OccSet
 elemOccSet        :: OccName -> OccSet -> Bool
-occSetElts        :: OccSet -> [OccName]
 isEmptyOccSet     :: OccSet -> Bool
 intersectOccSet   :: OccSet -> OccSet -> OccSet
 intersectsOccSet  :: OccSet -> OccSet -> Bool
@@ -458,7 +457,6 @@ unionOccSets      = unionUniqSets
 unionManyOccSets  = unionManyUniqSets
 minusOccSet       = minusUniqSet
 elemOccSet        = elementOfUniqSet
-occSetElts        = uniqSetToList
 isEmptyOccSet     = isEmptyUniqSet
 intersectOccSet   = intersectUniqSets
 intersectsOccSet s1 s2 = not (isEmptyOccSet (s1 `intersectOccSet` s2))
