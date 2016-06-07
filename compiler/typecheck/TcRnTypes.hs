@@ -162,7 +162,6 @@ import Module
 import SrcLoc
 import VarSet
 import ErrUtils
-import UniqFM
 import UniqDFM
 import UniqSupply
 import BasicTypes
