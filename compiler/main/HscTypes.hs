@@ -2610,7 +2610,7 @@ data VectInfo
     { vectInfoVar            :: VarEnv  (Var    , Var  )    -- ^ @(f, f_v)@ keyed on @f@
     , vectInfoTyCon          :: NameEnv (TyCon  , TyCon)    -- ^ @(T, T_v)@ keyed on @T@
     , vectInfoDataCon        :: NameEnv (DataCon, DataCon)  -- ^ @(C, C_v)@ keyed on @C@
-    , vectInfoParallelVars   :: VarSet                      -- ^ set of parallel variables
+    , vectInfoParallelVars   :: DVarSet                     -- ^ set of parallel variables
     , vectInfoParallelTyCons :: NameSet                     -- ^ set of parallel type constructors
     }
 
@@ -2641,14 +2641,14 @@ data IfaceVectInfo
 
 noVectInfo :: VectInfo
 noVectInfo
-  = VectInfo emptyVarEnv emptyNameEnv emptyNameEnv emptyVarSet emptyNameSet
+  = VectInfo emptyVarEnv emptyNameEnv emptyNameEnv emptyDVarSet emptyNameSet
 
 plusVectInfo :: VectInfo -> VectInfo -> VectInfo
 plusVectInfo vi1 vi2 =
   VectInfo (vectInfoVar            vi1 `plusVarEnv`    vectInfoVar            vi2)
            (vectInfoTyCon          vi1 `plusNameEnv`   vectInfoTyCon          vi2)
            (vectInfoDataCon        vi1 `plusNameEnv`   vectInfoDataCon        vi2)
-           (vectInfoParallelVars   vi1 `unionVarSet`   vectInfoParallelVars   vi2)
+           (vectInfoParallelVars   vi1 `unionDVarSet`  vectInfoParallelVars   vi2)
            (vectInfoParallelTyCons vi1 `unionNameSet` vectInfoParallelTyCons vi2)
 
 concatVectInfo :: [VectInfo] -> VectInfo

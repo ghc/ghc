@@ -1042,13 +1042,13 @@ vectAvoidInfo :: VarSet -> CoreExprWithFVs -> VM CoreExprWithVectInfo
 vectAvoidInfo pvs ce@(_, AnnVar v)
   = do
     { gpvs <- globalParallelVars
-    ; vi <- if v `elemVarSet` pvs || v `elemVarSet` gpvs
+    ; vi <- if v `elemVarSet` pvs || v `elemDVarSet` gpvs
             then return VIParr
             else vectAvoidInfoTypeOf ce
     ; viTrace ce vi []
     ; when (vi == VIParr) $
         traceVt "  reason:" $ if v `elemVarSet` pvs  then text "local"  else
-                              if v `elemVarSet` gpvs then text "global" else text "parallel type"
+                              if v `elemDVarSet` gpvs then text "global" else text "parallel type"
 
     ; return ((fvs, vi), AnnVar v)
     }

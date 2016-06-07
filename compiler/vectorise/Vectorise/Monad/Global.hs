@@ -135,7 +135,7 @@ lookupVectDecl var
 
 -- |Get the set of global parallel variables.
 --
-globalParallelVars :: VM VarSet
+globalParallelVars :: VM DVarSet
 globalParallelVars = readGEnv global_parallel_vars
 
 -- |Get the set of all parallel type constructors (those that may embed parallelism) including both

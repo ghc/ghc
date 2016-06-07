@@ -185,7 +185,7 @@ dumpVar dflags var
 addGlobalParallelVar :: Var -> VM ()
 addGlobalParallelVar var
   = do { traceVt "addGlobalParallelVar" (ppr var)
-       ; updGEnv $ \env -> env{global_parallel_vars = extendVarSet (global_parallel_vars env) var}
+       ; updGEnv $ \env -> env{global_parallel_vars = extendDVarSet (global_parallel_vars env) var}
        }
 
 -- |Mark the given type constructor as parallel — i.e., its values might embed parallel arrays.

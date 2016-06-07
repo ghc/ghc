@@ -486,11 +486,12 @@ tidyVectInfo (_, var_env) info@(VectInfo { vectInfoVar          = vars
                          , isDataConWorkId var || not (isImplicitId var)
                          ]
 
-    tidy_parallelVars = mkVarSet [ tidy_var
-                                 | var <- varSetElems parallelVars
-                                 , let tidy_var = lookup_var var
-                                 , isExternalId tidy_var && isExportedId tidy_var
-                                 ]
+    tidy_parallelVars = mkDVarSet
+                          [ tidy_var
+                          | var <- dVarSetElems parallelVars
+                          , let tidy_var = lookup_var var
+                          , isExternalId tidy_var && isExportedId tidy_var
+                          ]
 
     lookup_var var = lookupWithDefaultVarEnv var_env var var
 

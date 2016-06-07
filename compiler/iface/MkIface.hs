@@ -325,7 +325,7 @@ mkIface_ hsc_env maybe_old_fingerprint
        { ifaceVectInfoVar            = [Var.varName v | (v, _  ) <- varEnvElts  vVar]
        , ifaceVectInfoTyCon          = [tyConName t   | (t, t_v) <- nameEnvElts vTyCon, t /= t_v]
        , ifaceVectInfoTyConReuse     = [tyConName t   | (t, t_v) <- nameEnvElts vTyCon, t == t_v]
-       , ifaceVectInfoParallelVars   = [Var.varName v | v <- varSetElems vParallelVars]
+       , ifaceVectInfoParallelVars   = [Var.varName v | v <- dVarSetElems vParallelVars]
        , ifaceVectInfoParallelTyCons = nameSetElemsStable vParallelTyCons
        }
 
