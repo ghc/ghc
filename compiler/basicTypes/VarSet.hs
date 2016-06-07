@@ -12,7 +12,7 @@ module VarSet (
         -- ** Manipulating these sets
         emptyVarSet, unitVarSet, mkVarSet,
         extendVarSet, extendVarSetList, extendVarSet_C,
-        elemVarSet, varSetElems, subVarSet,
+        elemVarSet, subVarSet,
         unionVarSet, unionVarSets, mapUnionVarSet,
         intersectVarSet, intersectsVarSet, disjointVarSet,
         isEmptyVarSet, delVarSet, delVarSetList, delVarSetByKey,
@@ -72,7 +72,6 @@ unionVarSets    :: [VarSet] -> VarSet
 mapUnionVarSet  :: (a -> VarSet) -> [a] -> VarSet
 -- ^ map the function over the list, and union the results
 
-varSetElems     :: VarSet -> [Var]
 unitVarSet      :: Var -> VarSet
 extendVarSet    :: VarSet -> Var -> VarSet
 extendVarSetList:: VarSet -> [Var] -> VarSet
@@ -108,7 +107,6 @@ subVarSet       :: VarSet -> VarSet -> Bool     -- True if first arg is subset o
 
 unionVarSet     = unionUniqSets
 unionVarSets    = unionManyUniqSets
-varSetElems     = uniqSetToList
 elemVarSet      = elementOfUniqSet
 minusVarSet     = minusUniqSet
 delVarSet       = delOneFromUniqSet
@@ -188,10 +186,10 @@ pluralVarSet = pluralUFM
 -- The order of variables is non-deterministic and for pretty-printing that
 -- shouldn't be a problem.
 -- Having this function helps contain the non-determinism created with
--- varSetElems.
+-- nonDetEltsUFM.
 -- Passing a list to the pretty-printing function allows the caller
 -- to decide on the order of Vars (eg. toposort them) without them having
--- to use varSetElems at the call site. This prevents from let-binding
+-- to use nonDetEltsUFM at the call site. This prevents from let-binding
 -- non-deterministically ordered lists and reusing them where determinism
 -- matters.
 pprVarSet :: VarSet          -- ^ The things to be pretty printed

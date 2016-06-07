@@ -19,6 +19,7 @@ import System.Environment( getArgs )
 import VarSet
 import PprCore
 import Unique
+import UniqFM
 import CoreLint
 import FastString
 
@@ -173,7 +174,9 @@ main = do
             putMsg dflags (text n <> char ':')
             -- liftIO $ putMsg dflags (ppr e)
             let e' = callArityRHS e
-            let bndrs = varSetElems (allBoundIds e')
+            let bndrs = nonDetEltsUFM (allBoundIds e')
+              -- It should be OK to use nonDetEltsUFM here, if it becomes a
+              -- problem we should use DVarSet
             -- liftIO $ putMsg dflags (ppr e')
             forM_ bndrs $ \v -> putMsg dflags $ nest 4 $ ppr v <+> ppr (idCallArity v)
 

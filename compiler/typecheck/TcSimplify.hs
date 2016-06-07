@@ -648,7 +648,9 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
 
            -- promoteTyVar ignores coercion variables
        ; outer_tclvl <- TcM.getTcLevel
-       ; mapM_ (promoteTyVar outer_tclvl) (varSetElems promote_tkvs)
+       ; mapM_ (promoteTyVar outer_tclvl) (nonDetEltsUFM promote_tkvs)
+           -- It's OK to use nonDetEltsUFM here because promoteTyVar is
+           -- commutative
 
            -- Emit an implication constraint for the
            -- remaining constraints from the RHS
