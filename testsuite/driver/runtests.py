@@ -276,7 +276,7 @@ else:
     # set stdout to unbuffered (is this the best way to do it?)
     sys.stdout = os.fdopen(sys.__stdout__.fileno(), "w", 0)
 
-tempdir = normalise_slashes_(tempfile.mkdtemp('', 'ghctest-'))
+tempdir = tempfile.mkdtemp('', 'ghctest-')
 
 def cleanup_and_exit(exitcode):
     if config.cleanup:

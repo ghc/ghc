@@ -546,6 +546,14 @@ def executeSetups(fs, name, opts):
 # The current directory of tests
 
 def newTestDir(tempdir, dir):
+    # testdir should be quoted when used, to make sure the testsuite
+    # keeps working when testdir contains backward slashes, for example
+    # from using os.path.join. Windows native and mingw* python set
+    # `os.path.sep = '\\'`, while msys2 python sets `os.path.sep = '/'`.
+    # To catch usage of unquoted testdir early, insert some spaces into
+    # tempdir.
+    tempdir = os.path.join(tempdir, 'test   spaces')
+
     # Hack. A few tests depend on files in ancestor directories
     # (e.g. extra_files(['../../../../libraries/base/dist-install/haddock.t']))
     # Make sure tempdir is sufficiently "deep", such that copying/linking those
@@ -564,6 +572,7 @@ def newTestDir(tempdir, dir):
 
 
 def _newTestDir(name, opts, tempdir, dir):
+    opts.dir = dir
     opts.srcdir = os.path.join(os.getcwd(), dir)
     opts.testdir = os.path.join(tempdir, dir, name)
     opts.compiler_always_flags = config.compiler_always_flags
@@ -710,7 +719,7 @@ def test_common_work (name, opts, func, args):
         files = set((f for f in os.listdir(opts.srcdir)
                         if f.startswith(name)))
         for filename in (opts.extra_files + extra_src_files.get(name, [])):
-            if filename.startswith('../../../../../'):
+            if filename.startswith('../../../../../../'):
                 framework_fail(name, 'whole-test',
                     'add extra level to testlib.py:newTestDir for: ' + filename)
 
@@ -836,7 +845,7 @@ def do_test(name, way, func, args, files):
         try:
             preCmd = getTestOpts().pre_cmd
             if preCmd != None:
-                result = runCmdFor(name, 'cd ' + getTestOpts().testdir + ' && ' + preCmd)
+                result = runCmdFor(name, 'cd "{opts.testdir}" && {preCmd}'.format(**locals()))
                 if result != 0:
                     framework_fail(name, way, 'pre-command failed: ' + str(result))
         except:
@@ -880,7 +889,7 @@ def do_test(name, way, func, args, files):
                 else:
                     if_verbose(1, '*** unexpected failure for %s' % full_name)
                     t.n_unexpected_failures = t.n_unexpected_failures + 1
-                    addFailingTestInfo(t.unexpected_failures, getTestOpts().testdir, name, reason, way)
+                    addFailingTestInfo(t.unexpected_failures, getTestOpts().dir, name, reason, way)
             else:
                 if getTestOpts().expect == 'missing-lib':
                     t.n_missing_libs = t.n_missing_libs + 1
@@ -1245,7 +1254,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
     flags = ' '.join(get_compiler_flags(override_flags, noforce) +
                      config.way_flags(name)[way])
 
-    cmd = ('cd {opts.testdir} && {cmd_prefix} '
+    cmd = ('cd "{opts.testdir}" && {cmd_prefix} '
            '{{compiler}} {to_do} {srcname} {flags} {extra_hc_opts} '
            '> {errname} 2>&1'
           ).format(**locals())
@@ -1327,7 +1336,7 @@ def simple_run(name, way, prog, extra_run_opts):
     if opts.cmd_wrapper != None:
         cmd = opts.cmd_wrapper(cmd) + redirection_append
 
-    cmd = 'cd ' + opts.testdir + ' && ' + cmd
+    cmd = 'cd "{opts.testdir}" && {cmd}'.format(**locals())
 
     # run the command
     result = runCmdFor(name, cmd, timeout_multiplier=opts.run_timeout_multiplier)
@@ -1434,7 +1443,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
     if getTestOpts().cmd_wrapper != None:
         cmd = getTestOpts().cmd_wrapper(cmd) + redirection_append;
 
-    cmd = 'cd ' + getTestOpts().testdir + " && " + cmd
+    cmd = 'cd "{opts.testdir}" && {cmd}'.format(**locals())
 
     result = runCmdFor(name, cmd, timeout_multiplier=opts.run_timeout_multiplier)
 
@@ -1553,9 +1562,10 @@ def write_file(file, str):
     h.close
 
 def check_hp_ok(name):
+    opts = getTestOpts()
 
     # do not qualify for hp2ps because we should be in the right directory
-    hp2psCmd = "cd " + getTestOpts().testdir + " && {hp2ps} " + name
+    hp2psCmd = 'cd "{opts.testdir}" && {{hp2ps}} {name}'.format(**locals())
 
     hp2psResult = runCmdExitCode(hp2psCmd)
 
@@ -1638,14 +1648,14 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
 
         if config.verbose >= 1 and _expect_pass(way):
             # See Note [Output comparison].
-            r = os.system('diff -uw {0} {1}'.format(expected_normalised_path,
-                                                    actual_normalised_path))
+            r = os.system('diff -uw "{0}" "{1}"'.format(expected_normalised_path,
+                                                        actual_normalised_path))
 
             # If for some reason there were no non-whitespace differences,
             # then do a full diff
             if r == 0:
-                r = os.system('diff -u {0} {1}'.format(expected_normalised_path,
-                                                       actual_normalised_path))
+                r = os.system('diff -u "{0}" "{1}"'.format(expected_normalised_path,
+                                                           actual_normalised_path))
 
         if config.accept and (getTestOpts().expect == 'fail' or
                               way in getTestOpts().expect_fail_for):
@@ -1656,7 +1666,7 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
             write_file(expected_path, actual_raw)
             return 1
         elif config.accept:
-            if_verbose(1, 'No output. Deleting {0}.'.format(expected_path))
+            if_verbose(1, 'No output. Deleting "{0}".'.format(expected_path))
             os.remove(expected_path)
             return 1
         else:
@@ -1973,17 +1983,13 @@ def in_srcdir(name, suffix=''):
 #
 def find_expected_file(name, suff):
     basename = add_suffix(name, suff)
-    basepath = in_srcdir(basename)
 
     files = [basename + ws + plat
              for plat in ['-' + config.platform, '-' + config.os, '']
              for ws in ['-ws-' + config.wordsize, '']]
 
-    dir = glob.glob(basepath + '*')
-    dir = [normalise_slashes_(d) for d in dir]
-
     for f in files:
-       if in_srcdir(f) in dir:
+        if os.path.exists(in_srcdir(f)):
             return f
 
     return basename
@@ -2003,7 +2009,7 @@ def findTFiles(roots):
 
 def findTFiles_(path):
     if os.path.isdir(path):
-        paths = [path + '/' + x for x in os.listdir(path)]
+        paths = [os.path.join(path, x) for x in os.listdir(path)]
         return findTFiles(paths)
     elif path[-2:] == '.T':
         return [path]
