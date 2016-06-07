@@ -49,6 +49,7 @@ import FamInst     ( makeInjectivityErrors )
 import Name
 import VarEnv
 import VarSet
+import UniqFM
 import Var         ( mkTyVar )
 import ErrUtils
 import DynFlags
@@ -1863,7 +1864,9 @@ checkValidInferredKinds orig_kvs out_of_scope extra
 
   where
     (env1, _) = tidyTyCoVarBndrs emptyTidyEnv orig_kvs
-    (env, _)  = tidyTyCoVarBndrs env1         (varSetElems out_of_scope)
+    (env, _)  = tidyTyCoVarBndrs env1         (nonDetEltsUFM out_of_scope)
+      -- It's OK to use nonDetEltsUFM here because it's only used for
+      -- generating the error message
 
 {-
 ************************************************************************
