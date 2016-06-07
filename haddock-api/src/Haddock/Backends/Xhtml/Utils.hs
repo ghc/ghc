@@ -75,8 +75,7 @@ spliceURL' maybe_file maybe_mod maybe_name maybe_loc = run
       case span_ of
       RealSrcSpan span__ ->
         show $ srcSpanStartLine span__
-      UnhelpfulSpan _ ->
-        error "spliceURL UnhelpfulSpan"
+      UnhelpfulSpan _ -> ""
 
   run "" = ""
   run ('%':'M':rest) = mdl  ++ run rest
