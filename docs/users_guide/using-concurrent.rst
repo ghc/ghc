@@ -78,7 +78,7 @@ following compiler options affect parallelism:
 
 .. ghc-flag:: -feager-blackholing
 
-    Blackholing is the act of marking a thunk (lazy computuation) as
+    Blackholing is the act of marking a thunk (lazy computation) as
     being under evaluation. It is useful for three reasons: firstly it
     lets us detect certain kinds of infinite loop (the
     ``NonTermination`` exception), secondly it avoids certain kinds of
