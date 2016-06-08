@@ -1766,21 +1766,38 @@ def normalise_prof (str):
     str = re.sub('[ \t]*main[ \t]+Main.*\n','',str)
 
     # We have somthing like this:
+    #
+    # MAIN         MAIN  <built-in>                 53  0  0.0   0.2  0.0  100.0
+    #  CAF         Main  <entire-module>           105  0  0.0   0.3  0.0   62.5
+    #   readPrec   Main  Main_1.hs:7:13-16         109  1  0.0   0.6  0.0    0.6
+    #   readPrec   Main  Main_1.hs:4:13-16         107  1  0.0   0.6  0.0    0.6
+    #   main       Main  Main_1.hs:(10,1)-(20,20)  106  1  0.0  20.2  0.0   61.0
+    #    ==        Main  Main_1.hs:7:25-26         114  1  0.0   0.0  0.0    0.0
+    #    ==        Main  Main_1.hs:4:25-26         113  1  0.0   0.0  0.0    0.0
+    #    showsPrec Main  Main_1.hs:7:19-22         112  2  0.0   1.2  0.0    1.2
+    #    showsPrec Main  Main_1.hs:4:19-22         111  2  0.0   0.9  0.0    0.9
+    #    readPrec  Main  Main_1.hs:7:13-16         110  0  0.0  18.8  0.0   18.8
+    #    readPrec  Main  Main_1.hs:4:13-16         108  0  0.0  19.9  0.0   19.9
+    #
+    # then we remove all the specific profiling data, leaving only the cost
+    # centre name, module, src, and entries, to end up with this: (modulo
+    # whitespace between columns)
+    #
+    # MAIN      MAIN <built-in>         0
+    # readPrec  Main Main_1.hs:7:13-16  1
+    # readPrec  Main Main_1.hs:4:13-16  1
+    # ==        Main Main_1.hs:7:25-26  1
+    # ==        Main Main_1.hs:4:25-26  1
+    # showsPrec Main Main_1.hs:7:19-22  2
+    # showsPrec Main Main_1.hs:4:19-22  2
+    # readPrec  Main Main_1.hs:7:13-16  0
+    # readPrec  Main Main_1.hs:4:13-16  0
 
-    # MAIN      MAIN                 101      0    0.0    0.0   100.0  100.0
-    # k         Main                 204      1    0.0    0.0     0.0    0.0
-    #  foo      Main                 205      1    0.0    0.0     0.0    0.0
-    #   foo.bar Main                 207      1    0.0    0.0     0.0    0.0
-
-    # then we remove all the specific profiling data, leaving only the
-    # cost centre name, module, and entries, to end up with this:
-
-    # MAIN                MAIN            0
-    #   k                 Main            1
-    #    foo              Main            1
-    #     foo.bar         Main            1
-
-    str = re.sub('\n([ \t]*[^ \t]+)([ \t]+[^ \t]+)([ \t]+\\d+)([ \t]+\\d+)[ \t]+([\\d\\.]+)[ \t]+([\\d\\.]+)[ \t]+([\\d\\.]+)[ \t]+([\\d\\.]+)','\n\\1 \\2 \\4',str)
+    # Split 9 whitespace-separated groups, take columns 1 (cost-centre), 2
+    # (module), 3 (src), and 5 (entries). SCC names can't have whitespace, so
+    # this works fine.
+    str = re.sub(r'\s*(\S+)\s*(\S+)\s*(\S+)\s*(\S+)\s*(\S+)\s*(\S+)\s*(\S+)\s*(\S+)\s*(\S+)\s*',
+            '\\1 \\2 \\3 \\5\n', str)
     return str
 
 def normalise_slashes_( str ):

@@ -1,27 +1,28 @@
-	Thu Apr  2 19:44 2015 Time and Allocation Profiling Report  (Final)
+	Sat Jun  4 11:59 2016 Time and Allocation Profiling Report  (Final)
 
-	   prof-doc-fib +RTS -p -RTS
+	   prof-doc-fib +RTS -hc -p -RTS
 
-	total time  =        0.31 secs   (310 ticks @ 1000 us, 1 processor)
-	total alloc = 538,951,032 bytes  (excludes profiling overheads)
+	total time  =        0.07 secs   (75 ticks @ 1000 us, 1 processor)
+	total alloc = 107,829,040 bytes  (excludes profiling overheads)
 
-COST CENTRE MODULE     %time %alloc
+COST CENTRE MODULE SRC                     %time %alloc
 
-fib         Main       100.0  100.0
+fib         Main   prof-doc-fib.hs:9:1-50  100.0  100.0
 
 
-                                                      individual      inherited
-COST CENTRE  MODULE                no.     entries  %time %alloc   %time %alloc
+                                                                                  individual      inherited
+COST CENTRE MODULE                SRC                          no.     entries  %time %alloc   %time %alloc
 
-MAIN         MAIN                   99           0    0.0    0.0   100.0  100.0
- CAF         Main                  197           0    0.0    0.0   100.0  100.0
-  main       Main                  198           1    0.0    0.0   100.0  100.0
-   main.f    Main                  201           1    0.0    0.0   100.0   99.9
-    fib      Main                  202     2692537  100.0   99.9   100.0   99.9
-   main.g    Main                  199           1    0.0    0.0     0.0    0.1
-    fib      Main                  200        1973    0.0    0.1     0.0    0.1
- CAF         GHC.Conc.Signal       179           0    0.0    0.0     0.0    0.0
- CAF         GHC.IO.Encoding       163           0    0.0    0.0     0.0    0.0
- CAF         GHC.IO.Encoding.Iconv 161           0    0.0    0.0     0.0    0.0
- CAF         GHC.IO.Handle.FD      152           0    0.0    0.0     0.0    0.0
- CAF         GHC.IO.Handle.Text    150           0    0.0    0.0     0.0    0.0
+MAIN        MAIN                  <built-in>                    45          0    0.0    0.0   100.0  100.0
+ CAF        Main                  <entire-module>               89          0    0.0    0.0   100.0  100.0
+  main      Main                  prof-doc-fib.hs:(4,1)-(7,26)  90          1    0.0    0.0   100.0  100.0
+   main.f   Main                  prof-doc-fib.hs:6:5-16        94          1    0.0    0.0   100.0   99.9
+    fib     Main                  prof-doc-fib.hs:9:1-50        95    2692537  100.0   99.9   100.0   99.9
+   main.g   Main                  prof-doc-fib.hs:7:5-26        92          1    0.0    0.0     0.0    0.1
+    fib     Main                  prof-doc-fib.hs:9:1-50        93       1973    0.0    0.1     0.0    0.1
+ CAF        GHC.IO.Handle.FD      <entire-module>               84          0    0.0    0.0     0.0    0.0
+ CAF        GHC.IO.Handle.Text    <entire-module>               83          0    0.0    0.0     0.0    0.0
+ CAF        GHC.Conc.Signal       <entire-module>               81          0    0.0    0.0     0.0    0.0
+ CAF        GHC.IO.Encoding       <entire-module>               78          0    0.0    0.0     0.0    0.0
+ CAF        GHC.IO.Encoding.Iconv <entire-module>               64          0    0.0    0.0     0.0    0.0
+ main       Main                  prof-doc-fib.hs:(4,1)-(7,26)  91          0    0.0    0.0     0.0    0.0
