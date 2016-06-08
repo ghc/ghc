@@ -21,7 +21,6 @@ module Literal
 
         -- ** Operations on Literals
         , literalType
-        , hashLiteral
         , absentLiteralOf
         , pprLiteral
 
@@ -58,7 +57,6 @@ import Util
 
 import Data.ByteString (ByteString)
 import Data.Int
-import Data.Ratio
 import Data.Word
 import Data.Char
 import Data.Data ( Data )
@@ -500,38 +498,3 @@ MachDouble      -1.0##
 LitInteger      -1                 (-1)
 MachLabel       "__label" ...      ("__label" ...)
 -}
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Hashing}
-*                                                                      *
-************************************************************************
-
-Hash values should be zero or a positive integer.  No negatives please.
-(They mess up the UniqFM for some reason.)
--}
-
-hashLiteral :: Literal -> Int
-hashLiteral (MachChar c)        = ord c + 1000  -- Keep it out of range of common ints
-hashLiteral (MachStr s)         = hashByteString s
-hashLiteral (MachNullAddr)      = 0
-hashLiteral (MachInt i)         = hashInteger i
-hashLiteral (MachInt64 i)       = hashInteger i
-hashLiteral (MachWord i)        = hashInteger i
-hashLiteral (MachWord64 i)      = hashInteger i
-hashLiteral (MachFloat r)       = hashRational r
-hashLiteral (MachDouble r)      = hashRational r
-hashLiteral (MachLabel s _ _)     = hashFS s
-hashLiteral (LitInteger i _)    = hashInteger i
-
-hashRational :: Rational -> Int
-hashRational r = hashInteger (numerator r)
-
-hashInteger :: Integer -> Int
-hashInteger i = 1 + abs (fromInteger (i `rem` 10000))
-                -- The 1+ is to avoid zero, which is a Bad Number
-                -- since we use * to combine hash values
-
-hashFS :: FastString -> Int
-hashFS s = uniqueOfFS s
