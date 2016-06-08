@@ -1918,25 +1918,6 @@ def runCmdFor( name, cmd, timeout_multiplier=1.0 ):
 def runCmdExitCode( cmd ):
     return (runCmd(cmd) >> 8);
 
-
-# -----------------------------------------------------------------------------
-# Files that are read or written but shouldn't be:
-# * ghci_history shouldn't be read or written by tests
-# * things under package.conf.d shouldn't be written by tests
-bad_file_usages = {}
-
-def add_bad_file_usage(name, file):
-    try:
-        if not file in bad_file_usages[name]:
-            bad_file_usages[name].append(file)
-    except:
-        bad_file_usages[name] = [file]
-
-def mkPath(curdir, path):
-    # Given the current full directory is 'curdir', what is the full
-    # path to 'path'?
-    return os.path.realpath(os.path.join(curdir, path))
-
 # -----------------------------------------------------------------------------
 # checking if ghostscript is available for checking the output of hp2ps
 
