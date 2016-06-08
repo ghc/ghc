@@ -1,28 +1,28 @@
-	Wed Jan 27 08:16 2016 Time and Allocation Profiling Report  (Final)
+	Fri Jun  3 11:00 2016 Time and Allocation Profiling Report  (Final)
 
-	   T5654b-O1 +RTS -p -RTS
+	   T5654b-O1 +RTS -hc -p -RTS
 
 	total time  =        0.00 secs   (0 ticks @ 1000 us, 1 processor)
-	total alloc =      39,016 bytes  (excludes profiling overheads)
+	total alloc =      38,880 bytes  (excludes profiling overheads)
 
-COST CENTRE MODULE            %time %alloc
+COST CENTRE MODULE           SRC              %time %alloc
 
-MAIN        MAIN                0.0    1.7
-CAF         GHC.IO.Handle.FD    0.0   88.5
-CAF         GHC.IO.Encoding     0.0    7.4
-CAF         GHC.Conc.Signal     0.0    1.7
+MAIN        MAIN             <built-in>         0.0    1.7
+CAF         GHC.IO.Handle.FD <entire-module>    0.0   88.8
+CAF         GHC.IO.Encoding  <entire-module>    0.0    7.1
+CAF         GHC.Conc.Signal  <entire-module>    0.0    1.7
 
 
-                                                     individual      inherited
-COST CENTRE MODULE                no.     entries  %time %alloc   %time %alloc
+                                                                          individual      inherited
+COST CENTRE MODULE                SRC                  no.     entries  %time %alloc   %time %alloc
 
-MAIN        MAIN                  105           0    0.0    1.7     0.0  100.0
- CAF        Main                  209           0    0.0    0.0     0.0    0.1
-  main      Main                  210           1    0.0    0.1     0.0    0.1
-   f        Main                  211           1    0.0    0.0     0.0    0.0
-    g       Main                  212           1    0.0    0.0     0.0    0.0
-     h      Main                  213           1    0.0    0.0     0.0    0.0
- CAF        GHC.Conc.Signal       203           0    0.0    1.7     0.0    1.7
- CAF        GHC.IO.Encoding       193           0    0.0    7.4     0.0    7.4
- CAF        GHC.IO.Encoding.Iconv 191           0    0.0    0.6     0.0    0.6
- CAF        GHC.IO.Handle.FD      183           0    0.0   88.5     0.0   88.5
+MAIN        MAIN                  <built-in>            43          0    0.0    1.7     0.0  100.0
+ CAF        Main                  <entire-module>       85          0    0.0    0.0     0.0    0.1
+  main      Main                  T5654b-O1.hs:22:1-21  86          1    0.0    0.1     0.0    0.1
+   f        Main                  T5654b-O1.hs:12:1-7   87          1    0.0    0.0     0.0    0.0
+    g       Main                  T5654b-O1.hs:16:1-7   88          1    0.0    0.0     0.0    0.0
+     h      Main                  T5654b-O1.hs:20:1-19  89          1    0.0    0.0     0.0    0.0
+ CAF        GHC.Conc.Signal       <entire-module>       79          0    0.0    1.7     0.0    1.7
+ CAF        GHC.IO.Encoding       <entire-module>       74          0    0.0    7.1     0.0    7.1
+ CAF        GHC.IO.Handle.FD      <entire-module>       72          0    0.0   88.8     0.0   88.8
+ CAF        GHC.IO.Encoding.Iconv <entire-module>       53          0    0.0    0.6     0.0    0.6
