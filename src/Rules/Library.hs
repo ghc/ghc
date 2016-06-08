@@ -62,17 +62,15 @@ buildPackageGhciLibrary context@Context {..} = priority 2 $ do
     let path = buildPath context
         libPrefix = path -/- "HS" ++ pkgNameString package
 
-    -- TODO: simplify handling of AutoApply.cmm
     matchVersionedFilePath libPrefix (waySuffix way <.> "o") ?> \obj -> do
-            cSrcs <- cSources context
-            hSrcs <- hSources context
-
-            eObjs <- extraObjects context
-            let cObjs = map (objFile context) cSrcs
-                hObjs = [ path -/- src <.> osuf way | src <- hSrcs ]
-                objs  = cObjs ++ hObjs ++ eObjs
-            need objs
-            build $ Target context Ld objs [obj]
+        cSrcs <- cSources context
+        hSrcs <- hSources context
+        eObjs <- extraObjects context
+        let cObjs = map (objFile context) cSrcs
+            hObjs = [ path -/- src <.> osuf way | src <- hSrcs ]
+            objs  = cObjs ++ hObjs ++ eObjs
+        need objs
+        build $ Target context Ld objs [obj]
 
 -- TODO: Get rid of code duplication and simplify. See also src2dep.
 -- | Given a 'Context' and a 'FilePath' to a source file, compute the 'FilePath'
