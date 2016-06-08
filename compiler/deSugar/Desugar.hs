@@ -31,7 +31,6 @@ import Class
 import Avail
 import CoreSyn
 import CoreFVs( exprsSomeFreeVarsList )
-import CoreStats   ( coreBindsStats )
 import CoreSubst
 import PprCore
 import DsMonad
@@ -390,11 +389,6 @@ deSugar hsc_env
                 mg_safe_haskell = safe_mode,
                 mg_trust_pkg    = imp_trust_own_pkg imports
               }
-
-        ; debugTraceMsg dflags 2 $
-            sep [ text "Result size of Desugar"
-                , nest 2 (equals <+> ppr (coreBindsStats ds_binds)) ]
-
         ; return (msgs, Just mod_guts)
         }}}}
 
