@@ -211,13 +211,14 @@ dumpPassResult :: DynFlags
                -> CoreProgram -> [CoreRule]
                -> IO ()
 dumpPassResult dflags unqual mb_flag hdr extra_info binds rules
-  | Just flag <- mb_flag
-  = Err.dumpSDoc dflags unqual flag (showSDoc dflags hdr) dump_doc
+  = do { forM_ mb_flag $ \flag ->
+           Err.dumpSDoc dflags unqual flag (showSDoc dflags hdr) dump_doc
 
-  | otherwise
-  = Err.debugTraceMsg dflags 2 size_doc
-          -- Report result size
-          -- This has the side effect of forcing the intermediate to be evaluated
+         -- Report result size
+         -- This has the side effect of forcing the intermediate to be evaluated
+         -- if it's not already forced by a -ddump flag.
+       ; Err.debugTraceMsg dflags 2 size_doc
+       }
 
   where
     size_doc = sep [text "Result size of" <+> hdr, nest 2 (equals <+> ppr (coreBindsStats binds))]
