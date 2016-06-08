@@ -78,7 +78,7 @@ buildHaddock = return cmdBuildHaddock
 -- TODO: Do we need to be able to set these from command line?
 -- TODO: Turn the flags below into a simple list @ghcWays :: [Way]@?
 dynamicGhcPrograms :: Bool
-dynamicGhcPrograms = True
+dynamicGhcPrograms = False
 
 ghciWithDebugger :: Bool
 ghciWithDebugger = False
