@@ -3,14 +3,14 @@
 module CmmType
     ( CmmType   -- Abstract
     , b8, b16, b32, b64, b128, b256, b512, f32, f64, bWord, bHalfWord, gcWord
-    , cInt, cLong
+    , cInt
     , cmmBits, cmmFloat
     , typeWidth, cmmEqType, cmmEqType_ignoring_ptrhood
     , isFloatType, isGcPtrType, isWord32, isWord64, isFloat64, isFloat32
 
     , Width(..)
     , widthInBits, widthInBytes, widthInLog, widthFromBytes
-    , wordWidth, halfWordWidth, cIntWidth, cLongWidth
+    , wordWidth, halfWordWidth, cIntWidth
     , halfWordMask
     , narrowU, narrowS
     , rEP_CostCentreStack_mem_alloc
@@ -129,10 +129,8 @@ bHalfWord dflags = cmmBits (halfWordWidth dflags)
 gcWord :: DynFlags -> CmmType
 gcWord dflags = CmmType GcPtrCat (wordWidth dflags)
 
-cInt, cLong :: DynFlags -> CmmType
-cInt  dflags = cmmBits (cIntWidth  dflags)
-cLong dflags = cmmBits (cLongWidth dflags)
-
+cInt :: DynFlags -> CmmType
+cInt dflags = cmmBits (cIntWidth  dflags)
 
 ------------ Predicates ----------------
 isFloatType, isGcPtrType :: CmmType -> Bool
@@ -207,15 +205,11 @@ halfWordMask dflags
  | otherwise             = panic "MachOp.halfWordMask: Unknown word size"
 
 -- cIntRep is the Width for a C-language 'int'
-cIntWidth, cLongWidth :: DynFlags -> Width
+cIntWidth :: DynFlags -> Width
 cIntWidth dflags = case cINT_SIZE dflags of
                    4 -> W32
                    8 -> W64
                    s -> panic ("cIntWidth: Unknown cINT_SIZE: " ++ show s)
-cLongWidth dflags = case cLONG_SIZE dflags of
-                    4 -> W32
-                    8 -> W64
-                    s -> panic ("cIntWidth: Unknown cLONG_SIZE: " ++ show s)
 
 widthInBits :: Width -> Int
 widthInBits W8   = 8
