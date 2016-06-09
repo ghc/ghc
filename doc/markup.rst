@@ -812,7 +812,7 @@ for in-line mathematics. An example looks like this: ::
 
 If the output format supports it, the mathematics will be rendered
 inside the documentation. For example, the HTML backend will display
-the mathematics via mathjax.
+the mathematics via MathJax.
 
 Anchors
 ~~~~~~~
