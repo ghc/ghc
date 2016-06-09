@@ -1,13 +1,13 @@
 T7861: T7861.hs:10:5: error:
-    Couldn't match type ‘a’ with ‘[a]’
-    ‘a’ is a rigid type variable bound by
-      the type signature for:
-        f :: forall a. (forall b. a) -> a
-      at T7861.hs:9:6
-    Expected type: (forall b. a) -> a
-      Actual type: (forall b. a) -> [a]
-    In the expression: doA
-    In an equation for ‘f’: f = doA
-    Relevant bindings include
-      f :: (forall b. a) -> a (bound at T7861.hs:10:1)
+    • Couldn't match type ‘a’ with ‘[a]’
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          f :: forall a. (forall b. a) -> a
+        at T7861.hs:9:1-23
+      Expected type: (forall b. a) -> a
+        Actual type: (forall b. a) -> [a]
+    • In the expression: doA
+      In an equation for ‘f’: f = doA
+    • Relevant bindings include
+        f :: (forall b. a) -> a (bound at T7861.hs:10:1)
 (deferred type error)

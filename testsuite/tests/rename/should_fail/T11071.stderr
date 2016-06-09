@@ -13,7 +13,7 @@ T11071.hs:21:12: error:
 
 T11071.hs:22:12: error:
     Not in scope: ‘M'.foobar’
-    Neither ‘Data.IntMap’, ‘Data.Map’ nor ‘System.IO’ exports ‘foobar’.
+    Neither ‘System.IO’, ‘Data.IntMap’ nor ‘Data.Map’ exports ‘foobar’.
 
 T11071.hs:23:12: error:
     Not in scope: ‘Data.List.sort’
