@@ -86,13 +86,18 @@ import UniqFM
 import FastString
 import Binary
 import Util
+import Data.List
+import Data.Ord
 import {-# SOURCE #-} Packages
 import GHC.PackageDb (BinaryStringRep(..))
 
+import Data.Coerce
 import Data.Data
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified FiniteMap as Map
+import Data.Set (Set)
+import qualified Data.Set as Set
 import System.FilePath
 
 -- Note [The identifier lexicon]
@@ -241,11 +246,8 @@ instance Uniquable ModuleName where
 instance Eq ModuleName where
   nm1 == nm2 = getUnique nm1 == getUnique nm2
 
--- Warning: gives an ordering relation based on the uniques of the
--- FastStrings which are the (encoded) module names.  This is _not_
--- a lexicographical ordering.
 instance Ord ModuleName where
-  nm1 `compare` nm2 = getUnique nm1 `compare` getUnique nm2
+  nm1 `compare` nm2 = stableModuleNameCmp nm1 nm2
 
 instance Outputable ModuleName where
   ppr = pprModuleName
@@ -389,10 +391,8 @@ newtype UnitId = PId FastString deriving( Eq, Typeable )
 instance Uniquable UnitId where
  getUnique pid = getUnique (unitIdFS pid)
 
--- Note: *not* a stable lexicographic ordering, a faster unique-based
--- ordering.
 instance Ord UnitId where
-  nm1 `compare` nm2 = getUnique nm1 `compare` getUnique nm2
+  nm1 `compare` nm2 = stableUnitIdCmp nm1 nm2
 
 instance Data UnitId where
   -- don't traverse?
@@ -509,65 +509,102 @@ wiredInUnitIds = [ primUnitId,
 -}
 
 -- | A map keyed off of 'Module's
-newtype ModuleEnv elt = ModuleEnv (Map Module elt)
+newtype ModuleEnv elt = ModuleEnv (Map NDModule elt)
+{-
+Note [ModuleEnv performance and determinism]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To prevent accidental reintroduction of nondeterminism the Ord instance
+for Module was changed to not depend on Unique ordering and to use the
+lexicographic order. This is potentially expensive, but when measured
+there was no difference in performance.
+
+To be on the safe side and not pessimize ModuleEnv uses nondeterministic
+ordering on Module and normalizes by doing the lexicographic sort when
+turning the env to a list.
+See Note [Unique Determinism] for more information about the source of
+nondeterminismand and Note [Deterministic UniqFM] for explanation of why
+it matters for maps.
+-}
+
+newtype NDModule = NDModule { unNDModule :: Module }
+  deriving Eq
+  -- A wrapper for Module with faster nondeterministic Ord.
+  -- Don't export, See [ModuleEnv performance and determinism]
+
+instance Ord NDModule where
+  compare (NDModule (Module p1 n1)) (NDModule (Module p2 n2)) =
+    (getUnique p1 `compare` getUnique p2) `thenCmp`
+    (getUnique n1 `compare` getUnique n2)
 
 filterModuleEnv :: (Module -> a -> Bool) -> ModuleEnv a -> ModuleEnv a
-filterModuleEnv f (ModuleEnv e) = ModuleEnv (Map.filterWithKey f e)
+filterModuleEnv f (ModuleEnv e) =
+  ModuleEnv (Map.filterWithKey (f . unNDModule) e)
 
 elemModuleEnv :: Module -> ModuleEnv a -> Bool
-elemModuleEnv m (ModuleEnv e) = Map.member m e
+elemModuleEnv m (ModuleEnv e) = Map.member (NDModule m) e
 
 extendModuleEnv :: ModuleEnv a -> Module -> a -> ModuleEnv a
-extendModuleEnv (ModuleEnv e) m x = ModuleEnv (Map.insert m x e)
+extendModuleEnv (ModuleEnv e) m x = ModuleEnv (Map.insert (NDModule m) x e)
 
-extendModuleEnvWith :: (a -> a -> a) -> ModuleEnv a -> Module -> a -> ModuleEnv a
-extendModuleEnvWith f (ModuleEnv e) m x = ModuleEnv (Map.insertWith f m x e)
+extendModuleEnvWith :: (a -> a -> a) -> ModuleEnv a -> Module -> a
+                    -> ModuleEnv a
+extendModuleEnvWith f (ModuleEnv e) m x =
+  ModuleEnv (Map.insertWith f (NDModule m) x e)
 
 extendModuleEnvList :: ModuleEnv a -> [(Module, a)] -> ModuleEnv a
-extendModuleEnvList (ModuleEnv e) xs = ModuleEnv (Map.insertList xs e)
+extendModuleEnvList (ModuleEnv e) xs =
+  ModuleEnv (Map.insertList [(NDModule k, v) | (k,v) <- xs] e)
 
 extendModuleEnvList_C :: (a -> a -> a) -> ModuleEnv a -> [(Module, a)]
                       -> ModuleEnv a
-extendModuleEnvList_C f (ModuleEnv e) xs = ModuleEnv (Map.insertListWith f xs e)
+extendModuleEnvList_C f (ModuleEnv e) xs =
+  ModuleEnv (Map.insertListWith f [(NDModule k, v) | (k,v) <- xs] e)
 
 plusModuleEnv_C :: (a -> a -> a) -> ModuleEnv a -> ModuleEnv a -> ModuleEnv a
-plusModuleEnv_C f (ModuleEnv e1) (ModuleEnv e2) = ModuleEnv (Map.unionWith f e1 e2)
+plusModuleEnv_C f (ModuleEnv e1) (ModuleEnv e2) =
+  ModuleEnv (Map.unionWith f e1 e2)
 
 delModuleEnvList :: ModuleEnv a -> [Module] -> ModuleEnv a
-delModuleEnvList (ModuleEnv e) ms = ModuleEnv (Map.deleteList ms e)
+delModuleEnvList (ModuleEnv e) ms =
+  ModuleEnv (Map.deleteList (map NDModule ms) e)
 
 delModuleEnv :: ModuleEnv a -> Module -> ModuleEnv a
-delModuleEnv (ModuleEnv e) m = ModuleEnv (Map.delete m e)
+delModuleEnv (ModuleEnv e) m = ModuleEnv (Map.delete (NDModule m) e)
 
 plusModuleEnv :: ModuleEnv a -> ModuleEnv a -> ModuleEnv a
 plusModuleEnv (ModuleEnv e1) (ModuleEnv e2) = ModuleEnv (Map.union e1 e2)
 
 lookupModuleEnv :: ModuleEnv a -> Module -> Maybe a
-lookupModuleEnv (ModuleEnv e) m = Map.lookup m e
+lookupModuleEnv (ModuleEnv e) m = Map.lookup (NDModule m) e
 
 lookupWithDefaultModuleEnv :: ModuleEnv a -> a -> Module -> a
-lookupWithDefaultModuleEnv (ModuleEnv e) x m = Map.findWithDefault x m e
+lookupWithDefaultModuleEnv (ModuleEnv e) x m =
+  Map.findWithDefault x (NDModule m) e
 
 mapModuleEnv :: (a -> b) -> ModuleEnv a -> ModuleEnv b
 mapModuleEnv f (ModuleEnv e) = ModuleEnv (Map.mapWithKey (\_ v -> f v) e)
 
 mkModuleEnv :: [(Module, a)] -> ModuleEnv a
-mkModuleEnv xs = ModuleEnv (Map.fromList xs)
+mkModuleEnv xs = ModuleEnv (Map.fromList [(NDModule k, v) | (k,v) <- xs])
 
 emptyModuleEnv :: ModuleEnv a
 emptyModuleEnv = ModuleEnv Map.empty
 
 moduleEnvKeys :: ModuleEnv a -> [Module]
-moduleEnvKeys (ModuleEnv e) = Map.keys e
+moduleEnvKeys (ModuleEnv e) = sort $ map unNDModule $ Map.keys e
+  -- See Note [ModuleEnv performance and determinism]
 
 moduleEnvElts :: ModuleEnv a -> [a]
-moduleEnvElts (ModuleEnv e) = Map.elems e
+moduleEnvElts e = map snd $ moduleEnvToList e
+  -- See Note [ModuleEnv performance and determinism]
 
 moduleEnvToList :: ModuleEnv a -> [(Module, a)]
-moduleEnvToList (ModuleEnv e) = Map.toList e
+moduleEnvToList (ModuleEnv e) =
+  sortBy (comparing fst) [(m, v) | (NDModule m, v) <- Map.toList e]
+  -- See Note [ModuleEnv performance and determinism]
 
 unitModuleEnv :: Module -> a -> ModuleEnv a
-unitModuleEnv m x = ModuleEnv (Map.singleton m x)
+unitModuleEnv m x = ModuleEnv (Map.singleton (NDModule m) x)
 
 isEmptyModuleEnv :: ModuleEnv a -> Bool
 isEmptyModuleEnv (ModuleEnv e) = Map.null e
@@ -576,7 +613,7 @@ foldModuleEnv :: (a -> b -> b) -> b -> ModuleEnv a -> b
 foldModuleEnv f x (ModuleEnv e) = Map.foldRightWithKey (\_ v -> f v) x e
 
 -- | A set of 'Module's
-type ModuleSet = Map Module ()
+type ModuleSet = Set NDModule
 
 mkModuleSet     :: [Module] -> ModuleSet
 extendModuleSet :: ModuleSet -> Module -> ModuleSet
@@ -584,11 +621,11 @@ emptyModuleSet  :: ModuleSet
 moduleSetElts   :: ModuleSet -> [Module]
 elemModuleSet   :: Module -> ModuleSet -> Bool
 
-emptyModuleSet    = Map.empty
-mkModuleSet ms    = Map.fromList [(m,()) | m <- ms ]
-extendModuleSet s m = Map.insert m () s
-moduleSetElts     = Map.keys
-elemModuleSet     = Map.member
+emptyModuleSet    = Set.empty
+mkModuleSet       = Set.fromList . coerce
+extendModuleSet s m = Set.insert (NDModule m) s
+moduleSetElts     = sort . coerce . Set.toList
+elemModuleSet     = Set.member . coerce
 
 {-
 A ModuleName has a Unique, so we can build mappings of these using

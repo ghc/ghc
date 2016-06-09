@@ -40,6 +40,7 @@ import Pair
 import Panic
 import VarSet
 import Control.Monad
+import Unique
 import Data.Set (Set)
 import qualified Data.Set as Set
 
@@ -126,7 +127,6 @@ certain that the modules in our `HscTypes.dep_finsts' are consistent.)
 data ModulePair = ModulePair Module Module
                   -- Invariant: first Module < second Module
                   -- use the smart constructor
-  deriving (Ord, Eq)
 
 -- | Smart constructor that establishes the invariant
 modulePair :: Module -> Module -> ModulePair
@@ -134,12 +134,40 @@ modulePair a b
   | a < b = ModulePair a b
   | otherwise = ModulePair b a
 
+instance Eq ModulePair where
+  (ModulePair a1 b1) == (ModulePair a2 b2) = a1 == a2 && b1 == b2
+
+instance Ord ModulePair where
+  (ModulePair a1 b1) `compare` (ModulePair a2 b2) =
+    nonDetCmpModule a1 a2 `thenCmp`
+    nonDetCmpModule b1 b2
+    -- See Note [ModulePairSet determinism and performance]
+
 instance Outputable ModulePair where
   ppr (ModulePair m1 m2) = angleBrackets (ppr m1 <> comma <+> ppr m2)
 
--- Sets of module pairs
---
+-- Fast, nondeterministic comparison on Module. Don't use when the ordering
+-- can change the ABI. See Note [ModulePairSet determinism and performance]
+nonDetCmpModule :: Module -> Module -> Ordering
+nonDetCmpModule a b =
+  nonDetCmpUnique (getUnique $ moduleUnitId a) (getUnique $ moduleUnitId b)
+  `thenCmp`
+  nonDetCmpUnique (getUnique $ moduleName a) (getUnique $ moduleName b)
+
 type ModulePairSet = Set ModulePair
+{-
+Note [ModulePairSet determinism and performance]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The size of ModulePairSet is quadratic in the number of modules.
+The Ord instance for Module uses string comparison which is linear in the
+length of ModuleNames and UnitIds. This adds up to a significant cost, see
+#12191.
+
+To get reasonable performance ModulePairSet uses nondeterministic ordering
+on Module based on Uniques. It doesn't affect the ABI, because it only
+determines the order the modules are checked for family instance consistency.
+See Note [Unique Determinism] in Unique
+-}
 
 listToSet :: [ModulePair] -> ModulePairSet
 listToSet l = Set.fromList l
@@ -170,6 +198,7 @@ checkFamInstConsistency famInstMods directlyImpMods
              ; toCheckPairs  =
                  Set.elems $ criticalPairs `Set.difference` okPairs
                  -- the difference gives us the pairs we need to check now
+                 -- See Note [ModulePairSet determinism and performance]
              }
 
        ; mapM_ (check hpt_fam_insts) toCheckPairs
