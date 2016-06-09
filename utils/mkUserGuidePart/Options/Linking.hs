@@ -75,7 +75,7 @@ linkingOptions =
          }
   , flag { flagName = "-no-rtsopts-suggestions"
          , flagDescription =
-           "Don't print RTS suggestions about linking with :ghc-flag:`rtsopts`."
+           "Don't print RTS suggestions about linking with :ghc-flag:`-rtsopts`."
          , flagType = DynamicFlag
          }
   , flag { flagName = "-no-link"
@@ -104,7 +104,7 @@ linkingOptions =
          }
   , flag { flagName = "-ticky"
          , flagDescription =
-           "For linking, this simply implies :ghc-flag:`debug`; "++
+           "For linking, this simply implies :ghc-flag:`-debug`; "++
            "see :ref:`ticky-ticky`."
          , flagType = DynamicFlag
          }

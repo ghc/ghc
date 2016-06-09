@@ -6,7 +6,7 @@ miscOptions :: [Flag]
 miscOptions =
   [ flag { flagName = "-jN"
          , flagDescription =
-           "When compiling with :ghc-flag:`-make`, compile ⟨N⟩ modules in parallel."
+           "When compiling with :ghc-flag:`--make`, compile ⟨N⟩ modules in parallel."
          , flagType = DynamicFlag
          }
   , flag { flagName = "-fno-hi-version-check"

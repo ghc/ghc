@@ -22,14 +22,14 @@ verbosityOptions =
   , flag { flagName = "-fprint-explicit-foralls"
          , flagDescription =
            "Print explicit ``forall`` quantification in types. " ++
-           "See also :ghc-flag:`XExplicitForAll`"
+           "See also :ghc-flag:`-XExplicitForAll`"
          , flagType = DynamicFlag
          , flagReverse = "-fno-print-explicit-foralls"
          }
   , flag { flagName = "-fprint-explicit-kinds"
          , flagDescription =
            "Print explicit kind foralls and kind arguments in types. " ++
-           "See also :ghc-flag:`XKindSignature`"
+           "See also :ghc-flag:`-XKindSignature`"
          , flagType = DynamicFlag
          , flagReverse = "-fno-print-explicit-kinds"
          }
@@ -43,7 +43,7 @@ verbosityOptions =
   , flag { flagName = "-fprint-unicode-syntax"
          , flagDescription =
            "Use unicode syntax when printing expressions, types and kinds. " ++
-           "See also :ghc-flag:`XUnicodeSyntax`"
+           "See also :ghc-flag:`-XUnicodeSyntax`"
          , flagType = DynamicFlag
          , flagReverse = "-fno-print-unicode-syntax"
          }
