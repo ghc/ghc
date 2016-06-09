@@ -417,104 +417,14 @@ instance, the binary integer literal ``0b11001001`` will be desugared into
 Pattern guards
 --------------
 
-.. ghc-flag:: -XPatternGuards
+.. ghc-flag:: -XNoPatternGuards
 
-   Enable pattern matches in guards.
+    :implied by: :ghc-flag:`-XHaskell98`
+    :since: 6.8.1
 
-The discussion that follows is an abbreviated version of Simon Peyton Jones's
-original `proposal
-<http://research.microsoft.com/~simonpj/Haskell/guards.html>`__. (Note that the
-proposal was written before pattern guards were implemented, so refers to them
-as unimplemented.)
-
-Suppose we have an abstract data type of finite maps, with a lookup
-operation: ::
-
-    lookup :: FiniteMap -> Int -> Maybe Int
-
-The lookup returns ``Nothing`` if the supplied key is not in the domain
-of the mapping, and ``(Just v)`` otherwise, where ``v`` is the value
-that the key maps to. Now consider the following definition: ::
-
-  clunky env var1 var2
-      | ok1 && ok2 = val1 + val2
-      | otherwise  = var1 + var2
-      where
-        m1 = lookup env var1
-        m2 = lookup env var2
-        ok1 = maybeToBool m1
-        ok2 = maybeToBool m2
-        val1 = expectJust m1
-        val2 = expectJust m2
-
-The auxiliary functions are ::
-
-    maybeToBool :: Maybe a -> Bool
-    maybeToBool (Just x) = True
-    maybeToBool Nothing  = False
-
-    expectJust :: Maybe a -> a
-    expectJust (Just x) = x
-    expectJust Nothing  = error "Unexpected Nothing"
-
-What is ``clunky`` doing? The guard ``ok1 && ok2`` checks that both
-lookups succeed, using ``maybeToBool`` to convert the ``Maybe`` types to
-booleans. The (lazily evaluated) ``expectJust`` calls extract the values
-from the results of the lookups, and binds the returned values to
-``val1`` and ``val2`` respectively. If either lookup fails, then clunky
-takes the ``otherwise`` case and returns the sum of its arguments.
-
-This is certainly legal Haskell, but it is a tremendously verbose and
-un-obvious way to achieve the desired effect. Arguably, a more direct
-way to write clunky would be to use case expressions: ::
-
-    clunky env var1 var2 = case lookup env var1 of
-      Nothing -> fail
-      Just val1 -> case lookup env var2 of
-        Nothing -> fail
-        Just val2 -> val1 + val2
-    where
-      fail = var1 + var2
-
-This is a bit shorter, but hardly better. Of course, we can rewrite any
-set of pattern-matching, guarded equations as case expressions; that is
-precisely what the compiler does when compiling equations! The reason
-that Haskell provides guarded equations is because they allow us to
-write down the cases we want to consider, one at a time, independently
-of each other. This structure is hidden in the case version. Two of the
-right-hand sides are really the same (``fail``), and the whole
-expression tends to become more and more indented.
-
-Here is how I would write ``clunky``: ::
-
-    clunky env var1 var2
-      | Just val1 <- lookup env var1
-      , Just val2 <- lookup env var2
-      = val1 + val2
-    ...other equations for clunky...
-
-The semantics should be clear enough. The qualifiers are matched in
-order. For a ``<-`` qualifier, which I call a pattern guard, the right
-hand side is evaluated and matched against the pattern on the left. If
-the match fails then the whole guard fails and the next equation is
-tried. If it succeeds, then the appropriate binding takes place, and the
-next qualifier is matched, in the augmented environment. Unlike list
-comprehensions, however, the type of the expression to the right of the
-``<-`` is the same as the type of the pattern to its left. The bindings
-introduced by pattern guards scope over all the remaining guard
-qualifiers, and over the right hand side of the equation.
-
-Just as with list comprehensions, boolean expressions can be freely
-mixed with among the pattern guards. For example: ::
-
-    f x | [y] <- x
-        , y > 3
-        , Just z <- h y
-        = ...
-
-Haskell's current guards therefore emerge as a special case, in which
-the qualifier list has just one element, a boolean expression.
-
+Disable `pattern guards 
+<http://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-460003.13>`__.
+   
 .. _view-patterns:
 
 View patterns
@@ -660,6 +570,7 @@ n+k patterns
 
 .. ghc-flag:: -XNPlusKPatterns
 
+    :implied by: :ghc-flag:`-XHaskell98`
     :since: 6.12
 
     Enable use of ``n+k`` patterns.

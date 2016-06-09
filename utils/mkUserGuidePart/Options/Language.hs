@@ -447,10 +447,11 @@ languageOptions =
          , flagReverse = "-XNoNegativeLiterals"
          , flagSince = "7.8.1"
          }
-  , flag { flagName = "-XNoNPlusKPatterns"
-         , flagDescription = "Disable support for ``n+k`` patterns."
+  , flag { flagName = "-XNPlusKPatterns"
+         , flagDescription = "Enable support for ``n+k`` patterns. "++
+           "Implied by :ghc-flag:`-XHaskell98`."
          , flagType = DynamicFlag
-         , flagReverse = "-XNPlusKPatterns"
+         , flagReverse = "-XNoNPlusKPatterns"
          , flagSince = "6.12.1"
          }
   , flag { flagName = "-XNullaryTypeClasses"
@@ -520,10 +521,11 @@ languageOptions =
          , flagReverse = "-XNoPartialTypeSignatures"
          , flagSince = "7.10.1"
          }
-  , flag { flagName = "-XPatternGuards"
-         , flagDescription = "Enable :ref:`pattern guards <pattern-guards>`."
+  , flag { flagName = "-XNoPatternGuards"
+         , flagDescription = "Disable :ref:`pattern guards <pattern-guards>`. "++
+           "Implied by :ghc-flag:`-XHaskell98`."
          , flagType = DynamicFlag
-         , flagReverse = "-XNoPatternGuards"
+         , flagReverse = "-XPatternGuards"
          , flagSince = "6.8.1"
          }
   , flag { flagName = "-XPatternSynonyms"
