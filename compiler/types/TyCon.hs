@@ -2072,8 +2072,8 @@ tyConRuntimeRepInfo _                                         = NoRRI
 -}
 
 instance Eq TyCon where
-    a == b = case (a `compare` b) of { EQ -> True;   _ -> False }
-    a /= b = case (a `compare` b) of { EQ -> False;  _ -> True  }
+    a == b = getUnique a == getUnique b
+    a /= b = getUnique a /= getUnique b
 
 instance Ord TyCon where
     a <= b = case (a `compare` b) of { LT -> True;  EQ -> True;  GT -> False }
