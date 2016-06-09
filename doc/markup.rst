@@ -803,7 +803,7 @@ Mathematics / LaTeX
 ~~~~~~~~~~~~~~~~~~~
 
 Haddock supports LaTeX syntax for rendering mathematical notation. The
-delimiters are ``\[...\]`` for displayed mathemetics and ``\(...\)``
+delimiters are ``\[...\]`` for displayed mathematics and ``\(...\)``
 for in-line mathematics. An example looks like this: ::
 
   \[
