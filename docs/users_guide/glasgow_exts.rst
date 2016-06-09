@@ -9268,7 +9268,7 @@ Impredicative polymorphism
 
 .. ghc-flag:: -XImpredicativeTypes
 
-    :implies: :ghc-flag:`RankNTypes`
+    :implies: :ghc-flag:`-RankNTypes`
 
     Allow impredicative polymorphic types.
 

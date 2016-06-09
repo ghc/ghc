@@ -8,7 +8,7 @@ recompilationCheckingOptions =
          , flagDescription =
            "Turn off recompilation checking. This is implied by any " ++
            "``-ddump-X`` option when compiling a single file " ++
-           "(i.e. when using :ghc-flag:`c`)."
+           "(i.e. when using :ghc-flag:`-c`)."
          , flagType = DynamicFlag
          , flagReverse = "-fno-force-recomp"
          }

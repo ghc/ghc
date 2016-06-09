@@ -7,7 +7,7 @@ phaseOptions =
   [ flag { flagName = "-F"
          , flagDescription =
            "Enable the use of a :ref:`pre-processor <pre-processor>` "++
-           "(set with :ghc-flag:`pgmF`)"
+           "(set with :ghc-flag:`-pgmF`)"
          , flagType = DynamicFlag
          }
   , flag { flagName = "-E"
