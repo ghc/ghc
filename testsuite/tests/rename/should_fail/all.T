@@ -115,7 +115,7 @@ test('T8448', normal, compile_fail, [''])
 test('T8149', normal, compile, [''])
 test('RnStaticPointersFail01', [], compile_fail, [''])
 test('RnStaticPointersFail02', [], compile_fail, [''])
-test('RnStaticPointersFail03', [], compile_fail, [''])
+test('RnStaticPointersFail03', [], compile_fail, ['-dsuppress-uniques'])
 test('T9006',
      extra_clean(['T9006a.hi', 'T9006a.o']),
      multimod_compile_fail, ['T9006', '-v0'])

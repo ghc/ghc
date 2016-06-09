@@ -1639,8 +1639,9 @@ runTcInteractive hsc_env thing_inside
     -- See Note [Initialising the type environment for GHCi]
     is_closed thing
       | AnId id <- thing
-      , NotTopLevel <- isTypeClosedLetBndr id
-      = Left (idName id, ATcId { tct_id = id, tct_closed = NotTopLevel })
+      , not (isTypeClosedLetBndr id)
+      = Left (idName id, ATcId { tct_id = id
+                               , tct_info = NotLetBound })
       | otherwise
       = Right thing
 

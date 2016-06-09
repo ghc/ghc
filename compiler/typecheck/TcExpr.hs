@@ -49,6 +49,8 @@ import ConLike
 import DataCon
 import PatSyn
 import Name
+import NameEnv
+import NameSet
 import RdrName
 import TyCon
 import Type
@@ -2499,11 +2501,152 @@ fieldNotInType p rdr
 ************************************************************************
 -}
 
+-- | A data type to describe why a variable is not closed.
+data NotClosedReason = NotLetBoundReason
+                     | NotTypeClosed VarSet
+                     | NotClosed Name NotClosedReason
+
+-- | Checks if the given name is closed and emits an error if not.
+--
+-- See Note [Not-closed error messages].
 checkClosedInStaticForm :: Name -> TcM ()
 checkClosedInStaticForm name = do
-    thing <- tcLookup name
-    case thing of
-      ATcId { tct_closed = NotTopLevel } ->
-         addErrTc $ quotes (ppr name) <+>
-                    text "is used in a static form but it is not closed."
-      _ -> return ()
+    type_env <- getLclTypeEnv
+    case checkClosed type_env name of
+      Nothing -> return ()
+      Just reason -> addErrTc $ explain name reason
+  where
+    -- See Note [Checking closedness].
+    checkClosed :: TcTypeEnv -> Name -> Maybe NotClosedReason
+    checkClosed type_env n = checkLoop type_env (unitNameSet n) n
+
+    checkLoop :: TcTypeEnv -> NameSet -> Name -> Maybe NotClosedReason
+    checkLoop type_env visited n = do
+      -- The @visited@ set is an accumulating parameter that contains the set of
+      -- visited nodes, so we avoid repeating cycles in the traversal.
+      case lookupNameEnv type_env n of
+        Just (ATcId { tct_id = tcid, tct_info = info }) -> case info of
+          ClosedLet   -> Nothing
+          NotLetBound -> Just NotLetBoundReason
+          NonClosedLet fvs type_closed -> listToMaybe $
+            -- Look for a non-closed variable in fvs
+            [ NotClosed n' reason
+            | n' <- nameSetElemsStable fvs
+            , not (elemNameSet n' visited)
+            , Just reason <- [checkLoop type_env (extendNameSet visited n') n']
+            ] ++
+            if type_closed then
+              []
+            else
+              -- We consider non-let-bound variables easier to figure out than
+              -- non-closed types, so we report non-closed types to the user
+              -- only if we cannot spot the former.
+              [ NotTypeClosed $ tyCoVarsOfType (idType tcid) ]
+        -- The binding is closed.
+        _ -> Nothing
+
+    -- Converts a reason into a human-readable sentence.
+    --
+    -- @explain name reason@ starts with
+    --
+    -- "<name> is used in a static form but it is not closed because it"
+    --
+    -- and then follows a list of causes. For each id in the path, the text
+    --
+    -- "uses <id> which"
+    --
+    -- is appended, yielding something like
+    --
+    -- "uses <id> which uses <id1> which uses <id2> which"
+    --
+    -- until the end of the path is reached, which is reported as either
+    --
+    -- "is not let-bound"
+    --
+    -- when the final node is not let-bound, or
+    --
+    -- "has a non-closed type because it contains the type variables:
+    -- v1, v2, v3"
+    --
+    -- when the final node has a non-closed type.
+    --
+    explain :: Name -> NotClosedReason -> SDoc
+    explain name reason =
+      quotes (ppr name) <+> text "is used in a static form but it is not closed"
+                        <+> text "because it"
+                        $$
+                        sep (causes reason)
+
+    causes :: NotClosedReason -> [SDoc]
+    causes NotLetBoundReason = [text "is not let-bound."]
+    causes (NotTypeClosed vs) =
+      [ text "has a non-closed type because it contains the"
+      , text "type variables:" <+>
+        pprVarSet vs (hsep . punctuate comma . map (quotes . ppr))
+      ]
+    causes (NotClosed n reason) =
+      let msg = text "uses" <+> quotes (ppr n) <+> text "which"
+       in case reason of
+            NotClosed _ _ -> msg : causes reason
+            _   -> let (xs0, xs1) = splitAt 1 $ causes reason
+                    in fmap (msg <+>) xs0 ++ xs1
+
+-- Note [Not-closed error messages]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- When variables in a static form are not closed, we go through the trouble
+-- of explaining why they aren't.
+--
+-- Thus, the following program
+--
+-- > {-# LANGUAGE StaticPointers #-}
+-- > module M where
+-- >
+-- > f x = static g
+-- >   where
+-- >     g = h
+-- >     h = x
+--
+-- produces the error
+--
+--    'g' is used in a static form but it is not closed because it
+--    uses 'h' which uses 'x' which is not let-bound.
+--
+-- And a program like
+--
+-- > {-# LANGUAGE StaticPointers #-}
+-- > module M where
+-- >
+-- > import Data.Typeable
+-- > import GHC.StaticPtr
+-- >
+-- > f :: Typeable a => a -> StaticPtr TypeRep
+-- > f x = const (static (g undefined)) (h x)
+-- >   where
+-- >     g = h
+-- >     h = typeOf
+--
+-- produces the error
+--
+--    'g' is used in a static form but it is not closed because it
+--    uses 'h' which has a non-closed type because it contains the
+--    type variables: 'a'
+--
+
+-- Note [Checking closedness]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- @checkClosed@ checks if a binding is closed and returns a reason if it is
+-- not.
+--
+-- The bindings define a graph where the nodes are ids, and there is an edge
+-- from @id1@ to @id2@ if the rhs of @id1@ contains @id2@ among its free
+-- variables.
+--
+-- When @n@ is not closed, it has to exist in the graph some node reachable
+-- from @n@ that it is not a let-bound variable or that it has a non-closed
+-- type. Thus, the "reason" is a path from @n@ to this offending node.
+--
+-- When @n@ is not closed, we traverse the graph reachable from @n@ to build
+-- the reason.
+--

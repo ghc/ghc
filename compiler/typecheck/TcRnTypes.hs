@@ -40,6 +40,8 @@ module TcRnTypes(
         -- Typechecker types
         TcTypeEnv, TcIdBinderStack, TcIdBinder(..),
         TcTyThing(..), PromotionErr(..),
+        IdBindingInfo(..),
+        IsGroupClosed(..),
         SelfBootInfo(..),
         pprTcTyThingCategory, pprPECategory,
 
@@ -885,7 +887,7 @@ data TcTyThing
 
   | ATcId   {           -- Ids defined in this module; may not be fully zonked
         tct_id     :: TcId,
-        tct_closed :: TopLevelFlag }   -- See Note [Bindings with closed types]
+        tct_info :: IdBindingInfo }   -- See Note [Bindings with closed types]
 
   | ATyVar  Name TcTyVar        -- The type variable to which the lexically scoped type
                                 -- variable is bound. We only need the Name
@@ -922,10 +924,50 @@ instance Outputable TcTyThing where     -- Debugging only
    ppr elt@(ATcId {})   = text "Identifier" <>
                           brackets (ppr (tct_id elt) <> dcolon
                                  <> ppr (varType (tct_id elt)) <> comma
-                                 <+> ppr (tct_closed elt))
+                                 <+> ppr (tct_info elt))
    ppr (ATyVar n tv)    = text "Type variable" <+> quotes (ppr n) <+> equals <+> ppr tv
    ppr (ATcTyCon tc)    = text "ATcTyCon" <+> ppr tc
    ppr (APromotionErr err) = text "APromotionErr" <+> ppr err
+
+-- | Describes how an Id is bound.
+--
+-- It is used for the following purposes:
+--
+-- a) for static forms in TcExpr.checkClosedInStaticForm and
+-- b) to figure out when a nested binding can be generalised (in
+--    TcBinds.decideGeneralisationPlan).
+--
+-- See Note [Meaning of IdBindingInfo].
+data IdBindingInfo
+    = NotLetBound
+    | ClosedLet
+    | NonClosedLet NameSet Bool
+
+-- Note [Meaning of IdBindingInfo]
+--
+-- @NotLetBound@ means that the Id is not let-bound (e.g. it is bound in a
+-- lambda-abstraction or in a case pattern).
+--
+-- @ClosedLet@ means that the Id is let-bound, it is closed and its type is
+-- closed as well.
+--
+-- @NonClosedLet fvs type-closed@ means that the Id is let-bound but it is not
+-- closed. The @fvs@ set contains the free variables of the rhs. The type-closed
+-- flag indicates if the type of Id is closed.
+
+instance Outputable IdBindingInfo where
+  ppr NotLetBound = text "NotLetBound"
+  ppr ClosedLet = text "TopLevelLet"
+  ppr (NonClosedLet fvs closed_type) =
+    text "TopLevelLet" <+> ppr fvs <+> ppr closed_type
+
+-- | Tells if a group of binders is closed.
+--
+-- When it is not closed, it provides a map of binder ids to the free vars
+-- in their right-hand sides.
+--
+data IsGroupClosed = ClosedGroup
+                   | NonClosedGroup (NameEnv NameSet)
 
 instance Outputable PromotionErr where
   ppr ClassPE        = text "ClassPE"
@@ -969,7 +1011,7 @@ have no free type variables, and it is the type variables in the
 environment that makes things tricky for OutsideIn generalisation.
 
 Definition:
-   A variable is "closed", and has tct_closed set to TopLevel,
+   A variable is "closed", and has tct_info set to TopLevel,
 iff
    a) all its free variables are imported, or are let-bound and closed
    b) generalisation is not restricted by the monomorphism restriction
