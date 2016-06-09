@@ -381,15 +381,8 @@ See also Note [Implicit TyThings] in HscTypes
 -}
 
 instance Eq (CoAxiom br) where
-    a == b = case (a `compare` b) of { EQ -> True;   _ -> False }
-    a /= b = case (a `compare` b) of { EQ -> False;  _ -> True  }
-
-instance Ord (CoAxiom br) where
-    a <= b = case (a `compare` b) of { LT -> True;  EQ -> True;  GT -> False }
-    a <  b = case (a `compare` b) of { LT -> True;  EQ -> False; GT -> False }
-    a >= b = case (a `compare` b) of { LT -> False; EQ -> True;  GT -> True  }
-    a >  b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
-    compare a b = getUnique a `compare` getUnique b
+    a == b = getUnique a == getUnique b
+    a /= b = getUnique a /= getUnique b
 
 instance Uniquable (CoAxiom br) where
     getUnique = co_ax_unique
