@@ -270,13 +270,6 @@ instance Eq PatSyn where
     (==) = (==) `on` getUnique
     (/=) = (/=) `on` getUnique
 
-instance Ord PatSyn where
-    (<=) = (<=) `on` getUnique
-    (<) = (<) `on` getUnique
-    (>=) = (>=) `on` getUnique
-    (>) = (>) `on` getUnique
-    compare = compare `on` getUnique
-
 instance Uniquable PatSyn where
     getUnique = psUnique
 
