@@ -50,6 +50,22 @@ Of course all this applies recursively, so that we flatten out nested tuples.
 Note [Unarisation and nullary tuples]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The above scheme has a special cases for nullary unboxed tuples, x :: (# #)
+To see why, consider
+    f2 :: (# Int, Int #) -> Int
+    f1 :: (# Int #) -> Int
+    f0 :: (# #) -> Int
+
+When we "unarise" to eliminate unboxed tuples (this is done at the STG level),
+we'll transform to
+    f2 :: Int -> Int -> Int
+    f1 :: Int -> Int
+    f0 :: ??
+
+We do not want to give f0 zero arguments, otherwise a lambda will
+turn into a thunk! So we want to get
+    f0 :: Void# -> Int
+
+So here is what we do for nullary tuples
 
   * Extend the UnariseEnv with   x :-> [voidPrimId]
 

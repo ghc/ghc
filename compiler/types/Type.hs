@@ -1714,33 +1714,11 @@ typeSize (CoercionTy co)  = coercionSize co
 *                                                                       *
 ********************************************************************** -}
 
-{- Note [Nullary unboxed tuple]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-At runtime we represent the nullary unboxed tuple as the type Void#.
-To see why, consider
-    f2 :: (# Int, Int #) -> Int
-    f1 :: (# Int #) -> Int
-    f0 :: (# #) -> Int
-
-When we "unarise" to eliminate unboxed tuples (this is done at the STG level),
-we'll transform to
-    f2 :: Int -> Int -> Int
-    f1 :: Int -> Int
-    f0 :: ??
-
-We do not want to give f0 zero arguments, otherwise a lambda will
-turn into a thunk! So we want to get
-    f0 :: Void# -> Int
-
-See Note [Unarisation and nullary tuples] in UnariseStg for more detail.
--}
-
 type UnaryType = Type
 
 data RepType
   = UbxTupleRep [UnaryType] -- Represented by multiple values
-                            -- INVARIANT: never an empty list
-                            -- (see Note [Nullary unboxed tuple])
+                            -- Can be zero, one, or more
   | UnaryRep UnaryType      -- Represented by a single value
 
 instance Outputable RepType where

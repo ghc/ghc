@@ -451,7 +451,7 @@ mkStgAltType bndr alts = case repType (idType bndr) of
                                         PolyAlt
         Nothing                      -> PolyAlt
     UbxTupleRep rep_tys -> UbxTupAlt (length rep_tys)
-    -- NB Nullary unboxed tuples have UnaryRep, and generate a PrimAlt
+        -- UbxTupAlt includes nullary and and singleton unboxed tuples
   where
    _is_poly_alt_tycon tc
         =  isFunTyCon tc
