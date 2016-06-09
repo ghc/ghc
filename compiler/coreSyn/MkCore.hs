@@ -716,35 +716,16 @@ aBSENT_ERROR_ID                 = mkRuntimeErrorId absentErrorName
 tYPE_ERROR_ID                   = mkRuntimeErrorId typeErrorName
 
 mkRuntimeErrorId :: Name -> Id
-mkRuntimeErrorId name = pc_bottoming_Id1 name runtimeErrorTy
-
-runtimeErrorTy :: Type
--- The runtime error Ids take a UTF8-encoded string as argument
-runtimeErrorTy = mkSpecSigmaTy [runtimeRep1TyVar, openAlphaTyVar] []
-                               (mkFunTy addrPrimTy openAlphaTy)
-
-{-
-Note [Error and friends have an "open-tyvar" forall]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-'error' and 'undefined' have types
-        error     :: forall (v :: RuntimeRep) (a :: TYPE v). String -> a
-        undefined :: forall (v :: RuntimeRep) (a :: TYPE v). a
-Notice the runtime-representation polymophism. This ensures that
-"error" can be instantiated at unboxed as well as boxed types.
-This is OK because it never returns, so the return type is irrelevant.
-
-
-************************************************************************
-*                                                                      *
-\subsection{Utilities}
-*                                                                      *
-************************************************************************
--}
-
-pc_bottoming_Id1 :: Name -> Type -> Id
--- Function of arity 1, which diverges after being given one argument
-pc_bottoming_Id1 name ty
- = mkVanillaGlobalWithInfo name ty bottoming_info
+-- Error function
+--   with type:  forall (r:RuntimeRep) (a:TYPE r). Addr# -> a
+--   with arity: 1
+-- which diverges after being given one argument
+-- The Addr# is expected to be the address of
+--   a UTF8-encoded error string
+-- For the RuntimeRep part, see
+--   Note [Error and friends have an "open-tyvar" forall]
+mkRuntimeErrorId name
+ = mkVanillaGlobalWithInfo name runtime_err_ty bottoming_info
  where
     bottoming_info = vanillaIdInfo `setStrictnessInfo`    strict_sig
                                    `setArityInfo`         1
@@ -761,3 +742,17 @@ pc_bottoming_Id1 name ty
 
     strict_sig = mkClosedStrictSig [evalDmd] exnRes
               -- exnRes: these throw an exception, not just diverge
+
+    runtime_err_ty = mkSpecSigmaTy [runtimeRep1TyVar, openAlphaTyVar] []
+                                   (mkFunTy addrPrimTy openAlphaTy)
+
+{- Note [Error and friends have an "open-tyvar" forall]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'error' and 'undefined' have types
+        error     :: forall (v :: RuntimeRep) (a :: TYPE v). String -> a
+        undefined :: forall (v :: RuntimeRep) (a :: TYPE v). a
+Notice the runtime-representation polymophism. This ensures that
+"error" can be instantiated at unboxed as well as boxed types.
+This is OK because it never returns, so the return type is irrelevant.
+-}
+
