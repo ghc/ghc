@@ -292,7 +292,7 @@ data AltCon
                       -- See Note [Literal alternatives]
 
   | DEFAULT           -- ^ Trivial alternative: @case e of { _ -> ... }@
-   deriving (Eq, Ord, Data)
+   deriving (Eq, Data)
 
 -- | Binding, used for top level bindings in a module and local bindings in a @let@.
 
