@@ -279,13 +279,6 @@ instance Eq Class where
     c1 == c2 = classKey c1 == classKey c2
     c1 /= c2 = classKey c1 /= classKey c2
 
-instance Ord Class where
-    c1 <= c2 = classKey c1 <= classKey c2
-    c1 <  c2 = classKey c1 <  classKey c2
-    c1 >= c2 = classKey c1 >= classKey c2
-    c1 >  c2 = classKey c1 >  classKey c2
-    compare c1 c2 = classKey c1 `compare` classKey c2
-
 instance Uniquable Class where
     getUnique c = classKey c
 
