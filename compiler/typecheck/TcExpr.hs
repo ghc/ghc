@@ -533,9 +533,10 @@ tcExpr (HsCase scrut matches) res_ty
 
 tcExpr (HsIf Nothing pred b1 b2) res_ty    -- Ordinary 'if'
   = do { pred' <- tcMonoExpr pred (mkCheckExpType boolTy)
-            -- this forces the branches to be fully instantiated
-            -- (See #10619)
-       ; res_ty <- mkCheckExpType <$> expTypeToType res_ty
+       ; res_ty <- tauifyExpType res_ty
+           -- Just like Note [Case branches must never infer a non-tau type]
+           -- in TcMatches (See #10619)
+
        ; b1' <- tcMonoExpr b1 res_ty
        ; b2' <- tcMonoExpr b2 res_ty
        ; return (HsIf Nothing pred' b1' b2') }
@@ -553,9 +554,10 @@ tcExpr (HsIf (Just fun) pred b1 b2) res_ty
 tcExpr (HsMultiIf _ alts) res_ty
   = do { res_ty <- if isSingleton alts
                    then return res_ty
-                   else mkCheckExpType <$> expTypeToType res_ty
-        -- Just like Note [Case branches must never infer a non-tau type]
-        -- in TcMatches
+                   else tauifyExpType res_ty
+             -- Just like TcMatches
+             -- Note [Case branches must never infer a non-tau type]
+
        ; alts' <- mapM (wrapLocM $ tcGRHS match_ctxt res_ty) alts
        ; res_ty <- readExpType res_ty
        ; return (HsMultiIf res_ty alts') }

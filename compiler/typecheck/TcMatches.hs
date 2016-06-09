@@ -90,8 +90,7 @@ tcMatchesFun fn@(L _ fun_name) matches exp_ty
                do { (matches', wrap_fun)
                        <- matchExpectedFunTys herald arity exp_rho $
                           \ pat_tys rhs_ty ->
-                     -- See Note [Case branches must never infer a non-tau type]
-                     do { tcMatches match_ctxt pat_tys rhs_ty matches }
+                          tcMatches match_ctxt pat_tys rhs_ty matches
                   ; return (wrap_fun, matches') }
         ; return (wrap_gen <.> wrap_fun, group) }
   where
@@ -187,10 +186,7 @@ tauifyMultipleMatches group exp_tys
   | otherwise                   = mapM tauifyExpType exp_tys
   -- NB: In the empty-match case, this ensures we fill in the ExpType
 
--- | Type-check a MatchGroup. If there are multiple RHSs, the expected type
--- must already be tauified.
--- See Note [Case branches must never infer a non-tau type]
--- about tauifyMultipleMatches
+-- | Type-check a MatchGroup.
 tcMatches :: (Outputable (body Name)) => TcMatchCtxt body
           -> [ExpSigmaType]      -- Expected pattern types
           -> ExpRhoType          -- Expected result-type of the Match.
@@ -207,6 +203,8 @@ data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
 tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
                                   , mg_origin = origin })
   = do { rhs_ty:pat_tys <- tauifyMultipleMatches matches (rhs_ty:pat_tys)
+            -- See Note [Case branches must never infer a non-tau type]
+
        ; matches' <- mapM (tcMatch ctxt pat_tys rhs_ty) matches
        ; pat_tys  <- mapM readExpType pat_tys
        ; rhs_ty   <- readExpType rhs_ty
