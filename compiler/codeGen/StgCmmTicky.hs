@@ -466,12 +466,12 @@ tickyAllocHeap genuine hp
                      (CmmLit (cmmLabelOffB ticky_ctr (oFFSET_StgEntCounter_allocs dflags)))
                      bytes,
             -- Bump the global allocation total ALLOC_HEAP_tot
-            addToMemLbl (cLong dflags)
+            addToMemLbl (bWord dflags)
                         (mkCmmDataLabel rtsUnitId (fsLit "ALLOC_HEAP_tot"))
                         bytes,
             -- Bump the global allocation counter ALLOC_HEAP_ctr
             if not genuine then mkNop
-            else addToMemLbl (cLong dflags)
+            else addToMemLbl (bWord dflags)
                              (mkCmmDataLabel rtsUnitId (fsLit "ALLOC_HEAP_ctr"))
                              1
             ]}
@@ -580,11 +580,11 @@ bumpHistogram :: FastString -> Int -> FCode ()
 bumpHistogram lbl n = do
     dflags <- getDynFlags
     let offset = n `min` (tICKY_BIN_COUNT dflags - 1)
-    emit (addToMem (cLong dflags)
+    emit (addToMem (bWord dflags)
            (cmmIndexExpr dflags
-                (cLongWidth dflags)
+                (wordWidth dflags)
                 (CmmLit (CmmLabel (mkCmmDataLabel rtsUnitId lbl)))
-                (CmmLit (CmmInt (fromIntegral offset) (cLongWidth dflags))))
+                (CmmLit (CmmInt (fromIntegral offset) (wordWidth dflags))))
            1)
 
 ------------------------------------------------------------------
