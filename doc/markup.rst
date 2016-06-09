@@ -807,12 +807,12 @@ delimiters are ``\[...\]`` for displayed mathematics and ``\(...\)``
 for in-line mathematics. An example looks like this: ::
 
   \[
-  f(a) = \frac{1}{2\pi i}\oint_\gamma \frac{f(z)}{z-a}\mathrm\,{d}z
+  f(a) = \frac{1}{2\pi i}\oint_\gamma \frac{f(z)}{z-a}\,\mathrm{d}z
   \]
 
 If the output format supports it, the mathematics will be rendered
 inside the documentation. For example, the HTML backend will display
-the mathematics via MathJax.
+the mathematics via `MathJax <https://www.mathjax.org>`__.
 
 Anchors
 ~~~~~~~
