@@ -1,6 +1,6 @@
 [1 of 4] Compiling OverloadedRecFldsFail10_A ( OverloadedRecFldsFail10_A.hs, OverloadedRecFldsFail10_A.o )
-[2 of 4] Compiling OverloadedRecFldsFail10_C ( OverloadedRecFldsFail10_C.hs, OverloadedRecFldsFail10_C.o )
-[3 of 4] Compiling OverloadedRecFldsFail10_B ( OverloadedRecFldsFail10_B.hs, OverloadedRecFldsFail10_B.o )
+[2 of 4] Compiling OverloadedRecFldsFail10_B ( OverloadedRecFldsFail10_B.hs, OverloadedRecFldsFail10_B.o )
+[3 of 4] Compiling OverloadedRecFldsFail10_C ( OverloadedRecFldsFail10_C.hs, OverloadedRecFldsFail10_C.o )
 [4 of 4] Compiling Main             ( overloadedrecfldsfail10.hs, overloadedrecfldsfail10.o )
 
 overloadedrecfldsfail10.hs:6:20: error:
