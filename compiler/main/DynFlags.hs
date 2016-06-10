@@ -2994,9 +2994,9 @@ dynamic_flags_deps = [
     wWarningFlagsDeps
  ++ map (mkFlag turnOff "fno-warn-" unSetWarningFlag . hideFlag)
     wWarningFlagsDeps
- ++ [ (NotDeprecated, unrecognisedWarning "W")
-    , (NotDeprecated, unrecognisedWarning "fwarn-")
-    , (NotDeprecated, unrecognisedWarning "fno-warn-") ]
+ ++ [ (NotDeprecated, unrecognisedWarning "W"),
+      (Deprecated,    unrecognisedWarning "fwarn-"),
+      (Deprecated,    unrecognisedWarning "fno-warn-") ]
  ++ map (mkFlag turnOn  "f"         setExtensionFlag  ) fLangFlagsDeps
  ++ map (mkFlag turnOff "fno-"      unSetExtensionFlag) fLangFlagsDeps
  ++ map (mkFlag turnOn  "X"         setExtensionFlag  ) xFlagsDeps
@@ -3015,7 +3015,7 @@ dynamic_flags_deps = [
 -- | This is where we handle unrecognised warning flags. We only issue a warning
 -- if -Wunrecognised-warning-flags is set. See Trac #11429 for context.
 unrecognisedWarning :: String -> Flag (CmdLineP DynFlags)
-unrecognisedWarning prefix = defFlag prefix (Prefix action)
+unrecognisedWarning prefix = defHiddenFlag prefix (Prefix action)
   where
     action :: String -> EwM (CmdLineP DynFlags) ()
     action flag = do
