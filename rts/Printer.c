@@ -805,6 +805,8 @@ void prettyPrintClosure_ (const StgClosure *obj)
 {
     const StgInfoTable *info;
 
+    obj = UNTAG_CONST_CLOSURE(obj);
+
     /* collapse any indirections */
     unsigned int type;
     type = get_itbl(obj)->type;
