@@ -211,15 +211,12 @@ pruneSparkQueue (Capability *cap)
               }
           } else {
               if (INFO_PTR_TO_STRUCT(info)->type == THUNK_STATIC) {
-                  if (*THUNK_STATIC_LINK(spark) != NULL) {
-                      elements[botInd] = spark; // keep entry (new address)
-                      botInd++;
-                      n++;
-                  } else {
-                      pruned_sparks++; // discard spark
-                      cap->spark_stats.gcd++;
-                      traceEventSparkGC(cap);
-                  }
+                  // We can't tell whether a THUNK_STATIC is garbage or not.
+                  // See also Note [STATIC_LINK fields]
+                  // isAlive() also ignores static closures (see GCAux.c)
+                  elements[botInd] = spark; // keep entry (new address)
+                  botInd++;
+                  n++;
               } else {
                   pruned_sparks++; // discard spark
                   cap->spark_stats.fizzled++;
