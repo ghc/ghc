@@ -1190,6 +1190,9 @@ mkNakedCastTy :: Type -> Coercion -> Type
 -- for which it's plain stupid to create a cast
 -- This simple function killed off a huge number of Refl casts
 -- in types, at birth.
+-- Note that it's fine to do this even for a "mkNaked" function,
+-- because we don't look at TyCons.  isReflCo checks if the coercion
+-- is structurally Refl; it does not check for shape k ~ k.
 mkNakedCastTy ty co | isReflCo co = ty
 mkNakedCastTy (CastTy ty co1) co2 = CastTy ty (co1 `mkTransCo` co2)
 mkNakedCastTy ty co = CastTy ty co
