@@ -71,7 +71,7 @@ module TcMType (
   zonkTyCoVarsAndFV, zonkTcTypeAndFV,
   zonkTyCoVarsAndFVList,
   zonkTcTypeAndSplitDepVars, zonkTcTypesAndSplitDepVars,
-  zonkQuantifiedTyVar, zonkQuantifiedTyVarOrType,
+  zonkQuantifiedTyVar,
   quantifyTyVars, quantifyZonkedTyVars,
   zonkTcTyCoVarBndr, zonkTcTyBinder, zonkTcType, zonkTcTypes, zonkCo,
   zonkTyCoVarKind, zonkTcTypeMapper,
@@ -934,23 +934,9 @@ zonkQuantifiedTyVar :: Bool     -- True  <=> this is a kind var and -XNoPolyKind
 --    * RuntimeRep variables: we never quantify over these
 
 zonkQuantifiedTyVar default_kind tv
-  = do { mb_tv' <- zonkQuantifiedTyVarOrType default_kind tv
-       ; return (case mb_tv' of
-                   Left x  -> Just x    -- Quantify over this
-                   Right _ -> Nothing)  -- Do not quantify over this
-       }
-
--- | Like zonkQuantifiedTyVar, but if zonking reveals that the tyvar
--- should become a type (when defaulting a RuntimeRep var to PtrRepLifted), it
--- returns the type instead.
-zonkQuantifiedTyVarOrType :: Bool -- True  <=> this is a kind var and -XNoPolyKinds
-                                  -- False <=> not a kind var or -XPolyKindsBool
-                          -> TcTyVar
-                          -> TcM (Either TcTyVar TcType)
-zonkQuantifiedTyVarOrType default_kind tv
   = case tcTyVarDetails tv of
       SkolemTv {} -> do { kind <- zonkTcType (tyVarKind tv)
-                        ; return $ Left $ setTyVarKind tv kind }
+                        ; return $ Just (setTyVarKind tv kind) }
         -- It might be a skolem type variable,
         -- for example from a user type signature
 
@@ -961,19 +947,19 @@ zonkQuantifiedTyVarOrType default_kind tv
       _other -> pprPanic "zonkQuantifiedTyVar" (ppr tv) -- FlatSkol, RuntimeUnk
 
   where
-    zonk_meta_tv :: TcTyVar -> TcM (Either TcTyVar TcType)
+    zonk_meta_tv :: TcTyVar -> TcM (Maybe TcTyVar)
     zonk_meta_tv tv
       | isRuntimeRepVar tv   -- Never quantify over a RuntimeRep var
       = do { writeMetaTyVar tv ptrRepLiftedTy
-           ; return (Right ptrRepLiftedTy) }
+           ; return Nothing }
 
       | default_kind         -- -XNoPolyKinds and this is a kind var
-      = do { kind <- default_kind_var tv
-           ; return (Right kind) }
+      = do { _ <- default_kind_var tv
+           ; return Nothing }
 
       | otherwise
       = do { tv' <- skolemiseUnboundMetaTyVar tv vanillaSkolemTv
-           ; return (Left tv') }
+           ; return (Just tv') }
 
     default_kind_var :: TyVar -> TcM Type
        -- defaultKindVar is used exclusively with -XNoPolyKinds
