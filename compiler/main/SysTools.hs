@@ -509,51 +509,25 @@ readCreateProcessWithExitCode' proc = do
 
     return (ex, output)
 
+replaceVar :: (String, String) -> [(String, String)] -> [(String, String)]
+replaceVar (var, value) env =
+    (var, value) : filter (\(var',_) -> var /= var') env
+
+-- | Version of @System.Process.readProcessWithExitCode@ that takes a
+-- key-value tuple to insert into the environment.
 readProcessEnvWithExitCode
     :: String -- ^ program path
     -> [String] -- ^ program args
-    -> [(String, String)] -- ^ environment to override
+    -> (String, String) -- ^ addition to the environment
     -> IO (ExitCode, String, String) -- ^ (exit_code, stdout, stderr)
 readProcessEnvWithExitCode prog args env_update = do
     current_env <- getEnvironment
-    let new_env = env_update ++ [ (k, v)
-                                | let overriden_keys = map fst env_update
-                                , (k, v) <- current_env
-                                , k `notElem` overriden_keys
-                                ]
-        p       = proc prog args
-
-    (_stdin, Just stdoh, Just stdeh, pid) <-
-        createProcess p{ std_out = CreatePipe
-                       , std_err = CreatePipe
-                       , env     = Just new_env
-                       }
-
-    outMVar <- newEmptyMVar
-    errMVar <- newEmptyMVar
-
-    _ <- forkIO $ do
-        stdo <- hGetContents stdoh
-        _ <- evaluate (length stdo)
-        putMVar outMVar stdo
-
-    _ <- forkIO $ do
-        stde <- hGetContents stdeh
-        _ <- evaluate (length stde)
-        putMVar errMVar stde
-
-    out <- takeMVar outMVar
-    hClose stdoh
-    err <- takeMVar errMVar
-    hClose stdeh
-
-    ex <- waitForProcess pid
-
-    return (ex, out, err)
+    readCreateProcessWithExitCode (proc prog args) {
+        env = Just (replaceVar env_update current_env) } ""
 
 -- Don't let gcc localize version info string, #8825
-en_locale_env :: [(String, String)]
-en_locale_env = [("LANGUAGE", "en")]
+c_locale_env :: (String, String)
+c_locale_env = ("LANGUAGE", "C")
 
 -- If the -B<dir> option is set, add <dir> to PATH.  This works around
 -- a bug in gcc on Windows Vista where it can't find its auxiliary
@@ -864,7 +838,7 @@ getLinkerInfo' dflags = do
                  -- -Wl,--version to get linker version info.
                  (exitc, stdo, stde) <- readProcessEnvWithExitCode pgm
                                         (["-Wl,--version"] ++ args3)
-                                        en_locale_env
+                                        c_locale_env
                  -- Split the output by lines to make certain kinds
                  -- of processing easier. In particular, 'clang' and 'gcc'
                  -- have slightly different outputs for '-Wl,--version', but
@@ -920,7 +894,7 @@ getCompilerInfo' dflags = do
   -- Process the executable call
   info <- catchIO (do
                 (exitc, stdo, stde) <-
-                    readProcessEnvWithExitCode pgm ["-v"] en_locale_env
+                    readProcessEnvWithExitCode pgm ["-v"] c_locale_env
                 -- Split the output by lines to make certain kinds
                 -- of processing easier.
                 parseCompilerInfo (lines stdo) (lines stde) exitc
