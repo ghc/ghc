@@ -172,7 +172,8 @@ topInstantiateInferred :: CtOrigin -> TcSigmaType
 -- then  wrap e :: rho
 topInstantiateInferred = top_instantiate False
 
-top_instantiate :: Bool   -- True <=> instantiate *all* variables
+top_instantiate :: Bool   -- True  <=> instantiate *all* variables
+                          -- False <=> instantiate only the invisible ones
                 -> CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 top_instantiate inst_all orig ty
   | not (null binders && null theta)
@@ -180,16 +181,21 @@ top_instantiate inst_all orig ty
              (inst_theta, leave_theta)
                | null leave_bndrs = (theta, [])
                | otherwise        = ([], theta)
-       ; (subst, inst_tvs') <- newMetaTyVars (map (binderVar "top_inst") inst_bndrs)
-       ; let inst_theta' = substThetaUnchecked subst inst_theta
-             sigma'      = substTyAddInScope subst (mkForAllTys leave_bndrs $
-                                                    mkFunTys leave_theta rho)
+             in_scope    = mkInScopeSet (tyCoVarsOfType ty)
+             empty_subst = mkEmptyTCvSubst in_scope
+             inst_tvs    = map (binderVar "top_inst") inst_bndrs
+       ; (subst, inst_tvs') <- mapAccumLM newMetaTyVarX empty_subst inst_tvs
+       ; let inst_theta' = substTheta subst inst_theta
+             sigma'      = substTy subst (mkForAllTys leave_bndrs $
+                                          mkFunTys leave_theta rho)
 
        ; wrap1 <- instCall orig (mkTyVarTys inst_tvs') inst_theta'
        ; traceTc "Instantiating"
                  (vcat [ text "all tyvars?" <+> ppr inst_all
                        , text "origin" <+> pprCtOrigin orig
                        , text "type" <+> ppr ty
+                       , text "theta" <+> ppr theta
+                       , text "leave_bndrs" <+> ppr leave_bndrs
                        , text "with" <+> ppr inst_tvs'
                        , text "theta:" <+>  ppr inst_theta' ])
 
