@@ -1186,7 +1186,13 @@ mkNakedAppTy :: Type -> Type -> Type
 mkNakedAppTy ty1 ty2 = mkNakedAppTys ty1 [ty2]
 
 mkNakedCastTy :: Type -> Coercion -> Type
-mkNakedCastTy = CastTy
+-- Do simple, fast compaction; especially dealing with Refl
+-- for which it's plain stupid to create a cast
+-- This simple function killed off a huge number of Refl casts
+-- in types, at birth.
+mkNakedCastTy ty co | isReflCo co = ty
+mkNakedCastTy (CastTy ty co1) co2 = CastTy ty (co1 `mkTransCo` co2)
+mkNakedCastTy ty co = CastTy ty co
 
 {-
 ************************************************************************
