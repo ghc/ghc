@@ -92,7 +92,9 @@ import GHC.PackageDb (BinaryStringRep(..), DbModuleRep(..), DbModule(..))
 
 import Data.Data
 import Data.Map (Map)
+import Data.Set (Set)
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import qualified FiniteMap as Map
 import System.FilePath
 
@@ -580,7 +582,7 @@ foldModuleEnv :: (a -> b -> b) -> b -> ModuleEnv a -> b
 foldModuleEnv f x (ModuleEnv e) = Map.foldRightWithKey (\_ v -> f v) x e
 
 -- | A set of 'Module's
-type ModuleSet = Map Module ()
+type ModuleSet = Set Module
 
 mkModuleSet     :: [Module] -> ModuleSet
 extendModuleSet :: ModuleSet -> Module -> ModuleSet
@@ -588,11 +590,11 @@ emptyModuleSet  :: ModuleSet
 moduleSetElts   :: ModuleSet -> [Module]
 elemModuleSet   :: Module -> ModuleSet -> Bool
 
-emptyModuleSet    = Map.empty
-mkModuleSet ms    = Map.fromList [(m,()) | m <- ms ]
-extendModuleSet s m = Map.insert m () s
-moduleSetElts     = Map.keys
-elemModuleSet     = Map.member
+emptyModuleSet    = Set.empty
+mkModuleSet       = Set.fromList
+extendModuleSet s m = Set.insert m s
+moduleSetElts     = Set.toList
+elemModuleSet     = Set.member
 
 {-
 A ModuleName has a Unique, so we can build mappings of these using
