@@ -34,7 +34,7 @@ module TcType (
 
   --------------------------------
   -- MetaDetails
-  UserTypeCtxt(..), pprUserTypeCtxt, pprSigCtxt, isSigMaybe,
+  UserTypeCtxt(..), pprUserTypeCtxt, isSigMaybe,
   TcTyVarDetails(..), pprTcTyVarDetails, vanillaSkolemTv, superSkolemTv,
   MetaDetails(Flexi, Indirect), MetaInfo(..),
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
@@ -563,20 +563,6 @@ pprUserTypeCtxt (ClassSCCtxt c)   = text "the super-classes of class" <+> quotes
 pprUserTypeCtxt SigmaCtxt         = text "the context of a polymorphic type"
 pprUserTypeCtxt (DataTyCtxt tc)   = text "the context of the data type declaration for" <+> quotes (ppr tc)
 pprUserTypeCtxt (PatSynCtxt n)    = text "the signature for pattern synonym" <+> quotes (ppr n)
-
-pprSigCtxt :: UserTypeCtxt -> SDoc -> SDoc
--- (pprSigCtxt ctxt <extra> <type>)
--- prints    In the type signature for 'f':
---              f :: <type>
--- The <extra> is either empty or "the ambiguity check for"
-pprSigCtxt ctxt pp_ty
-  | Just n <- isSigMaybe ctxt
-  = hang (text "In the type signature:")
-       2 (pprPrefixOcc n <+> dcolon <+> pp_ty)
-
-  | otherwise
-  = hang (text "In" <+> pprUserTypeCtxt ctxt <> colon)
-       2 pp_ty
 
 isSigMaybe :: UserTypeCtxt -> Maybe Name
 isSigMaybe (FunSigCtxt n _) = Just n

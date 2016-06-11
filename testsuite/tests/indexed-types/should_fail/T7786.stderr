@@ -1,16 +1,4 @@
 
-T7786.hs:86:22: error:
-    • Couldn't match type ‘xxx’ with ‘'Empty’
-      Inaccessible code in
-        a pattern with constructor: Nil :: forall a. Sing 'Empty,
-        in a pattern binding in
-             'do' block
-    • In the pattern: Nil
-      In the pattern: Nil :: Sing xxx
-      In a stmt of a 'do' block:
-        Nil :: Sing xxx <- return
-                             (buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db)
-
 T7786.hs:86:49: error:
     • Couldn't match type ‘xxx’
                      with ‘Intersect (BuriedUnder sub k 'Empty) inv’
@@ -21,6 +9,32 @@ T7786.hs:86:49: error:
       In a stmt of a 'do' block:
         Nil :: Sing xxx <- return
                              (buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db)
+      In the expression:
+        do { Nil :: Sing xxx <- return
+                                  (buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db);
+             return $ Sub db k sub }
+    • Relevant bindings include
+        sub :: Database sub (bound at T7786.hs:86:13)
+        k :: Sing k (bound at T7786.hs:86:11)
+        db :: Database inv (bound at T7786.hs:86:8)
+        addSub :: Database inv
+                  -> Sing k
+                  -> Database sub
+                  -> Maybe (Database (BuriedUnder sub k inv))
+          (bound at T7786.hs:86:1)
+
+T7786.hs:90:31: error:
+    • Could not deduce: Intersect (BuriedUnder sub k 'Empty) inv
+                        ~
+                        'Empty
+        arising from a use of ‘Sub’
+      from the context: xxx ~ 'Empty
+        bound by a pattern with constructor: Nil :: forall a. Sing 'Empty,
+                 in a pattern binding in
+                      'do' block
+        at T7786.hs:86:22-24
+    • In the second argument of ‘($)’, namely ‘Sub db k sub’
+      In a stmt of a 'do' block: return $ Sub db k sub
       In the expression:
         do { Nil :: Sing xxx <- return
                                   (buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db);

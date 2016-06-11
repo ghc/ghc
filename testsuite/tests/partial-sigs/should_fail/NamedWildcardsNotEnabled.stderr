@@ -4,7 +4,7 @@ NamedWildcardsNotEnabled.hs:4:9: error:
       ‘_b’ is a rigid type variable bound by
         the type signature for:
           foo :: forall _a _b. _a -> _b
-        at NamedWildcardsNotEnabled.hs:3:8
+        at NamedWildcardsNotEnabled.hs:3:1-15
     • In the expression: not x
       In an equation for ‘foo’: foo x = not x
     • Relevant bindings include
@@ -15,7 +15,7 @@ NamedWildcardsNotEnabled.hs:4:13: error:
       ‘_a’ is a rigid type variable bound by
         the type signature for:
           foo :: forall _a _b. _a -> _b
-        at NamedWildcardsNotEnabled.hs:3:8
+        at NamedWildcardsNotEnabled.hs:3:1-15
     • In the first argument of ‘not’, namely ‘x’
       In the expression: not x
       In an equation for ‘foo’: foo x = not x

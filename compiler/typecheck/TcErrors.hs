@@ -1545,7 +1545,7 @@ suggestAddSig ctxt ty1 ty2
     inferred_bndrs = nub (get_inf ty1 ++ get_inf ty2)
     get_inf ty | Just tv <- tcGetTyVar_maybe ty
                , isSkolemTyVar tv
-               , (_, InferSkol prs) <- getSkolemInfo (cec_encl ctxt) tv
+               , InferSkol prs <- ic_info (getSkolemInfo (cec_encl ctxt) tv)
                = map fst prs
                | otherwise
                = []
@@ -2477,17 +2477,18 @@ mkAmbigMsg prepend_msg ct
 
 pprSkol :: [Implication] -> TcTyVar -> SDoc
 pprSkol implics tv
-  | (skol_tvs, skol_info) <- getSkolemInfo implics tv
   = case skol_info of
-      UnkSkol         -> pp_tv <+> text "is an unknown type variable"
+      UnkSkol         -> quotes (ppr tv) <+> text "is an unknown type variable"
       SigSkol ctxt ty -> ppr_rigid (pprSigSkolInfo ctxt
                                       (mkSpecForAllTys skol_tvs ty))
       _               -> ppr_rigid (pprSkolInfo skol_info)
   where
-    pp_tv = quotes (ppr tv)
-    ppr_rigid pp_info = hang (pp_tv <+> text "is a rigid type variable bound by")
-                           2 (sep [ pp_info
-                                  , text "at" <+> ppr (getSrcLoc tv) ])
+    Implic { ic_skols = skol_tvs, ic_info = skol_info }
+       = getSkolemInfo implics tv
+    ppr_rigid pp_info
+       = hang (quotes (ppr tv) <+> text "is a rigid type variable bound by")
+            2 (sep [ pp_info
+                   , text "at" <+> ppr (getSrcSpan tv) ])
 
 getAmbigTkvs :: Ct -> ([Var],[Var])
 getAmbigTkvs ct
@@ -2497,15 +2498,14 @@ getAmbigTkvs ct
     ambig_tkvs = filter isAmbiguousTyVar tkvs
     dep_tkv_set = tyCoVarsOfTypes (map tyVarKind tkvs)
 
-getSkolemInfo :: [Implication] -> TcTyVar -> ([TcTyVar], SkolemInfo)
+getSkolemInfo :: [Implication] -> TcTyVar -> Implication
 -- Get the skolem info for a type variable
 -- from the implication constraint that binds it
 getSkolemInfo [] tv
   = pprPanic "No skolem info:" (ppr tv)
 
 getSkolemInfo (implic:implics) tv
-  | let skols = ic_skols implic
-  , tv `elem` ic_skols implic = (skols, ic_info implic)
+  | tv `elem` ic_skols implic = implic
   | otherwise                 = getSkolemInfo implics tv
 
 -----------------------

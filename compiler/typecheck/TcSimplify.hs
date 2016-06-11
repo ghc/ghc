@@ -516,7 +516,7 @@ the let binding.
 
 simplifyInfer :: TcLevel               -- Used when generating the constraints
               -> Bool                  -- Apply monomorphism restriction
-              -> [TcIdSigInfo]         -- Any signatures (possibly partial)
+              -> [TcIdSigInst]         -- Any signatures (possibly partial)
               -> [(Name, TcTauType)]   -- Variables to be generalised,
                                        -- and their tau-types
               -> WantedConstraints
@@ -540,8 +540,8 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
              , text "(unzonked) wanted =" <+> ppr wanteds
              ]
 
-       ; let partial_sigs  = filter isPartialSig sigs
-             psig_theta    = concatMap sig_theta partial_sigs
+       ; let partial_sigs = filter isPartialSig sigs
+             psig_theta   = concatMap sig_inst_theta partial_sigs
 
        -- First do full-blown solving
        -- NB: we must gather up all the bindings from doing
@@ -654,8 +654,13 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
 
            -- Emit an implication constraint for the
            -- remaining constraints from the RHS
+           -- extra_qtvs: see Note [Quantification and partial signatures]
        ; bound_theta_vars <- mapM TcM.newEvVar bound_theta
        ; psig_theta_vars  <- mapM zonkId psig_theta_vars
+       ; all_qtvs         <- add_psig_tvs qtvs
+                             [ tv | sig <- partial_sigs
+                                  , (_,tv) <- sig_inst_skols sig ]
+
        ; let full_theta      = psig_theta      ++ bound_theta
              full_theta_vars = psig_theta_vars ++ bound_theta_vars
              skol_info   = InferSkol [ (name, mkSigmaTy [] full_theta ty)
@@ -664,13 +669,8 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
                         -- they are also bound in ic_skols and we want them
                         -- to be tidied uniformly
 
-             -- extra_qtvs: see Note [Quantification and partial signatures]
-             extra_qtvs = [ tv | sig <- partial_sigs
-                               , (_, tv) <- sig_skols sig
-                               , not (tv `elem` qtvs) ]
-
              implic = Implic { ic_tclvl    = rhs_tclvl
-                             , ic_skols    = extra_qtvs ++ qtvs
+                             , ic_skols    = all_qtvs
                              , ic_no_eqs   = False
                              , ic_given    = full_theta_vars
                              , ic_wanted   = wanted_transformed
@@ -691,6 +691,16 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
               , text "implic =" <+> ppr implic ]
 
        ; return ( qtvs, full_theta_vars, TcEvBinds ev_binds_var ) }
+  where
+    add_psig_tvs qtvs [] = return qtvs
+    add_psig_tvs qtvs (tv:tvs)
+      = do { tv <- zonkTcTyVarToTyVar tv
+           ; if tv `elem` qtvs
+             then add_psig_tvs qtvs tvs
+             else do { mb_tv <- zonkQuantifiedTyVar False tv
+                     ; case mb_tv of
+                         Nothing -> add_psig_tvs qtvs      tvs
+                         Just tv -> add_psig_tvs (tv:qtvs) tvs } }
 
 {- Note [Add signature contexts as givens]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -727,6 +737,7 @@ type signatures.
 Note [Deciding quantification]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If the monomorphism restriction does not apply, then we quantify as follows:
+
   * Take the global tyvars, and "grow" them using the equality constraints
     E.g.  if x:alpha is in the environment, and alpha ~ [beta] (which can
           happen because alpha is untouchable here) then do not quantify over
@@ -759,7 +770,8 @@ decideQuantification
   -> TcM ( [TcTyVar]       -- Quantify over these (skolems)
          , [PredType] )    -- and this context (fully zonked)
 -- See Note [Deciding quantification]
-decideQuantification apply_mr name_taus psig_theta constraints
+decideQuantification apply_mr name_taus psig_theta candidates
+{-
   | apply_mr     -- Apply the Monomorphism restriction
   = do { gbl_tvs <- tcGetGlobalTyCoVars
        ; zonked_taus <- mapM TcM.zonkTcType (psig_theta ++ taus)
@@ -788,30 +800,51 @@ decideQuantification apply_mr name_taus psig_theta constraints
        ; return (qtvs, []) }
 
   | otherwise
+-}
   = do { gbl_tvs <- tcGetGlobalTyCoVars
        ; zonked_taus <- mapM TcM.zonkTcType (psig_theta ++ taus)
                         -- psig_theta: see Note [Quantification and partial signatures]
        ; let DV { dv_kvs = zkvs, dv_tvs = ztvs} = splitDepVarsOfTypes zonked_taus
-             mono_tvs     = growThetaTyVars equality_constraints gbl_tvs
-             tau_tvs_plus = growThetaTyVarsDSet constraints ztvs
-             dvs_plus     = DV { dv_kvs = zkvs, dv_tvs = tau_tvs_plus }
+             (gbl_cand, quant_cand)  -- gbl_cand   = do not quantify me
+                = case apply_mr of   -- quant_cand = try to quantify me
+                    True  -> (candidates, [])
+                    False -> ([], candidates)
+             zonked_tkvs     = dVarSetToVarSet zkvs `unionVarSet` dVarSetToVarSet ztvs
+             eq_constraints  = filter isEqPred quant_cand
+             constrained_tvs = tyCoVarsOfTypes gbl_cand
+             mono_tvs        = growThetaTyVars eq_constraints $
+                               gbl_tvs `unionVarSet` constrained_tvs
+             tau_tvs_plus    = growThetaTyVarsDSet quant_cand ztvs
+             dvs_plus        = DV { dv_kvs = zkvs, dv_tvs = tau_tvs_plus }
+
        ; qtvs <- quantifyZonkedTyVars mono_tvs dvs_plus
           -- We don't grow the kvs, as there's no real need to. Recall
           -- that quantifyTyVars uses the separation between kvs and tvs
           -- only for defaulting, and we don't want (ever) to default a tv
           -- to *. So, don't grow the kvs.
 
-       ; constraints <- TcM.zonkTcTypes constraints
+       ; quant_cand <- TcM.zonkTcTypes quant_cand
                  -- quantifyTyVars turned some meta tyvars into
                  -- quantified skolems, so we have to zonk again
 
        ; let qtv_set   = mkVarSet qtvs
-             theta     = pickQuantifiablePreds qtv_set constraints
+             theta     = pickQuantifiablePreds qtv_set quant_cand
              min_theta = mkMinimalBySCs theta
                -- See Note [Minimize by Superclasses]
 
+           -- Warn about the monomorphism restriction
+       ; warn_mono <- woptM Opt_WarnMonomorphism
+       ; let mr_bites = constrained_tvs `intersectsVarSet` zonked_tkvs
+       ; warnTc (Reason Opt_WarnMonomorphism) (warn_mono && mr_bites) $
+         hang (text "The Monomorphism Restriction applies to the binding"
+               <> plural bndrs <+> text "for" <+> pp_bndrs)
+             2 (text "Consider giving a type signature for"
+                <+> if isSingleton bndrs then pp_bndrs
+                                         else text "these binders")
+
        ; traceTc "decideQuantification 2"
-           (vcat [ text "constraints:"  <+> ppr constraints
+           (vcat [ text "gbl_cand:"     <+> ppr gbl_cand
+                 , text "quant_cand:"   <+> ppr quant_cand
                  , text "gbl_tvs:"      <+> ppr gbl_tvs
                  , text "mono_tvs:"     <+> ppr mono_tvs
                  , text "tau_tvs_plus:" <+> ppr tau_tvs_plus
@@ -820,7 +853,6 @@ decideQuantification apply_mr name_taus psig_theta constraints
        ; return (qtvs, min_theta) }
   where
     pp_bndrs = pprWithCommas (quotes . ppr) bndrs
-    equality_constraints = filter isEqPred constraints
     (bndrs, taus) = unzip name_taus
 
 ------------------

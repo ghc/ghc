@@ -453,14 +453,18 @@ newUniqueSupply
         writeMutVar u_var us1 ;
         return us2 }}}
 
-newLocalName :: Name -> TcM Name
-newLocalName name = newName (nameOccName name)
+cloneLocalName :: Name -> TcM Name
+-- Make a fresh Internal name with the same OccName and SrcSpan
+cloneLocalName name = newNameAt (nameOccName name) (nameSrcSpan name)
 
 newName :: OccName -> TcM Name
-newName occ
+newName occ = do { loc  <- getSrcSpanM
+                 ; newNameAt occ loc }
+
+newNameAt :: OccName -> SrcSpan -> TcM Name
+newNameAt occ span
   = do { uniq <- newUnique
-       ; loc  <- getSrcSpanM
-       ; return (mkInternalName uniq occ loc) }
+       ; return (mkInternalName uniq occ span) }
 
 newSysName :: OccName -> TcRnIf gbl lcl Name
 newSysName occ
@@ -1274,6 +1278,13 @@ emitInsoluble ct
          v <- readTcRef lie_var ;
          traceTc "emitInsoluble" (ppr v) }
 
+emitInsolubles :: [Ct] -> TcM ()
+emitInsolubles cts
+  = do { lie_var <- getConstraintVar ;
+         updTcRef lie_var (`addInsols` listToBag cts) ;
+         v <- readTcRef lie_var ;
+         traceTc "emitInsoluble" (ppr v) }
+
 -- | Throw out any constraints emitted by the thing_inside
 discardConstraints :: TcM a -> TcM a
 discardConstraints thing_inside = fst <$> captureConstraints thing_inside
@@ -1344,19 +1355,21 @@ traceTcConstraints msg
 
 emitWildCardHoleConstraints :: [(Name, TcTyVar)] -> TcM ()
 emitWildCardHoleConstraints wcs
-  = do { ctLoc <- getCtLocM HoleOrigin Nothing
-       ; forM_ wcs $ \(name, tv) -> do {
-       ; let real_span = case nameSrcSpan name of
+  = do { ct_loc <- getCtLocM HoleOrigin Nothing
+       ; emitInsolubles (map (do_one ct_loc) wcs) }
+  where
+    do_one :: CtLoc -> (Name, TcTyVar) -> Ct
+    do_one ct_loc (name, tv)
+       = CHoleCan { cc_ev = CtDerived { ctev_pred = mkTyVarTy tv
+                                      , ctev_loc  = ct_loc' }
+                  , cc_hole = TypeHole (occName name) }
+       where
+         real_span = case nameSrcSpan name of
                            RealSrcSpan span  -> span
                            UnhelpfulSpan str -> pprPanic "emitWildCardHoleConstraints"
                                                       (ppr name <+> quotes (ftext str))
                -- Wildcards are defined locally, and so have RealSrcSpans
-             ctLoc' = setCtLocSpan ctLoc real_span
-             ty     = mkTyVarTy tv
-             can    = CHoleCan { cc_ev   = CtDerived { ctev_pred = ty
-                                                     , ctev_loc  = ctLoc' }
-                               , cc_hole = TypeHole (occName name) }
-       ; emitInsoluble can } }
+         ct_loc' = setCtLocSpan ct_loc real_span
 
 {-
 ************************************************************************

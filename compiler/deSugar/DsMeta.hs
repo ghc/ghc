@@ -189,8 +189,8 @@ hsSigTvBinders binds
     --    here 'k' scopes too
     get_scoped_tvs (L _ (TypeSig _ sig))
        | HsIB { hsib_vars = implicit_vars
-              , hsib_body = sig1 } <- sig
-       , (explicit_vars, _) <- splitLHsForAllTy (hswc_body sig1)
+              , hsib_body = hs_ty } <- hswc_body sig
+       , (explicit_vars, _) <- splitLHsForAllTy hs_ty
        = implicit_vars ++ map hsLTyVarName explicit_vars
     get_scoped_tvs _ = []
 
@@ -567,7 +567,7 @@ repRuleD (L loc (HsRule n act bndrs lhs _ rhs _))
 ruleBndrNames :: LRuleBndr Name -> [Name]
 ruleBndrNames (L _ (RuleBndr n))      = [unLoc n]
 ruleBndrNames (L _ (RuleBndrSig n sig))
-  | HsIB { hsib_vars = vars } <- sig
+  | HsWC { hswc_body = HsIB { hsib_vars = vars }} <- sig
   = unLoc n : vars
 
 repRuleBndr :: LRuleBndr Name -> DsM (Core TH.RuleBndrQ)
@@ -735,8 +735,8 @@ rep_wc_ty_sig :: Name -> SrcSpan -> LHsSigWcType Name -> Located Name
     -- We must special-case the top-level explicit for-all of a TypeSig
     -- See Note [Scoped type variables in bindings]
 rep_wc_ty_sig mk_sig loc sig_ty nm
-  | HsIB { hsib_vars = implicit_tvs, hsib_body = sig1 } <- sig_ty
-  , (explicit_tvs, ctxt, ty) <- splitLHsSigmaTy (hswc_body sig1)
+  | HsIB { hsib_vars = implicit_tvs, hsib_body = hs_ty } <- hswc_body sig_ty
+  , (explicit_tvs, ctxt, ty) <- splitLHsSigmaTy hs_ty
   = do { nm1 <- lookupLOcc nm
        ; let rep_in_scope_tv tv = do { name <- lookupBinder (hsLTyVarName tv)
                                      ; repTyVarBndrWithKind tv name }
@@ -917,8 +917,8 @@ repHsPatSynSigType (HsIB { hsib_vars = implicit_tvs
     (univs, reqs, exis, provs, ty) = splitLHsPatSynTy body
 
 repHsSigWcType :: LHsSigWcType Name -> DsM (Core TH.TypeQ)
-repHsSigWcType ib_ty@(HsIB { hsib_body = sig1 })
-  = repHsSigType (ib_ty { hsib_body = hswc_body sig1 })
+repHsSigWcType (HsWC { hswc_body = sig1 })
+  = repHsSigType sig1
 
 -- yield the representation of a list of types
 repLTys :: [LHsType Name] -> DsM [Core TH.TypeQ]

@@ -15,7 +15,6 @@ module DsMonad (
         foldlM, foldrM, whenGOptM, unsetGOptM, unsetWOptM,
         Applicative(..),(<$>),
 
-        newLocalName,
         duplicateLocalDs, newSysLocalDs, newSysLocalsDs, newUniqueId,
         newFailLocalDs, newPredVarDs,
         getSrcSpanDs, putSrcSpanDs,

@@ -6,7 +6,7 @@ T4174.hs:42:12: error:
           testcase :: forall (m :: * -> *) minor n t p a b.
                       Monad m =>
                       m (Field (Way (GHC6'8 minor) n t p) a b)
-        at T4174.hs:41:13
+        at T4174.hs:41:1-63
       Expected type: m (Field (Way (GHC6'8 minor) n t p) a b)
         Actual type: m (Field (WayOf m) SmStep RtsSpinLock)
     • In the expression: sync_large_objects

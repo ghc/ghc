@@ -1,9 +1,9 @@
 
-T11399.hs:7:32: error:
+T11399.hs:10:32: error:
     • Couldn't match kind ‘*’ with ‘GHC.Types.RuntimeRep’
       When matching kinds
-        k :: * -> *
+        a :: * -> *
         TYPE :: GHC.Types.RuntimeRep -> *
-      Expected kind ‘* -> *’, but ‘UhOh k’ has kind ‘k * -> *’
-    • In the first argument of ‘Functor’, namely ‘UhOh k’
-      In the instance declaration for ‘Functor (UhOh k)’
+      Expected kind ‘* -> *’, but ‘UhOh a’ has kind ‘a * -> *’
+    • In the first argument of ‘Functor’, namely ‘UhOh a’
+      In the instance declaration for ‘Functor (UhOh a)’

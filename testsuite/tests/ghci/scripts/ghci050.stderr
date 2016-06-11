@@ -3,7 +3,7 @@
     • Couldn't match expected type ‘ListableElem (a, a)’
                   with actual type ‘a’
       ‘a’ is a rigid type variable bound by
-        the instance declaration at <interactive>:5:10
+        the instance declaration at <interactive>:5:10-23
     • In the expression: a
       In the expression: [a, b]
       In an equation for ‘asList’: asList (a, b) = [a, b]

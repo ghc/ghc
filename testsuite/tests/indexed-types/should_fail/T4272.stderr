@@ -4,7 +4,7 @@ T4272.hs:15:26: error:
       ‘a’ is a rigid type variable bound by
         the type signature for:
           laws :: forall a b. TermLike a => TermFamily a a -> b
-        at T4272.hs:14:16
+        at T4272.hs:14:1-53
       Expected type: TermFamily a (TermFamily a a)
         Actual type: TermFamily a a
     • In the first argument of ‘terms’, namely

@@ -5,7 +5,7 @@ tcfail198.hs:6:36: error:
       This (rigid, skolem) type variable is bound by
         an expression type signature:
           a1
-        at tcfail198.hs:6:36-41
+        at tcfail198.hs:6:41
     • In the expression: x :: a
       In the second argument of ‘(++)’, namely ‘[x :: a]’
       In the expression: xs ++ [x :: a]

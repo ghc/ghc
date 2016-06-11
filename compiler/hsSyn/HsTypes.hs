@@ -288,16 +288,12 @@ data HsWildCardBndrs name thing
     -- See Note [The wildcard story for types]
   = HsWC { hswc_wcs :: PostRn name [Name]
                 -- Wild cards, both named and anonymous
+                -- after the renamer
 
-         , hswc_ctx :: Maybe SrcSpan
-                -- Indicates whether hswc_body has an
-                -- extra-constraint wildcard, and if so where
-                --    e.g.  (Eq a, _) => a -> a
-                -- NB: the wildcard stays in HsQualTy inside the type!
-                -- So for pretty printing purposes you can ignore
-                -- hswc_ctx
-
-         , hswc_body :: thing  -- Main payload (type or list of types)
+         , hswc_body :: thing
+                -- Main payload (type or list of types)
+                -- If there is an extra-constraints wildcard,
+                -- it's still there in the hsc_body.
     }
 
 deriving instance (Data name, Data thing, Data (PostRn name [Name]))
@@ -308,7 +304,7 @@ deriving instance (Data name, Data thing, Data (PostRn name [Name]))
 
 type LHsSigType   name = HsImplicitBndrs name (LHsType name)    -- Implicit only
 type LHsWcType    name = HsWildCardBndrs name (LHsType name)    -- Wildcard only
-type LHsSigWcType name = HsImplicitBndrs name (LHsWcType name)  -- Both
+type LHsSigWcType name = HsWildCardBndrs name (LHsSigType name) -- Both
 
 -- See Note [Representing type signatures]
 
@@ -319,11 +315,11 @@ hsSigType :: LHsSigType name -> LHsType name
 hsSigType = hsImplicitBody
 
 hsSigWcType :: LHsSigWcType name -> LHsType name
-hsSigWcType sig_ty = hswc_body (hsib_body sig_ty)
+hsSigWcType sig_ty = hsib_body (hswc_body sig_ty)
 
 dropWildCards :: LHsSigWcType name -> LHsSigType name
 -- Drop the wildcard part of a LHsSigWcType
-dropWildCards sig_ty = sig_ty { hsib_body = hsSigWcType sig_ty }
+dropWildCards sig_ty = hswc_body sig_ty
 
 {- Note [Representing type signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -351,8 +347,7 @@ mkHsImplicitBndrs x = HsIB { hsib_body = x
 
 mkHsWildCardBndrs :: thing -> HsWildCardBndrs RdrName thing
 mkHsWildCardBndrs x = HsWC { hswc_body = x
-                           , hswc_wcs  = PlaceHolder
-                           , hswc_ctx  = Nothing }
+                           , hswc_wcs  = PlaceHolder }
 
 -- Add empty binders.  This is a bit suspicious; what if
 -- the wrapped thing had free type variables?
@@ -362,8 +357,7 @@ mkEmptyImplicitBndrs x = HsIB { hsib_body = x
 
 mkEmptyWildCardBndrs :: thing -> HsWildCardBndrs Name thing
 mkEmptyWildCardBndrs x = HsWC { hswc_body = x
-                              , hswc_wcs  = []
-                              , hswc_ctx  = Nothing }
+                              , hswc_wcs  = [] }
 
 
 --------------------------------------------------
@@ -789,8 +783,8 @@ hsWcScopedTvs :: LHsSigWcType Name -> [Name]
 --  - the named wildcars; see Note [Scoping of named wildcards]
 -- because they scope in the same way
 hsWcScopedTvs sig_ty
-  | HsIB { hsib_vars = vars, hsib_body = sig_ty1 } <- sig_ty
-  , HsWC { hswc_wcs = nwcs, hswc_body = sig_ty2 } <- sig_ty1
+  | HsWC { hswc_wcs = nwcs, hswc_body = sig_ty1 }  <- sig_ty
+  , HsIB { hsib_vars = vars, hsib_body = sig_ty2 } <- sig_ty1
   = case sig_ty2 of
       L _ (HsForAllTy { hst_bndrs = tvs }) -> vars ++ nwcs ++
                                               map hsLTyVarName tvs
@@ -1237,10 +1231,10 @@ ppr_mono_ty _    (HsPArrTy ty)       = paBrackets (ppr_mono_lty TopPrec ty)
 ppr_mono_ty prec (HsIParamTy n ty)   = maybeParen prec FunPrec (ppr n <+> dcolon <+> ppr_mono_lty TopPrec ty)
 ppr_mono_ty _    (HsSpliceTy s _)    = pprSplice s
 ppr_mono_ty _    (HsCoreTy ty)       = ppr ty
-ppr_mono_ty _    (HsExplicitListTy _ tys) = quote $ brackets (interpp'SP tys)
+ppr_mono_ty _    (HsExplicitListTy _ tys)  = quote $ brackets (interpp'SP tys)
 ppr_mono_ty _    (HsExplicitTupleTy _ tys) = quote $ parens (interpp'SP tys)
 ppr_mono_ty _    (HsTyLit t)         = ppr_tylit t
-ppr_mono_ty _    (HsWildCardTy (AnonWildCard _))     = char '_'
+ppr_mono_ty _    (HsWildCardTy {})   = char '_'
 
 ppr_mono_ty ctxt_prec (HsEqTy ty1 ty2)
   = maybeParen ctxt_prec TyOpPrec $

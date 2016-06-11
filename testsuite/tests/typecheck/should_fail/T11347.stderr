@@ -5,7 +5,7 @@ T11347.hs:6:41: error:
           from type ‘Id1 a -> Discern (Id1 a) b’
             to type ‘Id2 a -> Discern (Id2 a) b’
       ‘a’ is a rigid type variable bound by
-        the deriving clause for ‘UnsafeCast b (Id2 a)’ at T11347.hs:6:41
+        the deriving clause for ‘UnsafeCast b (Id2 a)’ at T11347.hs:6:41-52
       ‘b’ is a rigid type variable bound by
-        the deriving clause for ‘UnsafeCast b (Id2 a)’ at T11347.hs:6:41
+        the deriving clause for ‘UnsafeCast b (Id2 a)’ at T11347.hs:6:41-52
     • When deriving the instance for (UnsafeCast b (Id2 a))

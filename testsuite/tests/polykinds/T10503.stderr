@@ -8,7 +8,7 @@ T10503.hs:8:6: error:
       ‘k’ is a rigid type variable bound by
         the type signature for:
           h :: forall k r. (Proxy 'KProxy ~ Proxy 'KProxy => r) -> r
-        at T10503.hs:8:6
+        at T10503.hs:8:6-85
     • In the ambiguity check for ‘h’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       In the type signature:

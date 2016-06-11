@@ -6,7 +6,7 @@ T3330a.hs:19:34: error:
         the type signature for:
           children :: forall (s :: * -> *) ix (r :: * -> *).
                       s ix -> PF s r ix -> [AnyF s]
-        at T3330a.hs:18:13
+        at T3330a.hs:18:1-43
       Expected type: (s0 ix0 -> ix1)
                      -> r ix1 -> Writer [AnyF s] (r'0 ix1)
         Actual type: s ix
@@ -25,7 +25,7 @@ T3330a.hs:19:44: error:
         the type signature for:
           children :: forall (s :: * -> *) ix (r :: * -> *).
                       s ix -> PF s r ix -> [AnyF s]
-        at T3330a.hs:18:13
+        at T3330a.hs:18:1-43
       Expected type: PF s r (r0 ix0 -> Writer [AnyF s0] (r0 ix0))
         Actual type: PF s r ix
     • In the third argument of ‘hmapM’, namely ‘x’

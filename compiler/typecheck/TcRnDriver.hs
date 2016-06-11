@@ -1943,17 +1943,15 @@ tcGhciStmts stmts
 getGhciStepIO :: TcM (LHsExpr Name)
 getGhciStepIO = do
     ghciTy <- getGHCiMonad
-    fresh_a <- newUnique
-    loc     <- getSrcSpanM
-    let a_tv    = mkInternalName fresh_a (mkTyVarOccFS (fsLit "a")) loc
-        ghciM   = nlHsAppTy (nlHsTyVar ghciTy) (nlHsTyVar a_tv)
+    a_tv <- newName (mkTyVarOccFS (fsLit "a"))
+    let ghciM   = nlHsAppTy (nlHsTyVar ghciTy) (nlHsTyVar a_tv)
         ioM     = nlHsAppTy (nlHsTyVar ioTyConName) (nlHsTyVar a_tv)
 
         step_ty = noLoc $ HsForAllTy { hst_bndrs = [noLoc $ UserTyVar (noLoc a_tv)]
                                      , hst_body  = nlHsFunTy ghciM ioM }
 
         stepTy :: LHsSigWcType Name
-        stepTy = mkEmptyImplicitBndrs (mkEmptyWildCardBndrs step_ty)
+        stepTy = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs step_ty)
 
     return (noLoc $ ExprWithTySig (nlHsVar ghciStepIoMName) stepTy)
 

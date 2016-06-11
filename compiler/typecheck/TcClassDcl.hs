@@ -20,8 +20,8 @@ module TcClassDcl ( tcClassSigs, tcClassDecl2,
 
 import HsSyn
 import TcEnv
-import TcPat( addInlinePrags, lookupPragEnv, emptyPragEnv )
-import TcEvidence( idHsWrapper )
+import TcSigs
+import TcEvidence ( idHsWrapper )
 import TcBinds
 import TcUnify
 import TcHsType
@@ -152,10 +152,10 @@ tcClassSigs clas sigs def_methods
 tcClassDecl2 :: LTyClDecl Name          -- The class declaration
              -> TcM (LHsBinds Id)
 
-tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
+tcClassDecl2 (L _ (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
                                 tcdMeths = default_binds}))
   = recoverM (return emptyLHsBinds)     $
-    setSrcSpan loc                      $
+    setSrcSpan (getLoc class_name)      $
     do  { clas <- tcLookupLocatedClass class_name
 
         -- We make a separate binding for each default method.
@@ -203,7 +203,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
   = do { -- First look up the default method -- It should be there!
          global_dm_id  <- tcLookupId dm_name
        ; global_dm_id  <- addInlinePrags global_dm_id prags
-       ; local_dm_name <- setSrcSpan bndr_loc (newLocalName sel_name)
+       ; local_dm_name <- newNameAt (getOccName sel_name) bndr_loc
             -- Base the local_dm_name on the selector name, because
             -- type errors from tcInstanceMethodBody come from here
 
@@ -241,26 +241,27 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
 
              ctxt = FunSigCtxt sel_name warn_redundant
 
-       ; local_dm_sig <- instTcTySig ctxt hs_ty local_dm_ty local_dm_name
-        ; (ev_binds, (tc_bind, _))
+       ; let local_dm_id = mkLocalId local_dm_name local_dm_ty
+             local_dm_sig = CompleteSig { sig_bndr = local_dm_id
+                                        , sig_ctxt  = ctxt
+                                        , sig_loc   = getLoc (hsSigType hs_ty) }
+
+       ; (ev_binds, (tc_bind, _))
                <- checkConstraints (ClsSkol clas) tyvars [this_dict] $
-                  tcPolyCheck NonRecursive no_prag_fn local_dm_sig
+                  tcPolyCheck no_prag_fn local_dm_sig
                               (L bind_loc lm_bind)
 
-        ; let export = ABE { abe_poly      = global_dm_id
-                           -- We have created a complete type signature in
-                           -- instTcTySig, hence it is safe to call
-                           -- completeSigPolyId
-                           , abe_mono      = completeIdSigPolyId local_dm_sig
-                           , abe_wrap      = idHsWrapper
-                           , abe_prags     = IsDefaultMethod }
-              full_bind = AbsBinds { abs_tvs      = tyvars
-                                   , abs_ev_vars  = [this_dict]
-                                   , abs_exports  = [export]
-                                   , abs_ev_binds = [ev_binds]
-                                   , abs_binds    = tc_bind }
+       ; let export = ABE { abe_poly   = global_dm_id
+                           , abe_mono  = local_dm_id
+                           , abe_wrap  = idHsWrapper
+                           , abe_prags = IsDefaultMethod }
+             full_bind = AbsBinds { abs_tvs      = tyvars
+                                  , abs_ev_vars  = [this_dict]
+                                  , abs_exports  = [export]
+                                  , abs_ev_binds = [ev_binds]
+                                  , abs_binds    = tc_bind }
 
-        ; return (unitBag (L bind_loc full_bind)) }
+       ; return (unitBag (L bind_loc full_bind)) }
 
   | otherwise = pprPanic "tcDefMeth" (ppr sel_id)
   where

@@ -1,33 +1,33 @@
 
 T10267.hs:8:1: error:
-    • Found hole: _ :: a0
-      Where: ‘a0’ is a rigid type variable bound by
+    • Found hole: _ :: a
+      Where: ‘a’ is a rigid type variable bound by
                the type signature for:
-                 j :: forall a0. a0 -> a0
-               at T10267.hs:8:1
+                 j :: forall a. a -> a
+               at T10267.hs:(8,1)-(12,14)
     • In the expression: _
       In an equation for ‘j’: j x = _
     • Relevant bindings include
-        x :: a0 (bound at T10267.hs:8:1)
-        j :: a0 -> a0 (bound at T10267.hs:8:1)
+        x :: a (bound at T10267.hs:8:1)
+        j :: a -> a (bound at T10267.hs:8:1)
 
 T10267.hs:8:1: error:
-    • Found hole: _foo :: a0 -> a0
-      Where: ‘a0’ is a rigid type variable bound by
+    • Found hole: _foo :: a -> a
+      Where: ‘a’ is a rigid type variable bound by
                the type signature for:
-                 i :: forall a0. a0 -> a0
-               at T10267.hs:8:1
+                 i :: forall a. a -> a
+               at T10267.hs:(8,1)-(12,14)
       Or perhaps ‘_foo’ is mis-spelled, or not in scope
     • In the expression: _foo
       In an equation for ‘i’: i = _foo
-    • Relevant bindings include i :: a0 -> a0 (bound at T10267.hs:8:1)
+    • Relevant bindings include i :: a -> a (bound at T10267.hs:8:1)
 
 T10267.hs:14:3: error:
     • Found hole: _foo :: a -> a
       Where: ‘a’ is a rigid type variable bound by
                the type signature for:
                  k :: forall a. a -> a
-               at T10267.hs:14:3
+               at T10267.hs:(14,3)-(21,2)
       Or perhaps ‘_foo’ is mis-spelled, or not in scope
     • In the expression: _foo
       In an equation for ‘k’: k = _foo
@@ -38,7 +38,7 @@ T10267.hs:23:3: error:
       Where: ‘a’ is a rigid type variable bound by
                the type signature for:
                  l :: forall a. a -> a
-               at T10267.hs:23:3
+               at T10267.hs:(23,3)-(30,2)
     • In the expression: _
       In an equation for ‘l’: l x = _
     • Relevant bindings include

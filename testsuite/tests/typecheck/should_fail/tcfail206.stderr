@@ -18,7 +18,7 @@ tcfail206.hs:11:5: error:
       ‘a’ is a rigid type variable bound by
         the type signature for:
           c :: forall a. a -> (a, Bool)
-        at tcfail206.hs:10:6
+        at tcfail206.hs:10:1-19
       Expected type: a -> (a, Bool)
         Actual type: Bool -> (a, Bool)
     • In the expression: (True || False,)
@@ -46,7 +46,7 @@ tcfail206.hs:20:5: error:
       ‘a’ is a rigid type variable bound by
         the type signature for:
           f :: forall a. a -> (# a, Bool #)
-        at tcfail206.hs:19:6
+        at tcfail206.hs:19:1-21
       Expected type: a -> (# a, Bool #)
         Actual type: Bool -> (# a, Bool #)
     • In the expression: (# True || False, #)

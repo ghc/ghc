@@ -399,6 +399,7 @@ Library
         TcAnnotations
         TcArrows
         TcBinds
+        TcSigs
         TcClassDcl
         TcDefaults
         TcDeriv

@@ -1,5 +1,5 @@
 TYPE SIGNATURES
-  bar :: forall t t1. t1 -> (t1 -> t) -> t
+  bar :: forall w t. t -> (t -> w) -> w
   foo :: forall a. (Show a, Enum a) => a -> String
 TYPE CONSTRUCTORS
 COERCION AXIOMS
@@ -11,50 +11,40 @@ WarningWildcardInstantiations.hs:5:14: warning: [-Wpartial-type-signatures (in -
     • Found type wildcard ‘_a’ standing for ‘a’
       Where: ‘a’ is a rigid type variable bound by
                the inferred type of foo :: (Show a, Enum a) => a -> String
-               at WarningWildcardInstantiations.hs:6:1
+               at WarningWildcardInstantiations.hs:6:1-21
     • In the type signature: foo :: (Show _a, _) => _a -> _
-    • Relevant bindings include
-        foo :: a -> String (bound at WarningWildcardInstantiations.hs:6:1)
 
 WarningWildcardInstantiations.hs:5:18: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    Found constraint wildcard ‘_’ standing for ‘Enum a’
-    In the type signature: foo :: (Show _a, _) => _a -> _
+    • Found type wildcard ‘_’ standing for ‘Enum a’
+      Where: ‘a’ is a rigid type variable bound by
+               the inferred type of foo :: (Show a, Enum a) => a -> String
+               at WarningWildcardInstantiations.hs:6:1-21
+    • In the type signature: foo :: (Show _a, _) => _a -> _
 
 WarningWildcardInstantiations.hs:5:30: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘String’
     • In the type signature: foo :: (Show _a, _) => _a -> _
-    • Relevant bindings include
-        foo :: a -> String (bound at WarningWildcardInstantiations.hs:6:1)
 
 WarningWildcardInstantiations.hs:8:8: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘t1’
-      Where: ‘t1’ is a rigid type variable bound by
-               the inferred type of bar :: t1 -> (t1 -> t) -> t
-               at WarningWildcardInstantiations.hs:9:1
-    • In the type signature: bar :: _ -> _ -> _
-    • Relevant bindings include
-        bar :: t1 -> (t1 -> t) -> t
-          (bound at WarningWildcardInstantiations.hs:9:1)
-
-WarningWildcardInstantiations.hs:8:13: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘t1 -> t’
-      Where: ‘t’ is a rigid type variable bound by
-               the inferred type of bar :: t1 -> (t1 -> t) -> t
-               at WarningWildcardInstantiations.hs:9:1
-             ‘t1’ is a rigid type variable bound by
-               the inferred type of bar :: t1 -> (t1 -> t) -> t
-               at WarningWildcardInstantiations.hs:9:1
-    • In the type signature: bar :: _ -> _ -> _
-    • Relevant bindings include
-        bar :: t1 -> (t1 -> t) -> t
-          (bound at WarningWildcardInstantiations.hs:9:1)
-
-WarningWildcardInstantiations.hs:8:18: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘t’
       Where: ‘t’ is a rigid type variable bound by
-               the inferred type of bar :: t1 -> (t1 -> t) -> t
-               at WarningWildcardInstantiations.hs:9:1
+               the inferred type of bar :: t -> (t -> w) -> w
+               at WarningWildcardInstantiations.hs:9:1-13
     • In the type signature: bar :: _ -> _ -> _
-    • Relevant bindings include
-        bar :: t1 -> (t1 -> t) -> t
-          (bound at WarningWildcardInstantiations.hs:9:1)
+
+WarningWildcardInstantiations.hs:8:13: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘t -> w’
+      Where: ‘w’ is a rigid type variable bound by
+               the inferred type of bar :: t -> (t -> w) -> w
+               at WarningWildcardInstantiations.hs:9:1-13
+             ‘t’ is a rigid type variable bound by
+               the inferred type of bar :: t -> (t -> w) -> w
+               at WarningWildcardInstantiations.hs:9:1-13
+    • In the type signature: bar :: _ -> _ -> _
+
+WarningWildcardInstantiations.hs:8:18: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘w’
+      Where: ‘w’ is a rigid type variable bound by
+               the inferred type of bar :: t -> (t -> w) -> w
+               at WarningWildcardInstantiations.hs:9:1-13
+    • In the type signature: bar :: _ -> _ -> _

@@ -27,8 +27,8 @@ import TcRnMonad
 import TcUnify
 import BasicTypes
 import Inst
-import TcBinds          ( chooseInferredQuantifiers, tcLocalBinds
-                        , tcUserTypeSig, tcExtendTyVarEnvFromSig )
+import TcBinds          ( chooseInferredQuantifiers, tcLocalBinds )
+import TcSigs           ( tcUserTypeSig, tcInstSig )
 import TcSimplify       ( simplifyInfer )
 import FamInst          ( tcGetFamInstEnvs, tcLookupDataFamInst )
 import FamInstEnv       ( FamInstEnvs )
@@ -256,8 +256,9 @@ tcExpr e@(HsLamCase matches) res_ty
     match_ctxt = MC { mc_what = CaseAlt, mc_body = tcBody }
 
 tcExpr e@(ExprWithTySig expr sig_ty) res_ty
-  = do { sig_info <- checkNoErrs $  -- Avoid error cascade
-                     tcUserTypeSig sig_ty Nothing
+  = do { let loc = getLoc (hsSigWcType sig_ty)
+       ; sig_info <- checkNoErrs $  -- Avoid error cascade
+                     tcUserTypeSig loc sig_ty Nothing
        ; (expr', poly_ty) <- tcExprSig expr sig_info
        ; let expr'' = ExprWithTySigOut expr' sig_ty
        ; tcWrapResult e expr'' poly_ty res_ty }
@@ -880,12 +881,13 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
 
         ; (result_subst, con1_tvs') <- newMetaTyVars con1_tvs
         ; let result_inst_tys = mkTyVarTys con1_tvs'
+              init_subst = mkEmptyTCvSubst (getTCvInScope result_subst)
 
-        ; (scrut_subst, scrut_inst_tys) <- mapAccumLM mk_inst_ty emptyTCvSubst
+        ; (scrut_subst, scrut_inst_tys) <- mapAccumLM mk_inst_ty init_subst
                                                       (con1_tvs `zip` result_inst_tys)
 
         ; let rec_res_ty    = TcType.substTy result_subst con1_res_ty
-              scrut_ty      = TcType.substTyUnchecked scrut_subst con1_res_ty
+              scrut_ty      = TcType.substTy scrut_subst  con1_res_ty
               con1_arg_tys' = map (TcType.substTy result_subst) con1_arg_tys
 
         ; wrap_res <- tcSubTypeHR (exprCtOrigin expr)
@@ -1443,20 +1445,14 @@ in the other order, the extra signature in f2 is reqd.
 ********************************************************************* -}
 
 tcExprSig :: LHsExpr Name -> TcIdSigInfo -> TcM (LHsExpr TcId, TcType)
-tcExprSig expr sig@(TISI { sig_bndr  = s_bndr
-                         , sig_skols = skol_prs
-                         , sig_theta = theta
-                         , sig_tau   = tau })
-  | null skol_prs  -- Fast path when there is no quantification at all
-  , null theta
-  , CompleteSig {} <- s_bndr
-  = do { expr' <- tcPolyExprNC expr tau
-       ; return (expr', tau) }
-
-  | CompleteSig poly_id <- s_bndr
-  = do { given <- newEvVars theta
+tcExprSig expr (CompleteSig { sig_bndr = poly_id, sig_loc = loc })
+  = setSrcSpan loc $   -- Sets the location for the implication constraint
+    do { (tv_prs, theta, tau) <- tcInstType (tcInstSigTyVars loc) poly_id
+       ; given <- newEvVars theta
+       ; let skol_info = SigSkol ExprSigCtxt (mkPhiTy theta tau)
+             skol_tvs  = map snd tv_prs
        ; (ev_binds, expr') <- checkConstraints skol_info skol_tvs given $
-                              tcExtendTyVarEnvFromSig sig $
+                              tcExtendTyVarEnv2 tv_prs $
                               tcPolyExprNC expr tau
 
        ; let poly_wrap = mkWpTyLams   skol_tvs
@@ -1464,20 +1460,26 @@ tcExprSig expr sig@(TISI { sig_bndr  = s_bndr
                          <.> mkWpLet  ev_binds
        ; return (mkLHsWrap poly_wrap expr', idType poly_id) }
 
-  | PartialSig { sig_name = name, sig_wcs = wc_prs, sig_hs_ty = hs_ty } <- s_bndr
-  = do { (tclvl, wanted, expr')
+tcExprSig expr sig@(PartialSig { psig_name = name, sig_loc = loc })
+  = setSrcSpan loc $   -- Sets the location for the implication constraint
+    do { (tclvl, wanted, (expr', sig_inst))
              <- pushLevelAndCaptureConstraints  $
-                tcExtendTyVarEnvFromSig sig $
-                do { addErrCtxt (pprSigCtxt ExprSigCtxt (ppr hs_ty)) $
-                     emitWildCardHoleConstraints wc_prs
-                   ; tcPolyExprNC expr tau }
+                do { sig_inst <- tcInstSig sig
+                   ; expr' <- tcExtendTyVarEnv2 (sig_inst_skols sig_inst) $
+                              tcExtendTyVarEnv2 (sig_inst_wcs   sig_inst) $
+                              tcPolyExprNC expr (sig_inst_tau sig_inst)
+                   ; return (expr', sig_inst) }
+       -- See Note [Partial expression signatures]
+       ; let tau = sig_inst_tau sig_inst
+             mr  = null (sig_inst_theta sig_inst) &&
+                   isNothing (sig_inst_wcx sig_inst)
        ; (qtvs, givens, ev_binds)
-                 <- simplifyInfer tclvl False [sig] [(name, tau)] wanted
+                 <- simplifyInfer tclvl mr [sig_inst] [(name, tau)] wanted
        ; tau <- zonkTcType tau
        ; let inferred_theta = map evVarPred givens
              tau_tvs        = tyCoVarsOfType tau
        ; (binders, my_theta) <- chooseInferredQuantifiers inferred_theta
-                                   tau_tvs qtvs (Just sig)
+                                   tau_tvs qtvs (Just sig_inst)
        ; let inferred_sigma = mkInvSigmaTy qtvs inferred_theta tau
              my_sigma       = mkForAllTys binders (mkPhiTy  my_theta tau)
        ; wrap <- if inferred_sigma `eqType` my_sigma -- NB: eqType ignores vis.
@@ -1494,10 +1496,34 @@ tcExprSig expr sig@(TISI { sig_bndr  = s_bndr
                          <.> mkWpLet  ev_binds
        ; return (mkLHsWrap poly_wrap expr', my_sigma) }
 
-  | otherwise = panic "tcExprSig"   -- Can't happen
-  where
-    skol_info = SigSkol ExprSigCtxt (mkPhiTy theta tau)
-    skol_tvs = map snd skol_prs
+
+{- Note [Partial expression signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Partial type signatures on expressions are easy to get wrong.  But
+here is a guiding principile
+    e :: ty
+should behave like
+    let x :: ty
+        x = e
+    in x
+
+So for partial signatures we apply the MR if no context is given.  So
+   e :: IO _          apply the MR
+   e :: _ => IO _     do not apply the MR
+just like in TcBinds.decideGeneralisationPlan
+
+This makes a difference (Trac #11670):
+   peek :: Ptr a -> IO CLong
+   peek ptr = peekElemOff undefined 0 :: _
+from (peekElemOff undefined 0) we get
+          type: IO w
+   constraints: Storable w
+
+We must NOT try to generalise over 'w' because the signature specifies
+no constraints so we'll complain about not being able to solve
+Storable w.  Instead, don't generalise; then _ gets instantiated to
+CLong, as it should.
+-}
 
 {- *********************************************************************
 *                                                                      *

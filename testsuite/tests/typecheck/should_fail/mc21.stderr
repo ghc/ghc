@@ -4,7 +4,7 @@ mc21.hs:12:26: error:
       ‘a’ is a rigid type variable bound by
         a type expected by the context:
           forall a. [a] -> [[a]]
-        at mc21.hs:11:9
+        at mc21.hs:(11,9)-(12,31)
       Expected type: [a] -> [[a]]
         Actual type: [[a]] -> [[a]]
     • In the expression: take 5

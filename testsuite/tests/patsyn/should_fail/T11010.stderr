@@ -5,7 +5,7 @@ T11010.hs:9:36: error:
         a pattern with constructor:
           Fun :: forall b a. String -> (a -> b) -> Expr a -> Expr b,
         in a pattern synonym declaration
-        at T11010.hs:9:26
+        at T11010.hs:9:26-36
       Expected type: a -> b
         Actual type: a1 -> b
     • In the declaration for pattern synonym ‘IntFun’

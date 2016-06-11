@@ -2,12 +2,11 @@
 T10045.hs:6:18: error:
     • Found type wildcard ‘_’ standing for ‘t2 -> Bool -> t1’
       Where: ‘t1’ is a rigid type variable bound by
-               the inferred type of copy :: t2 -> Bool -> t1 at T10045.hs:7:10
+               the inferred type of copy :: t2 -> Bool -> t1 at T10045.hs:7:10-34
              ‘t2’ is a rigid type variable bound by
-               the inferred type of copy :: t2 -> Bool -> t1 at T10045.hs:7:10
+               the inferred type of copy :: t2 -> Bool -> t1 at T10045.hs:7:10-34
       To use the inferred type, enable PartialTypeSignatures
-    • In the type signature:
-        copy :: _
+    • In the type signature: copy :: _
       In the expression:
         let
           copy :: _
@@ -20,6 +19,5 @@ T10045.hs:6:18: error:
                 copy w from = copy w True
               in copy ws1 False
     • Relevant bindings include
-        copy :: t2 -> Bool -> t1 (bound at T10045.hs:7:10)
         ws1 :: () (bound at T10045.hs:5:11)
         foo :: Meta -> t (bound at T10045.hs:5:1)

@@ -7,9 +7,9 @@ T2664.hs:31:52: error:
                                IO (PChan (a :*: b), PChan c)
         at T2664.hs:23:5-12
       ‘b’ is a rigid type variable bound by
-        the instance declaration at T2664.hs:22:10
+        the instance declaration at T2664.hs:22:10-52
       ‘a’ is a rigid type variable bound by
-        the instance declaration at T2664.hs:22:10
+        the instance declaration at T2664.hs:22:10-52
     • In the third argument of ‘pchoose’, namely ‘newPChan’
       In the first argument of ‘E’, namely ‘(pchoose Right v newPChan)’
       In the expression:

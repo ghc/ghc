@@ -4,7 +4,7 @@ tcfail131.hs:7:11: error:
       ‘b’ is a rigid type variable bound by
         the type signature for:
           g :: forall b. Num b => b -> b
-        at tcfail131.hs:6:8
+        at tcfail131.hs:6:3-22
     • In the first argument of ‘f’, namely ‘x’
       In the expression: f x x
       In an equation for ‘g’: g x = f x x

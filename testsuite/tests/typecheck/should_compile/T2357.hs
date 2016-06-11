@@ -1,7 +1,11 @@
+{-# LANGUAGE NoMonomorphismRestriction #-}
+
 module Foo where
 
-f :: Show a => a
-(f, _) = undefined
+f :: Read a => a
+-- This one needs NoMonomorphismRestriction else f could
+-- not get a polymoprhic type
+(f, _) = (read "3", True)
 
-g :: Show a => a
+g :: Read a => a
 g = f

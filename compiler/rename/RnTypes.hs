@@ -103,100 +103,95 @@ rn_hs_sig_wc_type :: Bool   -- see rnImplicitBndrs
                   -> RnM (a, FreeVars)
 -- rn_hs_sig_wc_type is used for source-language type signatures
 rn_hs_sig_wc_type no_implicit_if_forall ctxt
-                  (HsIB { hsib_body = wc_ty }) thing_inside
-  = do { let hs_ty = hswc_body wc_ty
-       ; free_vars <- extractFilteredRdrTyVars hs_ty
-       ; (free_vars', nwc_rdrs) <- partition_nwcs free_vars
-       ; rnImplicitBndrs no_implicit_if_forall free_vars' hs_ty $ \ vars ->
-    do { rn_hs_wc_type ctxt wc_ty nwc_rdrs $ \ wc_ty' ->
-         thing_inside (HsIB { hsib_vars = vars
-                            , hsib_body = wc_ty' }) } }
+                  (HsWC { hswc_body = HsIB { hsib_body = hs_ty }})
+                  thing_inside
+  = do { free_vars <- extractFilteredRdrTyVars hs_ty
+       ; (tv_rdrs, nwc_rdrs) <- partition_nwcs free_vars
+       ; rnImplicitBndrs no_implicit_if_forall tv_rdrs hs_ty $ \ vars ->
+    do { (wcs, hs_ty', fvs1) <- rnWcBody ctxt nwc_rdrs hs_ty
+       ; let sig_ty' = HsWC { hswc_wcs = wcs, hswc_body = ib_ty' }
+             ib_ty'  = HsIB { hsib_vars = vars, hsib_body = hs_ty' }
+       ; (res, fvs2) <- thing_inside sig_ty'
+       ; return (res, fvs1 `plusFV` fvs2) } }
 
 rnHsWcType :: HsDocContext -> LHsWcType RdrName -> RnM (LHsWcType Name, FreeVars)
-rnHsWcType ctxt wc_ty@(HsWC { hswc_body = hs_ty })
+rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
   = do { free_vars <- extractFilteredRdrTyVars hs_ty
        ; (_, nwc_rdrs) <- partition_nwcs free_vars
-       ; rn_hs_wc_type ctxt wc_ty nwc_rdrs $ \ wc_ty' ->
-         return (wc_ty', emptyFVs) }
+       ; (wcs, hs_ty', fvs) <- rnWcBody ctxt nwc_rdrs hs_ty
+       ; let sig_ty' = HsWC { hswc_wcs = wcs, hswc_body = hs_ty' }
+       ; return (sig_ty', fvs) }
 
--- | Renames a type with wild card binders.
--- Expects a list of names of type variables that should be replaced with
--- named wild cards. (See Note [Renaming named wild cards])
--- Although the parser does not create named wild cards, it is possible to find
--- them in declaration splices, so the function tries to collect them.
-rn_hs_wc_type :: HsDocContext -> LHsWcType RdrName
-              -> [Located RdrName]  -- Named wildcards
-              -> (LHsWcType Name -> RnM (a, FreeVars))
-              -> RnM (a, FreeVars)
-rn_hs_wc_type ctxt (HsWC { hswc_body = hs_ty }) nwc_rdrs thing_inside
+rnWcBody :: HsDocContext -> [Located RdrName] -> LHsType RdrName
+         -> RnM ([Name], LHsType Name, FreeVars)
+rnWcBody ctxt nwc_rdrs hs_ty
   = do { nwcs <- mapM newLocalBndrRn nwc_rdrs
-       ; bindLocalNamesFV nwcs $
-    do { let env = RTKE { rtke_level = TypeLevel
+       ; let env = RTKE { rtke_level = TypeLevel
                         , rtke_what  = RnTypeBody
                         , rtke_nwcs  = mkNameSet nwcs
                         , rtke_ctxt  = ctxt }
-       ; (wc_ty, fvs1) <- rnWcSigTy env hs_ty
-       ; let wc_ty' :: HsWildCardBndrs Name (LHsType Name)
-             wc_ty' = wc_ty { hswc_wcs = nwcs ++ hswc_wcs wc_ty }
-       ; (res, fvs2) <- thing_inside wc_ty'
-       ; return (res, fvs1 `plusFV` fvs2) } }
-
-rnWcSigTy :: RnTyKiEnv -> LHsType RdrName
-          -> RnM (LHsWcType Name, FreeVars)
--- ^ Renames just the top level of a type signature
--- It's exactly like rnHsTyKi, except that it uses rnWcSigContext
--- on a qualified type, and return info on any extra-constraints
--- wildcard.  Some code duplication, but no big deal.
-rnWcSigTy env (L loc hs_ty@(HsForAllTy { hst_bndrs = tvs, hst_body = hs_tau }))
-  = bindLHsTyVarBndrs (rtke_ctxt env) (Just $ inTypeDoc hs_ty)
-                      Nothing [] tvs $ \ _ tvs' _ _ ->
-    do { (hs_tau', fvs) <- rnWcSigTy env hs_tau
-       ; let hs_ty' = HsForAllTy { hst_bndrs = tvs', hst_body = hswc_body hs_tau' }
-             awcs_bndrs = collectAnonWildCardsBndrs tvs'
-       ; return ( hs_tau' { hswc_wcs = hswc_wcs hs_tau' ++ awcs_bndrs
-                          , hswc_body = L loc hs_ty' }, fvs) }
-
-rnWcSigTy env (L loc (HsQualTy { hst_ctxt = hs_ctxt, hst_body = tau }))
-  = do { (hs_ctxt', fvs1) <- rnWcSigContext env hs_ctxt
-       ; (tau',     fvs2) <- rnLHsTyKi env tau
-       ; let awcs_tau = collectAnonWildCards tau'
-             hs_ty'   = HsQualTy { hst_ctxt = hswc_body hs_ctxt'
-                                 , hst_body = tau' }
-       ; return ( HsWC { hswc_wcs = hswc_wcs hs_ctxt' ++ awcs_tau
-                       , hswc_ctx = hswc_ctx hs_ctxt'
-                       , hswc_body = L loc hs_ty' }
-                , fvs1 `plusFV` fvs2) }
-
-rnWcSigTy env hs_ty
-  = do { (hs_ty', fvs) <- rnLHsTyKi env hs_ty
-       ; return (HsWC { hswc_wcs = collectAnonWildCards hs_ty'
-                      , hswc_ctx = Nothing
-                      , hswc_body = hs_ty' }
-                , fvs) }
-
-rnWcSigContext :: RnTyKiEnv -> LHsContext RdrName
-               -> RnM (HsWildCardBndrs Name (LHsContext Name), FreeVars)
-rnWcSigContext env (L loc hs_ctxt)
-  | Just (hs_ctxt1, hs_ctxt_last) <- snocView hs_ctxt
-  , L lx (HsWildCardTy wc) <- ignoreParens hs_ctxt_last
-  = do { (hs_ctxt1', fvs) <- mapFvRn rn_top_constraint hs_ctxt1
-       ; setSrcSpan lx $ checkExtraConstraintWildCard env wc
-       ; wc' <- rnAnonWildCard wc
-       ; let hs_ctxt' = hs_ctxt1' ++ [L lx (HsWildCardTy wc')]
-             awcs     = concatMap collectAnonWildCards hs_ctxt1'
-             -- NB: *not* including the extra-constraint wildcard
-       ; return ( HsWC { hswc_wcs = awcs
-                       , hswc_ctx = Just lx
-                       , hswc_body = L loc hs_ctxt' }
-                , fvs ) }
-  | otherwise
-  = do { (hs_ctxt', fvs) <- mapFvRn rn_top_constraint hs_ctxt
-       ; return (HsWC { hswc_wcs = concatMap collectAnonWildCards hs_ctxt'
-                      , hswc_ctx = Nothing
-                      , hswc_body = L loc hs_ctxt' }, fvs) }
+       ; (hs_ty', fvs) <- bindLocalNamesFV nwcs $
+                          rn_lty env hs_ty
+       ; let awcs = collectAnonWildCards hs_ty'
+       ; return (nwcs ++ awcs, hs_ty', fvs) }
   where
-    rn_top_constraint = rnLHsTyKi (env { rtke_what = RnTopConstraint })
+    rn_lty env (L loc hs_ty)
+      = setSrcSpan loc $
+        do { (hs_ty', fvs) <- rn_ty env hs_ty
+           ; return (L loc hs_ty', fvs) }
 
+    rn_ty :: RnTyKiEnv -> HsType RdrName -> RnM (HsType Name, FreeVars)
+    -- A lot of faff just to allow the extra-constraints wildcard to appear
+    rn_ty env hs_ty@(HsForAllTy { hst_bndrs = tvs, hst_body = hs_body })
+      = bindLHsTyVarBndrs (rtke_ctxt env) (Just $ inTypeDoc hs_ty)
+                           Nothing [] tvs $ \ _ tvs' _ _ ->
+        do { (hs_body', fvs) <- rn_lty env hs_body
+           ; return (HsForAllTy { hst_bndrs = tvs', hst_body = hs_body' }, fvs) }
+
+    rn_ty env (HsQualTy { hst_ctxt = L cx hs_ctxt, hst_body = hs_ty })
+      | Just (hs_ctxt1, hs_ctxt_last) <- snocView hs_ctxt
+      , L lx (HsWildCardTy wc) <- ignoreParens hs_ctxt_last
+      = do { (hs_ctxt1', fvs1) <- mapFvRn (rn_top_constraint env) hs_ctxt1
+           ; wc' <- setSrcSpan lx $
+                    do { checkExtraConstraintWildCard env wc
+                       ; rnAnonWildCard wc }
+           ; let hs_ctxt' = hs_ctxt1' ++ [L lx (HsWildCardTy wc')]
+           ; (hs_ty', fvs2) <- rnLHsTyKi env hs_ty
+           ; return (HsQualTy { hst_ctxt = L cx hs_ctxt', hst_body = hs_ty' }
+                    , fvs1 `plusFV` fvs2) }
+
+      | otherwise
+      = do { (hs_ctxt', fvs1) <- mapFvRn (rn_top_constraint env) hs_ctxt
+           ; (hs_ty', fvs2)   <- rnLHsTyKi env hs_ty
+           ; return (HsQualTy { hst_ctxt = L cx hs_ctxt', hst_body = hs_ty' }
+                    , fvs1 `plusFV` fvs2) }
+
+    rn_ty env hs_ty = rnHsTyKi env hs_ty
+
+    rn_top_constraint env = rnLHsTyKi (env { rtke_what = RnTopConstraint })
+
+
+checkExtraConstraintWildCard :: RnTyKiEnv -> HsWildCardInfo RdrName
+                             -> RnM ()
+-- Rename the extra-constraint spot in a type signature
+--    (blah, _) => type
+-- Check that extra-constraints are allowed at all, and
+-- if so that it's an anonymous wildcard
+checkExtraConstraintWildCard env wc
+  = checkWildCard env mb_bad
+  where
+    mb_bad | not (extraConstraintWildCardsAllowed env)
+           = Just (text "Extra-constraint wildcard" <+> quotes (ppr wc)
+                   <+> text "not allowed")
+           | otherwise
+           = Nothing
+
+extraConstraintWildCardsAllowed :: RnTyKiEnv -> Bool
+extraConstraintWildCardsAllowed env
+  = case rtke_ctxt env of
+      TypeSigCtx {}       -> True
+      ExprWithTySigCtx {} -> True
+      _                   -> False
 
 -- | Finds free type and kind variables in a type,
 --     without duplicates, and
@@ -736,27 +731,6 @@ checkNamedWildCard env name
                RnConstraint    -> Just constraint_msg
     constraint_msg = notAllowed (ppr name) <+> text "in a constraint"
 
-checkExtraConstraintWildCard :: RnTyKiEnv -> HsWildCardInfo RdrName
-                             -> RnM ()
--- Rename the extra-constraint spot in a type signature
---    (blah, _) => type
--- Check that extra-constraints are allowed at all, and
--- if so that it's an anonymous wildcard
-checkExtraConstraintWildCard env wc
-  = checkWildCard env mb_bad
-  where
-    mb_bad | not (extraConstraintWildCardsAllowed env)
-           = Just (text "Extra-constraint wildcard" <+> quotes (ppr wc)
-                   <+> text "not allowed")
-           | otherwise
-           = Nothing
-
-extraConstraintWildCardsAllowed :: RnTyKiEnv -> Bool
-extraConstraintWildCardsAllowed env
-  = case rtke_ctxt env of
-      TypeSigCtx {}       -> True
-      _                   -> False
-
 wildCardsAllowed :: RnTyKiEnv -> Bool
 -- ^ In what contexts are wildcards permitted
 wildCardsAllowed env
@@ -1052,7 +1026,9 @@ collectAnonWildCards lty = go lty
       HsRecTy flds                 -> gos $ map (cd_fld_type . unLoc) flds
       HsExplicitListTy _ tys       -> gos tys
       HsExplicitTupleTy _ tys      -> gos tys
-      HsForAllTy { hst_body = ty } -> go ty
+      HsForAllTy { hst_bndrs = bndrs
+                 , hst_body = ty } -> collectAnonWildCardsBndrs bndrs
+                                      `mappend` go ty
       HsQualTy { hst_ctxt = L _ ctxt
                , hst_body = ty }  -> gos ctxt `mappend` go ty
       -- HsQuasiQuoteTy, HsSpliceTy, HsCoreTy, HsTyLit

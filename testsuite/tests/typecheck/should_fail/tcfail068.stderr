@@ -4,13 +4,13 @@ tcfail068.hs:14:9: error:
       ‘s1’ is a rigid type variable bound by
         a type expected by the context:
           forall s1. GHC.ST.ST s1 (IndTree s a)
-        at tcfail068.hs:13:9
+        at tcfail068.hs:(13,9)-(14,31)
       ‘s’ is a rigid type variable bound by
         the type signature for:
           itgen :: forall a s.
                    Constructed a =>
                    (Int, Int) -> a -> IndTree s a
-        at tcfail068.hs:11:10
+        at tcfail068.hs:11:1-55
       Expected type: GHC.ST.ST s1 (IndTree s a)
         Actual type: GHC.ST.ST s1 (STArray s1 (Int, Int) a)
     • In the first argument of ‘runST’, namely
@@ -29,11 +29,11 @@ tcfail068.hs:19:9: error:
           itiap :: forall a s.
                    Constructed a =>
                    (Int, Int) -> (a -> a) -> IndTree s a -> IndTree s a
-        at tcfail068.hs:16:10
+        at tcfail068.hs:16:1-75
       ‘s1’ is a rigid type variable bound by
         a type expected by the context:
           forall s1. GHC.ST.ST s1 (IndTree s a)
-        at tcfail068.hs:18:9
+        at tcfail068.hs:(18,9)-(21,19)
       Expected type: GHC.ST.ST s1 (IndTree s a)
         Actual type: GHC.ST.ST s (IndTree s a)
     • In the first argument of ‘runST’, namely
@@ -60,11 +60,11 @@ tcfail068.hs:24:36: error:
           itrap :: forall a s.
                    Constructed a =>
                    ((Int, Int), (Int, Int)) -> (a -> a) -> IndTree s a -> IndTree s a
-        at tcfail068.hs:23:10
+        at tcfail068.hs:23:1-87
       ‘s1’ is a rigid type variable bound by
         a type expected by the context:
           forall s1. GHC.ST.ST s1 (IndTree s a)
-        at tcfail068.hs:24:29
+        at tcfail068.hs:24:29-46
       Expected type: GHC.ST.ST s1 (IndTree s a)
         Actual type: GHC.ST.ST s (IndTree s a)
     • In the first argument of ‘runST’, namely ‘(itrap' i k)’
@@ -103,11 +103,11 @@ tcfail068.hs:36:46: error:
                         -> c
                         -> IndTree s b
                         -> (c, IndTree s b)
-        at tcfail068.hs:34:15
+        at tcfail068.hs:(34,1)-(35,62)
       ‘s1’ is a rigid type variable bound by
         a type expected by the context:
           forall s1. GHC.ST.ST s1 (c, IndTree s b)
-        at tcfail068.hs:36:40
+        at tcfail068.hs:36:40-63
       Expected type: GHC.ST.ST s1 (c, IndTree s b)
         Actual type: GHC.ST.ST s (c, IndTree s b)
     • In the first argument of ‘runST’, namely ‘(itrapstate' i k s)’

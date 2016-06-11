@@ -7,9 +7,9 @@ gadt7.hs:16:38: error:
                    in a case alternative
           at gadt7.hs:16:33
       ‘t’ is a rigid type variable bound by
-        the inferred type of i1b :: T t2 -> t1 -> t at gadt7.hs:16:1
+        the inferred type of i1b :: T t2 -> t1 -> t at gadt7.hs:16:1-44
       ‘t1’ is a rigid type variable bound by
-        the inferred type of i1b :: T t2 -> t1 -> t at gadt7.hs:16:1
+        the inferred type of i1b :: T t2 -> t1 -> t at gadt7.hs:16:1-44
       Possible fix: add a type signature for ‘i1b’
     • In the expression: y1
       In a case alternative: K -> y1

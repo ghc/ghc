@@ -5,7 +5,7 @@ T9662.hs:47:8: error:
         the type signature for:
           test :: forall sh k m n.
                   Shape (((sh :. k) :. m) :. n) -> Shape (((sh :. m) :. n) :. k)
-        at T9662.hs:44:9
+        at T9662.hs:44:1-50
       Expected type: Exp (((sh :. m) :. n) :. k)
                      -> Exp (((sh :. m) :. n) :. k)
         Actual type: Exp

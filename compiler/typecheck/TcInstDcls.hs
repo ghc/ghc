@@ -18,7 +18,7 @@ import TcTyClsDecls
 import TcClassDcl( tcClassDecl2, tcATDefault,
                    HsSigFun, lookupHsSig, mkHsSigFun,
                    findMethodBind, instantiateMethod )
-import TcPat      ( addInlinePrags, lookupPragEnv, emptyPragEnv )
+import TcSigs
 import TcRnMonad
 import TcValidity
 import TcHsSyn    ( zonkTcTypeToTypes, emptyZonkEnv )
@@ -761,7 +761,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
     setSrcSpan loc                              $
     addErrCtxt (instDeclCtxt2 (idType dfun_id)) $
     do {  -- Instantiate the instance decl with skolem constants
-       ; (inst_tyvars, dfun_theta, inst_head) <- tcSkolDFunType (idType dfun_id)
+       ; (inst_tyvars, dfun_theta, inst_head) <- tcSkolDFunType dfun_id
        ; dfun_ev_vars <- newEvVars dfun_theta
                      -- We instantiate the dfun_id with superSkolems.
                      -- See Note [Subtle interaction of recursion and overlap]
@@ -1349,7 +1349,7 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
                      sig_fn (spec_inst_prags, prag_fn)
                      sel_id (L bind_loc meth_bind) bndr_loc
   = add_meth_ctxt $
-    do { traceTc "tcMethodBody" (ppr sel_id <+> ppr (idType sel_id))
+    do { traceTc "tcMethodBody" (ppr sel_id <+> ppr (idType sel_id) $$ ppr bndr_loc)
        ; (global_meth_id, local_meth_id) <- setSrcSpan bndr_loc $
                                             mkMethIds clas tyvars dfun_ev_vars
                                                       inst_tys sel_id
@@ -1396,7 +1396,8 @@ tcMethodBodyHelp sig_fn sel_id local_meth_id meth_bind
   | Just hs_sig_ty <- lookupHsSig sig_fn sel_name
               -- There is a signature in the instance
               -- See Note [Instance method signatures]
-  = do { (sig_ty, hs_wrap)
+  = do { let ctxt = FunSigCtxt sel_name True
+       ; (sig_ty, hs_wrap)
              <- setSrcSpan (getLoc (hsSigType hs_sig_ty)) $
                 do { inst_sigs <- xoptM LangExt.InstanceSigs
                    ; checkTc inst_sigs (misplacedInstSig sel_name hs_sig_ty)
@@ -1408,8 +1409,13 @@ tcMethodBodyHelp sig_fn sel_id local_meth_id meth_bind
                    ; return (sig_ty, hs_wrap) }
 
        ; inner_meth_name <- newName (nameOccName sel_name)
-       ; tc_sig  <- instTcTySig ctxt hs_sig_ty sig_ty inner_meth_name
-       ; (tc_bind, [inner_id]) <- tcPolyCheck NonRecursive no_prag_fn tc_sig meth_bind
+       ; let inner_meth_id  = mkLocalId inner_meth_name sig_ty
+             inner_meth_sig = CompleteSig { sig_bndr = inner_meth_id
+                                          , sig_ctxt = ctxt
+                                          , sig_loc  = getLoc (hsSigType hs_sig_ty) }
+
+
+       ; (tc_bind, [inner_id]) <- tcPolyCheck no_prag_fn inner_meth_sig meth_bind
 
        ; let export = ABE { abe_poly  = local_meth_id
                           , abe_mono  = inner_id
@@ -1422,7 +1428,10 @@ tcMethodBodyHelp sig_fn sel_id local_meth_id meth_bind
                           , abs_binds = tc_bind, abs_ev_binds = [] }) }
 
   | otherwise  -- No instance signature
-  = do { tc_sig <- instTcTySigFromId local_meth_id
+  = do { let ctxt = FunSigCtxt sel_name False
+                    -- False <=> don't report redundant constraints
+                    -- The signature is not under the users control!
+             tc_sig = completeSigFromId ctxt local_meth_id
               -- Absent a type sig, there are no new scoped type variables here
               -- Only the ones from the instance decl itself, which are already
               -- in scope.  Example:
@@ -1430,11 +1439,10 @@ tcMethodBodyHelp sig_fn sel_id local_meth_id meth_bind
               --      instance C [c] where { op = <rhs> }
               -- In <rhs>, 'c' is scope but 'b' is not!
 
-       ; (tc_bind, _) <- tcPolyCheck NonRecursive no_prag_fn tc_sig meth_bind
+       ; (tc_bind, _) <- tcPolyCheck no_prag_fn tc_sig meth_bind
        ; return tc_bind }
 
   where
-    ctxt       = FunSigCtxt sel_name True
     sel_name   = idName sel_id
     no_prag_fn = emptyPragEnv   -- No pragmas for local_meth_id;
                                 -- they are all for meth_id

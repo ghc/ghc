@@ -14,7 +14,7 @@ T4093b.hs:31:13: error:
                              (EitherCO e (A C O n) (A O O n) ~ A e O n,
                               EitherCO x (A C C n) (A C O n) ~ A C x n) =>
                              Block n e x -> A e x n
-        at T4093b.hs:20:12
+        at T4093b.hs:(19,1)-(22,26)
       Expected type: EitherCO e (A C O n) (A O O n)
         Actual type: (MaybeC C (n C O), MaybeC O (n O C))
     • In the expression: (JustC n, NothingC)

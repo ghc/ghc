@@ -5,7 +5,7 @@ T7748a.hs:16:24: error:
       ‘a’ is a rigid type variable bound by
         the type signature for:
           test :: forall a r. a -> r -> ()
-        at T7748a.hs:11:9
+        at T7748a.hs:11:1-20
     • In the pattern: Just (Just p)
       In a case alternative: Just (Just p) -> p
       In the expression:

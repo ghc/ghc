@@ -4,7 +4,7 @@ T8450.hs:8:7: error:
       ‘a’ is a rigid type variable bound by
         the type signature for:
           run :: forall a. a
-        at T8450.hs:7:15
+        at T8450.hs:7:1-18
     • In the expression: runEffect $ (undefined :: Either a ())
       In an equation for ‘run’:
           run = runEffect $ (undefined :: Either a ())

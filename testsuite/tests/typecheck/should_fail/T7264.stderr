@@ -2,7 +2,7 @@
 T7264.hs:13:19: error:
     • Couldn't match type ‘a’ with ‘forall r. r -> String’
       ‘a’ is a rigid type variable bound by
-        the inferred type of mkFoo2 :: a -> Maybe Foo at T7264.hs:13:1
+        the inferred type of mkFoo2 :: a -> Maybe Foo at T7264.hs:13:1-32
       Expected type: a -> Foo
         Actual type: (forall r. r -> String) -> Foo
     • In the first argument of ‘mmap’, namely ‘Foo’

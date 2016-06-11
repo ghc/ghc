@@ -6,7 +6,7 @@ tcfail201.hs:17:56: error:
           gfoldl' :: forall (c :: * -> *) a.
                      (forall a1 b. c (a1 -> b) -> a1 -> c b)
                      -> (forall g. g -> c g) -> a -> c a
-        at tcfail201.hs:15:12
+        at tcfail201.hs:15:1-85
       Expected type: c a
         Actual type: c (HsDoc t0)
     • In the expression: z DocEmpty

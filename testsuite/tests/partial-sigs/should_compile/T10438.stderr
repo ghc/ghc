@@ -2,9 +2,8 @@
 T10438.hs:7:22: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘t2’
       Where: ‘t2’ is a rigid type variable bound by
-               the inferred type of g :: t2 -> t2 at T10438.hs:6:9
-    • In the type signature:
-        x :: _
+               the inferred type of g :: t2 -> t2 at T10438.hs:(6,9)-(8,21)
+    • In the type signature: x :: _
       In an equation for ‘g’:
           g r
             = x
@@ -21,7 +20,6 @@ T10438.hs:7:22: warning: [-Wpartial-type-signatures (in -Wdefault)]
                       x :: _
                       x = r
     • Relevant bindings include
-        x :: t2 (bound at T10438.hs:8:17)
         r :: t2 (bound at T10438.hs:6:11)
         g :: t2 -> t2 (bound at T10438.hs:6:9)
         f :: t1 (bound at T10438.hs:5:5)

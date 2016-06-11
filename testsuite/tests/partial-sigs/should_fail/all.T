@@ -1,7 +1,7 @@
 test('AnnotatedConstraint', normal, compile_fail, [''])
 test('AnnotatedConstraintNotForgotten', normal, compile_fail, [''])
 test('Defaulting1MROff', normal, compile, [''])
-test('ExtraConstraintsWildcardInExpressionSignature', normal, compile_fail, [''])
+test('ExtraConstraintsWildcardInExpressionSignature', normal, compile, [''])
 test('ExtraConstraintsWildcardInPatternSignature', normal, compile_fail, [''])
 test('ExtraConstraintsWildcardInPatternSplice', normal, compile_fail, [''])
 test('ExtraConstraintsWildcardInTypeSpliceUsed',
@@ -62,3 +62,4 @@ test('T11122', normal, compile, [''])
 test('T11976', normal, compile_fail, [''])
 test('PatBind3', normal, compile_fail, [''])
 test('T12039', normal, compile_fail, [''])
+

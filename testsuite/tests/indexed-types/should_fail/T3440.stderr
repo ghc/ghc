@@ -10,11 +10,11 @@ T3440.hs:11:22: error:
         a pattern with constructor:
           GADT :: forall a. a -> Fam a -> GADT (Fam a),
         in an equation for ‘unwrap’
-        at T3440.hs:11:9
+        at T3440.hs:11:9-16
       ‘a’ is a rigid type variable bound by
         the type signature for:
           unwrap :: forall a. GADT (Fam a) -> (a, Fam a)
-        at T3440.hs:10:11
+        at T3440.hs:10:1-36
     • In the expression: x
       In the expression: (x, y)
       In an equation for ‘unwrap’: unwrap (GADT x y) = (x, y)

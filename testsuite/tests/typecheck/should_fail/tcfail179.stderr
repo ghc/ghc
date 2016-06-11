@@ -5,11 +5,11 @@ tcfail179.hs:14:41: error:
         a pattern with constructor:
           T :: forall s x. (s -> (x -> s) -> (x, s, Int)) -> T s,
         in a case alternative
-        at tcfail179.hs:14:14
+        at tcfail179.hs:14:14-16
       ‘s’ is a rigid type variable bound by
         the type signature for:
           run :: forall s. T s -> Int
-        at tcfail179.hs:12:8
+        at tcfail179.hs:12:1-17
       Expected type: x -> s
         Actual type: s -> s
     • In the second argument of ‘g’, namely ‘id’

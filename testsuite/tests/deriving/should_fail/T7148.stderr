@@ -5,7 +5,7 @@ T7148.hs:27:40: error:
           from type ‘forall b. SameType b () -> SameType b b’
             to type ‘forall b. SameType b () -> SameType b (Tagged a b)’
       ‘b’ is a rigid type variable bound by
-        the deriving clause for ‘IsoUnit (Tagged a b)’ at T7148.hs:27:40
+        the deriving clause for ‘IsoUnit (Tagged a b)’ at T7148.hs:27:40-46
     • When deriving the instance for (IsoUnit (Tagged a b))
 
 T7148.hs:27:40: error:
@@ -14,5 +14,5 @@ T7148.hs:27:40: error:
           from type ‘forall b. SameType () b -> SameType b b’
             to type ‘forall b. SameType () b -> SameType (Tagged a b) b’
       ‘b’ is a rigid type variable bound by
-        the deriving clause for ‘IsoUnit (Tagged a b)’ at T7148.hs:27:40
+        the deriving clause for ‘IsoUnit (Tagged a b)’ at T7148.hs:27:40-46
     • When deriving the instance for (IsoUnit (Tagged a b))

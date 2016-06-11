@@ -564,7 +564,7 @@ mkLHsSigType :: LHsType RdrName -> LHsSigType RdrName
 mkLHsSigType ty = mkHsImplicitBndrs ty
 
 mkLHsSigWcType :: LHsType RdrName -> LHsSigWcType RdrName
-mkLHsSigWcType ty = mkHsImplicitBndrs (mkHsWildCardBndrs ty)
+mkLHsSigWcType ty = mkHsWildCardBndrs (mkHsImplicitBndrs ty)
 
 mkClassOpSigs :: [LSig RdrName] -> [LSig RdrName]
 -- Convert TypeSig to ClassOpSig

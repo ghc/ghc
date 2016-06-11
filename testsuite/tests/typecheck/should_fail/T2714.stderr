@@ -4,7 +4,7 @@ T2714.hs:8:5: error:
       ‘a’ is a rigid type variable bound by
         the type signature for:
           f :: forall a b. ((a -> b) -> b) -> forall c. c -> a
-        at T2714.hs:7:6
+        at T2714.hs:7:1-42
       Expected type: ((a -> b) -> b) -> c -> a
         Actual type: ((a -> b) -> b) -> f0 (a -> b) -> f0 b
     • In the expression: ffmap

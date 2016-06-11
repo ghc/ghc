@@ -60,7 +60,7 @@ module TcEnv(
         topIdLvl, isBrackStage,
 
         -- New Ids
-        newLocalName, newDFunName, newDFunName', newFamInstTyConName,
+        newDFunName, newDFunName', newFamInstTyConName,
         newFamInstAxiomName,
         mkStableIdFromString, mkStableIdFromName,
         mkWrapperName

@@ -4,7 +4,7 @@ SimpleFail5a.hs:31:11: error:
       ‘a’ is a rigid type variable bound by
         the type signature for:
           bar3wrong :: forall a. S3 a -> a
-        at SimpleFail5a.hs:30:14
+        at SimpleFail5a.hs:30:1-22
       Expected type: S3 a
         Actual type: S3 Int
     • In the pattern: D3Int

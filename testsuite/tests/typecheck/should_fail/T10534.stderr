@@ -8,11 +8,11 @@ T10534a.hs:10:9: error:
       ‘a’ is a rigid type variable bound by
         the type signature for:
           silly :: forall a b. Coercible (DF a) (DF b) => a -> b
-        at T10534a.hs:9:10
+        at T10534a.hs:9:1-42
       ‘b’ is a rigid type variable bound by
         the type signature for:
           silly :: forall a b. Coercible (DF a) (DF b) => a -> b
-        at T10534a.hs:9:10
+        at T10534a.hs:9:1-42
     • In the expression: coerce
       In an equation for ‘silly’: silly = coerce
     • Relevant bindings include
