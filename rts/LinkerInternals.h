@@ -42,8 +42,8 @@ typedef
 
 typedef
    struct _Section {
-      void* start;                /* actual start of section in memory */
-      StgWord size;               /* actual size of section in memory */
+      void*    start;              /* actual start of section in memory */
+      StgWord  size;               /* actual size of section in memory */
       SectionKind kind;
       SectionAlloc alloc;
 
