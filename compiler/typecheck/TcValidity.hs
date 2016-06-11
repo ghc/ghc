@@ -10,7 +10,7 @@ module TcValidity (
   ContextKind(..), expectedKindInCtxt,
   checkValidTheta, checkValidFamPats,
   checkValidInstance, validDerivPred,
-  checkInstTermination,
+  checkInstTermination, checkTySynRhs,
   ClsInstInfo, checkValidCoAxiom, checkValidCoAxBranch,
   checkValidTyFamEqn,
   arityErr, badATErr,
@@ -355,11 +355,6 @@ checkValidType ctxt ty
         -- Check the internal validity of the type itself
        ; check_type env ctxt rank ty
 
-        -- Check that the thing has kind Type, and is lifted if necessary.
-        -- Do this *after* check_type, because we can't usefully take
-        -- the kind of an ill-formed type such as (a~Int)
-       ; check_kind env ctxt ty
-
        ; checkUserTypeError ty
 
        -- Check for ambiguous types.  See Note [When to call checkAmbiguity]
@@ -375,23 +370,18 @@ checkValidMonoType ty
   = do { env <- tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
        ; check_type env SigmaCtxt MustBeMonoType ty }
 
-check_kind :: TidyEnv -> UserTypeCtxt -> TcType -> TcM ()
--- Check that the type's kind is acceptable for the context
-check_kind env ctxt ty
-  | TySynCtxt {} <- ctxt
-  , returnsConstraintKind actual_kind
+checkTySynRhs :: UserTypeCtxt -> TcType -> TcM ()
+checkTySynRhs ctxt ty
+  | returnsConstraintKind actual_kind
   = do { ck <- xoptM LangExt.ConstraintKinds
        ; if ck
          then  when (isConstraintKind actual_kind)
                     (do { dflags <- getDynFlags
-                        ; check_pred_ty env dflags ctxt ty })
-         else addErrTcM (constraintSynErr env actual_kind) }
+                        ; check_pred_ty emptyTidyEnv dflags ctxt ty })
+         else addErrTcM (constraintSynErr emptyTidyEnv actual_kind) }
 
   | otherwise
-  = case expectedKindInCtxt ctxt of
-      TheKind k -> checkTcM (tcEqType actual_kind k)               (kindErr env actual_kind)
-      OpenKind  -> checkTcM (classifiesTypeWithValues actual_kind) (kindErr env actual_kind)
-      AnythingKind -> return ()
+  = return ()
   where
     actual_kind = typeKind ty
 
@@ -652,9 +642,6 @@ forAllEscapeErr env ty tau_kind
 
 ubxArgTyErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
 ubxArgTyErr env ty = (env, sep [text "Illegal unboxed tuple type as function argument:", ppr_tidy env ty])
-
-kindErr :: TidyEnv -> Kind -> (TidyEnv, SDoc)
-kindErr env kind = (env, sep [text "Expecting an ordinary type, but found a type of kind", ppr_tidy env kind])
 
 {-
 Note [Liberal type synonyms]

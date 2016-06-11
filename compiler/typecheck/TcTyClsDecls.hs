@@ -2113,7 +2113,8 @@ checkValidTyCon tc
               -> checkValidClass cl
 
             | Just syn_rhs <- synTyConRhs_maybe tc
-              -> checkValidType syn_ctxt syn_rhs
+              -> do { checkValidType syn_ctxt syn_rhs
+                    ; checkTySynRhs syn_ctxt syn_rhs }
 
             | Just fam_flav <- famTyConFlav_maybe tc
               -> case fam_flav of
