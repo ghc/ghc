@@ -594,7 +594,7 @@ getMBlocksOnNode(uint32_t node, uint32_t n)
 #ifdef DEBUG
     if (RtsFlags.DebugFlags.numa) return addr; // faking NUMA
 #endif
-    osBindMBlocksToNode(addr, n * MBLOCK_SIZE, RtsFlags.GcFlags.numaMap[node]);
+    osBindMBlocksToNode(addr, n * MBLOCK_SIZE, numa_map[node]);
     return addr;
 }
 

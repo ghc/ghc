@@ -26,6 +26,7 @@
 #include "sm/GC.h" // for gcWorkerThread()
 #include "STM.h"
 #include "RtsUtils.h"
+#include "sm/OSMem.h"
 
 #if !defined(mingw32_HOST_OS)
 #include "rts/IOManager.h" // for setIOManagerControlFd()
@@ -58,6 +59,12 @@ static Capability *last_free_capability[MAX_NUMA_NODES];
  * for some reason.  All Capabilities should yieldCapability().
  */
 PendingSync * volatile pending_sync = 0;
+
+// Number of logical NUMA nodes
+uint32_t n_numa_nodes;
+
+// Map logical NUMA node to OS node numbers
+uint32_t numa_map[MAX_NUMA_NODES];
 
 /* Let foreign code get the current Capability -- assuming there is one!
  * This is useful for unsafe foreign calls because they are called with
@@ -326,6 +333,31 @@ void initCapabilities (void)
     traceCapsetCreate(CAPSET_OSPROCESS_DEFAULT, CapsetTypeOsProcess);
     traceCapsetCreate(CAPSET_CLOCKDOMAIN_DEFAULT, CapsetTypeClockdomain);
 
+    // Initialise NUMA
+    if (!RtsFlags.GcFlags.numa) {
+        n_numa_nodes = 1;
+        for (i = 0; i < MAX_NUMA_NODES; i++) {
+            numa_map[i] = 0;
+        }
+    } else {
+        uint32_t nNodes = osNumaNodes();
+        if (nNodes > MAX_NUMA_NODES) {
+            barf("Too many NUMA nodes (max %d)", MAX_NUMA_NODES);
+        }
+        StgWord mask = RtsFlags.GcFlags.numaMask & osNumaMask();
+        uint32_t logical = 0, physical = 0;
+        for (; physical < MAX_NUMA_NODES; physical++) {
+            if (mask & 1) {
+                numa_map[logical++] = physical;
+            }
+            mask = mask >> 1;
+        }
+        n_numa_nodes = logical;
+        if (logical == 0) {
+            barf("%s: available NUMA node set is empty");
+        }
+    }
+
 #if defined(THREADED_RTS)
 
 #ifndef REG_Base
@@ -355,7 +387,7 @@ void initCapabilities (void)
     // There are no free capabilities to begin with.  We will start
     // a worker Task to each Capability, which will quickly put the
     // Capability on the free list when it finds nothing to do.
-    for (i = 0; i < RtsFlags.GcFlags.nNumaNodes; i++) {
+    for (i = 0; i < n_numa_nodes; i++) {
         last_free_capability[i] = capabilities[0];
     }
 }
@@ -730,9 +762,9 @@ void waitForCapability (Capability **pCap, Task *task)
                 // Otherwise, search for a free capability on this node.
                 cap = NULL;
                 for (i = task->node; i < enabled_capabilities;
-                     i += RtsFlags.GcFlags.nNumaNodes) {
+                     i += n_numa_nodes) {
                     // visits all the capabilities on this node, because
-                    // cap[i]->node == i % RtsFlags.GcFlags.nNumaNodes
+                    // cap[i]->node == i % n_numa_nodes
                     if (!capabilities[i]->running_task) {
                         cap = capabilities[i];
                         break;

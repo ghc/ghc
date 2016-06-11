@@ -429,7 +429,7 @@ workerStart(Task *task)
         setThreadAffinity(cap->no, n_capabilities);
     }
     if (RtsFlags.GcFlags.numa && !RtsFlags.DebugFlags.numa) {
-        setThreadNode(RtsFlags.GcFlags.numaMap[task->node]);
+        setThreadNode(numa_map[task->node]);
     }
 
     // set the thread-local pointer to the Task:
@@ -510,7 +510,7 @@ void rts_setInCallCapability (
         if (RtsFlags.GcFlags.numa) {
             task->node = capNoToNumaNode(preferred_capability);
             if (!DEBUG_IS_ON || !RtsFlags.DebugFlags.numa) { // faking NUMA
-                setThreadNode(RtsFlags.GcFlags.numaMap[task->node]);
+                setThreadNode(numa_map[task->node]);
             }
         }
     }

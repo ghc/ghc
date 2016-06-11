@@ -123,7 +123,6 @@ static void errorRtsOptsDisabled (const char *s);
 
 void initRtsFlagsDefaults(void)
 {
-    uint32_t i;
     StgWord64 maxStkSize = 8 * getPhysicalMemorySize() / 10;
     // if getPhysicalMemorySize fails just move along with an 8MB limit
     if (maxStkSize == 0)
@@ -160,10 +159,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.heapBase           = 0;   /* means don't care */
     RtsFlags.GcFlags.allocLimitGrace    = (100*1024) / BLOCK_SIZE;
     RtsFlags.GcFlags.numa               = rtsFalse;
-    RtsFlags.GcFlags.nNumaNodes         = 1;
-    for (i = 0; i < MAX_NUMA_NODES; i++) {
-        RtsFlags.GcFlags.numaMap[i] = 0;
-    }
+    RtsFlags.GcFlags.numaMask           = 1;
 
     RtsFlags.DebugFlags.scheduler       = rtsFalse;
     RtsFlags.DebugFlags.interpreter     = rtsFalse;
@@ -776,28 +772,8 @@ error = rtsTrue;
                           break;
                       }
 
-                      uint32_t nNodes = osNumaNodes();
-                      if (nNodes > MAX_NUMA_NODES) {
-                          errorBelch("%s: Too many NUMA nodes (max %d)",
-                                     rts_argv[arg], MAX_NUMA_NODES);
-                          error = rtsTrue;
-                      } else {
-                          RtsFlags.GcFlags.numa = rtsTrue;
-                          mask = mask & osNumaMask();
-                          uint32_t logical = 0, physical = 0;
-                          for (; physical < MAX_NUMA_NODES; physical++) {
-                              if (mask & 1) {
-                                  RtsFlags.GcFlags.numaMap[logical++] = physical;
-                              }
-                              mask = mask >> 1;
-                          }
-                          RtsFlags.GcFlags.nNumaNodes = logical;
-                          if (logical == 0) {
-                              errorBelch("%s: available node set is empty",
-                                         rts_argv[arg]);
-                              error = rtsTrue;
-                          }
-                      }
+                      RtsFlags.GcFlags.numa = rtsTrue;
+                      RtsFlags.GcFlags.numaMask = mask;
                   }
 #endif
 #if defined(DEBUG) && defined(THREADED_RTS)
@@ -821,11 +797,7 @@ error = rtsTrue;
                       } else {
                           RtsFlags.GcFlags.numa = rtsTrue;
                           RtsFlags.DebugFlags.numa = rtsTrue;
-                          RtsFlags.GcFlags.nNumaNodes = nNodes;
-                          uint32_t physical = 0;
-                          for (; physical < MAX_NUMA_NODES; physical++) {
-                              RtsFlags.GcFlags.numaMap[physical] = physical;
-                          }
+                          RtsFlags.GcFlags.numaMask = (1<<nNodes) - 1;
                       }
                   }
 #endif

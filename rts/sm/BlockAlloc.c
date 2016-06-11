@@ -467,7 +467,7 @@ uint32_t nodeWithLeastBlocks (void)
 {
     uint32_t node = 0, i;
     uint32_t min_blocks = n_alloc_blocks_by_node[0];
-    for (i = 1; i < RtsFlags.GcFlags.nNumaNodes; i++) {
+    for (i = 1; i < n_numa_nodes; i++) {
         if (n_alloc_blocks_by_node[i] < min_blocks) {
             min_blocks = n_alloc_blocks_by_node[i];
             node = i;
@@ -504,7 +504,7 @@ bdescr* allocLargeChunkOnNode (uint32_t node, W_ min, W_ max)
     StgWord ln, lnmax;
 
     if (min >= BLOCKS_PER_MBLOCK) {
-        return allocGroup(max);
+        return allocGroupOnNode(node,max);
     }
 
     ln = log_2_ceil(min);
@@ -811,7 +811,7 @@ void returnMemoryToOS(uint32_t n /* megablocks */)
     StgWord size;
 
     // ToDo: not fair, we free all the memory starting with node 0.
-    for (node = 0; n > 0 && node < RtsFlags.GcFlags.nNumaNodes; node++) {
+    for (node = 0; n > 0 && node < n_numa_nodes; node++) {
         bd = free_mblock_list[node];
         while ((n > 0) && (bd != NULL)) {
             size = BLOCKS_TO_MBLOCKS(bd->blocks);
@@ -875,7 +875,7 @@ checkFreeListSanity(void)
     StgWord ln, min;
     uint32_t node;
 
-    for (node = 0; node < RtsFlags.GcFlags.nNumaNodes; node++) {
+    for (node = 0; node < n_numa_nodes; node++) {
         min = 1;
         for (ln = 0; ln < NUM_FREE_LISTS; ln++) {
             IF_DEBUG(block_alloc,
@@ -950,7 +950,7 @@ countFreeList(void)
   StgWord ln;
   uint32_t node;
 
-  for (node = 0; node < RtsFlags.GcFlags.nNumaNodes; node++) {
+  for (node = 0; node < n_numa_nodes; node++) {
       for (ln=0; ln < NUM_FREE_LISTS; ln++) {
           for (bd = free_list[node][ln]; bd != NULL; bd = bd->link) {
               total_blocks += bd->blocks;

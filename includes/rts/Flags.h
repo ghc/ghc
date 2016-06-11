@@ -73,9 +73,7 @@ typedef struct _GC_FLAGS {
                                  */
 
     rtsBool numa;               /* Use NUMA */
-    uint32_t nNumaNodes;        /* Number of nodes */
-    uint32_t numaMap[MAX_NUMA_NODES]; /* Map our internal node numbers to OS
-                                       * node numbers */
+    StgWord numaMask;
 } GC_FLAGS;
 
 /* See Note [Synchronization of flags and base APIs] */

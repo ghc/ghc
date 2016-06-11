@@ -114,7 +114,7 @@ data GCFlags = GCFlags
     , heapBase              :: Word -- ^ address to ask the OS for memory
     , allocLimitGrace       :: Word
     , numa                  :: Bool
-    , nNumaNodes            :: Word32
+    , numaMask              :: Word
     } deriving (Show)
 
 -- | Parameters concerning context switching
@@ -376,7 +376,7 @@ getGCFlags = do
           <*> #{peek GC_FLAGS, heapBase} ptr
           <*> #{peek GC_FLAGS, allocLimitGrace} ptr
           <*> #{peek GC_FLAGS, numa} ptr
-          <*> #{peek GC_FLAGS, nNumaNodes} ptr
+          <*> #{peek GC_FLAGS, numaMask} ptr
 
 getParFlags :: IO ParFlags
 getParFlags = do

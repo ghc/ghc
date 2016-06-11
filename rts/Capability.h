@@ -39,7 +39,7 @@ struct Capability_ {
     // The NUMA node on which this capability resides.  This is used to allocate
     // node-local memory in allocate().
     //
-    // Note: this is always equal to cap->no % RtsFlags.ParFlags.nNumaNodes.
+    // Note: this is always equal to cap->no % n_numa_nodes.
     // The reason we slice it this way is that if we add or remove capabilities
     // via setNumCapabilities(), then we keep the number of capabilities on each
     // NUMA node balanced.
@@ -158,9 +158,6 @@ struct Capability_ {
   ATTRIBUTE_ALIGNED(64)
 #endif
   ;
-
-
-#define capNoToNumaNode(n) ((n) % RtsFlags.GcFlags.nNumaNodes)
 
 #if defined(THREADED_RTS)
 #define ASSERT_TASK_ID(task) ASSERT(task->id == osThreadId())
@@ -348,6 +345,18 @@ void markCapability (evac_fn evac, void *user, Capability *cap,
 void markCapabilities (evac_fn evac, void *user);
 
 void traverseSparkQueues (evac_fn evac, void *user);
+
+/* -----------------------------------------------------------------------------
+   NUMA
+   -------------------------------------------------------------------------- */
+
+/* Number of logical NUMA nodes */
+extern uint32_t n_numa_nodes;
+
+/* Map logical NUMA node to OS node numbers */
+extern uint32_t numa_map[MAX_NUMA_NODES];
+
+#define capNoToNumaNode(n) ((n) % n_numa_nodes)
 
 /* -----------------------------------------------------------------------------
    Messages

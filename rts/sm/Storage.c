@@ -57,7 +57,7 @@ generation *oldest_gen  = NULL; /* oldest generation, for convenience */
 /*
  * Array of nurseries, size == n_capabilities
  *
- * nursery[i] belongs to NUMA node (i % RtsFlags.GcFlags.nNumaNodes)
+ * nursery[i] belongs to NUMA node (i % n_numa_nodes)
  * This is chosen to be the same convention as capabilities[i], so
  * that when not using nursery chunks (+RTS -n), we just map
  * capabilities to nurseries 1:1.
@@ -209,7 +209,7 @@ initStorage (void)
 
   N = 0;
 
-  for (n = 0; n < RtsFlags.GcFlags.nNumaNodes; n++) {
+  for (n = 0; n < n_numa_nodes; n++) {
       next_nursery[n] = n;
   }
   storageAddCapabilities(0, n_capabilities);
@@ -615,7 +615,7 @@ assignNurseriesToCapabilities (uint32_t from, uint32_t to)
     for (i = from; i < to; i++) {
         node = capabilities[i]->node;
         assignNurseryToCapability(capabilities[i], next_nursery[node]);
-        next_nursery[node] += RtsFlags.GcFlags.nNumaNodes;
+        next_nursery[node] += n_numa_nodes;
     }
 }
 
@@ -642,7 +642,7 @@ resetNurseries (void)
 {
     uint32_t n;
 
-    for (n = 0; n < RtsFlags.GcFlags.nNumaNodes; n++) {
+    for (n = 0; n < n_numa_nodes; n++) {
         next_nursery[n] = n;
     }
     assignNurseriesToCapabilities(0, n_capabilities);
@@ -758,22 +758,20 @@ getNewNursery (Capability *cap)
     for(;;) {
         i = next_nursery[node];
         if (i < n_nurseries) {
-            if (cas(&next_nursery[node], i,
-                    i+RtsFlags.GcFlags.nNumaNodes) == i) {
+            if (cas(&next_nursery[node], i, i+n_numa_nodes) == i) {
                 assignNurseryToCapability(cap, i);
                 return rtsTrue;
             }
-        } else if (RtsFlags.GcFlags.nNumaNodes > 1) {
+        } else if (n_numa_nodes > 1) {
             // Try to find an unused nursery chunk on other nodes.  We'll get
             // remote memory, but the rationale is that avoiding GC is better
             // than avoiding remote memory access.
             rtsBool lost = rtsFalse;
-            for (n = 0; n < RtsFlags.GcFlags.nNumaNodes; n++) {
+            for (n = 0; n < n_numa_nodes; n++) {
                 if (n == node) continue;
                 i = next_nursery[n];
                 if (i < n_nurseries) {
-                    if (cas(&next_nursery[n], i,
-                            i+RtsFlags.GcFlags.nNumaNodes) == i) {
+                    if (cas(&next_nursery[n], i, i+n_numa_nodes) == i) {
                         assignNurseryToCapability(cap, i);
                         return rtsTrue;
                     } else {
