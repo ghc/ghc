@@ -820,22 +820,28 @@ funArgTy ty | Just ty' <- coreView ty = funArgTy ty'
 funArgTy (ForAllTy (Anon arg) _res) = arg
 funArgTy ty                         = pprPanic "funArgTy" (ppr ty)
 
-piResultTy :: Type -> Type -> Type
+piResultTy :: Type -> Type ->  Type
+piResultTy ty arg = case piResultTy_maybe ty arg of
+                      Just res -> res
+                      Nothing  -> pprPanic "piResultTy" (ppr ty $$ ppr arg)
+
+piResultTy_maybe :: Type -> Type -> Maybe Type
+
 -- ^ Just like 'piResultTys' but for a single argument
 -- Try not to iterate 'piResultTy', because it's inefficient to substitute
 -- one variable at a time; instead use 'piResultTys"
-piResultTy ty arg
-  | Just ty' <- coreView ty = piResultTy ty' arg
+piResultTy_maybe ty arg
+  | Just ty' <- coreView ty = piResultTy_maybe ty' arg
 
   | ForAllTy bndr res <- ty
   = case bndr of
-      Anon {}    -> res
-      Named tv _ -> substTy (extendTvSubst empty_subst tv arg) res
+      Anon {}    -> Just res
+      Named tv _ -> Just (substTy (extendTvSubst empty_subst tv arg) res)
         where
           empty_subst = mkEmptyTCvSubst $ mkInScopeSet $
                         tyCoVarsOfTypes [arg,res]
   | otherwise
-  = pprPanic "piResultTy" (ppr ty $$ ppr arg)
+  = Nothing
 
 -- | (piResultTys f_ty [ty1, .., tyn]) gives the type of (f ty1 .. tyn)
 --   where f :: f_ty
@@ -1474,6 +1480,7 @@ isPredTy ty = go ty []
       | isPredTy arg                = isPredTy res   -- (Eq a => C a)
       | otherwise                   = False          -- (Int -> Bool)
     go (ForAllTy (Named {}) ty) []  = go ty []
+    go (CastTy _ co) args           = go_k (pSnd (coercionKind co)) args
     go _ _ = False
 
     go_tc :: TyCon -> [KindOrType] -> Bool
@@ -1486,7 +1493,15 @@ isPredTy ty = go ty []
 
     go_k :: Kind -> [KindOrType] -> Bool
     -- True <=> ('k' applied to 'kts') = Constraint
-    go_k k args = isConstraintKind (piResultTys k args)
+    go_k k [] = isConstraintKind k
+    go_k k (arg:args) = case piResultTy_maybe k arg of
+                          Just k' -> go_k k' args
+                          Nothing -> pprTrace "isPredTy" (ppr ty)
+                                     False
+       -- This last case should not happen; but it does if we
+       -- we call isPredTy during kind checking, especially if
+       -- there is actually a kind error.  Example that showed
+       -- this up: polykinds/T11399
 
 isClassPred, isEqPred, isNomEqPred, isIPPred :: PredType -> Bool
 isClassPred ty = case tyConAppTyCon_maybe ty of
