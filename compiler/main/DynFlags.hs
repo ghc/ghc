@@ -1400,11 +1400,8 @@ dynamicTooMkDynamicDynFlags dflags0
 -- | Used by 'GHC.runGhc' to partially initialize a new 'DynFlags' value
 initDynFlags :: DynFlags -> IO DynFlags
 initDynFlags dflags = do
- let -- We can't build with dynamic-too on Windows, as labels before
-     -- the fork point are different depending on whether we are
-     -- building dynamically or not.
-     platformCanGenerateDynamicToo
-         = platformOS (targetPlatform dflags) /= OSMinGW32
+ let platformCanGenerateDynamicToo
+         = True
  refCanGenerateDynamicToo <- newIORef platformCanGenerateDynamicToo
  refNextTempSuffix <- newIORef 0
  refFilesToClean <- newIORef []
@@ -4699,7 +4696,7 @@ compilerInfo dflags
        ("RTS ways",                    cGhcRTSWays),
        ("RTS expects libdw",           showBool cGhcRtsWithLibdw),
        -- Whether or not we support @-dynamic-too@
-       ("Support dynamic-too",         showBool $ not isWindows),
+       ("Support dynamic-too",         "YES"),
        -- Whether or not we support the @-j@ flag with @--make@.
        ("Support parallel --make",     "YES"),
        -- Whether or not we support "Foo from foo-0.1-XXX:Foo" syntax in
@@ -4731,7 +4728,6 @@ compilerInfo dflags
   where
     showBool True  = "YES"
     showBool False = "NO"
-    isWindows = platformOS (targetPlatform dflags) == OSMinGW32
 
 #include "../includes/dist-derivedconstants/header/GHCConstantsHaskellWrappers.hs"
 
@@ -4800,11 +4796,6 @@ makeDynFlagsConsistent :: DynFlags -> (DynFlags, [Located String])
 -- ensure that a later change doesn't invalidate an earlier check.
 -- Be careful not to introduce potential loops!
 makeDynFlagsConsistent dflags
- -- Disable -dynamic-too on Windows (#8228, #7134, #5987)
- | os == OSMinGW32 && gopt Opt_BuildDynamicToo dflags
-    = let dflags' = gopt_unset dflags Opt_BuildDynamicToo
-          warn    = "-dynamic-too is not supported on Windows"
-      in loop dflags' warn
  | hscTarget dflags == HscC &&
    not (platformUnregisterised (targetPlatform dflags))
     = if cGhcWithNativeCodeGen == "YES"
