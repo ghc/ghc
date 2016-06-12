@@ -544,6 +544,8 @@ void osReleaseHeapMemory(void)
         sysErrorBelch("unable to release address space");
 }
 
+#endif
+
 rtsBool osNumaAvailable(void)
 {
 #ifdef HAVE_NUMA_H
@@ -575,5 +577,3 @@ StgWord osNumaMask(void)
     return 1;
 #endif
 }
-
-#endif
