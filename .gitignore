@@ -12,6 +12,9 @@ Thumbs.db
 *.orig
 *.prof
 *.rej
+*.patch
+*.stackdump
+foo*
 
 *.hi
 *.hi-boot
