@@ -36,12 +36,12 @@
                                 SymI_HasProto(stg_finalizzeWeakzh)
 
 #define RTS_LIBDW_SYMBOLS                       \
-      SymE_HasProto(backtraceFree)              \
-      SymE_HasProto(libdwGetBacktrace)          \
-      SymE_HasProto(libdwLookupLocation)        \
-      SymE_HasProto(libdwPoolTake)              \
-      SymE_HasProto(libdwPoolRelease)           \
-      SymE_HasProto(libdwPoolClear)
+      SymI_HasProto(backtraceFree)              \
+      SymI_HasProto(libdwGetBacktrace)          \
+      SymI_HasProto(libdwLookupLocation)        \
+      SymI_HasProto(libdwPoolTake)              \
+      SymI_HasProto(libdwPoolRelease)           \
+      SymI_HasProto(libdwPoolClear)
 
 #if !defined (mingw32_HOST_OS)
 #define RTS_POSIX_ONLY_SYMBOLS                  \
