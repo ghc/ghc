@@ -769,10 +769,7 @@ tc_infer_args :: Outputable fun
               -> Int                      -- ^ number to start arg counter at
               -> TcM (TCvSubst, [TyBinder], [TcType], [LHsType Name], Int)
 tc_infer_args mode orig_ty binders mb_kind_info orig_args n0
-  = do { traceTc "tc_infer_args {" (ppr binders $$ ppr orig_args)
-       ; stuff <- go emptyTCvSubst binders orig_args n0 []
-       ; traceTc "tc_infer_args }" (ppr stuff)
-       ; return stuff }
+  = go emptyTCvSubst binders orig_args n0 []
   where
     go subst binders []   n acc
       = return ( subst, binders, reverse acc, [], n )
