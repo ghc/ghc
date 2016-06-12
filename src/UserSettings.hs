@@ -102,8 +102,8 @@ verboseCommands = return False
 
 -- | Customise build progress messages (e.g. executing a build command).
 putBuild :: String -> Action ()
-putBuild = putColoured Vivid White
+putBuild = putColoured Dull Magenta
 
 -- | Customise build success messages (e.g. a package is built successfully).
 putSuccess :: String -> Action ()
-putSuccess = putColoured Vivid Green
+putSuccess = putColoured Dull Green
