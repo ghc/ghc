@@ -179,7 +179,7 @@ renameLSigType :: LHsSigType Name -> RnM (LHsSigType DocName)
 renameLSigType = renameImplicit renameLType
 
 renameLSigWcType :: LHsSigWcType Name -> RnM (LHsSigWcType DocName)
-renameLSigWcType = renameImplicit (renameWc renameLType)
+renameLSigWcType = renameWc (renameImplicit renameLType)
 
 renameLKind :: LHsKind Name -> RnM (LHsKind DocName)
 renameLKind = renameLType
@@ -573,7 +573,7 @@ renameWc :: (in_thing -> RnM out_thing)
 renameWc rn_thing (HsWC { hswc_body = thing })
   = do { thing' <- rn_thing thing
        ; return (HsWC { hswc_body = thing'
-                      , hswc_wcs = PlaceHolder, hswc_ctx = Nothing }) }
+                      , hswc_wcs = PlaceHolder }) }
 
 renameDocInstance :: DocInstance Name -> RnM (DocInstance DocName)
 renameDocInstance (inst, idoc, L l n) = do

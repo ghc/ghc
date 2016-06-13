@@ -81,10 +81,10 @@ specializeSig :: forall name . (Eq name, DataId name, SetName name)
               -> Sig name
               -> Sig name
 specializeSig bndrs typs (TypeSig lnames typ) =
-    TypeSig lnames (typ { hsib_body = (hsib_body typ) { hswc_body = noLoc typ'}})
+    TypeSig lnames (typ { hswc_body = (hswc_body typ) { hsib_body = noLoc typ'}})
   where
     true_type :: HsType name
-    true_type = unLoc (hswc_body (hsib_body typ))
+    true_type = unLoc (hsSigWcType typ)
     typ' :: HsType name
     typ' = rename fv . sugar $ specializeTyVarBndrs bndrs typs true_type
     fv = foldr Set.union Set.empty . map freeVariables $ typs

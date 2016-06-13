@@ -357,7 +357,7 @@ synifySigType s ty = mkEmptyImplicitBndrs (synifyType s ty)
 
 synifySigWcType :: SynifyTypeState -> Type -> LHsSigWcType Name
 -- Ditto (see synifySigType)
-synifySigWcType s ty = mkEmptyImplicitBndrs (mkEmptyWildCardBndrs (synifyType s ty))
+synifySigWcType s ty = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs (synifyType s ty))
 
 synifyPatSynSigType :: PatSyn -> LHsSigType Name
 -- Ditto (see synifySigType)

@@ -646,10 +646,8 @@ ppInstanceSigs :: LinksInfo -> Splice -> Unicode -> Qualification
 ppInstanceSigs links splice unicode qual sigs = do
     TypeSig lnames typ <- sigs
     let names = map unLoc lnames
-        L loc rtyp = get_type typ
+        L loc rtyp = hsSigWcType typ
     return $ ppSimpleSig links splice unicode qual loc names rtyp
-    where
-      get_type = hswc_body . hsib_body
 
 
 lookupAnySubdoc :: Eq id1 => id1 -> [(id1, DocForDecl id2)] -> DocForDecl id2
