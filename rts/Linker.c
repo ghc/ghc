@@ -241,7 +241,6 @@ static ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
 #define open wopen
 #define WSTR(s) L##s
 #define pathprintf swprintf
-#define pathsplit _wsplitpath_s
 #define pathsize sizeof(wchar_t)
 #else
 #define pathcmp strcmp
@@ -251,7 +250,6 @@ static ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
 #define struct_stat struct stat
 #define WSTR(s) s
 #define pathprintf snprintf
-#define pathsplit _splitpath_s
 #define pathsize sizeof(char)
 #endif
 
@@ -264,6 +262,30 @@ static pathchar* pathdup(pathchar *path)
     /* sigh, strdup() isn't a POSIX function, so do it the long way */
     ret = stgMallocBytes( strlen(path)+1, "pathdup" );
     strcpy(ret, path);
+#endif
+    return ret;
+}
+
+static pathchar* pathdir(pathchar *path)
+{
+    pathchar *ret;
+#if defined(mingw32_HOST_OS)
+    pathchar *drive, *dirName;
+    size_t memberLen = pathlen(path) + 1;
+    dirName = stgMallocBytes(pathsize * memberLen, "pathdir(path)");
+    ret     = stgMallocBytes(pathsize * memberLen, "pathdir(path)");
+    drive   = stgMallocBytes(pathsize * _MAX_DRIVE, "pathdir(path)");
+    _wsplitpath_s(path, drive, _MAX_DRIVE, dirName, pathsize * pathlen(path), NULL, 0, NULL, 0);
+    pathprintf(ret, memberLen, WSTR("%" PATH_FMT "%" PATH_FMT), drive, dirName);
+    stgFree(drive);
+    stgFree(dirName);
+#else
+    pathchar* dirName = dirname(path);
+    size_t memberLen  = pathlen(dirName);
+    ret = stgMallocBytes(pathsize * (memberLen + 2), "pathdir(path)");
+    strcpy(ret, dirName);
+    ret[memberLen  ] = '/';
+    ret[memberLen+1] = '\0';
 #endif
     return ret;
 }
@@ -310,7 +332,8 @@ static char *allocateImageAndTrampolines (
 #if defined(x86_64_HOST_ARCH)
    FILE* f,
 #endif
-   int size );
+   int size,
+   int isThin);
 #if defined(x86_64_HOST_ARCH)
 static int ocAllocateSymbolExtras_PEi386 ( ObjectCode* oc );
 static size_t makeSymbolExtra_PEi386( ObjectCode* oc, size_t, char* symbol );
@@ -1839,12 +1862,24 @@ static HsInt loadArchive_ (pathchar *path)
     if (n != 8)
         barf("loadArchive: Failed reading header from `%" PATH_FMT "'", path);
     if (strncmp(tmp, "!<arch>\n", 8) == 0) {}
-#if !defined(mingw32_HOST_OS)
-    /* See Note [thin archives on Windows] */
+    /* Check if this is a thin archive by looking for the magic string "!<thin>\n"
+     *
+     * ar thin libraries have the exact same format as normal archives except they
+     * have a different magic string and they don't copy the object files into the
+     * archive.
+     *
+     * Instead each header entry points to the location of the object file on disk.
+     * This is useful when a library is only created to satisfy a compile time dependency
+     * instead of to be distributed. This saves the time required for copying.
+     *
+     * Thin archives are always flattened. They always only contain simple headers
+     * pointing to the object file and so we need not allocate more memory than needed
+     * to find the object file.
+     *
+     */
     else if (strncmp(tmp, "!<thin>\n", 8) == 0) {
         isThin = 1;
     }
-#endif
 #if defined(darwin_HOST_OS)
     /* Not a standard archive, look for a fat archive magic number: */
     else if (ntohl(*(uint32_t *)tmp) == FAT_MAGIC) {
@@ -2090,7 +2125,7 @@ static HsInt loadArchive_ (pathchar *path)
 #if defined(x86_64_HOST_ARCH)
                f,
 #endif
-               memberSize);
+               memberSize, isThin);
 #elif defined(darwin_HOST_OS)
             if (RTS_LINKER_USE_MMAP)
                 image = mmapForLinker(memberSize, MAP_ANONYMOUS, -1, 0);
@@ -2105,36 +2140,27 @@ static HsInt loadArchive_ (pathchar *path)
 #else // not windows or darwin
             image = stgMallocBytes(memberSize, "loadArchive(image)");
 #endif
-
-#if !defined(mingw32_HOST_OS)
-            /*
-             * Note [thin archives on Windows]
-             * This doesn't compile on Windows because it assumes
-             * char* pathnames, and we use wchar_t* on Windows.  It's
-             * not trivial to fix, so I'm leaving it disabled on
-             * Windows for now --SDM
-             */
             if (isThin) {
                 FILE *member;
-                char *pathCopy, *dirName, *memberPath;
+                pathchar *pathCopy, *dirName, *memberPath, *objFileName;
 
                 /* Allocate and setup the dirname of the archive.  We'll need
-                   this to locate the thin member */
-                pathCopy = stgMallocBytes(strlen(path) + 1, "loadArchive(file)");
-                strcpy(pathCopy, path);
-                dirName = dirname(pathCopy);
+                    this to locate the thin member */
+                pathCopy = pathdup(path); // Convert the char* to a pathchar*
+                dirName  = pathdir(pathCopy);
 
                 /* Append the relative member name to the dirname.  This should be
                    be the full path to the actual thin member. */
-                memberPath = stgMallocBytes(
-                    strlen(path) + 1 + strlen(fileName) + 1, "loadArchive(file)");
-                strcpy(memberPath, dirName);
-                memberPath[strlen(dirName)] = '/';
-                strcpy(memberPath + strlen(dirName) + 1, fileName);
+                int memberLen = pathlen(dirName) + 1 + strlen(fileName) + 1;
+                memberPath    = stgMallocBytes(pathsize * memberLen, "loadArchive(file)");
+                objFileName   = mkPath(fileName);
+                pathprintf(memberPath, memberLen, WSTR("%" PATH_FMT "%" PATH_FMT), dirName, objFileName);
+                stgFree(objFileName);
+                stgFree(dirName);
 
                 member = pathopen(memberPath, WSTR("rb"));
                 if (!member)
-                    barf("loadObj: can't read `%s'", path);
+                    barf("loadObj: can't read thin archive `%" PATH_FMT "'", memberPath);
 
                 n = fread ( image, 1, memberSize, member );
                 if (n != memberSize) {
@@ -2146,7 +2172,6 @@ static HsInt loadArchive_ (pathchar *path)
                 stgFree(pathCopy);
             }
             else
-#endif
             {
                 n = fread ( image, 1, memberSize, f );
                 if (n != memberSize) {
@@ -2221,7 +2246,7 @@ static HsInt loadArchive_ (pathchar *path)
             if (!isThin || thisFileNameSize == 0) {
                 n = fseek(f, memberSize, SEEK_CUR);
                 if (n != 0)
-                    barf("loadArchive: error whilst seeking by %d in `%s'",
+                    barf("loadArchive: error whilst seeking by %d in `%" PATH_FMT "'",
                          memberSize, path);
             }
         }
@@ -2321,7 +2346,7 @@ preloadObjectFile (pathchar *path)
    /* coverity[toctou] */
    f = pathopen(path, WSTR("rb"));
    if (!f) {
-       errorBelch("loadObj: can't read `%" PATH_FMT "'", path);
+       errorBelch("loadObj: can't preload `%" PATH_FMT "'", path);
        return NULL;
    }
 
@@ -2333,7 +2358,7 @@ preloadObjectFile (pathchar *path)
 #if defined(x86_64_HOST_ARCH)
        f,
 #endif
-       fileSize);
+       fileSize, HS_BOOL_FALSE);
     if (image == NULL) {
         fclose(f);
         return NULL;
@@ -3052,38 +3077,42 @@ allocateImageAndTrampolines (
 #if defined(x86_64_HOST_ARCH)
    FILE* f,
 #endif
-   int size )
+   int size,
+   int isThin)
 {
    char* image;
 #if defined(x86_64_HOST_ARCH)
-   /* PeCoff contains number of symbols right in it's header, so
-      we can reserve the room for symbolExtras right here. */
-   COFF_header hdr;
-   size_t n;
+   if (!isThin)
+   {
+       /* PeCoff contains number of symbols right in it's header, so
+          we can reserve the room for symbolExtras right here. */
+       COFF_header hdr;
+       size_t n;
 
-   n = fread ( &hdr, 1, sizeof_COFF_header, f );
-   if (n != sizeof( COFF_header )) {
-       errorBelch("getNumberOfSymbols: error whilst reading `%s' header in `%S'",
-                  member_name, arch_name);
-       return NULL;
+       n = fread(&hdr, 1, sizeof_COFF_header, f);
+       if (n != sizeof(COFF_header)) {
+           errorBelch("getNumberOfSymbols: error whilst reading `%s' header in `%S'",
+               member_name, arch_name);
+           return NULL;
+       }
+       fseek(f, -sizeof_COFF_header, SEEK_CUR);
+
+       if (!verifyCOFFHeader(&hdr, arch_name)) {
+           return 0;
+       }
+
+       /* We get back 8-byte aligned memory (is that guaranteed?), but
+          the offsets to the sections within the file are all 4 mod 8
+          (is that guaranteed?). We therefore need to offset the image
+          by 4, so that all the pointers are 8-byte aligned, so that
+          pointer tagging works. */
+       /* For 32-bit case we don't need this, hence we use macro PEi386_IMAGE_OFFSET,
+          which equals to 4 for 64-bit case and 0 for 32-bit case. */
+       /* We allocate trampolines area for all symbols right behind
+          image data, aligned on 8. */
+       size = ((PEi386_IMAGE_OFFSET + size + 0x7) & ~0x7)
+           + hdr.NumberOfSymbols * sizeof(SymbolExtra);
    }
-   fseek( f, -sizeof_COFF_header, SEEK_CUR );
-
-   if (!verifyCOFFHeader(&hdr, arch_name)) {
-       return 0;
-   }
-
-   /* We get back 8-byte aligned memory (is that guaranteed?), but
-      the offsets to the sections within the file are all 4 mod 8
-      (is that guaranteed?). We therefore need to offset the image
-      by 4, so that all the pointers are 8-byte aligned, so that
-      pointer tagging works. */
-   /* For 32-bit case we don't need this, hence we use macro PEi386_IMAGE_OFFSET,
-      which equals to 4 for 64-bit case and 0 for 32-bit case. */
-   /* We allocate trampolines area for all symbols right behind
-      image data, aligned on 8. */
-   size = ((PEi386_IMAGE_OFFSET + size + 0x7) & ~0x7)
-              + hdr.NumberOfSymbols * sizeof(SymbolExtra);
 #endif
    image = VirtualAlloc(NULL, size,
                         MEM_RESERVE | MEM_COMMIT,
@@ -3133,9 +3162,9 @@ static int findAndLoadImportLibrary(ObjectCode* oc)
             /* First load the containing DLL if not loaded. */
             Section section = oc->sections[i];
 
-            pathchar* dirName = stgMallocBytes(pathsize * pathlen(oc->fileName), "findAndLoadImportLibrary(oc)");
-            pathsplit(oc->fileName, NULL, 0, dirName, pathsize * pathlen(oc->fileName), NULL, 0, NULL, 0);
-            HsPtr token = addLibrarySearchPath(dirName);
+            pathchar* dirName = pathdir(oc->fileName);
+            HsPtr token       = addLibrarySearchPath(dirName);
+            stgFree(dirName);
             char* dllName = (char*)section.start;
 
             if (strlen(dllName) == 0 || dllName[0] == ' ')

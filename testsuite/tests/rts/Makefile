@@ -162,3 +162,9 @@ linker_error3:
 	"$(TEST_HC)" -c linker_error3.c -o linker_error3_o.o
 	"$(TEST_HC)" linker_error3.o -o linker_error3 -no-hs-main -optc-g -debug -threaded
 	./linker_error3 linker_error3_o.o
+
+ .PHONY: T11788
+T11788:
+	"$(TEST_HC)" -c T11788.c -o T11788_obj.o
+	"$(AR)" rsT libT11788.a T11788_obj.o 2> /dev/null
+	echo main | "$(TEST_HC)" $(filter-out -rtsopts, $(TEST_HC_OPTS_INTERACTIVE)) T11788.hs -lT11788 -L"$(PWD)"
