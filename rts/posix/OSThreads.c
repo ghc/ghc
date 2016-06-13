@@ -318,7 +318,7 @@ setThreadAffinity (uint32_t n STG_UNUSED,
 }
 #endif
 
-#ifdef HAVE_NUMA_H
+#if HAVE_LIBNUMA
 void setThreadNode (uint32_t node)
 {
     ASSERT(node < RtsFlags.GcFlags.nNumaNodes);

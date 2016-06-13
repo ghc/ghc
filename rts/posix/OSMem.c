@@ -306,7 +306,7 @@ void osBindMBlocksToNode(
     StgWord size STG_UNUSED,
     uint32_t node STG_UNUSED)
 {
-#ifdef HAVE_NUMAIF_H
+#if HAVE_LIBNUMA
     int ret;
     StgWord mask = 0;
     mask |= 1 << node;
@@ -548,7 +548,7 @@ void osReleaseHeapMemory(void)
 
 rtsBool osNumaAvailable(void)
 {
-#ifdef HAVE_NUMA_H
+#if HAVE_LIBNUMA
     return (numa_available() != -1);
 #else
     return rtsFalse;
@@ -557,7 +557,7 @@ rtsBool osNumaAvailable(void)
 
 uint32_t osNumaNodes(void)
 {
-#ifdef HAVE_NUMA_H
+#if HAVE_LIBNUMA
     return numa_num_configured_nodes();
 #else
     return 1;
@@ -566,7 +566,7 @@ uint32_t osNumaNodes(void)
 
 StgWord osNumaMask(void)
 {
-#ifdef HAVE_NUMA_H
+#if HAVE_LIBNUMA
     struct bitmask *mask;
     mask = numa_get_mems_allowed();
     if (mask->size > sizeof(StgWord)*8) {
