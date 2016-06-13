@@ -348,7 +348,7 @@ isSourceSuffix suff  = isHaskellishSuffix suff || isCishSuffix suff
 --         specified suffix is a Haskell one.
 isHaskellishTarget :: (String, Maybe Phase) -> Bool
 isHaskellishTarget (f,Nothing) =
-  looksLikeModuleName f || isHaskellSrcFilename f || '.' `notElem` f
+  looksLikeModuleName f || isHaskellSrcFilename f || not (hasExtension f)
 isHaskellishTarget (_,Just phase) =
   phase `notElem` [ As True, As False, Cc, Cobjc, Cobjcxx, CmmCpp, Cmm
                   , StopLn]

@@ -488,3 +488,6 @@ test('T12135',
       extra_clean(['T12135.o', 'T12135.hi', 'T12135', 'T12135a/T12135.h', 'T12135b/T12135.h'])],
      run_command,
      ['$MAKE -s --no-print-directory T12135'])
+
+test('T12192', normal, run_command,
+     ['mkdir foo && (cd foo && {compiler} -v0 ../T12192)'])

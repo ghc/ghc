@@ -306,7 +306,7 @@ partition_args (arg:args) srcs objs
          the flag parser, and we want them to generate errors later in
          checkOptions, so we class them as source files (#5921)
 
-       - and finally we consider everything not containing a '.' to be
+       - and finally we consider everything without an extension to be
          a comp manager input, as shorthand for a .hs or .lhs filename.
 
       Everything else is considered to be a linker object, and passed
@@ -316,7 +316,7 @@ looks_like_an_input :: String -> Bool
 looks_like_an_input m =  isSourceFilename m
                       || looksLikeModuleName m
                       || "-" `isPrefixOf` m
-                      || '.' `notElem` m
+                      || not (hasExtension m)
 
 -- -----------------------------------------------------------------------------
 -- Option sanity checks
