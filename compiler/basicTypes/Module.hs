@@ -69,7 +69,7 @@ module Module
         lookupWithDefaultModuleEnv, mapModuleEnv, mkModuleEnv, emptyModuleEnv,
         moduleEnvKeys, moduleEnvElts, moduleEnvToList,
         unitModuleEnv, isEmptyModuleEnv,
-        foldModuleEnv, extendModuleEnvWith, filterModuleEnv,
+        extendModuleEnvWith, filterModuleEnv,
 
         -- * ModuleName mappings
         ModuleNameEnv, DModuleNameEnv,
@@ -577,9 +577,6 @@ unitModuleEnv m x = ModuleEnv (Map.singleton m x)
 
 isEmptyModuleEnv :: ModuleEnv a -> Bool
 isEmptyModuleEnv (ModuleEnv e) = Map.null e
-
-foldModuleEnv :: (a -> b -> b) -> b -> ModuleEnv a -> b
-foldModuleEnv f x (ModuleEnv e) = Map.foldRightWithKey (\_ v -> f v) x e
 
 -- | A set of 'Module's
 type ModuleSet = Set Module
