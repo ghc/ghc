@@ -10,7 +10,7 @@
 :type f
 :type g
 
-:shell $HC $HC_OPTS -fforce-recomp -c A.hs
+:shell "$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -c A.hs
 
 :load A
 -- we can now see only f
@@ -24,9 +24,12 @@
 :type f
 :type g
 
-:shell $HC $HC_OPTS -fforce-recomp -c B.hs
+:shell "$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -c B.hs
 :load B
+
+-- this will tell us we need to load A interpreted
 :module *A
+
 :add *A
 :module *A
 :type f
