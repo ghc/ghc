@@ -1,6 +1,6 @@
 
 T11339.hs:15:5: error:
-    • Illegal overloaded signature conflicts with monomorphism restriction
+    • Overloaded signature conflicts with monomorphism restriction
         t :: forall (f :: * -> *). Applicative f => (a -> f b) -> f t
     • In an equation for ‘failing’:
           failing left right afb s

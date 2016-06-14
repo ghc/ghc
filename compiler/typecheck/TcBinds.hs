@@ -955,7 +955,7 @@ checkOverloadedSig monomorphism_restriction_applies sig
   , let orig_sig = sig_inst_sig sig
   = setSrcSpan (sig_loc orig_sig) $
     failWith $
-    hang (text "Illegal overloaded signature conflicts with monomorphism restriction")
+    hang (text "Overloaded signature conflicts with monomorphism restriction")
        2 (ppr orig_sig)
   | otherwise
   = return ()
@@ -1484,7 +1484,7 @@ For (2) it would look like
     in <body>
 
 We typecheck pattern bindings as follows:
-  1. In tcLhs we bind q'::alpha, for each varibable q bound by the
+  1. In tcLhs we bind q'::alpha, for each variable q bound by the
      pattern, where q' is a fresh name, and alpha is a fresh
      unification variable; it will be the monomorphic verion of q that
      we later generalise
