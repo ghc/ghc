@@ -1479,7 +1479,7 @@ topSortModuleGraph drop_hs_boot_nodes summaries mb_root_mod
             -- the specified node.
             let root | Just node <- lookup_node HsSrcFile root_mod, graph `hasVertexG` node = node
                      | otherwise = throwGhcException (ProgramError "module does not exist")
-            in graphFromEdgedVertices (seq root (reachableG graph root))
+            in graphFromEdgedVerticesUniq (seq root (reachableG graph root))
 
 type SummaryNode = (ModSummary, Int, [Int])
 
@@ -1491,7 +1491,8 @@ summaryNodeSummary (s, _, _) = s
 
 moduleGraphNodes :: Bool -> [ModSummary]
   -> (Graph SummaryNode, HscSource -> ModuleName -> Maybe SummaryNode)
-moduleGraphNodes drop_hs_boot_nodes summaries = (graphFromEdgedVertices nodes, lookup_node)
+moduleGraphNodes drop_hs_boot_nodes summaries =
+  (graphFromEdgedVerticesUniq nodes, lookup_node)
   where
     numbered_summaries = zip summaries [1..]
 

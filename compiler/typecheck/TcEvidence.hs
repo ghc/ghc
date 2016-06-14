@@ -687,7 +687,7 @@ evVarsOfTerms = mapUnionVarSet evVarsOfTerm
 
 -- | Do SCC analysis on a bag of 'EvBind's.
 sccEvBinds :: Bag EvBind -> [SCC EvBind]
-sccEvBinds bs = stronglyConnCompFromEdgedVertices edges
+sccEvBinds bs = stronglyConnCompFromEdgedVerticesUniq edges
   where
     edges :: [(EvBind, EvVar, [EvVar])]
     edges = foldrBag ((:) . mk_node) [] bs

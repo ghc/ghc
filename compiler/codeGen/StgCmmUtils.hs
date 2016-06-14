@@ -411,7 +411,7 @@ unscramble dflags vertices = mapM_ do_component components
                                     stmt1 `mustFollow` stmt2 ]
 
         components :: [SCC Vrtx]
-        components = stronglyConnCompFromEdgedVertices edges
+        components = stronglyConnCompFromEdgedVerticesUniq edges
 
         -- do_components deal with one strongly-connected component
         -- Not cyclic, or singleton?  Just do it

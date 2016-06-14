@@ -141,7 +141,7 @@ mkSynEdges syn_decls = [ (ldecl, name, nonDetEltsUFM fvs)
             -- Note [Deterministic SCC] in Digraph.
 
 calcSynCycles :: [LTyClDecl Name] -> [SCC (LTyClDecl Name)]
-calcSynCycles = stronglyConnCompFromEdgedVertices . mkSynEdges
+calcSynCycles = stronglyConnCompFromEdgedVerticesUniq . mkSynEdges
 
 {- Note [Superclass cycle check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -471,7 +471,8 @@ findLoopBreakers deps
   = go [(tc,tc,ds) | (tc,ds) <- deps]
   where
     go edges = [ name
-               | CyclicSCC ((tc,_,_) : edges') <- stronglyConnCompFromEdgedVerticesR edges,
+               | CyclicSCC ((tc,_,_) : edges') <-
+                   stronglyConnCompFromEdgedVerticesUniqR edges,
                  name <- tyConName tc : go edges']
 
 {-

@@ -273,7 +273,7 @@ mkTopCAFInfo localCAFs = foldl addToTop Map.empty g
               cafset  = foldr Set.delete (foldl Set.union Set.empty cafsets) lbls
           in foldl (\env l -> Map.insert l (flatten env cafset) env) env lbls
 
-        g = stronglyConnCompFromEdgedVertices
+        g = stronglyConnCompFromEdgedVerticesOrd
               [ ((l,cafs), l, Set.elems cafs) | (cafs, Just l) <- localCAFs ]
 
 flatten :: Map CLabel CAFSet -> CAFSet -> CAFSet

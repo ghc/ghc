@@ -441,7 +441,7 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
     isPatSyn _ = False
 
     sccs :: [SCC (LHsBind Name)]
-    sccs = stronglyConnCompFromEdgedVertices (mkEdges sig_fn binds)
+    sccs = stronglyConnCompFromEdgedVerticesUniq (mkEdges sig_fn binds)
 
     go :: [SCC (LHsBind Name)] -> TcM (LHsBinds TcId, thing)
     go (scc:sccs) = do  { (binds1, ids1) <- tc_scc scc

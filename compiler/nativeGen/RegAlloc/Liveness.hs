@@ -679,13 +679,13 @@ sccBlocks blocks entries = map (fmap get_node) sccs
         nodes = [ (block, id, getOutEdges instrs)
                 | block@(BasicBlock id instrs) <- blocks ]
 
-        g1 = graphFromEdgedVertices nodes
+        g1 = graphFromEdgedVerticesUniq nodes
 
         reachable :: BlockSet
         reachable = setFromList [ id | (_,id,_) <- reachablesG g1 roots ]
 
-        g2 = graphFromEdgedVertices [ node | node@(_,id,_) <- nodes
-                                           , id `setMember` reachable ]
+        g2 = graphFromEdgedVerticesUniq [ node | node@(_,id,_) <- nodes
+                                               , id `setMember` reachable ]
 
         sccs = stronglyConnCompG g2
 

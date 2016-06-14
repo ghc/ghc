@@ -34,7 +34,7 @@ import VarEnv
 import Var
 import Demand           ( argOneShots, argsOneShots )
 import Maybes           ( orElse )
-import Digraph          ( SCC(..), stronglyConnCompFromEdgedVerticesR )
+import Digraph          ( SCC(..), stronglyConnCompFromEdgedVerticesUniqR )
 import Unique
 import UniqFM
 import Util
@@ -193,10 +193,12 @@ occAnalRecBind env imp_rule_edges pairs body_usage
     bndr_set = mkVarSet (map fst pairs)
 
     sccs :: [SCC (Node Details)]
-    sccs = {-# SCC "occAnalBind.scc" #-} stronglyConnCompFromEdgedVerticesR nodes
+    sccs = {-# SCC "occAnalBind.scc" #-}
+      stronglyConnCompFromEdgedVerticesUniqR nodes
 
     nodes :: [Node Details]
-    nodes = {-# SCC "occAnalBind.assoc" #-} map (makeNode env imp_rule_edges bndr_set) pairs
+    nodes = {-# SCC "occAnalBind.assoc" #-}
+      map (makeNode env imp_rule_edges bndr_set) pairs
 
 {-
 Note [Dead code]
@@ -863,7 +865,7 @@ loopBreakNodes :: Int
                -> [Binding]
 -- Return the bindings sorted into a plausible order, and marked with loop breakers.
 loopBreakNodes depth bndr_set weak_fvs nodes binds
-  = go (stronglyConnCompFromEdgedVerticesR nodes) binds
+  = go (stronglyConnCompFromEdgedVerticesUniqR nodes) binds
   where
     go []         binds = binds
     go (scc:sccs) binds = loop_break_scc scc (go sccs binds)

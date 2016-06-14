@@ -49,7 +49,8 @@ import DynFlags
 import Util             ( debugIsOn, partitionWith )
 import HscTypes         ( HscEnv, hsc_dflags )
 import ListSetOps       ( findDupsEq, removeDups, equivClasses )
-import Digraph          ( SCC, flattenSCC, flattenSCCs, stronglyConnCompFromEdgedVertices )
+import Digraph          ( SCC, flattenSCC, flattenSCCs
+                        , stronglyConnCompFromEdgedVerticesUniq )
 import UniqFM
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -1338,7 +1339,7 @@ depAnalTyClDecls :: GlobalRdrEnv
                  -> [SCC (LTyClDecl Name)]
 -- See Note [Dependency analysis of type, class, and instance decls]
 depAnalTyClDecls rdr_env ds_w_fvs
-  = stronglyConnCompFromEdgedVertices edges
+  = stronglyConnCompFromEdgedVerticesUniq edges
   where
     edges = [ (d, tcdName (unLoc d), map (getParent rdr_env) (nonDetEltsUFM fvs))
             | (d, fvs) <- ds_w_fvs ]

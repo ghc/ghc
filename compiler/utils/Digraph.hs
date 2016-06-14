@@ -3,7 +3,7 @@
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
 
 module Digraph(
-        Graph, graphFromEdgedVertices,
+        Graph, graphFromEdgedVerticesOrd, graphFromEdgedVerticesUniq,
 
         SCC(..), Node, flattenSCC, flattenSCCs,
         stronglyConnCompG,
@@ -17,7 +17,10 @@ module Digraph(
         findCycle,
 
         -- For backwards compatability with the simpler version of Digraph
-        stronglyConnCompFromEdgedVertices, stronglyConnCompFromEdgedVerticesR,
+        stronglyConnCompFromEdgedVerticesOrd,
+        stronglyConnCompFromEdgedVerticesOrdR,
+        stronglyConnCompFromEdgedVerticesUniq,
+        stronglyConnCompFromEdgedVerticesUniqR,
     ) where
 
 #include "HsVersions.h"
@@ -57,6 +60,8 @@ import qualified Data.Set as Set
 import qualified Data.Graph as G
 import Data.Graph hiding (Graph, Edge, transposeG, reachable)
 import Data.Tree
+import Unique
+import UniqFM
 
 {-
 ************************************************************************
@@ -96,29 +101,71 @@ emptyGraph = Graph (array (1, 0) []) (error "emptyGraph") (const Nothing)
 
 -- See Note [Deterministic SCC]
 graphFromEdgedVertices
-        :: Ord key                      -- We only use Ord for efficiency,
-                                        -- it doesn't effect the result, so
-                                        -- it can be safely used with Unique's.
-        => [Node key payload]           -- The graph; its ok for the
+        :: ReduceFn key payload
+        -> [Node key payload]           -- The graph; its ok for the
                                         -- out-list to contain keys which arent
                                         -- a vertex key, they are ignored
         -> Graph (Node key payload)
-graphFromEdgedVertices []             = emptyGraph
-graphFromEdgedVertices edged_vertices = Graph graph vertex_fn (key_vertex . key_extractor)
+graphFromEdgedVertices _reduceFn []            = emptyGraph
+graphFromEdgedVertices reduceFn edged_vertices =
+  Graph graph vertex_fn (key_vertex . key_extractor)
   where key_extractor (_, k, _) = k
-        (bounds, vertex_fn, key_vertex, numbered_nodes) = reduceNodesIntoVertices edged_vertices key_extractor
+        (bounds, vertex_fn, key_vertex, numbered_nodes) =
+          reduceFn edged_vertices key_extractor
         graph = array bounds [ (v, sort $ mapMaybe key_vertex ks)
                              | (v, (_, _, ks)) <- numbered_nodes]
                 -- We normalize outgoing edges by sorting on node order, so
                 -- that the result doesn't depend on the order of the edges
 
-
-reduceNodesIntoVertices
+-- See Note [Deterministic SCC]
+-- See Note [reduceNodesIntoVertices implementations]
+graphFromEdgedVerticesOrd
         :: Ord key
-        => [node]
-        -> (node -> key)
-        -> (Bounds, Vertex -> node, key -> Maybe Vertex, [(Vertex, node)])
-reduceNodesIntoVertices nodes key_extractor = (bounds, (!) vertex_map, key_vertex, numbered_nodes)
+        => [Node key payload]           -- The graph; its ok for the
+                                        -- out-list to contain keys which arent
+                                        -- a vertex key, they are ignored
+        -> Graph (Node key payload)
+graphFromEdgedVerticesOrd = graphFromEdgedVertices reduceNodesIntoVerticesOrd
+
+-- See Note [Deterministic SCC]
+-- See Note [reduceNodesIntoVertices implementations]
+graphFromEdgedVerticesUniq
+        :: Uniquable key
+        => [Node key payload]           -- The graph; its ok for the
+                                        -- out-list to contain keys which arent
+                                        -- a vertex key, they are ignored
+        -> Graph (Node key payload)
+graphFromEdgedVerticesUniq = graphFromEdgedVertices reduceNodesIntoVerticesUniq
+
+type ReduceFn key payload =
+  [Node key payload] -> (Node key payload -> key) ->
+    (Bounds, Vertex -> Node key payload
+    , key -> Maybe Vertex, [(Vertex, Node key payload)])
+
+{-
+Note [reduceNodesIntoVertices implementations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+reduceNodesIntoVertices is parameterized by the container type.
+This is to accomodate key types that don't have an Ord instance
+and hence preclude the use of Data.Map. An example of such type
+would be Unique, there's no way to implement Ord Unique
+deterministically.
+
+For such types, there's a version with a Uniquable constraint.
+This leaves us with two versions of every function that depends on
+reduceNodesIntoVertices, one with Ord constraint and the other with
+Uniquable constraint.
+For example: graphFromEdgedVerticesOrd and graphFromEdgedVerticesUniq.
+
+The Uniq version should be a tiny bit more efficient since it uses
+Data.IntMap internally.
+-}
+reduceNodesIntoVertices
+  :: ([(key, Vertex)] -> m)
+  -> (key -> m -> Maybe Vertex)
+  -> ReduceFn key payload
+reduceNodesIntoVertices fromList lookup nodes key_extractor =
+  (bounds, (!) vertex_map, key_vertex, numbered_nodes)
   where
     max_v           = length nodes - 1
     bounds          = (0, max_v) :: (Vertex, Vertex)
@@ -128,9 +175,17 @@ reduceNodesIntoVertices nodes key_extractor = (bounds, (!) vertex_map, key_verte
     numbered_nodes  = zip [0..] nodes
     vertex_map      = array bounds numbered_nodes
 
-    key_map = Map.fromList
+    key_map = fromList
       [ (key_extractor node, v) | (v, node) <- numbered_nodes ]
-    key_vertex k = Map.lookup k key_map
+    key_vertex k = lookup k key_map
+
+-- See Note [reduceNodesIntoVertices implementations]
+reduceNodesIntoVerticesOrd :: Ord key => ReduceFn key payload
+reduceNodesIntoVerticesOrd = reduceNodesIntoVertices Map.fromList Map.lookup
+
+-- See Note [reduceNodesIntoVertices implementations]
+reduceNodesIntoVerticesUniq :: Uniquable key => ReduceFn key payload
+reduceNodesIntoVerticesUniq = reduceNodesIntoVertices listToUFM (flip lookupUFM)
 
 {-
 ************************************************************************
@@ -204,7 +259,10 @@ edges going from them to earlier ones.
 {-
 Note [Deterministic SCC]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-stronglyConnCompFromEdgedVertices and stronglyConnCompFromEdgedVerticesR
+stronglyConnCompFromEdgedVerticesUniq,
+stronglyConnCompFromEdgedVerticesUniqR,
+stronglyConnCompFromEdgedVerticesOrd and
+stronglyConnCompFromEdgedVerticesOrdR
 provide a following guarantee:
 Given a deterministically ordered list of nodes it returns a deterministically
 ordered list of strongly connected components, where the list of vertices
@@ -230,22 +288,47 @@ decodeSccs Graph { gr_int_graph = graph, gr_vertex_to_node = vertex_fn } forest
 
 -- The following two versions are provided for backwards compatability:
 -- See Note [Deterministic SCC]
-stronglyConnCompFromEdgedVertices
+-- See Note [reduceNodesIntoVertices implementations]
+stronglyConnCompFromEdgedVerticesOrd
         :: Ord key
         => [Node key payload]
         -> [SCC payload]
-stronglyConnCompFromEdgedVertices
-  = map (fmap get_node) . stronglyConnCompFromEdgedVerticesR
+stronglyConnCompFromEdgedVerticesOrd
+  = map (fmap get_node) . stronglyConnCompFromEdgedVerticesOrdR
+  where get_node (n, _, _) = n
+
+-- The following two versions are provided for backwards compatability:
+-- See Note [Deterministic SCC]
+-- See Note [reduceNodesIntoVertices implementations]
+stronglyConnCompFromEdgedVerticesUniq
+        :: Uniquable key
+        => [Node key payload]
+        -> [SCC payload]
+stronglyConnCompFromEdgedVerticesUniq
+  = map (fmap get_node) . stronglyConnCompFromEdgedVerticesUniqR
   where get_node (n, _, _) = n
 
 -- The "R" interface is used when you expect to apply SCC to
 -- (some of) the result of SCC, so you dont want to lose the dependency info
 -- See Note [Deterministic SCC]
-stronglyConnCompFromEdgedVerticesR
+-- See Note [reduceNodesIntoVertices implementations]
+stronglyConnCompFromEdgedVerticesOrdR
         :: Ord key
         => [Node key payload]
         -> [SCC (Node key payload)]
-stronglyConnCompFromEdgedVerticesR = stronglyConnCompG . graphFromEdgedVertices
+stronglyConnCompFromEdgedVerticesOrdR =
+  stronglyConnCompG . graphFromEdgedVertices reduceNodesIntoVerticesOrd
+
+-- The "R" interface is used when you expect to apply SCC to
+-- (some of) the result of SCC, so you dont want to lose the dependency info
+-- See Note [Deterministic SCC]
+-- See Note [reduceNodesIntoVertices implementations]
+stronglyConnCompFromEdgedVerticesUniqR
+        :: Uniquable key
+        => [Node key payload]
+        -> [SCC (Node key payload)]
+stronglyConnCompFromEdgedVerticesUniqR =
+  stronglyConnCompG . graphFromEdgedVertices reduceNodesIntoVerticesUniq
 
 {-
 ************************************************************************

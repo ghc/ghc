@@ -2473,7 +2473,7 @@ checkForCyclicBinds ev_binds
   = pprPanic "Cycle in coercion bindings" $ ppr coercion_cycles
   where
     cycles :: [[EvBind]]
-    cycles = [c | CyclicSCC c <- stronglyConnCompFromEdgedVertices edges]
+    cycles = [c | CyclicSCC c <- stronglyConnCompFromEdgedVerticesUniq edges]
 
     coercion_cycles = [c | c <- cycles, any is_co_bind c]
     is_co_bind (EvBind { eb_lhs = b }) = isEqPred (varType b)

@@ -1847,7 +1847,7 @@ isVoidTy ty = case repType ty of
 toposortTyVars :: [TyVar] -> [TyVar]
 toposortTyVars tvs = reverse $
                      [ tv | (tv, _, _) <- topologicalSortG $
-                                          graphFromEdgedVertices nodes ]
+                                          graphFromEdgedVerticesOrd nodes ]
   where
     var_ids :: VarEnv Int
     var_ids = mkVarEnv (zip tvs [1..])

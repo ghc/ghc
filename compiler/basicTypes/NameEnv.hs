@@ -66,7 +66,7 @@ depAnal :: (node -> [Name])      -- Defs
 --
 -- The get_defs and get_uses functions are called only once per node
 depAnal get_defs get_uses nodes
-  = stronglyConnCompFromEdgedVertices (map mk_node keyed_nodes)
+  = stronglyConnCompFromEdgedVerticesUniq (map mk_node keyed_nodes)
   where
     keyed_nodes = nodes `zip` [(1::Int)..]
     mk_node (node, key) = (node, key, mapMaybe (lookupNameEnv key_map) (get_uses node))

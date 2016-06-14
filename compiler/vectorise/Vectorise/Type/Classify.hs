@@ -96,7 +96,7 @@ type TyConGroup = ([TyCon], UniqSet TyCon)
 -- Compute mutually recursive groups of tycons in topological order.
 --
 tyConGroups :: [TyCon] -> [TyConGroup]
-tyConGroups tcs = map mk_grp (stronglyConnCompFromEdgedVertices edges)
+tyConGroups tcs = map mk_grp (stronglyConnCompFromEdgedVerticesUniq edges)
   where
     edges = [((tc, ds), tc, nonDetEltsUFM ds) | tc <- tcs
                                 , let ds = tyConsOfTyCon tc]

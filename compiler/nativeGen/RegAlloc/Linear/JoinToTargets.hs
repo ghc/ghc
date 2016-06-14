@@ -169,7 +169,7 @@ joinToTargets_again
                 --
                 -- We need to do the R2 -> R3 move before R1 -> R2.
                 --
-                let sccs  = stronglyConnCompFromEdgedVerticesR graph
+                let sccs  = stronglyConnCompFromEdgedVerticesOrdR graph
 
 {-              -- debugging
                 pprTrace
@@ -313,7 +313,7 @@ handleComponent delta instr
         instrLoad       <- loadR (RegReal dreg) slot
 
         remainingFixUps <- mapM (handleComponent delta instr)
-                                (stronglyConnCompFromEdgedVerticesR rest)
+                                (stronglyConnCompFromEdgedVerticesOrdR rest)
 
         -- make sure to do all the reloads after all the spills,
         --      so we don't end up clobbering the source values.

@@ -764,7 +764,7 @@ sccBlocks
                 , BlockId
                 , [BlockId])]
 
-sccBlocks blocks = stronglyConnCompFromEdgedVerticesR (map mkNode blocks)
+sccBlocks blocks = stronglyConnCompFromEdgedVerticesUniqR (map mkNode blocks)
 
 -- we're only interested in the last instruction of
 -- the block, and only if it has a single destination.
