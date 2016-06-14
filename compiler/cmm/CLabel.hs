@@ -487,10 +487,10 @@ mkClosureLabel name         c     = IdLabel name c Closure
 mkInfoTableLabel name       c     = IdLabel name c InfoTable
 mkEntryLabel name           c     = IdLabel name c Entry
 mkClosureTableLabel name    c     = IdLabel name c ClosureTable
-mkLocalConInfoTableLabel    c con = IdLabel con c ConInfoTable
-mkLocalConEntryLabel        c con = IdLabel con c ConEntry
-mkLocalStaticInfoTableLabel c con = IdLabel con c StaticInfoTable
-mkLocalStaticConEntryLabel  c con = IdLabel con c StaticConEntry
+mkLocalConInfoTableLabel    c con = IdLabel con  c ConInfoTable
+mkLocalConEntryLabel        c con = IdLabel con  c ConEntry
+mkLocalStaticInfoTableLabel c con = IdLabel con  c StaticInfoTable
+mkLocalStaticConEntryLabel  c con = IdLabel con  c StaticConEntry
 mkConInfoTableLabel name    c     = IdLabel name c ConInfoTable
 mkStaticInfoTableLabel name c     = IdLabel name c StaticInfoTable
 
@@ -1315,7 +1315,7 @@ pprDynamicLinkerAsmLabel platform dllInfo lbl
              GotSymbolOffset -> ppr lbl <> text "@gotoff"
    else if platformOS platform == OSMinGW32
         then case dllInfo of
-             SymbolPtr -> text "__imp_" <> ppr lbl
+             SymbolPtr -> ppr lbl
              _         -> panic "pprDynamicLinkerAsmLabel"
    else panic "pprDynamicLinkerAsmLabel"
 

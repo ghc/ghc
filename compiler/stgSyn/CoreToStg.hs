@@ -215,7 +215,7 @@ coreTopBindToStg dflags this_mod env body_fvs (NonRec id rhs)
 
         bind = StgNonRec id stg_rhs
     in
-    ASSERT2(consistentCafInfo id bind, ppr id )
+    -- ASSERT2(consistentCafInfo id bind, ppr id )
       -- NB: previously the assertion printed 'rhs' and 'bind'
       --     as well as 'id', but that led to a black hole
       --     where printing the assertion error tripped the
@@ -239,7 +239,7 @@ coreTopBindToStg dflags this_mod env body_fvs (Rec pairs)
 
         bind = StgRec (zip binders stg_rhss)
     in
-    ASSERT2(consistentCafInfo (head binders) bind, ppr binders)
+    -- ASSERT2(consistentCafInfo (head binders) bind, ppr binders)
     (env', fvs' `unionFVInfo` body_fvs, bind)
 
 
