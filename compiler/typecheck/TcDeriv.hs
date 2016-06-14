@@ -1928,8 +1928,8 @@ this by simplifying the RHS to a form in which
 
 Note [Deterministic simplifyInstanceContexts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Canonicalisation uses cmpType which is nondeterministic. Sorting
-with cmpType puts the returned lists in a nondeterministic order.
+Canonicalisation uses nonDetCmpType which is nondeterministic. Sorting
+with nonDetCmpType puts the returned lists in a nondeterministic order.
 If we were to return them, we'd get class constraints in
 nondeterministic order.
 
@@ -1948,7 +1948,7 @@ Or:
 To prevent the order from being nondeterministic we only
 canonicalize when comparing and return them in the same order as
 simplifyDeriv returned them.
-See also Note [cmpType nondeterminism]
+See also Note [nonDetCmpType nondeterminism]
 -}
 
 
@@ -1999,7 +1999,7 @@ simplifyInstanceContexts infer_specs
     eqSolution a b = eqListBy (eqListBy eqType) (canSolution a) (canSolution b)
        -- Canonicalise for comparison
        -- See Note [Deterministic simplifyInstanceContexts]
-    canSolution = map (sortBy cmpType)
+    canSolution = map (sortBy nonDetCmpType)
     ------------------------------------------------------------------
     gen_soln :: DerivSpec ThetaOrigin -> TcM ThetaType
     gen_soln (DS { ds_loc = loc, ds_tvs = tyvars

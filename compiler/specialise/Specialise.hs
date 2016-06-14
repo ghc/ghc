@@ -1746,8 +1746,8 @@ CallInfoSet used to be defined as:
   data CallInfoSet = CIS Id (Map CallKey ([DictExpr], VarSet))
 
 Unfortunately this was not deterministic. The Ord instance of CallKey was
-defined in terms of cmpType which is not deterministic.
-See Note [cmpType nondeterminism].
+defined in terms of nonDetCmpType which is not deterministic.
+See Note [nonDetCmpType nondeterminism].
 The end result was that if the function had multiple specializations they would
 be generated in arbitrary order.
 

@@ -711,7 +711,9 @@ check_valid_theta env ctxt theta
        ; traceTc "check_valid_theta" (ppr theta)
        ; mapM_ (check_pred_ty env dflags ctxt) theta }
   where
-    (_,dups) = removeDups cmpType theta
+    (_,dups) = removeDups nonDetCmpType theta
+    -- It's OK to use nonDetCmpType because dups only appears in the
+    -- warning
 
 -------------------------
 {- Note [Validity checking for constraints]

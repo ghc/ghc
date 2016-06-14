@@ -128,7 +128,8 @@ module Type (
         tyCoVarsOfTypesWellScoped,
 
         -- * Type comparison
-        eqType, eqTypeX, eqTypes, cmpType, cmpTypes, cmpTypeX, cmpTypesX, cmpTc,
+        eqType, eqTypeX, eqTypes, nonDetCmpType, nonDetCmpTypes, nonDetCmpTypeX,
+        nonDetCmpTypesX, nonDetCmpTc,
         eqVarBndrs,
 
         -- * Forcing evaluation of types
@@ -2055,16 +2056,22 @@ eqType :: Type -> Type -> Bool
 -- (The kind check is a recursive call, but since all kinds have type
 -- @Type@, there is no need to check the types of kinds.)
 -- See also Note [Non-trivial definitional equality] in TyCoRep.
-eqType t1 t2 = isEqual $ cmpType t1 t2
+eqType t1 t2 = isEqual $ nonDetCmpType t1 t2
+  -- It's OK to use nonDetCmpType here and eqType is deterministic,
+  -- nonDetCmpType does equality deterministically
 
 -- | Compare types with respect to a (presumably) non-empty 'RnEnv2'.
 eqTypeX :: RnEnv2 -> Type -> Type -> Bool
-eqTypeX env t1 t2 = isEqual $ cmpTypeX env t1 t2
+eqTypeX env t1 t2 = isEqual $ nonDetCmpTypeX env t1 t2
+  -- It's OK to use nonDetCmpType here and eqTypeX is deterministic,
+  -- nonDetCmpTypeX does equality deterministically
 
 -- | Type equality on lists of types, looking through type synonyms
 -- but not newtypes.
 eqTypes :: [Type] -> [Type] -> Bool
-eqTypes tys1 tys2 = isEqual $ cmpTypes tys1 tys2
+eqTypes tys1 tys2 = isEqual $ nonDetCmpTypes tys1 tys2
+  -- It's OK to use nonDetCmpType here and eqTypes is deterministic,
+  -- nonDetCmpTypes does equality deterministically
 
 eqVarBndrs :: RnEnv2 -> [Var] -> [Var] -> Maybe RnEnv2
 -- Check that the var lists are the same length
@@ -2080,24 +2087,25 @@ eqVarBndrs _ _ _= Nothing
 -- Now here comes the real worker
 
 {-
-Note [cmpType nondeterminism]
+Note [nonDetCmpType nondeterminism]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-cmpType is implemented in terms of cmpTypeX. cmpTypeX uses cmpTc which
-compares TyCons by their Unique value. Using Uniques for ordering leads
-to nondeterminism. We hit the same problem in the TyVarTy case, comparing
-type variables is nondeterministic, note the call to nonDetCmpVar in cmpTypeX.
+nonDetCmpType is implemented in terms of nonDetCmpTypeX. nonDetCmpTypeX
+uses nonDetCmpTc which compares TyCons by their Unique value. Using Uniques for
+ordering leads to nondeterminism. We hit the same problem in the TyVarTy case,
+comparing type variables is nondeterministic, note the call to nonDetCmpVar in
+nonDetCmpTypeX.
 See Note [Unique Determinism] for more details.
 -}
 
-cmpType :: Type -> Type -> Ordering
-cmpType t1 t2
+nonDetCmpType :: Type -> Type -> Ordering
+nonDetCmpType t1 t2
   -- we know k1 and k2 have the same kind, because they both have kind *.
-  = cmpTypeX rn_env t1 t2
+  = nonDetCmpTypeX rn_env t1 t2
   where
     rn_env = mkRnEnv2 (mkInScopeSet (tyCoVarsOfTypes [t1, t2]))
 
-cmpTypes :: [Type] -> [Type] -> Ordering
-cmpTypes ts1 ts2 = cmpTypesX rn_env ts1 ts2
+nonDetCmpTypes :: [Type] -> [Type] -> Ordering
+nonDetCmpTypes ts1 ts2 = nonDetCmpTypesX rn_env ts1 ts2
   where
     rn_env = mkRnEnv2 (mkInScopeSet (tyCoVarsOfTypes (ts1 ++ ts2)))
 
@@ -2111,9 +2119,9 @@ data TypeOrdering = TLT  -- ^ @t1 < t2@
                   | TGT  -- ^ @t1 > t2@
                   deriving (Eq, Ord, Enum, Bounded)
 
-cmpTypeX :: RnEnv2 -> Type -> Type -> Ordering  -- Main workhorse
+nonDetCmpTypeX :: RnEnv2 -> Type -> Type -> Ordering  -- Main workhorse
     -- See Note [Non-trivial definitional equality] in TyCoRep
-cmpTypeX env orig_t1 orig_t2 =
+nonDetCmpTypeX env orig_t1 orig_t2 =
     case go env orig_t1 orig_t2 of
       -- If there are casts then we also need to do a comparison of the kinds of
       -- the types being compared
@@ -2165,7 +2173,7 @@ cmpTypeX env orig_t1 orig_t2 =
     go env (ForAllTy (Anon s1) t1) (ForAllTy (Anon s2) t2)
       = go env s1 s2 `thenCmpTy` go env t1 t2
     go env (TyConApp tc1 tys1) (TyConApp tc2 tys2)
-      = liftOrdering (tc1 `cmpTc` tc2) `thenCmpTy` gos env tys1 tys2
+      = liftOrdering (tc1 `nonDetCmpTc` tc2) `thenCmpTy` gos env tys1 tys2
     go _   (LitTy l1)          (LitTy l2)          = liftOrdering (compare l1 l2)
     go env (CastTy t1 _)       t2                  = hasCast $ go env t1 t2
     go env t1                  (CastTy t2 _)       = hasCast $ go env t1 t2
@@ -2176,7 +2184,7 @@ cmpTypeX env orig_t1 orig_t2 =
       = liftOrdering $ (get_rank ty1) `compare` (get_rank ty2)
       where get_rank :: Type -> Int
             get_rank (CastTy {})
-              = pprPanic "cmpTypeX.get_rank" (ppr [ty1,ty2])
+              = pprPanic "nonDetCmpTypeX.get_rank" (ppr [ty1,ty2])
             get_rank (TyVarTy {})            = 0
             get_rank (CoercionTy {})         = 1
             get_rank (AppTy {})              = 3
@@ -2192,20 +2200,20 @@ cmpTypeX env orig_t1 orig_t2 =
     gos env (ty1:tys1) (ty2:tys2) = go env ty1 ty2 `thenCmpTy` gos env tys1 tys2
 
 -------------
-cmpTypesX :: RnEnv2 -> [Type] -> [Type] -> Ordering
-cmpTypesX _   []        []        = EQ
-cmpTypesX env (t1:tys1) (t2:tys2) = cmpTypeX env t1 t2
-                                      `thenCmp` cmpTypesX env tys1 tys2
-cmpTypesX _   []        _         = LT
-cmpTypesX _   _         []        = GT
+nonDetCmpTypesX :: RnEnv2 -> [Type] -> [Type] -> Ordering
+nonDetCmpTypesX _   []        []        = EQ
+nonDetCmpTypesX env (t1:tys1) (t2:tys2) = nonDetCmpTypeX env t1 t2
+                                      `thenCmp` nonDetCmpTypesX env tys1 tys2
+nonDetCmpTypesX _   []        _         = LT
+nonDetCmpTypesX _   _         []        = GT
 
 -------------
 -- | Compare two 'TyCon's. NB: This should /never/ see the "star synonyms",
 -- as recognized by Kind.isStarKindSynonymTyCon. See Note
 -- [Kind Constraint and kind *] in Kind.
--- See Note [cmpType nondeterminism]
-cmpTc :: TyCon -> TyCon -> Ordering
-cmpTc tc1 tc2
+-- See Note [nonDetCmpType nondeterminism]
+nonDetCmpTc :: TyCon -> TyCon -> Ordering
+nonDetCmpTc tc1 tc2
   = ASSERT( not (isStarKindSynonymTyCon tc1) && not (isStarKindSynonymTyCon tc2) )
     u1 `nonDetCmpUnique` u2
   where
