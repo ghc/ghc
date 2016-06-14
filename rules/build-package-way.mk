@@ -176,13 +176,33 @@ endef # build-package-way
 # $5 = object files to link
 # $6 = output filename
 define build-dll
+	EXT="$(suffix $6)"
+	BASE="$(basename $6)"
+	LST="$(BASE).lst"
+	$(shell nm -g $5 | sed -r 's/^.+\s[A-Z]\s(.+)/\1/' | sed -r 's/^.+:.*$//g' | sed '/^\s*$/d' > $LST)
+	SYMBOLS=`cat $LST | wc -l`
+	echo "Number of symbols in $6: $$SYMBOLS"
+    # Now check that the DLL doesn't have too many symbols. See trac #5987.
+	case $(shell echo $$(($SYMBOLS / 65536))) in 
+	   0) echo DLL $6 OK;;
+	  [0-9]*) echo Too many symbols in DLL $6; tail $LST; exit 1;; 
+	  *) echo bad DLL $6; exit 1;;
+	esac
+
+	awk 'NR%65536==1{def="$BASE_"++i+".def";}{print "    " $0 > def}' $LST
+	DEFS=$("$BASE_*.def")
+	for file in $DEFS
+	do
+	  DLLfile="$(shell $$(basename $file)).dll"
+	  DLLimport="$(shell $$(basename $file)).dll.a"
+	  sed -i '1i\LIBRARY "$DLLfile"\EXPORTS' $file
+	  dlltool -d $file -l $DLLimport
+	done
+
 	$(call cmd,$1_$2_HC) $($1_$2_$3_ALL_HC_OPTS) $($1_$2_$3_GHC_LD_OPTS) $4 $5 \
 	    -shared -dynamic -dynload deploy \
 	    $(addprefix -l,$($1_$2_EXTRA_LIBRARIES)) \
 	    -no-auto-link-packages \
 	    -o $6
-# Now check that the DLL doesn't have too many symbols. See trac #5987.
-	SYMBOLS=`$(OBJDUMP) -p $6 | sed -n "1,/^.Ordinal\/Name Pointer/ D; p; /^$$/ q" | tail -n +2 | wc -l`; echo "Number of symbols in $6: $$SYMBOLS"
-	case `$(OBJDUMP) -p $6 | sed -n "1,/^.Ordinal\/Name Pointer/ D; p; /^$$/ q" | grep "\[ *0\]" | wc -l` in 1) echo DLL $6 OK;; 0) echo No symbols in DLL $6; exit 1;; [0-9]*) echo Too many symbols in DLL $6; $(OBJDUMP) -p $6 | sed -n "1,/^.Ordinal\/Name Pointer/ D; p; /^$$/ q" | tail; exit 1;; *) echo bad DLL $6; exit 1;; esac
 endef
 
