@@ -23,11 +23,11 @@ process_dll_link() {
     case $(($SYMBOLS / 65536)) in 
         0) 
             echo DLL $6 OK
+            exit 0
             ;;
         [0-9]*) 
             echo Too many symbols in DLL $6
-            tail $exports
-            exit 1
+            echo "We'll have to split the dll..."
             ;; 
         *) 
             echo bad DLL $6
@@ -35,18 +35,16 @@ process_dll_link() {
             ;;
     esac
 
-    awk '\
-        NR%65536==1 \
-        {def="$BASE_"++i+".def";} \
-        {print "    " $0 > def} \
-        ' $exports
+    i=0
+    awk -v root="$base" 'NR%65536==1{def=root "-" ++i ".def";}{print "    " $0 > def}' "$exports"
 
-    defs="$BASE_*.def"
+    defs="$base*.def"
     for file in $defs
     do
-        DLLfile="$(shell $$(basename $file)).$ext"
-        DLLimport="$(shell $$(basename $file)).dll.a"
-        sed -i '1i\LIBRARY "$DLLfile"\EXPORTS' $file
+        basefile="$(basename $file)"
+        DLLfile="${file%.*}.$ext"
+        DLLimport="${file%.*}.dll.a"
+        sed -i "1i\LIBRARY $basefile\EXPORTS" $file
         dlltool -d $file -l $DLLimport
     done
 }
@@ -59,10 +57,9 @@ test() {
     dir="compiler/stage2/build"
     way=""
     flags=""
-    
+
     process_dll_link "$dir" "$distdir" "$way" "$flags" "$objs" "$out"
 }
-
 
 usage() {
     echo "$0 - Split a dll is required and perform the linking"
