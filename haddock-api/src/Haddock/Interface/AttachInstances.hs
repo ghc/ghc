@@ -169,15 +169,15 @@ instHead (_, _, cls, args)
   = (map argCount args, className cls, map simplify args)
 
 argCount :: Type -> Int
-argCount (AppTy t _) = argCount t + 1
+argCount (AppTy t _)     = argCount t + 1
 argCount (TyConApp _ ts) = length ts
-argCount (ForAllTy (Anon _) _ ) = 2
-argCount (ForAllTy _ t) = argCount t
-argCount (CastTy t _) = argCount t
+argCount (FunTy _ _ )    = 2
+argCount (ForAllTy _ t)  = argCount t
+argCount (CastTy t _)    = argCount t
 argCount _ = 0
 
 simplify :: Type -> SimpleType
-simplify (ForAllTy (Anon t1) t2) = SimpleType funTyConName [simplify t1, simplify t2]
+simplify (FunTy t1 t2)  = SimpleType funTyConName [simplify t1, simplify t2]
 simplify (ForAllTy _ t) = simplify t
 simplify (AppTy t1 t2) = SimpleType s (ts ++ maybeToList (simplify_maybe t2))
   where (SimpleType s ts) = simplify t1
@@ -239,8 +239,9 @@ isTypeHidden expInfo = typeHidden
       case t of
         TyVarTy {} -> False
         AppTy t1 t2 -> typeHidden t1 || typeHidden t2
+        FunTy t1 t2 -> typeHidden t1 || typeHidden t2
         TyConApp tcon args -> nameHidden (getName tcon) || any typeHidden args
-        ForAllTy bndr ty -> typeHidden (binderType bndr) || typeHidden ty
+        ForAllTy bndr ty -> typeHidden (tyVarKind (binderVar bndr)) || typeHidden ty
         LitTy _ -> False
         CastTy ty _ -> typeHidden ty
         CoercionTy {} -> False

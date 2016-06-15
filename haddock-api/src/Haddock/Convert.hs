@@ -406,7 +406,7 @@ synifyType _ (AppTy t1 t2) = let
   s1 = synifyType WithinType t1
   s2 = synifyType WithinType t2
   in noLoc $ HsAppTy s1 s2
-synifyType _ (ForAllTy (Anon t1) t2) = let
+synifyType _ (FunTy t1 t2) = let
   s1 = synifyType WithinType t1
   s2 = synifyType WithinType t2
   in noLoc $ HsFunTy s1 s2
