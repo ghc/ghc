@@ -70,7 +70,7 @@ process_dll_link() {
     echo "$obj_files" | sed 's/\s/\n/g' | sed '/^\s*$/d' > "$base-$i.objs"
     
     count=`ls $base-*.lst | wc -l | cut -d' ' -f1`
-    echo "OK, we'll split the DLL into $count"
+    echo "OK, based on the amount of symbols we'll split the DLL into $count"
 
     items=$(seq 1 $count)
     for i in $items
@@ -118,7 +118,6 @@ process_dll_link() {
     echo "save" >> $arscript
     echo "end" >> $arscript
     ar -M < $arscript
-    rm -f $implibs $arscript
 
     # now exit
     exit 0
@@ -150,9 +149,11 @@ usage() {
 case $1 in
     test)
         test
+        exit 0
         ;;
     link)
         process_dll_link "$2" "$3" "$4" "$5" "$6" "$7" "$8"
+        exit 0
         ;;
     *)
         usage
