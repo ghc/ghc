@@ -1,5 +1,5 @@
 
-:l ../shell.hs
+:l shell.hs
 :def shell (\s -> do shell s; return "")
 
 :set prompt ""

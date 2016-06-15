@@ -2,7 +2,7 @@
 -- This scenario demands propagation of types up in the tree of terms
 
 :set -XExistentialQuantification -XDeriveDataTypeable -XGeneralizedNewtypeDeriving
-:l ../Test 
+:l Test 
 let t = O (map Just [[1,1],[2,2]])
 :p t
 seq _t1 ()  -- The contents of the opaque

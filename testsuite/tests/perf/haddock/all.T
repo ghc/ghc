@@ -47,7 +47,7 @@ test('haddock.base',
             # 2016-04-06: 5509757068 (x86/Linux)
       ],
      stats,
-     ['../../../../libraries/base/dist-install/haddock.t'])
+     ['haddock.t'])
 
 test('haddock.Cabal',
      [unless(in_tree_compiler(), skip), req_haddock
@@ -97,7 +97,7 @@ test('haddock.Cabal',
             # 2016-04-06: 6268156056 (x86/Linux)
       ],
      stats,
-     ['../../../../libraries/Cabal/Cabal/dist-install/haddock.t'])
+     ['haddock.t'])
 
 test('haddock.compiler',
      [unless(in_tree_compiler(), skip), req_haddock
@@ -131,4 +131,4 @@ test('haddock.compiler',
             # 2016-04-06: 16222702892 (x86/Linux)
       ],
      stats,
-     ['../../../../compiler/stage2/haddock.t'])
+     ['haddock.t'])

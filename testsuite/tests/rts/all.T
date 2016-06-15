@@ -69,7 +69,7 @@ test('T2783', [ omit_ways(['ghci']), exit_code(1) ], compile_and_run, [''])
 test('testwsdeque', [unless(in_tree_compiler(), skip),
                     req_smp, # needs atomic 'cas'
                     c_src, only_ways(['threaded1', 'threaded2'])],
-                    compile_and_run, ['-I../../../rts'])
+                    compile_and_run, [''])
 
 test('T3236', [c_src, only_ways(['normal','threaded1']), exit_code(1)], compile_and_run, [''])
 

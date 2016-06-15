@@ -546,25 +546,6 @@ def executeSetups(fs, name, opts):
 # The current directory of tests
 
 def newTestDir(tempdir, dir):
-    # opts.testdir should be quoted when used, to make sure the testsuite
-    # keeps working when it contains backward slashes, for example from
-    # using os.path.join. Windows native and mingw* python
-    # (/mingw64/bin/python) set `os.path.sep = '\\'`, while msys2 python
-    # (/bin/python, /usr/bin/python or /usr/local/bin/python) sets
-    # `os.path.sep = '/'`.
-    # To catch usage of unquoted opts.testdir early, insert some spaces into
-    # tempdir.
-    tempdir = os.path.join(tempdir, 'test   spaces')
-
-    # Hack. A few tests depend on files in ancestor directories
-    # (e.g. extra_files(['../../../../libraries/base/dist-install/haddock.t']))
-    # Make sure tempdir is sufficiently "deep", such that copying/linking those
-    # files won't cause any problems.
-    #
-    # If you received a framework failure about adding an extra level:
-    #  * add one extra '../' to the startswith('../../../../../') in do_test
-    #  * add one more number here:
-    tempdir = os.path.join(tempdir, '1', '2', '3')
 
     global thisdir_settings
     # reset the options for this test directory
@@ -572,10 +553,12 @@ def newTestDir(tempdir, dir):
         return _newTestDir(name, opts, tempdir, dir)
     thisdir_settings = settings
 
+# Should be equal to entry in toplevel .gitignore.
+testdir_suffix = '.run'
 
 def _newTestDir(name, opts, tempdir, dir):
     opts.srcdir = os.path.join(os.getcwd(), dir)
-    opts.testdir = os.path.join(tempdir, dir, name)
+    opts.testdir = os.path.join(tempdir, dir, name + testdir_suffix)
     opts.compiler_always_flags = config.compiler_always_flags
 
 # -----------------------------------------------------------------------------
@@ -718,13 +701,10 @@ def test_common_work (name, opts, func, args):
         # this seems to be necessary for only about 10% of all
         # tests).
         files = set((f for f in os.listdir(opts.srcdir)
-                        if f.startswith(name)))
+                        if f.startswith(name) and
+                           not f.endswith(testdir_suffix)))
         for filename in (opts.extra_files + extra_src_files.get(name, [])):
-            if filename.startswith('../../../../../../'):
-                framework_fail(name, 'whole-test',
-                    'add extra level to testlib.py:newTestDir for: ' + filename)
-
-            elif filename.startswith('/'):
+            if filename.startswith('/'):
                 framework_fail(name, 'whole-test',
                     'no absolute paths in extra_files please: ' + filename)
 
@@ -790,8 +770,18 @@ def do_test(name, way, func, args, files):
         # would otherwise (accidentally) write to the same output file.
         # It also makes it easier to keep the testsuite clean.
 
-        for filename in files:
-            src = in_srcdir(filename)
+        for extra_file in files:
+            src = in_srcdir(extra_file)
+            if extra_file.startswith('..'):
+                # In case the extra_file is a file in an ancestor
+                # directory (e.g. extra_files(['../shell.hs'])), make
+                # sure it is copied to the test directory
+                # (testdir/shell.hs), instead of ending up somewhere
+                # else in the tree (testdir/../shell.hs)
+                filename = os.path.basename(extra_file)
+            else:
+                filename = extra_file
+            assert not '..' in filename # no funny stuff (foo/../../bar)
             dst = in_testdir(filename)
 
             if os.path.isfile(src):
@@ -821,7 +811,7 @@ def do_test(name, way, func, args, files):
                     pass
                 else:
                     framework_fail(name, way,
-                        'extra_file does not exist: ' + filename)
+                        'extra_file does not exist: ' + extra_file)
 
         if not files:
             # Always create the testdir, even when no files were copied

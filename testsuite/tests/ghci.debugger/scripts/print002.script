@@ -11,7 +11,7 @@ let i = Just (10::Integer)
 case i of Just j -> Control.Exception.evaluate j
 :p i
 
-:l ../Test.hs
+:l Test.hs
 
 let s = S1 'a' 'b' 'c'
 s

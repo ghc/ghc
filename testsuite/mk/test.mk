@@ -192,11 +192,20 @@ RUNTEST_OPTS += --skip-perf-tests
 endif
 
 ifeq "$(CLEANUP)" "0"
-RUNTEST_OPTS += -e cleanup=False
+RUNTEST_OPTS += -e config.cleanup=False
 else ifeq "$(CLEANUP)" "NO"
-RUNTEST_OPTS += -e cleanup=False
+RUNTEST_OPTS += -e config.cleanup=False
 else
-RUNTEST_OPTS += -e cleanup=True
+RUNTEST_OPTS += -e config.cleanup=True
+endif
+
+ifeq "$(LOCAL)" "0"
+# See Note [Running tests in /tmp].
+RUNTEST_OPTS += -e config.local=False
+else ifeq "$(LOCAL)" "NO"
+RUNTEST_OPTS += -e config.local=False
+else
+RUNTEST_OPTS += -e config.local=True
 endif
 
 RUNTEST_OPTS +=  \

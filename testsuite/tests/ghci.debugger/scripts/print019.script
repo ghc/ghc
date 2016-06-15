@@ -1,5 +1,5 @@
 :set -XExistentialQuantification -XDeriveDataTypeable -XGeneralizedNewtypeDeriving
-:l ../Test
+:l Test
 let a = O (id 'a')
 let b = O (id "abc")
 :p a

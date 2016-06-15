@@ -5,15 +5,15 @@ Stopped in <exception thrown>, <unknown>
 _exception :: e = _
 Stopped in <exception thrown>, <unknown>
 _exception :: e = _
--1  : main (../Test7.hs:2:18-28)
--2  : main (../Test7.hs:2:8-29)
+-1  : main (Test7.hs:2:18-28)
+-2  : main (Test7.hs:2:8-29)
 <end of history>
-Logged breakpoint at ../Test7.hs:2:18-28
+Logged breakpoint at Test7.hs:2:18-28
 _result :: a
-Logged breakpoint at ../Test7.hs:2:8-29
+Logged breakpoint at Test7.hs:2:8-29
 _result :: IO a
 no more logged breakpoints
-Logged breakpoint at ../Test7.hs:2:18-28
+Logged breakpoint at Test7.hs:2:18-28
 _result :: a
 Stopped at <unknown>
 _exception :: e
@@ -22,28 +22,28 @@ _exception = SomeException
                (ErrorCallWithLocation
                   "foo"
                   "CallStack (from HasCallStack):
-  error, called at ../Test7.hs:2:18 in main:Main")
+  error, called at Test7.hs:2:18 in main:Main")
 _result :: a = _
 _exception :: SomeException = SomeException
                                 (ErrorCallWithLocation
                                    "foo"
                                    "CallStack (from HasCallStack):
-  error, called at ../Test7.hs:2:18 in main:Main")
+  error, called at Test7.hs:2:18 in main:Main")
 *** Exception: foo
 CallStack (from HasCallStack):
-  error, called at ../Test7.hs:2:18 in main:Main
+  error, called at Test7.hs:2:18 in main:Main
 Stopped in <exception thrown>, <unknown>
 _exception :: e = SomeException
                     (ErrorCallWithLocation
                        "foo"
                        "CallStack (from HasCallStack):
-  error, called at ../Test7.hs:2:18 in main:Main")
+  error, called at Test7.hs:2:18 in main:Main")
 Stopped in <exception thrown>, <unknown>
 _exception :: e = SomeException
                     (ErrorCallWithLocation
                        "foo"
                        "CallStack (from HasCallStack):
-  error, called at ../Test7.hs:2:18 in main:Main")
+  error, called at Test7.hs:2:18 in main:Main")
 *** Exception: foo
 CallStack (from HasCallStack):
-  error, called at ../Test7.hs:2:18 in main:Main
+  error, called at Test7.hs:2:18 in main:Main

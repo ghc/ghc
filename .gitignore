@@ -181,3 +181,6 @@ GIT_COMMIT_ID
 .ghc
 .bash_history
 .gitconfig
+
+# Should be equal to testdir_suffix from testsuite/driver/testlib.py.
+*.run

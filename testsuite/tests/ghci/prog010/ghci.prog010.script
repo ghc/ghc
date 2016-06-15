@@ -1,6 +1,6 @@
 -- test for #1205
 
-:l ../shell.hs
+:l shell.hs
 :def shell (\s -> do shell s; return "")
 
 :shell rm -f A.o A.hi B.o B.hi

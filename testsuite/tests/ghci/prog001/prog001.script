@@ -1,6 +1,6 @@
 :unset +s
 
-:l ../shell.hs
+:l shell.hs
 :def shell (\s -> do shell s; return "")
 
 -- first, tidy up:

@@ -1,6 +1,6 @@
 -- Recovery of types, polymorphic bindings inside a bkpt
 
-:l ../QSort
+:l QSort
 :break 5
 qsort [8::Integer, 4]
 

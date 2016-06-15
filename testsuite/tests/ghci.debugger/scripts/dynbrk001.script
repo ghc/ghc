@@ -1,7 +1,7 @@
 
 :set -fprint-explicit-foralls
 
-:l ../QSort
+:l QSort
 
 :delete 1        
 -- Illegal: empty breakpoint list

@@ -1,4 +1,4 @@
-:l ../QSort
+:l QSort
 :break qsort
 qsort [3::Integer,2,1]
 :i a

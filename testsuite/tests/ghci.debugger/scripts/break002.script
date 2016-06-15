@@ -1,5 +1,5 @@
 -- can't set breakpoints on non-interpreted things:
 :b Data.List.map
 
-:l ../Test2.hs
+:l Test2.hs
 :b Data.List.map

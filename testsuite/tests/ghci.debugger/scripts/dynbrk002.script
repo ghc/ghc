@@ -1,6 +1,6 @@
 -- :abandon stops a debugging session 
 
-:l ../QSort
+:l QSort
 :break QSort 5
 run
 :abandon

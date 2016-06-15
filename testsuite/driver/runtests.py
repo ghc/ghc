@@ -276,10 +276,24 @@ else:
     # set stdout to unbuffered (is this the best way to do it?)
     sys.stdout = os.fdopen(sys.__stdout__.fileno(), "w", 0)
 
-tempdir = tempfile.mkdtemp('', 'ghctest-')
+if config.local:
+    tempdir = ''
+else:
+    # See note [Running tests in /tmp]
+    tempdir = tempfile.mkdtemp('', 'ghctest-')
+
+    # opts.testdir should be quoted when used, to make sure the testsuite
+    # keeps working when it contains backward slashes, for example from
+    # using os.path.join. Windows native and mingw* python
+    # (/mingw64/bin/python) set `os.path.sep = '\\'`, while msys2 python
+    # (/bin/python, /usr/bin/python or /usr/local/bin/python) sets
+    # `os.path.sep = '/'`.
+    # To catch usage of unquoted opts.testdir early, insert some spaces into
+    # tempdir.
+    tempdir = os.path.join(tempdir, 'test   spaces')
 
 def cleanup_and_exit(exitcode):
-    if config.cleanup:
+    if config.cleanup and tempdir:
         shutil.rmtree(tempdir, ignore_errors=True)
     exit(exitcode)
 
@@ -334,3 +348,35 @@ else:
         summary(t, open(config.summary_file, 'w'))
 
 cleanup_and_exit(0)
+
+# Note [Running tests in /tmp]
+#
+# Use LOCAL=0 to run tests in /tmp, to catch tests that use files from
+# the source directory without copying them to the test directory first.
+#
+# As an example, take a run_command test with a Makefile containing
+# `$(TEST_HC) ../Foo.hs`. GHC will now create the output files Foo.o and
+# Foo.hi in the source directory. There are 2 problems with this:
+# * Output files in the source directory won't get cleaned up automatically.
+# * Two tests might (over)write the same output file.
+#
+# Tests that only fail when run concurrently with other tests are the
+# worst, so we try to catch them early by enabling LOCAL=0 in validate.
+#
+# Adding -outputdir='.' to TEST_HC_OPTS would help a bit, but it requires
+# making changes to quite a few tests. The problem is that
+# `$(TEST_HC) ../Foo.hs -outputdir=.` with Foo.hs containing
+# `module Main where` does not produce Foo.o, as it would without
+# -outputdir, but Main.o. See [1].
+#
+# Using -outputdir='.' is not foolproof anyway, since it does not change
+# the destination of the final executable (Foo.exe).
+#
+# Another hardening method that could be tried is to `chmod -w` the
+# source directory.
+#
+# By default we set LOCAL=1, because it makes it easier to inspect the
+# test directory while working on a new test.
+#
+# [1]
+# https://downloads.haskell.org/~ghc/8.0.1/docs/html/users_guide/separate_compilation.html#output-files

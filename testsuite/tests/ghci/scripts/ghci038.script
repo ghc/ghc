@@ -1,5 +1,5 @@
 -- Tests for ":show imports" and import/:module
-:l ../shell.hs
+:l shell.hs
 :def shell (\s -> do shell s; return "")
 :l
 

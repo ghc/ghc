@@ -2,7 +2,7 @@
 -- handled correctly by RtClosureInspect
 
 :set -XUnboxedTuples -fobject-code
-:l ../Unboxed
+:l Unboxed
 :p o1
 :p o2
 force_them

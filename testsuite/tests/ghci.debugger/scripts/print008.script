@@ -2,7 +2,7 @@
 -- testing that tyvars are instantiated to unknown
 
 :set -XExistentialQuantification -XDeriveDataTypeable -XGeneralizedNewtypeDeriving
-:l ../Test
+:l Test
 let t = O (map Just [[1,1],[2,2]])
 
 :p t

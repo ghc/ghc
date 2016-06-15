@@ -1,4 +1,4 @@
-:l ../QSort.hs
+:l QSort.hs
 :set -fbreak-on-exception
 :trace qsort ("abc" ++ undefined)
 :back

@@ -68,7 +68,7 @@ test('lazy-bs-alloc',
             # 2014-01-28: Widen 1->2% (x86/Windows was at 425212)
             # 2016-04-06: 429760 (x86/Linux) no idea what happened
       only_ways(['normal']),
-      extra_run_opts('../../numeric/should_run/arith011.stdout'),
+      extra_run_opts('arith011.stdout'),
       ignore_output,
 
       # Use `+RTS -G1` for more stable residency measurements. Note [residency].

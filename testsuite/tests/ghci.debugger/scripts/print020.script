@@ -1,5 +1,5 @@
 :set -fno-warn-overlapping-patterns
-:l ../HappyTest.hs
+:l HappyTest.hs
 :break lexer
 main
 :force _result

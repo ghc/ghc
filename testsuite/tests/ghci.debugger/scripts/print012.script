@@ -1,6 +1,6 @@
 :set -XGADTs -XRankNTypes -XExistentialQuantification -XDeriveDataTypeable -XGeneralizedNewtypeDeriving
-:l ../GADT
-:a ../Test
+:l GADT
+:a Test
 :m +Main
 let o = O (id foo)
 :p o

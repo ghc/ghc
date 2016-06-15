@@ -274,6 +274,12 @@ class TestOptions:
        self.compile_timeout_multiplier = 1.0
        self.run_timeout_multiplier = 1.0
 
+       self.cleanup = True
+
+       # Sould we run tests in a local subdirectory (<testname>-run) or
+       # in temporary directory in /tmp? See Note [Running tests in /tmp].
+       self.local = True
+
 # The default set of options
 global default_testopts
 default_testopts = TestOptions()

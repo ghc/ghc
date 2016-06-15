@@ -1,6 +1,6 @@
 -- Test -fwarn-type-errors
 -- This test shows how each error is printed at runtime
-:l ../../typecheck/should_run/Defer01
+:l Defer01
 t5624
 print a
 print (b B)

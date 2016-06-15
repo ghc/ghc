@@ -3,7 +3,7 @@ error "foo"
 :set -fbreak-on-exception
 error "foo"
 :abandon
-:l ../Test7.hs
+:l Test7.hs
 :tr main
 :hist
 :back

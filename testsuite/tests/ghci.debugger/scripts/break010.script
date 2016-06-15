@@ -1,4 +1,4 @@
-:l ../Test6.hs
+:l Test6.hs
 :b 5
 main
 :abandon

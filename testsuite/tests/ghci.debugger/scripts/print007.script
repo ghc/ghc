@@ -5,7 +5,7 @@
 -- but they seem to be not.
 -- So this test fails with wrong output
 :set -XExistentialQuantification -XDeriveDataTypeable -XGeneralizedNewtypeDeriving
-:l ../Test
+:l Test
 
 let s = S2 'a' 'b'
 seq s ()
@@ -13,7 +13,7 @@ seq s ()
 
 :set -funbox-strict-fields 
 :l
-:l ../Test
+:l Test
 
 let s = S2 'a' 'b'
 seq s ()
@@ -22,7 +22,7 @@ seq s ()
 
 :set -funbox-strict-fields -O
 :l
-:l ../Test
+:l Test
 
 let s = S2 'a' 'b'
 seq s ()
