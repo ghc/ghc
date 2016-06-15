@@ -69,15 +69,14 @@ process_dll_link() {
     echo "$buffer"    | sed 's/\s/\n/g' | sed '/^\s*$/d' > "$base-$i.lst"
     echo "$obj_files" | sed 's/\s/\n/g' | sed '/^\s*$/d' > "$base-$i.objs"
     
-    count=`ls $base-*.lst | wc -l`
+    count=`ls $base-*.lst | wc -l | cut -d' ' -f1`
     echo "OK, we'll split the DLL into $count"
 
-    for i in $(seq 1 $count)
+    items=$(seq 1 $count)
+    for i in $items
     do
         file="$base-$i.def"
         lstfile="$base-$i.lst"
-        objfile="$base-$i.objs"
-        objs=`cat "$objfile"`
         awk -v root="$file" '{def=root;}{print "    \"" $0 "\""> def}' $lstfile
         echo "Processing $file..."
         basefile="$(basename $file)"
@@ -87,32 +86,37 @@ process_dll_link() {
         dlltool -d $file -l $DLLimport
     done
 
-    # Create import libs and perform link
-    #defs="$base-*.def"
-    #for file in $defs
-    #do
-    #    echo "Processing $file..."
-    #    basefile="$(basename $file)"
-    #    DLLfile="${basefile%.*}.$ext"
-    #    DLLimport="${file%.*}.dll.a"
-    #    sed -i "1i\LIBRARY \"$DLLfile\"\\nEXPORTS" $file
-    #    dlltool -d $file -l $DLLimport
-    #    eval "$7 $file -o $DLLfile"
-    #done
-    
+    for i in $items
+    do
+        def="$base-$i.def"
+        objfile="$base-$i.objs"
+        objs=`cat "$objfile" | tr "\n" " "`
+        basefile="$(basename $def)"
+        DLLfile="${basefile%.*}.$ext"
+        others=$(echo "$items $i" | tr " " "\n" | sort | uniq -u)
+        declare -A imports
+        for j in $others
+        do
+            imports=`echo "$imports" "$base-$j.dll.a"`
+        done
+        cmd="$7 $objs $imports -o $2/$DLLfile"
+        echo "$cmd"
+        eval "$cmd"
+    done
+
     # do some cleanup and create merged lib
-    #implibs="$base*.dll.a"
-    #arscript="$base.mri"
-    #impLib="$base.dll.a"
-    #echo "create $impLib" > $arscript
-    #for file in $implibs
-    #do
-    #    echo "addlib $file" >> $arscript
-    #done
-    #echo "save" >> $arscript
-    #echo "end" >> $arscript
-    #ar -M < $arscript
-    #rm -f $(implibs) $arscript
+    implibs="$base*.dll.a"
+    arscript="$base.mri"
+    impLib="$base.dll.a"
+    echo "create $impLib" > $arscript
+    for file in $implibs
+    do
+        echo "addlib $file" >> $arscript
+    done
+    echo "save" >> $arscript
+    echo "end" >> $arscript
+    ar -M < $arscript
+    rm -f $implibs $arscript
 }
 
 test() {
