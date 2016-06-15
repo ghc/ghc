@@ -93,11 +93,13 @@ process_dll_link() {
         objs=`cat "$objfile" | tr "\n" " "`
         basefile="$(basename $def)"
         DLLfile="${basefile%.*}.$ext"
-        others=$(echo "$items $i" | tr " " "\n" | sort | uniq -u)
         declare -A imports
-        for j in $others
+        for j in $items
         do
-            imports=`echo "$imports" "$base-$j.dll.a"`
+            if [ "$j" -ne "$i" ]
+            then
+                imports=`echo "$imports" "$base-$j.dll.a"`
+            fi
         done
         cmd="$7 $objs $imports -o $2/$DLLfile"
         echo "$cmd"
@@ -117,6 +119,9 @@ process_dll_link() {
     echo "end" >> $arscript
     ar -M < $arscript
     rm -f $implibs $arscript
+
+    # now exit
+    exit 0
 }
 
 test() {
@@ -135,12 +140,11 @@ test() {
 usage() {
     echo "$0 - Split a dll is required and perform the linking"
     echo
-    echo "Usage: $0 <action> <arch>"
+    echo "Usage: $0 <action>"
     echo
     echo "Where <action> is one of,"
-    echo "    download     download the necessary tarballs for the given architecture"
-    echo "    verify       verify the existance and correctness of the necessary tarballs"
-    echo "and <arch> is one of i386, x86_64, or all"
+    echo "    test    perform a test link of libGHC"
+    echo "    link    perform a real link of dll, arguments: dir distdir way flags objs out link_cmd"
 }
 
 case $1 in
@@ -148,7 +152,7 @@ case $1 in
         test
         ;;
     link)
-        link=0
+        process_dll_link "$2" "$3" "$4" "$5" "$6" "$7" "$8"
         ;;
     *)
         usage
