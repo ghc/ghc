@@ -23,7 +23,10 @@ process_dll_link() {
     # Now check that the DLL doesn't have too many symbols. See trac #5987.
     case $(($SYMBOLS / 65535)) in 
         0) 
-            echo DLL $6 OK
+            echo DLL $6 OK, no need to split
+            cmd="$7 $5 -o $6"
+            echo "$cmd"
+            eval "$cmd"
             exit 0
             ;;
         [0-9]*) 
