@@ -540,9 +540,6 @@ tc_mkRepTy gk_ tycon k =
 
     let mkSum' a b = mkTyConApp plus  [k,a,b]
         mkProd a b = mkTyConApp times [k,a,b]
-        -- The second kind variable of (:.:) must always be *.
-        -- See Note [Handling kinds in a Rep instance]
-        mkComp a b = mkTyConApp comp  [k,liftedTypeKind,a,b]
         mkRec0 a   = mkBoxTy uAddr uChar uDouble uFloat uInt uWord rec0 k a
         mkRec1 a   = mkTyConApp rec1  [k,a]
         mkPar1     = mkTyConTy  par1
@@ -582,7 +579,7 @@ tc_mkRepTy gk_ tycon k =
             -- the presence of composition).
             argPar argVar = argTyFold argVar $ ArgTyAlg
               {ata_rec0 = mkRec0, ata_par1 = mkPar1,
-               ata_rec1 = mkRec1, ata_comp = mkComp}
+               ata_rec1 = mkRec1, ata_comp = mkComp comp k}
 
         tyConName_user = case tyConFamInst_maybe tycon of
                            Just (ptycon, _) -> tyConName ptycon
@@ -639,6 +636,21 @@ tc_mkRepTy gk_ tycon k =
                                          HsUnpack{}  -> pDUpk
 
     return (mkD tycon)
+
+mkComp :: TyCon -> Kind -> Type -> Type -> Type
+mkComp comp k f g
+  | k1_first  = mkTyConApp comp  [k,liftedTypeKind,f,g]
+  | otherwise = mkTyConApp comp  [liftedTypeKind,k,f,g]
+  where
+    -- Which of these is the case?
+    --     newtype (:.:) {k1} {k2} (f :: k2->*) (g :: k1->k2) (p :: k1) = ...
+    -- or  newtype (:.:) {k2} {k1} (f :: k2->*) (g :: k1->k2) (p :: k1) = ...
+    -- We want to instantiate with k1=k, and k2=*
+    --    Reason for k2=*: see Note [Handling kinds in a Rep instance]
+    -- But we need to know which way round!
+    k1_first = k_first == p_kind_var
+    [k_first,_,_,_,p] = tyConTyVars comp
+    Just p_kind_var = getTyVar_maybe (tyVarKind p)
 
 -- Given the TyCons for each URec-related type synonym, check to see if the
 -- given type is an unlifted type that generics understands. If so, return

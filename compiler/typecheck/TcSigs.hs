@@ -34,7 +34,7 @@ import TcUnify( tcSkolemise, unifyType, noThing )
 import Inst( topInstantiate )
 import TcEnv( tcLookupId )
 import TcEvidence( HsWrapper, (<.>) )
-import Type( mkNamedBinders )
+import Type( mkTyVarBinders )
 
 import DynFlags
 import Var      ( TyVar, tyVarName, tyVarKind )

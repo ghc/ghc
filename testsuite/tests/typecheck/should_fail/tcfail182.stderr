@@ -1,10 +1,10 @@
 
 tcfail182.hs:9:3: error:
-    Couldn't match expected type ‘Prelude.Maybe a’
-                with actual type ‘Maybe t0’
-    NB: ‘Maybe’ is defined at tcfail182.hs:6:1-18
-        ‘Prelude.Maybe’ is defined in ‘GHC.Base’ in package ‘base-4.9.0.0’
-    In the pattern: Foo
-    In an equation for ‘f’: f Foo = 3
-    Relevant bindings include
-      f :: Prelude.Maybe a -> Int (bound at tcfail182.hs:9:1)
+    • Couldn't match expected type ‘Prelude.Maybe a’
+                  with actual type ‘Maybe a0’
+      NB: ‘Maybe’ is defined at tcfail182.hs:6:1-18
+          ‘Prelude.Maybe’ is defined in ‘GHC.Base’ in package ‘base-4.9.0.0’
+    • In the pattern: Foo
+      In an equation for ‘f’: f Foo = 3
+    • Relevant bindings include
+        f :: Prelude.Maybe a -> Int (bound at tcfail182.hs:9:1)

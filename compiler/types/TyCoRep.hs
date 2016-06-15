@@ -22,7 +22,9 @@ Note [The Type-related module hierarchy]
 {-# LANGUAGE ImplicitParams #-}
 
 module TyCoRep (
-        TyThing(..),
+        TyThing(..), pprTyThingCategory, pprShortTyThing,
+
+        -- * Types
         Type(..),
         TyLit(..),
         KindOrType, Kind,
@@ -44,8 +46,8 @@ module TyCoRep (
         sameVis,
 
         -- * Functions over binders
-        TyBinder(..), TyVarBinder(..),
-        binderVar, binderType, binderVisibility,
+        TyBinder(..), TyVarBinder,
+        binderVar, binderVars, binderKind, binderVisibility,
         delBinderVar,
         isInvisible, isVisible,
         isInvisibleBinder, isVisibleBinder,
@@ -55,7 +57,7 @@ module TyCoRep (
 
         -- * Pretty-printing
         pprType, pprParendType, pprTypeApp, pprTvBndr, pprTvBndrs,
-        pprShortTyThing, pprTyThingCategory, pprSigmaType,
+        pprSigmaType,
         pprTheta, pprForAll, pprForAllImplicit, pprUserForAll,
         pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprTyLit,
@@ -168,6 +170,63 @@ import Data.IORef ( IORef )   -- for CoercionHole
 #if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
 import GHC.Stack (CallStack)
 #endif
+
+{-
+%************************************************************************
+%*                                                                      *
+                        TyThing
+%*                                                                      *
+%************************************************************************
+
+Despite the fact that DataCon has to be imported via a hi-boot route,
+this module seems the right place for TyThing, because it's needed for
+funTyCon and all the types in TysPrim.
+
+It is also SOURCE-imported into Name.hs
+
+
+Note [ATyCon for classes]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Both classes and type constructors are represented in the type environment
+as ATyCon.  You can tell the difference, and get to the class, with
+   isClassTyCon :: TyCon -> Bool
+   tyConClass_maybe :: TyCon -> Maybe Class
+The Class and its associated TyCon have the same Name.
+-}
+
+-- | A global typecheckable-thing, essentially anything that has a name.
+-- Not to be confused with a 'TcTyThing', which is also a typecheckable
+-- thing but in the *local* context.  See 'TcEnv' for how to retrieve
+-- a 'TyThing' given a 'Name'.
+data TyThing
+  = AnId     Id
+  | AConLike ConLike
+  | ATyCon   TyCon       -- TyCons and classes; see Note [ATyCon for classes]
+  | ACoAxiom (CoAxiom Branched)
+
+instance Outputable TyThing where
+  ppr = pprShortTyThing
+
+instance NamedThing TyThing where       -- Can't put this with the type
+  getName (AnId id)     = getName id    -- decl, because the DataCon instance
+  getName (ATyCon tc)   = getName tc    -- isn't visible there
+  getName (ACoAxiom cc) = getName cc
+  getName (AConLike cl) = conLikeName cl
+
+pprShortTyThing :: TyThing -> SDoc
+-- c.f. PprTyThing.pprTyThing, which prints all the details
+pprShortTyThing thing
+  = pprTyThingCategory thing <+> quotes (ppr (getName thing))
+
+pprTyThingCategory :: TyThing -> SDoc
+pprTyThingCategory (ATyCon tc)
+  | isClassTyCon tc = text "Class"
+  | otherwise       = text "Type constructor"
+pprTyThingCategory (ACoAxiom _) = text "Coercion axiom"
+pprTyThingCategory (AnId   _)   = text "Identifier"
+pprTyThingCategory (AConLike (RealDataCon _)) = text "Data constructor"
+pprTyThingCategory (AConLike (PatSynCon _))  = text "Pattern synonym"
+
 
 {- **********************************************************************
 *                                                                       *
@@ -381,27 +440,6 @@ data TyBinder
   | Anon Type   -- Visibility is determined by the type (Constraint vs. *)
   deriving Data.Data
 
-data TyVarBinder
-  = TvBndr TyVar            -- Always a TyVar (not CoVar or Id)
-           VisibilityFlag
-  deriving Data.Data
-
--- | Is something required to appear in source Haskell ('Visible'),
--- permitted by request ('Specified') (visible type application), or
--- prohibited entirely from appearing in source Haskell ('Invisible')?
--- See Note [TyBinders and VisibilityFlags]
-data VisibilityFlag = Visible | Specified | Invisible
-  deriving (Eq, Data.Data)
-
-binderVar :: TyVarBinder -> TyVar
-binderVar (TvBndr v _) = v
-
-binderType :: TyVarBinder -> Type
-binderType (TvBndr v _) = varType v
-
-binderVisibility :: TyVarBinder -> VisibilityFlag
-binderVisibility (TvBndr _ vis) = vis
-
 -- | Remove the binder's variable from the set, if the binder has
 -- a variable.
 delBinderVar :: VarSet -> TyVarBinder -> VarSet
@@ -415,22 +453,6 @@ isInvisibleBinder (Anon ty)              = isPredTy ty
 -- | Does this binder bind a visible argument?
 isVisibleBinder :: TyBinder -> Bool
 isVisibleBinder = not . isInvisibleBinder
-
--- | Do these denote the same level of visibility? Except that
--- 'Specified' and 'Invisible' are considered the same. Used
--- for printing.
-sameVis :: VisibilityFlag -> VisibilityFlag -> Bool
-sameVis Visible Visible = True
-sameVis Visible _       = False
-sameVis _       Visible = False
-sameVis _       _       = True
-
-isVisible :: VisibilityFlag -> Bool
-isVisible Visible = True
-isVisible _       = False
-
-isInvisible :: VisibilityFlag -> Bool
-isInvisible v = not (isVisible v)
 
 
 {- Note [TyBinders]
@@ -584,18 +606,6 @@ We could change this decision, but Visible, Named TyBinders are rare
 anyway.  (Most are Anons.)
 -}
 
-instance Binary VisibilityFlag where
-  put_ bh Visible   = putByte bh 0
-  put_ bh Specified = putByte bh 1
-  put_ bh Invisible = putByte bh 2
-
-  get bh = do
-    h <- getByte bh
-    case h of
-      0 -> return Visible
-      1 -> return Specified
-      _ -> return Invisible
-
 
 {- **********************************************************************
 *                                                                       *
@@ -670,8 +680,8 @@ mkFunTy arg res = FunTy arg res
 mkFunTys :: [Type] -> Type -> Type
 mkFunTys tys ty = foldr mkFunTy ty tys
 
-mkForAllTy :: TyVarBinder -> Type -> Type
-mkForAllTy = ForAllTy
+mkForAllTy :: TyVar -> VisibilityFlag -> Type -> Type
+mkForAllTy tv vis ty = ForAllTy (TvBndr tv vis) ty
 
 -- | Wraps foralls over the type using the provided 'TyVar's from left to right
 mkForAllTys :: [TyVarBinder] -> Type -> Type
@@ -1560,60 +1570,6 @@ closeOverKindsList tvs = fvVarList $ closeOverKindsFV tvs
 -- Returns a deterministic set.
 closeOverKindsDSet :: DTyVarSet -> DTyVarSet
 closeOverKindsDSet = fvDVarSet . closeOverKindsFV . dVarSetElems
-
-{-
-%************************************************************************
-%*                                                                      *
-                        TyThing
-%*                                                                      *
-%************************************************************************
-
-Despite the fact that DataCon has to be imported via a hi-boot route,
-this module seems the right place for TyThing, because it's needed for
-funTyCon and all the types in TysPrim.
-
-Note [ATyCon for classes]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-Both classes and type constructors are represented in the type environment
-as ATyCon.  You can tell the difference, and get to the class, with
-   isClassTyCon :: TyCon -> Bool
-   tyConClass_maybe :: TyCon -> Maybe Class
-The Class and its associated TyCon have the same Name.
--}
-
--- | A global typecheckable-thing, essentially anything that has a name.
--- Not to be confused with a 'TcTyThing', which is also a typecheckable
--- thing but in the *local* context.  See 'TcEnv' for how to retrieve
--- a 'TyThing' given a 'Name'.
-data TyThing
-  = AnId     Id
-  | AConLike ConLike
-  | ATyCon   TyCon       -- TyCons and classes; see Note [ATyCon for classes]
-  | ACoAxiom (CoAxiom Branched)
-
-instance Outputable TyThing where
-  ppr = pprShortTyThing
-
-pprShortTyThing :: TyThing -> SDoc
--- c.f. PprTyThing.pprTyThing, which prints all the details
-pprShortTyThing thing
-  = pprTyThingCategory thing <+> quotes (ppr (getName thing))
-
-pprTyThingCategory :: TyThing -> SDoc
-pprTyThingCategory (ATyCon tc)
-  | isClassTyCon tc = text "Class"
-  | otherwise       = text "Type constructor"
-pprTyThingCategory (ACoAxiom _) = text "Coercion axiom"
-pprTyThingCategory (AnId   _)   = text "Identifier"
-pprTyThingCategory (AConLike (RealDataCon _)) = text "Data constructor"
-pprTyThingCategory (AConLike (PatSynCon _))  = text "Pattern synonym"
-
-
-instance NamedThing TyThing where       -- Can't put this with the type
-  getName (AnId id)     = getName id    -- decl, because the DataCon instance
-  getName (ATyCon tc)   = getName tc    -- isn't visible there
-  getName (ACoAxiom cc) = getName cc
-  getName (AConLike cl) = conLikeName cl
 
 {-
 %************************************************************************
@@ -2773,7 +2729,7 @@ pprUserForAll bndrs
     pprForAll bndrs
   where
     bndr_has_kind_var bndr
-      = not (isEmptyVarSet (tyCoVarsOfType (binderType bndr)))
+      = not (isEmptyVarSet (tyCoVarsOfType (binderKind bndr)))
 
 pprForAllImplicit :: [TyVar] -> SDoc
 pprForAllImplicit tvs = pprForAll [ TvBndr tv Specified | tv <- tvs ]
@@ -2826,19 +2782,11 @@ pprTvBndrNoParens tv
              where
                kind = tyVarKind tv
 
-instance Outputable TyVarBinder where
-  ppr (TvBndr v Visible)   = ppr v
-  ppr (TvBndr v Specified) = char '@' <> ppr v
-  ppr (TvBndr v Invisible) = braces (ppr v)
-
 instance Outputable TyBinder where
-  ppr (Named tvb) = ppr tvb
-  ppr (Anon ty)   = text "[anon]" <+> ppr ty
-
-instance Outputable VisibilityFlag where
-  ppr Visible   = text "[vis]"
-  ppr Specified = text "[spec]"
-  ppr Invisible = text "[invis]"
+  ppr (Anon ty) = text "[anon]" <+> ppr ty
+  ppr (Named (TvBndr v Visible))   = ppr v
+  ppr (Named (TvBndr v Specified)) = char '@' <> ppr v
+  ppr (Named (TvBndr v Invisible)) = braces (ppr v)
 
 -----------------
 instance Outputable Coercion where -- defined here to avoid orphans
@@ -3164,13 +3112,15 @@ tidyTyCoVarBndr tidy_env@(occ_env, subst) tyvar
            else mkVarOcc   (occNameString occ ++ "0")
          | otherwise         = occ
 
-tidyTyVarBinder :: TidyEnv -> TyVarBinder -> (TidyEnv, TyVarBinder)
+tidyTyVarBinder :: TidyEnv -> TyVarBndr TyVar vis
+                -> (TidyEnv, TyVarBndr TyVar vis)
 tidyTyVarBinder tidy_env (TvBndr tv vis)
   = (tidy_env', TvBndr tv' vis)
   where
     (tidy_env', tv') = tidyTyCoVarBndr tidy_env tv
 
-tidyTyVarBinders :: TidyEnv -> [TyVarBinder] -> (TidyEnv, [TyVarBinder])
+tidyTyVarBinders :: TidyEnv -> [TyVarBndr TyVar vis]
+                 -> (TidyEnv, [TyVarBndr TyVar vis])
 tidyTyVarBinders = mapAccumL tidyTyVarBinder
 
 ---------------

@@ -2034,8 +2034,8 @@ doTyConApp clas ty args
 -- polymorphism, but no more.
 onlyNamedBndrsApplied :: TyCon -> [KindOrType] -> Bool
 onlyNamedBndrsApplied tc ks
- = all isNamedTyBinder used_bndrs &&
-   all isAnonTyBinder  leftover_bndrs
+ = all isNamedTyConBinder         used_bndrs &&
+   all (not . isNamedTyConBinder) leftover_bndrs
  where
    bndrs                        = tyConBinders tc
    (used_bndrs, leftover_bndrs) = splitAtList ks bndrs
@@ -2052,9 +2052,10 @@ doTyApp clas ty f tk
   | isForAllTy (typeKind f)
   = return NoInstance -- We can't solve until we know the ctr.
   | otherwise
-  = return $ GenInst [mk_typeable_pred clas f, mk_typeable_pred clas tk]
+  = do { traceTcS "doTyApp" (ppr clas $$ ppr ty $$ ppr f $$ ppr tk)
+       ; return $ GenInst [mk_typeable_pred clas f, mk_typeable_pred clas tk]
                      (\[t1,t2] -> EvTypeable ty $ EvTypeableTyApp t1 t2)
-                     True
+                     True }
 
 -- Emit a `Typeable` constraint for the given type.
 mk_typeable_pred :: Class -> Type -> PredType
@@ -2073,13 +2074,13 @@ doTyLit kc t = do { kc_clas <- tcLookupClass kc
 {- Note [Typeable (T a b c)]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For type applications we always decompose using binary application,
-vai doTyApp, until we get to a *kind* instantiation.  Exmaple
+via doTyApp, until we get to a *kind* instantiation.  Exmaple
    Proxy :: forall k. k -> *
 
 To solve Typeable (Proxy (* -> *) Maybe) we
   - First decompose with doTyApp,
     to get (Typeable (Proxy (* -> *))) and Typeable Maybe
-  - Then sovle (Typeable (Proxy (* -> *))) with doTyConApp
+  - Then solve (Typeable (Proxy (* -> *))) with doTyConApp
 
 If we attempt to short-cut by solving it all at once, via
 doTyCOnAPp

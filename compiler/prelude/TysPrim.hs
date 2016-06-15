@@ -12,12 +12,16 @@
 module TysPrim(
         mkPrimTyConName, -- For implicit parameters in TysWiredIn only
 
-        mkTemplateTyVars,
+        mkTemplateKindVars, mkTemplateTyVars, mkTemplateTyVarsFrom,
+        mkTemplateKiTyVars,
+
+        mkTemplateTyConBinders, mkTemplateKindTyConBinders,
+        mkTemplateAnonTyConBinders,
+
         alphaTyVars, alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar,
         alphaTys, alphaTy, betaTy, gammaTy, deltaTy,
         runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep1Ty, runtimeRep2Ty,
         openAlphaTy, openBetaTy, openAlphaTyVar, openBetaTyVar,
-        kKiVar,
 
         -- Kind constructors...
         tYPETyConName, unliftedTypeKindTyConName,
@@ -88,7 +92,7 @@ import {-# SOURCE #-} TysWiredIn
   , word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy
   , doubleElemRepDataConTy )
 
-import Var              ( TyVar, KindVar, mkTyVar )
+import Var              ( TyVar, mkTyVar )
 import Name
 import TyCon
 import SrcLoc
@@ -96,8 +100,8 @@ import Unique
 import PrelNames
 import FastString
 import Outputable
-import TyCoRep   -- doesn't need special access, but this is easier to avoid
-                 -- import loops
+import TyCoRep   -- Doesn't need special access, but this is easier to avoid
+                 -- import loops which show up if you import Type instead
 
 import Data.Char
 
@@ -212,16 +216,76 @@ alphaTyVars is a list of type variables for use in templates:
         ["a", "b", ..., "z", "t1", "t2", ... ]
 -}
 
+mkTemplateKindVars :: [Kind] -> [TyVar]
+-- k0  with unique (mkAlphaTyVarUnique 0)
+-- k1  with unique (mkAlphaTyVarUnique 1)
+-- ... etc
+mkTemplateKindVars kinds
+  = [ mkTyVar name kind
+    | (kind, u) <- kinds `zip` [0..]
+    , let occ = mkTyVarOccFS (mkFastString ('k' : show u))
+          name = mkInternalName (mkAlphaTyVarUnique u) occ noSrcSpan
+    ]
+
+mkTemplateTyVarsFrom :: Int -> [Kind] -> [TyVar]
+-- a  with unique (mkAlphaTyVarUnique n)
+-- b  with unique (mkAlphaTyVarUnique n+1)
+-- ... etc
+-- Typically called as
+--   mkTemplateTyVarsFrom (legth kv_bndrs) kinds
+-- where kv_bndrs are the kind-level binders of a TyCon
+mkTemplateTyVarsFrom n kinds
+  = [ mkTyVar name kind
+    | (kind, index) <- zip kinds [0..],
+      let ch_ord = index + ord 'a'
+          name_str | ch_ord <= ord 'z' = [chr ch_ord]
+                   | otherwise         = 't':show index
+          uniq = mkAlphaTyVarUnique (index + n)
+          name = mkInternalName uniq occ noSrcSpan
+          occ  = mkTyVarOccFS (mkFastString name_str)
+    ]
+
 mkTemplateTyVars :: [Kind] -> [TyVar]
-mkTemplateTyVars kinds =
-  [ mkTyVar (mkInternalName (mkAlphaTyVarUnique u)
-                            (mkTyVarOccFS (mkFastString name))
-                            noSrcSpan) k
-  | (k,u) <- zip kinds [2..],
-    let name | c <= 'z'  = [c]
-             | otherwise = 't':show u
-          where c = chr (u-2 + ord 'a')
-  ]
+mkTemplateTyVars = mkTemplateTyVarsFrom 1
+
+mkTemplateTyConBinders
+    :: [Kind]                -- [k1, .., kn]   Kinds of kind-forall'd vars
+    -> ([Kind] -> [Kind])    -- Arg is [kv1:k1, ..., kvn:kn]
+                             --     same length as first arg
+                             -- Result is anon arg kinds
+    -> [TyConBinder]
+mkTemplateTyConBinders kind_var_kinds mk_anon_arg_kinds
+  = kv_bndrs ++ tv_bndrs
+  where
+    kv_bndrs   = mkTemplateKindTyConBinders kind_var_kinds
+    anon_kinds = mk_anon_arg_kinds (mkTyVarTys (binderVars kv_bndrs))
+    tv_bndrs   = mkTemplateAnonTyConBindersFrom (length kv_bndrs) anon_kinds
+
+mkTemplateKiTyVars
+    :: [Kind]                -- [k1, .., kn]   Kinds of kind-forall'd vars
+    -> ([Kind] -> [Kind])    -- Arg is [kv1:k1, ..., kvn:kn]
+                             --     same length as first arg
+                             -- Result is anon arg kinds [ak1, .., akm]
+    -> [TyVar]   -- [kv1:k1, ..., kvn:kn, av1:ak1, ..., avm:akm]
+-- Example: if you want the tyvars for
+--   forall (r:RuntimeRep) (a:TYPE r) (b:*). blah
+-- call mkTemplateKiTyVars [RuntimeRep] (\[r]. [TYPE r, *)
+mkTemplateKiTyVars kind_var_kinds mk_arg_kinds
+  = kv_bndrs ++ tv_bndrs
+  where
+    kv_bndrs   = mkTemplateKindVars kind_var_kinds
+    anon_kinds = mk_arg_kinds (mkTyVarTys kv_bndrs)
+    tv_bndrs   = mkTemplateTyVarsFrom (length kv_bndrs) anon_kinds
+
+mkTemplateKindTyConBinders :: [Kind] -> [TyConBinder]
+-- Makes named, Specified binders
+mkTemplateKindTyConBinders kinds = [mkNamedTyConBinder Specified tv | tv <- mkTemplateKindVars kinds]
+
+mkTemplateAnonTyConBinders :: [Kind] -> [TyConBinder]
+mkTemplateAnonTyConBinders kinds = map mkAnonTyConBinder (mkTemplateTyVars kinds)
+
+mkTemplateAnonTyConBindersFrom :: Int -> [Kind] -> [TyConBinder]
+mkTemplateAnonTyConBindersFrom n kinds = map mkAnonTyConBinder (mkTemplateTyVarsFrom n kinds)
 
 alphaTyVars :: [TyVar]
 alphaTyVars = mkTemplateTyVars $ repeat liftedTypeKind
@@ -250,10 +314,6 @@ openAlphaTy, openBetaTy :: Type
 openAlphaTy = mkTyVarTy openAlphaTyVar
 openBetaTy  = mkTyVarTy openBetaTyVar
 
-kKiVar :: KindVar
-kKiVar = (mkTemplateTyVars $ repeat liftedTypeKind) !! 10
-  -- the 10 selects the 11th letter in the alphabet: 'k'
-
 {-
 ************************************************************************
 *                                                                      *
@@ -266,9 +326,10 @@ funTyConName :: Name
 funTyConName = mkPrimTyConName (fsLit "(->)") funTyConKey funTyCon
 
 funTyCon :: TyCon
-funTyCon = mkFunTyCon funTyConName (map Anon [liftedTypeKind, liftedTypeKind])
-                                   tc_rep_nm
+funTyCon = mkFunTyCon funTyConName tc_bndrs tc_rep_nm
   where
+    tc_bndrs = mkTemplateAnonTyConBinders [liftedTypeKind, liftedTypeKind]
+
         -- You might think that (->) should have type (?? -> ? -> *), and you'd be right
         -- But if we do that we get kind errors when saying
         --      instance Control.Arrow (->)
@@ -331,7 +392,7 @@ tYPETyCon, unliftedTypeKindTyCon :: TyCon
 tYPETyConName, unliftedTypeKindTyConName :: Name
 
 tYPETyCon = mkKindTyCon tYPETyConName
-                        [Anon runtimeRepTy]
+                        (mkTemplateAnonTyConBinders [runtimeRepTy])
                         liftedTypeKind
                         [Nominal]
                         (mkPrelTyConRepName tYPETyConName)
@@ -340,8 +401,7 @@ tYPETyCon = mkKindTyCon tYPETyConName
    -- NB: unlifted is wired in because there is no way to parse it in
    -- Haskell. That's the only reason for wiring it in.
 unliftedTypeKindTyCon = mkSynonymTyCon unliftedTypeKindTyConName
-                          [] liftedTypeKind
-                          [] []
+                          [] liftedTypeKind []
                           (tYPE (TyConApp ptrRepUnliftedDataConTyCon []))
 
 --------------------------
@@ -379,7 +439,7 @@ pcPrimTyCon :: Name -> [Role] -> PrimRep -> TyCon
 pcPrimTyCon name roles rep
   = mkPrimTyCon name binders result_kind roles
   where
-    binders     = map (const (Anon liftedTypeKind)) roles
+    binders     = mkTemplateAnonTyConBinders (map (const liftedTypeKind) roles)
     result_kind = tYPE rr
 
     rr = case rep of
@@ -682,11 +742,10 @@ mkProxyPrimTy k ty = TyConApp proxyPrimTyCon [k, ty]
 
 proxyPrimTyCon :: TyCon
 proxyPrimTyCon = mkPrimTyCon proxyPrimTyConName binders res_kind [Nominal,Nominal]
-  where binders  = [ Named (TvBndr kv Specified)
-                   , Anon k ]
-        res_kind = tYPE voidRepDataConTy
-        kv       = kKiVar
-        k        = mkTyVarTy kv
+  where
+     -- Kind: forall k. k -> Void#
+     binders = mkTemplateTyConBinders [liftedTypeKind] (\ks-> ks)
+     res_kind = tYPE voidRepDataConTy
 
 
 {- *********************************************************************
@@ -699,46 +758,33 @@ proxyPrimTyCon = mkPrimTyCon proxyPrimTyConName binders res_kind [Nominal,Nomina
 eqPrimTyCon :: TyCon  -- The representation type for equality predicates
                       -- See Note [The equality types story]
 eqPrimTyCon  = mkPrimTyCon eqPrimTyConName binders res_kind roles
-  where binders = [ Named (TvBndr kv1 Specified)
-                  , Named (TvBndr kv2 Specified)
-                  , Anon k1
-                  , Anon k2 ]
-        res_kind = tYPE voidRepDataConTy
-        [kv1, kv2] = mkTemplateTyVars [liftedTypeKind, liftedTypeKind]
-        k1 = mkTyVarTy kv1
-        k2 = mkTyVarTy kv2
-        roles = [Nominal, Nominal, Nominal, Nominal]
+  where
+    -- Kind :: forall k1 k2. k1 -> k2 -> Void#
+    binders  = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] (\ks -> ks)
+    res_kind = tYPE voidRepDataConTy
+    roles    = [Nominal, Nominal, Nominal, Nominal]
 
 -- like eqPrimTyCon, but the type for *Representational* coercions
 -- this should only ever appear as the type of a covar. Its role is
 -- interpreted in coercionRole
 eqReprPrimTyCon :: TyCon   -- See Note [The equality types story]
 eqReprPrimTyCon = mkPrimTyCon eqReprPrimTyConName binders res_kind roles
-  where binders = [ Named (TvBndr kv1 Specified)
-                  , Named (TvBndr kv2 Specified)
-                  , Anon k1
-                  , Anon k2 ]
-        res_kind = tYPE voidRepDataConTy
-        [kv1, kv2]    = mkTemplateTyVars [liftedTypeKind, liftedTypeKind]
-        k1            = mkTyVarTy kv1
-        k2            = mkTyVarTy kv2
-        roles         = [Nominal, Nominal, Representational, Representational]
+  where
+    -- Kind :: forall k1 k2. k1 -> k2 -> Void#
+    binders  = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] (\ks -> ks)
+    res_kind = tYPE voidRepDataConTy
+    roles    = [Nominal, Nominal, Representational, Representational]
 
 -- like eqPrimTyCon, but the type for *Phantom* coercions.
 -- This is only used to make higher-order equalities. Nothing
 -- should ever actually have this type!
 eqPhantPrimTyCon :: TyCon
-eqPhantPrimTyCon = mkPrimTyCon eqPhantPrimTyConName binders res_kind
-                               [Nominal, Nominal, Phantom, Phantom]
-  where binders = [ Named (TvBndr kv1 Specified)
-                  , Named (TvBndr kv2 Specified)
-                  , Anon k1
-                  , Anon k2 ]
-        res_kind = tYPE voidRepDataConTy
-        [kv1, kv2]    = mkTemplateTyVars [liftedTypeKind, liftedTypeKind]
-        k1            = mkTyVarTy kv1
-        k2            = mkTyVarTy kv2
-
+eqPhantPrimTyCon = mkPrimTyCon eqPhantPrimTyConName binders res_kind roles
+  where
+    -- Kind :: forall k1 k2. k1 -> k2 -> Void#
+    binders  = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] (\ks -> ks)
+    res_kind = tYPE voidRepDataConTy
+    roles    = [Nominal, Nominal, Phantom, Phantom]
 
 {- *********************************************************************
 *                                                                      *

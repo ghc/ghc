@@ -26,10 +26,11 @@ module TcHsSyn (
         -- | For a description of "zonking", see Note [What is zonking?]
         -- in TcMType
         zonkTopDecls, zonkTopExpr, zonkTopLExpr,
-        zonkTopBndrs, zonkTyBndrsX, zonkTyBinders,
+        zonkTopBndrs, zonkTyBndrsX,
+        zonkTyConBinders,
         emptyZonkEnv, mkEmptyZonkEnv,
         zonkTcTypeToType, zonkTcTypeToTypes, zonkTyVarOcc,
-        zonkCoToCo, zonkTcKindToKind,
+        zonkCoToCo,
         zonkEvBinds,
 
         -- * Validity checking
@@ -48,7 +49,6 @@ import TcEvidence
 import TysPrim
 import TysWiredIn
 import Type
-import TyCoRep  ( TyBinder(..), TyVarBinder(..) )
 import TyCon
 import Coercion
 import ConLike
@@ -340,14 +340,13 @@ zonkTyBndrX env tv
        ; let tv' = mkTyVar (tyVarName tv) ki
        ; return (extendTyZonkEnv1 env tv', tv') }
 
-zonkTyBinders :: ZonkEnv -> [TcTyBinder] -> TcM (ZonkEnv, [TyBinder])
-zonkTyBinders = mapAccumLM zonkTyBinder
+zonkTyConBinders :: ZonkEnv -> [TyConBinder] -> TcM (ZonkEnv, [TyConBinder])
+zonkTyConBinders = mapAccumLM zonkTyConBinderX
 
-zonkTyBinder :: ZonkEnv -> TcTyBinder -> TcM (ZonkEnv, TyBinder)
-zonkTyBinder env (Anon ty) = (env, ) <$> (Anon <$> zonkTcTypeToType env ty)
-zonkTyBinder env (Named (TvBndr tv vis))
+zonkTyConBinderX :: ZonkEnv -> TyConBinder -> TcM (ZonkEnv, TyConBinder)
+zonkTyConBinderX env (TvBndr tv vis)
   = do { (env', tv') <- zonkTyBndrX env tv
-       ; return (env', Named (TvBndr tv' vis)) }
+       ; return (env', TvBndr tv' vis) }
 
 zonkTopExpr :: HsExpr TcId -> TcM (HsExpr Id)
 zonkTopExpr e = zonkExpr emptyZonkEnv e
@@ -1575,14 +1574,6 @@ zonkTcTypeToType = mapType zonk_tycomapper
 
 zonkTcTypeToTypes :: ZonkEnv -> [TcType] -> TcM [Type]
 zonkTcTypeToTypes env tys = mapM (zonkTcTypeToType env) tys
-
--- | Used during kind-checking in TcTyClsDecls, where it's more convenient
--- to keep the binders and result kind separate.
-zonkTcKindToKind :: [TcTyBinder] -> TcKind -> TcM ([TyBinder], Kind)
-zonkTcKindToKind binders res_kind
-  = do { (env, binders') <- zonkTyBinders emptyZonkEnv binders
-       ; res_kind' <- zonkTcTypeToType env res_kind
-       ; return (binders', res_kind') }
 
 zonkCoToCo :: ZonkEnv -> Coercion -> TcM Coercion
 zonkCoToCo = mapCoercion zonk_tycomapper

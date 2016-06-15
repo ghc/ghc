@@ -1311,8 +1311,8 @@ patSynToIfaceDecl ps
                 , ifPatMatcher    = to_if_pr (patSynMatcher ps)
                 , ifPatBuilder    = fmap to_if_pr (patSynBuilder ps)
                 , ifPatIsInfix    = patSynIsInfix ps
-                , ifPatUnivBndrs  = map binderToIfaceForAllBndr univ_bndrs'
-                , ifPatExBndrs    = map binderToIfaceForAllBndr ex_bndrs'
+                , ifPatUnivBndrs  = map toIfaceForAllBndr univ_bndrs'
+                , ifPatExBndrs    = map toIfaceForAllBndr ex_bndrs'
                 , ifPatProvCtxt   = tidyToIfaceContext env2 prov_theta
                 , ifPatReqCtxt    = tidyToIfaceContext env2 req_theta
                 , ifPatArgs       = map (tidyToIfaceType env2) args
@@ -1361,15 +1361,14 @@ coAxBranchToIfaceBranch' :: TyCon -> CoAxBranch -> IfaceAxBranch
 coAxBranchToIfaceBranch' tc (CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
                                         , cab_lhs = lhs
                                         , cab_roles = roles, cab_rhs = rhs })
-  = IfaceAxBranch { ifaxbTyVars  = toIfaceTvBndrs tv_bndrs
+  = IfaceAxBranch { ifaxbTyVars  = toIfaceTvBndrs tidy_tvs
                   , ifaxbCoVars  = map toIfaceIdBndr cvs
                   , ifaxbLHS     = tidyToIfaceTcArgs env1 tc lhs
                   , ifaxbRoles   = roles
                   , ifaxbRHS     = tidyToIfaceType env1 rhs
                   , ifaxbIncomps = [] }
   where
-
-    (env1, tv_bndrs) = tidyTyClTyCoVarBndrs emptyTidyEnv tvs
+    (env1, tidy_tvs) = tidyTyCoVarBndrs emptyTidyEnv tvs
     -- Don't re-bind in-scope tyvars
     -- See Note [CoAxBranch type variables] in CoAxiom
 
@@ -1420,10 +1419,8 @@ tyConToIfaceDecl env tycon
   -- to put them into interface files
   = ( env
     , IfaceData { ifName       = getOccName tycon,
-                  ifBinders    = if_degenerate_binders,
-                  ifResKind    = if_degenerate_res_kind,
-                    -- FunTyCon, PrimTyCon etc don't have
-                    -- `tyConTyVars`, hence "degenerate"
+                  ifBinders    = if_binders,
+                  ifResKind    = if_res_kind,
                   ifCType      = Nothing,
                   ifRoles      = tyConRoles tycon,
                   ifCtxt       = [],
@@ -1435,17 +1432,12 @@ tyConToIfaceDecl env tycon
     -- NOTE: Not all TyCons have `tyConTyVars` field. Forcing this when `tycon`
     -- is one of these TyCons (FunTyCon, PrimTyCon, PromotedDataCon) will cause
     -- an error.
-    (tc_env1, tc_tyvars) = tidyTyClTyCoVarBndrs env (tyConTyVars tycon)
-    if_binders  = zipIfaceBinders tc_tyvars (tyConBinders tycon)
-    if_res_kind = tidyToIfaceType tc_env1 (tyConResKind tycon)
+    (tc_env1, tc_binders) = tidyTyConBinders env (tyConBinders tycon)
+    tc_tyvars      = binderVars tc_binders
+    if_binders     = toIfaceTyVarBinders tc_binders
+    if_res_kind    = tidyToIfaceType tc_env1 (tyConResKind tycon)
     if_syn_type ty = tidyToIfaceType tc_env1 ty
     if_res_var     = getOccFS `fmap` tyConFamilyResVar_maybe tycon
-
-      -- Use these when you don't have tyConTyVars
-    (degenerate_binders, degenerate_res_kind)
-      = splitPiTys (tidyType env (tyConKind tycon))
-    if_degenerate_binders  = toDegenerateBinders degenerate_binders
-    if_degenerate_res_kind = toIfaceType degenerate_res_kind
 
     parent = case tyConFamInstSig_maybe tycon of
                Just (tc, ty, ax) -> IfDataInstance (coAxiomName ax)
@@ -1482,7 +1474,7 @@ tyConToIfaceDecl env tycon
         = IfCon   { ifConOcc     = getOccName (dataConName data_con),
                     ifConInfix   = dataConIsInfix data_con,
                     ifConWrapper = isJust (dataConWrapId_maybe data_con),
-                    ifConExTvs   = map binderToIfaceForAllBndr ex_bndrs',
+                    ifConExTvs   = map toIfaceForAllBndr ex_bndrs',
                     ifConEqSpec  = map (to_eq_spec . eqSpecPair) eq_spec,
                     ifConCtxt    = tidyToIfaceContext con_env2 theta,
                     ifConArgTys  = map (tidyToIfaceType con_env2) arg_tys,
@@ -1508,7 +1500,7 @@ tyConToIfaceDecl env tycon
                      -- A bit grimy, perhaps, but it's simple!
 
           (con_env2, ex_bndrs') = tidyTyVarBinders con_env1 ex_bndrs
-          to_eq_spec (tv,ty) = (toIfaceTyVar (tidyTyVar con_env2 tv), tidyToIfaceType con_env2 ty)
+          to_eq_spec (tv,ty) = (tidyTyVar con_env2 tv, tidyToIfaceType con_env2 ty)
 
     ifaceOverloaded flds = case dFsEnvElts flds of
                              fl:_ -> flIsOverloaded fl
@@ -1530,19 +1522,18 @@ classToIfaceDecl env clas
     , IfaceClass { ifCtxt   = tidyToIfaceContext env1 sc_theta,
                    ifName   = getOccName tycon,
                    ifRoles  = tyConRoles (classTyCon clas),
-                   ifBinders = binders,
+                   ifBinders = toIfaceTyVarBinders tc_binders,
                    ifFDs    = map toIfaceFD clas_fds,
                    ifATs    = map toIfaceAT clas_ats,
                    ifSigs   = map toIfaceClassOp op_stuff,
                    ifMinDef = fmap getOccFS (classMinimalDef clas),
                    ifRec    = boolToRecFlag (isRecursiveTyCon tycon) })
   where
-    (clas_tyvars, clas_fds, sc_theta, _, clas_ats, op_stuff)
+    (_, clas_fds, sc_theta, _, clas_ats, op_stuff)
       = classExtraBigSig clas
     tycon = classTyCon clas
 
-    (env1, clas_tyvars') = tidyTyCoVarBndrs env clas_tyvars
-    binders = zipIfaceBinders clas_tyvars' (tyConBinders tycon)
+    (env1, tc_binders) = tidyTyConBinders env (tyConBinders tycon)
 
     toIfaceAT :: ClassATItem -> IfaceAT
     toIfaceAT (ATI tc def)
@@ -1551,7 +1542,7 @@ classToIfaceDecl env clas
         (env2, if_decl) = tyConToIfaceDecl env1 tc
 
     toIfaceClassOp (sel_id, def_meth)
-        = ASSERT(sel_tyvars == clas_tyvars)
+        = ASSERT( sel_tyvars == binderVars tc_binders )
           IfaceClassOp (getOccName sel_id)
                        (tidyToIfaceType env1 op_ty)
                        (fmap toDmSpec def_meth)
@@ -1568,8 +1559,8 @@ classToIfaceDecl env clas
     toDmSpec (_, VanillaDM)       = VanillaDM
     toDmSpec (_, GenericDM dm_ty) = GenericDM (tidyToIfaceType env1 dm_ty)
 
-    toIfaceFD (tvs1, tvs2) = (map (getOccFS . tidyTyVar env1) tvs1,
-                              map (getOccFS . tidyTyVar env1) tvs2)
+    toIfaceFD (tvs1, tvs2) = (map (tidyTyVar env1) tvs1
+                             ,map (tidyTyVar env1) tvs2)
 
 --------------------------
 tidyToIfaceType :: TidyEnv -> Type -> IfaceType
@@ -1581,20 +1572,26 @@ tidyToIfaceTcArgs env tc tys = toIfaceTcArgs tc (tidyTypes env tys)
 tidyToIfaceContext :: TidyEnv -> ThetaType -> IfaceContext
 tidyToIfaceContext env theta = map (tidyToIfaceType env) theta
 
-tidyTyClTyCoVarBndrs :: TidyEnv -> [TyCoVar] -> (TidyEnv, [TyCoVar])
-tidyTyClTyCoVarBndrs env tvs = mapAccumL tidyTyClTyCoVarBndr env tvs
+toIfaceTyVarBinder :: TyVarBndr TyVar vis -> TyVarBndr IfaceTvBndr vis
+toIfaceTyVarBinder (TvBndr tv vis) = TvBndr (toIfaceTvBndr tv) vis
 
-tidyTyClTyCoVarBndr :: TidyEnv -> TyCoVar -> (TidyEnv, TyCoVar)
+toIfaceTyVarBinders :: [TyVarBndr TyVar vis] -> [TyVarBndr IfaceTvBndr vis]
+toIfaceTyVarBinders = map toIfaceTyVarBinder
+
+tidyTyConBinder :: TidyEnv -> TyConBinder -> (TidyEnv, TyConBinder)
 -- If the type variable "binder" is in scope, don't re-bind it
 -- In a class decl, for example, the ATD binders mention
 -- (amd must mention) the class tyvars
-tidyTyClTyCoVarBndr env@(_, subst) tv
- | Just tv' <- lookupVarEnv subst tv = (env, tv')
- | otherwise                         = tidyTyCoVarBndr env tv
+tidyTyConBinder env@(_, subst) tvb@(TvBndr tv vis)
+ = case lookupVarEnv subst tv of
+     Just tv' -> (env,  TvBndr tv' vis)
+     Nothing  -> tidyTyVarBinder env tvb
 
-tidyTyVar :: TidyEnv -> TyVar -> TyVar
-tidyTyVar (_, subst) tv = lookupVarEnv subst tv `orElse` tv
-   -- TcType.tidyTyVarOcc messes around with FlatSkols
+tidyTyConBinders :: TidyEnv -> [TyConBinder] -> (TidyEnv, [TyConBinder])
+tidyTyConBinders = mapAccumL tidyTyConBinder
+
+tidyTyVar :: TidyEnv -> TyVar -> FastString
+tidyTyVar (_, subst) tv = toIfaceTyVar (lookupVarEnv subst tv `orElse` tv)
 
 --------------------------
 instanceToIfaceInst :: ClsInst -> IfaceClsInst

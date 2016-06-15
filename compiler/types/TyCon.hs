@@ -6,16 +6,21 @@
 The @TyCon@ datatype
 -}
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, FlexibleInstances #-}
 
 module TyCon(
         -- * Main TyCon data types
-        TyCon,
-
-        AlgTyConRhs(..), visibleDataCons,
+        TyCon, AlgTyConRhs(..), visibleDataCons,
         AlgTyConFlav(..), isNoParent,
         FamTyConFlav(..), Role(..), Injectivity(..),
         RuntimeRepInfo(..),
+
+        -- * TyConBinder
+        TyConBinder, TyConBndrVis(..),
+        mkNamedTyConBinder, mkNamedTyConBinders,
+        mkAnonTyConBinder, mkAnonTyConBinders,
+        tyConBinderVisibility, isNamedTyConBinder,
+        isVisibleTyConBinder, isInvisibleTyConBinder,
 
         -- ** Field labels
         tyConFieldLabels, tyConFieldLabelEnv,
@@ -91,7 +96,7 @@ module TyCon(
         expandSynTyCon_maybe,
         makeTyConAbstract,
         newTyConCo, newTyConCo_maybe,
-        pprPromotionQuote,
+        pprPromotionQuote, mkTyConKind,
 
         -- * Runtime type representation
         TyConRepName, tyConRepName_maybe,
@@ -111,9 +116,10 @@ module TyCon(
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} TyCoRep ( Kind, Type, PredType, TyBinder, pprType, mkPiTys )
+import {-# SOURCE #-} TyCoRep ( Kind, Type, PredType, pprType )
 import {-# SOURCE #-} TysWiredIn  ( runtimeRepTyCon, constraintKind
-                                  , vecCountTyCon, vecElemTyCon, liftedTypeKind )
+                                  , vecCountTyCon, vecElemTyCon, liftedTypeKind
+                                  , mkFunKind, mkForAllKind )
 import {-# SOURCE #-} DataCon ( DataCon, dataConExTyVars, dataConFieldLabels )
 
 import Binary
@@ -359,22 +365,129 @@ See also:
  * [Verifying injectivity annotation] in FamInstEnv
  * [Type inference for type families with injectivity] in TcInteract
 
-
 ************************************************************************
 *                                                                      *
-\subsection{The data type}
+                    TyConBinder
 *                                                                      *
 ************************************************************************
 -}
 
-{- Note [TyCon binders]
-~~~~~~~~~~~~~~~~~~~~~~~
+type TyConBinder = TyVarBndr TyVar TyConBndrVis
 
-data TyConBinder = TCB TyVar TcConBinderVis
+data TyConBndrVis
+  = NamedTCB VisibilityFlag
+  | AnonTCB
 
-data TyConBinderVis = NamedTCB VisiblityFlag
-                    | AnonTCB
+mkAnonTyConBinder :: TyVar -> TyConBinder
+mkAnonTyConBinder tv = TvBndr tv AnonTCB
+
+mkAnonTyConBinders :: [TyVar] -> [TyConBinder]
+mkAnonTyConBinders tvs = map mkAnonTyConBinder tvs
+
+mkNamedTyConBinder :: VisibilityFlag -> TyVar -> TyConBinder
+-- The odd argument order supports currying
+mkNamedTyConBinder vis tv = TvBndr tv (NamedTCB vis)
+
+mkNamedTyConBinders :: VisibilityFlag -> [TyVar] -> [TyConBinder]
+-- The odd argument order supports currying
+mkNamedTyConBinders vis tvs = map (mkNamedTyConBinder vis) tvs
+
+tyConBinderVisibility :: TyConBinder -> VisibilityFlag
+tyConBinderVisibility (TvBndr _ (NamedTCB vis)) = vis
+tyConBinderVisibility (TvBndr _ AnonTCB)        = Visible
+
+isNamedTyConBinder :: TyConBinder -> Bool
+isNamedTyConBinder (TvBndr _ (NamedTCB {})) = True
+isNamedTyConBinder _                        = False
+
+isVisibleTyConBinder :: TyVarBndr tv TyConBndrVis -> Bool
+-- Works for IfaceTyConBinder too
+isVisibleTyConBinder (TvBndr _ (NamedTCB vis)) = isVisible vis
+isVisibleTyConBinder (TvBndr _ AnonTCB)        = True
+
+isInvisibleTyConBinder :: TyVarBndr tv TyConBndrVis -> Bool
+-- Works for IfaceTyConBinder too
+isInvisibleTyConBinder tcb = not (isVisibleTyConBinder tcb)
+
+mkTyConKind :: [TyConBinder] -> Kind -> Kind
+mkTyConKind bndrs res_kind = foldr mk res_kind bndrs
+  where
+    mk :: TyConBinder -> Kind -> Kind
+    mk (TvBndr tv AnonTCB)        k = mkFunKind (tyVarKind tv) k
+    mk (TvBndr tv (NamedTCB vis)) k = mkForAllKind tv vis k
+
+{- Note [The binders/kind/arity fields of a TyCon]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+All TyCons have this group of fields
+  tyConBinders :: [TyConBinder]
+  tyConResKind :: Kind
+  tyConTyVars  :: [TyVra] -- Cached = binderVars tyConBinders
+  tyConKind    :: Kind    -- Cached = mkTyConKind tyConBinders tyConResKind
+  tyConArity   :: Arity   -- Cached = length tyConBinders
+
+They fit together like so:
+
+* tyConBinders gives the telescope of type variables on the LHS of the
+  type declaration.  For example:
+
+    type App a (b :: k) = a b
+
+  tyConBinders = [ TvBndr (k::*)   (NamedTCB Invisible)
+                 , TvBndr (a:k->*) AnonTCB
+                 , TvBndr (b:k)    AnonTCB ]
+
+  Note that that are three binders here, including the
+  kind variable k.
+
+  See Note [TyBinders and VisibilityFlags] in TyConRep for what
+  the visibility flag means.
+
+* Each TyConBinder tyConBinders has a TyVar, and that TyVar may
+  scope over some other part of the TyCon's definition. Eg
+      type T a = a->a
+  we have
+      tyConBinders = [ TvBndr (a:*) AnonTCB ]
+      synTcRhs     = a->a
+  So the 'a' scopes over the synTcRhs
+
+* From the tyConBinders and tyConResKind we can get the tyConKind
+  E.g for our App example:
+      App :: forall k. (k->*) -> k -> *
+
+  We get a 'forall' in the kind for each NamedTCB, and an arrow
+  for each AnonTCB
+
+  tyConKind is the full kind of the TyCon, not just the result kind
+
+* tyConArity is the arguments this TyCon must be applied to, to be
+  considered saturated.  Here we mean "applied to in the actual Type",
+  not surface syntax; i.e. including implicit kind variables.
+  So it's just (length tyConBinders)
 -}
+
+instance Outputable tv => Outputable (TyVarBndr tv TyConBndrVis) where
+  ppr (TvBndr v AnonTCB)              = ppr v
+  ppr (TvBndr v (NamedTCB Visible))   = ppr v
+  ppr (TvBndr v (NamedTCB Specified)) = char '@' <> ppr v
+  ppr (TvBndr v (NamedTCB Invisible)) = braces (ppr v)
+
+instance Binary TyConBndrVis where
+  put_ bh AnonTCB        = putByte bh 0
+  put_ bh (NamedTCB vis) = do { putByte bh 1; put_ bh vis }
+
+  get bh = do { h <- getByte bh
+              ; case h of
+                  0 -> return AnonTCB
+                  _ -> do { vis <- get bh; return (NamedTCB vis) } }
+
+
+{- *********************************************************************
+*                                                                      *
+               The TyCon type
+*                                                                      *
+************************************************************************
+-}
+
 
 -- | TyCons represent type constructors. Type constructors are introduced by
 -- things such as:
@@ -405,10 +518,10 @@ data TyCon
         tyConName   :: Name,     -- ^ Name of the constructor
 
         -- See Note [The binders/kind/arity fields of a TyCon]
-        tyConBinders :: [TyBinder], -- ^ The TyBinders for this TyCon's kind.
-        tyConResKind :: Kind,       -- ^ Result kind
-        tyConKind   :: Kind,        -- ^ Kind of this TyCon
-        tyConArity  :: Arity,       -- ^ Arity
+        tyConBinders :: [TyConBinder], -- ^ Full binders
+        tyConResKind :: Kind,             -- ^ Result kind
+        tyConKind    :: Kind,             -- ^ Kind of this TyCon
+        tyConArity   :: Arity,            -- ^ Arity
 
         tcRepName :: TyConRepName
     }
@@ -434,23 +547,20 @@ data TyCon
         tyConName    :: Name,    -- ^ Name of the constructor
 
         -- See Note [The binders/kind/arity fields of a TyCon]
-        tyConBinders :: [TyBinder], -- ^ The TyBinders for this TyCon's kind.
-        tyConResKind :: Kind,       -- ^ Result kind
-        tyConKind   :: Kind,        -- ^ Kind of this TyCon
-        tyConArity  :: Arity,       -- ^ Arity
+        tyConBinders :: [TyConBinder], -- ^ Full binders
+        tyConTyVars  :: [TyVar],          -- ^ TyVar binders
+        tyConResKind :: Kind,             -- ^ Result kind
+        tyConKind    :: Kind,             -- ^ Kind of this TyCon
+        tyConArity   :: Arity,            -- ^ Arity
 
-        -- See Note [tyConTyVars and tyConBinders]
-        tyConTyVars  :: [TyVar], -- ^ The kind and type variables used in the
-                                 -- type constructor.
-                                 -- Invariant: length tyConTyVars = tyConArity
-                                 -- Precisely, this list scopes over:
-                                 --
-                                 -- 1. The 'algTcStupidTheta'
-                                 -- 2. The cached types in algTyConRhs.NewTyCon
-                                 -- 3. The family instance types if present
-                                 --
-                                 -- Note that it does /not/ scope over the data
-                                 -- constructors.
+              -- The tyConTyVars scope over:
+              --
+              -- 1. The 'algTcStupidTheta'
+              -- 2. The cached types in algTyConRhs.NewTyCon
+              -- 3. The family instance types if present
+              --
+              -- Note that it does /not/ scope over the data
+              -- constructors.
 
         tcRoles      :: [Role],  -- ^ The role for each type variable
                                  -- This list has length = tyConArity
@@ -497,15 +607,12 @@ data TyCon
         tyConName    :: Name,    -- ^ Name of the constructor
 
         -- See Note [The binders/kind/arity fields of a TyCon]
-        tyConBinders :: [TyBinder], -- ^ The TyBinders for this TyCon's kind.
-        tyConResKind :: Kind,       -- ^ Result kind
-        tyConKind   :: Kind,        -- ^ Kind of this TyCon
-        tyConArity  :: Arity,       -- ^ Arity
-
-        -- See Note [tyConTyVars and tyConBinders]
-        tyConTyVars  :: [TyVar], -- ^ List of type and kind variables in this
-                                 -- TyCon. Includes implicit kind variables.
-                                 -- Scopes over: synTcRhs
+        tyConBinders :: [TyConBinder], -- ^ Full binders
+        tyConTyVars  :: [TyVar],          -- ^ TyVar binders
+        tyConResKind :: Kind,             -- ^ Result kind
+        tyConKind    :: Kind,             -- ^ Kind of this TyCon
+        tyConArity   :: Arity,            -- ^ Arity
+             -- tyConTyVars scope over: synTcRhs
 
         tcRoles      :: [Role],  -- ^ The role for each type variable
                                  -- This list has length = tyConArity
@@ -525,16 +632,12 @@ data TyCon
         tyConName    :: Name,    -- ^ Name of the constructor
 
         -- See Note [The binders/kind/arity fields of a TyCon]
-        tyConBinders :: [TyBinder], -- ^ The TyBinders for this TyCon's kind.
-        tyConResKind :: Kind,       -- ^ Result kind
-        tyConKind   :: Kind,        -- ^ Kind of this TyCon
-        tyConArity  :: Arity,       -- ^ Arity
-
-        -- See Note [tyConTyVars and tyConBinders]
-        tyConTyVars  :: [TyVar], -- ^ The kind and type variables used in the
-                                 -- type constructor.
-                                 -- Invariant: length tyvars = arity
-            -- Needed to connect an associated family TyCon
+        tyConBinders :: [TyConBinder], -- ^ Full binders
+        tyConTyVars  :: [TyVar],          -- ^ TyVar binders
+        tyConResKind :: Kind,             -- ^ Result kind
+        tyConKind    :: Kind,             -- ^ Kind of this TyCon
+        tyConArity   :: Arity,            -- ^ Arity
+            -- tyConTyVars connect an associated family TyCon
             -- with its parent class; see TcValidity.checkConsistentFamInst
 
         famTcResVar  :: Maybe Name,   -- ^ Name of result type variable, used
@@ -566,10 +669,10 @@ data TyCon
         tyConName     :: Name,   -- ^ Name of the constructor
 
         -- See Note [The binders/kind/arity fields of a TyCon]
-        tyConBinders :: [TyBinder], -- ^ The TyBinders for this TyCon's kind.
-        tyConResKind :: Kind,       -- ^ Result kind
-        tyConKind   :: Kind,        -- ^ Kind of this TyCon
-        tyConArity  :: Arity,       -- ^ Arity
+        tyConBinders :: [TyConBinder], -- ^ Full binders
+        tyConResKind :: Kind,             -- ^ Result kind
+        tyConKind    :: Kind,             -- ^ Kind of this TyCon
+        tyConArity   :: Arity,            -- ^ Arity
 
         tcRoles       :: [Role], -- ^ The role for each type variable
                                  -- This list has length = tyConArity
@@ -590,10 +693,10 @@ data TyCon
         tyConName    :: Name,       -- ^ Same Name as the data constructor
 
         -- See Note [The binders/kind/arity fields of a TyCon]
-        tyConBinders :: [TyBinder], -- ^ The TyBinders for this TyCon's kind.
-        tyConResKind :: Kind,       -- ^ Result kind
-        tyConKind   :: Kind,        -- ^ Kind of this TyCon
-        tyConArity  :: Arity,       -- ^ Arity
+        tyConBinders :: [TyConBinder], -- ^ Full binders
+        tyConResKind :: Kind,             -- ^ Result kind
+        tyConKind    :: Kind,             -- ^ Kind of this TyCon
+        tyConArity   :: Arity,            -- ^ Arity
 
         tcRoles       :: [Role],    -- ^ Roles: N for kind vars, R for type vars
         dataCon       :: DataCon,   -- ^ Corresponding data constructor
@@ -608,11 +711,11 @@ data TyCon
         tyConUnsat  :: Bool,  -- ^ can this tycon be unsaturated?
 
         -- See Note [The binders/kind/arity fields of a TyCon]
-        tyConTyVars  :: [TyVar],    -- ^ The TyCon's parameterised tyvars
-        tyConBinders :: [TyBinder], -- ^ The TyBinders for this TyCon's kind.
-        tyConResKind :: Kind,       -- ^ Result kind
-        tyConKind    :: Kind,       -- ^ Kind of this TyCon
-        tyConArity   :: Arity,      -- ^ Arity
+        tyConBinders :: [TyConBinder], -- ^ Full binders
+        tyConTyVars  :: [TyVar],          -- ^ TyVar binders
+        tyConResKind :: Kind,             -- ^ Result kind
+        tyConKind    :: Kind,             -- ^ Kind of this TyCon
+        tyConArity   :: Arity,            -- ^ Arity
 
         tcTyConScopedTyVars :: [TyVar] -- ^ Scoped tyvars over the
                                        -- tycon's body. See Note [TcTyCon]
@@ -815,51 +918,8 @@ data FamTyConFlav
    -- | Built-in type family used by the TypeNats solver
    | BuiltInSynFamTyCon BuiltInSynFamily
 
-{- Note [The binders/kind/arity fields of a TyCon]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-All TyCons have this group of fields
-  tyConBinders :: [TyBinder]
-  tyConResKind :: Kind
-  tyConKind    :: Kind   -- Cached = mkPiTys tyConBinders tyConResKind
-  tyConArity   :: Arity  -- Cached = length tyConBinders
-
-They fit together like so:
-
-* tyConBinders gives the telescope of Named (forall'd)
-  Anon (ordinary ->) binders
-
-* Note that tyConBinders /includes/ Anon arguments.  For example:
-    type App a (b :: k) = a b
-      -- App :: forall {k}; (k->*) -> k -> *
-  we get
-    tyConTyBinders = [ Named (k :: *) Invisible, Anon (k->*), Anon k ]
-
-* tyConKind is the full kind of the TyCon,
-  not just the result kind
-
-* tyConArity is the arguments this TyCon must be applied to, to be
-  considered saturated.  Here we mean "applied to in the actual Type",
-  not surface syntax; i.e. including implicit kind variables.
-
-Note [tyConTyVars and tyConBinders]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-  type App a (b :: k) = a b
-    -- App :: forall {k}; (k->*) -> k -> *
-
-For App we get:
-  tyConTyVars    = [ k:*,                      a:k->*,      b:k]
-  tyConTyBinders = [ Named (k :: *) Invisible, Anon (k->*), Anon k ]
-
-The tyConBinder field is used to construct the kind of App, namely
-  App :: forall {k}; (k->*) -> k -> *
-The tyConTyVars field always corresponds 1-1 with tyConBinders, and
-records the names of the binders.  That is important for type synonyms,
-etc, where those names scope over some other field in the TyCon. In
-this case, 'a' and 'b' are mentioned in the RHS.
-
-Note [Closed type families]
-~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Closed type families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * In an open type family you can add new instances later.  This is the
   usual case.
 
@@ -1240,14 +1300,14 @@ So we compromise, and move their Kind calculation to the call site.
 -- | Given the name of the function type constructor and it's kind, create the
 -- corresponding 'TyCon'. It is reccomended to use 'TyCoRep.funTyCon' if you want
 -- this functionality
-mkFunTyCon :: Name -> [TyBinder] -> Name -> TyCon
+mkFunTyCon :: Name -> [TyConBinder] -> Name -> TyCon
 mkFunTyCon name binders rep_nm
   = FunTyCon {
         tyConUnique  = nameUnique name,
         tyConName    = name,
         tyConBinders = binders,
         tyConResKind = liftedTypeKind,
-        tyConKind    = mkPiTys binders liftedTypeKind,
+        tyConKind    = mkTyConKind binders liftedTypeKind,
         tyConArity   = 2,
         tcRepName    = rep_nm
     }
@@ -1257,11 +1317,8 @@ mkFunTyCon name binders rep_nm
 -- type constructor - you can get hold of it easily (see Generics
 -- module)
 mkAlgTyCon :: Name
-           -> [TyBinder]        -- ^ Binders of the resulting 'TyCon'
+           -> [TyConBinder]  -- ^ Binders of the 'TyCon'
            -> Kind              -- ^ Result kind
-           -> [TyVar]           -- ^ 'TyVar's scoped over: see 'tyConTyVars'.
-                                --   Arity is inferred from the length of this
-                                --   list
            -> [Role]            -- ^ The roles for each TyVar
            -> Maybe CType       -- ^ The C type this type corresponds to
                                 --   when using the CAPI FFI
@@ -1272,15 +1329,15 @@ mkAlgTyCon :: Name
            -> RecFlag           -- ^ Is the 'TyCon' recursive?
            -> Bool              -- ^ Was the 'TyCon' declared with GADT syntax?
            -> TyCon
-mkAlgTyCon name binders res_kind tyvars roles cType stupid rhs parent is_rec gadt_syn
+mkAlgTyCon name binders res_kind roles cType stupid rhs parent is_rec gadt_syn
   = AlgTyCon {
         tyConName        = name,
         tyConUnique      = nameUnique name,
         tyConBinders     = binders,
         tyConResKind     = res_kind,
-        tyConKind        = mkPiTys binders res_kind,
-        tyConArity       = length tyvars,
-        tyConTyVars      = tyvars,
+        tyConKind        = mkTyConKind binders res_kind,
+        tyConArity       = length binders,
+        tyConTyVars      = binderVars binders,
         tcRoles          = roles,
         tyConCType       = cType,
         algTcStupidTheta = stupid,
@@ -1292,32 +1349,31 @@ mkAlgTyCon name binders res_kind tyvars roles cType stupid rhs parent is_rec gad
     }
 
 -- | Simpler specialization of 'mkAlgTyCon' for classes
-mkClassTyCon :: Name -> [TyBinder]
-             -> [TyVar] -> [Role] -> AlgTyConRhs -> Class
+mkClassTyCon :: Name -> [TyConBinder]
+             -> [Role] -> AlgTyConRhs -> Class
              -> RecFlag -> Name -> TyCon
-mkClassTyCon name binders tyvars roles rhs clas is_rec tc_rep_name
-  = mkAlgTyCon name binders constraintKind tyvars roles Nothing [] rhs
+mkClassTyCon name binders roles rhs clas is_rec tc_rep_name
+  = mkAlgTyCon name binders constraintKind roles Nothing [] rhs
                (ClassTyCon clas tc_rep_name)
                is_rec False
 
 mkTupleTyCon :: Name
-             -> [TyBinder]
+             -> [TyConBinder]
              -> Kind    -- ^ Result kind of the 'TyCon'
              -> Arity   -- ^ Arity of the tuple
-             -> [TyVar] -- ^ 'TyVar's scoped over: see 'tyConTyVars'
              -> DataCon
              -> TupleSort    -- ^ Whether the tuple is boxed or unboxed
              -> AlgTyConFlav
              -> TyCon
-mkTupleTyCon name binders res_kind arity tyvars con sort parent
+mkTupleTyCon name binders res_kind arity con sort parent
   = AlgTyCon {
         tyConName        = name,
         tyConUnique      = nameUnique name,
         tyConBinders     = binders,
         tyConResKind     = res_kind,
-        tyConKind        = mkPiTys binders res_kind,
+        tyConKind        = mkTyConKind binders res_kind,
         tyConArity       = arity,
-        tyConTyVars      = tyvars,
+        tyConTyVars      = binderVars binders,
         tcRoles          = replicate arity Representational,
         tyConCType       = Nothing,
         algTcStupidTheta = [],
@@ -1335,31 +1391,32 @@ mkTupleTyCon name binders res_kind arity tyvars con sort parent
 -- TcErrors sometimes calls typeKind.
 -- See also Note [Kind checking recursive type and class declarations]
 -- in TcTyClsDecls.
-mkTcTyCon :: Name -> [TyVar]
-          -> [TyBinder] -> Kind  -- ^ /result/ kind only
+mkTcTyCon :: Name
+          -> [TyConBinder]
+          -> Kind                -- ^ /result/ kind only
           -> Bool                -- ^ Can this be unsaturated?
           -> [TyVar]             -- ^ Scoped type variables, see Note [TcTyCon]
           -> TyCon
-mkTcTyCon name tvs binders res_kind unsat scoped_tvs
+mkTcTyCon name binders res_kind unsat scoped_tvs
   = TcTyCon { tyConUnique  = getUnique name
             , tyConName    = name
-            , tyConTyVars  = tvs
+            , tyConTyVars  = binderVars binders
             , tyConBinders = binders
             , tyConResKind = res_kind
-            , tyConKind    = mkPiTys binders res_kind
+            , tyConKind    = mkTyConKind binders res_kind
             , tyConUnsat   = unsat
             , tyConArity   = length binders
             , tcTyConScopedTyVars = scoped_tvs }
 
 -- | Create an unlifted primitive 'TyCon', such as @Int#@
-mkPrimTyCon :: Name -> [TyBinder]
+mkPrimTyCon :: Name -> [TyConBinder]
             -> Kind   -- ^ /result/ kind
             -> [Role] -> TyCon
 mkPrimTyCon name binders res_kind roles
   = mkPrimTyCon' name binders res_kind roles True (Just $ mkPrelTyConRepName name)
 
 -- | Kind constructors
-mkKindTyCon :: Name -> [TyBinder]
+mkKindTyCon :: Name -> [TyConBinder]
             -> Kind  -- ^ /result/ kind
             -> [Role] -> Name -> TyCon
 mkKindTyCon name binders res_kind roles rep_nm
@@ -1368,14 +1425,14 @@ mkKindTyCon name binders res_kind roles rep_nm
     tc = mkPrimTyCon' name binders res_kind roles False (Just rep_nm)
 
 -- | Create a lifted primitive 'TyCon' such as @RealWorld@
-mkLiftedPrimTyCon :: Name -> [TyBinder]
+mkLiftedPrimTyCon :: Name -> [TyConBinder]
                   -> Kind   -- ^ /result/ kind
                   -> [Role] -> TyCon
 mkLiftedPrimTyCon name binders res_kind roles
   = mkPrimTyCon' name binders res_kind roles False (Just rep_nm)
   where rep_nm = mkPrelTyConRepName name
 
-mkPrimTyCon' :: Name -> [TyBinder]
+mkPrimTyCon' :: Name -> [TyConBinder]
              -> Kind    -- ^ /result/ kind
              -> [Role]
              -> Bool -> Maybe TyConRepName -> TyCon
@@ -1385,7 +1442,7 @@ mkPrimTyCon' name binders res_kind roles is_unlifted rep_nm
         tyConUnique  = nameUnique name,
         tyConBinders = binders,
         tyConResKind = res_kind,
-        tyConKind    = mkPiTys binders res_kind,
+        tyConKind    = mkTyConKind binders res_kind,
         tyConArity   = length roles,
         tcRoles      = roles,
         isUnlifted   = is_unlifted,
@@ -1393,34 +1450,34 @@ mkPrimTyCon' name binders res_kind roles is_unlifted rep_nm
     }
 
 -- | Create a type synonym 'TyCon'
-mkSynonymTyCon :: Name -> [TyBinder] -> Kind   -- ^ /result/ kind
-               -> [TyVar] -> [Role] -> Type -> TyCon
-mkSynonymTyCon name binders res_kind tyvars roles rhs
+mkSynonymTyCon :: Name -> [TyConBinder] -> Kind   -- ^ /result/ kind
+               -> [Role] -> Type -> TyCon
+mkSynonymTyCon name binders res_kind roles rhs
   = SynonymTyCon {
         tyConName    = name,
         tyConUnique  = nameUnique name,
         tyConBinders = binders,
         tyConResKind = res_kind,
-        tyConKind    = mkPiTys binders res_kind,
-        tyConArity   = length tyvars,
-        tyConTyVars  = tyvars,
+        tyConKind    = mkTyConKind binders res_kind,
+        tyConArity   = length binders,
+        tyConTyVars  = binderVars binders,
         tcRoles      = roles,
         synTcRhs     = rhs
     }
 
 -- | Create a type family 'TyCon'
-mkFamilyTyCon :: Name -> [TyBinder] -> Kind  -- ^ /result/ kind
-              -> [TyVar] -> Maybe Name -> FamTyConFlav
+mkFamilyTyCon :: Name -> [TyConBinder] -> Kind  -- ^ /result/ kind
+              -> Maybe Name -> FamTyConFlav
               -> Maybe Class -> Injectivity -> TyCon
-mkFamilyTyCon name binders res_kind tyvars resVar flav parent inj
+mkFamilyTyCon name binders res_kind resVar flav parent inj
   = FamilyTyCon
       { tyConUnique  = nameUnique name
       , tyConName    = name
       , tyConBinders = binders
       , tyConResKind = res_kind
-      , tyConKind    = mkPiTys binders res_kind
-      , tyConArity   = length tyvars
-      , tyConTyVars  = tyvars
+      , tyConKind    = mkTyConKind binders res_kind
+      , tyConArity   = length binders
+      , tyConTyVars  = binderVars binders
       , famTcResVar  = resVar
       , famTcFlav    = flav
       , famTcParent  = parent
@@ -1432,23 +1489,22 @@ mkFamilyTyCon name binders res_kind tyvars resVar flav parent inj
 -- Somewhat dodgily, we give it the same Name
 -- as the data constructor itself; when we pretty-print
 -- the TyCon we add a quote; see the Outputable TyCon instance
-mkPromotedDataCon :: DataCon -> Name -> TyConRepName -> [TyBinder] -> Kind -> [Role]
+mkPromotedDataCon :: DataCon -> Name -> TyConRepName
+                  -> [TyConBinder] -> Kind -> [Role]
                   -> RuntimeRepInfo -> TyCon
 mkPromotedDataCon con name rep_name binders res_kind roles rep_info
   = PromotedDataCon {
         tyConUnique   = nameUnique name,
         tyConName     = name,
-        tyConArity    = arity,
+        tyConArity    = length roles,
         tcRoles       = roles,
         tyConBinders  = binders,
         tyConResKind  = res_kind,
-        tyConKind     = mkPiTys binders res_kind,
+        tyConKind     = mkTyConKind binders res_kind,
         dataCon       = con,
         tcRepName     = rep_name,
         promDcRepInfo = rep_info
   }
-  where
-    arity = length roles
 
 isFunTyCon :: TyCon -> Bool
 isFunTyCon (FunTyCon {}) = True
@@ -1463,7 +1519,7 @@ isAbstractTyCon _ = False
 -- Used when recovering from errors
 makeTyConAbstract :: TyCon -> TyCon
 makeTyConAbstract tc
-  = mkTcTyCon (tyConName tc) (tyConTyVars tc)
+  = mkTcTyCon (tyConName tc)
               (tyConBinders tc) (tyConResKind tc)
               (mightBeUnsaturatedTyCon tc) [{- no scoped vars -}]
 

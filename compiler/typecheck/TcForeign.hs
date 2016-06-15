@@ -131,7 +131,7 @@ normaliseFfiType' env ty0 = go initRecTc ty0
       | (bndrs, inner_ty) <- splitForAllTyVarBndrs ty
       , not (null bndrs)
       = do (coi, nty1, gres1) <- go rec_nts inner_ty
-           return ( mkHomoForAllCos (map binderVar bndrs) coi
+           return ( mkHomoForAllCos (binderVars bndrs) coi
                   , mkForAllTys bndrs nty1, gres1 )
 
       | otherwise -- see Note [Don't recur in normaliseFfiType']

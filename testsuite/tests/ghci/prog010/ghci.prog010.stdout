@@ -1,7 +1,7 @@
-f :: t -> [t]
+f :: a -> [a]
 g :: a -> Maybe a
-f :: t -> [t]
-f :: t -> [t]
+f :: a -> [a]
+f :: a -> [a]
 g :: a -> Maybe a
-f :: t -> [t]
+f :: a -> [a]
 g :: a -> Maybe a

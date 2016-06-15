@@ -4,15 +4,11 @@ import Outputable ( SDoc )
 import Data.Data  ( Data )
 
 data Type
-data TyBinder
-data TyVarBinder
 data TyThing
 data Coercion
 data LeftOrRight
 data UnivCoProvenance
 data TCvSubst
-
-mkPiTys :: [TyBinder] -> Type -> Type
 
 type PredType = Type
 type Kind = Type

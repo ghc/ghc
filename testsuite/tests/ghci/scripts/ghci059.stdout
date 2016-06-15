@@ -1,4 +1,4 @@
 type role Coercible representational representational
-class a ~R# b => Coercible (a :: k) (b :: k)
+class a ~R# b => Coercible (a :: k0) (b :: k0)
   	-- Defined in ‘GHC.Types’
 coerce :: Coercible a b => a -> b 	-- Defined in ‘GHC.Prim’

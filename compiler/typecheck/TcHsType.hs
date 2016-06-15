@@ -741,14 +741,15 @@ bigConstraintTuple arity
 -- the visible ones.
 tcInferArgs :: Outputable fun
             => fun                      -- ^ the function
-            -> [TyBinder]               -- ^ function kind's binders
+            -> [TyConBinder]            -- ^ function kind's binders
             -> Maybe (VarEnv Kind)      -- ^ possibly, kind info (see above)
             -> [LHsType Name]           -- ^ args
             -> TcM (TCvSubst, [TyBinder], [TcType], [LHsType Name], Int)
                -- ^ (instantiating subst, un-insted leftover binders,
                --   typechecked args, untypechecked args, n)
-tcInferArgs fun binders mb_kind_info args
-  = do { (subst, leftover_binders, args', leftovers, n)
+tcInferArgs fun tc_binders mb_kind_info args
+  = do { let binders = tyConBindersTyBinders tc_binders  -- UGH!
+       ; (subst, leftover_binders, args', leftovers, n)
            <- tc_infer_args typeLevelMode fun binders mb_kind_info args 1
         -- now, we need to instantiate any remaining invisible arguments
        ; let (invis_bndrs, other_binders) = span isInvisibleBinder leftover_binders
@@ -1241,14 +1242,15 @@ kcHsTyVarBndrs name cusk open_fam all_kind_vars
   = do { kv_kinds <- mk_kv_kinds
        ; let scoped_kvs = zipWith mk_skolem_tv kv_ns kv_kinds
        ; tcExtendTyVarEnv2 (kv_ns `zip` scoped_kvs) $
-    do { (tvs, binders, res_kind, stuff) <- solveEqualities $
-                                            bind_telescope hs_tvs thing_inside
+    do { (tc_binders, res_kind, stuff) <- solveEqualities $
+                                          bind_telescope hs_tvs thing_inside
 
            -- Now, because we're in a CUSK, quantify over the mentioned
            -- kind vars, in dependency order.
-       ; binders  <- mapM zonkTcTyBinder binders
+       ; tc_binders  <- mapM zonkTyConBinder tc_binders
        ; res_kind <- zonkTcType res_kind
-       ; let qkvs = tyCoVarsOfTypeWellScoped (mkPiTys binders res_kind)
+       ; let tc_tvs = binderVars tc_binders
+             qkvs   = tyCoVarsOfTypeWellScoped (mkTyConKind tc_binders res_kind)
                    -- the visibility of tvs doesn't matter here; we just
                    -- want the free variables not to include the tvs
 
@@ -1256,41 +1258,40 @@ kcHsTyVarBndrs name cusk open_fam all_kind_vars
           -- lied about having a CUSK. Error.
        ; let (meta_tvs, good_tvs) = partition isMetaTyVar qkvs
        ; when (not (null meta_tvs)) $
-         report_non_cusk_tvs (qkvs ++ tvs)
+         report_non_cusk_tvs (qkvs ++ tc_tvs)
 
-          -- if any of the scoped_kvs aren't actually mentioned in a binder's
+          -- If any of the scoped_kvs aren't actually mentioned in a binder's
           -- kind (or the return kind), then we're in the CUSK case from
           -- Note [Free-floating kind vars]
-       ; let tycon_tyvars      = good_tvs ++ tvs
+       ; let all_tc_tvs        = good_tvs ++ tc_tvs
              all_mentioned_tvs = mapUnionVarSet (tyCoVarsOfType . tyVarKind)
-                                                tycon_tyvars
+                                                all_tc_tvs
                                  `unionVarSet` tyCoVarsOfType res_kind
              unmentioned_kvs   = filterOut (`elemVarSet` all_mentioned_tvs)
                                            scoped_kvs
-       ; reportFloatingKvs name tycon_tyvars unmentioned_kvs
+       ; reportFloatingKvs name all_tc_tvs unmentioned_kvs
 
-       ; let final_binders      = mkNamedTyBinders Specified good_tvs ++ binders
-             mk_tctc unsat      = mkTcTyCon name tycon_tyvars
-                                            final_binders res_kind
-                                            unsat (scoped_kvs ++ tvs)
-                                -- the tvs contain the binders already
-                                -- in scope from an enclosing class, but
-                                -- re-adding tvs to the env't doesn't cause
-                                -- harm
+       ; let final_binders = map (mkNamedTyConBinder Specified) good_tvs
+                            ++ tc_binders
+             mk_tctc unsat = mkTcTyCon name final_binders res_kind
+                                       unsat (scoped_kvs ++ tc_tvs)
+                           -- the tvs contain the binders already
+                           -- in scope from an enclosing class, but
+                           -- re-adding tvs to the env't doesn't cause
+                           -- harm
        ; return ( mk_tctc, stuff ) }}
 
   | otherwise
   = do { kv_kinds <- mk_kv_kinds
        ; scoped_kvs <- zipWithM newSigTyVar kv_ns kv_kinds
                      -- the names must line up in splitTelescopeTvs
-       ; (tvs, binders, res_kind, stuff)
+       ; (binders, res_kind, stuff)
            <- tcExtendTyVarEnv2 (kv_ns `zip` scoped_kvs) $
               bind_telescope hs_tvs thing_inside
        ; let   -- NB: Don't add scoped_kvs to tyConTyVars, because they
                -- must remain lined up with the binders
-             mk_tctc unsat = mkTcTyCon name tvs
-                                       binders res_kind unsat
-                                       (scoped_kvs ++ tvs)
+             mk_tctc unsat = mkTcTyCon name binders res_kind unsat
+                                       (scoped_kvs ++ binderVars binders)
        ; return (mk_tctc, stuff) }
   where
       -- if -XNoTypeInType and we know all the implicits are kind vars,
@@ -1306,24 +1307,23 @@ kcHsTyVarBndrs name cusk open_fam all_kind_vars
       -- to handle them one at a time.
     bind_telescope :: [LHsTyVarBndr Name]
                    -> TcM (Kind, r)
-                   -> TcM ([TcTyVar], [TyBinder], TcKind, r)
+                   -> TcM ([TyConBinder], TcKind, r)
     bind_telescope [] thing
       = do { (res_kind, stuff) <- thing
-           ; return ([], [], res_kind, stuff) }
+           ; return ([], res_kind, stuff) }
     bind_telescope (L _ hs_tv : hs_tvs) thing
       = do { tv_pair@(tv, _) <- kc_hs_tv hs_tv
                -- NB: Bring all tvs into scope, even non-dependent ones,
                -- as they're needed in type synonyms, data constructors, etc.
-           ; (tvs, binders, res_kind, stuff) <- bind_unless_scoped tv_pair $
-                                                bind_telescope hs_tvs $
-                                                thing
+           ; (binders, res_kind, stuff) <- bind_unless_scoped tv_pair $
+                                           bind_telescope hs_tvs $
+                                           thing
                   -- See Note [Dependent LHsQTyVars]
            ; let new_binder | hsTyVarName hs_tv `elemNameSet` dep_names
-                            = mkNamedBinder (mkTyVarBinder Visible tv)
+                            = mkNamedTyConBinder Visible tv
                             | otherwise
-                            = mkAnonBinder (tyVarKind tv)
-           ; return ( tv : tvs
-                    , new_binder : binders
+                            = mkAnonTyConBinder tv
+           ; return ( new_binder : binders
                     , res_kind, stuff ) }
 
     -- | Bind the tyvar in the env't unless the bool is True
@@ -1619,7 +1619,7 @@ kcTyClTyVars tycon_name thing_inside
        ; tcExtendTyVarEnv (tcTyConScopedTyVars tycon) $ thing_inside }
 
 tcTyClTyVars :: Name
-             -> ([TyVar] -> [TyBinder] -> Kind -> TcM a) -> TcM a
+             -> ([TyConBinder] -> Kind -> TcM a) -> TcM a
 -- ^ Used for the type variables of a type or class decl
 -- on the second full pass (type-checking/desugaring) in TcTyClDecls.
 -- This is *not* used in the initial-kind run, nor in the "kind-checking" pass.
@@ -1640,9 +1640,7 @@ tcTyClTyVars tycon_name thing_inside
   = do { tycon <- kcLookupTcTyCon tycon_name
 
        ; let scoped_tvs = tcTyConScopedTyVars tycon
-
                -- these are all zonked:
-             tkvs       = tyConTyVars tycon
              binders    = tyConBinders tycon
              res_kind   = tyConResKind tycon
 
@@ -1655,11 +1653,11 @@ tcTyClTyVars tycon_name thing_inside
           -- Add the *unzonked* tyvars to the env't, because those
           -- are the ones mentioned in the source.
        ; tcExtendTyVarEnv scoped_tvs $
-         thing_inside tkvs binders res_kind }
+         thing_inside binders res_kind }
   where
 
 -----------------------------------
-tcDataKindSig :: Kind -> TcM ([TyVar], [TyBinder], Kind)
+tcDataKindSig :: Kind -> TcM ([TyConBinder], Kind)
 -- GADT decls can have a (perhaps partial) kind signature
 --      e.g.  data T :: * -> * -> * where ...
 -- This function makes up suitable (kinded) type variables for
@@ -1679,20 +1677,23 @@ tcDataKindSig kind
                             , isNothing (lookupLocalRdrOcc rdr_env occ) ]
                  -- Note [Avoid name clashes for associated data types]
 
-            -- NB: Use the tv from a binder if there is one. Otherwise,
-            -- we end up inventing a new Unique for it, and any other tv
-            -- that mentions the first ends up with the wrong kind.
-              tvs = [ tv
-                    | (bndr, occ, uniq) <- zip3 bndrs occs uniqs
-                    , let tv = case bndr of
-                                 Named tvb -> binderVar tvb
-                                 Anon kind -> mk_tv span uniq occ kind ]
+              extra_bndrs = zipWith3 (mk_tc_bndr span) tv_bndrs occs uniqs
 
-        ; return (tvs, bndrs, res_kind) }
+        ; return (extra_bndrs, res_kind) }
   where
-    (bndrs, res_kind) = splitPiTys kind
+    (tv_bndrs, res_kind) = splitPiTys kind
     mk_tv loc uniq occ kind
       = mkTyVar (mkInternalName uniq occ loc) kind
+
+    -- NB: Use the tv from a binder if there is one. Otherwise,
+    -- we end up inventing a new Unique for it, and any other tv
+    -- that mentions the first ends up with the wrong kind.
+    -- Ugh!
+    mk_tc_bndr loc tv_bndr occ uniq
+      = case tv_bndr of
+          Named (TvBndr tv vis) -> TvBndr tv (NamedTCB vis)
+          Anon kind -> TvBndr (mk_tv loc uniq occ kind) AnonTCB
+
 
 badKindSig :: Kind -> SDoc
 badKindSig kind

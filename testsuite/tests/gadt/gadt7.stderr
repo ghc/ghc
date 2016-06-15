@@ -2,14 +2,14 @@
 gadt7.hs:16:38: error:
     • Couldn't match expected type ‘t’ with actual type ‘t1’
         ‘t’ is untouchable
-          inside the constraints: t2 ~ Int
+          inside the constraints: a ~ Int
           bound by a pattern with constructor: K :: T Int,
                    in a case alternative
           at gadt7.hs:16:33
       ‘t’ is a rigid type variable bound by
-        the inferred type of i1b :: T t2 -> t1 -> t at gadt7.hs:16:1-44
+        the inferred type of i1b :: T a -> t1 -> t at gadt7.hs:16:1-44
       ‘t1’ is a rigid type variable bound by
-        the inferred type of i1b :: T t2 -> t1 -> t at gadt7.hs:16:1-44
+        the inferred type of i1b :: T a -> t1 -> t at gadt7.hs:16:1-44
       Possible fix: add a type signature for ‘i1b’
     • In the expression: y1
       In a case alternative: K -> y1
@@ -17,4 +17,4 @@ gadt7.hs:16:38: error:
     • Relevant bindings include
         y1 :: t1 (bound at gadt7.hs:16:16)
         y :: t1 (bound at gadt7.hs:16:7)
-        i1b :: T t2 -> t1 -> t (bound at gadt7.hs:16:1)
+        i1b :: T a -> t1 -> t (bound at gadt7.hs:16:1)

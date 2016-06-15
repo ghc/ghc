@@ -139,6 +139,7 @@ import ByteCodeTypes
 import InteractiveEvalTypes ( Resume )
 import GHCi.Message         ( Pipe )
 import GHCi.RemoteTypes
+import UniqFM
 #endif
 
 import HsSyn
@@ -179,7 +180,6 @@ import Maybes
 import Outputable
 import SrcLoc
 import Unique
-import UniqFM
 import UniqDFM
 import UniqSupply
 import FastString

@@ -9,6 +9,14 @@
 -- | This module is about types that can be defined in Haskell, but which
 --   must be wired into the compiler nonetheless.  C.f module TysPrim
 module TysWiredIn (
+        -- * Helper functions defined here
+        mkWiredInTyConName, -- This is used in TcTypeNats to define the
+                            -- built-in functions for evaluation.
+
+        mkWiredInIdName,    -- used in MkId
+
+        mkFunKind, mkForAllKind,
+
         -- * All wired in things
         wiredInTyCons, isBuiltInOcc_maybe,
 
@@ -50,7 +58,6 @@ module TysWiredIn (
         nilDataCon, nilDataConName, nilDataConKey,
         consDataCon_RDR, consDataCon, consDataConName,
         promotedNilDataCon, promotedConsDataCon,
-
         mkListTy,
 
         -- * Maybe
@@ -85,11 +92,6 @@ module TysWiredIn (
         -- * Equality predicates
         heqTyCon, heqClass, heqDataCon,
         coercibleTyCon, coercibleDataCon, coercibleClass,
-
-        mkWiredInTyConName, -- This is used in TcTypeNats to define the
-                            -- built-in functions for evaluation.
-
-        mkWiredInIdName,    -- used in MkId
 
         -- * RuntimeRep and friends
         runtimeRepTyCon, vecCountTyCon, vecElemTyCon,
@@ -347,13 +349,13 @@ anyTyConName =
     mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Any") anyTyConKey anyTyCon
 
 anyTyCon :: TyCon
-anyTyCon = mkFamilyTyCon anyTyConName binders res_kind [kKiVar] Nothing
+anyTyCon = mkFamilyTyCon anyTyConName binders res_kind Nothing
                          (ClosedSynFamilyTyCon Nothing)
                          Nothing
                          NotInjective
   where
-    binders  = [mkNamedBinder (mkTyVarBinder Specified kKiVar)]
-    res_kind = mkTyVarTy kKiVar
+    binders@[kv] = mkTemplateKindTyConBinders [liftedTypeKind]
+    res_kind = mkTyVarTy (binderVar kv)
 
 anyTy :: Type
 anyTy = mkTyConTy anyTyCon
@@ -453,9 +455,8 @@ pcNonRecDataTyCon = pcTyCon False NonRecursive
 pcTyCon :: Bool -> RecFlag -> Name -> Maybe CType -> [TyVar] -> [DataCon] -> TyCon
 pcTyCon is_enum is_rec name cType tyvars cons
   = mkAlgTyCon name
-                (map (mkAnonBinder . tyVarKind) tyvars)
+                (mkAnonTyConBinders tyvars)
                 liftedTypeKind
-                tyvars
                 (map (const Representational) tyvars)
                 cType
                 []              -- No stupid theta
@@ -549,6 +550,14 @@ liftedTypeKind, constraintKind, unboxedTupleKind :: Kind
 liftedTypeKind   = tYPE ptrRepLiftedTy
 constraintKind   = mkTyConApp constraintKindTyCon []
 unboxedTupleKind = tYPE unboxedTupleRepDataConTy
+
+-- mkFunKind and mkForAllKind are defined here
+-- solely so that TyCon can use them via a SOURCE import
+mkFunKind :: Kind -> Kind -> Kind
+mkFunKind = mkFunTy
+
+mkForAllKind :: TyVar -> VisibilityFlag -> Kind -> Kind
+mkForAllKind = mkForAllTy
 
 {-
 ************************************************************************
@@ -729,50 +738,54 @@ boxedTupleArr   = listArray (0,mAX_TUPLE_SIZE) [mk_tuple Boxed   i | i <- [0..mA
 unboxedTupleArr = listArray (0,mAX_TUPLE_SIZE) [mk_tuple Unboxed i | i <- [0..mAX_TUPLE_SIZE]]
 
 mk_tuple :: Boxity -> Int -> (TyCon,DataCon)
-mk_tuple boxity arity = (tycon, tuple_con)
+mk_tuple Boxed arity = (tycon, tuple_con)
   where
-        tycon   = mkTupleTyCon tc_name tc_binders tc_res_kind tc_arity tyvars tuple_con
-                               tup_sort flavour
+    tycon = mkTupleTyCon tc_name tc_binders tc_res_kind tc_arity tuple_con
+                         BoxedTuple flavour
 
-        (tup_sort, modu, tc_binders, tc_res_kind, tc_arity, tyvars, tyvar_tys, flavour)
-          = case boxity of
-          Boxed ->
-            let boxed_tyvars = take arity alphaTyVars in
-            ( BoxedTuple
-            , gHC_TUPLE
-            , nOfThem arity (mkAnonBinder liftedTypeKind)
-            , liftedTypeKind
-            , arity
-            , boxed_tyvars
-            , mkTyVarTys boxed_tyvars
-            , VanillaAlgTyCon (mkPrelTyConRepName tc_name)
-            )
-            -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
-          Unboxed ->
-            let all_tvs = mkTemplateTyVars (replicate arity runtimeRepTy ++
-                                            map (tYPE . mkTyVarTy) (take arity all_tvs))
-                   -- NB: This must be one call to mkTemplateTyVars, to make
-                   -- sure that all the uniques are different
-                (rr_tvs, open_tvs) = splitAt arity all_tvs
-            in
-            ( UnboxedTuple
-            , gHC_PRIM
-            , map (mkNamedBinder . mkTyVarBinder Specified) rr_tvs ++
-              map (mkAnonBinder . tyVarKind) open_tvs
-            , unboxedTupleKind
-            , arity * 2
-            , all_tvs
-            , mkTyVarTys open_tvs
-            , UnboxedAlgTyCon
-            )
+    tc_binders  = mkTemplateAnonTyConBinders (nOfThem arity liftedTypeKind)
+    tc_res_kind = liftedTypeKind
+    tc_arity    = arity
+    flavour     = VanillaAlgTyCon (mkPrelTyConRepName tc_name)
 
-        tc_name = mkWiredInName modu (mkTupleOcc tcName boxity arity) tc_uniq
-                                (ATyCon tycon) BuiltInSyntax
-        tuple_con = pcDataCon dc_name tyvars tyvar_tys tycon
-        dc_name   = mkWiredInName modu (mkTupleOcc dataName boxity arity) dc_uniq
-                                  (AConLike (RealDataCon tuple_con)) BuiltInSyntax
-        tc_uniq   = mkTupleTyConUnique   boxity arity
-        dc_uniq   = mkTupleDataConUnique boxity arity
+    dc_tvs     = binderVars tc_binders
+    dc_arg_tys = mkTyVarTys dc_tvs
+    tuple_con  = pcDataCon dc_name dc_tvs dc_arg_tys tycon
+
+    boxity  = Boxed
+    modu    = gHC_TUPLE
+    tc_name = mkWiredInName modu (mkTupleOcc tcName boxity arity) tc_uniq
+                         (ATyCon tycon) BuiltInSyntax
+    dc_name = mkWiredInName modu (mkTupleOcc dataName boxity arity) dc_uniq
+                            (AConLike (RealDataCon tuple_con)) BuiltInSyntax
+    tc_uniq = mkTupleTyConUnique   boxity arity
+    dc_uniq = mkTupleDataConUnique boxity arity
+
+mk_tuple Unboxed arity = (tycon, tuple_con)
+  where
+    tycon = mkTupleTyCon tc_name tc_binders tc_res_kind tc_arity tuple_con
+                         UnboxedTuple flavour
+
+    -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+    -- Kind:  forall (k1:RuntimeRep) (k2:RuntimeRep). TYPE k2 -> TYPE k2 -> #
+    tc_binders = mkTemplateTyConBinders (nOfThem arity runtimeRepTy)
+                                        (\ks -> map tYPE ks)
+    tc_res_kind = unboxedTupleKind
+    tc_arity    = arity * 2
+    flavour     = UnboxedAlgTyCon
+
+    dc_tvs     = binderVars tc_binders
+    dc_arg_tys = mkTyVarTys (drop arity dc_tvs)
+    tuple_con  = pcDataCon dc_name dc_tvs dc_arg_tys tycon
+
+    boxity  = Unboxed
+    modu    = gHC_PRIM
+    tc_name = mkWiredInName modu (mkTupleOcc tcName boxity arity) tc_uniq
+                         (ATyCon tycon) BuiltInSyntax
+    dc_name = mkWiredInName modu (mkTupleOcc dataName boxity arity) dc_uniq
+                            (AConLike (RealDataCon tuple_con)) BuiltInSyntax
+    tc_uniq = mkTupleTyConUnique   boxity arity
+    dc_uniq = mkTupleDataConUnique boxity arity
 
 unitTyCon :: TyCon
 unitTyCon = tupleTyCon Boxed 0
@@ -812,48 +825,43 @@ heqSCSelId, coercibleSCSelId :: Id
 (heqTyCon, heqClass, heqDataCon, heqSCSelId)
   = (tycon, klass, datacon, sc_sel_id)
   where
-    tycon     = mkClassTyCon heqTyConName binders tvs roles
+    tycon     = mkClassTyCon heqTyConName binders roles
                              rhs klass NonRecursive
                              (mkPrelTyConRepName heqTyConName)
-    klass     = mkClass tvs [] [sc_pred] [sc_sel_id] [] [] (mkAnd []) tycon
+    klass     = mk_class tycon sc_pred sc_sel_id
     datacon   = pcDataCon heqDataConName tvs [sc_pred] tycon
 
-    binders   = [ mkNamedBinder (mkTyVarBinder Specified kv1)
-                , mkNamedBinder (mkTyVarBinder Specified kv2)
-                , mkAnonBinder k1
-                , mkAnonBinder k2 ]
-    kv1:kv2:_ = drop 9 alphaTyVars -- gets "j" and "k"
-    k1        = mkTyVarTy kv1
-    k2        = mkTyVarTy kv2
-    [av,bv]   = mkTemplateTyVars [k1, k2]
-    tvs       = [kv1, kv2, av, bv]
+    -- Kind: forall k1 k2. k1 -> k2 -> Constraint
+    binders   = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] (\ks -> ks)
     roles     = [Nominal, Nominal, Nominal, Nominal]
     rhs       = DataTyCon { data_cons = [datacon], is_enum = False }
 
+    tvs       = binderVars binders
     sc_pred   = mkTyConApp eqPrimTyCon (mkTyVarTys tvs)
     sc_sel_id = mkDictSelId heqSCSelIdName klass
 
 (coercibleTyCon, coercibleClass, coercibleDataCon, coercibleSCSelId)
   = (tycon, klass, datacon, sc_sel_id)
   where
-    tycon     = mkClassTyCon coercibleTyConName binders tvs roles
+    tycon     = mkClassTyCon coercibleTyConName binders roles
                              rhs klass NonRecursive
                              (mkPrelTyConRepName coercibleTyConName)
-    klass     = mkClass tvs [] [sc_pred] [sc_sel_id] [] [] (mkAnd []) tycon
+    klass     = mk_class tycon sc_pred sc_sel_id
     datacon   = pcDataCon coercibleDataConName tvs [sc_pred] tycon
 
-    binders   = [ mkNamedBinder (mkTyVarBinder Specified kKiVar)
-                , mkAnonBinder k
-                , mkAnonBinder k ]
-    k         = mkTyVarTy kKiVar
-    [av,bv]   = mkTemplateTyVars [k, k]
-    tvs       = [kKiVar, av, bv]
+    -- Kind: forall k. k -> k -> Constraint
+    binders   = mkTemplateTyConBinders [liftedTypeKind] (\[k] -> [k,k])
     roles     = [Nominal, Representational, Representational]
     rhs       = DataTyCon { data_cons = [datacon], is_enum = False }
 
-    sc_pred   = mkTyConApp eqReprPrimTyCon [k, k, mkTyVarTy av, mkTyVarTy bv]
-    sc_sel_id = mkDictSelId coercibleSCSelIdName klass
+    tvs@[k,a,b] = binderVars binders
+    sc_pred     = mkTyConApp eqReprPrimTyCon (mkTyVarTys [k, k, a, b])
+    sc_sel_id   = mkDictSelId coercibleSCSelIdName klass
 
+mk_class :: TyCon -> PredType -> Id -> Class
+mk_class tycon sc_pred sc_sel_id
+  = mkClass (tyConName tycon) (tyConTyVars tycon) [] [sc_pred] [sc_sel_id]
+            [] [] (mkAnd []) tycon
 
 {- *********************************************************************
 *                                                                      *
@@ -870,18 +878,15 @@ liftedTypeKindTyCon, starKindTyCon, unicodeStarKindTyCon :: TyCon
 
    -- See Note [TYPE] in TysPrim
 liftedTypeKindTyCon   = mkSynonymTyCon liftedTypeKindTyConName
-                                       [] liftedTypeKind
-                                       [] []
+                                       [] liftedTypeKind []
                                        (tYPE ptrRepLiftedTy)
 
 starKindTyCon         = mkSynonymTyCon starKindTyConName
-                                       [] liftedTypeKind
-                                       [] []
+                                       [] liftedTypeKind []
                                        (tYPE ptrRepLiftedTy)
 
 unicodeStarKindTyCon  = mkSynonymTyCon unicodeStarKindTyConName
-                                       [] liftedTypeKind
-                                       [] []
+                                       [] liftedTypeKind []
                                        (tYPE ptrRepLiftedTy)
 
 runtimeRepTyCon :: TyCon

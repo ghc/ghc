@@ -3132,5 +3132,5 @@ deferTcSForAllEq role loc kind_cos (bndrs1,body1) (bndrs2,body2)
       ; let cobndrs    = zip skol_tvs kind_cos
       ; return $ mkForAllCos cobndrs hole_co }
    where
-     tvs1 = map binderVar bndrs1
-     tvs2 = map binderVar bndrs2
+     tvs1 = binderVars bndrs1
+     tvs2 = binderVars bndrs2

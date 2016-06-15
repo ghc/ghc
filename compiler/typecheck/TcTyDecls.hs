@@ -48,7 +48,7 @@ import IdInfo
 import VarEnv
 import VarSet
 import NameSet  ( NameSet, unitNameSet, emptyNameSet, unionNameSet
-                , extendNameSet, mkNameSet, nameSetElems, elemNameSet )
+                , extendNameSet, mkNameSet, elemNameSet )
 import Coercion ( ltRole )
 import Digraph
 import BasicTypes
@@ -609,7 +609,7 @@ initialRoleEnv1 is_boot annots_env tc
   | otherwise             = pprPanic "initialRoleEnv1" (ppr tc)
   where name         = tyConName tc
         bndrs        = tyConBinders tc
-        visflags     = map tyBinderVisibility $ take (tyConArity tc) bndrs
+        visflags     = map tyConBinderVisibility bndrs
         num_exps     = count (== Visible) visflags
 
           -- if the number of annotations in the role annotation decl

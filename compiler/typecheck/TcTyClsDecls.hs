@@ -351,9 +351,10 @@ kcTyClGroup decls
                  kc_binders  = tyConBinders tc
                  kc_res_kind = tyConResKind tc
                  kc_tyvars   = tyConTyVars tc
-           ; kvs <- kindGeneralize (mkPiTys kc_binders kc_res_kind)
-           ; (kc_binders', kc_res_kind') <- zonkTcKindToKind kc_binders kc_res_kind
-           ; kc_tyvars <- mapM zonkTcTyVarToTyVar kc_tyvars
+           ; kvs <- kindGeneralize (mkTyConKind kc_binders kc_res_kind)
+
+           ; (env, kc_binders') <- zonkTyConBinders emptyZonkEnv kc_binders
+           ; kc_res_kind' <- zonkTcTypeToType env kc_res_kind
 
                       -- Make sure kc_kind' has the final, zonked kind variables
            ; traceTc "Generalise kind" $
@@ -361,8 +362,8 @@ kcTyClGroup decls
                   , ppr kvs, ppr kc_binders', ppr kc_res_kind'
                   , ppr kc_tyvars, ppr (tcTyConScopedTyVars tc)]
 
-           ; return (mkTcTyCon name (kvs ++ kc_tyvars)
-                               (mkNamedTyBinders Invisible kvs ++ kc_binders')
+           ; return (mkTcTyCon name
+                               (mkNamedTyConBinders Invisible kvs ++ kc_binders')
                                kc_res_kind'
                                (mightBeUnsaturatedTyCon tc)
                                (tcTyConScopedTyVars tc)) }
@@ -726,15 +727,15 @@ tcTyClDecl1 parent _rec_info (FamDecl { tcdFam = fd })
 tcTyClDecl1 _parent rec_info
             (SynDecl { tcdLName = L _ tc_name, tcdRhs = rhs })
   = ASSERT( isNothing _parent )
-    tcTyClTyVars tc_name $ \ tkvs' binders res_kind ->
-    tcTySynRhs rec_info tc_name tkvs' binders res_kind rhs
+    tcTyClTyVars tc_name $ \ binders res_kind ->
+    tcTySynRhs rec_info tc_name binders res_kind rhs
 
   -- "data/newtype" declaration
 tcTyClDecl1 _parent rec_info
             (DataDecl { tcdLName = L _ tc_name, tcdDataDefn = defn })
   = ASSERT( isNothing _parent )
-    tcTyClTyVars tc_name $ \ tkvs' tycon_binders res_kind ->
-    tcDataDefn rec_info tc_name tkvs' tycon_binders res_kind defn
+    tcTyClTyVars tc_name $ \ tycon_binders res_kind ->
+    tcDataDefn rec_info tc_name tycon_binders res_kind defn
 
 tcTyClDecl1 _parent rec_info
             (ClassDecl { tcdLName = L _ class_name
@@ -743,13 +744,12 @@ tcTyClDecl1 _parent rec_info
             , tcdATs = ats, tcdATDefs = at_defs })
   = ASSERT( isNothing _parent )
     do { clas <- fixM $ \ clas ->
-            tcTyClTyVars class_name $ \ tkvs' binders res_kind ->
+            tcTyClTyVars class_name $ \ binders res_kind ->
             do { MASSERT( isConstraintKind res_kind )
                  -- This little knot is just so we can get
                  -- hold of the name of the class TyCon, which we
                  -- need to look up its recursiveness
-               ; traceTc "tcClassDecl 1" (ppr class_name $$ ppr tkvs' $$
-                                          ppr binders)
+               ; traceTc "tcClassDecl 1" (ppr class_name $$ ppr binders)
                ; let tycon_name = tyConName (classTyCon clas)
                      tc_isrec = rti_is_rec rec_info tycon_name
                      roles = rti_roles rec_info tycon_name
@@ -762,10 +762,10 @@ tcTyClDecl1 _parent rec_info
                ; at_stuff <- tcClassATs class_name clas ats at_defs
                ; mindef <- tcClassMinimalDef class_name sigs sig_stuff
                ; clas <- buildClass
-                            class_name tkvs' roles ctxt' binders
+                            class_name binders roles ctxt'
                             fds' at_stuff
                             sig_stuff mindef tc_isrec
-               ; traceTc "tcClassDecl" (ppr fundeps $$ ppr tkvs' $$
+               ; traceTc "tcClassDecl" (ppr fundeps $$ ppr binders $$
                                         ppr fds')
                ; return clas }
 
@@ -780,25 +780,24 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info, fdLName = tc_lname@(L _ tc_na
                               , fdTyVars = tvs, fdResultSig = L _ sig
                               , fdInjectivityAnn = inj })
   | DataFamily <- fam_info
-  = tcTyClTyVars tc_name $ \ tkvs' binders res_kind -> do
+  = tcTyClTyVars tc_name $ \ binders res_kind -> do
   { traceTc "data family:" (ppr tc_name)
   ; checkFamFlag tc_name
-  ; (extra_tvs, extra_binders, real_res_kind) <- tcDataKindSig res_kind
+  ; (extra_binders, real_res_kind) <- tcDataKindSig res_kind
   ; tc_rep_name <- newTyConRepName tc_name
-  ; let final_tvs = tkvs' `chkAppend` extra_tvs -- we may not need these
-        tycon = mkFamilyTyCon tc_name (binders `chkAppend` extra_binders)
-                              real_res_kind final_tvs
+  ; let tycon = mkFamilyTyCon tc_name (binders `chkAppend` extra_binders)
+                              real_res_kind
                               (resultVariableName sig)
                               (DataFamilyTyCon tc_rep_name)
                               parent NotInjective
   ; return tycon }
 
   | OpenTypeFamily <- fam_info
-  = tcTyClTyVars tc_name $ \ tkvs' binders res_kind -> do
+  = tcTyClTyVars tc_name $ \ binders res_kind -> do
   { traceTc "open type family:" (ppr tc_name)
   ; checkFamFlag tc_name
-  ; inj' <- tcInjectivity tkvs' inj
-  ; let tycon = mkFamilyTyCon tc_name binders res_kind tkvs'
+  ; inj' <- tcInjectivity binders inj
+  ; let tycon = mkFamilyTyCon tc_name binders res_kind
                                (resultVariableName sig) OpenSynFamilyTyCon
                                parent inj'
   ; return tycon }
@@ -809,11 +808,11 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info, fdLName = tc_lname@(L _ tc_na
     do { traceTc "Closed type family:" (ppr tc_name)
          -- the variables in the header scope only over the injectivity
          -- declaration but this is not involved here
-       ; (tvs', inj', binders, res_kind)
+       ; (inj', binders, res_kind)
             <- tcTyClTyVars tc_name
-               $ \ tkvs' binders res_kind ->
-               do { inj' <- tcInjectivity tkvs' inj
-                  ; return (tkvs', inj', binders, res_kind) }
+               $ \ binders res_kind ->
+               do { inj' <- tcInjectivity binders inj
+                  ; return (inj', binders, res_kind) }
 
        ; checkFamFlag tc_name -- make sure we have -XTypeFamilies
 
@@ -821,7 +820,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info, fdLName = tc_lname@(L _ tc_na
          -- but eqns might be empty in the Just case as well
        ; case mb_eqns of
            Nothing   ->
-               return $ mkFamilyTyCon tc_name binders res_kind tvs'
+               return $ mkFamilyTyCon tc_name binders res_kind
                                       (resultVariableName sig)
                                       AbstractClosedSynFamilyTyCon parent
                                       inj'
@@ -850,7 +849,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info, fdLName = tc_lname@(L _ tc_na
               | null eqns = Nothing   -- mkBranchedCoAxiom fails on empty list
               | otherwise = Just (mkBranchedCoAxiom co_ax_name fam_tc branches)
 
-             fam_tc = mkFamilyTyCon tc_name binders res_kind tvs' (resultVariableName sig)
+             fam_tc = mkFamilyTyCon tc_name binders res_kind (resultVariableName sig)
                       (ClosedSynFamilyTyCon mb_co_ax) parent inj'
 
          -- We check for instance validity later, when doing validity
@@ -867,7 +866,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info, fdLName = tc_lname@(L _ tc_na
 -- True on position
 -- N means that a function is injective in its Nth argument. False means it is
 -- not.
-tcInjectivity :: [TyVar] -> Maybe (LInjectivityAnn Name)
+tcInjectivity :: [TyConBinder] -> Maybe (LInjectivityAnn Name)
               -> TcM Injectivity
 tcInjectivity _ Nothing
   = return NotInjective
@@ -890,9 +889,10 @@ tcInjectivity _ Nothing
   -- therefore we can always infer the result kind if we know the result type.
   -- But this does not seem to be useful in any way so we don't do it.  (Another
   -- reason is that the implementation would not be straightforward.)
-tcInjectivity tvs (Just (L loc (InjectivityAnn _ lInjNames)))
+tcInjectivity tcbs (Just (L loc (InjectivityAnn _ lInjNames)))
   = setSrcSpan loc $
-    do { dflags <- getDynFlags
+    do { let tvs = binderVars tcbs
+       ; dflags <- getDynFlags
        ; checkTc (xopt LangExt.TypeFamilyDependencies dflags)
                  (text "Illegal injectivity annotation" $$
                   text "Use TypeFamilyDependencies to allow this")
@@ -907,29 +907,28 @@ tcInjectivity tvs (Just (L loc (InjectivityAnn _ lInjNames)))
 
 tcTySynRhs :: RecTyInfo
            -> Name
-           -> [TyVar] -> [TyBinder] -> Kind
+           -> [TyConBinder] -> Kind
            -> LHsType Name -> TcM TyCon
-tcTySynRhs rec_info tc_name tvs binders res_kind hs_ty
+tcTySynRhs rec_info tc_name binders res_kind hs_ty
   = do { env <- getLclEnv
        ; traceTc "tc-syn" (ppr tc_name $$ ppr (tcl_env env))
        ; rhs_ty <- solveEqualities $ tcCheckLHsType hs_ty res_kind
        ; rhs_ty <- zonkTcTypeToType emptyZonkEnv rhs_ty
        ; let roles = rti_roles rec_info tc_name
-             tycon = mkSynonymTyCon tc_name binders res_kind tvs roles rhs_ty
+             tycon = mkSynonymTyCon tc_name binders res_kind roles rhs_ty
        ; return tycon }
 
 tcDataDefn :: RecTyInfo -> Name
-           -> [TyVar] -> [TyBinder] -> Kind
+           -> [TyConBinder] -> Kind
            -> HsDataDefn Name -> TcM TyCon
   -- NB: not used for newtype/data instances (whether associated or not)
 tcDataDefn rec_info     -- Knot-tied; don't look at this eagerly
-           tc_name tvs tycon_binders res_kind
+           tc_name tycon_binders res_kind
          (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
                      , dd_ctxt = ctxt, dd_kindSig = mb_ksig
                      , dd_cons = cons })
- =  do { (extra_tvs, extra_bndrs, real_res_kind) <- tcDataKindSig res_kind
+ =  do { (extra_bndrs, real_res_kind) <- tcDataKindSig res_kind
        ; let final_bndrs  = tycon_binders `chkAppend` extra_bndrs
-             final_tvs    = tvs           `chkAppend` extra_tvs
              roles        = rti_roles rec_info tc_name
 
        ; stupid_tc_theta <- solveEqualities $ tcHsContext ctxt
@@ -945,13 +944,15 @@ tcDataDefn rec_info     -- Knot-tied; don't look at this eagerly
        ; gadt_syntax <- dataDeclChecks tc_name new_or_data stupid_theta cons
 
        ; tycon <- fixM $ \ tycon -> do
-             { let res_ty = mkTyConApp tycon (mkTyVarTys final_tvs)
+             { let res_ty = mkTyConApp tycon (mkTyVarTys (binderVars final_bndrs))
              ; data_cons <- tcConDecls new_or_data tycon
-                                       (final_tvs, final_bndrs, res_ty) cons
+                                       (final_bndrs, res_ty) cons
              ; tc_rhs    <- mk_tc_rhs is_boot tycon data_cons
              ; tc_rep_nm <- newTyConRepName tc_name
-             ; return (mkAlgTyCon tc_name (tycon_binders `chkAppend` extra_bndrs)
-                                  real_res_kind final_tvs roles
+             ; return (mkAlgTyCon tc_name
+                                  final_bndrs
+                                  real_res_kind
+                                  roles
                                   (fmap unLoc cType)
                                   stupid_theta tc_rhs
                                   (VanillaAlgTyCon tc_rep_nm)
@@ -1187,7 +1188,7 @@ two bad things could happen:
 -}
 
 -----------------
-type FamTyConShape = (Name, Arity, [TyBinder], Kind)
+type FamTyConShape = (Name, Arity, [TyConBinder], Kind)
   -- See Note [Type-checking type patterns]
 
 famTyConShape :: TyCon -> FamTyConShape
@@ -1421,23 +1422,23 @@ consUseGadtSyntax _                           = False
                  -- All constructors have same shape
 
 -----------------------------------
-tcConDecls :: NewOrData -> TyCon -> ([TyVar], [TyBinder], Type)
+tcConDecls :: NewOrData -> TyCon -> ([TyConBinder], Type)
            -> [LConDecl Name] -> TcM [DataCon]
   -- Why both the tycon tyvars and binders? Because the tyvars
   -- have all the names and the binders have the visibilities.
-tcConDecls new_or_data rep_tycon (tmpl_tvs, tmpl_bndrs, res_tmpl)
+tcConDecls new_or_data rep_tycon (tmpl_bndrs, res_tmpl)
   = concatMapM $ addLocM $
-    tcConDecl new_or_data rep_tycon tmpl_tvs tmpl_bndrs res_tmpl
+    tcConDecl new_or_data rep_tycon tmpl_bndrs res_tmpl
 
 tcConDecl :: NewOrData
           -> TyCon             -- Representation tycon. Knot-tied!
-          -> [TyVar] -> [TyBinder] -> Type
+          -> [TyConBinder] -> Type
                  -- Return type template (with its template tyvars)
                  --    (tvs, T tys), where T is the family TyCon
           -> ConDecl Name
           -> TcM [DataCon]
 
-tcConDecl new_or_data rep_tycon tmpl_tvs tmpl_bndrs res_tmpl
+tcConDecl new_or_data rep_tycon tmpl_bndrs res_tmpl
           (ConDeclH98 { con_name = name
                       , con_qvars = hs_qvars, con_cxt = hs_ctxt
                       , con_details = hs_details })
@@ -1478,7 +1479,7 @@ tcConDecl new_or_data rep_tycon tmpl_tvs tmpl_bndrs res_tmpl
                  -- we're doing this to get the right behavior around removing
                  -- any vars bound in exp_binders.
 
-       ; kvs <- quantifyZonkedTyVars (mkVarSet tmpl_tvs) vars
+       ; kvs <- quantifyZonkedTyVars (mkVarSet (binderVars tmpl_bndrs)) vars
 
              -- Zonk to Types
        ; (ze, qkvs)      <- zonkTyBndrsX emptyZonkEnv kvs
@@ -1499,7 +1500,7 @@ tcConDecl new_or_data rep_tycon tmpl_tvs tmpl_bndrs res_tmpl
 
              ; buildDataCon fam_envs name is_infix rep_nm
                             stricts Nothing field_lbls
-                            tmpl_tvs tmpl_bndrs
+                            (mkDataConUnivTyVarBinders tmpl_bndrs)
                             ex_tvs
                             [{- no eq_preds -}] ctxt arg_tys
                             res_tmpl rep_tycon
@@ -1511,7 +1512,7 @@ tcConDecl new_or_data rep_tycon tmpl_tvs tmpl_bndrs res_tmpl
        ; mapM buildOneDataCon [name]
        }
 
-tcConDecl _new_or_data rep_tycon tmpl_tvs _tmpl_bndrs res_tmpl
+tcConDecl _new_or_data rep_tycon tmpl_bndrs res_tmpl
           (ConDeclGADT { con_names = names, con_type = ty })
   = addErrCtxt (dataConCtxtName names) $
     do { traceTc "tcConDecl 1" (ppr names)
@@ -1531,13 +1532,13 @@ tcConDecl _new_or_data rep_tycon tmpl_tvs _tmpl_bndrs res_tmpl
        ; res_ty  <- zonkTcTypeToType ze res_ty
 
        ; let (univ_tvs, ex_tvs, eq_preds, res_ty', arg_subst)
-               = rejigConRes tmpl_tvs res_tmpl qtkvs res_ty
+               = rejigConRes tmpl_bndrs res_tmpl qtkvs res_ty
              -- NB: this is a /lazy/ binding, so we pass five thunks to buildDataCon
              --     without yet forcing the guards in rejigConRes
              -- See Note [Checking GADT return types]
 
              -- See Note [Wrong visibility for GADTs]
-             univ_bndrs = mkNamedTyBinders Specified univ_tvs
+             univ_bndrs = mkTyVarBinders Specified univ_tvs
              ex_bndrs   = mkTyVarBinders Specified ex_tvs
 
        ; fam_envs <- tcGetFamInstEnvs
@@ -1552,7 +1553,7 @@ tcConDecl _new_or_data rep_tycon tmpl_tvs _tmpl_bndrs res_tmpl
              ; buildDataCon fam_envs name is_infix
                             rep_nm
                             stricts Nothing field_lbls
-                            univ_tvs univ_bndrs ex_bndrs eq_preds
+                            univ_bndrs ex_bndrs eq_preds
                             (substTys arg_subst ctxt)
                             (substTys arg_subst arg_tys)
                             (substTy  arg_subst res_ty')
@@ -1740,7 +1741,7 @@ errors reported in one pass.  See Trac #7175, and #10836.
 --      TI :: forall b1 c1. (b1 ~ c1) => b1 -> :R7T b1 c1
 -- In this case orig_res_ty = T (e,e)
 
-rejigConRes :: [TyVar] -> Type    -- Template for result type; e.g.
+rejigConRes :: [TyConBinder] -> Type    -- Template for result type; e.g.
                                   -- data instance T [a] b c = ...
                                   --      gives template ([a,b,c], T [a] b c)
                                   -- Type must be of kind *!
@@ -1754,7 +1755,7 @@ rejigConRes :: [TyVar] -> Type    -- Template for result type; e.g.
         -- We don't check that the TyCon given in the ResTy is
         -- the same as the parent tycon, because checkValidDataCon will do it
 
-rejigConRes tmpl_tvs res_tmpl dc_tvs res_ty
+rejigConRes tmpl_bndrs res_tmpl dc_tvs res_ty
         -- E.g.  data T [a] b c where
         --         MkT :: forall x y z. T [(x,y)] z z
         -- The {a,b,c} are the tmpl_tvs, and the {x,y,z} are the dc_tvs
@@ -1790,8 +1791,9 @@ rejigConRes tmpl_tvs res_tmpl dc_tvs res_ty
         --  bad-result-type error before seeing that the other fields look odd
         -- See Note [Checking GADT return types]
   = (tmpl_tvs, dc_tvs `minusList` tmpl_tvs, [], res_ty, emptyTCvSubst)
-
   where
+    tmpl_tvs = binderVars tmpl_bndrs
+
 {-
 Note [mkGADTVars]
 ~~~~~~~~~~~~~~~~~

@@ -1087,8 +1087,8 @@ inferConstraints tvs main_cls cls_tys inst_ty rep_tc rep_tc_args mkTheta
   where
     tc_binders = tyConBinders rep_tc
     choose_level bndr
-      | isNamedTyBinder bndr = KindLevel
-      | otherwise            = TypeLevel
+      | isNamedTyConBinder bndr = KindLevel
+      | otherwise               = TypeLevel
     t_or_ks = map choose_level tc_binders ++ repeat TypeLevel
        -- want to report *kind* errors when possible
 

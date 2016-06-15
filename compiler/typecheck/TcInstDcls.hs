@@ -649,10 +649,10 @@ tcDataFamInstDecl mb_clsinfo
              orig_res_ty          = mkTyConApp fam_tc pats'
 
        ; (rep_tc, axiom) <- fixM $ \ ~(rec_rep_tc, _) ->
-           do { let ty_binders = mkTyBindersPreferAnon full_tvs liftedTypeKind
+           do { let ty_binders = mkTyConBindersPreferAnon full_tvs liftedTypeKind
               ; data_cons <- tcConDecls new_or_data
                                         rec_rep_tc
-                                        (full_tvs, ty_binders, orig_res_ty) cons
+                                        (ty_binders, orig_res_ty) cons
               ; tc_rhs <- case new_or_data of
                      DataType -> return (mkDataTyConRhs data_cons)
                      NewType  -> ASSERT( not (null data_cons) )
@@ -668,7 +668,6 @@ tcDataFamInstDecl mb_clsinfo
                       -- the end of Note [Data type families] in TyCon
                     rep_tc   = mkAlgTyCon rep_tc_name
                                           ty_binders liftedTypeKind
-                                          full_tvs
                                           (map (const Nominal) full_tvs)
                                           (fmap unLoc cType) stupid_theta
                                           tc_rhs parent

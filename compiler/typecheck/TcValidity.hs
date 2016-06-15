@@ -50,7 +50,7 @@ import Name
 import VarEnv
 import VarSet
 import UniqFM
-import Var         ( mkTyVar )
+import Var         ( TyVarBndr(..), mkTyVar )
 import ErrUtils
 import DynFlags
 import Util
@@ -1006,7 +1006,7 @@ tyConArityErr tc tks
 
     -- tc_type_arity = number of *type* args expected
     -- tc_type_args  = number of *type* args encountered
-    tc_type_arity = count isVisibleBinder $ tyConBinders tc
+    tc_type_arity = count isVisibleTyConBinder (tyConBinders tc)
     tc_type_args  = length vis_tks
 
 arityErr :: Outputable a => String -> a -> Int -> Int -> SDoc
@@ -1667,7 +1667,7 @@ checkValidFamPats mb_clsinfo fam_tc tvs cvs ty_pats
          --     type instance F Int y = y
          -- because then the type (F Int) would be like (\y.y)
          checkTc (length ty_pats == fam_arity) $
-           wrongNumberOfParmsErr (fam_arity - count isInvisibleBinder fam_bndrs)
+           wrongNumberOfParmsErr (fam_arity - count isInvisibleTyConBinder fam_bndrs)
              -- report only explicit arguments
 
        ; mapM_ checkValidTypePat ty_pats

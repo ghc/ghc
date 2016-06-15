@@ -39,7 +39,7 @@ module Type (
         splitForAllTys, splitForAllTyVarBndrs,
         splitForAllTy_maybe, splitForAllTy,
         splitPiTy_maybe, splitPiTy, splitPiTys,
-        mkPiTy, mkPiTys, mkTyBindersPreferAnon,
+        mkPiTy, mkPiTys, mkTyConBindersPreferAnon,
         mkLamType, mkLamTypes,
         piResultTy, piResultTys,
         applyTysX, dropForAlls,
@@ -82,14 +82,15 @@ module Type (
         predTypeEqRel,
 
         -- ** Binders
-        sameVis, mkNamedTyBinders,
+        sameVis,
         mkTyVarBinder, mkTyVarBinders,
-        mkAnonBinder, mkNamedBinder,
+        mkAnonBinder,
         isAnonTyBinder, isNamedTyBinder,
-        binderVar, binderType, binderVisibility,
-        tyBinderType, tyBinderVisibility,
+        binderVar, binderVars, binderKind, binderVisibility,
+        tyBinderType,
         binderRelevantType_maybe, caseBinder,
         isVisible, isInvisible, isVisibleBinder, isInvisibleBinder,
+        tyConBindersTyBinders,
 
         -- ** Common type constructors
         funTyCon,
@@ -880,10 +881,10 @@ piResultTys ty orig_args@(arg:args)
   | otherwise
   = pprPanic "piResultTys1" (ppr ty $$ ppr orig_args)
   where
+    in_scope = mkInScopeSet (tyCoVarsOfTypes (ty:orig_args))
+
     go :: TvSubstEnv -> Type -> [Type] -> Type
     go tv_env ty [] = substTy (mkTvSubst in_scope tv_env) ty
-      where
-        in_scope = mkInScopeSet (tyCoVarsOfTypes (ty:orig_args))
 
     go tv_env ty all_args@(arg:args)
       | Just ty' <- coreView ty
@@ -1098,7 +1099,7 @@ mkCastTy ty co = -- NB: don't check if the coercion "from" type matches here;
       = split_apps (t2:args) t1 co
     split_apps args (TyConApp tc tc_args) co
       | mightBeUnsaturatedTyCon tc
-      = affix_co (tyConBinders tc) (mkTyConTy tc) (tc_args `chkAppend` args) co
+      = affix_co (tyConTyBinders tc) (mkTyConTy tc) (tc_args `chkAppend` args) co
       | otherwise -- not decomposable... but it may still be oversaturated
       = let (non_decomp_args, decomp_args) = splitAt (tyConArity tc) tc_args
             saturated_tc = mkTyConApp tc non_decomp_args
@@ -1107,7 +1108,7 @@ mkCastTy ty co = -- NB: don't check if the coercion "from" type matches here;
                  saturated_tc (decomp_args `chkAppend` args) co
 
     split_apps args (FunTy arg res) co
-      = affix_co (tyConBinders funTyCon) (mkTyConTy funTyCon)
+      = affix_co (tyConTyBinders funTyCon) (mkTyConTy funTyCon)
                  (arg : res : args) co
     split_apps args ty co
       = affix_co (fst $ splitPiTys $ typeKind ty)
@@ -1133,6 +1134,17 @@ mkCastTy ty co = -- NB: don't check if the coercion "from" type matches here;
 
     no_double_casts (CastTy ty co1) co2 = CastTy ty (co1 `mkTransCo` co2)
     no_double_casts ty              co  = CastTy ty co
+
+tyConTyBinders :: TyCon -> [TyBinder]
+-- Return the tyConBinders in TyBinder form
+tyConTyBinders tycon = tyConBindersTyBinders (tyConBinders tycon)
+
+tyConBindersTyBinders :: [TyConBinder] -> [TyBinder]
+-- Return the tyConBinders in TyBinder form
+tyConBindersTyBinders = map to_tyb
+  where
+    to_tyb (TvBndr tv (NamedTCB vis)) = Named (TvBndr tv vis)
+    to_tyb (TvBndr tv AnonTCB)        = Anon (tyVarKind tv)
 
 {-
 --------------------------------------------------------------------
@@ -1221,16 +1233,16 @@ mkLamTypes vs ty = foldr mkLamType ty vs
 -- | Given a list of type-level vars and a result type, makes TyBinders, preferring
 -- anonymous binders if the variable is, in fact, not dependent.
 -- All binders are /visible/.
-mkTyBindersPreferAnon :: [TyVar] -> Type -> [TyBinder]
-mkTyBindersPreferAnon vars inner_ty = fst (go vars)
+mkTyConBindersPreferAnon :: [TyVar] -> Type -> [TyConBinder]
+mkTyConBindersPreferAnon vars inner_ty = fst (go vars)
   where
-    go :: [TyVar] -> ([TyBinder], VarSet) -- also returns the free vars
+    go :: [TyVar] -> ([TyConBinder], VarSet) -- also returns the free vars
     go [] = ([], tyCoVarsOfType inner_ty)
     go (v:vs) |  v `elemVarSet` fvs
-              = ( Named (TvBndr v Visible) : binders
+              = ( TvBndr v (NamedTCB Visible) : binders
                 , fvs `delVarSet` v `unionVarSet` kind_vars )
               | otherwise
-              = ( Anon (tyVarKind v) : binders
+              = ( TvBndr v AnonTCB : binders
                 , fvs `unionVarSet` kind_vars )
       where
         (binders, fvs) = go vs
@@ -1382,17 +1394,9 @@ mkTyVarBinder vis var = TvBndr var vis
 mkTyVarBinders :: VisibilityFlag -> [TyVar] -> [TyVarBinder]
 mkTyVarBinders vis = map (mkTyVarBinder vis)
 
-mkNamedTyBinders :: VisibilityFlag -> [TyVar] -> [TyBinder]
-mkNamedTyBinders vis tvs
-  = map (mkNamedBinder . mkTyVarBinder vis) tvs
-
 -- | Make an anonymous binder
 mkAnonBinder :: Type -> TyBinder
 mkAnonBinder = Anon
-
--- | Make a Named TyBinder
-mkNamedBinder :: TyVarBinder -> TyBinder
-mkNamedBinder = Named
 
 -- | Does this binder bind a variable that is /not/ erased? Returns
 -- 'True' for anonymous binders.
@@ -1406,15 +1410,8 @@ isNamedTyBinder (Anon {})  = False
 
 tyBinderType :: TyBinder -> Type
 -- Barely used
-tyBinderType (Named tvb) = binderType tvb
+tyBinderType (Named tvb) = binderKind tvb
 tyBinderType (Anon ty)   = ty
-
-tyBinderVisibility :: TyBinder -> VisibilityFlag
--- Barely used
-tyBinderVisibility (Named tvb) = binderVisibility tvb
-tyBinderVisibility (Anon ty)
-                 | isPredTy ty = Invisible
-                 | otherwise   = Visible
 
 -- | Extract a relevant type, if there is one.
 binderRelevantType_maybe :: TyBinder -> Maybe Type
@@ -1764,7 +1761,7 @@ repType ty
       | Just ty' <- coreView ty
       = go rec_nts ty'
 
-    go rec_nts (ForAllTy (Named {}) ty2)  -- Drop type foralls
+    go rec_nts (ForAllTy _ ty2)  -- Drop type foralls
       = go rec_nts ty2
 
     go rec_nts (TyConApp tc tys)        -- Expand newtypes
@@ -1821,8 +1818,7 @@ kindPrimRep ki = WARN( True
 typeRepArity :: Arity -> Type -> RepArity
 typeRepArity 0 _ = 0
 typeRepArity n ty = case repType ty of
-  UnaryRep (ForAllTy bndr ty) -> length (flattenRepType (repType (binderType bndr)))
-                                 + typeRepArity (n - 1) ty
+  UnaryRep (FunTy arg res) -> length (flattenRepType (repType arg)) + typeRepArity (n - 1) res
   _ -> pprPanic "typeRepArity: arity greater than type can handle" (ppr (n, ty, repType ty))
 
 isVoidTy :: Type -> Bool

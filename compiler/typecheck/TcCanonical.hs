@@ -607,7 +607,7 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel
         else
           do { traceTcS "Creating implication for polytype equality" $ ppr ev
              ; kind_cos <- zipWithM (unifyWanted loc Nominal)
-                             (map binderType bndrs1) (map binderType bndrs2)
+                             (map binderKind bndrs1) (map binderKind bndrs2)
              ; all_co <- deferTcSForAllEq (eqRelRole eq_rel) loc
                                            kind_cos (bndrs1,body1) (bndrs2,body2)
              ; setWantedEq orig_dest all_co
@@ -1138,7 +1138,7 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
       -- in error messages
     bndrs      = tyConBinders tc
     kind_loc   = toKindLoc loc
-    is_kinds   = map isNamedTyBinder bndrs
+    is_kinds   = map isNamedTyConBinder bndrs
     new_locs | Just KindLevel <- ctLocTypeOrKind_maybe loc
              = repeat loc
              | otherwise

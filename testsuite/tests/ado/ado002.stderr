@@ -1,6 +1,6 @@
 
 ado002.hs:8:8: error:
-    • Couldn't match expected type ‘Char -> IO t1’
+    • Couldn't match expected type ‘Char -> IO b0’
                   with actual type ‘IO Char’
     • The function ‘getChar’ is applied to one argument,
       but its type ‘IO Char’ has none

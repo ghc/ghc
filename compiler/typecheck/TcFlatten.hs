@@ -986,7 +986,7 @@ flatten_one ty@(ForAllTy {})
 -- We allow for-alls when, but only when, no type function
 -- applications inside the forall involve the bound type variables.
   = do { let (bndrs, rho) = splitForAllTyVarBndrs ty
-             tvs          = map binderVar bndrs
+             tvs          = binderVars bndrs
        ; (rho', co) <- setMode FM_SubstOnly $ flatten_one rho
                          -- Substitute only under a forall
                          -- See Note [Flattening under a forall]

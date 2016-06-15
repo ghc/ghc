@@ -30,10 +30,10 @@ WildcardInstantiations.hs:8:8: error:
 
 WildcardInstantiations.hs:8:13: error:
     • Found type wildcard ‘_’ standing for ‘t -> w’
-      Where: ‘w’ is a rigid type variable bound by
+      Where: ‘t’ is a rigid type variable bound by
                the inferred type of bar :: t -> (t -> w) -> w
                at WildcardInstantiations.hs:9:1-13
-             ‘t’ is a rigid type variable bound by
+             ‘w’ is a rigid type variable bound by
                the inferred type of bar :: t -> (t -> w) -> w
                at WildcardInstantiations.hs:9:1-13
       To use the inferred type, enable PartialTypeSignatures

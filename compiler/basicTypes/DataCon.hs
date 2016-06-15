@@ -77,7 +77,9 @@ import BasicTypes
 import FastString
 import Module
 import Binary
+import UniqSet
 import UniqFM
+import Unique( mkAlphaTyVarUnique )
 
 import qualified Data.Data as Data
 import Data.Char
@@ -797,19 +799,49 @@ mkDataCon name declared_infix prom_info
 
     rep_ty = mkForAllTys univ_tvs $ mkForAllTys ex_tvs $
              mkFunTys rep_arg_tys $
-             mkTyConApp rep_tycon (mkTyVarTys (map binderVar univ_tvs))
+             mkTyConApp rep_tycon (mkTyVarTys (binderVars univ_tvs))
 
       -- See Note [Promoted data constructors] in TyCon
-    prom_binders = map mkNamedBinder (filterEqSpec eq_spec univ_tvs) ++
-                   map mkNamedBinder ex_tvs ++
-                   map mkAnonBinder theta ++
-                   map mkAnonBinder orig_arg_tys
-    prom_res_kind = orig_res_ty
-    promoted      = mkPromotedDataCon con name prom_info prom_binders
-                                      prom_res_kind roles rep_info
+    prom_tv_bndrs = [ mkNamedTyConBinder vis tv
+                    | TvBndr tv vis <- filterEqSpec eq_spec univ_tvs ++ ex_tvs ]
+
+    prom_arg_bndrs = mkCleanAnonTyConBinders prom_tv_bndrs (theta ++ orig_arg_tys)
+    prom_res_kind  = orig_res_ty
+    promoted       = mkPromotedDataCon con name prom_info
+                                       (prom_tv_bndrs ++ prom_arg_bndrs)
+                                       prom_res_kind roles rep_info
 
     roles = map (const Nominal) (univ_tvs ++ ex_tvs) ++
             map (const Representational) orig_arg_tys
+
+mkCleanAnonTyConBinders :: [TyConBinder] -> [Type] -> [TyConBinder]
+-- Make sure that the "anonymous" tyvars don't clash in
+-- name or unique with the universal/existential ones.
+-- Tiresome!  And unnecessary because these tyvars are never looked at
+mkCleanAnonTyConBinders tc_bndrs tys
+  = [ mkAnonTyConBinder (mkTyVar name ty)
+    | (name, ty) <- fresh_names `zip` tys ]
+  where
+    fresh_names = freshNames (map getName (binderVars tc_bndrs))
+
+freshNames :: [Name] -> [Name]
+-- Make names whose Uniques and OccNames differ from
+-- those in the 'avoid' list
+freshNames avoids
+  = [ mkSystemName uniq occ
+    | n <- [0..]
+    , let uniq = mkAlphaTyVarUnique n
+          occ = mkTyVarOccFS (mkFastString ('x' : show n))
+
+    , not (uniq `elementOfUniqSet` avoid_uniqs)
+    , not (occ `elemOccSet` avoid_occs) ]
+
+  where
+    avoid_uniqs :: UniqSet Unique
+    avoid_uniqs = mkUniqSet (map getUnique avoids)
+
+    avoid_occs :: OccSet
+    avoid_occs = mkOccSet (map getOccName avoids)
 
 -- | The 'Name' of the 'DataCon', giving it a unique, rooted identification
 dataConName :: DataCon -> Name
@@ -842,7 +874,7 @@ dataConIsInfix = dcInfix
 
 -- | The universally-quantified type variables of the constructor
 dataConUnivTyVars :: DataCon -> [TyVar]
-dataConUnivTyVars (MkData { dcUnivTyVars = tvbs }) = map binderVar tvbs
+dataConUnivTyVars (MkData { dcUnivTyVars = tvbs }) = binderVars tvbs
 
 -- | 'TyBinder's for the universally-quantified type variables
 dataConUnivTyVarBinders :: DataCon -> [TyVarBinder]
@@ -850,7 +882,7 @@ dataConUnivTyVarBinders = dcUnivTyVars
 
 -- | The existentially-quantified type variables of the constructor
 dataConExTyVars :: DataCon -> [TyVar]
-dataConExTyVars (MkData { dcExTyVars = tvbs }) = map binderVar tvbs
+dataConExTyVars (MkData { dcExTyVars = tvbs }) = binderVars tvbs
 
 -- | 'TyBinder's for the existentially-quantified type variables
 dataConExTyVarBinders :: DataCon -> [TyVarBinder]
@@ -859,7 +891,7 @@ dataConExTyVarBinders = dcExTyVars
 -- | Both the universal and existentiatial type variables of the constructor
 dataConAllTyVars :: DataCon -> [TyVar]
 dataConAllTyVars (MkData { dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs })
-  = map binderVar (univ_tvs ++ ex_tvs)
+  = binderVars (univ_tvs ++ ex_tvs)
 
 -- | Equalities derived from the result type of the data constructor, as written
 -- by the programmer in any GADT declaration. This includes *all* GADT-like
@@ -1014,9 +1046,9 @@ dataConInstSig (MkData { dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs
     , substTheta subst (eqSpecPreds eq_spec ++ theta)
     , substTys   subst arg_tys)
   where
-    univ_subst = zipTvSubst (map binderVar univ_tvs) univ_tys
+    univ_subst = zipTvSubst (binderVars univ_tvs) univ_tys
     (subst, ex_tvs') = mapAccumL Type.substTyVarBndr univ_subst $
-                       map binderVar ex_tvs
+                       binderVars ex_tvs
 
 
 -- | The \"full signature\" of the 'DataCon' returns, in order:
@@ -1038,7 +1070,7 @@ dataConFullSig :: DataCon
 dataConFullSig (MkData {dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs,
                         dcEqSpec = eq_spec, dcOtherTheta = theta,
                         dcOrigArgTys = arg_tys, dcOrigResTy = res_ty})
-  = (map binderVar univ_tvs, map binderVar ex_tvs, eq_spec, theta, arg_tys, res_ty)
+  = (binderVars univ_tvs, binderVars ex_tvs, eq_spec, theta, arg_tys, res_ty)
 
 dataConOrigResTy :: DataCon -> Type
 dataConOrigResTy dc = dcOrigResTy dc
@@ -1086,7 +1118,7 @@ dataConInstArgTys dc@(MkData {dcUnivTyVars = univ_tvs,
  = ASSERT2( length univ_tvs == length inst_tys
           , text "dataConInstArgTys" <+> ppr dc $$ ppr univ_tvs $$ ppr inst_tys)
    ASSERT2( null ex_tvs, ppr dc )
-   map (substTyWith (map binderVar univ_tvs) inst_tys) (dataConRepArgTys dc)
+   map (substTyWith (binderVars univ_tvs) inst_tys) (dataConRepArgTys dc)
 
 -- | Returns just the instantiated /value/ argument types of a 'DataCon',
 -- (excluding dictionary args)
@@ -1104,7 +1136,7 @@ dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
           , text "dataConInstOrigArgTys" <+> ppr dc $$ ppr tyvars $$ ppr inst_tys )
     map (substTyWith tyvars inst_tys) arg_tys
   where
-    tyvars = map binderVar (univ_tvs ++ ex_tvs)
+    tyvars = binderVars (univ_tvs ++ ex_tvs)
 
 -- | Returns the argument types of the wrapper, excluding all dictionary arguments
 -- and without substituting for any type variables
@@ -1265,7 +1297,7 @@ buildAlgTyCon :: Name
 
 buildAlgTyCon tc_name ktvs roles cType stupid_theta rhs
               is_rec gadt_syn parent
-  = mkAlgTyCon tc_name binders liftedTypeKind ktvs roles cType stupid_theta
+  = mkAlgTyCon tc_name binders liftedTypeKind roles cType stupid_theta
                rhs parent is_rec gadt_syn
   where
-    binders = mkTyBindersPreferAnon ktvs liftedTypeKind
+    binders = mkTyConBindersPreferAnon ktvs liftedTypeKind

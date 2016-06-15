@@ -3,11 +3,11 @@ without -fprint-explicit-foralls
 pattern P :: Bool 	-- Defined at <interactive>:16:1
 pattern Pe :: a -> Ex 	-- Defined at <interactive>:17:1
 pattern Pu :: t -> t 	-- Defined at <interactive>:18:1
-pattern Pue :: t -> a -> (t, Ex) 	-- Defined at <interactive>:19:1
+pattern Pue :: a -> a1 -> (a, Ex) 	-- Defined at <interactive>:19:1
 pattern Pur :: (Num a, Eq a) => a -> [a]
   	-- Defined at <interactive>:20:1
-pattern Purp :: (Num a, Eq a) => Show t => a
-                                           -> t -> ([a], UnivProv t)
+pattern Purp :: (Num a1, Eq a1) => Show a => a1
+                                             -> a -> ([a1], UnivProv a)
   	-- Defined at <interactive>:21:1
 pattern Pure :: (Num a, Eq a) => a -> a1 -> ([a], Ex)
   	-- Defined at <interactive>:22:1
@@ -16,9 +16,9 @@ pattern Purep :: (Num a, Eq a) => Show a1 => a
   	-- Defined at <interactive>:23:1
 pattern Pep :: () => Show a => a -> ExProv
   	-- Defined at <interactive>:24:1
-pattern Pup :: () => Show t => t -> UnivProv t
+pattern Pup :: () => Show a => a -> UnivProv a
   	-- Defined at <interactive>:25:1
-pattern Puep :: () => Show a => a -> t -> (ExProv, t)
+pattern Puep :: () => Show a => a -> b -> (ExProv, b)
   	-- Defined at <interactive>:26:1
 
 with -fprint-explicit-foralls
@@ -27,12 +27,12 @@ pattern P :: Bool 	-- Defined at <interactive>:16:1
 pattern Pe :: () => forall {a}. a -> Ex
   	-- Defined at <interactive>:17:1
 pattern Pu :: forall {t}. t -> t 	-- Defined at <interactive>:18:1
-pattern Pue :: forall {t}. () => forall {a}. t -> a -> (t, Ex)
+pattern Pue :: forall {a}. () => forall {a1}. a -> a1 -> (a, Ex)
   	-- Defined at <interactive>:19:1
 pattern Pur :: forall {a}. (Num a, Eq a) => a -> [a]
   	-- Defined at <interactive>:20:1
-pattern Purp :: forall {t} {a}. (Num a, Eq a) => Show t => a
-                                                           -> t -> ([a], UnivProv t)
+pattern Purp :: forall {a} {a1}. (Num a1, Eq a1) => Show a => a1
+                                                              -> a -> ([a1], UnivProv a)
   	-- Defined at <interactive>:21:1
 pattern Pure :: forall {a}. (Num a, Eq a) => forall {a1}. a
                                                           -> a1 -> ([a], Ex)
@@ -42,8 +42,8 @@ pattern Purep :: forall {a}. (Num a, Eq a) => forall {a1}. Show
   	-- Defined at <interactive>:23:1
 pattern Pep :: () => forall {a}. Show a => a -> ExProv
   	-- Defined at <interactive>:24:1
-pattern Pup :: forall {t}. () => Show t => t -> UnivProv t
+pattern Pup :: forall {a}. () => Show a => a -> UnivProv a
   	-- Defined at <interactive>:25:1
-pattern Puep :: forall {t}. () => forall {a}. Show a => a
-                                                        -> t -> (ExProv, t)
+pattern Puep :: forall {b}. () => forall {a}. Show a => a
+                                                        -> b -> (ExProv, b)
   	-- Defined at <interactive>:26:1

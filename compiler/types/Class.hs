@@ -23,7 +23,7 @@ module Class (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} TyCon     ( TyCon, tyConName, tyConUnique )
+import {-# SOURCE #-} TyCon     ( TyCon )
 import {-# SOURCE #-} TyCoRep   ( Type, PredType, pprType )
 import Var
 import Name
@@ -155,7 +155,7 @@ The @mkClass@ function fills in the indirect superclasses.
 The SrcSpan is for the entire original declaration.
 -}
 
-mkClass :: [TyVar]
+mkClass :: Name -> [TyVar]
         -> [([TyVar], [TyVar])]
         -> [PredType] -> [Id]
         -> [ClassATItem]
@@ -164,10 +164,12 @@ mkClass :: [TyVar]
         -> TyCon
         -> Class
 
-mkClass tyvars fds super_classes superdict_sels at_stuff
+mkClass cls_name tyvars fds super_classes superdict_sels at_stuff
         op_stuff mindef tycon
-  = Class { classKey     = tyConUnique tycon,
-            className    = tyConName tycon,
+  = Class { classKey     = nameUnique cls_name,
+            className    = cls_name,
+                -- NB:  tyConName tycon = cls_name,
+                -- But it takes a module loop to assert it here
             classTyVars  = tyvars,
             classFunDeps = fds,
             classSCTheta = super_classes,
@@ -238,8 +240,7 @@ classATItems :: Class -> [ClassATItem]
 classATItems = classATStuff
 
 classTvsFds :: Class -> ([TyVar], [FunDep TyVar])
-classTvsFds c
-  = (classTyVars c, classFunDeps c)
+classTvsFds c = (classTyVars c, classFunDeps c)
 
 classHasFds :: Class -> Bool
 classHasFds (Class { classFunDeps = fds }) = not (null fds)

@@ -46,14 +46,14 @@ import CoreSyn     ( isOrphan )
 import FunDeps
 import TcMType
 import Type
-import TyCoRep     ( TyBinder(..), TyVarBinder(..) )
+import TyCoRep     ( TyBinder(..) )
 import TcType
 import HscTypes
 import Class( Class )
 import MkId( mkDictFunId )
 import Id
 import Name
-import Var      ( EvVar, mkTyVar )
+import Var      ( EvVar, mkTyVar, TyVarBndr(..) )
 import DataCon
 import TyCon
 import VarEnv

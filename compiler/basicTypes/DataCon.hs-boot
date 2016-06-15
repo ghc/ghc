@@ -1,12 +1,12 @@
 module DataCon where
-import Var( TyVar )
+import Var( TyVar, TyVarBinder )
 import Name( Name, NamedThing )
 import {-# SOURCE #-} TyCon( TyCon )
 import FieldLabel ( FieldLabel )
 import Unique ( Uniquable )
 import Outputable ( Outputable, OutputableBndr )
 import BasicTypes (Arity)
-import {-# SOURCE #-} TyCoRep (Type, ThetaType, TyVarBinder)
+import {-# SOURCE #-} TyCoRep ( Type, ThetaType )
 
 data DataCon
 data DataConRep

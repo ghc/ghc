@@ -303,8 +303,8 @@ GHC.Generics representation types:
                                                                    'GHC.Generics.NoSourceStrictness
                                                                    'GHC.Generics.DecidedLazy)
                                                                 ((GHC.Generics.:.:)
-                                                                   (k -> GHC.Types.*)
                                                                    *
+                                                                   (k -> GHC.Types.*)
                                                                    (T10604_deriving.Proxy *)
                                                                    (GHC.Generics.Rec1
                                                                       (k -> GHC.Types.*)

@@ -280,7 +280,7 @@ mkDictSelId name clas
     val_index      = assoc "MkId.mkDictSelId" (sel_names `zip` [0..]) name
 
     sel_ty = mkForAllTys tyvars $
-             mkFunTy (mkClassPred clas (mkTyVarTys (map binderVar tyvars))) $
+             mkFunTy (mkClassPred clas (mkTyVarTys (binderVars tyvars))) $
              getNth arg_tys val_index
 
     base_info = noCafIdInfo
@@ -1066,22 +1066,17 @@ dollarId = pcMiscPrelId dollarName ty
              App (Var f) (Var x)
 
 ------------------------------------------------
--- proxy# :: forall a. Proxy# a
 proxyHashId :: Id
 proxyHashId
   = pcMiscPrelId proxyName ty
        (noCafIdInfo `setUnfoldingInfo` evaldUnfolding) -- Note [evaldUnfoldings]
   where
-    ty      = mkSpecForAllTys [kv, tv] (mkProxyPrimTy k t)
-    kv      = kKiVar
-    k       = mkTyVarTy kv
-    [tv]    = mkTemplateTyVars [k]
-    t       = mkTyVarTy tv
+    -- proxy# :: forall k (a:k). Proxy# k a
+    bndrs   = mkTemplateKiTyVars [liftedTypeKind] (\ks -> ks)
+    [k,t]   = mkTyVarTys bndrs
+    ty      = mkSpecForAllTys bndrs (mkProxyPrimTy k t)
 
 ------------------------------------------------
--- unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
---                         (a :: TYPE r1) (b :: TYPE r2).
---                         a -> b
 unsafeCoerceId :: Id
 unsafeCoerceId
   = pcMiscPrelId unsafeCoerceName ty info
@@ -1089,14 +1084,19 @@ unsafeCoerceId
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
 
-    tvs = [ runtimeRep1TyVar, runtimeRep2TyVar
-          , openAlphaTyVar, openBetaTyVar ]
+    -- unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+    --                         (a :: TYPE r1) (b :: TYPE r2).
+    --                         a -> b
+    bndrs = mkTemplateKiTyVars [runtimeRepTy, runtimeRepTy]
+                               (\ks -> map tYPE ks)
 
-    ty  = mkSpecForAllTys tvs $ mkFunTy openAlphaTy openBetaTy
+    [_, _, a, b] = mkTyVarTys bndrs
 
-    [x] = mkTemplateLocals [openAlphaTy]
-    rhs = mkLams (tvs ++ [x]) $
-          Cast (Var x) (mkUnsafeCo Representational openAlphaTy openBetaTy)
+    ty  = mkSpecForAllTys bndrs (mkFunTy a b)
+
+    [x] = mkTemplateLocals [a]
+    rhs = mkLams (bndrs ++ [x]) $
+          Cast (Var x) (mkUnsafeCo Representational a b)
 
 ------------------------------------------------
 nullAddrId :: Id

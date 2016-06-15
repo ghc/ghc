@@ -359,7 +359,7 @@ patSynUnivTyVarBinders :: PatSyn -> [TyVarBinder]
 patSynUnivTyVarBinders = psUnivTyVars
 
 patSynExTyVars :: PatSyn -> [TyVar]
-patSynExTyVars ps = map binderVar (psExTyVars ps)
+patSynExTyVars ps = binderVars (psExTyVars ps)
 
 patSynExTyVarBinders :: PatSyn -> [TyVarBinder]
 patSynExTyVarBinders = psExTyVars
@@ -368,7 +368,7 @@ patSynSig :: PatSyn -> ([TyVar], ThetaType, [TyVar], ThetaType, [Type], Type)
 patSynSig (MkPatSyn { psUnivTyVars = univ_tvs, psExTyVars = ex_tvs
                     , psProvTheta = prov, psReqTheta = req
                     , psArgs = arg_tys, psOrigResTy = res_ty })
-  = (map binderVar univ_tvs, req, map binderVar ex_tvs, prov, arg_tys, res_ty)
+  = (binderVars univ_tvs, req, binderVars ex_tvs, prov, arg_tys, res_ty)
 
 patSynMatcher :: PatSyn -> (Id,Bool)
 patSynMatcher = psMatcher
@@ -397,7 +397,7 @@ patSynInstArgTys (MkPatSyn { psName = name, psUnivTyVars = univ_tvs
           , text "patSynInstArgTys" <+> ppr name $$ ppr tyvars $$ ppr inst_tys )
     map (substTyWith tyvars inst_tys) arg_tys
   where
-    tyvars = map binderVar (univ_tvs ++ ex_tvs)
+    tyvars = binderVars (univ_tvs ++ ex_tvs)
 
 patSynInstResTy :: PatSyn -> [Type] -> Type
 -- Return the type of whole pattern
@@ -410,7 +410,7 @@ patSynInstResTy (MkPatSyn { psName = name, psUnivTyVars = univ_tvs
                 inst_tys
   = ASSERT2( length univ_tvs == length inst_tys
            , text "patSynInstResTy" <+> ppr name $$ ppr univ_tvs $$ ppr inst_tys )
-    substTyWith (map binderVar univ_tvs) inst_tys res_ty
+    substTyWith (binderVars univ_tvs) inst_tys res_ty
 
 -- | Print the type of a pattern synonym. The foralls are printed explicitly
 pprPatSynType :: PatSyn -> SDoc

@@ -73,7 +73,8 @@ module TcMType (
   zonkTcTypeAndSplitDepVars, zonkTcTypesAndSplitDepVars,
   zonkQuantifiedTyVar,
   quantifyTyVars, quantifyZonkedTyVars,
-  zonkTcTyCoVarBndr, zonkTcTyBinder, zonkTcType, zonkTcTypes, zonkCo,
+  zonkTcTyCoVarBndr, zonkTcTyBinder, zonkTyConBinder,
+  zonkTcType, zonkTcTypes, zonkCo,
   zonkTyCoVarKind, zonkTcTypeMapper,
 
   zonkEvVar, zonkWC, zonkSimples, zonkId, zonkCt, zonkSkolemInfo,
@@ -87,6 +88,7 @@ module TcMType (
 import TyCoRep
 import TcType
 import Type
+import TyCon( TyConBinder )
 import Kind
 import Coercion
 import Class
@@ -1375,10 +1377,16 @@ zonkTcTyCoVarBndr tyvar
 
 -- | Zonk a TyBinder
 zonkTcTyBinder :: TcTyBinder -> TcM TcTyBinder
-zonkTcTyBinder (Anon ty)   = Anon <$> zonkTcType ty
-zonkTcTyBinder (Named (TvBndr tv vis))
+zonkTcTyBinder (Anon ty)   = Anon  <$> zonkTcType ty
+zonkTcTyBinder (Named tvb) = Named <$> zonkTyVarBinder tvb
+
+zonkTyConBinder :: TyConBinder -> TcM TyConBinder
+zonkTyConBinder = zonkTyVarBinder
+
+zonkTyVarBinder :: TyVarBndr TyVar vis -> TcM (TyVarBndr TyVar vis)
+zonkTyVarBinder (TvBndr tv vis)
   = do { tv' <- zonkTcTyCoVarBndr tv
-       ; return (Named (TvBndr tv' vis)) }
+       ; return (TvBndr tv' vis) }
 
 zonkTcTyVar :: TcTyVar -> TcM TcType
 -- Simply look through all Flexis

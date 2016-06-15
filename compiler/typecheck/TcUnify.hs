@@ -381,8 +381,11 @@ matchExpectedTyConApp tc orig_ty
     -- because that'll make types that are utterly ill-kinded.
     -- This happened in Trac #7368
     defer
-      = do { (_subst, args) <- tcInstBinders (tyConBinders tc)
-           ; co <- unifyType noThing (mkTyConApp tc args) orig_ty
+      = do { (_, arg_tvs) <- newMetaTyVars (tyConTyVars tc)
+           ; traceTc "mtca" (ppr tc $$ ppr (tyConTyVars tc) $$ ppr arg_tvs)
+           ; let args = mkTyVarTys arg_tvs
+                 tc_template = mkTyConApp tc args
+           ; co <- unifyType noThing tc_template orig_ty
            ; return (co, args) }
 
 ----------------------
@@ -1458,7 +1461,7 @@ checkTauTvUpdate dflags origin t_or_k tv ty
     defer_me (TyVarTy tv')     = tv == tv' || defer_me (tyVarKind tv')
     defer_me (TyConApp tc tys) = isTypeFamilyTyCon tc || any defer_me tys
                                  || not (impredicative || isTauTyCon tc)
-    defer_me (ForAllTy bndr t) = defer_me (binderType bndr) || defer_me t
+    defer_me (ForAllTy bndr t) = defer_me (binderKind bndr) || defer_me t
                                  || not impredicative
     defer_me (FunTy fun arg)   = defer_me fun || defer_me arg
     defer_me (AppTy fun arg)   = defer_me fun || defer_me arg

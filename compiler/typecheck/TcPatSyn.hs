@@ -14,9 +14,8 @@ module TcPatSyn ( tcInferPatSynDecl, tcCheckPatSynDecl
 
 import HsSyn
 import TcPat
-import Type( binderVar, mkNamedBinders, binderVisibility, mkEmptyTCvSubst
-           , tidyTyCoVarBndrs, tidyTypes, tidyType )
-           , tcHsContext, tcHsLiftedType, tcHsOpenType, kindGeneralize )
+import Type( mkTyVarBinders, mkEmptyTCvSubst
+           , tidyTyVarBinders, tidyTypes, tidyType )
 import TcRnMonad
 import TcSigs( emptyPragEnv, completeSigFromId )
 import TcEnv
@@ -133,14 +132,13 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                <+> pprQuotedList bad_tvs)
 
          -- See Note [The pattern-synonym signature splitting rule]
-       ; let get_tv = binderVar "tcCheckPatSynDecl"
-             univ_fvs = closeOverKinds $
+       ; let univ_fvs = closeOverKinds $
                         (tyCoVarsOfTypes (pat_ty : req_theta) `extendVarSetList` explicit_univ_tvs)
-             (extra_univ, extra_ex) = partition ((`elemVarSet` univ_fvs) . get_tv) implicit_tvs
-             univ_bndrs = extra_univ ++ mkNamedBinders Specified explicit_univ_tvs
-             ex_bndrs   = extra_ex   ++ mkNamedBinders Specified explicit_ex_tvs
-             univ_tvs   = map get_tv univ_bndrs
-             ex_tvs     = map get_tv ex_bndrs
+             (extra_univ, extra_ex) = partition ((`elemVarSet` univ_fvs) . binderVar) implicit_tvs
+             univ_bndrs = extra_univ ++ mkTyVarBinders Specified explicit_univ_tvs
+             ex_bndrs   = extra_ex   ++ mkTyVarBinders Specified explicit_ex_tvs
+             univ_tvs   = binderVars univ_bndrs
+             ex_tvs     = binderVars ex_bndrs
 
        -- Right!  Let's check the pattern against the signature
        -- See Note [Checking against a pattern signature]
@@ -323,8 +321,8 @@ tc_patsyn_finish lname dir is_infix lpat'
 
        -- Make the 'matcher'
        ; (matcher_id, matcher_bind) <- tcPatSynMatcher lname lpat'
-                                         (map binderVar univ_tvs, req_theta, req_ev_binds, req_dicts)
-                                         (map binderVar ex_tvs, ex_tys, prov_theta, prov_dicts)
+                                         (binderVars univ_tvs, req_theta, req_ev_binds, req_dicts)
+                                         (binderVars ex_tvs, ex_tys, prov_theta, prov_dicts)
                                          (args, arg_tys)
                                          pat_ty
 

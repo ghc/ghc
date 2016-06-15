@@ -11,7 +11,7 @@ T11213.hs:21:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
 
 T11213.hs:22:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
     Top-level binding with no type signature:
-      Pue :: forall t. () => forall a. t -> a -> (t, Ex)
+      Pue :: forall a. () => forall a1. a -> a1 -> (a, Ex)
 
 T11213.hs:23:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
     Top-level binding with no type signature:
@@ -19,9 +19,9 @@ T11213.hs:23:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
 
 T11213.hs:24:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
     Top-level binding with no type signature:
-      Purp :: forall t a.
-              (Num a, Eq a) =>
-              Show t => a -> t -> ([a], UnivProv t)
+      Purp :: forall a a1.
+              (Num a1, Eq a1) =>
+              Show a => a1 -> a -> ([a1], UnivProv a)
 
 T11213.hs:25:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
     Top-level binding with no type signature:
@@ -39,8 +39,8 @@ T11213.hs:27:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
 
 T11213.hs:28:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
     Top-level binding with no type signature:
-      Pup :: forall t. () => Show t => t -> UnivProv t
+      Pup :: forall a. () => Show a => a -> UnivProv a
 
 T11213.hs:29:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
     Top-level binding with no type signature:
-      Puep :: forall t. () => forall a. Show a => a -> t -> (ExProv, t)
+      Puep :: forall b. () => forall a. Show a => a -> b -> (ExProv, b)

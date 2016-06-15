@@ -1781,7 +1781,7 @@ reify_tc_app tc tys
         isEmptyVarSet $
         filterVarSet isTyVar $
         tyCoVarsOfType $
-        mkPiTys (dropList tys tc_binders) tc_res_kind
+        mkTyConKind (dropList tys tc_binders) tc_res_kind
 
 reifyPred :: TyCoRep.PredType -> TcM TH.Pred
 reifyPred ty

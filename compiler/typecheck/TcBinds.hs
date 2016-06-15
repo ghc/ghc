@@ -35,7 +35,7 @@ import FamInstEnv( normaliseType )
 import FamInst( tcGetFamInstEnvs )
 import TyCon
 import TcType
-import Type( mkStrLitTy, tidyOpenType, TyVarBinder, mkTyVarBinder )
+import Type( mkStrLitTy, tidyOpenType, mkTyVarBinder )
 import TysPrim
 import TysWiredIn( cTupleTyConName )
 import Id

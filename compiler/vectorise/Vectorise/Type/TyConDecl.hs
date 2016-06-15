@@ -61,10 +61,9 @@ vectTyConDecl tycon name'
        ; cls' <- liftDs $
                    buildClass
                      name'                      -- new name: "V:Class"
-                     (tyConTyVars tycon)        -- keep original type vars
+                     (tyConBinders tycon)       -- keep original kind
                      (map (const Nominal) (tyConRoles tycon)) -- all role are N for safety
                      theta'                     -- superclasses
-                     (tyConBinders tycon)       -- keep original kind
                      (snd . classTvsFds $ cls)  -- keep the original functional dependencies
                      []                         -- no associated types (for the moment)
                      methods'                   -- method info
@@ -105,7 +104,6 @@ vectTyConDecl tycon name'
                     name'                   -- new name
                     (tyConBinders tycon)
                     (tyConResKind tycon)    -- keep original kind
-                    (tyConTyVars tycon)     -- keep original type vars
                     (map (const Nominal) (tyConRoles tycon)) -- all roles are N for safety
                     Nothing
                     []                      -- no stupid theta
@@ -191,7 +189,7 @@ vectDataCon dc
                     (dataConSrcBangs dc)           -- strictness as original constructor
                     (Just $ dataConImplBangs dc)
                     []                             -- no labelled fields for now
-                    univ_tvs univ_bndrs            -- universally quantified vars
+                    univ_bndrs                     -- universally quantified vars
                     []                             -- no existential tvs for now
                     []                             -- no equalities for now
                     []                             -- no context for now
@@ -204,4 +202,4 @@ vectDataCon dc
     rep_arg_tys = dataConRepArgTys dc
     tycon       = dataConTyCon dc
     (univ_tvs, ex_tvs, eq_spec, theta, _arg_tys, _res_ty) = dataConFullSig dc
-    univ_bndrs  = map mkNamedBinder (dataConUnivTyVarBinders dc)
+    univ_bndrs  = dataConUnivTyVarBinders dc

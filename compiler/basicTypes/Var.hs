@@ -5,7 +5,7 @@
 \section{@Vars@: Variables}
 -}
 
-{-# LANGUAGE CPP, MultiWayIf #-}
+{-# LANGUAGE CPP, MultiWayIf, FlexibleInstances, DeriveDataTypeable #-}
 
 -- |
 -- #name_types#
@@ -56,7 +56,12 @@ module Var (
         isGlobalId, isExportedId,
         mustHaveLocalBinding,
 
-        -- ** Constructing 'TyVar's
+        -- * TyVar's
+        TyVarBndr(..), VisibilityFlag(..), TyVarBinder,
+        binderVar, binderVars, binderVisibility, binderKind,
+        isVisible, isInvisible, sameVis,
+
+        -- ** Constructing TyVar's
         mkTyVar, mkTcTyVar,
 
         -- ** Taking 'TyVar's apart
@@ -77,12 +82,13 @@ import {-# SOURCE #-}   TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolem
 import {-# SOURCE #-}   IdInfo( IdDetails, IdInfo, coVarDetails, isCoVarDetails, vanillaIdInfo, pprIdDetails )
 
 import Name hiding (varName)
-import Unique
+import Unique ( Uniquable, Unique, getKey, getUnique
+              , mkUniqueGrimily, nonDetCmpUnique )
 import Util
+import Binary
 import DynFlags
 import Outputable
 
-import Unique (nonDetCmpUnique)
 import Data.Data
 
 {-
@@ -309,10 +315,69 @@ updateVarTypeM :: Monad m => (Type -> m Type) -> Id -> m Id
 updateVarTypeM f id = do { ty' <- f (varType id)
                          ; return (id { varType = ty' }) }
 
+{- *********************************************************************
+*                                                                      *
+*                   VisibilityFlag
+*                                                                      *
+********************************************************************* -}
+
+-- | Is something required to appear in source Haskell ('Visible'),
+-- permitted by request ('Specified') (visible type application), or
+-- prohibited entirely from appearing in source Haskell ('Invisible')?
+-- See Note [TyBinders and VisibilityFlags] in TyCoRep
+data VisibilityFlag = Visible | Specified | Invisible
+  deriving (Eq, Data)
+
+isVisible :: VisibilityFlag -> Bool
+isVisible Visible = True
+isVisible _       = False
+
+isInvisible :: VisibilityFlag -> Bool
+isInvisible v = not (isVisible v)
+
+-- | Do these denote the same level of visibility? Except that
+-- 'Specified' and 'Invisible' are considered the same. Used
+-- for printing.
+sameVis :: VisibilityFlag -> VisibilityFlag -> Bool
+sameVis Visible Visible = True
+sameVis Visible _       = False
+sameVis _       Visible = False
+sameVis _       _       = True
+
+
+{- *********************************************************************
+*                                                                      *
+*                   TyVarBndr, TyVarBinder
+*                                                                      *
+********************************************************************* -}
+
+-- TyVarBndr is polymorphic in both tyvar and visiblity fields:
+--   * tyvar can be TyVar or IfaceTv
+--   * vis   can be VisibilityFlag or TyConBndrVis
+data TyVarBndr tyvar vis = TvBndr tyvar vis
+  deriving( Data )
+
+-- | A `TyVarBinder` is the binder of a ForAllTy
+-- It's convenient to define this synonym here rather its natural
+-- home in TyCoRep, because it's used in DataCon.hs-boot
+type TyVarBinder = TyVarBndr TyVar VisibilityFlag
+
+binderVar :: TyVarBndr tv vis -> tv
+binderVar (TvBndr v _) = v
+
+binderVars :: [TyVarBndr tv vis] -> [tv]
+binderVars tvbs = map binderVar tvbs
+
+binderVisibility :: TyVarBndr tv vis -> vis
+binderVisibility (TvBndr _ vis) = vis
+
+binderKind :: TyVarBndr TyVar vis -> Kind
+binderKind (TvBndr tv _) = tyVarKind tv
+
 {-
 ************************************************************************
 *                                                                      *
-\subsection{Type and kind variables}
+*                 Type and kind variables                              *
 *                                                                      *
 ************************************************************************
 -}
@@ -362,6 +427,35 @@ tcTyVarDetails var = pprPanic "tcTyVarDetails" (ppr var <+> dcolon <+> pprKind (
 
 setTcTyVarDetails :: TyVar -> TcTyVarDetails -> TyVar
 setTcTyVarDetails tv details = tv { tc_tv_details = details }
+
+-------------------------------------
+instance Outputable tv => Outputable (TyVarBndr tv VisibilityFlag) where
+  ppr (TvBndr v Visible)   = ppr v
+  ppr (TvBndr v Specified) = char '@' <> ppr v
+  ppr (TvBndr v Invisible) = braces (ppr v)
+
+instance Outputable VisibilityFlag where
+  ppr Visible   = text "[vis]"
+  ppr Specified = text "[spec]"
+  ppr Invisible = text "[invis]"
+
+instance (Binary tv, Binary vis) => Binary (TyVarBndr tv vis) where
+  put_ bh (TvBndr tv vis) = do { put_ bh tv; put_ bh vis }
+
+  get bh = do { tv <- get bh; vis <- get bh; return (TvBndr tv vis) }
+
+
+instance Binary VisibilityFlag where
+  put_ bh Visible   = putByte bh 0
+  put_ bh Specified = putByte bh 1
+  put_ bh Invisible = putByte bh 2
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> return Visible
+      1 -> return Specified
+      _ -> return Invisible
 
 {-
 %************************************************************************

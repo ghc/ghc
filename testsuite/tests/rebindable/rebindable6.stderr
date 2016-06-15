@@ -25,7 +25,7 @@ rebindable6.hs:110:17: error:
                    return b }
 
 rebindable6.hs:111:17: error:
-    • Ambiguous type variables ‘t0’, ‘t1’ arising from a do statement
+    • Ambiguous type variables ‘t1’, ‘t0’ arising from a do statement
       prevents the constraint ‘(HasBind
                                   (IO (Maybe b) -> (Maybe b -> t1) -> t0))’ from being solved.
         (maybe you haven't applied a function to enough arguments?)
@@ -33,7 +33,7 @@ rebindable6.hs:111:17: error:
         g :: IO (Maybe b) (bound at rebindable6.hs:108:19)
         test_do :: IO a -> IO (Maybe b) -> IO b
           (bound at rebindable6.hs:108:9)
-      Probable fix: use a type annotation to specify what ‘t0’, ‘t1’ should be.
+      Probable fix: use a type annotation to specify what ‘t1’, ‘t0’ should be.
       These potential instance exist:
         instance HasBind (IO a -> (a -> IO b) -> IO b)
           -- Defined at rebindable6.hs:51:18
