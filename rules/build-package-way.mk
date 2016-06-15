@@ -176,11 +176,10 @@ endef # build-package-way
 # $5 = object files to link
 # $6 = output filename
 define build-dll
-	action=$(call cmd,$1_$2_HC) $($1_$2_$3_ALL_HC_OPTS) $($1_$2_$3_GHC_LD_OPTS) $4 \
-	           -shared -dynamic -dynload deploy \
-	           $(addprefix -l,$($1_$2_EXTRA_LIBRARIES)) \
-	           -no-auto-link-packages \
-
-	rules/build-dll-win32.sh link "$1" "$2" "$3" "$4" "$5" "$6" "$action"
+# Call out to the shell script to decide how to build the dll.
+rules/build-dll-win32.sh link "$1" "$2" "$3" "$4" "$5" "$6" "$(call cmd,$1_$2_HC) $($1_$2_$3_ALL_HC_OPTS) $($1_$2_$3_GHC_LD_OPTS) $4 \
+           -shared -dynamic -dynload deploy \
+           $(addprefix -l,$($1_$2_EXTRA_LIBRARIES)) \
+           -no-auto-link-packages"
 endef
 
