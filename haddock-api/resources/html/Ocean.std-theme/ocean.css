@@ -333,6 +333,8 @@ div#style-menu-holder {
   top: 10%;
   padding: 0;
   max-width: 75%;
+  /* Ensure that synopsis covers everything (including MathJAX markup) */
+  z-index: 1;
 }
 
 #synopsis .caption {
