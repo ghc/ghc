@@ -1264,6 +1264,7 @@ allowed_combination way = and [ x `allowedWith` y
         (WayCustom {}) `allowedWith` _          = True
         WayThreaded `allowedWith` WayProf       = True
         WayThreaded `allowedWith` WayEventLog   = True
+        WayProf     `allowedWith` WayEventLog   = True
         _ `allowedWith` _                       = False
 
 mkBuildTag :: [Way] -> String

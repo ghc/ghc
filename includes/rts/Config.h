@@ -27,12 +27,16 @@
 #define USING_LIBBFD 1
 #endif
 
-/* DEBUG implies TRACING and TICKY_TICKY
- */
+/* DEBUG implies TRACING and TICKY_TICKY  */
 #if defined(DEBUG)
+#if !defined(TRACING)
 #define TRACING
+#endif
+#if !defined(TICKY_TICKY)
 #define TICKY_TICKY
 #endif
+#endif
+
 
 /* -----------------------------------------------------------------------------
    Signals - supported on non-PAR versions of the runtime.  See RtsSignals.h.

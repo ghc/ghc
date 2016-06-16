@@ -26,6 +26,7 @@ Contents:
    utils
    win32-dlls
    bugs
+   eventlog-formats
    editing-guide
 
 

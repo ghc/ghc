@@ -274,14 +274,21 @@ BuildSharedLibs=$(strip $(if $(findstring dyn,$(GhcLibWays)),YES,NO))
 # In addition, the RTS is built in some further variations.  Ways that
 # make sense here:
 #
-#   thr         : threaded
-#   thr_p       : threaded profiled
-#   debug       : debugging (compile with -g for the C compiler, and -DDEBUG)
-#   debug_p     : debugging profiled
-#   thr_debug   : debugging threaded
-#   thr_debug_p : debugging threaded profiled
-#   l           : event logging
-#   thr_l       : threaded and event logging
+#   thr           : threaded
+#   thr_p         : threaded + profiled + eventlog
+#   debug         : debugging + eventlog
+#   thr_debug     : debugging + threaded, + eventlog
+#   l             : eventlog
+#   p             : profiled + eventlog
+#   thr_l         : threaded + eventlog
+#
+# Note how there are a few cases which are handled specially (in packageHsLibs)
+# to reduce the number of distinct ways,
+#
+#   debug     implies  eventlog
+#   profiled  implies  eventlog
+#
+# This means, for instance, that there is no debug_l way.
 #
 GhcRTSWays=l
 

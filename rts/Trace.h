@@ -275,6 +275,20 @@ void traceTaskMigrate_ (Task       *task,
 
 void traceTaskDelete_ (Task       *task);
 
+void traceHeapProfBegin(StgWord8 profile_id);
+void traceHeapProfSampleBegin(StgInt era);
+void traceHeapProfSampleString(StgWord8 profile_id,
+                               const char *label, StgWord residency);
+#ifdef PROFILING
+void traceHeapProfCostCentre(StgWord32 ccID,
+                             const char *label,
+                             const char *module,
+                             const char *srcloc,
+                             StgBool is_caf);
+void traceHeapProfSampleCostCentre(StgWord8 profile_id,
+                                   CostCentreStack *stack, StgWord residency);
+#endif /* PROFILING */
+
 #else /* !TRACING */
 
 #define traceSchedEvent(cap, tag, tso, other) /* nothing */
@@ -304,6 +318,11 @@ void traceTaskDelete_ (Task       *task);
 #define traceTaskCreate_(taskID, cap) /* nothing */
 #define traceTaskMigrate_(taskID, cap, new_cap) /* nothing */
 #define traceTaskDelete_(taskID) /* nothing */
+#define traceHeapProfBegin(profile_id) /* nothing */
+#define traceHeapProfCostCentre(ccID, label, module, srcloc, is_caf) /* nothing */
+#define traceHeapProfSampleBegin(era) /* nothing */
+#define traceHeapProfSampleCostCentre(profile_id, stack, residency) /* nothing */
+#define traceHeapProfSampleString(profile_id, label, residency) /* nothing */
 
 #endif /* TRACING */
 

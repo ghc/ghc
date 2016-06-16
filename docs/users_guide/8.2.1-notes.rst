@@ -56,6 +56,10 @@ Runtime system
 
 -  TODO FIXME.
 
+- The :ref:`heap profiler <prof-heap>` can now emit heap census data to the GHC
+  event log, allowing heap profiles to be correlated with other tracing events
+  (see :ghc-ticket:`11094`).
+
 Build system
 ~~~~~~~~~~~~
 

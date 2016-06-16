@@ -425,10 +425,14 @@ To generate a heap profile from your program:
 
 2. Run it with one of the heap profiling options described below (eg.
    :rts-flag:`-h` for a basic producer profile). This generates the file
-   ``prog.hp``.
+   :file:`{prog}.hp`.
 
-3. Run ``hp2ps`` to produce a Postscript file, ``prog.ps``. The
-   ``hp2ps`` utility is described in detail in :ref:`hp2ps`.
+   If the :ref:`event log <rts-eventlog>` is enabled (with the :rts-flag:`-l`
+   runtime system flag) heap samples will additionally be emitted to the GHC
+   event log (see :ref:`heap-profiler-events` for details about event format).
+
+3. Run :command:`hp2ps` to produce a Postscript file, :file:`{prog}.ps`. The
+   :command:`hp2ps` utility is described in detail in :ref:`hp2ps`.
 
 4. Display the heap profile using a postscript viewer such as Ghostview,
    or print it out on a Postscript-capable printer.
@@ -484,6 +488,18 @@ following RTS options select which break-down to use:
 
     Break down the graph by biography. Biographical profiling is
     described in more detail below (:ref:`biography-prof`).
+
+.. rts-flag:: -l
+
+    :noindex:
+
+    .. index::
+       single: eventlog; and heap profiling
+
+    Emit profile samples to the :ref:`GHC event log <rts-eventlog>`.
+    This format is both more expressive than the old ``.hp`` format
+    and can be correlated with other events over the program's runtime.
+    See :ref:`heap-profiler-events` for details on the produced event structure.
 
 In addition, the profile can be restricted to heap data which satisfies
 certain criteria - for example, you might want to display a profile by
@@ -747,7 +763,7 @@ Usage:
 
     hp2ps [flags] [<file>[.hp]]
 
-The program :command:`hp2ps` program converts a heap profile as produced
+The program :command:`hp2ps` program converts a ``.hp`` file produced
 by the ``-h<break-down>`` runtime option into a PostScript graph of the
 heap profile. By convention, the file to be processed by :command:`hp2ps` has a
 ``.hp`` extension. The PostScript output is written to :file:`{file}@.ps`.

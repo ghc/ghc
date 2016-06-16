@@ -622,6 +622,49 @@ void traceTaskDelete_ (Task *task)
     }
 }
 
+void traceHeapProfBegin(StgWord8 profile_id)
+{
+    if (eventlog_enabled) {
+        postHeapProfBegin(profile_id);
+    }
+}
+
+void traceHeapProfSampleBegin(StgInt era)
+{
+    if (eventlog_enabled) {
+        postHeapProfSampleBegin(era);
+    }
+}
+
+void traceHeapProfSampleString(StgWord8 profile_id,
+                               const char *label, StgWord residency)
+{
+    if (eventlog_enabled) {
+        postHeapProfSampleString(profile_id, label, residency);
+    }
+}
+
+#ifdef PROFILING
+void traceHeapProfCostCentre(StgWord32 ccID,
+                             const char *label,
+                             const char *module,
+                             const char *srcloc,
+                             StgBool is_caf)
+{
+    if (eventlog_enabled) {
+        postHeapProfCostCentre(ccID, label, module, srcloc, is_caf);
+    }
+}
+
+void traceHeapProfSampleCostCentre(StgWord8 profile_id,
+                                   CostCentreStack *stack, StgWord residency)
+{
+    if (eventlog_enabled) {
+        postHeapProfSampleCostCentre(profile_id, stack, residency);
+    }
+}
+#endif
+
 #ifdef DEBUG
 static void vtraceCap_stderr(Capability *cap, char *msg, va_list ap)
 {
