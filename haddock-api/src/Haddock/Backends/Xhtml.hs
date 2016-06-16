@@ -35,8 +35,8 @@ import Text.XHtml hiding ( name, title, p, quote )
 import Haddock.GhcUtils
 
 import Control.Monad         ( when, unless )
-import Data.Char             ( toUpper )
-import Data.List             ( sortBy, intercalate, isPrefixOf )
+import Data.Char             ( toUpper, isSpace )
+import Data.List             ( sortBy, intercalate, isPrefixOf, intersperse )
 import Data.Maybe
 import System.FilePath hiding ( (</>) )
 import System.Directory
@@ -201,8 +201,7 @@ moduleInfo iface =
         field info >>= \a -> return (th << fieldName <-> td << a)
 
       entries :: [HtmlTable]
-      entries = mapMaybe doOneEntry [
-          ("Copyright",hmi_copyright),
+      entries = maybeToList copyrightsTable ++ mapMaybe doOneEntry [
           ("License",hmi_license),
           ("Maintainer",hmi_maintainer),
           ("Stability",hmi_stability),
@@ -215,6 +214,14 @@ moduleInfo iface =
             Nothing -> Nothing
             Just Haskell98 -> Just "Haskell98"
             Just Haskell2010 -> Just "Haskell2010"
+
+          multilineRow :: String -> [String] -> HtmlTable
+          multilineRow title xs = (th ! [valign "top"]) << title <-> td << (toLines xs)
+            where toLines = mconcat . intersperse br . map toHtml
+
+          copyrightsTable :: Maybe HtmlTable
+          copyrightsTable = fmap (multilineRow "Copyright" . split) (hmi_copyright info)
+            where split = map (trim . filter (/= ',')) . lines
 
           extsForm
             | OptShowExtensions `elem` ifaceOptions iface =
@@ -648,6 +655,9 @@ processDecl :: Bool -> Html -> Maybe Html
 processDecl True = Just
 processDecl False = Just . divTopDecl
 
+trim :: String -> String
+trim = f . f
+  where f = reverse . dropWhile isSpace
 
 processDeclOneLiner :: Bool -> Html -> Maybe Html
 processDeclOneLiner True = Just
