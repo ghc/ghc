@@ -27,14 +27,6 @@ $1_$2_$3_LIB_FILE = libHS$$($1_$2_COMPONENT_ID)$$($3_libsuf)
 $1_$2_$3_LIB = $1/$2/build/$$($1_$2_$3_LIB_FILE)
 $$($1_$2_COMPONENT_ID)_$2_$3_LIB = $$($1_$2_$3_LIB)
 
-ifeq "$$(HostOS_CPP)" "mingw32"
-ifneq "$$($1_$2_dll0_HS_OBJS)" ""
-$1_$2_$3_LIB0_ROOT = HS$$($1_$2_COMPONENT_ID)-0$$($3_libsuf)
-$1_$2_$3_LIB0_NAME = lib$$($1_$2_$3_LIB0_ROOT)
-$1_$2_$3_LIB0 = $1/$2/build/$$($1_$2_$3_LIB0_NAME)
-endif
-endif
-
 # Note [inconsistent distdirs]
 #
 # hack: the DEPS_LIBS mechanism assumes that the distdirs for packages
@@ -62,17 +54,6 @@ $1_$2_$3_ALL_OBJS = $$($1_$2_$3_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS)
 
 ifeq "$3" "dyn"
 
-ifneq "$$($1_$2_dll0_MODULES)" ""
-$$($1_$2_$3_LIB)  : $1/$2/dll-split.stamp
-ifneq "$$($1_$2_$3_LIB0)" ""
-$$($1_$2_$3_LIB0) : $1/$2/dll-split.stamp
-endif
-endif
-
-$1/$2/dll-split.stamp: $$($1_$2_depfile_haskell) $$$$(dll-split_INPLACE)
-	$$(dll-split_INPLACE) $$< "$$($1_$2_dll0_START_MODULE)" "$$($1_$2_dll0_MODULES)"
-	touch $$@
-
 # Link a dynamic library
 # On windows we have to supply the extra libs this one links to when building it.
 ifeq "$$(HostOS_CPP)" "mingw32"
@@ -81,12 +62,6 @@ ifneq "$$($1_$2_$3_LIB0)" ""
 	$$(call build-dll,$1,$2,$3,-L$1/$2/build -l$$($1_$2_$3_LIB0_ROOT),$$(filter-out $$($1_$2_dll0_HS_OBJS),$$($1_$2_$3_HS_OBJS)) $$($1_$2_$3_NON_HS_OBJS),$$@)
 else
 	$$(call build-dll,$1,$2,$3,,$$($1_$2_$3_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS),$$@)
-endif
-
-ifneq "$$($1_$2_$3_LIB0)" ""
-$$($1_$2_$3_LIB) : $$($1_$2_$3_LIB0)
-$$($1_$2_$3_LIB0) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
-	$$(call build-dll,$1,$2,$3,,$$($1_$2_dll0_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS),$$($1_$2_$3_LIB0))
 endif
 
 else # ifneq "$$(HostOS_CPP)" "mingw32"
@@ -115,14 +90,6 @@ else
 	"$$(XARGS)" $$(XARGS_OPTS) "$$($1_$2_AR)" $$($1_$2_AR_OPTS) $$($1_$2_EXTRA_AR_ARGS) $$@ < $$@.contents
 endif
 	$$(call removeFiles,$$@.contents)
-
-ifeq "$$(HostOS_CPP)" "mingw32"
-ifneq "$$($1_$2_$3_LIB0)" ""
-$$($1_$2_$3_LIB) : $$($1_$2_$3_LIB0)
-$$($1_$2_$3_LIB0) :
-	$$(call cmd,$1_$2_AR) $$($1_$2_AR_OPTS) $$($1_$2_EXTRA_AR_ARGS) $$@
-endif
-endif
 
 endif # "$3" "dyn"
 
