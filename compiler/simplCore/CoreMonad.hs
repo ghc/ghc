@@ -837,22 +837,22 @@ putMsgS = putMsg . text
 putMsg :: SDoc -> CoreM ()
 putMsg = msg SevInfo
 
--- | Output a string error to the screen
+-- | Output an error to the screen. Does not cause the compiler to die.
 errorMsgS :: String -> CoreM ()
 errorMsgS = errorMsg . text
 
--- | Output an error to the screen
+-- | Output an error to the screen. Does not cause the compiler to die.
 errorMsg :: SDoc -> CoreM ()
 errorMsg = msg SevError
 
 warnMsg :: SDoc -> CoreM ()
 warnMsg = msg SevWarning
 
--- | Output a fatal string error to the screen. Note this does not by itself cause the compiler to die
+-- | Output a fatal error to the screen. Does not cause the compiler to die.
 fatalErrorMsgS :: String -> CoreM ()
 fatalErrorMsgS = fatalErrorMsg . text
 
--- | Output a fatal error to the screen. Note this does not by itself cause the compiler to die
+-- | Output a fatal error to the screen. Does not cause the compiler to die.
 fatalErrorMsg :: SDoc -> CoreM ()
 fatalErrorMsg = msg SevFatal
 
