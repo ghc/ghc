@@ -163,8 +163,8 @@ _darcs/
 /rts/package.conf.install
 /rts/package.conf.install.raw
 /stage3.package.conf
-/testsuite_summary.txt
-/testlog
+/testsuite_summary*.txt
+/testlog*
 /utils/runghc/runghc.cabal
 
 /extra-gcc-opts

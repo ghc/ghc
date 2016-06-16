@@ -240,6 +240,8 @@ RUNTEST_OPTS +=  \
 	--config 'gs=$(call quote_path,$(GS))' \
 	--config 'timeout_prog=$(call quote_path,$(TIMEOUT_PROGRAM))'
 
+RUNTEST_OPTS += -e "config.stage=$(GhcStage)"
+
 ifneq "$(SUMMARY_FILE)" ""
 RUNTEST_OPTS +=  \
 	--summary-file "$(SUMMARY_FILE)"
@@ -304,11 +306,11 @@ verbose: test
 accept:
 	$(MAKE) accept=YES
 
-fast:
+fast fasttest:
 	# See Note [validate and testsuite speed] in toplevel Makefile.
 	$(MAKE) SPEED=2
 
-slow:
+slow slowtest:
 	$(MAKE) SPEED=0
 
 list_broken:

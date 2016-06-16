@@ -266,11 +266,31 @@ FAST)
 esac
 
 if [ $be_quiet -eq 1 ] && [ -z $VERBOSE ]; then
-    TEST_VERBOSITY="VERBOSE=1 NO_PRINT_SUMMARY=YES"
+    TEST_VERBOSITY="VERBOSE=1"
 fi
 
+rm testsuite_summary.txt testsuite_summary_stage1.txt
+
 # Use LOCAL=0, see Note [Running tests in /tmp].
-$make $MAKE_TEST_TARGET stage=2 $BINDIST LOCAL=0 $TEST_VERBOSITY THREADS=$threads 2>&1 | tee testlog
+$make -C testsuite/tests $BINDIST \
+      $MAKE_TEST_TARGET stage=2 LOCAL=0 $TEST_VERBOSITY THREADS=$threads \
+      NO_PRINT_SUMMARY=YES SUMMARY_FILE=../../testsuite_summary.txt \
+      2>&1 | tee testlog
+
+# Run a few tests using the stage1 compiler.
+# See Note [Why is there no stage1 setup function?].
+# Don't use BINDIST=YES, as stage1 is not available in a bindist.
+$make -C testsuite/tests/stage1 \
+      $MAKE_TEST_TARGET stage=1 LOCAL=0 $TEST_VERBOSITY THREADS=$threads \
+      NO_PRINT_SUMMARY=YES SUMMARY_FILE=../../../testsuite_summary_stage1.txt \
+      2>&1 | tee testlog-stage1
+
+echo
+echo '==== STAGE 1 TESTS ==== '
+cat testsuite_summary_stage1.txt
+
+echo '==== STAGE 2 TESTS ==== '
+cat testsuite_summary.txt
 
 check_packages post-testsuite
 
@@ -284,7 +304,12 @@ if
     grep '\<0 unexpected passes' testsuite_summary.txt >/dev/null 2>/dev/null &&
     grep '\<0 unexpected failures' testsuite_summary.txt >/dev/null 2>/dev/null &&
     grep '\<0 unexpected stat failures' testsuite_summary.txt >/dev/null 2>/dev/null &&
-    ! grep 'Some files are written by multiple tests' testsuite_summary.txt >/dev/null 2>/dev/null ; then
+
+    grep '\<0 caused framework failures' testsuite_summary_stage1.txt >/dev/null 2>/dev/null &&
+    grep '\<0 unexpected passes' testsuite_summary_stage1.txt >/dev/null 2>/dev/null &&
+    grep '\<0 unexpected failures' testsuite_summary_stage1.txt >/dev/null 2>/dev/null &&
+    grep '\<0 unexpected stat failures' testsuite_summary_stage1.txt >/dev/null 2>/dev/null ; then
+
     if [ $testsuite_only -eq 0 ] && [ $no_clean -eq 0 ]
     then
         cat <<EOF

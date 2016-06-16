@@ -3,7 +3,6 @@ def f(name, opts):
 
 setTestOpts(f)
 
-test('T2632', normal, compile, [''])
 test('T2931', normal, compile, ['-v0'])
 test('T3572', normal, compile_and_run, [''])
 test('T4056', normal, compile, ['-v0'])

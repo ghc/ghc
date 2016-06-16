@@ -28,10 +28,10 @@ verbose:
 accept:
 	$(MAKE) -C $(TOP)/tests accept
 
-fast:
+fast fasttest:
 	$(MAKE) -C $(TOP)/tests fast
 
-slow:
+slow slowtest:
 	$(MAKE) -C $(TOP)/tests slow
 
 list_broken:

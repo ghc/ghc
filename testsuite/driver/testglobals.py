@@ -60,10 +60,13 @@ class TestConfig:
 
         self.list_broken = False
 
-        # Path to the compiler
+        # Path to the compiler (stage2 by default)
         self.compiler = ''
         # and ghc-pkg
         self.ghc_pkg = ''
+
+        # Is self.compiler a stage 1, 2 or 3 compiler?
+        self.stage = 2
 
         # Compiler version info
         self.compiler_version = ''

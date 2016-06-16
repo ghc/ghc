@@ -100,6 +100,36 @@ def expect_fail( name, opts ):
 def reqlib( lib ):
     return lambda name, opts, l=lib: _reqlib (name, opts, l )
 
+def stage1(name, opts):
+    # See Note [Why is there no stage1 setup function?]
+    framework_fail(name, 'stage1 setup function does not exist',
+                   'add your test to testsuite/tests/stage1 instead')
+
+# Note [Why is there no stage1 setup function?]
+#
+# Presumably a stage1 setup function would signal that the stage1
+# compiler should be used to compile a test.
+#
+# Trouble is, the path to the compiler + the `ghc --info` settings for
+# that compiler are currently passed in from the `make` part of the
+# testsuite driver.
+#
+# Switching compilers in the Python part would be entirely too late, as
+# all ghc_with_* settings would be wrong. See config/ghc for possible
+# consequences (for example, config.run_ways would still be
+# based on the default compiler, quite likely causing ./validate --slow
+# to fail).
+#
+# It would be possible to let the Python part of the testsuite driver
+# make the call to `ghc --info`, but doing so would require quite some
+# work. Care has to be taken to not affect the run_command tests for
+# example, as they also use the `ghc --info` settings:
+#     quasiquotation/qq007/Makefile:ifeq "$(GhcDynamic)" "YES"
+#
+# If you want a test to run using the stage1 compiler, add it to the
+# testsuite/tests/stage1 directory. Validate runs the tests in that
+# directory with `make stage=1`.
+
 # Cache the results of looking to see if we have a library or not.
 # This makes quite a difference, especially on Windows.
 have_lib = {}
@@ -2038,7 +2068,7 @@ def summary(t, file, short=False):
         # Only print the list of unexpected tests above.
         return
 
-    file.write('OVERALL SUMMARY for test run started at '
+    file.write('SUMMARY for test run started at '
                + time.strftime("%c %Z", t.start_time) + '\n'
                + str(datetime.timedelta(seconds=
                     round(time.time() - time.mktime(t.start_time)))).rjust(8)
