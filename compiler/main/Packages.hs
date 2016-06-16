@@ -1480,16 +1480,7 @@ isDllName dflags _this_pkg this_mod name
     -- In the mean time, always force dynamic indirections to be
     -- generated: when the module name isn't the module being
     -- compiled, references are dynamic.
-    = if mod /= this_mod
-      then True
-      else case dllSplit dflags of
-           Nothing -> False
-           Just ss ->
-               let findMod m = let modStr = moduleNameString (moduleName m)
-                               in case find (modStr `Set.member`) ss of
-                                  Just i -> i
-                                  Nothing -> panic ("Can't find " ++ modStr ++ "in DLL split")
-               in findMod mod /= findMod this_mod
+    = mod /= this_mod
 
   | otherwise = False  -- no, it is not even an external name
 

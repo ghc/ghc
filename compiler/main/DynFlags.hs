@@ -718,14 +718,6 @@ data DynFlags = DynFlags {
   dynObjectSuf          :: String,
   dynHiSuf              :: String,
 
-  -- Packages.isDllName needs to know whether a call is within a
-  -- single DLL or not. Normally it does this by seeing if the call
-  -- is to the same package, but for the ghc package, we split the
-  -- package between 2 DLLs. The dllSplit tells us which sets of
-  -- modules are in which package.
-  dllSplitFile          :: Maybe FilePath,
-  dllSplit              :: Maybe [Set String],
-
   outputFile            :: Maybe String,
   dynOutputFile         :: Maybe String,
   outputHi              :: Maybe String,
@@ -1495,9 +1487,6 @@ defaultDynFlags mySettings =
         dynObjectSuf            = "dyn_" ++ phaseInputExt StopLn,
         dynHiSuf                = "dyn_hi",
 
-        dllSplitFile            = Nothing,
-        dllSplit                = Nothing,
-
         pluginModNames          = [],
         pluginModNameOpts       = [],
         frontendPluginOpts      = [],
@@ -2170,29 +2159,15 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
 
   let (dflags5, consistency_warnings) = makeDynFlagsConsistent dflags4
 
-  dflags6 <- case dllSplitFile dflags5 of
-             Nothing -> return (dflags5 { dllSplit = Nothing })
-             Just f ->
-                 case dllSplit dflags5 of
-                 Just _ ->
-                     -- If dllSplit is out of date then it would have
-                     -- been set to Nothing. As it's a Just, it must be
-                     -- up-to-date.
-                     return dflags5
-                 Nothing ->
-                     do xs <- liftIO $ readFile f
-                        let ss = map (Set.fromList . words) (lines xs)
-                        return $ dflags5 { dllSplit = Just ss }
-
   -- Set timer stats & heap size
-  when (enableTimeStats dflags6) $ liftIO enableTimingStats
-  case (ghcHeapSize dflags6) of
+  when (enableTimeStats dflags5) $ liftIO enableTimingStats
+  case (ghcHeapSize dflags5) of
     Just x -> liftIO (setHeapSize x)
     _      -> return ()
 
-  liftIO $ setUnsafeGlobalDynFlags dflags6
+  liftIO $ setUnsafeGlobalDynFlags dflags5
 
-  return (dflags6, leftover, consistency_warnings ++ sh_warns ++ warns)
+  return (dflags5, leftover, consistency_warnings ++ sh_warns ++ warns)
 
 updateWays :: DynFlags -> DynFlags
 updateWays dflags
@@ -2474,9 +2449,6 @@ dynamic_flags_deps = [
         (noArg (\d -> d { ghcLink=LinkStaticLib }))
   , make_ord_flag defGhcFlag "dynload"            (hasArg parseDynLibLoaderMode)
   , make_ord_flag defGhcFlag "dylib-install-name" (hasArg setDylibInstallName)
-    -- -dll-split is an internal flag, used only during the GHC build
-  , make_ord_flag defHiddenFlag "dll-split"
-      (hasArg (\f d -> d { dllSplitFile = Just f, dllSplit = Nothing }))
 
         ------- Libraries ---------------------------------------------------
   , make_ord_flag defFlag "L"   (Prefix addLibraryPath)
