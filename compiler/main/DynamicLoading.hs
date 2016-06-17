@@ -19,6 +19,8 @@ module DynamicLoading (
         getValueSafely,
         getHValueSafely,
         lessUnsafeCoerce
+#else
+        pluginError,
 #endif
     ) where
 
@@ -55,6 +57,16 @@ import Hooks
 import Data.Maybe        ( mapMaybe )
 import GHC.Exts          ( unsafeCoerce# )
 
+#else
+
+import Module           ( ModuleName, moduleNameString )
+import Panic
+
+import Data.List        ( intercalate )
+
+#endif
+
+#ifdef GHCI
 
 loadPlugins :: HscEnv -> IO [(ModuleName, Plugin, [CommandLineOption])]
 loadPlugins hsc_env
@@ -243,4 +255,15 @@ throwCmdLineErrorS dflags = throwCmdLineError . showSDoc dflags
 
 throwCmdLineError :: String -> IO a
 throwCmdLineError = throwGhcExceptionIO . CmdLineError
+
+#else
+
+pluginError :: [ModuleName] -> a
+pluginError modnames = throwGhcException (CmdLineError msg)
+  where
+    msg = "not built for interactive use - can't load plugins ("
+            -- module names are not z-encoded
+          ++ intercalate ", " (map moduleNameString modnames)
+          ++ ")"
+
 #endif
