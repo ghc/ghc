@@ -32,15 +32,15 @@ process_dll_link() {
     echo "Number of symbols in $6: $SYMBOLS_DLL"
     # Now check that the DLL doesn't have too many symbols. See trac #5987.
     case $(($SYMBOLS_DLL / $max)) in
-        0) 
+        0)
             echo DLL $6 OK, no need to split
             exit 0
             ;;
-        [0-9]*) 
+        [0-9]*)
             echo Too many symbols in DLL $6
             echo "We'll have to split the dll..."
             ;; 
-        *) 
+        *)
             echo bad DLL $6
             exit 1
             ;;
@@ -75,7 +75,7 @@ process_dll_link() {
         obj_count=`echo $obj_symbols | wc -w | cut -d' ' -f1`
         echo "Using $obj ($obj_count)"
         count=$(($count + $obj_count))
-        
+
         if [ "$count" -gt "$max" ]
         then
             echo ">> DLL split at $(($count - $obj_count)) symbols."
@@ -95,7 +95,7 @@ process_dll_link() {
     i=$(($i + 1))
     echo "$buffer"    | sed 's/\s/\n/g' | sed '/^\s*$/d' | sort | uniq -u > "$base-pt$i.lst"
     echo "$obj_files" | sed 's/\s/\n/g' | sed '/^\s*$/d' | sort | uniq -u > "$base-pt$i.objs"
-    
+
     count=$i
     echo "OK, based on the amount of symbols we'll split the DLL into $count"
 
