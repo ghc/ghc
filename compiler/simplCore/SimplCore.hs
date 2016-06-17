@@ -59,6 +59,8 @@ import qualified GHC.LanguageExtensions as LangExt
 #ifdef GHCI
 import DynamicLoading   ( loadPlugins )
 import Plugins          ( installCoreToDos )
+#else
+import DynamicLoading   ( pluginError )
 #endif
 
 {-
@@ -350,7 +352,11 @@ getCoreToDo dflags
 
 addPluginPasses :: [CoreToDo] -> CoreM [CoreToDo]
 #ifndef GHCI
-addPluginPasses builtin_passes = return builtin_passes
+addPluginPasses builtin_passes
+  = do { dflags <- getDynFlags
+       ; let pluginMods = pluginModNames dflags
+       ; unless (null pluginMods) (pluginError pluginMods)
+       ; return builtin_passes }
 #else
 addPluginPasses builtin_passes
   = do { hsc_env <- getHscEnv

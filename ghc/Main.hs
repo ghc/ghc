@@ -32,6 +32,8 @@ import GHCi.UI          ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 #ifdef GHCI
 import DynamicLoading
 import Plugins
+#else
+import DynamicLoading   ( pluginError )
 #endif
 import Module           ( ModuleName )
 
@@ -841,8 +843,7 @@ dumpPackagesSimple dflags = putMsg dflags (pprPackagesSimple dflags)
 
 doFrontend :: ModuleName -> [(String, Maybe Phase)] -> Ghc ()
 #ifndef GHCI
-doFrontend _ _ =
-    throwGhcException (CmdLineError "not built for interactive use")
+doFrontend modname _ = pluginError [modname]
 #else
 doFrontend modname srcs = do
     hsc_env <- getSession
