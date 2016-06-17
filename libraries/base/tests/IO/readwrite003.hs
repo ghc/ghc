@@ -9,4 +9,5 @@ main = do
   hPutStrLn h "yz"
   hClose h
   h <- openBinaryFile file ReadMode
+  hSetNewlineMode stdout noNewlineTranslation
   hGetContents h >>= putStr

@@ -162,7 +162,7 @@ if windows:
 # Try to use UTF8
 if windows:
     import ctypes
-    # Windows Python provides windll, mingw python provides cdll.
+    # Windows and mingw* Python provide windll, msys2 python provides cdll.
     if hasattr(ctypes, 'windll'):
         mydll = ctypes.windll
     else:

@@ -5,6 +5,7 @@
 
 from __future__ import print_function
 
+import io
 import shutil
 import sys
 import os
@@ -1466,16 +1467,15 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
 
 def split_file(in_fn, delimiter, out1_fn, out2_fn):
-    infile = open(in_fn)
-    out1 = open(out1_fn, 'w')
-    out2 = open(out2_fn, 'w')
+    # See Note [Universal newlines].
+    infile = io.open(in_fn, 'r', encoding='utf8', newline=None)
+    out1 = io.open(out1_fn, 'w', encoding='utf8', newline='')
+    out2 = io.open(out2_fn, 'w', encoding='utf8', newline='')
 
     line = infile.readline()
-    line = re.sub('\r', '', line) # ignore Windows EOL
     while (re.sub('^\s*','',line) != delimiter and line != ''):
         out1.write(line)
         line = infile.readline()
-        line = re.sub('\r', '', line)
     out1.close()
 
     line = infile.readline()
@@ -1538,19 +1538,40 @@ def dump_stderr( name ):
 def read_no_crs(file):
     str = ''
     try:
-        h = open(file)
+        # See Note [Universal newlines].
+        h = io.open(file, 'r', encoding='utf8', newline=None)
         str = h.read()
         h.close
     except:
         # On Windows, if the program fails very early, it seems the
         # files stdout/stderr are redirected to may not get created
         pass
-    return re.sub('\r', '', str)
+    return str
 
 def write_file(file, str):
-    h = open(file, 'w')
+    # See Note [Universal newlines].
+    h = io.open(file, 'w', encoding='utf8', newline='')
     h.write(str)
     h.close
+
+# Note [Universal newlines]
+#
+# We don't want to write any Windows style line endings ever, because
+# it would mean that `make accept` would touch every line of the file
+# when switching between Linux and Windows.
+#
+# Furthermore, when reading a file, it is convenient to translate all
+# Windows style endings to '\n', as it simplifies searching or massaging
+# the content.
+#
+# Solution: use `io.open` instead of `open`
+#  * when reading: use newline=None to translate '\r\n' to '\n'
+#  * when writing: use newline='' to not translate '\n' to '\r\n'
+#
+# See https://docs.python.org/2/library/io.html#io.open.
+#
+# This should work with both python2 and python3, and with both mingw*
+# as msys2 style Python.
 
 def check_hp_ok(name):
     opts = getTestOpts()
@@ -1681,7 +1702,7 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
 
 def normalise_whitespace( str ):
     # Merge contiguous whitespace characters into a single space.
-    return ' '.join(w for w in str.split())
+    return u' '.join(w for w in str.split())
 
 callSite_re = re.compile(r', called at (.+):[\d]+:[\d]+ in [\w\-\.]+:')
 
@@ -1825,7 +1846,7 @@ def normalise_asm( str ):
           out.append(instr[0] + ' ' + instr[1])
         else:
           out.append(instr[0])
-    out = '\n'.join(out)
+    out = u'\n'.join(out)
     return out
 
 def if_verbose( n, s ):
@@ -2115,7 +2136,7 @@ def printFrameworkFailureSummary(file, testInfos):
     file.write('\n')
 
 def modify_lines(s, f):
-    s = '\n'.join([f(l) for l in s.splitlines()])
+    s = u'\n'.join([f(l) for l in s.splitlines()])
     if s and s[-1] != '\n':
         # Prevent '\ No newline at end of file' warnings when diffing.
         s += '\n'
