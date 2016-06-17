@@ -581,7 +581,7 @@ data CmmTickScope
     -- to add ticks to this scope. On the other hand, this means that
     -- setting this scope on a block means no ticks apply to it.
 
-  | SubScope U.Unique CmmTickScope
+  | SubScope !U.Unique CmmTickScope
     -- ^ Constructs a new sub-scope to an existing scope. This allows
     -- us to translate Core-style scoping rules (see @tickishScoped@)
     -- into the Cmm world. Suppose the following code:
