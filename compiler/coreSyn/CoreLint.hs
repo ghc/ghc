@@ -1909,7 +1909,9 @@ mkDefaultArgsMsg args
 mkCaseAltMsg :: CoreExpr -> Type -> Type -> MsgDoc
 mkCaseAltMsg e ty1 ty2
   = hang (text "Type of case alternatives not the same as the annotation on case:")
-         4 (vcat [ppr ty1, ppr ty2, ppr e])
+         4 (vcat [ text "Actual type:" <+> ppr ty1,
+                   text "Annotation on case:" <+> ppr ty2,
+                   text "Alt Rhs:" <+> ppr e ])
 
 mkScrutMsg :: Id -> Type -> Type -> TCvSubst -> MsgDoc
 mkScrutMsg var var_ty scrut_ty subst
