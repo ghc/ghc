@@ -188,7 +188,7 @@ cmmMetaLlvmPrelude = do
     setUniqMeta uniq tbaaId
     parentId <- maybe (return Nothing) getUniqMeta parent
     -- Build definition
-    return $ MetaUnamed tbaaId $ MetaStruct
+    return $ MetaUnnamed tbaaId $ MetaStruct
         [ MetaStr name
         , case parentId of
           Just p  -> MetaNode p

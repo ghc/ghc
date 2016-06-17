@@ -1,3 +1,5 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Llvm.MetaData where
 
 import Llvm.Types
@@ -55,16 +57,23 @@ import Outputable
 --     !llvm.module.linkage = !{ !0, !1 }
 --
 
+-- | A reference to an un-named metadata node.
+newtype MetaId = MetaId Int
+               deriving (Eq, Ord, Enum)
+
+instance Outputable MetaId where
+    ppr (MetaId n) = char '!' <> int n
+
 -- | LLVM metadata expressions
 data MetaExpr = MetaStr LMString
-              | MetaNode Int
+              | MetaNode MetaId
               | MetaVar LlvmVar
               | MetaStruct [MetaExpr]
               deriving (Eq)
 
 instance Outputable MetaExpr where
   ppr (MetaStr    s ) = text "!\"" <> ftext s <> char '"'
-  ppr (MetaNode   n ) = text "!" <> int n
+  ppr (MetaNode   n ) = ppr n
   ppr (MetaVar    v ) = ppr v
   ppr (MetaStruct es) = text "!{ " <> ppCommaJoin es <> char '}'
 
@@ -77,7 +86,7 @@ data MetaAnnot = MetaAnnot LMString MetaExpr
 data MetaDecl
     -- | Named metadata. Only used for communicating module information to
     -- LLVM. ('!name = !{ [!<n>] }' form).
-    = MetaNamed LMString [Int]
+    = MetaNamed LMString [MetaId]
     -- | Metadata node declaration.
     -- ('!0 = metadata !{ <metadata expression> }' form).
-    | MetaUnamed Int MetaExpr
+    | MetaUnnamed MetaId MetaExpr

@@ -42,7 +42,7 @@ module Llvm (
         i64, i32, i16, i8, i1, i8Ptr, llvmWord, llvmWordPtr,
 
         -- ** Metadata types
-        MetaExpr(..), MetaAnnot(..), MetaDecl(..),
+        MetaExpr(..), MetaAnnot(..), MetaDecl(..), MetaId(..),
 
         -- ** Operations on the type system.
         isGlobal, getLitType, getVarType,
