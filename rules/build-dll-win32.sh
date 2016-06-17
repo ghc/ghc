@@ -17,16 +17,23 @@ process_dll_link() {
     ext="${6##*.}"
     base="${6%.*}"
     exports="$base.lst"
-    nm -g $5 | sed -r 's/^.+\s[A-Z]\s(.+)/\1/' | sed -r 's/^.+:.*$//g' | sed '/^\s*$/d' | sort | uniq -u > $exports
-    SYMBOLS=`cat $exports | wc -l | cut -d' ' -f1`
-    echo "Number of symbols in $6: $SYMBOLS"
+    max=65535
+
+    # Build the DLL first
+    cmd="$7 $5 -o $6"
+    echo "$cmd"
+    eval "$cmd"
+    # rm -f "$6.a"
+
+    # Now measure the DLL
+    nm -g $6 | sed -r 's/^.+\s[A-Z]\s(.+)/\1/' | sed -r 's/^.+:.*$//g' | sed '/^\s*$/d' | sort | uniq -u > $exports
+    SYMBOLS_DLL=`cat $exports | wc -l | cut -d' ' -f1`
+
+    echo "Number of symbols in $6: $SYMBOLS_DLL"
     # Now check that the DLL doesn't have too many symbols. See trac #5987.
-    case $(($SYMBOLS / 65535)) in 
+    case $(($SYMBOLS_DLL / $max)) in
         0) 
             echo DLL $6 OK, no need to split
-            cmd="$7 $5 -o $6"
-            echo "$cmd"
-            eval "$cmd"
             exit 0
             ;;
         [0-9]*) 
@@ -39,9 +46,25 @@ process_dll_link() {
             ;;
     esac
 
+    # We need to know how many symbols came from other static archives
+    # So take the total number of symbols and remove those we know came
+    # from the object files. Use this to lower the max amount of symbols.
+    #
+    # This granularity is the best we can do without --print-map like info.
+    nm -g $5 | sed -r 's/^.+\s[A-Z]\s(.+)/\1/' | sed -r 's/^.+:.*$//g' | sed '/^\s*$/d' | sort | uniq -u > $exports
+    SYMBOLS_OBJ=`cat $exports | wc -l | cut -d' ' -f1`
+    echo "Number of symbols in object files for $6: $SYMBOLS_OBJ"
+    max=$(($max - ($SYMBOLS_DLL - $SYMBOLS_OBJ)))
+    echo "OK, we only have space for $max symbols from object files when building $6"
+
+    if [ "$max" -lt "0" ]
+    then
+        echo "Uhm.. Split is impossible, too many symbols from static archives."
+        exit 1;
+    fi
+
     # First split the dlls up by whole object files
     i=0
-    max=65535
     count=0
     declare -A buffer
     declare -A obj_files
@@ -55,9 +78,10 @@ process_dll_link() {
         
         if [ "$count" -gt "$max" ]
         then
+            echo ">> DLL split at $(($count - $obj_count)) symbols."
             i=$(($i + 1))
-            echo "$buffer"    | sed 's/\s/\n/g' | sed '/^\s*$/d' > "$base-pt$i.lst"
-            echo "$obj_files" | sed 's/\s/\n/g' | sed '/^\s*$/d' > "$base-pt$i.objs"
+            echo "$buffer"    | sed 's/\s/\n/g' | sed '/^\s*$/d' | sort | uniq -u > "$base-pt$i.lst"
+            echo "$obj_files" | sed 's/\s/\n/g' | sed '/^\s*$/d' | sort | uniq -u > "$base-pt$i.objs"
             buffer="$obj_symbols"
             obj_files="$obj"
             count=$obj_count
@@ -69,10 +93,10 @@ process_dll_link() {
 
     # Write the rest in the buffer
     i=$(($i + 1))
-    echo "$buffer"    | sed 's/\s/\n/g' | sed '/^\s*$/d' > "$base-pt$i.lst"
-    echo "$obj_files" | sed 's/\s/\n/g' | sed '/^\s*$/d' > "$base-pt$i.objs"
+    echo "$buffer"    | sed 's/\s/\n/g' | sed '/^\s*$/d' | sort | uniq -u > "$base-pt$i.lst"
+    echo "$obj_files" | sed 's/\s/\n/g' | sed '/^\s*$/d' | sort | uniq -u > "$base-pt$i.objs"
     
-    count=`ls $base-*.lst | wc -l | cut -d' ' -f1`
+    count=$i
     echo "OK, based on the amount of symbols we'll split the DLL into $count"
 
     items=$(seq 1 $count)
@@ -104,7 +128,7 @@ process_dll_link() {
                 imports=`echo "$imports" "$base-pt$j.dll.a"`
             fi
         done
-        cmd="$7 $objs $imports -o $2/$DLLfile"
+        cmd="$7 $objs $def $imports -o $2/$DLLfile"
         echo "$cmd"
         eval "$cmd"
     done
