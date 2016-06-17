@@ -58,11 +58,7 @@ ifeq "$3" "dyn"
 # On windows we have to supply the extra libs this one links to when building it.
 ifeq "$$(HostOS_CPP)" "mingw32"
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
-ifneq "$$($1_$2_$3_LIB0)" ""
-	$$(call build-dll,$1,$2,$3,-L$1/$2/build -l$$($1_$2_$3_LIB0_ROOT),$$(filter-out $$($1_$2_dll0_HS_OBJS),$$($1_$2_$3_HS_OBJS)) $$($1_$2_$3_NON_HS_OBJS),$$@)
-else
-	$$(call build-dll,$1,$2,$3,,$$($1_$2_$3_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS),$$@)
-endif
+$$(call build-dll,$1,$2,$3,-L$1/$2/build ,$$($1_$2_$3_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS),$$@)
 
 else # ifneq "$$(HostOS_CPP)" "mingw32"
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
@@ -100,7 +96,7 @@ $(call all-target,$1_$2_$3,$$($1_$2_$3_LIB))
 ifneq "$4" "0"
 BINDIST_HI += $$($1_$2_$3_HI)
 BINDIST_LIBS += $$($1_$2_$3_LIB)
-BINDIST_LIBS += $$($1_$2_$3_LIB0)
+# Need to put the split libs and import libraries here
 endif
 
 ifeq "$$($1_$2_SplitSections)" "YES"
