@@ -9,9 +9,124 @@ Functions for working with the typechecker environment (setters, getters...).
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module TcRnMonad(
-        module TcRnMonad,
-        module TcRnTypes,
-        module IOEnv
+  -- * Initalisation
+  initTc, initTcInteractive, initTcForLookup, initTcRnIf,
+
+  -- * Simple accessors
+  discardResult,
+  getTopEnv, updTopEnv, getGblEnv, updGblEnv,
+  setGblEnv, getLclEnv, updLclEnv, setLclEnv,
+  getEnvs, setEnvs,
+  xoptM, doptM, goptM, woptM,
+  setXOptM, unsetGOptM, unsetWOptM,
+  whenDOptM, whenGOptM, whenWOptM, whenXOptM,
+  getGhcMode,
+  withDoDynamicToo,
+  getEpsVar,
+  getEps,
+  updateEps, updateEps_,
+  getHpt, getEpsAndHpt,
+
+  -- * Arrow scopes
+  newArrowScope, escapeArrowScope,
+
+  -- * Unique supply
+  newUnique, newUniqueSupply, newLocalName, newName,
+  newSysName, newSysLocalId, newSysLocalIds,
+
+  -- * Accessing input/output
+  newTcRef, readTcRef, writeTcRef, updTcRef,
+
+  -- * Debugging
+  traceTc, traceRn, traceOptTcRn, traceTcRn,
+  getPrintUnqualified,
+  printForUserTcRn,
+  debugDumpTcRn,
+  traceIf, traceHiDiffs, traceOptIf,
+  debugTc,
+
+  -- * Typechecker global environment
+  setModule, getIsGHCi, getGHCiMonad, getInteractivePrintName,
+  tcIsHsBootOrSig, tcSelfBootInfo, getGlobalRdrEnv,
+  getRdrEnvs, getImports,
+  getFixityEnv, extendFixityEnv, getRecFieldEnv,
+  getDeclaredDefaultTys,
+  addDependentFiles,
+
+  -- * Error management
+  getSrcSpanM, setSrcSpan, addLocM,
+  wrapLocM, wrapLocFstM, wrapLocSndM,
+  getErrsVar, setErrsVar,
+  addErr,
+  failWith, failAt,
+  addErrAt, addErrs,
+  checkErr,
+  addMessages,
+  discardWarnings,
+
+  -- * Shared error message stuff: renamer and typechecker
+  mkLongErrAt, mkErrDocAt, addLongErrAt, reportErrors, reportError,
+  reportWarning, recoverM, mapAndRecoverM, mapAndReportM,
+  tryTc,
+  askNoErrs, discardErrs,
+  tryTcErrs, tryTcLIE, tryTcLIE_,
+  checkNoErrs, whenNoErrs,
+  ifErrsM, failIfErrsM,
+  checkTH, failTH,
+
+  -- * Context management for the type checker
+  getErrCtxt, setErrCtxt, addErrCtxt, addErrCtxtM, addLandmarkErrCtxt,
+  addLandmarkErrCtxtM, updCtxt, popErrCtxt, getCtLocM, setCtLocM,
+
+  -- * Error message generation (type checker)
+  addErrTc, addErrsTc,
+  addErrTcM, mkErrTcM,
+  failWithTc, failWithTcM,
+  checkTc, checkTcM,
+  failIfTc, failIfTcM,
+  warnIf, warnTc, warnTcM,
+  addWarnTc, addWarnTcM, addWarn, addWarnAt, add_warn,
+  tcInitTidyEnv, tcInitOpenTidyEnv, mkErrInfo,
+
+  -- * Type constraints
+  newTcEvBinds,
+  addTcEvBind,
+  getTcEvBinds, getTcEvBindsMap,
+  chooseUniqueOccTc,
+  getConstraintVar, setConstraintVar,
+  emitConstraints, emitSimple, emitSimples,
+  emitImplication, emitImplications, emitInsoluble,
+  discardConstraints, captureConstraints,
+  pushLevelAndCaptureConstraints,
+  pushTcLevelM_, pushTcLevelM,
+  getTcLevel, setTcLevel, isTouchableTcM,
+  getLclTypeEnv, setLclTypeEnv,
+  traceTcConstraints, emitWildCardHoleConstraints,
+
+  -- * Template Haskell context
+  recordThUse, recordThSpliceUse, recordTopLevelSpliceLoc,
+  getTopLevelSpliceLocs, keepAlive, getStage, getStageAndBindLevel, setStage,
+
+  -- * Safe Haskell context
+  recordUnsafeInfer, finalSafeMode, fixSafeInstances,
+
+  -- * Stuff for the renamer's local env
+  getLocalRdrEnv, setLocalRdrEnv,
+
+  -- * Stuff for interface decls
+  mkIfLclEnv,
+  initIfaceTcRn,
+  initIfaceCheck,
+  initIfaceTc,
+  initIfaceLcl,
+  getIfModule,
+  failIfM,
+  forkM_maybe,
+  forkM,
+
+  -- * Types etc.
+  module TcRnTypes,
+  module IOEnv
   ) where
 
 #include "HsVersions.h"
@@ -502,12 +617,6 @@ updTcRef :: TcRef a -> (a -> a) -> TcRnIf gbl lcl ()
 -- Returns ()
 updTcRef ref fn = liftIO $ do { old <- readIORef ref
                               ; writeIORef ref (fn old) }
-
-updTcRefX :: TcRef a -> (a -> a) -> TcRnIf gbl lcl a
--- Returns previous value
-updTcRefX ref fn = liftIO $ do { old <- readIORef ref
-                              ; writeIORef ref (fn old)
-                              ; return old }
 
 {-
 ************************************************************************
