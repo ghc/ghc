@@ -72,10 +72,11 @@ data MetaExpr = MetaStr LMString
               deriving (Eq)
 
 instance Outputable MetaExpr where
-  ppr (MetaStr    s ) = text "!\"" <> ftext s <> char '"'
+  ppr (MetaVar (LMLitVar (LMNullLit _))) = text "null"
+  ppr (MetaStr    s ) = char '!' <> doubleQuotes (ftext s)
   ppr (MetaNode   n ) = ppr n
   ppr (MetaVar    v ) = ppr v
-  ppr (MetaStruct es) = text "!{ " <> ppCommaJoin es <> char '}'
+  ppr (MetaStruct es) = char '!' <> braces (ppCommaJoin es)
 
 -- | Associates some metadata with a specific label for attaching to an
 -- instruction.

@@ -107,21 +107,12 @@ ppLlvmMetas metas = vcat $ map ppLlvmMeta metas
 -- | Print out an LLVM metadata definition.
 ppLlvmMeta :: MetaDecl -> SDoc
 ppLlvmMeta (MetaUnnamed n m)
-  = ppr n <> text " = " <> ppLlvmMetaExpr m
+  = ppr n <+> equals <+> ppr m
 
 ppLlvmMeta (MetaNamed n m)
-  = exclamation <> ftext n <> text " = !" <> braces nodes
+  = exclamation <> ftext n <+> equals <+> exclamation <> braces nodes
   where
     nodes = hcat $ intersperse comma $ map ppr m
-
--- | Print out an LLVM metadata value.
-ppLlvmMetaExpr :: MetaExpr -> SDoc
-ppLlvmMetaExpr (MetaVar (LMLitVar (LMNullLit _))) = text "null"
-ppLlvmMetaExpr (MetaStr    s ) = text "!" <> doubleQuotes (ftext s)
-ppLlvmMetaExpr (MetaNode   n ) = ppr n
-ppLlvmMetaExpr (MetaVar    v ) = ppr v
-ppLlvmMetaExpr (MetaStruct es) =
-    text "!{" <> hsep (punctuate comma (map ppLlvmMetaExpr es)) <> char '}'
 
 
 -- | Print out a list of function definitions.
