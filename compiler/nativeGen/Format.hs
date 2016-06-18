@@ -57,7 +57,9 @@ intFormat width
         W16     -> II16
         W32     -> II32
         W64     -> II64
-        other   -> pprPanic "Format.intFormat" (ppr other)
+        other   -> sorry $ "The native code generator cannot " ++
+            "produce code for Format.intFormat " ++ show other
+            ++ "\n\tConsider using the llvm backend with -fllvm"
 
 
 -- | Get the float format of this width.
