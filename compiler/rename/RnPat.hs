@@ -636,7 +636,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
     find_tycon :: GlobalRdrEnv -> Name {- DataCon -} -> Maybe Name {- TyCon -}
     -- Return the parent *type constructor* of the data constructor
     -- (that is, the parent of the data constructor),
-    -- or 'Nothing' if it is a pattern synonym.
+    -- or 'Nothing' if it is a pattern synonym or not in scope.
     -- That's the parent to use for looking up record fields.
     find_tycon env con
       | Just (AConLike (RealDataCon dc)) <- wiredInNameTyThing_maybe con
@@ -648,8 +648,9 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
           ParentIs p -> Just p
           _          -> Nothing
 
-      | otherwise
-      = pprPanic "find_tycon" (ppr con $$ ppr (lookupGRE_Name env con))
+      | otherwise = Nothing
+        -- This can happen if the datacon is not in scope
+        -- and we are in a TH splice (Trac #12130)
 
     dup_flds :: [[RdrName]]
         -- Each list represents a RdrName that occurred more than once

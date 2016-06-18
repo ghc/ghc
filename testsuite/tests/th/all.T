@@ -408,3 +408,5 @@ test('T11680', normal, compile_fail, ['-v0'])
 test('T11809', normal, compile, ['-v0'])
 test('T11797', normal, compile, ['-v0 -dsuppress-uniques'])
 test('T11941', normal, compile_fail, ['-v0'])
+test('T12130', extra_clean(['T12130a.hi','T12130a.o']),
+              multimod_compile, ['T12130', '-v0 ' + config.ghc_th_way_flags])
