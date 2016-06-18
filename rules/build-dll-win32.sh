@@ -19,21 +19,29 @@ process_dll_link() {
     exports="$base.lst"
     max=65535
 
-    # Build the DLL first
-    cmd="$7 $5 -o $6"
-    echo "$cmd"
-    eval "$cmd"
-    # rm -f "$6.a"
-
-    # Now measure the DLL
-    nm -g $6 | sed -r 's/^.+\s[A-Z]\s(.+)/\1/' | sed -r 's/^.+:.*$//g' | sed '/^\s*$/d' | sort | uniq -u > $exports
-    SYMBOLS_DLL=`cat $exports | wc -l | cut -d' ' -f1`
+    # We need to know how many symbols came from other static archives
+    # So take the total number of symbols and remove those we know came
+    # from the object files. Use this to lower the max amount of symbols.
+    #
+    # This granularity is the best we can do without --print-map like info.
+    nm -g $5 | sed -nr 's/^[a-z,A-Z,0-9]+\s[A-Z]\s(.+)$/\1/p' | sed -r 's/^.+:.*$//g' | sed '/^\s*$/d' | sort | uniq -u > $exports
+    SYMBOLS_OBJ=`cat $exports | wc -l | cut -d' ' -f1`
+    echo "Number of symbols in object files for $6: $SYMBOLS_OBJ"
 
     echo "Number of symbols in $6: $SYMBOLS_DLL"
     # Now check that the DLL doesn't have too many symbols. See trac #5987.
-    case $(($SYMBOLS_DLL / $max)) in
+    case $(($SYMBOLS_OBJ / $max)) in
         0)
             echo DLL $6 OK, no need to split
+            defFile="$base.def"
+            # Create a def file hiding symbols not in original object files
+            # because --export-all is re-exporting things from static libs
+            awk -v root="$defFile" '{def=root;}{print "    \"" $0 "\""> def}' $exports
+            sed -i "1i\LIBRARY \"${6##*/}\"\\nEXPORTS" $defFile
+            
+            cmd="$7 $5 $defFile -o $6"
+            echo "$cmd"
+            eval "$cmd" || exit 1
             exit 0
             ;;
         [0-9]*)
@@ -46,22 +54,7 @@ process_dll_link() {
             ;;
     esac
 
-    # We need to know how many symbols came from other static archives
-    # So take the total number of symbols and remove those we know came
-    # from the object files. Use this to lower the max amount of symbols.
-    #
-    # This granularity is the best we can do without --print-map like info.
-    nm -g $5 | sed -r 's/^.+\s[A-Z]\s(.+)/\1/' | sed -r 's/^.+:.*$//g' | sed '/^\s*$/d' | sort | uniq -u > $exports
-    SYMBOLS_OBJ=`cat $exports | wc -l | cut -d' ' -f1`
-    echo "Number of symbols in object files for $6: $SYMBOLS_OBJ"
-    max=$(($max - ($SYMBOLS_DLL - $SYMBOLS_OBJ)))
     echo "OK, we only have space for $max symbols from object files when building $6"
-
-    if [ "$max" -lt "0" ]
-    then
-        echo "Uhm.. Split is impossible, too many symbols from static archives."
-        exit 1;
-    fi
 
     # First split the dlls up by whole object files
     i=0
@@ -71,7 +64,7 @@ process_dll_link() {
 
     for obj in $5
     do
-        obj_symbols=`nm -g $obj | sed -r 's/^.+\s[A-Z]\s(.+)/\1/' | sed -r 's/^.+:.*$//g' | sed '/^\s*$/d'`
+        obj_symbols=`nm -g $obj | sed -nr 's/^[a-z,A-Z,0-9]+\s[A-Z]\s(.+)$/\1/p' | sed -r 's/^.+:.*$//g' | sed '/^\s*$/d'`
         obj_count=`echo $obj_symbols | wc -w | cut -d' ' -f1`
         echo "Using $obj ($obj_count)"
         count=$(($count + $obj_count))
@@ -130,7 +123,7 @@ process_dll_link() {
         done
         cmd="$7 $objs $def $imports -o $2/$DLLfile"
         echo "$cmd"
-        eval "$cmd"
+        eval "$cmd" || exit 1
     done
 
     # do some cleanup and create merged lib
