@@ -217,3 +217,9 @@ test('ffi023', [ omit_ways(['ghci']),
                 # ffi023_stub.h before compiling ffi023_c.c, which
                 # needs it.
               compile_and_run, ['ffi023_c.c'])
+
+test('T12134',
+     [omit_ways(['ghci']), extra_clean(['T12134_c.o'])],
+     compile_and_run,
+     ['T12134_c.c'])
+

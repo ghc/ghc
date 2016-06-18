@@ -263,7 +263,10 @@ allFPArgRegs platform
     = case platformOS platform of
       OSAIX    -> map (regSingle . fReg) [1..13]
       OSDarwin -> map (regSingle . fReg) [1..13]
-      OSLinux  -> map (regSingle . fReg) [1..8]
+      OSLinux  -> case platformArch platform of
+        ArchPPC      -> map (regSingle . fReg) [1..8]
+        ArchPPC_64 _ -> map (regSingle . fReg) [1..13]
+        _            -> panic "PPC.Regs.allFPArgRegs: unknown PPC Linux"
       _        -> panic "PPC.Regs.allFPArgRegs: not defined for this architecture"
 
 fits16Bits :: Integral a => a -> Bool
