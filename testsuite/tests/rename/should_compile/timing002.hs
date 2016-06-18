@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-tabs #-}
 -- !!! 500 defns chained together with "where"s
 module Main(main) where
 

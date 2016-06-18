@@ -92,8 +92,7 @@ test('ghci056',
      ],
      ghci_script, ['ghci056.script'])
 
-test('ghci057', extra_hc_opts('-fwarn-tabs'), ghci_script, ['ghci057.script'])
-
+test('ghci057', normal, ghci_script, ['ghci057.script'])
 test('ghci060', normal, ghci_script, ['ghci060.script'])
 test('ghci061', normal, ghci_script, ['ghci061.script'])
 
@@ -203,7 +202,7 @@ test('T9181', normal, ghci_script, ['T9181.script'])
 test('T9086b', normal, ghci_script, ['T9086b.script'])
 test('T9140', combined_output, ghci_script, ['T9140.script'])
 test('T9658', normal, ghci_script, ['T9658.script'])
-test('T9293', extra_hc_opts('-fwarn-tabs'), ghci_script, ['T9293.script'])
+test('T9293', normal, ghci_script, ['T9293.script'])
 test('T9762',
  [ unless(have_dynamic(),skip)
  , pre_cmd('$MAKE -s --no-print-directory T9762_prep')

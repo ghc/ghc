@@ -1006,8 +1006,8 @@ def run_command( name, way, cmd ):
 # -----------------------------------------------------------------------------
 # GHCi tests
 
-def ghci_script( name, way, script, override_flags = None ):
-    flags = ' '.join(get_compiler_flags(override_flags))
+def ghci_script( name, way, script):
+    flags = ' '.join(get_compiler_flags())
 
     way_flags = ' '.join(config.way_flags(name)[way])
 
@@ -1021,32 +1021,6 @@ def ghci_script( name, way, script, override_flags = None ):
 
 # -----------------------------------------------------------------------------
 # Compile-only tests
-
-def compile_override_default_flags(overrides):
-    def apply(name, way, extra_opts):
-        return do_compile(name, way, 0, '', [], extra_opts, overrides)
-
-    return apply
-
-def compile_fail_override_default_flags(overrides):
-    def apply(name, way, extra_opts):
-        return do_compile(name, way, 1, '', [], extra_opts, overrides)
-
-    return apply
-
-def compile_without_flag(flag):
-    def apply(name, way, extra_opts):
-        overrides = [f for f in getTestOpts().compiler_always_flags if f != flag]
-        return compile_override_default_flags(overrides)(name, way, extra_opts)
-
-    return apply
-
-def compile_fail_without_flag(flag):
-    def apply(name, way, extra_opts):
-        overrides = [f for f in getTestOpts.compiler_always_flags if f != flag]
-        return compile_fail_override_default_flags(overrides)(name, way, extra_opts)
-
-    return apply
 
 def compile( name, way, extra_hc_opts ):
     return do_compile( name, way, 0, '', [], extra_hc_opts )
@@ -1066,7 +1040,7 @@ def multi_compile( name, way, top_mod, extra_mods, extra_hc_opts ):
 def multi_compile_fail( name, way, top_mod, extra_mods, extra_hc_opts ):
     return do_compile( name, way, 1, top_mod, extra_mods, extra_hc_opts)
 
-def do_compile( name, way, should_fail, top_mod, extra_mods, extra_hc_opts, override_flags = None ):
+def do_compile(name, way, should_fail, top_mod, extra_mods, extra_hc_opts):
     # print 'Compile only, extra args = ', extra_hc_opts
 
     result = extras_build( way, extra_mods, extra_hc_opts )
@@ -1074,7 +1048,7 @@ def do_compile( name, way, should_fail, top_mod, extra_mods, extra_hc_opts, over
        return result
     extra_hc_opts = result['hc_opts']
 
-    result = simple_build(name, way, extra_hc_opts, should_fail, top_mod, 0, 1, override_flags)
+    result = simple_build(name, way, extra_hc_opts, should_fail, top_mod, 0, 1)
 
     if badResult(result):
         return result
@@ -1222,7 +1196,7 @@ def extras_build( way, extra_mods, extra_hc_opts ):
 
     return {'passFail' : 'pass', 'hc_opts' : extra_hc_opts}
 
-def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, override_flags=None):
+def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf):
     opts = getTestOpts()
     errname = add_suffix(name, 'comp.stderr')
 
@@ -1262,8 +1236,7 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, o
     else:
         cmd_prefix = getTestOpts().compile_cmd_prefix + ' '
 
-    flags = ' '.join(get_compiler_flags(override_flags) +
-                     config.way_flags(name)[way])
+    flags = ' '.join(get_compiler_flags() + config.way_flags(name)[way])
 
     cmd = ('cd "{opts.testdir}" && {cmd_prefix} '
            '{{compiler}} {to_do} {srcname} {flags} {extra_hc_opts} '
@@ -1437,8 +1410,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
     if os.path.exists(stdin_file):
         os.system('cat "{0}" >> "{1}"'.format(stdin_file, qscriptname))
 
-    flags = ' '.join(get_compiler_flags() +
-                     config.way_flags(name)[way])
+    flags = ' '.join(get_compiler_flags() + config.way_flags(name)[way])
 
     if getTestOpts().combined_output:
         redirection        = ' > {0} 2>&1'.format(outname)
@@ -1505,13 +1477,10 @@ def split_file(in_fn, delimiter, out1_fn, out2_fn):
 
 # -----------------------------------------------------------------------------
 # Utils
-def get_compiler_flags(override_flags=None):
+def get_compiler_flags():
     opts = getTestOpts()
 
-    if override_flags is not None:
-        flags = copy.copy(override_flags)
-    else:
-        flags = copy.copy(opts.compiler_always_flags)
+    flags = copy.copy(opts.compiler_always_flags)
 
     flags.append(opts.extra_hc_opts)
 

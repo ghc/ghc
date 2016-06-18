@@ -38,14 +38,6 @@ TEST_HC_OPTS = -dcore-lint -dcmm-lint -dno-debug-output -no-user-$(GhcPackageDbF
 
 TEST_HC_OPTS_INTERACTIVE = $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci
 
-# The warning suppression flag below is a temporary kludge. While working with
-# tests that contain tabs, please de-tab them so this flag can be eventually
-# removed. See
-# http://ghc.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
-# for details
-#
-TEST_HC_OPTS += -fno-warn-tabs
-
 ifeq "$(MinGhcVersion711)" "YES"
 # Don't warn about missing specialisations. They can only occur with `-O`, but
 # we want tests to produce the same output for all test ways.
