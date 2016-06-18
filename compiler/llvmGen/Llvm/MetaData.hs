@@ -65,9 +65,9 @@ instance Outputable MetaId where
     ppr (MetaId n) = char '!' <> int n
 
 -- | LLVM metadata expressions
-data MetaExpr = MetaStr LMString
-              | MetaNode MetaId
-              | MetaVar LlvmVar
+data MetaExpr = MetaStr !LMString
+              | MetaNode !MetaId
+              | MetaVar !LlvmVar
               | MetaStruct [MetaExpr]
               deriving (Eq)
 
@@ -87,7 +87,7 @@ data MetaAnnot = MetaAnnot LMString MetaExpr
 data MetaDecl
     -- | Named metadata. Only used for communicating module information to
     -- LLVM. ('!name = !{ [!<n>] }' form).
-    = MetaNamed LMString [MetaId]
+    = MetaNamed !LMString [MetaId]
     -- | Metadata node declaration.
     -- ('!0 = metadata !{ <metadata expression> }' form).
-    | MetaUnnamed MetaId MetaExpr
+    | MetaUnnamed !MetaId !MetaExpr
