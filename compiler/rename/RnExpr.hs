@@ -1765,19 +1765,23 @@ needJoin [L loc (LastStmt e _ t)]
  | Just arg <- isReturnApp e = (False, [L loc (LastStmt arg True t)])
 needJoin stmts = (True, stmts)
 
--- | @Just e@, if the expression is @return e@, otherwise @Nothing@
+-- | @Just e@, if the expression is @return e@ or @return $ e@,
+-- otherwise @Nothing@
 isReturnApp :: LHsExpr Name -> Maybe (LHsExpr Name)
 isReturnApp (L _ (HsPar expr)) = isReturnApp expr
-isReturnApp (L _ (HsApp f arg))
-  | is_return f = Just arg
-  | otherwise = Nothing
+isReturnApp (L _ e) = case e of
+  OpApp l op _ r | is_return l, is_dollar op -> Just r
+  HsApp f arg    | is_return f               -> Just arg
+  _otherwise -> Nothing
  where
-  is_return (L _ (HsPar e)) = is_return e
-  is_return (L _ (HsAppType e _)) = is_return e
-  is_return (L _ (HsVar (L _ r))) = r == returnMName || r == pureAName
+  is_var f (L _ (HsPar e)) = is_var f e
+  is_var f (L _ (HsAppType e _)) = is_var f e
+  is_var f (L _ (HsVar (L _ r))) = f r
        -- TODO: I don't know how to get this right for rebindable syntax
-  is_return _ = False
-isReturnApp _ = Nothing
+  is_var _ _ = False
+
+  is_return = is_var (\n -> n == returnMName || n == pureAName)
+  is_dollar = is_var (`hasKey` dollarIdKey)
 
 {-
 ************************************************************************
