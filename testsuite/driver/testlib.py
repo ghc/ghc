@@ -7,7 +7,6 @@ from __future__ import print_function
 
 import io
 import shutil
-import sys
 import os
 import errno
 import string
@@ -675,7 +674,6 @@ def get_package_cache_timestamp():
         except:
             return 0.0
 
-
 def test_common_work (name, opts, func, args):
     try:
         t.total_tests = t.total_tests+1
@@ -745,8 +743,11 @@ def test_common_work (name, opts, func, args):
                 files.update((os.path.relpath(f, opts.srcdir)
                             for f in glob.iglob(in_srcdir(filename))))
 
-            else:
+            elif filename:
                 files.add(filename)
+
+            else:
+                framework_fail(name, 'whole-test', 'extra_file is empty string')
 
         # Run the required tests...
         for way in do_ways:
@@ -766,16 +767,6 @@ def test_common_work (name, opts, func, args):
         if package_conf_cache_file_start_timestamp != package_conf_cache_file_end_timestamp:
             framework_fail(name, 'whole-test', 'Package cache timestamps do not match: ' + str(package_conf_cache_file_start_timestamp) + ' ' + str(package_conf_cache_file_end_timestamp))
 
-        try:
-            for f in files_written[name]:
-                if os.path.exists(f):
-                    try:
-                        if not f in files_written_not_removed[name]:
-                            files_written_not_removed[name].append(f)
-                    except:
-                        files_written_not_removed[name] = [f]
-        except:
-            pass
     except Exception as e:
         framework_fail(name, 'runTest', 'Unhandled exception: ' + str(e))
 
@@ -1009,7 +1000,7 @@ def run_command( name, way, cmd ):
 def ghci_script( name, way, script):
     flags = ' '.join(get_compiler_flags())
 
-    way_flags = ' '.join(config.way_flags(name)[way])
+    way_flags = ' '.join(config.way_flags[way])
 
     # We pass HC and HC_OPTS as environment variables, so that the
     # script can invoke the correct compiler by using ':! $HC $HC_OPTS'
@@ -1202,21 +1193,17 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf):
 
     if top_mod != '':
         srcname = top_mod
-        base, suf = os.path.splitext(top_mod)
     elif addsuf:
         srcname = add_hs_lhs_suffix(name)
     else:
         srcname = name
 
-    to_do = ''
     if top_mod != '':
         to_do = '--make '
         if link:
             to_do = to_do + '-o ' + name
     elif link:
         to_do = '-o ' + name
-    elif opts.compile_to_hc:
-        to_do = '-C'
     else:
         to_do = '-c' # just compile
 
@@ -1236,7 +1223,7 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf):
     else:
         cmd_prefix = getTestOpts().compile_cmd_prefix + ' '
 
-    flags = ' '.join(get_compiler_flags() + config.way_flags(name)[way])
+    flags = ' '.join(get_compiler_flags() + config.way_flags[way])
 
     cmd = ('cd "{opts.testdir}" && {cmd_prefix} '
            '{{compiler}} {to_do} {srcname} {flags} {extra_hc_opts} '
@@ -1410,7 +1397,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
     if os.path.exists(stdin_file):
         os.system('cat "{0}" >> "{1}"'.format(stdin_file, qscriptname))
 
-    flags = ' '.join(get_compiler_flags() + config.way_flags(name)[way])
+    flags = ' '.join(get_compiler_flags() + config.way_flags[way])
 
     if getTestOpts().combined_output:
         redirection        = ' > {0} 2>&1'.format(outname)
@@ -1455,7 +1442,6 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
         return passed()
     else:
         return failBecause('bad stdout or stderr')
-
 
 def split_file(in_fn, delimiter, out1_fn, out2_fn):
     # See Note [Universal newlines].
@@ -1997,7 +1983,6 @@ def find_expected_file(name, suff):
 
 def cleanup():
     shutil.rmtree(getTestOpts().testdir, ignore_errors=True)
-
 
 # -----------------------------------------------------------------------------
 # Return a list of all the files ending in '.T' below directories roots.

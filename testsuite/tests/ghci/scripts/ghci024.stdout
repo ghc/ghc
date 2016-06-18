@@ -6,6 +6,7 @@ with the following modifiers:
   -XNondecreasingIndentation
 GHCi-specific dynamic flag settings:
 other dynamic, non-language, flag settings:
+  -fno-ghci-history
   -fimplicit-import-qualified
   -fshow-warning-groups
 warning settings:

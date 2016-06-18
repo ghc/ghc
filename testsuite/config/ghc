@@ -1,5 +1,4 @@
 import re
-import subprocess
 
 # Testsuite configuration setup for GHC
 #
@@ -36,24 +35,12 @@ if (ghc_with_native_codegen == 1):
     config.compile_ways.append('optasm')
     config.run_ways.append('optasm')
 
-config.compiler_debugged = ghc_debugged
-
-if (ghc_with_vanilla == 1):
-    config.have_vanilla = True
-
-if (ghc_with_dynamic == 1):
-    config.have_dynamic = True
-
-if (ghc_with_profiling == 1):
-    config.have_profiling = True
+if config.have_profiling:
     config.compile_ways.append('profasm')
     config.run_ways.append('profasm')
 
-if (ghc_with_interpreter == 1):
-    config.have_interp = True
+if config.have_interp:
     config.run_ways.append('ghci')
-
-config.unregisterised = (ghc_unregisterised == 1)
 
 if (ghc_with_threaded_rts == 1):
     config.run_ways.append('threaded1')
@@ -64,25 +51,20 @@ if (ghc_with_threaded_rts == 1):
 if (ghc_with_dynamic_rts == 1):
     config.have_shared_libs = True
 
-config.ghc_dynamic_by_default = ghc_dynamic_by_default
-if ghc_dynamic_by_default and ghc_with_vanilla == 1:
+if config.ghc_dynamic_by_default and config.have_vanilla == 1:
     config.run_ways.append('static')
 else:
     if (ghc_with_dynamic_rts == 1):
         config.run_ways.append('dyn')
 
-config.ghc_dynamic = ghc_dynamic
-
-if (ghc_with_profiling == 1 and ghc_with_threaded_rts == 1):
+if (config.have_profiling and ghc_with_threaded_rts == 1):
     config.run_ways.append('profthreaded')
 
 if (ghc_with_llvm == 1):
     config.compile_ways.append('optllvm')
     config.run_ways.append('optllvm')
 
-config.in_tree_compiler = in_tree_compiler
-
-config.way_flags = lambda name : {
+config.way_flags = {
     'normal'       : [],
     'normal_h'     : [],
     'g1'           : [],
@@ -95,12 +77,12 @@ config.way_flags = lambda name : {
     'prof'         : ['-prof', '-static', '-fprof-auto', '-fasm'],
     'profasm'      : ['-O', '-prof', '-static', '-fprof-auto'],
     'profthreaded' : ['-O', '-prof', '-static', '-fprof-auto', '-threaded'],
-    'ghci'         : ['--interactive', '-v0', '-ignore-dot-ghci', '+RTS', '-I0.1', '-RTS'],
+    'ghci'         : ['--interactive', '-v0', '-ignore-dot-ghci', '-fno-ghci-history', '+RTS', '-I0.1', '-RTS'],
     'threaded1'    : ['-threaded', '-debug'],
     'threaded1_ls' : ['-threaded', '-debug'],
     'threaded2'    : ['-O', '-threaded', '-eventlog'],
     'threaded2_hT' : ['-O', '-threaded'],
-    'hpc'          : ['-O', '-fhpc', '-hpcdir', '.hpc.' + name ],
+    'hpc'          : ['-O', '-fhpc'],
     'prof_hc_hb'   : ['-O', '-prof', '-static', '-fprof-auto'],
     'prof_hb'      : ['-O', '-prof', '-static', '-fprof-auto'],
     'prof_hd'      : ['-O', '-prof', '-static', '-fprof-auto'],
@@ -113,7 +95,7 @@ config.way_flags = lambda name : {
     'profllvm'         : ['-prof', '-static', '-fprof-auto', '-fllvm'],
     'profoptllvm'      : ['-O', '-prof', '-static', '-fprof-auto', '-fllvm'],
     'profthreadedllvm' : ['-O', '-prof', '-static', '-fprof-auto', '-threaded', '-fllvm'],
-    'ghci-ext'         : ['--interactive', '-v0', '-ignore-dot-ghci', '-fexternal-interpreter', '+RTS', '-I0.1', '-RTS'],
+    'ghci-ext'         : ['--interactive', '-v0', '-ignore-dot-ghci', '-fno-ghci-history', '-fexternal-interpreter', '+RTS', '-I0.1', '-RTS'],
    }
 
 config.way_rts_flags = {
@@ -153,16 +135,16 @@ config.way_rts_flags = {
 # Useful classes of ways that can be used with only_ways(), omit_ways() and
 # expect_broken_for().
 
-prof_ways     = [x[0] for x in config.way_flags('dummy_name').items()
+prof_ways     = [x[0] for x in config.way_flags.items()
                       if '-prof' in x[1]]
 
-threaded_ways = [x[0] for x in config.way_flags('dummy_name').items()
+threaded_ways = [x[0] for x in config.way_flags.items()
                       if '-threaded' in x[1] or 'ghci' == x[0]]
 
-opt_ways      = [x[0] for x in config.way_flags('dummy_name').items()
+opt_ways      = [x[0] for x in config.way_flags.items()
                       if '-O' in x[1]]
 
-llvm_ways     = [x[0] for x in config.way_flags('dummy_name').items()
+llvm_ways     = [x[0] for x in config.way_flags.items()
                       if '-fflvm' in x[1]]
 
 def get_compiler_info():
@@ -176,15 +158,6 @@ def get_compiler_info():
     # See Note [Replacing backward slashes in config.libdir].
     config.libdir = compilerInfoDict['LibDir'].replace('\\', '/')
 
-    v = compilerInfoDict["Project version"]
-    config.compiler_version = v
-    config.compiler_maj_version = re.sub('^([0-9]+\.[0-9]+).*',r'\1', v)
-
-    # -fno-ghci-history was added in 7.3
-    if version_ge(config.compiler_version, '7.3'):
-       config.compiler_always_flags = \
-          config.compiler_always_flags + ['-fno-ghci-history']
-
     if re.match(".*_p(_.*|$)", rtsInfoDict["RTS way"]):
         config.compiler_profiled = True
     else:
@@ -195,19 +168,8 @@ def get_compiler_info():
     except:
         config.package_conf_cache_file = ''
 
-    try:
-        if compilerInfoDict["GHC Dynamic"] == "YES":
-            ghcDynamic = True
-        elif compilerInfoDict["GHC Dynamic"] == "NO":
-            ghcDynamic = False
-        else:
-            raise 'Bad value for "GHC Dynamic"'
-    except KeyError:
-        # GHC < 7.7 doesn't have a "GHC Dynamic" field
-        ghcDynamic = False
-
     # See Note [WayFlags]
-    if ghcDynamic:
+    if config.ghc_dynamic:
         config.ghc_th_way_flags = "-dynamic"
         config.ghci_way_flags   = "-dynamic"
         config.plugin_way_flags = "-dynamic"

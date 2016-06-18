@@ -12,21 +12,17 @@ test('arith006', normal, compile_and_run, [''])
 test('arith007', normal, compile_and_run, [''])
 
 # On i386, we need -msse2 to get reliable floating point results
-ways = normal
-opts = ''
-if config.platform.startswith('i386-'):
-    if version_ge(config.compiler_version, '6.13'):
-        opts = '-msse2'
-    else:
-        ways = expect_fail_for(['optasm','threaded2','hpc','dyn','profasm'])
-
-test('arith008', ways, compile_and_run, [opts])
+if config.arch == 'i386':
+    opts = '-msse2'
+else:
+    opts = ''
+test('arith008', normal, compile_and_run, [opts])
 
 test('arith009', normal, compile_and_run, [''])
 test('arith010', normal, compile_and_run, [''])
 test('arith011', normal, compile_and_run, [''])
 
-test('arith012', ways, compile_and_run, [opts])
+test('arith012', normal, compile_and_run, [opts])
 
 test('arith013', normal, compile_and_run, [''])
 test('arith014', normal, compile_and_run, [''])

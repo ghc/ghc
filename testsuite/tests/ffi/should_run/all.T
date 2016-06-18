@@ -47,17 +47,12 @@ test('ffi007', omit_ways(['ghci']), compile_and_run, [''])
 test('ffi008', [exit_code(1), omit_ways(['ghci'])], compile_and_run, [''])
 
 # On i386, we need -msse2 to get reliable floating point results
-maybe_skip = normal
-opts = ''
 if config.platform.startswith('i386-'):
-    if version_ge(config.compiler_version, '6.13'):
-        opts = '-msse2'
-    else:
-        maybe_skip = only_ways(['ghci'])
+    opts = '-msse2'
+else:
+    opts = ''
 
-test('ffi009', [when(fast(), skip),
-                reqlib('random'),
-                maybe_skip] ,compile_and_run, [opts])
+test('ffi009', [when(fast(), skip), reqlib('random')], compile_and_run, [opts])
 
 test('ffi010', normal, compile_and_run, [''])
 test('ffi011', normal, compile_and_run, [''])

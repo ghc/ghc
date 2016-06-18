@@ -1,8 +1,4 @@
-def f(name, opts):
-    if (ghc_with_interpreter == 0):
-        opts.skip = 1
-
-setTestOpts(f)
+setTestOpts(req_interp)
 
 test('plugins01',
      [pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins01 TOP={top}'),

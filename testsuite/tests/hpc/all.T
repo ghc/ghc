@@ -13,7 +13,7 @@ setTestOpts(only_ways(['hpc']))
 def T2991(cmd):
   # The .mix file for the literate module should have non-zero entries.
   # The `grep` should exit with exit code 0.
-  return(cmd + " && grep -q cover_me .hpc.T2991/T2991LiterateModule.mix")
+  return(cmd + " && grep -q cover_me .hpc/T2991LiterateModule.mix")
 test('T2991', [cmd_wrapper(T2991), extra_clean(['T2991LiterateModule.hi',
                                                 'T2991LiterateModule.o'])],
               # Run with 'ghc --main'. Do not list other modules explicitly.

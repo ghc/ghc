@@ -68,10 +68,6 @@ class TestConfig:
         # Is self.compiler a stage 1, 2 or 3 compiler?
         self.stage = 2
 
-        # Compiler version info
-        self.compiler_version = ''
-        self.compiler_maj_version = ''
-
         # Flags we always give to this compiler
         self.compiler_always_flags = []
         
@@ -189,9 +185,6 @@ class TestOptions:
 
        # don't give anything as stdin
        self.no_stdin = 0
-
-       # compile this test to .hc only
-       self.compile_to_hc = 0
 
        # We sometimes want to modify the compiler_always_flags, so
        # they are copied from config.compiler_always_flags when we
