@@ -269,7 +269,7 @@ if [ $be_quiet -eq 1 ] && [ -z $VERBOSE ]; then
     TEST_VERBOSITY="VERBOSE=1"
 fi
 
-rm testsuite_summary.txt testsuite_summary_stage1.txt
+rm -f testsuite_summary.txt testsuite_summary_stage1.txt
 
 # Use LOCAL=0, see Note [Running tests in /tmp].
 $make -C testsuite/tests $BINDIST \
