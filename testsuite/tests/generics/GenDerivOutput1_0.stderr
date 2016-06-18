@@ -2,25 +2,26 @@
 ==================== Derived instances ====================
 Derived instances:
   instance GHC.Generics.Generic1 GenDerivOutput1_0.List where
-    GHC.Generics.from1 GenDerivOutput1_0.Nil
+    GHC.Generics.from1 x
       = GHC.Generics.M1
-          (GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1))
-    GHC.Generics.from1 (GenDerivOutput1_0.Cons g1 g2)
-      = GHC.Generics.M1
-          (GHC.Generics.R1
-             (GHC.Generics.M1
-                ((GHC.Generics.:*:)
-                   (GHC.Generics.M1 (GHC.Generics.Par1 g1))
-                   (GHC.Generics.M1 (GHC.Generics.Rec1 g2)))))
-    GHC.Generics.to1
-      (GHC.Generics.M1 (GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)))
-      = GenDerivOutput1_0.Nil
-    GHC.Generics.to1
-      (GHC.Generics.M1 (GHC.Generics.R1 (GHC.Generics.M1 ((GHC.Generics.:*:) (GHC.Generics.M1 g1)
-                                                                             (GHC.Generics.M1 g2)))))
-      = GenDerivOutput1_0.Cons
-          (GHC.Generics.unPar1 g1) (GHC.Generics.unRec1 g2)
-
+          (case x of {
+             GenDerivOutput1_0.Nil
+               -> GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)
+             GenDerivOutput1_0.Cons g1 g2
+               -> GHC.Generics.R1
+                    (GHC.Generics.M1
+                       ((GHC.Generics.:*:)
+                          (GHC.Generics.M1 (GHC.Generics.Par1 g1))
+                          (GHC.Generics.M1 (GHC.Generics.Rec1 g2)))) })
+    GHC.Generics.to1 (GHC.Generics.M1 x)
+      = case x of {
+          GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)
+            -> GenDerivOutput1_0.Nil
+          GHC.Generics.R1 (GHC.Generics.M1 ((GHC.Generics.:*:) (GHC.Generics.M1 g1)
+                                                               (GHC.Generics.M1 g2)))
+            -> GenDerivOutput1_0.Cons
+                 (GHC.Generics.unPar1 g1) (GHC.Generics.unRec1 g2) }
+  
 
 GHC.Generics representation types:
   type GHC.Generics.Rep1 GenDerivOutput1_0.List = GHC.Generics.D1
