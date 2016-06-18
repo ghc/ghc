@@ -5,5 +5,5 @@ module ShouldCompile where
 
 f x = y
     where (y,z) | y < z     = (0,1)
-    	    	| y > z     = (1,2)
-		| True	    = (2,3)
+                | y > z     = (1,2)
+                | True      = (2,3)

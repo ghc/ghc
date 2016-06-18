@@ -14,7 +14,7 @@ In Hugs(January 1998), one gets
 where line 32 is the one marked -- ##
 
 It compiles in ghc-3.00.  Changing very small things, like the
-line marked ---**** to 
+line marked ---**** to
       action_0 (6) = happyShift action_0        ---****
 
 then makes ghc produce a similar message:
@@ -27,11 +27,11 @@ then makes ghc produce a similar message:
 module ShouldSucceed where
 
 data HappyAbsSyn t1 t2 t3
-	= HappyTerminal Token
-	| HappyErrorToken Int
-	| HappyAbsSyn1 t1
-	| HappyAbsSyn2 t2
-	| HappyAbsSyn3 t3
+        = HappyTerminal Token
+        | HappyErrorToken Int
+        | HappyAbsSyn1 t1
+        | HappyAbsSyn2 t2
+        | HappyAbsSyn3 t3
 
 action_0 (6) = happyShift action_3        --- *****
 action_0 (1) = happyGoto action_1
@@ -56,38 +56,38 @@ action_6 _ = happyReduce_3
 
 happyReduce_1 = happySpecReduce_1 1 reduction where {    -- ##
   reduction
-	(HappyAbsSyn2  happy_var_1)
-	 =  HappyAbsSyn1
-		 (\p -> let q = map (\(x,y) -> (x,y p)) happy_var_1 in  (10.1))
+        (HappyAbsSyn2  happy_var_1)
+         =  HappyAbsSyn1
+                 (\p -> let q = map (\(x,y) -> (x,y p)) happy_var_1 in  (10.1))
 ;
   reduction _  = notHappyAtAll }
 
 happyReduce_2 = happySpecReduce_3 2 reduction where {
   reduction
-	(HappyAbsSyn3  happy_var_3)
-	_
-	(HappyTerminal (TokenVar happy_var_1))
-	 =  HappyAbsSyn2
-		 ([(happy_var_1,happy_var_3)]);
+        (HappyAbsSyn3  happy_var_3)
+        _
+        (HappyTerminal (TokenVar happy_var_1))
+         =  HappyAbsSyn2
+                 ([(happy_var_1,happy_var_3)]);
   reduction _ _ _  = notHappyAtAll }
 
 happyReduce_3 = happySpecReduce_1 3 reduction where {
   reduction
-	(HappyTerminal (TokenInt happy_var_1))
-	 =  HappyAbsSyn3
-		 (\p -> happy_var_1);
+        (HappyTerminal (TokenInt happy_var_1))
+         =  HappyAbsSyn3
+                 (\p -> happy_var_1);
   reduction _  = notHappyAtAll }
 
 happyNewToken action sts stk [] =
-	action 7 7 (error "reading EOF!") (HappyState action) sts stk []
+        action 7 7 (error "reading EOF!") (HappyState action) sts stk []
 
 happyNewToken action sts stk (tk:tks) =
-	let cont i = action i i tk (HappyState action) sts stk tks in
-	case tk of {
-	TokenInt happy_dollar_dollar -> cont 4;
-	TokenEq -> cont 5;
-	TokenVar happy_dollar_dollar -> cont 6;
-	}
+        let cont i = action i i tk (HappyState action) sts stk tks in
+        case tk of {
+        TokenInt happy_dollar_dollar -> cont 4;
+        TokenEq -> cont 5;
+        TokenVar happy_dollar_dollar -> cont 6;
+        }
 
 happyThen = \m k -> k m
 happyReturn = \a tks -> a
@@ -99,7 +99,7 @@ happyError ::[Token] -> a
 happyError _ = error "Parse error\n"
 
 --Here are our tokens
-data Token  = 
+data Token  =
               TokenInt Int
             | TokenVar String
             | TokenEq
@@ -109,14 +109,14 @@ main = print (myparser [] [])
 -- $Id: tc095.hs,v 1.4 2005/05/24 11:33:11 simonpj Exp $
 
 {-
-	The stack is in the following order throughout the parse:
+        The stack is in the following order throughout the parse:
 
-	i	current token number
-	j	another copy of this to avoid messing with the stack
-	tk	current token semantic value
-	st	current state
-	sts	state stack
-	stk	semantic stack
+        i       current token number
+        j       another copy of this to avoid messing with the stack
+        tk      current token semantic value
+        st      current state
+        sts     state stack
+        stk     semantic stack
 -}
 
 -----------------------------------------------------------------------------
@@ -160,8 +160,8 @@ happyShift new_state i tk st sts stk =
 
 happySpecReduce_0 i fn (-1) tk _ sts stk
      = case sts of
-	st@(HappyState action):sts -> action (-1) (-1) tk st sts stk
-	_ -> happyError
+        st@(HappyState action):sts -> action (-1) (-1) tk st sts stk
+        _ -> happyError
 happySpecReduce_0 i fn j tk st@(HappyState action) sts stk
      = action i j tk st (st:sts) (fn : stk)
 
@@ -181,8 +181,8 @@ happySpecReduce_2 _ _ _ _ _ _ _
 
 happySpecReduce_3 i fn (-1) tk _ (st@(HappyState action):sts) stk
      = action (-1) (-1) tk st sts stk
-happySpecReduce_3 i fn j tk _ (_:_:sts@(st@(HappyState action):_)) 
-	(v1:v2:v3:stk')
+happySpecReduce_3 i fn j tk _ (_:_:sts@(st@(HappyState action):_))
+        (v1:v2:v3:stk')
      = action i j tk st sts (fn v1 v2 v3 : stk')
 happySpecReduce_3 _ _ _ _ _ _ _
      = notHappyAtAll
@@ -194,12 +194,12 @@ happyReduce k i fn j tk st sts stk = action i j tk st' sts' (fn stk)
 
 happyMonadReduce k i c fn (-1) tk _ sts stk
       = case sts of
-	     (st@(HappyState action):sts) -> action (-1) (-1) tk st sts stk
-	     [] -> happyError
+             (st@(HappyState action):sts) -> action (-1) (-1) tk st sts stk
+             [] -> happyError
 happyMonadReduce k i c fn j tk st sts stk =
-	happyThen (fn stk) (\r -> action i j tk st' sts' (c r : stk'))
+        happyThen (fn stk) (\r -> action i j tk st' sts' (c r : stk'))
        where sts'@(st'@(HappyState action):_) = drop (k::Int) (st:sts)
-	     stk' = drop (k::Int) stk
+             stk' = drop (k::Int) stk
 
 -----------------------------------------------------------------------------
 -- Moving to a new state after a reduction
@@ -217,18 +217,18 @@ happyFail  (-1) tk st' [] stk = happyError
 
 -- discard a state
 happyFail  (-1) tk st' (st@(HappyState action):sts) stk =
---	_trace "discarding state" $
-	action (-1) (-1) tk st sts stk
+--      _trace "discarding state" $
+        action (-1) (-1) tk st sts stk
 
 -- Enter error recovery: generate an error token,
--- 			 save the old token and carry on.
+--                       save the old token and carry on.
 
 -- we push the error token on the stack in anticipation of a shift,
 -- and also because this is a convenient place to store the saved token.
 
 happyFail  i tk st@(HappyState action) sts stk =
---	_trace "entering error recovery" $
-	action (-1) (-1) tk st sts (HappyErrorToken i : stk)
+--      _trace "entering error recovery" $
+        action (-1) (-1) tk st sts (HappyErrorToken i : stk)
 
 -- Internal happy errors:
 

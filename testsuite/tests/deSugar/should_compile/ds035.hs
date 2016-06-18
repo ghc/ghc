@@ -15,9 +15,9 @@ clen CNil = 0#
 clen (CCons _ cl) = 1# +# (clen cl)
 
 main = putStr (case len4_twice of
-	    8# -> "bingo\n"
-	    _  -> "oops\n")
+            8# -> "bingo\n"
+            _  -> "oops\n")
   where
-    list4	= mk 4#
-    !len4	= clen list4
-    !len4_twice	= len4 +# len4
+    list4       = mk 4#
+    !len4       = clen list4
+    !len4_twice = len4 +# len4

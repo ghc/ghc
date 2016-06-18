@@ -1,4 +1,4 @@
-{- 
+{-
 From: Wolfgang Drotschmann <drotschm@athene.informatik.uni-bonn.de>
 Resent-Date:  Thu, 15 May 1997 17:23:09 +0100
 
@@ -7,7 +7,7 @@ I couldn't fix. But I played around with it, I found a small little
 script which reproduces it very well:
 
 panic! (the `impossible' happened):
-	tlist
+        tlist
 -}
 
 module TcFail where

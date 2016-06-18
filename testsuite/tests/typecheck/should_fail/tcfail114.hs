@@ -9,5 +9,5 @@ data Bar = Bar { bar :: () }
 
 test :: Bar
 test = undefined { foo = () }
-	-- The point is that foo is a class method,
-	-- but not a record selector
+        -- The point is that foo is a class method,
+        -- but not a record selector

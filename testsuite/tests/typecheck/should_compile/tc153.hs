@@ -6,7 +6,7 @@ data T a = T a
 
 instance Eq (T a) where
   (==) x y = let v :: a
-		 v = undefined
-	     in
-		v
+                 v = undefined
+             in
+                v
 

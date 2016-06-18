@@ -3,7 +3,7 @@
 module ShoudlFail where
 
 class Foo f where
-	baa :: f a -> f
+        baa :: f a -> f
 
 instance Foo Maybe where
-	baa z = z
+        baa z = z

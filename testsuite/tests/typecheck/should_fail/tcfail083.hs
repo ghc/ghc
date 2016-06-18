@@ -11,6 +11,6 @@ display (State{ bar = Bar { flag = f, baz = b }}) = print (f,b)
 -- display (State{ bar = Bar { flag = f }, baz = b }) = print (f,b)
 
 -- GHC 4.04 (as released) crashed with
---	panic! (the `impossible' happened): tcLookupValue: b{-r4n-}
+--      panic! (the `impossible' happened): tcLookupValue: b{-r4n-}
 -- Bug reported by Sven Panne
 

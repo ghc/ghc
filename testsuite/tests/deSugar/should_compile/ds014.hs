@@ -8,8 +8,8 @@ b = "b"
 c = a:b
 d = b ++ b
 
-b1 = ""		-- examples from the Haskell report
-b2 = "\&"	-- the same thing
+b1 = ""         -- examples from the Haskell report
+b2 = "\&"       -- the same thing
 b3 = "\SO\&H" ++ "\137\&9"
 
 a000 = '\NUL'
@@ -51,21 +51,21 @@ a134 = '\\'
 a177 = '\DEL'
 
 ascii = "\NUL\SOH\STX\ETX\EOT\ENQ\ACK\BEL\
-    	\\BS\HT\LF\VT\FF\CR\SO\SI\
-	\\DLE\DC1\DC2\DC3\DC4\NAK\SYN\ETB\
-	\\CAN\EM\SUB\ESC\FS\GS\RS\US\
-	\\SP!\"#$%&'\
-	\()*+,-./\
-	\01234567\
-	\89:;<=>?\
-	\@ABCDEFG\
-	\HIJKLMNO\
-	\PQRSTUVW\
-	\XYZ[\\]^_\
-	\`abcdefg\
-	\hijklmno\
-	\pqrstuvw\
-	\xyz{|}~\DEL"
+        \\BS\HT\LF\VT\FF\CR\SO\SI\
+        \\DLE\DC1\DC2\DC3\DC4\NAK\SYN\ETB\
+        \\CAN\EM\SUB\ESC\FS\GS\RS\US\
+        \\SP!\"#$%&'\
+        \()*+,-./\
+        \01234567\
+        \89:;<=>?\
+        \@ABCDEFG\
+        \HIJKLMNO\
+        \PQRSTUVW\
+        \XYZ[\\]^_\
+        \`abcdefg\
+        \hijklmno\
+        \pqrstuvw\
+        \xyz{|}~\DEL"
 
 na200 = '\o200'
 na250 = '\o250'

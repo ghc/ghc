@@ -3,7 +3,7 @@
 module ShouldFail where
 
 -- The danger here is getting a type like
---	f :: forall (a::??). a -> Bool
+--      f :: forall (a::??). a -> Bool
 -- and hence allowing the bogus calls that follow
 
 f x = True

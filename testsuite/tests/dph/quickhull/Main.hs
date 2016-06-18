@@ -2,11 +2,11 @@
 import qualified Types as QH
 import QuickHullVect (quickhull)
 
-import qualified Data.Array.Parallel.Unlifted 	    as U
-import qualified Data.Array.Parallel.Prelude 	    as P
+import qualified Data.Array.Parallel.Unlifted       as U
+import qualified Data.Array.Parallel.Prelude        as P
 
 import qualified Data.Array.Parallel.PArray         as P
-import Data.Array.Parallel.PArray		    (PArray)
+import Data.Array.Parallel.PArray                   (PArray)
 
 import System.Environment
 import Data.List
@@ -17,7 +17,7 @@ import TestData
 
 -----
 runQuickhull :: PArray QH.Point -> [(Double, Double)]
-runQuickhull pts 
+runQuickhull pts
  = let result = quickhull pts
        resxs  = P.toUArray (QH.xsOf result)
        resys  = P.toUArray (QH.ysOf result)
@@ -25,19 +25,19 @@ runQuickhull pts
 
 
 -- Main Program ---------------------------------------------------------------
-main 
- = do	args	<- getArgs
-	let n = case args of
-		 [s]	-> read s
-		 _	-> 1000
+main
+ = do   args    <- getArgs
+        let n = case args of
+                 [s]    -> read s
+                 _      -> 1000
 
-	paInput <- toPArrayPoints 
-		$  genPointsCombo n
-	
-	let psHull  = runQuickhull paInput
-	    psInput = P.toList paInput
-	
-	putStr 
-	 $ makeSVG 
-		(roundPoints psInput)
-		(roundPoints psHull)
+        paInput <- toPArrayPoints
+                $  genPointsCombo n
+
+        let psHull  = runQuickhull paInput
+            psInput = P.toList paInput
+
+        putStr
+         $ makeSVG
+                (roundPoints psInput)
+                (roundPoints psHull)

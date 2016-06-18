@@ -2,6 +2,6 @@
 --
 module ShouldCompile where
 
-f x	= g (x == x) x
-g b x	= abs (f x)
---g b x	= (f x) + (f x)
+f x     = g (x == x) x
+g b x   = abs (f x)
+--g b x = (f x) + (f x)

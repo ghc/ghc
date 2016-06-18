@@ -4,7 +4,7 @@
 
 module ShouldCompile where
 
-infix 1 `DArrowX`	-- (->) has precedence 0
+infix 1 `DArrowX`       -- (->) has precedence 0
 
 data DArrowX :: * -> * -> * where
   First   :: a `DArrowX`  a' -> (a,b) `DArrowX` (a',b)

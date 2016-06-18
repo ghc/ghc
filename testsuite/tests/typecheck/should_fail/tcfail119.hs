@@ -1,5 +1,5 @@
 -- Gave a nasty
---	tcLookupGlobal: `FunnyError.$dmb' is not in scope
+--      tcLookupGlobal: `FunnyError.$dmb' is not in scope
 -- failure in GHC 6.2, because the type-checking of
 -- the default method didn't recover.
 

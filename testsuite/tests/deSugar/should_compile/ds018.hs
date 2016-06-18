@@ -5,7 +5,7 @@ module ShouldCompile where
 -- exprs
 
 f x y z = [x,y,z,x,y,z]
-f2 x y	= []
+f2 x y  = []
 
 g1 x y  = ()
 
@@ -13,30 +13,30 @@ g1 x y  = ()
    and probably won't in the near future, so this test is only a reminder.
 
 g x y z = (x,y,z,x,y,z,
-	   x,y,z,x,y,z,
-	   x,y,z,x,y,z,
-	   x,y,z,x,y,z,
-	   x,y,z,x,y,z,
-	   x,y,z,x,y,z,
-	   x,y,z,x,y,z,
-	   x,y,z,x,y,z,
-	   x,y,z,x,y,z,
-	   x,y,z,x,y,z,
-	   x,y,z,x,y,z,
-	   x,y,z,x,y,z,
-	   x,y,z,x,y,z,
-	   x,y,z,x,y,z,
-	   x,y,z,x,y,z,
-	   x,y,z,x,y,z,
-	   x,y,z,x,y,z,
-	   x,y,z,x,y,z,
-	   x,y,z,x,y,z,
-	   x,y,z,x,y,z,
-	   x,y,z,x,y,z,
-	   x,y,z,x,y,z,
-	   x,y,z,x,y,z,
-	   x,y,z,x,y,z,
-	   x,y,z,x,y,z) -- hey, we love big tuples
+           x,y,z,x,y,z,
+           x,y,z,x,y,z,
+           x,y,z,x,y,z,
+           x,y,z,x,y,z,
+           x,y,z,x,y,z,
+           x,y,z,x,y,z,
+           x,y,z,x,y,z,
+           x,y,z,x,y,z,
+           x,y,z,x,y,z,
+           x,y,z,x,y,z,
+           x,y,z,x,y,z,
+           x,y,z,x,y,z,
+           x,y,z,x,y,z,
+           x,y,z,x,y,z,
+           x,y,z,x,y,z,
+           x,y,z,x,y,z,
+           x,y,z,x,y,z,
+           x,y,z,x,y,z,
+           x,y,z,x,y,z,
+           x,y,z,x,y,z,
+           x,y,z,x,y,z,
+           x,y,z,x,y,z,
+           x,y,z,x,y,z,
+           x,y,z,x,y,z) -- hey, we love big tuples
 -}
 
 -- pats

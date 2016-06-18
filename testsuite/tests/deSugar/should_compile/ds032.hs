@@ -3,9 +3,9 @@
 module ShouldCompile where
 
 
-flatten :: Int		-- Indentation
-        -> Bool		-- True => just had a newline
-        -> Float	-- Current seq to flatten
+flatten :: Int          -- Indentation
+        -> Bool         -- True => just had a newline
+        -> Float        -- Current seq to flatten
         -> [(Int,Float)]-- Work list with indentation
         -> String
 

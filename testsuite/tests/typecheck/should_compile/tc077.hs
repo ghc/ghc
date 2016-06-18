@@ -6,4 +6,4 @@ data NUM = ONE | TWO
 class (Num a) => ORD a
 
 class (ORD a, Show a) => EQ a where
-	(===) :: a -> a -> Bool
+        (===) :: a -> a -> Bool

@@ -14,13 +14,13 @@ data HNil      = HNil      deriving (Eq,Show,Read)
 data HCons e l = HCons e l deriving (Eq,Show,Read)
 
 type e :*: l = HCons e l
-	-- In GHC 6.4 the deeply-nested use of this
-	-- synonym gave rise to exponential behaviour
+        -- In GHC 6.4 the deeply-nested use of this
+        -- synonym gave rise to exponential behaviour
 
 --- list endian16
-newtype Tables = Tables [TableInfo] deriving (Show, Typeable) 
+newtype Tables = Tables [TableInfo] deriving (Show, Typeable)
 
-type TableInfo = 
+type TableInfo =
     AvgPot :*:
     NumPlayers :*:
     Waiting :*:
@@ -31,7 +31,7 @@ type TableInfo =
     InfoMaxPlayers :*:
     RealMoneyTable :*:
     LowBet :*:
-    HighBet :*: 
+    HighBet :*:
     MinStartMoney :*:
     MaxStartMoney :*:
     GamesPerHour :*:
@@ -46,30 +46,30 @@ type TableInfo =
     LangID :*:
     HNil
 
-newtype TourType = TourType TourType_ deriving (Show, Typeable) 
+newtype TourType = TourType TourType_ deriving (Show, Typeable)
 newtype AvgPot = AvgPot Word64 deriving (Show, Typeable)
 newtype NumPlayers = NumPlayers Word16 deriving (Show, Typeable)
 newtype Waiting = Waiting Word16 deriving (Show, Typeable)
 newtype PlayersFlop = PlayersFlop Word8 deriving (Show, Typeable)
-newtype TableName = TableName String deriving (Show, Typeable) 
-newtype TableID = TableID Word32 deriving (Show, Typeable) 
-newtype OldTableID = OldTableID Word32 deriving (Show, Typeable) 
-newtype GameType = GameType GameType_ deriving (Show, Typeable) 
-newtype InfoMaxPlayers = InfoMaxPlayers Word16 deriving (Show, Typeable) 
-newtype RealMoneyTable = RealMoneyTable Bool deriving (Show, Typeable) 
-newtype LowBet = LowBet RealMoney_ deriving (Show, Typeable) 
-newtype HighBet = HighBet RealMoney_ deriving (Show, Typeable) 
-newtype MinStartMoney = MinStartMoney RealMoney_ deriving (Show, Typeable) 
-newtype MaxStartMoney = MaxStartMoney RealMoney_ deriving (Show, Typeable) 
-newtype GamesPerHour = GamesPerHour Word16 deriving (Show, Typeable) 
-newtype TourID = TourID Word32 deriving (Show, Typeable) 
-newtype BetType = BetType BetType_ deriving (Show, Typeable) 
-newtype CantReturnLess = CantReturnLess Word32 deriving (Show, Typeable) 
-newtype AffiliateID = AffiliateID [Word8] deriving (Show, Typeable) 
-newtype NIsResurrecting = NIsResurrecting Word32 deriving (Show, Typeable) 
-newtype MinutesForTimeout = MinutesForTimeout Word32 deriving (Show, Typeable) 
-newtype SeatsToResurrect = SeatsToResurrect Word32 deriving (Show, Typeable) 
-newtype LangID = LangID Word32 deriving (Show, Typeable) 
+newtype TableName = TableName String deriving (Show, Typeable)
+newtype TableID = TableID Word32 deriving (Show, Typeable)
+newtype OldTableID = OldTableID Word32 deriving (Show, Typeable)
+newtype GameType = GameType GameType_ deriving (Show, Typeable)
+newtype InfoMaxPlayers = InfoMaxPlayers Word16 deriving (Show, Typeable)
+newtype RealMoneyTable = RealMoneyTable Bool deriving (Show, Typeable)
+newtype LowBet = LowBet RealMoney_ deriving (Show, Typeable)
+newtype HighBet = HighBet RealMoney_ deriving (Show, Typeable)
+newtype MinStartMoney = MinStartMoney RealMoney_ deriving (Show, Typeable)
+newtype MaxStartMoney = MaxStartMoney RealMoney_ deriving (Show, Typeable)
+newtype GamesPerHour = GamesPerHour Word16 deriving (Show, Typeable)
+newtype TourID = TourID Word32 deriving (Show, Typeable)
+newtype BetType = BetType BetType_ deriving (Show, Typeable)
+newtype CantReturnLess = CantReturnLess Word32 deriving (Show, Typeable)
+newtype AffiliateID = AffiliateID [Word8] deriving (Show, Typeable)
+newtype NIsResurrecting = NIsResurrecting Word32 deriving (Show, Typeable)
+newtype MinutesForTimeout = MinutesForTimeout Word32 deriving (Show, Typeable)
+newtype SeatsToResurrect = SeatsToResurrect Word32 deriving (Show, Typeable)
+newtype LangID = LangID Word32 deriving (Show, Typeable)
 
 data GameType_
     = EmptyGame
@@ -105,4 +105,4 @@ data BetType_
     | BetTeenPatti
     | BetTeenPattiFixed
     deriving (Enum, Eq, Show, Typeable)
-               
+

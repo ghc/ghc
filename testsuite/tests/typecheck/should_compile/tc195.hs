@@ -3,9 +3,9 @@
 
 -- This one made GHC 6.4 loop because Unify.unify
 -- didn't deal correctly with unifying
---	a :=: Foo a
+--      a :=: Foo a
 -- where
---	type Foo a = a
+--      type Foo a = a
 
 module ShouldSucceed where
 

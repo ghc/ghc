@@ -12,14 +12,14 @@ class Parse a where
        forced :: a -> Bool
 
        parseFile string | all forced x = x
-		       where x = map parseLine (lines' string)
+                       where x = map parseLine (lines' string)
        parseLine = pl.parse where pl (a,_) = a
        parse = parseType.whiteSpace
        forced x = True
 
 instance Parse Int where
        parseType str = pl (span' isDigit str)
-	       where 	pl (l,r) = (strToInt l,r)
+               where    pl (l,r) = (strToInt l,r)
        forced n | n>=0 = True
 
 instance Parse Char where
@@ -27,14 +27,14 @@ instance Parse Char where
        forced n = True
 
 instance (Parse a) => Parse [a] where
-	parseType more = (map parseLine (seperatedBy ',' (l++",")),out)
-		       where 	(l,']':out) = span' (\x->x/=']') (tail more)
-	forced = all forced
+        parseType more = (map parseLine (seperatedBy ',' (l++",")),out)
+                       where    (l,']':out) = span' (\x->x/=']') (tail more)
+        forced = all forced
 
 seperatedBy :: Char -> String -> [String]
 seperatedBy ch [] = []
 seperatedBy ch xs = twaddle ch (span' (\x->x/=ch) xs)
-	       where	twaddle ch (l,_:r) = l:seperatedBy ch r
+               where    twaddle ch (l,_:r) = l:seperatedBy ch r
 
 whiteSpace :: String -> String
 whiteSpace = dropWhile isSpace
@@ -52,7 +52,7 @@ lines' s = plumb (span' ((/=) '\n') s)
 strToInt :: String -> Int
 strToInt x = strToInt' (length x-1) x
       where   strToInt' _ [] = 0
-	      strToInt' x (a:l) = (charToInt a)*(10^x) + (strToInt' (x-1) l)
+              strToInt' x (a:l) = (charToInt a)*(10^x) + (strToInt' (x-1) l)
 
 charToInt :: Char -> Int
 charToInt x = (ord x - ord '0')

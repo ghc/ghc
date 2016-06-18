@@ -9,7 +9,7 @@ class CommutativeRing a
 class CommutativeRing a => LinSolvRing a
 class LinSolvRing a => EuclideanRing a
 
-instance EuclideanRing a => LinSolvRing (Pol a)	       -- XXXX
+instance EuclideanRing a => LinSolvRing (Pol a)        -- XXXX
 instance CommutativeRing a => CommutativeRing (Pol a)
 
 data Pol a = MkPol

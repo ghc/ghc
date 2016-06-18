@@ -1,6 +1,6 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
               UndecidableInstances,
-	      IncoherentInstances,
+              IncoherentInstances,
               FlexibleInstances #-}
 
 -- Trac #2307

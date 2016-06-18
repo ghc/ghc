@@ -12,19 +12,19 @@ primesList :: Int -> [Int]
 primesList 1 = []
 primesList n = sps ++ [ i | i <- [sq+1..n], multiple sps i ]
   where
-    sps = primesList sq 
+    sps = primesList sq
     sq  = floor $ sqrt $ fromIntegral n
 
     multiple :: [Int] -> Int -> Bool
     multiple ps i = and [i `mod` p /= 0 | p <- ps]
 
 
-main 
- = do	let n			= 1000
-	let resultViaNDP	= P.toList $ primesVect n
-	let resultViaLists	= primesList n
-	
-	print resultViaNDP
-	print resultViaLists
-	print $ resultViaNDP == resultViaLists
-	
+main
+ = do   let n                   = 1000
+        let resultViaNDP        = P.toList $ primesVect n
+        let resultViaLists      = primesList n
+
+        print resultViaNDP
+        print resultViaLists
+        print $ resultViaNDP == resultViaLists
+

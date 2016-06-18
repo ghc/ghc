@@ -18,7 +18,7 @@ problems.
 
 
 SPJ note: the type signature on "multiply" should be
-	multiply :: Group a => a -> a -> a
+        multiply :: Group a => a -> a -> a
 
 -}
 

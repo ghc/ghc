@@ -6,5 +6,5 @@ module ShouldCompile where
 type A i = i
 data T k = MkT (k Int)
 
-f :: T A	-- BAD!
+f :: T A        -- BAD!
 f = error "foo"

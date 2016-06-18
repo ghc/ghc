@@ -6,7 +6,7 @@ module Body
         , Accel
         , MassPoint
         , Body
-        
+
         , unitBody
         , massPointOfBody
         , setMassOfBody
@@ -43,7 +43,7 @@ unitBody x y
 
 -- | Take the MassPoint of a body.
 massPointOfBody :: Body -> MassPoint
-massPointOfBody (mp, vel, acc)  
+massPointOfBody (mp, vel, acc)
         = mp
 
 
@@ -55,10 +55,10 @@ setMassOfBody mass ((x, y, _), vel, acc)
 
 -- | Set the acceleration of a body.
 setAccelOfBody :: Accel -> Body -> Body
-setAccelOfBody acc' (mp, vel, _)        
+setAccelOfBody acc' (mp, vel, _)
         = (mp, vel, acc')
 
-        
+
 -- | Set the starting velocity of a body.
 --   It is set to rotate around the origin, with the speed proportional
 --   to the sqrt of the distance from it. This seems to make nice simulations.
@@ -68,18 +68,18 @@ setStartVelOfBody startVel (mp@(x, y, mass), vel, acc)
         (x', y')        = normaliseV (x, y)
         vel'            = (y', -x')
         vel''           = mulSV (sqrt (magV pos) * startVel) vel'
-        
+
    in   (mp, vel'', acc)
 
 
 -- | Advance a body forwards in time.
 advanceBody :: Double -> Body -> Body
-advanceBody time 
-	( (px, py, mass) 
-	, (vx, vy) 
-	, acc@(ax, ay))
+advanceBody time
+        ( (px, py, mass)
+        , (vx, vy)
+        , acc@(ax, ay))
 
-  =	( (px + time * vx, py + time * vy, mass)
-	, (vx + time * ax, vy + time * ay)
-	, acc)
+  =     ( (px + time * vx, py + time * vy, mass)
+        , (vx + time * ax, vy + time * ay)
+        , acc)
 

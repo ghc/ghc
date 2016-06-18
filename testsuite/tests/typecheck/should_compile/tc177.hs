@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances, UndecidableInstances,
              MultiParamTypeClasses, FunctionalDependencies #-}
 
--- This is a rather complicated program that uses functional 
+-- This is a rather complicated program that uses functional
 -- dependencies to do Peano arithmetic.
 --
 -- GHC 6.2 dies because tcSimplifyRestricted was trying to
@@ -51,17 +51,17 @@ class Ins r l l' | r l -> l' where
 
 instance Ins ((LAB l1 r1),r1') Nil (Cons (Cons ((LAB l1 r1),r1') Nil) Nil) where
     ins l Nil = (Cons (Cons l Nil) Nil)
-   
+
 
 instance ( L2N l1 n1
      , L2N l2 n2
      , EqR n1 n2 b
      , Ins1 ((LAB l1 r1),r1') (Cons (Cons ((LAB l2 r2),r2') rs) rs') b l
-     ) => Ins ((LAB l1 r1),r1') (Cons (Cons ((LAB l2 r2),r2') rs) rs') l 
+     ) => Ins ((LAB l1 r1),r1') (Cons (Cons ((LAB l2 r2),r2') rs) rs') l
     where
-      ins ((LAB l1 r1),r1') (Cons (Cons ((LAB l2 r2),r2') rs) rs') 
-	= ins1  ((LAB l1 r1),r1') (Cons (Cons ((LAB l2 r2),r2') rs) rs') 
-		(eqR (l2n l1)  (l2n l2))
+      ins ((LAB l1 r1),r1') (Cons (Cons ((LAB l2 r2),r2') rs) rs')
+        = ins1  ((LAB l1 r1),r1') (Cons (Cons ((LAB l2 r2),r2') rs) rs')
+                (eqR (l2n l1)  (l2n l2))
 -- Note that n1 and n2 are functionally defined by l1 and l2, respectively,
 -- and b is functionally defined by n1 and n2.
 
@@ -69,11 +69,11 @@ instance ( L2N l1 n1
 class Ins1 r l b l' | r l b -> l' where
     ins1 :: r -> l -> b -> l'
 
-instance Ins1 ((LAB l1 r1),r1') (Cons r rs) T 
-	      (Cons (Cons ((LAB l1 r1),r1') r) rs) where
+instance Ins1 ((LAB l1 r1),r1') (Cons r rs) T
+              (Cons (Cons ((LAB l1 r1),r1') r) rs) where
    ins1 l (Cons r rs) _ = (Cons (Cons l r) rs)
 
-instance ( Ins ((LAB l1 r1),r1') rs rs') 
+instance ( Ins ((LAB l1 r1),r1') rs rs')
       => Ins1 ((LAB l1 r1),r1') (Cons r rs) F (Cons r rs') where
     ins1 l (Cons r rs) _ = (Cons r (ins l rs))
 

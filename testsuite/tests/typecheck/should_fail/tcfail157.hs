@@ -5,12 +5,12 @@
 -- This one (due to Oleg) made 6.4.1 go into a loop in the typechecker,
 -- despite the lack of UndecidableInstances
 --
--- The example corresponds to a type function (realized as a class E 
--- with functional dependencies) in the context of an instance. 
+-- The example corresponds to a type function (realized as a class E
+-- with functional dependencies) in the context of an instance.
 -- The function in question is
 --
---	class E m a b | m a -> b
---	instance E m (() -> ()) (m ())
+--      class E m a b | m a -> b
+--      instance E m (() -> ()) (m ())
 --
 -- We see that the result of the function, "m ()" is smaller (in the
 -- number of constructors) that the functions' arguments, "m" and

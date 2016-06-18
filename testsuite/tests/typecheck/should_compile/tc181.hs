@@ -6,10 +6,10 @@
 
 module Folders where
 
-data Folder = Folder 
+data Folder = Folder
 
 newtype SB x = SB x
-newtype SS x = SS x 
+newtype SS x = SS x
 
 data NodeArcsHidden = NodeArcsHidden
 
@@ -22,26 +22,26 @@ instance HasSS (SB x) x where
 class HMV option graph node where
    modd :: option -> graph -> node value -> IO ()
 
-instance HMV NodeArcsHidden graph node 
-      => HMV (Maybe NodeArcsHidden) graph node 
+instance HMV NodeArcsHidden graph node
+      => HMV (Maybe NodeArcsHidden) graph node
   where
    modd = error "burk"
 
-gn :: HMV NodeArcsHidden graph node 
-   => graph 
+gn :: HMV NodeArcsHidden graph node
+   => graph
    -> SS (graph -> node Int -> IO ())
 gn graph = fmapSS (\ arcsHidden -> (\ graph node -> modd arcsHidden graph node))
-	          (toSS (error "C" :: SB (Maybe NodeArcsHidden)))
+                  (toSS (error "C" :: SB (Maybe NodeArcsHidden)))
 
 -- The call to modd gives rise to
---	HMV option graph node
+--      HMV option graph node
 -- The call to toSS gives rise to
---	HasSS (SB (Maybe NodeArcsHidden)) x  
+--      HasSS (SB (Maybe NodeArcsHidden)) x
 -- where (toSS (error ...)) :: SS x
 -- and hence arcsHidden :: x
 --
 -- Then improvement should give x = Maybe NodeArcsHidden
 -- and hence option=Maybe NodeArcsHidden
-   
+
 fmapSS :: (a->b) -> SS a -> SS b
 fmapSS = error "urk"

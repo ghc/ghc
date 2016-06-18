@@ -13,4 +13,4 @@ instance C [a] Char where
 newtype T = T Char deriving( Show, C [a] )
 
 main = do { print (op [] 'x')
-	  ; print (op [] (T 'y')) }
+          ; print (op [] (T 'y')) }

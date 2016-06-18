@@ -1,6 +1,6 @@
 -- This test killed GHC 6.0.2 when it read the interface file for
--- Tc170_Aux, because there was a 
---	forall a. (# ... #)
+-- Tc170_Aux, because there was a
+--      forall a. (# ... #)
 -- in the default method for 'position'
 --
 -- NB: only fails when compiled in batch mode. In --make mode, GHC

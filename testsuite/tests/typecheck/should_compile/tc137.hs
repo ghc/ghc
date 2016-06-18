@@ -2,7 +2,7 @@
              FlexibleInstances #-}
 {-# OPTIONS -dcore-lint #-}
 
-{- 	 This one killed GHC 5.02
+{-       This one killed GHC 5.02
 
 The problem is that in rather obscure cases (involving functional
 dependencies) it is possible to get an AbsBinds [] [] (no tyvars, no

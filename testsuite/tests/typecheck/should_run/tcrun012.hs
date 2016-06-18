@@ -5,7 +5,7 @@
 module Main where
 
 main = do { let ?x = 13 in putStrLn $ show $ foo
-	  ; let ?x = 14 in putStrLn $ show $ baz () }
+          ; let ?x = 14 in putStrLn $ show $ baz () }
 
 foo :: (?x :: Int) => Int
 foo = ?x

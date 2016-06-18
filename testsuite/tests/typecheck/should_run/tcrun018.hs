@@ -22,18 +22,18 @@ instance C3 Maybe Bool
 
 
 main = do { print (c2 True :: Maybe Bool) ;
-	    print (c3 True :: Maybe Bool) }
+            print (c3 True :: Maybe Bool) }
 
 ------------------------------------------------------------------------
-{-	Here's the email from Ralf Laemmel
-	reporting a bug in Hugs
+{-      Here's the email from Ralf Laemmel
+        reporting a bug in Hugs
 
 1. If you evaluate "test",
    then you get as expected "Just True".
 
 2. Now remove the "Monad M" constraint
-   in the class C2. [giving the class C3] 
-   This is of course legal and semantics-preserving 
+   in the class C2. [giving the class C3]
+   This is of course legal and semantics-preserving
    since the monad constraints is implied by C1
    anyway.
 
@@ -47,7 +47,7 @@ anything etc.), then you see "Program error: {_Gc Black
 Hole}". Of course, there is no such black hole.
 
 I extracted the above fragment from a huge problem.
-The scheme is the following. It seems have to do 
+The scheme is the following. It seems have to do
 with multi-parameter classes. It definitely has to
 do with multi-layered class hierarchies where one
 class has a class-wide superclass, as C2 has C1 in
@@ -75,7 +75,7 @@ But I would be glad to help you by checking if the
 problem is gone after you did the bug fix.
 
 
--- 
+--
 Dr.-Ing. Ralf Laemmel
 CWI & VU, Amsterdam, The Netherlands
 http://www.cwi.nl/~ralf/

@@ -57,20 +57,20 @@ h2 (g::(forall a. a ->a)) = let y = P (g 3) (g (P 3 4))
 
 xs1 :: List (forall a. a ->a)
 xs1 = let cons = Cons :: (forall a. a ->a)
-		      -> List (forall a. a->a)
-		      -> List (forall a. a ->a)
+                      -> List (forall a. a->a)
+                      -> List (forall a. a ->a)
       in cons (\x -> x) Nil
 
 xs2 :: List (forall a. a -> a)
 xs2 = (Cons :: ((forall a. a->a)
-	    -> List (forall a. a->a)
-	    -> List (forall a. a->a)))
-	(\x ->x) Nil
+            -> List (forall a. a->a)
+            -> List (forall a. a->a)))
+        (\x ->x) Nil
 
 foo2 :: forall a. List a -> a -> a
 foo2 x y = y
 
-bar4 = (foo2 :: List (forall a. a->a) -> (forall a. a->a) -> (forall a.a->a)) 
-	   xs1 (\x -> x)
+bar4 = (foo2 :: List (forall a. a->a) -> (forall a. a->a) -> (forall a.a->a))
+           xs1 (\x -> x)
 
 

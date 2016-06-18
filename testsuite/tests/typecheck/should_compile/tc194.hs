@@ -1,8 +1,8 @@
 {-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
 
 -- Tests the special case of
--- 	non-recursive, function binding, 
---	with no type signature
+--      non-recursive, function binding,
+--      with no type signature
 
 module ShouldCompile where
 

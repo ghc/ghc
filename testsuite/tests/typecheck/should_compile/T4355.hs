@@ -4,8 +4,8 @@
 module T4355 where
 
 import Control.Arrow
-import Control.Monad.Trans	-- From mtl
-import Control.Monad.Reader	-- Ditto
+import Control.Monad.Trans      -- From mtl
+import Control.Monad.Reader     -- Ditto
 import Data.Typeable
 import Data.Maybe
 

@@ -12,16 +12,16 @@
 --    In the instance declaration for `C (Maybe a) a'
 --
 -- Since L is a superclass of the (sought) constraint (C a b'), you might
--- think that we'd generate the superclasses (L a b') and (L a b), and now 
+-- think that we'd generate the superclasses (L a b') and (L a b), and now
 -- the fundep will force b=b'.  But GHC is very cautious about generating
 -- superclasses when doing context reduction for instance declarations,
 -- because of the danger of superclass loops.
 --
 -- So, today, this program fails.  It's trivial to fix by adding a fundep for C
--- 	class (G a, L a b) => C a b | a -> b
+--      class (G a, L a b) => C a b | a -> b
 
--- Note: Sept 08: when fixing Trac #1470, tc138 started working! 
--- This test is a very strange one (fundeps, undecidable instances), 
+-- Note: Sept 08: when fixing Trac #1470, tc138 started working!
+-- This test is a very strange one (fundeps, undecidable instances),
 -- so I'm just marking it as "should-succeed".  It's not very clear to
 -- me what the "right" answer should be; when we have the type equality
 -- story more worked out we might want to think about that.

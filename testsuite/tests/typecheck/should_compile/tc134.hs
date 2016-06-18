@@ -8,4 +8,4 @@ f :: Int -> Int
 f x :: Int = x
 
 g :: Int -> Int
-g x :: a = x :: a	-- Here, a is a name for Int
+g x :: a = x :: a       -- Here, a is a name for Int

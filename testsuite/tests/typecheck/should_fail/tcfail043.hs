@@ -6,7 +6,7 @@
 -- search falls under the monomorphism restriction, and there is no
 -- call to search which might fix its type.  So there should be a complaint.
 -- But the actual error message is horrible:
--- 
+--
 -- "bug001.hs", line 26: Ambiguous overloading:
 --     class "Ord_", type "a" (at a use of an overloaded identifier: gt)
 --     class "Eq_", type "a" (at a use of an overloaded identifier: eq)
@@ -21,10 +21,10 @@ instance Eq_ Int where
  eq = eqIntEq
 
 instance (Eq_ a) => Eq_ [a] where
- eq = \ xs ys -> 
-     if (null xs) 
+ eq = \ xs ys ->
+     if (null xs)
         then (null ys)
-        else if (null ys) 
+        else if (null ys)
                 then False
                 else (&&) (eq (hd xs) (hd ys)) (eq (tl xs) (tl ys))
 
@@ -34,9 +34,9 @@ class (Eq_ a) => Ord_ a where
 instance Ord_ Int where
  gt = ordIntGt
 
-search 
+search
  = \ a bs -> if gt (hd bs) a
-                then False 
+                then False
                 else if eq a (hd bs) then True else search a (tl bs)
 
 
@@ -61,50 +61,50 @@ eqIntEq  2 3 = True
 Main.Eq__INST_PreludeBuiltin.Int =
     let
       AbsBinds [] [] [(eq, eq)]
-	  {- nonrec -}
-	  {-# LINE 2 "test3.hs" -}
+          {- nonrec -}
+          {-# LINE 2 "test3.hs" -}
 
-	  eq :: PreludeBuiltin.Int -> PreludeBuiltin.Int -> PreludeCore.Bool
-	  eq = Main.eqIntEq
+          eq :: PreludeBuiltin.Int -> PreludeBuiltin.Int -> PreludeCore.Bool
+          eq = Main.eqIntEq
     in ({-dict-} [] [eq])
 
 Main.Eq__INST_PreludeBuiltin.List =
     /\ t135 ->
-	\{-dict-} _dict138 ->
-	    let
-	      {- nonrec -}
-	      _dict136 = {-singleDict-} _dict138
-	      {- nonrec -}
-	      _dict129 = {-singleDict-} _dict136
-	      AbsBinds [] [] [(eq, eq)]
-		  {- nonrec -}
+        \{-dict-} _dict138 ->
+            let
+              {- nonrec -}
+              _dict136 = {-singleDict-} _dict138
+              {- nonrec -}
+              _dict129 = {-singleDict-} _dict136
+              AbsBinds [] [] [(eq, eq)]
+                  {- nonrec -}
 
-		  _dict133 =
-		      Main.Eq__INST_PreludeBuiltin.List
-			  [t135] [{-singleDict-} _dict136]
-		  {- nonrec -}
-		  {-# LINE 5 "test3.hs" -}
+                  _dict133 =
+                      Main.Eq__INST_PreludeBuiltin.List
+                          [t135] [{-singleDict-} _dict136]
+                  {- nonrec -}
+                  {-# LINE 5 "test3.hs" -}
 
-		  eq :: [t135] -> [t135] -> PreludeCore.Bool
-		  eq = \ xs ys -> 
+                  eq :: [t135] -> [t135] -> PreludeCore.Bool
+                  eq = \ xs ys ->
 
 if (Main.null t135) xs then
-				      (Main.null t135) ys
-				  else
+                                      (Main.null t135) ys
+                                  else
 
-				      if (Main.null t135) ys then
-					  PreludeCore.False
-				      else
+                                      if (Main.null t135) ys then
+                                          PreludeCore.False
+                                      else
 
-					  Main.and
-
-
-					      ((Main.Eq_.eq t135 _dict129)
+                                          Main.and
 
 
-						   ((Main.hd t135) xs)
-						   ((Main.hd t135) ys))
-					      
+                                              ((Main.Eq_.eq t135 _dict129)
+
+
+                                                   ((Main.hd t135) xs)
+                                                   ((Main.hd t135) ys))
+
 
 
 
@@ -114,19 +114,19 @@ if (Main.null t135) xs then
 
 
 
-						   ((Main.tl t135) xs)
-						   ((Main.tl t135) ys))
-	    in ({-dict-} [] [eq])
+                                                   ((Main.tl t135) xs)
+                                                   ((Main.tl t135) ys))
+            in ({-dict-} [] [eq])
 Main.Ord__INST_PreludeBuiltin.Int =
     let
       {- nonrec -}
       _dict142 = Main.Eq__INST_PreludeBuiltin.Int [] []
       AbsBinds [] [] [(gt, gt)]
-	  {- nonrec -}
-	  {-# LINE 16 "test3.hs" -}
+          {- nonrec -}
+          {-# LINE 16 "test3.hs" -}
 
-	  gt :: PreludeBuiltin.Int -> PreludeBuiltin.Int -> PreludeCore.Bool
-	  gt = Main.ordIntGt
+          gt :: PreludeBuiltin.Int -> PreludeBuiltin.Int -> PreludeCore.Bool
+          gt = Main.ordIntGt
     in ({-dict-} [_dict142] [gt])
 
 Main.Eq_.eq = /\ a -> \{-classdict-} [] [eq] -> eq
@@ -142,7 +142,7 @@ AbsBinds [t60] [] [(hd, Main.hd)]
 
     hd :: [t60] -> t60
     hd (a PreludeBuiltin.: as)
-	       = a
+               = a
 
 AbsBinds [t68] [] [(tl, Main.tl)]
     {- nonrec -}
@@ -152,7 +152,7 @@ AbsBinds [t68] [] [(tl, Main.tl)]
 
     tl :: [t68] -> [t68]
     tl (a PreludeBuiltin.: as)
-	       = as
+               = as
 
 
 AbsBinds [t91] [_dict85, _dict88] [(search, Main.search)]
@@ -162,23 +162,23 @@ AbsBinds [t91] [_dict85, _dict88] [(search, Main.search)]
 
     search :: t91 -> [t91] -> PreludeCore.Bool
     search
-	= \ a bs -> 
+        = \ a bs ->
 
 
 if (Main.Ord_.gt t91 _dict85) ((Main.hd t91) bs) a then
-			PreludeCore.False
-		    else
+                        PreludeCore.False
+                    else
 
-			if (Main.Eq_.eq t91 _dict88) a ((Main.hd t91) bs) then
-			    PreludeCore.True
-			else
+                        if (Main.Eq_.eq t91 _dict88) a ((Main.hd t91) bs) then
+                            PreludeCore.True
+                        else
 
-			    search a ((Main.tl t91) bs)
+                            search a ((Main.tl t91) bs)
 AbsBinds [] [] [(and, Main.and)]
     {- nonrec -}
     and :: PreludeCore.Bool -> PreludeCore.Bool -> PreludeCore.Bool
     and PreludeCore.True PreludeCore.True
-		= PreludeCore.True
+                = PreludeCore.True
 AbsBinds [] [] [(ordIntGt, Main.ordIntGt)]
     {- nonrec -}
     _dict97 = PreludeCore.Num_INST_PreludeBuiltin.Int [] []
@@ -194,7 +194,7 @@ AbsBinds [] [] [(ordIntGt, Main.ordIntGt)]
 
     ordIntGt :: PreludeBuiltin.Int -> PreludeBuiltin.Int -> PreludeCore.Bool
     ordIntGt
-	2 3 = PreludeCore.True
+        2 3 = PreludeCore.True
 AbsBinds [] [] [(eqIntEq, Main.eqIntEq)]
     {- nonrec -}
     _dict105 = PreludeCore.Num_INST_PreludeBuiltin.Int [] []
@@ -208,7 +208,7 @@ AbsBinds [] [] [(eqIntEq, Main.eqIntEq)]
 
     eqIntEq :: PreludeBuiltin.Int -> PreludeBuiltin.Int -> PreludeCore.Bool
     eqIntEq
-	2 3 = PreludeCore.True
+        2 3 = PreludeCore.True
 
 
 AbsBinds [t112] [] [(null, Main.null)]

@@ -6,4 +6,4 @@ module ShouldCompile where
 nodups []                   = []
 nodups [x]                  = [x]
 nodups (y:x:xs) | y == x    = nodups (x:xs)
-    	    	| True	    = y : nodups (x:xs)
+                | True      = y : nodups (x:xs)

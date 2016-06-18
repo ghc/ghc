@@ -8,7 +8,7 @@ module Main (main) where
 
 
 class MyClass a b where
-	foo :: a -> b -> Int
+        foo :: a -> b -> Int
 
 data Special = forall b. (MyClass Int b)=> MkSpecial b
 data General a = forall b. (MyClass a b)=> MkGeneral b
@@ -21,5 +21,5 @@ xs :: [General Int]
 xs = [MkGeneral True, MkGeneral False]
 
 main = print [foo (3::Int) x | MkGeneral x <- xs]
-	-- Without the (::Int) part we get an 
-	-- incomprehensible error message :-(
+        -- Without the (::Int) part we get an
+        -- incomprehensible error message :-(

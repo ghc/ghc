@@ -3,10 +3,10 @@
 module ShouldSucceed where
 
 class Normal a
-	where
-	normal :: a -> Bool
+        where
+        normal :: a -> Bool
 
 instance Normal ( a -> b ) where
-	normal _ = True
+        normal _ = True
 
 f x = normal id

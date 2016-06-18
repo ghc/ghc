@@ -15,9 +15,9 @@ mkDigraph = MkDigraph
 stronglyConnComp :: Eq vertex => [Edge vertex] -> [vertex] -> [[vertex]]
 stronglyConnComp es vs
   = snd (span_tree (new_range reversed_edges)
-		    ([],[])
+                    ([],[])
                    ( snd (dfs (new_range es) ([],[]) vs) )
-	 )
+         )
  where
    reversed_edges = map swap es
 
@@ -26,16 +26,16 @@ stronglyConnComp es vs
 
    new_range    []       w = []
    new_range ((x,y):xys) w
-	= if x==w
-	  then (y : (new_range xys w))
-	  else (new_range xys w)
+        = if x==w
+          then (y : (new_range xys w))
+          else (new_range xys w)
 
    span_tree r (vs,ns) []   = (vs,ns)
    span_tree r (vs,ns) (x:xs)
-	| x `elem` vs = span_tree r (vs,ns) xs
-	| otherwise = span_tree r (vs',(x:ns'):ns) xs
-	  where
-	    (vs',ns') = dfs r (x:vs,[]) (r x)
+        | x `elem` vs = span_tree r (vs,ns) xs
+        | otherwise = span_tree r (vs',(x:ns'):ns) xs
+          where
+            (vs',ns') = dfs r (x:vs,[]) (r x)
 
 dfs r (vs,ns)   []   = (vs,ns)
 dfs r (vs,ns) (x:xs) | x `elem` vs = dfs r (vs,ns) xs
@@ -55,8 +55,8 @@ topSort :: (Eq vertex) => [Edge vertex] -> [vertex]
 
 topSort edges vertices
  = case cycles of
-	[] -> Succeeded [v | [v] <- singletons]
-	_  -> Failed cycles
+        [] -> Succeeded [v | [v] <- singletons]
+        _  -> Failed cycles
    where
    sccs = stronglyConnComp edges vertices
    (cycles, singletons) = partition (isCyclic edges) sccs
@@ -69,9 +69,9 @@ mkVertices :: FlattenedDependencyInfo vertex name code -> [vertex]
 mkVertices info = [ vertex | (vertex,_,_,_) <- info]
 
 mkEdges :: (Ord name) =>
-	    [vertex]
-	 -> FlattenedDependencyInfo vertex name code
-	 -> [Edge vertex]
+            [vertex]
+         -> FlattenedDependencyInfo vertex name code
+         -> [Edge vertex]
 
 mkEdges vertices flat_info
  = [ (source_vertex, target_vertex)
@@ -82,13 +82,13 @@ mkEdges vertices flat_info
  where
    vertices_defining name flat_info
     = [ vertex |  (vertex, names_defined, _, _) <- flat_info,
-   		name `Set.member` names_defined
+                name `Set.member` names_defined
       ]
 
 lookupVertex :: (Eq vertex) =>
-	    	 FlattenedDependencyInfo vertex name code
-	      -> vertex
-	      -> code
+                 FlattenedDependencyInfo vertex name code
+              -> vertex
+              -> code
 
 lookupVertex flat_info vertex
  = head code_list

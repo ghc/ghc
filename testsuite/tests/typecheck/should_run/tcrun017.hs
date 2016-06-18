@@ -6,9 +6,9 @@
 module Main where
 
 foo :: ((?x :: Int) => IO a) -> Int -> IO a
-	-- Note the rank2 type
-foo s z = do  let ?x = z   in s		-- Should pick up ?x = z
-	      let ?x = z+3 in s		-- Ditto z+3
+        -- Note the rank2 type
+foo s z = do  let ?x = z   in s         -- Should pick up ?x = z
+              let ?x = z+3 in s         -- Ditto z+3
 
 main = foo (print ?x) 42
 

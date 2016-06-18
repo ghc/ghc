@@ -3,6 +3,6 @@
 module ShouldCompile where
 
 f x y z | x == y     = []
-	| x /= z     = []
-	| True	     = []
-	| False	     = []
+        | x /= z     = []
+        | True       = []
+        | False      = []

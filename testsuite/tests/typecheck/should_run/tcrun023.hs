@@ -9,5 +9,5 @@ foo n = show (n + length ?x)
 
 
 main = do { putStrLn (let ?x = [True,False] in foo 3) ;
-	    putStrLn (let ?x = "fred"       in foo 4) }
+            putStrLn (let ?x = "fred"       in foo 4) }
 

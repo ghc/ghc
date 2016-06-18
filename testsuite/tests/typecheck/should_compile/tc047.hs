@@ -10,7 +10,7 @@ type OL a =  [a]
 -- the following bogus type sig. was accepted by BOTH hbc and nhc
 f x = ranOAL where -- ranOAL :: OL (a,v) -> [a]
 --ranOAL :: OL (a,v) -> [v], the right sig.
-		   ranOAL ( xs) = mp sd xs
+                   ranOAL ( xs) = mp sd xs
 
 
 mp f [] = []

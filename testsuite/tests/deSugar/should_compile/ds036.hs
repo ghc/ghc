@@ -8,8 +8,8 @@ Date:       10 Mar 1992 17:17:21 GMT
 
 Will,
 
-I have just started using Haskell at York and have found a compilation 
-error in the code below which disappears when the last line is 
+I have just started using Haskell at York and have found a compilation
+error in the code below which disappears when the last line is
 commented out
 -}
 
@@ -33,11 +33,11 @@ Dave
 
 
 -----------------------------------------------------------------------
-David Cattrall			Telephone +44 904 432777
-Department of Computer Science	
-University of York		JANET:	dmc@uk.ac.york.minster
+David Cattrall                  Telephone +44 904 432777
+Department of Computer Science
+University of York              JANET:  dmc@uk.ac.york.minster
 YORK Y01 5DD
-United Kingdom			UUNET:	uucp!ukc!minster!dmc
+United Kingdom                  UUNET:  uucp!ukc!minster!dmc
 -----------------------------------------------------------------------
 -}
 

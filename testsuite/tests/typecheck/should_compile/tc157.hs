@@ -4,7 +4,7 @@
 
 module ShouldCompile where
 
-type C u a = u	-- Note 'a' unused
+type C u a = u  -- Note 'a' unused
 
 foo :: (forall a. C u a -> C u a) -> u
 foo x = undefined x

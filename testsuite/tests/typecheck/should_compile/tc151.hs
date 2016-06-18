@@ -9,7 +9,7 @@ data Fork a                   =  ForkC a a
 mapFork                       :: forall a1 a2 . (a1 -> a2) -> (Fork a1 -> Fork a2)
 mapFork mapA (ForkC a1 a2)    =  ForkC (mapA a1) (mapA a2)
 
-data SequF s a	  =  EmptyF | ZeroF (s (Fork a)) | OneF a (s (Fork a))
+data SequF s a    =  EmptyF | ZeroF (s (Fork a)) | OneF a (s (Fork a))
 newtype HFix h a  =  HIn (h (HFix h) a)
 
 type Sequ =  HFix SequF
@@ -26,5 +26,5 @@ mapHFix :: forall h1 h2 . (forall f1 f2 . (forall c1 c2 . (c1 -> c2) -> (f1 c1 -
 mapHFix mapH mapA (HIn v)     =  HIn (mapH (mapHFix mapH) mapA v)
 
 mapSequ  :: forall a1 a2 . (a1 -> a2) -> (Sequ a1 -> Sequ a2)
-mapSequ	 =  mapHFix mapSequF
+mapSequ  =  mapHFix mapSequF
 

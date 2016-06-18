@@ -5,14 +5,14 @@ module ShouldFail where
 data NUM = ONE | TWO
 
 class EQ a where
-	(===) :: a -> a -> Bool
+        (===) :: a -> a -> Bool
 
 class ORD a where
-	(<<) :: a -> a -> Bool
-	a << b = True
+        (<<) :: a -> a -> Bool
+        a << b = True
 
 instance EQ (a -> b) where
-	f === g = True
+        f === g = True
 
 instance ORD (a -> b)
 
@@ -22,8 +22,8 @@ f = (<<) === (<<)
 
 {-
 instance EQ NUM where
---	a /= b = False
-	a === b = True
---	a /= b = False
+--      a /= b = False
+        a === b = True
+--      a /= b = False
 
 -}

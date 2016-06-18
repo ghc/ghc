@@ -1,9 +1,9 @@
--- Gave a bad error message in a version of 6.3, as a 
+-- Gave a bad error message in a version of 6.3, as a
 -- result of 6.3's new duplicate-instance reporting structure
 --
---	Foo.hs:4:5:
---	    No instance for `Eq Foo'
---	    When deriving the `Eq' instance for type `Bar'
+--      Foo.hs:4:5:
+--          No instance for `Eq Foo'
+--          When deriving the `Eq' instance for type `Bar'
 
 module ShouldFail where
 

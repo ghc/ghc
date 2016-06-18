@@ -5,14 +5,14 @@
 
 module ShouldCompile where
 
-	-- The for-all hoisting should hoist the
-	-- implicit parameter to give
-	-- 	r :: (?param::a) => a
+        -- The for-all hoisting should hoist the
+        -- implicit parameter to give
+        --      r :: (?param::a) => a
     r :: Int -> ((?param :: a) => a)
     r = error "urk"
 
-	-- The unboxed tuple is OK because it is
-	-- used on the right hand end of an arrow	
+        -- The unboxed tuple is OK because it is
+        -- used on the right hand end of an arrow
     type T = (# Int, Int #)
 
     f :: Int -> T

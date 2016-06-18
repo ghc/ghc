@@ -6,7 +6,7 @@
 module ShouldCompile where
 
 data T a where
-	MkT :: (Eq b) => a -> b -> T a
+        MkT :: (Eq b) => a -> b -> T a
 
 f :: (Show a) => a -> Bool
 f = undefined

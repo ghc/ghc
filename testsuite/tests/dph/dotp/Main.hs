@@ -25,7 +25,7 @@ generateVectorU n =
     k = 1000
 
 generateVector :: Int -> IO (PArray Double)
-generateVector n 
+generateVector n
   = do
       vec <- generateVectorU n
       return $ P.fromUArray vec
@@ -37,18 +37,18 @@ generateVectors n =
     w <- generateVector n
     return (v,w)
 
-main 
- = do	-- compute dot product with NDP
-	vectors			<- generateVectors 100000
-	let resultViaNDP	= (uncurry dotp) vectors
+main
+ = do   -- compute dot product with NDP
+        vectors                 <- generateVectors 100000
+        let resultViaNDP        = (uncurry dotp) vectors
 
-	-- compute with lists
-	let (aVecX, aVecY) = vectors
-	let vecX		= P.toList aVecX
-	let vecY		= P.toList aVecY
-	let resultViaList	= sum $ zipWith (*) vecX vecY
+        -- compute with lists
+        let (aVecX, aVecY) = vectors
+        let vecX                = P.toList aVecX
+        let vecY                = P.toList aVecY
+        let resultViaList       = sum $ zipWith (*) vecX vecY
 
-	-- ignore wibbles in low order bits
-	putStr $ (take 12 $ show resultViaNDP) ++ "\n"
-	putStr $ (take 12 $ show resultViaList) ++ "\n"
-	
+        -- ignore wibbles in low order bits
+        putStr $ (take 12 $ show resultViaNDP) ++ "\n"
+        putStr $ (take 12 $ show resultViaList) ++ "\n"
+

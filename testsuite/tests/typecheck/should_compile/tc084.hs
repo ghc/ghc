@@ -19,5 +19,5 @@ g b x y = if b then x+x else x-x
 f = g True
 
 h y x = f (x::Int) y
-	-- This use of f binds the overloaded monomorphic
-	-- type to Int
+        -- This use of f binds the overloaded monomorphic
+        -- type to Int

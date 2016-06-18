@@ -5,4 +5,4 @@ module ShouldFail where
 class Foo a where
   op :: a -> a
 
-  op2 x = x	-- Bogus declaration
+  op2 x = x     -- Bogus declaration

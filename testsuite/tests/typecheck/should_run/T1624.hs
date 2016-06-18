@@ -13,4 +13,4 @@ instance Foo (Maybe a) a where
 
 
 main = do { print (foo (Just 'x'))
-	  ; print (bar (Just 'y')) }
+          ; print (bar (Just 'y')) }

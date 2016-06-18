@@ -5,7 +5,7 @@
 
 -- The key thing here is that foo should get the type
 --     foo :: forall b s t1. (Zork s (Z [Char]) b)
---	   => Q s (Z [Char]) t1 -> ST s ()
+--         => Q s (Z [Char]) t1 -> ST s ()
 
 -- Note the quantification over 'b', which was previously
 -- omitted; see Note [Important subtlety in oclose] in FunDeps

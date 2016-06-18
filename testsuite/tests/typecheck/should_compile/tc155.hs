@@ -4,7 +4,7 @@
 -- partial application of the type sig.
 -- But with LiberalTypeSynonyms it should be OK because when
 -- you expand the type synonyms it's just Int->Int
--- 	c.f should_fail/tcfail107.hs
+--      c.f should_fail/tcfail107.hs
 
 module ShouldCompile where
 

@@ -8,10 +8,10 @@ module Main where
 -- mbs@cse.ogi.edu 24-Oct-2001 22:21:27
 
 f :: (?x :: Int) => ((?x :: Int) => Int) -> Int -> Int
-f g y = if y == 0 
-	then g 
-	else let ?x = ?x + 1 
-	     in f g (y - 1)
+f g y = if y == 0
+        then g
+        else let ?x = ?x + 1
+             in f g (y - 1)
 
 h :: (?x :: Int) => Int
 h = ?x

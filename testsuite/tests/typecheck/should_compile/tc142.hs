@@ -5,7 +5,7 @@ module ShouldFail where
 
 data NUM = ONE | TWO
 class EQ a where
-	(==) :: a -> a -> Bool
+        (==) :: a -> a -> Bool
 
 instance EQ NUM where
-	a == b = True
+        a == b = True

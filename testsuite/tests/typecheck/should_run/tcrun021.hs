@@ -52,7 +52,7 @@ model :: Map LinuxObjectId LinuxObject
 model =  fromList [ (Left [], File []), (Left ["home"], File ["home"]) ]
 
 
--- 	works
+--      works
 -- model :: (LinuxObjectId, LinuxObject)
 -- model =  (Left [], File [])
 

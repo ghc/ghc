@@ -14,20 +14,20 @@ class Bug f a r | f a -> r where
    bug::f->a->r
 
 instance                Bug (Int->r) Int      r
-instance (Bug f a r) => Bug f        (c a)    (c r) 
+instance (Bug f a r) => Bug f        (c a)    (c r)
 
 f:: Bug(Int->Int) a r => a->r
 f = bug (id::Int->Int)
 
 g1 = f (f [0::Int])
--- Inner f gives result type 
---	f [0::Int] :: Bug (Int->Int) [Int] r => r
+-- Inner f gives result type
+--      f [0::Int] :: Bug (Int->Int) [Int] r => r
 -- Which matches the second instance declaration, giving r = [r']
---	f [0::Int] :: Bug (Int->Int) Int r' => r'
+--      f [0::Int] :: Bug (Int->Int) Int r' => r'
 -- Wwich matches the first instance decl giving r' = Int
---	f [0::Int] :: Int
+--      f [0::Int] :: Int
 -- The outer f now has constraint
---	Bug (Int->Int) Int r
+--      Bug (Int->Int) Int r
 -- which makes r=Int
 -- So g1::Int
 

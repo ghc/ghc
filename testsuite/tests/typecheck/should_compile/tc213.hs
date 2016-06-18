@@ -1,7 +1,7 @@
 {-# LANGUAGE RankNTypes, ScopedTypeVariables, FlexibleInstances,
              MultiParamTypeClasses, FunctionalDependencies #-}
 
--- This tests scoped type variables, used in an expression 
+-- This tests scoped type variables, used in an expression
 -- type signature in t1 and t2
 
 module Foo7 where
@@ -36,14 +36,14 @@ instance Ix key => Mark (ST s) (STUArray s key Bool) key where
 -- traversing the hull suc^*(start) with loop detection
 trav suc start i = new i >>= \ c -> mapM_ (compo c) start >> return c
      where compo c x = markQ c x >>= flip unless (visit c x)
-	   visit c x = mark c x >> mapM_ (compo c) (suc x)
+           visit c x = mark c x >> mapM_ (compo c) (suc x)
 
 -- sample graph
 f 1 = 1 : []
 f n = n : f (if even n then div n 2 else 3*n+1)
 
 t1 = runST ( (trav f [1..10] (1,52) >>= \ (s::STRef s (Set Int)) -> seen s)
-	    :: forall s. ST s [Int] )
+            :: forall s. ST s [Int] )
 
 t2 = runST ( (trav f [1..10] (1,52) >>= \ (s::STUArray s Int Bool) -> seen s)
-	    :: forall s. ST s [Int] )
+            :: forall s. ST s [Int] )
