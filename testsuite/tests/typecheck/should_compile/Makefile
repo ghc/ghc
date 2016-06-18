@@ -20,9 +20,9 @@ T2412:
 
 tc245:
 	$(RM) -f Tc245_A.hi Tc245_A.o tc245.hi tc245.o
-	'$(TEST_HC)' $(filter-out -fforce-recomp,$(TEST_HC_OPTS)) --make tc245
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make tc245
 	$(RM) -f tc245.hi tc245.o
-	'$(TEST_HC)' $(filter-out -fforce-recomp,$(TEST_HC_OPTS)) --make tc245
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make tc245
 
 # Trac #5792 gave an error on the second compilation,
 # presumably because of the .hi file

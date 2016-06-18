@@ -619,7 +619,7 @@ T10320:
 	$(RM) -rf T10320 T10320.dump-rule-rewrites T10320.hi T10320.o
 	"$(TEST_HC)" $(TEST_HC_OPTS) -ddump-to-file -ddump-rule-rewrites -fenable-rewrite-rules T10320.hs
 	[ -s T10320.dump-rule-rewrites ]
-	"$(TEST_HC)" $(TEST_HC_OPTS) -ddump-to-file -ddump-rule-rewrites T10320.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -fforce-recomp -ddump-to-file -ddump-rule-rewrites T10320.hs
 	[ -f T10320.dump-rule-rewrites ] && [ ! -s T10320.dump-rule-rewrites ]
 
 .PHONY: T12135

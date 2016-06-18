@@ -418,9 +418,8 @@ test('T8101', expect_broken(10600), compile, ['-Wall -fno-code'])
 test('T8101b', expect_broken(10600), multimod_compile,
      ['T8101b', '-Wall -fno-code'])
 
-def build_T9050(name, way):
-     return simple_build(name + '.cmm', way, '-outputdir=. ', 0, '', 0, 0, 0)
-test('T9050', normal, build_T9050, [])
+# Should not panic when compiling cmm file together with -outputdir.
+test('T9050', cmm_src, compile, ['-outputdir=.'])
 
 test('write_interface_oneshot',
      extra_clean(['write_interface_oneshot_hidir/*']),

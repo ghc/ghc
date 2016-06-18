@@ -1007,9 +1007,7 @@ def run_command( name, way, cmd ):
 # GHCi tests
 
 def ghci_script( name, way, script, override_flags = None ):
-    # filter out -fforce-recomp from compiler_always_flags, because we're
-    # actually testing the recompilation behaviour in the GHCi tests.
-    flags = ' '.join(get_compiler_flags(override_flags, noforce=True))
+    flags = ' '.join(get_compiler_flags(override_flags))
 
     way_flags = ' '.join(config.way_flags(name)[way])
 
@@ -1076,10 +1074,7 @@ def do_compile( name, way, should_fail, top_mod, extra_mods, extra_hc_opts, over
        return result
     extra_hc_opts = result['hc_opts']
 
-    force = 0
-    if extra_mods:
-       force = 1
-    result = simple_build( name, way, extra_hc_opts, should_fail, top_mod, 0, 1, force, override_flags )
+    result = simple_build(name, way, extra_hc_opts, should_fail, top_mod, 0, 1, override_flags)
 
     if badResult(result):
         return result
@@ -1103,7 +1098,7 @@ def do_compile( name, way, should_fail, top_mod, extra_mods, extra_hc_opts, over
 
 def compile_cmp_asm( name, way, extra_hc_opts ):
     print('Compile only, extra args = ', extra_hc_opts)
-    result = simple_build( name + '.cmm', way, '-keep-s-files -O ' + extra_hc_opts, 0, '', 0, 0, 0)
+    result = simple_build(name + '.cmm', way, '-keep-s-files -O ' + extra_hc_opts, 0, '', 0, 0)
 
     if badResult(result):
         return result
@@ -1137,11 +1132,7 @@ def compile_and_run__( name, way, top_mod, extra_mods, extra_hc_opts ):
     if way.startswith('ghci'): # interpreted...
         return interpreter_run( name, way, extra_hc_opts, 0, top_mod )
     else: # compiled...
-        force = 0
-        if extra_mods:
-           force = 1
-
-        result = simple_build( name, way, extra_hc_opts, 0, top_mod, 1, 1, force)
+        result = simple_build(name, way, extra_hc_opts, 0, top_mod, 1, 1)
         if badResult(result):
             return result
 
@@ -1222,9 +1213,8 @@ def checkStats(name, way, stats_file, range_fields):
 # Build a single-module program
 
 def extras_build( way, extra_mods, extra_hc_opts ):
-    for modopts in extra_mods:
-        mod, opts = modopts
-        result = simple_build( mod, way, opts + ' ' + extra_hc_opts, 0, '', 0, 0, 0)
+    for mod, opts in extra_mods:
+        result = simple_build(mod, way, opts + ' ' + extra_hc_opts, 0, '', 0, 0)
         if not (mod.endswith('.hs') or mod.endswith('.lhs')):
             extra_hc_opts += ' ' + replace_suffix(mod, 'o')
         if badResult(result):
@@ -1232,8 +1222,7 @@ def extras_build( way, extra_mods, extra_hc_opts ):
 
     return {'passFail' : 'pass', 'hc_opts' : extra_hc_opts}
 
-
-def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, noforce, override_flags = None ):
+def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, override_flags=None):
     opts = getTestOpts()
     errname = add_suffix(name, 'comp.stderr')
 
@@ -1273,7 +1262,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
     else:
         cmd_prefix = getTestOpts().compile_cmd_prefix + ' '
 
-    flags = ' '.join(get_compiler_flags(override_flags, noforce) +
+    flags = ' '.join(get_compiler_flags(override_flags) +
                      config.way_flags(name)[way])
 
     cmd = ('cd "{opts.testdir}" && {cmd_prefix} '
@@ -1448,7 +1437,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
     if os.path.exists(stdin_file):
         os.system('cat "{0}" >> "{1}"'.format(stdin_file, qscriptname))
 
-    flags = ' '.join(get_compiler_flags(override_flags=None, noforce=False) +
+    flags = ' '.join(get_compiler_flags() +
                      config.way_flags(name)[way])
 
     if getTestOpts().combined_output:
@@ -1516,16 +1505,13 @@ def split_file(in_fn, delimiter, out1_fn, out2_fn):
 
 # -----------------------------------------------------------------------------
 # Utils
-def get_compiler_flags(override_flags, noforce):
+def get_compiler_flags(override_flags=None):
     opts = getTestOpts()
 
     if override_flags is not None:
         flags = copy.copy(override_flags)
     else:
         flags = copy.copy(opts.compiler_always_flags)
-
-    if noforce:
-        flags = [f for f in flags if f != '-fforce-recomp']
 
     flags.append(opts.extra_hc_opts)
 

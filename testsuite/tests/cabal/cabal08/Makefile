@@ -22,7 +22,7 @@ cabal08: clean
 	cd p2 && $(SETUP) register
 	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db tmp1.d -package-db tmp2.d Main.hs
 	./Main
-	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db tmp1.d -package-db tmp2.d -hide-all-packages -package base -package p Main.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -fforce-recomp -package-db tmp1.d -package-db tmp2.d -hide-all-packages -package base -package p Main.hs
 	./Main
 ifneq "$(CLEANUP)" ""
 	$(MAKE) -s --no-print-directory clean
