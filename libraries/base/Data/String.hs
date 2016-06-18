@@ -1,5 +1,8 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude, FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
 
 -----------------------------------------------------------------------------
@@ -29,6 +32,7 @@ module Data.String (
 
 import GHC.Base
 import Data.Functor.Const (Const (Const))
+import Data.Functor.Identity (Identity (Identity))
 import Data.List (lines, words, unlines, unwords)
 
 -- | Class for string-like datastructures; used by the overloaded string
@@ -83,5 +87,5 @@ instance (a ~ Char) => IsString [a] where
     fromString xs = xs
 
 -- | @since 4.9.0.0
-instance IsString a => IsString (Const a b) where
-    fromString = Const . fromString
+deriving instance IsString a => IsString (Const a b)
+deriving instance IsString a => IsString (Identity a)

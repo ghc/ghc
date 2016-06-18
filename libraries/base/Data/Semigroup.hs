@@ -1,11 +1,12 @@
-{-# LANGUAGE DefaultSignatures   #-}
-{-# LANGUAGE DeriveDataTypeable  #-}
-{-# LANGUAGE DeriveGeneric       #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE PolyKinds           #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE Trustworthy         #-}
-{-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE DefaultSignatures          #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE PolyKinds                  #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE Trustworthy                #-}
+{-# LANGUAGE TypeOperators              #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -70,9 +71,12 @@ import           Prelude             hiding (foldr1)
 import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Fix
+import           Data.Bifoldable
 import           Data.Bifunctor
+import           Data.Bitraversable
 import           Data.Coerce
 import           Data.Data
+import           Data.Functor.Identity
 import           Data.List.NonEmpty
 import           Data.Monoid         (All (..), Any (..), Dual (..), Endo (..),
                                       Product (..), Sum (..))
@@ -280,6 +284,11 @@ stimesIdempotent n x
   | otherwise = x
 
 -- | @since 4.9.0.0
+instance Semigroup a => Semigroup (Identity a) where
+  (<>) = coerce ((<>) :: a -> a -> a)
+  stimes n (Identity a) = Identity (stimes n a)
+
+-- | @since 4.9.0.0
 instance Semigroup a => Semigroup (Const a b) where
   (<>) = coerce ((<>) :: a -> a -> a)
   stimes n (Const a) = Const (stimes n a)
@@ -473,6 +482,12 @@ instance Ord a => Ord (Arg a b) where
 -- | @since 4.9.0.0
 instance Bifunctor Arg where
   bimap f g (Arg a b) = Arg (f a) (g b)
+
+instance Bifoldable Arg where
+  bifoldMap f g (Arg a b) = f a `mappend` g b
+
+instance Bitraversable Arg where
+  bitraverse f g (Arg a b) = Arg <$> f a <*> g b
 
 -- | Use @'Option' ('First' a)@ to get the behavior of
 -- 'Data.Monoid.First' from "Data.Monoid".

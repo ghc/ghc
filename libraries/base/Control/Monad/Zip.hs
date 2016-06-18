@@ -19,6 +19,7 @@
 module Control.Monad.Zip where
 
 import Control.Monad (liftM, liftM2)
+import Data.Functor.Identity
 import Data.Monoid
 import Data.Proxy
 import GHC.Generics
@@ -57,6 +58,11 @@ instance MonadZip [] where
     mzip     = zip
     mzipWith = zipWith
     munzip   = unzip
+
+-- | @since 4.8.0.0
+instance MonadZip Identity where
+    mzipWith                 = liftM2
+    munzip (Identity (a, b)) = (Identity a, Identity b)
 
 -- | @since 4.8.0.0
 instance MonadZip Dual where

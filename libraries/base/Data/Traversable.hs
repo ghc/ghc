@@ -56,6 +56,8 @@ import Control.Applicative ( Const(..), ZipList(..) )
 import Data.Either ( Either(..) )
 import Data.Foldable ( Foldable )
 import Data.Functor
+import Data.Functor.Identity ( Identity(..) )
+import Data.Functor.Utils ( StateL(..), StateR(..) )
 import Data.Monoid ( Dual(..), Sum(..), Product(..), First(..), Last(..) )
 import Data.Proxy ( Proxy(..) )
 
@@ -240,6 +242,8 @@ instance Traversable Last where
 instance Traversable ZipList where
     traverse f (ZipList x) = ZipList <$> traverse f x
 
+deriving instance Traversable Identity
+
 -- Instances for GHC.Generics
 -- | @since 4.9.0.0
 instance Traversable U1 where
@@ -281,42 +285,12 @@ forM :: (Traversable t, Monad m) => t a -> (a -> m b) -> m (t b)
 {-# INLINE forM #-}
 forM = flip mapM
 
--- left-to-right state transformer
-newtype StateL s a = StateL { runStateL :: s -> (s, a) }
-
--- | @since 4.0
-instance Functor (StateL s) where
-    fmap f (StateL k) = StateL $ \ s -> let (s', v) = k s in (s', f v)
-
--- | @since 4.0
-instance Applicative (StateL s) where
-    pure x = StateL (\ s -> (s, x))
-    StateL kf <*> StateL kv = StateL $ \ s ->
-        let (s', f) = kf s
-            (s'', v) = kv s'
-        in (s'', f v)
-
 -- |The 'mapAccumL' function behaves like a combination of 'fmap'
 -- and 'foldl'; it applies a function to each element of a structure,
 -- passing an accumulating parameter from left to right, and returning
 -- a final value of this accumulator together with the new structure.
 mapAccumL :: Traversable t => (a -> b -> (a, c)) -> a -> t b -> (a, t c)
 mapAccumL f s t = runStateL (traverse (StateL . flip f) t) s
-
--- right-to-left state transformer
-newtype StateR s a = StateR { runStateR :: s -> (s, a) }
-
--- | @since 4.0
-instance Functor (StateR s) where
-    fmap f (StateR k) = StateR $ \ s -> let (s', v) = k s in (s', f v)
-
--- | @since 4.0
-instance Applicative (StateR s) where
-    pure x = StateR (\ s -> (s, x))
-    StateR kf <*> StateR kv = StateR $ \ s ->
-        let (s', v) = kv s
-            (s'', f) = kf s'
-        in (s'', f v)
 
 -- |The 'mapAccumR' function behaves like a combination of 'fmap'
 -- and 'foldr'; it applies a function to each element of a structure,
@@ -331,23 +305,9 @@ mapAccumR f s t = runStateR (traverse (StateR . flip f) t) s
 --   'sequenceA' will result in infinite recursion.)
 fmapDefault :: Traversable t => (a -> b) -> t a -> t b
 {-# INLINE fmapDefault #-}
-fmapDefault f = getId . traverse (Id . f)
+fmapDefault f = runIdentity . traverse (Identity . f)
 
 -- | This function may be used as a value for `Data.Foldable.foldMap`
 -- in a `Foldable` instance.
 foldMapDefault :: (Traversable t, Monoid m) => (a -> m) -> t a -> m
 foldMapDefault f = getConst . traverse (Const . f)
-
--- local instances
-
-newtype Id a = Id { getId :: a }
-
--- | @since 2.01
-instance Functor Id where
-    fmap f (Id x) = Id (f x)
-
--- | @since 2.01
-instance Applicative Id where
-    pure = Id
-    Id f <*> Id x = Id (f x)
-

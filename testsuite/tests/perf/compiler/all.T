@@ -776,9 +776,10 @@ test('T9961',
 test('T9233',
     [ only_ways(['normal']),
       compiler_stats_num_field('bytes allocated',
-        [(wordsize(64), 1066246248, 5),
+        [(wordsize(64), 984268712, 5),
          # 2015-08-04    999826288     initial value
          # 2016-04-14   1066246248     Final demand analyzer run
+         # 2016-06-18    984268712     shuffling around of Data.Functor.Identity
          (wordsize(32),  515672240, 5)   # Put in your value here if you hit this
          # 2016-04-06    515672240     (x86/Linux) initial value
         ]),

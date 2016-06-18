@@ -129,6 +129,7 @@ import GHC.Show
 import Text.Read( reads )
 
 -- Imports for the instances
+import Data.Functor.Identity -- So we can give Data instance for Identity
 import Data.Int              -- So we can give Data instance for Int8, ...
 import Data.Type.Coercion
 import Data.Word             -- So we can give Data instance for Word8, ...
@@ -310,14 +311,14 @@ class Typeable a => Data a where
   -- isomorphism pair as injection and projection.
   gmapT :: (forall b. Data b => b -> b) -> a -> a
 
-  -- Use an identity datatype constructor ID (see below)
+  -- Use the Identity datatype constructor
   -- to instantiate the type constructor c in the type of gfoldl,
-  -- and perform injections ID and projections unID accordingly.
+  -- and perform injections Identity and projections runIdentity accordingly.
   --
-  gmapT f x0 = unID (gfoldl k ID x0)
+  gmapT f x0 = runIdentity (gfoldl k Identity x0)
     where
-      k :: Data d => ID (d->b) -> d -> ID b
-      k (ID c) x = ID (c (f x))
+      k :: Data d => Identity (d->b) -> d -> Identity b
+      k (Identity c) x = Identity (c (f x))
 
 
   -- | A generic query with a left-associative binary operator
@@ -423,10 +424,6 @@ was transformed successfully.
              )
 
 
--- | The identity type constructor needed for the definition of gmapT
-newtype ID x = ID { unID :: x }
-
-
 -- | The constant type constructor needed for the definition of gmapQl
 newtype CONST c a = CONST { unCONST :: c }
 
@@ -461,13 +458,13 @@ fromConstrB :: Data a
             => (forall d. Data d => d)
             -> Constr
             -> a
-fromConstrB f = unID . gunfold k z
+fromConstrB f = runIdentity . gunfold k z
  where
-  k :: forall b r. Data b => ID (b -> r) -> ID r
-  k c = ID (unID c f)
+  k :: forall b r. Data b => Identity (b -> r) -> Identity r
+  k c = Identity (runIdentity c f)
 
-  z :: forall r. r -> ID r
-  z = ID
+  z :: forall r. r -> Identity r
+  z = Identity
 
 
 -- | Monadic variation on 'fromConstrB'
@@ -1199,6 +1196,9 @@ deriving instance (a ~ b, Data a) => Data (a :~: b)
 
 -- | @since 4.7.0.0
 deriving instance (Coercible a b, Data a, Data b) => Data (Coercion a b)
+
+-- | @since 4.9.0.0
+deriving instance Data a => Data (Identity a)
 
 -- | @since 4.7.0.0
 deriving instance Data Version
