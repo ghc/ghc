@@ -4,7 +4,7 @@
 class (Num a, Integral a) => Foo a
 
 main = putStr (shows (f ((fromInteger 21)::Int)
-			((fromInteger 37))) "\n")
+                        ((fromInteger 37))) "\n")
 
 instance Foo Int
 

@@ -36,7 +36,7 @@ main = do
   putStrLn "Testing Enum (Ratio Int): "
   testEnumRatioInt
 
-{- 
+{-
   Here's the properties that's supposed to
   hold for arithmetic sequences over Int:
 
@@ -44,30 +44,30 @@ main = do
 
    - [e1,e2..] = [e1, (e1+i), (e1+2*i), ... upper]
                  where
-		  i = e2 - e1
-		  upper
-		   | i >  0 = maxBound
-		   | i <  0 = minBound
-		   | i == 0 = maxBound -- this really shouldn't matter (I feel.)
+                  i = e2 - e1
+                  upper
+                   | i >  0 = maxBound
+                   | i <  0 = minBound
+                   | i == 0 = maxBound -- this really shouldn't matter (I feel.)
    - [e1..e3] = [e1, (e1+i), (e1+2*i),..e3]
                 where
-		 i
-		  | e3 >= e1 = 1
-		  | e3 <  e1 = (-1)
-    
+                 i
+                  | e3 >= e1 = 1
+                  | e3 <  e1 = (-1)
+
    - [e1,e2..e3] = res
                    where
-		    i = e2 - e1
-		    
-		    res
-		     | i >= 0 && e3 <  e1 = []
-		     | i <  0 && e3 >= e1 = []  -- (*)
-		     | otherwise          = [e1, (e1+i), (e1 + 2*i), .. e3]
+                    i = e2 - e1
+
+                    res
+                     | i >= 0 && e3 <  e1 = []
+                     | i <  0 && e3 >= e1 = []  -- (*)
+                     | otherwise          = [e1, (e1+i), (e1 + 2*i), .. e3]
 
    Note:
      (*) - I think this instead should be (i < 0 && e3 > e1), since, as is,
 
-            [x,(x+1) ..x] = [x] 
+            [x,(x+1) ..x] = [x]
             [x,(x-1) ..x] = []
 
            which does not look right, symmetrically speaking.
@@ -75,7 +75,7 @@ main = do
 
    The same properties hold for other Prelude types that
    are instances of Enum as well as being Bounded.
-   
+
    For non-Bounded types (e.g., Float and Double), the properties are similar,
    except that the boundary tests become slightly different, i.e., when an
    element becomes greater than (e3 + i/2) (or less than (e3 + i/2) for negative
@@ -98,7 +98,7 @@ testEnumInt = do
      -- pred
   printTest (pred (1::Int))
   printTest (pred (maxBound::Int))
-  mayBomb   (printTest (pred (minBound::Int))) 
+  mayBomb   (printTest (pred (minBound::Int)))
 
      -- toEnum
   printTest ((map (toEnum::Int->Int) [1,minBound,maxBound]))
@@ -109,7 +109,7 @@ testEnumInt = do
      -- [x..] aka enumFrom
   printTest ((take 7 [(1::Int)..]))
   printTest ((take 7 [((maxBound::Int)-5)..])) -- just in case it doesn't catch the upper bound..
-  
+
      -- [x,y..] aka enumFromThen
   printTest ((take 7 [(1::Int),2..]))
   printTest ((take 7 [(1::Int),7..]))
@@ -123,7 +123,7 @@ testEnumInt = do
   let x = (maxBound::Int) - 5
   printTest ((take 7 [x, (x+1) ..]))
 
-	-- Test overflow conditions
+        -- Test overflow conditions
   printTest (([minBound::Int,1..]))
   printTest (([minBound::Int,0..]))
   printTest (([minBound::Int,-1..]))
@@ -148,7 +148,7 @@ testEnumInt = do
   printTest ((take 7 [(2::Int),1..1]))
   printTest ((take 7 [(2::Int),3..1]))
 
-	-- Test overflow conditions
+        -- Test overflow conditions
   printTest (([minBound, 1..maxBound::Int]))
   printTest (([minBound, 0..maxBound::Int]))
   printTest (([minBound,-1..maxBound::Int]))
@@ -190,7 +190,7 @@ testEnumChar = do
   do{ putStr ( "    " ++ "(take 7 ['\\NUL' .. ])" ++ " = " ) ; print (take 7 ['\NUL' .. ]) }
   -- printTest ((take 7 ['\250' .. ]))
   do{ putStr ( "    " ++ "(take 7 ['\\250' .. ])" ++ " = " ) ; print (take 7 ['\250' .. ]) }
-  
+
      -- [x,y..] aka enumFromThen
   printTest ((take 7 ['a','b'..]))
   printTest ((take 7 ['a','e'..]))
@@ -237,7 +237,7 @@ testEnumUnit = do
   mayBomb (printTest ((succ ())))
   mayBomb (printTest ((succ (minBound::()))))
   mayBomb (printTest ((succ (maxBound::()))))
-       
+
    -- pred:
   mayBomb (printTest ((pred ())))
   mayBomb (printTest ((pred (minBound::()))))
@@ -268,7 +268,7 @@ testEnumOrdering = do
   printTest ((succ LT))
   printTest ((succ (minBound::Ordering)))
   mayBomb (printTest ((succ (maxBound::Ordering))))
-       
+
    -- pred:
   printTest ((pred GT))
   printTest ((pred (maxBound::Ordering)))
@@ -322,7 +322,7 @@ testEnumBool = do
   printTest ((succ False))
   printTest ((succ (minBound::Bool)))
   mayBomb (printTest ((succ (maxBound::Bool))))
-       
+
    -- pred:
   printTest ((pred True))
   printTest ((pred (maxBound::Bool)))
@@ -380,7 +380,7 @@ testEnumInteger = do
      -- [x..] aka enumFrom
   printTest ((take 7 [(1::Integer)..]))
   printTest ((take 7 [(-5::Integer)..]))
-  
+
      -- [x,y..] aka enumFromThen
   printTest ((take 7 [(1::Integer),2..]))
   printTest ((take 7 [(1::Integer),7..]))
@@ -422,7 +422,7 @@ testEnumRational = do
      -- [x..] aka enumFrom
   printTest ((take 7 [(1::Rational)..]))
   printTest ((take 7 [(-5::Rational)..]))
-  
+
      -- [x,y..] aka enumFromThen
   printTest ((take 7 [(1::Rational),2..]))
   printTest ((take 7 [(1::Rational),7..]))
@@ -465,7 +465,7 @@ testEnumRatioInt = do
   printTest ((take 7 [(1::Ratio Int)..]))
   printTest ((take 7 [(-5::Ratio Int)..]))
   printTest ((take 7 [((toEnum ((maxBound::Int)-5))::Ratio Int)..]))
-  
+
      -- [x,y..] aka enumFromThen
   printTest ((take 7 [(1::Ratio Int),2..]))
   printTest ((take 7 [(1::Ratio Int),7..]))

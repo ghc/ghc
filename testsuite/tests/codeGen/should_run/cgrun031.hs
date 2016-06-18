@@ -19,8 +19,8 @@ prog :: Int -> Int -> Int
 
 prog size_1 size_2
   = let
-	list1 = static1 : (map mk_foo [1 .. size_1])
-	list2 = static2 : (map mk_foo [1 .. size_2])
+        list1 = static1 : (map mk_foo [1 .. size_1])
+        list2 = static2 : (map mk_foo [1 .. size_2])
     in
     I# (add_up 0# list1 (reverse list2))
 

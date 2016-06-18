@@ -9,12 +9,12 @@
 module FooModule where
 
 class Concrete a b | a -> b where
-	bar :: a -> String
+        bar :: a -> String
 
 class Wuggle b | -> b  -- To make the Concrete instance work
 
 instance (Show a, Wuggle b) => Concrete a b where
-	bar = error "urk"
+        bar = error "urk"
 
 wib :: Concrete a b => a -> String
 -- Weird test case: (Concrete a b) is simplifiable
@@ -39,7 +39,7 @@ from (Concrete a b).
 
 
 OK,  found that in GHC 6.6, adding
-	instance Concrete Bool Bool
+        instance Concrete Bool Bool
 fixed the problem. That's weird isn't it?  The reason is this. When GHC looks
 at the instance decls, it now sees *two* instance decls matching
 (Concrete a q), and so it declines for now to use either of them

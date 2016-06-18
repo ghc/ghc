@@ -2,7 +2,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 -- Type error message looks like
--- 	TF.hs:12:11:
+--      TF.hs:12:11:
 --    Couldn't match expected type `Memo d'
 --           against inferred type `Memo d1'
 --      NB: `Memo' is a (non-injective) type function

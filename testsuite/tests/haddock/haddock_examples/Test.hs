@@ -4,7 +4,7 @@
 -- Module      :  Test
 -- Copyright   :  (c) Simon Marlow 2002
 -- License     :  BSD-style
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional
 -- Portability :  portable
@@ -16,80 +16,80 @@
 
 -- This is plain comment, ignored by Haddock.
 
-module Test ( 
+module Test (
 
-	-- Section headings are introduced with '-- *':
-	-- * Type declarations
+        -- Section headings are introduced with '-- *':
+        -- * Type declarations
 
-	-- Subsection headings are introduced with '-- **' and so on.
-	-- ** Data types
-	T(..), T2, T3(..), T4(..), T5(..), T6(..),
-	N1(..), N2(..), N3(..), N4, N5(..), N6(..), N7(..),
+        -- Subsection headings are introduced with '-- **' and so on.
+        -- ** Data types
+        T(..), T2, T3(..), T4(..), T5(..), T6(..),
+        N1(..), N2(..), N3(..), N4, N5(..), N6(..), N7(..),
 
-	-- ** Records
-	R(..), R1(..),
+        -- ** Records
+        R(..), R1(..),
 
-	-- | test that we can export record selectors on their own:
-	p, q, u,
+        -- | test that we can export record selectors on their own:
+        p, q, u,
 
-	-- * Class declarations
-	C(a,b), D(..), E, F(..),
-	
-	-- | Test that we can export a class method on its own:
-	a,
+        -- * Class declarations
+        C(a,b), D(..), E, F(..),
 
-	-- * Function types
-	f, g,
+        -- | Test that we can export a class method on its own:
+        a,
 
-	-- * Auxiliary stuff
+        -- * Function types
+        f, g,
 
-	-- $aux1
+        -- * Auxiliary stuff
 
-	-- $aux2
+        -- $aux1
 
-	-- $aux3
+        -- $aux2
 
-	-- $aux4
+        -- $aux3
 
-	-- $aux5
+        -- $aux4
 
-	-- $aux6
+        -- $aux5
 
-	-- $aux7
+        -- $aux6
 
-	-- $aux8
+        -- $aux7
 
-	-- $aux9
+        -- $aux8
 
-	-- $aux10
+        -- $aux9
 
-	-- $aux11
+        -- $aux10
 
-	-- $aux12
+        -- $aux11
 
-	-- | This is some inline documentation in the export list
-	--
-	-- > a code block using bird-tracks
-	-- > each line must begin with > (which isn't significant unless it
-	-- > is at the beginning of the line).
+        -- $aux12
 
-	-- * A hidden module
-	module Hidden,
+        -- | This is some inline documentation in the export list
+        --
+        -- > a code block using bird-tracks
+        -- > each line must begin with > (which isn't significant unless it
+        -- > is at the beginning of the line).
 
-	-- * A visible module
-	module Visible,
+        -- * A hidden module
+        module Hidden,
 
-	{-| nested-style doc comments -}
+        -- * A visible module
+        module Visible,
 
-	-- * Existential \/ Universal types
-	Ex(..),
+        {-| nested-style doc comments -}
 
-	-- * Type signatures with argument docs
-	k, l, m, o,
+        -- * Existential \/ Universal types
+        Ex(..),
 
-	-- * A section
-	-- and without an intervening comma:
-	-- ** A subsection 
+        -- * Type signatures with argument docs
+        k, l, m, o,
+
+        -- * A section
+        -- and without an intervening comma:
+        -- ** A subsection
 
 {-|
  > a literal line
@@ -97,7 +97,7 @@ module Test (
  $ a non /literal/ line $
 -}
 
-	f',
+        f',
    ) where
 
 import Hidden
@@ -108,7 +108,7 @@ import Visible
 data T a b
  = A Int (Maybe Float) -- ^ This comment describes the 'A' constructor
  | -- | This comment describes the 'B' constructor
-   B (T a b, T Int Float) -- ^ 
+   B (T a b, T Int Float) -- ^
 
 -- | An abstract data declaration
 data T2 a b = T2 a b
@@ -141,25 +141,25 @@ newtype N1 a = N1 a
 newtype N2 a b = N2 {n :: a b}
 
 -- | A newtype with a fieldname, documentation on the field
-newtype N3 a b = N3 {n3 :: a b -- ^ this is the 'n3' field 
-		    }
+newtype N3 a b = N3 {n3 :: a b -- ^ this is the 'n3' field
+                    }
 
 -- | An abstract newtype - we show this one as data rather than newtype because
 -- the difference isn\'t visible to the programmer for an abstract type.
 newtype N4 a b = N4 a
 
 newtype N5 a b = N5 {n5 :: a b -- ^ no docs on the datatype or the constructor
-		    }
+                    }
 
 newtype N6 a b = N6 {n6 :: a b
-		    }
-		 -- ^ docs on the constructor only
+                    }
+                 -- ^ docs on the constructor only
 
 -- | docs on the newtype and the constructor
 newtype N7 a b = N7 {n7 :: a b
-		    }
-		-- ^ The 'N7' constructor
-		 
+                    }
+                -- ^ The 'N7' constructor
+
 
 class (D a) => C a  where
    -- |this is a description of the 'a' method
@@ -194,7 +194,7 @@ class F a where
 
 -- | This is the documentation for the 'R' record, which has four fields,
 -- 'p', 'q', 'r', and 's'.
-data R = 
+data R =
   -- | This is the 'C1' record constructor, with the following fields:
   C1 { p :: Int -- ^ This comment applies to the 'p' field
      , q :: forall a . a->a  -- ^ This comment applies to the 'q' field
@@ -207,16 +207,16 @@ data R =
   -- ^ This is the 'C2' record constructor, also with some fields:
 
 -- | Testing different record commenting styles
-data R1 
+data R1
   -- | This is the 'C3' record constructor
-  = C3 { 
-	-- | The 's1' record selector
-	  s1 :: Int
-	-- | The 's2' record selector
-	, s2 :: Int
-	, s3 :: Int  -- NOTE: In the original examples/Test.hs in Haddock, there is an extra "," here.
-                     -- Since GHC doesn't allow that, I have removed it in this file. 
-	-- ^ The 's3' record selector
+  = C3 {
+        -- | The 's1' record selector
+          s1 :: Int
+        -- | The 's2' record selector
+        , s2 :: Int
+        , s3 :: Int  -- NOTE: In the original examples/Test.hs in Haddock, there is an extra "," here.
+                     -- Since GHC doesn't allow that, I have removed it in this file.
+        -- ^ The 's3' record selector
      }
 
 -- These section headers are only used when there is no export list to
@@ -236,7 +236,7 @@ using double quotes: "Foo".  We can add emphasis /like this/.
    - This is the next item (different kind of bullet)
 
    (1) This is an ordered list
- 
+
    2. This is the next item (different kind of bullet)
 
 @
@@ -342,42 +342,42 @@ test2
 
 -- $aux12
 -- > foo
--- 
+--
 -- > bar
--- 
+--
 
 -- | A data-type using existential\/universal types
-data Ex a 
+data Ex a
   = forall b . C b => Ex1 b
   | forall b . Ex2 b
-  | forall b . C a => Ex3 b -- NOTE: I have added "forall b" here make GHC accept this file 
+  | forall b . C a => Ex3 b -- NOTE: I have added "forall b" here make GHC accept this file
   | Ex4 (forall a . a -> a)
 
 -- | This is a function with documentation for each argument
-k :: T () () 	  -- ^ This argument has type 'T'
+k :: T () ()      -- ^ This argument has type 'T'
   -> (T2 Int Int) -- ^ This argument has type 'T2 Int Int'
   -> (T3 Bool Bool -> T4 Float Float) -- ^ This argument has type @T3 Bool Bool -> T4 Float Float@
-  -> T5 () ()	  -- ^ This argument has a very long description that should
-		  -- hopefully cause some wrapping to happen when it is finally
-		  -- rendered by Haddock in the generated HTML page.
-  -> IO ()	  -- ^ This is the result type
+  -> T5 () ()     -- ^ This argument has a very long description that should
+                  -- hopefully cause some wrapping to happen when it is finally
+                  -- rendered by Haddock in the generated HTML page.
+  -> IO ()        -- ^ This is the result type
 
 -- This function has arg docs but no docs for the function itself
 l :: (Int, Int, Float) -- ^ takes a triple
   -> Int -- ^ returns an 'Int'
 
--- | This function has some arg docs 
+-- | This function has some arg docs
 m :: R
-  -> N1 ()	-- ^ one of the arguments
-  -> IO Int	-- ^ and the return value
+  -> N1 ()      -- ^ one of the arguments
+  -> IO Int     -- ^ and the return value
 
 -- | This function has some arg docs but not a return value doc
 
 -- can't use the original name ('n') with GHC
-newn :: R		-- ^ one of the arguments, an 'R'
-     -> N1 ()		-- ^ one of the arguments
+newn :: R               -- ^ one of the arguments, an 'R'
+     -> N1 ()           -- ^ one of the arguments
      -> IO Int
-newn = undefined 
+newn = undefined
 
 
 -- | A foreign import with argument docs
@@ -387,12 +387,12 @@ foreign import ccall unsafe "header.h"
 
 -- | We should be able to escape this: \#\#\#
 
--- p :: Int 
+-- p :: Int
 -- can't use the above original definition with GHC
-newp :: Int  
+newp :: Int
 newp = undefined
 
--- | a function with a prime can be referred to as 'f'' 
+-- | a function with a prime can be referred to as 'f''
 -- but f' doesn't get link'd 'f\''
 f' :: Int
 
@@ -402,7 +402,7 @@ f' :: Int
 data T1
 f = undefined
 f' = undefined
-type CInt = Int  
+type CInt = Int
 k = undefined
 l = undefined
 m = undefined

@@ -36,11 +36,11 @@ instance GMapKey () where
 
 instance (GMapKey a, GMapKey b) => GMapKey (a, b) where
   data GMap (a, b) v            = GMapPair (GMap a (GMap b v))
-  empty		                = GMapPair empty
-  lookup (a, b) (GMapPair gm)   = lookup a gm >>= lookup b 
+  empty                         = GMapPair empty
+  lookup (a, b) (GMapPair gm)   = lookup a gm >>= lookup b
   insert (a, b) v (GMapPair gm) = GMapPair $ case lookup a gm of
-				    Nothing  -> insert a (insert b v empty) gm
-				    Just gm2 -> insert a (insert b v gm2  ) gm
+                                    Nothing  -> insert a (insert b v empty) gm
+                                    Just gm2 -> insert a (insert b v gm2  ) gm
 
 instance (GMapKey a, GMapKey b) => GMapKey (Either a b) where
   data GMap (Either a b) v                = GMapEither (GMap a v) (GMap b v)
@@ -58,10 +58,10 @@ nonsence = undefined
 
 myGMap :: GMap (Int, Either Char ()) String
 myGMap = insert (5, Left 'c') "(5, Left 'c')"    $
-	 insert (4, Right ()) "(4, Right ())"    $
-	 insert (5, Right ()) "This is the one!" $
-	 insert (5, Right ()) "This is the two!" $
-	 insert (6, Right ()) "(6, Right ())"    $
-	 insert (5, Left 'a') "(5, Left 'a')"    $
-	 empty
+         insert (4, Right ()) "(4, Right ())"    $
+         insert (5, Right ()) "This is the one!" $
+         insert (5, Right ()) "This is the two!" $
+         insert (6, Right ()) "(6, Right ())"    $
+         insert (5, Left 'a') "(5, Left 'a')"    $
+         empty
 main = putStrLn $ maybe "Couldn't find key!" id $ lookup (5, Right ()) myGMap

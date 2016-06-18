@@ -6,11 +6,11 @@ import System.Environment ( getArgs )
 
 main :: IO ()
 main = do (arg:_) <- getArgs
-	  mapM_ printTriple [ (i,fib i,mfib i) | i <- [10..read arg] ]
+          mapM_ printTriple [ (i,fib i,mfib i) | i <- [10..read arg] ]
   where printTriple (i,fi,mfi) = do print i
-				    print fi
-				    print mfi
-				    putStrLn ""
+                                    print fi
+                                    print mfi
+                                    putStrLn ""
 
 -- There is not much point in memoising Integers, so we use unary "numbers" instead
 mfib :: Integer -> Integer

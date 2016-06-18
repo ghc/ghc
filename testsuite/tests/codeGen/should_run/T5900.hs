@@ -4,11 +4,11 @@ import Debug.Trace
 
 fl :: Word64 -> Word64 -> Word64
 fl fin sk =
-	let (x1, x2) = w64tow32 fin in
-	let (k1, k2) = w64tow32 sk in
-	let y2 = x2 `xor` ((x1 .&. k1) `rotateL` 1) in
-	let y1 = x1 `xor` (y2 .|. k2) in
-	trace (show fin ++ " " ++ show sk ++ " -> " ++ show (w32tow64 (y1, y2))) $ w32tow64 (y1, y2)
+        let (x1, x2) = w64tow32 fin in
+        let (k1, k2) = w64tow32 sk in
+        let y2 = x2 `xor` ((x1 .&. k1) `rotateL` 1) in
+        let y1 = x1 `xor` (y2 .|. k2) in
+        trace (show fin ++ " " ++ show sk ++ " -> " ++ show (w32tow64 (y1, y2))) $ w32tow64 (y1, y2)
 
 w64tow32 :: Word64 -> (Word32, Word32)
 w64tow32 w = (fromIntegral (w `shiftR` 32), fromIntegral (w .&. 0xffffffff))

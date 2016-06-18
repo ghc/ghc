@@ -1,6 +1,6 @@
-{-	Check that list comprehensions can be written
-	in do-notation. This actually broke 2.02, with
-	a pattern match failure in dsListComp!
+{-      Check that list comprehensions can be written
+        in do-notation. This actually broke 2.02, with
+        a pattern match failure in dsListComp!
 -}
 
 module Main where

@@ -16,10 +16,10 @@ g _                      = "Odd3"
 funny = T { x = undefined, y = False }
 
 main = do { print (f funny)  -- Should work, because we test
-       	    	     	     -- y first, which fails, and falls
-			     -- through to "OK"
+                             -- y first, which fails, and falls
+                             -- through to "OK"
 
-          ; Control.Exception.catch 
-	          (print (g funny))        -- Should fail, because we test
-	    	  (\(_::SomeException) -> print "caught")   -- x first, and hit "undefined"
-	  }
+          ; Control.Exception.catch
+                  (print (g funny))        -- Should fail, because we test
+                  (\(_::SomeException) -> print "caught")   -- x first, and hit "undefined"
+          }

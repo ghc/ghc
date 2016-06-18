@@ -1,5 +1,5 @@
 -- !!! Tests garbage collection in the branch of a case
--- !!!	alternative where the constructor is returned in the heap.
+-- !!!  alternative where the constructor is returned in the heap.
 
 {- This is also a rather stressful test for another reason.
    The mutual recursion between munch and f causes lots of
@@ -10,7 +10,7 @@
 
    As it turns out, they are mostly garbage, so the GC could eliminate
    them (though this isn't implemented at present), but that isn't
-   necessarily the case.  
+   necessarily the case.
 
    The only correct solution is to spot that the updates are all
    updating with the same value (update frames stacked on top of each
@@ -47,8 +47,8 @@ munch n Empty = return () -- error "this never happens!\n"
 
 munch 0 _ = putStr "I succeeded!\n"
 munch n s = case (f n s) of
-	      (True, rest) -> rest
-	      (False, _)   -> error "this never happens either\n"
+              (True, rest) -> rest
+              (False, _)   -> error "this never happens either\n"
 
 --f :: Int -> Stream a -> (Bool, [Request])
 

@@ -1,7 +1,7 @@
 module Main where
 
 data Y = X1 | X2 | X3 | X4 | X5 | X6 | X7 | X8
-	deriving( Show )
+        deriving( Show )
 
 data X = WithY Y
          | A1 | A2 | A3 | A4 | A5 | A6 | A7 | A8
@@ -19,8 +19,8 @@ foo (WithY _) = X1
 
 bar :: X -> Y
 bar (WithY x) = x
-bar y = foobar (foo y)	-- The WithY case can't occur, and in an 
-			-- earlier version that confused the code generator
+bar y = foobar (foo y)  -- The WithY case can't occur, and in an
+                        -- earlier version that confused the code generator
 
 {-# NOINLINE foobar #-}
 foobar x = x

@@ -1,9 +1,9 @@
 {-# LANGUAGE
-	FlexibleContexts,
-	RankNTypes,
-	TypeFamilies,
-	MultiParamTypeClasses,
-	FlexibleInstances #-}
+        FlexibleContexts,
+        RankNTypes,
+        TypeFamilies,
+        MultiParamTypeClasses,
+        FlexibleInstances #-}
 
 -- See Trac #4178
 

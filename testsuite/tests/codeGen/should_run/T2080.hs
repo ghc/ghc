@@ -15,7 +15,7 @@ utf8DecodeChar# a# fred =
 -- Omitting the next line gives an ASSERT error:
 -- ghc-6.9: panic! (the 'impossible' happened)
 --   (GHC version 6.9 for x86_64-unknown-linux):
--- 	ASSERT failed! file nativeGen/MachCodeGen.hs line 1049
+--      ASSERT failed! file nativeGen/MachCodeGen.hs line 1049
 -- %MO_S_Le_I8(I8[R2], 127 :: I8)
       | fred -> True
 

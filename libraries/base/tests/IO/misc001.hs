@@ -16,9 +16,9 @@ main   =  do
 
 copyFile h1 h2 = do
   eof <- hIsEOF h1
-  if eof 
-	then return ()
-    	else do
+  if eof
+        then return ()
+        else do
   c <- hGetChar h1
   c <- hPutChar h2 (toUpper c)
   copyFile h1 h2

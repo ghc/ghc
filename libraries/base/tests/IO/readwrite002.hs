@@ -1,4 +1,4 @@
--- !!! Testing RW handles 
+-- !!! Testing RW handles
 
 import System.IO
 import System.IO.Error
@@ -39,10 +39,10 @@ speakString = "##############################\n"
 speak cd = do
      (do
         ready <- hReady cd
-        if ready then 
-	   hGetChar cd >>= putChar
-	 else
-	   return ()
+        if ready then
+           hGetChar cd >>= putChar
+         else
+           return ()
         ready <- hReady stdin
         if ready then (do { ch <- getChar; hPutChar cd ch})
          else return ())

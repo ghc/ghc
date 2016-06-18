@@ -6,6 +6,6 @@ import System.IO.Error
 main = do
   hIn <- openFile "openFile001.hs" ReadMode
   hPutStr hIn "test" `catchIOError` \ err ->
-      if isIllegalOperation err 
-	then putStrLn "ok."
-	else error "Oh dear\n"
+      if isIllegalOperation err
+        then putStrLn "ok."
+        else error "Oh dear\n"

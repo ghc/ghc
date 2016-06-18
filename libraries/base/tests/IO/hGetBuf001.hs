@@ -14,16 +14,16 @@ main = do
   -- test should run quickly, but arrange to kill it if it hangs for any reason:
   main_t <- myThreadId
   forkIO $ do
-	threadDelay 10000000
-	throwTo main_t (ErrorCall "killed")
+        threadDelay 10000000
+        throwTo main_t (ErrorCall "killed")
 
-  zipWithM_ ($) 
-	  [ f rbuf wbuf
-	    | f <- [hGetBufTest, hGetBufNBTest, hGetBufSomeTest],
-	      rbuf <- [buf1,buf2,buf3],
-	      wbuf <- [buf1,buf2,buf3]
-	    ]
-	  [1..]
+  zipWithM_ ($)
+          [ f rbuf wbuf
+            | f <- [hGetBufTest, hGetBufNBTest, hGetBufSomeTest],
+              rbuf <- [buf1,buf2,buf3],
+              wbuf <- [buf1,buf2,buf3]
+            ]
+          [1..]
 
 msg = "hello!"
 msg_length = length msg
@@ -66,13 +66,13 @@ readProc m1 m2 finished h = do
   let
     loop 0 = return ()
     loop n = do putMVar m2 (); takeMVar m1
-		r <- hGetBuf h buf msg_length
-		if (r /= msg_length) 
-			then do hPutStr stderr ("error: " ++ show r)
-			        exitFailure
-			else do s <- peekCStringLen (buf,r)
-			        hPutStr stdout (show n ++ " ")
-			        loop (n-1)
+                r <- hGetBuf h buf msg_length
+                if (r /= msg_length)
+                        then do hPutStr stderr ("error: " ++ show r)
+                                exitFailure
+                        else do s <- peekCStringLen (buf,r)
+                                hPutStr stdout (show n ++ " ")
+                                loop (n-1)
   loop 100
   hPutStr stdout "\n"
   putMVar m2 (); takeMVar m1
@@ -90,12 +90,12 @@ writeProc m1 m2 h = do
   let
     loop 0 = return ()
     loop n =
-	withCStringLen msg  $ \ (s,len) -> do
-	  takeMVar m2
-	  hPutBuf h s len
-	  hFlush h
-	  putMVar m1 ()
-	  loop (n-1)
+        withCStringLen msg  $ \ (s,len) -> do
+          takeMVar m2
+          hPutBuf h s len
+          hFlush h
+          putMVar m1 ()
+          loop (n-1)
 
   loop 100
   takeMVar m2
@@ -134,13 +134,13 @@ readProcNB m1 m2 finished h = do
   let
     loop 0 = return ()
     loop n = do putMVar m2 (); takeMVar m1
-		r <- hGetBufNonBlocking h buf read_size
-		if (r /= msg_length) 
-			then do hPutStr stderr ("error: " ++ show r)
-			        exitFailure
-			else do s <- peekCStringLen (buf,r)
-			        hPutStr stdout (show n ++ " ")
-			        loop (n-1)
+                r <- hGetBufNonBlocking h buf read_size
+                if (r /= msg_length)
+                        then do hPutStr stderr ("error: " ++ show r)
+                                exitFailure
+                        else do s <- peekCStringLen (buf,r)
+                                hPutStr stdout (show n ++ " ")
+                                loop (n-1)
   loop 100
   hPutStr stdout "\n"
   putMVar m2 (); takeMVar m1
@@ -158,12 +158,12 @@ writeProcNB m1 m2 h = do
   let
     loop 0 = return ()
     loop n =
-	withCStringLen msg  $ \ (s,len) -> do
-	  takeMVar m2
-	  hPutBufNonBlocking h s len
-	  hFlush h
-	  putMVar m1 ()
-	  loop (n-1)
+        withCStringLen msg  $ \ (s,len) -> do
+          takeMVar m2
+          hPutBufNonBlocking h s len
+          hFlush h
+          putMVar m1 ()
+          loop (n-1)
 
   loop 100
   takeMVar m2
@@ -198,13 +198,13 @@ readProcSome m1 m2 finished h = do
   let
     loop 0 = return ()
     loop n = do putMVar m2 (); takeMVar m1
-		r <- hGetBufSome h buf read_size
-		if (r /= msg_length) 
-			then do hPutStr stderr ("error: " ++ show r)
-			        exitFailure
-			else do s <- peekCStringLen (buf,r)
-			        hPutStr stdout (show n ++ " ")
-			        loop (n-1)
+                r <- hGetBufSome h buf read_size
+                if (r /= msg_length)
+                        then do hPutStr stderr ("error: " ++ show r)
+                                exitFailure
+                        else do s <- peekCStringLen (buf,r)
+                                hPutStr stdout (show n ++ " ")
+                                loop (n-1)
   loop 100
   hPutStr stdout "\n"
   putMVar m2 (); takeMVar m1

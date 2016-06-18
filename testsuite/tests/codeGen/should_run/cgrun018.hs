@@ -19,7 +19,7 @@ xxx = (Tfo (-0.8143#)  (-0.5091#)  (-0.2788#)
             (1.5227#)   (6.9114#)  (-7.0765#))
 
 selectee1 = F# (case xxx of
-		  Tfo _ _ _ _ _ _ _ x _ _ _ _ -> x)
+                  Tfo _ _ _ _ _ _ _ x _ _ _ _ -> x)
 
 selectee2 = F# (case xxx of
-		  Tfo _ _ y _ _ _ _ _ _ _ _ _ -> y)
+                  Tfo _ _ y _ _ _ _ _ _ _ _ _ -> y)

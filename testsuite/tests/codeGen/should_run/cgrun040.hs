@@ -1,7 +1,7 @@
 module Main(main) where
 
 data Burble a = B1 { op1 :: a -> Int, op2 :: Int -> a, op3 :: Int}
-	      | B2 { op2 :: Int -> a, op4 :: Int -> Int } 
+              | B2 { op2 :: Int -> a, op4 :: Int -> Int }
 
 
 f1 :: Int -> Burble Int

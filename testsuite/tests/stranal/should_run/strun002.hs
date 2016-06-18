@@ -4,7 +4,7 @@ module Main where
 
 is_volatile :: [Int] -> (String,Int) -> Int
 is_volatile [] (destVarName, destPtr)
-	= error ("Variable not found: " ++ "(" ++ (show destPtr) ++ ") " ++ destVarName)
+        = error ("Variable not found: " ++ "(" ++ (show destPtr) ++ ") " ++ destVarName)
 is_volatile (a:allWrites) (destVarName, destPtr)
   | a == destPtr    = a
   | otherwise = is_volatile allWrites (destVarName, destPtr)

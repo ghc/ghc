@@ -9,5 +9,5 @@ f 0 = C3 (C1 T1) 42
 f n = C3 (C1 T1) n
 
 main = case f 23 of
-	  C3 y z -> case y of
-			C1 T1 -> putStrLn "ok"
+          C3 y z -> case y of
+                        C1 T1 -> putStrLn "ok"

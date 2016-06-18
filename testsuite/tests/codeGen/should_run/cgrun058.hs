@@ -25,6 +25,6 @@ myMul x y = tn ((ti x) * (ti y))
 test = [ (x,y,ti (myMul (tn x) (tn y)),x * y)
        | x<-[-100, -99, -98, -97, -2, -1, 0, 1, 2, 97, 98, 99, 100],
          y<-([-100..(-1)]++[1..100]),
-	 testi myMul (*)  x y ]
+         testi myMul (*)  x y ]
 
 main = print test

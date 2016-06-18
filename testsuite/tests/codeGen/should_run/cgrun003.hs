@@ -1,6 +1,6 @@
 main = print (id2 (id2 id2) (42::Int))
---	where
---	id2 = s k k
+--      where
+--      id2 = s k k
 
 -- id2 x = s k k x
 

@@ -1,13 +1,13 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module InstEqContext  where 
+module InstEqContext  where
 
 
-{- encoding of 
- -	class C a | -> a
+{- encoding of
+ -      class C a | -> a
  -}
-class a ~ Int => C a 
+class a ~ Int => C a
 
 instance C Int
 

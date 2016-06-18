@@ -1,13 +1,13 @@
-{- 
+{-
 
 From: Olaf Chitil <chitil@Informatik.RWTH-Aachen.DE>
 
 It is a problem with 0.29 (which we use for compiling 2.01), it is gone
 in 2.01.
 
-	f :: Eq a => a -> [b] -> [b] -> Bool
-	f a [] [] = (a==a)
-	main = print (f True "" "Hallo")
+        f :: Eq a => a -> [b] -> [b] -> Bool
+        f a [] [] = (a==a)
+        main = print (f True "" "Hallo")
 
 
 when run after compilation with 0.29 you get:
@@ -18,9 +18,9 @@ Fail: In pattern-matching: function f{-aYw-}; at test.hs, line 6
 
 The problem is the dictionary, because for the program
 
-	f :: a -> [b] -> [b] -> Bool
-	f a [] [] = True
-	main = print (f True "" "Hallo")
+        f :: a -> [b] -> [b] -> Bool
+        f a [] [] = True
+        main = print (f True "" "Hallo")
 
 0.29 gives the function name "f" as well.
 

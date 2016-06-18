@@ -2,8 +2,8 @@
 
 module Main where
 
-{- 
- - This is a test framework for Arrays, using QuickCheck 
+{-
+ - This is a test framework for Arrays, using QuickCheck
  -
  -}
 
@@ -20,84 +20,84 @@ infixl 9  !, //
 infixr 0 ==>
 infix  1 `classify`
 
-prop_array = 
+prop_array =
     forAll genBounds       $ \ (b :: (Int,Int))     ->
     forAll (genIVPs b 10)     $ \ (vs :: [(Int,Int)]) ->
     Array.array b vs
-	 `same_arr`
+         `same_arr`
     array b vs
-prop_listArray = 
+prop_listArray =
     forAll genBounds       $ \ (b :: (Int,Int))     ->
     forAll (vector (length [fst b..snd b]))
-	                   $ \ (vs :: [Bool]) ->
+                           $ \ (vs :: [Bool]) ->
     Array.listArray b vs == Array.array b (zipWith (\ a b -> (a,b))
-				                   (Array.range b) vs)
+                                                   (Array.range b) vs)
 
-prop_indices = 
+prop_indices =
     forAll genBounds       $ \ (b :: (Int,Int))     ->
     forAll (genIVPs b 10)     $ \ (vs :: [(Int,Int)]) ->
     let arr = Array.array b vs
     in Array.indices arr == ((Array.range . Array.bounds) arr)
 
-prop_elems = 
+prop_elems =
     forAll genBounds       $ \ (b :: (Int,Int))     ->
     forAll (genIVPs b 10)     $ \ (vs :: [(Int,Int)]) ->
     let arr = Array.array b vs
     in Array.elems arr == [arr Array.! i | i <- Array.indices arr]
 
-prop_assocs = 
+prop_assocs =
     forAll genBounds       $ \ (b :: (Int,Int))     ->
     forAll (genIVPs b 10)     $ \ (vs :: [(Int,Int)]) ->
     let arr = Array.array b vs
     in Array.assocs arr == [(i, arr Array.! i) | i <- Array.indices arr]
 
-prop_slashslash = 
+prop_slashslash =
     forAll genBounds       $ \ (b :: (Int,Int))     ->
     forAll (genIVPs b 10)     $ \ (vs :: [(Int,Int)])  ->
     let arr = Array.array b vs
         us = []
     in arr Array.// us == Array.array (Array.bounds arr)
-                          ([(i,arr Array.! i) 
-			    | i <- Array.indices arr \\ [i | (i,_) <- us]]
+                          ([(i,arr Array.! i)
+                            | i <- Array.indices arr \\ [i | (i,_) <- us]]
                              ++ us)
-prop_accum = 
+prop_accum =
     forAll genBounds          $ \ (b :: (Int,Int))    ->
     forAll (genIVPs b 10)     $ \ (vs :: [(Int,Int)]) ->
 
     forAll (genIVPs b 10)     $ \ (us :: [(Int,Int)]) ->
     forAll (choose (0,length us))
-	                   $ \ n ->
+                           $ \ n ->
     let us' = take n us in
     forAll arbitrary       $ \ (fn :: Int -> Int -> Int) ->
     let arr = Array.array b vs
-    in Array.accum fn arr us' 
+    in Array.accum fn arr us'
         == foldl (\a (i,v) -> a Array.// [(i,fn (a Array.! i) v)]) arr us'
 
-prop_accumArray = 
+prop_accumArray =
     forAll arbitrary          $ \ (f :: Int -> Int -> Int) ->
     forAll arbitrary          $ \ (z :: Int) ->
     forAll genBounds          $ \ (b :: (Int,Int))    ->
     forAll (genIVPs b 10)     $ \ (vs :: [(Int,Int)]) ->
-    Array.accumArray f z b vs == Array.accum f 
+    Array.accumArray f z b vs == Array.accum f
                 (Array.array b [(i,z) | i <- Array.range b]) vs
 
 
 same_arr :: (Eq b) => Array.Array Int b -> Array Int b -> Bool
 same_arr a1 a2 = a == c && b == d
-		 && all (\ n -> (a1 Array.! n) == (a2 ! n)) [a..b]
+                 && all (\ n -> (a1 Array.! n) == (a2 ! n)) [a..b]
     where (a,b) = Array.bounds a1 :: (Int,Int)
           (c,d) = bounds a2 :: (Int,Int)
 
 genBounds :: Gen (Int,Int)
 genBounds = do m <- choose (0,20)
-	       n <- choose (minBound,maxBound-m) 
-	       return (n,n+m-1)
+               n <- choose (minBound,maxBound-m)
+               return (n,n+m-1)
 
 genIVP :: Arbitrary a => (Int,Int) -> Gen (Int,a)
 genIVP b = do { i <- choose b
-	      ; v <- arbitrary
-              ; return (i,v) 
-	      }
+              ; v <- arbitrary
+              ; return (i,v)
+              }
 
 genIVPs :: Arbitrary a => (Int,Int) -> Int -> Gen [(Int,a)]
 genIVPs b@(low,high) s
@@ -114,7 +114,7 @@ prop_id = forAll genBounds $ \ (b :: (Int,Int)) ->
 -- and then rifts together the split lists into one.
 -- Think: rifting a pack of cards.
 rift :: Int -> [a] -> [a]
-rift n xs = comb (drop n xs) (take n xs) 
+rift n xs = comb (drop n xs) (take n xs)
    where
       comb (a:as) (b:bs) = a : b : comb as bs
       comb (a:as) []     = a : as
@@ -124,27 +124,27 @@ rift n xs = comb (drop n xs) (take n xs)
 
 -- suffle makes n random rifts. Typically after
 -- log n rifts, the list is in a pretty random order.
--- (where n is the number of elements in the list) 
+-- (where n is the number of elements in the list)
 
 shuffle :: Int -> [a] -> Gen [a]
 shuffle 0 m = return m
 shuffle n m = do { r <- choose (1,length m)
                  ; shuffle (n-1) (rift r m)
-		 }
-prop_shuffle = 
+                 }
+prop_shuffle =
     forAll (shuffle 10 [1..10::Int]) $ \ lst ->
     label (show lst) True
 
 ------------------------------------------------------------------------------
 
 main = do test prop_array
-	  test prop_listArray
-	  test prop_indices
-	  test prop_elems
-	  test prop_assocs
-	  test prop_slashslash
-	  test prop_accum
-	  test prop_accumArray
+          test prop_listArray
+          test prop_indices
+          test prop_elems
+          test prop_assocs
+          test prop_slashslash
+          test prop_accum
+          test prop_accumArray
 
 
 instance Show (a -> b) where { show _ = "<FN>" }
@@ -201,7 +201,7 @@ ixmap                 :: (Ix a, Ix b) => (a,a) -> (a -> b) -> Array b c
 ixmap b f a           = array b [(i, a ! f i) | i <- range b]
 
 instance  (Ix a)          => Functor (Array a) where
-    fmap fn (MkArray b f) =  MkArray b (fn . f) 
+    fmap fn (MkArray b f) =  MkArray b (fn . f)
 
 instance  (Ix a, Eq b)  => Eq (Array a b)  where
     a == a'             =  assocs a == assocs a'
@@ -328,11 +328,11 @@ instance Arbitrary Integer where
   coarbitrary n = variant (fromInteger (if n >= 0 then 2*n else 2*(-n) + 1))
 
 instance Arbitrary Float where
-  arbitrary     = liftM3 fraction arbitrary arbitrary arbitrary 
+  arbitrary     = liftM3 fraction arbitrary arbitrary arbitrary
   coarbitrary x = coarbitrary (decodeFloat x)
 
 instance Arbitrary Double where
-  arbitrary     = liftM3 fraction arbitrary arbitrary arbitrary 
+  arbitrary     = liftM3 fraction arbitrary arbitrary arbitrary
   coarbitrary x = coarbitrary (decodeFloat x)
 
 fraction a b c = fromInteger a + (fromInteger b / (abs (fromInteger c) + 1))
@@ -441,7 +441,7 @@ quick = Config
   , configSize    = (+ 3) . (`div` 2)
   , configEvery   = \n args -> let s = show n in s ++ ","
   }
-         
+
 verbose :: Config
 verbose = quick
   { configEvery = \n args -> show n ++ ":\n" ++ unlines args
@@ -451,13 +451,13 @@ test, quickCheck, verboseCheck :: Testable a => a -> IO ()
 test         = check quick
 quickCheck   = check quick
 verboseCheck = check verbose
-         
+
 check :: Testable a => Config -> a -> IO ()
 check config a =
   do rnd <- newStdGen
      tests config (evaluate a) rnd 0 0 []
 
-tests :: Config -> Gen Result -> StdGen -> Int -> Int -> [[String]] -> IO () 
+tests :: Config -> Gen Result -> StdGen -> Int -> Int -> [[String]] -> IO ()
 tests config gen rnd0 ntest nfail stamps
   | ntest == configMaxTest config = do done "OK, passed" ntest stamps
   | nfail == configMaxFail config = do done "Arguments exhausted after" ntest stamps
@@ -509,7 +509,7 @@ done mesg ntest stamps =
 {-
 instance Observable StdGen where { observer = observeBase }
 
-instance Observable a => Observable (Gen a) where 
+instance Observable a => Observable (Gen a) where
   observer (Gen a) = send "Gen" (return (Gen) << a)
-			   
+
 -}

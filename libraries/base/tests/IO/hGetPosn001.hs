@@ -25,4 +25,4 @@ copy :: Handle -> Handle -> IO ()
 copy hIn hOut =
     tryIOError (hGetChar hIn) >>=
     either (\ err -> if isEOFError err then return () else error "copy")
-	   ( \ x -> hPutChar hOut x >> copy hIn hOut)
+           ( \ x -> hPutChar hOut x >> copy hIn hOut)

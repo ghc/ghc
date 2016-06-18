@@ -21,7 +21,7 @@ hidden a = a
  Module      :  Test
  Copyright   :  (c) Simon Marlow 2002
  License     :  BSD-style
- 
+
  Maintainer  :  libraries@haskell.org
  Stability   :  provisional
  Portability :  portable
@@ -77,7 +77,7 @@ newtype N1 a = N1 a
 <document comment>
 newtype N2 a b = N2 {n :: a b}
 <document comment>
-newtype N3 a b = N3 {n3 :: a b  this is the 'n3' field }
+newtype N3 a b = N3 {n3 :: a b  this is the 'n3' field}
 <document comment>
 newtype N4 a b = N4 a
 newtype N5 a b

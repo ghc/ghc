@@ -13,7 +13,7 @@ class Monad (ItemM l) => List l where
 
 instance Monad m => List (ListT m) where
   type ItemM (ListT m) = m
-  joinL = [ ListT . (>>= runListT)	-- Right section
+  joinL = [ ListT . (>>= runListT)      -- Right section
           , ListT . (runListT <<=)      -- Left section
           ]
 

@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 
-module Main where 
+module Main where
 
 type family Elem c
 
@@ -11,8 +11,8 @@ class Col c where
 
 -- LIST
 instance Col [a] where
-  isEmpty   	  = null
-  add	   	  = flip (:)
+  isEmpty         = null
+  add             = flip (:)
   headTail (x:xs) =  (x,xs)
 
 type instance Elem [a] = a
@@ -30,13 +30,13 @@ instance Col (Sequence a) where
 
 type instance Elem (Sequence a) = a
 
--- 
-addAll c1 c2 
-	| isEmpty c1
-	= c2
-	| otherwise
-	= let (x,c1') = headTail c1
-	  in addAll c1' (add c2 x)
+--
+addAll c1 c2
+        | isEmpty c1
+        = c2
+        | otherwise
+        = let (x,c1') = headTail c1
+          in addAll c1' (add c2 x)
 
 --
 main = print $ addAll c1 c2

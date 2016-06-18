@@ -17,7 +17,7 @@ main = do
 
   h <- openFile file ReadMode
   let loop = do
-	b <- hIsEOF h 
-	if b then return () 
-	     else do c <- hGetChar h; putChar c; loop
+        b <- hIsEOF h
+        if b then return ()
+             else do c <- hGetChar h; putChar c; loop
   loop

@@ -29,5 +29,5 @@ instance Foo a => Foo [a] where
 -- try it:
 main = do
     putStr (show (op2 (3::Int)    3.14159))
-    putStr (show (op2 'X' 	  3.14159))
+    putStr (show (op2 'X'         3.14159))
     putStr (show (op2 ([]::[Char])3.14159))

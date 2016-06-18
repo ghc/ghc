@@ -1,10 +1,10 @@
--- Tests match on empty field lists 
+-- Tests match on empty field lists
 
 module Main where
 
-data Person	=  Female {firstName, lastName :: String}
-      		|  Male   {firstName, lastName :: String}
-      		deriving (Show)
+data Person     =  Female {firstName, lastName :: String}
+                |  Male   {firstName, lastName :: String}
+                deriving (Show)
 
 isFemale (Female{})   =  True
 isFemale (Male{})     =  False

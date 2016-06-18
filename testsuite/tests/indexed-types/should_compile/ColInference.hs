@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 
-module ColInference  where 
+module ColInference  where
 
 type family Elem c
 
@@ -11,9 +11,9 @@ class Col c where
  add       :: c -> Elem c -> c
  headTail  :: c -> (Elem c,c)
 
-addAll c1 c2 
-	| isEmpty c1
-	= c2
-	| otherwise
-	= let (x,c1') = headTail c1
-	  in addAll c1' (add c2 x)
+addAll c1 c2
+        | isEmpty c1
+        = c2
+        | otherwise
+        = let (x,c1') = headTail c1
+          in addAll c1' (add c2 x)

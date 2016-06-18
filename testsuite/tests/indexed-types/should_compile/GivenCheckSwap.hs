@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 
-module GivenCheckSwapMain where 
+module GivenCheckSwapMain where
 
 type family S x
 
@@ -8,5 +8,5 @@ f :: a -> S a
 f = undefined
 
 g :: Char ~ S a => a -> Char
-g y   | False  		= f y
-      |	otherwise	= 'a'
+g y   | False           = f y
+      | otherwise       = 'a'

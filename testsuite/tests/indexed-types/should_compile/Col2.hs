@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module Col  where 
+module Col  where
 
 type family Elem c
 
@@ -11,4 +11,4 @@ class (Eq (Elem c)) => Col c where
   count     :: Elem c -> c -> Int
 
 instance Eq e => Col [e] where
-  count	    x = length . filter (==x)
+  count     x = length . filter (==x)

@@ -4,7 +4,7 @@ module Main where
 -- libraries/base/GHC/Base.lhs for the fix.
 
 data FourArrow = A | B | C | D | E | ABE | AC | BD | CDE
-		 deriving (Eq)
+                 deriving (Eq)
 
 dom E   = ABE
 
@@ -24,7 +24,7 @@ bceFour f g
     | dom f == dom g && cod f == cod g
     = "it works"
     | otherwise = error ("Four.bceFour: precondition fails:"
-			  ++ "arrows not parallel"
-			  ++ "\n")
+                          ++ "arrows not parallel"
+                          ++ "\n")
 
 main = print (bceFour E E)

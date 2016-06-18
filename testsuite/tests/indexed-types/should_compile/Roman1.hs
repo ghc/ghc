@@ -22,8 +22,8 @@ new p = runST (do
 ---------------------------------------------
 -- Here's a simpler version that also failed
 
-type family FMut :: * -> *	-- No args	
-     	    	     		-- Same thing happens with one arg
+type family FMut :: * -> *      -- No args
+                                -- Same thing happens with one arg
 
 type family   FState (m :: *)
 type instance FState Char = Int

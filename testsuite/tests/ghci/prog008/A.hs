@@ -3,9 +3,9 @@
 
 -- Tests a bug spotted by Claus in which the type
 -- of c3 was wrongly displayed in GHCi as
---	c3 :: C a b => a -> b
+--      c3 :: C a b => a -> b
 -- Should be
---	c3 :: C a b => a1 -> b
+--      c3 :: C a b => a1 -> b
 
 module A where
 

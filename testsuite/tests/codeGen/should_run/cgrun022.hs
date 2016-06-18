@@ -4,7 +4,7 @@
 module Main where
 
 main = f (putStr "a")
-	 (take 1000000 (repeat True))
-	 (putStr "b")
+         (take 1000000 (repeat True))
+         (putStr "b")
 
 f a ns b = if last ns then a else b

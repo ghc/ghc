@@ -10,7 +10,7 @@ g :: Int -> Int -> Int -> [Int]
 
 g x y z
   = let
-	f a b = a + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b
-	g c = f c c
+        f a b = a + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b + b * a * b - a + a + b
+        g c = f c c
     in
     [g x, g y, g z, g x, g y, g z, g x, g y, g z, g x, g y, g z, g x, g y, g z, g x, g y, g z, g x, g y, g z, g x, g y, g z, g x, g y, g z, g x, g y, g z, g x, g y]

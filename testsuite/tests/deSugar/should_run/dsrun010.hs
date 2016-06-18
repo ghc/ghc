@@ -9,10 +9,10 @@ test :: (MonadPlus m) => [a] -> m Bool
 test xs
   =   do
         (_:_) <- return xs
-		-- Should fail here
+                -- Should fail here
         return True
     `mplus`
-	-- Failure in LH arg should trigger RH arg
+        -- Failure in LH arg should trigger RH arg
       do
         return False
 

@@ -9,10 +9,10 @@ main = putStr (shows true_or_false "\n")
   where
     true_or_false
       = case (cmp_name True imp1 imp2) of
-	  -1# -> False
-	  0#  -> True
-	  1#  -> False
-   
+          -1# -> False
+          0#  -> True
+          1#  -> False
+
     imp1 = Imp s "Imp1" s s
     imp2 = Imp s "Imp2" s s
 
@@ -36,17 +36,17 @@ cmp_name False (Imp m1 n1 _ _) (Imp m2 n2 _ _)
   = case cmpString n1 n2 of {
       -1# -> -1#;
       0# -> case cmpString m1 m2 of {
-	       0# -> 0#;
-	       xxx -> if null m1 || null m2
-		      then 0#
-		      else xxx
-	     };
+               0# -> 0#;
+               xxx -> if null m1 || null m2
+                      then 0#
+                      else xxx
+             };
       _ -> 1#
     }
 
 cmp_name True (Imp _ _ _ o1) (Prel nm)
   = let
-	(_, n2) = getOrigName nm
+        (_, n2) = getOrigName nm
     in
     cmpString o1 n2
 
@@ -61,15 +61,15 @@ cmp_name by_local other_p1 other_p2
       _ -> -1#
 
 data ProtoName
-  = Unk		String	-- local name in module
+  = Unk         String  -- local name in module
 
-  | Imp		String 	-- name of defining module 
-		String 	-- name used in defining name
-		String  -- name of the module whose interface told me
-			-- about this thing
-		String 	-- occurrence name
+  | Imp         String  -- name of defining module
+                String  -- name used in defining name
+                String  -- name of the module whose interface told me
+                        -- about this thing
+                String  -- occurrence name
 
-  | Prel	String{-Name-}
+  | Prel        String{-Name-}
 
 cmpString, cmpName :: String -> String -> Int#
 cmpString a b = 0#

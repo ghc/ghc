@@ -5,7 +5,7 @@ module ShouldCompile where
 data family T a
 
 data instance T Int = A | B
-		    deriving Eq
+                    deriving Eq
 
 foo :: T Int -> Bool
 foo x = x == x

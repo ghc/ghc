@@ -13,14 +13,14 @@ test blocking = do
          -- mix ordinary char buffering with hGetBuf
          eof <- hIsEOF h
          when (not eof) $ hGetChar h >>= putChar
-  	 b <- allocaBytes sz $ \ptr -> do
+         b <- allocaBytes sz $ \ptr -> do
                 r <- (if blocking then hGetBuf else hGetBufNonBlocking) h ptr sz
-         	if (r == 0)
-		   then return True
-		   else do s <- peekCStringLen (ptr,r)
-			   putStr s
-			   return False
-	 if b then return () else loop -- tail call
+                if (r == 0)
+                   then return True
+                   else do s <- peekCStringLen (ptr,r)
+                           putStr s
+                           return False
+         if b then return () else loop -- tail call
 
   loop
 
