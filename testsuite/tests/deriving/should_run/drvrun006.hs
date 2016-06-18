@@ -2,7 +2,7 @@
 module Main(main) where
 
 infix 4 :^:
-data Tree a 
+data Tree a
   =  Leaf a  | (Tree a) :^: (Tree a)
      deriving (Show, Read)
 
@@ -25,25 +25,25 @@ main = do
 instance (Show a) => Show (Tree a) where
 
         showsPrec d (Leaf m) = showParen (d >= 10) showStr
-    	  where
+          where
              showStr = showString "Leaf " . showsPrec 10 m
 
         showsPrec d (u :^: v) = showParen (d > 4) showStr
-    	  where
-             showStr = showsPrec 5 u . 
+          where
+             showStr = showsPrec 5 u .
                        showString " :^: " .
                        showsPrec 5 v
 
 instance (Read a) => Read (Tree a) where
 
-	readsPrec d r =  readParen (d > 4)
-			 (\r -> [(u:^:v,w) |
-				 (u,s) <- readsPrec 5 r,
-				 (":^:",t) <- lex s,
-				 (v,w) <- readsPrec 5 t]) r
+        readsPrec d r =  readParen (d > 4)
+                         (\r -> [(u:^:v,w) |
+                                 (u,s) <- readsPrec 5 r,
+                                 (":^:",t) <- lex s,
+                                 (v,w) <- readsPrec 5 t]) r
 
-		      ++ readParen (d > 9)
-			 (\r -> [(Leaf m,t) |
-				 ("Leaf",s) <- lex r,
-				 (m,t) <- readsPrec 10 s]) r
+                      ++ readParen (d > 9)
+                         (\r -> [(Leaf m,t) |
+                                 ("Leaf",s) <- lex r,
+                                 (m,t) <- readsPrec 10 s]) r
 -}

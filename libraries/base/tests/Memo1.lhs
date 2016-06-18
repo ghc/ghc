@@ -7,16 +7,16 @@
 \begin{code}
 
 module Memo1
-	( memo  	-- :: (a -> b) -> a -> b
-	, memoSized 	-- :: Int -> (a -> b) -> a -> b
- 	) 
-	where
+        ( memo          -- :: (a -> b) -> a -> b
+        , memoSized     -- :: Int -> (a -> b) -> a -> b
+        )
+        where
 
-import System.Mem.StableName	( StableName, makeStableName, hashStableName )
-import System.Mem.Weak		( Weak, mkWeakPtr, mkWeak, deRefWeak, finalize )
-import Data.Array.IO		( IOArray, newArray, readArray, writeArray )
-import System.IO.Unsafe		( unsafePerformIO )
-import Control.Concurrent.MVar	( MVar, newMVar, putMVar, takeMVar )
+import System.Mem.StableName    ( StableName, makeStableName, hashStableName )
+import System.Mem.Weak          ( Weak, mkWeakPtr, mkWeak, deRefWeak, finalize )
+import Data.Array.IO            ( IOArray, newArray, readArray, writeArray )
+import System.IO.Unsafe         ( unsafePerformIO )
+import Control.Concurrent.MVar  ( MVar, newMVar, putMVar, takeMVar )
 \end{code}
 
 -----------------------------------------------------------------------------
@@ -40,10 +40,10 @@ the documentation).
 
 \begin{code}
 type MemoTable key val
-	= MVar (
-	    Int,	-- current table size
-	    IOArray Int [MemoEntry key val]   -- hash table
-	   )
+        = MVar (
+            Int,        -- current table size
+            IOArray Int [MemoEntry key val]   -- hash table
+           )
 
 -- a memo table entry: compile with -funbox-strict-fields to eliminate
 -- the boxes around the StableName and Weak fields.
@@ -76,19 +76,19 @@ strict = ($!)
 lazyMemoSized :: Int -> (a -> b) -> a -> b
 lazyMemoSized size f =
    let (table,weak) = unsafePerformIO (
-		do { tbl <- newArray (0,size) []
-		   ; mvar <- newMVar (size,tbl)
-		   ; weak <- mkWeakPtr mvar (Just (table_finalizer tbl size))
-		   ; return (mvar,weak)
-		   })
+                do { tbl <- newArray (0,size) []
+                   ; mvar <- newMVar (size,tbl)
+                   ; weak <- mkWeakPtr mvar (Just (table_finalizer tbl size))
+                   ; return (mvar,weak)
+                   })
    in  memo' f table weak
 
 table_finalizer :: IOArray Int [MemoEntry key val] -> Int -> IO ()
-table_finalizer table size = 
+table_finalizer table size =
    sequence_ [ finalizeBucket i | i <- [0..size] ]
  where
    finalizeBucket i = do
-      bucket <- readArray table i 
+      bucket <- readArray table i
       sequence_ [ finalize w | MemoEntry _ w <- bucket ]
 
 memo' :: (a -> b) -> MemoTable a b -> Weak (MemoTable a b) -> a -> b
@@ -101,35 +101,35 @@ memo' f ref weak_ref = \k -> unsafePerformIO $ do
 
    case lkp of
      Just result -> do
-	putMVar ref (size,table)
-	return result
+        putMVar ref (size,table)
+        return result
      Nothing -> do
-	let result = f k
-	weak <- mkWeak k result (Just (finalizer hash_key stable_key weak_ref))
-	writeArray table hash_key (MemoEntry stable_key weak : bucket)
-	putMVar ref (size,table)
-	return result
+        let result = f k
+        weak <- mkWeak k result (Just (finalizer hash_key stable_key weak_ref))
+        writeArray table hash_key (MemoEntry stable_key weak : bucket)
+        putMVar ref (size,table)
+        return result
 
 finalizer :: Int -> StableName a -> Weak (MemoTable a b) -> IO ()
-finalizer hash_key stable_key weak_ref = 
-  do r <- deRefWeak weak_ref 
+finalizer hash_key stable_key weak_ref =
+  do r <- deRefWeak weak_ref
      case r of
-	Nothing -> return ()
-	Just mvar -> do
-        	(size,table) <- takeMVar mvar
-		bucket <- readArray table hash_key
-		let new_bucket = [ e | e@(MemoEntry sn weak) <- bucket, 
-				       sn /= stable_key ]
-		writeArray table hash_key new_bucket
-		putMVar mvar (size,table)
+        Nothing -> return ()
+        Just mvar -> do
+                (size,table) <- takeMVar mvar
+                bucket <- readArray table hash_key
+                let new_bucket = [ e | e@(MemoEntry sn weak) <- bucket,
+                                       sn /= stable_key ]
+                writeArray table hash_key new_bucket
+                putMVar mvar (size,table)
 
 lookupSN :: StableName key -> [MemoEntry key val] -> IO (Maybe val)
 lookupSN sn [] = sn `seq` return Nothing -- make it strict in sn
 lookupSN sn (MemoEntry sn' weak : xs)
    | sn == sn'  = do maybe_item <- deRefWeak weak
-		     case maybe_item of
-			Nothing -> error ("dead weak pair: " ++ 
-						show (hashStableName sn))
-			Just v  -> return (Just v)
+                     case maybe_item of
+                        Nothing -> error ("dead weak pair: " ++
+                                                show (hashStableName sn))
+                        Just v  -> return (Just v)
    | otherwise  = lookupSN sn xs
 \end{code}

@@ -7,5 +7,5 @@
 module ShouldCompile where
 
 $( case reverse "no" of
-	[] -> return []
+        [] -> return []
  )

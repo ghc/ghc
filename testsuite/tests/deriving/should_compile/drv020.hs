@@ -1,7 +1,7 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
              FlexibleInstances, GeneralizedNewtypeDeriving #-}
 
--- Test deriving of a multi-parameter class for 
+-- Test deriving of a multi-parameter class for
 -- one-argument newtype defined in the same module
 module ShouldSucceed where
 
@@ -26,14 +26,14 @@ instance Applicative (State s) where
     (<*>) = ap
 
 instance Monad (State s) where
-	return a = State $ \s -> (a, s)
-	m >>= k  = State $ \s -> let
-		(a, s') = runState m s
-		in runState (k a) s'
+        return a = State $ \s -> (a, s)
+        m >>= k  = State $ \s -> let
+                (a, s') = runState m s
+                in runState (k a) s'
 
 instance MonadState s (State s) where
-	get   = State $ \s -> (s, s)
-	put s = State $ \_ -> ((), s)
+        get   = State $ \s -> (s, s)
+        put s = State $ \_ -> ((), s)
 
 -- test code
 

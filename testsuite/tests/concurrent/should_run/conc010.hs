@@ -17,12 +17,12 @@ import Control.Exception
 --     thread could exit before the second thread has time to print
 --     the result.
 
-main = do 
+main = do
   block  <- newEmptyMVar
   ready  <- newEmptyMVar
   ready2 <- newEmptyMVar
-  id <- forkIO (Control.Exception.catch (putMVar ready () >> takeMVar block) 
-		(\e -> putStr (show (e::SomeException)) >> putMVar ready2 ()))
+  id <- forkIO (Control.Exception.catch (putMVar ready () >> takeMVar block)
+                (\e -> putStr (show (e::SomeException)) >> putMVar ready2 ()))
   takeMVar ready
   throwTo id (ErrorCall "hello")
   takeMVar ready2

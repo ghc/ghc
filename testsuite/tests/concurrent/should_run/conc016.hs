@@ -16,9 +16,9 @@ main = do
   main_thread <- myThreadId
   m <- newEmptyMVar
   sub_thread <- forkIO (do
-	    	 	 takeMVar m
-	    	 	 throwTo main_thread (ErrorCall "foo")
-	 		)
+                         takeMVar m
+                         throwTo main_thread (ErrorCall "foo")
+                        )
   mask_ $ do
     putMVar m ()
     sum [1..10000] `seq` -- to be sure the other thread is now blocked

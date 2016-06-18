@@ -28,9 +28,9 @@ main = do
      putStrLn "newThread back again"
      putMVar th "1 sec later"
   threadDelay 500000 >> putStrLn "mainThread"
-	-- this will not be blocked in the threaded RTS
+        -- this will not be blocked in the threaded RTS
   forkIO $ (hFun 2)
-	-- neither will this
+        -- neither will this
   x <- takeMVar th
   putStrLn x
   putStrLn "\nshutting down"

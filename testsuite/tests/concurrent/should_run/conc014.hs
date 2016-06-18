@@ -9,8 +9,8 @@ main = do
   m <- newEmptyMVar
   forkIO (do { takeMVar m;  throwTo main_thread (ErrorCall "foo") })
   (do { throwIO (ErrorCall "wibble")
-	  `Control.Exception.catch`
-	    (\e -> let _ = e::ErrorCall in
+          `Control.Exception.catch`
+            (\e -> let _ = e::ErrorCall in
                    do putMVar m (); evaluate (sum [1..10000]); putStrLn "done.")
        ; myDelay 500000 })
     `Control.Exception.catch`

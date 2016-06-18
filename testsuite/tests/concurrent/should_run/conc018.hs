@@ -17,10 +17,10 @@ main = do
 
   m <- newEmptyMVar
   t <- forkIO $ do
-	    Control.Exception.catch (do
-		m <- newMVar ()
-		putMVar m ()
-	     )
-	     (\e -> putMVar m (e::SomeException))
+            Control.Exception.catch (do
+                m <- newMVar ()
+                putMVar m ()
+             )
+             (\e -> putMVar m (e::SomeException))
   takeMVar m >>= print
   -- should print "thread blocked indefinitely"

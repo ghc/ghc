@@ -27,9 +27,9 @@ main = do
   threadDelay 500000
   yield -- another hack, just in case child yields right after "sleep 1"
   putMVar th "main" `catch` (\BlockedIndefinitelyOnMVar -> return ())
-	-- tests that the other thread doing an unsafe call to 
-	-- sleep(3) has blocked this thread.  Not sure if this
-	-- is a useful test.
+        -- tests that the other thread doing an unsafe call to
+        -- sleep(3) has blocked this thread.  Not sure if this
+        -- is a useful test.
   x <- takeMVar th
   putStrLn x
   putStrLn "\nshutting down"

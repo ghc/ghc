@@ -1,10 +1,10 @@
-module Scheduler 
+module Scheduler
 ( runTIO
 , module Event
 , module Thread
 , TTree
 , TIO
-) 
+)
 where
 
 import Event
@@ -18,14 +18,14 @@ type TIO   = ContM SysReq SysRsp IO
 
 
 runTIO :: [TIO ()] -> IO ()
-runTIO l = runThreads $ map buildThread l 
+runTIO l = runThreads $ map buildThread l
 
-data World = World 
+data World = World
     { mReadyQ :: ! (Chan (TTree))  }
 
 max_steps = 1
-worker_pure world= 
-  do 
+worker_pure world=
+  do
       t <- readChan readyq
       case t of
         (Atom _) -> return ()
@@ -38,26 +38,26 @@ worker_pure world=
  exec_thread 0 t =
   do putStr "."; hFlush stdout
      writeChan readyq t
- exec_thread c (Atom mx) = 
-     do 
+ exec_thread c (Atom mx) =
+     do
         x <- mx
         exec_thread (c-1) x
  exec_thread c (Stop) = return ()
- 
+
 runThreads :: [TTree] -> IO ()
 runThreads l =
-  do 
+  do
      mready <- newChan
      writeList2Chan mready l
-     let world = World mready 
+     let world = World mready
      multiloop world
 
 loop_p world = do worker_pure world; loop_p world
 
-multiloop world = 
-  do 
-	-- a mixture of bound threads & lightweight threads 
-	-- to make things interesting...
+multiloop world =
+  do
+        -- a mixture of bound threads & lightweight threads
+        -- to make things interesting...
      forkOS (loop_p world)
      forkOS (loop_p world)
      forkOS (loop_p world)

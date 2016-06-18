@@ -36,12 +36,12 @@ main = do
   putMVar inVar 2
   threadDelay 1000
   throwTo tid (E.ErrorCall "2nd")
-	-- the second time around, exceptions will be blocked, because
-	-- the trapHandler is effectively "still in the handler" from the
-	-- first exception.  I'm not sure if this is by design or by
-	-- accident.  Anyway, the trapHandler will at some point block
-	-- in takeMVar, and thereby become interruptible, at which point
-	-- it will receive the second exception.
+        -- the second time around, exceptions will be blocked, because
+        -- the trapHandler is effectively "still in the handler" from the
+        -- first exception.  I'm not sure if this is by design or by
+        -- accident.  Anyway, the trapHandler will at some point block
+        -- in takeMVar, and thereby become interruptible, at which point
+        -- it will receive the second exception.
   takeMVar caughtVar
   -- Running the GHCi way complains that tid is blocked indefinitely if
   -- it still exists, so kill it.

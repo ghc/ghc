@@ -6,9 +6,9 @@ import Control.Concurrent
 
 main = do
   s <- newEmptyMVar
-  let 
+  let
     write = do
-	putMVar s "hello world\n"
+        putMVar s "hello world\n"
 
   forkIO write
   str <- takeMVar s

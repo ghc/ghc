@@ -7,11 +7,11 @@ import Data.Ratio
 toBinary :: Integer -> Stream
 toBinary 0 = [0]
 toBinary x = toBinary t ++ [x `mod` 2]
-	     where t = x `div` 2
-	     
+             where t = x `div` 2
+
 
 
 fl :: Stream -> Stream
 fl (x:xs) = (f x):xs
-	  where f 0 = 1
-	  	f 1 = 0
+          where f 0 = 1
+                f 1 = 0

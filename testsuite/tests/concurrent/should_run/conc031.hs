@@ -22,9 +22,9 @@ main = do
     -- this is just to demonstrate that it is only about the GC timing
     --
     gcThread = forkIO $ let gc = do
-				   putStrLn "delay"
-				   threadDelay 100000
-				   putStrLn "gc"
-				   performGC
-				   gc 
-			in gc
+                                   putStrLn "delay"
+                                   threadDelay 100000
+                                   putStrLn "gc"
+                                   performGC
+                                   gc
+                        in gc

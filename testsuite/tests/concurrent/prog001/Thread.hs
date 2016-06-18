@@ -8,27 +8,27 @@ import Converter
 
 threadTesting1 :: Gray -> Gray -> IO Int
 threadTesting1 xs ys = do
-		    m <- newEmptyMVar
-		    c1 <- forkIO (t1 m xs ys)
-		    c2 <- forkIO (t2 m xs ys)
-		    c3 <- forkIO (t3 m xs ys)
-		    c4 <- forkIO (t4 m xs ys)
-		    c5 <- forkIO (t5 m xs ys)
-		    c6 <- forkIO (t6 m xs ys)
-		    c7 <- forkIO (t7 m xs ys)
-		    c8 <- forkIO (t8 m xs ys)
-		    c9 <- forkIO (t9 m xs ys)
-		    c <- takeMVar m
-		    killThread c1
-		    killThread c2
-		    killThread c3
-		    killThread c4
-		    killThread c5
-		    killThread c6
-		    killThread c7
-		    killThread c8
-		    killThread c9
-		    return c
+                    m <- newEmptyMVar
+                    c1 <- forkIO (t1 m xs ys)
+                    c2 <- forkIO (t2 m xs ys)
+                    c3 <- forkIO (t3 m xs ys)
+                    c4 <- forkIO (t4 m xs ys)
+                    c5 <- forkIO (t5 m xs ys)
+                    c6 <- forkIO (t6 m xs ys)
+                    c7 <- forkIO (t7 m xs ys)
+                    c8 <- forkIO (t8 m xs ys)
+                    c9 <- forkIO (t9 m xs ys)
+                    c <- takeMVar m
+                    killThread c1
+                    killThread c2
+                    killThread c3
+                    killThread c4
+                    killThread c5
+                    killThread c6
+                    killThread c7
+                    killThread c8
+                    killThread c9
+                    return c
 
 
 
@@ -59,10 +59,10 @@ t1 m (1:1:x) (0:1:y) = putMVar m 204
 t1 m (1:1:x) (1:0:y) = putMVar m 201
 t1 m (1:1:x) (1:1:y) = putMVar m 202
 
-			
+
 t2 :: MVar Int -> Stream -> Stream -> IO()
 t2 m (0:0:x) (b:1:0:y) = putMVar m 30
-t2 m (1:0:x) (b:1:0:y) = putMVar m 31						
+t2 m (1:0:x) (b:1:0:y) = putMVar m 31
 t2 m (0:1:x) (b:1:0:y) = putMVar m 60
 t2 m (1:1:x) (b:1:0:y) = putMVar m 61
 t2 m x y = yield

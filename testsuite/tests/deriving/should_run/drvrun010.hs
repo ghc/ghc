@@ -7,6 +7,6 @@ main = putStrLn $
        then "works" else "not"
 
 -- The point here is that if 'show' generates
---	Test { field=-1 }
+--      Test { field=-1 }
 -- the lexer things the '=-' is one lexeme, which does not work
 

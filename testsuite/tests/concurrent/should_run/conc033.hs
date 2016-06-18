@@ -6,5 +6,5 @@ main = do
   r <- Control.Exception.try $ do
           m <- newEmptyMVar
           takeMVar m
-	  return ()
+          return ()
   print (r::Either SomeException ())

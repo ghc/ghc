@@ -9,9 +9,9 @@ $(return [])
 
 test :: String
 test = $(do
-	test <- [d|
-		type family T :: (* -> (* -> * -> *)) -> (* -> *) -> * |]
+        test <- [d|
+                type family T :: (* -> (* -> * -> *)) -> (* -> *) -> * |]
         blah <- reify ''S
-	return (LitE (StringL (pprint test ++ "\n" ++ pprint blah))))
+        return (LitE (StringL (pprint test ++ "\n" ++ pprint blah))))
 
 main = putStrLn test

@@ -13,8 +13,8 @@ a :: MyArr
 a = array bds [ ((i,j), i+j) | (i,j) <- range bds ]
 
 main = do { putStrLn (show a) ;
-	    let { b :: MyArr ;
-		  b = read (show a) } ;
-	    putStrLn (show b)
-	  }
+            let { b :: MyArr ;
+                  b = read (show a) } ;
+            putStrLn (show b)
+          }
 

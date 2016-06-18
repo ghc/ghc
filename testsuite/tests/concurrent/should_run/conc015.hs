@@ -16,17 +16,17 @@ main = do
   m <- newEmptyMVar
   m2 <- newEmptyMVar
   forkIO (do takeMVar m
-	     throwTo main_thread (ErrorCall "foo")
-	     throwTo main_thread (ErrorCall "bar") 
-	     putMVar m2 ()
-	 )
+             throwTo main_thread (ErrorCall "foo")
+             throwTo main_thread (ErrorCall "bar")
+             putMVar m2 ()
+         )
   ( do
     mask $ \restore -> do
-	putMVar m ()
+        putMVar m ()
         print =<< getMaskingState -- True
-	sum [1..1] `seq` -- give 'foo' a chance to be raised
+        sum [1..1] `seq` -- give 'foo' a chance to be raised
           (restore $ myDelay 500000)
-		`Control.Exception.catch` 
+                `Control.Exception.catch`
                     \e -> putStrLn ("caught1: " ++ show (e::SomeException))
     threadDelay 10000
     takeMVar m2
