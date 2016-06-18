@@ -13,10 +13,10 @@
 
 module DoParamM where
 
-import Prelude (const, String, ($), (.), Maybe(..), 
-		Int, fromInteger, succ, pred, fromEnum, toEnum, 
-		(+), Char, (==), Bool(..),
-		IO, getLine, putStrLn, read, show)
+import Prelude (const, String, ($), (.), Maybe(..),
+                Int, fromInteger, succ, pred, fromEnum, toEnum,
+                (+), Char, (==), Bool(..),
+                IO, getLine, putStrLn, read, show)
 import qualified Prelude
 import qualified Control.Monad.State as State
 import qualified Control.Monad.Identity as IdM
@@ -38,7 +38,7 @@ instance Prelude.Monad m => Monadish (RegularM m) where
     fail   = RegularM . Prelude.fail
     m >>= f = RegularM ((Prelude.>>=) (unRM m) (unRM . f))
 
--- As a warm-up, we write the regular State computation, with the same 
+-- As a warm-up, we write the regular State computation, with the same
 -- type of state throughout. We thus inject Monad.State into the
 -- parameterized monad
 
@@ -53,9 +53,9 @@ test1 = State.runState (unRM c) (0::Int) where
 -- The same in the do-notation
 test1_do = State.runState (unRM c) (0::Int) where
          c = do
-	     v <- gget
-	     gput (succ v)
-	     return v
+             v <- gget
+             gput (succ v)
+             return v
          gget :: (State.MonadState s m) => RegularM m s s s
          gget = RegularM State.get
          gput :: (State.MonadState s m) => s -> RegularM m s s ()
@@ -70,8 +70,8 @@ newtype VST m si so v = VST{runVST:: si -> m (so,v)}
 instance Prelude.Monad m => Monadish (VST m) where
   return x = VST (\si -> Prelude.return (si,x))
   fail x   = VST (\si -> Prelude.fail x)
-  m >>= f  = VST (\si -> (Prelude.>>=) (runVST m si) 
-		                       (\ (sm,x) -> runVST (f x) sm))
+  m >>= f  = VST (\si -> (Prelude.>>=) (runVST m si)
+                                       (\ (sm,x) -> runVST (f x) sm))
 
 vsget :: Prelude.Monad m => VST m si si si
 vsget = VST (\si -> Prelude.return (si,si))
@@ -84,9 +84,9 @@ vsm1 () = vsget >>= (\v -> vsput (succ v) >> return v)
 
 -- The same with the do-notation
 vsm1_do () = do
-	     v <- vsget 
-	     vsput (succ v)
-	     return v
+             v <- vsget
+             vsput (succ v)
+             return v
 
 {-
  *DoParamM> :t vsm1
@@ -102,7 +102,7 @@ test2_do = IdM.runIdentity (runVST (vsm1_do ()) (0::Int))
 
 
 -- Now, we vary the type of the state, from Int to a Char
-vsm2 () = vsget >>= (\v -> vsput ((toEnum (65+v))::Char) >> 
+vsm2 () = vsget >>= (\v -> vsput ((toEnum (65+v))::Char) >>
                            vsget >>= \v' -> return (v,v'))
 
 {-
@@ -113,10 +113,10 @@ vsm2 () = vsget >>= (\v -> vsput ((toEnum (65+v))::Char) >>
 -- The same with the do-notation
  -- the following does not yet work
 vsm2_do () = do
-	     v <- vsget
+             v <- vsget
              vsput ((toEnum (65+v))::Char)
              v' <- vsget
-	     return (v,v')
+             return (v,v')
 
 test3 = IdM.runIdentity (runVST (vsm2 ()) (0::Int))
 -- ('A',(0,'A'))
@@ -132,7 +132,7 @@ test3_do = IdM.runIdentity (runVST (vsm2_do ()) (0::Int))
     In the first argument of `return', namely `(v == v')'
     In the expression: return (v == v')
 
-vsm3 () = vsget >>= (\v -> vsput ((toEnum (65+v))::Char) >> 
+vsm3 () = vsget >>= (\v -> vsput ((toEnum (65+v))::Char) >>
                            vsget >>= \v' -> return (v==v'))
  -}
 
@@ -140,10 +140,10 @@ vsm3 () = vsget >>= (\v -> vsput ((toEnum (65+v))::Char) >>
  -- The following too must report a type error -- the expression
 --    return (v == v') must be flagged, rather than something else
 vsm3_do () = do
-	     v <- vsget
+             v <- vsget
              vsput ((toEnum (65+v))::Char)
              v' <- vsget
-	     return (v==v')
+             return (v==v')
 
 
 
@@ -154,7 +154,7 @@ crec1 :: (Prelude.Enum si, Prelude.Monad m) => VST m si si Int
 crec1 = vsget >>= (\s1 -> case fromEnum s1 of
                       0 -> return 0
                       1 -> vsput (pred s1) >> return 1
-                      _ -> vsput True >> 
+                      _ -> vsput True >>
                            crec1 >>= (\v ->
                              (vsput s1 >> -- restore state type to si
                               return (v + 10))))
@@ -162,12 +162,12 @@ crec1 = vsget >>= (\s1 -> case fromEnum s1 of
 -- The same in the do-notation
 crec1_do :: (Prelude.Enum si, Prelude.Monad m) => VST m si si Int
 crec1_do = do
-	s1 <- vsget 
+        s1 <- vsget
         case fromEnum s1 of
            0 -> return 0
            1 -> do {vsput (pred s1); return 1}
            _ -> do
-		vsput True
+                vsput True
                 v <- crec1_do
                 vsput s1 -- restore state type to si
                 return (v + 10)
@@ -208,17 +208,17 @@ runLIO = unLIO
 
 -- User code
 
-tlock1 = lget >>=  (\l -> 
-	 return (read l) >>= (\x ->
-	 lput (show (x+1))))
+tlock1 = lget >>=  (\l ->
+         return (read l) >>= (\x ->
+         lput (show (x+1))))
 
 tlock1r = runLIO tlock1
 
 -- the same in the do-notation
 tlock1_do = do
-	    l <- lget
-	    let x = read l
-	    lput (show (x+1))
+            l <- lget
+            let x = read l
+            lput (show (x+1))
 
 {-
   *VarStateM> :t tlock1
@@ -228,16 +228,16 @@ tlock1_do = do
 -}
 
 
-tlock2 = lget >>= (\l -> 
-	 lock >> (
-	 return (read l) >>= (\x ->
-	 lput (show (x+1)))))
+tlock2 = lget >>= (\l ->
+         lock >> (
+         return (read l) >>= (\x ->
+         lput (show (x+1)))))
 
 tlock2_do = do
-	    l <- lget
-	    lock
-	    let x = read l
-	    lput (show (x+1))
+            l <- lget
+            lock
+            let x = read l
+            lput (show (x+1))
 
 {-
   *VarStateM> :t tlock2
@@ -272,7 +272,7 @@ tlock3r_do = runLIO tlock3_do
 {-
  gives a type error:
     Couldn't match expected type `Locked'
-	   against inferred type `Unlocked'
+           against inferred type `Unlocked'
       Expected type: LIO Locked r b
       Inferred type: LIO Unlocked Locked ()
     In the expression: tlock2
@@ -291,7 +291,7 @@ tlock4_do = do {tlock2_do; tlock2_do}
 {-
 DoParamM.hs:298:30:
     Couldn't match expected type `Unlocked'
-	   against inferred type `Locked'
+           against inferred type `Locked'
       Expected type: LIO Unlocked r b
       Inferred type: LIO Locked Unlocked ()
     In the second argument of `(>>)', namely `unlock'

@@ -164,20 +164,20 @@ test4 :: NonTerminating
 test4 = NonTerminating (Apply omega omega) help3
 
 help1 :: Reducible (Apply Omega Omega)
-help1 = Reducible (ReduceSimple 
-		(ReplaceApply (ReplaceVarEq Equal (LiftLambda 
-			(LiftApply (LiftVarLess LessZero) (LiftVarLess LessZero)))) 
-		(ReplaceVarEq Equal (LiftLambda (LiftApply 
-			(LiftVarLess LessZero) (LiftVarLess LessZero))))))
+help1 = Reducible (ReduceSimple
+                (ReplaceApply (ReplaceVarEq Equal (LiftLambda
+                        (LiftApply (LiftVarLess LessZero) (LiftVarLess LessZero))))
+                (ReplaceVarEq Equal (LiftLambda (LiftApply
+                        (LiftVarLess LessZero) (LiftVarLess LessZero))))))
 
 help2 :: ReduceEventually (Apply Omega Omega) t -> Equal (Apply Omega Omega) t
 help2 ReduceZero = Equal
-help2 (ReduceSucc (ReduceSimple (ReplaceApply 
-	(ReplaceVarEq _ (LiftLambda (LiftApply (LiftVarLess _) (LiftVarLess _)))) 
-	(ReplaceVarEq _ (LiftLambda (LiftApply (LiftVarLess _) (LiftVarLess _)))))) y)
+help2 (ReduceSucc (ReduceSimple (ReplaceApply
+        (ReplaceVarEq _ (LiftLambda (LiftApply (LiftVarLess _) (LiftVarLess _))))
+        (ReplaceVarEq _ (LiftLambda (LiftApply (LiftVarLess _) (LiftVarLess _)))))) y)
   = case help2 y of
       Equal -> Equal
 
 help3 :: Infinite (Apply Omega Omega)
 help3 x = case help2 x of
-	      Equal -> help1
+              Equal -> help1

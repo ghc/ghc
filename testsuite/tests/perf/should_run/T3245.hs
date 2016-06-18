@@ -7,8 +7,8 @@ import Data.Typeable
 import System.CPUTime
 
 size :: Int
-size = 40000	-- This was big enough to take 5 seconds in 
-       		-- the bad case on my machine.
+size = 40000    -- This was big enough to take 5 seconds in
+                -- the bad case on my machine.
 
 data Any = forall a. (Typeable a) => Any a
 

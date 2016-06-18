@@ -3,7 +3,7 @@ module T4851 where
 
 import Prelude hiding ( id, (.) )
 
-import Control.Category	( Category(..) )
+import Control.Category ( Category(..) )
 import Control.Arrow
 
 garbage x =

@@ -5,7 +5,7 @@ module ShouldCompile where
 -- data RBTree = forall n. Root (SubTree Black n)
 
 -- Kind Colour
-data Red 
+data Red
 data Black
 
 -- Kind Nat
@@ -20,12 +20,12 @@ data SubTree c n where
 
 
 ins :: Int -> SubTree c n -> SubTree c n
-ins n Leaf 		     = (Fix (RNode Leaf n Leaf))
+ins n Leaf                   = (Fix (RNode Leaf n Leaf))
 ins n (BNode x m y) | n <= m = black (ins n x) m y
 ins n (BNode x m y) | n > m  = black x m (ins n y)
 ins n (RNode x m y) | n <= m = RNode (ins n x) m y
 ins n (RNode x m y) | n > m  = RNode x m (ins n y)
- 
+
 black :: SubTree c n -> Int -> SubTree d n -> SubTree Black (S n)
 black (RNode (Fix u) v c) w (x@(RNode _ _ _)) = Fix(RNode (blacken u) v (BNode c w x))
 

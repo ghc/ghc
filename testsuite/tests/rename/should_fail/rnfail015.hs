@@ -11,7 +11,7 @@ data Token
      |  TokIs
      |  TokDeref
      |  TokFind
-     |  TokLiteral		-- Duplicated!
+     |  TokLiteral              -- Duplicated!
      |  TokThe
 
       deriving Show

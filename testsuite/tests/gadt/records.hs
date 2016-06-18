@@ -18,8 +18,7 @@ g (T1 {x=xv, y=yv}) = T2 { x = xv }
 h v = x v + 1
 
 main = do { let t1 = T1 { y = "foo", x = 4 }
-	    	t2 = g t1
-	  ; print (h (f 8 undefined))
-	  ; print (h t2)
-	}
-	
+                t2 = g t1
+          ; print (h (f 8 undefined))
+          ; print (h t2)
+        }

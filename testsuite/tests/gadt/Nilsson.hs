@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs, ScopedTypeVariables #-}
 
--- Supplied by Henrik Nilsson, showed up a bug in GADTs 
+-- Supplied by Henrik Nilsson, showed up a bug in GADTs
 
 module Nilsson where
 
@@ -12,7 +12,7 @@ fromEvent = undefined
 usrErr :: String -> String -> String -> a
 usrErr = undefined
 
-type DTime = Double	-- [s]
+type DTime = Double     -- [s]
 
 data SF a b = SF {sfTF :: a -> Transition a b}
 
@@ -53,13 +53,13 @@ sfArr (FDG f)     = sfArrG f
 sfId :: SF' a a
 sfId = sf
     where
-	sf = SFArr (\_ a -> (sf, a)) FDI
+        sf = SFArr (\_ a -> (sf, a)) FDI
 
 
 sfConst :: b -> SF' a b
 sfConst b = sf
     where
-	sf = SFArr (\_ _ -> (sf, b)) (FDC b)
+        sf = SFArr (\_ _ -> (sf, b)) (FDC b)
 
 
 sfNever :: SF' a (Event b)
@@ -76,7 +76,7 @@ sfArrE f fne = sf
 sfArrG :: (a -> b) -> SF' a b
 sfArrG f = sf
     where
-	sf = SFArr (\_ a -> (sf, f a)) (FDG f)
+        sf = SFArr (\_ a -> (sf, f a)) (FDG f)
 
 
 sfAcc :: (c -> a -> (c, b)) -> c -> b -> SF' (Event a) b
@@ -107,10 +107,10 @@ sfAcc f c bne = sf
 -- * We still want to be able to get hold of the original function.
 
 data FunDesc a b where
-    FDI :: FunDesc a a					-- Identity function
-    FDC :: b -> FunDesc a b				-- Constant function
-    FDE :: (Event a -> b) -> b -> FunDesc (Event a) b	-- Event-processing fun
-    FDG :: (a -> b) -> FunDesc a b			-- General function
+    FDI :: FunDesc a a                                  -- Identity function
+    FDC :: b -> FunDesc a b                             -- Constant function
+    FDE :: (Event a -> b) -> b -> FunDesc (Event a) b   -- Event-processing fun
+    FDG :: (a -> b) -> FunDesc a b                      -- General function
 
 fdFun :: FunDesc a b -> (a -> b)
 fdFun FDI       = id
@@ -142,17 +142,17 @@ vfyNoEv :: Event a -> b -> b
 vfyNoEv NoEvent b = b
 vfyNoEv _       _  = usrErr "AFRP" "vfyNoEv"
                             "Assertion failed: Functions on events must not \
-			    \map NoEvent to Event."
+                            \map NoEvent to Event."
 
 compPrim :: SF a b -> SF b c -> SF a c
 compPrim (SF {sfTF = tf10}) (SF {sfTF = tf20}) = SF {sfTF = tf0}
     where
-	tf0 a0 = (cpXX sf1 sf2, c0)
-	    where
-		(sf1, b0) = tf10 a0
-		(sf2, c0) = tf20 b0
+        tf0 a0 = (cpXX sf1 sf2, c0)
+            where
+                (sf1, b0) = tf10 a0
+                (sf2, c0) = tf20 b0
 
-	-- Naming convention: cp<X><Y> where  <X> and <Y> is one of:
+        -- Naming convention: cp<X><Y> where  <X> and <Y> is one of:
         -- X - arbitrary signal function
         -- A - arbitrary pure arrow
         -- C - constant arrow
@@ -165,35 +165,35 @@ compPrim (SF {sfTF = tf10}) (SF {sfTF = tf20}) = SF {sfTF = tf0}
         cpXX sf1                 (SFArr _ fd2)     = cpXA sf1 fd2
         cpXX (SFAcc _ f1 s1 bne) (SFAcc _ f2 s2 cne) =
             sfAcc f (s1, s2) (vfyNoEv bne cne)
-	    where
-		f (s1, s2) a =
-		    case f1 s1 a of
-			(s1', NoEvent) -> ((s1', s2), cne)
-			(s1', Event b) ->
-			    let (s2', c) = f2 s2 b in ((s1', s2'), c)
+            where
+                f (s1, s2) a =
+                    case f1 s1 a of
+                        (s1', NoEvent) -> ((s1', s2), cne)
+                        (s1', Event b) ->
+                            let (s2', c) = f2 s2 b in ((s1', s2'), c)
         cpXX (SFCpAXA _ fd11 sf12 fd13) (SFCpAXA _ fd21 sf22 fd23) =
             cpAXA fd11 (cpXX (cpXA sf12 (fdComp fd13 fd21)) sf22) fd23
-	cpXX sf1 sf2 = SF' tf
-	    where
-	        tf dt a = (cpXX sf1' sf2', c)
-		    where
-		        (sf1', b) = (sfTF' sf1) dt a
-			(sf2', c) = (sfTF' sf2) dt b
+        cpXX sf1 sf2 = SF' tf
+            where
+                tf dt a = (cpXX sf1' sf2', c)
+                    where
+                        (sf1', b) = (sfTF' sf1) dt a
+                        (sf2', c) = (sfTF' sf2) dt b
 
         cpAXA :: FunDesc a b -> SF' b c -> FunDesc c d -> SF' a d
         cpAXA FDI     sf2 fd3     = cpXA sf2 fd3
         cpAXA fd1     sf2 FDI     = cpAX fd1 sf2
         cpAXA (FDC b) sf2 fd3     = cpCXA b sf2 fd3
-        cpAXA fd1     sf2 (FDC d) = sfConst d        
+        cpAXA fd1     sf2 (FDC d) = sfConst d
         cpAXA fd1 (SFArr _ fd2) fd3 = sfArr (fdComp (fdComp fd1 fd2) fd3)
 
-	cpAX :: FunDesc a b -> SF' b c -> SF' a c
+        cpAX :: FunDesc a b -> SF' b c -> SF' a c
         cpAX FDI           sf2 = sf2
         cpAX (FDC b)       sf2 = cpCX b sf2
         cpAX (FDE f1 f1ne) sf2 = cpEX f1 f1ne sf2
         cpAX (FDG f1)      sf2 = cpGX f1 sf2
 
-	cpXA :: SF' a b -> FunDesc b c -> SF' a c
+        cpXA :: SF' a b -> FunDesc b c -> SF' a c
         cpXA sf1 FDI           = sf1
         cpXA sf1 (FDC c)       = sfConst c
         cpXA sf1 (FDE f2 f2ne) = cpXE sf1 f2 f2ne
@@ -204,13 +204,13 @@ compPrim (SF {sfTF = tf10}) (SF {sfTF = tf20}) = SF {sfTF = tf0}
         cpCX b (SFAcc _ _ _ cne)          = sfConst (vfyNoEv b cne)
         cpCX b (SFCpAXA _ fd21 sf22 fd23) =
             cpCXA ((fdFun fd21) b) sf22 fd23
-	cpCX b sf2 = SFCpAXA tf (FDC b) sf2 FDI
-	    where
-		tf dt _ = (cpCX b sf2', c)
-		    where
-			(sf2', c) = (sfTF' sf2) dt b
+        cpCX b sf2 = SFCpAXA tf (FDC b) sf2 FDI
+            where
+                tf dt _ = (cpCX b sf2', c)
+                    where
+                        (sf2', c) = (sfTF' sf2) dt b
 
--- For SPJ: The following version did not work. 
+-- For SPJ: The following version did not work.
 -- The commented out one below did work, by lambda-lifting cpCXAux
         cpCXA :: b -> SF' b c -> FunDesc c d -> SF' a d
         cpCXA b sf2 FDI     = cpCX b sf2
@@ -219,7 +219,7 @@ compPrim (SF {sfTF = tf10}) (SF {sfTF = tf20}) = SF {sfTF = tf0}
             where
                 f3  = fdFun fd3
 
-		cpCXAAux :: SF' b c -> SF' a d
+                cpCXAAux :: SF' b c -> SF' a d
                 cpCXAAux (SFArr _ fd2) = sfConst (f3 ((fdFun fd2) b))
                 cpCXAAux (SFAcc _ _ _ cne) = sfConst (vfyNoEv b (f3 cne))
                 cpCXAAux (SFCpAXA _ fd21 sf22 fd23) = cpCXA ((fdFun fd21) b) sf22 (fdComp fd23 fd3)
@@ -231,7 +231,7 @@ compPrim (SF {sfTF = tf10}) (SF {sfTF = tf20}) = SF {sfTF = tf0}
         cpCXA b sf2 fd3 = cpCXAAux b fd3 (fdFun fd3) sf2
             where
                 -- f3  = fdFun fd3
-		-- Really something like: cpCXAAux :: SF' b c -> SF' a d
+                -- Really something like: cpCXAAux :: SF' b c -> SF' a d
                 cpCXAAux :: b -> FunDesc c d -> (c -> d) -> SF' b c -> SF' a d
                 cpCXAAux b fd3 f3 (SFArr _ fd2) = sfConst (f3 ((fdFun fd2) b))
                 cpCXAAux b fd3 f3 (SFAcc _ _ _ cne) = sfConst (vfyNoEv b (f3 cne))
@@ -239,44 +239,44 @@ compPrim (SF {sfTF = tf10}) (SF {sfTF = tf20}) = SF {sfTF = tf0}
 -}
 
         cpGX :: (a -> b) -> SF' b c -> SF' a c
-	cpGX f1 (SFArr _ fd2) = sfArr (fdComp (FDG f1) fd2)
+        cpGX f1 (SFArr _ fd2) = sfArr (fdComp (FDG f1) fd2)
         cpGX f1 (SFCpAXA _ fd21 sf22 fd23) =
             cpAXA (fdComp (FDG f1) fd21) sf22 fd23
-	cpGX f1 sf2 = SFCpAXA tf (FDG f1) sf2 FDI
-	    where
-		tf dt a = (cpGX f1 sf2', c)
-		    where
-			(sf2', c) = (sfTF' sf2) dt (f1 a)
+        cpGX f1 sf2 = SFCpAXA tf (FDG f1) sf2 FDI
+            where
+                tf dt a = (cpGX f1 sf2', c)
+                    where
+                        (sf2', c) = (sfTF' sf2) dt (f1 a)
 
         cpXG :: SF' a b -> (b -> c) -> SF' a c
-	cpXG (SFArr _ fd1) f2 = sfArr (fdComp fd1 (FDG f2))
+        cpXG (SFArr _ fd1) f2 = sfArr (fdComp fd1 (FDG f2))
         cpXG (SFAcc _ f1 s bne) f2 = sfAcc f s (f2 bne)
             where
                 f s a = let (s', b) = f1 s a in (s', f2 b)
-	cpXG (SFCpAXA _ fd11 sf12 fd22) f2 =
+        cpXG (SFCpAXA _ fd11 sf12 fd22) f2 =
             cpAXA fd11 sf12 (fdComp fd22 (FDG f2))
-	cpXG sf1 f2 = SFCpAXA tf FDI sf1 (FDG f2)
-	    where
-		tf dt a = (cpXG sf1' f2, f2 b)
-		    where
-			(sf1', b) = (sfTF' sf1) dt a
+        cpXG sf1 f2 = SFCpAXA tf FDI sf1 (FDG f2)
+            where
+                tf dt a = (cpXG sf1' f2, f2 b)
+                    where
+                        (sf1', b) = (sfTF' sf1) dt a
 
         cpEX :: (Event a -> b) -> b -> SF' b c -> SF' (Event a) c
-	cpEX f1 f1ne (SFArr _ fd2) = sfArr (fdComp (FDE f1 f1ne) fd2)
-	cpEX f1 f1ne (SFAcc _ f2 s cne) = sfAcc f s (vfyNoEv f1ne cne)
+        cpEX f1 f1ne (SFArr _ fd2) = sfArr (fdComp (FDE f1 f1ne) fd2)
+        cpEX f1 f1ne (SFAcc _ f2 s cne) = sfAcc f s (vfyNoEv f1ne cne)
             where
                 f s a = f2 s (fromEvent (f1 (Event a)))
-	cpEX f1 f1ne (SFCpAXA _ fd21 sf22 fd23) =
+        cpEX f1 f1ne (SFCpAXA _ fd21 sf22 fd23) =
             cpAXA (fdComp (FDE f1 f1ne) fd21) sf22 fd23
-	cpEX f1 f1ne sf2 = SFCpAXA tf (FDE f1 f1ne) sf2 FDI
-	    where
-		tf dt ea = (cpEX f1 f1ne sf2', c)
-		    where
+        cpEX f1 f1ne sf2 = SFCpAXA tf (FDE f1 f1ne) sf2 FDI
+            where
+                tf dt ea = (cpEX f1 f1ne sf2', c)
+                    where
                         (sf2', c) = case ea of
-				        NoEvent -> (sfTF' sf2) dt f1ne
-					_       -> (sfTF' sf2) dt (f1 ea)
+                                        NoEvent -> (sfTF' sf2) dt f1ne
+                                        _       -> (sfTF' sf2) dt (f1 ea)
 
-	cpXE :: SF' a (Event b) -> (Event b -> c) -> c -> SF' a c
+        cpXE :: SF' a (Event b) -> (Event b -> c) -> c -> SF' a c
         cpXE (SFArr _ fd1)   f2 f2ne = sfArr (fdComp fd1 (FDE f2 f2ne))
         cpXE (SFAcc _ f1 s bne) f2 f2ne = sfAcc f s (vfyNoEv bne f2ne)
             where
@@ -285,9 +285,9 @@ compPrim (SF {sfTF = tf10}) (SF {sfTF = tf20}) = SF {sfTF = tf0}
                             case eb of NoEvent -> (s', f2ne); _ -> (s', f2 eb)
         cpXE (SFCpAXA _ fd11 sf12 fd13) f2 f2ne =
             cpAXA fd11 sf12 (fdComp fd13 (FDE f2 f2ne))
-	cpXE sf1 f2 f2ne = SFCpAXA tf FDI sf1 (FDE f2 f2ne)
-	    where
-		tf dt a = (cpXE sf1' f2 f2ne,
+        cpXE sf1 f2 f2ne = SFCpAXA tf FDI sf1 (FDE f2 f2ne)
+            where
+                tf dt a = (cpXE sf1' f2 f2ne,
                            case eb of NoEvent -> f2ne; _ -> f2 eb)
-		    where
+                    where
                         (sf1', eb) = (sfTF' sf1) dt a

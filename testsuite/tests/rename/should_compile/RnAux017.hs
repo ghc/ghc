@@ -1,6 +1,6 @@
 module RnAux017 where
-import Test	-- Import main module so there really is a loop
-		-- (avoid warning message)
+import Test     -- Import main module so there really is a loop
+                -- (avoid warning message)
 data Wibble = Wibble
 data Wobble = Wobble
 

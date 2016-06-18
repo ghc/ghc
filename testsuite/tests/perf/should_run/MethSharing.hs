@@ -2,7 +2,7 @@ module Main where
 
 -- This test works efficiently because the full laziness
 -- pass now floats out applications
--- 	\x -> f y (x+1)
+--      \x -> f y (x+1)
 -- It'll float out the (f y) if that's a redex
 
 loop :: Double -> [Int] -> Double
@@ -93,5 +93,5 @@ the application of (^) to the two dictionaries during full laziness
 (note that (^) has arity 2 so the application is oversaturated). Why
 doesn't that happen? SetLevels (if this is the right place to look)
 has this:
- 
+
 -}

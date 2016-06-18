@@ -9,8 +9,8 @@ class Key k where
 
 instance (Key a, Key b) => Key (a,b) where
   type Map (a,b) = MP a b
-  lookup (a,b) (m :: Map (a,b) elt) 
+  lookup (a,b) (m :: Map (a,b) elt)
      = case lookup a m :: Maybe (Map b elt) of
-	  Just (m2 :: Map b elt) -> lookup b m2 :: Maybe elt
+          Just (m2 :: Map b elt) -> lookup b m2 :: Maybe elt
 
 data MP a b elt = MP (Map a (Map b elt))

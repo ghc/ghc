@@ -28,6 +28,6 @@ g2 (C (p :: x)) = ()
 g3 :: forall x y . D x y -> ()
 -- D (..)  :: D x y
 -- C (..)  :: C sk y
---	sk = y
+--      sk = y
 -- p :: sk
 g3 (D (C (p :: y))) = ()

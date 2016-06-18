@@ -21,11 +21,11 @@ instance Monad X where
   (X a) >>= f = f a
 
 instance MonadFix X where
-  mfix f = fix (f . unX) 
+  mfix f = fix (f . unX)
          where unX ~(X x) = x
 
 z :: X [Int]
 z = mdo x <- return (1:x)
-	return (take 4 x)
+        return (take 4 x)
 
 main = print z

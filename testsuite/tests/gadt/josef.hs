@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs, KindSignatures,
              MultiParamTypeClasses, FunctionalDependencies #-}
 
--- Program from Josef Svenningsson 
+-- Program from Josef Svenningsson
 
 -- Just a short explanation of the program. It contains
 -- some class declarations capturing some definitions from
@@ -10,7 +10,7 @@
 -- function defining the semantics for lambda terms called
 -- 'interp'.
 
--- Made GHC 6.4 bleat 
+-- Made GHC 6.4 bleat
 --    Quantified type variable `t' is unified with
 --        another quantified type variable `terminal'
 --    When trying to generalise the type inferred for `interp'
@@ -38,14 +38,14 @@ class Category arr =>
   inRight :: arr b (coprod a b)
   ccase   :: arr a c -> arr b c -> arr (coprod a b) c
 
-class ProductCategory prod arr => 
+class ProductCategory prod arr =>
       Exponential exp prod arr | arr -> exp where
   eval   :: arr (prod (exp a b) a) b
   curryA :: arr (prod c a) b -> arr c (exp a b)
 
 
-class (Exponential exp prod arr, Terminal terminal arr) => 
-  CartesianClosed terminal exp prod arr | arr -> terminal exp prod 
+class (Exponential exp prod arr, Terminal terminal arr) =>
+  CartesianClosed terminal exp prod arr | arr -> terminal exp prod
 
 data V prod env t where
   Z :: V prod (prod env t) t
@@ -55,13 +55,13 @@ data Lambda terminal (exp :: * -> * -> *) prod env t where
     Unit :: Lambda foo exp prod env foo
     Var  :: V prod env t -> Lambda terminal exp prod env t
 {-    Lam  :: Lambda terminal exp prod (prod env a) t
-	 -> Lambda terminal exp prod env (exp a t)
-    App  :: Lambda terminal exp prod env (exp t t') 
-	 -> Lambda terminal exp prod env t -> Lambda terminal exp prod env t'
+         -> Lambda terminal exp prod env (exp a t)
+    App  :: Lambda terminal exp prod env (exp t t')
+         -> Lambda terminal exp prod env t -> Lambda terminal exp prod env t'
 -}
 
-interp :: CartesianClosed terminal exp prod arr => 
-	  Lambda terminal exp prod s t -> arr s t
+interp :: CartesianClosed terminal exp prod arr =>
+          Lambda terminal exp prod s t -> arr s t
 interp (Unit)       = terminal -- Terminal terminal arr => arr a terminal
 -- interp (Var Z)      = second
 -- interp (Var (S v))  = first `comp` interp (Var v)

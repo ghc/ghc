@@ -3,6 +3,6 @@ module Foo where
 
 f x = x
   where
-    a		= []
-    (b,c,a)	= ([],[],d)
-    [d,b,_]	= ([],a,[])
+    a           = []
+    (b,c,a)     = ([],[],d)
+    [d,b,_]     = ([],a,[])

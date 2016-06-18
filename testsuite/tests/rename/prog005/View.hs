@@ -11,8 +11,8 @@ Compiling VersionGraphClient ( ./VersionGraphClient.hs, ./VersionGraphClient.o )
 
 View.hs:14:
      Couldn't match `VersionGraphClient' against `VersionGraphClient'
-	Expected type: VersionGraphClient
-	Inferred type: VersionGraphClient
+        Expected type: VersionGraphClient
+        Inferred type: VersionGraphClient
      In the `graphClient1' field of a record
      In the record construction: View {graphClient1 = graphClient}
 
@@ -23,9 +23,9 @@ However ghc without make has no problems.
 # ghc -c View.hs
 -}
 
--- | This module defines the fundamental structure of the (untyped) 
--- objects in a repository. 
--- 
+-- | This module defines the fundamental structure of the (untyped)
+-- objects in a repository.
+--
 -- We depend circularly on CodedValue.hs.  This module is compiled
 -- first and uses CodedValue.hi-boot.
 module View(

@@ -3,12 +3,12 @@ module ShouldCompile where
 
 import Data.List ( reverse, sort )
 
-sort :: Int	-- Clashes with Data.List.sort, 
-sort = 4	-- but never used, so OK	
-	
+sort :: Int     -- Clashes with Data.List.sort,
+sort = 4        -- but never used, so OK
 
-reverse :: Int	-- Clashes with Data.List.reverse, 
-reverse = 3	-- but the only uses are qualified
+
+reverse :: Int  -- Clashes with Data.List.reverse,
+reverse = 3     -- but the only uses are qualified
 
 x = ShouldCompile.reverse
 

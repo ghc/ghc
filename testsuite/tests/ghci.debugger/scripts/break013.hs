@@ -1,4 +1,4 @@
 g i = (a,b,c)
       where a = False
- 	    b = True
+            b = True
             c = ()

@@ -9,4 +9,4 @@ import Control.Monad.Fix
 
 main :: IO ()
 main = mdo x <- return (1:x)
-	   return ()
+           return ()
