@@ -5,22 +5,22 @@ Subject:    a compiler test
 Date:        3 Mar 1992 12:31:00 GMT
 
 Will,
-   One of the decisions taken at the FLARE meeting yesterday was that we 
-(FLARE people) should send you (GRASP people) interesting Haskell programs 
-to test your new compiler. So allow me to present the following program, 
+   One of the decisions taken at the FLARE meeting yesterday was that we
+(FLARE people) should send you (GRASP people) interesting Haskell programs
+to test your new compiler. So allow me to present the following program,
 written by Colin Runciman in various functional languages over the years,
-which puts propositions into clausal form. The original program was 
+which puts propositions into clausal form. The original program was
 interactive, but I've made it batch so that you can run it over night.
-Here is an example run with the prototype compiler. Note the result is 
+Here is an example run with the prototype compiler. Note the result is
 "a <=".
 
-	hc clausify.hs
-	Haskell-0.41 (EXPERIMENTAL)
-	Glasgow University Haskell Compiler, version 0.41
-	G-Code version
-	-71$ a.out
-	a <= 
-	-71$
+        hc clausify.hs
+        Haskell-0.41 (EXPERIMENTAL)
+        Glasgow University Haskell Compiler, version 0.41
+        G-Code version
+        -71$ a.out
+        a <=
+        -71$
 
 Cheers,
 
@@ -47,7 +47,7 @@ res n = concat (map clauses xs)
  where xs = take n (repeat "(a = a = a) = (a = a = a) = (a = a = a)")
        {-# NOINLINE xs #-}
 
-data StackFrame = Ast Formula | Lex Char 
+data StackFrame = Ast Formula | Lex Char
 
 data Formula =
   Sym Char |
@@ -55,7 +55,7 @@ data Formula =
   Dis Formula Formula |
   Con Formula Formula |
   Imp Formula Formula |
-  Eqv Formula Formula 
+  Eqv Formula Formula
 
 -- separate positive and negative literals, eliminating duplicates
 clause p = clause' p ([] , [])

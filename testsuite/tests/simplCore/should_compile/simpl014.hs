@@ -10,8 +10,8 @@ module ShouldCompile where
 
  data IHandler st where
      IHandler :: forall st ev res.
-		 Serialize (TxContext ev) => String -> IO ev
-		 -> (res -> IO ()) -> Ev st ev res -> IHandler st
+                 Serialize (TxContext ev) => String -> IO ev
+                 -> (res -> IO ()) -> Ev st ev res -> IHandler st
      -- Weird test case: (Serialize (TxContext ev)) is simplifiable
 
  data Ev st ev res  = Ev

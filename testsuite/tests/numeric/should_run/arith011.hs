@@ -83,7 +83,7 @@ testConversions zero = do
 
 samples :: (Num a) => a -> [a]
 samples zero = map fromInteger ([-3 .. -1]++[0 .. 3])
-  
+
 table1 :: (Show a, Show b) => String -> (a -> b) -> [a] -> IO ()
 table1 nm f xs = do
   sequence [ f' x | x <- xs ]
@@ -94,7 +94,7 @@ table1 nm f xs = do
 table2 :: (Show a, Show b, Show c) => String -> (a -> b -> c) -> [a] -> [b] -> IO ()
 table2 nm op xs ys = do
   sequence [ sequence [ op' x y | y <- ys ] >> putStrLn " "
-           | x <- xs 
+           | x <- xs
            ]
   putStrLn "#"
  where
@@ -120,19 +120,19 @@ testEq zero = do
 
 testOrd zero = do
   putStrLn "testOrd"
-  table2 "<="  	    (<=)    xs xs
-  table2 "< "  	    (<)     xs xs
-  table2 "> "  	    (>)     xs xs
-  table2 ">="  	    (>=)    xs xs
+  table2 "<="       (<=)    xs xs
+  table2 "< "       (<)     xs xs
+  table2 "> "       (>)     xs xs
+  table2 ">="       (>=)    xs xs
   table2 "`compare`" compare xs xs
  where
   xs = samples zero
 
 testNum zero = do
   putStrLn "testNum"
-  table2 "+"  	  (+)    xs xs
-  table2 "-"  	  (-)    xs xs
-  table2 "*"  	  (*)    xs xs
+  table2 "+"      (+)    xs xs
+  table2 "-"      (-)    xs xs
+  table2 "*"      (*)    xs xs
   table1 "negate" negate xs
  where
   xs = samples zero
@@ -161,7 +161,7 @@ testBits zero do_bitsize = do
   table2 "`xor`"            xor           xs xs
   table1 "complement"       complement    xs
   table2 "`shiftL`"         shiftL        xs ([0..3] ++ [32,64])
-  table2 "`shiftR`"         shiftR        xs ([0..3] ++ [32,64]) 
+  table2 "`shiftR`"         shiftR        xs ([0..3] ++ [32,64])
   table2 "`rotate`"         rotate        xs ([-3..3] ++ [-64,-32,32,64])
   table1 "bit"              (\ x -> (bit x) `asTypeOf` zero)   [(0::Int)..3]
   table2 "`setBit`"         setBit        xs ([0..3] ++ [32,64])

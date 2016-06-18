@@ -9,4 +9,4 @@ module ShouldCompile where
 newtype R = R (forall a. a->a)
 
 foo = case undefined of
-	R f -> f ()
+        R f -> f ()

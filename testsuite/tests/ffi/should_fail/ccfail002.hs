@@ -7,5 +7,5 @@ module ShouldFail where
 
 import GHC.Exts
 
-foreign import ccall unsafe "foo" 
-	foo :: Int# -> Int# -> Int# -> (# Int# , Int#, Int# #)
+foreign import ccall unsafe "foo"
+        foo :: Int# -> Int# -> Int# -> (# Int# , Int#, Int# #)

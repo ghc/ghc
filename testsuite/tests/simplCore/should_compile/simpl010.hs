@@ -16,4 +16,4 @@ f x T2      = [x]
 
 h :: a -> Bool -> T a -> T a -> [a]
 h x b p q = f x (case b of { True -> p; False -> q })
-	
+

@@ -1,9 +1,9 @@
 {-# OPTIONS_GHC -O2 -ddump-simpl  #-}
 module Roman where
 
-{- From: Roman Leshchinskiy [mailto:rl@cse.unsw.edu.au] 
+{- From: Roman Leshchinskiy [mailto:rl@cse.unsw.edu.au]
    Sent: 07 February 2008 03:34
-   Subject: Quadratic SpecConstr 
+   Subject: Quadratic SpecConstr
 
 Here is a program which makes SpecConstr generate a quadratic number of
 iterations:
@@ -23,14 +23,14 @@ bar m n = foo n (n,n) (n,n) (n,n) (n,n)
 
 {- For this particular function, I get 14 specialisations, one for each
    possible combination of arguments.
- 
+
    However, since we can see all the call sites outside the loop, we could
    use that to 'seed' the specialisation, and get just one specialisation.
 -}
 
 
--- Eyeball guidance: 
--- 	There should be just one specialisation for foo
--- 	Indeed, the original function should disappear,
---		since it isn't used
-	
+-- Eyeball guidance:
+--      There should be just one specialisation for foo
+--      Indeed, the original function should disappear,
+--              since it isn't used
+

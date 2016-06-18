@@ -3,15 +3,15 @@
 -- HsImpExp stuff
 
 module OneOfEverything (
-	fixn, 
-	FooData,
-	FooDataB(..),
-	FooDataC( .. ),
-	Tree(Leaf, Branch),
-	EqClass(..),
-	OrdClass(orda, ordb),
-	module OneC ,
-	module OneOfEverything
+        fixn,
+        FooData,
+        FooDataB(..),
+        FooDataC( .. ),
+        Tree(Leaf, Branch),
+        EqClass(..),
+        OrdClass(orda, ordb),
+        module OneC ,
+        module OneOfEverything
     ) where
 
 import Prelude
@@ -21,9 +21,9 @@ import Control.Monad
 
 -- HsDecls stuff
 
-infix	6 `fixn`
-infixl	7 +#
-infixr	8 `fixr`
+infix   6 `fixn`
+infixl  7 +#
+infixr  8 `fixr`
 
 fixn x y = x
 fixl x y = x
@@ -61,19 +61,19 @@ bindwith a b = b
 reca a = recb a
 recb a = reca a
 
-(~(a,b,c)) | nullity b	= a
-	   | nullity c	= a
-	   | otherwise	= a
-	   where
-	    nullity = null
+(~(a,b,c)) | nullity b  = a
+           | nullity c  = a
+           | otherwise  = a
+           where
+            nullity = null
 
 -- HsMatches stuff
 
 mat a b c d | foof a b = d
-	    | foof a c = d
-	    | foof b c = d
-	    where
-		foof a b = a == b
+            | foof a c = d
+            | foof b c = d
+            where
+                foof a b = a == b
 
 -- HsExpr stuff
 expr a b c d
@@ -85,11 +85,11 @@ expr a b c d
   + (9 *)
   + (* 8)
   + (case x of
-	[] | null x	-> 99
-	   | otherwise	-> 98
-	   | True	-> 97
-	   where
-	     null x = False
+        [] | null x     -> 99
+           | otherwise  -> 98
+           | True       -> 97
+           where
+             null x = False
     )
   + [ z | z <- c, isSpace z ]
   + let y = foo

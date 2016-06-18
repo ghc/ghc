@@ -6,12 +6,12 @@ type CInt  = Int32
 type CSize = Word32
 
 foreign import ccall "wrapper"
-   mkComparator :: (Ptr Int -> Ptr Int -> IO CInt) 
-		-> IO (Ptr (Ptr Int -> Ptr Int -> IO CInt))
+   mkComparator :: (Ptr Int -> Ptr Int -> IO CInt)
+                -> IO (Ptr (Ptr Int -> Ptr Int -> IO CInt))
 
 foreign import ccall
-   qsort :: Ptr Int -> CSize -> CSize -> Ptr (Ptr Int -> Ptr Int -> IO CInt) 
-	 -> IO ()
+   qsort :: Ptr Int -> CSize -> CSize -> Ptr (Ptr Int -> Ptr Int -> IO CInt)
+         -> IO ()
 
 compareInts :: Ptr Int -> Ptr Int -> IO CInt
 compareInts a1 a2 = do

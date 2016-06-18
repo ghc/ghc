@@ -2,12 +2,12 @@ import Foreign
 import Foreign.C.Types
 
 foreign import ccall "wrapper"
-   mkComparator :: (Ptr Int -> Ptr Int -> IO CInt) 
-		-> IO (FunPtr (Ptr Int -> Ptr Int -> IO CInt))
+   mkComparator :: (Ptr Int -> Ptr Int -> IO CInt)
+                -> IO (FunPtr (Ptr Int -> Ptr Int -> IO CInt))
 
 foreign import ccall
-   qsort :: Ptr Int -> CSize -> CSize -> FunPtr (Ptr Int -> Ptr Int -> IO CInt) 
-	 -> IO ()
+   qsort :: Ptr Int -> CSize -> CSize -> FunPtr (Ptr Int -> Ptr Int -> IO CInt)
+         -> IO ()
 
 compareInts :: Ptr Int -> Ptr Int -> IO CInt
 compareInts a1 a2 = do

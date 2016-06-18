@@ -1,7 +1,7 @@
 module Main where
 
 main = print (fib' 100)
-	-- This will time out unless memoing works properly
+        -- This will time out unless memoing works properly
 
 data Nat = Z | S Nat
            deriving (Show, Eq)
@@ -9,11 +9,11 @@ data Nat = Z | S Nat
 memo f = g
   where
     fz = f Z
-    fs = memo (f . S) 
+    fs = memo (f . S)
     g  Z    = fz
     g (S n) = fs n
-	-- It is a BAD BUG to inline 'fs' inside g
-	-- and that happened in 6.4.1, resulting in exponential behaviour
+        -- It is a BAD BUG to inline 'fs' inside g
+        -- and that happened in 6.4.1, resulting in exponential behaviour
 
 -- memo f = g (f Z) (memo (f . S))
 --        = g (f Z) (g (f (S Z)) (memo (f . S . S)))

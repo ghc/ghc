@@ -12,7 +12,7 @@ bar :: Int -> Int -> Int
 {-# INLINE [0] bar #-}
 bar _ n = n
 
-{-   The trouble here was 
+{-   The trouble here was
 
     *** Simplify:
          Result size = 25
@@ -28,11 +28,11 @@ bar _ n = n
          Result size = 25
 
 
-    etc.  
+    etc.
 
 The reason was this:
-	x = n# +# 1#
- 	i = I# x
+        x = n# +# 1#
+        i = I# x
 
 Being an unboxed value, we were treating the argument context of x
 as intersting, and hence inlining x in the arg of I#. But then we just

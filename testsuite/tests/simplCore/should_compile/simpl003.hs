@@ -11,8 +11,8 @@ type IMonad a
    = IMonadState -> IMonadReturn a
 
 data IMonadReturn a
-   = IMonadOk	IMonadState a
-   | IMonadFail	IMonadState String
+   = IMonadOk   IMonadState a
+   | IMonadFail IMonadState String
 
 type IMonadState
    = Int
@@ -26,7 +26,7 @@ thenI m k
    = \s0 -> case m s0 of
                IMonadFail s1 msg -> IMonadFail s1 msg
                IMonadOk s1 r1    -> k r1 s1
-   
+
 tickI n = \s0 -> IMonadOk (s0+n) ()
 
 mapI f [] = returnI []

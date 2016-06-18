@@ -5,6 +5,6 @@ import Data.Word
 
 main = do
   print (fromIntegral ((2^30 -1 + 2^30) - (2^30 + 2^30 :: Integer))
-		:: Data.Int.Int64)
+                :: Data.Int.Int64)
   print (fromIntegral ((2^30 -1 + 2^30) - (2^30 + 2^30 :: Integer))
-		:: Data.Word.Word64)
+                :: Data.Word.Word64)

@@ -11,7 +11,7 @@ data Failure = Failure
 instance Exception Failure
 
 test = (E.throw Failure >> return ())
-          `E.catch` 
+          `E.catch`
        (\(x::Failure) -> return ())
 
 main :: IO ()
@@ -23,14 +23,14 @@ f True = error "urk"
 
 {-
 Uderlying cause: we call
-	  catch# thing handler
+          catch# thing handler
 and expect that (thing state-token) will
     - either diverge/throw an exception
     - or return (# x,y #)
 But it does neither: it returns a PAP, because
     thing = \p q. blah
 
-In particular, 'thing = lvl_sxo' is 
+In particular, 'thing = lvl_sxo' is
   lvl_sxc :: IO Any
   lvl_sxc = error "urk"
 
@@ -40,14 +40,14 @@ In particular, 'thing = lvl_sxo' is
           -- inline (>>) --
 
     = (\(eta::S#). case lvl_sxc |> g1 eta of ...) |> g2
-    where 
+    where
       g1 :: IO Any ~ S# -> (# S#, Any #)
       g2 :: S# -> (# S#, () #) -> IO ()
 
           -- case-of-bottomming function --
 
     = (\ (eta::S#). lvl_sxc |> g1 |> ug3) |> g2
-    where 
+    where
       ug3(unsafe) :: S# -> (S#, Any) ~ (# S#, () #)
 
 This is all fine.  But it's crucial that lvl_sxc actually diverges.

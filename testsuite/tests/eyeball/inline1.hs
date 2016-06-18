@@ -8,7 +8,7 @@ newtype T s a = T { unT :: Int -> ST s a }
 instance Monad (T s) where
    return = T . const . return
    T p >>= f = T $ \i -> do { x <- p i
-  			    ; unT (f x) i }
+                            ; unT (f x) i }
 
 myIndex :: T s Int
 {-# INLINE myIndex #-}

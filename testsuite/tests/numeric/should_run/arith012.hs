@@ -18,15 +18,15 @@ tst = do
 ----
 -- Test data:
 doubles :: [Double]
-doubles = [ -1.2 , 0, 0.1, 0.5, 1.0, 1234.45454, 
+doubles = [ -1.2 , 0, 0.1, 0.5, 1.0, 1234.45454,
            1.6053e4, 1.64022e12, 6.894e-4, 6.34543455634582173,
-	   5342413403.40540423255]
+           5342413403.40540423255]
 ints :: [Int]
 ints = [ 0, 1, 255, 65513, 6029, 1024, 256, 201357245]
 
 integers :: [Integer]
 integers = [ 0, 1, 255, 65513, 6029, 1024, 256,
-	    2343243543500233, 656194962055457832]
+            2343243543500233, 656194962055457832]
 ---
 
 test_doubleToFloat :: IO ()
@@ -69,7 +69,7 @@ showBin i = showIntAtBase 2 intToDigit i
 showList' :: [ShowS] -> String
 showList' [] = "[]"
 showList' (x:xs) = showChar '[' . x $ showl xs ""
-      where 
+      where
        showl []     = showChar ']'
        showl (x:xs) = showChar ',' . x . showl xs
 

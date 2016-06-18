@@ -1,7 +1,7 @@
 {-# OPTIONS -XImpredicativeTypes -fno-warn-deprecated-flags -XEmptyDataDecls -XGADTs -XLiberalTypeSynonyms -XFlexibleInstances -XScopedTypeVariables #-}
 
 -- See Trac #1627.  The point is that we should get nice
--- 		    compact code for Foo
+--                  compact code for Foo
 
 -- In GHC 7.0 this fails, and rightly so.
 
@@ -50,8 +50,8 @@ liftArray :: forall arr m a i . (Ix i, MArray arr a m) =>
 liftArray a = E (do
     let ix :: [E m i] -> m i
         ix [i] = runE i
-	{-# INLINE f #-}
-	f is = V (ix is >>= readArray a) (\ x -> ix is >>= \ i -> writeArray a i x)
+        {-# INLINE f #-}
+        f is = V (ix is >>= readArray a) (\ x -> ix is >>= \ i -> writeArray a i x)
     return f
   )
 

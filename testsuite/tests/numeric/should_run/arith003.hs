@@ -6,9 +6,9 @@
 main
   = putStr
        (
-	showit (do_ops int_ops) ++
-	showit (do_ops integer_ops)
-    	)
+        showit (do_ops int_ops) ++
+        showit (do_ops integer_ops)
+        )
 
 showit :: (Show a, Integral a) => [(String, a, a, a)] -> String
 showit stuff = concat
@@ -17,7 +17,7 @@ showit stuff = concat
        ]
 
 do_ops :: Integral a => [((a -> a -> a), String, [(a,a)])]
-	-> [(String, a, a, a)]
+        -> [(String, a, a, a)]
 do_ops ops = [ (str, l, r, l `op` r) | (op,str,args) <- ops, (l,r) <- args ]
 
 small_operands, non_min_operands, operands, non_max_operands
@@ -28,17 +28,17 @@ non_min_operands = small_operands ++ [ fromIntegral maxInt ]
 non_max_operands = small_operands ++ [ fromIntegral minInt ]
 
 large_operands :: [ Integer ]
-large_operands = operands ++ 
+large_operands = operands ++
    [ fromIntegral minInt - 1,
      fromIntegral maxInt + 1,
      fromIntegral minInt * 2,
      fromIntegral maxInt * 2,
-     fromIntegral minInt ^ 2, 
+     fromIntegral minInt ^ 2,
      fromIntegral maxInt ^ 2
    ]
 
 integer_ops :: [((Integer -> Integer -> Integer), String, [(Integer,Integer)])]
-integer_ops = [ 
+integer_ops = [
   ((+),  "(+)",  both_large),
   ((-),  "(-)",  both_large),
   (div,  "div",  large_non_zero_r),
@@ -50,7 +50,7 @@ integer_ops = [
   ]
 
 int_ops :: [((Int -> Int -> Int), String, [(Int,Int)])]
-int_ops = [ 
+int_ops = [
   ((+),  "(+)",  both_small),
   ((-),  "(-)",  both_small),
   ((^),  "(^)",  small_non_neg_r),
@@ -71,7 +71,7 @@ both_small, non_zero_r, non_min_either_non_zero, non_min_l_or_zero_r,
   :: Integral a => [(a,a)]
 
 both_small      = [ (l,r) | l <- operands, r <- operands ]
-both_large	= [ (l,r) | l <- large_operands, r <- large_operands ]
+both_large      = [ (l,r) | l <- large_operands, r <- large_operands ]
 large_non_zero_r = [ (l,r) | l <- operands, r <- large_operands, r /= 0 ]
 non_zero_r      = [ (l,r) | l <- operands, r <- operands, r /= 0 ]
 non_min_either_non_zero = [ (l,r) | l <- non_min_operands, r <- non_min_operands, l /= 0 || r /= 0 ]

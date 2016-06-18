@@ -5,13 +5,13 @@ module Cpr001_imp where
 import Control.Applicative (Applicative(..))
 import Control.Monad (liftM, ap)
 
-data MS		= MS { instr	:: String
-		     , pc	:: Int
-		     , mem	:: String
-		     , stack	:: String
-		     , frames	:: [String]
-		     , status	:: Maybe String
-		     }
+data MS         = MS { instr    :: String
+                     , pc       :: Int
+                     , mem      :: String
+                     , stack    :: String
+                     , frames   :: [String]
+                     , status   :: Maybe String
+                     }
 
 
 newtype StateTrans s a = ST ( s -> (s, Maybe a))
@@ -30,23 +30,23 @@ instance Applicative (StateTrans s) where
 
 instance Monad (StateTrans s) where
     (ST p) >>= k
-	= ST (\s0 -> let
-		     (s1, r0)	= p s0
-		     in
-		     case r0 of
-		     Just v -> let
+        = ST (\s0 -> let
+                     (s1, r0)   = p s0
+                     in
+                     case r0 of
+                     Just v -> let
                                (ST q) = k v
-			       in
-			       q s1
-		     Nothing -> (s1, Nothing)
-	     )
+                               in
+                               q s1
+                     Nothing -> (s1, Nothing)
+             )
     return v
-	= ST (\s -> (s, Just v))
+        = ST (\s -> (s, Just v))
 
 
 -- machine state transitions
 
-type MachineStateTrans	= StateTrans MS
+type MachineStateTrans  = StateTrans MS
 
 type MST = MachineStateTrans
 
@@ -60,6 +60,6 @@ setMSvc call
 -- -------------------------------------------------------------------
 
 data Instr
-    = LoadI		Int		-- load int const
-    | SysCall		String  	-- system call (svc)
+    = LoadI             Int             -- load int const
+    | SysCall           String          -- system call (svc)
 

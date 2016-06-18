@@ -5,7 +5,7 @@ import Cpr001_imp
 
 -- -------------------------------------------------------------------
 
-intpInstr	:: Instr -> MST ()
+intpInstr       :: Instr -> MST ()
 
 intpInstr (SysCall "exit")
     = setMTerminated

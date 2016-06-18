@@ -66,43 +66,43 @@ d64 = undefined
 
 
 foreign export ccall "kitchen"
-   sink :: --ForeignObj 
---        -> ByteArray Int 
---	-> MutableByteArray Int RealWorld
-	   Int
-	-> Int8
-	-> Int16
-	-> Int32
-	-> Int64
-	-> Word8
-	-> Word16
-	-> Word32
-	-> Word64
-	-> Float
-	-> Double
-	-> IO Int
+   sink :: --ForeignObj
+--        -> ByteArray Int
+--      -> MutableByteArray Int RealWorld
+           Int
+        -> Int8
+        -> Int16
+        -> Int32
+        -> Int64
+        -> Word8
+        -> Word16
+        -> Word32
+        -> Word64
+        -> Float
+        -> Double
+        -> IO Int
 
 sink  = undefined
 sink2 = undefined
 
 foreign export ccall dynamic
-  sink2 :: (--ForeignObj 
---        -> ByteArray Int 
---	-> MutableByteArray Int RealWorld
-	   StablePtr a
-	-> Int
-	-> Int8
-	-> Int16
-	-> Int32
-	-> Int64
-	-> Word8
-	-> Word16
-	-> Word32
-	-> Word64
-	-> Float
-	-> Double
-	-> IO ())
-	-> IO Addr
+  sink2 :: (--ForeignObj
+--        -> ByteArray Int
+--      -> MutableByteArray Int RealWorld
+           StablePtr a
+        -> Int
+        -> Int8
+        -> Int16
+        -> Int32
+        -> Int64
+        -> Word8
+        -> Word16
+        -> Word32
+        -> Word64
+        -> Float
+        -> Double
+        -> IO ())
+        -> IO Addr
 
 
 -}

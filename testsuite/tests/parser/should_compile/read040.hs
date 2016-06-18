@@ -4,5 +4,5 @@
 
 module ShouldCompile where
 
-f () = do { x :: Bool <- return True 
-	  ; return x }
+f () = do { x :: Bool <- return True
+          ; return x }

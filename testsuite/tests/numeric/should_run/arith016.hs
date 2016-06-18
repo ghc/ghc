@@ -3,10 +3,10 @@
 module Main where
 
 import GHC.Exts ( Float(F#),
-		   eqFloat#, neFloat#, ltFloat#,
-		   leFloat#, gtFloat#, geFloat#,
+                   eqFloat#, neFloat#, ltFloat#,
+                   leFloat#, gtFloat#, geFloat#,
                    isTrue#
-		 )
+                 )
 
 fcmp_eq, fcmp_ne, fcmp_lt, fcmp_le, fcmp_gt, fcmp_ge :: (String, Float -> Float -> Bool)
 fcmp_eq = ("==", \ (F# a) (F# b) -> isTrue# (a `eqFloat#` b))

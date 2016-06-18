@@ -2,8 +2,8 @@
 -- !!! A rules test
 -- At one time the rule got too specialised a type:
 --
---  _R "ffoo" forall {@ a1 v :: (a1, ((), ()))} 
---	      fst @ a1 @ () (sndSnd @ a1 @ () @ () v) = fst @ a1 @ ((), ()) v
+--  _R "ffoo" forall {@ a1 v :: (a1, ((), ()))}
+--            fst @ a1 @ () (sndSnd @ a1 @ () @ () v) = fst @ a1 @ ((), ()) v
 
 
 module Main where

@@ -4,13 +4,13 @@
 
 module ShouldCompile where
 
-data StateM m s a = STM (s -> m (a,s)) 
+data StateM m s a = STM (s -> m (a,s))
 
 instance Functor m => Functor (StateM m s) where
-  fmap f (STM xs) =  STM (\s -> fmap (\ (x,s') -> (f x, s')) 
-                    		     (xs s)                                
-		         )
-{-	With GHC 4.04 (first release) this program gave:
+  fmap f (STM xs) =  STM (\s -> fmap (\ (x,s') -> (f x, s'))
+                                     (xs s)
+                         )
+{-      With GHC 4.04 (first release) this program gave:
 
   panic! (the `impossible' happened):
           mk_cpr_let: not a product
@@ -21,5 +21,5 @@ instance Functor m => Functor (StateM m s) where
 
  The reason: 'Functor' is a newtype, whose element is a for-all type.
 
-	newtype Functor f = Functor (forall a,b.  (a->b) -> f a -> f b)
+        newtype Functor f = Functor (forall a,b.  (a->b) -> f a -> f b)
 -}

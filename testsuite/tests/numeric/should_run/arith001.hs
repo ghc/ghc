@@ -3,15 +3,15 @@
 import Data.Ratio
 
 main = putStr (show r42  ++ "\n" ++
-	       show nu42 ++ ", " ++
-	       show de42 ++ "\n" ++
-	       show nu42d ++ ", " ++
-	       show de42d ++ "\n" ++
-	       show s2 ++ ", " ++
-	       show e2 ++ "\n" ++
-	       show s ++ ", " ++
-	       show e ++ "\n" )
-  where  
+               show nu42 ++ ", " ++
+               show de42 ++ "\n" ++
+               show nu42d ++ ", " ++
+               show de42d ++ "\n" ++
+               show s2 ++ ", " ++
+               show e2 ++ "\n" ++
+               show s ++ ", " ++
+               show e ++ "\n" )
+  where
     d42 :: Double
     r42 :: Rational
     nu42, de42 :: Integer
@@ -24,5 +24,5 @@ main = putStr (show r42  ++ "\n" ++
     nu42d= fromInteger nu42
     de42d= fromInteger de42
 
-    (s,e)= decodeFloat (nu42d / de42d )   
+    (s,e)= decodeFloat (nu42d / de42d )
     (s2,e2) = decodeFloat d42

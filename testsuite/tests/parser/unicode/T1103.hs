@@ -1,6 +1,6 @@
 {-# LANGUAGE UnicodeSyntax #-}
 {-
-	Three kinds of Unicode tests for our purposes.
+        Three kinds of Unicode tests for our purposes.
 -}
 
 module UniTest where
@@ -9,5 +9,5 @@ module UniTest where
 
 てすと3 ∷ IO ()
 てすと3 = do
-	putStrLn $ show 人間虫 where
-	人間虫 = "humasect"
+        putStrLn $ show 人間虫 where
+        人間虫 = "humasect"

@@ -14,5 +14,5 @@ neg = negate
      "f" forall (c::Char->Int) (x::Char). f (c x) = "RULE FIRED"
  #-}
 
-main = do { print (f (ord 'a')) 	-- Rule should fire
-	  ; print (f (neg 1)) }		-- Rule should not fire
+main = do { print (f (ord 'a'))         -- Rule should fire
+          ; print (f (neg 1)) }         -- Rule should not fire

@@ -8,5 +8,5 @@ module ShouldFail where
 
 k = (-3 **)
   where
-	(**) = const
-	infixl 7 **
+        (**) = const
+        infixl 7 **

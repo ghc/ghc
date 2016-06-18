@@ -11,38 +11,38 @@
 
 {-
       $wunfold_shU =
-	\ (ww_she :: [[a_abm]]) (ww1_shf :: Data.Maybe.Maybe (Stream.Stream a_abm)) ->
-	  case ww1_shf of wild2_afo {
-	    Data.Maybe.Nothing ->
-	      case ww_she of wild_ad6 {
-		[] -> GHC.Base.[] @ a_abm;
-		: x_ado xs1_adp ->
-		  $wunfold_shU
-		    xs1_adp
-		    (Data.Maybe.Just
-		       @ (Stream.Stream a_abm) (Stream.Stream @ a_abm @ [a_abm] 
-								*** lvl1_shW *** 
-								x_ado))
-	      };
-	    Data.Maybe.Just ds3_afJ ->
-	      case ds3_afJ of wild3_afL { Stream.Stream @ s1_afN stepb_afO sb_afP ->
-	      case stepb_afO sb_afP of wild4_afR {
-		Stream.Done -> $wunfold_shU ww_she (Data.Maybe.Nothing @ (Stream.Stream a_abm));
-		Stream.Yield x_afV sb'_afW ->
-		  GHC.Base.:
-		    @ a_abm
-		    x_afV
-		    ($wunfold_shU
-		       ww_she
-		       (Data.Maybe.Just
-			  @ (Stream.Stream a_abm) (Stream.Stream @ a_abm @ s1_afN stepb_afO sb'_afW)));
-		Stream.Skip sb'_afZ ->
-		  $wunfold_shU
-		    ww_she
-		    (Data.Maybe.Just
-		       @ (Stream.Stream a_abm) (Stream.Stream @ a_abm @ s1_afN stepb_afO sb'_afZ))
-	      }
-	      }
+        \ (ww_she :: [[a_abm]]) (ww1_shf :: Data.Maybe.Maybe (Stream.Stream a_abm)) ->
+          case ww1_shf of wild2_afo {
+            Data.Maybe.Nothing ->
+              case ww_she of wild_ad6 {
+                [] -> GHC.Base.[] @ a_abm;
+                : x_ado xs1_adp ->
+                  $wunfold_shU
+                    xs1_adp
+                    (Data.Maybe.Just
+                       @ (Stream.Stream a_abm) (Stream.Stream @ a_abm @ [a_abm]
+                                                                *** lvl1_shW ***
+                                                                x_ado))
+              };
+            Data.Maybe.Just ds3_afJ ->
+              case ds3_afJ of wild3_afL { Stream.Stream @ s1_afN stepb_afO sb_afP ->
+              case stepb_afO sb_afP of wild4_afR {
+                Stream.Done -> $wunfold_shU ww_she (Data.Maybe.Nothing @ (Stream.Stream a_abm));
+                Stream.Yield x_afV sb'_afW ->
+                  GHC.Base.:
+                    @ a_abm
+                    x_afV
+                    ($wunfold_shU
+                       ww_she
+                       (Data.Maybe.Just
+                          @ (Stream.Stream a_abm) (Stream.Stream @ a_abm @ s1_afN stepb_afO sb'_afW)));
+                Stream.Skip sb'_afZ ->
+                  $wunfold_shU
+                    ww_she
+                    (Data.Maybe.Just
+                       @ (Stream.Stream a_abm) (Stream.Stream @ a_abm @ s1_afN stepb_afO sb'_afZ))
+              }
+              }
 -}
 
 
@@ -50,7 +50,7 @@
 module Main( main, foo ) where
 -- Must export foo to make the issue show up
 
-import Prelude hiding ( concatMap, map) 
+import Prelude hiding ( concatMap, map)
 
 main = print (sum (foo [[1,2], [3,4,5]]))
 
@@ -86,7 +86,7 @@ streamToList (Stream next s) = unfold s
 "stream/unstream"
   forall s. listToStream (streamToList s) = s
   #-}
-            
+
 map :: (a -> b) -> [a] -> [b]
 map f = unstream . mapS f . stream
 {-# INLINE map #-}
@@ -131,7 +131,7 @@ mapS f (Stream next s0) = Stream next' s0
           Yield x s' -> Yield (f x) s'
 {-# INLINE [0] mapS #-}
 
-            
+
 concatMapS :: (a -> Stream b) -> Stream a -> Stream b
 concatMapS f (Stream step s) = Stream step' (s, Nothing)
   where step' (s, Nothing) =

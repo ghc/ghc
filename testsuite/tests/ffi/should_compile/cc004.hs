@@ -34,19 +34,19 @@ foreign import stdcall "dynamic" d64 :: FunPtr (IO Int64) -> IO Int64
 foreign import ccall unsafe "kitchen"
    sink :: Ptr a
         -> ByteArray#
-	-> MutableByteArray# RealWorld
-	-> Int
-	-> Int8
-	-> Int16
-	-> Int32
-	-> Int64
-	-> Word8
-	-> Word16
-	-> Word32
-	-> Word64
-	-> Float
-	-> Double
-	-> IO ()
+        -> MutableByteArray# RealWorld
+        -> Int
+        -> Int8
+        -> Int16
+        -> Int32
+        -> Int64
+        -> Word8
+        -> Word16
+        -> Word32
+        -> Word64
+        -> Float
+        -> Double
+        -> IO ()
 
 
 type Sink2 b = Ptr b
