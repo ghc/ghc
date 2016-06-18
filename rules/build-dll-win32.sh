@@ -39,7 +39,7 @@ process_dll_link() {
             awk -v root="$defFile" '{def=root;}{print "    \"" $0 "\""> def}' $exports
             sed -i "1i\LIBRARY \"${6##*/}\"\\nEXPORTS" $defFile
             
-            cmd="$7 $5 $defFile -o $6"
+            cmd="$7 $5 $defFile -optl-Wl,--retain-symbols-file=$exports -o $6"
             echo "$cmd"
             eval "$cmd" || exit 1
             exit 0
@@ -110,6 +110,7 @@ process_dll_link() {
     do
         def="$base-pt$i.def"
         objfile="$base-pt$i.objs"
+        lstfile="$base-pt$i.lst"
         objs=`cat "$objfile" | tr "\n" " "`
         basefile="$(basename $def)"
         DLLfile="${basefile%.*}.$ext"
@@ -121,7 +122,7 @@ process_dll_link() {
                 imports=`echo "$imports" "$base-pt$j.dll.a"`
             fi
         done
-        cmd="$7 $objs $def $imports -o $2/$DLLfile"
+        cmd="$7 $objs $def $imports -optl-Wl,--retain-symbols-file=$lstfile -o $2/$DLLfile"
         echo "$cmd"
         eval "$cmd" || exit 1
     done
