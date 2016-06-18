@@ -11,29 +11,29 @@ import Text.ParserCombinators.Parsec
 
 readPPM f
   = do  h <- openFile f ReadMode
-	s <- hGetContents h
-	case (parse parsePPM f s) of
-	  Left err -> error (show err)
-	  Right x  -> return x
+        s <- hGetContents h
+        case (parse parsePPM f s) of
+          Left err -> error (show err)
+          Right x  -> return x
 
 writePPM f ppm
   = do  h <- openFile f WriteMode
-	let s = showPPM (length (head ppm)) (length ppm) ppm
-	hPutStr h s
+        let s = showPPM (length (head ppm)) (length ppm) ppm
+        hPutStr h s
 
 -- parsing
 
 parsePPM
   = do  string "P6"
-	whiteSpace
-	width <- number
-	whiteSpace
-	height <- number
-	whiteSpace
-	colormax <- number
-	whiteSpace
-	cs <- getInput
-	return (chop width (chopColors cs))
+        whiteSpace
+        width <- number
+        whiteSpace
+        height <- number
+        whiteSpace
+        colormax <- number
+        whiteSpace
+        cs <- getInput
+        return (chop width (chopColors cs))
 
 chopColors [] = []
 chopColors (a:b:c:ds) = (ord a, ord b, ord c) : chopColors ds
@@ -44,15 +44,15 @@ chop n xs = h : chop n t
 
 number
   = do  ds <- many1 digit
-	return (read ds :: Int)
+        return (read ds :: Int)
 
 whiteSpace
   = skipMany (simpleSpace <|> oneLineComment <?> "")
     where simpleSpace = skipMany1 (oneOf " \t\n\r\v")
-	  oneLineComment =
-	      do  char '#'
-		  skipMany (noneOf "\n\r\v")
-		  return ()
+          oneLineComment =
+              do  char '#'
+                  skipMany (noneOf "\n\r\v")
+                  return ()
 
 -- printing
 

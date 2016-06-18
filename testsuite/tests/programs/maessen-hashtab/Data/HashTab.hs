@@ -16,36 +16,36 @@
 -----------------------------------------------------------------------------
 
 module Data.HashTab (
-	-- * Basic hash table operations
-	HashTable, new, insert, delete, lookup, update,
-	-- * Converting to and from lists
-	fromList, toList,
-	-- * Hash functions
-	-- $hash_functions
-	hashInt, hashString,
-	prime,
-	-- * Diagnostics
-	longestChain
+        -- * Basic hash table operations
+        HashTable, new, insert, delete, lookup, update,
+        -- * Converting to and from lists
+        fromList, toList,
+        -- * Hash functions
+        -- $hash_functions
+        hashInt, hashString,
+        prime,
+        -- * Diagnostics
+        longestChain
  ) where
 
 -- This module is imported by Data.Typeable, which is pretty low down in the
 -- module hierarchy, so don't import "high-level" modules
 
 -- Right now we import high-level modules with gay abandon.
-import Prelude	hiding	( lookup )
-import Data.Tuple	( fst )
+import Prelude  hiding  ( lookup )
+import Data.Tuple       ( fst )
 import Data.Bits
 import Data.Maybe
-import Data.List	( maximumBy, partition, concat, foldl )
-import Data.Int		( Int32 )
+import Data.List        ( maximumBy, partition, concat, foldl )
+import Data.Int         ( Int32 )
 
 import Data.Array.Base
 import Data.Array       hiding (bounds)
 import Data.Array.IO
 
-import Data.Char	( ord )
-import Data.IORef	( IORef, newIORef, readIORef, writeIORef )
-import Control.Monad	( mapM, sequence_ )
+import Data.Char        ( ord )
+import Data.IORef       ( IORef, newIORef, readIORef, writeIORef )
+import Control.Monad    ( mapM, sequence_ )
 
 
 -----------------------------------------------------------------------
@@ -81,11 +81,11 @@ newtype HashTable key val = HashTable (IORef (HT key val))
 
 data HT key val
   = HT {
-	kcount  :: !Int32,              -- Total number of keys.
-	buckets :: !(HTArray [(key,val)]),
+        kcount  :: !Int32,              -- Total number of keys.
+        buckets :: !(HTArray [(key,val)]),
         bmask   :: !Int32,
-	hash_fn :: key -> Int32,
-	cmp     :: key -> key -> Bool
+        hash_fn :: key -> Int32,
+        cmp     :: key -> key -> Bool
    }
 
 -- -----------------------------------------------------------------------------
@@ -151,7 +151,7 @@ hYSTERESIS = 0 :: Int32 -- entries to ignore in load computation
 --
 new
   :: (key -> key -> Bool)    -- ^ @eq@: An equality comparison on keys
-  -> (key -> Int32)	     -- ^ @hash@: A hash function on keys
+  -> (key -> Int32)          -- ^ @hash@: A hash function on keys
   -> IO (HashTable key val)  -- ^ Returns: an empty hash table
 
 new cmpr hash = do
@@ -190,9 +190,9 @@ insert (HashTable ref) key val = do
   writeMutArray bkts' indx ((key,val):bucket)
   freezeArray bkts'
   table2 <-
-	if tooBig k b
-	   then expandHashTable table1
-	   else return table1
+        if tooBig k b
+           then expandHashTable table1
+           else return table1
   writeIORef ref table2
 
 tooBig :: Int32 -> Int32 -> Bool
@@ -280,9 +280,9 @@ update (HashTable ref) key val = do
   writeMutArray bkts' indx ((key,val):bucket')
   freezeArray bkts'
   table2 <-
-	if tooBig k' b          -- off by one from insert's resize heuristic.
-	   then expandHashTable table1
-	   else return table1
+        if tooBig k' b          -- off by one from insert's resize heuristic.
+           then expandHashTable table1
+           else return table1
   writeIORef ref table2
   return (deleted>0)
 
@@ -297,8 +297,8 @@ lookup (HashTable ref) key = do
   let indx = bucketIndex table key
   bucket <- readHTArray bkts indx
   case [ val | (key',val) <- bucket, cmpr key key' ] of
-	[] -> return Nothing
-	(v:_) -> return (Just v)
+        [] -> return Nothing
+        (v:_) -> return (Just v)
 
 -- -----------------------------------------------------------------------------
 -- Converting to/from lists

@@ -91,12 +91,12 @@ stake, sdrop :: Int -> Stream a -> Stream a
 stake 0 xs = xs
 --should be: stake (i+1) (Scons x xs) = Scons x (stake i xs)
 stake i (Scons x xs) | i < 0     = error "Signal.stake: < 0"
-		     | otherwise = Scons x (stake (i-1) xs)
+                     | otherwise = Scons x (stake (i-1) xs)
 
 sdrop 0 xs = xs
 --should be:sdrop (i+1) (Scons x xs) = sdrop i xs
-sdrop i (Scons x xs) | i < 0	 = error "Signal.sdrop: < 0"
-		     | otherwise = sdrop i xs
+sdrop i (Scons x xs) | i < 0     = error "Signal.sdrop: < 0"
+                     | otherwise = sdrop i xs
 
 smap2 :: (a->b->c) -> Stream a -> Stream b -> Stream c
 smap2 f as bs =

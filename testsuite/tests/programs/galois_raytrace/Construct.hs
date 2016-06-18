@@ -69,7 +69,7 @@ data CSG a
 -- the a is application-specific texture information
 type Texture a = (Face, Point, a)
 
-union, intersect, difference		:: CSG a -> CSG a -> CSG a
+union, intersect, difference            :: CSG a -> CSG a -> CSG a
 
 union p@(Box b1 _) q@(Box b2 _) = Box (mergeBox b1 b2) (Union p q)
 union p q = Union p q
@@ -85,25 +85,25 @@ difference p q = Difference p q
 
 mkBox b p = Box b p
 
-plane, sphere, cube, cylinder, cone	:: a -> CSG a
+plane, sphere, cube, cylinder, cone     :: a -> CSG a
 
 plane = Plane
 sphere s =
     mkBox (B (-1 - epsilon) (1 + epsilon)
-	     (-1 - epsilon) (1 + epsilon)
-	     (-1 - epsilon) (1 + epsilon)) (Sphere s)
+             (-1 - epsilon) (1 + epsilon)
+             (-1 - epsilon) (1 + epsilon)) (Sphere s)
 cone s =
     mkBox (B (-1 - epsilon) (1 + epsilon)
-	     (   - epsilon) (1 + epsilon)
-	     (-1 - epsilon) (1 + epsilon)) (Cone s)
+             (   - epsilon) (1 + epsilon)
+             (-1 - epsilon) (1 + epsilon)) (Cone s)
 cube s =
     mkBox (B (- epsilon) (1 + epsilon)
-	     (- epsilon) (1 + epsilon)
-	     (- epsilon) (1 + epsilon)) (Cube s)
+             (- epsilon) (1 + epsilon)
+             (- epsilon) (1 + epsilon)) (Cube s)
 cylinder s =
     mkBox (B (-1 - epsilon) (1 + epsilon)
-	     (   - epsilon) (1 + epsilon)
-	     (-1 - epsilon) (1 + epsilon)) (Cylinder s)
+             (   - epsilon) (1 + epsilon)
+             (-1 - epsilon) (1 + epsilon)) (Cylinder s)
 
 ----------------------------
 -- Object transformations
@@ -120,16 +120,16 @@ transform mm'       (Difference p q)     = Difference (transform mm' p)   (trans
 transform mm'@(m,_) (Box box p)          = Box        (transformBox m box) (transform mm' p)
 transform (m, m')   prim                 = Transform  m m' prim
 
-translate				:: Coords -> CSG a -> CSG a
-translateX, translateY, translateZ	:: Double -> CSG a -> CSG a
+translate                               :: Coords -> CSG a -> CSG a
+translateX, translateY, translateZ      :: Double -> CSG a -> CSG a
 
 translate xyz = transform $ transM xyz
 translateX x = translate (x, 0, 0)
 translateY y = translate (0, y, 0)
 translateZ z = translate (0, 0, z)
 
-scale      				:: Coords -> CSG a -> CSG a
-scaleX, scaleY, scaleZ, uscale		:: Double -> CSG a -> CSG a
+scale                                   :: Coords -> CSG a -> CSG a
+scaleX, scaleY, scaleZ, uscale          :: Double -> CSG a -> CSG a
 
 scale xyz = transform $ scaleM xyz
 scaleX x = scale (x, 1, 1)
@@ -137,7 +137,7 @@ scaleY y = scale (1, y, 1)
 scaleZ z = scale (1, 1, z)
 uscale u = scale (u,u,u)
 
-rotateX, rotateY, rotateZ		:: Radian -> CSG a -> CSG a
+rotateX, rotateY, rotateZ               :: Radian -> CSG a -> CSG a
 
 rotateX a = transform $ rotxM a
 rotateY a = transform $ rotyM a
@@ -145,72 +145,72 @@ rotateZ a = transform $ rotzM a
 
 unit = matrix
       ( ( 1.0, 0.0, 0.0, 0.0 ),
-	( 0.0, 1.0, 0.0, 0.0 ),
-	( 0.0, 0.0, 1.0, 0.0 ),
-	( 0.0, 0.0, 0.0, 1.0 ) )
+        ( 0.0, 1.0, 0.0, 0.0 ),
+        ( 0.0, 0.0, 1.0, 0.0 ),
+        ( 0.0, 0.0, 0.0, 1.0 ) )
 
 transM (x, y, z)
   = ( matrix
       ( ( 1, 0, 0, x ),
-	( 0, 1, 0, y ),
-	( 0, 0, 1, z ),
-	( 0, 0, 0, 1 ) ),
+        ( 0, 1, 0, y ),
+        ( 0, 0, 1, z ),
+        ( 0, 0, 0, 1 ) ),
       matrix
       ( ( 1, 0, 0, -x ),
-	( 0, 1, 0, -y ),
-	( 0, 0, 1, -z ),
-	( 0, 0, 0,  1 ) ) )
+        ( 0, 1, 0, -y ),
+        ( 0, 0, 1, -z ),
+        ( 0, 0, 0,  1 ) ) )
 
 scaleM (x, y, z)
   = ( matrix
       ( (   x',    0,    0, 0 ),
-	(    0,   y',    0, 0 ),
-	(    0,    0,   z', 0 ),
-	(    0,    0,    0, 1 ) ),
+        (    0,   y',    0, 0 ),
+        (    0,    0,   z', 0 ),
+        (    0,    0,    0, 1 ) ),
       matrix
       ( ( 1/x',    0,    0, 0 ),
-	(    0, 1/y',    0, 0 ),
-	(    0,    0, 1/z', 0 ),
-	(    0,    0,    0, 1 ) ) )
+        (    0, 1/y',    0, 0 ),
+        (    0,    0, 1/z', 0 ),
+        (    0,    0,    0, 1 ) ) )
   where x' = nonZero x
-	y' = nonZero y
-	z' = nonZero z
+        y' = nonZero y
+        z' = nonZero z
 
 rotxM t
   = ( matrix
       ( (      1,      0,      0, 0 ),
-	(      0,  cos t, -sin t, 0 ),
-	(      0,  sin t,  cos t, 0 ),
-	(      0,      0,      0, 1 ) ),
+        (      0,  cos t, -sin t, 0 ),
+        (      0,  sin t,  cos t, 0 ),
+        (      0,      0,      0, 1 ) ),
       matrix
       ( (      1,      0,      0, 0 ),
-	(      0,  cos t,  sin t, 0 ),
-	(      0, -sin t,  cos t, 0 ),
-	(      0,      0,      0, 1 ) ) )
+        (      0,  cos t,  sin t, 0 ),
+        (      0, -sin t,  cos t, 0 ),
+        (      0,      0,      0, 1 ) ) )
 
 rotyM t
   = ( matrix
       ( (  cos t,      0,  sin t, 0 ),
-	(      0,      1,      0, 0 ),
-	( -sin t,      0,  cos t, 0 ),
-	(      0,      0,      0, 1 ) ),
+        (      0,      1,      0, 0 ),
+        ( -sin t,      0,  cos t, 0 ),
+        (      0,      0,      0, 1 ) ),
       matrix
       ( (  cos t,      0, -sin t, 0 ),
-	(      0,      1,      0, 0 ),
-	(  sin t,      0,  cos t, 0 ),
-	(      0,      0,      0, 1 ) ) )
+        (      0,      1,      0, 0 ),
+        (  sin t,      0,  cos t, 0 ),
+        (      0,      0,      0, 1 ) ) )
 
 rotzM t
   = ( matrix
       ( (  cos t, -sin t,      0, 0 ),
-	(  sin t,  cos t,      0, 0 ),
-	(      0,      0,      1, 0 ),
-	(      0,      0,      0, 1 ) ),
+        (  sin t,  cos t,      0, 0 ),
+        (      0,      0,      1, 0 ),
+        (      0,      0,      0, 1 ) ),
       matrix
       ( (  cos t,  sin t,      0, 0 ),
-	( -sin t,  cos t,      0, 0 ),
-	(      0,      0,      1, 0 ),
-	(      0,      0,      0, 1 ) ) )
+        ( -sin t,  cos t,      0, 0 ),
+        (      0,      0,      1, 0 ),
+        (      0,      0,      0, 1 ) ) )
 
 -------------------
 -- Eye transformations
@@ -220,9 +220,9 @@ rotzM t
 -- These are implemented as inverse transforms of the model.
 -------------------
 
-eye				 	:: Transform
-translateEye				:: Coords -> Transform -> Transform
-rotateEyeX, rotateEyeY, rotateEyeZ	:: Radian -> Transform -> Transform
+eye                                     :: Transform
+translateEye                            :: Coords -> Transform -> Transform
+rotateEyeX, rotateEyeY, rotateEyeZ      :: Radian -> Transform -> Transform
 
 eye = (unit, unit)
 translateEye xyz (eye1, eye2)
@@ -255,11 +255,11 @@ transformBox t (B x1  x2  y1  y2  z1  z2)
        (foldr1 min (map zCoord pts'))
        (foldr1 max (map zCoord pts')))
   where pts' = map (multMP t) pts
-	pts =  [point x1 y1 z1,
-		point x1 y1 z2,
-		point x1 y2 z1,
-		point x1 y2 z2,
-		point x2 y1 z1,
-		point x2 y1 z2,
-		point x2 y2 z1,
-		point x2 y2 z2]
+        pts =  [point x1 y1 z1,
+                point x1 y1 z2,
+                point x1 y2 z1,
+                point x1 y2 z2,
+                point x2 y1 z1,
+                point x2 y1 z2,
+                point x2 y2 z1,
+                point x2 y2 z2]

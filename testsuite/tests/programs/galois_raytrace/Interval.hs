@@ -29,8 +29,8 @@ import Geometry
 -- solid.  As a convenience, we also keep an additional flag that
 -- indicates whether the last intersection ends inside or outside.
 
-type IList a		= (Bool, [Intersection a], Bool)
-type Intersection a	= (Double, Bool, a)
+type IList a            = (Bool, [Intersection a], Bool)
+type Intersection a     = (Double, Bool, a)
 
 emptyIList = (False, [], False)
 openIList = (True, [], True)
@@ -46,7 +46,7 @@ mkExit  (t, a) = (t, False, a)
 entryexit w1 w2 = (False, [mkEntry w1, mkExit w2], False)
 exitentry w1 w2 = (True, [mkExit w1, mkEntry w2], True)
 arrange   w1@(t1, _) w2@(t2, _) | t1 < t2   = entryexit w1 w2
-				| otherwise = entryexit w2 w1
+                                | otherwise = entryexit w2 w1
 
 
 cmpI :: Intersection a -> Intersection a -> Ordering
@@ -66,23 +66,23 @@ unionIntervals :: IList a -> IList a -> IList a
 unionIntervals (isStartOpen, is, isEndOpen) (jsStartOpen, js, jsEndOpen)
   = (isStartOpen || jsStartOpen, uniIntervals is js, isEndOpen || jsEndOpen)
   where uniIntervals is [] | jsEndOpen = []
-			   | otherwise = is
-	uniIntervals [] js | isEndOpen = []
-			   | otherwise = js
-	uniIntervals is@(i : is') js@(j : js')
-	  = case cmpI i j of
-	    EQ -> if isEntry i == isEntry j then i : uniIntervals is' js'
-					    else uniIntervals is' js'
-	    LT -> if isEntry j then i : uniIntervals is' js
-			       else     uniIntervals is' js
-	    GT -> if isEntry i then j : uniIntervals is js'
-			       else     uniIntervals is js'
+                           | otherwise = is
+        uniIntervals [] js | isEndOpen = []
+                           | otherwise = js
+        uniIntervals is@(i : is') js@(j : js')
+          = case cmpI i j of
+            EQ -> if isEntry i == isEntry j then i : uniIntervals is' js'
+                                            else uniIntervals is' js'
+            LT -> if isEntry j then i : uniIntervals is' js
+                               else     uniIntervals is' js
+            GT -> if isEntry i then j : uniIntervals is js'
+                               else     uniIntervals is js'
 
 intersectIntervals :: IList a -> IList a -> IList a
 intersectIntervals is js
   = complementIntervals (unionIntervals is' js')
   where is' = complementIntervals is
-	js' = complementIntervals js
+        js' = complementIntervals js
 
 differenceIntervals :: IList a -> IList a -> IList a
 differenceIntervals is js
@@ -114,8 +114,8 @@ t7 = differenceIntervals i2 i2
 
 sh (o1,is,o2) =
     do  if o1 then putStr "..." else return ()
-	putStr $ foldr1 (++) (map si is)
-	if o2 then putStr "..." else return ()
+        putStr $ foldr1 (++) (map si is)
+        if o2 then putStr "..." else return ()
 si (i, True, _, _) = "<" ++ show i
 si (i, False, _, _) = " " ++ show i ++ ">"
 -}

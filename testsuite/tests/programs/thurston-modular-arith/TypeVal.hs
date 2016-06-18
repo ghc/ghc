@@ -48,18 +48,18 @@ instance (TypeVal Integer n) => TypeVal Integer (Dbl n)
 
 instance ValToType Integer where
     valToType n | n == 0 = Wrapper (undefined :: Zero)
-	        | even n    =
-		   case valToType (div n 2) of {Wrapper x ->
-	           case x of {(_ :: t) ->
-		   Wrapper (undefined :: Dbl t)}}
-	        | n > 0  =
-		   case valToType (n-1) of {Wrapper x ->
-	           case x of {(_ :: t) ->
-		   Wrapper (undefined :: Succ t)}}
-	        | n < 1  =
-		   case valToType (n+1) of {Wrapper x ->
-	           case x of {(_ :: t) ->
-		   Wrapper (undefined :: Pred t)}}
+                | even n    =
+                   case valToType (div n 2) of {Wrapper x ->
+                   case x of {(_ :: t) ->
+                   Wrapper (undefined :: Dbl t)}}
+                | n > 0  =
+                   case valToType (n-1) of {Wrapper x ->
+                   case x of {(_ :: t) ->
+                   Wrapper (undefined :: Succ t)}}
+                | n < 1  =
+                   case valToType (n+1) of {Wrapper x ->
+                   case x of {(_ :: t) ->
+                   Wrapper (undefined :: Pred t)}}
 
 --- ValToType (a,b)
 --- Doesn't work.  Perhaps a bug in ghc?
@@ -69,8 +69,8 @@ instance ValToType Integer where
 
 --instance (ValToType a, ValToType b) => ValToType (a,b) where
 --    valToType (a,b) = case valToType a of {x ->
---		    case valToType b of {y ->
---		    Wrapper (x,y)}}
+--                  case valToType b of {y ->
+--                  Wrapper (x,y)}}
 
 data NIL a = Dummy20
 instance TypeVal [a] (NIL a)
@@ -82,8 +82,8 @@ instance (TypeVal [a] r, TypeVal a t) => TypeVal [a] (CONS t r)
 instance (ValToType a) => ValToType [a] where
   valToType [] = Wrapper (undefined::NIL a)
   valToType (x:xs) = case valToType x of {Wrapper x' ->
-		     case x' of {(_::xt) ->
-		     case valToType xs of {Wrapper xs' ->
-		     case xs' of {(_::xst) ->
-		     Wrapper (undefined::CONS xt xst)}}}}
+                     case x' of {(_::xt) ->
+                     case valToType xs of {Wrapper xs' ->
+                     case xs' of {(_::xst) ->
+                     Wrapper (undefined::CONS xt xst)}}}}
 

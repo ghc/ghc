@@ -53,42 +53,42 @@ evalSurface (SFun f)   = f
 surface (Planar _ v0 v1) (n, p0, fn)
   = (norm, evalSurface fn n' u v)
   where norm = normalize $ cross v0 v1
-	(n', u, v) = planarUV n p0
+        (n', u, v) = planarUV n p0
 
 surface (Spherical _ v0 v1) (_, p0, fn)
   = (norm, evalSurface fn 0 u v)
   where x = xCoord p0
-	y = yCoord p0
-	z = zCoord p0
-	k = sqrt (1 - sq y)
-	theta = adjustRadian (atan2 (x / k) (z / k))
-	-- correct so that the image grows left-to-right
-	-- instead of right-to-left
-	u = 1.0 - clampf (theta / (2 * pi))
-	v =       clampf ((y + 1) / 2)
-	norm = normalize $ cross v0 v1
+        y = yCoord p0
+        z = zCoord p0
+        k = sqrt (1 - sq y)
+        theta = adjustRadian (atan2 (x / k) (z / k))
+        -- correct so that the image grows left-to-right
+        -- instead of right-to-left
+        u = 1.0 - clampf (theta / (2 * pi))
+        v =       clampf ((y + 1) / 2)
+        norm = normalize $ cross v0 v1
 
 -- ZZ ignore the (incorrect) surface model, and estimate the normal
 -- from the intersection in object space
 surface (Cylindrical _ v0 v1) (_, p0, fn)
   = (norm, evalSurface fn 0 u v)
   where x = xCoord p0
-	y = yCoord p0
-	z = zCoord p0
-	u = clampf $ adjustRadian (atan2 x z) / (2 * pi)
-	v = y
-	norm = normalize $ cross v0 v1
+        y = yCoord p0
+        z = zCoord p0
+        u = clampf $ adjustRadian (atan2 x z) / (2 * pi)
+        v = y
+        norm = normalize $ cross v0 v1
 
 -- ZZ ignore the (incorrect) surface model, and estimate the normal
 -- from the intersection in object space
 surface (Conic _ v0 v1) (_, p0, fn)
   = (norm, evalSurface fn 0 u v)
   where x = xCoord p0
-	y = yCoord p0
-	z = zCoord p0
-	u = clampf $ adjustRadian (atan2 (x / y) (z / y)) / (2 * pi)
-	v = y
-	norm = normalize $ cross v0 v1
+        y = yCoord p0
+        z = zCoord p0
+        u = clampf $ adjustRadian (atan2 (x / y) (z / y)) / (2 * pi)
+        v = y
+        norm = normalize $ cross v0 v1
 
 planarUV face p0
   = case face of
@@ -106,8 +106,8 @@ planarUV face p0
 
     ConeBase       -> (1, (x + 1) / 2, (z + 1) / 2)
   where x = xCoord p0
-	y = yCoord p0
-	z = zCoord p0
+        y = yCoord p0
+        z = zCoord p0
 
 -- misc
 

@@ -160,7 +160,7 @@ tangents :: Vector -> (Vector, Vector)
 tangents v@(V x y z)
   = (v1, v `cross` v1)
   where v1 | x == 0    = normalize (vector 0 z (-y))
-	   | otherwise = normalize (vector (-y) x 0)
+           | otherwise = normalize (vector (-y) x 0)
 
 {-# INLINE dot4 #-}
 dot4 :: Quad -> Quad -> Double
@@ -195,7 +195,7 @@ norm (V x y z) = sqrt (sq x + sq y + sq z)
 normalize :: Vector -> Vector
 normalize v@(V x y z)
              | norm /= 0 = multSV (1/norm) v
-	     | otherwise = error "normalize empty!"
+             | otherwise = error "normalize empty!"
     where norm = sqrt (sq x + sq y + sq z)
 
 -- This does computes the distance *squared*

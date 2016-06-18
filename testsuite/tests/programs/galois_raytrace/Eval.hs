@@ -47,10 +47,10 @@ instance MonadEval IO where
   err  s = error s
 
 data State
-	= State { env   :: Env
-	        , stack :: Stack
-	        , code  :: Code
-	        } deriving Show
+        = State { env   :: Env
+                , stack :: Stack
+                , code  :: Code
+                } deriving Show
 
 callback :: Env -> Code -> Stack -> Stack
 callback env code stk
@@ -151,7 +151,7 @@ step _ = err "Tripped on sidewalk while stepping."
 
 opFnTable :: Array GMLOp PrimOp
 opFnTable = array (minBound,maxBound)
-	          [ (op,prim) | (_,TOp op,prim) <- opcodes ]
+                  [ (op,prim) | (_,TOp op,prim) <- opcodes ]
 
 
 
@@ -181,7 +181,7 @@ doPrimOp (Surface_Obj fn) _ (VClosure env code:stk)
   = case absapply env code [VAbsObj AbsFACE,VAbsObj AbsU,VAbsObj AbsV] of
       Just [VReal r3,VReal r2,VReal r1,VPoint c1 c2 c3] ->
            let
-	       res = prop (color c1 c2 c3) r1 r2 r3
+               res = prop (color c1 c2 c3) r1 r2 r3
            in
                return ((VObject (fn (SConst res))) : stk)
       _ -> return ((VObject (fn (SFun call))) : stk)
@@ -190,7 +190,7 @@ doPrimOp (Surface_Obj fn) _ (VClosure env code:stk)
         call i r1 r2 =
           case callback env code [VReal r2,VReal r1,VInt i] of
              [VReal r3,VReal r2,VReal r1,VPoint c1 c2 c3]
-		 -> prop (color c1 c2 c3) r1 r2 r3
+                 -> prop (color c1 c2 c3) r1 r2 r3
              stk -> error ("callback failed: incorrectly typed return arguments"
                          ++ show stk)
 
@@ -241,10 +241,10 @@ doPrimOp primOp op args
   = err ("\n\ntype error when attempting to execute builtin primitive \"" ++
           show op ++ "\"\n\n| " ++
           show op ++ " takes " ++ show (length types) ++ " argument" ++ s
-	           ++ " with" ++ the ++ " type" ++ s ++ "\n|\n|" ++
+                   ++ " with" ++ the ++ " type" ++ s ++ "\n|\n|" ++
           "      " ++ unwords [ show ty | ty <- types ]  ++ "\n|\n|" ++
           " currently, the relevent argument" ++ s ++ " on the stack " ++
-	          are ++ "\n|\n| " ++
+                  are ++ "\n|\n| " ++
           unwords [ "(" ++ show arg ++ ")"
                   | arg <-  reverse (take (length types) args) ]  ++ "\n|\n| "
           ++ "    (top of stack is on the right hand side)\n\n")
@@ -261,7 +261,7 @@ doPrimOp primOp op args
 
 doAllOp :: PrimOp -> GMLOp -> Stack -> IO Stack
 doAllOp (Render render) Op_render
-			   (VString str:VInt ht:VInt wid:VReal fov
+                           (VString str:VInt ht:VInt wid:VReal fov
                            :VInt dep:VObject obj:VArray arr
                            :VPoint r g b : stk)
   = do { render (color r g b) lights obj dep (fov * (pi / 180.0)) wid ht str
@@ -303,7 +303,7 @@ instance Applicative Abs where
 
 instance Monad Abs where
     (Abs fn) >>= k = Abs (\ s -> case fn s of
-			           AbsState r s' -> runAbs (k r) s'
+                                   AbsState r s' -> runAbs (k r) s'
                                    AbsFail m     -> AbsFail m)
     return       = pure
     fail s       = Abs (\ n -> AbsFail s)
@@ -333,9 +333,9 @@ mainEval prog = do { stk <- eval (State emptyEnv [] prog)
   * Oops, one of the example actually has something
   * on the stack at the end.
   * Oh well...
-		   ; if null stk
+                   ; if null stk
                      then return ()
-		     else do { putStrLn done
+                     else do { putStrLn done
                              ; print stk
                              }
 -}

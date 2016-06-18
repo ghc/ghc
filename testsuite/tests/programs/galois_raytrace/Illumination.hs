@@ -98,14 +98,14 @@ illum cxt (pos,normV,(col,kd,ks,n)) v
 
     ambTerm = multSC kd (multCC amb col)
     difTerm = multSC kd (sumCC [multSC (dot normV lj) (multCC intensity col)
-	       |(loc,intensity) <- visibleLights,
-	       let lj = normalize ({- pos `subVV` -} loc)])
+               |(loc,intensity) <- visibleLights,
+               let lj = normalize ({- pos `subVV` -} loc)])
     -- ZZ might want to avoid the phong, when you can...
     spcTerm = multSC ks (sumCC [multSC ((dot normV hj) ** n ) (multCC intensity col)
-	       |(loc,intensity) <- visibleLights,
-	       -- ZZ note this is specific to the light at infinity
-	       let lj = {- pos `subVV` -} normalize loc,
-	       let hj = normalize (lj `subVV` normalize v)])
+               |(loc,intensity) <- visibleLights,
+               -- ZZ note this is specific to the light at infinity
+               let lj = {- pos `subVV` -} normalize loc,
+               let hj = normalize (lj `subVV` normalize v)])
     recTerm  = if recCoeff `nearC` black then black else multCC recCoeff recRay
     recCoeff = multSC ks col
     recRay   = illumination cxt (pos,newV)
@@ -203,8 +203,8 @@ castRay ray p
     (False, (0, b, _) : _, _)        -> Nothing -- eye is inside
     (False, (i, False, _) : _, _)    -> Nothing -- eye is inside
     (False, (t, b, (s, p0)) : _, _)     ->
-	let (v, prop) = surface s p0 in
-	    Just (offsetToPoint ray t, v, prop)
+        let (v, prop) = surface s p0 in
+            Just (offsetToPoint ray t, v, prop)
 
 intersects ray p
   = case intersectRayWithObject ray p of

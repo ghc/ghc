@@ -4,10 +4,10 @@
 -- which is included in the distribution.
 
 module CSG(module Construct,
-	   module Geometry,
-	   module Intersections,
-	   module Interval,
-	   module Misc) where
+           module Geometry,
+           module Intersections,
+           module Interval,
+           module Misc) where
 
 import Construct
 import Geometry

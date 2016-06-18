@@ -7,11 +7,11 @@ Subject: ghc bug
 
 
 Some floating constants that are within the floating range
-become wrong, e.g. 
+become wrong, e.g.
 
-	1.82173691287639817263897126389712638972163e-300::Double
+        1.82173691287639817263897126389712638972163e-300::Double
 
-	-- Lennart
+        -- Lennart
 
 PS.  Maybe you use fromRational as defined in the Prelude?
 That won't do.  It is badly broken, tell me if you want

@@ -1,5 +1,5 @@
 --------------------------------
---	The Game of Life      --
+--      The Game of Life      --
 --------------------------------
 
 generations x = 30
@@ -70,20 +70,20 @@ gen1 n board = map1 row1 (shift1 (copy1 n 0) board)
 
 row1 :: Tuple3 (L Int) (L Int) (L Int) -> L Int
 row1 (T3 last this next)
-  = zipWith31 elt1 (shift2 0 last) 
-                   (shift2 0 this) 
+  = zipWith31 elt1 (shift2 0 last)
+                   (shift2 0 this)
                    (shift2 0 next)
 
 
-elt1 :: Tuple3 Int Int Int 
-        -> (Tuple3 Int Int Int) 
+elt1 :: Tuple3 Int Int Int
+        -> (Tuple3 Int Int Int)
         -> (Tuple3 Int Int Int) -> Int
-elt1 (T3 a b c) (T3 d e f) (T3 g h i) 
+elt1 (T3 a b c) (T3 d e f) (T3 g h i)
  = if (not (eq tot 2))
           && (not (eq tot 3))
       then 0
       else if (eq tot 3) then 1 else e
-   where tot = a `plus` b `plus` c `plus` d 
+   where tot = a `plus` b `plus` c `plus` d
                `plus` f `plus` g `plus` h `plus` i
 
 eq :: Int -> Int -> Bool
@@ -98,7 +98,7 @@ shiftr1 x xs = append2 (C1 x N)  (init1 xs)
 shiftl1 :: L Int -> L (L Int) -> L (L Int)
 shiftl1 x xs = append2 (tail1 xs) (C1 x N)
 
-shift1 :: L Int -> L (L Int) 
+shift1 :: L Int -> L (L Int)
             -> L (Tuple3 (L Int) (L Int) (L Int))
 shift1 x xs = zip31 (shiftr1 x xs) xs (shiftl1 x xs)
 
@@ -128,9 +128,9 @@ copy3 n x = C1 x (copy3 (n-1) x)
 -- Displaying one generation
 
 disp1 :: (Tuple2 (L Char) (L (L Int))) -> L Char
-disp1 (T2 gen xss) 
- = append1 gen 
-    (append1 (C1 '\n' (C1 '\n' N)) 
+disp1 (T2 gen xss)
+ = append1 gen
+    (append1 (C1 '\n' (C1 '\n' N))
              (foldr_1 (glue1 (C1 '\n' N)) N
                        (map4 (compose2 concat1 (map2 star1)) xss)))
 
@@ -139,13 +139,13 @@ star1 i = case i of
            0 -> C1 ' ' (C1 ' ' N)
            1 -> C1 ' ' (C1 'o' N)
 
-glue1 :: L Char -> L Char -> L Char -> L Char 
+glue1 :: L Char -> L Char -> L Char -> L Char
 glue1 s xs ys = append1 xs (append1 s ys)
 
 -- Generating and displaying a sequence of generations
 
 life1 :: Int -> L (L Int) -> L Char
-life1 n xss 
+life1 n xss
   = foldr_1 (glue1 (copy3 (n+2) '\VT')) N
             (map5 disp1
               (zip1_ (map6 (string_ListChar.show) (ints 0))
@@ -165,7 +165,7 @@ initial1 n xss = take1 n (append2 (map3 (compose1 (take2 n)
                            (`append3` (copy1 n 0))) xss)
                                 (copy2 n (copy1 n 0)))
 
-iterate1 :: (L (L Int) -> L (L Int)) 
+iterate1 :: (L (L Int) -> L (L Int))
                -> L (L Int) -> L (L (L Int))
 iterate1 f x = C1 x (iterate1 f (f x))
 
@@ -177,14 +177,14 @@ take1 0 _ = N
 take1 _ N = N
 --should be:take1 (n+1) (C1 x xs) = C1 x (take1 n xs)
 take1 n (C1 x xs) | n < 0     = error "Main.take1"
-		  | otherwise = C1 x (take1 (n-1) xs)
+                  | otherwise = C1 x (take1 (n-1) xs)
 
 take2 :: Int -> L Int -> L Int
 take2 0 _ = N
 take2 _ N = N
 --should be:take2 (n+1) (C1 x xs) = C1 x (take2 n xs)
 take2 n (C1 x xs) | n < 0     = error "Main.take2"
-		  | otherwise = C1 x (take2 (n-1) xs)
+                  | otherwise = C1 x (take2 (n-1) xs)
 
 take3 :: Int -> L (L (L Int))
              -> L (L (L Int))
@@ -216,7 +216,7 @@ tail2 N = error "tail2 got a bad list"
 
 -- maps
 
-map1 :: (Tuple3 (L Int) (L Int) (L Int) -> L Int) -> 
+map1 :: (Tuple3 (L Int) (L Int) (L Int) -> L Int) ->
                 L (Tuple3 (L Int) (L Int) (L Int))
              -> L (L Int)
 map1 f N = N
@@ -235,7 +235,7 @@ map4 :: (L Int -> L Char)
 map4 f N = N
 map4 f (C1 x xs) = C1 (f x) (map4 f xs)
 
-map5 :: (Tuple2 (L Char) (L (L Int)) -> L Char) 
+map5 :: (Tuple2 (L Char) (L (L Int)) -> L Char)
           -> L (Tuple2 (L Char) (L (L Int)))
           -> L (L Char)
 map5 f N = N
@@ -247,12 +247,12 @@ map6 f (C1 x xs) = C1 (f x) (map6 f xs)
 
 -- compose
 
-compose2 :: (L (L Char) -> L Char) 
-            -> (L Int -> L (L Char)) 
+compose2 :: (L (L Char) -> L Char)
+            -> (L Int -> L (L Char))
             -> L Int -> L Char
 compose2 f g xs = f (g xs)
 
-compose1 :: (L Int -> L Int) 
+compose1 :: (L Int -> L Int)
              -> (L Int -> L Int) -> L Int -> L Int
 compose1 f g xs = f (g xs)
 
@@ -263,7 +263,7 @@ concat1 = foldr_1 append1 N
 
 -- foldr
 
-foldr_1 :: (L Char -> L Char -> L Char) 
+foldr_1 :: (L Char -> L Char -> L Char)
             -> L Char -> L (L Char) -> L Char
 foldr_1 f a N = a
 foldr_1 f a (C1 x xs) = f x (foldr_1 f a xs)
@@ -297,26 +297,26 @@ zip1_ = pzip T2
 zip2_ :: L (L Int)
          -> L (L Int)
          -> L (Tuple2 (L Int) (L Int))
-zip2_ = pzip T2 
+zip2_ = pzip T2
 
-zip3d :: L Int -> (Tuple2 (L Int) (L Int)) 
+zip3d :: L Int -> (Tuple2 (L Int) (L Int))
             -> (Tuple3 (L Int) (L Int) (L Int))
 zip3d x (T2 y z) = T3 x y z
 
-zip3_ :: L (L Int) 
+zip3_ :: L (L Int)
          -> L (Tuple2 (L Int) (L Int))
          -> L (Tuple3 (L Int) (L Int) (L Int))
 zip3_ = pzip zip3d
 
 zip4_ :: L Int
-         -> L Int 
+         -> L Int
          -> L (Tuple2 Int Int)
 zip4_ = pzip T2
 
 zip5d :: Int -> (Tuple2 Int Int) -> (Tuple3 Int Int Int)
 zip5d x (T2 y z) = T3 x y z
 
-zip5_ :: L Int 
+zip5_ :: L Int
          -> L (Tuple2 Int Int)
          -> L (Tuple3 Int Int Int)
 zip5_ = pzip zip5d
@@ -327,30 +327,30 @@ zip6_ :: L (Tuple3 Int Int Int)
                       (Tuple3 Int Int Int))
 zip6_ = pzip T2
 
-zip31 :: L (L Int) -> L (L Int) 
-         -> L (L Int)  
+zip31 :: L (L Int) -> L (L Int)
+         -> L (L Int)
          -> L (Tuple3 (L Int) (L Int) (L Int))
 zip31 as bs cs
   = zip3_ as (zip2_ bs cs)
 
-zip32 :: L Int -> L Int -> L Int 
+zip32 :: L Int -> L Int -> L Int
           -> L (Tuple3 Int Int Int)
 zip32 as bs cs
   = zip5_ as (zip4_ bs cs)
 
 -- zipWith
 
-zipWith21 :: ((Tuple3 Int Int Int) 
-              -> (Tuple2 (Tuple3 Int Int Int) 
+zipWith21 :: ((Tuple3 Int Int Int)
+              -> (Tuple2 (Tuple3 Int Int Int)
                          (Tuple3 Int Int Int)) -> Int)
-              -> L (Tuple3 Int Int Int) 
-              -> L (Tuple2 (Tuple3 Int Int Int) 
+              -> L (Tuple3 Int Int Int)
+              -> L (Tuple2 (Tuple3 Int Int Int)
                            (Tuple3 Int Int Int))
               -> L Int
-zipWith21 = pzip 
+zipWith21 = pzip
 
-zipWith31 :: ((Tuple3 Int Int Int) 
-              -> (Tuple3 Int Int Int) 
+zipWith31 :: ((Tuple3 Int Int Int)
+              -> (Tuple3 Int Int Int)
               -> (Tuple3 Int Int Int) -> Int)
                -> L (Tuple3 Int Int Int)
                -> L (Tuple3 Int Int Int)

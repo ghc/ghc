@@ -6,12 +6,12 @@
             land_i, lnot_i, lor_i, lshift_i, rshift_i,
             descr,
             destr_update, indassoc, lowbound, tabulate, upbound, update, valassoc) where {
-	    import Data.Bits;
+            import Data.Bits;
 --            import Word2;
             import Data.Word;
-	    import Data.Complex; -- 1.3
-	    import Data.Array; -- 1.3
---	    import Data.Int ( Num(fromInt) );
+            import Data.Complex; -- 1.3
+            import Data.Array; -- 1.3
+--          import Data.Int ( Num(fromInt) );
             type Complex_type   = Complex Double;
             type Array_type b   = Array Int b;
             type Assoc_type a   = (Int, a);

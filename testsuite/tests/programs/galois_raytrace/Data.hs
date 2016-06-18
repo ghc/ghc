@@ -23,19 +23,19 @@ type Code = [GMLToken]
 
 data GMLToken
     -- All these can occur in parsed code
-	= TOp     GMLOp
-	| TId     Name
-	| TBind   Name
-	| TBool   Bool
-	| TInt    Int
-	| TReal   Double
-	| TString String
-	| TBody   Code
-	| TArray  Code
-	| TApply
-	| TIf
-	 -- These can occur in optimized/transformed code
-	 -- NONE (yet!)
+        = TOp     GMLOp
+        | TId     Name
+        | TBind   Name
+        | TBool   Bool
+        | TInt    Int
+        | TReal   Double
+        | TString String
+        | TBody   Code
+        | TArray  Code
+        | TApply
+        | TIf
+         -- These can occur in optimized/transformed code
+         -- NONE (yet!)
 
 
 instance Show GMLToken where
@@ -63,22 +63,22 @@ instance Show GMLToken where
 type Stack = [GMLValue]
 
 data GMLValue
-	= VBool    !Bool
-	| VInt     !Int
-	| VReal    !Double
-	| VString  String
-	| VClosure Env Code
-	| VArray   (Array Int GMLValue)		-- FIXME: Haskell array
+        = VBool    !Bool
+        | VInt     !Int
+        | VReal    !Double
+        | VString  String
+        | VClosure Env Code
+        | VArray   (Array Int GMLValue)         -- FIXME: Haskell array
         -- uses the interpreter version of point
-	| VPoint   { xPoint :: !Double
+        | VPoint   { xPoint :: !Double
                    , yPoint :: !Double
                    , zPoint :: !Double
                    }
         -- these are abstract to the interpreter
-	| VObject  Object
-	| VLight   Light
-	-- This is an abstract object, used by the abstract interpreter
-	| VAbsObj  AbsObj
+        | VObject  Object
+        | VLight   Light
+        -- This is an abstract object, used by the abstract interpreter
+        | VAbsObj  AbsObj
 
 
 -- There are only *3* basic abstract values,
@@ -200,7 +200,7 @@ opTable = [ (kwd,op) | (kwd,op,_) <- opcodes ]
 
 opNameTable :: Array GMLOp Name
 opNameTable = array (minBound,maxBound)
-	          [ (op,name) | (name,TOp op,_) <- opcodes ]
+                  [ (op,name) | (name,TOp op,_) <- opcodes ]
 
 undef = error "undefined function"
 image = error "undefined function: talk to image group"
@@ -210,62 +210,62 @@ image = error "undefined function: talk to image group"
 
 opcodes :: [(String,GMLToken,PrimOp)]
 opcodes =
- [ ("apply",	  TApply,	 	error "incorrect use of apply")
- , ("if",	  TIf, 			error "incorrect use of if")
- , ("false",	  TBool False, 		error "incorrect use of false")
- , ("true",	  TBool True, 		error "incorrect use of true")
+ [ ("apply",      TApply,               error "incorrect use of apply")
+ , ("if",         TIf,                  error "incorrect use of if")
+ , ("false",      TBool False,          error "incorrect use of false")
+ , ("true",       TBool True,           error "incorrect use of true")
  ] ++ map (\ (a,b,c) -> (a,TOp b,c))
    -- These are just invocation, any coercions need to occur between here
    -- and before arriving at the application code (like deg -> rad).
- [ ("acos",	  Op_acos, 	 Real_Real (rad2deg . acos))
- , ("addi",	  Op_addi, 	 Int_Int_Int (+))
- , ("addf",	  Op_addf, 	 Real_Real_Real (+))
- , ("asin",	  Op_asin, 	 Real_Real (rad2deg . asin))
- , ("clampf",	  Op_clampf, 	 Real_Real clampf)
- , ("cone",	  Op_cone, 	 Surface_Obj cone)
- , ("cos",	  Op_cos, 	 Real_Real (cos . deg2rad))
- , ("cube",	  Op_cube, 	 Surface_Obj cube)
- , ("cylinder",	  Op_cylinder, 	 Surface_Obj cylinder)
+ [ ("acos",       Op_acos,       Real_Real (rad2deg . acos))
+ , ("addi",       Op_addi,       Int_Int_Int (+))
+ , ("addf",       Op_addf,       Real_Real_Real (+))
+ , ("asin",       Op_asin,       Real_Real (rad2deg . asin))
+ , ("clampf",     Op_clampf,     Real_Real clampf)
+ , ("cone",       Op_cone,       Surface_Obj cone)
+ , ("cos",        Op_cos,        Real_Real (cos . deg2rad))
+ , ("cube",       Op_cube,       Surface_Obj cube)
+ , ("cylinder",   Op_cylinder,   Surface_Obj cylinder)
  , ("difference", Op_difference, Obj_Obj_Obj difference)
- , ("divi",	  Op_divi, 	 Int_Int_Int (ourQuot))
- , ("divf",	  Op_divf, 	 Real_Real_Real (/))
- , ("eqi",	  Op_eqi, 	 Int_Int_Bool (==))
- , ("eqf",	  Op_eqf, 	 Real_Real_Bool (==))
- , ("floor",	  Op_floor, 	 Real_Int floor)
- , ("frac",	  Op_frac, 	 Real_Real (snd . properFraction))
- , ("get",	  Op_get, 	 Arr_Int_Value ixGet)
- , ("getx",	  Op_getx, 	 Point_Real (\ x y z -> x))
- , ("gety",	  Op_gety, 	 Point_Real (\ x y z -> y))
- , ("getz",	  Op_getz, 	 Point_Real (\ x y z -> z))
+ , ("divi",       Op_divi,       Int_Int_Int (ourQuot))
+ , ("divf",       Op_divf,       Real_Real_Real (/))
+ , ("eqi",        Op_eqi,        Int_Int_Bool (==))
+ , ("eqf",        Op_eqf,        Real_Real_Bool (==))
+ , ("floor",      Op_floor,      Real_Int floor)
+ , ("frac",       Op_frac,       Real_Real (snd . properFraction))
+ , ("get",        Op_get,        Arr_Int_Value ixGet)
+ , ("getx",       Op_getx,       Point_Real (\ x y z -> x))
+ , ("gety",       Op_gety,       Point_Real (\ x y z -> y))
+ , ("getz",       Op_getz,       Point_Real (\ x y z -> z))
  , ("intersect",  Op_intersect,  Obj_Obj_Obj intersect)
- , ("length",	  Op_length, 	 Arr_Int (succ . snd . bounds))
- , ("lessi",	  Op_lessi, 	 Int_Int_Bool (<))
- , ("lessf",	  Op_lessf, 	 Real_Real_Bool (<))
- , ("light",	  Op_light, 	 Point_Color_Light light)
- , ("modi",	  Op_modi, 	 Int_Int_Int (ourRem))
- , ("muli",	  Op_muli, 	 Int_Int_Int (*))
- , ("mulf",	  Op_mulf, 	 Real_Real_Real (*))
- , ("negi",	  Op_negi, 	 Int_Int negate)
- , ("negf",	  Op_negf, 	 Real_Real negate)
- , ("plane",	  Op_plane, 	 Surface_Obj plane)
- , ("point",	  Op_point, 	 Real_Real_Real_Point VPoint)
+ , ("length",     Op_length,     Arr_Int (succ . snd . bounds))
+ , ("lessi",      Op_lessi,      Int_Int_Bool (<))
+ , ("lessf",      Op_lessf,      Real_Real_Bool (<))
+ , ("light",      Op_light,      Point_Color_Light light)
+ , ("modi",       Op_modi,       Int_Int_Int (ourRem))
+ , ("muli",       Op_muli,       Int_Int_Int (*))
+ , ("mulf",       Op_mulf,       Real_Real_Real (*))
+ , ("negi",       Op_negi,       Int_Int negate)
+ , ("negf",       Op_negf,       Real_Real negate)
+ , ("plane",      Op_plane,      Surface_Obj plane)
+ , ("point",      Op_point,      Real_Real_Real_Point VPoint)
  , ("pointlight", Op_pointlight, Point_Color_Light pointlight)
- , ("real",	  Op_real, 	 Int_Real fromIntegral)
- , ("render",	  Op_render, 	 Render $ render eye)
- , ("rotatex",	  Op_rotatex, 	 Obj_Real_Obj (\ o d -> rotateX (deg2rad d) o))
- , ("rotatey",	  Op_rotatey, 	 Obj_Real_Obj (\ o d -> rotateY (deg2rad d) o))
- , ("rotatez",	  Op_rotatez, 	 Obj_Real_Obj (\ o d -> rotateZ (deg2rad d) o))
- , ("scale",	  Op_scale, 	 Obj_Real_Real_Real_Obj (\ o x y z -> scale (x,y,z) o))
- , ("sin",	  Op_sin, 	 Real_Real (sin . deg2rad))
- , ("sphere",	  Op_sphere, 	 Surface_Obj sphere') -- see comment at end of file
+ , ("real",       Op_real,       Int_Real fromIntegral)
+ , ("render",     Op_render,     Render $ render eye)
+ , ("rotatex",    Op_rotatex,    Obj_Real_Obj (\ o d -> rotateX (deg2rad d) o))
+ , ("rotatey",    Op_rotatey,    Obj_Real_Obj (\ o d -> rotateY (deg2rad d) o))
+ , ("rotatez",    Op_rotatez,    Obj_Real_Obj (\ o d -> rotateZ (deg2rad d) o))
+ , ("scale",      Op_scale,      Obj_Real_Real_Real_Obj (\ o x y z -> scale (x,y,z) o))
+ , ("sin",        Op_sin,        Real_Real (sin . deg2rad))
+ , ("sphere",     Op_sphere,     Surface_Obj sphere') -- see comment at end of file
  , ("spotlight",  Op_spotlight,  Point_Point_Color_Real_Real_Light mySpotlight)
- , ("sqrt",	  Op_sqrt, 	 Real_Real ourSqrt)
- , ("subi",	  Op_subi, 	 Int_Int_Int (-))
- , ("subf",	  Op_subf, 	 Real_Real_Real (-))
+ , ("sqrt",       Op_sqrt,       Real_Real ourSqrt)
+ , ("subi",       Op_subi,       Int_Int_Int (-))
+ , ("subf",       Op_subf,       Real_Real_Real (-))
  , ("trace",      Op_trace,      Value_String_Value mytrace)
  , ("translate",  Op_translate,  Obj_Real_Real_Real_Obj (\ o x y z -> translate (x,y,z) o))
- , ("union",	  Op_union, 	 Obj_Obj_Obj union)
- , ("uscale",	  Op_uscale, 	 Obj_Real_Obj (\ o r -> uscale r o))
+ , ("union",      Op_union,      Obj_Obj_Obj union)
+ , ("uscale",     Op_uscale,     Obj_Real_Obj (\ o r -> uscale r o))
  ]
 
 -- This enumerate all possible ways of calling the fixed primitives

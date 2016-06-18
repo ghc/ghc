@@ -8,25 +8,25 @@ main =
     solutions = queens 8
 
 queens :: Int -> [[Int]]
-queens n = valid n n 
+queens n = valid n n
 
 valid :: Int -> Int -> [[Int]]
 valid 0 n = [[]]
-valid m n = filter safe (extend n (valid (m-1) n)) 
+valid m n = filter safe (extend n (valid (m-1) n))
 
-extend n b = cp (fromTo 1 n) b 
+extend n b = cp (fromTo 1 n) b
 
 cp :: [a] -> [[a]] -> [[a]]
 cp [] y = []
-cp (a:x) y = map (a:) y ++ cp x y 
+cp (a:x) y = map (a:) y ++ cp x y
 
 safe (a:b) = no_threat a b 1
 
 no_threat a [] m = True
 no_threat a (b:y) m =
-    a /= b && a+m /= b && a-m /= b && no_threat a y (m+1) 
+    a /= b && a+m /= b && a-m /= b && no_threat a y (m+1)
 
-board :: [Int] -> String 
+board :: [Int] -> String
 board b =
     unlines (concat (zipWith rank (from 1) b))
   where
@@ -34,12 +34,12 @@ board b =
         map line ["o o o", " \\|/ ", " === "]
       where
         line crown_slice =
-	    concat (zipWith square (from 1) b)
+            concat (zipWith square (from 1) b)
           where
-	    square scol _ =
-		if scol == qcol then crown_slice
-	 	else if (scol `rem` (2::Int)) == (r `rem` (2::Int)) then "....."
-		else "     "
+            square scol _ =
+                if scol == qcol then crown_slice
+                else if (scol `rem` (2::Int)) == (r `rem` (2::Int)) then "....."
+                else "     "
 
 -- in place of ..
 

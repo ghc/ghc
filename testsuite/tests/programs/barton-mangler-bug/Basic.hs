@@ -33,10 +33,10 @@ instance Signal SignalRep where
   toSig = id
 instance (Physical a, Physical b) => Eq (a -> b) where
   a == b = error "Attempt to apply equality to functions"
-binop:: (Physical a, Physical b) => (Float -> Float -> Float) -> 
+binop:: (Physical a, Physical b) => (Float -> Float -> Float) ->
                                     (a -> b) -> (a -> b) -> a -> b
 binop op f g t = toPhysical ((fromPhysical (f t)) `op` (fromPhysical (g t)))
-unop:: (Physical a, Physical b ) => (Float -> Float) -> 
+unop:: (Physical a, Physical b ) => (Float -> Float) ->
                                     (a -> b) -> a -> b
 unop op f t = toPhysical (op (fromPhysical (f t)))
 instance (Physical a, Physical b) => Num (SignalRep a b) where
@@ -47,11 +47,11 @@ instance (Physical a, Physical b) => Num (SignalRep a b) where
   signum f = FunctionRep (unop abs (mapSignal f))
   fromInteger i = FunctionRep (\t -> toPhysical (fromInteger i))
   --fromInt i = FunctionRep (\t -> toPhysical (fromInt i))
-instance (Physical a, Physical b) => 
+instance (Physical a, Physical b) =>
          Fractional (SignalRep a b) where
   f / g = FunctionRep (binop (/) (mapSignal f) (mapSignal g))
   fromRational r = FunctionRep (\t -> (toPhysical (fromRational r)))
-instance (Physical a, Physical b) => 
+instance (Physical a, Physical b) =>
           Floating (SignalRep a b) where
   pi = FunctionRep (\t -> (toPhysical pi))
   exp   f = FunctionRep (unop exp (mapSignal f))
@@ -67,7 +67,7 @@ instance (Physical a, Physical b) =>
   acosh f = FunctionRep (unop acosh (mapSignal f))
   atanh f = FunctionRep (unop atanh (mapSignal f))
 data Event =
-  TimeEvent Float | 
+  TimeEvent Float |
   FunctionEvent (Float -> Bool) |
   BurstEvent Int Event
 
@@ -82,7 +82,7 @@ instance Eq Event where
 eventOccurs:: Event -> Float -> Float
 eventOccurs (TimeEvent t) x = if x < t then x else t
 eventOccurs (FunctionEvent f) x = stepEval f x
-eventOccurs (BurstEvent i e) x = 
+eventOccurs (BurstEvent i e) x =
           if i == 1 then
             eventOccurs e x
           else
@@ -90,7 +90,7 @@ eventOccurs (BurstEvent i e) x =
 stepEval:: (Float -> Bool) -> Float -> Float
 stepEval f x = if f x then x else stepEval f (x + eventEps x)
 data ZeroIndicator = LocalZero | GlobalZero deriving (Eq, Show)
-data {- (Physical a, Physical b) => -} FunctionWindow a b = 
+data {- (Physical a, Physical b) => -} FunctionWindow a b =
      Window ZeroIndicator Event (SignalRep a b)
      deriving (Eq, Show)
 data PieceCont a b = Windows [FunctionWindow a b]
@@ -100,43 +100,43 @@ instance Signal PieceCont where
   mapSignal (Windows wl) t = (mapSignal s) (toPhysical t')
       where (t', (Window z e s), wl') = getWindow 0.0 (fromPhysical t) wl
   toSig = PieceContRep
-getWindow:: (Physical a, Physical b) => 
-            Float -> Float -> [ FunctionWindow a b ] -> 
+getWindow:: (Physical a, Physical b) =>
+            Float -> Float -> [ FunctionWindow a b ] ->
             (Float, FunctionWindow a b, [ FunctionWindow a b ])
 getWindow st t [] = (t, Window LocalZero e f, [])
                     where e = TimeEvent (realmul 2 t)
                           f = FunctionRep (\t -> toPhysical 0.0)
-getWindow st t (w:wl) = if t' <= wt then (t',w,w:wl) 
+getWindow st t (w:wl) = if t' <= wt then (t',w,w:wl)
                         else getWindow (st+wt) t wl
     where wt = eventOccurs e t'
           (Window z e s) = w
           t' = if z == LocalZero then t-st else t
-(|>) :: (Physical a, Physical b) => FunctionWindow a b -> 
+(|>) :: (Physical a, Physical b) => FunctionWindow a b ->
         PieceCont a b -> PieceCont a b
 w |> (Windows wl) = Windows (w:wl)
 nullWindow = Windows []
-cycleWindows:: (Physical a, Physical b) => 
+cycleWindows:: (Physical a, Physical b) =>
                 PieceCont a b -> PieceCont a b
 cycleWindows (Windows wl) = Windows (cycle wl)
 constant:: (Physical a, Physical b) => b -> SignalRep a b
 constant x = FunctionRep (\t -> x)
 linear:: (Physical a, Physical b) => Float -> b -> SignalRep a b
 linear m b  = FunctionRep (\x -> toPhysical (realmul m (fromPhysical x) + (fromPhysical b)))
-sine:: (Physical a, Physical b) => 
+sine:: (Physical a, Physical b) =>
        b -> Frequency -> Float -> SignalRep a b
 sine mag omeg phase = FunctionRep (\x -> toPhysical (realmul (fromPhysical mag) (sin (realmul (realmul (realmul 2 pi) (fromPhysical omeg)) (fromPhysical x) + phase))))
 waveform:: (Physical a, Physical b) => a -> [b] -> SignalRep a b
 waveform samp ampls =
   let stepSlope y y' = realdiv ((fromPhysical y') - (fromPhysical y)) (fromPhysical samp)
-      makeWin (v,v') = Window LocalZero (TimeEvent (fromPhysical samp)) 
+      makeWin (v,v') = Window LocalZero (TimeEvent (fromPhysical samp))
                        (linear (stepSlope v v') v)
       points = cycle ampls
   in PieceContRep (Windows (map makeWin (zip points (tail points))))
-random:: (Physical a, Physical b) => 
+random:: (Physical a, Physical b) =>
          Integer -> a -> SignalRep a b
 random i s = waveform s (map toPhysical (rand i))
 ramp:: (Physical a, Physical b) => a -> b -> SignalRep a b
-ramp per v = 
+ramp per v =
   let sig = linear (realdiv (fromPhysical v) (fromPhysical per)) (toPhysical 0.0)
   in PieceContRep (Windows (cycle ([Window LocalZero (TimeEvent (fromPhysical per)) sig ])))
 triangle:: (Physical a, Physical b) => a -> b -> SignalRep a b
@@ -163,7 +163,7 @@ pulse st wid lvl =
       f t = if (fromPhysical t) < (fromPhysical st) then (toPhysical 0.0)
             else if (fromPhysical t) < tr then lvl else (toPhysical 0.0)
   in FunctionRep f
-trap:: (Physical a, Physical b) => a -> a -> a -> a -> b -> 
+trap:: (Physical a, Physical b) => a -> a -> a -> a -> b ->
                                    SignalRep a b
 trap st r wid f lvl =
   let stepSlope y y' t = realdiv (y' -  y) (fromPhysical t)
@@ -226,7 +226,7 @@ pulse_ac = Pulse_ac {dc_offset = toPhysical 0.0,
                      amplitude = toPhysical 0.0}
 -}
 
-makeWin:: (Physical a, Physical b) => a -> a -> 
+makeWin:: (Physical a, Physical b) => a -> a ->
            SignalRep a b -> SignalRep a b
 makeWin st wid sig =
   let wins = Window LocalZero (TimeEvent (fromPhysical st)) (constant (toPhysical 0.0)) |>
@@ -238,7 +238,7 @@ instance Signal BasicSignal where
     let ring = sine ringing oscillation 0.0
         cond = asTypeOf (expc damp_fac) ring
         sig = temp ring cond
-        temp:: (Physical a, Physical b) => SignalRep a b -> 
+        temp:: (Physical a, Physical b) => SignalRep a b ->
                 SignalRep a b -> SignalRep a b
         temp f g = FunctionRep (binop (*) (mapSignal f) (mapSignal g))
 --        temp f g = f * g
@@ -249,21 +249,21 @@ instance Signal BasicSignal where
     in PieceContRep wins
   toSig Pulse_dc{ start_delay = start_delay
                 , rise_time   = rise_time
-		, pulse_width = pulse_width
-		, fall_time   = fall_time
-		, dc_offset   = dc_offset
-		, period      = period
-		, amplitude   = amplitude
-		, over        = over
-		, under       = under
-		} =
+                , pulse_width = pulse_width
+                , fall_time   = fall_time
+                , dc_offset   = dc_offset
+                , period      = period
+                , amplitude   = amplitude
+                , over        = over
+                , under       = under
+                } =
     let pul = trap start_delay rise_time pulse_width fall_time amplitude
         so = toPhysical ((fromPhysical start_delay) + (fromPhysical rise_time))
         su = toPhysical ((fromPhysical so) + (fromPhysical pulse_width) + (fromPhysical fall_time))
         oversh = toSig over{start_delay=so}
         undersh = toSig under{start_delay=su}
         off = constant dc_offset
-        temp:: (Physical a, Physical b) => SignalRep a b -> 
+        temp:: (Physical a, Physical b) => SignalRep a b ->
                 SignalRep a b -> SignalRep a b
         temp f g = FunctionRep (binop (+) (mapSignal f) (mapSignal g))
         sig = temp (temp (temp pul oversh) undersh) off
@@ -272,13 +272,13 @@ instance Signal BasicSignal where
     in PieceContRep (cycleWindows wins)
 sumSig:: (Physical a, Physical b, Signal s, Signal s') =>
          (s a b) -> (s' a b) -> SignalRep a b
-sumSig f f' = 
+sumSig f f' =
    let s1 t = fromPhysical (mapSignal f t)
        s2 t = fromPhysical (mapSignal f' t)
    in FunctionRep (\t -> toPhysical ((s1 t) + (s2 t)))
 mulSig:: (Physical a, Physical b, Signal s, Signal s') =>
          (s a b) -> (s' a b) -> SignalRep a b
-mulSig f f' = 
+mulSig f f' =
    let f1 t = fromPhysical (mapSignal f t)
        f2 t = fromPhysical (mapSignal f' t)
    in FunctionRep (\t -> toPhysical ((f1 t) * (f2 t)))
