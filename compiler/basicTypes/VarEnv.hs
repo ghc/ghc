@@ -90,7 +90,7 @@ import StaticFlags
 -}
 
 -- | A set of variables that are in scope at some point
--- "Secrets of the Glasgow Haskell Compiler inliner" Section 3. provides
+-- "Secrets of the Glasgow Haskell Compiler inliner" Section 3.2 provides
 -- the motivation for this abstraction.
 data InScopeSet = InScope (VarEnv Var) {-# UNPACK #-} !Int
         -- The (VarEnv Var) is just a VarSet.  But we write it like
