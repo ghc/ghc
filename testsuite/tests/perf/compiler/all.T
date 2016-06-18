@@ -545,7 +545,7 @@ test('T5642',
             # 2014-12-10:  641085256 Improvements in constraints solver
             # 2016-04-06:  462677300
 
-            (wordsize(64), 1300685592, 10)])
+            (wordsize(64),  916484672, 10)])
             # prev:        1300000000
             # 2014-07-17:  1358833928 (general round of updates)
             # 2014-08-07:  1402242360 (caused by 1fc60ea)
@@ -558,8 +558,9 @@ test('T5642',
             # 2014-12-10:  1282916024 Improvements in constraints solver
             # 2015-10-28:  1412808976 Emit Typeable at definition site
             # 2015-11-22:  1071915072 Use TypeLits in the metadata encoding
-            # 2016-02-08:  950004816  Pattern match checker re-rework
+            # 2016-02-08:   950004816 Pattern match checker re-rework
             # 2016-05-12:  1300685592 Make Generic1 poly-kinded
+            # 2016-06-05:   916484672 Refactor derived Generic instances to reduce allocations
       ],
       compile,['-O'])
 

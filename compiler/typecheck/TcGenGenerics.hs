@@ -319,10 +319,17 @@ gk2gkDC Gen1_{} d = Gen1_DC $ last $ dataConUnivTyVars d
 -- Bindings for the Generic instance
 mkBindsRep :: GenericKind -> TyCon -> LHsBinds RdrName
 mkBindsRep gk tycon =
-    unitBag (mkRdrFunBind (L loc from01_RDR) from_matches)
+    unitBag (mkRdrFunBind (L loc from01_RDR) [from_eqn])
   `unionBags`
-    unitBag (mkRdrFunBind (L loc to01_RDR) to_matches)
+    unitBag (mkRdrFunBind (L loc to01_RDR) [to_eqn])
       where
+        -- The topmost M1 (the datatype metadata) has the exact same type
+        -- across all cases of a from/to definition, and can be factored out
+        -- to save some allocations during typechecking.
+        -- See Note [Generics compilation speed tricks]
+        from_eqn = mkHsCaseAlt x_Pat $ mkM1_E $ nlHsCase x_Expr from_matches
+        to_eqn   = mkHsCaseAlt (mkM1_P x_Pat) $ nlHsCase x_Expr to_matches
+
         from_matches  = [mkHsCaseAlt pat rhs | (pat,rhs) <- from_alts]
         to_matches    = [mkHsCaseAlt pat rhs | (pat,rhs) <- to_alts  ]
         loc           = srcLocSpan (getSrcLoc tycon)
@@ -689,8 +696,8 @@ mkSum :: GenericKind_ -- Generic or Generic1?
 -- Datatype without any constructors
 mkSum _ _ tycon [] = ([from_alt], [to_alt])
   where
-    from_alt = (nlWildPat, mkM1_E (makeError errMsgFrom))
-    to_alt   = (mkM1_P nlWildPat, makeError errMsgTo)
+    from_alt = (nlWildPat, makeError errMsgFrom)
+    to_alt   = (nlWildPat, makeError errMsgTo)
                -- These M1s are meta-information for the datatype
     makeError s = nlHsApp (nlHsVar error_RDR) (nlHsLit (mkHsString s))
     tyConStr   = occNameString (nameOccName (tyConName tycon))
@@ -726,9 +733,9 @@ mk1Sum gk_ us i n datacon = (from_alt, to_alt)
     datacon_rdr  = getRdrName datacon
 
     from_alt     = (nlConVarPat datacon_rdr datacon_vars, from_alt_rhs)
-    from_alt_rhs = mkM1_E (genLR_E i n (mkProd_E gk_ us' datacon_varTys))
+    from_alt_rhs = genLR_E i n (mkProd_E gk_ us' datacon_varTys)
 
-    to_alt     = ( mkM1_P (genLR_P i n (mkProd_P gk us' datacon_varTys))
+    to_alt     = ( genLR_P i n (mkProd_P gk us' datacon_varTys)
                  , to_alt_rhs
                  ) -- These M1s are meta-information for the datatype
     to_alt_rhs = case gk_ of
@@ -831,6 +838,15 @@ wrapArg_P Gen1 v _  = m1DataCon_RDR `nlConVarPat` [v]
 mkGenericLocal :: US -> RdrName
 mkGenericLocal u = mkVarUnqual (mkFastString ("g" ++ show u))
 
+x_RDR :: RdrName
+x_RDR = mkVarUnqual (fsLit "x")
+
+x_Expr :: LHsExpr RdrName
+x_Expr = nlHsVar x_RDR
+
+x_Pat :: LPat RdrName
+x_Pat = nlVarPat x_RDR
+
 mkM1_E :: LHsExpr RdrName -> LHsExpr RdrName
 mkM1_E e = nlHsVar m1DataCon_RDR `nlHsApp` e
 
@@ -929,4 +945,59 @@ the code that GHC generates using (:.:) is always of the form x :.: Rec1 y
 for some types x and y. In other words, the second type to which (:.:) is
 applied always has kind k -> *, for some kind k, so k2 cannot possibly be
 anything other than * in a generated Generic1 instance.
+
+Note [Generics compilation speed tricks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Deriving Generic(1) is known to have a large constant factor during
+compilation, which contributes to noticeable compilation slowdowns when
+deriving Generic(1) for large datatypes (see Trac #5642).
+
+To ease the pain, there is a trick one can play when generating definitions for
+to(1) and from(1). If you have a datatype like:
+
+  data Letter = A | B | C | D
+
+then a naïve Generic instance for Letter would be:
+
+  instance Generic Letter where
+    type Rep Letter = D1 ('MetaData ...) ...
+
+    to (M1 (L1 (L1 (M1 U1)))) = A
+    to (M1 (L1 (R1 (M1 U1)))) = B
+    to (M1 (R1 (L1 (M1 U1)))) = C
+    to (M1 (R1 (R1 (M1 U1)))) = D
+
+    from A = M1 (L1 (L1 (M1 U1)))
+    from B = M1 (L1 (R1 (M1 U1)))
+    from C = M1 (R1 (L1 (M1 U1)))
+    from D = M1 (R1 (R1 (M1 U1)))
+
+Notice that in every LHS pattern-match of the 'to' definition, and in every RHS
+expression in the 'from' definition, the topmost constructor is M1. This
+corresponds to the datatype-specific metadata (the D1 in the Rep Letter
+instance). But this is wasteful from a typechecking perspective, since this
+definition requires GHC to typecheck an application of M1 in every single case,
+leading to an O(n) increase in the number of coercions the typechecker has to
+solve, which in turn increases allocations and degrades compilation speed.
+
+Luckily, since the topmost M1 has the exact same type across every case, we can
+factor it out reduce the typechecker's burden:
+
+  instance Generic Letter where
+    type Rep Letter = D1 ('MetaData ...) ...
+
+    to (M1 x) = case x of
+      L1 (L1 (M1 U1)) -> A
+      L1 (R1 (M1 U1)) -> B
+      R1 (L1 (M1 U1)) -> C
+      R1 (R1 (M1 U1)) -> D
+
+    from x = M1 (case x of
+      A -> L1 (L1 (M1 U1))
+      B -> L1 (R1 (M1 U1))
+      C -> R1 (L1 (M1 U1))
+      D -> R1 (R1 (M1 U1)))
+
+A simple change, but one that pays off, since it goes turns an O(n) amount of
+coercions to an O(1) amount.
 -}
