@@ -1260,10 +1260,12 @@ genCCall' dflags gcp target dest_regs args
                                 GCPLinux -> roundTo 16 finalStack
                                 GCPLinux64ELF 1 ->
                                     roundTo 16 $ (48 +) $ max 64 $ sum $
-                                    map (widthInBytes . typeWidth) argReps
+                                    map (roundTo 8 . widthInBytes . typeWidth)
+                                        argReps
                                 GCPLinux64ELF 2 ->
                                     roundTo 16 $ (32 +) $ max 64 $ sum $
-                                    map (widthInBytes . typeWidth) argReps
+                                    map (roundTo 8 . widthInBytes . typeWidth)
+                                        argReps
                                 _ -> panic "genCall': unknown calling conv."
 
         argReps = map (cmmExprType dflags) args
@@ -1414,11 +1416,21 @@ genCCall' dflags gcp target dest_regs args
                                 | otherwise ->
                                    stackOffset
                                GCPLinux64ELF _ ->
-                                   -- everything on the stack is 8-byte
-                                   -- aligned on a 64 bit system
-                                   -- (except vector status, not used now)
+                                   -- Everything on the stack is mapped to
+                                   -- 8-byte aligned doublewords
                                    stackOffset
-                stackSlot = AddrRegImm sp (ImmInt stackOffset')
+                stackOffset''
+                     | isFloatType rep && typeWidth rep == W32 =
+                         case gcp of
+                         -- The ELF v1 ABI Section 3.2.3 requires:
+                         -- "Single precision floating point values
+                         -- are mapped to the second word in a single
+                         -- doubleword"
+                         GCPLinux64ELF 1 -> stackOffset' + 4
+                         _               -> stackOffset'
+                     | otherwise = stackOffset'
+
+                stackSlot = AddrRegImm sp (ImmInt stackOffset'')
                 (nGprs, nFprs, stackBytes, regs)
                     = case gcp of
                       GCPAIX ->
