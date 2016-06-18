@@ -2,10 +2,6 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-# -fforce-recomp makes lots of driver tests trivially pass, so we
-# filter it out from $(TEST_HC_OPTS).
-TEST_HC_OPTS_NO_RECOMP = $(filter-out -fforce-recomp,$(TEST_HC_OPTS))
-
 # Recompilation tests
 
 clean:
@@ -28,12 +24,12 @@ recomp015: clean
 	# This test checks that GHC can read these fields correctly and avoids
 	# recompilation (just like recomp011 which does the same thing for a smaller
 	# number of sections)
-	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) Generate.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) Generate.hs
 	./Generate > ManySections.s
 	echo 'main = putStrLn "Running main..."' > Main.hs
-	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) -c ManySections.s
-	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) --make -O Main.hs ManySections.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c ManySections.s
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -O Main.hs ManySections.o
 	./Main
 	sleep 1
-	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) --make -O Main.hs ManySections.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -O Main.hs ManySections.o
 	./Main

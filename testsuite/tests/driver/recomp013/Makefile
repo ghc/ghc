@@ -2,10 +2,6 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-# -fforce-recomp makes lots of driver tests trivially pass, so we
-# filter it out from $(TEST_HC_OPTS).
-TEST_HC_OPTS_NO_RECOMP = $(filter-out -fforce-recomp,$(TEST_HC_OPTS))
-
 # Recompilation tests
 
 clean:
@@ -18,8 +14,8 @@ recomp013: clean
 	echo 'module B (module A) where import A hiding (a1)' > B.hs
 	echo 'module C where import B; a2 = 142' > C.hs
 	echo 'first run'
-	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) --make C.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make C.hs
 	sleep 1
 	echo 'module B (module A) where import A hiding (a1, a2)' > B.hs
 	echo 'second run'
-	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RECOMP) --make C.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make C.hs

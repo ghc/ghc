@@ -2,11 +2,7 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-# -fforce-recomp makes lots of driver tests trivially pass, so we
-# filter it out from $(TEST_HC_OPTS).
-TEST_HC_OPTS_NO_RECOMP = $(filter-out -fforce-recomp,$(TEST_HC_OPTS))
-
-S03_OPTS=$(TEST_HC_OPTS_NO_RECOMP) -outputdir tmp_sigof03 -i -itmp_sigof03
+S03_OPTS=$(TEST_HC_OPTS) -outputdir tmp_sigof03 -i -itmp_sigof03
 sigof03:
 	rm -rf tmp_sigof03
 	mkdir tmp_sigof03
@@ -17,7 +13,7 @@ sigof03:
 	'$(TEST_HC)' $(S03_OPTS) tmp_sigof03/A.o tmp_sigof03/Main.o -o tmp_sigof03/Main
 	./tmp_sigof03/Main
 
-S03M_OPTS=$(TEST_HC_OPTS_NO_RECOMP) -outputdir tmp_sigof03m
+S03M_OPTS=$(TEST_HC_OPTS) -outputdir tmp_sigof03m
 sigof03m:
 	rm -rf tmp_sigof03m
 	mkdir tmp_sigof03m
