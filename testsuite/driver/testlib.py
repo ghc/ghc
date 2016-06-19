@@ -1320,7 +1320,7 @@ def simple_run(name, way, prog, extra_run_opts):
         use_stdin = opts.stdin
     else:
         stdin_file = add_suffix(name, 'stdin')
-        if os.path.exists(in_srcdir(stdin_file)):
+        if os.path.exists(in_testdir(stdin_file)):
             use_stdin = stdin_file
         else:
             use_stdin = '/dev/null'
@@ -1441,12 +1441,12 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     # figure out what to use for stdin
     if getTestOpts().stdin != '':
-        stdin_file = in_srcdir(opts.stdin)
+        stdin_file = in_testdir(opts.stdin)
     else:
-        stdin_file = in_srcdir(name, 'stdin')
+        stdin_file = in_testdir(name, 'stdin')
 
     if os.path.exists(stdin_file):
-        os.system('cat ' + stdin_file + ' >>' + qscriptname)
+        os.system('cat "{0}" >> "{1}"'.format(stdin_file, qscriptname))
 
     flags = ' '.join(get_compiler_flags(override_flags=None, noforce=False) +
                      config.way_flags(name)[way])
