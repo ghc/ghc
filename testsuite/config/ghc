@@ -173,7 +173,8 @@ def get_compiler_info():
     s = re.sub('[\r\n]', '', s)
     rtsInfoDict = dict(eval(s))
 
-    config.libdir = compilerInfoDict['LibDir']
+    # See Note [Replacing backward slashes in config.libdir].
+    config.libdir = compilerInfoDict['LibDir'].replace('\\', '/')
 
     v = compilerInfoDict["Project version"]
     config.compiler_version = v
@@ -224,3 +225,35 @@ def get_compiler_info():
         config.plugin_way_flags = "-static"
         config.ghc_th_way       = "normal"
         config.ghc_plugin_way   = "normal"
+
+# Note [Replacing backward slashes in config.libdir]
+# 
+# We *do* need to replace backslashes in config.libdir, for the following
+# reason:
+#
+# * Tests use config.libdir as follows:
+#
+#     extra_run_opts('"' + config.libdir + '"')
+#
+#   The double quotes are there because config.libdir might contain
+#   spaces.
+#
+# * This string is then written /as is/ to <testname>.genscript in
+#   testlib.interpreter_run:
+#
+#     script.write(':set args ' + opts.extra_run_opts + '\n')
+#
+# * But GHCi expects the arguments to ':set args' to be proper Haskell
+#   strings (when they are quoted), with backslashes escaped. Since
+#   config.libdir contains single backslash characters, tests such as T5313
+#   will fail for WAY=ghci with "Pattern match failure in do expression".
+#
+# Arguably the above code for writing `:set args` should be smarter. This
+# is tricky to get right though, because in GHCI `:set args foo\bar` (no
+# double quotes) works perfectly fine, and is interpreted as the Haskell
+# string "foo\\bar". Therfore, simply escaping all backward slashes in
+# opts.extra_run_opts before concatenating it with ':set args' is not right
+# either.
+#
+# Replacing backslashes to forward slashes in config.libdir works around the
+# problem.
