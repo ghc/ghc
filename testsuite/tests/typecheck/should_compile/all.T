@@ -359,6 +359,10 @@ test('tc263',
     multimod_compile, ['tc263','-v0'])
 test('tc264', normal, multimod_compile, ['tc264.hsig', '-sig-of "ShouldCompile is base:Data.STRef"'])
 test('tc265', compile_timeout_multiplier(0.01), compile, [''])
+test('tc266',
+     [extra_clean(['Tc266.hi-boot', 'Tc266.o-boot', 'Tc266a.hi', 'Tc266a.o', 'Tc266.hi', 'Tc266.o']), run_timeout_multiplier(0.01)] ,
+     run_command,
+     ['$MAKE -s --no-print-directory tc266'])
 
 test('GivenOverlapping', normal, compile, [''])
 test('GivenTypeSynonym', normal, compile, [''])

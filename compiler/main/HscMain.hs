@@ -159,6 +159,7 @@ import Control.Monad
 import Data.IORef
 import System.FilePath as FilePath
 import System.Directory
+import System.IO (fixIO)
 import qualified Data.Map as Map
 
 #include "HsVersions.h"
@@ -645,6 +646,7 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
   = do
     -- One-shot mode needs a knot-tying mutable variable for interface
     -- files. See TcRnTypes.TcGblEnv.tcg_type_env_var.
+    -- See also Note [hsc_type_env_var hack]
     type_env_var <- newIORef emptyNameEnv
     let mod = ms_mod mod_summary
         hsc_env = hsc_env'{ hsc_type_env_var = Just (mod, type_env_var) }
@@ -659,13 +661,30 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
     e <- hscIncrementalFrontend always_do_basic_recompilation_check m_tc_result mHscMessage
             mod_summary source_modified mb_old_iface mod_index
     case e of
+        -- We didn't need to do any typechecking; the old interface
+        -- file on disk was good enough.
         Left iface -> do
-            details <- liftIO $ genModDetails hsc_env iface
-            return (HscUpToDate, HomeModInfo{
-                hm_details = details,
-                hm_iface = iface,
-                hm_linkable = Nothing
-            })
+            -- Knot tying!  See Note [Knot-tying typecheckIface]
+            hmi <- liftIO . fixIO $ \hmi' -> do
+                let hsc_env' =
+                        hsc_env {
+                            hsc_HPT = addToHpt (hsc_HPT hsc_env)
+                                        (ms_mod_name mod_summary) hmi'
+                        }
+                -- NB: This result is actually not that useful
+                -- in one-shot mode, since we're not going to do
+                -- any further typechecking.  It's much more useful
+                -- in make mode, since this HMI will go into the HPT.
+                details <- genModDetails hsc_env' iface
+                return HomeModInfo{
+                    hm_details = details,
+                    hm_iface = iface,
+                    hm_linkable = Nothing }
+            return (HscUpToDate, hmi)
+        -- We finished type checking.  (mb_old_hash is the hash of
+        -- the interface that existed on disk; it's possible we had
+        -- to retypecheck but the resulting interface is exactly
+        -- the same.)
         Right (FrontendTypecheck tc_result, mb_old_hash) -> do
             (status, hmi, no_change) <-
                     if hscTarget dflags /= HscNothing &&
@@ -735,11 +754,12 @@ hscMaybeWriteIface dflags iface changed summary =
 -- NoRecomp handlers
 --------------------------------------------------------------
 
+-- NB: this must be knot-tied appropriately, see hscIncrementalCompile
 genModDetails :: HscEnv -> ModIface -> IO ModDetails
 genModDetails hsc_env old_iface
   = do
     new_details <- {-# SCC "tcRnIface" #-}
-                   initIfaceCheck (text "genModDetails") hsc_env (typecheckIface old_iface)
+                   initIfaceLoad hsc_env (typecheckIface old_iface)
     dumpIfaceStats hsc_env
     return new_details
 
