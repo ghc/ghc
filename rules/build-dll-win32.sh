@@ -28,7 +28,7 @@ process_dll_link() {
     SYMBOLS_OBJ=`cat $exports | wc -l | cut -d' ' -f1`
     echo "Number of symbols in object files for $6: $SYMBOLS_OBJ"
 
-    echo "Number of symbols in $6: $SYMBOLS_DLL"
+    # echo "Number of symbols in $6: $SYMBOLS_DLL"
     # Now check that the DLL doesn't have too many symbols. See trac #5987.
     case $(($SYMBOLS_OBJ / $max)) in
         0)
