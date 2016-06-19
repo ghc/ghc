@@ -266,7 +266,7 @@ test('T9078', [ omit_ways(threaded_ways) ], compile_and_run, ['-with-rtsopts="-D
 test('T10017', [ when(opsys('mingw32'), skip)
                , only_ways(threaded_ways), extra_run_opts('+RTS -N2 -RTS') ], compile_and_run, [''])
 
-test('T11108', normal, compile_and_run, [''])
+test('T11108', expect_broken_for(11108, ['ghci', 'hpc']), compile_and_run, [''])
 
 test('rdynamic', [ unless(opsys('linux') or opsys('mingw32'), skip)
                  # this needs runtime infrastructure to do in ghci:
@@ -275,9 +275,13 @@ test('rdynamic', [ unless(opsys('linux') or opsys('mingw32'), skip)
                  ],
      compile_and_run, ['-rdynamic -package ghc'])
 
-test('GcStaticPointers', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
+test('GcStaticPointers',
+     [when(doing_ghci(), extra_hc_opts('-fobject-code')),
+      expect_broken_for(12207, opt_ways)],
      compile_and_run, [''])
-test('ListStaticPointers', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
+test('ListStaticPointers',
+     [when(doing_ghci(), extra_hc_opts('-fobject-code')),
+      expect_broken_for(12207, opt_ways)],
      compile_and_run, [''])
 
 # 251 = RTS exit code for "out of memory"
