@@ -5,10 +5,9 @@ module Rules.Actions (
     makeExecutable, renderProgram, renderLibrary
     ) where
 
-import qualified System.Directory       as IO
+import qualified System.Directory.Extra as IO
 import qualified System.IO              as IO
 import qualified Control.Exception.Base as IO
-import qualified System.Directory.Extra as X
 
 import Base
 import CmdLineFlag
@@ -133,7 +132,7 @@ copyDirectory source target = do
 copyDirectoryContent :: (FilePath -> IO Bool) -> FilePath -> FilePath -> Action ()
 copyDirectoryContent test source target = do
     putProgressInfo $ renderAction "Copy directory" source target
-    liftIO $ X.listFilesInside test' source >>= mapM_ cp
+    liftIO $ IO.listFilesInside test' source >>= mapM_ cp
   where
     target' a = target -/- fromJust (stripPrefix source a)
     test' a = ifM (test a) (mkdir a >> return True) (return False)
