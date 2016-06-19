@@ -165,8 +165,7 @@ applyPatch dir patch = do
     quietly $ cmd Shell cmdEcho [Cwd dir] [path, "-p0 <", patch]
 
 runBuilder :: Builder -> [String] -> Action ()
-runBuilder =
-    runBuilderWith []
+runBuilder = runBuilderWith []
 
 runBuilderWith :: [CmdOption] -> Builder -> [String] -> Action ()
 runBuilderWith options builder args = do
