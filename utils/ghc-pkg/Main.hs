@@ -790,7 +790,7 @@ mungePackageDBPaths :: FilePath -> PackageDB -> PackageDB
 mungePackageDBPaths top_dir db@PackageDB { packages = pkgs } =
     db { packages = map (mungePackagePaths top_dir pkgroot) pkgs }
   where
-    pkgroot = takeDirectory (locationAbsolute db)
+    pkgroot = takeDirectory $ dropTrailingPathSeparator (locationAbsolute db)
     -- It so happens that for both styles of package db ("package.conf"
     -- files and "package.conf.d" dirs) the pkgroot is the parent directory
     -- ${pkgroot}/package.conf  or  ${pkgroot}/package.conf.d/
