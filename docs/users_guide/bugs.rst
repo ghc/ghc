@@ -479,13 +479,6 @@ Bugs in GHC
    in the compiler's internal representation and can be unified producing
    unexpected results. See :ghc-ticket:`11715` for one example.
 
--  :ghc-flag:`-XTypeInType` still has a few rough edges, especially where
-   it interacts with other advanced type-system features. For instance,
-   this definition causes the typechecker to loop (:ghc-ticket:`11559`), ::
-
-     data A :: Type where
-       B :: forall (a :: A). A
-
 .. _bugs-ghci:
 
 Bugs in GHCi (the interactive GHC)

@@ -1,0 +1,7 @@
+
+T11554.hs:10:21: error:
+    • Type constructor ‘A’ cannot be used here
+        (it is defined and used in the same recursive group)
+    • In the kind ‘A’
+      In the definition of data constructor ‘B’
+      In the data declaration for ‘A’
