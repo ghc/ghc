@@ -855,14 +855,10 @@ def do_test(name, way, func, args, files):
         if config.use_threads:
             t.lock.release()
 
-        try:
-            preCmd = getTestOpts().pre_cmd
-            if preCmd != None:
-                result = runCmdFor(name, 'cd "{opts.testdir}" && {preCmd}'.format(**locals()))
-                if result != 0:
-                    framework_fail(name, way, 'pre-command failed: ' + str(result))
-        except:
-            framework_fail(name, way, 'pre-command exception')
+        if opts.pre_cmd:
+            exit_code = runCmd('cd "{0}" && {1}'.format(opts.testdir, opts.pre_cmd))
+            if exit_code != 0:
+                framework_fail(name, way, 'pre_cmd failed: {0}'.format(exit_code))
 
         try:
             result = func(*[name,way] + args)
@@ -1230,11 +1226,11 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf):
            '> {errname} 2>&1'
           ).format(**locals())
 
-    result = runCmdFor(name, cmd, timeout_multiplier=opts.compile_timeout_multiplier)
+    exit_code = runCmd(cmd, opts.compile_timeout_multiplier)
 
-    if result != 0 and not should_fail:
+    if exit_code != 0 and not should_fail:
         if config.verbose >= 1 and _expect_pass(way):
-            print('Compile failed (status ' + repr(result) + ') errors were:')
+            print('Compile failed (exit code {0}) errors were:'.format(exit_code))
             actual_stderr_path = in_testdir(name, 'comp.stderr')
             if_verbose_dump(1, actual_stderr_path)
 
@@ -1246,10 +1242,10 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf):
         return statsResult
 
     if should_fail:
-        if result == 0:
+        if exit_code == 0:
             return failBecause('exit code 0')
     else:
-        if result != 0:
+        if exit_code != 0:
             return failBecause('exit code non-0')
 
     return passed()
@@ -1310,10 +1306,7 @@ def simple_run(name, way, prog, extra_run_opts):
     cmd = 'cd "{opts.testdir}" && {cmd}'.format(**locals())
 
     # run the command
-    result = runCmdFor(name, cmd, timeout_multiplier=opts.run_timeout_multiplier)
-
-    exit_code = result >> 8
-    signal    = result & 0xff
+    exit_code = runCmd(cmd, opts.run_timeout_multiplier)
 
     # check the exit code
     if exit_code != opts.exit_code:
@@ -1415,10 +1408,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     cmd = 'cd "{opts.testdir}" && {cmd}'.format(**locals())
 
-    result = runCmdFor(name, cmd, timeout_multiplier=opts.run_timeout_multiplier)
-
-    exit_code = result >> 8
-    signal    = result & 0xff
+    exit_code = runCmd(cmd, opts.run_timeout_multiplier)
 
     # split the stdout into compilation/program output
     split_file(in_testdir(outname), delimiter,
@@ -1556,14 +1546,14 @@ def check_hp_ok(name):
     # do not qualify for hp2ps because we should be in the right directory
     hp2psCmd = 'cd "{opts.testdir}" && {{hp2ps}} {name}'.format(**locals())
 
-    hp2psResult = runCmdExitCode(hp2psCmd)
+    hp2psResult = runCmd(hp2psCmd)
 
     actual_ps_path = in_testdir(name, 'ps')
 
-    if(hp2psResult == 0):
-        if (os.path.exists(actual_ps_path)):
+    if hp2psResult == 0:
+        if os.path.exists(actual_ps_path):
             if gs_working:
-                gsResult = runCmdExitCode(genGSCmd(actual_ps_path))
+                gsResult = runCmd(genGSCmd(actual_ps_path))
                 if (gsResult == 0):
                     return (True)
                 else:
@@ -1837,74 +1827,26 @@ def if_verbose_dump( n, f ):
         except:
             print('')
 
-def rawSystem(cmd_and_args):
-    # We prefer subprocess.call to os.spawnv as the latter
-    # seems to send its arguments through a shell or something
-    # with the Windows (non-cygwin) python. An argument "a b c"
-    # turns into three arguments ["a", "b", "c"].
+def runCmd(cmd, timeout_multiplier=1.0):
+    timeout_prog = strip_quotes(config.timeout_prog)
+    timeout = str(int(ceil(config.timeout * timeout_multiplier)))
 
-    cmd = cmd_and_args[0]
-    return subprocess.call([strip_quotes(cmd)] + cmd_and_args[1:])
+    # Format cmd using config. Example: cmd='{hpc} report A.tix'
+    cmd = cmd.format(**config.__dict__)
+    if_verbose( 3, cmd )
 
-# Note that this doesn't handle the timeout itself; it is just used for
-# commands that have timeout handling built-in.
-def rawSystemWithTimeout(cmd_and_args):
-    r = rawSystem(cmd_and_args)
+    # cmd is a complex command in Bourne-shell syntax
+    # e.g (cd . && 'C:/users/simonpj/HEAD/inplace/bin/ghc-stage2' ...etc)
+    # Hence it must ultimately be run by a Bourne shell. It's timeout's job
+    # to invoke the Bourne shell
+    r = subprocess.call([timeout_prog, timeout, cmd])
     if r == 98:
         # The python timeout program uses 98 to signal that ^C was pressed
         stopNow()
     if r == 99 and getTestOpts().exit_code != 99:
         # Only print a message when timeout killed the process unexpectedly.
-        cmd = cmd_and_args[-1]
         if_verbose(1, 'Timeout happened...killed process "{0}"...\n'.format(cmd))
     return r
-
-# cmd is a complex command in Bourne-shell syntax
-# e.g (cd . && 'c:/users/simonpj/darcs/HEAD/compiler/stage1/ghc-inplace' ...etc)
-# Hence it must ultimately be run by a Bourne shell
-#
-# Mostly it invokes the command wrapped in 'timeout' thus
-#  timeout 300 'cd . && ...blah blah'
-# so it's timeout's job to invoke the Bourne shell
-#
-# But watch out for the case when there is no timeout program!
-# Then, when using the native Python, os.system will invoke the cmd shell
-
-def runCmd( cmd ):
-    # Format cmd using config. Example: cmd='{hpc} report A.tix'
-    cmd = cmd.format(**config.__dict__)
-
-    if_verbose( 3, cmd )
-    r = 0
-    if config.os == 'mingw32':
-        # On MinGW, we will always have timeout
-        assert config.timeout_prog!=''
-
-    if config.timeout_prog != '':
-        r = rawSystemWithTimeout([config.timeout_prog, str(config.timeout), cmd])
-    else:
-        r = os.system(cmd)
-    return r << 8
-
-def runCmdFor( name, cmd, timeout_multiplier=1.0 ):
-    # Format cmd using config. Example: cmd='{hpc} report A.tix'
-    cmd = cmd.format(**config.__dict__)
-
-    if_verbose( 3, cmd )
-    r = 0
-    if config.os == 'mingw32':
-        # On MinGW, we will always have timeout
-        assert config.timeout_prog!=''
-    timeout = int(ceil(config.timeout * timeout_multiplier))
-
-    if config.timeout_prog != '':
-        r = rawSystemWithTimeout([config.timeout_prog, str(timeout), cmd])
-    else:
-        r = os.system(cmd)
-    return r << 8
-
-def runCmdExitCode( cmd ):
-    return (runCmd(cmd) >> 8);
 
 # -----------------------------------------------------------------------------
 # checking if ghostscript is available for checking the output of hp2ps
@@ -1920,9 +1862,9 @@ global gs_working
 gs_working = 0
 if config.have_profiling:
   if config.gs != '':
-    resultGood = runCmdExitCode(genGSCmd(config.confdir + '/good.ps'));
+    resultGood = runCmd(genGSCmd(config.confdir + '/good.ps'));
     if resultGood == 0:
-        resultBad = runCmdExitCode(genGSCmd(config.confdir + '/bad.ps') +
+        resultBad = runCmd(genGSCmd(config.confdir + '/bad.ps') +
                                    ' >/dev/null 2>&1')
         if resultBad != 0:
             print("GhostScript available for hp2ps tests")
