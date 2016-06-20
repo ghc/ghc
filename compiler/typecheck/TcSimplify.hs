@@ -771,36 +771,6 @@ decideQuantification
          , [PredType] )    -- and this context (fully zonked)
 -- See Note [Deciding quantification]
 decideQuantification apply_mr name_taus psig_theta candidates
-{-
-  | apply_mr     -- Apply the Monomorphism restriction
-  = do { gbl_tvs <- tcGetGlobalTyCoVars
-       ; zonked_taus <- mapM TcM.zonkTcType (psig_theta ++ taus)
-                        -- psig_theta: see Note [Quantification and partial signatures]
-       ; let zonked_dvs      = splitDepVarsOfTypes zonked_taus
-             zonked_tkvs     = tcDepVarSet zonked_dvs
-             constrained_tvs = tyCoVarsOfTypes constraints `unionVarSet`
-                               filterVarSet isCoVar zonked_tkvs
-             mono_tvs = gbl_tvs `unionVarSet` constrained_tvs
-
-       ; qtvs <- quantifyZonkedTyVars mono_tvs zonked_dvs
-
-           -- Warn about the monomorphism restriction
-       ; warn_mono <- woptM Opt_WarnMonomorphism
-       ; let mr_bites = constrained_tvs `intersectsVarSet` zonked_tkvs
-       ; warnTc (Reason Opt_WarnMonomorphism) (warn_mono && mr_bites) $
-         hang (text "The Monomorphism Restriction applies to the binding"
-               <> plural bndrs <+> text "for" <+> pp_bndrs)
-             2 (text "Consider giving a type signature for"
-                <+> if isSingleton bndrs then pp_bndrs
-                                         else text "these binders")
-
-       -- All done
-       ; traceTc "decideQuantification 1" (vcat [ppr constraints, ppr gbl_tvs, ppr mono_tvs
-                                                , ppr qtvs, ppr mr_bites])
-       ; return (qtvs, []) }
-
-  | otherwise
--}
   = do { gbl_tvs <- tcGetGlobalTyCoVars
        ; zonked_taus <- mapM TcM.zonkTcType (psig_theta ++ taus)
                         -- psig_theta: see Note [Quantification and partial signatures]
