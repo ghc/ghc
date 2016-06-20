@@ -12,8 +12,8 @@ module Specialise ( specProgram, specUnfolding ) where
 import Id
 import TcType hiding( substTy )
 import Type   hiding( substTy, extendTvSubstList )
-import Coercion( Coercion )
 import Module( Module, HasModule(..) )
+import Coercion( Coercion )
 import CoreMonad
 import qualified CoreSubst
 import CoreUnfold
@@ -22,7 +22,7 @@ import VarEnv
 import CoreSyn
 import Rules
 import CoreUtils        ( exprIsTrivial, applyTypeToArgs, mkCast )
-import CoreFVs          ( exprFreeVars, exprsFreeVars, idFreeVars )
+import CoreFVs          ( exprFreeVars, exprsFreeVars, idFreeVars, exprsFreeIdsList )
 import UniqSupply
 import Name
 import MkId             ( voidArgId, voidPrimId )
@@ -1230,6 +1230,9 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
 
         -- Construct the new binding
         --      f1 = SUBST[a->t1,c->t3, d1->d1', d2->d2'] (/\ b -> rhs)
+        -- PLUS the rule
+        --      RULE "SPEC f" forall b d1' d2'. f b d1' d2' = f1 b
+        --      In the rule, d1' and d2' are just wildcards, not used in the RHS
         -- PLUS the usage-details
         --      { d1' = dx1; d2' = dx2 }
         -- where d1', d2' are cloned versions of d1,d2, with the type substitution
@@ -1252,9 +1255,10 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
            ; let (rhs_env2, dx_binds, spec_dict_args)
                             = bindAuxiliaryDicts rhs_env rhs_dict_ids call_ds inst_dict_ids
                  ty_args    = mk_ty_args call_ts poly_tyvars
-                 rule_args  = ty_args ++ map varToCoreExpr inst_dict_ids
-                                -- varToCoreExpr does the right thing for CoVars
-                 rule_bndrs = poly_tyvars ++ inst_dict_ids
+                 ev_args    = map varToCoreExpr inst_dict_ids  -- ev_args, ev_bndrs:
+                 ev_bndrs   = exprsFreeIdsList ev_args         -- See Note [Evidence foralls]
+                 rule_args  = ty_args     ++ ev_args
+                 rule_bndrs = poly_tyvars ++ ev_bndrs
 
            ; dflags <- getDynFlags
            ; if already_covered dflags rule_args then
@@ -1338,7 +1342,26 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
 
            ; return (Just ((spec_f_w_arity, spec_rhs), final_uds, spec_env_rule)) } }
 
-{-
+{- Note [Evidence foralls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose (Trac #12212) that we are specialising
+   f :: forall a b. (Num a, F a ~ F b) => blah
+with a=b=Int. Then the RULE will be something like
+   RULE forall (d:Num Int) (g :: F Int ~ F Int).
+        f Int Int d g = f_spec
+But both varToCoreExpr (when constructing the LHS args), and the
+simplifier (when simplifying the LHS args), will transform to
+   RULE forall (d:Num Int) (g :: F Int ~ F Int).
+        f Int Int d <F Int> = f_spec
+by replacing g with Refl.  So now 'g' is unbound, which results in a later
+crash. So we use Refl right off the bat, and do not forall-quantify 'g':
+ * varToCoreExpr generates a Refl
+ * exprsFreeIdsList returns the Ids bound by the args,
+   which won't include g
+
+You might wonder if this will match as often, but the simplifer replaces
+complicated Refl coercions with Refl pretty aggressively.
+
 Note [Orphans and auto-generated rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we specialise an INLINEABLE function, or when we have
