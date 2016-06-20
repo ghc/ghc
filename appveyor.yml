@@ -37,4 +37,4 @@ install:
 build_script:
     - cd C:\msys64\home\ghc\hadrian
     - echo "" | stack --no-terminal exec -- build.bat selftest
-    - echo "" | stack --no-terminal exec -- build.bat -j --verbose --no-progress --progress-colour=never --profile=- --flavour=quick inplace/bin/ghc-stage1.exe
+    - echo "" | stack --no-terminal exec -- build.bat -j --verbose --no-progress --progress-colour=never --profile=- --flavour=quickest inplace/bin/ghc-stage1.exe
