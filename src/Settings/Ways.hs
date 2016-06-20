@@ -5,6 +5,7 @@ import CmdLineFlag
 import Oracles.Config.Flag
 import Predicate
 import Settings.Flavours.Quick
+import Settings.Flavours.Quickest
 import UserSettings
 
 -- | Combine default library ways with user modifications.
@@ -29,8 +30,10 @@ defaultLibraryWays = mconcat
     , notStage0 ? platformSupportsSharedLibs ? append [dynamic] ]
 
 flavourLibraryWays :: Ways
-flavourLibraryWays = mconcat
-    [ cmdFlavour == Quick ? quickFlavourWays ]
+flavourLibraryWays = case cmdFlavour of
+    Default  -> mempty
+    Quick    -> quickFlavourWays
+    Quickest -> quickestFlavourWays
 
 defaultRtsWays :: Ways
 defaultRtsWays = do

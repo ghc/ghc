@@ -20,6 +20,7 @@ import Settings.Builders.Ld
 import Settings.Builders.Make
 import Settings.Builders.Tar
 import Settings.Flavours.Quick
+import Settings.Flavours.Quickest
 import Settings.Packages.Base
 import Settings.Packages.Compiler
 import Settings.Packages.Directory
@@ -88,5 +89,7 @@ defaultPackageArgs = mconcat
     , unlitPackageArgs ]
 
 flavourArgs :: Args
-flavourArgs = mconcat
-    [ cmdFlavour == Quick ? quickFlavourArgs ]
+flavourArgs = case cmdFlavour of
+    Default  -> mempty
+    Quick    -> quickFlavourArgs
+    Quickest -> quickestFlavourArgs

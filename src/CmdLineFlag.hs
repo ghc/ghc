@@ -21,7 +21,7 @@ data Untracked = Untracked
     , splitObjects   :: Bool }
     deriving (Eq, Show)
 
-data Flavour        = Default | Quick deriving (Eq, Show)
+data Flavour        = Default | Quick | Quickest deriving (Eq, Show)
 data ProgressColour = Never | Auto | Always deriving (Eq, Show)
 data ProgressInfo   = None | Brief | Normal | Unicorn deriving (Eq, Show)
 
@@ -43,9 +43,10 @@ readFlavour ms =
     maybe (Left "Cannot parse flavour") (Right . set) (go =<< lower <$> ms)
   where
     go :: String -> Maybe Flavour
-    go "default" = Just Default
-    go "quick"   = Just Quick
-    go _         = Nothing
+    go "default"  = Just Default
+    go "quick"    = Just Quick
+    go "quickest" = Just Quickest
+    go _          = Nothing
     set :: Flavour -> Untracked -> Untracked
     set flag flags = flags { flavour = flag }
 
@@ -83,7 +84,7 @@ readSplitObjects = Right $ \flags -> flags { splitObjects = True }
 cmdFlags :: [OptDescr (Either String (Untracked -> Untracked))]
 cmdFlags =
     [ Option [] ["flavour"] (OptArg readFlavour "FLAVOUR")
-      "Build flavour (Default or Quick)."
+      "Build flavour (Default, Quick or Quickest)."
     , Option [] ["haddock"] (NoArg readBuildHaddock)
       "Generate Haddock documentation."
     , Option [] ["progress-colour"] (OptArg readProgressColour "MODE")
