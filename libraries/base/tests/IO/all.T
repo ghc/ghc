@@ -41,9 +41,8 @@ test('hReady001', normal, compile_and_run, ['-cpp'])
 # data to read.  It relies on piping input from 'sleep 1', which doesn't
 # work for the 'ghci' way because in that case we already pipe input from
 # a script, so hence omit_ways(['ghci'])
-test('hReady002', [ no_stdin, cmd_prefix('sleep 1 |'),
-                    omit_ways(['ghci']) ],
-                   compile_and_run, [''])
+test('hReady002', [cmd_prefix('sleep 1 |'), omit_ways(['ghci'])],
+     compile_and_run, [''])
 
 test('hSeek001', normal, compile_and_run, [''])
 test('hSeek002', normal, compile_and_run, ['-cpp'])
@@ -61,7 +60,7 @@ test('hSetBuffering004', set_stdin('hSetBuffering004.hs'), compile_and_run, ['']
 test('ioeGetErrorString001', normal, compile_and_run, ['-cpp'])
 test('ioeGetFileName001',    normal, compile_and_run, ['-cpp'])
 test('ioeGetHandle001',      normal, compile_and_run, ['-cpp'])
-test('isEOF001',     normal, compile_and_run, [''])
+test('isEOF001', extra_run_opts('</dev/null'), compile_and_run, [''])
 
 test('misc001',
      [extra_run_opts('misc001.hs misc001.out'),

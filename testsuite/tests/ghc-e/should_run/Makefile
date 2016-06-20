@@ -22,7 +22,7 @@ ghc-e006:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e "data X = X deriving Show" -e "X"
 
 T2228:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e ":main" T2228.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e ":main" T2228.hs </dev/null
 
 T2636:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e ":main" T2636.hs; if [ "$?" != 0 ]; then true; else false; fi

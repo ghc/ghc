@@ -183,9 +183,6 @@ class TestOptions:
        # don't compare output
        self.ignore_output = 0
 
-       # don't give anything as stdin
-       self.no_stdin = 0
-
        # We sometimes want to modify the compiler_always_flags, so
        # they are copied from config.compiler_always_flags when we
        # make a new instance of TestOptions.

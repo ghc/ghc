@@ -175,9 +175,6 @@ def req_smp( name, opts ):
 def ignore_output( name, opts ):
     opts.ignore_output = 1
 
-def no_stdin( name, opts ):
-    opts.no_stdin = 1
-
 def combined_output( name, opts ):
     opts.combined_output = True
 
@@ -1059,7 +1056,7 @@ def compile_and_run__( name, way, top_mod, extra_mods, extra_hc_opts ):
     extra_hc_opts = result['hc_opts']
 
     if way.startswith('ghci'): # interpreted...
-        return interpreter_run( name, way, extra_hc_opts, 0, top_mod )
+        return interpreter_run(name, way, extra_hc_opts, top_mod)
     else: # compiled...
         result = simple_build(name, way, extra_hc_opts, 0, top_mod, 1, 1)
         if badResult(result):
@@ -1149,7 +1146,10 @@ def extras_build( way, extra_mods, extra_hc_opts ):
 
 def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf):
     opts = getTestOpts()
-    errname = add_suffix(name, 'comp.stderr')
+
+    # Redirect stdout and stderr to the same file
+    stdout = in_testdir(name, 'comp.stderr')
+    stderr = subprocess.STDOUT
 
     if top_mod != '':
         srcname = top_mod
@@ -1186,11 +1186,10 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf):
     flags = ' '.join(get_compiler_flags() + config.way_flags[way])
 
     cmd = ('cd "{opts.testdir}" && {cmd_prefix} '
-           '{{compiler}} {to_do} {srcname} {flags} {extra_hc_opts} '
-           '> {errname} 2>&1'
+           '{{compiler}} {to_do} {srcname} {flags} {extra_hc_opts}'
           ).format(**locals())
 
-    exit_code = runCmd(cmd, opts.compile_timeout_multiplier)
+    exit_code = runCmd(cmd, None, stdout, stderr, opts.compile_timeout_multiplier)
 
     if exit_code != 0 and not should_fail:
         if config.verbose >= 1 and _expect_pass(way):
@@ -1225,17 +1224,18 @@ def simple_run(name, way, prog, extra_run_opts):
     opts = getTestOpts()
 
     # figure out what to use for stdin
-    if opts.stdin != '':
-        use_stdin = opts.stdin
+    if opts.stdin:
+        stdin = in_testdir(opts.stdin)
+    elif os.path.exists(in_testdir(name, 'stdin')):
+        stdin = in_testdir(name, 'stdin')
     else:
-        stdin_file = add_suffix(name, 'stdin')
-        if os.path.exists(in_testdir(stdin_file)):
-            use_stdin = stdin_file
-        else:
-            use_stdin = '/dev/null'
+        stdin = None
 
-    run_stdout = add_suffix(name,'run.stdout')
-    run_stderr = add_suffix(name,'run.stderr')
+    stdout = in_testdir(name, 'run.stdout')
+    if opts.combined_output:
+        stderr = subprocess.STDOUT
+    else:
+        stderr = in_testdir(name, 'run.stderr')
 
     my_rts_flags = rts_flags(way)
 
@@ -1245,32 +1245,16 @@ def simple_run(name, way, prog, extra_run_opts):
     else:
         stats_args = ''
 
-    if opts.no_stdin:
-        stdin_comes_from = ''
-    else:
-        stdin_comes_from = ' <' + use_stdin
-
-    if opts.combined_output:
-        redirection        = ' > {0} 2>&1'.format(run_stdout)
-        redirection_append = ' >> {0} 2>&1'.format(run_stdout)
-    else:
-        redirection        = ' > {0} 2> {1}'.format(run_stdout, run_stderr)
-        redirection_append = ' >> {0} 2>> {1}'.format(run_stdout, run_stderr)
-
     # Put extra_run_opts last: extra_run_opts('+RTS foo') should work.
-    cmd = prog + stats_args + ' '  \
-        + my_rts_flags + ' '       \
-        + extra_run_opts + ' '     \
-        + stdin_comes_from         \
-        + redirection
+    cmd = prog + stats_args + ' ' + my_rts_flags + ' ' + extra_run_opts
 
     if opts.cmd_wrapper != None:
-        cmd = opts.cmd_wrapper(cmd) + redirection_append
+        cmd = opts.cmd_wrapper(cmd)
 
     cmd = 'cd "{opts.testdir}" && {cmd}'.format(**locals())
 
     # run the command
-    exit_code = runCmd(cmd, opts.run_timeout_multiplier)
+    exit_code = runCmd(cmd, stdin, stdout, stderr, opts.run_timeout_multiplier)
 
     # check the exit code
     if exit_code != opts.exit_code:
@@ -1305,73 +1289,60 @@ def rts_flags(way):
 # -----------------------------------------------------------------------------
 # Run a program in the interpreter and check its output
 
-def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
+def interpreter_run(name, way, extra_hc_opts, top_mod):
     opts = getTestOpts()
 
-    outname = add_suffix(name, 'interp.stdout')
-    errname = add_suffix(name, 'interp.stderr')
+    stdout = in_testdir(name, 'interp.stdout')
+    stderr = in_testdir(name, 'interp.stderr')
+    script = in_testdir(name, 'genscript')
+
+    if opts.combined_output:
+        framework_fail(name, 'unsupported',
+                       'WAY=ghci and combined_output together is not supported')
 
     if (top_mod == ''):
         srcname = add_hs_lhs_suffix(name)
     else:
         srcname = top_mod
 
-    scriptname = add_suffix(name, 'genscript')
-    qscriptname = in_testdir(scriptname)
-
     delimiter = '===== program output begins here\n'
 
-    script = open(qscriptname, 'w')
-    if not compile_only:
+    with open(script, 'w') as f:
         # set the prog name and command-line args to match the compiled
         # environment.
-        script.write(':set prog ' + name + '\n')
-        script.write(':set args ' + getTestOpts().extra_run_opts + '\n')
+        f.write(':set prog ' + name + '\n')
+        f.write(':set args ' + opts.extra_run_opts + '\n')
         # Add marker lines to the stdout and stderr output files, so we
         # can separate GHCi's output from the program's.
-        script.write(':! echo ' + delimiter)
-        script.write(':! echo 1>&2 ' + delimiter)
+        f.write(':! echo ' + delimiter)
+        f.write(':! echo 1>&2 ' + delimiter)
         # Set stdout to be line-buffered to match the compiled environment.
-        script.write('System.IO.hSetBuffering System.IO.stdout System.IO.LineBuffering\n')
+        f.write('System.IO.hSetBuffering System.IO.stdout System.IO.LineBuffering\n')
         # wrapping in GHC.TopHandler.runIO ensures we get the same output
         # in the event of an exception as for the compiled program.
-        script.write('GHC.TopHandler.runIOFastExit Main.main Prelude.>> Prelude.return ()\n')
-    script.close()
+        f.write('GHC.TopHandler.runIOFastExit Main.main Prelude.>> Prelude.return ()\n')
 
-    # figure out what to use for stdin
-    if getTestOpts().stdin != '':
-        stdin_file = in_testdir(opts.stdin)
-    else:
-        stdin_file = in_testdir(name, 'stdin')
-
-    if os.path.exists(stdin_file):
-        os.system('cat "{0}" >> "{1}"'.format(stdin_file, qscriptname))
+    stdin = in_testdir(opts.stdin if opts.stdin else add_suffix(name, 'stdin'))
+    if os.path.exists(stdin):
+        os.system('cat "{0}" >> "{1}"'.format(stdin, script))
 
     flags = ' '.join(get_compiler_flags() + config.way_flags[way])
 
-    if getTestOpts().combined_output:
-        redirection        = ' > {0} 2>&1'.format(outname)
-        redirection_append = ' >> {0} 2>&1'.format(outname)
-    else:
-        redirection        = ' > {0} 2> {1}'.format(outname, errname)
-        redirection_append = ' >> {0} 2>> {1}'.format(outname, errname)
-
-    cmd = ('{{compiler}} {srcname} {flags} {extra_hc_opts} '
-           '< {scriptname} {redirection}'
+    cmd = ('{{compiler}} {srcname} {flags} {extra_hc_opts}'
           ).format(**locals())
 
     if getTestOpts().cmd_wrapper != None:
-        cmd = getTestOpts().cmd_wrapper(cmd) + redirection_append;
+        cmd = opts.cmd_wrapper(cmd);
 
     cmd = 'cd "{opts.testdir}" && {cmd}'.format(**locals())
 
-    exit_code = runCmd(cmd, opts.run_timeout_multiplier)
+    exit_code = runCmd(cmd, script, stdout, stderr, opts.run_timeout_multiplier)
 
     # split the stdout into compilation/program output
-    split_file(in_testdir(outname), delimiter,
+    split_file(stdout, delimiter,
                in_testdir(name, 'comp.stdout'),
                in_testdir(name, 'run.stdout'))
-    split_file(in_testdir(errname), delimiter,
+    split_file(stderr, delimiter,
                in_testdir(name, 'comp.stderr'),
                in_testdir(name, 'run.stderr'))
 
@@ -1784,19 +1755,35 @@ def if_verbose_dump( n, f ):
         except:
             print('')
 
-def runCmd(cmd, timeout_multiplier=1.0):
+def runCmd(cmd, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0):
     timeout_prog = strip_quotes(config.timeout_prog)
     timeout = str(int(ceil(config.timeout * timeout_multiplier)))
 
     # Format cmd using config. Example: cmd='{hpc} report A.tix'
     cmd = cmd.format(**config.__dict__)
-    if_verbose( 3, cmd )
+    if_verbose(3, cmd + ('< ' + os.path.basename(stdin) if stdin else ''))
+
+    if stdin:
+        stdin = open(stdin, 'r')
+    if stdout:
+        stdout = open(stdout, 'w')
+    if stderr and stderr is not subprocess.STDOUT:
+        stderr = open(stderr, 'w')
 
     # cmd is a complex command in Bourne-shell syntax
     # e.g (cd . && 'C:/users/simonpj/HEAD/inplace/bin/ghc-stage2' ...etc)
     # Hence it must ultimately be run by a Bourne shell. It's timeout's job
     # to invoke the Bourne shell
-    r = subprocess.call([timeout_prog, timeout, cmd])
+    r = subprocess.call([timeout_prog, timeout, cmd],
+                        stdin=stdin, stdout=stdout, stderr=stderr)
+
+    if stdin:
+        stdin.close()
+    if stdout:
+        stdout.close()
+    if stderr and stderr is not subprocess.STDOUT:
+        stderr.close()
+
     if r == 98:
         # The python timeout program uses 98 to signal that ^C was pressed
         stopNow()

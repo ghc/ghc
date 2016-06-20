@@ -306,7 +306,7 @@ test('linker_error3',
      run_command,
      ['$MAKE -s --no-print-directory linker_error3'])
 
-test('T9839_01', [ no_stdin, ignore_output],
+test('T9839_01', ignore_output,
                 run_command,
                 ['{compiler} -e 1 +RTS -T-s 2>&1 | \
                   grep "flag -T given an argument when none was expected: -T-s"'])
