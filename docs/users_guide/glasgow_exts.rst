@@ -939,9 +939,21 @@ then the expression will only require ``Applicative``. Otherwise, the expression
 will require ``Monad``. The block may return a pure expression ``E`` depending
 upon the results ``p1...pn`` with either ``return`` or ``pure``.
 
-Note: the final statement really must be of the form ``return E`` or
-``pure E``, otherwise you get a ``Monad`` constraint.  Using ``$`` as
-in ``return $ E`` or ``pure $ E`` is also acceptable.
+Note: the final statement must match one of these patterns exactly:
+
+- ``return E``
+- ``return $ E``
+- ``pure E``
+- ``pure $ E``
+
+otherwise GHC cannot recognise it as a ``return`` statement, and the
+transformation to use ``<$>`` that we saw above does not apply.  In
+particular, slight variations such as ``return . Just $ x`` or ``let x
+= e in return x`` would not be recognised.
+
+If the final statement is not of one of these forms, GHC falls back to
+standard ``do`` desugaring, and the expression will require a
+``Monad`` constraint.
 
 When the statements of a ``do`` expression have dependencies between
 them, and ``ApplicativeDo`` cannot infer an ``Applicative`` type, it
