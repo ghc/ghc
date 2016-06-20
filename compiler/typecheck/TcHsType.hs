@@ -881,7 +881,11 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
        ; case thing of
            ATyVar _ tv -> return (mkTyVarTy tv, tyVarKind tv)
 
-           ATcTyCon tc_tc -> do { check_tc tc_tc
+           ATcTyCon tc_tc -> do { -- See Note [GADT kind self-reference]
+                                  unless
+                                    (isTypeLevel (mode_level mode))
+                                    (promotionErr name TyConPE)
+                                ; check_tc tc_tc
                                 ; tc <- get_loopy_tc name tc_tc
                                 ; handle_tyfams tc tc_tc }
                              -- mkNakedTyConApp: see Note [Type-checking inside the knot]
@@ -1002,6 +1006,26 @@ look at the TyCon or Class involved.
 
 This is horribly delicate.  I hate it.  A good example of how
 delicate it is can be seen in Trac #7903.
+
+Note [GADT kind self-reference]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A promoted type cannot be used in the body of that type's declaration.
+Trac #11554 shows this example, which made GHC loop:
+
+  import Data.Kind
+  data P (x :: k) = Q
+  data A :: Type where
+    B :: forall (a :: A). P a -> A
+
+In order to check the constructor B, we need have the promoted type A, but in
+order to get that promoted type, B must first be checked. To prevent looping, a
+TyConPE promotion error is given when tcTyVar checks an ATcTyCon in kind mode.
+Any ATcTyCon is a TyCon being defined in the current recursive group (see data
+type decl for TcTyThing), and all such TyCons are illegal in kinds.
+
+Trac #11962 proposes checking the head of a data declaration separately from
+its constructors. This would allow the example above to pass.
 
 Note [Body kind of a HsForAllTy]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
