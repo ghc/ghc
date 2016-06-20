@@ -13,6 +13,7 @@
 {-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE Trustworthy            #-}
 {-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE TypeInType             #-}
 {-# LANGUAGE TypeOperators          #-}
 {-# LANGUAGE TypeSynonymInstances   #-}
 {-# LANGUAGE UndecidableInstances   #-}
@@ -736,7 +737,7 @@ import GHC.Read    ( Read(..), lex, readParen )
 import GHC.Show    ( Show(..), showString )
 
 -- Needed for metadata
-import Data.Proxy   ( Proxy(..), KProxy(..) )
+import Data.Proxy   ( Proxy(..) )
 import GHC.TypeLits ( Nat, Symbol, KnownSymbol, KnownNat, symbolVal, natVal )
 
 --------------------------------------------------------------------------------
@@ -1236,13 +1237,13 @@ class SingI (a :: k) where
 -- | The 'SingKind' class is essentially a /kind/ class. It classifies all kinds
 -- for which singletons are defined. The class supports converting between a singleton
 -- type and the base (unrefined) type which it is built from.
-class (kparam ~ 'KProxy) => SingKind (kparam :: KProxy k) where
+class SingKind k where
   -- | Get a base type from a proxy for the promoted kind. For example,
-  -- @DemoteRep ('KProxy :: KProxy Bool)@ will be the type @Bool@.
-  type DemoteRep kparam :: *
+  -- @DemoteRep Bool@ will be the type @Bool@.
+  type DemoteRep k :: *
 
   -- | Convert a singleton to its unrefined version.
-  fromSing :: Sing (a :: k) -> DemoteRep kparam
+  fromSing :: Sing (a :: k) -> DemoteRep k
 
 -- Singleton symbols
 data instance Sing (s :: Symbol) where
@@ -1252,8 +1253,8 @@ data instance Sing (s :: Symbol) where
 instance KnownSymbol a => SingI a where sing = SSym
 
 -- | @since 4.9.0.0
-instance SingKind ('KProxy :: KProxy Symbol) where
-  type DemoteRep ('KProxy :: KProxy Symbol) = String
+instance SingKind Symbol where
+  type DemoteRep Symbol = String
   fromSing (SSym :: Sing s) = symbolVal (Proxy :: Proxy s)
 
 -- Singleton booleans
@@ -1268,8 +1269,8 @@ instance SingI 'True  where sing = STrue
 instance SingI 'False where sing = SFalse
 
 -- | @since 4.9.0.0
-instance SingKind ('KProxy :: KProxy Bool) where
-  type DemoteRep ('KProxy :: KProxy Bool) = Bool
+instance SingKind Bool where
+  type DemoteRep Bool = Bool
   fromSing STrue  = True
   fromSing SFalse = False
 
@@ -1285,10 +1286,8 @@ instance            SingI 'Nothing  where sing = SNothing
 instance SingI a => SingI ('Just a) where sing = SJust sing
 
 -- | @since 4.9.0.0
-instance SingKind ('KProxy :: KProxy a) =>
-    SingKind ('KProxy :: KProxy (Maybe a)) where
-  type DemoteRep ('KProxy :: KProxy (Maybe a)) =
-      Maybe (DemoteRep ('KProxy :: KProxy a))
+instance SingKind a => SingKind (Maybe a) where
+  type DemoteRep (Maybe a) = Maybe (DemoteRep a)
   fromSing SNothing  = Nothing
   fromSing (SJust a) = Just (fromSing a)
 
@@ -1305,8 +1304,8 @@ instance (SingI a, KnownNat n) => SingI ('InfixI a n) where
   sing = SInfix (sing :: Sing a) (natVal (Proxy :: Proxy n))
 
 -- | @since 4.9.0.0
-instance SingKind ('KProxy :: KProxy FixityI) where
-  type DemoteRep ('KProxy :: KProxy FixityI) = Fixity
+instance SingKind FixityI where
+  type DemoteRep FixityI = Fixity
   fromSing SPrefix      = Prefix
   fromSing (SInfix a n) = Infix (fromSing a) (I# (integerToInt n))
 
@@ -1326,8 +1325,8 @@ instance SingI 'RightAssociative where sing = SRightAssociative
 instance SingI 'NotAssociative   where sing = SNotAssociative
 
 -- | @since 4.0.0.0
-instance SingKind ('KProxy :: KProxy Associativity) where
-  type DemoteRep ('KProxy :: KProxy Associativity) = Associativity
+instance SingKind Associativity where
+  type DemoteRep Associativity = Associativity
   fromSing SLeftAssociative  = LeftAssociative
   fromSing SRightAssociative = RightAssociative
   fromSing SNotAssociative   = NotAssociative
@@ -1348,8 +1347,8 @@ instance SingI 'SourceNoUnpack       where sing = SSourceNoUnpack
 instance SingI 'SourceUnpack         where sing = SSourceUnpack
 
 -- | @since 4.9.0.0
-instance SingKind ('KProxy :: KProxy SourceUnpackedness) where
-  type DemoteRep ('KProxy :: KProxy SourceUnpackedness) = SourceUnpackedness
+instance SingKind SourceUnpackedness where
+  type DemoteRep SourceUnpackedness = SourceUnpackedness
   fromSing SNoSourceUnpackedness = NoSourceUnpackedness
   fromSing SSourceNoUnpack       = SourceNoUnpack
   fromSing SSourceUnpack         = SourceUnpack
@@ -1370,8 +1369,8 @@ instance SingI 'SourceLazy         where sing = SSourceLazy
 instance SingI 'SourceStrict       where sing = SSourceStrict
 
 -- | @since 4.9.0.0
-instance SingKind ('KProxy :: KProxy SourceStrictness) where
-  type DemoteRep ('KProxy :: KProxy SourceStrictness) = SourceStrictness
+instance SingKind SourceStrictness where
+  type DemoteRep SourceStrictness = SourceStrictness
   fromSing SNoSourceStrictness = NoSourceStrictness
   fromSing SSourceLazy         = SourceLazy
   fromSing SSourceStrict       = SourceStrict
@@ -1392,8 +1391,8 @@ instance SingI 'DecidedStrict where sing = SDecidedStrict
 instance SingI 'DecidedUnpack where sing = SDecidedUnpack
 
 -- | @since 4.9.0.0
-instance SingKind ('KProxy :: KProxy DecidedStrictness) where
-  type DemoteRep ('KProxy :: KProxy DecidedStrictness) = DecidedStrictness
+instance SingKind DecidedStrictness where
+  type DemoteRep DecidedStrictness = DecidedStrictness
   fromSing SDecidedLazy   = DecidedLazy
   fromSing SDecidedStrict = DecidedStrict
   fromSing SDecidedUnpack = DecidedUnpack
