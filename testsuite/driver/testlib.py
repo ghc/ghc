@@ -1498,7 +1498,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
 def split_file(in_fn, delimiter, out1_fn, out2_fn):
     # See Note [Universal newlines].
-    infile = io.open(in_fn, 'r', encoding='utf8', newline=None)
+    infile = io.open(in_fn, 'r', encoding='utf8', errors='replace', newline=None)
     out1 = io.open(out1_fn, 'w', encoding='utf8', newline='')
     out2 = io.open(out2_fn, 'w', encoding='utf8', newline='')
 
@@ -1569,7 +1569,7 @@ def read_no_crs(file):
     str = ''
     try:
         # See Note [Universal newlines].
-        h = io.open(file, 'r', encoding='utf8', newline=None)
+        h = io.open(file, 'r', encoding='utf8', errors='replace', newline=None)
         str = h.read()
         h.close
     except:
@@ -1602,6 +1602,12 @@ def write_file(file, str):
 #
 # This should work with both python2 and python3, and with both mingw*
 # as msys2 style Python.
+#
+# Do note that io.open returns unicode strings. So we have to specify
+# the expected encoding. But there is at least one file which is not
+# valid utf8 (decodingerror002.stdout). Solution: use errors='replace'.
+# Another solution would be to open files in binary mode always, and
+# operate on bytes.
 
 def check_hp_ok(name):
     opts = getTestOpts()
