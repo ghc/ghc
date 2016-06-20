@@ -35,7 +35,7 @@ $1_$2_DIST_GCC_CC_OPTS = \
 $1_$2_DIST_CC_OPTS = \
  $$(SRC_CC_OPTS) \
  $$($1_CC_OPTS) \
- -I$1/$2/build/autogen \
+ -I$1/$2/build/$$(or $$($1_EXECUTABLE),$$($1_$2_PROGNAME),.)/autogen \
  $$(foreach dir,$$(filter-out /%,$$($1_$2_INCLUDE_DIRS)),-I$1/$$(dir)) \
  $$(foreach dir,$$(filter /%,$$($1_$2_INCLUDE_DIRS)),-I$$(dir)) \
  $$($1_$2_CC_OPTS) \
@@ -75,8 +75,8 @@ $1_$2_ALL_HSC2HS_OPTS = \
  --cflag=-D__GLASGOW_HASKELL__=$$(if $$(filter 0,$3),$$(GhcCanonVersion),$$(ProjectVersionInt)) \
  $$($1_$2_HSC2HS_CC_OPTS) \
  $$($1_$2_HSC2HS_LD_OPTS) \
- --cflag=-I$1/$2/build/autogen \
- $$(if $$($1_PACKAGE),--cflag=-include --cflag=$1/$2/build/autogen/cabal_macros.h) \
+ --cflag=-I$1/$2/build/$$(or $$($1_EXECUTABLE),$$($1_$2_PROGNAME),.)/autogen \
+ $$(if $$($1_PACKAGE),--cflag=-include --cflag=$1/$2/build/$$(or $$($1_EXECUTABLE),$$($1_$2_PROGNAME),.)/autogen/cabal_macros.h) \
  $$($$(basename $$<)_HSC2HS_OPTS) \
  $$(EXTRA_HSC2HS_OPTS)
 

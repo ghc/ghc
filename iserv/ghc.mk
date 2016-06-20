@@ -12,6 +12,7 @@
 
 iserv_USES_CABAL = YES
 iserv_PACKAGE = iserv-bin
+iserv_EXECUTABLE = iserv
 
 ifeq "$(GhcDebugged)" "YES"
 iserv_stage2_MORE_HC_OPTS += -debug

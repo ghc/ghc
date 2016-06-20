@@ -122,13 +122,16 @@ $1_$2_$3_MOST_HC_OPTS = \
         $$(if $$($1_PACKAGE),$$($4_THIS_UNIT_ID) $$($1_$2_COMPONENT_ID))) \
  $$(if $$($1_PACKAGE),-hide-all-packages) \
  -i $$(if $$($1_$2_HS_SRC_DIRS),$$(foreach dir,$$($1_$2_HS_SRC_DIRS),-i$1/$$(dir)),-i$1) \
- -i$1/$2/build -i$1/$2/build/autogen \
- -I$1/$2/build -I$1/$2/build/autogen \
+ -i$1/$2/build \
+ -I$1/$2/build \
+ -i$1/$2/build/$$(or $$($1_EXECUTABLE),$$($1_$2_PROGNAME),.)/autogen \
+ -I$1/$2/build/$$(or $$($1_EXECUTABLE),$$($1_$2_PROGNAME),.)/autogen \
  $$(foreach dir,$$(filter-out /%,$$($1_$2_INCLUDE_DIRS)),-I$1/$$(dir)) \
  $$(foreach dir,$$(filter /%,$$($1_$2_INCLUDE_DIRS)),-I$$(dir)) \
  $$(foreach inc,$$($1_$2_INCLUDE),-\#include "$$(inc)") \
  $$(foreach opt,$$($1_$2_CPP_OPTS),-optP$$(opt)) \
- $$(if $$($1_PACKAGE),-optP-include -optP$1/$2/build/autogen/cabal_macros.h) \
+ $$(if $$($1_PACKAGE),-optP-include \
+    -optP$1/$2/build/$$(or $$($1_EXECUTABLE),$$($1_$2_PROGNAME),.)/autogen/cabal_macros.h) \
  $$($1_$2_$4_DEP_OPTS) \
  $$($1_$2_HC_OPTS) \
  $$(CONF_HC_OPTS_STAGE$4) \
@@ -139,6 +142,14 @@ $1_$2_$3_MOST_HC_OPTS = \
  $$(SRC_HC_WARNING_OPTS) \
  $$(SRC_HC_WARNING_OPTS_STAGE$4) \
  $$(EXTRA_HC_OPTS)
+
+# What is going on with $1_EXECUTABLE?  Recent version of Cabal
+# place the cabal_macros.h for executables in build/exename/autogen
+# rather than the traditional build/autogen.  This is Right(TM)
+# thing to do, but we have to accommodate it.  Usually, it suffices
+# to look in the PROGNAME, but for ghc the PROGNAME is ghc-stage1
+# while Cabal puts it in 'ghc', so we $1_EXECUTABLE is for that
+# case.
 
 $1_$2_$3_MOST_DIR_HC_OPTS = \
  $$($1_$2_$3_MOST_HC_OPTS) \

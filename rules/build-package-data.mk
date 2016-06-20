@@ -113,7 +113,7 @@ $1_$2_CONFIGURE_OPTS += $$(if $$(HAPPY),--with-happy="$$(HAPPY)")
 ifneq "$$(BINDIST)" "YES"
 ifneq "$$(NO_GENERATED_MAKEFILE_RULES)" "YES"
 $1/$2/inplace-pkg-config : $1/$2/package-data.mk
-$1/$2/build/autogen/cabal_macros.h : $1/$2/package-data.mk
+$1/$2/build/$$(or $$($1_EXECUTABLE),$$($1_$2_PROGNAME),.)/autogen/cabal_macros.h : $1/$2/package-data.mk
 
 # This rule configures the package, generates the package-data.mk file
 # for our build system, and registers the package for use in-place in

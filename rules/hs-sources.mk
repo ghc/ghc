@@ -28,7 +28,7 @@ endif
 $1_$2_HS_SRCS := $$(foreach file,$$($1_$2_SLASH_MODS),\
                  $$(firstword \
                    $$(wildcard \
-                     $$(foreach dir,$$($1_$2_HS_SRC_DIRS) $2/build/autogen,\
+                     $$(foreach dir,$$($1_$2_HS_SRC_DIRS) $2/build/$$(or $$($1_EXECUTABLE),$$($1_$2_PROGNAME),.)/autogen,\
                         $1/$$(dir)/$$(file).hs $1/$$(dir)/$$(file).lhs)) \
                    $1/$2/build/$$(file).hs))
 

@@ -21,7 +21,7 @@ import SrcLoc
 import Distribution.Simple.GHC ( componentGhcOptions )
 import Distribution.Simple.Configure ( getPersistBuildConfig )
 import Distribution.Simple.Program.GHC ( renderGhcOptions )
-import Distribution.PackageDescription ( library, libBuildInfo )
+import Distribution.PackageDescription ( libBuildInfo )
 import Distribution.Simple.LocalBuildInfo
 import qualified Distribution.Verbosity as V
 
@@ -179,13 +179,10 @@ flagsFromCabal :: FilePath -> IO [String]
 flagsFromCabal distPref = do
   lbi <- getPersistBuildConfig distPref
   let pd = localPkgDescr lbi
-      findLibraryConfig []                         = Nothing
-      findLibraryConfig ((CLibName, clbi, _) :  _) = Just clbi
-      findLibraryConfig (_                   : xs) = findLibraryConfig xs
-      mLibraryConfig = findLibraryConfig (componentsConfigs lbi)
-  case (library pd, mLibraryConfig) of
-    (Just lib, Just clbi) ->
-      let bi = libBuildInfo lib
+  case maybeGetDefaultLibraryLocalBuildInfo lbi of
+    Just clbi ->
+      let CLib lib = getComponent pd (componentLocalName clbi)
+          bi = libBuildInfo lib
           odir = buildDir lbi
           opts = componentGhcOptions V.normal lbi bi clbi odir
       in return $ renderGhcOptions (compiler lbi) (hostPlatform lbi) opts

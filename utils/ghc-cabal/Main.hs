@@ -150,14 +150,16 @@ doCopy directory distDir
       noGhcPrimHook f pd lbi us flags
               = let pd'
                      | packageName pd == PackageName "ghc-prim" =
-                        case library pd of
-                        Just lib ->
+                        case libraries pd of
+                        [lib] ->
                             let ghcPrim = fromJust (simpleParse "GHC.Prim")
                                 ems = filter (ghcPrim /=) (exposedModules lib)
                                 lib' = lib { exposedModules = ems }
-                            in pd { library = Just lib' }
-                        Nothing ->
+                            in pd { libraries = [lib'] }
+                        [] ->
                             error "Expected a library, but none found"
+                        _ ->
+                            error "Expected a single library, but multiple found"
                      | otherwise = pd
                 in f pd' lbi us flags
       modHook relocatableBuild f pd lbi us flags
@@ -227,8 +229,8 @@ doRegister directory distDir ghc ghcpkg topdir
             progs' <- configurePrograms [ghcProgram', ghcPkgProgram'] progs
             instInfos <- dump (hcPkgInfo progs') verbosity GlobalPackageDB
             let installedPkgs' = PackageIndex.fromList instInfos
-            let updateComponentConfig (cn, clbi, deps)
-                    = (cn, updateComponentLocalBuildInfo clbi, deps)
+            let updateComponentConfig (clbi, deps)
+                    = (updateComponentLocalBuildInfo clbi, deps)
                 updateComponentLocalBuildInfo clbi = clbi -- TODO: remove
                 ccs' = map updateComponentConfig (componentsConfigs lbi)
                 lbi' = lbi {
@@ -308,7 +310,8 @@ generate directory distdir dll0Modules config_args
       let pd = updatePackageDescription hooked_bi pd0
 
       -- generate Paths_<pkg>.hs and cabal-macros.h
-      writeAutogenFiles verbosity pd lbi
+      withAllComponentsInBuildOrder pd lbi $ \_ clbi ->
+        writeAutogenFiles verbosity pd lbi clbi
 
       -- generate inplace-pkg-config
       withLibLBI pd lbi $ \lib clbi ->
@@ -328,7 +331,7 @@ generate directory distdir dll0Modules config_args
           comp = compiler lbi
           libBiModules lib = (libBuildInfo lib, libModules lib)
           exeBiModules exe = (buildInfo exe, ModuleName.main : exeModules exe)
-          biModuless = (maybeToList $ fmap libBiModules $ library pd)
+          biModuless = (map libBiModules $ libraries pd)
                     ++ (map exeBiModules $ executables pd)
           buildableBiModuless = filter isBuildable biModuless
               where isBuildable (bi', _) = buildable bi'

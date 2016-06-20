@@ -12,6 +12,7 @@
 
 ghc_USES_CABAL = YES
 ghc_PACKAGE = ghc-bin
+ghc_EXECUTABLE = ghc
 
 ghc_stage1_CONFIGURE_OPTS += --flags=stage1
 ghc_stage2_CONFIGURE_OPTS += --flags=stage2
