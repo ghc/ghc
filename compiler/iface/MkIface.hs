@@ -952,7 +952,7 @@ checkOldIface hsc_env mod_summary source_modified maybe_iface
         showPass dflags $
             "Checking old interface for " ++
               (showPpr dflags $ ms_mod mod_summary)
-        initIfaceCheck hsc_env $
+        initIfaceCheck (text "checkOldIface") hsc_env $
             check_old_iface hsc_env mod_summary source_modified maybe_iface
 
 check_old_iface

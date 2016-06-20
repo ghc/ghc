@@ -1619,15 +1619,15 @@ initIfaceTcRn thing_inside
               ; get_type_env = readTcRef (tcg_type_env_var tcg_env) }
         ; setEnvs (if_env, ()) thing_inside }
 
-initIfaceCheck :: HscEnv -> IfG a -> IO a
+initIfaceCheck :: SDoc -> HscEnv -> IfG a -> IO a
 -- Used when checking the up-to-date-ness of the old Iface
 -- Initialise the environment with no useful info at all
-initIfaceCheck hsc_env do_this
+initIfaceCheck doc hsc_env do_this
  = do let rec_types = case hsc_type_env_var hsc_env of
                          Just (mod,var) -> Just (mod, readTcRef var)
                          Nothing        -> Nothing
           gbl_env = IfGblEnv {
-                        if_doc = text "initIfaceCheck",
+                        if_doc = text "initIfaceCheck" <+> doc,
                         if_rec_types = rec_types
                     }
       initTcRnIf 'i' hsc_env gbl_env () do_this

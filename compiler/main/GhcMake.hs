@@ -1422,7 +1422,7 @@ typecheckLoop dflags hsc_env mods = do
   new_hpt <-
     fixIO $ \new_hpt -> do
       let new_hsc_env = hsc_env{ hsc_HPT = new_hpt }
-      mds <- initIfaceCheck new_hsc_env $
+      mds <- initIfaceCheck (text "typecheckLoop") new_hsc_env $
                 mapM (typecheckIface . hm_iface) hmis
       let new_hpt = addListToHpt old_hpt
                         (zip mods [ hmi{ hm_details = details }

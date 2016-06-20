@@ -610,7 +610,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
         = return (uniqDSetToList acc_mods, uniqDSetToList acc_pkgs)
     follow_deps (mod:mods) acc_mods acc_pkgs
         = do
-          mb_iface <- initIfaceCheck hsc_env $
+          mb_iface <- initIfaceCheck (text "getLinkDeps") hsc_env $
                         loadInterface msg mod (ImportByUser False)
           iface <- case mb_iface of
                     Maybes.Failed err      -> throwGhcExceptionIO (ProgramError (showSDoc dflags err))
