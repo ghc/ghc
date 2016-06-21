@@ -90,7 +90,7 @@ especially on value bindings.  Here's an overview.
   The instantiation does the obvious thing for complete signatures,
   but for /partial/ signatures it starts from the HsSyn, so it
   has to kind-check it etc: tcHsPartialSigType.  It's convenient
-  to do this at the same time as instantiation, becuase we can
+  to do this at the same time as instantiation, because we can
   make the wildcards into unification variables right away, raather
   than somehow quantifying over them.  And the "TcLevel" of those
   unification variables is correct because we are in tcMonoBinds.

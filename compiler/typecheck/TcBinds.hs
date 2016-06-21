@@ -1468,7 +1468,7 @@ and suppose t :: T.  Which of these pattern bindings are ok?
 
   E3. let { MkT (toInteger -> r) _ = t } in <body>
 
-Well (E1) is clearly wrong becuase the existential 'a' escapes.
+Well (E1) is clearly wrong because the existential 'a' escapes.
 What type could 'p' possibly have?
 
 But (E2) is fine, despite the existential pattern, because

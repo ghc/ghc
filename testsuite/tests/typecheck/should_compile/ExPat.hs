@@ -7,7 +7,7 @@ data T where
 
 -- c.f. T11700
 
--- Succeeds becuase y::Int
+-- Succeeds because y::Int
 f x = let MkT _ y  = x
       in y
 

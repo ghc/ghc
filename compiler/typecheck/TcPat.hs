@@ -330,7 +330,7 @@ tc_pat penv lpat@(LazyPat pat) pat_ty thing_inside
         --   see Note [Hopping the LIE in lazy patterns]
 
         -- Check there are no unlifted types under the lazy pattern
-        -- This is a very unsatisfactory test.  We have to zonk becuase
+        -- This is a very unsatisfactory test.  We have to zonk because
         -- the binder-tys are typically just a unification variable,
         -- which should by now have been unified... but it might be
         -- deferred for the constraint solver...Ugh!  Also
