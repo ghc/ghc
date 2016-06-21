@@ -891,7 +891,7 @@ checkCaseAlts :: CoreExpr -> OutType -> [CoreAlt] -> LintM ()
 -- b2) Check that the others are in increasing order
 -- c) Check that there's a default for infinite types
 -- NB: Algebraic cases are not necessarily exhaustive, because
---     the simplifer correctly eliminates case that can't
+--     the simplifier correctly eliminates case that can't
 --     possibly match.
 
 checkCaseAlts e ty alts =

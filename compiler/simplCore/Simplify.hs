@@ -2320,7 +2320,7 @@ knownCon env scrut dc dc_ty_args dc_args bndr bs rhs cont
 -------------------
 missingAlt :: SimplEnv -> Id -> [InAlt] -> SimplCont -> SimplM (SimplEnv, OutExpr)
                 -- This isn't strictly an error, although it is unusual.
-                -- It's possible that the simplifer might "see" that
+                -- It's possible that the simplifier might "see" that
                 -- an inner case has no accessible alternatives before
                 -- it "sees" that the entire branch of an outer case is
                 -- inaccessible.  So we simply put an error case here instead.

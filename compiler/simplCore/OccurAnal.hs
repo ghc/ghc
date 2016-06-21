@@ -958,7 +958,7 @@ reOrderNodes depth bndr_set weak_fvs (node : nodes) binds
         | otherwise = 0
 
         -- Checking for a constructor application
-        -- Cheap and cheerful; the simplifer moves casts out of the way
+        -- Cheap and cheerful; the simplifier moves casts out of the way
         -- The lambda case is important to spot x = /\a. C (f a)
         -- which comes up when C is a dictionary constructor and
         -- f is a default method.

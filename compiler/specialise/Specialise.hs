@@ -398,7 +398,7 @@ Seems quite reasonable.  Similar things could be done with instance decls:
 Ho hum.  Things are complex enough without this.  I pass.
 
 
-Requirements for the simplifer
+Requirements for the simplifier
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The simplifier has to be able to take advantage of the specialisation.
 
@@ -1356,7 +1356,7 @@ crash. So we use Refl right off the bat, and do not forall-quantify 'g':
  * exprsFreeIdsList returns the Ids bound by the args,
    which won't include g
 
-You might wonder if this will match as often, but the simplifer replaces
+You might wonder if this will match as often, but the simplifier replaces
 complicated Refl coercions with Refl pretty aggressively.
 
 Note [Orphans and auto-generated rules]

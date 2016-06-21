@@ -393,7 +393,7 @@ mkDataConWorkId wkr_name data_con
         -- the simplifier thinks that y is "sure to be evaluated" (because
         --  $wMkT is strict) and drops the case.  No, $wMkT is not strict.
         --
-        -- When the simplifer sees a pattern
+        -- When the simplifier sees a pattern
         --      case e of MkT x -> ...
         -- it uses the dataConRepStrictness of MkT to mark x as evaluated;
         -- but that's fine... dataConRepStrictness comes from the data con
