@@ -675,7 +675,7 @@ do_not_copy = ('.hi', '.o', '.dyn_hi', '.dyn_o') # 12112
 
 def test_common_work (name, opts, func, args):
     try:
-        t.total_tests = t.total_tests+1
+        t.total_tests += 1
         setLocalTestOpts(opts)
 
         package_conf_cache_file_start_timestamp = get_package_cache_timestamp()
@@ -696,7 +696,7 @@ def test_common_work (name, opts, func, args):
         # A test itself can request extra ways by setting opts.extra_ways
         all_ways = all_ways + [way for way in opts.extra_ways if way not in all_ways]
 
-        t.total_test_cases = t.total_test_cases + len(all_ways)
+        t.total_test_cases += len(all_ways)
 
         ok_way = lambda way: \
             not getTestOpts().skip \
@@ -761,9 +761,7 @@ def test_common_work (name, opts, func, args):
                 framework_fail(name, way, str(e))
                 traceback.print_exc()
 
-        for way in all_ways:
-            if way not in do_ways:
-                skiptest (name,way)
+        t.n_tests_skipped += len(set(all_ways) - set(do_ways))
 
         if config.cleanup and do_ways:
             cleanup()
@@ -782,8 +780,10 @@ def do_test(name, way, func, args, files):
     full_name = name + '(' + way + ')'
 
     if_verbose(2, "=====> {0} {1} of {2} {3}".format(
-        full_name, t.total_tests, len(allTestNames),
-        [t.n_unexpected_passes, t.n_unexpected_failures, t.n_framework_failures]))
+        full_name, t.total_tests, len(allTestNames), 
+        [len(t.unexpected_passes),
+         len(t.unexpected_failures),
+         len(t.framework_failures)]))
 
     # Clean up prior to the test, so that we can't spuriously conclude
     # that it passed on the basis of old run outputs.
@@ -847,86 +847,38 @@ def do_test(name, way, func, args, files):
     except:
         passFail = 'No passFail found'
 
+    directory = re.sub('^\\.[/\\\\]', '', opts.testdir)
+
     if passFail == 'pass':
         if _expect_pass(way):
-            t.n_expected_passes = t.n_expected_passes + 1
-            if name in t.expected_passes:
-                t.expected_passes[name].append(way)
-            else:
-                t.expected_passes[name] = [way]
+            t.n_expected_passes += 1
         else:
             if_verbose(1, '*** unexpected pass for %s' % full_name)
-            t.n_unexpected_passes = t.n_unexpected_passes + 1
-            addPassingTestInfo(t.unexpected_passes, opts.testdir, name, way)
+            t.unexpected_passes.append((directory, name, 'unexpected', way))
     elif passFail == 'fail':
         if _expect_pass(way):
             reason = result['reason']
             tag = result.get('tag')
             if tag == 'stat':
                 if_verbose(1, '*** unexpected stat test failure for %s' % full_name)
-                t.n_unexpected_stat_failures = t.n_unexpected_stat_failures + 1
-                addFailingTestInfo(t.unexpected_stat_failures, opts.testdir, name, reason, way)
+                t.unexpected_stat_failures.append((directory, name, reason, way))
             else:
                 if_verbose(1, '*** unexpected failure for %s' % full_name)
-                t.n_unexpected_failures = t.n_unexpected_failures + 1
-                addFailingTestInfo(t.unexpected_failures, opts.testdir, name, reason, way)
+                t.unexpected_failures.append((directory, name, reason, way))
         else:
             if opts.expect == 'missing-lib':
-                t.n_missing_libs = t.n_missing_libs + 1
-                if name in t.missing_libs:
-                    t.missing_libs[name].append(way)
-                else:
-                    t.missing_libs[name] = [way]
+                t.missing_libs.append((directory, name, 'missing-lib', way))
             else:
-                t.n_expected_failures = t.n_expected_failures + 1
-                if name in t.expected_failures:
-                    t.expected_failures[name].append(way)
-                else:
-                    t.expected_failures[name] = [way]
+                t.n_expected_failures += 1
     else:
         framework_fail(name, way, 'bad result ' + passFail)
 
-def addPassingTestInfo (testInfos, directory, name, way):
-    directory = re.sub('^\\.[/\\\\]', '', directory)
-
-    if not directory in testInfos:
-        testInfos[directory] = {}
-
-    if not name in testInfos[directory]:
-        testInfos[directory][name] = []
-
-    testInfos[directory][name].append(way)
-
-def addFailingTestInfo (testInfos, directory, name, reason, way):
-    directory = re.sub('^\\.[/\\\\]', '', directory)
-
-    if not directory in testInfos:
-        testInfos[directory] = {}
-
-    if not name in testInfos[directory]:
-        testInfos[directory][name] = {}
-
-    if not reason in testInfos[directory][name]:
-        testInfos[directory][name][reason] = []
-
-    testInfos[directory][name][reason].append(way)
-
-def skiptest (name, way):
-    # print 'Skipping test \"', name, '\"'
-    t.n_tests_skipped = t.n_tests_skipped + 1
-    if name in t.tests_skipped:
-        t.tests_skipped[name].append(way)
-    else:
-        t.tests_skipped[name] = [way]
-
-def framework_fail( name, way, reason ):
+def framework_fail(name, way, reason):
+    opts = getTestOpts()
+    directory = re.sub('^\\.[/\\\\]', '', opts.testdir)
     full_name = name + '(' + way + ')'
     if_verbose(1, '*** framework failure for %s %s ' % (full_name, reason))
-    t.n_framework_failures = t.n_framework_failures + 1
-    if name in t.framework_failures:
-        t.framework_failures[name].append(way)
-    else:
-        t.framework_failures[name] = [way]
+    t.framework_failures.append((directory, name, way, reason))
 
 def badResult(result):
     try:
@@ -1907,89 +1859,55 @@ def summary(t, file, short=False):
                + repr(t.n_tests_skipped).rjust(8)
                + ' were skipped\n'
                + '\n'
-               + repr(t.n_missing_libs).rjust(8)
+               + repr(len(t.missing_libs)).rjust(8)
                + ' had missing libraries\n'
                + repr(t.n_expected_passes).rjust(8)
                + ' expected passes\n'
                + repr(t.n_expected_failures).rjust(8)
                + ' expected failures\n'
                + '\n'
-               + repr(t.n_framework_failures).rjust(8)
+               + repr(len(t.framework_failures)).rjust(8)
                + ' caused framework failures\n'
-               + repr(t.n_unexpected_passes).rjust(8)
+               + repr(len(t.unexpected_passes)).rjust(8)
                + ' unexpected passes\n'
-               + repr(t.n_unexpected_failures).rjust(8)
+               + repr(len(t.unexpected_failures)).rjust(8)
                + ' unexpected failures\n'
-               + repr(t.n_unexpected_stat_failures).rjust(8)
+               + repr(len(t.unexpected_stat_failures)).rjust(8)
                + ' unexpected stat failures\n'
                + '\n')
 
-    if t.n_unexpected_passes > 0:
+    if t.unexpected_passes:
         file.write('Unexpected passes:\n')
-        printPassingTestInfosSummary(file, t.unexpected_passes)
+        printTestInfosSummary(file, t.unexpected_passes)
 
-    if t.n_unexpected_failures > 0:
+    if t.unexpected_failures:
         file.write('Unexpected failures:\n')
-        printFailingTestInfosSummary(file, t.unexpected_failures)
+        printTestInfosSummary(file, t.unexpected_failures)
 
-    if t.n_unexpected_stat_failures > 0:
+    if t.unexpected_stat_failures:
         file.write('Unexpected stat failures:\n')
-        printFailingTestInfosSummary(file, t.unexpected_stat_failures)
+        printTestInfosSummary(file, t.unexpected_stat_failures)
 
-    if t.n_framework_failures > 0:
-        file.write('Test framework failures:\n')
-        printFrameworkFailureSummary(file, t.framework_failures)
+    if t.framework_failures:
+        file.write('Framework failures:\n')
+        printTestInfosSummary(file, t.framework_failures)
 
     if stopping():
         file.write('WARNING: Testsuite run was terminated early\n')
 
 def printUnexpectedTests(file, testInfoss):
-    unexpected = []
-    for testInfos in testInfoss:
-        directories = testInfos.keys()
-        for directory in directories:
-            tests = list(testInfos[directory].keys())
-            unexpected += tests
-    if unexpected != []:
+    unexpected = {name for testInfos in testInfoss
+                       for (_, name, _, _) in testInfos}
+    if unexpected:
         file.write('Unexpected results from:\n')
         file.write('TEST="' + ' '.join(unexpected) + '"\n')
         file.write('\n')
 
-def printPassingTestInfosSummary(file, testInfos):
-    directories = list(testInfos.keys())
-    directories.sort()
-    maxDirLen = max(len(x) for x in directories)
-    for directory in directories:
-        tests = list(testInfos[directory].keys())
-        tests.sort()
-        for test in tests:
-           file.write('   ' + directory.ljust(maxDirLen + 2) + test + \
-                      ' (' + ','.join(testInfos[directory][test]) + ')\n')
-    file.write('\n')
-
-def printFailingTestInfosSummary(file, testInfos):
-    directories = list(testInfos.keys())
-    directories.sort()
-    maxDirLen = max(len(d) for d in directories)
-    for directory in directories:
-        tests = list(testInfos[directory].keys())
-        tests.sort()
-        for test in tests:
-           reasons = testInfos[directory][test].keys()
-           for reason in reasons:
-               file.write('   ' + directory.ljust(maxDirLen + 2) + test + \
-                          ' [' + reason + ']' + \
-                          ' (' + ','.join(testInfos[directory][test][reason]) + ')\n')
-    file.write('\n')
-
-def printFrameworkFailureSummary(file, testInfos):
-    names = list(testInfos.keys())
-    names.sort()
-    maxNameLen = max(len(n) for n in names)
-    for name in names:
-        ways = testInfos[name]
-        file.write('   ' + name.ljust(maxNameLen + 2) + \
-                   ' (' + ','.join(ways) + ')\n')
+def printTestInfosSummary(file, testInfos):
+    maxDirLen = max(len(directory) for (directory, _, _, _) in testInfos)
+    for (directory, name, reason, way) in testInfos:
+        directory = directory.ljust(maxDirLen)
+        file.write('   {directory}  {name} [{reason}] ({way})\n'.format(**locals()))
     file.write('\n')
 
 def modify_lines(s, f):

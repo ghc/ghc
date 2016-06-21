@@ -320,8 +320,8 @@ if config.list_broken:
     print(' '.join(map (lambda bdn: '#' + str(bdn[0]) + '(' + bdn[1] + '/' + bdn[2] + ')', brokens)))
     print('')
 
-    if t.n_framework_failures != 0:
-        print('WARNING:', str(t.n_framework_failures), 'framework failures!')
+    if t.framework_failures:
+        print('WARNING:', len(framework_failures), 'framework failures!')
         print('')
 else:
     # Now run all the tests
