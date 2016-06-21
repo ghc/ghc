@@ -64,7 +64,7 @@ def setLocalTestOpts(opts):
 
 def isStatsTest():
     opts = getTestOpts()
-    return len(opts.compiler_stats_range_fields) > 0 or len(opts.stats_range_fields) > 0
+    return bool(opts.compiler_stats_range_fields or opts.stats_range_fields)
 
 
 # This can be called at the top of a file of tests, to set default test options
@@ -791,6 +791,7 @@ def do_test(name, way, func, args, files):
     # Clean up prior to the test, so that we can't spuriously conclude
     # that it passed on the basis of old run outputs.
     cleanup()
+    os.makedirs(opts.testdir)
 
     # Link all source files for this test into a new directory in
     # /tmp, and run the test in that directory. This makes it
@@ -800,39 +801,14 @@ def do_test(name, way, func, args, files):
 
     for extra_file in files:
         src = in_srcdir(extra_file)
-        if extra_file.startswith('..'):
-            # In case the extra_file is a file in an ancestor
-            # directory (e.g. extra_files(['../shell.hs'])), make
-            # sure it is copied to the test directory
-            # (testdir/shell.hs), instead of ending up somewhere
-            # else in the tree (testdir/../shell.hs)
-            filename = os.path.basename(extra_file)
-        else:
-            filename = extra_file
-        assert not '..' in filename # no funny stuff (foo/../../bar)
-        dst = in_testdir(filename)
-
+        dst = in_testdir(os.path.basename(extra_file.rstrip('/\\')))
         if os.path.isfile(src):
-            dirname = os.path.dirname(dst)
-            if dirname:
-                mkdirp(dirname)
-            try:
-                link_or_copy_file(src, dst)
-            except OSError as e:
-                if e.errno == errno.EEXIST and os.path.isfile(dst):
-                    # Some tests depend on files from ancestor
-                    # directories (e.g. '../shell.hs'). It is
-                    # possible such a file was already copied over
-                    # for another test, since cleanup() doesn't
-                    # delete them.
-                    pass
-                else:
-                    raise
+            link_or_copy_file(src, dst)
         elif os.path.isdir(src):
-            os.makedirs(dst)
+            os.mkdir(dst)
             lndir(src, dst)
         else:
-            if not config.haddock and os.path.splitext(filename)[1] == '.t':
+            if not config.haddock and os.path.splitext(extra_file)[1] == '.t':
                 # When using a ghc built without haddock support, .t
                 # files are rightfully missing. Don't
                 # framework_fail. Test will be skipped later.
@@ -840,12 +816,6 @@ def do_test(name, way, func, args, files):
             else:
                 framework_fail(name, way,
                     'extra_file does not exist: ' + extra_file)
-
-    if not files:
-        # Always create the testdir, even when no files were copied
-        # (because user forgot to specify extra_files setup function), to
-        # prevent the confusing error: can't cd to <testdir>.
-        os.makedirs(opts.testdir)
 
     if func.__name__ == 'run_command' or opts.pre_cmd:
         # When running 'MAKE' make sure 'TOP' still points to the
@@ -994,7 +964,6 @@ def run_command( name, way, cmd ):
 
 def ghci_script( name, way, script):
     flags = ' '.join(get_compiler_flags())
-
     way_flags = ' '.join(config.way_flags[way])
 
     # We pass HC and HC_OPTS as environment variables, so that the
@@ -1121,7 +1090,7 @@ def checkStats(name, way, stats_file, range_fields):
     full_name = name + '(' + way + ')'
 
     result = passed()
-    if len(range_fields) > 0:
+    if range_fields:
         try:
             f = open(in_testdir(stats_file))
         except IOError as e:
@@ -1151,10 +1120,6 @@ def checkStats(name, way, stats_file, range_fields):
                 result = failBecause('stat not good enough', tag='stat')
 
             if val < lowerBound or val > upperBound or config.verbose >= 4:
-                valStr = str(val)
-                valLen = len(valStr)
-                expectedStr = str(expected)
-                expectedLen = len(expectedStr)
                 length = max(len(str(x)) for x in [expected, lowerBound, upperBound, val])
 
                 def display(descr, val, extra):
@@ -1203,7 +1168,7 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf):
         to_do = '-c' # just compile
 
     stats_file = name + '.comp.stats'
-    if len(opts.compiler_stats_range_fields) > 0:
+    if opts.compiler_stats_range_fields:
         extra_hc_opts += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
 
     # Required by GHC 7.3+, harmless for earlier versions:
@@ -1275,7 +1240,7 @@ def simple_run(name, way, prog, extra_run_opts):
     my_rts_flags = rts_flags(way)
 
     stats_file = name + '.stats'
-    if len(opts.stats_range_fields) > 0:
+    if opts.stats_range_fields:
         stats_args = ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
     else:
         stats_args = ''
@@ -1315,8 +1280,8 @@ def simple_run(name, way, prog, extra_run_opts):
             dump_stderr(name)
         return failBecause('bad exit code')
 
-    check_hp = my_rts_flags.find("-h") != -1
-    check_prof = my_rts_flags.find("-p") != -1
+    check_hp = '-h' in my_rts_flags
+    check_prof = '-p' in my_rts_flags
 
     if not opts.ignore_output:
         bad_stderr = not opts.combined_output and not check_stderr_ok(name, way)
@@ -1334,15 +1299,8 @@ def simple_run(name, way, prog, extra_run_opts):
     return checkStats(name, way, stats_file, opts.stats_range_fields)
 
 def rts_flags(way):
-    if (way == ''):
-        return ''
-    else:
-        args = config.way_rts_flags[way]
-
-    if args == []:
-        return ''
-    else:
-        return '+RTS ' + ' '.join(args) + ' -RTS'
+    args = config.way_rts_flags.get(way, [])
+    return '+RTS {} -RTS'.format(' '.join(args)) if args else ''
 
 # -----------------------------------------------------------------------------
 # Run a program in the interpreter and check its output
