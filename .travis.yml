@@ -3,7 +3,7 @@ sudo: true
 matrix:
     include:
         - os: linux
-          env: CABALVER=1.22 GHCVER=7.10.3 TARGET=
+          env: CABALVER=1.22 GHCVER=7.10.3 FLAVOUR=quick TARGET=
           addons:
               apt:
                   packages:
@@ -20,7 +20,7 @@ matrix:
               - cabal install alex happy
 
         - os: osx
-          env: TARGET=
+          env: FLAVOUR=quickest TARGET=
           before_install:
               - brew update
               - brew install ghc cabal-install
@@ -59,7 +59,7 @@ install:
 script:
     - ( cd ghc/hadrian && cabal haddock --internal )
     - ./ghc/hadrian/build.sh selftest
-    - ./ghc/hadrian/build.sh -j --verbose --no-progress --progress-colour=never --profile=- --flavour=quick $TARGET
+    - ./ghc/hadrian/build.sh -j --verbose --no-progress --progress-colour=never --profile=- --flavour=$FLAVOUR $TARGET
     - ./ghc/inplace/bin/ghc-stage2 -e 1+2
 
 cache:
