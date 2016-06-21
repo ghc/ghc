@@ -329,7 +329,7 @@ A FamInstEnv maps a family name to the list of known instances for that family.
 
 The same FamInstEnv includes both 'data family' and 'type family' instances.
 Type families are reduced during type inference, but not data families;
-the user explains when to use a data family instance by using contructors
+the user explains when to use a data family instance by using constructors
 and pattern matching.
 
 Nevertheless it is still useful to have data families in the FamInstEnv:

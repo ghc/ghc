@@ -497,7 +497,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                  -- The Cpr info can be important inside INLINE rhss, where the
                  -- wrapper constructor isn't inlined.
                  -- And the argument strictness can be important too; we
-                 -- may not inline a contructor when it is partially applied.
+                 -- may not inline a constructor when it is partially applied.
                  -- For example:
                  --      data W = C !Int !Int !Int
                  --      ...(let w = C x in ...(w p q)...)...

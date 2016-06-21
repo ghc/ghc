@@ -22,7 +22,7 @@
    Building Haskell objects from C datatypes.
 
    TODO: Currently this code does not tag created pointers,
-         however it is not unsafe (the contructor code will do it)
+         however it is not unsafe (the constructor code will do it)
          just inefficient.
    ------------------------------------------------------------------------- */
 HaskellObj

@@ -894,7 +894,7 @@ CPRResult:         NoCPR
             RetProd    RetSum ConTag
 
 
-Product contructors return (Dunno (RetProd rs))
+Product constructors return (Dunno (RetProd rs))
 In a fixpoint iteration, start from Diverges
 We have lubs, but not glbs; but that is ok.
 -}

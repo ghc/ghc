@@ -1507,7 +1507,7 @@ type GlobalScruts = IdSet   -- See Note [Binder swap on GlobalId scrutinees]
 --      y = /\a -> (p a, q a)   -- Still don't inline p or q
 --      z = f (p,q)             -- Do inline p,q; it may make a rule fire
 -- So OccEncl tells enought about the context to know what to do when
--- we encounter a contructor application or PAP.
+-- we encounter a constructor application or PAP.
 
 data OccEncl
   = OccRhs              -- RHS of let(rec), albeit perhaps inside a type lambda

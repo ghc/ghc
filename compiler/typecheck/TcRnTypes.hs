@@ -695,7 +695,7 @@ data TcLclEnv           -- Changes as we move inside an expression
                 --   Does *not* include global name envt; may shadow it
                 --   Includes both ordinary variables and type variables;
                 --   they are kept distinct because tyvar have a different
-                --   occurrence contructor (Name.TvOcc)
+                --   occurrence constructor (Name.TvOcc)
                 -- We still need the unsullied global name env so that
                 --   we can look up record field names
 

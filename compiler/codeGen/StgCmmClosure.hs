@@ -292,7 +292,7 @@ mkLFImported id
 --                Dynamic pointer tagging
 -----------------------------------------------------
 
-type ConTagZ = Int      -- A *zero-indexed* contructor tag
+type ConTagZ = Int      -- A *zero-indexed* constructor tag
 
 type DynTag = Int       -- The tag on a *pointer*
                         -- (from the dynamic-tagging paper)

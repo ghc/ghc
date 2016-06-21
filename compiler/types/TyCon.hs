@@ -215,7 +215,7 @@ See also Note [Wrappers for data instance tycons] in MkId.hs
 * The axiom ax_ti may be eta-reduced; see
   Note [Eta reduction for data family axioms] in TcInstDcls
 
-* The data contructor T2 has a wrapper (which is what the
+* The data constructor T2 has a wrapper (which is what the
   source-level "T2" invokes):
 
         $WT2 :: Bool -> T Int

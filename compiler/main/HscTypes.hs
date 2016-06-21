@@ -1793,7 +1793,7 @@ implicitTyConThings tc
     implicitCoTyCon tc ++
 
       -- for each data constructor in order,
-      --   the contructor, worker, and (possibly) wrapper
+      --   the constructor, worker, and (possibly) wrapper
     [ thing | dc    <- tyConDataCons tc
             , thing <- AConLike (RealDataCon dc) : dataConImplicitTyThings dc ]
       -- NB. record selectors are *not* implicit, they have fully-fledged

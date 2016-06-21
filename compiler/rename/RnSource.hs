@@ -1728,7 +1728,7 @@ rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
 badGadtStupidTheta :: HsDocContext -> SDoc
 badGadtStupidTheta _
   = vcat [text "No context is allowed on a GADT-style data declaration",
-          text "(You can put a context on each contructor, though.)"]
+          text "(You can put a context on each constructor, though.)"]
 
 rnFamDecl :: Maybe Name -- Just cls => this FamilyDecl is nested
                         --             inside an *class decl* for cls

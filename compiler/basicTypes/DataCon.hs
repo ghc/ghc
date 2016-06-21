@@ -598,7 +598,7 @@ Terminology:
 
 Note [Data con representation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The dcRepType field contains the type of the representation of a contructor
+The dcRepType field contains the type of the representation of a constructor
 This may differ from the type of the constructor *Id* (built
 by MkId.mkDataConId) for two reasons:
         a) the constructor Id may be overloaded, but the dictionary isn't stored
