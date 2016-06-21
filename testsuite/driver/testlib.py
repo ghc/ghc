@@ -1933,19 +1933,14 @@ def cleanup():
 # Return a list of all the files ending in '.T' below directories roots.
 
 def findTFiles(roots):
-    # It would be better to use os.walk, but that
-    # gives backslashes on Windows, which trip the
-    # testsuite later :-(
-    return [filename for root in roots for filename in findTFiles_(root)]
-
-def findTFiles_(path):
-    if os.path.isdir(path):
-        paths = [os.path.join(path, x) for x in os.listdir(path)]
-        return findTFiles(paths)
-    elif path[-2:] == '.T':
-        return [path]
-    else:
-        return []
+    for root in roots:
+        for path, dirs, files in os.walk(root, topdown=True):
+            # Never pick up .T files in uncleaned .run directories.
+            dirs[:] = [dir for dir in sorted(dirs)  
+                           if not dir.endswith(testdir_suffix)]
+            for filename in files:
+                if filename.endswith('.T'):
+                    yield os.path.join(path, filename)
 
 # -----------------------------------------------------------------------------
 # Output a test summary to the specified file object
