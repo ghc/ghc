@@ -756,7 +756,13 @@ def test_common_work (name, opts, func, args):
         for way in do_ways:
             if stopping():
                 break
-            do_test(name, way, func, args, files)
+            try:
+                do_test(name, way, func, args, files)
+            except KeyboardInterrupt:
+                stopNow()
+            except Exception as e:
+                framework_fail(name, way, str(e))
+                traceback.print_exc()
 
         for way in all_ways:
             if way not in do_ways:
@@ -778,150 +784,140 @@ def do_test(name, way, func, args, files):
 
     full_name = name + '(' + way + ')'
 
-    try:
-        if_verbose(2, "=====> %s %d of %d %s " % \
-                    (full_name, t.total_tests, len(allTestNames), \
-                    [t.n_unexpected_passes, \
-                     t.n_unexpected_failures, \
-                     t.n_framework_failures]))
+    if_verbose(2, "=====> {0} {1} of {2} {3}".format(
+        full_name, t.total_tests, len(allTestNames),
+        [t.n_unexpected_passes, t.n_unexpected_failures, t.n_framework_failures]))
 
-        # Clean up prior to the test, so that we can't spuriously conclude
-        # that it passed on the basis of old run outputs.
-        cleanup()
+    # Clean up prior to the test, so that we can't spuriously conclude
+    # that it passed on the basis of old run outputs.
+    cleanup()
 
-        # Link all source files for this test into a new directory in
-        # /tmp, and run the test in that directory. This makes it
-        # possible to run tests in parallel, without modification, that
-        # would otherwise (accidentally) write to the same output file.
-        # It also makes it easier to keep the testsuite clean.
+    # Link all source files for this test into a new directory in
+    # /tmp, and run the test in that directory. This makes it
+    # possible to run tests in parallel, without modification, that
+    # would otherwise (accidentally) write to the same output file.
+    # It also makes it easier to keep the testsuite clean.
 
-        for extra_file in files:
-            src = in_srcdir(extra_file)
-            if extra_file.startswith('..'):
-                # In case the extra_file is a file in an ancestor
-                # directory (e.g. extra_files(['../shell.hs'])), make
-                # sure it is copied to the test directory
-                # (testdir/shell.hs), instead of ending up somewhere
-                # else in the tree (testdir/../shell.hs)
-                filename = os.path.basename(extra_file)
-            else:
-                filename = extra_file
-            assert not '..' in filename # no funny stuff (foo/../../bar)
-            dst = in_testdir(filename)
+    for extra_file in files:
+        src = in_srcdir(extra_file)
+        if extra_file.startswith('..'):
+            # In case the extra_file is a file in an ancestor
+            # directory (e.g. extra_files(['../shell.hs'])), make
+            # sure it is copied to the test directory
+            # (testdir/shell.hs), instead of ending up somewhere
+            # else in the tree (testdir/../shell.hs)
+            filename = os.path.basename(extra_file)
+        else:
+            filename = extra_file
+        assert not '..' in filename # no funny stuff (foo/../../bar)
+        dst = in_testdir(filename)
 
-            if os.path.isfile(src):
-                dirname = os.path.dirname(dst)
-                if dirname:
-                    mkdirp(dirname)
-                try:
-                    link_or_copy_file(src, dst)
-                except OSError as e:
-                    if e.errno == errno.EEXIST and os.path.isfile(dst):
-                        # Some tests depend on files from ancestor
-                        # directories (e.g. '../shell.hs'). It is
-                        # possible such a file was already copied over
-                        # for another test, since cleanup() doesn't
-                        # delete them.
-                        pass
-                    else:
-                        raise
-            elif os.path.isdir(src):
-                os.makedirs(dst)
-                lndir(src, dst)
-            else:
-                if not config.haddock and os.path.splitext(filename)[1] == '.t':
-                    # When using a ghc built without haddock support, .t
-                    # files are rightfully missing. Don't
-                    # framework_fail. Test will be skipped later.
+        if os.path.isfile(src):
+            dirname = os.path.dirname(dst)
+            if dirname:
+                mkdirp(dirname)
+            try:
+                link_or_copy_file(src, dst)
+            except OSError as e:
+                if e.errno == errno.EEXIST and os.path.isfile(dst):
+                    # Some tests depend on files from ancestor
+                    # directories (e.g. '../shell.hs'). It is
+                    # possible such a file was already copied over
+                    # for another test, since cleanup() doesn't
+                    # delete them.
                     pass
                 else:
-                    framework_fail(name, way,
-                        'extra_file does not exist: ' + extra_file)
-
-        if not files:
-            # Always create the testdir, even when no files were copied
-            # (because user forgot to specify extra_files setup function), to
-            # prevent the confusing error: can't cd to <testdir>.
-            os.makedirs(opts.testdir)
-
-        if func.__name__ == 'run_command' or opts.pre_cmd:
-            # When running 'MAKE' make sure 'TOP' still points to the
-            # root of the testsuite.
-            src_makefile = in_srcdir('Makefile')
-            dst_makefile = in_testdir('Makefile')
-            if os.path.exists(src_makefile):
-                with open(src_makefile, 'r') as src:
-                    makefile = re.sub('TOP=.*', 'TOP=' + config.top, src.read(), 1)
-                    with open(dst_makefile, 'w') as dst:
-                        dst.write(makefile)
-
-        if config.use_threads:
-            t.lock.release()
-
-        if opts.pre_cmd:
-            exit_code = runCmd('cd "{0}" && {1}'.format(opts.testdir, opts.pre_cmd))
-            if exit_code != 0:
-                framework_fail(name, way, 'pre_cmd failed: {0}'.format(exit_code))
-
-        try:
-            result = func(*[name,way] + args)
-        finally:
-            if config.use_threads:
-                t.lock.acquire()
-
-        if getTestOpts().expect != 'pass' and \
-                getTestOpts().expect != 'fail' and \
-                getTestOpts().expect != 'missing-lib':
-            framework_fail(name, way, 'bad expected ' + getTestOpts().expect)
-
-        try:
-            passFail = result['passFail']
-        except:
-            passFail = 'No passFail found'
-
-        if passFail == 'pass':
-            if _expect_pass(way):
-                t.n_expected_passes = t.n_expected_passes + 1
-                if name in t.expected_passes:
-                    t.expected_passes[name].append(way)
-                else:
-                    t.expected_passes[name] = [way]
-            else:
-                if_verbose(1, '*** unexpected pass for %s' % full_name)
-                t.n_unexpected_passes = t.n_unexpected_passes + 1
-                addPassingTestInfo(t.unexpected_passes, getTestOpts().testdir, name, way)
-        elif passFail == 'fail':
-            if _expect_pass(way):
-                reason = result['reason']
-                tag = result.get('tag')
-                if tag == 'stat':
-                    if_verbose(1, '*** unexpected stat test failure for %s' % full_name)
-                    t.n_unexpected_stat_failures = t.n_unexpected_stat_failures + 1
-                    addFailingTestInfo(t.unexpected_stat_failures, getTestOpts().testdir, name, reason, way)
-                else:
-                    if_verbose(1, '*** unexpected failure for %s' % full_name)
-                    t.n_unexpected_failures = t.n_unexpected_failures + 1
-                    addFailingTestInfo(t.unexpected_failures, getTestOpts().testdir, name, reason, way)
-            else:
-                if getTestOpts().expect == 'missing-lib':
-                    t.n_missing_libs = t.n_missing_libs + 1
-                    if name in t.missing_libs:
-                        t.missing_libs[name].append(way)
-                    else:
-                        t.missing_libs[name] = [way]
-                else:
-                    t.n_expected_failures = t.n_expected_failures + 1
-                    if name in t.expected_failures:
-                        t.expected_failures[name].append(way)
-                    else:
-                        t.expected_failures[name] = [way]
+                    raise
+        elif os.path.isdir(src):
+            os.makedirs(dst)
+            lndir(src, dst)
         else:
-            framework_fail(name, way, 'bad result ' + passFail)
-    except KeyboardInterrupt:
-        stopNow()
+            if not config.haddock and os.path.splitext(filename)[1] == '.t':
+                # When using a ghc built without haddock support, .t
+                # files are rightfully missing. Don't
+                # framework_fail. Test will be skipped later.
+                pass
+            else:
+                framework_fail(name, way,
+                    'extra_file does not exist: ' + extra_file)
+
+    if not files:
+        # Always create the testdir, even when no files were copied
+        # (because user forgot to specify extra_files setup function), to
+        # prevent the confusing error: can't cd to <testdir>.
+        os.makedirs(opts.testdir)
+
+    if func.__name__ == 'run_command' or opts.pre_cmd:
+        # When running 'MAKE' make sure 'TOP' still points to the
+        # root of the testsuite.
+        src_makefile = in_srcdir('Makefile')
+        dst_makefile = in_testdir('Makefile')
+        if os.path.exists(src_makefile):
+            with open(src_makefile, 'r') as src:
+                makefile = re.sub('TOP=.*', 'TOP=' + config.top, src.read(), 1)
+                with open(dst_makefile, 'w') as dst:
+                    dst.write(makefile)
+
+    if config.use_threads:
+        t.lock.release()
+
+    if opts.pre_cmd:
+        exit_code = runCmd('cd "{0}" && {1}'.format(opts.testdir, opts.pre_cmd))
+        if exit_code != 0:
+            framework_fail(name, way, 'pre_cmd failed: {0}'.format(exit_code))
+
+    try:
+        result = func(*[name,way] + args)
+    finally:
+        if config.use_threads:
+            t.lock.acquire()
+
+    if opts.expect not in ['pass', 'fail', 'missing-lib']:
+        framework_fail(name, way, 'bad expected ' + opts.expect)
+
+    try:
+        passFail = result['passFail']
     except:
-        framework_fail(name, way, 'do_test exception')
-        traceback.print_exc()
+        passFail = 'No passFail found'
+
+    if passFail == 'pass':
+        if _expect_pass(way):
+            t.n_expected_passes = t.n_expected_passes + 1
+            if name in t.expected_passes:
+                t.expected_passes[name].append(way)
+            else:
+                t.expected_passes[name] = [way]
+        else:
+            if_verbose(1, '*** unexpected pass for %s' % full_name)
+            t.n_unexpected_passes = t.n_unexpected_passes + 1
+            addPassingTestInfo(t.unexpected_passes, opts.testdir, name, way)
+    elif passFail == 'fail':
+        if _expect_pass(way):
+            reason = result['reason']
+            tag = result.get('tag')
+            if tag == 'stat':
+                if_verbose(1, '*** unexpected stat test failure for %s' % full_name)
+                t.n_unexpected_stat_failures = t.n_unexpected_stat_failures + 1
+                addFailingTestInfo(t.unexpected_stat_failures, opts.testdir, name, reason, way)
+            else:
+                if_verbose(1, '*** unexpected failure for %s' % full_name)
+                t.n_unexpected_failures = t.n_unexpected_failures + 1
+                addFailingTestInfo(t.unexpected_failures, opts.testdir, name, reason, way)
+        else:
+            if opts.expect == 'missing-lib':
+                t.n_missing_libs = t.n_missing_libs + 1
+                if name in t.missing_libs:
+                    t.missing_libs[name].append(way)
+                else:
+                    t.missing_libs[name] = [way]
+            else:
+                t.n_expected_failures = t.n_expected_failures + 1
+                if name in t.expected_failures:
+                    t.expected_failures[name].append(way)
+                else:
+                    t.expected_failures[name] = [way]
+    else:
+        framework_fail(name, way, 'bad result ' + passFail)
 
 def addPassingTestInfo (testInfos, directory, name, way):
     directory = re.sub('^\\.[/\\\\]', '', directory)
