@@ -619,6 +619,15 @@ def runTest (opts, name, func, args):
 # name  :: String
 # setup :: TestOpts -> IO ()
 def test (name, setup, func, args):
+    global aloneTests
+    global parallelTests
+    global allTestNames
+    global thisdir_settings
+    if name in allTestNames:
+        framework_fail(name, 'duplicate', 'There are multiple tests with this name')
+    if not re.match('^[0-9]*[a-zA-Z][a-zA-Z0-9._-]*$', name):
+        framework_fail(name, 'bad_name', 'This test has an invalid name')
+
     if config.run_only_some_tests:
         if name not in config.only:
             return
@@ -629,15 +638,6 @@ def test (name, setup, func, args):
             # we've already seen (in .T files), so that we can later
             # report on any tests we couldn't find and error out.
             config.only.remove(name)
-
-    global aloneTests
-    global parallelTests
-    global allTestNames
-    global thisdir_settings
-    if name in allTestNames:
-        framework_fail(name, 'duplicate', 'There are multiple tests with this name')
-    if not re.match('^[0-9]*[a-zA-Z][a-zA-Z0-9._-]*$', name):
-        framework_fail(name, 'bad_name', 'This test has an invalid name')
 
     # Make a deep copy of the default_testopts, as we need our own copy
     # of any dictionaries etc inside it. Otherwise, if one test modifies
