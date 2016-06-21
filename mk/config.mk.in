@@ -109,8 +109,6 @@ endif
 # Some platforms don't support shared libraries
 NoSharedLibsPlatformList = \
 	powerpc-ibm-aix \
-	x86_64-unknown-mingw32 \
-	i386-unknown-mingw32
 
 ifeq "$(SOLARIS_BROKEN_SHLD)" "YES"
 NoSharedLibsPlatformList += i386-unknown-solaris2
@@ -127,9 +125,7 @@ PlatformSupportsSharedLibs = $(if $(filter $(TARGETPLATFORM),\
 # Currently this isn't possible on Windows, and we have not yet enabled
 # it on i386 while we consider the performance implications.
 #
-ifeq "$(TargetOS_CPP)" "mingw32"
-DYNAMIC_BY_DEFAULT = NO
-else ifeq "$(TargetArch_CPP)" "i386"
+ifeq "$(TargetArch_CPP)" "i386"
 DYNAMIC_BY_DEFAULT = NO
 else
 DYNAMIC_BY_DEFAULT = YES
@@ -146,11 +142,7 @@ DYNAMIC_TOO = YES
 # Use the dynamic way when building programs in the GHC tree. In
 # particular, this means that GHCi will use DLLs rather than loading
 # object files directly.
-ifeq "$(TargetOS_CPP)" "mingw32"
-# This doesn't work on Windows yet
-DYNAMIC_GHC_PROGRAMS = NO
-DYNAMIC_TOO=NO
-else ifeq "$(PlatformSupportsSharedLibs)" "NO"
+ifeq "$(PlatformSupportsSharedLibs)" "NO"
 DYNAMIC_GHC_PROGRAMS = NO
 else
 DYNAMIC_GHC_PROGRAMS = YES
