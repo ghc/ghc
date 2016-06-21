@@ -40,8 +40,8 @@ import Pair
 import Panic
 import VarSet
 import Control.Monad
-import Data.Map (Map)
-import qualified Data.Map as Map
+import Data.Set (Set)
+import qualified Data.Set as Set
 
 #if __GLASGOW_HASKELL__ < 709
 import Prelude hiding ( and )
@@ -124,28 +124,25 @@ certain that the modules in our `HscTypes.dep_finsts' are consistent.)
 -- whose family instances need to be checked for consistency.
 --
 data ModulePair = ModulePair Module Module
+                  -- Invariant: first Module < second Module
+                  -- use the smart constructor
+  deriving (Ord, Eq)
 
--- canonical order of the components of a module pair
---
-canon :: ModulePair -> (Module, Module)
-canon (ModulePair m1 m2) | m1 < m2   = (m1, m2)
-                         | otherwise = (m2, m1)
-
-instance Eq ModulePair where
-  mp1 == mp2 = canon mp1 == canon mp2
-
-instance Ord ModulePair where
-  mp1 `compare` mp2 = canon mp1 `compare` canon mp2
+-- | Smart constructor that establishes the invariant
+modulePair :: Module -> Module -> ModulePair
+modulePair a b
+  | a < b = ModulePair a b
+  | otherwise = ModulePair b a
 
 instance Outputable ModulePair where
   ppr (ModulePair m1 m2) = angleBrackets (ppr m1 <> comma <+> ppr m2)
 
 -- Sets of module pairs
 --
-type ModulePairSet = Map ModulePair ()
+type ModulePairSet = Set ModulePair
 
 listToSet :: [ModulePair] -> ModulePairSet
-listToSet l = Map.fromList (zip l (repeat ()))
+listToSet l = Set.fromList l
 
 checkFamInstConsistency :: [Module] -> [Module] -> TcM ()
 checkFamInstConsistency famInstMods directlyImpMods
@@ -170,7 +167,8 @@ checkFamInstConsistency famInstMods directlyImpMods
                  -- instances of okPairs are consistent
              ; criticalPairs = listToSet $ allPairs famInstMods
                  -- all pairs that we need to consider
-             ; toCheckPairs  = Map.keys $ criticalPairs `Map.difference` okPairs
+             ; toCheckPairs  =
+                 Set.elems $ criticalPairs `Set.difference` okPairs
                  -- the difference gives us the pairs we need to check now
              }
 
@@ -178,7 +176,7 @@ checkFamInstConsistency famInstMods directlyImpMods
        }
   where
     allPairs []     = []
-    allPairs (m:ms) = map (ModulePair m) ms ++ allPairs ms
+    allPairs (m:ms) = map (modulePair m) ms ++ allPairs ms
 
     check hpt_fam_insts (ModulePair m1 m2)
       = do { env1 <- getFamInsts hpt_fam_insts m1
