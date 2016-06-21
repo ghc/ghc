@@ -5,7 +5,7 @@ import GHC
 import Predicate
 
 optimise :: Context -> Bool
-optimise Context {..} = stage == Stage0 && package `elem` [compiler, ghc]
+optimise Context {..} = package `elem` [compiler, ghc]
                      || stage == Stage1 && isLibrary package
 
 quickFlavourArgs :: Args
