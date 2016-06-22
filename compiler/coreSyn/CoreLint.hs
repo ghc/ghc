@@ -552,7 +552,7 @@ lintRhs :: CoreExpr -> LintM OutType
 -- but produce errors otherwise.
 lintRhs rhs
     | (binders0, rhs') <- collectTyBinders rhs
-    , (fun@(Var b), args) <- collectArgs rhs'
+    , (fun@(Var b), args, _) <- collectArgsTicks (const True) rhs'
     , Just con <- isDataConId_maybe b
     , dataConName con == staticPtrDataConName
     , length args == 5
