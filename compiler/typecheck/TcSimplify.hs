@@ -30,7 +30,7 @@ import PrelNames
 import TcErrors
 import TcEvidence
 import TcInteract
-import TcCanonical   ( makeSuperClasses, mkGivensWithSuperClasses )
+import TcCanonical   ( makeSuperClasses )
 import TcMType   as TcM
 import TcRnMonad as TcM
 import TcSMonad  as TcS
@@ -446,7 +446,7 @@ tcCheckSatisfiability given_ids
        ; let given_loc = mkGivenLoc topTcLevel UnkSkol lcl_env
        ; (res, _ev_binds) <- runTcS $
              do { traceTcS "checkSatisfiability {" (ppr given_ids)
-                ; given_cts <- mkGivensWithSuperClasses given_loc (bagToList given_ids)
+                ; let given_cts = mkGivens given_loc (bagToList given_ids)
                      -- See Note [Superclasses and satisfiability]
                 ; insols <- solveSimpleGivens given_cts
                 ; insols <- try_harder insols
@@ -558,7 +558,7 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
             <- setTcLevel rhs_tclvl $
                runTcSWithEvBinds False (Just ev_binds_var) $
                do { let loc = mkGivenLoc rhs_tclvl UnkSkol tc_lcl_env
-                  ; psig_givens <- mkGivensWithSuperClasses loc psig_theta_vars
+                        psig_givens = mkGivens loc psig_theta_vars
                   ; _ <- solveSimpleGivens psig_givens
                          -- See Note [Add signature contexts as givens]
                   ; solveWanteds wanteds }
@@ -1216,9 +1216,9 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
          -- Solve the nested constraints
        ; ((no_given_eqs, given_insols, residual_wanted), used_tcvs)
              <- nestImplicTcS m_ev_binds (mkVarSet (skols ++ given_ids)) tclvl $
-               do { let loc = mkGivenLoc tclvl info env
-                  ; givens_w_scs <- mkGivensWithSuperClasses loc given_ids
-                  ; given_insols <- solveSimpleGivens givens_w_scs
+               do { let loc    = mkGivenLoc tclvl info env
+                        givens = mkGivens loc given_ids
+                  ; given_insols <- solveSimpleGivens givens
 
                   ; residual_wanted <- solveWanteds wanteds
                         -- solveWanteds, *not* solveWantedsAndDrop, because

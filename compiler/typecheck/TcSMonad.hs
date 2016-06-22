@@ -55,7 +55,7 @@ module TcSMonad (
     getUnsolvedInerts,
     removeInertCts, getPendingScDicts,
     addInertCan, addInertEq, insertFunEq,
-    emitInsoluble, emitWorkNC,
+    emitInsoluble, emitWorkNC, emitWork,
 
     -- The Model
     InertModel, kickOutAfterUnification,
