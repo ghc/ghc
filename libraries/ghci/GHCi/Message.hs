@@ -4,13 +4,15 @@
 
 module GHCi.Message
   ( Message(..), Msg(..)
+  , THMessage(..), THMsg(..)
+  , QResult(..)
   , EvalStatus_(..), EvalStatus, EvalResult(..), EvalOpts(..), EvalExpr(..)
   , SerializableException(..)
   , THResult(..), THResultType(..)
   , ResumeContext(..)
   , QState(..)
-  , getMessage, putMessage
-  , Pipe(..), remoteCall, readPipe, writePipe
+  , getMessage, putMessage, getTHMessage, putTHMessage
+  , Pipe(..), remoteCall, remoteTHCall, readPipe, writePipe
   ) where
 
 import GHCi.RemoteTypes
@@ -162,7 +164,7 @@ data Message a where
   StartTH :: Message (RemoteRef (IORef QState))
 
   -- | Run TH module finalizers, and free the HValueRef
-  FinishTH :: RemoteRef (IORef QState) -> Message ()
+  FinishTH :: RemoteRef (IORef QState) -> Message (QResult ())
 
   -- | Evaluate a TH computation.
   --
@@ -176,38 +178,98 @@ data Message a where
    -> HValueRef {- e.g. TH.Q TH.Exp -}
    -> THResultType
    -> Maybe TH.Loc
-   -> Message ByteString {- e.g. TH.Exp -}
+   -> Message (QResult ByteString)
 
-  -- Template Haskell Quasi monad operations
-  NewName :: String -> Message (THResult TH.Name)
-  Report :: Bool -> String -> Message (THResult ())
-  LookupName :: Bool -> String -> Message (THResult (Maybe TH.Name))
-  Reify :: TH.Name -> Message (THResult TH.Info)
-  ReifyFixity :: TH.Name -> Message (THResult (Maybe TH.Fixity))
-  ReifyInstances :: TH.Name -> [TH.Type] -> Message (THResult [TH.Dec])
-  ReifyRoles :: TH.Name -> Message (THResult [TH.Role])
-  ReifyAnnotations :: TH.AnnLookup -> TypeRep -> Message (THResult [ByteString])
-  ReifyModule :: TH.Module -> Message (THResult TH.ModuleInfo)
-  ReifyConStrictness :: TH.Name -> Message (THResult [TH.DecidedStrictness])
-
-  AddDependentFile :: FilePath -> Message (THResult ())
-  AddTopDecls :: [TH.Dec] -> Message (THResult ())
-  IsExtEnabled :: Extension -> Message (THResult Bool)
-  ExtsEnabled :: Message (THResult [Extension])
-
-  StartRecover :: Message ()
-  EndRecover :: Bool -> Message ()
-
-  -- Template Haskell return values
-
-  -- | RunTH finished successfully; return value follows
-  QDone :: Message ()
-  -- | RunTH threw an exception
-  QException :: String -> Message ()
-  -- | RunTH called 'fail'
-  QFail :: String -> Message ()
 
 deriving instance Show (Message a)
+
+
+-- | Template Haskell return values
+data QResult a
+  = QDone a
+    -- ^ RunTH finished successfully; return value follows
+  | QException String
+    -- ^ RunTH threw an exception
+  | QFail String
+    -- ^ RunTH called 'fail'
+  deriving (Generic, Show)
+
+instance Binary a => Binary (QResult a)
+
+
+-- | Messages sent back to GHC from GHCi.TH, to implement the methods
+-- of 'Quasi'.
+data THMessage a where
+  NewName :: String -> THMessage (THResult TH.Name)
+  Report :: Bool -> String -> THMessage (THResult ())
+  LookupName :: Bool -> String -> THMessage (THResult (Maybe TH.Name))
+  Reify :: TH.Name -> THMessage (THResult TH.Info)
+  ReifyFixity :: TH.Name -> THMessage (THResult (Maybe TH.Fixity))
+  ReifyInstances :: TH.Name -> [TH.Type] -> THMessage (THResult [TH.Dec])
+  ReifyRoles :: TH.Name -> THMessage (THResult [TH.Role])
+  ReifyAnnotations :: TH.AnnLookup -> TypeRep
+    -> THMessage (THResult [ByteString])
+  ReifyModule :: TH.Module -> THMessage (THResult TH.ModuleInfo)
+  ReifyConStrictness :: TH.Name -> THMessage (THResult [TH.DecidedStrictness])
+
+  AddDependentFile :: FilePath -> THMessage (THResult ())
+  AddTopDecls :: [TH.Dec] -> THMessage (THResult ())
+  IsExtEnabled :: Extension -> THMessage (THResult Bool)
+  ExtsEnabled :: THMessage (THResult [Extension])
+
+  StartRecover :: THMessage ()
+  EndRecover :: Bool -> THMessage ()
+
+  -- | Indicates that this RunTH is finished, and the next message
+  -- will be the result of RunTH (a QResult).
+  RunTHDone :: THMessage ()
+
+deriving instance Show (THMessage a)
+
+data THMsg = forall a . (Binary a, Show a) => THMsg (THMessage a)
+
+getTHMessage :: Get THMsg
+getTHMessage = do
+  b <- getWord8
+  case b of
+    0  -> THMsg <$> NewName <$> get
+    1  -> THMsg <$> (Report <$> get <*> get)
+    2  -> THMsg <$> (LookupName <$> get <*> get)
+    3  -> THMsg <$> Reify <$> get
+    4  -> THMsg <$> ReifyFixity <$> get
+    5  -> THMsg <$> (ReifyInstances <$> get <*> get)
+    6  -> THMsg <$> ReifyRoles <$> get
+    7  -> THMsg <$> (ReifyAnnotations <$> get <*> get)
+    8  -> THMsg <$> ReifyModule <$> get
+    9  -> THMsg <$> ReifyConStrictness <$> get
+    10 -> THMsg <$> AddDependentFile <$> get
+    11 -> THMsg <$> AddTopDecls <$> get
+    12 -> THMsg <$> (IsExtEnabled <$> get)
+    13 -> THMsg <$> return ExtsEnabled
+    14 -> THMsg <$> return StartRecover
+    15 -> THMsg <$> EndRecover <$> get
+    _  -> return (THMsg RunTHDone)
+
+putTHMessage :: THMessage a -> Put
+putTHMessage m = case m of
+  NewName a                   -> putWord8 0  >> put a
+  Report a b                  -> putWord8 1  >> put a >> put b
+  LookupName a b              -> putWord8 2  >> put a >> put b
+  Reify a                     -> putWord8 3  >> put a
+  ReifyFixity a               -> putWord8 4  >> put a
+  ReifyInstances a b          -> putWord8 5  >> put a >> put b
+  ReifyRoles a                -> putWord8 6  >> put a
+  ReifyAnnotations a b        -> putWord8 7  >> put a >> put b
+  ReifyModule a               -> putWord8 8  >> put a
+  ReifyConStrictness a        -> putWord8 9  >> put a
+  AddDependentFile a          -> putWord8 10 >> put a
+  AddTopDecls a               -> putWord8 11 >> put a
+  IsExtEnabled a              -> putWord8 12 >> put a
+  ExtsEnabled                 -> putWord8 13
+  StartRecover                -> putWord8 14
+  EndRecover a                -> putWord8 15 >> put a
+  RunTHDone                   -> putWord8 16
+
 
 data EvalOpts = EvalOpts
   { useSandboxThread :: Bool
@@ -341,26 +403,7 @@ getMessage = do
       30 -> Msg <$> (GetBreakpointVar <$> get <*> get)
       31 -> Msg <$> return StartTH
       32 -> Msg <$> FinishTH <$> get
-      33 -> Msg <$> (RunTH <$> get <*> get <*> get <*> get)
-      34 -> Msg <$> NewName <$> get
-      35 -> Msg <$> (Report <$> get <*> get)
-      36 -> Msg <$> (LookupName <$> get <*> get)
-      37 -> Msg <$> Reify <$> get
-      38 -> Msg <$> ReifyFixity <$> get
-      39 -> Msg <$> (ReifyInstances <$> get <*> get)
-      40 -> Msg <$> ReifyRoles <$> get
-      41 -> Msg <$> (ReifyAnnotations <$> get <*> get)
-      42 -> Msg <$> ReifyModule <$> get
-      43 -> Msg <$> ReifyConStrictness <$> get
-      44 -> Msg <$> AddDependentFile <$> get
-      45 -> Msg <$> AddTopDecls <$> get
-      46 -> Msg <$> (IsExtEnabled <$> get)
-      47 -> Msg <$> return ExtsEnabled
-      48 -> Msg <$> return StartRecover
-      49 -> Msg <$> EndRecover <$> get
-      50 -> Msg <$> return QDone
-      51 -> Msg <$> QException <$> get
-      _  -> Msg <$> QFail <$> get
+      _  -> Msg <$> (RunTH <$> get <*> get <*> get <*> get)
 
 putMessage :: Message a -> Put
 putMessage m = case m of
@@ -398,25 +441,6 @@ putMessage m = case m of
   StartTH                     -> putWord8 31
   FinishTH val                -> putWord8 32 >> put val
   RunTH st q loc ty           -> putWord8 33 >> put st >> put q >> put loc >> put ty
-  NewName a                   -> putWord8 34 >> put a
-  Report a b                  -> putWord8 35 >> put a >> put b
-  LookupName a b              -> putWord8 36 >> put a >> put b
-  Reify a                     -> putWord8 37 >> put a
-  ReifyFixity a               -> putWord8 38 >> put a
-  ReifyInstances a b          -> putWord8 39 >> put a >> put b
-  ReifyRoles a                -> putWord8 40 >> put a
-  ReifyAnnotations a b        -> putWord8 41 >> put a >> put b
-  ReifyModule a               -> putWord8 42 >> put a
-  ReifyConStrictness a        -> putWord8 43 >> put a
-  AddDependentFile a          -> putWord8 44 >> put a
-  AddTopDecls a               -> putWord8 45 >> put a
-  IsExtEnabled a              -> putWord8 46 >> put a
-  ExtsEnabled                 -> putWord8 47
-  StartRecover                -> putWord8 48
-  EndRecover a                -> putWord8 49 >> put a
-  QDone                       -> putWord8 50
-  QException a                -> putWord8 51 >> put a
-  QFail a                     -> putWord8 52  >> put a
 
 -- -----------------------------------------------------------------------------
 -- Reading/writing messages
@@ -430,6 +454,11 @@ data Pipe = Pipe
 remoteCall :: Binary a => Pipe -> Message a -> IO a
 remoteCall pipe msg = do
   writePipe pipe (putMessage msg)
+  readPipe pipe get
+
+remoteTHCall :: Binary a => Pipe -> THMessage a -> IO a
+remoteTHCall pipe msg = do
+  writePipe pipe (putTHMessage msg)
   readPipe pipe get
 
 writePipe :: Pipe -> Put -> IO ()

@@ -75,9 +75,9 @@ putState s = GHCiQ $ \_ -> return ((),s)
 noLoc :: TH.Loc
 noLoc = TH.Loc "<no file>" "<no package>" "<no module>" (0,0) (0,0)
 
-ghcCmd :: Binary a => Message (THResult a) -> GHCiQ a
+ghcCmd :: Binary a => THMessage (THResult a) -> GHCiQ a
 ghcCmd m = GHCiQ $ \s -> do
-  r <- remoteCall (qsPipe s) m
+  r <- remoteTHCall (qsPipe s) m
   case r of
     THException str -> throwIO (GHCiQException s str)
     THComplete res -> return (res, s)
@@ -88,12 +88,12 @@ instance TH.Quasi GHCiQ where
 
   -- See Note [TH recover with -fexternal-interpreter] in TcSplice
   qRecover (GHCiQ h) (GHCiQ a) = GHCiQ $ \s -> (do
-    remoteCall (qsPipe s) StartRecover
+    remoteTHCall (qsPipe s) StartRecover
     (r, s') <- a s
-    remoteCall (qsPipe s) (EndRecover False)
+    remoteTHCall (qsPipe s) (EndRecover False)
     return (r,s'))
       `catch`
-       \GHCiQException{} -> remoteCall (qsPipe s) (EndRecover True) >> h s
+       \GHCiQException{} -> remoteTHCall (qsPipe s) (EndRecover True) >> h s
   qLookupName isType occ = ghcCmd (LookupName isType occ)
   qReify name = ghcCmd (Reify name)
   qReifyFixity name = ghcCmd (ReifyFixity name)

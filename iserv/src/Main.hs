@@ -58,21 +58,17 @@ serv verbose pipe@Pipe{..} restore = loop
   wrapRunTH :: forall a. (Binary a, Show a) => IO a -> IO ()
   wrapRunTH io = do
     r <- try io
+    writePipe pipe (putTHMessage RunTHDone)
     case r of
       Left e
         | Just (GHCiQException _ err) <- fromException e  -> do
-           when verbose $ putStrLn "iserv: QFail"
-           writePipe pipe (putMessage (QFail err))
-           loop
+           reply (QFail err :: QResult a)
         | otherwise -> do
-           when verbose $ putStrLn "iserv: QException"
            str <- showException e
-           writePipe pipe (putMessage (QException str))
-           loop
+           reply (QException str :: QResult a)
       Right a -> do
         when verbose $ putStrLn "iserv: QDone"
-        writePipe pipe (putMessage QDone)
-        reply a
+        reply (QDone a)
 
   -- carefully when showing an exception, there might be other exceptions
   -- lurking inside it.  If so, we return the inner exception instead.
