@@ -8,7 +8,9 @@ def f(name, opts):
     opts.extra_hc_opts = '-XTemplateHaskell -package template-haskell'
 setTestOpts(f)
 setTestOpts(req_interp)
-setTestOpts(only_ways(['normal','ghci']))
+# TH should work with -fexternal-interpreter too
+setTestOpts(extra_ways(['ext-interp']))
+setTestOpts(only_ways(['normal','ghci','ext-interp']))
 
 test('TH_mkName', normal, compile, ['-v0'])
 test('TH_1tuple', normal, compile_fail, ['-v0'])
@@ -129,7 +131,7 @@ test('TH_scopedTvs', normal, compile, ['-v0'])
 
 test('TH_runIO', normal, compile_fail, ['-v0'])
 
-test('TH_ghci1', normal, ghci_script, ['TH_ghci1.script'])
+test('TH_ghci1', only_ways(['ghci']), ghci_script, ['TH_ghci1.script'])
 
 test('TH_linePragma', normal, compile_fail, ['-v0'])
 
@@ -259,7 +261,8 @@ test('T7064',
 test('T7092', extra_clean(['T7092a.hi','T7092a.o']),
               multimod_compile, ['T7092', '-v0 ' + config.ghc_th_way_flags])
 test('T7276', normal, compile_fail, ['-v0'])
-test('T7276a', combined_output, ghci_script, ['T7276a.script'])
+test('T7276a', [ only_ways(['ghci']), combined_output ],
+               ghci_script, ['T7276a.script'])
 
 test('TH_TyInstWhere1', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('TH_TyInstWhere2', normal, compile, ['-v0'])
@@ -272,7 +275,7 @@ test('T7532',
      multimod_compile,
      ['T7532', '-v0 ' + config.ghc_th_way_flags])
 test('T2222', normal, compile, ['-v0'])
-test('T1849', normal, ghci_script, ['T1849.script'])
+test('T1849', only_ways(['ghci']), ghci_script, ['T1849.script'])
 test('T7681', normal, compile, ['-v0'])
 test('T7910', normal, compile_and_run, ['-v0'])
 
@@ -317,7 +320,7 @@ test('T8577',
      extra_clean(['T8577a.hi', 'T8577a.o']),
      multimod_compile_fail,
      ['T8577', '-v0 ' + config.ghc_th_way_flags])
-test('T8625', normal, ghci_script, ['T8625.script'])
+test('T8625', only_ways(['ghci']), ghci_script, ['T8625.script'])
 test('TH_StaticPointers', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
      compile_and_run, [''])
 test('TH_StaticPointers02', [], compile_fail, [''])
@@ -348,8 +351,8 @@ test('T1476b', normal, compile, ['-v0'])
 test('T8031', normal, compile, ['-v0'])
 test('T8624', normal, run_command, ['$MAKE -s --no-print-directory T8624'])
 test('TH_Lift', normal, compile, ['-v0'])
-test('T10047', normal, ghci_script, ['T10047.script'])
-test('T10019', normal, ghci_script, ['T10019.script'])
+test('T10047', only_ways(['ghci']), ghci_script, ['T10047.script'])
+test('T10019', only_ways(['ghci']), ghci_script, ['T10019.script'])
 test('T10267', extra_clean(['T10267a.hi', 'T10267a.o']),
                multimod_compile_fail,
                ['T10267', '-dsuppress-uniques -v0 ' + config.ghc_th_way_flags])
