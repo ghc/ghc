@@ -782,10 +782,9 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
        ; let dfun_ev_binds = TcEvBinds dfun_ev_binds_var
        ; ((sc_meth_ids, sc_meth_binds, sc_meth_implics), tclvl)
              <- pushTcLevelM $
-                do { fam_envs <- tcGetFamInstEnvs
-                   ; (sc_ids, sc_binds, sc_implics)
+                do { (sc_ids, sc_binds, sc_implics)
                         <- tcSuperClasses dfun_id clas inst_tyvars dfun_ev_vars
-                                          inst_tys dfun_ev_binds fam_envs
+                                          inst_tys dfun_ev_binds
                                           sc_theta'
 
                       -- Typecheck the methods
@@ -958,7 +957,7 @@ Notice that
 -}
 
 tcSuperClasses :: DFunId -> Class -> [TcTyVar] -> [EvVar] -> [TcType]
-               -> TcEvBinds -> FamInstEnvs
+               -> TcEvBinds
                -> TcThetaType
                -> TcM ([EvVar], LHsBinds Id, Bag Implication)
 -- Make a new top-level function binding for each superclass,
@@ -969,7 +968,7 @@ tcSuperClasses :: DFunId -> Class -> [TcTyVar] -> [EvVar] -> [TcType]
 -- See Note [Recursive superclasses] for why this is so hard!
 -- In effect, be build a special-purpose solver for the first step
 -- of solving each superclass constraint
-tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds _fam_envs sc_theta
+tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds sc_theta
   = do { (ids, binds, implics) <- mapAndUnzip3M tc_super (zip sc_theta [fIRST_TAG..])
        ; return (ids, listToBag binds, listToBag implics) }
   where
