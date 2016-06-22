@@ -1053,6 +1053,7 @@ handleTHMessage msg = case msg of
   ReifyAnnotations lookup tyrep ->
     wrapTHResult $ (map B.pack <$> getAnnotationsByTypeRep lookup tyrep)
   ReifyModule m -> wrapTHResult $ TH.qReifyModule m
+  ReifyConStrictness nm -> wrapTHResult $ TH.qReifyConStrictness nm
   AddDependentFile f -> wrapTHResult $ TH.qAddDependentFile f
   AddTopDecls decs -> wrapTHResult $ TH.qAddTopDecls decs
   IsExtEnabled ext -> wrapTHResult $ TH.qIsExtEnabled ext
