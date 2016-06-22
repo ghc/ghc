@@ -1,0 +1,6 @@
+
+T12163.hs:8:16: error:
+    • Can't make a derived instance of ‘Functor (T a)’:
+        Constructor ‘Mk’ is a GADT
+        Possible fix: use a standalone deriving declaration instead
+    • In the data declaration for ‘T’

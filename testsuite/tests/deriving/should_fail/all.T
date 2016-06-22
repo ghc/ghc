@@ -58,4 +58,4 @@ test('T9687', normal, compile_fail, [''])
 
 test('T8984', normal, compile_fail, [''])
 test('T9968a', normal, compile_fail, [''])
-
+test('T12163', normal, compile_fail, [''])
