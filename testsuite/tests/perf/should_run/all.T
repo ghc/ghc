@@ -276,9 +276,10 @@ test('T7257',
                       [(wordsize(32), 989850664, 10),
                         # expected value: 1246287228 (i386/Linux)
                         # 2016-04-06: 989850664 (i386/Linux) no idea what happened
-                       (wordsize(64), 1654893248, 5)]),
+                       (wordsize(64), 1414893248, 5)]),
                         # 2012-09-21: 1774893760 (amd64/Linux)
                         # 2015-11-03: 1654893248 (amd64/Linux)
+                        # 2016-06-22: 1414893248 (amd64/Linux, sizeExpr fix)
       stats_num_field('peak_megabytes_allocated',
                       [(wordsize(32), 217, 5),
                         # 2012-10-08: 217 (x86/Linux)
