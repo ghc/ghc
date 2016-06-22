@@ -1415,12 +1415,19 @@ cond_stdOK Nothing permissive (_, rep_tc)
 
     check_con :: DataCon -> Validity
     check_con con
-      | not (isVanillaDataCon con)
-      = NotValid (badCon con (text "has existentials or constraints in its type"))
+      | not (null eq_spec)
+      = bad "is a GADT"
+      | not (null ex_tvs)
+      = bad "has existential type variables in its type"
+      | not (null theta)
+      = bad "has constraints in its type"
       | not (permissive || all isTauTy (dataConOrigArgTys con))
-      = NotValid (badCon con (text "has a higher-rank type"))
+      = bad "has a higher-rank type"
       | otherwise
       = IsValid
+      where
+        (_, ex_tvs, eq_spec, theta, _, _) = dataConFullSig con
+        bad msg = NotValid (badCon con (text msg))
 
 no_cons_why :: TyCon -> SDoc
 no_cons_why rep_tc = quotes (pprSourceTyCon rep_tc) <+>
