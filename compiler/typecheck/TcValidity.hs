@@ -888,7 +888,6 @@ check_class_pred env dflags ctxt pred cls tys
 A type signature like
    f :: Eq [(a,b)] => a -> b
 is very fragile, for reasons described at length in TcInteract
-
 Note [Instance and Given overlap].  So this warning discourages uses
 from writing simplifiable class constraints, at least unless the
 top-level instance is explicitly declared as OVERLAPPABLE.
