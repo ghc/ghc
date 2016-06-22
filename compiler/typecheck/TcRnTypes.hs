@@ -73,7 +73,7 @@ module TcRnTypes(
         isUserTypeErrorCt, getUserTypeErrorMsg,
         ctEvidence, ctLoc, setCtLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
         mkTcEqPredLikeEv,
-        mkNonCanonical, mkNonCanonicalCt,
+        mkNonCanonical, mkNonCanonicalCt, mkGivens,
         ctEvPred, ctEvLoc, ctEvOrigin, ctEvEqRel,
         ctEvTerm, ctEvCoercion, ctEvId,
         tyCoVarsOfCt, tyCoVarsOfCts,
@@ -1506,6 +1506,14 @@ mkNonCanonical ev = CNonCanonical { cc_ev = ev }
 
 mkNonCanonicalCt :: Ct -> Ct
 mkNonCanonicalCt ct = CNonCanonical { cc_ev = cc_ev ct }
+
+mkGivens :: CtLoc -> [EvId] -> [Ct]
+mkGivens loc ev_ids
+  = map mk ev_ids
+  where
+    mk ev_id = mkNonCanonical (CtGiven { ctev_evar = ev_id
+                                       , ctev_pred = evVarPred ev_id
+                                       , ctev_loc = loc })
 
 ctEvidence :: Ct -> CtEvidence
 ctEvidence = cc_ev

@@ -3,7 +3,7 @@
 module TcCanonical(
      canonicalize,
      unifyDerived,
-     makeSuperClasses, mkGivensWithSuperClasses,
+     makeSuperClasses,
      StopOrContinue(..), stopWith, continueWith
   ) where
 
@@ -191,12 +191,23 @@ canEvNC ev
 -}
 
 canClassNC :: CtEvidence -> Class -> [Type] -> TcS (StopOrContinue Ct)
+-- "NC" means "non-canonical"; that is, we have got here
+-- from a NonCanonical constrataint, not from a CDictCan
 -- Precondition: EvVar is class evidence
-canClassNC ev cls tys = canClass ev cls tys (has_scs cls)
+canClassNC ev cls tys
+  | isGiven ev  -- See Note [Eagerly expand given superclasses]
+  = do { sc_cts <- mkStrictSuperClasses ev cls tys
+       ; emitWork sc_cts
+       ; canClass ev cls tys False }
+  | otherwise
+  = canClass ev cls tys (has_scs cls)
   where
     has_scs cls = not (null (classSCTheta cls))
 
-canClass :: CtEvidence -> Class -> [Type] -> Bool -> TcS (StopOrContinue Ct)
+canClass :: CtEvidence
+         -> Class -> [Type]
+         -> Bool            -- True <=> un-explored superclasses
+         -> TcS (StopOrContinue Ct)
 -- Precondition: EvVar is class evidence
 
 canClass ev cls tys pend_sc
@@ -255,15 +266,24 @@ Givens and Wanteds. But:
 
 So here's the plan:
 
-1. Generate superclasses for given (but not wanted) constraints;
-   see Note [Aggressively expand given superclasses].  However
-   stop if you encounter the same class twice.  That is, expand
-   eagerly, but have a conservative termination condition: see
+1. Eagerly generate superclasses for given (but not wanted)
+   constraints; see Note [Eagerly expand given superclasses].
+   This is done in canClassNC, when we take a non-canonical constraint
+   and cannonicalise it.
+
+   However stop if you encounter the same class twice.  That is,
+   expand eagerly, but have a conservative termination condition: see
    Note [Expanding superclasses] in TcType.
 
-2. Solve the wanteds as usual, but do /no/ expansion of superclasses
-   in solveSimpleGivens or solveSimpleWanteds.
-   See Note [Danger of adding superclasses during solving]
+2. Solve the wanteds as usual, but do no further expansion of
+   superclasses for canonical CDictCans in solveSimpleGivens or
+   solveSimpleWanteds; Note [Danger of adding superclasses during solving]
+
+   However, /do/ continue to eagerly expand superlasses for /given/
+   non-canonical constraints (canClassNC does this).  As Trac #12175
+   showed, a type-family application can expand to a class constraint,
+   and we want to see its superclasses for just the same reason as
+   Note [Eagerly expand given superclasses].
 
 3. If we have any remaining unsolved wanteds
         (see Note [When superclasses help] in TcRnTypes)
@@ -284,11 +304,11 @@ isPendingScDict holds).
 When we take a CNonCanonical or CIrredCan, but end up classifying it
 as a CDictCan, we set the cc_pend_sc flag to False.
 
-Note [Aggressively expand given superclasses]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In step (1) of Note [The superclass story], why do we aggressively
-expand Given superclasses by one layer?  Mainly because of some very
-obscure cases like this:
+Note [Eagerly expand given superclasses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In step (1) of Note [The superclass story], why do we eagerly expand
+Given superclasses by one layer?  Mainly because of some very obscure
+cases like this:
 
    instance Bad a => Eq (T a)
 
@@ -299,6 +319,19 @@ Here if we can't satisfy (Eq (T a)) from the givens we'll use the
 instance declaration; but then we are stuck with (Bad a).  Sigh.
 This is really a case of non-confluent proofs, but to stop our users
 complaining we expand one layer in advance.
+
+Note [Instance and Given overlap] in TcInteract.
+
+We also want to do this if we have
+
+   f :: F (T a) => blah
+
+where
+   type instance F (T a) = Ord (T a)
+
+So we may need to do a little work on the givens to expose the
+class that has the superclasses.  That's why the superclass
+expansion for Givens happens in canClassNC.
 
 Note [Why adding superclasses can help]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -367,23 +400,6 @@ Mind you, now that Wanteds cannot rewrite Derived, I think this particular
 situation can't happen.
   -}
 
-mkGivensWithSuperClasses :: CtLoc -> [EvId] -> TcS [Ct]
--- From a given EvId, make its Ct, plus the Ct's of its superclasses
--- See Note [The superclass story]
--- The loop-breaking here follows Note [Expanding superclasses] in TcType
---
--- Example:  class D a => C a
---           class C [a] => D a
--- makeGivensWithSuperClasses (C x) will return (C x, D x, C[x])
---   i.e. up to and including the first repetition of C
-mkGivensWithSuperClasses loc ev_ids = concatMapM go ev_ids
-  where
-    go ev_id = mk_superclasses emptyNameSet this_ev
-       where
-         this_ev = CtGiven { ctev_evar = ev_id
-                           , ctev_pred = evVarPred ev_id
-                           , ctev_loc = loc }
-
 makeSuperClasses :: [Ct] -> TcS [Ct]
 -- Returns strict superclasses, transitively, see Note [The superclasses story]
 -- See Note [The superclass story]
@@ -401,8 +417,13 @@ makeSuperClasses :: [Ct] -> TcS [Ct]
 makeSuperClasses cts = concatMapM go cts
   where
     go (CDictCan { cc_ev = ev, cc_class = cls, cc_tyargs = tys })
-          = mk_strict_superclasses (unitNameSet (className cls)) ev cls tys
+          = mkStrictSuperClasses ev cls tys
     go ct = pprPanic "makeSuperClasses" (ppr ct)
+
+mkStrictSuperClasses :: CtEvidence -> Class -> [Type] -> TcS [Ct]
+-- Return constraints for the strict superclasses of (c tys)
+mkStrictSuperClasses ev cls tys
+  = mk_strict_superclasses (unitNameSet (className cls)) ev cls tys
 
 mk_superclasses :: NameSet -> CtEvidence -> TcS [Ct]
 -- Return this constraint, plus its superclasses, if any
