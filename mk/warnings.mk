@@ -21,13 +21,14 @@ ifeq "$(GccLT46)" "NO"
 ifneq "$(HostOS_CPP)" "mingw32"
 SRC_CC_WARNING_OPTS += -Werror=unused-but-set-variable
 endif
-# gcc 4.6 gives 3 warning for giveCapabilityToTask not being inlined
-SRC_CC_WARNING_OPTS += -Wno-error=inline
 endif
 
 ifeq "$(GccLT44)" "NO"
 # Suppress the warning about __sync_fetch_and_nand (#9678).
 libraries/ghc-prim/cbits/atomic_CC_OPTS += -Wno-sync-nand
+# gcc 4.6 gives 3 warnings for giveCapabilityToTask not being inlined
+# gcc 4.4 gives 2 warnings for lockClosure not being inlined
+SRC_CC_WARNING_OPTS += -Wno-error=inline
 endif
 
 else
