@@ -31,7 +31,7 @@ module TcRnMonad(
   newArrowScope, escapeArrowScope,
 
   -- * Unique supply
-  newUnique, newUniqueSupply, newName,
+  newUnique, newUniqueSupply, newName, newNameAt, cloneLocalName,
   newSysName, newSysLocalId, newSysLocalIds,
 
   -- * Accessing input/output
