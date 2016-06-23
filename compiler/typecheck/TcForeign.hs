@@ -189,7 +189,7 @@ normaliseFfiType' env ty0 = go initRecTc ty0
 checkNewtypeFFI :: GlobalRdrEnv -> TyCon -> Maybe GlobalRdrElt
 checkNewtypeFFI rdr_env tc
   | Just con <- tyConSingleDataCon_maybe tc
-  , [gre] <- lookupGRE_Name rdr_env (dataConName con)
+  , Just gre <- lookupGRE_Name rdr_env (dataConName con)
   = Just gre    -- See Note [Newtype constructor usage in foreign declarations]
   | otherwise
   = Nothing

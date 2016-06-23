@@ -637,12 +637,13 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
     -- (that is, the parent of the data constructor),
     -- or 'Nothing' if it is a pattern synonym or not in scope.
     -- That's the parent to use for looking up record fields.
-    find_tycon env con
-      | Just (AConLike (RealDataCon dc)) <- wiredInNameTyThing_maybe con
+    find_tycon env con_name
+      | Just (AConLike (RealDataCon dc)) <- wiredInNameTyThing_maybe con_name
       = Just (tyConName (dataConTyCon dc))
         -- Special case for [], which is built-in syntax
         -- and not in the GlobalRdrEnv (Trac #8448)
-      | [gre] <- lookupGRE_Name env con
+
+      | Just gre <- lookupGRE_Name env con_name
       = case gre_par gre of
           ParentIs p -> Just p
           _          -> Nothing

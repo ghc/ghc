@@ -734,10 +734,14 @@ lookupGRE_RdrName rdr_name env
     Nothing   -> []
     Just gres -> pickGREs rdr_name gres
 
-lookupGRE_Name :: GlobalRdrEnv -> Name -> [GlobalRdrElt]
+lookupGRE_Name :: GlobalRdrEnv -> Name -> Maybe GlobalRdrElt
 lookupGRE_Name env name
-  = [ gre | gre <- lookupGlobalRdrEnv env (nameOccName name),
-            gre_name gre == name ]
+  = case [ gre | gre <- lookupGlobalRdrEnv env (nameOccName name)
+               , gre_name gre == name ] of
+      []    -> Nothing
+      [gre] -> Just gre
+      gres  -> pprPanic "lookupGRE_Name" (ppr name $$ ppr gres)
+               -- See INVARIANT 1 on GlobalRdrEnv
 
 lookupGRE_Field_Name :: GlobalRdrEnv -> Name -> FastString -> [GlobalRdrElt]
 -- Used when looking up record fields, where the selector name and
@@ -751,8 +755,10 @@ getGRE_NameQualifier_maybes :: GlobalRdrEnv -> Name -> [Maybe [ModuleName]]
 -- Returns all the qualifiers by which 'x' is in scope
 -- Nothing means "the unqualified version is in scope"
 -- [] means the thing is not in scope at all
-getGRE_NameQualifier_maybes env
-  = map (qualifier_maybe) . lookupGRE_Name env
+getGRE_NameQualifier_maybes env name
+  = case lookupGRE_Name env name of
+      Just gre -> [qualifier_maybe gre]
+      Nothing  -> []
   where
     qualifier_maybe (GRE { gre_lcl = lcl, gre_imp = iss })
       | lcl       = Nothing

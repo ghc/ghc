@@ -1244,7 +1244,7 @@ mkCoercibleExplanation rdr_env fam_envs ty1 ty2
         | isNewTyCon tc
         , [data_con] <- tyConDataCons tc
         , let dc_name = dataConName data_con
-        , null (lookupGRE_Name rdr_env dc_name)
+        , isNothing (lookupGRE_Name rdr_env dc_name)
         = Just $ hang (text "The data constructor" <+> quotes (ppr dc_name))
                     2 (sep [ text "of newtype" <+> quotes (pprSourceTyCon tc)
                            , text "is not in scope" ])

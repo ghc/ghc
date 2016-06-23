@@ -1973,8 +1973,8 @@ exportClashErr global_env name1 name2 ie1 ie2
     -- get_gre finds a GRE for the Name, so that we can show its provenance
     get_gre name
         = case lookupGRE_Name global_env name of
-             (gre:_) -> gre
-             []      -> pprPanic "exportClashErr" (ppr name)
+             Just gre -> gre
+             Nothing  -> pprPanic "exportClashErr" (ppr name)
     get_loc name = greSrcSpan (get_gre name)
     (name1', ie1', name2', ie2') = if get_loc name1 < get_loc name2
                                    then (name1, ie1, name2, ie2)

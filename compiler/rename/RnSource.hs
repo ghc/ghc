@@ -1358,11 +1358,11 @@ toParents rdr_env ns
 getParent :: GlobalRdrEnv -> Name -> Name
 getParent rdr_env n
   = case lookupGRE_Name rdr_env n of
-      gre : _ -> case gre_par gre of
-                   ParentIs  { par_is = p } -> p
-                   FldParent { par_is = p } -> p
-                   _                        -> n
-      _ -> n
+      Just gre -> case gre_par gre of
+                    ParentIs  { par_is = p } -> p
+                    FldParent { par_is = p } -> p
+                    _                        -> n
+      Nothing -> n
 
 
 {- Note [Extra dependencies from .hs-boot files]

@@ -901,7 +901,7 @@ mkEqnHelp overlap_mode tvs cls cls_tys tycon tc_args mtheta
              hidden_data_cons = not (isWiredInName (tyConName rep_tc)) &&
                                 (isAbstractTyCon rep_tc ||
                                  any not_in_scope data_con_names)
-             not_in_scope dc  = null (lookupGRE_Name rdr_env dc)
+             not_in_scope dc  = isNothing (lookupGRE_Name rdr_env dc)
 
        ; addUsedDataCons rdr_env rep_tc
        ; unless (isNothing mtheta || not hidden_data_cons)

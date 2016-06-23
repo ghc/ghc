@@ -1018,7 +1018,7 @@ addUsedDataCons :: GlobalRdrEnv -> TyCon -> RnM ()
 addUsedDataCons rdr_env tycon
   = addUsedGREs [ gre
                 | dc <- tyConDataCons tycon
-                , gre : _ <- [lookupGRE_Name rdr_env (dataConName dc) ] ]
+                , Just gre <- [lookupGRE_Name rdr_env (dataConName dc)] ]
 
 addUsedGRE :: Bool -> GlobalRdrElt -> RnM ()
 -- Called for both local and imported things

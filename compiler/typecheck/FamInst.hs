@@ -322,7 +322,7 @@ tcTopNormaliseNewTypeTF_maybe faminsts rdr_env ty
         (not (isAbstractTyCon tc) && all in_scope data_con_names)
       where
         data_con_names = map dataConName (tyConDataCons tc)
-        in_scope dc    = not $ null $ lookupGRE_Name rdr_env dc
+        in_scope dc    = isJust (lookupGRE_Name rdr_env dc)
 
 {-
 ************************************************************************
