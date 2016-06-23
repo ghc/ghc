@@ -863,6 +863,8 @@ check_class_pred env dflags ctxt pred cls tys
 
     -- See Note [Simplifiable given constraints]
     check_simplifiable_class_constraint
+       | xopt LangExt.MonoLocalBinds dflags
+       = return ()
        | DataTyCtxt {} <- ctxt   -- Don't do this check for the "stupid theta"
        = return ()               -- of a data type declaration
        | otherwise
@@ -879,8 +881,8 @@ check_class_pred env dflags ctxt pred cls tys
      = vcat [ hang (text "The constraint" <+> quotes (ppr (tidyType env pred)))
                  2 (text "matches an instance declaration")
             , ppr match
-            , hang (text "This makes type inference very fragile;")
-                 2 (text "try simplifying it using the instance") ]
+            , hang (text "This makes type inference for inner bindings fragile;")
+                 2 (text "either use MonoLocalBinds, or simplify it using the instance") ]
     simplifiable_constraint_warn [] = pprPanic "check_class_pred" (ppr pred)
 
 {- Note [Simplifiable given constraints]
@@ -888,10 +890,16 @@ check_class_pred env dflags ctxt pred cls tys
 A type signature like
    f :: Eq [(a,b)] => a -> b
 is very fragile, for reasons described at length in TcInteract
-Note [Instance and Given overlap].  So this warning discourages uses
-from writing simplifiable class constraints, at least unless the
-top-level instance is explicitly declared as OVERLAPPABLE.
-Trac #11948 provoked me to do this.
+Note [Instance and Given overlap].  As that Note discusses, for the
+most part the clever stuff in TcInteract means that we don't use a
+top-level instance if a local Given might fire, so there is no
+fragility. But if we /infer/ the type of a local let-binding, things
+can go wrong (Trac #11948 is an example, discussed in the Note).
+
+So this warning is switched on only if we have NoMonoLocalBinds; in
+that case the warning discourages uses from writing simplifiable class
+constraints, at least unless the top-level instance is explicitly
+declared as OVERLAPPABLE.
 -}
 
 -------------------------
