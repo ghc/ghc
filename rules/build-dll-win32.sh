@@ -34,12 +34,17 @@ process_dll_link() {
         0)
             echo DLL $6 OK, no need to split
             defFile="$base.def"
+            elst="$base.elst"
             # Create a def file hiding symbols not in original object files
             # because --export-all is re-exporting things from static libs
             awk -v root="$defFile" '{def=root;}{print "    \"" $0 "\""> def}' $exports
             sed -i "1i\LIBRARY \"${6##*/}\"\\nEXPORTS" $defFile
+            # Note: This the aliasing is a hack for #8696 which unconditionally
+            #       says that all symbols from other modules, even in the same
+            #       package should be addressed by their SymbolPtr.
+            awk -v root="$elst" '{def=root;}{print "__imp_\"" $0 "\""> def}' $exports
             
-            cmd="$7 $5 $defFile -optl-Wl,--retain-symbols-file=$exports -o $6"
+            cmd="$7 $defFile $5 -optl-Wl,--retain-symbols-file=$elst -o $6"
             echo "$cmd"
             eval "$cmd" || exit 1
             exit 0
@@ -97,12 +102,15 @@ process_dll_link() {
     do
         file="$base-pt$i.def"
         lstfile="$base-pt$i.lst"
+        elstfile="$base-pt$i.elst"
         awk -v root="$file" '{def=root;}{print "    \"" $0 "\""> def}' $lstfile
+        sed -i "1i\LIBRARY \"$DLLfile\"\\nEXPORTS" $file
+        # Apply the same aliasing hack for #8696 here
+        awk -v root="$elstfile" '{def=root;}{print "__imp_\"" $0 "\""> def}' $lstfile
         echo "Processing $file..."
         basefile="$(basename $file)"
         DLLfile="${basefile%.*}.$ext"
         DLLimport="${file%.*}.dll.a"
-        sed -i "1i\LIBRARY \"$DLLfile\"\\nEXPORTS" $file
         dlltool -d $file -l $DLLimport
     done
 
@@ -110,7 +118,7 @@ process_dll_link() {
     do
         def="$base-pt$i.def"
         objfile="$base-pt$i.objs"
-        lstfile="$base-pt$i.lst"
+        elstfile="$base-pt$i.elst"
         objs=`cat "$objfile" | tr "\n" " "`
         basefile="$(basename $def)"
         DLLfile="${basefile%.*}.$ext"
@@ -122,7 +130,7 @@ process_dll_link() {
                 imports=`echo "$imports" "$base-pt$j.dll.a"`
             fi
         done
-        cmd="$7 $objs $def $imports -optl-Wl,--retain-symbols-file=$lstfile -o $2/$DLLfile"
+        cmd="$7 $objs $def $imports -optl-Wl,--retain-symbols-file=$elstfile -o $2/$DLLfile"
         echo "$cmd"
         eval "$cmd" || exit 1
     done
