@@ -2140,13 +2140,6 @@ instance Eq TyCon where
     a == b = getUnique a == getUnique b
     a /= b = getUnique a /= getUnique b
 
-instance Ord TyCon where
-    a <= b = case (a `compare` b) of { LT -> True;  EQ -> True;  GT -> False }
-    a <  b = case (a `compare` b) of { LT -> True;  EQ -> False; GT -> False }
-    a >= b = case (a `compare` b) of { LT -> False; EQ -> True;  GT -> True  }
-    a >  b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
-    compare a b = getUnique a `compare` getUnique b
-
 instance Uniquable TyCon where
     getUnique tc = tyConUnique tc
 
