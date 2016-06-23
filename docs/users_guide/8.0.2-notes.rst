@@ -21,3 +21,22 @@ Language
 -  :ghc-flag:`-XStaticPointers` now allows the body of the ``static`` form to
    refer to closed local bindings. For instance, this is now permitted:
    ``f = static x where x = 'a'``.
+
+TODO FIXME Heading title
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+-  GHCi now supports two new commands. :ghci-cmd:`:type` ``+d`` performs
+   defaulting on the type before reporting it to the user, and
+   :ghci-cmd:`:type` ``+v`` refrains from instantiating any variables before
+   reporting, which is useful in concert with :ghc-flag:`-XTypeApplications`.
+
+   .. code-block:: none
+
+	*X> :type +d length
+	length :: [a] -> Int
+
+	*X> :set -fprint-explicit-foralls
+	*X> :type length
+	length :: forall {a} {t :: * -> *}. Foldable t => t a -> Int
+	*X> :type +v length
+	length :: forall (t :: * -> *). Foldable t => forall a. t a -> Int
