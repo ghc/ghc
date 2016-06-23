@@ -10,6 +10,7 @@
 --  (c) The University of Glasgow 2002-2006
 --
 
+-- | Create real byte-code objects from 'ResolvedBCO's.
 module GHCi.CreateBCO (createBCOs) where
 
 import GHCi.ResolvedBCO

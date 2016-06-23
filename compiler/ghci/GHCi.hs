@@ -137,6 +137,13 @@ Things that do not work with -fexternal-interpreter
 dynCompileExpr cannot work, because we have no way to run code of an
 unknown type in the remote process.  This API fails with an error
 message if it is used with -fexternal-interpreter.
+
+Other Notes on Remote GHCi
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+  * This wiki page has an implementation overview:
+    https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/ExternalInterpreter
+  * Note [External GHCi pointers] in compiler/ghci/GHCi.hs
+  * Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs
 -}
 
 -- | Run a command in the interpreter's context.  With

@@ -947,12 +947,14 @@ runTH ty fhv = do
   dflags <- getDynFlags
   if not (gopt Opt_ExternalInterpreter dflags)
     then do
-       -- just run it in the local TcM
+       -- Run it in the local TcM
       hv <- liftIO $ wormhole dflags fhv
       r <- runQuasi (unsafeCoerce# hv :: TH.Q a)
       return r
     else
-      -- run it on the server
+      -- Run it on the server.  For an overview of how TH works with
+      -- Remote GHCi, see Note [Remote Template Haskell] in
+      -- libraries/ghci/GHCi/TH.hs.
       withIServ hsc_env $ \i -> do
         rstate <- getTHState i
         loc <- TH.qLocation
@@ -965,7 +967,8 @@ runTH ty fhv = do
         return $! runGet get (LB.fromStrict bs)
 
 
--- | communicate with a remotely-running TH computation until it finishes
+-- | communicate with a remotely-running TH computation until it finishes.
+-- See Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs.
 runRemoteTH
   :: IServ
   -> [Messages]   --  saved from nested calls to qRecover
@@ -1030,6 +1033,13 @@ Back in GHC, when we receive:
     and merge in the new messages if caught_error is false.
 -}
 
+-- | Retrieve (or create, if it hasn't been created already), the
+-- remote TH state.  The TH state is a remote reference to an IORef
+-- QState living on the server, and we have to pass this to each RunTH
+-- call we make.
+--
+-- The TH state is stored in tcg_th_remote_state in the TcGblEnv.
+--
 getTHState :: IServ -> TcM (ForeignRef (IORef QState))
 getTHState i = do
   tcg <- getGblEnv

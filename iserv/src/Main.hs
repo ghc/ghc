@@ -1,4 +1,11 @@
 {-# LANGUAGE RecordWildCards, GADTs, ScopedTypeVariables, RankNTypes #-}
+
+-- |
+-- The Remote GHCi server.
+--
+-- For details on Remote GHCi, see Note [Remote GHCi] in
+-- compiler/ghci/GHCi.hs.
+--
 module Main (main) where
 
 import GHCi.Run
@@ -55,6 +62,10 @@ serv verbose pipe@Pipe{..} restore = loop
     writePipe pipe (put r)
     loop
 
+  -- Run some TH code, which may interact with GHC by sending
+  -- THMessage requests, and then finally send RunTHDone followed by a
+  -- QResult.  For an overview of how TH works with Remote GHCi, see
+  -- Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs.
   wrapRunTH :: forall a. (Binary a, Show a) => IO a -> IO ()
   wrapRunTH io = do
     r <- try io

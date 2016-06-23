@@ -2,6 +2,12 @@
     GeneralizedNewtypeDeriving, ExistentialQuantification, RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-orphans #-}
 
+-- |
+-- Remote GHCi message types and serialization.
+--
+-- For details on Remote GHCi, see Note [Remote GHCi] in
+-- compiler/ghci/GHCi.hs.
+--
 module GHCi.Message
   ( Message(..), Msg(..)
   , THMessage(..), THMsg(..)
@@ -44,7 +50,8 @@ import System.IO.Error
 -- -----------------------------------------------------------------------------
 -- The RPC protocol between GHC and the interactive server
 
--- | A @Message a@ is a message that returns a value of type @a@
+-- | A @Message a@ is a message that returns a value of type @a@.
+-- These are requests sent from GHC to the server.
 data Message a where
   -- | Exit the iserv process
   Shutdown :: Message ()
@@ -159,6 +166,8 @@ data Message a where
    -> Message (Maybe HValueRef)
 
   -- Template Haskell -------------------------------------------
+  -- For more details on how TH works with Remote GHCi, see
+  -- Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs.
 
   -- | Start a new TH module, return a state token that should be
   StartTH :: Message (RemoteRef (IORef QState))
@@ -198,7 +207,8 @@ instance Binary a => Binary (QResult a)
 
 
 -- | Messages sent back to GHC from GHCi.TH, to implement the methods
--- of 'Quasi'.
+-- of 'Quasi'.  For an overview of how TH works with Remote GHCi, see
+-- Note [Remote Template Haskell] in GHCi.TH.
 data THMessage a where
   NewName :: String -> THMessage (THResult TH.Name)
   Report :: Bool -> String -> THMessage (THResult ())
@@ -352,6 +362,9 @@ data THResultType = THExp | THPat | THType | THDec | THAnnWrapper
 
 instance Binary THResultType
 
+-- | The server-side Template Haskell state.  This is created by the
+-- StartTH message.  A new one is created per module that GHC
+-- typechecks.
 data QState = QState
   { qsMap        :: Map TypeRep Dynamic
        -- ^ persistent data between splices in a module

@@ -1,4 +1,12 @@
 {-# LANGUAGE CPP, StandaloneDeriving, GeneralizedNewtypeDeriving #-}
+
+-- |
+-- Types for referring to remote objects in Remote GHCi.  For more
+-- details, see Note [External GHCi pointers] in compiler/ghci/GHCi.hs
+--
+-- For details on Remote GHCi, see Note [Remote GHCi] in
+-- compiler/ghci/GHCi.hs.
+--
 module GHCi.RemoteTypes
   ( RemotePtr(..), toRemotePtr, fromRemotePtr, castRemotePtr
   , HValue(..)
