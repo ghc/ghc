@@ -156,7 +156,7 @@ type IfaceForAllBndr  = TyVarBndr IfaceTvBndr VisibilityFlag
 data IfaceTcArgs
   = ITC_Nil
   | ITC_Vis   IfaceType IfaceTcArgs   -- "Vis" means show when pretty-printing
-  | ITC_Invis IfaceKind IfaceTcArgs   -- "Invis" means don't show when pretty-printin
+  | ITC_Invis IfaceKind IfaceTcArgs   -- "Invis" means don't show when pretty-printing
                                       --         except with -fprint-explicit-kinds
 
 -- Encodes type constructors, kind constructors,

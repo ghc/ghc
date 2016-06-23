@@ -1347,7 +1347,9 @@ filterOutInvisibleTyVars :: TyCon -> [TyVar] -> [TyVar]
 filterOutInvisibleTyVars tc tvs = snd $ partitionInvisibles tc mkTyVarTy tvs
 
 -- | Given a tycon and a list of things (which correspond to arguments),
--- partitions the things into the invisible ones and the visible ones.
+-- partitions the things into
+--      Invisible or Specified ones and
+--      Visible ones
 -- The callback function is necessary for this scenario:
 --
 -- > T :: forall k. k -> k

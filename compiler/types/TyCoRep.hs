@@ -2752,7 +2752,6 @@ pprTvBndrs tvs = sep (map pprTvBndr tvs)
 
 -- | Render the ... in @(forall ... .)@ or @(forall ... ->)@.
 -- Returns both the list of not-yet-rendered binders and the doc.
--- No anonymous binders here!
 ppr_tv_bndrs :: [TyVarBinder]
              -> VisibilityFlag  -- ^ visibility of the first binder in the list
              -> ([TyVarBinder], SDoc)
