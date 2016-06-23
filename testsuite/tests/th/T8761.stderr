@@ -1,8 +1,4 @@
-pattern Q1 x1_0 x2_1 x3_2 <- ((x1_0, x2_1), [x3_2], _, _)
-pattern x1_0 Q2 x2_1 = ((x1_0, x2_1))
-pattern Q3 {qx3, qy3, qz3} <- ((qx3, qy3), [qz3]) where
-                                  Q3 qx3 qy3 qz3 = ((qx3, qy3), [qz3])
-T8761.hs:(15,1)-(38,13): Splicing declarations
+T8761.hs:(16,1)-(39,13): Splicing declarations
     do { [qx1, qy1, qz1] <- mapM
                               (\ i -> newName $ "x" ++ show i) [1, 2, 3];
          let nm1 = mkName "Q1"
@@ -36,7 +32,7 @@ T8761.hs:(15,1)-(38,13): Splicing declarations
     pattern x1 `Q2` x2 = ((x1, x2))
     pattern Q3{qx3, qy3, qz3} <- ((qx3, qy3), [qz3]) where
                                 Q3 qx3 qy3 qz3 = ((qx3, qy3), [qz3])
-T8761.hs:(41,1)-(45,29): Splicing declarations
+T8761.hs:(42,1)-(46,29): Splicing declarations
     [d| pattern P1 x y z <- ((x, y), [z], _, _)
         pattern P2 x y z = ((x, y), [z])
         pattern P3 x y z <- ((x, y), [z]) where
@@ -46,7 +42,7 @@ T8761.hs:(41,1)-(45,29): Splicing declarations
     pattern P2 x y z = ((x, y), [z])
     pattern P3 x y z <- ((x, y), [z]) where
                        P3 x y z = ((x, y), [z])
-T8761.hs:(48,1)-(52,21): Splicing declarations
+T8761.hs:(49,1)-(53,21): Splicing declarations
     [d| pattern x :*: y <- ((x, _), [y])
         pattern x :+: y = (x, y)
         pattern x :~: y <- (x, y) where
@@ -56,7 +52,7 @@ T8761.hs:(48,1)-(52,21): Splicing declarations
     pattern x :+: y = (x, y)
     pattern x :~: y <- (x, y) where
                       (:~:) x y = (x, y)
-T8761.hs:(55,1)-(61,23): Splicing declarations
+T8761.hs:(56,1)-(62,23): Splicing declarations
     [d| pattern R1{x1, y1} <- ((x1, _), [y1])
         getX1 = x1 ((1, 2), [3])
         getY1 = y1 ((1, 2), [3])
@@ -70,7 +66,7 @@ T8761.hs:(55,1)-(61,23): Splicing declarations
     pattern R2{x2, y2} = (x2, [y2])
     pattern R3{x3, y3} <- (x3, [y3]) where
                          R3 x y = (x, [y])
-T8761.hs:(70,1)-(104,39): Splicing declarations
+T8761.hs:(71,1)-(105,39): Splicing declarations
     [d| pattern P :: Bool
         pattern P <- True
         pattern Pe :: forall a. a -> Ex
@@ -123,6 +119,10 @@ T8761.hs:(70,1)-(104,39): Splicing declarations
     pattern Pup x <- MkUnivProv x
     pattern Puep :: forall a. forall b. Show b => a -> b -> (ExProv, a)
     pattern Puep x y <- (MkExProv y, x)
+pattern Q1 x1_0 x2_1 x3_2 <- ((x1_0, x2_1), [x3_2], _, _)
+pattern x1_0 Q2 x2_1 = ((x1_0, x2_1))
+pattern Q3 {qx3, qy3, qz3} <- ((qx3, qy3), [qz3]) where
+                                  Q3 qx3 qy3 qz3 = ((qx3, qy3), [qz3])
 pattern T8761.P :: GHC.Types.Bool
 pattern T8761.Pe :: () => forall (a0_0 :: *) . a0_0 -> T8761.Ex
 pattern T8761.Pu :: forall (a0_0 :: *) . a0_0 -> a0_0
@@ -147,12 +147,13 @@ pattern T8761.Pup :: forall (a0_0 :: *) . () => GHC.Show.Show a0_0 =>
                                                 a0_0 -> T8761.UnivProv a0_0
 pattern T8761.Puep :: forall (a0_0 :: *) . () => forall (b0_1 :: *) . GHC.Show.Show b0_1 =>
                                                  a0_0 -> b0_1 -> (T8761.ExProv, a0_0)
-T8761.hs:(107,1)-(111,25): Splicing declarations
+T8761.hs:(108,1)-(117,25): Splicing declarations
     do { infos <- mapM
                     reify
                     ['P, 'Pe, 'Pu, 'Pue, 'Pur, 'Purp, 'Pure, 'Purep, 'Pep, 'Pup,
                      'Puep];
          mapM_ (runIO . putStrLn . pprint) infos;
+         runIO $ hFlush stdout;
          [d| theAnswerIs = 42 |] }
   ======>
     theAnswerIs = 42

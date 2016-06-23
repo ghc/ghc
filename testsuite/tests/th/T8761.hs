@@ -6,6 +6,7 @@ module T8761 where
 
 import Control.Monad
 import Language.Haskell.TH
+import System.IO
 
 data Ex         where MkEx       :: forall a. a -> Ex
 data ExProv     where MkExProv   :: forall a. (Show a) => a -> ExProv
@@ -108,4 +109,9 @@ do
   infos <- mapM reify [ 'P, 'Pe, 'Pu, 'Pue, 'Pur, 'Purp
                       , 'Pure, 'Purep, 'Pep, 'Pup, 'Puep ]
   mapM_ (runIO . putStrLn . pprint) infos
+  runIO $ hFlush stdout
+    -- GHC does not guarantee to do this after TH code.  In particular
+    -- when the output is going to a file, and we're using GHC with
+    -- the runtime linker or with -fexternal-interpreter, stdout will
+    -- not get flushed.
   [d| theAnswerIs = 42 |]
