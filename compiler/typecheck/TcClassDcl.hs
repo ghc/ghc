@@ -199,7 +199,7 @@ tcDefMeth _ _ _ _ _ prag_fn (sel_id, Nothing)
 
 tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
           (sel_id, Just (dm_name, dm_spec))
-  | Just (L bind_loc dm_bind, bndr_loc) <- findMethodBind sel_name binds_in
+  | Just (L bind_loc dm_bind, bndr_loc, prags) <- findMethodBind sel_name binds_in prag_fn
   = do { -- First look up the default method -- It should be there!
          global_dm_id  <- tcLookupId dm_name
        ; global_dm_id  <- addInlinePrags global_dm_id prags
@@ -265,7 +265,6 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
   | otherwise = pprPanic "tcDefMeth" (ppr sel_id)
   where
     sel_name = idName sel_id
-    prags    = lookupPragEnv prag_fn sel_name
     no_prag_fn = emptyPragEnv   -- No pragmas for local_meth_id;
                                 -- they are all for meth_id
 
@@ -325,17 +324,21 @@ lookupHsSig :: HsSigFun -> Name -> Maybe (LHsSigType Name)
 lookupHsSig = lookupNameEnv
 
 ---------------------------
-findMethodBind  :: Name                 -- Selector name
+findMethodBind  :: Name                 -- Selector
                 -> LHsBinds Name        -- A group of bindings
-                -> Maybe (LHsBind Name, SrcSpan)
-                -- Returns the binding, and the binding
-                -- site of the method binder
-findMethodBind sel_name binds
+                -> TcPragEnv
+                -> Maybe (LHsBind Name, SrcSpan, [LSig Name])
+                -- Returns the binding, the binding
+                -- site of the method binder, and any inline or
+                -- specialisation pragmas
+findMethodBind sel_name binds prag_fn
   = foldlBag mplus Nothing (mapBag f binds)
   where
+    prags    = lookupPragEnv prag_fn sel_name
+
     f bind@(L _ (FunBind { fun_id = L bndr_loc op_name }))
       | op_name == sel_name
-             = Just (bind, bndr_loc)
+             = Just (bind, bndr_loc, prags)
     f _other = Nothing
 
 ---------------------------

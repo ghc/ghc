@@ -700,9 +700,6 @@ ppr_iface_sigma_type show_foralls_unconditionally ty
     (tvs, theta, tau) = splitIfaceSigmaTy ty
 
 -------------------
-instance Outputable IfaceForAllBndr where
-  ppr = pprIfaceForAllBndr
-
 pprIfaceForAllPart :: [IfaceForAllBndr] -> [IfaceType] -> SDoc -> SDoc
 pprIfaceForAllPart tvs ctxt sdoc = ppr_iface_forall_part False tvs ctxt sdoc
 

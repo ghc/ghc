@@ -224,3 +224,9 @@ GHC.Generics representation types:
                                                                                                              GenDerivOutput.Rose)))
 
 
+
+==================== Filling in method body ====================
+GHC.Base.Functor [GenDerivOutput.List]
+  GHC.Base.<$ = GHC.Base.$dm<$ @GenDerivOutput.List
+
+
