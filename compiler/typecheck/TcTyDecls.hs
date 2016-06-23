@@ -610,8 +610,8 @@ initialRoleEnv1 is_boot annots_env tc
   | otherwise             = pprPanic "initialRoleEnv1" (ppr tc)
   where name         = tyConName tc
         bndrs        = tyConBinders tc
-        visflags     = map tyConBinderVisibility bndrs
-        num_exps     = count (== Visible) visflags
+        argflags     = map tyConBinderArgFlag bndrs
+        num_exps     = count isVisibleArgFlag argflags
 
           -- if the number of annotations in the role annotation decl
           -- is wrong, just ignore it. We check this in the validity check.
@@ -620,12 +620,13 @@ initialRoleEnv1 is_boot annots_env tc
               Just (L _ (RoleAnnotDecl _ annots))
                 | annots `lengthIs` num_exps -> map unLoc annots
               _                              -> replicate num_exps Nothing
-        default_roles = build_default_roles visflags role_annots
+        default_roles = build_default_roles argflags role_annots
 
-        build_default_roles (Visible : viss) (m_annot : ras)
-          = (m_annot `orElse` default_role) : build_default_roles viss ras
-        build_default_roles (_inv    : viss) ras
-          = Nominal : build_default_roles viss ras
+        build_default_roles (argf : argfs) (m_annot : ras)
+          | isVisibleArgFlag argf
+          = (m_annot `orElse` default_role) : build_default_roles argfs ras
+        build_default_roles (_argf : argfs) ras
+          = Nominal : build_default_roles argfs ras
         build_default_roles [] [] = []
         build_default_roles _ _ = pprPanic "initialRoleEnv1 (2)"
                                            (vcat [ppr tc, ppr role_annots])

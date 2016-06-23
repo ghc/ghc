@@ -18,7 +18,7 @@ module IfaceType (
         IfaceTyLit(..), IfaceTcArgs(..),
         IfaceContext, IfaceBndr(..), IfaceOneShot(..), IfaceLamBndr,
         IfaceTvBndr, IfaceIdBndr, IfaceTyConBinder,
-        IfaceForAllBndr, VisibilityFlag(..),
+        IfaceForAllBndr, ArgFlag(..),
 
         ifConstraintKind, ifTyConBinderTyVar, ifTyConBinderName,
 
@@ -146,7 +146,7 @@ data IfaceTyLit
   deriving (Eq)
 
 type IfaceTyConBinder = TyVarBndr IfaceTvBndr TyConBndrVis
-type IfaceForAllBndr  = TyVarBndr IfaceTvBndr VisibilityFlag
+type IfaceForAllBndr  = TyVarBndr IfaceTvBndr ArgFlag
 
 -- See Note [Suppressing invisible arguments]
 -- We use a new list type (rather than [(IfaceType,Bool)], because
@@ -524,8 +524,8 @@ toIfaceTcArgs tc ty_args
       | Just ty' <- coreView ty
       = go env ty' ts
     go env (ForAllTy (TvBndr tv vis) res) (t:ts)
-      | isVisible vis = ITC_Vis   t' ts'
-      | otherwise     = ITC_Invis t' ts'
+      | isVisibleArgFlag vis = ITC_Vis   t' ts'
+      | otherwise            = ITC_Invis t' ts'
       where
         t'  = toIfaceType t
         ts' = go (extendTvSubst env tv t) res ts
@@ -716,15 +716,15 @@ pprIfaceForAll bndrs@(TvBndr _ vis : _)
     (bndrs', doc) = ppr_itv_bndrs bndrs vis
 
     add_separator stuff = case vis of
-                            Visible   -> stuff <+> arrow
-                            _inv      -> stuff <>  dot
+                            Required -> stuff <+> arrow
+                            _inv     -> stuff <>  dot
 
 
 -- | Render the ... in @(forall ... .)@ or @(forall ... ->)@.
 -- Returns both the list of not-yet-rendered binders and the doc.
 -- No anonymous binders here!
 ppr_itv_bndrs :: [IfaceForAllBndr]
-             -> VisibilityFlag  -- ^ visibility of the first binder in the list
+             -> ArgFlag  -- ^ visibility of the first binder in the list
              -> ([IfaceForAllBndr], SDoc)
 ppr_itv_bndrs all_bndrs@(bndr@(TvBndr _ vis) : bndrs) vis1
   | vis `sameVis` vis1 = let (bndrs', doc) = ppr_itv_bndrs bndrs vis1 in
@@ -740,11 +740,11 @@ pprIfaceForAllCoBndrs :: [(IfLclName, IfaceCoercion)] -> SDoc
 pprIfaceForAllCoBndrs bndrs = hsep $ map pprIfaceForAllCoBndr bndrs
 
 pprIfaceForAllBndr :: IfaceForAllBndr -> SDoc
-pprIfaceForAllBndr (TvBndr tv Invisible) = sdocWithDynFlags $ \dflags ->
+pprIfaceForAllBndr (TvBndr tv Inferred) = sdocWithDynFlags $ \dflags ->
                                            if gopt Opt_PrintExplicitForalls dflags
                                            then braces $ pprIfaceTvBndr tv
                                            else pprIfaceTvBndr tv
-pprIfaceForAllBndr (TvBndr tv _)         = pprIfaceTvBndr tv
+pprIfaceForAllBndr (TvBndr tv _)        = pprIfaceTvBndr tv
 
 pprIfaceForAllCoBndr :: (IfLclName, IfaceCoercion) -> SDoc
 pprIfaceForAllCoBndr (tv, kind_co)

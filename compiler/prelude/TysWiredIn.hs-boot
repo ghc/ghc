@@ -1,12 +1,12 @@
 module TysWiredIn where
 
-import Var( TyVar, VisibilityFlag )
+import Var( TyVar, ArgFlag )
 import {-# SOURCE #-} TyCon      ( TyCon )
 import {-# SOURCE #-} TyCoRep    (Type, Kind)
 
 
 mkFunKind :: Kind -> Kind -> Kind
-mkForAllKind :: TyVar -> VisibilityFlag -> Kind -> Kind
+mkForAllKind :: TyVar -> ArgFlag -> Kind -> Kind
 
 listTyCon :: TyCon
 typeNatKind, typeSymbolKind :: Type

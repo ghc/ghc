@@ -1452,7 +1452,7 @@ mkEqInfoMsg ct ty1 ty2
       _                                        -> (ty1, ty2)
 
     invis_msg | Just vis <- tcEqTypeVis act_ty exp_ty
-              , vis /= Visible
+              , not vis
               = ppSuggestExplicitKinds
               | otherwise
               = empty

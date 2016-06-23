@@ -163,7 +163,7 @@ topInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 -- then  wrap e :: rho  (that is, wrap :: ty "->" rho)
 topInstantiate = top_instantiate True
 
--- | Instantiate all outer 'Invisible' binders
+-- | Instantiate all outer 'Inferred' binders
 -- and any context. Never looks through arrows or specified type variables.
 -- Used for visible type application.
 topInstantiateInferred :: CtOrigin -> TcSigmaType
@@ -174,7 +174,7 @@ topInstantiateInferred :: CtOrigin -> TcSigmaType
 topInstantiateInferred = top_instantiate False
 
 top_instantiate :: Bool   -- True  <=> instantiate *all* variables
-                          -- False <=> instantiate only the invisible ones
+                          -- False <=> instantiate only the inferred ones
                 -> CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 top_instantiate inst_all orig ty
   | not (null binders && null theta)
@@ -218,7 +218,7 @@ top_instantiate inst_all orig ty
 
     should_inst bndr
       | inst_all  = True
-      | otherwise = binderVisibility bndr == Invisible
+      | otherwise = binderArgFlag bndr == Inferred
 
 deeplyInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 --   Int -> forall a. a -> a  ==>  (\x:Int. [] x alpha) :: Int -> alpha

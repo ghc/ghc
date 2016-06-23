@@ -49,7 +49,7 @@ module TcType (
 
   --------------------------------
   -- Builders
-  mkPhiTy, mkInvSigmaTy, mkSpecSigmaTy, mkSigmaTy,
+  mkPhiTy, mkInfSigmaTy, mkSpecSigmaTy, mkSigmaTy,
   mkNakedTyConApp, mkNakedAppTys, mkNakedAppTy,
   mkNakedCastTy,
 
@@ -128,7 +128,7 @@ module TcType (
 
   --------------------------------
   -- Rexported from Type
-  Type, PredType, ThetaType, TyBinder, VisibilityFlag(..),
+  Type, PredType, ThetaType, TyBinder, ArgFlag(..),
 
   mkForAllTy, mkForAllTys, mkInvForAllTys, mkSpecForAllTys, mkInvForAllTy,
   mkFunTy, mkFunTys,
@@ -1121,8 +1121,10 @@ isRuntimeUnkSkol x
 mkSigmaTy :: [TyVarBinder] -> [PredType] -> Type -> Type
 mkSigmaTy bndrs theta tau = mkForAllTys bndrs (mkPhiTy theta tau)
 
-mkInvSigmaTy :: [TyVar] -> [PredType] -> Type -> Type
-mkInvSigmaTy tyvars ty = mkSigmaTy (mkTyVarBinders Invisible tyvars) ty
+-- | Make a sigma ty wherea ll type variables are 'Inferred'. That is,
+-- they cannot be used with visible type application.
+mkInfSigmaTy :: [TyVar] -> [PredType] -> Type -> Type
+mkInfSigmaTy tyvars ty = mkSigmaTy (mkTyVarBinders Inferred tyvars) ty
 
 -- | Make a sigma ty where all type variables are "specified". That is,
 -- they can be used with visible type application
@@ -1446,30 +1448,32 @@ tcEqTypeNoKindCheck ty1 ty2
   = isNothing $ tc_eq_type coreView ty1 ty2
 
 -- | Like 'tcEqType', but returns information about whether the difference
--- is visible in the case of a mismatch. A return of Nothing means the types
--- are 'tcEqType'.
-tcEqTypeVis :: TcType -> TcType -> Maybe VisibilityFlag
+-- is visible in the case of a mismatch.
+-- @Nothing@    : the types are equal
+-- @Just True@  : the types differ, and the point of difference is visible
+-- @Just False@ : the types differ, and the point of difference is invisible
+tcEqTypeVis :: TcType -> TcType -> Maybe Bool
 tcEqTypeVis ty1 ty2
   = tc_eq_type coreView ty1 ty2 <!> invis (tc_eq_type coreView ki1 ki2)
   where
     ki1 = typeKind ty1
     ki2 = typeKind ty2
 
-      -- convert Just Visible to Just Invisible
-    invis :: Maybe VisibilityFlag -> Maybe VisibilityFlag
-    invis = fmap (const Invisible)
+      -- convert Just True to Just False
+    invis :: Maybe Bool -> Maybe Bool
+    invis = fmap (const False)
 
-(<!>) :: Maybe VisibilityFlag -> Maybe VisibilityFlag -> Maybe VisibilityFlag
-Nothing        <!> x            = x
-Just Visible   <!> _            = Just Visible
-Just _inv      <!> Just Visible = Just Visible
-Just inv       <!> _            = Just inv
+(<!>) :: Maybe Bool -> Maybe Bool -> Maybe Bool
+Nothing        <!> x         = x
+Just True      <!> _         = Just True
+Just _vis      <!> Just True = Just True
+Just vis       <!> _         = Just vis
 infixr 3 <!>
 
 -- | Real worker for 'tcEqType'. No kind check!
 tc_eq_type :: (TcType -> Maybe TcType)  -- ^ @coreView@, if you want unwrapping
-           -> Type -> Type -> Maybe VisibilityFlag
-tc_eq_type view_fun orig_ty1 orig_ty2 = go Visible orig_env orig_ty1 orig_ty2
+           -> Type -> Type -> Maybe Bool
+tc_eq_type view_fun orig_ty1 orig_ty2 = go True orig_env orig_ty1 orig_ty2
   where
     go vis env t1 t2 | Just t1' <- view_fun t1 = go vis env t1' t2
     go vis env t1 t2 | Just t2' <- view_fun t2 = go vis env t1 t2'
@@ -1482,7 +1486,7 @@ tc_eq_type view_fun orig_ty1 orig_ty2 = go Visible orig_env orig_ty1 orig_ty2
 
     go vis env (ForAllTy (TvBndr tv1 vis1) ty1)
                (ForAllTy (TvBndr tv2 vis2) ty2)
-      = go vis1 env (tyVarKind tv1) (tyVarKind tv2)
+      = go (isVisibleArgFlag vis1) env (tyVarKind tv1) (tyVarKind tv2)
           <!> go vis (rnBndr2 env tv1 tv2) ty1 ty2
           <!> check vis (vis1 == vis2)
     go vis env (FunTy arg1 res1) (FunTy arg2 res2)
@@ -1507,17 +1511,17 @@ tc_eq_type view_fun orig_ty1 orig_ty2 = go Visible orig_env orig_ty1 orig_ty2
     gos (v:_)  _   _        _        = Just v
     gos _      _   _        _        = panic "tc_eq_type"
 
-    tc_vis :: VisibilityFlag -> TyCon -> [VisibilityFlag]
-    tc_vis Visible tc = viss ++ repeat Visible
-       -- the repeat Visible is necessary because tycons can legitimately
+    tc_vis :: Bool -> TyCon -> [Bool]
+    tc_vis True tc = viss ++ repeat True
+       -- the repeat True is necessary because tycons can legitimately
        -- be oversaturated
       where
         bndrs = tyConBinders tc
-        viss  = map tyConBinderVisibility bndrs
-    tc_vis vis _ = repeat vis   -- if we're not in a visible context, our args
-                                -- aren't either
+        viss  = map (isVisibleArgFlag . tyConBinderArgFlag) bndrs
+    tc_vis False _ = repeat False  -- if we're not in a visible context, our args
+                                   -- aren't either
 
-    check :: VisibilityFlag -> Bool -> Maybe VisibilityFlag
+    check :: Bool -> Bool -> Maybe Bool
     check _   True  = Nothing
     check vis False = Just vis
 
@@ -2172,7 +2176,7 @@ to_tc_mapper
     hole ftvs h r t1 t2 = mkHoleCo h r <$> to_tc_type ftvs t1
                                        <*> to_tc_type ftvs t2
 
-    tybinder :: VarSet -> TyVar -> VisibilityFlag -> Identity (VarSet, TyVar)
+    tybinder :: VarSet -> TyVar -> ArgFlag -> Identity (VarSet, TyVar)
     tybinder ftvs tv _vis = do { kind' <- to_tc_type ftvs (tyVarKind tv)
                                ; let tv' = mkTcTyVar (tyVarName tv) kind'
                                                      vanillaSkolemTv
@@ -2521,7 +2525,7 @@ sizeType = go
     go (FunTy arg res)           = go arg + go res + 1
     go (AppTy fun arg)           = go fun + go arg
     go (ForAllTy (TvBndr tv vis) ty)
-        | Visible <- vis         = go (tyVarKind tv) + go ty + 1
+        | isVisibleArgFlag vis   = go (tyVarKind tv) + go ty + 1
         | otherwise              = go ty + 1
     go (CastTy ty _)             = go ty
     go (CoercionTy {})           = 0

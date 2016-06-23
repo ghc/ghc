@@ -1191,7 +1191,7 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
            ; case tcSplitForAllTy_maybe upsilon_ty of
                Just (tvb, inner_ty) ->
                  do { let tv   = binderVar tvb
-                          vis  = binderVisibility tvb
+                          vis  = binderArgFlag tvb
                           kind = tyVarKind tv
                     ; MASSERT2( vis == Specified
                         , (vcat [ ppr fun_ty, ppr upsilon_ty, ppr tvb
@@ -1484,7 +1484,7 @@ tcExprSig expr sig@(PartialSig { psig_name = name, sig_loc = loc })
              tau_tvs        = tyCoVarsOfType tau
        ; (binders, my_theta) <- chooseInferredQuantifiers inferred_theta
                                    tau_tvs qtvs (Just sig_inst)
-       ; let inferred_sigma = mkInvSigmaTy qtvs inferred_theta tau
+       ; let inferred_sigma = mkInfSigmaTy qtvs inferred_theta tau
              my_sigma       = mkForAllTys binders (mkPhiTy  my_theta tau)
        ; wrap <- if inferred_sigma `eqType` my_sigma -- NB: eqType ignores vis.
                  then return idHsWrapper  -- Fast path; also avoids complaint when we infer

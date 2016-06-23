@@ -14,7 +14,7 @@ module Type (
         -- $type_classification
 
         -- $representation_types
-        TyThing(..), Type, VisibilityFlag(..), KindOrType, PredType, ThetaType,
+        TyThing(..), Type, ArgFlag(..), KindOrType, PredType, ThetaType,
         Var, TyVar, isTyVar, TyCoVar, TyBinder, TyVarBinder,
 
         -- ** Constructing and deconstructing types
@@ -86,10 +86,10 @@ module Type (
         mkTyVarBinder, mkTyVarBinders,
         mkAnonBinder,
         isAnonTyBinder, isNamedTyBinder,
-        binderVar, binderVars, binderKind, binderVisibility,
+        binderVar, binderVars, binderKind, binderArgFlag,
         tyBinderType,
         binderRelevantType_maybe, caseBinder,
-        isVisible, isInvisible, isVisibleBinder, isInvisibleBinder,
+        isVisibleArgFlag, isInvisibleArgFlag, isVisibleBinder, isInvisibleBinder,
         tyConBindersTyBinders,
 
         -- ** Common type constructors
@@ -462,7 +462,7 @@ data TyCoMapper env m
           -- ^ What to do with coercion holes. See Note [Coercion holes] in
           -- TyCoRep.
 
-      , tcm_tybinder :: env -> TyVar -> VisibilityFlag -> m (env, TyVar)
+      , tcm_tybinder :: env -> TyVar -> ArgFlag -> m (env, TyVar)
           -- ^ The returned env is used in the extended scope
       }
 
@@ -505,7 +505,7 @@ mapCoercion mapper@(TyCoMapper { tcm_smart = smart, tcm_covar = covar
     go (AppCo c1 c2) = mkappco <$> go c1 <*> go c2
     go (ForAllCo tv kind_co co)
       = do { kind_co' <- go kind_co
-           ; (env', tv') <- tybinder env tv Invisible
+           ; (env', tv') <- tybinder env tv Inferred
            ; co' <- mapCoercion mapper env' co
            ; return $ mkforallco tv' kind_co' co' }
         -- See Note [Efficiency for mapCoercion ForAllCo case]
@@ -1197,7 +1197,7 @@ interfaces.  Notably this plays a role in tcTySigs in TcBinds.hs.
 -- | Make a dependent forall.
 mkInvForAllTy :: TyVar -> Type -> Type
 mkInvForAllTy tv ty = ASSERT( isTyVar tv )
-                      ForAllTy (TvBndr tv Invisible) ty
+                      ForAllTy (TvBndr tv Inferred) ty
 
 -- | Like mkForAllTys, but assumes all variables are dependent and invisible,
 -- a common case
@@ -1214,18 +1214,18 @@ mkSpecForAllTys tvs = ASSERT( all isTyVar tvs )
 -- | Like mkForAllTys, but assumes all variables are dependent and visible
 mkVisForAllTys :: [TyVar] -> Type -> Type
 mkVisForAllTys tvs = ASSERT( all isTyVar tvs )
-                     mkForAllTys [ TvBndr tv Visible | tv <- tvs ]
+                     mkForAllTys [ TvBndr tv Required | tv <- tvs ]
 
 mkLamType  :: Var -> Type -> Type
 -- ^ Makes a @(->)@ type or an implicit forall type, depending
 -- on whether it is given a type variable or a term variable.
 -- This is used, for example, when producing the type of a lambda.
--- Always uses Invisible binders.
+-- Always uses Inferred binders.
 mkLamTypes :: [Var] -> Type -> Type
 -- ^ 'mkLamType' for multiple type or value arguments
 
 mkLamType v ty
-   | isTyVar v = ForAllTy (TvBndr v Invisible) ty
+   | isTyVar v = ForAllTy (TvBndr v Inferred) ty
    | otherwise = FunTy    (varType v)          ty
 
 mkLamTypes vs ty = foldr mkLamType ty vs
@@ -1239,7 +1239,7 @@ mkTyConBindersPreferAnon vars inner_ty = fst (go vars)
     go :: [TyVar] -> ([TyConBinder], VarSet) -- also returns the free vars
     go [] = ([], tyCoVarsOfType inner_ty)
     go (v:vs) |  v `elemVarSet` fvs
-              = ( TvBndr v (NamedTCB Visible) : binders
+              = ( TvBndr v (NamedTCB Required) : binders
                 , fvs `delVarSet` v `unionVarSet` kind_vars )
               | otherwise
               = ( TvBndr v AnonTCB : binders
@@ -1333,7 +1333,7 @@ splitPiTysInvisible ty = split ty ty []
    where
     split orig_ty ty bs | Just ty' <- coreView ty = split orig_ty ty' bs
     split _       (ForAllTy b@(TvBndr _ vis) res) bs
-      | isInvisible vis                = split res res (Named b  : bs)
+      | isInvisibleArgFlag vis         = split res res (Named b  : bs)
     split _       (FunTy arg res)  bs
       | isPredTy arg                   = split res res (Anon arg : bs)
     split orig_ty _                bs  = (reverse bs, orig_ty)
@@ -1348,8 +1348,8 @@ filterOutInvisibleTyVars tc tvs = snd $ partitionInvisibles tc mkTyVarTy tvs
 
 -- | Given a tycon and a list of things (which correspond to arguments),
 -- partitions the things into
---      Invisible or Specified ones and
---      Visible ones
+--      Inferred or Specified ones and
+--      Required ones
 -- The callback function is necessary for this scenario:
 --
 -- > T :: forall k. k -> k
@@ -1370,8 +1370,8 @@ partitionInvisibles tc get_ty = go emptyTCvSubst (tyConKind tc)
   where
     go _ _ [] = ([], [])
     go subst (ForAllTy (TvBndr tv vis) res_ki) (x:xs)
-      | isVisible vis = second (x :) (go subst' res_ki xs)
-      | otherwise     = first  (x :) (go subst' res_ki xs)
+      | isVisibleArgFlag vis = second (x :) (go subst' res_ki xs)
+      | otherwise            = first  (x :) (go subst' res_ki xs)
       where
         subst' = extendTvSubst subst tv (get_ty x)
     go subst (TyVarTy tv) xs
@@ -1389,11 +1389,11 @@ partitionInvisibles tc get_ty = go emptyTCvSubst (tyConKind tc)
 -}
 
 -- | Make a named binder
-mkTyVarBinder :: VisibilityFlag -> Var -> TyVarBinder
+mkTyVarBinder :: ArgFlag -> Var -> TyVarBinder
 mkTyVarBinder vis var = TvBndr var vis
 
 -- | Make many named binders
-mkTyVarBinders :: VisibilityFlag -> [TyVar] -> [TyVarBinder]
+mkTyVarBinders :: ArgFlag -> [TyVar] -> [TyVarBinder]
 mkTyVarBinders vis = map (mkTyVarBinder vis)
 
 -- | Make an anonymous binder

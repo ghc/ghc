@@ -418,9 +418,9 @@ data DataCon
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For the TyVarBinders in a DataCon and PatSyn:
 
- * Each Visibilty flag is Invisible or Specified.
-   None are Visible. (A DataCon is a term-level function; see
-   Note [No Visible TyBinder in terms] in TyCoRep.)
+ * Each argument flag is Inferred or Specified.
+   None are Required. (A DataCon is a term-level function; see
+   Note [No Required TyBinder in terms] in TyCoRep.)
 
 Why do we need the TyVarBinders, rather than just the TyVars?  So that
 we can construct the right type for the DataCon with its foralls
@@ -741,7 +741,7 @@ mkDataCon :: Name
                             -- if it is a record, otherwise empty
           -> [TyVarBinder]  -- ^ Universals. See Note [TyVarBinders in DataCons]
           -> [TyVarBinder]  -- ^ Existentials.
-                            -- (These last two must be Named and Invisible/Specified)
+                            -- (These last two must be Named and Inferred/Specified)
           -> [EqSpec]       -- ^ GADT equalities
           -> ThetaType      -- ^ Theta-type occuring before the arguments proper
           -> [Type]         -- ^ Original argument types

@@ -363,7 +363,7 @@ kcTyClGroup decls
                   , ppr kc_tyvars, ppr (tcTyConScopedTyVars tc)]
 
            ; return (mkTcTyCon name
-                               (mkNamedTyConBinders Invisible kvs ++ kc_binders')
+                               (mkNamedTyConBinders Inferred kvs ++ kc_binders')
                                kc_res_kind'
                                (mightBeUnsaturatedTyCon tc)
                                (tcTyConScopedTyVars tc)) }
@@ -1492,7 +1492,7 @@ tcConDecl new_or_data rep_tycon tmpl_bndrs res_tmpl
        -- Can't print univ_tvs, arg_tys etc, because we are inside the knot here
        ; traceTc "tcConDecl 2" (ppr name $$ ppr field_lbls)
        ; let
-           ex_tvs = mkTyVarBinders Invisible qkvs ++
+           ex_tvs = mkTyVarBinders Inferred qkvs ++
                     mkTyVarBinders Specified user_qtvs
            buildOneDataCon (L _ name) = do
              { is_infix <- tcConIsInfixH98 name hs_details

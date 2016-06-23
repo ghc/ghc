@@ -1660,8 +1660,8 @@ functorLikeTraverse var (FT { ft_triv = caseTrivial,     ft_var = caseVar
        where
          (xrs,xcs) = unzip (map (go co) args)
     go co (ForAllTy (TvBndr v vis) x)
-       | isVisible vis   = panic "unexpected visible binder"
-       | v /= var && xc  = (caseForAll v xr,True)
+       | isVisibleArgFlag vis = panic "unexpected visible binder"
+       | v /= var && xc       = (caseForAll v xr,True)
        where (xr,xc) = go co x
 
     go _ _ = (caseTrivial,False)

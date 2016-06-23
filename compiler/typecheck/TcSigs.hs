@@ -393,7 +393,7 @@ tcPatSynSig name sig_ty
               , text "prov" <+> ppr prov
               , text "body_ty" <+> ppr body_ty ]
        ; return (TPSI { patsig_name = name
-                      , patsig_implicit_bndrs = mkTyVarBinders Invisible kvs ++
+                      , patsig_implicit_bndrs = mkTyVarBinders Inferred kvs ++
                                                 mkTyVarBinders Specified implicit_tvs
                       , patsig_univ_bndrs     = univ_tvs
                       , patsig_req            = req

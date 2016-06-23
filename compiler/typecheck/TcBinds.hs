@@ -770,9 +770,9 @@ mkExport prag_fn qtvs theta
         -- NB: we have already done checkValidType, including an ambiguity check,
         --     on the type; either when we checked the sig or in mkInferredPolyId
         ; let poly_ty     = idType poly_id
-              sel_poly_ty = mkInvSigmaTy qtvs theta mono_ty
+              sel_poly_ty = mkInfSigmaTy qtvs theta mono_ty
                 -- This type is just going into tcSubType,
-                -- so Inv vs. Spec doesn't matter
+                -- so Inferred vs. Specified doesn't matter
 
         ; wrap <- if sel_poly_ty `eqType` poly_ty  -- NB: eqType ignores visibility
                   then return idHsWrapper  -- Fast path; also avoids complaint when we infer
@@ -842,7 +842,7 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs Nothing
     do { let free_tvs = closeOverKinds (growThetaTyVars inferred_theta tau_tvs)
                         -- Include kind variables!  Trac #7916
              my_theta = pickCapturedPreds free_tvs inferred_theta
-             binders  = [ mkTyVarBinder Invisible tv
+             binders  = [ mkTyVarBinder Inferred tv
                         | tv <- qtvs
                         , tv `elemVarSet` free_tvs ]
        ; return (binders, my_theta) }
@@ -891,7 +891,7 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
         | tv <- qtvs
         , tv `elemVarSet` free_tvs
         , let vis | tv `elemVarSet` spec_tv_set = Specified
-                  | otherwise                   = Invisible ]
+                  | otherwise                   = Inferred ]
                           -- Pulling from qtvs maintains original order
 
     mk_ctuple [pred] = return pred

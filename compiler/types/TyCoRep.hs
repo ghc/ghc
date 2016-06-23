@@ -29,7 +29,7 @@ module TyCoRep (
         TyLit(..),
         KindOrType, Kind,
         PredType, ThetaType,      -- Synonyms
-        VisibilityFlag(..),
+        ArgFlag(..),
 
         -- * Coercions
         Coercion(..), LeftOrRight(..),
@@ -47,9 +47,9 @@ module TyCoRep (
 
         -- * Functions over binders
         TyBinder(..), TyVarBinder,
-        binderVar, binderVars, binderKind, binderVisibility,
+        binderVar, binderVars, binderKind, binderArgFlag,
         delBinderVar,
-        isInvisible, isVisible,
+        isInvisibleArgFlag, isVisibleArgFlag,
         isInvisibleBinder, isVisibleBinder,
 
         -- * Functions over coercions
@@ -426,7 +426,7 @@ same kinds.
 
 {- **********************************************************************
 *                                                                       *
-                  TyBinder and VisibilityFlag
+                  TyBinder and ArgFlag
 *                                                                       *
 ********************************************************************** -}
 
@@ -445,7 +445,7 @@ delBinderVar vars (TvBndr tv _) = vars `delVarSet` tv
 
 -- | Does this binder bind an invisible argument?
 isInvisibleBinder :: TyBinder -> Bool
-isInvisibleBinder (Named (TvBndr _ vis)) = isInvisible vis
+isInvisibleBinder (Named (TvBndr _ vis)) = isInvisibleArgFlag vis
 isInvisibleBinder (Anon ty)              = isPredTy ty
 
 -- | Does this binder bind a visible argument?
@@ -479,10 +479,10 @@ The two constructors for TyBinder sort out the two different possibilities.
 `Named` builds a polytype, while `Anon` builds an ordinary function.
 (ForAllTy (Anon arg) res used to be called FunTy arg res.)
 
-Note [TyBinders and VisibilityFlags]
+Note [TyBinders and ArgFlags]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A ForAllTy contains a TyVarBinder.  Each TyVarBinder is equipped
-with a VisibilityFlag, which says whether or not arguments for this
+with a ArgFlag, which says whether or not arguments for this
 binder should be visible (explicit) in source Haskell.
 
 -----------------------------------------------------------------------
@@ -491,15 +491,15 @@ binder should be visible (explicit) in source Haskell.
 -----------------------------------------------------------------------
 In the type of a term
  Anon:             f :: type -> type         Arg required:     f x
- Named Invisible:  f :: forall {a}. type     Arg not allowed:  f
+ Named Inferred:   f :: forall {a}. type     Arg not allowed:  f
  Named Specified:  f :: forall a. type       Arg optional:     f  or  f @Int
- Named Visible:         Illegal: See Note [No Visible TyBinder in terms]
+ Named Required:         Illegal: See Note [No Required TyBinder in terms]
 
 In the kind of a type
  Anon:             T :: kind -> kind         Required:            T *
- Named Invisible:  T :: forall {k}. kind     Arg not allowed:     T
+ Named Inferred:   T :: forall {k}. kind     Arg not allowed:     T
  Named Specified:  T :: forall k. kind       Arg not allowed[1]:  T
- Named Visible:    T :: forall k -> kind     Required:            T *
+ Named Required:   T :: forall k -> kind     Required:            T *
 ------------------------------------------------------------------------
 
 [1] In types, in the Specified case, it would make sense to allow
@@ -510,9 +510,9 @@ In the kind of a type
 
 In term declarations:
 
-* Invisible.  Function defn, with no signature:  f1 x = x
-  We infer f1 :: forall {a}. a -> a, with 'a' Invisible
-  It's Invisible because it doesn't appear in any
+* Inferred.  Function defn, with no signature:  f1 x = x
+  We infer f1 :: forall {a}. a -> a, with 'a' Inferred
+  It's Inferred because it doesn't appear in any
   user-written signature for f1
 
 * Specified.  Function defn, with signature (implicit forall):
@@ -524,10 +524,10 @@ In term declarations:
      f3 :: forall a. a -> a; f3 x = x
   So f3 gets the type f3 :: forall a. a->a, with 'a' Specified
 
-* Invisible/Specified.  Function signature with inferred kind polymorphism.
+* Inferred/Specified.  Function signature with inferred kind polymorphism.
      f4 :: a b -> Int
-  So 'f4' get the type f4 :: forall {k} (a:k->*) (b:k). a b -> Int
-  Here 'k' is Invisible (it's not mentioned in the type),
+  So 'f4' gets the type f4 :: forall {k} (a:k->*) (b:k). a b -> Int
+  Here 'k' is Inferred (it's not mentioned in the type),
   but 'a' and 'b' are Specified.
 
 * Specified.  Function signature with explicit kind polymorphism
@@ -536,19 +536,19 @@ In term declarations:
   so we get f5 :: forall (k:*) (a:k->*) (b:k). a b -> Int
 
 * Similarly pattern synonyms:
-  Invisible - from inferred types (e.g. no pattern type signature)
-            - or from inferred kind polymorphism
+  Inferred - from inferred types (e.g. no pattern type signature)
+           - or from inferred kind polymorphism
 
 In type declarations:
 
-* Invisible (k)
+* Inferred (k)
      data T1 a b = MkT1 (a b)
   Here T1's kind is  T1 :: forall {k:*}. (k->*) -> k -> *
-  The kind variable 'k' is Invisible, since it is not mentioned
+  The kind variable 'k' is Inferred, since it is not mentioned
 
   Note that 'a' and 'b' correspond to /Anon/ TyBinders in T1's kind,
   and Anon binders don't have a visibility flag. (Or you could think
-  of Anon having an implicit Visible flag.)
+  of Anon having an implicit Required flag.)
 
 * Specified (k)
      data T2 (a::k->*) b = MkT (a b)
@@ -556,17 +556,17 @@ In type declarations:
   The kind variable 'k' is Specified, since it is mentioned in
   the signature.
 
-* Visible (k)
+* Required (k)
      data T k (a::k->*) b = MkT (a b)
   Here T's kind is  T :: forall k:* -> (k->*) -> k -> *
-  The kind Visible, since it bound in a positional way in T's declaration
+  The kind is Required, since it bound in a positional way in T's declaration
   Every use of T must be explicitly applied to a kind
 
-* Invisible (k1), Specified (k)
+* Inferred (k1), Specified (k)
      data T a b (c :: k) = MkT (a b) (Proxy c)
   Here T's kind is  T :: forall {k1:*} (k:*). (k1->*) -> k1 -> k -> *
   So 'k' is Specified, because it appears explicitly,
-  but 'k1' is Invisible, because it does not
+  but 'k1' is Inferred, because it does not
 
 ---- Printing -----
 
@@ -577,30 +577,30 @@ In type declarations:
  Specified: a list of Specified binders is written between `forall` and `.`:
                const :: forall a b. a -> b -> a
 
- Invisible: with -fprint-explicit-foralls, Invisible binders are written
+ Inferred:  with -fprint-explicit-foralls, Inferred binders are written
             in braces:
                f :: forall {k} (a:k). S k a -> Int
             Otherwise, they are printed like Specified binders.
 
- Visible: binders are put between `forall` and `->`:
+ Required: binders are put between `forall` and `->`:
               T :: forall k -> *
 
 ---- Other points -----
 
 * In classic Haskell, all named binders (that is, the type variables in
-  a polymorphic function type f :: forall a. a -> a) have been Invisible.
+  a polymorphic function type f :: forall a. a -> a) have been Inferred.
 
-* Invisible variables correspond to "generalized" variables from the
+* Inferred variables correspond to "generalized" variables from the
   Visible Type Applications paper (ESOP'16).
 
-Note [No Visible TyBinder in terms]
+Note [No Required TyBinder in terms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We don't allow Visible foralls for term variables, including pattern
+We don't allow Required foralls for term variables, including pattern
 synonyms and data constructors.  Why?  Because then an application
 would need a /compulsory/ type argument (possibly without an "@"?),
 thus (f Int); and we don't have concrete syntax for that.
 
-We could change this decision, but Visible, Named TyBinders are rare
+We could change this decision, but Required, Named TyBinders are rare
 anyway.  (Most are Anons.)
 -}
 
@@ -678,7 +678,7 @@ mkFunTy arg res = FunTy arg res
 mkFunTys :: [Type] -> Type -> Type
 mkFunTys tys ty = foldr mkFunTy ty tys
 
-mkForAllTy :: TyVar -> VisibilityFlag -> Type -> Type
+mkForAllTy :: TyVar -> ArgFlag -> Type -> Type
 mkForAllTy tv vis ty = ForAllTy (TvBndr tv vis) ty
 
 -- | Wraps foralls over the type using the provided 'TyVar's from left to right
@@ -2690,7 +2690,7 @@ ppr_sigma_type dflags False orig_ty
     split :: [TyVar] -> [PredType] -> Type
           -> ([TyVar], [PredType], Type)
     split bndr_acc theta_acc (ForAllTy (TvBndr tv vis) ty)
-      | isInvisible vis         = split (tv : bndr_acc) theta_acc ty
+      | isInvisibleArgFlag vis  = split (tv : bndr_acc) theta_acc ty
     split bndr_acc theta_acc (FunTy ty1 ty2)
       | isPredTy ty1            = split bndr_acc (ty1 : theta_acc) ty2
     split bndr_acc theta_acc ty = (reverse bndr_acc, reverse theta_acc, ty)
@@ -2742,7 +2742,7 @@ pprForAll bndrs@(TvBndr _ vis : _)
     (bndrs', doc) = ppr_tv_bndrs bndrs vis
 
     add_separator stuff = case vis of
-                            Visible   -> stuff <+> arrow
+                            Required  -> stuff <+> arrow
                             _inv      -> stuff <>  dot
 
 pprTvBndrs :: [TyVar] -> SDoc
@@ -2751,12 +2751,12 @@ pprTvBndrs tvs = sep (map pprTvBndr tvs)
 -- | Render the ... in @(forall ... .)@ or @(forall ... ->)@.
 -- Returns both the list of not-yet-rendered binders and the doc.
 ppr_tv_bndrs :: [TyVarBinder]
-             -> VisibilityFlag  -- ^ visibility of the first binder in the list
+             -> ArgFlag  -- ^ visibility of the first binder in the list
              -> ([TyVarBinder], SDoc)
 ppr_tv_bndrs all_bndrs@(TvBndr tv vis : bndrs) vis1
   | vis `sameVis` vis1 = let (bndrs', doc) = ppr_tv_bndrs bndrs vis1
                              pp_tv = sdocWithDynFlags $ \dflags ->
-                                     if Invisible == vis &&
+                                     if Inferred == vis &&
                                         gopt Opt_PrintExplicitForalls dflags
                                      then braces (pprTvBndrNoParens tv)
                                      else pprTvBndr tv
@@ -2781,9 +2781,9 @@ pprTvBndrNoParens tv
 
 instance Outputable TyBinder where
   ppr (Anon ty) = text "[anon]" <+> ppr ty
-  ppr (Named (TvBndr v Visible))   = ppr v
+  ppr (Named (TvBndr v Required))  = ppr v
   ppr (Named (TvBndr v Specified)) = char '@' <> ppr v
-  ppr (Named (TvBndr v Invisible)) = braces (ppr v)
+  ppr (Named (TvBndr v Inferred))  = braces (ppr v)
 
 -----------------
 instance Outputable Coercion where -- defined here to avoid orphans

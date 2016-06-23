@@ -2104,7 +2104,7 @@ considers this example, with -fprint-explicit-foralls enabled:
 
   Note that the variables and constraints are reordered here, because this
   is possible during regeneralization. Also note that the variables are
-  reported as Invisible instead of Specified.
+  reported as Inferred instead of Specified.
 
 :type +v / TM_NoInst
 

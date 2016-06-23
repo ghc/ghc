@@ -178,9 +178,9 @@ mkDataConUnivTyVarBinders tc_bndrs
    mk_binder (TvBndr tv tc_vis) = mkTyVarBinder vis tv
       where
         vis = case tc_vis of
-                AnonTCB          -> Specified
-                NamedTCB Visible -> Specified
-                NamedTCB vis     -> vis
+                AnonTCB           -> Specified
+                NamedTCB Required -> Specified
+                NamedTCB vis      -> vis
 
 {- Note [Building the TyBinders for a DataCon]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -201,8 +201,8 @@ of the DataCon. Here is an example:
 
 The TyCon has
 
-  tyConTyVars    = [ k:*,                               a:k->*,      b:k]
-  tyConTyBinders = [ Named (TvBndr (k :: *) Invisible), Anon (k->*), Anon k ]
+  tyConTyVars    = [ k:*,                              a:k->*,      b:k]
+  tyConTyBinders = [ Named (TvBndr (k :: *) Inferred), Anon (k->*), Anon k ]
 
 The TyBinders for App line up with App's kind, given above.
 
@@ -211,7 +211,7 @@ But the DataCon MkApp has the type
 
 That is, its TyBinders should be
 
-  dataConUnivTyVarBinders = [ TvBndr (k:*)    Invisible
+  dataConUnivTyVarBinders = [ TvBndr (k:*)    Inferred
                             , TvBndr (a:k->*) Specified
                             , TvBndr (b:k)    Specified ]
 
@@ -219,12 +219,12 @@ So we want to take the TyCon's TyBinders and the TyCon's TyVars and
 merge them, pulling
   - variable names from the TyVars
   - visibilities from the TyBinders
-  - but changing Anon/Visible to Specified
+  - but changing Anon/Required to Specified
 
-The last part about Visible->Specified comes from this:
+The last part about Required->Specified comes from this:
   data T k (a:k) b = MkT (a b)
-Here k is Visible in T's kind, but we don't have Visible binders in
-the TyBinders for a term (see Note [No Visible TyBinder in terms]
+Here k is Required in T's kind, but we don't have Required binders in
+the TyBinders for a term (see Note [No Required TyBinder in terms]
 in TyCoRep), so we change it to Specified when making MkT's TyBinders
 
 This merging operation is done by mkDataConUnivTyBinders. In contrast,

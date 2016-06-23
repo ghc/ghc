@@ -752,7 +752,7 @@ tcInferArgs fun tc_binders mb_kind_info args
        ; (subst, leftover_binders, args', leftovers, n)
            <- tc_infer_args typeLevelMode fun binders mb_kind_info args 1
         -- now, we need to instantiate any remaining invisible arguments
-       ; let (invis_bndrs, other_binders) = span isInvisibleBinder leftover_binders
+       ; let (invis_bndrs, other_binders) = break isVisibleBinder leftover_binders
        ; (subst', invis_args)
            <- tcInstBindersX subst mb_kind_info invis_bndrs
        ; return ( subst'
@@ -780,7 +780,7 @@ tc_infer_args mode orig_ty binders mb_kind_info orig_args n0
     -- typechecking, we don't.
 
     go subst binders all_args n acc
-      | (inv_binders, other_binders) <- span isInvisibleBinder binders
+      | (inv_binders, other_binders) <- break isVisibleBinder binders
       , not (null inv_binders)
       = do { traceTc "tc_infer_args 1" (ppr inv_binders)
            ; (subst', args') <- tcInstBindersX subst mb_kind_info inv_binders
@@ -1320,7 +1320,7 @@ kcHsTyVarBndrs name cusk open_fam all_kind_vars
                                            thing
                   -- See Note [Dependent LHsQTyVars]
            ; let new_binder | hsTyVarName hs_tv `elemNameSet` dep_names
-                            = mkNamedTyConBinder Visible tv
+                            = mkNamedTyConBinder Required tv
                             | otherwise
                             = mkAnonTyConBinder tv
            ; return ( new_binder : binders

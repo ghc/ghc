@@ -622,8 +622,8 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel
       ; if not (equalLength bndrs1 bndrs2)
         then do { traceTcS "Forall failure" $
                      vcat [ ppr s1, ppr s2, ppr bndrs1, ppr bndrs2
-                          , ppr (map binderVisibility bndrs1)
-                          , ppr (map binderVisibility bndrs2) ]
+                          , ppr (map binderArgFlag bndrs1)
+                          , ppr (map binderArgFlag bndrs2) ]
                 ; canEqHardFailure ev s1 s2 }
         else
           do { traceTcS "Creating implication for polytype equality" $ ppr ev

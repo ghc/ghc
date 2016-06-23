@@ -19,7 +19,7 @@ module TyCon(
         TyConBinder, TyConBndrVis(..),
         mkNamedTyConBinder, mkNamedTyConBinders,
         mkAnonTyConBinder, mkAnonTyConBinders,
-        tyConBinderVisibility, isNamedTyConBinder,
+        tyConBinderArgFlag, isNamedTyConBinder,
         isVisibleTyConBinder, isInvisibleTyConBinder,
 
         -- ** Field labels
@@ -375,7 +375,7 @@ See also:
 type TyConBinder = TyVarBndr TyVar TyConBndrVis
 
 data TyConBndrVis
-  = NamedTCB VisibilityFlag
+  = NamedTCB ArgFlag
   | AnonTCB
 
 mkAnonTyConBinder :: TyVar -> TyConBinder
@@ -384,17 +384,17 @@ mkAnonTyConBinder tv = TvBndr tv AnonTCB
 mkAnonTyConBinders :: [TyVar] -> [TyConBinder]
 mkAnonTyConBinders tvs = map mkAnonTyConBinder tvs
 
-mkNamedTyConBinder :: VisibilityFlag -> TyVar -> TyConBinder
+mkNamedTyConBinder :: ArgFlag -> TyVar -> TyConBinder
 -- The odd argument order supports currying
 mkNamedTyConBinder vis tv = TvBndr tv (NamedTCB vis)
 
-mkNamedTyConBinders :: VisibilityFlag -> [TyVar] -> [TyConBinder]
+mkNamedTyConBinders :: ArgFlag -> [TyVar] -> [TyConBinder]
 -- The odd argument order supports currying
 mkNamedTyConBinders vis tvs = map (mkNamedTyConBinder vis) tvs
 
-tyConBinderVisibility :: TyConBinder -> VisibilityFlag
-tyConBinderVisibility (TvBndr _ (NamedTCB vis)) = vis
-tyConBinderVisibility (TvBndr _ AnonTCB)        = Visible
+tyConBinderArgFlag :: TyConBinder -> ArgFlag
+tyConBinderArgFlag (TvBndr _ (NamedTCB vis)) = vis
+tyConBinderArgFlag (TvBndr _ AnonTCB)        = Required
 
 isNamedTyConBinder :: TyConBinder -> Bool
 isNamedTyConBinder (TvBndr _ (NamedTCB {})) = True
@@ -402,7 +402,7 @@ isNamedTyConBinder _                        = False
 
 isVisibleTyConBinder :: TyVarBndr tv TyConBndrVis -> Bool
 -- Works for IfaceTyConBinder too
-isVisibleTyConBinder (TvBndr _ (NamedTCB vis)) = isVisible vis
+isVisibleTyConBinder (TvBndr _ (NamedTCB vis)) = isVisibleArgFlag vis
 isVisibleTyConBinder (TvBndr _ AnonTCB)        = True
 
 isInvisibleTyConBinder :: TyVarBndr tv TyConBndrVis -> Bool
@@ -432,14 +432,14 @@ They fit together like so:
 
     type App a (b :: k) = a b
 
-  tyConBinders = [ TvBndr (k::*)   (NamedTCB Invisible)
+  tyConBinders = [ TvBndr (k::*)   (NamedTCB Inferred)
                  , TvBndr (a:k->*) AnonTCB
                  , TvBndr (b:k)    AnonTCB ]
 
   Note that that are three binders here, including the
   kind variable k.
 
-  See Note [TyBinders and VisibilityFlags] in TyConRep for what
+  See Note [TyBinders and ArgFlags] in TyCoRep for what
   the visibility flag means.
 
 * Each TyConBinder tyConBinders has a TyVar, and that TyVar may
@@ -467,9 +467,9 @@ They fit together like so:
 
 instance Outputable tv => Outputable (TyVarBndr tv TyConBndrVis) where
   ppr (TvBndr v AnonTCB)              = ppr v
-  ppr (TvBndr v (NamedTCB Visible))   = ppr v
+  ppr (TvBndr v (NamedTCB Required))  = ppr v
   ppr (TvBndr v (NamedTCB Specified)) = char '@' <> ppr v
-  ppr (TvBndr v (NamedTCB Invisible)) = braces (ppr v)
+  ppr (TvBndr v (NamedTCB Inferred))  = braces (ppr v)
 
 instance Binary TyConBndrVis where
   put_ bh AnonTCB        = putByte bh 0

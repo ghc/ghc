@@ -556,7 +556,7 @@ unboxedTupleKind = tYPE unboxedTupleRepDataConTy
 mkFunKind :: Kind -> Kind -> Kind
 mkFunKind = mkFunTy
 
-mkForAllKind :: TyVar -> VisibilityFlag -> Kind -> Kind
+mkForAllKind :: TyVar -> ArgFlag -> Kind -> Kind
 mkForAllKind = mkForAllTy
 
 {-

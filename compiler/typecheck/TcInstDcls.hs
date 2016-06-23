@@ -1532,7 +1532,7 @@ mkDefMethBind clas inst_tys sel_id dm_name
 
               fn   = noLoc (idName sel_id)
               visible_inst_tys = [ ty | (tcb, ty) <- tyConBinders (classTyCon clas) `zip` inst_tys
-                                      , tyConBinderVisibility tcb /= Invisible ]
+                                      , tyConBinderArgFlag tcb /= Inferred ]
               rhs  = foldl mk_vta (nlHsVar dm_name) visible_inst_tys
               bind = noLoc $ mkTopFunBind Generated fn $
                              [mkSimpleMatch (FunRhs fn Prefix) [] rhs]
