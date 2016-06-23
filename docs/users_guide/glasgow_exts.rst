@@ -3053,8 +3053,10 @@ More details:
       unqualified).
 
    -  In the case of expressions (but not patterns), the variable ``f``
-      is in scope unqualified, apart from the binding of the record
-      selector itself.
+      is in scope unqualified, and is not imported or bound at top level.
+      For example, ``f`` can be bound by an enclosing pattern match or
+      let/where-binding.  (The motivation here is that it should be
+      easy for the reader to figure out what the "``..``" expands to.)
 
    These rules restrict record wildcards to the situations in which the
    user could have written the expanded version. For example ::
