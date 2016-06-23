@@ -837,7 +837,8 @@ instance Eq (DeBruijn Type) where
             -> True
         _ -> False
 
-instance Outputable a => Outputable (TypeMapG a) where
+instance {-# OVERLAPPING #-}
+         Outputable a => Outputable (TypeMapG a) where
   ppr m = text "TypeMap elts" <+> ppr (foldTM (:) m [])
 
 emptyT :: TypeMapX a

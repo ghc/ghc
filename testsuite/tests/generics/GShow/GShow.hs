@@ -119,7 +119,8 @@ instance GShow Char   where gshowsPrec = showsPrec
 instance GShow Double where gshowsPrec = showsPrec
 instance GShow Int    where gshowsPrec = showsPrec
 instance GShow Float  where gshowsPrec = showsPrec
-instance GShow String where gshowsPrec = showsPrec
+instance {-# OVERLAPPING #-}
+         GShow String where gshowsPrec = showsPrec
 instance GShow Word   where gshowsPrec = showsPrec
 instance GShow Bool   where gshowsPrec = showsPrec
 

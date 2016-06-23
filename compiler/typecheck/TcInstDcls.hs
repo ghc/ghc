@@ -731,16 +731,15 @@ tcInstDecls2 tycl_decls inst_decls
         ; let dm_ids = collectHsBindsBinders dm_binds
               -- Add the default method Ids (again)
               -- (they were arready added in TcTyDecls.tcAddImplicits)
-              -- See Note [Default methods and instances]
+              -- See Note [Default methods in the type environment]
         ; inst_binds_s <- tcExtendGlobalValEnv dm_ids $
                           mapM tcInstDecl2 inst_decls
 
           -- Done
         ; return (dm_binds `unionBags` unionManyBags inst_binds_s) }
 
-{-
-See Note [Default methods and instances]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Default methods in the type environment]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The default method Ids are already in the type environment (see Note
 [Default method Ids and Template Haskell] in TcTyDcls), BUT they
 don't have their InlinePragmas yet.  Usually that would not matter,
@@ -1224,7 +1223,7 @@ tcMethods :: DFunId -> Class
         -- The returned inst_meth_ids all have types starting
         --      forall tvs. theta => ...
 tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
-                  dfun_ev_binds prags@(spec_inst_prags,_) op_items
+                  dfun_ev_binds (spec_inst_prags, prag_fn) op_items
                   (InstBindings { ib_binds      = binds
                                 , ib_tyvars     = lexical_tvs
                                 , ib_pragmas    = sigs
@@ -1247,9 +1246,10 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
     ----------------------
     tc_item :: ClassOpItem -> TcM (Id, LHsBind Id, Maybe Implication)
     tc_item (sel_id, dm_info)
-      | Just (user_bind, bndr_loc) <- findMethodBind (idName sel_id) binds
+      | Just (user_bind, bndr_loc, prags) <- findMethodBind (idName sel_id) binds prag_fn
       = tcMethodBody clas tyvars dfun_ev_vars inst_tys
-                              dfun_ev_binds is_derived hs_sig_fn prags
+                              dfun_ev_binds is_derived hs_sig_fn
+                              spec_inst_prags prags
                               sel_id user_bind bndr_loc
       | otherwise
       = do { traceTc "tc_def" (ppr sel_id)
@@ -1258,11 +1258,12 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
     ----------------------
     tc_default :: Id -> DefMethInfo -> TcM (TcId, LHsBind Id, Maybe Implication)
 
-    tc_default sel_id (Just (dm_name, GenericDM {}))
-      = do { meth_bind <- mkGenericDefMethBind clas inst_tys sel_id dm_name
+    tc_default sel_id (Just (dm_name, _))
+      = do { (meth_bind, inline_prags) <- mkDefMethBind clas inst_tys sel_id dm_name
            ; tcMethodBody clas tyvars dfun_ev_vars inst_tys
-                                  dfun_ev_binds is_derived hs_sig_fn prags
-                                  sel_id meth_bind inst_loc }
+                          dfun_ev_binds is_derived hs_sig_fn
+                          spec_inst_prags inline_prags
+                          sel_id meth_bind inst_loc }
 
     tc_default sel_id Nothing     -- No default method at all
       = do { traceTc "tc_def: warn" (ppr sel_id)
@@ -1286,65 +1287,24 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                               (hcat [ppr inst_loc, vbar, ppr sel_id ])
         lam_wrapper  = mkWpTyLams tyvars <.> mkWpLams dfun_ev_vars
 
-    tc_default sel_id (Just (dm_name, VanillaDM)) -- A polymorphic default method
-      = do {     -- Build the typechecked version directly,
-                 -- without calling typecheck_method;
-                 -- see Note [Default methods in instances]
-                 -- Generate   /\as.\ds. let self = df as ds
-                 --                      in $dm inst_tys self
-                 -- The 'let' is necessary only because HsSyn doesn't allow
-                 -- you to apply a function to a dictionary *expression*.
-
-           ; self_dict <- newDict clas inst_tys
-           ; let ev_term = EvDFunApp dfun_id (mkTyVarTys tyvars)
-                                     (map EvId dfun_ev_vars)
-                 self_ev_bind = mkWantedEvBind self_dict ev_term
-
-           ; (meth_id, local_meth_id)
-                   <- mkMethIds clas tyvars dfun_ev_vars inst_tys sel_id
-           ; dm_id <- tcLookupId dm_name
-           ; let dm_inline_prag = idInlinePragma dm_id
-                 rhs = HsWrap (mkWpEvVarApps [self_dict] <.> mkWpTyApps inst_tys) $
-                       HsVar (noLoc dm_id)
-
-                 meth_bind = mkVarBind local_meth_id (L inst_loc rhs)
-                 meth_id1 = meth_id `setInlinePragma` dm_inline_prag
-                        -- Copy the inline pragma (if any) from the default
-                        -- method to this version. Note [INLINE and default methods]
-
-                 export = ABE { abe_wrap = idHsWrapper
-                              , abe_poly = meth_id1
-                              , abe_mono = local_meth_id
-                              , abe_prags = mk_meth_spec_prags meth_id1 spec_inst_prags [] }
-                 bind = AbsBinds { abs_tvs = tyvars, abs_ev_vars = dfun_ev_vars
-                                 , abs_exports = [export]
-                                 , abs_ev_binds = [EvBinds (unitBag self_ev_bind)]
-                                 , abs_binds    = unitBag meth_bind }
-             -- Default methods in an instance declaration can't have their own
-             -- INLINE or SPECIALISE pragmas. It'd be possible to allow them, but
-             -- currently they are rejected with
-             --           "INLINE pragma lacks an accompanying binding"
-
-           ; return (meth_id1, L inst_loc bind, Nothing) }
-
     ----------------------
     -- Check if one of the minimal complete definitions is satisfied
     checkMinimalDefinition
       = whenIsJust (isUnsatisfied methodExists (classMinimalDef clas)) $
-          warnUnsatisfiedMinimalDefinition
-      where
-      methodExists meth = isJust (findMethodBind meth binds)
+        warnUnsatisfiedMinimalDefinition
+
+    methodExists meth = isJust (findMethodBind meth binds prag_fn)
 
 ------------------------
 tcMethodBody :: Class -> [TcTyVar] -> [EvVar] -> [TcType]
              -> TcEvBinds -> Bool
              -> HsSigFun
-             -> ([LTcSpecPrag], TcPragEnv)
+             -> [LTcSpecPrag] -> [LSig Name]
              -> Id -> LHsBind Name -> SrcSpan
              -> TcM (TcId, LHsBind Id, Maybe Implication)
 tcMethodBody clas tyvars dfun_ev_vars inst_tys
                      dfun_ev_binds is_derived
-                     sig_fn (spec_inst_prags, prag_fn)
+                     sig_fn spec_inst_prags prags
                      sel_id (L bind_loc meth_bind) bndr_loc
   = add_meth_ctxt $
     do { traceTc "tcMethodBody" (ppr sel_id <+> ppr (idType sel_id) $$ ppr bndr_loc)
@@ -1352,8 +1312,7 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
                                             mkMethIds clas tyvars dfun_ev_vars
                                                       inst_tys sel_id
 
-       ; let prags   = lookupPragEnv prag_fn (idName sel_id)
-             lm_bind = meth_bind { fun_id = L bndr_loc (idName local_meth_id) }
+       ; let lm_bind = meth_bind { fun_id = L bndr_loc (idName local_meth_id) }
                        -- Substitute the local_meth_name for the binder
                        -- NB: the binding is always a FunBind
 
@@ -1553,21 +1512,41 @@ mk_meth_spec_prags meth_id spec_inst_prags spec_prags_for_me
          | L inst_loc (SpecPrag _ wrap inl) <- spec_inst_prags]
 
 
-mkGenericDefMethBind :: Class -> [Type] -> Id -> Name -> TcM (LHsBind Name)
-mkGenericDefMethBind clas inst_tys sel_id dm_name
-  =     -- A generic default method
-        -- If the method is defined generically, we only have to call the
-        -- dm_name.
-    do  { dflags <- getDynFlags
+mkDefMethBind :: Class -> [Type] -> Id -> Name -> TcM (LHsBind Name, [LSig Name])
+-- The is a default method (vanailla or generic) defined in the class
+-- So make a binding   op = $dmop @t1 @t2
+-- where $dmop is the name of the default method in the class,
+-- and t1,t2 are the instace types.
+-- See Note [Default methods in instances] for why we use
+-- visible type application here
+mkDefMethBind clas inst_tys sel_id dm_name
+  = do  { dflags <- getDynFlags
+        ; dm_id <- tcLookupId dm_name
+        ; let inline_prag = idInlinePragma dm_id
+              inline_prags | isAnyInlinePragma inline_prag
+                           = [noLoc (InlineSig fn inline_prag)]
+                           | otherwise
+                           = []
+                 -- Copy the inline pragma (if any) from the default method
+                 -- to this version. Note [INLINE and default methods]
+
+              fn   = noLoc (idName sel_id)
+              visible_inst_tys = [ ty | (tcb, ty) <- tyConBinders (classTyCon clas) `zip` inst_tys
+                                      , tyConBinderVisibility tcb /= Invisible ]
+              rhs  = foldl mk_vta (nlHsVar dm_name) visible_inst_tys
+              bind = noLoc $ mkTopFunBind Generated fn $
+                             [mkSimpleMatch (FunRhs fn Prefix) [] rhs]
+
         ; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Filling in method body"
                    (vcat [ppr clas <+> ppr inst_tys,
                           nest 2 (ppr sel_id <+> equals <+> ppr rhs)]))
 
-        ; let fn = noLoc (idName sel_id)
-        ; return (noLoc $ mkTopFunBind Generated fn
-                                    [mkSimpleMatch (FunRhs fn Prefix) [] rhs]) }
+       ; return (bind, inline_prags) }
   where
-    rhs = nlHsVar dm_name
+    mk_vta :: LHsExpr Name -> Type -> LHsExpr Name
+    mk_vta fun ty = noLoc (HsAppType fun (mkEmptyWildCardBndrs $ noLoc $ HsCoreTy ty))
+       -- NB: use visible type application
+       -- See Note [Default methods in instances]
 
 ----------------------
 derivBindCtxt :: Id -> Class -> [Type ] -> SDoc
@@ -1614,16 +1593,19 @@ From the class decl we get
    $dmfoo :: forall v x. Baz v x => x -> x
    $dmfoo y = <blah>
 
-Notice that the type is ambiguous.  That's fine, though. The instance
-decl generates
+Notice that the type is ambiguous.  So we use Visible Type Application
+to disambiguate:
 
    $dBazIntInt = MkBaz fooIntInt
-   fooIntInt = $dmfoo Int Int $dBazIntInt
+   fooIntInt = $dmfoo @Int @Int
 
-BUT this does mean we must generate the dictionary translation of
-fooIntInt directly, rather than generating source-code and
-type-checking it.  That was the bug in Trac #1061. In any case it's
-less work to generate the translated version!
+Lacking VTA we'd get ambiguity errors involving the default method.  This applies
+equally to vanilla default methods (Trac #1061) and generic default methods
+(Trac #12220).
+
+Historical note: before we had VTA we had to generate
+post-type-checked code, which took a lot more code, and didn't work for
+generic default methods.
 
 Note [INLINE and default methods]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
