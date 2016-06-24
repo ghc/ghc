@@ -1,6 +1,6 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
-## 2.11.0.0  *TBA*
+## 2.11.0.0  *May 2016*
 
   * Bundled with GHC 8.0.1
 
@@ -30,9 +30,8 @@
     in Haskell source code (`SourceUnpackedness` and `SourceStrictness`, as
     well as `Bang`), and one for strictness information after a constructor is
     compiled (`DecidedStrictness`). `Strict`, `StrictType` and `VarStrictType`
-    have been deprecated in favor of `Bang`, `BangType` and `VarBangType`, and
-    three functions (`isStrict`, `isLazy`, and `unpack`) were removed because
-    they no longer serve any use in this new design. (#10697)
+    have been deprecated in favor of `Bang`, `BangType` and `VarBangType`.
+    (#10697)
 
   * Add `reifyConStrictness` to query a data constructor's `DecidedStrictness`
     values for its fields (#10697)
@@ -44,8 +43,6 @@
     `Nothing` otherwise (#10704 and #11345)
 
   * Add `MonadFail Q` instance for GHC 8.0 and later (#11661)
-
-  * TODO: document API changes and important bugfixes
 
   * Add support for OVERLAP(S/PED/PING) pragmas on instances
 
