@@ -171,8 +171,11 @@ instance Outputable AvailInfo where
    ppr = pprAvail
 
 pprAvail :: AvailInfo -> SDoc
-pprAvail (Avail _ n)         = ppr n
-pprAvail (AvailTC n ns fs) = ppr n <> braces (hsep (punctuate comma (map ppr ns ++ map (ppr . flLabel) fs)))
+pprAvail (Avail _ n)
+  = ppr n
+pprAvail (AvailTC n ns fs)
+  = ppr n <> braces (sep [ fsep (punctuate comma (map ppr ns)) <> semi
+                         , fsep (punctuate comma (map (ppr . flLabel) fs))])
 
 instance Binary AvailInfo where
     put_ bh (Avail b aa) = do
