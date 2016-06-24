@@ -237,3 +237,7 @@ test('T11662',
      [extra_clean(['T11662_A.hi', 'T11662_A.o'])],
      multimod_compile,
      ['T11662', '-v0'])
+test('T12127',
+     [extra_clean(['T12127a.hi', 'T12127a.o'])],
+     multimod_compile,
+     ['T12127', '-v0'])
