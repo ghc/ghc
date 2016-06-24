@@ -1,0 +1,5 @@
+
+T12229.hs:7:7: warning: [-Wmissing-fields (in -Wdefault)]
+    • Fields of ‘MkT’ not initialised: pi
+    • In the expression: MkT {..}
+      In an equation for ‘f’: f x = MkT {..}
