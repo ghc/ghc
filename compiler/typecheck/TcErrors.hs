@@ -244,6 +244,16 @@ data HoleChoice
   | HoleWarn      -- Defer to runtime, emit a compile-time warning
   | HoleDefer     -- Defer to runtime, no warning
 
+instance Outputable HoleChoice where
+  ppr HoleError = text "HoleError"
+  ppr HoleWarn  = text "HoleWarn"
+  ppr HoleDefer = text "HoleDefer"
+
+instance Outputable TypeErrorChoice  where
+  ppr TypeError = text "TypeError"
+  ppr TypeWarn  = text "TypeWarn"
+  ppr TypeDefer = text "TypeDefer"
+
 data ReportErrCtxt
     = CEC { cec_encl :: [Implication]  -- Enclosing implications
                                        --   (innermost first)
@@ -421,7 +431,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
               , ("skolem eq1",   very_wrong,      True, mkSkolReporter)
               , ("skolem eq2",   skolem_eq,       True, mkSkolReporter)
               , ("non-tv eq",    non_tv_eq,       True, mkSkolReporter)
-              , ("Out of scope", is_out_of_scope, True,  mkHoleReporter)
+              , ("Out of scope", is_out_of_scope, True, mkHoleReporter)
               , ("Holes",        is_hole,         False, mkHoleReporter)
 
                   -- The only remaining equalities are alpha ~ ty,
@@ -528,14 +538,14 @@ mkSkolReporter ctxt cts
 mkHoleReporter :: Reporter
 -- Reports errors one at a time
 mkHoleReporter ctxt
-  = mapM_ $ \ct ->
-    do { err <- mkHoleError ctxt ct
-       ; maybeReportHoleError ctxt ct err
-       ; maybeAddDeferredHoleBinding ctxt err ct }
+  = mapM_ $ \ct -> do { err <- mkHoleError ctxt ct
+                      ; maybeReportHoleError ctxt ct err
+                      ; maybeAddDeferredHoleBinding ctxt err ct }
 
 mkUserTypeErrorReporter :: Reporter
 mkUserTypeErrorReporter ctxt
-  = mapM_ $ \ct -> maybeReportError ctxt =<< mkUserTypeError ctxt ct
+  = mapM_ $ \ct -> do { err <- mkUserTypeError ctxt ct
+                      ; maybeReportError ctxt err }
 
 mkUserTypeError :: ReportErrCtxt -> Ct -> TcM ErrMsg
 mkUserTypeError ctxt ct = mkErrorMsgFromCt ctxt ct
@@ -553,7 +563,6 @@ mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg)
 -- and report only the first (to avoid a cascade)
 mkGroupReporter mk_err ctxt cts
   = mapM_ (reportGroup mk_err ctxt) (equivClasses cmp_loc cts)
-  where
 
 cmp_lhs_type :: Ct -> Ct -> Ordering
 cmp_lhs_type ct1 ct2
@@ -577,9 +586,13 @@ reportGroup mk_err ctxt cts =
 
         (_, cts') -> do { err <- mk_err ctxt cts'
                         ; maybeReportError ctxt err
-                        ; mapM_ (maybeAddDeferredBinding ctxt err) cts' }
-                                -- Add deferred bindings for all
-                                -- But see Note [Always warn with -fdefer-type-errors]
+                            -- But see Note [Always warn with -fdefer-type-errors]
+                        ; traceTc "reportGroup" (ppr cts')
+                        ; mapM_ (addDeferredBinding ctxt err) cts' }
+                            -- Add deferred bindings for all
+                            -- Redundant if we are going to abort compilation,
+                            -- but that's hard to know for sure, and if we don't
+                            -- abort, we need bindings for all (e.g. Trac #12156)
   where
     isMonadFailInstanceMissing ct =
         case ctLocOrigin (ctLoc ct) of
@@ -649,23 +662,10 @@ addDeferredBinding ctxt err ct
 
 maybeAddDeferredHoleBinding :: ReportErrCtxt -> ErrMsg -> Ct -> TcM ()
 maybeAddDeferredHoleBinding ctxt err ct
-    | isExprHoleCt ct
-    , case cec_expr_holes ctxt of
-        HoleDefer -> True
-        HoleWarn  -> True
-        HoleError -> False
-    = addDeferredBinding ctxt err ct  -- Only add bindings for holes in expressions
-    | otherwise                       -- not for holes in partial type signatures
-    = return ()
-
-maybeAddDeferredBinding :: ReportErrCtxt -> ErrMsg -> Ct -> TcM ()
-maybeAddDeferredBinding ctxt err ct =
-  case cec_defer_type_errors ctxt of
-        TypeDefer -> deferred
-        TypeWarn -> deferred
-        TypeError -> return ()
-  where
-    deferred = addDeferredBinding ctxt err ct
+  | isExprHoleCt ct
+  = addDeferredBinding ctxt err ct  -- Only add bindings for holes in expressions
+  | otherwise                       -- not for holes in partial type signatures
+  = return ()
 
 tryReporters :: ReportErrCtxt -> [ReporterSpec] -> [Ct] -> TcM (ReportErrCtxt, [Ct])
 -- Use the first reporter in the list whose predicate says True
@@ -688,9 +688,10 @@ tryReporters ctxt reporters cts
 tryReporter :: ReportErrCtxt -> ReporterSpec -> [Ct] -> TcM (ReportErrCtxt, [Ct])
 tryReporter ctxt (str, keep_me,  suppress_after, reporter) cts
   | null yeses = return (ctxt, cts)
-  | otherwise  = do { traceTc "tryReporter:" (text str <+> ppr yeses)
+  | otherwise  = do { traceTc "tryReporter{ " (text str <+> ppr yeses)
                     ; reporter ctxt yeses
                     ; let ctxt' = ctxt { cec_suppress = suppress_after || cec_suppress ctxt }
+                    ; traceTc "tryReporter end }" (text str <+> ppr (cec_suppress ctxt) <+> ppr suppress_after)
                     ; return (ctxt', nos) }
   where
     (yeses, nos) = partition (\ct -> keep_me ct (classifyPredType (ctPred ct))) cts
