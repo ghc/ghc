@@ -1283,14 +1283,13 @@ buildAlgTyCon :: Name
               -> Maybe CType
               -> ThetaType             -- ^ Stupid theta
               -> AlgTyConRhs
-              -> RecFlag
               -> Bool                  -- ^ True <=> was declared in GADT syntax
               -> AlgTyConFlav
               -> TyCon
 
 buildAlgTyCon tc_name ktvs roles cType stupid_theta rhs
-              is_rec gadt_syn parent
+              gadt_syn parent
   = mkAlgTyCon tc_name binders liftedTypeKind roles cType stupid_theta
-               rhs parent is_rec gadt_syn
+               rhs parent gadt_syn
   where
     binders = mkTyConBindersPreferAnon ktvs liftedTypeKind

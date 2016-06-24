@@ -136,7 +136,7 @@ import Class            ( Class, mkClass )
 import RdrName
 import Name
 import NameSet          ( NameSet, mkNameSet, elemNameSet )
-import BasicTypes       ( Arity, RecFlag(..), Boxity(..),
+import BasicTypes       ( Arity, Boxity(..),
                           TupleSort(..) )
 import ForeignCall
 import SrcLoc           ( noSrcSpan )
@@ -446,14 +446,14 @@ parrTyCon_RDR   = nameRdrName parrTyConName
 ************************************************************************
 -}
 
-pcNonRecDataTyCon :: Name -> Maybe CType -> [TyVar] -> [DataCon] -> TyCon
+pcNonEnumTyCon :: Name -> Maybe CType -> [TyVar] -> [DataCon] -> TyCon
 -- Not an enumeration
-pcNonRecDataTyCon = pcTyCon False NonRecursive
+pcNonEnumTyCon = pcTyCon False
 
 -- This function assumes that the types it creates have all parameters at
 -- Representational role, and that there is no kind polymorphism.
-pcTyCon :: Bool -> RecFlag -> Name -> Maybe CType -> [TyVar] -> [DataCon] -> TyCon
-pcTyCon is_enum is_rec name cType tyvars cons
+pcTyCon :: Bool -> Name -> Maybe CType -> [TyVar] -> [DataCon] -> TyCon
+pcTyCon is_enum name cType tyvars cons
   = mkAlgTyCon name
                 (mkAnonTyConBinders tyvars)
                 liftedTypeKind
@@ -462,7 +462,6 @@ pcTyCon is_enum is_rec name cType tyvars cons
                 []              -- No stupid theta
                 (DataTyCon cons is_enum)
                 (VanillaAlgTyCon (mkPrelTyConRepName name))
-                is_rec
                 False           -- Not in GADT syntax
 
 pcDataCon :: Name -> [TyVar] -> [Type] -> TyCon -> DataCon
@@ -535,15 +534,15 @@ pcSpecialDataCon dc_name arg_tys tycon rri
 typeNatKindCon, typeSymbolKindCon :: TyCon
 -- data Nat
 -- data Symbol
-typeNatKindCon    = pcTyCon False NonRecursive typeNatKindConName    Nothing [] []
-typeSymbolKindCon = pcTyCon False NonRecursive typeSymbolKindConName Nothing [] []
+typeNatKindCon    = pcTyCon False typeNatKindConName    Nothing [] []
+typeSymbolKindCon = pcTyCon False typeSymbolKindConName Nothing [] []
 
 typeNatKind, typeSymbolKind :: Kind
 typeNatKind    = mkTyConTy typeNatKindCon
 typeSymbolKind = mkTyConTy typeSymbolKindCon
 
 constraintKindTyCon :: TyCon
-constraintKindTyCon = pcTyCon False NonRecursive constraintKindTyConName
+constraintKindTyCon = pcTyCon False constraintKindTyConName
                               Nothing [] []
 
 liftedTypeKind, constraintKind, unboxedTupleKind :: Kind
@@ -826,7 +825,7 @@ heqSCSelId, coercibleSCSelId :: Id
   = (tycon, klass, datacon, sc_sel_id)
   where
     tycon     = mkClassTyCon heqTyConName binders roles
-                             rhs klass NonRecursive
+                             rhs klass
                              (mkPrelTyConRepName heqTyConName)
     klass     = mk_class tycon sc_pred sc_sel_id
     datacon   = pcDataCon heqDataConName tvs [sc_pred] tycon
@@ -844,7 +843,7 @@ heqSCSelId, coercibleSCSelId :: Id
   = (tycon, klass, datacon, sc_sel_id)
   where
     tycon     = mkClassTyCon coercibleTyConName binders roles
-                             rhs klass NonRecursive
+                             rhs klass
                              (mkPrelTyConRepName coercibleTyConName)
     klass     = mk_class tycon sc_pred sc_sel_id
     datacon   = pcDataCon coercibleDataConName tvs [sc_pred] tycon
@@ -890,7 +889,7 @@ unicodeStarKindTyCon  = mkSynonymTyCon unicodeStarKindTyConName
                                        (tYPE ptrRepLiftedTy)
 
 runtimeRepTyCon :: TyCon
-runtimeRepTyCon = pcNonRecDataTyCon runtimeRepTyConName Nothing []
+runtimeRepTyCon = pcNonEnumTyCon runtimeRepTyConName Nothing []
                           (vecRepDataCon : runtimeRepSimpleDataCons)
 
 vecRepDataCon :: DataCon
@@ -935,7 +934,7 @@ voidRepDataConTy, intRepDataConTy, wordRepDataConTy, int64RepDataConTy,
                                    runtimeRepSimpleDataCons
 
 vecCountTyCon :: TyCon
-vecCountTyCon = pcNonRecDataTyCon vecCountTyConName Nothing []
+vecCountTyCon = pcNonEnumTyCon vecCountTyConName Nothing []
                         vecCountDataCons
 
 -- See Note [Wiring in RuntimeRep]
@@ -954,7 +953,7 @@ vec2DataConTy, vec4DataConTy, vec8DataConTy, vec16DataConTy, vec32DataConTy,
   vec64DataConTy] = map (mkTyConTy . promoteDataCon) vecCountDataCons
 
 vecElemTyCon :: TyCon
-vecElemTyCon = pcNonRecDataTyCon vecElemTyConName Nothing [] vecElemDataCons
+vecElemTyCon = pcNonEnumTyCon vecElemTyConName Nothing [] vecElemDataCons
 
 -- See Note [Wiring in RuntimeRep]
 vecElemDataCons :: [DataCon]
@@ -992,7 +991,7 @@ charTy :: Type
 charTy = mkTyConTy charTyCon
 
 charTyCon :: TyCon
-charTyCon   = pcNonRecDataTyCon charTyConName
+charTyCon   = pcNonEnumTyCon charTyConName
                        (Just (CType "" Nothing ("HsChar",fsLit "HsChar")))
                        [] [charDataCon]
 charDataCon :: DataCon
@@ -1005,7 +1004,7 @@ intTy :: Type
 intTy = mkTyConTy intTyCon
 
 intTyCon :: TyCon
-intTyCon = pcNonRecDataTyCon intTyConName
+intTyCon = pcNonEnumTyCon intTyConName
                             (Just (CType "" Nothing ("HsInt",fsLit "HsInt"))) []
                             [intDataCon]
 intDataCon :: DataCon
@@ -1015,7 +1014,7 @@ wordTy :: Type
 wordTy = mkTyConTy wordTyCon
 
 wordTyCon :: TyCon
-wordTyCon = pcNonRecDataTyCon wordTyConName
+wordTyCon = pcNonEnumTyCon wordTyConName
                       (Just (CType "" Nothing ("HsWord", fsLit "HsWord"))) []
                       [wordDataCon]
 wordDataCon :: DataCon
@@ -1025,7 +1024,7 @@ word8Ty :: Type
 word8Ty = mkTyConTy word8TyCon
 
 word8TyCon :: TyCon
-word8TyCon = pcNonRecDataTyCon word8TyConName
+word8TyCon = pcNonEnumTyCon word8TyConName
                       (Just (CType "" Nothing ("HsWord8", fsLit "HsWord8"))) []
                       [word8DataCon]
 word8DataCon :: DataCon
@@ -1035,7 +1034,7 @@ floatTy :: Type
 floatTy = mkTyConTy floatTyCon
 
 floatTyCon :: TyCon
-floatTyCon   = pcNonRecDataTyCon floatTyConName
+floatTyCon   = pcNonEnumTyCon floatTyConName
                       (Just (CType "" Nothing ("HsFloat", fsLit "HsFloat"))) []
                       [floatDataCon]
 floatDataCon :: DataCon
@@ -1045,7 +1044,7 @@ doubleTy :: Type
 doubleTy = mkTyConTy doubleTyCon
 
 doubleTyCon :: TyCon
-doubleTyCon = pcNonRecDataTyCon doubleTyConName
+doubleTyCon = pcNonEnumTyCon doubleTyConName
                       (Just (CType "" Nothing ("HsDouble",fsLit "HsDouble"))) []
                       [doubleDataCon]
 
@@ -1106,7 +1105,7 @@ boolTy :: Type
 boolTy = mkTyConTy boolTyCon
 
 boolTyCon :: TyCon
-boolTyCon = pcTyCon True NonRecursive boolTyConName
+boolTyCon = pcTyCon True boolTyConName
                     (Just (CType "" Nothing ("HsBool", fsLit "HsBool")))
                     [] [falseDataCon, trueDataCon]
 
@@ -1119,7 +1118,7 @@ falseDataConId = dataConWorkId falseDataCon
 trueDataConId  = dataConWorkId trueDataCon
 
 orderingTyCon :: TyCon
-orderingTyCon = pcTyCon True NonRecursive orderingTyConName Nothing
+orderingTyCon = pcTyCon True orderingTyConName Nothing
                         [] [ltDataCon, eqDataCon, gtDataCon]
 
 ltDataCon, eqDataCon, gtDataCon :: DataCon
@@ -1151,7 +1150,7 @@ listTyCon :: TyCon
 listTyCon = buildAlgTyCon listTyConName alpha_tyvar [Representational]
                           Nothing []
                           (DataTyCon [nilDataCon, consDataCon] False )
-                          Recursive False
+                          False
                           (VanillaAlgTyCon $ mkPrelTyConRepName listTyConName)
 
 nilDataCon :: DataCon
@@ -1168,7 +1167,7 @@ consDataCon = pcDataConWithFixity True {- Declared infix -}
 -- Wired-in type Maybe
 
 maybeTyCon :: TyCon
-maybeTyCon = pcTyCon False NonRecursive maybeTyConName Nothing alpha_tyvar
+maybeTyCon = pcTyCon False maybeTyConName Nothing alpha_tyvar
                      [nothingDataCon, justDataCon]
 
 nothingDataCon :: DataCon
@@ -1264,7 +1263,7 @@ mkPArrTy ty  = mkTyConApp parrTyCon [ty]
 --     @PrelPArr@.
 --
 parrTyCon :: TyCon
-parrTyCon  = pcNonRecDataTyCon parrTyConName Nothing alpha_tyvar [parrDataCon]
+parrTyCon  = pcNonEnumTyCon parrTyConName Nothing alpha_tyvar [parrDataCon]
 
 parrDataCon :: DataCon
 parrDataCon  = pcDataCon

@@ -285,11 +285,10 @@ buildClass :: Name  -- Name of the class/tycon (they have the same Name)
            -> [ClassATItem]                -- Associated types
            -> [TcMethInfo]                 -- Method info
            -> ClassMinimalDef              -- Minimal complete definition
-           -> RecFlag                      -- Info for type constructor
            -> TcRnIf m n Class
 
 buildClass tycon_name binders roles sc_theta
-           fds at_items sig_stuff mindef tc_isrec
+           fds at_items sig_stuff mindef
   = fixM  $ \ rec_clas ->       -- Only name generation inside loop
     do  { traceIf (text "buildClass")
 
@@ -356,7 +355,7 @@ buildClass tycon_name binders roles sc_theta
                  else return (mkDataTyConRhs [dict_con])
 
         ; let { tycon = mkClassTyCon tycon_name binders roles
-                                     rhs rec_clas tc_isrec tc_rep_name
+                                     rhs rec_clas tc_rep_name
                 -- A class can be recursive, and in the case of newtypes
                 -- this matters.  For example
                 --      class C a where { op :: C b => a -> b -> Int }

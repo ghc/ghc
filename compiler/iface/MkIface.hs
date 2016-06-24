@@ -1409,7 +1409,6 @@ tyConToIfaceDecl env tycon
                   ifRoles   = tyConRoles tycon,
                   ifCtxt    = tidyToIfaceContext tc_env1 (tyConStupidTheta tycon),
                   ifCons    = ifaceConDecls (algTyConRhs tycon) (algTcFields tycon),
-                  ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
                   ifGadtSyntax = isGadtSyntaxTyCon tycon,
                   ifParent  = parent })
 
@@ -1425,7 +1424,6 @@ tyConToIfaceDecl env tycon
                   ifRoles      = tyConRoles tycon,
                   ifCtxt       = [],
                   ifCons       = IfDataTyCon [] False [],
-                  ifRec        = boolToRecFlag False,
                   ifGadtSyntax = False,
                   ifParent     = IfNoParent })
   where
@@ -1526,8 +1524,7 @@ classToIfaceDecl env clas
                    ifFDs    = map toIfaceFD clas_fds,
                    ifATs    = map toIfaceAT clas_ats,
                    ifSigs   = map toIfaceClassOp op_stuff,
-                   ifMinDef = fmap getOccFS (classMinimalDef clas),
-                   ifRec    = boolToRecFlag (isRecursiveTyCon tycon) })
+                   ifMinDef = fmap getOccFS (classMinimalDef clas) })
   where
     (_, clas_fds, sc_theta, _, clas_ats, op_stuff)
       = classExtraBigSig clas

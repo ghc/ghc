@@ -12,7 +12,8 @@ files for imported data types.
 {-# LANGUAGE CPP #-}
 
 module TcTyDecls(
-        calcRecFlags, RecTyInfo(..),
+        RolesInfo,
+        inferRoles,
         calcSynCycles,
         checkClassCycles,
 
@@ -47,8 +48,7 @@ import Id
 import IdInfo
 import VarEnv
 import VarSet
-import NameSet  ( NameSet, unitNameSet, emptyNameSet, unionNameSet
-                , extendNameSet, mkNameSet, elemNameSet )
+import NameSet  ( NameSet, unitNameSet, extendNameSet, elemNameSet )
 import Coercion ( ltRole )
 import Digraph
 import BasicTypes
@@ -57,7 +57,6 @@ import Unique ( mkBuiltinUnique )
 import Outputable
 import Util
 import Maybes
-import Data.List
 import Bag
 import FastString
 import FV
@@ -253,231 +252,6 @@ checkClassCycles cls
 {-
 ************************************************************************
 *                                                                      *
-        Deciding which type constructors are recursive
-*                                                                      *
-************************************************************************
-
-Identification of recursive TyCons
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The knot-tying parameters: @rec_details_list@ is an alist mapping @Name@s to
-@TyThing@s.
-
-Identifying a TyCon as recursive serves two purposes
-
-1.  Avoid infinite types.  Non-recursive newtypes are treated as
-"transparent", like type synonyms, after the type checker.  If we did
-this for all newtypes, we'd get infinite types.  So we figure out for
-each newtype whether it is "recursive", and add a coercion if so.  In
-effect, we are trying to "cut the loops" by identifying a loop-breaker.
-
-2.  Avoid infinite unboxing.  This has nothing to do with newtypes.
-Suppose we have
-        data T = MkT Int T
-        f (MkT x t) = f t
-Well, this function diverges, but we don't want the strictness analyser
-to diverge.  But the strictness analyser will diverge because it looks
-deeper and deeper into the structure of T.   (I believe there are
-examples where the function does something sane, and the strictness
-analyser still diverges, but I can't see one now.)
-
-Now, concerning (1), the FC2 branch currently adds a coercion for ALL
-newtypes.  I did this as an experiment, to try to expose cases in which
-the coercions got in the way of optimisations.  If it turns out that we
-can indeed always use a coercion, then we don't risk recursive types,
-and don't need to figure out what the loop breakers are.
-
-For newtype *families* though, we will always have a coercion, so they
-are always loop breakers!  So you can easily adjust the current
-algorithm by simply treating all newtype families as loop breakers (and
-indeed type families).  I think.
-
-
-
-For newtypes, we label some as "recursive" such that
-
-    INVARIANT: there is no cycle of non-recursive newtypes
-
-In any loop, only one newtype need be marked as recursive; it is
-a "loop breaker".  Labelling more than necessary as recursive is OK,
-provided the invariant is maintained.
-
-A newtype M.T is defined to be "recursive" iff
-        (a) it is declared in an hi-boot file (see RdrHsSyn.hsIfaceDecl)
-        (b) it is declared in a source file, but that source file has a
-            companion hi-boot file which declares the type
-   or   (c) one can get from T's rhs to T via type
-            synonyms, or non-recursive newtypes *in M*
-             e.g.  newtype T = MkT (T -> Int)
-
-(a) is conservative; declarations in hi-boot files are always
-        made loop breakers. That's why in (b) we can restrict attention
-        to tycons in M, because any loops through newtypes outside M
-        will be broken by those newtypes
-(b) ensures that a newtype is not treated as a loop breaker in one place
-and later as a non-loop-breaker.  This matters in GHCi particularly, when
-a newtype T might be embedded in many types in the environment, and then
-T's source module is compiled.  We don't want T's recursiveness to change.
-
-The "recursive" flag for algebraic data types is irrelevant (never consulted)
-for types with more than one constructor.
-
-
-An algebraic data type M.T is "recursive" iff
-        it has just one constructor, and
-        (a) it is declared in an hi-boot file (see RdrHsSyn.hsIfaceDecl)
-        (b) it is declared in a source file, but that source file has a
-            companion hi-boot file which declares the type
- or     (c) one can get from its arg types to T via type synonyms,
-            or by non-recursive newtypes or non-recursive product types in M
-             e.g.  data T = MkT (T -> Int) Bool
-Just like newtype in fact
-
-A type synonym is recursive if one can get from its
-right hand side back to it via type synonyms.  (This is
-reported as an error.)
-
-A class is recursive if one can get from its superclasses
-back to it.  (This is an error too.)
-
-Hi-boot types
-~~~~~~~~~~~~~
-A data type read from an hi-boot file will have an AbstractTyCon as its AlgTyConRhs
-and will respond True to isAbstractTyCon. The idea is that we treat these as if one
-could get from these types to anywhere.  So when we see
-
-        module Baz where
-        import {-# SOURCE #-} Foo( T )
-        newtype S = MkS T
-
-then we mark S as recursive, just in case. What that means is that if we see
-
-        import Baz( S )
-        newtype R = MkR S
-
-then we don't need to look inside S to compute R's recursiveness.  Since S is imported
-(not from an hi-boot file), one cannot get from R back to S except via an hi-boot file,
-and that means that some data type will be marked recursive along the way.  So R is
-unconditionly non-recursive (i.e. there'll be a loop breaker elsewhere if necessary)
-
-This in turn means that we grovel through fewer interface files when computing
-recursiveness, because we need only look at the type decls in the module being
-compiled, plus the outer structure of directly-mentioned types.
--}
-
-data RecTyInfo = RTI { rti_roles      :: Name -> [Role]
-                     , rti_is_rec     :: Name -> RecFlag }
-
-calcRecFlags :: SelfBootInfo -> Bool  -- hs-boot file?
-             -> RoleAnnotEnv -> [TyCon] -> RecTyInfo
--- The 'boot_names' are the things declared in M.hi-boot, if M is the current module.
--- Any type constructors in boot_names are automatically considered loop breakers
--- Recursion of newtypes/data types can happen via
--- the class TyCon, so all_tycons includes the class tycons
-calcRecFlags boot_details is_boot mrole_env all_tycons
-  = RTI { rti_roles      = roles
-        , rti_is_rec     = is_rec }
-  where
-    roles = inferRoles is_boot mrole_env all_tycons
-
-    ----------------- Recursion calculation ----------------
-    is_rec n | n `elemNameSet` rec_names = Recursive
-             | otherwise                 = NonRecursive
-
-    boot_name_set = case boot_details of
-                      NoSelfBoot                -> emptyNameSet
-                      SelfBoot { sb_tcs = tcs } -> tcs
-    rec_names = boot_name_set     `unionNameSet`
-                nt_loop_breakers  `unionNameSet`
-                prod_loop_breakers
-
-
-        -------------------------------------------------
-        --                      NOTE
-        -- These edge-construction loops rely on
-        -- every loop going via tyclss, the types and classes
-        -- in the module being compiled.  Stuff in interface
-        -- files should be correctly marked.  If not (e.g. a
-        -- type synonym in a hi-boot file) we can get an infinite
-        -- loop.  We could program round this, but it'd make the code
-        -- rather less nice, so I'm not going to do that yet.
-
-    single_con_tycons = [ tc | tc <- all_tycons
-                             , not (tyConName tc `elemNameSet` boot_name_set)
-                                 -- Remove the boot_name_set because they are
-                                 -- going to be loop breakers regardless.
-                             , isSingleton (tyConDataCons tc) ]
-        -- Both newtypes and data types, with exactly one data constructor
-
-    (new_tycons, prod_tycons) = partition isNewTyCon single_con_tycons
-        -- NB: we do *not* call isProductTyCon because that checks
-        --     for vanilla-ness of data constructors; and that depends
-        --     on empty existential type variables; and that is figured
-        --     out by tcResultType; which uses tcMatchTy; which uses
-        --     coreView; which calls expandSynTyCon_maybe; which uses
-        --     the recursiveness of the TyCon.  Result... a black hole.
-        -- YUK YUK YUK
-
-        --------------- Newtypes ----------------------
-    nt_loop_breakers = mkNameSet (findLoopBreakers nt_edges)
-    is_rec_nt tc = tyConName tc  `elemNameSet` nt_loop_breakers
-        -- is_rec_nt is a locally-used helper function
-
-    nt_edges = [(t, mk_nt_edges t) | t <- new_tycons]
-
-    mk_nt_edges nt      -- Invariant: nt is a newtype
-        = [ tc | tc <- nonDetEltsUFM (tyConsOfType (new_tc_rhs nt))
-                        -- tyConsOfType looks through synonyms
-                        -- It's OK to use nonDetEltsUFM here, see
-                        -- Note [findLoopBreakers determinism].
-               , tc `elem` new_tycons ]
-           -- If not (tc `elem` new_tycons) we know that either it's a local *data* type,
-           -- or it's imported.  Either way, it can't form part of a newtype cycle
-
-        --------------- Product types ----------------------
-    prod_loop_breakers = mkNameSet (findLoopBreakers prod_edges)
-
-    prod_edges = [(tc, mk_prod_edges tc) | tc <- prod_tycons]
-
-    mk_prod_edges tc    -- Invariant: tc is a product tycon
-        = concatMap (mk_prod_edges1 tc) (dataConOrigArgTys (head (tyConDataCons tc)))
-
-    mk_prod_edges1 ptc ty = concatMap (mk_prod_edges2 ptc) (nonDetEltsUFM (tyConsOfType ty))
-                                      -- It's OK to use nonDetEltsUFM here, see
-                                      -- Note [findLoopBreakers determinism].
-
-    mk_prod_edges2 ptc tc
-        | tc `elem` prod_tycons   = [tc]                -- Local product
-        | tc `elem` new_tycons    = if is_rec_nt tc     -- Local newtype
-                                    then []
-                                    else mk_prod_edges1 ptc (new_tc_rhs tc)
-                -- At this point we know that either it's a local non-product data type,
-                -- or it's imported.  Either way, it can't form part of a cycle
-        | otherwise = []
-
-new_tc_rhs :: TyCon -> Type
-new_tc_rhs tc = snd (newTyConRhs tc)    -- Ignore the type variables
-
-{-
-Note [findLoopBreakers determinism]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The order of edges doesn't matter for determinism here as explained in
-Note [Deterministic SCC] in Digraph. It's enough for the order of nodes
-to be deterministic.
--}
-
-findLoopBreakers :: [(TyCon, [TyCon])] -> [Name]
--- Finds a set of tycons that cut all loops
-findLoopBreakers deps
-  = go [(tc,tc,ds) | (tc,ds) <- deps]
-  where
-    go edges = [ name
-               | CyclicSCC ((tc,_,_) : edges') <-
-                   stronglyConnCompFromEdgedVerticesUniqR edges,
-                 name <- tyConName tc : go edges']
-
-{-
-************************************************************************
-*                                                                      *
         Role inference
 *                                                                      *
 ************************************************************************
@@ -584,6 +358,8 @@ the kind of a type is totally irrelevant to the representation of that type. So,
 we want to totally ignore coercions when doing role inference. This includes omitting
 any type variables that appear in nominal positions but only within coercions.
 -}
+
+type RolesInfo = Name -> [Role]
 
 type RoleEnv = NameEnv [Role]        -- from tycon names to roles
 

@@ -60,7 +60,6 @@ module TyCon(
         isUnliftedTyCon,
         isGadtSyntaxTyCon, isInjectiveTyCon, isGenerativeTyCon, isGenInjAlgRhs,
         isTyConAssoc, tyConAssoc_maybe,
-        isRecursiveTyCon,
         isImplicitTyCon,
         isTyConWithSrcDataCons,
         isTcTyCon,
@@ -589,9 +588,6 @@ data TyCon
 
         algTcFields :: FieldLabelEnv, -- ^ Maps a label to information
                                       -- about the field
-
-        algTcRec    :: RecFlag,     -- ^ Tells us whether the data type is part
-                                    -- of a mutually-recursive group or not
 
         algTcParent :: AlgTyConFlav -- ^ Gives the class or family declaration
                                        -- 'TyCon' for derived 'TyCon's representing
@@ -1327,10 +1323,9 @@ mkAlgTyCon :: Name
            -> AlgTyConRhs       -- ^ Information about data constructors
            -> AlgTyConFlav      -- ^ What flavour is it?
                                 -- (e.g. vanilla, type family)
-           -> RecFlag           -- ^ Is the 'TyCon' recursive?
            -> Bool              -- ^ Was the 'TyCon' declared with GADT syntax?
            -> TyCon
-mkAlgTyCon name binders res_kind roles cType stupid rhs parent is_rec gadt_syn
+mkAlgTyCon name binders res_kind roles cType stupid rhs parent gadt_syn
   = AlgTyCon {
         tyConName        = name,
         tyConUnique      = nameUnique name,
@@ -1345,18 +1340,17 @@ mkAlgTyCon name binders res_kind roles cType stupid rhs parent is_rec gadt_syn
         algTcRhs         = rhs,
         algTcFields      = fieldsOfAlgTcRhs rhs,
         algTcParent      = ASSERT2( okParent name parent, ppr name $$ ppr parent ) parent,
-        algTcRec         = is_rec,
         algTcGadtSyntax  = gadt_syn
     }
 
 -- | Simpler specialization of 'mkAlgTyCon' for classes
 mkClassTyCon :: Name -> [TyConBinder]
              -> [Role] -> AlgTyConRhs -> Class
-             -> RecFlag -> Name -> TyCon
-mkClassTyCon name binders roles rhs clas is_rec tc_rep_name
+             -> Name -> TyCon
+mkClassTyCon name binders roles rhs clas tc_rep_name
   = mkAlgTyCon name binders constraintKind roles Nothing [] rhs
                (ClassTyCon clas tc_rep_name)
-               is_rec False
+               False
 
 mkTupleTyCon :: Name
              -> [TyConBinder]
@@ -1382,7 +1376,6 @@ mkTupleTyCon name binders res_kind arity con sort parent
                                         tup_sort = sort },
         algTcFields      = emptyDFsEnv,
         algTcParent      = parent,
-        algTcRec         = NonRecursive,
         algTcGadtSyntax  = False
     }
 
@@ -1815,11 +1808,6 @@ isBoxedTupleTyCon (AlgTyCon { algTcRhs = rhs })
   | TupleTyCon { tup_sort = sort } <- rhs
   = isBoxed (tupleSortBoxity sort)
 isBoxedTupleTyCon _ = False
-
--- | Is this a recursive 'TyCon'?
-isRecursiveTyCon :: TyCon -> Bool
-isRecursiveTyCon (AlgTyCon {algTcRec = Recursive}) = True
-isRecursiveTyCon _                                 = False
 
 -- | Is this a PromotedDataCon?
 isPromotedDataCon :: TyCon -> Bool
@@ -2258,10 +2246,7 @@ initRecTc = RC 100 emptyNameEnv
 checkRecTc :: RecTcChecker -> TyCon -> Maybe RecTcChecker
 -- Nothing      => Recursion detected
 -- Just rec_tcs => Keep going
-checkRecTc rc@(RC bound rec_nts) tc
-  | not (isRecursiveTyCon tc)
-  = Just rc  -- Tuples are a common example here
-  | otherwise
+checkRecTc (RC bound rec_nts) tc
   = case lookupNameEnv rec_nts tc_name of
       Just n | n >= bound -> Nothing
              | otherwise  -> Just (RC bound (extendNameEnv rec_nts tc_name (n+1)))

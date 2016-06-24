@@ -185,9 +185,7 @@ tcTyClDecls tyclds role_annots
             -- the final TyCons and Classes
        ; fixM $ \ ~rec_tyclss -> do
            { is_boot   <- tcIsHsBootOrSig
-           ; self_boot <- tcSelfBootInfo
-           ; let rec_flags = calcRecFlags self_boot is_boot
-                                          role_annots rec_tyclss
+           ; let roles = inferRoles is_boot role_annots rec_tyclss
 
                  -- Populate environment with knot-tied ATyCon for TyCons
                  -- NB: if the decls mention any ill-staged data cons
@@ -201,7 +199,7 @@ tcTyClDecls tyclds role_annots
              tcExtendKindEnv2 (map mkTcTyConPair tc_tycons)              $
 
                  -- Kind and type check declarations for this group
-               mapM (tcTyClDecl rec_flags) tyclds
+               mapM (tcTyClDecl roles) tyclds
            } }
   where
     ppr_tc_tycon tc = parens (sep [ ppr (tyConName tc) <> comma
@@ -706,8 +704,8 @@ e.g. the need to make the data constructor worker name for
      a constraint tuple match the wired-in one
 -}
 
-tcTyClDecl :: RecTyInfo -> LTyClDecl Name -> TcM TyCon
-tcTyClDecl rec_info (L loc decl)
+tcTyClDecl :: RolesInfo -> LTyClDecl Name -> TcM TyCon
+tcTyClDecl roles_info (L loc decl)
   | Just thing <- wiredInNameTyThing_maybe (tcdName decl)
   = case thing of -- See Note [Declarations for wired-in things]
       ATyCon tc -> return tc
@@ -716,28 +714,28 @@ tcTyClDecl rec_info (L loc decl)
   | otherwise
   = setSrcSpan loc $ tcAddDeclCtxt decl $
     do { traceTc "tcTyAndCl-x" (ppr decl)
-       ; tcTyClDecl1 Nothing rec_info decl }
+       ; tcTyClDecl1 Nothing roles_info decl }
 
   -- "type family" declarations
-tcTyClDecl1 :: Maybe Class -> RecTyInfo -> TyClDecl Name -> TcM TyCon
-tcTyClDecl1 parent _rec_info (FamDecl { tcdFam = fd })
+tcTyClDecl1 :: Maybe Class -> RolesInfo -> TyClDecl Name -> TcM TyCon
+tcTyClDecl1 parent _roles_info (FamDecl { tcdFam = fd })
   = tcFamDecl1 parent fd
 
   -- "type" synonym declaration
-tcTyClDecl1 _parent rec_info
+tcTyClDecl1 _parent roles_info
             (SynDecl { tcdLName = L _ tc_name, tcdRhs = rhs })
   = ASSERT( isNothing _parent )
     tcTyClTyVars tc_name $ \ binders res_kind ->
-    tcTySynRhs rec_info tc_name binders res_kind rhs
+    tcTySynRhs roles_info tc_name binders res_kind rhs
 
   -- "data/newtype" declaration
-tcTyClDecl1 _parent rec_info
+tcTyClDecl1 _parent roles_info
             (DataDecl { tcdLName = L _ tc_name, tcdDataDefn = defn })
   = ASSERT( isNothing _parent )
     tcTyClTyVars tc_name $ \ tycon_binders res_kind ->
-    tcDataDefn rec_info tc_name tycon_binders res_kind defn
+    tcDataDefn roles_info tc_name tycon_binders res_kind defn
 
-tcTyClDecl1 _parent rec_info
+tcTyClDecl1 _parent roles_info
             (ClassDecl { tcdLName = L _ class_name
             , tcdCtxt = ctxt, tcdMeths = meths
             , tcdFDs = fundeps, tcdSigs = sigs
@@ -751,8 +749,7 @@ tcTyClDecl1 _parent rec_info
                  -- need to look up its recursiveness
                ; traceTc "tcClassDecl 1" (ppr class_name $$ ppr binders)
                ; let tycon_name = tyConName (classTyCon clas)
-                     tc_isrec = rti_is_rec rec_info tycon_name
-                     roles = rti_roles rec_info tycon_name
+                     roles = roles_info tycon_name
 
                ; ctxt' <- solveEqualities $ tcHsContext ctxt
                ; ctxt' <- zonkTcTypeToTypes emptyZonkEnv ctxt'
@@ -764,7 +761,7 @@ tcTyClDecl1 _parent rec_info
                ; clas <- buildClass
                             class_name binders roles ctxt'
                             fds' at_stuff
-                            sig_stuff mindef tc_isrec
+                            sig_stuff mindef
                ; traceTc "tcClassDecl" (ppr fundeps $$ ppr binders $$
                                         ppr fds')
                ; return clas }
@@ -905,31 +902,31 @@ tcInjectivity tcbs (Just (L loc (InjectivityAnn _ lInjNames)))
                                        , ppr inj_ktvs, ppr inj_bools ])
        ; return $ Injective inj_bools }
 
-tcTySynRhs :: RecTyInfo
+tcTySynRhs :: RolesInfo
            -> Name
            -> [TyConBinder] -> Kind
            -> LHsType Name -> TcM TyCon
-tcTySynRhs rec_info tc_name binders res_kind hs_ty
+tcTySynRhs roles_info tc_name binders res_kind hs_ty
   = do { env <- getLclEnv
        ; traceTc "tc-syn" (ppr tc_name $$ ppr (tcl_env env))
        ; rhs_ty <- solveEqualities $ tcCheckLHsType hs_ty res_kind
        ; rhs_ty <- zonkTcTypeToType emptyZonkEnv rhs_ty
-       ; let roles = rti_roles rec_info tc_name
+       ; let roles = roles_info tc_name
              tycon = mkSynonymTyCon tc_name binders res_kind roles rhs_ty
        ; return tycon }
 
-tcDataDefn :: RecTyInfo -> Name
+tcDataDefn :: RolesInfo -> Name
            -> [TyConBinder] -> Kind
            -> HsDataDefn Name -> TcM TyCon
   -- NB: not used for newtype/data instances (whether associated or not)
-tcDataDefn rec_info     -- Knot-tied; don't look at this eagerly
+tcDataDefn roles_info
            tc_name tycon_binders res_kind
          (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
                      , dd_ctxt = ctxt, dd_kindSig = mb_ksig
                      , dd_cons = cons })
  =  do { (extra_bndrs, real_res_kind) <- tcDataKindSig res_kind
        ; let final_bndrs  = tycon_binders `chkAppend` extra_bndrs
-             roles        = rti_roles rec_info tc_name
+             roles        = roles_info tc_name
 
        ; stupid_tc_theta <- solveEqualities $ tcHsContext ctxt
        ; stupid_theta    <- zonkTcTypeToTypes emptyZonkEnv
@@ -956,7 +953,6 @@ tcDataDefn rec_info     -- Knot-tied; don't look at this eagerly
                                   (fmap unLoc cType)
                                   stupid_theta tc_rhs
                                   (VanillaAlgTyCon tc_rep_nm)
-                                  (rti_is_rec rec_info tc_name)
                                   gadt_syntax) }
        ; return tycon }
   where

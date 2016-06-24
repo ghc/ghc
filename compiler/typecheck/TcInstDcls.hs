@@ -671,7 +671,7 @@ tcDataFamInstDecl mb_clsinfo
                                           (map (const Nominal) full_tvs)
                                           (fmap unLoc cType) stupid_theta
                                           tc_rhs parent
-                                          Recursive gadt_syntax
+                                          gadt_syntax
                  -- We always assume that indexed types are recursive.  Why?
                  -- (1) Due to their open nature, we can never be sure that a
                  -- further instance might not introduce a new recursive

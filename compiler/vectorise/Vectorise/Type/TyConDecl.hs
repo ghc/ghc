@@ -12,7 +12,6 @@ import Class
 import Type
 import TyCon
 import DataCon
-import BasicTypes
 import DynFlags
 import Var
 import Name
@@ -51,9 +50,6 @@ vectTyConDecl tycon name'
              opTys        = drop (length argTys - length opItems) argTys  -- only method types
        ; methods' <- sequence [ vectMethod id meth ty | ((id, meth), ty) <- zip opItems opTys]
 
-           -- keep the original recursiveness flag
-       ; let rec_flag = boolToRecFlag (isRecursiveTyCon tycon)
-
            -- construct the vectorised class (this also creates the class type constructors and its
            -- data constructor)
            --
@@ -68,7 +64,6 @@ vectTyConDecl tycon name'
                      []                         -- no associated types (for the moment)
                      methods'                   -- method info
                      (classMinimalDef cls)      -- Inherit minimal complete definition from cls
-                     rec_flag                   -- whether recursive
 
            -- the original dictionary constructor must map to the vectorised one
        ; let tycon'        = classTyCon cls'
@@ -94,9 +89,8 @@ vectTyConDecl tycon name'
            -- vectorise the data constructor of the class tycon
        ; rhs' <- vectAlgTyConRhs tycon (algTyConRhs tycon)
 
-           -- keep the original recursiveness and GADT flags
-       ; let rec_flag  = boolToRecFlag (isRecursiveTyCon tycon)
-             gadt_flag = isGadtSyntaxTyCon tycon
+           -- keep the original GADT flags
+       ; let gadt_flag = isGadtSyntaxTyCon tycon
 
            -- build the vectorised type constructor
        ; tc_rep_name <- mkDerivedName mkTyConRepOcc name'
@@ -109,7 +103,6 @@ vectTyConDecl tycon name'
                     []                      -- no stupid theta
                     rhs'                    -- new constructor defs
                     (VanillaAlgTyCon tc_rep_name)
-                    rec_flag                -- whether recursive
                     gadt_flag               -- whether in GADT syntax
        }
 

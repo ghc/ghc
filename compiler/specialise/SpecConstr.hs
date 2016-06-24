@@ -34,7 +34,7 @@ import DataCon
 import Coercion         hiding( substCo )
 import Rules
 import Type             hiding ( substTy )
-import TyCon            ( isRecursiveTyCon, tyConName )
+import TyCon            ( tyConName )
 import Id
 import PprCore          ( pprParendExpr )
 import MkCore           ( mkImpossibleExpr )
@@ -1834,15 +1834,15 @@ is_too_recursive :: ScEnv -> (CallPat, ValueEnv) -> Bool
     -- This is only necessary if ForceSpecConstr is in effect:
     -- otherwise specConstrCount will cause specialisation to terminate.
     -- See Note [Limit recursive specialisation]
+-- TODO: make me more accurate
 is_too_recursive env ((_,exprs), val_env)
  = sc_force env && maximum (map go exprs) > sc_recursive env
  where
   go e
-   | Just (ConVal (DataAlt dc) args) <- isValue val_env e
-   , isRecursiveTyCon (dataConTyCon dc)
+   | Just (ConVal (DataAlt _) args) <- isValue val_env e
    = 1 + sum (map go args)
 
-   |App f a                          <- e
+   | App f a                         <- e
    = go f + go a
 
    | otherwise

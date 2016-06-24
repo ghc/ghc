@@ -14,7 +14,6 @@ import Vectorise.Generic.Description
 import Vectorise.Utils
 import Vectorise.Env( GlobalEnv( global_fam_inst_env ) )
 
-import BasicTypes
 import BuildTyCl
 import DataCon
 import TyCon
@@ -58,12 +57,10 @@ buildDataFamInst name' fam_tc vect_tc rhs
                            []          -- no stupid theta
                            rhs
                            (DataFamInstTyCon ax fam_tc pat_tys)
-                           rec_flag    -- FIXME: is this ok?
                            False       -- not GADT syntax
       ; liftDs $ newFamInst (DataFamilyInst rep_tc) ax }
  where
     tyvars    = tyConTyVars vect_tc
-    rec_flag  = boolToRecFlag (isRecursiveTyCon vect_tc)
 
 buildPDataTyConRhs :: Name -> TyCon -> TyCon -> SumRepr -> VM AlgTyConRhs
 buildPDataTyConRhs orig_name vect_tc repr_tc repr

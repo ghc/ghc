@@ -101,7 +101,6 @@ data IfaceDecl
                 ifRoles      :: [Role],         -- Roles
                 ifCtxt       :: IfaceContext,   -- The "stupid theta"
                 ifCons       :: IfaceConDecls,  -- Includes new/data/data family info
-                ifRec        :: RecFlag,        -- Recursive or not?
                 ifGadtSyntax :: Bool,           -- True <=> declared using
                                                 -- GADT syntax
                 ifParent     :: IfaceTyConParent -- The axiom, for a newtype,
@@ -130,9 +129,7 @@ data IfaceDecl
                  ifFDs     :: [FunDep FastString],      -- Functional dependencies
                  ifATs     :: [IfaceAT],                -- Associated type families
                  ifSigs    :: [IfaceClassOp],           -- Method signatures
-                 ifMinDef  :: BooleanFormula IfLclName, -- Minimal complete definition
-                 ifRec     :: RecFlag                   -- Is newtype/datatype associated
-                                                        --   with the class recursive?
+                 ifMinDef  :: BooleanFormula IfLclName  -- Minimal complete definition
     }
 
   | IfaceAxiom { ifName       :: IfaceTopBndr,        -- Axiom name
@@ -625,7 +622,7 @@ pprIfaceDecl :: ShowSub -> IfaceDecl -> SDoc
 pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
                              ifCtxt = context,
                              ifRoles = roles, ifCons = condecls,
-                             ifParent = parent, ifRec = isrec,
+                             ifParent = parent,
                              ifGadtSyntax = gadt,
                              ifBinders = binders })
 
@@ -671,10 +668,10 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
               IfDataTyCon{}     -> text "data"
               IfNewTyCon{}      -> text "newtype"
 
-    pp_extra = vcat [pprCType ctype, pprRec isrec]
+    pp_extra = vcat [pprCType ctype]
 
 
-pprIfaceDecl ss (IfaceClass { ifATs = ats, ifSigs = sigs, ifRec = isrec
+pprIfaceDecl ss (IfaceClass { ifATs = ats, ifSigs = sigs
                             , ifCtxt   = context, ifName  = clas
                             , ifRoles = roles
                             , ifFDs    = fds, ifMinDef = minDef
@@ -682,14 +679,13 @@ pprIfaceDecl ss (IfaceClass { ifATs = ats, ifSigs = sigs, ifRec = isrec
   = vcat [ pprRoles (== Nominal) (pprPrefixIfDeclBndr ss clas) binders roles
          , text "class" <+> pprIfaceDeclHead context ss clas binders Nothing
                                 <+> pprFundeps fds <+> pp_where
-         , nest 2 (vcat [ vcat asocs, vcat dsigs, pprec
+         , nest 2 (vcat [ vcat asocs, vcat dsigs
                         , ppShowAllSubs ss (pprMinDef minDef)])]
     where
       pp_where = ppShowRhs ss $ ppUnless (null sigs && null ats) (text "where")
 
       asocs = ppr_trim $ map maybeShowAssoc ats
       dsigs = ppr_trim $ map maybeShowSig sigs
-      pprec = ppShowIface ss (pprRec isrec)
 
       maybeShowAssoc :: IfaceAT -> Maybe SDoc
       maybeShowAssoc asc@(IfaceAT d _)
@@ -804,10 +800,6 @@ pprRoles suppress_if tyCon bndrs roles
       let froles = suppressIfaceInvisibles dflags bndrs roles
       in ppUnless (all suppress_if roles || null froles) $
          text "type role" <+> tyCon <+> hsep (map ppr froles)
-
-pprRec :: RecFlag -> SDoc
-pprRec NonRecursive = Outputable.empty
-pprRec Recursive    = text "RecFlag: Recursive"
 
 pprInfixIfDeclBndr, pprPrefixIfDeclBndr :: ShowSub -> OccName -> SDoc
 pprInfixIfDeclBndr (ShowSub { ss_ppr_bndr = ppr_bndr }) occ
@@ -1453,7 +1445,7 @@ instance Binary IfaceDecl where
         put_ bh details
         put_ bh idinfo
 
-    put_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7 a8 a9 a10) = do
+    put_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7 a8 a9) = do
         putByte bh 2
         put_ bh (occNameFS a1)
         put_ bh a2
@@ -1464,7 +1456,6 @@ instance Binary IfaceDecl where
         put_ bh a7
         put_ bh a8
         put_ bh a9
-        put_ bh a10
 
     put_ bh (IfaceSynonym a1 a2 a3 a4 a5) = do
         putByte bh 3
@@ -1483,7 +1474,7 @@ instance Binary IfaceDecl where
         put_ bh a5
         put_ bh a6
 
-    put_ bh (IfaceClass a1 a2 a3 a4 a5 a6 a7 a8 a9) = do
+    put_ bh (IfaceClass a1 a2 a3 a4 a5 a6 a7 a8) = do
         putByte bh 5
         put_ bh a1
         put_ bh (occNameFS a2)
@@ -1493,7 +1484,6 @@ instance Binary IfaceDecl where
         put_ bh a6
         put_ bh a7
         put_ bh a8
-        put_ bh a9
 
     put_ bh (IfaceAxiom a1 a2 a3 a4) = do
         putByte bh 6
@@ -1535,9 +1525,8 @@ instance Binary IfaceDecl where
                     a7  <- get bh
                     a8  <- get bh
                     a9  <- get bh
-                    a10 <- get bh
                     occ <- return $! mkTcOccFS a1
-                    return (IfaceData occ a2 a3 a4 a5 a6 a7 a8 a9 a10)
+                    return (IfaceData occ a2 a3 a4 a5 a6 a7 a8 a9)
             3 -> do a1 <- get bh
                     a2 <- get bh
                     a3 <- get bh
@@ -1561,9 +1550,8 @@ instance Binary IfaceDecl where
                     a6 <- get bh
                     a7 <- get bh
                     a8 <- get bh
-                    a9 <- get bh
                     occ <- return $! mkClsOccFS a2
-                    return (IfaceClass a1 occ a3 a4 a5 a6 a7 a8 a9)
+                    return (IfaceClass a1 occ a3 a4 a5 a6 a7 a8)
             6 -> do a1 <- get bh
                     a2 <- get bh
                     a3 <- get bh
