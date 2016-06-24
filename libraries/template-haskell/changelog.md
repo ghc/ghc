@@ -1,5 +1,13 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
+## next *TBA*
+  * Bundled with GHC *TBA*
+
+  * Add support for pattern synonyms. This introduces one new constructor to
+    `Info` (`PatSynI`), two new constructors to `Dec` (`PatSynD` and
+    `PatSynSigD`), and two new data types (`PatSynDir` and `PatSynArgs`),
+    among other changes. (#8761)
+
 ## 2.11.0.0  *May 2016*
 
   * Bundled with GHC 8.0.1
