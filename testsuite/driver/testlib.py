@@ -1841,7 +1841,9 @@ def findTFiles(roots):
 def summary(t, file, short=False):
 
     file.write('\n')
-    printUnexpectedTests(file, [t.unexpected_passes, t.unexpected_failures, t.unexpected_stat_failures])
+    printUnexpectedTests(file,
+        [t.unexpected_passes, t.unexpected_failures,
+         t.unexpected_stat_failures, t.framework_failures])
 
     if short:
         # Only print the list of unexpected tests above.
@@ -1897,7 +1899,8 @@ def summary(t, file, short=False):
 
 def printUnexpectedTests(file, testInfoss):
     unexpected = {name for testInfos in testInfoss
-                       for (_, name, _, _) in testInfos}
+                       for (_, name, _, _) in testInfos
+                       if not name.endswith('.T')}
     if unexpected:
         file.write('Unexpected results from:\n')
         file.write('TEST="' + ' '.join(unexpected) + '"\n')
