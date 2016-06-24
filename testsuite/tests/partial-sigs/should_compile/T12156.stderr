@@ -1,0 +1,3 @@
+
+T12156.hs:3:14: warning: [-Wtyped-holes (in -Wdefault)]
+    Variable not in scope: v
