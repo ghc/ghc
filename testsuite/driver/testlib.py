@@ -674,6 +674,8 @@ def get_package_cache_timestamp():
         except:
             return 0.0
 
+do_not_copy = ('.hi', '.o', '.dyn_hi', '.dyn_o') # 12112
+
 def test_common_work (name, opts, func, args):
     try:
         t.total_tests = t.total_tests+1
@@ -729,9 +731,10 @@ def test_common_work (name, opts, func, args):
         # specify all other files that their test depends on (but
         # this seems to be necessary for only about 10% of all
         # tests).
-        files = set((f for f in os.listdir(opts.srcdir)
-                        if f.startswith(name) and
-                           not f.endswith(testdir_suffix)))
+        files = set(f for f in os.listdir(opts.srcdir)
+                       if f.startswith(name) and not f == name and
+                          not f.endswith(testdir_suffix) and
+                          not os.path.splitext(f)[1] in do_not_copy)
         for filename in (opts.extra_files + extra_src_files.get(name, [])):
             if filename.startswith('/'):
                 framework_fail(name, 'whole-test',
