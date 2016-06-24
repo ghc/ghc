@@ -336,7 +336,7 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
     ppLaTeX title pkgStr visibleIfaces odir (fmap _doc prologue) opt_latex_style
                   libDir
 
-  when (Flag_HyperlinkedSource `elem` flags) $ do
+  when (Flag_HyperlinkedSource `elem` flags && not (null ifaces)) $ do
     ppHyperlinkedSource odir libDir opt_source_css pretty srcMap ifaces
 
 -- | From GHC 7.10, this function has a potential to crash with a
