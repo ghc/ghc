@@ -1,0 +1,2 @@
+ghc-stage2: default output name would overwrite the input file; must specify -o explicitly
+Usage: For basic information, try the `--help' option.

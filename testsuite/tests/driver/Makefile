@@ -457,8 +457,8 @@ static001:
 
 T3674:
 	$(RM) T3674*.o T3674*.hi T3674_pre
-	"$(TEST_HC)" $(TEST_HC_OPTS) --make T3674_pre.hs
-	"$(TEST_HC)" $(TEST_HC_OPTS) --make T3674.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) --make -v0 T3674_pre.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) --make -v0 T3674.hs
 
 .PHONY: rtsopts001
 rtsopts001:
@@ -614,9 +614,9 @@ T10182:
 .PHONY: T10320
 T10320:
 	$(RM) -rf T10320 T10320.dump-rule-rewrites T10320.hi T10320.o
-	"$(TEST_HC)" $(TEST_HC_OPTS) -ddump-to-file -ddump-rule-rewrites -fenable-rewrite-rules T10320.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 -ddump-to-file -ddump-rule-rewrites -fenable-rewrite-rules T10320.hs
 	[ -s T10320.dump-rule-rewrites ]
-	"$(TEST_HC)" $(TEST_HC_OPTS) -fforce-recomp -ddump-to-file -ddump-rule-rewrites T10320.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 -fforce-recomp -ddump-to-file -ddump-rule-rewrites T10320.hs
 	[ -f T10320.dump-rule-rewrites ] && [ ! -s T10320.dump-rule-rewrites ]
 
 .PHONY: T12135

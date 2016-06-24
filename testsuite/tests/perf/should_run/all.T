@@ -69,7 +69,7 @@ test('lazy-bs-alloc',
             # 2016-04-06: 429760 (x86/Linux) no idea what happened
       only_ways(['normal']),
       extra_run_opts('arith011.stdout'),
-      ignore_output,
+      ignore_stdout,
 
       # Use `+RTS -G1` for more stable residency measurements. Note [residency].
       # Only 64-bit as we don't have a good 32-bit test environment at the moment
@@ -265,7 +265,7 @@ test('T5536',
                    # 17/1/13:         892399040 (x86_64/Linux)
                    #                  (new demand analyser)
      extra_clean(['T5536.data']),
-     ignore_output,
+     ignore_stdout,
      only_ways(['normal'])
      ],
     compile_and_run,

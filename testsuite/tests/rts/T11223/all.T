@@ -25,7 +25,7 @@ test('T11223_simple_link_lib',
 # I'm ignoring the output since for this particular invocation normalise_errmsg
 # isn't being called and I can't figure out why not.
 test('T11223_simple_duplicate',
-     [when(ghc_dynamic(), skip), ignore_output, exit_code(2), normalise_errmsg_fun(normalise_duplicate_errmsg)],
+     [when(ghc_dynamic(), skip), ignore_stderr, ignore_stdout, exit_code(2), normalise_errmsg_fun(normalise_duplicate_errmsg)],
      run_command,
      ['$MAKE -s --no-print-directory t_11223_simple_duplicate'])
 

@@ -65,6 +65,7 @@ extra_src_files = {
   'T11223_link_order_a_b_succeed': ['bar.c', 'foo.c', 'foo2.hs'],
   'T11223_link_order_b_a_2_succeed': ['bar.c', 'foo.c', 'foo3.hs'],
   'T11223_link_order_b_a_succeed': ['bar.c', 'foo.c', 'foo2.hs'],
+  'T11223_simple_duplicate': ['bar.c', 'foo.c', 'foo.hs'],
   'T11223_simple_duplicate_lib': ['bar.c', 'foo.c', 'foo.hs'],
   'T11223_simple_link': ['foo.c', 'foo.hs'],
   'T11223_simple_link_lib': ['foo.c', 'foo.hs'],

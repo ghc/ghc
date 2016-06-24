@@ -6,19 +6,31 @@ test('ghcpkg01',
                   'local01.package.conf.old']),
      run_command,
      ['$MAKE -s --no-print-directory ghcpkg01'])
+
+# Use ignore_stderr to prevent (when HADDOCK_DOCS=NO):
+#  warning: haddock-interfaces .. doesn't exist or isn't a file
 test('ghcpkg02',
-     [ignore_output,
+     [ignore_stderr,
       extra_clean(['package.conf.ghcpkg02', 'package.conf.ghcpkg02.old'])],
      run_command,
      ['$MAKE -s --no-print-directory ghcpkg02'])
+
 test('ghcpkg03',
      [extra_clean(['local03.package.conf',
                    'local03.package.conf.old']),
       normalise_errmsg_fun(normaliseDynlibNames)],
      run_command,
      ['$MAKE -s --no-print-directory ghcpkg03'])
+
+def normalise_package_order(s):
+    # Package order is not deterministic?
+    return re.sub('testpkg-1.2.3.4 newtestpkg-2.0',
+                  'newtestpkg-2.0 testpkg-1.2.3.4',
+                  s)
+
 test('ghcpkg04',
-     [ignore_output,
+     [
+      normalise_errmsg_fun(normalise_package_order),
       extra_clean(['local04.package.conf',
                    'local04.package.conf.old'])],
      run_command,

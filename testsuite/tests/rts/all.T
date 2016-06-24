@@ -23,7 +23,7 @@ test('derefnull',
       # Apparently the output can be different on different
       # Linux setups, so just ignore it. As long as we get
       # the right exit code we're OK.
-      when(opsys('linux'), ignore_output),
+      when(opsys('linux'), ignore_stderr),
       # SIGBUS on OX X (PPC and x86 only; amd64 gives SEGV)
       when(platform('i386-apple-darwin'), exit_code(138)),
       when(platform('powerpc-apple-darwin'), exit_code(138)),
@@ -39,7 +39,7 @@ test('divbyzero',
       # Apparently the output can be different on different
       # Linux setups, so just ignore it. As long as we get
       # the right exit code we're OK.
-      when(opsys('linux'), ignore_output),
+      when(opsys('linux'), ignore_stderr),
       # PowerPC 64 bit and most likely PowerPC 32 bit processors
       # do not generate an exception (interrupt) for integer
       # division by zero but the result is undefined.
@@ -57,7 +57,7 @@ test('outofmem', when(opsys('darwin'), skip),
                  run_command, ['$MAKE -s --no-print-directory outofmem'])
 test('outofmem2', normal, run_command, ['$MAKE -s --no-print-directory outofmem2'])
 
-test('T2047', [ignore_output, extra_run_opts('+RTS -c -RTS')],
+test('T2047', [ignore_stdout, extra_run_opts('+RTS -c -RTS')],
               compile_and_run, ['-package containers'])
 
 # Blackhole-detection test.
@@ -223,9 +223,10 @@ test('T7815', [ multi_cpu_race,
                 req_smp,
                 only_ways(['threaded1', 'threaded2']) ], compile_and_run, [''] )
 
-# ignore_output because it contains a unique:
+# ignore_stderr because it contains a unique:
 #   ffishutdown: Main_dul: interrupted
-test('ffishutdown', [ ignore_output, only_ways(['threaded1','threaded2']) ], compile_and_run, [''])
+test('ffishutdown', [ignore_stderr, only_ways(['threaded1','threaded2'])],
+     compile_and_run, [''])
 
 test('T7919',
      [extra_clean(['T7919A.o','T7919A.hi', 'T7919A.dyn_o','T7919A.dyn_hi']),
@@ -240,10 +241,10 @@ test('linker_unload',
      run_command,
      ['$MAKE -s --no-print-directory linker_unload'])
 
-test('T8209', [ only_ways(threaded_ways), ignore_output ],
+test('T8209', [ only_ways(threaded_ways), ignore_stdout ],
               compile_and_run, [''])
 
-test('T8242', [ only_ways(threaded_ways), ignore_output ],
+test('T8242', [ only_ways(threaded_ways), ignore_stdout ],
               compile_and_run, [''])
 
 test('T8124', [ only_ways(threaded_ways), omit_ways(['ghci']),
@@ -286,51 +287,62 @@ test('overflow2', [ exit_code(251) ], compile_and_run, [''])
 test('overflow3', [ exit_code(251) ], compile_and_run, [''])
 
 test('linker_error1',
-     [ extra_clean(['linker_error1.o','linker_error1']), ignore_output ],
+     [ extra_clean(['linker_error1.o','linker_error1']), ignore_stderr ],
      run_command,
      ['$MAKE -s --no-print-directory linker_error1'])
 
 test('linker_error2',
      [ extra_clean(['linker_error2.o','linker_error2_c.o', 'linker_error2']),
-       ignore_output ],
+       ignore_stderr ],
      run_command,
      ['$MAKE -s --no-print-directory linker_error2'])
 
 test('linker_error3',
      [ extra_clean(['linker_error3.o','linker_error3_c.o', 'linker_error3']),
-       ignore_output ],
+       ignore_stderr ],
      run_command,
      ['$MAKE -s --no-print-directory linker_error3'])
 
-test('T9839_01', ignore_output,
-                run_command,
-                ['{compiler} -e 1 +RTS -T-s 2>&1 | \
-                  grep "flag -T given an argument when none was expected: -T-s"'])
+def grep_stderr(pattern):
+    def wrapper(cmd, pattern=pattern):
+        swap12 = '3>&1 1>&2 2>&3 3>&-' # Swap file descriptors 1 and 2.
+        return('{cmd} {swap12} | grep "{pattern}" {swap12}'.format(**locals()))
+    return cmd_wrapper(wrapper)
 
-test('T9839_02', [ only_ways(prof_ways), ignore_output, exit_code(1), extra_run_opts('+RTS -Pax')],
-                compile_and_run,
-                [''])
+# The ghci way gets confused by the RTS options
+test('T9839_01',
+     [omit_ways(['ghci']), extra_run_opts('+RTS -T-s'), no_check_hp,
+      grep_stderr('given an argument when none was expected')],
+     compile_and_run, [''])
 
-test('T9839_03', [ only_ways(prof_ways), ignore_output, exit_code(1), extra_run_opts('+RTS -Px')],
-                compile_and_run,
-                [''])
+test('T9839_02',
+     [only_ways(prof_ways), extra_run_opts('+RTS -Pax'), no_check_hp,
+      grep_stderr('given an argument when none was expected')],
+     compile_and_run, [''])
 
-test('T9839_04', [ only_ways(prof_ways), ignore_output, exit_code(0), extra_run_opts('+RTS -xc')],
-                compile_and_run,
-                [''])
+test('T9839_03',
+     [only_ways(prof_ways), extra_run_opts('+RTS -Px'), no_check_hp,
+      grep_stderr('given an argument when none was expected')],
+     compile_and_run, [''])
 
-test('T9839_05', [ only_ways(prof_ways), ignore_output, exit_code(1), extra_run_opts('+RTS -xcx')],
-                compile_and_run,
-                [''])
+test('T9839_04',
+     [only_ways(prof_ways), extra_run_opts('+RTS -xc')],
+     compile_and_run, [''])
 
-test('T9839_06', [ only_ways(prof_ways), ignore_output, exit_code(1), extra_run_opts('+RTS -xtx')],
-                compile_and_run,
-                [''])
+test('T9839_05',
+     [only_ways(prof_ways), extra_run_opts('+RTS -xcx'), no_check_hp,
+      grep_stderr('given an argument when none was expected')],
+     compile_and_run, [''])
 
-# ignore_output as RTS reports slightly different error messages
+test('T9839_06',
+     [only_ways(prof_ways), extra_run_opts('+RTS -xtx'), no_check_hp,
+      grep_stderr('given an argument when none was expected')],
+     compile_and_run, [''])
+
+# ignore_stderr as RTS reports slightly different error messages
 # in 'epoll' and 'select' backends on reading from EBADF
 # mingw32 skip as UNIX pipe and close(fd) is used to exercise the problem
-test('T10590', [ignore_output, when(opsys('mingw32'),skip)], compile_and_run, [''])
+test('T10590', [ignore_stderr, when(opsys('mingw32'), skip)], compile_and_run, [''])
 
 # 20000 was easily enough to trigger the bug with 7.10
 test('T10904', [ omit_ways(['ghci']), extra_run_opts('20000') ],

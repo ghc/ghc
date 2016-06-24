@@ -176,7 +176,8 @@ class TestOptions:
        self.stdin = ''
 
        # don't compare output
-       self.ignore_output = 0
+       self.ignore_stdout = False
+       self.ignore_stderr = False
 
        # We sometimes want to modify the compiler_always_flags, so
        # they are copied from config.compiler_always_flags when we
@@ -245,6 +246,9 @@ class TestOptions:
        # stdout file.  Accepts two arguments: filename of actual stdout
        # output, and a normaliser function given other test options
        self.check_stdout = None
+
+       # Check .hp file when profiling libraries are available?
+       self.check_hp = True
 
        # Extra normalisation for compiler error messages
        self.extra_errmsg_normaliser = lambda x: x

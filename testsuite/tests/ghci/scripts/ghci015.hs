@@ -25,8 +25,8 @@ runTest loop = do
 forked loop args@(tc1, tc2, tmv, hisTId) = catch ((loop args) >>= setTMV . Just) hndlr `finally` setTMV Nothing 
         where 
             setTMV x = atomically (tryPutTMVar tmv x >> return ()) 
-            hndlr (AsyncException ThreadKilled) = return () 
-            hndlr e                             = throwTo hisTId e 
+            hndlr ThreadKilled = return ()
+            hndlr e            = throwTo hisTId e
  
 goodLoop args@(tc1, tc2, tmv, hisTId) = do 
     x <- atomically (readTChan tc1) 

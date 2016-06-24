@@ -28,10 +28,12 @@ test('ghci012', normal, ghci_script, ['ghci012.script'])
 test('ghci013', normal, ghci_script, ['ghci013.script'])
 test('ghci014', reqlib('QuickCheck'), ghci_script, ['ghci014.script'])
 
-# Ignore output from ghci015, the output is non-deterministic
+# Ignore stderr from ghci015, the output is non-deterministic
 # (has occasional "thread blocked indefinitely" exceptions), and this
 # is part of the test.
-test('ghci015', ignore_output, ghci_script, ['ghci015.script'])
+# But don't silence both stderr and stdout, as then the test would trivially
+# pass when ghci015.hs has errors.
+test('ghci015', [reqlib('stm'), ignore_stderr], ghci_script, ['ghci015.script'])
 
 test('ghci016', expect_broken(552), ghci_script, ['ghci016.script'])
 test('ghci017', [reqlib('haskell98'), extra_run_opts('-hide-package haskell98')], ghci_script, ['ghci017.script'])
@@ -245,7 +247,7 @@ test('T10576a', expect_broken(10576), ghci_script, ['T10576a.script'])
 test('T10576b', expect_broken(10576), ghci_script, ['T10576b.script'])
 test('T11051a', normal, ghci_script, ['T11051a.script'])
 test('T11051b', normal, ghci_script, ['T11051b.script'])
-test('T11266', check_stdout(lambda *args: 1), ghci_script, ['T11266.script'])
+test('T11266', ignore_stdout, ghci_script, ['T11266.script'])
 
 test('T11389', req_interp, run_command, ['$MAKE -s --no-print-directory T11389'])
 test('T11524a', normal, ghci_script, ['T11524a.script'])

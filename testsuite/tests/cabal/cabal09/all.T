@@ -4,6 +4,6 @@ else:
    cleanup = 'CLEANUP=0'
 
 test('cabal09',
-     ignore_output,
+     normal,
      run_command,
      ['$MAKE -s --no-print-directory cabal09 ' + cleanup])

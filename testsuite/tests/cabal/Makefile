@@ -243,8 +243,7 @@ ghcpkg02:
 	$(GHC_PKG_ghcpkg02) init $(PACKAGE_CONF_ghcpkg02)
 	set -e; \
 	for i in `'$(GHC_PKG)' list --global --simple-output -v0`; do \
-		echo Updating $$i; \
-		'$(GHC_PKG)' describe --global $$i | $(GHC_PKG_ghcpkg02) update --global --force -; \
+		'$(GHC_PKG)' describe --global $$i | $(GHC_PKG_ghcpkg02) -v0 update --global --force -; \
 	done
 
 PKGCONF07=local07.package.conf

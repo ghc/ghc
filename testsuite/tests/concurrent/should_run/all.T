@@ -239,9 +239,9 @@ test('conc064',
      exit_code(1),
      compile_and_run, [''])
 
-test('conc065', ignore_output, compile_and_run, [''])
-test('conc066', ignore_output, compile_and_run, [''])
-test('conc067', ignore_output, compile_and_run, [''])
+test('conc065', ignore_stdout, compile_and_run, [''])
+test('conc066', ignore_stdout, compile_and_run, [''])
+test('conc067', ignore_stdout, compile_and_run, [''])
 
 # omit threaded2, the behaviour of this test is non-deterministic with more
 # than one CPU.

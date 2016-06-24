@@ -172,8 +172,11 @@ def req_smp( name, opts ):
     if not config.have_smp:
         opts.expect = 'fail'
 
-def ignore_output( name, opts ):
-    opts.ignore_output = 1
+def ignore_stdout(name, opts):
+    opts.ignore_stdout = True
+
+def ignore_stderr(name, opts):
+    opts.ignore_stderr = True
 
 def combined_output( name, opts ):
     opts.combined_output = True
@@ -483,6 +486,9 @@ def check_stdout( f ):
 
 def _check_stdout( name, opts, f ):
     opts.check_stdout = f
+
+def no_check_hp(name, opts):
+    opts.check_hp = False
 
 # ----
 
@@ -902,7 +908,7 @@ def failBecause(reason, tag=None):
 # The expected exit code can be changed via exit_code() as normal, and
 # the expected stdout/stderr are stored in <testname>.stdout and
 # <testname>.stderr.  The output of the command can be ignored
-# altogether by using run_command_ignore_output instead of
+# altogether by using the setup function ignore_stdout instead of
 # run_command.
 
 def run_command( name, way, cmd ):
@@ -1216,21 +1222,19 @@ def simple_run(name, way, prog, extra_run_opts):
             dump_stderr(name)
         return failBecause('bad exit code')
 
-    check_hp = '-h' in my_rts_flags
+    if not (opts.ignore_stderr or stderr_ok(name, way) or opts.combined_output):
+        return failBecause('bad stderr')
+    if not (opts.ignore_stdout or stdout_ok(name, way)):
+        return failBecause('bad stdout')
+
+    check_hp = '-h' in my_rts_flags and opts.check_hp
     check_prof = '-p' in my_rts_flags
 
-    if not opts.ignore_output:
-        bad_stderr = not opts.combined_output and not check_stderr_ok(name, way)
-        bad_stdout = not check_stdout_ok(name, way)
-        if bad_stderr:
-            return failBecause('bad stderr')
-        if bad_stdout:
-            return failBecause('bad stdout')
-        # exit_code > 127 probably indicates a crash, so don't try to run hp2ps.
-        if check_hp and (exit_code <= 127 or exit_code == 251) and not check_hp_ok(name):
-            return failBecause('bad heap profile')
-        if check_prof and not check_prof_ok(name, way):
-            return failBecause('bad profile')
+    # exit_code > 127 probably indicates a crash, so don't try to run hp2ps.
+    if check_hp and (exit_code <= 127 or exit_code == 251) and not check_hp_ok(name):
+        return failBecause('bad heap profile')
+    if check_prof and not check_prof_ok(name, way):
+        return failBecause('bad profile')
 
     return checkStats(name, way, stats_file, opts.stats_range_fields)
 
@@ -1307,11 +1311,12 @@ def interpreter_run(name, way, extra_hc_opts, top_mod):
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
-    if getTestOpts().ignore_output or (check_stderr_ok(name, way) and
-                                       check_stdout_ok(name, way)):
-        return passed()
+    if not (opts.ignore_stderr or stderr_ok(name, way)):
+        return failBecause('bad stderr')
+    elif not (opts.ignore_stdout or stdout_ok(name, way)):
+        return failBecause('bad stdout')
     else:
-        return failBecause('bad stdout or stderr')
+        return passed()
 
 def split_file(in_fn, delimiter, out1_fn, out2_fn):
     # See Note [Universal newlines].
@@ -1345,7 +1350,7 @@ def get_compiler_flags():
 
     return flags
 
-def check_stdout_ok(name, way):
+def stdout_ok(name, way):
    actual_stdout_file = add_suffix(name, 'run.stdout')
    expected_stdout_file = find_expected_file(name, 'stdout')
 
@@ -1363,7 +1368,7 @@ def dump_stdout( name ):
    print('Stdout:')
    print(read_no_crs(in_testdir(name, 'run.stdout')))
 
-def check_stderr_ok(name, way):
+def stderr_ok(name, way):
    actual_stderr_file = add_suffix(name, 'run.stderr')
    expected_stderr_file = find_expected_file(name, 'stderr')
 
