@@ -276,8 +276,6 @@ data Type
   | ForAllTy
         {-# UNPACK #-} !TyVarBinder
         Type            -- ^ A Π type.
-                        -- This includes arrow types, constructed with
-                        -- @ForAllTy (Anon ...)@. See also Note [TyBinder].
 
   | FunTy Type Type     -- ^ t1 -> t2   Very common, so an important special case
 
