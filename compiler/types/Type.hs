@@ -91,6 +91,7 @@ module Type (
         binderRelevantType_maybe, caseBinder,
         isVisibleArgFlag, isInvisibleArgFlag, isVisibleBinder, isInvisibleBinder,
         tyConBindersTyBinders,
+        mkTyBinderTyConBinder,
 
         -- ** Common type constructors
         funTyCon,
@@ -160,7 +161,8 @@ module Type (
         zapTCvSubst, getTCvInScope, getTCvSubstRangeFVs,
         extendTCvInScope, extendTCvInScopeList, extendTCvInScopeSet,
         extendTCvSubst, extendCvSubst,
-        extendTvSubst, extendTvSubstList, extendTvSubstAndInScope,
+        extendTvSubst, extendTvSubstBinder,
+        extendTvSubstList, extendTvSubstAndInScope,
         extendTvSubstWithClone,
         isInScope, composeTCvSubstEnv, composeTCvSubst, zipTyEnv, zipCoEnv,
         isEmptyTCvSubst, unionTCvSubst,
@@ -227,6 +229,9 @@ import Pair
 import ListSetOps
 import Digraph
 import Unique ( nonDetCmpUnique )
+import SrcLoc  ( SrcSpan )
+import OccName ( OccName )
+import Name    ( mkInternalName )
 
 import Maybes           ( orElse )
 import Data.Maybe       ( isJust, mapMaybe )
@@ -1434,6 +1439,16 @@ caseBinder (Anon t)  _ d = d t
 zipTyBinderSubst :: [TyBinder] -> [Type] -> TCvSubst
 zipTyBinderSubst bndrs tys
   = mkTvSubstPrs [ (tv, ty) | (Named (TvBndr tv _), ty) <- zip bndrs tys ]
+
+-- | Manufacture a new 'TyConBinder' from a 'TyBinder'. Anonymous
+-- 'TyBinder's are still assigned names as 'TyConBinder's, so we need
+-- the extra gunk with which to construct a 'Name'. Used when producing
+-- tyConTyVars from a datatype kind signature. Defined here to avoid module
+-- loops.
+mkTyBinderTyConBinder :: TyBinder -> SrcSpan -> Unique -> OccName -> TyConBinder
+mkTyBinderTyConBinder (Named (TvBndr tv argf)) _ _ _ = TvBndr tv (NamedTCB argf)
+mkTyBinderTyConBinder (Anon kind) loc uniq occ
+  = TvBndr (mkTyVar (mkInternalName uniq occ loc) kind) AnonTCB
 
 {-
 %************************************************************************

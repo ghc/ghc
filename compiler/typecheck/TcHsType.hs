@@ -55,9 +55,8 @@ import TcUnify
 import TcIface
 import TcSimplify ( solveEqualities )
 import TcType
-import Inst   ( tcInstBinders, tcInstBindersX )
+import Inst   ( tcInstBinders, tcInstBindersX, tcInstBinderX )
 import Type
-import TyCoRep( TyBinder(..) )
 import Kind
 import RdrName( lookupLocalRdrOcc )
 import Var
@@ -85,7 +84,7 @@ import PrelNames hiding ( wildCardName )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Maybes
-import Data.List ( partition )
+import Data.List ( partition, zipWith4 )
 import Control.Monad
 
 {-
@@ -734,11 +733,16 @@ bigConstraintTuple arity
 -- | Apply a type of a given kind to a list of arguments. This instantiates
 -- invisible parameters as necessary. However, it does *not* necessarily
 -- apply all the arguments, if the kind runs out of binders.
+-- Never calls 'matchExpectedFunKind'; when the kind runs out of binders,
+-- this stops processing.
 -- This takes an optional @VarEnv Kind@ which maps kind variables to kinds.
 -- These kinds should be used to instantiate invisible kind variables;
 -- they come from an enclosing class for an associated type/data family.
 -- This version will instantiate all invisible arguments left over after
--- the visible ones.
+-- the visible ones. Used only when typechecking type/data family patterns
+-- (where we need to instantiate all remaining invisible parameters; for
+-- example, consider @type family F :: k where F = Int; F = Maybe@. We
+-- need to instantiate the @k@.)
 tcInferArgs :: Outputable fun
             => fun                      -- ^ the function
             -> [TyConBinder]            -- ^ function kind's binders
@@ -779,36 +783,35 @@ tc_infer_args mode orig_ty binders mb_kind_info orig_args n0
     -- do want to instantiate all invisible arguments. During other
     -- typechecking, we don't.
 
-    go subst binders all_args n acc
-      | (inv_binders, other_binders) <- break isVisibleBinder binders
-      , not (null inv_binders)
-      = do { traceTc "tc_infer_args 1" (ppr inv_binders)
-           ; (subst', args') <- tcInstBindersX subst mb_kind_info inv_binders
-           ; go subst' other_binders all_args n (reverse args' ++ acc) }
+    go subst (binder:binders) all_args@(arg:args) n acc
+      | isInvisibleBinder binder
+      = do { traceTc "tc_infer_args (invis)" (ppr binder)
+           ; (subst', arg') <- tcInstBinderX mb_kind_info subst binder
+           ; go subst' binders all_args n (arg' : acc) }
 
-    go subst (binder:binders) (arg:args) n acc
-      = ASSERT( isVisibleBinder binder )
-        do { traceTc "tc_infer_args 2" (ppr binder $$ ppr arg)
+      | otherwise
+      = do { traceTc "tc_infer_args (vis)" (ppr binder $$ ppr arg)
            ; arg' <- addErrCtxt (funAppCtxt orig_ty arg n) $
-                     tc_lhs_type mode arg (substTyUnchecked subst $ tyBinderType binder)
-           ; let subst' = case binder of
-                   Named bndr -> extendTvSubst subst (binderVar bndr) arg'
-                   Anon {}    -> subst
+                     tc_lhs_type mode arg (substTyUnchecked subst $
+                                           tyBinderType binder)
+           ; let subst' = extendTvSubstBinder subst binder arg'
            ; go subst' binders args (n+1) (arg' : acc) }
 
     go subst [] all_args n acc
       = return (subst, [], reverse acc, all_args, n)
 
 -- | Applies a type to a list of arguments.
--- Always consumes all the arguments.
--- Used for types only
+-- Always consumes all the arguments, using 'matchExpectedFunKind' as
+-- necessary. If you wish to apply a type to a list of HsTypes, this is
+-- your function.
+-- Used for type-checking types only.
 tcInferApps :: Outputable fun
-             => TcTyMode
-             -> fun                  -- ^ Function (for printing only)
-             -> TcType               -- ^ Function (could be knot-tied)
-             -> TcKind               -- ^ Function kind (zonked)
-             -> [LHsType Name]       -- ^ Args
-             -> TcM (TcType, TcKind) -- ^ (f args, result kind)
+            => TcTyMode
+            -> fun                  -- ^ Function (for printing only)
+            -> TcType               -- ^ Function (could be knot-tied)
+            -> TcKind               -- ^ Function kind (zonked)
+            -> [LHsType Name]       -- ^ Args
+            -> TcM (TcType, TcKind) -- ^ (f args, result kind)
 tcInferApps mode orig_ty ty ki args = go ty ki args 1
   where
     go fun fun_kind []   _ = return (fun, fun_kind)
@@ -1677,23 +1680,15 @@ tcDataKindSig kind
                             , isNothing (lookupLocalRdrOcc rdr_env occ) ]
                  -- Note [Avoid name clashes for associated data types]
 
-              extra_bndrs = zipWith3 (mk_tc_bndr span) tv_bndrs occs uniqs
+    -- NB: Use the tv from a binder if there is one. Otherwise,
+    -- we end up inventing a new Unique for it, and any other tv
+    -- that mentions the first ends up with the wrong kind.
+              extra_bndrs = zipWith4 mkTyBinderTyConBinder
+                              tv_bndrs (repeat span) uniqs occs
 
         ; return (extra_bndrs, res_kind) }
   where
     (tv_bndrs, res_kind) = splitPiTys kind
-    mk_tv loc uniq occ kind
-      = mkTyVar (mkInternalName uniq occ loc) kind
-
-    -- NB: Use the tv from a binder if there is one. Otherwise,
-    -- we end up inventing a new Unique for it, and any other tv
-    -- that mentions the first ends up with the wrong kind.
-    -- Ugh!
-    mk_tc_bndr loc tv_bndr occ uniq
-      = case tv_bndr of
-          Named (TvBndr tv vis) -> TvBndr tv (NamedTCB vis)
-          Anon kind -> TvBndr (mk_tv loc uniq occ kind) AnonTCB
-
 
 badKindSig :: Kind -> SDoc
 badKindSig kind

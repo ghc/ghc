@@ -14,7 +14,7 @@ module Inst (
        instCall, instDFunType, instStupidTheta,
        newWanted, newWanteds,
 
-       tcInstBinders, tcInstBindersX,
+       tcInstBinders, tcInstBindersX, tcInstBinderX,
 
        newOverloadedLit, mkOverLit,
 
