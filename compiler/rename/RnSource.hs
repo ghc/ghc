@@ -2114,8 +2114,8 @@ add gp loc (SpliceD splice@(SpliceDecl _ flag)) ds
 
        ; return (gp, Just (splice, ds)) }
   where
-    badImplicitSplice = text "Parse error: naked expression at top level"
-                     $$ text "Perhaps you intended to use TemplateHaskell"
+    badImplicitSplice = text "Parse error: module header, import declaration"
+                     $$ text "or top-level declaration expected."
 
 -- Class declarations: pull out the fixity signatures to the top
 add gp@(HsGroup {hs_tyclds = ts, hs_fixds = fs}) l (TyClD d) ds
