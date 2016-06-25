@@ -928,6 +928,8 @@ runLink dflags args = do
        This functions moves libraries on the link all the way back
        but keeps the order amongst them the same. -}
     argFixup []                        r = [] ++ r
+    -- retain any lib in "-o" position.
+    argFixup (o@(Option "-o"):o'@(FileOption _ _):xs) r = o:o':argFixup xs r
     argFixup (o@(Option       opt):xs) r = if testLib opt
                                               then argFixup xs (r ++ [o])
                                               else o:argFixup xs r
