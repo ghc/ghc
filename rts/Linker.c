@@ -327,11 +327,16 @@ static void *lookupSymbolInDLLs ( unsigned char *lbl );
 #ifndef x86_64_HOST_ARCH
  static void zapTrailingAtSign   ( unsigned char *sym );
 #endif
+
+#if defined(x86_64_HOST_ARCH)
+#define ONLY_USED_x86_64_HOST_ARCH(x) (x)
+#else
+#define ONLY_USED_x86_64_HOST_ARCH(x) (x) GNUC3_ATTRIBUTE(__unused__)
+#endif
+
 static char *allocateImageAndTrampolines (
    pathchar* arch_name, char* member_name,
-#if defined(x86_64_HOST_ARCH)
    FILE* f,
-#endif
    int size,
    int isThin);
 #if defined(x86_64_HOST_ARCH)
@@ -2121,11 +2126,8 @@ static HsInt loadArchive_ (pathchar *path)
 #if defined(mingw32_HOST_OS)
             // TODO: We would like to use allocateExec here, but allocateExec
             //       cannot currently allocate blocks large enough.
-            image = allocateImageAndTrampolines(path, fileName,
-#if defined(x86_64_HOST_ARCH)
-               f,
-#endif
-               memberSize, isThin);
+            image = allocateImageAndTrampolines(path, fileName, f, memberSize,
+                                                isThin);
 #elif defined(darwin_HOST_OS)
             if (RTS_LINKER_USE_MMAP)
                 image = mmapForLinker(memberSize, MAP_ANONYMOUS, -1, 0);
@@ -2354,11 +2356,8 @@ preloadObjectFile (pathchar *path)
 
         // TODO: We would like to use allocateExec here, but allocateExec
         //       cannot currently allocate blocks large enough.
-    image = allocateImageAndTrampolines(path, "itself",
-#if defined(x86_64_HOST_ARCH)
-       f,
-#endif
-       fileSize, HS_BOOL_FALSE);
+    image = allocateImageAndTrampolines(path, "itself", f, fileSize,
+                                        HS_BOOL_FALSE);
     if (image == NULL) {
         fclose(f);
         return NULL;
@@ -3074,11 +3073,9 @@ static int verifyCOFFHeader ( COFF_header *hdr, pathchar *filename);
 static char *
 allocateImageAndTrampolines (
    pathchar* arch_name, char* member_name,
-#if defined(x86_64_HOST_ARCH)
-   FILE* f,
-#endif
+   FILE* ONLY_USED_x86_64_HOST_ARCH (f),
    int size,
-   int isThin)
+   int  ONLY_USED_x86_64_HOST_ARCH (isThin))
 {
    char* image;
 #if defined(x86_64_HOST_ARCH)
