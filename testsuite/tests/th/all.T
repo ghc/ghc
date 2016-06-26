@@ -48,6 +48,7 @@ test('TH_NestedSplices',
 # normal way first, which is why the work is done by a Makefile rule.
 test('TH_spliceE5_prof',
      [req_profiling,
+      only_ways(['normal']),
       when(ghc_dynamic(), expect_broken(11495)),
       extra_clean(['TH_spliceE5_prof_Lib.p.o', 'TH_spliceE5_prof_Lib.hi',
                    'TH_spliceE5_prof_Lib.dyn_o', 'TH_spliceE5_prof_Lib.dyn_hi',
@@ -58,7 +59,7 @@ test('TH_spliceE5_prof',
 
 test('TH_spliceE5_prof_ext',
      [req_profiling,
-      omit_ways(['ghci']),
+      only_ways(['normal']),
       extra_clean(['TH_spliceE5_prof_ext_Lib.hi',
                    'TH_spliceE5_prof_ext_Lib.o'])],
      run_command,
@@ -145,8 +146,9 @@ test('T2713', normal, compile_fail, ['-v0'])
 test('T2674', normal, compile_fail, ['-v0'])
 test('TH_emptycase', normal, compile, ['-v0'])
 
-test('T2386', extra_clean(['T2386_Lib.hi', 'T2386_Lib.o']),
-	      run_command,
+test('T2386', [ extra_clean(['T2386_Lib.hi', 'T2386_Lib.o']),
+                only_ways(['normal']) ],
+              run_command,
 	      ['$MAKE -s --no-print-directory T2386'] )
 
 test('T2685', extra_clean(['T2685a.hi','T2685a.o']),
@@ -216,7 +218,9 @@ test('T5434', extra_clean(['T5434a.hi','T5434a.o']),
 test('T5508', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('TH_Depends',
      [extra_clean(['TH_Depends_External.o', 'TH_Depends_External.hi',
-                   'TH_Depends_external.txt'])],
+                   'TH_Depends_external.txt']),
+      only_ways(['normal']),
+     ],
      run_command,
      ['$MAKE -s --no-print-directory TH_Depends'])
 test('T5597', extra_clean(['T5597a.hi','T5597a.o']),
@@ -267,8 +271,10 @@ test('T7276a', [ only_ways(['ghci']), combined_output ],
 test('TH_TyInstWhere1', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('TH_TyInstWhere2', normal, compile, ['-v0'])
 
-test('T7445', extra_clean(['T7445a.hi', 'T7445a.o']),
-	      run_command,
+test('T7445', [ extra_clean(['T7445a.hi', 'T7445a.o']),
+                only_ways(['normal']),
+              ],
+              run_command,
 	      ['$MAKE -s --no-print-directory T7445'] )
 test('T7532',
      extra_clean(['T7532a.hi', 'T7532a.o']),
@@ -299,7 +305,7 @@ test('TH_Roles4', normal, compile, ['-v0'])
 test('T8186', normal, compile_and_run, ['-v0'])
 
 test('T8333',
-     normal,
+     only_ways(['normal']),
      run_command,
      ['$MAKE -s --no-print-directory T8333'])
 
@@ -349,7 +355,9 @@ test('T7484', normal, compile_fail, ['-v0'])
 test('T1476', normal, compile, ['-v0'])
 test('T1476b', normal, compile, ['-v0'])
 test('T8031', normal, compile, ['-v0'])
-test('T8624', normal, run_command, ['$MAKE -s --no-print-directory T8624'])
+test('T8624', only_ways(['normal']),
+              run_command,
+              ['$MAKE -s --no-print-directory T8624'])
 test('TH_Lift', normal, compile, ['-v0'])
 test('T10047', only_ways(['ghci']), ghci_script, ['T10047.script'])
 test('T10019', only_ways(['ghci']), ghci_script, ['T10019.script'])
