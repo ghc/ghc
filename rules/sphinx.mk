@@ -58,12 +58,12 @@ pdf : pdf_$1
 ifneq "$$(BINDIST)" "YES"
 $1/$2.pdf: $1/conf.py $$($1_RST_SOURCES)
 	$(SPHINXBUILD) -b latex -d $1/.doctrees-pdf $(SPHINXOPTS) $1 $1/build-pdf/$2
-	cd $1/build-pdf/$2 ; xelatex $2.tex
-	cd $1/build-pdf/$2 ; xelatex $2.tex
-	cd $1/build-pdf/$2 ; xelatex $2.tex
+	cd $1/build-pdf/$2 ; xelatex -halt-on-error $2.tex
+	cd $1/build-pdf/$2 ; xelatex -halt-on-error $2.tex
+	cd $1/build-pdf/$2 ; xelatex -halt-on-error $2.tex
 	cd $1/build-pdf/$2 ; makeindex $2.idx
-	cd $1/build-pdf/$2 ; xelatex $2.tex
-	cd $1/build-pdf/$2 ; xelatex $2.tex
+	cd $1/build-pdf/$2 ; xelatex -halt-on-error $2.tex
+	cd $1/build-pdf/$2 ; xelatex -halt-on-error $2.tex
 	cp $1/build-pdf/$2/$2.pdf $1/$2.pdf
 endif
 
