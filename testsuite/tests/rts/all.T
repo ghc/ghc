@@ -259,9 +259,9 @@ test('T8124', [ only_ways(threaded_ways), omit_ways(['ghci']),
 # The ghci way gets confused by the RTS options
 test('T9045', [ omit_ways(['ghci']), extra_run_opts('10000 +RTS -A8k -RTS') ], compile_and_run, [''])
 
-# I couldn't reproduce 9078 with the -threaded runtime, but could easily
-# with the non-threaded one.
-test('T9078', [ omit_ways(threaded_ways) ], compile_and_run, ['-with-rtsopts="-DS" -debug'])
+# T9078 needs to be compiled with -debug, which threaded1 does for us.
+# Assert failure is reproducible with ghc-7.8.2.
+test('T9078', only_ways(['threaded1']), compile_and_run, [''])
 
 test('T10017', [ when(opsys('mingw32'), skip)
                , only_ways(threaded_ways), extra_run_opts('+RTS -N2 -RTS') ], compile_and_run, [''])
