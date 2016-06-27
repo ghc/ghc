@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, ScopedTypeVariables #-}
+{-# LANGUAGE BangPatterns, CPP, ScopedTypeVariables #-}
 
 -----------------------------------------------------------------------------
 --
@@ -579,10 +579,9 @@ releaseRegs regs = do
   let platform = targetPlatform dflags
   assig <- getAssigR
   free <- getFreeRegsR
-  let loop _     free _ | free `seq` False = undefined
-      loop assig free [] = do setAssigR assig; setFreeRegsR free; return ()
-      loop assig free (RegReal rr : rs) = loop assig (frReleaseReg platform rr free) rs
-      loop assig free (r:rs) =
+  let loop assig !free [] = do setAssigR assig; setFreeRegsR free; return ()
+      loop assig !free (RegReal rr : rs) = loop assig (frReleaseReg platform rr free) rs
+      loop assig !free (r:rs) =
          case lookupUFM assig r of
          Just (InBoth real _) -> loop (delFromUFM assig r)
                                       (frReleaseReg platform real free) rs

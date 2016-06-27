@@ -1388,7 +1388,7 @@ pushAtom _ _ (AnnLit lit) = do
 
 pushAtom _ _ expr
    = pprPanic "ByteCodeGen.pushAtom"
-              (pprCoreExpr (deAnnotate (undefined, expr)))
+              (pprCoreExpr (deAnnotate' expr))
 
 
 -- -----------------------------------------------------------------------------
@@ -1628,7 +1628,7 @@ atomPrimRep e | Just e' <- bcView e = atomPrimRep e'
 atomPrimRep (AnnVar v)              = bcIdPrimRep v
 atomPrimRep (AnnLit l)              = typePrimRep (literalType l)
 atomPrimRep (AnnCoercion {})        = VoidRep
-atomPrimRep other = pprPanic "atomPrimRep" (ppr (deAnnotate (undefined,other)))
+atomPrimRep other = pprPanic "atomPrimRep" (ppr (deAnnotate' other))
 
 atomRep :: AnnExpr' Id ann -> ArgRep
 atomRep e = toArgRep (atomPrimRep e)

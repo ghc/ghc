@@ -64,9 +64,8 @@ bPutStr :: BufHandle -> String -> IO ()
 bPutStr (BufHandle buf r hdl) !str = do
   i <- readFastMutInt r
   loop str i
-  where loop _ i | i `seq` False = undefined
-        loop "" i = do writeFastMutInt r i; return ()
-        loop (c:cs) i
+  where loop "" !i = do writeFastMutInt r i; return ()
+        loop (c:cs) !i
            | i >= buf_size = do
                 hPutBuf hdl buf buf_size
                 loop (c:cs) 0

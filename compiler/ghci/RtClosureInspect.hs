@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, ScopedTypeVariables, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE BangPatterns, CPP, ScopedTypeVariables, MagicHash, UnboxedTuples #-}
 
 -----------------------------------------------------------------------------
 --
@@ -702,13 +702,12 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
    --
    -- [SPJ May 11] I don't understand the difference between my_ty and old_ty
 
-  go max_depth _ _ _ | seq max_depth False = undefined
   go 0 my_ty _old_ty a = do
     traceTR (text "Gave up reconstructing a term after" <>
                   int max_depth <> text " steps")
     clos <- trIO $ getClosureData dflags a
     return (Suspension (tipe clos) my_ty a Nothing)
-  go max_depth my_ty old_ty a = do
+  go !max_depth my_ty old_ty a = do
     let monomorphic = not(isTyVarTy my_ty)
     -- This ^^^ is a convention. The ancestor tests for
     -- monomorphism and passes a type instead of a tv
