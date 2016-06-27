@@ -1,5 +1,3 @@
-setTestOpts(omit_ways(['optasm']))
-
 test('SimpleFail1a', normal, compile_fail, [''])
 test('SimpleFail1b', normal, compile_fail, [''])
 test('SimpleFail2a', normal, compile_fail, [''])
