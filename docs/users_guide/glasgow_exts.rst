@@ -11376,7 +11376,7 @@ obfuscates matters, so we do not do so here.)
 
 The translation is carefully crafted to make bang patterns meaningful
 for reursive and polymorphic bindings as well as straightforward
-non-recurisve bindings.
+non-recursive bindings.
 
 Here are some examples of how this translation works. The first
 expression of each sequence is Haskell source; the subsequent ones are

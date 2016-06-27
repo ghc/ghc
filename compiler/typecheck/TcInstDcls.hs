@@ -142,7 +142,7 @@ Note [Instances and loop breakers]
 
 * Instead the idea is to inline df_i into op1_i, which may then select
   methods from the MkC record, and thereby break the recursion with
-  df_i, leaving a *self*-recurisve op1_i.  (If op1_i doesn't call op at
+  df_i, leaving a *self*-recursive op1_i.  (If op1_i doesn't call op at
   the same type, it won't mention df_i, so there won't be recursion in
   the first place.)
 

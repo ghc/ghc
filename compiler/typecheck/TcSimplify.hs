@@ -480,7 +480,7 @@ signature
 where F is a type function.  This happened in Trac #3972.
 
 We could do more than once but we'd have to have /some/ limit: in the
-the recurisve case, we would go on forever in the common case where
+the recursive case, we would go on forever in the common case where
 the constraints /are/ satisfiable (Trac #10592 comment:12!).
 
 For stratightforard situations without type functions the try_harder
