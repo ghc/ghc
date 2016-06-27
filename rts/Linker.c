@@ -329,9 +329,9 @@ static void *lookupSymbolInDLLs ( unsigned char *lbl );
 #endif
 
 #if defined(x86_64_HOST_ARCH)
-#define ONLY_USED_x86_64_HOST_ARCH(x) (x)
+#define USED_IF_x86_64_HOST_ARCH    /* Nothing */
 #else
-#define ONLY_USED_x86_64_HOST_ARCH(x) (x) GNUC3_ATTRIBUTE(__unused__)
+#define USED_IF_x86_64_HOST_ARCH    STG_UNUSED
 #endif
 
 static char *allocateImageAndTrampolines (
@@ -3073,9 +3073,9 @@ static int verifyCOFFHeader ( COFF_header *hdr, pathchar *filename);
 static char *
 allocateImageAndTrampolines (
    pathchar* arch_name, char* member_name,
-   FILE* ONLY_USED_x86_64_HOST_ARCH (f),
+   FILE* f USED_IF_x86_64_HOST_ARCH,
    int size,
-   int  ONLY_USED_x86_64_HOST_ARCH (isThin))
+   int isThin USED_IF_x86_64_HOST_ARCH)
 {
    char* image;
 #if defined(x86_64_HOST_ARCH)
