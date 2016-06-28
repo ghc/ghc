@@ -1029,8 +1029,22 @@ Here is a running example:
   executed, even when optimizations are disabled.  So we get
 
    k = map toUpper
-   lvl = StaticPtr <fingerprint> k
-   f x = ...lvl...
+   static_ptr = StaticPtr <fingerprint> k
+   f x = ...static_ptr...
+
+  The FloatOut pass is careful to produce an /exported/ Id for a floated
+  'StaticPtr', so the binding is not removed by the simplifier (see #12207).
+  E.g. the code for `f` above might look like
+
+    static_ptr = StaticPtr <fingerprint> k
+    f x = ...(staticKey static_ptr)...
+
+  which might correctly be simplified to
+
+    f x = ...<fingerprint>...
+
+  BUT the top-level binding for static_ptr must remain, so that it can be
+  collected to populate the Static Pointer Table.
 
 * The CoreTidy pass produces a C function which inserts all the
   floated 'StaticPtr' in the static pointer table (see the call to

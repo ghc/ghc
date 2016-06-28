@@ -552,10 +552,7 @@ lintRhs :: CoreExpr -> LintM OutType
 -- but produce errors otherwise.
 lintRhs rhs
     | (binders0, rhs') <- collectTyBinders rhs
-    , (fun@(Var b), args, _) <- collectArgsTicks (const True) rhs'
-    , Just con <- isDataConId_maybe b
-    , dataConName con == staticPtrDataConName
-    , length args == 5
+    , Just (fun, args) <- collectStaticPtrSatArgs rhs'
     = flip fix binders0 $ \loopBinders binders -> case binders of
         -- imitate @lintCoreExpr (Lam ...)@
         var : vars -> addLoc (LambdaBodyOf var) $

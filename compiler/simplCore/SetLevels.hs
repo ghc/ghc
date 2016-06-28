@@ -64,7 +64,11 @@ module SetLevels (
 
 import CoreSyn
 import CoreMonad        ( FloatOutSwitches(..) )
-import CoreUtils        ( exprType, exprOkForSpeculation, exprIsBottom )
+import CoreUtils        ( exprType
+                        , exprOkForSpeculation
+                        , exprIsBottom
+                        , collectStaticPtrSatArgs
+                        )
 import CoreArity        ( exprBotStrictness_maybe )
 import CoreFVs          -- all of it
 import CoreSubst
@@ -86,6 +90,7 @@ import Outputable
 import FastString
 import UniqDFM
 import FV
+import Data.Maybe
 
 {-
 ************************************************************************
@@ -1099,7 +1104,8 @@ newLvlVar :: LevelledExpr        -- The RHS of the new binding
           -> LvlM Id
 newLvlVar lvld_rhs is_bot
   = do { uniq <- getUniqueM
-       ; return (add_bot_info (mkLocalIdOrCoVar (mk_name uniq) rhs_ty)) }
+       ; return (add_bot_info (mk_id uniq))
+       }
   where
     add_bot_info var  -- We could call annotateBotStr always, but the is_bot
                       -- flag just tells us when we don't need to do so
@@ -1107,7 +1113,13 @@ newLvlVar lvld_rhs is_bot
        | otherwise = var
     de_tagged_rhs = deTagExpr lvld_rhs
     rhs_ty = exprType de_tagged_rhs
-    mk_name uniq = mkSystemVarName uniq (mkFastString "lvl")
+    mk_id uniq
+      -- See Note [Grand plan for static forms] in SimplCore.
+      | isJust (collectStaticPtrSatArgs lvld_rhs)
+      = mkExportedVanillaId (mkSystemVarName uniq (mkFastString "static_ptr"))
+                            rhs_ty
+      | otherwise
+      = mkLocalIdOrCoVar (mkSystemVarName uniq (mkFastString "lvl")) rhs_ty
 
 cloneCaseBndrs :: LevelEnv -> Level -> [Var] -> LvlM (LevelEnv, [Var])
 cloneCaseBndrs env@(LE { le_subst = subst, le_lvl_env = lvl_env, le_env = id_env })

@@ -275,13 +275,9 @@ test('rdynamic', [ unless(opsys('linux') or opsys('mingw32'), skip)
                  ],
      compile_and_run, ['-rdynamic -package ghc'])
 
-test('GcStaticPointers',
-     [when(doing_ghci(), extra_hc_opts('-fobject-code')),
-      expect_broken_for(12207, opt_ways)],
+test('GcStaticPointers', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
      compile_and_run, [''])
-test('ListStaticPointers',
-     [when(doing_ghci(), extra_hc_opts('-fobject-code')),
-      expect_broken_for(12207, opt_ways)],
+test('ListStaticPointers', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
      compile_and_run, [''])
 
 # 251 = RTS exit code for "out of memory"

@@ -20,11 +20,10 @@ import CoreFVs
 import CoreTidy
 import CoreMonad
 import CorePrep
-import CoreUtils        (rhsIsStatic)
+import CoreUtils        (rhsIsStatic, collectStaticPtrSatArgs)
 import CoreStats        (coreBindsStats, CoreStats(..))
 import CoreLint
 import Literal
-import PrelNames
 import Rules
 import PatSyn
 import ConLike
@@ -655,11 +654,8 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
                       || isStaticPtrApp e
 
   isStaticPtrApp :: CoreExpr -> Bool
-  isStaticPtrApp (collectTyBinders -> (_, e))
-      | (Var v, _) <- collectArgs e
-      , Just con <- isDataConId_maybe v
-      =  dataConName con == staticPtrDataConName
-  isStaticPtrApp _ = False
+  isStaticPtrApp (collectTyBinders -> (_, e)) =
+    isJust $ collectStaticPtrSatArgs e
 
   rule_rhs_vars  = mapUnionVarSet ruleRhsFreeVars imp_id_rules
   vect_var_vs    = mkVarSet [var_v | (var, var_v) <- nameEnvElts vect_vars, isGlobalId var]
