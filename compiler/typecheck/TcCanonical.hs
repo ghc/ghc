@@ -583,11 +583,11 @@ can_eq_nc' True _rdr_env _envs ev ReprEq ty1 _ ty2 _
 
 -- When working with ReprEq, unwrap newtypes.
 can_eq_nc' _flat rdr_env envs ev ReprEq ty1 _ ty2 ps_ty2
-  | Just (co, ty1') <- tcTopNormaliseNewTypeTF_maybe envs rdr_env ty1
-  = can_eq_newtype_nc rdr_env ev NotSwapped co ty1 ty1' ty2 ps_ty2
+  | Just stuff1 <- tcTopNormaliseNewTypeTF_maybe envs rdr_env ty1
+  = can_eq_newtype_nc ev NotSwapped ty1 stuff1 ty2 ps_ty2
 can_eq_nc' _flat rdr_env envs ev ReprEq ty1 ps_ty1 ty2 _
-  | Just (co, ty2') <- tcTopNormaliseNewTypeTF_maybe envs rdr_env ty2
-  = can_eq_newtype_nc rdr_env ev IsSwapped  co ty2 ty2' ty1 ps_ty1
+  | Just stuff2 <- tcTopNormaliseNewTypeTF_maybe envs rdr_env ty2
+  = can_eq_newtype_nc ev IsSwapped  ty2 stuff2 ty1 ps_ty1
 
 -- Then, get rid of casts
 can_eq_nc' flat _rdr_env _envs ev eq_rel (CastTy ty1 co1) _ ty2 ps_ty2
@@ -820,23 +820,21 @@ E.] am worried that it would slow down the common case.)
 
 ------------------------
 -- | We're able to unwrap a newtype. Update the bits accordingly.
-can_eq_newtype_nc :: GlobalRdrEnv
-                  -> CtEvidence           -- ^ :: ty1 ~ ty2
+can_eq_newtype_nc :: CtEvidence           -- ^ :: ty1 ~ ty2
                   -> SwapFlag
-                  -> TcCoercion           -- ^ :: ty1 ~ ty1'
-                  -> TcType               -- ^ ty1
-                  -> TcType               -- ^ ty1'
+                  -> TcType                                    -- ^ ty1
+                  -> ((Bag GlobalRdrElt, TcCoercion), TcType)  -- ^ :: ty1 ~ ty1'
                   -> TcType               -- ^ ty2
                   -> TcType               -- ^ ty2, with type synonyms
                   -> TcS (StopOrContinue Ct)
-can_eq_newtype_nc rdr_env ev swapped co ty1 ty1' ty2 ps_ty2
+can_eq_newtype_nc ev swapped ty1 ((gres, co), ty1') ty2 ps_ty2
   = do { traceTcS "can_eq_newtype_nc" $
-         vcat [ ppr ev, ppr swapped, ppr co, ppr ty1', ppr ty2 ]
+         vcat [ ppr ev, ppr swapped, ppr co, ppr gres, ppr ty1', ppr ty2 ]
 
          -- check for blowing our stack:
          -- See Note [Newtypes can blow the stack]
        ; checkReductionDepth (ctEvLoc ev) ty1
-       ; addUsedDataCons rdr_env (tyConAppTyCon ty1)
+       ; addUsedGREs (bagToList gres)
            -- we have actually used the newtype constructor here, so
            -- make sure we don't warn about importing it!
 

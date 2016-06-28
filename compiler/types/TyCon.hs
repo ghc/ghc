@@ -87,6 +87,7 @@ module TyCon(
         algTyConRhs,
         newTyConRhs, newTyConEtadArity, newTyConEtadRhs,
         unwrapNewTyCon_maybe, unwrapNewTyConEtad_maybe,
+        newTyConDataCon_maybe,
         algTcFields,
         tyConRuntimeRepInfo,
         tyConBinders, tyConResKind,
@@ -2050,6 +2051,10 @@ newTyConCo :: TyCon -> CoAxiom Unbranched
 newTyConCo tc = case newTyConCo_maybe tc of
                  Just co -> co
                  Nothing -> pprPanic "newTyConCo" (ppr tc)
+
+newTyConDataCon_maybe :: TyCon -> Maybe DataCon
+newTyConDataCon_maybe (AlgTyCon {algTcRhs = NewTyCon { data_con = con }}) = Just con
+newTyConDataCon_maybe _ = Nothing
 
 -- | Find the \"stupid theta\" of the 'TyCon'. A \"stupid theta\" is the context
 -- to the left of an algebraic type declaration, e.g. @Eq a@ in the declaration
