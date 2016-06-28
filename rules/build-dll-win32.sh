@@ -42,9 +42,11 @@ process_dll_link() {
             # Note: This the aliasing is a hack for #8696 which unconditionally
             #       says that all symbols from other modules, even in the same
             #       package should be addressed by their SymbolPtr.
-            awk -v root="$elst" '{def=root;}{print "__imp_\"" $0 "\""> def}' $exports
+            awk -v root="$elst.tmp" '{def=root;}{print "__imp_" $0> def}' $exports
+            cat "$elst.tmp" | sed -r 's/^__imp_(\.refptr\..+)$/\1/p' > $elst
+            rm -f "$elst.tmp"
             
-            cmd="$7 $defFile $5 -optl-Wl,--retain-symbols-file=$elst -o $6"
+            cmd="$7 $defFile $5 -optl-Wl,--retain-symbols-file=$exports -o $6"
             echo "$cmd"
             eval "$cmd" || exit 1
             exit 0
@@ -106,7 +108,9 @@ process_dll_link() {
         awk -v root="$file" '{def=root;}{print "    \"" $0 "\""> def}' $lstfile
         sed -i "1i\LIBRARY \"$DLLfile\"\\nEXPORTS" $file
         # Apply the same aliasing hack for #8696 here
-        awk -v root="$elstfile" '{def=root;}{print "__imp_\"" $0 "\""> def}' $lstfile
+        awk -v root="$elstfile.tmp" '{def=root;}{print "__imp_" $0> def}' $lstfile
+        cat "$lstfile.tmp" | sed -r 's/^__imp_(\.refptr\..+)$/\1/p' > $lstfile
+        rm -f "$lstfile.tmp"
         echo "Processing $file..."
         basefile="$(basename $file)"
         DLLfile="${basefile%.*}.$ext"
@@ -118,7 +122,7 @@ process_dll_link() {
     do
         def="$base-pt$i.def"
         objfile="$base-pt$i.objs"
-        elstfile="$base-pt$i.elst"
+        elstfile="$base-pt$i.lst"
         objs=`cat "$objfile" | tr "\n" " "`
         basefile="$(basename $def)"
         DLLfile="${basefile%.*}.$ext"

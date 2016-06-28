@@ -710,7 +710,7 @@ link_caf node _is_upd = do
         -- Call the RTS function newCAF, returning the newly-allocated
         -- blackhole indirection closure
   ; let newCAF_lbl = mkForeignLabel (fsLit "newCAF") Nothing
-                                    ForeignLabelInThisPackage IsFunction
+                                    ForeignLabelInRtsPackage IsFunction
   ; bh <- newTemp (bWord dflags)
   ; emitRtsCallGen [(bh,AddrHint)] newCAF_lbl
       [ (CmmReg (CmmGlobal BaseReg),  AddrHint),

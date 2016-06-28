@@ -349,6 +349,15 @@ data ForeignLabelSource
    --   destination module.
    | ForeignLabelInThisPackage
 
+   -- | Label is in the Rts package. This is used to distinguish between calls
+   --   to Rts functions on Windows with compiled using dyn way.
+   --   For calls in the same package we use a
+   --   simple pointer to the function *foo, for calls in other packages
+   --   we use a pointer to a pointer **foo.
+   --   This is because of the indirection caused by exporting functions from a
+   --   dll using __declspec.
+   | ForeignLabelInRtsPackage
+
    deriving (Eq, Ord)
 
 
@@ -962,15 +971,14 @@ labelDynamic :: DynFlags -> UnitId -> Module -> CLabel -> Bool
 labelDynamic dflags this_pkg this_mod lbl =
   case lbl of
    -- is the RTS in a DLL or not?
-   RtsLabel _           -> (WayDyn `elem` ways dflags) && (this_pkg /= rtsUnitId)
+   RtsLabel _           -> (WayDyn `elem` ways dflags) && (this_pkg == rtsUnitId)
 
    IdLabel n _ _        -> isDllName dflags this_pkg this_mod n
 
    -- When compiling in the "dyn" way, each package is to be linked into
    -- its own shared library.
    CmmLabel pkg _ _
-    | os == OSMinGW32 ->
-       (WayDyn `elem` ways dflags) && (this_pkg /= pkg)
+    | os == OSMinGW32 -> False
     | otherwise ->
        True
 
@@ -989,6 +997,14 @@ labelDynamic dflags this_pkg this_mod lbl =
             -- linked into its own DLL.
             ForeignLabelInPackage pkgId ->
                 (WayDyn `elem` ways dflags) && (this_pkg /= pkgId)
+
+            -- If the call is from the rts package, we need to call it
+            -- using a trampoline always if ways is dyn.
+            -- This is because the call generated for this label will
+            -- be a SymbolPtr which ends up dereferencing the pointer
+            -- twice.
+            ForeignLabelInRtsPackage ->
+                (WayDyn `elem` ways dflags) && (this_pkg == rtsUnitId)
 
        else -- On Mac OS X and on ELF platforms, false positives are OK,
             -- so we claim that all foreign imports come from dynamic
