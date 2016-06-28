@@ -45,8 +45,8 @@ module Coercion (
         instNewTyCon_maybe,
 
         NormaliseStepper, NormaliseStepResult(..), composeSteppers,
-        modifyStepResultCo, unwrapNewTypeStepper,
-        topNormaliseNewType_maybe, topNormaliseTypeX_maybe,
+        mapStepResult, unwrapNewTypeStepper,
+        topNormaliseNewType_maybe, topNormaliseTypeX,
 
         decomposeCo, getCoVar_maybe,
         splitTyConAppCo_maybe,
@@ -848,6 +848,7 @@ mkSymCo    (SubCo (SymCo co))     = SubCo co
 mkSymCo co                        = SymCo co
 
 -- | Create a new 'Coercion' by composing the two given 'Coercion's transitively.
+--   (co1 ; co2)
 mkTransCo :: Coercion -> Coercion -> Coercion
 mkTransCo co1 (Refl {}) = co1
 mkTransCo (Refl {}) co2 = co2
@@ -1271,30 +1272,32 @@ instNewTyCon_maybe tc tys
 -}
 
 -- | A function to check if we can reduce a type by one step. Used
--- with 'topNormaliseTypeX_maybe'.
-type NormaliseStepper = RecTcChecker
-                     -> TyCon     -- tc
-                     -> [Type]    -- tys
-                     -> NormaliseStepResult
+-- with 'topNormaliseTypeX'.
+type NormaliseStepper ev = RecTcChecker
+                         -> TyCon     -- tc
+                         -> [Type]    -- tys
+                         -> NormaliseStepResult ev
 
 -- | The result of stepping in a normalisation function.
--- See 'topNormaliseTypeX_maybe'.
-data NormaliseStepResult
+-- See 'topNormaliseTypeX'.
+data NormaliseStepResult ev
   = NS_Done   -- ^ Nothing more to do
   | NS_Abort  -- ^ Utter failure. The outer function should fail too.
-  | NS_Step RecTcChecker Type Coercion  -- ^ We stepped, yielding new bits;
-                                        -- ^ co :: old type ~ new type
+  | NS_Step RecTcChecker Type ev    -- ^ We stepped, yielding new bits;
+                                    -- ^ ev is evidence;
+                                    -- Usually a co :: old type ~ new type
 
-modifyStepResultCo :: (Coercion -> Coercion)
-                   -> NormaliseStepResult -> NormaliseStepResult
-modifyStepResultCo f (NS_Step rec_nts ty co) = NS_Step rec_nts ty (f co)
-modifyStepResultCo _ result                  = result
+mapStepResult :: (ev1 -> ev2)
+              -> NormaliseStepResult ev1 -> NormaliseStepResult ev2
+mapStepResult f (NS_Step rec_nts ty ev) = NS_Step rec_nts ty (f ev)
+mapStepResult _ NS_Done                 = NS_Done
+mapStepResult _ NS_Abort                = NS_Abort
 
 -- | Try one stepper and then try the next, if the first doesn't make
 -- progress.
 -- So if it returns NS_Done, it means that both steppers are satisfied
-composeSteppers :: NormaliseStepper -> NormaliseStepper
-                -> NormaliseStepper
+composeSteppers :: NormaliseStepper ev -> NormaliseStepper ev
+                -> NormaliseStepper ev
 composeSteppers step1 step2 rec_nts tc tys
   = case step1 rec_nts tc tys of
       success@(NS_Step {}) -> success
@@ -1303,7 +1306,7 @@ composeSteppers step1 step2 rec_nts tc tys
 
 -- | A 'NormaliseStepper' that unwraps newtypes, careful not to fall into
 -- a loop. If it would fall into a loop, it produces 'NS_Abort'.
-unwrapNewTypeStepper :: NormaliseStepper
+unwrapNewTypeStepper :: NormaliseStepper Coercion
 unwrapNewTypeStepper rec_nts tc tys
   | Just (ty', co) <- instNewTyCon_maybe tc tys
   = case checkRecTc rec_nts tc of
@@ -1317,28 +1320,32 @@ unwrapNewTypeStepper rec_nts tc tys
 -- to use the provided 'NormaliseStepper' until that function fails, and then
 -- this function returns. The roles of the coercions produced by the
 -- 'NormaliseStepper' must all be the same, which is the role returned from
--- the call to 'topNormaliseTypeX_maybe'.
-topNormaliseTypeX_maybe :: NormaliseStepper -> Type -> Maybe (Coercion, Type)
-topNormaliseTypeX_maybe stepper
-  = go initRecTc Nothing
-  where
-    go rec_nts mb_co1 ty
+-- the call to 'topNormaliseTypeX'.
+--
+-- Typically ev is Coercion.
+--
+-- If topNormaliseTypeX step plus ty = Just (ev, ty')
+-- then ty ~ev1~ t1 ~ev2~ t2 ... ~evn~ ty'
+-- and ev = ev1 `plus` ev2 `plus` ... `plus` evn
+-- If it returns Nothing then no newtype unwrapping could happen
+topNormaliseTypeX :: NormaliseStepper ev -> (ev -> ev -> ev)
+                  -> Type -> Maybe (ev, Type)
+topNormaliseTypeX stepper plus ty
+ | Just (tc, tys) <- splitTyConApp_maybe ty
+ , NS_Step rec_nts ty' ev <- stepper initRecTc tc tys
+ = go rec_nts ev ty'
+ | otherwise
+ = Nothing
+ where
+    go rec_nts ev ty
       | Just (tc, tys) <- splitTyConApp_maybe ty
       = case stepper rec_nts tc tys of
-          NS_Step rec_nts' ty' co2
-            -> go rec_nts' (mb_co1 `trans` co2) ty'
-
-          NS_Done  -> all_done
+          NS_Step rec_nts' ty' ev' -> go rec_nts' (ev `plus` ev') ty'
+          NS_Done  -> Just (ev, ty)
           NS_Abort -> Nothing
 
       | otherwise
-      = all_done
-      where
-        all_done | Just co <- mb_co1 = Just (co, ty)
-                 | otherwise         = Nothing
-
-    Nothing    `trans` co2 = Just co2
-    (Just co1) `trans` co2 = Just (co1 `mkTransCo` co2)
+      = Just (ev, ty)
 
 topNormaliseNewType_maybe :: Type -> Maybe (Coercion, Type)
 -- ^ Sometimes we want to look through a @newtype@ and get its associated coercion.
@@ -1357,8 +1364,9 @@ topNormaliseNewType_maybe :: Type -> Maybe (Coercion, Type)
 -- the type family environment. If you do have that at hand, consider to use
 -- topNormaliseType_maybe, which should be a drop-in replacement for
 -- topNormaliseNewType_maybe
+-- If topNormliseNewType_maybe ty = Just (co, ty'), then co : ty ~R ty'
 topNormaliseNewType_maybe ty
-  = topNormaliseTypeX_maybe unwrapNewTypeStepper ty
+  = topNormaliseTypeX unwrapNewTypeStepper mkTransCo ty
 
 {-
 %************************************************************************

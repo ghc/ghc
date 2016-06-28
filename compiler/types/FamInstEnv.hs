@@ -1208,7 +1208,7 @@ topNormaliseType_maybe :: FamInstEnvs -> Type -> Maybe (Coercion, Type)
 -- Its a bit like Type.repType, but handles type families too
 
 topNormaliseType_maybe env ty
-  = topNormaliseTypeX_maybe stepper ty
+  = topNormaliseTypeX stepper mkTransCo ty
   where
     stepper = unwrapNewTypeStepper `composeSteppers` tyFamStepper
 
