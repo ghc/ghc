@@ -971,14 +971,15 @@ labelDynamic :: DynFlags -> UnitId -> Module -> CLabel -> Bool
 labelDynamic dflags this_pkg this_mod lbl =
   case lbl of
    -- is the RTS in a DLL or not?
-   RtsLabel _           -> (WayDyn `elem` ways dflags) && (this_pkg == rtsUnitId)
+   RtsLabel _           -> (WayDyn `elem` ways dflags) && (this_pkg /= rtsUnitId)
 
    IdLabel n _ _        -> isDllName dflags this_pkg this_mod n
 
    -- When compiling in the "dyn" way, each package is to be linked into
    -- its own shared library.
    CmmLabel pkg _ _
-    | os == OSMinGW32 -> False
+    | os == OSMinGW32 ->
+       (WayDyn `elem` ways dflags) && (this_pkg /= pkg)
     | otherwise ->
        True
 
@@ -1004,7 +1005,7 @@ labelDynamic dflags this_pkg this_mod lbl =
             -- be a SymbolPtr which ends up dereferencing the pointer
             -- twice.
             ForeignLabelInRtsPackage ->
-                (WayDyn `elem` ways dflags) && (this_pkg == rtsUnitId)
+                (WayDyn `elem` ways dflags) && (this_pkg /= rtsUnitId)
 
        else -- On Mac OS X and on ELF platforms, false positives are OK,
             -- so we claim that all foreign imports come from dynamic
@@ -1331,7 +1332,7 @@ pprDynamicLinkerAsmLabel platform dllInfo lbl
              GotSymbolOffset -> ppr lbl <> text "@gotoff"
    else if platformOS platform == OSMinGW32
         then case dllInfo of
-             SymbolPtr -> ppr lbl
+             SymbolPtr -> text "__imp_" <> ppr lbl
              _         -> panic "pprDynamicLinkerAsmLabel"
    else panic "pprDynamicLinkerAsmLabel"
 
