@@ -2,7 +2,7 @@ module Rules.Actions (
     build, buildWithCmdOptions, buildWithResources, copyFile, fixFile, moveFile,
     removeFile, copyDirectory, copyDirectoryContent, createDirectory,
     moveDirectory, removeDirectory, applyPatch, runBuilder, runBuilderWith,
-    makeExecutable, renderProgram, renderLibrary
+    makeExecutable, renderProgram, renderLibrary, Exclude(..), ExcludeNot(..)
     ) where
 
 import qualified System.Directory.Extra as IO
@@ -14,6 +14,7 @@ import CmdLineFlag
 import Context
 import Expression
 import Oracles.ArgsHash
+import Oracles.DirectoryContent
 import Oracles.WindowsPath
 import Settings
 import Settings.Args
@@ -127,17 +128,18 @@ copyDirectory source target = do
     putProgressInfo $ renderAction "Copy directory" source target
     quietly $ cmd cmdEcho ["cp", "-r", source, target]
 
--- | Copy the content of the source directory into the target directory. Only
--- the files and directories for which the predicate returns True are copied.
-copyDirectoryContent :: (FilePath -> IO Bool) -> FilePath -> FilePath -> Action ()
-copyDirectoryContent test source target = do
-    putProgressInfo $ renderAction "Copy directory" source target
-    liftIO $ IO.listFilesInside test' source >>= mapM_ cp
+-- | Copy the content of the source directory into the target directory.
+-- 'Exclude' and 'ExcludeNot' are a list of file patterns matched with '?=='.
+-- The copied content is tracked.
+copyDirectoryContent :: Exclude -> ExcludeNot -> FilePath -> FilePath -> Action ()
+copyDirectoryContent exclude excludeNot source target = do
+    putProgressInfo $ renderAction "Copy directory content" source target
+    getDirectoryContent exclude excludeNot source >>= mapM_ cp
   where
+    cp a = do
+        createDirectory $ dropFileName $ target' a
+        copyFile a $ target' a
     target' a = target -/- fromJust (stripPrefix source a)
-    test' a = ifM (test a) (mkdir a >> return True) (return False)
-    mkdir a = IO.createDirectoryIfMissing True $ target' a
-    cp a = whenM (test a) $ IO.copyFile a $ target' a
 
 -- | Move a directory. The contents of the source directory is untracked.
 moveDirectory :: FilePath -> FilePath -> Action ()
