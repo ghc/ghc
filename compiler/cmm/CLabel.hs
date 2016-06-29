@@ -244,8 +244,91 @@ data CLabel
   | LargeBitmapLabel
         {-# UNPACK #-} !Unique
 
-  deriving (Eq, Ord)
+  deriving Eq
 
+-- This is laborious, but necessary. We can't derive Ord because
+-- Unique doesn't have an Ord instance. Note nonDetCmpUnique in the
+-- implementation. See Note [No Ord for Unique]
+-- This is non-deterministic but we do not currently support deterministic
+-- code-generation. See Note [Unique Determinism and code generation]
+instance Ord CLabel where
+  compare (IdLabel a1 b1 c1) (IdLabel a2 b2 c2) =
+    compare a1 a2 `thenCmp`
+    compare b1 b2 `thenCmp`
+    compare c1 c2
+  compare (CmmLabel a1 b1 c1) (CmmLabel a2 b2 c2) =
+    compare a1 a2 `thenCmp`
+    compare b1 b2 `thenCmp`
+    compare c1 c2
+  compare (RtsLabel a1) (RtsLabel a2) = compare a1 a2
+  compare (ForeignLabel a1 b1 c1 d1) (ForeignLabel a2 b2 c2 d2) =
+    compare a1 a2 `thenCmp`
+    compare b1 b2 `thenCmp`
+    compare c1 c2 `thenCmp`
+    compare d1 d2
+  compare (CaseLabel u1 a1) (CaseLabel u2 a2) =
+    nonDetCmpUnique u1 u2 `thenCmp`
+    compare a1 a2
+  compare (AsmTempLabel u1) (AsmTempLabel u2) = nonDetCmpUnique u1 u2
+  compare (AsmTempDerivedLabel a1 b1) (AsmTempDerivedLabel a2 b2) =
+    compare a1 a2 `thenCmp`
+    compare b1 b2
+  compare (StringLitLabel u1) (StringLitLabel u2) =
+    nonDetCmpUnique u1 u2
+  compare (PlainModuleInitLabel a1) (PlainModuleInitLabel a2) =
+    compare a1 a2
+  compare (CC_Label a1) (CC_Label a2) =
+    compare a1 a2
+  compare (CCS_Label a1) (CCS_Label a2) =
+    compare a1 a2
+  compare (DynamicLinkerLabel a1 b1) (DynamicLinkerLabel a2 b2) =
+    compare a1 a2 `thenCmp`
+    compare b1 b2
+  compare PicBaseLabel PicBaseLabel = EQ
+  compare (DeadStripPreventer a1) (DeadStripPreventer a2) =
+    compare a1 a2
+  compare (HpcTicksLabel a1) (HpcTicksLabel a2) =
+    compare a1 a2
+  compare (SRTLabel u1) (SRTLabel u2) =
+    nonDetCmpUnique u1 u2
+  compare (LargeSRTLabel u1) (LargeSRTLabel u2) =
+    nonDetCmpUnique u1 u2
+  compare (LargeBitmapLabel u1) (LargeBitmapLabel u2) =
+    nonDetCmpUnique u1 u2
+  compare IdLabel{} _ = LT
+  compare _ IdLabel{} = GT
+  compare CmmLabel{} _ = LT
+  compare _ CmmLabel{} = GT
+  compare RtsLabel{} _ = LT
+  compare _ RtsLabel{} = GT
+  compare ForeignLabel{} _ = LT
+  compare _ ForeignLabel{} = GT
+  compare CaseLabel{} _ = LT
+  compare _ CaseLabel{} = GT
+  compare AsmTempLabel{} _ = LT
+  compare _ AsmTempLabel{} = GT
+  compare AsmTempDerivedLabel{} _ = LT
+  compare _ AsmTempDerivedLabel{} = GT
+  compare StringLitLabel{} _ = LT
+  compare _ StringLitLabel{} = GT
+  compare PlainModuleInitLabel{} _ = LT
+  compare _ PlainModuleInitLabel{} = GT
+  compare CC_Label{} _ = LT
+  compare _ CC_Label{} = GT
+  compare CCS_Label{} _ = LT
+  compare _ CCS_Label{} = GT
+  compare DynamicLinkerLabel{} _ = LT
+  compare _ DynamicLinkerLabel{} = GT
+  compare PicBaseLabel{} _ = LT
+  compare _ PicBaseLabel{} = GT
+  compare DeadStripPreventer{} _ = LT
+  compare _ DeadStripPreventer{} = GT
+  compare HpcTicksLabel{} _ = LT
+  compare _ HpcTicksLabel{} = GT
+  compare SRTLabel{} _ = LT
+  compare _ SRTLabel{} = GT
+  compare LargeSRTLabel{} _ = LT
+  compare _ LargeSRTLabel{} = GT
 
 -- | Record where a foreign label is stored.
 data ForeignLabelSource

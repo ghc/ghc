@@ -26,7 +26,6 @@ dataConFullSig :: DataCon
                -> ([TyVar], [TyVar], [EqSpec], ThetaType, [Type], Type)
 
 instance Eq DataCon
-instance Ord DataCon
 instance Uniquable DataCon
 instance NamedThing DataCon
 instance Outputable DataCon

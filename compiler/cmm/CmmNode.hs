@@ -34,8 +34,10 @@ import qualified Unique as U
 
 import Compiler.Hoopl
 import Data.Maybe
-import Data.List (tails,sort)
+import Data.List (tails,sortBy)
 import Prelude hiding (succ)
+import Unique (nonDetCmpUnique)
+import Util
 
 
 ------------------------
@@ -652,15 +654,23 @@ instance Eq CmmTickScope where
   (SubScope u _) == (SubScope u' _) = u == u'
   (SubScope _ _) == _               = False
   _              == (SubScope _ _)  = False
-  scope          == scope'          = sort (scopeUniques scope) ==
-                                      sort (scopeUniques scope')
+  scope          == scope'          =
+    sortBy nonDetCmpUnique (scopeUniques scope) ==
+    sortBy nonDetCmpUnique (scopeUniques scope')
+    -- This is still deterministic because
+    -- the order is the same for equal lists
+
+-- This is non-deterministic but we do not currently support deterministic
+-- code-generation. See Note [Unique Determinism and code generation]
+-- See Note [No Ord for Unique]
 instance Ord CmmTickScope where
   compare GlobalScope    GlobalScope     = EQ
   compare GlobalScope    _               = LT
   compare _              GlobalScope     = GT
-  compare (SubScope u _) (SubScope u' _) = compare u u'
-  compare scope scope'                   = compare (sort $ scopeUniques scope)
-                                                   (sort $ scopeUniques scope')
+  compare (SubScope u _) (SubScope u' _) = nonDetCmpUnique u u'
+  compare scope scope'                   = cmpList nonDetCmpUnique
+     (sortBy nonDetCmpUnique $ scopeUniques scope)
+     (sortBy nonDetCmpUnique $ scopeUniques scope')
 
 instance Outputable CmmTickScope where
   ppr GlobalScope     = text "global"

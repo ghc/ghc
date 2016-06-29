@@ -537,8 +537,8 @@ newtype NDModule = NDModule { unNDModule :: Module }
 
 instance Ord NDModule where
   compare (NDModule (Module p1 n1)) (NDModule (Module p2 n2)) =
-    (getUnique p1 `compare` getUnique p2) `thenCmp`
-    (getUnique n1 `compare` getUnique n2)
+    (getUnique p1 `nonDetCmpUnique` getUnique p2) `thenCmp`
+    (getUnique n1 `nonDetCmpUnique` getUnique n2)
 
 filterModuleEnv :: (Module -> a -> Bool) -> ModuleEnv a -> ModuleEnv a
 filterModuleEnv f (ModuleEnv e) =

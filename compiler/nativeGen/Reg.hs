@@ -55,7 +55,28 @@ data VirtualReg
         | VirtualRegF  {-# UNPACK #-} !Unique
         | VirtualRegD  {-# UNPACK #-} !Unique
         | VirtualRegSSE {-# UNPACK #-} !Unique
-        deriving (Eq, Show, Ord)
+        deriving (Eq, Show)
+
+-- This is laborious, but necessary. We can't derive Ord because
+-- Unique doesn't have an Ord instance. Note nonDetCmpUnique in the
+-- implementation. See Note [No Ord for Unique]
+-- This is non-deterministic but we do not currently support deterministic
+-- code-generation. See Note [Unique Determinism and code generation]
+instance Ord VirtualReg where
+  compare (VirtualRegI a) (VirtualRegI b) = nonDetCmpUnique a b
+  compare (VirtualRegHi a) (VirtualRegHi b) = nonDetCmpUnique a b
+  compare (VirtualRegF a) (VirtualRegF b) = nonDetCmpUnique a b
+  compare (VirtualRegD a) (VirtualRegD b) = nonDetCmpUnique a b
+  compare (VirtualRegSSE a) (VirtualRegSSE b) = nonDetCmpUnique a b
+  compare VirtualRegI{} _ = LT
+  compare _ VirtualRegI{} = GT
+  compare VirtualRegHi{} _ = LT
+  compare _ VirtualRegHi{} = GT
+  compare VirtualRegF{} _ = LT
+  compare _ VirtualRegF{} = GT
+  compare VirtualRegD{} _ = LT
+  compare _ VirtualRegD{} = GT
+
 
 instance Uniquable VirtualReg where
         getUnique reg

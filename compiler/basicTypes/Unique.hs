@@ -196,31 +196,54 @@ use `deriving' because we want {\em precise} control of ordering
 -- As such, to get deterministic builds, the order of the allocated
 -- @Uniques@ should not affect the final result.
 -- see also wiki/DeterministicBuilds
+--
+-- Note [Unique Determinism and code generation]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- The goal of the deterministic builds (wiki/DeterministicBuilds, #4012)
+-- is to get ABI compatible binaries given the same inputs and environment.
+-- The motivation behind that is that if the ABI doesn't change the
+-- binaries can be safely reused.
+-- Note that this is weaker than bit-for-bit identical binaries and getting
+-- bit-for-bit identical binaries is not a goal for now.
+-- This means that we don't care about nondeterminism that happens after
+-- the interface files are created, in particular we don't care about
+-- register allocation and code generation.
+-- To track progress on bit-for-bit determinism see #12262.
 
-eqUnique, ltUnique, leUnique :: Unique -> Unique -> Bool
+eqUnique :: Unique -> Unique -> Bool
 eqUnique (MkUnique u1) (MkUnique u2) = u1 == u2
-ltUnique (MkUnique u1) (MkUnique u2) = u1 <  u2
-leUnique (MkUnique u1) (MkUnique u2) = u1 <= u2
 
 -- Provided here to make it explicit at the call-site that it can
 -- introduce non-determinism.
 -- See Note [Unique Determinism]
+-- See Note [No Ord for Unique]
 nonDetCmpUnique :: Unique -> Unique -> Ordering
 nonDetCmpUnique (MkUnique u1) (MkUnique u2)
   = if u1 == u2 then EQ else if u1 < u2 then LT else GT
+
+{-
+Note [No Ord for Unique]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+As explained in Note [Unique Determinism] the relative order of Uniques
+is nondeterministic. To prevent from accidental use the Ord Unique
+instance has been removed.
+This makes it easier to maintain deterministic builds, but comes with some
+drawbacks.
+The biggest drawback is that Maps keyed by Uniques can't directly be used.
+The alternatives are:
+
+  1) Use UniqFM or UniqDFM, see Note [Deterministic UniqFM] to decide which
+  2) Create a newtype wrapper based on Unique ordering where nondeterminism
+     is controlled. See Module.ModuleEnv
+  3) Change the algorithm to use nonDetCmpUnique and document why it's still
+     deterministic
+  4) Use TrieMap as done in CmmCommonBlockElim.groupByLabel
+-}
 
 instance Eq Unique where
     a == b = eqUnique a b
     a /= b = not (eqUnique a b)
 
-instance Ord Unique where
-    a  < b = ltUnique a b
-    a <= b = leUnique a b
-    a  > b = not (leUnique a b)
-    a >= b = not (ltUnique a b)
-    compare a b = nonDetCmpUnique a b
-
------------------
 instance Uniquable Unique where
     getUnique u = u
 

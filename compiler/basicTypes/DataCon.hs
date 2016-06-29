@@ -627,13 +627,6 @@ instance Eq DataCon where
     a == b = getUnique a == getUnique b
     a /= b = getUnique a /= getUnique b
 
-instance Ord DataCon where
-    a <= b = getUnique a <= getUnique b
-    a <  b = getUnique a <  getUnique b
-    a >= b = getUnique a >= getUnique b
-    a >  b = getUnique a > getUnique b
-    compare a b = getUnique a `compare` getUnique b
-
 instance Uniquable DataCon where
     getUnique = dcUnique
 

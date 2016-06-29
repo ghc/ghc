@@ -250,8 +250,11 @@ data LocalReg
 instance Eq LocalReg where
   (LocalReg u1 _) == (LocalReg u2 _) = u1 == u2
 
+-- This is non-deterministic but we do not currently support deterministic
+-- code-generation. See Note [Unique Determinism and code generation]
+-- See Note [No Ord for Unique]
 instance Ord LocalReg where
-  compare (LocalReg u1 _) (LocalReg u2 _) = compare u1 u2
+  compare (LocalReg u1 _) (LocalReg u2 _) = nonDetCmpUnique u1 u2
 
 instance Uniquable LocalReg where
   getUnique (LocalReg uniq _) = uniq
