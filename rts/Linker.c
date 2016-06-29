@@ -1703,9 +1703,7 @@ void freeObjectCode (ObjectCode *oc)
 * Sets the initial status of a fresh ObjectCode
 */
 static void setOcInitialStatus(ObjectCode* oc) {
-    if (oc->isImportLib == HS_BOOL_TRUE) {
-        oc->status = OBJECT_DONT_RESOLVE;
-    } else if (oc->archiveMemberName == NULL) {
+    if (oc->archiveMemberName == NULL) {
         oc->status = OBJECT_NEEDED;
     } else {
         oc->status = OBJECT_LOADED;
