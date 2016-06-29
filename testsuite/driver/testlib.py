@@ -1236,7 +1236,7 @@ def simple_run(name, way, prog, extra_run_opts):
 
 def rts_flags(way):
     args = config.way_rts_flags.get(way, [])
-    return '+RTS {} -RTS'.format(' '.join(args)) if args else ''
+    return '+RTS {0} -RTS'.format(' '.join(args)) if args else ''
 
 # -----------------------------------------------------------------------------
 # Run a program in the interpreter and check its output
@@ -1898,9 +1898,9 @@ def summary(t, file, short=False):
         file.write('WARNING: Testsuite run was terminated early\n')
 
 def printUnexpectedTests(file, testInfoss):
-    unexpected = {name for testInfos in testInfoss
+    unexpected = set(name for testInfos in testInfoss
                        for (_, name, _, _) in testInfos
-                       if not name.endswith('.T')}
+                       if not name.endswith('.T'))
     if unexpected:
         file.write('Unexpected results from:\n')
         file.write('TEST="' + ' '.join(unexpected) + '"\n')
