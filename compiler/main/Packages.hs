@@ -61,6 +61,7 @@ import UniqDFM
 import Module
 import Util
 import Panic
+import Platform
 import Outputable
 import Maybes
 
@@ -1465,7 +1466,7 @@ isDllName :: DynFlags -> UnitId -> Module -> Name -> Bool
 -- Despite the "dll", I think this function just means that
 -- the symbol comes from another dynamically-linked package,
 -- and applies on all platforms, not just Windows
-isDllName dflags _this_pkg this_mod name
+isDllName dflags this_pkg this_mod name
   | WayDyn `notElem` ways dflags = False
   | Just mod <- nameModule_maybe name
     -- Issue #8696 - when GHC is dynamically linked, it will attempt
@@ -1480,7 +1481,16 @@ isDllName dflags _this_pkg this_mod name
     -- In the mean time, always force dynamic indirections to be
     -- generated: when the module name isn't the module being
     -- compiled, references are dynamic.
-    = mod /= this_mod
+    = case platformOS $ targetPlatform dflags of
+        -- On Windows the hack for #8696 makes it unlinkable.
+        -- As the entire setup of the code from Cmm down to the RTS expects
+        -- the use of trampolines for the imports only when linking intra-packages.
+        -- I much rather have TH not supported than Dynamic linking not due to a hack.
+        -- Also not sure this would break on Windows anyway.
+        OSMinGW32 -> moduleUnitId mod /= this_pkg
+
+        -- For the other platforms, still perform the hack
+        _         -> mod /= this_mod
 
   | otherwise = False  -- no, it is not even an external name
 
