@@ -35,18 +35,16 @@ process_dll_link() {
             echo DLL $6 OK, no need to split
             defFile="$base.def"
             elst="$base.elst"
+
             # Create a def file hiding symbols not in original object files
             # because --export-all is re-exporting things from static libs
-            awk -v root="$defFile" '{def=root;}{print "    \"" $0 "\""> def}' $exports
+            awk -v root="$defFile" '{def=root;}{print "    \"" $0 "\" PRIVATE"> def}' $exports
             sed -i "1i\LIBRARY \"${6##*/}\"\\nEXPORTS" $defFile
-            # Note: This the aliasing is a hack for #8696 which unconditionally
-            #       says that all symbols from other modules, even in the same
-            #       package should be addressed by their SymbolPtr.
-            awk -v root="$elst.tmp" '{def=root;}{print "__imp_" $0> def}' $exports
-            cat "$elst.tmp" | sed -r 's/^__imp_(\.refptr\..+)$/\1/p' > $elst
-            rm -f "$elst.tmp"
+
+            DLLimport="$base.dll.a"
+            dlltool -d $defFile -l $DLLimport
             
-            cmd="$7 $defFile $5 -optl-Wl,--retain-symbols-file=$exports -o $6"
+            cmd="$7 $DLLimport $5 -optl-Wl,--retain-symbols-file=$exports -o $6"
             echo "$cmd"
             eval "$cmd" || exit 1
             exit 0

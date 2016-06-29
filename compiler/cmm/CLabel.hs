@@ -1005,7 +1005,7 @@ labelDynamic dflags this_pkg this_mod lbl =
             -- be a SymbolPtr which ends up dereferencing the pointer
             -- twice.
             ForeignLabelInRtsPackage ->
-                (WayDyn `elem` ways dflags) && (this_pkg /= rtsUnitId)
+                (WayDyn `elem` ways dflags) && (this_pkg == rtsUnitId)
 
        else -- On Mac OS X and on ELF platforms, false positives are OK,
             -- so we claim that all foreign imports come from dynamic
