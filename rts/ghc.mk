@@ -169,6 +169,7 @@ $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) rts/dist/libs.depend rts/d
 	"$$(RM)" $$(RM_OPTS) $$@
 	# Call out to the shell script to decide how to build the dll.
 	rules/build-dll-win32.sh link "rts/dist/build" "rts/dist/build" "" "" "$$(rts_$1_OBJS)" "$$@" "$$(rts_dist_HC) -this-unit-id rts -shared -dynamic -dynload deploy \
+         -package base -package ghc-prim \
          -no-auto-link-packages -Lrts/dist/build -l$$(LIBFFI_NAME) \
          `cat rts/dist/libs.depend | tr '\n' ' '` \
          $$(rts_dist_$1_GHC_LD_OPTS)"
