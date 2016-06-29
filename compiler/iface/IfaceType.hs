@@ -922,17 +922,22 @@ ppr_co ctxt_prec (IfaceInstCo co ty)
 ppr_co ctxt_prec (IfaceAxiomRuleCo tc cos)
   = maybeParen ctxt_prec TyConPrec $ ppr tc <+> parens (interpp'SP cos)
 
-ppr_co ctxt_prec co
-  = ppr_special_co ctxt_prec doc cos
-  where (doc, cos) = case co of
-                     { IfaceAxiomInstCo n i cos -> (ppr n <> brackets (ppr i), cos)
-                     ; IfaceSymCo co            -> (text "Sym", [co])
-                     ; IfaceTransCo co1 co2     -> (text "Trans", [co1,co2])
-                     ; IfaceNthCo d co          -> (text "Nth:" <> int d,
-                                                    [co])
-                     ; IfaceLRCo lr co          -> (ppr lr, [co])
-                     ; IfaceSubCo co            -> (text "Sub", [co])
-                     ; _                        -> panic "pprIfaceCo" }
+ppr_co ctxt_prec (IfaceAxiomInstCo n i cos)
+  = ppr_special_co ctxt_prec (ppr n <> brackets (ppr i)) cos
+ppr_co ctxt_prec (IfaceSymCo co)
+  = ppr_special_co ctxt_prec (text "Sym") [co]
+ppr_co ctxt_prec (IfaceTransCo co1 co2)
+  = ppr_special_co ctxt_prec  (text "Trans") [co1,co2]
+ppr_co ctxt_prec (IfaceNthCo d co)
+  = ppr_special_co ctxt_prec (text "Nth:" <> int d) [co]
+ppr_co ctxt_prec (IfaceLRCo lr co)
+  = ppr_special_co ctxt_prec (ppr lr) [co]
+ppr_co ctxt_prec (IfaceSubCo co)
+  = ppr_special_co ctxt_prec (text "Sub") [co]
+ppr_co ctxt_prec (IfaceCoherenceCo co1 co2)
+  = ppr_special_co ctxt_prec (text "Coh") [co1,co2]
+ppr_co ctxt_prec (IfaceKindCo co)
+  = ppr_special_co ctxt_prec (text "Kind") [co]
 
 ppr_special_co :: TyPrec -> SDoc -> [IfaceCoercion] -> SDoc
 ppr_special_co ctxt_prec doc cos
