@@ -1366,7 +1366,7 @@ def stdout_ok(name, way):
 
 def dump_stdout( name ):
    print('Stdout:')
-   print(read_no_crs(in_testdir(name, 'run.stdout')))
+   print(open(in_testdir(name, 'run.stdout')).read())
 
 def stderr_ok(name, way):
    actual_stderr_file = add_suffix(name, 'run.stderr')
@@ -1379,7 +1379,7 @@ def stderr_ok(name, way):
 
 def dump_stderr( name ):
    print("Stderr:")
-   print(read_no_crs(in_testdir(name, 'run.stderr')))
+   print(open(in_testdir(name, 'run.stderr')).read())
 
 def read_no_crs(file):
     str = ''
