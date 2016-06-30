@@ -1,0 +1,22 @@
+[1 of 1] Compiling A                ( A.hs, A.o )
+TYPE SIGNATURES
+  test2 ::
+    forall t b (f :: * -> *).
+    (Num b, Num t, Applicative f) =>
+    (t -> f b) -> f b
+TYPE CONSTRUCTORS
+COERCION AXIOMS
+Dependent modules: []
+Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,
+                     integer-gmp-1.0.0.1]
+[1 of 1] Compiling A                ( A.hs, A.o )
+TYPE SIGNATURES
+  test2 ::
+    forall t b (f :: * -> *).
+    (Num b, Num t, Applicative f) =>
+    (t -> f b) -> f b
+TYPE CONSTRUCTORS
+COERCION AXIOMS
+Dependent modules: []
+Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,
+                     integer-gmp-1.0.0.1]

@@ -202,6 +202,7 @@ extra_src_files = {
   'determ017': ['A.hs'],
   'determ018': ['A.hs'],
   'determ019': ['A.hs'],
+  'determ021': ['A.hs'],
   'dodgy': ['DodgyA.hs'],
   'driver011': ['A011.hs'],
   'driver012': ['A012.hs'],
