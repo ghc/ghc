@@ -10,7 +10,7 @@ module CmmExpr
     , CmmLit(..), cmmLitType
     , LocalReg(..), localRegType
     , GlobalReg(..), isArgReg, globalRegType, spReg, hpReg, spLimReg, nodeReg, node, baseReg
-    , VGcPtr(..), vgcFlag       -- Temporary!
+    , VGcPtr(..)
 
     , DefinerOfRegs, UserOfRegs
     , foldRegsDefd, foldRegsUsed, filterRegsUsed
@@ -381,15 +381,10 @@ instance DefinerOfRegs r a => DefinerOfRegs r (Maybe a) where
 -----------------------------------------------------------------------------
 
 data VGcPtr = VGcPtr | VNonGcPtr deriving( Eq, Show )
-        -- TEMPORARY!!!
 
 -----------------------------------------------------------------------------
 --              Global STG registers
 -----------------------------------------------------------------------------
-vgcFlag :: CmmType -> VGcPtr
-vgcFlag ty | isGcPtrType ty = VGcPtr
-           | otherwise      = VNonGcPtr
-
 {-
 Note [Overlapping global registers]
 
