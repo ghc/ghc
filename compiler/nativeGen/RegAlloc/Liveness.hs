@@ -462,10 +462,14 @@ slurpReloadCoalesce live
         mergeSlotMaps :: UniqFM Reg -> UniqFM Reg -> UniqFM Reg
         mergeSlotMaps map1 map2
                 = listToUFM
-                $ [ (k, r1)     | (k, r1)       <- ufmToList map1
-                                , case lookupUFM map2 k of
-                                        Nothing -> False
-                                        Just r2 -> r1 == r2 ]
+                $ [ (k, r1)
+                  | (k, r1) <- nonDetUFMToList map1
+                  -- This is non-deterministic but we do not
+                  -- currently support deterministic code-generation.
+                  -- See Note [Unique Determinism and code generation]
+                  , case lookupUFM map2 k of
+                          Nothing -> False
+                          Just r2 -> r1 == r2 ]
 
 
 -- | Strip away liveness information, yielding NatCmmDecl

@@ -66,7 +66,7 @@ import qualified Data.IntMap as M
 import Data.Data
 import Data.List (sortBy)
 import Data.Function (on)
-import UniqFM (UniqFM, listToUFM_Directly, ufmToList, ufmToIntMap)
+import UniqFM (UniqFM, listToUFM_Directly, nonDetUFMToList, ufmToIntMap)
 
 -- Note [Deterministic UniqFM]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -372,7 +372,7 @@ instance Monoid (UniqDFM a) where
 -- This should not be used in commited code, provided for convenience to
 -- make ad-hoc conversions when developing
 alwaysUnsafeUfmToUdfm :: UniqFM elt -> UniqDFM elt
-alwaysUnsafeUfmToUdfm = listToUDFM_Directly . ufmToList
+alwaysUnsafeUfmToUdfm = listToUDFM_Directly . nonDetUFMToList
 
 -- Output-ery
 

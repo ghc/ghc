@@ -87,7 +87,10 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
 
         -- and free up those registers which are now free.
         let to_free =
-                [ r     | (reg, loc) <- ufmToList assig
+                [ r     | (reg, loc) <- nonDetUFMToList assig
+                        -- This is non-deterministic but we do not
+                        -- currently support deterministic code-generation.
+                        -- See Note [Unique Determinism and code generation]
                         , not (elemUniqSet_Directly reg live_set)
                         , r          <- regsOfLoc loc ]
 
@@ -148,7 +151,10 @@ joinToTargets_again
     src_assig dest_assig
 
         -- the assignments already match, no problem.
-        | ufmToList dest_assig == ufmToList src_assig
+        | nonDetUFMToList dest_assig == nonDetUFMToList src_assig
+        -- This is non-deterministic but we do not
+        -- currently support deterministic code-generation.
+        -- See Note [Unique Determinism and code generation]
         = joinToTargets' block_live new_blocks block_id instr dests
 
         -- assignments don't match, need fixup code
@@ -223,7 +229,10 @@ joinToTargets_again
 --
 makeRegMovementGraph :: RegMap Loc -> RegMap Loc -> [(Unique, Loc, [Loc])]
 makeRegMovementGraph adjusted_assig dest_assig
- = [ node       | (vreg, src) <- ufmToList adjusted_assig
+ = [ node       | (vreg, src) <- nonDetUFMToList adjusted_assig
+                    -- This is non-deterministic but we do not
+                    -- currently support deterministic code-generation.
+                    -- See Note [Unique Determinism and code generation]
                     -- source reg might not be needed at the dest:
                 , Just loc <- [lookupUFM_Directly dest_assig vreg]
                 , node <- expandNode vreg src loc ]

@@ -80,7 +80,6 @@ pprStats code statss
         $$ text ""
         $$ text "-- spills-added"
         $$ text "--    (reg_name, allocs, clobbers, loads, joinRR, joinRM)"
-        $$ (vcat $ map pprSpill
-                 $ ufmToList spills)
+        $$ (pprUFMWithKeys spills (vcat . map pprSpill))
         $$ text "")
 

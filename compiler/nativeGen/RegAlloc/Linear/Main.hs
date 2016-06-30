@@ -620,7 +620,10 @@ saveClobberedTemps clobbered dying
         assig   <- getAssigR
         let to_spill
                 = [ (temp,reg)
-                        | (temp, InReg reg) <- ufmToList assig
+                        | (temp, InReg reg) <- nonDetUFMToList assig
+                        -- This is non-deterministic but we do not
+                        -- currently support deterministic code-generation.
+                        -- See Note [Unique Determinism and code generation]
                         , any (realRegsAlias reg) clobbered
                         , temp `notElem` map getUnique dying  ]
 
@@ -682,7 +685,10 @@ clobberRegs clobbered
         setFreeRegsR $! foldr (frAllocateReg platform) freeregs clobbered
 
         assig           <- getAssigR
-        setAssigR $! clobber assig (ufmToList assig)
+        setAssigR $! clobber assig (nonDetUFMToList assig)
+          -- This is non-deterministic but we do not
+          -- currently support deterministic code-generation.
+          -- See Note [Unique Determinism and code generation]
 
    where
         -- if the temp was InReg and clobbered, then we will have
@@ -802,17 +808,23 @@ allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
                 -- the vregs we could kick out that are already in a slot
                 let candidates_inBoth
                         = [ (temp, reg, mem)
-                                | (temp, InBoth reg mem) <- ufmToList assig
-                                , temp `notElem` keep'
-                                , targetClassOfRealReg platform reg == classOfVirtualReg r ]
+                          | (temp, InBoth reg mem) <- nonDetUFMToList assig
+                          -- This is non-deterministic but we do not
+                          -- currently support deterministic code-generation.
+                          -- See Note [Unique Determinism and code generation]
+                          , temp `notElem` keep'
+                          , targetClassOfRealReg platform reg == classOfVirtualReg r ]
 
                 -- the vregs we could kick out that are only in a reg
                 --      this would require writing the reg to a new slot before using it.
                 let candidates_inReg
                         = [ (temp, reg)
-                                | (temp, InReg reg)     <- ufmToList assig
-                                , temp `notElem` keep'
-                                , targetClassOfRealReg platform reg == classOfVirtualReg r ]
+                          | (temp, InReg reg) <- nonDetUFMToList assig
+                          -- This is non-deterministic but we do not
+                          -- currently support deterministic code-generation.
+                          -- See Note [Unique Determinism and code generation]
+                          , temp `notElem` keep'
+                          , targetClassOfRealReg platform reg == classOfVirtualReg r ]
 
                 let result
 
@@ -857,7 +869,7 @@ allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
                         = pprPanic ("RegAllocLinear.allocRegsAndSpill: no spill candidates\n")
                         $ vcat
                                 [ text "allocating vreg:  " <> text (show r)
-                                , text "assignment:       " <> text (show $ ufmToList assig)
+                                , text "assignment:       " <> ppr assig
                                 , text "freeRegs:         " <> text (show freeRegs)
                                 , text "initFreeRegs:     " <> text (show (frInitFreeRegs platform `asTypeOf` freeRegs)) ]
 

@@ -129,7 +129,7 @@ instance (Outputable statics, Outputable instr)
 
         $$ (if (not $ isNullUFM $ raCoalesced s)
                 then    text "#  Registers coalesced."
-                        $$ (vcat $ map ppr $ ufmToList $ raCoalesced s)
+                        $$ (pprUFMWithKeys (raCoalesced s) (vcat . map ppr))
                         $$ text ""
                 else empty)
 
@@ -160,7 +160,7 @@ instance (Outputable statics, Outputable instr)
 
         $$ (if (not $ isNullUFM $ raCoalesced s)
                 then    text "#  Registers coalesced."
-                        $$ (vcat $ map ppr $ ufmToList $ raCoalesced s)
+                        $$ (pprUFMWithKeys (raCoalesced s) (vcat . map ppr))
                         $$ text ""
                 else empty)
 
