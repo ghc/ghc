@@ -5,6 +5,7 @@ import os.path
 import sys
 import re
 import glob
+import io
 from collections import defaultdict
 
 # keyed on unique type, values are lists of (unique, name) pairs
@@ -12,7 +13,7 @@ def find_uniques(source_files):
     uniques = defaultdict(lambda: defaultdict(lambda: set()))
     unique_re = re.compile(r"([\w\d]+)\s*=\s*mk([\w\d']+)Unique\s+(\d+)")
     for f in source_files:
-        ms = unique_re.findall(open(f).read())
+        ms = unique_re.findall(io.open(f, encoding='utf8').read())
         for m in ms:
             name = m[0]
             _type = m[1]
