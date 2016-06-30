@@ -375,7 +375,7 @@ cvtDec (TH.PatSynD nm args dir pat)
 cvtDec (TH.PatSynSigD nm ty)
   = do { nm' <- cNameL nm
        ; ty' <- cvtPatSynSigTy ty
-       ; returnJustL $ Hs.SigD $ PatSynSig nm' (mkLHsSigType ty') }
+       ; returnJustL $ Hs.SigD $ PatSynSig [nm'] (mkLHsSigType ty') }
 
 ----------------
 cvtTySynEqn :: Located RdrName -> TySynEqn -> CvtM (LTyFamInstEqn RdrName)

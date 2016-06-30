@@ -558,8 +558,8 @@ mkSigTvFn sigs
       = add_scoped_tvs names (hsScopedTvs sig_ty) env
     add_scoped_sig (L _ (TypeSig names sig_ty)) env
       = add_scoped_tvs names (hsWcScopedTvs sig_ty) env
-    add_scoped_sig (L _ (PatSynSig name sig_ty)) env
-      = add_scoped_tvs [name] (hsScopedTvs sig_ty) env
+    add_scoped_sig (L _ (PatSynSig names sig_ty)) env
+      = add_scoped_tvs names (hsScopedTvs sig_ty) env
     add_scoped_sig _ env = env
 
     add_scoped_tvs :: [Located Name] -> [Name] -> NameEnv [Name] -> NameEnv [Name]
@@ -925,13 +925,13 @@ renameSig ctxt sig@(MinimalSig s (L l bf))
   = do new_bf <- traverse (lookupSigOccRn ctxt sig) bf
        return (MinimalSig s (L l new_bf), emptyFVs)
 
-renameSig ctxt sig@(PatSynSig v ty)
-  = do  { v' <- lookupSigOccRn ctxt sig v
+renameSig ctxt sig@(PatSynSig vs ty)
+  = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
         ; (ty', fvs) <- rnHsSigType ty_ctxt ty
-        ; return (PatSynSig v' ty', fvs) }
+        ; return (PatSynSig new_vs ty', fvs) }
   where
     ty_ctxt = GenericCtx (text "a pattern synonym signature for"
-                          <+> quotes (ppr v))
+                          <+> ppr_sig_bndrs vs)
 
 ppr_sig_bndrs :: [Located RdrName] -> SDoc
 ppr_sig_bndrs bs = quotes (pprWithCommas ppr bs)

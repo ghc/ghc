@@ -705,7 +705,7 @@ data Sig name
       --           'ApiAnnotation.AnnDot','ApiAnnotation.AnnDarrow'
 
       -- For details on above see note [Api annotations] in ApiAnnotation
-  | PatSynSig (Located name) (LHsSigType name)
+  | PatSynSig [Located name] (LHsSigType name)
       -- P :: forall a b. Req => Prov => ty
 
       -- | A signature for a class method
@@ -901,9 +901,8 @@ ppr_sig (InlineSig var inl)       = pragBrackets (ppr inl <+> pprPrefixOcc (unLo
 ppr_sig (SpecInstSig _ ty)
   = pragBrackets (text "SPECIALIZE instance" <+> ppr ty)
 ppr_sig (MinimalSig _ bf)         = pragBrackets (pprMinimalSig bf)
-ppr_sig (PatSynSig name sig_ty)
-  = text "pattern" <+> pprPrefixOcc (unLoc name) <+> dcolon
-                           <+> ppr sig_ty
+ppr_sig (PatSynSig names sig_ty)
+  = text "pattern" <+> pprVarSig (map unLoc names) (ppr sig_ty)
 
 instance OutputableBndr name => Outputable (FixitySig name) where
   ppr (FixitySig names fixity) = sep [ppr fixity, pprops]

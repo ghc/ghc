@@ -196,10 +196,11 @@ tcTySig (L loc (TypeSig names sig_ty))
                           | L _ name <- names ]
        ; return (map TcIdSig sigs) }
 
-tcTySig (L loc (PatSynSig (L _ name) sig_ty))
+tcTySig (L loc (PatSynSig names sig_ty))
   = setSrcSpan loc $
-    do { tpsi <- tcPatSynSig name sig_ty
-       ; return [TcPatSynSig tpsi] }
+    do { tpsigs <- sequence [ tcPatSynSig name sig_ty
+                            | L _ name <- names ]
+       ; return (map TcPatSynSig tpsigs) }
 
 tcTySig _ = return []
 

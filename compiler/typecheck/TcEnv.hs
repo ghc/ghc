@@ -601,7 +601,7 @@ getTypeSigNames sigs
     get_type_sig sig ns =
       case sig of
         L _ (TypeSig names _) -> extendNameSetList ns (map unLoc names)
-        L _ (PatSynSig name _) -> extendNameSet ns (unLoc name)
+        L _ (PatSynSig names _) -> extendNameSetList ns (map unLoc names)
         _ -> ns
 
 

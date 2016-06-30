@@ -4315,13 +4315,18 @@ Note also the following points
 -  You may specify an explicit *pattern signature*, as we did for
    ``ExNumPat`` above, to specify the type of a pattern, just as you can
    for a function. As usual, the type signature can be less polymorphic
-   than the inferred type. For example
-
-   ::
+   than the inferred type. For example ::
 
          -- Inferred type would be 'a -> [a]'
          pattern SinglePair :: (a, a) -> [(a, a)]
          pattern SinglePair x = [x]
+
+   Just like signatures on value-level bindings, pattern synonym signatures can
+   apply to more than one pattern. For instance, ::
+
+         pattern Left', Right' :: a -> Either a a
+         pattern Left' x  = Left x
+         pattern Right' x = Right x
 
 -  The GHCi :ghci-cmd:`:info` command shows pattern types in this format.
 
