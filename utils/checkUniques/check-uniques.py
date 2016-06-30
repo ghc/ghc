@@ -12,7 +12,7 @@ def find_uniques(source_files):
     uniques = defaultdict(lambda: defaultdict(lambda: set()))
     unique_re = re.compile(r"([\w\d]+)\s*=\s*mk([\w\d']+)Unique\s+(\d+)")
     for f in source_files:
-        ms = unique_re.findall(open(f).read())
+        ms = unique_re.findall(open(f).read().decode('utf8'))
         for m in ms:
             name = m[0]
             _type = m[1]
