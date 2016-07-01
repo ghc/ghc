@@ -22,6 +22,9 @@ Language
 
 -  TODO FIXME.
 
+- Pattern synonym signatures can now be applied to multiple patterns, just like
+  value-level binding signatures. See :ref:`patsyn-typing` for details.
+
 Compiler
 ~~~~~~~~
 

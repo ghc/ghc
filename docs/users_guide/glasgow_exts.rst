@@ -4256,6 +4256,9 @@ A module which imports ``MyNum(..)`` from ``Example`` and then re-exports
 ``Example``. A more complete specification can be found on the
 :ghc-wiki:`wiki. <PatternSynonyms/AssociatingSynonyms>`
 
+
+.. _patsyn-typing:
+
 Typing of pattern synonyms
 --------------------------
 
