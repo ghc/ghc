@@ -988,6 +988,7 @@ findDupSigs sigs
     expand_sig sig@(InlineSig n _)           = [(n,sig)]
     expand_sig sig@(TypeSig ns _)            = [(n,sig) | n <- ns]
     expand_sig sig@(ClassOpSig _ ns _)       = [(n,sig) | n <- ns]
+    expand_sig sig@(PatSynSig ns  _ )        = [(n,sig) | n <- ns]
     expand_sig _ = []
 
     matching_sig (L _ n1,sig1) (L _ n2,sig2)       = n1 == n2 && mtch sig1 sig2
@@ -995,6 +996,7 @@ findDupSigs sigs
     mtch (InlineSig {})        (InlineSig {})      = True
     mtch (TypeSig {})          (TypeSig {})        = True
     mtch (ClassOpSig d1 _ _)   (ClassOpSig d2 _ _) = d1 == d2
+    mtch (PatSynSig _ _)       (PatSynSig _ _)     = True
     mtch _ _ = False
 
 -- Warn about multiple MINIMAL signatures
