@@ -885,6 +885,10 @@ tupleParens HsUnboxedTuple = ubxParenList
 tupleParens _              = parenList
 
 
+sumParens :: [LaTeX] -> LaTeX
+sumParens = ubxparens . hsep . punctuate (text " | ")
+
+
 -------------------------------------------------------------------------------
 -- * Rendering of HsType
 --
@@ -948,6 +952,7 @@ ppr_mono_ty _         (HsBangTy b ty)     u = ppBang b <> ppLParendType u ty
 ppr_mono_ty _         (HsTyVar (L _ name)) _ = ppDocName name
 ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)   u = ppr_fun_ty ctxt_prec ty1 ty2 u
 ppr_mono_ty _         (HsTupleTy con tys) u = tupleParens con (map (ppLType u) tys)
+ppr_mono_ty _         (HsSumTy tys) u       = sumParens (map (ppLType u) tys)
 ppr_mono_ty _         (HsKindSig ty kind) u = parens (ppr_mono_lty pREC_TOP ty u <+> dcolon u <+> ppLKind u kind)
 ppr_mono_ty _         (HsListTy ty)       u = brackets (ppr_mono_lty pREC_TOP ty u)
 ppr_mono_ty _         (HsPArrTy ty)       u = pabrackets (ppr_mono_lty pREC_TOP ty u)

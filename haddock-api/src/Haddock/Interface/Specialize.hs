@@ -273,6 +273,7 @@ renameType (HsFunTy la lr) = HsFunTy <$> renameLType la <*> renameLType lr
 renameType (HsListTy lt) = HsListTy <$> renameLType lt
 renameType (HsPArrTy lt) = HsPArrTy <$> renameLType lt
 renameType (HsTupleTy srt lt) = HsTupleTy srt <$> mapM renameLType lt
+renameType (HsSumTy lt) = HsSumTy <$> mapM renameLType lt
 renameType (HsOpTy la lop lb) =
     HsOpTy <$> renameLType la <*> located renameName lop <*> renameLType lb
 renameType (HsParTy lt) = HsParTy <$> renameLType lt

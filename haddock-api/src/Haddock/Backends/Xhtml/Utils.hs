@@ -20,7 +20,7 @@ module Haddock.Backends.Xhtml.Utils (
   (<+>), (<=>), char,
   keyword, punctuate,
 
-  braces, brackets, pabrackets, parens, parenList, ubxParenList,
+  braces, brackets, pabrackets, parens, parenList, ubxParenList, ubxSumList,
   arrow, comma, dcolon, dot, darrow, equals, forallSymbol, quote, promoQuote,
 
   hsep, vcat,
@@ -175,6 +175,10 @@ parenList = parens . hsep . punctuate comma
 
 ubxParenList :: [Html] -> Html
 ubxParenList = ubxparens . hsep . punctuate comma
+
+
+ubxSumList :: [Html]  -> Html
+ubxSumList = ubxparens . hsep . punctuate (toHtml " | ")
 
 
 ubxparens :: Html -> Html

@@ -913,6 +913,9 @@ tupleParens HsUnboxedTuple = ubxParenList
 tupleParens _              = parenList
 
 
+sumParens :: [Html] -> Html
+sumParens = ubxSumList
+
 --------------------------------------------------------------------------------
 -- * Rendering of HsType
 --------------------------------------------------------------------------------
@@ -989,6 +992,7 @@ ppr_mono_ty _         (HsBangTy b ty)     u q = ppBang b +++ ppLParendType u q t
 ppr_mono_ty _         (HsTyVar (L _ name)) _ q = ppDocName q Prefix True name
 ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)   u q = ppr_fun_ty ctxt_prec ty1 ty2 u q
 ppr_mono_ty _         (HsTupleTy con tys) u q = tupleParens con (map (ppLType u q) tys)
+ppr_mono_ty _         (HsSumTy tys) u q = sumParens (map (ppLType u q) tys)
 ppr_mono_ty _         (HsKindSig ty kind) u q =
     parens (ppr_mono_lty pREC_TOP ty u q <+> dcolon u <+> ppLKind u q kind)
 ppr_mono_ty _         (HsListTy ty)       u q = brackets (ppr_mono_lty pREC_TOP ty u q)

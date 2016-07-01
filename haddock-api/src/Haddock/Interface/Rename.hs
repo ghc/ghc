@@ -238,6 +238,7 @@ renameType t = case t of
   HsEqTy ty1 ty2 -> liftM2 HsEqTy (renameLType ty1) (renameLType ty2)
 
   HsTupleTy b ts -> return . HsTupleTy b =<< mapM renameLType ts
+  HsSumTy ts -> HsSumTy <$> mapM renameLType ts
 
   HsOpTy a (L loc op) b -> do
     op' <- rename op
