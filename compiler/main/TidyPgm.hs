@@ -57,6 +57,7 @@ import Maybes
 import UniqSupply
 import ErrUtils (Severity(..))
 import Outputable
+import UniqFM
 import SrcLoc
 import qualified ErrUtils as Err
 
@@ -484,7 +485,10 @@ tidyVectInfo (_, var_env) info@(VectInfo { vectInfoVar          = vars
       -- we only export mappings whose domain and co-domain is exported (otherwise, the iface is
       -- inconsistent)
     tidy_vars = mkVarEnv [ (tidy_var, (tidy_var, tidy_var_v))
-                         | (var, var_v) <- varEnvElts vars
+                         | (var, var_v) <- nonDetEltsUFM vars
+                         -- It's OK to use nonDetEltsUFM here because we
+                         -- immediately forget the ordering by creating
+                         -- a new env
                          , let tidy_var   = lookup_var var
                                tidy_var_v = lookup_var var_v
                          , isExternalId tidy_var   && isExportedId tidy_var
@@ -658,7 +662,9 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
     isJust $ collectStaticPtrSatArgs e
 
   rule_rhs_vars  = mapUnionVarSet ruleRhsFreeVars imp_id_rules
-  vect_var_vs    = mkVarSet [var_v | (var, var_v) <- nameEnvElts vect_vars, isGlobalId var]
+  vect_var_vs    = mkVarSet [var_v | (var, var_v) <- nonDetEltsUFM vect_vars, isGlobalId var]
+    -- It's OK to use nonDetEltsUFM here because we immediately forget the
+    -- ordering by creating a set
 
   flatten_binds    = flattenBinds binds
   binders          = map fst flatten_binds
