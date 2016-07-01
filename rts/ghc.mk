@@ -89,6 +89,23 @@ rts/dist/libs.depend : $$(ghc-pkg_INPLACE) | $$(dir $$@)/.
 	"$(ghc-pkg_INPLACE)" --simple-output field rts library-dirs \
 	  | sed -e 's/\([^ ][^ ]*\)/-L\1/g' >> $@
 
+ifneq "$(BINDIST)" "YES"
+ifneq "$(UseSystemLibFFI)" "YES"
+ifeq "$(HostOS_CPP)" "mingw32"
+rts/dist/build/$(LIBFFI_DLL): libffi/build/inst/bin/$(LIBFFI_DLL)
+	cp $< $@
+else
+# This is a little hacky. We don't know the SO version, so we only
+# depend on libffi.so, but copy libffi.so*
+rts/dist/build/lib$(LIBFFI_NAME)$(soext): libffi/build/inst/lib/lib$(LIBFFI_NAME)$(soext)
+	cp libffi/build/inst/lib/lib$(LIBFFI_NAME)$(soext)* rts/dist/build
+ifeq "$(TargetOS_CPP)" "darwin"
+	install_name_tool -id @rpath/lib$(LIBFFI_NAME)$(soext) rts/dist/build/lib$(LIBFFI_NAME)$(soext)
+endif
+endif
+endif
+endif
+
 #-----------------------------------------------------------------------------
 # Building one way
 define build-rts-way # args: $1 = way
@@ -150,6 +167,36 @@ ifeq "$$(TargetOS_CPP)" "mingw32"
 rts_dist_$1_CC_OPTS += -DWINVER=$(rts_WINVER)
 endif
 
+# ----------------------------------------------------------------------------
+# On Windows, as the RTS and base libraries have recursive imports,
+# 	we have to break the loop with "import libraries".
+# 	These are made from rts/win32/libHS*.def which contain lists of
+# 	all the symbols in those libraries used by the RTS.
+# TODO: We really need to find out why and break this dependency.
+#       It's quite fragile
+ifeq "$(HostOS_CPP)" "mingw32"
+
+ALL_RTS_DEF_LIBNAMES 	= base ghc-prim
+ALL_RTS_DEF_LIBS	= \
+	rts/dist/build/win32/libHSbase.dll.a \
+	rts/dist/build/win32/libHSghc-prim.dll.a
+    
+# -- import libs for the regular Haskell libraries
+define make-importlib-def # args $1 = lib name
+rts/dist/build/win32/libHS$1.def : rts/win32/libHS$1.def
+	cat rts/win32/libHS$1.def \
+		| sed "s/@LibVersion@/$$(libraries/$1_dist-install_VERSION)/" \
+		| sed "s/@ProjectVersion@/$$(ProjectVersion)/" \
+		> rts/dist/build/win32/libHS$1.def
+
+rts/dist/build/win32/libHS$1.dll.a : rts/dist/build/win32/libHS$1.def
+	"$$(DLLTOOL)" 	-d rts/dist/build/win32/libHS$1.def \
+			-l rts/dist/build/win32/libHS$1.dll.a
+endef
+$(foreach lib,$(ALL_RTS_DEF_LIBNAMES),$(eval $(call make-importlib-def,$(lib))))
+endif
+
+
 ifneq "$$(UseSystemLibFFI)" "YES"
 rts_dist_FFI_SO = rts/dist/build/lib$$(LIBFFI_NAME)$$(soext)
 else
@@ -165,7 +212,7 @@ endif
 # $6 = output filename
 ifneq "$$(findstring dyn, $1)" ""
 ifeq "$$(HostOS_CPP)" "mingw32"
-$$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) rts/dist/libs.depend rts/dist/build/$$(LIBFFI_DLL)
+$$(rts_$1_LIB) : $$(rts_$1_OBJS) $(ALL_RTS_DEF_LIBS) rts/dist/libs.depend rts/dist/build/$$(LIBFFI_DLL)
 	"$$(RM)" $$(RM_OPTS) $$@
 	# Call out to the shell script to decide how to build the dll.
 	rules/build-dll-win32.sh link "rts/dist/build" "rts/dist/build" "" "" "$$(rts_$1_OBJS)" "$$@" "$$(rts_dist_HC) -this-unit-id rts -shared -dynamic -dynload deploy \

@@ -47,6 +47,7 @@ process_dll_link() {
             cmd="$7 $DLLimport $5 -optl-Wl,--retain-symbols-file=$exports -o $6"
             echo "$cmd"
             eval "$cmd" || exit 1
+            touch "$2/.build-done" # Crude way to force dependencies for make targets
             exit 0
             ;;
         [0-9]*)
