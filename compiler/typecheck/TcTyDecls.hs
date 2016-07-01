@@ -18,7 +18,7 @@ module TcTyDecls(
         checkClassCycles,
 
         -- * Implicits
-        tcAddImplicits,
+        tcAddImplicits, mkDefaultMethodType,
 
         -- * Record selectors
         mkRecSelBinds, mkOneRecordSelector
@@ -647,17 +647,18 @@ mkDefaultMethodIds :: [TyCon] -> [Id]
 -- the filled-in default methods of each instance declaration
 -- See Note [Default method Ids and Template Haskell]
 mkDefaultMethodIds tycons
-  = [ mkExportedVanillaId dm_name (mk_dm_ty cls sel_id dm_spec)
+  = [ mkExportedVanillaId dm_name (mkDefaultMethodType cls sel_id dm_spec)
     | tc <- tycons
     , Just cls <- [tyConClass_maybe tc]
     , (sel_id, Just (dm_name, dm_spec)) <- classOpItems cls ]
-  where
-    mk_dm_ty :: Class -> Id -> DefMethSpec Type -> Type
-    mk_dm_ty _ sel_id VanillaDM        = idType sel_id
-    mk_dm_ty cls _   (GenericDM dm_ty) = mkSpecSigmaTy cls_tvs [pred] dm_ty
-       where
-         cls_tvs = classTyVars cls
-         pred    = mkClassPred cls (mkTyVarTys cls_tvs)
+
+mkDefaultMethodType :: Class -> Id -> DefMethSpec Type -> Type
+-- Returns the top-level type of the default method
+mkDefaultMethodType _ sel_id VanillaDM        = idType sel_id
+mkDefaultMethodType cls _   (GenericDM dm_ty) = mkSpecSigmaTy cls_tvs [pred] dm_ty
+   where
+     cls_tvs = classTyVars cls
+     pred    = mkClassPred cls (mkTyVarTys cls_tvs)
 
 {-
 ************************************************************************

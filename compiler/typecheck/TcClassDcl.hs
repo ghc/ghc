@@ -103,7 +103,7 @@ tcClassSigs clas sigs def_methods
   = do { traceTc "tcClassSigs 1" (ppr clas)
 
        ; gen_dm_prs <- concat <$> mapM (addLocM tc_gen_sig) gen_sigs
-       ; let gen_dm_env :: NameEnv Type
+       ; let gen_dm_env :: NameEnv (SrcSpan, Type)
              gen_dm_env = mkNameEnv gen_dm_prs
 
        ; op_info <- concat <$> mapM (addLocM (tc_sig gen_dm_env)) vanilla_sigs
@@ -125,7 +125,7 @@ tcClassSigs clas sigs def_methods
     dm_bind_names :: [Name]     -- These ones have a value binding in the class decl
     dm_bind_names = [op | L _ (FunBind {fun_id = L _ op}) <- bagToList def_methods]
 
-    tc_sig :: NameEnv Type -> ([Located Name], LHsSigType Name)
+    tc_sig :: NameEnv (SrcSpan, Type) -> ([Located Name], LHsSigType Name)
            -> TcM [TcMethInfo]
     tc_sig gen_dm_env (op_names, op_hs_ty)
       = do { traceTc "ClsSig 1" (ppr op_names)
@@ -133,13 +133,13 @@ tcClassSigs clas sigs def_methods
            ; traceTc "ClsSig 2" (ppr op_names)
            ; return [ (op_name, op_ty, f op_name) | L _ op_name <- op_names ] }
            where
-             f nm | Just ty <- lookupNameEnv gen_dm_env nm = Just (GenericDM ty)
+             f nm | Just lty <- lookupNameEnv gen_dm_env nm = Just (GenericDM lty)
                   | nm `elem` dm_bind_names                = Just VanillaDM
                   | otherwise                              = Nothing
 
     tc_gen_sig (op_names, gen_hs_ty)
       = do { gen_op_ty <- tcClassSigType op_names gen_hs_ty
-           ; return [ (op_name, gen_op_ty) | L _ op_name <- op_names ] }
+           ; return [ (op_name, (loc, gen_op_ty)) | L loc op_name <- op_names ] }
 
 {-
 ************************************************************************

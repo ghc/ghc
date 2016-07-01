@@ -32,7 +32,7 @@ import Type
 import Id
 import TcType
 
-import SrcLoc( noSrcSpan )
+import SrcLoc( SrcSpan, noSrcSpan )
 import DynFlags
 import TcRnMonad
 import UniqSupply
@@ -274,9 +274,23 @@ buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
                        (mkTyVarTys (binderVars (univ_tvs ++ ex_tvs)))
 
 ------------------------------------------------------
-type TcMethInfo = (Name, Type, Maybe (DefMethSpec Type))
-        -- A temporary intermediate, to communicate between
-        -- tcClassSigs and buildClass.
+type TcMethInfo     -- A temporary intermediate, to communicate
+                    -- between tcClassSigs and buildClass.
+  = ( Name   -- Name of the class op
+    , Type   -- Type of the class op
+    , Maybe (DefMethSpec (SrcSpan, Type)))
+         -- Nothing                    => no default method
+         --
+         -- Just VanillaDM             => There is an ordinary
+         --                               polymorphic default method
+         --
+         -- Just (GenericDM (loc, ty)) => There is a generic default metho
+         --                               Here is its type, and the location
+         --                               of the type signature
+         --    We need that location /only/ to attach it to the
+         --    generic default method's Name; and we need /that/
+         --    only to give the right location of an ambiguity error
+         --    for the generic default method, spat out by checkValidClass
 
 buildClass :: Name  -- Name of the class/tycon (they have the same Name)
            -> [TyConBinder]                -- Of the tycon
@@ -376,11 +390,19 @@ buildClass tycon_name binders roles sc_theta
 
     mk_op_item :: Class -> TcMethInfo -> TcRnIf n m ClassOpItem
     mk_op_item rec_clas (op_name, _, dm_spec)
-      = do { dm_info <- case dm_spec of
-                          Nothing   -> return Nothing
-                          Just spec -> do { dm_name <- newImplicitBinder op_name mkDefaultMethodOcc
-                                          ; return (Just (dm_name, spec)) }
+      = do { dm_info <- mk_dm_info op_name dm_spec
            ; return (mkDictSelId op_name rec_clas, dm_info) }
+
+    mk_dm_info :: Name -> Maybe (DefMethSpec (SrcSpan, Type))
+               -> TcRnIf n m (Maybe (Name, DefMethSpec Type))
+    mk_dm_info _ Nothing
+      = return Nothing
+    mk_dm_info op_name (Just VanillaDM)
+      = do { dm_name <- newImplicitBinder op_name mkDefaultMethodOcc
+           ; return (Just (dm_name, VanillaDM)) }
+    mk_dm_info op_name (Just (GenericDM (loc, dm_ty)))
+      = do { dm_name <- newImplicitBinderLoc op_name mkDefaultMethodOcc loc
+           ; return (Just (dm_name, GenericDM dm_ty)) }
 
 {-
 Note [Class newtypes and equality predicates]
@@ -407,6 +429,14 @@ newImplicitBinder :: Name                       -- Base name
 -- For source type/class decls, this is the first occurrence
 -- For iface ones, the LoadIface has alrady allocated a suitable name in the cache
 newImplicitBinder base_name mk_sys_occ
+  = newImplicitBinderLoc base_name mk_sys_occ (nameSrcSpan base_name)
+
+newImplicitBinderLoc :: Name                       -- Base name
+                     -> (OccName -> OccName)       -- Occurrence name modifier
+                     -> SrcSpan
+                     -> TcRnIf m n Name            -- Implicit name
+-- Just the same, but lets you specify the SrcSpan
+newImplicitBinderLoc base_name mk_sys_occ loc
   | Just mod <- nameModule_maybe base_name
   = newGlobalBinder mod occ loc
   | otherwise           -- When typechecking a [d| decl bracket |],
@@ -416,7 +446,6 @@ newImplicitBinder base_name mk_sys_occ
         ; return (mkInternalName uniq occ loc) }
   where
     occ = mk_sys_occ (nameOccName base_name)
-    loc = nameSrcSpan base_name
 
 -- | Make the 'TyConRepName' for this 'TyCon'
 newTyConRepName :: Name -> TcRnIf gbl lcl TyConRepName
