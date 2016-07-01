@@ -470,10 +470,10 @@ renameSig sig = case sig of
     lnames' <- mapM renameL lnames
     ltype' <- renameLSigType sig_ty
     return (ClassOpSig is_default lnames' ltype')
-  PatSynSig lname sig_ty -> do
-    lname' <- renameL lname
+  PatSynSig lnames sig_ty -> do
+    lnames' <- mapM renameL lnames
     sig_ty' <- renameLSigType sig_ty
-    return $ PatSynSig lname' sig_ty'
+    return $ PatSynSig lnames' sig_ty'
   FixSig (FixitySig lnames fixity) -> do
     lnames' <- mapM renameL lnames
     return $ FixSig (FixitySig lnames' fixity)

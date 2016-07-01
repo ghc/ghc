@@ -251,7 +251,7 @@ declNames :: LHsDecl DocName -> [DocName]
 declNames (L _ decl) = case decl of
   TyClD d  -> [tcdName d]
   SigD (TypeSig lnames _ ) -> map unLoc lnames
-  SigD (PatSynSig lname _) -> [unLoc lname]
+  SigD (PatSynSig lnames _) -> map unLoc lnames
   ForD (ForeignImport (L _ n) _ _ _) -> [n]
   ForD (ForeignExport (L _ n) _ _ _) -> [n]
   _ -> error "declaration not supported by declNames"
@@ -296,8 +296,8 @@ ppDecl (L loc decl) (doc, fnArgsDoc) instances subdocs _fixities = case decl of
   TyClD d@(ClassDecl {})    -> ppClassDecl instances loc doc subdocs d unicode
   SigD (TypeSig lnames t)   -> ppFunSig loc (doc, fnArgsDoc) (map unLoc lnames)
                                         (hsSigWcType t) unicode
-  SigD (PatSynSig lname ty) ->
-      ppLPatSig loc (doc, fnArgsDoc) lname ty unicode
+  SigD (PatSynSig lnames ty) ->
+      ppLPatSig loc (doc, fnArgsDoc) (map unLoc lnames) ty unicode
   ForD d                         -> ppFor loc (doc, fnArgsDoc) d unicode
   InstD _                        -> empty
   DerivD _                       -> empty
@@ -355,14 +355,14 @@ ppFunSig loc doc docnames (L _ typ) unicode =
  where
    names = map getName docnames
 
-ppLPatSig :: SrcSpan -> DocForDecl DocName -> Located DocName
+ppLPatSig :: SrcSpan -> DocForDecl DocName -> [DocName]
           -> LHsSigType DocName
           -> Bool -> LaTeX
-ppLPatSig _loc (doc, _argDocs) (L _ name) ty unicode
+ppLPatSig _loc (doc, _argDocs) docnames ty unicode
   = declWithDoc pref1 (documentationToLaTeX doc)
   where
     pref1 = hsep [ keyword "pattern"
-                 , ppDocBinder name
+                 , hsep $ punctuate comma $ map ppDocBinder docnames
                  , dcolon unicode
                  , ppLType unicode (hsSigType ty)
                  ]

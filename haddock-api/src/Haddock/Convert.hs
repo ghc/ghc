@@ -101,7 +101,7 @@ tyThingToLHsDecl t = case t of
     (synifySigWcType ImplicitizeForAll (dataConUserType dc)))
 
   AConLike (PatSynCon ps) ->
-    allOK . SigD $ PatSynSig (synifyName ps) (synifyPatSynSigType ps)
+    allOK . SigD $ PatSynSig [synifyName ps] (synifyPatSynSigType ps)
   where
     withErrs e x = return (e, x)
     allOK x = return (mempty, x)
