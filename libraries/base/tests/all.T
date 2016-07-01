@@ -143,6 +143,9 @@ test('CatEntail', normal, compile, [''])
 test('T7653', high_memory_usage, compile_and_run, [''])
 test('T7787', normal, compile_and_run, [''])
 
+def stderr_contains(pattern):
+    return normalise_errmsg_fun(lambda s: pattern if pattern in s else s)
+
 test('topHandler01', when(opsys('mingw32'), skip), compile_and_run, [''])
 test('topHandler02',
      [when(opsys('mingw32'), skip),
@@ -150,7 +153,7 @@ test('topHandler02',
       signal_exit_code(2)
      ], compile_and_run, [''])
 test('topHandler03',
-     [when(opsys('mingw32'), skip),
+     [when(opsys('mingw32'), skip), stderr_contains('Terminated'),
       signal_exit_code(15)
      ], compile_and_run, [''])
 test('topHandler04',
