@@ -1,10 +1,11 @@
 module Rules.Actions (
     build, buildWithCmdOptions, buildWithResources, copyFile, fixFile, moveFile,
-    removeFile, copyDirectory, createDirectory, moveDirectory, removeDirectory,
-    applyPatch, runBuilder, makeExecutable, renderProgram, renderLibrary
+    removeFile, copyDirectory, copyDirectoryContent, createDirectory,
+    moveDirectory, removeDirectory, applyPatch, runBuilder, runBuilderWith,
+    makeExecutable, renderProgram, renderLibrary, Match(..)
     ) where
 
-import qualified System.Directory       as IO
+import qualified System.Directory.Extra as IO
 import qualified System.IO              as IO
 import qualified Control.Exception.Base as IO
 
@@ -13,6 +14,7 @@ import CmdLineFlag
 import Context
 import Expression
 import Oracles.ArgsHash
+import Oracles.DirectoryContent
 import Oracles.WindowsPath
 import Settings
 import Settings.Args
@@ -126,6 +128,18 @@ copyDirectory source target = do
     putProgressInfo $ renderAction "Copy directory" source target
     quietly $ cmd cmdEcho ["cp", "-r", source, target]
 
+-- | Copy the content of the source directory into the target directory.
+-- The copied content is tracked.
+copyDirectoryContent :: Match -> FilePath -> FilePath -> Action ()
+copyDirectoryContent expr source target = do
+    putProgressInfo $ renderAction "Copy directory content" source target
+    getDirectoryContent expr source >>= mapM_ cp
+  where
+    cp a = do
+        createDirectory $ dropFileName $ target' a
+        copyFile a $ target' a
+    target' a = target -/- fromJust (stripPrefix source a)
+
 -- | Move a directory. The contents of the source directory is untracked.
 moveDirectory :: FilePath -> FilePath -> Action ()
 moveDirectory source target = do
@@ -152,12 +166,15 @@ applyPatch dir patch = do
     quietly $ cmd Shell cmdEcho [Cwd dir] [path, "-p0 <", patch]
 
 runBuilder :: Builder -> [String] -> Action ()
-runBuilder builder args = do
+runBuilder = runBuilderWith []
+
+runBuilderWith :: [CmdOption] -> Builder -> [String] -> Action ()
+runBuilderWith options builder args = do
     needBuilder builder
     path <- builderPath builder
     let note = if null args then "" else " (" ++ intercalate ", " args ++ ")"
     putBuild $ "| Run " ++ show builder ++ note
-    quietly $ cmd [path] args
+    quietly $ cmd options [path] args
 
 makeExecutable :: FilePath -> Action ()
 makeExecutable file = do
