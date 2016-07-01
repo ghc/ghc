@@ -54,7 +54,7 @@ module UniqFM (
         intersectUFM_C,
         disjointUFM,
         nonDetFoldUFM, foldUFM, nonDetFoldUFM_Directly,
-        anyUFM, allUFM,
+        anyUFM, allUFM, seqEltsUFM,
         mapUFM, mapUFM_Directly,
         elemUFM, elemUFM_Directly,
         filterUFM, filterUFM_Directly, partitionUFM,
@@ -291,6 +291,12 @@ anyUFM p (UFM m) = M.fold ((||) . p) False m
 
 allUFM :: (elt -> Bool) -> UniqFM elt -> Bool
 allUFM p (UFM m) = M.fold ((&&) . p) True m
+
+seqEltsUFM :: ([elt] -> ()) -> UniqFM elt -> ()
+seqEltsUFM seqList = seqList . nonDetEltsUFM
+  -- It's OK to use nonDetEltsUFM here because the type guarantees that
+  -- the only interesting thing this function can do is to force the
+  -- elements.
 
 -- See Note [Deterministic UniqFM] to learn about nondeterminism.
 -- If you use this please provide a justification why it doesn't introduce
