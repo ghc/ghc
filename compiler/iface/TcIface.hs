@@ -435,11 +435,11 @@ tc_iface_decl _parent ignore_prags
                 -- it mentions unless it's necessary to do so
           ; return (op_name, op_ty, dm') }
 
-   tc_dm :: Maybe (DefMethSpec IfaceType) -> IfL (Maybe (DefMethSpec Type))
+   tc_dm :: Maybe (DefMethSpec IfaceType) -> IfL (Maybe (DefMethSpec (SrcSpan, Type)))
    tc_dm Nothing               = return Nothing
    tc_dm (Just VanillaDM)      = return (Just VanillaDM)
    tc_dm (Just (GenericDM ty)) = do { ty' <- tcIfaceType ty
-                                    ; return (Just (GenericDM ty')) }
+                                    ; return (Just (GenericDM (noSrcSpan, ty'))) }
 
    tc_at cls (IfaceAT tc_decl if_def)
      = do ATyCon tc <- tc_iface_decl (Just cls) ignore_prags tc_decl

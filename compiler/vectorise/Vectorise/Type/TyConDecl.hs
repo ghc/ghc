@@ -14,6 +14,8 @@ import TyCon
 import DataCon
 import BasicTypes
 import DynFlags
+import BasicTypes( DefMethSpec(..) )
+import SrcLoc( SrcSpan, noSrcSpan )
 import Var
 import Name
 import Outputable
@@ -132,6 +134,13 @@ vectMethod id defMeth ty
 
       ; return  (Var.varName id', ty', defMethSpecOfDefMeth defMeth)
       }
+
+-- | Convert a `DefMethInfo` to a `DefMethSpec`, which discards the name field in
+--   the `DefMeth` constructor of the `DefMeth`.
+defMethSpecOfDefMeth :: DefMethInfo -> Maybe (DefMethSpec (SrcSpan, Type))
+defMethSpecOfDefMeth Nothing = Nothing
+defMethSpecOfDefMeth (Just (_, VanillaDM))    = Just VanillaDM
+defMethSpecOfDefMeth (Just (_, GenericDM ty)) = Just (GenericDM (noSrcSpan, ty))
 
 -- |Vectorise the RHS of an algebraic type.
 --

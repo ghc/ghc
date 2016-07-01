@@ -10,7 +10,7 @@ module Class (
         ClassOpItem,
         ClassATItem(..),
         ClassMinimalDef,
-        DefMethInfo, pprDefMethInfo, defMethSpecOfDefMeth,
+        DefMethInfo, pprDefMethInfo,
 
         FunDep, pprFundeps, pprFunDep,
 
@@ -111,14 +111,6 @@ data ClassATItem
                       -- Note [Associated type defaults]
 
 type ClassMinimalDef = BooleanFormula Name -- Required methods
-
--- | Convert a `DefMethInfo` to a `DefMethSpec`, which discards the name field in
---   the `DefMeth` constructor of the `DefMeth`.
-defMethSpecOfDefMeth :: DefMethInfo -> Maybe (DefMethSpec Type)
-defMethSpecOfDefMeth meth
- = case meth of
-     Nothing        -> Nothing
-     Just (_, spec) -> Just spec
 
 {-
 Note [Associated type defaults]
