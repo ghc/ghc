@@ -630,6 +630,9 @@ class NamedThing a where
 
     getOccName n = nameOccName (getName n)      -- Default method
 
+instance NamedThing e => NamedThing (GenLocated l e) where
+    getName = getName . unLoc
+
 getSrcLoc           :: NamedThing a => a -> SrcLoc
 getSrcSpan          :: NamedThing a => a -> SrcSpan
 getOccString        :: NamedThing a => a -> String
