@@ -1,31 +1,39 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, DeriveGeneric #-}
 module Oracles.DirectoryContent (
-    getDirectoryContent, directoryContentOracle, Exclude(..), ExcludeNot(..)
+    getDirectoryContent, directoryContentOracle, Match(..)
     ) where
 
 import Base
+import GHC.Generics
 import System.Directory.Extra
 
-newtype DirectoryContent = DirectoryContent (Exclude, ExcludeNot, FilePath)
-    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
-newtype Exclude = Exclude [FilePattern]
-    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
-newtype ExcludeNot = ExcludeNot [FilePattern]
+newtype DirectoryContent = DirectoryContent (Match, FilePath)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
 
--- | Get the directory content. 'Exclude' and 'ExcludeNot' are a list of file
--- patterns matched with '?=='.
-getDirectoryContent :: Exclude -> ExcludeNot -> FilePath -> Action [FilePath]
-getDirectoryContent exclude excludeNot dir =
-    askOracle $ DirectoryContent (exclude, excludeNot, dir)
+data Match = Test FilePattern | Not (Match) | And [Match] | Or [Match]
+    deriving (Generic, Eq, Show, Typeable)
+instance Binary Match
+instance Hashable Match
+instance NFData Match
+
+matches :: Match -> FilePath -> Bool
+matches (Test m) f = m ?== f
+matches (Not m) f = not $ matches m f
+matches (And [])     _               = True
+matches (And (m:ms)) f | matches m f = matches (And ms) f
+                       | otherwise   = False
+matches (Or [])     _               = False
+matches (Or (m:ms)) f | matches m f = True
+                      | otherwise   = matches (Or ms) f
+
+-- | Get the directory content recursively.
+getDirectoryContent :: Match -> FilePath -> Action [FilePath]
+getDirectoryContent expr dir =
+    askOracle $ DirectoryContent (expr, dir)
 
 directoryContentOracle :: Rules ()
 directoryContentOracle = void $ addOracle oracle
   where
     oracle :: DirectoryContent -> Action [FilePath]
-    oracle (DirectoryContent (Exclude exclude, ExcludeNot excludeNot, dir)) =
-        liftIO $ filter test <$> listFilesInside (return . test) dir
-      where
-        test a = include' a || not (exclude' a)
-        exclude' a = any (?== a) exclude
-        include' a = any (?== a) excludeNot
+    oracle (DirectoryContent (expr, dir)) =
+        liftIO $ filter (matches expr) <$> listFilesInside (return . matches expr) dir

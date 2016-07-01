@@ -2,7 +2,7 @@ module Rules.Actions (
     build, buildWithCmdOptions, buildWithResources, copyFile, fixFile, moveFile,
     removeFile, copyDirectory, copyDirectoryContent, createDirectory,
     moveDirectory, removeDirectory, applyPatch, runBuilder, runBuilderWith,
-    makeExecutable, renderProgram, renderLibrary, Exclude(..), ExcludeNot(..)
+    makeExecutable, renderProgram, renderLibrary, Match(..)
     ) where
 
 import qualified System.Directory.Extra as IO
@@ -129,12 +129,11 @@ copyDirectory source target = do
     quietly $ cmd cmdEcho ["cp", "-r", source, target]
 
 -- | Copy the content of the source directory into the target directory.
--- 'Exclude' and 'ExcludeNot' are a list of file patterns matched with '?=='.
 -- The copied content is tracked.
-copyDirectoryContent :: Exclude -> ExcludeNot -> FilePath -> FilePath -> Action ()
-copyDirectoryContent exclude excludeNot source target = do
+copyDirectoryContent :: Match -> FilePath -> FilePath -> Action ()
+copyDirectoryContent expr source target = do
     putProgressInfo $ renderAction "Copy directory content" source target
-    getDirectoryContent exclude excludeNot source >>= mapM_ cp
+    getDirectoryContent expr source >>= mapM_ cp
   where
     cp a = do
         createDirectory $ dropFileName $ target' a
