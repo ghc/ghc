@@ -172,7 +172,6 @@ def setup(app):
                         indextemplate='pair: %s; RTS option',
                         doc_field_types=[
                             Field('since', label='Introduced in GHC version', names=['since']),
-                            Field('static')
                         ])
 
 def increase_python_stack():
