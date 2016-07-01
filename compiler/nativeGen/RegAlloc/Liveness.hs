@@ -221,7 +221,7 @@ instance Outputable instr
          where  pprRegs :: SDoc -> RegSet -> SDoc
                 pprRegs name regs
                  | isEmptyUniqSet regs  = empty
-                 | otherwise            = name <> (hcat $ punctuate space $ map ppr $ uniqSetToList regs)
+                 | otherwise            = name <> (pprUFM regs (hcat . punctuate space . map ppr))
 
 instance Outputable LiveInfo where
     ppr (LiveInfo mb_static entryIds liveVRegsOnEntry liveSlotsOnEntry)
@@ -572,7 +572,8 @@ patchEraseLive patchF cmm
         patchCmm (CmmProc info label live sccs)
          | LiveInfo static id (Just blockMap) mLiveSlots <- info
          = let
-                patchRegSet set = mkUniqSet $ map patchF $ uniqSetToList set
+                patchRegSet set = mkUniqSet $ map patchF $ nonDetEltsUFM set
+                  -- See Note [Unique Determinism and code generation]
                 blockMap'       = mapMap patchRegSet blockMap
 
                 info'           = LiveInfo static id (Just blockMap') mLiveSlots
@@ -629,9 +630,10 @@ patchRegsLiveInstr patchF li
                 (patchRegsOfInstr instr patchF)
                 (Just live
                         { -- WARNING: have to go via lists here because patchF changes the uniq in the Reg
-                          liveBorn      = mkUniqSet $ map patchF $ uniqSetToList $ liveBorn live
-                        , liveDieRead   = mkUniqSet $ map patchF $ uniqSetToList $ liveDieRead live
-                        , liveDieWrite  = mkUniqSet $ map patchF $ uniqSetToList $ liveDieWrite live })
+                          liveBorn      = mkUniqSet $ map patchF $ nonDetEltsUFM $ liveBorn live
+                        , liveDieRead   = mkUniqSet $ map patchF $ nonDetEltsUFM $ liveDieRead live
+                        , liveDieWrite  = mkUniqSet $ map patchF $ nonDetEltsUFM $ liveDieWrite live })
+                          -- See Note [Unique Determinism and code generation]
 
 
 --------------------------------------------------------------------------------
@@ -757,7 +759,8 @@ checkIsReverseDependent sccs'
          = let  dests           = slurpJumpDestsOfBlock block
                 blocksSeen'     = unionUniqSets blocksSeen $ mkUniqSet [blockId block]
                 badDests        = dests `minusUniqSet` blocksSeen'
-           in   case uniqSetToList badDests of
+           in   case nonDetEltsUFM badDests of
+                 -- See Note [Unique Determinism and code generation]
                  []             -> go blocksSeen' sccs
                  bad : _        -> Just bad
 
@@ -765,7 +768,8 @@ checkIsReverseDependent sccs'
          = let  dests           = unionManyUniqSets $ map slurpJumpDestsOfBlock blocks
                 blocksSeen'     = unionUniqSets blocksSeen $ mkUniqSet $ map blockId blocks
                 badDests        = dests `minusUniqSet` blocksSeen'
-           in   case uniqSetToList badDests of
+           in   case nonDetEltsUFM badDests of
+                 -- See Note [Unique Determinism and code generation]
                  []             -> go blocksSeen' sccs
                  bad : _        -> Just bad
 
@@ -858,7 +862,8 @@ livenessSCCs platform blockmap done
                 = a' == b'
               where a' = map f $ mapToList a
                     b' = map f $ mapToList b
-                    f (key,elt) = (key, uniqSetToList elt)
+                    f (key,elt) = (key, nonDetEltsUFM elt)
+                    -- See Note [Unique Determinism and code generation]
 
 
 
@@ -994,7 +999,8 @@ liveness1 platform liveregs blockmap (LiveInstr instr _)
             -- registers that are live only in the branch targets should
             -- be listed as dying here.
             live_branch_only = live_from_branch `minusUniqSet` liveregs
-            r_dying_br  = uniqSetToList (mkUniqSet r_dying `unionUniqSets`
+            r_dying_br  = nonDetEltsUFM (mkUniqSet r_dying `unionUniqSets`
                                         live_branch_only)
+                          -- See Note [Unique Determinism and code generation]
 
 

@@ -29,7 +29,6 @@ module UniqSet (
         sizeUniqSet,
         isEmptyUniqSet,
         lookupUniqSet,
-        uniqSetToList,
         partitionUniqSet
     ) where
 
@@ -69,7 +68,6 @@ partitionUniqSet :: (a -> Bool) -> UniqSet a -> (UniqSet a, UniqSet a)
 sizeUniqSet :: UniqSet a -> Int
 isEmptyUniqSet :: UniqSet a -> Bool
 lookupUniqSet :: Uniquable a => UniqSet b -> a -> Maybe b
-uniqSetToList :: UniqSet a -> [a]
 
 {-
 ************************************************************************
@@ -116,7 +114,6 @@ partitionUniqSet = partitionUFM
 sizeUniqSet = sizeUFM
 isEmptyUniqSet = isNullUFM
 lookupUniqSet = lookupUFM
-uniqSetToList = eltsUFM
 
 uniqSetAny :: (a -> Bool) -> UniqSet a -> Bool
 uniqSetAny = anyUFM

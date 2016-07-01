@@ -62,9 +62,12 @@ regSpill platform code slotsFree regs
         | otherwise
         = do
                 -- Allocate a slot for each of the spilled regs.
-                let slots       = take (sizeUniqSet regs) $ uniqSetToList slotsFree
+                let slots       = take (sizeUniqSet regs) $ nonDetEltsUFM slotsFree
                 let regSlotMap  = listToUFM
-                                $ zip (uniqSetToList regs) slots
+                                $ zip (nonDetEltsUFM regs) slots
+                    -- This is non-deterministic but we do not
+                    -- currently support deterministic code-generation.
+                    -- See Note [Unique Determinism and code generation]
 
                 -- Grab the unique supply from the monad.
                 us      <- getUniqueSupplyM
@@ -139,7 +142,8 @@ regSpill_top platform regSlotMap cmm
                 moreSlotsLive   = Set.fromList
                                 $ catMaybes
                                 $ map (lookupUFM regSlotMap)
-                                $ uniqSetToList regsLive
+                                $ nonDetEltsUFM regsLive
+                    -- See Note [Unique Determinism and code generation]
 
                 slotMap'
                  = Map.insert blockId (Set.union curSlotsLive moreSlotsLive)

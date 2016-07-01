@@ -350,7 +350,8 @@ initBlock id block_live
                           Nothing ->
                             setFreeRegsR    (frInitFreeRegs platform)
                           Just live ->
-                            setFreeRegsR $ foldr (frAllocateReg platform) (frInitFreeRegs platform) [ r | RegReal r <- uniqSetToList live ]
+                            setFreeRegsR $ foldr (frAllocateReg platform) (frInitFreeRegs platform) [ r | RegReal r <- nonDetEltsUFM live ]
+                            -- See Note [Unique Determinism and code generation]
                         setAssigR       emptyRegMap
 
                 -- load info about register assignments leading into this block.
@@ -443,8 +444,9 @@ raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live))
            return (new_instrs, [])
 
         _ -> genRaInsn block_live new_instrs id instr
-                        (uniqSetToList $ liveDieRead live)
-                        (uniqSetToList $ liveDieWrite live)
+                        (nonDetEltsUFM $ liveDieRead live)
+                        (nonDetEltsUFM $ liveDieWrite live)
+                        -- See Note [Unique Determinism and code generation]
 
 raInsn _ _ _ instr
         = pprPanic "raInsn" (text "no match for:" <> ppr instr)

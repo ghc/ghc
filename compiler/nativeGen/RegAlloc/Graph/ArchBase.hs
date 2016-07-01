@@ -22,6 +22,7 @@ module RegAlloc.Graph.ArchBase (
         squeese
 ) where
 import UniqSet
+import UniqFM
 import Unique
 
 
@@ -88,7 +89,10 @@ worst   :: (RegClass    -> UniqSet Reg)
 worst regsOfClass regAlias neighbors classN classC
  = let  regAliasS regs  = unionManyUniqSets
                         $ map regAlias
-                        $ uniqSetToList regs
+                        $ nonDetEltsUFM regs
+                        -- This is non-deterministic but we do not
+                        -- currently support deterministic code-generation.
+                        -- See Note [Unique Determinism and code generation]
 
         -- all the regs in classes N, C
         regsN           = regsOfClass classN
@@ -117,7 +121,8 @@ bound   :: (RegClass    -> UniqSet Reg)
 bound regsOfClass regAlias classN classesC
  = let  regAliasS regs  = unionManyUniqSets
                         $ map regAlias
-                        $ uniqSetToList regs
+                        $ nonDetEltsUFM regs
+                        -- See Note [Unique Determinism and code generation]
 
         regsC_aliases
                 = unionManyUniqSets
@@ -150,5 +155,5 @@ powersetL       = map concat . mapM (\x -> [[],[x]])
 
 -- | powersetLS (list of sets)
 powersetLS :: Uniquable a => UniqSet a -> [UniqSet a]
-powersetLS s    = map mkUniqSet $ powersetL $ uniqSetToList s
-
+powersetLS s    = map mkUniqSet $ powersetL $ nonDetEltsUFM s
+  -- See Note [Unique Determinism and code generation]

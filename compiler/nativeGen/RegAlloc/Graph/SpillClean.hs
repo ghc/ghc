@@ -414,7 +414,8 @@ intersects assocs       = foldl1' intersectAssoc assocs
 findRegOfSlot :: Assoc Store -> Int -> Maybe Reg
 findRegOfSlot assoc slot
         | close                 <- closeAssoc (SSlot slot) assoc
-        , Just (SReg reg)       <- find isStoreReg $ uniqSetToList close
+        , Just (SReg reg)       <- find isStoreReg $ nonDetEltsUFM close
+           -- See Note [Unique Determinism and code generation]
         = Just reg
 
         | otherwise
@@ -582,7 +583,8 @@ closeAssoc a assoc
  =      closeAssoc' assoc emptyUniqSet (unitUniqSet a)
  where
         closeAssoc' assoc visited toVisit
-         = case uniqSetToList toVisit of
+         = case nonDetEltsUFM toVisit of
+             -- See Note [Unique Determinism and code generation]
 
                 -- nothing else to visit, we're done
                 []      -> visited

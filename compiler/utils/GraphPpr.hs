@@ -86,7 +86,8 @@ dotNode colorMap triv node
         excludes
                 = hcat $ punctuate space
                 $ map (\n -> text "-" <> ppr n)
-                $ uniqSetToList $ nodeExclusions node
+                $ nonDetEltsUFM $ nodeExclusions node
+                -- See Note [Unique Determinism and code generation]
 
         preferences
                 = hcat $ punctuate space
@@ -144,12 +145,14 @@ dotNodeEdges visited node
         | otherwise
         = let   dconflicts
                         = map (dotEdgeConflict (nodeId node))
-                        $ uniqSetToList
+                        $ nonDetEltsUFM
+                        -- See Note [Unique Determinism and code generation]
                         $ minusUniqSet (nodeConflicts node) visited
 
                 dcoalesces
                         = map (dotEdgeCoalesce (nodeId node))
-                        $ uniqSetToList
+                        $ nonDetEltsUFM
+                        -- See Note [Unique Determinism and code generation]
                         $ minusUniqSet (nodeCoalesce node) visited
 
                 out     =  vcat dconflicts
