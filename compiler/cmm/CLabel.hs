@@ -348,16 +348,6 @@ data ForeignLabelSource
    --   (ie, core code) else the information will be wrong relative to the
    --   destination module.
    | ForeignLabelInThisPackage
-
-   -- | Label is in the Rts package. This is used to distinguish between calls
-   --   to Rts functions on Windows with compiled using dyn way.
-   --   For calls in the same package we use a
-   --   simple pointer to the function *foo, for calls in other packages
-   --   we use a pointer to a pointer **foo.
-   --   This is because of the indirection caused by exporting functions from a
-   --   dll using __declspec.
-   | ForeignLabelInRtsPackage
-
    deriving (Eq, Ord)
 
 
@@ -998,15 +988,6 @@ labelDynamic dflags this_pkg this_mod lbl =
             -- linked into its own DLL.
             ForeignLabelInPackage pkgId ->
                 (WayDyn `elem` ways dflags) && (this_pkg /= pkgId)
-
-            -- If the call is from the rts package, we need to call it
-            -- using a trampoline always if ways is dyn.
-            -- This is because the call generated for this label will
-            -- be a SymbolPtr which ends up dereferencing the pointer
-            -- twice.
-            ForeignLabelInRtsPackage ->
-                (WayDyn `elem` ways dflags) && (this_pkg == rtsUnitId)
-
        else -- On Mac OS X and on ELF platforms, false positives are OK,
             -- so we claim that all foreign imports come from dynamic
             -- libraries
