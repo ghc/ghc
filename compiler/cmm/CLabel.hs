@@ -348,6 +348,7 @@ data ForeignLabelSource
    --   (ie, core code) else the information will be wrong relative to the
    --   destination module.
    | ForeignLabelInThisPackage
+
    deriving (Eq, Ord)
 
 
@@ -988,6 +989,7 @@ labelDynamic dflags this_pkg this_mod lbl =
             -- linked into its own DLL.
             ForeignLabelInPackage pkgId ->
                 (WayDyn `elem` ways dflags) && (this_pkg /= pkgId)
+
        else -- On Mac OS X and on ELF platforms, false positives are OK,
             -- so we claim that all foreign imports come from dynamic
             -- libraries
