@@ -165,7 +165,6 @@ initStorage (void)
   generations = (generation *)stgMallocBytes(RtsFlags.GcFlags.generations
                                              * sizeof(struct generation_),
                                              "initStorage: gens");
-  ASSERT(generations);
 
   /* Initialise all generations */
   for(g = 0; g < RtsFlags.GcFlags.generations; g++) {
