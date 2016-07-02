@@ -2281,7 +2281,7 @@ Notice that
    twice at the outer level, because Id is non-recursive
 
 So, when expanding, we keep track of when we've seen a recursive
-newtype at outermost level; and bale out if we see it again.
+newtype at outermost level; and bail out if we see it again.
 
 We sometimes want to do the same for product types, so that the
 strictness analyser doesn't unbox infinitely deeply.
