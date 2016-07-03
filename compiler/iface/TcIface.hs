@@ -191,7 +191,7 @@ tcHiBootIface hsc_src mod
           then do { hpt <- getHpt
                  ; case lookupHpt hpt (moduleName mod) of
                       Just info | mi_boot (hm_iface info)
-                                -> return (mkSelfBootInfo (hm_details info))
+                                -> mkSelfBootInfo (hm_iface info) (hm_details info)
                       _ -> return NoSelfBoot }
           else do
 
@@ -205,7 +205,7 @@ tcHiBootIface hsc_src mod
 
         ; case read_result of {
             Succeeded (iface, _path) -> do { tc_iface <- typecheckIface iface
-                                           ; return (mkSelfBootInfo tc_iface) } ;
+                                           ; mkSelfBootInfo iface tc_iface } ;
             Failed err               ->
 
         -- There was no hi-boot file. But if there is circularity in
@@ -237,13 +237,28 @@ tcHiBootIface hsc_src mod
                           quotes (ppr mod) <> colon) 4 err
 
 
-mkSelfBootInfo :: ModDetails -> SelfBootInfo
-mkSelfBootInfo mds
-  = SelfBoot { sb_mds = mds
-             , sb_tcs = mkNameSet (map tyConName (typeEnvTyCons iface_env))
-             , sb_ids = mkNameSet (map idName (typeEnvIds iface_env)) }
+mkSelfBootInfo :: ModIface -> ModDetails -> TcRn SelfBootInfo
+mkSelfBootInfo iface mds
+  = do -- NB: This is computed DIRECTLY from the ModIface rather
+       -- than from the ModDetails, so that we can query 'sb_tcs'
+       -- WITHOUT forcing the contents of the interface.
+       tcs <- mapM (lookupOrig (mi_module iface) . ifName)
+            . filter isIfaceTyCon
+            . map snd
+            $ mi_decls iface
+       return $ SelfBoot { sb_mds = mds
+                         , sb_tcs = mkNameSet tcs }
   where
-    iface_env = md_types mds
+    -- | Retuerns @True@ if, when you call 'tcIfaceDecl' on
+    -- this 'IfaceDecl', an ATyCon would be returned.
+    -- NB: This code assumes that a TyCon cannot be implicit.
+    isIfaceTyCon IfaceId{}      = False
+    isIfaceTyCon IfaceData{}    = True
+    isIfaceTyCon IfaceSynonym{} = True
+    isIfaceTyCon IfaceFamily{}  = True
+    isIfaceTyCon IfaceClass{}   = True
+    isIfaceTyCon IfaceAxiom{}   = False
+    isIfaceTyCon IfacePatSyn{}  = False
 
 {-
 ************************************************************************

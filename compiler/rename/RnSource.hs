@@ -1156,7 +1156,7 @@ Note [Dependency analysis of type, class, and instance decls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A TyClGroup represents a strongly connected components of
 type/class/instance decls, together with the role annotations for the
-type/class declarations.  The renamer uses strongyly connected
+type/class declarations.  The renamer uses strongly connected
 comoponent analysis to build these groups.  We do this for a number of
 reasons:
 
@@ -1368,7 +1368,9 @@ getParent rdr_env n
 
 {- Note [Extra dependencies from .hs-boot files]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider the following case:
+This is a long story, so buckle in.
+
+**Dependencies via hs-boot files are not obvious.** Consider the following case:
 
 A.hs-boot
   module A where
@@ -1377,24 +1379,61 @@ A.hs-boot
 B.hs
   module B where
     import {-# SOURCE #-} A
-    type DisguisedA1 = A1
-    data B1 = B1 DisguisedA1
+    type B1 = A1
 
 A.hs
   module A where
     import B
-    data A2 = A2 A1
-    data A1 = A1 B1
+    data A2 = MkA2 B1
+    data A1 = MkA1 A2
 
-Here A1 is really recursive (via B1), but we won't see that easily when
-doing dependency analysis when compiling A.hs
+Here A2 is really recursive (via B1), but we won't see that easily when
+doing dependency analysis when compiling A.hs.  When we look at A2,
+we see that its free variables are simply B1, but without (recursively) digging
+into the definition of B1 will we see that it actually refers to A1 via an
+hs-boot file.
 
-To handle this problem, we add a dependency
+**Recursive declarations, even those broken by an hs-boot file, need to
+be type-checked together.**  Whenever we refer to a declaration via
+an hs-boot file, we must be careful not to force the TyThing too early:
+ala Note [Tying the knot] if we force the TyThing before we have
+defined it ourselves in the local type environment, GHC will error.
+
+Conservatively, then, it would make sense that we to typecheck A1
+and A2 from the previous example together, because the two types are
+truly mutually recursive through B1.
+
+If we are being clever, we might observe that while kind-checking
+A2, we don't actually need to force the TyThing for A1: B1
+independently records its kind, so there is no need to go "deeper".
+But then we are in an uncomfortable situation where we have
+constructed a TyThing for A2 before we have checked A1, and we
+have to be absolutely certain we don't force it too deeply until
+we get around to kind checking A1, which could be for a very long
+time.
+
+Indeed, with datatype promotion, we may very well need to look
+at the type of MkA2 before we have kind-checked A1: consider,
+
+    data T = MkT (Proxy 'MkA2)
+
+To promote MkA2, we need to lift its type to the kind level.
+We never tested this, but it seems likely A1 would get poked
+at this point.
+
+**Here's what we do instead.**  So it is expedient for us to
+make sure A1 and A2 are kind checked together in a loop.
+To ensure that our dependency analysis can catch this,
+we add a dependency:
+
   - from every local declaration
-  - to everything that comes from this module's .hs-boot file.
-In this case, we'll ad and edges
-  - from A2 to A1 (but that edge is there already)
-  - from A1 to A1 (which is new)
+  - to everything that comes from this module's .hs-boot file
+    (this is gotten from sb_tcs in the SelfBootInfo).
+
+In this case, we'll add an edges
+
+  - from A1 to A2 (but that edge is there already)
+  - from A2 to A1 (which is new)
 
 Well, not quite *every* declaration. Imagine module A
 above had another datatype declaration:
@@ -1405,7 +1444,15 @@ Even though A3 has a dependency (on Int), all its dependencies are from things
 that live on other packages. Since we don't have mutual dependencies across
 packages, it is safe not to add the dependencies on the .hs-boot stuff to A2.
 
-Hence function Name.thisPackageImport.
+Hence function nameIsHomePackageImport.
+
+Note that this is fairly conservative: it essentially implies that
+EVERY type declaration in this modules hs-boot file will be kind-checked
+together in one giant loop (and furthermore makes every other type
+in the module depend on this loop).  This is perhaps less than ideal, because
+the larger a recursive group, the less polymorphism available (we
+cannot infer a type to be polymorphically instantiated while we
+are inferring its kind), but no one has hollered about this (yet!)
 -}
 
 addBootDeps :: [(LTyClDecl Name, FreeVars)] -> RnM [(LTyClDecl Name, FreeVars)]

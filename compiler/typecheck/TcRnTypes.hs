@@ -624,10 +624,10 @@ data SelfBootInfo
   = NoSelfBoot    -- No corresponding hi-boot file
   | SelfBoot
        { sb_mds :: ModDetails   -- There was a hi-boot file,
-       , sb_tcs :: NameSet      -- defining these TyCons,
-       , sb_ids :: NameSet }    -- and these Ids
-  -- We need this info to compute a safe approximation to
-  -- recursive loops, to avoid infinite inlinings
+       , sb_tcs :: NameSet }    -- defining these TyCons,
+-- What is sb_tcs used for?  See Note [Extra dependencies from .hs-boot files]
+-- in RnSource
+
 
 {- Note [Tracking unused binding and imports]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
