@@ -46,14 +46,7 @@ process_dll_link() {
             
             cmd="$7 $DLLimport -v3 -optl-Wl,--trace $5 -optl-Wl,--retain-symbols-file=$exports -o $6"
             echo "$cmd"
-            eval "$cmd" || exit 1
-            
-            # Now recreate the def file but instead don't point to any specific dll
-            rm "$defFile"
-            awk -v root="$defFile" '{def=root;}{print "    \"" $0 "\""> def}' $exports
-            sed -i "1i\EXPORTS" $defFile
-            dlltool -d $defFile -l $DLLimport
-            
+            eval "$cmd" || exit 1            
             exit 0
             ;;
         [0-9]*)
