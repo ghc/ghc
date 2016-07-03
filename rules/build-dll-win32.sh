@@ -38,15 +38,22 @@ process_dll_link() {
 
             # Create a def file hiding symbols not in original object files
             # because --export-all is re-exporting things from static libs
-            awk -v root="$defFile" '{def=root;}{print "    \"" $0 "\" PRIVATE"> def}' $exports
+            awk -v root="$defFile" '{def=root;}{print "    \"" $0 "\""> def}' $exports
             sed -i "1i\LIBRARY \"${6##*/}\"\\nEXPORTS" $defFile
 
             DLLimport="$base.dll.a"
             dlltool -d $defFile -l $DLLimport
             
-            cmd="$7 $DLLimport -v3 $5 -optl-Wl,--retain-symbols-file=$exports -o $6"
+            cmd="$7 $DLLimport -v3 -optl-Wl,--trace $5 -optl-Wl,--retain-symbols-file=$exports -o $6"
             echo "$cmd"
             eval "$cmd" || exit 1
+            
+            # Now recreate the def file but instead don't point to any specific dll
+            rm "$defFile"
+            awk -v root="$defFile" '{def=root;}{print "    \"" $0 "\""> def}' $exports
+            sed -i "1i\EXPORTS" $defFile
+            dlltool -d $defFile -l $DLLimport
+            
             exit 0
             ;;
         [0-9]*)
