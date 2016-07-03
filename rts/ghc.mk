@@ -202,18 +202,18 @@ else
 rts_dist_FFI_SO =
 endif
 
-# Making a shared library for the RTS.
-# $1 = dir
-# $2 = distdir
-# $3 = way
-# $4 = extra flags
-# $5 = object files to link
-# $6 = output filename
 ifneq "$$(findstring dyn, $1)" ""
 ifeq "$$(HostOS_CPP)" "mingw32"
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) $(ALL_RTS_DEF_LIBS) rts/dist/libs.depend rts/dist/build/$$(LIBFFI_DLL)
 	"$$(RM)" $$(RM_OPTS) $$@
 	# Call out to the shell script to decide how to build the dll.
+    # Making a shared library for the RTS.
+    # $1 = dir
+    # $2 = distdir
+    # $3 = way
+    # $4 = extra flags
+    # $5 = object files to link
+    # $6 = output filename
 	rules/build-dll-win32.sh link "rts/dist/build" "rts/dist/build" "" "" "$$(rts_$1_OBJS)" "$$@" "$$(rts_dist_HC) -this-unit-id rts -shared -dynamic -dynload deploy \
          -no-auto-link-packages -Lrts/dist/build -l$$(LIBFFI_NAME) \
          `cat rts/dist/libs.depend | tr '\n' ' '` \

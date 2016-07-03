@@ -44,7 +44,7 @@ process_dll_link() {
             DLLimport="$base.dll.a"
             dlltool -d $defFile -l $DLLimport
             
-            cmd="$7 $DLLimport $5 -optl-Wl,--retain-symbols-file=$exports -o $6"
+            cmd="$7 $DLLimport -v3 $5 -optl-Wl,--retain-symbols-file=$exports -o $6"
             echo "$cmd"
             eval "$cmd" || exit 1
             exit 0
