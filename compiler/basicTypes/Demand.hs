@@ -69,6 +69,7 @@ import UniqFM
 import Util
 import BasicTypes
 import Binary
+import FastString
 import Maybes           ( orElse )
 
 import Type            ( Type, isUnliftedType )
@@ -2066,12 +2067,15 @@ instance Binary ArgStr where
 
 instance Binary Count where
     put_ bh One  = do putByte bh 0
-    put_ bh (Many _) = do putByte bh 1
+    put_ bh (Many mr) = do
+        putByte bh 1
+        put_ bh (map mkFastString mr)
 
     get  bh = do h <- getByte bh
                  case h of
                    0 -> return One
-                   _ -> return (Many ["iface"])
+                   _ -> do mr <- get bh
+                           return (Many (map unpackFS mr))
 
 instance Binary ArgUse where
     put_ bh Abs          = do
