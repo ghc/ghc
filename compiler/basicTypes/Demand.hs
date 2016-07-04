@@ -11,7 +11,7 @@ module Demand (
         StrDmd, UseDmd(..), Count,
 
         Demand, CleanDemand, getStrDmd, getUseDmd,
-        mkProdDmd, mkOnceUsedDmd, mkManyUsedDmd, mkHeadStrict, oneifyDmd,
+        mkProdDmd, mkDataDmd, mkOnceUsedDmd, mkManyUsedDmd, mkHeadStrict, oneifyDmd,
         toCleanDmd,
         absDmd, topDmd, botDmd, seqDmd,
         lubDmd, bothDmd,
@@ -40,7 +40,8 @@ module Demand (
 
         seqDemand, seqDemandList, seqDmdType, seqStrictSig,
 
-        evalDmd, cleanEvalDmd, cleanEvalProdDmd, isStrictDmd,
+        evalDmd, cleanEvalDmd, cleanEvalProdDmd,
+        isStrictDmd,
         splitDmdTy, splitFVs,
         deferAfterIO,
         postProcessUnsat, postProcessDmdType,
@@ -315,7 +316,7 @@ splitStrProdDmd _ (SCall {}) = Nothing
 
          Used
          /   \
-     UCall   UProd
+     UCall   UData
          \   /
          UHead
           |
@@ -329,9 +330,9 @@ data UseDmd
   = UCall Count UseDmd   -- Call demand for absence
                          -- Used only for values of function type
 
-  | UProd [ArgUse]     -- Product
+  | UData [ArgUse]     -- Product
                          -- Used only for values of product type
-                         -- See Note [Don't optimise UProd(Used) to Used]
+                         -- See Note [Don't optimise UData(Used) to Used]
                          -- [Invariant] Not all components are Abs
                          --             (in that case, use UHead)
 
@@ -371,7 +372,7 @@ instance Outputable UseDmd where
   ppr Used           = char 'U'
   ppr (UCall c a)    = char 'C' <> ppr c <> parens (ppr a)
   ppr UHead          = char 'H'
-  ppr (UProd as)     = char 'U' <> parens (hcat (punctuate (char ',') (map ppr as)))
+  ppr (UData as)     = char 'U' <> parens (hcat (punctuate (char ',') (map ppr as)))
 
 instance Outputable Count where
   ppr One  = char '1'
@@ -385,10 +386,10 @@ mkUCall :: Count -> UseDmd -> UseDmd
 --mkUCall c Used = Used c
 mkUCall c a  = UCall c a
 
-mkUProd :: [ArgUse] -> UseDmd
-mkUProd ux
+mkUData :: [ArgUse] -> UseDmd
+mkUData ux
   | all (== Abs) ux    = UHead
-  | otherwise          = UProd ux
+  | otherwise          = UData ux
 
 lubCount :: Count -> Count -> Count
 lubCount _ Many = Many
@@ -405,14 +406,14 @@ lubUse UHead       u               = u
 lubUse (UCall c u) UHead           = UCall c u
 lubUse (UCall c1 u1) (UCall c2 u2) = UCall (lubCount c1 c2) (lubUse u1 u2)
 lubUse (UCall _ _) _               = Used
-lubUse (UProd ux) UHead            = UProd ux
-lubUse (UProd ux1) (UProd ux2)
-     | length ux1 == length ux2    = UProd $ zipWith lubArgUse ux1 ux2
+lubUse (UData ux) UHead            = UData ux
+lubUse (UData ux1) (UData ux2)
+     | length ux1 == length ux2    = UData $ zipWith lubArgUse ux1 ux2
      | otherwise                   = Used
-lubUse (UProd {}) (UCall {})       = Used
--- lubUse (UProd {}) Used             = Used
-lubUse (UProd ux) Used             = UProd (map (`lubArgUse` useTop) ux)
-lubUse Used       (UProd ux)       = UProd (map (`lubArgUse` useTop) ux)
+lubUse (UData {}) (UCall {})       = Used
+-- lubUse (UData {}) Used             = Used
+lubUse (UData ux) Used             = UData (map (`lubArgUse` useTop) ux)
+lubUse Used       (UData ux)       = UData (map (`lubArgUse` useTop) ux)
 lubUse Used _                      = Used  -- Note [Used should win]
 
 -- `both` is different from `lub` in its treatment of counting; if
@@ -435,31 +436,32 @@ bothUse (UCall c u) UHead           = UCall c u
 bothUse (UCall _ u1) (UCall _ u2)   = UCall Many (u1 `lubUse` u2)
 
 bothUse (UCall {}) _                = Used
-bothUse (UProd ux) UHead            = UProd ux
-bothUse (UProd ux1) (UProd ux2)
-      | length ux1 == length ux2    = UProd $ zipWith bothArgUse ux1 ux2
+bothUse (UData ux) UHead            = UData ux
+bothUse (UData ux1) (UData ux2)
+      | length ux1 == length ux2    = UData $ zipWith bothArgUse ux1 ux2
       | otherwise                   = Used
-bothUse (UProd {}) (UCall {})       = Used
--- bothUse (UProd {}) Used             = Used  -- Note [Used should win]
-bothUse Used (UProd ux)             = UProd (map (`bothArgUse` useTop) ux)
-bothUse (UProd ux) Used             = UProd (map (`bothArgUse` useTop) ux)
+bothUse (UData {}) (UCall {})       = Used
+-- bothUse (UData {}) Used             = Used  -- Note [Used should win]
+bothUse Used (UData ux)             = UData (map (`bothArgUse` useTop) ux)
+bothUse (UData ux) Used             = UData (map (`bothArgUse` useTop) ux)
 bothUse Used _                      = Used  -- Note [Used should win]
 
 peelUseCall :: UseDmd -> Maybe (Count, UseDmd)
 peelUseCall (UCall c u)   = Just (c,u)
 peelUseCall _             = Nothing
 
-addCaseBndrDmd :: Demand    -- On the case binder
+addCaseBndrDmd :: Arity
+               -> Demand    -- On the case binder
                -> [Demand]  -- On the components of the constructor
                -> [Demand]  -- Final demands for the components of the constructor
 -- See Note [Demand on case-alternative binders]
-addCaseBndrDmd (JD { sd = ms, ud = mu }) alt_dmds
+addCaseBndrDmd offset (JD { sd = ms, ud = mu }) alt_dmds
   = case mu of
      Abs     -> alt_dmds
      Use _ u -> zipWith bothDmd alt_dmds (mkJointDmds ss us)
              where
                 Just ss = splitArgStrProdDmd arity ms  -- Guaranteed not to be a call
-                Just us = splitUseProdDmd      arity u   -- Ditto
+                Just us = splitUseProdDmd offset arity u   -- Ditto
   where
     arity = length alt_dmds
 
@@ -492,17 +494,17 @@ consequences play out.
 This is needed even for non-product types, in case the case-binder
 is used but the components of the case alternative are not.
 
-Note [Don't optimise UProd(Used) to Used]
+Note [Don't optimise UData(Used) to Used]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 These two UseDmds:
-   UProd [Used, Used]   and    Used
+   UData [Used, Used]   and    Used
 are semantically equivalent, but we do not turn the former into
 the latter, for a regrettable-subtle reason.  Suppose we did.
 then
   f (x,y) = (y,x)
 would get
   StrDmd = Str  = SProd [Lazy, Lazy]
-  UseDmd = Used = UProd [Used, Used]
+  UseDmd = Used = UData [Used, Used]
 But with the joint demand of <Str, Used> doesn't convey any clue
 that there is a product involved, and so the worthSplittingFun
 will not fire.  (We'd need to use the type as well to make it fire.)
@@ -511,13 +513,13 @@ Moreover, consider
 This too would get <Str, Used>, but this time there really isn't any
 point in w/w since the components of the pair are not used at all.
 
-So the solution is: don't aggressively collapse UProd [Used,Used] to
+So the solution is: don't aggressively collapse UData [Used,Used] to
 Used; intead leave it as-is. In effect we are using the UseDmd to do a
 little bit of boxity analysis.  Not very nice.
 
 Note [Used should win]
 ~~~~~~~~~~~~~~~~~~~~~~
-Both in lubUse and bothUse we want (Used `both` UProd us) to be Used.
+Both in lubUse and bothUse we want (Used `both` UData us) to be Used.
 Why?  Because Used carries the implication the whole thing is used,
 box and all, so we don't want to w/w it.  If we use it both boxed and
 unboxed, then we are definitely using the box, and so we are quite
@@ -525,7 +527,7 @@ likely to pay a reboxing cost.  So we make Used win here.
 
 Example is in the Buffer argument of GHC.IO.Handle.Internals.writeCharBuffer
 
-Baseline: (A) Not making Used win (UProd wins)
+Baseline: (A) Not making Used win (UData wins)
 Compare with: (B) making Used win for lub and both
 
             Min          -0.3%     -5.6%    -10.7%    -11.0%    -33.3%
@@ -533,7 +535,7 @@ Compare with: (B) making Used win for lub and both
  Geometric Mean          -0.0%     +0.5%     +0.3%     +0.2%     -0.8%
 
 Baseline: (B) Making Used win for both lub and both
-Compare with: (C) making Used win for both, but UProd win for lub
+Compare with: (C) making Used win for both, but UData win for lub
 
             Min          -0.1%     -0.3%     -7.9%     -8.0%     -6.5%
             Max          +0.1%     +1.0%    +21.0%    +21.0%     +0.5%
@@ -548,7 +550,7 @@ markReusedDmd (Use _ a)   = Use Many (markReused a)
 
 markReused :: UseDmd -> UseDmd
 markReused (UCall _ u)      = UCall Many u   -- No need to recurse here
-markReused (UProd ux)       = UProd (map markReusedDmd ux)
+markReused (UData ux)       = UData (map markReusedDmd ux)
 markReused u                = u
 
 isUsedMU :: ArgUse -> Bool
@@ -561,13 +563,13 @@ isUsedU :: UseDmd -> Bool
 -- True <=> markReused d = d
 isUsedU Used           = True
 isUsedU UHead          = True
-isUsedU (UProd us)     = all isUsedMU us
+isUsedU (UData us)     = all isUsedMU us
 isUsedU (UCall One _)  = False
 isUsedU (UCall Many _) = True  -- No need to recurse
 
 -- Squashing usage demand demands
 seqUseDmd :: UseDmd -> ()
-seqUseDmd (UProd ds)   = seqArgUseList ds
+seqUseDmd (UData ds)   = seqArgUseList ds
 seqUseDmd (UCall c d)  = c `seq` seqUseDmd d
 seqUseDmd _            = ()
 
@@ -580,12 +582,13 @@ seqArgUse (Use c u)  = c `seq` seqUseDmd u
 seqArgUse _          = ()
 
 -- Splitting polymorphic Maybe-Used demands
-splitUseProdDmd :: Int -> UseDmd -> Maybe [ArgUse]
-splitUseProdDmd n Used        = Just (replicate n useTop)
-splitUseProdDmd n UHead       = Just (replicate n Abs)
-splitUseProdDmd n (UProd ds)  = ASSERT2( ds `lengthIs` n, text "splitUseProdDmd" $$ ppr n $$ ppr ds )
-                                Just ds
-splitUseProdDmd _ (UCall _ _) = Nothing
+splitUseProdDmd :: Int -> Int -> UseDmd -> Maybe [ArgUse]
+splitUseProdDmd _ n Used        = Just (replicate n useTop)
+splitUseProdDmd _ n UHead       = Just (replicate n Abs)
+splitUseProdDmd o n (UData ds)  = ASSERT2( ds_ `lengthExceeds` n, text "splitUseProdDmd" $$ ppr o $$ ppr n $$ ppr ds)
+                                  Just (take n ds_)
+    where ds_ = drop o ds
+splitUseProdDmd _ _ (UCall _ _) = Nothing
       -- This can happen when the programmer uses unsafeCoerce,
       -- and we don't then want to crash the compiler (Trac #9208)
 
@@ -657,7 +660,12 @@ evalDmd = JD { sd = Str VanStr HeadStr, ud = useTop }
 mkProdDmd :: [Demand] -> CleanDemand
 mkProdDmd dx
   = JD { sd = mkSProd $ map getStrDmd dx
-       , ud = mkUProd $ map getUseDmd dx }
+       , ud = mkUData $ map getUseDmd dx }
+
+mkDataDmd :: [Demand] -> CleanDemand
+mkDataDmd dx
+  = JD { sd = HeadStr, ud = mkUData $ map getUseDmd dx }
+
 
 mkCallDmd :: CleanDemand -> CleanDemand
 mkCallDmd (JD {sd = d, ud = u})
@@ -673,8 +681,7 @@ cleanEvalDmd :: CleanDemand
 cleanEvalDmd = JD { sd = HeadStr, ud = Used }
 
 cleanEvalProdDmd :: Arity -> CleanDemand
-cleanEvalProdDmd n = JD { sd = HeadStr, ud = UProd (replicate n useTop) }
-
+cleanEvalProdDmd n = JD { sd = HeadStr, ud = UData (replicate n useTop) }
 
 {-
 ************************************************************************
@@ -787,12 +794,14 @@ splitFVs is_thunk rhs_fvs
 
 data TypeShape = TsFun TypeShape
                | TsProd [TypeShape]
+               | TsData [TypeShape]
                | TsUnk
 
 instance Outputable TypeShape where
   ppr TsUnk        = text "TsUnk"
   ppr (TsFun ts)   = text "TsFun" <> parens (ppr ts)
   ppr (TsProd tss) = parens (hsep $ punctuate comma $ map ppr tss)
+  ppr (TsData tss) = parens (hsep $ punctuate comma $ map ppr tss)
 
 trimToType :: Demand -> TypeShape -> Demand
 -- See Note [Trimming a demand to a type]
@@ -817,8 +826,10 @@ trimToType (JD { sd = ms, ud = mu }) ts
     go_u :: UseDmd -> TypeShape -> UseDmd
     go_u UHead       _          = UHead
     go_u (UCall c u) (TsFun ts) = UCall c (go_u u ts)
-    go_u (UProd mus) (TsProd tss)
-      | equalLength mus tss      = UProd (zipWith go_mu mus tss)
+    go_u (UData mus) (TsProd tss)
+      | equalLength mus tss      = UData (zipWith go_mu mus tss)
+    go_u (UData mus) (TsData tss)
+      | equalLength mus tss      = UData (zipWith go_mu mus tss)
     go_u _           _           = Used
 
 {-
@@ -867,11 +878,11 @@ splitProdDmd_maybe :: Demand -> Maybe [Demand]
 -- The demand is not necessarily strict!
 splitProdDmd_maybe (JD { sd = s, ud = u })
   = case (s,u) of
-      (Str _ (SProd sx), Use _ u) | Just ux <- splitUseProdDmd (length sx) u
+      (Str _ (SProd sx), Use _ u) | Just ux <- splitUseProdDmd 0 (length sx) u
                                   -> Just (mkJointDmds sx ux)
-      (Str _ s, Use _ (UProd ux)) | Just sx <- splitStrProdDmd (length ux) s
+      (Str _ s, Use _ (UData ux)) | Just sx <- splitStrProdDmd (length ux) s
                                   -> Just (mkJointDmds sx ux)
-      (Lazy,    Use _ (UProd ux)) -> Just (mkJointDmds (replicate (length ux) Lazy) ux)
+      (Lazy,    Use _ (UData ux)) -> Just (mkJointDmds (replicate (length ux) Lazy) ux)
       _ -> Nothing
 
 {-
@@ -1704,12 +1715,12 @@ dmdTransformSig (StrictSig dmd_ty@(DmdType _ arg_ds _)) cd
   = postProcessUnsat (peelManyCalls (length arg_ds) cd) dmd_ty
     -- see Note [Demands from unsaturated function calls]
 
-dmdTransformDataConSig :: Arity -> StrictSig -> CleanDemand -> DmdType
+dmdTransformDataConSig :: Int -> Arity -> StrictSig -> CleanDemand -> DmdType
 -- Same as dmdTransformSig but for a data constructor (worker),
 -- which has a special kind of demand transformer.
 -- If the constructor is saturated, we feed the demand on
 -- the result into the constructor arguments.
-dmdTransformDataConSig arity (StrictSig (DmdType _ _ con_res))
+dmdTransformDataConSig offset arity (StrictSig (DmdType _ _ con_res))
                              (JD { sd = str, ud = abs })
   | Just str_dmds <- go_str arity str
   , Just abs_dmds <- go_abs arity abs
@@ -1724,7 +1735,7 @@ dmdTransformDataConSig arity (StrictSig (DmdType _ _ con_res))
     go_str n HyperStr   = go_str (n-1) HyperStr
     go_str _ _          = Nothing
 
-    go_abs 0 dmd            = splitUseProdDmd arity dmd
+    go_abs 0 dmd            = splitUseProdDmd offset arity dmd
     go_abs n (UCall One u') = go_abs (n-1) u'
     go_abs _ _              = Nothing
 
@@ -1935,7 +1946,7 @@ zap_usg :: KillFlags -> UseDmd -> UseDmd
 zap_usg kfs (UCall c u)
     | kf_called_once kfs = UCall Many (zap_usg kfs u)
     | otherwise          = UCall c    (zap_usg kfs u)
-zap_usg kfs (UProd us)   = UProd (map (zap_musg kfs) us)
+zap_usg kfs (UData us)   = UData (map (zap_musg kfs) us)
 zap_usg _   u            = u
 
 -- If the argument is a used non-newtype dictionary, give it strict
@@ -2065,7 +2076,7 @@ instance Binary UseDmd where
             putByte bh 2
             put_ bh c
             put_ bh u
-    put_ bh (UProd ux)   = do
+    put_ bh (UData ux)   = do
             putByte bh 3
             put_ bh ux
 
@@ -2078,7 +2089,7 @@ instance Binary UseDmd where
                       u <- get bh
                       return (UCall c u)
               _ -> do ux <- get bh
-                      return (UProd ux)
+                      return (UData ux)
 
 instance (Binary s, Binary u) => Binary (JointDmd s u) where
     put_ bh (JD { sd = x, ud = y }) = do put_ bh x; put_ bh y

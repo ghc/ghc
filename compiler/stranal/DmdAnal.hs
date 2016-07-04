@@ -23,7 +23,7 @@ import BasicTypes
 import Data.List
 import DataCon
 import Id
-import CoreUtils        ( exprIsHNF, exprType, exprIsTrivial )
+import CoreUtils        ( exprIsHNF, exprType, exprIsTrivial, findAlt )
 import TyCon
 import Type
 import Coercion         ( Coercion, coVarsOfCo )
@@ -35,6 +35,7 @@ import TysPrim          ( realWorldStatePrimTy )
 import ErrUtils         ( dumpIfSet_dyn )
 import Name             ( getName, stableNameCmp )
 import Data.Function    ( on )
+
 
 {-
 ************************************************************************
@@ -178,14 +179,14 @@ dmdAnal' env dmd (App fun arg)
         (arg_dmd, res_ty) = splitDmdTy fun_ty
         (arg_ty, arg')    = dmdAnalStar env (dmdTransformThunkDmd arg arg_dmd) arg
     in
---    pprTrace "dmdAnal:app" (vcat
---         [ text "dmd =" <+> ppr dmd
---         , text "expr =" <+> ppr (App fun arg)
---         , text "fun dmd_ty =" <+> ppr fun_ty
---         , text "arg dmd =" <+> ppr arg_dmd
---         , text "arg dmd_ty =" <+> ppr arg_ty
---         , text "res dmd_ty =" <+> ppr res_ty
---         , text "overall res dmd_ty =" <+> ppr (res_ty `bothDmdType` arg_ty) ])
+    -- pprTrace "dmdAnal:app" (vcat
+    --      [ text "dmd =" <+> ppr dmd
+    --      , text "expr =" <+> ppr (App fun arg)
+    --      , text "fun dmd_ty =" <+> ppr fun_ty
+    --      , text "arg dmd =" <+> ppr arg_dmd
+    --      , text "arg dmd_ty =" <+> ppr arg_ty
+    --      , text "res dmd_ty =" <+> ppr res_ty
+    --      , text "overall res dmd_ty =" <+> ppr (res_ty `bothDmdType` arg_ty) ])
     (res_ty `bothDmdType` arg_ty, App fun' arg')
 
 -- this is an anonymous lambda, since @dmdAnalRhs@ uses @collectBinders@
@@ -217,7 +218,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
         (rhs_ty, rhs')           = dmdAnal env_alt dmd rhs
         (alt_ty1, dmds)          = findBndrsDmds env rhs_ty bndrs
         (alt_ty2, case_bndr_dmd) = findBndrDmd env False alt_ty1 case_bndr
-        id_dmds                  = addCaseBndrDmd case_bndr_dmd dmds
+        id_dmds                  = addCaseBndrDmd 0 case_bndr_dmd dmds
         alt_ty3 | io_hack_reqd scrut dc bndrs = deferAfterIO alt_ty2
                 | otherwise                   = alt_ty2
 
@@ -238,21 +239,28 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
 --                                   , text "res_ty" <+> ppr res_ty ]) $
     (res_ty, Case scrut' case_bndr' ty [(DataAlt dc, bndrs', rhs')])
 
+
 dmdAnal' env dmd (Case scrut case_bndr ty alts)
   = let      -- Case expression with multiple alternatives
-        (alt_tys, alts')     = mapAndUnzip (dmdAnalAlt env dmd case_bndr) alts
-        (scrut_ty, scrut')   = dmdAnal env cleanEvalDmd scrut
+        mbTyCon = fmap fst $ splitTyConApp_maybe (idType case_bndr)
+
+        (alt_tys, alt_dmds, alts')   = mapAndUnzip3 (dmdAnalAlt env dmd case_bndr) alts
+        scrut_dmd            = mkAltsDataDmd mbTyCon (zip [dc | (dc,_,_) <- alts] alt_dmds)
+        (scrut_ty, scrut')   = dmdAnal env scrut_dmd scrut
         (alt_ty, case_bndr') = annotateBndr env (foldr lubDmdType botDmdType alt_tys) case_bndr
                                -- NB: Base case is botDmdType, for empty case alternatives
                                --     This is a unit for lubDmdType, and the right result
                                --     when there really are no alternatives
         res_ty               = alt_ty `bothDmdType` toBothDmdArg scrut_ty
     in
---    pprTrace "dmdAnal:Case2" (vcat [ text "scrut" <+> ppr scrut
---                                   , text "scrut_ty" <+> ppr scrut_ty
---                                   , text "alt_tys" <+> ppr alt_tys
---                                   , text "alt_ty" <+> ppr alt_ty
---                                   , text "res_ty" <+> ppr res_ty ]) $
+    -- pprTrace "dmdAnal:Case2" (vcat [ text "dmd" <+> ppr dmd
+    --                                , text "scrut" <+> ppr scrut
+    --                                , text "scrut_ty" <+> ppr scrut_ty
+    --                                , text "alt_dmds" <+> ppr alt_dmds
+    --                                , text "scrut_dmd" <+> ppr scrut_dmd
+    --                                , text "alt_tys" <+> ppr alt_tys
+    --                                , text "alt_ty" <+> ppr alt_ty
+    --                                , text "res_ty" <+> ppr res_ty ]) $
     (res_ty, Case scrut' case_bndr' ty alts')
 
 dmdAnal' env dmd (Let (NonRec id rhs) body)
@@ -299,18 +307,42 @@ io_hack_reqd scrut con bndrs
   | otherwise
   = False
 
-dmdAnalAlt :: AnalEnv -> CleanDemand -> Id -> Alt Var -> (DmdType, Alt Var)
+dmdAnalAlt :: AnalEnv -> CleanDemand -> Id -> Alt Var -> (DmdType, [Demand], Alt Var)
 dmdAnalAlt env dmd case_bndr (con,bndrs,rhs)
   | null bndrs    -- Literals, DEFAULT, and nullary constructors
   , (rhs_ty, rhs') <- dmdAnal env dmd rhs
-  = (rhs_ty, (con, [], rhs'))
+  = (rhs_ty, [], (con, [], rhs'))
 
   | otherwise     -- Non-nullary data constructors
   , (rhs_ty, rhs') <- dmdAnal env dmd rhs
   , (alt_ty, dmds) <- findBndrsDmds env rhs_ty bndrs
   , let case_bndr_dmd = findIdDemand alt_ty case_bndr
-        id_dmds       = addCaseBndrDmd case_bndr_dmd dmds
-  = (alt_ty, (con, setBndrsDemandInfo bndrs id_dmds, rhs'))
+        id_dmds       = addCaseBndrDmd (offsetOfAltCon con) case_bndr_dmd dmds
+  = (alt_ty, id_dmds, (con, setBndrsDemandInfo bndrs id_dmds, rhs'))
+
+offsetOfAltCon :: AltCon -> Int
+offsetOfAltCon (DataAlt dc) = offsetOf dc
+offsetOfAltCon _ = 0
+
+offsetOf :: DataCon -> Int
+offsetOf dc =
+    sum $ map dataConRepArity $ takeWhile (/= dc) $ tyConDataCons $ dataConTyCon dc
+
+mkAltsDataDmd :: Maybe TyCon -> [(AltCon, [Demand])] -> CleanDemand
+mkAltsDataDmd Nothing    _    = cleanEvalDmd
+mkAltsDataDmd (Just tyc) alts = mkDataDmd dmds
+  where
+    alts' = [ (a,dmds,()) | (a,dmds) <- alts ] -- to suit findAlt
+
+    lookupAlt :: DataCon -> [Demand]
+    lookupAlt dc = case findAlt (DataAlt dc) alts' of
+        Just (_, dmds, _) | length dmds == arity -> dmds
+        _ -> replicate arity absDmd
+      where arity = dataConRepArity dc
+
+    dmds :: [Demand]
+    dmds = concatMap lookupAlt (tyConDataCons tyc)
+
 
 
 {- Note [IO hack in the demand analyser]
@@ -421,8 +453,8 @@ dmdTransform :: AnalEnv         -- The strictness environment
         -- this function plus demand on its free variables
 
 dmdTransform env var dmd
-  | isDataConWorkId var                          -- Data constructor
-  = dmdTransformDataConSig (idArity var) (idStrictness var) dmd
+  | Just dc <- isDataConWorkId_maybe var                          -- Data constructor
+  = dmdTransformDataConSig (offsetOf dc) (idArity var) (idStrictness var) dmd
 
   | gopt Opt_DmdTxDictSel (ae_dflags env),
     Just _ <- isClassOpId_maybe var -- Dictionary component selector
