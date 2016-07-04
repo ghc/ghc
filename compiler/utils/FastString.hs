@@ -482,9 +482,7 @@ nullFS f = BS.null (fs_bs f)
 
 -- | Unpacks and decodes the FastString
 unpackFS :: FastString -> String
-unpackFS (FastString _ _ bs _) =
-  inlinePerformIO $ BS.unsafeUseAsCStringLen bs $ \(ptr, len) ->
-        utf8DecodeString (castPtr ptr) len
+unpackFS (FastString _ _ bs _) = inlinePerformIO $ utf8DecodeStringLazy bs
 
 -- | Gives the UTF-8 encoded bytes corresponding to a 'FastString'
 bytesFS :: FastString -> [Word8]

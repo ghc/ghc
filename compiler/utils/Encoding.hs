@@ -18,6 +18,7 @@ module Encoding (
         utf8CharStart,
         utf8DecodeChar,
         utf8DecodeString,
+        utf8DecodeStringLazy,
         utf8EncodeChar,
         utf8EncodeString,
         utf8EncodedLength,
@@ -32,6 +33,9 @@ import Foreign
 import Data.Char
 import Numeric
 import ExtsCompat46
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Unsafe   as BS
+import System.IO.Unsafe ( unsafeInterleaveIO )
 
 -- -----------------------------------------------------------------------------
 -- UTF-8
@@ -109,6 +113,19 @@ utf8CharStart p = go p
                  if w >= 0x80 && w < 0xC0
                         then go (p `plusPtr` (-1))
                         else return p
+
+utf8DecodeStringLazy :: BS.ByteString -> IO [Char]
+utf8DecodeStringLazy bs
+  = unpack bs
+  where
+    unpack bs
+        | BS.null bs = return []
+        | otherwise  =
+          BS.unsafeUseAsCString bs $ \ptr ->
+            case utf8DecodeChar (castPtr ptr) of
+              (c, nBytes) -> do
+                chs <- unsafeInterleaveIO $ unpack (BS.drop nBytes bs)
+                return (c : chs)
 
 utf8DecodeString :: Ptr Word8 -> Int -> IO [Char]
 utf8DecodeString ptr len
