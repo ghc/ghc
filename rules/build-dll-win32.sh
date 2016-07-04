@@ -44,7 +44,7 @@ process_dll_link() {
             DLLimport="$base.dll.a"
             dlltool -d $defFile -l $DLLimport
             
-            cmd="$7 $DLLimport -v3 -optl-Wl,--trace $5 -optl-Wl,--retain-symbols-file=$exports -o $6"
+            cmd="$7 $DLLimport $5 -optl-Wl,--retain-symbols-file=$exports -o $6"
             echo "$cmd"
             eval "$cmd" || exit 1            
             exit 0
@@ -105,10 +105,7 @@ process_dll_link() {
         elstfile="$base-pt$i.elst"
         awk -v root="$file" '{def=root;}{print "    \"" $0 "\""> def}' $lstfile
         sed -i "1i\LIBRARY \"$DLLfile\"\\nEXPORTS" $file
-        # Apply the same aliasing hack for #8696 here
-        awk -v root="$elstfile.tmp" '{def=root;}{print "__imp_" $0> def}' $lstfile
-        cat "$lstfile.tmp" | sed -r 's/^__imp_(\.refptr\..+)$/\1/p' > $lstfile
-        rm -f "$lstfile.tmp"
+        
         echo "Processing $file..."
         basefile="$(basename $file)"
         DLLfile="${basefile%.*}.$ext"
