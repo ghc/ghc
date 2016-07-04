@@ -1142,7 +1142,7 @@ ppr_defn_site imp_spec name
                 2 (pprLoc loc)
   where
     loc = nameSrcSpan name
-    defining_mod = nameModule name
+    defining_mod = ASSERT2( isExternalName name, ppr name ) nameModule name
     same_module = importSpecModule imp_spec == moduleName defining_mod
     pp_mod | same_module = empty
            | otherwise   = text "in" <+> quotes (ppr defining_mod)

@@ -1650,7 +1650,8 @@ mkPrintUnqualified dflags env = QueryQualify qual_name
                             -- Eg  f = True; g = 0; f = False
       where
         is_name :: Name -> Bool
-        is_name name = nameModule name == mod && nameOccName name == occ
+        is_name name = ASSERT2( isExternalName name, ppr name )
+                       nameModule name == mod && nameOccName name == occ
 
         forceUnqualNames :: [Name]
         forceUnqualNames =
