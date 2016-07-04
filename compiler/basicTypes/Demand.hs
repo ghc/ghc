@@ -330,8 +330,7 @@ data UseDmd
   = UCall Count UseDmd   -- Call demand for absence
                          -- Used only for values of function type
 
-  | UData [ArgUse]     -- Product
-                         -- Used only for values of product type
+  | UData [[ArgUse]]     -- Data type
                          -- See Note [Don't optimise UData(Used) to Used]
                          -- [Invariant] Not all components are Abs
                          --             (in that case, use UHead)
@@ -372,7 +371,10 @@ instance Outputable UseDmd where
   ppr Used           = char 'U'
   ppr (UCall c a)    = char 'C' <> ppr c <> parens (ppr a)
   ppr UHead          = char 'H'
-  ppr (UData as)     = char 'U' <> parens (hcat (punctuate (char ',') (map ppr as)))
+  ppr (UData ass)     = char 'U' <> pprCons ass
+    where
+        pprCons ass = hcat (punctuate (char ';') (map pprCon ass))
+        pprCon as   = hcat (punctuate (char ',') (map ppr as))
 
 instance Outputable Count where
   ppr One  = char '1'
@@ -386,10 +388,10 @@ mkUCall :: Count -> UseDmd -> UseDmd
 --mkUCall c Used = Used c
 mkUCall c a  = UCall c a
 
-mkUData :: [ArgUse] -> UseDmd
+mkUData :: [[ArgUse]] -> UseDmd
 mkUData ux
-  | all (== Abs) ux    = UHead
-  | otherwise          = UData ux
+  | all (all (== Abs)) ux = UHead
+  | otherwise             = UData ux
 
 lubCount :: Count -> Count -> Count
 lubCount _ Many = Many
@@ -408,12 +410,12 @@ lubUse (UCall c1 u1) (UCall c2 u2) = UCall (lubCount c1 c2) (lubUse u1 u2)
 lubUse (UCall _ _) _               = Used
 lubUse (UData ux) UHead            = UData ux
 lubUse (UData ux1) (UData ux2)
-     | length ux1 == length ux2    = UData $ zipWith lubArgUse ux1 ux2
+     | all2 equalLength ux1 ux2    = UData $ zipWith (zipWith lubArgUse) ux1 ux2
      | otherwise                   = Used
 lubUse (UData {}) (UCall {})       = Used
 -- lubUse (UData {}) Used             = Used
-lubUse (UData ux) Used             = UData (map (`lubArgUse` useTop) ux)
-lubUse Used       (UData ux)       = UData (map (`lubArgUse` useTop) ux)
+lubUse (UData uss) Used            = UData (map (map (`lubArgUse` useTop)) uss)
+lubUse Used        (UData uss)     = UData (map (map (`lubArgUse` useTop)) uss)
 lubUse Used _                      = Used  -- Note [Used should win]
 
 -- `both` is different from `lub` in its treatment of counting; if
@@ -438,30 +440,30 @@ bothUse (UCall _ u1) (UCall _ u2)   = UCall Many (u1 `lubUse` u2)
 bothUse (UCall {}) _                = Used
 bothUse (UData ux) UHead            = UData ux
 bothUse (UData ux1) (UData ux2)
-      | length ux1 == length ux2    = UData $ zipWith bothArgUse ux1 ux2
+      | all2 equalLength ux1 ux2    = UData $ zipWith (zipWith bothArgUse) ux1 ux2
       | otherwise                   = Used
 bothUse (UData {}) (UCall {})       = Used
 -- bothUse (UData {}) Used             = Used  -- Note [Used should win]
-bothUse Used (UData ux)             = UData (map (`bothArgUse` useTop) ux)
-bothUse (UData ux) Used             = UData (map (`bothArgUse` useTop) ux)
+bothUse Used (UData uss)            = UData (map (map (`bothArgUse` useTop)) uss)
+bothUse (UData uss) Used            = UData (map (map (`bothArgUse` useTop)) uss)
 bothUse Used _                      = Used  -- Note [Used should win]
 
 peelUseCall :: UseDmd -> Maybe (Count, UseDmd)
 peelUseCall (UCall c u)   = Just (c,u)
 peelUseCall _             = Nothing
 
-addCaseBndrDmd :: Arity
+addCaseBndrDmd :: Int
                -> Demand    -- On the case binder
                -> [Demand]  -- On the components of the constructor
                -> [Demand]  -- Final demands for the components of the constructor
 -- See Note [Demand on case-alternative binders]
-addCaseBndrDmd offset (JD { sd = ms, ud = mu }) alt_dmds
+addCaseBndrDmd conIdx (JD { sd = ms, ud = mu }) alt_dmds
   = case mu of
      Abs     -> alt_dmds
      Use _ u -> zipWith bothDmd alt_dmds (mkJointDmds ss us)
              where
                 Just ss = splitArgStrProdDmd arity ms  -- Guaranteed not to be a call
-                Just us = splitUseProdDmd offset arity u   -- Ditto
+                Just us = splitUseProdDmd conIdx arity u   -- Ditto
   where
     arity = length alt_dmds
 
@@ -550,7 +552,7 @@ markReusedDmd (Use _ a)   = Use Many (markReused a)
 
 markReused :: UseDmd -> UseDmd
 markReused (UCall _ u)      = UCall Many u   -- No need to recurse here
-markReused (UData ux)       = UData (map markReusedDmd ux)
+markReused (UData uss)      = UData (map (map markReusedDmd) uss)
 markReused u                = u
 
 isUsedMU :: ArgUse -> Bool
@@ -563,13 +565,13 @@ isUsedU :: UseDmd -> Bool
 -- True <=> markReused d = d
 isUsedU Used           = True
 isUsedU UHead          = True
-isUsedU (UData us)     = all isUsedMU us
+isUsedU (UData uss)    = all (all isUsedMU) uss
 isUsedU (UCall One _)  = False
 isUsedU (UCall Many _) = True  -- No need to recurse
 
 -- Squashing usage demand demands
 seqUseDmd :: UseDmd -> ()
-seqUseDmd (UData ds)   = seqArgUseList ds
+seqUseDmd (UData dss)  = map seqArgUseList dss `seqList` ()
 seqUseDmd (UCall c d)  = c `seq` seqUseDmd d
 seqUseDmd _            = ()
 
@@ -583,11 +585,12 @@ seqArgUse _          = ()
 
 -- Splitting polymorphic Maybe-Used demands
 splitUseProdDmd :: Int -> Int -> UseDmd -> Maybe [ArgUse]
-splitUseProdDmd _ n Used        = Just (replicate n useTop)
-splitUseProdDmd _ n UHead       = Just (replicate n Abs)
-splitUseProdDmd o n (UData ds)  = ASSERT2( ds_ `lengthExceeds` n, text "splitUseProdDmd" $$ ppr o $$ ppr n $$ ppr ds)
-                                  Just (take n ds_)
-    where ds_ = drop o ds
+splitUseProdDmd _      n Used        = Just (replicate n useTop)
+splitUseProdDmd _      n UHead       = Just (replicate n Abs)
+splitUseProdDmd conIdx n (UData ds)  =
+    ASSERT2( ds `lengthExceeds` conIdx && ds !! conIdx `lengthIs` n,
+             text "splitUseProdDmd" $$ ppr conIdx $$ ppr n $$ ppr ds)
+    Just (ds !! conIdx)
 splitUseProdDmd _ _ (UCall _ _) = Nothing
       -- This can happen when the programmer uses unsafeCoerce,
       -- and we don't then want to crash the compiler (Trac #9208)
@@ -660,11 +663,11 @@ evalDmd = JD { sd = Str VanStr HeadStr, ud = useTop }
 mkProdDmd :: [Demand] -> CleanDemand
 mkProdDmd dx
   = JD { sd = mkSProd $ map getStrDmd dx
-       , ud = mkUData $ map getUseDmd dx }
+       , ud = mkUData [ map getUseDmd dx ] }
 
-mkDataDmd :: [Demand] -> CleanDemand
+mkDataDmd :: [[Demand]] -> CleanDemand
 mkDataDmd dx
-  = JD { sd = HeadStr, ud = mkUData $ map getUseDmd dx }
+  = JD { sd = HeadStr, ud = mkUData $ map (map getUseDmd) dx }
 
 
 mkCallDmd :: CleanDemand -> CleanDemand
@@ -681,7 +684,7 @@ cleanEvalDmd :: CleanDemand
 cleanEvalDmd = JD { sd = HeadStr, ud = Used }
 
 cleanEvalProdDmd :: Arity -> CleanDemand
-cleanEvalProdDmd n = JD { sd = HeadStr, ud = UData (replicate n useTop) }
+cleanEvalProdDmd n = JD { sd = HeadStr, ud = UData [replicate n useTop] }
 
 {-
 ************************************************************************
@@ -794,7 +797,7 @@ splitFVs is_thunk rhs_fvs
 
 data TypeShape = TsFun TypeShape
                | TsProd [TypeShape]
-               | TsData [TypeShape]
+               | TsData [[TypeShape]]
                | TsUnk
 
 instance Outputable TypeShape where
@@ -824,13 +827,13 @@ trimToType (JD { sd = ms, ud = mu }) ts
     go_mu (Use c u) ts = Use c (go_u u ts)
 
     go_u :: UseDmd -> TypeShape -> UseDmd
-    go_u UHead       _          = UHead
-    go_u (UCall c u) (TsFun ts) = UCall c (go_u u ts)
-    go_u (UData mus) (TsProd tss)
-      | equalLength mus tss      = UData (zipWith go_mu mus tss)
-    go_u (UData mus) (TsData tss)
-      | equalLength mus tss      = UData (zipWith go_mu mus tss)
-    go_u _           _           = Used
+    go_u UHead       _            = UHead
+    go_u (UCall c u) (TsFun ts)   = UCall c (go_u u ts)
+    go_u (UData [mus]) (TsProd tss)
+      | equalLength mus tss       = UData [zipWith go_mu mus tss]
+    go_u (UData mus) (TsData tsss)
+      | all2 equalLength mus tsss = UData (zipWith (zipWith go_mu) mus tsss)
+    go_u _           _            = Used
 
 {-
 Note [Trimming a demand to a type]
@@ -873,17 +876,28 @@ can be expanded to saturate a callee's arity.
 -}
 
 splitProdDmd_maybe :: Demand -> Maybe [Demand]
+-- Product types have one constructor
+splitProdDmd_maybe = splitConDmd_maybe 0
+
+splitConDmd_maybe :: Int -> Demand -> Maybe [Demand]
 -- Split a product into its components, iff there is any
 -- useful information to be extracted thereby
 -- The demand is not necessarily strict!
-splitProdDmd_maybe (JD { sd = s, ud = u })
+splitConDmd_maybe conIdx (JD { sd = s, ud = u })
   = case (s,u) of
-      (Str _ (SProd sx), Use _ u) | Just ux <- splitUseProdDmd 0 (length sx) u
-                                  -> Just (mkJointDmds sx ux)
-      (Str _ s, Use _ (UData ux)) | Just sx <- splitStrProdDmd (length ux) s
-                                  -> Just (mkJointDmds sx ux)
-      (Lazy,    Use _ (UData ux)) -> Just (mkJointDmds (replicate (length ux) Lazy) ux)
-      _ -> Nothing
+      (Str _ (SProd sx), Use _ u)
+            | Just ux <- splitUseProdDmd conIdx (length sx) u
+                    -> Just (mkJointDmds sx ux)
+      (Str _ s, Use _ (UData uxx))
+            | lengthExceeds uxx conIdx
+            , let ux = uxx !! conIdx
+            , Just sx <- splitStrProdDmd (length ux) s
+                    -> Just (mkJointDmds sx ux)
+      (Lazy,    Use _ (UData uxx))
+            | lengthExceeds uxx conIdx
+            , let ux = uxx !! conIdx
+                    -> Just (mkJointDmds (replicate (length ux) Lazy) ux)
+      _             -> Nothing
 
 {-
 ************************************************************************
@@ -1720,7 +1734,7 @@ dmdTransformDataConSig :: Int -> Arity -> StrictSig -> CleanDemand -> DmdType
 -- which has a special kind of demand transformer.
 -- If the constructor is saturated, we feed the demand on
 -- the result into the constructor arguments.
-dmdTransformDataConSig offset arity (StrictSig (DmdType _ _ con_res))
+dmdTransformDataConSig conIdx arity (StrictSig (DmdType _ _ con_res))
                              (JD { sd = str, ud = abs })
   | Just str_dmds <- go_str arity str
   , Just abs_dmds <- go_abs arity abs
@@ -1735,7 +1749,7 @@ dmdTransformDataConSig offset arity (StrictSig (DmdType _ _ con_res))
     go_str n HyperStr   = go_str (n-1) HyperStr
     go_str _ _          = Nothing
 
-    go_abs 0 dmd            = splitUseProdDmd offset arity dmd
+    go_abs 0 dmd            = splitUseProdDmd conIdx arity dmd
     go_abs n (UCall One u') = go_abs (n-1) u'
     go_abs _ _              = Nothing
 
@@ -1946,7 +1960,7 @@ zap_usg :: KillFlags -> UseDmd -> UseDmd
 zap_usg kfs (UCall c u)
     | kf_called_once kfs = UCall Many (zap_usg kfs u)
     | otherwise          = UCall c    (zap_usg kfs u)
-zap_usg kfs (UData us)   = UData (map (zap_musg kfs) us)
+zap_usg kfs (UData uss)  = UData (map (map (zap_musg kfs)) uss)
 zap_usg _   u            = u
 
 -- If the argument is a used non-newtype dictionary, give it strict

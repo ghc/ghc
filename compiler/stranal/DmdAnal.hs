@@ -317,16 +317,13 @@ dmdAnalAlt env dmd case_bndr (con,bndrs,rhs)
   , (rhs_ty, rhs') <- dmdAnal env dmd rhs
   , (alt_ty, dmds) <- findBndrsDmds env rhs_ty bndrs
   , let case_bndr_dmd = findIdDemand alt_ty case_bndr
-        id_dmds       = addCaseBndrDmd (offsetOfAltCon con) case_bndr_dmd dmds
+        id_dmds       = addCaseBndrDmd (altTag con) case_bndr_dmd dmds
   = (alt_ty, id_dmds, (con, setBndrsDemandInfo bndrs id_dmds, rhs'))
 
-offsetOfAltCon :: AltCon -> Int
-offsetOfAltCon (DataAlt dc) = offsetOf dc
-offsetOfAltCon _ = 0
+altTag :: AltCon -> Int
+altTag (DataAlt dc) = dataConTag dc - fIRST_TAG
+altTag _ = 0
 
-offsetOf :: DataCon -> Int
-offsetOf dc =
-    sum $ map dataConRepArity $ takeWhile (/= dc) $ tyConDataCons $ dataConTyCon dc
 
 mkAltsDataDmd :: Maybe TyCon -> [(AltCon, [Demand])] -> CleanDemand
 mkAltsDataDmd Nothing    _    = cleanEvalDmd
@@ -340,8 +337,8 @@ mkAltsDataDmd (Just tyc) alts = mkDataDmd dmds
         _ -> replicate arity absDmd
       where arity = dataConRepArity dc
 
-    dmds :: [Demand]
-    dmds = concatMap lookupAlt (tyConDataCons tyc)
+    dmds :: [[Demand]]
+    dmds = map lookupAlt (tyConDataCons tyc)
 
 
 
@@ -454,7 +451,7 @@ dmdTransform :: AnalEnv         -- The strictness environment
 
 dmdTransform env var dmd
   | Just dc <- isDataConWorkId_maybe var                          -- Data constructor
-  = dmdTransformDataConSig (offsetOf dc) (idArity var) (idStrictness var) dmd
+  = dmdTransformDataConSig (dataConTag dc - fIRST_TAG) (idArity var) (idStrictness var) dmd
 
   | gopt Opt_DmdTxDictSel (ae_dflags env),
     Just _ <- isClassOpId_maybe var -- Dictionary component selector

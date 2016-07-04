@@ -537,7 +537,7 @@ findTypeShape fam_envs ty
   = TsProd (map (findTypeShape fam_envs) $ dataConInstArgTys con tc_args)
 
   | Just (tc, tc_args)  <- splitTyConApp_maybe ty
-  = TsData $ concatMap (\con -> map (findTypeShape fam_envs) $ dataConInstArgTys con tc_args) (tyConDataCons tc)
+  = TsData $ map (\con -> map (findTypeShape fam_envs) $ dataConInstArgTys con tc_args) (tyConDataCons tc)
 
   | Just (_, res) <- splitFunTy_maybe ty
   = TsFun (findTypeShape fam_envs res)
