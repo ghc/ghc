@@ -17,7 +17,8 @@ process_dll_link() {
     ext="${6##*.}"
     base="${6%.*}"
     exports="$base.lst"
-    max=65535
+    max=20000
+    #max=65535
 
     # We need to know how many symbols came from other static archives
     # So take the total number of symbols and remove those we know came
@@ -103,12 +104,12 @@ process_dll_link() {
         file="$base-pt$i.def"
         lstfile="$base-pt$i.lst"
         elstfile="$base-pt$i.elst"
+        basefile="$(basename $file)"
+        DLLfile="${basefile%.*}.$ext"
         awk -v root="$file" '{def=root;}{print "    \"" $0 "\""> def}' $lstfile
         sed -i "1i\LIBRARY \"$DLLfile\"\\nEXPORTS" $file
         
         echo "Processing $file..."
-        basefile="$(basename $file)"
-        DLLfile="${basefile%.*}.$ext"
         DLLimport="${file%.*}.dll.a"
         dlltool -d $file -l $DLLimport
     done
@@ -120,7 +121,7 @@ process_dll_link() {
         elstfile="$base-pt$i.lst"
         objs=`cat "$objfile" | tr "\n" " "`
         basefile="$(basename $def)"
-        DLLfile="${basefile%.*}.$ext"
+        DLLfile="$base-pt$i.$ext"
         declare -A imports
         for j in $items
         do
@@ -129,7 +130,7 @@ process_dll_link() {
                 imports=`echo "$imports" "$base-pt$j.dll.a"`
             fi
         done
-        cmd="$7 $objs $def $imports -optl-Wl,--retain-symbols-file=$elstfile -o $2/$DLLfile"
+        cmd="$7 $objs $def $imports -optl-Wl,--retain-symbols-file=$elstfile -o $DLLfile"
         echo "$cmd"
         eval "$cmd" || exit 1
     done
