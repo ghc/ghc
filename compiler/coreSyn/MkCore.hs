@@ -323,17 +323,17 @@ Usually we want the former, but occasionally the latter.
 -}
 
 -- | Build a small tuple holding the specified variables
--- One-tuples are flattened; see Note [Flattening of one-tuples]
+-- One-tuples are flattened; see Note [Flattening one-tuples]
 mkCoreVarTup :: [Id] -> CoreExpr
 mkCoreVarTup ids = mkCoreTup (map Var ids)
 
 -- | Build the type of a small tuple that holds the specified variables
--- One-tuples are flattened; see Note [Flattening of one-tuples]
+-- One-tuples are flattened; see Note [Flattening one-tuples]
 mkCoreVarTupTy :: [Id] -> Type
 mkCoreVarTupTy ids = mkBoxedTupleTy (map idType ids)
 
 -- | Build a small tuple holding the specified expressions
--- One-tuples are flattened; see NOte [Flattening of one-tuples]
+-- One-tuples are flattened; see Note [Flattening one-tuples]
 mkCoreTup :: [CoreExpr] -> CoreExpr
 mkCoreTup []  = Var unitDataConId
 mkCoreTup [c] = c
@@ -357,7 +357,7 @@ mkCoreTupBoxity Boxed   exps = mkCoreTup exps
 mkCoreTupBoxity Unboxed exps = mkCoreUbxTup (map exprType exps) exps
 
 -- | Build a big tuple holding the specified variables
--- One-tuples are flattened; see Note [Flattening of one-tuples]
+-- One-tuples are flattened; see Note [Flattening one-tuples]
 mkBigCoreVarTup :: [Id] -> CoreExpr
 mkBigCoreVarTup ids = mkBigCoreTup (map Var ids)
 
@@ -369,17 +369,17 @@ mkBigCoreVarTup1 [id] = mkCoreConApps (tupleDataCon Boxed 1)
 mkBigCoreVarTup1 ids  = mkBigCoreTup (map Var ids)
 
 -- | Build the type of a big tuple that holds the specified variables
--- One-tuples are flattened; see Note [Flattening of one-tuples]
+-- One-tuples are flattened; see Note [Flattening one-tuples]
 mkBigCoreVarTupTy :: [Id] -> Type
 mkBigCoreVarTupTy ids = mkBigCoreTupTy (map idType ids)
 
 -- | Build a big tuple holding the specified expressions
--- One-tuples are flattened; see Note [Flattening of one-tuples]
+-- One-tuples are flattened; see Note [Flattening one-tuples]
 mkBigCoreTup :: [CoreExpr] -> CoreExpr
 mkBigCoreTup = mkChunkified mkCoreTup
 
 -- | Build the type of a big tuple that holds the specified type of thing
--- One-tuples are flattened; see Note [Flattening of one-tuples]
+-- One-tuples are flattened; see Note [Flattening one-tuples]
 mkBigCoreTupTy :: [Type] -> Type
 mkBigCoreTupTy = mkChunkified mkBoxedTupleTy
 
