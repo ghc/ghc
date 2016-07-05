@@ -35,7 +35,7 @@ import Numeric
 import ExtsCompat46
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Unsafe   as BS
-import System.IO.Unsafe ( unsafeInterleaveIO )
+import System.IO.Unsafe ( unsafePerformIO )
 
 -- -----------------------------------------------------------------------------
 -- UTF-8
@@ -114,19 +114,18 @@ utf8CharStart p = go p
                         then go (p `plusPtr` (-1))
                         else return p
 
-utf8DecodeStringLazy :: BS.ByteString -> IO [Char]
+utf8DecodeStringLazy :: BS.ByteString -> [Char]
 utf8DecodeStringLazy !bs
-  = unpack 0
+  = build (unpack 0)
   where
-    unpack !offset
-        | BS.null bs' = return []
+    unpack !offset cons nil
+        | BS.null bs' = nil
         | otherwise  =
-          BS.unsafeUseAsCString bs' $ \ptr ->
+          unsafePerformIO $ BS.unsafeUseAsCString bs' $ \ptr ->
             case utf8DecodeChar (castPtr ptr) of
-              (c, nBytes) -> do
-                chs <- unsafeInterleaveIO $ unpack (offset + nBytes)
-                return (c : chs)
+              (c, nBytes) -> return $ c `cons` unpack (offset + nBytes) cons nil
         where !bs' = BS.drop offset bs
+{-# INLINEABLE utf8DecodeStringLazy #-}
 
 utf8DecodeString :: Ptr Word8 -> Int -> IO [Char]
 utf8DecodeString ptr len
