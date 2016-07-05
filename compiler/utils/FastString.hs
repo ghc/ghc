@@ -109,6 +109,7 @@ import ExtsCompat46
 import System.IO
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.Data
+import Data.String
 import Data.IORef       ( IORef, newIORef, readIORef, atomicModifyIORef' )
 import Data.Maybe       ( isJust )
 import Data.Char
@@ -196,6 +197,9 @@ instance Ord FastString where
     min x y | x <= y    =  x
             | otherwise =  y
     compare a b = cmpFS a b
+
+instance IsString FastString where
+    fromString = fsLit
 
 instance Show FastString where
    show fs = show (unpackFS fs)
