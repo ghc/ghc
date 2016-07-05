@@ -53,7 +53,9 @@ import TyCon
 import Coercion
 import ConLike
 import DataCon
+import HscTypes
 import Name
+import NameEnv
 import Var
 import VarSet
 import VarEnv
@@ -256,8 +258,11 @@ setZonkType :: ZonkEnv -> UnboundTyVarZonker -> ZonkEnv
 setZonkType (ZonkEnv _ ty_env id_env) zonk_ty
   = ZonkEnv zonk_ty ty_env id_env
 
-zonkEnvIds :: ZonkEnv -> [Id]
-zonkEnvIds (ZonkEnv _ _ id_env) = varEnvElts id_env
+zonkEnvIds :: ZonkEnv -> TypeEnv
+zonkEnvIds (ZonkEnv _ _ id_env) =
+  mkNameEnv [(getName id, AnId id) | id <- nonDetEltsUFM id_env]
+  -- It's OK to use nonDetEltsUFM here because we forget the ordering
+  -- immediately by creating a TypeEnv
 
 zonkIdOcc :: ZonkEnv -> TcId -> Id
 -- Ids defined in this module should be in the envt;
@@ -357,7 +362,7 @@ zonkTopLExpr e = zonkLExpr emptyZonkEnv e
 zonkTopDecls :: Bag EvBind
              -> LHsBinds TcId
              -> [LRuleDecl TcId] -> [LVectDecl TcId] -> [LTcSpecPrag] -> [LForeignDecl TcId]
-             -> TcM ([Id],
+             -> TcM (TypeEnv,
                      Bag EvBind,
                      LHsBinds Id,
                      [LForeignDecl Id],

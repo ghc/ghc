@@ -521,13 +521,13 @@ tcRnSrcDecls explicit_mod_hdr decls
                          tcg_fords     = fords } = tcg_env
             ; all_ev_binds = cur_ev_binds `unionBags` new_ev_binds } ;
 
-      ; (bind_ids, ev_binds', binds', fords', imp_specs', rules', vects')
+      ; (bind_env, ev_binds', binds', fords', imp_specs', rules', vects')
             <- {-# SCC "zonkTopDecls" #-}
                zonkTopDecls all_ev_binds binds rules vects
                             imp_specs fords ;
       ; traceTc "Tc11" empty
 
-      ; let { final_type_env = extendTypeEnvWithIds type_env bind_ids
+      ; let { final_type_env = plusTypeEnv type_env bind_env
             ; tcg_env' = tcg_env { tcg_binds    = binds',
                                    tcg_ev_binds = ev_binds',
                                    tcg_imp_specs = imp_specs',
