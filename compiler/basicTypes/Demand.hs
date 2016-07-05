@@ -389,9 +389,12 @@ mkUCall :: Count -> UseDmd -> UseDmd
 mkUCall c a  = UCall c a
 
 mkUData :: [[ArgUse]] -> UseDmd
-mkUData ux
-  | all (all (== Abs)) ux = UHead
-  | otherwise             = UData ux
+mkUData [ux] | all (== Abs) ux = UHead
+  -- Sum types are not UHead (which is assumed to be the demand type of a seq),
+  -- As although the components may possibly not be used, the information _which_
+  -- constructor is used is important.
+mkUData uss | all null uss     = Used
+mkUData uss                    = UData uss
 
 lubCount :: Count -> Count -> Count
 lubCount _ Many = Many
