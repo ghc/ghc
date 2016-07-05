@@ -43,6 +43,7 @@ import DynFlags
 import ForeignCall
 import Demand           ( isUsedOnce )
 import PrimOp           ( PrimCall(..) )
+import UniqFM
 
 import Data.Maybe    (isJust)
 import Control.Monad (liftM, ap)
@@ -1002,7 +1003,10 @@ lookupFVInfo fvs id
 
 -- Non-top-level things only, both type variables and ids
 getFVs :: FreeVarsInfo -> [Var]
-getFVs fvs = [id | (id, how_bound, _) <- varEnvElts fvs,
+getFVs fvs = [id | (id, how_bound, _) <- nonDetEltsUFM fvs,
+  -- It's OK to use nonDetEltsUFM here because we're not aiming for
+  -- bit-for-bit determinism.
+  -- See Note [Unique Determinism and code generation]
                     not (topLevelBound how_bound) ]
 
 getFVSet :: FreeVarsInfo -> VarSet
