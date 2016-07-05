@@ -60,14 +60,17 @@ moduleLayout = sdocWithPlatform $ \platform ->
         text "target datalayout = \"e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:64:128-a0:0:64-n32\""
         $+$ text "target triple = \"arm-unknown-nto-qnx8.0.0eabi\""
     Platform { platformArch = ArchARM {}, platformOS = OSiOS } ->
-        text "target datalayout = \"e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:64:128-a0:0:64-n32\""
-        $+$ text "target triple = \"arm-apple-darwin10\""
-    Platform { platformArch = ArchX86, platformOS = OSiOS } ->
-        text "target datalayout = \"e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:32:64-f32:32:32-f64:32:64-v64:64:64-v128:128:128-a0:0:64-f80:128:128-n8:16:32\""
-        $+$ text "target triple = \"i386-apple-darwin11\""
+        text "target datalayout = \"e-m:o-p:32:32-f64:32:64-v64:32:64-v128:32:128-a:0:32-n32-S32\""
+        $+$ text "target triple = \"thumbv7-apple-ios7.0.0\""
     Platform { platformArch = ArchARM64, platformOS = OSiOS } ->
-        text "target datalayout = \"e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-a0:0:64-n32:64-S128\""
+        text "target datalayout = \"e-m:o-i64:64-i128:128-n32:64-S128\""
         $+$ text "target triple = \"arm64-apple-ios7.0.0\""
+    Platform { platformArch = ArchX86, platformOS = OSiOS } ->
+        text "target datalayout = \"e-m:o-p:32:32-f64:32:64-f80:128-n8:16:32-S128\""
+        $+$ text "target triple = \"i386-apple-ios7.0.0\""
+    Platform { platformArch = ArchX86_64, platformOS = OSiOS } ->
+        text "target datalayout = \"e-m:o-i64:64-f80:128-n8:16:32:64-S128\""
+        $+$ text "target triple = \"x86_64-apple-ios7.0.0\""
     Platform { platformArch = ArchARM64, platformOS = OSLinux } ->
         text "target datalayout = \"e-m:e-i64:64-i128:128-n32:64-S128\""
         $+$ text "target triple = \"aarch64-unknown-linux-gnu\""
@@ -78,7 +81,7 @@ moduleLayout = sdocWithPlatform $ \platform ->
         -- If you see the above panic, GHC is missing the required target datalayout
         -- and triple information. You can obtain this info by compiling a simple
         -- 'hello world' C program with the clang C compiler eg:
-        --     clang hello.c -emit-llvm -o hello.ll
+        --     clang -S hello.c -emit-llvm -o -
         -- and the first two lines of hello.ll should provide the 'target datalayout'
         -- and 'target triple' lines required.
 
