@@ -3,7 +3,9 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-{-# LANGUAGE DeriveDataTypeable, BangPatterns #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- |
 -- #name_types#
@@ -585,11 +587,12 @@ NB: The string must already be encoded!
 -}
 
 mk_deriv :: NameSpace
-         -> String              -- Distinguishes one sort of derived name from another
-         -> String
+         -> FastString      -- ^ A prefix which distinguishes one sort of derived name
+                            -- from another
+         -> [FastString]    -- ^ The name we are deriving from in pieces which will
+                            -- be concatenated
          -> OccName
-
-mk_deriv occ_sp sys_prefix str = mkOccName occ_sp (sys_prefix ++ str)
+mk_deriv occ_sp sys_prefix str = mkOccNameFS occ_sp (concatFS $ sys_prefix : str)
 
 isDerivedOccName :: OccName -> Bool
 isDerivedOccName occ =
@@ -642,11 +645,10 @@ mkGenOcc2           = mk_simple_deriv varName  "$gto"
 mkGenD         = mk_simple_deriv tcName "D1"
 
 mkGenC :: OccName -> Int -> OccName
-mkGenC occ m   = mk_deriv tcName ("C1_" ++ show m) (occNameString occ)
+mkGenC occ m   = mk_deriv tcName "C1_" [fsLit (show m), occNameFS occ]
 
 mkGenS :: OccName -> Int -> Int -> OccName
-mkGenS occ m n = mk_deriv tcName ("S1_" ++ show m ++ "_" ++ show n)
-                   (occNameString occ)
+mkGenS occ m n = mk_deriv tcName "S1_" [fsLit (show m), "_", fsLit (show n), occNameFS occ]
 
 mkGenR   = mk_simple_deriv tcName "Rep_"
 mkGen1R  = mk_simple_deriv tcName "Rep1_"
@@ -675,12 +677,12 @@ mkPDatasTyConOcc   = mk_simple_deriv_with tcName   "VPs:"
 mkPDataDataConOcc  = mk_simple_deriv_with dataName "VPD:"
 mkPDatasDataConOcc = mk_simple_deriv_with dataName "VPDs:"
 
-mk_simple_deriv :: NameSpace -> String -> OccName -> OccName
-mk_simple_deriv sp px occ = mk_deriv sp px (occNameString occ)
+mk_simple_deriv :: NameSpace -> FastString -> OccName -> OccName
+mk_simple_deriv sp px occ = mk_deriv sp px [occNameFS occ]
 
-mk_simple_deriv_with :: NameSpace -> String -> Maybe String -> OccName -> OccName
-mk_simple_deriv_with sp px Nothing     occ = mk_deriv sp px                  (occNameString occ)
-mk_simple_deriv_with sp px (Just with) occ = mk_deriv sp (px ++ with ++ "_") (occNameString occ)
+mk_simple_deriv_with :: NameSpace -> FastString -> Maybe String -> OccName -> OccName
+mk_simple_deriv_with sp px Nothing     occ = mk_deriv sp px [occNameFS occ]
+mk_simple_deriv_with sp px (Just with) occ = mk_deriv sp px [fsLit with, fsLit "_", occNameFS occ]
 
 -- Data constructor workers are made by setting the name space
 -- of the data constructor OccName (which should be a DataName)
@@ -689,19 +691,19 @@ mkDataConWorkerOcc datacon_occ = setOccNameSpace varName datacon_occ
 
 mkSuperDictAuxOcc :: Int -> OccName -> OccName
 mkSuperDictAuxOcc index cls_tc_occ
-  = mk_deriv varName "$cp" (show index ++ occNameString cls_tc_occ)
+  = mk_deriv varName "$cp" [fsLit $ show index, occNameFS cls_tc_occ]
 
 mkSuperDictSelOcc :: Int        -- ^ Index of superclass, e.g. 3
                   -> OccName    -- ^ Class, e.g. @Ord@
                   -> OccName    -- ^ Derived 'Occname', e.g. @$p3Ord@
 mkSuperDictSelOcc index cls_tc_occ
-  = mk_deriv varName "$p" (show index ++ occNameString cls_tc_occ)
+  = mk_deriv varName "$p" [fsLit $ show index, occNameFS cls_tc_occ]
 
 mkLocalOcc :: Unique            -- ^ Unique to combine with the 'OccName'
            -> OccName           -- ^ Local name, e.g. @sat@
            -> OccName           -- ^ Nice unique version, e.g. @$L23sat@
 mkLocalOcc uniq occ
-   = mk_deriv varName ("$L" ++ show uniq) (occNameString occ)
+   = mk_deriv varName "$L" [fsLit $ show uniq, occNameFS occ]
         -- The Unique might print with characters
         -- that need encoding (e.g. 'z'!)
 
