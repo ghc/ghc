@@ -1465,27 +1465,6 @@ void ghci_enquire(SymbolAddr* addr)
       }
    }
 }
-
-void ghci_find(SymbolAddr *addr);
-void ghci_find(SymbolAddr *addr)
-{
-    ObjectCode *oc;
-    uint32_t i;
-
-    for (oc = objects; oc != NULL; oc = oc->next) {
-        for (i = 0; i < (uint32_t)oc->n_sections; i++) {
-            Section *section = &oc->sections[i];
-            if (addr > section->start &&
-                (StgWord)addr < (StgWord)section->start+section->size) {
-                debugBelch("%p is in %" PATH_FMT, addr,
-                           oc->archiveMemberName ?
-                             oc->archiveMemberName : oc->fileName);
-                debugBelch(", section %d, offset %lx\n", i,
-                           (StgWord)addr - (StgWord)section->start);
-            }
-        }
-    }
-}
 #endif
 
 #if RTS_LINKER_USE_MMAP
@@ -2557,10 +2536,6 @@ int ocTryLoad (ObjectCode* oc) {
             return 0;
         }
     }
-
-    IF_DEBUG(linker, debugBelch("Resolving %" PATH_FMT "\n",
-                                oc->archiveMemberName ?
-                                oc->archiveMemberName : oc->fileName));
 
 #           if defined(OBJFORMAT_ELF)
         r = ocResolve_ELF ( oc );
