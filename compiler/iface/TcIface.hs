@@ -783,7 +783,7 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
        ; vParallelVars <- mapM vectVar                         parallelVars
        ; let (vTyCons, vDataCons, vScSels) = unzip3 (tyConRes1 ++ tyConRes2)
        ; return $ VectInfo
-                  { vectInfoVar            = mkVarEnv  vVars `extendVarEnvList` concat vScSels
+                  { vectInfoVar            = mkDVarEnv vVars `extendDVarEnvList` concat vScSels
                   , vectInfoTyCon          = mkNameEnv vTyCons
                   , vectInfoDataCon        = mkNameEnv (concat vDataCons)
                   , vectInfoParallelVars   = mkDVarSet vParallelVars

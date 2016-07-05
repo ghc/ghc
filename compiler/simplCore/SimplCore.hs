@@ -659,10 +659,10 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                    -- (In contrast to automatically vectorised variables, their unvectorised versions
                    -- don't depend on them.)
                  vectVars = mkVarSet $
-                              catMaybes [ fmap snd $ lookupVarEnv (vectInfoVar (mg_vect_info guts)) bndr
+                              catMaybes [ fmap snd $ lookupDVarEnv (vectInfoVar (mg_vect_info guts)) bndr
                                         | Vect bndr _ <- mg_vect_decls guts]
                               ++
-                              catMaybes [ fmap snd $ lookupVarEnv (vectInfoVar (mg_vect_info guts)) bndr
+                              catMaybes [ fmap snd $ lookupDVarEnv (vectInfoVar (mg_vect_info guts)) bndr
                                         | bndr <- bindersOfBinds binds]
                                         -- FIXME: This second comprehensions is only needed as long as we
                                         --        have vectorised bindings where we get "Could NOT call

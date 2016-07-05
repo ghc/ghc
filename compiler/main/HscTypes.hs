@@ -2640,7 +2640,7 @@ on just the OccName easily in a Core pass.
 --
 data VectInfo
   = VectInfo
-    { vectInfoVar            :: VarEnv  (Var    , Var  )    -- ^ @(f, f_v)@ keyed on @f@
+    { vectInfoVar            :: DVarEnv (Var    , Var  )    -- ^ @(f, f_v)@ keyed on @f@
     , vectInfoTyCon          :: NameEnv (TyCon  , TyCon)    -- ^ @(T, T_v)@ keyed on @T@
     , vectInfoDataCon        :: NameEnv (DataCon, DataCon)  -- ^ @(C, C_v)@ keyed on @C@
     , vectInfoParallelVars   :: DVarSet                     -- ^ set of parallel variables
@@ -2674,11 +2674,11 @@ data IfaceVectInfo
 
 noVectInfo :: VectInfo
 noVectInfo
-  = VectInfo emptyVarEnv emptyNameEnv emptyNameEnv emptyDVarSet emptyNameSet
+  = VectInfo emptyDVarEnv emptyNameEnv emptyNameEnv emptyDVarSet emptyNameSet
 
 plusVectInfo :: VectInfo -> VectInfo -> VectInfo
 plusVectInfo vi1 vi2 =
-  VectInfo (vectInfoVar            vi1 `plusVarEnv`    vectInfoVar            vi2)
+  VectInfo (vectInfoVar            vi1 `plusDVarEnv`   vectInfoVar            vi2)
            (vectInfoTyCon          vi1 `plusNameEnv`   vectInfoTyCon          vi2)
            (vectInfoDataCon        vi1 `plusNameEnv`   vectInfoDataCon        vi2)
            (vectInfoParallelVars   vi1 `unionDVarSet`  vectInfoParallelVars   vi2)

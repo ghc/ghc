@@ -27,15 +27,16 @@ module VarEnv (
         DVarEnv, DIdEnv, DTyVarEnv,
 
         -- ** Manipulating these environments
-        emptyDVarEnv,
+        emptyDVarEnv, mkDVarEnv,
         dVarEnvElts,
         extendDVarEnv, extendDVarEnv_C,
+        extendDVarEnvList,
         lookupDVarEnv,
         isEmptyDVarEnv, foldDVarEnv,
         mapDVarEnv,
         modifyDVarEnv,
         alterDVarEnv,
-        plusDVarEnv_C,
+        plusDVarEnv, plusDVarEnv_C,
         unitDVarEnv,
         delDVarEnv,
         delDVarEnvList,
@@ -515,6 +516,9 @@ emptyDVarEnv = emptyUDFM
 dVarEnvElts :: DVarEnv a -> [a]
 dVarEnvElts = eltsUDFM
 
+mkDVarEnv :: [(Var, a)] -> DVarEnv a
+mkDVarEnv = listToUDFM
+
 extendDVarEnv :: DVarEnv a -> Var -> a -> DVarEnv a
 extendDVarEnv = addToUDFM
 
@@ -529,6 +533,9 @@ mapDVarEnv = mapUDFM
 
 alterDVarEnv :: (Maybe a -> Maybe a) -> DVarEnv a -> Var -> DVarEnv a
 alterDVarEnv = alterUDFM
+
+plusDVarEnv :: DVarEnv a -> DVarEnv a -> DVarEnv a
+plusDVarEnv = plusUDFM
 
 plusDVarEnv_C :: (a -> a -> a) -> DVarEnv a -> DVarEnv a -> DVarEnv a
 plusDVarEnv_C = plusUDFM_C
@@ -556,6 +563,9 @@ modifyDVarEnv mangle_fn env key
 
 partitionDVarEnv :: (a -> Bool) -> DVarEnv a -> (DVarEnv a, DVarEnv a)
 partitionDVarEnv = partitionUDFM
+
+extendDVarEnvList :: DVarEnv a -> [(Var, a)] -> DVarEnv a
+extendDVarEnvList = addListToUDFM
 
 anyDVarEnv :: (a -> Bool) -> DVarEnv a -> Bool
 anyDVarEnv = anyUDFM
