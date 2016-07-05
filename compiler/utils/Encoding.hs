@@ -115,17 +115,18 @@ utf8CharStart p = go p
                         else return p
 
 utf8DecodeStringLazy :: BS.ByteString -> IO [Char]
-utf8DecodeStringLazy bs
-  = unpack bs
+utf8DecodeStringLazy !bs
+  = unpack 0
   where
-    unpack bs
-        | BS.null bs = return []
+    unpack !offset
+        | BS.null bs' = return []
         | otherwise  =
-          BS.unsafeUseAsCString bs $ \ptr ->
+          BS.unsafeUseAsCString bs' $ \ptr ->
             case utf8DecodeChar (castPtr ptr) of
               (c, nBytes) -> do
-                chs <- unsafeInterleaveIO $ unpack (BS.drop nBytes bs)
+                chs <- unsafeInterleaveIO $ unpack (offset + nBytes)
                 return (c : chs)
+        where !bs' = BS.drop offset bs
 
 utf8DecodeString :: Ptr Word8 -> Int -> IO [Char]
 utf8DecodeString ptr len
