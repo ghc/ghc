@@ -1427,6 +1427,15 @@ tyCoVarsOfTypes :: [Type] -> TyCoVarSet
 tyCoVarsOfTypes tys = fvVarSet $ tyCoFVsOfTypes tys
 
 -- | Returns free variables of types, including kind variables as
+-- a non-deterministic set. For type synonyms it does /not/ expand the
+-- synonym.
+tyCoVarsOfTypesSet :: TyVarEnv Type -> TyCoVarSet
+-- See Note [Free variables of types]
+tyCoVarsOfTypesSet tys = fvVarSet $ tyCoFVsOfTypes $ nonDetEltsUFM tys
+  -- It's OK to use nonDetEltsUFM here because we immediately forget the
+  -- ordering by returning a set
+
+-- | Returns free variables of types, including kind variables as
 -- a deterministic set. For type synonyms it does /not/ expand the
 -- synonym.
 tyCoVarsOfTypesDSet :: [Type] -> DTyCoVarSet
@@ -1495,6 +1504,11 @@ tyCoFVsOfProv (HoleProv _)        fv_cand in_scope acc = emptyFV fv_cand in_scop
 
 tyCoVarsOfCos :: [Coercion] -> TyCoVarSet
 tyCoVarsOfCos cos = fvVarSet $ tyCoFVsOfCos cos
+
+tyCoVarsOfCosSet :: CoVarEnv Coercion -> TyCoVarSet
+tyCoVarsOfCosSet cos = fvVarSet $ tyCoFVsOfCos $ nonDetEltsUFM cos
+  -- It's OK to use nonDetEltsUFM here because we immediately forget the
+  -- ordering by returning a set
 
 tyCoFVsOfCos :: [Coercion] -> FV
 tyCoFVsOfCos []       fv_cand in_scope acc = emptyFV fv_cand in_scope acc
@@ -1755,8 +1769,8 @@ getTCvSubstRangeFVs :: TCvSubst -> VarSet
 getTCvSubstRangeFVs (TCvSubst _ tenv cenv)
     = unionVarSet tenvFVs cenvFVs
   where
-    tenvFVs = tyCoVarsOfTypes $ varEnvElts tenv
-    cenvFVs = tyCoVarsOfCos   $ varEnvElts cenv
+    tenvFVs = tyCoVarsOfTypesSet tenv
+    cenvFVs = tyCoVarsOfCosSet cenv
 
 isInScope :: Var -> TCvSubst -> Bool
 isInScope v (TCvSubst in_scope _ _) = v `elemInScopeSet` in_scope
@@ -2056,8 +2070,8 @@ isValidTCvSubst (TCvSubst in_scope tenv cenv) =
   (tenvFVs `varSetInScope` in_scope) &&
   (cenvFVs `varSetInScope` in_scope)
   where
-  tenvFVs = tyCoVarsOfTypes $ varEnvElts tenv
-  cenvFVs = tyCoVarsOfCos $ varEnvElts cenv
+  tenvFVs = tyCoVarsOfTypesSet tenv
+  cenvFVs = tyCoVarsOfCosSet cenv
 
 -- | This checks if the substitution satisfies the invariant from
 -- Note [The substitution invariant].
@@ -2071,10 +2085,10 @@ checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
              text "in_scope" <+> ppr in_scope $$
              text "tenv" <+> ppr tenv $$
              text "tenvFVs"
-               <+> ppr (tyCoVarsOfTypes $ varEnvElts tenv) $$
+               <+> ppr (tyCoVarsOfTypesSet tenv) $$
              text "cenv" <+> ppr cenv $$
              text "cenvFVs"
-               <+> ppr (tyCoVarsOfCos $ varEnvElts cenv) $$
+               <+> ppr (tyCoVarsOfCosSet cenv) $$
              text "tys" <+> ppr tys $$
              text "cos" <+> ppr cos )
     ASSERT2( tysCosFVsInScope,
@@ -2355,7 +2369,7 @@ substTyVarBndrCallback subst_fn subst@(TCvSubst in_scope tenv cenv) old_var
     new_env | no_change = delVarEnv tenv old_var
             | otherwise = extendVarEnv tenv old_var (TyVarTy new_var)
 
-    _no_capture = not (new_var `elemVarSet` tyCoVarsOfTypes (varEnvElts tenv))
+    _no_capture = not (new_var `elemVarSet` tyCoVarsOfTypesSet tenv)
     -- Assertion check that we are not capturing something in the substitution
 
     old_ki = tyVarKind old_var
