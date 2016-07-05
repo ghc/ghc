@@ -993,11 +993,11 @@ The main effects of CONLIKE are:
 
 isConLike :: RuleMatchInfo -> Bool
 isConLike ConLike = True
-isConLike _            = False
+isConLike _       = False
 
 isFunLike :: RuleMatchInfo -> Bool
 isFunLike FunLike = True
-isFunLike _            = False
+isFunLike _       = False
 
 isEmptyInlineSpec :: InlineSpec -> Bool
 isEmptyInlineSpec EmptyInlineSpec = True
