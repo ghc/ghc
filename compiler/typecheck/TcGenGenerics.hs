@@ -21,8 +21,8 @@ import DataCon
 import TyCon
 import FamInstEnv       ( FamInst, FamFlavor(..), mkSingleCoAxiom )
 import FamInst
-import Module           ( Module, moduleName, moduleNameFS
-                        , moduleUnitId, unitIdFS )
+import Module           ( moduleName, moduleNameFS
+                        , moduleUnitId, unitIdFS, getModule )
 import IfaceEnv         ( newGlobalBinder )
 import Name      hiding ( varName )
 import RdrName
@@ -63,10 +63,10 @@ For the generic representation we need to generate:
 \end{itemize}
 -}
 
-gen_Generic_binds :: GenericKind -> TyCon -> [Type] -> Module
+gen_Generic_binds :: GenericKind -> TyCon -> [Type]
                  -> TcM (LHsBinds RdrName, FamInst)
-gen_Generic_binds gk tc inst_tys mod = do
-  repTyInsts <- tc_mkRepFamInsts gk tc inst_tys mod
+gen_Generic_binds gk tc inst_tys = do
+  repTyInsts <- tc_mkRepFamInsts gk tc inst_tys
   return (mkBindsRep gk tc, repTyInsts)
 
 {-
@@ -354,13 +354,12 @@ mkBindsRep gk tycon =
 --       type Rep_D a b = ...representation type for D ...
 --------------------------------------------------------------------------------
 
-tc_mkRepFamInsts :: GenericKind -- Gen0 or Gen1
-               -> TyCon         -- The type to generate representation for
-               -> [Type]        -- The type(s) to which Generic(1) is applied
-                                -- in the generated instance
-               -> Module        -- Used as the location of the new RepTy
-               -> TcM (FamInst) -- Generated representation0 coercion
-tc_mkRepFamInsts gk tycon inst_tys mod =
+tc_mkRepFamInsts :: GenericKind   -- Gen0 or Gen1
+                 -> TyCon         -- The type to generate representation for
+                 -> [Type]        -- The type(s) to which Generic(1) is applied
+                                  -- in the generated instance
+                 -> TcM FamInst   -- Generated representation0 coercion
+tc_mkRepFamInsts gk tycon inst_tys =
        -- Consider the example input tycon `D`, where data D a b = D_ a
        -- Also consider `R:DInt`, where { data family D x y :: * -> *
        --                               ; data instance D Int a b = D_ a }
@@ -404,24 +403,26 @@ tc_mkRepFamInsts gk tycon inst_tys mod =
      ; repTy <- tc_mkRepTy gk_ tycon arg_ki
 
        -- `rep_name` is a name we generate for the synonym
-     ; rep_name <- let mkGen = case gk of Gen0 -> mkGenR; Gen1 -> mkGen1R
-                   in newGlobalBinder mod (mkGen (nameOccName (tyConName tycon)))
-                        (nameSrcSpan (tyConName tycon))
+     ; mod <- getModule
+     ; loc <- getSrcSpanM
+     ; let tc_occ  = nameOccName (tyConName tycon)
+           rep_occ = case gk of Gen0 -> mkGenR tc_occ; Gen1 -> mkGen1R tc_occ
+     ; rep_name <- newGlobalBinder mod rep_occ loc
 
        -- We make sure to substitute the tyvars with their user-supplied
        -- type arguments before generating the Rep/Rep1 instance, since some
        -- of the tyvars might have been instantiated when deriving.
        -- See Note [Generating a correctly typed Rep instance].
-     ; let env      = zipTyEnv tyvars inst_args
-           in_scope = mkInScopeSet (tyCoVarsOfTypes inst_tys)
-           subst    = mkTvSubst in_scope env
-           repTy'   = substTy  subst repTy
-           tcv' = tyCoVarsOfTypeList inst_ty
+     ; let env        = zipTyEnv tyvars inst_args
+           in_scope   = mkInScopeSet (tyCoVarsOfTypes inst_tys)
+           subst      = mkTvSubst in_scope env
+           repTy'     = substTy  subst repTy
+           tcv'       = tyCoVarsOfTypeList inst_ty
            (tv', cv') = partition isTyVar tcv'
-           tvs'     = toposortTyVars tv'
-           cvs'     = toposortTyVars cv'
-           axiom    = mkSingleCoAxiom Nominal rep_name tvs' cvs'
-                                      fam_tc inst_tys repTy'
+           tvs'       = toposortTyVars tv'
+           cvs'       = toposortTyVars cv'
+           axiom      = mkSingleCoAxiom Nominal rep_name tvs' cvs'
+                                        fam_tc inst_tys repTy'
 
      ; newFamInst SynFamilyInst axiom  }
 

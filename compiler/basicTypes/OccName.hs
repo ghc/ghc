@@ -583,7 +583,7 @@ mkDataConWrapperOcc, mkWorkerOcc,
         mkClassDataConOcc, mkDictOcc,
         mkIPOcc, mkSpecOcc, mkForeignExportOcc, mkRepEqOcc,
         mkGenR, mkGen1R,
-        mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc, mkNewTyCoOcc,
+        mkDataConWorkerOcc, mkNewTyCoOcc,
         mkInstTyCoOcc, mkEqPredCoOcc, mkClassOpAuxOcc,
         mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
         mkTyConRepOcc
@@ -620,12 +620,6 @@ mkTyConRepOcc occ = mk_simple_deriv varName prefix occ
 -- Generic deriving mechanism
 mkGenR   = mk_simple_deriv tcName "Rep_"
 mkGen1R  = mk_simple_deriv tcName "Rep1_"
-
--- data T = MkT ... deriving( Data ) needs definitions for
---      $tT   :: Data.Generics.Basics.DataType
---      $cMkT :: Data.Generics.Basics.Constr
-mkDataTOcc = mk_simple_deriv varName  "$t"
-mkDataCOcc = mk_simple_deriv varName  "$c"
 
 -- Vectorisation
 mkVectOcc, mkVectTyConOcc, mkVectDataConOcc, mkVectIsoOcc,
@@ -683,8 +677,7 @@ mkLocalOcc uniq occ
 mkInstTyTcOcc :: String                 -- ^ Family name, e.g. @Map@
               -> OccSet                 -- ^ avoid these Occs
               -> OccName                -- ^ @R:Map@
-mkInstTyTcOcc str set =
-  chooseUniqueOcc tcName ('R' : ':' : str) set
+mkInstTyTcOcc str = chooseUniqueOcc tcName ('R' : ':' : str)
 
 mkDFunOcc :: String             -- ^ Typically the class and type glommed together e.g. @OrdMaybe@.
                                 -- Only used in debug mode, for extra clarity
@@ -701,6 +694,16 @@ mkDFunOcc info_str is_boot set
   where
     prefix | is_boot   = "$fx"
            | otherwise = "$f"
+
+mkDataTOcc, mkDataCOcc
+  :: OccName            -- ^ TyCon or data con string
+  -> OccSet             -- ^ avoid these Occs
+  -> OccName            -- ^ E.g. @$f3OrdMaybe@
+-- data T = MkT ... deriving( Data ) needs definitions for
+--      $tT   :: Data.Generics.Basics.DataType
+--      $cMkT :: Data.Generics.Basics.Constr
+mkDataTOcc occ = chooseUniqueOcc VarName ("$t" ++ occNameString occ)
+mkDataCOcc occ = chooseUniqueOcc VarName ("$c" ++ occNameString occ)
 
 {-
 Sometimes we need to pick an OccName that has not already been used,

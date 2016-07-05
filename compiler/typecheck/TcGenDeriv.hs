@@ -30,9 +30,14 @@ module TcGenDeriv (
 
 #include "HsVersions.h"
 
+
+import LoadIface( loadInterfaceForName )
+import HscTypes( lookupFixity, mi_fix )
+import TcRnMonad
 import HsSyn
 import RdrName
 import BasicTypes
+import Module( getModule )
 import DataCon
 import Name
 import Fingerprint
@@ -108,27 +113,51 @@ is willing to support it. The canDeriveAnyClass function checks if this is
 the case.
 -}
 
-hasBuiltinDeriving :: DynFlags
-                   -> (Name -> Fixity)
-                   -> Class
+hasBuiltinDeriving :: Class
                    -> Maybe (SrcSpan
                              -> TyCon
-                             -> (LHsBinds RdrName, BagDerivStuff))
-hasBuiltinDeriving dflags fix_env clas = assocMaybe gen_list (getUnique clas)
+                             -> TcM (LHsBinds RdrName, BagDerivStuff))
+hasBuiltinDeriving clas
+  = assocMaybe gen_list (getUnique clas)
   where
-    gen_list :: [(Unique, SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff))]
-    gen_list = [ (eqClassKey,          gen_Eq_binds)
-               , (ordClassKey,         gen_Ord_binds)
-               , (enumClassKey,        gen_Enum_binds)
-               , (boundedClassKey,     gen_Bounded_binds)
-               , (ixClassKey,          gen_Ix_binds)
-               , (showClassKey,        gen_Show_binds fix_env)
-               , (readClassKey,        gen_Read_binds fix_env)
-               , (dataClassKey,        gen_Data_binds dflags)
-               , (functorClassKey,     gen_Functor_binds)
-               , (foldableClassKey,    gen_Foldable_binds)
-               , (traversableClassKey, gen_Traversable_binds)
-               , (liftClassKey,        gen_Lift_binds) ]
+    gen_list :: [(Unique, SrcSpan -> TyCon -> TcM (LHsBinds RdrName, BagDerivStuff))]
+    gen_list = [ (eqClassKey,          simple gen_Eq_binds)
+               , (ordClassKey,         simple gen_Ord_binds)
+               , (enumClassKey,        simple gen_Enum_binds)
+               , (boundedClassKey,     simple gen_Bounded_binds)
+               , (ixClassKey,          simple gen_Ix_binds)
+               , (showClassKey,        with_fix_env gen_Show_binds)
+               , (readClassKey,        with_fix_env gen_Read_binds)
+               , (dataClassKey,        gen_Data_binds)
+               , (functorClassKey,     simple gen_Functor_binds)
+               , (foldableClassKey,    simple gen_Foldable_binds)
+               , (traversableClassKey, simple gen_Traversable_binds)
+               , (liftClassKey,        simple gen_Lift_binds) ]
+
+    simple gen_fn loc tc
+      = return (gen_fn loc tc)
+
+    with_fix_env gen_fn loc tc
+      = do { fix_env <- getDataConFixityFun tc
+           ; return (gen_fn fix_env loc tc) }
+
+getDataConFixityFun :: TyCon -> TcM (Name -> Fixity)
+-- If the TyCon is locally defined, we want the local fixity env;
+-- but if it is imported (which happens for standalone deriving)
+-- we need to get the fixity env from the interface file
+-- c.f. RnEnv.lookupFixity, and Trac #9830
+getDataConFixityFun tc
+  = do { this_mod <- getModule
+       ; if nameIsLocalOrFrom this_mod name
+         then do { fix_env <- getFixityEnv
+                 ; return (lookupFixity fix_env) }
+         else do { iface <- loadInterfaceForName doc name
+                            -- Should already be loaded!
+                 ; return (mi_fix iface . nameOccName) } }
+  where
+    name = tyConName tc
+    doc = text "Data con fixities for" <+> ppr name
+
 
 {-
 ************************************************************************
@@ -1273,57 +1302,71 @@ we generate
     dataCast2 = gcast2   -- if T :: * -> * -> *
 -}
 
-gen_Data_binds :: DynFlags
-               -> SrcSpan
+gen_Data_binds :: SrcSpan
                -> TyCon                 -- For data families, this is the
                                         --  *representation* TyCon
-               -> (LHsBinds RdrName,    -- The method bindings
-                   BagDerivStuff)       -- Auxiliary bindings
-gen_Data_binds dflags loc rep_tc
+               -> TcM (LHsBinds RdrName,    -- The method bindings
+                       BagDerivStuff)       -- Auxiliary bindings
+gen_Data_binds loc rep_tc
+  = do { dflags  <- getDynFlags
+
+       -- Make unique names for the data type and constructor
+       -- auxiliary bindings.  Start with the name of the TyCon/DataCon
+       -- but that might not be unique: see Trac #12245.
+       ; dt_occ  <- chooseUniqueOccTc (mkDataTOcc (getOccName rep_tc))
+       ; dc_occs <- mapM (chooseUniqueOccTc . mkDataCOcc . getOccName)
+                         (tyConDataCons rep_tc)
+       ; let dt_rdr  = mkRdrUnqual dt_occ
+             dc_rdrs = map mkRdrUnqual dc_occs
+
+       -- OK, now do the work
+       ; return (gen_data dflags dt_rdr dc_rdrs loc rep_tc) }
+
+gen_data :: DynFlags -> RdrName -> [RdrName]
+         -> SrcSpan -> TyCon
+         -> (LHsBinds RdrName,    -- The method bindings
+             BagDerivStuff)       -- Auxiliary bindings
+gen_data dflags data_type_name constr_names loc rep_tc
   = (listToBag [gfoldl_bind, gunfold_bind, toCon_bind, dataTypeOf_bind]
      `unionBags` gcast_binds,
                 -- Auxiliary definitions: the data type and constructors
-     listToBag ( DerivHsBind (genDataTyCon)
-               : map (DerivHsBind . genDataDataCon) data_cons))
+     listToBag ( genDataTyCon
+               : zipWith genDataDataCon data_cons constr_names ) )
   where
     data_cons  = tyConDataCons rep_tc
     n_cons     = length data_cons
     one_constr = n_cons == 1
-
-    genDataTyCon :: (LHsBind RdrName, LSig RdrName)
+    genDataTyCon :: DerivStuff
     genDataTyCon        --  $dT
-      = (mkHsVarBind loc rdr_name rhs,
-         L loc (TypeSig [L loc rdr_name] sig_ty))
-      where
-        rdr_name = mk_data_type_name rep_tc
-        sig_ty   = mkLHsSigWcType (nlHsTyVar dataType_RDR)
-        constrs  = [nlHsVar (mk_constr_name con) | con <- tyConDataCons rep_tc]
-        rhs = nlHsVar mkDataType_RDR
-              `nlHsApp` nlHsLit (mkHsString (showSDocOneLine dflags (ppr rep_tc)))
-              `nlHsApp` nlList constrs
+      = DerivHsBind (mkHsVarBind loc data_type_name rhs,
+                     L loc (TypeSig [L loc data_type_name] sig_ty))
 
-    genDataDataCon :: DataCon -> (LHsBind RdrName, LSig RdrName)
-    genDataDataCon dc       --  $cT1 etc
-      = (mkHsVarBind loc rdr_name rhs,
-         L loc (TypeSig [L loc rdr_name] sig_ty))
+    sig_ty = mkLHsSigWcType (nlHsTyVar dataType_RDR)
+    rhs    = nlHsVar mkDataType_RDR
+             `nlHsApp` nlHsLit (mkHsString (showSDocOneLine dflags (ppr rep_tc)))
+             `nlHsApp` nlList (map nlHsVar constr_names)
+
+    genDataDataCon :: DataCon -> RdrName -> DerivStuff
+    genDataDataCon dc constr_name       --  $cT1 etc
+      = DerivHsBind (mkHsVarBind loc constr_name rhs,
+                     L loc (TypeSig [L loc constr_name] sig_ty))
       where
-        rdr_name = mk_constr_name dc
         sig_ty   = mkLHsSigWcType (nlHsTyVar constr_RDR)
         rhs      = nlHsApps mkConstr_RDR constr_args
 
         constr_args
-           = [ -- nlHsIntLit (toInteger (dataConTag dc)), -- Tag
-           nlHsVar (mk_data_type_name (dataConTyCon dc)), -- DataType
-           nlHsLit (mkHsString (occNameString dc_occ)),   -- String name
-               nlList  labels,                            -- Field labels
-           nlHsVar fixity]                                -- Fixity
+           = [ -- nlHsIntLit (toInteger (dataConTag dc)),   -- Tag
+               nlHsVar (data_type_name)                     -- DataType
+             , nlHsLit (mkHsString (occNameString dc_occ))  -- String name
+             , nlList  labels                               -- Field labels
+             , nlHsVar fixity ]                             -- Fixity
 
         labels   = map (nlHsLit . mkHsString . unpackFS . flLabel)
                        (dataConFieldLabels dc)
         dc_occ   = getOccName dc
         is_infix = isDataSymOcc dc_occ
         fixity | is_infix  = infix_RDR
-           | otherwise = prefix_RDR
+               | otherwise = prefix_RDR
 
         ------------ gfoldl
     gfoldl_bind = mk_HRFunBind 2 loc gfoldl_RDR (map gfoldl_eqn data_cons)
@@ -1362,15 +1405,15 @@ gen_Data_binds dflags loc rep_tc
         tag = dataConTag dc
 
         ------------ toConstr
-    toCon_bind = mk_FunBind loc toConstr_RDR (map to_con_eqn data_cons)
-    to_con_eqn dc = ([nlWildConPat dc], nlHsVar (mk_constr_name dc))
+    toCon_bind = mk_FunBind loc toConstr_RDR (zipWith to_con_eqn data_cons constr_names)
+    to_con_eqn dc con_name = ([nlWildConPat dc], nlHsVar con_name)
 
         ------------ dataTypeOf
     dataTypeOf_bind = mk_easy_FunBind
                         loc
                         dataTypeOf_RDR
                         [nlWildPat]
-                        (nlHsVar (mk_data_type_name rep_tc))
+                        (nlHsVar data_type_name)
 
         ------------ gcast1/2
         -- Make the binding    dataCast1 x = gcast1 x  -- if T :: * -> *
@@ -2326,12 +2369,6 @@ genAuxBinds loc b = genAuxBinds' b2 where
   add1 x (a,b,c) = (x `consBag` a,b,c)
   add2 x (a,b,c) = (a,x `consBag` b,c)
   add3 x (a,b,c) = (a,b,x `consBag` c)
-
-mk_data_type_name :: TyCon -> RdrName   -- "$tT"
-mk_data_type_name tycon = mkAuxBinderName (tyConName tycon) mkDataTOcc
-
-mk_constr_name :: DataCon -> RdrName    -- "$cC"
-mk_constr_name con = mkAuxBinderName (dataConName con) mkDataCOcc
 
 mkParentType :: TyCon -> Type
 -- Turn the representation tycon of a family into
