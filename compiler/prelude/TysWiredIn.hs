@@ -95,6 +95,7 @@ import TyCon
 import Class            ( Class, mkClass )
 import TypeRep
 import RdrName
+import UniqFM
 import Name
 import NameSet          ( NameSet, mkNameSet, elemNameSet )
 import BasicTypes       ( Arity, RecFlag(..), Boxity(..),
@@ -364,39 +365,36 @@ Note [How tuples work]  See also Note [Known-key names] in PrelNames
   are not serialised into interface files using OccNames at all.
 -}
 
-isBuiltInOcc_maybe :: OccName -> Maybe Name
--- Built in syntax isn't "in scope" so these OccNames
--- map to wired-in Names with BuiltInSyntax
-isBuiltInOcc_maybe occ
-  = case occNameString occ of
-        "[]"             -> choose_ns listTyConName nilDataConName
-        ":"              -> Just consDataConName
-        "[::]"           -> Just parrTyConName
-        "()"             -> tup_name Boxed      0
-        "(##)"           -> tup_name Unboxed    0
-        '(':',':rest     -> parse_tuple Boxed   2 rest
-        '(':'#':',':rest -> parse_tuple Unboxed 2 rest
-        _other           -> Nothing
+builtInOccNames :: UniqFM (OccName -> Name)
+builtInOccNames = listToUFM $
+    [ (fsLit "[]",    choose_ns listTyConName nilDataConName)
+    , (fsLit ":" ,    const consDataConName)
+    , (fsLit "[::]",  const parrTyConName)
+    , (fsLit "()",    tup_name Boxed 0)
+    , (fsLit "(##)",  tup_name Unboxed 0)
+    ] ++
+    [ (fsLit $ "("++replicate n ','++")", tup_name Boxed (n+1)) | n <- [1..62] ] ++
+    [ (fsLit $ "(#"++replicate n ','++"#)", tup_name Unboxed (n+1)) | n <- [1..62] ]
   where
-    ns = occNameSpace occ
-
-    parse_tuple sort n rest
-      | (',' : rest2) <- rest   = parse_tuple sort (n+1) rest2
-      | tail_matches sort rest  = tup_name sort n
-      | otherwise               = Nothing
-
-    tail_matches Boxed   ")" = True
-    tail_matches Unboxed "#)" = True
-    tail_matches _       _    = False
+    choose_ns :: Name -> Name -> OccName -> Name
+    choose_ns tc dc occ
+      | isTcClsNameSpace ns   = tc
+      | isDataConNameSpace ns = dc
+      | otherwise             = pprPanic "tup_name" (ppr occ)
+      where ns = occNameSpace occ
 
     tup_name boxity arity
       = choose_ns (getName (tupleTyCon   boxity arity))
                   (getName (tupleDataCon boxity arity))
 
-    choose_ns tc dc
-      | isTcClsNameSpace ns   = Just tc
-      | isDataConNameSpace ns = Just dc
-      | otherwise             = pprPanic "tup_name" (ppr occ)
+
+isBuiltInOcc_maybe :: OccName -> Maybe Name
+-- Built in syntax isn't "in scope" so these OccNames
+-- map to wired-in Names with BuiltInSyntax
+isBuiltInOcc_maybe occ
+  = case lookupUFM builtInOccNames occ of
+      Just f  -> Just (f occ)
+      Nothing -> Nothing
 
 mkTupleOcc :: NameSpace -> Boxity -> Arity -> OccName
 mkTupleOcc ns sort ar = mkOccName ns str
