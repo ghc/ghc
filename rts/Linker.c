@@ -1477,13 +1477,10 @@ void ghci_find(SymbolAddr *addr)
             Section *section = &oc->sections[i];
             if (addr > section->start &&
                 (StgWord)addr < (StgWord)section->start+section->size) {
-                debugBelch("%p is in ", addr);
-                if (oc->archiveMemberName) {
-                    debugBelch("%s", oc->archiveMemberName);
-                } else {
-                    debugBelch("%" PATH_FMT, oc->fileName);
-                }
-                debugBelch(", section %d, offset %" FMT_Word "\n", i,
+                debugBelch("%p is in %" PATH_FMT, addr,
+                           oc->archiveMemberName ?
+                             oc->archiveMemberName : oc->fileName);
+                debugBelch(", section %d, offset %lx\n", i,
                            (StgWord)addr - (StgWord)section->start);
             }
         }
