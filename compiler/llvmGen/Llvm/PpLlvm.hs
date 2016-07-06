@@ -73,7 +73,7 @@ ppLlvmGlobal (LMGlobal var@(LMGlobalVar _ _ link x a c) dat) =
             Nothing -> empty
 
         rhs = case dat of
-            Just stat -> ppr stat
+            Just stat -> pprSpecialStatic stat
             Nothing   -> ppr (pLower $ getVarType var)
 
         -- Position of linkage is different for aliases.

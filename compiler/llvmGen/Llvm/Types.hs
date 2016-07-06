@@ -175,6 +175,14 @@ instance Outputable LlvmStatic where
   ppr (LMSub s1 s2)
       = pprStaticArith s1 s2 (sLit "sub") (sLit "fsub") "LMSub"
 
+
+pprSpecialStatic :: LlvmStatic -> SDoc
+pprSpecialStatic (LMBitc v t) =
+    ppr (pLower t) <> text ", bitcast (" <> ppr v <> text " to " <> ppr t
+        <> char ')'
+pprSpecialStatic stat = ppr stat
+
+
 pprStaticArith :: LlvmStatic -> LlvmStatic -> LitString -> LitString -> String -> SDoc
 pprStaticArith s1 s2 int_op float_op op_name =
   let ty1 = getStatType s1
