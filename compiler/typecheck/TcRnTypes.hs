@@ -502,8 +502,11 @@ data TcGblEnv
         tcg_th_topnames :: TcRef NameSet,
         -- ^ Exact names bound in top-level declarations in tcg_th_topdecls
 
-        tcg_th_modfinalizers :: TcRef [TH.Q ()],
-        -- ^ Template Haskell module finalizers
+        tcg_th_modfinalizers :: TcRef [TcM ()],
+        -- ^ Template Haskell module finalizers.
+        --
+        -- They are computations in the @TcM@ monad rather than @Q@ because we
+        -- set them to use particular local environments.
 
         tcg_th_state :: TcRef (Map TypeRep Dynamic),
         tcg_th_remote_state :: TcRef (Maybe (ForeignRef (IORef QState))),
@@ -788,6 +791,25 @@ data ThStage    -- See Note [Template Haskell state diagram] in TcSplice
                       --   the result replaces the splice
                       -- Binding level = 0
 
+#ifdef GHCI
+  | RunSplice (TcRef [ForeignRef (TH.Q ())])
+      -- Set when running a splice, i.e. NOT when renaming or typechecking the
+      -- Haskell code for the splice. See Note [RunSplice ThLevel].
+      --
+      -- Contains a list of mod finalizers collected while executing the splice.
+      --
+      -- 'addModFinalizer' inserts finalizers here, and from here they are taken
+      -- to construct an @HsSpliced@ annotation for untyped splices. See Note
+      -- [Delaying modFinalizers in untyped splices] in "RnSplice".
+      --
+      -- For typed splices, the typechecker takes finalizers from here and
+      -- inserts them in the list of finalizers in the global environment.
+      --
+      -- See Note [Collecting modFinalizers in typed splices] in "TcSplice".
+#else
+  | RunSplice ()
+#endif
+
   | Comp        -- Ordinary Haskell code
                 -- Binding level = 1
 
@@ -811,9 +833,10 @@ topAnnStage    = Splice Untyped
 topSpliceStage = Splice Untyped
 
 instance Outputable ThStage where
-   ppr (Splice _)  = text "Splice"
-   ppr Comp        = text "Comp"
-   ppr (Brack s _) = text "Brack" <> parens (ppr s)
+   ppr (Splice _)    = text "Splice"
+   ppr (RunSplice _) = text "RunSplice"
+   ppr Comp          = text "Comp"
+   ppr (Brack s _)   = text "Brack" <> parens (ppr s)
 
 type ThLevel = Int
     -- NB: see Note [Template Haskell levels] in TcSplice
@@ -827,9 +850,25 @@ impLevel = 0    -- Imported things; they can be used inside a top level splice
 outerLevel = 1  -- Things defined outside brackets
 
 thLevel :: ThStage -> ThLevel
-thLevel (Splice _)  = 0
-thLevel Comp        = 1
-thLevel (Brack s _) = thLevel s + 1
+thLevel (Splice _)    = 0
+thLevel (RunSplice _) =
+    -- See Note [RunSplice ThLevel].
+    panic "thLevel: called when running a splice"
+thLevel Comp          = 1
+thLevel (Brack s _)   = thLevel s + 1
+
+{- Node [RunSplice ThLevel]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'RunSplice' stage is set when executing a splice, and only when running a
+splice. In particular it is not set when the splice is renamed or typechecked.
+
+'RunSplice' is needed to provide a reference where 'addModFinalizer' can insert
+the finalizer (see Note [Delaying modFinalizers in untyped splices]), and
+'addModFinalizer' runs when doing Q things. Therefore, It doesn't make sense to
+set 'RunSplice' when renaming or typechecking the splice, where 'Splice', 'Brak'
+or 'Comp' are used instead.
+
+-}
 
 ---------------------------
 -- Arrow-notation context

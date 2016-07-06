@@ -53,7 +53,7 @@ serv verbose pipe@Pipe{..} restore = loop
     case msg of
       Shutdown -> return ()
       RunTH st q ty loc -> wrapRunTH $ runTH pipe st q ty loc
-      FinishTH st -> wrapRunTH $ finishTH pipe st
+      RunModFinalizers st qrefs -> wrapRunTH $ runModFinalizerRefs pipe st qrefs
       _other -> run msg >>= reply
 
   reply :: forall a. (Binary a, Show a) => a -> IO ()

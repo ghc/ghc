@@ -458,6 +458,10 @@ addTopDecls ds = Q (qAddTopDecls ds)
 
 -- | Add a finalizer that will run in the Q monad after the current module has
 -- been type checked. This only makes sense when run within a top-level splice.
+--
+-- The finalizer is given the local type environment at the splice point. Thus
+-- 'reify' is able to find the local definitions when executed inside the
+-- finalizer.
 addModFinalizer :: Q () -> Q ()
 addModFinalizer act = Q (qAddModFinalizer (unQ act))
 

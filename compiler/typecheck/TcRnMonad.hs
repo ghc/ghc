@@ -106,6 +106,7 @@ module TcRnMonad(
   -- * Template Haskell context
   recordThUse, recordThSpliceUse, recordTopLevelSpliceLoc,
   getTopLevelSpliceLocs, keepAlive, getStage, getStageAndBindLevel, setStage,
+  addModFinalizersWithLclEnv,
 
   -- * Safe Haskell context
   recordUnsafeInfer, finalSafeMode, fixSafeInstances,
@@ -174,6 +175,7 @@ import Data.Set ( Set )
 import qualified Data.Set as Set
 
 #ifdef GHCI
+import {-# SOURCE #-} TcSplice ( runRemoteModFinalizers )
 import qualified Data.Map as Map
 #endif
 
@@ -1528,6 +1530,21 @@ getStageAndBindLevel name
 
 setStage :: ThStage -> TcM a -> TcRn a
 setStage s = updLclEnv (\ env -> env { tcl_th_ctxt = s })
+
+#ifdef GHCI
+-- | Adds the given modFinalizers to the global environment and set them to use
+-- the current local environment.
+addModFinalizersWithLclEnv :: ThModFinalizers -> TcM ()
+addModFinalizersWithLclEnv mod_finalizers
+  = do lcl_env <- getLclEnv
+       th_modfinalizers_var <- fmap tcg_th_modfinalizers getGblEnv
+       updTcRef th_modfinalizers_var $ \fins ->
+         setLclEnv lcl_env (runRemoteModFinalizers mod_finalizers)
+         : fins
+#else
+addModFinalizersWithLclEnv :: ThModFinalizers -> TcM ()
+addModFinalizersWithLclEnv ThModFinalizers = return ()
+#endif
 
 {-
 ************************************************************************

@@ -45,7 +45,13 @@ import Type
 
 -- libraries:
 import Data.Data hiding (Fixity(..))
+import qualified Data.Data as Data (Fixity(..))
 import Data.Maybe (isNothing)
+
+#ifdef GHCI
+import GHCi.RemoteTypes ( ForeignRef )
+import qualified Language.Haskell.TH as TH (Q)
+#endif
 
 {-
 ************************************************************************
@@ -1926,11 +1932,54 @@ data HsSplice id
         SrcSpan          -- The span of the enclosed string
         FastString       -- The enclosed string
 
+   | HsSpliced  -- See Note [Delaying modFinalizers in untyped splices] in
+                -- RnSplice.
+                -- This is the result of splicing a splice. It is produced by
+                -- the renamer and consumed by the typechecker. It lives only
+                -- between the two.
+        ThModFinalizers     -- TH finalizers produced by the splice.
+        (HsSplicedThing id) -- The result of splicing
+  deriving Typeable
+
 deriving instance (DataId id) => Data (HsSplice id)
 
 isTypedSplice :: HsSplice id -> Bool
 isTypedSplice (HsTypedSplice {}) = True
 isTypedSplice _                  = False   -- Quasi-quotes are untyped splices
+
+-- | Finalizers produced by a splice with
+-- 'Language.Haskell.TH.Syntax.addModFinalizer'
+--
+-- See Note [Delaying modFinalizers in untyped splices] in RnSplice. For how
+-- this is used.
+--
+#ifdef GHCI
+newtype ThModFinalizers = ThModFinalizers [ForeignRef (TH.Q ())]
+#else
+data ThModFinalizers = ThModFinalizers
+#endif
+
+-- A Data instance which ignores the argument of 'ThModFinalizers'.
+#ifdef GHCI
+instance Data ThModFinalizers where
+  gunfold _ z _ = z $ ThModFinalizers []
+  toConstr  a   = mkConstr (dataTypeOf a) "ThModFinalizers" [] Data.Prefix
+  dataTypeOf a  = mkDataType "HsExpr.ThModFinalizers" [toConstr a]
+#else
+instance Data ThModFinalizers where
+  gunfold _ z _ = z ThModFinalizers
+  toConstr  a   = mkConstr (dataTypeOf a) "ThModFinalizers" [] Data.Prefix
+  dataTypeOf a  = mkDataType "HsExpr.ThModFinalizers" [toConstr a]
+#endif
+
+-- | Values that can result from running a splice.
+data HsSplicedThing id
+    = HsSplicedExpr (HsExpr id)
+    | HsSplicedTy   (HsType id)
+    | HsSplicedPat  (Pat id)
+  deriving Typeable
+
+deriving instance (DataId id) => Data (HsSplicedThing id)
 
 -- See Note [Pending Splices]
 type SplicePointName = Name
@@ -2015,6 +2064,11 @@ splices. In contrast, when pretty printing the output of the type checker, we
 sense, although I hate to add another constructor to HsExpr.
 -}
 
+instance OutputableBndrId id => Outputable (HsSplicedThing id) where
+  ppr (HsSplicedExpr e) = ppr_expr e
+  ppr (HsSplicedTy   t) = ppr t
+  ppr (HsSplicedPat  p) = ppr p
+
 instance (OutputableBndrId id) => Outputable (HsSplice id) where
   ppr s = pprSplice s
 
@@ -2026,6 +2080,7 @@ pprSplice :: (OutputableBndrId id) => HsSplice id -> SDoc
 pprSplice (HsTypedSplice   n e)  = ppr_splice (text "$$") n e
 pprSplice (HsUntypedSplice n e)  = ppr_splice (text "$")  n e
 pprSplice (HsQuasiQuote n q _ s) = ppr_quasi n q s
+pprSplice (HsSpliced _ thing)    = ppr thing
 
 ppr_quasi :: OutputableBndr id => id -> id -> FastString -> SDoc
 ppr_quasi n quoter quote = ifPprDebug (brackets (ppr n)) <>

@@ -501,6 +501,18 @@ tc_hs_type _ ty@(HsRecTy _)      _
       -- signatures) should have been removed by now
     = failWithTc (text "Record syntax is illegal here:" <+> ppr ty)
 
+-- HsSpliced is an annotation produced by 'RnSplice.rnSpliceType'.
+-- Here we get rid of it and add the finalizers to the global environment
+-- while capturing the local environment.
+--
+-- See Note [Delaying modFinalizers in untyped splices].
+tc_hs_type mode (HsSpliceTy (HsSpliced mod_finalizers (HsSplicedTy ty))
+                            _
+                )
+           exp_kind
+  = do addModFinalizersWithLclEnv mod_finalizers
+       tc_hs_type mode ty exp_kind
+
 -- This should never happen; type splices are expanded by the renamer
 tc_hs_type _ ty@(HsSpliceTy {}) _exp_kind
   = failWithTc (text "Unexpected type splice:" <+> ppr ty)
