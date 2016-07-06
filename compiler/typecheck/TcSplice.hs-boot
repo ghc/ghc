@@ -9,7 +9,7 @@ import TcType   ( ExpRhoType )
 import Annotations ( Annotation, CoreAnnTarget )
 
 #ifdef GHCI
-import HsSyn      ( LHsType, LPat, LHsDecl )
+import HsSyn      ( LHsType, LPat, LHsDecl, ThModFinalizers )
 import RdrName    ( RdrName )
 import TcRnTypes  ( SpliceType )
 import qualified Language.Haskell.TH as TH
@@ -39,5 +39,6 @@ runMetaD :: LHsExpr TcId -> TcM [LHsDecl RdrName]
 
 lookupThName_maybe :: TH.Name -> TcM (Maybe Name)
 runQuasi :: TH.Q a -> TcM a
+runRemoteModFinalizers :: ThModFinalizers -> TcM ()
 finishTH :: TcM ()
 #endif

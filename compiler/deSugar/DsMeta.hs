@@ -1046,6 +1046,7 @@ repSplice :: HsSplice Name -> DsM (Core a)
 repSplice (HsTypedSplice   n _)  = rep_splice n
 repSplice (HsUntypedSplice n _)  = rep_splice n
 repSplice (HsQuasiQuote n _ _ _) = rep_splice n
+repSplice e@(HsSpliced _ _)      = pprPanic "repSplice" (ppr e)
 
 rep_splice :: Name -> DsM (Core a)
 rep_splice splice_name

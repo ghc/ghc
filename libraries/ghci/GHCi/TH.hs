@@ -5,7 +5,12 @@
 -- |
 -- Running TH splices
 --
-module GHCi.TH (startTH, finishTH, runTH, GHCiQException(..)) where
+module GHCi.TH
+  ( startTH
+  , runModFinalizerRefs
+  , runTH
+  , GHCiQException(..)
+  ) where
 
 import GHCi.Message
 import GHCi.RemoteTypes
@@ -30,14 +35,7 @@ import qualified Language.Haskell.TH.Syntax as TH
 import Unsafe.Coerce
 
 initQState :: Pipe -> QState
-initQState p = QState M.empty [] Nothing p
-
-runModFinalizers :: GHCiQ ()
-runModFinalizers = go =<< getState
-  where
-    go s | (f:ff) <- qsFinalizers s = do
-      putState (s { qsFinalizers = ff}) >> TH.runQ f >> getState >>= go
-    go _ = return ()
+initQState p = QState M.empty Nothing p
 
 newtype GHCiQ a = GHCiQ { runGHCiQ :: QState -> IO (a, QState) }
 
@@ -69,9 +67,6 @@ instance Fail.MonadFail GHCiQ where
 
 getState :: GHCiQ QState
 getState = GHCiQ $ \s -> return (s,s)
-
-putState :: QState -> GHCiQ ()
-putState s = GHCiQ $ \_ -> return ((),s)
 
 noLoc :: TH.Loc
 noLoc = TH.Loc "<no file>" "<no package>" "<no module>" (0,0) (0,0)
@@ -116,8 +111,8 @@ instance TH.Quasi GHCiQ where
   qRunIO m = GHCiQ $ \s -> fmap (,s) m
   qAddDependentFile file = ghcCmd (AddDependentFile file)
   qAddTopDecls decls = ghcCmd (AddTopDecls decls)
-  qAddModFinalizer fin = GHCiQ $ \s ->
-    return ((), s { qsFinalizers = fin : qsFinalizers s })
+  qAddModFinalizer fin = GHCiQ (\s -> mkRemoteRef fin >>= return . (, s)) >>=
+                         ghcCmd . AddModFinalizer
   qGetQ = GHCiQ $ \s ->
     let lookup :: forall a. Typeable a => Map TypeRep Dynamic -> Maybe a
         lookup m = fromDynamic =<< M.lookup (typeOf (undefined::a)) m
@@ -132,11 +127,17 @@ startTH = do
   r <- newIORef (initQState (error "startTH: no pipe"))
   mkRemoteRef r
 
-finishTH :: Pipe -> RemoteRef (IORef QState) -> IO ()
-finishTH pipe rstate = do
+-- | Runs the mod finalizers.
+--
+-- The references must be created on the caller process.
+runModFinalizerRefs :: Pipe -> RemoteRef (IORef QState)
+                    -> [RemoteRef (TH.Q ())]
+                    -> IO ()
+runModFinalizerRefs pipe rstate qrefs = do
+  qs <- mapM localRef qrefs
   qstateref <- localRef rstate
   qstate <- readIORef qstateref
-  _ <- runGHCiQ runModFinalizers qstate { qsPipe = pipe }
+  _ <- runGHCiQ (TH.runQ $ sequence_ qs) qstate { qsPipe = pipe }
   return ()
 
 runTH

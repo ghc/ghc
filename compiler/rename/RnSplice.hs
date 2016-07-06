@@ -46,7 +46,17 @@ import THNames          ( quoteExpName, quotePatName, quoteDecName, quoteTypeNam
                         , decsQTyConName, expQTyConName, patQTyConName, typeQTyConName, )
 
 import {-# SOURCE #-} TcExpr   ( tcPolyExpr )
-import {-# SOURCE #-} TcSplice ( runMetaD, runMetaE, runMetaP, runMetaT, tcTopSpliceExpr )
+import {-# SOURCE #-} TcSplice
+    ( runMetaD
+    , runMetaE
+    , runMetaP
+    , runMetaT
+    , runRemoteModFinalizers
+    , tcTopSpliceExpr
+    )
+
+import GHCi.RemoteTypes ( ForeignRef )
+import qualified Language.Haskell.TH as TH (Q)
 #endif
 
 import qualified GHC.LanguageExtensions as LangExt
@@ -77,6 +87,10 @@ rnBracket e br_body
                                        illegalUntypedBracket
            ; Splice Untyped -> checkTc (not (isTypedBracket br_body))
                                        illegalTypedBracket
+           ; RunSplice _    ->
+               -- See Note [RunSplice ThLevel] in "TcRnTypes".
+               pprPanic "rnBracket: Renaming bracket when running a splice"
+                        (ppr e)
            ; Comp           -> return ()
            ; Brack {}       -> failWithTc illegalBracket
            }
@@ -278,12 +292,17 @@ rnSpliceGen run_splice pend_splice splice
                    else Untyped
 
 ------------------
+
+-- | Returns the result of running a splice and the modFinalizers collected
+-- during the execution.
+--
+-- See Note [Delaying modFinalizers in untyped splices].
 runRnSplice :: UntypedSpliceFlavour
             -> (LHsExpr Id -> TcRn res)
             -> (res -> SDoc)    -- How to pretty-print res
                                 -- Usually just ppr, but not for [Decl]
             -> HsSplice Name    -- Always untyped
-            -> TcRn res
+            -> TcRn (res, [ForeignRef (TH.Q ())])
 runRnSplice flavour run_meta ppr_res splice
   = do { splice' <- getHooked runRnSpliceHook return >>= ($ splice)
 
@@ -291,6 +310,7 @@ runRnSplice flavour run_meta ppr_res splice
                   HsUntypedSplice _ e     ->  e
                   HsQuasiQuote _ q qs str -> mkQuasiQuoteExpr flavour q qs str
                   HsTypedSplice {}        -> pprPanic "runRnSplice" (ppr splice)
+                  HsSpliced {}            -> pprPanic "runRnSplice" (ppr splice)
 
              -- Typecheck the expression
        ; meta_exp_ty   <- tcMetaTy meta_ty_name
@@ -298,13 +318,16 @@ runRnSplice flavour run_meta ppr_res splice
                           tcPolyExpr the_expr meta_exp_ty
 
              -- Run the expression
-       ; result <- run_meta zonked_q_expr
+       ; mod_finalizers_ref <- newTcRef []
+       ; result <- setStage (RunSplice mod_finalizers_ref) $
+                     run_meta zonked_q_expr
+       ; mod_finalizers <- readTcRef mod_finalizers_ref
        ; traceSplice (SpliceInfo { spliceDescription = what
                                  , spliceIsDecl      = is_decl
                                  , spliceSource      = Just the_expr
                                  , spliceGenerated   = ppr_res result })
 
-       ; return result }
+       ; return (result, mod_finalizers) }
 
   where
     meta_ty_name = case flavour of
@@ -330,6 +353,8 @@ makePending flavour (HsUntypedSplice n e)
 makePending flavour (HsQuasiQuote n quoter q_span quote)
   = PendingRnSplice flavour n (mkQuasiQuoteExpr flavour quoter q_span quote)
 makePending _ splice@(HsTypedSplice {})
+  = pprPanic "makePending" (ppr splice)
+makePending _ splice@(HsSpliced {})
   = pprPanic "makePending" (ppr splice)
 
 ------------------
@@ -380,6 +405,8 @@ rnSplice (HsQuasiQuote splice_name quoter q_loc quote)
 
         ; return (HsQuasiQuote splice_name' quoter' q_loc quote, unitFV quoter') }
 
+rnSplice splice@(HsSpliced {}) = pprPanic "rnSplice" (ppr splice)
+
 ---------------------
 rnSpliceExpr :: HsSplice RdrName -> RnM (HsExpr Name, FreeVars)
 rnSpliceExpr splice
@@ -402,11 +429,66 @@ rnSpliceExpr splice
 
            ; return (HsSpliceE rn_splice, lcl_names `plusFV` gbl_names) }
 
-      | otherwise  -- Run it here
+      | otherwise  -- Run it here, see Note [Running splices in the Renamer]
       = do { traceRn (text "rnSpliceExpr: untyped expression splice")
-           ; rn_expr <- runRnSplice UntypedExpSplice runMetaE ppr rn_splice
+           ; (rn_expr, mod_finalizers) <-
+                runRnSplice UntypedExpSplice runMetaE ppr rn_splice
            ; (lexpr3, fvs) <- checkNoErrs (rnLExpr rn_expr)
-           ; return (HsPar lexpr3, fvs)  }
+             -- See Note [Delaying modFinalizers in untyped splices].
+           ; return ( HsPar $ HsSpliceE
+                            . HsSpliced (ThModFinalizers mod_finalizers)
+                            . HsSplicedExpr <$>
+                            lexpr3
+                    , fvs)
+           }
+
+{- Note [Delaying modFinalizers in untyped splices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When splices run in the renamer, 'reify' does not have access to the local
+type environment (Trac #11832, [1]).
+
+For instance, in
+
+> let x = e in $(reify (mkName "x") >>= runIO . print >> [| return () |])
+
+'reify' cannot find @x@, because the local type environment is not yet
+populated. To address this, we allow 'reify' execution to be deferred with
+'addModFinalizer'.
+
+> let x = e in $(do addModFinalizer (reify (mkName "x") >>= runIO . print)
+                    [| return () |]
+                )
+
+The finalizer is run with the local type environment when type checking is
+complete.
+
+Since the local type environment is not available in the renamer, we annotate
+the tree at the splice point [2] with @HsSpliceE (HsSpliced finalizers e)@ where
+@e@ is the result of splicing and @finalizers@ are the finalizers that have been
+collected during evaluation of the splice [3]. In our example,
+
+> HsLet
+>   (x = e)
+>   (HsSpliceE $ HsSpliced [reify (mkName "x") >>= runIO . print]
+>                          (HsSplicedExpr $ return ())
+>   )
+
+When the typechecker finds the annotation, it inserts the finalizers in the
+global environment and exposes the current local environment to them [4, 5, 6].
+
+> addModFinalizersWithLclEnv [reify (mkName "x") >>= runIO . print]
+
+References:
+
+[1] https://ghc.haskell.org/trac/ghc/wiki/TemplateHaskell/Reify
+[2] 'rnSpliceExpr'
+[3] 'TcSplice.qAddModFinalizer'
+[4] 'TcExpr.tcExpr' ('HsSpliceE' ('HsSpliced' ...))
+[5] 'TcHsType.tc_hs_type' ('HsSpliceTy' ('HsSpliced' ...))
+[6] 'TcPat.tc_pat' ('SplicePat' ('HsSpliced' ...))
+
+-}
 
 ----------------------
 rnSpliceType :: HsSplice RdrName -> PostTc Name Kind
@@ -419,11 +501,18 @@ rnSpliceType splice k
 
     run_type_splice rn_splice
       = do { traceRn (text "rnSpliceType: untyped type splice")
-           ; hs_ty2 <- runRnSplice UntypedTypeSplice runMetaT ppr rn_splice
+           ; (hs_ty2, mod_finalizers) <-
+                runRnSplice UntypedTypeSplice runMetaT ppr rn_splice
            ; (hs_ty3, fvs) <- do { let doc = SpliceTypeCtx hs_ty2
                                  ; checkNoErrs $ rnLHsType doc hs_ty2 }
                                     -- checkNoErrs: see Note [Renamer errors]
-           ; return (HsParTy hs_ty3, fvs) }
+             -- See Note [Delaying modFinalizers in untyped splices].
+           ; return ( HsParTy $ flip HsSpliceTy k
+                              . HsSpliced (ThModFinalizers mod_finalizers)
+                              . HsSplicedTy <$>
+                              hs_ty3
+                    , fvs
+                    ) }
               -- Wrap the result of the splice in parens so that we don't
               -- lose the outermost location set by runQuasiQuote (#7918)
 
@@ -479,8 +568,15 @@ rnSplicePat splice
 
     run_pat_splice rn_splice
       = do { traceRn (text "rnSplicePat: untyped pattern splice")
-           ; pat <- runRnSplice UntypedPatSplice runMetaP ppr rn_splice
-           ; return (Left (ParPat pat), emptyFVs) }
+           ; (pat, mod_finalizers) <-
+                runRnSplice UntypedPatSplice runMetaP ppr rn_splice
+             -- See Note [Delaying modFinalizers in untyped splices].
+           ; return ( Left $ ParPat $ SplicePat
+                                    . HsSpliced (ThModFinalizers mod_finalizers)
+                                    . HsSplicedPat <$>
+                                    pat
+                    , emptyFVs
+                    ) }
               -- Wrap the result of the quasi-quoter in parens so that we don't
               -- lose the outermost location set by runQuasiQuote (#7918)
 
@@ -500,11 +596,27 @@ rnTopSpliceDecls splice
    = do  { (rn_splice, fvs) <- setStage (Splice Untyped) $
                                rnSplice splice
          ; traceRn (text "rnTopSpliceDecls: untyped declaration splice")
-         ; decls <- runRnSplice UntypedDeclSplice runMetaD ppr_decls rn_splice
+         ; (decls, mod_finalizers) <-
+              runRnSplice UntypedDeclSplice runMetaD ppr_decls rn_splice
+         ; add_mod_finalizers_now mod_finalizers
          ; return (decls,fvs) }
    where
      ppr_decls :: [LHsDecl RdrName] -> SDoc
      ppr_decls ds = vcat (map ppr ds)
+
+     -- Adds finalizers to the global environment instead of delaying them
+     -- to the type checker.
+     --
+     -- Declaration splices do not have an interesting local environment so
+     -- there is no point in delaying them.
+     --
+     -- See Note [Delaying modFinalizers in untyped splices].
+     add_mod_finalizers_now :: [ForeignRef (TH.Q ())] -> TcRn ()
+     add_mod_finalizers_now mod_finalizers = do
+       th_modfinalizers_var <- fmap tcg_th_modfinalizers getGblEnv
+       updTcRef th_modfinalizers_var $ \fins ->
+         runRemoteModFinalizers (ThModFinalizers mod_finalizers) : fins
+
 
 {-
 Note [rnSplicePat]
@@ -540,6 +652,7 @@ spliceCtxt splice
              HsUntypedSplice {} -> text "untyped splice:"
              HsTypedSplice   {} -> text "typed splice:"
              HsQuasiQuote    {} -> text "quasi-quotation:"
+             HsSpliced       {} -> text "spliced expression:"
 
 -- | The splice data to be logged
 data SpliceInfo

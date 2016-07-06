@@ -161,9 +161,6 @@ data Message a where
   -- | Start a new TH module, return a state token that should be
   StartTH :: Message (RemoteRef (IORef QState))
 
-  -- | Run TH module finalizers, and free the HValueRef
-  FinishTH :: RemoteRef (IORef QState) -> Message ()
-
   -- | Evaluate a TH computation.
   --
   -- Returns a ByteString, because we have to force the result
@@ -190,7 +187,13 @@ data Message a where
   ReifyModule :: TH.Module -> Message (THResult TH.ModuleInfo)
   ReifyConStrictness :: TH.Name -> Message (THResult [TH.DecidedStrictness])
 
+  -- | Run the given mod finalizers.
+  RunModFinalizers :: RemoteRef (IORef QState)
+                   -> [RemoteRef (TH.Q ())]
+                   -> Message (THResult ())
+
   AddDependentFile :: FilePath -> Message (THResult ())
+  AddModFinalizer :: RemoteRef (TH.Q ()) -> Message (THResult ())
   AddTopDecls :: [TH.Dec] -> Message (THResult ())
   IsExtEnabled :: Extension -> Message (THResult Bool)
   ExtsEnabled :: Message (THResult [Extension])
@@ -293,8 +296,6 @@ instance Binary THResultType
 data QState = QState
   { qsMap        :: Map TypeRep Dynamic
        -- ^ persistent data between splices in a module
-  , qsFinalizers :: [TH.Q ()]
-       -- ^ registered finalizers (in reverse order)
   , qsLocation   :: Maybe TH.Loc
        -- ^ location for current splice, if any
   , qsPipe :: Pipe
@@ -340,7 +341,7 @@ getMessage = do
       29 -> Msg <$> (BreakpointStatus <$> get <*> get)
       30 -> Msg <$> (GetBreakpointVar <$> get <*> get)
       31 -> Msg <$> return StartTH
-      32 -> Msg <$> FinishTH <$> get
+      -- 32 is missing
       33 -> Msg <$> (RunTH <$> get <*> get <*> get <*> get)
       34 -> Msg <$> NewName <$> get
       35 -> Msg <$> (Report <$> get <*> get)
@@ -360,6 +361,8 @@ getMessage = do
       49 -> Msg <$> EndRecover <$> get
       50 -> Msg <$> return QDone
       51 -> Msg <$> QException <$> get
+      52 -> Msg <$> (RunModFinalizers <$> get <*> get)
+      53 -> Msg <$> (AddModFinalizer <$> get)
       _  -> Msg <$> QFail <$> get
 
 putMessage :: Message a -> Put
@@ -396,7 +399,6 @@ putMessage m = case m of
   BreakpointStatus arr ix     -> putWord8 29 >> put arr >> put ix
   GetBreakpointVar a b        -> putWord8 30 >> put a >> put b
   StartTH                     -> putWord8 31
-  FinishTH val                -> putWord8 32 >> put val
   RunTH st q loc ty           -> putWord8 33 >> put st >> put q >> put loc >> put ty
   NewName a                   -> putWord8 34 >> put a
   Report a b                  -> putWord8 35 >> put a >> put b
@@ -416,7 +418,9 @@ putMessage m = case m of
   EndRecover a                -> putWord8 49 >> put a
   QDone                       -> putWord8 50
   QException a                -> putWord8 51 >> put a
-  QFail a                     -> putWord8 52  >> put a
+  RunModFinalizers a b        -> putWord8 52 >> put a >> put b
+  AddModFinalizer a           -> putWord8 53 >> put a
+  QFail a                     -> putWord8 54 >> put a
 
 -- -----------------------------------------------------------------------------
 -- Reading/writing messages

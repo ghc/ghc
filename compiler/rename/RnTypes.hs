@@ -1059,6 +1059,7 @@ collectAnonWildCards lty = go lty
       HsForAllTy { hst_body = ty } -> go ty
       HsQualTy { hst_ctxt = L _ ctxt
                , hst_body = ty }  -> gos ctxt `mappend` go ty
+      HsSpliceTy (HsSpliced _ (HsSplicedTy ty)) _ -> go $ L noSrcSpan ty
       -- HsQuasiQuoteTy, HsSpliceTy, HsCoreTy, HsTyLit
       _ -> mempty
 
