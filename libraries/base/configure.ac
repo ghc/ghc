@@ -192,14 +192,24 @@ FP_SEARCH_LIBS_PROTO(iconv,
                      [AC_MSG_ERROR([iconv is required on non-Windows platforms])])
 
 # If possible, we use libcharset instead of nl_langinfo(CODESET) to
-# determine the current locale's character encoding.
-FP_SEARCH_LIBS_PROTO(
+# determine the current locale's character encoding.  Allow the user
+# to disable this with --without-libcharset if they don't want a
+# dependency on libcharset.
+AC_ARG_WITH([libcharset],
+  [AS_HELP_STRING([--with-libcharset],
+    [Use libcharset [default=only if available]])],
+  [],
+  [with_libcharset=check])
+
+AS_IF([test "x$with_libcharset" != xno],
+  FP_SEARCH_LIBS_PROTO(
     [locale_charset],
     [#include <libcharset.h>],
     [const char* charset = locale_charset();],
     [charset],
     [AC_DEFINE([HAVE_LIBCHARSET], [1], [Define to 1 if you have libcharset.])
-     EXTRA_LIBS="$EXTRA_LIBS $ac_lib"])
+     EXTRA_LIBS="$EXTRA_LIBS $ac_lib"]
+  ))
 
 fi
 
