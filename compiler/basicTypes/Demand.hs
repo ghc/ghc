@@ -377,8 +377,7 @@ data Count = One | Many ManyReasons
 -- Pretty-printing
 instance Outputable ArgUse where
   ppr Abs              = char 'A'
-  ppr (Use (Many _) a) = ppr a
-  ppr (Use One  a)     = char '1' <> char '*' <> ppr a
+  ppr (Use c  a)       = ppr c <> char '*' <> ppr a
 
 instance Outputable UseDmd where
   ppr Used           = char 'U'
@@ -388,7 +387,7 @@ instance Outputable UseDmd where
 
 instance Outputable Count where
   ppr One  = char '1'
-  ppr (Many _) = text ""
+  ppr (Many mr) = text "ω" <> parens (hcat (punctuate (char ',') (map text mr)))
 
 useBot, useTop :: ArgUse
 useBot     = Abs
@@ -761,7 +760,7 @@ oneifyDmd jd                            = jd
 
 isTopDmd :: Demand -> Bool
 -- Used to suppress pretty-printing of an uninformative demand
-isTopDmd (JD {sd = Lazy, ud = Use (Many _) Used}) = True
+isTopDmd (JD {sd = Lazy, ud = Use (Many _) Used}) = False -- True
 isTopDmd _                                        = False
 
 isAbsDmd :: Demand -> Bool
