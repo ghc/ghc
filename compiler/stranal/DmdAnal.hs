@@ -62,10 +62,10 @@ dmdAnalTopBind :: AnalEnv
                -> CoreBind
                -> (AnalEnv, CoreBind)
 dmdAnalTopBind sigs (NonRec id rhs)
-  = (extendAnalEnv TopLevel sigs id sig, NonRec id2 rhs2)
+  = (extendAnalEnv TopLevel sigs id2 (idStrictness id2), NonRec id2 rhs2)
   where
-    (  _, _, _,   rhs1) = dmdAnalRhsLetDown TopLevel Nothing sigs             id rhs
-    (sig, _, id2, rhs2) = dmdAnalRhsLetDown TopLevel Nothing (nonVirgin sigs) id rhs1
+    ( _, _,   rhs1) = dmdAnalRhsLetDown TopLevel Nothing sigs             id rhs
+    ( _, id2, rhs2) = dmdAnalRhsLetDown TopLevel Nothing (nonVirgin sigs) id rhs1
         -- Do two passes to improve CPR information
         -- See Note [CPR for thunks]
         -- See Note [Optimistic CPR in the "virgin" case]
@@ -284,10 +284,11 @@ dmdAnal' env dmd (Let (NonRec id rhs) body)
 dmdAnal' env dmd (Let (NonRec id rhs) body)
   = (body_ty2, Let (NonRec id2 rhs') body')
   where
-    (sig, lazy_fv, id1, rhs') = dmdAnalRhsLetDown NotTopLevel Nothing env id rhs
-    (body_ty, body')          = dmdAnal (extendAnalEnv NotTopLevel env id sig) dmd body
-    (body_ty1, id2)           = annotateBndr env body_ty id1
-    body_ty2                  = addLazyFVs body_ty1 lazy_fv
+    (lazy_fv, id1, rhs') = dmdAnalRhsLetDown NotTopLevel Nothing env id rhs
+    env1                 = extendAnalEnv NotTopLevel env id1 (idStrictness id1)
+    (body_ty, body')     = dmdAnal env1 dmd body
+    (body_ty1, id2)      = annotateBndr env body_ty id1
+    body_ty2             = addLazyFVs body_ty1 lazy_fv -- see Note [Lazy and unleasheable free variables]
 
         -- If the actual demand is better than the vanilla call
         -- demand, you might think that we might do better to re-analyse
@@ -307,7 +308,7 @@ dmdAnal' env dmd (Let (Rec pairs) body)
         (env', lazy_fv, pairs') = dmdFix NotTopLevel env pairs
         (body_ty, body')        = dmdAnal env' dmd body
         body_ty1                = deleteFVs body_ty (map fst pairs)
-        body_ty2                = addLazyFVs body_ty1 lazy_fv
+        body_ty2                = addLazyFVs body_ty1 lazy_fv -- see Note [Lazy and unleasheable free variables]
     in
     body_ty2 `seq`
     (body_ty2,  Let (Rec pairs') body')
@@ -479,55 +480,53 @@ dmdTransform env var dmd
 
 -- Recursive bindings
 dmdFix :: TopLevelFlag
-       -> AnalEnv               -- Does not include bindings for this binding
+       -> AnalEnv                            -- Does not include bindings for this binding
        -> [(Id,CoreExpr)]
-       -> (AnalEnv, DmdEnv,
-           [(Id,CoreExpr)])     -- Binders annotated with stricness info
+       -> (AnalEnv, DmdEnv, [(Id,CoreExpr)]) -- Binders annotated with stricness info
 
 dmdFix top_lvl env orig_pairs
-  = (updSigEnv env (sigEnv final_env), lazy_fv, pairs')
-     -- Return to original virgin state, keeping new signatures
+  = loop 1 initial_pairs
   where
-    bndrs        = map fst orig_pairs
-    initial_env = addInitialSigs top_lvl env bndrs
-    (final_env, lazy_fv, pairs') = loop 1 initial_env orig_pairs
+    bndrs = map fst orig_pairs
 
-    loop :: Int
-         -> AnalEnv                     -- Already contains the current sigs
-         -> [(Id,CoreExpr)]
-         -> (AnalEnv, DmdEnv, [(Id,CoreExpr)])
-    loop n env pairs
-      = -- pprTrace "dmd loop" (ppr n <+> ppr bndrs $$ ppr env) $
-        loop' n env pairs
+    -- See Note [Initialising strictness]
+    initial_pairs | ae_virgin env = [(setIdStrictness id botSig, rhs) | (id, rhs) <- orig_pairs ]
 
-    loop' n env pairs
-      | found_fixpoint
-      = (env', lazy_fv, pairs')
-                -- Note: return pairs', not pairs.   pairs' is the result of
-                -- processing the RHSs with sigs (= sigs'), whereas pairs
-                -- is the result of processing the RHSs with the *previous*
-                -- iteration of sigs.
+                  | otherwise     = orig_pairs
 
-      | n >= 10
-      = -- pprTrace "dmdFix loop" (ppr n <+> (vcat
-        --                 [ text "Sigs:" <+> ppr [ (id,lookupVarEnv (sigEnv env) id,
-        --                                              lookupVarEnv (sigEnv env') id)
-        --                                          | (id,_) <- pairs],
-        --                   text "env:" <+> ppr env,
-        --                   text "binds:" <+> pprCoreBinding (Rec pairs)]))
-        (env, lazy_fv, orig_pairs)      -- Safe output
-                -- The lazy_fv part is really important!  orig_pairs has no strictness
-                -- info, including nothing about free vars.  But if we have
-                --      letrec f = ....y..... in ...f...
-                -- where 'y' is free in f, we must record that y is mentioned,
-                -- otherwise y will get recorded as absent altogether
+    -- If fixed-point iteration does not yield a result we use this instead
+    -- See Note [Safe abortion in the fixed-point iteration]
+    abort :: (AnalEnv, DmdEnv, [(Id,CoreExpr)])
+    abort = (env, lazy_fv', zapped_pairs)
+      where (lazy_fv, pairs') = step True (zapIdStrictness orig_pairs)
+            -- Note [Lazy and unleasheable free variables]
+            non_lazy_fvs = plusVarEnvList $ map (strictSigDmdEnv . idStrictness . fst) pairs'
+            lazy_fv'     = lazy_fv `plusVarEnv` mapVarEnv (const topDmd) non_lazy_fvs
+            zapped_pairs = zapIdStrictness pairs'
 
-      | otherwise
-      = loop (n+1) (nonVirgin env') pairs'
+    -- The fixed-point varies the idStrictness field of the binders, and terminates if that
+    -- annotation does not change any more.
+    loop :: Int -> [(Id,CoreExpr)] -> (AnalEnv, DmdEnv, [(Id,CoreExpr)])
+    loop n pairs
+      | found_fixpoint = (final_anal_env, lazy_fv, pairs')
+      | n == 10        = abort
+      | otherwise      = loop (n+1) pairs'
       where
-        found_fixpoint = all (same_sig (sigEnv env) (sigEnv env')) bndrs
+        found_fixpoint    = map (idStrictness . fst) pairs' == map (idStrictness . fst) pairs
+        first_round       = n == 1
+        (lazy_fv, pairs') = step first_round pairs
+        final_anal_env    = extendAnalEnvs top_lvl env (map fst pairs')
 
-        ((env',lazy_fv), pairs') = mapAccumL my_downRhs (env, emptyDmdEnv) pairs
+    step :: Bool -> [(Id, CoreExpr)] -> (DmdEnv, [(Id, CoreExpr)])
+    step first_round pairs = (lazy_fv, pairs')
+      where
+        -- In all but the first iteration, delete the virgin flag
+        start_env | first_round = env
+                  | otherwise   = nonVirgin env
+
+        start = (extendAnalEnvs top_lvl start_env (map fst pairs), emptyDmdEnv)
+
+        ((_,lazy_fv), pairs') = mapAccumL my_downRhs start pairs
                 -- mapAccumL: Use the new signature to do the next pair
                 -- The occurrence analyser has arranged them in a good order
                 -- so this can significantly reduce the number of iterations needed
@@ -535,23 +534,39 @@ dmdFix top_lvl env orig_pairs
         my_downRhs (env, lazy_fv) (id,rhs)
           = ((env', lazy_fv'), (id', rhs'))
           where
-            (sig, lazy_fv1, id', rhs') = dmdAnalRhsLetDown top_lvl (Just bndrs) env id rhs
-            lazy_fv'                   = plusVarEnv_C bothDmd lazy_fv lazy_fv1
-            env'                       = extendAnalEnv top_lvl env id sig
+            (lazy_fv1, id', rhs') = dmdAnalRhsLetDown top_lvl (Just bndrs) env id rhs
+            lazy_fv'              = plusVarEnv_C bothDmd lazy_fv lazy_fv1
+            env'                  = extendAnalEnv top_lvl env id (idStrictness id')
 
-    same_sig sigs sigs' var = lookup sigs var == lookup sigs' var
-    lookup sigs var = case lookupVarEnv sigs var of
-                        Just (sig,_) -> sig
-                        Nothing      -> pprPanic "dmdFix" (ppr var)
 
+    zapIdStrictness :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
+    zapIdStrictness pairs = [(setIdStrictness id nopSig, rhs) | (id, rhs) <- pairs ]
+
+{-
+Note [Safe abortion in the fixed-point iteration]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Fixed-point iteration may fail to terminate. But we cannot simply give up and
+return the environment and code unchanged! We still need to do one additional
+round, for two reasons:
+
+ * To get information on used free variables (both lazy and strict!)
+   (see Note [Lazy and unleasheable free variables])
+ * To ensure that all expressions have been traversed at least once, and any left-over
+   strictness annotations have been updated.
+
+This final iteration does not add the variables to the strictness signature
+environment, which effectively assigns them 'nopSig' (see "getStrictness")
+
+-}
 
 -- Trivial RHS
 -- See Note [Demand analysis for trivial right-hand sides]
 dmdAnalTrivialRhs ::
     AnalEnv -> Id -> CoreExpr -> Var ->
-    (StrictSig, VarEnv Demand, Id, CoreExpr)
+    (DmdEnv, Id, CoreExpr)
 dmdAnalTrivialRhs env id rhs fn
-  = (fn_str, fn_fv, set_idStrictness env id fn_str, rhs)
+  = (fn_fv, set_idStrictness env id fn_str, rhs)
   where
     fn_str = getStrictness env fn
     fn_fv | isLocalId fn = unitVarEnv fn topDmd
@@ -579,7 +594,7 @@ dmdAnalTrivialRhs env id rhs fn
 dmdAnalRhsLetDown :: TopLevelFlag
            -> Maybe [Id]   -- Just bs <=> recursive, Nothing <=> non-recursive
            -> AnalEnv -> Id -> CoreExpr
-           -> (StrictSig, DmdEnv, Id, CoreExpr)
+           -> (DmdEnv, Id, CoreExpr)
 -- Process the RHS of the binding, add the strictness signature
 -- to the Id, and augment the environment with the signature as well.
 dmdAnalRhsLetDown top_lvl rec_flag env id rhs
@@ -587,7 +602,7 @@ dmdAnalRhsLetDown top_lvl rec_flag env id rhs
   = dmdAnalTrivialRhs env id rhs fn
 
   | otherwise
-  = (sig_ty, lazy_fv, id', mkLams bndrs' body')
+  = (lazy_fv, id', mkLams bndrs' body')
   where
     (bndrs, body)    = collectBinders rhs
     env_body         = foldl extendSigsWithLam env bndrs
@@ -604,12 +619,12 @@ dmdAnalRhsLetDown top_lvl rec_flag env id rhs
                  Nothing            -> cleanEvalDmd
                  Just (dc, _, _, _) -> cleanEvalProdDmd (dataConRepArity dc)
 
-    -- See Note [Lazy and unleashable free variables]
     -- See Note [Aggregated demand for cardinality]
     rhs_fv1 = case rec_flag of
                 Just bs -> reuseEnv (delVarEnvList rhs_fv bs)
                 Nothing -> rhs_fv
 
+    -- See Note [Lazy and unleashable free variables]
     (lazy_fv, sig_fv) = splitFVs is_thunk rhs_fv1
 
     rhs_res'  = trimCPRInfo trim_all trim_sums rhs_res
@@ -946,7 +961,7 @@ error stub, but which has RULES, you may want it not to be eliminated
 in favour of error!
 
 Note [Lazy and unleasheable free variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We put the strict and once-used FVs in the DmdType of the Id, so
 that at its call sites we unleash demands on its strict fvs.
 An example is 'roll' in imaginary/wheel-sieve2
@@ -974,9 +989,32 @@ Incidentally, here's a place where lambda-lifting h would
 lose the cigar --- we couldn't see the joint strictness in t/x
 
         ON THE OTHER HAND
+
 We don't want to put *all* the fv's from the RHS into the
-DmdType, because that makes fixpointing very slow --- the
-DmdType gets full of lazy demands that are slow to converge.
+DmdType. Because
+
+ * it makes the strictness signatures larger, and hence slows down fixpointing
+
+and
+
+ * it is useless information at the call site anyways:
+   For lazy, used-many times fv's we will never get any better result than
+   that, no matter how good the actual demand on the function at the call site
+   is (unless it is always absent, but then the whole binder is useless).
+
+Therefore we exclude lazy multiple-used fv's from the environment in the
+DmdType.
+
+But now the signature lies! (Missing variables are assumed to be absent.) To
+make up for this, the code that analyses the binding keeps the demand on those
+variable separate (usually called "lazy_fv") and adds it to the demand of the
+whole binding later.
+
+What if we decide _not_ to store a strictness signature for a binding at all, as
+we do when aborting a fixed-point iteration? The we risk losing the information
+that the strict variables are being used. In that case, we take all free variables
+mentioned in the (unsound) strictness signature, conservatively approximate the
+demand put on them (topDmd), and add that to the "lazy_fv" returned by "dmdFix".
 
 
 Note [Lamba-bound unfoldings]
@@ -1037,11 +1075,14 @@ emptyAnalEnv dflags fam_envs
 emptySigEnv :: SigEnv
 emptySigEnv = emptyVarEnv
 
-sigEnv :: AnalEnv -> SigEnv
-sigEnv = ae_sigs
+-- | Extend an environment with the strictness IDs attached to the id
+extendAnalEnvs :: TopLevelFlag -> AnalEnv -> [Id] -> AnalEnv
+extendAnalEnvs top_lvl env vars
+  = env { ae_sigs = extendSigEnvs top_lvl (ae_sigs env) vars }
 
-updSigEnv :: AnalEnv -> SigEnv -> AnalEnv
-updSigEnv env sigs = env { ae_sigs = sigs }
+extendSigEnvs :: TopLevelFlag -> SigEnv -> [Id] -> SigEnv
+extendSigEnvs top_lvl sigs vars
+  = extendVarEnvList sigs [ (var, (idStrictness var, top_lvl)) | var <- vars]
 
 extendAnalEnv :: TopLevelFlag -> AnalEnv -> Id -> StrictSig -> AnalEnv
 extendAnalEnv top_lvl env var sig
@@ -1058,15 +1099,6 @@ getStrictness env fn
   | isGlobalId fn                        = idStrictness fn
   | Just (sig, _) <- lookupSigEnv env fn = sig
   | otherwise                            = nopSig
-
-addInitialSigs :: TopLevelFlag -> AnalEnv -> [Id] -> AnalEnv
--- See Note [Initialising strictness]
-addInitialSigs top_lvl env@(AE { ae_sigs = sigs, ae_virgin = virgin }) ids
-  = env { ae_sigs = extendVarEnvList sigs [ (id, (init_sig id, top_lvl))
-                                          | id <- ids ] }
-  where
-    init_sig | virgin    = \_ -> botSig
-             | otherwise = idStrictness
 
 nonVirgin :: AnalEnv -> AnalEnv
 nonVirgin env = env { ae_virgin = False }

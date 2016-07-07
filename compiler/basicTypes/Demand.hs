@@ -36,7 +36,9 @@ module Demand (
         appIsBottom, isBottomingSig, pprIfaceStrictSig,
         trimCPRInfo, returnsCPR_maybe,
         StrictSig(..), mkStrictSig, mkClosedStrictSig, nopSig, botSig, cprProdSig,
-        isTopSig, hasDemandEnvSig, splitStrictSig, increaseStrictSigArity,
+        isTopSig, hasDemandEnvSig,
+        splitStrictSig, strictSigDmdEnv,
+        increaseStrictSigArity,
 
         seqDemand, seqDemandList, seqDmdType, seqStrictSig,
 
@@ -1681,6 +1683,9 @@ isTopSig (StrictSig ty) = isTopDmdType ty
 
 hasDemandEnvSig :: StrictSig -> Bool
 hasDemandEnvSig (StrictSig (DmdType env _ _)) = not (isEmptyVarEnv env)
+
+strictSigDmdEnv :: StrictSig -> DmdEnv
+strictSigDmdEnv (StrictSig (DmdType env _ _)) = env
 
 isBottomingSig :: StrictSig -> Bool
 -- True if the signature diverges or throws an exception

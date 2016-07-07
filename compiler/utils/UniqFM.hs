@@ -49,6 +49,7 @@ module UniqFM (
         plusUFM,
         plusUFM_C,
         plusUFM_CD,
+        plusUFMList,
         minusUFM,
         intersectUFM,
         intersectUFM_C,
@@ -70,6 +71,8 @@ module UniqFM (
 
 import Unique           ( Uniquable(..), Unique, getKey )
 import Outputable
+
+import Data.List (foldl')
 
 import qualified Data.IntMap as M
 import qualified Data.IntSet as S
@@ -213,6 +216,9 @@ plusUFM_CD f (UFM xm) dx (UFM ym) dy
       (M.map (\x -> x `f` dy))
       (M.map (\y -> dx `f` y))
       xm ym
+
+plusUFMList :: [UniqFM elt] -> UniqFM elt
+plusUFMList = foldl' plusUFM emptyUFM
 
 minusUFM :: UniqFM elt1 -> UniqFM elt2 -> UniqFM elt1
 minusUFM (UFM x) (UFM y) = UFM (M.difference x y)
