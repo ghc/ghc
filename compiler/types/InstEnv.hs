@@ -41,7 +41,7 @@ import Unify
 import Outputable
 import ErrUtils
 import BasicTypes
-import UniqFM
+import UniqDFM
 import Util
 import Id
 import Data.Data        ( Data )
@@ -330,7 +330,21 @@ or, to put it another way, we have
 -}
 
 ---------------------------------------------------
-type InstEnv = UniqFM ClsInstEnv        -- Maps Class to instances for that class
+{-
+Note [InstEnv determinism]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+We turn InstEnvs into a list in some places that don't directly affect
+the ABI. That happens when we create output for `:info`.
+Unfortunately that nondeterminism is nonlocal and it's hard to tell what it
+affects without following a chain of functions. It's also easy to accidentally
+make that nondeterminism affect the ABI. Furthermore the envs should be
+relatively small, so it should be free to use deterministic maps here.
+Testing with nofib and validate detected no difference between UniqFM and
+UniqDFM. See also Note [Deterministic UniqFM]
+-}
+
+type InstEnv = UniqDFM ClsInstEnv      -- Maps Class to instances for that class
+  -- See Note [InstEnv determinism]
 
 -- | 'InstEnvs' represents the combination of the global type class instance
 -- environment, the local type class instance environment, and the set of
@@ -365,10 +379,11 @@ instance Outputable ClsInstEnv where
 -- the dfun type.
 
 emptyInstEnv :: InstEnv
-emptyInstEnv = emptyUFM
+emptyInstEnv = emptyUDFM
 
 instEnvElts :: InstEnv -> [ClsInst]
-instEnvElts ie = [elt | ClsIE elts <- eltsUFM ie, elt <- elts]
+instEnvElts ie = [elt | ClsIE elts <- eltsUDFM ie, elt <- elts]
+  -- See Note [InstEnv determinism]
 
 -- | Test if an instance is visible, by checking that its origin module
 -- is in 'VisibleOrphanModules'.
@@ -388,7 +403,7 @@ classInstances :: InstEnvs -> Class -> [ClsInst]
 classInstances (InstEnvs { ie_global = pkg_ie, ie_local = home_ie, ie_visible = vis_mods }) cls
   = get home_ie ++ get pkg_ie
   where
-    get env = case lookupUFM env cls of
+    get env = case lookupUDFM env cls of
                 Just (ClsIE insts) -> filter (instIsVisible vis_mods) insts
                 Nothing            -> []
 
@@ -397,20 +412,20 @@ classInstances (InstEnvs { ie_global = pkg_ie, ie_local = home_ie, ie_visible = 
 memberInstEnv :: InstEnv -> ClsInst -> Bool
 memberInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm } ) =
     maybe False (\(ClsIE items) -> any (identicalClsInstHead ins_item) items)
-          (lookupUFM inst_env cls_nm)
+          (lookupUDFM inst_env cls_nm)
 
 extendInstEnvList :: InstEnv -> [ClsInst] -> InstEnv
 extendInstEnvList inst_env ispecs = foldl extendInstEnv inst_env ispecs
 
 extendInstEnv :: InstEnv -> ClsInst -> InstEnv
 extendInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm })
-  = addToUFM_C add inst_env cls_nm (ClsIE [ins_item])
+  = addToUDFM_C add inst_env cls_nm (ClsIE [ins_item])
   where
     add (ClsIE cur_insts) _ = ClsIE (ins_item : cur_insts)
 
 deleteFromInstEnv :: InstEnv -> ClsInst -> InstEnv
 deleteFromInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm })
-  = adjustUFM adjust inst_env cls_nm
+  = adjustUDFM adjust inst_env cls_nm
   where
     adjust (ClsIE items) = ClsIE (filterOut (identicalClsInstHead ins_item) items)
 
@@ -702,7 +717,7 @@ lookupInstEnv' ie vis_mods cls tys
     all_tvs    = all isNothing rough_tcs
 
     --------------
-    lookup env = case lookupUFM env cls of
+    lookup env = case lookupUDFM env cls of
                    Nothing -> ([],[])   -- No instances for this class
                    Just (ClsIE insts) -> find [] [] insts
 

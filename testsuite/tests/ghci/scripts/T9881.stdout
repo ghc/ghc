@@ -3,15 +3,15 @@ data Data.ByteString.Lazy.ByteString
   | Data.ByteString.Lazy.Internal.Chunk {-# UNPACK #-}Data.ByteString.ByteString
                                         Data.ByteString.Lazy.ByteString
   	-- Defined in ‘Data.ByteString.Lazy.Internal’
-instance Eq Data.ByteString.Lazy.ByteString
-  -- Defined in ‘Data.ByteString.Lazy.Internal’
-instance Ord Data.ByteString.Lazy.ByteString
+instance Monoid Data.ByteString.Lazy.ByteString
   -- Defined in ‘Data.ByteString.Lazy.Internal’
 instance Read Data.ByteString.Lazy.ByteString
   -- Defined in ‘Data.ByteString.Lazy.Internal’
 instance Show Data.ByteString.Lazy.ByteString
   -- Defined in ‘Data.ByteString.Lazy.Internal’
-instance Monoid Data.ByteString.Lazy.ByteString
+instance Eq Data.ByteString.Lazy.ByteString
+  -- Defined in ‘Data.ByteString.Lazy.Internal’
+instance Ord Data.ByteString.Lazy.ByteString
   -- Defined in ‘Data.ByteString.Lazy.Internal’
 
 data Data.ByteString.ByteString
@@ -20,13 +20,13 @@ data Data.ByteString.ByteString
                                 {-# UNPACK #-}Int
                                 {-# UNPACK #-}Int
   	-- Defined in ‘Data.ByteString.Internal’
-instance Eq Data.ByteString.ByteString
-  -- Defined in ‘Data.ByteString.Internal’
-instance Ord Data.ByteString.ByteString
+instance Monoid Data.ByteString.ByteString
   -- Defined in ‘Data.ByteString.Internal’
 instance Read Data.ByteString.ByteString
   -- Defined in ‘Data.ByteString.Internal’
 instance Show Data.ByteString.ByteString
   -- Defined in ‘Data.ByteString.Internal’
-instance Monoid Data.ByteString.ByteString
+instance Eq Data.ByteString.ByteString
+  -- Defined in ‘Data.ByteString.Internal’
+instance Ord Data.ByteString.ByteString
   -- Defined in ‘Data.ByteString.Internal’
