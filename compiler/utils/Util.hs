@@ -443,9 +443,9 @@ atLength :: ([a] -> b)   -- Called when length ls >= n, passed (drop n ls)
          -> [a]
          -> Int
          -> b
-atLength atLenPred atEnd ls n
-  | n < 0     = atLenPred ls
-  | otherwise = go n ls
+atLength atLenPred atEnd ls0 n0
+  | n0 < 0    = atLenPred ls0
+  | otherwise = go n0 ls0
   where
     -- go's first arg n >= 0
     go 0 ls     = atLenPred ls
@@ -454,15 +454,24 @@ atLength atLenPred atEnd ls n
 
 -- Some special cases of atLength:
 
+-- | @(lengthExceeds xs n) = (length xs > n)@
 lengthExceeds :: [a] -> Int -> Bool
--- ^ > (lengthExceeds xs n) = (length xs > n)
-lengthExceeds = atLength notNull False
+lengthExceeds lst n
+  | n < 0
+  = True
+  | otherwise
+  = atLength notNull False lst n
 
 lengthAtLeast :: [a] -> Int -> Bool
 lengthAtLeast = atLength (const True) False
 
+-- | @(lengthIs xs n) = (length xs == n)@
 lengthIs :: [a] -> Int -> Bool
-lengthIs = atLength null False
+lengthIs lst n
+  | n < 0
+  = False
+  | otherwise
+  = atLength null False lst n
 
 listLengthCmp :: [a] -> Int -> Ordering
 listLengthCmp = atLength atLen atEnd
