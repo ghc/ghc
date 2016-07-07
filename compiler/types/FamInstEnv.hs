@@ -48,7 +48,7 @@ import VarSet
 import VarEnv
 import Name
 import PrelNames ( eqPrimTyConKey )
-import UniqFM
+import UniqDFM
 import Outputable
 import Maybes
 import TrieMap
@@ -361,7 +361,7 @@ These two axioms for T, one with one pattern, one with two;
 see Note [Eta reduction for data families]
 -}
 
-type FamInstEnv = UniqFM FamilyInstEnv  -- Maps a family to its instances
+type FamInstEnv = UniqDFM FamilyInstEnv  -- Maps a family to its instances
      -- See Note [FamInstEnv]
 
 type FamInstEnvs = (FamInstEnv, FamInstEnv)
@@ -381,16 +381,16 @@ emptyFamInstEnvs :: (FamInstEnv, FamInstEnv)
 emptyFamInstEnvs = (emptyFamInstEnv, emptyFamInstEnv)
 
 emptyFamInstEnv :: FamInstEnv
-emptyFamInstEnv = emptyUFM
+emptyFamInstEnv = emptyUDFM
 
 famInstEnvElts :: FamInstEnv -> [FamInst]
-famInstEnvElts fi = [elt | FamIE elts <- eltsUFM fi, elt <- elts]
+famInstEnvElts fi = [elt | FamIE elts <- eltsUDFM fi, elt <- elts]
 
 familyInstances :: (FamInstEnv, FamInstEnv) -> TyCon -> [FamInst]
 familyInstances (pkg_fie, home_fie) fam
   = get home_fie ++ get pkg_fie
   where
-    get env = case lookupUFM env fam of
+    get env = case lookupUDFM env fam of
                 Just (FamIE insts) -> insts
                 Nothing                      -> []
 
@@ -400,14 +400,14 @@ extendFamInstEnvList inst_env fis = foldl extendFamInstEnv inst_env fis
 extendFamInstEnv :: FamInstEnv -> FamInst -> FamInstEnv
 extendFamInstEnv inst_env
                  ins_item@(FamInst {fi_fam = cls_nm})
-  = addToUFM_C add inst_env cls_nm (FamIE [ins_item])
+  = addToUDFM_C add inst_env cls_nm (FamIE [ins_item])
   where
     add (FamIE items) _ = FamIE (ins_item:items)
 
 deleteFromFamInstEnv :: FamInstEnv -> FamInst -> FamInstEnv
 -- Used only for overriding in GHCi
 deleteFromFamInstEnv inst_env fam_inst@(FamInst {fi_fam = fam_nm})
- = adjustUFM adjust inst_env fam_nm
+ = adjustUDFM adjust inst_env fam_nm
  where
    adjust :: FamilyInstEnv -> FamilyInstEnv
    adjust (FamIE items)
@@ -712,7 +712,7 @@ lookupFamInstEnvByTyCon :: FamInstEnvs -> TyCon -> [FamInst]
 lookupFamInstEnvByTyCon (pkg_ie, home_ie) fam_tc
   = get pkg_ie ++ get home_ie
   where
-    get ie = case lookupUFM ie fam_tc of
+    get ie = case lookupUDFM ie fam_tc of
                Nothing          -> []
                Just (FamIE fis) -> fis
 
@@ -875,7 +875,7 @@ lookupFamInstEnvInjectivityConflicts injList (pkg_ie, home_ie)
           | otherwise = True
 
       lookup_inj_fam_conflicts ie
-          | isOpenFamilyTyCon fam, Just (FamIE insts) <- lookupUFM ie fam
+          | isOpenFamilyTyCon fam, Just (FamIE insts) <- lookupUDFM ie fam
           = map (coAxiomSingleBranch . fi_axiom) $
             filter isInjConflict insts
           | otherwise = []
@@ -915,7 +915,7 @@ lookup_fam_inst_env'          -- The worker, local to this module
     -> [FamInstMatch]
 lookup_fam_inst_env' match_fun ie fam match_tys
   | isOpenFamilyTyCon fam
-  , Just (FamIE insts) <- lookupUFM ie fam
+  , Just (FamIE insts) <- lookupUDFM ie fam
   = find insts    -- The common case
   | otherwise = []
   where
