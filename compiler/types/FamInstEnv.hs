@@ -359,10 +359,23 @@ Then we get a data type for each instance, and an axiom:
 
 These two axioms for T, one with one pattern, one with two;
 see Note [Eta reduction for data families]
+
+Note [FamInstEnv determinism]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We turn FamInstEnvs into a list in some places that don't directly affect
+the ABI. That happens in family consistency checks and when producing output
+for `:info`. Unfortunately that nondeterminism is nonlocal and it's hard
+to tell what it affects without following a chain of functions. It's also
+easy to accidentally make that nondeterminism affect the ABI. Furthermore
+the envs should be relatively small, so it should be free to use deterministic
+maps here. Testing with nofib and validate detected no difference between
+UniqFM and UniqDFM.
+See Note [Deterministic UniqFM].
 -}
 
 type FamInstEnv = UniqDFM FamilyInstEnv  -- Maps a family to its instances
      -- See Note [FamInstEnv]
+     -- See Note [FamInstEnv determinism]
 
 type FamInstEnvs = (FamInstEnv, FamInstEnv)
      -- External package inst-env, Home-package inst-env
@@ -385,6 +398,7 @@ emptyFamInstEnv = emptyUDFM
 
 famInstEnvElts :: FamInstEnv -> [FamInst]
 famInstEnvElts fi = [elt | FamIE elts <- eltsUDFM fi, elt <- elts]
+  -- See Note [FamInstEnv determinism]
 
 familyInstances :: (FamInstEnv, FamInstEnv) -> TyCon -> [FamInst]
 familyInstances (pkg_fie, home_fie) fam
