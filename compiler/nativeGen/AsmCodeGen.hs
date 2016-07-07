@@ -432,7 +432,9 @@ cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap us
         -- Generate .file directives for every new file that has been
         -- used. Note that it is important that we generate these in
         -- ascending order, as Clang's 3.6 assembler complains.
-        let newFileIds = sortBy (comparing snd) $ eltsUFM $ fileIds' `minusUFM` fileIds
+        let newFileIds = sortBy (comparing snd) $
+                         nonDetEltsUFM $ fileIds' `minusUFM` fileIds
+            -- See Note [Unique Determinism and code generation]
             pprDecl (f,n) = text "\t.file " <> ppr n <+>
                             doubleQuotes (ftext f)
 

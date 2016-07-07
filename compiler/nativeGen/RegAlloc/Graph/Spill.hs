@@ -376,6 +376,5 @@ makeSpillStats s
 
 instance Outputable SpillStats where
  ppr stats
-        = (vcat $ map (\(r, s, l) -> ppr r <+> int s <+> int l)
-                        $ eltsUFM (spillStoreLoad stats))
-
+        = pprUFM (spillStoreLoad stats)
+                 (vcat . map (\(r, s, l) -> ppr r <+> int s <+> int l))

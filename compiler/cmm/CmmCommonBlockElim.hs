@@ -297,5 +297,6 @@ groupByLabel = go (TM.emptyTM :: TM.ListMap UniqDFM a)
 
 
 groupByInt :: (a -> Int) -> [a] -> [[a]]
-groupByInt f xs = eltsUFM $ List.foldl' go emptyUFM xs
+groupByInt f xs = nonDetEltsUFM $ List.foldl' go emptyUFM xs
+  -- See Note [Unique Determinism and code generation]
   where go m x = alterUFM (Just . maybe [x] (x:)) m (f x)

@@ -184,7 +184,7 @@ instance Outputable StackMap where
      text "Sp = " <> int sm_sp $$
      text "sm_args = " <> int sm_args $$
      text "sm_ret_off = " <> int sm_ret_off $$
-     text "sm_regs = " <> ppr (eltsUFM sm_regs)
+     text "sm_regs = " <> pprUFM sm_regs ppr
 
 
 cmmLayoutStack :: DynFlags -> ProcPointSet -> ByteOff -> CmmGraph
@@ -684,7 +684,8 @@ allocate dflags ret_off live stackmap@StackMap{ sm_sp = sp0
                    | x <- [ 1 .. toWords dflags ret_off] ]
                   live_words =
                    [ (toWords dflags x, Occupied)
-                   | (r,off) <- eltsUFM regs1,
+                   | (r,off) <- nonDetEltsUFM regs1,
+                   -- See Note [Unique Determinism and code generation]
                      let w = localRegBytes dflags r,
                      x <- [ off, off - wORD_SIZE dflags .. off - w + 1] ]
    in
@@ -964,7 +965,9 @@ stackMapToLiveness dflags StackMap{..} =
                                      toWords dflags (sm_sp - sm_args)) live_words
    where
      live_words =  [ (toWords dflags off, False)
-                   | (r,off) <- eltsUFM sm_regs, isGcPtrType (localRegType r) ]
+                   | (r,off) <- nonDetEltsUFM sm_regs
+                   , isGcPtrType (localRegType r) ]
+                   -- See Note [Unique Determinism and code generation]
 
 
 -- -----------------------------------------------------------------------------
@@ -1118,4 +1121,5 @@ insertReloads stackmap =
 
 
 stackSlotRegs :: StackMap -> [(LocalReg, StackLoc)]
-stackSlotRegs sm = eltsUFM (sm_regs sm)
+stackSlotRegs sm = nonDetEltsUFM (sm_regs sm)
+  -- See Note [Unique Determinism and code generation]

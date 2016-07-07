@@ -153,7 +153,8 @@ chooseSpill
 chooseSpill info graph
  = let  cost    = spillCost_length info graph
         node    = minimumBy (\n1 n2 -> compare (cost $ nodeId n1) (cost $ nodeId n2))
-                $ eltsUFM $ graphMap graph
+                $ nonDetEltsUFM $ graphMap graph
+                -- See Note [Unique Determinism and code generation]
 
    in   nodeId node
 
@@ -241,7 +242,8 @@ lifeMapFromSpillCostInfo :: SpillCostInfo -> UniqFM (VirtualReg, Int)
 lifeMapFromSpillCostInfo info
         = listToUFM
         $ map (\(r, _, _, life) -> (r, (r, life)))
-        $ eltsUFM info
+        $ nonDetEltsUFM info
+        -- See Note [Unique Determinism and code generation]
 
 
 -- | Determine the degree (number of neighbors) of this node which

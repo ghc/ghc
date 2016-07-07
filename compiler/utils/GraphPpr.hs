@@ -25,7 +25,7 @@ dumpGraph
 
 dumpGraph graph
         =  text "Graph"
-        $$ (vcat $ map dumpNode $ eltsUFM $ graphMap graph)
+        $$ pprUFM (graphMap graph) (vcat . map dumpNode)
 
 dumpNode
         :: (Outputable k, Outputable color)
@@ -65,7 +65,8 @@ dotGraph
         -> Graph k cls color -> SDoc
 
 dotGraph colorMap triv graph
- = let  nodes   = eltsUFM $ graphMap graph
+ = let  nodes   = nonDetEltsUFM $ graphMap graph
+                  -- See Note [Unique Determinism and code generation]
    in   vcat
                 (  [ text "graph G {" ]
                 ++ map (dotNode colorMap triv) nodes

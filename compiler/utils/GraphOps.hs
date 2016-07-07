@@ -307,7 +307,8 @@ coalesceGraph' aggressive triv graph kkPairsAcc
  = let
         -- find all the nodes that have coalescence edges
         cNodes  = filter (\node -> not $ isEmptyUniqSet (nodeCoalesce node))
-                $ eltsUFM $ graphMap graph
+                $ nonDetEltsUFM $ graphMap graph
+                -- See Note [Unique Determinism and code generation]
 
         -- build a list of pairs of keys for node's we'll try and coalesce
         --      every pair of nodes will appear twice in this list
@@ -528,7 +529,8 @@ freezeAllInGraph
 freezeAllInGraph graph
         = foldr freezeNode graph
                 $ map nodeId
-                $ eltsUFM $ graphMap graph
+                $ nonDetEltsUFM $ graphMap graph
+                -- See Note [Unique Determinism and code generation]
 
 
 -- | Find all the nodes in the graph that meet some criteria
@@ -539,7 +541,8 @@ scanGraph
         -> [Node k cls color]
 
 scanGraph match graph
-        = filter match $ eltsUFM $ graphMap graph
+        = filter match $ nonDetEltsUFM $ graphMap graph
+          -- See Note [Unique Determinism and code generation]
 
 
 -- | validate the internal structure of a graph
@@ -557,10 +560,10 @@ validateGraph doc isColored graph
 
         -- Check that all edges point to valid nodes.
         | edges         <- unionManyUniqSets
-                                (  (map nodeConflicts       $ eltsUFM $ graphMap graph)
-                                ++ (map nodeCoalesce        $ eltsUFM $ graphMap graph))
+                                (  (map nodeConflicts       $ nonDetEltsUFM $ graphMap graph)
+                                ++ (map nodeCoalesce        $ nonDetEltsUFM $ graphMap graph))
 
-        , nodes         <- mkUniqSet $ map nodeId $ eltsUFM $ graphMap graph
+        , nodes         <- mkUniqSet $ map nodeId $ nonDetEltsUFM $ graphMap graph
         , badEdges      <- minusUniqSet edges nodes
         , not $ isEmptyUniqSet badEdges
         = pprPanic "GraphOps.validateGraph"
@@ -570,7 +573,8 @@ validateGraph doc isColored graph
 
         -- Check that no conflicting nodes have the same color
         | badNodes      <- filter (not . (checkNode graph))
-                        $ eltsUFM $ graphMap graph
+                        $ nonDetEltsUFM $ graphMap graph
+                           -- See Note [Unique Determinism and code generation]
         , not $ null badNodes
         = pprPanic "GraphOps.validateGraph"
                 (  text "Node has same color as one of it's conflicts"
@@ -581,7 +585,7 @@ validateGraph doc isColored graph
         --      check that all nodes have a color.
         | isColored
         , badNodes      <- filter (\n -> isNothing $ nodeColor n)
-                        $  eltsUFM $ graphMap graph
+                        $  nonDetEltsUFM $ graphMap graph
         , not $ null badNodes
         = pprPanic "GraphOps.validateGraph"
                 (  text "Supposably colored graph has uncolored nodes."
@@ -630,7 +634,8 @@ slurpNodeConflictCount graph
         $ map   (\node
                   -> let count  = sizeUniqSet $ nodeConflicts node
                      in  (count, (count, 1)))
-        $ eltsUFM
+        $ nonDetEltsUFM
+        -- See Note [Unique Determinism and code generation]
         $ graphMap graph
 
 

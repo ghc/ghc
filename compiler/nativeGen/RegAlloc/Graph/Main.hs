@@ -401,7 +401,8 @@ patchRegsFromGraph platform graph code
 --  We need to deepSeq the whole graph before trying to colour it to avoid
 --  space leaks.
 seqGraph :: Color.Graph VirtualReg RegClass RealReg -> ()
-seqGraph graph          = seqNodes (eltsUFM (Color.graphMap graph))
+seqGraph graph          = seqNodes (nonDetEltsUFM (Color.graphMap graph))
+   -- See Note [Unique Determinism and code generation]
 
 seqNodes :: [Color.Node VirtualReg RegClass RealReg] -> ()
 seqNodes ns

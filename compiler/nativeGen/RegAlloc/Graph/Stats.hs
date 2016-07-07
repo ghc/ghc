@@ -129,7 +129,7 @@ instance (Outputable statics, Outputable instr)
 
         $$ (if (not $ isNullUFM $ raCoalesced s)
                 then    text "#  Registers coalesced."
-                        $$ (pprUFMWithKeys (raCoalesced s) (vcat . map ppr))
+                        $$ pprUFMWithKeys (raCoalesced s) (vcat . map ppr)
                         $$ text ""
                 else empty)
 
@@ -160,7 +160,7 @@ instance (Outputable statics, Outputable instr)
 
         $$ (if (not $ isNullUFM $ raCoalesced s)
                 then    text "#  Registers coalesced."
-                        $$ (pprUFMWithKeys (raCoalesced s) (vcat . map ppr))
+                        $$ pprUFMWithKeys (raCoalesced s) (vcat . map ppr)
                         $$ text ""
                 else empty)
 
@@ -232,7 +232,7 @@ pprStatsLifetimes stats
 
    in   (  text "-- vreg-population-lifetimes"
         $$ text "--   (instruction_count, number_of_vregs_that_lived_that_long)"
-        $$ (vcat $ map ppr $ eltsUFM lifeBins)
+        $$ pprUFM lifeBins (vcat . map ppr)
         $$ text "\n")
 
 
@@ -240,7 +240,8 @@ binLifetimeCount :: UniqFM (VirtualReg, Int) -> UniqFM (Int, Int)
 binLifetimeCount fm
  = let  lifes   = map (\l -> (l, (l, 1)))
                 $ map snd
-                $ eltsUFM fm
+                $ nonDetEltsUFM fm
+                -- See Note [Unique Determinism and code generation]
 
    in   addListToUFM_C
                 (\(l1, c1) (_, c2) -> (l1, c1 + c2))
@@ -260,7 +261,7 @@ pprStatsConflict stats
 
    in   (  text "-- vreg-conflicts"
         $$ text "--   (conflict_count, number_of_vregs_that_had_that_many_conflicts)"
-        $$ (vcat $ map ppr $ eltsUFM confMap)
+        $$ pprUFM confMap (vcat . map ppr)
         $$ text "\n")
 
 
@@ -285,7 +286,8 @@ pprStatsLifeConflict stats graph
                                         , ppr $ sizeUniqSet (Color.nodeConflicts node)
                                         , ppr $ lifetime ])
                 $ map Color.nodeId
-                $ eltsUFM
+                $ nonDetEltsUFM
+                -- See Note [Unique Determinism and code generation]
                 $ Color.graphMap graph
 
    in   (  text "-- vreg-conflict-lifetime"

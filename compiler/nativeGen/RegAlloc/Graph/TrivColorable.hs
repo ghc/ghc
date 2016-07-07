@@ -59,7 +59,8 @@ accSqueeze
         -> UniqFM reg
         -> Int
 
-accSqueeze count maxCount squeeze ufm = acc count (eltsUFM ufm)
+accSqueeze count maxCount squeeze ufm = acc count (nonDetEltsUFM ufm)
+  -- See Note [Unique Determinism and code generation]
   where acc count [] = count
         acc count _ | count >= maxCount = count
         acc count (r:rs) = acc (count + squeeze r) rs
