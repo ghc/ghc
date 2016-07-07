@@ -80,67 +80,114 @@ import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
 #endif
 
-{-
-************************************************************************
-*                                                                      *
-\subsection{The signature of the module}
-*                                                                      *
-************************************************************************
--}
 
-emptyUFM        :: UniqFM elt
-isNullUFM       :: UniqFM elt -> Bool
-unitUFM         :: Uniquable key => key -> elt -> UniqFM elt
-unitDirectlyUFM -- got the Unique already
-                :: Unique -> elt -> UniqFM elt
-listToUFM       :: Uniquable key => [(key,elt)] -> UniqFM elt
-listToUFM_Directly
-                :: [(Unique, elt)] -> UniqFM elt
-listToUFM_C     :: Uniquable key => (elt -> elt -> elt)
-                           -> [(key, elt)]
-                           -> UniqFM elt
+newtype UniqFM ele = UFM (M.IntMap ele)
+  deriving (Data, Eq, Functor, Typeable)
+  -- We used to derive Traversable and Foldable, but they were nondeterministic
+  -- and not obvious at the call site. You can use explicit nonDetEltsUFM
+  -- and fold a list if needed.
+  -- See Note [Deterministic UniqFM] in UniqDFM to learn about determinism.
 
-addToUFM        :: Uniquable key => UniqFM elt -> key -> elt  -> UniqFM elt
-addListToUFM    :: Uniquable key => UniqFM elt -> [(key,elt)] -> UniqFM elt
+emptyUFM :: UniqFM elt
+emptyUFM = UFM M.empty
+
+isNullUFM :: UniqFM elt -> Bool
+isNullUFM (UFM m) = M.null m
+
+unitUFM :: Uniquable key => key -> elt -> UniqFM elt
+unitUFM k v = UFM (M.singleton (getKey $ getUnique k) v)
+
+-- when you've got the Unique already
+unitDirectlyUFM :: Unique -> elt -> UniqFM elt
+unitDirectlyUFM u v = UFM (M.singleton (getKey u) v)
+
+listToUFM :: Uniquable key => [(key,elt)] -> UniqFM elt
+listToUFM = foldl (\m (k, v) -> addToUFM m k v) emptyUFM
+
+listToUFM_Directly :: [(Unique, elt)] -> UniqFM elt
+listToUFM_Directly = foldl (\m (u, v) -> addToUFM_Directly m u v) emptyUFM
+
+listToUFM_C
+  :: Uniquable key
+  => (elt -> elt -> elt)
+  -> [(key, elt)]
+  -> UniqFM elt
+listToUFM_C f = foldl (\m (k, v) -> addToUFM_C f m k v) emptyUFM
+
+addToUFM :: Uniquable key => UniqFM elt -> key -> elt  -> UniqFM elt
+addToUFM (UFM m) k v = UFM (M.insert (getKey $ getUnique k) v m)
+
+addListToUFM :: Uniquable key => UniqFM elt -> [(key,elt)] -> UniqFM elt
+addListToUFM = foldl (\m (k, v) -> addToUFM m k v)
+
 addListToUFM_Directly :: UniqFM elt -> [(Unique,elt)] -> UniqFM elt
-addToUFM_Directly
-                :: UniqFM elt -> Unique -> elt -> UniqFM elt
+addListToUFM_Directly = foldl (\m (k, v) -> addToUFM_Directly m k v)
 
-addToUFM_C      :: Uniquable key => (elt -> elt -> elt) -- old -> new -> result
-                           -> UniqFM elt                -- old
-                           -> key -> elt                -- new
-                           -> UniqFM elt                -- result
+addToUFM_Directly :: UniqFM elt -> Unique -> elt -> UniqFM elt
+addToUFM_Directly (UFM m) u v = UFM (M.insert (getKey u) v m)
 
-addToUFM_Acc    :: Uniquable key =>
-                              (elt -> elts -> elts)     -- Add to existing
-                           -> (elt -> elts)             -- New element
-                           -> UniqFM elts               -- old
-                           -> key -> elt                -- new
-                           -> UniqFM elts               -- result
+addToUFM_C
+  :: Uniquable key
+  => (elt -> elt -> elt)  -- old -> new -> result
+  -> UniqFM elt           -- old
+  -> key -> elt           -- new
+  -> UniqFM elt           -- result
+-- Arguments of combining function of M.insertWith and addToUFM_C are flipped.
+addToUFM_C f (UFM m) k v =
+  UFM (M.insertWith (flip f) (getKey $ getUnique k) v m)
 
-alterUFM        :: Uniquable key =>
-                              (Maybe elt -> Maybe elt)  -- How to adjust
-                           -> UniqFM elt                -- old
-                           -> key                       -- new
-                           -> UniqFM elt                -- result
+addToUFM_Acc
+  :: Uniquable key
+  => (elt -> elts -> elts)  -- Add to existing
+  -> (elt -> elts)          -- New element
+  -> UniqFM elts            -- old
+  -> key -> elt             -- new
+  -> UniqFM elts            -- result
+addToUFM_Acc exi new (UFM m) k v =
+  UFM (M.insertWith (\_new old -> exi v old) (getKey $ getUnique k) (new v) m)
 
-addListToUFM_C  :: Uniquable key => (elt -> elt -> elt)
-                           -> UniqFM elt -> [(key,elt)]
-                           -> UniqFM elt
+alterUFM
+  :: Uniquable key
+  => (Maybe elt -> Maybe elt)  -- How to adjust
+  -> UniqFM elt                -- old
+  -> key                       -- new
+  -> UniqFM elt                -- result
+alterUFM f (UFM m) k = UFM (M.alter f (getKey $ getUnique k) m)
 
-adjustUFM       :: Uniquable key => (elt -> elt) -> UniqFM elt -> key -> UniqFM elt
+addListToUFM_C
+  :: Uniquable key
+  => (elt -> elt -> elt)
+  -> UniqFM elt -> [(key,elt)]
+  -> UniqFM elt
+addListToUFM_C f = foldl (\m (k, v) -> addToUFM_C f m k v)
+
+adjustUFM :: Uniquable key => (elt -> elt) -> UniqFM elt -> key -> UniqFM elt
+adjustUFM f (UFM m) k = UFM (M.adjust f (getKey $ getUnique k) m)
+
 adjustUFM_Directly :: (elt -> elt) -> UniqFM elt -> Unique -> UniqFM elt
+adjustUFM_Directly f (UFM m) u = UFM (M.adjust f (getKey u) m)
 
-delFromUFM      :: Uniquable key => UniqFM elt -> key    -> UniqFM elt
-delListFromUFM  :: Uniquable key => UniqFM elt -> [key] -> UniqFM elt
+delFromUFM :: Uniquable key => UniqFM elt -> key    -> UniqFM elt
+delFromUFM (UFM m) k = UFM (M.delete (getKey $ getUnique k) m)
+
+delListFromUFM :: Uniquable key => UniqFM elt -> [key] -> UniqFM elt
+delListFromUFM = foldl delFromUFM
+
 delListFromUFM_Directly :: UniqFM elt -> [Unique] -> UniqFM elt
+delListFromUFM_Directly = foldl delFromUFM_Directly
+
 delFromUFM_Directly :: UniqFM elt -> Unique -> UniqFM elt
+delFromUFM_Directly (UFM m) u = UFM (M.delete (getKey u) m)
 
 -- Bindings in right argument shadow those in the left
-plusUFM         :: UniqFM elt -> UniqFM elt -> UniqFM elt
+plusUFM :: UniqFM elt -> UniqFM elt -> UniqFM elt
+-- M.union is left-biased, plusUFM should be right-biased.
+plusUFM (UFM x) (UFM y) = UFM (M.union y x)
+     -- Note (M.union y x), with arguments flipped
+     -- M.union is left-biased, plusUFM should be right-biased.
 
-plusUFM_C       :: (elt -> elt -> elt)
-                -> UniqFM elt -> UniqFM elt -> UniqFM elt
+plusUFM_C :: (elt -> elt -> elt) -> UniqFM elt -> UniqFM elt -> UniqFM elt
+plusUFM_C f (UFM x) (UFM y) = UFM (M.unionWith f x y)
 
 -- | `plusUFM_CD f m1 d1 m2 d2` merges the maps using `f` as the
 -- combinding function and `d1` resp. `d2` as the default value if
@@ -153,137 +200,82 @@ plusUFM_C       :: (elt -> elt -> elt)
 -- plusUFM_CD f {A: 1, B: 2} 23 {B: 3, C: 4} 42
 --    == {A: f 1 42, B: f 2 3, C: f 23 4 }
 -- @
-plusUFM_CD      :: (elt -> elt -> elt)
-                -> UniqFM elt -> elt -> UniqFM elt -> elt -> UniqFM elt
-
-minusUFM        :: UniqFM elt1 -> UniqFM elt2 -> UniqFM elt1
-
-intersectUFM    :: UniqFM elt -> UniqFM elt -> UniqFM elt
-intersectUFM_C  :: (elt1 -> elt2 -> elt3)
-                -> UniqFM elt1 -> UniqFM elt2 -> UniqFM elt3
-disjointUFM     :: UniqFM elt1 -> UniqFM elt2 -> Bool
-
-foldUFM         :: (elt -> a -> a) -> a -> UniqFM elt -> a
-mapUFM          :: (elt1 -> elt2) -> UniqFM elt1 -> UniqFM elt2
-mapUFM_Directly :: (Unique -> elt1 -> elt2) -> UniqFM elt1 -> UniqFM elt2
-filterUFM       :: (elt -> Bool) -> UniqFM elt -> UniqFM elt
-filterUFM_Directly :: (Unique -> elt -> Bool) -> UniqFM elt -> UniqFM elt
-partitionUFM    :: (elt -> Bool) -> UniqFM elt -> (UniqFM elt, UniqFM elt)
-
-sizeUFM         :: UniqFM elt -> Int
---hashUFM               :: UniqFM elt -> Int
-elemUFM         :: Uniquable key => key -> UniqFM elt -> Bool
-elemUFM_Directly:: Unique -> UniqFM elt -> Bool
-
-lookupUFM       :: Uniquable key => UniqFM elt -> key -> Maybe elt
-lookupUFM_Directly  -- when you've got the Unique already
-                :: UniqFM elt -> Unique -> Maybe elt
-lookupWithDefaultUFM
-                :: Uniquable key => UniqFM elt -> elt -> key -> elt
-lookupWithDefaultUFM_Directly
-                :: UniqFM elt -> elt -> Unique -> elt
-eltsUFM         :: UniqFM elt -> [elt]
-ufmToSet_Directly :: UniqFM elt -> S.IntSet
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Monoid interface}
-*                                                                      *
-************************************************************************
--}
-
-#if __GLASGOW_HASKELL__ > 710
-instance Semigroup (UniqFM a) where
-  (<>) = plusUFM
-#endif
-
-instance Monoid (UniqFM a) where
-    mempty = emptyUFM
-    mappend = plusUFM
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Implementation using ``Data.IntMap''}
-*                                                                      *
-************************************************************************
--}
-
-
-newtype UniqFM ele = UFM (M.IntMap ele)
-  deriving (Data, Eq, Functor, Typeable)
-  -- We used to derive Traversable and Foldable, but they were nondeterministic
-  -- and not obvious at the call site. You can use explicit nonDetEltsUFM
-  -- and fold a list if needed.
-  -- See Note [Deterministic UniqFM] in UniqDFM to learn about determinism.
-
-emptyUFM = UFM M.empty
-isNullUFM (UFM m) = M.null m
-unitUFM k v = UFM (M.singleton (getKey $ getUnique k) v)
-unitDirectlyUFM u v = UFM (M.singleton (getKey u) v)
-listToUFM = foldl (\m (k, v) -> addToUFM m k v) emptyUFM
-listToUFM_Directly = foldl (\m (u, v) -> addToUFM_Directly m u v) emptyUFM
-listToUFM_C f = foldl (\m (k, v) -> addToUFM_C f m k v) emptyUFM
-
-alterUFM f (UFM m) k = UFM (M.alter f (getKey $ getUnique k) m)
-addToUFM (UFM m) k v   = UFM (M.insert (getKey $ getUnique k) v m)
-addListToUFM = foldl (\m (k, v) -> addToUFM m k v)
-addListToUFM_Directly = foldl (\m (k, v) -> addToUFM_Directly m k v)
-addToUFM_Directly (UFM m) u v = UFM (M.insert (getKey u) v m)
-
--- Arguments of combining function of M.insertWith and addToUFM_C are flipped.
-addToUFM_C f (UFM m) k v =
-  UFM (M.insertWith (flip f) (getKey $ getUnique k) v m)
-addToUFM_Acc exi new (UFM m) k v =
-  UFM (M.insertWith (\_new old -> exi v old) (getKey $ getUnique k) (new v) m)
-addListToUFM_C f = foldl (\m (k, v) -> addToUFM_C f m k v)
-
-adjustUFM f (UFM m) k = UFM (M.adjust f (getKey $ getUnique k) m)
-adjustUFM_Directly f (UFM m) u = UFM (M.adjust f (getKey u) m)
-
-delFromUFM (UFM m) k = UFM (M.delete (getKey $ getUnique k) m)
-delListFromUFM = foldl delFromUFM
-delFromUFM_Directly (UFM m) u = UFM (M.delete (getKey u) m)
-delListFromUFM_Directly = foldl delFromUFM_Directly
-
--- M.union is left-biased, plusUFM should be right-biased.
-plusUFM (UFM x) (UFM y) = UFM (M.union y x)
-     -- Note (M.union y x), with arguments flipped
-     -- M.union is left-biased, plusUFM should be right-biased.
-
-plusUFM_C f (UFM x) (UFM y) = UFM (M.unionWith f x y)
-
+plusUFM_CD
+  :: (elt -> elt -> elt)
+  -> UniqFM elt  -- map X
+  -> elt         -- default for X
+  -> UniqFM elt  -- map Y
+  -> elt         -- default for Y
+  -> UniqFM elt
 plusUFM_CD f (UFM xm) dx (UFM ym) dy
-    = UFM $ M.mergeWithKey
-        (\_ x y -> Just (x `f` y))
-        (M.map (\x -> x `f` dy))
-        (M.map (\y -> dx `f` y))
-        xm ym
+  = UFM $ M.mergeWithKey
+      (\_ x y -> Just (x `f` y))
+      (M.map (\x -> x `f` dy))
+      (M.map (\y -> dx `f` y))
+      xm ym
+
+minusUFM :: UniqFM elt1 -> UniqFM elt2 -> UniqFM elt1
 minusUFM (UFM x) (UFM y) = UFM (M.difference x y)
+
+intersectUFM :: UniqFM elt -> UniqFM elt -> UniqFM elt
 intersectUFM (UFM x) (UFM y) = UFM (M.intersection x y)
+
+intersectUFM_C
+  :: (elt1 -> elt2 -> elt3)
+  -> UniqFM elt1
+  -> UniqFM elt2
+  -> UniqFM elt3
 intersectUFM_C f (UFM x) (UFM y) = UFM (M.intersectionWith f x y)
+
+disjointUFM :: UniqFM elt1 -> UniqFM elt2 -> Bool
 disjointUFM (UFM x) (UFM y) = M.null (M.intersection x y)
 
+foldUFM :: (elt -> a -> a) -> a -> UniqFM elt -> a
 foldUFM k z (UFM m) = M.fold k z m
 
-
+mapUFM :: (elt1 -> elt2) -> UniqFM elt1 -> UniqFM elt2
 mapUFM f (UFM m) = UFM (M.map f m)
-mapUFM_Directly f (UFM m) = UFM (M.mapWithKey (f . getUnique) m)
-filterUFM p (UFM m) = UFM (M.filter p m)
-filterUFM_Directly p (UFM m) = UFM (M.filterWithKey (p . getUnique) m)
-partitionUFM p (UFM m) = case M.partition p m of
-                           (left, right) -> (UFM left, UFM right)
 
+mapUFM_Directly :: (Unique -> elt1 -> elt2) -> UniqFM elt1 -> UniqFM elt2
+mapUFM_Directly f (UFM m) = UFM (M.mapWithKey (f . getUnique) m)
+
+filterUFM :: (elt -> Bool) -> UniqFM elt -> UniqFM elt
+filterUFM p (UFM m) = UFM (M.filter p m)
+
+filterUFM_Directly :: (Unique -> elt -> Bool) -> UniqFM elt -> UniqFM elt
+filterUFM_Directly p (UFM m) = UFM (M.filterWithKey (p . getUnique) m)
+
+partitionUFM :: (elt -> Bool) -> UniqFM elt -> (UniqFM elt, UniqFM elt)
+partitionUFM p (UFM m) =
+  case M.partition p m of
+    (left, right) -> (UFM left, UFM right)
+
+sizeUFM :: UniqFM elt -> Int
 sizeUFM (UFM m) = M.size m
+
+elemUFM :: Uniquable key => key -> UniqFM elt -> Bool
 elemUFM k (UFM m) = M.member (getKey $ getUnique k) m
+
+elemUFM_Directly :: Unique -> UniqFM elt -> Bool
 elemUFM_Directly u (UFM m) = M.member (getKey u) m
 
+lookupUFM :: Uniquable key => UniqFM elt -> key -> Maybe elt
 lookupUFM (UFM m) k = M.lookup (getKey $ getUnique k) m
+
+-- when you've got the Unique already
+lookupUFM_Directly :: UniqFM elt -> Unique -> Maybe elt
 lookupUFM_Directly (UFM m) u = M.lookup (getKey u) m
+
+lookupWithDefaultUFM :: Uniquable key => UniqFM elt -> elt -> key -> elt
 lookupWithDefaultUFM (UFM m) v k = M.findWithDefault v (getKey $ getUnique k) m
+
+lookupWithDefaultUFM_Directly :: UniqFM elt -> elt -> Unique -> elt
 lookupWithDefaultUFM_Directly (UFM m) v u = M.findWithDefault v (getKey u) m
+
+eltsUFM :: UniqFM elt -> [elt]
 eltsUFM (UFM m) = M.elems m
+
+ufmToSet_Directly :: UniqFM elt -> S.IntSet
 ufmToSet_Directly (UFM m) = M.keysSet m
 
 anyUFM :: (elt -> Bool) -> UniqFM elt -> Bool
@@ -331,13 +323,18 @@ nonDetUFMToList (UFM m) = map (\(k, v) -> (getUnique k, v)) $ M.toList m
 ufmToIntMap :: UniqFM elt -> M.IntMap elt
 ufmToIntMap (UFM m) = m
 
-{-
-************************************************************************
-*                                                                      *
-\subsection{Output-ery}
-*                                                                      *
-************************************************************************
--}
+-- Instances
+
+#if __GLASGOW_HASKELL__ > 710
+instance Semigroup (UniqFM a) where
+  (<>) = plusUFM
+#endif
+
+instance Monoid (UniqFM a) where
+    mempty = emptyUFM
+    mappend = plusUFM
+
+-- Output-ery
 
 instance Outputable a => Outputable (UniqFM a) where
     ppr ufm = pprUniqFM ppr ufm
