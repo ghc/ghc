@@ -82,7 +82,7 @@ ccSrcSpan p = (# peek CostCentre, srcloc) p
 -- | Returns a @[String]@ representing the current call stack.  This
 -- can be useful for debugging.
 --
--- The implementation uses the call-stack simulation maintined by the
+-- The implementation uses the call-stack simulation maintained by the
 -- profiler, so it only works if the program was compiled with @-prof@
 -- and contains suitable SCC annotations (e.g. by using @-fprof-auto@).
 -- Otherwise, the list returned is likely to be empty or
