@@ -67,8 +67,8 @@ classifyTyCons convStatus parTyCons tcs = classify [] [] [] [] convStatus parTyC
         refs = ds `delListFromUniqSet` tcs
 
           -- the tycons that directly or indirectly depend on parallel arrays
-        tcs_par | any ((`elemNameSet` parTyCons) . tyConName) . eltsUFM $ refs = tcs
-                | otherwise                                                    = []
+        tcs_par | anyUFM ((`elemNameSet` parTyCons) . tyConName) refs = tcs
+                | otherwise = []
 
         pts' = pts `extendNameSetList` map tyConName tcs_par
 
