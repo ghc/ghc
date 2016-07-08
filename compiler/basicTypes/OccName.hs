@@ -521,9 +521,7 @@ parenSymOcc occ doc | isSymOcc occ = parens doc
 startsWithUnderscore :: OccName -> Bool
 -- ^ Haskell 98 encourages compilers to suppress warnings about unsed
 -- names in a pattern if they start with @_@: this implements that test
-startsWithUnderscore occ = case occNameString occ of
-                             ('_' : _) -> True
-                             _other    -> False
+startsWithUnderscore occ = headFS (occNameFS occ) == '_'
 
 {-
 ************************************************************************
