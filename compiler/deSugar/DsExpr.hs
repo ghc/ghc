@@ -470,12 +470,10 @@ dsExpr (HsStatic _ expr@(L loc _)) = do
     mkStaticPtrFingerprint :: Module -> DsM Fingerprint
     mkStaticPtrFingerprint this_mod = do
       n <- mkGenPerModuleNum this_mod
-      return $ fingerprintString $ unpackFS $ concatFS
-        [ unitIdFS $ moduleUnitId this_mod
-        , fsLit ":"
-        , moduleNameFS $ moduleName this_mod
-        , fsLit ":"
-        , mkFastString $ show n
+      return $ fingerprintString $ intercalate ":"
+        [ unitIdString $ moduleUnitId this_mod
+        , moduleNameString $ moduleName this_mod
+        , show n
         ]
 
     mkGenPerModuleNum :: Module -> DsM Int
