@@ -198,6 +198,7 @@ instance IsString FastString where
 instance Monoid FastString where
     mempty = nilFS
     mappend = appendFS
+    mconcat = concatFS
 
 instance Show FastString where
    show fs = show (unpackFS fs)
