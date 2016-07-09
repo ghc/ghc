@@ -1,0 +1,4 @@
+
+T12146.hs:1:21:
+    Parse error: module header, import declaration
+    or top-level declaration expected.
