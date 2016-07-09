@@ -113,7 +113,7 @@ rts/dist/build/win32/libHS$1.def : rts/win32/libHS$1.def
 
 rts/dist/build/win32/libHS$1.dll.a : rts/dist/build/win32/libHS$1.def
 	"$$(DLLTOOL)" 	-d rts/dist/build/win32/libHS$1.def \
-			-l rts/dist/build/win32/libHS$1.dll.a
+			-y rts/dist/build/win32/libHS$1.dll.a
 endef
 $(foreach lib,$(ALL_RTS_DEF_LIBNAMES),$(eval $(call make-importlib-def,$(lib))))
 endif
