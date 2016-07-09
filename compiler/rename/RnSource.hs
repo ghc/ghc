@@ -2206,6 +2206,10 @@ add gp loc (SpliceD _ splice@(SpliceDecl _ _ flag)) ds
   where
     badImplicitSplice = text "Parse error: module header, import declaration"
                      $$ text "or top-level declaration expected."
+                     -- The compiler should suggest the above, and not using
+                     -- TemplateHaskell since the former suggestion is more
+                     -- relevant to the larger base of users.
+                     -- See Trac #12146 for discussion.
 
 -- Class declarations: pull out the fixity signatures to the top
 add gp@(HsGroup {hs_tyclds = ts, hs_fixds = fs}) l (TyClD _ d) ds
