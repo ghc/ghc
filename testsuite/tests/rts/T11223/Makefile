@@ -6,7 +6,7 @@ include $(TOP)/mk/test.mk
 # Testing RTS linker object resolution
 #
 
-CC=gcc
+CC=$(TEST_CC)
 
 .PHONY: t_11223_simple_link
 t_11223_simple_link:

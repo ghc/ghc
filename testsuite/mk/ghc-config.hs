@@ -28,6 +28,7 @@ main = do
   getGhcFieldOrDefault fields "GhcProfiled" "GHC Profiled" "NO"
   getGhcFieldProgWithDefault fields "AR" "ar command" "ar"
   getGhcFieldProgWithDefault fields "LLC" "LLVM llc command" "llc"
+  getGhcFieldProgWithDefault fields "TEST_CC" "C compiler command" "gcc"
 
   let pkgdb_flag = case lookup "Project version" fields of
         Just v
