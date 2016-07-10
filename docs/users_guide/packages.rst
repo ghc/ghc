@@ -1323,10 +1323,15 @@ environment specifies precisely which packages should be visible.
 Note that for the ``package-db`` directive, if a relative path is given it
 must be relative to the location of the package environment file.
 
+.. ghc-flag:: -package-env ⟨file⟩|⟨name⟩
+
+    Use the package environment in ⟨file⟩, or in
+    ``$HOME/.ghc/arch-os-version/environments/⟨name⟩``
+
 In order, ``ghc`` will look for the package environment in the following
 locations:
 
--  File ⟨file⟩ if you pass the option ``-package-env file``.
+-  File ⟨file⟩ if you pass the option :ghc-flag:`-package-env file`.
 
 -  File ``$HOME/.ghc/arch-os-version/environments/name`` if you pass the
    option ``-package-env name``.
