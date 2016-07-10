@@ -70,7 +70,7 @@ import SrcLoc
 import Foreign
 import Data.Array
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Internal as BS
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Unsafe   as BS
 import Data.IORef
 import Data.Char                ( ord, chr )
@@ -692,25 +692,18 @@ putBS bh bs =
                 go (n+1)
   go 0
 
-{- -- possible faster version, not quite there yet:
-getBS bh@BinMem{} = do
-  (I# l) <- get bh
-  arr <- readIORef (arr_r bh)
-  off <- readFastMutInt (off_r bh)
-  return $! (mkFastSubBytesBA# arr off l)
--}
 getBS :: BinHandle -> IO ByteString
 getBS bh = do
-  l <- get bh
-  fp <- mallocForeignPtrBytes l
-  withForeignPtr fp $ \ptr -> do
-    let go n | n == l = return $ BS.fromForeignPtr fp 0 l
-             | otherwise = do
-                b <- getByte bh
-                pokeElemOff ptr n b
-                go (n+1)
-    --
-    go 0
+  l <- get bh :: IO Int
+  arr <- readIORef (_arr_r bh)
+  sz <- readFastMutInt (_sz_r bh)
+  off <- readFastMutInt (_off_r bh)
+  when (off + l > sz) $
+        ioError (mkIOError eofErrorType "Data.Binary.getBS" Nothing Nothing)
+  writeFastMutInt (_off_r bh) (off+l)
+  withForeignPtr arr $ \ptr -> do
+      bs <- BS.unsafePackCStringLen (castPtr $ ptr `plusPtr` off, fromIntegral l)
+      return $! BS.copy bs
 
 instance Binary ByteString where
   put_ bh f = putBS bh f
