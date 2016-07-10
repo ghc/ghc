@@ -18,6 +18,7 @@ t10358
 t10396
 t10399
 t11430
+load-main
 stringSource
 *.hi
 *.o

@@ -20,15 +20,23 @@ main = do
 
 testOneFile :: FilePath -> String -> IO ()
 testOneFile libdir fileName = do
+       let modByFile m =
+             case ml_hs_file $ ms_location m of
+               Nothing -> False
+               Just fn -> fn == fileName
        ((anns,_cs),p) <- runGhc (Just libdir) $ do
                         dflags <- getSessionDynFlags
                         _ <- setSessionDynFlags dflags
-                        let mn =mkModuleName fileName
-                        addTarget Target { targetId = TargetModule mn
+                        addTarget Target { targetId = TargetFile fileName Nothing
                                          , targetAllowObjCode = True
                                          , targetContents = Nothing }
                         _ <- load LoadAllTargets
-                        modSum <- getModSummary mn
+                        graph <- getModuleGraph
+                        let
+                          modSum = case filter modByFile graph of
+                                    [x] -> x
+                                    xs -> error $ "Can't find module, got:"
+                                             ++ show (map (ml_hs_file . ms_location) xs)
                         p <- parseModule modSum
                         return (pm_annotations p,p)
 
