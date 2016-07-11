@@ -664,7 +664,7 @@ getDictionary bh = do
 -- The Symbol Table
 ---------------------------------------------------------
 
--- On disk, the symbol table is an array of IfaceExtName, when
+-- On disk, the symbol table is an array of IfExtName, when
 -- reading it in we turn it into a SymbolTable.
 
 type SymbolTable = Array Int Name
