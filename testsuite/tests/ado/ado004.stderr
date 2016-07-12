@@ -18,17 +18,17 @@ TYPE SIGNATURES
     (Num b, Num t, Functor f) =>
     (t -> f b) -> f b
   test3 ::
-    forall a t (m :: * -> *) t1.
-    (Num t1, Monad m) =>
-    (t1 -> m t) -> (t -> t -> m a) -> m a
+    forall a t1 (m :: * -> *) t2.
+    (Num t2, Monad m) =>
+    (t2 -> m t1) -> (t1 -> t1 -> m a) -> m a
   test4 ::
-    forall a a1 (m :: * -> *) t.
+    forall a1 a2 (m :: * -> *) t.
     (Num t, Monad m) =>
-    (t -> m a1) -> (a1 -> a1 -> m a) -> m a
+    (t -> m a2) -> (a2 -> a2 -> m a1) -> m a1
   test5 ::
-    forall a a1 (m :: * -> *) t.
+    forall a1 a2 (m :: * -> *) t.
     (Num t, Monad m) =>
-    (t -> m a1) -> (a1 -> a1 -> m a) -> m a
+    (t -> m a2) -> (a2 -> a2 -> m a1) -> m a1
   test6 ::
     forall a (m :: * -> *) t.
     (Num (m a), Monad m) =>

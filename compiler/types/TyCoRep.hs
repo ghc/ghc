@@ -3104,7 +3104,15 @@ ppSuggestExplicitKinds
 --
 -- It doesn't change the uniques at all, just the print names.
 tidyTyCoVarBndrs :: TidyEnv -> [TyCoVar] -> (TidyEnv, [TyCoVar])
-tidyTyCoVarBndrs tidy_env tvs = mapAccumL tidyTyCoVarBndr tidy_env tvs
+tidyTyCoVarBndrs (occ_env, subst) tvs
+    = mapAccumL tidyTyCoVarBndr tidy_env' tvs
+  where
+    -- Seed the occ_env with clashes among the names, see
+    -- Node [Tidying multiple names at once] in OccName
+    -- Se still go through tidyTyCoVarBndr so that each kind variable is tidied
+    -- with the correct tidy_env
+    occs = map getHelpfulOccName tvs
+    tidy_env' = (avoidClashesOccEnv occ_env occs, subst)
 
 tidyTyCoVarBndr :: TidyEnv -> TyCoVar -> (TidyEnv, TyCoVar)
 tidyTyCoVarBndr tidy_env@(occ_env, subst) tyvar

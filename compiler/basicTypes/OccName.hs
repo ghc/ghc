@@ -98,7 +98,9 @@ module OccName (
         filterOccSet,
 
         -- * Tidying up
-        TidyOccEnv, emptyTidyOccEnv, tidyOccNames, tidyOccName, initTidyOccEnv,
+        TidyOccEnv, emptyTidyOccEnv, initTidyOccEnv,
+        tidyOccName,
+        tidyOccNames, avoidClashesOccEnv,
 
         -- FsEnv
         FastStringEnv, emptyFsEnv, lookupFsEnv, extendFsEnv, mkFsEnv
@@ -810,6 +812,36 @@ So we use the TidyOccEnv mapping for "a" (not "a7" or "a8") as our base for
 starting the search; and we make sure to update the starting point for "a"
 after we allocate a new one.
 
+
+Node [Tidying multiple names at once]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Consider
+
+    > :t (id,id,id)
+
+Every id contributes a type variable to the type signature, and all of them are
+"a". If we tidy them one by one, we get
+
+    (id,id,id) :: (a2 -> a2, a1 -> a1, a -> a)
+
+which is a bit unfortunate, as it unfairly renames only one of them. What we
+would like to see is
+
+    (id,id,id) :: (a3 -> a3, a2 -> a2, a1 -> a1)
+
+This is achieved in tidyOccNames. It still uses tidyOccName to rename each name
+on its own, but it prepares the TidyEnv (using avoidClashesOccEnv), by “blocking” every
+name that occurs twice in the map. This way, none of the "a"s will get the
+priviledge of keeping this name, and all of them will get a suitable numbery by
+tidyOccName.
+
+It may be inappropriate to use tidyOccNames if the caller needs access to the
+intermediate environments (e.g. to tidy the tyVarKind of a type variable). In that
+case, avoidClashesOccEnv should be used directly, and tidyOccName afterwards.
+
+This is #12382.
+
 -}
 
 type TidyOccEnv = UniqFM Int    -- The in-scope OccNames
@@ -823,16 +855,29 @@ initTidyOccEnv = foldl add emptyUFM
   where
     add env (OccName _ fs) = addToUFM env fs 1
 
+-- see Note [Tidying multiple names at once]
 tidyOccNames :: TidyOccEnv -> [OccName] -> (TidyOccEnv, [OccName])
-tidyOccNames env occs = mapAccumL tidyOccName env occs
+tidyOccNames env occs = mapAccumL tidyOccName env' occs
+  where
+    env' = avoidClashesOccEnv env occs
+
+avoidClashesOccEnv :: TidyOccEnv -> [OccName] -> TidyOccEnv
+avoidClashesOccEnv env occs = go env emptyUFM occs
+  where
+    go env _        [] = env
+    go env seenOnce ((OccName _ fs):occs)
+      | fs `elemUFM` env      = go env seenOnce                  occs
+      | fs `elemUFM` seenOnce = go (addToUFM env fs 1) seenOnce  occs
+      | otherwise             = go env (addToUFM seenOnce fs ()) occs
 
 tidyOccName :: TidyOccEnv -> OccName -> (TidyOccEnv, OccName)
 tidyOccName env occ@(OccName occ_sp fs)
-  = case lookupUFM env fs of
-      Nothing -> (addToUFM env fs 1, occ)   -- Desired OccName is free
-      Just {} -> case lookupUFM env base1 of
-                   Nothing -> (addToUFM env base1 2, OccName occ_sp base1)
-                   Just n  -> find 1 n
+  | not (fs `elemUFM` env)
+  = (addToUFM env fs 1, occ)   -- Desired OccName is free
+  | otherwise
+  = case lookupUFM env base1 of
+       Nothing -> (addToUFM env base1 2, OccName occ_sp base1)
+       Just n  -> find 1 n
   where
     base :: String  -- Drop trailing digits (see Note [TidyOccEnv])
     base  = dropWhileEndLE isDigit (unpackFS fs)
