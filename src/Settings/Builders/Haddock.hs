@@ -6,6 +6,7 @@ import Oracles.PackageData
 import Predicate
 import Settings
 import Settings.Builders.Ghc
+import Settings.Paths
 
 -- | Given a version string such as "2.16.2" produce an integer equivalent.
 versionToInt :: String -> Int

@@ -1,8 +1,11 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Oracles.WindowsPath (
-    fixAbsolutePathOnWindows, topDirectory, windowsPathOracle
+    fixAbsolutePathOnWindows, topDirectory, getTopDirectory, windowsPathOracle
     ) where
 
+-- TODO: Rename to Oracles.Path.
+
+import Control.Monad.Trans.Reader
 import Data.Char
 
 import Base
@@ -14,6 +17,9 @@ newtype WindowsPath = WindowsPath FilePath
 -- | Path to the GHC source tree.
 topDirectory :: Action FilePath
 topDirectory = fixAbsolutePathOnWindows =<< setting GhcSourcePath
+
+getTopDirectory :: ReaderT a Action FilePath
+getTopDirectory = lift topDirectory
 
 -- | Fix an absolute path on Windows:
 -- * "/c/" => "C:/"

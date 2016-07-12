@@ -1,7 +1,7 @@
 module CmdLineFlag (
-    putCmdLineFlags, cmdFlags, cmdBuildHaddock, cmdFlavour, Flavour (..),
-    cmdProgressColour, ProgressColour (..), cmdProgressInfo, ProgressInfo (..),
-    cmdSkipConfigure, cmdSplitObjects
+    putCmdLineFlags, cmdFlags, cmdBuildHaddock, cmdFlavour, cmdProgressColour,
+    ProgressColour (..), cmdProgressInfo, ProgressInfo (..), cmdSkipConfigure,
+    cmdSplitObjects
     ) where
 
 import Data.IORef
@@ -14,14 +14,13 @@ import System.IO.Unsafe
 -- build rules to be rurun.
 data Untracked = Untracked
     { buildHaddock   :: Bool
-    , flavour        :: Flavour
+    , flavour        :: Maybe String
     , progressColour :: ProgressColour
     , progressInfo   :: ProgressInfo
     , skipConfigure  :: Bool
     , splitObjects   :: Bool }
     deriving (Eq, Show)
 
-data Flavour        = Default | Quick | Quickest deriving (Eq, Show)
 data ProgressColour = Never | Auto | Always deriving (Eq, Show)
 data ProgressInfo   = None | Brief | Normal | Unicorn deriving (Eq, Show)
 
@@ -29,7 +28,7 @@ data ProgressInfo   = None | Brief | Normal | Unicorn deriving (Eq, Show)
 defaultUntracked :: Untracked
 defaultUntracked = Untracked
     { buildHaddock   = False
-    , flavour        = Default
+    , flavour        = Nothing
     , progressColour = Auto
     , progressInfo   = Normal
     , skipConfigure  = False
@@ -39,16 +38,7 @@ readBuildHaddock :: Either String (Untracked -> Untracked)
 readBuildHaddock = Right $ \flags -> flags { buildHaddock = True }
 
 readFlavour :: Maybe String -> Either String (Untracked -> Untracked)
-readFlavour ms =
-    maybe (Left "Cannot parse flavour") (Right . set) (go =<< lower <$> ms)
-  where
-    go :: String -> Maybe Flavour
-    go "default"  = Just Default
-    go "quick"    = Just Quick
-    go "quickest" = Just Quickest
-    go _          = Nothing
-    set :: Flavour -> Untracked -> Untracked
-    set flag flags = flags { flavour = flag }
+readFlavour ms = Right $ \flags -> flags { flavour = ms }
 
 readProgressColour :: Maybe String -> Either String (Untracked -> Untracked)
 readProgressColour ms =
@@ -112,7 +102,7 @@ getCmdLineFlags = unsafePerformIO $ readIORef cmdLineFlags
 cmdBuildHaddock :: Bool
 cmdBuildHaddock = buildHaddock getCmdLineFlags
 
-cmdFlavour :: Flavour
+cmdFlavour :: Maybe String
 cmdFlavour = flavour getCmdLineFlags
 
 cmdProgressColour :: ProgressColour

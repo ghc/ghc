@@ -2,7 +2,7 @@ module Settings.Builders.Make (makeBuilderArgs) where
 
 import Base
 import Predicate
-import Settings
+import Settings.Paths
 
 makeBuilderArgs :: Args
 makeBuilderArgs = do

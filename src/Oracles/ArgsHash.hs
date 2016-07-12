@@ -4,8 +4,8 @@ module Oracles.ArgsHash (checkArgsHash, argsHashOracle) where
 import Base
 import Expression
 import Settings
-import Settings.Args
 import Target
+import UserSettings
 
 newtype ArgsHashKey = ArgsHashKey Target
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)

@@ -10,6 +10,7 @@ import Base
 import Expression
 import GHC
 import Settings
+import Settings.Paths
 
 cabalRules :: Rules ()
 cabalRules = do

@@ -4,6 +4,7 @@ import Base
 import Predicate
 import Settings
 import Settings.Builders.GhcCabal
+import Settings.Paths
 
 ghcPkgBuilderArgs :: Args
 ghcPkgBuilderArgs = builder GhcPkg ? (initArgs <> updateArgs)

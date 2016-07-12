@@ -1,6 +1,7 @@
 module Settings.Packages.Compiler (compilerPackageArgs) where
 
 import Base
+import Flavour
 import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
@@ -33,9 +34,9 @@ compilerPackageArgs = package compiler ? do
                 notM (flag GhcUnregisterised) ?
                 notStage0 ? arg "--ghc-option=-DGHCI_TABLES_NEXT_TO_CODE"
               , ghcWithInterpreter ?
-                ghciWithDebugger ?
+                ghciWithDebugger flavour ?
                 notStage0 ? arg "--ghc-option=-DDEBUGGER"
-              , ghcProfiled ?
+              , ghcProfiled flavour ?
                 notStage0 ? arg "--ghc-pkg-option=--force"
               ]
 

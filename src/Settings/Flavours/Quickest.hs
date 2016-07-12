@@ -1,9 +1,17 @@
-module Settings.Flavours.Quickest (quickestFlavourArgs, quickestFlavourWays) where
+module Settings.Flavours.Quickest (quickestFlavour) where
 
+import Flavour
 import Predicate
+import {-# SOURCE #-} Settings.Default
 
-quickestFlavourArgs :: Args
-quickestFlavourArgs = builder Ghc ? arg "-O0"
+quickestFlavour :: Flavour
+quickestFlavour = defaultFlavour
+    { name        = "quickest"
+    , args        = defaultArgs <> quickestArgs
+    , libraryWays = defaultLibraryWays <> quickestLibraryWays }
 
-quickestFlavourWays :: Ways
-quickestFlavourWays = remove [profiling]
+quickestArgs :: Args
+quickestArgs = builder Ghc ? arg "-O0"
+
+quickestLibraryWays :: Ways
+quickestLibraryWays = remove [profiling]

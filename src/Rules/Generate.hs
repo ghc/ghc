@@ -19,8 +19,9 @@ import Rules.Generators.GhcSplit
 import Rules.Generators.GhcVersionH
 import Rules.Generators.VersionHs
 import Rules.Libffi
-import Settings
+import Settings.Paths
 import Target
+import UserSettings
 
 installTargets :: [FilePath]
 installTargets = [ "inplace/lib/ghc-usage.txt"

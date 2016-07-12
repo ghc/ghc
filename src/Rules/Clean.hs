@@ -5,7 +5,7 @@ import Context
 import Package
 import Rules.Actions
 import Rules.Generate
-import Settings.Packages
+import Settings
 import Settings.Paths
 import Stage
 import UserSettings

@@ -3,50 +3,38 @@
 -- If you don't copy the file your changes will be tracked by git and you can
 -- accidentally commit them.
 module UserSettings (
-    buildRootPath, trackBuildSystem, userArgs, userPackages, userLibraryWays,
-    userRtsWays, userKnownPackages, integerLibrary, buildHaddock, validating,
-    ghciWithDebugger, ghcProfiled, ghcDebugged, dynamicGhcPrograms,
-    turnWarningsIntoErrors, splitObjects, verboseCommands, putBuild, putSuccess
+    buildRootPath, userFlavours, userKnownPackages, integerLibrary,
+    trackBuildSystem, validating, turnWarningsIntoErrors, verboseCommands,
+    putBuild, putSuccess
     ) where
 
 import System.Console.ANSI
 
 import Base
-import CmdLineFlag
+import Flavour
 import GHC
 import Predicate
-import Settings.Default
 
+-- TODO: Update the docs.
 -- See doc/user-settings.md for instructions.
 
 -- | All build results are put into 'buildRootPath' directory.
 buildRootPath :: FilePath
 buildRootPath = "_build"
 
--- | Modify default build command line arguments.
-userArgs :: Args
-userArgs = builder Ghc ? remove ["-Wall", "-fwarn-tabs"]
+-- | User defined build flavours. See 'defaultFlavour' as an example.
+userFlavours :: [Flavour]
+userFlavours = []
 
--- | Modify the set of packages that are built by default in each stage.
-userPackages :: Packages
-userPackages = mempty
-
--- | Add user defined packages. Don't forget to add them to 'userPackages' too.
+-- | Add user defined packages. Note, this only let's Hadrian know about the
+-- existence of a new package; to actually build it you need to create a new
+-- build flavour, modifying the list of packages that are built by default.
 userKnownPackages :: [Package]
 userKnownPackages = []
 
 -- | Choose the integer library: 'integerGmp' or 'integerSimple'.
 integerLibrary :: Package
 integerLibrary = integerGmp
-
--- FIXME: We skip 'dynamic' since it's currently broken #4.
--- | Modify the set of ways in which library packages are built.
-userLibraryWays :: Ways
-userLibraryWays = remove [dynamic]
-
--- | Modify the set of ways in which the 'rts' package is built.
-userRtsWays :: Ways
-userRtsWays = mempty
 
 -- | User defined flags. Note the following type semantics:
 -- * @Bool@: a plain Boolean flag whose value is known at compile time.
@@ -65,29 +53,6 @@ trackBuildSystem = True
 -- TODO: This should be set automatically when validating.
 validating :: Bool
 validating = False
-
--- | Control when split objects are generated. Note, due to the GHC bug #11315
--- it is necessary to do a full clean rebuild when changing this option.
-splitObjects :: Predicate
-splitObjects = return cmdSplitObjects &&^ defaultSplitObjects
-
--- | Control when to build Haddock documentation.
-buildHaddock :: Predicate
-buildHaddock = return cmdBuildHaddock
-
--- TODO: Do we need to be able to set these from command line?
--- TODO: Turn the flags below into a simple list @ghcWays :: [Way]@?
-dynamicGhcPrograms :: Bool
-dynamicGhcPrograms = False
-
-ghciWithDebugger :: Bool
-ghciWithDebugger = False
-
-ghcProfiled :: Bool
-ghcProfiled = False
-
-ghcDebugged :: Bool
-ghcDebugged = False
 
 -- TODO: Replace with stage2 ? arg "-Werror"? Also see #251.
 -- | To enable -Werror in Stage2 set turnWarningsIntoErrors = stage2.

@@ -2,11 +2,13 @@ module Rules.Generators.ConfigHs (generateConfigHs) where
 
 import Base
 import Expression
+import Flavour
 import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
-import Settings
 import Rules.Generators.Common
+import Settings
+import UserSettings
 
 generateConfigHs :: Expr String
 generateConfigHs = do
@@ -96,6 +98,6 @@ generateConfigHs = do
         , "cGhcThreaded :: Bool"
         , "cGhcThreaded = " ++ show (threaded `elem` rtsWays)
         , "cGhcDebugged :: Bool"
-        , "cGhcDebugged = " ++ show ghcDebugged
+        , "cGhcDebugged = " ++ show (ghcDebugged flavour)
         , "cGhcRtsWithLibdw :: Bool"
         , "cGhcRtsWithLibdw = " ++ show cGhcRtsWithLibdw ]

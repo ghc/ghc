@@ -9,6 +9,7 @@ import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Oracles.PackageData
 import Settings
+import UserSettings
 
 includes :: [FilePath]
 includes = ["includes", "includes/dist-derivedconstants/header"]

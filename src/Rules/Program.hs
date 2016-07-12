@@ -14,7 +14,9 @@ import Rules.Library
 import Rules.Wrappers.Ghc
 import Rules.Wrappers.GhcPkg
 import Settings
+import Settings.Paths
 import Target
+import UserSettings
 
 -- TODO: Move to buildRootPath, see #113.
 -- | Directory for wrapped binaries.

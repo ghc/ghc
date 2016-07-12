@@ -24,6 +24,7 @@ executable hadrian
                        , Context
                        , Environment
                        , Expression
+                       , Flavour
                        , GHC
                        , Oracles.ArgsHash
                        , Oracles.Config
@@ -68,7 +69,6 @@ executable hadrian
                        , Rules.Wrappers.Ghc
                        , Rules.Wrappers.GhcPkg
                        , Settings
-                       , Settings.Args
                        , Settings.Builders.Alex
                        , Settings.Builders.Ar
                        , Settings.Builders.Common
@@ -90,7 +90,6 @@ executable hadrian
                        , Settings.Default
                        , Settings.Flavours.Quick
                        , Settings.Flavours.Quickest
-                       , Settings.Packages
                        , Settings.Packages.Base
                        , Settings.Packages.Compiler
                        , Settings.Packages.Directory
@@ -106,7 +105,6 @@ executable hadrian
                        , Settings.Packages.Touchy
                        , Settings.Packages.Unlit
                        , Settings.Paths
-                       , Settings.Ways
                        , Stage
                        , Target
                        , UserSettings

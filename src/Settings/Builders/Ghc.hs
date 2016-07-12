@@ -1,6 +1,7 @@
 module Settings.Builders.Ghc (ghcBuilderArgs, ghcMBuilderArgs, commonGhcArgs) where
 
 import Base
+import Flavour
 import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
@@ -9,6 +10,7 @@ import Predicate
 import Settings
 import Settings.Builders.Common
 import Settings.Builders.GhcCabal
+import Settings.Paths
 
 -- TODO: Add support for -dyno.
 -- $1/$2/build/%.$$($3_o-bootsuf) : $1/$4/%.hs-boot
@@ -57,7 +59,7 @@ needTouchy = do
 
 -- TODO: Add GhcSplit builder and use needBuilder.
 splitObjectsArgs :: Args
-splitObjectsArgs = splitObjects ? do
+splitObjectsArgs = splitObjects flavour ? do
     lift $ need [ghcSplit]
     arg "-split-objs"
 

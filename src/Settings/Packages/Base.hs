@@ -3,7 +3,7 @@ module Settings.Packages.Base (basePackageArgs) where
 import Base
 import GHC
 import Predicate
-import Settings
+import UserSettings
 
 basePackageArgs :: Args
 basePackageArgs = package base ?

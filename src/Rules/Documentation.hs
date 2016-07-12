@@ -3,11 +3,13 @@ module Rules.Documentation (buildPackageDocumentation) where
 import Base
 import Context
 import Expression
+import Flavour
 import GHC
 import Oracles.ModuleFiles
 import Oracles.PackageData
 import Rules.Actions
 import Settings
+import Settings.Paths
 import Target
 
 haddockHtmlLib :: FilePath
@@ -38,7 +40,7 @@ buildPackageDocumentation context@Context {..} =
 
             -- Build Haddock documentation
             -- TODO: pass the correct way from Rules via Context
-            let haddockWay = if dynamicGhcPrograms then dynamic else vanilla
+            let haddockWay = if dynamicGhcPrograms flavour then dynamic else vanilla
             build $ Target (context {way = haddockWay}) Haddock srcs [file]
 
         when (package == haddock) $ haddockHtmlLib %> \_ -> do

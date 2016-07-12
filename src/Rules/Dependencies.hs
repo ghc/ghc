@@ -8,8 +8,9 @@ import Expression
 import Oracles.ModuleFiles
 import Oracles.PackageData
 import Rules.Actions
-import Settings
+import Settings.Paths
 import Target
+import UserSettings
 
 buildPackageDependencies :: [(Resource, Int)] -> Context -> Rules ()
 buildPackageDependencies rs context@Context {..} =

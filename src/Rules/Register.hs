@@ -6,8 +6,8 @@ import Expression
 import GHC
 import Rules.Actions
 import Rules.Libffi
-import Settings
 import Settings.Packages.Rts
+import Settings.Paths
 import Target
 
 -- | Build package-data.mk by processing the .cabal file with ghc-cabal utility.

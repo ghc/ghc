@@ -4,6 +4,7 @@ import Base
 import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Oracles.PackageData
+import Oracles.WindowsPath
 import Predicate
 import Settings
 import Settings.Builders.Common

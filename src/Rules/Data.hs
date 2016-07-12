@@ -9,9 +9,10 @@ import Oracles.Dependencies
 import Rules.Actions
 import Rules.Generate
 import Rules.Libffi
-import Settings
 import Settings.Builders.Common
+import Settings.Paths
 import Target
+import UserSettings
 
 -- | Build @package-data.mk@ by using ghc-cabal utility to process .cabal files.
 buildPackageData :: Context -> Rules ()

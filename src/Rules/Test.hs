@@ -3,14 +3,14 @@ module Rules.Test (testRules) where
 import Base
 import Builder
 import Expression
+import Flavour
 import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Oracles.WindowsPath
 import Rules.Actions
-import Settings.Packages
+import Settings
 import Target
-import UserSettings
 
 -- TODO: clean up after testing
 testRules :: Rules ()
@@ -43,7 +43,7 @@ testRules = do
             , "-e", "config.speed=2"
             , "-e", "ghc_compiler_always_flags=" ++ show "-fforce-recomp -dcore-lint -dcmm-lint -dno-debug-output -no-user-package-db -rtsopts"
             , "-e", "ghc_with_native_codegen=" ++ show ghcWithNativeCodeGenInt
-            , "-e", "ghc_debugged=" ++ yesNo ghcDebugged
+            , "-e", "ghc_debugged=" ++ yesNo (ghcDebugged flavour)
             , "-e", "ghc_with_vanilla=1" -- TODO: do we always build vanilla?
             , "-e", "ghc_with_dynamic=0" -- TODO: support dynamic
             , "-e", "ghc_with_profiling=0" -- TODO: support profiling

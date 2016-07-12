@@ -2,7 +2,8 @@ module Rules.Wrappers.GhcPkg (ghcPkgWrapper) where
 
 import Base
 import Expression
-import Settings
+import Oracles.WindowsPath
+import Settings.Paths
 
 ghcPkgWrapper :: FilePath -> Expr String
 ghcPkgWrapper program = do

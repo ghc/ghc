@@ -5,7 +5,7 @@ import Context
 import Expression
 import Oracles.Dependencies
 import Rules.Actions
-import Settings
+import Settings.Paths
 import Target
 
 compilePackage :: [(Resource, Int)] -> Context -> Rules ()

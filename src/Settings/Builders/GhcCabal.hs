@@ -6,12 +6,15 @@ module Settings.Builders.GhcCabal (
 
 import Base
 import Context
+import Flavour
 import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
+import Oracles.WindowsPath
 import Predicate
 import Settings
 import Settings.Builders.Common
+import Settings.Paths
 
 ghcCabalBuilderArgs :: Args
 ghcCabalBuilderArgs = builder GhcCabal ? do
@@ -49,7 +52,7 @@ libraryArgs = do
     append [ if vanilla `elem` ways
              then  "--enable-library-vanilla"
              else "--disable-library-vanilla"
-           , if vanilla `elem` ways && withGhci && not dynamicGhcPrograms
+           , if vanilla `elem` ways && withGhci && not (dynamicGhcPrograms flavour)
              then  "--enable-library-for-ghci"
              else "--disable-library-for-ghci"
            , if profiling `elem` ways

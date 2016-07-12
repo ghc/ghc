@@ -1,10 +1,9 @@
 module Rules (topLevelTargets, buildRules) where
 
-import Data.Foldable
-
 import Base
 import Context
 import Expression
+import Flavour
 import GHC
 import qualified Rules.Compile
 import qualified Rules.Data
@@ -20,25 +19,26 @@ import qualified Rules.Perl
 import qualified Rules.Program
 import qualified Rules.Register
 import Settings
+import Settings.Paths
 
 allStages :: [Stage]
 allStages = [minBound ..]
 
--- | 'need' all top-level build targets
+-- | This rule 'need' all top-level build targets.
 topLevelTargets :: Rules ()
 topLevelTargets = do
 
     want $ Rules.Generate.installTargets
 
-    -- TODO: do we want libffiLibrary to be a top-level target?
+    -- TODO: Do we want libffiLibrary to be a top-level target?
 
     action $ do -- TODO: Add support for all rtsWays
         rtsLib    <- pkgLibraryFile $ rtsContext { way = vanilla  }
         rtsThrLib <- pkgLibraryFile $ rtsContext { way = threaded }
         need [ rtsLib, rtsThrLib ]
 
-    for_ allStages $ \stage ->
-        for_ (knownPackages \\ [rts, libffi]) $ \pkg -> action $ do
+    forM_ allStages $ \stage ->
+        forM_ (knownPackages \\ [rts, libffi]) $ \pkg -> action $ do
             let context = vanillaContext stage pkg
             activePackages <- interpretInContext context getPackages
             when (pkg `elem` activePackages) $
@@ -46,7 +46,7 @@ topLevelTargets = do
                 then do -- build a library
                     ways <- interpretInContext context getLibraryWays
                     libs <- mapM (pkgLibraryFile . Context stage pkg) ways
-                    docs <- interpretInContext context buildHaddock
+                    docs <- interpretInContext context $ buildHaddock flavour
                     need $ libs ++ [ pkgHaddockFile context | docs && stage == Stage1 ]
                 else do -- otherwise build a program
                     need [ fromJust $ programPath context ] -- TODO: drop fromJust
@@ -65,11 +65,11 @@ packageRules = do
     let contexts        = liftM3 Context        allStages knownPackages allWays
         vanillaContexts = liftM2 vanillaContext allStages knownPackages
 
-    for_ contexts $ mconcat
+    forM_ contexts $ mconcat
         [ Rules.Compile.compilePackage readPackageDb
         , Rules.Library.buildPackageLibrary ]
 
-    for_ vanillaContexts $ mconcat
+    forM_ vanillaContexts $ mconcat
         [ Rules.Data.buildPackageData
         , Rules.Dependencies.buildPackageDependencies readPackageDb
         , Rules.Documentation.buildPackageDocumentation

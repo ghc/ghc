@@ -4,8 +4,8 @@ import Base
 import Oracles.Config.Setting
 import Oracles.PackageData
 import Predicate
-import Settings
 import Settings.Builders.Common
+import Settings
 
 -- TODO: handle custom $1_$2_MKDEPENDC_OPTS and
 ccBuilderArgs :: Args

@@ -17,9 +17,9 @@ import Oracles.ArgsHash
 import Oracles.DirectoryContent
 import Oracles.WindowsPath
 import Settings
-import Settings.Args
 import Settings.Builders.Ar
 import Target
+import UserSettings
 
 -- | Build a 'Target' with the right 'Builder' and command line arguments.
 -- Force a rebuild if the argument list has changed since the last build.

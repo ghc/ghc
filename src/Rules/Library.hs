@@ -8,11 +8,14 @@ import qualified System.Directory as IO
 import Base
 import Context
 import Expression
+import Flavour
 import Oracles.PackageData
 import Rules.Actions
 import Rules.Gmp
 import Settings
+import Settings.Paths
 import Target
+import UserSettings
 
 buildPackageLibrary :: Context -> Rules ()
 buildPackageLibrary context@Context {..} = do
@@ -34,7 +37,7 @@ buildPackageLibrary context@Context {..} = do
         -- explicitly as this would needlessly bloat the Shake database).
         need $ cObjs ++ hObjs
 
-        split <- interpretInContext context splitObjects
+        split <- interpretInContext context $ splitObjects flavour
         splitObjs <- if not split then return hObjs else -- TODO: make clearer!
             concatForM hSrcs $ \src -> do
                 let splitPath = path -/- src ++ "_" ++ osuf way ++ "_split"

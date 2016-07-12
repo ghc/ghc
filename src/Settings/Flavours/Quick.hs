@@ -1,17 +1,25 @@
-module Settings.Flavours.Quick (quickFlavourArgs, quickFlavourWays) where
+module Settings.Flavours.Quick (quickFlavour) where
 
 import Context
+import Flavour
 import GHC
 import Predicate
+import {-# SOURCE #-} Settings.Default
+
+quickFlavour :: Flavour
+quickFlavour = defaultFlavour
+    { name        = "quick"
+    , args        = defaultArgs <> quickArgs
+    , libraryWays = defaultLibraryWays <> quickLibraryWays }
 
 optimise :: Context -> Bool
-optimise Context {..} = package `elem` [compiler, ghc]
-                     || stage == Stage1 && isLibrary package
+optimise Context {..} =
+    package `elem` [compiler, ghc] || stage == Stage1 && isLibrary package
 
-quickFlavourArgs :: Args
-quickFlavourArgs = builder Ghc ? do
+quickArgs :: Args
+quickArgs = builder Ghc ? do
     context <- getContext
     if optimise context then arg "-O" else arg "-O0"
 
-quickFlavourWays :: Ways
-quickFlavourWays = remove [profiling]
+quickLibraryWays :: Ways
+quickLibraryWays = remove [profiling]
