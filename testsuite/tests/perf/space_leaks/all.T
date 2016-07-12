@@ -60,11 +60,13 @@ test('T4029',
           [(wordsize(64), 82, 10)]),
             # 2016-02-26: 66 (amd64/Linux)           INITIAL
             # 2016-05-23: 82 (amd64/Linux)           Use -G1
+            # 2016-07-13: 92 (amd64/Linux)           Changes to tidyType
       stats_num_field('max_bytes_used',
           [(wordsize(64), 25247216, 5)]),
             # 2016-02-26: 24071720 (amd64/Linux)     INITIAL
             # 2016-04-21: 25542832 (amd64/Linux)
             # 2016-05-23: 25247216 (amd64/Linux)     Use -G1
+            # 2016-07-13: 27575416 (amd64/Linux)     Changes to tidyType
       extra_hc_opts('+RTS -G1 -RTS' ),
       ],
      ghci_script,

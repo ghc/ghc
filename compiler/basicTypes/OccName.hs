@@ -98,7 +98,7 @@ module OccName (
         filterOccSet,
 
         -- * Tidying up
-        TidyOccEnv, emptyTidyOccEnv, tidyOccName, initTidyOccEnv,
+        TidyOccEnv, emptyTidyOccEnv, tidyOccNames, tidyOccName, initTidyOccEnv,
 
         -- FsEnv
         FastStringEnv, emptyFsEnv, lookupFsEnv, extendFsEnv, mkFsEnv
@@ -114,6 +114,7 @@ import FastStringEnv
 import Outputable
 import Lexeme
 import Binary
+import Data.List (mapAccumL)
 import Data.Char
 import Data.Data
 
@@ -821,6 +822,9 @@ initTidyOccEnv :: [OccName] -> TidyOccEnv       -- Initialise with names to avoi
 initTidyOccEnv = foldl add emptyUFM
   where
     add env (OccName _ fs) = addToUFM env fs 1
+
+tidyOccNames :: TidyOccEnv -> [OccName] -> (TidyOccEnv, [OccName])
+tidyOccNames env occs = mapAccumL tidyOccName env occs
 
 tidyOccName :: TidyOccEnv -> OccName -> (TidyOccEnv, OccName)
 tidyOccName env occ@(OccName occ_sp fs)
