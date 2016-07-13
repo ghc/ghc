@@ -35,7 +35,8 @@ cabalRules = do
             else do
                 need [pkgCabalFile pkg]
                 pd <- liftIO . readPackageDescription silent $ pkgCabalFile pkg
-                let depsLib  = collectDeps $ condLibrary pd
+                -- TODO: Support more than one Cabal library per package.
+                let depsLib  = collectDeps . fmap snd . listToMaybe $ condLibraries pd
                     depsExes = map (collectDeps . Just . snd) $ condExecutables pd
                     deps     = concat $ depsLib : depsExes
                     depNames = [ name | Dependency (DP.PackageName name) _ <- deps ]
