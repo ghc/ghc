@@ -1,2 +1,2 @@
-:set -Wall -fno-warn-name-shadowing -isrc -XRecordWildCards
+:set -Wall -fno-warn-name-shadowing -isrc -i../libraries/Cabal/Cabal -XRecordWildCards
 :load Main
