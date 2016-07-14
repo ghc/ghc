@@ -38,12 +38,19 @@ buildPackageData context@Context {..} = do
 
     -- TODO: Get rid of this, see #113.
     dataFile %> \mk -> do
+        -- TODO: This is a hack. Add a proper support for autogen directory
+        -- structure of the new Cabal (probably only after #113).
+        let oldBuild
+                | isLibrary package = oldPath -/- "build"
+                | package == ghc    = oldPath -/- "build/ghc"
+                | package == hpcBin = oldPath -/- "build/hpc"
+                | otherwise         = oldPath -/- "build" -/- pkgNameString package
         copyFile inTreeMk mk
-        autogenFiles <- getDirectoryFiles (oldPath -/- "build") ["autogen/*"]
+        autogenFiles <- getDirectoryFiles oldBuild ["autogen/*"]
         createDirectory $ buildPath context -/- "autogen"
         forM_ autogenFiles $ \file' -> do
             let file = unifyPath file'
-            copyFile (oldPath -/- "build" -/- file) (buildPath context -/- file)
+            copyFile (oldBuild -/- file) (buildPath context -/- file)
         let haddockPrologue = "haddock-prologue.txt"
         copyFile (oldPath -/- haddockPrologue) (buildPath context -/- haddockPrologue)
         postProcessPackageData context mk
