@@ -38,4 +38,4 @@ build_script:
     - cd C:\msys64\home\ghc\hadrian
     - echo "" | stack --no-terminal exec -- build.bat selftest
     - echo "" | stack --no-terminal exec -- build.bat -j --verbose --no-progress --progress-colour=never --profile=- --flavour=quickest
-    - stack exec -- C:\msys64\home\ghc\inplace\bin\ghc-stage2.exe -e 1+2
+    - C:\msys64\home\ghc\inplace\bin\ghc-stage2.exe -e 1+2
