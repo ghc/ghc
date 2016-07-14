@@ -41,10 +41,11 @@ buildPackageData context@Context {..} = do
         -- TODO: This is a hack. Add a proper support for autogen directory
         -- structure of the new Cabal (probably only after #113).
         let oldBuild
-                | isLibrary package = oldPath -/- "build"
-                | package == ghc    = oldPath -/- "build/ghc"
-                | package == hpcBin = oldPath -/- "build/hpc"
-                | otherwise         = oldPath -/- "build" -/- pkgNameString package
+                | isLibrary package   = oldPath -/- "build"
+                | package == ghc      = oldPath -/- "build/ghc"
+                | package == hpcBin   = oldPath -/- "build/hpc"
+                | package == iservBin = oldPath -/- "build/iserv"
+                | otherwise           = oldPath -/- "build" -/- pkgNameString package
         copyFile inTreeMk mk
         autogenFiles <- getDirectoryFiles oldBuild ["autogen/*"]
         createDirectory $ buildPath context -/- "autogen"
