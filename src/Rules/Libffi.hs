@@ -58,7 +58,7 @@ configureEnvironment = do
 libffiRules :: Rules ()
 libffiRules = do
     libffiDependencies &%> \_ -> do
-        when trackBuildSystem $ need [sourcePath -/- "Rules/Libffi.hs"]
+        need [sourcePath -/- "Rules/Libffi.hs"]
         useSystemFfi <- flag UseSystemFfi
         if useSystemFfi
         then do

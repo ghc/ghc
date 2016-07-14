@@ -2,12 +2,10 @@ module Rules.Generators.Common (trackSource, yesNo, cppify) where
 
 import Base
 import Expression
-import UserSettings
 
--- | Track a given source file when constructing an expression if the user
--- enabled 'trackBuildSystem' in @hadrian/src/UserSettings.hs@.
+-- | Track a given source file when constructing an expression.
 trackSource :: FilePath -> Expr ()
-trackSource file = lift $ when trackBuildSystem $ need [ sourcePath -/- file ]
+trackSource file = lift $ need [ sourcePath -/- file ]
 
 -- | Turn a 'Bool' computed by an 'Action' into a 'String' expression returning
 -- "YES" (when the Boolean is 'True') or "NO" (when the Boolean is 'False').

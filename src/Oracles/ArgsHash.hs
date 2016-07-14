@@ -5,7 +5,6 @@ import Base
 import Expression
 import Settings
 import Target
-import UserSettings
 
 newtype ArgsHashKey = ArgsHashKey Target
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
@@ -21,7 +20,7 @@ newtype ArgsHashKey = ArgsHashKey Target
 -- argument list constructors are assumed not to examine target sources, but
 -- only append them to argument lists where appropriate.
 checkArgsHash :: Target -> Action ()
-checkArgsHash target = when trackBuildSystem $ do
+checkArgsHash target = do
     let hashed = [ show . hash $ inputs target ]
     _ <- askOracle . ArgsHashKey $ target { inputs = hashed } :: Action Int
     return ()

@@ -34,7 +34,7 @@ gmpRules :: Rules ()
 gmpRules = do
     -- TODO: split into multiple rules
     gmpLibraryH %> \_ -> do
-        when trackBuildSystem $ need [sourcePath -/- "Rules/Gmp.hs"]
+        need [sourcePath -/- "Rules/Gmp.hs"]
         removeDirectory gmpBuildPath
 
         -- We don't use system GMP on Windows. TODO: fix?

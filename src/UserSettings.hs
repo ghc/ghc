@@ -3,9 +3,8 @@
 -- If you don't copy the file your changes will be tracked by git and you can
 -- accidentally commit them.
 module UserSettings (
-    buildRootPath, userFlavours, userKnownPackages, integerLibrary,
-    trackBuildSystem, validating, turnWarningsIntoErrors, verboseCommands,
-    putBuild, putSuccess
+    buildRootPath, userFlavours, userKnownPackages, integerLibrary, validating,
+    turnWarningsIntoErrors, verboseCommands, putBuild, putSuccess
     ) where
 
 import System.Console.ANSI
@@ -41,14 +40,6 @@ integerLibrary = integerGmp
 -- * @Action Bool@: a flag whose value can depend on the build environment.
 -- * @Predicate@: a flag whose value can depend on the build environment and
 -- on the current build target.
-
--- TODO: Drop 'trackBuildSystem' as it brings negligible gains.
--- | Set this to True if you are making any changes in the build system and want
--- appropriate rebuilds to be initiated. Switching this to False speeds things
--- up a little (particularly zero builds).
--- WARNING: a complete rebuild is required when changing this setting.
-trackBuildSystem :: Bool
-trackBuildSystem = True
 
 -- TODO: This should be set automatically when validating.
 validating :: Bool
