@@ -3,6 +3,8 @@
 ## next *TBA*
   * Bundled with GHC *TBA*
 
+  * `Data.Type.Bool.Not` given a type family dependency (#12057).
+
   * `Foreign.Ptr` now exports the constructors for `IntPtr` and `WordPtr`
     (#11983)
 
