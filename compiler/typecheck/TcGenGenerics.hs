@@ -135,7 +135,8 @@ canDoGenerics :: TyCon -> Validity
 -- Check (a) from Note [Requirements for deriving Generic and Rep] is taken
 -- care of because canDoGenerics is applied to rep tycons.
 --
--- It returns Nothing if deriving is possible. It returns (Just reason) if not.
+-- It returns IsValid if deriving is possible. It returns (NotValid reason)
+-- if not.
 canDoGenerics tc
   = mergeErrors (
           -- Check (b) from Note [Requirements for deriving Generic and Rep].
@@ -221,7 +222,8 @@ explicitly, even though foldDataConArgs is also doing this internally.
 -- Checks (a) through (c) from Note [Requirements for deriving Generic and Rep]
 -- are taken care of by the call to canDoGenerics.
 --
--- It returns Nothing if deriving is possible. It returns (Just reason) if not.
+-- It returns IsValid if deriving is possible. It returns (NotValid reason)
+-- if not.
 canDoGenerics1 :: TyCon -> Validity
 canDoGenerics1 rep_tc =
   canDoGenerics rep_tc `andValid` additionalChecks
