@@ -1,0 +1,6 @@
+test('compact_simple', omit_ways(['ghci']), compile_and_run, [''])
+test('compact_loop', omit_ways(['ghci']), compile_and_run, [''])
+test('compact_append', omit_ways(['ghci']), compile_and_run, [''])
+test('compact_autoexpand', omit_ways(['ghci']), compile_and_run, [''])
+test('compact_simple_array', omit_ways(['ghci']), compile_and_run, [''])
+test('compact_serialize', omit_ways(['ghci']), compile_and_run, [''])

@@ -25,6 +25,7 @@
 #include "Prelude.h"
 #include "Trace.h"
 #include "LdvProfile.h"
+#include "CNF.h"
 
 #if defined(PROF_SPIN) && defined(THREADED_RTS) && defined(PARALLEL_GC)
 StgWord64 whitehole_spin = 0;
@@ -245,7 +246,7 @@ copy(StgClosure **p, const StgInfoTable *info,
 
    This just consists of removing the object from the (doubly-linked)
    gen->large_objects list, and linking it on to the (singly-linked)
-   gen->new_large_objects list, from where it will be scavenged later.
+   gct->todo_large_objects list, from where it will be scavenged later.
 
    Convention: bd->flags has BF_EVACUATED set for a large object
    that has been evacuated, or unset otherwise.
@@ -305,12 +306,13 @@ evacuate_large(StgPtr p)
   bd->flags |= BF_EVACUATED;
   initBdescr(bd, new_gen, new_gen->to);
 
-  // If this is a block of pinned objects, we don't have to scan
-  // these objects, because they aren't allowed to contain any
+  // If this is a block of pinned or compact objects, we don't have to scan
+  // these objects, because they aren't allowed to contain any outgoing
   // pointers.  For these blocks, we skip the scavenge stage and put
   // them straight on the scavenged_large_objects list.
   if (bd->flags & BF_PINNED) {
       ASSERT(get_itbl((StgClosure *)p)->type == ARR_WORDS);
+
       if (new_gen != gen) { ACQUIRE_SPIN_LOCK(&new_gen->sync); }
       dbl_link_onto(bd, &new_gen->scavenged_large_objects);
       new_gen->n_scavenged_large_blocks += bd->blocks;
@@ -353,6 +355,110 @@ evacuate_static_object (StgClosure **link_field, StgClosure *q)
         }
 #endif
     }
+}
+
+/* ----------------------------------------------------------------------------
+   Evacuate an object inside a CompactNFData
+
+   Don't actually evacuate the object. Instead, evacuate the structure
+   (which is a large object, so it is just relinked onto the new list
+   of large objects of the generation).
+
+   It is assumed that objects in the struct live in the same generation
+   as the struct itself all the time.
+   ------------------------------------------------------------------------- */
+STATIC_INLINE void
+evacuate_compact (StgPtr p)
+{
+    StgCompactNFData *str;
+    bdescr *bd;
+    generation *gen, *new_gen;
+    uint32_t gen_no, new_gen_no;
+
+    str = objectGetCompact((StgClosure*)p);
+    ASSERT(get_itbl((StgClosure*)str)->type == COMPACT_NFDATA);
+
+    bd = Bdescr((StgPtr)str);
+    gen_no = bd->gen_no;
+
+    // already evacuated? (we're about to do the same check,
+    // but we avoid taking the spin-lock)
+    if (bd->flags & BF_EVACUATED) {
+        /* Don't forget to set the gct->failed_to_evac flag if we didn't get
+         * the desired destination (see comments in evacuate()).
+         */
+        if (gen_no < gct->evac_gen_no) {
+            gct->failed_to_evac = rtsTrue;
+            TICK_GC_FAILED_PROMOTION();
+        }
+        return;
+    }
+
+    gen = bd->gen;
+    gen_no = bd->gen_no;
+    ACQUIRE_SPIN_LOCK(&gen->sync);
+
+    // already evacuated?
+    if (bd->flags & BF_EVACUATED) {
+        /* Don't forget to set the gct->failed_to_evac flag if we didn't get
+         * the desired destination (see comments in evacuate()).
+         */
+        if (gen_no < gct->evac_gen_no) {
+            gct->failed_to_evac = rtsTrue;
+            TICK_GC_FAILED_PROMOTION();
+        }
+        RELEASE_SPIN_LOCK(&gen->sync);
+        return;
+    }
+
+    // remove from large_object list
+    if (bd->u.back) {
+        bd->u.back->link = bd->link;
+    } else { // first object in the list
+        gen->compact_objects = bd->link;
+    }
+    if (bd->link) {
+        bd->link->u.back = bd->u.back;
+    }
+
+    /* link it on to the evacuated compact object list of the destination gen
+     */
+    new_gen_no = bd->dest_no;
+
+    if (new_gen_no < gct->evac_gen_no) {
+        if (gct->eager_promotion) {
+            new_gen_no = gct->evac_gen_no;
+        } else {
+            gct->failed_to_evac = rtsTrue;
+        }
+    }
+
+    new_gen = &generations[new_gen_no];
+
+    // Note: for speed we only update the generation of the first block here
+    // This means that bdescr of subsequent blocks will think they are in
+    // the wrong generation
+    // (This should not be a problem because there is no code that checks
+    // for that - the only code touching the generation of the block is
+    // in the GC, and that should never see blocks other than the first)
+    bd->flags |= BF_EVACUATED;
+    initBdescr(bd, new_gen, new_gen->to);
+
+    if (new_gen != gen) { ACQUIRE_SPIN_LOCK(&new_gen->sync); }
+    dbl_link_onto(bd, &new_gen->live_compact_objects);
+    new_gen->n_live_compact_blocks += str->totalW / BLOCK_SIZE_W;
+    if (new_gen != gen) { RELEASE_SPIN_LOCK(&new_gen->sync); }
+
+    RELEASE_SPIN_LOCK(&gen->sync);
+
+    // Note: the object did not move in memory, because it lives
+    // in pinned (BF_COMPACT) allocation, so we do not need to rewrite it
+    // or muck with forwarding pointers
+    // Also there is no tag to worry about on the struct (tags are used
+    // for constructors and functions, but a struct is neither). There
+    // might be a tag on the object pointer, but again we don't change
+    // the pointer because we don't move the object so we don't need to
+    // rewrite the tag.
 }
 
 /* ----------------------------------------------------------------------------
@@ -459,8 +565,7 @@ loop:
 
   bd = Bdescr((P_)q);
 
-  if ((bd->flags & (BF_LARGE | BF_MARKED | BF_EVACUATED)) != 0) {
-
+  if ((bd->flags & (BF_LARGE | BF_MARKED | BF_EVACUATED | BF_COMPACT)) != 0) {
       // pointer into to-space: just return it.  It might be a pointer
       // into a generation that we aren't collecting (> N), or it
       // might just be a pointer into to-space.  The latter doesn't
@@ -475,6 +580,15 @@ loop:
               gct->failed_to_evac = rtsTrue;
               TICK_GC_FAILED_PROMOTION();
           }
+          return;
+      }
+
+      // Check for compact before checking for large, this allows doing the
+      // right thing for objects that are half way in the middle of the first
+      // block of a compact (and would be treated as large objects even though
+      // they are not)
+      if (bd->flags & BF_COMPACT) {
+          evacuate_compact((P_)q);
           return;
       }
 
@@ -735,6 +849,12 @@ loop:
       copy(p,info,q,sizeofW(StgTRecChunk),gen_no);
       return;
 
+  case COMPACT_NFDATA:
+      // CompactNFData objects are at least one block plus the header
+      // so they are larger than the large_object_threshold (80% of
+      // block size) and never copied by value
+      barf("evacuate: compact nfdata is not large");
+      return;
   default:
     barf("evacuate: strange closure type %d", (int)(INFO_PTR_TO_STRUCT(info)->type));
   }

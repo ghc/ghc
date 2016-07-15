@@ -940,6 +940,24 @@ static void heapProfObject(Census *census, StgClosure *p, size_t size,
             }
 }
 
+// Compact objects require special handling code because they
+// are not stored consecutively in memory (rather, each object
+// is a list of objects), and that would break the while loop
+// below. But we know that each block holds at most one object
+// so we don't need the loop.
+//
+// See Note [Compact Normal Forms] for details.
+static void
+heapCensusCompactList(Census *census, bdescr *bd)
+{
+    for (; bd != NULL; bd = bd->link) {
+        StgCompactNFDataBlock *block = (StgCompactNFDataBlock*)bd->start;
+        StgCompactNFData *str = block->owner;
+        heapProfObject(census, (StgClosure*)str,
+                       compact_nfdata_full_sizeW(str), rtsTrue);
+    }
+}
+
 /* -----------------------------------------------------------------------------
  * Code to perform a heap census.
  * -------------------------------------------------------------------------- */
@@ -1116,6 +1134,10 @@ heapCensusChain( Census *census, bdescr *bd )
                 size = sizeofW(StgTRecChunk);
                 break;
 
+            case COMPACT_NFDATA:
+                barf("heapCensus, found compact object in the wrong list");
+                break;
+
             default:
                 barf("heapCensus, unknown object: %d", info->type);
             }
@@ -1153,6 +1175,7 @@ void heapCensus (Time t)
       // Are we interested in large objects?  might be
       // confusing to include the stack in a heap profile.
       heapCensusChain( census, generations[g].large_objects );
+      heapCensusCompactList ( census, generations[g].compact_objects );
 
       for (n = 0; n < n_capabilities; n++) {
           ws = &gc_threads[n]->gens[g];

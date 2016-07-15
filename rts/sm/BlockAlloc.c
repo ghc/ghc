@@ -795,6 +795,7 @@ countAllocdBlocks(bdescr *bd)
     W_ n;
     for (n=0; bd != NULL; bd=bd->link) {
         n += bd->blocks;
+
         // hack for megablock groups: see (*1) above
         if (bd->blocks > BLOCKS_PER_MBLOCK) {
             n -= (MBLOCK_SIZE / BLOCK_SIZE - BLOCKS_PER_MBLOCK)

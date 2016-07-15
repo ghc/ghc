@@ -142,6 +142,7 @@ processHeapClosureForDead( const StgClosure *c )
     case RET_BIG:
         // others
     case INVALID_OBJECT:
+    case COMPACT_NFDATA:
     default:
         barf("Invalid object in processHeapClosureForDead(): %d", info->type);
         return 0;

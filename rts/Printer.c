@@ -386,6 +386,12 @@ printClosure( const StgClosure *obj )
       break;
 #endif
 
+    case COMPACT_NFDATA:
+        debugBelch("COMPACT_NFDATA(size=%" FMT_Word ")\n",
+                   (W_)((StgCompactNFData *)obj)->totalDataW * sizeof(W_));
+        break;
+
+
     default:
             //barf("printClosure %d",get_itbl(obj)->type);
             debugBelch("*** printClosure: unknown type %d ****\n",
@@ -873,7 +879,8 @@ const char *closure_type_names[] = {
  [ATOMICALLY_FRAME]      = "ATOMICALLY_FRAME",
  [CATCH_RETRY_FRAME]     = "CATCH_RETRY_FRAME",
  [CATCH_STM_FRAME]       = "CATCH_STM_FRAME",
- [WHITEHOLE]             = "WHITEHOLE"
+ [WHITEHOLE]             = "WHITEHOLE",
+ [COMPACT_NFDATA]        = "COMPACT_NFDATA"
 };
 
 const char *

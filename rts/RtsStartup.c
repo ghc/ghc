@@ -35,6 +35,7 @@
 #include "FileLock.h"
 #include "LinkerInternals.h"
 #include "LibdwPool.h"
+#include "sm/CNF.h"
 
 #if defined(PROFILING)
 # include "ProfHeap.h"

@@ -100,8 +100,12 @@ initGeneration (generation *gen, int g)
     gen->n_large_blocks = 0;
     gen->n_large_words = 0;
     gen->n_new_large_words = 0;
+    gen->compact_objects = NULL;
+    gen->n_compact_blocks = 0;
     gen->scavenged_large_objects = NULL;
     gen->n_scavenged_large_blocks = 0;
+    gen->live_compact_objects = NULL;
+    gen->n_live_compact_blocks = 0;
     gen->mark = 0;
     gen->compact = 0;
     gen->bitmap = NULL;
@@ -1208,12 +1212,13 @@ W_ countOccupied (bdescr *bd)
 
 W_ genLiveWords (generation *gen)
 {
-    return gen->n_words + gen->n_large_words;
+    return gen->n_words + gen->n_large_words +
+        gen->n_compact_blocks * BLOCK_SIZE_W;
 }
 
 W_ genLiveBlocks (generation *gen)
 {
-    return gen->n_blocks + gen->n_large_blocks;
+    return gen->n_blocks + gen->n_large_blocks + gen->n_compact_blocks;
 }
 
 W_ gcThreadLiveWords (uint32_t i, uint32_t g)
@@ -1266,7 +1271,8 @@ calcNeeded (rtsBool force_major, memcount *blocks_needed)
         gen = &generations[g];
 
         blocks = gen->n_blocks // or: gen->n_words / BLOCK_SIZE_W (?)
-               + gen->n_large_blocks;
+               + gen->n_large_blocks
+               + gen->n_compact_blocks;
 
         // we need at least this much space
         needed += blocks;

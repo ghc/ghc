@@ -1,0 +1,47 @@
+name:           compact
+version:        1.0.0.0
+-- NOTE: Don't forget to update ./changelog.md
+license:        BSD3
+license-file:   LICENSE
+maintainer:     libraries@haskell.org
+bug-reports:    http://ghc.haskell.org/trac/ghc/newticket?component=libraries/compact
+synopsis:       In memory storage of deeply evaluated data structure
+category:       Data
+description:
+    This package provides a single data structure, called a Compact,
+    which holds a single haskell object in fully evaluated form. The
+    invariant is, no pointers live inside the struct that point outside
+    it, which ensures efficient garbage collection without ever reading
+    the structure contents (effectively, it works as a manually managed
+    "oldest generation" which is never freed until the whole is released).
+
+    Internally, the struct is stored a single contiguous block of memory,
+    which allows efficient serialization and deserialization of structs
+    for distributed computing.
+build-type:     Simple
+cabal-version:  >=1.10
+tested-with:    GHC==7.11
+
+source-repository head
+  type:     git
+  location: http://git.haskell.org/ghc.git
+  subdir:   libraries/compact
+
+library
+  default-language: Haskell2010
+  other-extensions:
+    MagicHash
+    BangPatterns
+    UnboxedTuples
+    CPP
+
+  build-depends: rts        == 1.0.*
+  build-depends: ghc-prim   == 0.5.0.0
+  build-depends: base       >= 4.9.0 && < 4.10
+  build-depends: deepseq    >= 1.4
+  build-depends: bytestring >= 0.10.6.0
+  ghc-options: -Wall
+
+  exposed-modules: Data.Compact
+                   Data.Compact.Internal
+                   Data.Compact.Serialized

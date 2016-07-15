@@ -47,6 +47,7 @@
 #include "RaiseAsync.h"
 #include "Stable.h"
 #include "CheckUnload.h"
+#include "CNF.h"
 
 #include <string.h> // for memset()
 #include <unistd.h>
@@ -592,6 +593,23 @@ GarbageCollect (uint32_t collect_gen,
         gen->n_large_blocks = gen->n_scavenged_large_blocks;
         gen->n_large_words  = countOccupied(gen->large_objects);
         gen->n_new_large_words = 0;
+
+        /* COMPACT_NFDATA. The currently live compacts are chained
+         * to live_compact_objects, quite like large objects. And
+         * objects left on the compact_objects list are dead.
+         *
+         * We don't run a simple freeChain because want to give the
+         * CNF module some chance to free memory that freeChain would
+         * not see (namely blocks appended to a CNF through a compactResize).
+         *
+         * See Note [Compact Normal Forms] for details.
+         */
+        for (bd = gen->compact_objects; bd; bd = next) {
+            next = bd->link;
+            compactFree(((StgCompactNFDataBlock*)bd->start)->owner);
+        }
+        gen->compact_objects = gen->live_compact_objects;
+        gen->n_compact_blocks = gen->n_live_compact_blocks;
     }
     else // for generations > N
     {
@@ -605,15 +623,27 @@ GarbageCollect (uint32_t collect_gen,
             gen->n_large_words += bd->free - bd->start;
         }
 
+        // And same for compacts
+        for (bd = gen->live_compact_objects; bd; bd = next) {
+            next = bd->link;
+            dbl_link_onto(bd, &gen->compact_objects);
+        }
+
         // add the new blocks we promoted during this GC
         gen->n_large_blocks += gen->n_scavenged_large_blocks;
+        gen->n_compact_blocks += gen->n_live_compact_blocks;
     }
 
     ASSERT(countBlocks(gen->large_objects) == gen->n_large_blocks);
     ASSERT(countOccupied(gen->large_objects) == gen->n_large_words);
+    // We can run the same assertion on compact objects because there
+    // is memory "the GC doesn't see" (directly), but which is still
+    // accounted in gen->n_compact_blocks
 
     gen->scavenged_large_objects = NULL;
     gen->n_scavenged_large_blocks = 0;
+    gen->live_compact_objects = NULL;
+    gen->n_live_compact_blocks = 0;
 
     // Count "live" data
     live_words  += genLiveWords(gen);
@@ -1207,6 +1237,8 @@ prepare_collected_gen (generation *gen)
     // initialise the large object queues.
     ASSERT(gen->scavenged_large_objects == NULL);
     ASSERT(gen->n_scavenged_large_blocks == 0);
+    ASSERT(gen->live_compact_objects == NULL);
+    ASSERT(gen->n_live_compact_blocks == 0);
 
     // grab all the partial blocks stashed in the gc_thread workspaces and
     // move them to the old_blocks list of this gen.
@@ -1243,6 +1275,11 @@ prepare_collected_gen (generation *gen)
 
     // mark the large objects as from-space
     for (bd = gen->large_objects; bd; bd = bd->link) {
+        bd->flags &= ~BF_EVACUATED;
+    }
+
+    // mark the compact objects as from-space
+    for (bd = gen->compact_objects; bd; bd = bd->link) {
         bd->flags &= ~BF_EVACUATED;
     }
 
@@ -1472,7 +1509,8 @@ resize_generations (void)
             words = oldest_gen->n_words;
         }
         live = (words + BLOCK_SIZE_W - 1) / BLOCK_SIZE_W +
-            oldest_gen->n_large_blocks;
+            oldest_gen->n_large_blocks +
+            oldest_gen->n_compact_blocks;
 
         // default max size for all generations except zero
         size = stg_max(live * RtsFlags.GcFlags.oldGenFactor,

@@ -391,7 +391,7 @@ wanteds os = concat
           ,structField Both "bdescr" "blocks"
           ,structField C    "bdescr" "gen_no"
           ,structField C    "bdescr" "link"
-          ,structField C    "bdescr" "flags"
+          ,structField Both "bdescr" "flags"
 
           ,structSize C  "generation"
           ,structField C "generation" "n_new_large_words"
@@ -562,6 +562,17 @@ wanteds os = concat
           ,closureField C "MessageBlackHole" "link"
           ,closureField C "MessageBlackHole" "tso"
           ,closureField C "MessageBlackHole" "bh"
+
+          ,closureSize  C "StgCompactNFData"
+          ,closureField C "StgCompactNFData" "totalW"
+          ,closureField C "StgCompactNFData" "autoBlockW"
+          ,closureField C "StgCompactNFData" "nursery"
+          ,closureField C "StgCompactNFData" "last"
+
+          ,structSize   C "StgCompactNFDataBlock"
+          ,structField  C "StgCompactNFDataBlock" "self"
+          ,structField  C "StgCompactNFDataBlock" "owner"
+          ,structField  C "StgCompactNFDataBlock" "next"
 
           ,structField_ C "RtsFlags_ProfFlags_showCCSOnException"
                           "RTS_FLAGS" "ProfFlags.showCCSOnException"

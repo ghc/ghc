@@ -351,12 +351,15 @@ emitPrimOp dflags [res] EqStableNameOp [arg1,arg2]
                                    cmmLoadIndexW dflags arg2 (fixedHdrSizeW dflags) (bWord dflags)
                          ])
 
-
 emitPrimOp dflags [res] ReallyUnsafePtrEqualityOp [arg1,arg2]
    = emitAssign (CmmLocal res) (CmmMachOp (mo_wordEq dflags) [arg1,arg2])
 
 --  #define addrToHValuezh(r,a) r=(P_)a
 emitPrimOp _      [res] AddrToAnyOp [arg]
+   = emitAssign (CmmLocal res) arg
+
+--  #define hvalueToAddrzh(r, a) r=(W_)a
+emitPrimOp _      [res] AnyToAddrOp [arg]
    = emitAssign (CmmLocal res) arg
 
 --  #define dataToTagzh(r,a)  r=(GET_TAG(((StgClosure *)a)->header.info))

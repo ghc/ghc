@@ -804,6 +804,7 @@ ppType (TyApp (TyCon "RealWorld")   []) = "realWorldTy"
 ppType (TyApp (TyCon "ThreadId#")   []) = "threadIdPrimTy"
 ppType (TyApp (TyCon "ForeignObj#") []) = "foreignObjPrimTy"
 ppType (TyApp (TyCon "BCO#")        []) = "bcoPrimTy"
+ppType (TyApp (TyCon "Compact#")    []) = "compactPrimTy"
 ppType (TyApp (TyCon "()")          []) = "unitTy"      -- unitTy is TysWiredIn's name for ()
 
 ppType (TyVar "a")                      = "alphaTy"
