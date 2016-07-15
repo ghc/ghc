@@ -3,7 +3,7 @@ sudo: true
 matrix:
     include:
         - os: linux
-          env: CABALVER=1.22 GHCVER=7.10.3 FLAVOUR=quick TARGET=
+          env: CABALVER=1.22 GHCVER=7.10.3 FLAVOUR=default TARGET=
           addons:
               apt:
                   packages:
