@@ -14,7 +14,6 @@ import Flavour
 import GHC
 import Predicate
 
--- TODO: Update the docs.
 -- See doc/user-settings.md for instructions.
 
 -- | All build results are put into 'buildRootPath' directory.
