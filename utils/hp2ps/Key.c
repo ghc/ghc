@@ -44,7 +44,8 @@ escape(char *result, const char *name)
 {
     while (*name != '\0')
     {
-        if (*name == '\\')
+        // escape parentheses too, because "name" could contain un-matched ones
+        if (*name == '\\' || *name == '(' || *name == ')')
         {
             *result++ = '\\';
         }
