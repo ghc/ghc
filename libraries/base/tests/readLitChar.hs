@@ -9,4 +9,7 @@ main =
        putStrLn (show $ readLitChar "'A'")
        putStrLn (show $ lexLitChar "A")
        putStrLn (show $ lexLitChar "'A'")
-
+       putStrLn (show $ lexLitChar "\\243\\&1")
+       putStrLn (show $ lexLitChar "a\\&1")
+       putStrLn (show $ lexLitChar "a\\&\\&1")
+       putStrLn (show $ lexLitChar "a\\&\\&")
