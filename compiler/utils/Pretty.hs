@@ -20,6 +20,49 @@
 --
 -----------------------------------------------------------------------------
 
+{-
+Note [Differences between libraries/pretty and compiler/utils/Pretty.hs]
+
+For historical reasons, there are two different copies of `Pretty` in the GHC
+source tree:
+ * `libraries/pretty` is a submodule containing
+   https://github.com/haskell/pretty. This is the `pretty` library as released
+   on hackage. It is used by several other libraries in the GHC source tree
+   (e.g. template-haskell and Cabal).
+ * `compiler/utils/Pretty.hs` (this module). It is used by GHC only.
+
+There is an ongoing effort in https://github.com/haskell/pretty/issues/1 and
+https://ghc.haskell.org/trac/ghc/ticket/10735 to try to get rid of GHC's copy
+of Pretty.
+
+Currently, GHC's copy of Pretty resembles pretty-1.1.2.0, with the following
+major differences:
+ * GHC's copy uses `Faststring` for performance reasons.
+ * GHC's copy has received a backported bugfix for #12227, which was
+   released as pretty-1.1.3.4 ("Remove harmful $! forcing in beside",
+   https://github.com/haskell/pretty/pull/35).
+
+Other differences are minor. Both copies define some extra functions and
+instances not defined in the other copy. To see all differences, do this in a
+ghc git tree:
+
+    $ cd libraries/pretty
+    $ git checkout v1.1.2.0
+    $ cd -
+    $ vimdiff compiler/utils/Pretty.hs \
+              libraries/pretty/src/Text/PrettyPrint/HughesPJ.hs
+
+For parity with `pretty-1.1.2.1`, the following two `pretty` commits would
+have to be backported:
+  * "Resolve foldr-strictness stack overflow bug"
+    (307b8173f41cd776eae8f547267df6d72bff2d68)
+  * "Special-case reduce for horiz/vert"
+    (c57c7a9dfc49617ba8d6e4fcdb019a3f29f1044c)
+This has not been done sofar, because these commits seem to cause more
+allocation in the compiler (see thomie's comments in
+https://github.com/haskell/pretty/pull/9).
+-}
+
 module Pretty (
 
         -- * The document type
@@ -590,7 +633,7 @@ beside p@(Beside p1 g1 q1) g2 q2
          | otherwise             = beside (reduceDoc p) g2 q2
 beside p@(Above{})         g q   = let !d = reduceDoc p in beside d g q
 beside (NilAbove p)        g q   = nilAbove_ $! beside p g q
-beside (TextBeside s sl p) g q   = textBeside_ s sl $! rest
+beside (TextBeside s sl p) g q   = textBeside_ s sl rest
                                where
                                   rest = case p of
                                            Empty -> nilBeside g q

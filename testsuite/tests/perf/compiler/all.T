@@ -150,7 +150,7 @@ test('T3294',
              # 2015-07-11 43196344 (x86/Linux, 64-bit machine) use +RTS -G1
              # 2016-04-06 28686588 (x86/Linux, 64-bit machine)
 
-           (wordsize(64), 50367248, 20)]),
+           (wordsize(64), 52992688, 20)]),
              # prev:           25753192 (amd64/Linux)
              # 29/08/2012:     37724352 (amd64/Linux)
              #  (increase due to new codegen, see #7198)
@@ -166,6 +166,8 @@ test('T3294',
              #  varies between 40959592 and 52914488... increasing to +-20%
              # 2015-10-28:     50367248  (amd64/Linux)
              #  D757: emit Typeable instances at site of type definition
+             # 2016-07-11:     54609256  (Windows) before fix for #12227
+             # 2016-07-11:     52992688  (Windows) after fix for #12227
 
       compiler_stats_num_field('bytes allocated',
           [(wordsize(32), 1377050640, 5),
@@ -175,7 +177,7 @@ test('T3294',
            # 2013-11-13: 1478325844  (x86/Windows, 64bit machine)
            # 2014-01-12: 1565185140  (x86/Linux)
            # 2013-04-04: 1377050640  (x86/Windows, 64bit machine)
-           (wordsize(64), 2709595808, 5)]),
+           (wordsize(64), 2739731144, 5)]),
             # old:        1357587088 (amd64/Linux)
             # 29/08/2012: 2961778696 (amd64/Linux)
             # (^ increase due to new codegen, see #7198)
@@ -186,6 +188,8 @@ test('T3294',
             # 12/03/2014: 2705289664 (amd64/Linux) (more call arity improvements)
             # 2014-17-07: 2671595512 (amd64/Linux) (round-about update)
             # 2014-09-10: 2709595808 (amd64/Linux) post-AMP cleanup
+            # 2016-07-11: 2664479936 (Windows) before fix for #12227
+            # 2016-07-11: 2739731144 (Windows) after fix for #12227 (ignoring)
       conf_3294,
 
       # Use `+RTS -G1` for more stable residency measurements. Note [residency].
@@ -822,3 +826,15 @@ test('T10547',
      ],
      compile_fail,
      ['-fprint-expanded-synonyms'])
+
+test('T12227',
+     [ only_ways(['normal']),
+       compiler_stats_num_field('bytes allocated',
+          [(wordsize(64), 1822822016, 5),
+          # 2016-07-11    5650186880 (Windows) before fix for #12227 
+          # 2016-07-11    1822822016 (Windows) after fix for #12227
+          ]),
+     ],
+     compile,
+     # Use `-M1G` to prevent memory thrashing with ghc-8.0.1.
+     ['-O2 -ddump-hi -ddump-to-file +RTS -M1G'])
