@@ -17,7 +17,8 @@ buildRootPath = "_build"
 
 ## Build flavour
 
-Build _flavour_ is a collection of build settings that fully define a GHC build:
+Build _flavour_ is a collection of build settings that fully define a GHC build
+(see `src/Flavour.hs`):
 ```haskell
 data Flavour = Flavour
     { name               :: String    -- ^ Flavour name, to set from command line.
@@ -37,21 +38,22 @@ a few others), which can be activated from the command line, e.g. `--flavour=qui
 Users can define new build flavours by adding them to `userFlavours` list:
 ```haskell
 userFlavour :: Flavour
-userFlavour = defaultFlavour { name = "user", ... } -- mofidy the default flavour
+userFlavour = defaultFlavour { name = "user", ... } -- mofidy the default build flavour
 
 userFlavours :: [Flavour]
 userFlavours = [userFlavour]
 ```
-Now `--flavour=user` will run Hadrian with `userFlavour` settings. Note:
-`defaultFlavour` is defined in module `Settings.Default`, which must be
-imported as `import {-# SOURCE #-} Settings.Default` to handle cyclic
-module dependencies. In the following sections we look at specific fields of
-the `Flavour` record in more detail.
+Now `--flavour=user` will run Hadrian with `userFlavour` settings. In the
+following sections we look at specific fields of the `Flavour` record in
+more detail. Note: `defaultFlavour`, as well as its individual fields such
+as `defaultArgs`, `defaultPackages`, etc. that we use below, are defined in module
+`Settings.Default`. Import it as
+`import {-# SOURCE #-} Settings.Default` to handle cyclic module dependencies. 
 
 ## Command line arguments
 
-One of the key features of Hadrian is that users can modify any build command by
-changing `userArgs`. The build system will detect the change and will rerun all
+One of the key features of Hadrian is that users can easily modify any build command.
+The build system will detect the change and will rerun all
 affected build rules during the next build, without requiring a full rebuild.
 
 For example, here is how to pass an extra argument `-O0` to all invocations of
@@ -106,7 +108,7 @@ userKnownPackages = [userPackage]
 userPackage :: Package
 userPackage = library "user-package"
 ```
-Note, you will also need to add `userPackage` to a specific build stage by modifying
+You will also need to add `userPackage` to a specific build stage by modifying
 `userPackages` as otherwise it will not be built.
 
 You can choose which integer library to use when builing GHC by setting
