@@ -253,7 +253,16 @@ lexLitChar =
      return (Char c)
 
 lexChar :: ReadP Char
-lexChar = do { (c,_) <- lexCharE; return c }
+lexChar = do { (c,_) <- lexCharE; consumeEmpties; return c }
+    where
+    -- Consumes the string "\&" repeatedly and greedily (will only produce one match)
+    consumeEmpties :: ReadP ()
+    consumeEmpties = do
+        rest <- look
+        case rest of
+            ('\\':'&':_) -> string "\\&" >> consumeEmpties
+            _ -> return ()
+
 
 lexCharE :: ReadP (Char, Bool)  -- "escaped or not"?
 lexCharE =

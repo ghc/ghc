@@ -229,7 +229,13 @@ lex s  = readP_to_S L.hsLex s
 --
 lexLitChar :: ReadS String      -- As defined by H2010
 lexLitChar = readP_to_S (do { (s, _) <- P.gather L.lexChar ;
-                              return s })
+                              let s' = removeNulls s in
+                              return s' })
+    where
+    -- remove nulls from end of the character if they exist
+    removeNulls [] = []
+    removeNulls ('\\':'&':xs) = removeNulls xs
+    removeNulls (first:rest) = first : removeNulls rest
         -- There was a skipSpaces before the P.gather L.lexChar,
         -- but that seems inconsistent with readLitChar
 
