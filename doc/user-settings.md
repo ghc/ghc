@@ -15,6 +15,39 @@ buildRootPath :: FilePath
 buildRootPath = "_build"
 ```
 
+## Build flavour
+
+Build _flavour_ is a collection of build settings that fully define a GHC build:
+```haskell
+data Flavour = Flavour
+    { name               :: String    -- ^ Flavour name, to set from command line.
+    , args               :: Args      -- ^ Use these command line arguments.
+    , packages           :: Packages  -- ^ Build these packages.
+    , libraryWays        :: Ways      -- ^ Build libraries these ways.
+    , rtsWays            :: Ways      -- ^ Build RTS these ways.
+    , splitObjects       :: Predicate -- ^ Build split objects.
+    , buildHaddock       :: Predicate -- ^ Build Haddock and documentation.
+    , dynamicGhcPrograms :: Bool      -- ^ Build dynamic GHC programs.
+    , ghciWithDebugger   :: Bool      -- ^ Enable GHCi debugger.
+    , ghcProfiled        :: Bool      -- ^ Build profiled GHC.
+    , ghcDebugged        :: Bool }    -- ^ Build GHC with debug information.
+```
+Hadrian provides several built-in flavours (`defaultFlavour`, `quickFlavour`, and
+a few others), which can be activated from the command line, e.g. `--flavour=quick`.
+Users can define new build flavours by adding them to `userFlavours` list:
+```haskell
+userFlavour :: Flavour
+userFlavour = defaultFlavour { name = "user", ... } -- mofidy the default flavour
+
+userFlavours :: [Flavour]
+userFlavours = [userFlavour]
+```
+Now `--flavour=user` will run Hadrian with `userFlavour` settings. Note:
+`defaultFlavour` is defined in module `Settings.Default`, which must be
+imported as `import {-# SOURCE #-} Settings.Default` to handle cyclic
+module dependencies. In the following sections we look at specific fields of
+the `Flavour` record in more detail.
+
 ## Command line arguments
 
 One of the key features of Hadrian is that users can modify any build command by
@@ -24,7 +57,9 @@ affected build rules during the next build, without requiring a full rebuild.
 For example, here is how to pass an extra argument `-O0` to all invocations of
 GHC when compiling package `cabal`:
 ```haskell
--- | Modify default build command line arguments.
+userFlavour :: Flavour
+userFlavour = defaultFlavour { name = "user", args = defaultArgs <> userArgs }
+
 userArgs :: Args
 userArgs = builder Ghc ? package cabal ? arg "-O0"
 ```
@@ -50,28 +85,28 @@ path component, excluding any separators.
 
 ## Packages
 
-To add or remove a package from a particular build stage, use `userPackages`. As
-an example, below we add package `base` to Stage0 and remove package `haskeline`
-from Stage1:
+Users can add and remove packages from particular build stages. As an example,
+below we add package `base` to Stage0 and remove package `haskeline` from Stage1:
 ```haskell
--- | Modify the set of packages that are built by default in each stage.
+userFlavour :: Flavour
+userFlavour = defaultFlavour { name = "user", packages = defaultPackages <> userPackages }
+
 userPackages :: Packages
 userPackages = mconcat
     [ stage0 ? append [base]
     , stage1 ? remove [haskeline] ]
 ```
 If you are working on a new GHC package you need to let Hadrian know about it
-by setting `userKnownPackages`:
+by adding it to `userKnownPackages`:
 ```haskell
--- | Add user defined packages. Don't forget to add them to 'userPackages' too.
 userKnownPackages :: [Package]
-userKnownPackages = [myPackage]
+userKnownPackages = [userPackage]
 
--- An example package that lives in "libraries/my-package" directory.
-myPackage :: Package
-myPackage = library "my-package"
+-- An example package that lives in "libraries/user-package" directory.
+userPackage :: Package
+userPackage = library "user-package"
 ```
-Note, you will also need to add `myPackage` to a specific build stage by modifying
+Note, you will also need to add `userPackage` to a specific build stage by modifying
 `userPackages` as otherwise it will not be built.
 
 You can choose which integer library to use when builing GHC by setting
@@ -85,17 +120,12 @@ integerLibrary = integerGmp
 
 Packages can be built in a number of ways, such as `vanilla`, `profiling` (with
 profiling information enabled), and many others as defined in `src/Way.hs`. You
-can change the default build ways using `userLibraryWays` and `userRtsWays` settings.
-As an example, below we remove `dynamic` from the list of library ways but keep
-`rts` package ways unchanged:
+can change the default build ways by modifying `libraryWays` and `rtsWays` fields
+of the `Flavour` record as required. As an example, below we remove `dynamic`
+from the list of library ways but keep `rts` package ways unchanged:
 ```haskell
--- | Modify the set of ways in which library packages are built.
-userLibraryWays :: Ways
-userLibraryWays = remove [dynamic]
-
--- | Modify the set of ways in which the 'rts' package is built.
-userRtsWays :: Ways
-userRtsWays = mempty
+userFlavour :: Flavour
+userFlavour = defaultFlavour { name = "user", libraryWays = defaultLibraryWays <> remove [dynamic] }
 ```
 
 ## Verbose command lines
@@ -133,18 +163,12 @@ verboseCommands = return True
 
 ## Miscellaneous
 
-Use the following settings to change the default behaviour of Hadrian with respect
-to building split objects and Haddock documentation.
-
+To change the default behaviour of Hadrian with respect to building split
+objects and Haddock documentation, override `splitObjects` and `buildHaddock`
+fields of the `Flavour` record, for example:
 ```haskell
--- | Control when split objects are generated. Note, due to the GHC bug #11315
--- it is necessary to do a full clean rebuild when changing this option.
-splitObjects :: Predicate
-splitObjects = (return cmdSplitObjects) &&^ defaultSplitObjects
-
--- | Control when to build Haddock documentation.
-buildHaddock :: Predicate
-buildHaddock = return cmdBuildHaddock
+userFlavour :: Flavour
+userFlavour = defaultFlavour { name = "user", splitObjects = return False, buildHaddock = return True }
 ```
 
 Hadrian prints various progress info during the build. You can customise how this
