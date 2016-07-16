@@ -38,7 +38,7 @@ a few others), which can be activated from the command line, e.g. `--flavour=qui
 Users can define new build flavours by adding them to `userFlavours` list:
 ```haskell
 userFlavour :: Flavour
-userFlavour = defaultFlavour { name = "user", ... } -- mofidy the default build flavour
+userFlavour = defaultFlavour { name = "user", ... } -- modify the default build flavour
 
 userFlavours :: [Flavour]
 userFlavours = [userFlavour]
