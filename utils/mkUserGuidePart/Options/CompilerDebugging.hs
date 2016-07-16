@@ -20,8 +20,16 @@ compilerDebuggingOptions =
          , flagDescription = "Dump interpreter byte code"
          , flagType = DynamicFlag
          }
+  , flag { flagName = "-ddump-cmm-from-stg"
+         , flagDescription = "Dump STG-to-C-- output"
+         , flagType = DynamicFlag
+         }
+  , flag { flagName = "-ddump-cmm-verbose"
+         , flagDescription = "Show output from each C-- pipeline pass"
+         , flagType = DynamicFlag
+         }
   , flag { flagName = "-ddump-cmm"
-         , flagDescription = "Dump C-- output"
+         , flagDescription = "Dump the final C-- output"
          , flagType = DynamicFlag
          }
   , flag { flagName = "-ddump-core-stats"

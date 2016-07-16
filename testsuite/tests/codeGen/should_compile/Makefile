@@ -9,13 +9,13 @@ debug:
 	# Without optimisations, we should get annotations for basically
 	# all expressions in the example program.
 	echo == Dbg ==
-	'$(TEST_HC)' $(TEST_HC_OPTS) debug -fforce-recomp -g -dppr-ticks -ddump-cmm \
+	'$(TEST_HC)' $(TEST_HC_OPTS) debug -fforce-recomp -g -dppr-ticks -ddump-cmm-verbose \
 		| grep -o src\<debug.hs:.*\> | sort -u
 	./debug
 
 	# With optimisations we will get fewer annotations.
 	echo == Dbg -O2 ==
-	'$(TEST_HC)' $(TEST_HC_OPTS) debug -fforce-recomp -g -dppr-ticks -ddump-cmm -O2 \
+	'$(TEST_HC)' $(TEST_HC_OPTS) debug -fforce-recomp -g -dppr-ticks -ddump-cmm-verbose -O2 \
 		> debug.cmm
 	cat debug.cmm | grep -o src\<debug.hs:.*\> | sort -u
 

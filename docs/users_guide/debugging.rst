@@ -131,7 +131,17 @@ Dumping out compiler intermediate structures
 
     .. ghc-flag:: -ddump-cmm
 
-        Print the C-- code out.
+        Dump the result of the C-- pipeline processing
+
+    .. ghc-flag:: -ddump-cmm-from-stg
+
+        Dump the result of STG-to-C-- conversion
+
+    .. ghc-flag:: -ddump-cmm-verbose
+
+        Dump output from all C-- pipeline stages. In case of
+        ``.cmm`` compilation this also dumps the result of
+        file parsing.
 
     .. ghc-flag:: -ddump-opt-cmm
 

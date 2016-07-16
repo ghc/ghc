@@ -295,15 +295,19 @@ data DumpFlag
 
    -- debugging flags
    = Opt_D_dump_cmm
+   | Opt_D_dump_cmm_from_stg
    | Opt_D_dump_cmm_raw
-   -- All of the cmm subflags (there are a lot!)  Automatically
-   -- enabled if you run -ddump-cmm
+   | Opt_D_dump_cmm_verbose
+   -- All of the cmm subflags (there are a lot!) automatically
+   -- enabled if you run -ddump-cmm-verbose
+   -- Each flag corresponds to exact stage of Cmm pipeline.
    | Opt_D_dump_cmm_cfg
    | Opt_D_dump_cmm_cbe
    | Opt_D_dump_cmm_switch
    | Opt_D_dump_cmm_proc
-   | Opt_D_dump_cmm_sink
    | Opt_D_dump_cmm_sp
+   | Opt_D_dump_cmm_sink
+   | Opt_D_dump_cmm_caf
    | Opt_D_dump_cmm_procmap
    | Opt_D_dump_cmm_split
    | Opt_D_dump_cmm_info
@@ -2606,8 +2610,12 @@ dynamic_flags_deps = [
 
   , make_ord_flag defGhcFlag "ddump-cmm"
         (setDumpFlag Opt_D_dump_cmm)
+  , make_ord_flag defGhcFlag "ddump-cmm-from-stg"
+        (setDumpFlag Opt_D_dump_cmm_from_stg)
   , make_ord_flag defGhcFlag "ddump-cmm-raw"
         (setDumpFlag Opt_D_dump_cmm_raw)
+  , make_ord_flag defGhcFlag "ddump-cmm-verbose"
+        (setDumpFlag Opt_D_dump_cmm_verbose)
   , make_ord_flag defGhcFlag "ddump-cmm-cfg"
         (setDumpFlag Opt_D_dump_cmm_cfg)
   , make_ord_flag defGhcFlag "ddump-cmm-cbe"
@@ -2616,10 +2624,12 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_cmm_switch)
   , make_ord_flag defGhcFlag "ddump-cmm-proc"
         (setDumpFlag Opt_D_dump_cmm_proc)
-  , make_ord_flag defGhcFlag "ddump-cmm-sink"
-        (setDumpFlag Opt_D_dump_cmm_sink)
   , make_ord_flag defGhcFlag "ddump-cmm-sp"
         (setDumpFlag Opt_D_dump_cmm_sp)
+  , make_ord_flag defGhcFlag "ddump-cmm-sink"
+        (setDumpFlag Opt_D_dump_cmm_sink)
+  , make_ord_flag defGhcFlag "ddump-cmm-caf"
+        (setDumpFlag Opt_D_dump_cmm_caf)
   , make_ord_flag defGhcFlag "ddump-cmm-procmap"
         (setDumpFlag Opt_D_dump_cmm_procmap)
   , make_ord_flag defGhcFlag "ddump-cmm-split"

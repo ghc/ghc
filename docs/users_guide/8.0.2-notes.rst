@@ -22,6 +22,17 @@ Language
    refer to closed local bindings. For instance, this is now permitted:
    ``f = static x where x = 'a'``.
 
+Compiler
+~~~~~~~~
+
+-  TODO FIXME.
+
+-  The :ghc-flag:`-ddump-cmm` now dumps the result after C-- pipeline pass. Two
+   more flags were added: :ghc-flag:`-ddump-cmm-from-stg` to allow to get the
+   initial cmm from STG-to-C-- code generation and :ghc-flag:`-ddump-cmm-verbose`
+   to obtain the intermediates from all C-- pipeline stages.
+
+
 TODO FIXME Heading title
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
