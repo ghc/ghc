@@ -411,3 +411,5 @@ test('T11941', normal, compile_fail, ['-v0'])
 test('T11484', normal, compile, ['-v0'])
 test('T12130', extra_clean(['T12130a.hi','T12130a.o']),
               multimod_compile, ['T12130', '-v0 ' + config.ghc_th_way_flags])
+test('T12403', omit_ways(['ghci']),
+              compile_and_run, ['-v0 -ddump-splices -dsuppress-uniques'])

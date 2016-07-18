@@ -1733,7 +1733,9 @@ reify_tc_app tc tys
     tc_binders  = tyConBinders tc
     tc_res_kind = tyConResKind tc
 
-    r_tc | isTupleTyCon tc                = if isPromotedDataCon tc
+    r_tc | isUnboxedTupleTyCon tc         = TH.UnboxedTupleT (arity `div` 2)
+             -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+         | isTupleTyCon tc                = if isPromotedDataCon tc
                                             then TH.PromotedTupleT arity
                                             else TH.TupleT arity
          | tc `hasKey` listTyConKey       = TH.ListT

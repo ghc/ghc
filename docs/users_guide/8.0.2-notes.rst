@@ -1,0 +1,59 @@
+.. _release-8-0-2:
+
+Release notes for version 8.0.2
+===============================
+
+TODO FIXME
+
+Highlights
+----------
+
+TODO FIXME.
+
+Full details
+------------
+
+Language
+~~~~~~~~
+
+-  TODO FIXME.
+
+-  :ghc-flag:`-XStaticPointers` now allows the body of the ``static`` form to
+   refer to closed local bindings. For instance, this is now permitted:
+   ``f = static x where x = 'a'``.
+
+Compiler
+~~~~~~~~
+
+-  TODO FIXME.
+
+-  The :ghc-flag:`-ddump-cmm` now dumps the result after C-- pipeline pass. Two
+   more flags were added: :ghc-flag:`-ddump-cmm-from-stg` to allow to get the
+   initial cmm from STG-to-C-- code generation and :ghc-flag:`-ddump-cmm-verbose`
+   to obtain the intermediates from all C-- pipeline stages.
+
+Template Haskell
+~~~~~~~~~~~~~~~~
+
+-  Reifying types that contain unboxed tuples now works correctly. (Previously,
+   Template Haskell reified unboxed tuples as boxed tuples with twice their
+   appropriate arity.)
+
+TODO FIXME Heading title
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+-  GHCi now supports two new commands. :ghci-cmd:`:type` ``+d`` performs
+   defaulting on the type before reporting it to the user, and
+   :ghci-cmd:`:type` ``+v`` refrains from instantiating any variables before
+   reporting, which is useful in concert with :ghc-flag:`-XTypeApplications`.
+
+   .. code-block:: none
+
+	*X> :type +d length
+	length :: [a] -> Int
+
+	*X> :set -fprint-explicit-foralls
+	*X> :type length
+	length :: forall {a} {t :: * -> *}. Foldable t => t a -> Int
+	*X> :type +v length
+	length :: forall (t :: * -> *). Foldable t => forall a. t a -> Int
