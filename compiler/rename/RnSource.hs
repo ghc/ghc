@@ -1268,7 +1268,7 @@ if the data instance is an assocaited type of an enclosing class instance.
 with different dependency structure!)
 
 Ugh.  For now we simply don't allow promotion of data constructors for
-data instaces.  See Note [AFamDataCon: not promoting data family
+data instances.  See Note [AFamDataCon: not promoting data family
 constructors] in TcEnv
 -}
 

@@ -888,7 +888,7 @@ wrapId wrapper id = mkHsWrap wrapper (HsVar (noLoc id))
 
 {- Note [Typechecking plan for instance declarations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For intance declarations we generate the following bindings and implication
+For instance declarations we generate the following bindings and implication
 constraints.  Example:
 
    instance Ord a => Ord [a] where compare = <compare-rhs>
@@ -1516,7 +1516,7 @@ mkDefMethBind :: Class -> [Type] -> Id -> Name -> TcM (LHsBind Name, [LSig Name]
 -- The is a default method (vanailla or generic) defined in the class
 -- So make a binding   op = $dmop @t1 @t2
 -- where $dmop is the name of the default method in the class,
--- and t1,t2 are the instace types.
+-- and t1,t2 are the instance types.
 -- See Note [Default methods in instances] for why we use
 -- visible type application here
 mkDefMethBind clas inst_tys sel_id dm_name

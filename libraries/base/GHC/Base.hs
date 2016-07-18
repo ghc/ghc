@@ -50,7 +50,7 @@ GHC.Num         Class: Num, plus instances for Int
 GHC.Real        Classes: Real, Integral, Fractional, RealFrac
                          plus instances for Int, Integer
                 Types:  Ratio, Rational
-                        plus intances for classes so far
+                        plus instances for classes so far
 
                 Rational is needed here because it is mentioned in the signature
                 of 'toRational' in class Real

@@ -130,7 +130,7 @@ And this is what checkAmbiguity does.
 What about this, though?
    g :: C [a] => Int
 Is every call to 'g' ambiguous?  After all, we might have
-   intance C [a] where ...
+   instance C [a] where ...
 at the call site.  So maybe that type is ok!  Indeed even f's
 quintessentially ambiguous type might, just possibly be callable:
 with -XFlexibleInstances we could have

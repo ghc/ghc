@@ -1466,7 +1466,7 @@ dupExport_ok :: Name -> IE RdrName -> IE RdrName -> Bool
 -- Example of "yes" (Trac #2436)
 --    module M( C(..), T(..) ) where
 --         class C a where { data T a }
---         instace C Int where { data T Int = TInt }
+--         instance C Int where { data T Int = TInt }
 --
 -- Example of "yes" (Trac #2436)
 --    module Foo ( T ) where
