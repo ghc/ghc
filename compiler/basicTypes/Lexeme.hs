@@ -155,18 +155,23 @@ okVarSymOcc str = all okSymChar str &&
 -- starts with an acceptable letter?
 okConIdOcc :: String -> Bool
 okConIdOcc str = okIdOcc str ||
-                 is_tuple_name1 str
+                 is_tuple_name1 True  str ||
+                   -- Is it a boxed tuple...
+                 is_tuple_name1 False str
+                   -- ...or an unboxed tuple (Trac #12407)?
   where
     -- check for tuple name, starting at the beginning
-    is_tuple_name1 ('(' : rest) = is_tuple_name2 rest
-    is_tuple_name1 _            = False
+    is_tuple_name1 True  ('(' : rest)       = is_tuple_name2 True  rest
+    is_tuple_name1 False ('(' : '#' : rest) = is_tuple_name2 False rest
+    is_tuple_name1 _     _                  = False
 
     -- check for tuple tail
-    is_tuple_name2 ")"          = True
-    is_tuple_name2 (',' : rest) = is_tuple_name2 rest
-    is_tuple_name2 (ws  : rest)
-      | isSpace ws              = is_tuple_name2 rest
-    is_tuple_name2 _            = False
+    is_tuple_name2 True  ")"          = True
+    is_tuple_name2 False "#)"         = True
+    is_tuple_name2 boxed (',' : rest) = is_tuple_name2 boxed rest
+    is_tuple_name2 boxed (ws  : rest)
+      | isSpace ws                    = is_tuple_name2 boxed rest
+    is_tuple_name2 _     _            = False
 
 -- | Is this an acceptable symbolic constructor name, assuming it
 -- starts with an acceptable character?
