@@ -1791,9 +1791,9 @@ matchClassInst dflags inerts clas tys loc
      pred = mkClassPred clas tys
 
 matchClassInst dflags _ clas tys loc
- = do { traceTcS "matchClassInst" $ vcat [ text "pred =" <+> ppr (mkClassPred clas tys) ]
+ = do { traceTcS "matchClassInst" $ text "pred =" <+> ppr (mkClassPred clas tys) <+> char '{'
       ; res <- match_class_inst dflags clas tys loc
-      ; traceTcS "matchClassInst result" $ ppr res
+      ; traceTcS "} matchClassInst result" $ ppr res
       ; return res }
 
 match_class_inst :: DynFlags -> Class -> [Type] -> CtLoc -> TcS LookupInstResult
