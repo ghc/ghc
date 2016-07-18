@@ -1658,7 +1658,11 @@ functorLikeTraverse var (FT { ft_triv = caseTrivial,     ft_var = caseVar
                           = (caseTyApp fun_ty (last xrs), True)
        | otherwise        = (caseWrongArg, True)   -- Non-decomposable (eg type function)
        where
-         (xrs,xcs) = unzip (map (go co) args)
+         -- When folding over an unboxed tuple, we must explicitly drop the
+         -- runtime rep arguments, or else GHC will generate twice as many
+         -- variables in a unboxed tuple pattern match and expression as it
+         -- actually needs. See Trac #12399
+         (xrs,xcs) = unzip (map (go co) (dropRuntimeRepArgs args))
     go _  (ForAllTy (Named _ Visible) _) = panic "unexpected visible binder"
     go co (ForAllTy (Named v _)       x) | v /= var && xc = (caseForAll v xr,True)
         where (xr,xc) = go co x
@@ -2727,7 +2731,7 @@ a is the last type variable in a given datatype):
 * ft_tup:     A tuple type which mentions the last type variable in at least
               one of its fields. The TyCon argument of ft_tup represents the
               particular tuple's type constructor.
-              Examples: (a, Int), (Maybe a, [a], Either a Int)
+              Examples: (a, Int), (Maybe a, [a], Either a Int), (# Int, a #)
 
 * ft_ty_app:  A type is being applied to the last type parameter, where the
               applied type does not mention the last type parameter (if it
