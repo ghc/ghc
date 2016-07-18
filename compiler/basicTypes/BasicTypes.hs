@@ -19,7 +19,7 @@ types that
 module BasicTypes(
         Version, bumpVersion, initialVersion,
 
-        ConTag, fIRST_TAG,
+        ConTag, ConTagZ, fIRST_TAG,
 
         Arity, RepArity,
 
@@ -48,6 +48,8 @@ module BasicTypes(
 
         TupleSort(..), tupleSortBoxity, boxityTupleSort,
         tupleParens,
+
+        sumParens, pprAlternative,
 
         -- ** The OneShotInfo type
         OneShotInfo(..),
@@ -131,6 +133,9 @@ type RepArity = Int
 -- | Type of the tags associated with each constructor possibility
 --   or superclass selector
 type ConTag = Int
+
+-- | A *zero-indexed* constructor tag
+type ConTagZ = Int
 
 fIRST_TAG :: ConTag
 -- ^ Tags are allocated from here for real constructors
@@ -615,6 +620,27 @@ tupleParens UnboxedTuple    p = text "(#" <+> p <+> ptext (sLit "#)")
 tupleParens ConstraintTuple p   -- In debug-style write (% Eq a, Ord b %)
   | opt_PprStyle_Debug        = text "(%" <+> p <+> ptext (sLit "%)")
   | otherwise                 = parens p
+
+{-
+************************************************************************
+*                                                                      *
+                Sums
+*                                                                      *
+************************************************************************
+-}
+
+sumParens :: SDoc -> SDoc
+sumParens p = ptext (sLit "(#") <+> p <+> ptext (sLit "#)")
+
+-- | Pretty print an alternative in an unboxed sum e.g. "| a | |".
+pprAlternative :: (a -> SDoc) -- ^ The pretty printing function to use
+               -> a           -- ^ The things to be pretty printed
+               -> ConTag      -- ^ Alternative (one-based)
+               -> Arity       -- ^ Arity
+               -> SDoc        -- ^ 'SDoc' where the alternative havs been pretty
+                              -- printed and finally packed into a paragraph.
+pprAlternative pp x alt arity =
+    fsep (replicate (alt - 1) vbar ++ [pp x] ++ replicate (arity - alt - 1) vbar)
 
 {-
 ************************************************************************

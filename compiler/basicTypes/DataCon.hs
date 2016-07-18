@@ -49,6 +49,7 @@ module DataCon (
 
         -- ** Predicates on DataCons
         isNullarySrcDataCon, isNullaryRepDataCon, isTupleDataCon, isUnboxedTupleCon,
+        isUnboxedSumCon,
         isVanillaDataCon, classDataCon, dataConCannotMatch,
         isBanged, isMarkedStrict, eqHsBang, isSrcStrict, isSrcUnpacked,
         specialPromotedDc, isLegacyPromotableDataCon, isLegacyPromotableTyCon,
@@ -80,6 +81,7 @@ import Binary
 import UniqSet
 import UniqFM
 import Unique( mkAlphaTyVarUnique )
+import {-# SOURCE #-} RepType ( typeRepArity )
 
 import qualified Data.Data as Data
 import Data.Char
@@ -979,7 +981,7 @@ dataConRepArity (MkData { dcRepArity = arity }) = arity
 
 
 -- | The number of fields in the /representation/ of the constructor
--- AFTER taking into account the unpacking of any unboxed tuple fields
+-- AFTER taking into account the unpacking of any unboxed tuple and sum fields
 dataConRepRepArity :: DataCon -> RepArity
 dataConRepRepArity dc = typeRepArity (dataConRepArity dc) (dataConRepType dc)
 
@@ -1163,6 +1165,9 @@ isTupleDataCon (MkData {dcRepTyCon = tc}) = isTupleTyCon tc
 
 isUnboxedTupleCon :: DataCon -> Bool
 isUnboxedTupleCon (MkData {dcRepTyCon = tc}) = isUnboxedTupleTyCon tc
+
+isUnboxedSumCon :: DataCon -> Bool
+isUnboxedSumCon (MkData {dcRepTyCon = tc}) = isUnboxedSumTyCon tc
 
 -- | Vanilla 'DataCon's are those that are nice boring Haskell 98 constructors
 isVanillaDataCon :: DataCon -> Bool

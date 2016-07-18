@@ -59,7 +59,9 @@ module RdrHsSyn (
         mkModuleImpExp,
         mkTypeImpExp,
         mkImpExpSubSpec,
-        checkImportSpec
+        checkImportSpec,
+
+        SumOrTuple (..), mkSumOrTuple
 
     ) where
 
@@ -866,6 +868,10 @@ checkAPat msg loc e0 = do
                                    return (TuplePat ps b [])
      | otherwise -> parseErrorSDoc loc (text "Illegal tuple section in pattern:" $$ ppr e0)
 
+   ExplicitSum alt arity expr _ -> do
+     p <- checkLPat msg expr
+     return (SumPat p alt arity placeHolderType)
+
    RecordCon { rcon_con_name = c, rcon_flds = HsRecFields fs dd }
                         -> do fs <- mapM (checkPatField msg) fs
                               return (ConPatIn c (RecCon (HsRecFields fs dd)))
@@ -1475,3 +1481,24 @@ mkImpExpSubSpec xs =
 
 parseErrorSDoc :: SrcSpan -> SDoc -> P a
 parseErrorSDoc span s = failSpanMsgP span s
+
+data SumOrTuple
+  = Sum ConTag Arity (LHsExpr RdrName)
+  | Tuple [LHsTupArg RdrName]
+
+mkSumOrTuple :: Boxity -> SrcSpan -> SumOrTuple -> P (HsExpr RdrName)
+
+-- Tuple
+mkSumOrTuple boxity _ (Tuple es) = return (ExplicitTuple es boxity)
+
+-- Sum
+mkSumOrTuple Unboxed _ (Sum alt arity e) =
+    return (ExplicitSum alt arity e PlaceHolder)
+mkSumOrTuple Boxed l (Sum alt arity (L _ e)) =
+    parseErrorSDoc l (hang (text "Boxed sums not supported:") 2 (ppr_boxed_sum alt arity e))
+  where
+    ppr_boxed_sum :: ConTag -> Arity -> HsExpr RdrName -> SDoc
+    ppr_boxed_sum alt arity e =
+      text "(" <+> ppr_bars (alt - 1) <+> ppr e <+> ppr_bars (arity - alt) <+> text ")"
+
+    ppr_bars n = hsep (replicate n (Outputable.char '|'))

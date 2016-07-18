@@ -8,11 +8,10 @@
 
 module CmmLive
     ( CmmLocalLive
-    , CmmGlobalLive
     , cmmLocalLiveness
     , cmmGlobalLiveness
     , liveLattice
-    , noLiveOnEntry, xferLive, gen, kill, gen_kill
+    , gen, kill, gen_kill
     )
 where
 
@@ -33,7 +32,6 @@ import Outputable
 -- | The variables live on entry to a block
 type CmmLive r = RegSet r
 type CmmLocalLive = CmmLive LocalReg
-type CmmGlobalLive = CmmLive GlobalReg
 
 -- | The dataflow lattice
 liveLattice :: Ord r => DataflowLattice (CmmLive r)

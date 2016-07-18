@@ -42,6 +42,7 @@ import Coercion
 import SrcLoc
 import Kind
 import Type
+import RepType
 import TyCoRep       -- checks validity of types/coercions
 import TyCon
 import CoAxiom
@@ -1401,13 +1402,10 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
      checkTypes t1 t2
        = case (repType t1, repType t2) of
            (UnaryRep _, UnaryRep _) ->
-              validateCoercion (typePrimRep t1)
-                               (typePrimRep t2)
-           (UbxTupleRep rep1, UbxTupleRep rep2) -> do
-              checkWarnL (length rep1 == length rep2)
-                         (report "unboxed tuples of different length")
-              zipWithM_ checkTypes rep1 rep2
-           _  -> addWarnL (report "unboxed tuple and ordinary type")
+              validateCoercion (typePrimRep t1) (typePrimRep t2)
+           (MultiRep rep1, MultiRep rep2) ->
+              checkWarnL (rep1 == rep2) (report "multi values with different reps")
+           _  -> addWarnL (report "multi rep and unary rep")
      validateCoercion :: PrimRep -> PrimRep -> LintM ()
      validateCoercion rep1 rep2
        = do { dflags <- getDynFlags

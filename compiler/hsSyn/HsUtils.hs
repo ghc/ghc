@@ -853,6 +853,7 @@ collect_lpat (L _ pat) bndrs
     go (ListPat pats _ _)         = foldr collect_lpat bndrs pats
     go (PArrPat pats _)           = foldr collect_lpat bndrs pats
     go (TuplePat pats _ _)        = foldr collect_lpat bndrs pats
+    go (SumPat pat _ _ _)         = collect_lpat pat bndrs
 
     go (ConPatIn _ ps)            = foldr collect_lpat bndrs (hsConPatArgs ps)
     go (ConPatOut {pat_args=ps})  = foldr collect_lpat bndrs (hsConPatArgs ps)

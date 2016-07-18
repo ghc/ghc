@@ -26,6 +26,7 @@ import Literal
 import Module
 import Name
 import Type
+import RepType
 import TyCon
 import Coercion
 import TcEnv

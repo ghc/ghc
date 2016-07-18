@@ -34,6 +34,7 @@ import HscTypes
 
 import DataCon
 import Type
+import RepType
 import qualified Unify as U
 import Var
 import TcRnMonad
@@ -464,7 +465,7 @@ cPprTermBase y =
    ppr_list :: Precedence -> Term -> m SDoc
    ppr_list p (Term{subTerms=[h,t]}) = do
        let elems      = h : getListTerms t
-           isConsLast = not(termType(last elems) `eqType` termType h)
+           isConsLast = not (termType (last elems) `eqType` termType h)
            is_string  = all (isCharTy . ty) elems
 
        print_elems <- mapM (y cons_prec) elems
@@ -804,15 +805,15 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 (nonPtrs clos)
            (ptr_i, ws, terms1) <- go ptr_i ws tys
            return (ptr_i, ws, unboxedTupleTerm ty terms0 : terms1)
       | otherwise
-      = case repType ty of
-          UnaryRep rep_ty -> do
+      = case repTypeArgs ty of
+          [rep_ty] ->  do
             (ptr_i, ws, term0)  <- go_rep ptr_i ws ty (typePrimRep rep_ty)
             (ptr_i, ws, terms1) <- go ptr_i ws tys
             return (ptr_i, ws, term0 : terms1)
-          UbxTupleRep rep_tys -> do
-            (ptr_i, ws, terms0) <- go_unary_types ptr_i ws rep_tys
-            (ptr_i, ws, terms1) <- go ptr_i ws tys
-            return (ptr_i, ws, unboxedTupleTerm ty terms0 : terms1)
+          rep_tys -> do
+           (ptr_i, ws, terms0) <- go_unary_types ptr_i ws rep_tys
+           (ptr_i, ws, terms1) <- go ptr_i ws tys
+           return (ptr_i, ws, unboxedTupleTerm ty terms0 : terms1)
 
     go_unary_types ptr_i ws [] = return (ptr_i, ws, [])
     go_unary_types ptr_i ws (rep_ty:rep_tys) = do
@@ -919,19 +920,25 @@ findPtrTys i ty
   = findPtrTyss i elem_tys
 
   | otherwise
-  = case repType ty of
+  = -- Can't directly call repTypeArgs here -- we lose type information in
+    -- some cases (e.g. singleton tuples)
+    case repType ty of
       UnaryRep rep_ty | typePrimRep rep_ty == PtrRep -> return (i + 1, [(i, ty)])
                       | otherwise                    -> return (i,     [])
-      UbxTupleRep rep_tys  -> foldM (\(i, extras) rep_ty -> if typePrimRep rep_ty == PtrRep
-                                                             then newVar liftedTypeKind >>= \tv -> return (i + 1, extras ++ [(i, tv)])
-                                                             else return (i, extras))
-                                    (i, []) rep_tys
+      MultiRep slot_tys ->
+        foldM (\(i, extras) rep_ty ->
+                if typePrimRep rep_ty == PtrRep
+                  then newVar liftedTypeKind >>= \tv -> return (i + 1, extras ++ [(i, tv)])
+                  else return (i, extras))
+              (i, []) (map slotTyToType slot_tys)
 
 findPtrTyss :: Int
             -> [Type]
             -> TR (Int, [(Int, Type)])
 findPtrTyss i tys = foldM step (i, []) tys
-  where step (i, discovered) elem_ty = findPtrTys i elem_ty >>= \(i, extras) -> return (i, discovered ++ extras)
+  where step (i, discovered) elem_ty = do
+          (i, extras) <- findPtrTys i elem_ty
+          return (i, discovered ++ extras)
 
 
 -- Compute the difference between a base type and the type found by RTTI

@@ -1138,6 +1138,7 @@ collectl (L _ pat) bndrs
     go (ListPat pats _ _)         = foldr collectl bndrs pats
     go (PArrPat pats _)           = foldr collectl bndrs pats
     go (TuplePat pats _ _)        = foldr collectl bndrs pats
+    go (SumPat pat _ _ _)         = collectl pat bndrs
 
     go (ConPatIn _ ps)            = foldr collectl bndrs (hsConPatArgs ps)
     go (ConPatOut {pat_args=ps, pat_binds=ds}) =

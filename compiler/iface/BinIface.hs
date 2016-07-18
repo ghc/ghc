@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE BinaryLiterals, CPP, ScopedTypeVariables #-}
 
 --
 --  (c) The University of Glasgow 2002-2006
@@ -23,7 +23,6 @@ module BinIface (
 import TcRnMonad
 import TyCon
 import ConLike
-import DataCon    ( dataConName, dataConWorkId, dataConTyCon )
 import PrelInfo   ( knownKeyNames )
 import Id         ( idName, isDataConWorkId_maybe )
 import TysWiredIn
@@ -46,6 +45,7 @@ import Platform
 import FastString
 import Constants
 import Util
+import DataCon
 
 import Data.Bits
 import Data.Char
@@ -294,21 +294,31 @@ serialiseName bh name _ = do
 --
 -- An occurrence of a name in an interface file is serialized as a single 32-bit word.
 -- The format of this word is:
---  00xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+--  00xxxxxx xxxxxxxx xxxxxxxx xxxxxxxx
 --   A normal name. x is an index into the symbol table
---  01xxxxxxxxyyyyyyyyyyyyyyyyyyyyyyyy
+--  01xxxxxx xxyyyyyy yyyyyyyy yyyyyyyyyy
 --   A known-key name. x is the Unique's Char, y is the int part
---  10xxyyzzzzzzzzzzzzzzzzzzzzzzzzzzzz
+--  100xxyyz zzzzzzzz zzzzzzzz zzzzzzzz
 --   A tuple name:
 --    x is the tuple sort (00b ==> boxed, 01b ==> unboxed, 10b ==> constraint)
 --    y is the thing (00b ==> tycon, 01b ==> datacon, 10b ==> datacon worker)
 --    z is the arity
---  11xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+--
+--  10100xxx xxxxxxxx xxxxxxxx xxxxxxxx
+--   A sum tycon name:
+--    x is the arity
+--  10101xxx xxxxxxxx xxyyyyyy yyyyyyyy
+--   A sum datacon name:
+--    x is the arity
+--    y is the alternative
+--  10110xxx xxxxxxxx xxyyyyyy yyyyyyyy
+--    worker
+--  11xxxxxx xxxxxxxx xxxxxxxx xxxxxxxx
 --   An implicit parameter TyCon name. x is an index into the FastString *dictionary*
 --
--- Note that we have to have special representation for tuples and IP TyCons because they
--- form an "infinite" family and hence are not recorded explicitly in wiredInTyThings or
--- basicKnownKeyNames.
+-- Note that we have to have special representation for tuples, sums, and IP
+-- TyCons because they form an "infinite" family and hence are not recorded
+-- explicitly in wiredInTyThings or basicKnownKeyNames.
 
 knownKeyNamesMap :: UniqFM Name
 knownKeyNamesMap = listToUFM_Directly [(nameUnique n, n) | n <- knownKeyNames]
@@ -326,13 +336,19 @@ putName _dict BinSymbolTable{
   = case wiredInNameTyThing_maybe name of
      Just (ATyCon tc)
        | Just sort <- tyConTuple_maybe tc -> putTupleName_ bh tc sort 0
+       | isUnboxedSumTyCon tc -> putSumTyConName_ bh tc
      Just (AConLike (RealDataCon dc))
        | let tc = dataConTyCon dc
        , Just sort <- tyConTuple_maybe tc -> putTupleName_ bh tc sort 1
+       | isUnboxedSumCon dc -> putSumDataConName_ bh dc
      Just (AnId x)
        | Just dc <- isDataConWorkId_maybe x
        , let tc = dataConTyCon dc
        , Just sort <- tyConTuple_maybe tc -> putTupleName_ bh tc sort 2
+     Just (AnId x)
+       | Just dc <- isDataConWorkId_maybe x
+       , isUnboxedSumCon dc
+       -> putSumWorkerId_ bh dc
      _ -> do
        symtab_map <- readIORef symtab_map_ref
        case lookupUFM symtab_map name of
@@ -347,8 +363,8 @@ putName _dict BinSymbolTable{
 
 putTupleName_ :: BinHandle -> TyCon -> TupleSort -> Word32 -> IO ()
 putTupleName_ bh tc tup_sort thing_tag
-  = -- ASSERT(arity < 2^(30 :: Int))
-    put_ bh (0x80000000 .|. (sort_tag `shiftL` 28) .|. (thing_tag `shiftL` 26) .|. arity)
+  = ASSERT(arity < 2^(25 :: Int))
+    put_ bh (0x80000000 .|. (sort_tag `shiftL` 27) .|. (thing_tag `shiftL` 25) .|. arity)
   where
     (sort_tag, arity) = case tup_sort of
       BoxedTuple      -> (0, fromIntegral (tyConArity tc))
@@ -356,33 +372,92 @@ putTupleName_ bh tc tup_sort thing_tag
         -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
       ConstraintTuple -> pprPanic "putTupleName:ConstraintTuple" (ppr tc)
 
+putSumTyConName_ :: BinHandle -> TyCon -> IO ()
+putSumTyConName_ bh tc
+  = ASSERT(arity < 2^(27 :: Int))
+    put_ bh (0xA0000000 .|. arity)
+  where
+    arity = (fromIntegral (tyConArity tc) `div` 2) :: Word32
+
+putSumDataConName_ :: BinHandle -> DataCon -> IO ()
+putSumDataConName_ bh dc
+  = ASSERT(arity < 2^(13 :: Int) && alt < 2^(14 :: Int))
+    put_ bh (0xA8000000 .|. (arity `shiftL` 14) .|. alt)
+  where
+    tc       = dataConTyCon dc
+    alt      = fromIntegral (dataConTag dc)
+    arity    = (fromIntegral (tyConArity tc) `div` 2) :: Word32
+
+putSumWorkerId_ :: BinHandle -> DataCon -> IO ()
+putSumWorkerId_ bh dc
+  = put_ bh (0xB0000000 .|. (arity `shiftL` 14) .|. alt)
+  where
+    tc       = dataConTyCon dc
+    alt      = fromIntegral (dataConTag dc)
+    arity    = (fromIntegral (tyConArity tc) `div` 2) :: Word32
+
 -- See Note [Symbol table representation of names]
 getSymtabName :: NameCacheUpdater
               -> Dictionary -> SymbolTable
               -> BinHandle -> IO Name
 getSymtabName _ncu _dict symtab bh = do
-    i <- get bh
+    i :: Word32 <- get bh
     case i .&. 0xC0000000 of
-        0x00000000 -> return $! symtab ! fromIntegral (i ::  Word32)
-        0x40000000 -> return $! case lookupUFM_Directly knownKeyNamesMap (mkUnique tag ix) of
-                        Nothing -> pprPanic "getSymtabName:unknown known-key unique" (ppr i)
-                        Just n  -> n
-          where tag = chr (fromIntegral ((i .&. 0x3FC00000) `shiftR` 22))
-                ix = fromIntegral i .&. 0x003FFFFF
-        0x80000000 -> return $! case thing_tag of
-                        0 -> tyConName (tupleTyCon sort arity)
-                        1 -> dataConName dc
-                        2 -> idName (dataConWorkId dc)
-                        _ -> pprPanic "getSymtabName:unknown tuple thing" (ppr i)
-          where
-            dc = tupleDataCon sort arity
-            sort = case (i .&. 0x30000000) `shiftR` 28 of
-                     0 -> Boxed
-                     1 -> Unboxed
-                     _ -> pprPanic "getSymtabName:unknown tuple sort" (ppr i)
-            thing_tag = (i .&. 0x0CFFFFFF) `shiftR` 26
-            arity = fromIntegral (i .&. 0x03FFFFFF)
-        _          -> pprPanic "getSymtabName:unknown name tag" (ppr i)
+      0x00000000 -> return $! symtab ! fromIntegral i
+
+      0x40000000 ->
+        let
+          tag = chr (fromIntegral ((i .&. 0x3FC00000) `shiftR` 22))
+          ix  = fromIntegral i .&. 0x003FFFFF
+        in
+          return $! case lookupUFM_Directly knownKeyNamesMap (mkUnique tag ix) of
+                      Nothing -> pprPanic "getSymtabName:unknown known-key unique" (ppr i)
+                      Just n  -> n
+
+      0x80000000 ->
+        case i .&. 0x20000000 of
+          0x00000000 ->
+            let
+              dc = tupleDataCon sort arity
+              sort = case (i .&. 0x18000000) `shiftR` 27 of
+                       0 -> Boxed
+                       1 -> Unboxed
+                       _ -> pprPanic "getSymtabName:unknown tuple sort" (ppr i)
+              arity = fromIntegral (i .&. 0x01FFFFFF)
+            in
+              return $! case ( (i .&. 0x06FFFFFF) `shiftR` 25 ) of
+                0 -> tyConName (tupleTyCon sort arity)
+                1 -> dataConName dc
+                2 -> idName (dataConWorkId dc)
+                _ -> pprPanic "getSymtabName:unknown tuple thing" (ppr i)
+
+          0x20000000 ->
+            return $! case ((i .&. 0x18000000) `shiftR` 27) of
+              0 -> tyConName $ sumTyCon ( fromIntegral (i .&. 0x7ffffff) )
+              1 -> let
+                     alt =
+                       -- first (least significant) 14 bits
+                       fromIntegral (i .&. 0b11111111111111)
+                     arity =
+                       -- next 13 bits
+                       fromIntegral ((i `shiftR` 14) .&. 0b1111111111111)
+                   in
+                     ASSERT( arity >= alt )
+                     dataConName (sumDataCon alt arity)
+              2 -> let
+                     alt =
+                       -- first (least significant) 14 bits
+                       fromIntegral (i .&. 0b11111111111111)
+                     arity =
+                       -- next 13 bits
+                       fromIntegral ((i `shiftR` 14) .&. 0b1111111111111)
+                   in
+                     ASSERT( arity >= alt )
+                     idName (dataConWorkId (sumDataCon alt arity))
+
+              _ -> pprPanic "getSymtabName:unknown sum sort" (ppr i)
+          _ -> pprPanic "getSyntabName:unknown `tuple or sum` tag" (ppr i)
+      _ -> pprPanic "getSymtabName:unknown name tag" (ppr i)
 
 data BinSymbolTable = BinSymbolTable {
         bin_symtab_next :: !FastMutInt, -- The next index to use

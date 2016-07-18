@@ -649,6 +649,9 @@ tcPatToExpr args pat = go pat
     go1 (TuplePat pats box _)       = do { exprs <- mapM go pats
                                          ; return $ ExplicitTuple
                                               (map (noLoc . Present) exprs) box }
+    go1 (SumPat pat alt arity _)    = do { expr <- go1 (unLoc pat)
+                                         ; return $ ExplicitSum alt arity (noLoc expr) PlaceHolder
+                                         }
     go1 (LitPat lit)                = return $ HsLit lit
     go1 (NPat (L _ n) mb_neg _ _)
         | Just neg <- mb_neg        = return $ unLoc $ nlHsSyntaxApps neg [noLoc (HsOverLit n)]
@@ -755,6 +758,7 @@ tcCheckPatSynPat = go
     go1   (PArrPat pats _)    = mapM_ go pats
     go1   (ListPat pats _ _)  = mapM_ go pats
     go1   (TuplePat pats _ _) = mapM_ go pats
+    go1   (SumPat pat _ _ _)  = go pat
     go1   LitPat{}            = return ()
     go1   NPat{}              = return ()
     go1   (SigPatIn pat _)    = go pat
@@ -813,6 +817,7 @@ tcCollectEx pat = let (fv, evs) = go pat in (fvVarListVarSet fv, evs)
     go1 (BangPat p)         = go p
     go1 (ListPat ps _ _)    = mergeMany . map go $ ps
     go1 (TuplePat ps _ _)   = mergeMany . map go $ ps
+    go1 (SumPat p _ _ _)    = go p
     go1 (PArrPat ps _)      = mergeMany . map go $ ps
     go1 (ViewPat _ p _)     = go p
     go1 con@ConPatOut{}     = merge (FV.mkFVs (pat_tvs con), pat_dicts con) $

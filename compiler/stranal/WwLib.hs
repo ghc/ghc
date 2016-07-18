@@ -24,6 +24,7 @@ import TysPrim          ( voidPrimTy )
 import TysWiredIn       ( tupleDataCon )
 import VarEnv           ( mkInScopeSet )
 import Type
+import RepType          ( isVoidTy )
 import Coercion
 import FamInstEnv
 import BasicTypes       ( Boxity(..) )

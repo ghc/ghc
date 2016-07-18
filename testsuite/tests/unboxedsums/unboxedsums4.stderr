@@ -1,0 +1,2 @@
+
+unboxedsums4.hs:3:7: error: Boxed sums not supported: ( 10 | )

@@ -87,12 +87,13 @@ cgTopRhsCon dflags id con args =
              -- needs to poke around inside it.
             info_tbl = mkDataConInfoTable dflags con True ptr_wds nonptr_wds
 
-            get_lit (arg, _offset) = do { CmmLit lit <- getArgAmode arg
+            get_lit (arg, _offset) = do { CmmExprArg (CmmLit lit) <- getArgAmode arg
                                         ; return lit }
 
         ; payload <- mapM get_lit nv_args_w_offsets
                 -- NB1: nv_args_w_offsets is sorted into ptrs then non-ptrs
                 -- NB2: all the amodes should be Lits!
+                --      TODO (osa): Why?
 
         ; let closure_rep = mkStaticClosureFields
                              dflags

@@ -44,6 +44,7 @@ module Unique (
         mkAlphaTyVarUnique,
         mkPrimOpIdUnique,
         mkTupleTyConUnique, mkTupleDataConUnique,
+        mkSumTyConUnique, mkSumDataConUnique,
         mkCTupleTyConUnique,
         mkPreludeMiscIdUnique, mkPreludeDataConUnique,
         mkPreludeTyConUnique, mkPreludeClassUnique,
@@ -328,9 +329,11 @@ mkAlphaTyVarUnique     :: Int -> Unique
 mkPreludeClassUnique   :: Int -> Unique
 mkPreludeTyConUnique   :: Int -> Unique
 mkTupleTyConUnique     :: Boxity -> Arity -> Unique
+mkSumTyConUnique       :: Arity -> Unique
 mkCTupleTyConUnique    :: Arity -> Unique
 mkPreludeDataConUnique :: Arity -> Unique
 mkTupleDataConUnique   :: Boxity -> Arity -> Unique
+mkSumDataConUnique     :: ConTagZ -> Arity -> Unique
 mkPrimOpIdUnique       :: Int -> Unique
 mkPreludeMiscIdUnique  :: Int -> Unique
 mkPArrDataConUnique    :: Int -> Unique
@@ -348,6 +351,7 @@ mkPreludeTyConUnique i                = mkUnique '3' (2*i)
 mkTupleTyConUnique Boxed           a  = mkUnique '4' (2*a)
 mkTupleTyConUnique Unboxed         a  = mkUnique '5' (2*a)
 mkCTupleTyConUnique                a  = mkUnique 'k' (2*a)
+mkSumTyConUnique                   a  = mkUnique 'z' (2*a)
 
 tyConRepNameUnique :: Unique -> Unique
 tyConRepNameUnique  u = incrUnique u
@@ -368,6 +372,11 @@ tyConRepNameUnique  u = incrUnique u
 mkPreludeDataConUnique i              = mkUnique '6' (3*i)    -- Must be alphabetic
 mkTupleDataConUnique Boxed          a = mkUnique '7' (3*a)    -- ditto (*may* be used in C labels)
 mkTupleDataConUnique Unboxed        a = mkUnique '8' (3*a)
+mkSumDataConUnique alt arity
+  | alt >= arity
+  = panic ("mkSumDataConUnique: " ++ show alt ++ " >= " ++ show arity)
+  | otherwise
+  = mkUnique 'z' (2 * alt * arity)
 
 dataConRepNameUnique, dataConWorkerUnique :: Unique -> Unique
 dataConWorkerUnique  u = incrUnique u

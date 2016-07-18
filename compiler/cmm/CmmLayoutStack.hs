@@ -1032,7 +1032,7 @@ lowerSafeForeignCall dflags block
 
         (_, regs, copyout) =
              copyOutOflow dflags NativeReturn Jump (Young succ)
-                            (map (CmmReg . CmmLocal) res)
+                            (map (CmmExprArg . CmmReg . CmmLocal) res)
                             ret_off []
 
         -- NB. after resumeThread returns, the top-of-stack probably contains

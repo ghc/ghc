@@ -855,6 +855,9 @@ to re-add floats on the top.
 etaExpand :: Arity              -- ^ Result should have this number of value args
           -> CoreExpr           -- ^ Expression to expand
           -> CoreExpr
+-- etaExpand arity e = res
+-- Then 'res' has at least 'arity' lambdas at the top
+--
 -- etaExpand deals with for-alls. For example:
 --              etaExpand 1 E
 -- where  E :: forall a. a -> a

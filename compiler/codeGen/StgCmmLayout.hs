@@ -68,7 +68,7 @@ import Control.Monad
 --
 -- >    p=x; q=y;
 --
-emitReturn :: [CmmExpr] -> FCode ReturnKind
+emitReturn :: [CmmArg] -> FCode ReturnKind
 emitReturn results
   = do { dflags    <- getDynFlags
        ; sequel    <- getSequel
@@ -90,7 +90,7 @@ emitReturn results
 -- using the call/return convention @conv@, passing @args@, and
 -- returning the results to the current sequel.
 --
-emitCall :: (Convention, Convention) -> CmmExpr -> [CmmExpr] -> FCode ReturnKind
+emitCall :: (Convention, Convention) -> CmmExpr -> [CmmArg] -> FCode ReturnKind
 emitCall convs fun args
   = emitCallWithExtraStack convs fun args noExtraStack
 
@@ -101,8 +101,8 @@ emitCall convs fun args
 -- @stack@, and returning the results to the current sequel.
 --
 emitCallWithExtraStack
-   :: (Convention, Convention) -> CmmExpr -> [CmmExpr]
-   -> [CmmExpr] -> FCode ReturnKind
+   :: (Convention, Convention) -> CmmExpr -> [CmmArg]
+   -> [CmmArg] -> FCode ReturnKind
 emitCallWithExtraStack (callConv, retConv) fun args extra_stack
   = do  { dflags <- getDynFlags
         ; adjustHpBackwards
@@ -187,7 +187,7 @@ slowCall fun stg_args
 
         (r, slow_code) <- getCodeR $ do
            r <- direct_call "slow_call" NativeNodeCall
-                 (mkRtsApFastLabel rts_fun) arity ((P,Just fun):argsreps)
+                 (mkRtsApFastLabel rts_fun) arity ((P,Just (CmmExprArg fun)):argsreps)
            emitComment $ mkFastString ("slow_call for " ++
                                       showSDoc dflags (ppr fun) ++
                                       " with pat " ++ unpackFS rts_fun)
@@ -213,7 +213,7 @@ slowCall fun stg_args
              fast_code <- getCode $
                 emitCall (NativeNodeCall, NativeReturn)
                   (entryCode dflags fun_iptr)
-                  (nonVArgs ((P,Just funv):argsreps))
+                  (nonVArgs ((P,Just (CmmExprArg funv)):argsreps))
 
              slow_lbl <- newLabelC
              fast_lbl <- newLabelC
@@ -271,7 +271,7 @@ slowCall fun stg_args
 direct_call :: String
             -> Convention     -- e.g. NativeNodeCall or NativeDirectCall
             -> CLabel -> RepArity
-            -> [(ArgRep,Maybe CmmExpr)] -> FCode ReturnKind
+            -> [(ArgRep,Maybe CmmArg)] -> FCode ReturnKind
 direct_call caller call_conv lbl arity args
   | debugIsOn && real_arity > length args  -- Too few args
   = do -- Caller should ensure that there enough args!
@@ -299,11 +299,11 @@ direct_call caller call_conv lbl arity args
 
 
 -- When constructing calls, it is easier to keep the ArgReps and the
--- CmmExprs zipped together.  However, a void argument has no
--- representation, so we need to use Maybe CmmExpr (the alternative of
+-- CmmArgs zipped together.  However, a void argument has no
+-- representation, so we need to use Maybe CmmArg (the alternative of
 -- using zeroCLit or even undefined would work, but would be ugly).
 --
-getArgRepsAmodes :: [StgArg] -> FCode [(ArgRep, Maybe CmmExpr)]
+getArgRepsAmodes :: [StgArg] -> FCode [(ArgRep, Maybe CmmArg)]
 getArgRepsAmodes = mapM getArgRepAmode
   where getArgRepAmode arg
            | V <- rep  = return (V, Nothing)
@@ -311,7 +311,7 @@ getArgRepsAmodes = mapM getArgRepAmode
                             return (rep, Just expr)
            where rep = toArgRep (argPrimRep arg)
 
-nonVArgs :: [(ArgRep, Maybe CmmExpr)] -> [CmmExpr]
+nonVArgs :: [(ArgRep, Maybe CmmArg)] -> [CmmArg]
 nonVArgs [] = []
 nonVArgs ((_,Nothing)  : args) = nonVArgs args
 nonVArgs ((_,Just arg) : args) = arg : nonVArgs args
@@ -354,7 +354,7 @@ just more arguments that we are passing on the stack (cml_args).
 -- | 'slowArgs' takes a list of function arguments and prepares them for
 -- pushing on the stack for "extra" arguments to a function which requires
 -- fewer arguments than we currently have.
-slowArgs :: DynFlags -> [(ArgRep, Maybe CmmExpr)] -> [(ArgRep, Maybe CmmExpr)]
+slowArgs :: DynFlags -> [(ArgRep, Maybe CmmArg)] -> [(ArgRep, Maybe CmmArg)]
 slowArgs _ [] = []
 slowArgs dflags args -- careful: reps contains voids (V), but args does not
   | gopt Opt_SccProfilingOn dflags
@@ -365,8 +365,8 @@ slowArgs dflags args -- careful: reps contains voids (V), but args does not
     (call_args, rest_args)  = splitAt n args
 
     stg_ap_pat = mkCmmRetInfoLabel rtsUnitId arg_pat
-    this_pat   = (N, Just (mkLblExpr stg_ap_pat)) : call_args
-    save_cccs  = [(N, Just (mkLblExpr save_cccs_lbl)), (N, Just curCCS)]
+    this_pat   = (N, Just (CmmExprArg (mkLblExpr stg_ap_pat))) : call_args
+    save_cccs  = [(N, Just (CmmExprArg (mkLblExpr save_cccs_lbl))), (N, Just (CmmExprArg curCCS))]
     save_cccs_lbl = mkCmmRetInfoLabel rtsUnitId (fsLit "stg_restore_cccs")
 
 -------------------------------------------------------------------------

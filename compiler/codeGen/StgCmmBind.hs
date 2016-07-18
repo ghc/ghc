@@ -72,6 +72,7 @@ cgTopRhsClosure :: DynFlags
                 -> (CgIdInfo, FCode ())
 
 cgTopRhsClosure dflags rec id ccs _ upd_flag args body =
+--   ASSERT2( idRepArity id == length args, ppr id )
   let closure_label = mkLocalClosureLabel (idName id) (idCafInfo id)
       cg_id_info    = litIdInfo dflags id lf_info (CmmLabel closure_label)
       lf_info       = mkClosureLFInfo dflags id TopLevel [] upd_flag args
@@ -210,9 +211,10 @@ cgRhs id (StgRhsCon cc con args)
     buildDynCon id True cc con args
 
 {- See Note [GC recovery] in compiler/codeGen/StgCmmClosure.hs -}
-cgRhs name (StgRhsClosure cc bi fvs upd_flag args body)
-  = do dflags <- getDynFlags
-       mkRhsClosure dflags name cc bi (nonVoidIds fvs) upd_flag args body
+cgRhs id (StgRhsClosure cc bi fvs upd_flag args body)
+  = -- ASSERT2( idRepArity id == length args, ppr id )
+    do dflags <- getDynFlags
+       mkRhsClosure dflags id cc bi (nonVoidIds fvs) upd_flag args body
 
 ------------------------------------------------------------------------
 --              Non-constructor right hand sides
@@ -551,7 +553,7 @@ mkSlowEntryCode bndr cl_info arg_regs -- function closure is already in `Node'
            -- mkDirectJump does not clobber `Node' containing function closure
            jump = mkJump dflags NativeNodeCall
                                 (mkLblExpr fast_lbl)
-                                (map (CmmReg . CmmLocal) (node : arg_regs))
+                                (map (CmmExprArg . CmmReg . CmmLocal) (node : arg_regs))
                                 (initUpdFrameOff dflags)
        tscope <- getTickScope
        emitProcWithConvention Slow Nothing slow_lbl

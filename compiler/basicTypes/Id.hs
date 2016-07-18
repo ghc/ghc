@@ -137,6 +137,7 @@ import UniqSupply
 import FastString
 import Util
 import StaticFlags
+import {-# SOURCE #-} RepType (typeRepArity)
 
 -- infixl so you can say (id `set` a `set` b)
 infixl  1 `setIdUnfoldingLazily`,
@@ -488,7 +489,7 @@ hasNoBinding :: Id -> Bool
 hasNoBinding id = case Var.idDetails id of
                         PrimOpId _       -> True        -- See Note [Primop wrappers]
                         FCallId _        -> True
-                        DataConWorkId dc -> isUnboxedTupleCon dc
+                        DataConWorkId dc -> isUnboxedTupleCon dc || isUnboxedSumCon dc
                         _                -> False
 
 isImplicitId :: Id -> Bool

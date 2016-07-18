@@ -33,6 +33,7 @@ module TyCon(
         mkKindTyCon,
         mkLiftedPrimTyCon,
         mkTupleTyCon,
+        mkSumTyCon,
         mkSynonymTyCon,
         mkFamilyTyCon,
         mkPromotedDataCon,
@@ -44,12 +45,14 @@ module TyCon(
         isFunTyCon,
         isPrimTyCon,
         isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon,
+        isUnboxedSumTyCon,
         isTypeSynonymTyCon,
         mightBeUnsaturatedTyCon,
         isPromotedDataCon, isPromotedDataCon_maybe,
         isKindTyCon, isLiftedTypeKindTyConName,
 
         isDataTyCon, isProductTyCon, isDataProductTyCon_maybe,
+        isDataSumTyCon_maybe,
         isEnumerationTyCon,
         isNewTyCon, isAbstractTyCon,
         isFamilyTyCon, isOpenFamilyTyCon,
@@ -751,6 +754,10 @@ data AlgTyConRhs
                                    -- tuple?
     }
 
+  | SumTyCon {
+        data_cons :: [DataCon]
+    }
+
   -- | Information about those 'TyCon's derived from a @newtype@ declaration
   | NewTyCon {
         data_con :: DataCon,    -- ^ The unique constructor for the @newtype@.
@@ -803,6 +810,7 @@ visibleDataCons (AbstractTyCon {})            = []
 visibleDataCons (DataTyCon{ data_cons = cs }) = cs
 visibleDataCons (NewTyCon{ data_con = c })    = [c]
 visibleDataCons (TupleTyCon{ data_con = c })  = [c]
+visibleDataCons (SumTyCon{ data_cons = cs })  = cs
 
 -- ^ Both type classes as well as family instances imply implicit
 -- type constructors.  These implicit type constructors refer to their parent
@@ -1362,21 +1370,47 @@ mkTupleTyCon :: Name
              -> TyCon
 mkTupleTyCon name binders res_kind arity con sort parent
   = AlgTyCon {
-        tyConName        = name,
         tyConUnique      = nameUnique name,
+        tyConName        = name,
         tyConBinders     = binders,
+        tyConTyVars      = binderVars binders,
         tyConResKind     = res_kind,
         tyConKind        = mkTyConKind binders res_kind,
         tyConArity       = arity,
-        tyConTyVars      = binderVars binders,
         tcRoles          = replicate arity Representational,
         tyConCType       = Nothing,
+        algTcGadtSyntax  = False,
         algTcStupidTheta = [],
         algTcRhs         = TupleTyCon { data_con = con,
                                         tup_sort = sort },
         algTcFields      = emptyDFsEnv,
-        algTcParent      = parent,
-        algTcGadtSyntax  = False
+        algTcParent      = parent
+    }
+
+mkSumTyCon :: Name
+             -> [TyConBinder]
+             -> Kind    -- ^ Kind of the resulting 'TyCon'
+             -> Arity   -- ^ Arity of the sum
+             -> [TyVar] -- ^ 'TyVar's scoped over: see 'tyConTyVars'
+             -> [DataCon]
+             -> AlgTyConFlav
+             -> TyCon
+mkSumTyCon name binders res_kind arity tyvars cons parent
+  = AlgTyCon {
+        tyConUnique      = nameUnique name,
+        tyConName        = name,
+        tyConBinders     = binders,
+        tyConTyVars      = tyvars,
+        tyConResKind     = res_kind,
+        tyConKind        = mkTyConKind binders res_kind,
+        tyConArity       = arity,
+        tcRoles          = replicate arity Representational,
+        tyConCType       = Nothing,
+        algTcGadtSyntax  = False,
+        algTcStupidTheta = [],
+        algTcRhs         = SumTyCon { data_cons = cons },
+        algTcFields      = emptyDFsEnv,
+        algTcParent      = parent
     }
 
 -- | Makes a tycon suitable for use during type-checking.
@@ -1530,6 +1564,9 @@ isUnliftedTyCon (PrimTyCon  {isUnlifted = is_unlifted})
 isUnliftedTyCon (AlgTyCon { algTcRhs = rhs } )
   | TupleTyCon { tup_sort = sort } <- rhs
   = not (isBoxed (tupleSortBoxity sort))
+isUnliftedTyCon (AlgTyCon { algTcRhs = rhs } )
+  | SumTyCon {} <- rhs
+  = True
 isUnliftedTyCon _ = False
 
 -- | Returns @True@ if the supplied 'TyCon' resulted from either a
@@ -1550,8 +1587,9 @@ isDataTyCon :: TyCon -> Bool
 -- @case@ expressions, and they get info tables allocated for them.
 --
 -- Generally, the function will be true for all @data@ types and false
--- for @newtype@s, unboxed tuples and type family 'TyCon's. But it is
--- not guaranteed to return @True@ in all cases that it could.
+-- for @newtype@s, unboxed tuples, unboxed sums and type family
+-- 'TyCon's. But it is not guaranteed to return @True@ in all cases
+-- that it could.
 --
 -- NB: for a data type family, only the /instance/ 'TyCon's
 --     get an info table.  The family declaration 'TyCon' does not
@@ -1559,6 +1597,7 @@ isDataTyCon (AlgTyCon {algTcRhs = rhs})
   = case rhs of
         TupleTyCon { tup_sort = sort }
                            -> isBoxed (tupleSortBoxity sort)
+        SumTyCon {}        -> False
         DataTyCon {}       -> True
         NewTyCon {}        -> False
         AbstractTyCon {}   -> False      -- We don't know, so return False
@@ -1599,6 +1638,7 @@ isGenerativeTyCon tc               r = isInjectiveTyCon tc r
 -- with respect to representational equality?
 isGenInjAlgRhs :: AlgTyConRhs -> Bool
 isGenInjAlgRhs (TupleTyCon {})          = True
+isGenInjAlgRhs (SumTyCon {})            = True
 isGenInjAlgRhs (DataTyCon {})           = True
 isGenInjAlgRhs (AbstractTyCon distinct) = distinct
 isGenInjAlgRhs (NewTyCon {})            = False
@@ -1650,6 +1690,19 @@ isDataProductTyCon_maybe (AlgTyCon { algTcRhs = rhs })
          -> Just con
        _ -> Nothing
 isDataProductTyCon_maybe _ = Nothing
+
+isDataSumTyCon_maybe :: TyCon -> Maybe [DataCon]
+isDataSumTyCon_maybe (AlgTyCon { algTcRhs = rhs })
+  = case rhs of
+      DataTyCon { data_cons = cons }
+        | length cons > 1
+        , all (null . dataConExTyVars) cons -- FIXME(osa): Why do we need this?
+        -> Just cons
+      SumTyCon { data_cons = cons }
+        | all (null . dataConExTyVars) cons -- FIXME(osa): Why do we need this?
+        -> Just cons
+      _ -> Nothing
+isDataSumTyCon_maybe _ = Nothing
 
 {- Note [Product types]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -1809,6 +1862,13 @@ isBoxedTupleTyCon (AlgTyCon { algTcRhs = rhs })
   = isBoxed (tupleSortBoxity sort)
 isBoxedTupleTyCon _ = False
 
+-- | Is this the 'TyCon' for an unboxed sum?
+isUnboxedSumTyCon :: TyCon -> Bool
+isUnboxedSumTyCon (AlgTyCon { algTcRhs = rhs })
+  | SumTyCon {} <- rhs
+  = True
+isUnboxedSumTyCon _ = False
+
 -- | Is this a PromotedDataCon?
 isPromotedDataCon :: TyCon -> Bool
 isPromotedDataCon (PromotedDataCon {}) = True
@@ -1862,6 +1922,7 @@ isImplicitTyCon (PrimTyCon {})       = True
 isImplicitTyCon (PromotedDataCon {}) = True
 isImplicitTyCon (AlgTyCon { algTcRhs = rhs, tyConName = name })
   | TupleTyCon {} <- rhs             = isWiredInName name
+  | SumTyCon {} <- rhs               = True
   | otherwise                        = False
 isImplicitTyCon (FamilyTyCon { famTcParent = parent }) = isJust parent
 isImplicitTyCon (SynonymTyCon {})    = False
@@ -1936,6 +1997,7 @@ tyConDataCons_maybe (AlgTyCon {algTcRhs = rhs})
        DataTyCon { data_cons = cons } -> Just cons
        NewTyCon { data_con = con }    -> Just [con]
        TupleTyCon { data_con = con }  -> Just [con]
+       SumTyCon { data_cons = cons }  -> Just cons
        _                              -> Nothing
 tyConDataCons_maybe _ = Nothing
 
@@ -1977,6 +2039,7 @@ tyConFamilySize tc@(AlgTyCon { algTcRhs = rhs })
       DataTyCon { data_cons = cons } -> length cons
       NewTyCon {}                    -> 1
       TupleTyCon {}                  -> 1
+      SumTyCon { data_cons = cons }  -> length cons
       _                              -> pprPanic "tyConFamilySize 1" (ppr tc)
 tyConFamilySize tc = pprPanic "tyConFamilySize 2" (ppr tc)
 
@@ -2148,6 +2211,7 @@ tyConFlavour (AlgTyCon { algTcParent = parent, algTcRhs = rhs })
                   TupleTyCon { tup_sort = sort }
                      | isBoxed (tupleSortBoxity sort) -> "tuple"
                      | otherwise                      -> "unboxed tuple"
+                  SumTyCon {}        -> "unboxed sum"
                   DataTyCon {}       -> "data type"
                   NewTyCon {}        -> "newtype"
                   AbstractTyCon {}   -> "abstract type"
