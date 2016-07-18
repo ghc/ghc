@@ -1,6 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -47,7 +46,6 @@ import GHC.Enum
 import GHC.Num
 import GHC.Read
 import GHC.Show
-import GHC.Generics
 
 {-
 -- just for testing
@@ -68,7 +66,7 @@ infixr 6 <>
 
 -- | The dual of a 'Monoid', obtained by swapping the arguments of 'mappend'.
 newtype Dual a = Dual { getDual :: a }
-        deriving (Eq, Ord, Read, Show, Bounded, Generic, Generic1)
+        deriving (Eq, Ord, Read, Show, Bounded)
 
 -- | @since 2.01
 instance Monoid a => Monoid (Dual a) where
@@ -90,7 +88,6 @@ instance Monad Dual where
 
 -- | The monoid of endomorphisms under composition.
 newtype Endo a = Endo { appEndo :: a -> a }
-               deriving (Generic)
 
 -- | @since 2.01
 instance Monoid (Endo a) where
@@ -99,7 +96,7 @@ instance Monoid (Endo a) where
 
 -- | Boolean monoid under conjunction ('&&').
 newtype All = All { getAll :: Bool }
-        deriving (Eq, Ord, Read, Show, Bounded, Generic)
+        deriving (Eq, Ord, Read, Show, Bounded)
 
 -- | @since 2.01
 instance Monoid All where
@@ -108,7 +105,7 @@ instance Monoid All where
 
 -- | Boolean monoid under disjunction ('||').
 newtype Any = Any { getAny :: Bool }
-        deriving (Eq, Ord, Read, Show, Bounded, Generic)
+        deriving (Eq, Ord, Read, Show, Bounded)
 
 -- | @since 2.01
 instance Monoid Any where
@@ -117,7 +114,7 @@ instance Monoid Any where
 
 -- | Monoid under addition.
 newtype Sum a = Sum { getSum :: a }
-        deriving (Eq, Ord, Read, Show, Bounded, Generic, Generic1, Num)
+        deriving (Eq, Ord, Read, Show, Bounded, Num)
 
 -- | @since 2.01
 instance Num a => Monoid (Sum a) where
@@ -140,7 +137,7 @@ instance Monad Sum where
 
 -- | Monoid under multiplication.
 newtype Product a = Product { getProduct :: a }
-        deriving (Eq, Ord, Read, Show, Bounded, Generic, Generic1, Num)
+        deriving (Eq, Ord, Read, Show, Bounded, Num)
 
 -- | @since 2.01
 instance Num a => Monoid (Product a) where
@@ -198,7 +195,7 @@ instance Monad Product where
 -- @'First' a@ is isomorphic to @'Alt' 'Maybe' a@, but precedes it
 -- historically.
 newtype First a = First { getFirst :: Maybe a }
-        deriving (Eq, Ord, Read, Show, Generic, Generic1,
+        deriving (Eq, Ord, Read, Show,
                   Functor, Applicative, Monad)
 
 -- | @since 2.01
@@ -212,7 +209,7 @@ instance Monoid (First a) where
 -- @'Last' a@ is isomorphic to @'Dual' ('First' a)@, and thus to
 -- @'Dual' ('Alt' 'Maybe' a)@
 newtype Last a = Last { getLast :: Maybe a }
-        deriving (Eq, Ord, Read, Show, Generic, Generic1,
+        deriving (Eq, Ord, Read, Show,
                   Functor, Applicative, Monad)
 
 -- | @since 2.01
@@ -225,7 +222,7 @@ instance Monoid (Last a) where
 --
 -- @since 4.8.0.0
 newtype Alt f a = Alt {getAlt :: f a}
-  deriving (Generic, Generic1, Read, Show, Eq, Ord, Num, Enum,
+  deriving (Read, Show, Eq, Ord, Num, Enum,
             Monad, MonadPlus, Applicative, Alternative, Functor)
 
 -- | @since 4.8.0.0

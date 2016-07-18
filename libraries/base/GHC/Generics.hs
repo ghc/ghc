@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP                    #-}
 {-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE DeriveFunctor          #-}
+{-# LANGUAGE DeriveFoldable         #-}
 {-# LANGUAGE DeriveGeneric          #-}
 {-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
@@ -85,7 +86,8 @@ module GHC.Generics  (
 --        'C1' ('MetaCons \"Node\" 'PrefixI 'False)
 --          ('S1' ('MetaSel 'Nothing
 --                          'NoSourceUnpackedness
---                          'NoSourceStrictness
+
+    --                          'NoSourceStrictness
 --                          'DecidedLazy)
 --                ('Rec0' (Tree a))
 --           ':*:'
@@ -725,16 +727,19 @@ import Data.Maybe  ( Maybe(..), fromMaybe )
 import GHC.Integer ( Integer, integerToInt )
 import GHC.Prim    ( Addr#, Char#, Double#, Float#, Int#, Word# )
 import GHC.Ptr     ( Ptr )
-import GHC.Types
+import GHC.Types   hiding (Any)
 
 -- Needed for instances
 import GHC.Arr     ( Ix )
 import GHC.Base    ( Alternative(..), Applicative(..), Functor(..)
-                   , Monad(..), MonadPlus(..), String )
+                   , Monad(..), MonadPlus(..), String
+                   , errorWithoutStackTrace )
 import GHC.Classes ( Eq(..), Ord(..) )
 import GHC.Enum    ( Bounded, Enum )
 import GHC.Read    ( Read(..), lex, readParen )
 import GHC.Show    ( Show(..), showString )
+import Data.Foldable
+import Data.Monoid
 
 -- Needed for metadata
 import Data.Proxy   ( Proxy(..) )
@@ -1218,6 +1223,62 @@ deriving instance Generic1 ((,,,) a b c)
 deriving instance Generic1 ((,,,,) a b c d)
 deriving instance Generic1 ((,,,,,) a b c d e)
 deriving instance Generic1 ((,,,,,,) a b c d e f)
+
+--------------------------------------------------------------------------------
+-- Foldable instances
+--------------------------------------------------------------------------------
+
+-- | @since 4.9.0.0
+instance Foldable U1 where
+    foldMap _ _ = mempty
+    {-# INLINE foldMap #-}
+    fold _ = mempty
+    {-# INLINE fold #-}
+    foldr _ z _ = z
+    {-# INLINE foldr #-}
+    foldl _ z _ = z
+    {-# INLINE foldl #-}
+    foldl1 _ _ = errorWithoutStackTrace "foldl1: U1"
+    foldr1 _ _ = errorWithoutStackTrace "foldr1: U1"
+    length _   = 0
+    null _     = True
+    elem _ _   = False
+    sum _      = 0
+    product _  = 1
+
+deriving instance Foldable V1
+deriving instance Foldable Par1
+deriving instance Foldable f => Foldable (Rec1 f)
+deriving instance Foldable (K1 i c)
+deriving instance Foldable f => Foldable (M1 i c f)
+deriving instance (Foldable f, Foldable g) => Foldable (f :+: g)
+deriving instance (Foldable f, Foldable g) => Foldable (f :*: g)
+deriving instance (Foldable f, Foldable g) => Foldable (f :.: g)
+deriving instance Foldable UAddr
+deriving instance Foldable UChar
+deriving instance Foldable UDouble
+deriving instance Foldable UFloat
+deriving instance Foldable UInt
+deriving instance Foldable UWord
+
+--------------------------------------------------------------------------------
+-- Instances for Data.Monoid
+--------------------------------------------------------------------------------
+deriving instance Generic (Dual a)
+deriving instance Generic1 Dual
+deriving instance Generic (Endo a)
+deriving instance Generic All
+deriving instance Generic Any
+deriving instance Generic (Sum a)
+deriving instance Generic1 Sum
+deriving instance Generic (Product a)
+deriving instance Generic1 Product
+deriving instance Generic (First a)
+deriving instance Generic1 First
+deriving instance Generic (Last a)
+deriving instance Generic1 Last
+deriving instance Generic (Alt f a)
+deriving instance Generic1 (Alt f)
 
 --------------------------------------------------------------------------------
 -- Copied from the singletons package
