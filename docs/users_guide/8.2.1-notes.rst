@@ -49,7 +49,8 @@ Template Haskell
   current declaration group when used as in
 
   .. code-block:: none
-  f x = $(addModFinalizer (reify 'x >>= runIO . print) >> [| x |])
+
+      f x = $(addModFinalizer (reify 'x >>= runIO . print) >> [| x |])
 
 Runtime system
 ~~~~~~~~~~~~~~
