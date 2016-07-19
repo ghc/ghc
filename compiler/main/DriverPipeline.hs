@@ -1748,7 +1748,6 @@ linkBinary' staticLink dflags o_files dep_packages = do
     -- get the full list of packages to link with, by combining the
     -- explicit packages with the auto packages and all of their
     -- dependencies, and eliminating duplicates.
-
     full_output_fn <- if isAbsolute output_fn
                       then return output_fn
                       else do d <- getCurrentDirectory
