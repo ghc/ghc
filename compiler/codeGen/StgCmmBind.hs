@@ -299,24 +299,30 @@ mkRhsClosure    dflags bndr _cc _bi
                 []                      -- No args; a thunk
                 (StgApp fun_id args)
 
-  | args `lengthIs` (arity-1)
-        && all (isGcPtrRep . idPrimRep . unsafe_stripNV) fvs
-        && isUpdatable upd_flag
-        && arity <= mAX_SPEC_AP_SIZE dflags
-        && not (gopt Opt_SccProfilingOn dflags)
-                                  -- not when profiling: we don't want to
-                                  -- lose information about this particular
-                                  -- thunk (e.g. its type) (#949)
+  -- We are looking for an "ApThunk"; see data con ApThunk in StgCmmClosure
+  -- of form (x1 x2 .... xn), where all the xi are locals (not top-level)
+  -- So the xi will all be free variables
+  | args `lengthIs` (n_fvs-1)  -- This happens only if the fun_id and
+                               -- args are all distinct local variables
+                               -- The "-1" is for fun_id
+    -- Missed opportunity:   (f x x) is not detected
+  , all (isGcPtrRep . idPrimRep . unsafe_stripNV) fvs
+  , isUpdatable upd_flag
+  , n_fvs <= mAX_SPEC_AP_SIZE dflags
+  , not (gopt Opt_SccProfilingOn dflags)
+                         -- not when profiling: we don't want to
+                         -- lose information about this particular
+                         -- thunk (e.g. its type) (#949)
 
-                   -- Ha! an Ap thunk
+          -- Ha! an Ap thunk
   = cgRhsStdThunk bndr lf_info payload
 
   where
-        lf_info = mkApLFInfo bndr upd_flag arity
-        -- the payload has to be in the correct order, hence we can't
-        -- just use the fvs.
-        payload = StgVarArg fun_id : args
-        arity   = length fvs
+    n_fvs   = length fvs
+    lf_info = mkApLFInfo bndr upd_flag n_fvs
+    -- the payload has to be in the correct order, hence we can't
+    -- just use the fvs.
+    payload = StgVarArg fun_id : args
 
 ---------- Default case ------------------
 mkRhsClosure dflags bndr cc _ fvs upd_flag args body
