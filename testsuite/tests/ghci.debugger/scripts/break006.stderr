@@ -5,12 +5,11 @@
       Use :print or :force to determine these types
       Relevant bindings include it :: t (bound at <interactive>:4:1)
       These potential instances exist:
-        instance (Show b, Show a) => Show (Either a b)
-          -- Defined in ‘Data.Either’
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show Integer -- Defined in ‘GHC.Show’
-        ...plus 23 others
-        ...plus 42 instances involving out-of-scope types
+        instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
+        ...plus 22 others
+        ...plus 11 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In a stmt of an interactive GHCi command: print it
 
@@ -20,11 +19,10 @@
       Use :print or :force to determine these types
       Relevant bindings include it :: t (bound at <interactive>:6:1)
       These potential instances exist:
-        instance (Show b, Show a) => Show (Either a b)
-          -- Defined in ‘Data.Either’
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show Integer -- Defined in ‘GHC.Show’
-        ...plus 23 others
-        ...plus 42 instances involving out-of-scope types
+        instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
+        ...plus 22 others
+        ...plus 11 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In a stmt of an interactive GHCi command: print it

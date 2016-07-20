@@ -650,13 +650,13 @@ look at it.
 -}
 
 tcIfaceInst :: IfaceClsInst -> IfL ClsInst
-tcIfaceInst (IfaceClsInst { ifDFun = dfun_occ, ifOFlag = oflag
+tcIfaceInst (IfaceClsInst { ifDFun = dfun_name, ifOFlag = oflag
                           , ifInstCls = cls, ifInstTys = mb_tcs
                           , ifInstOrph = orph })
-  = do { dfun <- forkM (text "Dict fun" <+> ppr dfun_occ) $
-                 tcIfaceExtId dfun_occ
+  = do { dfun <- forkM (text "Dict fun" <+> ppr dfun_name) $
+                 tcIfaceExtId dfun_name
        ; let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
-       ; return (mkImportedInstance cls mb_tcs' dfun oflag orph) }
+       ; return (mkImportedInstance cls mb_tcs' dfun_name dfun oflag orph) }
 
 tcIfaceFamInst :: IfaceFamInst -> IfL FamInst
 tcIfaceFamInst (IfaceFamInst { ifFamInstFam = fam, ifFamInstTys = mb_tcs
