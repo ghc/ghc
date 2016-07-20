@@ -1344,6 +1344,12 @@ pushAtom d p e
 pushAtom _ _ (AnnCoercion {})   -- Coercions are zero-width things,
    = return (nilOL, 0)          -- treated just like a variable V
 
+-- See Note [Empty case alternatives] in coreSyn/CoreSyn.hs
+-- and Note [Bottoming expressions] in coreSyn/CoreUtils.hs:
+-- The scrutinee of an empty case evaluates to bottom
+pushAtom d p (AnnCase (_, a) _ _ []) -- trac #12128
+   = pushAtom d p a
+
 pushAtom d p (AnnVar v)
    | UnaryRep rep_ty <- repType (idType v)
    , V <- typeArgRep rep_ty
@@ -1644,6 +1650,11 @@ atomPrimRep :: AnnExpr' Id ann -> PrimRep
 atomPrimRep e | Just e' <- bcView e = atomPrimRep e'
 atomPrimRep (AnnVar v)              = bcIdPrimRep v
 atomPrimRep (AnnLit l)              = typePrimRep (literalType l)
+
+-- Trac #12128:
+-- A case expresssion can be an atom because empty cases evaluate to bottom.
+-- See Note [Empty case alternatives] in coreSyn/CoreSyn.hs
+atomPrimRep (AnnCase _ _ ty _)      = ASSERT(typePrimRep ty == PtrRep) PtrRep
 atomPrimRep (AnnCoercion {})        = VoidRep
 atomPrimRep other = pprPanic "atomPrimRep" (ppr (deAnnotate (undefined,other)))
 
