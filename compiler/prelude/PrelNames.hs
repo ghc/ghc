@@ -87,7 +87,8 @@ This is accomplished through a combination of mechanisms:
        b) The known infinite families of names are specially
           serialised by BinIface.putName, with that special treatment
           detected when we read back to ensure that we get back to the
-          correct uniques.
+          correct uniques. See Note [Symbol table representation of names]
+          in BinIface.
 
        Most of the infinite families cannot occur in source code,
        so mechanisms (a,b) sufficies to ensure that they always have

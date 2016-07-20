@@ -85,6 +85,25 @@ There are many wrinkles:
   representations for TyCon and Module.  See GHC.Types
   Note [Runtime representation of modules and tycons]
 
+
+Note [Tuples and Typeable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Tuples are generally special in GHC since they are not placed in the original
+name cache (see Note [Built-in syntax and the OrigNameCache]). This poses a
+problem for Typeable: we need to serialize the Name of a type representation for
+a tuple type with enough information such that the compiler will realize that
+the Name is that of a tuple type representation (and thus gets the same unique
+as is indicated in the wired-in TyCon) when it is loaded from an interface file.
+
+We ensure this by only including the type representations for the type
+contructor and its promoted data constructor in the original name cache. The
+alternative would have been to use the same special interface file encoding as
+we use for tuple TyCons for tuple type representations. Unfortunately, this is
+rather tiresome to do so we are going to live with this compromise for now.
+
+A great deal of discussion on how we came to this design can be found in #12357.
+
 -}
 
 -- | Generate the Typeable bindings for a module. This is the only

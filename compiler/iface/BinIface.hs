@@ -275,7 +275,10 @@ fromOnDiskName :: Array Int Name -> NameCache -> OnDiskName -> (NameCache, Name)
 fromOnDiskName _ nc (pid, mod_name, occ) =
     let mod   = mkModule pid mod_name
         cache = nsNames nc
-    in case lookupOrigNameCache cache  mod occ of
+    in -- We use lookupOrigNameCache' here since we will never see any built-in
+       -- syntax in an interface file that isn't in the name cache (for instance
+       -- tuple TyCons). See Note [Symbol table representation of names].
+       case lookupOrigNameCache' cache  mod occ of
            Just name -> (nc, name)
            Nothing   ->
                let (uniq, us) = takeUniqFromSupply (nsUniqs nc)
