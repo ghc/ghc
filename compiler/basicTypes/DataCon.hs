@@ -382,10 +382,10 @@ data DataCon
         -- Constructor representation
         dcRep      :: DataConRep,
 
-        -- Cached
-          -- dcRepArity == length dataConRepArgTys
+        -- Cached; see Note [DataCon arities]
+        -- INVARIANT: dcRepArity    == length dataConRepArgTys
+        -- INVARIANT: dcSourceArity == length dcOrigArgTys
         dcRepArity    :: Arity,
-          -- dcSourceArity == length dcOrigArgTys
         dcSourceArity :: Arity,
 
         -- Result type of constructor is T t1..tn
@@ -427,6 +427,14 @@ Why do we need the TyVarBinders, rather than just the TyVars?  So that
 we can construct the right type for the DataCon with its foralls
 attributed the correce visiblity.  That in turn governs whether you
 can use visible type application at a call of the data constructor.
+
+Note [DataCon arities]
+~~~~~~~~~~~~~~~~~~~~~~
+dcSourceArity does not take constraints into account,
+but dcRepArity does.  For example:
+   MkT :: Ord a => a -> T a
+    dcSourceArity = 1
+    dcRepArity    = 2
 -}
 
 data DataConRep
@@ -979,10 +987,12 @@ dataConRepArity :: DataCon -> Arity
 dataConRepArity (MkData { dcRepArity = arity }) = arity
 
 -- | Return whether there are any argument types for this 'DataCon's original source type
+-- See Note [DataCon arities]
 isNullarySrcDataCon :: DataCon -> Bool
-isNullarySrcDataCon dc = null (dcOrigArgTys dc)
+isNullarySrcDataCon dc = dataConSourceArity dc == 0
 
 -- | Return whether there are any argument types for this 'DataCon's runtime representation type
+-- See Note [DataCon arities]
 isNullaryRepDataCon :: DataCon -> Bool
 isNullaryRepDataCon dc = dataConRepArity dc == 0
 
