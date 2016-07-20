@@ -532,3 +532,4 @@ test('T12067', extra_clean(['T12067a.hi', 'T12067a.o']),
 test('T12185', normal, compile, [''])
 test('T12133', normal, compile, [''])
 test('T12381', normal, compile, [''])
+test('T12082', normal, compile, [''])
