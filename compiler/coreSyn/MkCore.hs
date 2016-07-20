@@ -722,8 +722,6 @@ mkRuntimeErrorId :: Name -> Id
 -- which diverges after being given one argument
 -- The Addr# is expected to be the address of
 --   a UTF8-encoded error string
--- For the RuntimeRep part, see
---   Note [Error and friends have an "open-tyvar" forall]
 mkRuntimeErrorId name
  = mkVanillaGlobalWithInfo name runtime_err_ty bottoming_info
  where
@@ -743,6 +741,8 @@ mkRuntimeErrorId name
     strict_sig = mkClosedStrictSig [evalDmd] exnRes
               -- exnRes: these throw an exception, not just diverge
 
+    -- forall (rr :: RuntimeRep) (a :: rr). Addr# -> a
+    --   See Note [Error and friends have an "open-tyvar" forall]
     runtime_err_ty = mkSpecSigmaTy [runtimeRep1TyVar, openAlphaTyVar] []
                                    (mkFunTy addrPrimTy openAlphaTy)
 

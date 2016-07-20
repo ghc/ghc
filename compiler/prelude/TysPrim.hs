@@ -351,43 +351,91 @@ funTyCon = mkFunTyCon funTyConName tc_bndrs tc_rep_nm
 *                                                                      *
 ************************************************************************
 
-Note [TYPE]
-~~~~~~~~~~~
-There are a few places where we wish to be able to deal interchangeably
-with kind * and kind #. unsafeCoerce#, error, and (->) are some of these
-places. The way we do this is to use runtime-representation polymorphism.
+Note [TYPE and RuntimeRep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+All types that classify values have a kind of the form (TYPE rr), where
 
-We have
+    data RuntimeRep     -- Defined in ghc-prim:GHC.Types
+      = PtrRepLifted
+      | PtrRepUnlifted
+      | IntRep
+      | FloatRep
+      .. etc ..
 
-    data RuntimeRep = PtrRepLifted | PtrRepUnlifted | ...
+    rr :: RuntimeRep
 
-and a magical constant (tYPETyCon)
+    TYPE :: RuntimeRep -> TYPE 'PtrRepLifted  -- Built in
 
-    TYPE :: RuntimeRep -> TYPE PtrRepLifted
+So for example:
+    Int        :: TYPE 'PtrRepLifted
+    Array# Int :: TYPE 'PtrRepUnlifted
+    Int#       :: TYPE 'IntRep
+    Float#     :: TYPE 'FloatRep
+    Maybe      :: TYPE 'PtrRepLifted -> TYPE 'PtrRepLifted
 
-We then have synonyms (liftedTypeKindTyCon, unliftedTypeKindTyCon)
+We abbreviate '*' specially:
+    type * = TYPE 'PtrRepLifted
 
-    type * = TYPE PtrRepLifted
-    type # = TYPE PtrRepUnlifted
+The 'rr' parameter tells us how the value is represented at runime.
 
-The (...) in the definition for RuntimeRep includes possibilities for
-the unboxed, unlifted representations, isomorphic to the PrimRep type
-in TyCon. RuntimeRep is itself declared in GHC.Types.
+Generally speaking, you can't be polymorphic in 'rr'.  E.g
+   f :: forall (rr:RuntimeRep) (a:TYPE rr). a -> [a]
+   f = /\(rr:RuntimeRep) (a:rr) \(a:rr). ...
+This is no good: we could not generate code code for 'f', because the
+calling convention for 'f' varies depending on whether the argument is
+a a Int, Int#, or Float#.  (You could imagine generating specialised
+code, one for each instantiation of 'rr', but we don't do that.)
 
-An alternative design would be to have
+Certain functions CAN be runtime-rep-polymorphic, because the code
+generator never has to manipulate a value of type 'a :: TYPE rr'.
 
-  data RuntimeRep = PtrRep Levity | ...
-  data Levity = Lifted | Unlifted
+* error :: forall (rr:RuntimeRep) (a:TYPE rr). String -> a
+  Code generator never has to manipulate the return value.
 
-but this slowed down GHC because every time we looked at *, we had to
-follow a bunch of pointers. When we have unpackable sums, we should
-go back to the stratified representation. This would allow, for example:
+* unsafeCoerce#, defined in MkId.unsafeCoerceId:
+  Always inlined to be a no-op
+     unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+                             (a :: TYPE r1) (b :: TYPE r2).
+                             a -> b
 
-    unsafeCoerce# :: forall (r1 :: RuntimeRep) (v2 :: Levity)
-                            (a :: TYPE v1) (b :: TYPE v2). a -> b
+* Unboxed tuples, and unboxed sums, defined in TysWiredIn
+  Always inlined, and hence specialised to the call site
+     (#,#) :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+                     (a :: TYPE r1) (b :: TYPE r2).
+                     a -> b -> TYPE 'UnboxedTupleRep
+     See Note [Unboxed tuple kinds]
 
-TYPE replaces the old sub-kinding machinery. We call variables `a` and `b`
-above "runtime-representation polymorphic".
+Note [Unboxed tuple kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+What kind does (# Int, Float# #) have?
+The "right" answer would be
+    TYPE ('UnboxedTupleRep [PtrRepLifted, FloatRep])
+Currently we do not do this.  We just have
+    (# Int, Float# #) :: TYPE 'UnboxedTupleRep
+which does not tell us exactly how is is represented.
+
+Note [PrimRep and kindPrimRep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As part of its source code, in TyCon, GHC has
+  data PrimRep = PtrRep | IntRep | FloatRep | ...etc...
+
+Notice that
+ * RuntimeRep is part of the syntax tree of the program being compiled
+     (defined in a library: ghc-prim:GHC.Types)
+ * PrimRep is part of GHC's source code.
+     (defined in TyCon)
+
+We need to get from one to the other; that is what kindPrimRep does.
+Suppose we have a value
+   (v :: t) where (t :: k)
+Given this kind
+    k = TyConApp "TYPE" [rep]
+GHC needs to be able to figure out how 'v' is represented at runtime.
+It expects 'rep' to be form
+    TyConApp rr_dc args
+where 'rr_dc' is a promoteed data constructor from RuntimeRep. So
+now we need to go from 'dc' to the correponding PrimRep.  We store this
+PrimRep in the promoted data constructor itself: see TyCon.promDcRepInfo.
 
 -}
 
@@ -400,7 +448,7 @@ tYPETyCon = mkKindTyCon tYPETyConName
                         [Nominal]
                         (mkPrelTyConRepName tYPETyConName)
 
-   -- See Note [TYPE]
+   -- See Note [TYPE and RuntimeRep]
    -- NB: unlifted is wired in because there is no way to parse it in
    -- Haskell. That's the only reason for wiring it in.
 unliftedTypeKindTyCon = mkSynonymTyCon unliftedTypeKindTyConName
@@ -425,7 +473,8 @@ mkPrimTcName built_in_syntax occ key tycon
   = mkWiredInName gHC_PRIM (mkTcOccFS occ) key (ATyCon tycon) built_in_syntax
 
 -----------------------------
--- | Given a RuntimeRep, applies TYPE to it. See Note [TYPE].
+-- | Given a RuntimeRep, applies TYPE to it.
+-- see Note [TYPE and RuntimeRep]
 tYPE :: Type -> Type
 tYPE rr = TyConApp tYPETyCon [rr]
 

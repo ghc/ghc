@@ -301,6 +301,10 @@ The type constructor Any,
 
 It has these properties:
 
+  * Note that 'Any' is kind polymorphic since in some program we may
+    need to use Any to fill in a type variable of some kind other than *
+    (see #959 for examples).  Its kind is thus `forall k. k``.
+
   * It is defined in module GHC.Types, and exported so that it is
     available to users.  For this reason it's treated like any other
     wired-in type:
@@ -317,7 +321,7 @@ It has these properties:
   * When instantiated at a lifted type it is inhabited by at least one value,
     namely bottom
 
-  * You can safely coerce any lifted type to Any, and back with unsafeCoerce.
+  * You can safely coerce any /lifted/ type to Any, and back with unsafeCoerce.
 
   * It does not claim to be a *data* type, and that's important for
     the code generator, because the code gen may *enter* a data value
@@ -325,6 +329,12 @@ It has these properties:
 
   * It is wired-in so we can easily refer to it where we don't have a name
     environment (e.g. see Rules.matchRule for one example)
+
+  * If (Any k) is the type of a value, it must be a /lifted/ value. So
+    if we have (Any @(TYPE rr)) then rr must be 'PtrRepLifted.  See
+    Note [TYPE and RuntimeRep] in TysPrim.  This is a convenient
+    invariant, and makes isUnliftedTyCon well-defined; otherwise what
+    would (isUnliftedTyCon Any) be?
 
 It's used to instantiate un-constrained type variables after type checking. For
 example, 'length' has type
@@ -342,10 +352,6 @@ choice.  In this situation GHC uses 'Any',
 > length (Any *) ([] (Any *))
 
 Above, we print kinds explicitly, as if with --fprint-explicit-kinds.
-
-Note that 'Any' is kind polymorphic since in some program we may need to use Any
-to fill in a type variable of some kind other than * (see #959 for examples).
-Its kind is thus `forall k. k``.
 
 The Any tycon used to be quite magic, but we have since been able to
 implement it merely with an empty kind polymorphic type family. See #10886 for a
@@ -786,7 +792,7 @@ mk_tuple Unboxed arity = (tycon, tuple_con)
                          UnboxedTuple flavour
 
     -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
-    -- Kind:  forall (k1:RuntimeRep) (k2:RuntimeRep). TYPE k2 -> TYPE k2 -> #
+    -- Kind:  forall (k1:RuntimeRep) (k2:RuntimeRep). TYPE k1 -> TYPE k2 -> #
     tc_binders = mkTemplateTyConBinders (nOfThem arity runtimeRepTy)
                                         (\ks -> map tYPE ks)
 
@@ -980,14 +986,18 @@ mk_class tycon sc_pred sc_sel_id
 *                                                                      *
 ********************************************************************* -}
 
--- For information about the usage of the following type, see Note [TYPE]
--- in module TysPrim
+-- For information about the usage of the following type,
+-- see Note [TYPE and RuntimeRep] in module TysPrim
 runtimeRepTy :: Type
 runtimeRepTy = mkTyConTy runtimeRepTyCon
 
 liftedTypeKindTyCon, starKindTyCon, unicodeStarKindTyCon :: TyCon
 
-   -- See Note [TYPE] in TysPrim
+-- Type syononyms; see Note [TYPE and RuntimeRep] in TysPrim
+-- type Type = tYPE 'PtrRepLifted
+-- type *    = tYPE 'PtrRepLifted
+-- type *    = tYPE 'PtrRepLifted  -- Unicode variant
+
 liftedTypeKindTyCon   = mkSynonymTyCon liftedTypeKindTyConName
                                        [] liftedTypeKind []
                                        (tYPE ptrRepLiftedTy)
