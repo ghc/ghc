@@ -9530,22 +9530,25 @@ types like ``(Int -> Bool)`` or ``Maybe``.
 For instance, the first wildcard in the type signature ``not'`` would
 produce the following error message:
 
-::
+.. code-block:: none
 
-    Test.hs:4:17:
-        Found hole ‘_’ with type: Bool
-        To use the inferred type, enable PartialTypeSignatures
-        In the type signature for ‘not'’: Bool -> _
+    Test.hs:4:17: error:
+        • Found type wildcard ‘_’ standing for ‘Bool’
+          To use the inferred type, enable PartialTypeSignatures
+        • In the type signature:
+            not' :: Bool -> _
+        • Relevant bindings include
+            not' :: Bool -> Bool (bound at Test.hs:5:1)
+
 
 When a wildcard is not instantiated to a monotype, it will be
-generalised over, i.e. replaced by a fresh type variable (of which the
-name will often start with ``w_``), e.g.
+generalised over, i.e. replaced by a fresh type variable, e.g.
 
 ::
 
     foo :: _ -> _
     foo x = x
-    -- Inferred: forall w_. w_ -> w_
+    -- Inferred: forall t. t -> t
 
     filter' :: _
     filter' = filter -- has type forall a. (a -> Bool) -> [a] -> [a]
@@ -9579,7 +9582,7 @@ of the type signature to make sure that it unifies with something: ::
 
     somethingShowable :: Show _x => _x -> _
     somethingShowable x = show x
-    -- Inferred type: Show w_x => w_x -> String
+    -- Inferred type: Show a => a -> String
 
     somethingShowable' :: Show _x => _x -> _
     somethingShowable' x = show (not x)
@@ -9594,7 +9597,7 @@ though syntactically similar, named wildcards can unify with monotypes
 as well as be generalised over (and behave as type variables).
 
 In the first example above, ``_x`` is generalised over (and is
-effectively replaced by a fresh type variable ``w_x``). In the second
+effectively replaced by a fresh type variable ``a``). In the second
 example, ``_x`` is unified with the ``Bool`` type, and as ``Bool``
 implements the ``Show`` type class, the constraint ``Show Bool`` can be
 simplified away.
@@ -9613,23 +9616,29 @@ no matching the actual type ``Bool``.
 
 .. code-block:: none
 
-    Test.hs:5:9:
-        Couldn't match expected type ‘_a’ with actual type ‘Bool’
+    Test.hs:5:9: error:
+        • Couldn't match expected type ‘_a’ with actual type ‘Bool’
           ‘_a’ is a rigid type variable bound by
-               the type signature for foo :: _a -> _a at Test.hs:4:8
-        Relevant bindings include foo :: _a -> _a (bound at Test.hs:4:1)
-        In the expression: False
-        In an equation for ‘foo’: foo _ = False
+            the type signature for:
+              foo :: forall _a. _a -> _a
+            at Test.hs:4:8
+        • In the expression: False
+          In an equation for ‘foo’: foo _ = False
+        • Relevant bindings include foo :: _a -> _a (bound at Test.hs:5:1)
 
-Compiling this program with :ghc-flag:`-XNamedWildCards` enabled produces the
-following error message reporting the inferred type of the named
-wildcard ``_a``.
+Compiling this program with :ghc-flag:`-XNamedWildCards` (as well as
+:ghc-flag:`-XPartialTypeSignatures`) enabled produces the following error
+message reporting the inferred type of the named wildcard ``_a``.
 
 .. code-block:: none
 
-    Test.hs:4:8: Warning:
-        Found hole ‘_a’ with type: Bool
-        In the type signature for ‘foo’: _a -> _a
+    Test.hs:4:8: warning: [-Wpartial-type-signatures]
+        • Found type wildcard ‘_a’ standing for ‘Bool’
+        • In the type signature:
+            foo :: _a -> _a
+        • Relevant bindings include
+            foo :: Bool -> Bool (bound at Test.hs:5:1)
+
 
 .. _extra-constraints-wildcard:
 
@@ -9649,10 +9658,11 @@ extra-constraints wildcard is used to infer three extra constraints.
     -- Inferred:
     --   forall a. (Enum a, Eq a, Show a) => a -> String
     -- Error:
-    Test.hs:5:12:
-        Found hole ‘_’ with inferred constraints: (Enum a, Eq a, Show a)
+    Test.hs:5:12: error:
+        Found constraint wildcard ‘_’ standing for ‘(Show a, Eq a, Enum a)’
         To use the inferred type, enable PartialTypeSignatures
-        In the type signature for ‘arbitCs’: _ => a -> String
+        In the type signature:
+          arbitCs :: _ => a -> String
 
 An extra-constraints wildcard shouldn't prevent the programmer from
 already listing the constraints he knows or wants to annotate, e.g.
@@ -9665,10 +9675,11 @@ already listing the constraints he knows or wants to annotate, e.g.
     -- Inferred:
     --   forall a. (Enum a, Show a, Eq a) => a -> String
     -- Error:
-    Test.hs:9:22:
-        Found hole ‘_’ with inferred constraints: (Eq a, Show a)
+    Test.hs:9:22: error:
+        Found constraint wildcard ‘_’ standing for ‘()’
         To use the inferred type, enable PartialTypeSignatures
-        In the type signature for ‘arbitCs'’: (Enum a, _) => a -> String
+        In the type signature:
+          arbitCs' :: (Enum a, _) => a -> String
 
 An extra-constraints wildcard can also lead to zero extra constraints to
 be inferred, e.g.
@@ -9679,10 +9690,11 @@ be inferred, e.g.
     noCs = "noCs"
     -- Inferred: String
     -- Error:
-    Test.hs:13:9:
-        Found hole ‘_’ with inferred constraints: ()
+    Test.hs:13:9: error:
+        Found constraint wildcard ‘_’ standing for ‘()’
         To use the inferred type, enable PartialTypeSignatures
-        In the type signature for ‘noCs’: _ => String
+        In the type signature:
+          noCs :: _ => String
 
 As a single extra-constraints wildcard is enough to infer any number of
 constraints, only one is allowed in a type signature and it should come
@@ -9709,6 +9721,11 @@ In the following example a wildcard is used in each of the three possible contex
 Anonymous and named wildcards *can* occur on the left hand side of a
 type or data instance declaration;
 see :ref:`type-wildcards-lhs`.
+
+Anonymous wildcards are also allowed in visible type applications
+(:ref:`visible-type-application`). If you want to specify only the second type
+argument to ``wurble``, then you can say ``wurble @_ @Int`` where the first
+argument is a wildcard.
 
 In all other contexts, type wildcards are disallowed, and a named wildcard is treated
 as an ordinary type variable.  For example: ::
