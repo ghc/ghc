@@ -85,8 +85,7 @@ knownKeyNames
 
            , concatMap tycon_kk_names typeNatTyCons
 
-             -- Tuple type representations
-           , tuple_rep_names
+           , concatMap (tycon_kk_names . tupleTyCon Boxed) [2..mAX_TUPLE_SIZE]  -- Yuk
 
            , cTupleTyConNames
              -- Constraint tuples are known-key but not wired-in
@@ -98,17 +97,6 @@ knownKeyNames
            , basicKnownKeyNames ]
 
   where
-  -- We only include the type representation bindings (for both the type and
-  -- promoted data constructors) for tuples, not the TyCons themselves since
-  -- they are handled specially in interface files and by isBuiltInOcc_maybe.
-  -- See Note [Built-in syntax and the OrigNameCache] and Note [Grand plan for
-  -- Typeable].
-  tuple_rep_names =
-      [ rep
-      | tc <- map (tupleTyCon Boxed) [2..mAX_TUPLE_SIZE]
-      , rep <- rep_names tc ++ concatMap (rep_names . promoteDataCon) (tyConDataCons tc)
-      ]
-
   -- All of the names associated with a known-key thing.
   -- This includes TyCons, DataCons and promoted TyCons.
   tycon_kk_names :: TyCon -> [Name]
