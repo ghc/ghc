@@ -98,6 +98,8 @@ See ``changelog.md`` in the ``base`` package for full release notes.
 
 -  Version number 4.10.0.0 (was 4.9.0.0)
 
+- ``Data.Either`` now provides ``fromLeft`` and ``fromRight``
+
 binary
 ~~~~~~
 

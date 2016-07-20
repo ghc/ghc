@@ -24,6 +24,8 @@ module Data.Either (
    rights,
    isLeft,
    isRight,
+   fromLeft,
+   fromRight,
    partitionEithers,
  ) where
 
@@ -279,6 +281,40 @@ isLeft (Right _) = False
 isRight :: Either a b -> Bool
 isRight (Left  _) = False
 isRight (Right _) = True
+
+-- | Return the contents of a 'Left'-value or a default value otherwise.
+--
+-- @since 4.10.0.0
+--
+-- ==== __Examples__
+--
+-- Basic usage:
+--
+-- >>> fromLeft 1 (Left 3)
+-- 3
+-- >>> fromLeft 1 (Right "foo")
+-- 1
+--
+fromLeft :: a -> Either a b -> a
+fromLeft _ (Left a) = a
+fromLeft a _        = a
+
+-- | Return the contents of a 'Right'-value or a default value otherwise.
+--
+-- @since 4.10.0.0
+--
+-- ==== __Examples__
+--
+-- Basic usage:
+--
+-- >>> fromRight 1 (Right 3)
+-- 3
+-- >>> fromRight 1 (Left "foo")
+-- 1
+--
+fromRight :: b -> Either a b -> b
+fromRight _ (Right b) = b
+fromRight b _         = b
 
 -- instance for the == Boolean type-level equality operator
 type family EqEither a b where
