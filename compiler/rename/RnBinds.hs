@@ -933,6 +933,10 @@ renameSig ctxt sig@(PatSynSig vs ty)
     ty_ctxt = GenericCtx (text "a pattern synonym signature for"
                           <+> ppr_sig_bndrs vs)
 
+renameSig ctxt sig@(SCCFunSig st v s)
+  = do  { new_v <- lookupSigOccRn ctxt sig v
+        ; return (SCCFunSig st new_v s, emptyFVs) }
+
 ppr_sig_bndrs :: [Located RdrName] -> SDoc
 ppr_sig_bndrs bs = quotes (pprWithCommas ppr bs)
 
@@ -971,6 +975,9 @@ okHsSig ctxt (L _ sig)
      (MinimalSig {}, ClsDeclCtxt {}) -> True
      (MinimalSig {}, _)              -> False
 
+     (SCCFunSig {}, HsBootCtxt {}) -> False
+     (SCCFunSig {}, _)             -> True
+
 -------------------
 findDupSigs :: [LSig RdrName] -> [[(Located RdrName, Sig RdrName)]]
 -- Check for duplicates on RdrName version,
@@ -989,6 +996,7 @@ findDupSigs sigs
     expand_sig sig@(TypeSig ns _)            = [(n,sig) | n <- ns]
     expand_sig sig@(ClassOpSig _ ns _)       = [(n,sig) | n <- ns]
     expand_sig sig@(PatSynSig ns  _ )        = [(n,sig) | n <- ns]
+    expand_sig sig@(SCCFunSig _ n _)         = [(n,sig)]
     expand_sig _ = []
 
     matching_sig (L _ n1,sig1) (L _ n2,sig2)       = n1 == n2 && mtch sig1 sig2
@@ -997,6 +1005,7 @@ findDupSigs sigs
     mtch (TypeSig {})          (TypeSig {})        = True
     mtch (ClassOpSig d1 _ _)   (ClassOpSig d2 _ _) = d1 == d2
     mtch (PatSynSig _ _)       (PatSynSig _ _)     = True
+    mtch (SCCFunSig{})         (SCCFunSig{})       = True
     mtch _ _ = False
 
 -- Warn about multiple MINIMAL signatures

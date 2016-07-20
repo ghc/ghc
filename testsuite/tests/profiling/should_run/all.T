@@ -104,7 +104,7 @@ test('T11627a', [extra_ways(extra_prof_ways)], compile_and_run, [''])
 test('T11627b', [ extra_run_opts('+RTS -i0 -RTS')  # census after each GC
                 , extra_ways(extra_prof_ways)
                 , when(opsys('mingw32'),
-                       expect_broken_for(12236, ['prof_hc_hb'])) 
+                       expect_broken_for(12236, ['prof_hc_hb']))
                 ]
                 , compile_and_run
                 , [''])
@@ -112,3 +112,8 @@ test('T11627b', [ extra_run_opts('+RTS -i0 -RTS')  # census after each GC
 test('T11978a',
      [only_ways(['profthreaded']), extra_run_opts('+RTS -hb -N10')],
      compile_and_run, [''])
+
+test('toplevel_scc_1',
+     [extra_ways(['prof_no_auto']), only_ways(['prof_no_auto'])],
+     compile_and_run,
+     [''])

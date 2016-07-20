@@ -199,7 +199,7 @@ to the compiler, it automatically inserts a cost centre annotation
 around every binding not marked INLINE in your program, but you are
 entirely free to add cost centre annotations yourself.
 
-The syntax of a cost centre annotation is ::
+The syntax of a cost centre annotation for expressions is ::
 
     {-# SCC "name" #-} <expression>
 
@@ -210,7 +210,24 @@ extends as far to the right as possible when parsing. (SCC stands for
 "Set Cost Centre"). The double quotes can be omitted if ``name`` is a
 Haskell identifier, for example: ::
 
-    {-# SCC my_function #-} <expression>
+    {-# SCC id #-} <expression>
+
+Cost centre annotations can also appear in the top-level or in a
+declaration context. In that case you need to pass a function name
+defined in the same module or scope with the annotation. Example: ::
+
+    f x y = ...
+      where
+        g z = ...
+        {-# SCC g #-}
+
+    {-# SCC f #-}
+
+If you want to give a cost centre different name than the function name,
+you can pass a string to the annotation ::
+
+    f x y = ...
+    {-# SCC f "cost_centre_name" #-}
 
 Here is an example of a program with a couple of SCCs: ::
 

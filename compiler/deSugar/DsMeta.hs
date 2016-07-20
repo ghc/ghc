@@ -695,8 +695,7 @@ rep_sigs sigs = do locs_cores <- rep_sigs' sigs
 
 rep_sigs' :: [LSig Name] -> DsM [(SrcSpan, Core TH.DecQ)]
         -- We silently ignore ones we don't recognise
-rep_sigs' sigs = do { sigs1 <- mapM rep_sig sigs ;
-                     return (concat sigs1) }
+rep_sigs' = concatMapM rep_sig
 
 rep_sig :: LSig Name -> DsM [(SrcSpan, Core TH.DecQ)]
 rep_sig (L loc (TypeSig nms ty))      = mapM (rep_wc_ty_sig sigDName loc ty) nms
@@ -711,6 +710,7 @@ rep_sig (L loc (SpecSig nm tys ispec))
   = concatMapM (\t -> rep_specialise nm t ispec loc) tys
 rep_sig (L loc (SpecInstSig _ ty))    = rep_specialiseInst ty loc
 rep_sig (L _   (MinimalSig {}))       = notHandled "MINIMAL pragmas" empty
+rep_sig (L _   (SCCFunSig {}))        = notHandled "SCC pragmas" empty
 
 rep_ty_sig :: Name -> SrcSpan -> LHsSigType Name -> Located Name
            -> DsM (SrcSpan, Core TH.DecQ)

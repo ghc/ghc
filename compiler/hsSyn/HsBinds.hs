@@ -796,6 +796,18 @@ data Sig name
   | MinimalSig SourceText (LBooleanFormula (Located name))
                -- Note [Pragma source text] in BasicTypes
 
+        -- | A "set cost centre" pragma for declarations
+        --
+        -- > {-# SCC funName #-}
+        --
+        -- or
+        --
+        -- > {-# SCC funName "cost_centre_name" #-}
+
+  | SCCFunSig  SourceText      -- Note [Pragma source text] in BasicTypes
+               (Located name)  -- Function name
+               (Maybe StringLiteral)
+
 deriving instance (DataId name) => Data (Sig name)
 
 
@@ -855,6 +867,7 @@ isPragLSig :: LSig name -> Bool
 -- Identifies pragmas
 isPragLSig (L _ (SpecSig {}))   = True
 isPragLSig (L _ (InlineSig {})) = True
+isPragLSig (L _ (SCCFunSig {})) = True
 isPragLSig _                    = False
 
 isInlineLSig :: LSig name -> Bool
@@ -864,7 +877,11 @@ isInlineLSig _                    = False
 
 isMinimalLSig :: LSig name -> Bool
 isMinimalLSig (L _ (MinimalSig {})) = True
-isMinimalLSig _                    = False
+isMinimalLSig _                     = False
+
+isSCCFunSig :: LSig name -> Bool
+isSCCFunSig (L _ (SCCFunSig {})) = True
+isSCCFunSig _                    = False
 
 hsSigDoc :: Sig name -> SDoc
 hsSigDoc (TypeSig {})           = text "type signature"
@@ -878,6 +895,7 @@ hsSigDoc (InlineSig _ prag)     = ppr (inlinePragmaSpec prag) <+> text "pragma"
 hsSigDoc (SpecInstSig {})       = text "SPECIALISE instance pragma"
 hsSigDoc (FixSig {})            = text "fixity declaration"
 hsSigDoc (MinimalSig {})        = text "MINIMAL pragma"
+hsSigDoc (SCCFunSig {})         = text "SCC pragma"
 
 {-
 Check if signatures overlap; this is used when checking for duplicate
@@ -903,6 +921,10 @@ ppr_sig (SpecInstSig _ ty)
 ppr_sig (MinimalSig _ bf)         = pragBrackets (pprMinimalSig bf)
 ppr_sig (PatSynSig names sig_ty)
   = text "pattern" <+> pprVarSig (map unLoc names) (ppr sig_ty)
+ppr_sig (SCCFunSig _ fn Nothing)
+  = pragBrackets (text "SCC" <+> ppr fn)
+ppr_sig (SCCFunSig _ fn (Just str))
+  = pragBrackets (text "SCC" <+> ppr fn <+> ppr (sl_st str))
 
 instance OutputableBndr name => Outputable (FixitySig name) where
   ppr (FixitySig names fixity) = sep [ppr fixity, pprops]

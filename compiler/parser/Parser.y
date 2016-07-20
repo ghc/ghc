@@ -835,7 +835,7 @@ topdecl :: { LHsDecl RdrName }
         -- The $(..) form is one possible form of infixexp
         -- but we treat an arbitrary expression just as if
         -- it had a $(..) wrapped around it
-        | infixexp                              { sLL $1 $> $ mkSpliceDecl $1 }
+        | infixexp_top                          { sLL $1 $> $ mkSpliceDecl $1 }
 
 -- Type classes
 --
@@ -1989,7 +1989,7 @@ decl_no_th :: { LHsDecl RdrName }
                                 -- Turn it all into an expression so that
                                 -- checkPattern can check that bangs are enabled
 
-        | infixexp opt_sig rhs  {% do { (ann,r) <- checkValDef empty $1 (snd $2) $3;
+        | infixexp_top opt_sig rhs  {% do { (ann,r) <- checkValDef empty $1 (snd $2) $3;
                                         let { l = comb2 $1 $> };
                                         case r of {
                                           (FunBind n _ _ _ _) ->
@@ -2029,7 +2029,7 @@ gdrh :: { LGRHS RdrName (LHsExpr RdrName) }
 sigdecl :: { LHsDecl RdrName }
         :
         -- See Note [Declaration/signature overlap] for why we need infixexp here
-          infixexp '::' sigtypedoc
+          infixexp_top '::' sigtypedoc
                         {% do v <- checkValSigLhs $1
                         ; _ <- ams (sLL $1 $> ()) [mu AnnDcolon $2]
                         ; return (sLL $1 $> $ SigD $
@@ -2055,6 +2055,16 @@ sigdecl :: { LHsDecl RdrName }
                             (mkInlinePragma (getINLINE_PRAGs $1) (getINLINE $1)
                                             (snd $2)))))
                        ((mo $1:fst $2) ++ [mc $4]) }
+
+        | '{-# SCC' qvar '#-}'
+          {% ams (sLL $1 $> (SigD (SCCFunSig (getSCC_PRAGs $1) $2 Nothing)))
+                 [mo $1, mc $3] }
+
+        | '{-# SCC' qvar STRING '#-}'
+          {% do { scc <- getSCC $3
+                ; let str_lit = StringLiteral (getSTRINGs $3) scc
+                ; ams (sLL $1 $> (SigD (SCCFunSig (getSCC_PRAGs $1) $2 (Just str_lit))))
+                      [mo $1, mc $4] } }
 
         | '{-# SPECIALISE' activation qvar '::' sigtypes1 '#-}'
              {% ams (
@@ -2121,14 +2131,18 @@ exp   :: { LHsExpr RdrName }
         | infixexp              { $1 }
 
 infixexp :: { LHsExpr RdrName }
-        : exp10                   { $1 }
-        | infixexp qop exp10      {% ams (sLL $1 $>
-                                             (OpApp $1 $2 placeHolderFixity $3))
-                                         [mj AnnVal $2] }
+        : exp10 { $1 }
+        | infixexp qop exp10  {% ams (sLL $1 $> (OpApp $1 $2 placeHolderFixity $3))
+                                     [mj AnnVal $2] }
                  -- AnnVal annotation for NPlusKPat, which discards the operator
 
+infixexp_top :: { LHsExpr RdrName }
+        : exp10_top               { $1 }
+        | infixexp_top qop exp10_top
+                                  {% ams (sLL $1 $> (OpApp $1 $2 placeHolderFixity $3))
+                                         [mj AnnVal $2] }
 
-exp10 :: { LHsExpr RdrName }
+exp10_top :: { LHsExpr RdrName }
         : '\\' apat apats opt_asig '->' exp
                    {% ams (sLL $1 $> $ HsLam (mkMatchGroup FromSource
                             [sLL $1 $> $ Match { m_ctxt = LambdaExpr
@@ -2170,9 +2184,6 @@ exp10 :: { LHsExpr RdrName }
                                               (mkHsDo MDoExpr (snd $ unLoc $2)))
                                            (mj AnnMdo $1:(fst $ unLoc $2)) }
 
-        | scc_annot exp        {% ams (sLL $1 $> $ HsSCC (snd $ fst $ unLoc $1) (snd $ unLoc $1) $2)
-                                      (fst $ fst $ unLoc $1) }
-
         | hpc_annot exp        {% ams (sLL $1 $> $ HsTickPragma (snd $ fst $ fst $ unLoc $1)
                                                                 (snd $ fst $ unLoc $1) (snd $ unLoc $1) $2)
                                       (fst $ fst $ fst $ unLoc $1) }
@@ -2190,6 +2201,11 @@ exp10 :: { LHsExpr RdrName }
                                               ,mc $3] }
                                           -- hdaume: core annotation
         | fexp                         { $1 }
+
+exp10 :: { LHsExpr RdrName }
+        : exp10_top            { $1 }
+        | scc_annot exp        {% ams (sLL $1 $> $ HsSCC (snd $ fst $ unLoc $1) (snd $ unLoc $1) $2)
+                                      (fst $ fst $ unLoc $1) }
 
 optSemi :: { ([Located a],Bool) }
         : ';'         { ([$1],True) }

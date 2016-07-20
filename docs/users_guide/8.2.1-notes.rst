@@ -13,6 +13,7 @@ Highlights
 The highlights since the 8.0 branch are:
 
 - TODO FIXME
+- SCC annotations can now be used for declarations.
 
 Full details
 ------------
@@ -32,7 +33,10 @@ Compiler
 
 - Old profiling flags ``-auto-all``, ``-auto``, and ``-caf-all`` are deprecated
   and their usage provokes a compile-time warning.
-  
+
+- Support for adding cost centres to declarations is added. The same `SCC`
+  syntax can be used, in addition to a new form for specifying the cost centre
+  name. See :ref:`scc-pragma` for examples.
 
 GHCi
 ~~~~
