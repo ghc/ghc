@@ -84,6 +84,7 @@ import Util
 import Outputable
 import FastString
 
+import Control.DeepSeq
 import Data.Bits
 import Data.Data
 import Data.List
@@ -237,6 +238,9 @@ data SrcSpan =
 
   deriving (Eq, Ord, Show) -- Show is used by Lexer.x, because we
                            -- derive Show for Token
+
+instance NFData SrcSpan where
+  rnf x = x `seq` ()
 
 -- | Built-in "bad" 'SrcSpan's for common sources of location uncertainty
 noSrcSpan, wiredInSrcSpan, interactiveSrcSpan :: SrcSpan

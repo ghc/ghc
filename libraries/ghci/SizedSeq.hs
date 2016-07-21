@@ -8,6 +8,7 @@ module SizedSeq
   , sizeSS
   ) where
 
+import Control.DeepSeq
 import Data.Binary
 import Data.List
 import GHC.Generics
@@ -25,6 +26,9 @@ instance Traversable SizedSeq where
   traverse f (SizedSeq sz l) = SizedSeq sz . reverse <$> traverse f (reverse l)
 
 instance Binary a => Binary (SizedSeq a)
+
+instance NFData a => NFData (SizedSeq a) where
+  rnf (SizedSeq _ xs) = rnf xs
 
 emptySS :: SizedSeq a
 emptySS = SizedSeq 0 []

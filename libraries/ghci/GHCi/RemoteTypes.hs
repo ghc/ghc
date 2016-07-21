@@ -17,6 +17,7 @@ module GHCi.RemoteTypes
   , unsafeForeignRefToRemoteRef, finalizeForeignRef
   ) where
 
+import Control.DeepSeq
 import Data.Word
 import Foreign hiding (newForeignPtr)
 import Foreign.Concurrent
@@ -49,6 +50,7 @@ castRemotePtr (RemotePtr a) = RemotePtr a
 
 deriving instance Show (RemotePtr a)
 deriving instance Binary (RemotePtr a)
+deriving instance NFData (RemotePtr a)
 
 -- -----------------------------------------------------------------------------
 -- HValueRef
@@ -90,6 +92,9 @@ freeRemoteRef (RemoteRef w) =
 
 -- | An HValueRef with a finalizer
 newtype ForeignRef a = ForeignRef (ForeignPtr ())
+
+instance NFData (ForeignRef a) where
+  rnf x = x `seq` ()
 
 type ForeignHValue = ForeignRef HValue
 

@@ -92,6 +92,7 @@ import Data.Ord
 import {-# SOURCE #-} Packages
 import GHC.PackageDb (BinaryStringRep(..), DbModuleRep(..), DbModule(..))
 
+import Control.DeepSeq
 import Data.Coerce
 import Data.Data
 import Data.Map (Map)
@@ -266,6 +267,9 @@ instance Data ModuleName where
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = mkNoRepType "ModuleName"
 
+instance NFData ModuleName where
+  rnf x = x `seq` ()
+
 stableModuleNameCmp :: ModuleName -> ModuleName -> Ordering
 -- ^ Compares module names lexically, rather than by their 'Unique's
 stableModuleNameCmp n1 n2 = moduleNameFS n1 `compare` moduleNameFS n2
@@ -319,7 +323,7 @@ moduleNameColons = dots_to_colons . moduleNameString
 -- | A Module is a pair of a 'UnitId' and a 'ModuleName'.
 data Module = Module {
    moduleUnitId :: !UnitId,  -- pkg-1.0
-   moduleName      :: !ModuleName  -- A.B.C
+   moduleName :: !ModuleName  -- A.B.C
   }
   deriving (Eq, Ord)
 
@@ -338,6 +342,9 @@ instance Data Module where
   toConstr _   = abstractConstr "Module"
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = mkNoRepType "Module"
+
+instance NFData Module where
+  rnf x = x `seq` ()
 
 -- | This gives a stable ordering, as opposed to the Ord instance which
 -- gives an ordering based on the 'Unique's of the components, which may
@@ -403,6 +410,9 @@ instance Data UnitId where
   toConstr _   = abstractConstr "UnitId"
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = mkNoRepType "UnitId"
+
+instance NFData UnitId where
+  rnf x = x `seq` ()
 
 stableUnitIdCmp :: UnitId -> UnitId -> Ordering
 -- ^ Compares package ids lexically, rather than by their 'Unique's
