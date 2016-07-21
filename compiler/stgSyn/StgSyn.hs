@@ -59,13 +59,12 @@ import Packages    ( isDllName )
 import Platform
 import PprCore     ( {- instances -} )
 import PrimOp      ( PrimOp, PrimCall )
-import TyCon       ( PrimRep(..) )
-import TyCon       ( TyCon )
+import TyCon       ( PrimRep(..), TyCon )
 import Type        ( Type )
-import Type        ( typePrimRep )
+import RepType     ( typePrimRep )
+import UniqFM
 import UniqSet
 import Unique      ( Unique )
-import UniqFM
 import Util
 
 {-
@@ -96,6 +95,10 @@ data GenStgBinding bndr occ
 data GenStgArg occ
   = StgVarArg  occ
   | StgLitArg  Literal
+
+    -- A rubbish arg is a value that's not supposed to be used by the generated
+    -- code, but it may be a GC root (i.e. used by GC) if the type is boxed.
+  | StgRubbishArg Type
 
 -- | Does this constructor application refer to
 -- anything in a different *Windows* DLL?
@@ -138,6 +141,7 @@ isAddrRep _       = False
 stgArgType :: StgArg -> Type
 stgArgType (StgVarArg v)   = idType v
 stgArgType (StgLitArg lit) = literalType lit
+stgArgType (StgRubbishArg ty) = ty
 
 
 -- | Strip ticks of a given type from an STG expression
@@ -192,13 +196,14 @@ primitives, and literals.
 
   | StgLit      Literal
 
-        -- StgConApp is vital for returning unboxed tuples
+        -- StgConApp is vital for returning unboxed tuples or sums
         -- which can't be let-bound first
   | StgConApp   DataCon
                 [GenStgArg occ] -- Saturated
+                [Type]          -- See Note [Types in StgConApp] in UnariseStg
 
   | StgOpApp    StgOp           -- Primitive op or foreign call
-                [GenStgArg occ] -- Saturated
+                [GenStgArg occ] -- Saturated. Not rubbish.
                 Type            -- Result type
                                 -- We need to know this so that we can
                                 -- assign result registers
@@ -402,8 +407,9 @@ The second flavour of right-hand-side is for constructors (simple but important)
                          -- DontCareCCS, because we don't count static
                          -- data in heap profiles, and we don't set CCCS
                          -- from static closure.
-        DataCon          -- constructor
-        [GenStgArg occ]  -- args
+        DataCon          -- Constructor. Never an unboxed tuple or sum, as those
+                         -- are not allocated.
+        [GenStgArg occ]  -- Args
 
 stgRhsArity :: StgRhs -> Int
 stgRhsArity (StgRhsClosure _ _ _ _ bndrs _)
@@ -442,7 +448,7 @@ exprHasCafRefs (StgApp f args)
   = stgIdHasCafRefs f || any stgArgHasCafRefs args
 exprHasCafRefs StgLit{}
   = False
-exprHasCafRefs (StgConApp _ args)
+exprHasCafRefs (StgConApp _ args _)
   = any stgArgHasCafRefs args
 exprHasCafRefs (StgOpApp _ args _)
   = any stgArgHasCafRefs args
@@ -538,9 +544,9 @@ type GenStgAlt bndr occ
 
 data AltType
   = PolyAlt             -- Polymorphic (a type variable)
-  | UbxTupAlt Int       -- Unboxed tuple of this arity
-  | AlgAlt    TyCon     -- Algebraic data type; the AltCons will be DataAlts
-  | PrimAlt   TyCon     -- Primitive data type; the AltCons will be LitAlts
+  | MultiValAlt Int     -- Multi value of this arity (unboxed tuple or sum)
+  | AlgAlt      TyCon   -- Algebraic data type; the AltCons will be DataAlts
+  | PrimAlt     TyCon   -- Primitive data type; the AltCons will be LitAlts
 
 {-
 ************************************************************************
@@ -660,6 +666,7 @@ instance (OutputableBndr bndr, Outputable bdee, Ord bdee)
 pprStgArg :: (Outputable bdee) => GenStgArg bdee -> SDoc
 pprStgArg (StgVarArg var) = ppr var
 pprStgArg (StgLitArg con) = ppr con
+pprStgArg (StgRubbishArg ty) = text "StgRubbishArg" <> dcolon <> ppr ty
 
 pprStgExpr :: (OutputableBndr bndr, Outputable bdee, Ord bdee)
            => GenStgExpr bndr bdee -> SDoc
@@ -670,8 +677,8 @@ pprStgExpr (StgLit lit)     = ppr lit
 pprStgExpr (StgApp func args)
   = hang (ppr func) 4 (sep (map (ppr) args))
 
-pprStgExpr (StgConApp con args)
-  = hsep [ ppr con, brackets (interppSP args)]
+pprStgExpr (StgConApp con args _)
+  = hsep [ ppr con, brackets (interppSP args) ]
 
 pprStgExpr (StgOpApp op args _)
   = hsep [ pprStgOp op, brackets (interppSP args)]
@@ -750,10 +757,10 @@ pprStgOp (StgPrimCallOp op)= ppr op
 pprStgOp (StgFCallOp op _) = ppr op
 
 instance Outputable AltType where
-  ppr PolyAlt        = text "Polymorphic"
-  ppr (UbxTupAlt n)  = text "UbxTup" <+> ppr n
-  ppr (AlgAlt tc)    = text "Alg"    <+> ppr tc
-  ppr (PrimAlt tc)   = text "Prim"   <+> ppr tc
+  ppr PolyAlt         = text "Polymorphic"
+  ppr (MultiValAlt n) = text "MultiAlt" <+> ppr n
+  ppr (AlgAlt tc)     = text "Alg"    <+> ppr tc
+  ppr (PrimAlt tc)    = text "Prim"   <+> ppr tc
 
 pprStgLVs :: Outputable occ => GenStgLiveVars occ -> SDoc
 pprStgLVs lvs
@@ -768,7 +775,7 @@ pprStgRhs :: (OutputableBndr bndr, Outputable bdee, Ord bdee)
 
 -- special case
 pprStgRhs (StgRhsClosure cc bi [free_var] upd_flag [{-no args-}] (StgApp func []))
-  = hcat [ ppr cc,
+  = hsep [ ppr cc,
            pp_binder_info bi,
            brackets (ifPprDebug (ppr free_var)),
            text " \\", ppr upd_flag, ptext (sLit " [] "), ppr func ]

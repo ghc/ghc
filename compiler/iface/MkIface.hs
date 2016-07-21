@@ -1460,6 +1460,7 @@ tyConToIfaceDecl env tycon
     ifaceConDecls (NewTyCon { data_con = con })    flds = IfNewTyCon  (ifaceConDecl con) (ifaceOverloaded flds) (ifaceFields flds)
     ifaceConDecls (DataTyCon { data_cons = cons }) flds = IfDataTyCon (map ifaceConDecl cons) (ifaceOverloaded flds) (ifaceFields flds)
     ifaceConDecls (TupleTyCon { data_con = con })  _    = IfDataTyCon [ifaceConDecl con] False []
+    ifaceConDecls (SumTyCon { data_cons = cons })  flds = IfDataTyCon (map ifaceConDecl cons) (ifaceOverloaded flds) (ifaceFields flds)
     ifaceConDecls (AbstractTyCon distinct)         _    = IfAbstractTyCon distinct
         -- The AbstractTyCon case happens when a TyCon has been trimmed
         -- during tidying.

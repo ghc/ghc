@@ -19,7 +19,8 @@ module StgCmmEnv (
 
         bindArgsToRegs, bindToReg, rebindToReg,
         bindArgToReg, idToReg,
-        getArgAmode, getNonVoidArgAmodes,
+        getArgAmode, getArgAmode_no_rubbish,
+        getNonVoidArgAmodes, getNonVoidArgAmodes_no_rubbish,
         getCgIdInfo,
         maybeLetNoEscape,
     ) where
@@ -33,18 +34,18 @@ import StgCmmClosure
 
 import CLabel
 
-import DynFlags
-import MkGraph
 import BlockId
 import CmmExpr
 import CmmUtils
-import Id
-import VarEnv
 import Control.Monad
+import DynFlags
+import Id
+import MkGraph
 import Name
-import StgSyn
 import Outputable
+import StgSyn
 import UniqFM
+import VarEnv
 
 -------------------------------------
 --        Non-void types
@@ -165,20 +166,34 @@ cgLookupPanic id
 
 
 --------------------
-getArgAmode :: NonVoid StgArg -> FCode CmmExpr
+getArgAmode :: NonVoid StgArg -> FCode CmmArg
 getArgAmode (NonVoid (StgVarArg var))  =
-  do { info  <- getCgIdInfo var; return (idInfoToAmode info) }
-getArgAmode (NonVoid (StgLitArg lit))  = liftM CmmLit $ cgLit lit
+  do { info  <- getCgIdInfo var; return (CmmExprArg (idInfoToAmode info)) }
+getArgAmode (NonVoid (StgLitArg lit))  = liftM (CmmExprArg . CmmLit) $ cgLit lit
+getArgAmode (NonVoid (StgRubbishArg ty)) = return (CmmRubbishArg ty)
 
-getNonVoidArgAmodes :: [StgArg] -> FCode [CmmExpr]
+getArgAmode_no_rubbish :: NonVoid StgArg -> FCode CmmExpr
+getArgAmode_no_rubbish (NonVoid (StgVarArg var))  =
+  do { info  <- getCgIdInfo var; return (idInfoToAmode info) }
+getArgAmode_no_rubbish (NonVoid (StgLitArg lit))  = liftM CmmLit $ cgLit lit
+getArgAmode_no_rubbish arg@(NonVoid (StgRubbishArg _)) = pprPanic "getArgAmode_no_rubbish" (ppr arg)
+
+getNonVoidArgAmodes :: [StgArg] -> FCode [CmmArg]
 -- NB: Filters out void args,
 --     so the result list may be shorter than the argument list
 getNonVoidArgAmodes [] = return []
 getNonVoidArgAmodes (arg:args)
   | isVoidRep (argPrimRep arg) = getNonVoidArgAmodes args
   | otherwise = do { amode  <- getArgAmode (NonVoid arg)
-                    ; amodes <- getNonVoidArgAmodes args
-                    ; return ( amode : amodes ) }
+                   ; amodes <- getNonVoidArgAmodes args
+                   ; return ( amode : amodes ) }
+
+-- This version assumes arguments are not rubbish. I think this assumption holds
+-- as long as we don't pass unboxed sums to primops and foreign fns.
+getNonVoidArgAmodes_no_rubbish :: [StgArg] -> FCode [CmmExpr]
+getNonVoidArgAmodes_no_rubbish
+  = mapM (getArgAmode_no_rubbish . NonVoid) . filter (not . isVoidRep . argPrimRep)
+
 
 ------------------------------------------------------------------------
 --        Interface functions for binding and re-binding names

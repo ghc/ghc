@@ -33,7 +33,7 @@ import HscTypes
 import CostCentre
 import Id
 import IdInfo
-import Type
+import RepType
 import DataCon
 import Name
 import TyCon
@@ -241,13 +241,13 @@ cgDataCon data_con
                 do { _ <- ticky_code
                    ; ldvEnter (CmmReg nodeReg)
                    ; tickyReturnOldCon (length arg_things)
-                   ; void $ emitReturn [cmmOffsetB dflags (CmmReg nodeReg)
-                                            (tagForCon dflags data_con)]
+                   ; void $ emitReturn [CmmExprArg (cmmOffsetB dflags (CmmReg nodeReg) (tagForCon dflags data_con))]
                    }
                         -- The case continuation code expects a tagged pointer
 
             arg_reps :: [(PrimRep, UnaryType)]
-            arg_reps = [(typePrimRep rep_ty, rep_ty) | ty <- dataConRepArgTys data_con, rep_ty <- flattenRepType (repType ty)]
+            arg_reps = [(typePrimRep rep_ty, rep_ty) | ty <- dataConRepArgTys data_con
+                                                     , rep_ty <- repTypeArgs ty]
 
             -- Dynamic closure code for non-nullary constructors only
         ; when (not (isNullaryRepDataCon data_con))

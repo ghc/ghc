@@ -46,6 +46,9 @@ stg2stg dflags module_name binds
         ; (processed_binds, _, cost_centres)
                 <- foldM do_stg_pass (binds', us0, ccs) (getStgToDo dflags)
 
+        ; dumpIfSet_dyn dflags Opt_D_dump_stg "Pre unarise:"
+                        (pprStgBindings processed_binds)
+
         ; let un_binds = unarise us1 processed_binds
 
         ; dumpIfSet_dyn dflags Opt_D_dump_stg "STG syntax:"

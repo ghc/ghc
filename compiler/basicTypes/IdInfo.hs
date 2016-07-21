@@ -304,7 +304,7 @@ type ArityInfo = Arity
 
 -- | It is always safe to assume that an 'Id' has an arity of 0
 unknownArity :: Arity
-unknownArity = 0 :: Arity
+unknownArity = 0
 
 ppArityInfo :: Int -> SDoc
 ppArityInfo 0 = empty

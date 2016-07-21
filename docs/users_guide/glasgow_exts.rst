@@ -259,6 +259,83 @@ There are some restrictions on the use of unboxed tuples:
 
    Indeed, the bindings can even be recursive.
 
+.. _unboxed-sums:
+
+Unboxed sums
+------------
+
+.. ghc-flag:: -XUnboxedSums
+
+    Enable the use of unboxed sum syntax.
+
+`-XUnboxedSums` enables new syntax for anonymous, unboxed sum types. The syntax
+for an unboxed sum type with N alternatives is ::
+
+    (# t_1 | t_2 | ... | t_N #)
+
+where `t_1` ... `t_N` are types (which can be unlifted, including unboxed tuple
+and sums).
+
+Unboxed tuples can be used for multi-arity alternatives. For example: ::
+
+    (# (# Int, String #) | Bool #)
+
+Term level syntax is similar. Leading and preceding bars (`|`) indicate which
+alternative it is. Here is two terms of the type shown above: ::
+
+    (# (# 1, "foo" #) | #) -- first alternative
+
+    (# | True #) -- second alternative
+
+Pattern syntax reflects the term syntax: ::
+
+    case x of
+      (# (# i, str #) | #) -> ...
+      (# | bool #) -> ...
+
+Unboxed sums are "unboxed" in the sense that, instead of allocating sums in the
+heap and representing values as pointers, unboxed sums are represented as their
+components, just like unboxed tuples. These "components" depend on alternatives
+of a sum type. Code generator tries to generate as compact layout as possible.
+In the best case, size of an unboxed sum is size of its biggest alternative +
+one word (for tag). The algorithm for generating memory layout for a sum type
+works like this:
+
+- All types are classified as one of these classes: 32bit word, 64bit word,
+  32bit float, 64bit float, pointer.
+
+- For each alternative of the sum type, a layout that consists of these fields
+  is generated. For example, if an alternative has `Int`, `Float#` and `String`
+  fields, the layout will have an 32bit word, 32bit float and pointer fields.
+
+- Layout fields are then overlapped so that the final layout will be as compact
+  as possible. E.g. say two alternatives have these fields: ::
+
+    Word32, String, Float#
+    Float#, Float#, Maybe Int
+
+  Final layout will be something like ::
+
+    Int32, Float32, Float32, Word32, Pointer
+
+  First `Int32` is for the tag. It has two `Float32` fields because floating
+  point types can't overlap with other types, because of limitations of the code
+  generator that we're hoping to overcome in the future, and second alternative
+  needs two `Float32` fields. `Word32` field is for the `Word32` in the first
+  alternative. `Pointer` field is shared between `String` and `Maybe Int` values
+  of the alternatives.
+
+  In the case of enumeration types (like `Bool`), the unboxed sum layout only
+  has an `Int32` field (i.e. the whole thing is represented by an integer).
+
+In the example above, a value of this type is thus represented as 5 values. As
+an another example, this is the layout for unboxed version of `Maybe a` type: ::
+
+    Int32, Pointer
+
+The `Pointer` field is not used when tag says that it's `Nothing`. Otherwise
+`Pointer` points to the value in `Just`.
+
 .. _syntax-extns:
 
 Syntactic extensions
@@ -422,9 +499,9 @@ Pattern guards
     :implied by: :ghc-flag:`-XHaskell98`
     :since: 6.8.1
 
-Disable `pattern guards 
+Disable `pattern guards
 <http://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-460003.13>`__.
-   
+
 .. _view-patterns:
 
 View patterns

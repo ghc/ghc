@@ -34,7 +34,7 @@ import TysPrim
 import BasicTypes
 import Class
 import CoreSyn
-import TysWiredIn
+import TysWiredIn hiding (sumTyCon)
 import Type
 import TyCon
 import DataCon

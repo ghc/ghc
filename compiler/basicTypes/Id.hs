@@ -40,7 +40,7 @@ module Id (
         mkWorkerId,
 
         -- ** Taking an Id apart
-        idName, idType, idUnique, idInfo, idDetails, idRepArity,
+        idName, idType, idUnique, idInfo, idDetails,
         recordSelectorTyCon,
 
         -- ** Modifying an Id
@@ -488,7 +488,7 @@ hasNoBinding :: Id -> Bool
 hasNoBinding id = case Var.idDetails id of
                         PrimOpId _       -> True        -- See Note [Primop wrappers]
                         FCallId _        -> True
-                        DataConWorkId dc -> isUnboxedTupleCon dc
+                        DataConWorkId dc -> isUnboxedTupleCon dc || isUnboxedSumCon dc
                         _                -> False
 
 isImplicitId :: Id -> Bool
@@ -565,9 +565,6 @@ idCallArity id = callArityInfo (idInfo id)
 
 setIdCallArity :: Id -> Arity -> Id
 setIdCallArity id arity = modifyIdInfo (`setCallArityInfo` arity) id
-
-idRepArity :: Id -> RepArity
-idRepArity x = typeRepArity (idArity x) (idType x)
 
 -- | Returns true if an application to n args would diverge
 isBottomingId :: Id -> Bool

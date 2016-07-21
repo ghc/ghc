@@ -78,6 +78,9 @@ module TysWiredIn (
         -- * Any
         anyTyCon, anyTy, anyTypeOfKind,
 
+        -- * Sums
+        mkSumTy, sumTyCon, sumDataCon,
+
         -- * Kinds
         typeNatKindCon, typeNatKind, typeSymbolKindCon, typeSymbolKind,
         isLiftedTypeKindTyConName, liftedTypeKind, constraintKind,
@@ -104,6 +107,7 @@ module TysWiredIn (
         voidRepDataConTy, intRepDataConTy,
         wordRepDataConTy, int64RepDataConTy, word64RepDataConTy, addrRepDataConTy,
         floatRepDataConTy, doubleRepDataConTy, unboxedTupleRepDataConTy,
+        unboxedSumRepDataConTy,
 
         vec2DataConTy, vec4DataConTy, vec8DataConTy, vec16DataConTy, vec32DataConTy,
         vec64DataConTy,
@@ -127,7 +131,7 @@ import TysPrim
 -- others:
 import CoAxiom
 import Id
-import Constants        ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE )
+import Constants        ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE, mAX_SUM_SIZE )
 import Module           ( Module )
 import Type
 import DataCon
@@ -137,8 +141,7 @@ import Class            ( Class, mkClass )
 import RdrName
 import Name
 import NameSet          ( NameSet, mkNameSet, elemNameSet )
-import BasicTypes       ( Arity, Boxity(..),
-                          TupleSort(..) )
+import BasicTypes       ( Arity, Boxity(..), TupleSort(..), ConTagZ )
 import ForeignCall
 import SrcLoc           ( noSrcSpan )
 import Unique
@@ -395,7 +398,7 @@ runtimeRepSimpleDataConNames
       , fsLit "VoidRep", fsLit "IntRep"
       , fsLit "WordRep", fsLit "Int64Rep", fsLit "Word64Rep"
       , fsLit "AddrRep", fsLit "FloatRep", fsLit "DoubleRep"
-      , fsLit "UnboxedTupleRep" ]
+      , fsLit "UnboxedTupleRep", fsLit "UnboxedSumRep" ]
       runtimeRepSimpleDataConKeys
       runtimeRepSimpleDataCons
 
@@ -786,7 +789,10 @@ mk_tuple Unboxed arity = (tycon, tuple_con)
     -- Kind:  forall (k1:RuntimeRep) (k2:RuntimeRep). TYPE k2 -> TYPE k2 -> #
     tc_binders = mkTemplateTyConBinders (nOfThem arity runtimeRepTy)
                                         (\ks -> map tYPE ks)
-    tc_res_kind = unboxedTupleKind
+
+    tc_res_kind | arity == 0 = tYPE voidRepDataConTy  -- Nullary unboxed tuple
+                | otherwise  = unboxedTupleKind
+
     tc_arity    = arity * 2
     flavour     = UnboxedAlgTyCon
 
@@ -826,6 +832,95 @@ unboxedUnitDataCon = tupleDataCon   Unboxed 0
 
 
 {- *********************************************************************
+*                                                                      *
+      Unboxed sums
+*                                                                      *
+********************************************************************* -}
+
+-- | OccName for n-ary unboxed sum type constructor.
+mkSumTyConOcc :: Arity -> OccName
+mkSumTyConOcc n = mkOccName tcName str
+  where
+    -- No need to cache these, the caching is done in mk_sum
+    str = '(' : '#' : bars ++ "#)"
+    bars = replicate (n-1) '|'
+
+-- | OccName for i-th alternative of n-ary unboxed sum data constructor.
+mkSumDataConOcc :: ConTag -> Arity -> OccName
+mkSumDataConOcc alt n = mkOccName dataName str
+  where
+    -- No need to cache these, the caching is done in mk_sum
+    str = '(' : '#' : bars alt ++ '_' : bars (n - alt - 1) ++ "#)"
+    bars i = replicate i '|'
+
+-- | Type constructor for n-ary unboxed sum.
+sumTyCon :: Arity -> TyCon
+sumTyCon n | n > mAX_SUM_SIZE = fst (mk_sum n)  -- Build one specially
+sumTyCon n = fst (unboxedSumArr ! n)
+
+-- | Data constructor for i-th alternative of a n-ary unboxed sum.
+sumDataCon :: ConTag -- Alternative
+           -> Arity  -- Arity
+           -> DataCon
+sumDataCon alt arity
+  | alt > arity
+  = panic ("sumDataCon: index out of bounds: alt "
+           ++ show alt ++ " > arity " ++ show arity)
+
+  | alt <= 0
+  = panic ("sumDataCon: Alts start from 1. (alt: " ++ show alt
+           ++ ", arity: " ++ show arity ++ ")")
+
+  | arity > mAX_SUM_SIZE
+  = snd (mk_sum arity) ! (alt - 1)  -- Build one specially
+
+  | otherwise
+  = snd (unboxedSumArr ! arity) ! (alt - 1)
+
+-- | Cached type and data constructors for sums. The outer array is
+-- indexed by the arity of the sum and the inner array is indexed by
+-- the alternative.
+unboxedSumArr :: Array Int (TyCon, Array Int DataCon)
+unboxedSumArr = listArray (0,mAX_SUM_SIZE) [mk_sum i | i <- [0..mAX_SUM_SIZE]]
+
+-- | Create type constructor and data constructors for n-ary unboxed sum.
+mk_sum :: Arity -> (TyCon, Array ConTagZ DataCon)
+mk_sum arity = (tycon, sum_cons)
+  where
+    tycon   = mkSumTyCon tc_name tc_binders tc_res_kind (arity * 2) tyvars (elems sum_cons)
+                         UnboxedAlgTyCon
+
+    tc_binders = mkTemplateTyConBinders (nOfThem arity runtimeRepTy)
+                                        (\ks -> map tYPE ks)
+
+    tyvars = mkTemplateTyVars (replicate arity runtimeRepTy ++
+                               map (tYPE . mkTyVarTy) (take arity tyvars))
+
+    tc_res_kind = tYPE unboxedSumRepDataConTy
+
+    open_tvs = drop arity tyvars
+
+    tc_name = mkWiredInName gHC_PRIM (mkSumTyConOcc arity) tc_uniq
+                            (ATyCon tycon) BuiltInSyntax
+
+    sum_cons = listArray (0,arity-1) [sum_con i | i <- [0..arity-1]]
+    sum_con i = let dc = pcDataCon dc_name
+                                   tyvars -- univ tyvars
+                                   [tyvar_tys !! i] -- arg types
+                                   tycon
+
+                    dc_name = mkWiredInName gHC_PRIM
+                                            (mkSumDataConOcc i arity)
+                                            (dc_uniq i)
+                                            (AConLike (RealDataCon dc))
+                                            BuiltInSyntax
+                in dc
+    tyvar_tys = mkTyVarTys open_tvs
+    tc_uniq   = mkSumTyConUnique   arity
+    dc_uniq i = mkSumDataConUnique i arity
+
+{-
+************************************************************************
 *                                                                      *
               Equality types and classes
 *                                                                      *
@@ -935,7 +1030,7 @@ runtimeRepSimpleDataCons@(ptrRepLiftedDataCon : ptrRepUnliftedDataCon : _)
   = zipWithLazy mk_runtime_rep_dc
     [ PtrRep, PtrRep, VoidRep, IntRep, WordRep, Int64Rep
     , Word64Rep, AddrRep, FloatRep, DoubleRep
-    , panic "unboxed tuple PrimRep" ]
+    , panic "unboxed tuple PrimRep", panic "unboxed sum PrimRep" ]
     runtimeRepSimpleDataConNames
   where
     mk_runtime_rep_dc primrep name
@@ -944,10 +1039,10 @@ runtimeRepSimpleDataCons@(ptrRepLiftedDataCon : ptrRepUnliftedDataCon : _)
 -- See Note [Wiring in RuntimeRep]
 voidRepDataConTy, intRepDataConTy, wordRepDataConTy, int64RepDataConTy,
   word64RepDataConTy, addrRepDataConTy, floatRepDataConTy, doubleRepDataConTy,
-  unboxedTupleRepDataConTy :: Type
+  unboxedTupleRepDataConTy, unboxedSumRepDataConTy :: Type
 [_, _, voidRepDataConTy, intRepDataConTy, wordRepDataConTy, int64RepDataConTy,
    word64RepDataConTy, addrRepDataConTy, floatRepDataConTy, doubleRepDataConTy,
-   unboxedTupleRepDataConTy] = map (mkTyConTy . promoteDataCon)
+   unboxedTupleRepDataConTy, unboxedSumRepDataConTy] = map (mkTyConTy . promoteDataCon)
                                    runtimeRepSimpleDataCons
 
 vecCountTyCon :: TyCon
@@ -1257,6 +1352,16 @@ mkBoxedTupleTy tys = mkTupleTy Boxed tys
 unitTy :: Type
 unitTy = mkTupleTy Boxed []
 
+{- *********************************************************************
+*                                                                      *
+            The sum types
+*                                                                      *
+************************************************************************
+-}
+
+mkSumTy :: [Type] -> Type
+mkSumTy tys = mkTyConApp (sumTyCon (length tys))
+                         (map (getRuntimeRep "mkSumTy") tys ++ tys)
 
 {- *********************************************************************
 *                                                                      *

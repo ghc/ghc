@@ -78,6 +78,7 @@ import Type
 import TyCoRep
 import TcType
 import TyCon
+import RepType
 import BasicTypes
 import Outputable
 import DynFlags
@@ -286,13 +287,11 @@ mkLFImported id
   | otherwise
   = mkLFArgument id -- Not sure of exact arity
   where
-    arity = idRepArity id
+    arity = idFunRepArity id
 
 -----------------------------------------------------
 --                Dynamic pointer tagging
 -----------------------------------------------------
-
-type ConTagZ = Int      -- A *zero-indexed* constructor tag
 
 type DynTag = Int       -- The tag on a *pointer*
                         -- (from the dynamic-tagging paper)

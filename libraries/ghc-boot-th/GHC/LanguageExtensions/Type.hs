@@ -47,6 +47,7 @@ data Extension
    | ScopedTypeVariables
    | AllowAmbiguousTypes
    | UnboxedTuples
+   | UnboxedSums
    | BangPatterns
    | TypeFamilies
    | TypeFamilyDependencies

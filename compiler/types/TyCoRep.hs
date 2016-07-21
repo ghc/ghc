@@ -2942,10 +2942,16 @@ pprTcApp style to_type p pp tc tys
   = pprPromotionQuote tc <>
     (tupleParens tup_sort $ pprWithCommas (pp TopPrec) ty_args)
 
+  | not (debugStyle style)
+  , isUnboxedSumTyCon tc
+  , let arity = tyConArity tc
+        ty_args = drop (arity `div` 2) tys -- Drop the kind args
+  , tys `lengthIs` arity -- Not a partial application
+  = pprSumApp pp tc ty_args
+
   | otherwise
   = sdocWithDynFlags $ \dflags ->
     pprTcApp_help to_type p pp tc tys dflags style
-  where
 
 pprTupleApp :: TyPrec -> (TyPrec -> a -> SDoc)
             -> TyCon -> TupleSort -> [a] -> SDoc
@@ -2959,6 +2965,11 @@ pprTupleApp p pp tc sort tys
   | otherwise
   = pprPromotionQuote tc <>
     tupleParens sort (pprWithCommas (pp TopPrec) tys)
+
+pprSumApp :: (TyPrec -> a -> SDoc) -> TyCon -> [a] -> SDoc
+pprSumApp pp tc tys
+  = pprPromotionQuote tc <>
+    sumParens (pprWithBars (pp TopPrec) tys)
 
 pprTcApp_help :: (a -> Type) -> TyPrec -> (TyPrec -> a -> SDoc)
               -> TyCon -> [a] -> DynFlags -> PprStyle -> SDoc

@@ -546,6 +546,9 @@ addTickHsExpr (ExplicitTuple es boxity) =
         liftM2 ExplicitTuple
                 (mapM addTickTupArg es)
                 (return boxity)
+addTickHsExpr (ExplicitSum tag arity e ty) = do
+        e' <- addTickLHsExpr e
+        return (ExplicitSum tag arity e' ty)
 addTickHsExpr (HsCase e mgs) =
         liftM2 HsCase
                 (addTickLHsExpr e) -- not an EvalInner; e might not necessarily

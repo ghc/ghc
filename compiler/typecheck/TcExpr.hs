@@ -472,6 +472,15 @@ tcExpr expr@(ExplicitTuple tup_args boxity) res_ty
 
        ; return $ mkHsWrap wrap (ExplicitTuple tup_args1 boxity) }
 
+tcExpr (ExplicitSum alt arity expr _) res_ty
+  = do { let sum_tc = sumTyCon arity
+       ; res_ty <- expTypeToType res_ty
+       ; (coi, arg_tys) <- matchExpectedTyConApp sum_tc res_ty
+       ; -- Drop levity vars, we don't care about them here
+         let arg_tys' = drop arity arg_tys
+       ; expr' <- tcPolyExpr expr (arg_tys' `getNth` (alt - 1))
+       ; return $ mkHsWrapCo coi (ExplicitSum alt arity expr' arg_tys') }
+
 tcExpr (ExplicitList _ witness exprs) res_ty
   = case witness of
       Nothing   -> do  { res_ty <- expTypeToType res_ty

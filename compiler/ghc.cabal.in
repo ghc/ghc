@@ -384,6 +384,7 @@ Library
         SimplStg
         StgStats
         UnariseStg
+        RepType
         Rules
         SpecConstr
         Specialise

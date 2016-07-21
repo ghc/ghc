@@ -537,6 +537,13 @@ rnHsTyKi env tupleTy@(HsTupleTy tup_con tys)
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi env) tys
        ; return (HsTupleTy tup_con tys', fvs) }
 
+rnHsTyKi env sumTy@(HsSumTy tys)
+  = do { data_kinds <- xoptM LangExt.DataKinds
+       ; when (not data_kinds && isRnKindLevel env)
+              (addErr (dataKindsErr env sumTy))
+       ; (tys', fvs) <- mapFvRn (rnLHsTyKi env) tys
+       ; return (HsSumTy tys', fvs) }
+
 -- Ensure that a type-level integer is nonnegative (#8306, #8412)
 rnHsTyKi env tyLit@(HsTyLit t)
   = do { data_kinds <- xoptM LangExt.DataKinds
@@ -1599,6 +1606,7 @@ extract_lty t_or_k (L _ ty) acc
       HsListTy ty               -> extract_lty t_or_k ty acc
       HsPArrTy ty               -> extract_lty t_or_k ty acc
       HsTupleTy _ tys           -> extract_ltys t_or_k tys acc
+      HsSumTy tys               -> extract_ltys t_or_k tys acc
       HsFunTy ty1 ty2           -> extract_lty t_or_k ty1 =<<
                                    extract_lty t_or_k ty2 acc
       HsIParamTy _ ty           -> extract_lty t_or_k ty acc

@@ -368,6 +368,11 @@ translatePat fam_insts pat = case pat of
     let tuple_con = tupleDataCon boxity (length ps)
     return [vanillaConPattern tuple_con tys (concat tidy_ps)]
 
+  SumPat p alt arity ty -> do
+    tidy_p <- translatePat fam_insts (unLoc p)
+    let sum_con = sumDataCon alt arity
+    return [vanillaConPattern sum_con ty tidy_p]
+
   -- --------------------------------------------------------------------------
   -- Not supposed to happen
   ConPatIn  {} -> panic "Check.translatePat: ConPatIn"

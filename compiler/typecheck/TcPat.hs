@@ -47,6 +47,7 @@ import Outputable
 import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
 import Control.Arrow  ( second )
+import ListSetOps ( getNth )
 
 {-
 ************************************************************************
@@ -465,6 +466,18 @@ tc_pat penv (TuplePat pats boxity _) pat_ty thing_inside
         ; pat_ty <- readExpType pat_ty
         ; ASSERT( length con_arg_tys == length pats ) -- Syntactically enforced
           return (mkHsWrapPat coi possibly_mangled_result pat_ty, res)
+        }
+
+tc_pat penv (SumPat pat alt arity _) pat_ty thing_inside
+  = do  { let tc = sumTyCon arity
+        ; (coi, arg_tys) <- matchExpectedPatTy (matchExpectedTyConApp tc)
+                                               penv pat_ty
+        ; -- Drop levity vars, we don't care about them here
+          let con_arg_tys = drop arity arg_tys
+        ; (pat', res) <- tc_lpat pat (mkCheckExpType (con_arg_tys `getNth` (alt - 1)))
+                                 penv thing_inside
+        ; pat_ty <- readExpType pat_ty
+        ; return (mkHsWrapPat coi (SumPat pat' alt arity con_arg_tys) pat_ty, res)
         }
 
 ------------------------

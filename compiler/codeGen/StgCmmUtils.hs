@@ -38,7 +38,7 @@ module StgCmmUtils (
         addToMem, addToMemE, addToMemLblE, addToMemLbl,
         mkWordCLit,
         newStringCLit, newByteStringCLit,
-        blankWord
+        blankWord, rubbishExpr
   ) where
 
 #include "HsVersions.h"
@@ -67,6 +67,7 @@ import UniqSupply (MonadUnique(..))
 import DynFlags
 import FastString
 import Outputable
+import RepType
 
 import qualified Data.ByteString as BS
 import qualified Data.Map as M
@@ -193,7 +194,7 @@ emitRtsCallGen res lbl args safe
   where
     call updfr_off =
       if safe then
-        emit =<< mkCmmCall fun_expr res' args' updfr_off
+        emit =<< mkCmmCall fun_expr res' (map CmmExprArg args') updfr_off
       else do
         let conv = ForeignConvention CCallConv arg_hints res_hints CmmMayReturn
         emit $ mkUnsafeCall (ForeignTarget fun_expr conv) res' args'
@@ -251,7 +252,7 @@ callerSaveVolatileRegs dflags = (caller_save, caller_load)
 
     callerRestoreGlobalReg reg
         = mkAssign (CmmGlobal reg)
-                    (CmmLoad (get_GlobalReg_addr dflags reg) (globalRegType dflags reg))
+                   (CmmLoad (get_GlobalReg_addr dflags reg) (globalRegType dflags reg))
 
 -- -----------------------------------------------------------------------------
 -- Global registers
@@ -361,15 +362,11 @@ newUnboxedTupleRegs res_ty
         ; sequel <- getSequel
         ; regs <- choose_regs dflags sequel
         ; ASSERT( regs `equalLength` reps )
-          return (regs, map primRepForeignHint reps) }
+          return (regs, map slotForeignHint reps) }
   where
-    UbxTupleRep ty_args = repType res_ty
-    reps = [ rep
-           | ty <- ty_args
-           , let rep = typePrimRep ty
-           , not (isVoidRep rep) ]
+    MultiRep reps = repType res_ty
     choose_regs _ (AssignTo regs _) = return regs
-    choose_regs dflags _            = mapM (newTemp . primRepCmmType dflags) reps
+    choose_regs dflags _            = mapM (newTemp . slotCmmType dflags) reps
 
 
 
@@ -377,14 +374,14 @@ newUnboxedTupleRegs res_ty
 --      emitMultiAssign
 -------------------------------------------------------------------------
 
-emitMultiAssign :: [LocalReg] -> [CmmExpr] -> FCode ()
+emitMultiAssign :: [LocalReg] -> [CmmArg] -> FCode ()
 -- Emit code to perform the assignments in the
 -- input simultaneously, using temporary variables when necessary.
 
 type Key  = Int
 type Vrtx = (Key, Stmt) -- Give each vertex a unique number,
                         -- for fast comparison
-type Stmt = (LocalReg, CmmExpr) -- r := e
+type Stmt = (LocalReg, CmmArg) -- r := e
 
 -- We use the strongly-connected component algorithm, in which
 --      * the vertices are the statements
@@ -393,7 +390,7 @@ type Stmt = (LocalReg, CmmExpr) -- r := e
 --        that is, if s1 should *follow* s2 in the final order
 
 emitMultiAssign []    []    = return ()
-emitMultiAssign [reg] [rhs] = emitAssign (CmmLocal reg) rhs
+emitMultiAssign [reg] [rhs] = emitAssign' (CmmLocal reg) rhs
 emitMultiAssign regs rhss   = do
   dflags <- getDynFlags
   ASSERT2( equalLength regs rhss, ppr regs $$ ppr rhss )
@@ -432,16 +429,20 @@ unscramble dflags vertices = mapM_ do_component components
 
         split :: DynFlags -> Unique -> Stmt -> (Stmt, Stmt)
         split dflags uniq (reg, rhs)
-          = ((tmp, rhs), (reg, CmmReg (CmmLocal tmp)))
+          = ((tmp, rhs), (reg, CmmExprArg (CmmReg (CmmLocal tmp))))
           where
-            rep = cmmExprType dflags rhs
+            rep = cmmArgType dflags rhs
             tmp = LocalReg uniq rep
 
         mk_graph :: Stmt -> FCode ()
-        mk_graph (reg, rhs) = emitAssign (CmmLocal reg) rhs
+        mk_graph (reg, rhs) = emitAssign' (CmmLocal reg) rhs
 
         mustFollow :: Stmt -> Stmt -> Bool
-        (reg, _) `mustFollow` (_, rhs) = regUsedIn dflags (CmmLocal reg) rhs
+        (reg, _) `mustFollow` (_, rhs) = regUsedIn' dflags (CmmLocal reg) rhs
+
+regUsedIn' :: DynFlags -> CmmReg -> CmmArg -> Bool
+regUsedIn' _      _   (CmmRubbishArg _) = False
+regUsedIn' dflags reg (CmmExprArg expr) = regUsedIn dflags reg expr
 
 -------------------------------------------------------------------------
 --      mkSwitch

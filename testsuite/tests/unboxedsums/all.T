@@ -1,0 +1,25 @@
+test('unarise',       omit_ways(['ghci']), compile_and_run, [''])
+test('unboxedsums1',  omit_ways(['ghci']), compile_and_run, [''])
+test('unboxedsums2',  omit_ways(['ghci']), compile_and_run, [''])
+test('unboxedsums3',  omit_ways(['ghci']), compile_and_run, [''])
+test('unboxedsums4',  omit_ways(['ghci']), compile_fail, [''])
+test('unboxedsums5',  omit_ways(['ghci']), compile, [''])
+test('unboxedsums6',  omit_ways(['ghci']), compile_and_run, [''])
+test('unboxedsums7',  omit_ways(['ghci']), compile_and_run, [''])
+test('unboxedsums8',  omit_ways(['ghci']), compile_and_run, [''])
+test('unboxedsums9',  omit_ways(['ghci']), compile_and_run, [''])
+test('unboxedsums10', omit_ways(['ghci']), compile_and_run, [''])
+test('unboxedsums11', omit_ways(['ghci']), compile_and_run, [''])
+
+test('ffi1', normal, compile_fail, [''])
+test('thunk', only_ways(['normal']), compile_and_run, [''])
+test('T12375', only_ways(['normal']), compile_and_run, [''])
+test('empty_sum', only_ways(['normal']), compile_and_run, [''])
+test('sum_rr', normal, compile_fail, [''])
+
+# TODO: Need to run this in --slow mode only
+# test('sum_api_annots',
+#      [only_ways(['normal']),
+#       extra_files([ "unboxedsums" + str(i) + ".hs" for i in range(1, 12) ])],
+#      run_command,
+#      ['$MAKE -s --no-print-directory sum_api_annots'])

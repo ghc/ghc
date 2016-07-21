@@ -385,6 +385,7 @@ data RuntimeRep = VecRep VecCount VecElem   -- ^ a SIMD vector type
                 | FloatRep        -- ^ a 32-bit floating point number
                 | DoubleRep       -- ^ a 64-bit floating point number
                 | UnboxedTupleRep -- ^ An unboxed tuple; this doesn't specify a concrete rep
+                | UnboxedSumRep   -- ^ An unboxed sum; this doesn't specify a concrete rep
 
 -- See also Note [Wiring in RuntimeRep] in TysWiredIn
 

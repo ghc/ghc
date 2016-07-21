@@ -433,9 +433,9 @@ $tab          { warnTab }
 }
 
 <0> {
-  "(#" / { ifExtension unboxedTuplesEnabled }
+  "(#" / { orExtensions unboxedTuplesEnabled unboxedSumsEnabled }
          { token IToubxparen }
-  "#)" / { ifExtension unboxedTuplesEnabled }
+  "#)" / { orExtensions unboxedTuplesEnabled unboxedSumsEnabled }
          { token ITcubxparen }
 }
 
@@ -994,6 +994,9 @@ atEOL _ _ _ (AI _ buf) = atEnd buf || currentChar buf == '\n'
 
 ifExtension :: (ExtsBitmap -> Bool) -> AlexAccPred ExtsBitmap
 ifExtension pred bits _ _ _ = pred bits
+
+orExtensions :: (ExtsBitmap -> Bool) -> (ExtsBitmap -> Bool) -> AlexAccPred ExtsBitmap
+orExtensions pred1 pred2 bits _ _ _ = pred1 bits || pred2 bits
 
 multiline_doc_comment :: Action
 multiline_doc_comment span buf _len = withLexedDocType (worker "")
@@ -2094,6 +2097,7 @@ data ExtBits
   | RecursiveDoBit -- mdo
   | UnicodeSyntaxBit -- the forall symbol, arrow symbols, etc
   | UnboxedTuplesBit -- (# and #)
+  | UnboxedSumsBit -- (# and #)
   | DatatypeContextsBit
   | TransformComprehensionsBit
   | QqBit -- enable quasiquoting
@@ -2141,6 +2145,8 @@ unicodeSyntaxEnabled :: ExtsBitmap -> Bool
 unicodeSyntaxEnabled = xtest UnicodeSyntaxBit
 unboxedTuplesEnabled :: ExtsBitmap -> Bool
 unboxedTuplesEnabled = xtest UnboxedTuplesBit
+unboxedSumsEnabled :: ExtsBitmap -> Bool
+unboxedSumsEnabled = xtest UnboxedSumsBit
 datatypeContextsEnabled :: ExtsBitmap -> Bool
 datatypeContextsEnabled = xtest DatatypeContextsBit
 qqEnabled :: ExtsBitmap -> Bool
@@ -2211,6 +2217,7 @@ mkParserFlags flags =
                .|. RecursiveDoBit              `setBitIf` xopt LangExt.RecursiveDo              flags
                .|. UnicodeSyntaxBit            `setBitIf` xopt LangExt.UnicodeSyntax            flags
                .|. UnboxedTuplesBit            `setBitIf` xopt LangExt.UnboxedTuples            flags
+               .|. UnboxedSumsBit              `setBitIf` xopt LangExt.UnboxedSums              flags
                .|. DatatypeContextsBit         `setBitIf` xopt LangExt.DatatypeContexts         flags
                .|. TransformComprehensionsBit  `setBitIf` xopt LangExt.TransformListComp        flags
                .|. TransformComprehensionsBit  `setBitIf` xopt LangExt.MonadComprehensions      flags

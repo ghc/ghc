@@ -21,6 +21,7 @@ import CoreArity        ( manifestArity )
 import StgSyn
 
 import Type
+import RepType
 import TyCon
 import MkId             ( coercionTokenId )
 import Id
@@ -45,7 +46,7 @@ import Demand           ( isUsedOnce )
 import PrimOp           ( PrimCall(..) )
 import UniqFM
 
-import Data.Maybe    (isJust)
+import Data.Maybe    (isJust, fromMaybe)
 import Control.Monad (liftM, ap)
 
 -- Note [Live vs free]
@@ -451,8 +452,7 @@ mkStgAltType bndr alts = case repType (idType bndr) of
                 | otherwise          -> ASSERT2( _is_poly_alt_tycon tc, ppr tc )
                                         PolyAlt
         Nothing                      -> PolyAlt
-    UbxTupleRep rep_tys -> UbxTupAlt (length rep_tys)
-        -- UbxTupAlt includes nullary and and singleton unboxed tuples
+    MultiRep slots -> MultiValAlt (length slots)
   where
    _is_poly_alt_tycon tc
         =  isFunTyCon tc
@@ -537,7 +537,9 @@ coreToStgApp _ f args ticks = do
 
         res_ty = exprType (mkApps (Var f) args)
         app = case idDetails f of
-                DataConWorkId dc | saturated -> StgConApp dc args'
+                DataConWorkId dc
+                  | saturated    -> StgConApp dc args'
+                                      (dropRuntimeRepArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
 
                 -- Some primitive operator that might be implemented as a library call.
                 PrimOpId op      -> ASSERT( saturated )
@@ -602,10 +604,10 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
 
         (aticks, arg'') = stripStgTicksTop tickishFloatable arg'
         stg_arg = case arg'' of
-                       StgApp v []      -> StgVarArg v
-                       StgConApp con [] -> StgVarArg (dataConWorkId con)
-                       StgLit lit       -> StgLitArg lit
-                       _                -> pprPanic "coreToStgArgs" (ppr arg)
+                       StgApp v []        -> StgVarArg v
+                       StgConApp con [] _ -> StgVarArg (dataConWorkId con)
+                       StgLit lit         -> StgLitArg lit
+                       _                  -> pprPanic "coreToStgArgs" (ppr arg)
 
         -- WARNING: what if we have an argument like (v `cast` co)
         --          where 'co' changes the representation type?
@@ -620,8 +622,8 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
         arg_ty = exprType arg
         stg_arg_ty = stgArgType stg_arg
         bad_args = (isUnliftedType arg_ty && not (isUnliftedType stg_arg_ty))
-                || (map typePrimRep (flattenRepType (repType arg_ty))
-                        /= map typePrimRep (flattenRepType (repType stg_arg_ty)))
+                || (map typePrimRep (repTypeArgs arg_ty)
+                        /= map typePrimRep (repTypeArgs stg_arg_ty))
         -- In GHCi we coerce an argument of type BCO# (unlifted) to HValue (lifted),
         -- and pass it to a function expecting an HValue (arg_ty).  This is ok because
         -- we can treat an unlifted value as lifted.  But the other way round
@@ -769,9 +771,11 @@ mkStgRhs' con_updateable rhs_fvs bndr binder_info rhs
                    (getFVs rhs_fvs)
                    ReEntrant
                    bndrs body
-  | StgConApp con args <- unticked_rhs
+  | StgConApp con args _ <- unticked_rhs
   , not (con_updateable con args)
-  = StgRhsCon noCCS con args
+  = -- CorePrep does this right, but just to make sure
+    ASSERT (not (isUnboxedTupleCon con || isUnboxedSumCon con))
+    StgRhsCon noCCS con args
   | otherwise
   = StgRhsClosure noCCS binder_info
                    (getFVs rhs_fvs)

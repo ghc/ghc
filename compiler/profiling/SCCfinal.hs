@@ -92,7 +92,7 @@ stgMassageForProfiling dflags mod_name _us stg_binds
 
     do_top_rhs _ (StgRhsClosure _ _ _ _ []
                      (StgTick (ProfNote _cc False{-not tick-} _push)
-                              (StgConApp con args)))
+                              (StgConApp con args _)))
       | not (isDllConApp dflags mod_name con args)
         -- Trivial _scc_ around nothing but static data
         -- Eliminate _scc_ ... and turn into StgRhsCon
@@ -139,8 +139,8 @@ stgMassageForProfiling dflags mod_name _us stg_binds
     do_expr (StgApp fn args)
       = return (StgApp fn args)
 
-    do_expr (StgConApp con args)
-      = return (StgConApp con args)
+    do_expr (StgConApp con args ty_args)
+      = return (StgConApp con args ty_args)
 
     do_expr (StgOpApp con args res_ty)
       = return (StgOpApp con args res_ty)
@@ -202,7 +202,7 @@ stgMassageForProfiling dflags mod_name _us stg_binds
         -- but need to reinstate PushCC for that.
     do_rhs (StgRhsClosure _closure_cc _bi _fv _u []
                (StgTick (ProfNote cc False{-not tick-} _push)
-                        (StgConApp con args)))
+                        (StgConApp con args _)))
       = do collectCC cc
            return (StgRhsCon currentCCS con args)
 

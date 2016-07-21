@@ -384,6 +384,9 @@ INFO_TABLE(stg_TSO, 0,0,TSO, "TSO", "TSO")
 INFO_TABLE(stg_STACK, 0,0, STACK, "STACK", "STACK")
 { foreign "C" barf("STACK object entered!") never returns; }
 
+INFO_TABLE(stg_RUBBISH_ENTRY, 0, 0, THUNK, "RUBBISH_ENTRY", "RUBBISH_ENTRY")
+{ foreign "C" barf("RUBBISH object entered!") never returns; }
+
 /* ----------------------------------------------------------------------------
    Weak pointers
 

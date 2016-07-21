@@ -155,6 +155,12 @@ vectAlgTyConRhs tc (TupleTyCon { data_con = con })
     -- but it's the behaviour we had before I refactored the
     -- representation of AlgTyConRhs to add tuples
 
+vectAlgTyConRhs tc (SumTyCon { data_cons = cons })
+  = -- FIXME (osa): I'm pretty sure this is broken.. TupleTyCon case is probably
+    -- also broken when the tuple is unboxed.
+    vectAlgTyConRhs tc (DataTyCon { data_cons = cons
+                                  , is_enum = all (((==) 0) . dataConRepArity) cons })
+
 vectAlgTyConRhs tc (NewTyCon {})
   = do dflags <- getDynFlags
        cantVectorise dflags noNewtypeErr (ppr tc)

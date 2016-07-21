@@ -21,6 +21,7 @@ import Maybes
 import Name             ( getSrcLoc )
 import ErrUtils         ( MsgDoc, Severity(..), mkLocMessage )
 import Type
+import RepType
 import TyCon
 import Util
 import SrcLoc
@@ -81,6 +82,7 @@ lintStgBindings whodunnit binds
 lintStgArg :: StgArg -> LintM (Maybe Type)
 lintStgArg (StgLitArg lit) = return (Just (literalType lit))
 lintStgArg (StgVarArg v)   = lintStgVar v
+lintStgArg (StgRubbishArg ty) = return (Just ty)
 
 lintStgVar :: Id -> LintM (Maybe Kind)
 lintStgVar v = do checkInScope v
@@ -133,9 +135,14 @@ lintStgRhs (StgRhsClosure _ _ _ _ binders expr)
         body_ty <- MaybeT $ lintStgExpr expr
         return (mkFunTys (map idType binders) body_ty)
 
-lintStgRhs (StgRhsCon _ con args) = runMaybeT $ do
-    arg_tys <- mapM (MaybeT . lintStgArg) args
-    MaybeT $ checkFunApp con_ty arg_tys (mkRhsConMsg con_ty arg_tys)
+lintStgRhs rhs@(StgRhsCon _ con args) = do
+    -- TODO: Check arg_tys
+    when (isUnboxedTupleCon con || isUnboxedSumCon con) $
+      addErrL (text "StgRhsCon is an unboxed tuple or sum application" $$
+               ppr rhs)
+    runMaybeT $ do
+      arg_tys <- mapM (MaybeT . lintStgArg) args
+      MaybeT $ checkFunApp con_ty arg_tys (mkRhsConMsg con_ty arg_tys)
   where
     con_ty = dataConRepType con
 
@@ -148,7 +155,8 @@ lintStgExpr e@(StgApp fun args) = runMaybeT $ do
     arg_tys <- mapM (MaybeT . lintStgArg) args
     MaybeT $ checkFunApp fun_ty arg_tys (mkFunAppMsg fun_ty arg_tys e)
 
-lintStgExpr e@(StgConApp con args) = runMaybeT $ do
+lintStgExpr e@(StgConApp con args _arg_tys) = runMaybeT $ do
+    -- TODO: Check arg_tys
     arg_tys <- mapM (MaybeT . lintStgArg) args
     MaybeT $ checkFunApp con_ty arg_tys (mkFunAppMsg con_ty arg_tys e)
   where
@@ -189,16 +197,16 @@ lintStgExpr (StgCase scrut bndr alts_type alts) = runMaybeT $ do
 
     in_scope <- MaybeT $ liftM Just $
      case alts_type of
-        AlgAlt tc    -> check_bndr tc >> return True
-        PrimAlt tc   -> check_bndr tc >> return True
-        UbxTupAlt _  -> return False -- Binder is always dead in this case
-        PolyAlt      -> return True
+        AlgAlt tc     -> check_bndr tc >> return True
+        PrimAlt tc    -> check_bndr tc >> return True
+        MultiValAlt _ -> return False -- Binder is always dead in this case
+        PolyAlt       -> return True
 
     MaybeT $ addInScopeVars [bndr | in_scope] $
              lintStgAlts alts scrut_ty
   where
     scrut_ty          = idType bndr
-    UnaryRep scrut_rep = repType scrut_ty -- Not used if scrutinee is unboxed tuple
+    UnaryRep scrut_rep = repType scrut_ty -- Not used if scrutinee is unboxed tuple or sum
     check_bndr tc = case tyConAppTyCon_maybe scrut_rep of
                         Just bndr_tc -> checkL (tc == bndr_tc) bad_bndr
                         Nothing      -> addErrL bad_bndr
@@ -362,7 +370,7 @@ have long since disappeared.
 
 checkFunApp :: Type                 -- The function type
             -> [Type]               -- The arg type(s)
-            -> MsgDoc              -- Error message
+            -> MsgDoc               -- Error message
             -> LintM (Maybe Type)   -- Just ty => result type is accurate
 
 checkFunApp fun_ty arg_tys msg
@@ -414,8 +422,8 @@ stgEqType orig_ty1 orig_ty2
   = gos (repType orig_ty1) (repType orig_ty2)
   where
     gos :: RepType -> RepType -> Bool
-    gos (UbxTupleRep tys1) (UbxTupleRep tys2)
-      = equalLength tys1 tys2 && and (zipWith go tys1 tys2)
+    gos (MultiRep slots1) (MultiRep slots2)
+      = slots1 == slots2
     gos (UnaryRep ty1) (UnaryRep ty2) = go ty1 ty2
     gos _ _ = False
 

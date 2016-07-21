@@ -196,6 +196,7 @@ import ForeignCall
 import VarSet
 import Coercion
 import Type
+import RepType (tyConPrimRep)
 import TyCon
 
 -- others:
@@ -2317,9 +2318,9 @@ isFFIPrimArgumentTy dflags ty
   | otherwise  = checkRepTyCon (legalFIPrimArgTyCon dflags) ty
 
 isFFIPrimResultTy :: DynFlags -> Type -> Validity
--- Checks for valid result type for a 'foreign import prim'
--- Currently it must be an unlifted type, including unboxed tuples,
--- or the well-known type Any.
+-- Checks for valid result type for a 'foreign import prim' Currently
+-- it must be an unlifted type, including unboxed tuples, unboxed
+-- sums, or the well-known type Any.
 isFFIPrimResultTy dflags ty
   | isAnyTy ty = IsValid
   | otherwise = checkRepTyCon (legalFIPrimResultTyCon dflags) ty
@@ -2403,10 +2404,8 @@ legalFFITyCon tc
 marshalableTyCon :: DynFlags -> TyCon -> Validity
 marshalableTyCon dflags tc
   | isUnliftedTyCon tc
-  , not (isUnboxedTupleTyCon tc)
-  , case tyConPrimRep tc of        -- Note [Marshalling VoidRep]
-       VoidRep -> False
-       _       -> True
+  , not (isUnboxedTupleTyCon tc || isUnboxedSumTyCon tc)
+  , tyConPrimRep tc /= VoidRep -- Note [Marshalling VoidRep]
   = validIfUnliftedFFITypes dflags
   | otherwise
   = boxedMarshalableTyCon tc
@@ -2429,24 +2428,22 @@ boxedMarshalableTyCon tc
 
 legalFIPrimArgTyCon :: DynFlags -> TyCon -> Validity
 -- Check args of 'foreign import prim', only allow simple unlifted types.
--- Strictly speaking it is unnecessary to ban unboxed tuples here since
+-- Strictly speaking it is unnecessary to ban unboxed tuples and sums here since
 -- currently they're of the wrong kind to use in function args anyway.
 legalFIPrimArgTyCon dflags tc
   | isUnliftedTyCon tc
-  , not (isUnboxedTupleTyCon tc)
+  , not (isUnboxedTupleTyCon tc || isUnboxedSumTyCon tc)
   = validIfUnliftedFFITypes dflags
   | otherwise
   = NotValid unlifted_only
 
 legalFIPrimResultTyCon :: DynFlags -> TyCon -> Validity
 -- Check result type of 'foreign import prim'. Allow simple unlifted
--- types and also unboxed tuple result types '... -> (# , , #)'
+-- types and also unboxed tuple and sum result types.
 legalFIPrimResultTyCon dflags tc
   | isUnliftedTyCon tc
-  , (isUnboxedTupleTyCon tc
-     || case tyConPrimRep tc of      -- Note [Marshalling VoidRep]
-           VoidRep -> False
-           _       -> True)
+  , isUnboxedTupleTyCon tc || isUnboxedSumTyCon tc
+     || tyConPrimRep tc /= VoidRep   -- Note [Marshalling VoidRep]
   = validIfUnliftedFFITypes dflags
 
   | otherwise

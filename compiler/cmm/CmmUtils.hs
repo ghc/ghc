@@ -10,7 +10,7 @@
 
 module CmmUtils(
         -- CmmType
-        primRepCmmType, primRepForeignHint,
+        primRepCmmType, slotCmmType, slotForeignHint, cmmArgType,
         typeCmmType, typeForeignHint,
 
         -- CmmLit
@@ -69,7 +69,7 @@ module CmmUtils(
 #include "HsVersions.h"
 
 import TyCon    ( PrimRep(..), PrimElemRep(..) )
-import Type     ( UnaryType, typePrimRep )
+import RepType  ( UnaryType, SlotTy (..), typePrimRep )
 
 import SMRep
 import Cmm
@@ -105,6 +105,13 @@ primRepCmmType _      FloatRep         = f32
 primRepCmmType _      DoubleRep        = f64
 primRepCmmType _      (VecRep len rep) = vec len (primElemRepCmmType rep)
 
+slotCmmType :: DynFlags -> SlotTy -> CmmType
+slotCmmType dflags PtrSlot    = gcWord dflags
+slotCmmType dflags WordSlot   = bWord dflags
+slotCmmType _      Word64Slot = b64
+slotCmmType _      FloatSlot  = f32
+slotCmmType _      DoubleSlot = f64
+
 primElemRepCmmType :: PrimElemRep -> CmmType
 primElemRepCmmType Int8ElemRep   = b8
 primElemRepCmmType Int16ElemRep  = b16
@@ -120,6 +127,10 @@ primElemRepCmmType DoubleElemRep = f64
 typeCmmType :: DynFlags -> UnaryType -> CmmType
 typeCmmType dflags ty = primRepCmmType dflags (typePrimRep ty)
 
+cmmArgType :: DynFlags -> CmmArg -> CmmType
+cmmArgType dflags (CmmExprArg e)     = cmmExprType dflags e
+cmmArgType dflags (CmmRubbishArg ty) = typeCmmType dflags ty
+
 primRepForeignHint :: PrimRep -> ForeignHint
 primRepForeignHint VoidRep      = panic "primRepForeignHint:VoidRep"
 primRepForeignHint PtrRep       = AddrHint
@@ -131,6 +142,13 @@ primRepForeignHint AddrRep      = AddrHint -- NB! AddrHint, but NonPtrArg
 primRepForeignHint FloatRep     = NoHint
 primRepForeignHint DoubleRep    = NoHint
 primRepForeignHint (VecRep {})  = NoHint
+
+slotForeignHint :: SlotTy -> ForeignHint
+slotForeignHint PtrSlot       = AddrHint
+slotForeignHint WordSlot      = NoHint
+slotForeignHint Word64Slot    = NoHint
+slotForeignHint FloatSlot     = NoHint
+slotForeignHint DoubleSlot    = NoHint
 
 typeForeignHint :: UnaryType -> ForeignHint
 typeForeignHint = primRepForeignHint . typePrimRep

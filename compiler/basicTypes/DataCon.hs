@@ -39,7 +39,7 @@ module DataCon (
         dataConInstOrigArgTys, dataConRepArgTys,
         dataConFieldLabels, dataConFieldType,
         dataConSrcBangs,
-        dataConSourceArity, dataConRepArity, dataConRepRepArity,
+        dataConSourceArity, dataConRepArity,
         dataConIsInfix,
         dataConWorkId, dataConWrapId, dataConWrapId_maybe,
         dataConImplicitTyThings,
@@ -49,6 +49,7 @@ module DataCon (
 
         -- ** Predicates on DataCons
         isNullarySrcDataCon, isNullaryRepDataCon, isTupleDataCon, isUnboxedTupleCon,
+        isUnboxedSumCon,
         isVanillaDataCon, classDataCon, dataConCannotMatch,
         isBanged, isMarkedStrict, eqHsBang, isSrcStrict, isSrcUnpacked,
         specialPromotedDc, isLegacyPromotableDataCon, isLegacyPromotableTyCon,
@@ -977,12 +978,6 @@ dataConSourceArity (MkData { dcSourceArity = arity }) = arity
 dataConRepArity :: DataCon -> Arity
 dataConRepArity (MkData { dcRepArity = arity }) = arity
 
-
--- | The number of fields in the /representation/ of the constructor
--- AFTER taking into account the unpacking of any unboxed tuple fields
-dataConRepRepArity :: DataCon -> RepArity
-dataConRepRepArity dc = typeRepArity (dataConRepArity dc) (dataConRepType dc)
-
 -- | Return whether there are any argument types for this 'DataCon's original source type
 isNullarySrcDataCon :: DataCon -> Bool
 isNullarySrcDataCon dc = null (dcOrigArgTys dc)
@@ -1163,6 +1158,9 @@ isTupleDataCon (MkData {dcRepTyCon = tc}) = isTupleTyCon tc
 
 isUnboxedTupleCon :: DataCon -> Bool
 isUnboxedTupleCon (MkData {dcRepTyCon = tc}) = isUnboxedTupleTyCon tc
+
+isUnboxedSumCon :: DataCon -> Bool
+isUnboxedSumCon (MkData {dcRepTyCon = tc}) = isUnboxedSumTyCon tc
 
 -- | Vanilla 'DataCon's are those that are nice boring Haskell 98 constructors
 isVanillaDataCon :: DataCon -> Bool
