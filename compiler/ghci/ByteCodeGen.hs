@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP, MagicHash, RecordWildCards #-}
+{-# OPTIONS_GHC -fprof-auto-top #-}
 --
 --  (c) The University of Glasgow 2002-2006
 --
@@ -60,6 +61,7 @@ import UniqSupply
 import Module
 import Control.Arrow ( second )
 
+import Control.Exception
 import Data.Array
 import Data.Map (Map)
 import Data.IntMap (IntMap)
@@ -96,10 +98,21 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
         dumpIfSet_dyn dflags Opt_D_dump_BCOs
            "Proto-BCOs" (vcat (intersperse (char ' ') (map ppr proto_bcos)))
 
-        assembleBCOs hsc_env proto_bcos tycs
+        cbc <- assembleBCOs hsc_env proto_bcos tycs
           (case modBreaks of
              Nothing -> Nothing
              Just mb -> Just mb{ modBreaks_breakInfo = breakInfo })
+
+        -- Squash space leaks in the CompiledByteCode.  This is really
+        -- important, because when loading a set of modules into GHCi
+        -- we don't touch the CompiledByteCode until the end when we
+        -- do linking.  Forcing out the thunks here reduces space
+        -- usage by more than 50% when loading a large number of
+        -- modules.
+        evaluate (seqCompiledByteCode cbc)
+
+        return cbc
+
   where dflags = hsc_dflags hsc_env
 
 -- -----------------------------------------------------------------------------
