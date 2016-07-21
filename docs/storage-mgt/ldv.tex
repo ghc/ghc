@@ -619,7 +619,7 @@ two options should result in nearly same profiling outputs, but
 the second run (without @-Sstderr@ option) spends almost twice as
 long in the Haskell mutator as the first run:
 1) @+RTS -Sstderr -hL -RTS@; 2) @+RTS -hL -RTS@.
-This is quite a subtle bug because this wierd phenomenon is not 
+This is quite a subtle bug because this weird phenomenon is not 
 observed in retainer profiling, yet the implementation of 
 @mut_user_time_during_LDV()@ is completely analogous to that of 
 @mut_user_time_during_RP()@. The overall shapes of the resultant graphs 

@@ -2513,7 +2513,7 @@ primop  CompactFixupPointersOp "compactFixupPointers#" GenPrimOp
 
 ------------------------------------------------------------------------
 section "Unsafe pointer equality"
---  (#1 Bad Guy: Alistair Reid :)
+--  (#1 Bad Guy: Alastair Reid :)
 ------------------------------------------------------------------------
 
 primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp

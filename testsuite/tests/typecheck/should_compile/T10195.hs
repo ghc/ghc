@@ -16,7 +16,7 @@ class Bar m m'
 instance (BarFamily m m' ~ 'True) => Bar m m'
 
 magic :: (Bar m m') => c m zp -> Foo m zp (c m' zq)
--- Wierd test case: (Bar m m') is simplifiable
+-- Weird test case: (Bar m m') is simplifiable
 magic = undefined
 
 getDict :: a -> Dict (Num a)
@@ -26,7 +26,7 @@ fromScalar = undefined
 
 foo :: (Bar m m')
   => c m zp -> Foo m zp (c m' zq) -> Foo m zp (c m' zq)
--- Wierd test case: (Bar m m') is simplifiable
+-- Weird test case: (Bar m m') is simplifiable
 foo b (Foo sc) =
   let scinv = fromScalar sc
   in case getDict scinv of
