@@ -1,11 +1,11 @@
-{-# LANGUAGE MagicHash, RecordWildCards #-}
+{-# LANGUAGE MagicHash, RecordWildCards, GeneralizedNewtypeDeriving #-}
 --
 --  (c) The University of Glasgow 2002-2006
 --
 
 -- | Bytecode assembler types
 module ByteCodeTypes
-  ( CompiledByteCode(..), FFIInfo(..)
+  ( CompiledByteCode(..), seqCompiledByteCode, FFIInfo(..)
   , UnlinkedBCO(..), BCOPtr(..), BCONPtr(..)
   , ItblEnv, ItblPtr(..)
   , CgBreakInfo(..)
@@ -26,6 +26,7 @@ import GHCi.BreakArray
 import GHCi.RemoteTypes
 import GHCi.FFI
 import GHCi.InfoTable
+import Control.DeepSeq
 
 import Foreign
 import Data.Array
@@ -48,38 +49,61 @@ data CompiledByteCode = CompiledByteCode
   }
                 -- ToDo: we're not tracking strings that we malloc'd
 newtype FFIInfo = FFIInfo (RemotePtr C_ffi_cif)
-  deriving Show
+  deriving (Show, NFData)
 
 instance Outputable CompiledByteCode where
   ppr CompiledByteCode{..} = ppr bc_bcos
+
+-- Not a real NFData instance, because ModBreaks contains some things
+-- we can't rnf
+seqCompiledByteCode :: CompiledByteCode -> ()
+seqCompiledByteCode CompiledByteCode{..} =
+  rnf bc_bcos `seq`
+  rnf (nameEnvElts bc_itbls) `seq`
+  rnf bc_ffis `seq`
+  rnf bc_strs `seq`
+  rnf (fmap seqModBreaks bc_breaks)
 
 type ItblEnv = NameEnv (Name, ItblPtr)
         -- We need the Name in the range so we know which
         -- elements to filter out when unloading a module
 
-newtype ItblPtr = ItblPtr (RemotePtr StgInfoTable) deriving Show
+newtype ItblPtr = ItblPtr (RemotePtr StgInfoTable)
+  deriving (Show, NFData)
 
 data UnlinkedBCO
    = UnlinkedBCO {
-        unlinkedBCOName   :: Name,
-        unlinkedBCOArity  :: Int,
-        unlinkedBCOInstrs :: UArray Int Word16,         -- insns
-        unlinkedBCOBitmap :: UArray Int Word,           -- bitmap
-        unlinkedBCOLits   :: (SizedSeq BCONPtr),        -- non-ptrs
-        unlinkedBCOPtrs   :: (SizedSeq BCOPtr)          -- ptrs
+        unlinkedBCOName   :: !Name,
+        unlinkedBCOArity  :: {-# UNPACK #-} !Int,
+        unlinkedBCOInstrs :: !(UArray Int Word16),      -- insns
+        unlinkedBCOBitmap :: !(UArray Int Word),        -- bitmap
+        unlinkedBCOLits   :: !(SizedSeq BCONPtr),       -- non-ptrs
+        unlinkedBCOPtrs   :: !(SizedSeq BCOPtr)         -- ptrs
    }
 
+instance NFData UnlinkedBCO where
+  rnf UnlinkedBCO{..} =
+    rnf unlinkedBCOLits `seq`
+    rnf unlinkedBCOPtrs
+
 data BCOPtr
-  = BCOPtrName   Name
-  | BCOPtrPrimOp PrimOp
-  | BCOPtrBCO    UnlinkedBCO
+  = BCOPtrName   !Name
+  | BCOPtrPrimOp !PrimOp
+  | BCOPtrBCO    !UnlinkedBCO
   | BCOPtrBreakArray  -- a pointer to this module's BreakArray
 
+instance NFData BCOPtr where
+  rnf (BCOPtrBCO bco) = rnf bco
+  rnf x = x `seq` ()
+
 data BCONPtr
-  = BCONPtrWord  Word
-  | BCONPtrLbl   FastString
-  | BCONPtrItbl  Name
-  | BCONPtrStr   ByteString
+  = BCONPtrWord  {-# UNPACK #-} !Word
+  | BCONPtrLbl   !FastString
+  | BCONPtrItbl  !Name
+  | BCONPtrStr   !ByteString
+
+instance NFData BCONPtr where
+  rnf x = x `seq` ()
 
 -- | Information about a breakpoint that we know at code-generation time
 data CgBreakInfo
@@ -87,6 +111,12 @@ data CgBreakInfo
    { cgb_vars   :: [(Id,Word16)]
    , cgb_resty  :: Type
    }
+
+-- Not a real NFData instance because we can't rnf Id or Type
+seqCgBreakInfo :: CgBreakInfo -> ()
+seqCgBreakInfo CgBreakInfo{..} =
+  rnf (map snd cgb_vars) `seq`
+  seqType cgb_resty
 
 instance Outputable UnlinkedBCO where
    ppr (UnlinkedBCO nm _arity _insns _bitmap lits ptrs)
@@ -125,6 +155,15 @@ data ModBreaks
    , modBreaks_breakInfo :: IntMap CgBreakInfo
         -- ^ info about each breakpoint from the bytecode generator
    }
+
+seqModBreaks :: ModBreaks -> ()
+seqModBreaks ModBreaks{..} =
+  rnf modBreaks_flags `seq`
+  rnf modBreaks_locs `seq`
+  rnf modBreaks_vars `seq`
+  rnf modBreaks_decls `seq`
+  rnf modBreaks_ccs `seq`
+  rnf (fmap seqCgBreakInfo modBreaks_breakInfo)
 
 -- | Construct an empty ModBreaks
 emptyModBreaks :: ModBreaks
