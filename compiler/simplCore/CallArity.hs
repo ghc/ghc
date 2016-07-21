@@ -150,7 +150,7 @@ The interesting cases of the analysis:
    Only one can be execuded, so
    Return (alt₁ ∪ alt₂ ∪...)
  * App e₁ e₂ (and analogously Case scrut alts), with non-trivial e₂:
-   We get the results from both sides, with the argument evaluted at most once.
+   We get the results from both sides, with the argument evaluated at most once.
    Additionally, anything called by e₁ can possibly be called with anything
    from e₂.
    Return: C(e₁) ∪ C(e₂) ∪ (fv e₁) × (fv e₂)

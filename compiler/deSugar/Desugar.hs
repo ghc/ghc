@@ -672,7 +672,7 @@ We want the user to express a rule saying roughly “mapping a coercion over a
 list can be replaced by a coercion”. But the cast operator of Core (▷) cannot
 be written in Haskell. So we use `coerce` for that (#2110). The user writes
     map coerce = coerce
-as a RULE, and this optimizes any kind of mapped' casts aways, including `map
+as a RULE, and this optimizes any kind of mapped' casts away, including `map
 MkNewtype`.
 
 For that we replace any forall'ed `c :: Coercible a b` value in a RULE by

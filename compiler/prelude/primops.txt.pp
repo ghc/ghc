@@ -2527,7 +2527,7 @@ primop  ParOp "par#" GenPrimOp
    a -> Int#
    with
       -- Note that Par is lazy to avoid that the sparked thing
-      -- gets evaluted strictly, which it should *not* be
+      -- gets evaluated strictly, which it should *not* be
    has_side_effects = True
    code_size = { primOpCodeSizeForeignCall }
 
