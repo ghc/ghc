@@ -861,8 +861,15 @@ mkSumDataConOcc alt n = mkOccName dataName str
 
 -- | Type constructor for n-ary unboxed sum.
 sumTyCon :: Arity -> TyCon
-sumTyCon n | n > mAX_SUM_SIZE = fst (mk_sum n)  -- Build one specially
-sumTyCon n = fst (unboxedSumArr ! n)
+sumTyCon arity
+  | arity > mAX_SUM_SIZE
+  = fst (mk_sum arity)  -- Build one specially
+
+  | arity < 2
+  = panic ("sumTyCon: Arity starts from 2. (arity: " ++ show arity ++ ")")
+
+  | otherwise
+  = fst (unboxedSumArr ! arity)
 
 -- | Data constructor for i-th alternative of a n-ary unboxed sum.
 sumDataCon :: ConTag -- Alternative
@@ -870,11 +877,15 @@ sumDataCon :: ConTag -- Alternative
            -> DataCon
 sumDataCon alt arity
   | alt > arity
-  = panic ("sumDataCon: index out of bounds: alt "
+  = panic ("sumDataCon: index out of bounds: alt: "
            ++ show alt ++ " > arity " ++ show arity)
 
   | alt <= 0
   = panic ("sumDataCon: Alts start from 1. (alt: " ++ show alt
+           ++ ", arity: " ++ show arity ++ ")")
+
+  | arity < 2
+  = panic ("sumDataCon: Arity starts from 2. (alt: " ++ show alt
            ++ ", arity: " ++ show arity ++ ")")
 
   | arity > mAX_SUM_SIZE
@@ -887,7 +898,7 @@ sumDataCon alt arity
 -- indexed by the arity of the sum and the inner array is indexed by
 -- the alternative.
 unboxedSumArr :: Array Int (TyCon, Array Int DataCon)
-unboxedSumArr = listArray (0,mAX_SUM_SIZE) [mk_sum i | i <- [0..mAX_SUM_SIZE]]
+unboxedSumArr = listArray (2,mAX_SUM_SIZE) [mk_sum i | i <- [2..mAX_SUM_SIZE]]
 
 -- | Create type constructor and data constructors for n-ary unboxed sum.
 mk_sum :: Arity -> (TyCon, Array ConTagZ DataCon)

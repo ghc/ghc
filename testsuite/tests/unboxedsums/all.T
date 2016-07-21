@@ -1,3 +1,8 @@
+test('unboxedsums_unit_tests',
+     only_ways(['normal']),
+     compile_and_run,
+     ['-package ghc'])
+
 test('unarise',       omit_ways(['ghci']), compile_and_run, [''])
 test('unboxedsums1',  omit_ways(['ghci']), compile_and_run, [''])
 test('unboxedsums2',  omit_ways(['ghci']), compile_and_run, [''])

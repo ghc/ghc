@@ -329,11 +329,9 @@ mkAlphaTyVarUnique     :: Int -> Unique
 mkPreludeClassUnique   :: Int -> Unique
 mkPreludeTyConUnique   :: Int -> Unique
 mkTupleTyConUnique     :: Boxity -> Arity -> Unique
-mkSumTyConUnique       :: Arity -> Unique
 mkCTupleTyConUnique    :: Arity -> Unique
 mkPreludeDataConUnique :: Arity -> Unique
 mkTupleDataConUnique   :: Boxity -> Arity -> Unique
-mkSumDataConUnique     :: ConTagZ -> Arity -> Unique
 mkPrimOpIdUnique       :: Int -> Unique
 mkPreludeMiscIdUnique  :: Int -> Unique
 mkPArrDataConUnique    :: Int -> Unique
@@ -351,7 +349,6 @@ mkPreludeTyConUnique i                = mkUnique '3' (2*i)
 mkTupleTyConUnique Boxed           a  = mkUnique '4' (2*a)
 mkTupleTyConUnique Unboxed         a  = mkUnique '5' (2*a)
 mkCTupleTyConUnique                a  = mkUnique 'k' (2*a)
-mkSumTyConUnique                   a  = mkUnique 'z' (2*a)
 
 tyConRepNameUnique :: Unique -> Unique
 tyConRepNameUnique  u = incrUnique u
@@ -372,12 +369,35 @@ tyConRepNameUnique  u = incrUnique u
 mkPreludeDataConUnique i              = mkUnique '6' (3*i)    -- Must be alphabetic
 mkTupleDataConUnique Boxed          a = mkUnique '7' (3*a)    -- ditto (*may* be used in C labels)
 mkTupleDataConUnique Unboxed        a = mkUnique '8' (3*a)
+
+--------------------------------------------------
+-- Sum arities start from 2. A sum of arity N has N data constructors, so it
+-- occupies N+1 slots: 1 TyCon + N DataCons.
+--
+-- So arity 2 sum takes uniques 0 (tycon), 1, 2  (2 data cons)
+--    arity 3 sum takes uniques 3 (tycon), 4, 5, 6 (3 data cons)
+-- etc.
+
+mkSumTyConUnique :: Arity -> Unique
+mkSumTyConUnique arity = mkUnique 'z' (sumUniqsOccupied arity)
+
+mkSumDataConUnique :: ConTagZ -> Arity -> Unique
 mkSumDataConUnique alt arity
   | alt >= arity
   = panic ("mkSumDataConUnique: " ++ show alt ++ " >= " ++ show arity)
   | otherwise
-  = mkUnique 'z' (2 * alt * arity)
+  = mkUnique 'z' (sumUniqsOccupied arity + alt + 1 {- skip the tycon -})
 
+-- How many unique slots occupied by sum types (including constructors) up to
+-- the given arity?
+sumUniqsOccupied :: Arity -> Int
+sumUniqsOccupied arity
+  = ASSERT(arity >= 2)
+    -- 3 + 4 + ... + arity
+    ((arity * (arity + 1)) `div` 2) - 3
+{-# INLINE sumUniqsOccupied #-}
+
+--------------------------------------------------
 dataConRepNameUnique, dataConWorkerUnique :: Unique -> Unique
 dataConWorkerUnique  u = incrUnique u
 dataConRepNameUnique u = stepUnique u 2
