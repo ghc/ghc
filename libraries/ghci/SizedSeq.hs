@@ -13,7 +13,7 @@ import Data.Binary
 import Data.List
 import GHC.Generics
 
-data SizedSeq a = SizedSeq !Word [a]
+data SizedSeq a = SizedSeq {-# UNPACK #-} !Word [a]
   deriving (Generic, Show)
 
 instance Functor SizedSeq where
