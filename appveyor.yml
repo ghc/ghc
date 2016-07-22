@@ -23,13 +23,13 @@ install:
     - git config --global url."git@github.com:/ghc/packages-".insteadOf      git@github.com:/ghc/packages/
     - git clone https://github.com/ghc/ghc --recurse-submodules --depth 1 C:\msys64\home\ghc\tmp
 
+    - bash -lc "mv /home/ghc/tmp/* /home/ghc"
     - echo "" | stack --no-terminal install alex happy shake ansi-terminal mtl
     - ghc   --version
     - stack --version
     - alex  --version
     - happy --version
     - stack exec -- ghc-pkg list
-    - bash -lc "mv /home/ghc/tmp/* /home/ghc"
     - cd C:\msys64\home\ghc
     - bash -lc "cd /home/ghc; mkdir -p ghc-tarballs/mingw-w64/x86_64/"
     - bash -lc "cd /home/ghc; mkdir -p ghc-tarballs/perl/"
