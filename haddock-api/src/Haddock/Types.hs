@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable, DeriveTraversable, StandaloneDeriving, TypeFamilies, RecordWildCards #-}
+{-# LANGUAGE CPP, DeriveDataTypeable, DeriveFunctor, DeriveFoldable, DeriveTraversable, StandaloneDeriving, TypeFamilies, RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module GHC.PlaceHolder
@@ -451,10 +451,12 @@ instance (NFData a, NFData mod)
     DocExamples a             -> a `deepseq` ()
     DocHeader a               -> a `deepseq` ()
 
-
+#if __GLASGOW_HASKELL__ < 801
+-- These were added to GHC itself in 8.2.1
 instance NFData Name where rnf x = seq x ()
 instance NFData OccName where rnf x = seq x ()
 instance NFData ModuleName where rnf x = seq x ()
+#endif
 
 instance NFData id => NFData (Header id) where
   rnf (Header a b) = a `deepseq` b `deepseq` ()
