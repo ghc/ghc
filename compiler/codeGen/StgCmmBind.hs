@@ -112,8 +112,7 @@ cgTopRhsClosure dflags rec id ccs _ upd_flag args body =
                  -- BUILD THE OBJECT, AND GENERATE INFO TABLE (IF NECESSARY)
         ; emitDataLits closure_label closure_rep
         ; let fv_details :: [(NonVoid Id, VirtualHpOffset)]
-              (_, _, fv_details) = mkVirtHeapOffsets dflags (isLFThunk lf_info)
-                                               (addIdReps [])
+              (_, _, fv_details) = mkVirtHeapOffsets dflags (isLFThunk lf_info) []
         -- Don't drop the non-void args until the closure info has been made
         ; forkClosureBody (closureCodeBody True id closure_info ccs
                                 (nonVoidIds args) (length args) body fv_details)
@@ -339,12 +338,7 @@ mkRhsClosure dflags bndr cc _ fvs upd_flag args body
         -- _was_ a free var of its RHS, mkClosureLFInfo thinks it *is*
         -- stored in the closure itself, so it will make sure that
         -- Node points to it...
-        ; let
-                is_elem      = isIn "cgRhsClosure"
-                bndr_is_a_fv = (NonVoid bndr) `is_elem` fvs
-                reduced_fvs | bndr_is_a_fv = fvs `minusList` [NonVoid bndr]
-                            | otherwise    = fvs
-
+        ; let   reduced_fvs = filter (NonVoid bndr /=) fvs
 
         -- MAKE CLOSURE INFO FOR THIS CLOSURE
         ; mod_name <- getModuleName
