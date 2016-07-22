@@ -29,8 +29,6 @@
 #ifdef HAVE_LIMITS_H
 #include <limits.h>
 #endif
-#include <dlfcn.h>
-#include <endian.h>
 
 /**
  * Note [Compact Normal Forms]
@@ -433,14 +431,6 @@ block_is_full (StgCompactNFDataBlock *block)
     return (bd->free + sizeW > top);
 }
 
-static inline StgWord max(StgWord a, StgWord b)
-{
-    if (a > b)
-        return a;
-    else
-        return b;
-}
-
 static rtsBool
 allocate_loop (Capability       *cap,
                StgCompactNFData *str,
@@ -471,7 +461,7 @@ allocate_loop (Capability       *cap,
         }
     }
 
-    next_size = max(str->autoBlockW * sizeof(StgWord),
+    next_size = stg_max(str->autoBlockW * sizeof(StgWord),
                     BLOCK_ROUND_UP(sizeW * sizeof(StgWord)));
     if (next_size >= BLOCKS_PER_MBLOCK * BLOCK_SIZE)
         next_size = BLOCKS_PER_MBLOCK * BLOCK_SIZE;
@@ -977,7 +967,7 @@ spew_failing_pointer(StgWord *fixup_table, uint32_t count, StgWord address)
     bdescr *bd;
     StgWord size;
 
-    debugBelch("Failed to adjust 0x%lx. Block dump follows...\n",
+    debugBelch("Failed to adjust 0x%" FMT_HexWord ". Block dump follows...\n",
                address);
 
     for (i  = 0; i < count; i++) {
@@ -988,8 +978,9 @@ spew_failing_pointer(StgWord *fixup_table, uint32_t count, StgWord address)
         bd = Bdescr((P_)block);
         size = (W_)bd->free - (W_)bd->start;
 
-        debugBelch("%d: was 0x%lx-0x%lx, now 0x%lx-0x%lx\n", i,
-                   key, key+size, value, value+size);
+        debugBelch("%" FMT_Word32 ": was 0x%" FMT_HexWord "-0x%" FMT_HexWord
+                   ", now 0x%" FMT_HexWord "-0x%" FMT_HexWord "\n", i, key,
+                   key+size, value, value+size);
     }
 }
 #endif

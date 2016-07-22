@@ -241,10 +241,10 @@ instance Outputable UnariseVal where
 -- | Extend the environment, checking the UnariseEnv invariant.
 extendRho :: UnariseEnv -> Id -> UnariseVal -> UnariseEnv
 extendRho rho x (MultiVal args)
-  = ASSERT (all (isNvUnaryType . stgArgType) args)
+  = ASSERT(all (isNvUnaryType . stgArgType) args)
     extendVarEnv rho x (MultiVal args)
 extendRho rho x (UnaryVal val)
-  = ASSERT (isNvUnaryType (stgArgType val))
+  = ASSERT(isNvUnaryType (stgArgType val))
     extendVarEnv rho x (UnaryVal val)
 
 --------------------------------------------------------------------------------
@@ -273,7 +273,7 @@ unariseRhs rho (StgRhsClosure ccs b_info fvs update_flag args expr)
        return (StgRhsClosure ccs b_info fvs' update_flag args1 expr')
 
 unariseRhs rho (StgRhsCon ccs con args)
-  = ASSERT (not (isUnboxedTupleCon con || isUnboxedSumCon con))
+  = ASSERT(not (isUnboxedTupleCon con || isUnboxedSumCon con))
     return (StgRhsCon ccs con (unariseConArgs rho args))
 
 --------------------------------------------------------------------------------
@@ -356,7 +356,7 @@ unariseMulti_maybe rho dc args ty_args
   = Just (unariseConArgs rho args)
 
   | isUnboxedSumCon dc
-  , let args1 = ASSERT (isSingleton args) (unariseConArgs rho args)
+  , let args1 = ASSERT(isSingleton args) (unariseConArgs rho args)
   = Just (mkUbxSum dc ty_args args1)
 
   | otherwise
@@ -374,7 +374,7 @@ elimCase rho args bndr (MultiValAlt _) [(_, bndrs, rhs)]
              | isUnboxedTupleBndr bndr
              = mapTupleIdBinders bndrs args rho1
              | otherwise
-             = ASSERT (isUnboxedSumBndr bndr)
+             = ASSERT(isUnboxedSumBndr bndr)
                if null bndrs then rho1
                              else mapSumIdBinders bndrs args rho1
 
@@ -480,7 +480,7 @@ mapTupleIdBinders
   -> UnariseEnv
   -> UnariseEnv
 mapTupleIdBinders ids args0 rho0
-  = ASSERT (not (any (isVoidTy . stgArgType) args0))
+  = ASSERT(not (any (isVoidTy . stgArgType) args0))
     let
       ids_unarised :: [(Id, RepType)]
       ids_unarised = map (\id -> (id, repType (idType id))) ids
@@ -498,7 +498,7 @@ mapTupleIdBinders ids args0 rho0
             | isMultiRep x_rep
             = extendRho rho x (MultiVal x_args)
             | otherwise
-            = ASSERT (x_args `lengthIs` 1)
+            = ASSERT(x_args `lengthIs` 1)
               extendRho rho x (UnaryVal (head x_args))
         in
           map_ids rho' xs args'
@@ -514,7 +514,7 @@ mapSumIdBinders
   -> UnariseEnv
 
 mapSumIdBinders [id] args rho0
-  = ASSERT (not (any (isVoidTy . stgArgType) args))
+  = ASSERT(not (any (isVoidTy . stgArgType) args))
     let
       arg_slots = concatMap (repTypeSlots . repType . stgArgType) args
       id_slots  = repTypeSlots (repType (idType id))
