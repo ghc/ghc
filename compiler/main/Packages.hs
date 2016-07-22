@@ -1260,22 +1260,9 @@ collectLinkOpts dflags ps =
 packageHsLibs :: DynFlags -> PackageConfig -> [String]
 packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)
   where
-        ways0 = ways dflags
-
-        ways1 = filter (/= WayDyn) ways0
-        -- the name of a shared library is libHSfoo-ghc<version>.so
-        -- except for the RTS libs, which follow the naming scheme
-        -- rts/ghc<version>/<way>/libHSrts.so)
-        -- we leave out the _dyn, because it is superfluous
-
-        -- debug and profiled RTSs include support for -eventlog
-        ways2 | WayDebug `elem` ways1 || WayProf `elem` ways1
-              = filter (/= WayEventLog) ways1
-              | otherwise
-              = ways1
-
-        tag     = mkBuildTag (filter (not . wayRTSOnly) ways2)
-        rts_tag = mkBuildTag ways2
+        ways0   = filterRtsWays $ ways dflags
+        tag     = mkBuildTag (filter (not . wayRTSOnly) ways0)
+        rts_tag = mkBuildTag ways0
 
         mkDynName x
          | WayDyn `notElem` ways dflags = x
