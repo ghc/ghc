@@ -15,7 +15,6 @@ install:
     - 7z x stack.zip stack.exe
     - bash -lc "curl -LsS http://www.haskell.org/ghc/dist/7.10.3/ghc-7.10.3-x86_64-unknown-mingw32.tar.xz | tar -xJ -C /mingw64 --strip-components=1"
     - stack exec -- pacman -S --noconfirm gcc binutils p7zip git
-    - echo "" | stack --no-terminal install alex happy shake ansi-terminal mtl
 
     - git config --global url."git://github.com/ghc/packages-".insteadOf     git://github.com/ghc/packages/
     - git config --global url."http://github.com/ghc/packages-".insteadOf    http://github.com/ghc/packages/
@@ -24,6 +23,7 @@ install:
     - git config --global url."git@github.com:/ghc/packages-".insteadOf      git@github.com:/ghc/packages/
     - git clone https://github.com/ghc/ghc --recurse-submodules --depth 1 C:\msys64\home\ghc\tmp
 
+    - echo "" | stack --no-terminal install alex happy shake ansi-terminal mtl
     - ghc   --version
     - stack --version
     - alex  --version
