@@ -1,17 +1,32 @@
 module Main where
 
+import BasicTypes
+import GHC
+import GhcMonad
+import Outputable
+import RepType
+import TysPrim
 import TysWiredIn
 import UniqSet
 import Unique
 
-import System.IO
+import qualified Control.Exception as E
 import Control.Monad
+import System.Environment (getArgs)
+import System.IO
+
+assert :: Bool -> String -> SDoc -> IO ()
+assert False tn msg = pprPanic tn msg
+assert True  _  _   = return ()
 
 main :: IO ()
-main = sequence_
-    [ uniq_tests ]
+main = do
+    [libdir] <- getArgs
+    runGhc (Just libdir) $ liftIO $ do
+      -- need to initialize the monad to initialize static flags etc.
+      sequence_ [ uniq_tests, layout_tests ]
 
-
+-- Make sure sum datacon/tycon uniques are really uniq
 uniq_tests :: IO ()
 uniq_tests = do
     let tycons   = map sumTyCon [2 .. 20]
@@ -21,6 +36,46 @@ uniq_tests = do
         us = mkUniqSet (map getUnique tycons)
                `unionUniqSets` mkUniqSet (map getUnique datacons)
 
-    when (sizeUniqSet us /= length tycons + length datacons) $ do
-      hPutStrLn stderr "Sum cons/tycons have same uniques."
-      hFlush stderr
+    assert (sizeUniqSet us == length tycons + length datacons)
+           "uniq_tests"
+           (text "Sum cons/tycons have same uniques.")
+
+layout_tests :: IO ()
+layout_tests = sequence_
+    [ layout1, layout2, layout3, enum_layout ]
+  where
+    assert_layout tn tys layout =
+      let
+        layout_ret = ubxSumRepType tys
+      in
+        assert (layout_ret == layout)
+               tn
+               (text "Unexpected sum layout." $$
+                text "Alts:           " <+> ppr tys $$
+                text "Expected layout:" <+> ppr layout $$
+                text "Actual layout:  " <+> ppr layout_ret)
+
+    ubxtup = mkTupleTy Unboxed
+
+    layout1 =
+      assert_layout "layout1"
+        [ ubxtup [ intTy, intPrimTy ]
+        , ubxtup [ intPrimTy, intTy ] ]
+        [ WordSlot, PtrSlot, WordSlot ]
+
+    layout2 =
+      assert_layout "layout2"
+        [ ubxtup [ intTy ]
+        , intTy ]
+        [ WordSlot, PtrSlot ]
+
+    layout3 =
+      assert_layout "layout3"
+        [ ubxtup [ intTy, intPrimTy, intTy, intPrimTy ]
+        , ubxtup [ intPrimTy, intTy, intPrimTy, intTy ] ]
+        [ WordSlot, PtrSlot, PtrSlot, WordSlot, WordSlot ]
+
+    enum_layout =
+      assert_layout "enum"
+        (replicate 10 (ubxtup []))
+        [ WordSlot ]
