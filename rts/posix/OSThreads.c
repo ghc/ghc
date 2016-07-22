@@ -14,11 +14,6 @@
  * because of some specific types, like u_char, u_int, etc. */
 #define __BSD_VISIBLE   1
 #endif
-#if defined(darwin_HOST_OS)
-/* Inclusion of system headers usually requires _DARWIN_C_SOURCE on Mac OS X
- * because of some specific types like u_char, u_int, etc. */
-#define _DARWIN_C_SOURCE 1
-#endif
 
 #include "Rts.h"
 
