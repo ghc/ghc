@@ -11,6 +11,8 @@ import Rules.Actions
 import Settings.Paths
 import Target
 import UserSettings
+import GHC
+
 
 buildPackageDependencies :: [(Resource, Int)] -> Context -> Rules ()
 buildPackageDependencies rs context@Context {..} =
@@ -20,6 +22,7 @@ buildPackageDependencies rs context@Context {..} =
         fmap (path ++)
             [ "//*.c.deps", "//*.cmm.deps", "//*.S.deps" ] |%> \out -> do
                 let src = dep2src context out
+                when (package == integerGmp) (need [gmpLibraryH])
                 need [src]
                 build $ Target context (Cc FindDependencies stage) [src] [out]
 
