@@ -24,14 +24,14 @@ ghcCabalBuilderArgs = builder GhcCabal ? do
             , arg path
             , arg dir
             , dll0Args
-            , withStaged $ Ghc Compile
+            , withStaged $ Ghc CompileHs
             , withStaged GhcPkg
             , bootPackageDatabaseArgs
             , libraryArgs
             , with HsColour
             , configureArgs
             , packageConstraints
-            , withStaged $ Cc Compile
+            , withStaged $ Cc CompileC
             , notStage0 ? with Ld
             , with Ar
             , with Alex
@@ -82,7 +82,7 @@ configureArgs = do
         , conf "--with-gmp-includes"      $ argSetting GmpIncludeDir
         , conf "--with-gmp-libraries"     $ argSetting GmpLibDir
         , crossCompiling ? (conf "--host" $ argSetting TargetPlatformFull)
-        , conf "--with-cc" $ argStagedBuilderPath (Cc Compile) ]
+        , conf "--with-cc" $ argStagedBuilderPath (Cc CompileC) ]
 
 newtype PackageDatabaseKey = PackageDatabaseKey Stage
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)

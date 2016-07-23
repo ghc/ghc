@@ -27,11 +27,17 @@ instance BuilderLike Builder where
 instance BuilderLike a => BuilderLike (Stage -> a) where
     builder s2b = builder . s2b =<< getStage
 
-instance BuilderLike a => BuilderLike (CompilerMode -> a) where
+instance BuilderLike a => BuilderLike (CcMode -> a) where
     builder c2b = do
         b <- getBuilder
         case b of
             Cc  c _ -> builder $ c2b c
+            _       -> return False
+
+instance BuilderLike a => BuilderLike (GhcMode -> a) where
+    builder c2b = do
+        b <- getBuilder
+        case b of
             Ghc c _ -> builder $ c2b c
             _       -> return False
 

@@ -25,7 +25,7 @@ gmpPatches :: [FilePath]
 gmpPatches = (gmpBase -/-) <$> ["gmpsrc.patch", "tarball/gmp-5.0.4.patch"]
 
 configureEnvironment :: Action [CmdOption]
-configureEnvironment = sequence [ builderEnvironment "CC" $ Cc Compile Stage1
+configureEnvironment = sequence [ builderEnvironment "CC" $ Cc CompileC Stage1
                                 , builderEnvironment "AR" Ar
                                 , builderEnvironment "NM" Nm ]
 

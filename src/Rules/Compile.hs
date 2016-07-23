@@ -22,18 +22,18 @@ compilePackage rs context@Context {..} = do
         if ("//*.c" ?== src)
         then do
             need $ src : deps
-            build $ Target context (Cc Compile stage) [src] [obj]
+            build $ Target context (Cc CompileC stage) [src] [obj]
         else do
             need $ src : deps
             needCompileDependencies context
-            buildWithResources rs $ Target context (Ghc Compile stage) [src] [obj]
+            buildWithResources rs $ Target context (Ghc CompileHs stage) [src] [obj]
 
     -- TODO: Get rid of these special cases.
     path <//> "*" <.> obootsuf way %> \obj -> do
         (src, deps) <- fileDependencies context obj
         need $ src : deps
         needCompileDependencies context
-        buildWithResources rs $ Target context (Ghc Compile stage) [src] [obj]
+        buildWithResources rs $ Target context (Ghc CompileHs stage) [src] [obj]
 
 needCompileDependencies :: Context -> Action ()
 needCompileDependencies context@Context {..} = do

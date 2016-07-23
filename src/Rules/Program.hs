@@ -87,7 +87,7 @@ buildBinary rs context@Context {..} bin = do
                   ++ [ path -/- "Paths_hsc2hs.o"      | package == hsc2hs  ]
                   ++ [ path -/- "Paths_haddock.o"     | package == haddock ]
     need binDeps
-    buildWithResources rs $ Target context (Ghc Link stage) binDeps [bin]
+    buildWithResources rs $ Target context (Ghc LinkHs stage) binDeps [bin]
     synopsis <- interpretInContext context $ getPkgData Synopsis
     putSuccess $ renderProgram
         (quote (pkgNameString package) ++ " (" ++ show stage ++ ").")

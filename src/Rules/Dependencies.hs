@@ -24,7 +24,7 @@ buildPackageDependencies rs context@Context {..} =
                 let src = dep2src context out
                 when (package == integerGmp) (need [gmpLibraryH])
                 need [src]
-                build $ Target context (Cc FindDependencies stage) [src] [out]
+                build $ Target context (Cc FindCDependencies stage) [src] [out]
 
         hDepFile %> \out -> do
             srcs <- haskellSources context
@@ -32,7 +32,7 @@ buildPackageDependencies rs context@Context {..} =
             if srcs == []
             then writeFileChanged out ""
             else buildWithResources rs $
-                Target context (Ghc FindDependencies stage) srcs [out]
+                Target context (Ghc FindHsDependencies stage) srcs [out]
             removeFile $ out <.> "bak"
 
         -- TODO: don't accumulate *.deps into .dependencies

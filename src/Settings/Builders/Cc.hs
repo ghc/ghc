@@ -10,12 +10,12 @@ import Settings
 -- TODO: handle custom $1_$2_MKDEPENDC_OPTS and
 ccBuilderArgs :: Args
 ccBuilderArgs = mconcat
-    [ builder (Cc Compile) ?
+    [ builder (Cc CompileC) ?
         mconcat [ commonCcArgs
                 , arg "-c", arg =<< getInput
                 , arg "-o", arg =<< getOutput ]
 
-    , builder (Cc FindDependencies) ? do
+    , builder (Cc FindCDependencies) ? do
         output <- getOutput
         mconcat [ arg "-E"
                 , arg "-MM"
