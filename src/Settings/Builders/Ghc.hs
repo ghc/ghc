@@ -18,7 +18,7 @@ import Settings.Paths
 --     $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno
 --     $$(addsuffix .$$(dyn_osuf)-boot,$$(basename $$@)))
 ghcBuilderArgs :: Args
-ghcBuilderArgs = (builder (Ghc Compile) ||^ builder (Ghc Link)) ? do
+ghcBuilderArgs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
     needTouchy
     mconcat [ commonGhcArgs
             , arg "-H32m"
@@ -28,12 +28,12 @@ ghcBuilderArgs = (builder (Ghc Compile) ||^ builder (Ghc Link)) ? do
             , arg "-fwarn-tabs"
             , splitObjectsArgs
             , ghcLinkArgs
-            , builder (Ghc Compile) ? arg "-c"
+            , builder (Ghc CompileHs) ? arg "-c"
             , append =<< getInputs
             , arg "-o", arg =<< getOutput ]
 
 ghcLinkArgs :: Args
-ghcLinkArgs = builder (Ghc Link) ? do
+ghcLinkArgs = builder (Ghc LinkHs) ? do
     stage   <- getStage
     libs    <- getPkgDataList DepExtraLibs
     gmpLibs <- if stage > Stage0
@@ -64,7 +64,7 @@ splitObjectsArgs = splitObjects flavour ? do
     arg "-split-objs"
 
 ghcMBuilderArgs :: Args
-ghcMBuilderArgs = builder (Ghc FindDependencies) ? do
+ghcMBuilderArgs = builder (Ghc FindHsDependencies) ? do
     ways <- getLibraryWays
     mconcat [ arg "-M"
             , commonGhcArgs

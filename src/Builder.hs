@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveGeneric, LambdaCase #-}
 module Builder (
-    CompilerMode (..), Builder (..),
+    CcMode (..), GhcMode (..), Builder (..),
     builderPath, getBuilderPath, builderEnvironment, specified, needBuilder
     ) where
 
@@ -19,10 +19,13 @@ import Stage
 -- 1) Compiling sources into object files.
 -- 2) Extracting source dependencies, e.g. by passing -M command line argument.
 -- 3) Linking object files & static libraries into an executable.
-data CompilerMode = Compile
-                  | FindDependencies
-                  | Link
-                  deriving (Eq, Generic, Show)
+-- We have CcMode for CC and GhcMode for GHC.
+
+data CcMode = CompileC | FindCDependencies
+    deriving (Eq, Generic, Show)
+
+data GhcMode = CompileHs | FindHsDependencies | LinkHs
+    deriving (Eq, Generic, Show)
 
 -- TODO: Do we really need HsCpp builder? Can't we use Cc instead?
 -- | A 'Builder' is an external command invoked in separate process using 'Shake.cmd'
@@ -34,11 +37,11 @@ data CompilerMode = Compile
 data Builder = Alex
              | Ar
              | DeriveConstants
-             | Cc CompilerMode Stage
+             | Cc CcMode Stage
              | Configure FilePath
              | GenApply
              | GenPrimopCode
-             | Ghc CompilerMode Stage
+             | Ghc GhcMode Stage
              | GhcCabal
              | GhcCabalHsColour   -- synonym for 'GhcCabal hscolour'
              | GhcPkg Stage
@@ -154,9 +157,13 @@ needBuilder = \case
         need [path]
 
 -- | Instances for storing in the Shake database.
-instance Binary CompilerMode
-instance Hashable CompilerMode
-instance NFData CompilerMode
+instance Binary CcMode
+instance Hashable CcMode
+instance NFData CcMode
+
+instance Binary GhcMode
+instance Hashable GhcMode
+instance NFData GhcMode
 
 instance Binary Builder
 instance Hashable Builder

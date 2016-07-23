@@ -44,8 +44,8 @@ configureEnvironment = do
                [ cArgs
                , argStagedSettingList ConfCcArgs ]
     ldFlags <- interpretInContext libffiContext $ fromDiffExpr ldArgs
-    sequence [ builderEnvironment "CC" $ Cc Compile Stage1
-             , builderEnvironment "CXX" $ Cc Compile Stage1
+    sequence [ builderEnvironment "CC" $ Cc CompileC Stage1
+             , builderEnvironment "CXX" $ Cc CompileC Stage1
              , builderEnvironment "LD" Ld
              , builderEnvironment "AR" Ar
              , builderEnvironment "NM" Nm

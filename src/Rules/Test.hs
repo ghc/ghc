@@ -16,7 +16,7 @@ import Target
 testRules :: Rules ()
 testRules = do
     "validate" ~> do
-        needBuilder $ Ghc Compile Stage2
+        needBuilder $ Ghc CompileHs Stage2
         needBuilder $ GhcPkg Stage1
         needBuilder Hpc
         build $ Target (vanillaContext Stage2 compiler) (Make "testsuite/tests") [] []
@@ -29,7 +29,7 @@ testRules = do
                     | pkg <- pkgs, isLibrary pkg, pkg /= rts, pkg /= libffi ]
         windows  <- windowsHost
         top      <- topDirectory
-        compiler <- builderPath $ Ghc Compile Stage2
+        compiler <- builderPath $ Ghc CompileHs Stage2
         ghcPkg   <- builderPath $ GhcPkg Stage1
         haddock  <- builderPath Haddock
         threads  <- shakeThreads <$> getShakeOptions
