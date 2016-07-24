@@ -63,7 +63,7 @@ else
         "$CABAL" sandbox init
         ( cd ../libraries/Cabal/Cabal
           ln -s "$absoluteRoot/cabal.sandbox.config" cabal.sandbox.config
-          cabal install
+          "$CABAL" install
           rm cabal.sandbox.config
         )
         "$CABAL" install                \
