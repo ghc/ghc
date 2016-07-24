@@ -61,6 +61,7 @@ else
     # Initialize sandbox if necessary
     if ! ( "$CABAL" sandbox hc-pkg list > /dev/null 2>&1); then
         "$CABAL" sandbox init
+        "$CABAL" sandbox add-source ../libraries/Cabal/Cabal
         "$CABAL" install                \
             --dependencies-only         \
             --disable-library-profiling \
