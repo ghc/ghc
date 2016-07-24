@@ -143,6 +143,6 @@ define build-dll
 rules/build-dll-win32.sh link "$1" "$2" "$3" "$4" "$5" "$6" "$(call cmd,$1_$2_HC) $($1_$2_$3_ALL_HC_OPTS) $($1_$2_$3_GHC_LD_OPTS) $4 \
            -shared -dynamic -dynload deploy \
            $(addprefix -l,$($1_$2_EXTRA_LIBRARIES)) \
-           -no-auto-link-packages"
+           -no-auto-link-packages" "NO"
 endef
 

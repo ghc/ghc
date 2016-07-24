@@ -6,6 +6,22 @@ fail() {
     exit 1
 }
 
+# Builds a delay import lib at the very end which is used to
+# be able to delay the picking of the RTS on Windows.
+# This function is called always and decided internally
+# what to do.
+# $1 = input def file
+# $2 = Output import delayed import lib
+# $3 = flag to indicate if delay import lib should be created.
+build_delay_import_lib()
+{
+    # Check if we have to create a delay loaded DLL
+    if [ "$3" -eq "YES" ]
+    then
+        dlltool -d $1 -y $2
+    fi
+}
+
 # $1 = dir
 # $2 = distdir
 # $3 = way
@@ -13,6 +29,7 @@ fail() {
 # $5 = object files to link
 # $6 = output filename
 # $7 = link command
+# $8 = create delay load import lib
 process_dll_link() {
     ext="${6##*.}"
     base="${6%.*}"
@@ -49,6 +66,7 @@ process_dll_link() {
 
             DLLimport="$base.dll.a"
             dlltool -d $defFile -l $DLLimport
+            build_delay_import_lib $defFile $DLLimport $8
             
             cmd="$7 $DLLimport $5 -optl-Wl,--retain-symbols-file=$exports -o $6"
             echo "$cmd"
@@ -136,6 +154,7 @@ process_dll_link() {
             fi
         done
         cmd="$7 $objs $def $imports -optl-Wl,--retain-symbols-file=$elstfile -o $DLLfile"
+        build_delay_import_lib $def "$base-pt$j.dll.a" $8
         echo "$cmd"
         eval "$cmd" || exit 1
     done
@@ -165,7 +184,7 @@ test() {
     dir="compiler/stage2/build"
     way=""
     flags=""
-    link_cmd="\"inplace/bin/ghc-stage1.exe\" -hisuf dyn_hi -osuf  dyn_o -hcsuf dyn_hc -fPIC -dynamic  -O0 -H64m -Wall      -this-unit-id ghc-8.1 -hide-all-packages -i -icompiler/basicTypes -icompiler/cmm -icompiler/codeGen -icompiler/coreSyn -icompiler/deSugar -icompiler/ghci -icompiler/hsSyn -icompiler/iface -icompiler/llvmGen -icompiler/main -icompiler/nativeGen -icompiler/parser -icompiler/prelude -icompiler/profiling -icompiler/rename -icompiler/simplCore -icompiler/simplStg -icompiler/specialise -icompiler/stgSyn -icompiler/stranal -icompiler/typecheck -icompiler/types -icompiler/utils -icompiler/vectorise -icompiler/stage2/build -icompiler/stage2/build/autogen -Icompiler/stage2/build -Icompiler/stage2/build/autogen -Icompiler/. -Icompiler/parser -Icompiler/utils -Icompiler/../rts/dist/build -Icompiler/stage2   -optP-DGHCI -optP-include -optPcompiler/stage2/build/autogen/cabal_macros.h -package-id Win32-2.3.1.1 -package-id array-0.5.1.1 -package-id base-4.9.0.0 -package-id binary-0.8.3.0 -package-id bytestring-0.10.8.1 -package-id containers-0.5.7.1 -package-id directory-1.2.6.2 -package-id filepath-1.4.1.0 -package-id ghc-boot-8.1 -package-id ghci-8.1 -package-id hoopl-3.10.2.1 -package-id hpc-0.6.0.3 -package-id process-1.4.2.0 -package-id template-haskell-2.11.0.0 -package-id time-1.6.0.1 -package-id transformers-0.5.2.0 -Wall -fno-warn-name-shadowing -this-unit-id ghc -XHaskell2010 -optc-DTHREADED_RTS -DGHCI_TABLES_NEXT_TO_CODE -DSTAGE=2 -Rghc-timing -O0  -no-user-package-db -rtsopts      -Wnoncanonical-monad-instances  -odir compiler/stage2/build -hidir compiler/stage2/build -optl-L'E:\msys64\home\Tamar\ghc2\libraries\process\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\hpc\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\hoopl\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\ghci\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\transformers\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\template-haskell\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\pretty\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\ghc-boot\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\ghc-boot-th\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\directory\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\time\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\filepath\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\binary\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\containers\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\Win32\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\bytestring\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\deepseq\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\array\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\base\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\integer-gmp\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\ghc-prim\dist-install\build' -optl-L'E:/msys64/home/Tamar/ghc2/rts/dist/build' -optl-lkernel32 -optl-luser32 -optl-lgdi32 -optl-lwinmm -optl-ladvapi32 -optl-lshell32 -optl-lshfolder -optl-lwsock32 -optl-luser32 -optl-lshell32 -optl-lmsvcrt -optl-lmingw32 -optl-lmingwex -optl-luser32 -optl-lmingw32 -optl-lmingwex -optl-lm -optl-lwsock32 -optl-lgdi32 -optl-lwinmm -optl-lmingwex -fPIC -dynamic  -O0 -H64m -Wall      -this-unit-id ghc-8.1 -hide-all-packages -i -icompiler/basicTypes -icompiler/cmm -icompiler/codeGen -icompiler/coreSyn -icompiler/deSugar -icompiler/ghci -icompiler/hsSyn -icompiler/iface -icompiler/llvmGen -icompiler/main -icompiler/nativeGen -icompiler/parser -icompiler/prelude -icompiler/profiling -icompiler/rename -icompiler/simplCore -icompiler/simplStg -icompiler/specialise -icompiler/stgSyn -icompiler/stranal -icompiler/typecheck -icompiler/types -icompiler/utils -icompiler/vectorise -icompiler/stage2/build -icompiler/stage2/build/autogen -Icompiler/stage2/build -Icompiler/stage2/build/autogen -Icompiler/. -Icompiler/parser -Icompiler/utils -Icompiler/../rts/dist/build -Icompiler/stage2   -optP-DGHCI -optP-include -optPcompiler/stage2/build/autogen/cabal_macros.h -package-id Win32-2.3.1.1 -package-id array-0.5.1.1 -package-id base-4.9.0.0 -package-id binary-0.8.3.0 -package-id bytestring-0.10.8.1 -package-id containers-0.5.7.1 -package-id directory-1.2.6.2 -package-id filepath-1.4.1.0 -package-id ghc-boot-8.1 -package-id ghci-8.1 -package-id hoopl-3.10.2.1 -package-id hpc-0.6.0.3 -package-id process-1.4.2.0 -package-id template-haskell-2.11.0.0 -package-id time-1.6.0.1 -package-id transformers-0.5.2.0 -Wall -fno-warn-name-shadowing -this-unit-id ghc -XHaskell2010 -optc-DTHREADED_RTS -DGHCI_TABLES_NEXT_TO_CODE -DSTAGE=2 -Rghc-timing -O0  -no-user-package-db -rtsopts -Wnoncanonical-monad-instances -shared -dynamic -dynload deploy  -no-auto-link-packages"
+    link_cmd="\"inplace/bin/ghc-stage1.exe\" -hisuf dyn_hi -osuf  dyn_o -hcsuf dyn_hc -fPIC -dynamic  -O0 -H64m -Wall      -this-unit-id ghc-8.1 -hide-all-packages -i -icompiler/basicTypes -icompiler/cmm -icompiler/codeGen -icompiler/coreSyn -icompiler/deSugar -icompiler/ghci -icompiler/hsSyn -icompiler/iface -icompiler/llvmGen -icompiler/main -icompiler/nativeGen -icompiler/parser -icompiler/prelude -icompiler/profiling -icompiler/rename -icompiler/simplCore -icompiler/simplStg -icompiler/specialise -icompiler/stgSyn -icompiler/stranal -icompiler/typecheck -icompiler/types -icompiler/utils -icompiler/vectorise -icompiler/stage2/build -icompiler/stage2/build/autogen -Icompiler/stage2/build -Icompiler/stage2/build/autogen -Icompiler/. -Icompiler/parser -Icompiler/utils -Icompiler/../rts/dist/build -Icompiler/stage2   -optP-DGHCI -optP-include -optPcompiler/stage2/build/autogen/cabal_macros.h -package-id Win32-2.3.1.1 -package-id array-0.5.1.1 -package-id base-4.9.0.0 -package-id binary-0.8.3.0 -package-id bytestring-0.10.8.1 -package-id containers-0.5.7.1 -package-id directory-1.2.6.2 -package-id filepath-1.4.1.0 -package-id ghc-boot-8.1 -package-id ghci-8.1 -package-id hoopl-3.10.2.1 -package-id hpc-0.6.0.3 -package-id process-1.4.2.0 -package-id template-haskell-2.11.0.0 -package-id time-1.6.0.1 -package-id transformers-0.5.2.0 -Wall -fno-warn-name-shadowing -this-unit-id ghc -XHaskell2010 -optc-DTHREADED_RTS -DGHCI_TABLES_NEXT_TO_CODE -DSTAGE=2 -Rghc-timing -O0  -no-user-package-db -rtsopts      -Wnoncanonical-monad-instances  -odir compiler/stage2/build -hidir compiler/stage2/build -optl-L'E:\msys64\home\Tamar\ghc2\libraries\process\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\hpc\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\hoopl\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\ghci\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\transformers\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\template-haskell\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\pretty\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\ghc-boot\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\ghc-boot-th\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\directory\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\time\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\filepath\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\binary\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\containers\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\Win32\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\bytestring\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\deepseq\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\array\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\base\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\integer-gmp\dist-install\build' -optl-L'E:\msys64\home\Tamar\ghc2\libraries\ghc-prim\dist-install\build' -optl-L'E:/msys64/home/Tamar/ghc2/rts/dist/build' -optl-lkernel32 -optl-luser32 -optl-lgdi32 -optl-lwinmm -optl-ladvapi32 -optl-lshell32 -optl-lshfolder -optl-lwsock32 -optl-luser32 -optl-lshell32 -optl-lmsvcrt -optl-lmingw32 -optl-lmingwex -optl-luser32 -optl-lmingw32 -optl-lmingwex -optl-lm -optl-lwsock32 -optl-lgdi32 -optl-lwinmm -optl-lmingwex -fPIC -dynamic  -O0 -H64m -Wall      -this-unit-id ghc-8.1 -hide-all-packages -i -icompiler/basicTypes -icompiler/cmm -icompiler/codeGen -icompiler/coreSyn -icompiler/deSugar -icompiler/ghci -icompiler/hsSyn -icompiler/iface -icompiler/llvmGen -icompiler/main -icompiler/nativeGen -icompiler/parser -icompiler/prelude -icompiler/profiling -icompiler/rename -icompiler/simplCore -icompiler/simplStg -icompiler/specialise -icompiler/stgSyn -icompiler/stranal -icompiler/typecheck -icompiler/types -icompiler/utils -icompiler/vectorise -icompiler/stage2/build -icompiler/stage2/build/autogen -Icompiler/stage2/build -Icompiler/stage2/build/autogen -Icompiler/. -Icompiler/parser -Icompiler/utils -Icompiler/../rts/dist/build -Icompiler/stage2   -optP-DGHCI -optP-include -optPcompiler/stage2/build/autogen/cabal_macros.h -package-id Win32-2.3.1.1 -package-id array-0.5.1.1 -package-id base-4.9.0.0 -package-id binary-0.8.3.0 -package-id bytestring-0.10.8.1 -package-id containers-0.5.7.1 -package-id directory-1.2.6.2 -package-id filepath-1.4.1.0 -package-id ghc-boot-8.1 -package-id ghci-8.1 -package-id hoopl-3.10.2.1 -package-id hpc-0.6.0.3 -package-id process-1.4.2.0 -package-id template-haskell-2.11.0.0 -package-id time-1.6.0.1 -package-id transformers-0.5.2.0 -Wall -fno-warn-name-shadowing -this-unit-id ghc -XHaskell2010 -optc-DTHREADED_RTS -DGHCI_TABLES_NEXT_TO_CODE -DSTAGE=2 -Rghc-timing -O0  -no-user-package-db -rtsopts -Wnoncanonical-monad-instances -shared -dynamic -dynload deploy  -no-auto-link-packages" "NO"
 
     process_dll_link "$dir" "$distdir" "$way" "$flags" "$objs" "$out" "$link_cmd"
 }
@@ -186,7 +205,7 @@ case $1 in
         exit 0
         ;;
     link)
-        process_dll_link "$2" "$3" "$4" "$5" "$6" "$7" "$8"
+        process_dll_link "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9"
         exit 0
         ;;
     *)
