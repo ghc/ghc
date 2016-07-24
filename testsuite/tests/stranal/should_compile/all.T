@@ -37,8 +37,10 @@ test('T8743', [ extra_clean(['T8743.o-boot', 'T8743a.hi', 'T8743a.o', 'T8743.hi-
 #   The intent here is to check that $wfoo has type
 #         $wfoo :: Int# -> Int# -> Int
 #   with two unboxed args.  See Trac #10482 for background
-test('T10482',  [ grepCoreString(r'wfoo.*Int') ], compile, ['-dppr-cols=200 -ddump-simpl'])
-test('T10482a', [ grepCoreString(r'wf.*Int') ],   compile, ['-dppr-cols=200 -ddump-simpl'])
+# 
+# Set -dppr-cols to ensure output doesn't wrap
+test('T10482',  [ grepCoreString(r'wfoo.*Int#') ], compile, ['-dppr-cols=200 -ddump-simpl'])
+test('T10482a', [ grepCoreString(r'wf.*Int#') ],   compile, ['-dppr-cols=200 -ddump-simpl'])
 
 test('T9208', when(compiler_debugged(), expect_broken(9208)), compile, [''])
 # T9208 fails (and should do so) if you have assertion checking on in the compiler
