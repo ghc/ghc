@@ -138,6 +138,7 @@ endef # build-package-way
 # $4 = extra flags
 # $5 = object files to link
 # $6 = output filename
+# $7 = indicated whether the dll should be delay loaded
 define build-dll
 # Call out to the shell script to decide how to build the dll.
 rules/build-dll-win32.sh link "$1" "$2" "$3" "$4" "$5" "$6" "$(call cmd,$1_$2_HC) $($1_$2_$3_ALL_HC_OPTS) $($1_$2_$3_GHC_LD_OPTS) $4 \
