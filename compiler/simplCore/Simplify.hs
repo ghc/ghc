@@ -590,7 +590,7 @@ makeTrivialWithInfo top_lvl env context info expr
         ; env'  <- completeNonRecX top_lvl env False var var expr
         ; expr' <- simplVar env' var
         ; return (env', expr') }
-        -- The simplVar is needed becase we're constructing a new binding
+        -- The simplVar is needed because we're constructing a new binding
         --     a = rhs
         -- And if rhs is of form (rhs1 |> co), then we might get
         --     a1 = rhs1

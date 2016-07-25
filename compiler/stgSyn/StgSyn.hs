@@ -137,7 +137,7 @@ isAddrRep _       = False
 
 -- | Type of an @StgArg@
 --
--- Very half baked becase we have lost the type arguments.
+-- Very half baked because we have lost the type arguments.
 stgArgType :: StgArg -> Type
 stgArgType (StgVarArg v)   = idType v
 stgArgType (StgLitArg lit) = literalType lit

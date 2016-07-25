@@ -1262,7 +1262,7 @@ lookupThName_maybe th_name
         ; return (listToMaybe names) }
   where
     lookup rdr_name
-        = do {  -- Repeat much of lookupOccRn, becase we want
+        = do {  -- Repeat much of lookupOccRn, because we want
                 -- to report errors in a TH-relevant way
              ; rdr_env <- getLocalRdrEnv
              ; case lookupLocalRdrEnv rdr_env rdr_name of

@@ -227,7 +227,7 @@ Suppose the inner loop is P->R->P->R etc.  Then here is
 how many heap checks we get in the *inner loop* under various
 conditions
 
-  Alooc   Heap check in branches (!Q!, !R!)?
+  Alloc   Heap check in branches (!Q!, !R!)?
   P Q R      yes     no (absorb to !P!)
 --------------------------------------
   n n n      0          0
@@ -877,7 +877,7 @@ emitEnter fun = do
       --
       -- Note in particular that the label Lret is used as a
       -- destination by both the tag-test and the call.  This is
-      -- becase Lret will necessarily be a proc-point, and we want to
+      -- because Lret will necessarily be a proc-point, and we want to
       -- ensure that we generate only one proc-point for this
       -- sequence.
       --
