@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 
 -- | Utilities related to Monad and Applicative classes
---   Mostly for backwards compatability.
+--   Mostly for backwards compatibility.
 
 module MonadUtils
         ( Applicative(..)
@@ -126,7 +126,7 @@ mapAndUnzip5M f (x:xs) = do
 
 -- | Monadic version of mapAccumL
 mapAccumLM :: Monad m
-            => (acc -> x -> m (acc, y)) -- ^ combining funcction
+            => (acc -> x -> m (acc, y)) -- ^ combining function
             -> acc                      -- ^ initial state
             -> [x]                      -- ^ inputs
             -> m (acc, [y])             -- ^ final state, outputs
