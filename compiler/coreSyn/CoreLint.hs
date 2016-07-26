@@ -715,7 +715,7 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
      ; when (null alts) $
      do { checkL (not (exprIsHNF scrut))
           (text "No alternatives for a case scrutinee in head-normal form:" <+> ppr scrut)
-        ; checkL scrut_diverges
+        ; checkWarnL scrut_diverges
           (text "No alternatives for a case scrutinee not known to diverge for sure:" <+> ppr scrut)
         }
 
