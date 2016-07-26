@@ -664,7 +664,7 @@ test('T9675',
           # 2016-04-06    18043224   (x86/Linux, 64-bit machine)
           ]),
        compiler_stats_num_field('peak_megabytes_allocated', # Note [residency]
-          [(wordsize(64), 144, 15),
+          [(wordsize(64), 121, 15),
           # 2014-10-13    66
           # 2014-10-13    58         seq the DmdEnv in seqDmdType as well
           # 2014-10-13    49         different machines giving different results...
@@ -674,6 +674,7 @@ test('T9675',
           # 2015-12-04    88         new pattern checker (D1535)
           # 2015-12-11    113        TypeInType (see #11196)
           # 2016-04-14    144        Final demand analyzer run
+          # 2016-07-26    121        Unboxed sums?
             (wordsize(32), 56, 15)
           # 2015-07-11    56         (x86/Linux, 64-bit machine) use +RTS -G1
           ]),
@@ -831,7 +832,7 @@ test('T12227',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
           [(wordsize(64), 1822822016, 5),
-          # 2016-07-11    5650186880 (Windows) before fix for #12227 
+          # 2016-07-11    5650186880 (Windows) before fix for #12227
           # 2016-07-11    1822822016 (Windows) after fix for #12227
           ]),
      ],
