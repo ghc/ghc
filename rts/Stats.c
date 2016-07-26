@@ -704,8 +704,8 @@ stat_exit (void)
                     TimeToSecondsDbl(tot_cpu - gc_cpu -
                                 PROF_VAL(RP_tot_time + HC_tot_time) - init_cpu) * 100
                     / TimeToSecondsDbl(tot_cpu),
-                    TimeToSecondsDbl(tot_cpu - gc_cpu -
-                                PROF_VAL(RP_tot_time + HC_tot_time) - init_cpu) * 100
+                    TimeToSecondsDbl(tot_elapsed - gc_elapsed -
+                                PROF_VAL(RPe_tot_time + HCe_tot_time) - init_elapsed) * 100
                     / TimeToSecondsDbl(tot_elapsed));
 
             /*
