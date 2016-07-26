@@ -709,7 +709,7 @@ every primitive type, so the function is partial.
 mk_absent_let :: DynFlags -> Id -> Maybe (CoreExpr -> CoreExpr)
 mk_absent_let dflags arg
   | not (isUnliftedType arg_ty)
-  = Just (Let (NonRec arg abs_rhs))
+  = Just (Let (NonRec lifted_arg abs_rhs))
   | Just tc <- tyConAppTyCon_maybe arg_ty
   , Just lit <- absentLiteralOf tc
   = Just (Let (NonRec arg (Lit lit)))
@@ -719,10 +719,14 @@ mk_absent_let dflags arg
   = WARN( True, text "No absent value for" <+> ppr arg_ty )
     Nothing
   where
-    arg_ty  = idType arg
-    abs_rhs = mkRuntimeErrorApp aBSENT_ERROR_ID arg_ty msg
-    msg     = showSDoc (gopt_set dflags Opt_SuppressUniques)
-                       (ppr arg <+> ppr (idType arg))
+    arg_ty     = idType arg
+    abs_rhs    = mkRuntimeErrorApp aBSENT_ERROR_ID arg_ty msg
+    lifted_arg = arg `setIdStrictness` exnSig
+              -- Note in strictness signature that this is bottoming
+              -- (for the sake of the "empty case scrutinee not known to
+              -- diverge for sure lint" warning)
+    msg        = showSDoc (gopt_set dflags Opt_SuppressUniques)
+                          (ppr arg <+> ppr (idType arg))
               -- We need to suppress uniques here because otherwise they'd
               -- end up in the generated code as strings. This is bad for
               -- determinism, because with different uniques the strings

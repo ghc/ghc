@@ -35,7 +35,8 @@ module Demand (
         vanillaCprProdRes, cprSumRes,
         appIsBottom, isBottomingSig, pprIfaceStrictSig,
         trimCPRInfo, returnsCPR_maybe,
-        StrictSig(..), mkStrictSig, mkClosedStrictSig, nopSig, botSig, cprProdSig,
+        StrictSig(..), mkStrictSig, mkClosedStrictSig,
+        nopSig, botSig, exnSig, cprProdSig,
         isTopSig, hasDemandEnvSig,
         splitStrictSig, strictSigDmdEnv,
         increaseStrictSigArity,
@@ -1264,9 +1265,10 @@ emptyDmdEnv = emptyVarEnv
 -- (lazy, absent, no CPR information, no termination information).
 -- Note that it is ''not'' the top of the lattice (which would be "may use everything"),
 -- so it is (no longer) called topDmd
-nopDmdType, botDmdType :: DmdType
+nopDmdType, botDmdType, exnDmdType :: DmdType
 nopDmdType = DmdType emptyDmdEnv [] topRes
 botDmdType = DmdType emptyDmdEnv [] botRes
+exnDmdType = DmdType emptyDmdEnv [] exnRes
 
 cprProdDmdType :: Arity -> DmdType
 cprProdDmdType arity
@@ -1691,9 +1693,10 @@ isBottomingSig :: StrictSig -> Bool
 -- True if the signature diverges or throws an exception
 isBottomingSig (StrictSig (DmdType _ _ res)) = isBotRes res
 
-nopSig, botSig :: StrictSig
+nopSig, botSig, exnSig :: StrictSig
 nopSig = StrictSig nopDmdType
 botSig = StrictSig botDmdType
+exnSig = StrictSig exnDmdType
 
 cprProdSig :: Arity -> StrictSig
 cprProdSig arity = StrictSig (cprProdDmdType arity)
