@@ -16,7 +16,7 @@ fail() {
 build_delay_import_lib()
 {
     # Check if we have to create a delay loaded DLL
-    if [ "$3" -eq "YES" ]
+    if [ "$3" == "YES" ];
     then
         dlltool -d $1 -y $2
     fi
