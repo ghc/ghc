@@ -257,9 +257,9 @@ improveClsFD clas_tvs fd
              length tys_inst == length clas_tvs
             , ppr tys_inst <+> ppr tys_actual )
 
-    case tcMatchTys ltys1 ltys2 of
+    case tcMatchTyKis ltys1 ltys2 of
         Nothing  -> []
-        Just subst | isJust (tcMatchTysX subst rtys1 rtys2)
+        Just subst | isJust (tcMatchTyKisX subst rtys1 rtys2)
                         -- Don't include any equations that already hold.
                         -- Reason: then we know if any actual improvement has happened,
                         --         in which case we need to iterate the solver
@@ -592,12 +592,12 @@ checkFunDeps inst_envs (ClsInst { is_tvs = qtvs1, is_cls = cls
       | instanceCantMatch trimmed_tcs rough_tcs2
       = False
       | otherwise
-      = case tcUnifyTys bind_fn ltys1 ltys2 of
+      = case tcUnifyTyKis bind_fn ltys1 ltys2 of
           Nothing         -> False
           Just subst
             -> isNothing $   -- Bogus legacy test (Trac #10675)
                              -- See Note [Bogus consistency check]
-               tcUnifyTys bind_fn (substTysUnchecked subst rtys1) (substTysUnchecked subst rtys2)
+               tcUnifyTyKis bind_fn (substTysUnchecked subst rtys1) (substTysUnchecked subst rtys2)
 
       where
         trimmed_tcs    = trimRoughMatchTcs cls_tvs fd rough_tcs1

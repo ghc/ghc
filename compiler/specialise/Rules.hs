@@ -51,7 +51,7 @@ import Name             ( Name, NamedThing(..), nameIsLocalOrFrom )
 import NameSet
 import NameEnv
 import UniqFM
-import Unify            ( ruleMatchTyX )
+import Unify            ( ruleMatchTyKiX )
 import BasicTypes       ( Activation, CompilerPhase, isActive, pprRuleName )
 import StaticFlags      ( opt_PprStyle_Debug )
 import DynFlags         ( DynFlags )
@@ -947,7 +947,7 @@ match_ty :: RuleMatchEnv
 
 match_ty renv subst ty1 ty2
   = do  { tv_subst'
-            <- Unify.ruleMatchTyX (rv_tmpls renv) (rv_lcl renv) tv_subst ty1 ty2
+            <- Unify.ruleMatchTyKiX (rv_tmpls renv) (rv_lcl renv) tv_subst ty1 ty2
         ; return (subst { rs_tv_subst = tv_subst' }) }
   where
     tv_subst = rs_tv_subst subst

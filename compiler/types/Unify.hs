@@ -5,16 +5,18 @@
 {-# LANGUAGE DeriveFunctor #-}
 
 module Unify (
-        tcMatchTy, tcMatchTys, tcMatchTyX, tcMatchTysX, tcUnifyTyWithTFs,
-        ruleMatchTyX,
+        tcMatchTy, tcMatchTyKi,
+        tcMatchTys, tcMatchTyKis,
+        tcMatchTyX, tcMatchTysX, tcMatchTyKisX,
+        ruleMatchTyKiX,
 
         -- * Rough matching
         roughMatchTcs, instanceCantMatch,
         typesCantMatch,
 
         -- Side-effect free unification
-        tcUnifyTy, tcUnifyTys,
-        tcUnifyTysFG,
+        tcUnifyTy, tcUnifyTyKi, tcUnifyTys, tcUnifyTyKis,
+        tcUnifyTysFG, tcUnifyTyWithTFs,
         BindFlag(..),
         UnifyResult, UnifyResultM(..),
 
@@ -74,12 +76,19 @@ Unification is much tricker than you might think.
 -- The returned substitution might bind coercion variables,
 -- if the variable is an argument to a GADT constructor.
 --
+-- Precondition: typeKind ty1 `eqType` typeKind ty2
+--
 -- We don't pass in a set of "template variables" to be bound
 -- by the match, because tcMatchTy (and similar functions) are
 -- always used on top-level types, so we can bind any of the
 -- free variables of the LHS.
 tcMatchTy :: Type -> Type -> Maybe TCvSubst
 tcMatchTy ty1 ty2 = tcMatchTys [ty1] [ty2]
+
+-- | Like 'tcMatchTy', but allows the kinds of the types to differ,
+-- and thus matches them as well.
+tcMatchTyKi :: Type -> Type -> Maybe TCvSubst
+tcMatchTyKi ty1 ty2 = tcMatchTyKis [ty1] [ty2]
 
 -- | This is similar to 'tcMatchTy', but extends a substitution
 tcMatchTyX :: TCvSubst            -- ^ Substitution to extend
@@ -98,16 +107,42 @@ tcMatchTys tys1 tys2
   where
     in_scope = mkInScopeSet (tyCoVarsOfTypes tys1 `unionVarSet` tyCoVarsOfTypes tys2)
 
+-- | Like 'tcMatchTyKi' but over a list of types.
+tcMatchTyKis :: [Type]         -- ^ Template
+             -> [Type]         -- ^ Target
+             -> Maybe TCvSubst -- ^ One-shot substitution
+tcMatchTyKis tys1 tys2
+  = tcMatchTyKisX (mkEmptyTCvSubst in_scope) tys1 tys2
+  where
+    in_scope = mkInScopeSet (tyCoVarsOfTypes tys1 `unionVarSet` tyCoVarsOfTypes tys2)
+
 -- | Like 'tcMatchTys', but extending a substitution
 tcMatchTysX :: TCvSubst       -- ^ Substitution to extend
             -> [Type]         -- ^ Template
             -> [Type]         -- ^ Target
             -> Maybe TCvSubst -- ^ One-shot substitution
-tcMatchTysX (TCvSubst in_scope tv_env cv_env) tys1 tys2
--- See Note [Kind coercions in Unify]
+tcMatchTysX subst tys1 tys2
+  = tc_match_tys_x False subst tys1 tys2
+
+-- | Like 'tcMatchTyKis', but extending a substitution
+tcMatchTyKisX :: TCvSubst        -- ^ Substitution to extend
+              -> [Type]          -- ^ Template
+              -> [Type]          -- ^ Target
+              -> Maybe TCvSubst  -- ^ One-shot subtitution
+tcMatchTyKisX subst tys1 tys2
+  = tc_match_tys_x True subst tys1 tys2
+
+-- | Worker for 'tcMatchTysX' and 'tcMatchTyKisX'
+tc_match_tys_x :: Bool          -- ^ match kinds?
+               -> TCvSubst
+               -> [Type]
+               -> [Type]
+               -> Maybe TCvSubst
+tc_match_tys_x match_kis (TCvSubst in_scope tv_env cv_env) tys1 tys2
   = case tc_unify_tys (const BindMe)
                       False  -- Matching, not unifying
                       False  -- Not an injectivity check
+                      match_kis
                       (mkRnEnv2 in_scope) tv_env cv_env tys1 tys2 of
       Unifiable (tv_env', cv_env')
         -> Just $ TCvSubst in_scope tv_env' cv_env'
@@ -115,17 +150,18 @@ tcMatchTysX (TCvSubst in_scope tv_env cv_env) tys1 tys2
 
 -- | This one is called from the expression matcher,
 -- which already has a MatchEnv in hand
-ruleMatchTyX
+ruleMatchTyKiX
   :: TyCoVarSet          -- ^ template variables
   -> RnEnv2
   -> TvSubstEnv          -- ^ type substitution to extend
   -> Type                -- ^ Template
   -> Type                -- ^ Target
   -> Maybe TvSubstEnv
-ruleMatchTyX tmpl_tvs rn_env tenv tmpl target
+ruleMatchTyKiX tmpl_tvs rn_env tenv tmpl target
 -- See Note [Kind coercions in Unify]
-  = case tc_unify_tys (matchBindFun tmpl_tvs) False False rn_env
-                      tenv emptyCvSubstEnv [tmpl] [target] of
+  = case tc_unify_tys (matchBindFun tmpl_tvs) False False
+                      True -- <-- this means to match the kinds
+                      rn_env tenv emptyCvSubstEnv [tmpl] [target] of
       Unifiable (tenv', _) -> Just tenv'
       _                    -> Nothing
 
@@ -294,14 +330,20 @@ which can't tell the difference between MaybeApart and SurelyApart, so those
 usages won't notice this design choice.
 -}
 
+-- | Simple unification of two types; all type variables are bindable
+-- Precondition: the kinds are already equal
 tcUnifyTy :: Type -> Type       -- All tyvars are bindable
           -> Maybe TCvSubst
                        -- A regular one-shot (idempotent) substitution
--- Simple unification of two types; all type variables are bindable
 tcUnifyTy t1 t2 = tcUnifyTys (const BindMe) [t1] [t2]
+
+-- | Like 'tcUnifyTy', but also unifies the kinds
+tcUnifyTyKi :: Type -> Type -> Maybe TCvSubst
+tcUnifyTyKi t1 t2 = tcUnifyTyKis (const BindMe) [t1] [t2]
 
 -- | Unify two types, treating type family applications as possibly unifying
 -- with anything and looking through injective type family applications.
+-- Precondition: kinds are the same
 tcUnifyTyWithTFs :: Bool  -- ^ True <=> do two-way unification;
                           --   False <=> do one-way matching.
                           --   See end of sec 5.2 from the paper
@@ -311,7 +353,7 @@ tcUnifyTyWithTFs :: Bool  -- ^ True <=> do two-way unification;
 -- The code is incorporated with the standard unifier for convenience, but
 -- its operation should match the specification in the paper.
 tcUnifyTyWithTFs twoWay t1 t2
-  = case tc_unify_tys (const BindMe) twoWay True
+  = case tc_unify_tys (const BindMe) twoWay True False
                        rn_env emptyTvSubstEnv emptyCvSubstEnv
                        [t1] [t2] of
       Unifiable  (subst, _) -> Just $ niFixTCvSubst subst
@@ -334,6 +376,15 @@ tcUnifyTys :: (TyCoVar -> BindFlag)
 -- second call to tcUnifyTys in FunDeps.checkClsFD
 tcUnifyTys bind_fn tys1 tys2
   = case tcUnifyTysFG bind_fn tys1 tys2 of
+      Unifiable result -> Just result
+      _                -> Nothing
+
+-- | Like 'tcUnifyTys' but also unifies the kinds
+tcUnifyTyKis :: (TyCoVar -> BindFlag)
+             -> [Type] -> [Type]
+             -> Maybe TCvSubst
+tcUnifyTyKis bind_fn tys1 tys2
+  = case tcUnifyTyKisFG bind_fn tys1 tys2 of
       Unifiable result -> Just result
       _                -> Nothing
 
@@ -373,12 +424,26 @@ instance MonadPlus UnifyResultM
 -- | @tcUnifyTysFG bind_tv tys1 tys2@ attepts to find a substitution @s@ (whose
 -- domain elements all respond 'BindMe' to @bind_tv@) such that
 -- @s(tys1)@ and that of @s(tys2)@ are equal, as witnessed by the returned
--- Coercions.
+-- Coercions. This version requires that the kinds of the types are the same,
+-- if you unify left-to-right.
 tcUnifyTysFG :: (TyVar -> BindFlag)
              -> [Type] -> [Type]
              -> UnifyResult
 tcUnifyTysFG bind_fn tys1 tys2
-  = do { (env, _) <- tc_unify_tys bind_fn True False env
+  = tc_unify_tys_fg False bind_fn tys1 tys2
+
+tcUnifyTyKisFG :: (TyVar -> BindFlag)
+               -> [Type] -> [Type]
+               -> UnifyResult
+tcUnifyTyKisFG bind_fn tys1 tys2
+  = tc_unify_tys_fg True bind_fn tys1 tys2
+
+tc_unify_tys_fg :: Bool
+                -> (TyVar -> BindFlag)
+                -> [Type] -> [Type]
+                -> UnifyResult
+tc_unify_tys_fg match_kis bind_fn tys1 tys2
+  = do { (env, _) <- tc_unify_tys bind_fn True False match_kis env
                                   emptyTvSubstEnv emptyCvSubstEnv
                                   tys1 tys2
        ; return $ niFixTCvSubst env }
@@ -391,14 +456,16 @@ tcUnifyTysFG bind_fn tys1 tys2
 tc_unify_tys :: (TyVar -> BindFlag)
              -> Bool        -- ^ True <=> unify; False <=> match
              -> Bool        -- ^ True <=> doing an injectivity check
+             -> Bool        -- ^ True <=> treat the kinds as well
              -> RnEnv2
              -> TvSubstEnv  -- ^ substitution to extend
              -> CvSubstEnv
              -> [Type] -> [Type]
              -> UnifyResultM (TvSubstEnv, CvSubstEnv)
-tc_unify_tys bind_fn unif inj_check rn_env tv_env cv_env tys1 tys2
+tc_unify_tys bind_fn unif inj_check match_kis rn_env tv_env cv_env tys1 tys2
   = initUM bind_fn unif inj_check rn_env tv_env cv_env $
-    do { unify_tys kis1 kis2
+    do { when match_kis $
+         unify_tys kis1 kis2
        ; unify_tys tys1 tys2
        ; (,) <$> getTvSubstEnv <*> getCvSubstEnv }
   where
@@ -684,8 +751,16 @@ For AppTy, we must unify the kinds of the functions, but once these are
 unified, we can continue unifying arguments without worrying further about
 kinds.
 
+The interface to this module includes both "...Ty" functions and
+"...TyKi" functions. The former assume that INVARIANT is already
+established, either because the kinds are the same or because the
+list of types being passed in are the well-typed arguments to some
+type constructor (see two paragraphs above). The latter take a separate
+pre-pass over the kinds to establish INVARIANT. Sometimes, it's important
+not to take the second pass, as it caused #12442.
+
 We thought, at one point, that this was all unnecessary: why should
-casts be in types in the first place? But they do. In
+casts be in types in the first place? But they are sometimes. In
 dependent/should_compile/KindEqualities2, we see, for example the
 constraint Num (Int |> (blah ; sym blah)).  We naturally want to find
 a dictionary for that constraint, which requires dealing with

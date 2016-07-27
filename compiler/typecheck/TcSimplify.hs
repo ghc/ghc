@@ -38,7 +38,7 @@ import TcType
 import TrieMap       () -- DV: for now
 import Type
 import TysWiredIn    ( ptrRepLiftedTy )
-import Unify         ( tcMatchTy )
+import Unify         ( tcMatchTyKi )
 import Util
 import Var
 import VarSet
@@ -2075,8 +2075,8 @@ disambigGroup (default_ty:default_tys) group@(the_tv, wanteds)
       = return False
 
     the_ty   = mkTyVarTy the_tv
-    mb_subst = tcMatchTy the_ty default_ty
-      -- Make sure the kinds match too; hence this call to tcMatchTy
+    mb_subst = tcMatchTyKi the_ty default_ty
+      -- Make sure the kinds match too; hence this call to tcMatchTyKi
       -- E.g. suppose the only constraint was (Typeable k (a::k))
       -- With the addition of polykinded defaulting we also want to reject
       -- ill-kinded defaulting attempts like (Eq []) or (Foldable Int) here.
