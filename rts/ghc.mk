@@ -170,7 +170,7 @@ $(call distdir-way-opts,rts,dist,$1,1) # 1 because the rts is built with stage1
 $(call c-suffix-rules,rts,dist,$1,YES)
 $(call cmm-suffix-rules,rts,dist,$1)
 
-rts_$1_LIB_FILE = libHSrts$(suffix $($1_libsuf))
+rts_$1_LIB_FILE = rts/dist/build/rts/ghc$(ProjectVersion)/$(subst,v,, $(subst dyn,,$(subst _dyn,,$(way))))/libHSrts$(suffix $($1_libsuf))
 
 rts_$1_C_OBJS   = $$(patsubst rts/%.c,rts/dist/build/%.$$($1_osuf),$$(rts_C_SRCS)) $$(patsubst %.c,%.$$($1_osuf),$$(rts_$1_EXTRA_C_SRCS))
 rts_$1_S_OBJS   = $$(patsubst rts/%.S,rts/dist/build/%.$$($1_osuf),$$(rts_S_SRCS))
