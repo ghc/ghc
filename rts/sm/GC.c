@@ -1068,8 +1068,6 @@ waitForGcThreads (Capability *cap USED_IF_THREADS)
     nat i, j;
     rtsBool retry = rtsTrue;
 
-    stat_startGCSync(gc_threads[cap->no]);
-
     while(retry) {
         for (i=0; i < n_threads; i++) {
             if (i == me || gc_threads[i]->idle) continue;
