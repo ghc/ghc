@@ -237,6 +237,7 @@ typedef struct _GCStats {
   StgWord64 current_bytes_slop;
   StgWord64 max_bytes_slop;
   StgWord64 peak_megabytes_allocated;
+  StgWord64 mblocks_allocated;
   StgWord64 par_tot_bytes_copied;
   StgWord64 par_max_bytes_copied;
   StgDouble mutator_cpu_seconds;

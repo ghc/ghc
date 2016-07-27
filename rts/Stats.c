@@ -883,6 +883,7 @@ extern void getGCStats( GCStats *s )
     s->max_bytes_used = max_residency*sizeof(W_);
     s->cumulative_bytes_used = cumulative_residency*(StgWord64)sizeof(W_);
     s->peak_megabytes_allocated = (StgWord64)(peak_mblocks_allocated * MBLOCK_SIZE / (1024L * 1024L));
+    s->mblocks_allocated = (StgWord64)mblocks_allocated;
     s->bytes_copied = GC_tot_copied*(StgWord64)sizeof(W_);
     s->max_bytes_slop = max_slop*(StgWord64)sizeof(W_);
     s->current_bytes_used = current_residency*(StgWord64)sizeof(W_);

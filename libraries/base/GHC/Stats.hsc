@@ -72,6 +72,7 @@ data GCStats = GCStats
     , peakMegabytesAllocated :: !Int64
     -- | CPU time spent running mutator threads.  This does not include
     -- any profiling overhead or initialization.
+    , mblocksAllocated :: !Int64 -- ^ Number of allocated megablocks
     , mutatorCpuSeconds :: !Double
 
     -- | Wall clock time spent running mutator threads.  This does not
@@ -131,6 +132,7 @@ getGCStats = do
     currentBytesSlop <- (# peek GCStats, current_bytes_slop) p
     maxBytesSlop <- (# peek GCStats, max_bytes_slop) p
     peakMegabytesAllocated <- (# peek GCStats, peak_megabytes_allocated ) p
+    mblocksAllocated <- (# peek GCStats, mblocks_allocated) p
     {-
     initCpuSeconds <- (# peek GCStats, init_cpu_seconds) p
     initWallSeconds <- (# peek GCStats, init_wall_seconds) p
