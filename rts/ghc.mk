@@ -36,7 +36,7 @@ rts_dist_WAYS = $(rts_WAYS)
 # we get way=dyn, we need both to map to the same folder, so I filter v
 # out as well to place them in the root.
 
-ALL_RTS_LIBS = $(foreach way,$(rts_WAYS),rts/dist/build/rts/ghc$(ProjectVersion)/$(subst,v,, $(subst dyn,,$(subst _dyn,,$(way))))/libHSrts$(suffix $($(way)_libsuf)))
+ALL_RTS_LIBS = $(foreach way,$(rts_WAYS),rts/dist/build/rts/ghc$(ProjectVersion)/$(subst dyn,,$(subst _dyn,,$(way)))/libHSrts$(suffix $($(way)_libsuf)))
 $(eval $(call all-target,rts,$(ALL_RTS_LIBS)))
 
 # -----------------------------------------------------------------------------
@@ -171,7 +171,7 @@ $(call c-suffix-rules,rts,dist,$1,YES)
 $(call cmm-suffix-rules,rts,dist,$1)
 
 rts_$1_LIB_FILE = libHSrts$(suffix $($1_libsuf))
-rts_$1_LIB = rts/dist/build/rts/ghc$(ProjectVersion)/$(subst,v,, $(subst dyn,,$(subst _dyn,,$1)))/$$(rts_$1_LIB_FILE)
+rts_$1_LIB = rts/dist/build/rts/ghc$(ProjectVersion)/$(subst dyn,,$(subst _dyn,,$1))/$$(rts_$1_LIB_FILE)
 
 rts_$1_C_OBJS   = $$(patsubst rts/%.c,rts/dist/build/%.$$($1_osuf),$$(rts_C_SRCS)) $$(patsubst %.c,%.$$($1_osuf),$$(rts_$1_EXTRA_C_SRCS))
 rts_$1_S_OBJS   = $$(patsubst rts/%.S,rts/dist/build/%.$$($1_osuf),$$(rts_S_SRCS))
@@ -220,7 +220,7 @@ $$(rts_$1_LIB) : $$(rts_$1_OBJS) $(ALL_RTS_DEF_LIBS) rts/dist/libs.depend rts/di
     # $5 = object files to link
     # $6 = output filename
     # $7 = indicated whether the dll should be delay loaded
-	rules/build-dll-win32.sh link "rts/dist/build" "rts/dist/build/rts/ghc$(ProjectVersion)/$(subst,v,, $(subst dyn,,$(subst _dyn,,$1)))" "" "" "$$(rts_$1_OBJS)" "$$@" "$$(rts_dist_HC) -this-unit-id rts -shared -dynamic -dynload deploy \
+	rules/build-dll-win32.sh link "rts/dist/build" "rts/dist/build/rts/ghc$(ProjectVersion)/$(subst dyn,,$(subst _dyn,,$1))" "" "" "$$(rts_$1_OBJS)" "$$@" "$$(rts_dist_HC) -this-unit-id rts -shared -dynamic -dynload deploy \
          -no-auto-link-packages -Lrts/dist/build -l$$(LIBFFI_NAME) \
          `cat rts/dist/libs.depend | tr '\n' ' '` \
          $$(ALL_RTS_DEF_LIBS) \
@@ -242,7 +242,7 @@ LIBFFI_LIBS =
 endif
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) rts/dist/libs.depend $$(rts_dist_FFI_SO)
 	"$$(RM)" $$(RM_OPTS) $$@
-	mkdir -p "rts/dist/build/rts/ghc$(ProjectVersion)/$(subst,v,, $(subst dyn,,$(subst _dyn,,$1)))"
+	mkdir -p "rts/dist/build/rts/ghc$(ProjectVersion)/$(subst dyn,,$(subst _dyn,,$1))"
 	"$$(rts_dist_HC)" -this-unit-id rts -shared -dynamic -dynload deploy \
 	  -no-auto-link-packages $$(LIBFFI_LIBS) `cat rts/dist/libs.depend` $$(rts_$1_OBJS) \
           $$(rts_dist_$1_GHC_LD_OPTS) \
@@ -251,7 +251,7 @@ endif
 else
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS)
 	"$$(RM)" $$(RM_OPTS) $$@
-	mkdir -p "rts/dist/build/rts/ghc$(ProjectVersion)/$(subst,v,, $(subst dyn,,$(subst _dyn,,$1)))"
+	mkdir -p "rts/dist/build/rts/ghc$(ProjectVersion)/$(subst dyn,,$(subst _dyn,,$1))"
 	echo $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) | "$$(XARGS)" $$(XARGS_OPTS) "$$(AR_STAGE1)" \
 		$$(AR_OPTS_STAGE1) $$(EXTRA_AR_ARGS_STAGE1) $$@
 
