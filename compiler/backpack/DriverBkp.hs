@@ -194,7 +194,7 @@ withBkpSession cid insts deps session_type do_this = do
           in ExposePackage
             (showSDoc dflags
                 (text "-unit-id" <+> ppr uid <+> ppr rn))
-            (UnitIdArg uid) rn) deps
+            (UnitIdArg uid) ExposeEager rn) deps
       } )) $ do
         dflags <- getSessionDynFlags
         -- pprTrace "flags" (ppr insts <> ppr deps) $ return ()

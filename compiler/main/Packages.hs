@@ -739,7 +739,7 @@ applyPackageFlag
 
 applyPackageFlag dflags prec_map pkg_db unusable no_hide_others pkgs vm flag =
   case flag of
-    ExposePackage _ arg (ModRenaming b rns) ->
+    ExposePackage _ arg exposeFlag (ModRenaming b rns) ->
        case findPackages prec_map pkg_db arg pkgs unusable of
          Left ps         -> packageFlagErr dflags flag ps
          Right (p:_) -> return vm'
@@ -773,7 +773,7 @@ applyPackageFlag dflags prec_map pkg_db unusable no_hide_others pkgs vm flag =
                 , uv_renamings = rns
                 , uv_package_name = First (Just n)
                 , uv_requirements = reqs
-                , uv_explicit = True
+                , uv_explicit = exposeFlag == ExposeEager
                 }
            vm' = Map.insertWith mappend (packageConfigId p) uv vm_cleared
            -- In the old days, if you said `ghc -package p-0.1 -package p-0.2`
@@ -936,6 +936,16 @@ packageFlagErr :: DynFlags
                -> PackageFlag
                -> [(PackageConfig, UnusablePackageReason)]
                -> IO a
+
+-- for missing DPH package we emit a more helpful error message, because
+-- this may be the result of using -fdph-par or -fdph-seq.
+packageFlagErr dflags (ExposePackage _ (PackageArg pkg) _ _) []
+  | is_dph_package pkg
+  = throwGhcExceptionIO (CmdLineError (showSDoc dflags $ dph_err))
+  where dph_err = text "the " <> text pkg <> text " package is not installed."
+                  $$ text "To install it: \"cabal install dph\"."
+        is_dph_package pkg = "dph" `isPrefixOf` pkg
+
 packageFlagErr dflags flag reasons
   = packageFlagErr' dflags (pprFlag flag) reasons
 
@@ -963,7 +973,7 @@ packageFlagErr' dflags flag_doc reasons
 pprFlag :: PackageFlag -> SDoc
 pprFlag flag = case flag of
     HidePackage p   -> text "-hide-package " <> text p
-    ExposePackage doc _ _ -> text doc
+    ExposePackage doc _ _ _ -> text doc
 
 pprTrustFlag :: TrustFlag -> SDoc
 pprTrustFlag flag = case flag of
@@ -1470,8 +1480,8 @@ mkPackageState dflags dbs preload0 = do
             _  -> unit'
       addIfMorePreferable m unit = addToUDFM_C preferLater m (fsPackageName unit) unit
       -- This is the set of maximally preferable packages. In fact, it is a set of
-      -- most preferable *units* keyed by package name, which act as stand-ins in 
-      -- for "a package in a database". We use units here because we don't have 
+      -- most preferable *units* keyed by package name, which act as stand-ins in
+      -- for "a package in a database". We use units here because we don't have
       -- "a package in a database" as a type currently.
       mostPreferablePackageReps = if gopt Opt_HideAllPackages dflags
                     then emptyUDFM
@@ -1481,7 +1491,7 @@ mkPackageState dflags dbs preload0 = do
       -- with the most preferable unit for package. Being equi-preferable means that
       -- they must be in the same database, with the same version, and the same pacakge name.
       --
-      -- We must take care to consider all these units and not just the most 
+      -- We must take care to consider all these units and not just the most
       -- preferable one, otherwise we can end up with problems like #16228.
       mostPreferable u =
         case lookupUDFM mostPreferablePackageReps (fsPackageName u) of
@@ -1575,7 +1585,6 @@ mkPackageState dflags dbs preload0 = do
   let explicit_pkgs = Map.keys vis_map
       req_ctx = Map.map (Set.toList)
               $ Map.unionsWith Set.union (map uv_requirements (Map.elems vis_map))
-
 
   let preload2 = preload1
 
