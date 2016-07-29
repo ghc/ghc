@@ -16,10 +16,10 @@ assertEquals expected actual =
 
 main = do
   let val = ("hello", Just 42) :: (String, Maybe Int)
-  str <- newCompact 4096 val
+  str <- compactWithSharing val
 
   let val2 = ("world", 42) :: (String, Int)
-  str2 <- appendCompact str val2
+  str2 <- compactAddWithSharing str val2
 
   -- check that values where not corrupted
   assertEquals ("hello", Just 42) val

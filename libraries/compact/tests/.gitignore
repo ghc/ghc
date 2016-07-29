@@ -1,6 +1,3 @@
-*.stderr
-!compact_serialize.stderr
-*.stdout
 .hpc.*
 *.eventlog
 *.genscript

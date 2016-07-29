@@ -817,7 +817,7 @@ stat_exit (void)
 void
 statDescribeGens(void)
 {
-  uint32_t g, mut, lge, i;
+  uint32_t g, mut, lge, compacts, i;
   W_ gen_slop;
   W_ tot_live, tot_slop;
   W_ gen_live, gen_blocks;
@@ -825,10 +825,10 @@ statDescribeGens(void)
   generation *gen;
 
   debugBelch(
-"----------------------------------------------------------\n"
-"  Gen     Max  Mut-list  Blocks    Large     Live     Slop\n"
-"       Blocks     Bytes          Objects                  \n"
-"----------------------------------------------------------\n");
+"----------------------------------------------------------------------\n"
+"  Gen     Max  Mut-list  Blocks    Large  Compacts      Live      Slop\n"
+"       Blocks     Bytes          Objects                              \n"
+"----------------------------------------------------------------------\n");
 
   tot_live = 0;
   tot_slop = 0;
@@ -838,6 +838,10 @@ statDescribeGens(void)
 
       for (bd = gen->large_objects, lge = 0; bd; bd = bd->link) {
           lge++;
+      }
+
+      for (bd = gen->compact_objects, compacts = 0; bd; bd = bd->link) {
+          compacts++;
       }
 
       gen_live   = genLiveWords(gen);
@@ -862,15 +866,15 @@ statDescribeGens(void)
 
       gen_slop = gen_blocks * BLOCK_SIZE_W - gen_live;
 
-      debugBelch("%8" FMT_Word " %8d %8" FMT_Word " %8" FMT_Word "\n", gen_blocks, lge,
+      debugBelch("%8" FMT_Word " %8d  %8d %9" FMT_Word " %9" FMT_Word "\n", gen_blocks, lge, compacts,
                  gen_live*(W_)sizeof(W_), gen_slop*(W_)sizeof(W_));
       tot_live += gen_live;
       tot_slop += gen_slop;
   }
-  debugBelch("----------------------------------------------------------\n");
-  debugBelch("%41s%8" FMT_Word " %8" FMT_Word "\n",
+  debugBelch("----------------------------------------------------------------------\n");
+  debugBelch("%51s%9" FMT_Word " %9" FMT_Word "\n",
              "",tot_live*sizeof(W_),tot_slop*sizeof(W_));
-  debugBelch("----------------------------------------------------------\n");
+  debugBelch("----------------------------------------------------------------------\n");
   debugBelch("\n");
 }
 

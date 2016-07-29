@@ -32,6 +32,7 @@ module Control.Exception.Base (
         BlockedIndefinitelyOnMVar(..),
         BlockedIndefinitelyOnSTM(..),
         AllocationLimitExceeded(..),
+        CompactionFailed(..),
         Deadlock(..),
         NoMethodError(..),
         PatternMatchFail(..),

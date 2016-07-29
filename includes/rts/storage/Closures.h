@@ -419,49 +419,61 @@ typedef struct MessageBlackHole_ {
     StgClosure *bh;
 } MessageBlackHole;
 
-// This is not a closure, it a bare
-// structure that lives at the beginning of
-// each consecutive block group in a
-// compact structure
+/* ----------------------------------------------------------------------------
+   Compact Regions
+   ------------------------------------------------------------------------- */
+
+//
+// A compact region is a list of blocks.  Each block starts with an
+// StgCompactNFDataBlock structure, and the list is chained through the next
+// field of these structs.  (the link field of the bdescr is used to chain
+// together multiple compact region on the compact_objects field of a
+// generation).
 //
 // See Note [Compact Normal Forms] for details
+//
 typedef struct StgCompactNFDataBlock_ {
-    struct StgCompactNFDataBlock_ *self; // the address of this block
-                                         // this is copied over to the receiving
-                                         // end when serializing a compact, so
-                                         // the receiving end can allocate the
-                                         // block at best as it can, and then
-                                         // verify if pointer adjustment is
-                                         // needed or not by comparing self with
-                                         // the actual address; the same data
-                                         // is sent over as SerializedCompact
-                                         // metadata, but having it here
-                                         // simplifies the fixup implementation
-    struct StgCompactNFData_ *owner; // the closure who owns this
-                                     // block (used in objectGetCompact)
-    struct StgCompactNFDataBlock_ *next; // chain of blocks used for
-                                         // serialization and freeing
+    struct StgCompactNFDataBlock_ *self;
+       // the address of this block this is copied over to the
+       // receiving end when serializing a compact, so the receiving
+       // end can allocate the block at best as it can, and then
+       // verify if pointer adjustment is needed or not by comparing
+       // self with the actual address; the same data is sent over as
+       // SerializedCompact metadata, but having it here simplifies
+       // the fixup implementation.
+    struct StgCompactNFData_ *owner;
+       // the closure who owns this block (used in objectGetCompact)
+    struct StgCompactNFDataBlock_ *next;
+       // chain of blocks used for serialization and freeing
 } StgCompactNFDataBlock;
 
+//
+// This is the Compact# primitive object.
+//
 typedef struct StgCompactNFData_ {
-    StgHeader              header; // for sanity and other checks in practice,
-                                   // nothing should ever need the compact info
-                                   // pointer (we don't even need fwding
-                                   // pointers because it's a large object)
-    StgWord                totalW; // for proper accounting in evac, includes
-                                   // slop, and removes the first block in
-                                   // larger than megablock allocation
-                                   // essentially meaningless, but if we got it
-                                   // wrong sanity would complain loudly
-    StgWord                totalDataW; // for stats/profiling only, it's the
-                                       // full amount of memory used by this
-                                       // compact, including the portions not
-                                       // yet used
-    StgWord                autoBlockW; // size of automatically appended blocks
-    StgCompactNFDataBlock *nursery; // where to (try to) allocate from when
-                                    // appending
-    StgCompactNFDataBlock *last; // the last block of the chain (to know where
-                                 // to append new blocks for resize)
+    StgHeader header;
+      // for sanity and other checks in practice, nothing should ever
+      // need the compact info pointer (we don't even need fwding
+      // pointers because it's a large object)
+    StgWord totalW;
+      // Total number of words in all blocks in the compact
+    StgWord autoBlockW;
+      // size of automatically appended blocks
+    StgPtr hp, hpLim;
+      // the beginning and end of the free area in the nursery block.  This is
+      // just a convenience so that we can avoid multiple indirections through
+      // the nursery pointer below during compaction.
+    StgCompactNFDataBlock *nursery;
+      // where to (try to) allocate from when appending
+    StgCompactNFDataBlock *last;
+      // the last block of the chain (to know where to append new
+      // blocks for resize)
+    struct hashtable *hash;
+      // the hash table for the current compaction, or NULL if
+      // there's no (sharing-preserved) compaction in progress.
+    StgClosure *result;
+      // Used temporarily to store the result of compaction.  Doesn't need to be
+      // a GC root.
 } StgCompactNFData;
 
 

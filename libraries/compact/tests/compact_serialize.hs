@@ -10,6 +10,7 @@ import Foreign.Ptr
 import Control.DeepSeq
 
 import Data.Compact
+import Data.Compact.Internal
 import Data.Compact.Serialized
 
 assertFail :: String -> IO ()
@@ -23,7 +24,7 @@ assertEquals expected actual =
 
 serialize :: NFData a => a -> IO (SerializedCompact a, [ByteString])
 serialize val = do
-  cnf <- newCompact 4096 val
+  cnf <- compactSized 4096 True val
 
   bytestrref <- newIORef undefined
   scref <- newIORef undefined

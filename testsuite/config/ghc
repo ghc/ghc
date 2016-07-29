@@ -25,6 +25,7 @@ config.run_ways           = ['normal', 'hpc']
 config.other_ways         = ['prof', 'normal_h',
                              'prof_hc_hb','prof_hb',
                              'prof_hd','prof_hy','prof_hr',
+                             'sanity',
                              'threaded1_ls', 'threaded2_hT', 'debug_numa',
                              'llvm', 'debugllvm',
                              'profllvm', 'profoptllvm', 'profthreadedllvm',
@@ -80,6 +81,7 @@ config.way_flags = {
     'profasm'      : ['-O', '-prof', '-static', '-fprof-auto'],
     'profthreaded' : ['-O', '-prof', '-static', '-fprof-auto', '-threaded'],
     'ghci'         : ['--interactive', '-v0', '-ignore-dot-ghci', '-fno-ghci-history', '+RTS', '-I0.1', '-RTS'],
+    'sanity'       : ['-debug'],
     'threaded1'    : ['-threaded', '-debug'],
     'threaded1_ls' : ['-threaded', '-debug'],
     'threaded2'    : ['-O', '-threaded', '-eventlog'],
@@ -116,6 +118,7 @@ config.way_rts_flags = {
     'profasm'      : ['-hc', '-p'], # test heap profiling too
     'profthreaded' : ['-p'],
     'ghci'         : [],
+    'sanity'       : ['-DS'],
     'threaded1'    : [],
     'threaded1_ls' : ['-ls'],
     'threaded2'    : ['-N2 -ls'],

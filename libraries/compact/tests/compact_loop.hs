@@ -6,6 +6,7 @@ import System.Mem
 import Text.Show
 
 import Data.Compact
+import Data.Compact.Internal
 
 assertFail :: String -> IO ()
 assertFail msg = throwIO $ AssertionFailed msg
@@ -36,7 +37,7 @@ instance NFData Tree where
 test x = do
   let a = Node Nil x b
       b = Node a Nil Nil
-  str <- newCompact 4096 a
+  str <- compactSized 4096 True a
 
   -- check the value in the compact
   assertEquals a (getCompact str)

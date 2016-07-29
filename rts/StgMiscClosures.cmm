@@ -619,14 +619,19 @@ INFO_TABLE_CONSTR(stg_MVAR_TSO_QUEUE,2,0,0,PRIM,"MVAR_TSO_QUEUE","MVAR_TSO_QUEUE
 /* ----------------------------------------------------------------------------
    COMPACT_NFDATA (a blob of data in NF with no outgoing pointers)
 
-   Just return immediately because the structure is in NF already
+   See Note [Compact Normal Forms] in sm/CNF.c
+
+   CLEAN/DIRTY refer to the state of the "hash" field: DIRTY means that
+   compaction is in progress and the hash table needs to be scanned by the GC.
    ------------------------------------------------------------------------- */
 
-INFO_TABLE( stg_COMPACT_NFDATA, 0, 0, COMPACT_NFDATA, "COMPACT_NFDATA", "COMPACT_NFDATA")
+INFO_TABLE( stg_COMPACT_NFDATA_CLEAN, 0, 5, COMPACT_NFDATA, "COMPACT_NFDATA", "COMPACT_NFDATA")
     ()
-{
-    return ();
-}
+{ foreign "C" barf("COMPACT_NFDATA_CLEAN object entered!") never returns; }
+
+INFO_TABLE( stg_COMPACT_NFDATA_DIRTY, 0, 5, COMPACT_NFDATA, "COMPACT_NFDATA", "COMPACT_NFDATA")
+    ()
+{ foreign "C" barf("COMPACT_NFDATA_DIRTY object entered!") never returns; }
 
 /* ----------------------------------------------------------------------------
    CHARLIKE and INTLIKE closures.

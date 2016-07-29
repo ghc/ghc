@@ -4,6 +4,7 @@ import Control.Exception
 import System.Mem
 
 import Data.Compact
+import Data.Compact.Internal
 
 assertFail :: String -> IO ()
 assertFail msg = throwIO $ AssertionFailed msg
@@ -21,7 +22,7 @@ main = do
   -- so total 3072 words, 12288 bytes on x86, 24576 on x86_64
   -- it should not fit in one block
   let val = replicate 4096 7 :: [Int]
-  str <- newCompact 1 val
+  str <- compactSized 1 True val
   assertEquals val (getCompact str)
   performMajorGC
   assertEquals val (getCompact str)

@@ -26,6 +26,7 @@
 #include "Trace.h"
 #include "LdvProfile.h"
 #include "CNF.h"
+#include "Scav.h"
 
 #if defined(PROF_SPIN) && defined(THREADED_RTS) && defined(PARALLEL_GC)
 StgWord64 whitehole_spin = 0;
@@ -360,9 +361,9 @@ evacuate_static_object (StgClosure **link_field, StgClosure *q)
 /* ----------------------------------------------------------------------------
    Evacuate an object inside a CompactNFData
 
-   Don't actually evacuate the object. Instead, evacuate the structure
-   (which is a large object, so it is just relinked onto the new list
-   of large objects of the generation).
+   These are treated in a similar way to large objects.  We remove the block
+   from the compact_objects list of the generation it is on, and link it onto
+   the live_compact_objects list of the destination generation.
 
    It is assumed that objects in the struct live in the same generation
    as the struct itself all the time.
@@ -375,6 +376,9 @@ evacuate_compact (StgPtr p)
     generation *gen, *new_gen;
     uint32_t gen_no, new_gen_no;
 
+    // We need to find the Compact# corresponding to this pointer, because it
+    // will give us the first block in the compact chain, which is the one we
+    // that gets linked onto the compact_objects list.
     str = objectGetCompact((StgClosure*)p);
     ASSERT(get_itbl((StgClosure*)str)->type == COMPACT_NFDATA);
 
@@ -411,7 +415,7 @@ evacuate_compact (StgPtr p)
         return;
     }
 
-    // remove from large_object list
+    // remove from compact_objects list
     if (bd->u.back) {
         bd->u.back->link = bd->link;
     } else { // first object in the list
@@ -444,10 +448,16 @@ evacuate_compact (StgPtr p)
     bd->flags |= BF_EVACUATED;
     initBdescr(bd, new_gen, new_gen->to);
 
-    if (new_gen != gen) { ACQUIRE_SPIN_LOCK(&new_gen->sync); }
-    dbl_link_onto(bd, &new_gen->live_compact_objects);
-    new_gen->n_live_compact_blocks += str->totalW / BLOCK_SIZE_W;
-    if (new_gen != gen) { RELEASE_SPIN_LOCK(&new_gen->sync); }
+    if (str->hash) {
+        gen_workspace *ws = &gct->gens[new_gen_no];
+        bd->link = ws->todo_large_objects;
+        ws->todo_large_objects = bd;
+    } else {
+        if (new_gen != gen) { ACQUIRE_SPIN_LOCK(&new_gen->sync); }
+        dbl_link_onto(bd, &new_gen->live_compact_objects);
+        new_gen->n_live_compact_blocks += str->totalW / BLOCK_SIZE_W;
+        if (new_gen != gen) { RELEASE_SPIN_LOCK(&new_gen->sync); }
+    }
 
     RELEASE_SPIN_LOCK(&gen->sync);
 
@@ -855,12 +865,6 @@ loop:
       copy(p,info,q,sizeofW(StgTRecChunk),gen_no);
       return;
 
-  case COMPACT_NFDATA:
-      // CompactNFData objects are at least one block plus the header
-      // so they are larger than the large_object_threshold (80% of
-      // block size) and never copied by value
-      barf("evacuate: compact nfdata is not large");
-      return;
   default:
     barf("evacuate: strange closure type %d", (int)(INFO_PTR_TO_STRUCT(info)->type));
   }

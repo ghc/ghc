@@ -21,10 +21,6 @@ void              exitCompact  (void);
 
 StgCompactNFData *compactNew   (Capability      *cap,
                                 StgWord          size);
-StgPtr            compactAppend(Capability       *cap,
-                                StgCompactNFData *str,
-                                StgClosure       *what,
-                                StgWord           share);
 void              compactResize(Capability       *cap,
                                 StgCompactNFData *str,
                                 StgWord           new_size);
@@ -34,12 +30,18 @@ StgWord           compactContains(StgCompactNFData *str,
                                   StgPtr            what);
 StgWord           countCompactBlocks(bdescr *outer);
 
+#ifdef DEBUG
+StgWord           countAllocdCompactBlocks(bdescr *outer);
+#endif
+
 StgCompactNFDataBlock *compactAllocateBlock(Capability            *cap,
                                             StgWord                size,
                                             StgCompactNFDataBlock *previous);
 StgPtr                 compactFixupPointers(StgCompactNFData      *str,
                                             StgClosure            *root);
 
+// Go from an arbitrary pointer into any block of a compact chain, to the
+// StgCompactNFDataBlock at the beginning of the block.
 INLINE_HEADER StgCompactNFDataBlock *objectGetCompactBlock (StgClosure *closure);
 INLINE_HEADER StgCompactNFDataBlock *objectGetCompactBlock (StgClosure *closure)
 {
@@ -59,12 +61,24 @@ INLINE_HEADER StgCompactNFDataBlock *objectGetCompactBlock (StgClosure *closure)
     return (StgCompactNFDataBlock*)(head_block->start);
 }
 
+// Go from an arbitrary pointer into any block of a compact chain, to the
+// StgCompactNFData for the whole compact chain.
 INLINE_HEADER StgCompactNFData *objectGetCompact (StgClosure *closure);
 INLINE_HEADER StgCompactNFData *objectGetCompact (StgClosure *closure)
 {
     StgCompactNFDataBlock *block = objectGetCompactBlock (closure);
     return block->owner;
 }
+
+extern void *allocateForCompact (Capability *cap,
+                                 StgCompactNFData *str,
+                                 StgWord sizeW);
+
+extern void insertCompactHash (Capability *cap,
+                               StgCompactNFData *str,
+                               StgClosure *p, StgClosure *to);
+
+extern void verifyCompact (StgCompactNFData *str);
 
 #include "EndPrivate.h"
 

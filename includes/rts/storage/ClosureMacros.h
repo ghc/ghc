@@ -421,12 +421,6 @@ closure_sizeW_ (const StgClosure *p, const StgInfoTable *info)
         return bco_sizeW((StgBCO *)p);
     case TREC_CHUNK:
         return sizeofW(StgTRecChunk);
-    case COMPACT_NFDATA:
-        // Nothing should ever call closure_sizeW() on a StgCompactNFData
-        // because CompactNFData is a magical object/list-of-objects that
-        // requires special paths pretty much everywhere in the GC
-        barf("closure_sizeW() called on a StgCompactNFData. "
-             "This should never happen.");
     default:
         return sizeW_fromITBL(info);
     }

@@ -1,5 +1,4 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 
@@ -22,57 +21,82 @@
 --
 -- /Since: 1.0.0/
 
-module Data.Compact.Internal(
-  Compact(..),
-  compactResize,
-  isCompact,
-  inCompact,
+module Data.Compact.Internal
+  ( Compact(..)
+  , mkCompact
+  , compactSized
+  ) where
 
-  compactAppendEvaledInternal,
-) where
+import Control.Concurrent.MVar
+import Control.DeepSeq
+import GHC.Prim
+import GHC.Types
 
--- Write down all GHC.Prim deps explicitly to keep them at minimum
-import GHC.Prim (Compact#,
-                 compactAppend#,
-                 compactResize#,
-                 compactContains#,
-                 compactContainsAny#,
-                 State#,
-                 RealWorld,
-                 Int#,
-                 )
--- We need to import Word from GHC.Types to see the representation
--- and to able to access the Word# to pass down the primops
-import GHC.Types (IO(..), Word(..), isTrue#)
+-- | A 'Compact' contains fully evaluated, pure, immutable data.
+--
+-- 'Compact' serves two purposes:
+--
+-- * Data stored in a 'Compact' has no garbage collection overhead.
+--   The garbage collector considers the whole 'Compact' to be alive
+--   if there is a reference to any object within it.
+--
+-- * A 'Compact' can be serialized, stored, and deserialized again.
+--   The serialized data can only be deserialized by the exact binary
+--   that created it, but it can be stored indefinitely before
+--   deserialization.
+--
+-- Compacts are self-contained, so compacting data involves copying
+-- it; if you have data that lives in two 'Compact's, each will have a
+-- separate copy of the data.
+--
+-- The cost of compaction is similar to the cost of GC for the same
+-- data, but it is perfomed only once.  However, retainining internal
+-- sharing during the compaction process is very costly, so it is
+-- optional; there are two ways to create a 'Compact': 'compact' and
+-- 'compactWithSharing'.
+--
+-- Data can be added to an existing 'Compact' with 'compactAdd' or
+-- 'compactAddWithSharing'.
+--
+-- Data in a compact doesn't ever move, so compacting data is also a
+-- way to pin arbitrary data structures in memory.
+--
+-- There are some limitations on what can be compacted:
+--
+-- * Functions.  Compaction only applies to data.
+--
+-- * Pinned 'ByteArray#' objects cannot be compacted.  This is for a
+--   good reason: the memory is pinned so that it can be referenced by
+--   address (the address might be stored in a C data structure, for
+--   example), so we can't make a copy of it to store in the 'Compact'.
+--
+-- * Mutable objects also cannot be compacted, because subsequent
+--   mutation would destroy the property that a compact is
+--   self-contained.
+--
+-- If compaction encounters any of the above, a 'CompactionFailed'
+-- exception will be thrown by the compaction operation.
+--
+data Compact a = Compact Compact# a (MVar ())
+    -- we can *read* from a Compact without taking a lock, but only
+    -- one thread can be writing to the compact at any given time.
+    -- The MVar here is to enforce mutual exclusion among writers.
+    -- Note: the MVar protects the Compact# only, not the pure value 'a'
 
--- | A 'Compact' contains fully evaluated, pure, and immutable data. If
--- any object in the compact is alive, then the whole compact is
--- alive. This means that 'Compact's are very cheap to keep around,
--- because the data inside a compact does not need to be traversed by
--- the garbage collector. However, the tradeoff is that the memory
--- that contains a 'Compact' cannot be recovered until the whole 'Compact'
--- is garbage.
-data Compact a = Compact Compact# a
+mkCompact
+  :: Compact# -> a -> State# RealWorld -> (# State# RealWorld, Compact a #)
+mkCompact compact# a s =
+  case unIO (newMVar ()) s of { (# s1, lock #) ->
+  (# s1, Compact compact# a lock #) }
+ where
+  unIO (IO a) = a
 
--- |Check if the second argument is inside the Compact
-inCompact :: Compact b -> a -> IO Bool
-inCompact (Compact buffer _) !val =
-  IO (\s -> case compactContains# buffer val s of
-         (# s', v #) -> (# s', isTrue# v #) )
-
--- |Check if the argument is in any Compact
-isCompact :: a -> IO Bool
-isCompact !val =
-  IO (\s -> case compactContainsAny# val s of
-         (# s', v #) -> (# s', isTrue# v #) )
-
-compactResize :: Compact a -> Word -> IO ()
-compactResize (Compact oldBuffer _) (W# new_size) =
-  IO (\s -> case compactResize# oldBuffer new_size s of
-         s' -> (# s', () #) )
-
-compactAppendEvaledInternal :: Compact# -> a -> Int# -> State# RealWorld ->
-                               (# State# RealWorld, Compact a #)
-compactAppendEvaledInternal buffer root share s =
-  case compactAppend# buffer root share s of
-    (# s', adjustedRoot #) -> (# s', Compact buffer adjustedRoot #)
+compactSized :: NFData a => Int -> Bool -> a -> IO (Compact a)
+compactSized (I# size) share a = IO $ \s0 ->
+  case compactNew# (int2Word# size) s0 of { (# s1, compact# #) ->
+  case compactAddPrim compact# a s1 of { (# s2, pk #) ->
+  mkCompact compact# pk s2 }}
+ where
+  compactAddPrim
+    | share = compactAddWithSharing#
+    | otherwise = compactAdd#

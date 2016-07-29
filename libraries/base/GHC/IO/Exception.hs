@@ -24,6 +24,8 @@ module GHC.IO.Exception (
   Deadlock(..),
   AllocationLimitExceeded(..), allocationLimitExceeded,
   AssertionFailed(..),
+  CompactionFailed(..),
+  cannotCompactFunction, cannotCompactPinned, cannotCompactMutable,
 
   SomeAsyncException(..),
   asyncExceptionToException, asyncExceptionFromException,
@@ -124,6 +126,35 @@ instance Show AllocationLimitExceeded where
 
 allocationLimitExceeded :: SomeException -- for the RTS
 allocationLimitExceeded = toException AllocationLimitExceeded
+
+-----
+
+-- |Compaction found an object that cannot be compacted.  Functions
+-- cannot be compacted, nor can mutable objects or pinned objects.
+-- See 'Data.Compact.compact'.
+--
+-- @since 4.10.0.0
+data CompactionFailed = CompactionFailed String
+
+-- | @since 4.10.0.0
+instance Exception CompactionFailed where
+
+-- | @since 4.10.0.0
+instance Show CompactionFailed where
+    showsPrec _ (CompactionFailed why) =
+      showString ("compaction failed: " ++ why)
+
+cannotCompactFunction :: SomeException -- for the RTS
+cannotCompactFunction =
+  toException (CompactionFailed "cannot compact functions")
+
+cannotCompactPinned :: SomeException -- for the RTS
+cannotCompactPinned =
+  toException (CompactionFailed "cannot compact pinned objects")
+
+cannotCompactMutable :: SomeException -- for the RTS
+cannotCompactMutable =
+  toException (CompactionFailed "cannot compact mutable objects")
 
 -----
 

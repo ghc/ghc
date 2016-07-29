@@ -102,6 +102,8 @@ initGeneration (generation *gen, int g)
     gen->n_new_large_words = 0;
     gen->compact_objects = NULL;
     gen->n_compact_blocks = 0;
+    gen->compact_blocks_in_import = NULL;
+    gen->n_compact_blocks_in_import = 0;
     gen->scavenged_large_objects = NULL;
     gen->n_scavenged_large_blocks = 0;
     gen->live_compact_objects = NULL;

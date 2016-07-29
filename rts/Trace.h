@@ -62,6 +62,7 @@ enum CapsetType { CapsetTypeCustom = CAPSET_TYPE_CUSTOM,
 #define DEBUG_squeeze     RtsFlags.DebugFlags.squeeze
 #define DEBUG_hpc         RtsFlags.DebugFlags.hpc
 #define DEBUG_sparks      RtsFlags.DebugFlags.sparks
+#define DEBUG_compact     RtsFlags.DebugFlags.compact
 
 // events
 extern int TRACE_sched;

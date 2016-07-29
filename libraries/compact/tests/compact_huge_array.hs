@@ -35,7 +35,7 @@ instance NFData (U.UArray i e) where
 -- test :: (Word -> a -> IO (Maybe (Compact a))) -> IO ()
 test func = do
   let fromList :: Array Int Int
-      fromList = listArray (1, 10) [1..]
+      fromList = listArray (1, 300000) [1..]
       frozen :: Array Int Int
       frozen = runST $ do
         arr <- arrTest :: ST s (STArray s Int Int)

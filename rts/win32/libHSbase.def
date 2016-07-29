@@ -38,6 +38,9 @@ EXPORTS
 	base_GHCziIOziException_blockedIndefinitelyOnSTM_closure
         base_GHCziIOziException_allocationLimitExceeded_closure
         base_GHCziIOziException_stackOverflow_closure
+        base_GHCziIOziException_cannotCompactFunction_closure
+        base_GHCziIOziException_cannotCompactPinned_closure
+        base_GHCziIOziException_cannotCompactMutable_closure
 
 	base_ControlziExceptionziBase_nonTermination_closure
 	base_ControlziExceptionziBase_nestedAtomically_closure

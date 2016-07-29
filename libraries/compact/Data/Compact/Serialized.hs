@@ -29,30 +29,13 @@ module Data.Compact.Serialized(
   importCompactByteStrings,
 ) where
 
--- Write down all GHC.Prim deps explicitly to keep them at minimum
-import GHC.Prim (Compact#,
-                 compactGetFirstBlock#,
-                 compactGetNextBlock#,
-                 compactAllocateBlock#,
-                 compactFixupPointers#,
-                 touch#,
-                 Addr#,
-                 nullAddr#,
-                 eqAddr#,
-                 addrToAny#,
-                 anyToAddr#,
-                 State#,
-                 RealWorld,
-                 Word#,
-                 )
-
--- We need to import Word from GHC.Types to see the representation
--- and to able to access the Word# to pass down the primops
-import GHC.Types (IO(..), Word(..), isTrue#)
+import GHC.Prim
+import GHC.Types
 import GHC.Word (Word8)
 
 import GHC.Ptr (Ptr(..), plusPtr)
 
+import Control.Concurrent
 import qualified Data.ByteString as ByteString
 import Data.ByteString.Internal(toForeignPtr)
 import Data.IORef(newIORef, readIORef, writeIORef)
@@ -60,16 +43,16 @@ import Foreign.ForeignPtr(withForeignPtr)
 import Foreign.Marshal.Utils(copyBytes)
 import Control.DeepSeq(NFData, force)
 
-import Data.Compact.Internal(Compact(..))
+import Data.Compact.Internal
 
 -- |A serialized version of the 'Compact' metadata (each block with
 -- address and size and the address of the root). This structure is
 -- meant to be sent alongside the actual 'Compact' data. It can be
 -- sent out of band in advance if the data is to be sent over RDMA
 -- (which requires both sender and receiver to have pinned buffers).
-data SerializedCompact a = SerializedCompact {
-  serializedCompactBlockList :: [(Ptr a, Word)],
-  serializedCompactRoot :: Ptr a
+data SerializedCompact a = SerializedCompact
+  { serializedCompactBlockList :: [(Ptr a, Word)]
+  , serializedCompactRoot :: Ptr a
   }
 
 addrIsNull :: Addr# -> Bool
@@ -109,7 +92,7 @@ mkBlockList buffer = compactGetFirstBlock buffer >>= go
 {-# NOINLINE withSerializedCompact #-}
 withSerializedCompact :: NFData c => Compact a ->
                          (SerializedCompact a -> IO c) -> IO c
-withSerializedCompact (Compact buffer root) func = do
+withSerializedCompact (Compact buffer root lock) func = withMVar lock $ \_ -> do
   rootPtr <- IO (\s -> case anyToAddr# root s of
                     (# s', rootAddr #) -> (# s', Ptr rootAddr #) )
   blockList <- mkBlockList buffer
@@ -129,7 +112,8 @@ fixupPointers firstBlock rootAddr s =
     (# s', buffer, adjustedRoot #) ->
       if addrIsNull adjustedRoot then (# s', Nothing #)
       else case addrToAny# adjustedRoot of
-        (# root #) -> (# s', Just $ Compact buffer root #)
+        (# root #) -> case mkCompact buffer root s' of
+          (# s'', c #) -> (# s'', Just c #)
 
 -- |Deserialize a 'SerializedCompact' into a in-memory 'Compact'. The
 -- provided function will be called with the address and size of each
@@ -175,11 +159,13 @@ importCompact (SerializedCompact blocks root) filler = do
   -- these are obviously strict lets, but ghc complains otherwise
   let !((_, W# firstSize):otherBlocks) = blocks
   let !(Ptr rootAddr) = root
-  IO (\s0 -> case compactAllocateBlock# firstSize nullAddr# s0 of
-         (# s1, firstBlock #) ->
-           case fillBlock firstBlock firstSize s1 of
-             s2 -> case go firstBlock otherBlocks s2 of
-               s3-> fixupPointers firstBlock rootAddr s3 )
+  IO $ \s0 ->
+    case compactAllocateBlock# firstSize nullAddr# s0 of {
+      (# s1, firstBlock #) ->
+    case fillBlock firstBlock firstSize s1 of { s2 ->
+    case go firstBlock otherBlocks s2 of { s3 ->
+    fixupPointers firstBlock rootAddr s3
+    }}}
   where
     -- note that the case statements above are strict even though
     -- they don't seem to inspect their argument because State#

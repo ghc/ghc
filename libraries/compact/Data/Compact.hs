@@ -2,6 +2,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# OPTIONS_GHC -Wno-redundant-constraints -Wno-name-shadowing #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -18,72 +19,102 @@
 -- holding fully evaluated data in a consecutive block of memory.
 --
 -- /Since: 1.0.0/
+
 module Data.Compact (
+  -- * The Compact type
   Compact,
+
+  -- * Compacting data
+  compact,
+  compactWithSharing,
+  compactAdd,
+  compactAddWithSharing,
+
+  -- * Inspecting a Compact
   getCompact,
   inCompact,
   isCompact,
+  compactSize,
 
-  newCompact,
-  newCompactNoShare,
-  appendCompact,
-  appendCompactNoShare,
+  -- * Other utilities
+  compactResize,
   ) where
 
--- Write down all GHC.Prim deps explicitly to keep them at minimum
-import GHC.Prim (Compact#,
-                 compactNew#,
-                 State#,
-                 RealWorld,
-                 Int#,
-                 )
--- We need to import Word from GHC.Types to see the representation
--- and to able to access the Word# to pass down the primops
-import GHC.Types (IO(..), Word(..))
+import Control.Concurrent
+import Control.DeepSeq (NFData)
+import GHC.Prim
+import GHC.Types
 
-import Control.DeepSeq (NFData, force)
+import Data.Compact.Internal as Internal
 
-import Data.Compact.Internal(Compact(..),
-                             isCompact,
-                             inCompact,
-                             compactAppendEvaledInternal)
-
--- |Retrieve the object that was stored in a Compact
+-- | Retrieve the object that was stored in a 'Compact'
 getCompact :: Compact a -> a
-getCompact (Compact _ obj) = obj
+getCompact (Compact _ obj _) = obj
 
-compactAppendInternal :: NFData a => Compact# -> a -> Int# ->
-                         State# RealWorld -> (# State# RealWorld, Compact a #)
-compactAppendInternal buffer root share s =
-  case force root of
-    !eval -> compactAppendEvaledInternal buffer eval share s
+-- | Compact a value. /O(size of unshared data)/
+--
+-- If the structure contains any internal sharing, the shared data
+-- will be duplicated during the compaction process.  Loops if the
+-- structure constains cycles.
+--
+-- The NFData constraint is just to ensure that the object contains no
+-- functions, 'compact' does not actually use it.  If your object
+-- contains any functions, then 'compact' will fail. (and your
+-- 'NFData' instance is lying).
+--
+compact :: NFData a => a -> IO (Compact a)
+compact = Internal.compactSized 31268 False
 
-compactAppendInternalIO :: NFData a => Int# -> Compact b -> a -> IO (Compact a)
-compactAppendInternalIO share (Compact buffer _) root =
-  IO (\s -> compactAppendInternal buffer root share s)
+-- | Compact a value, retaining any internal sharing and
+-- cycles. /O(size of data)/
+--
+-- This is typically about 10x slower than 'compact', because it works
+-- by maintaining a hash table mapping uncompacted objects to
+-- compacted objects.
+--
+-- The 'NFData' constraint is just to ensure that the object contains no
+-- functions, `compact` does not actually use it.  If your object
+-- contains any functions, then 'compactWithSharing' will fail. (and
+-- your 'NFData' instance is lying).
+--
+compactWithSharing :: NFData a => a -> IO (Compact a)
+compactWithSharing = Internal.compactSized 31268 True
 
--- |Append a value to a 'Compact', and return a new 'Compact'
--- that shares the same buffer but a different root object.
-appendCompact :: NFData a => Compact b -> a -> IO (Compact a)
-appendCompact = compactAppendInternalIO 1#
+-- | Add a value to an existing 'Compact'.  Behaves exactly like
+-- 'compact' with respect to sharing and the 'NFData' constraint.
+compactAdd :: NFData a => Compact b -> a -> IO (Compact a)
+compactAdd (Compact compact# _ lock) a = withMVar lock $ \_ -> IO $ \s ->
+  case compactAdd# compact# a s of { (# s1, pk #) ->
+  (# s1, Compact compact# pk lock #) }
 
--- |Append a value to a 'Compact'. This function differs from
--- 'appendCompact' in that it will not preserve internal sharing
--- in the passed in value (and it will diverge on cyclic structures).
-appendCompactNoShare :: NFData a => Compact b -> a -> IO (Compact a)
-appendCompactNoShare = compactAppendInternalIO 0#
+-- | Add a value to an existing 'Compact'.  Behaves exactly like
+-- 'compactWithSharing' with respect to sharing and the 'NFData'
+-- constraint.
+compactAddWithSharing :: NFData a => Compact b -> a -> IO (Compact a)
+compactAddWithSharing (Compact compact# _ lock) a =
+  withMVar lock $ \_ -> IO $ \s ->
+    case compactAddWithSharing# compact# a s of { (# s1, pk #) ->
+    (# s1, Compact compact# pk lock #) }
 
-compactNewInternal :: NFData a => Int# -> Word -> a -> IO (Compact a)
-compactNewInternal share (W# size) root =
-  IO (\s -> case compactNew# size s of
-         (# s', buffer #) -> compactAppendInternal buffer root share s' )
 
--- |Create a new 'Compact', with the provided value as suggested block
--- size (which will be adjusted if unsuitable), and append the given
--- value to it, as if calling 'appendCompact'
-newCompact :: NFData a => Word -> a -> IO (Compact a)
-newCompact = compactNewInternal 1#
+-- | Check if the second argument is inside the 'Compact'
+inCompact :: Compact b -> a -> IO Bool
+inCompact (Compact buffer _ _) !val =
+  IO (\s -> case compactContains# buffer val s of
+         (# s', v #) -> (# s', isTrue# v #) )
 
--- |Create a new 'Compact', but append the value using 'appendCompactNoShare'
-newCompactNoShare :: NFData a => Word -> a -> IO (Compact a)
-newCompactNoShare = compactNewInternal 0#
+-- | Check if the argument is in any 'Compact'
+isCompact :: a -> IO Bool
+isCompact !val =
+  IO (\s -> case compactContainsAny# val s of
+         (# s', v #) -> (# s', isTrue# v #) )
+
+compactSize :: Compact a -> IO Word
+compactSize (Compact buffer _ lock) = withMVar lock $ \_ -> IO $ \s0 ->
+   case compactSize# buffer s0 of (# s1, sz #) -> (# s1, W# sz #)
+
+compactResize :: Compact a -> Word -> IO ()
+compactResize (Compact oldBuffer _ lock) (W# new_size) =
+  withMVar lock $ \_ -> IO $ \s ->
+    case compactResize# oldBuffer new_size s of
+      s' -> (# s', () #)
