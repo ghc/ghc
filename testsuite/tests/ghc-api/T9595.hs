@@ -21,6 +21,7 @@ main =
                 setSessionDynFlags (dflags {
                     packageFlags = [ExposePackage "-package ghc"
                                                   (PackageArg "ghc")
+                                                  ExposeEager
                                                   (ModRenaming True [])]
                     })
                 state <- hsc_units <$> getSession

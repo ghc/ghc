@@ -392,7 +392,7 @@ warnUnusedPackages hsc_env mod_graph =
        else []
 
     where
-        packageArg (ExposePackage _ arg _) = Just arg
+        packageArg (ExposePackage _ arg _ _) = Just arg
         packageArg _ = Nothing
 
         pprUnusedArg (PackageArg str) = text str

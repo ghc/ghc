@@ -843,7 +843,7 @@ applyPackageFlag
 
 applyPackageFlag prec_map pkg_map closure unusable no_hide_others pkgs vm flag =
   case flag of
-    ExposePackage _ arg (ModRenaming b rns) ->
+    ExposePackage _ arg exposeFlag (ModRenaming b rns) ->
        case findPackages prec_map pkg_map closure arg pkgs unusable of
          Left ps     -> Failed (PackageFlagErr flag ps)
          Right (p:_) -> Succeeded vm'
@@ -876,7 +876,7 @@ applyPackageFlag prec_map pkg_map closure unusable no_hide_others pkgs vm flag =
                 , uv_renamings = rns
                 , uv_package_name = First (Just n)
                 , uv_requirements = reqs
-                , uv_explicit = True
+                , uv_explicit = exposeFlag == ExposeEager
                 }
            vm' = Map.insertWith mappend (mkUnit p) uv vm_cleared
            -- In the old days, if you said `ghc -package p-0.1 -package p-0.2`
@@ -1020,7 +1020,7 @@ comparing f a b = f a `compare` f b
 pprFlag :: PackageFlag -> SDoc
 pprFlag flag = case flag of
     HidePackage p   -> text "-hide-package " <> text p
-    ExposePackage doc _ _ -> text doc
+    ExposePackage doc _ _ _ -> text doc
 
 pprTrustFlag :: TrustFlag -> SDoc
 pprTrustFlag flag = case flag of

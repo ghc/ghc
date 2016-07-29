@@ -233,7 +233,7 @@ withBkpSession cid insts deps session_type do_this = do
               in ExposePackage
                 (showSDoc dflags
                     (text "-unit-id" <+> ppr uid <+> ppr rn))
-                (UnitIdArg uid) rn) deps
+                (UnitIdArg uid) ExposeEager rn) deps
             }
     withTempSession mk_temp_env $ do
       dflags <- getSessionDynFlags
