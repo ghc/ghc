@@ -122,6 +122,60 @@ ld-options:
          , "-Wl,-u,_base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure"
          , "-Wl,-u,_base_GHCziConcziSync_runSparks_closure"
          , "-Wl,-u,_base_GHCziConcziSignal_runHandlersPtr_closure"
+         , "-Wl,-u,_hs_atomic_add8"
+         , "-Wl,-u,_hs_atomic_add16"
+         , "-Wl,-u,_hs_atomic_add32"
+#if WORD_SIZE_IN_BITS == 64
+         , "-Wl,-u,_hs_atomic_add64"
+#endif
+         , "-Wl,-u,_hs_atomic_sub8"
+         , "-Wl,-u,_hs_atomic_sub16"
+         , "-Wl,-u,_hs_atomic_sub32"
+#if WORD_SIZE_IN_BITS == 64
+         , "-Wl,-u,_hs_atomic_sub64"
+#endif
+         , "-Wl,-u,_hs_atomic_and8"
+         , "-Wl,-u,_hs_atomic_and16"
+         , "-Wl,-u,_hs_atomic_and32"
+#if WORD_SIZE_IN_BITS == 64
+         , "-Wl,-u,_hs_atomic_and64"
+#endif
+         , "-Wl,-u,_hs_atomic_nand8"
+         , "-Wl,-u,_hs_atomic_nand16"
+         , "-Wl,-u,_hs_atomic_nand32"
+#if WORD_SIZE_IN_BITS == 64
+         , "-Wl,-u,_hs_atomic_nand64"
+#endif
+         , "-Wl,-u,_hs_atomic_or8"
+         , "-Wl,-u,_hs_atomic_or16"
+         , "-Wl,-u,_hs_atomic_or32"
+#if WORD_SIZE_IN_BITS == 64
+         , "-Wl,-u,_hs_atomic_or64"
+#endif
+         , "-Wl,-u,_hs_atomic_xor8"
+         , "-Wl,-u,_hs_atomic_xor16"
+         , "-Wl,-u,_hs_atomic_xor32"
+#if WORD_SIZE_IN_BITS == 64
+         , "-Wl,-u,_hs_atomic_xor64"
+#endif
+         , "-Wl,-u,_hs_cmpxchg8"
+         , "-Wl,-u,_hs_cmpxchg16"
+         , "-Wl,-u,_hs_cmpxchg32"
+#if WORD_SIZE_IN_BITS == 64
+         , "-Wl,-u,_hs_cmpxchg64"
+#endif
+         , "-Wl,-u,_hs_atomicread8"
+         , "-Wl,-u,_hs_atomicread16"
+         , "-Wl,-u,_hs_atomicread32"
+#if WORD_SIZE_IN_BITS == 64
+         , "-Wl,-u,_hs_atomicread64"
+#endif
+         , "-Wl,-u,_hs_atomicwrite8"
+         , "-Wl,-u,_hs_atomicwrite16"
+         , "-Wl,-u,_hs_atomicwrite32"
+#if WORD_SIZE_IN_BITS == 64
+         , "-Wl,-u,_hs_atomicwrite64"
+#endif
 #else
            "-Wl,-u,ghczmprim_GHCziTypes_Izh_static_info"
          , "-Wl,-u,ghczmprim_GHCziTypes_Czh_static_info"
@@ -164,6 +218,60 @@ ld-options:
          , "-Wl,-u,base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure"
          , "-Wl,-u,base_GHCziConcziSync_runSparks_closure"
          , "-Wl,-u,base_GHCziConcziSignal_runHandlersPtr_closure"
+         , "-Wl,-u,hs_atomic_add8"
+         , "-Wl,-u,hs_atomic_add16"
+         , "-Wl,-u,hs_atomic_add32"
+#if WORD_SIZE_IN_BITS == 64
+         , "-Wl,-u,hs_atomic_add64"
+#endif
+         , "-Wl,-u,hs_atomic_sub8"
+         , "-Wl,-u,hs_atomic_sub16"
+         , "-Wl,-u,hs_atomic_sub32"
+#if WORD_SIZE_IN_BITS == 64
+         , "-Wl,-u,hs_atomic_sub64"
+#endif
+         , "-Wl,-u,hs_atomic_and8"
+         , "-Wl,-u,hs_atomic_and16"
+         , "-Wl,-u,hs_atomic_and32"
+#if WORD_SIZE_IN_BITS == 64
+         , "-Wl,-u,hs_atomic_and64"
+#endif
+         , "-Wl,-u,hs_atomic_nand8"
+         , "-Wl,-u,hs_atomic_nand16"
+         , "-Wl,-u,hs_atomic_nand32"
+#if WORD_SIZE_IN_BITS == 64
+         , "-Wl,-u,hs_atomic_nand64"
+#endif
+         , "-Wl,-u,hs_atomic_or8"
+         , "-Wl,-u,hs_atomic_or16"
+         , "-Wl,-u,hs_atomic_or32"
+#if WORD_SIZE_IN_BITS == 64
+         , "-Wl,-u,hs_atomic_or64"
+#endif
+         , "-Wl,-u,hs_atomic_xor8"
+         , "-Wl,-u,hs_atomic_xor16"
+         , "-Wl,-u,hs_atomic_xor32"
+#if WORD_SIZE_IN_BITS == 64
+         , "-Wl,-u,hs_atomic_xor64"
+#endif
+         , "-Wl,-u,hs_cmpxchg8"
+         , "-Wl,-u,hs_cmpxchg16"
+         , "-Wl,-u,hs_cmpxchg32"
+#if WORD_SIZE_IN_BITS == 64
+         , "-Wl,-u,hs_cmpxchg64"
+#endif
+         , "-Wl,-u,hs_atomicread8"
+         , "-Wl,-u,hs_atomicread16"
+         , "-Wl,-u,hs_atomicread32"
+#if WORD_SIZE_IN_BITS == 64
+         , "-Wl,-u,hs_atomicread64"
+#endif
+         , "-Wl,-u,hs_atomicwrite8"
+         , "-Wl,-u,hs_atomicwrite16"
+         , "-Wl,-u,hs_atomicwrite32"
+#if WORD_SIZE_IN_BITS == 64
+         , "-Wl,-u,hs_atomicwrite64"
+#endif
 #endif
 
 /*  Pick up static libraries in preference over dynamic if in earlier search
