@@ -66,11 +66,11 @@ process_dll_link() {
 
             DLLimport="$base.dll.a"
             dlltool -d $defFile -l $DLLimport
-            build_delay_import_lib $defFile $DLLimport $8
             
             cmd="$7 $DLLimport $5 -optl-Wl,--retain-symbols-file=$exports -o $6"
             echo "$cmd"
             eval "$cmd" || exit 1            
+            build_delay_import_lib $defFile $DLLimport $8
             exit 0
             ;;
         [0-9]*)
@@ -154,9 +154,9 @@ process_dll_link() {
             fi
         done
         cmd="$7 $objs $def $imports -optl-Wl,--retain-symbols-file=$elstfile -o $DLLfile"
-        build_delay_import_lib $def "$base-pt$j.dll.a" $8
         echo "$cmd"
         eval "$cmd" || exit 1
+        build_delay_import_lib $def "$base-pt$j.dll.a" $8
     done
 
     # do some cleanup and create merged lib
