@@ -17,15 +17,16 @@ process_dll_link() {
     ext="${6##*.}"
     base="${6%.*}"
     exports="$base.lst"
-    max=20000
-    #max=65535
+    #max=20000
+    max=65535
 
     # We need to know how many symbols came from other static archives
     # So take the total number of symbols and remove those we know came
     # from the object files. Use this to lower the max amount of symbols.
     #
     # This granularity is the best we can do without --print-map like info.
-    nm -g $5 | sed -nr 's/^[a-z,A-Z,0-9]+\s[A-Z]\s(.+)$/\1/p' | sed -r 's/^.+:.*$//g' | sed '/^\s*$/d' | sort | uniq -u > $exports
+    RAW_EXPORTS=`nm -g $5 | sed -nr 's/^[a-z,A-Z,0-9]+\s([A-Z])\s(.+)$/\1 \2\n/p' | sed -r 's/^.+:.*$//g' | sed '/^\s*$/d' | sort | uniq -u`
+    echo -e "${RAW_EXPORTS}" | sed -nr 's/^[A-Z]+\s(.+)$/\1/p' > $exports
     SYMBOLS_OBJ=`cat $exports | wc -l | cut -d' ' -f1`
     echo "Number of symbols in object files for $6: $SYMBOLS_OBJ"
 
@@ -39,7 +40,11 @@ process_dll_link() {
 
             # Create a def file hiding symbols not in original object files
             # because --export-all is re-exporting things from static libs
-            awk -v root="$defFile" '{def=root;}{print "    \"" $0 "\""> def}' $exports
+            # we need to separate out data from functions. So first create two temporaries
+            globals=`echo -e "${RAW_EXPORTS}" | sed -nr 's/^[DdGgrRSs]\s(.+)$/\1\n/p'1 | sed '/^\s*$/d'`
+            functions=`echo -e "${RAW_EXPORTS}" | sed -nr 's/^[^DdGgrRSs]\s(.+)$/\1\n/p'1 | sed '/^\s*$/d'`
+            echo -e "${globals}" | awk -v root="$defFile" '{def=root;}{print "    \"" $0 "\" DATA"> def}'
+            echo -e "${functions}" | awk -v root="$defFile" '{def=root;}{print "    \"" $0 "\"">> def}'
             sed -i "1i\LIBRARY \"${6##*/}\"\\nEXPORTS" $defFile
 
             DLLimport="$base.dll.a"
