@@ -25,7 +25,7 @@ buildPackageData context@Context {..} = do
 
     inTreeMk %> \mk -> do
         -- Make sure all generated dependencies are in place before proceeding.
-        orderOnly $ generatedDependencies stage package
+        orderOnly =<< interpretInContext context generatedDependencies
 
         -- GhcCabal may run the configure script, so we depend on it.
         whenM (doesFileExist $ configure <.> "ac") $ need [configure]
@@ -59,7 +59,7 @@ buildPackageData context@Context {..} = do
     -- TODO: PROGNAME was $(CrossCompilePrefix)hp2ps.
     priority 2.0 $ do
         when (package == hp2ps) $ dataFile %> \mk -> do
-            orderOnly $ generatedDependencies stage package
+            orderOnly =<< interpretInContext context generatedDependencies
             includes <- interpretInContext context $ fromDiffExpr includesArgs
             let prefix = fixKey (buildPath context) ++ "_"
                 cSrcs  = [ "AreaBelow.c", "Curves.c", "Error.c", "Main.c"
@@ -76,7 +76,7 @@ buildPackageData context@Context {..} = do
             putSuccess $ "| Successfully generated " ++ mk
 
         when (package == unlit) $ dataFile %> \mk -> do
-            orderOnly $ generatedDependencies stage package
+            orderOnly =<< interpretInContext context generatedDependencies
             let prefix   = fixKey (buildPath context) ++ "_"
                 contents = unlines $ map (prefix++)
                     [ "PROGNAME = unlit"
@@ -86,7 +86,7 @@ buildPackageData context@Context {..} = do
             putSuccess $ "| Successfully generated " ++ mk
 
         when (package == touchy) $ dataFile %> \mk -> do
-            orderOnly $ generatedDependencies stage package
+            orderOnly =<< interpretInContext context generatedDependencies
             let prefix   = fixKey (buildPath context) ++ "_"
                 contents = unlines $ map (prefix++)
                     [ "PROGNAME = touchy"
@@ -98,7 +98,7 @@ buildPackageData context@Context {..} = do
         -- package, we cannot generate the corresponding `package-data.mk` file
         -- by running by running `ghcCabal`, because it has not yet been built.
         when (package == ghcCabal && stage == Stage0) $ dataFile %> \mk -> do
-            orderOnly $ generatedDependencies stage package
+            orderOnly =<< interpretInContext context generatedDependencies
             let prefix   = fixKey (buildPath context) ++ "_"
                 contents = unlines $ map (prefix++)
                     [ "PROGNAME = ghc-cabal"
@@ -110,7 +110,7 @@ buildPackageData context@Context {..} = do
 
         when (package == rts && stage == Stage1) $ do
             dataFile %> \mk -> do
-                orderOnly $ generatedDependencies stage package
+                orderOnly =<< interpretInContext context generatedDependencies
                 windows <- windowsHost
                 let prefix = fixKey (buildPath context) ++ "_"
                     dirs   = [ ".", "hooks", "sm", "eventlog", "linker" ]
