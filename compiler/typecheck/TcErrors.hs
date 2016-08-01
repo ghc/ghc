@@ -2546,7 +2546,7 @@ relevantBindings want_filtering ctxt ct
        ; (tidy_env', docs, discards)
               <- go env1 ct_tvs (maxRelevantBinds dflags)
                     emptyVarSet [] False
-                    (tcl_bndrs lcl_env)
+                    (remove_shadowing $ tcl_bndrs lcl_env)
          -- tcl_bndrs has the innermost bindings first,
          -- which are probably the most relevant ones
 
@@ -2571,6 +2571,16 @@ relevantBindings want_filtering ctxt ct
 
     dec_max :: Maybe Int -> Maybe Int
     dec_max = fmap (\n -> n - 1)
+
+    ---- fixes #12177
+    ---- builds up a list of bindings whose OccName has not been seen before
+    remove_shadowing :: [TcIdBinder] -> [TcIdBinder]
+    remove_shadowing bindings = reverse $ fst $ foldl
+      (\(bindingAcc, seenNames) binding ->
+        if (occName binding) `elemOccSet` seenNames -- if we've seen it
+          then (bindingAcc, seenNames)              -- skip it
+          else (binding:bindingAcc, extendOccSet seenNames (occName binding)))
+      ([], emptyOccSet) bindings
 
     go :: TidyEnv -> TcTyVarSet -> Maybe Int -> TcTyVarSet -> [SDoc]
        -> Bool                          -- True <=> some filtered out due to lack of fuel

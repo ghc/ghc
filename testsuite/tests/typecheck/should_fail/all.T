@@ -423,3 +423,4 @@ test('T12063', [ expect_broken(12063), extra_clean(['T12063.hi-boot', 'T12063.o-
 test('T11974b', normal, compile_fail, [''])
 test('T12151', normal, compile_fail, [''])
 test('T7437', normal, compile_fail, [''])
+test('T12177', normal, compile_fail, [''])
