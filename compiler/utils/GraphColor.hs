@@ -184,7 +184,7 @@ colorScan_spin iterative triv spill graph
                 kksCoalesce
 
         -- Coalesce:
-        --      If we're doing iterative coalescing and no triv nodes are avaliable
+        --      If we're doing iterative coalescing and no triv nodes are available
         --      then it's time for a coalescing pass.
         | iterative
         = case coalesceGraph False triv graph of
