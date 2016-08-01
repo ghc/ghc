@@ -1,0 +1,28 @@
+
+T12177.hs:3:19: error:
+    • Found hole: _ :: t
+      Where: ‘t’ is a rigid type variable bound by
+               the inferred type of bar :: t2 -> t1 -> t
+               at T12177.hs:3:1-19
+    • In the expression: _
+      In the expression: \ x -> _
+      In the expression: \ x -> \ x -> _
+    • Relevant bindings include
+        x :: t1 (bound at T12177.hs:3:14)
+        bar :: t2 -> t1 -> t (bound at T12177.hs:3:1)
+
+T12177.hs:5:37: error:
+    • Found hole: _ :: t
+      Where: ‘t’ is a rigid type variable bound by
+               the inferred type of baz :: t5 -> t4 -> t3 -> t2 -> t1 -> t
+               at T12177.hs:5:1-37
+    • In the expression: _
+      In the expression: \ z -> _
+      In the expression: \ x -> \ z -> _
+    • Relevant bindings include
+        z :: t1 (bound at T12177.hs:5:32)
+        x :: t2 (bound at T12177.hs:5:26)
+        y :: t4 (bound at T12177.hs:5:14)
+        baz :: t5 -> t4 -> t3 -> t2 -> t1 -> t
+          (bound at T12177.hs:5:1)
+          
