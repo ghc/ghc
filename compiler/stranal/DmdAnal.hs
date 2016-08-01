@@ -67,8 +67,9 @@ dmdAnalTopBind sigs (NonRec id rhs)
     (  _, _, _,   rhs1) = dmdAnalRhsLetDown TopLevel Nothing sigs             id rhs
     (sig, _, id2, rhs2) = dmdAnalRhsLetDown TopLevel Nothing (nonVirgin sigs) id rhs1
         -- Do two passes to improve CPR information
-        -- See comments with ignore_cpr_info in mk_sig_ty
-        -- and with extendSigsWithLam
+        -- See Note [CPR for thunks]
+        -- See Note [Optimistic CPR in the "virgin" case]
+        -- See Note [Initial CPR for strict binders]
 
 dmdAnalTopBind sigs (Rec pairs)
   = (sigs', Rec pairs')
