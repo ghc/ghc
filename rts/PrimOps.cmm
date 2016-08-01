@@ -221,7 +221,7 @@ stg_casIntArrayzh( gcptr arr, W_ ind, W_ old, W_ new )
     W_ p, h;
 
     p = arr + SIZEOF_StgArrBytes + WDS(ind);
-    (h) = ccall cas(p, old, new);
+    (h) = prim %cmpxchgW(p, old, new);
 
     return(h);
 }
@@ -338,7 +338,7 @@ stg_casArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
     W_ p, len;
 
     p = arr + SIZEOF_StgMutArrPtrs + WDS(ind);
-    (h) = ccall cas(p, old, new);
+    (h) = prim %cmpxchgW(p, old, new);
 
     if (h != old) {
         // Failure, return what was there instead of 'old':
@@ -490,7 +490,7 @@ stg_casSmallArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
     W_ p, len;
 
     p = arr + SIZEOF_StgSmallMutArrPtrs + WDS(ind);
-    (h) = ccall cas(p, old, new);
+    (h) = prim %cmpxchgW(p, old, new);
 
     if (h != old) {
         // Failure, return what was there instead of 'old':
@@ -530,7 +530,7 @@ stg_casMutVarzh ( gcptr mv, gcptr old, gcptr new )
 {
     gcptr h;
 
-    (h) = ccall cas(mv + SIZEOF_StgHeader + OFFSET_StgMutVar_var, old, new);
+    (h) = prim %cmpxchgW(mv + SIZEOF_StgHeader + OFFSET_StgMutVar_var, old, new);
     if (h != old) {
         return (1,h);
     } else {
@@ -606,7 +606,7 @@ stg_atomicModifyMutVarzh ( gcptr mv, gcptr f )
     x = StgMutVar_var(mv);
     StgThunk_payload(z,1) = x;
 #ifdef THREADED_RTS
-    (h) = ccall cas(mv + SIZEOF_StgHeader + OFFSET_StgMutVar_var, x, y);
+    (h) = prim %cmpxchgW(mv + SIZEOF_StgHeader + OFFSET_StgMutVar_var, x, y);
     if (h != x) { goto retry; }
 #else
     StgMutVar_var(mv) = y;

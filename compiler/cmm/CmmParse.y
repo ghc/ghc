@@ -987,7 +987,12 @@ callishMachOps = listToUFM $
         ( "popcnt8",  (,) $ MO_PopCnt W8  ),
         ( "popcnt16", (,) $ MO_PopCnt W16 ),
         ( "popcnt32", (,) $ MO_PopCnt W32 ),
-        ( "popcnt64", (,) $ MO_PopCnt W64 )
+        ( "popcnt64", (,) $ MO_PopCnt W64 ),
+
+        ( "cmpxchg8",  (,) $ MO_Cmpxchg W8  ),
+        ( "cmpxchg16", (,) $ MO_Cmpxchg W16 ),
+        ( "cmpxchg32", (,) $ MO_Cmpxchg W32 ),
+        ( "cmpxchg64", (,) $ MO_Cmpxchg W64 )
 
         -- ToDo: the rest, maybe
         -- edit: which rest?
