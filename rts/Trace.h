@@ -45,23 +45,23 @@ enum CapsetType { CapsetTypeCustom = CAPSET_TYPE_CUSTOM,
 // Message classes
 // -----------------------------------------------------------------------------
 
-// debugging flags, set with +RTS -D<something>
-extern int DEBUG_sched;
-extern int DEBUG_interp;
-extern int DEBUG_weak;
-extern int DEBUG_gccafs;
-extern int DEBUG_gc;
-extern int DEBUG_block_alloc;
-extern int DEBUG_sanity;
-extern int DEBUG_stable;
-extern int DEBUG_stm;
-extern int DEBUG_prof;
-extern int DEBUG_gran;
-extern int DEBUG_par;
-extern int DEBUG_linker;
-extern int DEBUG_squeeze;
-extern int DEBUG_hpc;
-extern int DEBUG_sparks;
+// shorthand for RtsFlags.DebugFlags.<blah>, useful with debugTrace()
+#define DEBUG_sched       RtsFlags.DebugFlags.scheduler
+#define DEBUG_interp      RtsFlags.DebugFlags.interp
+#define DEBUG_weak        RtsFlags.DebugFlags.weak
+#define DEBUG_gccafs      RtsFlags.DebugFlags.gccafs
+#define DEBUG_gc          RtsFlags.DebugFlags.gc
+#define DEBUG_block_alloc RtsFlags.DebugFlags.alloc
+#define DEBUG_sanity      RtsFlags.DebugFlags.sanity
+#define DEBUG_stable      RtsFlags.DebugFlags.stable
+#define DEBUG_stm         RtsFlags.DebugFlags.stm
+#define DEBUG_prof        RtsFlags.DebugFlags.prof
+#define DEBUG_gran        RtsFlags.DebugFlags.gran
+#define DEBUG_par         RtsFlags.DebugFlags.par
+#define DEBUG_linker      RtsFlags.DebugFlags.linker
+#define DEBUG_squeeze     RtsFlags.DebugFlags.squeeze
+#define DEBUG_hpc         RtsFlags.DebugFlags.hpc
+#define DEBUG_sparks      RtsFlags.DebugFlags.sparks
 
 // events
 extern int TRACE_sched;

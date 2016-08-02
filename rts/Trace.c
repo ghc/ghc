@@ -25,26 +25,6 @@
 #include <unistd.h>
 #endif
 
-#ifdef DEBUG
-// debugging flags, set with +RTS -D<something>
-int DEBUG_sched;
-int DEBUG_interp;
-int DEBUG_weak;
-int DEBUG_gccafs;
-int DEBUG_gc;
-int DEBUG_block_alloc;
-int DEBUG_sanity;
-int DEBUG_stable;
-int DEBUG_stm;
-int DEBUG_prof;
-int DEBUG_gran;
-int DEBUG_par;
-int DEBUG_linker;
-int DEBUG_squeeze;
-int DEBUG_hpc;
-int DEBUG_sparks;
-#endif
-
 // events
 int TRACE_sched;
 int TRACE_gc;
@@ -67,27 +47,6 @@ void initTracing (void)
 {
 #ifdef THREADED_RTS
     initMutex(&trace_utx);
-#endif
-
-#ifdef DEBUG
-#define DEBUG_FLAG(name, class) \
-    class = RtsFlags.DebugFlags.name ? 1 : 0;
-
-    DEBUG_FLAG(scheduler,    DEBUG_sched);
-
-    DEBUG_FLAG(interpreter,  DEBUG_interp);
-    DEBUG_FLAG(weak,         DEBUG_weak);
-    DEBUG_FLAG(gccafs,       DEBUG_gccafs);
-    DEBUG_FLAG(gc,           DEBUG_gc);
-    DEBUG_FLAG(block_alloc,  DEBUG_block_alloc);
-    DEBUG_FLAG(sanity,       DEBUG_sanity);
-    DEBUG_FLAG(stable,       DEBUG_stable);
-    DEBUG_FLAG(stm,          DEBUG_stm);
-    DEBUG_FLAG(prof,         DEBUG_prof);
-    DEBUG_FLAG(linker,       DEBUG_linker);
-    DEBUG_FLAG(squeeze,      DEBUG_squeeze);
-    DEBUG_FLAG(hpc,          DEBUG_hpc);
-    DEBUG_FLAG(sparks,       DEBUG_sparks);
 #endif
 
     // -Ds turns on scheduler tracing too
