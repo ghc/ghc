@@ -6,12 +6,11 @@ module Rules.Generate (
 import qualified System.Directory as IO
 
 import Base
-import Context
+import Context hiding (package)
 import Expression
 import GHC
 import Oracles.ModuleFiles
-import Predicate ( (?) )
-import qualified Predicate as Predicate
+import Predicate
 import Rules.Actions
 import Rules.Generators.ConfigHs
 import Rules.Generators.GhcAutoconfH
@@ -43,16 +42,16 @@ platformH stage = buildPath (vanillaContext stage compiler) -/- "ghc_boot_platfo
 
 -- TODO: move generated files to buildRootPath, see #113
 includesDependencies :: [FilePath]
-includesDependencies = ("includes" -/-) <$>
+includesDependencies = fmap ("includes" -/-)
     [ "ghcautoconf.h"
     , "ghcplatform.h"
     , "ghcversion.h" ]
 
 ghcPrimDependencies :: Expr [FilePath]
-ghcPrimDependencies = getStage >>= \stage ->
-     let prependPath x = buildPath (vanillaContext stage ghcPrim) -/- x
-     in return $
-         fmap prependPath [ "autogen/GHC/Prim.hs" , "GHC/PrimopWrappers.hs" ]
+ghcPrimDependencies = do
+    stage <- getStage
+    let path = buildPath $ vanillaContext stage ghcPrim
+    return [path -/- "autogen/GHC/Prim.hs", path -/- "GHC/PrimopWrappers.hs"]
 
 derivedConstantsPath :: FilePath
 derivedConstantsPath = "includes/dist-derivedconstants/header"
@@ -65,42 +64,38 @@ derivedConstantsDependencies = installTargets ++ fmap (derivedConstantsPath -/-)
     , "GHCConstantsHaskellWrappers.hs" ]
 
 compilerDependencies :: Expr [FilePath]
-compilerDependencies = getStage >>= \stage ->
-    let prependBuildPath x = buildPath (vanillaContext stage compiler) -/- x
-    in mconcat $
-        [ return $ (platformH stage)
-                       : includesDependencies
-                       ++ derivedConstantsDependencies
-        , Predicate.notStage0 ? return (gmpLibraryH : libffiDependencies)
-        , return $ fmap prependBuildPath
-              [ "primop-can-fail.hs-incl"
-              , "primop-code-size.hs-incl"
-              , "primop-commutable.hs-incl"
-              , "primop-data-decl.hs-incl"
-              , "primop-fixity.hs-incl"
-              , "primop-has-side-effects.hs-incl"
-              , "primop-list.hs-incl"
-              , "primop-out-of-line.hs-incl"
-              , "primop-primop-info.hs-incl"
-              , "primop-strictness.hs-incl"
-              , "primop-tag.hs-incl"
-              , "primop-vector-tycons.hs-incl"
-              , "primop-vector-tys-exports.hs-incl"
-              , "primop-vector-tys.hs-incl"
-              , "primop-vector-uniques.hs-incl"
-              ]
-        ]
+compilerDependencies = do
+    stage <- getStage
+    let path = buildPath $ vanillaContext stage compiler
+    mconcat [ return [platformH stage]
+            , return includesDependencies
+            , return derivedConstantsDependencies
+            , notStage0 ? return (gmpLibraryH : libffiDependencies)
+            , return $ fmap (path -/-)
+                  [ "primop-can-fail.hs-incl"
+                  , "primop-code-size.hs-incl"
+                  , "primop-commutable.hs-incl"
+                  , "primop-data-decl.hs-incl"
+                  , "primop-fixity.hs-incl"
+                  , "primop-has-side-effects.hs-incl"
+                  , "primop-list.hs-incl"
+                  , "primop-out-of-line.hs-incl"
+                  , "primop-primop-info.hs-incl"
+                  , "primop-strictness.hs-incl"
+                  , "primop-tag.hs-incl"
+                  , "primop-vector-tycons.hs-incl"
+                  , "primop-vector-tys-exports.hs-incl"
+                  , "primop-vector-tys.hs-incl"
+                  , "primop-vector-uniques.hs-incl" ] ]
 
 generatedDependencies :: Expr [FilePath]
 generatedDependencies = mconcat
-    [ Predicate.package compiler ? compilerDependencies
-    , Predicate.package ghcPrim ? ghcPrimDependencies
-    , Predicate.package rts ? return (
-          libffiDependencies
-              ++ includesDependencies
-              ++ derivedConstantsDependencies)
-    , Predicate.stage0 ? return includesDependencies
-    ]
+    [ package compiler ? compilerDependencies
+    , package ghcPrim  ? ghcPrimDependencies
+    , package rts      ? return (libffiDependencies
+        ++ includesDependencies
+        ++ derivedConstantsDependencies)
+    , stage0 ? return includesDependencies ]
 
 generate :: FilePath -> Context -> Expr String -> Action ()
 generate file context expr = do
