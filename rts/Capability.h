@@ -66,6 +66,7 @@ struct Capability_ {
     // also lock-free.
     StgTSO *run_queue_hd;
     StgTSO *run_queue_tl;
+    uint32_t n_run_queue;
 
     // Tasks currently making safe foreign calls.  Doubly-linked.
     // When returning, a task first acquires the Capability before
@@ -74,6 +75,7 @@ struct Capability_ {
     // the returning_tasks list, we must also migrate its entry from
     // this list.
     InCall *suspended_ccalls;
+    uint32_t n_suspended_ccalls;
 
     // One mutable list per generation, so we don't need to take any
     // locks when updating an old-generation thunk.  This also lets us
@@ -130,6 +132,7 @@ struct Capability_ {
     // check whether it is NULL without taking the lock, however.
     Task *returning_tasks_hd; // Singly-linked, with head/tail
     Task *returning_tasks_tl;
+    uint32_t n_returning_tasks;
 
     // Messages, or END_TSO_QUEUE.
     // Locks required: cap->lock
@@ -171,15 +174,27 @@ struct Capability_ {
   ASSERT(task->cap == cap);                                             \
   ASSERT_PARTIAL_CAPABILITY_INVARIANTS(cap,task)
 
+#if defined(THREADED_RTS)
+#define ASSERT_THREADED_CAPABILITY_INVARIANTS(cap,task)                  \
+  ASSERT(cap->returning_tasks_hd == NULL ?                              \
+           cap->returning_tasks_tl == NULL && cap->n_returning_tasks == 0 \
+         : 1);
+#else
+#define ASSERT_THREADED_CAPABILITY_INVARIANTS(cap,task) /* nothing */
+#endif
+
 // Sometimes a Task holds a Capability, but the Task is not associated
 // with that Capability (ie. task->cap != cap).  This happens when
 // (a) a Task holds multiple Capabilities, and (b) when the current
 // Task is bound, its thread has just blocked, and it may have been
 // moved to another Capability.
-#define ASSERT_PARTIAL_CAPABILITY_INVARIANTS(cap,task)  \
-  ASSERT(cap->run_queue_hd == END_TSO_QUEUE ?           \
-            cap->run_queue_tl == END_TSO_QUEUE : 1);    \
-  ASSERT(myTask() == task);                             \
+#define ASSERT_PARTIAL_CAPABILITY_INVARIANTS(cap,task)                  \
+  ASSERT(cap->run_queue_hd == END_TSO_QUEUE ?                           \
+            cap->run_queue_tl == END_TSO_QUEUE && cap->n_run_queue == 0 \
+         : 1);                                                          \
+  ASSERT(cap->suspended_ccalls == NULL ? cap->n_suspended_ccalls == 0 : 1); \
+  ASSERT_THREADED_CAPABILITY_INVARIANTS(cap,task);                      \
+  ASSERT(myTask() == task);                                             \
   ASSERT_TASK_ID(task);
 
 #if defined(THREADED_RTS)

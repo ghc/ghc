@@ -99,7 +99,7 @@ findSpark (Capability *cap)
   rtsBool retry;
   uint32_t i = 0;
 
-  if (!emptyRunQueue(cap) || cap->returning_tasks_hd != NULL) {
+  if (!emptyRunQueue(cap) || cap->n_returning_tasks != 0) {
       // If there are other threads, don't try to run any new
       // sparks: sparks might be speculative, we don't want to take
       // resources away from the main computation.
@@ -212,6 +212,7 @@ newReturningTask (Capability *cap, Task *task)
         cap->returning_tasks_hd = task;
     }
     cap->returning_tasks_tl = task;
+    cap->n_returning_tasks++;
 }
 
 STATIC_INLINE Task *
@@ -226,6 +227,7 @@ popReturningTask (Capability *cap)
         cap->returning_tasks_tl = NULL;
     }
     task->next = NULL;
+    cap->n_returning_tasks--;
     return task;
 }
 #endif
@@ -249,6 +251,7 @@ initCapability (Capability *cap, uint32_t i)
 
     cap->run_queue_hd      = END_TSO_QUEUE;
     cap->run_queue_tl      = END_TSO_QUEUE;
+    cap->n_run_queue       = 0;
 
 #if defined(THREADED_RTS)
     initMutex(&cap->lock);
@@ -256,8 +259,10 @@ initCapability (Capability *cap, uint32_t i)
     cap->spare_workers     = NULL;
     cap->n_spare_workers   = 0;
     cap->suspended_ccalls  = NULL;
+    cap->n_suspended_ccalls = 0;
     cap->returning_tasks_hd = NULL;
     cap->returning_tasks_tl = NULL;
+    cap->n_returning_tasks  = 0;
     cap->inbox              = (Message*)END_TSO_QUEUE;
     cap->sparks             = allocSparkPool();
     cap->spark_stats.created    = 0;
@@ -507,7 +512,7 @@ releaseCapability_ (Capability* cap,
 
     // Check to see whether a worker thread can be given
     // the go-ahead to return the result of an external call..
-    if (cap->returning_tasks_hd != NULL) {
+    if (cap->n_returning_tasks != 0) {
         giveCapabilityToTask(cap,cap->returning_tasks_hd);
         // The Task pops itself from the queue (see waitForCapability())
         return;
