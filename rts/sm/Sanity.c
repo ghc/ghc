@@ -796,12 +796,14 @@ checkRunQueue(Capability *cap)
 {
     StgTSO *prev, *tso;
     prev = END_TSO_QUEUE;
-    for (tso = cap->run_queue_hd; tso != END_TSO_QUEUE;
-         prev = tso, tso = tso->_link) {
+    uint32_t n;
+    for (n = 0, tso = cap->run_queue_hd; tso != END_TSO_QUEUE;
+         prev = tso, tso = tso->_link, n++) {
         ASSERT(prev == END_TSO_QUEUE || prev->_link == tso);
         ASSERT(tso->block_info.prev == prev);
     }
     ASSERT(cap->run_queue_tl == prev);
+    ASSERT(cap->n_run_queue == n);
 }
 
 /* -----------------------------------------------------------------------------
