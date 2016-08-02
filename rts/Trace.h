@@ -69,6 +69,7 @@ extern int TRACE_gc;
 extern int TRACE_spark_sampled;
 extern int TRACE_spark_full;
 /* extern int TRACE_user; */  // only used in Trace.c
+extern int TRACE_cap;
 
 // -----------------------------------------------------------------------------
 // Posting events
@@ -244,19 +245,23 @@ void traceThreadStatus_ (StgTSO *tso);
 
 /*
  * Events for describing capabilities and capability sets in the eventlog
- *
- * Note: unlike other events, these are not conditional on TRACE_sched or
- * similar because capabilities and capability sets are important
- * context for other events. Since other events depend on these events
- * then for simplicity we always emit them, rather than working out if
- * they're necessary . They should be very low volume.
  */
-void traceCapEvent (Capability   *cap,
+#define traceCapEvent(cap, tag)                 \
+    if (RTS_UNLIKELY(TRACE_cap)) {              \
+        traceCapEvent_(cap, tag);               \
+    }
+
+void traceCapEvent_ (Capability   *cap,
                     EventTypeNum  tag);
 
-void traceCapsetEvent (EventTypeNum tag,
-                       CapsetID     capset,
-                       StgWord      info);
+#define traceCapsetEvent(cap, capset, info)     \
+    if (RTS_UNLIKELY(TRACE_cap)) {              \
+        traceCapsetEvent_(cap, capset, info);   \
+    }
+
+void traceCapsetEvent_ (EventTypeNum tag,
+                        CapsetID     capset,
+                        StgWord      info);
 
 void traceWallClockTime_(void);
 
