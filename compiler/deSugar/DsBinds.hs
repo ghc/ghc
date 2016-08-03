@@ -347,6 +347,11 @@ dsHsBind dflags (AbsBindsSig { abs_tvs = tyvars, abs_ev_vars = dicts
 dsHsBind _ (PatSynBind{}) = panic "dsHsBind: PatSynBind"
 
 
+
+-- | This is where we apply INLINE and INLINABLE pragmas. All we need to
+-- do is to attach the unfolding information to the Id. When the interface
+-- files are created, unfoldings are only attached if the information is
+-- present.
 ------------------------
 makeCorePair :: DynFlags -> Id -> Bool -> Arity -> CoreExpr -> (Id, CoreExpr)
 makeCorePair dflags gbl_id is_default_method dict_arity rhs
