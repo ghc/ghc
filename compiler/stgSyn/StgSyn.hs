@@ -13,7 +13,6 @@ generation.
 
 module StgSyn (
         GenStgArg(..),
-        GenStgLiveVars,
 
         GenStgBinding(..), GenStgExpr(..), GenStgRhs(..),
         GenStgAlt, AltType(..),
@@ -25,7 +24,7 @@ module StgSyn (
         combineStgBinderInfo,
 
         -- a set of synonyms for the most common (only :-) parameterisation
-        StgArg, StgLiveVars,
+        StgArg,
         StgBinding, StgExpr, StgRhs, StgAlt,
 
         -- StgOp
@@ -37,8 +36,7 @@ module StgSyn (
         stgArgType,
         stripStgTicksTop,
 
-        pprStgBinding, pprStgBindings,
-        pprStgLVs
+        pprStgBinding, pprStgBindings
     ) where
 
 #include "HsVersions.h"
@@ -62,8 +60,6 @@ import PrimOp      ( PrimOp, PrimCall )
 import TyCon       ( PrimRep(..), TyCon )
 import Type        ( Type )
 import RepType     ( typePrimRep )
-import UniqFM
-import UniqSet
 import Unique      ( Unique )
 import Util
 
@@ -175,8 +171,6 @@ their closures first.)
 There is no constructor for a lone variable; it would appear as
 @StgApp var []@.
 -}
-
-type GenStgLiveVars occ = UniqSet occ
 
 data GenStgExpr bndr occ
   = StgApp
@@ -560,7 +554,6 @@ This happens to be the only one we use at the moment.
 
 type StgBinding  = GenStgBinding  Id Id
 type StgArg      = GenStgArg      Id
-type StgLiveVars = GenStgLiveVars Id
 type StgExpr     = GenStgExpr     Id Id
 type StgRhs      = GenStgRhs      Id Id
 type StgAlt      = GenStgAlt      Id Id
@@ -761,14 +754,6 @@ instance Outputable AltType where
   ppr (MultiValAlt n) = text "MultiAlt" <+> ppr n
   ppr (AlgAlt tc)     = text "Alg"    <+> ppr tc
   ppr (PrimAlt tc)    = text "Prim"   <+> ppr tc
-
-pprStgLVs :: Outputable occ => GenStgLiveVars occ -> SDoc
-pprStgLVs lvs
-  = getPprStyle $ \ sty ->
-    if userStyle sty || isEmptyUniqSet lvs then
-        empty
-    else
-        hcat [text "{-lvs:", pprUFM lvs interpp'SP, text "-}"]
 
 pprStgRhs :: (OutputableBndr bndr, Outputable bdee, Ord bdee)
           => GenStgRhs bndr bdee -> SDoc
