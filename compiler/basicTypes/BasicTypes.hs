@@ -980,7 +980,7 @@ if an Id has defaultInlinePragma it means the user didn't specify anything.
 
 If inl_inline = Inline or Inlineable, then the Id should have an InlineRule unfolding.
 
-If you want to know where InlinePragmas take effect: Look in DsBinds.mkCorePair
+If you want to know where InlinePragmas take effect: Look in DsBinds.makeCorePair
 
 Note [CONLIKE pragma]
 ~~~~~~~~~~~~~~~~~~~~~
