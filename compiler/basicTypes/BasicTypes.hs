@@ -971,14 +971,14 @@ This data type mirrors what you can write in an INLINE or NOINLINE pragma in
 the source program.
 
 If you write nothing at all, you get defaultInlinePragma:
-   inl_inline = False
+   inl_inline = EmptyInlineSpec
    inl_act    = AlwaysActive
    inl_rule   = FunLike
 
 It's not possible to get that combination by *writing* something, so
 if an Id has defaultInlinePragma it means the user didn't specify anything.
 
-If inl_inline = True, then the Id should have an InlineRule unfolding.
+If inl_inline = Inline or Inlineable, then the Id should have an InlineRule unfolding.
 
 Note [CONLIKE pragma]
 ~~~~~~~~~~~~~~~~~~~~~
