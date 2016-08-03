@@ -369,7 +369,7 @@ output it generates.
  'pattern'      { L _ ITpattern } -- for pattern synonyms
  'static'       { L _ ITstatic }  -- for static pointers extension
 
- '{-# INLINE'             { L _ (ITinline_prag _ _ _) }
+ '{-# INLINE'             { L _ (ITinline_prag _ _ _) } -- INLINE or INLINABLE
  '{-# SPECIALISE'         { L _ (ITspec_prag _) }
  '{-# SPECIALISE_INLINE'  { L _ (ITspec_inline_prag _ _) }
  '{-# SOURCE'             { L _ (ITsource_prag _) }
@@ -2058,6 +2058,7 @@ sigdecl :: { LHsDecl RdrName }
 
         | pattern_synonym_sig   { sLL $1 $> . SigD . unLoc $ $1 }
 
+        -- This rule is for both INLINE and INLINABLE pragmas
         | '{-# INLINE' activation qvar '#-}'
                 {% ams ((sLL $1 $> $ SigD (InlineSig $3
                             (mkInlinePragma (getINLINE_PRAGs $1) (getINLINE $1)
