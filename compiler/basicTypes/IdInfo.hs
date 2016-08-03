@@ -38,7 +38,7 @@ module IdInfo (
         demandInfo, setDemandInfo, pprStrictness,
 
         -- ** Unfolding Info
-        unfoldingInfo, setUnfoldingInfo, setUnfoldingInfoLazily,
+        unfoldingInfo, setUnfoldingInfo,
 
         -- ** The InlinePragInfo type
         InlinePragInfo,
@@ -229,11 +229,6 @@ setInlinePragInfo info pr = pr `seq` info { inlinePragInfo = pr }
 setOccInfo :: IdInfo -> OccInfo -> IdInfo
 setOccInfo        info oc = oc `seq` info { occInfo = oc }
         -- Try to avoid spack leaks by seq'ing
-
-setUnfoldingInfoLazily :: IdInfo -> Unfolding -> IdInfo
-setUnfoldingInfoLazily info uf  -- Lazy variant to avoid looking at the
-  =                             -- unfolding of an imported Id unless necessary
-    info { unfoldingInfo = uf } -- (In this case the demand-zapping is redundant.)
 
 setUnfoldingInfo :: IdInfo -> Unfolding -> IdInfo
 setUnfoldingInfo info uf

@@ -1232,7 +1232,7 @@ tcIdInfo ignore_prags name ty info
       = do { unf <- tcUnfolding name ty info if_unf
            ; let info1 | lb        = info `setOccInfo` strongLoopBreaker
                        | otherwise = info
-           ; return (info1 `setUnfoldingInfoLazily` unf) }
+           ; return (info1 `setUnfoldingInfo` unf) }
 
 tcUnfolding :: Name -> Type -> IdInfo -> IfaceUnfolding -> IfL Unfolding
 tcUnfolding name _ info (IfCoreUnfold stable if_expr)

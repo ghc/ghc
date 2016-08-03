@@ -315,7 +315,7 @@ vectTopBinder var inline expr
                   (text "Inferred type" <+> ppr vdty)
               }
           -- Make the vectorised version of binding's name, and set the unfolding used for inlining
-      ; var' <- liftM (`setIdUnfoldingLazily` unfolding)
+      ; var' <- liftM (`setIdUnfolding` unfolding)
                 $  mkVectId var vty
 
           -- Add the mapping between the plain and vectorised name to the state.
