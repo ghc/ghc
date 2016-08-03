@@ -349,9 +349,12 @@ dsHsBind _ (PatSynBind{}) = panic "dsHsBind: PatSynBind"
 
 
 -- | This is where we apply INLINE and INLINABLE pragmas. All we need to
--- do is to attach the unfolding information to the Id. When the interface
--- files are created, unfoldings are only attached if the information is
--- present.
+-- do is to attach the unfolding information to the Id.
+--
+-- Other decisions about whether to inline are made in
+-- `calcUnfoldingGuidance` but the decision about whether to then expose
+-- the unfolding in the interface file is made in `TidyPgm.addExternal`
+-- using this information.
 ------------------------
 makeCorePair :: DynFlags -> Id -> Bool -> Arity -> CoreExpr -> (Id, CoreExpr)
 makeCorePair dflags gbl_id is_default_method dict_arity rhs
