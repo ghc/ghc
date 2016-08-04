@@ -11,7 +11,7 @@ module CmmLive
     , cmmLocalLiveness
     , cmmGlobalLiveness
     , liveLattice
-    , gen, kill, gen_kill
+    , gen_kill
     )
 where
 
