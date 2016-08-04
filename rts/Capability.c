@@ -213,6 +213,7 @@ newReturningTask (Capability *cap, Task *task)
     }
     cap->returning_tasks_tl = task;
     cap->n_returning_tasks++;
+    ASSERT_RETURNING_TASKS(cap,task);
 }
 
 STATIC_INLINE Task *
@@ -228,6 +229,7 @@ popReturningTask (Capability *cap)
     }
     task->next = NULL;
     cap->n_returning_tasks--;
+    ASSERT_RETURNING_TASKS(cap,task);
     return task;
 }
 #endif
@@ -507,6 +509,7 @@ releaseCapability_ (Capability* cap,
     task = cap->running_task;
 
     ASSERT_PARTIAL_CAPABILITY_INVARIANTS(cap,task);
+    ASSERT_RETURNING_TASKS(cap,task);
 
     cap->running_task = NULL;
 

@@ -174,13 +174,15 @@ struct Capability_ {
   ASSERT(task->cap == cap);                                             \
   ASSERT_PARTIAL_CAPABILITY_INVARIANTS(cap,task)
 
+// This assert requires cap->lock to be held, so it can't be part of
+// ASSERT_PARTIAL_CAPABILITY_INVARIANTS()
 #if defined(THREADED_RTS)
-#define ASSERT_THREADED_CAPABILITY_INVARIANTS(cap,task)                  \
+#define ASSERT_RETURNING_TASKS(cap,task)                                \
   ASSERT(cap->returning_tasks_hd == NULL ?                              \
            cap->returning_tasks_tl == NULL && cap->n_returning_tasks == 0 \
          : 1);
 #else
-#define ASSERT_THREADED_CAPABILITY_INVARIANTS(cap,task) /* nothing */
+#define ASSERT_RETURNING_TASKS(cap,task) /* nothing */
 #endif
 
 // Sometimes a Task holds a Capability, but the Task is not associated
@@ -193,7 +195,6 @@ struct Capability_ {
             cap->run_queue_tl == END_TSO_QUEUE && cap->n_run_queue == 0 \
          : 1);                                                          \
   ASSERT(cap->suspended_ccalls == NULL ? cap->n_suspended_ccalls == 0 : 1); \
-  ASSERT_THREADED_CAPABILITY_INVARIANTS(cap,task);                      \
   ASSERT(myTask() == task);                                             \
   ASSERT_TASK_ID(task);
 
