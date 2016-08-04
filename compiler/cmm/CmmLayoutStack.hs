@@ -190,11 +190,11 @@ instance Outputable StackMap where
 cmmLayoutStack :: DynFlags -> ProcPointSet -> ByteOff -> CmmGraph
                -> UniqSM (CmmGraph, BlockEnv StackMap)
 cmmLayoutStack dflags procpoints entry_args
-               graph0@(CmmGraph { g_entry = entry })
+               graph@(CmmGraph { g_entry = entry })
   = do
     -- We need liveness info. Dead assignments are removed later
     -- by the sinking pass.
-    let (graph, liveness) = (graph0, cmmLocalLiveness dflags graph0)
+    let liveness = cmmLocalLiveness dflags graph
         blocks = postorderDfs graph
 
     (final_stackmaps, _final_high_sp, new_blocks) <-
