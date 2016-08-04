@@ -53,15 +53,25 @@ import UniqFM( disjointUFM, pluralUFM, pprUFM )
 import UniqDFM( disjointUDFM, udfmToUfm )
 import Outputable (SDoc)
 
--- | A non-deterministic set of variables.
+-- | A non-deterministic Variable Set
+--
+-- A non-deterministic set of variables.
 -- See Note [Deterministic UniqFM] in UniqDFM for explanation why it's not
 -- deterministic and why it matters. Use DVarSet if the set eventually
 -- gets converted into a list or folded over in a way where the order
 -- changes the generated code, for example when abstracting variables.
 type VarSet       = UniqSet Var
+
+-- | Identifier Set
 type IdSet        = UniqSet Id
+
+-- | Type Variable Set
 type TyVarSet     = UniqSet TyVar
+
+-- | Coercion Variable Set
 type CoVarSet     = UniqSet CoVar
+
+-- | Type or Coercion Variable Set
 type TyCoVarSet   = UniqSet TyCoVar
 
 emptyVarSet     :: VarSet
@@ -203,9 +213,16 @@ pprVarSet = pprUFM
 -- See Note [Deterministic UniqFM] in UniqDFM for explanation why we need
 -- DVarSet.
 
+-- | Deterministic Variable Set
 type DVarSet     = UniqDSet Var
+
+-- | Deterministic Identifier Set
 type DIdSet      = UniqDSet Id
+
+-- | Deterministic Type Variable Set
 type DTyVarSet   = UniqDSet TyVar
+
+-- | Deterministic Type or Coercion Variable Set
 type DTyCoVarSet = UniqDSet TyCoVar
 
 emptyDVarSet :: DVarSet

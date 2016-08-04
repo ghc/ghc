@@ -38,25 +38,39 @@ import Data.Data hiding ( Fixity )
 
 -- Note [Literal source text] in BasicTypes for SourceText fields in
 -- the following
+-- | Haskell Literal
 data HsLit
-  = HsChar          SourceText Char        -- Character
-  | HsCharPrim      SourceText Char        -- Unboxed character
-  | HsString        SourceText FastString  -- String
-  | HsStringPrim    SourceText ByteString  -- Packed bytes
-  | HsInt           SourceText Integer     -- Genuinely an Int; arises from
-                                       --     TcGenDeriv, and from TRANSLATION
-  | HsIntPrim       SourceText Integer     -- literal Int#
-  | HsWordPrim      SourceText Integer     -- literal Word#
-  | HsInt64Prim     SourceText Integer     -- literal Int64#
-  | HsWord64Prim    SourceText Integer     -- literal Word64#
-  | HsInteger       SourceText Integer Type -- Genuinely an integer; arises only
-                                          --   from TRANSLATION (overloaded
-                                          --   literals are done with HsOverLit)
-  | HsRat           FractionalLit Type -- Genuinely a rational; arises only from
-                                       --   TRANSLATION (overloaded literals are
-                                       --   done with HsOverLit)
-  | HsFloatPrim     FractionalLit      -- Unboxed Float
-  | HsDoublePrim    FractionalLit      -- Unboxed Double
+  = HsChar          SourceText Char
+      -- ^ Character
+  | HsCharPrim      SourceText Char
+      -- ^ Unboxed character
+  | HsString        SourceText FastString
+      -- ^ String
+  | HsStringPrim    SourceText ByteString
+      -- ^ Packed bytes
+  | HsInt           SourceText Integer
+      -- ^ Genuinely an Int; arises from
+      -- @TcGenDeriv@, and from TRANSLATION
+  | HsIntPrim       SourceText Integer
+      -- ^ literal @Int#@
+  | HsWordPrim      SourceText Integer
+      -- ^ literal @Word#@
+  | HsInt64Prim     SourceText Integer
+      -- ^ literal @Int64#@
+  | HsWord64Prim    SourceText Integer
+      -- ^ literal @Word64#@
+  | HsInteger       SourceText Integer Type
+      -- ^ Genuinely an integer; arises only
+      -- from TRANSLATION (overloaded
+      -- literals are done with HsOverLit)
+  | HsRat           FractionalLit Type
+      -- ^ Genuinely a rational; arises only from
+      -- TRANSLATION (overloaded literals are
+      -- done with HsOverLit)
+  | HsFloatPrim     FractionalLit
+      -- ^ Unboxed Float
+  | HsDoublePrim    FractionalLit
+      -- ^ Unboxed Double
   deriving Data
 
 instance Eq HsLit where
@@ -75,7 +89,8 @@ instance Eq HsLit where
   (HsDoublePrim x1)   == (HsDoublePrim x2)   = x1==x2
   _                   == _                   = False
 
-data HsOverLit id       -- An overloaded literal
+-- | Haskell Overloaded Literal
+data HsOverLit id
   = OverLit {
         ol_val :: OverLitVal,
         ol_rebindable :: PostRn id Bool, -- Note [ol_rebindable]
@@ -85,10 +100,11 @@ deriving instance (DataId id) => Data (HsOverLit id)
 
 -- Note [Literal source text] in BasicTypes for SourceText fields in
 -- the following
+-- | Overloaded Literal Value
 data OverLitVal
-  = HsIntegral   !SourceText !Integer    -- Integer-looking literals;
-  | HsFractional !FractionalLit          -- Frac-looking literals
-  | HsIsString   !SourceText !FastString -- String-looking literals
+  = HsIntegral   !SourceText !Integer    -- ^ Integer-looking literals;
+  | HsFractional !FractionalLit          -- ^ Frac-looking literals
+  | HsIsString   !SourceText !FastString -- ^ String-looking literals
   deriving Data
 
 overLitType :: HsOverLit a -> PostTc a Type

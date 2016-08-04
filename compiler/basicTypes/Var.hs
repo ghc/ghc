@@ -101,32 +101,53 @@ import Data.Data
 -- large number of SOURCE imports of Id.hs :-(
 -}
 
+-- | Identifier
 type Id    = Var       -- A term-level identifier
                        --  predicate: isId
 
+-- | Coercion Variable
 type CoVar = Id        -- See Note [Evidence: EvIds and CoVars]
                        --   predicate: isCoVar
 
+-- |
 type NcId  = Id        -- A term-level (value) variable that is
                        -- /not/ an (unlifted) coercion
                        --    predicate: isNonCoVarId
 
+-- | Type or kind Variable
 type TyVar   = Var     -- Type *or* kind variable (historical)
 
+-- | Type or Kind Variable
 type TKVar   = Var     -- Type *or* kind variable (historical)
+
+-- | Type Variable
 type TypeVar = Var     -- Definitely a type variable
+
+-- | Kind Variable
 type KindVar = Var     -- Definitely a kind variable
                        -- See Note [Kind and type variables]
 
 -- See Note [Evidence: EvIds and CoVars]
+-- | Evidence Identifier
 type EvId   = Id        -- Term-level evidence: DictId, IpId, or EqVar
+
+-- | Evidence Variable
 type EvVar  = EvId      -- ...historical name for EvId
+
+-- | Dictionary Function Identifier
 type DFunId = Id        -- A dictionary function
+
+-- | Dictionary Identifier
 type DictId = EvId      -- A dictionary variable
+
+-- | Implicit parameter Identifier
 type IpId   = EvId      -- A term-level implicit parameter
+
+-- | Equality Variable
 type EqVar  = EvId      -- Boxed equality evidence
 
-type TyCoVar = Id       -- Type, kind, *or* coercion variable
+-- | Type or Coercion Variable
+type TyCoVar = Id       -- Type, *or* coercion variable
                         --   predicate: isTyCoVar
 
 {- Note [Evidence: EvIds and CoVars]
@@ -163,7 +184,9 @@ strictness).  The essential info about different kinds of @Vars@ is
 in its @VarDetails@.
 -}
 
--- | Essentially a typed 'Name', that may also contain some additional information
+-- | Variable
+--
+-- Essentially a typed 'Name', that may also contain some additional information
 -- about the 'Var' and it's use sites.
 data Var
   = TyVar {  -- Type and kind variables
@@ -193,6 +216,7 @@ data Var
         id_details :: IdDetails,        -- Stable, doesn't change
         id_info    :: IdInfo }          -- Unstable, updated by simplifier
 
+-- | Identifier Scope
 data IdScope    -- See Note [GlobalId/LocalId]
   = GlobalId
   | LocalId ExportFlag
@@ -321,7 +345,9 @@ updateVarTypeM f id = do { ty' <- f (varType id)
 *                                                                      *
 ********************************************************************* -}
 
--- | Is something required to appear in source Haskell ('Required'),
+-- | Argument Flag
+--
+-- Is something required to appear in source Haskell ('Required'),
 -- permitted by request ('Specified') (visible type application), or
 -- prohibited entirely from appearing in source Haskell ('Inferred')?
 -- See Note [TyBinders and ArgFlags] in TyCoRep
@@ -352,13 +378,17 @@ sameVis _        _        = True
 *                                                                      *
 ********************************************************************* -}
 
+-- Type Variable Binder
+--
 -- TyVarBndr is polymorphic in both tyvar and visiblity fields:
 --   * tyvar can be TyVar or IfaceTv
 --   * argf  can be ArgFlag or TyConBndrVis
 data TyVarBndr tyvar argf = TvBndr tyvar argf
   deriving( Data )
 
--- | A `TyVarBinder` is the binder of a ForAllTy
+-- | Type Variable Binder
+--
+-- A 'TyVarBinder' is the binder of a ForAllTy
 -- It's convenient to define this synonym here rather its natural
 -- home in TyCoRep, because it's used in DataCon.hs-boot
 type TyVarBinder = TyVarBndr TyVar ArgFlag

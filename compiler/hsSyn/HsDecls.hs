@@ -128,20 +128,21 @@ type LHsDecl id = Located (HsDecl id)
 
 -- | A Haskell Declaration
 data HsDecl id
-  = TyClD       (TyClDecl id)     -- ^ A type or class declaration.
-  | InstD       (InstDecl  id)    -- ^ An instance declaration.
-  | DerivD      (DerivDecl id)
-  | ValD        (HsBind id)
-  | SigD        (Sig id)
-  | DefD        (DefaultDecl id)
-  | ForD        (ForeignDecl id)
-  | WarningD    (WarnDecls id)
-  | AnnD        (AnnDecl id)
-  | RuleD       (RuleDecls id)
-  | VectD       (VectDecl id)
-  | SpliceD     (SpliceDecl id)   -- Includes quasi-quotes
-  | DocD        (DocDecl)
-  | RoleAnnotD  (RoleAnnotDecl id)
+  = TyClD       (TyClDecl id)      -- ^ Type or Class Declaration
+  | InstD       (InstDecl  id)     -- ^ Instance declaration
+  | DerivD      (DerivDecl id)     -- ^ Deriving declaration
+  | ValD        (HsBind id)        -- ^ Value declaration
+  | SigD        (Sig id)           -- ^ Signature declaration
+  | DefD        (DefaultDecl id)   -- ^ 'default' declaration
+  | ForD        (ForeignDecl id)   -- ^ Foreign declaration
+  | WarningD    (WarnDecls id)     -- ^ Warning declaration
+  | AnnD        (AnnDecl id)       -- ^ Annotation declaration
+  | RuleD       (RuleDecls id)     -- ^ Rule declaration
+  | VectD       (VectDecl id)      -- ^ Vectorise declaration
+  | SpliceD     (SpliceDecl id)    -- ^ Splice declaration
+                                   -- (Includes quasi-quotes)
+  | DocD        (DocDecl)          -- ^ Documentation comment declaration
+  | RoleAnnotD  (RoleAnnotDecl id) -- ^ Role annotation declaration
 deriving instance (DataId id) => Data (HsDecl id)
 
 
@@ -158,7 +159,9 @@ deriving instance (DataId id) => Data (HsDecl id)
 --
 -- The latter is for class methods only
 
--- | A 'HsDecl' is categorised into a 'HsGroup' before being
+-- | Haskell Group
+--
+-- A 'HsDecl' is categorised into a 'HsGroup' before being
 -- fed to the renamer.
 data HsGroup id
   = HsGroup {
@@ -300,7 +303,10 @@ data SpliceExplicitFlag = ExplicitSplice | -- <=> $(f x y)
                           ImplicitSplice   -- <=> f x y,  i.e. a naked top level expression
     deriving Data
 
+-- | Located Splice Declaration
 type LSpliceDecl name = Located (SpliceDecl name)
+
+-- | Splice Declaration
 data SpliceDecl id
   = SpliceDecl                  -- Top level splice
         (Located (HsSplice id))
@@ -449,6 +455,7 @@ Interface file code:
     suck in the dfun binding
 -}
 
+-- | Located Declaration of a Type or Class
 type LTyClDecl name = Located (TyClDecl name)
 
 -- | A type or class declaration.
@@ -741,6 +748,7 @@ See Note [Dependency analsis of type, class, and instance decls]
 in RnSource for more info.
 -}
 
+-- | Type or Class Group
 data TyClGroup name  -- See Note [TyClGroups and dependency analysis]
   = TyClGroup { group_tyclds :: [LTyClDecl name]
               , group_roles  :: [LRoleAnnotDecl name]
@@ -837,7 +845,10 @@ conditions.
 See also Note [Injective type families] in TyCon
 -}
 
+-- | Located type Family Result Signature
 type LFamilyResultSig name = Located (FamilyResultSig name)
+
+-- | type Family Result Signature
 data FamilyResultSig name = -- see Note [FamilyResultSig]
     NoSig
   -- ^ - 'ApiAnnotation.AnnKeywordId' :
@@ -860,7 +871,10 @@ data FamilyResultSig name = -- see Note [FamilyResultSig]
 
 deriving instance (DataId name) => Data (FamilyResultSig name)
 
+-- | Located type Family Declaration
 type LFamilyDecl name = Located (FamilyDecl name)
+
+-- | type Family Declaration
 data FamilyDecl name = FamilyDecl
   { fdInfo           :: FamilyInfo name              -- type/data, closed/open
   , fdLName          :: Located name                 -- type constructor
@@ -879,6 +893,7 @@ data FamilyDecl name = FamilyDecl
 
 deriving instance (DataId id) => Data (FamilyDecl id)
 
+-- | Located Injectivity Annotation
 type LInjectivityAnn name = Located (InjectivityAnn name)
 
 -- | If the user supplied an injectivity annotation it is represented using
@@ -977,6 +992,7 @@ instance Outputable (FamilyInfo name) where
 *                                                                      *
 ********************************************************************* -}
 
+-- | Haskell Data type Definition
 data HsDataDefn name   -- The payload of a data type defn
                        -- Used *both* for vanilla data declarations,
                        --       *and* for data family instances
@@ -1010,6 +1026,7 @@ data HsDataDefn name   -- The payload of a data type defn
    }
 deriving instance (DataId id) => Data (HsDataDefn id)
 
+-- | Haskell Deriving clause
 type HsDeriving name = Maybe (Located [LHsSigType name])
   -- ^ The optional 'deriving' clause of a data declaration
   --
@@ -1033,6 +1050,7 @@ data NewOrData
   | DataType                    -- ^ @data Blah ...@
   deriving( Eq, Data )                -- Needed because Demand derives Eq
 
+-- | Located data Constructor Declaration
 type LConDecl name = Located (ConDecl name)
       -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi' when
       --   in a GADT constructor list
@@ -1062,6 +1080,8 @@ type LConDecl name = Located (ConDecl name)
 --            'ApiAnnotation.AnnForall','ApiAnnotation.AnnDot'
 
 -- For details on above see note [Api annotations] in ApiAnnotation
+
+-- | data Constructor Declaration
 data ConDecl name
   = ConDeclGADT
       { con_names   :: [Located name]
@@ -1092,6 +1112,7 @@ data ConDecl name
       }
 deriving instance (DataId name) => Data (ConDecl name)
 
+-- | Haskell data Constructor Declaration Details
 type HsConDeclDetails name
    = HsConDetails (LBangType name) (Located [LConDeclField name])
 
@@ -1217,14 +1238,18 @@ It is parameterised over its tfe_pats field:
 -}
 
 ----------------- Type synonym family instances -------------
+
+-- | Located Type Family Instance Equation
 type LTyFamInstEqn  name = Located (TyFamInstEqn  name)
   -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi'
   --   when in a list
 
 -- For details on above see note [Api annotations] in ApiAnnotation
 
+-- | Located Type Family Default Equation
 type LTyFamDefltEqn name = Located (TyFamDefltEqn name)
 
+-- | Haskell Type Patterns
 type HsTyPats name = HsImplicitBndrs name [LHsType name]
             -- ^ Type patterns (with kind and type bndrs)
             -- See Note [Family instance declaration binders]
@@ -1258,11 +1283,16 @@ type patterns, i.e. fv(pat_tys).  Note in particular
    in the associated 'type' decl
 -}
 
+-- | Type Family Instance Equation
 type TyFamInstEqn  name = TyFamEqn name (HsTyPats name)
+
+-- | Type Family Default Equation
 type TyFamDefltEqn name = TyFamEqn name (LHsQTyVars name)
   -- See Note [Type family instance declarations in HsSyn]
 
--- | One equation in a type family instance declaration
+-- | Type Family Equation
+--
+-- One equation in a type family instance declaration
 -- See Note [Type family instance declarations in HsSyn]
 data TyFamEqn name pats
   = TyFamEqn
@@ -1275,7 +1305,10 @@ data TyFamEqn name pats
     -- For details on above see note [Api annotations] in ApiAnnotation
 deriving instance (DataId name, Data pats) => Data (TyFamEqn name pats)
 
+-- | Located Type Family Instance Declaration
 type LTyFamInstDecl name = Located (TyFamInstDecl name)
+
+-- | Type Family Instance Declaration
 data TyFamInstDecl name
   = TyFamInstDecl
        { tfid_eqn  :: LTyFamInstEqn name
@@ -1289,7 +1322,10 @@ deriving instance (DataId name) => Data (TyFamInstDecl name)
 
 ----------------- Data family instances -------------
 
+-- | Located Data Family Instance Declaration
 type LDataFamInstDecl name = Located (DataFamInstDecl name)
+
+-- | Data Family Instance Declaration
 data DataFamInstDecl name
   = DataFamInstDecl
        { dfid_tycon     :: Located name
@@ -1309,7 +1345,10 @@ deriving instance (DataId name) => Data (DataFamInstDecl name)
 
 ----------------- Class instances -------------
 
+-- | Located Class Instance Declaration
 type LClsInstDecl name = Located (ClsInstDecl name)
+
+-- | Class Instance Declaration
 data ClsInstDecl name
   = ClsInstDecl
       { cid_poly_ty :: LHsSigType name    -- Context => Class Instance-type
@@ -1336,7 +1375,10 @@ deriving instance (DataId id) => Data (ClsInstDecl id)
 
 ----------------- Instances of all kinds -------------
 
+-- | Located Instance Declaration
 type LInstDecl name = Located (InstDecl name)
+
+-- | Instance Declaration
 data InstDecl name  -- Both class and family instances
   = ClsInstD
       { cid_inst  :: ClsInstDecl name }
@@ -1448,8 +1490,10 @@ instDeclDataFamInsts inst_decls
 ************************************************************************
 -}
 
+-- | Located Deriving Declaration
 type LDerivDecl name = Located (DerivDecl name)
 
+-- | Deriving Declaration
 data DerivDecl name = DerivDecl
         { deriv_type         :: LHsSigType name
         , deriv_overlap_mode :: Maybe (Located OverlapMode)
@@ -1478,8 +1522,10 @@ for the parser to check that; we pass them all through in the abstract
 syntax, and that restriction must be checked in the front end.
 -}
 
+-- | Located Default Declaration
 type LDefaultDecl name = Located (DefaultDecl name)
 
+-- | Default Declaration
 data DefaultDecl name
   = DefaultDecl [LHsType name]
         -- ^ - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnDefault',
@@ -1506,9 +1552,11 @@ instance (OutputableBndrId name) => Outputable (DefaultDecl name) where
 --
 --  * the Boolean value indicates whether the pre-standard deprecated syntax
 --   has been used
---
+
+-- | Located Foreign Declaration
 type LForeignDecl name = Located (ForeignDecl name)
 
+-- | Foreign Declaration
 data ForeignDecl name
   = ForeignImport
       { fd_name   :: Located name          -- defines this name
@@ -1629,15 +1677,19 @@ instance Outputable ForeignExport where
 ************************************************************************
 -}
 
+-- | Located Rule Declarations
 type LRuleDecls name = Located (RuleDecls name)
 
   -- Note [Pragma source text] in BasicTypes
+-- | Rule Declarations
 data RuleDecls name = HsRules { rds_src   :: SourceText
                               , rds_rules :: [LRuleDecl name] }
 deriving instance (DataId name) => Data (RuleDecls name)
 
+-- | Located Rule Declaration
 type LRuleDecl name = Located (RuleDecl name)
 
+-- | Rule Declaration
 data RuleDecl name
   = HsRule                             -- Source rule
         (Located (SourceText,RuleName)) -- Rule name
@@ -1663,7 +1715,10 @@ deriving instance (DataId name) => Data (RuleDecl name)
 flattenRuleDecls :: [LRuleDecls name] -> [LRuleDecl name]
 flattenRuleDecls decls = concatMap (rds_rules . unLoc) decls
 
+-- | Located Rule Binder
 type LRuleBndr name = Located (RuleBndr name)
+
+-- | Rule Binder
 data RuleBndr name
   = RuleBndr (Located name)
   | RuleBndrSig (Located name) (LHsSigWcType name)
@@ -1714,8 +1769,10 @@ A vectorisation pragma, one of
   {-# VECTORISE SCALAR type T #-}
 -}
 
+-- | Located Vectorise Declaration
 type LVectDecl name = Located (VectDecl name)
 
+-- | Vectorise Declaration
 data VectDecl name
   = HsVect
       SourceText   -- Note [Pragma source text] in BasicTypes
@@ -1818,8 +1875,10 @@ instance (OutputableBndrId name) => Outputable (VectDecl name) where
 ************************************************************************
 -}
 
+-- | Located Documentation comment Declaration
 type LDocDecl = Located (DocDecl)
 
+-- | Documentation comment Declaration
 data DocDecl
   = DocCommentNext HsDocString
   | DocCommentPrev HsDocString
@@ -1847,18 +1906,20 @@ docDeclDoc (DocGroup _ d) = d
 We use exported entities for things to deprecate.
 -}
 
-
+-- | Located Warning Declarations
 type LWarnDecls name = Located (WarnDecls name)
 
  -- Note [Pragma source text] in BasicTypes
+-- | Warning pragma Declarations
 data WarnDecls name = Warnings { wd_src :: SourceText
                                , wd_warnings :: [LWarnDecl name]
                                }
   deriving Data
 
-
+-- | Located Warning pragma Declaration
 type LWarnDecl name = Located (WarnDecl name)
 
+-- | Warning pragma Declaration
 data WarnDecl name = Warning [Located name] WarningTxt
   deriving Data
 
@@ -1877,8 +1938,10 @@ instance OutputableBndr name => Outputable (WarnDecl name) where
 ************************************************************************
 -}
 
+-- | Located Annotation Declaration
 type LAnnDecl name = Located (AnnDecl name)
 
+-- | Annotation Declaration
 data AnnDecl name = HsAnnotation
                       SourceText -- Note [Pragma source text] in BasicTypes
                       (AnnProvenance name) (Located (HsExpr name))
@@ -1894,6 +1957,7 @@ instance (OutputableBndrId name) => Outputable (AnnDecl name) where
     ppr (HsAnnotation _ provenance expr)
       = hsep [text "{-#", pprAnnProvenance provenance, pprExpr (unLoc expr), text "#-}"]
 
+-- | Annotation Provenance
 data AnnProvenance name = ValueAnnProvenance (Located name)
                         | TypeAnnProvenance (Located name)
                         | ModuleAnnProvenance
@@ -1921,10 +1985,12 @@ pprAnnProvenance (TypeAnnProvenance (L _ name))
 ************************************************************************
 -}
 
+-- | Located Role Annotation Declaration
 type LRoleAnnotDecl name = Located (RoleAnnotDecl name)
 
 -- See #8185 for more info about why role annotations are
 -- top-level declarations
+-- | Role Annotation Declaration
 data RoleAnnotDecl name
   = RoleAnnotDecl (Located name)         -- type constructor
                   [Located (Maybe Role)] -- optional annotations

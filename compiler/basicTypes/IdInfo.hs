@@ -102,7 +102,9 @@ infixl  1 `setRuleInfo`,
 ************************************************************************
 -}
 
--- | The 'IdDetails' of an 'Id' give stable, and necessary,
+-- | Identifier Details
+--
+-- The 'IdDetails' of an 'Id' give stable, and necessary,
 -- information about the Id.
 data IdDetails
   = VanillaId
@@ -138,6 +140,7 @@ data IdDetails
                -- This only covers /un-lifted/ coercions, of type
                -- (t1 ~# t2) or (t1 ~R# t2), not their lifted variants
 
+-- | Recursive Selector Parent
 data RecSelParent = RecSelData TyCon | RecSelPatSyn PatSyn deriving Eq
   -- Either `TyCon` or `PatSyn` depending
   -- on the origin of the record selector.
@@ -187,7 +190,9 @@ pprIdDetails other     = brackets (pp other)
 ************************************************************************
 -}
 
--- | An 'IdInfo' gives /optional/ information about an 'Id'.  If
+-- | Identifier Information
+--
+-- An 'IdInfo' gives /optional/ information about an 'Id'.  If
 -- present it never lies, but it may not be present, in which case there
 -- is always a conservative assumption which can be made.
 --
@@ -287,7 +292,9 @@ of their arities; so it should not be asking...  (but other things
 besides the code-generator need arity info!)
 -}
 
--- | An 'ArityInfo' of @n@ tells us that partial application of this
+-- | Arity Information
+--
+-- An 'ArityInfo' of @n@ tells us that partial application of this
 -- 'Id' to up to @n-1@ value arguments does essentially no work.
 --
 -- That is not necessarily the same as saying that it has @n@ leading
@@ -313,7 +320,9 @@ ppArityInfo n = hsep [text "Arity", int n]
 ************************************************************************
 -}
 
--- | Tells when the inlining is active.
+-- | Inline Pragma Information
+--
+-- Tells when the inlining is active.
 -- When it is active the thing may be inlined, depending on how
 -- big it is.
 --
@@ -362,7 +371,9 @@ In TidyPgm, when the LocalId becomes a GlobalId, its RULES are stripped off
 and put in the global list.
 -}
 
--- | Records the specializations of this 'Id' that we know about
+-- | Rule Information
+--
+-- Records the specializations of this 'Id' that we know about
 -- in the form of rewrite 'CoreRule's that target them
 data RuleInfo
   = RuleInfo
@@ -402,7 +413,9 @@ setRuleInfoHead fn (RuleInfo rules fvs)
 
 -- CafInfo is used to build Static Reference Tables (see simplStg/SRT.hs).
 
--- | Records whether an 'Id' makes Constant Applicative Form references
+-- | Constant applicative form Information
+--
+-- Records whether an 'Id' makes Constant Applicative Form references
 data CafInfo
         = MayHaveCafRefs                -- ^ Indicates that the 'Id' is for either:
                                         --

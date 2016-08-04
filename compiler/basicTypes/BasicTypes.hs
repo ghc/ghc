@@ -115,7 +115,9 @@ import Data.Function (on)
 -- See also Note [Definition of arity] in CoreArity
 type Arity = Int
 
--- | The number of represented arguments that can be applied to a value before it does
+-- | Representation Arity
+--
+-- The number of represented arguments that can be applied to a value before it does
 -- "real work". So:
 --  fib 100                    has representation arity 0
 --  \x -> fib x                has representation arity 1
@@ -130,8 +132,10 @@ type RepArity = Int
 ************************************************************************
 -}
 
--- | Type of the tags associated with each constructor possibility
---   or superclass selector
+-- | Constructor Tag
+--
+-- Type of the tags associated with each constructor possibility or superclass
+-- selector
 type ConTag = Int
 
 -- | A *zero-indexed* constructor tag
@@ -271,7 +275,7 @@ initialVersion = 1
 ************************************************************************
 -}
 
--- |A String Literal in the source, including its original raw format for use by
+-- | A String Literal in the source, including its original raw format for use by
 -- source to source manipulation tools.
 data StringLiteral = StringLiteral
                        { sl_st :: SourceText, -- literal raw source.
@@ -282,6 +286,8 @@ data StringLiteral = StringLiteral
 instance Eq StringLiteral where
   (StringLiteral _ a) == (StringLiteral _ b) = a == b
 
+-- | Warning Text
+--
 -- reason/explanation from a WARNING or DEPRECATED pragma
 data WarningTxt = WarningTxt (Located SourceText)
                              [Located StringLiteral]
@@ -429,6 +435,7 @@ instance Outputable Boxity where
 ************************************************************************
 -}
 
+-- | Recursivity Flag
 data RecFlag = Recursive
              | NonRecursive
              deriving( Eq, Data )
@@ -666,6 +673,7 @@ Tring is the 'representation' type.  (This just helps us remember
 whether to use 'from' or 'to'.
 -}
 
+-- | Embedding Projection pair
 data EP a = EP { fromEP :: a,   -- :: T -> Tring
                  toEP   :: a }  -- :: Tring -> T
 
@@ -692,7 +700,7 @@ the base of the module hierarchy.  So it seemed simpler to put the
 defn of OccInfo here, safely at the bottom
 -}
 
--- | Identifier occurrence information
+-- | identifier Occurrence Information
 data OccInfo
   = NoOccInfo           -- ^ There are many occurrences, or unknown occurrences
 
@@ -733,11 +741,13 @@ seqOccInfo :: OccInfo -> ()
 seqOccInfo occ = occ `seq` ()
 
 -----------------
+-- | Interesting Context
 type InterestingCxt = Bool      -- True <=> Function: is applied
                                 --          Data value: scrutinised by a case with
                                 --                      at least one non-DEFAULT branch
 
 -----------------
+-- | Inside Lambda
 type InsideLam = Bool   -- True <=> Occurs inside a non-linear lambda
                         -- Substituting a redex for this occurrence is
                         -- dangerous because it might duplicate work.
@@ -804,6 +814,7 @@ interface files; it is converted to Class.DefMethInfo before begin put in a
 Class object.
 -}
 
+-- | Default Method Specification
 data DefMethSpec ty
   = VanillaDM     -- Default method given with polymorphic code
   | GenericDM ty  -- Default method given with code of this type
@@ -911,6 +922,7 @@ type SourceText = String -- Note [Literal source text],[Pragma source text]
 When a rule or inlining is active
 -}
 
+-- | Phase Number
 type PhaseNum = Int  -- Compilation phase
                      -- Phases decrease towards zero
                      -- Zero is the last phase
@@ -933,6 +945,7 @@ data Activation = NeverActive
                 deriving( Eq, Data )
                   -- Eq used in comparing rules in HsDecls
 
+-- | Rule Match Information
 data RuleMatchInfo = ConLike                    -- See Note [CONLIKE pragma]
                    | FunLike
                    deriving( Eq, Data, Show )
@@ -955,6 +968,7 @@ data InlinePragma            -- Note [InlinePragma]
       , inl_rule   :: RuleMatchInfo  -- Should the function be treated like a constructor?
     } deriving( Eq, Data )
 
+-- | Inline Specification
 data InlineSpec   -- What the user's INLINE pragma looked like
   = Inline
   | Inlinable
@@ -1172,6 +1186,8 @@ isEarlyActive AlwaysActive      = True
 isEarlyActive (ActiveBefore {}) = True
 isEarlyActive _                 = False
 
+-- | Fractional Literal
+--
 -- Used (instead of Rational) to represent exactly the floating point literal that we
 -- encountered in the user's source program. This allows us to pretty-print exactly what
 -- the user wrote, which is important e.g. for floating point numbers that can't represented

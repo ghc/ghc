@@ -195,7 +195,9 @@ uniqAway' (InScope set n) var
 ************************************************************************
 -}
 
--- | When we are comparing (or matching) types or terms, we are faced with
+-- | Rename Environment 2
+--
+-- When we are comparing (or matching) types or terms, we are faced with
 -- \"going under\" corresponding binders.  E.g. when comparing:
 --
 -- > \x. e1     ~   \y. e2
@@ -390,7 +392,9 @@ succeeding with [a -> v y], which is bogus of course.
 ************************************************************************
 -}
 
--- | When tidying up print names, we keep a mapping of in-scope occ-names
+-- | Tidy Environment
+--
+-- When tidying up print names, we keep a mapping of in-scope occ-names
 -- (the 'TidyOccEnv') and a Var-to-Var of the current renamings
 type TidyEnv = (TidyOccEnv, VarEnv Var)
 
@@ -405,10 +409,19 @@ emptyTidyEnv = (emptyTidyOccEnv, emptyVarEnv)
 ************************************************************************
 -}
 
+-- | Variable Environment
 type VarEnv elt     = UniqFM elt
+
+-- | Identifier Environment
 type IdEnv elt      = VarEnv elt
+
+-- | Type Variable Environment
 type TyVarEnv elt   = VarEnv elt
+
+-- | Type or Coercion Variable Environment
 type TyCoVarEnv elt = VarEnv elt
+
+-- | Coercion Variable Environment
 type CoVarEnv elt   = VarEnv elt
 
 emptyVarEnv       :: VarEnv a
@@ -504,8 +517,13 @@ modifyVarEnv_Directly mangle_fn env key
 -- See Note [Deterministic UniqFM] in UniqDFM for explanation why we need
 -- DVarEnv.
 
+-- | Deterministic Variable Environment
 type DVarEnv elt = UniqDFM elt
+
+-- | Deterministic Identifier Environment
 type DIdEnv elt = DVarEnv elt
+
+-- | Deterministic Type Variable Environment
 type DTyVarEnv elt = DVarEnv elt
 
 emptyDVarEnv :: DVarEnv a

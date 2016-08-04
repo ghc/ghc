@@ -458,6 +458,7 @@ type Unboxer = Var -> UniqSM ([Var], CoreExpr -> CoreExpr)
 data Boxer = UnitBox | Boxer (TCvSubst -> UniqSM ([Var], CoreExpr))
   -- Box:   build src arg using these rep vars
 
+-- | Data Constructor Boxer
 newtype DataConBoxer = DCB ([Type] -> [Var] -> UniqSM ([Var], [CoreBind]))
                        -- Bind these src-level vars, returning the
                        -- rep-level vars to bind in the pattern

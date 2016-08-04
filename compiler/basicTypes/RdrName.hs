@@ -89,7 +89,9 @@ import Data.List( sortBy )
 ************************************************************************
 -}
 
--- | Do not use the data constructors of RdrName directly: prefer the family
+-- | Reader Name
+--
+-- Do not use the data constructors of RdrName directly: prefer the family
 -- of functions that creates them, such as 'mkRdrUnqual'
 --
 -- - Note: A Located RdrName will only have API Annotations if it is a
@@ -109,11 +111,15 @@ import Data.List( sortBy )
 -- For details on above see note [Api annotations] in ApiAnnotation
 data RdrName
   = Unqual OccName
-        -- ^ Used for ordinary, unqualified occurrences, e.g. @x@, @y@ or @Foo@.
+        -- ^ Unqualified  name
+        --
+        -- Used for ordinary, unqualified occurrences, e.g. @x@, @y@ or @Foo@.
         -- Create such a 'RdrName' with 'mkRdrUnqual'
 
   | Qual ModuleName OccName
-        -- ^ A qualified name written by the user in
+        -- ^ Qualified name
+        --
+        -- A qualified name written by the user in
         -- /source/ code.  The module isn't necessarily
         -- the module where the thing is defined;
         -- just the one from which it is imported.
@@ -121,14 +127,18 @@ data RdrName
         -- Create such a 'RdrName' with 'mkRdrQual'
 
   | Orig Module OccName
-        -- ^ An original name; the module is the /defining/ module.
+        -- ^ Original name
+        --
+        -- An original name; the module is the /defining/ module.
         -- This is used when GHC generates code that will be fed
         -- into the renamer (e.g. from deriving clauses), but where
         -- we want to say \"Use Prelude.map dammit\". One of these
         -- can be created with 'mkOrig'
 
   | Exact Name
-        -- ^ We know exactly the 'Name'. This is used:
+        -- ^ Exact name
+        --
+        -- We know exactly the 'Name'. This is used:
         --
         --  (1) When the parser parses built-in syntax like @[]@
         --      and @(,)@, but wants a 'RdrName' from it
@@ -319,7 +329,10 @@ instance Ord RdrName where
 ************************************************************************
 -}
 
--- | This environment is used to store local bindings (@let@, @where@, lambda, @case@).
+-- | Local Reader Environment
+--
+-- This environment is used to store local bindings
+-- (@let@, @where@, lambda, @case@).
 -- It is keyed by OccName, because we never use it for qualified names
 -- We keep the current mapping, *and* the set of all Names in scope
 -- Reason: see Note [Splicing Exact names] in RnEnv
@@ -405,6 +418,7 @@ the in-scope-name-set.
 ************************************************************************
 -}
 
+-- | Global Reader Environment
 type GlobalRdrEnv = OccEnv [GlobalRdrElt]
 -- ^ Keyed by 'OccName'; when looking up a qualified name
 -- we look up the 'OccName' part, and then check the 'Provenance'
@@ -431,7 +445,9 @@ type GlobalRdrEnv = OccEnv [GlobalRdrElt]
 --                  nameOccName (gre_name gre), but not always in the
 --                  case of record seectors; see greOccName
 
--- | An element of the 'GlobalRdrEnv'
+-- | Global Reader Element
+--
+-- An element of the 'GlobalRdrEnv'
 data GlobalRdrElt
   = GRE { gre_name :: Name
         , gre_par  :: Parent
@@ -1019,13 +1035,17 @@ shadowName env name
 ************************************************************************
 -}
 
--- | The 'ImportSpec' of something says how it came to be imported
+-- | Import Specification
+--
+-- The 'ImportSpec' of something says how it came to be imported
 -- It's quite elaborate so that we can give accurate unused-name warnings.
 data ImportSpec = ImpSpec { is_decl :: ImpDeclSpec,
                             is_item :: ImpItemSpec }
                 deriving( Eq, Ord, Data )
 
--- | Describes a particular import declaration and is
+-- | Import Declaration Specification
+--
+-- Describes a particular import declaration and is
 -- shared among all the 'Provenance's for that decl
 data ImpDeclSpec
   = ImpDeclSpec {
@@ -1040,7 +1060,9 @@ data ImpDeclSpec
         is_dloc     :: SrcSpan     -- ^ The location of the entire import declaration
     } deriving Data
 
--- | Describes import info a particular Name
+-- | Import Item Specification
+--
+-- Describes import info a particular Name
 data ImpItemSpec
   = ImpAll              -- ^ The import had no import list,
                         -- or had a hiding list

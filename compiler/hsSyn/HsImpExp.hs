@@ -32,6 +32,7 @@ import Data.Data
 One per \tr{import} declaration in a module.
 -}
 
+-- | Located Import Declaration
 type LImportDecl name = Located (ImportDecl name)
         -- ^ When in a list this may have
         --
@@ -39,7 +40,9 @@ type LImportDecl name = Located (ImportDecl name)
 
         -- For details on above see note [Api annotations] in ApiAnnotation
 
--- | A single Haskell @import@ declaration.
+-- | Import Declaration
+--
+-- A single Haskell @import@ declaration.
 data ImportDecl name
   = ImportDecl {
       ideclSourceSrc :: Maybe SourceText,
@@ -127,6 +130,7 @@ instance (OutputableBndr name, HasOccName name) => Outputable (ImportDecl name) 
 ************************************************************************
 -}
 
+-- | Located Import or Export
 type LIE name = Located (IE name)
         -- ^ When in a list this may have
         --
@@ -137,18 +141,26 @@ type LIE name = Located (IE name)
 -- | Imported or exported entity.
 data IE name
   = IEVar       (Located name)
-        -- ^ - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnPattern',
+        -- ^ Imported or Exported Variable
+        --
+        -- - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnPattern',
         --             'ApiAnnotation.AnnType'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
         -- See Note [Located RdrNames] in HsExpr
-  | IEThingAbs  (Located name)     -- ^ Class/Type (can't tell)
+  | IEThingAbs  (Located name)
+        -- ^ Imported or exported Thing with Absent list
+        --
+        -- The thing is a Class/Type (can't tell)
         --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnPattern',
         --             'ApiAnnotation.AnnType','ApiAnnotation.AnnVal'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
         -- See Note [Located RdrNames] in HsExpr
-  | IEThingAll  (Located name)     -- ^ Class/Type plus all methods/constructors
+  | IEThingAll  (Located name)
+        -- ^ Imported or exported Thing with All imported or exported
+        --
+        -- The thing is a Class/Type and the All refers to methods/constructors
         --
         -- - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen',
         --       'ApiAnnotation.AnnDotdot','ApiAnnotation.AnnClose',
@@ -161,15 +173,20 @@ data IE name
                 IEWildcard
                 [Located name]
                 [Located (FieldLbl name)]
-                 -- ^ Class/Type plus some methods/constructors
-                 -- and record fields; see Note [IEThingWith]
+        -- ^ Imported or exported Thing With given imported or exported
+        --
+        -- The thing is a Class/Type and the imported or exported things are
+        -- methods/constructors and record fields; see Note [IEThingWith]
         -- - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen',
         --                                   'ApiAnnotation.AnnClose',
         --                                   'ApiAnnotation.AnnComma',
         --                                   'ApiAnnotation.AnnType'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-  | IEModuleContents  (Located ModuleName) -- ^ (Export Only)
+  | IEModuleContents  (Located ModuleName)
+        -- ^ Imported or exported module contents
+        --
+        -- (Export Only)
         --
         -- - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnModule'
 
@@ -179,6 +196,7 @@ data IE name
   | IEDocNamed          String           -- ^ Reference to named doc
   deriving (Eq, Data)
 
+-- | Imported or Exported Wildcard
 data IEWildcard = NoIEWildcard | IEWildcard Int deriving (Eq, Data)
 
 {-

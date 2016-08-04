@@ -101,13 +101,16 @@ We keep information about the {\em definition} point for each entity;
 this is the obvious stuff:
 -}
 
--- | Represents a single point within a file
+-- | Real Source Location
+--
+-- Represents a single point within a file
 data RealSrcLoc
   = SrcLoc      FastString              -- A precise location (file name)
                 {-# UNPACK #-} !Int     -- line number, begins at 1
                 {-# UNPACK #-} !Int     -- column number, begins at 1
   deriving (Eq, Ord)
 
+-- | Source Location
 data SrcLoc
   = RealSrcLoc {-# UNPACK #-}!RealSrcLoc
   | UnhelpfulLoc FastString     -- Just a general indication
@@ -219,6 +222,8 @@ The end position is defined to be the column /after/ the end of the
 span.  That is, a span of (1,1)-(1,2) is one character long, and a
 span of (1,1)-(1,1) is zero characters long.
 -}
+
+-- | Real Source Span
 data RealSrcSpan
   = RealSrcSpan'
         { srcSpanFile     :: !FastString,
@@ -229,7 +234,9 @@ data RealSrcSpan
         }
   deriving Eq
 
--- | A 'SrcSpan' identifies either a specific portion of a text file
+-- | Source Span
+--
+-- A 'SrcSpan' identifies either a specific portion of a text file
 -- or a human-readable description of a location.
 data SrcSpan =
     RealSrcSpan !RealSrcSpan

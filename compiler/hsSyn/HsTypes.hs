@@ -104,7 +104,10 @@ import qualified Data.Semigroup as Semigroup
 ************************************************************************
 -}
 
+-- | Located Bang Type
 type LBangType name = Located (BangType name)
+
+-- | Bang Type
 type BangType name  = HsType name       -- Bangs are in the HsType data type
 
 getBangType :: LHsType a -> LHsType a
@@ -219,19 +222,26 @@ Note carefully:
 
 -}
 
+-- | Located Haskell Context
 type LHsContext name = Located (HsContext name)
       -- ^ 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnUnit'
 
       -- For details on above see note [Api annotations] in ApiAnnotation
 
+-- | Haskell Context
 type HsContext name = [LHsType name]
 
+-- | Located Haskell Type
 type LHsType name = Located (HsType name)
       -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma' when
       --   in a list
 
       -- For details on above see note [Api annotations] in ApiAnnotation
+
+-- | Haskell Kind
 type HsKind name = HsType name
+
+-- | Located Haskell Kind
 type LHsKind name = Located (HsKind name)
       -- ^ 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
 
@@ -241,9 +251,11 @@ type LHsKind name = Located (HsKind name)
 --             LHsQTyVars
 --  The explicitly-quantified binders in a data/type declaration
 
+-- | Located Haskell Type Variable Binder
 type LHsTyVarBndr name = Located (HsTyVarBndr name)
                          -- See Note [HsType binders]
 
+-- | Located Haskell Quantified Type Variables
 data LHsQTyVars name   -- See Note [HsType binders]
   = HsQTvs { hsq_implicit :: PostRn name [Name]      -- implicit (dependent) variables
            , hsq_explicit :: [LHsTyVarBndr name]     -- explicit variables
@@ -278,11 +290,13 @@ isEmptyLHsQTvs _                = False
 --    * Pattern type signatures (SigPatIn)
 -- In the last of these, wildcards can happen, so we must accommodate them
 
+-- | Haskell Implicit Binders
 data HsImplicitBndrs name thing   -- See Note [HsType binders]
   = HsIB { hsib_vars :: PostRn name [Name] -- Implicitly-bound kind & type vars
          , hsib_body :: thing              -- Main payload (type or list of types)
     }
 
+-- | Haskell Wildcard Binders
 data HsWildCardBndrs name thing
     -- See Note [HsType binders]
     -- See Note [The wildcard story for types]
@@ -302,8 +316,13 @@ deriving instance (Data name, Data thing, Data (PostRn name [Name]))
 deriving instance (Data name, Data thing, Data (PostRn name [Name]))
   => Data (HsWildCardBndrs name thing)
 
+-- | Located Haskell Signature Type
 type LHsSigType   name = HsImplicitBndrs name (LHsType name)    -- Implicit only
+
+-- | Located Haskell Wildcard Type
 type LHsWcType    name = HsWildCardBndrs name (LHsType name)    -- Wildcard only
+
+-- | Located Haskell Signature Wildcard Type
 type LHsSigWcType name = HsWildCardBndrs name (LHsSigType name) -- Both
 
 -- See Note [Representing type signatures]
@@ -378,6 +397,8 @@ instance OutputableBndr HsIPName where
     pprPrefixOcc n = ppr n
 
 --------------------------------------------------
+
+-- | Haskell Type Variable Binder
 data HsTyVarBndr name
   = UserTyVar        -- no explicit kinding
          (Located name)
@@ -401,6 +422,7 @@ isHsKindedTyVar (KindedTyVar {}) = True
 hsTvbAllKinded :: LHsQTyVars name -> Bool
 hsTvbAllKinded = all (isHsKindedTyVar . unLoc) . hsQTvExplicit
 
+-- | Haskell Type
 data HsType name
   = HsForAllTy   -- See Note [HsType binders]
       { hst_bndrs :: [LHsTyVarBndr name]   -- Explicit, user-supplied 'forall a b c'
@@ -566,6 +588,7 @@ deriving instance (DataId name) => Data (HsType name)
 
 -- Note [Literal source text] in BasicTypes for SourceText fields in
 -- the following
+-- | Haskell Type Literal
 data HsTyLit
   = HsNumTy SourceText Integer
   | HsStrTy SourceText FastString
@@ -577,9 +600,11 @@ newtype HsWildCardInfo name      -- See Note [The wildcard story for types]
       -- each individual anonymous wildcard during renaming
 deriving instance (DataId name) => Data (HsWildCardInfo name)
 
+-- | Located Haskell Application Type
 type LHsAppType name = Located (HsAppType name)
       -- ^ 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSimpleQuote'
 
+-- | Haskell Application Type
 data HsAppType name
   = HsAppInfix (Located name)       -- either a symbol or an id in backticks
   | HsAppPrefix (LHsType name)      -- anything else, including things like (+)
@@ -695,17 +720,22 @@ four constructors of HsTupleSort:
                                         disappears after type checking
 -}
 
+-- | Haskell Tuple Sort
 data HsTupleSort = HsUnboxedTuple
                  | HsBoxedTuple
                  | HsConstraintTuple
                  | HsBoxedOrConstraintTuple
                  deriving Data
 
+
+-- | Located Constructor Declaration Field
 type LConDeclField name = Located (ConDeclField name)
       -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma' when
       --   in a list
 
       -- For details on above see note [Api annotations] in ApiAnnotation
+
+-- | Constructor Declaration Field
 data ConDeclField name  -- Record fields have Haddoc docs on them
   = ConDeclField { cd_fld_names :: [LFieldOcc name],
                                    -- ^ See Note [ConDeclField names]
@@ -721,6 +751,7 @@ instance (OutputableBndrId name) => Outputable (ConDeclField name) where
 
 -- HsConDetails is used for patterns/expressions *and* for data type
 -- declarations
+-- | Haskell Constructor Details
 data HsConDetails arg rec
   = PrefixCon [arg]             -- C p1 p2 p3
   | RecCon    rec               -- C { x = p1, y = p2 }
@@ -1034,9 +1065,12 @@ getLHsInstDeclClass_maybe inst_ty
 ************************************************************************
 -}
 
+-- | Located Field Occurrence
 type LFieldOcc name = Located (FieldOcc name)
 
--- | Represents an *occurrence* of an unambiguous field.  We store
+-- | Field Occurrence
+--
+-- Represents an *occurrence* of an unambiguous field.  We store
 -- both the 'RdrName' the user originally wrote, and after the
 -- renamer, the selector function.
 data FieldOcc name = FieldOcc { rdrNameFieldOcc  :: Located RdrName
@@ -1054,7 +1088,9 @@ mkFieldOcc :: Located RdrName -> FieldOcc RdrName
 mkFieldOcc rdr = FieldOcc rdr PlaceHolder
 
 
--- | Represents an *occurrence* of a field that is potentially
+-- | Ambiguous Field Occurrence
+--
+-- Represents an *occurrence* of a field that is potentially
 -- ambiguous after the renamer, with the ambiguity resolved by the
 -- typechecker.  We always store the 'RdrName' that the user
 -- originally wrote, and store the selector function after the renamer

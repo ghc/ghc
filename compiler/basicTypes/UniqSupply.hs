@@ -46,7 +46,9 @@ import Data.Char
 ************************************************************************
 -}
 
--- | A value of type 'UniqSupply' is unique, and it can
+-- | Unique Supply
+--
+-- A value of type 'UniqSupply' is unique, and it can
 -- supply /one/ distinct 'Unique'.  Also, from the supply, one can
 -- also manufacture an arbitrary number of further 'UniqueSupply' values,
 -- which will be distinct from the first and from all others.

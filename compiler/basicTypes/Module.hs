@@ -180,7 +180,9 @@ import System.FilePath
 ************************************************************************
 -}
 
--- | Where a module lives on the file system: the actual locations
+-- | Module Location
+--
+-- Where a module lives on the file system: the actual locations
 -- of the .hs, .hi and .o files, if we have them
 data ModLocation
    = ModLocation {

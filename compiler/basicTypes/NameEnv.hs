@@ -82,6 +82,7 @@ depAnal get_defs get_uses nodes
 ************************************************************************
 -}
 
+-- | Name Environment
 type NameEnv a = UniqFM a       -- Domain is Name
 
 emptyNameEnv       :: NameEnv a
@@ -131,7 +132,8 @@ disjointNameEnv x y     = isNullUFM (intersectUFM x y)
 
 lookupNameEnv_NF env n = expectJust "lookupNameEnv_NF" (lookupNameEnv env n)
 
--- Deterministic NameEnv
+-- | Deterministic Name Environment
+--
 -- See Note [Deterministic UniqFM] in UniqDFM for explanation why we need
 -- DNameEnv.
 type DNameEnv a = UniqDFM a

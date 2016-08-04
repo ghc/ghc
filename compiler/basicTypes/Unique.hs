@@ -87,7 +87,9 @@ The @Chars@ are ``tag letters'' that identify the @UniqueSupply@.
 Fast comparison is everything on @Uniques@:
 -}
 
--- | The type of unique identifiers that are used in many places in GHC
+-- | Unique identifier.
+--
+-- The type of unique identifiers that are used in many places in GHC
 -- for fast ordering and equality tests. You should generate these with
 -- the functions from the 'UniqSupply' module
 newtype Unique = MkUnique Int

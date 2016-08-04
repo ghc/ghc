@@ -54,7 +54,9 @@ import Module           ( ModuleName )
 -- libraries:
 import Data.Data hiding ( Fixity )
 
--- | All we actually declare here is the top-level structure for a module.
+-- | Haskell Module
+--
+-- All we actually declare here is the top-level structure for a module.
 data HsModule name
   = HsModule {
       hsmodName :: Maybe (Located ModuleName),

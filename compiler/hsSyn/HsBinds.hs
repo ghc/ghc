@@ -60,40 +60,51 @@ Global bindings (where clauses)
 -- one for the left and one for the right.
 -- Other than during renaming, these will be the same.
 
+-- | Haskell Local Bindings
 type HsLocalBinds id = HsLocalBindsLR id id
 
--- | Bindings in a 'let' expression
+-- | Haskell Local Bindings with separate Left and Right identifier types
+--
+-- Bindings in a 'let' expression
 -- or a 'where' clause
 data HsLocalBindsLR idL idR
   = HsValBinds (HsValBindsLR idL idR)
+      -- ^ Haskell Value Bindings
+
          -- There should be no pattern synonyms in the HsValBindsLR
          -- These are *local* (not top level) bindings
          -- The parser accepts them, however, leaving the the
          -- renamer to report them
 
   | HsIPBinds  (HsIPBinds idR)
+      -- ^ Haskell Implicit Parameter Bindings
 
   | EmptyLocalBinds
+      -- ^ Empty Local Bindings
 
 deriving instance (DataId idL, DataId idR)
   => Data (HsLocalBindsLR idL idR)
 
+-- | Haskell Value Bindings
 type HsValBinds id = HsValBindsLR id id
 
--- | Value bindings (not implicit parameters)
+-- | Haskell Value bindings with separate Left and Right identifier types
+-- (not implicit parameters)
 -- Used for both top level and nested bindings
 -- May contain pattern synonym bindings
 data HsValBindsLR idL idR
-  = -- | Before renaming RHS; idR is always RdrName
+  = -- | Value Bindings In
+    --
+    -- Before renaming RHS; idR is always RdrName
     -- Not dependency analysed
     -- Recursive by default
     ValBindsIn
         (LHsBindsLR idL idR) [LSig idR]
 
-    -- | After renaming RHS; idR can be Name or Id
-    --  Dependency analysed,
-    -- later bindings in the list may depend on earlier
-    -- ones.
+    -- | Value Bindings Out
+    --
+    -- After renaming RHS; idR can be Name or Id Dependency analysed,
+    -- later bindings in the list may depend on earlier ones.
   | ValBindsOut
         [(RecFlag, LHsBinds idL)]
         [LSig Name]
@@ -101,15 +112,26 @@ data HsValBindsLR idL idR
 deriving instance (DataId idL, DataId idR)
   => Data (HsValBindsLR idL idR)
 
+-- | Located Haskell Binding
 type LHsBind  id = LHsBindLR  id id
+
+-- | Located Haskell Bindings
 type LHsBinds id = LHsBindsLR id id
+
+-- | Haskell Binding
 type HsBind   id = HsBindLR   id id
 
+-- | Located Haskell Bindings with separate Left and Right identifier types
 type LHsBindsLR idL idR = Bag (LHsBindLR idL idR)
+
+-- | Located Haskell Binding with separate Left and Right identifier types
 type LHsBindLR  idL idR = Located (HsBindLR idL idR)
 
+-- | Haskell Binding with separate Left and Right id's
 data HsBindLR idL idR
-  = -- | FunBind is used for both functions   @f x = e@
+  = -- | Function Binding
+    --
+    -- FunBind is used for both functions     @f x = e@
     -- and variables                          @f = \x -> e@
     --
     -- Reason 1: Special case for type inference: see 'TcBinds.tcMonoBinds'.
@@ -158,7 +180,9 @@ data HsBindLR idL idR
         fun_tick :: [Tickish Id]  -- ^ Ticks to put on the rhs, if any
     }
 
-  -- | The pattern is never a simple variable;
+  -- | Pattern Binding
+  --
+  -- The pattern is never a simple variable;
   -- That case is done by FunBind
   --
   --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnBang',
@@ -176,7 +200,9 @@ data HsBindLR idL idR
                -- the bound variables.
     }
 
-  -- | Dictionary binding and suchlike.
+  -- | Variable Binding
+  --
+  -- Dictionary binding and suchlike.
   -- All VarBinds are introduced by the type checker
   | VarBind {
         var_id     :: idL,
@@ -185,6 +211,7 @@ data HsBindLR idL idR
                                      -- (used for implication constraints only)
     }
 
+  -- | Abstraction Bindings
   | AbsBinds {                      -- Binds abstraction; TRANSLATION
         abs_tvs     :: [TyVar],
         abs_ev_vars :: [EvVar],  -- ^ Includes equality constraints
@@ -203,6 +230,7 @@ data HsBindLR idL idR
         abs_binds    :: LHsBinds idL
     }
 
+  -- | Abstraction Bindings Signature
   | AbsBindsSig {  -- Simpler form of AbsBinds, used with a type sig
                    -- in tcPolyCheck. Produces simpler desugaring and
                    -- is necessary to avoid #11405, comment:3.
@@ -217,6 +245,7 @@ data HsBindLR idL idR
                                        -- FunBind
     }
 
+  -- | Patterns Synonym Binding
   | PatSynBind (PatSynBind idL idR)
         -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnPattern',
         --          'ApiAnnotation.AnnLarrow','ApiAnnotation.AnnEqual',
@@ -240,6 +269,7 @@ deriving instance (DataId idL, DataId idR)
         --
         -- See Note [AbsBinds]
 
+-- | Abtraction Bindings Export
 data ABExport id
   = ABE { abe_poly      :: id    -- ^ Any INLINE pragmas is attached to this Id
         , abe_mono      :: id
@@ -254,6 +284,8 @@ data ABExport id
 --             'ApiAnnotation.AnnClose' @'}'@,
 
 -- For details on above see note [Api annotations] in ApiAnnotation
+
+-- | Pattern Synonym binding
 data PatSynBind idL idR
   = PSB { psb_id   :: Located idL,             -- ^ Name of the pattern synonym
           psb_fvs  :: PostRn idR NameSet,      -- ^ See Note [Bind free vars]
@@ -619,6 +651,7 @@ pprTicks pp_no_debug pp_when_debug
 ************************************************************************
 -}
 
+-- | Haskell Implicit Parameter Bindings
 data HsIPBinds id
   = IPBinds
         [LIPBind id]
@@ -629,6 +662,7 @@ deriving instance (DataId id) => Data (HsIPBinds id)
 isEmptyIPBinds :: HsIPBinds id -> Bool
 isEmptyIPBinds (IPBinds is ds) = null is && isEmptyTcEvBinds ds
 
+-- | Located Implicit Parameter Binding
 type LIPBind id = Located (IPBind id)
 -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi' when in a
 --   list
@@ -672,6 +706,7 @@ signatures.  Then all the machinery to move them into place, etc.,
 serves for both.
 -}
 
+-- | Located Signature
 type LSig name = Located (Sig name)
 
 -- | Signatures and pragmas
@@ -810,20 +845,26 @@ data Sig name
 
 deriving instance (DataId name) => Data (Sig name)
 
-
+-- | Located Fixity Signature
 type LFixitySig name = Located (FixitySig name)
+
+-- | Fixity Signature
 data FixitySig name = FixitySig [Located name] Fixity
   deriving Data
 
--- | TsSpecPrags conveys pragmas from the type checker to the desugarer
+-- | Type checker Specialisation Pragmas
+--
+-- 'TcSpecPrags' conveys @SPECIALISE@ pragmas from the type checker to the desugarer
 data TcSpecPrags
   = IsDefaultMethod     -- ^ Super-specialised: a default method should
                         -- be macro-expanded at every call site
   | SpecPrags [LTcSpecPrag]
   deriving Data
 
+-- | Located Type checker Specification Pragmas
 type LTcSpecPrag = Located TcSpecPrag
 
+-- | Type checker Specification Pragma
 data TcSpecPrag
   = SpecPrag
         Id
@@ -963,14 +1004,16 @@ pprMinimalSig (L _ bf) = text "MINIMAL" <+> ppr (fmap unLoc bf)
 ************************************************************************
 -}
 
+-- | Haskell Pattern Synonym Details
 data HsPatSynDetails a
-  = InfixPatSyn a a
-  | PrefixPatSyn [a]
-  | RecordPatSyn [RecordPatSynField a]
+  = InfixPatSyn a a                    -- ^ Infix Pattern Synonym
+  | PrefixPatSyn [a]                   -- ^ Prefix Pattern Synonym
+  | RecordPatSyn [RecordPatSynField a] -- ^ Record Pattern Synonym
   deriving Data
 
 
 -- See Note [Record PatSyn Fields]
+-- | Record Pattern Synonym Field
 data RecordPatSynField a
   = RecordPatSynField {
       recordPatSynSelectorId :: a  -- Selector name visible in rest of the file
@@ -1061,6 +1104,7 @@ instance Traversable HsPatSynDetails where
     traverse f (PrefixPatSyn args) = PrefixPatSyn <$> traverse f args
     traverse f (RecordPatSyn args) = RecordPatSyn <$> traverse (traverse f) args
 
+-- | Haskell Pattern Synonym Direction
 data HsPatSynDir id
   = Unidirectional
   | ImplicitBidirectional

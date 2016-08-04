@@ -45,7 +45,8 @@ import Data.List
 ************************************************************************
 -}
 
--- | A pattern synonym
+-- | Pattern Synonym
+--
 -- See Note [Pattern synonym representation]
 -- See Note [Pattern synonym signatures]
 data PatSyn

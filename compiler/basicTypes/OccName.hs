@@ -228,6 +228,11 @@ demoteNameSpace TcClsName = Just DataName
 ************************************************************************
 -}
 
+-- | Occurrence Name
+--
+-- In this context that means:
+-- "classified (i.e. as a type name, value name, etc) but not qualified
+-- and not yet resolved"
 data OccName = OccName
     { occNameSpace  :: !NameSpace
     , occNameFS     :: !FastString
