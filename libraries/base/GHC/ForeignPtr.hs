@@ -432,7 +432,7 @@ unsafeForeignPtrToPtr (ForeignPtr fo _) = Ptr fo
 castForeignPtr :: ForeignPtr a -> ForeignPtr b
 -- ^This function casts a 'ForeignPtr'
 -- parameterised by one type into another type.
-castForeignPtr f = unsafeCoerce# f
+castForeignPtr = coerce
 
 -- | Causes the finalizers associated with a foreign pointer to be run
 -- immediately.
