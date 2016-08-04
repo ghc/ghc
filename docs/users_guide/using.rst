@@ -418,7 +418,8 @@ The main advantages to using ``ghc --make`` over traditional
    dependencies never get out of sync with the source.
 
 -  Using the :ghc-flag:`-j` flag, you can compile modules in parallel. Specify
-   ``-j⟨N⟩`` to compile ⟨N⟩ jobs in parallel.
+   ``-j⟨N⟩`` to compile ⟨N⟩ jobs in parallel. If N is omitted,
+   then it defaults to the number of processors.
 
 Any of the command-line options described in the rest of this chapter
 can be used with ``--make``, but note that any options you give on the
@@ -444,11 +445,12 @@ The source files for the program don't all need to be in the same
 directory; the :ghc-flag:`-i` option can be used to add directories to the
 search path (see :ref:`search-path`).
 
-.. ghc-flag:: -j <N>
+.. ghc-flag:: -j [N]
 
     Perform compilation in parallel when possible. GHC will use up to ⟨N⟩
-    threads during compilation. Note that compilation of a module may not
-    begin until its dependencies have been built.
+    threads during compilation. If N is omitted, then it defaults to the
+    number of processors. Note that compilation of a module may not begin
+    until its dependencies have been built.
 
 .. _eval-mode:
 

@@ -2343,8 +2343,17 @@ dynamic_flags_deps = [
                   "deprecated: They no longer have any effect"))))
   , make_ord_flag defFlag "v"        (OptIntSuffix setVerbosity)
 
-  , make_ord_flag defGhcFlag "j"     (OptIntSuffix (\n ->
-                                            upd (\d -> d {parMakeCount = n})))
+  , make_ord_flag defGhcFlag "j"     (OptIntSuffix
+        (\n -> case n of
+                 Just n
+                     | n > 0     -> upd (\d -> d { parMakeCount = Just n })
+                     | otherwise -> addErr "Syntax: -j[n] where n > 0"
+                 Nothing -> upd (\d -> d { parMakeCount = Nothing })))
+                 -- When the number of parallel builds
+                 -- is omitted, it is the same
+                 -- as specifing that the number of
+                 -- parallel builds is equal to the
+                 -- result of getNumProcessors
   , make_ord_flag defFlag "sig-of"   (sepArg setSigOf)
 
     -- RTS options -------------------------------------------------------------
