@@ -229,12 +229,7 @@ doRegister directory distDir ghc ghcpkg topdir
             progs' <- configurePrograms [ghcProgram', ghcPkgProgram'] progs
             instInfos <- dump (hcPkgInfo progs') verbosity GlobalPackageDB
             let installedPkgs' = PackageIndex.fromList instInfos
-            let updateComponentConfig (clbi, deps)
-                    = (updateComponentLocalBuildInfo clbi, deps)
-                updateComponentLocalBuildInfo clbi = clbi -- TODO: remove
-                ccs' = map updateComponentConfig (componentsConfigs lbi)
-                lbi' = lbi {
-                               componentsConfigs = ccs',
+            let lbi' = lbi {
                                installedPkgs = installedPkgs',
                                installDirTemplates = idts,
                                withPrograms = progs'
