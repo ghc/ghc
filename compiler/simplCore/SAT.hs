@@ -373,7 +373,7 @@ saTransformMaybe binder maybe_arg_staticness rhs_binders rhs_body
   where
     should_transform staticness = n_static_args > 1 -- THIS IS THE DECISION POINT
       where
-        n_static_args = length (filter isStaticValue staticness)
+        n_static_args = count isStaticValue staticness
 
 saTransform :: Id -> SATInfo -> [Id] -> CoreExpr -> SatM CoreBind
 saTransform binder arg_staticness rhs_binders rhs_body

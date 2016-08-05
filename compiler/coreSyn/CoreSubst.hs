@@ -1434,7 +1434,7 @@ exprIsLambda_maybe (in_scope_set, id_unf) (Cast casted_e co)
 -- Another attempt: See if we find a partial unfolding
 exprIsLambda_maybe (in_scope_set, id_unf) e
     | (Var f, as, ts) <- collectArgsTicks tickishFloatable e
-    , idArity f > length (filter isValArg as)
+    , idArity f > count isValArg as
     -- Make sure there is hope to get a lambda
     , Just rhs <- expandUnfolding_maybe (id_unf f)
     -- Optimize, for beta-reduction

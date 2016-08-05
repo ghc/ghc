@@ -2455,7 +2455,7 @@ badFieldsUpd rbinds data_cons
       sortBy (compare `on` fst) .
       map (\ item@(_, membershipRow) -> (countTrue membershipRow, item))
 
-    countTrue = length . filter id
+    countTrue = count id
 
 {-
 Note [Finding the conflicting fields]
