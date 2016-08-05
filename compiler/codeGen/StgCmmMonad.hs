@@ -219,8 +219,7 @@ instance Outputable CgIdInfo where
 
 -- Sequel tells what to do with the result of this expression
 data Sequel
-  = Return Bool         -- Return result(s) to continuation found on the stack.
-                        -- True <=> the continuation is update code (???)
+  = Return              -- Return result(s) to continuation found on the stack.
 
   | AssignTo
         [LocalReg]      -- Put result(s) in these regs and fall through
@@ -233,7 +232,7 @@ data Sequel
                         -- allocating primOp)
 
 instance Outputable Sequel where
-    ppr (Return b) = text "Return" <+> ppr b
+    ppr Return = text "Return"
     ppr (AssignTo regs b) = text "AssignTo" <+> ppr regs <+> ppr b
 
 -- See Note [sharing continuations] below
@@ -320,7 +319,7 @@ initCgInfoDown dflags mod
                  , cgd_tick_scope= GlobalScope }
 
 initSequel :: Sequel
-initSequel = Return False
+initSequel = Return
 
 initUpdFrameOff :: DynFlags -> UpdFrameOffset
 initUpdFrameOff dflags = widthInBytes (wordWidth dflags) -- space for the RA

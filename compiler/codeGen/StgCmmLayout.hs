@@ -74,7 +74,7 @@ emitReturn results
        ; sequel    <- getSequel
        ; updfr_off <- getUpdFrameOff
        ; case sequel of
-           Return _ ->
+           Return ->
              do { adjustHpBackwards
                 ; let e = CmmLoad (CmmStackSlot Old updfr_off) (gcWord dflags)
                 ; emit (mkReturn dflags (entryCode dflags e) results updfr_off)
@@ -109,7 +109,7 @@ emitCallWithExtraStack (callConv, retConv) fun args extra_stack
         ; sequel <- getSequel
         ; updfr_off <- getUpdFrameOff
         ; case sequel of
-            Return _ -> do
+            Return -> do
               emit $ mkJumpExtra dflags callConv fun args updfr_off extra_stack
               return AssignedDirectly
             AssignTo res_regs _ -> do
