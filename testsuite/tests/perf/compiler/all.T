@@ -28,7 +28,8 @@ setTestOpts(no_lint)
 #    really changed, then you know there's an issue.
 
 test('T1969',
-     [compiler_stats_num_field('peak_megabytes_allocated', # Note [residency]
+     [expect_broken(12437),
+      compiler_stats_num_field('peak_megabytes_allocated', # Note [residency]
           [(wordsize(32), 30, 15),
              # 2010-05-17 14 (x86/Windows)
              #            15 (x86/OS X)
