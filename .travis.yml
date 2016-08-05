@@ -17,7 +17,7 @@ matrix:
               - PATH="$HOME/.cabal/bin:$PATH"
               - export PATH
               - cabal update
-              - cabal install alex happy
+              - cabal install alex happy ansi-terminal mtl shake quickcheck
 
         - os: osx
           env: FLAVOUR=quickest TARGET=
@@ -25,7 +25,7 @@ matrix:
               - brew update
               - brew install ghc cabal-install
               - cabal update
-              - cabal install alex happy
+              - cabal install alex happy ansi-terminal mtl shake quickcheck
               - PATH="$HOME/.cabal/bin:$PATH"
               - export PATH
 
@@ -51,13 +51,9 @@ install:
     - mv .git ghc/hadrian
     - ( cd ghc/hadrian && git reset --hard HEAD )
 
-    - ( cd ghc/hadrian && cabal install --only-dependencies )
-    - ( cd ghc/hadrian && cabal configure )
-
     - ghc-pkg list
 
 script:
-    - ( cd ghc/hadrian && cabal haddock --internal )
     - ./ghc/hadrian/build.sh selftest
     - ./ghc/hadrian/build.sh -j --verbose --no-progress --progress-colour=never --profile=- --flavour=$FLAVOUR $TARGET
     - ./ghc/inplace/bin/ghc-stage2 -e 1+2
