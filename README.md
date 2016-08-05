@@ -23,7 +23,7 @@ follow these steps:
 * If you have never built GHC before, start with the [preparation guide][ghc-preparation].
 
 * This build system is written in Haskell (obviously) and depends on the following Haskell
-packages, which need to be installed: `ansi-terminal mtl shake QuickCheck`.
+packages, which need to be installed: `ansi-terminal mtl shake quickcheck`.
 
 * Get the sources. It is important for the build system to be in the `hadrian` directory
 of the GHC source tree:
