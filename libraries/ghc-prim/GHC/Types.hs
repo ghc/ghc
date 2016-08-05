@@ -229,7 +229,7 @@ class a ~~ b
 --      Nevertheless one can pretend that the following three kinds of instances
 --      exist. First, as a trivial base-case:
 --
---      @instance a a@
+--      @instance Coercible a a@
 --
 --      Furthermore, for every type constructor there is
 --      an instance that allows to coerce under the type constructor. For
