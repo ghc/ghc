@@ -7,7 +7,7 @@ module BlockId
   , BlockSet, BlockEnv
   , IsSet(..), setInsertList, setDeleteList, setUnions
   , IsMap(..), mapInsertList, mapDeleteList, mapUnions
-  , emptyBlockSet, emptyBlockMap
+  , emptyBlockSet, emptyBlockMap, lookupBlockMap, insertBlockMap
   , blockLbl, infoTblLbl, retPtLbl
   ) where
 
@@ -60,6 +60,12 @@ instance Outputable a => Outputable (BlockEnv a) where
 
 emptyBlockMap :: BlockEnv a
 emptyBlockMap = mapEmpty
+
+lookupBlockMap :: BlockId -> BlockEnv a -> Maybe a
+lookupBlockMap = mapLookup
+
+insertBlockMap :: BlockId -> a -> BlockEnv a -> BlockEnv a
+insertBlockMap = mapInsert
 
 -- Block sets
 type BlockSet = Hoopl.LabelSet

@@ -55,9 +55,7 @@ import State
 
 import Data.List
 import Data.Maybe
-import Data.Map                 (Map)
-import Data.Set                 (Set)
-import qualified Data.Map       as Map
+import Data.IntSet              (IntSet)
 
 -----------------------------------------------------------------------------
 type RegSet = UniqSet Reg
@@ -173,7 +171,7 @@ data LiveInfo
                 [BlockId]                 -- entry points (first one is the
                                           -- entry point for the proc).
                 (Maybe (BlockMap RegSet)) -- argument locals live on entry to this block
-                (Map BlockId (Set Int))   -- stack slots live on entry to this block
+                (BlockMap IntSet)         -- stack slots live on entry to this block
 
 
 -- | A basic block with liveness information.
@@ -648,7 +646,7 @@ natCmmTopToLive (CmmData i d)
         = CmmData i d
 
 natCmmTopToLive (CmmProc info lbl live (ListGraph []))
-        = CmmProc (LiveInfo info [] Nothing Map.empty) lbl live []
+        = CmmProc (LiveInfo info [] Nothing emptyBlockMap) lbl live []
 
 natCmmTopToLive proc@(CmmProc info lbl live (ListGraph blocks@(first : _)))
  = let  first_id        = blockId first
@@ -659,7 +657,7 @@ natCmmTopToLive proc@(CmmProc info lbl live (ListGraph blocks@(first : _)))
                                         BasicBlock l (map (\i -> LiveInstr (Instr i) Nothing) instrs)))
                         $ sccs
 
-   in   CmmProc (LiveInfo info (first_id : entry_ids) Nothing Map.empty)
+   in   CmmProc (LiveInfo info (first_id : entry_ids) Nothing emptyBlockMap)
                 lbl live sccsLive
 
 
@@ -725,7 +723,7 @@ regLiveness _ (CmmData i d)
 regLiveness _ (CmmProc info lbl live [])
         | LiveInfo static mFirst _ _    <- info
         = return $ CmmProc
-                        (LiveInfo static mFirst (Just mapEmpty) Map.empty)
+                        (LiveInfo static mFirst (Just mapEmpty) emptyBlockMap)
                         lbl live []
 
 regLiveness platform (CmmProc info lbl live sccs)
