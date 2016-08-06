@@ -549,7 +549,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
 
                 -- do the graph coloring register allocation
                 let ((alloced, regAllocStats), usAlloc)
-                        = {-# SCC "RegAlloc" #-}
+                        = {-# SCC "RegAlloc-color" #-}
                           initUs usLive
                           $ Color.regAlloc
                                 dflags
@@ -593,7 +593,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                            return (alloced', ra_stats )
 
                 let ((alloced, regAllocStats), usAlloc)
-                        = {-# SCC "RegAlloc" #-}
+                        = {-# SCC "RegAlloc-linear" #-}
                           initUs usLive
                           $ liftM unzip
                           $ mapM reg_alloc withLiveness
