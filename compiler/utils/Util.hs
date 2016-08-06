@@ -1,6 +1,6 @@
 -- (c) The University of Glasgow 2006
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, BangPatterns #-}
 
 -- | Highly random utility functions
 --
@@ -619,9 +619,10 @@ all2 _ _      _      = False
 -- Count the number of times a predicate is true
 
 count :: (a -> Bool) -> [a] -> Int
-count _ [] = 0
-count p (x:xs) | p x       = 1 + count p xs
-               | otherwise = count p xs
+count p = go 0
+  where go !n [] = n
+        go !n (x:xs) | p x       = go (n+1) xs
+                     | otherwise = go n xs
 
 {-
 @splitAt@, @take@, and @drop@ but with length of another
