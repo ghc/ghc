@@ -114,6 +114,7 @@ module Data.Data (
 
 ------------------------------------------------------------------------------
 
+import Data.Functor.Const
 import Data.Either
 import Data.Eq
 import Data.Maybe
@@ -323,12 +324,12 @@ class Typeable a => Data a where
 
   -- | A generic query with a left-associative binary operator
   gmapQl :: forall r r'. (r -> r' -> r) -> r -> (forall d. Data d => d -> r') -> a -> r
-  gmapQl o r f = unCONST . gfoldl k z
+  gmapQl o r f = getConst . gfoldl k z
     where
-      k :: Data d => CONST r (d->b) -> d -> CONST r b
-      k c x = CONST $ (unCONST c) `o` f x
-      z :: g -> CONST r g
-      z _   = CONST r
+      k :: Data d => Const r (d->b) -> d -> Const r b
+      k c x = Const $ (getConst c) `o` f x
+      z :: g -> Const r g
+      z _   = Const r
 
   -- | A generic query with a right-associative binary operator
   gmapQr :: forall r r'. (r' -> r -> r) -> r -> (forall d. Data d => d -> r') -> a -> r
@@ -422,10 +423,6 @@ was transformed successfully.
                         else (f y >>= \y' -> return (h y',True))
                              `mplus` return (h y, b)
              )
-
-
--- | The constant type constructor needed for the definition of gmapQl
-newtype CONST c a = CONST { unCONST :: c }
 
 
 -- | Type constructor for adding counters to queries
