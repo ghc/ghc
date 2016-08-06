@@ -714,7 +714,7 @@ extern void DEBUG_LoadSymbols( const char *name )
 
 #else /* USING_LIBBFD */
 
-extern void DEBUG_LoadSymbols( char *name STG_UNUSED )
+extern void DEBUG_LoadSymbols( const char *name STG_UNUSED )
 {
   /* nothing, yet */
 }

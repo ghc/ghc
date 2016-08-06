@@ -26,7 +26,7 @@ extern void        printClosure    ( const StgClosure *obj );
 extern void        printStackChunk ( StgPtr sp, StgPtr spLim );
 extern void        printTSO        ( StgTSO *tso );
 
-extern void DEBUG_LoadSymbols( char *name );
+extern void DEBUG_LoadSymbols( const char *name );
 
 extern const char *lookupGHCName( void *addr );
 
