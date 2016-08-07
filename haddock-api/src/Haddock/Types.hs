@@ -449,7 +449,7 @@ instance (NFData a, NFData mod)
     DocExamples a             -> a `deepseq` ()
     DocHeader a               -> a `deepseq` ()
 
-#if !MIN_VERSION_ghc(8,0,2)
+#if !MIN_VERSION_GLASGOW_HASKELL(8,0,1,1)
 -- These were added to GHC itself in 8.0.2
 instance NFData Name where rnf x = seq x ()
 instance NFData OccName where rnf x = seq x ()
