@@ -40,7 +40,7 @@ import GHC.Generics (K1(..))
 -- element on which an action can be performed, 'Bitraversable' data structures
 -- have two such varieties of elements.
 --
--- A definition of 'traverse' must satisfy the following laws:
+-- A definition of 'bitraverse' must satisfy the following laws:
 --
 -- [/naturality/]
 --   @'bitraverse' (t . f) (t . g) ≡ t . 'bitraverse' f g@
