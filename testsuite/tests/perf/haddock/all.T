@@ -52,7 +52,7 @@ test('haddock.base',
 test('haddock.Cabal',
      [unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 10070330520, 5)
+          [(wordsize(64), 16014171248, 5)
             # 2012-08-14: 3255435248 (amd64/Linux)
             # 2012-08-29: 3324606664 (amd64/Linux, new codegen)
             # 2012-10-08: 3373401360 (amd64/Linux)
