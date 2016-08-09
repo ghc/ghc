@@ -42,7 +42,7 @@ uniq_tests = do
 
 layout_tests :: IO ()
 layout_tests = sequence_
-    [ layout1, layout2, layout3, enum_layout ]
+    [ layout1, layout2, layout3, layout4, layout5, enum_layout ]
   where
     assert_layout tn tys layout =
       let
@@ -74,6 +74,18 @@ layout_tests = sequence_
         [ ubxtup [ intTy, intPrimTy, intTy, intPrimTy ]
         , ubxtup [ intPrimTy, intTy, intPrimTy, intTy ] ]
         [ WordSlot, PtrSlot, PtrSlot, WordSlot, WordSlot ]
+
+    layout4 =
+      assert_layout "layout4"
+        [ ubxtup [ floatPrimTy, floatPrimTy ]
+        , ubxtup [ intPrimTy, intPrimTy ] ]
+        [ WordSlot, WordSlot, WordSlot, FloatSlot, FloatSlot ]
+
+    layout5 =
+      assert_layout "layout5"
+        [ ubxtup [ intPrimTy, intPrimTy ]
+        , ubxtup [ floatPrimTy, floatPrimTy ] ]
+        [ WordSlot, WordSlot, WordSlot, FloatSlot, FloatSlot ]
 
     enum_layout =
       assert_layout "enum"

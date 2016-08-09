@@ -199,7 +199,9 @@ ubxSumRepType constrs0 =
       | Just s' <- s `fitsIn` es
       = -- found a slot, use it
         s' : merge ess ss
-
+      | s < es
+      = -- we need a new slot and this is the right place for it
+        s : merge (es : ess) ss
       | otherwise
       = -- keep searching for a slot
         es : merge ess (s : ss)
