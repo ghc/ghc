@@ -111,7 +111,7 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) stg_args res_ty
 
             _something_else ->
                 do { _ <- emitForeignCall safety res_regs call_target call_args
-                   ; emitReturn (map (CmmExprArg . CmmReg . CmmLocal) res_regs)
+                   ; emitReturn (map (CmmReg . CmmLocal) res_regs)
                    }
          }
 
@@ -524,12 +524,10 @@ getFCallArgs args
   = do  { mb_cmms <- mapM get args
         ; return (catMaybes mb_cmms) }
   where
-    get arg@(StgRubbishArg{})
-            = pprPanic "getFCallArgs" (text "Rubbish arg in foreign call:" <+> ppr arg)
     get arg | isVoidRep arg_rep
             = return Nothing
             | otherwise
-            = do { cmm <- getArgAmode_no_rubbish (NonVoid arg)
+            = do { cmm <- getArgAmode (NonVoid arg)
                  ; dflags <- getDynFlags
                  ; return (Just (add_shim dflags arg_ty cmm, hint)) }
             where

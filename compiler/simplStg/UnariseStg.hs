@@ -188,6 +188,7 @@ import DataCon
 import FastString (FastString, mkFastString)
 import Id
 import Literal (Literal (..))
+import MkCore (aBSENT_ERROR_ID)
 import MkId (voidPrimId, voidArgId)
 import MonadUtils (mapAccumLM)
 import Outputable
@@ -288,8 +289,6 @@ unariseExpr rho e@(StgApp f [])
         -> return (StgApp f' [])
       Just (UnaryVal (StgLitArg f'))
         -> return (StgLit f')
-      Just (UnaryVal arg@(StgRubbishArg {}))
-        -> pprPanic "unariseExpr - app1" (ppr e $$ ppr arg)
       Nothing
         -> return e
 
@@ -389,7 +388,6 @@ elimCase rho args bndr (MultiValAlt _) alts
            scrut' = case tag_arg of
                       StgVarArg v     -> StgApp v []
                       StgLitArg l     -> StgLit l
-                      StgRubbishArg _ -> pprPanic "unariseExpr" (ppr args)
 
        alts' <- unariseSumAlts rho1 real_args alts
        return (StgCase scrut' tag_bndr tagAltTy alts')
@@ -561,7 +559,14 @@ mkUbxSum dc ty_args args0
         | Just stg_arg <- IM.lookup arg_idx arg_map
         = stg_arg : mkTupArgs (arg_idx + 1) slots_left arg_map
         | otherwise
-        = StgRubbishArg (slotTyToType slot) : mkTupArgs (arg_idx + 1) slots_left arg_map
+        = slotRubbishArg slot : mkTupArgs (arg_idx + 1) slots_left arg_map
+
+      slotRubbishArg :: SlotTy -> StgArg
+      slotRubbishArg PtrSlot    = StgVarArg aBSENT_ERROR_ID
+      slotRubbishArg WordSlot   = StgLitArg (MachWord 0)
+      slotRubbishArg Word64Slot = StgLitArg (MachWord64 0)
+      slotRubbishArg FloatSlot  = StgLitArg (MachFloat 0)
+      slotRubbishArg DoubleSlot = StgLitArg (MachDouble 0)
     in
       tag_arg : mkTupArgs 0 sum_slots arg_idxs
 
@@ -659,7 +664,7 @@ unariseConArg :: UnariseEnv -> InStgArg -> [OutStgArg]
 unariseConArg rho (StgVarArg x) =
   case lookupVarEnv rho x of
     Just (UnaryVal arg) -> [arg]
-    Just (MultiVal as) -> as       -- 'as' can be empty
+    Just (MultiVal as) -> as      -- 'as' can be empty
     Nothing
       | isVoidTy (idType x) -> [] -- e.g. C realWorld#
                                   -- Here realWorld# is not in the envt, but

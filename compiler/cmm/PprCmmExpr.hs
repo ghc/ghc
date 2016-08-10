@@ -53,9 +53,6 @@ instance Outputable CmmExpr where
 instance Outputable CmmReg where
     ppr e = pprReg e
 
-instance Outputable CmmArg where
-    ppr a = pprArg a
-
 instance Outputable CmmLit where
     ppr l = pprLit l
 
@@ -275,12 +272,6 @@ pprGlobalReg gr
         GCFun          -> text "stg_gc_fun"
         BaseReg        -> text "BaseReg"
         PicBaseReg     -> text "PicBaseReg"
-
------------------------------------------------------------------------------
-
-pprArg :: CmmArg -> SDoc
-pprArg (CmmExprArg e) = ppr e
-pprArg (CmmRubbishArg ty) = text "Rubbish" <+> dcolon <+> ppr ty
 
 -----------------------------------------------------------------------------
 

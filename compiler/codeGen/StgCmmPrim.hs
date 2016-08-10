@@ -46,7 +46,6 @@ import Util
 import Prelude hiding ((<*>))
 
 import Data.Bits ((.&.), bit)
-import Data.Bifunctor (first)
 import Control.Monad (liftM, when)
 
 ------------------------------------------------------------------------
@@ -80,10 +79,10 @@ cgOpApp (StgFCallOp fcall _) stg_args res_ty
 cgOpApp (StgPrimOp TagToEnumOp) [arg] res_ty
   = ASSERT(isEnumerationTyCon tycon)
     do  { dflags <- getDynFlags
-        ; args' <- getNonVoidArgAmodes_no_rubbish [arg]
+        ; args' <- getNonVoidArgAmodes [arg]
         ; let amode = case args' of [amode] -> amode
                                     _ -> panic "TagToEnumOp had void arg"
-        ; emitReturn [CmmExprArg (tagToClosure dflags tycon amode)] }
+        ; emitReturn [tagToClosure dflags tycon amode] }
    where
           -- If you're reading this code in the attempt to figure
           -- out why the compiler panic'ed here, it is probably because
@@ -94,11 +93,11 @@ cgOpApp (StgPrimOp TagToEnumOp) [arg] res_ty
 
 cgOpApp (StgPrimOp primop) args res_ty = do
     dflags <- getDynFlags
-    cmm_args <- getNonVoidArgAmodes_no_rubbish args
+    cmm_args <- getNonVoidArgAmodes args
     case shouldInlinePrimOp dflags primop cmm_args of
         Nothing -> do  -- out-of-line
           let fun = CmmLit (CmmLabel (mkRtsPrimOpLabel primop))
-          emitCall (NativeNodeCall, NativeReturn) fun (map CmmExprArg cmm_args)
+          emitCall (NativeNodeCall, NativeReturn) fun cmm_args
 
         Just f  -- inline
           | ReturnsPrim VoidRep <- result_info
@@ -109,12 +108,12 @@ cgOpApp (StgPrimOp primop) args res_ty = do
           -> do dflags <- getDynFlags
                 res <- newTemp (primRepCmmType dflags rep)
                 f [res]
-                emitReturn [CmmExprArg (CmmReg (CmmLocal res))]
+                emitReturn [CmmReg (CmmLocal res)]
 
           | ReturnsAlg tycon <- result_info, isUnboxedTupleTyCon tycon
           -> do (regs, _hints) <- newUnboxedTupleRegs res_ty
                 f regs
-                emitReturn (map (CmmExprArg . CmmReg . CmmLocal) regs)
+                emitReturn (map (CmmReg . CmmLocal) regs)
 
           | otherwise -> panic "cgPrimop"
           where
@@ -257,7 +256,7 @@ cgPrimOp   :: [LocalReg]        -- where to put the results
 
 cgPrimOp results op args
   = do dflags <- getDynFlags
-       arg_exprs <- getNonVoidArgAmodes_no_rubbish args
+       arg_exprs <- getNonVoidArgAmodes args
        emitPrimOp dflags results op arg_exprs
 
 
@@ -1658,7 +1657,7 @@ doNewByteArrayOp res_r n = do
     let hdr_size = fixedHdrSize dflags
 
     base <- allocHeapClosure rep info_ptr curCCS
-                     [ (CmmExprArg (mkIntExpr dflags n),
+                     [ (mkIntExpr dflags n,
                         hdr_size + oFFSET_StgArrBytes_bytes dflags)
                      ]
 
@@ -1771,7 +1770,7 @@ doNewArrayOp res_r rep info payload n init = do
         (mkIntExpr dflags (nonHdrSize dflags rep))
         (zeroExpr dflags)
 
-    base <- allocHeapClosure rep info_ptr curCCS (map (first CmmExprArg) payload)
+    base <- allocHeapClosure rep info_ptr curCCS payload
 
     arr <- CmmLocal `fmap` newTemp (bWord dflags)
     emit $ mkAssign arr base
@@ -1954,9 +1953,9 @@ emitCloneArray info_p res_r src src_off n = do
     let hdr_size = fixedHdrSize dflags
 
     base <- allocHeapClosure rep info_ptr curCCS
-                     [ (CmmExprArg (mkIntExpr dflags n),
+                     [ (mkIntExpr dflags n,
                         hdr_size + oFFSET_StgMutArrPtrs_ptrs dflags)
-                     , (CmmExprArg (mkIntExpr dflags (nonHdrSizeW rep)),
+                     , (mkIntExpr dflags (nonHdrSizeW rep),
                         hdr_size + oFFSET_StgMutArrPtrs_size dflags)
                      ]
 
@@ -1993,7 +1992,7 @@ emitCloneSmallArray info_p res_r src src_off n = do
     let hdr_size = fixedHdrSize dflags
 
     base <- allocHeapClosure rep info_ptr curCCS
-                     [ (CmmExprArg (mkIntExpr dflags n),
+                     [ (mkIntExpr dflags n,
                         hdr_size + oFFSET_StgSmallMutArrPtrs_ptrs dflags)
                      ]
 

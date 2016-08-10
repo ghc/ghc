@@ -15,6 +15,7 @@ test('unboxedsums8',  omit_ways(['ghci']), compile_and_run, [''])
 test('unboxedsums9',  omit_ways(['ghci']), compile_and_run, [''])
 test('unboxedsums10', omit_ways(['ghci']), compile_and_run, [''])
 test('unboxedsums11', omit_ways(['ghci']), compile_and_run, [''])
+test('unboxedsums12', omit_ways(['ghci']), compile, [''])
 
 test('ffi1', normal, compile_fail, [''])
 test('thunk', only_ways(['normal']), compile_and_run, [''])

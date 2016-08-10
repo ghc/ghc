@@ -551,7 +551,7 @@ mkSlowEntryCode bndr cl_info arg_regs -- function closure is already in `Node'
            -- mkDirectJump does not clobber `Node' containing function closure
            jump = mkJump dflags NativeNodeCall
                                 (mkLblExpr fast_lbl)
-                                (map (CmmExprArg . CmmReg . CmmLocal) (node : arg_regs))
+                                (map (CmmReg . CmmLocal) (node : arg_regs))
                                 (initUpdFrameOff dflags)
        tscope <- getTickScope
        emitProcWithConvention Slow Nothing slow_lbl

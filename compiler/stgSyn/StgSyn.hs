@@ -92,10 +92,6 @@ data GenStgArg occ
   = StgVarArg  occ
   | StgLitArg  Literal
 
-    -- A rubbish arg is a value that's not supposed to be used by the generated
-    -- code, but it may be a GC root (i.e. used by GC) if the type is boxed.
-  | StgRubbishArg Type
-
 -- | Does this constructor application refer to
 -- anything in a different *Windows* DLL?
 -- If so, we can't allocate it statically
@@ -137,7 +133,6 @@ isAddrRep _       = False
 stgArgType :: StgArg -> Type
 stgArgType (StgVarArg v)   = idType v
 stgArgType (StgLitArg lit) = literalType lit
-stgArgType (StgRubbishArg ty) = ty
 
 
 -- | Strip ticks of a given type from an STG expression
@@ -197,7 +192,7 @@ primitives, and literals.
                 [Type]          -- See Note [Types in StgConApp] in UnariseStg
 
   | StgOpApp    StgOp           -- Primitive op or foreign call
-                [GenStgArg occ] -- Saturated. Not rubbish.
+                [GenStgArg occ] -- Saturated.
                 Type            -- Result type
                                 -- We need to know this so that we can
                                 -- assign result registers
@@ -659,7 +654,6 @@ instance (OutputableBndr bndr, Outputable bdee, Ord bdee)
 pprStgArg :: (Outputable bdee) => GenStgArg bdee -> SDoc
 pprStgArg (StgVarArg var) = ppr var
 pprStgArg (StgLitArg con) = ppr con
-pprStgArg (StgRubbishArg ty) = text "StgRubbishArg" <> dcolon <> ppr ty
 
 pprStgExpr :: (OutputableBndr bndr, Outputable bdee, Ord bdee)
            => GenStgExpr bndr bdee -> SDoc

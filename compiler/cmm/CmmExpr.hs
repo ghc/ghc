@@ -6,7 +6,6 @@
 
 module CmmExpr
     ( CmmExpr(..), cmmExprType, cmmExprWidth, maybeInvertCmmExpr
-    , CmmArg(..)
     , CmmReg(..), cmmRegType
     , CmmLit(..), cmmLitType
     , LocalReg(..), localRegType
@@ -36,7 +35,6 @@ import CmmMachOp
 import CmmType
 import DynFlags
 import Outputable (panic)
-import Type
 import Unique
 
 import Data.Set (Set)
@@ -74,10 +72,6 @@ data CmmReg
   = CmmLocal  {-# UNPACK #-} !LocalReg
   | CmmGlobal GlobalReg
   deriving( Eq, Ord )
-
-data CmmArg
-  = CmmExprArg CmmExpr
-  | CmmRubbishArg Type -- See StgRubbishArg in StgSyn.hs
 
 -- | A stack area is either the stack slot where a variable is spilled
 -- or the stack space where function arguments and results are passed.
