@@ -67,6 +67,7 @@ import Paths_haddock_api (getDataDir)
 import System.Directory (doesDirectoryExist)
 #endif
 
+import Text.ParserCombinators.ReadP (readP_to_S)
 import GHC hiding (verbosity)
 import Config
 import DynFlags hiding (projectVersion, verbosity)
@@ -296,6 +297,23 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
 
     sourceUrls' = (srcBase, srcModule', pkgSrcMap', pkgSrcLMap')
 
+    -- TODO: This silently suppresses errors
+    installedMap :: Map Module InstalledInterface
+    installedMap = Map.fromList [ (unwire (instMod iface), iface) | iface <- installedIfaces ]
+
+    -- The user gives use base-4.9.0.0, but the InstalledInterface
+    -- records the *wired in* identity base.  So untranslate it
+    -- so that we can service the request.
+    unwire :: Module -> Module
+    unwire m = m { moduleUnitId = unwireUnitId dflags (moduleUnitId m) }
+
+    reexportedIfaces =
+        [ iface
+        | mod_str <- reexportFlags flags
+        , (m, "") <- readP_to_S parseModuleId mod_str
+        , Just iface <- [Map.lookup m installedMap]
+        ]
+
   libDir   <- getHaddockLibDir flags
   prologue <- getPrologue dflags' flags
   themes   <- getThemes libDir flags >>= either bye return
@@ -316,7 +334,7 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
     copyHtmlBits odir libDir themes withQuickjump
 
   when (Flag_Html `elem` flags) $ do
-    ppHtml dflags' title pkgStr visibleIfaces odir
+    ppHtml dflags' title pkgStr visibleIfaces reexportedIfaces odir
                 prologue
                 themes opt_mathjax sourceUrls' opt_wiki_urls
                 opt_contents_url opt_index_url unicode qual

@@ -31,6 +31,7 @@ module Haddock.Options (
   qualification,
   verbosity,
   ghcFlags,
+  reexportFlags,
   readIfaceArgs,
   optPackageName,
   optPackageVersion
@@ -99,6 +100,7 @@ data Flag
   | Flag_NoPrintMissingDocs
   | Flag_PackageName String
   | Flag_PackageVersion String
+  | Flag_Reexport String
   deriving (Eq, Show)
 
 
@@ -197,6 +199,8 @@ options backwardsCompat =
       "generate html with newlines and indenting (for use with --html)",
     Option [] ["no-print-missing-docs"] (NoArg Flag_NoPrintMissingDocs)
       "don't print information about any undocumented entities",
+    Option []  ["reexport"] (ReqArg Flag_Reexport "MOD")
+      "reexport the module MOD, adding it to the index",
     Option [] ["package-name"] (ReqArg Flag_PackageName "NAME")
       "name of the package being documented",
     Option [] ["package-version"] (ReqArg Flag_PackageVersion "VERSION")
@@ -312,6 +316,9 @@ verbosity flags =
 
 ghcFlags :: [Flag] -> [String]
 ghcFlags flags = [ option | Flag_OptGhc option <- flags ]
+
+reexportFlags :: [Flag] -> [String]
+reexportFlags flags = [ option | Flag_Reexport option <- flags ]
 
 
 readIfaceArgs :: [Flag] -> [(DocPaths, FilePath)]
