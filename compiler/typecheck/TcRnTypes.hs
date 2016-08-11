@@ -3163,7 +3163,7 @@ data TcPluginResult
   = TcPluginContradiction [Ct]
     -- ^ The plugin found a contradiction.
     -- The returned constraints are removed from the inert set,
-    -- and recorded as insoluable.
+    -- and recorded as insoluble.
 
   | TcPluginOk [(EvTerm,Ct)] [Ct]
     -- ^ The first field is for constraints that were solved.
