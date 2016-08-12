@@ -1606,26 +1606,28 @@ warnMissingSignatures gbl_env
                        (mapM_ add_bind_warn binds)
                 where
                   add_pat_syn_warn p
-                    = add_warn (patSynName p) (pprPatSynType p)
+                    = add_warn name $
+                      hang (text "Pattern synonym with no type signature:")
+                         2 (text "pattern" <+> pprPrefixName name <+> dcolon <+> pp_ty)
+                    where
+                      name  = patSynName p
+                      pp_ty = pprPatSynType p
 
                   add_bind_warn id
                     = do { env <- tcInitTidyEnv     -- Why not use emptyTidyEnv?
                          ; let name    = idName id
                                (_, ty) = tidyOpenType env (idType id)
                                ty_msg  = ppr ty
-                         ; add_warn name ty_msg }
+                         ; add_warn name $
+                           hang (text "Top-level binding with no type signature:")
+                              2 (pprPrefixName name <+> dcolon <+> ty_msg) }
 
-                  add_warn name ty_msg
+                  add_warn name msg
                     = when (name `elemNameSet` sig_ns && export_check name)
-                           (addWarnAt (Reason flag) (getSrcSpan name)
-                                                    (get_msg name ty_msg))
+                           (addWarnAt (Reason flag) (getSrcSpan name) msg)
 
                   export_check name
                     = not warn_only_exported || name `elemNameSet` exports
-
-                  get_msg name ty_msg
-                    = sep [ text "Top-level binding with no type signature:",
-                            nest 2 $ pprPrefixName name <+> dcolon <+> ty_msg ]
 
        ; add_sig_warns }
 
