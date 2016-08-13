@@ -239,9 +239,9 @@ INLINE_HEADER Time fsecondsToTime (double t)
 #include "rts/LibdwPool.h"
 
 /* Misc stuff without a home */
-DLL_IMPORT_RTS extern char **prog_argv; /* so we can get at these from Haskell */
-DLL_IMPORT_RTS extern int    prog_argc;
-DLL_IMPORT_RTS extern char  *prog_name;
+extern DLL_IMPORT_RTS char **prog_argv; /* so we can get at these from Haskell */
+extern DLL_IMPORT_RTS int    prog_argc;
+extern DLL_IMPORT_RTS char  *prog_name;
 
 #ifdef mingw32_HOST_OS
 // We need these two from Haskell too
@@ -249,9 +249,9 @@ void getWin32ProgArgv(int *argc, wchar_t **argv[]);
 void setWin32ProgArgv(int argc, wchar_t *argv[]);
 #endif
 
-void stackOverflow(StgTSO* tso);
+void DLL_IMPORT_RTS stackOverflow(StgTSO* tso);
 
-void stg_exit(int n) GNU_ATTRIBUTE(__noreturn__);
+void DLL_IMPORT_RTS stg_exit(int n) GNU_ATTRIBUTE(__noreturn__);
 
 #ifndef mingw32_HOST_OS
 int stg_sig_install (int, int, void *);
@@ -262,10 +262,10 @@ int stg_sig_install (int, int, void *);
    -------------------------------------------------------------------------- */
 
 // Returns non-zero if the RTS is a profiling version
-int rts_isProfiled(void);
+int DLL_IMPORT_RTS rts_isProfiled(void);
 
 // Returns non-zero if the RTS is a dynamically-linked version
-int rts_isDynamic(void);
+int DLL_IMPORT_RTS rts_isDynamic(void);
 
 /* -----------------------------------------------------------------------------
    RTS Exit codes

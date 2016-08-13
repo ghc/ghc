@@ -107,22 +107,22 @@ typedef struct {
 // Clients should start with defaultRtsConfig and then customise it.
 // Bah, I really wanted this to be a const struct value, but it seems
 // you can't do that in C (it generates code).
-extern const RtsConfig defaultRtsConfig;
+extern DLL_IMPORT_RTS const RtsConfig getDefaultRtsConfig();
 
 /* ----------------------------------------------------------------------------
    Starting up and shutting down the Haskell RTS.
    ------------------------------------------------------------------------- */
 
 /* DEPRECATED, use hs_init() or hs_init_ghc() instead  */
-extern void startupHaskell         ( int argc, char *argv[],
-                                     void (*init_root)(void) );
+extern DLL_IMPORT_RTS void startupHaskell(int argc, char *argv[],
+                                            void (*init_root)(void) );
 
 /* DEPRECATED, use hs_exit() instead  */
-extern void shutdownHaskell        ( void );
+extern DLL_IMPORT_RTS void shutdownHaskell ( void );
 
 /* Like hs_init(), but allows rtsopts. For more complicated usage,
  * use hs_init_ghc. */
-extern void hs_init_with_rtsopts (int *argc, char **argv[]);
+extern DLL_IMPORT_RTS void hs_init_with_rtsopts (int *argc, char **argv[]);
 
 /*
  * GHC-specific version of hs_init() that allows specifying whether
@@ -130,10 +130,10 @@ extern void hs_init_with_rtsopts (int *argc, char **argv[]);
  * options are allowed), and allows passing an option string that is
  * to be interpreted by the RTS only, not passed to the program.
  */
-extern void hs_init_ghc (int *argc, char **argv[],   // program arguments
-                         RtsConfig rts_config);      // RTS configuration
+extern DLL_IMPORT_RTS void hs_init_ghc (int *argc, char **argv[],   // program arguments
+                                        RtsConfig rts_config);      // RTS configuration
 
-extern void shutdownHaskellAndExit (int exitCode, int fastExit)
+extern DLL_IMPORT_RTS void shutdownHaskellAndExit (int exitCode, int fastExit)
     GNUC3_ATTRIBUTE(__noreturn__);
 
 #ifndef mingw32_HOST_OS
@@ -286,7 +286,7 @@ SchedulerStatus rts_getSchedStatus (Capability *cap);
  * but the next one will cause allocation of the thread-local memory
  * again.
  */
-void rts_done (void);
+void DLL_IMPORT_RTS rts_done(void);
 
 /* --------------------------------------------------------------------------
    Wrapper closures
@@ -301,8 +301,8 @@ void rts_done (void);
 //      the base package itself.
 //
 #if defined(COMPILING_WINDOWS_DLL) && !defined(COMPILING_BASE_PACKAGE)
-__declspec(dllimport) extern StgWord base_GHCziTopHandler_runIO_closure[];
-__declspec(dllimport) extern StgWord base_GHCziTopHandler_runNonIO_closure[];
+DLLIMPORT extern StgWord base_GHCziTopHandler_runIO_closure[];
+DLLIMPORT extern StgWord base_GHCziTopHandler_runNonIO_closure[];
 #else
 extern StgWord base_GHCziTopHandler_runIO_closure[];
 extern StgWord base_GHCziTopHandler_runNonIO_closure[];
