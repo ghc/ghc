@@ -410,20 +410,20 @@ dnl ** Building a cross compiler?
 dnl --------------------------------------------------------------
 CrossCompiling=NO
 # If 'host' and 'target' differ, then this means we are building a cross-compiler.
-if test "$target" != "$host" ; then
+if test "$TargetPlatform" != "$HostPlatform" ; then
     CrossCompiling=YES
     cross_compiling=yes   # This tells configure that it can accept just 'target',
                           # otherwise you get
                           #   configure: error: cannot run C compiled programs.
                           #   If you meant to cross compile, use `--host'.
 fi
-if test "$build" != "$host" ; then
+if test "$BuildPlatform" != "$host" ; then
    AC_MSG_ERROR([
 You've selected:
 
-  BUILD:  $build   (the architecture we're building on)
-  HOST:   $host    (the architecture the compiler we're building will execute on)
-  TARGET: $target  (the architecture the compiler we're building will produce code for)
+  BUILD:  $BuildPlatform   (the architecture we're building on)
+  HOST:   $HostPlatform    (the architecture the compiler we're building will execute on)
+  TARGET: $TargetPlatform  (the architecture the compiler we're building will produce code for)
 
 BUILD must equal HOST; that is, we do not support building GHC itself
 with a cross-compiler.  To cross-compile GHC itself, set TARGET: stage
@@ -437,7 +437,7 @@ then
 else
   CrossCompilePrefix=""
 fi
-TargetPlatformFull="${target}"
+TargetPlatformFull="${TargetPlatform}"
 AC_SUBST(CrossCompiling)
 AC_SUBST(CrossCompilePrefix)
 AC_SUBST(TargetPlatformFull)
