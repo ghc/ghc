@@ -80,8 +80,8 @@ kosher free variables.
 -}
 
 type TcCoercion  = Coercion
-type TcCoercionN = CoercionN    -- A Nominal          corecion ~N
-type TcCoercionR = CoercionR    -- A Representational corecion ~R
+type TcCoercionN = CoercionN    -- A Nominal          coercion ~N
+type TcCoercionR = CoercionR    -- A Representational coercion ~R
 type TcCoercionP = CoercionP    -- a phantom coercion
 
 mkTcReflCo             :: Role -> TcType -> TcCoercion

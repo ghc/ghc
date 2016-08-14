@@ -1287,7 +1287,7 @@ lintCoercion :: OutCoercion -> LintM (LintedKind, LintedKind, LintedType, Linted
 -- Check the kind of a coercion term, returning the kind
 -- Post-condition: the returned OutTypes are lint-free
 --
--- If   lintCorecion co = (k1, k2, s1, s2, r)
+-- If   lintCoercion co = (k1, k2, s1, s2, r)
 -- then co :: s1 ~r s2
 --      s1 :: k2
 --      s2 :: k2
