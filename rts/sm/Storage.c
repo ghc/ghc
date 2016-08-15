@@ -106,6 +106,8 @@ initGeneration (generation *gen, int g)
     gen->n_scavenged_large_blocks = 0;
     gen->live_compact_objects = NULL;
     gen->n_live_compact_blocks = 0;
+    gen->compact_blocks_in_import = NULL;
+    gen->n_compact_blocks_in_import = 0;
     gen->mark = 0;
     gen->compact = 0;
     gen->bitmap = NULL;
