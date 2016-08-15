@@ -483,6 +483,32 @@ AC_SUBST([LdCmd])
 dnl ** Which nm to use?
 dnl --------------------------------------------------------------
 FP_ARG_WITH_PATH_GNU_PROG([NM], [nm], [nm])
+
+if test "$TargetOS_CPP" = "darwin"
+then
+    AC_MSG_CHECKING(whether nm program is broken)
+    # Some versions of XCode ship a broken version of `nm`. Detect and work
+    # around this issue. See : https://ghc.haskell.org/trac/ghc/ticket/11744
+    nmver=$(${NM} --version | grep version | sed 's/ //g')
+    case "$nmver" in
+        LLVMversion7.3.0|LLVMversion7.3.1)
+            AC_MSG_RESULT(yes)
+            echo "The detected nm program is broken."
+            echo
+            echo "See: https://ghc.haskell.org/trac/ghc/ticket/11744"
+            echo
+            echo "Try re-running configure with:"
+            echo
+            echo '   ./configure --with-nm=$(xcrun --find nm-classic)'
+            echo
+            exit 1
+            ;;
+        *)
+            AC_MSG_RESULT(no)
+            ;;
+        esac
+fi
+
 NmCmd="$NM"
 AC_SUBST([NmCmd])
 
