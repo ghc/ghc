@@ -164,11 +164,8 @@ compactAllocateBlockInternal(Capability            *cap,
     default:
 #ifdef DEBUG
         ASSERT(!"code should not be reached");
-#elif __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5)
-        /* __builtin_unreachable is supported since GNU C 4.5 */
-        __builtin_unreachable();
 #else
-        abort();
+        RTS_UNREACHABLE;
 #endif
     }
     RELEASE_SM_LOCK;

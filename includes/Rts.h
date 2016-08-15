@@ -61,6 +61,13 @@ extern "C" {
 #define RTS_UNLIKELY(p) p
 #endif
 
+/* __builtin_unreachable is supported since GNU C 4.5 */
+#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5)
+#define RTS_UNREACHABLE __builtin_unreachable()
+#else
+#define RTS_UNREACHABLE abort()
+#endif
+
 /* Fix for mingw stat problem (done here so it's early enough) */
 #ifdef mingw32_HOST_OS
 #define __MSVCRT__ 1
