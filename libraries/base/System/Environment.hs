@@ -305,7 +305,7 @@ putEnv keyvalue = do
 foreign import ccall unsafe "putenv" c_putenv :: CString -> IO CInt
 #endif
 
--- | @unSet name@ removes the specified environment variable from the
+-- | @unsetEnv name@ removes the specified environment variable from the
 -- environment of the current process.
 --
 -- Throws `Control.Exception.IOException` if @name@ is the empty string or
