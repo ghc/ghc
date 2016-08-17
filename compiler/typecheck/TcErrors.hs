@@ -621,9 +621,15 @@ maybeReportHoleError ctxt ct err
        HoleWarn  -> reportWarning (Reason Opt_WarnPartialTypeSignatures) err
        HoleDefer -> return ()
 
-  -- Otherwise this is a typed hole in an expression
+  | isOutOfScopeCt ct
+  = -- Always report an error for out-of-scope variables
+    -- See Trac #12170, #12406
+    reportError err
+
+  -- Otherwise this is a typed hole in an expression,
+  -- but not for an out-of-scope variable
   | otherwise
-  = -- If deferring, report a warning only if -Wtyped-holds is on
+  = -- If deferring, report a warning only if -Wtyped-holes is on
     case cec_expr_holes ctxt of
        HoleError -> reportError err
        HoleWarn  -> reportWarning (Reason Opt_WarnTypedHoles) err
