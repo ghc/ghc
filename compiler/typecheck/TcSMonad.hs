@@ -16,7 +16,7 @@ module TcSMonad (
     TcS, runTcS, runTcSDeriveds, runTcSWithEvBinds,
     failTcS, warnTcS, addErrTcS,
     runTcSEqualities,
-    nestTcS, nestImplicTcS,
+    nestTcS, nestImplicTcS, setEvBindsTcS,
 
     runTcPluginTcS, addUsedGREs, deferTcSForAllEq,
 
@@ -2476,6 +2476,10 @@ checkForCyclicBinds ev_binds
     edges = [ (bind, bndr, varSetElems (evVarsOfTerm rhs))
             | bind@(EvBind { eb_lhs = bndr, eb_rhs = rhs}) <- bagToList ev_binds ]
 #endif
+
+setEvBindsTcS :: Maybe EvBindsVar -> TcS a -> TcS a
+setEvBindsTcS m_ref (TcS thing_inside)
+ = TcS $ \ env -> thing_inside (env { tcs_ev_binds = m_ref })
 
 nestImplicTcS :: Maybe EvBindsVar -> TyCoVarSet -- bound in this implication
               -> TcLevel -> TcS a
