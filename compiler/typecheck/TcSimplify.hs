@@ -170,9 +170,12 @@ defaultCallStacks wanteds
   handle_simples simples
     = catBagMaybes <$> mapBagM defaultCallStack simples
 
-  handle_implic implic = do
-    wanteds <- defaultCallStacks (ic_wanted implic)
-    return (implic { ic_wanted = wanteds })
+  handle_implic implic
+    = do { wanteds <- setEvBindsTcS (ic_binds implic) $
+                      -- defaultCallStack sets a binding, so
+                      -- we must set the correct binding group
+                      defaultCallStacks (ic_wanted implic)
+         ; return (implic { ic_wanted = wanteds }) }
 
   defaultCallStack ct
     | Just _ <- isCallStackPred (ctPred ct)
