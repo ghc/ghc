@@ -26,7 +26,18 @@ ccBuilderArgs = mconcat
                 , arg $ dropExtension output -<.> "o"
                 , arg "-x"
                 , arg "c"
-                , arg =<< getInput ] ]
+                , arg =<< getInput ]
+
+    , builder (Cc FindMissingInclude) ? do
+        mconcat [ arg "-E"
+                , arg "-MM"
+                , arg "-MG"
+                , commonCcArgs
+                , arg "-MF"
+                , arg =<< getOutput
+                , arg =<< getInput
+                ]
+    ]
 
 commonCcArgs :: Args
 commonCcArgs = mconcat [ append =<< getPkgDataList CcArgs
