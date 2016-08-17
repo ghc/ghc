@@ -28,7 +28,8 @@ setTestOpts(no_lint)
 #    really changed, then you know there's an issue.
 
 test('T1969',
-     [compiler_stats_num_field('peak_megabytes_allocated', # Note [residency]
+     [expect_broken(12437),
+      compiler_stats_num_field('peak_megabytes_allocated', # Note [residency]
           [(wordsize(32), 30, 15),
              # 2010-05-17 14 (x86/Windows)
              #            15 (x86/OS X)
@@ -64,7 +65,7 @@ test('T1969',
              # 2014-06-29 5949188 (x86/Linux)
              # 2015-07-11 6241108 (x86/Linux, 64bit machine) use +RTS -G1
              # 2016-04-06 9093608 (x86/Linux, 64bit machine)
-           (wordsize(64), 15017528, 20)]),
+           (wordsize(64), 15017528, 15)]),
              # 2014-09-10 10463640, 10  # post-AMP-update (somewhat stabelish)
                # looks like the peak is around ~10M, but we're
                # unlikely to GC exactly on the peak.
