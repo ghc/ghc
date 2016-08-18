@@ -7,6 +7,7 @@
 {-# LANGUAGE StandaloneDeriving  #-}
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE PolyKinds           #-}
+{-# LANGUAGE RankNTypes          #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -25,6 +26,7 @@
 module Data.Type.Coercion
   ( Coercion(..)
   , coerceWith
+  , gcoerceWith
   , sym
   , trans
   , repr
@@ -55,6 +57,12 @@ data Coercion a b where
 -- | Type-safe cast, using representational equality
 coerceWith :: Coercion a b -> a -> b
 coerceWith Coercion x = coerce x
+
+-- | Generalized form of type-safe cast using representational equality
+--
+-- @since 4.10.0.0
+gcoerceWith :: Coercion a b -> (Coercible a b => r) -> r
+gcoerceWith Coercion x = x
 
 -- | Symmetry of representational equality
 sym :: Coercion a b -> Coercion b a

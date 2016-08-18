@@ -100,6 +100,9 @@ See ``changelog.md`` in the ``base`` package for full release notes.
 
 - ``Data.Either`` now provides ``fromLeft`` and ``fromRight``
 
+- ``Data.Type.Coercion`` now provides ``gcoerceWith``, which is analogous to
+  ``gcastWith`` from ``Data.Type.Equality``.
+
 binary
 ~~~~~~
 

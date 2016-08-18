@@ -16,6 +16,8 @@
 
   * `Data.Either` now provides `fromLeft` and `fromRight` (#12402)
 
+  * `Data.Type.Coercion` now provides `gcoerceWith` (#12493)
+
 ## 4.9.0.0  *May 2016*
 
   * Bundled with GHC 8.0
