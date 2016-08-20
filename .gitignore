@@ -13,7 +13,7 @@ cabal.sandbox.config
 # build.cabal-new.sh specific
 /dist-newstyle/
 
-# build.stack.sh specific
+# build.stack.sh and build.stack.bat specific
 /.stack-work/
 
 # the user settings
