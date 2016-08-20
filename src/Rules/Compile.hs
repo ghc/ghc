@@ -11,8 +11,6 @@ import Target
 
 import Development.Shake.Util
 
-import Data.Maybe
-import Data.List
 import qualified Data.Set as Set
 
 compilePackage :: [(Resource, Int)] -> Context -> Rules ()
