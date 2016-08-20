@@ -225,7 +225,7 @@ $$(rts_$1_LIB) : $$(rts_$1_OBJS) $(ALL_RTS_DEF_LIBS) rts/dist/libs.depend rts/di
          `cat rts/dist/libs.depend | tr '\n' ' '` \
          $$(ALL_RTS_DEF_LIBS) \
          $$(rts_dist_$1_GHC_LD_OPTS)" "NO" \
-         "$(rts_INSTALL_INFO)" "$(ProjectVersion)"
+         "$(rts_INSTALL_INFO)-$(subst dyn,,$(subst _dyn,,$(subst v,,$1)))" "$(ProjectVersion)"
 
 else
 ifneq "$$(UseSystemLibFFI)" "YES"

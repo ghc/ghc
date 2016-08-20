@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 -----------------------------------------------------------------------------
 --
 -- GHC Windows Manifest generator
@@ -5,6 +7,7 @@
 -- (c) The University of Glasgow 2016
 --
 -----------------------------------------------------------------------------
+
 module Manifest (
    mkManifest
   ) where
@@ -15,7 +18,77 @@ import SysTools
 
 import System.Directory
 import System.FilePath
+import System.Info
 
+#include "ghcplatform.h"
+
+-- | Manifest file required fields
+data ManifestFile = ManifestFile { name          :: String
+                                 , version       :: String
+                                 , architecture  :: String
+                                 , dependencies  :: [ManifestFile]
+                                 , isApplication :: Bool
+                                 , fullname      :: String
+                                 }
+
+-- | Translate TARGET_ARCH into something that Windows manifests expect                                 
+getProcessorArchitecture :: String
+getProcessorArchitecture 
+  = case TARGET_ARCH of
+      "x86"    -> "x86"
+      "x86_64" -> "amd64"
+      _        -> error "Unknown TARGET_ARCH"
+
+-- | Generate manifest file for the given configuration
+-- TODO: Secure the dependencies with a SHA1 hash so we only
+--       load genuine Haskell libraries.
+generateManifest :: ManifestFile -> String
+generateManifest manifest | isApplication manifest
+  = unlines [ "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+            , "<assembly xmlns=\"urn:schemas-microsoft-com:asm.v1\" manifestVersion=\"1.0\">"
+            , "  <assemblyIdentity version=\"" ++ version manifest ++ "\""
+            , "                    processorArchitecture=\"" ++ architecture manifest ++ "\""
+            , "                    name=\"" ++ name manifest ++ "\""
+            , "                    type=\"win32\"/>"
+            , ""
+            , "  <trustInfo xmlns=\"urn:schemas-microsoft-com:asm.v3\">"
+            , "    <security>"
+            , "      <requestedPrivileges>"
+            , "        <requestedExecutionLevel level=\"asInvoker\" uiAccess=\"false\"/>"
+            , "        </requestedPrivileges>"
+            , "       </security>"
+            , "  </trustInfo>"
+            , ""
+            , "  <dependency>"
+            , "   <dependentAssembly>"
+            , unlines $ map (\dep -> unlines 
+                [ "    <assemblyIdentity name=\"" ++ name dep ++ "\""
+                , "                      version=\"" ++ version dep ++ "\""
+                , "                      type=\"win32\""
+                , "                      processorArchitecture=\"" ++ architecture dep ++ "\"/>"
+                ])
+            , "   </dependentAssembly>"
+            , "  </dependency>"
+            , ""
+            ,  unlines $ map (\dep -> unlines 
+                [ "  <file name=\"" ++ fullname dep ++ "\" />"
+                ])
+            , "</assembly>"
+            ]
+generateManifest manifest
+  = unlines [ "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+            , "  <assembly xmlns=\"urn:schemas-microsoft-com:asm.v1\" manifestVersion=\"1.0\">"
+            , "  <trustInfo xmlns=\"urn:schemas-microsoft-com:asm.v3\">"
+            , "    <security>"
+            , "      <requestedPrivileges>"
+            , "        <requestedExecutionLevel level=\"asInvoker\" uiAccess=\"false\"/>"
+            , "        </requestedPrivileges>"
+            , "       </security>"
+            , "  </trustInfo>"
+            , "</assembly>"
+            ]
+      
+-- | Generate the appropriate Manifest file for program inclusion.
 mkManifest
    :: DynFlags
    -> FilePath                          -- filename of executable
@@ -25,21 +98,7 @@ mkManifest dflags assembly
    gopt Opt_GenManifest dflags
     = do let manifest_filename = assembly <.> "manifest"
 
-         writeFile manifest_filename $
-             "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"++
-             "  <assembly xmlns=\"urn:schemas-microsoft-com:asm.v1\" manifestVersion=\"1.0\">\n"++
-             "  <assemblyIdentity version=\"1.0.0.0\"\n"++
-             "     processorArchitecture=\"X86\"\n"++
-             "     name=\"" ++ dropExtension assembly ++ "\"\n"++
-             "     type=\"win32\"/>\n\n"++
-             "  <trustInfo xmlns=\"urn:schemas-microsoft-com:asm.v3\">\n"++
-             "    <security>\n"++
-             "      <requestedPrivileges>\n"++
-             "        <requestedExecutionLevel level=\"asInvoker\" uiAccess=\"false\"/>\n"++
-             "        </requestedPrivileges>\n"++
-             "       </security>\n"++
-             "  </trustInfo>\n"++
-             "</assembly>\n"
+         writeFile manifest_filename $ generateManifest manifest
 
          -- Windows will find the manifest file if it is named
          -- foo.exe.manifest. However, for extra robustness, and so that
