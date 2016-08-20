@@ -1625,17 +1625,12 @@ mkExtraObjToLinkIntoBinary dflags = do
   main
    | gopt Opt_NoHsMain dflags = Outputable.empty
    | otherwise = vcat [
-      text "#define COMPILING_WINDOWS_DLL 1",
       text "#include \"Rts.h\"",
-      text "#define STRINGIZE_(x) #x",
-      text "#define STRINGIZE(x) STRINGIZE_(x)",
       text "extern StgClosure ZCMain_main_closure;",
       text "int main(int argc, char *argv[])",
       char '{',
-      text "printf(\"DLLIMPORT: %s\\n\", STRINGIZE(DLLIMPORT));",
-      text "printf(\"DLL_IMPORT_DATA_VAR: %s\\n\", STRINGIZE(DLL_IMPORT_DATA_VAR));",
       text " rtsSupportsBoundThreads();",
-      text " RtsConfig __conf = **__imp_defaultRtsConfig;",
+      text " RtsConfig __conf = defaultRtsConfig;",
       text " __conf.rts_opts_enabled = "
           <> text (show (rtsOptsEnabled dflags)) <> semi,
       text " __conf.rts_opts_suggestions = "

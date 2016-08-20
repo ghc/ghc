@@ -118,7 +118,7 @@ rts/dist/build/win32/libHS$1.def : rts/win32/libHS$1.def
 
 rts/dist/build/win32/libHS$1.dll.a : rts/dist/build/win32/libHS$1.def
 	"$$(DLLTOOL)" 	-d rts/dist/build/win32/libHS$1.def \
-			-y rts/dist/build/win32/libHS$1.dll.a
+			-l rts/dist/build/win32/libHS$1.dll.a
 endef
 $(foreach lib,$(ALL_RTS_DEF_LIBNAMES),$(eval $(call make-importlib-def,$(lib))))
 endif
@@ -224,7 +224,7 @@ $$(rts_$1_LIB) : $$(rts_$1_OBJS) $(ALL_RTS_DEF_LIBS) rts/dist/libs.depend rts/di
          -no-auto-link-packages -Lrts/dist/build -l$$(LIBFFI_NAME) \
          `cat rts/dist/libs.depend | tr '\n' ' '` \
          $$(ALL_RTS_DEF_LIBS) \
-         $$(rts_dist_$1_GHC_LD_OPTS)" "YES"
+         $$(rts_dist_$1_GHC_LD_OPTS)" "NO"
 
 else
 ifneq "$$(UseSystemLibFFI)" "YES"

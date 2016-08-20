@@ -107,7 +107,7 @@ typedef struct {
 // Clients should start with defaultRtsConfig and then customise it.
 // Bah, I really wanted this to be a const struct value, but it seems
 // you can't do that in C (it generates code).
-extern DLL_IMPORT_RTS const RtsConfig getDefaultRtsConfig();
+extern const RtsConfig defaultRtsConfig;
 
 /* ----------------------------------------------------------------------------
    Starting up and shutting down the Haskell RTS.
