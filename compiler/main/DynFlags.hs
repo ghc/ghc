@@ -39,7 +39,7 @@ module DynFlags (
         DynFlags(..),
         FlagSpec(..),
         HasDynFlags(..), ContainsDynFlags(..),
-        RtsOptsEnabled(..),
+        RtsOptsEnabled(..), SxSResolveMode(..),
         HscTarget(..), isObjectTarget, defaultObjectTarget,
         targetRetainsAllBindings,
         GhcMode(..), isOneShot,
@@ -470,6 +470,7 @@ data GeneralFlag
    | Opt_PrintEvldWithShow
    | Opt_PrintBindContents
    | Opt_GenManifest
+   | Opt_GenSxSManifest
    | Opt_EmbedManifest
    | Opt_SharedImplib
    | Opt_BuildingCabalPackage
@@ -738,6 +739,14 @@ data DynFlags = DynFlags {
   frameworkPaths        :: [String],    -- used on darwin only
   cmdlineFrameworks     :: [String],    -- ditto
 
+  -- | Windows SxS settings
+  sxsResolveMode        :: SxSResolveMode,
+  
+  -- | Shared Lib ABI settings
+  sharedLibABIName      :: Maybe String,
+  sharedLibABIVersion   :: Maybe String,
+  
+  -- | Runtime system options
   rtsOpts               :: Maybe String,
   rtsOptsEnabled        :: RtsOptsEnabled,
   rtsOptsSuggestions    :: Bool,
@@ -1218,6 +1227,9 @@ data DynLibLoader
 
 data RtsOptsEnabled = RtsOptsNone | RtsOptsSafeOnly | RtsOptsAll
   deriving (Show)
+  
+data SxSResolveMode = SxSRelative | SxSAbsolute | SxSCache
+  deriving (Show)
 
 -----------------------------------------------------------------------------
 -- Ways
@@ -1506,6 +1518,10 @@ defaultDynFlags mySettings =
         rtsOpts                 = Nothing,
         rtsOptsEnabled          = RtsOptsSafeOnly,
         rtsOptsSuggestions      = True,
+
+        sxsResolveMode          = SxSCache,
+        sharedABIName           = Nothing,
+        sharedABIVersion        = Nothing,
 
         hpcDir                  = ".hpc",
 
@@ -2535,6 +2551,18 @@ dynamic_flags_deps = [
         (NoArg (setRtsOptsEnabled RtsOptsNone))
   , make_ord_flag defGhcFlag "no-rtsopts-suggestions"
       (noArg (\d -> d {rtsOptsSuggestions = False}))
+  , make_ord_flag defGhcFlag "fgen-sxs-assembly"
+        (NoArg (setSxSResolveMode SxSCache))
+  , make_ord_flag defGhcFlag "fgen-sxs-assembly=cache"
+        (NoArg (setSxSResolveMode SxSCache))
+  , make_ord_flag defGhcFlag "fgen-sxs-assembly=absolute"
+        (NoArg (setSxSResolveMode SxSAbsolute))
+  , make_ord_flag defGhcFlag "fgen-sxs-assembly=relative"
+        (NoArg (setSxSResolveMode SxSRelative))
+  , make_ord_flag defGhcFlag "dylib-abi-name"
+        (SepArg setSharedABIName)
+  , make_ord_flag defGhcFlag "dylib-abi-version"
+        (SepArg setSharedABIVersion)
 
   , make_ord_flag defGhcFlag "main-is"              (SepArg setMainIs)
   , make_ord_flag defGhcFlag "haddock"              (NoArg (setGeneralFlag Opt_Haddock))
@@ -3355,6 +3383,7 @@ fFlagsDeps = [
   flagSpec "full-laziness"                    Opt_FullLaziness,
   flagSpec "fun-to-thunk"                     Opt_FunToThunk,
   flagSpec "gen-manifest"                     Opt_GenManifest,
+  flagSpec "fgen-sxs-assembly"                Opt_GenSxSManifest,
   flagSpec "ghci-history"                     Opt_GhciHistory,
   flagGhciSpec "local-ghci-history"           Opt_LocalGhciHistory,
   flagSpec "ghci-sandbox"                     Opt_GhciSandbox,
@@ -4613,6 +4642,21 @@ setRtsOpts arg  = upd $ \ d -> d {rtsOpts = Just arg}
 
 setRtsOptsEnabled :: RtsOptsEnabled -> DynP ()
 setRtsOptsEnabled arg  = upd $ \ d -> d {rtsOptsEnabled = arg}
+
+-----------------------------------------------------------------------------
+-- Windows SxS opts
+
+setSxSResolveMode :: SxSResolveMode -> DynP ()
+setSxSResolveMode arg  = upd $ \ d -> d {sxsResolveMode = arg}
+
+-----------------------------------------------------------------------------
+-- Shared ABI opts
+
+setSharedABIName :: String -> DynP ()
+setSharedABIName arg  = upd $ \ d -> d {sharedABIName = Just arg}
+
+setSharedABIVersion :: String -> DynP ()
+setSharedABIVersion arg  = upd $ \ d -> d {sharedABIVersion = Just arg}
 
 -----------------------------------------------------------------------------
 -- Hpc stuff

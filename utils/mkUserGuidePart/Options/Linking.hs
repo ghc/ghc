@@ -126,6 +126,31 @@ linkingOptions =
            "Don't generate an import library for a DLL (Windows only)"
          , flagType = DynamicFlag
          }
+  , flag { flagName = "-fgen-sxs-assembly,-fgen-sxs-assembly={absolute,relative,cache}"
+         , flagDescription =
+           "Generate a Windows Side By Side assembly (Windows only)." ++
+           "Using ``absolute`` will put the full path to the sxs resources " ++
+           "in the manifest. ``relative`` means put a path relative to the " ++
+           "assembly being compiled and ``cache`` means rely on the SxS global cache (default)."
+         , flagType = DynamicFlag
+         }
+  , flag { flagName = "-dylib-abi-name ⟨name⟩"
+         , flagDescription =
+           "Requires ``-shared`` to have an effect. When compiling shared libraries " ++
+           "on Linux this option sets the ``SONAME`` of the library if specified." ++
+           "On Windows, when used with ``-fgen-sxs-assembly`` this sets the SxS " ++
+           "assembly name."
+         , flagType = DynamicFlag
+         }
+  , flag { flagName = "-dylib-abi-version ⟨version⟩"
+         , flagDescription =
+           "Requires ``-shared`` to have an effect. When compiling shared libraries " ++
+           "on Linux this option gets combined with the value of ``-dylib-abi-name`` " ++
+           "to produce the full ``SONAME``. On Windows, when used with ``-fgen-sxs-assembly`` " ++
+           "this sets the SxS assembly version. Value defaults to ``1.0.0`` is required but " ++
+           "not specified."
+         , flagType = DynamicFlag
+         }
   , flag { flagName = "-dylib-install-name ⟨path⟩"
          , flagDescription =
            "Set the install name (via ``-install_name`` passed to Apple's " ++

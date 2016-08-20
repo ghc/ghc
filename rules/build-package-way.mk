@@ -58,7 +58,8 @@ ifeq "$3" "dyn"
 # On windows we have to supply the extra libs this one links to when building it.
 ifeq "$$(HostOS_CPP)" "mingw32"
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
-	$$(call build-dll,$1,$2,$3,-L$1/$2/build,$$($1_$2_$3_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS),$$@)
+	$$(call build-dll,$1,$2,$3,-L$1/$2/build,$$($1_$2_$3_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS) \
+    "NO" "$$($1_$2_PACKAGE)" "$$($1_$2_VERSION)" ,$$@)
 
 else # ifneq "$$(HostOS_CPP)" "mingw32"
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
@@ -139,11 +140,14 @@ endef # build-package-way
 # $5 = object files to link
 # $6 = output filename
 # $7 = indicated whether the dll should be delay loaded
+# $8 = SxS Name
+# $9 = SxS Version
 define build-dll
 # Call out to the shell script to decide how to build the dll.
 rules/build-dll-win32.sh link "$1" "$2" "$3" "$4" "$5" "$6" "$(call cmd,$1_$2_HC) $($1_$2_$3_ALL_HC_OPTS) $($1_$2_$3_GHC_LD_OPTS) $4 \
            -shared -dynamic -dynload deploy \
            $(addprefix -l,$($1_$2_EXTRA_LIBRARIES)) \
-           -no-auto-link-packages" "NO"
+           -no-auto-link-packages" $7 \
+           $8 $9
 endef
 
