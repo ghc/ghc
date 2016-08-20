@@ -59,7 +59,7 @@ ifeq "$3" "dyn"
 ifeq "$$(HostOS_CPP)" "mingw32"
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
 	$$(call build-dll,$1,$2,$3,-L$1/$2/build,$$($1_$2_$3_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS) \
-    "NO" "$$($1_$2_PACKAGE)" "$$($1_$2_VERSION)" ,$$@)
+    ,$$@, "NO", "$$($1_$2_PACKAGE)", "$$($1_$2_VERSION)")
 
 else # ifneq "$$(HostOS_CPP)" "mingw32"
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)

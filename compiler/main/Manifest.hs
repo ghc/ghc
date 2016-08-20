@@ -5,15 +5,16 @@
 -- (c) The University of Glasgow 2016
 --
 -----------------------------------------------------------------------------
-
+module Manifest (
+   mkManifest
+  ) where
+  
 import DynFlags
 import Platform
+import SysTools
 
+import System.Directory
 import System.FilePath
-
-module Manifest (
-  mkManifest
-  ) where
 
 mkManifest
    :: DynFlags
@@ -44,25 +45,26 @@ mkManifest dflags assembly
          -- foo.exe.manifest. However, for extra robustness, and so that
          -- we can move the binary around, we can embed the manifest in
          -- the binary itself using windres:
-         if not (gopt Opt_EmbedManifest dflags) then return [] else do
+         if not (gopt Opt_EmbedManifest dflags) 
+         then return [] 
+         else do
+             rc_filename <- newTempName dflags "rc"
+             rc_obj_filename <- newTempName dflags (objectSuf dflags)
 
-         rc_filename <- newTempName dflags "rc"
-         rc_obj_filename <- newTempName dflags (objectSuf dflags)
+             writeFile rc_filename $
+                 "1 24 MOVEABLE PURE " ++ show manifest_filename ++ "\n"
+                   -- magic numbers :-)
+                   -- show is a bit hackish above, but we need to escape the
+                   -- backslashes in the path.
 
-         writeFile rc_filename $
-             "1 24 MOVEABLE PURE " ++ show manifest_filename ++ "\n"
-               -- magic numbers :-)
-               -- show is a bit hackish above, but we need to escape the
-               -- backslashes in the path.
+             runWindres dflags $ map SysTools.Option $
+                   ["--input="++rc_filename,
+                    "--output="++rc_obj_filename,
+                    "--output-format=coff"]
+                   -- no FileOptions here: windres doesn't like seeing
+                   -- backslashes, apparently
 
-         runWindres dflags $ map SysTools.Option $
-               ["--input="++rc_filename,
-                "--output="++rc_obj_filename,
-                "--output-format=coff"]
-               -- no FileOptions here: windres doesn't like seeing
-               -- backslashes, apparently
+             removeFile manifest_filename
 
-         removeFile manifest_filename
-
-         return [rc_obj_filename]
+             return [rc_obj_filename]
  | otherwise = return []
