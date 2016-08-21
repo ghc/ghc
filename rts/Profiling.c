@@ -1119,9 +1119,11 @@ insertIndexTableInSortedList(IndexTable* tbl, IndexTable* sortedList)
 static void
 sortCCSTree(CostCentreStack *ccs)
 {
+    IndexTable *tbl;
+
     if (ccs->indexTable == NULL) return;
 
-    for (IndexTable *tbl = ccs->indexTable; tbl != NULL; tbl = tbl->next)
+    for (tbl = ccs->indexTable; tbl != NULL; tbl = tbl->next)
         if (!tbl->back_edge)
             sortCCSTree(tbl->ccs);
 
