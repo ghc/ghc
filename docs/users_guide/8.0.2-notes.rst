@@ -39,6 +39,10 @@ Template Haskell
    Template Haskell reified unboxed tuples as boxed tuples with twice their
    appropriate arity.)
 
+-  Splicing singleton unboxed tuple types (e.g., ``(# Int #)``) now works
+   correctly. Previously, Template Haskell would implicitly remove the
+   parentheses when splicing, which would turn ``(# Int #)`` into ``Int``.
+
 TODO FIXME Heading title
 ~~~~~~~~~~~~~~~~~~~~~~~~
 

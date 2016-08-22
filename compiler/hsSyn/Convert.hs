@@ -1134,9 +1134,7 @@ cvtTypeKind ty_str ty
              -> mk_apps (HsTyVar (noLoc (getRdrName (tupleTyCon Boxed n)))) tys'
            UnboxedTupleT n
              | length tys' == n         -- Saturated
-             -> if n==1 then return (head tys') -- Singleton tuples treated
-                                                -- like nothing (ie just parens)
-                        else returnL (HsTupleTy HsUnboxedTuple tys')
+             -> returnL (HsTupleTy HsUnboxedTuple tys')
              | otherwise
              -> mk_apps (HsTyVar (noLoc (getRdrName (tupleTyCon Unboxed n))))
                         tys'

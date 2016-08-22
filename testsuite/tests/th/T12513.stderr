@@ -1,0 +1,10 @@
+
+T12513.hs:9:7: error:
+    • Couldn't match expected type ‘Int’ with actual type ‘(# Int #)’
+    • In the expression: x
+      In an equation for ‘f’: f x = x
+
+T12513.hs:12:7: error:
+    • Couldn't match expected type ‘Int’ with actual type ‘(# Int #)’
+    • In the expression: x
+      In an equation for ‘g’: g x = x
