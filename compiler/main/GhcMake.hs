@@ -1049,6 +1049,8 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags cleanup par_sem
                 let lcl_hsc_env = localize_hsc_env hsc_env
 
                 -- Re-typecheck the loop
+                -- This is necessary to make sure the knot is tied when
+                -- we close a recursive module loop, see bug #12035.
                 type_env_var <- liftIO $ newIORef emptyNameEnv
                 let lcl_hsc_env' = lcl_hsc_env { hsc_type_env_var =
                                     Just (ms_mod lcl_mod, type_env_var) }
@@ -1158,7 +1160,8 @@ upsweep old_hpt stable_mods cleanup sccs = do
         -- Lazily reload the HPT modules participating in the loop.
         -- See Note [Tying the knot]--if we don't throw out the old HPT
         -- and reinitalize the knot-tying process, anything that was forced
-        -- while we were previously typechecking won't get updated.
+        -- while we were previously typechecking won't get updated, this
+        -- was bug #12035.
         hsc_env2 <- liftIO $ reTypecheckLoop hsc_env1 mod done
         setSession hsc_env2
 

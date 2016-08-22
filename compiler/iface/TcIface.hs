@@ -1421,6 +1421,10 @@ ifKnotErr name env_doc type_env = vcat
 --      * Note [Knot-tying typecheckIface]
 --      * Note [DFun knot-tying]
 --      * Note [hsc_type_env_var hack]
+--
+-- There is also a wiki page on the subject, see:
+--
+--      https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/TyingTheKnot
 
 tcIfaceTyConByName :: IfExtName -> IfL TyCon
 tcIfaceTyConByName name
