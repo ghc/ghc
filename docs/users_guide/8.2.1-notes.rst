@@ -56,6 +56,14 @@ Template Haskell
 
       f x = $(addModFinalizer (reify 'x >>= runIO . print) >> [| x |])
 
+-  Reifying types that contain unboxed tuples now works correctly. (Previously,
+   Template Haskell reified unboxed tuples as boxed tuples with twice their
+   appropriate arity.)
+
+-  Splicing singleton unboxed tuple types (e.g., ``(# Int #)``) now works
+   correctly. Previously, Template Haskell would implicitly remove the
+   parentheses when splicing, which would turn ``(# Int #)`` into ``Int``.
+
 Runtime system
 ~~~~~~~~~~~~~~
 

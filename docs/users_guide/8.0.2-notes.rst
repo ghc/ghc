@@ -32,17 +32,6 @@ Compiler
    initial cmm from STG-to-C-- code generation and :ghc-flag:`-ddump-cmm-verbose`
    to obtain the intermediates from all C-- pipeline stages.
 
-Template Haskell
-~~~~~~~~~~~~~~~~
-
--  Reifying types that contain unboxed tuples now works correctly. (Previously,
-   Template Haskell reified unboxed tuples as boxed tuples with twice their
-   appropriate arity.)
-
--  Splicing singleton unboxed tuple types (e.g., ``(# Int #)``) now works
-   correctly. Previously, Template Haskell would implicitly remove the
-   parentheses when splicing, which would turn ``(# Int #)`` into ``Int``.
-
 TODO FIXME Heading title
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
