@@ -467,8 +467,8 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
         -- e.g. a reference to a constructor must be turned into a reference
         -- to the TyCon for the purposes of calculating dependencies.
        parent_map :: OccEnv OccName
-       parent_map = foldr extend emptyOccEnv new_decls
-          where extend d env =
+       parent_map = foldl' extend emptyOccEnv new_decls
+          where extend env d =
                   extendOccEnvList env [ (b,n) | b <- ifaceDeclImplicitBndrs d ]
                   where n = getOccName d
 
