@@ -149,6 +149,7 @@ pprExp i (LamCaseE ms) = parensIf (i > noPrec)
                        $ text "\\case" $$ nest nestDepth (ppr ms)
 pprExp _ (TupE es) = parens (commaSep es)
 pprExp _ (UnboxedTupE es) = hashParens (commaSep es)
+pprExp _ (UnboxedSumE e alt arity) = unboxedSumBars (ppr e) alt arity
 -- Nesting in Cond is to avoid potential problems in do statments
 pprExp i (CondE guard true false)
  = parensIf (i > noPrec) $ sep [text "if"   <+> ppr guard,
@@ -179,7 +180,7 @@ pprExp i (DoE ss_) = parensIf (i > noPrec) $ text "do" <+> pprStms ss_
 pprExp _ (CompE []) = text "<<Empty CompExp>>"
 -- This will probably break with fixity declarations - would need a ';'
 pprExp _ (CompE ss) = text "[" <> ppr s
-                  <+> text "|"
+                  <+> bar
                   <+> commaSep ss'
                    <> text "]"
     where s = last ss
@@ -205,7 +206,7 @@ instance Ppr Stmt where
     ppr (BindS p e) = ppr p <+> text "<-" <+> ppr e
     ppr (LetS ds) = text "let" <+> (braces (semiSep ds))
     ppr (NoBindS e) = ppr e
-    ppr (ParS sss) = sep $ punctuate (text "|")
+    ppr (ParS sss) = sep $ punctuate bar
                          $ map commaSep sss
 
 ------------------------------
@@ -216,8 +217,8 @@ instance Ppr Match where
 ------------------------------
 pprGuarded :: Doc -> (Guard, Exp) -> Doc
 pprGuarded eqDoc (guard, expr) = case guard of
-  NormalG guardExpr -> char '|' <+> ppr guardExpr <+> eqDoc <+> ppr expr
-  PatG    stmts     -> char '|' <+> vcat (punctuate comma $ map ppr stmts) $$
+  NormalG guardExpr -> bar <+> ppr guardExpr <+> eqDoc <+> ppr expr
+  PatG    stmts     -> bar <+> vcat (punctuate comma $ map ppr stmts) $$
                          nest nestDepth (eqDoc <+> ppr expr)
 
 ------------------------------
@@ -266,6 +267,7 @@ pprPat i (LitP l)     = pprLit i l
 pprPat _ (VarP v)     = pprName' Applied v
 pprPat _ (TupP ps)    = parens (commaSep ps)
 pprPat _ (UnboxedTupP ps) = hashParens (commaSep ps)
+pprPat _ (UnboxedSumP p alt arity) = unboxedSumBars (ppr p) alt arity
 pprPat i (ConP s ps)  = parensIf (i >= appPrec) $ pprName' Applied s
                                               <+> sep (map (pprPat appPrec) ps)
 pprPat _ (ParensP p)  = parens $ pprPat noPrec p
@@ -389,7 +391,7 @@ ppr_data maybeInst ctxt t argsDoc ksig cs decs
     pref :: [Doc] -> [Doc]
     pref xs | isGadtDecl = xs
     pref []              = []      -- No constructors; can't happen in H98
-    pref (d:ds)          = (char '=' <+> d):map (char '|' <+>) ds
+    pref (d:ds)          = (char '=' <+> d):map (bar <+>) ds
 
     maybeWhere :: Doc
     maybeWhere | isGadtDecl = text "where"
@@ -436,7 +438,7 @@ ppr_tf_head (TypeFamilyHead tc tvs res inj)
 instance Ppr FunDep where
     ppr (FunDep xs ys) = hsep (map ppr xs) <+> text "->" <+> hsep (map ppr ys)
     ppr_list [] = empty
-    ppr_list xs = char '|' <+> commaSep xs
+    ppr_list xs = bar <+> commaSep xs
 
 ------------------------------
 instance Ppr FamFlavour where
@@ -452,7 +454,7 @@ instance Ppr FamilyResultSig where
 ------------------------------
 instance Ppr InjectivityAnn where
     ppr (InjectivityAnn lhs rhs) =
-        char '|' <+> ppr lhs <+> text "->" <+> hsep (map ppr rhs)
+        bar <+> ppr lhs <+> text "->" <+> hsep (map ppr rhs)
 
 ------------------------------
 instance Ppr Foreign where
@@ -655,6 +657,7 @@ pprParendType (ConT c)            = ppr c
 pprParendType (TupleT 0)          = text "()"
 pprParendType (TupleT n)          = parens (hcat (replicate (n-1) comma))
 pprParendType (UnboxedTupleT n)   = hashParens $ hcat $ replicate (n-1) comma
+pprParendType (UnboxedSumT arity) = hashParens $ hcat $ replicate (arity-1) bar
 pprParendType ArrowT              = parens (text "->")
 pprParendType ListT               = text "[]"
 pprParendType (LitT l)            = pprTyLit l
@@ -795,3 +798,15 @@ commaSepWith pprFun = sep . punctuate comma . map pprFun
 -- followed by space.
 semiSep :: Ppr a => [a] -> Doc
 semiSep = sep . punctuate semi . map ppr
+
+-- Prints out the series of vertical bars that wraps an expression or pattern
+-- used in an unboxed sum.
+unboxedSumBars :: Doc -> SumAlt -> SumArity -> Doc
+unboxedSumBars d alt arity = hashParens $
+    bars (alt-1) <> d <> bars (arity - alt)
+  where
+    bars i = hsep (replicate i bar)
+
+-- Text containing the vertical bar character.
+bar :: Doc
+bar = char '|'

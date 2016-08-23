@@ -1819,7 +1819,8 @@ reify_tc_app tc tys
     tc_binders  = tyConBinders tc
     tc_res_kind = tyConResKind tc
 
-    r_tc | isUnboxedTupleTyCon tc         = TH.UnboxedTupleT (arity `div` 2)
+    r_tc | isUnboxedSumTyCon tc           = TH.UnboxedSumT (arity `div` 2)
+         | isUnboxedTupleTyCon tc         = TH.UnboxedTupleT (arity `div` 2)
              -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
          | isTupleTyCon tc                = if isPromotedDataCon tc
                                             then TH.PromotedTupleT arity

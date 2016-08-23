@@ -1,0 +1,6 @@
+
+T12478_4.hs:7:8: error:
+    • Illegal sum arity: 1
+        Sums must have an arity of at least 2
+      When splicing a TH type: (#  #) GHC.Tuple.()
+    • In the untyped splice: $(unboxedSumT 1 `appT` conT ''())

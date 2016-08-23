@@ -771,6 +771,10 @@ cvtl e = wrapL (cvt e)
     cvt (UnboxedTupE es)      = do { es' <- mapM cvtl es
                                    ; return $ ExplicitTuple
                                            (map (noLoc . Present) es') Unboxed }
+    cvt (UnboxedSumE e alt arity) = do { e' <- cvtl e
+                                       ; unboxedSumChecks alt arity
+                                       ; return $ ExplicitSum
+                                             alt arity e' placeHolderType }
     cvt (CondE x y z)  = do { x' <- cvtl x; y' <- cvtl y; z' <- cvtl z;
                             ; return $ HsIf (Just noSyntaxExpr) x' y' z' }
     cvt (MultiIfE alts)
@@ -1045,6 +1049,10 @@ cvtp (TH.VarP s)       = do { s' <- vName s; return $ Hs.VarPat (noLoc s') }
 cvtp (TupP [p])        = do { p' <- cvtPat p; return $ ParPat p' } -- Note [Dropping constructors]
 cvtp (TupP ps)         = do { ps' <- cvtPats ps; return $ TuplePat ps' Boxed   [] }
 cvtp (UnboxedTupP ps)  = do { ps' <- cvtPats ps; return $ TuplePat ps' Unboxed [] }
+cvtp (UnboxedSumP p alt arity)
+                       = do { p' <- cvtPat p
+                            ; unboxedSumChecks alt arity
+                            ; return $ SumPat p' alt arity placeHolderType }
 cvtp (ConP s ps)       = do { s' <- cNameL s; ps' <- cvtPats ps
                             ; return $ ConPatIn s' (PrefixCon ps') }
 cvtp (InfixP p1 s p2)  = do { s' <- cNameL s; p1' <- cvtPat p1; p2' <- cvtPat p2
@@ -1138,6 +1146,16 @@ cvtTypeKind ty_str ty
              | otherwise
              -> mk_apps (HsTyVar (noLoc (getRdrName (tupleTyCon Unboxed n))))
                         tys'
+           UnboxedSumT n
+             | n < 2
+            -> failWith $
+                   vcat [ text "Illegal sum arity:" <+> text (show n)
+                        , nest 2 $
+                            text "Sums must have an arity of at least 2" ]
+             | length tys' == n -- Saturated
+             -> returnL (HsSumTy tys')
+             | otherwise
+             -> mk_apps (HsTyVar (noLoc (getRdrName (sumTyCon n)))) tys'
            ArrowT
              | [x',y'] <- tys' -> returnL (HsFunTy x' y')
              | otherwise -> mk_apps (HsTyVar (noLoc (getRdrName funTyCon))) tys'
@@ -1347,6 +1365,22 @@ overloadedLit _             = False
 
 cvtFractionalLit :: Rational -> FractionalLit
 cvtFractionalLit r = FL { fl_text = show (fromRational r :: Double), fl_value = r }
+
+-- Checks that are performed when converting unboxed sum expressions and
+-- patterns alike.
+unboxedSumChecks :: TH.SumAlt -> TH.SumArity -> CvtM ()
+unboxedSumChecks alt arity
+    | alt > arity
+    = failWith $ text "Sum alternative"    <+> text (show alt)
+             <+> text "exceeds its arity," <+> text (show arity)
+    | alt <= 0
+    = failWith $ vcat [ text "Illegal sum alternative:" <+> text (show alt)
+                      , nest 2 $ text "Sum alternatives must start from 1" ]
+    | arity < 2
+    = failWith $ vcat [ text "Illegal sum arity:" <+> text (show arity)
+                      , nest 2 $ text "Sums must have an arity of at least 2" ]
+    | otherwise
+    = return ()
 
 --------------------------------------------------------------------
 --      Turning Name back into RdrName

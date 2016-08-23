@@ -38,7 +38,7 @@ templateHaskellNames = [
     floatPrimLName, doublePrimLName, rationalLName, stringPrimLName,
     charPrimLName,
     -- Pat
-    litPName, varPName, tupPName, unboxedTupPName,
+    litPName, varPName, tupPName, unboxedTupPName, unboxedSumPName,
     conPName, tildePName, bangPName, infixPName,
     asPName, wildPName, recPName, listPName, sigPName, viewPName,
     -- FieldPat
@@ -50,7 +50,7 @@ templateHaskellNames = [
     -- Exp
     varEName, conEName, litEName, appEName, infixEName,
     infixAppName, sectionLName, sectionRName, lamEName, lamCaseEName,
-    tupEName, unboxedTupEName,
+    tupEName, unboxedTupEName, unboxedSumEName,
     condEName, multiIfEName, letEName, caseEName, doEName, compEName,
     fromEName, fromThenEName, fromToEName, fromThenToEName,
     listEName, sigEName, recConEName, recUpdEName, staticEName, unboundVarEName,
@@ -93,7 +93,8 @@ templateHaskellNames = [
     prefixPatSynName, infixPatSynName, recordPatSynName,
     -- Type
     forallTName, varTName, conTName, appTName, equalityTName,
-    tupleTName, unboxedTupleTName, arrowTName, listTName, sigTName, litTName,
+    tupleTName, unboxedTupleTName, unboxedSumTName,
+    arrowTName, listTName, sigTName, litTName,
     promotedTName, promotedTupleTName, promotedNilTName, promotedConsTName,
     wildCardTName,
     -- TyLit
@@ -236,12 +237,14 @@ stringPrimLName = libFun (fsLit "stringPrimL") stringPrimLIdKey
 charPrimLName   = libFun (fsLit "charPrimL")   charPrimLIdKey
 
 -- data Pat = ...
-litPName, varPName, tupPName, unboxedTupPName, conPName, infixPName, tildePName, bangPName,
-    asPName, wildPName, recPName, listPName, sigPName, viewPName :: Name
+litPName, varPName, tupPName, unboxedTupPName, unboxedSumPName, conPName,
+    infixPName, tildePName, bangPName, asPName, wildPName, recPName, listPName,
+    sigPName, viewPName :: Name
 litPName   = libFun (fsLit "litP")   litPIdKey
 varPName   = libFun (fsLit "varP")   varPIdKey
 tupPName   = libFun (fsLit "tupP")   tupPIdKey
 unboxedTupPName = libFun (fsLit "unboxedTupP") unboxedTupPIdKey
+unboxedSumPName = libFun (fsLit "unboxedSumP") unboxedSumPIdKey
 conPName   = libFun (fsLit "conP")   conPIdKey
 infixPName = libFun (fsLit "infixP") infixPIdKey
 tildePName = libFun (fsLit "tildeP") tildePIdKey
@@ -268,8 +271,8 @@ clauseName = libFun (fsLit "clause") clauseIdKey
 -- data Exp = ...
 varEName, conEName, litEName, appEName, infixEName, infixAppName,
     sectionLName, sectionRName, lamEName, lamCaseEName, tupEName,
-    unboxedTupEName, condEName, multiIfEName, letEName, caseEName,
-    doEName, compEName, staticEName, unboundVarEName :: Name
+    unboxedTupEName, unboxedSumEName, condEName, multiIfEName, letEName,
+    caseEName, doEName, compEName, staticEName, unboundVarEName :: Name
 varEName        = libFun (fsLit "varE")        varEIdKey
 conEName        = libFun (fsLit "conE")        conEIdKey
 litEName        = libFun (fsLit "litE")        litEIdKey
@@ -282,6 +285,7 @@ lamEName        = libFun (fsLit "lamE")        lamEIdKey
 lamCaseEName    = libFun (fsLit "lamCaseE")    lamCaseEIdKey
 tupEName        = libFun (fsLit "tupE")        tupEIdKey
 unboxedTupEName = libFun (fsLit "unboxedTupE") unboxedTupEIdKey
+unboxedSumEName = libFun (fsLit "unboxedSumE") unboxedSumEIdKey
 condEName       = libFun (fsLit "condE")       condEIdKey
 multiIfEName    = libFun (fsLit "multiIfE")    multiIfEIdKey
 letEName        = libFun (fsLit "letE")        letEIdKey
@@ -414,16 +418,16 @@ infixPatSynName  = libFun (fsLit "infixPatSyn")  infixPatSynIdKey
 recordPatSynName = libFun (fsLit "recordPatSyn") recordPatSynIdKey
 
 -- data Type = ...
-forallTName, varTName, conTName, tupleTName, unboxedTupleTName, arrowTName,
-    listTName, appTName, sigTName, equalityTName, litTName,
-    promotedTName, promotedTupleTName,
-    promotedNilTName, promotedConsTName,
-    wildCardTName :: Name
+forallTName, varTName, conTName, tupleTName, unboxedTupleTName,
+    unboxedSumTName, arrowTName, listTName, appTName, sigTName, equalityTName,
+    litTName, promotedTName, promotedTupleTName, promotedNilTName,
+    promotedConsTName, wildCardTName :: Name
 forallTName         = libFun (fsLit "forallT")        forallTIdKey
 varTName            = libFun (fsLit "varT")           varTIdKey
 conTName            = libFun (fsLit "conT")           conTIdKey
 tupleTName          = libFun (fsLit "tupleT")         tupleTIdKey
 unboxedTupleTName   = libFun (fsLit "unboxedTupleT")  unboxedTupleTIdKey
+unboxedSumTName     = libFun (fsLit "unboxedSumT")    unboxedSumTIdKey
 arrowTName          = libFun (fsLit "arrowT")         arrowTIdKey
 listTName           = libFun (fsLit "listT")          listTIdKey
 appTName            = libFun (fsLit "appT")           appTIdKey
@@ -727,23 +731,24 @@ liftStringIdKey :: Unique
 liftStringIdKey     = mkPreludeMiscIdUnique 230
 
 -- data Pat = ...
-litPIdKey, varPIdKey, tupPIdKey, unboxedTupPIdKey, conPIdKey, infixPIdKey,
-  tildePIdKey, bangPIdKey, asPIdKey, wildPIdKey, recPIdKey, listPIdKey,
-  sigPIdKey, viewPIdKey :: Unique
+litPIdKey, varPIdKey, tupPIdKey, unboxedTupPIdKey, unboxedSumPIdKey, conPIdKey,
+  infixPIdKey, tildePIdKey, bangPIdKey, asPIdKey, wildPIdKey, recPIdKey,
+  listPIdKey, sigPIdKey, viewPIdKey :: Unique
 litPIdKey         = mkPreludeMiscIdUnique 240
 varPIdKey         = mkPreludeMiscIdUnique 241
 tupPIdKey         = mkPreludeMiscIdUnique 242
 unboxedTupPIdKey  = mkPreludeMiscIdUnique 243
-conPIdKey         = mkPreludeMiscIdUnique 244
-infixPIdKey       = mkPreludeMiscIdUnique 245
-tildePIdKey       = mkPreludeMiscIdUnique 246
-bangPIdKey        = mkPreludeMiscIdUnique 247
-asPIdKey          = mkPreludeMiscIdUnique 248
-wildPIdKey        = mkPreludeMiscIdUnique 249
-recPIdKey         = mkPreludeMiscIdUnique 250
-listPIdKey        = mkPreludeMiscIdUnique 251
-sigPIdKey         = mkPreludeMiscIdUnique 252
-viewPIdKey        = mkPreludeMiscIdUnique 253
+unboxedSumPIdKey  = mkPreludeMiscIdUnique 244
+conPIdKey         = mkPreludeMiscIdUnique 245
+infixPIdKey       = mkPreludeMiscIdUnique 246
+tildePIdKey       = mkPreludeMiscIdUnique 247
+bangPIdKey        = mkPreludeMiscIdUnique 248
+asPIdKey          = mkPreludeMiscIdUnique 249
+wildPIdKey        = mkPreludeMiscIdUnique 250
+recPIdKey         = mkPreludeMiscIdUnique 251
+listPIdKey        = mkPreludeMiscIdUnique 252
+sigPIdKey         = mkPreludeMiscIdUnique 253
+viewPIdKey        = mkPreludeMiscIdUnique 254
 
 -- type FieldPat = ...
 fieldPatIdKey :: Unique
@@ -761,7 +766,7 @@ clauseIdKey         = mkPreludeMiscIdUnique 262
 -- data Exp = ...
 varEIdKey, conEIdKey, litEIdKey, appEIdKey, infixEIdKey, infixAppIdKey,
     sectionLIdKey, sectionRIdKey, lamEIdKey, lamCaseEIdKey, tupEIdKey,
-    unboxedTupEIdKey, condEIdKey, multiIfEIdKey,
+    unboxedTupEIdKey, unboxedSumEIdKey, condEIdKey, multiIfEIdKey,
     letEIdKey, caseEIdKey, doEIdKey, compEIdKey,
     fromEIdKey, fromThenEIdKey, fromToEIdKey, fromThenToEIdKey,
     listEIdKey, sigEIdKey, recConEIdKey, recUpdEIdKey, staticEIdKey,
@@ -778,22 +783,23 @@ lamEIdKey         = mkPreludeMiscIdUnique 278
 lamCaseEIdKey     = mkPreludeMiscIdUnique 279
 tupEIdKey         = mkPreludeMiscIdUnique 280
 unboxedTupEIdKey  = mkPreludeMiscIdUnique 281
-condEIdKey        = mkPreludeMiscIdUnique 282
-multiIfEIdKey     = mkPreludeMiscIdUnique 283
-letEIdKey         = mkPreludeMiscIdUnique 284
-caseEIdKey        = mkPreludeMiscIdUnique 285
-doEIdKey          = mkPreludeMiscIdUnique 286
-compEIdKey        = mkPreludeMiscIdUnique 287
-fromEIdKey        = mkPreludeMiscIdUnique 288
-fromThenEIdKey    = mkPreludeMiscIdUnique 289
-fromToEIdKey      = mkPreludeMiscIdUnique 290
-fromThenToEIdKey  = mkPreludeMiscIdUnique 291
-listEIdKey        = mkPreludeMiscIdUnique 292
-sigEIdKey         = mkPreludeMiscIdUnique 293
-recConEIdKey      = mkPreludeMiscIdUnique 294
-recUpdEIdKey      = mkPreludeMiscIdUnique 295
-staticEIdKey      = mkPreludeMiscIdUnique 296
-unboundVarEIdKey  = mkPreludeMiscIdUnique 297
+unboxedSumEIdKey  = mkPreludeMiscIdUnique 282
+condEIdKey        = mkPreludeMiscIdUnique 283
+multiIfEIdKey     = mkPreludeMiscIdUnique 284
+letEIdKey         = mkPreludeMiscIdUnique 285
+caseEIdKey        = mkPreludeMiscIdUnique 286
+doEIdKey          = mkPreludeMiscIdUnique 287
+compEIdKey        = mkPreludeMiscIdUnique 288
+fromEIdKey        = mkPreludeMiscIdUnique 289
+fromThenEIdKey    = mkPreludeMiscIdUnique 290
+fromToEIdKey      = mkPreludeMiscIdUnique 291
+fromThenToEIdKey  = mkPreludeMiscIdUnique 292
+listEIdKey        = mkPreludeMiscIdUnique 293
+sigEIdKey         = mkPreludeMiscIdUnique 294
+recConEIdKey      = mkPreludeMiscIdUnique 295
+recUpdEIdKey      = mkPreludeMiscIdUnique 296
+staticEIdKey      = mkPreludeMiscIdUnique 297
+unboundVarEIdKey  = mkPreludeMiscIdUnique 298
 
 -- type FieldExp = ...
 fieldExpIdKey :: Unique
@@ -907,27 +913,27 @@ infixPatSynIdKey  = mkPreludeMiscIdUnique 370
 recordPatSynIdKey = mkPreludeMiscIdUnique 371
 
 -- data Type = ...
-forallTIdKey, varTIdKey, conTIdKey, tupleTIdKey, unboxedTupleTIdKey, arrowTIdKey,
-    listTIdKey, appTIdKey, sigTIdKey, equalityTIdKey, litTIdKey,
-    promotedTIdKey, promotedTupleTIdKey,
-    promotedNilTIdKey, promotedConsTIdKey,
-    wildCardTIdKey :: Unique
+forallTIdKey, varTIdKey, conTIdKey, tupleTIdKey, unboxedTupleTIdKey,
+    unboxedSumTIdKey, arrowTIdKey, listTIdKey, appTIdKey, sigTIdKey,
+    equalityTIdKey, litTIdKey, promotedTIdKey, promotedTupleTIdKey,
+    promotedNilTIdKey, promotedConsTIdKey, wildCardTIdKey :: Unique
 forallTIdKey        = mkPreludeMiscIdUnique 380
 varTIdKey           = mkPreludeMiscIdUnique 381
 conTIdKey           = mkPreludeMiscIdUnique 382
 tupleTIdKey         = mkPreludeMiscIdUnique 383
 unboxedTupleTIdKey  = mkPreludeMiscIdUnique 384
-arrowTIdKey         = mkPreludeMiscIdUnique 385
-listTIdKey          = mkPreludeMiscIdUnique 386
-appTIdKey           = mkPreludeMiscIdUnique 387
-sigTIdKey           = mkPreludeMiscIdUnique 388
-equalityTIdKey      = mkPreludeMiscIdUnique 389
-litTIdKey           = mkPreludeMiscIdUnique 390
-promotedTIdKey      = mkPreludeMiscIdUnique 391
-promotedTupleTIdKey = mkPreludeMiscIdUnique 392
-promotedNilTIdKey   = mkPreludeMiscIdUnique 393
-promotedConsTIdKey  = mkPreludeMiscIdUnique 394
-wildCardTIdKey      = mkPreludeMiscIdUnique 395
+unboxedSumTIdKey    = mkPreludeMiscIdUnique 385
+arrowTIdKey         = mkPreludeMiscIdUnique 386
+listTIdKey          = mkPreludeMiscIdUnique 387
+appTIdKey           = mkPreludeMiscIdUnique 388
+sigTIdKey           = mkPreludeMiscIdUnique 389
+equalityTIdKey      = mkPreludeMiscIdUnique 390
+litTIdKey           = mkPreludeMiscIdUnique 391
+promotedTIdKey      = mkPreludeMiscIdUnique 392
+promotedTupleTIdKey = mkPreludeMiscIdUnique 393
+promotedNilTIdKey   = mkPreludeMiscIdUnique 394
+promotedConsTIdKey  = mkPreludeMiscIdUnique 395
+wildCardTIdKey      = mkPreludeMiscIdUnique 396
 
 -- data TyLit = ...
 numTyLitIdKey, strTyLitIdKey :: Unique

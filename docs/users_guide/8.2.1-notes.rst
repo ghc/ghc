@@ -213,6 +213,8 @@ template-haskell
 
 -  Version number XXXXX (was 2.9.0.0)
 
+-  Added support for unboxed sums :ghc-ticket:`12478`.
+
 time
 ~~~~
 

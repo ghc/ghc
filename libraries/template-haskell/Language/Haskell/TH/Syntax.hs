@@ -1176,8 +1176,6 @@ mk_unboxed_tup_name n_commas space
     occ = mkOccName ("(#" ++ replicate n_commas ',' ++ "#)")
     tup_mod = mkModName "GHC.Tuple"
 
-
-
 -----------------------------------------------------
 --              Locations
 -----------------------------------------------------
@@ -1277,6 +1275,19 @@ data ModuleInfo =
 In 'ClassOpI' and 'DataConI', name of the parent class or type
 -}
 type ParentName = Name
+
+-- | In 'UnboxedSumE' and 'UnboxedSumP', the number associated with a
+-- particular data constructor. 'SumAlt's are one-indexed and should never
+-- exceed the value of its corresponding 'SumArity'. For example:
+--
+-- * @(\#_|\#)@ has 'SumAlt' 1 (out of a total 'SumArity' of 2)
+--
+-- * @(\#|_\#)@ has 'SumAlt' 2 (out of a total 'SumArity' of 2)
+type SumAlt = Int
+
+-- | In 'UnboxedSumE', 'UnboxedSumT', and 'UnboxedSumP', the total number of
+-- 'SumAlt's. For example, @(\#|\#)@ has a 'SumArity' of 2.
+type SumArity = Int
 
 -- | In 'PrimTyConI', arity of the type constructor
 type Arity = Int
@@ -1398,26 +1409,27 @@ data Lit = CharL Char
 
 -- | Pattern in Haskell given in @{}@
 data Pat
-  = LitP Lit                      -- ^ @{ 5 or \'c\' }@
-  | VarP Name                     -- ^ @{ x }@
-  | TupP [Pat]                    -- ^ @{ (p1,p2) }@
-  | UnboxedTupP [Pat]             -- ^ @{ (\# p1,p2 \#) }@
-  | ConP Name [Pat]               -- ^ @data T1 = C1 t1 t2; {C1 p1 p1} = e@
-  | InfixP Pat Name Pat           -- ^ @foo ({x :+ y}) = e@
-  | UInfixP Pat Name Pat          -- ^ @foo ({x :+ y}) = e@
-                                  --
-                                  -- See "Language.Haskell.TH.Syntax#infix"
-  | ParensP Pat                   -- ^ @{(p)}@
-                                  --
-                                  -- See "Language.Haskell.TH.Syntax#infix"
-  | TildeP Pat                    -- ^ @{ ~p }@
-  | BangP Pat                     -- ^ @{ !p }@
-  | AsP Name Pat                  -- ^ @{ x \@ p }@
-  | WildP                         -- ^ @{ _ }@
-  | RecP Name [FieldPat]          -- ^ @f (Pt { pointx = x }) = g x@
-  | ListP [ Pat ]                 -- ^ @{ [1,2,3] }@
-  | SigP Pat Type                 -- ^ @{ p :: t }@
-  | ViewP Exp Pat                 -- ^ @{ e -> p }@
+  = LitP Lit                        -- ^ @{ 5 or \'c\' }@
+  | VarP Name                       -- ^ @{ x }@
+  | TupP [Pat]                      -- ^ @{ (p1,p2) }@
+  | UnboxedTupP [Pat]               -- ^ @{ (\# p1,p2 \#) }@
+  | UnboxedSumP Pat SumAlt SumArity -- ^ @{ (\#|p|\#) }@
+  | ConP Name [Pat]                 -- ^ @data T1 = C1 t1 t2; {C1 p1 p1} = e@
+  | InfixP Pat Name Pat             -- ^ @foo ({x :+ y}) = e@
+  | UInfixP Pat Name Pat            -- ^ @foo ({x :+ y}) = e@
+                                    --
+                                    -- See "Language.Haskell.TH.Syntax#infix"
+  | ParensP Pat                     -- ^ @{(p)}@
+                                    --
+                                    -- See "Language.Haskell.TH.Syntax#infix"
+  | TildeP Pat                      -- ^ @{ ~p }@
+  | BangP Pat                       -- ^ @{ !p }@
+  | AsP Name Pat                    -- ^ @{ x \@ p }@
+  | WildP                           -- ^ @{ _ }@
+  | RecP Name [FieldPat]            -- ^ @f (Pt { pointx = x }) = g x@
+  | ListP [ Pat ]                   -- ^ @{ [1,2,3] }@
+  | SigP Pat Type                   -- ^ @{ p :: t }@
+  | ViewP Exp Pat                   -- ^ @{ e -> p }@
   deriving( Show, Eq, Ord, Data, Generic )
 
 type FieldPat = (Name,Pat)
@@ -1452,6 +1464,7 @@ data Exp
   | LamCaseE [Match]                   -- ^ @{ \\case m1; m2 }@
   | TupE [Exp]                         -- ^ @{ (e1,e2) }  @
   | UnboxedTupE [Exp]                  -- ^ @{ (\# e1,e2 \#) }  @
+  | UnboxedSumE Exp SumAlt SumArity    -- ^ @{ (\#|e|\#) }@
   | CondE Exp Exp Exp                  -- ^ @{ if e1 then e2 else e3 }@
   | MultiIfE [(Guard, Exp)]            -- ^ @{ if | g1 -> e1 | g2 -> e2 }@
   | LetE [Dec] Exp                     -- ^ @{ let x=e1;   y=e2 in e3 }@
@@ -1804,6 +1817,7 @@ data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> -> \<t
           -- See Note [Representing concrete syntax in types]
           | TupleT Int                    -- ^ @(,), (,,), etc.@
           | UnboxedTupleT Int             -- ^ @(\#,\#), (\#,,\#), etc.@
+          | UnboxedSumT SumArity          -- ^ @(\#|\#), (\#||\#), etc.@
           | ArrowT                        -- ^ @->@
           | EqualityT                     -- ^ @~@
           | ListT                         -- ^ @[]@

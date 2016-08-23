@@ -80,12 +80,19 @@ rationalL   = RationalL
 
 litP :: Lit -> PatQ
 litP l = return (LitP l)
+
 varP :: Name -> PatQ
 varP v = return (VarP v)
+
 tupP :: [PatQ] -> PatQ
 tupP ps = do { ps1 <- sequence ps; return (TupP ps1)}
+
 unboxedTupP :: [PatQ] -> PatQ
 unboxedTupP ps = do { ps1 <- sequence ps; return (UnboxedTupP ps1)}
+
+unboxedSumP :: PatQ -> SumAlt -> SumArity -> PatQ
+unboxedSumP p alt arity = do { p1 <- p; return (UnboxedSumP p1 alt arity) }
+
 conP :: Name -> [PatQ] -> PatQ
 conP n ps = do ps' <- sequence ps
                return (ConP n ps')
@@ -265,6 +272,9 @@ tupE es = do { es1 <- sequence es; return (TupE es1)}
 
 unboxedTupE :: [ExpQ] -> ExpQ
 unboxedTupE es = do { es1 <- sequence es; return (UnboxedTupE es1)}
+
+unboxedSumE :: ExpQ -> SumAlt -> SumArity -> ExpQ
+unboxedSumE e alt arity = do { e1 <- e; return (UnboxedSumE e1 alt arity) }
 
 condE :: ExpQ -> ExpQ -> ExpQ -> ExpQ
 condE x y z =  do { a <- x; b <- y; c <- z; return (CondE a b c)}
@@ -626,6 +636,9 @@ tupleT i = return (TupleT i)
 
 unboxedTupleT :: Int -> TypeQ
 unboxedTupleT i = return (UnboxedTupleT i)
+
+unboxedSumT :: SumArity -> TypeQ
+unboxedSumT arity = return (UnboxedSumT arity)
 
 sigT :: TypeQ -> Kind -> TypeQ
 sigT t k
