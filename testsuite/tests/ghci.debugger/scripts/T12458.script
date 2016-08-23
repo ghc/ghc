@@ -1,0 +1,4 @@
+data D a = D
+d = D
+:print d
+d `seq` ()

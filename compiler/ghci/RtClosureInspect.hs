@@ -905,10 +905,9 @@ cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
         (_,mb_dc)    <- tryTcErrs (tcLookupDataCon dcname)
         case mb_dc of
           Nothing-> do
-                     --  TODO: Check this case
-            forM [0..length (elems $ ptrs clos)] $ \i -> do
-                        tv <- newVar liftedTypeKind
-                        return$ appArr (\e->(tv,e)) (ptrs clos) i
+            forM (elems $ ptrs clos) $ \a -> do
+              tv <- newVar liftedTypeKind
+              return (tv, a)
 
           Just dc -> do
             arg_tys <- getDataConArgTys dc my_ty
