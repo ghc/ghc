@@ -13,12 +13,13 @@ module Manifest (
   ) where
   
 import DynFlags
+import PackageConfig
 import Platform
 import SysTools
 
-import System.Directory
+import Data.Version
+
 import System.FilePath
-import System.Info
 
 #include "ghcplatform.h"
 
@@ -32,8 +33,8 @@ data ManifestFile = ManifestFile { name          :: String
                                  }
 
 -- | Translate TARGET_ARCH into something that Windows manifests expect                                 
-getProcessorArchitecture :: String
-getProcessorArchitecture 
+getTargetArchitecture :: String
+getTargetArchitecture 
   = case TARGET_ARCH of
       "x86"    -> "x86"
       "x86_64" -> "amd64"
@@ -43,62 +44,94 @@ getProcessorArchitecture
 -- TODO: Secure the dependencies with a SHA1 hash so we only
 --       load genuine Haskell libraries.
 generateManifest :: ManifestFile -> String
-generateManifest manifest | isApplication manifest
+generateManifest manifest
   = unlines [ "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
             , "<assembly xmlns=\"urn:schemas-microsoft-com:asm.v1\" manifestVersion=\"1.0\">"
             , "  <assemblyIdentity version=\"" ++ version manifest ++ "\""
             , "                    processorArchitecture=\"" ++ architecture manifest ++ "\""
             , "                    name=\"" ++ name manifest ++ "\""
             , "                    type=\"win32\"/>"
-            , ""
-            , "  <trustInfo xmlns=\"urn:schemas-microsoft-com:asm.v3\">"
-            , "    <security>"
-            , "      <requestedPrivileges>"
-            , "        <requestedExecutionLevel level=\"asInvoker\" uiAccess=\"false\"/>"
-            , "        </requestedPrivileges>"
-            , "       </security>"
-            , "  </trustInfo>"
+            -- Generate a security context for binary compiles
+            , if not $ isApplication manifest
+                 then ""
+                 else unlines 
+                       [ ""
+                        , "  <trustInfo xmlns=\"urn:schemas-microsoft-com:asm.v3\">"
+                        , "    <security>"
+                        , "      <requestedPrivileges>"
+                        , "        <requestedExecutionLevel level=\"asInvoker\" uiAccess=\"false\"/>"
+                        , "        </requestedPrivileges>"
+                        , "       </security>"
+                        , "  </trustInfo>"
+                        ]
+
             , ""
             , "  <dependency>"
             , "   <dependentAssembly>"
+            -- Generate dependencies
             , unlines $ map (\dep -> unlines 
                 [ "    <assemblyIdentity name=\"" ++ name dep ++ "\""
                 , "                      version=\"" ++ version dep ++ "\""
                 , "                      type=\"win32\""
                 , "                      processorArchitecture=\"" ++ architecture dep ++ "\"/>"
-                ])
+                ]) (dependencies manifest)
+
             , "   </dependentAssembly>"
             , "  </dependency>"
             , ""
+            -- Generate dependency names. This is controlled directly by the SxS names.
             ,  unlines $ map (\dep -> unlines 
                 [ "  <file name=\"" ++ fullname dep ++ "\" />"
-                ])
+                ]) (dependencies manifest)
+
             , "</assembly>"
             ]
-generateManifest manifest
-  = unlines [ "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
-            , "  <assembly xmlns=\"urn:schemas-microsoft-com:asm.v1\" manifestVersion=\"1.0\">"
-            , "  <trustInfo xmlns=\"urn:schemas-microsoft-com:asm.v3\">"
-            , "    <security>"
-            , "      <requestedPrivileges>"
-            , "        <requestedExecutionLevel level=\"asInvoker\" uiAccess=\"false\"/>"
-            , "        </requestedPrivileges>"
-            , "       </security>"
-            , "  </trustInfo>"
-            , "</assembly>"
-            ]
-      
+
+createManifestDefinition :: DynFlags -> [PackageConfig] -> FilePath -> ManifestFile
+createManifestDefinition dflags pkgs assembly =
+  let isBinary = case ghcLink dflags of
+                    LinkBinary -> True
+                    LinkDynLib -> False
+                    _          -> error "Link mode nor supported for assembly generation"
+
+  in ManifestFile { name          = maybe assembly id (sharedLibABIName    dflags)
+                  , version       = maybe "1.0.0"  id (sharedLibABIVersion dflags)
+                  , architecture  = getTargetArchitecture
+                  , isApplication = isBinary
+                  , fullname      = ""
+                  , dependencies  = if WayDyn `elem` ways dflags 
+                                       then genDependencies pkgs
+                                       else []
+                  }
+     where genDependencies :: [PackageConfig] -> [ManifestFile]
+           genDependencies []       = []
+           genDependencies (dep:xs) = 
+              let manifest = ManifestFile { name          = packageNameString dep
+                                          , version       = showVersion $ packageVersion dep
+                                          , architecture  = getTargetArchitecture
+                                          , isApplication = False
+                                          , fullname      = case sxsResolveMode dflags of
+                                                               SxSRelative -> "packageNameString dep"
+                                                               SxSAbsolute -> "packageNameString dep"
+                                                               SxSCache    -> "packageNameString dep"
+                                          , dependencies  = []
+                                          }
+              in manifest : genDependencies xs
+
 -- | Generate the appropriate Manifest file for program inclusion.
 mkManifest
    :: DynFlags
+   -> [PackageConfig]                   -- dependencies of this link object
    -> FilePath                          -- filename of executable
    -> IO [FilePath]                     -- extra objects to embed, maybe
-mkManifest dflags assembly
+mkManifest dflags pkgs assembly
  | platformOS (targetPlatform dflags) == OSMinGW32 &&
    gopt Opt_GenManifest dflags
     = do let manifest_filename = assembly <.> "manifest"
 
-         writeFile manifest_filename $ generateManifest manifest
+         writeFile manifest_filename
+             $ generateManifest
+             $ createManifestDefinition dflags pkgs assembly
 
          -- Windows will find the manifest file if it is named
          -- foo.exe.manifest. However, for extra robustness, and so that
@@ -122,8 +155,6 @@ mkManifest dflags assembly
                     "--output-format=coff"]
                    -- no FileOptions here: windres doesn't like seeing
                    -- backslashes, apparently
-
-             removeFile manifest_filename
 
              return [rc_obj_filename]
  | otherwise = return []

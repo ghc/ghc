@@ -1754,6 +1754,7 @@ linkBinary' staticLink dflags o_files dep_packages = do
                       else do d <- getCurrentDirectory
                               return $ normalise (d </> output_fn)
     pkg_lib_paths <- getPackageLibraryPath dflags dep_packages
+    pkgs <- getPreloadPackagesAnd dflags dep_packages
     let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
         get_pkg_lib_path_opts l
          | osElfTarget (platformOS platform) &&
@@ -1839,7 +1840,7 @@ linkBinary' staticLink dflags o_files dep_packages = do
                else ["-lpthread"]
          | otherwise               = []
 
-    resource_objs <- mkManifest dflags output_fn
+    resource_objs <- mkManifest dflags pkgs output_fn
 
     let link = if staticLink
                    then SysTools.runLibtool
