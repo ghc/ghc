@@ -540,6 +540,7 @@ extra_src_files = {
   'tc251': ['Tc251_Help.hs'],
   'tc263': ['Tc263_Help.hs'],
   'tc266': ['Tc266.hs', 'Tc266a.hs', 'Tc266.hs-boot'],
+  'Tc267': ['Tc267a.hs', 'Tc267b.hs', 'Tc267a.hs-boot', 'Tc267b.hs-boot'],
   'tcfail186': ['Tcfail186_Help.hs'],
   'tcrun025': ['TcRun025_B.hs'],
   'tcrun038': ['TcRun038_B.hs'],

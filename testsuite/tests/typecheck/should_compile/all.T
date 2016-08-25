@@ -363,6 +363,10 @@ test('tc266',
      [extra_clean(['Tc266.hi-boot', 'Tc266.o-boot', 'Tc266a.hi', 'Tc266a.o', 'Tc266.hi', 'Tc266.o']), run_timeout_multiplier(0.01)] ,
      run_command,
      ['$MAKE -s --no-print-directory tc266'])
+test('Tc267',
+     extra_clean(['Tc267a.hi-boot', 'Tc267a.o-boot', 'Tc267b.hi-boot', 'Tc267b.o-boot', 'Tc267a.hi', 'Tc267a.o', 'Tc267b.hi', 'Tc267b.o']),
+     run_command,
+     ['$MAKE -s --no-print-directory Tc267'])
 
 test('GivenOverlapping', normal, compile, [''])
 test('GivenTypeSynonym', normal, compile, [''])
