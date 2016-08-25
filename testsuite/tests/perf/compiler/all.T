@@ -28,7 +28,8 @@ setTestOpts(no_lint)
 #    really changed, then you know there's an issue.
 
 test('T1969',
-     [compiler_stats_num_field('peak_megabytes_allocated', # Note [residency]
+     [
+compiler_stats_num_field('peak_megabytes_allocated', # Note [residency]
           [(wordsize(32), 30, 15),
              # 2010-05-17 14 (x86/Windows)
              #            15 (x86/OS X)
@@ -91,7 +92,7 @@ test('T1969',
              # 2014-06-29 303300692 (x86/Linux)
              # 2015-07-11 288699104 (x86/Linux, 64-bit machine) use +RTS -G1
              # 2016-04-06 344730660 (x86/Linux, 64-bit machine)
-           (wordsize(64), 695430728, 5)]),
+           (wordsize(64), 736973272, 5)]),
              # 17/11/2009 434845560 (amd64/Linux)
              # 08/12/2009 459776680 (amd64/Linux)
              # 17/05/2010 519377728 (amd64/Linux)
@@ -111,6 +112,7 @@ test('T1969',
              # 10/09/2014 630299456 (x86_64/Linux) post-AMP-cleanup
              # 03/06/2015 581460896 (x86_64/Linux) use +RTS -G1
              # 28/10/2015 695430728 (x86_64/Linux) emit Typeable at definition site
+             # 25/08/2016 736973272 (x86_64/Linux) unknown
       only_ways(['normal']),
 
       extra_hc_opts('-dcore-lint -static'),
