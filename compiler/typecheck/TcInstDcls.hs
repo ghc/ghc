@@ -16,7 +16,7 @@ import HsSyn
 import TcBinds
 import TcTyClsDecls
 import TcClassDcl( tcClassDecl2, tcATDefault,
-                   HsSigFun, lookupHsSig, mkHsSigFun,
+                   HsSigFun, mkHsSigFun,
                    findMethodBind, instantiateMethod )
 import TcSigs
 import TcRnMonad
@@ -1349,8 +1349,8 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
 
 tcMethodBodyHelp :: HsSigFun -> Id -> TcId
                  -> LHsBind Name -> TcM (LHsBinds TcId)
-tcMethodBodyHelp sig_fn sel_id local_meth_id meth_bind
-  | Just hs_sig_ty <- lookupHsSig sig_fn sel_name
+tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
+  | Just hs_sig_ty <- hs_sig_fn sel_name
               -- There is a signature in the instance
               -- See Note [Instance method signatures]
   = do { let ctxt = FunSigCtxt sel_name True

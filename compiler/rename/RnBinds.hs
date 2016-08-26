@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
@@ -547,24 +549,19 @@ depAnalBinds binds_w_dus
 mkSigTvFn :: [LSig Name] -> (Name -> [Name])
 -- Return a lookup function that maps an Id Name to the names
 -- of the type variables that should scope over its body.
-mkSigTvFn sigs
-  = \n -> lookupNameEnv env n `orElse` []
+mkSigTvFn sigs = \n -> lookupNameEnv env n `orElse` []
   where
-    env :: NameEnv [Name]
-    env = foldr add_scoped_sig emptyNameEnv sigs
+    env = mkHsSigEnv get_scoped_tvs sigs
 
-    add_scoped_sig :: LSig Name -> NameEnv [Name] -> NameEnv [Name]
-    add_scoped_sig (L _ (ClassOpSig _ names sig_ty)) env
-      = add_scoped_tvs names (hsScopedTvs sig_ty) env
-    add_scoped_sig (L _ (TypeSig names sig_ty)) env
-      = add_scoped_tvs names (hsWcScopedTvs sig_ty) env
-    add_scoped_sig (L _ (PatSynSig names sig_ty)) env
-      = add_scoped_tvs names (hsScopedTvs sig_ty) env
-    add_scoped_sig _ env = env
-
-    add_scoped_tvs :: [Located Name] -> [Name] -> NameEnv [Name] -> NameEnv [Name]
-    add_scoped_tvs id_names tv_names env
-      = foldr (\(L _ id_n) env -> extendNameEnv env id_n tv_names) env id_names
+    get_scoped_tvs :: LSig Name -> Maybe ([Located Name], [Name])
+    -- Returns (binders, scoped tvs for those binders)
+    get_scoped_tvs (L _ (ClassOpSig _ names sig_ty))
+      = Just (names, hsScopedTvs sig_ty)
+    get_scoped_tvs (L _ (TypeSig names sig_ty))
+      = Just (names, hsWcScopedTvs sig_ty)
+    get_scoped_tvs (L _ (PatSynSig names sig_ty))
+      = Just (names, hsScopedTvs sig_ty)
+    get_scoped_tvs _ = Nothing
 
 -- Process the fixity declarations, making a FastString -> (Located Fixity) map
 -- (We keep the location around for reporting duplicate fixity declarations.)
