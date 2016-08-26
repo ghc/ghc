@@ -54,7 +54,7 @@ module HsUtils(
 
   -- Types
   mkHsAppTy, mkHsAppTys, userHsTyVarBndrs, userHsLTyVarBndrs,
-  mkLHsSigType, mkLHsSigWcType, mkClassOpSigs,
+  mkLHsSigType, mkLHsSigWcType, mkClassOpSigs, mkHsSigEnv,
   nlHsAppTy, nlHsTyVar, nlHsFunTy, nlHsTyConApp,
 
   -- Stmts
@@ -105,6 +105,7 @@ import TcType
 import DataCon
 import Name
 import NameSet
+import NameEnv
 import BasicTypes
 import SrcLoc
 import FastString
@@ -565,6 +566,32 @@ mkLHsSigType ty = mkHsImplicitBndrs ty
 
 mkLHsSigWcType :: LHsType RdrName -> LHsSigWcType RdrName
 mkLHsSigWcType ty = mkHsImplicitBndrs (mkHsWildCardBndrs ty)
+
+mkHsSigEnv :: forall a. (LSig Name -> Maybe ([Located Name], a))
+                     -> [LSig Name]
+                     -> NameEnv a
+mkHsSigEnv get_info sigs
+  = mkNameEnv          (mk_pairs ordinary_sigs)
+   `extendNameEnvList` (mk_pairs gen_dm_sigs)
+   -- The subtlety is this: in a class decl with a
+   -- default-method signature as well as a method signature
+   -- we want the latter to win (Trac #12533)
+   --    class C x where
+   --       op :: forall a . x a -> x a
+   --       default op :: forall b . x b -> x b
+   --       op x = ...(e :: b -> b)...
+   -- The scoped type variables of the 'default op', namely 'b',
+   -- scope over the code for op.   The 'forall a' does not!
+   -- This applies both in the renamer and typechecker, both
+   -- of which use this function
+  where
+    (gen_dm_sigs, ordinary_sigs) = partition is_gen_dm_sig sigs
+    is_gen_dm_sig (L _ (ClassOpSig True _ _)) = True
+    is_gen_dm_sig _                           = False
+
+    mk_pairs :: [LSig Name] -> [(Name, a)]
+    mk_pairs sigs = [ (n,a) | Just (ns,a) <- map get_info sigs
+                            , L _ n <- ns ]
 
 mkClassOpSigs :: [LSig RdrName] -> [LSig RdrName]
 -- Convert TypeSig to ClassOpSig
