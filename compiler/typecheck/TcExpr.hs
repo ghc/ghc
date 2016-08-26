@@ -1658,16 +1658,16 @@ tc_infer_id lbl id_name
 
 
 tcUnboundId :: UnboundVar -> ExpRhoType -> TcM (HsExpr TcId)
--- Typechedk an occurrence of an unbound Id
+-- Typecheck an occurrence of an unbound Id
 --
--- Some of these started life as a true hole "_".  Others might simply
--- be variables that accidentally have no binding site
+-- Some of these started life as a true expression hole "_".
+-- Others might simply be variables that accidentally have no binding site
 --
 -- We turn all of them into HsVar, since HsUnboundVar can't contain an
 -- Id; and indeed the evidence for the CHoleCan does bind it, so it's
 -- not unbound any more!
 tcUnboundId unbound res_ty
- = do { ty <- newFlexiTyVarTy liftedTypeKind
+ = do { ty <- newOpenFlexiTyVarTy  -- Allow Int# etc (Trac #12531)
       ; let occ = unboundVarOcc unbound
       ; name <- newSysName occ
       ; let ev = mkLocalId name ty
