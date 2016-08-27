@@ -39,7 +39,7 @@ import RnSource   ( addTcgDUs )
 import Avail
 
 import Unify( tcUnifyTy )
-import BasicTypes ( DerivStrategy(..) )
+import BasicTypes ( DefMethSpec(..), DerivStrategy(..) )
 import Class
 import Type
 import ErrUtils
@@ -394,20 +394,28 @@ tcDeriving deriv_infos deriv_decls
 
         ; let (infer_specs, given_specs) = splitEarlyDerivSpec early_specs
         ; insts1 <- mapM genInst given_specs
+        ; insts2 <- mapM genInst infer_specs
 
-        -- the stand-alone derived instances (@insts1@) are used when inferring
-        -- the contexts for "deriving" clauses' instances (@infer_specs@)
-        ; final_specs <- extendLocalInstEnv (map (iSpec . fstOf3) insts1) $
-                         simplifyInstanceContexts infer_specs
-
-        ; insts2 <- mapM genInst final_specs
-
-        ; let (inst_infos, deriv_stuff, maybe_fvs) = unzip3 (insts1 ++ insts2)
+        ; let (_, deriv_stuff, maybe_fvs) = unzip3 (insts1 ++ insts2)
         ; loc <- getSrcSpanM
         ; let (binds, famInsts, extraInstances) =
                 genAuxBinds loc (unionManyBags deriv_stuff)
 
         ; dflags <- getDynFlags
+
+        ; let mk_inst_infos1 = map fstOf3 insts1
+              famInstBag     = bagToList famInsts
+        ; inst_infos1 <- apply_inst_infos mk_inst_infos1 given_specs
+        -- the stand-alone derived instances (@inst_infos1@) are used when
+        -- inferring the contexts for "deriving" clauses' instances
+        -- (@infer_specs@)
+        ; final_specs <- tcExtendLocalFamInstEnv famInstBag $
+                         extendLocalInstEnv (map iSpec inst_infos1) $
+                         simplifyInstanceContexts infer_specs
+
+        ; let mk_inst_infos2 = map fstOf3 insts2
+        ; inst_infos2 <- apply_inst_infos mk_inst_infos2 final_specs
+        ; let inst_infos = inst_infos1 ++ inst_infos2
 
         ; (inst_info, rn_binds, rn_dus) <-
             renameDeriv is_boot (inst_infos ++ (bagToList extraInstances)) binds
@@ -416,7 +424,7 @@ tcDeriving deriv_infos deriv_decls
              liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
                         (ddump_deriving inst_info rn_binds famInsts))
 
-        ; gbl_env <- tcExtendLocalFamInstEnv (bagToList famInsts) $
+        ; gbl_env <- tcExtendLocalFamInstEnv famInstBag $
                      tcExtendLocalInstEnv (map iSpec (bagToList inst_info)) getGblEnv
         ; let all_dus = rn_dus `plusDU` usesOnly (NameSet.mkFVs $ catMaybes maybe_fvs)
         ; return (addTcgDUs gbl_env all_dus, inst_info, rn_binds) }
@@ -432,6 +440,10 @@ tcDeriving deriv_infos deriv_decls
              (vcat (map pprRepTy (bagToList repFamInsts)))
 
     hangP s x = text "" $$ hang (ptext (sLit s)) 2 x
+
+    apply_inst_infos :: [ThetaType -> TcM (InstInfo RdrName)]
+                     -> [DerivSpec ThetaType] -> TcM [InstInfo RdrName]
+    apply_inst_infos = zipWithM (\f ds -> f (ds_theta ds))
 
 -- Prints the representable type family instance
 pprRepTy :: FamInst -> SDoc
@@ -1059,8 +1071,7 @@ mk_data_eqn overlap_mode tvs cls cls_tys tycon tc_args rep_tc rep_tc_args
        dfun_name            <- newDFunName' cls tycon
        case mtheta of
         Nothing -> -- Infer context
-          inferConstraints tvs cls cls_tys
-                           inst_ty rep_tc rep_tc_args
+          inferConstraints tvs cls cls_tys inst_ty rep_tc rep_tc_args mechanism
             $ \inferred_constraints tvs' inst_tys' ->
             return $ InferTheta $ DS
                    { ds_loc = loc
@@ -1131,7 +1142,7 @@ mk_eqn_no_mechanism dflags mtheta cls cls_tys rep_tc go_for_it bale_out
 ----------------------
 
 inferConstraints :: [TyVar] -> Class -> [TcType] -> TcType
-                 -> TyCon -> [TcType]
+                 -> TyCon -> [TcType] -> DerivSpecMechanism
                  -> (ThetaOrigin -> [TyVar] -> [TcType] -> TcM a)
                  -> TcM a
 -- inferConstraints figures out the constraints needed for the
@@ -1149,7 +1160,8 @@ inferConstraints :: [TyVar] -> Class -> [TcType] -> TcType
 -- Generate a sufficiently large set of constraints that typechecking the
 -- generated method definitions should succeed.   This set will be simplified
 -- before being used in the instance declaration
-inferConstraints tvs main_cls cls_tys inst_ty rep_tc rep_tc_args mkTheta
+inferConstraints tvs main_cls cls_tys inst_ty
+                 rep_tc rep_tc_args mechanism mkTheta
   | is_generic                        -- Generic constraints are easy
   = mkTheta [] tvs inst_tys
 
@@ -1233,6 +1245,16 @@ inferConstraints tvs main_cls cls_tys inst_ty rep_tc rep_tc_args mkTheta
     get_std_constrained_tys :: CtOrigin -> TypeOrKind -> Type
                             -> [(ThetaOrigin, Maybe TCvSubst)]
     get_std_constrained_tys orig t_or_k ty
+        | DerivSpecAnyClass <- mechanism
+        = [ ([mkPredOrigin orig t_or_k gm_pred'], Nothing)
+          | let op_items = classOpItems main_cls
+          , (_, Just (_, GenericDM gm_sigma_ty)) <- op_items
+          , let (_, gm_preds, _) = tcSplitSigmaTy gm_sigma_ty
+          , gm_pred <- gm_preds
+          , let env         = zipTyEnv cls_tvs inst_tys
+                in_scope    = mkInScopeSet $ tyCoVarsOfTypes $ gm_pred:inst_tys
+                subst       = mkTvSubst in_scope env
+                gm_pred'    = substTy subst gm_pred ]
         | is_functor_like = mk_functor_like_constraints orig t_or_k main_cls $
                             deepSubtypesContaining last_tv ty
         | otherwise       = [( [mk_cls_pred orig t_or_k main_cls ty]
@@ -2425,16 +2447,17 @@ the renamer.  What a great hack!
 -- Representation tycons differ from the tycon in the instance signature in
 -- case of instances for indexed families.
 --
-genInst :: DerivSpec ThetaType
-        -> TcM (InstInfo RdrName, BagDerivStuff, Maybe Name)
+genInst :: DerivSpec theta
+        -> TcM (ThetaType -> TcM (InstInfo RdrName), BagDerivStuff, Maybe Name)
 genInst spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon
-                 , ds_theta = theta, ds_mechanism = mechanism, ds_tys = tys
+                 , ds_mechanism = mechanism, ds_tys = tys
                  , ds_cls = clas, ds_loc = loc })
   -- See Note [Bindings for Generalised Newtype Deriving]
   | DerivSpecNewtype rhs_ty <- mechanism
-  = do { inst_spec <- newDerivClsInst theta spec
-       ; doDerivInstErrorChecks clas inst_spec mechanism
-       ; return ( InstInfo
+  = let mk_inst_info theta = do
+          inst_spec <- newDerivClsInst theta spec
+          doDerivInstErrorChecks clas inst_spec mechanism
+          return $ InstInfo
                     { iSpec   = inst_spec
                     , iBinds  = InstBindings
                         { ib_binds      = gen_Newtype_binds loc clas
@@ -2445,24 +2468,26 @@ genInst spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon
                         , ib_extensions = [ LangExt.ImpredicativeTypes
                                           , LangExt.RankNTypes ]
                         , ib_derived    = True } }
-                , emptyBag
-                , Just $ getName $ head $ tyConDataCons rep_tycon ) }
+    in return ( mk_inst_info
+              , emptyBag
+              , Just $ getName $ head $ tyConDataCons rep_tycon )
               -- See Note [Newtype deriving and unused constructors]
   | otherwise
-  = do { (meth_binds, deriv_stuff) <- genDerivStuff mechanism loc clas
-                                        rep_tycon tys tvs
-       ; inst_spec <- newDerivClsInst theta spec
-       ; doDerivInstErrorChecks clas inst_spec mechanism
-       ; traceTc "newder" (ppr inst_spec)
-       ; let inst_info
-               = InstInfo { iSpec   = inst_spec
-                          , iBinds  = InstBindings
-                                        { ib_binds = meth_binds
-                                        , ib_tyvars = map Var.varName tvs
-                                        , ib_pragmas = []
-                                        , ib_extensions = []
-                                        , ib_derived = True } }
-       ; return ( inst_info, deriv_stuff, Nothing ) }
+  = do (meth_binds, deriv_stuff) <- genDerivStuff mechanism loc clas
+                                      rep_tycon tys tvs
+       let mk_inst_info theta = do
+             inst_spec <- newDerivClsInst theta spec
+             doDerivInstErrorChecks clas inst_spec mechanism
+             traceTc "newder" (ppr inst_spec)
+             return $ InstInfo
+                       { iSpec   = inst_spec
+                       , iBinds  = InstBindings
+                                     { ib_binds = meth_binds
+                                     , ib_tyvars = map Var.varName tvs
+                                     , ib_pragmas = []
+                                     , ib_extensions = []
+                                     , ib_derived = True } }
+       return (mk_inst_info, deriv_stuff, Nothing)
 
 doDerivInstErrorChecks :: Class -> ClsInst -> DerivSpecMechanism -> TcM ()
 doDerivInstErrorChecks clas clas_inst mechanism
