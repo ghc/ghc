@@ -38,6 +38,10 @@ Compiler
   syntax can be used, in addition to a new form for specifying the cost centre
   name. See :ref:`scc-pragma` for examples.
 
+- It is now possible to explicitly pick a strategy to use when deriving a
+  class instance using the :ghc-flag:`-XDerivingStrategies` language extension
+  (see :ref:`deriving-strategies`).
+
 GHCi
 ~~~~
 

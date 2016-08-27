@@ -42,11 +42,11 @@ import NameEnv
 import Avail
 import Outputable
 import Bag
-import BasicTypes       ( RuleName, pprRuleName )
+import BasicTypes       ( DerivStrategy, RuleName, pprRuleName )
 import FastString
 import SrcLoc
 import DynFlags
-import Util             ( debugIsOn, partitionWith )
+import Util             ( debugIsOn, lengthExceeds, partitionWith )
 import HscTypes         ( HscEnv, hsc_dflags )
 import ListSetOps       ( findDupsEq, removeDups, equivClasses )
 import Digraph          ( SCC, flattenSCC, flattenSCCs
@@ -57,6 +57,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
 import Control.Arrow ( first )
 import Data.List ( sortBy, mapAccumL )
+import Data.Maybe ( isJust )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 
 {-
@@ -945,11 +946,14 @@ Here 'k' is in scope in the kind signature, just like 'x'.
 -}
 
 rnSrcDerivDecl :: DerivDecl RdrName -> RnM (DerivDecl Name, FreeVars)
-rnSrcDerivDecl (DerivDecl ty overlap)
+rnSrcDerivDecl (DerivDecl ty deriv_strat overlap)
   = do { standalone_deriv_ok <- xoptM LangExt.StandaloneDeriving
+       ; deriv_strats_ok     <- xoptM LangExt.DerivingStrategies
        ; unless standalone_deriv_ok (addErr standaloneDerivErr)
+       ; failIfTc (isJust deriv_strat && not deriv_strats_ok) $
+           illegalDerivStrategyErr $ fmap unLoc deriv_strat
        ; (ty', fvs) <- rnLHsInstType (text "In a deriving declaration") ty
-       ; return (DerivDecl ty' overlap, fvs) }
+       ; return (DerivDecl ty' deriv_strat overlap, fvs) }
 
 standaloneDerivErr :: SDoc
 standaloneDerivErr
@@ -1767,16 +1771,39 @@ rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
                      L _ (ConDeclGADT {}) : _  -> False
                      _                         -> True
 
-    rn_derivs Nothing
-      = return (Nothing, emptyFVs)
-    rn_derivs (Just (L loc ds))
-      = do { (ds', fvs) <- mapFvRn (rnHsSigType doc) ds
-           ; return (Just (L loc ds'), fvs) }
+    rn_derivs (L loc ds)
+      = do { deriv_strats_ok <- xoptM LangExt.DerivingStrategies
+           ; failIfTc (lengthExceeds ds 1 && not deriv_strats_ok)
+               multipleDerivClausesErr
+           ; (ds', fvs) <- mapFvRn (rnLHsDerivingClause deriv_strats_ok doc) ds
+           ; return (L loc ds', fvs) }
+
+rnLHsDerivingClause :: Bool -> HsDocContext -> LHsDerivingClause RdrName
+                    -> RnM (LHsDerivingClause Name, FreeVars)
+rnLHsDerivingClause deriv_strats_ok doc
+                (L loc (HsDerivingClause { deriv_clause_strategy = dcs
+                                         , deriv_clause_tys = L loc' dct }))
+  = do { failIfTc (isJust dcs && not deriv_strats_ok) $
+           illegalDerivStrategyErr $ fmap unLoc dcs
+       ; (dct', fvs) <- mapFvRn (rnHsSigType doc) dct
+       ; return ( L loc (HsDerivingClause { deriv_clause_strategy = dcs
+                                          , deriv_clause_tys = L loc' dct' })
+                , fvs ) }
 
 badGadtStupidTheta :: HsDocContext -> SDoc
 badGadtStupidTheta _
   = vcat [text "No context is allowed on a GADT-style data declaration",
           text "(You can put a context on each constructor, though.)"]
+
+illegalDerivStrategyErr :: Maybe DerivStrategy -> SDoc
+illegalDerivStrategyErr ds
+  = vcat [ text "Illegal deriving strategy" <> colon <+> maybe empty ppr ds
+         , text "Use DerivingStrategies to enable this extension" ]
+
+multipleDerivClausesErr :: SDoc
+multipleDerivClausesErr
+  = vcat [ text "Illegal use of multiple, consecutive deriving clauses"
+         , text "Use DerivingStrategies to allow this" ]
 
 rnFamDecl :: Maybe Name -- Just cls => this FamilyDecl is nested
                         --             inside an *class decl* for cls

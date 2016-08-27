@@ -10,7 +10,7 @@ makeSimpleDatatype :: Name
                    -> Q Dec
 makeSimpleDatatype tyName conName srcUpk srcStr =
   dataD (cxt []) tyName [] Nothing [normalC conName
-    [bangType (bang srcUpk srcStr) (conT ''Int)]] (cxt [])
+    [bangType (bang srcUpk srcStr) (conT ''Int)]] []
 
 checkBang :: Name
           -> SourceUnpackednessQ

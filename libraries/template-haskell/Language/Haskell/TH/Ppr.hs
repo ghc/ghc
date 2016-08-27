@@ -353,8 +353,12 @@ ppr_dec _ (ClosedTypeFamilyD tfhead@(TypeFamilyHead tc _ _ _) eqns)
       = ppr tc <+> sep (map pprParendType lhs) <+> text "=" <+> ppr rhs
 ppr_dec _ (RoleAnnotD name roles)
   = hsep [ text "type role", ppr name ] <+> hsep (map ppr roles)
-ppr_dec _ (StandaloneDerivD cxt ty)
-  = hsep [ text "deriving instance", pprCxt cxt, ppr ty ]
+ppr_dec _ (StandaloneDerivD ds cxt ty)
+  = hsep [ text "deriving"
+         , maybe empty ppr_deriv_strategy ds
+         , text "instance"
+         , pprCxt cxt
+         , ppr ty ]
 ppr_dec _ (DefaultSigD n ty)
   = hsep [ text "default", pprPrefixOcc n, dcolon, ppr ty ]
 ppr_dec _ (PatSynD name args dir pat)
@@ -368,6 +372,12 @@ ppr_dec _ (PatSynD name args dir pat)
 ppr_dec _ (PatSynSigD name ty)
   = pprPatSynSig name ty
 
+ppr_deriv_strategy :: DerivStrategy -> Doc
+ppr_deriv_strategy ds = text $
+  case ds of
+    Bespoke  -> "bespoke"
+    Anyclass -> "anyclass"
+    Newtype  -> "newtype"
 
 ppr_overlap :: Overlap -> Doc
 ppr_overlap o = text $
@@ -377,7 +387,8 @@ ppr_overlap o = text $
     Overlapping   -> "{-# OVERLAPPING #-}"
     Incoherent    -> "{-# INCOHERENT #-}"
 
-ppr_data :: Doc -> Cxt -> Name -> Doc -> Maybe Kind -> [Con] -> Cxt -> Doc
+ppr_data :: Doc -> Cxt -> Name -> Doc -> Maybe Kind -> [Con] -> [DerivClause]
+         -> Doc
 ppr_data maybeInst ctxt t argsDoc ksig cs decs
   = sep [text "data" <+> maybeInst
             <+> pprCxt ctxt
@@ -386,7 +397,7 @@ ppr_data maybeInst ctxt t argsDoc ksig cs decs
          if null decs
            then empty
            else nest nestDepth
-              $ text "deriving" <+> ppr_cxt_preds decs]
+              $ vcat $ map ppr_deriv_clause decs]
   where
     pref :: [Doc] -> [Doc]
     pref xs | isGadtDecl = xs
@@ -408,7 +419,8 @@ ppr_data maybeInst ctxt t argsDoc ksig cs decs
                 Nothing -> empty
                 Just k  -> dcolon <+> ppr k
 
-ppr_newtype :: Doc -> Cxt -> Name -> Doc -> Maybe Kind -> Con -> Cxt -> Doc
+ppr_newtype :: Doc -> Cxt -> Name -> Doc -> Maybe Kind -> Con -> [DerivClause]
+            -> Doc
 ppr_newtype maybeInst ctxt t argsDoc ksig c decs
   = sep [text "newtype" <+> maybeInst
             <+> pprCxt ctxt
@@ -417,11 +429,16 @@ ppr_newtype maybeInst ctxt t argsDoc ksig c decs
          if null decs
            then empty
            else nest nestDepth
-                $ text "deriving" <+> ppr_cxt_preds decs]
+                $ vcat $ map ppr_deriv_clause decs]
   where
     ksigDoc = case ksig of
                 Nothing -> empty
                 Just k  -> dcolon <+> ppr k
+
+ppr_deriv_clause :: DerivClause -> Doc
+ppr_deriv_clause (DerivClause ds ctxt)
+  = text "deriving" <+> maybe empty ppr_deriv_strategy ds
+                    <+> ppr_cxt_preds ctxt
 
 ppr_tySyn :: Doc -> Name -> Doc -> Type -> Doc
 ppr_tySyn maybeInst t argsDoc rhs

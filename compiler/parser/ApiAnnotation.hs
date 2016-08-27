@@ -186,10 +186,12 @@ getAndRemoveAnnotationComments (anns,canns) span =
 -- corresponding token, unless otherwise noted
 -- See note [Api annotations] above for details of the usage
 data AnnKeywordId
-    = AnnAs
+    = AnnAnyclass
+    | AnnAs
     | AnnAt
     | AnnBang  -- ^ '!'
     | AnnBackquote -- ^ '`'
+    | AnnBespoke
     | AnnBy
     | AnnCase -- ^ case or lambda case
     | AnnClass

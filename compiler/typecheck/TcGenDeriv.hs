@@ -18,7 +18,7 @@ This is where we do all the grimy bindings' generation.
 module TcGenDeriv (
         BagDerivStuff, DerivStuff(..),
 
-        hasBuiltinDeriving,
+        hasBespokeDeriving,
         FFoldType(..), functorLikeTraverse,
         deepSubtypesContaining, foldDataConArgs,
         mkCoerceClassMethEqn,
@@ -104,20 +104,25 @@ data DerivStuff     -- Please add this auxiliary stuff
 *                                                                      *
 ************************************************************************
 
-Only certain blessed classes can be used in a deriving clause. These classes
-are listed below in the definition of hasBuiltinDeriving (with the exception
+Only certain blessed classes can be used in a deriving clause (without the
+assistance of GeneralizedNewtypeDeriving or DeriveAnyClass). These classes
+are listed below in the definition of hasBespokeDeriving (with the exception
 of Generic and Generic1, which are handled separately in TcGenGenerics).
 
-A class might be able to be used in a deriving clause if it -XDeriveAnyClass
-is willing to support it. The canDeriveAnyClass function checks if this is
-the case.
+A class might be able to be used in a deriving clause if -XDeriveAnyClass
+is willing to support it. The canDeriveAnyClass function in TcDeriv checks
+if this is the case.
 -}
 
-hasBuiltinDeriving :: Class
+-- NB: The classes listed below should be in sync with the ones listed in
+-- the definition of sideConditions in TcDeriv (except for Generic(1), as
+-- noted above). If you add a new class to hasBespokeDeriving, make sure to
+-- update sideConditions as well!
+hasBespokeDeriving :: Class
                    -> Maybe (SrcSpan
                              -> TyCon
                              -> TcM (LHsBinds RdrName, BagDerivStuff))
-hasBuiltinDeriving clas
+hasBespokeDeriving clas
   = assocMaybe gen_list (getUnique clas)
   where
     gen_list :: [(Unique, SrcSpan -> TyCon -> TcM (LHsBinds RdrName, BagDerivStuff))]

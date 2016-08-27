@@ -112,6 +112,10 @@ T11018:
 T10276:
 	$(CHECK_API_ANNOTATIONS) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Test10276.hs
 
+.PHONY: T10598
+T10598:
+	$(CHECK_API_ANNOTATIONS) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Test10598.hs
+
 .PHONY: T11321
 T11321:
 	$(CHECK_API_ANNOTATIONS) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Test11321.hs

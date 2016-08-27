@@ -23,7 +23,7 @@ largeData =
     [normalC dataName
              (replicate size (((,) <$> bang noSourceUnpackedness
                                        noSourceStrictness) `ap` [t| Int |]))]
-    (cxt [])
+    []
 
 conE' :: Name -> [ExpQ] -> ExpQ
 conE' n es = foldl appE (conE n) es

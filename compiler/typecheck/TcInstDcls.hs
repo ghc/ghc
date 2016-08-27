@@ -683,11 +683,11 @@ tcDataFamInstDecl mb_clsinfo
        ; checkValidTyCon rep_tc
 
        ; let m_deriv_info = case derivs of
-               Nothing          -> Nothing
-               Just (L _ preds) ->
-                 Just $ DerivInfo { di_rep_tc = rep_tc
-                                  , di_preds  = preds
-                                  , di_ctxt   = tcMkDataFamInstCtxt decl }
+               L _ []    -> Nothing
+               L _ preds ->
+                 Just $ DerivInfo { di_rep_tc  = rep_tc
+                                  , di_clauses = preds
+                                  , di_ctxt    = tcMkDataFamInstCtxt decl }
 
        ; fam_inst <- newFamInst (DataFamilyInst rep_tc) axiom
        ; return (fam_inst, m_deriv_info) } }

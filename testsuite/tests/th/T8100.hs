@@ -9,8 +9,8 @@ data Bar = Bar Int
 
 $( do decs <- [d| deriving instance Eq a => Eq (Foo a)
                   deriving instance Ord a => Ord (Foo a) |]
-      return ( StandaloneDerivD [] (ConT ''Eq `AppT` ConT ''Bar)
-             : StandaloneDerivD [] (ConT ''Ord `AppT` ConT ''Bar)
+      return ( StandaloneDerivD Nothing [] (ConT ''Eq `AppT` ConT ''Bar)
+             : StandaloneDerivD Nothing [] (ConT ''Ord `AppT` ConT ''Bar)
              : decs ) )
 
 blah :: Ord a => Foo a -> Foo a -> Ordering

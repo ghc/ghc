@@ -1522,13 +1522,15 @@ data Dec
   | ValD Pat Body [Dec]           -- ^ @{ p = b where decs }@
   | DataD Cxt Name [TyVarBndr]
           (Maybe Kind)            -- Kind signature (allowed only for GADTs)
-          [Con] Cxt
+          [Con] [DerivClause]
                                   -- ^ @{ data Cxt x => T x = A x | B (T x)
-                                  --       deriving (Z,W)}@
+                                  --       deriving (Z,W)
+                                  --       deriving bespoke Eq }@
   | NewtypeD Cxt Name [TyVarBndr]
              (Maybe Kind)         -- Kind signature
-             Con Cxt              -- ^ @{ newtype Cxt x => T x = A (B x)
-                                  --       deriving (Z,W Q)}@
+             Con [DerivClause]    -- ^ @{ newtype Cxt x => T x = A (B x)
+                                  --       deriving (Z,W Q)
+                                  --       deriving bespoke Eq }@
   | TySynD Name [TyVarBndr] Type  -- ^ @{ type T x = (x,x) }@
   | ClassD Cxt Name [TyVarBndr]
          [FunDep] [Dec]           -- ^ @{ class Eq a => Ord a where ds }@
@@ -1551,14 +1553,18 @@ data Dec
 
   | DataInstD Cxt Name [Type]
              (Maybe Kind)         -- Kind signature
-             [Con] Cxt            -- ^ @{ data instance Cxt x => T [x]
-                                  --       = A x | B (T x) deriving (Z,W)}@
+             [Con] [DerivClause]  -- ^ @{ data instance Cxt x => T [x]
+                                  --       = A x | B (T x)
+                                  --       deriving (Z,W)
+                                  --       deriving bespoke Eq }@
 
   | NewtypeInstD Cxt Name [Type]
-                 (Maybe Kind)     -- Kind signature
-                 Con Cxt          -- ^ @{ newtype instance Cxt x => T [x]
-                                  --        = A (B x) deriving (Z,W)}@
-  | TySynInstD Name TySynEqn      -- ^ @{ type instance ... }@
+                 (Maybe Kind)      -- Kind signature
+                 Con [DerivClause] -- ^ @{ newtype instance Cxt x => T [x]
+                                   --        = A (B x)
+                                   --        deriving (Z,W)
+                                   --        deriving bespoke Eq }@
+  | TySynInstD Name TySynEqn       -- ^ @{ type instance ... }@
 
   -- | open type families (may also appear in [Dec] of 'ClassD' and 'InstanceD')
   | OpenTypeFamilyD TypeFamilyHead
@@ -1568,7 +1574,8 @@ data Dec
        -- ^ @{ type family F a b = (r :: *) | r -> a where ... }@
 
   | RoleAnnotD Name [Role]     -- ^ @{ type role T nominal representational }@
-  | StandaloneDerivD Cxt Type  -- ^ @{ deriving instance Ord a => Ord (Foo a) }@
+  | StandaloneDerivD (Maybe DerivStrategy) Cxt Type
+       -- ^ @{ deriving bespoke instance Ord a => Ord (Foo a) }@
   | DefaultSigD Name Type      -- ^ @{ default size :: Data a => a -> Int }@
 
   -- | Pattern Synonyms
@@ -1591,6 +1598,17 @@ data Overlap = Overlappable   -- ^ May be overlapped by more specific instances
              | Incoherent     -- ^ Both 'Overlappable' and 'Overlappable', and
                               -- pick an arbitrary one if multiple choices are
                               -- available.
+  deriving( Show, Eq, Ord, Data, Generic )
+
+-- | A single @deriving@ clause at the end of a datatype.
+data DerivClause = DerivClause (Maybe DerivStrategy) Cxt
+    -- ^ @{ deriving bespoke (Eq, Ord) }@
+  deriving( Show, Eq, Ord, Data, Generic )
+
+-- | What the user explicitly requests when deriving an instance.
+data DerivStrategy = Bespoke  -- ^ Tailor-fit an instance to a data type
+                   | Anyclass -- ^ @-XDeriveAnyClass@
+                   | Newtype  -- ^ @-XGeneralizedNewtypeDeriving@
   deriving( Show, Eq, Ord, Data, Generic )
 
 -- | A Pattern synonym's type. Note that a pattern synonym's *fully*

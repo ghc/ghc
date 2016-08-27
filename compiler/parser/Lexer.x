@@ -612,6 +612,8 @@ data Token
   | ITusing
   | ITpattern
   | ITstatic
+  | ITbespoke
+  | ITanyclass
 
   -- Pragmas, see  note [Pragma source text] in BasicTypes
   | ITinline_prag       SourceText InlineSpec RuleMatchInfo
@@ -803,6 +805,8 @@ reservedWordsFM = listToUFM $
          ( "role",           ITrole,          0 ),
          ( "pattern",        ITpattern,       xbit PatternSynonymsBit),
          ( "static",         ITstatic,        0 ),
+         ( "bespoke",        ITbespoke,       0 ),
+         ( "anyclass",       ITanyclass,      0 ),
          ( "group",          ITgroup,         xbit TransformComprehensionsBit),
          ( "by",             ITby,            xbit TransformComprehensionsBit),
          ( "using",          ITusing,         xbit TransformComprehensionsBit),
@@ -838,6 +842,10 @@ not allowed. Furthermore, checks further downstream (TcTyClsDecls) ensure that
 type families and role annotations are never declared without their extensions
 on. In fact, by unconditionally lexing these pseudo-keywords as special, we
 can get better error messages.
+
+By similar reasoning, we also unconditionally lex 'bespoke' and 'anyclass' as
+special, since they are only ever used as keywords in a deriving statement.
+See Note [Deriving strategies] in TcDeriv.
 
 Also, note that these are included in the `varid` production in the parser --
 a key detail to make all this work.
