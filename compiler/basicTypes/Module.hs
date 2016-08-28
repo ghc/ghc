@@ -308,7 +308,7 @@ moduleNameSlashes :: ModuleName -> String
 moduleNameSlashes = dots_to_slashes . moduleNameString
   where dots_to_slashes = map (\c -> if c == '.' then pathSeparator else c)
 
--- |Returns the string version of the module name, with dots replaced by underscores.
+-- |Returns the string version of the module name, with dots replaced by colons.
 --
 moduleNameColons :: ModuleName -> String
 moduleNameColons = dots_to_colons . moduleNameString
