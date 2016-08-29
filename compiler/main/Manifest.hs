@@ -75,7 +75,7 @@ generateManifest manifest
                        -- Generate dependencies
                        , unlines $ map (\dep -> unlines 
                            [ "  <dependency>""   <dependentAssembly>"
-                           , "    <assemblyIdentity name=\"" ++ name dep ++ "\""
+                           , "    <assemblyIdentity name=\"" ++ (dropExtension $ fullname dep) ++ "\""
                            , "                      version=\"" ++ version dep ++ "\""
                            , "                      type=\"win32\""
                            , "                      processorArchitecture=\"" ++ architecture dep ++ "\"/>"
@@ -86,7 +86,7 @@ generateManifest manifest
                        , ""
                        -- Generate dependency names. This is controlled directly by the SxS names.
                        ,  unlines $ map (\dep ->  
-                           "  <file name=\"" ++ fullname dep ++ "\" />"
+                           "  <file name=\"" ++ (takeFileName $ fullname dep) ++ "\" />"
                            ) (dependencies manifest)
                        
                        ]
