@@ -745,7 +745,7 @@ data Sig name
 
       -- | A signature for a class method
       --   False: ordinary class-method signature
-      --   True:  default class method signature
+      --   True:  generic-default class method signature
       -- e.g.   class C a where
       --          op :: a -> a                   -- Ordinary
       --          default op :: Eq a => a -> a   -- Generic default
