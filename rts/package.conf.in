@@ -4,7 +4,7 @@
 #include "rts/Config.h"
 
 name:           rts
-version:        1.0
+version:        1.0.0.0
 id:             rts
 key:            rts
 license:        BSD3

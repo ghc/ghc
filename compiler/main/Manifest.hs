@@ -11,15 +11,17 @@
 module Manifest (
    mkManifest
   ) where
-  
+
 import DynFlags
 import PackageConfig
 import Platform
 import SysTools
 
 import Data.Version
+import Debug.Trace
 
 import System.FilePath
+import System.Directory (findFile)
 
 #include "ghcplatform.h"
 
@@ -32,7 +34,7 @@ data ManifestFile = ManifestFile { name          :: String
                                  , fullname      :: String
                                  }
 
--- | Translate TARGET_ARCH into something that Windows manifests expect                                 
+-- | Translate TARGET_ARCH into something that Windows manifests expect
 getTargetArchitecture :: String
 getTargetArchitecture 
   = case TARGET_ARCH of
@@ -51,6 +53,7 @@ generateManifest manifest
             , "                    processorArchitecture=\"" ++ architecture manifest ++ "\""
             , "                    name=\"" ++ name manifest ++ "\""
             , "                    type=\"win32\"/>"
+
             -- Generate a security context for binary compiles
             , if not $ isApplication manifest
                  then ""
@@ -65,58 +68,71 @@ generateManifest manifest
                         , "  </trustInfo>"
                         ]
 
-            , ""
-            , "  <dependency>"
-            , "   <dependentAssembly>"
-            -- Generate dependencies
-            , unlines $ map (\dep -> unlines 
-                [ "    <assemblyIdentity name=\"" ++ name dep ++ "\""
-                , "                      version=\"" ++ version dep ++ "\""
-                , "                      type=\"win32\""
-                , "                      processorArchitecture=\"" ++ architecture dep ++ "\"/>"
-                ]) (dependencies manifest)
+            , if null $ dependencies manifest
+                 then ""
+                 else unlines
+                       [ ""
+                       -- Generate dependencies
+                       , unlines $ map (\dep -> unlines 
+                           [ "  <dependency>""   <dependentAssembly>"
+                           , "    <assemblyIdentity name=\"" ++ name dep ++ "\""
+                           , "                      version=\"" ++ version dep ++ "\""
+                           , "                      type=\"win32\""
+                           , "                      processorArchitecture=\"" ++ architecture dep ++ "\"/>"
+                           , "   </dependentAssembly>"
+                           , "  </dependency>"
+                           ]) (dependencies manifest)
 
-            , "   </dependentAssembly>"
-            , "  </dependency>"
-            , ""
-            -- Generate dependency names. This is controlled directly by the SxS names.
-            ,  unlines $ map (\dep -> unlines 
-                [ "  <file name=\"" ++ fullname dep ++ "\" />"
-                ]) (dependencies manifest)
-
+                       , ""
+                       -- Generate dependency names. This is controlled directly by the SxS names.
+                       ,  unlines $ map (\dep ->  
+                           "  <file name=\"" ++ fullname dep ++ "\" />"
+                           ) (dependencies manifest)
+                       
+                       ]
             , "</assembly>"
             ]
 
-createManifestDefinition :: DynFlags -> [PackageConfig] -> FilePath -> ManifestFile
-createManifestDefinition dflags pkgs assembly =
+createManifestDefinition :: DynFlags -> [PackageConfig] -> FilePath -> IO ManifestFile
+createManifestDefinition dflags pkgs assembly = do
   let isBinary = case ghcLink dflags of
                     LinkBinary -> True
                     LinkDynLib -> False
                     _          -> error "Link mode nor supported for assembly generation"
+  deps <- if WayDyn `elem` ways dflags 
+             then genDependencies pkgs
+             else return []
+  return ManifestFile { name          = maybe (dropExtension $ takeFileName assembly) id (sharedLibABIName    dflags)
+                      , version       = maybe "1.0.0.0"  id (sharedLibABIVersion dflags)
+                      , architecture  = getTargetArchitecture
+                      , isApplication = isBinary
+                      , fullname      = ""
+                      , dependencies  = deps
+                      }
+     where genDependencies :: [PackageConfig] -> IO [ManifestFile]
+           genDependencies []       = return []
+           genDependencies (dep:xs) = do              
+              let fullPkgName = "libHS"
+                             ++ packageNameString dep
+                             ++ "-"
+                             ++ (showVersion $ packageVersion dep)
+                             ++ "-ghc"
+                             ++ projectVersion dflags
+                            <.> ".dll"
+              fullPkgPath <- findFile (libraryDirs dep) fullPkgName
 
-  in ManifestFile { name          = maybe assembly id (sharedLibABIName    dflags)
-                  , version       = maybe "1.0.0"  id (sharedLibABIVersion dflags)
-                  , architecture  = getTargetArchitecture
-                  , isApplication = isBinary
-                  , fullname      = ""
-                  , dependencies  = if WayDyn `elem` ways dflags 
-                                       then genDependencies pkgs
-                                       else []
-                  }
-     where genDependencies :: [PackageConfig] -> [ManifestFile]
-           genDependencies []       = []
-           genDependencies (dep:xs) = 
               let manifest = ManifestFile { name          = packageNameString dep
                                           , version       = showVersion $ packageVersion dep
                                           , architecture  = getTargetArchitecture
                                           , isApplication = False
                                           , fullname      = case sxsResolveMode dflags of
-                                                               SxSRelative -> "packageNameString dep"
-                                                               SxSAbsolute -> "packageNameString dep"
-                                                               SxSCache    -> "packageNameString dep"
+                                                               SxSRelative -> "Get abs path from commandline"
+                                                               SxSAbsolute -> maybe (packageNameString dep) id fullPkgPath
+                                                               SxSCache    -> packageNameString dep
                                           , dependencies  = []
                                           }
-              in manifest : genDependencies xs
+              rest <- genDependencies xs
+              return (manifest : rest)
 
 -- | Generate the appropriate Manifest file for program inclusion.
 mkManifest
@@ -129,9 +145,10 @@ mkManifest dflags pkgs assembly
    gopt Opt_GenManifest dflags
     = do let manifest_filename = assembly <.> "manifest"
 
+         manifest_def <- createManifestDefinition dflags pkgs assembly
+
          writeFile manifest_filename
-             $ generateManifest
-             $ createManifestDefinition dflags pkgs assembly
+             $ generateManifest manifest_def
 
          -- Windows will find the manifest file if it is named
          -- foo.exe.manifest. However, for extra robustness, and so that
