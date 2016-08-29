@@ -70,7 +70,6 @@ import Lexeme
 import FastString
 import Pair
 import Bag
-import TcEnv (InstInfo)
 import StaticFlags( opt_PprStyle_Debug )
 
 import ListSetOps ( assocMaybe )
@@ -90,12 +89,11 @@ data AuxBindSpec
 data DerivStuff     -- Please add this auxiliary stuff
   = DerivAuxBind AuxBindSpec
 
-  -- Generics
+  -- Generics and DeriveAnyClass
   | DerivFamInst FamInst               -- New type family instances
 
   -- New top-level auxiliary bindings
   | DerivHsBind (LHsBind RdrName, LSig RdrName) -- Also used for SYB
-  | DerivInst (InstInfo RdrName)                -- New, auxiliary instances
 
 {-
 ************************************************************************
@@ -2346,11 +2344,11 @@ genAuxBindSpec loc (DerivMaxTag tycon)
     max_tag =  case (tyConDataCons tycon) of
                  data_cons -> toInteger ((length data_cons) - fIRST_TAG)
 
-type SeparateBagsDerivStuff = -- AuxBinds and SYB bindings
-                              ( Bag (LHsBind RdrName, LSig RdrName)
-                                -- Extra bindings (used by Generic only)
-                              , Bag (FamInst)           -- Extra family instances
-                              , Bag (InstInfo RdrName)) -- Extra instances
+type SeparateBagsDerivStuff =
+  -- AuxBinds and SYB bindings
+  ( Bag (LHsBind RdrName, LSig RdrName)
+  -- Extra family instances (used by Generic and DeriveAnyClass)
+  , Bag (FamInst) )
 
 genAuxBinds :: SrcSpan -> BagDerivStuff -> SeparateBagsDerivStuff
 genAuxBinds loc b = genAuxBinds' b2 where
@@ -2363,16 +2361,14 @@ genAuxBinds loc b = genAuxBinds' b2 where
 
   genAuxBinds' :: BagDerivStuff -> SeparateBagsDerivStuff
   genAuxBinds' = foldrBag f ( mapBag (genAuxBindSpec loc) (rm_dups b1)
-                            , emptyBag, emptyBag)
+                            , emptyBag )
   f :: DerivStuff -> SeparateBagsDerivStuff -> SeparateBagsDerivStuff
   f (DerivAuxBind _) = panic "genAuxBinds'" -- We have removed these before
   f (DerivHsBind  b) = add1 b
   f (DerivFamInst t) = add2 t
-  f (DerivInst    i) = add3 i
 
-  add1 x (a,b,c) = (x `consBag` a,b,c)
-  add2 x (a,b,c) = (a,x `consBag` b,c)
-  add3 x (a,b,c) = (a,b,x `consBag` c)
+  add1 x (a,b) = (x `consBag` a,b)
+  add2 x (a,b) = (a,x `consBag` b)
 
 mkParentType :: TyCon -> Type
 -- Turn the representation tycon of a family into

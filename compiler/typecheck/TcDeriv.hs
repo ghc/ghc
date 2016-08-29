@@ -387,13 +387,12 @@ tcDeriving deriv_infos deriv_decls
 
         ; let (inst_infos, deriv_stuff, maybe_fvs) = unzip3 (insts1 ++ insts2)
         ; loc <- getSrcSpanM
-        ; let (binds, famInsts, extraInstances) =
-                genAuxBinds loc (unionManyBags deriv_stuff)
+        ; let (binds, famInsts) = genAuxBinds loc (unionManyBags deriv_stuff)
 
         ; dflags <- getDynFlags
 
         ; (inst_info, rn_binds, rn_dus) <-
-            renameDeriv is_boot (inst_infos ++ (bagToList extraInstances)) binds
+            renameDeriv is_boot inst_infos binds
 
         ; unless (isEmptyBag inst_info) $
              liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
