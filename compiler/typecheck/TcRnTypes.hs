@@ -2091,10 +2091,10 @@ ppr_bag doc bag
 
 data Implication
   = Implic {
-      ic_tclvl :: TcLevel, -- TcLevel: unification variables
-                                -- free in the environment
+      ic_tclvl :: TcLevel,       -- TcLevel of unification variables
+                                 -- allocated /inside/ this implication
 
-      ic_skols  :: [TcTyVar],    -- Introduced skolems
+      ic_skols :: [TcTyVar],     -- Introduced skolems
       ic_info  :: SkolemInfo,    -- See Note [Skolems in an implication]
                                  -- See Note [Shadowing in a constraint]
 
