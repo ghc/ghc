@@ -232,6 +232,9 @@ litE c = return (LitE c)
 appE :: ExpQ -> ExpQ -> ExpQ
 appE x y = do { a <- x; b <- y; return (AppE a b)}
 
+appTypeE :: ExpQ -> TypeQ -> ExpQ
+appTypeE x t = do { a <- x; s <- t; return (AppTypeE a s) }
+
 parensE :: ExpQ -> ExpQ
 parensE x = do { x' <- x; return (ParensE x') }
 

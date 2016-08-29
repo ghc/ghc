@@ -215,6 +215,8 @@ template-haskell
 
 -  Added support for unboxed sums :ghc-ticket:`12478`.
 
+-  Added support for visible type applications :ghc-ticket:`12530`.
+
 time
 ~~~~
 

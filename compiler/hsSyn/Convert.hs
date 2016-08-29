@@ -756,6 +756,9 @@ cvtl e = wrapL (cvt e)
                                    ; return $ HsApp (mkLHsPar x') y' }
     cvt (AppE x y)            = do { x' <- cvtl x; y' <- cvtl y
                                    ; return $ HsApp x' y' }
+    cvt (AppTypeE e t) = do { e' <- cvtl e
+                            ; t' <- cvtType t
+                            ; return $ HsAppType e' $ mkHsWildCardBndrs t' }
     cvt (LamE ps e)    = do { ps' <- cvtPats ps; e' <- cvtl e
                             ; return $ HsLam (mkMatchGroup FromSource
                                              [mkSimpleMatch LambdaExpr ps' e'])}

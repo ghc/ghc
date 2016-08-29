@@ -1124,6 +1124,9 @@ repE (HsLamCase (MG { mg_alts = L _ ms }))
                         ; core_ms <- coreList matchQTyConName ms'
                         ; repLamCase core_ms }
 repE (HsApp x y)   = do {a <- repLE x; b <- repLE y; repApp a b}
+repE (HsAppType e t) = do { a <- repLE e
+                          ; s <- repLTy (hswc_body t)
+                          ; repAppType a s }
 
 repE (OpApp e1 op _ e2) =
   do { arg1 <- repLE e1;
@@ -1852,6 +1855,9 @@ repLit (MkC c) = rep2 litEName [c]
 
 repApp :: Core TH.ExpQ -> Core TH.ExpQ -> DsM (Core TH.ExpQ)
 repApp (MkC x) (MkC y) = rep2 appEName [x,y]
+
+repAppType :: Core TH.ExpQ -> Core TH.TypeQ -> DsM (Core TH.ExpQ)
+repAppType (MkC x) (MkC y) = rep2 appTypeEName [x,y]
 
 repLam :: Core [TH.PatQ] -> Core TH.ExpQ -> DsM (Core TH.ExpQ)
 repLam (MkC ps) (MkC e) = rep2 lamEName [ps, e]

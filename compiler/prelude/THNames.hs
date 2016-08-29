@@ -48,7 +48,7 @@ templateHaskellNames = [
     -- Clause
     clauseName,
     -- Exp
-    varEName, conEName, litEName, appEName, infixEName,
+    varEName, conEName, litEName, appEName, appTypeEName, infixEName,
     infixAppName, sectionLName, sectionRName, lamEName, lamCaseEName,
     tupEName, unboxedTupEName, unboxedSumEName,
     condEName, multiIfEName, letEName, caseEName, doEName, compEName,
@@ -269,7 +269,7 @@ clauseName :: Name
 clauseName = libFun (fsLit "clause") clauseIdKey
 
 -- data Exp = ...
-varEName, conEName, litEName, appEName, infixEName, infixAppName,
+varEName, conEName, litEName, appEName, appTypeEName, infixEName, infixAppName,
     sectionLName, sectionRName, lamEName, lamCaseEName, tupEName,
     unboxedTupEName, unboxedSumEName, condEName, multiIfEName, letEName,
     caseEName, doEName, compEName, staticEName, unboundVarEName :: Name
@@ -277,6 +277,7 @@ varEName        = libFun (fsLit "varE")        varEIdKey
 conEName        = libFun (fsLit "conE")        conEIdKey
 litEName        = libFun (fsLit "litE")        litEIdKey
 appEName        = libFun (fsLit "appE")        appEIdKey
+appTypeEName    = libFun (fsLit "appTypeE")    appTypeEIdKey
 infixEName      = libFun (fsLit "infixE")      infixEIdKey
 infixAppName    = libFun (fsLit "infixApp")    infixAppIdKey
 sectionLName    = libFun (fsLit "sectionL")    sectionLIdKey
@@ -764,9 +765,9 @@ clauseIdKey         = mkPreludeMiscIdUnique 262
 
 
 -- data Exp = ...
-varEIdKey, conEIdKey, litEIdKey, appEIdKey, infixEIdKey, infixAppIdKey,
-    sectionLIdKey, sectionRIdKey, lamEIdKey, lamCaseEIdKey, tupEIdKey,
-    unboxedTupEIdKey, unboxedSumEIdKey, condEIdKey, multiIfEIdKey,
+varEIdKey, conEIdKey, litEIdKey, appEIdKey, appTypeEIdKey, infixEIdKey,
+    infixAppIdKey, sectionLIdKey, sectionRIdKey, lamEIdKey, lamCaseEIdKey,
+    tupEIdKey, unboxedTupEIdKey, unboxedSumEIdKey, condEIdKey, multiIfEIdKey,
     letEIdKey, caseEIdKey, doEIdKey, compEIdKey,
     fromEIdKey, fromThenEIdKey, fromToEIdKey, fromThenToEIdKey,
     listEIdKey, sigEIdKey, recConEIdKey, recUpdEIdKey, staticEIdKey,
@@ -775,31 +776,32 @@ varEIdKey         = mkPreludeMiscIdUnique 270
 conEIdKey         = mkPreludeMiscIdUnique 271
 litEIdKey         = mkPreludeMiscIdUnique 272
 appEIdKey         = mkPreludeMiscIdUnique 273
-infixEIdKey       = mkPreludeMiscIdUnique 274
-infixAppIdKey     = mkPreludeMiscIdUnique 275
-sectionLIdKey     = mkPreludeMiscIdUnique 276
-sectionRIdKey     = mkPreludeMiscIdUnique 277
-lamEIdKey         = mkPreludeMiscIdUnique 278
-lamCaseEIdKey     = mkPreludeMiscIdUnique 279
-tupEIdKey         = mkPreludeMiscIdUnique 280
-unboxedTupEIdKey  = mkPreludeMiscIdUnique 281
-unboxedSumEIdKey  = mkPreludeMiscIdUnique 282
-condEIdKey        = mkPreludeMiscIdUnique 283
-multiIfEIdKey     = mkPreludeMiscIdUnique 284
-letEIdKey         = mkPreludeMiscIdUnique 285
-caseEIdKey        = mkPreludeMiscIdUnique 286
-doEIdKey          = mkPreludeMiscIdUnique 287
-compEIdKey        = mkPreludeMiscIdUnique 288
-fromEIdKey        = mkPreludeMiscIdUnique 289
-fromThenEIdKey    = mkPreludeMiscIdUnique 290
-fromToEIdKey      = mkPreludeMiscIdUnique 291
-fromThenToEIdKey  = mkPreludeMiscIdUnique 292
-listEIdKey        = mkPreludeMiscIdUnique 293
-sigEIdKey         = mkPreludeMiscIdUnique 294
-recConEIdKey      = mkPreludeMiscIdUnique 295
-recUpdEIdKey      = mkPreludeMiscIdUnique 296
-staticEIdKey      = mkPreludeMiscIdUnique 297
-unboundVarEIdKey  = mkPreludeMiscIdUnique 298
+appTypeEIdKey     = mkPreludeMiscIdUnique 274
+infixEIdKey       = mkPreludeMiscIdUnique 275
+infixAppIdKey     = mkPreludeMiscIdUnique 276
+sectionLIdKey     = mkPreludeMiscIdUnique 277
+sectionRIdKey     = mkPreludeMiscIdUnique 278
+lamEIdKey         = mkPreludeMiscIdUnique 279
+lamCaseEIdKey     = mkPreludeMiscIdUnique 280
+tupEIdKey         = mkPreludeMiscIdUnique 281
+unboxedTupEIdKey  = mkPreludeMiscIdUnique 282
+unboxedSumEIdKey  = mkPreludeMiscIdUnique 283
+condEIdKey        = mkPreludeMiscIdUnique 284
+multiIfEIdKey     = mkPreludeMiscIdUnique 285
+letEIdKey         = mkPreludeMiscIdUnique 286
+caseEIdKey        = mkPreludeMiscIdUnique 287
+doEIdKey          = mkPreludeMiscIdUnique 288
+compEIdKey        = mkPreludeMiscIdUnique 289
+fromEIdKey        = mkPreludeMiscIdUnique 290
+fromThenEIdKey    = mkPreludeMiscIdUnique 291
+fromToEIdKey      = mkPreludeMiscIdUnique 292
+fromThenToEIdKey  = mkPreludeMiscIdUnique 293
+listEIdKey        = mkPreludeMiscIdUnique 294
+sigEIdKey         = mkPreludeMiscIdUnique 295
+recConEIdKey      = mkPreludeMiscIdUnique 296
+recUpdEIdKey      = mkPreludeMiscIdUnique 297
+staticEIdKey      = mkPreludeMiscIdUnique 298
+unboundVarEIdKey  = mkPreludeMiscIdUnique 299
 
 -- type FieldExp = ...
 fieldExpIdKey :: Unique

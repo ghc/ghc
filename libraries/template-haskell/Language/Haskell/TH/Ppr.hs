@@ -131,6 +131,8 @@ pprExp _ (ConE c)     = pprName' Applied c
 pprExp i (LitE l)     = pprLit i l
 pprExp i (AppE e1 e2) = parensIf (i >= appPrec) $ pprExp opPrec e1
                                               <+> pprExp appPrec e2
+pprExp i (AppTypeE e t)
+ = parensIf (i >= appPrec) $ pprExp opPrec e <+> char '@' <> pprParendType t
 pprExp _ (ParensE e)  = parens (pprExp noPrec e)
 pprExp i (UInfixE e1 op e2)
  = parensIf (i > unopPrec) $ pprExp unopPrec e1
