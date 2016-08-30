@@ -126,16 +126,16 @@ def parse_flag(env, sig, signode):
     names = []
     for i, flag in enumerate(sig.split(',')):
         flag = flag.strip()
-        equals = '='
+        sep = '='
         parts = flag.split('=')
         if len(parts) == 1:
-            equals=''
+            sep=' '
             parts = flag.split()
         if len(parts) == 0: continue
 
         name = parts[0]
         names.append(name)
-        sig = equals + ' '.join(parts[1:])
+        sig = sep + ' '.join(parts[1:])
         sig = re.sub(ur'<([-a-zA-Z ]+)>', ur'⟨\1⟩', sig)
         if i > 0:
             signode += addnodes.desc_name(', ', ', ')
