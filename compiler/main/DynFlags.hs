@@ -4410,13 +4410,15 @@ interpretPackageEnv dflags = do
     parseEnvFile envfile = mapM_ parseEntry . lines
       where
         parseEntry str = case words str of
-          ["package-db", db]    -> addPkgConfRef (PkgConfFile (envdir </> db))
+          ("package-db": _)     -> addPkgConfRef (PkgConfFile (envdir </> db))
             -- relative package dbs are interpreted relative to the env file
             where envdir = takeDirectory envfile
+                  db     = drop 11 str
           ["clear-package-db"]  -> clearPkgConf
           ["global-package-db"] -> addPkgConfRef GlobalPkgConf
           ["user-package-db"]   -> addPkgConfRef UserPkgConf
           ["package-id", pkgid] -> exposePackageId pkgid
+          (('-':'-':_):_)       -> return () -- comments
           -- and the original syntax introduced in 7.10:
           [pkgid]               -> exposePackageId pkgid
           []                    -> return ()
