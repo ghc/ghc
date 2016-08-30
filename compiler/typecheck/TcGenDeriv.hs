@@ -2197,7 +2197,7 @@ coercing from.  So from, say,
          ) :: a -> [T x] -> Int
 
 Notice that we give the 'coerce' call two type signatures: one to
-fix the of the inner call, and one for the expected type.  The outer
+fix the type of the inner call, and one for the expected type.  The outer
 type signature ought to be redundant, but may improve error messages.
 The inner one is essential to fix the type at which 'op' is called.
 
