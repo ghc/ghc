@@ -35,8 +35,12 @@ Using Packages
 .. index::
    single: packages; using
 
-GHC only knows about packages that are *installed*. To see which
-packages are installed, use the ``ghc-pkg list`` command:
+GHC only knows about packages that are *installed*. Installed packages live in
+package databases. For details on package databases and how to control which
+package databases or specific set of packages are visible to GHC, see
+:ref:`package-databases`.
+
+To see which packages are currently available, use the ``ghc-pkg list`` command:
 
 .. code-block:: none
 
@@ -87,7 +91,11 @@ in the output of ``ghc-pkg list``. Command-line flags, described below,
 allow you to expose a hidden package or hide an exposed one. Only
 modules from exposed packages may be imported by your Haskell code; if
 you try to import a module from a hidden package, GHC will emit an error
-message. If there are a multiple exposed versions of a package, GHC will
+message. It should be noted that a hidden package might still get linked
+with your program as a dependency of an exposed package, it is only restricted
+from direct imports.
+
+If there are multiple exposed versions of a package, GHC will
 prefer the latest one. Additionally, some packages may be broken: that
 is, they are missing from the package database, or one of their
 dependencies are broken; in this case; these packages are excluded from
@@ -124,11 +132,19 @@ The GHC command line options that control packages are:
 
     This option causes the installed package ⟨pkg⟩ to be exposed. The
     package ⟨pkg⟩ can be specified in full with its version number (e.g.
-    ``network-1.0``) or the version number can be omitted if there is
-    only one version of the package installed. If there are multiple
-    versions of ⟨pkg⟩ installed and :ghc-flag:`-hide-all-packages` was not
-    specified, then all other versions will become hidden. :ghc-flag:`-package`
-    supports thinning and renaming described in
+    ``network-1.0``) or the version number can be omitted in which case GHC
+    will automatically expose the latest non-broken version from the installed
+    versions of the package.
+
+    By default (when :ghc-flag:`-hide-all-packages` is not specified), GHC
+    exposes only one version of a package, all other versions become hidden.
+    If `-package` option is specified multiple times for the same package the
+    last one overrides the previous ones. On the other hand, if
+    :ghc-flag:`-hide-all-packages` is used, GHC allows you to expose multiple
+    versions of a package by using the `-package` option multiple times with
+    different versions of the same package.
+
+    `-package` supports thinning and renaming described in
     :ref:`package-thinning-and-renaming`.
 
     The ``-package ⟨pkg⟩`` option also causes package ⟨pkg⟩ to be linked into
@@ -212,7 +228,7 @@ The GHC command line options that control packages are:
 
 .. ghc-flag:: -this-unit-id ⟨unit-id⟩
 
-    Tells GHC the the module being compiled forms part of unit ID
+    Tells GHC that the module being compiled forms part of unit ID
     ⟨unit-id⟩; internally, these keys are used to determine type equality
     and linker symbols.  As of GHC 8.0, unit IDs must consist solely
     of alphanumeric characters, dashes, underscores and periods.  GHC
@@ -350,24 +366,38 @@ management of package databases can be done through the :command:`ghc-pkg` tool
 
 GHC knows about two package databases in particular:
 
--  The global package database, which comes with your GHC installation,
+-  The *global package database*, which comes with your GHC installation,
    e.g. ``/usr/lib/ghc-6.12.1/package.conf.d``.
 
--  A package database private to each user. On Unix systems this will be
-   ``$HOME/.ghc/arch-os-version/package.conf.d``, and on Windows it will
+-  The *user package database* private to each user. On Unix systems this will
+   be ``$HOME/.ghc/arch-os-version/package.conf.d``, and on Windows it will
    be something like
    ``C:\Documents And Settings\user\ghc\package.conf.d``. The
    ``ghc-pkg`` tool knows where this file should be located, and will
    create it if it doesn't exist (see :ref:`package-management`).
 
-When GHC starts up, it reads the contents of these two package
-databases, and builds up a list of the packages it knows about. You can
-see GHC's package table by running GHC with the :ghc-flag:`-v` flag.
+*Package database stack:* Package databases are arranged in a stack structure.
+When GHC starts up it adds the global and the user package databases to the
+stack, in that order, unless :envvar:`GHC_PACKAGE_PATH` is specified. When
+`GHC_PACKAGE_PATH` is specified then it will determine the initial database
+stack. Several command line options described below can further manipulate this
+initial stack. You can see GHC's effective package database stack by running
+GHC with the :ghc-flag:`-v` flag.
 
-Package databases may overlap, and they are arranged in a stack
-structure. Packages closer to the top of the stack will override
-(*shadow*) those below them. By default, the stack contains just the
-global and the user's package databases, in that order.
+*Package shadowing:* When multiple package databases are in use it
+is possible, though rarely, that the same installed package id is present in
+more than one database. In that case, packages closer to the top of the stack
+will override (*shadow*) those below them. If the conflicting packages are
+found to be equivalent (by ABI hash comparison) then one of them replaces all
+references to the other, otherwise the overridden package and all those
+depending on it will be removed.
+
+*Package version selection:* When selecting a package, GHC will search for
+packages in all available databases. If multiple versions of the same package
+are available the latest non-broken version will be chosen.
+
+*Version conflict resolution:* If multiple instances of a package version
+chosen by GHC are available then GHC will choose an unspecified instance.
 
 You can control GHC's package database stack using the following
 options:
@@ -375,8 +405,6 @@ options:
 .. ghc-flag:: -package-db ⟨file⟩
 
     Add the package database ⟨file⟩ on top of the current stack.
-    Packages in additional databases read this way will override those
-    in the initial stack and those in previously specified databases.
 
 .. ghc-flag:: -no-global-package-db
 
@@ -415,28 +443,121 @@ The ``GHC_PACKAGE_PATH`` environment variable
 
 .. envvar:: GHC_PACKAGE_PATH
 
-    The :envvar:`GHC_PACKAGE_PATH` environment variable may be set to a
+    The `GHC_PACKAGE_PATH` environment variable may be set to a
     ``:``\-separated (``;``\-separated on Windows) list of files containing
-    package databases. This list of package databases is used by GHC and
-    ghc-pkg, with earlier databases in the list overriding later ones. This
-    order was chosen to match the behaviour of the :envvar:`PATH` environment
-    variable; think of it as a list of package databases that are searched
-    left-to-right for packages.
+    package databases. This list of package databases, used by GHC and ghc-pkg,
+    specifies a stack of package databases from top to bottom. This order was
+    chosen to match the behaviour of the :envvar:`PATH` environment variable
+    where entries earlier in the PATH override ones that come later. See
+    :ref:`package-databases` for details on how the package database stack is
+    used.
 
-    If :envvar:`GHC_PACKAGE_PATH` ends in a separator, then the default package
-    database stack (i.e. the user and global package databases, in that
-    order) is appended. For example, to augment the usual set of packages
-    with a database of your own, you could say (on Unix):
+    Normally `GHC_PACKAGE_PATH` replaces the default package stack. For
+    example, all of the following commands are equivalent, creating a stack with
+    db1 at the top followed by db2 (use ``;`` instead of ``:`` on Windows):
+
+    .. code-block:: none
+
+        $ ghc -clear-package-db -package-db db2.conf -package-db db1.conf
+        $ env GHC_PACKAGE_PATH=db1.conf:db2.conf ghc
+        $ env GHC_PACKAGE_PATH=db2.conf ghc -package-db db1.conf
+
+    However, if `GHC_PACKAGE_PATH` ends in a separator, the default databases
+    (i.e. the user and global package databases, in that order) are appended
+    to the path. For example, to augment the usual set of packages with a
+    database of your own, you could say (on Unix):
 
     .. code-block:: none
 
         $ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:
 
-    (use ``;`` instead of ``:`` on Windows).
-
-    To check whether your :envvar:`GHC_PACKAGE_PATH` setting is doing the right
+    To check whether your `GHC_PACKAGE_PATH` setting is doing the right
     thing, ``ghc-pkg list`` will list all the databases in use, in the
     reverse order they are searched.
+
+.. _package-environments:
+
+Package environments
+~~~~~~~~~~~~~~~~~~~~
+
+.. index::
+   single: package environments
+   single: environment file
+
+A *package environment file* is a file that tells ``ghc`` precisely which
+packages should be visible. It can be used to create environments for ``ghc``
+or ``ghci`` that are local to a shell session or to some file system location.
+They are intended to be managed by build/package tools, to enable ``ghc`` and
+``ghci`` to automatically use an environment created by the tool.
+
+The file contains package IDs and optionally package databases, one directive
+per line:
+
+.. code-block:: none
+
+    clear-package-db
+    global-package-db
+    user-package-db
+    package-db db.d/
+    package-id id_1
+    package-id id_2
+    ...
+    package-id id_n
+
+If such a package environment is found, it is equivalent to passing these
+command line arguments to ``ghc``:
+
+.. code-block:: none
+
+    -hide-all-packages
+    -clear-package-db
+    -global-package-db
+    -user-package-db
+    -package-db db.d/
+    -package-id id_1
+    -package-id id_2
+    ...
+    -package-id id_n
+
+Note the implicit :ghc-flag:`-hide-all-packages` and the fact that it is
+:ghc-flag:`-package-id`, not :ghc-flag:`-package`. This is because the
+environment specifies precisely which packages should be visible.
+
+Note that for the ``package-db`` directive, if a relative path is given it
+must be relative to the location of the package environment file.
+
+.. ghc-flag:: -package-env ⟨file⟩|⟨name⟩
+
+    Use the package environment in ⟨file⟩, or in
+    ``$HOME/.ghc/arch-os-version/environments/⟨name⟩``
+
+In order, ``ghc`` will look for the package environment in the following
+locations:
+
+-  File ⟨file⟩ if you pass the option :ghc-flag:`-package-env file`.
+
+-  File ``$HOME/.ghc/arch-os-version/environments/name`` if you pass the
+   option ``-package-env name``.
+
+-  File ⟨file⟩ if the environment variable ``GHC_ENVIRONMENT`` is set to
+   ⟨file⟩.
+
+-  File ``$HOME/.ghc/arch-os-version/environments/name`` if the
+   environment variable ``GHC_ENVIRONMENT`` is set to ⟨name⟩.
+
+Additionally, unless ``-hide-all-packages`` is specified ``ghc`` will also
+look for the package environment in the following locations:
+
+-  File ``.ghc.environment.arch-os-version`` if it exists in the current
+   directory or any parent directory (but not the user's home directory).
+
+-  File ``$HOME/.ghc/arch-os-version/environments/default`` if it
+   exists.
+
+Package environments can be modified by further command line arguments;
+for example, if you specify ``-package foo`` on the command line, then
+package ⟨foo⟩ will be visible even if it's not listed in the currently
+active package environment.
 
 .. _package-ids:
 
@@ -1271,84 +1392,5 @@ The allowed fields, with their types, are:
 
     (optional string) The directory containing the Haddock-generated
     HTML for this package.
-
-.. _package-environments:
-
-Package environments
---------------------
-
-.. index::
-   single: package environments
-   single: environment file
-
-A *package environment file* is a file that tells ``ghc`` precisely which
-packages should be visible. It can be used to create environments for ``ghc``
-or ``ghci`` that are local to a shell session or to some file system location.
-They are intended to be managed by build/package tools, to enable ``ghc`` and
-``ghci`` to automatically use an environment created by the tool.
-
-The file contains package IDs and optionally package databases, one directive
-per line:
-
-.. code-block:: none
-
-    clear-package-db
-    global-package-db
-    user-package-db
-    package-db db.d/
-    package-id id_1
-    package-id id_2
-    ...
-    package-id id_n
-
-If such a package environment is found, it is equivalent to passing these
-command line arguments to ``ghc``:
-
-.. code-block:: none
-
-    -hide-all-packages
-    -clear-package-db
-    -global-package-db
-    -user-package-db
-    -package-db db.d/
-    -package-id id_1
-    -package-id id_2
-    ...
-    -package-id id_n
-
-Note the implicit :ghc-flag:`-hide-all-packages` and the fact that it is
-:ghc-flag:`-package-id`, not :ghc-flag:`-package`. This is because the
-environment specifies precisely which packages should be visible.
-
-Note that for the ``package-db`` directive, if a relative path is given it
-must be relative to the location of the package environment file.
-
-In order, ``ghc`` will look for the package environment in the following
-locations:
-
--  File ⟨file⟩ if you pass the option ``-package-env file``.
-
--  File ``$HOME/.ghc/arch-os-version/environments/name`` if you pass the
-   option ``-package-env name``.
-
--  File ⟨file⟩ if the environment variable ``GHC_ENVIRONMENT`` is set to
-   ⟨file⟩.
-
--  File ``$HOME/.ghc/arch-os-version/environments/name`` if the
-   environment variable ``GHC_ENVIRONMENT`` is set to ⟨name⟩.
-
-Additionally, unless ``-hide-all-packages`` is specified ``ghc`` will also
-look for the package environment in the following locations:
-
--  File ``.ghc.environment.arch-os-version`` if it exists in the current
-   directory or any parent directory (but not the user's home directory).
-
--  File ``$HOME/.ghc/arch-os-version/environments/default`` if it
-   exists.
-
-Package environments can be modified by further command line arguments;
-for example, if you specify ``-package foo`` on the command line, then
-package ⟨foo⟩ will be visible even if it's not listed in the currently
-active package environment.
 
 .. [1] it used to in GHC 6.4, but not since 6.6
