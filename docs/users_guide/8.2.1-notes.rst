@@ -149,7 +149,10 @@ filepath
 ghc
 ~~~
 
--  TODO FIXME.
+-  The ``GHC.initGhcMonad`` function no longer installs signal handlers by
+   default. This means that the RTS won't attempt to handle Ctrl-C gracefully.
+   If you would like to use GHC's signal handlers, call
+   ``GHC.installSignalHandlers`` during initialization.
 
 ghc-boot
 ~~~~~~~~
