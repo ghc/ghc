@@ -135,7 +135,6 @@ data NameSpace = VarName        -- Variables, including "real" data constructors
                | TcClsName      -- Type constructors and classes; Haskell has them
                                 -- in the same name space for now.
                deriving( Eq, Ord )
-   {-! derive: Binary !-}
 
 -- Note [Data Constructors]
 -- see also: Note [Data Constructor Naming] in DataCon.hs
