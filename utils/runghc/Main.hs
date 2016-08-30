@@ -107,6 +107,7 @@ printUsage = do
     putStrLn ""
     putStrLn "The runghc flags are"
     putStrLn "    -f /path/to/ghc       Tell runghc where GHC is"
+    putStrLn "    --ghc-arg=<arg>       Pass an option or argument to GHC"
     putStrLn "    --help                Print this usage information"
     putStrLn "    --version             Print version number"
 
