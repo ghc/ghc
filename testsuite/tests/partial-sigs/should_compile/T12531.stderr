@@ -1,0 +1,9 @@
+
+T12531.hs:6:11: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: Int#
+    • In the first argument of ‘(+#)’, namely ‘_’
+      In the first argument of ‘I#’, namely ‘(_ +# x)’
+      In the expression: I# (_ +# x)
+    • Relevant bindings include
+        x :: Int# (bound at T12531.hs:6:3)
+        f :: Int# -> Int (bound at T12531.hs:6:1)
