@@ -227,7 +227,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ParFlags.parGcEnabled      = 1;
     RtsFlags.ParFlags.parGcGen          = 0;
     RtsFlags.ParFlags.parGcLoadBalancingEnabled = rtsTrue;
-    RtsFlags.ParFlags.parGcLoadBalancingGen = 1;
+    RtsFlags.ParFlags.parGcLoadBalancingGen = ~0u; /* auto, based on -A */
     RtsFlags.ParFlags.parGcNoSyncWithIdle   = 0;
     RtsFlags.ParFlags.parGcThreads      = 0; /* defaults to -N */
     RtsFlags.ParFlags.setAffinity       = 0;
@@ -393,7 +393,8 @@ usage_text[] = {
 "  -qg[<n>]  Use parallel GC only for generations >= <n>",
 "            (default: 0, -qg alone turns off parallel GC)",
 "  -qb[<n>]  Use load-balancing in the parallel GC only for generations >= <n>",
-"            (default: 1, -qb alone turns off load-balancing)",
+"            (default: 1 for -A < 32M, 0 otherwise;"
+"             -qb alone turns off load-balancing)",
 "  -qn<n>    Use <n> threads for parallel GC (defaults to value of -N)",
 "  -qa       Use the OS to set thread affinity (experimental)",
 "  -qm       Don't automatically migrate threads between CPUs",
@@ -1448,6 +1449,22 @@ static void normaliseRtsOpts (void)
         errorBelch("stack chunk buffer size (-kb) must be less than 50%%\n"
                    "of the stack chunk size (-kc)");
         errorUsage();
+    }
+
+    if (RtsFlags.ParFlags.parGcLoadBalancingGen == ~0u) {
+        StgWord alloc_area_bytes
+            = RtsFlags.GcFlags.minAllocAreaSize * BLOCK_SIZE;
+
+        // If allocation area is larger that CPU cache
+        // we can finish scanning quicker doing work-stealing
+        // scan. Trac #9221
+        // 32M looks big enough not to fit into L2 cache
+        // of popular modern CPUs.
+        if (alloc_area_bytes >= 32 * 1024 * 1024) {
+            RtsFlags.ParFlags.parGcLoadBalancingGen = 0;
+        } else {
+            RtsFlags.ParFlags.parGcLoadBalancingGen = 1;
+        }
     }
 
 #ifdef THREADED_RTS
