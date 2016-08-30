@@ -465,11 +465,13 @@ addTopDecls ds = Q (qAddTopDecls ds)
 addModFinalizer :: Q () -> Q ()
 addModFinalizer act = Q (qAddModFinalizer (unQ act))
 
--- | Get state from the 'Q' monad.
+-- | Get state from the 'Q' monad. Note that the state is local to the
+-- Haskell module in which the Template Haskell expression is executed.
 getQ :: Typeable a => Q (Maybe a)
 getQ = Q qGetQ
 
--- | Replace the state in the 'Q' monad.
+-- | Replace the state in the 'Q' monad. Note that the state is local to the
+-- Haskell module in which the Template Haskell expression is executed.
 putQ :: Typeable a => a -> Q ()
 putQ x = Q (qPutQ x)
 
