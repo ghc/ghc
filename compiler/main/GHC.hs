@@ -13,6 +13,8 @@ module GHC (
         defaultErrorHandler,
         defaultCleanupHandler,
         prettyPrintGhcErrors,
+        installSignalHandlers,
+        withCleanupSession,
 
         -- * GHC Monad
         Ghc, GhcT, GhcMonad(..), HscEnv,
@@ -438,6 +440,7 @@ runGhc mb_top_dir ghc = do
   ref <- newIORef (panic "empty session")
   let session = Session ref
   flip unGhc session $ do
+    liftIO installSignalHandlers  -- catch ^C
     initGhcMonad mb_top_dir
     withCleanupSession ghc
 
@@ -462,6 +465,7 @@ runGhcT mb_top_dir ghct = do
   ref <- liftIO $ newIORef (panic "empty session")
   let session = Session ref
   flip unGhcT session $ do
+    liftIO installSignalHandlers  -- catch ^C
     initGhcMonad mb_top_dir
     withCleanupSession ghct
 
@@ -496,8 +500,7 @@ withCleanupSession ghc = ghc `gfinally` cleanup
 initGhcMonad :: GhcMonad m => Maybe FilePath -> m ()
 initGhcMonad mb_top_dir
   = do { env <- liftIO $
-                do { installSignalHandlers  -- catch ^C
-                   ; initStaticOpts
+                do { initStaticOpts
                    ; mySettings <- initSysTools mb_top_dir
                    ; dflags <- initDynFlags (defaultDynFlags mySettings)
                    ; checkBrokenTablesNextToCode dflags
