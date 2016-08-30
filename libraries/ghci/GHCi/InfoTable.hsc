@@ -24,15 +24,16 @@ mkConInfoTable
    :: Int     -- ptr words
    -> Int     -- non-ptr words
    -> Int     -- constr tag
+   -> Int     -- pointer tag
    -> [Word8]  -- con desc
    -> IO (Ptr StgInfoTable)
       -- resulting info table is allocated with allocateExec(), and
       -- should be freed with freeExec().
 
-mkConInfoTable ptr_words nonptr_words tag con_desc =
+mkConInfoTable ptr_words nonptr_words tag ptrtag con_desc =
   castFunPtrToPtr <$> newExecConItbl itbl con_desc
   where
-     entry_addr = stg_interp_constr_entry
+     entry_addr = interpConstrEntry !! ptrtag
      code' = mkJumpToAddr entry_addr
      itbl  = StgInfoTable {
                  entry = if ghciTablesNextToCode
@@ -283,8 +284,23 @@ byte7 w = fromIntegral (w `shiftR` 56)
 #include "Rts.h"
 
 -- entry point for direct returns for created constr itbls
-foreign import ccall "&stg_interp_constr_entry"
-    stg_interp_constr_entry :: EntryFunPtr
+foreign import ccall "&stg_interp_constr1_entry" stg_interp_constr1_entry :: EntryFunPtr
+foreign import ccall "&stg_interp_constr2_entry" stg_interp_constr2_entry :: EntryFunPtr
+foreign import ccall "&stg_interp_constr3_entry" stg_interp_constr3_entry :: EntryFunPtr
+foreign import ccall "&stg_interp_constr4_entry" stg_interp_constr4_entry :: EntryFunPtr
+foreign import ccall "&stg_interp_constr5_entry" stg_interp_constr5_entry :: EntryFunPtr
+foreign import ccall "&stg_interp_constr6_entry" stg_interp_constr6_entry :: EntryFunPtr
+foreign import ccall "&stg_interp_constr7_entry" stg_interp_constr7_entry :: EntryFunPtr
+
+interpConstrEntry :: [EntryFunPtr]
+interpConstrEntry = [ error "pointer tag 0"
+                    , stg_interp_constr1_entry
+                    , stg_interp_constr2_entry
+                    , stg_interp_constr3_entry
+                    , stg_interp_constr4_entry
+                    , stg_interp_constr5_entry
+                    , stg_interp_constr6_entry
+                    , stg_interp_constr7_entry ]
 
 -- Ultra-minimalist version specially for constructors
 #if SIZEOF_VOID_P == 8

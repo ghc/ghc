@@ -714,7 +714,13 @@
       SymI_HasProto(stg_waitWritezh)                                    \
       SymI_HasProto(stg_writeTVarzh)                                    \
       SymI_HasProto(stg_yieldzh)                                        \
-      SymI_NeedsProto(stg_interp_constr_entry)                          \
+      SymI_NeedsProto(stg_interp_constr1_entry)                         \
+      SymI_NeedsProto(stg_interp_constr2_entry)                         \
+      SymI_NeedsProto(stg_interp_constr3_entry)                         \
+      SymI_NeedsProto(stg_interp_constr4_entry)                         \
+      SymI_NeedsProto(stg_interp_constr5_entry)                         \
+      SymI_NeedsProto(stg_interp_constr6_entry)                         \
+      SymI_NeedsProto(stg_interp_constr7_entry)                         \
       SymI_HasProto(stg_arg_bitmaps)                                    \
       SymI_HasProto(large_alloc_lim)                                    \
       SymI_HasProto(g0)                                                 \
