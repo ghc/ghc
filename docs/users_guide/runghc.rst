@@ -11,7 +11,7 @@ compile them.
 
 .. _runghc-introduction:
 
-Flags
+Usage
 -----
 
 The ``runghc`` command-line looks like:
@@ -20,17 +20,45 @@ The ``runghc`` command-line looks like:
 
     runghc [runghc flags] [GHC flags] module [program args]
 
-The runghc flags are ``-f /path/to/ghc``, which tells runghc which GHC
-to use to run the program, and ``--help``, which prints usage
-information. If it is not given then runghc will search for GHC in the
-directories in the system search path.
+Any flags not recognized by runghc are automatically passed to GHC.
+If a flag is recognized by both runghc and GHC but you want to
+pass it to GHC then you can place it after a ``--`` separator. Flags after the
+separator are treated as GHC only flags. Alternatively you can use the runghc
+option ``--ghc-arg=<arg>`` to pass any flag or argument directly to GHC.
 
-runghc will try to work out where the boundaries between
-``[runghc flags]`` and ``[GHC flags]``, and ``[program args]`` and
-``module`` are, but you can use a ``--`` flag if it doesn't get it
-right. For example, ``runghc -- -Wunused-bindings Foo`` means
-runghc won't try to use ``warn-unused-bindings`` as the path to GHC, but
-instead will pass the flag to GHC. If a GHC flag doesn't start with a
-dash then you need to prefix it with ``--ghc-arg=`` or runghc will think
-that it is the program to run, e.g.
-``runghc -package-db --ghc-arg=foo.conf Main.hs``.
+``module`` could be a Haskell source filename with or without the extension.
+If for some reason the filename starts with a ``-`` you can use a second
+``--`` to indicate the end of flags. Anything following a second
+``--`` will be considered a program file or module name followed by its
+arguments. For example:
+
+- ``runghc -- -- -hello.hs``
+
+runghc flags
+------------
+
+runghc accepts the following flags:
+
+- ``-f /path/to/ghc``: tell runghc the path of GHC executable to use to run the program. By default runghc will search for GHC in the directories in the system search path.
+- ``--ghc-arg=<arg>``: Pass an option or argument to GHC
+- ``--help``: print usage information.
+- ``--version``: print version information.
+
+GHC Flags
+---------
+
+As discussed earlier, use ``--`` or ``--ghc-arg=<arg>`` to disambiguate GHC
+flags when needed. For example, ``-f`` is recognized by runghc, therefore to
+pass ``-fliberate-case`` to GHC use any of the following:
+
+- ``runghc -- -fliberate-case``
+- ``runghc --ghc-arg=-fliberate-case``
+
+Note that any non-flag arguments are never passed to GHC. An unused non-flag
+argument will be considered as the name of the program to run. If a GHC flag
+takes an argument use ``--ghc-arg=<arg>`` to pass the argument to GHC.
+For example, if you want to pass ``-package foo`` to GHC use any of the
+following:
+
+- ``runghc -package --ghc-arg=foo Main.hs``
+- ``runghc --ghc-arg=-package --ghc-arg=foo Main.hs``
