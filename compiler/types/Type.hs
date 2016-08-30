@@ -1270,11 +1270,13 @@ splitForAllTyVarBndrs ty = split ty ty []
 
 -- | Checks whether this is a proper forall (with a named binder)
 isForAllTy :: Type -> Bool
+isForAllTy ty | Just ty' <- coreView ty = isForAllTy ty'
 isForAllTy (ForAllTy {}) = True
 isForAllTy _             = False
 
 -- | Is this a function or forall?
 isPiTy :: Type -> Bool
+isPiTy ty | Just ty' <- coreView ty = isForAllTy ty'
 isPiTy (ForAllTy {}) = True
 isPiTy (FunTy {})    = True
 isPiTy _             = False

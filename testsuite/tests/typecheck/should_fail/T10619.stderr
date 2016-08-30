@@ -17,15 +17,10 @@ T10619.hs:9:15: error:
               else
                   \ y -> y
     • Relevant bindings include
-        foo :: t -> (b -> b) -> b -> b (bound at T10619.hs:8:1)
+        foo :: p -> (b -> b) -> b -> b (bound at T10619.hs:8:1)
 
 T10619.hs:14:15: error:
-    • Couldn't match type ‘b’ with ‘a’
-        because type variable ‘a’ would escape its scope
-      This (rigid, skolem) type variable is bound by
-        a type expected by the context:
-          a -> a
-        at T10619.hs:14:15-65
+    • Couldn't match type ‘b -> b’ with ‘forall a. a -> a’
       Expected type: (b -> b) -> b -> b
         Actual type: (forall a. a -> a) -> forall b. b -> b
     • In the expression:
@@ -42,7 +37,7 @@ T10619.hs:14:15: error:
               else
                   ((\ x -> x) :: (forall a. a -> a) -> forall b. b -> b)
     • Relevant bindings include
-        bar :: t -> (b -> b) -> b -> b (bound at T10619.hs:12:1)
+        bar :: p -> (b -> b) -> b -> b (bound at T10619.hs:12:1)
 
 T10619.hs:16:13: error:
     • Couldn't match type ‘forall a. a -> a’ with ‘b -> b’
@@ -56,12 +51,7 @@ T10619.hs:16:13: error:
         baz :: Bool -> (b -> b) -> b -> b (bound at T10619.hs:16:1)
 
 T10619.hs:20:14: error:
-    • Couldn't match type ‘b’ with ‘a’
-        because type variable ‘a’ would escape its scope
-      This (rigid, skolem) type variable is bound by
-        a type expected by the context:
-          a -> a
-        at T10619.hs:20:14-64
+    • Couldn't match type ‘b -> b’ with ‘forall a. a -> a’
       Expected type: (b -> b) -> b -> b
         Actual type: (forall a. a -> a) -> forall b. b -> b
     • In the expression:

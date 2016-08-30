@@ -24,13 +24,14 @@ module TcType (
   TcTyVar, TcTyVarSet, TcDTyVarSet, TcTyCoVarSet, TcDTyCoVarSet,
   TcKind, TcCoVar, TcTyCoVar, TcTyBinder, TcTyVarBinder, TcTyCon,
 
-  ExpType(..), ExpSigmaType, ExpRhoType, mkCheckExpType,
+  ExpType(..), InferResult(..), ExpSigmaType, ExpRhoType, mkCheckExpType,
 
   SyntaxOpType(..), synKnownType, mkSynFunTys,
 
   -- TcLevel
   TcLevel(..), topTcLevel, pushTcLevel, isTopTcLevel,
   strictlyDeeperThan, sameDepthAs, fmvTcLevel,
+  tcTypeLevel, tcTyVarLevel, maxTcLevel,
 
   --------------------------------
   -- MetaDetails
@@ -40,7 +41,7 @@ module TcType (
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
   isSigTyVar, isOverlappableTyVar,  isTyConableTyVar,
   isFskTyVar, isFmvTyVar, isFlattenTyVar,
-  isAmbiguousTyVar, metaTvRef, metaTyVarInfo,
+  isAmbiguousTyVar, metaTyVarRef, metaTyVarInfo,
   isFlexi, isIndirect, isRuntimeUnkSkol,
   metaTyVarTcLevel, setMetaTyVarTcLevel, metaTyVarTcLevel_maybe,
   isTouchableMetaTyVar, isTouchableOrFmv,
@@ -297,19 +298,27 @@ type TcDTyCoVarSet  = DTyCoVarSet
 -- | An expected type to check against during type-checking.
 -- See Note [ExpType] in TcMType, where you'll also find manipulators.
 data ExpType = Check TcType
-             | Infer Unique  -- for debugging only
-                     TcLevel -- See Note [TcLevel of ExpType] in TcMType
-                     Kind
-                     (IORef (Maybe TcType))
+             | Infer !InferResult
+
+data InferResult
+  = IR { ir_uniq :: Unique  -- For debugging only
+       , ir_lvl  :: TcLevel -- See Note [TcLevel of ExpType] in TcMType
+       , ir_inst :: Bool    -- True <=> deeply instantiate before returning
+       , ir_kind :: Kind
+       , ir_ref  :: IORef (Maybe TcType) }
 
 type ExpSigmaType = ExpType
 type ExpRhoType   = ExpType
 
 instance Outputable ExpType where
-  ppr (Check ty) = ppr ty
-  ppr (Infer u lvl ki _)
-    = parens (text "Infer" <> braces (ppr u <> comma <> ppr lvl)
-              <+> dcolon <+> ppr ki)
+  ppr (Check ty) = text "Check" <> braces (ppr ty)
+  ppr (Infer ir) = ppr ir
+
+instance Outputable InferResult where
+  ppr (IR { ir_uniq = u, ir_lvl = lvl
+          , ir_kind = ki, ir_inst = inst })
+    = text "Infer" <> braces (ppr u <> comma <> ppr lvl <+> ppr inst)
+       <+> dcolon <+> ppr ki
 
 -- | Make an 'ExpType' suitable for checking.
 mkCheckExpType :: TcType -> ExpType
@@ -419,6 +428,7 @@ we would need to enforce the separation.
 -- See Note [TyVars and TcTyVars]
 data TcTyVarDetails
   = SkolemTv      -- A skolem
+       TcLevel    -- Level of the implication that binds it
        Bool       -- True <=> this skolem type variable can be overlapped
                   --          when looking up instances
                   -- See Note [Binding when looking up instances] in InstEnv
@@ -436,8 +446,8 @@ data TcTyVarDetails
 
 vanillaSkolemTv, superSkolemTv :: TcTyVarDetails
 -- See Note [Binding when looking up instances] in InstEnv
-vanillaSkolemTv = SkolemTv False  -- Might be instantiated
-superSkolemTv   = SkolemTv True   -- Treat this as a completely distinct type
+vanillaSkolemTv = SkolemTv (pushTcLevel topTcLevel) False  -- Might be instantiated
+superSkolemTv   = SkolemTv (pushTcLevel topTcLevel) True   -- Treat this as a completely distinct type
 
 -----------------------------
 data MetaDetails
@@ -466,10 +476,10 @@ instance Outputable MetaDetails where
 
 pprTcTyVarDetails :: TcTyVarDetails -> SDoc
 -- For debugging
-pprTcTyVarDetails (SkolemTv True)  = text "ssk"
-pprTcTyVarDetails (SkolemTv False) = text "sk"
 pprTcTyVarDetails (RuntimeUnk {})  = text "rt"
 pprTcTyVarDetails (FlatSkol {})    = text "fsk"
+pprTcTyVarDetails (SkolemTv lvl True)  = text "ssk" <> colon <> ppr lvl
+pprTcTyVarDetails (SkolemTv lvl False) = text "sk"  <> colon <> ppr lvl
 pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
   = pp_info <> colon <> ppr tclvl
   where
@@ -659,6 +669,9 @@ The flatten meta-vars could equally well all have level 0, or just NotALevel
 since they do not live across implications.
 -}
 
+maxTcLevel :: TcLevel -> TcLevel -> TcLevel
+maxTcLevel (TcLevel a) (TcLevel b) = TcLevel (a `max` b)
+
 fmvTcLevel :: TcLevel -> TcLevel
 -- See Note [TcLevel assignment]
 fmvTcLevel (TcLevel n) = TcLevel (n-1)
@@ -688,6 +701,24 @@ checkTcLevelInvariant :: TcLevel -> TcLevel -> Bool
 -- Checks (MetaTvInv) from Note [TcLevel and untouchable type variables]
 checkTcLevelInvariant (TcLevel ctxt_tclvl) (TcLevel tv_tclvl)
   = ctxt_tclvl >= tv_tclvl
+
+tcTyVarLevel :: TcTyVar -> TcLevel
+tcTyVarLevel tv
+  = ASSERT2( isTcTyVar tv, ppr tv )
+    case tcTyVarDetails tv of
+          MetaTv { mtv_tclvl = tv_lvl } -> tv_lvl
+          SkolemTv tv_lvl _             -> tv_lvl
+          FlatSkol ty                   -> tcTypeLevel ty
+          RuntimeUnk                    -> topTcLevel
+
+tcTypeLevel :: TcType -> TcLevel
+-- Max level of any free var of the type
+tcTypeLevel ty
+  = foldDVarSet add topTcLevel (tyCoVarsOfTypeDSet ty)
+  where
+    add v lvl
+      | isTcTyVar v = lvl `maxTcLevel` tcTyVarLevel v
+      | otherwise   = lvl
 
 instance Outputable TcLevel where
   ppr (TcLevel us) = ppr us
@@ -1038,8 +1069,8 @@ isSkolemTyVar tv
 isOverlappableTyVar tv
   = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
-        SkolemTv overlappable -> overlappable
-        _                     -> False
+        SkolemTv _ overlappable -> overlappable
+        _                       -> False
 
 isMetaTyVar tv
   = ASSERT2( isTcTyVar tv, ppr tv )
@@ -1080,6 +1111,12 @@ metaTyVarTcLevel_maybe tv
       MetaTv { mtv_tclvl = tclvl } -> Just tclvl
       _                            -> Nothing
 
+metaTyVarRef :: TyVar -> IORef MetaDetails
+metaTyVarRef tv
+  = case tcTyVarDetails tv of
+        MetaTv { mtv_ref = ref } -> ref
+        _ -> pprPanic "metaTyVarRef" (ppr tv)
+
 setMetaTyVarTcLevel :: TcTyVar -> TcLevel -> TcTyVar
 setMetaTyVarTcLevel tv tclvl
   = case tcTyVarDetails tv of
@@ -1091,12 +1128,6 @@ isSigTyVar tv
   = case tcTyVarDetails tv of
         MetaTv { mtv_info = SigTv } -> True
         _                           -> False
-
-metaTvRef :: TyVar -> IORef MetaDetails
-metaTvRef tv
-  = case tcTyVarDetails tv of
-        MetaTv { mtv_ref = ref } -> ref
-        _ -> pprPanic "metaTvRef" (ppr tv)
 
 isFlexi, isIndirect :: MetaDetails -> Bool
 isFlexi Flexi = True

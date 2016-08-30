@@ -865,7 +865,7 @@ checkExpectedKind :: TcType               -- the type whose kind we're checking
 checkExpectedKind ty act_kind exp_kind
  = do { (ty', act_kind') <- instantiate ty act_kind exp_kind
       ; let origin = TypeEqOrigin { uo_actual   = act_kind'
-                                  , uo_expected = mkCheckExpType exp_kind
+                                  , uo_expected = exp_kind
                                   , uo_thing    = Just $ mkTypeErrorThing ty'
                                   }
       ; co_k <- uType origin KindLevel act_kind' exp_kind
@@ -1288,7 +1288,8 @@ kcHsTyVarBndrs name cusk open_fam all_kind_vars
           , hsq_dependent = dep_names }) thing_inside
   | cusk
   = do { kv_kinds <- mk_kv_kinds
-       ; let scoped_kvs = zipWith mk_skolem_tv kv_ns kv_kinds
+       ; lvl <- getTcLevel
+       ; let scoped_kvs = zipWith (mk_skolem_tv lvl) kv_ns kv_kinds
        ; tcExtendTyVarEnv2 (kv_ns `zip` scoped_kvs) $
     do { (tc_binders, res_kind, stuff) <- solveEqualities $
                                           bind_telescope hs_tvs thing_inside
@@ -1539,14 +1540,16 @@ tcHsTyVarName m_kind name
            _ -> do { kind <- case m_kind of
                                Just kind -> return kind
                                Nothing   -> newMetaKindVar
-                   ; return (mk_skolem_tv name kind, False) }}
+                   ; tv <- newSkolemTyVar name kind
+                   ; return (tv, False) }}
 
 -- makes a new skolem tv
 newSkolemTyVar :: Name -> Kind -> TcM TcTyVar
-newSkolemTyVar name kind = return (mk_skolem_tv name kind)
+newSkolemTyVar name kind = do { lvl <- getTcLevel
+                              ; return (mk_skolem_tv lvl name kind) }
 
-mk_skolem_tv :: Name -> Kind -> TcTyVar
-mk_skolem_tv n k = mkTcTyVar n k vanillaSkolemTv
+mk_skolem_tv :: TcLevel -> Name -> Kind -> TcTyVar
+mk_skolem_tv lvl n k = mkTcTyVar n k (SkolemTv lvl False)
 
 ------------------
 kindGeneralizeType :: Type -> TcM Type
@@ -1823,7 +1826,7 @@ tcHsPartialSigType ctxt sig_ty
         ; tau     <- zonkTcType tau
         ; checkValidType ctxt (mkSpecForAllTys all_tvs $ mkPhiTy theta tau)
 
-        ; traceTc "tcHsPatSigType" (ppr all_tvs)
+        ; traceTc "tcHsPartialSigType" (ppr all_tvs)
         ; return (wcs, wcx, all_tvs, theta, tau) }
   where
     new_implicit_tv name = do { kind <- newMetaKindVar
@@ -1902,7 +1905,7 @@ tcPatSig in_pat_bind sig res_ty
         ; if null sig_tvs then do {
                 -- Just do the subsumption check and return
                   wrap <- addErrCtxtM (mk_msg sig_ty) $
-                          tcSubTypeET_NC PatSigCtxt res_ty sig_ty
+                          tcSubTypeET PatSigOrigin PatSigCtxt res_ty sig_ty
                 ; return (sig_ty, [], sig_wcs, wrap)
         } else do
                 -- Type signature binds at least one scoped type variable
@@ -1925,7 +1928,7 @@ tcPatSig in_pat_bind sig res_ty
 
         -- Now do a subsumption check of the pattern signature against res_ty
         ; wrap <- addErrCtxtM (mk_msg sig_ty) $
-                  tcSubTypeET_NC PatSigCtxt res_ty sig_ty
+                  tcSubTypeET PatSigOrigin PatSigCtxt res_ty sig_ty
 
         -- Phew!
         ; return (sig_ty, sig_tvs, sig_wcs, wrap)

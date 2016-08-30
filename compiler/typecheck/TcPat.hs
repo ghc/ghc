@@ -141,11 +141,12 @@ tcPatBndr :: PatEnv -> Name -> ExpSigmaType -> TcM (HsWrapper, TcId)
 -- (coi, xp) = tcPatBndr penv x pat_ty
 -- Then coi : pat_ty ~ typeof(xp)
 --
-tcPatBndr (PE { pe_ctxt = LetPat lookup_sig
-              , pe_orig = orig }) bndr_name pat_ty
+tcPatBndr penv@(PE { pe_ctxt = LetPat lookup_sig
+                   , pe_orig = orig })
+          bndr_name pat_ty
           -- See Note [Typing patterns in pattern bindings]
   | Just bndr_id <- lookup_sig bndr_name
-  = do { wrap <- tcSubTypeET orig pat_ty (idType bndr_id)
+  = do { wrap <- tcSubTypePat penv orig pat_ty (idType bndr_id)
        ; traceTc "tcPatBndr(lsl,sig)" (ppr bndr_id $$ ppr (idType bndr_id) $$ ppr pat_ty)
        ; return (wrap, bndr_id) }
 
@@ -158,6 +159,11 @@ tcPatBndr (PE { pe_ctxt = _lam_or_proc }) bndr_name pat_ty
        ; return (idHsWrapper, mkLocalId bndr_name pat_ty) }
                -- Whether or not there is a sig is irrelevant,
                -- as this is local
+
+tcSubTypePat :: PatEnv -> ExpSigmaType -> TcSigmaType -> TcM HsWrapper
+-- tcSubTypeET with the UserTypeCtxt specialised to GenSigCtxt
+-- Used when typechecking patterns
+tcSubTypePat penv t1 t2 = tcSubTypeET (pe_orig penv) GenSigCtxt t1 t2
 
 {- Note [Partial signatures for pattern bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -382,7 +388,7 @@ tc_pat penv (ViewPat expr pat _) overall_pat_ty thing_inside
             -- expr_wrap1 :: expr'_inferred "->" (inf_arg_ty -> inf_res_ty)
 
          -- check that overall pattern is more polymorphic than arg type
-        ; expr_wrap2 <- tcSubTypeET (pe_orig penv) overall_pat_ty inf_arg_ty
+        ; expr_wrap2 <- tcSubTypePat penv overall_pat_ty inf_arg_ty
             -- expr_wrap2 :: overall_pat_ty "->" inf_arg_ty
 
          -- pattern must have inf_res_ty
@@ -487,13 +493,12 @@ tc_pat penv (ConPatIn con arg_pats) pat_ty thing_inside
 
 ------------------------
 -- Literal patterns
-tc_pat _ (LitPat simple_lit) pat_ty thing_inside
+tc_pat penv (LitPat simple_lit) pat_ty thing_inside
   = do  { let lit_ty = hsLitType simple_lit
-        ; co <- unifyPatType simple_lit lit_ty pat_ty
-                -- coi is of kind: pat_ty ~ lit_ty
-        ; res <- thing_inside
+        ; wrap   <- tcSubTypePat penv pat_ty lit_ty
+        ; res    <- thing_inside
         ; pat_ty <- readExpType pat_ty
-        ; return ( mkHsWrapPatCo co (LitPat simple_lit) pat_ty
+        ; return ( mkHsWrapPat wrap (LitPat simple_lit) pat_ty
                  , res) }
 
 ------------------------
@@ -607,15 +612,6 @@ tc_pat penv (SplicePat (HsSpliced mod_finalizers (HsSplicedPat pat)))
 
 tc_pat _ _other_pat _ _ = panic "tc_pat"        -- ConPatOut, SigPatOut
 
-----------------
-unifyPatType :: Outputable a => a -> TcType -> ExpSigmaType -> TcM TcCoercion
--- In patterns we want a coercion from the
--- context type (expected) to the actual pattern type
--- But we don't want to reverse the args to unifyType because
--- that controls the actual/expected stuff in error messages
-unifyPatType thing actual_ty expected_ty
-  = do { coi <- unifyExpType (Just thing) actual_ty expected_ty
-       ; return (mkTcSymCo coi) }
 
 {-
 Note [Hopping the LIE in lazy patterns]
@@ -826,7 +822,7 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
               prov_theta' = substTheta tenv prov_theta
               req_theta'  = substTheta tenv req_theta
 
-        ; wrap <- tcSubTypeET (pe_orig penv) pat_ty ty'
+        ; wrap <- tcSubTypePat penv pat_ty ty'
         ; traceTc "tcPatSynPat" (ppr pat_syn $$
                                  ppr pat_ty $$
                                  ppr ty' $$

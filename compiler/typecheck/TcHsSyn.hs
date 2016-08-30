@@ -1598,7 +1598,7 @@ zonkTvSkolemising :: UnboundTyVarZonker
 -- This variant is used for the LHS of rules
 -- See Note [Zonking the LHS of a RULE].
 zonkTvSkolemising tv
-  = do { tv' <- skolemiseUnboundMetaTyVar tv vanillaSkolemTv
+  = do { tv' <- skolemiseUnboundMetaTyVar tv
        ; return (mkTyVarTy tv') }
 
 zonkTypeZapping :: UnboundTyVarZonker

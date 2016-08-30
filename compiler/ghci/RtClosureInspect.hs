@@ -1219,7 +1219,7 @@ zonkRttiType = zonkTcTypeToType (mkEmptyZonkEnv zonk_unbound_meta)
   where
     zonk_unbound_meta tv
       = ASSERT( isTcTyVar tv )
-        do { tv' <- skolemiseUnboundMetaTyVar tv RuntimeUnk
+        do { tv' <- skolemiseRuntimeUnk tv
              -- This is where RuntimeUnks are born:
              -- otherwise-unconstrained unification variables are
              -- turned into RuntimeUnks as they leave the

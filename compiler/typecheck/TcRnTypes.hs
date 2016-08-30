@@ -2796,7 +2796,7 @@ data CtOrigin
                                    -- function or instance
 
   | TypeEqOrigin { uo_actual   :: TcType
-                 , uo_expected :: ExpType
+                 , uo_expected :: TcType
                  , uo_thing    :: Maybe ErrorThing
                                   -- ^ The thing that has type "actual"
                  }

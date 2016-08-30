@@ -1455,8 +1455,8 @@ mkEqInfoMsg ct ty1 ty2
     -- mismatched types for suggestion about -fprint-explicit-kinds
     (act_ty, exp_ty) = case ctOrigin ct of
       TypeEqOrigin { uo_actual = act
-                   , uo_expected = Check exp } -> (act, exp)
-      _                                        -> (ty1, ty2)
+                   , uo_expected = exp } -> (act, exp)
+      _                                  -> (ty1, ty2)
 
     invis_msg | Just vis <- tcEqTypeVis act_ty exp_ty
               , not vis
@@ -1624,7 +1624,7 @@ mkExpectedActualMsg :: Type -> Type -> CtOrigin -> Maybe TypeOrKind -> Bool
 -- NotSwapped means (actual, expected), IsSwapped is the reverse
 -- First return val is whether or not to print a herald above this msg
 mkExpectedActualMsg ty1 ty2 (TypeEqOrigin { uo_actual = act
-                                          , uo_expected = Check exp
+                                          , uo_expected = exp
                                           , uo_thing = maybe_thing })
                     m_level printExpanded
   | KindLevel <- level, occurs_check_error       = (True, Nothing, empty)

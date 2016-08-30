@@ -33,7 +33,6 @@ import TcEvidence
 import TcHsType
 import TcPat
 import TcMType
-import Inst( deeplyInstantiate )
 import FamInstEnv( normaliseType )
 import FamInst( tcGetFamInstEnvs )
 import TyCon
@@ -800,7 +799,7 @@ mkExport prag_fn qtvs theta
                                            -- an ambiguouse type and have AllowAmbiguousType
                                            -- e..g infer  x :: forall a. F a -> Int
                   else addErrCtxtM (mk_impedence_match_msg mono_info sel_poly_ty poly_ty) $
-                       tcSubType_NC sig_ctxt sel_poly_ty (mkCheckExpType poly_ty)
+                       tcSubType_NC sig_ctxt sel_poly_ty poly_ty
 
         ; warn_missing_sigs <- woptM Opt_WarnMissingLocalSignatures
         ; when warn_missing_sigs $
@@ -1198,36 +1197,6 @@ Note that
 should not typecheck because
        case id of { (f :: forall a. a->a) -> f }
 will not typecheck.
-
-Note [Instantiate when inferring a type]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-  f = (*)
-As there is no incentive to instantiate the RHS, tcMonoBinds will
-produce a type of forall a. Num a => a -> a -> a for `f`. This will then go
-through simplifyInfer and such, remaining unchanged.
-
-There are two problems with this:
- 1) If the definition were `g _ = (*)`, we get a very unusual type of
-    `forall {a}. a -> forall b. Num b => b -> b -> b` for `g`. This is
-    surely confusing for users.
-
- 2) The monomorphism restriction can't work. The MR is dealt with in
-    simplifyInfer, and simplifyInfer has no way of instantiating. This
-    could perhaps be worked around, but it may be hard to know even
-    when instantiation should happen.
-
-There is an easy solution to both problems: instantiate (deeply) when
-inferring a type. So that's what we do. Note that this decision is
-user-facing.
-
-We do this deep instantiation in tcMonoBinds, in the FunBind case
-only, and only when we do not have a type signature.  Conveniently,
-the fun_co_fn field of FunBind gives a place to record the coercion.
-
-We do not need to do this
- * for PatBinds, because we don't have a function type
- * for FunBinds where we have a signature, bucause we aren't doing inference
 -}
 
 data MonoBindInfo = MBI { mbi_poly_name :: Name
@@ -1252,27 +1221,21 @@ tcMonoBinds is_rec sig_fn no_gen
         -- e.g.         f = \(x::forall a. a->a) -> <body>
         --      We want to infer a higher-rank type for f
     setSrcSpan b_loc    $
-    do  { rhs_ty <- newOpenInferExpType
-        ; (co_fn, matches')
-            <- tcExtendIdBndrs [TcIdBndr_ExpType name rhs_ty NotTopLevel] $
+    do  { ((co_fn, matches'), rhs_ty)
+            <- tcInferInst $ \ exp_ty ->
+                  -- tcInferInst: see TcUnify,
+                  -- Note [Deep instantiation of InferResult]
+               tcExtendIdBndrs [TcIdBndr_ExpType name exp_ty NotTopLevel] $
                   -- We extend the error context even for a non-recursive
                   -- function so that in type error messages we show the
                   -- type of the thing whose rhs we are type checking
-               tcMatchesFun (L nm_loc name) matches rhs_ty
-        ; rhs_ty  <- readExpType rhs_ty
-
-        -- Deeply instantiate the inferred type
-        -- See Note [Instantiate when inferring a type]
-        ; let orig = matchesCtOrigin matches
-        ; rhs_ty <- zonkTcType rhs_ty -- NB: zonk to uncover any foralls
-        ; (inst_wrap, rhs_ty) <- addErrCtxtM (instErrCtxt name rhs_ty) $
-                                 deeplyInstantiate orig rhs_ty
+               tcMatchesFun (L nm_loc name) matches exp_ty
 
         ; mono_id <- newLetBndr no_gen name rhs_ty
         ; return (unitBag $ L b_loc $
                      FunBind { fun_id = L nm_loc mono_id,
                                fun_matches = matches', bind_fvs = fvs,
-                               fun_co_fn = inst_wrap <.> co_fn, fun_tick = [] },
+                               fun_co_fn = co_fn, fun_tick = [] },
                   [MBI { mbi_poly_name = name
                        , mbi_sig       = Nothing
                        , mbi_mono_id   = mono_id }]) }
@@ -1338,7 +1301,7 @@ tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
                            $$ ppr no_gen)
 
         ; ((pat', _), pat_ty) <- addErrCtxt (patMonoBindsCtxt pat grhss) $
-                                 tcInfer $ \ exp_ty ->
+                                 tcInferNoInst $ \ exp_ty ->
                                  tcLetPat inst_sig_fun pat exp_ty $
                                  return () -- mapM (lookup_info inst_sig_fun) bndr_names
 
@@ -1770,16 +1733,3 @@ patMonoBindsCtxt :: (OutputableBndrId id, Outputable body)
 patMonoBindsCtxt pat grhss
   = hang (text "In a pattern binding:") 2 (pprPatBind pat grhss)
 
-instErrCtxt :: Name -> TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
-instErrCtxt name ty env
-  = do { let (env', ty') = tidyOpenType env ty
-       ; return (env', hang (text "When instantiating" <+> quotes (ppr name) <>
-                             text ", initially inferred to have" $$
-                             text "this overly-general type:")
-                          2 (ppr ty') $$
-                       extra) }
-  where
-    extra = sdocWithDynFlags $ \dflags ->
-            ppWhen (xopt LangExt.MonomorphismRestriction dflags) $
-            text "NB: This instantiation can be caused by the" <+>
-            text "monomorphism restriction."

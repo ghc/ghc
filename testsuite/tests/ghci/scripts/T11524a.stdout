@@ -2,7 +2,7 @@ without -fprint-explicit-foralls
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 pattern P :: Bool 	-- Defined at <interactive>:16:1
 pattern Pe :: a -> Ex 	-- Defined at <interactive>:17:1
-pattern Pu :: t -> t 	-- Defined at <interactive>:18:1
+pattern Pu :: p -> p 	-- Defined at <interactive>:18:1
 pattern Pue :: a -> a1 -> (a, Ex) 	-- Defined at <interactive>:19:1
 pattern Pur :: (Num a, Eq a) => a -> [a]
   	-- Defined at <interactive>:20:1
@@ -26,7 +26,7 @@ with -fprint-explicit-foralls
 pattern P :: Bool 	-- Defined at <interactive>:16:1
 pattern Pe :: () => forall {a}. a -> Ex
   	-- Defined at <interactive>:17:1
-pattern Pu :: forall {t}. t -> t 	-- Defined at <interactive>:18:1
+pattern Pu :: forall {p}. p -> p 	-- Defined at <interactive>:18:1
 pattern Pue :: forall {a}. () => forall {a1}. a -> a1 -> (a, Ex)
   	-- Defined at <interactive>:19:1
 pattern Pur :: forall {a}. (Num a, Eq a) => a -> [a]
