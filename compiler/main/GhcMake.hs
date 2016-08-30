@@ -762,7 +762,12 @@ parUpsweep n_jobs old_hpt stable_mods cleanup sccs = do
 
     let updNumCapabilities = liftIO $ do
             n_capabilities <- getNumCapabilities
-            unless (n_capabilities /= 1) $ setNumCapabilities n_jobs
+            n_cpus <- getNumProcessors
+            -- Setting number of capabilities more than
+            -- CPU count usually leads to high userspace
+            -- lock contention. Trac #9221
+            let n_caps = min n_jobs n_cpus
+            unless (n_capabilities /= 1) $ setNumCapabilities n_caps
             return n_capabilities
     -- Reset the number of capabilities once the upsweep ends.
     let resetNumCapabilities orig_n = liftIO $ setNumCapabilities orig_n
