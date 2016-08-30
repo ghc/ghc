@@ -1,0 +1,18 @@
+:set -fobject-code
+:load T12523.hs
+data ID1 a = IC11 a
+data ID2 a b = IC21 a | IC22 b
+data ID3 a b c = IC31 a | IC32 b | IC33 c
+data ID4 a b c d = IC41 a | IC42 b | IC43 c | IC44 d
+data ID5 a b c d e = IC51 a | IC52 b | IC53 c | IC54 d | IC55 e
+data ID6 a b c d e f = IC61 a | IC62 b | IC63 c | IC64 d | IC65 e | IC66 f
+data ID7 a b c d e f g = IC71 a | IC72 b | IC73 c | IC74 d | IC75 e | IC76 f | IC77 g
+data ID8 a b c d e f g h = IC81 a | IC82 b | IC83 c | IC84 d | IC85 e | IC86 f | IC87 g | IC88 h
+map d1 [ IC11 "C11" ]
+map d2 [ IC21 "C21", IC22 "C22" ]
+map d3 [ IC31 "C31", IC32 "C32", IC33 "C33" ]
+map d4 [ IC41 "C41", IC42 "C42", IC43 "C43", IC44 "C44" ]
+map d5 [ IC51 "C51", IC52 "C52", IC53 "C53", IC54 "C54", IC55 "C55" ]
+map d6 [ IC61 "C61", IC62 "C62", IC63 "C63", IC64 "C64", IC65 "C65", IC66 "C66" ]
+map d7 [ IC71 "C71", IC72 "C72", IC73 "C73", IC74 "C74", IC75 "C75", IC76 "C76", IC77 "C77" ]
+map d8 [ IC81 "C81", IC82 "C82", IC83 "C83", IC84 "C84", IC85 "C85", IC86 "C86", IC87 "C87", IC88 "C88" ]

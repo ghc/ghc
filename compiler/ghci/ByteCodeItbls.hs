@@ -19,6 +19,7 @@ import DataCon          ( DataCon, dataConRepArgTys, dataConIdentity )
 import TyCon            ( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
 import Type             ( flattenRepType, repType, typePrimRep )
 import StgCmmLayout     ( mkVirtHeapOffsets )
+import StgCmmClosure    ( tagForCon )
 import Util
 import Panic
 
@@ -68,5 +69,6 @@ make_constr_itbls hsc_env cons =
 
          descr = dataConIdentity dcon
 
-     r <- iservCmd hsc_env (MkConInfoTable  ptrs' nptrs_really conNo descr)
+     r <- iservCmd hsc_env (MkConInfoTable ptrs' nptrs_really
+                              conNo (tagForCon dflags dcon) descr)
      return (getName dcon, ItblPtr r)
