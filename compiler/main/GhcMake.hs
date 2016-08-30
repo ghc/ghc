@@ -601,6 +601,11 @@ unload hsc_env stable_linkables -- Unload everthing *except* 'stable_linkables'
 
     - Note that objects are only considered stable if they only depend
       on other objects.  We can't link object code against byte code.
+
+    - Note that even if an object is stable, we may end up recompiling
+      if the interface is out of date because an *external* interface
+      has changed.  The current code in GhcMake handles this case
+      fairly poorly, so be careful.
 -}
 checkStability
         :: HomePackageTable   -- HPT from last compilation
