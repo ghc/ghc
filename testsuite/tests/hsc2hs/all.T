@@ -35,3 +35,9 @@ test('T10272',
      [extra_clean(['T10272.hs', 'T10272_hsc_make.c'])],
      run_command,
      ['$MAKE -s --no-print-directory T10272'])
+
+test('T12504',
+     [extra_clean(['T12504/path/to/T12504.hs']),
+      extra_files(['T12504'])],
+     run_command,
+     ['$MAKE -s --no-print-directory T12504'])

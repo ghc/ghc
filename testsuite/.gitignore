@@ -790,6 +790,7 @@ mk/ghcconfig*_test___spaces_ghc*.exe.mk
 /tests/ghci/scripts/ghci027.hs
 /tests/ghci/should_run/3171.err
 /tests/hsc2hs/3837.hs
+/tests/hsc2hs/T12504/path/to/T12504.hs
 /tests/hsc2hs/T3837.hs
 /tests/hsc2hs/hsc2hs001.hs
 /tests/hsc2hs/hsc2hs002.hs
