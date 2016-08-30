@@ -113,7 +113,11 @@ extern StgPtr hs_spt_lookup(StgWord64 key[2]);
 extern int hs_spt_keys(StgPtr keys[], int szKeys);
 extern int hs_spt_key_count (void);
 
+extern void hs_try_putmvar (int capability, HsStablePtr sp);
+
 /* -------------------------------------------------------------------------- */
+
+
 
 #ifdef __cplusplus
 }

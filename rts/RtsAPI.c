@@ -16,6 +16,7 @@
 #include "Schedule.h"
 #include "Capability.h"
 #include "Stable.h"
+#include "Threads.h"
 #include "Weak.h"
 
 /* ----------------------------------------------------------------------------
@@ -620,3 +621,77 @@ void rts_done (void)
     freeMyTask();
 }
 
+/* -----------------------------------------------------------------------------
+   tryPutMVar from outside Haskell
+
+   The C call
+
+      hs_try_putmvar(cap, mvar)
+
+   is equivalent to the Haskell call
+
+      tryPutMVar mvar ()
+
+   but it is
+
+     * non-blocking: takes a bounded, short, amount of time
+     * asynchronous: the actual putMVar may be performed after the
+       call returns.  That's why hs_try_putmvar() doesn't return a
+       result to say whether the put succeeded.
+
+   NOTE: this call transfers ownership of the StablePtr to the RTS, which will
+   free it after the tryPutMVar has taken place.  The reason is that otherwise,
+   it would be very difficult for the caller to arrange to free the StablePtr
+   in all circumstances.
+
+   For more details, see the section "Waking up Haskell threads from C" in the
+   User's Guide.
+   -------------------------------------------------------------------------- */
+
+void hs_try_putmvar (/* in */ int capability,
+                     /* in */ HsStablePtr mvar)
+{
+    Task *task = getTask();
+    Capability *cap;
+
+    if (capability < 0) {
+        capability = task->preferred_capability;
+        if (capability < 0) {
+            capability = 0;
+        }
+    }
+    cap = capabilities[capability % enabled_capabilities];
+
+#if !defined(THREADED_RTS)
+
+    performTryPutMVar(cap, (StgMVar*)deRefStablePtr(mvar), Unit_closure);
+    freeStablePtr(mvar);
+
+#else
+
+    ACQUIRE_LOCK(&cap->lock);
+    // If the capability is free, we can perform the tryPutMVar immediately
+    if (cap->running_task == NULL) {
+        cap->running_task = task;
+        task->cap = cap;
+        RELEASE_LOCK(&cap->lock);
+
+        performTryPutMVar(cap, (StgMVar*)deRefStablePtr(mvar), Unit_closure);
+
+        freeStablePtr(mvar);
+
+        // Wake up the capability, which will start running the thread that we
+        // just awoke (if there was one).
+        releaseCapability(cap);
+    } else {
+        PutMVar *p = stgMallocBytes(sizeof(PutMVar),"hs_try_putmvar");
+        // We cannot deref the StablePtr if we don't have a capability,
+        // so we have to store it and deref it later.
+        p->mvar = mvar;
+        p->link = cap->putMVars;
+        cap->putMVars = p;
+        RELEASE_LOCK(&cap->lock);
+    }
+
+#endif
+}

@@ -150,7 +150,8 @@ typedef struct Task_ {
     struct InCall_ *spare_incalls;
 
     rtsBool    worker;          // == rtsTrue if this is a worker Task
-    rtsBool    stopped;         // this task has stopped or exited Haskell
+    rtsBool    stopped;         // == rtsTrue between newBoundTask and
+                                // boundTaskExiting, or in a worker Task.
 
     // So that we can detect when a finalizer illegally calls back into Haskell
     rtsBool running_finalizers;
@@ -205,7 +206,12 @@ uint32_t  freeTaskManager (void);
 // thread-local storage and will remain even after boundTaskExiting()
 // has been called; to free the memory, see freeMyTask().
 //
-Task *newBoundTask (void);
+Task* newBoundTask (void);
+
+// Return the current OS thread's Task, which is created if it doesn't already
+// exist.  After you have finished using RTS APIs, you should call freeMyTask()
+// to release this thread's Task.
+Task* getTask (void);
 
 // The current task is a bound task that is exiting.
 //

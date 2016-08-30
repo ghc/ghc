@@ -50,6 +50,8 @@ module GHC.Conc
         , threadStatus
         , threadCapability
 
+        , newStablePtrPrimMVar, PrimMVar
+
         -- * Waiting
         , threadDelay
         , registerDelay

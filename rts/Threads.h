@@ -41,6 +41,8 @@ StgBool isThreadBound (StgTSO* tso);
 void threadStackOverflow  (Capability *cap, StgTSO *tso);
 W_   threadStackUnderflow (Capability *cap, StgTSO *tso);
 
+rtsBool performTryPutMVar(Capability *cap, StgMVar *mvar, StgClosure *value);
+
 #ifdef DEBUG
 void printThreadBlockage (StgTSO *tso);
 void printThreadStatus (StgTSO *t);

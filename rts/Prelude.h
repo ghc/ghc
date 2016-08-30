@@ -24,6 +24,7 @@
  * modules these names are defined in.
  */
 
+PRELUDE_CLOSURE(ghczmprim_GHCziTuple_Z0T_closure);
 PRELUDE_CLOSURE(ghczmprim_GHCziTypes_True_closure);
 PRELUDE_CLOSURE(ghczmprim_GHCziTypes_False_closure);
 PRELUDE_CLOSURE(base_GHCziPack_unpackCString_closure);
@@ -87,6 +88,7 @@ PRELUDE_INFO(base_GHCziWord_W64zh_con_info);
 PRELUDE_INFO(base_GHCziStable_StablePtr_static_info);
 PRELUDE_INFO(base_GHCziStable_StablePtr_con_info);
 
+#define Unit_closure              DLL_IMPORT_DATA_REF(ghczmprim_GHCziTuple_Z0T_closure)
 #define True_closure              DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_True_closure)
 #define False_closure             DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_False_closure)
 #define unpackCString_closure     DLL_IMPORT_DATA_REF(base_GHCziPack_unpackCString_closure)

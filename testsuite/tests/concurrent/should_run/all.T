@@ -255,3 +255,34 @@ test('setnumcapabilities001',
 
 # omit ghci, which can't handle unboxed tuples:
 test('compareAndSwap', [omit_ways(['ghci','hpc']), reqlib('primitive')], compile_and_run, [''])
+
+test('hs_try_putmvar001',
+     [
+     when(opsys('mingw32'),skip), # uses pthread APIs in the C code
+     only_ways(['threaded1','threaded2']),
+      extra_clean(['hs_try_putmvar001_c.o'])],
+     compile_and_run,
+     ['hs_try_putmvar001_c.c'])
+
+# A benchmark for hs_try_putmvar() vs. foreign export
+# This one should work for both threaded and non-threaded RTS
+test('hs_try_putmvar002',
+     [
+     pre_cmd('$MAKE -s --no-print-directory hs_try_putmvar002_setup'),
+     extra_clean(['hs_try_putmvar002_c.o']),
+     extra_run_opts('1 8 10000')
+     ],
+     compile_and_run,
+     ['hs_try_putmvar002_c.c'])
+
+# Another benchmark for hs_try_putmvar() vs. foreign export
+test('hs_try_putmvar003',
+     [
+     when(opsys('mingw32'),skip), # uses pthread APIs in the C code
+     pre_cmd('$MAKE -s --no-print-directory hs_try_putmvar003_setup'),
+     only_ways(['threaded1','threaded2']),
+     extra_clean(['hs_try_putmvar003_c.o']),
+     extra_run_opts('1 16 32 100')
+     ],
+     compile_and_run,
+     ['hs_try_putmvar003_c.c'])

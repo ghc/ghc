@@ -123,6 +123,7 @@ struct Capability_ {
     //    returning_tasks_{hd,tl}
     //    wakeup_queue
     //    inbox
+    //    putMVars
     Mutex lock;
 
     // Tasks waiting to return from a foreign call, or waiting to make
@@ -137,6 +138,10 @@ struct Capability_ {
     // Messages, or END_TSO_QUEUE.
     // Locks required: cap->lock
     Message *inbox;
+
+    // putMVars are really messages, but they're allocated with malloc() so they
+    // can't go on the inbox queue: the GC would get confused.
+    struct PutMVar_ *putMVars;
 
     SparkPool *sparks;
 
@@ -378,6 +383,11 @@ extern uint32_t numa_map[MAX_NUMA_NODES];
    Messages
    -------------------------------------------------------------------------- */
 
+typedef struct PutMVar_ {
+    StgStablePtr mvar;
+    struct PutMVar_ *link;
+} PutMVar;
+
 #ifdef THREADED_RTS
 
 INLINE_HEADER rtsBool emptyInbox(Capability *cap);
@@ -459,7 +469,8 @@ contextSwitchCapability (Capability *cap)
 
 INLINE_HEADER rtsBool emptyInbox(Capability *cap)
 {
-    return (cap->inbox == (Message*)END_TSO_QUEUE);
+    return (cap->inbox == (Message*)END_TSO_QUEUE &&
+            cap->putMVars == NULL);
 }
 
 #endif

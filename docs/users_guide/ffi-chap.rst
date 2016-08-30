@@ -616,6 +616,125 @@ the threads have exited first. (Unofficially, if you want to use this
 fast and loose version of ``hs_exit()``, then call
 ``shutdownHaskellAndExit()`` instead).
 
+.. _hs_try_putmvar:
+
+Waking up Haskell threads from C
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Sometimes we want to be able to wake up a Haskell thread from some C
+code.  For example, when using a callback-based C API, we register a C
+callback and then we need to wait for the callback to run.
+
+One way to do this is to create a ``foreign export`` that will do
+whatever needs to be done to wake up the Haskell thread - perhaps
+``putMVar`` - and then call this from our C callback.  There are a
+couple of problems with this:
+
+1. Calling a foreign export has a lot of overhead: it creates a
+   complete new Haskell thread, for example.
+2. The call may block for a long time if a GC is in progress.  We
+   can't use this method if the C API we're calling doesn't allow
+   blocking in the callback.
+
+For these reasons GHC provides an external API to ``tryPutMVar``,
+``hs_try_putmvar``, which you can use to cheaply and asynchronously
+wake up a Haskell thread from C/C++.
+
+.. code-block:: c
+
+  void hs_try_putmvar (int capability, HsStablePtr sp);
+
+The C call ``hs_try_putmvar(cap, mvar)`` is equivalent to the Haskell
+call ``tryPutMVar mvar ()``, except that it is
+
+* non-blocking: takes a bounded, short, amount of time
+
+* asynchronous: the actual putMVar may be performed after the call
+  returns (for example, if the RTS is currently garbage collecting).
+  That's why ``hs_try_putmvar()`` doesn't return a result to say
+  whether the put succeeded.  It is your responsibility to ensure that
+  the ``MVar`` is empty; if it is full, ``hs_try_putmvar()`` will have
+  no effect.
+
+**Example**. Suppose we have a C/C++ function to call that will return and then
+invoke a callback at some point in the future, passing us some data.
+We want to wait in Haskell for the callback to be called, and retrieve
+the data.  We can do it like this:
+
+.. code-block:: haskell
+
+     import GHC.Conc (newStablePtrPrimMVar, PrimMVar)
+
+     makeExternalCall = mask_ $ do
+       mvar <- newEmptyMVar
+       sp <- newStablePtrPrimMVar mvar
+       fp <- mallocForeignPtr
+       withForeignPtr fp $ \presult -> do
+         cap <- threadCapability =<< myThreadId
+         scheduleCallback sp cap presult
+         takeMVar mvar `onException`
+           forkIO (do takeMVar mvar; touchForeignPtr fp)
+         peek presult
+
+     foreign import ccall "scheduleCallback"
+         scheduleCallback :: StablePtr PrimMVar
+                          -> Int
+                          -> Ptr Result
+                          -> IO ()
+
+And inside ``scheduleCallback``, we create a callback that will in due
+course store the result data in the ``Ptr Result``, and then call
+``hs_try_putmvar()``.
+
+There are a few things to note here.
+
+* There's a special function to create the ``StablePtr``:
+  ``newStablePtrPrimMVar``, because the RTS needs a ``StablePtr`` to
+  the primitive ``MVar#`` object, and we can't create that directly.
+  Do *not* just use ``newStablePtr`` on the ``MVar``: your program
+  will crash.
+
+* The ``StablePtr`` is freed by ``hs_try_putmvar()``.  This is because
+  it would otherwise be difficult to arrange to free the ``StablePtr``
+  reliably: we can't free it in Haskell, because if the ``takeMVar``
+  is interrupted by an asynchronous exception, then the callback will
+  fire at a later time.  We can't free it in C, because we don't know
+  when to free it (not when ``hs_try_putmvar()`` returns, because that
+  is an async call that uses the ``StablePtr`` at some time in the
+  future).
+
+* The ``mask_`` is to avoid asynchronous exceptions before the
+  ``scheduleCallback`` call, which would leak the ``StablePtr``.
+
+* We find out the current capability number and pass it to C.  This is
+  passed back to ``hs_try_putmvar``, and helps the RTS to know which
+  capability it should try to perform the ``tryPutMVar`` on.  If you
+  don't care, you can pass ``-1`` for the capability to
+  ``hs_try_putmvar``, and it will pick an arbitrary one.
+
+  Picking the right capability will help avoid unnecessary context
+  switches.  Ideally you should pass the capability that the thread
+  that will be woken up last ran on, which you can find by calling
+  ``threadCapability`` in Haskell.
+
+* If you want to also pass some data back from the C callback to
+  Haskell, this is best done by first allocating some memory in
+  Haskell to receive the data, and passing the address to C, as we did
+  in the above example.
+
+* ``takeMVar`` can be interrupted by an asynchronous exception.  If
+  this happens, the callback in C will still run at some point in the
+  future, will still write the result, and will still call
+  ``hs_try_putmvar()``.  Therefore we have to arrange that the memory
+  for the result stays alive until the callback has run, so if an
+  exception is thrown during ``takeMVar`` we fork another thread to
+  wait for the callback and hold the memory alive using
+  ``touchForeignPtr``.
+
+For a fully working example, see
+``testsuite/tests/concurrent/should_run/hs_try_putmvar001.hs`` in the
+GHC source tree.
+
 .. _ffi-floating-point:
 
 Floating point and the FFI

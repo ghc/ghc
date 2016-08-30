@@ -266,6 +266,7 @@ initCapability (Capability *cap, uint32_t i)
     cap->returning_tasks_tl = NULL;
     cap->n_returning_tasks  = 0;
     cap->inbox              = (Message*)END_TSO_QUEUE;
+    cap->putMVars           = NULL;
     cap->sparks             = allocSparkPool();
     cap->spark_stats.created    = 0;
     cap->spark_stats.dud        = 0;

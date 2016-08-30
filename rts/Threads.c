@@ -744,6 +744,85 @@ threadStackUnderflow (Capability *cap, StgTSO *tso)
 }
 
 /* ----------------------------------------------------------------------------
+   Implementation of tryPutMVar#
+
+   NOTE: this should be kept in sync with stg_tryPutMVarzh in PrimOps.cmm
+   ------------------------------------------------------------------------- */
+
+rtsBool performTryPutMVar(Capability *cap, StgMVar *mvar, StgClosure *value)
+{
+    const StgInfoTable *info;
+    StgMVarTSOQueue *q;
+    StgTSO *tso;
+
+    info = lockClosure((StgClosure*)mvar);
+
+    if (mvar->value != &stg_END_TSO_QUEUE_closure) {
+#if defined(THREADED_RTS)
+        unlockClosure((StgClosure*)mvar, info);
+#endif
+        return rtsFalse;
+    }
+
+    q = mvar->head;
+loop:
+    if (q == (StgMVarTSOQueue*)&stg_END_TSO_QUEUE_closure) {
+        /* No further takes, the MVar is now full. */
+        if (info == &stg_MVAR_CLEAN_info) {
+            dirty_MVAR(&cap->r, (StgClosure*)mvar);
+        }
+
+        mvar->value = value;
+        unlockClosure((StgClosure*)mvar, &stg_MVAR_DIRTY_info);
+        return rtsTrue;
+    }
+    if (q->header.info == &stg_IND_info ||
+        q->header.info == &stg_MSG_NULL_info) {
+        q = (StgMVarTSOQueue*)((StgInd*)q)->indirectee;
+        goto loop;
+    }
+
+    // There are takeMVar(s) waiting: wake up the first one
+    tso = q->tso;
+    mvar->head = q->link;
+    if (mvar->head == (StgMVarTSOQueue*)&stg_END_TSO_QUEUE_closure) {
+        mvar->tail = (StgMVarTSOQueue*)&stg_END_TSO_QUEUE_closure;
+    }
+
+    ASSERT(tso->block_info.closure == (StgClosure*)mvar);
+    // save why_blocked here, because waking up the thread destroys
+    // this information
+    StgWord why_blocked = tso->why_blocked;
+
+    // actually perform the takeMVar
+    StgStack* stack = tso->stackobj;
+    stack->sp[1] = (W_)value;
+    stack->sp[0] = (W_)&stg_ret_p_info;
+
+    // indicate that the MVar operation has now completed.
+    tso->_link = (StgTSO*)&stg_END_TSO_QUEUE_closure;
+
+    if (stack->dirty == 0) {
+        dirty_STACK(cap, stack);
+    }
+
+    tryWakeupThread(cap, tso);
+
+    // If it was an readMVar, then we can still do work,
+    // so loop back. (XXX: This could take a while)
+    if (why_blocked == BlockedOnMVarRead) {
+        q = ((StgMVarTSOQueue*)q)->link;
+        goto loop;
+    }
+
+    ASSERT(why_blocked == BlockedOnMVar);
+
+    unlockClosure((StgClosure*)mvar, info);
+
+    return rtsTrue;
+}
+
+/* ----------------------------------------------------------------------------
  * Debugging: why is a thread blocked
  * ------------------------------------------------------------------------- */
 

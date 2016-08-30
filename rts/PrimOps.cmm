@@ -1739,6 +1739,13 @@ loop:
 }
 
 
+// NOTE: there is another implementation of this function in
+// Threads.c:performTryPutMVar().  Keep them in sync!  It was
+// measurably slower to call the C function from here (70% for a
+// tight loop doing tryPutMVar#).
+//
+// TODO: we could kill the duplication by making tryPutMVar# into an
+// inline primop that expands into a C call to performTryPutMVar().
 stg_tryPutMVarzh ( P_ mvar, /* :: MVar a */
                    P_ val,  /* :: a */ )
 {
@@ -1811,6 +1818,7 @@ loop:
     unlockClosure(mvar, info);
     return (1);
 }
+
 
 stg_readMVarzh ( P_ mvar, /* :: MVar a */ )
 {
