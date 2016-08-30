@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, GADTs, ScopedTypeVariables, RankNTypes #-}
+{-# LANGUAGE CPP, RecordWildCards, GADTs, ScopedTypeVariables, RankNTypes #-}
 
 -- |
 -- The Remote GHCi server.
@@ -23,14 +23,32 @@ import System.Environment
 import System.Exit
 import Text.Printf
 
+dieWithUsage :: IO a
+dieWithUsage = do
+    prog <- getProgName
+    die $ prog ++ ": " ++ msg
+  where
+#ifdef WINDOWS
+    msg = "usage: iserv <write-handle> <read-handle> [-v]"
+#else
+    msg = "usage: iserv <write-fd> <read-fd> [-v]"
+#endif
+
 main :: IO ()
 main = do
-  (arg0:arg1:rest) <- getArgs
-  let wfd1 = read arg0; rfd2 = read arg1
+  args <- getArgs
+  (wfd1, rfd2, rest) <-
+      case args of
+        arg0:arg1:rest -> do
+            let wfd1 = read arg0
+                rfd2 = read arg1
+            return (wfd1, rfd2, rest)
+        _ -> dieWithUsage
+
   verbose <- case rest of
     ["-v"] -> return True
     []     -> return False
-    _      -> die "iserv: syntax: iserv <write-fd> <read-fd> [-v]"
+    _      -> dieWithUsage
   when verbose $ do
     printf "GHC iserv starting (in: %d; out: %d)\n"
       (fromIntegral rfd2 :: Int) (fromIntegral wfd1 :: Int)
