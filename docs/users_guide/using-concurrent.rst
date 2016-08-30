@@ -136,7 +136,8 @@ RTS ``-N`` options.
 
     Be careful when using all the processors in your machine: if some of
     your processors are in use by other programs, this can actually harm
-    performance rather than improve it.
+    performance rather than improve it. Asking GHC to create more capabilities
+    than you have physical threads is almost always a bad idea.
 
     Setting ``-N`` also has the effect of enabling the parallel garbage
     collector (see :ref:`rts-options-gc`).
