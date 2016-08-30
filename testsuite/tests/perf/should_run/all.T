@@ -116,8 +116,9 @@ test('T3736',
      ['$MAKE -s --no-print-directory T3736'])
 test('T3738',
      [extra_clean(['T3738a.hi', 'T3738a.o']),
-      stats_num_field('peak_megabytes_allocated', (1, 0)),
-                                 # expected value: 1 (amd64/Linux)
+      stats_num_field('peak_megabytes_allocated', (2, 0)),
+                    # expected value: 1 (amd64/Linux)
+                    # 2016-08-31:     2 (allocation area size bumped to 1MB)
       stats_num_field('bytes allocated',
                       [(wordsize(32), 45648, 5),
                     # expected value: 50520 (x86/Linux)
@@ -132,8 +133,9 @@ test('T3738',
      ['-O'])
 
 test('MethSharing',
-     [stats_num_field('peak_megabytes_allocated', (1, 0)),
-                                 # expected value: 1 (amd64/Linux)
+     [stats_num_field('peak_megabytes_allocated', (2, 0)),
+                    # expected value: 1 (amd64/Linux)
+                    # 2016-08-31:     2 (allocation area size bumped to 1MB)
       stats_num_field('bytes allocated',
                       [(wordsize(32), 360940756, 5),
                     # expected value: 2685858140 (x86/OS X)

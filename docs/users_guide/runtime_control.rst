@@ -267,7 +267,7 @@ performance.
 
 .. rts-flag:: -A ⟨size⟩
 
-    :default: 512k
+    :default: 1MB
 
     .. index::
        single: allocation area, size

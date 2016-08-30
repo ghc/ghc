@@ -754,7 +754,7 @@ reasons for this:
    data into. When using compacting collection (see the :rts-flag:`-c`
    option), this is reduced to 2L, and can further be reduced by
    tweaking the :rts-flag:`-F` option. Also add the size of the allocation area
-   (currently a fixed 512Kb).
+   (see :rts-flag:`-A`).
 
 -  The stack isn't counted in the heap profile by default. See the
    RTS :rts-flag:`-xt` option.
