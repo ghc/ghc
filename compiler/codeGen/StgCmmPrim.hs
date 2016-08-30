@@ -310,8 +310,11 @@ emitPrimOp _ [res] GetCurrentCCSOp [_dummy_arg]
 emitPrimOp dflags [res] ReadMutVarOp [mutv]
    = emitAssign (CmmLocal res) (cmmLoadIndexW dflags mutv (fixedHdrSizeW dflags) (gcWord dflags))
 
-emitPrimOp dflags [] WriteMutVarOp [mutv,var]
-   = do emitStore (cmmOffsetW dflags mutv (fixedHdrSizeW dflags)) var
+emitPrimOp dflags res@[] WriteMutVarOp [mutv,var]
+   = do -- Without this write barrier, other CPUs may see this pointer before
+        -- the writes for the closure it points to have occurred.
+        emitPrimCall res MO_WriteBarrier []
+        emitStore (cmmOffsetW dflags mutv (fixedHdrSizeW dflags)) var
         emitCCall
                 [{-no results-}]
                 (CmmLit (CmmLabel mkDirty_MUT_VAR_Label))
