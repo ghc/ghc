@@ -668,13 +668,8 @@ cpeApp :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 -- May return a CpeRhs because of saturating primops
 cpeApp top_env expr
   = do { let (terminal, args, depth) = collect_args expr
-       ; (head, app, floats) <- cpe_app top_env terminal args depth
-
-        -- Now deal with the function
-       ; case head of
-           Just fn_id -> do { sat_app <- maybeSaturate fn_id app depth
-                            ; return (floats, sat_app) }
-           _other              -> return (floats, app) }
+       ; cpe_app top_env terminal args depth
+       }
 
   where
     -- We have a nested data structure of the form
@@ -702,11 +697,25 @@ cpeApp top_env expr
             -> CoreExpr
             -> [CpeArg]
             -> Int
-            -> UniqSM (Maybe Id, CpeApp, Floats)
+            -> UniqSM (Floats, CpeRhs)
     cpe_app env (Var f) (CpeArg Type{} : CpeArg arg : args) depth
         | f `hasKey` lazyIdKey          -- Replace (lazy a) with a, and
        || f `hasKey` noinlineIdKey      -- Replace (noinline a) with a
-        = cpe_app env arg args (depth - 1)
+        -- Consider the code:
+        --
+        --      lazy (f x) y
+        --
+        -- We need to make sure that we need to recursively collect arguments on
+        -- "f x", otherwise we'll float "f x" out (it's not a variable) and
+        -- end up with this awful -ddump-prep:
+        --
+        --      case f x of f_x {
+        --        __DEFAULT -> f_x y
+        --      }
+        --
+        -- rather than the far superior "f x y".  Test case is par01.
+        = let (terminal, args', depth') = collect_args arg
+          in cpe_app env terminal (args' ++ args) (depth + depth' - 1)
     cpe_app env (Var f) [CpeArg _runtimeRep@Type{}, CpeArg _type@Type{}, CpeArg arg] 1
         | f `hasKey` runRWKey
         -- Replace (runRW# f) by (f realWorld#), beta reducing if possible (this
@@ -724,7 +733,7 @@ cpeApp top_env expr
            -- cpe_ExprIsTrivial).  But note that we need the type of the
            -- expression, not the id.
            ; (app, floats) <- rebuild_app args e2 (exprType e2) emptyFloats stricts
-           ; return (hd, app, floats) }
+           ; mb_saturate hd app floats depth }
         where
           stricts = case idStrictness v of
                             StrictSig (DmdType _ demands _)
@@ -737,15 +746,26 @@ cpeApp top_env expr
                 -- Here, we can't evaluate the arg strictly, because this
                 -- partial application might be seq'd
 
+        -- We inlined into something that's not a var and has no args.
+        -- Bounce it back up to cpeRhsE.
+    cpe_app env fun [] _ = cpeRhsE env fun
+
         -- N-variable fun, better let-bind it
-    cpe_app env fun args _
+    cpe_app env fun args depth
       = do { (fun_floats, fun') <- cpeArg env evalDmd fun ty
                           -- The evalDmd says that it's sure to be evaluated,
                           -- so we'll end up case-binding it
            ; (app, floats) <- rebuild_app args fun' ty fun_floats []
-           ; return (Nothing, app, floats) }
+           ; mb_saturate Nothing app floats depth }
         where
           ty = exprType fun
+
+    -- Saturate if necessary
+    mb_saturate head app floats depth =
+       case head of
+         Just fn_id -> do { sat_app <- maybeSaturate fn_id app depth
+                          ; return (floats, sat_app) }
+         _other              -> return (floats, app)
 
     -- Deconstruct and rebuild the application, floating any non-atomic
     -- arguments to the outside.  We collect the type of the expression,
