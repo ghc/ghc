@@ -25,7 +25,8 @@ module RnEnv (
         lookupFieldFixityRn, lookupTyFixityRn,
         lookupInstDeclBndr, lookupRecFieldOcc, lookupFamInstName,
         lookupConstructorFields,
-        lookupSyntaxName, lookupSyntaxNames, lookupIfThenElse,
+        lookupSyntaxName, lookupSyntaxName', lookupSyntaxNames,
+        lookupIfThenElse,
         lookupGreAvailRn,
         getLookupOccRn,mkUnboundName, mkUnboundNameRdr, isUnboundName,
         addUsedGRE, addUsedGREs, addUsedDataCons,
@@ -1566,6 +1567,16 @@ lookupIfThenElse
          else do { ite <- lookupOccRn (mkVarUnqual (fsLit "ifThenElse"))
                  ; return ( Just (mkRnSyntaxExpr ite)
                           , unitFV ite ) } }
+
+lookupSyntaxName' :: Name          -- ^ The standard name
+                  -> RnM Name      -- ^ Possibly a non-standard name
+lookupSyntaxName' std_name
+  = do { rebindable_on <- xoptM LangExt.RebindableSyntax
+       ; if not rebindable_on then
+           return std_name
+         else
+            -- Get the similarly named thing from the local environment
+           lookupOccRn (mkRdrUnqual (nameOccName std_name)) }
 
 lookupSyntaxName :: Name                                -- The standard name
                  -> RnM (SyntaxExpr Name, FreeVars)     -- Possibly a non-standard name
