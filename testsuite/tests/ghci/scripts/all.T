@@ -259,4 +259,7 @@ test('T12007', normal, ghci_script, ['T12007.script'])
 test('T11975', normal, ghci_script, ['T11975.script'])
 test('T10963', normal, ghci_script, ['T10963.script'])
 test('T12520', normal, ghci_script, ['T12520.script'])
+test('T12091',
+     [expect_broken(12091), extra_run_opts('-fobject-code')],
+     ghci_script, ['T12091.script'])
 test('T12523', normal, ghci_script, ['T12523.script'])
