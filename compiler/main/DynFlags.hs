@@ -480,6 +480,7 @@ data GeneralFlag
    | Opt_HelpfulErrors
    | Opt_DeferTypeErrors
    | Opt_DeferTypedHoles
+   | Opt_DeferOutOfScopeVariables
    | Opt_PIC
    | Opt_SccProfilingOn
    | Opt_Ticky
@@ -608,6 +609,7 @@ data WarningFlag =
    | Opt_WarnUntickedPromotedConstructors
    | Opt_WarnDerivingTypeable
    | Opt_WarnDeferredTypeErrors
+   | Opt_WarnDeferredOutOfScopeVariables
    | Opt_WarnNonCanonicalMonadInstances   -- since 8.0
    | Opt_WarnNonCanonicalMonadFailInstances -- since 8.0
    | Opt_WarnNonCanonicalMonoidInstances  -- since 8.0
@@ -3248,6 +3250,8 @@ wWarningFlagsDeps = [
   depFlagSpec "auto-orphans"             Opt_WarnAutoOrphans
     "it has no effect",
   flagSpec "deferred-type-errors"        Opt_WarnDeferredTypeErrors,
+  flagSpec "deferred-out-of-scope-variables"
+                                         Opt_WarnDeferredOutOfScopeVariables,
   flagSpec "deprecations"                Opt_WarnWarningsDeprecations,
   flagSpec "deprecated-flags"            Opt_WarnDeprecatedFlags,
   flagSpec "deriving-typeable"           Opt_WarnDerivingTypeable,
@@ -3363,6 +3367,7 @@ fFlagsDeps = [
   flagSpec "cpr-anal"                         Opt_CprAnal,
   flagSpec "defer-type-errors"                Opt_DeferTypeErrors,
   flagSpec "defer-typed-holes"                Opt_DeferTypedHoles,
+  flagSpec "defer-out-of-scope-variables"     Opt_DeferOutOfScopeVariables,
   flagSpec "dicts-cheap"                      Opt_DictsCheap,
   flagSpec "dicts-strict"                     Opt_DictsStrict,
   flagSpec "dmd-tx-dict-sel"                  Opt_DmdTxDictSel,
@@ -3709,6 +3714,7 @@ default_PIC platform =
 -- on
 impliedGFlags :: [(GeneralFlag, TurnOnFlag, GeneralFlag)]
 impliedGFlags = [(Opt_DeferTypeErrors, turnOn, Opt_DeferTypedHoles)
+                ,(Opt_DeferTypeErrors, turnOn, Opt_DeferOutOfScopeVariables)
                 ,(Opt_Strictness, turnOn, Opt_WorkerWrapper)
                 ]
 
@@ -3906,6 +3912,7 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnDeprecatedFlags,
         Opt_WarnDeferredTypeErrors,
         Opt_WarnTypedHoles,
+        Opt_WarnDeferredOutOfScopeVariables,
         Opt_WarnPartialTypeSignatures,
         Opt_WarnUnrecognisedPragmas,
         Opt_WarnDuplicateExports,

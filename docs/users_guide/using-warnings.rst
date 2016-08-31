@@ -152,13 +152,24 @@ of ``-W(no-)*``.
 
 .. ghc-flag:: -fdefer-typed-holes
 
-    Defer typed holes errors until runtime. This will turn the errors
+    Defer typed holes errors (errors about names with a leading underscore
+    (e.g., “_”, “_foo”, “_bar”)) until runtime. This will turn the errors
     produced by :ref:`typed holes <typed-holes>` into warnings. Using a value
     that depends on a typed hole produces a runtime error, the same as
     :ghc-flag:`-fdefer-type-errors` (which implies this option). See :ref:`typed-holes`
     and :ref:`defer-type-errors`.
 
     Implied by :ghc-flag:`-fdefer-type-errors`. See also :ghc-flag:`-Wtyped-holes`.
+
+.. ghc-flag:: -fdefer-out-of-scope-variables
+
+    Defer variable out of scope errors (errors about names without a leading underscore)
+    until runtime. This will turn variable-out-of-scope errors into warnings.
+    Using a value that depends on a typed hole produces a runtime error,
+    the same as :ghc-flag:`-fdefer-type-errors` (which implies this option).
+    See :ref:`typed-holes` and :ref:`defer-type-errors`.
+
+    Implied by :ghc-flag:`-fdefer-type-errors`. See also :ghc-flag:`-Wdeferred-out-of-scope-variables`.
 
 .. ghc-flag:: -Wpartial-type-signatures
 
