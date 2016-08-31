@@ -15,6 +15,7 @@ module PPC.Instr (
     archWordFormat,
     RI(..),
     Instr(..),
+    stackFrameHeaderSize,
     maxSpillSlots,
     allocMoreStack,
     makeFarBranches
@@ -505,7 +506,7 @@ ppc_mkSpillInstr
 
 ppc_mkSpillInstr dflags reg delta slot
   = let platform = targetPlatform dflags
-        off      = spillSlotToOffset slot
+        off      = spillSlotToOffset dflags slot
         arch     = platformArch platform
     in
     let fmt = case targetClassOfReg platform reg of
@@ -530,7 +531,7 @@ ppc_mkLoadInstr
 
 ppc_mkLoadInstr dflags reg delta slot
   = let platform = targetPlatform dflags
-        off     = spillSlotToOffset slot
+        off      = spillSlotToOffset dflags slot
         arch     = platformArch platform
     in
     let fmt = case targetClassOfReg platform reg of
@@ -546,6 +547,22 @@ ppc_mkLoadInstr dflags reg delta slot
     in instr fmt reg (AddrRegImm sp (ImmInt (off-delta)))
 
 
+-- | The size of a minimal stackframe header including minimal
+-- parameter save area.
+stackFrameHeaderSize :: DynFlags -> Int
+stackFrameHeaderSize dflags
+  = case platformOS platform of
+      OSLinux  -> case platformArch platform of
+                             -- header + parameter save area
+        ArchPPC           -> 64 -- TODO: check ABI spec
+        ArchPPC_64 ELF_V1 -> 48 + 8 * 8
+        ArchPPC_64 ELF_V2 -> 32 + 8 * 8
+        _ -> panic "PPC.stackFrameHeaderSize: Unknown Linux"
+      OSAIX    -> 24 + 8 * 4
+      OSDarwin -> 64 -- TODO: check ABI spec
+      _ -> panic "PPC.stackFrameHeaderSize: not defined for this OS"
+     where platform = targetPlatform dflags
+
 -- | The maximum number of bytes required to spill a register. PPC32
 -- has 32-bit GPRs and 64-bit FPRs, while PPC64 has 64-bit GPRs and
 -- 64-bit FPRs. So the maximum is 8 regardless of platforms unlike
@@ -557,7 +574,8 @@ spillSlotSize = 8
 -- | The number of spill slots available without allocating more.
 maxSpillSlots :: DynFlags -> Int
 maxSpillSlots dflags
-    = ((rESERVED_C_STACK_BYTES dflags - 64) `div` spillSlotSize) - 1
+    = ((rESERVED_C_STACK_BYTES dflags - stackFrameHeaderSize dflags)
+       `div` spillSlotSize) - 1
 --     = 0 -- useful for testing allocMoreStack
 
 -- | The number of bytes that the stack pointer should be aligned
@@ -567,9 +585,9 @@ stackAlign :: Int
 stackAlign = 16
 
 -- | Convert a spill slot number to a *byte* offset, with no sign.
-spillSlotToOffset :: Int -> Int
-spillSlotToOffset slot
-   = 64 + spillSlotSize * slot
+spillSlotToOffset :: DynFlags -> Int -> Int
+spillSlotToOffset dflags slot
+   = stackFrameHeaderSize dflags + spillSlotSize * slot
 
 
 --------------------------------------------------------------------------------
