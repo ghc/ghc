@@ -1286,14 +1286,15 @@ genCCall' dflags gcp target dest_regs args
 
         spFormat = if target32Bit platform then II32 else II64
 
+        -- TODO: Do not create a new stack frame if delta is too large.
         move_sp_down finalStack
-               | delta > 64 =
+               | delta > stackFrameHeaderSize dflags =
                         toOL [STU spFormat sp (AddrRegImm sp (ImmInt (-delta))),
                               DELTA (-delta)]
                | otherwise = nilOL
                where delta = stackDelta finalStack
         move_sp_up finalStack
-               | delta > 64 =  -- TODO: fix-up stack back-chain
+               | delta > stackFrameHeaderSize dflags =
                         toOL [ADD sp sp (RIImm (ImmInt delta)),
                               DELTA 0]
                | otherwise = nilOL
