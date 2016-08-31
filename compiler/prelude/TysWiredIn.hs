@@ -489,7 +489,7 @@ pcDataConWithFixity :: Bool      -- ^ declared infix?
                     -> [Type]    -- ^ args
                     -> TyCon
                     -> DataCon
-pcDataConWithFixity infx n = pcDataConWithFixity' infx n (incrUnique (nameUnique n))
+pcDataConWithFixity infx n = pcDataConWithFixity' infx n (dataConWorkerUnique (nameUnique n))
                                                   NoRRI
 -- The Name's unique is the first of two free uniques;
 -- the first is used for the datacon itself,
@@ -535,7 +535,7 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri tyvars ex_tyvars arg_tys
 -- used for RuntimeRep and friends
 pcSpecialDataCon :: Name -> [Type] -> TyCon -> RuntimeRepInfo -> DataCon
 pcSpecialDataCon dc_name arg_tys tycon rri
-  = pcDataConWithFixity' False dc_name (incrUnique (nameUnique dc_name)) rri
+  = pcDataConWithFixity' False dc_name (dataConWorkerUnique (nameUnique dc_name)) rri
                          [] [] arg_tys tycon
 
 {-

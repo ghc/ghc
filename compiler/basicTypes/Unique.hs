@@ -31,7 +31,6 @@ module Unique (
         getKey,                         -- Used in Var, UniqFM, Name only!
         mkUnique, unpkUnique,           -- Used in BinIface only
 
-        incrUnique,                     -- Used for renumbering
         deriveUnique,                   -- Ditto
         newTagUnique,                   -- Used in CgCase
         initTyVarUnique,
