@@ -24,6 +24,9 @@ Compiler
 -  The :ghc-flag:`-Wredundant-constraints` flag has been removed from the
    :ghc-flag:`-Wall` flag set (see :ghc-ticket:`10635`).
 
+-  Added :ghc-flag:`-fdefer-out-of-scope-variables`, which converts variable
+   out of scope variables errors into warnings.
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
