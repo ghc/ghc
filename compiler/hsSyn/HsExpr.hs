@@ -1956,8 +1956,10 @@ isTypedSplice _                  = False   -- Quasi-quotes are untyped splices
 --
 #ifdef GHCI
 newtype ThModFinalizers = ThModFinalizers [ForeignRef (TH.Q ())]
+                        deriving (Typeable)
 #else
 data ThModFinalizers = ThModFinalizers
+                     deriving (Typeable)
 #endif
 
 -- A Data instance which ignores the argument of 'ThModFinalizers'.
