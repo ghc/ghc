@@ -33,6 +33,19 @@ Compiler
    initial cmm from STG-to-C-- code generation and :ghc-flag:`-ddump-cmm-verbose`
    to obtain the intermediates from all C-- pipeline stages.
 
+Template Haskell
+~~~~~~~~~~~~~~~~
+
+-  TODO FIXME.
+
+- ``addModFinalizer`` now exposes the local typing environment at the splice
+  point. This allows ``reify`` to see local and top-level definitions in the
+  current declaration group when used as in
+
+  .. code-block:: none
+
+      f x = $(addModFinalizer (reify 'x >>= runIO . print) >> [| x |])
+
 TODO FIXME Heading title
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
