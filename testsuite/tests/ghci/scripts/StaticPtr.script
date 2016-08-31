@@ -1,0 +1,23 @@
+:set -XStaticPointers
+:load StaticPtr.hs
+import GHC.StaticPtr
+import Prelude
+
+:{
+let checkKey :: Show a => StaticPtr a -> IO ()
+    checkKey x = do
+      allKeys <- staticPtrKeys
+      putStrLn $
+        show (deRefStaticPtr x)
+        ++ "    " ++
+        (if staticKey x `elem` allKeys
+            then "good"
+            else "bad")
+:}
+
+checkKey s1
+checkKey s2
+
+-- :m + StaticPtr
+--checkKey topLevelStatic
+--checkKey (fst nestedStatic)

@@ -14,6 +14,7 @@ module GHCi
   , evalStringToIOString
   , mallocData
   , createBCOs
+  , addSptEntry
   , mkCostCentres
   , costCentreStackInfo
   , newBreakArray
@@ -52,6 +53,7 @@ import GHCi.Run
 import GHCi.RemoteTypes
 import GHCi.ResolvedBCO
 import GHCi.BreakArray (BreakArray)
+import Fingerprint
 import HscTypes
 import UniqFM
 import Panic
@@ -325,6 +327,11 @@ createBCOs hsc_env rbcos = do
   parMap _ [] = []
   parMap f (x:xs) = fx `par` (fxs `pseq` (fx : fxs))
     where fx = f x; fxs = parMap f xs
+
+addSptEntry :: HscEnv -> Fingerprint -> ForeignHValue -> IO ()
+addSptEntry hsc_env fpr ref =
+  withForeignRef ref $ \val ->
+    iservCmd hsc_env (AddSptEntry fpr val)
 
 costCentreStackInfo :: HscEnv -> RemotePtr CostCentreStack -> IO [String]
 costCentreStackInfo hsc_env ccs =

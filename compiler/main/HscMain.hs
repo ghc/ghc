@@ -82,8 +82,10 @@ module HscMain
     ) where
 
 import Id
+import GHCi             ( addSptEntry )
 import GHCi.RemoteTypes ( ForeignHValue )
 import ByteCodeGen      ( byteCodeGen, coreExprToBCOs )
+import StaticPtrTable   ( collectStaticThings )
 import Linker
 import CoreTidy         ( tidyExpr )
 import Type             ( Type )
@@ -1565,6 +1567,15 @@ hscDeclsWithLocation hsc_env0 str source linenumber =
 
     let src_span = srcLocSpan interactiveSrcLoc
     liftIO $ linkDecls hsc_env src_span cbc
+
+#ifdef GHCI
+    {- Extract static pointer table entries -}
+    let add_spt_entry :: (Id, Fingerprint) -> Hsc ()
+        add_spt_entry (i, fpr) = do
+            val <- liftIO $ getHValue hsc_env (idName i)
+            liftIO $ addSptEntry hsc_env fpr val
+    mapM_ add_spt_entry (collectStaticThings prepd_binds)
+#endif
 
     let tcs = filterOut isImplicitTyCon (mg_tcs simpl_mg)
         patsyns = mg_patsyns simpl_mg

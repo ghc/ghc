@@ -46,7 +46,12 @@
 --
 
 {-# LANGUAGE ViewPatterns #-}
-module StaticPtrTable (sptModuleInitCode) where
+{-# LANGUAGE TupleSections #-}
+
+module StaticPtrTable
+  ( sptModuleInitCode
+  , collectStaticThings
+  ) where
 
 -- See SimplCore Note [Grand plan for static forms]
 
@@ -70,24 +75,8 @@ import GHC.Fingerprint
 --
 sptModuleInitCode :: Module -> CoreProgram -> SDoc
 sptModuleInitCode this_mod binds =
-    sptInitCode $ catMaybes
-                $ map (\(b, e) -> ((,) b) <$> staticPtrFp e)
-                $ flattenBinds binds
+    sptInitCode $ collectStaticThings binds
   where
-    staticPtrFp :: CoreExpr -> Maybe Fingerprint
-    staticPtrFp (collectTyBinders -> (_, e))
-      | (Var v, _ : Lit lit0 : Lit lit1 : _) <- collectArgs e
-      , Just con <- isDataConId_maybe v
-      , dataConName con == staticPtrDataConName
-      , Just w0 <- fromPlatformWord64Rep lit0
-      , Just w1 <- fromPlatformWord64Rep lit1
-      = Just $ Fingerprint (fromInteger w0) (fromInteger w1)
-    staticPtrFp _ = Nothing
-
-    fromPlatformWord64Rep (MachWord w)   = Just w
-    fromPlatformWord64Rep (MachWord64 w) = Just w
-    fromPlatformWord64Rep _              = Nothing
-
     sptInitCode :: [(Id, Fingerprint)] -> SDoc
     sptInitCode [] = Outputable.empty
     sptInitCode entries = vcat
@@ -125,3 +114,24 @@ sptModuleInitCode this_mod binds =
                  [ integer (fromIntegral w1) <> text "ULL"
                  , integer (fromIntegral w2) <> text "ULL"
                  ]
+
+-- | Collect all of the bindings that should have static pointer table entries,
+-- along with their fingerprints.
+collectStaticThings :: CoreProgram -> [(Id, Fingerprint)]
+collectStaticThings binds =
+    mapMaybe (\(b, e) -> (b,) <$> staticPtrFp e)
+    $ flattenBinds binds
+  where
+    staticPtrFp :: CoreExpr -> Maybe Fingerprint
+    staticPtrFp (collectTyBinders -> (_, e))
+      | (Var v, _ : Lit lit0 : Lit lit1 : _) <- collectArgs e
+      , Just con <- isDataConId_maybe v
+      , dataConName con == staticPtrDataConName
+      , Just w0 <- fromPlatformWord64Rep lit0
+      , Just w1 <- fromPlatformWord64Rep lit1
+      = Just $ Fingerprint (fromInteger w0) (fromInteger w1)
+    staticPtrFp _ = Nothing
+
+    fromPlatformWord64Rep (MachWord w)   = Just w
+    fromPlatformWord64Rep (MachWord64 w) = Just w
+    fromPlatformWord64Rep _              = Nothing

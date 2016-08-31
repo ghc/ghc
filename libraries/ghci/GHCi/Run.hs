@@ -20,6 +20,7 @@ import GHCi.ObjLink
 import GHCi.RemoteTypes
 import GHCi.TH
 import GHCi.BreakArray
+import GHCi.StaticPtrTable
 
 import Control.Concurrent
 import Control.DeepSeq
@@ -56,6 +57,7 @@ run m = case m of
   FindSystemLibrary str -> findSystemLibrary str
   CreateBCOs bcos -> createBCOs (concatMap (runGet get) bcos)
   FreeHValueRefs rs -> mapM_ freeRemoteRef rs
+  AddSptEntry fpr r -> localRef r >>= sptAddEntry fpr
   EvalStmt opts r -> evalStmt opts r
   ResumeStmt opts r -> resumeStmt opts r
   AbandonStmt r -> abandonStmt r

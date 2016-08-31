@@ -18,13 +18,14 @@ module GHCi.RemoteTypes
   ) where
 
 import Control.DeepSeq
-import Data.Word
 import Foreign hiding (newForeignPtr)
 import Foreign.Concurrent
 import Data.Binary
 import Unsafe.Coerce
 import GHC.Exts
 import GHC.ForeignPtr
+import Foreign.Ptr (Ptr)
+import Data.Word (Word64)
 
 -- -----------------------------------------------------------------------------
 -- RemotePtr
