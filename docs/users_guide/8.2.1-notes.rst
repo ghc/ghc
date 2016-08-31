@@ -38,9 +38,6 @@ Compiler
   syntax can be used, in addition to a new form for specifying the cost centre
   name. See :ref:`scc-pragma` for examples.
 
-- Added :ghc-flag:`-fdefer-out-of-scope-variables`, which converts variable
-  out of scope variables errors into warnings.
-
 GHCi
 ~~~~
 

@@ -33,6 +33,9 @@ Compiler
    initial cmm from STG-to-C-- code generation and :ghc-flag:`-ddump-cmm-verbose`
    to obtain the intermediates from all C-- pipeline stages.
 
+-  Added :ghc-flag:`-fdefer-out-of-scope-variables`, which converts variable
+   out of scope variables errors into warnings.
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
