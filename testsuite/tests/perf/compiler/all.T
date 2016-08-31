@@ -428,8 +428,9 @@ test('T5631',
 test('parsing001',
      [compiler_stats_num_field('bytes allocated',
           [(wordsize(32), 274000576, 10),
-           (wordsize(64), 587079016, 5)]),
+           (wordsize(64), 682266448, 5)]),
         # expected value: 587079016 (amd64/Linux)
+        # 2016-08-31:     682266448 (amd64/Linux)
        only_ways(['normal']),
       ],
      compile_fail, [''])
