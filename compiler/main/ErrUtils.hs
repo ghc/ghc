@@ -13,7 +13,9 @@ module ErrUtils (
         Severity(..),
 
         -- * Messages
-        MsgDoc, ErrMsg, ErrDoc, errDoc, WarnMsg,
+        ErrMsg, errMsgDoc,
+        ErrDoc, errDoc, errDocImportant, errDocContext, errDocSupplementary,
+        WarnMsg, MsgDoc,
         Messages, ErrorMessages, WarningMessages,
         unionMessages,
         errMsgSpan, errMsgContext,
@@ -22,6 +24,7 @@ module ErrUtils (
         -- ** Formatting
         pprMessageBag, pprErrMsgBagWithLoc,
         pprLocErrMsg, printBagOfErrors,
+        formatErrDoc,
 
         -- ** Construction
         emptyMessages, mkLocMessage, mkLocMessageAnn, makeIntoWarning,
@@ -127,11 +130,11 @@ data ErrMsg = ErrMsg {
 -- from.
 data ErrDoc = ErrDoc {
         -- | Primary error msg.
-        errDocImportant :: [MsgDoc],
+        errDocImportant     :: [MsgDoc],
         -- | Context e.g. \"In the second argument of ...\".
-        _errDocContext :: [MsgDoc],
+        errDocContext       :: [MsgDoc],
         -- | Supplementary information, e.g. \"Relevant bindings include ...\".
-        _errDocSupplementary :: [MsgDoc]
+        errDocSupplementary :: [MsgDoc]
         }
 
 errDoc :: [MsgDoc] -> [MsgDoc] -> [MsgDoc] -> ErrDoc
