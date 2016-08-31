@@ -9361,13 +9361,21 @@ Here are some more details:
    containing holes, by using the :ghc-flag:`-fdefer-typed-holes` flag. This
    flag defers errors produced by typed holes until runtime, and
    converts them into compile-time warnings. These warnings can in turn
-   be suppressed entirely by :ghc-flag:`-fno-warn-typed-holes`).
+   be suppressed entirely by :ghc-flag:`-fno-warn-typed-holes`.
 
-   The result is that a hole will behave like ``undefined``, but with
+   The same behaviour for "``Variable out of scope``" errors, it terminates
+   compilation by default. You can defer such errors by using the
+   :ghc-flag:`-fdefer-out-of-scope-variables` flag. This flag defers errors
+   produced by out of scope variables until runtime, and
+   converts them into compile-time warnings. These warnings can in turn
+   be suppressed entirely by :ghc-flag:`-fno-warn-deferred-out-of-scope-variables`.
+
+   The result is that a hole or a variable will behave like ``undefined``, but with
    the added benefits that it shows a warning at compile time, and will
    show the same message if it gets evaluated at runtime. This behaviour
    follows that of the :ghc-flag:`-fdefer-type-errors` option, which implies
-   :ghc-flag:`-fdefer-typed-holes`. See :ref:`defer-type-errors`.
+   :ghc-flag:`-fdefer-typed-holes` and :ghc-flag:`-fdefer-out-of-scope-variables`.
+   See :ref:`defer-type-errors`.
 
 -  All unbound identifiers are treated as typed holes, *whether or not
    they start with an underscore*. The only difference is in the error
@@ -9861,12 +9869,13 @@ will not prevent compilation. You can use
 :ghc-flag:`-Wno-deferred-type-errors <-Wdeferred-type-errors>` to suppress these
 warnings.
 
-This flag implies the :ghc-flag:`-fdefer-typed-holes` flag, which enables this
-behaviour for `typed holes <#typed-holes>`__. Should you so wish, it is
+This flag implies the :ghc-flag:`-fdefer-typed-holes` and
+:ghc-flag:`-fdefer-out-of-scope-variables` flags, which enables this
+behaviour for `typed holes <#typed-holes>`__ and variables. Should you so wish, it is
 possible to enable :ghc-flag:`-fdefer-type-errors` without enabling
-:ghc-flag:`-fdefer-typed-holes`, by explicitly specifying
-:ghc-flag:`-fno-defer-typed-holes` on the command-line after the
-:ghc-flag:`-fdefer-type-errors` flag.
+:ghc-flag:`-fdefer-typed-holes` or :ghc-flag:`-fdefer-out-of-scope-variables`,
+by explicitly specifying :ghc-flag:`-fno-defer-typed-holes` or :ghc-flag:`-fno-defer-out-of-scope-variables`
+on the command-line after the :ghc-flag:`-fdefer-type-errors` flag.
 
 At runtime, whenever a term containing a type error would need to be
 evaluated, the error is converted into a runtime exception of type

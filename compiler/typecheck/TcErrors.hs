@@ -139,21 +139,28 @@ reportUnsolved wanted
                         | warn_partial_sigs = HoleWarn
                         | otherwise         = HoleDefer
 
-       ; report_unsolved (Just binds_var) False type_errors expr_holes type_holes wanted
+       ; defer_out_of_scope <- goptM Opt_DeferOutOfScopeVariables
+       ; warn_out_of_scope <- woptM Opt_WarnDeferredOutOfScopeVariables
+       ; let out_of_scope_holes | not defer_out_of_scope = HoleError
+                                | warn_out_of_scope      = HoleWarn
+                                | otherwise              = HoleDefer
+
+       ; report_unsolved (Just binds_var) False type_errors expr_holes
+          type_holes out_of_scope_holes wanted
        ; getTcEvBinds binds_var }
 
 -- | Report *all* unsolved goals as errors, even if -fdefer-type-errors is on
 -- See Note [Deferring coercion errors to runtime]
 reportAllUnsolved :: WantedConstraints -> TcM ()
 reportAllUnsolved wanted
-  = report_unsolved Nothing False TypeError HoleError HoleError wanted
+  = report_unsolved Nothing False TypeError HoleError HoleError HoleError wanted
 
 -- | Report all unsolved goals as warnings (but without deferring any errors to
 -- run-time). See Note [Safe Haskell Overlapping Instances Implementation] in
 -- TcSimplify
 warnAllUnsolved :: WantedConstraints -> TcM ()
 warnAllUnsolved wanted
-  = report_unsolved Nothing True TypeWarn HoleWarn HoleWarn wanted
+  = report_unsolved Nothing True TypeWarn HoleWarn HoleWarn HoleWarn wanted
 
 -- | Report unsolved goals as errors or warnings.
 report_unsolved :: Maybe EvBindsVar  -- cec_binds
@@ -161,8 +168,10 @@ report_unsolved :: Maybe EvBindsVar  -- cec_binds
                 -> TypeErrorChoice   -- Deferred type errors
                 -> HoleChoice        -- Expression holes
                 -> HoleChoice        -- Type holes
+                -> HoleChoice        -- Out of scope holes
                 -> WantedConstraints -> TcM ()
-report_unsolved mb_binds_var err_as_warn type_errors expr_holes type_holes wanted
+report_unsolved mb_binds_var err_as_warn type_errors expr_holes
+    type_holes out_of_scope_holes wanted
   | isEmptyWC wanted
   = return ()
   | otherwise
@@ -186,6 +195,7 @@ report_unsolved mb_binds_var err_as_warn type_errors expr_holes type_holes wante
                             , cec_errors_as_warns = err_as_warn
                             , cec_expr_holes = expr_holes
                             , cec_type_holes = type_holes
+                            , cec_out_of_scope_holes = out_of_scope_holes
                             , cec_suppress = False -- See Note [Suppressing error messages]
                             , cec_warn_redundant = warn_redundant
                             , cec_binds    = mb_binds_var }
@@ -272,8 +282,13 @@ data ReportErrCtxt
           , cec_defer_type_errors :: TypeErrorChoice -- Defer type errors until runtime
                                                      -- Irrelevant if cec_binds = Nothing
 
-          , cec_expr_holes :: HoleChoice  -- Holes in expressions
-          , cec_type_holes :: HoleChoice  -- Holes in types
+          -- cec_expr_holes is a union of:
+          --   cec_type_holes - a set of typed holes: '_', '_a', '_foo'
+          --   cec_out_of_scope_holes - a set of variables which are
+          --                            out of scope: 'x', 'y', 'bar'
+          , cec_expr_holes :: HoleChoice           -- Holes in expressions
+          , cec_type_holes :: HoleChoice           -- Holes in types
+          , cec_out_of_scope_holes :: HoleChoice   -- Out of scope holes
 
           , cec_warn_redundant :: Bool    -- True <=> -Wredundant-constraints
 
@@ -613,10 +628,17 @@ maybeReportHoleError ctxt ct err
        HoleWarn  -> reportWarning (Reason Opt_WarnPartialTypeSignatures) err
        HoleDefer -> return ()
 
+  -- Always report an error for out-of-scope variables
+  -- Unless -fdefer-out-of-scope-variables is on,
+  -- in which case the messages are discarded.
+  -- See Trac #12170, #12406
   | isOutOfScopeCt ct
-  = -- Always report an error for out-of-scope variables
-    -- See Trac #12170, #12406
-    reportError err
+  = -- If deferring, report a warning only if -Wout-of-scope-variables is on
+    case cec_out_of_scope_holes ctxt of
+      HoleError -> reportError err
+      HoleWarn  ->
+        reportWarning (Reason Opt_WarnDeferredOutOfScopeVariables) err
+      HoleDefer -> return ()
 
   -- Otherwise this is a typed hole in an expression,
   -- but not for an out-of-scope variable
