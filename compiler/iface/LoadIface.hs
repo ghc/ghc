@@ -138,7 +138,7 @@ importDecl name
         { eps <- getEps
         ; case lookupTypeEnv (eps_PTE eps) name of
             Just thing -> return (Succeeded thing)
-            Nothing    -> return (Failed not_found_msg)
+            Nothing    -> return $ Failed (ifPprDebug (found_things_msg eps) $$ not_found_msg)
     }}}
   where
     nd_doc = text "Need decl for" <+> ppr name
@@ -146,6 +146,11 @@ importDecl name
                                 pprNameSpace (occNameSpace (nameOccName name)) <+> ppr name)
                        2 (vcat [text "Probable cause: bug in .hi-boot file, or inconsistent .hi file",
                                 text "Use -ddump-if-trace to get an idea of which file caused the error"])
+    found_things_msg eps =
+        hang (text "Found the following declarations in" <+> ppr (nameModule name) <> colon)
+           2 (vcat (map ppr $ filter is_interesting $ nameEnvElts $ eps_PTE eps))
+      where
+        is_interesting thing = nameModule name == nameModule (getName thing)
 
 
 {-
