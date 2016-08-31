@@ -21,7 +21,8 @@ Language
 Compiler
 ~~~~~~~~
 
--  TODO FIXME.
+-  The :ghc-flag:`-Wredundant-constraints` flag has been removed from the
+   :ghc-flag:`-Wall` flag set (see :ghc-ticket:`10635`).
 
 Template Haskell
 ~~~~~~~~~~~~~~~~
