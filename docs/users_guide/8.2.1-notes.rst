@@ -43,6 +43,8 @@ GHCi
 
 -  TODO FIXME.
 
+- Added :ghc-flag:`-flocal-ghci-history` which uses current directory for `.ghci-history`.
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
 

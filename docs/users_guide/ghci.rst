@@ -1901,6 +1901,17 @@ Most of the command-line options accepted by GHC (see :ref:`using-ghc`)
 also make sense in interactive mode. The ones that don't make sense are
 mostly obvious.
 
+.. ghc-flag:: -flocal-ghci-history
+
+  By default, GHCi keeps global history in ``~/.ghc/ghci_history`` or
+  ``%APPDATA%/<app>/ghci_history``, but you can use current directory, e.g.:
+
+  .. code-block:: none
+
+      $ ghci -flocal-ghci-history
+
+  It will create ``.ghci-history`` in current folder where GHCi is launched.
+
 Packages
 ~~~~~~~~
 

@@ -36,4 +36,11 @@ miscOptions =
          , flagType = DynamicFlag
          , flagReverse = "-fno-reverse-errors"
          }
+  , flag { flagName = "-flocal-ghci-history"
+         , flagDescription =
+           "Use current directory for the GHCi command history "++
+           "file ``.ghci-history``."
+         , flagType = DynamicFlag
+         , flagReverse = "-fno-local-ghci-history"
+         }
   ]

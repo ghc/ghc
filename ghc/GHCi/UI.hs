@@ -613,10 +613,16 @@ runGHCi paths maybe_exprs = do
 runGHCiInput :: InputT GHCi a -> GHCi a
 runGHCiInput f = do
     dflags <- getDynFlags
-    histFile <- if gopt Opt_GhciHistory dflags
-                then liftIO $ withGhcAppData (\dir -> return (Just (dir </> "ghci_history")))
-                                             (return Nothing)
-                else return Nothing
+    let ghciHistory = gopt Opt_GhciHistory dflags
+    let localGhciHistory = gopt Opt_LocalGhciHistory dflags
+    currentDirectory <- liftIO $ getCurrentDirectory
+
+    histFile <- case (ghciHistory, localGhciHistory) of
+      (True, True) -> return (Just (currentDirectory </> ".ghci_history"))
+      (True, _) -> liftIO $ withGhcAppData
+        (\dir -> return (Just (dir </> "ghci_history"))) (return Nothing)
+      _ -> return Nothing
+
     runInputT
         (setComplete ghciCompleteWord $ defaultSettings {historyFile = histFile})
         f
