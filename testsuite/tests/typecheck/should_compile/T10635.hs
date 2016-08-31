@@ -1,5 +1,4 @@
 {-# LANGUAGE GADTs #-}
-{-# OPTIONS_GHC -Wredundant-constraints #-}
 
 module T9939 where
 
@@ -21,4 +20,3 @@ data Equal a b where
 f4 :: (Eq a, Eq b) => a -> b -> Equal a b -> Bool
 -- Eq b redundant
 f4 x y EQUAL = y==y
-
