@@ -8,7 +8,7 @@ TODO FIXME
 Highlights
 ----------
 
-TODO FIXME.
+-  Many, many bug fixes.
 
 Full details
 ------------
@@ -36,4 +36,9 @@ Template Haskell
   .. code-block:: none
 
       f x = $(addModFinalizer (reify 'x >>= runIO . print) >> [| x |])
+
+``ghc`` library
+~~~~~~~~~~~~~~~
+
+- Accessors are now exposed for ``ErrUtils.ErrMsg`` and ``ErrUtils.ErrDoc``.
 
