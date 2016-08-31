@@ -50,6 +50,8 @@ ifeq "$(MinGhcVersion711)" "YES"
 TEST_HC_OPTS += -fno-warn-missed-specialisations
 endif
 
+TEST_HC_OPTS_INTERACTIVE = $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci
+
 RUNTEST_OPTS =
 
 ifeq "$(filter $(TargetOS_CPP), cygwin32 mingw32)" ""
