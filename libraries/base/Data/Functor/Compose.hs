@@ -28,6 +28,7 @@ import Data.Data (Data)
 import Data.Foldable (Foldable(foldMap))
 import Data.Traversable (Traversable(traverse))
 import GHC.Generics (Generic, Generic1)
+import Text.Read (Read(..), readListDefault, readListPrecDefault)
 
 infixr 9 `Compose`
 
@@ -50,11 +51,14 @@ instance (Ord1 f, Ord1 g) => Ord1 (Compose f g) where
 
 -- | @since 4.9.0.0
 instance (Read1 f, Read1 g) => Read1 (Compose f g) where
-    liftReadsPrec rp rl = readsData $
-        readsUnaryWith (liftReadsPrec rp' rl') "Compose" Compose
+    liftReadPrec rp rl = readData $
+        readUnaryWith (liftReadPrec rp' rl') "Compose" Compose
       where
-        rp' = liftReadsPrec rp rl
-        rl' = liftReadList rp rl
+        rp' = liftReadPrec     rp rl
+        rl' = liftReadListPrec rp rl
+
+    liftReadListPrec = liftReadListPrecDefault
+    liftReadList     = liftReadListDefault
 
 -- | @since 4.9.0.0
 instance (Show1 f, Show1 g) => Show1 (Compose f g) where
@@ -76,7 +80,10 @@ instance (Ord1 f, Ord1 g, Ord a) => Ord (Compose f g a) where
 
 -- | @since 4.9.0.0
 instance (Read1 f, Read1 g, Read a) => Read (Compose f g a) where
-    readsPrec = readsPrec1
+    readPrec = readPrec1
+
+    readListPrec = readListPrecDefault
+    readList     = readListDefault
 
 -- | @since 4.9.0.0
 instance (Show1 f, Show1 g, Show a) => Show (Compose f g a) where

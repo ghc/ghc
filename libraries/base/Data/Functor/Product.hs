@@ -31,6 +31,7 @@ import Data.Functor.Classes
 import Data.Monoid (mappend)
 import Data.Traversable (Traversable(traverse))
 import GHC.Generics (Generic, Generic1)
+import Text.Read (Read(..), readListDefault, readListPrecDefault)
 
 -- | Lifted product of functors.
 data Product f g a = Pair (f a) (g a)
@@ -47,8 +48,11 @@ instance (Ord1 f, Ord1 g) => Ord1 (Product f g) where
 
 -- | @since 4.9.0.0
 instance (Read1 f, Read1 g) => Read1 (Product f g) where
-    liftReadsPrec rp rl = readsData $
-        readsBinaryWith (liftReadsPrec rp rl) (liftReadsPrec rp rl) "Pair" Pair
+    liftReadPrec rp rl = readData $
+        readBinaryWith (liftReadPrec rp rl) (liftReadPrec rp rl) "Pair" Pair
+
+    liftReadListPrec = liftReadListPrecDefault
+    liftReadList     = liftReadListDefault
 
 -- | @since 4.9.0.0
 instance (Show1 f, Show1 g) => Show1 (Product f g) where
@@ -65,7 +69,10 @@ instance (Ord1 f, Ord1 g, Ord a) => Ord (Product f g a) where
 
 -- | @since 4.9.0.0
 instance (Read1 f, Read1 g, Read a) => Read (Product f g a) where
-    readsPrec = readsPrec1
+    readPrec = readPrec1
+
+    readListPrec = readListPrecDefault
+    readList     = readListDefault
 
 -- | @since 4.9.0.0
 instance (Show1 f, Show1 g, Show a) => Show (Product f g a) where

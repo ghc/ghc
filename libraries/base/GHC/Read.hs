@@ -147,6 +147,31 @@ readParen b g   =  if b then mandatory else optional
 -- >                 up_prec = 5
 -- >
 -- >         readListPrec = readListPrecDefault
+--
+-- Why do both 'readsPrec' and 'readPrec' exist, and why does GHC opt to
+-- implement 'readPrec' in derived 'Read' instances instead of 'readsPrec'?
+-- The reason is that 'readsPrec' is based on the 'ReadS' type, and although
+-- 'ReadS' is mentioned in the Haskell 2010 Report, it is not a very efficient
+-- parser data structure.
+--
+-- 'readPrec', on the other hand, is based on a much more efficient 'ReadPrec'
+-- datatype (a.k.a \"new-style parsers\"), but its definition relies on the use
+-- of the @RankNTypes@ language extension. Therefore, 'readPrec' (and its
+-- cousin, 'readListPrec') are marked as GHC-only. Nevertheless, it is
+-- recommended to use 'readPrec' instead of 'readsPrec' whenever possible
+-- for the efficiency improvements it brings.
+--
+-- As mentioned above, derived 'Read' instances in GHC will implement
+-- 'readPrec' instead of 'readsPrec'. The default implementations of
+-- 'readsPrec' (and its cousin, 'readList') will simply use 'readPrec' under
+-- the hood. If you are writing a 'Read' instance by hand, it is recommended
+-- to write it like so:
+--
+-- @
+-- instance 'Read' T where
+--   'readPrec'     = ...
+--   'readListPrec' = 'readListPrecDefault'
+-- @
 
 class Read a where
   {-# MINIMAL readsPrec | readPrec #-}

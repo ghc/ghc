@@ -111,6 +111,12 @@ See ``changelog.md`` in the ``base`` package for full release notes.
 - ``Data.Type.Coercion`` now provides ``gcoerceWith``, which is analogous to
   ``gcastWith`` from ``Data.Type.Equality``.
 
+- The ``Read1`` and ``Read2`` classes in ``Data.Functor.Classes`` have new
+  methods, ``liftReadList(2)`` and ``liftReadListPrec(2)``, that are defined in
+  terms of ``ReadPrec`` instead of ``ReadS``. This matches the interface
+  provided in GHC's version of the ``Read`` class, and allows users to write
+  more efficient ``Read1`` and ``Read2`` instances.
+
 binary
 ~~~~~~
 

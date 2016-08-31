@@ -21,12 +21,13 @@ module Data.Functor.Sum (
     Sum(..),
   ) where
 
+import Control.Applicative ((<|>))
 import Data.Data (Data)
 import Data.Foldable (Foldable(foldMap))
 import Data.Functor.Classes
-import Data.Monoid (mappend)
 import Data.Traversable (Traversable(traverse))
 import GHC.Generics (Generic, Generic1)
+import Text.Read (Read(..), readListDefault, readListPrecDefault)
 
 -- | Lifted sum of functors.
 data Sum f g a = InL (f a) | InR (g a)
@@ -48,9 +49,12 @@ instance (Ord1 f, Ord1 g) => Ord1 (Sum f g) where
 
 -- | @since 4.9.0.0
 instance (Read1 f, Read1 g) => Read1 (Sum f g) where
-    liftReadsPrec rp rl = readsData $
-        readsUnaryWith (liftReadsPrec rp rl) "InL" InL `mappend`
-        readsUnaryWith (liftReadsPrec rp rl) "InR" InR
+    liftReadPrec rp rl = readData $
+        readUnaryWith (liftReadPrec rp rl) "InL" InL <|>
+        readUnaryWith (liftReadPrec rp rl) "InR" InR
+
+    liftReadListPrec = liftReadListPrecDefault
+    liftReadList     = liftReadListDefault
 
 -- | @since 4.9.0.0
 instance (Show1 f, Show1 g) => Show1 (Sum f g) where
@@ -67,7 +71,10 @@ instance (Ord1 f, Ord1 g, Ord a) => Ord (Sum f g a) where
     compare = compare1
 -- | @since 4.9.0.0
 instance (Read1 f, Read1 g, Read a) => Read (Sum f g a) where
-    readsPrec = readsPrec1
+    readPrec = readPrec1
+
+    readListPrec = readListPrecDefault
+    readList     = readListDefault
 -- | @since 4.9.0.0
 instance (Show1 f, Show1 g, Show a) => Show (Sum f g a) where
     showsPrec = showsPrec1
