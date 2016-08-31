@@ -25,7 +25,8 @@ Language
 Compiler
 ~~~~~~~~
 
--  TODO FIXME.
+-  The :ghc-flag:`-Wredundant-constraints` flag has been removed from the
+   :ghc-flag:`-Wall` flag set (see :ghc-ticket:`10635`).
 
 -  The :ghc-flag:`-ddump-cmm` now dumps the result after C-- pipeline pass. Two
    more flags were added: :ghc-flag:`-ddump-cmm-from-stg` to allow to get the
