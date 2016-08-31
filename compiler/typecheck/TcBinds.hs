@@ -1262,69 +1262,81 @@ data TcMonoBind         -- Half completed; LHS done, RHS not done
   | TcPatBind [MonoBindInfo] (LPat TcId) (GRHSs Name (LHsExpr Name)) TcSigmaType
 
 tcLhs :: TcSigFun -> LetBndrSpec -> HsBind Name -> TcM TcMonoBind
+-- Only called with plan InferGen (LetBndrSpec = LetLclBndr)
+--                    or NoGen    (LetBndrSpec = LetGblBndr)
+-- CheckGen is used only for functions with a complete type signature,
+--          and tcPolyCheck doesn't use tcMonoBinds at all
+
 tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name, fun_matches = matches })
-  = do { mono_info <- tcLhsId sig_fn no_gen name
+  | Just (TcIdSig sig) <- sig_fn name
+  = -- There is a type signature.
+    -- It must be partial; if complete we'd be in tcPolyCheck!
+    --    e.g.   f :: _ -> _
+    --           f x = ...g...
+    --           Just g = ...f...
+    -- Hence always typechecked with InferGen
+    do { mono_info <- tcLhsSigId no_gen (name, sig)
+       ; return (TcFunBind mono_info nm_loc matches) }
+
+  | otherwise  -- No type signature
+  = do { mono_ty <- newOpenFlexiTyVarTy
+       ; mono_id <- newLetBndr no_gen name mono_ty
+       ; let mono_info = MBI { mbi_poly_name = name
+                             , mbi_sig       = Nothing
+                             , mbi_mono_id   = mono_id }
        ; return (TcFunBind mono_info nm_loc matches) }
 
 tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
-  = do  { let bndr_names = collectPatBinders pat
-        ; mbis <- mapM (tcLhsId sig_fn no_gen) bndr_names
-            -- See Note [Existentials in pattern bindings]
+  = -- See Note [Typechecking pattern bindings]
+    do  { sig_mbis <- mapM (tcLhsSigId no_gen) sig_names
 
         ; let inst_sig_fun = lookupNameEnv $ mkNameEnv $
-                             bndr_names `zip` map mbi_mono_id mbis
+                             [ (mbi_poly_name mbi, mbi_mono_id mbi)
+                             | mbi <- sig_mbis ]
+
+            -- See Note [Existentials in pattern bindings]
+        ; ((pat', nosig_mbis), pat_ty)
+            <- addErrCtxt (patMonoBindsCtxt pat grhss) $
+               tcInferInst $ \ exp_ty ->
+               tcLetPat inst_sig_fun no_gen pat exp_ty $
+               mapM lookup_info nosig_names
+
+        ; let mbis = sig_mbis ++ nosig_mbis
 
         ; traceTc "tcLhs" (vcat [ ppr id <+> dcolon <+> ppr (idType id)
                                 | mbi <- mbis, let id = mbi_mono_id mbi ]
                            $$ ppr no_gen)
 
-        ; ((pat', _), pat_ty) <- addErrCtxt (patMonoBindsCtxt pat grhss) $
-                                 tcInfer $ \ exp_ty ->
-                                 tcLetPat inst_sig_fun pat exp_ty $
-                                 return () -- mapM (lookup_info inst_sig_fun) bndr_names
-
         ; return (TcPatBind mbis pat' grhss pat_ty) }
+  where
+    bndr_names = collectPatBinders pat
+    (nosig_names, sig_names) = partitionWith find_sig bndr_names
+
+    find_sig :: Name -> Either Name (Name, TcIdSigInfo)
+    find_sig name = case sig_fn name of
+                      Just (TcIdSig sig) -> Right (name, sig)
+                      _                  -> Left name
+
+      -- After typechecking the pattern, look up the binder
+      -- names that lack a signature, which the pattern has brought
+      -- into scope.
+    lookup_info :: Name -> TcM MonoBindInfo
+    lookup_info name
+      = do { mono_id <- tcLookupId name
+           ; return (MBI { mbi_poly_name = name
+                         , mbi_sig       = Nothing
+                         , mbi_mono_id   = mono_id }) }
 
 tcLhs _ _ other_bind = pprPanic "tcLhs" (ppr other_bind)
         -- AbsBind, VarBind impossible
 
 -------------------
-data LetBndrSpec
-  = LetLclBndr            -- We are going to generalise, and wrap in an AbsBinds
-                          -- so clone a fresh binder for the local monomorphic Id
-
-  | LetGblBndr TcPragEnv  -- Generalisation plan is NoGen, so there isn't going
-                          -- to be an AbsBinds; So we must bind the global version
-                          -- of the binder right away.
-                          -- And here is the inline-pragma information
-
-instance Outputable LetBndrSpec where
-  ppr LetLclBndr      = text "LetLclBndr"
-  ppr (LetGblBndr {}) = text "LetGblBndr"
-
-tcLhsId :: TcSigFun -> LetBndrSpec -> Name -> TcM MonoBindInfo
-tcLhsId sig_fn no_gen name
-  | Just (TcIdSig sig) <- sig_fn name
-  = -- A partial type signature on a FunBind, in a mixed group
-    --    e.g.   f :: _ -> _
-    --           f x = ...g...
-    --           Just g = ...f...
-    -- Hence always typechecked with InferGen; hence LetLclBndr
-    --
-    -- A compelete type sig on a FunBind is checked with CheckGen
-    -- and does not go via tcLhsId
-    do { inst_sig <- tcInstSig sig
-       ; the_id <- newSigLetBndr no_gen name inst_sig
+tcLhsSigId :: LetBndrSpec -> (Name, TcIdSigInfo) -> TcM MonoBindInfo
+tcLhsSigId no_gen (name, sig)
+  = do { inst_sig <- tcInstSig sig
+       ; mono_id <- newSigLetBndr no_gen name inst_sig
        ; return (MBI { mbi_poly_name = name
                      , mbi_sig       = Just inst_sig
-                     , mbi_mono_id   = the_id }) }
-
-  | otherwise
-  = -- No type signature, plan InferGen (LetLclBndr) or NoGen (LetGblBndr)
-    do { mono_ty <- newOpenFlexiTyVarTy
-       ; mono_id <- newLetBndr no_gen name mono_ty
-       ; return (MBI { mbi_poly_name = name
-                     , mbi_sig       = Nothing
                      , mbi_mono_id   = mono_id }) }
 
 ------------
@@ -1334,20 +1346,6 @@ newSigLetBndr (LetGblBndr prags) name (TISI { sig_inst_sig = id_sig })
   = addInlinePrags poly_id (lookupPragEnv prags name)
 newSigLetBndr no_gen name (TISI { sig_inst_tau = tau })
   = newLetBndr no_gen name tau
-
-newLetBndr :: LetBndrSpec -> Name -> TcType -> TcM TcId
--- In the polymorphic case when we are going to generalise
---    (plan InferGen, no_gen = LetLclBndr), generate a "monomorphic version"
---    of the Id; the original name will be bound to the polymorphic version
---    by the AbsBinds
--- In the monomorphic case when we are not going to generalise
---    (plan NoGen, no_gen = LetGblBndr) there is no AbsBinds,
---    and we use the original name directly
-newLetBndr LetLclBndr name ty
-  = do { mono_name <- cloneLocalName name
-       ; return (mkLocalId mono_name ty) }
-newLetBndr (LetGblBndr prags) name ty
-  = addInlinePrags (mkLocalId name ty) (lookupPragEnv prags name)
 
 -------------------
 tcRhs :: TcMonoBind -> TcM (HsBind TcId)
@@ -1417,9 +1415,13 @@ getMonoBindInfo tc_binds
     get_info (TcFunBind info _ _)    rest = info : rest
     get_info (TcPatBind infos _ _ _) rest = infos ++ rest
 
-{- Note [Existentials in pattern bindings]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (typecheck/should_compile/ExPat):
+
+{- Note [Typechecking pattern bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Look at:
+   - typecheck/should_compile/ExPat
+   - Trac #12427, typecheck/should_compile/T12427{a,b}
+
   data T where
     MkT :: Integral a => a -> Int -> T
 
@@ -1431,48 +1433,96 @@ and suppose t :: T.  Which of these pattern bindings are ok?
 
   E3. let { MkT (toInteger -> r) _ = t } in <body>
 
-Well (E1) is clearly wrong because the existential 'a' escapes.
-What type could 'p' possibly have?
+* (E1) is clearly wrong because the existential 'a' escapes.
+  What type could 'p' possibly have?
 
-But (E2) is fine, despite the existential pattern, because
-q::Int, and nothing escapes.
+* (E2) is fine, despite the existential pattern, because
+  q::Int, and nothing escapes.
 
-Even (E3) is fine.  The existential pattern binds a dictionary
-for (Integral a) which the view pattern can use to convert the
-a-valued field to an Integer, so r :: Integer.
+* Even (E3) is fine.  The existential pattern binds a dictionary
+  for (Integral a) which the view pattern can use to convert the
+  a-valued field to an Integer, so r :: Integer.
 
 An easy way to see all three is to imagine the desugaring.
-For (2) it would look like
+For (E2) it would look like
     let q = case t of MkT _ q' -> q'
     in <body>
 
-We typecheck pattern bindings as follows:
-  1. In tcLhs we bind q'::alpha, for each variable q bound by the
-     pattern, where q' is a fresh name, and alpha is a fresh
-     unification variable; it will be the monomorphic verion of q that
-     we later generalise
 
-     It's very important that these fresh unification variables
-     alpha are born here, not deep under implications as would happen
-     if we allocated them when we encountered q during tcPat.
+We typecheck pattern bindings as follows.  First tcLhs does this:
 
-  2. Still in tcLhs, we build a little environment mappting "q" ->
-     q':alpha, and pass that to tcLetPet.
+  1. Take each type signature q :: ty, partial or complete, and
+     instantiate it (with tcLhsSigId) to get a MonoBindInfo.  This
+     gives us a fresh "mono_id" qm :: instantiate(ty), where qm has
+     a fresh name.
 
-  3. Then tcLhs invokes tcLetPat to typecheck the patter as usual:
-     - When tcLetPat finds an existential constructor, it binds fresh
-       type variables and dictionaries as usual, and emits an
-       implication constraint.
+     Any fresh unification variables in instiatiate(ty) born here, not
+     deep under implications as would happen if we allocated them when
+     we encountered q during tcPat.
 
-     - When tcLetPat finds a variable (TcPat.tcPatBndr) it looks it up
-       in the little environment, which should always succeed.  And
-       uses tcSubTypeET to connect the type of that variable with the
-       expected type of the pattern.
+  2. Build a little environment mapping "q" -> "qm" for those Ids
+     with signatures (inst_sig_fun)
+
+  3. Invoke tcLetPat to typecheck the pattern.
+
+     - We pass in the current TcLevel.  This is captured by
+       TcPat.tcLetPat, and put into the pc_lvl field of PatCtxt, in
+       PatEnv.
+
+     - When tcPat finds an existential constructor, it binds fresh
+       type variables and dictionaries as usual, increments the TcLevel,
+       and emits an implication constraint.
+
+     - When we come to a binder (TcPat.tcPatBndr), it looks it up
+       in the little environment (the pc_sig_fn field of PatCtxt).
+
+         Success => There was a type signature, so just use it,
+                    checking compatibility with the expected type.
+
+         Failure => No type sigature.
+             Infer case: (happens only outside any constructor pattern)
+                         use a unification variable
+                         at the outer level pc_lvl
+
+             Check case: use promoteTcType to promote the type
+                         to the outer level pc_lvl.  This is the
+                         place where we emit a constraint that'll blow
+                         up if existential capture takes place
+
+       Result: the type of the binder is always at pc_lvl. This is
+       crucial.
+
+  4. Throughout, when we are making up an Id for the pattern-bound variables
+     (newLetBndr), we have two cases:
+
+     - If we are generalising (generalisation plan is InferGen or
+       CheckGen), then the let_bndr_spec will be LetLclBndr.  In that case
+       we want to bind a cloned, local version of the variable, with the
+       type given by the pattern context, *not* by the signature (even if
+       there is one; see Trac #7268). The mkExport part of the
+       generalisation step will do the checking and impedance matching
+       against the signature.
+
+     - If for some some reason we are not generalising (plan = NoGen), the
+       LetBndrSpec will be LetGblBndr.  In that case we must bind the
+       global version of the Id, and do so with precisely the type given
+       in the signature.  (Then we unify with the type from the pattern
+       context type.)
+
 
 And that's it!  The implication constraints check for the skolem
-escape.  It's quite simple and neat, and more exressive than before
+escape.  It's quite simple and neat, and more expressive than before
 e.g. GHC 8.0 rejects (E2) and (E3).
 
+Example for (E1), starting at level 1.  We generate
+     p :: beta:1, with constraints (forall:3 a. Integral a => a ~ beta)
+The (a~beta) can't float (because of the 'a'), nor be solved (because
+beta is untouchable.)
+
+Example for (E2), we generate
+     q :: beta:1, with constraint (forall:3 a. Integral a => Int ~ beta)
+The beta is untoucable, but floats out of the constraint and can
+be solved absolutely fine.
 
 ************************************************************************
 *                                                                      *
