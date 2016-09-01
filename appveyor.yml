@@ -1,41 +1,36 @@
-clone_folder: "C:\\msys64\\home\\ghc\\hadrian"
+clone_folder: "c:\\ghc\\hadrian"
 environment:
   global:
     STACK_ROOT: "c:\\sr"
 
 cache:
-    - "c:\\sr"
+    - "c:\\sr -> appveyor.yml"
 
 install:
-    - cd
-    - set MSYSTEM=MINGW64
-    - set PATH=C:\msys64\mingw64\bin;C:\msys64\usr\bin;C:\msys64;%PATH%
-    - set PATH=%PATH%;C:\Users\appveyor\AppData\Roaming\local\bin\;%APPVEYOR_BUILD_FOLDER%
+    # Get Stack
     - curl -ostack.zip -LsS --insecure https://www.stackage.org/stack/windows-x86_64
     - 7z x stack.zip stack.exe
-    - bash -lc "curl -LsS http://www.haskell.org/ghc/dist/7.10.3/ghc-7.10.3-x86_64-unknown-mingw32.tar.xz | tar -xJ -C /mingw64 --strip-components=1"
-    - stack exec -- pacman -S --noconfirm gcc binutils p7zip git
 
-    - git config --global url."git://github.com/ghc/packages-".insteadOf     git://github.com/ghc/packages/
-    - git config --global url."http://github.com/ghc/packages-".insteadOf    http://github.com/ghc/packages/
-    - git config --global url."https://github.com/ghc/packages-".insteadOf   https://github.com/ghc/packages/
-    - git config --global url."ssh://git@github.com/ghc/packages-".insteadOf ssh://git@github.com/ghc/packages/
-    - git config --global url."git@github.com:/ghc/packages-".insteadOf      git@github.com:/ghc/packages/
-    - git clone https://github.com/ghc/ghc --recurse-submodules --depth 1 C:\msys64\home\ghc\tmp
+    # Fetch GHC sources into c:\ghc
+    # Note: Appveyor has already cloned Hadrian into c:\ghc\hadrian, so it's tricky
+    - cd ..
+    - git init
+    - git remote add origin git://git.haskell.org/ghc.git
+    - git pull --recurse-submodules origin master
+    - git submodule update --init --recursive
 
-    - bash -lc "mv /home/ghc/tmp/* /home/ghc"
-    - echo "" | stack --no-terminal install alex happy shake ansi-terminal mtl
-    - ghc   --version
-    - stack --version
-    - alex  --version
-    - happy --version
-    - stack exec -- ghc-pkg list
-    - cd C:\msys64\home\ghc
-    - bash -lc "cd /home/ghc; mkdir -p ghc-tarballs/mingw-w64/x86_64/"
-    - bash -lc "cd /home/ghc; mkdir -p ghc-tarballs/perl/"
+    # Install all Hadrian and GHC build dependencies
+    - cd hadrian
+    - stack setup
+    - stack exec -- pacman -S autoconf automake-wrapper make patch tar --noconfirm
 
 build_script:
-    - cd C:\msys64\home\ghc\hadrian
-    - echo "" | stack --no-terminal exec -- build.bat selftest
-    - echo "" | stack --no-terminal exec -- build.bat -j --verbose --no-progress --progress-colour=never --profile=- --flavour=quickest
-    - C:\msys64\home\ghc\inplace\bin\ghc-stage2.exe -e 1+2
+    # Build Hadrian
+    - stack build
+    # Run internal Hadrian tests
+    - stack exec hadrian -- selftest
+    # Build GHC
+    - echo "" | stack --no-terminal exec hadrian -- --lint --directory ".." -j --verbose --no-progress --progress-colour=never --profile=- --flavour=quickest
+    # Test GHC binary
+    - cd ..
+    - inplace\bin\ghc-stage2 -e 1+2
