@@ -396,21 +396,6 @@ GhcRtsWithLibdw=$(strip $(if $(filter $(TargetArch_CPP),i386 x86_64),@UseLibdw@,
 #
 ################################################################################
 
-# Directory used by GHC (and possibly other tools) for storing
-# temporary files.  If your TMPDIR isn't big enough, either override
-# this in build.mk or set your environment variable "TMPDIR" to point
-# to somewhere with more space.  (TMPDIR=. is a good choice).
-
-# DEFAULT_TMPDIR isn't called TMPDIR because GNU make tends to
-# override an environment variable with the value of the make variable
-# of the same name (if it exists) when executing sub-processes, so
-# setting the TMPDIR env var would have no effect in the build tree.
-
-DEFAULT_TMPDIR		= /tmp
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-DEFAULT_TMPDIR		= /C/TEMP
-endif
-
 BIN_DIST_NAME         = ghc-$(ProjectVersion)
 BIN_DIST_PREP_DIR     = bindistprep/$(BIN_DIST_NAME)
 BIN_DIST_PREP_TAR     = bindistprep/$(BIN_DIST_NAME)-$(TARGETPLATFORM).tar

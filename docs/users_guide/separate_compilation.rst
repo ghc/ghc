@@ -405,10 +405,6 @@ Redirecting temporary files
     name of the directory where temporary files should be put. GCC and other
     programs will honour the :envvar:`TMPDIR` variable as well.
 
-    Even better idea: Set the :envvar:`DEFAULT_TMPDIR` :command:`make` variable when
-    building GHC, and never worry about :envvar:`TMPDIR` again. (see the build
-    documentation).
-
 .. _hi-options:
 
 Other options related to interface files
