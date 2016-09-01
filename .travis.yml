@@ -3,7 +3,6 @@ sudo: true
 matrix:
     include:
         - os: linux
-          env: CABALVER=1.22 GHCVER=7.10.3 FLAVOUR=quickest TARGET=
           addons:
               apt:
                   packages:
@@ -12,65 +11,47 @@ matrix:
                       - zlib1g-dev
                   sources: hvr-ghc
           before_install:
-              - PATH="/opt/ghc/$GHCVER/bin:$PATH"
-              - PATH="/opt/cabal/$CABALVER/bin:$PATH"
-              - PATH="$HOME/.cabal/bin:$PATH"
-              - export PATH
-              - cabal update
-              - cabal install alex happy ansi-terminal mtl shake quickcheck
+              - PATH="/opt/ghc/7.10.3/bin:$PATH"
+              - PATH="/opt/cabal/1.22/bin:$PATH"
 
         - os: osx
-          env: FLAVOUR=quickest TARGET=
           before_install:
               - brew update
               - brew install ghc cabal-install
-              - cabal update
-              - cabal install alex happy ansi-terminal mtl shake quickcheck
-              - PATH="$HOME/.cabal/bin:$PATH"
-              - export PATH
 
 install:
+    # Add Cabal to PATH
+    - PATH="$HOME/.cabal/bin:$PATH"
+    - export PATH
     - env
-    - ghc --version
-    - cabal --version
-    - alex --version
-    - happy --version
 
-    - git config --global url."git://github.com/ghc/packages-".insteadOf     git://github.com/ghc/packages/
-    - git config --global url."http://github.com/ghc/packages-".insteadOf    http://github.com/ghc/packages/
-    - git config --global url."https://github.com/ghc/packages-".insteadOf   https://github.com/ghc/packages/
-    - git config --global url."ssh://git@github.com/ghc/packages-".insteadOf ssh://git@github.com/ghc/packages/
-    - git config --global url."git@github.com:/ghc/packages-".insteadOf      git@github.com:/ghc/packages/
-    - travis_retry git clone https://github.com/ghc/ghc --recurse-submodules --depth 1
+    # Install all Hadrian and GHC build dependencies
+    - cabal update
+    - cabal install alex happy ansi-terminal mtl shake quickcheck
 
-    # Travis clones the project into ".", but we need it as a child directory
-    # of "ghc/". For this reason, we - rather hackily - move the GHC-Shake
-    # ".git"  directory into the appropriate location, and perform a hard reset
-    # in order to regenerate the GHC-Shake files.
+    # Fetch GHC sources into ./ghc
+    - git clone --recursive git://git.haskell.org/ghc.git --quiet
+
+    # Travis has already cloned Hadrian into ./ and we need to move it
+    # to ./ghc/hadrian -- one way to do it is to move the .git directory
+    # and perform a hard reset in order to regenerate Hadrian files
     - mkdir ghc/hadrian
     - mv .git ghc/hadrian
-    - ( cd ghc/hadrian && git reset --hard HEAD )
-
-    - ghc-pkg list
+    - cd ghc/hadrian
+    - git reset --hard HEAD
 
 script:
-    - ./ghc/hadrian/build.sh selftest
-    - ./ghc/hadrian/build.sh -j --verbose --no-progress --progress-colour=never --profile=- --flavour=$FLAVOUR $TARGET
-    - ./ghc/inplace/bin/ghc-stage2 -e 1+2
+    # Run internal Hadrian tests
+    - ./build.sh selftest
+
+    # Build GHC
+    - ./build.sh -j --flavour=quickest --verbose --no-progress --progress-colour=never --progress-info=brief --profile=-
+
+    # Test GHC binary
+    - cd ..
+    - ghc/inplace/bin/ghc-stage2 -e 1+2
 
 cache:
     directories:
         - $HOME/.cabal
         - $HOME/.ghc
-
-notifications:
-    irc:
-        on_success: change # always/never/change
-        on_failure: always
-        channels:
-            - "chat.freenode.net#shaking-up-ghc"
-        template:
-            - "#%{build_number} finished in %{duration}. %{message}"
-            - "Repo: %{repository_slug}, branch: %{branch}"
-            - "%{author}: %{commit_subject}"
-            - "Build details: %{build_url}"
