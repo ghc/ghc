@@ -12,7 +12,7 @@ install:
     - 7z x stack.zip stack.exe
 
     # Fetch GHC sources into c:\ghc
-    # Note: Appveyor has already cloned Hadrian into c:\ghc\hadrian, so it's tricky
+    # Note: AppVeyor has already cloned Hadrian into c:\ghc\hadrian, so it's tricky
     - cd ..
     - git init
     - git remote add origin git://git.haskell.org/ghc.git
@@ -30,7 +30,7 @@ build_script:
     # Run internal Hadrian tests
     - stack exec hadrian -- selftest
     # Build GHC
-    - stack exec hadrian -- --lint --directory ".." -j --verbose --no-progress --progress-colour=never --profile=- --flavour=quickest
+    - stack exec hadrian -- --lint --directory ".." -j --flavour=quickest --verbose --no-progress --progress-info=brief --progress-colour=never --profile=-
     # Test GHC binary
     - cd ..
     - inplace\bin\ghc-stage2 -e 1+2
