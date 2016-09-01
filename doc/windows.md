@@ -2,8 +2,8 @@
 
 [![Windows status](https://img.shields.io/appveyor/ci/snowleopard/hadrian/master.svg?label=Windows)](https://ci.appveyor.com/project/snowleopard/hadrian)
 
-Here is how you can build GHC, from source, on Windows. We assume that you
-already have `git` and `stack` installed.
+Here is how you can build GHC, from source, on Windows. We assume that `git` and `stack` are
+installed (see [prerequisites](https://github.com/snowleopard/hadrian/blob/master/doc/windows.md#prerequisites)).
 
 ```sh
 # Get GHC and Hadrian sources
