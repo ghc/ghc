@@ -1398,7 +1398,19 @@ static void* lookupSymbol_ (char *lbl)
         return NULL;
 #       endif
     } else {
-        void *val = pinfo->value;
+#if defined(mingw32_HOST_OS)
+            // If Windows, perform initialization of uninitialized
+            // Symbols from the C runtime which was loaded above.
+            // We do this on lookup to prevent the hit when
+            // The symbol isn't being used.
+            if (pinfo->value == (void*)0xBAADF00D)
+            {
+                char symBuffer[50];
+                sprintf(symBuffer, "_%s", lbl);
+                pinfo->value = GetProcAddress(GetModuleHandle("msvcrt"), symBuffer);
+            }
+#endif
+        void* val = pinfo->value;
         IF_DEBUG(linker, debugBelch("lookupSymbol: value of %s is %p\n", lbl, val));
 
         int r;

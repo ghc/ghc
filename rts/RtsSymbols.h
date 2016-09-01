@@ -22,7 +22,6 @@ typedef struct _RtsSymbolVal {
     void   *addr;
 } RtsSymbolVal;
 
-
-extern  RtsSymbolVal rtsSyms[];
+extern RtsSymbolVal rtsSyms[];
 
 #endif /* RTS_SYMBOLS_H */

@@ -86,8 +86,119 @@
       RTS_WIN32_ONLY(SymI_HasProto(_imp___iob))          \
       RTS_WIN64_ONLY(SymI_HasProto(__iob_func))
 
+#define RTS_MINGW_COMPAT_SYMBOLS                         \
+      SymI_HasProto_deprecated(access)                   \
+      SymI_HasProto_deprecated(cabs)                     \
+      SymI_HasProto_deprecated(cgets)                    \
+      SymI_HasProto_deprecated(chdir)                    \
+      SymI_HasProto_deprecated(chmod)                    \
+      SymI_HasProto_deprecated(chsize)                   \
+      SymI_HasProto_deprecated(close)                    \
+      SymI_HasProto_deprecated(cprintf)                  \
+      SymI_HasProto_deprecated(cputs)                    \
+      SymI_HasProto_deprecated(creat)                    \
+      SymI_HasProto_deprecated(cscanf)                   \
+      SymI_HasProto_deprecated(cwait)                    \
+      SymI_HasProto_deprecated(dup)                      \
+      SymI_HasProto_deprecated(dup2)                     \
+      SymI_HasProto_deprecated(ecvt)                     \
+      SymI_HasProto_deprecated(eof)                      \
+      SymI_HasProto_deprecated(execl)                    \
+      SymI_HasProto_deprecated(execle)                   \
+      SymI_HasProto_deprecated(execlp)                   \
+      SymI_HasProto_deprecated(execlpe)                  \
+      SymI_HasProto_deprecated(execv)                    \
+      SymI_HasProto_deprecated(execve)                   \
+      SymI_HasProto_deprecated(execvp)                   \
+      SymI_HasProto_deprecated(execvpe)                  \
+      SymI_HasProto_deprecated(fcloseall)                \
+      SymI_HasProto_deprecated(fcvt)                     \
+      SymI_HasProto_deprecated(fdopen)                   \
+      SymI_HasProto_deprecated(fgetchar)                 \
+      SymI_HasProto_deprecated(filelength)               \
+      SymI_HasProto_deprecated(fileno)                   \
+      SymI_HasProto_deprecated(flushall)                 \
+      SymI_HasProto_deprecated(fputchar)                 \
+      SymI_HasProto_deprecated(gcvt)                     \
+      SymI_HasProto_deprecated(getch)                    \
+      SymI_HasProto_deprecated(getche)                   \
+      SymI_HasProto_deprecated(getcwd)                   \
+      SymI_HasProto_deprecated(getpid)                   \
+      SymI_HasProto_deprecated(getw)                     \
+      SymI_HasProto_deprecated(hypot)                    \
+      SymI_HasProto_deprecated(inp)                      \
+      SymI_HasProto_deprecated(inpw)                     \
+      SymI_HasProto_deprecated(isascii)                  \
+      SymI_HasProto_deprecated(isatty)                   \
+      SymI_HasProto_deprecated(iscsym)                   \
+      SymI_HasProto_deprecated(iscsymf)                  \
+      SymI_HasProto_deprecated(itoa)                     \
+      SymI_HasProto_deprecated(j0)                       \
+      SymI_HasProto_deprecated(j1)                       \
+      SymI_HasProto_deprecated(jn)                       \
+      SymI_HasProto_deprecated(kbhit)                    \
+      SymI_HasProto_deprecated(lfind)                    \
+      SymI_HasProto_deprecated(locking)                  \
+      SymI_HasProto_deprecated(lsearch)                  \
+      SymI_HasProto_deprecated(lseek)                    \
+      SymI_HasProto_deprecated(ltoa)                     \
+      SymI_HasProto_deprecated(memccpy)                  \
+      SymI_HasProto_deprecated(memicmp)                  \
+      SymI_HasProto_deprecated(mkdir)                    \
+      SymI_HasProto_deprecated(mktemp)                   \
+      SymI_HasProto_deprecated(open)                     \
+      SymI_HasProto_deprecated(outp)                     \
+      SymI_HasProto_deprecated(outpw)                    \
+      SymI_HasProto_deprecated(putch)                    \
+      SymI_HasProto_deprecated(putenv)                   \
+      SymI_HasProto_deprecated(putw)                     \
+      SymI_HasProto_deprecated(read)                     \
+      SymI_HasProto_deprecated(rmdir)                    \
+      SymI_HasProto_deprecated(rmtmp)                    \
+      SymI_HasProto_deprecated(setmode)                  \
+      SymI_HasProto_deprecated(sopen)                    \
+      SymI_HasProto_deprecated(spawnl)                   \
+      SymI_HasProto_deprecated(spawnle)                  \
+      SymI_HasProto_deprecated(spawnlp)                  \
+      SymI_HasProto_deprecated(spawnlpe)                 \
+      SymI_HasProto_deprecated(spawnv)                   \
+      SymI_HasProto_deprecated(spawnve)                  \
+      SymI_HasProto_deprecated(spawnvp)                  \
+      SymI_HasProto_deprecated(spawnvpe)                 \
+      SymI_HasProto_deprecated(strcmpi)                  \
+      SymI_HasProto_deprecated(strdup)                   \
+      SymI_HasProto_deprecated(stricmp)                  \
+      SymI_HasProto_deprecated(strlwr)                   \
+      SymI_HasProto_deprecated(strnicmp)                 \
+      SymI_HasProto_deprecated(strnset)                  \
+      SymI_HasProto_deprecated(strrev)                   \
+      SymI_HasProto_deprecated(strset)                   \
+      SymI_HasProto_deprecated(strupr)                   \
+      SymI_HasProto_deprecated(swab)                     \
+      SymI_HasProto_deprecated(tell)                     \
+      SymI_HasProto_deprecated(tempnam)                  \
+      SymI_HasProto_deprecated(toascii)                  \
+      SymI_HasProto_deprecated(tzset)                    \
+      SymI_HasProto_deprecated(ultoa)                    \
+      SymI_HasProto_deprecated(umask)                    \
+      SymI_HasProto_deprecated(ungetch)                  \
+      SymI_HasProto_deprecated(unlink)                   \
+      SymI_HasProto_deprecated(wcsdup)                   \
+      SymI_HasProto_deprecated(wcsicmp)                  \
+      SymI_HasProto_deprecated(wcsicoll)                 \
+      SymI_HasProto_deprecated(wcslwr)                   \
+      SymI_HasProto_deprecated(wcsnicmp)                 \
+      SymI_HasProto_deprecated(wcsnset)                  \
+      SymI_HasProto_deprecated(wcsrev)                   \
+      SymI_HasProto_deprecated(wcsset)                   \
+      SymI_HasProto_deprecated(wcsupr)                   \
+      SymI_HasProto_deprecated(write)                    \
+      SymI_HasProto_deprecated(y0)                       \
+      SymI_HasProto_deprecated(y1)                       \
+      SymI_HasProto_deprecated(yn)
 #else
 #define RTS_MINGW_ONLY_SYMBOLS /**/
+#define RTS_MINGW_COMPAT_SYMBOLS /**/
 #endif
 
 
@@ -789,6 +900,7 @@
 #endif
 #define SymI_HasProto(vvv) /**/
 #define SymI_HasProto_redirect(vvv,xxx) /**/
+#define SymI_HasProto_deprecated(vvv) /**/
 RTS_SYMBOLS
 RTS_RET_SYMBOLS
 RTS_POSIX_ONLY_SYMBOLS
@@ -801,6 +913,7 @@ RTS_LIBFFI_SYMBOLS
 #undef SymI_NeedsDataProto
 #undef SymI_HasProto
 #undef SymI_HasProto_redirect
+#undef SymI_HasProto_deprecated
 #undef SymE_HasProto
 #undef SymE_HasDataProto
 #undef SymE_NeedsProto
@@ -826,11 +939,19 @@ RTS_LIBFFI_SYMBOLS
     { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
       (void*)(&(xxx)) },
 
+// SymI_HasProto_deprecated allows us to redirect references from their deprecated
+// names to the undeprecated ones. e.g. access -> _access.
+// We use the hexspeak for unallocated memory 0xBAADF00D to signal the RTS
+// that this needs to be loaded from somewhere else.
+#define SymI_HasProto_deprecated(vvv)   \
+   { #vvv, (void*)0xBAADF00D },
+
 RtsSymbolVal rtsSyms[] = {
       RTS_SYMBOLS
       RTS_RET_SYMBOLS
       RTS_POSIX_ONLY_SYMBOLS
       RTS_MINGW_ONLY_SYMBOLS
+      RTS_MINGW_COMPAT_SYMBOLS
       RTS_DARWIN_ONLY_SYMBOLS
       RTS_OPENBSD_ONLY_SYMBOLS
       RTS_LIBGCC_SYMBOLS
