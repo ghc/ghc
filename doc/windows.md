@@ -1,23 +1,60 @@
-# Building on Windows
+# Building GHC on Windows
 
-Here are a list of instructions to build GHC, from source, on Windows. I tested these instructions on a clean machine using the [free Windows 10 VirtualBox image](https://dev.windows.com/en-us/microsoft-edge/tools/vms/windows/) (I bumped the VM CPUs to 4, and RAM to 4096Mb). These instructions are not currently the official GHC building instructions, but might be simpler and more robust than those.
+[![Windows status](https://img.shields.io/appveyor/ci/snowleopard/hadrian/master.svg?label=Windows)](https://ci.appveyor.com/project/snowleopard/hadrian)
 
-The first step is to [install Stack](https://www.stackage.org/stack/windows-x86_64-installer) (I just accepted all the defaults), then open a command prompt and run:
+Here is how you can build GHC, from source, on Windows. We assume that you
+already have `git` and `stack` installed.
 
-	stack setup
-	stack install happy alex
-	stack exec -- pacman -S gcc binutils git automake-wrapper tar make patch autoconf --noconfirm
-	stack exec -- git clone --recursive git://git.haskell.org/ghc.git
-	cd ghc
-	stack exec -- git clone git://github.com/snowleopard/hadrian
-	stack build --stack-yaml=hadrian/stack.yaml --only-dependencies
-	stack exec --stack-yaml=hadrian/stack.yaml -- hadrian/build.bat -j --flavour=quickest
+```sh
+# Get GHC and Hadrian sources
+git clone --recursive git://git.haskell.org/ghc.git
+cd ghc
+git clone git://github.com/snowleopard/hadrian
+cd hadrian
 
-The entire process should take about 20 minutes. Note, this will build GHC without optimisations. If you need an optimised GHC, drop the `--flavour=quickest` flag from the last command line (this will slow down the build to about an hour).
+# Download and install the bootstrapping GHC and MSYS2
+stack setup
 
-#### Future ideas
+# Install utilities required during the GHC build process
+stack exec -- pacman -S autoconf automake-wrapper make patch tar --noconfirm
 
-Here are some alternatives that have been considered, but not yet tested. Use the instructions above.
+# Build Hadrian and dependencies (including GHC dependencies Alex and Happy)
+stack build
 
-* The `pacman` install of `gcc` is probably not necessary, but it does pull in a lot of tools, some of which probably are necessary. Ideally thin the list down.
-* Happy/Alex should be able to be installed by adding them as `build-tools` in the Cabal file.
+# Build GHC
+stack exec hadrian -- --directory ".." -j --flavour=quickest
+
+# Test GHC
+cd ..
+inplace\bin\ghc-stage2 -e 1+2
+```	
+
+The entire process should take about 20 minutes. Note, this will build GHC without
+optimisations. If you need an optimised GHC, drop the `--flavour=quickest` flag from
+the build command line (this will slow down the build to about an hour).
+
+These are currently not the
+[official GHC building instructions](https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation/Windows),
+but are much simpler and may also be more robust.
+
+The `stack build` and `stack exec hadrian` commands can be replaced by an invocation
+of Hadrian's Stack-based build script: `build.stack.bat -j --flavour=quickest`. Use this
+script if you plan to work on Hadrian and/or rebuild GHC often.
+
+## Prerequisites
+
+The above works on a clean machine with `git` and `stack` installed (tested with default
+installation settings), which you can get from https://git-scm.com/download/win and
+https://www.stackage.org/stack/windows-x86_64-installer. 
+
+## Testing
+
+These instructions have been tested on a clean Windows 10 machine using the
+[free VirtualBox image](https://dev.windows.com/en-us/microsoft-edge/tools/vms/windows/),
+and are also routinely tested on
+[Hadrian's AppVeyor CI instance](https://ci.appveyor.com/project/snowleopard/hadrian/history). 
+
+## Notes
+
+Beware of the [current limitations of Hadrian](https://github.com/snowleopard/hadrian#current-limitations).
+
