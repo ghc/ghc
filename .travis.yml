@@ -49,7 +49,7 @@ script:
 
     # Test GHC binary
     - cd ..
-    - ghc/inplace/bin/ghc-stage2 -e 1+2
+    - inplace/bin/ghc-stage2 -e 1+2
 
 cache:
     directories:
