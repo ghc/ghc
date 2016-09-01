@@ -4102,13 +4102,13 @@ ocGetNames_PEi386 ( ObjectCode* oc )
    if (globalBssSize > 0) {
        bss = stgCallocBytes(1, globalBssSize,
                             "ocGetNames_PEi386(non-anonymous bss)");
-       addSection(&sections[oc->n_sections-1],
+       addSection(&oc->sections[oc->n_sections-1],
                   SECTIONKIND_RWDATA, SECTION_MALLOC,
                   bss, globalBssSize, 0, 0, 0);
        IF_DEBUG(linker, debugBelch("bss @ %p %" FMT_Word "\n", bss, globalBssSize));
        addProddableBlock(oc, bss, globalBssSize);
    } else {
-       addSection(&sections[oc->n_sections-1],
+       addSection(&oc->sections[oc->n_sections-1],
                   SECTIONKIND_OTHER, SECTION_NOMEM, NULL, 0, 0, 0, 0);
    }
 
