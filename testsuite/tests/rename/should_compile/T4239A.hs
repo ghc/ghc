@@ -8,3 +8,4 @@ data (:+++) = (:+++)
             | X
             | Y
 
+(·) = undefined
