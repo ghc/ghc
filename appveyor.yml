@@ -17,11 +17,11 @@ install:
     - git init
     - git remote add origin git://git.haskell.org/ghc.git
     - git pull --recurse-submodules origin master
-    - git submodule update --init --recursive
+    - git submodule update --init --recursive --quiet
 
     # Install all Hadrian and GHC build dependencies
     - cd hadrian
-    - stack setup --silent
+    - stack setup > nul
     - stack exec -- pacman -S autoconf automake-wrapper make patch tar --noconfirm
 
 build_script:
