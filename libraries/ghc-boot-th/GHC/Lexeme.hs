@@ -11,14 +11,31 @@
 module GHC.Lexeme (
           -- * Lexical characteristics of Haskell names
         startsVarSym, startsVarId, startsConSym, startsConId,
-        startsVarSymASCII, isVarSymChar
+        startsVarSymASCII, isVarSymChar, okSymChar
   ) where
 
 import Data.Char
 
+-- | Is this character acceptable in a symbol (after the first char)?
+-- See alexGetByte in Lexer.x
+okSymChar :: Char -> Bool
+okSymChar c
+  | c `elem` "(),;[]`{}_\"'"
+  = False
+  | otherwise
+  = case generalCategory c of
+      ConnectorPunctuation -> True
+      DashPunctuation      -> True
+      OtherPunctuation     -> True
+      MathSymbol           -> True
+      CurrencySymbol       -> True
+      ModifierSymbol       -> True
+      OtherSymbol          -> True
+      _                    -> False
+
 startsVarSym, startsVarId, startsConSym, startsConId :: Char -> Bool
-startsVarSym c = startsVarSymASCII c || (ord c > 0x7f && isSymbol c)  -- Infix Ids
-startsConSym c = c == ':'               -- Infix data constructors
+startsVarSym c = okSymChar c && c /= ':' -- Infix Ids
+startsConSym c = c == ':'                -- Infix data constructors
 startsVarId c  = c == '_' || case generalCategory c of  -- Ordinary Ids
   LowercaseLetter -> True
   OtherLetter     -> True   -- See #1103
