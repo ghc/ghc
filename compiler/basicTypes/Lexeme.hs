@@ -205,6 +205,25 @@ okIdChar c = case generalCategory c of
   OtherNumber     -> True -- See #4373
   _               -> c == '\'' || c == '_'
 
+-- | Is this character acceptable in a symbol (after the first char)?
+-- See alexGetByte in Lexer.x
+okSymChar :: Char -> Bool
+okSymChar c
+  | c `elem` specialSymbols
+  = False
+  | c `elem` "_\"'"
+  = False
+  | otherwise
+  = case generalCategory c of
+      ConnectorPunctuation -> True
+      DashPunctuation      -> True
+      OtherPunctuation     -> True
+      MathSymbol           -> True
+      CurrencySymbol       -> True
+      ModifierSymbol       -> True
+      OtherSymbol          -> True
+      _                    -> False
+
 -- | All reserved identifiers. Taken from section 2.4 of the 2010 Report.
 reservedIds :: Set.Set String
 reservedIds = Set.fromList [ "case", "class", "data", "default", "deriving"
@@ -212,6 +231,10 @@ reservedIds = Set.fromList [ "case", "class", "data", "default", "deriving"
                            , "infix", "infixl", "infixr", "instance", "let"
                            , "module", "newtype", "of", "then", "type", "where"
                            , "_" ]
+
+-- | All punctuation that cannot appear in symbols. See $special in Lexer.x.
+specialSymbols :: [Char]
+specialSymbols = "(),;[]`{}"
 
 -- | All reserved operators. Taken from section 2.4 of the 2010 Report.
 reservedOps :: Set.Set String

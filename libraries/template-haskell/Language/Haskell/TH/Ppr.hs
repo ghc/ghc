@@ -10,9 +10,8 @@ import Text.PrettyPrint (render)
 import Language.Haskell.TH.PprLib
 import Language.Haskell.TH.Syntax
 import Data.Word ( Word8 )
-import Data.Char ( toLower, chr)
+import Data.Char ( toLower, chr, ord, isSymbol )
 import GHC.Show  ( showMultiLineString )
-import GHC.Lexeme( startsVarSym )
 import Data.Ratio ( numerator, denominator )
 
 nestDepth :: Int
@@ -115,8 +114,11 @@ isSymOcc :: Name -> Bool
 isSymOcc n
   = case nameBase n of
       []    -> True  -- Empty name; weird
-      (c:_) -> startsVarSym c
+      (c:_) -> isSymbolASCII c || (ord c > 0x7f && isSymbol c)
                    -- c.f. OccName.startsVarSym in GHC itself
+
+isSymbolASCII :: Char -> Bool
+isSymbolASCII c = c `elem` "!#$%&*+./<=>?@\\^|~-"
 
 pprInfixExp :: Exp -> Doc
 pprInfixExp (VarE v) = pprName' Infix v
