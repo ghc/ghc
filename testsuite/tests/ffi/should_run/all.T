@@ -82,8 +82,7 @@ test('ffi015', [ omit_ways(['ghci']), extra_clean(['ffi015_cbits.o']) ],
 # GHCi can't handle foreign import "&"
 test('ffi016', omit_ways(['ghci']), compile_and_run, [''])
 
-test('ffi017', when(opsys('mingw32'), expect_broken_for(12209, ['ghci'])),
-     compile_and_run, [''])
+test('ffi017', normal, compile_and_run, [''])
 
 test('ffi018', [ omit_ways(['ghci']), extra_clean(['ffi018_c.o']) ],
                compile_and_run, ['ffi018_c.c'])
@@ -138,8 +137,7 @@ test('ffi020', [ omit_ways(prof_ways),
                  exit_code(1) ], compile_and_run, [''])
 
 
-test('ffi021', when(opsys('mingw32'), expect_broken_for(12209, ['ghci'])),
-     compile_and_run, [''])
+test('ffi021', normal, compile_and_run, [''])
 
 test('ffi022', normal, compile_and_run, [''])
 

@@ -722,6 +722,7 @@ initLinker_ (int retain_cafs)
     initMutex(&dl_mutex);
 #endif
 #endif
+
     symhash = allocStrHashTable();
 
     /* populate the symbol table with stuff from the RTS */
@@ -1369,6 +1370,18 @@ static SymbolAddr* lookupSymbol_ (SymbolName* lbl)
         return NULL;
 #       endif
     } else {
+#if defined(mingw32_HOST_OS)
+            // If Windows, perform initialization of uninitialized
+            // Symbols from the C runtime which was loaded above.
+            // We do this on lookup to prevent the hit when
+            // The symbol isn't being used.
+            if (pinfo->value == (void*)0xBAADF00D)
+            {
+                char symBuffer[50];
+                sprintf(symBuffer, "_%s", lbl);
+                pinfo->value = GetProcAddress(GetModuleHandle("msvcrt"), symBuffer);
+            }
+#endif
         SymbolAddr* val = pinfo->value;
         IF_DEBUG(linker, debugBelch("lookupSymbol: value of %s is %p\n", lbl, val));
 

@@ -365,3 +365,8 @@ test('T10296b', [only_ways('threaded2')], compile_and_run, [''])
 
 test('numa001', [ extra_run_opts('8'), extra_ways(['debug_numa']) ]
                 , compile_and_run, [''])
+                
+test('T12497', [ unless(opsys('mingw32'), skip)
+               ],
+               run_command, ['$MAKE -s --no-print-directory T12497'])
+
