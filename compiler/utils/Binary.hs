@@ -420,6 +420,17 @@ instance (Binary a, Binary b, Binary c, Binary d, Binary e, Binary f) => Binary 
                                  f <- get bh
                                  return (a,b,c,d,e,f)
 
+instance (Binary a, Binary b, Binary c, Binary d, Binary e, Binary f, Binary g) => Binary (a,b,c,d,e,f,g) where
+    put_ bh (a,b,c,d,e,f,g) = do put_ bh a; put_ bh b; put_ bh c; put_ bh d; put_ bh e; put_ bh f; put_ bh g
+    get bh                  = do a <- get bh
+                                 b <- get bh
+                                 c <- get bh
+                                 d <- get bh
+                                 e <- get bh
+                                 f <- get bh
+                                 g <- get bh
+                                 return (a,b,c,d,e,f,g)
+
 instance Binary a => Binary (Maybe a) where
     put_ bh Nothing  = putByte bh 0
     put_ bh (Just a) = do putByte bh 1; put_ bh a

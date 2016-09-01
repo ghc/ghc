@@ -629,3 +629,10 @@ T12135:
 	cp T12135b.h T12135b/T12135.h
 	"$(TEST_HC)" $(TEST_HC_OPTS) -IT12135b -IT12135a --make T12135.hs
 	./T12135
+
+.PHONY: T10923
+T10923:
+	$(RM) -rf T10923.o T10923.hi
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v1 -O0 -c T10923.hs
+	# should NOT output "compilation is NOT required"
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v1 -O -c T10923.hs

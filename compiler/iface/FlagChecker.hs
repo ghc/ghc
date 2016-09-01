@@ -45,8 +45,14 @@ fingerprintDynFlags dflags@DynFlags{..} this_mod nameio =
         -- -fprof-auto etc.
         prof = if gopt Opt_SccProfilingOn dflags then fromEnum profAuto else 0
 
-    in -- pprTrace "flags" (ppr (mainis, safeHs, lang, cpp, paths)) $
-       computeFingerprint nameio (mainis, safeHs, lang, cpp, paths, prof)
+        -- -O, see https://ghc.haskell.org/trac/ghc/ticket/10923
+        opt = if hscTarget == HscInterpreted ||
+                 hscTarget == HscNothing
+                 then 0
+                 else optLevel
+
+    in -- pprTrace "flags" (ppr (mainis, safeHs, lang, cpp, paths, prof, opt)) $
+       computeFingerprint nameio (mainis, safeHs, lang, cpp, paths, prof, opt)
 
 
 {- Note [path flags and recompilation]

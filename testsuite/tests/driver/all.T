@@ -492,3 +492,8 @@ test('T12135',
      ['$MAKE -s --no-print-directory T12135'])
 
 test('T12192', normal, run_command, ['mkdir foo && (cd foo && {compiler} -v0 ../T12192)']) 
+
+test('T10923',
+     extra_clean(['T10923.o', 'T10923.hi']),
+     run_command,
+     ['$MAKE -s --no-print-directory T10923'])
