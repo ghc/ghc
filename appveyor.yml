@@ -27,10 +27,13 @@ install:
 build_script:
     # Build Hadrian
     - stack build
+
     # Run internal Hadrian tests
     - stack exec hadrian -- selftest
+
     # Build GHC
     - stack exec hadrian -- --lint --directory ".." -j --flavour=quickest --verbose --no-progress --progress-info=brief --progress-colour=never --profile=-
+
     # Test GHC binary
     - cd ..
     - inplace\bin\ghc-stage2 -e 1+2
