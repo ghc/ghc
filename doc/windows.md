@@ -10,9 +10,9 @@ installed (see [prerequisites](https://github.com/snowleopard/hadrian/blob/maste
 git clone --recursive git://git.haskell.org/ghc.git
 cd ghc
 git clone git://github.com/snowleopard/hadrian
-cd hadrian
 
 # Download and install the bootstrapping GHC and MSYS2
+cd hadrian
 stack setup
 
 # Install utilities required during the GHC build process
