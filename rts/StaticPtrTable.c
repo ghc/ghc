@@ -43,6 +43,9 @@ void hs_spt_insert(StgWord64 key[2],void *spe_closure) {
 #endif
   }
 
+  // Cannot remove this indirection yet because getStablePtr()
+  // might return NULL, in which case hs_spt_lookup() returns NULL
+  // instead of the actual closure pointer.
   StgStablePtr * entry = stgMallocBytes( sizeof(StgStablePtr)
                                        , "hs_spt_insert: entry"
                                        );
@@ -72,8 +75,8 @@ StgPtr hs_spt_lookup(StgWord64 key[2]) {
   if (spt) {
     ACQUIRE_LOCK(&spt_lock);
     const StgStablePtr * entry = lookupHashTable(spt, (StgWord)key);
-    RELEASE_LOCK(&spt_lock);
     const StgPtr ret = entry ? deRefStablePtr(*entry) : NULL;
+    RELEASE_LOCK(&spt_lock);
     return ret;
   } else
     return NULL;
