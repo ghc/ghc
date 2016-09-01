@@ -21,7 +21,7 @@ install:
 
     # Install all Hadrian and GHC build dependencies
     - cd hadrian
-    - stack setup
+    - stack setup --silent
     - stack exec -- pacman -S autoconf automake-wrapper make patch tar --noconfirm
 
 build_script:
