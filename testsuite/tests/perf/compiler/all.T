@@ -428,8 +428,9 @@ test('T5631',
 test('parsing001',
      [compiler_stats_num_field('bytes allocated',
           [(wordsize(32), 274000576, 10),
-           (wordsize(64), 587079016, 5)]),
+           (wordsize(64), 581551384, 5)]),
         # expected value: 587079016 (amd64/Linux)
+        # 2016-09-01:     581551384 (amd64/Linux) Restore w/w limit (#11565)
        only_ways(['normal']),
       ],
      compile_fail, [''])
@@ -767,7 +768,7 @@ test('T9872d',
 test('T9961',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 568526784, 5),
+          [(wordsize(64), 537297968, 5),
           # 2015-01-12    807117816   Initally created
           # 2015-spring   772510192   Got better
           # 2015-05-22    663978160   Fix for #10370 improves it more
@@ -775,6 +776,7 @@ test('T9961',
           # 2015-12-17    745044392   x86_64/Darwin  Creep upwards
           # 2016-03-20    519436672   x64_64/Linux   Don't use build desugaring for large lists (#11707)
           # 2016-03-24    568526784   x64_64/Linux   Add eqInt* variants (#11688)
+          # 2016-09-01    537297968   x64_64/Linux   Restore w/w limit (#11565)
            (wordsize(32), 275264188, 5)
           # was           375647160
           # 2016-04-06    275264188   x86/Linux
