@@ -405,6 +405,9 @@ test('T10820', normal, compile_and_run, ['-v0'])
 test('T11341', normal, compile, ['-v0 -dsuppress-uniques'])
 test('T11345', normal, compile_and_run, ['-v0 -dsuppress-uniques'])
 test('TH_finalizer', normal, compile, ['-v0'])
+test('TH_finalizer2',
+     normal, multimod_compile_and_run,
+     ['TH_finalizer2', '-v0 ' + config.ghc_th_way_flags])
 test('T10603', normal, compile, ['-ddump-splices -dsuppress-uniques'])
 test('T11452', normal, compile_fail, ['-v0'])
 test('T9022', normal, compile_and_run, ['-v0'])

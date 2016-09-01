@@ -654,6 +654,7 @@ rnTopSpliceDecls splice
      --
      -- See Note [Delaying modFinalizers in untyped splices].
      add_mod_finalizers_now :: [ForeignRef (TH.Q ())] -> TcRn ()
+     add_mod_finalizers_now []             = return ()
      add_mod_finalizers_now mod_finalizers = do
        th_modfinalizers_var <- fmap tcg_th_modfinalizers getGblEnv
        updTcRef th_modfinalizers_var $ \fins ->

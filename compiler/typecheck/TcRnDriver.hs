@@ -471,7 +471,8 @@ tcRnSrcDecls :: Bool  -- False => no 'module M(..) where' header at all
 tcRnSrcDecls explicit_mod_hdr decls
  = do { -- Do all the declarations
       ; ((tcg_env, tcl_env), lie) <- captureConstraints $
-              do { (tcg_env, tcl_env) <- tc_rn_src_decls decls ;
+              do { envs <- tc_rn_src_decls decls
+                 ; (tcg_env, tcl_env) <- setEnvs envs run_th_modfinalizers
 
                    -- Check for the 'main' declaration
                    -- Must do this inside the captureConstraints
@@ -538,6 +539,27 @@ tcRnSrcDecls explicit_mod_hdr decls
       ; setGlobalTypeEnv tcg_env' final_type_env
 
    } }
+
+#ifdef GHCI
+-- | Runs TH finalizers and renames and typechecks the top-level declarations
+-- that they could introduce.
+run_th_modfinalizers :: TcM (TcGblEnv, TcLclEnv)
+run_th_modfinalizers = do
+  th_modfinalizers_var <- fmap tcg_th_modfinalizers getGblEnv
+  th_modfinalizers <- readTcRef th_modfinalizers_var
+  if null th_modfinalizers
+  then getEnvs
+  else do
+    writeTcRef th_modfinalizers_var []
+    sequence_ th_modfinalizers
+    -- Finalizers can add top-level declarations with addTopDecls.
+    envs <- tc_rn_src_decls []
+    -- addTopDecls can add declarations which add new finalizers.
+    setEnvs envs run_th_modfinalizers
+#else
+run_th_modfinalizers :: TcM (TcGblEnv, TcLclEnv)
+run_th_modfinalizers = getEnvs
+#endif /* GHCI */
 
 tc_rn_src_decls :: [LHsDecl RdrName]
                 -> TcM (TcGblEnv, TcLclEnv)

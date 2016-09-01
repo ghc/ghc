@@ -962,16 +962,12 @@ addModFinalizerRef finRef = do
         pprPanic "addModFinalizer was called when no finalizers were collected"
                  (ppr th_stage)
 
--- | Run all module finalizers
+-- | Releases the external interpreter state.
 finishTH :: TcM ()
 finishTH = do
-  tcg <- getGblEnv
-  let th_modfinalizers_var = tcg_th_modfinalizers tcg
-  modfinalizers <- readTcRef th_modfinalizers_var
-  writeTcRef th_modfinalizers_var []
-  sequence_ modfinalizers
   dflags <- getDynFlags
-  when (gopt Opt_ExternalInterpreter dflags) $
+  when (gopt Opt_ExternalInterpreter dflags) $ do
+    tcg <- getGblEnv
     writeTcRef (tcg_th_remote_state tcg) Nothing
 
 runTHExp :: ForeignHValue -> TcM TH.Exp
