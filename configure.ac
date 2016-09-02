@@ -417,7 +417,7 @@ if test "$TargetPlatform" != "$HostPlatform" ; then
                           #   configure: error: cannot run C compiled programs.
                           #   If you meant to cross compile, use `--host'.
 fi
-if test "$BuildPlatform" != "$host" ; then
+if test "$BuildPlatform" != "$HostPlatform" ; then
    AC_MSG_ERROR([
 You've selected:
 
