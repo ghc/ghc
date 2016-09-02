@@ -63,7 +63,8 @@ $(ghc-cabal_DIST_BINARY): utils/ghc-cabal/Main.hs $(TOUCH_DEP) | $$(dir $$@)/. b
 	       -ilibraries/binary/src -DGENERICS \
 	       -ilibraries/filepath \
 	       -ilibraries/hpc \
-	       $(utils/ghc-cabal_dist_EXTRA_HC_OPTS)
+	       $(utils/ghc-cabal_dist_EXTRA_HC_OPTS) \
+	       $(EXTRA_HC_OPTS)
 	"$(TOUCH_CMD)" $@
 endif
 
