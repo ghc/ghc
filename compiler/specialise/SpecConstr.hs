@@ -29,7 +29,7 @@ import CoreFVs          ( exprsFreeVarsList )
 import CoreMonad
 import Literal          ( litIsLifted )
 import HscTypes         ( ModGuts(..) )
-import WwLib            ( mkWorkerArgs )
+import WwLib            ( isWorkerSmallEnough, mkWorkerArgs )
 import DataCon
 import Coercion         hiding( substCo )
 import Rules
@@ -1533,10 +1533,14 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
 
   | Just all_calls <- lookupVarEnv bind_calls fn
   = -- pprTrace "specialise entry {" (ppr fn <+> ppr (length all_calls)) $
-    do  { (boring_call, pats) <- callsToPats env specs arg_occs all_calls
-
+    do  { (boring_call, all_pats) <- callsToPats env specs arg_occs all_calls
                 -- Bale out if too many specialisations
-        ; let n_pats      = length pats
+        ; let pats = filter (is_small_enough . fst) all_pats
+              is_small_enough vars = isWorkerSmallEnough (sc_dflags env) vars
+                  -- We are about to construct w/w pair in 'spec_one'.
+                  -- Omit specialisation leading to high arity workers.
+                  -- See Note [Limit w/w arity]
+              n_pats      = length pats
               spec_count' = n_pats + spec_count
         ; case sc_count env of
             Just max | not (sc_force env) && spec_count' > max

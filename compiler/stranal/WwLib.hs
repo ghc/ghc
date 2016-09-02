@@ -8,6 +8,7 @@
 
 module WwLib ( mkWwBodies, mkWWstr, mkWorkerArgs
              , deepSplitProductType_maybe, findTypeShape
+             , isWorkerSmallEnough
  ) where
 
 #include "HsVersions.h"
@@ -143,7 +144,8 @@ mkWwBodies dflags fam_envs fun_ty demands res_info
               wrapper_body = wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var
               worker_body = mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args
 
-        ; if is_small_enough work_args && (useful1 && not only_one_void_argument || useful2)
+        ; if isWorkerSmallEnough dflags work_args
+             && (useful1 && not only_one_void_argument || useful2)
           then return (Just (worker_args_dmds, wrapper_body, worker_body))
           else return Nothing
         }
@@ -163,10 +165,12 @@ mkWwBodies dflags fam_envs fun_ty demands res_info
       = True
       | otherwise
       = False
-    is_small_enough args = count isId args <= maxWorkerArgs dflags
-          -- See Note [Limit w/w arity]
-          -- We count only Free variables (isId) to skip Type, Kind
-          -- variables which have no runtime representation.
+
+-- See Note [Limit w/w arity]
+isWorkerSmallEnough :: DynFlags -> [Var] -> Bool
+isWorkerSmallEnough dflags vars = count isId vars <= maxWorkerArgs dflags
+    -- We count only Free variables (isId) to skip Type, Kind
+    -- variables which have no runtime representation.
 
 {-
 Note [Always do CPR w/w]
