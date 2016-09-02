@@ -82,9 +82,23 @@ foo :: Database inv
 foo db k sub = buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db
 -}
 
+foogle :: Database inv
+       -> Sing post
+       -> Database sub
+       -> Maybe (Sing (Intersect (BuriedUnder sub post 'Empty) inv))
+
+foogle db k sub = return (buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db)
+
+
 addSub :: Database inv -> Sing k -> Database sub -> Maybe (Database ((sub `BuriedUnder` k) inv))
-addSub db k sub = do Nil :: Sing xxx <- return (buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db)
+addSub db k sub = do Nil :: Sing xxx <- foogle db k sub
+                     return $ Sub db k sub
+
+{-
+addSub :: Database inv -> Sing k -> Database sub -> Maybe (Database ((sub `BuriedUnder` k) inv))
+addSub db k sub = do Nil :: Sing xxx <- foogle db sub k
                      -- Nil :: Sing ((sub `BuriedUnder` k) Empty `Intersect` inv) <- return (buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db)
                      -- Nil :: Sing Empty <- return (buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db)
                      -- Nil <- return (buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db)
                      return $ Sub db k sub
+-}

@@ -5,6 +5,8 @@ module ContextStack2 where
 type family TF a :: *
 type instance TF (a,b) = (TF a, TF b)
 
+-- Succeeds with new approach to fuvs
+-- Aug 2016
 t :: (a ~ TF (a,Int)) => Int
 t = undefined
 

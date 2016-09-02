@@ -1394,7 +1394,7 @@ canEqTyVar2 dflags ev eq_rel swapped tv1 xi2
              -- canonical, and we might loop if we were to use it in rewriting.
          else do { traceTcS "Occurs-check in representational equality"
                            (ppr xi1 $$ ppr xi2)
-                      ; continueWith (CIrredEvCan { cc_ev = new_ev }) } }
+                 ; continueWith (CIrredEvCan { cc_ev = new_ev }) } }
   where
     role = eqRelRole eq_rel
     xi1  = mkTyVarTy tv1
@@ -1410,19 +1410,9 @@ canEqTyVarTyVar :: CtEvidence           -- tv1 ~ rhs (or rhs ~ tv1, if swapped)
 -- Both LHS and RHS rewrote to a type variable
 -- See Note [Canonical orientation for tyvar/tyvar equality constraints]
 canEqTyVarTyVar ev eq_rel swapped tv1 tv2 kco2
-  | tv1 == tv2
-  = do { let mk_coh = case swapped of IsSwapped  -> mkTcCoherenceLeftCo
-                                      NotSwapped -> mkTcCoherenceRightCo
-       ; setEvBindIfWanted ev (EvCoercion $ mkTcReflCo role xi1 `mk_coh` kco2)
-       ; stopWith ev "Equal tyvars" }
-
--- We don't do this any more
--- See Note [Orientation of equalities with fmvs] in TcFlatten
---  | isFmvTyVar tv1  = do_fmv swapped            tv1 xi1 xi2 co1 co2
---  | isFmvTyVar tv2  = do_fmv (flipSwap swapped) tv2 xi2 xi1 co2 co1
-
-  | swap_over       = do_swap
-  | otherwise       = no_swap
+  | tv1 == tv2 = do_same
+  | swap_over  = do_swap
+  | otherwise  = no_swap
   where
     role = eqRelRole eq_rel
     xi1 = mkTyVarTy tv1
@@ -1432,6 +1422,11 @@ canEqTyVarTyVar ev eq_rel swapped tv1 tv2 kco2
 
     no_swap = canon_eq swapped            tv1 xi1 xi2 co1 co2
     do_swap = canon_eq (flipSwap swapped) tv2 xi2 xi1 co2 co1
+    do_same = do { let mk_coh = case swapped of
+                                   IsSwapped  -> mkTcCoherenceLeftCo
+                                   NotSwapped -> mkTcCoherenceRightCo
+                 ; setEvBindIfWanted ev (EvCoercion $ mkTcReflCo role xi1 `mk_coh` kco2)
+                 ; stopWith ev "Equal tyvars" }
 
     canon_eq swapped tv1 ty1 ty2 co1 co2
         -- ev  : tv1 ~ orhs  (not swapped) or   orhs ~ tv1   (swapped)
@@ -1450,33 +1445,10 @@ canEqTyVarTyVar ev eq_rel swapped tv1 tv2 kco2
              CTyEqCan { cc_ev = new_new_ev, cc_tyvar = tv1
                       , cc_rhs = ty2', cc_eq_rel = eq_rel } }
 
-{- We don't do this any more
-   See Note [Orientation of equalities with fmvs] in TcFlatten
-    -- tv1 is the flatten meta-var
-    do_fmv swapped tv1 xi1 xi2 co1 co2
-      | same_kind
-      = canon_eq swapped tv1 xi1 xi2 co1 co2
-      | otherwise  -- Presumably tv1 :: *, since it is a flatten meta-var,
-                   -- at a kind that has some interesting sub-kind structure.
-                   -- Since the two kinds are not the same, we must have
-                   -- tv1 `subKind` tv2, which is the wrong way round
-                   --   e.g.  (fmv::*) ~ (a::OpenKind)
-                   -- So make a new meta-var and use that:
-                   --         fmv ~ (beta::*)
-                   --         (a::OpenKind) ~ (beta::*)
-      = ASSERT2( k1_sub_k2,
-                 ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1) $$
-                 ppr xi2 <+> dcolon <+> ppr (typeKind xi2) )
-        ASSERT2( isWanted ev, ppr ev )  -- Only wanteds have flatten meta-vars
-        do { tv_ty <- newFlexiTcSTy (tyVarKind tv1)
-           ; new_ev <- newWantedEvVarNC (ctEvLoc ev)
-                                        (mkPrimEqPredRole (eqRelRole eq_rel)
-                                           g           tv_ty xi2)
-           ; emitWorkNC [new_ev]
-           ; canon_eq swapped tv1 xi1 tv_ty co1 (ctEvCoercion new_ev) }
--}
-
     swap_over
+      | isFmvTyVar tv1 = False
+      | isFmvTyVar tv2 = True
+      
       -- If tv1 is touchable, swap only if tv2 is also
       -- touchable and it's strictly better to update the latter
       -- But see Note [Avoid unnecessary swaps]
@@ -1491,13 +1463,15 @@ canEqTyVarTyVar ev eq_rel swapped tv1 tv2 kco2
       -- If only one is a meta tyvar, put it on the left
       -- This is not because it'll be solved; but because
       -- the floating step looks for meta tyvars on the left
-      | isMetaTyVar tv2 = True
+      | isMetaTyVar tv2
+      = True
 
       -- So neither is a meta tyvar (including FlatMetaTv)
 
       -- If only one is a flatten skolem, put it on the left
       -- See Note [Eliminate flat-skols]
-      | not (isFlattenTyVar tv1), isFlattenTyVar tv2 = True
+      | not (isFlattenTyVar tv1), isFlattenTyVar tv2
+      = True
 
       | otherwise = False
 
@@ -1971,6 +1945,11 @@ unify_derived loc role    orig_ty1 orig_ty2
       | tc1 == tc2, tys1 `equalLength` tys2
       , isInjectiveTyCon tc1 role
       = unifyDeriveds loc (tyConRolesX role tc1) tys1 tys2
+
+    go (TyVarTy tv1) (TyVarTy tv2)
+      | tv1 == tv2
+      = return ()
+
     go (TyVarTy tv) ty2
       = do { mb_ty <- isFilledMetaTyVar_maybe tv
            ; case mb_ty of

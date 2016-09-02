@@ -583,7 +583,7 @@ test('T5837',
              # 2014-12-08: 115905208  Constraint solver perf improvements (esp kick-out)
              # 2016-04-06: 24199320  (x86/Linux, 64-bit machine) TypeInType
 
-           (wordsize(64), 48507272, 10)])
+           (wordsize(64), 61640208, 10)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
@@ -602,8 +602,11 @@ test('T5837',
              # 2015-12-11 43877520  amd64/Linux, TypeInType (see #11196)
              # 2016-03-18 48507272  Mac, accept small regression in exchange
              #                           for other optimisations
+             # 2016-08-29 61640208 New constraint solver /succeeds/ on this code
+             #                           so program goes through whole pipeline
+             #                           so allocation legitimately increases
       ],
-      compile_fail,['-freduction-depth=50'])
+      compile,['-freduction-depth=50'])
 
 test('T6048',
      [ only_ways(['optasm']),

@@ -182,7 +182,8 @@ solveSimpleWanteds simples
 
           ; if unif_count == 0 && not rerun_plugin
             then return (n, wc2)             -- Done
-            else do { traceTcS "solveSimple going round again:" (ppr rerun_plugin)
+            else do { traceTcS "solveSimple going round again:" $
+                      ppr unif_count $$ ppr rerun_plugin
                     ; go (n+1) limit wc2 } }      -- Loop
 
 
@@ -385,19 +386,19 @@ runSolverPipeline pipeline workItem
 
        ; bumpStepCountTcS    -- One step for each constraint processed
        ; final_res  <- run_pipeline pipeline (ContinueWith workItem)
-
-       ; final_is <- getTcSInerts
        ; case final_res of
            Stop ev s       -> do { traceFireTcS ev s
+                                 ; final_is <- getTcSInerts
                                  ; traceTcS "End solver pipeline (discharged) }"
                                        (text "inerts =" <+> ppr final_is)
                                  ; return () }
            ContinueWith ct -> do { traceFireTcS (ctEvidence ct) (text "Kept as inert")
+                                 ; addInertCan ct
+                                 ; final_is <- getTcSInerts
                                  ; traceTcS "End solver pipeline (kept as inert) }" $
                                        vcat [ text "final_item =" <+> ppr ct
                                             , pprTvBndrs $ tyCoVarsOfCtList ct
-                                            , text "inerts     =" <+> ppr final_is]
-                                 ; addInertCan ct }
+                                            , text "inerts     =" <+> ppr final_is] }
        }
   where run_pipeline :: [(String,SimplifierStage)] -> StopOrContinue Ct
                      -> TcS (StopOrContinue Ct)
@@ -1389,26 +1390,31 @@ doTopReactDict _ w = pprPanic "doTopReactDict" (ppr w)
 doTopReactFunEq :: Ct -> TcS (StopOrContinue Ct)
 doTopReactFunEq work_item@(CFunEqCan { cc_ev = old_ev, cc_fun = fam_tc
                                      , cc_tyargs = args, cc_fsk = fsk })
+  | fsk `elemVarSet` tyCoVarsOfTypes args
+  = no_reduction
+  | otherwise
   = do { match_res <- matchFam fam_tc args
                            -- Look up in top-level instances, or built-in axiom
                            -- See Note [MATCHING-SYNONYMS]
        ; case match_res of
-           Nothing -> do { improveTopFunEqs (ctEvLoc old_ev) fam_tc args fsk
-                         ; continueWith work_item }
-           Just (ax_co, rhs_ty)
-             -> reduce_top_fun_eq old_ev fsk ax_co rhs_ty }
+           Nothing         -> no_reduction
+           Just match_info -> reduce_top_fun_eq old_ev fsk match_info }
+  where
+    no_reduction = do { improveTopFunEqs (ctEvLoc old_ev) fam_tc args fsk
+                      ; continueWith work_item }
 
 doTopReactFunEq w = pprPanic "doTopReactFunEq" (ppr w)
 
-reduce_top_fun_eq :: CtEvidence -> TcTyVar -> TcCoercion -> TcType
+reduce_top_fun_eq :: CtEvidence -> TcTyVar -> (TcCoercion, TcType)
                   -> TcS (StopOrContinue Ct)
--- Found an applicable top-level axiom: use it to reduce
-reduce_top_fun_eq old_ev fsk ax_co rhs_ty
+-- We have found an applicable top-level axiom: use it to reduce
+reduce_top_fun_eq old_ev fsk (ax_co, rhs_ty)
   | Just (tc, tc_args) <- tcSplitTyConApp_maybe rhs_ty
   , isTypeFamilyTyCon tc
   , tc_args `lengthIs` tyConArity tc    -- Short-cut
-  = shortCutReduction old_ev fsk ax_co tc tc_args
-       -- Try shortcut; see Note [Short cut for top-level reaction]
+  = -- RHS is another type-family application
+    -- Try shortcut; see Note [Short cut for top-level reaction]
+    shortCutReduction old_ev fsk ax_co tc tc_args
 
   | isGiven old_ev  -- Not shortcut
   = do { let final_co = mkTcSymCo (ctEvCoercion old_ev) `mkTcTransCo` ax_co
@@ -1419,39 +1425,51 @@ reduce_top_fun_eq old_ev fsk ax_co rhs_ty
        ; stopWith old_ev "Fun/Top (given)" }
 
   -- So old_ev is Wanted or Derived
-  | not (fsk `elemVarSet` tyCoVarsOfType rhs_ty)
+--  | not (fsk `elemVarSet` tyCoVarsOfType rhs_ty)
+  | otherwise
   = do { dischargeFmv old_ev fsk ax_co rhs_ty
        ; traceTcS "doTopReactFunEq" $
          vcat [ text "old_ev:" <+> ppr old_ev
               , nest 2 (text ":=") <+> ppr ax_co ]
        ; stopWith old_ev "Fun/Top (wanted)" }
 
-  | otherwise -- We must not assign ufsk := ...ufsk...!
+{-
+  | otherwise -- We must not assign fuv := ...fuv...!
+              -- We have fuv ~ rhs_ty, but 'fuv' occurs in rhs_ty
+              -- So we do  fuv := alpha, and emit the
   = do { alpha_ty <- newFlexiTcSTy (tyVarKind fsk)
+
        ; new_ev <- case old_ev of
            CtWanted {}  -> do { (ev, _) <- newWantedEq loc Nominal alpha_ty rhs_ty
-                              ; updWorkListTcS $
-                                  extendWorkListEq (mkNonCanonical ev)
+--                              ; updWorkListTcS $
+--                                extendWorkListEq (mkNonCanonical ev)
                               ; return ev }
-           CtDerived {} -> do { ev <- newDerivedNC loc pred
-                              ; updWorkListTcS (extendWorkListDerived loc ev)
+           CtDerived {} -> do { let pred = mkPrimEqPred alpha_ty rhs_ty
+	                      ; ev <- newDerivedNC loc pred
+--                              ; updWorkListTcS (extendWorkListDerived loc ev)
                               ; return ev }
-             where pred = mkPrimEqPred alpha_ty rhs_ty
            _ -> pprPanic "reduce_top_fun_eq" (ppr old_ev)
+
+       ; updInertIrreds (mkNonCanonical new_ev `consCts`)
 
             -- By emitting this as non-canonical, we deal with all
             -- flattening, occurs-check, and ufsk := ufsk issues
        ; let final_co = ax_co `mkTcTransCo` mkTcSymCo (ctEvCoercion new_ev)
+            --   old_ev :: fam_tc args ~ fmv
             --    ax_co :: fam_tc args ~ rhs_ty
-            --       ev :: alpha ~ rhs_ty
-            --     ufsk := alpha
+            --   new_ev :: alpha ~ rhs_ty
             -- final_co :: fam_tc args ~ alpha
+            --
+            --     fmv := alpha
        ; dischargeFmv old_ev fsk final_co alpha_ty
        ; traceTcS "doTopReactFunEq (occurs)" $
          vcat [ text "old_ev:" <+> ppr old_ev
-              , nest 2 (text ":=") <+> ppr final_co
+              , ppUnless (isDerived old_ev) $
+                   -- No evidence for derived constraints
+                nest 2 (text ":=") <+> ppr final_co
               , text "new_ev:" <+> ppr new_ev ]
        ; stopWith old_ev "Fun/Top (wanted)" }
+-}
   where
     loc = ctEvLoc old_ev
     deeper_loc = bumpCtLocDepth loc
@@ -1570,10 +1588,10 @@ dischargeFmv :: CtEvidence -> TcTyVar -> TcCoercion -> TcType -> TcS ()
 -- (dischargeFmv x fmv co ty)
 --     [W] ev :: F tys ~ fmv
 --         co :: F tys ~ xi
--- Precondition: fmv is not filled, and fuv `notElem` xi
+-- Precondition: fmv is not filled, and fmv `notElem` xi
 --
 -- Then set fmv := xi,
---      set ev := co
+--      set ev  := co
 --      kick out any inert things that are now rewritable
 --
 -- Does not evaluate 'co' if 'ev' is Derived

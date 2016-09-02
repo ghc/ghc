@@ -1,10 +1,9 @@
 
-T8227.hs:16:44: error:
-    • Couldn't match expected type ‘Scalar (V (Scalar (V a)))’
-                  with actual type ‘Scalar (V a)’
-      NB: ‘Scalar’ is a type function, and may not be injective
-    • In the first argument of ‘arcLengthToParam’, namely ‘eps’
-      In the expression: arcLengthToParam eps eps
+T8227.hs:16:27: error:
+    • Couldn't match expected type ‘Scalar (V a)’
+                  with actual type ‘Scalar (V (Scalar (V a)))
+                                    -> Scalar (V (Scalar (V a)))’
+    • In the expression: arcLengthToParam eps eps
       In an equation for ‘absoluteToParam’:
           absoluteToParam eps seg = arcLengthToParam eps eps
     • Relevant bindings include

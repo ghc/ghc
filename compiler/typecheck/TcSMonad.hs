@@ -1113,7 +1113,7 @@ Note [Adding an inert canonical constraint the InertCans]
         (respecting flavours) by the new constraint. This is done
         by kickOutRewritable.
 
-    (B) Applies only to nominal equalities: a ~ ty.  Four cases:
+    (B) Applies only to Nominal equalities: a ~ ty.  Four cases:
 
         [Representational]   [G/W/D] a ~R ty:
           Just add it to inert_eqs
@@ -1130,6 +1130,11 @@ Note [Adding an inert canonical constraint the InertCans]
                kick out a Derived *copy*, leaving the original unchanged.
                Reason for (b) if the model can rewrite c, then we have already
                generated a shadow copy
+
+              Reason for doing this at all: class or fun-eq constraints may be
+	      rewritten and fundeps may then give rise to new equalities.
+	      An Irred constraint might be rewritten to a class constraint
+	      that has superclasses or fundeps
 
        [Given/Wanted Nominal]  [G/W] a ~N ty:
           1. Add it to inert_eqs
@@ -1237,28 +1242,23 @@ add_inert_eq ics@(IC { inert_count = n
 add_inert_eq _ ct = pprPanic "addInertEq" (ppr ct)
 
 emitDerivedShadows :: InertCans -> TcTyVar -> TcS ()
-emitDerivedShadows IC { inert_eqs      = tv_eqs
-                      , inert_dicts    = dicts
+emitDerivedShadows IC { inert_dicts    = dicts
+                      -- , inert_eqs      = tv_eqs
                       , inert_safehask = safehask
                       , inert_funeqs   = funeqs
                       , inert_irreds   = irreds
                       , inert_model    = model } new_tv
-  | null shadows
-  = return ()
-  | otherwise
-  = do { traceTcS "Emit derived shadows:" $
-         vcat [ text "tyvar =" <+> ppr new_tv
-              , text "shadows =" <+> vcat (map ppr shadows) ]
-       ; emitWork shadows }
+  = emitShadows shadows
   where
     shadows = foldDicts  get_ct dicts    $
               foldDicts  get_ct safehask $
               foldFunEqs get_ct funeqs   $
               foldIrreds get_ct irreds   $
-              foldTyEqs  get_ct tv_eqs []
+              []   -- For tyvar eqs we always have a shadow already
+--              foldTyEqs  get_ct tv_eqs []
       -- Ignore insolubles
 
-    get_ct ct cts | want_shadow ct = mkShadowCt ct : cts
+    get_ct ct cts | want_shadow ct = ct : cts
                   | otherwise      = cts
 
     want_shadow ct
@@ -1270,15 +1270,43 @@ emitDerivedShadows IC { inert_eqs      = tv_eqs
       where
         rw_tvs = rewritableTyCoVars ct
 
-mkShadowCt :: Ct -> Ct
+emitShadows :: [Ct] -> TcS ()
+emitShadows cts
+  | null cts
+  = return ()
+  | otherwise
+  = do { shadows <- concatMapM mkShadowCt cts
+       ; traceTcS "Emitting shadows:" (vcat (map ppr shadows))
+       ; updWorkListTcS (extendWorkListCts shadows) }
+
+mkShadowCt :: Ct -> TcS [Ct]
 -- Produce a Derived shadow constraint from the input
 -- If it is a CFunEqCan, make it NonCanonical, to avoid
 --   duplicating the flatten-skolems
 -- Otherwise keep the canonical shape.  This just saves work, but
 -- is sometimes important; see Note [Keep CDictCan shadows as CDictCan]
+mkShadowCt ct@(CFunEqCan { cc_ev = ev, cc_fun = tc
+                         , cc_tyargs = xis, cc_fsk = old_fmv })
+  = do { let fam_ty = mkTyConApp tc xis
+             loc    = ctEvLoc ev
+       ; new_fmv <- newFmv fam_ty
+       ; let old_fmv_ty = mkTyVarTy old_fmv
+             new_fmv_ty = mkTyVarTy new_fmv
+             eq_pred = mkPrimEqPred fam_ty     new_fmv_ty
+             tv_eq   = mkPrimEqPred new_fmv_ty old_fmv_ty
+             der_fun_eq_ev = CtDerived { ctev_pred = eq_pred, ctev_loc = loc }
+             der_tv_eq_ev  = CtDerived { ctev_pred = tv_eq,   ctev_loc = loc }
+
+       ; return [ CTyEqCan { cc_ev     = der_tv_eq_ev
+                           , cc_tyvar  = old_fmv
+                           , cc_rhs    = new_fmv_ty
+                           , cc_eq_rel = NomEq }
+
+                , ct { cc_ev  = der_fun_eq_ev
+                     , cc_fsk = new_fmv } ] }
+
 mkShadowCt ct
-  | CFunEqCan {} <- ct = CNonCanonical { cc_ev = derived_ev }
-  | otherwise          = ct { cc_ev = derived_ev }
+  = return [ct { cc_ev = derived_ev }]
   where
     ev = ctEvidence ct
     derived_ev = CtDerived { ctev_pred = ctEvPred ev
@@ -1326,7 +1354,7 @@ rewritableTyCoVars ct                              = tyCoVarsOfType (ctPred ct)
 addInertCan :: Ct -> TcS ()  -- Constraints *other than* equalities
 addInertCan ct
   = do { traceTcS "insertInertCan {" $
-         text "Trying to insert new inert item:" <+> ppr ct
+         text "Trying to insert new non-eq inert item:" <+> ppr ct
 
        ; ics <- getInertCans
        ; setInertCans (add_item ics ct)
@@ -1335,7 +1363,7 @@ addInertCan ct
        -- See Note [Emitting shadow constraints]
        ; let rw_tvs = rewritableTyCoVars ct
        ; when (not (isDerivedCt ct) && modelCanRewrite (inert_model ics) rw_tvs)
-              (emitWork [mkShadowCt ct])
+              (emitShadows [ct])
 
        ; traceTcS "addInertCan }" $ empty }
 

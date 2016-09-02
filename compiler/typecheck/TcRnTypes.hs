@@ -1455,7 +1455,8 @@ data Ct
       cc_tyvar  :: TcTyVar,
       cc_rhs    :: TcType,     -- Not necessarily function-free (hence not Xi)
                                -- See invariants above
-      cc_eq_rel :: EqRel
+
+      cc_eq_rel :: EqRel       -- INVARIANT: cc_eq_rel = ctEvEqRel cc_ev
     }
 
   | CFunEqCan {  -- F xis ~ fsk
