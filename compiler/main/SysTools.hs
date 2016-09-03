@@ -65,7 +65,7 @@ import Platform
 import Util
 import DynFlags
 import Exception
-import Manifest
+import {-# SOURCE #-} Manifest
 
 import LlvmCodeGen.Base (llvmVersionStr, supportedLlvmVersion)
 

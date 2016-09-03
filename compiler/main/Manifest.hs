@@ -14,11 +14,12 @@ module Manifest (
 
 import DynFlags
 import PackageConfig
+import Packages
 import Platform
 import SysTools
+import Module
 
 import Data.Version
-import Debug.Trace
 
 import System.FilePath
 import System.Directory (findFile)
@@ -74,7 +75,8 @@ generateManifest manifest
                        [ ""
                        -- Generate dependencies
                        , unlines $ map (\dep -> unlines 
-                           [ "  <dependency>""   <dependentAssembly>"
+                           [ "  <dependency>"
+                           , "   <dependentAssembly>"
                            , "    <assemblyIdentity name=\"" ++ (dropExtension $ fullname dep) ++ "\""
                            , "                      version=\"" ++ version dep ++ "\""
                            , "                      type=\"win32\""
@@ -112,15 +114,26 @@ createManifestDefinition dflags pkgs assembly = do
      where genDependencies :: [PackageConfig] -> IO [ManifestFile]
            genDependencies []       = return []
            genDependencies (dep:xs) = do              
-              let fullPkgName = "libHS"
-                             ++ packageNameString dep
-                             ++ "-"
-                             ++ (showVersion $ packageVersion dep)
-                             ++ "-ghc"
-                             ++ projectVersion dflags
-                            <.> ".dll"
-              fullPkgPath <- findFile (libraryDirs dep) fullPkgName
+              let fullPkgName = if packageConfigId dep == rtsUnitId
+                                   then "libHS"
+                                        ++ packageNameString dep
+                                       <.> ".dll"
+                                   else "libHS"
+                                        ++ packageNameString dep
+                                        ++ "-"
+                                        ++ (showVersion $ packageVersion dep)
+                                        ++ "-ghc"
+                                        ++ projectVersion dflags
+                                       <.> ".dll"
+              let modPath = if packageConfigId dep == rtsUnitId
+                               then \base -> base </> "rts"
+                                                  </> ("ghc" ++ projectVersion dflags)
+                                                  </> mkBuildTag (filterRtsWays $ ways dflags)
+                               else id
 
+              fullPkgPath <- findFile (map modPath $ libraryDirs dep) fullPkgName
+              print (map modPath $ libraryDirs dep)
+              print fullPkgPath
               let manifest = ManifestFile { name          = packageNameString dep
                                           , version       = showVersion $ packageVersion dep
                                           , architecture  = getTargetArchitecture
@@ -128,7 +141,7 @@ createManifestDefinition dflags pkgs assembly = do
                                           , fullname      = case sxsResolveMode dflags of
                                                                SxSRelative -> "Get abs path from commandline"
                                                                SxSAbsolute -> maybe (packageNameString dep) id fullPkgPath
-                                                               SxSCache    -> packageNameString dep
+                                                               SxSCache    -> fullPkgName
                                           , dependencies  = []
                                           }
               rest <- genDependencies xs
