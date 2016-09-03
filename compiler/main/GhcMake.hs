@@ -1831,7 +1831,7 @@ summariseFile hsc_env old_summaries file mb_phase obj_allowed maybe_buf
     get_src_timestamp = case maybe_buf of
                            Just (_,t) -> return t
                            Nothing    -> liftIO $ getModificationUTCTime file
-                        -- getMofificationUTCTime may fail
+                        -- getModificationUTCTime may fail
 
     new_summary src_timestamp = do
         let dflags = hsc_dflags hsc_env
