@@ -74,7 +74,7 @@ readSplitObjects = Right $ \flags -> flags { splitObjects = True }
 cmdFlags :: [OptDescr (Either String (Untracked -> Untracked))]
 cmdFlags =
     [ Option [] ["flavour"] (OptArg readFlavour "FLAVOUR")
-      "Build flavour (Default, Quick or Quickest)."
+      "Build flavour (default, quick or quickest)."
     , Option [] ["haddock"] (NoArg readBuildHaddock)
       "Generate Haddock documentation."
     , Option [] ["progress-colour"] (OptArg readProgressColour "MODE")
