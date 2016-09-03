@@ -1089,7 +1089,7 @@ checkFlagHash hsc_env iface = do
 --   - a new home module has been added that shadows a package module
 -- See bug #1372.
 --
--- Returns True if recompilation is required.
+-- Returns (RecompBecause <textual reason>) if recompilation is required.
 checkDependencies :: HscEnv -> ModSummary -> ModIface -> IfG RecompileRequired
 checkDependencies hsc_env summary iface
  = checkList (map dep_missing (ms_imps summary ++ ms_srcimps summary))
