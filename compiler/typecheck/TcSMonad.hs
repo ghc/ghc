@@ -66,7 +66,7 @@ module TcSMonad (
 
     -- Inert CDictCans
     lookupInertDict, findDictsByClass, addDict, addDictsByClass,
-    delDict, partitionDicts, foldDicts, filterDicts,
+    delDict, foldDicts, filterDicts,
 
     -- Inert CTyEqCans
     EqualCtList, findTyEqs, foldTyEqs, isInInertEqs,
@@ -81,8 +81,8 @@ module TcSMonad (
     lookupFlatCache, extendFlatCache, newFlattenSkolem,            -- Flatten skolems
 
     -- Inert CFunEqCans
-    updInertFunEqs, findFunEq, sizeFunEqMap, filterFunEqs,
-    findFunEqsByTyCon, partitionFunEqs, foldFunEqs,
+    updInertFunEqs, findFunEq, sizeFunEqMap,
+    findFunEqsByTyCon,
 
     instDFunType,                              -- Instantiation
 
@@ -2223,11 +2223,6 @@ filterFunEqs = filterTcAppMap
 
 insertFunEq :: FunEqMap a -> TyCon -> [Type] -> a -> FunEqMap a
 insertFunEq m tc tys val = insertTcApp m (getUnique tc) tys val
-
--- insertFunEqCt :: FunEqMap Ct -> Ct -> FunEqMap Ct
--- insertFunEqCt m ct@(CFunEqCan { cc_fun = tc, cc_tyargs = tys })
---  = insertFunEq m tc tys ct
--- insertFunEqCt _ ct = pprPanic "insertFunEqCt" (ppr ct)
 
 partitionFunEqs :: (Ct -> Bool) -> FunEqMap Ct -> ([Ct], FunEqMap Ct)
 -- Optimise for the case where the predicate is false
