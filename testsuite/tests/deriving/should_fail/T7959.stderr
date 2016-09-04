@@ -4,5 +4,5 @@ T7959.hs:5:1: error:
     • In the stand-alone deriving instance for ‘A’
 
 T7959.hs:6:17: error:
-    • Expected kind ‘k0 -> Constraint’, but ‘A’ has kind ‘Constraint’
+    • ‘A’ is not a unary constraint, as expected by a deriving clause
     • In the data declaration for ‘B’

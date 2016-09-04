@@ -226,26 +226,25 @@ tc_hs_sig_type (HsIB { hsib_body = hs_ty
        ; return (mkSpecForAllTys tkvs ty) }
 
 -----------------
-tcHsDeriv :: LHsSigType Name -> TcM ([TyVar], Class, [Type], Kind)
+tcHsDeriv :: LHsSigType Name -> TcM ([TyVar], Class, [Type], [Kind])
 -- Like tcHsSigType, but for the ...deriving( C t1 ty2 ) clause
--- Returns the C, [ty1, ty2, and the kind of C's *next* argument
+-- Returns the C, [ty1, ty2, and the kinds of C's remaining arguments
 -- E.g.    class C (a::*) (b::k->k)
 --         data T a b = ... deriving( C Int )
---    returns ([k], C, [k, Int],  k->k)
--- Also checks that (C ty1 ty2 arg) :: Constraint
--- if arg has a suitable kind
+--    returns ([k], C, [k, Int], [k->k])
 tcHsDeriv hs_ty
-  = do { arg_kind <- newMetaKindVar
+  = do { cls_kind <- newMetaKindVar
                     -- always safe to kind-generalize, because there
                     -- can be no covars in an outer scope
        ; ty <- checkNoErrs $
                  -- avoid redundant error report with "illegal deriving", below
-               tc_hs_sig_type hs_ty (mkFunTy arg_kind constraintKind)
+               tc_hs_sig_type hs_ty cls_kind
        ; ty <- kindGeneralizeType ty  -- also zonks
-       ; arg_kind <- zonkTcType arg_kind
+       ; cls_kind <- zonkTcType cls_kind
        ; let (tvs, pred) = splitForAllTys ty
+       ; let (args, _) = splitFunTys cls_kind
        ; case getClassPredTys_maybe pred of
-           Just (cls, tys) -> return (tvs, cls, tys, arg_kind)
+           Just (cls, tys) -> return (tvs, cls, tys, args)
            Nothing -> failWithTc (text "Illegal deriving item" <+> quotes (ppr hs_ty)) }
 
 tcHsClsInstType :: UserTypeCtxt    -- InstDeclCtxt or SpecInstCtxt

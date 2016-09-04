@@ -612,7 +612,7 @@ deriveTyData :: [TyVar] -> TyCon -> [Type]   -- LHS of data or data instance
 -- I.e. not standalone deriving
 deriveTyData tvs tc tc_args deriv_pred
   = setSrcSpan (getLoc (hsSigType deriv_pred)) $  -- Use loc of the 'deriving' item
-    do  { (deriv_tvs, cls, cls_tys, cls_arg_kind)
+    do  { (deriv_tvs, cls, cls_tys, cls_arg_kinds)
                 <- tcExtendTyVarEnv tvs $
                    tcHsDeriv deriv_pred
                 -- Deriving preds may (now) mention
@@ -623,6 +623,9 @@ deriveTyData tvs tc tc_args deriv_pred
                 -- Typeable is special, because Typeable :: forall k. k -> Constraint
                 -- so the argument kind 'k' is not decomposable by splitKindFunTys
                 -- as is the case for all other derivable type classes
+        ; when (length cls_arg_kinds /= 1) $
+            failWithTc (nonUnaryErr deriv_pred)
+        ; let [cls_arg_kind] = cls_arg_kinds
         ; if className cls == typeableClassName
           then do warnUselessTypeable
                   return []
@@ -1304,6 +1307,10 @@ checkSideConditions dflags mtheta cls cls_tys rep_tc
 
 classArgsErr :: Class -> [Type] -> SDoc
 classArgsErr cls cls_tys = quotes (ppr (mkClassPred cls cls_tys)) <+> text "is not a class"
+
+nonUnaryErr :: LHsSigType Name -> SDoc
+nonUnaryErr ct = quotes (ppr ct)
+  <+> text "is not a unary constraint, as expected by a deriving clause"
 
 nonStdErr :: Class -> SDoc
 nonStdErr cls =

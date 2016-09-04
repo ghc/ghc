@@ -1,8 +1,6 @@
 
 drvfail009.hs:10:31: error:
-    Expecting one more argument to ‘C’
-    Expected kind ‘* -> Constraint’,
-      but ‘C’ has kind ‘* -> * -> Constraint’
+    ‘C’ is not a unary constraint, as expected by a deriving clause
     In the newtype declaration for ‘T1’
 
 drvfail009.hs:13:31: error:
