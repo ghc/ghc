@@ -144,3 +144,13 @@ T10083:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T10083.hs-boot
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T10083a.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T10083.hs
+
+.PHONY: T5615
+T5615:
+	$(RM) -f T5615.o T5615.hi T5615.dump-simpl
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T5615.hs -ddump-simpl -ddump-to-file
+	-grep 'divInt#' T5615.dump-simpl
+	-grep 'modInt#' T5615.dump-simpl
+	-grep 'quotInt#' T5615.dump-simpl
+	-grep 'remInt#' T5615.dump-simpl
+	grep -c '1999#' T5615.dump-simpl

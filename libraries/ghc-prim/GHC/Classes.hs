@@ -440,6 +440,9 @@ not False               =  True
 -- These don't really belong here, but we don't have a better place to
 -- put them
 
+-- These functions have built-in rules.
+{-# NOINLINE [0] divInt# #-}
+{-# NOINLINE [0] modInt# #-}
 divInt# :: Int# -> Int# -> Int#
 x# `divInt#` y#
         -- Be careful NOT to overflow if we do any additional arithmetic

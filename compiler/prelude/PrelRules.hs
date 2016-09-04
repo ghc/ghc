@@ -988,7 +988,26 @@ builtinRules
      BuiltinRule { ru_name = fsLit "Inline", ru_fn = inlineIdName,
                    ru_nargs = 2, ru_try = \_ _ _ -> match_inline },
      BuiltinRule { ru_name = fsLit "MagicDict", ru_fn = idName magicDictId,
-                   ru_nargs = 4, ru_try = \_ _ _ -> match_magicDict }
+                   ru_nargs = 4, ru_try = \_ _ _ -> match_magicDict },
+     mkBasicRule divIntName 2 $ msum
+        [ nonZeroLit 1 >> binaryLit (intOp2 div)
+        , leftZero zeroi
+        , do
+          [arg, Lit (MachInt d)] <- getArgs
+          Just n <- return $ exactLog2 d
+          dflags <- getDynFlags
+          return $ Var (mkPrimOpId ISraOp) `App` arg `App` mkIntVal dflags n
+        ],
+     mkBasicRule modIntName 2 $ msum
+        [ nonZeroLit 1 >> binaryLit (intOp2 mod)
+        , leftZero zeroi
+        , do
+          [arg, Lit (MachInt d)] <- getArgs
+          Just _ <- return $ exactLog2 d
+          dflags <- getDynFlags
+          return $ Var (mkPrimOpId AndIOp)
+            `App` arg `App` mkIntVal dflags (d - 1)
+        ]
      ]
  ++ builtinIntegerRules
 

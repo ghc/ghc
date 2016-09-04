@@ -26,6 +26,7 @@ module CmmOpt (
 import CmmUtils
 import Cmm
 import DynFlags
+import Util
 
 import Outputable
 import Platform
@@ -374,26 +375,6 @@ cmmMachOpFoldM dflags mop [x, (CmmLit (CmmInt n _))]
 -- Anything else is just too hard.
 
 cmmMachOpFoldM _ _ _ = Nothing
-
--- -----------------------------------------------------------------------------
--- exactLog2
-
--- This algorithm for determining the $\log_2$ of exact powers of 2 comes
--- from GCC.  It requires bit manipulation primitives, and we use GHC
--- extensions.  Tough.
-
-exactLog2 :: Integer -> Maybe Integer
-exactLog2 x
-  = if (x <= 0 || x >= 2147483648) then
-       Nothing
-    else
-       if (x .&. (-x)) /= x then
-          Nothing
-       else
-          Just (pow2 x)
-  where
-    pow2 x | x == 1 = 0
-           | otherwise = 1 + pow2 (x `shiftR` 1)
 
 -- -----------------------------------------------------------------------------
 -- Utils

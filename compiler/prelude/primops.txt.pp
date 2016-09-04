@@ -221,12 +221,16 @@ primop   IntMulMayOfloOp  "mulIntMayOflo#"
 
 primop   IntQuotOp    "quotInt#"    Dyadic
    Int# -> Int# -> Int#
-   {Rounds towards zero.}
+   {Rounds towards zero. The behavior is undefined if the second argument is
+    zero.
+   }
    with can_fail = True
 
 primop   IntRemOp    "remInt#"    Dyadic
    Int# -> Int# -> Int#
-   {Satisfies \texttt{(quotInt\# x y) *\# y +\# (remInt\# x y) == x}.}
+   {Satisfies \texttt{(quotInt\# x y) *\# y +\# (remInt\# x y) == x}. The
+    behavior is undefined if the second argument is zero.
+   }
    with can_fail = True
 
 primop   IntQuotRemOp "quotRemInt#"    GenPrimOp

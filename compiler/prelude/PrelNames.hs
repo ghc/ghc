@@ -232,6 +232,9 @@ basicKnownKeyNames
         toIntegerName, toRationalName,
         fromIntegralName, realToFracName,
 
+        -- Int# stuff
+        divIntName, modIntName,
+
         -- String stuff
         fromStringName,
 
@@ -911,6 +914,11 @@ decidedUnpackDataConName        = dcQual gHC_GENERICS (fsLit "DecidedUnpack")   
 metaDataDataConName  = dcQual gHC_GENERICS (fsLit "MetaData")  metaDataDataConKey
 metaConsDataConName  = dcQual gHC_GENERICS (fsLit "MetaCons")  metaConsDataConKey
 metaSelDataConName   = dcQual gHC_GENERICS (fsLit "MetaSel")   metaSelDataConKey
+
+-- Primitive Int
+divIntName, modIntName :: Name
+divIntName = varQual gHC_CLASSES (fsLit "divInt#") divIntIdKey
+modIntName = varQual gHC_CLASSES (fsLit "modInt#") modIntIdKey
 
 -- Base strings Strings
 unpackCStringName, unpackCStringFoldrName,
@@ -1909,7 +1917,7 @@ wildCardKey, absentErrorIdKey, augmentIdKey, appendIdKey,
     realWorldPrimIdKey, recConErrorIdKey,
     unpackCStringUtf8IdKey, unpackCStringAppendIdKey,
     unpackCStringFoldrIdKey, unpackCStringIdKey,
-    typeErrorIdKey :: Unique
+    typeErrorIdKey, divIntIdKey, modIntIdKey :: Unique
 
 wildCardKey                   = mkPreludeMiscIdUnique  0  -- See Note [WildCard binders]
 absentErrorIdKey              = mkPreludeMiscIdUnique  1
@@ -1934,6 +1942,8 @@ unpackCStringFoldrIdKey       = mkPreludeMiscIdUnique 19
 unpackCStringIdKey            = mkPreludeMiscIdUnique 20
 voidPrimIdKey                 = mkPreludeMiscIdUnique 21
 typeErrorIdKey                = mkPreludeMiscIdUnique 22
+divIntIdKey                   = mkPreludeMiscIdUnique 23
+modIntIdKey                   = mkPreludeMiscIdUnique 24
 
 unsafeCoerceIdKey, concatIdKey, filterIdKey, zipIdKey, bindIOIdKey,
     returnIOIdKey, newStablePtrIdKey,

@@ -137,6 +137,7 @@ test('simpl021',
      run_command,
      ['$MAKE -s --no-print-directory simpl021'])
 test('T5327', normal, run_command, ['$MAKE -s --no-print-directory T5327'])
+test('T5615', normal, run_command, ['$MAKE -s --no-print-directory T5615'])
 test('T5623', normal, run_command, ['$MAKE -s --no-print-directory T5623'])
 test('T5658b',
      normal,
