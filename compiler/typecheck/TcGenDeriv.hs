@@ -329,7 +329,7 @@ Several special cases:
   values we can't call the overloaded functions.
   See function unliftedOrdOp
 
-Note [Do not rely on compare]
+Note [Game plan for deriving Ord]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's a bad idea to define only 'compare', and build the other binary
 comparisons on top of it; see Trac #2130, #4019.  Reason: we don't
@@ -341,8 +341,16 @@ binary result, something like this:
                                        True  -> False
                                        False -> True
 
+This being said, we can get away with generating full code only for
+'compare' and '<' thus saving us generation of other three operators.
+Other operators can be cheaply expressed through '<':
+a <= b = not $ b < a
+a > b = b < a
+a >= b = not $ a < b
+
 So for sufficiently small types (few constructors, or all nullary)
 we generate all methods; for large ones we just use 'compare'.
+
 -}
 
 data OrdOp = OrdCompare | OrdLT | OrdLE | OrdGE | OrdGT
@@ -395,12 +403,20 @@ gen_Ord_binds loc tycon
     aux_binds | single_con_type = emptyBag
               | otherwise       = unitBag $ DerivAuxBind $ DerivCon2Tag tycon
 
-        -- Note [Do not rely on compare]
+        -- Note [Game plan for deriving Ord]
     other_ops | (last_tag - first_tag) <= 2     -- 1-3 constructors
                 || null non_nullary_cons        -- Or it's an enumeration
-              = listToBag (map mkOrdOp [OrdLT,OrdLE,OrdGE,OrdGT])
+              = listToBag [mkOrdOp OrdLT, lE, gT, gE]
               | otherwise
               = emptyBag
+
+    negate_expr = nlHsApp (nlHsVar not_RDR)
+    lE = mk_easy_FunBind loc le_RDR [a_Pat, b_Pat] $
+        negate_expr (nlHsApp (nlHsApp (nlHsVar lt_RDR) b_Expr) a_Expr)
+    gT = mk_easy_FunBind loc gt_RDR [a_Pat, b_Pat] $
+        nlHsApp (nlHsApp (nlHsVar lt_RDR) b_Expr) a_Expr
+    gE = mk_easy_FunBind loc ge_RDR [a_Pat, b_Pat] $
+        negate_expr (nlHsApp (nlHsApp (nlHsVar lt_RDR) a_Expr) b_Expr)
 
     get_tag con = dataConTag con - fIRST_TAG
         -- We want *zero-based* tags, because that's what
@@ -2622,11 +2638,11 @@ as_RDRs         = [ mkVarUnqual (mkFastString ("a"++show i)) | i <- [(1::Int) ..
 bs_RDRs         = [ mkVarUnqual (mkFastString ("b"++show i)) | i <- [(1::Int) .. ] ]
 cs_RDRs         = [ mkVarUnqual (mkFastString ("c"++show i)) | i <- [(1::Int) .. ] ]
 
-a_Expr, c_Expr, f_Expr, z_Expr, ltTag_Expr, eqTag_Expr, gtTag_Expr,
+a_Expr, b_Expr, c_Expr, f_Expr, z_Expr, ltTag_Expr, eqTag_Expr, gtTag_Expr,
     false_Expr, true_Expr, fmap_Expr,
     mempty_Expr, foldMap_Expr, traverse_Expr :: LHsExpr RdrName
 a_Expr          = nlHsVar a_RDR
--- b_Expr       = nlHsVar b_RDR
+b_Expr          = nlHsVar b_RDR
 c_Expr          = nlHsVar c_RDR
 f_Expr          = nlHsVar f_RDR
 z_Expr          = nlHsVar z_RDR
