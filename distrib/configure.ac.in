@@ -89,17 +89,6 @@ dnl --------------------------------------------------------------
 FIND_LD([LdCmd])
 AC_SUBST([LdCmd])
 
-dnl ** Have libdw?
-dnl --------------------------------------------------------------
-dnl Check for a usable version of libdw/elfutils
-dnl Currently we need 0.158 or newer.
-BinDistNeedsLibdw=@UseLibdw@
-if test "x$BinDistNeedsLibdw" = "xyes" ; then
-    AC_CHECK_LIB(dw, dwfl_attach_state, [UseLibdw=YES],
-        [AC_MSG_ERROR([Binary distribution was built with libdw support but target system doesn't have supported libdw version (needs at least 0.158)])]
-    )];
-fi
-
 FP_GCC_VERSION
 AC_PROG_CPP
 
@@ -152,6 +141,18 @@ dnl ** how to invoke `ar' and `ranlib'
 #
 FP_PROG_AR_SUPPORTS_ATFILE
 FP_PROG_AR_NEEDS_RANLIB
+
+dnl ** Have libdw?
+dnl --------------------------------------------------------------
+dnl Check for a usable version of libdw/elfutils
+dnl Currently we need 0.158 or newer.
+BinDistNeedsLibdw=@UseLibdw@
+if test "x$BinDistNeedsLibdw" = "xYES" ; then
+  AC_CHECK_LIB(dw, dwfl_attach_state,
+    [UseLibdw=YES],
+    [AC_MSG_ERROR([Binary distribution was built with libdw support but target system doesn't have supported libdw version (needs at least 0.158)])]
+  )
+fi
 
 FP_SETTINGS
 
