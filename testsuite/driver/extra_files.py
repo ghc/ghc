@@ -426,6 +426,7 @@ extra_src_files = {
   'plugins05': ['HomePackagePlugin.hs'],
   'plugins06': ['LinkerTicklingPlugin.hs'],
   'plugins07': ['rule-defining-plugin/'],
+  'T12567a': ['T12567b.hs', 'simple-plugin/'],
   'print002': ['../Test.hs'],
   'print003': ['../Test.hs'],
   'print005': ['../QSort.hs'],

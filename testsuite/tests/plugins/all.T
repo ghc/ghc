@@ -70,3 +70,9 @@ test('T11244',
       clean_cmd('$MAKE -s --no-print-directory -C rule-defining-plugin clean.T11244')],
      run_command,
      ['$MAKE -s --no-print-directory T11244'])
+
+test('T12567a',
+     [pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.T12567a TOP={top}'),
+      clean_cmd('$MAKE -s --no-print-directory -C simple-plugin clean.T12567a')],
+     run_command,
+     ['$MAKE -s --no-print-directory T12567a'])
