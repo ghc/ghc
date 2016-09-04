@@ -1,6 +1,4 @@
 
 drvfail005.hs:4:13: error:
-    • Expecting one fewer argument to ‘Show a’
-      Expected kind ‘k0 -> Constraint’,
-        but ‘Show a’ has kind ‘Constraint’
+    • ‘Show a’ is not a unary constraint, as expected by a deriving clause
     • In the data declaration for ‘Test’
