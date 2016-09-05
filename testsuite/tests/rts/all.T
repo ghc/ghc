@@ -267,7 +267,7 @@ test('T9078', only_ways(['threaded1']), compile_and_run, [''])
 test('T10017', [ when(opsys('mingw32'), skip)
                , only_ways(threaded_ways), extra_run_opts('+RTS -N2 -RTS') ], compile_and_run, [''])
 
-test('T11108', expect_broken_for(11108, ['ghci', 'hpc']), compile_and_run, [''])
+test('T11108', normal, compile_and_run, [''])
 
 test('rdynamic', [ unless(opsys('linux') or opsys('mingw32'), skip)
                  # this needs runtime infrastructure to do in ghci:

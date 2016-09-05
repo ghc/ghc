@@ -1,4 +1,4 @@
-{-# LANGUAGE RecursiveDo, LambdaCase #-}
+{-# LANGUAGE RecursiveDo, LambdaCase, BangPatterns #-}
 
 import Control.Monad.Fix
 import Data.IORef
@@ -22,8 +22,8 @@ makePull f = do
     -- This seems to be the culprit, changing the order makes the weakRef get gc'ed
     -- In this configuration it crashes
 
-    foo <- Pull weak f <$> newIORef [] <*> newIORef Nothing
-    weak <- mkWeakPtr foo (Just $ print "died")
+    !foo <- Pull weak f <$> newIORef [] <*> newIORef Nothing
+    weak <- mkWeakPtr foo Nothing
 
   return foo
 
