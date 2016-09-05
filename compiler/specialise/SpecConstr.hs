@@ -1539,7 +1539,7 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
               is_small_enough vars = isWorkerSmallEnough (sc_dflags env) vars
                   -- We are about to construct w/w pair in 'spec_one'.
                   -- Omit specialisation leading to high arity workers.
-                  -- See Note [Limit w/w arity]
+                  -- See Note [Limit w/w arity] in WwLib
               n_pats      = length pats
               spec_count' = n_pats + spec_count
         ; case sc_count env of
