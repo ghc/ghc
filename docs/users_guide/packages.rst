@@ -384,6 +384,11 @@ stack. Several command line options described below can further manipulate this
 initial stack. You can see GHC's effective package database stack by running
 GHC with the :ghc-flag:`-v` flag.
 
+This stack structure means that the order of :ghc-flag:`-package-db` flags or
+:envvar:`GHC_PACKAGE_PATH` is important.  Each substack of the stack
+must be well formed (packages in databases on top of the stack can refer
+to packages below, but not vice versa).
+
 *Package shadowing:* When multiple package databases are in use it
 is possible, though rarely, that the same installed package id is present in
 more than one database. In that case, packages closer to the top of the stack
