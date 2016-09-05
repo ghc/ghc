@@ -554,7 +554,7 @@ test('T5642',
             # 2014-12-10:  641085256 Improvements in constraints solver
             # 2016-04-06:  462677300
 
-            (wordsize(64),  916484672, 10)])
+            (wordsize(64),  838316496, 10)])
             # prev:        1300000000
             # 2014-07-17:  1358833928 (general round of updates)
             # 2014-08-07:  1402242360 (caused by 1fc60ea)
@@ -570,6 +570,7 @@ test('T5642',
             # 2016-02-08:   950004816 Pattern match checker re-rework
             # 2016-05-12:  1300685592 Make Generic1 poly-kinded
             # 2016-06-05:   916484672 Refactor derived Generic instances to reduce allocations
+            # 2016-09-03:   838316496 Derive the Generic instance in perf/compiler/T5642
       ],
       compile,['-O'])
 
