@@ -126,6 +126,57 @@ been decided to remove them from the next version of the language
 standard. This behaviour can be controlled with the ``DatatypeContexts``
 extension. See :ref:`datatype-contexts`.
 
+.. _infelicities-recursive-groups:
+
+Typechecking of recursive binding groups
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The Haskell Report specifies that a group of bindings (at top level, or
+in a ``let`` or ``where``) should be sorted into strongly-connected
+components, and then type-checked in dependency order
+(`Haskell Report, Section
+4.5.1 <http://www.haskell.org/onlinereport/decls.html#sect4.5.1>`__). As
+each group is type-checked, any binders of the group that have an
+explicit type signature are put in the type environment with the
+specified polymorphic type, and all others are monomorphic until the
+group is generalised (`Haskell Report, Section
+4.5.2 <http://www.haskell.org/onlinereport/decls.html#sect4.5.2>`__).
+
+Following a suggestion of Mark Jones, in his paper `Typing Haskell in
+Haskell <http://citeseer.ist.psu.edu/424440.html>`__, GHC implements a
+more general scheme. In GHC *the dependency analysis ignores references to
+variables that have an explicit type signature*. As a result of this refined
+dependency analysis, the dependency groups are smaller, and more bindings will
+typecheck. For example, consider: ::
+
+      f :: Eq a => a -> Bool
+      f x = (x == x) || g True || g "Yes"
+
+      g y = (y <= y) || f True
+
+This is rejected by Haskell 98, but under Jones's scheme the definition
+for ``g`` is typechecked first, separately from that for ``f``, because
+the reference to ``f`` in ``g``\'s right hand side is ignored by the
+dependency analysis. Then ``g``\'s type is generalised, to get ::
+
+      g :: Ord a => a -> Bool
+
+Now, the definition for ``f`` is typechecked, with this type for ``g``
+in the type environment.
+
+The same refined dependency analysis also allows the type signatures of
+mutually-recursive functions to have different contexts, something that is
+illegal in Haskell 98 (Section 4.5.2, last sentence). GHC only insists that the
+type signatures of a *refined* group have identical type signatures; in practice
+this means that only variables bound by the same pattern binding must have the
+same context. For example, this is fine: ::
+
+      f :: Eq a => a -> Bool
+      f x = (x == x) || g True
+
+      g :: Ord a => a -> Bool
+      g y = (y <= y) || f True
+
 .. _infelicities-Modules:
 
 Module system and interface files

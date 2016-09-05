@@ -601,14 +601,6 @@ languageOptions =
          , flagReverse = "-XNoRecursiveDo"
          , flagSince = "6.8.1"
          }
-  , flag { flagName = "-XRelaxedPolyRec"
-         , flagDescription =
-           "*(deprecated)* Relaxed checking for :ref:`mutually-recursive "++
-           "polymorphic functions <typing-binds>`."
-         , flagType = DynamicFlag
-         , flagReverse = "-XNoRelaxedPolyRec"
-         , flagSince = "6.8.1"
-         }
   , flag { flagName = "-XRoleAnnotations"
          , flagDescription =
            "Enable :ref:`role annotations <role-annotations>`."
