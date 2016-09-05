@@ -577,6 +577,8 @@ tc_rn_src_decls ds
 #ifdef GHCI
         -- Get TH-generated top-level declarations and make sure they don't
         -- contain any splices since we don't handle that at the moment
+        --
+        -- The plumbing here is a bit odd: see Trac #10853
       ; th_topdecls_var <- fmap tcg_th_topdecls getGblEnv
       ; th_ds <- readTcRef th_topdecls_var
       ; writeTcRef th_topdecls_var []
