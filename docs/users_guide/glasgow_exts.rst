@@ -10082,7 +10082,7 @@ The :ghc-flag:`-XTemplateHaskellQuotes` extension is considered safe under
        add1 :: Int -> Q Exp
        add1 x = [| x + 1 |]
 
-   Now consider a splice using <literal>add1</literal> in a separate
+   Now consider a splice using ``add1`` in a separate
    module: ::
 
        module Foo where
