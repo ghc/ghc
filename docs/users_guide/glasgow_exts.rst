@@ -10276,8 +10276,6 @@ The :ghc-flag:`-XTemplateHaskellQuotes` extension is considered safe under
 
    -  Recursive ``do``-statements (see :ghc-ticket:`1262`)
 
-   -  Pattern synonyms (see :ghc-ticket:`8761`)
-
    -  Typed holes (see :ghc-ticket:`10267`)
 
 (Compared to the original paper, there are many differences of detail.
