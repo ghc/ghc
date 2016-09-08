@@ -10276,7 +10276,8 @@ The :ghc-flag:`-XTemplateHaskellQuotes` extension is considered safe under
 
    -  Recursive ``do``-statements (see :ghc-ticket:`1262`)
 
-   -  Typed holes (see :ghc-ticket:`10267`)
+   -  Type holes in typed splices (see :ghc-ticket:`10945` and
+      :ghc-ticket:`10946`)
 
 (Compared to the original paper, there are many differences of detail.
 The syntax for a declaration splice uses "``$``" not "``splice``". The type of
