@@ -25,6 +25,7 @@ module Hooks ( Hooks
              , runRnSpliceHook
 #ifdef GHCI
              , getValueSafelyHook
+             , createIservProcessHook
 #endif
              ) where
 
@@ -45,6 +46,7 @@ import CoreSyn
 import GHCi.RemoteTypes
 import SrcLoc
 import Type
+import System.Process
 #endif
 import BasicTypes
 
@@ -78,6 +80,7 @@ emptyHooks = Hooks
   , runRnSpliceHook        = Nothing
 #ifdef GHCI
   , getValueSafelyHook     = Nothing
+  , createIservProcessHook = Nothing
 #endif
   }
 
@@ -96,6 +99,7 @@ data Hooks = Hooks
   , runRnSpliceHook        :: Maybe (HsSplice Name -> RnM (HsSplice Name))
 #ifdef GHCI
   , getValueSafelyHook     :: Maybe (HscEnv -> Name -> Type -> IO (Maybe HValue))
+  , createIservProcessHook :: Maybe (CreateProcess -> IO ProcessHandle)
 #endif
   }
 
