@@ -1767,19 +1767,23 @@ isInInertEqs eqs tv rhs
       , rhs `eqType` rhs2 = True
       | otherwise         = False
 
-getNoGivenEqs :: TcLevel     -- TcLevel of this implication
+getNoGivenEqs :: TcLevel          -- TcLevel of this implication
                -> [TcTyVar]       -- Skolems of this implication
+               -> Cts             -- Given insolubles from solveGivens
                -> TcS Bool        -- True <=> definitely no residual given equalities
 -- See Note [When does an implication have given equalities?]
-getNoGivenEqs tclvl skol_tvs
-  = do { inerts@(IC { inert_eqs = ieqs, inert_irreds = iirreds, inert_funeqs = funeqs })
+getNoGivenEqs tclvl skol_tvs given_insols
+  = do { inerts@(IC { inert_eqs = ieqs, inert_irreds = iirreds
+                    , inert_funeqs = funeqs })
              <- getInertCans
        ; let local_fsks = foldFunEqs add_fsk funeqs emptyVarSet
 
-             has_given_eqs = foldrBag ((||) . ev_given_here . ctEvidence)  False iirreds
+             has_given_eqs = foldrBag ((||) . ev_given_here . ctEvidence) False
+                                      (iirreds `unionBags` given_insols)
                           || anyDVarEnv (eqs_given_here local_fsks) ieqs
 
-       ; traceTcS "getNoGivenEqs" (vcat [ppr has_given_eqs, ppr inerts])
+       ; traceTcS "getNoGivenEqs" (vcat [ ppr has_given_eqs, ppr inerts
+                                        , ppr given_insols])
        ; return (not has_given_eqs) }
   where
     eqs_given_here :: VarSet -> EqualCtList -> Bool

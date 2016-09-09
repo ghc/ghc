@@ -519,3 +519,5 @@ test('T12067', extra_clean(['T12067a.hi', 'T12067a.o']),
      multimod_compile, ['T12067', '-v0'])
 test('T10635', normal, compile, [''])
 test('T12170b', normal, compile, [''])
+test('T12466', normal, compile, [''])
+test('T12466a', normal, compile, [''])
