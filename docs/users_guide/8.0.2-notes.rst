@@ -33,6 +33,10 @@ Compiler
    initial cmm from STG-to-C-- code generation and :ghc-flag:`-ddump-cmm-verbose`
    to obtain the intermediates from all C-- pipeline stages.
 
+-  The RTS :ghc-flag: `-xb` now reads the base heap address in any base,
+   defaulting to decimal, hexadecimal if the address starts with `0x`, and
+   octal if the address starts with `0`.
+
 Runtime system
 ~~~~~~~~~~~~~~
 

@@ -271,6 +271,9 @@ usage_text[] = {
 "  -O<size>  Sets the minimum size of the old generation (default 1M)",
 "  -M<size>  Sets the maximum heap size (default unlimited)  Egs: -M256k -M1G",
 "  -H<size>  Sets the minimum heap size (default 0M)   Egs: -H24m  -H1G",
+"  -xb<addr> Sets the address from which a suitable start for the heap memory",
+"            will be searched from. This is useful if the default address",
+"            clashes with some third-party library.",
 "  -m<n>     Minimum % of heap which must be available (default 3%)",
 "  -G<n>     Number of generations (default: 2)",
 "  -c<n>     Use in-place compaction instead of copying in the oldest generation",
@@ -1293,7 +1296,7 @@ error = rtsTrue;
                     OPTION_UNSAFE;
                     if (rts_argv[arg][3] != '\0') {
                         RtsFlags.GcFlags.heapBase
-                            = strtol(rts_argv[arg]+3, (char **) NULL, 16);
+                            = strToStgWord(rts_argv[arg]+3, (char **) NULL, 0);
                     } else {
                         errorBelch("-xb: requires argument");
                         error = rtsTrue;
