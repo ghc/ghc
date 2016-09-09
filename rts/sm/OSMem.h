@@ -39,7 +39,10 @@ void setExecutable (void *p, W_ len, rtsBool exec);
 // to the amount of memory actually reserved.
 //
 // This function is called once when the block allocator is initialized.
-void *osReserveHeapMemory(W_ *len);
+//
+// startAddress must be greater or equal than 8 * (1 << 30), and can be
+// NULL, in which case a default will be picked by the RTS.
+void *osReserveHeapMemory(void *startAddress, W_ *len);
 
 // Commit (allocate memory for) a piece of address space, which must
 // be within the previously reserved space After this call, it is safe

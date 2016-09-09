@@ -431,16 +431,18 @@ osTryReserveHeapMemory (W_ len, void *hint)
     return start;
 }
 
-void *osReserveHeapMemory(W_ *len)
+void *osReserveHeapMemory(void *startAddressPtr, W_ *len)
 {
     int attempt;
     void *at;
 
     /* We want to ensure the heap starts at least 8 GB inside the address space,
-       to make sure that any dynamically loaded code will be close enough to the
-       original code so that short relocations will work. This is in particular
-       important on Darwin/Mach-O, because object files not compiled as shared
-       libraries are position independent but cannot be loaded about 4GB.
+       since we want to reserve the address space below that address for code.
+       Specifically, we need to make sure that any dynamically loaded code will
+       be close enough to the original code so that short relocations will work.
+       This is in particular important on Darwin/Mach-O, because object files
+       not compiled as shared libraries are position independent but cannot be
+       loaded above 4GB.
 
        We do so with a hint to the mmap, and we verify the OS satisfied our
        hint. We loop, shifting our hint by 1 BLOCK_SIZE every time, in case
@@ -453,6 +455,19 @@ void *osReserveHeapMemory(W_ *len)
 
     */
 
+    W_ minimumAddress = (W_)8 * (1 << 30);
+    // We don't use minimumAddress (0x200000000) as default because we know
+    // it can clash with third-party libraries. See ticket #12573.
+    W_ startAddress = 0x4200000000;
+    if (startAddressPtr) {
+        startAddress = (W_)startAddressPtr;
+    }
+    if (startAddress < minimumAddress) {
+        errorBelch(
+            "Provided heap start address %p is lower than minimum address %p",
+            (void*)startAddress, (void*)minimumAddress);
+    }
+
     attempt = 0;
     while (1) {
         if (*len < MBLOCK_SIZE) {
@@ -460,7 +475,7 @@ void *osReserveHeapMemory(W_ *len)
             barf("osReserveHeapMemory: Failed to allocate heap storage");
         }
 
-        void *hint = (void*)((W_)8 * (1 << 30) + attempt * BLOCK_SIZE);
+        void *hint = (void*)(startAddress + attempt * BLOCK_SIZE);
         at = osTryReserveHeapMemory(*len, hint);
         if (at == NULL) {
             // This means that mmap failed which we take to mean that we asked
@@ -468,7 +483,7 @@ void *osReserveHeapMemory(W_ *len)
             // limits. In this case we reduce our allocation request by a factor
             // of two and try again.
             *len /= 2;
-        } else if ((W_)at >= ((W_)8 * (1 << 30))) {
+        } else if ((W_)at >= minimumAddress) {
             // Success! We were given a block of memory starting above the 8 GB
             // mark, which is what we were looking for.
             break;
@@ -479,6 +494,7 @@ void *osReserveHeapMemory(W_ *len)
                 sysErrorBelch("unable to release reserved heap");
             }
         }
+        attempt++;
     }
 
     return at;

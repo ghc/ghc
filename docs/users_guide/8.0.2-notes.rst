@@ -30,6 +30,10 @@ Compiler
 -  Added :ghc-flag:`-fdefer-out-of-scope-variables`, which converts variable
    out of scope variables errors into warnings.
 
+-  The RTS :ghc-flag: `-xb` now reads the base heap address in any base,
+   defaulting to decimal, hexadecimal if the address starts with `0x`, and
+   octal if the address starts with `0`.
+
 Runtime system
 ~~~~~~~~~~~~~~
 

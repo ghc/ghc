@@ -102,6 +102,7 @@ typedef StgWord32          StgHalfWord;
 #define FMT_Word     FMT_Word64
 #define FMT_HexWord  FMT_HexWord64
 #define FMT_Int      FMT_Int64
+#define strToStgWord       strtoull
 #else
 #if SIZEOF_VOID_P == 4
 typedef StgInt32           StgInt;
@@ -111,6 +112,7 @@ typedef StgWord16          StgHalfWord;
 #define FMT_Word     FMT_Word32
 #define FMT_HexWord  FMT_HexWord32
 #define FMT_Int      FMT_Int32
+#define strToStgWord       strtoul
 #else
 #error GHC untested on this architecture: sizeof(void *) != 4 or 8
 #endif
