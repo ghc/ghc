@@ -55,3 +55,5 @@ Template Haskell
 
 - Accessors are now exposed for ``ErrUtils.ErrMsg`` and ``ErrUtils.ErrDoc``.
 
+- There is now a ``createIservProcessHook`` to allow API users to redirect the
+  ``stdout`` and ``stderr`` handles.
