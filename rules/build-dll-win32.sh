@@ -49,7 +49,7 @@ process_dll_link() {
     SYMBOLS_OBJ=`cat $exports | wc -l | cut -d' ' -f1`
     echo "Number of symbols in object files for $6: $SYMBOLS_OBJ"
 
-    SXS_OPTS="-fgen-sxs-assembly -dylib-abi-name \"$9\" -dylib-abi-version \"$10\""
+    SXS_OPTS="-fgen-sxs-assembly -dylib-abi-name \"$9\" -dylib-abi-version \"${10}\""
     
     # echo "Number of symbols in $6: $SYMBOLS_DLL"
     # Now check that the DLL doesn't have too many symbols. See trac #5987.
@@ -209,7 +209,7 @@ case $1 in
         exit 0
         ;;
     link)
-        process_dll_link "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9"
+        process_dll_link "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}"
         exit 0
         ;;
     *)
