@@ -447,7 +447,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
     -- type checking to get a Lint error later
     report1 = [ ("custom_error", is_user_type_error,
                                                   True, mkUserTypeErrorReporter)
-              , ("insoluble1",   is_given_eq,     True, mkGroupReporter mkEqErr)
+              , ("insoluble1",   is_given_eq,     True, mkGivenErrorReporter)
               , ("insoluble2",   utterly_wrong,   True, mkGroupReporter mkEqErr)
               , ("skolem eq1",   very_wrong,      True, mkSkolReporter)
               , ("skolem eq2",   skolem_eq,       True, mkSkolReporter)
@@ -578,6 +578,77 @@ mkUserTypeError ctxt ct = mkErrorMsgFromCt ctxt ct
                             Just msg -> msg
                             Nothing  -> pprPanic "mkUserTypeError" (ppr ct)
 
+
+mkGivenErrorReporter :: Reporter
+-- See Note [Given errors]
+mkGivenErrorReporter ctxt cts
+  | Just implic <- find_gadt_match (cec_encl ctxt)
+  = do { (ctxt, binds_msg, ct) <- relevantBindings True ctxt ct
+       ; dflags <- getDynFlags
+       ; let ct' = setCtLoc ct (setCtLocEnv (ctLoc ct) (ic_env implic))
+                   -- For given constraints we overwrite the env (and hence src-loc)
+                  -- with one from the implication.  See Note [Inaccessible code]
+
+             inaccessible_msg = hang (text "Inaccessible code in")
+                                   2 (ppr (ic_info implic))
+             report = important inaccessible_msg `mappend`
+                      relevant_bindings binds_msg
+
+       ; err <- mkEqErr_help dflags ctxt report ct'
+                             Nothing ty1 ty2
+
+       ; traceTc "mkGivenErrorRporter" (ppr ct)
+       ; maybeReportError ctxt err }
+
+  | otherwise   -- Discard Given errors that don't come from
+                -- a pattern match; maybe we should warn instead?
+  = do { traceTc "mkGivenErrorRporter no" (ppr ct $$ ppr (cec_encl ctxt))
+       ; return () }
+  where
+    (ct : _ )  = cts    -- Never empty
+    (ty1, ty2) = getEqPredTys (ctPred ct)
+
+    find_gadt_match [] = Nothing
+    find_gadt_match (implic : implics)
+      | PatSkol {} <- ic_info implic
+      , not (ic_no_eqs implic)
+      = Just implic
+      | otherwise
+      = find_gadt_match implics
+
+{- Note [Given errors]
+~~~~~~~~~~~~~~~~~~~~~~
+Given constaints reprsent things for which we have (or will have)
+evidence, so they aren't errors.  But if a Given constraint is
+insoluble, this code is inaccessible, and we might want to at least
+warn about that.  A classic case is
+
+   data T a where
+     T1 :: T Int
+     T2 :: T a
+     T3 :: T Bool
+
+   f :: T Int -> Bool
+   f T1 = ...
+   f T2 = ...
+   f T3 = ...  -- We want to report this case as inaccessible
+
+We'd like to point out that the T3 match is inaccessible. It
+will have a Given constraint [G] Int ~ Bool.
+
+But we don't want to report ALL insoluble Given constraints.  See Trac
+#12466 for a long discussion on.  For example, if we aren't careful
+we'll complain about
+   f :: ((Int ~ Bool) => a -> a) -> Int
+which arguably is OK.  It's more debatable for
+   g :: (Int ~ Bool) => Int -> Int
+but it's tricky to distinguish these cases to we don't report
+either.
+
+The bottom line is this: find_gadt_match looks for an encosing
+pattern match which binds some equality constraints.  If we
+find one, we report the insoluble Given.
+-}
 
 mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg)
                              -- Make error message for a group
@@ -1170,17 +1241,8 @@ mkEqErr ctxt (ct:_) = mkEqErr1 ctxt ct
 mkEqErr _ [] = panic "mkEqErr"
 
 mkEqErr1 :: ReportErrCtxt -> Ct -> TcM ErrMsg
-mkEqErr1 ctxt ct
-  | arisesFromGivens ct
-  = do { (ctxt, binds_msg, ct) <- relevantBindings True ctxt ct
-       ; let (given_loc, given_msg) = mk_given (ctLoc ct) (cec_encl ctxt)
-       ; dflags <- getDynFlags
-       ; let report = important given_msg `mappend` relevant_bindings binds_msg
-       ; mkEqErr_help dflags ctxt report
-                      (setCtLoc ct given_loc) -- Note [Inaccessible code]
-                      Nothing ty1 ty2 }
-
-  | otherwise   -- Wanted or derived
+mkEqErr1 ctxt ct   -- Wanted or derived;
+                   -- givens handled in mkGivenErrorReporter
   = do { (ctxt, binds_msg, ct) <- relevantBindings True ctxt ct
        ; rdr_env <- getGlobalRdrEnv
        ; fam_envs <- tcGetFamInstEnvs
@@ -1199,14 +1261,6 @@ mkEqErr1 ctxt ct
          else mkErrorMsgFromCt ctxt ct report }
   where
     (ty1, ty2) = getEqPredTys (ctPred ct)
-
-    mk_given :: CtLoc -> [Implication] -> (CtLoc, SDoc)
-    -- For given constraints we overwrite the env (and hence src-loc)
-    -- with one from the implication.  See Note [Inaccessible code]
-    mk_given loc []           = (loc, empty)
-    mk_given loc (implic : _) = (setCtLocEnv loc (ic_env implic)
-                                , hang (text "Inaccessible code in")
-                                     2 (ppr (ic_info implic)))
 
        -- If the types in the error message are the same as the types
        -- we are unifying, don't add the extra expected/actual message

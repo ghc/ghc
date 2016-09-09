@@ -1254,7 +1254,7 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
                         -- we want to retain derived equalities so we can float
                         -- them out in floatEqualities
 
-                  ; no_eqs <- getNoGivenEqs tclvl skols
+                  ; no_eqs <- getNoGivenEqs tclvl skols given_insols
                         -- Call getNoGivenEqs /after/ solveWanteds, because
                         -- solveWanteds can augment the givens, via expandSuperClasses,
                         -- to reveal given superclass equalities

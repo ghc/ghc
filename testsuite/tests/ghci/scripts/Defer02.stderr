@@ -41,8 +41,7 @@ Defer01.hs:31:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
       but its type ‘Char’ has none
       In the expression: e 'q'
       In an equation for ‘f’: f = e 'q'
-    • Relevant bindings include
-        f :: t (bound at Defer01.hs:31:1)
+    • Relevant bindings include f :: t (bound at Defer01.hs:31:1)
 
 Defer01.hs:34:8: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type ‘Char’ with actual type ‘a’
@@ -55,8 +54,7 @@ Defer01.hs:34:8: warning: [-Wdeferred-type-errors (in -Wdefault)]
       In an equation for ‘h’: h x = (x, 'c')
     • Relevant bindings include
         x :: a (bound at Defer01.hs:34:3)
-        h :: a -> (Char, Char)
-          (bound at Defer01.hs:34:1)
+        h :: a -> (Char, Char) (bound at Defer01.hs:34:1)
 
 Defer01.hs:39:17: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type ‘Bool’ with actual type ‘T a’
@@ -86,26 +84,11 @@ Defer01.hs:43:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
       In the expression: myOp 23
       In an equation for ‘j’: j = myOp 23
 
-Defer01.hs:45:1: warning: [-Wdeferred-type-errors (in -Wdefault)]
-    Couldn't match type ‘Int’ with ‘Bool’
-    Inaccessible code in
-      the type signature for:
-        k :: Int ~ Bool => Int -> Bool
-
-Defer01.hs:45:6: warning: [-Wdeferred-type-errors (in -Wdefault)]
-    • Couldn't match type ‘Int’ with ‘Bool’
-      Inaccessible code in
-        the type signature for:
-          k :: Int ~ Bool => Int -> Bool
-    • In the ambiguity check for ‘k’
-      To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
-      In the type signature: k :: (Int ~ Bool) => Int -> Bool
-
-Defer01.hs:46:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+Defer01.hs:47:1: warning: [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
     In an equation for ‘k’: k x = ...
 
-Defer01.hs:49:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
+Defer01.hs:50:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type ‘IO a0’
                   with actual type ‘Char -> IO ()’
     • Probable cause: ‘putChar’ is applied to too few arguments
@@ -131,7 +114,7 @@ Defer01.hs:49:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
       In an equation for ‘b’: b x = x == x
 (deferred type error)
 
-<interactive>:7:11: error:
+<interactive>:10:11: error:
     • Couldn't match type ‘Bool’ with ‘Int’
       Expected type: C Int
         Actual type: C Bool
@@ -150,8 +133,7 @@ Defer01.hs:49:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
       but its type ‘Char’ has none
       In the expression: e 'q'
       In an equation for ‘f’: f = e 'q'
-    • Relevant bindings include
-        f :: t (bound at Defer01.hs:31:1)
+    • Relevant bindings include f :: t (bound at Defer01.hs:31:1)
 (deferred type error)
 *** Exception: Defer01.hs:34:8: error:
     • Couldn't match expected type ‘Char’ with actual type ‘a’
@@ -164,8 +146,7 @@ Defer01.hs:49:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
       In an equation for ‘h’: h x = (x, 'c')
     • Relevant bindings include
         x :: a (bound at Defer01.hs:34:3)
-        h :: a -> (Char, Char)
-          (bound at Defer01.hs:34:1)
+        h :: a -> (Char, Char) (bound at Defer01.hs:34:1)
 (deferred type error)
 *** Exception: Defer01.hs:39:17: error:
     • Couldn't match expected type ‘Bool’ with actual type ‘T a’
@@ -182,12 +163,12 @@ Defer01.hs:49:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
       In an equation for ‘j’: j = myOp 23
 (deferred type error)
 
-<interactive>:13:8: error:
+<interactive>:16:8: error:
     • Couldn't match type ‘Int’ with ‘Bool’ arising from a use of ‘k’
     • In the first argument of ‘print’, namely ‘(k 2)’
       In the expression: print (k 2)
       In an equation for ‘it’: it = print (k 2)
-*** Exception: Defer01.hs:49:5: error:
+*** Exception: Defer01.hs:50:5: error:
     • Couldn't match expected type ‘IO a0’
                   with actual type ‘Char -> IO ()’
     • Probable cause: ‘putChar’ is applied to too few arguments
