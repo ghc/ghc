@@ -23,6 +23,12 @@ module Foreign.C.Types
         ( -- * Representations of C types
           -- $ctypes
 
+          -- ** Platform differences
+          -- | This module contains platform specific information about types.
+          --   __/As such the types presented on this page reflect the platform
+          --   on which the documentation was generated and may not coincide with
+          --   the types on your platform./__
+
           -- ** Integral types
           -- | These types are represented as @newtype@s of
           -- types in "Data.Int" and "Data.Word", and are instances of
