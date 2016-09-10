@@ -80,7 +80,6 @@ import Data.Char ( toUpper )
 import Data.List as List
 import Data.Map (Map)
 import Data.Set (Set)
-import Data.Maybe (mapMaybe)
 #if __GLASGOW_HASKELL__ > 710
 import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
@@ -1223,9 +1222,9 @@ collectLibraryPaths ps = nub (filter notNull (concatMap libraryDirs ps))
 
 collectRtsLibraryPaths :: DynFlags -> String -> PackageConfig -> [FilePath]
 collectRtsLibraryPaths dflags rts_tag pkgConfig
-  = case packageConfigId pkgConfig of
-      rtsUnitId -> map mkPath $ libraryDirs pkgConfig -- This produces lots of directories that don't exist.
-      _         -> []
+  = if packageConfigId pkgConfig == rtsUnitId
+       then map mkPath $ libraryDirs pkgConfig -- This produces lots of directories that don't exist.
+       else []
   where mkPath :: FilePath -> FilePath
         mkPath base = base FilePath.</> "rts"
                            FilePath.</> ("ghc" ++ projectVersion dflags)
@@ -1255,19 +1254,17 @@ collectLinkOpts dflags ps =
 
 collectRtsLinkOpts :: DynFlags -> PackageConfig -> [String]
 collectRtsLinkOpts dflags pkgConfig
-  = case packageConfigId pkgConfig of
-      rtsUnitId | WayDyn `notElem` ways dflags
+  = if packageConfigId pkgConfig == rtsUnitId && WayDyn `notElem` ways dflags
       -- If we're statically linking packages then
       -- tell the linker so we also statically link the RTS
-                -> ["-Wl,-static"]
-      _         -> []
+      then ["-Wl,-static"]
+      else []
 
 packageHsLibs :: DynFlags -> PackageConfig -> [String]
 packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)
   where
         ways0   = filterRtsWays $ ways dflags
         tag     = mkBuildTag (filter (not . wayRTSOnly) ways0)
-        rts_tag = mkBuildTag ways0
 
         mkDynName x
          | WayDyn `notElem` ways dflags = x

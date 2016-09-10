@@ -3,8 +3,6 @@ module Manifest where
 import DynFlags
 import PackageConfig
 
-import System.FilePath
-
 -- | Generate the appropriate Manifest file for program inclusion.
 mkManifest
    :: DynFlags
