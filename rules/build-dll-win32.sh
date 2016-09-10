@@ -7,9 +7,10 @@ fail() {
 }
 
 # Builds a delay import lib at the very end which is used to
-# be able to delay the picking of the RTS on Windows.
+# be able to delay the picking of a DLL on Windows.
 # This function is called always and decided internally
 # what to do.
+#
 # $1 = input def file
 # $2 = Output import delayed import lib
 # $3 = flag to indicate if delay import lib should be created.
@@ -36,8 +37,10 @@ process_dll_link() {
     ext="${6##*.}"
     base="${6%.*}"
     exports="$base.lst"
-    #max=20000
-    max=65535
+
+    # Maximum number of symbols to allow into
+    # one DLL. This is the split factor.
+    DLL_MAX_SYMBOLS=65535
 
     # We need to know how many symbols came from other static archives
     # So take the total number of symbols and remove those we know came
@@ -49,11 +52,13 @@ process_dll_link() {
     SYMBOLS_OBJ=`cat $exports | wc -l | cut -d' ' -f1`
     echo "Number of symbols in object files for $6: $SYMBOLS_OBJ"
 
+    # Side-by-Side assembly generation flags for GHC. Pass these along so the DLLs
+    # get the proper manifests generated.
     SXS_OPTS="-fgen-sxs-assembly -dylib-abi-name \"$9\" -dylib-abi-version \"${10}\""
     
     # echo "Number of symbols in $6: $SYMBOLS_DLL"
     # Now check that the DLL doesn't have too many symbols. See trac #5987.
-    case $(($SYMBOLS_OBJ / $max)) in
+    case $(($SYMBOLS_OBJ / $DLL_MAX_SYMBOLS)) in
         0)
             echo DLL $6 OK, no need to split
             defFile="$base.def"
@@ -64,6 +69,11 @@ process_dll_link() {
             # we need to separate out data from functions. So first create two temporaries
             globals=`echo -e "${RAW_EXPORTS}" | sed -nr 's/^[DdGgrRSs]\s(.+)$/\1\n/p'1 | sed '/^\s*$/d'`
             functions=`echo -e "${RAW_EXPORTS}" | sed -nr 's/^[^DdGgrRSs]\s(.+)$/\1\n/p'1 | sed '/^\s*$/d'`
+
+            # This split is important because for DATA entries the compiler should not generate
+            # a trampoline since CONTS DATA is directly referenced and not executed. This is not very
+            # important for mingw-w64 which would generate both the trampoline and direct referecne
+            # by default, but for libtool is it and even for mingw-w64 we can trim the output.
             echo -e "${globals}" | awk -v root="$defFile" '{def=root;}{print "    \"" $0 "\" DATA"> def}'
             echo -e "${functions}" | awk -v root="$defFile" '{def=root;}{print "    \"" $0 "\"">> def}'
             sed -i "1i\LIBRARY \"${6##*/}\"\\nEXPORTS" $defFile
@@ -87,9 +97,12 @@ process_dll_link() {
             ;;
     esac
 
-    echo "OK, we only have space for $max symbols from object files when building $6"
+    echo "OK, we only have space for $DLL_MAX_SYMBOLS symbols from object files when building $6"
 
     # First split the dlls up by whole object files
+    # To do this, we iterate over all object file and
+    # generate a the partitions based on allowing a
+    # maximum of $DLL_MAX_SYMBOLS in one DLL.
     i=0
     count=0
     declare -A buffer
@@ -102,7 +115,7 @@ process_dll_link() {
         echo "Using $obj ($obj_count)"
         count=$(($count + $obj_count))
 
-        if [ "$count" -gt "$max" ]
+        if [ "$count" -gt "$DLL_MAX_SYMBOLS" ]
         then
             echo ">> DLL split at $(($count - $obj_count)) symbols."
             i=$(($i + 1))
@@ -123,7 +136,7 @@ process_dll_link() {
     echo "$obj_files" | sed 's/\s/\n/g' | sed '/^\s*$/d' | sort | uniq -u > "$base-pt$i.objs"
 
     count=$i
-    echo "OK, based on the amount of symbols we'll split the DLL into $count"
+    echo "OK, based on the amount of symbols we'll split the DLL into $count pieces."
 
     items=$(seq 1 $count)
     for i in $items
@@ -133,9 +146,16 @@ process_dll_link() {
         elstfile="$base-pt$i.elst"
         basefile="$(basename $file)"
         DLLfile="${basefile%.*}.$ext"
-        awk -v root="$file" '{def=root;}{print "    \"" $0 "\""> def}' $lstfile
+
+        # Now do the same split and partitioning as above.
+        # I'm wondering if these can't be refactored to share code with above
+        # but my shell foo is weak. So I'll leave it as is for now.
+        globals=`echo -e "${RAW_EXPORTS}" | sed -nr 's/^[DdGgrRSs]\s(.+)$/\1\n/p'1 | sed '/^\s*$/d'`
+        functions=`echo -e "${RAW_EXPORTS}" | sed -nr 's/^[^DdGgrRSs]\s(.+)$/\1\n/p'1 | sed '/^\s*$/d'`
+        echo -e "${globals}" | awk -v root="$defFile" '{def=root;}{print "    \"" $0 "\" DATA"> def}'
+        echo -e "${functions}" | awk -v root="$defFile" '{def=root;}{print "    \"" $0 "\"">> def}'
         sed -i "1i\LIBRARY \"$DLLfile\"\\nEXPORTS" $file
-        
+
         echo "Processing $file..."
         DLLimport="${file%.*}.dll.a"
         dlltool -d $file -l $DLLimport
@@ -163,7 +183,19 @@ process_dll_link() {
         build_delay_import_lib $def "$base-pt$j.dll.a" $8
     done
 
-    # do some cleanup and create merged lib
+    # Do some cleanup and create merged lib.
+    # Because we have no split the DLL we need
+    # to provide a way for the linker to know about the split
+    # DLL. Also the compile was supposed to produce a DLL
+    # foo.dll and import library foo.dll.a. However we've actually
+    # produced foo-pt1.dll, foo-pt2.dll etc. What we don't want is to have
+    # To somehow convey back to the compiler that we split the DLL in x pieces
+    # as this would require a lot of changes.
+    #
+    # Instead we produce a merged import library which contains the union of
+    # all the import libraries produced. This works because import libraries contain
+    # only .idata section which point to the right dlls. So LD will do the right thing.
+    # And this means we don't have to do any special handling for the rest of the pipeline.
     implibs="$base*.dll.a"
     arscript="$base.mri"
     impLib="$base.dll.a"
