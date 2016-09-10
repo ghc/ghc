@@ -20,6 +20,9 @@ import Packages
 import Platform
 import SysTools
 import Module
+import ErrUtils
+import Outputable (text,hcat,SDoc)
+
 
 import Data.Version
 import Data.Maybe
@@ -102,9 +105,11 @@ createManifestDefinition dflags pkgs assembly = do
                     LinkBinary -> True
                     LinkDynLib -> False
                     _          -> error "Link mode nor supported for assembly generation"
+
   deps <- if WayDyn `elem` ways dflags 
              then genDependencies pkgs
              else return []
+
   return ManifestFile { name          = maybe (dropExtension $ takeFileName assembly) id (sharedLibABIName    dflags)
                       , version       = maybe "1.0.0.0"  id (sharedLibABIVersion dflags)
                       , architecture  = getTargetArchitecture
@@ -126,25 +131,30 @@ createManifestDefinition dflags pkgs assembly = do
                                         ++ "-ghc"
                                         ++ projectVersion dflags
                                        <.> ".dll"
+
               let modPath = if packageConfigId dep == rtsUnitId
                                then \base -> base </> "rts"
                                                   </> ("ghc" ++ projectVersion dflags)
                                                   </> mkBuildTag (filterRtsWays $ ways dflags)
                                else id
 
+              let modName = if packageConfigId dep == rtsUnitId
+                               then packageNameString dep
+                                    ++ mkBuildTag (filterRtsWays $ ways dflags)
+                               else packageNameString dep
+
               fullPkgPath <- findFile (map modPath $ libraryDirs dep) fullPkgName
-              print (map modPath $ libraryDirs dep)
-              print fullPkgPath
+
               let outDir = normalise $ takeDirectory $ fromJust (outputFile dflags)
               print outDir
               print fullPkgPath
-              let manifest = ManifestFile { name          = packageNameString dep
+              let manifest = ManifestFile { name          = modName
                                           , version       = showVersion $ packageVersion dep
                                           , architecture  = getTargetArchitecture
                                           , isApplication = False
                                           , fullname      = case sxsResolveMode dflags of
                                                                SxSRelative -> "Get abs path from commandline"
-                                                               SxSAbsolute -> maybe (packageNameString dep) (filepathRelativePathTo outDir . normalise) fullPkgPath
+                                                               SxSAbsolute -> maybe (modName) (filepathRelativePathTo outDir . normalise) fullPkgPath
                                                                SxSCache    -> fullPkgName
                                           , dependencies  = []
                                           }
@@ -152,16 +162,19 @@ createManifestDefinition dflags pkgs assembly = do
               return (manifest : rest)
 
 -- | Generate the appropriate Manifest file for program inclusion.
+--   This function can create both manifests for DLLs and EXEs as well
+--   as Side-By-Side assembly definitions if compiling Dynamic way.
 mkManifest
-   :: DynFlags
-   -> [PackageConfig]                   -- dependencies of this link object
-   -> FilePath                          -- filename of executable
-   -> IO [FilePath]                     -- extra objects to embed, maybe
+   :: DynFlags                          -- ^ DynFlags to use for compilation information
+   -> [PackageConfig]                   -- ^ Dependencies of this link object
+   -> FilePath                          -- ^ Filename of executable
+   -> IO [FilePath]                     -- ^ Extra objects to embed, maybe
 mkManifest dflags pkgs assembly
  | platformOS (targetPlatform dflags) == OSMinGW32 &&
    gopt Opt_GenManifest dflags
     = do let manifest_filename = assembly <.> "manifest"
 
+         debugTraceMsg dflags 2 (text $ "Creating manifest for `" ++ manifest_filename ++ "'")
          manifest_def <- createManifestDefinition dflags pkgs assembly
 
          writeFile manifest_filename
@@ -174,6 +187,7 @@ mkManifest dflags pkgs assembly
          if not (gopt Opt_EmbedManifest dflags) 
          then return [] 
          else do
+             debugTraceMsg dflags 2 (text $ "Embedding manifest `" ++ manifest_filename ++ "' into `" ++ assembly ++ "'")
              rc_filename <- newTempName dflags "rc"
              rc_obj_filename <- newTempName dflags (objectSuf dflags)
 
