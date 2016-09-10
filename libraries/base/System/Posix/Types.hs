@@ -25,6 +25,12 @@
 module System.Posix.Types (
 
   -- * POSIX data types
+
+  -- ** Platform differences
+  -- | This module contains platform specific information about types.
+  --   __/As such the types presented on this page reflect the platform
+  --   on which the documentation was generated and may not coincide with
+  --   the types on your platform./__
 #if defined(HTYPE_DEV_T)
   CDev(..),
 #endif
