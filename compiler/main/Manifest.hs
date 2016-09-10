@@ -146,8 +146,9 @@ createManifestDefinition dflags pkgs assembly = do
               fullPkgPath <- findFile (map modPath $ libraryDirs dep) fullPkgName
 
               let outDir = normalise $ takeDirectory $ fromJust (outputFile dflags)
-              print outDir
-              print fullPkgPath
+
+              debugTraceMsg dflags 2 (text $ "Processing reference to `" ++ fromJust outDir ++ "'.")
+
               let manifest = ManifestFile { name          = modName
                                           , version       = showVersion $ packageVersion dep
                                           , architecture  = getTargetArchitecture
