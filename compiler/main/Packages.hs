@@ -1527,8 +1527,11 @@ isDllName dflags this_pkg this_mod name
     = case platformOS $ targetPlatform dflags of
         -- On Windows the hack for #8696 makes it unlinkable.
         -- As the entire setup of the code from Cmm down to the RTS expects
-        -- the use of trampolines for the imports only when linking intra-packages.
-        -- I much rather have TH not supported than Dynamic linking not due to a hack.
+        -- the use of trampolines for the imported functions only when
+        -- doing intra-package linking, e.g. refering to a symbol defined in the same
+        -- package should not use a trampoline.
+        -- I much rather have dynamic TH not supported than the entire Dynamic linking
+        -- not due to a hack.
         -- Also not sure this would break on Windows anyway.
         OSMinGW32 -> moduleUnitId mod /= this_pkg
 
