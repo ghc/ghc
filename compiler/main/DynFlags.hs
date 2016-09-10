@@ -3675,7 +3675,6 @@ defaultFlags settings
       Opt_FlatCache,
       Opt_GenManifest,
       Opt_GhciHistory,
-      Opt_LocalGhciHistory,
       Opt_GhciSandbox,
       Opt_HelpfulErrors,
       Opt_KeepHiFiles,
