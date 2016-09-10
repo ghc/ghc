@@ -38,6 +38,14 @@ Compiler
   syntax can be used, in addition to a new form for specifying the cost centre
   name. See :ref:`scc-pragma` for examples.
 
+- ``mkManifest`` can now generate Side-By-Side assemblies for inclusion in the
+  Windows SxS Cache. (see :ghc-ticket:`10352`).
+
+- Dynamic Compilation is now supported again on Windows. Use the ``-dynamic`` flag
+  to compile a dynamic version of a Windows executable. In order for this program
+  to run on other machines you will need to install the GHC 8.2.1 Redistributables.
+  (see :ghc-ticket:`5987`).
+
 GHCi
 ~~~~
 
@@ -67,10 +75,34 @@ Runtime system
   event log, allowing heap profiles to be correlated with other tracing events
   (see :ghc-ticket:`11094`).
 
+- The different runtime libraries are no longer named differently from eachother.
+  All runtime are now named ``libHSrts.<suffix>`` and are distinguished internally
+  by an ABI name. e.g. ``rts-dyn``, ``rts-thr`` etc. The different flavors are put inside
+  different folders corresponding to their flavor to distinguish them on the file system.
+  (see :ghc-ticket:`10352`).
+
+- On Windows core dynamic libraries now contain SxS manifest entried and can be installed in
+  the side-by-side assembly cache. This allows multiple versions of the runtime to co-exist.
+  (see :ghc-ticket:`10352`).
+
+- On Linux the ``rts`` now has a default ``rts`` linked against for dynamic libraries.
+  An ``SONAME`` is being used to internally determine the ABI to use for picking the ``rts``.
+  ``dlopen()`` can now be used to open a dynamicly compiled Haskell library without needing to
+  first make sure an ``rts`` is loaded as we default to the RTS specified during linking.
+  ALternate ``rts`` can still be used by using ``LD_PRELOAD``.
+ (see :ghc-ticket:`10352`).
+
 Build system
 ~~~~~~~~~~~~
 
 -  TODO FIXME.
+
+- ``dll-split`` has been removed and replaced with an automatic partitioning script ``build-dll-win32``.
+  This script can transparently split and compile any DLLs that require this. Note that the ``rts`` and
+  ``base`` can not be split at this point because of the mutual recursion between ``base`` and ``rts``.
+  There is currently no explicit dependency between the two in the build system and such there is no way
+  to notify ``base`` that the ``rts`` has been split, or vice versa.
+  (see :ghc-ticket:`5987`).
 
 Package system
 ~~~~~~~~~~~~~~
