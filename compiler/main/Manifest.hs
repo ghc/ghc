@@ -147,7 +147,7 @@ createManifestDefinition dflags pkgs assembly = do
 
               let outDir = normalise $ takeDirectory $ fromJust (outputFile dflags)
 
-              debugTraceMsg dflags 2 (text $ "Processing reference to `" ++ fromJust outDir ++ "'.")
+              debugTraceMsg dflags 2 (text $ "Processing reference to `" ++ fullPkgPath ++ "'.")
 
               let manifest = ManifestFile { name          = modName
                                           , version       = showVersion $ packageVersion dep
