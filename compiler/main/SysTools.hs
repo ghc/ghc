@@ -1601,11 +1601,8 @@ linkDynLib dflags0 o_files dep_packages
     -- The RTS library path is still added to the library search path
     -- above in case the RTS is being explicitly linked in (see #3807).
     let platform = targetPlatform dflags
-        os = platformOS platform
-        pkgs_no_rts = case os of
-                        OSMinGW32 -> pkgs -- For Windows keep the RTS in so we can resolve the symbols
-                        _         -> filter ((/= rtsUnitId) . packageConfigId) pkgs
-    let pkg_link_opts = let (package_hs_libs, extra_libs, other_flags) = collectLinkOpts dflags pkgs_no_rts
+        os       = platformOS platform
+    let pkg_link_opts = let (package_hs_libs, extra_libs, other_flags) = collectLinkOpts dflags pkgs
                         in  package_hs_libs ++ extra_libs ++ other_flags
 
         -- probably _stub.o files
