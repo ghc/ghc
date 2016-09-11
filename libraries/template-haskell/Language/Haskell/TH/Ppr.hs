@@ -159,12 +159,17 @@ pprExp i (DoE ss_) = parensIf (i > noPrec) $ text "do" <+> pprStms ss_
 
 pprExp _ (CompE []) = text "<<Empty CompExp>>"
 -- This will probably break with fixity declarations - would need a ';'
-pprExp _ (CompE ss) = text "[" <> ppr s
-                  <+> text "|"
-                  <+> commaSep ss'
-                   <> text "]"
-    where s = last ss
-          ss' = init ss
+pprExp _ (CompE ss) =
+    if null ss'
+       -- If there are no statements in a list comprehension besides the last
+       -- one, we simply treat it like a normal list.
+       then text "[" <> ppr s <> text "]"
+       else text "[" <> ppr s
+        <+> text "|"
+        <+> commaSep ss'
+         <> text "]"
+  where s = last ss
+        ss' = init ss
 pprExp _ (ArithSeqE d) = ppr d
 pprExp _ (ListE es) = brackets (commaSep es)
 pprExp i (SigE e t) = parensIf (i > noPrec) $ ppr e <+> dcolon <+> ppr t
