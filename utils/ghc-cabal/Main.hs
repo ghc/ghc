@@ -379,7 +379,6 @@ generate directory distdir config_args
       let variablePrefix = directory ++ '_':distdir
           mods      = map display modules
           otherMods = map display (otherModules bi)
-          allMods = mods ++ otherMods
       let xs = [variablePrefix ++ "_VERSION = " ++ display (pkgVersion (package pd)),
                 -- TODO: move inside withLibLBI
                 variablePrefix ++ "_COMPONENT_ID = " ++ localCompatPackageKey lbi,
