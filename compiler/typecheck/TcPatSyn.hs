@@ -555,7 +555,7 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name, psb_def = lpat
            Unidirectional -> panic "tcPatSynBuilderBind"
 
     mk_mg :: LHsExpr Name -> MatchGroup Name (LHsExpr Name)
-    mk_mg body = mkMatchGroupName Generated [builder_match]
+    mk_mg body = mkMatchGroup Generated [builder_match]
              where
                builder_args  = [L loc (VarPat (L loc n)) | L loc n <- args]
                builder_match = mkMatch (FunRhs (L loc name) Prefix)

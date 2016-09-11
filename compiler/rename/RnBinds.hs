@@ -1028,7 +1028,7 @@ rnMatchGroup ctxt rnBody (MG { mg_alts = L _ ms, mg_origin = origin })
   = do { empty_case_ok <- xoptM LangExt.EmptyCase
        ; when (null ms && not empty_case_ok) (addErr (emptyCaseErr ctxt))
        ; (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt rnBody) ms
-       ; return (mkMatchGroupName origin new_ms, ms_fvs) }
+       ; return (mkMatchGroup origin new_ms, ms_fvs) }
 
 rnMatch :: Outputable (body RdrName) => HsMatchContext Name
         -> (Located (body RdrName) -> RnM (Located (body Name), FreeVars))

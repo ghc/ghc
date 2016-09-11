@@ -22,7 +22,7 @@ module HsUtils(
   -- Terms
   mkHsPar, mkHsApp, mkHsAppType, mkHsAppTypeOut, mkHsConApp, mkHsCaseAlt,
   mkSimpleMatch, unguardedGRHSs, unguardedRHS,
-  mkMatchGroup, mkMatchGroupName, mkMatch, mkHsLam, mkHsIf,
+  mkMatchGroup, mkMatch, mkHsLam, mkHsIf,
   mkHsWrap, mkLHsWrap, mkHsWrapCo, mkHsWrapCoR, mkLHsWrapCo,
   mkHsDictLet, mkHsLams,
   mkHsOpApp, mkHsDo, mkHsComp, mkHsWrapPat, mkHsWrapPatCo,
@@ -163,10 +163,6 @@ mkMatchGroup origin matches = MG { mg_alts = mkLocatedList matches
 mkLocatedList ::  [Located a] -> Located [Located a]
 mkLocatedList [] = noLoc []
 mkLocatedList ms = L (combineLocs (head ms) (last ms)) ms
-
-mkMatchGroupName :: Origin -> [LMatch Name (Located (body Name))]
-             -> MatchGroup Name (Located (body Name))
-mkMatchGroupName = mkMatchGroup
 
 mkHsApp :: LHsExpr name -> LHsExpr name -> LHsExpr name
 mkHsApp e1 e2 = addCLoc e1 e2 (HsApp e1 e2)
@@ -703,7 +699,7 @@ mkTopFunBind :: Origin -> Located Name -> [LMatch Name (LHsExpr Name)]
              -> HsBind Name
 -- In Name-land, with empty bind_fvs
 mkTopFunBind origin fn ms = FunBind { fun_id = fn
-                                    , fun_matches = mkMatchGroupName origin ms
+                                    , fun_matches = mkMatchGroup origin ms
                                     , fun_co_fn = idHsWrapper
                                     , bind_fvs = emptyNameSet -- NB: closed
                                                               --     binding
