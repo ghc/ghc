@@ -10,6 +10,9 @@ Highlights
 
 -  Many, many bug fixes.
 
+-  A bug has been fixed that caused standalone derived ``Ix`` instances to fail
+   for GADTs with exactly one constructor (:ghc-ticket:`12583`).
+
 Full details
 ------------
 
