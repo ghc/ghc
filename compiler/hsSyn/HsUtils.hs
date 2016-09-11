@@ -152,8 +152,9 @@ unguardedGRHSs rhs@(L loc _)
 unguardedRHS :: SrcSpan -> Located (body id) -> [LGRHS id (Located (body id))]
 unguardedRHS loc rhs = [L loc (GRHS [] rhs)]
 
-mkMatchGroup :: Origin -> [LMatch RdrName (Located (body RdrName))]
-             -> MatchGroup RdrName (Located (body RdrName))
+mkMatchGroup :: (PostTc name Type ~ PlaceHolder)
+             => Origin -> [LMatch name (Located (body name))]
+             -> MatchGroup name (Located (body name))
 mkMatchGroup origin matches = MG { mg_alts = mkLocatedList matches
                                  , mg_arg_tys = []
                                  , mg_res_ty = placeHolderType
@@ -165,10 +166,7 @@ mkLocatedList ms = L (combineLocs (head ms) (last ms)) ms
 
 mkMatchGroupName :: Origin -> [LMatch Name (Located (body Name))]
              -> MatchGroup Name (Located (body Name))
-mkMatchGroupName origin matches = MG { mg_alts = mkLocatedList matches
-                                     , mg_arg_tys = []
-                                     , mg_res_ty = placeHolderType
-                                     , mg_origin = origin }
+mkMatchGroupName = mkMatchGroup
 
 mkHsApp :: LHsExpr name -> LHsExpr name -> LHsExpr name
 mkHsApp e1 e2 = addCLoc e1 e2 (HsApp e1 e2)
