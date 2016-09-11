@@ -908,7 +908,12 @@ gen_Ix_binds loc tycon
       = mk_easy_FunBind loc inRange_RDR
                 [nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed,
                  con_pat cs_needed] $
-          foldl1 and_Expr (zipWith3Equal "single_con_inRange" in_range as_needed bs_needed cs_needed)
+          if con_arity == 0
+             -- If the product type has no fields, inRange is trivially true
+             -- (see Trac #12853).
+             then true_Expr
+             else foldl1 and_Expr (zipWith3Equal "single_con_inRange" in_range
+                    as_needed bs_needed cs_needed)
       where
         in_range a b c = nlHsApps inRange_RDR [mkLHsVarTuple [a,b], nlHsVar c]
 

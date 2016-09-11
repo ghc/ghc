@@ -1954,9 +1954,15 @@ ppr_do_stmts stmts
 pprComp :: (OutputableBndrId id, Outputable body)
         => [LStmt id body] -> SDoc
 pprComp quals     -- Prints:  body | qual1, ..., qualn
-  | not (null quals)
-  , L _ (LastStmt body _ _) <- last quals
-  = hang (ppr body <+> vbar) 2 (pprQuals (dropTail 1 quals))
+  | Just (initStmts, L _ (LastStmt body _ _)) <- snocView quals
+  = if null initStmts
+       -- If there are no statements in a list comprehension besides the last
+       -- one, we simply treat it like a normal list. This does arise
+       -- occasionally in code that GHC generates, e.g., in implementations of
+       -- 'range' for derived 'Ix' instances for product datatypes with exactly
+       -- one constructor (e.g., see Trac #12583).
+       then ppr body
+       else hang (ppr body <+> vbar) 2 (pprQuals initStmts)
   | otherwise
   = pprPanic "pprComp" (pprQuals quals)
 

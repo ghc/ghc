@@ -22,6 +22,9 @@ Language
    refer to closed local bindings. For instance, this is now permitted:
    ``f = static x where x = 'a'``.
 
+-  A bug has been fixed that caused standalone derived ``Ix`` instances to fail
+   for GADTs with exactly one constructor (:ghc-ticket:`12583`).
+
 Compiler
 ~~~~~~~~
 
