@@ -384,6 +384,13 @@ initHeapProfiling(void)
         errorBelch("cannot mix -hb and -hr");
         stg_exit(EXIT_FAILURE);
     }
+#ifdef THREADED_RTS
+    // See Trac #12019.
+    if (doingLDVProfiling() && RtsFlags.ParFlags.nCapabilities > 1) {
+        errorBelch("-hb cannot be used with multiple capabilities");
+        stg_exit(EXIT_FAILURE);
+    }
+#endif
 #endif
 
     // we only count eras if we're doing LDV profiling.  Otherwise era
