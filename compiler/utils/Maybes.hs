@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -26,12 +27,7 @@ import Control.Monad
 import Control.Monad.Trans.Maybe
 import Control.Exception (catch, SomeException(..))
 import Data.Maybe
-#if __GLASGOW_HASKELL__ >= 800
-import GHC.Stack
-#else
-import GHC.Exts (Constraint)
-type HasCallStack = (() :: Constraint)
-#endif
+import Util (HasCallStack)
 
 infixr 4 `orElse`
 

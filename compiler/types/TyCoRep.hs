@@ -167,9 +167,6 @@ import UniqFM
 import qualified Data.Data as Data hiding ( TyCon )
 import Data.List
 import Data.IORef ( IORef )   -- for CoercionHole
-#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
-import GHC.Stack (CallStack)
-#endif
 
 {-
 %************************************************************************
@@ -1986,12 +1983,7 @@ ForAllCo tv (sym h) (sym g[tv |-> tv |> sym h])
 -}
 
 -- | Type substitution, see 'zipTvSubst'
-substTyWith ::
--- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
-#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
-    (?callStack :: CallStack) =>
-#endif
-    [TyVar] -> [Type] -> Type -> Type
+substTyWith :: HasCallStack => [TyVar] -> [Type] -> Type -> Type
 -- Works only if the domain of the substitution is a
 -- superset of the type being substituted into
 substTyWith tvs tys = ASSERT( length tvs == length tys )
@@ -2018,12 +2010,7 @@ substTyWithInScope in_scope tvs tys ty =
   where tenv = zipTyEnv tvs tys
 
 -- | Coercion substitution, see 'zipTvSubst'
-substCoWith ::
--- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
-#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
-    (?callStack :: CallStack) =>
-#endif
-    [TyVar] -> [Type] -> Coercion -> Coercion
+substCoWith :: HasCallStack => [TyVar] -> [Type] -> Coercion -> Coercion
 substCoWith tvs tys = ASSERT( length tvs == length tys )
                       substCo (zipTvSubst tvs tys)
 
@@ -2075,11 +2062,7 @@ isValidTCvSubst (TCvSubst in_scope tenv cenv) =
 
 -- | This checks if the substitution satisfies the invariant from
 -- Note [The substitution invariant].
-checkValidSubst ::
-#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
-    (?callStack :: CallStack) =>
-#endif
-    TCvSubst -> [Type] -> [Coercion] -> a -> a
+checkValidSubst :: HasCallStack => TCvSubst -> [Type] -> [Coercion] -> a -> a
 checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
   = ASSERT2( isValidTCvSubst subst,
              text "in_scope" <+> ppr in_scope $$
@@ -2111,12 +2094,7 @@ checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
 -- | Substitute within a 'Type'
 -- The substitution has to satisfy the invariants described in
 -- Note [The substitution invariant].
-substTy ::
--- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
-#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
-    (?callStack :: CallStack) =>
-#endif
-    TCvSubst -> Type  -> Type
+substTy :: HasCallStack => TCvSubst -> Type  -> Type
 substTy subst ty
   | isEmptyTCvSubst subst = ty
   | otherwise = checkValidSubst subst [ty] [] $ subst_ty subst ty
@@ -2134,12 +2112,7 @@ substTyUnchecked subst ty
 -- | Substitute within several 'Type's
 -- The substitution has to satisfy the invariants described in
 -- Note [The substitution invariant].
-substTys ::
--- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
-#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
-    (?callStack :: CallStack) =>
-#endif
-    TCvSubst -> [Type] -> [Type]
+substTys :: HasCallStack => TCvSubst -> [Type] -> [Type]
 substTys subst tys
   | isEmptyTCvSubst subst = tys
   | otherwise = checkValidSubst subst tys [] $ map (subst_ty subst) tys
@@ -2157,12 +2130,7 @@ substTysUnchecked subst tys
 -- | Substitute within a 'ThetaType'
 -- The substitution has to satisfy the invariants described in
 -- Note [The substitution invariant].
-substTheta ::
--- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
-#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
-    (?callStack :: CallStack) =>
-#endif
-    TCvSubst -> ThetaType -> ThetaType
+substTheta :: HasCallStack => TCvSubst -> ThetaType -> ThetaType
 substTheta = substTys
 
 -- | Substitute within a 'ThetaType' disabling the sanity checks.
@@ -2218,12 +2186,7 @@ lookupTyVar (TCvSubst _ tenv _) tv
 -- | Substitute within a 'Coercion'
 -- The substitution has to satisfy the invariants described in
 -- Note [The substitution invariant].
-substCo ::
--- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
-#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
-    (?callStack :: CallStack) =>
-#endif
-    TCvSubst -> Coercion -> Coercion
+substCo :: HasCallStack => TCvSubst -> Coercion -> Coercion
 substCo subst co
   | isEmptyTCvSubst subst = co
   | otherwise = checkValidSubst subst [] [co] $ subst_co subst co
@@ -2241,12 +2204,7 @@ substCoUnchecked subst co
 -- | Substitute within several 'Coercion's
 -- The substitution has to satisfy the invariants described in
 -- Note [The substitution invariant].
-substCos ::
--- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
-#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
-    (?callStack :: CallStack) =>
-#endif
-    TCvSubst -> [Coercion] -> [Coercion]
+substCos :: HasCallStack => TCvSubst -> [Coercion] -> [Coercion]
 substCos subst cos
   | isEmptyTCvSubst subst = cos
   | otherwise = checkValidSubst subst [] cos $ map (subst_co subst) cos
@@ -2341,12 +2299,7 @@ substCoVars subst cvs = map (substCoVar subst) cvs
 lookupCoVar :: TCvSubst -> Var  -> Maybe Coercion
 lookupCoVar (TCvSubst _ _ cenv) v = lookupVarEnv cenv v
 
-substTyVarBndr ::
--- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
-#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
-    (?callStack :: CallStack) =>
-#endif
-    TCvSubst -> TyVar -> (TCvSubst, TyVar)
+substTyVarBndr :: HasCallStack => TCvSubst -> TyVar -> (TCvSubst, TyVar)
 substTyVarBndr = substTyVarBndrCallback substTy
 
 -- | Like 'substTyVarBndr' but disables sanity checks.

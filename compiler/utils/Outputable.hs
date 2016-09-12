@@ -118,9 +118,6 @@ import Data.List (intersperse)
 
 import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
-#if __GLASGOW_HASKELL__ > 710
-import GHC.Stack
-#endif
 
 {-
 ************************************************************************
@@ -1074,9 +1071,13 @@ doOrDoes _   = text "do"
 ************************************************************************
 -}
 
-pprPanic :: String -> SDoc -> a
+callStackDoc :: HasCallStack => SDoc
+callStackDoc =
+    hang (text "Call stack:") 4 (vcat $ map text $ lines prettyCurrentCallStack)
+
+pprPanic :: HasCallStack => String -> SDoc -> a
 -- ^ Throw an exception saying "bug in GHC"
-pprPanic    = panicDoc
+pprPanic s doc = panicDoc s (doc $$ callStackDoc)
 
 pprSorry :: String -> SDoc -> a
 -- ^ Throw an exception saying "this isn't finished yet"
@@ -1101,13 +1102,8 @@ pprTraceIt desc x = pprTrace desc (ppr x) x
 
 -- | If debug output is on, show some 'SDoc' on the screen along
 -- with a call stack when available.
-#if __GLASGOW_HASKELL__ > 710
-pprSTrace :: (?callStack :: CallStack) => SDoc -> a -> a
-pprSTrace = pprTrace (prettyCallStack ?callStack)
-#else
-pprSTrace :: SDoc -> a -> a
-pprSTrace = pprTrace "no callstack info"
-#endif
+pprSTrace :: HasCallStack => SDoc -> a -> a
+pprSTrace doc = pprTrace "" (doc $$ callStackDoc)
 
 warnPprTrace :: Bool -> String -> Int -> SDoc -> a -> a
 -- ^ Just warn about an assertion failure, recording the given file and line number.
@@ -1122,22 +1118,11 @@ warnPprTrace True   file  line  msg x
 
 -- | Panic with an assertation failure, recording the given file and
 -- line number. Should typically be accessed with the ASSERT family of macros
-#if __GLASGOW_HASKELL__ > 710
-assertPprPanic :: (?callStack :: CallStack) => String -> Int -> SDoc -> a
+assertPprPanic :: HasCallStack => String -> Int -> SDoc -> a
 assertPprPanic _file _line msg
   = pprPanic "ASSERT failed!" doc
   where
-    doc = sep [ text (prettyCallStack ?callStack)
-              , msg ]
-#else
-assertPprPanic :: String -> Int -> SDoc -> a
-assertPprPanic file line msg
-  = pprPanic "ASSERT failed!" doc
-  where
-    doc = sep [ hsep [ text "file", text file
-                     , text "line", int line ]
-              , msg ]
-#endif
+    doc = sep [ msg, callStackDoc ]
 
 pprDebugAndThen :: DynFlags -> (String -> a) -> SDoc -> SDoc -> a
 pprDebugAndThen dflags cont heading pretty_msg

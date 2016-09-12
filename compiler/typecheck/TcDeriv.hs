@@ -65,9 +65,6 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Data.List
-#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
-import GHC.Stack (CallStack)
-#endif
 
 {-
 ************************************************************************
@@ -138,21 +135,11 @@ mkPredOrigin origin t_or_k pred = PredOrigin pred origin t_or_k
 mkThetaOrigin :: CtOrigin -> TypeOrKind -> ThetaType -> ThetaOrigin
 mkThetaOrigin origin t_or_k = map (mkPredOrigin origin t_or_k)
 
-substPredOrigin ::
--- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
-#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
-    (?callStack :: CallStack) =>
-#endif
-    TCvSubst -> PredOrigin -> PredOrigin
+substPredOrigin :: HasCallStack => TCvSubst -> PredOrigin -> PredOrigin
 substPredOrigin subst (PredOrigin pred origin t_or_k)
   = PredOrigin (substTy subst pred) origin t_or_k
 
-substThetaOrigin ::
--- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
-#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
-    (?callStack :: CallStack) =>
-#endif
-    TCvSubst -> ThetaOrigin -> ThetaOrigin
+substThetaOrigin :: HasCallStack => TCvSubst -> ThetaOrigin -> ThetaOrigin
 substThetaOrigin subst = map (substPredOrigin subst)
 
 data EarlyDerivSpec = InferTheta (DerivSpec ThetaOrigin)
