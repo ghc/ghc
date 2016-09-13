@@ -38,6 +38,7 @@ import FastString
 import GHC hiding (NoLink)
 import GhcMonad (withSession)
 import HscTypes
+import NameCache
 import IfaceEnv
 import Name
 import UniqFM
@@ -125,6 +126,7 @@ writeInterfaceFile filename iface = do
 
   -- put the main thing
   let bh = setUserData bh0 $ newWriteState (putName bin_symtab)
+                                           (putName bin_symtab)
                                            (putFastString bin_dict)
   put_ bh iface
 
