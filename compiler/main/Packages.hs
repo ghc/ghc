@@ -1254,10 +1254,18 @@ collectLinkOpts dflags ps =
 
 collectRtsLinkOpts :: DynFlags -> PackageConfig -> [String]
 collectRtsLinkOpts dflags pkgConfig
-  = if packageConfigId pkgConfig == rtsUnitId && WayDyn `notElem` ways dflags
+  = if    packageConfigId pkgConfig == rtsUnitId
+       && WayDyn `notElem` ways dflags
+#if defined(mingw32_HOST_OS)
       -- If we're statically linking packages then
       -- tell the linker so we also statically link the RTS
+      -- This may be a bit of a big hammer as it affects
+      -- user programs as well. Instead should look into
+      -- specifying the full lib name to -l to disambiguate. 
       then ["-Wl,-static"]
+#else
+      then []
+#endif
       else []
 
 packageHsLibs :: DynFlags -> PackageConfig -> [String]

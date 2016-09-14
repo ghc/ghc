@@ -1739,11 +1739,13 @@ linkBinary :: DynFlags -> [FilePath] -> [UnitId] -> IO ()
 linkBinary = linkBinary' False
 
 linkBinary' :: Bool -> DynFlags -> [FilePath] -> [UnitId] -> IO ()
-linkBinary' staticLink dflags o_files dep_packages = do
-    let platform = targetPlatform dflags
-        mySettings = settings dflags
-        verbFlags = getVerbFlags dflags
-        output_fn = exeFileName staticLink dflags
+linkBinary' staticLink dflags o_files dep_packages_all = do
+    let platform     = targetPlatform dflags
+        mySettings   = settings dflags
+        verbFlags    = getVerbFlags dflags
+        output_fn    = exeFileName staticLink dflags
+        dep_packages = filter (/=rtsUnitId) dep_packages_all
+        rts_packages = filter (==rtsUnitId) dep_packages_all
 
     -- get the full list of packages to link with, by combining the
     -- explicit packages with the auto packages and all of their
@@ -1753,9 +1755,9 @@ linkBinary' staticLink dflags o_files dep_packages = do
                       else do d <- getCurrentDirectory
                               return $ normalise (d </> output_fn)
     pkg_lib_paths <- getPackageLibraryPath dflags dep_packages
+    rts_lib_paths <- getPackageLibraryPath dflags rts_packages
     pkgs <- getPreloadPackagesAnd dflags dep_packages
-    let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
-        get_pkg_lib_path_opts l
+    let get_pkg_lib_path_opts forceRPath l
          | osElfTarget (platformOS platform) &&
            dynLibLoader dflags == SystemDependent &&
            WayDyn `elem` ways dflags
@@ -1763,7 +1765,7 @@ linkBinary' staticLink dflags o_files dep_packages = do
                             then "$ORIGIN" </>
                                  (l `makeRelativeTo` full_output_fn)
                             else l
-                  rpath = if gopt Opt_RPath dflags
+                  rpath = if gopt Opt_RPath dflags || forceRPath
                           then ["-Wl,-rpath",      "-Wl," ++ libpath]
                           else []
                   -- Solaris 11's linker does not support -rpath-link option. It silently
@@ -1787,6 +1789,8 @@ linkBinary' staticLink dflags o_files dep_packages = do
               in ["-L" ++ l] ++ ["-Wl,-rpath", "-Wl," ++ libpath]
          | otherwise = ["-L" ++ l]
 
+    let link_rts_opts = concatMap (get_pkg_lib_path_opts True) rts_lib_paths
+    let pkg_lib_path_opts = concatMap (get_pkg_lib_path_opts False) pkg_lib_paths
     let lib_paths = libraryPaths dflags
     let lib_path_opts = map ("-L"++) lib_paths
 
@@ -1908,6 +1912,7 @@ linkBinary' staticLink dflags o_files dep_packages = do
                          resource_objs
                       ++ framework_opts
                       ++ pkg_lib_path_opts
+                      ++ link_rts_opts
                       ++ extraLinkObj:noteLinkObjs
                       ++ pkg_link_opts
                       ++ pkg_framework_opts

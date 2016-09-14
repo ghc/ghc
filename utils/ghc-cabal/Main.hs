@@ -369,7 +369,10 @@ generate directory distdir config_args
           libraryDirs = forDeps Installed.libraryDirs
           -- The mkLibraryRelDir function is a bit of a hack.
           -- Ideally it should be handled in the makefiles instead.
-          mkLibraryRelDir "rts"   = "rts/dist/build"
+          -- Also we can't determine which RTS ways we're supposed to refer to here
+          -- since they all now have the same SONAME and are all in different dirs
+          -- So instead default to the non theaded vanilla RTS.
+          mkLibraryRelDir "rts"   = "rts/dist/build/rts/ghc" ++ (show $ compilerVersion $ compiler $ lbi)
           mkLibraryRelDir "ghc"   = "compiler/stage2/build"
           mkLibraryRelDir "Cabal" = "libraries/Cabal/Cabal/dist-install/build"
           mkLibraryRelDir l       = "libraries/" ++ l ++ "/dist-install/build"
