@@ -716,15 +716,12 @@ dataToQa mkCon mkLit appCon antiQ t =
                                           (NameG DataName
                                                 (mkPkgName "ghc-prim")
                                                 (mkModName "GHC.Tuple"))
-                      -- It is possible for a Data instance to be defined such
-                      -- that toConstr uses a Constr defined using a function,
-                      -- not a data constructor. In such a case, we must take
-                      -- care to build the Name using mkNameG_v (for values),
-                      -- not mkNameG_d (for data constructors).
-                      -- See Trac #10796.
+
+                      -- Tricky case: see Note [Data for non-algebraic types]
                       fun@(x:_)   | startsVarSym x || startsVarId x
                                   -> mkNameG_v tyconPkg tyconMod fun
                       con         -> mkNameG_d tyconPkg tyconMod con
+
                   where
                     tycon :: TyCon
                     tycon = (typeRepTyCon . typeOf) t
@@ -746,6 +743,34 @@ dataToQa mkCon mkLit appCon antiQ t =
           constr = toConstr t
 
       Just y -> y
+
+
+{- Note [Data for non-algebraic types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Class Data was originally intended for algebraic data types.  But
+it is possible to use it for abstract types too.  For example, in
+package `text` we find
+
+  instance Data Text where
+    ...
+    toConstr _ = packConstr
+
+  packConstr :: Constr
+  packConstr = mkConstr textDataType "pack" [] Prefix
+
+Here `packConstr` isn't a real data constructor, it's an ordiary
+function.  Two complications
+
+* In such a case, we must take care to build the Name using
+  mkNameG_v (for values), not mkNameG_d (for data constructors).
+  See Trac #10796.
+
+* The pseudo-constructor is named only by its string, here "pack".
+  But 'dataToQa' needs the TyCon of its defining module, and has
+  to assume it's defined in the same module as the TyCon itself.
+  But nothing enforces that; Trac #12596 shows what goes wrong if
+  "pack" is defined in a different module than the data type "Text".
+  -}
 
 -- | 'dataToExpQ' converts a value to a 'Q Exp' representation of the
 -- same value, in the SYB style. It is generalized to take a function
