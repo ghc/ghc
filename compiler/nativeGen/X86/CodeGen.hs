@@ -2603,7 +2603,8 @@ genSwitch :: DynFlags -> CmmExpr -> SwitchTargets -> NatM InstrBlock
 genSwitch dflags expr targets
   | gopt Opt_PIC dflags
   = do
-        (reg,e_code) <- getSomeReg (cmmOffset dflags expr offset)
+        (reg,e_code) <- getNonClobberedReg (cmmOffset dflags expr offset)
+           -- getNonClobberedReg because it needs to survive across t_code
         lbl <- getNewLabelNat
         dflags <- getDynFlags
         let is32bit = target32Bit (targetPlatform dflags)
@@ -2624,6 +2625,7 @@ genSwitch dflags expr targets
         let op = OpAddr (AddrBaseIndex (EABaseReg tableReg)
                                        (EAIndex reg (wORD_SIZE dflags)) (ImmInt 0))
 
+        offsetReg <- getNewRegNat (intFormat (wordWidth dflags))
         return $ if is32bit || os == OSDarwin
                  then e_code `appOL` t_code `appOL` toOL [
                                 ADD (intFormat (wordWidth dflags)) op (OpReg tableReg),
@@ -2636,8 +2638,9 @@ genSwitch dflags expr targets
                       -- hack should be removed in conjunction with the hack in
                       -- PprMach.hs/pprDataItem once binutils 2.17 is standard.
                       e_code `appOL` t_code `appOL` toOL [
-                               MOVSxL II32 op (OpReg reg),
-                               ADD (intFormat (wordWidth dflags)) (OpReg reg)
+                               MOVSxL II32 op (OpReg offsetReg),
+                               ADD (intFormat (wordWidth dflags))
+                                   (OpReg offsetReg)
                                    (OpReg tableReg),
                                JMP_TBL (OpReg tableReg) ids rosection lbl
                        ]
