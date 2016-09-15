@@ -37,7 +37,6 @@ test('T10272',
      ['$MAKE -s --no-print-directory T10272'])
 
 test('T12504',
-     [extra_clean(['T12504/path/to/T12504.hs']),
-      extra_files(['T12504'])],
+     [extra_clean(['T12504/path/to/T12504.hs'])],
      run_command,
      ['$MAKE -s --no-print-directory T12504'])
