@@ -973,8 +973,10 @@ prodCapability (Capability *cap, Task *task)
 rtsBool
 tryGrabCapability (Capability *cap, Task *task)
 {
+    int r;
     if (cap->running_task != NULL) return rtsFalse;
-    ACQUIRE_LOCK(&cap->lock);
+    r = TRY_ACQUIRE_LOCK(&cap->lock);
+    if (r != 0) return rtsFalse;
     if (cap->running_task != NULL) {
         RELEASE_LOCK(&cap->lock);
         return rtsFalse;
