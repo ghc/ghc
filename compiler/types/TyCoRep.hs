@@ -1683,7 +1683,7 @@ the range of the TvSubstEnv should *never* include a type headed with
 CoercionTy.
 
 Note [The substitution invariant]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When calling (substTy subst ty) it should be the case that
 the in-scope set in the substitution is a superset of both:
 
