@@ -612,9 +612,19 @@ The GHC runtime treats program exit as a special case, to avoid the need
 to wait for blocked threads when a standalone executable exits. Since
 the program and all its threads are about to terminate at the same time
 that the code is removed from memory, it isn't necessary to ensure that
-the threads have exited first. (Unofficially, if you want to use this
-fast and loose version of ``hs_exit()``, then call
-``shutdownHaskellAndExit()`` instead).
+the threads have exited first.  If you want this fast and loose
+version of ``hs_exit()``, you can call:
+
+.. code-block:: c
+
+   void hs_exit_nowait(void);
+
+instead.  This is particularly useful if you have foreign libraries
+that need to call ``hs_exit()`` at program exit (perhaps via a C++
+destructor): in this case you should use ``hs_exit_nowait()``, because
+the thread that called ``exit()`` and is running C++ destructors is in
+a foreign call from Haskell that will never return, so ``hs_exit()``
+would deadlock.
 
 .. _hs_try_putmvar:
 

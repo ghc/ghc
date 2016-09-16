@@ -455,6 +455,14 @@ hs_exit(void)
     // be safe; this might be a DLL
 }
 
+void
+hs_exit_nowait(void)
+{
+    hs_exit_(rtsFalse);
+    // do not wait for outstanding foreign calls to return; if they return in
+    // the future, they will block indefinitely.
+}
+
 // Compatibility interfaces
 void
 shutdownHaskell(void)

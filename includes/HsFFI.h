@@ -96,6 +96,7 @@ typedef void*                   HsStablePtr;
 
 extern void hs_init     (int *argc, char **argv[]);
 extern void hs_exit     (void);
+extern void hs_exit_nowait(void);
 extern void hs_set_argv (int argc, char *argv[]);
 extern void hs_add_root (void (*init_root)(void));
 extern void hs_thread_done (void);
