@@ -4765,7 +4765,8 @@ compilerInfo dflags
     showBool False = "NO"
     isWindows = platformOS (targetPlatform dflags) == OSMinGW32
 
-#include "../includes/dist-derivedconstants/header/GHCConstantsHaskellWrappers.hs"
+-- Produced by deriveConstants
+#include "GHCConstantsHaskellWrappers.hs"
 
 bLOCK_SIZE_W :: DynFlags -> Int
 bLOCK_SIZE_W dflags = bLOCK_SIZE dflags `quot` wORD_SIZE dflags

@@ -24,6 +24,7 @@ $1_$2_C_FILES_DEPS = $$(filter-out $$($1_$2_C_FILES_NODEPS),$$($1_$2_C_FILES))
 
 $1_$2_MKDEPENDHS_FLAGS = -dep-makefile $$($1_$2_depfile_haskell).tmp $$(foreach way,$$($1_$2_WAYS),-dep-suffix "$$(patsubst %o,%,$$($$(way)_osuf))")
 $1_$2_MKDEPENDHS_FLAGS += -include-pkg-deps
+$1_$2_MKDEPENDHS_FLAGS += $(addprefix -I,$($1_INCLUDE_DIRS))
 
 ifneq "$$(NO_GENERATED_MAKEFILE_RULES)" "YES"
 

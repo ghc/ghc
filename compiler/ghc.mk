@@ -259,6 +259,11 @@ PRIMOP_BITS_STAGE3 = $(addprefix compiler/stage3/build/,$(PRIMOP_BITS_NAMES))
 compiler_CPP_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
 compiler_CPP_OPTS += ${GhcCppOpts}
 
+# We add these paths to the Haskell compiler's #include search path list since
+# we must avoid #including files by paths relative to the source file as Hadrian
+# moves the build artifacts out of the source tree. See #8040.
+compiler_HC_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
+
 define preprocessCompilerFiles
 # $0 = stage
 compiler/stage$1/build/primops.txt: compiler/prelude/primops.txt.pp compiler/stage$1/$$(PLATFORM_H)

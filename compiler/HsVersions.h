@@ -20,7 +20,7 @@ you will screw up the layout where they are used in case expressions!
  * ghcconfig.h, because that will include ghcplatform.h which has the
  * wrong platform settings for the compiler (it has the platform
  * settings for the target plat instead). */
-#include "../includes/ghcautoconf.h"
+#include "ghcautoconf.h"
 
 #define GLOBAL_VAR(name,value,ty)  \
 {-# NOINLINE name #-};             \
