@@ -763,12 +763,27 @@ matchSimply scrut hs_ctx pat result_expr fail_expr = do
 
 matchSinglePat :: CoreExpr -> HsMatchContext Name -> LPat Id
                -> Type -> MatchResult -> DsM MatchResult
--- Do not warn about incomplete patterns
+-- matchSinglePat does not warn about incomplete patterns
 -- Used for things like [ e | pat <- stuff ], where
 -- incomplete patterns are just fine
+
 matchSinglePat (Var var) ctx pat ty match_result
+  | isLocalId var
+  = match_single_pat_var var ctx pat ty match_result
+
+matchSinglePat scrut hs_ctx pat ty match_result
+  = do { var           <- selectSimpleMatchVarL pat
+       ; match_result' <- match_single_pat_var var hs_ctx pat ty match_result
+       ; return (adjustMatchResult (bindNonRec var scrut) match_result') }
+
+match_single_pat_var :: Id -> HsMatchContext Name -> LPat Id
+                     -> Type -> MatchResult -> DsM MatchResult
+-- matchSinglePat ensures that the scrutinee is a variable
+-- and then calls match_single_pat_var
+match_single_pat_var var ctx pat ty match_result
   = do { dflags <- getDynFlags
        ; locn   <- getSrcSpanDs
+
                     -- Pattern match check warnings
        ; checkSingle dflags (DsMatchContext ctx locn) var (unLoc pat)
 
@@ -776,10 +791,6 @@ matchSinglePat (Var var) ctx pat ty match_result
                                 , eqn_rhs  = match_result }
        ; match [var] ty [eqn_info] }
 
-matchSinglePat scrut hs_ctx pat ty match_result
-  = do { var <- selectSimpleMatchVarL pat
-       ; match_result' <- matchSinglePat (Var var) hs_ctx pat ty match_result
-       ; return (adjustMatchResult (bindNonRec var scrut) match_result') }
 
 
 {-
