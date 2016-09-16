@@ -142,8 +142,7 @@ dsHsBind dflags
   = do  { body_expr <- dsGuarded grhss ty
         ; let body' = mkOptTickBox rhs_tick body_expr
               pat'  = decideBangHood dflags pat
-        ; (force_var,sel_binds) <-
-            mkSelectorBinds var_ticks pat body'
+        ; (force_var,sel_binds) <- mkSelectorBinds var_ticks pat body'
           -- We silently ignore inline pragmas; no makeCorePair
           -- Not so cool, but really doesn't matter
         ; let force_var' = if isBangedLPat pat'

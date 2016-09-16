@@ -597,23 +597,14 @@ in a binding group:
 where p binds x,y (this list of binders can be empty).
 There are two cases.
 
-General case (A).
-  In the general case we generate these bindings (A)
+------ Special case (A) -------
+  For a pattern that is just a variable,
+     let !x = e in body
+  ==>
+     let x = e in x `seq` body
+  So we return the binding, with 'x' as the variable to seq.
 
-       { t = case e of p -> (x,y)
-       ; x = case t of (x,y) -> x
-       ; y = case t of (x,y) -> y }
-
-  and we return 't' as the variable to force if the pattern
-  is strict.  So with -XStrict or an outermost-bang-pattern, the binding
-     let p = e in body
-  would turn into
-     let { t = case e of p -> (x,y)
-         ; x = case t of (x,y) -> x
-         ; y = case t of (x,y) -> y }
-     in t `seq` t
-
-Special case (B).
+------ Special case (B) -------
   For a pattern that is essentially just a tuple:
       * A product type, so cannot fail
       * Only one level, so that
@@ -625,7 +616,38 @@ Special case (B).
        ; y = case v of p -> y }
   with 'v' as the variable to force
 
-Examples:
+------ General case (C) -------
+  In the general case we generate these bindings:
+       let { ...; p = e; ... } in body
+  ==>
+       let { t = case e of p -> (x,y)
+           ; x = case t of (x,y) -> x
+           ; y = case t of (x,y) -> y }
+       in t `seq` body
+
+  Note that we return 't' as the variable to force if the pattern
+  is strict (i.e. with -XStrict or an outermost-bang-pattern)
+
+  Note that (A) /includes/ the situation where
+
+   * The pattern binds exactly one variable
+        let !(Just (Just x) = e in body
+     ==>
+       let { t = case e of Just (Just v) -> Unit v
+           ; v = case t of Unit v -> v }
+       in t `seq` body
+    The 'Unit' is a one-tuple; see Note [One-tuples] in TysWiredIn
+    Note that forcing 't' makes the pattern match happen,
+    but does not force 'v'.
+
+  * The pattern binds no variables
+        let !(True,False) = e in body
+    ==>
+        let t = case e of (True,False) -> ()
+        in t `seq` body
+
+
+------ Examples ----------
   *   !(_, (_, a)) = e
     ==>
       t = case e of (_, (_, a)) -> Unit a
@@ -708,14 +730,17 @@ mkSelectorBinds :: [[Tickish Id]] -- ^ ticks to add, possibly
                 -- and all the desugared binds
 
 mkSelectorBinds ticks pat val_expr
-  | is_simple_lpat pat  -- Special case (B)
-  = do { let pat_ty = hsLPatType pat
+  | L _ (VarPat (L _ v)) <- pat'     -- Special case (A)
+  = return (v, [(v, val_expr)])
+
+  | is_flat_prod_lpat pat'           -- Special case (B)
+  = do { let pat_ty = hsLPatType pat'
        ; val_var <- newSysLocalDs pat_ty
 
-       ; let mk_bind scrut_var tick bndr_var
+       ; let mk_bind tick bndr_var
                -- (mk_bind sv bv)  generates  bv = case sv of { pat -> bv }
                -- Remember, 'pat' binds 'bv'
-               = do { rhs_expr <- matchSimply (Var scrut_var) PatBindRhs pat
+               = do { rhs_expr <- matchSimply (Var val_var) PatBindRhs pat'
                                        (Var bndr_var)
                                        (Var bndr_var)  -- Neat hack
                       -- Neat hack: since 'pat' can't fail, the
@@ -724,12 +749,12 @@ mkSelectorBinds ticks pat val_expr
                       -- that bndr_var is just the ticket.
                     ; return (bndr_var, mkOptTickBox tick rhs_expr) }
 
-       ; binds <- zipWithM (mk_bind val_var) ticks' binders
+       ; binds <- zipWithM mk_bind ticks' binders
        ; return ( val_var, (val_var, val_expr) : binds) }
 
-  | otherwise
+  | otherwise                          -- General case (C)
   = do { tuple_var  <- newSysLocalDs tuple_ty
-       ; error_expr <- mkErrorAppDs iRREFUT_PAT_ERROR_ID tuple_ty (ppr pat)
+       ; error_expr <- mkErrorAppDs iRREFUT_PAT_ERROR_ID tuple_ty (ppr pat')
        ; tuple_expr <- matchSimply val_expr PatBindRhs pat
                                    local_tuple error_expr
        ; let mk_tup_bind tick binder
@@ -739,30 +764,34 @@ mkSelectorBinds ticks pat val_expr
              tup_binds = zipWith mk_tup_bind ticks' binders
        ; return (tuple_var, (tuple_var, tuple_expr) : tup_binds) }
   where
-    binders = collectPatBinders pat
+    pat' = strip_bangs pat
+           -- Strip the bangs before looking for case (A) or (B)
+           -- The incoming pattern may well have a bang on it
+
+    binders = collectPatBinders pat'
     ticks'  = ticks ++ repeat []
 
     local_binders = map localiseId binders      -- See Note [Localise pattern binders]
     local_tuple   = mkBigCoreVarTup1 binders
     tuple_ty      = exprType local_tuple
 
-is_simple_lpat :: LPat a -> Bool
-is_simple_lpat p = is_simple_pat (unLoc p)
+strip_bangs :: LPat a -> LPat a
+-- Remove outermost bangs and parens
+strip_bangs (L _ (ParPat p))  = strip_bangs p
+strip_bangs (L _ (BangPat p)) = strip_bangs p
+strip_bangs lp                = lp
 
-is_simple_pat :: Pat a -> Bool
-is_simple_pat (VarPat _)                   = True
-is_simple_pat (ParPat p)                   = is_simple_lpat p
-is_simple_pat (TuplePat ps Boxed _)        = all is_triv_lpat ps
-is_simple_pat (ConPatOut { pat_con = con
-                         , pat_args = ps}) = is_simple_con_pat con ps
-is_simple_pat _ = False
+is_flat_prod_lpat :: LPat a -> Bool
+is_flat_prod_lpat p = is_flat_prod_pat (unLoc p)
 
-is_simple_con_pat :: Located ConLike -> HsConPatDetails a -> Bool
-is_simple_con_pat con args
- = case con of
-     L _ (RealDataCon con) -> isProductTyCon (dataConTyCon con)
-                              && all is_triv_lpat (hsConPatArgs args)
-     L _ (PatSynCon {})    -> False
+is_flat_prod_pat :: Pat a -> Bool
+is_flat_prod_pat (ParPat p)            = is_flat_prod_lpat p
+is_flat_prod_pat (TuplePat ps Boxed _) = all is_triv_lpat ps
+is_flat_prod_pat (ConPatOut { pat_con = L _ pcon, pat_args = ps})
+  | RealDataCon con <- pcon
+  , isProductTyCon (dataConTyCon con)
+  = all is_triv_lpat (hsConPatArgs ps)
+is_flat_prod_pat _ = False
 
 is_triv_lpat :: LPat a -> Bool
 is_triv_lpat p = is_triv_pat (unLoc p)
@@ -926,28 +955,25 @@ mkBinaryTickBox ixT ixF e = do
 
 -- *******************************************************************
 
--- | Remove any bang from a pattern and say if it is a strict bind,
--- also make irrefutable patterns ordinary patterns if -XStrict.
+-- | Use -XStrict to add a ! or remove a ~
 --
 -- Examples:
--- ~pat    => False, pat   -- when -XStrict
---                         -- even if pat = ~pat'
--- ~pat    => False, ~pat  -- without -XStrict
--- ~(~pat) => False, ~pat  -- when -XStrict
--- pat     => True,  pat   -- when -XStrict
--- !pat    => True,  pat   -- always
+-- ~pat    => pat    -- when -XStrict (even if pat = ~pat')
+-- !pat    => !pat   -- always
+-- pat     => !pat   -- when -XStrict
+-- pat     => pat    -- otherwise
 decideBangHood :: DynFlags
                -> LPat id  -- ^ Original pattern
                -> LPat id  -- Pattern with bang if necessary
 decideBangHood dflags lpat
+  | not (xopt LangExt.Strict dflags)
+  = lpat
+  | otherwise   --  -XStrict
   = go lpat
   where
-    xstrict = xopt LangExt.Strict dflags
-
     go lp@(L l p)
       = case p of
-           ParPat p              -> L l (ParPat (go p))
-           LazyPat lp' | xstrict -> lp'
-           BangPat _             -> lp
-           _ | xstrict   -> L l (BangPat lp)
-             | otherwise -> lp
+           ParPat p    -> L l (ParPat (go p))
+           LazyPat lp' -> lp'
+           BangPat _   -> lp
+           _           -> L l (BangPat lp)
