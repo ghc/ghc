@@ -644,7 +644,7 @@ figureLlvmVersion dflags = do
 
 {- Note [Windows stack usage]
 
-See: Trac #8870 (and #8834 for related info)
+See: Trac #8870 (and #8834 for related info) and #12186
 
 On Windows, occasionally we need to grow the stack. In order to do
 this, we would normally just bump the stack pointer - but there's a
@@ -665,17 +665,11 @@ stack space in GHC itself. In the x86 codegen, we needed approximately
 ~12kb of stack space in one go, which caused the process to segfault,
 as the intervening pages were not committed.
 
-In the future, we should do the same thing, to make the problem
-completely go away. In the mean time, we're using a workaround: we
-instruct the linker to specify the generated PE as having an initial
-reserved stack size of 8mb, as well as a initial *committed* stack
-size of 8mb. The default committed size was previously only 4k.
+GCC can emit such a check for us automatically but only when the flag
+-fstack-check is used.
 
-Theoretically it's possible to still hit this problem if you request a
-stack bump of more than 8mb in one go. But the amount of code
-necessary is quite large, and 8mb "should be more than enough for
-anyone" right now (he said, before millions of lines of code cried out
-in terror).
+See https://gcc.gnu.org/onlinedocs/gnat_ugn/Stack-Overflow-Checking.html
+for more information.
 
 -}
 
@@ -828,11 +822,12 @@ getLinkerInfo' dflags = do
                    [ -- Reduce ld memory usage
                      "-Wl,--hash-size=31"
                    , "-Wl,--reduce-memory-overheads"
-                     -- Increase default stack, see
+                     -- Emit gcc stack checks
                      -- Note [Windows stack usage]
+                   , "-fstack-check"
                      -- Force static linking of libGCC
                      -- Note [Windows static libGCC]
-                   , "-Xlinker", "--stack=0x800000,0x800000", "-static-libgcc" ]
+                   , "-static-libgcc" ]
                _ -> do
                  -- In practice, we use the compiler as the linker here. Pass
                  -- -Wl,--version to get linker version info.
