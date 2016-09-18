@@ -386,7 +386,7 @@ initHeapProfiling(void)
     }
 #ifdef THREADED_RTS
     // See Trac #12019.
-    if (doingLDVProfiling() && RtsFlags.ParFlags.nCapabilities > 1) {
+    if (doingLDVProfiling() && RtsFlags.ParFlags.nNodes > 1) {
         errorBelch("-hb cannot be used with multiple capabilities");
         stg_exit(EXIT_FAILURE);
     }
