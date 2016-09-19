@@ -367,6 +367,22 @@ addPluginPasses builtin_passes
 #endif
 
 {-
+Note [RULEs enabled in SimplGently]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+RULES are enabled when doing "gentle" simplification.  Two reasons:
+
+  * We really want the class-op cancellation to happen:
+        op (df d1 d2) --> $cop3 d1 d2
+    because this breaks the mutual recursion between 'op' and 'df'
+
+  * I wanted the RULE
+        lift String ===> ...
+    to work in Template Haskell when simplifying
+    splices, so we get simpler code for literal strings
+
+But watch out: list fusion can prevent floating.  So use phase control
+to switch off those rules until after floating.
+
 ************************************************************************
 *                                                                      *
                   The CoreToDo interpreter
