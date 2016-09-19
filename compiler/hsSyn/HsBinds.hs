@@ -593,6 +593,7 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
       pprLHsBinds val_binds
 ppr_monobind (AbsBindsSig { abs_tvs         = tyvars
                           , abs_ev_vars     = dictvars
+                          , abs_sig_export  = poly_id
                           , abs_sig_ev_bind = ev_bind
                           , abs_sig_bind    = bind })
   = sdocWithDynFlags $ \ dflags ->
@@ -600,7 +601,8 @@ ppr_monobind (AbsBindsSig { abs_tvs         = tyvars
       hang (text "AbsBindsSig" <+> brackets (interpp'SP tyvars)
                                <+> brackets (interpp'SP dictvars))
          2 $ braces $ vcat
-      [ text "Bind:"     <+> ppr bind
+      [ text "Exported type:" <+> pprBndr LetBind poly_id
+      , text "Bind:"     <+> ppr bind
       , text "Evidence:" <+> ppr ev_bind ]
     else
       ppr bind

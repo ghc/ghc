@@ -1323,14 +1323,14 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
                        -- Substitute the local_meth_name for the binder
                        -- NB: the binding is always a FunBind
 
-       ; global_meth_id <- addInlinePrags global_meth_id prags
-       ; spec_prags     <- tcSpecPrags global_meth_id prags
-
             -- taking instance signature into account might change the type of
             -- the local_meth_id
        ; (meth_implic, ev_binds_var, tc_bind)
              <- checkInstConstraints $
                 tcMethodBodyHelp sig_fn sel_id local_meth_id (L bind_loc lm_bind)
+
+       ; global_meth_id <- addInlinePrags global_meth_id prags
+       ; spec_prags     <- tcSpecPrags global_meth_id prags
 
         ; let specs  = mk_meth_spec_prags global_meth_id spec_inst_prags spec_prags
               export = ABE { abe_poly      = global_meth_id

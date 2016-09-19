@@ -987,7 +987,7 @@ data InlinePragma            -- Note [InlinePragma]
                                      --   That is, inl_sat describes the number of *source-code*
                                      --   arguments the thing must be applied to.  We add on the
                                      --   number of implicit, dictionary arguments when making
-                                     --   the InlineRule, and don't look at inl_sat further
+                                     --   the Unfolding, and don't look at inl_sat further
 
       , inl_act    :: Activation     -- Says during which phases inlining is allowed
 
