@@ -646,23 +646,18 @@ Note [TcLevel assignment]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 We arrange the TcLevels like this
 
+   0   Level for flatten meta-vars
    1   Top level
-   2     Flatten-meta-vars of level 3
-   3   First-level implication constraints
-   4     Flatten-meta-vars of level 5
-   5   Second-level implication constraints
+   2   First-level implication constraints
+   3   Second-level implication constraints
    ...etc...
 
-The even-numbered levels are for the flatten-meta-variables assigned
-at the next level in.  Eg for a second-level implication conststraint
-(level 5), the flatten meta-vars are level 4, which makes them untouchable.
-The flatten meta-vars could equally well all have level 0, or just NotALevel
-since they do not live across implications.
+The flatten meta-vars are all at level 0, just to make them untouchable.
 -}
 
 fmvTcLevel :: TcLevel -> TcLevel
 -- See Note [TcLevel assignment]
-fmvTcLevel (TcLevel n) = TcLevel (n-1)
+fmvTcLevel _ = TcLevel 0
 
 topTcLevel :: TcLevel
 -- See Note [TcLevel assignment]
@@ -674,7 +669,7 @@ isTopTcLevel _           = False
 
 pushTcLevel :: TcLevel -> TcLevel
 -- See Note [TcLevel assignment]
-pushTcLevel (TcLevel us) = TcLevel (us + 2)
+pushTcLevel (TcLevel us) = TcLevel (us + 1)
 
 strictlyDeeperThan :: TcLevel -> TcLevel -> Bool
 strictlyDeeperThan (TcLevel tv_tclvl) (TcLevel ctxt_tclvl)
