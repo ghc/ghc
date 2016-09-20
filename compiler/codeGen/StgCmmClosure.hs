@@ -18,6 +18,9 @@ module StgCmmClosure (
         idPrimRep, isVoidRep, isGcPtrRep, addIdReps, addArgReps,
         argPrimRep,
 
+        NonVoid(..), fromNonVoid, nonVoidIds, nonVoidStgArgs,
+        assertNonVoidIds, assertNonVoidStgArgs,
+
         -- * LambdaFormInfo
         LambdaFormInfo,         -- Abstract
         StandardFormInfo,        -- ...ditto...
@@ -84,6 +87,8 @@ import Outputable
 import DynFlags
 import Util
 
+import Data.Coerce (coerce)
+
 -----------------------------------------------------------------------------
 --                Data types and synonyms
 -----------------------------------------------------------------------------
@@ -115,6 +120,42 @@ isKnownFun LFLetNoEscape = True
 isKnownFun _             = False
 
 
+-------------------------------------
+--        Non-void types
+-------------------------------------
+-- We frequently need the invariant that an Id or a an argument
+-- is of a non-void type. This type is a witness to the invariant.
+
+newtype NonVoid a = NonVoid a
+  deriving (Eq, Show)
+
+fromNonVoid :: NonVoid a -> a
+fromNonVoid (NonVoid a) = a
+
+instance (Outputable a) => Outputable (NonVoid a) where
+  ppr (NonVoid a) = ppr a
+
+nonVoidIds :: [Id] -> [NonVoid Id]
+nonVoidIds ids = [NonVoid id | id <- ids, not (isVoidTy (idType id))]
+
+-- | Used in places where some invariant ensures that all these Ids are
+-- non-void; e.g. constructor field binders in case expressions.
+-- See Note [Post-unarisation invariants] in UnariseStg.
+assertNonVoidIds :: [Id] -> [NonVoid Id]
+assertNonVoidIds ids = ASSERT(not (any (isVoidTy . idType) ids))
+                       coerce ids
+
+nonVoidStgArgs :: [StgArg] -> [NonVoid StgArg]
+nonVoidStgArgs args = [NonVoid arg | arg <- args, not (isVoidTy (stgArgType arg))]
+
+-- | Used in places where some invariant ensures that all these arguments are
+-- non-void; e.g. constructor arguments.
+-- See Note [Post-unarisation invariants] in UnariseStg.
+assertNonVoidStgArgs :: [StgArg] -> [NonVoid StgArg]
+assertNonVoidStgArgs args = ASSERT(not (any (isVoidTy . stgArgType) args))
+                            coerce args
+
+
 -----------------------------------------------------------------------------
 --                Representations
 -----------------------------------------------------------------------------
@@ -126,11 +167,13 @@ idPrimRep id = typePrimRep (idType id)
     -- NB: typePrimRep fails on unboxed tuples,
     --     but by StgCmm no Ids have unboxed tuple type
 
-addIdReps :: [Id] -> [(PrimRep, Id)]
-addIdReps ids = [(idPrimRep id, id) | id <- ids]
+addIdReps :: [NonVoid Id] -> [NonVoid (PrimRep, Id)]
+addIdReps = map (\id -> let id' = fromNonVoid id
+                         in NonVoid (idPrimRep id', id'))
 
-addArgReps :: [StgArg] -> [(PrimRep, StgArg)]
-addArgReps args = [(argPrimRep arg, arg) | arg <- args]
+addArgReps :: [NonVoid StgArg] -> [NonVoid (PrimRep, StgArg)]
+addArgReps = map (\arg -> let arg' = fromNonVoid arg
+                           in NonVoid (argPrimRep arg', arg'))
 
 argPrimRep :: StgArg -> PrimRep
 argPrimRep arg = typePrimRep (stgArgType arg)

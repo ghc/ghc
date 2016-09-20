@@ -206,7 +206,9 @@ cgRhs :: Id
 
 cgRhs id (StgRhsCon cc con args)
   = withNewTickyCounterCon (idName id) $
-    buildDynCon id True cc con args
+    buildDynCon id True cc con (assertNonVoidStgArgs args)
+      -- con args are always non-void,
+      -- see Note [Post-unarisation invariants] in UnariseStg
 
 {- See Note [GC recovery] in compiler/codeGen/StgCmmClosure.hs -}
 cgRhs id (StgRhsClosure cc bi fvs upd_flag args body)
@@ -273,8 +275,9 @@ mkRhsClosure    dflags bndr _cc _bi
   , StgApp selectee [{-no args-}] <- strip sel_expr
   , the_fv == scrutinee                -- Scrutinee is the only free variable
 
-  , let (_, _, params_w_offsets) = mkVirtConstrOffsets dflags (addIdReps params)
-                                   -- Just want the layout
+  , let (_, _, params_w_offsets) = mkVirtConstrOffsets dflags (addIdReps (assertNonVoidIds params))
+                                   -- pattern binders are always non-void,
+                                   -- see Note [Post-unarisation invariants] in UnariseStg
   , Just the_offset <- assocMaybe params_w_offsets (NonVoid selectee)
 
   , let offset_into_int = bytesToWordsRoundUp dflags the_offset
@@ -305,7 +308,7 @@ mkRhsClosure    dflags bndr _cc _bi
                                -- args are all distinct local variables
                                -- The "-1" is for fun_id
     -- Missed opportunity:   (f x x) is not detected
-  , all (isGcPtrRep . idPrimRep . unsafe_stripNV) fvs
+  , all (isGcPtrRep . idPrimRep . fromNonVoid) fvs
   , isUpdatable upd_flag
   , n_fvs <= mAX_SPEC_AP_SIZE dflags
   , not (gopt Opt_SccProfilingOn dflags)
@@ -348,7 +351,7 @@ mkRhsClosure dflags bndr cc _ fvs upd_flag args body
                 fv_details :: [(NonVoid Id, ByteOff)]
                 (tot_wds, ptr_wds, fv_details)
                    = mkVirtHeapOffsets dflags (isLFThunk lf_info)
-                                       (addIdReps (map unsafe_stripNV reduced_fvs))
+                                       (addIdReps reduced_fvs)
                 closure_info = mkClosureInfo dflags False       -- Not static
                                              bndr lf_info tot_wds ptr_wds
                                              descr
@@ -392,7 +395,8 @@ cgRhsStdThunk bndr lf_info payload
     mod_name <- getModuleName
   ; dflags <- getDynFlags
   ; let (tot_wds, ptr_wds, payload_w_offsets)
-            = mkVirtHeapOffsets dflags (isLFThunk lf_info) (addArgReps payload)
+            = mkVirtHeapOffsets dflags (isLFThunk lf_info)
+                                (addArgReps (nonVoidStgArgs payload))
 
         descr = closureDescription dflags mod_name (idName bndr)
         closure_info = mkClosureInfo dflags False       -- Not static
@@ -421,9 +425,9 @@ mkClosureLFInfo :: DynFlags
                 -> LambdaFormInfo
 mkClosureLFInfo dflags bndr top fvs upd_flag args
   | null args =
-        mkLFThunk (idType bndr) top (map unsafe_stripNV fvs) upd_flag
+        mkLFThunk (idType bndr) top (map fromNonVoid fvs) upd_flag
   | otherwise =
-        mkLFReEntrant top (map unsafe_stripNV fvs) args (mkArgDescr dflags args)
+        mkLFReEntrant top (map fromNonVoid fvs) args (mkArgDescr dflags args)
 
 
 ------------------------------------------------------------------------

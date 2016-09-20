@@ -58,7 +58,7 @@ import Data.Char
 cgTopRhsCon :: DynFlags
             -> Id               -- Name of thing bound to this RHS
             -> DataCon          -- Id
-            -> [StgArg]         -- Args
+            -> [NonVoid StgArg] -- Args
             -> (CgIdInfo, FCode ())
 cgTopRhsCon dflags id con args =
     let id_info = litIdInfo dflags id (mkConLFInfo con) (CmmLabel closure_label)
@@ -72,7 +72,7 @@ cgTopRhsCon dflags id con args =
      do { this_mod <- getModuleName
         ; when (platformOS (targetPlatform dflags) == OSMinGW32) $
               -- Windows DLLs have a problem with static cross-DLL refs.
-              ASSERT( not (isDllConApp dflags this_mod con args) ) return ()
+              MASSERT( not (isDllConApp dflags this_mod con (map fromNonVoid args)) )
         ; ASSERT( args `lengthIs` countConRepArgs con ) return ()
 
         -- LAY IT OUT
@@ -120,7 +120,7 @@ buildDynCon :: Id                 -- Name of the thing to which this constr will
             -> CostCentreStack    -- Where to grab cost centre from;
                                   -- current CCS if currentOrSubsumedCCS
             -> DataCon            -- The data constructor
-            -> [StgArg]           -- Its args
+            -> [NonVoid StgArg]   -- Its args
             -> FCode (CgIdInfo, FCode CmmAGraph)
                -- Return details about how to find it and initialization code
 buildDynCon binder actually_bound cc con args
@@ -133,7 +133,7 @@ buildDynCon' :: DynFlags
              -> Id -> Bool
              -> CostCentreStack
              -> DataCon
-             -> [StgArg]
+             -> [NonVoid StgArg]
              -> FCode (CgIdInfo, FCode CmmAGraph)
 
 {- We used to pass a boolean indicating whether all the
@@ -192,7 +192,7 @@ because they don't support cross package data references well.
 buildDynCon' dflags platform binder _ _cc con [arg]
   | maybeIntLikeCon con
   , platformOS platform /= OSMinGW32 || not (gopt Opt_PIC dflags)
-  , StgLitArg (MachInt val) <- arg
+  , NonVoid (StgLitArg (MachInt val)) <- arg
   , val <= fromIntegral (mAX_INTLIKE dflags) -- Comparisons at type Integer!
   , val >= fromIntegral (mIN_INTLIKE dflags) -- ...ditto...
   = do  { let intlike_lbl   = mkCmmClosureLabel rtsUnitId (fsLit "stg_INTLIKE")
@@ -206,7 +206,7 @@ buildDynCon' dflags platform binder _ _cc con [arg]
 buildDynCon' dflags platform binder _ _cc con [arg]
   | maybeCharLikeCon con
   , platformOS platform /= OSMinGW32 || not (gopt Opt_PIC dflags)
-  , StgLitArg (MachChar val) <- arg
+  , NonVoid (StgLitArg (MachChar val)) <- arg
   , let val_int = ord val :: Int
   , val_int <= mAX_CHARLIKE dflags
   , val_int >= mIN_CHARLIKE dflags
@@ -228,7 +228,6 @@ buildDynCon' dflags _ binder actually_bound ccs con args
   gen_code reg
     = do  { let (tot_wds, ptr_wds, args_w_offsets)
                   = mkVirtConstrOffsets dflags (addArgReps args)
-                  -- No void args in args_w_offsets
                 nonptr_wds = tot_wds - ptr_wds
                 info_tbl = mkDataConInfoTable dflags con False
                                 ptr_wds nonptr_wds
@@ -250,7 +249,7 @@ buildDynCon' dflags _ binder actually_bound ccs con args
 --      Binding constructor arguments
 ---------------------------------------------------------------
 
-bindConArgs :: AltCon -> LocalReg -> [Id] -> FCode [LocalReg]
+bindConArgs :: AltCon -> LocalReg -> [NonVoid Id] -> FCode [LocalReg]
 -- bindConArgs is called from cgAlt of a case
 -- (bindConArgs con args) augments the environment with bindings for the
 -- binders args, assuming that we have just returned from a 'case' which

@@ -138,7 +138,9 @@ cgTopRhs :: DynFlags -> RecFlag -> Id -> StgRhs -> (CgIdInfo, FCode ())
         -- It's already been externalised if necessary
 
 cgTopRhs dflags _rec bndr (StgRhsCon _cc con args)
-  = cgTopRhsCon dflags bndr con args
+  = cgTopRhsCon dflags bndr con (assertNonVoidStgArgs args)
+      -- con args are always non-void,
+      -- see Note [Post-unarisation invariants] in UnariseStg
 
 cgTopRhs dflags rec bndr (StgRhsClosure cc bi fvs upd_flag args body)
   = ASSERT(null fvs)    -- There should be no free variables
@@ -219,8 +221,8 @@ cgDataCon data_con
   = do  { dflags <- getDynFlags
         ; let
             (tot_wds, --  #ptr_wds + #nonptr_wds
-             ptr_wds, --  #ptr_wds
-             arg_things) = mkVirtConstrOffsets dflags arg_reps
+             ptr_wds) --  #ptr_wds
+              = mkVirtConstrSizes dflags arg_reps
 
             nonptr_wds   = tot_wds - ptr_wds
 
@@ -240,14 +242,17 @@ cgDataCon data_con
                 -- NB 2: We don't set CC when entering data (WDP 94/06)
                 do { _ <- ticky_code
                    ; ldvEnter (CmmReg nodeReg)
-                   ; tickyReturnOldCon (length arg_things)
+                   ; tickyReturnOldCon (length arg_reps)
                    ; void $ emitReturn [cmmOffsetB dflags (CmmReg nodeReg) (tagForCon dflags data_con)]
                    }
                         -- The case continuation code expects a tagged pointer
 
-            arg_reps :: [(PrimRep, UnaryType)]
-            arg_reps = [(typePrimRep rep_ty, rep_ty) | ty <- dataConRepArgTys data_con
-                                                     , rep_ty <- repTypeArgs ty]
+            -- We're generating info tables, so we don't know and care about
+            -- what the actual arguments are. Using () here as the place holder.
+            arg_reps :: [NonVoid PrimRep]
+            arg_reps = [NonVoid (typePrimRep rep_ty) | ty <- dataConRepArgTys data_con
+                                                     , rep_ty <- repTypeArgs ty
+                                                     , not (isVoidTy rep_ty)]
 
             -- Dynamic closure code for non-nullary constructors only
         ; when (not (isNullaryRepDataCon data_con))

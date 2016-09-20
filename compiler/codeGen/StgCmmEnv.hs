@@ -13,8 +13,6 @@ module StgCmmEnv (
         litIdInfo, lneIdInfo, rhsIdInfo, mkRhsInit,
         idInfoToAmode,
 
-        NonVoid(..), unsafe_stripNV, nonVoidIds,
-
         addBindC, addBindsC,
 
         bindArgsToRegs, bindToReg, rebindToReg,
@@ -30,6 +28,7 @@ import TyCon
 import StgCmmMonad
 import StgCmmUtils
 import StgCmmClosure
+import StgSyn (StgArg)
 
 import CLabel
 
@@ -44,25 +43,6 @@ import Outputable
 import StgSyn
 import UniqFM
 import VarEnv
-
--------------------------------------
---        Non-void types
--------------------------------------
--- We frequently need the invariant that an Id or a an argument
--- is of a non-void type. This type is a witness to the invariant.
-
-newtype NonVoid a = NonVoid a
-  deriving (Eq, Show)
-
--- Use with care; if used inappropriately, it could break invariants.
-unsafe_stripNV :: NonVoid a -> a
-unsafe_stripNV (NonVoid a) = a
-
-instance (Outputable a) => Outputable (NonVoid a) where
-  ppr (NonVoid a) = ppr a
-
-nonVoidIds :: [Id] -> [NonVoid Id]
-nonVoidIds ids = [NonVoid id | id <- ids, not (isVoidRep (idPrimRep id))]
 
 -------------------------------------
 --        Manipulating CgIdInfo

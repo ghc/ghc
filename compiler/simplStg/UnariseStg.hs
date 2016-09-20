@@ -174,6 +174,20 @@ table for an Id may be larger than the idArity. Instead we record what we call
 the RepArity, which is the Arity taking into account any expanded arguments, and
 corresponds to the number of (possibly-void) *registers* arguments will arrive
 in.
+
+Note [Post-unarisation invariants]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+STG programs after unarisation have these invariants:
+
+  * No unboxed sums at all.
+
+  * No unboxed tuple binders. Tuples only appear in return position.
+
+  * DataCon applications (StgRhsCon and StgConApp) don't have void arguments.
+    This means that it's safe to wrap `StgArg`s of DataCon applications with
+    `StgCmmEnv.NonVoid`, for example.
+
+  * Alt binders (binders in patterns) are always non-void.
 -}
 
 {-# LANGUAGE CPP, TupleSections #-}
