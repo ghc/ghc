@@ -82,7 +82,7 @@ tyThingToLHsDecl t = case t of
                         (map (noLoc . getName) l, map (noLoc . getName) r) ) $
                          snd $ classTvsFds cl
          , tcdSigs = noLoc (MinimalSig mempty . noLoc . fmap noLoc $ classMinimalDef cl) :
-                      map (noLoc . synifyIdSig DeleteTopLevelQuantification)
+                      map (noLoc . synifyTcIdSig DeleteTopLevelQuantification)
                         (classMethods cl)
          , tcdMeths = emptyBag --ignore default method definitions, they don't affect signature
          -- class associated-types are a subset of TyCon:
@@ -317,6 +317,8 @@ synifyName = noLoc . getName
 synifyIdSig :: SynifyTypeState -> Id -> Sig Name
 synifyIdSig s i = TypeSig [synifyName i] (synifySigWcType s (varType i))
 
+synifyTcIdSig :: SynifyTypeState -> Id -> Sig Name
+synifyTcIdSig s i = ClassOpSig False [synifyName i] (synifySigType s (varType i))
 
 synifyCtx :: [PredType] -> LHsContext Name
 synifyCtx = noLoc . map (synifyType WithinType)
