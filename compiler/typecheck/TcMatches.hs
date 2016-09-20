@@ -869,10 +869,9 @@ tcDoStmt ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
               tup_ty  = mkBigCoreTupTy tup_elt_tys
 
         ; tcExtendIdEnv tup_ids $ do
-        { stmts_ty <- newOpenInferExpType
-        ; (stmts', (ret_op', tup_rets))
-                <- tcStmtsAndThen ctxt tcDoStmt stmts stmts_ty   $
-                   \ inner_res_ty ->
+        { ((stmts', (ret_op', tup_rets)), stmts_ty)
+                <- tcInferInst $ \ exp_ty ->
+                   tcStmtsAndThen ctxt tcDoStmt stmts exp_ty $ \ inner_res_ty ->
                    do { tup_rets <- zipWithM tcCheckId tup_names
                                       (map mkCheckExpType tup_elt_tys)
                              -- Unify the types of the "final" Ids (which may
@@ -881,14 +880,12 @@ tcDoStmt ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
                           <- tcSyntaxOp DoOrigin ret_op [synKnownType tup_ty]
                                         inner_res_ty $ \_ -> return ()
                       ; return (ret_op', tup_rets) }
-        ; stmts_ty <- readExpType stmts_ty
 
-        ; mfix_res_ty <- newOpenInferExpType
-        ; (_, mfix_op')
-            <- tcSyntaxOp DoOrigin mfix_op
-                          [synKnownType (mkFunTy tup_ty stmts_ty)] mfix_res_ty $
+        ; ((_, mfix_op'), mfix_res_ty)
+            <- tcInferInst $ \ exp_ty ->
+               tcSyntaxOp DoOrigin mfix_op
+                          [synKnownType (mkFunTy tup_ty stmts_ty)] exp_ty $
                \ _ -> return ()
-        ; mfix_res_ty <- readExpType mfix_res_ty
 
         ; ((thing, new_res_ty), bind_op')
             <- tcSyntaxOp DoOrigin bind_op
@@ -1014,7 +1011,7 @@ tcApplicativeStmts
 tcApplicativeStmts ctxt pairs rhs_ty thing_inside
  = do { body_ty <- newFlexiTyVarTy liftedTypeKind
       ; let arity = length pairs
-      ; ts <- replicateM (arity-1) $ newOpenInferExpType
+      ; ts <- replicateM (arity-1) $ newInferExpTypeInst
       ; exp_tys <- replicateM arity $ newFlexiTyVarTy liftedTypeKind
       ; pat_tys <- replicateM arity $ newFlexiTyVarTy liftedTypeKind
       ; let fun_ty = mkFunTys pat_tys body_ty

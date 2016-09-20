@@ -72,11 +72,9 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
        ; let (arg_names, rec_fields, is_infix) = collectPatSynArgInfo details
        ; (tclvl, wanted, ((lpat', args), pat_ty))
             <- pushLevelAndCaptureConstraints  $
-               do { pat_ty <- newOpenInferExpType
-                  ; stuff <- tcPat PatSyn lpat pat_ty $
-                             mapM tcLookupId arg_names
-                  ; pat_ty <- readExpType pat_ty
-                  ; return (stuff, pat_ty) }
+               tcInferInst $ \ exp_ty ->
+               tcPat PatSyn lpat exp_ty $
+               mapM tcLookupId arg_names
 
        ; let named_taus = (name, pat_ty) : map (\arg -> (getName arg, varType arg)) args
 
@@ -390,11 +388,11 @@ tcPatSynMatcher (L loc name) lpat
                 (args, arg_tys) pat_ty
   = do { rr_name <- newNameAt (mkTyVarOcc "rep") loc
        ; tv_name <- newNameAt (mkTyVarOcc "r")   loc
-       ; let rr_tv    = mkTcTyVar rr_name runtimeRepTy (SkolemTv False)
-             rr       = mkTyVarTy rr_tv
-             res_tv   = mkTcTyVar tv_name  (tYPE rr) (SkolemTv False)
-             is_unlifted = null args && null prov_dicts
+       ; let rr_tv  = mkTcTyVar rr_name runtimeRepTy vanillaSkolemTv
+             rr     = mkTyVarTy rr_tv
+             res_tv = mkTcTyVar tv_name  (tYPE rr) vanillaSkolemTv
              res_ty = mkTyVarTy res_tv
+             is_unlifted = null args && null prov_dicts
              (cont_args, cont_arg_tys)
                | is_unlifted = ([nlHsVar voidPrimId], [voidPrimTy])
                | otherwise   = (args,                 arg_tys)

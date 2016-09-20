@@ -573,7 +573,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
        ; psig_theta_vars <- mapM TcM.newEvVar psig_theta
        ; wanted_transformed_incl_derivs
             <- setTcLevel rhs_tclvl $
-               runTcSWithEvBinds False (Just ev_binds_var) $
+               runTcSWithEvBinds False ev_binds_var $
                do { let loc = mkGivenLoc rhs_tclvl UnkSkol tc_lcl_env
                         psig_givens = mkGivens loc psig_theta_vars
                   ; _ <- solveSimpleGivens psig_givens
@@ -692,7 +692,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
                              , ic_given    = full_theta_vars
                              , ic_wanted   = wanted_transformed
                              , ic_status   = IC_Unsolved
-                             , ic_binds    = Just ev_binds_var
+                             , ic_binds    = ev_binds_var
                              , ic_info     = skol_info
                              , ic_env      = tc_lcl_env }
        ; emitImplication implic
@@ -1225,7 +1225,7 @@ solveImplication :: Implication    -- Wanted
 -- Precondition: The TcS monad contains an empty worklist and given-only inerts
 -- which after trying to solve this implication we must restore to their original value
 solveImplication imp@(Implic { ic_tclvl  = tclvl
-                             , ic_binds  = m_ev_binds
+                             , ic_binds  = ev_binds_var
                              , ic_skols  = skols
                              , ic_given  = given_ids
                              , ic_wanted = wanteds
@@ -1243,8 +1243,8 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
        ; traceTcS "solveImplication {" (ppr imp $$ text "Inerts" <+> ppr inerts)
 
          -- Solve the nested constraints
-       ; ((no_given_eqs, given_insols, residual_wanted), used_tcvs)
-             <- nestImplicTcS m_ev_binds (mkVarSet (skols ++ given_ids)) tclvl $
+       ; (no_given_eqs, given_insols, residual_wanted)
+             <- nestImplicTcS ev_binds_var tclvl $
                do { let loc    = mkGivenLoc tclvl info env
                         givens = mkGivens loc given_ids
                   ; given_insols <- solveSimpleGivens givens
@@ -1265,35 +1265,33 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
              <- floatEqualities skols no_given_eqs residual_wanted
 
        ; traceTcS "solveImplication 2"
-           (ppr given_insols $$ ppr residual_wanted $$ ppr used_tcvs)
+           (ppr given_insols $$ ppr residual_wanted)
        ; let final_wanted = residual_wanted `addInsols` given_insols
 
        ; res_implic <- setImplicationStatus (imp { ic_no_eqs = no_given_eqs
                                                  , ic_wanted = final_wanted })
-                                            used_tcvs
 
-       ; evbinds <- TcS.getTcEvBindsMap
+       ; (evbinds, tcvs) <- TcS.getTcEvBindsAndTCVs ev_binds_var
        ; traceTcS "solveImplication end }" $ vcat
              [ text "no_given_eqs =" <+> ppr no_given_eqs
              , text "floated_eqs =" <+> ppr floated_eqs
              , text "res_implic =" <+> ppr res_implic
-             , text "implication evbinds = " <+> ppr (evBindMapBinds evbinds) ]
+             , text "implication evbinds =" <+> ppr (evBindMapBinds evbinds)
+             , text "implication tvcs =" <+> ppr tcvs ]
 
        ; return (floated_eqs, res_implic) }
 
 ----------------------
-setImplicationStatus :: Implication -> TyCoVarSet  -- needed variables
-                     -> TcS (Maybe Implication)
+setImplicationStatus :: Implication -> TcS (Maybe Implication)
 -- Finalise the implication returned from solveImplication:
 --    * Set the ic_status field
 --    * Trim the ic_wanted field to remove Derived constraints
 -- Return Nothing if we can discard the implication altogether
-setImplicationStatus implic@(Implic { ic_binds = m_ev_binds_var
-                                    , ic_info = info
+setImplicationStatus implic@(Implic { ic_binds  = ev_binds_var
+                                    , ic_info   = info
                                     , ic_tclvl  = tc_lvl
                                     , ic_wanted = wc
-                                    , ic_given = givens })
-                     used_tcvs
+                                    , ic_given  = givens })
  | some_insoluble
  = return $ Just $
    implic { ic_status = IC_Insoluble
@@ -1308,11 +1306,8 @@ setImplicationStatus implic@(Implic { ic_binds = m_ev_binds_var
 
  | otherwise  -- Everything is solved; look at the implications
               -- See Note [Tracking redundant constraints]
- = do { ev_binds <- case m_ev_binds_var of
-                      Just (EvBindsVar ref _) -> TcS.readTcRef ref
-                      Nothing                 -> return emptyEvBindMap
-      ; let all_needs = neededEvVars ev_binds
-                                     (used_tcvs `unionVarSet` implic_needs)
+ = do { ev_binds <- TcS.getTcEvBindsAndTCVs ev_binds_var
+      ; let all_needs = neededEvVars ev_binds implic_needs
 
             dead_givens | warnRedundantGivens info
                         = filterOut (`elemVarSet` all_needs) givens
@@ -1333,8 +1328,13 @@ setImplicationStatus implic@(Implic { ic_binds = m_ev_binds_var
                                                    , wc_impl   = pruned_implics } }
                -- We can only prune the child implications (pruned_implics)
                -- in the IC_Solved status case, because only then we can
-               -- accumulate their needed evidence variales into the
+               -- accumulate their needed evidence variables into the
                -- IC_Solved final_status field of the parent implication.
+
+        -- Check that there are no term-level evidence bindings
+        -- in the cases where we have no place to put them
+      ; MASSERT2( termEvidenceAllowed info || isEmptyEvBindMap (fst ev_binds)
+                , ppr info $$ ppr ev_binds )
 
       ; return $ if discard_entire_implication
                  then Nothing
@@ -1383,12 +1383,12 @@ warnRedundantGivens (SigSkol ctxt _)
 warnRedundantGivens (InstSkol {}) = True
 warnRedundantGivens _             = False
 
-neededEvVars :: EvBindMap -> VarSet -> VarSet
+neededEvVars :: (EvBindMap, TcTyVarSet) -> VarSet -> VarSet
 -- Find all the evidence variables that are "needed",
 --    and then delete all those bound by the evidence bindings
--- See note [Tracking redundant constraints]
-neededEvVars ev_binds initial_seeds
- = needed `minusVarSet` bndrs
+-- See Note [Tracking redundant constraints]
+neededEvVars (ev_binds, tcvs) initial_seeds
+ = (needed `unionVarSet` tcvs) `minusVarSet` bndrs
  where
    seeds  = foldEvBindMap add_wanted initial_seeds ev_binds
    needed = transCloVarSet also_needs seeds
@@ -1457,8 +1457,8 @@ works:
 * When the constraint solver finishes solving all the wanteds in
   an implication, it sets its status to IC_Solved
 
-  - The ics_dead field, of IC_Solved, records the subset of this implication's
-    ic_given that are redundant (not needed).
+  - The ics_dead field, of IC_Solved, records the subset of this
+    implication's ic_given that are redundant (not needed).
 
   - The ics_need field of IC_Solved then records all the
     in-scope (given) evidence variables bound by the context, that
@@ -1471,7 +1471,6 @@ works:
     a) it is free in the RHS of a Wanted EvBind,
     b) it is free in the RHS of an EvBind whose LHS is needed,
     c) it is in the ics_need of a nested implication.
-    d) it is listed in the tcs_used_tcvs field of the nested TcSEnv
 
 * We need to be careful not to discard an implication
   prematurely, even one that is fully solved, because we might
@@ -2053,8 +2052,7 @@ disambigGroup (default_ty:default_tys) group@(the_tv, wanteds)
   = do { traceTcS "disambigGroup {" (vcat [ ppr default_ty, ppr the_tv, ppr wanteds ])
        ; fake_ev_binds_var <- TcS.newTcEvBinds
        ; tclvl             <- TcS.getTcLevel
-       ; (success, _) <- nestImplicTcS (Just fake_ev_binds_var) emptyVarSet
-                                       (pushTcLevel tclvl) try_group
+       ; success <- nestImplicTcS fake_ev_binds_var (pushTcLevel tclvl) try_group
 
        ; if success then
              -- Success: record the type variable binding, and return

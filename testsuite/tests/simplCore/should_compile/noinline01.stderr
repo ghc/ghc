@@ -1,7 +1,7 @@
 
 ==================== Pre unarise: ====================
 Noinline01.f [InlPrag=INLINE (sat-args=1)]
-  :: forall t. t -> GHC.Types.Bool
+  :: forall p. p -> GHC.Types.Bool
 [GblId, Arity=1, Caf=NoCafRefs, Str=<L,A>, Unf=OtherCon []] =
     \r [eta] GHC.Types.True [];
 
@@ -26,7 +26,7 @@ Noinline01.$trModule :: GHC.Types.Module
 
 ==================== STG syntax: ====================
 Noinline01.f [InlPrag=INLINE (sat-args=1)]
-  :: forall t. t -> GHC.Types.Bool
+  :: forall p. p -> GHC.Types.Bool
 [GblId, Arity=1, Caf=NoCafRefs, Str=<L,A>, Unf=OtherCon []] =
     \r [eta] GHC.Types.True [];
 

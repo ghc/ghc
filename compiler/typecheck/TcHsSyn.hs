@@ -1445,8 +1445,9 @@ zonk_tc_ev_binds env (TcEvBinds var) = zonkEvBindsVar env var
 zonk_tc_ev_binds env (EvBinds bs)    = zonkEvBinds env bs
 
 zonkEvBindsVar :: ZonkEnv -> EvBindsVar -> TcM (ZonkEnv, Bag EvBind)
-zonkEvBindsVar env (EvBindsVar ref _) = do { bs <- readMutVar ref
-                                           ; zonkEvBinds env (evBindMapBinds bs) }
+zonkEvBindsVar env (EvBindsVar { ebv_binds = ref })
+  = do { bs <- readMutVar ref
+       ; zonkEvBinds env (evBindMapBinds bs) }
 
 zonkEvBinds :: ZonkEnv -> Bag EvBind -> TcM (ZonkEnv, Bag EvBind)
 zonkEvBinds env binds
@@ -1598,7 +1599,7 @@ zonkTvSkolemising :: UnboundTyVarZonker
 -- This variant is used for the LHS of rules
 -- See Note [Zonking the LHS of a RULE].
 zonkTvSkolemising tv
-  = do { tv' <- skolemiseUnboundMetaTyVar tv vanillaSkolemTv
+  = do { tv' <- skolemiseUnboundMetaTyVar tv
        ; return (mkTyVarTy tv') }
 
 zonkTypeZapping :: UnboundTyVarZonker

@@ -225,7 +225,7 @@ deeplyInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 -- if    deeplyInstantiate ty = (wrap, rho)
 -- and   e :: ty
 -- then  wrap e :: rho
--- That is, wrap :: ty "->" rho
+-- That is, wrap :: ty ~> rho
 
 deeplyInstantiate orig ty
   | Just (arg_tys, tvs, theta, rho) <- tcDeepSplitSigmaTy_maybe ty
@@ -381,7 +381,7 @@ tcInstBinderX _ subst (Anon ty)
      -- This is the *only* constraint currently handled in types.
   | Just (mk, role, k1, k2) <- get_pred_tys_maybe substed_ty
   = do { let origin = TypeEqOrigin { uo_actual   = k1
-                                   , uo_expected = mkCheckExpType k2
+                                   , uo_expected = k2
                                    , uo_thing    = Nothing }
        ; co <- case role of
                  Nominal          -> unifyKind noThing k1 k2

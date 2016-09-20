@@ -142,9 +142,11 @@ reportUnsolved wanted
                                 | warn_out_of_scope      = HoleWarn
                                 | otherwise              = HoleDefer
 
-       ; report_unsolved (Just binds_var) False type_errors expr_holes
+       ; report_unsolved binds_var False type_errors expr_holes
           type_holes out_of_scope_holes wanted
-       ; getTcEvBinds binds_var }
+
+       ; ev_binds <- getTcEvBindsMap binds_var
+       ; return (evBindMapBinds ev_binds)}
 
 -- | Report *all* unsolved goals as errors, even if -fdefer-type-errors is on
 -- However, do not make any evidence bindings, because we don't
@@ -155,17 +157,21 @@ reportUnsolved wanted
 -- and for simplifyDefault.
 reportAllUnsolved :: WantedConstraints -> TcM ()
 reportAllUnsolved wanted
-  = report_unsolved Nothing False TypeError HoleError HoleError HoleError wanted
+  = do { ev_binds <- newTcEvBinds
+       ; report_unsolved ev_binds False TypeError
+                         HoleError HoleError HoleError wanted }
 
 -- | Report all unsolved goals as warnings (but without deferring any errors to
 -- run-time). See Note [Safe Haskell Overlapping Instances Implementation] in
 -- TcSimplify
 warnAllUnsolved :: WantedConstraints -> TcM ()
 warnAllUnsolved wanted
-  = report_unsolved Nothing True TypeWarn HoleWarn HoleWarn HoleWarn wanted
+  = do { ev_binds <- newTcEvBinds
+       ; report_unsolved ev_binds True TypeWarn
+                         HoleWarn HoleWarn HoleWarn wanted }
 
 -- | Report unsolved goals as errors or warnings.
-report_unsolved :: Maybe EvBindsVar  -- cec_binds
+report_unsolved :: EvBindsVar        -- cec_binds
                 -> Bool              -- Errors as warnings
                 -> TypeErrorChoice   -- Deferred type errors
                 -> HoleChoice        -- Expression holes
@@ -277,21 +283,15 @@ data ReportErrCtxt
                                        -- ic_skols and givens are tidied, rest are not
           , cec_tidy  :: TidyEnv
 
-          , cec_binds :: Maybe EvBindsVar
-                         -- Nothing <=> Report all errors, including holes
-                         --             Do not add any evidence bindings, because
-                         --             we have no convenient place to put them
-                         --             See TcErrors.reportAllUnsolved
-                         -- Just ev <=> make some errors (depending on cec_defer)
-                         --             into warnings, and emit evidence bindings
-                         --             into 'ev' for unsolved constraints
+          , cec_binds :: EvBindsVar    -- Make some errors (depending on cec_defer)
+                                       -- into warnings, and emit evidence bindings
+                                       -- into 'cec_binds' for unsolved constraints
 
           , cec_errors_as_warns :: Bool   -- Turn all errors into warnings
                                           -- (except for Holes, which are
                                           -- controlled by cec_type_holes and
                                           -- cec_expr_holes)
           , cec_defer_type_errors :: TypeErrorChoice -- Defer type errors until runtime
-                                                     -- Irrelevant if cec_binds = Nothing
 
           -- cec_expr_holes is a union of:
           --   cec_type_holes - a set of typed holes: '_', '_a', '_foo'
@@ -325,7 +325,7 @@ Specifically (see reportWanteds)
 
 reportImplic :: ReportErrCtxt -> Implication -> TcM ()
 reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_given = given
-                                 , ic_wanted = wanted, ic_binds = m_evb
+                                 , ic_wanted = wanted, ic_binds = evb
                                  , ic_status = status, ic_info = info
                                  , ic_env = tcl_env, ic_tclvl = tc_lvl })
   | BracketSkol <- info
@@ -356,11 +356,7 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_given = given
                       -- tree rooted here, or we've come across
                       -- a suppress-worthy constraint higher up (Trac #11541)
 
-                 , cec_binds    = cec_binds ctxt *> m_evb }
-                      -- If cec_binds ctxt is Nothing, that means
-                      -- we're reporting *all* errors. Don't change
-                      -- that behavior just because we're going into
-                      -- an implication.
+                 , cec_binds    = evb }
 
     dead_givens = case status of
                     IC_Solved { ics_dead = dead } -> dead
@@ -754,12 +750,12 @@ addDeferredBinding :: ReportErrCtxt -> ErrMsg -> Ct -> TcM ()
 addDeferredBinding ctxt err ct
   | CtWanted { ctev_pred = pred, ctev_dest = dest } <- ctEvidence ct
     -- Only add deferred bindings for Wanted constraints
-  , Just ev_binds_var <- cec_binds ctxt  -- We have somewhere to put the bindings
   = do { dflags <- getDynFlags
        ; let err_msg = pprLocErrMsg err
              err_fs  = mkFastString $ showSDoc dflags $
                        err_msg $$ text "(deferred type error)"
              err_tm  = EvDelayedError pred err_fs
+             ev_binds_var = cec_binds ctxt
 
        ; case dest of
            EvVarDest evar
@@ -1537,8 +1533,8 @@ mkEqInfoMsg ct ty1 ty2
     -- mismatched types for suggestion about -fprint-explicit-kinds
     (act_ty, exp_ty) = case ctOrigin ct of
       TypeEqOrigin { uo_actual = act
-                   , uo_expected = Check exp } -> (act, exp)
-      _                                        -> (ty1, ty2)
+                   , uo_expected = exp } -> (act, exp)
+      _                                  -> (ty1, ty2)
 
     invis_msg | Just vis <- tcEqTypeVis act_ty exp_ty
               , not vis
@@ -1706,7 +1702,7 @@ mkExpectedActualMsg :: Type -> Type -> CtOrigin -> Maybe TypeOrKind -> Bool
 -- NotSwapped means (actual, expected), IsSwapped is the reverse
 -- First return val is whether or not to print a herald above this msg
 mkExpectedActualMsg ty1 ty2 (TypeEqOrigin { uo_actual = act
-                                          , uo_expected = Check exp
+                                          , uo_expected = exp
                                           , uo_thing = maybe_thing })
                     m_level printExpanded
   | KindLevel <- level, occurs_check_error       = (True, Nothing, empty)
