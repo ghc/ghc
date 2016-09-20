@@ -103,6 +103,7 @@ module TcRnTypes(
         pushErrCtxt, pushErrCtxtSameOrigin,
 
         SkolemInfo(..), pprSigSkolInfo, pprSkolInfo,
+        termEvidenceAllowed,
 
         CtEvidence(..), TcEvDest(..),
         mkGivenLoc, mkKindLoc, toKindLoc,
@@ -112,7 +113,7 @@ module TcRnTypes(
         -- Constraint solver plugins
         TcPlugin(..), TcPluginResult(..), TcPluginSolver,
         TcPluginM, runTcPluginM, unsafeTcPluginTcM,
-        getEvBindsTcPluginM_maybe,
+        getEvBindsTcPluginM,
 
         CtFlavour(..), ctEvFlavour,
         CtFlavourRole, ctEvFlavourRole, ctFlavourRole,
@@ -2117,12 +2118,8 @@ data Implication
 
       ic_wanted :: WantedConstraints,  -- The wanted
 
-      ic_binds  :: Maybe EvBindsVar,
-                                  -- Points to the place to fill in the
+      ic_binds  :: EvBindsVar,    -- Points to the place to fill in the
                                   -- abstraction and bindings.
-                                  -- is Nothing if we can't deal with
-                                  -- non-equality constraints here
-                                  -- (this happens in TcS.deferTcSForAllEq)
 
       ic_status   :: ImplicStatus
     }
@@ -2723,6 +2720,14 @@ data SkolemInfo
 instance Outputable SkolemInfo where
   ppr = pprSkolInfo
 
+termEvidenceAllowed :: SkolemInfo -> Bool
+-- Whether an implication constraint with this SkolemInfo
+-- is permitted to have term-level evidence.  There is
+-- only one that is not, associated with unifiying
+-- forall-types
+termEvidenceAllowed (UnifyForAllSkol {}) = False
+termEvidenceAllowed _                    = True
+
 pprSkolInfo :: SkolemInfo -> SDoc
 -- Complete the sentence "is a rigid type variable bound by..."
 pprSkolInfo (SigSkol ctxt ty) = pprSigSkolInfo ctxt ty
@@ -2802,7 +2807,7 @@ data CtOrigin
                                    -- function or instance
 
   | TypeEqOrigin { uo_actual   :: TcType
-                 , uo_expected :: ExpType
+                 , uo_expected :: TcType
                  , uo_thing    :: Maybe ErrorThing
                                   -- ^ The thing that has type "actual"
                  }
@@ -3117,9 +3122,9 @@ type TcPluginSolver = [Ct]    -- given
                    -> [Ct]    -- wanted
                    -> TcPluginM TcPluginResult
 
-newtype TcPluginM a = TcPluginM (Maybe EvBindsVar -> TcM a)
+newtype TcPluginM a = TcPluginM (EvBindsVar -> TcM a)
 
-instance Functor     TcPluginM where
+instance Functor TcPluginM where
   fmap = liftM
 
 instance Applicative TcPluginM where
@@ -3137,7 +3142,7 @@ instance MonadFail.MonadFail TcPluginM where
   fail x   = TcPluginM (const $ fail x)
 #endif
 
-runTcPluginM :: TcPluginM a -> Maybe EvBindsVar -> TcM a
+runTcPluginM :: TcPluginM a -> EvBindsVar -> TcM a
 runTcPluginM (TcPluginM m) = m
 
 -- | This function provides an escape for direct access to
@@ -3149,8 +3154,8 @@ unsafeTcPluginTcM = TcPluginM . const
 -- | Access the 'EvBindsVar' carried by the 'TcPluginM' during
 -- constraint solving.  Returns 'Nothing' if invoked during
 -- 'tcPluginInit' or 'tcPluginStop'.
-getEvBindsTcPluginM_maybe :: TcPluginM (Maybe EvBindsVar)
-getEvBindsTcPluginM_maybe = TcPluginM return
+getEvBindsTcPluginM :: TcPluginM EvBindsVar
+getEvBindsTcPluginM = TcPluginM return
 
 
 data TcPlugin = forall s. TcPlugin

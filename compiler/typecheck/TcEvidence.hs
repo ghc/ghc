@@ -13,7 +13,7 @@ module TcEvidence (
   -- Evidence bindings
   TcEvBinds(..), EvBindsVar(..),
   EvBindMap(..), emptyEvBindMap, extendEvBinds,
-  lookupEvBind, evBindMapBinds, foldEvBindMap,
+  lookupEvBind, evBindMapBinds, foldEvBindMap, isEmptyEvBindMap,
   EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, mkGivenEvBind, mkWantedEvBind,
   sccEvBinds, evBindVar,
   EvTerm(..), mkEvCast, evVarsOfTerm, mkEvScSelectors,
@@ -283,8 +283,24 @@ data TcEvBinds
   | EvBinds             -- Immutable after zonking
        (Bag EvBind)
 
-data EvBindsVar = EvBindsVar (IORef EvBindMap) Unique
-     -- The Unique is for debug printing only
+data EvBindsVar
+  = EvBindsVar {
+      ebv_uniq :: Unique,
+         -- The Unique is for debug printing only
+
+      ebv_binds :: IORef EvBindMap,
+      -- The main payload: the value-level evidence bindings
+      --     (dictionaries etc)
+
+      ebv_tcvs :: IORef TyCoVarSet
+      -- The free vars of the (rhss of) the coercion bindings
+      -- 
+      -- Coercions don't actually have bindings
+      -- because we plug them in-place (via a mutable
+      -- variable); but we keep their free variables
+      -- so that we can report unused given constraints
+      -- See Note [Tracking redundant constraints] in TcSimplify
+    }                     
 
 instance Data.Data TcEvBinds where
   -- Placeholder; we can't travers into TcEvBinds
@@ -325,6 +341,9 @@ extendEvBinds bs ev_bind
                                                (eb_lhs ev_bind)
                                                ev_bind }
 
+isEmptyEvBindMap :: EvBindMap -> Bool
+isEmptyEvBindMap (EvBindMap m) = isEmptyDVarEnv m
+
 lookupEvBind :: EvBindMap -> EvVar -> Maybe EvBind
 lookupEvBind bs = lookupDVarEnv (ev_bind_varenv bs)
 
@@ -334,6 +353,9 @@ evBindMapBinds = foldEvBindMap consBag emptyBag
 foldEvBindMap :: (EvBind -> a -> a) -> a -> EvBindMap -> a
 foldEvBindMap k z bs = foldDVarEnv k z (ev_bind_varenv bs)
 
+instance Outputable EvBindMap where
+  ppr (EvBindMap m) = ppr m
+  
 -----------------
 -- All evidence is bound by EvBinds; no side effects
 data EvBind
@@ -761,10 +783,11 @@ instance Outputable TcEvBinds where
   ppr (EvBinds bs)  = text "EvBinds" <> braces (vcat (map ppr (bagToList bs)))
 
 instance Outputable EvBindsVar where
-  ppr (EvBindsVar _ u) = text "EvBindsVar" <> angleBrackets (ppr u)
+  ppr (EvBindsVar { ebv_uniq = u })
+     = text "EvBindsVar" <> angleBrackets (ppr u)
 
 instance Uniquable EvBindsVar where
-  getUnique (EvBindsVar _ u) = u
+  getUnique (EvBindsVar { ebv_uniq = u }) = u
 
 instance Outputable EvBind where
   ppr (EvBind { eb_lhs = v, eb_rhs = e, eb_is_given = is_given })

@@ -48,8 +48,7 @@ module TcPluginM (
         -- * Manipulating evidence bindings
         newEvVar,
         setEvBind,
-        getEvBindsTcPluginM,
-        getEvBindsTcPluginM_maybe
+        getEvBindsTcPluginM
 #endif
     ) where
 
@@ -64,12 +63,12 @@ import qualified Finder
 
 import FamInstEnv ( FamInstEnv )
 import TcRnMonad  ( TcGblEnv, TcLclEnv, Ct, CtLoc, TcPluginM
-                  , unsafeTcPluginTcM, getEvBindsTcPluginM_maybe
+                  , unsafeTcPluginTcM, getEvBindsTcPluginM
                   , liftIO, traceTc )
 import TcMType    ( TcTyVar, TcType )
 import TcEnv      ( TcTyThing )
 import TcEvidence ( TcCoercion, CoercionHole
-                  , EvTerm, EvBind, EvBindsVar, mkGivenEvBind )
+                  , EvTerm, EvBind, mkGivenEvBind )
 import TcRnTypes  ( CtEvidence(..) )
 import Var        ( EvVar )
 
@@ -84,7 +83,6 @@ import Type
 import Id
 import InstEnv
 import FastString
-import Maybes
 import Unique
 
 
@@ -190,12 +188,4 @@ setEvBind :: EvBind -> TcPluginM ()
 setEvBind ev_bind = do
     tc_evbinds <- getEvBindsTcPluginM
     unsafeTcPluginTcM $ TcM.addTcEvBind tc_evbinds ev_bind
-
--- | Access the 'EvBindsVar' carried by the 'TcPluginM' during
--- constraint solving.  This must not be invoked from 'tcPluginInit'
--- or 'tcPluginStop', or it will panic.
-getEvBindsTcPluginM :: TcPluginM EvBindsVar
-getEvBindsTcPluginM = fmap (expectJust oops) getEvBindsTcPluginM_maybe
-  where
-    oops = "plugin attempted to read EvBindsVar outside the constraint solver"
 #endif

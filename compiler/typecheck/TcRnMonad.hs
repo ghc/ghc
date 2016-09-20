@@ -91,7 +91,7 @@ module TcRnMonad(
   -- * Type constraints
   newTcEvBinds,
   addTcEvBind,
-  getTcEvBinds, getTcEvBindsMap,
+  getTcEvTyCoVars, getTcEvBindsMap,
   chooseUniqueOccTc,
   getConstraintVar, setConstraintVar,
   emitConstraints, emitSimple, emitSimples,
@@ -1319,27 +1319,29 @@ debugTc thing
 -}
 
 newTcEvBinds :: TcM EvBindsVar
-newTcEvBinds = do { ref <- newTcRef emptyEvBindMap
+newTcEvBinds = do { binds_ref <- newTcRef emptyEvBindMap
+                  ; tcvs_ref  <- newTcRef emptyVarSet
                   ; uniq <- newUnique
                   ; traceTc "newTcEvBinds" (text "unique =" <+> ppr uniq)
-                  ; return (EvBindsVar ref uniq) }
+                  ; return (EvBindsVar { ebv_binds = binds_ref
+                                       , ebv_tcvs = tcvs_ref
+                                       , ebv_uniq = uniq }) }
+
+getTcEvTyCoVars :: EvBindsVar -> TcM TyCoVarSet
+getTcEvTyCoVars (EvBindsVar { ebv_tcvs = ev_ref })
+  = readTcRef ev_ref
+
+getTcEvBindsMap :: EvBindsVar -> TcM EvBindMap
+getTcEvBindsMap (EvBindsVar { ebv_binds = ev_ref })
+  = readTcRef ev_ref
 
 addTcEvBind :: EvBindsVar -> EvBind -> TcM ()
 -- Add a binding to the TcEvBinds by side effect
-addTcEvBind (EvBindsVar ev_ref u) ev_bind
+addTcEvBind (EvBindsVar { ebv_binds = ev_ref, ebv_uniq = u }) ev_bind
   = do { traceTc "addTcEvBind" $ ppr u $$
                                  ppr ev_bind
        ; bnds <- readTcRef ev_ref
        ; writeTcRef ev_ref (extendEvBinds bnds ev_bind) }
-
-getTcEvBinds :: EvBindsVar -> TcM (Bag EvBind)
-getTcEvBinds (EvBindsVar ev_ref _)
-  = do { bnds <- readTcRef ev_ref
-       ; return (evBindMapBinds bnds) }
-
-getTcEvBindsMap :: EvBindsVar -> TcM EvBindMap
-getTcEvBindsMap (EvBindsVar ev_ref _)
-  = readTcRef ev_ref
 
 chooseUniqueOccTc :: (OccSet -> OccName) -> TcM OccName
 chooseUniqueOccTc fn =

@@ -1,8 +1,8 @@
 
 mono.hs:7:4: error:
     • Couldn't match type ‘Bool’ with ‘Int’
-      Expected type: [Int]
-        Actual type: [Bool]
+      Expected type: [Bool]
+        Actual type: [Int]
     • In the pattern: Single x
       In an equation for ‘f’: f (Single x) = x
 

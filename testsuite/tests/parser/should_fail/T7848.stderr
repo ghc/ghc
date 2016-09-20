@@ -1,10 +1,7 @@
 
 T7848.hs:6:1: error:
     • Occurs check: cannot construct the infinite type:
-        t ~ t0 -> t1 -> A -> A -> A -> A -> t2 -> t
-    • When checking that:
-          t0 -> t1 -> A -> A -> A -> A -> forall t2. t2 -> t
-        is more polymorphic than: t
+        t ~ p0 -> p1 -> A -> A -> A -> A -> p2 -> t
     • Relevant bindings include x :: t (bound at T7848.hs:6:1)
 
 T7848.hs:10:9: error:
