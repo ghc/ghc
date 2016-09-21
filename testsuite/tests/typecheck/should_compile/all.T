@@ -535,4 +535,4 @@ test('T12381', normal, compile, [''])
 test('T12082', normal, compile, [''])
 test('T12427a', normal, compile_fail, [''])
 test('T12427b', normal, compile, [''])
-
+test('T12507', normal, compile, [''])
