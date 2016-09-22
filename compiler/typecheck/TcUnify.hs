@@ -18,6 +18,7 @@ module TcUnify (
   -- Various unifications
   unifyType, unifyTheta, unifyKind, noThing,
   uType, unifyExpType,
+  swapOverTyVars, canSolveByUnification,
 
   --------------------------------
   -- Holes
@@ -1116,13 +1117,13 @@ uType origin t_or_k orig_ty1 orig_ty2
            ; case lookup_res of
                Filled ty1   -> do { traceTc "found filled tyvar" (ppr tv1 <+> text ":->" <+> ppr ty1)
                                   ; go ty1 ty2 }
-               Unfilled ds1 -> uUnfilledVar origin t_or_k NotSwapped tv1 ds1 ty2 }
+               Unfilled _ -> uUnfilledVar origin t_or_k NotSwapped tv1 ty2 }
     go ty1 (TyVarTy tv2)
       = do { lookup_res <- lookupTcTyVar tv2
            ; case lookup_res of
                Filled ty2   -> do { traceTc "found filled tyvar" (ppr tv2 <+> text ":->" <+> ppr ty2)
                                   ; go ty1 ty2 }
-               Unfilled ds2 -> uUnfilledVar origin t_or_k IsSwapped tv2 ds2 ty1 }
+               Unfilled _ -> uUnfilledVar origin t_or_k IsSwapped tv2 ty1 }
 
       -- See Note [Expanding synonyms during unification]
     go ty1@(TyConApp tc1 []) (TyConApp tc2 [])
@@ -1304,87 +1305,77 @@ of the substitution; rather, notice that @uVar@ (defined below) nips
 back into @uTys@ if it turns out that the variable is already bound.
 -}
 
+----------
 uUnfilledVar :: CtOrigin
              -> TypeOrKind
              -> SwapFlag
-             -> TcTyVar -> TcTyVarDetails       -- Tyvar 1
-             -> TcTauType                       -- Type 2
+             -> TcTyVar        -- Tyvar 1
+             -> TcTauType      -- Type 2
              -> TcM Coercion
 -- "Unfilled" means that the variable is definitely not a filled-in meta tyvar
 --            It might be a skolem, or untouchable, or meta
 
-uUnfilledVar origin t_or_k swapped tv1 details1 (TyVarTy tv2)
-  | tv1 == tv2  -- Same type variable => no-op
-  = return (mkNomReflCo (mkTyVarTy tv1))
+uUnfilledVar origin t_or_k swapped tv1 ty2
+  = do { ty2 <- zonkTcType ty2
+             -- Zonk to expose things to the
+             -- occurs check, and so that if ty2
+             -- looks like a type variable then it
+             -- is a type variable
+       ; uUnfilledVar1 origin t_or_k swapped tv1 ty2 }
 
-  | otherwise  -- Distinct type variables
-  = do  { lookup2 <- lookupTcTyVar tv2
-        ; case lookup2 of
-            Filled ty2'
-              -> uUnfilledVar origin t_or_k swapped tv1 details1 ty2'
-            Unfilled details2
-              -> uUnfilledVars origin t_or_k swapped tv1 details1 tv2 details2
-        }
+----------
+uUnfilledVar1 :: CtOrigin
+              -> TypeOrKind
+              -> SwapFlag
+              -> TcTyVar        -- Tyvar 1
+              -> TcTauType      -- Type 2, zonked
+              -> TcM Coercion
+uUnfilledVar1 origin t_or_k swapped tv1 ty2
+  | Just tv2 <- tcGetTyVar_maybe ty2
+  = go tv2
 
-uUnfilledVar origin t_or_k swapped tv1 details1 non_var_ty2
--- ty2 is not a type variable
-  = case details1 of
-      MetaTv { mtv_ref = ref1 }
-        -> do { dflags <- getDynFlags
-              ; mb_ty2' <- checkTauTvUpdate dflags origin t_or_k tv1 non_var_ty2
-              ; case mb_ty2' of
-                  Just (ty2', co_k) -> maybe_sym swapped <$>
-                                       updateMeta tv1 ref1 ty2' co_k
-                  Nothing   -> do { traceTc "Occ/type-family defer"
-                                        (ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)
-                                         $$ ppr non_var_ty2 $$ ppr (typeKind non_var_ty2))
-                                  ; defer }
-              }
+  | otherwise
+  = uUnfilledVar2 origin t_or_k swapped tv1 ty2
 
-      _other -> do { traceTc "Skolem defer" (ppr tv1); defer }  -- Skolems of all sorts
   where
-    defer = unSwap swapped (uType_defer origin t_or_k) (mkTyVarTy tv1) non_var_ty2
+    -- 'go' handles the case where both are
+    -- tyvars so we might want to swap
+    go tv2 | tv1 == tv2  -- Same type variable => no-op
+           = return (mkNomReflCo (mkTyVarTy tv1))
+
+           | swapOverTyVars tv1 tv2   -- Distinct type variables
+           = uUnfilledVar2 origin t_or_k (flipSwap swapped)
+                           tv2 (mkTyVarTy tv1)
+
+           | otherwise
+           = uUnfilledVar2 origin t_or_k swapped tv1 ty2
+
+----------
+uUnfilledVar2 :: CtOrigin
+              -> TypeOrKind
+              -> SwapFlag
+              -> TcTyVar        -- Tyvar 1
+              -> TcTauType      -- Type 2, zonked
+              -> TcM Coercion
+uUnfilledVar2 origin t_or_k swapped tv1 ty2
+  = do { dflags  <- getDynFlags
+       ; cur_lvl <- getTcLevel
+       ; go dflags cur_lvl }
+  where
+    go dflags cur_lvl
+      | canSolveByUnification cur_lvl tv1 ty2
+      , Just ty2' <- metaTyVarUpdateOK dflags tv1 ty2
+      = do { co_k <- uType kind_origin KindLevel (typeKind ty2') (tyVarKind tv1)
+           ; co   <- updateMeta tv1 ty2' co_k
+           ; return (maybe_sym swapped co) }
+
+      | otherwise
+      = unSwap swapped (uType_defer origin t_or_k) ty1 ty2
                -- Occurs check or an untouchable: just defer
                -- NB: occurs check isn't necessarily fatal:
                --     eg tv1 occured in type family parameter
 
-----------------
-uUnfilledVars :: CtOrigin
-              -> TypeOrKind
-              -> SwapFlag
-              -> TcTyVar -> TcTyVarDetails      -- Tyvar 1
-              -> TcTyVar -> TcTyVarDetails      -- Tyvar 2
-              -> TcM Coercion
--- Invarant: The type variables are distinct,
---           Neither is filled in yet
-
-uUnfilledVars origin t_or_k swapped tv1 details1 tv2 details2
-  = do { traceTc "uUnfilledVars for" (ppr tv1 <+> text "and" <+> ppr tv2)
-       ; traceTc "uUnfilledVars" (    text "trying to unify" <+> ppr k1
-                                  <+> text "with"            <+> ppr k2)
-       ; co_k <- uType kind_origin KindLevel k1 k2
-       ; let no_swap ref = maybe_sym swapped <$>
-                           updateMeta tv1 ref ty2 (mkSymCo co_k)
-             do_swap ref = maybe_sym (flipSwap swapped) <$>
-                           updateMeta tv2 ref ty1 co_k
-       ; case (details1, details2) of
-         { ( MetaTv { mtv_info = i1, mtv_ref = ref1 }
-           , MetaTv { mtv_info = i2, mtv_ref = ref2 } )
-             | nicer_to_update_tv1 tv1 i1 i2 -> no_swap ref1
-             | otherwise                     -> do_swap ref2
-         ; (MetaTv { mtv_ref = ref1 }, _) -> no_swap ref1
-         ; (_, MetaTv { mtv_ref = ref2 }) -> do_swap ref2
-
-           -- Can't do it in-place, so defer
-           -- This happens for skolems of all sorts
-         ; _ -> do { traceTc "deferring because I can't find a meta-tyvar:"
-                       (pprTcTyVarDetails details1 <+> pprTcTyVarDetails details2)
-                   ; unSwap swapped (uType_defer origin t_or_k) ty1 ty2 } } }
-  where
-    k1  = tyVarKind tv1
-    k2  = tyVarKind tv2
     ty1 = mkTyVarTy tv1
-    ty2 = mkTyVarTy tv2
     kind_origin = KindEqOrigin ty1 (Just ty2) origin (Just t_or_k)
 
 -- | apply sym iff swapped
@@ -1392,27 +1383,16 @@ maybe_sym :: SwapFlag -> Coercion -> Coercion
 maybe_sym IsSwapped  = mkSymCo
 maybe_sym NotSwapped = id
 
-nicer_to_update_tv1 :: TcTyVar -> MetaInfo -> MetaInfo -> Bool
-nicer_to_update_tv1 _   _     SigTv = True
-nicer_to_update_tv1 _   SigTv _     = False
-        -- Try not to update SigTvs; and try to update sys-y type
-        -- variables in preference to ones gotten (say) by
-        -- instantiating a polymorphic function with a user-written
-        -- type sig
-nicer_to_update_tv1 tv1 _     _     = isSystemName (Var.varName tv1)
-
 ----------------
-checkTauTvUpdate :: DynFlags
-                 -> CtOrigin
-                 -> TypeOrKind
-                 -> TcTyVar             -- tv :: k1
-                 -> TcType              -- ty :: k2
-                 -> TcM (Maybe ( TcType        -- possibly-expanded ty
-                               , Coercion )) -- :: k2 ~N k1
---    (checkTauTvUpdate tv ty)
--- We are about to update the TauTv tv with ty.
+metaTyVarUpdateOK :: DynFlags
+                  -> TcTyVar             -- tv :: k1
+                  -> TcType              -- ty :: k2
+                  -> Maybe TcType        -- possibly-expanded ty
+-- (metaTyFVarUpdateOK tv ty)
+-- We are about to update the meta-tyvar tv with ty.
 -- Check (a) that tv doesn't occur in ty (occurs check)
---       (b) that kind(ty) matches kind(tv)
+--       (b) that ty does not have any foralls
+--           (in the impredicative case), or type functions
 --
 -- We have two possible outcomes:
 -- (1) Return the type to update the type variable with,
@@ -1429,48 +1409,106 @@ checkTauTvUpdate :: DynFlags
 -- we return Nothing, leaving it to the later constraint simplifier to
 -- sort matters out.
 
-checkTauTvUpdate dflags origin t_or_k tv ty
-  | SigTv <- info
-  = ASSERT( not (isTyVarTy ty) )
-    return Nothing
-  | otherwise
-  = do { ty   <- zonkTcType ty
-       ; co_k <- uType kind_origin KindLevel (typeKind ty) (tyVarKind tv)
-       ; if | defer_me ty ->  -- Quick test
-                -- Failed quick test so try harder
-                case occurCheckExpand dflags tv ty of
-                   OC_OK ty2 | defer_me ty2 -> return Nothing
-                             | otherwise    -> return (Just (ty2, co_k))
-                   _                        -> return Nothing
-            | otherwise   -> return (Just (ty, co_k)) }
-
+metaTyVarUpdateOK dflags tv ty
+  = case defer_me impredicative ty of
+      OC_OK _   -> Just ty
+      OC_Forall -> Nothing  -- forall or type function
+      OC_Occurs -> occCheckExpand tv ty
   where
-    kind_origin   = KindEqOrigin (mkTyVarTy tv) (Just ty) origin (Just t_or_k)
     details       = tcTyVarDetails tv
-    info          = mtv_info details
-
     impredicative = canUnifyWithPolyType dflags details
 
-    defer_me :: TcType -> Bool
+    defer_me :: Bool    -- True <=> foralls are ok
+             -> TcType
+             -> OccCheckResult ()
     -- Checks for (a) occurrence of tv
     --            (b) type family applications
-    --            (c) foralls
+    --            (c) foralls if the Bool is false
     -- See Note [Prevent unification with type families]
     -- See Note [Refactoring hazard: checkTauTvUpdate]
-    defer_me (LitTy {})        = False
-    defer_me (TyVarTy tv')     = tv == tv' || defer_me (tyVarKind tv')
-    defer_me (TyConApp tc tys) = isTypeFamilyTyCon tc || any defer_me tys
-                                 || not (impredicative || isTauTyCon tc)
-    defer_me (ForAllTy bndr t) = defer_me (binderKind bndr) || defer_me t
-                                 || not impredicative
-    defer_me (FunTy fun arg)   = defer_me fun || defer_me arg
-    defer_me (AppTy fun arg)   = defer_me fun || defer_me arg
-    defer_me (CastTy ty co)    = defer_me ty || defer_me_co co
-    defer_me (CoercionTy co)   = defer_me_co co
+    -- See Note [Checking for foralls] in TcType
+
+    defer_me _ (TyVarTy tv')
+       | tv == tv' = OC_Occurs
+       | otherwise = defer_me True (tyVarKind tv')
+    defer_me b (TyConApp tc tys)
+       | isTypeFamilyTyCon tc = OC_Forall   -- We use OC_Forall to signal
+                                            -- forall /or/ type function
+       | not (isTauTyCon tc)  = OC_Forall
+       | otherwise            = mapM (defer_me b) tys >> OC_OK ()
+
+    defer_me b (ForAllTy (TvBndr tv' _) t)
+       | not b     = OC_Forall
+       | tv == tv' = OC_OK ()
+       | otherwise = do { defer_me True (tyVarKind tv'); defer_me b t }
+
+    defer_me _ (LitTy {})        = OC_OK ()
+    defer_me b (FunTy fun arg)   = defer_me b fun >> defer_me b arg
+    defer_me b (AppTy fun arg)   = defer_me b fun >> defer_me b arg
+    defer_me b (CastTy ty co)    = defer_me b ty  >> defer_me_co co
+    defer_me _ (CoercionTy co)   = defer_me_co co
 
       -- We don't really care if there are type families in a coercion,
       -- but we still can't have an occurs-check failure
-    defer_me_co co = tv `elemVarSet` tyCoVarsOfCo co
+    defer_me_co co | tv `elemVarSet` tyCoVarsOfCo co = OC_Occurs
+                   | otherwise                       = OC_OK ()
+
+swapOverTyVars :: TcTyVar -> TcTyVar -> Bool
+-- See Note [Canonical orientation for tyvar/tyvar equality constraints]
+swapOverTyVars tv1 tv2
+  | Just lvl1 <- metaTyVarTcLevel_maybe tv1
+      -- If tv1 is touchable, swap only if tv2 is also
+      -- touchable and it's strictly better to update the latter
+      -- But see Note [Avoid unnecessary swaps]
+  = case metaTyVarTcLevel_maybe tv2 of
+      Nothing   -> False
+      Just lvl2 | lvl2 `strictlyDeeperThan` lvl1 -> True
+                | lvl1 `strictlyDeeperThan` lvl2 -> False
+                | otherwise                      -> nicer_to_update tv2
+
+  -- So tv1 is not a meta tyvar
+  -- If only one is a meta tyvar, put it on the left
+  -- This is not because it'll be solved; but because
+  -- the floating step looks for meta tyvars on the left
+  | isMetaTyVar tv2 = True
+
+  -- So neither is a meta tyvar (including FlatMetaTv)
+
+  -- If only one is a flatten skolem, put it on the left
+  -- See Note [Eliminate flat-skols]
+  | not (isFlattenTyVar tv1), isFlattenTyVar tv2 = True
+
+  | otherwise = False
+
+  where
+    nicer_to_update tv2
+      =  (isSigTyVar tv1                 && not (isSigTyVar tv2))
+      || (isSystemName (Var.varName tv2) && not (isSystemName (Var.varName tv1)))
+
+-- @trySpontaneousSolve wi@ solves equalities where one side is a
+-- touchable unification variable.
+-- Returns True <=> spontaneous solve happened
+canSolveByUnification :: TcLevel -> TcTyVar -> TcType -> Bool
+canSolveByUnification tclvl tv xi
+  | isTouchableMetaTyVar tclvl tv
+  = case metaTyVarInfo tv of
+      SigTv -> is_tyvar xi
+      _     -> True
+
+  | otherwise    -- Untouchable
+  = False
+  where
+    is_tyvar xi
+      = case tcGetTyVar_maybe xi of
+          Nothing -> False
+          Just tv -> case tcTyVarDetails tv of
+                       MetaTv { mtv_info = info }
+                                   -> case info of
+                                        SigTv -> True
+                                        _     -> False
+                       SkolemTv {} -> True
+                       FlatSkol {} -> False
+                       RuntimeUnk  -> True
 
 {-
 Note [Prevent unification with type families]
@@ -1508,14 +1546,15 @@ with type families].) So I checked the result of occurCheckExpand for any
 type family occurrences and deferred if there were any. This was done
 in commit e9bf7bb5cc9fb3f87dd05111aa23da76b86a8967 .
 
-This approach turned out not to be performant, because the expanded type
-was bigger than the original type, and tyConsOfType looks through type
-synonyms. So it then struck me that we could dispense with the defer_me
-check entirely. This simplified the code nicely, and it cut the allocations
-in T5030 by half. But, as documented in Note [Prevent unification with
-type families], this destroyed performance in T3064. Regardless, I missed this
-regression and the change was committed as
-3f5d1a13f112f34d992f6b74656d64d95a3f506d .
+This approach turned out not to be performant, because the expanded
+type was bigger than the original type, and tyConsOfType (needed to
+see if there are any type family occurrences) looks through type
+synonyms. So it then struck me that we could dispense with the
+defer_me check entirely. This simplified the code nicely, and it cut
+the allocations in T5030 by half. But, as documented in Note [Prevent
+unification with type families], this destroyed performance in
+T3064. Regardless, I missed this regression and the change was
+committed as 3f5d1a13f112f34d992f6b74656d64d95a3f506d .
 
 Bottom lines:
  * defer_me is back, but now fixed w.r.t. #11407.
@@ -1598,15 +1637,14 @@ lookupTcTyVar tyvar
 
 -- | Fill in a meta-tyvar
 updateMeta :: TcTyVar            -- ^ tv to fill in, tv :: k1
-           -> TcRef MetaDetails  -- ^ ref to tv's metadetails
            -> TcType             -- ^ ty2 :: k2
            -> Coercion           -- ^ kind_co :: k2 ~N k1
            -> TcM Coercion       -- ^ :: tv ~N ty2 (= ty2 |> kind_co ~N ty2)
-updateMeta tv1 ref1 ty2 kind_co
-  = do { let ty2_refl   = mkNomReflCo ty2
-             (ty2', co) = ( ty2 `mkCastTy` kind_co
-                          , mkCoherenceLeftCo ty2_refl kind_co )
-       ; writeMetaTyVarRef tv1 ref1 ty2'
+updateMeta tv1 ty2 kind_co
+  = do { let ty2'     = ty2 `mkCastTy` kind_co
+             ty2_refl = mkNomReflCo ty2
+             co       = mkCoherenceLeftCo ty2_refl kind_co
+       ; writeMetaTyVar tv1 ty2'
        ; return co }
 
 {-
