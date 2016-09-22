@@ -35,11 +35,11 @@ tc141.hs:13:13: error:
         in v
 
 tc141.hs:15:18: error:
-    • Couldn't match expected type ‘a1’ with actual type ‘t’
-        because type variable ‘a1’ would escape its scope
+    • Couldn't match expected type ‘a2’ with actual type ‘t’
+        because type variable ‘a2’ would escape its scope
       This (rigid, skolem) type variable is bound by
         the type signature for:
-          v :: a1
+          v :: a2
         at tc141.hs:14:14-19
     • In the expression: b
       In an equation for ‘v’: v = b
@@ -49,6 +49,6 @@ tc141.hs:15:18: error:
           v = b
         in v
     • Relevant bindings include
-        v :: a1 (bound at tc141.hs:15:14)
+        v :: a2 (bound at tc141.hs:15:14)
         b :: t (bound at tc141.hs:13:5)
-        g :: t1 -> t -> forall a. a (bound at tc141.hs:13:1)
+        g :: a1 -> t -> forall a. a (bound at tc141.hs:13:1)

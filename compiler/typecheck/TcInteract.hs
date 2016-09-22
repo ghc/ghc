@@ -13,6 +13,7 @@ import BasicTypes ( infinity, IntWithInf, intGtLimit )
 import HsTypes ( HsIPName(..) )
 import TcCanonical
 import TcFlatten
+import TcUnify( canSolveByUnification )
 import VarSet
 import Type
 import InstEnv( DFunInstType, lookupInstEnv, instanceDFunId )
@@ -1121,56 +1122,33 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv
 
        ; stopWith ev "Solved from inert (r)" }
 
+  | ReprEq <- eq_rel   -- We never solve representational
+  = unsolved_inert     -- equalities by unification
+
+  | isGiven ev         -- See Note [Touchables and givens]
+  = unsolved_inert
+
   | otherwise
   = do { tclvl <- getTcLevel
-       ; if canSolveByUnification tclvl ev eq_rel tv rhs
+       ; if canSolveByUnification tclvl tv rhs
          then do { solveByUnification ev tv rhs
                  ; n_kicked <- kickOutAfterUnification tv
                  ; return (Stop ev (text "Solved by unification" <+> ppr_kicked n_kicked)) }
 
-         else do { traceTcS "Can't solve tyvar equality"
-                       (vcat [ text "LHS:" <+> ppr tv <+> dcolon <+> ppr (tyVarKind tv)
-                             , ppWhen (isMetaTyVar tv) $
-                               nest 4 (text "TcLevel of" <+> ppr tv
-                                       <+> text "is" <+> ppr (metaTyVarTcLevel tv))
-                             , text "RHS:" <+> ppr rhs <+> dcolon <+> ppr (typeKind rhs)
-                             , text "TcLevel =" <+> ppr tclvl ])
-                 ; addInertEq workItem
-                 ; return (Stop ev (text "Kept as inert")) } }
+         else unsolved_inert }
+
+  where
+    unsolved_inert
+      = do { traceTcS "Can't solve tyvar equality"
+                (vcat [ text "LHS:" <+> ppr tv <+> dcolon <+> ppr (tyVarKind tv)
+                      , ppWhen (isMetaTyVar tv) $
+                        nest 4 (text "TcLevel of" <+> ppr tv
+                                <+> text "is" <+> ppr (metaTyVarTcLevel tv))
+                      , text "RHS:" <+> ppr rhs <+> dcolon <+> ppr (typeKind rhs) ])
+           ; addInertEq workItem
+           ; return (Stop ev (text "Kept as inert")) }
 
 interactTyVarEq _ wi = pprPanic "interactTyVarEq" (ppr wi)
-
--- @trySpontaneousSolve wi@ solves equalities where one side is a
--- touchable unification variable.
--- Returns True <=> spontaneous solve happened
-canSolveByUnification :: TcLevel -> CtEvidence -> EqRel
-                      -> TcTyVar -> Xi -> Bool
-canSolveByUnification tclvl gw eq_rel tv xi
-  | ReprEq <- eq_rel   -- we never solve representational equalities this way.
-  = False
-
-  | isGiven gw   -- See Note [Touchables and givens]
-  = False
-
-  | isTouchableMetaTyVar tclvl tv
-  = case metaTyVarInfo tv of
-      SigTv -> is_tyvar xi
-      _     -> True
-
-  | otherwise    -- Untouchable
-  = False
-  where
-    is_tyvar xi
-      = case tcGetTyVar_maybe xi of
-          Nothing -> False
-          Just tv -> case tcTyVarDetails tv of
-                       MetaTv { mtv_info = info }
-                                   -> case info of
-                                        SigTv -> True
-                                        _     -> False
-                       SkolemTv {} -> True
-                       FlatSkol {} -> False
-                       RuntimeUnk  -> True
 
 solveByUnification :: CtEvidence -> TcTyVar -> Xi -> TcS ()
 -- Solve with the identity coercion
@@ -1446,7 +1424,9 @@ reduce_top_fun_eq old_ev fsk ax_co rhs_ty
        ; dischargeFmv old_ev fsk final_co alpha_ty
        ; traceTcS "doTopReactFunEq (occurs)" $
          vcat [ text "old_ev:" <+> ppr old_ev
-              , nest 2 (text ":=") <+> ppr final_co
+              , nest 2 (text ":=") <+>
+                   if isDerived old_ev then text "(derived)"
+                   else ppr final_co
               , text "new_ev:" <+> ppr new_ev ]
        ; stopWith old_ev "Fun/Top (wanted)" }
   where

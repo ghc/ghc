@@ -584,7 +584,7 @@ deriveStandalone (L loc (DerivDecl deriv_ty overlap_mode))
               , text "type:" <+> ppr inst_ty ]
 
        ; let bale_out msg = failWithTc (derivingThingErr False cls cls_tys
-                              inst_ty deriv_strat msg)
+                              inst_ty msg)
 
        ; case tcSplitTyConApp_maybe inst_ty of
            Just (tc, tc_args)
@@ -594,9 +594,6 @@ deriveStandalone (L loc (DerivDecl deriv_ty overlap_mode))
 
               | isUnboxedTupleTyCon tc
               -> bale_out $ unboxedTyConErr "tuple"
-
-              | isUnboxedSumTyCon tc
-              -> bale_out $ unboxedTyConErr "sum"
 
               | isAlgTyCon tc || isDataFamilyTyCon tc  -- All other classes
               -> do { spec <- mkEqnHelp (fmap unLoc overlap_mode)
