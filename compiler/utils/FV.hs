@@ -184,7 +184,7 @@ mapUnionFV :: (a -> FV) -> [a] -> FV
 mapUnionFV _f [] _fv_cand _in_scope acc = acc
 mapUnionFV f (a:as) fv_cand in_scope acc =
   mapUnionFV f as fv_cand in_scope $! f a fv_cand in_scope $! acc
-{-# INLINE mapUnionFV #-}
+{-# INLINABLE mapUnionFV #-}
 
 -- | Union many free variable computations.
 unionsFV :: [FV] -> FV
