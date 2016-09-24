@@ -615,7 +615,7 @@ test('T6048',
             # prev:       38000000 (x86/Linux)
             # 2012-10-08: 48887164 (x86/Linux)
             # 2014-04-04: 62618072 (x86 Windows, 64 bit machine)
-            # 2014-09-03: 56315812 (x86 Windows, w/w for INLINEABLE)
+            # 2014-09-03: 56315812 (x86 Windows, w/w for INLINABLE)
             # 2014-12-01: 49987836 (x86 Windows)
             # 2016-04-06: 55701280 (x86/Linux, 64-bit machine)
 

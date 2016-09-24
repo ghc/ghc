@@ -2969,7 +2969,7 @@ Note [Setting the new unfolding]
   can get into an infinite loop
 
 If there's an stable unfolding on a loop breaker (which happens for
-INLINEABLE), we hang on to the inlining.  It's pretty dodgy, but the
+INLINABLE), we hang on to the inlining.  It's pretty dodgy, but the
 user did say 'INLINE'.  May need to revisit this choice.
 
 ************************************************************************

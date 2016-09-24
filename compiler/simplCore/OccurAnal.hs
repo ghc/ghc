@@ -927,7 +927,7 @@ reOrderNodes depth bndr_set weak_fvs (node : nodes) binds
                               -- Note [DFuns should not be loop breakers]
 
         | Just be_very_keen <- hasStableCoreUnfolding_maybe (idUnfolding bndr)
-        = if be_very_keen then 6    -- Note [Loop breakers and INLINE/INLINEABLE pragmas]
+        = if be_very_keen then 6    -- Note [Loop breakers and INLINE/INLINABLE pragmas]
                           else 3
                -- Data structures are more important than INLINE pragmas
                -- so that dictionary/method recursion unravels
@@ -1010,18 +1010,18 @@ The RULES stuff means that we can't choose $dm as a loop breaker
 opInt *and* opBool, and so on.  The number of loop breakders is
 linear in the number of instance declarations.
 
-Note [Loop breakers and INLINE/INLINEABLE pragmas]
+Note [Loop breakers and INLINE/INLINABLE pragmas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Avoid choosing a function with an INLINE pramga as the loop breaker!
 If such a function is mutually-recursive with a non-INLINE thing,
 then the latter should be the loop-breaker.
 
-It's vital to distinguish between INLINE and INLINEABLE (the
+It's vital to distinguish between INLINE and INLINABLE (the
 Bool returned by hasStableCoreUnfolding_maybe).  If we start with
-   Rec { {-# INLINEABLE f #-}
+   Rec { {-# INLINABLE f #-}
          f x = ...f... }
 and then worker/wrapper it through strictness analysis, we'll get
-   Rec { {-# INLINEABLE $wf #-}
+   Rec { {-# INLINABLE $wf #-}
          $wf p q = let x = (p,q) in ...f...
 
          {-# INLINE f #-}

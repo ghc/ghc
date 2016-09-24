@@ -476,8 +476,8 @@ showSigned showPos p x
 even, odd       :: (Integral a) => a -> Bool
 even n          =  n `rem` 2 == 0
 odd             =  not . even
-{-# INLINEABLE even #-}
-{-# INLINEABLE odd  #-}
+{-# INLINABLE even #-}
+{-# INLINABLE odd  #-}
 
 -------------------------------------------------------
 -- | raise a number to a non-negative integral power

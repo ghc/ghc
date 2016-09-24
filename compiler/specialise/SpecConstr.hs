@@ -421,7 +421,7 @@ This seeding is done in the binding for seed_calls in specRec.
 
 Actually in case (2), instead of using the calls from the RHS, it
 would be better to specialise in the importing module.  We'd need to
-add an INLINEABLE pragma to the function, and then it can be
+add an INLINABLE pragma to the function, and then it can be
 specialised in the importing scope, just as is done for type classes
 in Specialise.specImports. This remains to be done (#10346).
 

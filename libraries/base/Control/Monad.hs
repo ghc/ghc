@@ -162,14 +162,14 @@ Note: 'foldM' is the same as 'foldlM'
 -}
 
 foldM          :: (Foldable t, Monad m) => (b -> a -> m b) -> b -> t a -> m b
-{-# INLINEABLE foldM #-}
+{-# INLINABLE foldM #-}
 {-# SPECIALISE foldM :: (a -> b -> IO a) -> a -> [b] -> IO a #-}
 {-# SPECIALISE foldM :: (a -> b -> Maybe a) -> a -> [b] -> Maybe a #-}
 foldM          = foldlM
 
 -- | Like 'foldM', but discards the result.
 foldM_         :: (Foldable t, Monad m) => (b -> a -> m b) -> b -> t a -> m ()
-{-# INLINEABLE foldM_ #-}
+{-# INLINABLE foldM_ #-}
 {-# SPECIALISE foldM_ :: (a -> b -> IO a) -> a -> [b] -> IO () #-}
 {-# SPECIALISE foldM_ :: (a -> b -> Maybe a) -> a -> [b] -> Maybe () #-}
 foldM_ f a xs  = foldlM f a xs >> return ()
@@ -198,7 +198,7 @@ Core: https://ghc.haskell.org/trac/ghc/ticket/11795#comment:6
 -- | @'replicateM' n act@ performs the action @n@ times,
 -- gathering the results.
 replicateM        :: (Applicative m) => Int -> m a -> m [a]
-{-# INLINEABLE replicateM #-}
+{-# INLINABLE replicateM #-}
 {-# SPECIALISE replicateM :: Int -> IO a -> IO [a] #-}
 {-# SPECIALISE replicateM :: Int -> Maybe a -> Maybe [a] #-}
 replicateM cnt0 f =
@@ -210,7 +210,7 @@ replicateM cnt0 f =
 
 -- | Like 'replicateM', but discards the result.
 replicateM_       :: (Applicative m) => Int -> m a -> m ()
-{-# INLINEABLE replicateM_ #-}
+{-# INLINABLE replicateM_ #-}
 {-# SPECIALISE replicateM_ :: Int -> IO a -> IO () #-}
 {-# SPECIALISE replicateM_ :: Int -> Maybe a -> Maybe () #-}
 replicateM_ cnt0 f =
@@ -223,7 +223,7 @@ replicateM_ cnt0 f =
 
 -- | The reverse of 'when'.
 unless            :: (Applicative f) => Bool -> f () -> f ()
-{-# INLINEABLE unless #-}
+{-# INLINABLE unless #-}
 {-# SPECIALISE unless :: Bool -> IO () -> IO () #-}
 {-# SPECIALISE unless :: Bool -> Maybe () -> Maybe () #-}
 unless p s        =  if p then pure () else s
@@ -251,7 +251,7 @@ f <$!> m = do
 -- @mfilter odd (Just 2) == Nothing@
 
 mfilter :: (MonadPlus m) => (a -> Bool) -> m a -> m a
-{-# INLINEABLE mfilter #-}
+{-# INLINABLE mfilter #-}
 mfilter p ma = do
   a <- ma
   if p a then return a else mzero

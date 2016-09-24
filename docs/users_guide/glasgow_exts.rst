@@ -12066,6 +12066,8 @@ behaviour:
    recursive function. The principal reason do to so to allow later use
    of ``SPECIALISE``
 
+The alternative spelling ``INLINEABLE`` is also accepted by GHC.
+
 .. _noinline-pragma:
 
 NOINLINE pragma

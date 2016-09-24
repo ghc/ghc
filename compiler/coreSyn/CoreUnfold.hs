@@ -199,22 +199,22 @@ specUnfolding to specialise its unfolding.  Some important points:
 * There is a bit of hack for INLINABLE functions:
      f :: Ord a => ....
      f = <big-rhs>
-     {- INLINEABLE f #-}
+     {- INLINABLE f #-}
   Now if we specialise f, should the specialised version still have
-  an INLINEABLE pragma?  If it does, we'll capture a specialised copy
+  an INLINABLE pragma?  If it does, we'll capture a specialised copy
   of <big-rhs> as its unfolding, and that probaby won't inline.  But
   if we don't, the specialised version of <big-rhs> might be small
   enough to inline at a call site. This happens with Control.Monad.liftM3,
   and can cause a lot more allocation as a result (nofib n-body shows this).
 
-  Moreover, keeping the INLINEABLE thing isn't much help, because
+  Moreover, keeping the INLINABLE thing isn't much help, because
   the specialised function (probaby) isn't overloaded any more.
 
   Conclusion: drop the INLINEALE pragma.  In practice what this means is:
      if a stable unfolding has UnfoldingGuidance of UnfWhen,
         we keep it (so the specialised thing too will always inline)
      if a stable unfolding has UnfoldingGuidance of UnfIfGoodArgs
-        (which arises from INLINEABLE), we discard it
+        (which arises from INLINABLE), we discard it
 -}
 
 mkCoreUnfolding :: UnfoldingSource -> Bool -> CoreExpr

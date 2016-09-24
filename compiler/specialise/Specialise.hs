@@ -624,7 +624,7 @@ for instance, the 'specImports' call in 'specProgram'.
 
 Note [Disabling cross-module specialisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Since GHC 7.10 we have performed specialisation of INLINEABLE bindings living
+Since GHC 7.10 we have performed specialisation of INLINABLE bindings living
 in modules outside of the current module. This can sometimes uncover user code
 which explodes in size when aggressively optimized. The
 -fno-cross-module-specialise option was introduced to allow users to being
@@ -725,7 +725,7 @@ specImport dflags this_mod top_env done callers rb fn calls_for_fn
                             2 (vcat [ text "when specialising" <+> quotes (ppr caller)
                                     | caller <- callers])
                       , ifPprDebug (text "calls:" <+> vcat (map (pprCallInfo fn) calls_for_fn))
-                      , text "Probable fix: add INLINEABLE pragma on" <+> quotes (ppr fn) ])
+                      , text "Probable fix: add INLINABLE pragma on" <+> quotes (ppr fn) ])
        ; return ([], []) }
 
   | otherwise
@@ -757,17 +757,17 @@ wantSpecImport dflags unf
                -- Specialise even INLINE things; it hasn't inlined yet,
                -- so perhaps it never will.  Moreover it may have calls
                -- inside it that we want to specialise
-       | otherwise -> False    -- Stable, not INLINE, hence INLINEABLE
+       | otherwise -> False    -- Stable, not INLINE, hence INLINABLE
 
 {- Note [Warning about missed specialisations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose
- * In module Lib, you carefully mark a function 'foo' INLINEABLE
+ * In module Lib, you carefully mark a function 'foo' INLINABLE
  * Import Lib(foo) into another module M
  * Call 'foo' at some specialised type in M
 Then you jolly well expect it to be specialised in M.  But what if
 'foo' calls another function 'Lib.bar'.  Then you'd like 'bar' to be
-specialised too.  But if 'bar' is not marked INLINEABLE it may well
+specialised too.  But if 'bar' is not marked INLINABLE it may well
 not be specialised.  The warning Opt_WarnMissedSpecs warns about this.
 
 It's more noisy to warning about a missed specialisation opportunity
@@ -1362,7 +1362,7 @@ complicated Refl coercions with Refl pretty aggressively.
 
 Note [Orphans and auto-generated rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When we specialise an INLINEABLE function, or when we have
+When we specialise an INLINABLE function, or when we have
 -fspecialise-aggressively, we auto-generate RULES that are orphans.
 We don't want to warn about these, or we'd generate a lot of warnings.
 Thus, we only warn about user-specified orphan rules.
@@ -1687,7 +1687,7 @@ all they should be inlined, right?  Two reasons:
    This particular example had a huge effect on the call to replicateM_
    in nofib/shootout/n-body.
 
-Why (b): discard INLINEABLE pragmas? See Trac #4874 for persuasive examples.
+Why (b): discard INLINABLE pragmas? See Trac #4874 for persuasive examples.
 Suppose we have
     {-# INLINABLE f #-}
     f :: Ord a => [a] -> Int

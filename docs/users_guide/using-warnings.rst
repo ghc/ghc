@@ -201,12 +201,12 @@ of ``-W(no-)*``.
               -Wall-missed-specialisations
 
     Emits a warning if GHC cannot specialise an overloaded function, usually
-    because the function needs an ``INLINEABLE`` pragma. The "all" form reports
+    because the function needs an ``INLINABLE`` pragma. The "all" form reports
     all such situations whereas the "non-all" form only reports when the
     situation arises during specialisation of an imported function.
 
     The "non-all" form is intended to catch cases where an imported function
-    that is marked as ``INLINEABLE`` (presumably to enable specialisation) cannot
+    that is marked as ``INLINABLE`` (presumably to enable specialisation) cannot
     be specialised as it calls other functions that are themselves not specialised.
 
     Note that these warnings will not throw errors if used with :ghc-flag:`-Werror`.

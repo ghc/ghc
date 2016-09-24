@@ -590,7 +590,7 @@ toIntegralSized x                 -- See Note [toIntegralSized optimization]
                             then Just (bit (yW-1)-1)
                             else Just (bit yW-1)
       | otherwise = Nothing
-{-# INLINEABLE toIntegralSized #-}
+{-# INLINABLE toIntegralSized #-}
 
 -- | 'True' if the size of @a@ is @<=@ the size of @b@, where size is measured
 -- by 'bitSizeMaybe' and 'isSigned'.

@@ -441,13 +441,13 @@ liftA3 :: Applicative f => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
 liftA3 f a b c = fmap f a <*> b <*> c
 
 
-{-# INLINEABLE liftA #-}
+{-# INLINABLE liftA #-}
 {-# SPECIALISE liftA :: (a1->r) -> IO a1 -> IO r #-}
 {-# SPECIALISE liftA :: (a1->r) -> Maybe a1 -> Maybe r #-}
-{-# INLINEABLE liftA2 #-}
+{-# INLINABLE liftA2 #-}
 {-# SPECIALISE liftA2 :: (a1->a2->r) -> IO a1 -> IO a2 -> IO r #-}
 {-# SPECIALISE liftA2 :: (a1->a2->r) -> Maybe a1 -> Maybe a2 -> Maybe r #-}
-{-# INLINEABLE liftA3 #-}
+{-# INLINABLE liftA3 #-}
 {-# SPECIALISE liftA3 :: (a1->a2->a3->r) -> IO a1 -> IO a2 -> IO a3 -> IO r #-}
 {-# SPECIALISE liftA3 :: (a1->a2->a3->r) ->
                                 Maybe a1 -> Maybe a2 -> Maybe a3 -> Maybe r #-}
@@ -547,7 +547,7 @@ f =<< x         = x >>= f
 -- will output the string @Debugging@ if the Boolean value @debug@
 -- is 'True', and otherwise do nothing.
 when      :: (Applicative f) => Bool -> f () -> f ()
-{-# INLINEABLE when #-}
+{-# INLINABLE when #-}
 {-# SPECIALISE when :: Bool -> IO () -> IO () #-}
 {-# SPECIALISE when :: Bool -> Maybe () -> Maybe () #-}
 when p s  = if p then s else pure ()
@@ -611,19 +611,19 @@ liftM4 f m1 m2 m3 m4    = do { x1 <- m1; x2 <- m2; x3 <- m3; x4 <- m4; return (f
 liftM5  :: (Monad m) => (a1 -> a2 -> a3 -> a4 -> a5 -> r) -> m a1 -> m a2 -> m a3 -> m a4 -> m a5 -> m r
 liftM5 f m1 m2 m3 m4 m5 = do { x1 <- m1; x2 <- m2; x3 <- m3; x4 <- m4; x5 <- m5; return (f x1 x2 x3 x4 x5) }
 
-{-# INLINEABLE liftM #-}
+{-# INLINABLE liftM #-}
 {-# SPECIALISE liftM :: (a1->r) -> IO a1 -> IO r #-}
 {-# SPECIALISE liftM :: (a1->r) -> Maybe a1 -> Maybe r #-}
-{-# INLINEABLE liftM2 #-}
+{-# INLINABLE liftM2 #-}
 {-# SPECIALISE liftM2 :: (a1->a2->r) -> IO a1 -> IO a2 -> IO r #-}
 {-# SPECIALISE liftM2 :: (a1->a2->r) -> Maybe a1 -> Maybe a2 -> Maybe r #-}
-{-# INLINEABLE liftM3 #-}
+{-# INLINABLE liftM3 #-}
 {-# SPECIALISE liftM3 :: (a1->a2->a3->r) -> IO a1 -> IO a2 -> IO a3 -> IO r #-}
 {-# SPECIALISE liftM3 :: (a1->a2->a3->r) -> Maybe a1 -> Maybe a2 -> Maybe a3 -> Maybe r #-}
-{-# INLINEABLE liftM4 #-}
+{-# INLINABLE liftM4 #-}
 {-# SPECIALISE liftM4 :: (a1->a2->a3->a4->r) -> IO a1 -> IO a2 -> IO a3 -> IO a4 -> IO r #-}
 {-# SPECIALISE liftM4 :: (a1->a2->a3->a4->r) -> Maybe a1 -> Maybe a2 -> Maybe a3 -> Maybe a4 -> Maybe r #-}
-{-# INLINEABLE liftM5 #-}
+{-# INLINABLE liftM5 #-}
 {-# SPECIALISE liftM5 :: (a1->a2->a3->a4->a5->r) -> IO a1 -> IO a2 -> IO a3 -> IO a4 -> IO a5 -> IO r #-}
 {-# SPECIALISE liftM5 :: (a1->a2->a3->a4->a5->r) -> Maybe a1 -> Maybe a2 -> Maybe a3 -> Maybe a4 -> Maybe a5 -> Maybe r #-}
 
@@ -642,7 +642,7 @@ ap                :: (Monad m) => m (a -> b) -> m a -> m b
 ap m1 m2          = do { x1 <- m1; x2 <- m2; return (x1 x2) }
 -- Since many Applicative instances define (<*>) = ap, we
 -- cannot define ap = (<*>)
-{-# INLINEABLE ap #-}
+{-# INLINABLE ap #-}
 {-# SPECIALISE ap :: IO (a -> b) -> IO a -> IO b #-}
 {-# SPECIALISE ap :: Maybe (a -> b) -> Maybe a -> Maybe b #-}
 
