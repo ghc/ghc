@@ -778,7 +778,10 @@ yields a better error message anyway.)
 flatten :: FlattenMode -> CtEvidence -> TcType
         -> TcS (Xi, TcCoercion)
 flatten mode ev ty
-  = runFlatten mode ev (flatten_one ty)
+  = do { traceTcS "flatten {" (ppr ty)
+       ; (ty', co) <- runFlatten mode ev (flatten_one ty)
+       ; traceTcS "flatten }" (ppr ty')
+       ; return (ty', co) }
 
 flattenManyNom :: CtEvidence -> [TcType] -> TcS ([Xi], [TcCoercion])
 -- Externally-callable, hence runFlatten
@@ -787,7 +790,10 @@ flattenManyNom :: CtEvidence -> [TcType] -> TcS ([Xi], [TcCoercion])
 --      ctEvFlavour ev = Nominal
 -- and we want to flatten all at nominal role
 flattenManyNom ev tys
-  = runFlatten FM_FlattenAll ev (flatten_many_nom tys)
+  = do { traceTcS "flatten_many {" (vcat (map ppr tys))
+       ; (tys', cos) <- runFlatten FM_FlattenAll ev (flatten_many_nom tys)
+       ; traceTcS "flatten }" (vcat (map ppr tys'))
+       ; return (tys', cos) }
 
 {- *********************************************************************
 *                                                                      *
@@ -943,7 +949,7 @@ flatten_one (AppTy ty1 ty2)
                                    role2 co2 xi2 ty2
                                    role1 ) }  -- output should match fmode
 
-flatten_one (TyConApp tc tys)
+flatten_one ty@(TyConApp tc tys)
   -- Expand type synonyms that mention type families
   -- on the RHS; see Note [Flattening synonyms]
   | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
@@ -952,8 +958,10 @@ flatten_one (TyConApp tc tys)
        ; let used_tcs = tyConsOfType rhs
        ; case mode of
            FM_FlattenAll | anyNameEnv isTypeFamilyTyCon used_tcs
-                         -> flatten_one expanded_ty
-           _             -> flatten_ty_con_app tc tys }
+                         -> do { traceFlat "flatten_one syn expand" (ppr ty $$ ppr used_tcs)
+                               ; flatten_one expanded_ty }
+           _             -> do { traceFlat "flatten_one syn no expand" (ppr ty)
+                               ; flatten_ty_con_app tc tys } }
 
   -- Otherwise, it's a type function application, and we have to
   -- flatten it away as well, and generate a new given equality constraint
