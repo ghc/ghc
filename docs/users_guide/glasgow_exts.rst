@@ -4199,7 +4199,7 @@ constructors. The syntax for doing this is as follows:
 
 ::
 
-      pattern Point :: (Int, Int)
+      pattern Point :: Int -> Int -> (Int, Int)
       pattern Point{x, y} = (x, y)
 
 The idea is that we can then use ``Point`` just as if we had defined a new
@@ -4229,7 +4229,11 @@ For a unidirectional record pattern synonym we define record selectors but do
 not allow record updates or construction.
 
 The syntax and semantics of pattern synonyms are elaborated in the
-following subsections. See the :ghc-wiki:`Wiki page <PatternSynonyms>` for more
+following subsections.
+There are also lots more details in the `paper
+<https://www.microsoft.com/en-us/research/wp-content/uploads/2016/08/pattern-synonyms-Haskell16.pdf>`_.
+
+See the :ghc-wiki:`Wiki page <PatternSynonyms>` for more
 details.
 
 Syntax and scoping of pattern synonyms
