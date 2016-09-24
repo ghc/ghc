@@ -1,5 +1,5 @@
 module Settings.Builders.Common (
-    includesArgs, cIncludeArgs, ldArgs, cArgs, cWarnings,
+    includes, includesArgs, cIncludeArgs, ldArgs, cArgs, cWarnings,
     argSetting, argSettingList, argStagedBuilderPath, argStagedSettingList
     ) where
 
