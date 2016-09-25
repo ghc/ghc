@@ -66,6 +66,7 @@ module Unique (
 
 import BasicTypes
 import FastString
+import {-# SOURCE #-} DynFlags( suppressUniques )
 import Outputable
 import Util
 
@@ -262,7 +263,10 @@ finish_show 't' u _pp_u | u < 26
 finish_show tag _ pp_u = tag : pp_u
 
 pprUnique :: Unique -> SDoc
-pprUnique u = text (showUnique u)
+pprUnique u = sdocWithDynFlags $ \dflags ->
+              if (suppressUniques dflags)
+              then text "xxx"
+              else text (showUnique u)
 
 instance Outputable Unique where
     ppr = pprUnique

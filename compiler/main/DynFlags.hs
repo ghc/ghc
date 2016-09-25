@@ -32,7 +32,7 @@ module DynFlags (
         wopt, wopt_set, wopt_unset,
         xopt, xopt_set, xopt_unset,
         lang_set,
-        useUnicodeSyntax,
+        useUnicodeSyntax, suppressUniques,
         whenGeneratingDynamicToo, ifGeneratingDynamicToo,
         whenCannotGenerateDynamicToo,
         dynamicTooMkDynamicDynFlags,
@@ -1865,6 +1865,9 @@ lang_set dflags lang =
 -- of this function.
 useUnicodeSyntax :: DynFlags -> Bool
 useUnicodeSyntax = gopt Opt_PrintUnicodeSyntax
+
+suppressUniques :: DynFlags -> Bool
+suppressUniques = gopt Opt_SuppressUniques
 
 -- | Set the Haskell language standard to use
 setLanguage :: Language -> DynP ()

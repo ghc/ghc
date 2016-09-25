@@ -577,11 +577,7 @@ pprModulePrefix sty mod occ = sdocWithDynFlags $ \dflags ->
 ppr_underscore_unique :: Unique -> SDoc
 -- Print an underscore separating the name from its unique
 -- But suppress it if we aren't printing the uniques anyway
-ppr_underscore_unique uniq
-  = sdocWithDynFlags $ \dflags ->
-    if gopt Opt_SuppressUniques dflags
-    then empty
-    else char '_' <> pprUnique uniq
+ppr_underscore_unique uniq = char '_' <> pprUnique uniq
 
 ppr_occ_name :: OccName -> SDoc
 ppr_occ_name occ = ftext (occNameFS occ)
