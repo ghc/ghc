@@ -1,6 +1,6 @@
 
 tcfail016.hs:8:1: error:
-    • Couldn't match type ‘(t, Expr t)’ with ‘Expr t’
+    • Couldn't match type ‘Expr t’ with ‘(t, Expr t)’
       Expected type: AnnExpr t -> [[Char]]
         Actual type: Expr t -> [[Char]]
     • Relevant bindings include

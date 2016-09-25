@@ -1,5 +1,7 @@
 {-# OPTIONS_GHC -XImpredicativeTypes -fno-warn-deprecated-flags #-}
 
+-- Sept 16: now scraping through with -XImpredicateTypes
+
 module Main where
 
 data Foo x y = Foo {foo1 :: x, foo2 :: y}

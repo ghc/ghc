@@ -535,7 +535,7 @@ unliftedCompare lt_op eq_op a_expr b_expr lt eq gt
                         -- mean more tests (dynamically)
         nlHsIf (ascribeBool $ genPrimOpApp a_expr eq_op b_expr) eq gt
   where
-    ascribeBool e = nlExprWithTySig e (toLHsSigWcType boolTy)
+    ascribeBool e = nlExprWithTySig e boolTy
 
 nlConWildPat :: DataCon -> LPat RdrName
 -- The pattern (K {})
@@ -2153,10 +2153,8 @@ coercing from.  So from, say,
              (op :: a -> [<rep-ty>] -> Int)
          ) :: a -> [T x] -> Int
 
-Notice that we give the 'coerce' call two type signatures: one to
-fix the of the inner call, and one for the expected type.  The outer
-type signature ought to be redundant, but may improve error messages.
-The inner one is essential to fix the type at which 'op' is called.
+Notice that we give the 'coerce' two explicitly-visible type arguments
+to say how it should be instantiated.  Recall
 
 See #8503 for more discussion.
 
@@ -2194,19 +2192,21 @@ gen_Newtype_binds loc cls inst_tvs cls_tys rhs_ty
       where
         Pair from_ty to_ty = mkCoerceClassMethEqn cls inst_tvs cls_tys rhs_ty meth_id
 
-        -- See "wrinkle" in Note [Newtype-deriving instances]
-        (_, _, from_ty') = tcSplitSigmaTy from_ty
-
         meth_RDR = getRdrName meth_id
 
-        rhs_expr = ( nlHsVar coerce_RDR
-                      `nlHsApp`
-                    (nlHsVar meth_RDR `nlExprWithTySig` toLHsSigWcType from_ty'))
-                  `nlExprWithTySig` toLHsSigWcType to_ty
+        rhs_expr = nlHsVar coerce_RDR `nlHsAppType` from_ty
+                                      `nlHsAppType` to_ty
+                                      `nlHsApp`     nlHsVar meth_RDR
 
+nlHsAppType :: LHsExpr RdrName -> Type -> LHsExpr RdrName
+nlHsAppType e s = noLoc (e `HsAppType` hs_ty)
+  where
+    hs_ty = mkHsWildCardBndrs (typeToLHsType s)
 
-    nlExprWithTySig :: LHsExpr RdrName -> LHsSigWcType RdrName -> LHsExpr RdrName
-    nlExprWithTySig e s = noLoc (ExprWithTySig e s)
+nlExprWithTySig :: LHsExpr RdrName -> Type -> LHsExpr RdrName
+nlExprWithTySig e s = noLoc (e `ExprWithTySig` hs_ty)
+  where
+    hs_ty = mkLHsSigWcType (typeToLHsType s)
 
 mkCoerceClassMethEqn :: Class   -- the class being derived
                      -> [TyVar] -- the tvs in the instance head

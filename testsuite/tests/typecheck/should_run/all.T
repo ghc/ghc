@@ -62,7 +62,7 @@ test('tcrun038',
 test('tcrun039', normal, compile_and_run, [''])
 test('tcrun040', normal, compile_and_run, [''])
 test('tcrun041', omit_ways(['ghci']), compile_and_run, [''])
-test('tcrun042', normal, compile_and_run, [''])
+test('tcrun042', normal, compile_fail, [''])
 test('tcrun043', normal, compile_and_run, [''])
 test('tcrun044', normal, compile_and_run, [''])
 test('tcrun045', normal, compile_fail, [''])

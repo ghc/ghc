@@ -2267,6 +2267,8 @@ genInst spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon
                         , ib_pragmas    = []
                         , ib_extensions = [ LangExt.ImpredicativeTypes
                                           , LangExt.RankNTypes ]
+                          -- Both these flags are needed for higher-rank uses of coerce
+                          -- See Note [Newtype-deriving instances] in TcGenDeriv
                         , ib_derived    = True } }
                 , emptyBag
                 , Just $ getName $ head $ tyConDataCons rep_tycon ) }

@@ -718,27 +718,13 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
                     ; tc_sub_type_ds eq_orig inst_orig ctxt ty_a' ty_e }
                Unfilled _   -> unify }
 
-
-    go ty_a (TyVarTy tv_e)
-      = do { dflags <- getDynFlags
-           ; tclvl  <- getTcLevel
-           ; lookup_res <- lookupTcTyVar tv_e
-           ; case lookup_res of
-               Filled ty_e' ->
-                 do { traceTc "tcSubTypeDS_NC_O following filled exp meta-tyvar:"
-                        (ppr tv_e <+> text "-->" <+> ppr ty_e')
-                    ; tc_sub_tc_type eq_orig inst_orig ctxt ty_a ty_e' }
-               Unfilled details
-                 |  canUnifyWithPolyType dflags details
-                    && isTouchableMetaTyVar tclvl tv_e  -- don't want skolems here
-                 -> unify
-
-     -- We've avoided instantiating ty_actual just in case ty_expected is
-     -- polymorphic. But we've now assiduously determined that it is *not*
-     -- polymorphic. So instantiate away. This is needed for e.g. test
-     -- typecheck/should_compile/T4284.
-                 |  otherwise
-                 -> inst_and_unify }
+    -- Historical note (Sept 16): there was a case here for
+    --    go ty_a (TyVarTy alpha)
+    -- which, in the impredicative case unified  alpha := ty_a
+    -- where th_a is a polytype.  Not only is this probably bogus (we
+    -- simply do not have decent story for imprdicative types), but it
+    -- caused Trac #12616 because (also bizarrely) 'deriving' code had
+    -- -XImpredicativeTypes on.  I deleted the entire case.
 
     go (ForAllTy (Anon act_arg) act_res) (ForAllTy (Anon exp_arg) exp_res)
       | not (isPredTy act_arg)
@@ -1325,7 +1311,7 @@ uUnfilledVar origin t_or_k swapped tv1 ty2
              -- Zonk to expose things to the
              -- occurs check, and so that if ty2
              -- looks like a type variable then it
-             -- is a type variable
+             -- /is/ a type variable
        ; uUnfilledVar1 origin t_or_k swapped tv1 ty2 }
 
 ----------

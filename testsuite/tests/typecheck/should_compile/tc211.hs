@@ -6,6 +6,9 @@
 -- Here are a bunch of tests for impredicative polymorphism
 -- mainly written by Dimitrios
 
+-- Sept 16: I'm just accepting the bizarre output.
+-- None of this is right
+
 module ShouldCompile where
 
 xs :: [forall a. a->a]

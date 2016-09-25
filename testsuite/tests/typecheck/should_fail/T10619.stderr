@@ -20,14 +20,9 @@ T10619.hs:9:15: error:
         foo :: t -> (b -> b) -> b -> b (bound at T10619.hs:8:1)
 
 T10619.hs:14:15: error:
-    • Couldn't match type ‘b’ with ‘a’
-        because type variable ‘a’ would escape its scope
-      This (rigid, skolem) type variable is bound by
-        a type expected by the context:
-          a -> a
-        at T10619.hs:14:15-65
+    • Couldn't match type ‘forall a. a -> a’ with ‘b -> b’
       Expected type: (b -> b) -> b -> b
-        Actual type: (forall a. a -> a) -> forall b. b -> b
+        Actual type: (forall a. a -> a) -> b -> b
     • In the expression:
         ((\ x -> x) :: (forall a. a -> a) -> forall b. b -> b)
       In the expression:
@@ -56,14 +51,9 @@ T10619.hs:16:13: error:
         baz :: Bool -> (b -> b) -> b -> b (bound at T10619.hs:16:1)
 
 T10619.hs:20:14: error:
-    • Couldn't match type ‘b’ with ‘a’
-        because type variable ‘a’ would escape its scope
-      This (rigid, skolem) type variable is bound by
-        a type expected by the context:
-          a -> a
-        at T10619.hs:20:14-64
+    • Couldn't match type ‘forall a. a -> a’ with ‘b -> b’
       Expected type: (b -> b) -> b -> b
-        Actual type: (forall a. a -> a) -> forall b. b -> b
+        Actual type: (forall a. a -> a) -> b -> b
     • In the expression:
           (\ x -> x) :: (forall a. a -> a) -> forall b. b -> b
       In an equation for ‘quux’:
