@@ -31,7 +31,10 @@ module TcUnify (
   matchActualFunTys, matchActualFunTysPart,
   matchExpectedFunKind,
 
-  wrapFunResCoercion
+  wrapFunResCoercion,
+
+  occCheckExpand, metaTyVarUpdateOK,
+  occCheckForErrors, OccCheckResult(..)
 
   ) where
 
@@ -58,6 +61,8 @@ import BasicTypes
 import Name   ( Name )
 import Bag
 import Util
+import Pair( pFst )
+import qualified GHC.LanguageExtensions as LangExt
 import Outputable
 import FastString
 
@@ -1397,76 +1402,6 @@ maybe_sym :: SwapFlag -> Coercion -> Coercion
 maybe_sym IsSwapped  = mkSymCo
 maybe_sym NotSwapped = id
 
-----------------
-metaTyVarUpdateOK :: DynFlags
-                  -> TcTyVar             -- tv :: k1
-                  -> TcType              -- ty :: k2
-                  -> Maybe TcType        -- possibly-expanded ty
--- (metaTyFVarUpdateOK tv ty)
--- We are about to update the meta-tyvar tv with ty.
--- Check (a) that tv doesn't occur in ty (occurs check)
---       (b) that ty does not have any foralls
---           (in the impredicative case), or type functions
---
--- We have two possible outcomes:
--- (1) Return the type to update the type variable with,
---        [we know the update is ok]
--- (2) Return Nothing,
---        [the update might be dodgy]
---
--- Note that "Nothing" does not mean "definite error".  For example
---   type family F a
---   type instance F Int = Int
--- consider
---   a ~ F a
--- This is perfectly reasonable, if we later get a ~ Int.  For now, though,
--- we return Nothing, leaving it to the later constraint simplifier to
--- sort matters out.
-
-metaTyVarUpdateOK dflags tv ty
-  = case defer_me impredicative ty of
-      OC_OK _   -> Just ty
-      OC_Forall -> Nothing  -- forall or type function
-      OC_Occurs -> occCheckExpand tv ty
-  where
-    details       = tcTyVarDetails tv
-    impredicative = canUnifyWithPolyType dflags details
-
-    defer_me :: Bool    -- True <=> foralls are ok
-             -> TcType
-             -> OccCheckResult ()
-    -- Checks for (a) occurrence of tv
-    --            (b) type family applications
-    --            (c) foralls if the Bool is false
-    -- See Note [Prevent unification with type families]
-    -- See Note [Refactoring hazard: checkTauTvUpdate]
-    -- See Note [Checking for foralls] in TcType
-
-    defer_me _ (TyVarTy tv')
-       | tv == tv' = OC_Occurs
-       | otherwise = defer_me True (tyVarKind tv')
-    defer_me b (TyConApp tc tys)
-       | isTypeFamilyTyCon tc = OC_Forall   -- We use OC_Forall to signal
-                                            -- forall /or/ type function
-       | not (isTauTyCon tc)  = OC_Forall
-       | otherwise            = mapM (defer_me b) tys >> OC_OK ()
-
-    defer_me b (ForAllTy (TvBndr tv' _) t)
-       | not b     = OC_Forall
-       | tv == tv' = OC_OK ()
-       | otherwise = do { defer_me True (tyVarKind tv'); defer_me b t }
-
-    defer_me _ (LitTy {})        = OC_OK ()
-    defer_me b (FunTy fun arg)   = defer_me b fun >> defer_me b arg
-    defer_me b (AppTy fun arg)   = defer_me b fun >> defer_me b arg
-    defer_me b (CastTy ty co)    = defer_me b ty  >> defer_me_co co
-    defer_me _ (CoercionTy co)   = defer_me_co co
-
-      -- We don't really care if there are type families in a coercion,
-      -- but we still can't have an occurs-check failure
-    defer_me_co co | tv `elemVarSet` tyCoVarsOfCo co = OC_Occurs
-                   | otherwise                       = OC_OK ()
-
 swapOverTyVars :: TcTyVar -> TcTyVar -> Bool
 -- See Note [Canonical orientation for tyvar/tyvar equality constraints]
 swapOverTyVars tv1 tv2
@@ -2021,4 +1956,3 @@ canUnifyWithPolyType dflags details
       MetaTv { mtv_info = TauTv }    -> xopt LangExt.ImpredicativeTypes dflags
       _other                         -> True
           -- We can have non-meta tyvars in given constraints
-

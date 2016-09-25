@@ -454,6 +454,8 @@ tYPETyCon = mkKindTyCon tYPETyConName
 unliftedTypeKindTyCon = mkSynonymTyCon unliftedTypeKindTyConName
                           [] liftedTypeKind []
                           (tYPE (TyConApp ptrRepUnliftedDataConTyCon []))
+                          True   -- no foralls
+                          True   -- family free
 
 --------------------------
 -- ... and now their names

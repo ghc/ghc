@@ -12,6 +12,7 @@ module TcFlatten(
 import TcRnTypes
 import TcType
 import Type
+import TcUnify( occCheckExpand )
 import TcEvidence
 import TyCon
 import TyCoRep   -- performs delicate algorithm on types
@@ -21,7 +22,6 @@ import VarEnv
 import NameEnv
 import Outputable
 import TcSMonad as TcS
-import DynFlags( DynFlags )
 
 import Util
 import Bag
@@ -1448,8 +1448,7 @@ We must solve both!
 
 unflatten :: Cts -> Cts -> TcS Cts
 unflatten tv_eqs funeqs
- = do { dflags   <- getDynFlags
-      ; tclvl    <- getTcLevel
+ = do { tclvl    <- getTcLevel
 
       ; traceTcS "Unflattening" $ braces $
         vcat [ text "Funeqs =" <+> pprCts funeqs
@@ -1460,11 +1459,11 @@ unflatten tv_eqs funeqs
          --                 ==> (flatten) [W] F alpha ~ fmv, [W] alpha ~ [fmv]
          --                 ==> (unify)   [W] F [fmv] ~ fmv
          -- See Note [Unflatten using funeqs first]
-      ; funeqs <- foldrBagM (unflatten_funeq dflags) emptyCts funeqs
+      ; funeqs <- foldrBagM unflatten_funeq emptyCts funeqs
       ; traceTcS "Unflattening 1" $ braces (pprCts funeqs)
 
           -- Step 2: unify the tv_eqs, if possible
-      ; tv_eqs  <- foldrBagM (unflatten_eq dflags tclvl) emptyCts tv_eqs
+      ; tv_eqs  <- foldrBagM (unflatten_eq tclvl) emptyCts tv_eqs
       ; traceTcS "Unflattening 2" $ braces (pprCts tv_eqs)
 
           -- Step 3: fill any remaining fmvs with fresh unification variables
@@ -1483,25 +1482,25 @@ unflatten tv_eqs funeqs
       ; zonkSimples all_flat }
   where
     ----------------
-    unflatten_funeq :: DynFlags -> Ct -> Cts -> TcS Cts
-    unflatten_funeq dflags ct@(CFunEqCan { cc_fun = tc, cc_tyargs = xis
+    unflatten_funeq :: Ct -> Cts -> TcS Cts
+    unflatten_funeq ct@(CFunEqCan { cc_fun = tc, cc_tyargs = xis
                                          , cc_fsk = fmv, cc_ev = ev }) rest
       = do {   -- fmv should be an un-filled flatten meta-tv;
                -- we now fix its final value by filling it, being careful
                -- to observe the occurs check.  Zonking will eliminate it
                -- altogether in due course
              rhs' <- zonkTcType (mkTyConApp tc xis)
-           ; case occurCheckExpand dflags fmv rhs' of
-               OC_OK rhs''    -- Normal case: fill the tyvar
+           ; case occCheckExpand fmv rhs' of
+               Just rhs''    -- Normal case: fill the tyvar
                  -> do { setEvBindIfWanted ev
                                (EvCoercion (mkTcReflCo (ctEvRole ev) rhs''))
                        ; unflattenFmv fmv rhs''
                        ; return rest }
 
-               _ ->  -- Occurs check
-                     return (ct `consCts` rest) }
+               Nothing ->  -- Occurs check
+                          return (ct `consCts` rest) }
 
-    unflatten_funeq _ other_ct _
+    unflatten_funeq other_ct _
       = pprPanic "unflatten_funeq" (ppr other_ct)
 
     ----------------
@@ -1512,23 +1511,23 @@ unflatten tv_eqs funeqs
     finalise_funeq ct = pprPanic "finalise_funeq" (ppr ct)
 
     ----------------
-    unflatten_eq ::  DynFlags -> TcLevel -> Ct -> Cts -> TcS Cts
-    unflatten_eq dflags tclvl ct@(CTyEqCan { cc_ev = ev, cc_tyvar = tv, cc_rhs = rhs }) rest
+    unflatten_eq :: TcLevel -> Ct -> Cts -> TcS Cts
+    unflatten_eq tclvl ct@(CTyEqCan { cc_ev = ev, cc_tyvar = tv, cc_rhs = rhs }) rest
       | isFmvTyVar tv   -- Previously these fmvs were untouchable,
                         -- but now they are touchable
                         -- NB: unlike unflattenFmv, filling a fmv here does
                         --     bump the unification count; it is "improvement"
                         -- Note [Unflattening can force the solver to iterate]
-      = do { lhs_elim <- tryFill dflags tv rhs ev
+      = do { lhs_elim <- tryFill tv rhs ev
            ; if lhs_elim then return rest else
-        do { rhs_elim <- try_fill dflags tclvl ev rhs (mkTyVarTy tv)
+        do { rhs_elim <- try_fill tclvl ev rhs (mkTyVarTy tv)
            ; if rhs_elim then return rest else
              return (ct `consCts` rest) } }
 
       | otherwise
       = return (ct `consCts` rest)
 
-    unflatten_eq _ _ ct _ = pprPanic "unflatten_irred" (ppr ct)
+    unflatten_eq _ ct _ = pprPanic "unflatten_irred" (ppr ct)
 
     ----------------
     finalise_eq :: Ct -> Cts -> TcS Cts
@@ -1549,33 +1548,33 @@ unflatten tv_eqs funeqs
     finalise_eq ct _ = pprPanic "finalise_irred" (ppr ct)
 
     ----------------
-    try_fill dflags tclvl ev ty1 ty2
+    try_fill tclvl ev ty1 ty2
       | Just tv1 <- tcGetTyVar_maybe ty1
       , isTouchableOrFmv tclvl tv1
       , typeKind ty1 `eqType` tyVarKind tv1
-      = tryFill dflags tv1 ty2 ev
+      = tryFill tv1 ty2 ev
       | otherwise
       = return False
 
-tryFill :: DynFlags -> TcTyVar -> TcType -> CtEvidence -> TcS Bool
+tryFill :: TcTyVar -> TcType -> CtEvidence -> TcS Bool
 -- (tryFill tv rhs ev) sees if 'tv' is an un-filled MetaTv
 -- If so, and if tv does not appear in 'rhs', set tv := rhs
 -- bind the evidence (which should be a CtWanted) to Refl<rhs>
 -- and return True.  Otherwise return False
-tryFill dflags tv rhs ev
+tryFill tv rhs ev
   = ASSERT2( not (isGiven ev), ppr ev )
     do { is_filled <- isFilledMetaTyVar tv
        ; if is_filled then return False else
     do { rhs' <- zonkTcType rhs
-       ; case occurCheckExpand dflags tv rhs' of
-           OC_OK rhs''    -- Normal case: fill the tyvar
+       ; case occCheckExpand tv rhs' of
+           Just rhs''    -- Normal case: fill the tyvar
              -> do { setEvBindIfWanted ev
                                (EvCoercion (mkTcReflCo (ctEvRole ev) rhs''))
                    ; unifyTyVar tv rhs''
                    ; return True }
 
-           _ ->  -- Occurs check
-                 return False } }
+           Nothing ->  -- Occurs check
+                      return False } }
 
 {-
 Note [Unflatten using funeqs first]

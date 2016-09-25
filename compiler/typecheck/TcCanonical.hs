@@ -10,7 +10,7 @@ module TcCanonical(
 #include "HsVersions.h"
 
 import TcRnTypes
-import TcUnify( swapOverTyVars )
+import TcUnify( swapOverTyVars, metaTyVarUpdateOK )
 import TcType
 import Type
 import TcFlatten
@@ -1369,7 +1369,7 @@ canEqTyVar2 :: DynFlags
 -- preserved as much as possible
 
 canEqTyVar2 dflags ev eq_rel swapped tv1 xi2
-  | OC_OK xi2' <- occurCheckExpand dflags tv1 xi2  -- No occurs check
+  | Just xi2' <- metaTyVarUpdateOK dflags tv1 xi2  -- No occurs check
      -- Must do the occurs check even on tyvar/tyvar
      -- equalities, in case have  x ~ (y :: ..x...)
      -- Trac #12593
@@ -1493,12 +1493,6 @@ round should be oriented in the CTyEqCan?  The rules, implemented by
 canEqTyVarTyVar, are these
 
  * If either is a flatten-meta-variables, it goes on the left.
-
- * If one is a strict sub-kind of the other e.g.
-       (alpha::?) ~ (beta::*)
-   orient them so RHS is a subkind of LHS.  That way we will replace
-   'a' with 'b', correctly narrowing the kind.
-   This establishes the subkind invariant of CTyEqCan.
 
  * Put a meta-tyvar on the left if possible
        alpha[3] ~ r

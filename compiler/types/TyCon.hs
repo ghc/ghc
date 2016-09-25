@@ -50,6 +50,7 @@ module TyCon(
         mightBeUnsaturatedTyCon,
         isPromotedDataCon, isPromotedDataCon_maybe,
         isKindTyCon, isLiftedTypeKindTyConName,
+        isTauTyCon, isFamFreeTyCon,
 
         isDataTyCon, isProductTyCon, isDataProductTyCon_maybe,
         isDataSumTyCon_maybe,
@@ -618,8 +619,16 @@ data TyCon
                                  -- This list has length = tyConArity
                                  -- See also Note [TyCon Role signatures]
 
-        synTcRhs     :: Type     -- ^ Contains information about the expansion
+        synTcRhs     :: Type,    -- ^ Contains information about the expansion
                                  -- of the synonym
+
+        synIsTau     :: Bool,   -- True <=> the RHS of this synonym does not
+                                 --          have any foralls, after expanding any
+                                 --          nested synonyms
+        synIsFamFree  :: Bool    -- True <=> the RHS of this synonym does mention
+                                 --          any type synonym families (data families
+                                 --          are fine), again after expanding any
+                                 --          nested synonyms
     }
 
   -- | Represents families (both type and data)
@@ -1479,8 +1488,8 @@ mkPrimTyCon' name binders res_kind roles is_unlifted rep_nm
 
 -- | Create a type synonym 'TyCon'
 mkSynonymTyCon :: Name -> [TyConBinder] -> Kind   -- ^ /result/ kind
-               -> [Role] -> Type -> TyCon
-mkSynonymTyCon name binders res_kind roles rhs
+               -> [Role] -> Type -> Bool -> Bool -> TyCon
+mkSynonymTyCon name binders res_kind roles rhs is_tau is_fam_free
   = SynonymTyCon {
         tyConName    = name,
         tyConUnique  = nameUnique name,
@@ -1490,7 +1499,9 @@ mkSynonymTyCon name binders res_kind roles rhs
         tyConArity   = length binders,
         tyConTyVars  = binderVars binders,
         tcRoles      = roles,
-        synTcRhs     = rhs
+        synTcRhs     = rhs,
+        synIsTau     = is_tau,
+        synIsFamFree = is_fam_free
     }
 
 -- | Create a type family 'TyCon'
@@ -1735,6 +1746,14 @@ isTypeSynonymTyCon :: TyCon -> Bool
 isTypeSynonymTyCon (SynonymTyCon {}) = True
 isTypeSynonymTyCon _                 = False
 
+isTauTyCon :: TyCon -> Bool
+isTauTyCon (SynonymTyCon { synIsTau = is_tau }) = is_tau
+isTauTyCon _                                    = True
+
+isFamFreeTyCon :: TyCon -> Bool
+isFamFreeTyCon (SynonymTyCon { synIsFamFree = fam_free }) = fam_free
+isFamFreeTyCon (FamilyTyCon { famTcFlav = flav })         = isDataFamFlav flav
+isFamFreeTyCon _                                          = True
 
 -- As for newtypes, it is in some contexts important to distinguish between
 -- closed synonyms and synonym families, as synonym families have no unique

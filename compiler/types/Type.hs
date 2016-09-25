@@ -99,7 +99,7 @@ module Type (
         -- ** Predicates on types
         isTyVarTy, isFunTy, isDictTy, isPredTy, isCoercionTy,
         isCoercionTy_maybe, isCoercionType, isForAllTy,
-        isPiTy,
+        isPiTy, isTauTy, isFamFreeTy,
 
         -- (Lifting and boxity)
         isUnliftedType, isUnboxedTupleType, isUnboxedSumType,
@@ -1383,6 +1383,17 @@ partitionInvisibles tc get_ty = go emptyTCvSubst (tyConKind tc)
     go _ _ xs = ([], xs)  -- something is ill-kinded. But this can happen
                           -- when printing errors. Assume everything is visible.
 
+-- @isTauTy@ tests if a type has no foralls
+isTauTy :: Type -> Bool
+isTauTy ty | Just ty' <- coreView ty = isTauTy ty'
+isTauTy (TyVarTy _)           = True
+isTauTy (LitTy {})            = True
+isTauTy (TyConApp tc tys)     = all isTauTy tys && isTauTyCon tc
+isTauTy (AppTy a b)           = isTauTy a && isTauTy b
+isTauTy (FunTy a b)           = isTauTy a && isTauTy b
+isTauTy (ForAllTy {})         = False
+isTauTy (CastTy ty _)         = isTauTy ty
+isTauTy (CoercionTy _)        = False  -- Not sure about this
 
 {-
 %************************************************************************
@@ -1828,6 +1839,18 @@ pprSourceTyCon tycon
   = ppr $ fam_tc `TyConApp` tys        -- can't be FunTyCon
   | otherwise
   = ppr tycon
+
+-- @isTauTy@ tests if a type has no foralls
+isFamFreeTy :: Type -> Bool
+isFamFreeTy ty | Just ty' <- coreView ty = isFamFreeTy ty'
+isFamFreeTy (TyVarTy _)       = True
+isFamFreeTy (LitTy {})        = True
+isFamFreeTy (TyConApp tc tys) = all isFamFreeTy tys && isFamFreeTyCon tc
+isFamFreeTy (AppTy a b)       = isFamFreeTy a && isFamFreeTy b
+isFamFreeTy (FunTy a b)       = isFamFreeTy a && isFamFreeTy b
+isFamFreeTy (ForAllTy _ ty)   = isFamFreeTy ty
+isFamFreeTy (CastTy ty _)     = isFamFreeTy ty
+isFamFreeTy (CoercionTy _)    = False  -- Not sure about this
 
 {-
 ************************************************************************

@@ -46,7 +46,6 @@ module TcType (
   metaTyVarTcLevel, setMetaTyVarTcLevel, metaTyVarTcLevel_maybe,
   isTouchableMetaTyVar, isTouchableOrFmv,
   isFloatedTouchableMetaTyVar,
-  canUnifyWithPolyType,
 
   --------------------------------
   -- Builders
@@ -83,8 +82,8 @@ module TcType (
 
   ---------------------------------
   -- Misc type manipulators
-  deNoteType, occurCheckExpand, OccCheckResult(..),
-  occCheckExpand,
+
+  deNoteType,
   orphNamesOfType, orphNamesOfCo,
   orphNamesOfTypes, orphNamesOfCoCon,
   getDFunTyKey,
@@ -216,7 +215,6 @@ import BasicTypes
 import Util
 import Bag
 import Maybes
-import Pair( pFst )
 import Outputable
 import FastString
 import ErrUtils( Validity(..), MsgDoc, isValid )
@@ -224,7 +222,6 @@ import FV
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.IORef
-import Control.Monad (liftM, ap)
 import Data.Functor.Identity
 
 {-
@@ -1162,24 +1159,6 @@ mkSpecSigmaTy tyvars ty = mkSigmaTy (mkTyVarBinders Specified tyvars) ty
 mkPhiTy :: [PredType] -> Type -> Type
 mkPhiTy = mkFunTys
 
--- @isTauTy@ tests if a type is "simple"..
-isTauTy :: Type -> Bool
-isTauTy ty | Just ty' <- coreView ty = isTauTy ty'
-isTauTy (TyVarTy _)           = True
-isTauTy (LitTy {})            = True
-isTauTy (TyConApp tc tys)     = all isTauTy tys && isTauTyCon tc
-isTauTy (AppTy a b)           = isTauTy a && isTauTy b
-isTauTy (FunTy a b)           = isTauTy a && isTauTy b
-isTauTy (ForAllTy {})         = False
-isTauTy (CastTy _ _)          = False
-isTauTy (CoercionTy _)        = False
-
-isTauTyCon :: TyCon -> Bool
--- Returns False for type synonyms whose expansion is a polytype
-isTauTyCon tc
-  | Just (_, rhs) <- synTyConDefn_maybe tc = isTauTy rhs
-  | otherwise                              = True
-
 ---------------
 getDFunTyKey :: Type -> OccName -- Get some string from a type, to be used to
                                 -- construct a dictionary function name
@@ -1563,262 +1542,6 @@ pickyEqType :: TcType -> TcType -> Bool
 pickyEqType ty1 ty2
   = isNothing $
     tc_eq_type (const Nothing) ty1 ty2
-
-{-
-Note [Occurs check expansion]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-(occurCheckExpand tv xi) expands synonyms in xi just enough to get rid
-of occurrences of tv outside type function arguments, if that is
-possible; otherwise, it returns Nothing.
-
-For example, suppose we have
-  type F a b = [a]
-Then
-  occurCheckExpand b (F Int b) = Just [Int]
-but
-  occurCheckExpand a (F a Int) = Nothing
-
-We don't promise to do the absolute minimum amount of expanding
-necessary, but we try not to do expansions we don't need to.  We
-prefer doing inner expansions first.  For example,
-  type F a b = (a, Int, a, [a])
-  type G b   = Char
-We have
-  occurCheckExpand b (F (G b)) = F Char
-even though we could also expand F to get rid of b.
-
-The two variants of the function are to support TcUnify.checkTauTvUpdate,
-which wants to prevent unification with type families. For more on this
-point, see Note [Prevent unification with type families] in TcUnify.
-
-Note [Occurrence checking: look inside kinds]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we are considering unifying
-   (alpha :: *)  ~  Int -> (beta :: alpha -> alpha)
-This may be an error (what is that alpha doing inside beta's kind?),
-but we must not make the mistake of actuallyy unifying or we'll
-build an infinite data structure.  So when looking for occurrences
-of alpha in the rhs, we must look in the kinds of type variables
-that occur there.
-
-NB: we may be able to remove the problem via expansion; see
-    Note [Occurs check expansion].  So we have to try that.
-
-Note [Checking for foralls]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Unless we have -XImpredicativeTypes (which is a totally unsupported
-feature), we do not want to unify
-    alpha ~ (forall a. a->a) -> Int
-So we look for foralls hidden inside the type, and it's convenient
-to do that at the same time as the occurs check (which looks for
-occurrences of alpha).
-
-However, it's not just a question of looking for foralls /anywhere/!
-Consider
-   (alpha :: forall k. k->*)  ~  (beta :: forall k. k->*)
-This is legal; e.g. dependent/should_compile/T11635.
-
-We don't want to reject it because of the forall in beta's kind,
-but (see Note [Occurrence checking: look inside kinds]) we do
-need to look in beta's kind.  So we carry a flag saying if a 'forall'
-is OK, and sitch the flag on when stepping inside a kind.
-
-Why is it OK?  Why does it not count as impredicative polymorphism?
-The reason foralls are bad is because we reply on "seeing" foralls
-when doing implicit instantiation.  But the forall inside the kind is
-fine.  We'll generate a kind equality constraint
-  (forall k. k->*) ~ (forall k. k->*)
-to check that the kinds of lhs and rhs are compatible.  If alpha's
-kind had instead been
-  (alpha :: kappa)
-then this kind equality would rightly complain about unifying kappa
-with (forall k. k->*)
-
--}
-
-data OccCheckResult a
-  = OC_OK a
-  | OC_Forall
-  | OC_Occurs
-
-instance Functor OccCheckResult where
-      fmap = liftM
-
-instance Applicative OccCheckResult where
-      pure = OC_OK
-      (<*>) = ap
-
-instance Monad OccCheckResult where
-  OC_OK x       >>= k = k x
-  OC_Forall     >>= _ = OC_Forall
-  OC_Occurs     >>= _ = OC_Occurs
-
-occurCheckExpand :: DynFlags -> TcTyVar -> Type -> OccCheckResult Type
--- See Note [Occurs check expansion]
--- Check whether
---   a) the given variable occurs in the given type.
---   b) there is a forall in the type (unless we have -XImpredicativeTypes)
---
--- We may have needed to do some type synonym unfolding in order to
--- get rid of the variable (or forall), so we also return the unfolded
--- version of the type, which is guaranteed to be syntactically free
--- of the given type variable.  If the type is already syntactically
--- free of the variable, then the same type is returned.
---
--- NB: in the past we also rejected a SigTv matched with a non-tyvar
---     But it is wrong to reject that for Givens;
---     and SigTv is in any case handled separately by
---        - TcUnify.checkTauTvUpdate (on-the-fly unifier)
---        - TcInteract.canSolveByUnification (main constraint solver)
-occurCheckExpand dflags tv ty
-  = case fast_check impredicative ty of
-      OC_OK _   -> OC_OK ty
-      OC_Forall -> OC_Forall
-      OC_Occurs -> case occCheckExpand tv ty of
-                     Nothing  -> OC_Occurs
-                     Just ty' -> OC_OK ty'
-  where
-    details       = tcTyVarDetails tv
-    impredicative = canUnifyWithPolyType dflags details
-
-    ok :: OccCheckResult ()
-    ok = OC_OK ()
-
-    fast_check :: Bool -> TcType -> OccCheckResult ()
-      -- True <=> Foralls are ok; otherwise stop with OC_Forall
-      -- See Note [Checking for foralls]
-
-    fast_check _ (TyVarTy tv')
-      | tv == tv' = OC_Occurs
-      | otherwise = fast_check True (tyVarKind tv')
-           -- See Note [Occurrence checking: look inside kinds]
-
-    fast_check b (TyConApp tc tys)
-      | not (b || isTauTyCon tc) = OC_Forall
-      | otherwise                = mapM (fast_check b) tys >> ok
-    fast_check _ (LitTy {})      = ok
-    fast_check b (FunTy a r)     = fast_check b a   >> fast_check b r
-    fast_check b (AppTy fun arg) = fast_check b fun >> fast_check b arg
-    fast_check b (CastTy ty co)  = fast_check b ty >> fast_check_co co
-    fast_check _ (CoercionTy co) = fast_check_co co
-    fast_check b (ForAllTy (TvBndr tv' _) ty)
-       | not b     = OC_Forall
-       | tv == tv' = ok
-       | otherwise = do { fast_check True (tyVarKind tv')
-                        ; fast_check b ty }
-
-     -- we really are only doing an occurs check here; no bother about
-     -- impredicativity in coercions, as they're inferred
-    fast_check_co co | tv `elemVarSet` tyCoVarsOfCo co = OC_Occurs
-                     | otherwise                       = ok
-
-
-occCheckExpand :: TcTyVar -> TcType -> Maybe TcType
-occCheckExpand tv ty
-  = go emptyVarEnv ty
-  where
-    go :: VarEnv TyVar -> Type -> Maybe Type
-          -- The Varenv carries mappings necessary
-          -- because of kind expansion
-    go env (TyVarTy tv')
-      | tv == tv'                         = Nothing
-      | Just tv'' <- lookupVarEnv env tv' = return (mkTyVarTy tv'')
-      | otherwise                         = do { k' <- go env (tyVarKind tv')
-                                               ; return (mkTyVarTy $
-                                                         setTyVarKind tv' k') }
-           -- See Note [Occurrence checking: look inside kinds]
-
-    go _   ty@(LitTy {}) = return ty
-    go env (AppTy ty1 ty2) = do { ty1' <- go env ty1
-                                ; ty2' <- go env ty2
-                                ; return (mkAppTy ty1' ty2') }
-    go env (FunTy ty1 ty2) = do { ty1' <- go env ty1
-                                ; ty2' <- go env ty2
-                                ; return (mkFunTy ty1' ty2') }
-    go env ty@(ForAllTy (TvBndr tv' vis) body_ty)
-       | tv == tv'         = return ty
-       | otherwise         = do { ki' <- go env (tyVarKind tv')
-                                ; let tv'' = setTyVarKind tv' ki'
-                                      env' = extendVarEnv env tv' tv''
-                                ; body' <- go env' body_ty
-                                ; return (ForAllTy (TvBndr tv'' vis) body') }
-
-    -- For a type constructor application, first try expanding away the
-    -- offending variable from the arguments.  If that doesn't work, next
-    -- see if the type constructor is a type synonym, and if so, expand
-    -- it and try again.
-    go env ty@(TyConApp tc tys)
-      = case mapM (go env) tys of
-          Just tys' -> return (mkTyConApp tc tys')
-          Nothing | Just ty' <- coreView ty -> go env ty'
-                  | otherwise               -> Nothing
-                      -- Failing that, try to expand a synonym
-
-    go env (CastTy ty co) =  do { ty' <- go env ty
-                                ; co' <- go_co env co
-                                ; return (mkCastTy ty' co') }
-    go env (CoercionTy co) = do { co' <- go_co env co
-                                ; return (mkCoercionTy co') }
-
-    go_co env (Refl r ty)               = do { ty' <- go env ty
-                                             ; return (mkReflCo r ty') }
-      -- Note: Coercions do not contain type synonyms
-    go_co env (TyConAppCo r tc args)    = do { args' <- mapM (go_co env) args
-                                             ; return (mkTyConAppCo r tc args') }
-    go_co env (AppCo co arg)            = do { co' <- go_co env co
-                                             ; arg' <- go_co env arg
-                                             ; return (mkAppCo co' arg') }
-    go_co env co@(ForAllCo tv' kind_co body_co)
-      | tv == tv'         = return co
-      | otherwise         = do { kind_co' <- go_co env kind_co
-                               ; let tv'' = setTyVarKind tv' $
-                                            pFst (coercionKind kind_co')
-                                     env' = extendVarEnv env tv' tv''
-                               ; body' <- go_co env' body_co
-                               ; return (ForAllCo tv'' kind_co' body') }
-    go_co env (CoVarCo c)               = do { k' <- go env (varType c)
-                                             ; return (mkCoVarCo (setVarType c k')) }
-    go_co env (AxiomInstCo ax ind args) = do { args' <- mapM (go_co env) args
-                                             ; return (mkAxiomInstCo ax ind args') }
-    go_co env (UnivCo p r ty1 ty2)      = do { p' <- go_prov env p
-                                             ; ty1' <- go env ty1
-                                             ; ty2' <- go env ty2
-                                             ; return (mkUnivCo p' r ty1' ty2') }
-    go_co env (SymCo co)                = do { co' <- go_co env co
-                                             ; return (mkSymCo co') }
-    go_co env (TransCo co1 co2)         = do { co1' <- go_co env co1
-                                             ; co2' <- go_co env co2
-                                             ; return (mkTransCo co1' co2') }
-    go_co env (NthCo n co)              = do { co' <- go_co env co
-                                             ; return (mkNthCo n co') }
-    go_co env (LRCo lr co)              = do { co' <- go_co env co
-                                             ; return (mkLRCo lr co') }
-    go_co env (InstCo co arg)           = do { co' <- go_co env co
-                                             ; arg' <- go_co env arg
-                                             ; return (mkInstCo co' arg') }
-    go_co env (CoherenceCo co1 co2)     = do { co1' <- go_co env co1
-                                             ; co2' <- go_co env co2
-                                             ; return (mkCoherenceCo co1' co2') }
-    go_co env (KindCo co)               = do { co' <- go_co env co
-                                             ; return (mkKindCo co') }
-    go_co env (SubCo co)                = do { co' <- go_co env co
-                                             ; return (mkSubCo co') }
-    go_co env (AxiomRuleCo ax cs)       = do { cs' <- mapM (go_co env) cs
-                                             ; return (mkAxiomRuleCo ax cs') }
-
-    go_prov _   UnsafeCoerceProv    = return UnsafeCoerceProv
-    go_prov env (PhantomProv co)    = PhantomProv <$> go_co env co
-    go_prov env (ProofIrrelProv co) = ProofIrrelProv <$> go_co env co
-    go_prov _   p@(PluginProv _)    = return p
-    go_prov _   p@(HoleProv _)      = return p
-
-canUnifyWithPolyType :: DynFlags -> TcTyVarDetails -> Bool
-canUnifyWithPolyType dflags details
-  = case details of
-      MetaTv { mtv_info = SigTv }    -> False
-      MetaTv { mtv_info = TauTv }    -> xopt LangExt.ImpredicativeTypes dflags
-      _other                         -> True
-          -- We can have non-meta tyvars in given constraints
 
 {- Note [Expanding superclasses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

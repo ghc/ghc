@@ -912,7 +912,7 @@ tcTySynRhs roles_info tc_name binders res_kind hs_ty
        ; rhs_ty <- solveEqualities $ tcCheckLHsType hs_ty res_kind
        ; rhs_ty <- zonkTcTypeToType emptyZonkEnv rhs_ty
        ; let roles = roles_info tc_name
-             tycon = mkSynonymTyCon tc_name binders res_kind roles rhs_ty
+             tycon = buildSynTyCon tc_name binders res_kind roles rhs_ty
        ; return tycon }
 
 tcDataDefn :: RolesInfo -> Name
