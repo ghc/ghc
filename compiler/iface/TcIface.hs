@@ -547,7 +547,7 @@ tc_iface_decl _ _ (IfaceSynonym {ifName = tc_name,
      { res_kind' <- tcIfaceType res_kind     -- Note [Synonym kind loop]
      ; rhs      <- forkM (mk_doc tc_name) $
                    tcIfaceType rhs_ty
-     ; let tycon = mkSynonymTyCon tc_name binders' res_kind' roles rhs
+     ; let tycon = buildSynTyCon tc_name binders' res_kind' roles rhs
      ; return (ATyCon tycon) }
    where
      mk_doc n = text "Type synonym" <+> ppr n

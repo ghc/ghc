@@ -1055,15 +1055,15 @@ liftedTypeKindTyCon, starKindTyCon, unicodeStarKindTyCon :: TyCon
 -- type *    = tYPE 'PtrRepLifted
 -- type *    = tYPE 'PtrRepLifted  -- Unicode variant
 
-liftedTypeKindTyCon   = mkSynonymTyCon liftedTypeKindTyConName
+liftedTypeKindTyCon   = buildSynTyCon liftedTypeKindTyConName
                                        [] liftedTypeKind []
                                        (tYPE ptrRepLiftedTy)
 
-starKindTyCon         = mkSynonymTyCon starKindTyConName
+starKindTyCon         = buildSynTyCon starKindTyConName
                                        [] liftedTypeKind []
                                        (tYPE ptrRepLiftedTy)
 
-unicodeStarKindTyCon  = mkSynonymTyCon unicodeStarKindTyConName
+unicodeStarKindTyCon  = buildSynTyCon unicodeStarKindTyConName
                                        [] liftedTypeKind []
                                        (tYPE ptrRepLiftedTy)
 

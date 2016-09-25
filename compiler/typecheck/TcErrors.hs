@@ -12,6 +12,7 @@ module TcErrors(
 import TcRnTypes
 import TcRnMonad
 import TcMType
+import TcUnify( occCheckForErrors, OccCheckResult(..) )
 import TcType
 import RnEnv( unknownNameSuggestions )
 import Type
@@ -1434,7 +1435,7 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
              tyvar_binding tv = ppr tv <+> dcolon <+> ppr (tyVarKind tv)
        ; mkErrorMsgFromCt ctxt ct $ mconcat [occCheckMsg, extra2, extra3, report] }
 
-  | OC_Forall <- occ_check_expand
+  | OC_Bad <- occ_check_expand
   = do { let msg = vcat [ text "Cannot instantiate unification variable"
                           <+> quotes (ppr tv1)
                         , hang (text "with a" <+> what <+> text "involving foralls:") 2 (ppr ty2)
@@ -1505,8 +1506,8 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
         -- Consider an ambiguous top-level constraint (a ~ F a)
         -- Not an occurs check, because F is a type function.
   where
-    occ_check_expand = occurCheckExpand dflags tv1 ty2
-    ty1    = mkTyVarTy tv1
+    ty1 = mkTyVarTy tv1
+    occ_check_expand = occCheckForErrors dflags tv1 ty2
 
     what = case ctLocTypeOrKind_maybe (ctLoc ct) of
       Just KindLevel -> text "kind"

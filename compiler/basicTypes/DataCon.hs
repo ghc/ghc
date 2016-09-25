@@ -24,7 +24,7 @@ module DataCon (
         FieldLbl(..), FieldLabel, FieldLabelString,
 
         -- ** Type construction
-        mkDataCon, buildAlgTyCon, fIRST_TAG,
+        mkDataCon, buildAlgTyCon, buildSynTyCon, fIRST_TAG,
 
         -- ** Type deconstruction
         dataConRepType, dataConSig, dataConInstSig, dataConFullSig,
@@ -1310,3 +1310,11 @@ buildAlgTyCon tc_name ktvs roles cType stupid_theta rhs
                rhs parent gadt_syn
   where
     binders = mkTyConBindersPreferAnon ktvs liftedTypeKind
+
+buildSynTyCon :: Name -> [TyConBinder] -> Kind   -- ^ /result/ kind
+                  -> [Role] -> Type -> TyCon
+buildSynTyCon name binders res_kind roles rhs
+  = mkSynonymTyCon name binders res_kind roles rhs is_tau is_fam_free
+  where
+    is_tau      = isTauTy rhs
+    is_fam_free = isFamFreeTy rhs
