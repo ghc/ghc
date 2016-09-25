@@ -216,6 +216,11 @@ data Report
            , report_relevant_bindings :: [SDoc]
            }
 
+instance Outputable Report where   -- Debugging only
+  ppr (Report { report_important = imp, report_relevant_bindings = rel })
+    = vcat [ text "important:" <+> vcat imp
+           , text "relevant:"  <+> vcat rel ]
+
 {- Note [Error report]
 The idea is that error msgs are divided into three parts: the main msg, the
 context block (\"In the second argument of ...\"), and the relevant bindings
