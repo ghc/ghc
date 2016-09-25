@@ -2272,8 +2272,7 @@ genInst spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon
                         { ib_binds      = gen_Newtype_binds loc clas tvs tys rhs_ty
                         , ib_tyvars     = map Var.varName tvs   -- Scope over bindings
                         , ib_pragmas    = []
-                        , ib_extensions = [ LangExt.ImpredicativeTypes
-                                          , LangExt.RankNTypes ]
+                        , ib_extensions = [ LangExt.RankNTypes ]
                         , ib_derived    = True } }
                 , emptyBag
                 , Just $ getName $ head $ tyConDataCons rep_tycon ) }
