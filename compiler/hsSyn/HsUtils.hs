@@ -32,7 +32,7 @@ module HsUtils(
   nlHsIntLit, nlHsVarApps,
   nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
   mkLHsTupleExpr, mkLHsVarTuple, missingTupArg,
-  toLHsSigWcType,
+  typeToLHsType,
 
   -- * Constructing general big tuples
   -- $big_tuples
@@ -597,14 +597,14 @@ mkClassOpSigs sigs
     fiddle (L loc (TypeSig nms ty)) = L loc (ClassOpSig False nms (dropWildCards ty))
     fiddle sig                      = sig
 
-toLHsSigWcType :: Type -> LHsSigWcType RdrName
+typeToLHsType :: Type -> LHsType RdrName
 -- ^ Converting a Type to an HsType RdrName
 -- This is needed to implement GeneralizedNewtypeDeriving.
 --
 -- Note that we use 'getRdrName' extensively, which
 -- generates Exact RdrNames rather than strings.
-toLHsSigWcType ty
-  = mkLHsSigWcType (go ty)
+typeToLHsType ty
+  = go ty
   where
     go :: Type -> LHsType RdrName
     go ty@(FunTy arg _)

@@ -10,8 +10,10 @@ import Control.Concurrent
 -- Actually (Dec 06) it succeeds now
 --
 -- In GHC 7.0 it fails again! (and rightly so)
-
+--
 -- With the Visible Type Application patch, this succeeds again.
+--
+-- Sept 16: fails again as it should
 
 foo = do var <- newEmptyMVar :: IO (MVar (forall a. Show a => a -> String))
          putMVar var (show :: forall b. Show b => b -> String)
