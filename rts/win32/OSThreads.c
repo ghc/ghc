@@ -9,6 +9,7 @@
 
 #include "Rts.h"
 #include <windows.h>
+#include "sm/OSMem.h"
 #if defined(THREADED_RTS)
 #include "RtsUtils.h"
 
@@ -572,8 +573,48 @@ interruptOSThread (OSThreadId id)
     CloseHandle(hdl);
 }
 
-void setThreadNode (uint32_t node STG_UNUSED) { /* nothing */ }
-void releaseThreadNode (void) { /* nothing */ }
+void setThreadNode (uint32_t node)
+{
+    if (osNumaAvailable())
+    {
+        StgWord mask = 0;
+        mask |= 1 << node;
+        if (!SetThreadAffinityMask(GetCurrentThread(), mask))
+        {
+            sysErrorBelch(
+                "setThreadNode: Error setting affinity of thread to NUMA node `%u': %lu.",
+                node, GetLastError());
+            stg_exit(EXIT_FAILURE);
+        }
+    }
+}
+
+void releaseThreadNode (void)
+{
+    if (osNumaAvailable())
+    {
+        StgWord processMask;
+        StgWord systemMask;
+        if (!GetProcessAffinityMask(GetCurrentProcess(),
+                                   &processMask,
+                                   &systemMask))
+        {
+            sysErrorBelch(
+                "releaseThreadNode: Error resetting affinity of thread: %lu",
+                GetLastError());
+            stg_exit(EXIT_FAILURE);
+        }
+
+        if (!SetThreadAffinityMask(GetCurrentThread(), processMask))
+        {
+            sysErrorBelch(
+                "releaseThreadNode: Error reseting NUMA affinity mask of thread: %lu.",
+                GetLastError());
+            stg_exit(EXIT_FAILURE);
+        }
+
+    }
+}
 
 #else /* !defined(THREADED_RTS) */
 

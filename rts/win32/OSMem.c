@@ -11,9 +11,7 @@
 #include "sm/HeapAlloc.h"
 #include "RtsUtils.h"
 
-#if HAVE_WINDOWS_H
 #include <windows.h>
-#endif
 
 typedef struct alloc_rec_ {
     char* base;    // non-aligned base address, directly from VirtualAlloc
@@ -39,11 +37,28 @@ static alloc_rec* allocs = NULL;
 /* free_blocks are kept in ascending order, and adjacent blocks are merged */
 static block_rec* free_blocks = NULL;
 
+/* Mingw-w64 does not currently have this in their header. So we have to import it.*/
+typedef LPVOID(WINAPI *VirtualAllocExNumaProc)(HANDLE, LPVOID, SIZE_T, DWORD, DWORD, DWORD);
+
+/* Cache NUMA API call. */
+VirtualAllocExNumaProc VirtualAllocExNuma;
+
 void
 osMemInit(void)
 {
     allocs = NULL;
     free_blocks = NULL;
+
+    /* Resolve and cache VirtualAllocExNuma. */
+    if (osNumaAvailable() && RtsFlags.GcFlags.numa)
+    {
+        VirtualAllocExNuma = (VirtualAllocExNumaProc)GetProcAddress(GetModuleHandleW(L"kernel32"), "VirtualAllocExNuma");
+        if (!VirtualAllocExNuma)
+        {
+            sysErrorBelch(
+                "osBindMBlocksToNode: VirtualAllocExNuma does not exist. How did you get this far?");
+        }
+    }
 }
 
 static
@@ -486,22 +501,72 @@ void osReleaseHeapMemory (void)
 
 rtsBool osNumaAvailable(void)
 {
-    return rtsFalse;
+    return osNumaNodes() > 1;
 }
 
 uint32_t osNumaNodes(void)
 {
-    return 1;
+    /* Cache the amount of NUMA values. */
+    static ULONG numNumaNodes = 0;
+
+    /* Cache the amount of NUMA nodes. */
+    if (!numNumaNodes && !GetNumaHighestNodeNumber(&numNumaNodes))
+    {
+        numNumaNodes = 1;
+    }
+
+    return numNumaNodes;
 }
 
 StgWord osNumaMask(void)
 {
-    return 1;
+    StgWord numaMask;
+    if (!GetNumaNodeProcessorMask(0, &numaMask))
+    {
+        return 1;
+    }
+    return numaMask;
 }
 
 void osBindMBlocksToNode(
-    void *addr STG_UNUSED,
-    StgWord size STG_UNUSED,
-    uint32_t node STG_UNUSED)
+    void *addr,
+    StgWord size,
+    uint32_t node)
 {
+    if (osNumaAvailable())
+    {
+        void* temp;
+        if (RtsFlags.GcFlags.numa) {
+            /* Note [base memory]
+               I would like to use addr here to specify the base
+               memory of allocation. The problem is that the address
+               we are requesting is too high. I can't figure out if it's
+               because of my NUMA-emulation or a bug in the code.
+
+               On windows also -xb is broken, it does nothing so that can't
+               be used to tweak it (see #12577). So for now, just let the OS decide.
+            */
+            temp = VirtualAllocExNuma(
+                          GetCurrentProcess(),
+                          NULL, // addr? See base memory
+                          size,
+                          MEM_RESERVE | MEM_COMMIT,
+                          PAGE_READWRITE,
+                          node
+                        );
+
+            if (!temp) {
+                if (GetLastError() == ERROR_NOT_ENOUGH_MEMORY) {
+                    errorBelch("out of memory");
+                }
+                else {
+                    sysErrorBelch(
+                        "osBindMBlocksToNode: VirtualAllocExNuma MEM_RESERVE %llu bytes "
+                        "at address %p bytes failed",
+                                        size, addr);
+                }
+                stg_exit(EXIT_FAILURE);
+            }
+        }
+    }
 }
