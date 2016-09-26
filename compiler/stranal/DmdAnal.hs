@@ -23,7 +23,7 @@ import BasicTypes
 import Data.List
 import DataCon
 import Id
-import CoreUtils        ( exprIsHNF, exprType, exprIsTrivial )
+import CoreUtils        ( exprIsHNF, exprIsTrivial )
 import TyCon
 import Type
 import Coercion         ( Coercion, coVarsOfCo )

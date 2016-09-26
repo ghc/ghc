@@ -34,7 +34,7 @@ import CoreSubst
 import OccurAnal        ( occurAnalyseExpr )
 import CoreFVs          ( exprFreeVars, exprsFreeVars, bindFreeVars
                         , rulesFreeVarsDSet, exprsOrphNames, exprFreeVarsList )
-import CoreUtils        ( exprType, eqExpr, mkTick, mkTicks,
+import CoreUtils        ( eqExpr, mkTick, mkTicks,
                           stripTicksTopT, stripTicksTopE )
 import PprCore          ( pprRules )
 import Type             ( Type, substTy, mkTCvSubst )

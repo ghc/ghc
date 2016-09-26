@@ -31,7 +31,6 @@ import Vectorise.Utils.Poly
 import Vectorise.Monad
 import Vectorise.Builtins
 import CoreSyn
-import CoreUtils
 import Id
 import Type
 import Control.Monad

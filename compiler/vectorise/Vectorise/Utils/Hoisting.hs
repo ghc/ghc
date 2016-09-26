@@ -17,7 +17,6 @@ import Vectorise.Vect
 import Vectorise.Utils.Poly
 
 import CoreSyn
-import CoreUtils
 import CoreUnfold
 import Type
 import Id

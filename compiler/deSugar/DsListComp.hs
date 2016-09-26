@@ -23,7 +23,6 @@ import DsMonad          -- the monadery used in the desugarer
 import DsUtils
 
 import DynFlags
-import CoreUtils
 import Id
 import Type
 import TysWiredIn

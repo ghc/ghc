@@ -46,7 +46,6 @@ import TyCon
 import TysWiredIn
 import CoreSyn
 import MkCore
-import CoreUtils
 import SrcLoc
 import Unique
 import BasicTypes

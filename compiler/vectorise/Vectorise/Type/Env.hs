@@ -24,7 +24,6 @@ import Vectorise.Generic.Description
 import Vectorise.Utils
 
 import CoreSyn
-import CoreUtils
 import CoreUnfold
 import DataCon
 import TyCon

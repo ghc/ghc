@@ -9,7 +9,7 @@ module WorkWrap ( wwTopBinds ) where
 
 import CoreSyn
 import CoreUnfold       ( certainlyWillInline, mkWwInlineRule, mkWorkerUnfolding )
-import CoreUtils        ( exprType, exprIsHNF )
+import CoreUtils        ( exprIsHNF )
 import Var
 import Id
 import IdInfo

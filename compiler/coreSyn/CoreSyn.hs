@@ -36,7 +36,7 @@ module CoreSyn (
         collectArgs, collectArgsTicks, flattenBinds,
 
         exprToType, exprToCoercion_maybe,
-        applyTypeToArg,
+        applyTypeToArg, applyTypeToArgs,
 
         isValArg, isTypeArg, isTyCoArg, valArgCount, valBndrCount,
         isRuntimeArg, isRuntimeVar,
@@ -86,7 +86,10 @@ module CoreSyn (
         isBuiltinRule, isLocalRule, isAutoRule,
 
         -- * Core vectorisation declarations data type
-        CoreVect(..)
+        CoreVect(..),
+
+        -- * Properties of expressions
+        exprType, coreAltType, coreAltsType,
     ) where
 
 #include "HsVersions.h"
@@ -98,11 +101,13 @@ import Type
 import Coercion
 import Name
 import NameSet
+import VarSet
 import NameEnv( NameEnv, emptyNameEnv )
 import Literal
 import DataCon
 import Module
 import TyCon
+import TysPrim
 import BasicTypes
 import DynFlags
 import Outputable
@@ -110,6 +115,7 @@ import Util
 import UniqFM
 import SrcLoc     ( RealSrcSpan, containsSpan )
 import Binary
+import Pair
 
 import Data.Data hiding (TyCon)
 import Data.Int
@@ -1854,3 +1860,120 @@ collectAnnBndrs e
   where
     collect bs (_, AnnLam b body) = collect (b:bs) body
     collect bs body               = (reverse bs, body)
+
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{Find the type of a Core atom/expression}
+*                                                                      *
+************************************************************************
+-}
+
+-- This used to live in CoreUtils, but we need it for the App type synonym.
+-- We could move this and the type synonym to CoreUtils, but then we would also
+-- have to move collectArgs and mkApps there.
+
+exprType :: CoreExpr -> Type
+-- ^ Recover the type of a well-typed Core expression. Fails when
+-- applied to the actual 'CoreSyn.Type' expression as it cannot
+-- really be said to have a type
+exprType (Var var)           = varType var
+exprType (Lit lit)           = literalType lit
+exprType (Coercion co)       = coercionType co
+exprType (Let bind body)
+  | NonRec tv rhs <- bind    -- See Note [Type bindings]
+  , Type ty <- rhs           = substTyWithUnchecked [tv] [ty] (exprType body)
+  | otherwise                = exprType body
+exprType (Case _ _ ty _)     = ty
+exprType (Cast _ co)         = pSnd (coercionKind co)
+exprType (Tick _ e)          = exprType e
+exprType (Lam binder expr)   = mkLamType binder (exprType expr)
+exprType e@(App _ _)
+  = case collectArgs e of
+        (fun, args) -> applyTypeToArgs e (exprType fun) args
+
+exprType _other = pprTrace "exprType" (empty {- import loop :-( (pprCoreExpr other) -}) alphaTy
+
+coreAltType :: CoreAlt -> Type
+-- ^ Returns the type of the alternatives right hand side
+coreAltType (_,bs,rhs)
+  | any bad_binder bs = expandTypeSynonyms ty
+  | otherwise         = ty    -- Note [Existential variables and silly type synonyms]
+  where
+    ty           = exprType rhs
+    free_tvs     = tyCoVarsOfType ty
+    bad_binder b = b `elemVarSet` free_tvs
+
+coreAltsType :: [CoreAlt] -> Type
+-- ^ Returns the type of the first alternative, which should be the same as for all alternatives
+coreAltsType (alt:_) = coreAltType alt
+coreAltsType []      = panic "corAltsType"
+
+{-
+Note [Type bindings]
+~~~~~~~~~~~~~~~~~~~~
+Core does allow type bindings, although such bindings are
+not much used, except in the output of the desuguarer.
+Example:
+     let a = Int in (\x:a. x)
+Given this, exprType must be careful to substitute 'a' in the
+result type (Trac #8522).
+
+Note [Existential variables and silly type synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+        data T = forall a. T (Funny a)
+        type Funny a = Bool
+        f :: T -> Bool
+        f (T x) = x
+
+Now, the type of 'x' is (Funny a), where 'a' is existentially quantified.
+That means that 'exprType' and 'coreAltsType' may give a result that *appears*
+to mention an out-of-scope type variable.  See Trac #3409 for a more real-world
+example.
+
+Various possibilities suggest themselves:
+
+ - Ignore the problem, and make Lint not complain about such variables
+
+ - Expand all type synonyms (or at least all those that discard arguments)
+      This is tricky, because at least for top-level things we want to
+      retain the type the user originally specified.
+
+ - Expand synonyms on the fly, when the problem arises. That is what
+   we are doing here.  It's not too expensive, I think.
+
+Note that there might be existentially quantified coercion variables, too.
+-}
+
+-- Not defined with applyTypeToArg because you can't print from CoreSyn.
+applyTypeToArgs :: CoreExpr -> Type -> [CoreExpr] -> Type
+-- ^ A more efficient version of 'applyTypeToArg' when we have several arguments.
+-- The first argument is just for debugging, and gives some context
+applyTypeToArgs _e op_ty args
+  = go op_ty args
+  where
+    go op_ty []                   = op_ty
+    go op_ty (Type ty : args)     = go_ty_args op_ty [ty] args
+    go op_ty (Coercion co : args) = go_ty_args op_ty [mkCoercionTy co] args
+    go op_ty (_ : args)           | Just (_, res_ty) <- splitFunTy_maybe op_ty
+                                  = go res_ty args
+    go _ _ = pprPanic "applyTypeToArgs" panic_msg
+
+    -- go_ty_args: accumulate type arguments so we can
+    -- instantiate all at once with piResultTys
+    go_ty_args op_ty rev_tys (Type ty : args)
+       = go_ty_args op_ty (ty:rev_tys) args
+    go_ty_args op_ty rev_tys (Coercion co : args)
+       = go_ty_args op_ty (mkCoercionTy co : rev_tys) args
+    go_ty_args op_ty rev_tys args
+       = go (piResultTys op_ty (reverse rev_tys)) args
+
+    panic_msg = text "temporary removed due to import cycles"
+    {-
+    panic_msg = vcat [ text "Expression:" <+> pprCoreExpr e
+                     , text "Type:" <+> ppr op_ty
+                     , text "Args:" <+> ppr args ]
+    -}
+

@@ -64,8 +64,7 @@ module SetLevels (
 
 import CoreSyn
 import CoreMonad        ( FloatOutSwitches(..) )
-import CoreUtils        ( exprType
-                        , exprOkForSpeculation
+import CoreUtils        ( exprOkForSpeculation
                         , exprIsBottom
                         , collectStaticPtrSatArgs
                         )

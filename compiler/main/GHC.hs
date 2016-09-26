@@ -321,7 +321,7 @@ import Avail
 import InstEnv
 import FamInstEnv ( FamInst )
 import SrcLoc
-import CoreSyn
+import CoreSyn         hiding ( exprType )
 import TidyPgm
 import DriverPhases     ( Phase(..), isHaskellSrcFilename )
 import Finder

@@ -17,7 +17,6 @@ import Vectorise.Utils.Hoisting
 import CoreSyn
 import Type
 import MkCore
-import CoreUtils
 import TyCon
 import DataCon
 import MkId

@@ -53,7 +53,6 @@ module SAT ( doStaticArgs ) where
 
 import Var
 import CoreSyn
-import CoreUtils
 import Type
 import Coercion
 import Id

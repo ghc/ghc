@@ -21,7 +21,7 @@ import VarSet
 import VarEnv
 import CoreSyn
 import Rules
-import CoreUtils        ( exprIsTrivial, applyTypeToArgs, mkCast )
+import CoreUtils        ( exprIsTrivial, mkCast )
 import CoreFVs          ( exprFreeVars, exprsFreeVars, idFreeVars, exprsFreeIdsList )
 import UniqSupply
 import Name

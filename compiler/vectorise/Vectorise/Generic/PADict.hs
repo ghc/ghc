@@ -11,7 +11,6 @@ import Vectorise.Utils
 
 import BasicTypes
 import CoreSyn
-import CoreUtils
 import CoreUnfold
 import Module
 import TyCon

@@ -55,7 +55,7 @@ import Id
 import Var      ( EvVar, setTyVarUnique )
 
 import CoreSyn
-import CoreUtils        ( exprType, needsCaseBinding, bindNonRec )
+import CoreUtils        ( needsCaseBinding, bindNonRec )
 import Literal
 import HscTypes
 

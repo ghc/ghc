@@ -21,7 +21,6 @@ module DsCCall
 import CoreSyn
 
 import DsMonad
-import CoreUtils
 import MkCore
 import MkId
 import ForeignCall

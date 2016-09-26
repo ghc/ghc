@@ -48,7 +48,7 @@ import FamInstEnv
 import Coercion
 import TcType
 import MkCore
-import CoreUtils        ( exprType, mkCast )
+import CoreUtils        ( mkCast )
 import CoreUnfold
 import Literal
 import TyCon

@@ -49,7 +49,6 @@ import CoreSyn
 import DsMonad
 import {-# SOURCE #-} DsExpr ( dsLExpr )
 
-import CoreUtils
 import MkCore
 import MkId
 import Id

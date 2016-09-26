@@ -14,7 +14,7 @@ module WwLib ( mkWwBodies, mkWWstr, mkWorkerArgs
 #include "HsVersions.h"
 
 import CoreSyn
-import CoreUtils        ( exprType, mkCast )
+import CoreUtils        ( mkCast )
 import Id
 import IdInfo           ( vanillaIdInfo )
 import DataCon

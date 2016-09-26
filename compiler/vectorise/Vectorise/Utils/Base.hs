@@ -32,7 +32,6 @@ import Vectorise.Vect
 import Vectorise.Builtins
 
 import CoreSyn
-import CoreUtils
 import FamInstEnv
 import Coercion
 import Type
