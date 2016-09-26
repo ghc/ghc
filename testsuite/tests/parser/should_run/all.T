@@ -9,3 +9,4 @@ test('ParserMultiWayIf', when(compiler_lt('ghc', '7.5'), skip), compile_and_run,
 test('BinaryLiterals0', normal, compile_and_run, [''])
 test('BinaryLiterals1', when(compiler_lt('ghc', '7.9'), skip), compile_and_run, [''])
 test('BinaryLiterals2', when(compiler_lt('ghc', '7.9'), skip), compile_and_run, [''])
+test('T10807', normal, compile_and_run, [''])
