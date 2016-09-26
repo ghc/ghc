@@ -280,24 +280,23 @@ data Expr b
 
 
 class CompressArgs b where
-    unpackArgs :: Expr b -> Arity -> [Expr b] -> [Expr b]
+    unpackArgs :: Expr b -> Arity -> [Arg b] -> [Arg b]
     unpackArgs _ _ l = l
 
-    packArgs :: Expr b -> [Expr b] -> [Expr b]
+    packArgs :: Expr b -> [Arg b] -> [Arg b]
     packArgs _ l = l
 
-popArg :: CompressArgs b => Expr b -> Maybe (Expr b, Expr b)
-popArg (Apps e a xs) = case unpackArgs e a xs of
-    [x] -> Just (e, x)
-    xs  -> Just (Apps e (a-1) (packArgs e (init xs)), last xs)
-popArg _ = Nothing
+popArg :: CompressArgs b => Expr b -> Maybe (Expr b, Arg b)
+popArg e = case collectArgs e of
+    (_, []) -> Nothing
+    (f, xs) -> Just (mkApps f (init xs), last xs)
 
 #if __GLASGOW_HASKELL__ > 710
 pattern App :: CompressArgs b => Expr b -> Arg b -> Expr b
 #endif
 pattern App e1 e2 <- (popArg -> Just (e1, e2))
   where App e1 e2 | (f, args) <- collectArgs e1
-                  = Apps f (length args +1) (packArgs f (args ++ [e2]))
+                  = mkApps f (args ++ [e2])
 
 -- | Type synonym for expressions that occur in function argument positions.
 -- Only 'Arg' should contain a 'Type' at top level, general 'Expr' should not
@@ -1446,7 +1445,7 @@ type CoreAlt  = Alt  CoreBndr
 
 -- Simple compression scheme, as a proof of concept: Only look for type
 -- arguments that thare the type of one argument.
-defaultPackArgs :: (Expr b -> Type) -> Expr b -> [Expr b] -> [Expr b]
+defaultPackArgs :: (Expr b -> Type) -> Expr b -> [Arg b] -> [Arg b]
 defaultPackArgs typeOf f args
     = go pis args
  where
@@ -1470,7 +1469,7 @@ defaultPackArgs typeOf f args
     isTyVar v (Anon t) | Just v' <- getTyVar_maybe t, v == v' = True
     isTyVar _ _ = False
 
-defaultUnpackArgs :: (Expr b -> Type) -> Expr b -> Arity -> [Expr b] -> [Expr b]
+defaultUnpackArgs :: (Expr b -> Type) -> Expr b -> Arity -> [Arg b] -> [Arg b]
 defaultUnpackArgs typeOf f arity args
     = go pis args
  where
@@ -1566,12 +1565,16 @@ mkVarApps :: CompressArgs b => Expr b -> [Var] -> Expr b
 -- use 'MkCore.mkCoreConApps' if possible
 mkConApp  :: CompressArgs b => DataCon -> [Arg b] -> Expr b
 
-mkApps    f args = foldl App                       f args
-mkCoApps  f args = foldl (\ e a -> App e (Coercion a)) f args
-mkVarApps f vars = foldl (\ e a -> App e (varToCoreExpr a)) f vars
+mkApps e [] = e
+mkApps e args2 = Apps f (length args) (packArgs f args)
+  where
+    (f, args1) = collectArgs e
+    args = args1 ++ args2
+mkCoApps  f args = mkApps f (map Coercion args)
+mkVarApps f vars = mkApps f (map varToCoreExpr vars)
 mkConApp con args = mkApps (Var (dataConWorkId con)) args
 
-mkTyApps  f args = foldl (\ e a -> App e (typeOrCoercion a)) f args
+mkTyApps  f args = mkApps f (map typeOrCoercion args)
   where
     typeOrCoercion ty
       | Just co <- isCoercionTy_maybe ty = Coercion co
@@ -1765,11 +1768,8 @@ collectTyAndValBinders expr
 -- | Takes a nested application expression and returns the the function
 -- being applied and the arguments to which it is applied
 collectArgs :: CompressArgs b => Expr b -> (Expr b, [Arg b])
-collectArgs expr
-  = go expr []
-  where
-    go (App f a) as = go f (a:as)
-    go e         as = (e, as)
+collectArgs (Apps e a xs) = (e, unpackArgs e a xs)
+collectArgs e = (e, [])
 
 -- | Like @collectArgs@, but also collects looks through floatable
 -- ticks if it means that we can find more arguments.
