@@ -91,10 +91,6 @@ import Maybes( isJust )
 import Data.Data hiding ( Fixity )
 import Data.Maybe ( fromMaybe )
 import Control.Monad ( unless )
-#if __GLASGOW_HASKELL > 710
-import Data.Semigroup   ( Semigroup )
-import qualified Data.Semigroup as Semigroup
-#endif
 
 {-
 ************************************************************************
