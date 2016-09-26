@@ -98,6 +98,7 @@ import CostCentre
 import VarEnv( InScopeSet )
 import Var
 import Type
+import TyCoRep ( TyBinder(..) )
 import Coercion
 import Name
 import NameSet
@@ -120,6 +121,7 @@ import Pair
 import Data.Data hiding (TyCon)
 import Data.Int
 import Data.Word
+import Data.List ( findIndex )
 
 infixl 4 `mkApps`, `mkTyApps`, `mkVarApps`, `App`, `mkCoApps`
 -- Left associative, so that we can say (f `mkTyApps` xs `mkVarApps` ys)
@@ -276,6 +278,7 @@ data Expr b
   | Coercion Coercion
   deriving Data
 
+
 class CompressArgs b where
     unpackArgs :: Expr b -> Arity -> [Expr b] -> [Expr b]
     unpackArgs _ _ l = l
@@ -289,7 +292,9 @@ popArg (Apps e a xs) = case unpackArgs e a xs of
     xs  -> Just (Apps e (a-1) (packArgs e (init xs)), last xs)
 popArg _ = Nothing
 
-pattern App :: Expr b -> Arg b -> Expr b
+#if __GLASGOW_HASKELL__ > 710
+pattern App :: CompressArgs b => Expr b -> Arg b -> Expr b
+#endif
 pattern App e1 e2 <- (popArg -> Just (e1, e2))
   where App e1 e2 | (f, args) <- collectArgs e1
                   = Apps f (length args +1) (packArgs f (args ++ [e2]))
@@ -1438,9 +1443,60 @@ type CoreBind = Bind CoreBndr
 -- | Case alternatives where binders are 'CoreBndr's
 type CoreAlt  = Alt  CoreBndr
 
+
+-- Simple compression scheme, as a proof of concept: Only look for type
+-- arguments that thare the type of one argument.
+defaultPackArgs :: (Expr b -> Type) -> Expr b -> [Expr b] -> [Expr b]
+defaultPackArgs typeOf f args
+    = go pis args
+ where
+    (all_pis,_) = splitPiTys (typeOf f)
+    -- Match the arity of the arguments with the arity of the type
+    n = min (length all_pis) (length args)
+    pis = take n all_pis
+
+    -- Remove redundant type type arguments
+    go (Named tyBndr : pis) (_ : args)
+      | any (isTyVar (binderVar tyBndr)) pis
+      = go pis args
+    go (_ : pis) (a : args)
+      = a : go pis args
+    -- More args than our type can handle, keep them
+    go [] args
+      = args
+    go _ [] = panic "defaultPackArgs: not enough args"
+
+    isTyVar :: TyVar -> TyBinder -> Bool
+    isTyVar v (Anon t) | Just v' <- getTyVar_maybe t, v == v' = True
+    isTyVar _ _ = False
+
+defaultUnpackArgs :: (Expr b -> Type) -> Expr b -> Arity -> [Expr b] -> [Expr b]
+defaultUnpackArgs typeOf f arity args
+    = go pis args
+ where
+    (all_pis,_) = splitPiTys (typeOf f)
+    -- Match the arity of the arguments with the arity of the type
+    n = min (length all_pis) arity
+    pis = take n all_pis
+
+    go (Named tyBndr : pis) args
+      | Just i <- findIndex (isTyVar (binderVar tyBndr)) pis
+      -- This is a type argument we have to recover
+      = let args' = go pis args
+        in Type (typeOf (args' !! i)) : args'
+    go (_ : pis) (a : args)
+      = a : go pis args
+    go [] args
+      = args
+    go _ [] = panic "defaultPackArgs: not enough args"
+
+    isTyVar :: TyVar -> TyBinder -> Bool
+    isTyVar v (Anon t) | Just v' <- getTyVar_maybe t, v == v' = True
+    isTyVar _ _ = False
+
 instance CompressArgs Var where
-    unpackArgs _  _ l = l
-    packArgs _ l = l
+    unpackArgs = defaultUnpackArgs exprType
+    packArgs = defaultPackArgs exprType
 
 {-
 ************************************************************************
@@ -1467,8 +1523,8 @@ instance Outputable b => OutputableBndr (TaggedBndr b) where
   pprPrefixOcc b = ppr b
 
 instance CompressArgs (TaggedBndr t) where
-    unpackArgs _  _ l = l
-    packArgs _ l = l
+    unpackArgs = defaultUnpackArgs (exprType . deTagExpr)
+    packArgs = defaultPackArgs (exprType . deTagExpr)
 
 deTagExpr :: TaggedExpr t -> CoreExpr
 deTagExpr (Var v)                   = Var v
