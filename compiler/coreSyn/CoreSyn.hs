@@ -3,12 +3,13 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-{-# LANGUAGE CPP, DeriveDataTypeable, DeriveFunctor #-}
+{-# LANGUAGE CPP, DeriveDataTypeable, DeriveFunctor, PatternSynonyms, ViewPatterns #-}
 
 -- | CoreSyn holds all the main data types for use by for the Glasgow Haskell Compiler midsection
 module CoreSyn (
         -- * Main data types
-        Expr(..), Alt, Bind(..), AltCon(..), Arg,
+        Expr(..), pattern App,  Alt, Bind(..), AltCon(..), Arg,
+        CompressArgs(..),
         Tickish(..), TickishScoping(..), TickishPlacement(..),
         CoreProgram, CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
         TaggedExpr, TaggedAlt, TaggedBind, TaggedArg, TaggedBndr(..), deTagExpr,
@@ -258,7 +259,8 @@ These data types are the heart of the compiler
 data Expr b
   = Var   Id
   | Lit   Literal
-  | App   (Expr b) (Arg b)
+--  | App   (Expr b) (Arg b)
+  | Apps  (Expr b) Arity [Expr b]
   | Lam   b (Expr b)
   | Let   (Bind b) (Expr b)
   | Case  (Expr b) b Type [Alt b]       -- See #case_invariant#
@@ -267,6 +269,24 @@ data Expr b
   | Type  Type
   | Coercion Coercion
   deriving Data
+
+class CompressArgs b where
+    unpackArgs :: Expr b -> Arity -> [Expr b] -> [Expr b]
+    unpackArgs _ _ l = l
+
+    packArgs :: Expr b -> [Expr b] -> [Expr b]
+    packArgs _ l = l
+
+popArg :: CompressArgs b => Expr b -> Maybe (Expr b, Expr b)
+popArg (Apps e a xs) = case unpackArgs e a xs of
+    [x] -> Just (e, x)
+    xs  -> Just (Apps e (a-1) (packArgs e (init xs)), last xs)
+popArg _ = Nothing
+
+pattern App :: Expr b -> Arg b -> Expr b
+pattern App e1 e2 <- (popArg -> Just (e1, e2))
+  where App e1 e2 | (f, args) <- collectArgs e1
+                  = Apps f (length args +1) (packArgs f (args ++ [e2]))
 
 -- | Type synonym for expressions that occur in function argument positions.
 -- Only 'Arg' should contain a 'Type' at top level, general 'Expr' should not
@@ -1412,6 +1432,10 @@ type CoreBind = Bind CoreBndr
 -- | Case alternatives where binders are 'CoreBndr's
 type CoreAlt  = Alt  CoreBndr
 
+instance CompressArgs Var where
+    unpackArgs _  _ l = l
+    packArgs _ l = l
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1435,6 +1459,10 @@ instance Outputable b => OutputableBndr (TaggedBndr b) where
   pprBndr _ b = ppr b   -- Simple
   pprInfixOcc  b = ppr b
   pprPrefixOcc b = ppr b
+
+instance CompressArgs (TaggedBndr t) where
+    unpackArgs _  _ l = l
+    packArgs _ l = l
 
 deTagExpr :: TaggedExpr t -> CoreExpr
 deTagExpr (Var v)                   = Var v
@@ -1465,16 +1493,16 @@ deTagAlt (con, bndrs, rhs) = (con, [b | TB b _ <- bndrs], deTagExpr rhs)
 
 -- | Apply a list of argument expressions to a function expression in a nested fashion. Prefer to
 -- use 'MkCore.mkCoreApps' if possible
-mkApps    :: Expr b -> [Arg b]  -> Expr b
+mkApps    :: CompressArgs b => Expr b -> [Arg b]  -> Expr b
 -- | Apply a list of type argument expressions to a function expression in a nested fashion
-mkTyApps  :: Expr b -> [Type]   -> Expr b
+mkTyApps  :: CompressArgs b => Expr b -> [Type]   -> Expr b
 -- | Apply a list of coercion argument expressions to a function expression in a nested fashion
-mkCoApps  :: Expr b -> [Coercion] -> Expr b
+mkCoApps  :: CompressArgs b => Expr b -> [Coercion] -> Expr b
 -- | Apply a list of type or value variables to a function expression in a nested fashion
-mkVarApps :: Expr b -> [Var] -> Expr b
+mkVarApps :: CompressArgs b => Expr b -> [Var] -> Expr b
 -- | Apply a list of argument expressions to a data constructor in a nested fashion. Prefer to
 -- use 'MkCore.mkCoreConApps' if possible
-mkConApp      :: DataCon -> [Arg b] -> Expr b
+mkConApp  :: CompressArgs b => DataCon -> [Arg b] -> Expr b
 
 mkApps    f args = foldl App                       f args
 mkCoApps  f args = foldl (\ e a -> App e (Coercion a)) f args
@@ -1487,7 +1515,7 @@ mkTyApps  f args = foldl (\ e a -> App e (typeOrCoercion a)) f args
       | Just co <- isCoercionTy_maybe ty = Coercion co
       | otherwise                        = Type ty
 
-mkConApp2 :: DataCon -> [Type] -> [Var] -> Expr b
+mkConApp2 :: CompressArgs b => DataCon -> [Type] -> [Var] -> Expr b
 mkConApp2 con tys arg_ids = Var (dataConWorkId con)
                             `mkApps` map Type tys
                             `mkApps` map varToCoreExpr arg_ids
@@ -1674,7 +1702,7 @@ collectTyAndValBinders expr
 
 -- | Takes a nested application expression and returns the the function
 -- being applied and the arguments to which it is applied
-collectArgs :: Expr b -> (Expr b, [Arg b])
+collectArgs :: CompressArgs b => Expr b -> (Expr b, [Arg b])
 collectArgs expr
   = go expr []
   where
@@ -1683,7 +1711,7 @@ collectArgs expr
 
 -- | Like @collectArgs@, but also collects looks through floatable
 -- ticks if it means that we can find more arguments.
-collectArgsTicks :: (Tickish Id -> Bool) -> Expr b
+collectArgsTicks :: CompressArgs b => (Tickish Id -> Bool) -> Expr b
                  -> (Expr b, [Arg b], [Tickish Id])
 collectArgsTicks skipTick expr
   = go expr [] []
@@ -1794,10 +1822,10 @@ collectAnnArgsTicks tickishOk expr
                               = go e as (t:ts)
     go e                as ts = (e, as, reverse ts)
 
-deAnnotate :: AnnExpr bndr annot -> Expr bndr
+deAnnotate :: CompressArgs bndr => AnnExpr bndr annot -> Expr bndr
 deAnnotate (_, e) = deAnnotate' e
 
-deAnnotate' :: AnnExpr' bndr annot -> Expr bndr
+deAnnotate' :: CompressArgs bndr => AnnExpr' bndr annot -> Expr bndr
 deAnnotate' (AnnType t)           = Type t
 deAnnotate' (AnnCoercion co)      = Coercion co
 deAnnotate' (AnnVar  v)           = Var v
@@ -1816,7 +1844,7 @@ deAnnotate' (AnnLet bind body)
 deAnnotate' (AnnCase scrut v t alts)
   = Case (deAnnotate scrut) v t (map deAnnAlt alts)
 
-deAnnAlt :: AnnAlt bndr annot -> Alt bndr
+deAnnAlt :: CompressArgs bndr => AnnAlt bndr annot -> Alt bndr
 deAnnAlt (con,args,rhs) = (con,args,deAnnotate rhs)
 
 -- | As 'collectBinders' but for 'AnnExpr' rather than 'Expr'

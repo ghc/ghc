@@ -70,6 +70,10 @@ Library
 
     GHC-Options: -Wall -fno-warn-name-shadowing
 
+    -- This is while working on 12626, which uses pattern synonyms,
+    -- until #8779 is implemented
+    GHC-Options: -fno-warn-incomplete-patterns
+
     if flag(ghci)
         CPP-Options: -DGHCI
         Include-Dirs: ../rts/dist/build @FFIIncludeDir@

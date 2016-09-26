@@ -6,7 +6,7 @@
 Utility functions on @Core@ syntax
 -}
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, ScopedTypeVariables #-}
 
 -- | Commonly useful utilites for manipulating the Core language
 module CoreUtils (
@@ -372,7 +372,7 @@ stripTicksTopT p = go []
 
 -- | Completely strip ticks satisfying a predicate from an
 -- expression. Note this is O(n) in the size of the expression!
-stripTicksE :: (Tickish Id -> Bool) -> Expr b -> Expr b
+stripTicksE :: CompressArgs b => (Tickish Id -> Bool) -> Expr b -> Expr b
 stripTicksE p expr = go expr
   where go (App e a)        = App (go e) (go a)
         go (Lam b e)        = Lam b (go e)
@@ -388,7 +388,7 @@ stripTicksE p expr = go expr
         go_b (b, e)         = (b, go e)
         go_a (c,bs,e)       = (c,bs, go e)
 
-stripTicksT :: (Tickish Id -> Bool) -> Expr b -> [Tickish Id]
+stripTicksT :: CompressArgs b => (Tickish Id -> Bool) -> Expr b -> [Tickish Id]
 stripTicksT p expr = fromOL $ go expr
   where go (App e a)        = go e `appOL` go a
         go (Lam _ e)        = go e
@@ -1241,17 +1241,17 @@ it's applied only to dictionaries.
 --
 -- We can only do this if the @y + 1@ is ok for speculation: it has no
 -- side effects, and can't diverge or raise an exception.
-exprOkForSpeculation, exprOkForSideEffects :: Expr b -> Bool
+exprOkForSpeculation, exprOkForSideEffects :: CompressArgs b => Expr b -> Bool
 exprOkForSpeculation = expr_ok primOpOkForSpeculation
 exprOkForSideEffects = expr_ok primOpOkForSideEffects
   -- Polymorphic in binder type
   -- There is one call at a non-Id binder type, in SetLevels
 
-expr_ok :: (PrimOp -> Bool) -> Expr b -> Bool
+expr_ok :: forall b. CompressArgs b => (PrimOp -> Bool) -> Expr b -> Bool
 expr_ok _ (Lit _)      = True
 expr_ok _ (Type _)     = True
 expr_ok _ (Coercion _) = True
-expr_ok primop_ok (Var v)      = app_ok primop_ok v []
+expr_ok primop_ok (Var v)      = app_ok primop_ok v ([] :: [Expr b])
 expr_ok primop_ok (Cast e _)   = expr_ok primop_ok e
 
 -- Tick annotations that *tick* cannot be speculated, because these
@@ -1273,7 +1273,7 @@ expr_ok primop_ok other_expr
         _            -> False
 
 -----------------------------
-app_ok :: (PrimOp -> Bool) -> Id -> [Expr b] -> Bool
+app_ok :: CompressArgs b => (PrimOp -> Bool) -> Id -> [Expr b] -> Bool
 app_ok primop_ok fun args
   = case idDetails fun of
       DFunId new_type ->  not new_type
@@ -1629,11 +1629,11 @@ c.f. add_evals in Simplify.simplAlt
 --      otherwise, they may or may not be equal.
 --
 -- See also 'exprIsBig'
-cheapEqExpr :: Expr b -> Expr b -> Bool
+cheapEqExpr :: CompressArgs b => Expr b -> Expr b -> Bool
 cheapEqExpr = cheapEqExpr' (const False)
 
 -- | Cheap expression equality test, can ignore ticks by type.
-cheapEqExpr' :: (Tickish Id -> Bool) -> Expr b -> Expr b -> Bool
+cheapEqExpr' :: CompressArgs b => (Tickish Id -> Bool) -> Expr b -> Expr b -> Bool
 cheapEqExpr' ignoreTick = go_s
   where go_s = go `on` stripTicksTopE ignoreTick
         go (Var v1)   (Var v2)   = v1 == v2
@@ -1654,7 +1654,7 @@ cheapEqExpr' ignoreTick = go_s
         {-# INLINE go #-}
 {-# INLINE cheapEqExpr' #-}
 
-exprIsBig :: Expr b -> Bool
+exprIsBig :: CompressArgs b => Expr b -> Bool
 -- ^ Returns @True@ of expressions that are too big to be compared by 'cheapEqExpr'
 exprIsBig (Lit _)      = False
 exprIsBig (Var _)      = False
@@ -2221,7 +2221,7 @@ isEmptyTy ty
 -- and @s = StaticPtr@ and the application of @StaticPtr@ is saturated.
 --
 -- Yields @Nothing@ otherwise.
-collectStaticPtrSatArgs :: Expr b -> Maybe (Expr b, [Arg b])
+collectStaticPtrSatArgs :: CompressArgs b => Expr b -> Maybe (Expr b, [Arg b])
 collectStaticPtrSatArgs e
     | (fun@(Var b), args, _) <- collectArgsTicks (const True) e
     , Just con <- isDataConId_maybe b

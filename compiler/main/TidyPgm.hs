@@ -1347,7 +1347,7 @@ hasCafRefs dflags this_pkg this_mod p@(_,cvt_integer) arity expr
   -- CorePrep later on, and we don't want to duplicate that
   -- knowledge in rhsIsStatic below.
 
-cafRefsE :: CafRefEnv -> Expr a -> Bool
+cafRefsE :: CompressArgs a => CafRefEnv -> Expr a -> Bool
 cafRefsE p (Var id)            = cafRefsV p id
 cafRefsE p (Lit lit)           = cafRefsL p lit
 cafRefsE p (App f a)           = cafRefsE p f || cafRefsE p a
@@ -1359,7 +1359,7 @@ cafRefsE p (Cast e _co)        = cafRefsE p e
 cafRefsE _ (Type _)            = False
 cafRefsE _ (Coercion _)        = False
 
-cafRefsEs :: CafRefEnv -> [Expr a] -> Bool
+cafRefsEs :: CompressArgs a => CafRefEnv -> [Expr a] -> Bool
 cafRefsEs _ []     = False
 cafRefsEs p (e:es) = cafRefsE p e || cafRefsEs p es
 

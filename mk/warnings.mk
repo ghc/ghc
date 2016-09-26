@@ -1,6 +1,7 @@
 # See Note [Order of warning flags].
 SRC_CC_OPTS     += -Wall $(WERROR)
 SRC_HC_OPTS     += -Wall
+
 # Don't add -Werror to SRC_HC_OPTS_STAGE0 (or SRC_HC_OPTS), because otherwise
 # validate may unnecessarily fail when booting with an older compiler.
 # It would be better to only exclude certain warnings from becoming errors
@@ -40,7 +41,6 @@ endif
 
 SRC_HC_WARNING_OPTS_STAGE1 += -Wnoncanonical-monad-instances
 SRC_HC_WARNING_OPTS_STAGE2 += -Wnoncanonical-monad-instances
-
 
 ######################################################################
 # Disable some warnings in packages we use

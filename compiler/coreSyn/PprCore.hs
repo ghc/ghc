@@ -43,10 +43,10 @@ import SrcLoc      ( pprUserRealSpan )
 @pprParendCoreExpr@ puts parens around non-atomic Core expressions.
 -}
 
-pprCoreBindings :: OutputableBndr b => [Bind b] -> SDoc
-pprCoreBinding  :: OutputableBndr b => Bind b  -> SDoc
-pprCoreExpr     :: OutputableBndr b => Expr b  -> SDoc
-pprParendExpr   :: OutputableBndr b => Expr b  -> SDoc
+pprCoreBindings :: (CompressArgs b, OutputableBndr b) => [Bind b] -> SDoc
+pprCoreBinding  :: (CompressArgs b, OutputableBndr b) => Bind b  -> SDoc
+pprCoreExpr     :: (CompressArgs b, OutputableBndr b) => Expr b  -> SDoc
+pprParendExpr   :: (CompressArgs b, OutputableBndr b) => Expr b  -> SDoc
 
 pprCoreBindings = pprTopBinds noAnn
 pprCoreBinding  = pprTopBind noAnn
@@ -57,10 +57,10 @@ pprCoreBindingWithSize  :: CoreBind  -> SDoc
 pprCoreBindingsWithSize = pprTopBinds sizeAnn
 pprCoreBindingWithSize = pprTopBind sizeAnn
 
-instance OutputableBndr b => Outputable (Bind b) where
+instance (CompressArgs b, OutputableBndr b) => Outputable (Bind b) where
     ppr bind = ppr_bind noAnn bind
 
-instance OutputableBndr b => Outputable (Expr b) where
+instance (CompressArgs b, OutputableBndr b) => Outputable (Expr b) where
     ppr expr = pprCoreExpr expr
 
 {-
@@ -82,14 +82,14 @@ sizeAnn e = text "-- RHS size:" <+> ppr (exprStats e)
 noAnn :: Expr b -> SDoc
 noAnn _ = empty
 
-pprTopBinds :: OutputableBndr a
+pprTopBinds :: (CompressArgs a, OutputableBndr a)
             => Annotation a -- ^ generate an annotation to place before the
                             -- binding
             -> [Bind a]     -- ^ bindings to show
             -> SDoc         -- ^ the pretty result
 pprTopBinds ann binds = vcat (map (pprTopBind ann) binds)
 
-pprTopBind :: OutputableBndr a => Annotation a -> Bind a -> SDoc
+pprTopBind :: (CompressArgs a, OutputableBndr a) => Annotation a -> Bind a -> SDoc
 pprTopBind ann (NonRec binder expr)
  = ppr_binding ann (binder,expr) $$ blankLine
 
@@ -102,14 +102,14 @@ pprTopBind ann (Rec (b:bs))
           text "end Rec }",
           blankLine]
 
-ppr_bind :: OutputableBndr b => Annotation b -> Bind b -> SDoc
+ppr_bind :: (CompressArgs b, OutputableBndr b) => Annotation b -> Bind b -> SDoc
 
 ppr_bind ann (NonRec val_bdr expr) = ppr_binding ann (val_bdr, expr)
 ppr_bind ann (Rec binds)           = vcat (map pp binds)
                                     where
                                       pp bind = ppr_binding ann bind <> semi
 
-ppr_binding :: OutputableBndr b => Annotation b -> (b, Expr b) -> SDoc
+ppr_binding :: (CompressArgs b, OutputableBndr b) => Annotation b -> (b, Expr b) -> SDoc
 ppr_binding ann (val_bdr, expr)
   = ann expr $$ pprBndr LetBind val_bdr $$
     hang (ppr val_bdr <+> equals) 2 (pprCoreExpr expr)
@@ -126,7 +126,7 @@ pprOptCo co = sdocWithDynFlags $ \dflags ->
               then text "..."
               else parens (sep [ppr co, dcolon <+> ppr (coercionType co)])
 
-ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
+ppr_expr :: (CompressArgs b, OutputableBndr b) => (SDoc -> SDoc) -> Expr b -> SDoc
         -- The function adds parens in context that need
         -- an atomic value (e.g. function args)
 
@@ -251,7 +251,7 @@ ppr_expr add_par (Tick tickish expr)
   then add_par (sep [ppr tickish, pprCoreExpr expr])
   else ppr_expr add_par expr
 
-pprCoreAlt :: OutputableBndr a => (AltCon, [a] , Expr a) -> SDoc
+pprCoreAlt :: (CompressArgs a, OutputableBndr a) => (AltCon, [a] , Expr a) -> SDoc
 pprCoreAlt (con, args, rhs)
   = hang (ppr_case_pat con args <+> arrow) 2 (pprCoreExpr rhs)
 
@@ -270,7 +270,7 @@ ppr_case_pat con args
 
 
 -- | Pretty print the argument in a function application.
-pprArg :: OutputableBndr a => Expr a -> SDoc
+pprArg :: (CompressArgs a, OutputableBndr a) => Expr a -> SDoc
 pprArg (Type ty)
  = sdocWithDynFlags $ \dflags ->
    if gopt Opt_SuppressTypeApplications dflags
