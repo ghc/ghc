@@ -243,3 +243,4 @@ test('T12127',
      multimod_compile,
      ['T12127', '-v0'])
 test('T12533', normal, compile, [''])
+test('T12597', normal, compile, [''])

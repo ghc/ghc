@@ -17,8 +17,7 @@ werror.hs:10:1: warning: [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
     Defined but not used: ‘f’
 
 werror.hs:10:1: warning: [-Wmissing-signatures (in -Wall)]
-    Top-level binding with no type signature:
-      f :: forall a1 a2. [a2] -> [a1]
+    Top-level binding with no type signature: f :: [a2] -> [a1]
 
 werror.hs:10:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive

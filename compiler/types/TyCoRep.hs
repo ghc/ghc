@@ -2689,6 +2689,8 @@ ppr_fun_tail (FunTy ty1 ty2)
 ppr_fun_tail other_ty = [ppr_type TopPrec other_ty]
 
 pprSigmaType :: Type -> SDoc
+-- Prints a top-level type for the user; in particular
+-- top-level foralls are omitted unless you use -fprint-explicit-foralls
 pprSigmaType ty = sdocWithDynFlags $ \dflags ->
                   eliminateRuntimeRep (ppr_sigma_type dflags False) ty
 

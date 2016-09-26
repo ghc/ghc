@@ -1615,7 +1615,7 @@ warnMissingSignatures gbl_env
                     = do { env <- tcInitTidyEnv     -- Why not use emptyTidyEnv?
                          ; let name    = idName id
                                (_, ty) = tidyOpenType env (idType id)
-                               ty_msg  = ppr ty
+                               ty_msg  = pprSigmaType ty
                          ; add_warn name $
                            hang (text "Top-level binding with no type signature:")
                               2 (pprPrefixName name <+> dcolon <+> ty_msg) }
