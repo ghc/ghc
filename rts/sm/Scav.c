@@ -329,105 +329,17 @@ scavenge_AP (StgAP *ap)
    Scavenge SRTs
    -------------------------------------------------------------------------- */
 
-/* Similar to scavenge_large_bitmap(), but we don't write back the
- * pointers we get back from evacuate().
- */
-static void
-scavenge_large_srt_bitmap( StgLargeSRT *large_srt )
-{
-    uint32_t i, j, size;
-    StgWord bitmap;
-    StgClosure **p;
-
-    size   = (uint32_t)large_srt->l.size;
-    p      = (StgClosure **)large_srt->srt;
-
-    for (i = 0; i < size / BITS_IN(W_); i++) {
-        bitmap = large_srt->l.bitmap[i];
-        // skip zero words: bitmaps can be very sparse, and this helps
-        // performance a lot in some cases.
-        if (bitmap != 0) {
-            for (j = 0; j < BITS_IN(W_); j++) {
-                if ((bitmap & 1) != 0) {
-                    evacuate(p);
-                }
-                p++;
-                bitmap = bitmap >> 1;
-            }
-        } else {
-            p += BITS_IN(W_);
-        }
-    }
-    if (size % BITS_IN(W_) != 0) {
-        bitmap = large_srt->l.bitmap[i];
-        for (j = 0; j < size % BITS_IN(W_); j++) {
-            if ((bitmap & 1) != 0) {
-                evacuate(p);
-            }
-            p++;
-            bitmap = bitmap >> 1;
-        }
-    }
-}
-
-/* evacuate the SRT.  If srt_bitmap is zero, then there isn't an
- * srt field in the info table.  That's ok, because we'll
- * never dereference it.
- */
-STATIC_INLINE GNUC_ATTR_HOT void
-scavenge_srt (StgClosure **srt, uint32_t srt_bitmap)
-{
-  uint32_t bitmap;
-  StgClosure **p;
-
-  bitmap = srt_bitmap;
-  p = srt;
-
-  if (bitmap == (StgHalfWord)(-1)) {
-      scavenge_large_srt_bitmap( (StgLargeSRT *)srt );
-      return;
-  }
-
-  while (bitmap != 0) {
-      if ((bitmap & 1) != 0) {
-#if defined(COMPILING_WINDOWS_DLL)
-          // Special-case to handle references to closures hiding out in DLLs, since
-          // double indirections required to get at those. The code generator knows
-          // which is which when generating the SRT, so it stores the (indirect)
-          // reference to the DLL closure in the table by first adding one to it.
-          // We check for this here, and undo the addition before evacuating it.
-          //
-          // If the SRT entry hasn't got bit 0 set, the SRT entry points to a
-          // closure that's fixed at link-time, and no extra magic is required.
-          if ( (W_)(*srt) & 0x1 ) {
-              evacuate( (StgClosure**) ((W_) (*srt) & ~0x1));
-          } else {
-              evacuate(p);
-          }
-#else
-          evacuate(p);
-#endif
-      }
-      p++;
-      bitmap = bitmap >> 1;
-  }
-}
-
-
 STATIC_INLINE GNUC_ATTR_HOT void
 scavenge_thunk_srt(const StgInfoTable *info)
 {
     StgThunkInfoTable *thunk_info;
-    uint32_t bitmap;
 
     if (!major_gc) return;
 
     thunk_info = itbl_to_thunk_itbl(info);
-    bitmap = thunk_info->i.srt_bitmap;
-    if (bitmap) {
-        // don't read srt_offset if bitmap==0, because it doesn't exist
-        // and so the memory might not be readable.
-        scavenge_srt((StgClosure **)GET_SRT(thunk_info), bitmap);
+    if (thunk_info->i.has_srt) {
+        StgClosure *srt = (StgClosure*)GET_SRT(thunk_info);
+        evacuate(&srt);
     }
 }
 
@@ -435,16 +347,13 @@ STATIC_INLINE GNUC_ATTR_HOT void
 scavenge_fun_srt(const StgInfoTable *info)
 {
     StgFunInfoTable *fun_info;
-    uint32_t bitmap;
 
     if (!major_gc) return;
 
     fun_info = itbl_to_fun_itbl(info);
-    bitmap = fun_info->i.srt_bitmap;
-    if (bitmap) {
-        // don't read srt_offset if bitmap==0, because it doesn't exist
-        // and so the memory might not be readable.
-        scavenge_srt((StgClosure **)GET_FUN_SRT(fun_info), bitmap);
+    if (fun_info->i.has_srt) {
+        StgClosure *srt = (StgClosure*)GET_FUN_SRT(fun_info);
+        evacuate(&srt);
     }
 }
 
@@ -1979,8 +1888,10 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
         p = scavenge_small_bitmap(p, size, bitmap);
 
     follow_srt:
-        if (major_gc)
-            scavenge_srt((StgClosure **)GET_SRT(info), info->i.srt_bitmap);
+        if (major_gc && info->i.has_srt) {
+            StgClosure *srt = (StgClosure*)GET_SRT(info);
+            evacuate(&srt);
+        }
         continue;
 
     case RET_BCO: {
