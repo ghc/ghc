@@ -2954,6 +2954,7 @@ pprTcApp_help to_type p pp tc tys dflags style
     pp_tc        = ppr tc
     tys_wo_kinds = suppressInvisibles to_type dflags tc tys
 
+    -- See Note [Printing eqauality constraints]
     mb_saturated_equality
       | hetero_eq_tc
       , [k1, k2, t1, t2] <- tys
@@ -2964,14 +2965,13 @@ pprTcApp_help to_type p pp tc tys dflags style
       | otherwise
       = Nothing
 
+    -- See Note [Printing eqauality constraints]
     homo_eq_tc   =  tc `hasKey` eqTyConKey             -- ~
     hetero_eq_tc =  tc `hasKey` eqPrimTyConKey         -- ~#
                  || tc `hasKey` eqReprPrimTyConKey     -- ~R#
                  || tc `hasKey` heqTyConKey            -- ~~
 
-      -- This is all a bit ad-hoc, trying to print out the best representation
-      -- of equalities. If you see a better design, go for it.
-
+    -- See Note [Printing eqauality constraints]
     print_equality (ki1, ki2, ty1, ty2)
       | print_eqs
       = ppr_infix_eq pp_tc
@@ -2998,6 +2998,30 @@ pprTcApp_help to_type p pp tc tys dflags style
     print_eqs   = gopt Opt_PrintEqualityRelations dflags ||
                   dumpStyle style ||
                   debugStyle style
+
+{- Note [Printing equality constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC has a lot of differnent equalities:
+   ~       Boxed   homogeneous   Nominal
+   ~~      Boxed   heterogeneous Nominal
+   ~#      Unboxed heterogeneous Nominal
+   ~R#     Unboxed heterogeneous Representational
+
+This is cofusing to the user, so when priting we usse this
+strategy:
+
+If -fprint-equality-relations or -dppr-debug or we are in
+   "dump style", then print the relation as-is, which
+   distinguishes the various different equalities listed
+   above
+
+If ...something about heterogeneous equalities
+
+Ohherwise print 'Coercible' for (~#), and "~" for the others.
+
+This is all a bit ad-hoc, trying to print out the best representation
+of equalities.  If you see a better design, go for it.
+-}
 
 ------------------
 -- | Given a 'TyCon',and the args to which it is applied,
