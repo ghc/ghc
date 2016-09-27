@@ -54,7 +54,7 @@ seqRules (BuiltinRule {} : rules) = seqRules rules
 seqExpr :: CoreExpr -> ()
 seqExpr (Var v)         = v `seq` ()
 seqExpr (Lit lit)       = lit `seq` ()
-seqExpr (App f a)       = seqExpr f `seq` seqExpr a
+seqExpr (Apps f n as)   = seqExpr f `seq` n `seq` seqExprs as
 seqExpr (Lam b e)       = seqBndr b `seq` seqExpr e
 seqExpr (Let b e)       = seqBind b `seq` seqExpr e
 seqExpr (Case e b t as) = seqExpr e `seq` seqBndr b `seq` seqType t `seq` seqAlts as
