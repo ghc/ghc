@@ -323,9 +323,21 @@ unpackArgs args = go args
     go [] = []
 
 popArg :: HasTypeOf b => Expr b -> Maybe (Expr b, Arg b)
-popArg e = case collectArgs e of
-    (_, []) -> Nothing
-    (f, xs) -> Just (mkApps f (init xs), last xs)
+popArg (Apps _ []) = panic "popArg: empty args"
+popArg (Apps _ [Left _]) = panic "popArg: left singleton"
+popArg (Apps e [Right x]) = Just (e, x)
+popArg (Apps e rxs) = Just (Apps e (fixUp xs 0 []), x)
+  where
+    Right x:xs = reverse rxs
+    ty   = exprType' x
+
+    -- An erased type argument referring to the popped argument needs to be
+    -- removed; all others can stay. This way we avoid re-consulting the
+    -- function's type.
+    fixUp []          _ acc          = acc
+    fixUp (Left i:xs) n acc | i == n = fixUp xs (n+1) (Right (Type ty) : acc)
+    fixUp (x     :xs) n acc          = fixUp xs (n+1) (x               : acc)
+popArg _ = Nothing
 
 #if __GLASGOW_HASKELL__ > 710
 pattern App :: HasTypeOf b => Expr b -> Arg b -> Expr b
