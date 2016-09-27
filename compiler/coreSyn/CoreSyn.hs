@@ -9,7 +9,7 @@
 module CoreSyn (
         -- * Main data types
         Expr(..), pattern App,  Alt, Bind(..), AltCon(..), Arg,
-        CompressArgs(..),
+        HasTypeOf, CompressedArgs,
         Tickish(..), TickishScoping(..), TickishPlacement(..),
         CoreProgram, CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
         TaggedExpr, TaggedAlt, TaggedBind, TaggedArg, TaggedBndr(..), deTagExpr,
@@ -268,7 +268,7 @@ data Expr b
   = Var   Id
   | Lit   Literal
 --  | App   (Expr b) (Arg b)
-  | Apps  (Expr b) Arity [Expr b]
+  | Apps  (Expr b) (CompressedArgs b)
   | Lam   b (Expr b)
   | Let   (Bind b) (Expr b)
   | Case  (Expr b) b Type [Alt b]       -- See #case_invariant#
@@ -279,20 +279,56 @@ data Expr b
   deriving Data
 
 
-class CompressArgs b where
-    unpackArgs :: Expr b -> Arity -> [Arg b] -> [Arg b]
-    unpackArgs _ _ l = l
+type CompressedArgs b = [Either Int (Arg b)]
+-- (Left n) means:
+-- This is the type of the n'ths parameter, counting from the next one
 
-    packArgs :: Expr b -> [Arg b] -> [Arg b]
-    packArgs _ l = l
+class HasTypeOf b where
+    exprType' :: Expr b -> Type
 
-popArg :: CompressArgs b => Expr b -> Maybe (Expr b, Arg b)
+-- Simple compression scheme, as a proof of concept: Only look for type
+-- arguments that thare the type of one argument.
+packArgs :: HasTypeOf b => Expr b -> [Arg b] -> CompressedArgs b
+packArgs f args = go pis args
+  where
+    (all_pis,_) = splitPiTys (exprType' f)
+    -- Only look at the arguments in the type as far as we have real arguments
+    pis = take (length args) all_pis
+
+    -- Remove redundant type variable arguments
+    go (Named tyBndr : pis) (_ : args)
+      | Just n <- findIndex (isTyVar (binderVar tyBndr)) pis
+      = Left n : go pis args
+    -- Keep other arguments
+    go (_ : pis) (a : args)
+      = Right a : go pis args
+    -- More args than our type can handle, keep them
+    go [] args
+      = map Right args
+    go _ [] = panic "defaultPackArgs: not enough args"
+
+    isTyVar :: TyVar -> TyBinder -> Bool
+    isTyVar v (Anon t) | Just v' <- getTyVar_maybe t, v == v' = True
+    isTyVar _ _ = False
+
+unpackArgs :: HasTypeOf b => CompressedArgs b -> [Arg b]
+unpackArgs args = go args
+  where
+    -- This is a type argument we have to recover
+    go (Left i : args) = Type ty : args'
+      where args' = go args
+            ty    = exprType' (args' !! i)
+    go (Right a : args) = a : args'
+      where args' = go args
+    go [] = []
+
+popArg :: HasTypeOf b => Expr b -> Maybe (Expr b, Arg b)
 popArg e = case collectArgs e of
     (_, []) -> Nothing
     (f, xs) -> Just (mkApps f (init xs), last xs)
 
 #if __GLASGOW_HASKELL__ > 710
-pattern App :: CompressArgs b => Expr b -> Arg b -> Expr b
+pattern App :: HasTypeOf b => Expr b -> Arg b -> Expr b
 #endif
 pattern App e1 e2 <- (popArg -> Just (e1, e2))
   where App e1 e2 | (f, args) <- collectArgs e1
@@ -1443,59 +1479,8 @@ type CoreBind = Bind CoreBndr
 type CoreAlt  = Alt  CoreBndr
 
 
--- Simple compression scheme, as a proof of concept: Only look for type
--- arguments that thare the type of one argument.
-defaultPackArgs :: (Expr b -> Type) -> Expr b -> [Arg b] -> [Arg b]
-defaultPackArgs typeOf f args
-    = go pis args
- where
-    (all_pis,_) = splitPiTys (typeOf f)
-    -- Match the arity of the arguments with the arity of the type
-    n = min (length all_pis) (length args)
-    pis = take n all_pis
-
-    -- Remove redundant type type arguments
-    go (Named tyBndr : pis) (_ : args)
-      | any (isTyVar (binderVar tyBndr)) pis
-      = go pis args
-    go (_ : pis) (a : args)
-      = a : go pis args
-    -- More args than our type can handle, keep them
-    go [] args
-      = args
-    go _ [] = panic "defaultPackArgs: not enough args"
-
-    isTyVar :: TyVar -> TyBinder -> Bool
-    isTyVar v (Anon t) | Just v' <- getTyVar_maybe t, v == v' = True
-    isTyVar _ _ = False
-
-defaultUnpackArgs :: (Expr b -> Type) -> Expr b -> Arity -> [Arg b] -> [Arg b]
-defaultUnpackArgs typeOf f arity args
-    = go pis args
- where
-    (all_pis,_) = splitPiTys (typeOf f)
-    -- Match the arity of the arguments with the arity of the type
-    n = min (length all_pis) arity
-    pis = take n all_pis
-
-    go (Named tyBndr : pis) args
-      | Just i <- findIndex (isTyVar (binderVar tyBndr)) pis
-      -- This is a type argument we have to recover
-      = let args' = go pis args
-        in Type (typeOf (args' !! i)) : args'
-    go (_ : pis) (a : args)
-      = a : go pis args
-    go [] args
-      = args
-    go _ [] = panic "defaultPackArgs: not enough args"
-
-    isTyVar :: TyVar -> TyBinder -> Bool
-    isTyVar v (Anon t) | Just v' <- getTyVar_maybe t, v == v' = True
-    isTyVar _ _ = False
-
-instance CompressArgs Var where
-    unpackArgs = defaultUnpackArgs exprType
-    packArgs = defaultPackArgs exprType
+instance HasTypeOf Var where
+    exprType' = exprType
 
 {-
 ************************************************************************
@@ -1521,9 +1506,8 @@ instance Outputable b => OutputableBndr (TaggedBndr b) where
   pprInfixOcc  b = ppr b
   pprPrefixOcc b = ppr b
 
-instance CompressArgs (TaggedBndr t) where
-    unpackArgs = defaultUnpackArgs (exprType . deTagExpr)
-    packArgs = defaultPackArgs (exprType . deTagExpr)
+instance HasTypeOf (TaggedBndr t) where
+    exprType' = exprType . deTagExpr
 
 deTagExpr :: TaggedExpr t -> CoreExpr
 deTagExpr (Var v)                   = Var v
@@ -1554,19 +1538,19 @@ deTagAlt (con, bndrs, rhs) = (con, [b | TB b _ <- bndrs], deTagExpr rhs)
 
 -- | Apply a list of argument expressions to a function expression in a nested fashion. Prefer to
 -- use 'MkCore.mkCoreApps' if possible
-mkApps    :: CompressArgs b => Expr b -> [Arg b]  -> Expr b
+mkApps    :: HasTypeOf b => Expr b -> [Arg b]  -> Expr b
 -- | Apply a list of type argument expressions to a function expression in a nested fashion
-mkTyApps  :: CompressArgs b => Expr b -> [Type]   -> Expr b
+mkTyApps  :: HasTypeOf b => Expr b -> [Type]   -> Expr b
 -- | Apply a list of coercion argument expressions to a function expression in a nested fashion
-mkCoApps  :: CompressArgs b => Expr b -> [Coercion] -> Expr b
+mkCoApps  :: HasTypeOf b => Expr b -> [Coercion] -> Expr b
 -- | Apply a list of type or value variables to a function expression in a nested fashion
-mkVarApps :: CompressArgs b => Expr b -> [Var] -> Expr b
+mkVarApps :: HasTypeOf b => Expr b -> [Var] -> Expr b
 -- | Apply a list of argument expressions to a data constructor in a nested fashion. Prefer to
 -- use 'MkCore.mkCoreConApps' if possible
-mkConApp  :: CompressArgs b => DataCon -> [Arg b] -> Expr b
+mkConApp  :: HasTypeOf b => DataCon -> [Arg b] -> Expr b
 
 mkApps e [] = e
-mkApps e args2 = Apps f (length args) (packArgs f args)
+mkApps e args2 = Apps f (packArgs f args)
   where
     (f, args1) = collectArgs e
     args = args1 ++ args2
@@ -1580,7 +1564,7 @@ mkTyApps  f args = mkApps f (map typeOrCoercion args)
       | Just co <- isCoercionTy_maybe ty = Coercion co
       | otherwise                        = Type ty
 
-mkConApp2 :: CompressArgs b => DataCon -> [Type] -> [Var] -> Expr b
+mkConApp2 :: HasTypeOf b => DataCon -> [Type] -> [Var] -> Expr b
 mkConApp2 con tys arg_ids = Var (dataConWorkId con)
                             `mkApps` map Type tys
                             `mkApps` map varToCoreExpr arg_ids
@@ -1767,13 +1751,13 @@ collectTyAndValBinders expr
 
 -- | Takes a nested application expression and returns the the function
 -- being applied and the arguments to which it is applied
-collectArgs :: CompressArgs b => Expr b -> (Expr b, [Arg b])
-collectArgs (Apps e a xs) = (e, unpackArgs e a xs)
+collectArgs :: HasTypeOf b => Expr b -> (Expr b, [Arg b])
+collectArgs (Apps e xs) = (e, unpackArgs xs)
 collectArgs e = (e, [])
 
 -- | Like @collectArgs@, but also collects looks through floatable
 -- ticks if it means that we can find more arguments.
-collectArgsTicks :: CompressArgs b => (Tickish Id -> Bool) -> Expr b
+collectArgsTicks :: HasTypeOf b => (Tickish Id -> Bool) -> Expr b
                  -> (Expr b, [Arg b], [Tickish Id])
 collectArgsTicks skipTick expr
   = go expr [] []
@@ -1884,10 +1868,10 @@ collectAnnArgsTicks tickishOk expr
                               = go e as (t:ts)
     go e                as ts = (e, as, reverse ts)
 
-deAnnotate :: CompressArgs bndr => AnnExpr bndr annot -> Expr bndr
+deAnnotate :: HasTypeOf bndr => AnnExpr bndr annot -> Expr bndr
 deAnnotate (_, e) = deAnnotate' e
 
-deAnnotate' :: CompressArgs bndr => AnnExpr' bndr annot -> Expr bndr
+deAnnotate' :: HasTypeOf bndr => AnnExpr' bndr annot -> Expr bndr
 deAnnotate' (AnnType t)           = Type t
 deAnnotate' (AnnCoercion co)      = Coercion co
 deAnnotate' (AnnVar  v)           = Var v
@@ -1906,7 +1890,7 @@ deAnnotate' (AnnLet bind body)
 deAnnotate' (AnnCase scrut v t alts)
   = Case (deAnnotate scrut) v t (map deAnnAlt alts)
 
-deAnnAlt :: CompressArgs bndr => AnnAlt bndr annot -> Alt bndr
+deAnnAlt :: HasTypeOf bndr => AnnAlt bndr annot -> Alt bndr
 deAnnAlt (con,args,rhs) = (con,args,deAnnotate rhs)
 
 -- | As 'collectBinders' but for 'AnnExpr' rather than 'Expr'

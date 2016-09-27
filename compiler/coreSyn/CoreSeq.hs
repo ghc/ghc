@@ -54,7 +54,7 @@ seqRules (BuiltinRule {} : rules) = seqRules rules
 seqExpr :: CoreExpr -> ()
 seqExpr (Var v)         = v `seq` ()
 seqExpr (Lit lit)       = lit `seq` ()
-seqExpr (Apps f n as)   = seqExpr f `seq` n `seq` seqExprs as
+seqExpr (Apps f as)     = seqExpr f `seq` seqCompArgs as
 seqExpr (Lam b e)       = seqBndr b `seq` seqExpr e
 seqExpr (Let b e)       = seqBind b `seq` seqExpr e
 seqExpr (Case e b t as) = seqExpr e `seq` seqBndr b `seq` seqType t `seq` seqAlts as
@@ -66,6 +66,11 @@ seqExpr (Coercion co)   = seqCo co
 seqExprs :: [CoreExpr] -> ()
 seqExprs [] = ()
 seqExprs (e:es) = seqExpr e `seq` seqExprs es
+
+seqCompArgs :: CompressedArgs CoreBndr -> ()
+seqCompArgs [] = ()
+seqCompArgs (Left n:es) = n `seq` seqCompArgs es
+seqCompArgs (Right e:es) = seqExpr e `seq` seqCompArgs es
 
 seqTickish :: Tickish Id -> ()
 seqTickish ProfNote{ profNoteCC = cc } = cc `seq` ()
