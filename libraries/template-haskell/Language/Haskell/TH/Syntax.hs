@@ -112,9 +112,8 @@ class Monad m => Quasi m where
 -----------------------------------------------------
 
 instance Quasi IO where
-  qNewName s = do { n <- readIORef counter
-                 ; writeIORef counter (n+1)
-                 ; return (mkNameU s n) }
+  qNewName s = do { n <- atomicModifyIORef' counter (\x -> (x + 1, x))
+                  ; pure (mkNameU s n) }
 
   qReport True  msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
   qReport False msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
