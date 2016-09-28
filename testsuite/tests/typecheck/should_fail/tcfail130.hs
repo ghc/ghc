@@ -1,7 +1,7 @@
 {-# LANGUAGE ImplicitParams #-}
 
 -- The defn of foo should be rejected; it's monomorphic, but
--- the implicit paramter escapes
+-- the implicit parameter escapes
 
 module Foo where
 

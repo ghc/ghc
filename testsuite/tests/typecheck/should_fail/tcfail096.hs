@@ -6,7 +6,7 @@ class Foo f a r | f a -> r where
       foo::f->a->r
 
 -- These instances are incompatible because we can unify
--- the first two paramters, though it's rather obscure:
+-- the first two parameters, though it's rather obscure:
 --      p -> (a,b)
 --      t -> (,) (a,a)
 --      c -> (,) a

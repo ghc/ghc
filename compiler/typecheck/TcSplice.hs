@@ -1851,7 +1851,7 @@ reify_tc_app tc tys
 
 reifyPred :: TyCoRep.PredType -> TcM TH.Pred
 reifyPred ty
-  -- We could reify the invisible paramter as a class but it seems
+  -- We could reify the invisible parameter as a class but it seems
   -- nicer to support them properly...
   | isIPPred ty = noTH (sLit "implicit parameters") (ppr ty)
   | otherwise   = reifyType ty

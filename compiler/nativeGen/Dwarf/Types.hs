@@ -152,7 +152,7 @@ pprDwarfInfo haveSrc d
     noChildren = pprDwarfInfoOpen haveSrc d
 
 -- | Prints assembler data corresponding to DWARF info records. Note
--- that the binary format of this is paramterized in @abbrevDecls@ and
+-- that the binary format of this is parameterized in @abbrevDecls@ and
 -- has to be kept in synch.
 pprDwarfInfoOpen :: Bool -> DwarfInfo -> SDoc
 pprDwarfInfoOpen haveSrc (DwarfCompileUnit _ name producer compDir lowLabel

@@ -1916,7 +1916,7 @@ Note that
     trigger superclass expansion. This was a good part of the loop
     in  Trac #11523
 
-  * Even for Wanted constraints, we say "no" for implicit paramters.
+  * Even for Wanted constraints, we say "no" for implicit parameters.
     we have [W] ?x::ty, expanding superclasses won't help:
       - Superclasses can't be implicit parameters
       - If we have a [G] ?x:ty2, then we'll have another unsolved

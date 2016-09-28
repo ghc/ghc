@@ -1667,7 +1667,7 @@ Note [FunDep and implicit parameter reactions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Currently, our story of interacting two dictionaries (or a dictionary
 and top-level instances) for functional dependencies, and implicit
-paramters, is that we simply produce new Derived equalities.  So for example
+parameters, is that we simply produce new Derived equalities.  So for example
 
         class D a b | a -> b where ...
     Inert:

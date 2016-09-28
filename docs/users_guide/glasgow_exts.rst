@@ -3383,7 +3383,7 @@ example), then we apply the function ``f`` directly to it. If a type is
 encountered that is not syntactically equivalent to the last type parameter
 *but does mention* the last type parameter somewhere in it, then a recursive
 call to ``fmap`` is made. If a type is found which doesn't mention the last
-type paramter at all, then it is left alone.
+type parameter at all, then it is left alone.
 
 The second of those cases, in which a type is unequal to the type parameter but
 does contain the type parameter, can be surprisingly tricky. For example, the
