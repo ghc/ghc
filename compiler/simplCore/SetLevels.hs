@@ -316,7 +316,7 @@ lvlExpr env expr@(_, AnnApp _ _) = do
          let (lapp, rargs) = left (n_val_args - arity) expr []
          rargs' <- mapM (lvlMFE False env) rargs
          lapp' <- lvlMFE False env lapp
-         return (foldl App lapp' rargs')
+         return (mkApps lapp' rargs')
         where
          n_val_args = count (isValArg . deAnnotate) args
          arity = idArity f
@@ -335,7 +335,7 @@ lvlExpr env expr@(_, AnnApp _ _) = do
       _otherwise -> do
          args' <- mapM (lvlMFE False env) args
          fun'  <- lvlExpr env fun
-         return (foldl App fun' args')
+         return (mkApps fun' args')
 
 -- We don't split adjacent lambdas.  That is, given
 --      \x y -> (x+1,y)

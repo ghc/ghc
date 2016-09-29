@@ -1774,7 +1774,7 @@ unC (MkC x) = x
 
 rep2 :: Name -> [ CoreExpr ] -> DsM (Core a)
 rep2 n xs = do { id <- dsLookupGlobalId n
-               ; return (MkC (foldl App (Var id) xs)) }
+               ; return (MkC (mkApps (Var id) xs)) }
 
 dataCon' :: Name -> [CoreExpr] -> DsM (Core a)
 dataCon' n args = do { id <- dsLookupDataCon n

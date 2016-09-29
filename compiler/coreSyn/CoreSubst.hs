@@ -1008,7 +1008,7 @@ simple_app subst (Tick t e) as
   | t `tickishScopesLike` SoftScope
   = mkTick t $ simple_app subst e as
 simple_app subst e as
-  = foldl App (simple_opt_expr subst e) as
+  = mkApps (simple_opt_expr subst e) as
 
 ----------------------
 simple_opt_bind,simple_opt_bind' :: Subst -> CoreBind -> (Subst, Maybe CoreBind)
