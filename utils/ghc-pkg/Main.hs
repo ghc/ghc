@@ -18,6 +18,7 @@ import qualified GHC.PackageDb as GhcPkg
 import GHC.PackageDb (BinaryStringRep(..))
 import qualified Distribution.Simple.PackageIndex as PackageIndex
 import qualified Data.Graph as Graph
+import qualified Data.Version as V
 import qualified Distribution.ModuleName as ModuleName
 import Distribution.ModuleName (ModuleName)
 import Distribution.InstalledPackageInfo as Cabal
@@ -324,8 +325,8 @@ data AsPackageArg
 
 -- | Represents how a package may be specified by a user on the command line.
 data PackageArg
-    -- | A package identifier foo-0.1; the version might be a glob.
-    = Id PackageIdentifier
+    -- | A package identifier foo-0.1, or a glob foo-*
+    = Id GlobPackageIdentifier
     -- | An installed package ID foo-0.1-HASH.  This is guaranteed to uniquely
     -- match a single entry in the package database.
     | IUId UnitId
@@ -487,25 +488,31 @@ parseCheck parser str what =
     [x] -> return x
     _ -> die ("cannot parse \'" ++ str ++ "\' as a " ++ what)
 
-readGlobPkgId :: String -> IO PackageIdentifier
+-- | Either an exact 'PackageIdentifier', or a glob for all packages
+-- matching 'PackageName'.
+data GlobPackageIdentifier
+    = ExactPackageIdentifier PackageIdentifier
+    | GlobPackageIdentifier  PackageName
+
+displayGlobPkgId :: GlobPackageIdentifier -> String
+displayGlobPkgId (ExactPackageIdentifier pid) = display pid
+displayGlobPkgId (GlobPackageIdentifier pn) = display pn ++ "-*"
+
+readGlobPkgId :: String -> IO GlobPackageIdentifier
 readGlobPkgId str = parseCheck parseGlobPackageId str "package identifier"
 
-parseGlobPackageId :: ReadP r PackageIdentifier
+parseGlobPackageId :: ReadP r GlobPackageIdentifier
 parseGlobPackageId =
-  parse
+  fmap ExactPackageIdentifier parse
      +++
   (do n <- parse
       _ <- string "-*"
-      return (PackageIdentifier{ pkgName = n, pkgVersion = globVersion }))
+      return (GlobPackageIdentifier n))
 
 readPackageArg :: AsPackageArg -> String -> IO PackageArg
 readPackageArg AsUnitId str =
     parseCheck (IUId `fmap` parse) str "installed package id"
 readPackageArg AsDefault str = Id `fmap` readGlobPkgId str
-
--- globVersion means "all versions"
-globVersion :: Version
-globVersion = Version [] ["*"]
 
 -- -----------------------------------------------------------------------------
 -- Package databases
@@ -1088,10 +1095,9 @@ convertPackageInfoToCacheFormat pkg =
        GhcPkg.unitId             = installedUnitId pkg,
        GhcPkg.sourcePackageId    = sourcePackageId pkg,
        GhcPkg.packageName        = packageName pkg,
-       GhcPkg.packageVersion     = packageVersion pkg,
+       GhcPkg.packageVersion     = V.Version (versionNumbers (packageVersion pkg)) [],
        GhcPkg.depends            = depends pkg,
-       GhcPkg.abiHash            = let AbiHash abi = abiHash pkg
-                                   in abi,
+       GhcPkg.abiHash            = unAbiHash (abiHash pkg),
        GhcPkg.importDirs         = importDirs pkg,
        GhcPkg.hsLibraries        = hsLibraries pkg,
        GhcPkg.extraLibraries     = extraLibraries pkg,
@@ -1113,7 +1119,7 @@ convertPackageInfoToCacheFormat pkg =
   where convertExposed (ExposedModule n reexport) = (n, reexport)
 
 instance GhcPkg.BinaryStringRep PackageName where
-  fromStringRep = PackageName . fromStringRep
+  fromStringRep = mkPackageName . fromStringRep
   toStringRep   = toStringRep . display
 
 instance GhcPkg.BinaryStringRep PackageIdentifier where
@@ -1123,7 +1129,7 @@ instance GhcPkg.BinaryStringRep PackageIdentifier where
 
 instance GhcPkg.BinaryStringRep UnitId where
   fromStringRep = mkUnitId . fromStringRep
-  toStringRep (SimpleUnitId (ComponentId cid_str)) = toStringRep cid_str
+  toStringRep (SimpleUnitId cid) = toStringRep (unComponentId cid)
 
 instance GhcPkg.BinaryStringRep ModuleName where
   fromStringRep = ModuleName.fromString . fromStringRep
@@ -1340,7 +1346,7 @@ showPackageDot verbosity myflags = do
 
 -- ToDo: This is no longer well-defined with unit ids, because the
 -- dependencies may be varying versions
-latestPackage ::  Verbosity -> [Flag] -> PackageIdentifier -> IO ()
+latestPackage ::  Verbosity -> [Flag] -> GlobPackageIdentifier -> IO ()
 latestPackage verbosity my_flags pkgid = do
   (_, _, flag_db_stack) <-
      getPkgDatabases verbosity False{-modify-} False{-use user-}
@@ -1401,18 +1407,16 @@ findPackagesByDB db_stack pkgarg
         [] -> die ("cannot find package " ++ pkg_msg pkgarg)
         ps -> return ps
   where
-        pkg_msg (Id pkgid)           = display pkgid
+        pkg_msg (Id pkgid)           = displayGlobPkgId pkgid
         pkg_msg (IUId ipid)          = display ipid
         pkg_msg (Substring pkgpat _) = "matching " ++ pkgpat
 
-matches :: PackageIdentifier -> PackageIdentifier -> Bool
-pid `matches` pid'
-  = (pkgName pid == pkgName pid')
-    && (pkgVersion pid == pkgVersion pid' || not (realVersion pid))
-
-realVersion :: PackageIdentifier -> Bool
-realVersion pkgid = versionBranch (pkgVersion pkgid) /= []
-  -- when versionBranch == [], this is a glob
+matches :: GlobPackageIdentifier -> PackageIdentifier -> Bool
+GlobPackageIdentifier pn `matches` pid'
+  = (pn == pkgName pid')
+ExactPackageIdentifier pid `matches` pid'
+  = pkgName pid == pkgName pid' &&
+    (pkgVersion pid == pkgVersion pid' || pkgVersion pid == nullVersion)
 
 matchesPkg :: PackageArg -> InstalledPackageInfo -> Bool
 (Id pid)        `matchesPkg` pkg = pid `matches` sourcePackageId pkg

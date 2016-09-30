@@ -150,7 +150,7 @@ doCopy directory distDir
     where
       noGhcPrimHook f pd lbi us flags
               = let pd'
-                     | packageName pd == PackageName "ghc-prim" =
+                     | packageName pd == mkPackageName "ghc-prim" =
                         case library pd of
                         Just lib ->
                             let ghcPrim = fromJust (simpleParse "GHC.Prim")
@@ -312,7 +312,7 @@ generate directory distdir dll0Modules config_args
           do cwd <- getCurrentDirectory
              let ipid = mkUnitId (display (packageId pd))
              let installedPkgInfo = inplaceInstalledPackageInfo cwd distdir
-                                        pd (AbiHash "") lib lbi clbi
+                                        pd (mkAbiHash "") lib lbi clbi
                  final_ipi = mangleIPI directory distdir lbi $ installedPkgInfo {
                                  Installed.installedUnitId = ipid,
                                  Installed.compatPackageKey = display (packageId pd),
@@ -350,7 +350,7 @@ generate directory distdir dll0Modules config_args
           -- stricter than gnu ld). Thus we remove the ldOptions for
           -- GHC's rts package:
           hackRtsPackage index =
-            case PackageIndex.lookupPackageName index (PackageName "rts") of
+            case PackageIndex.lookupPackageName index (mkPackageName "rts") of
               [(_,[rts])] ->
                  PackageIndex.insert rts{
                      Installed.ldOptions = [],
