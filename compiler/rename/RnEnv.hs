@@ -2112,7 +2112,7 @@ warnUnused flag names = do
 
 warnUnused1 :: WarningFlag -> NameEnv (FieldLabelString, Name) -> Name -> RnM ()
 warnUnused1 flag fld_env name
-  = when (reportable name) $
+  = when (reportable name occ) $
     addUnusedWarning flag
                      occ (nameSrcSpan name)
                      (text "Defined but not used")
@@ -2125,7 +2125,7 @@ warnUnusedGRE :: GlobalRdrElt -> RnM ()
 warnUnusedGRE gre@(GRE { gre_name = name, gre_lcl = lcl, gre_imp = is })
   | lcl       = do fld_env <- mkFieldEnv <$> getGlobalRdrEnv
                    warnUnused1 Opt_WarnUnusedTopBinds fld_env name
-  | otherwise = when (reportable name) (mapM_ warn is)
+  | otherwise = when (reportable name occ) (mapM_ warn is)
   where
     occ = greOccName gre
     warn spec = addUnusedWarning Opt_WarnUnusedTopBinds occ span msg
@@ -2143,12 +2143,15 @@ mkFieldEnv rdr_env = mkNameEnv [ (gre_name gre, (lbl, par_is (gre_par gre)))
                                , Just lbl <- [greLabel gre]
                                ]
 
-reportable :: Name -> Bool
-reportable name
+-- | Should we report the fact that this 'Name' is unused? The
+-- 'OccName' may differ from 'nameOccName' due to
+-- DuplicateRecordFields.
+reportable :: Name -> OccName -> Bool
+reportable name occ
   | isWiredInName name = False    -- Don't report unused wired-in names
                                   -- Otherwise we get a zillion warnings
                                   -- from Data.Tuple
-  | otherwise = not (startsWithUnderscore (nameOccName name))
+  | otherwise = not (startsWithUnderscore occ)
 
 addUnusedWarning :: WarningFlag -> OccName -> SrcSpan -> SDoc -> RnM ()
 addUnusedWarning flag occ span msg
