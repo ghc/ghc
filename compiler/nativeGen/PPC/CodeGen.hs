@@ -9,9 +9,8 @@
 -----------------------------------------------------------------------------
 
 -- This is a big module, but, if you pay attention to
--- (a) the sectioning, (b) the type signatures, and
--- (c) the #if blah_TARGET_ARCH} things, the
--- structure should not be too overwhelming.
+-- (a) the sectioning, and (b) the type signatures,
+-- the structure should not be too overwhelming.
 
 module PPC.CodeGen (
         cmmTopCodeGen,
@@ -471,7 +470,8 @@ getRegister' _ (CmmMachOp (MO_UU_Conv W32 W64) [CmmLoad mem _]) = do
     return (Any II64 (\dst -> addr_code `snocOL` LD II32 dst addr))
 
 getRegister' _ (CmmMachOp (MO_SS_Conv W32 W64) [CmmLoad mem _]) = do
-    Amode addr addr_code <- getAmode D mem
+    -- lwa is DS-form. See Note [Power instruction format]
+    Amode addr addr_code <- getAmode DS mem
     return (Any II64 (\dst -> addr_code `snocOL` LA II32 dst addr))
 
 getRegister' dflags (CmmMachOp mop [x]) -- unary MachOps
@@ -733,6 +733,14 @@ temporary, then do the other computation, and then use the temporary:
     ... (tmp) ...
 -}
 
+{- Note [Power instruction format]
+In some instructions the 16 bit offset must be a multiple of 4, i.e.
+the two least significant bits mus be zero. The "Power ISA" specification
+calls these instruction formats "DS-FORM" and the instructions with
+arbitrary 16 bit offsets are "D-FORM".
+
+The Power ISA specification document can be obtained from www.power.org.
+-}
 data InstrForm = D | DS
 
 getAmode :: InstrForm -> CmmExpr -> NatM Amode
