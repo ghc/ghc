@@ -1553,11 +1553,11 @@ extractDataDefnKindVars :: HsDataDefn RdrName -> RnM [Located RdrName]
 -- Eg    data T a = T1 (S (a :: k) | forall (b::k). T2 (S b)
 -- Here k should scope over the whole definition
 extractDataDefnKindVars (HsDataDefn { dd_ctxt = ctxt, dd_kindSig = ksig
-                                    , dd_cons = cons, dd_derivs = derivs })
+                                    , dd_cons = cons, dd_derivs = L _ derivs })
   = (nubL . freeKiTyVarsKindVars) <$>
     (extract_lctxt TypeLevel ctxt =<<
      extract_mb extract_lkind ksig =<<
-     extract_mb (extract_sig_tys . unLoc) derivs =<<
+     extract_sig_tys (concatMap (unLoc . deriv_clause_tys . unLoc) derivs) =<<
      foldrM (extract_con . unLoc) emptyFKTV cons)
   where
     extract_con (ConDeclGADT { }) acc = return acc

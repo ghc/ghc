@@ -30,6 +30,7 @@ type TypeQ               = Q Type
 type TyLitQ              = Q TyLit
 type CxtQ                = Q Cxt
 type PredQ               = Q Pred
+type DerivClauseQ        = Q DerivClause
 type MatchQ              = Q Match
 type ClauseQ             = Q Clause
 type BodyQ               = Q Body
@@ -360,20 +361,22 @@ funD nm cs =
 tySynD :: Name -> [TyVarBndr] -> TypeQ -> DecQ
 tySynD tc tvs rhs = do { rhs1 <- rhs; return (TySynD tc tvs rhs1) }
 
-dataD :: CxtQ -> Name -> [TyVarBndr] -> Maybe Kind -> [ConQ] -> CxtQ -> DecQ
+dataD :: CxtQ -> Name -> [TyVarBndr] -> Maybe Kind -> [ConQ] -> [DerivClauseQ]
+      -> DecQ
 dataD ctxt tc tvs ksig cons derivs =
   do
     ctxt1 <- ctxt
     cons1 <- sequence cons
-    derivs1 <- derivs
+    derivs1 <- sequence derivs
     return (DataD ctxt1 tc tvs ksig cons1 derivs1)
 
-newtypeD :: CxtQ -> Name -> [TyVarBndr] -> Maybe Kind -> ConQ -> CxtQ -> DecQ
+newtypeD :: CxtQ -> Name -> [TyVarBndr] -> Maybe Kind -> ConQ -> [DerivClauseQ]
+         -> DecQ
 newtypeD ctxt tc tvs ksig con derivs =
   do
     ctxt1 <- ctxt
     con1 <- con
-    derivs1 <- derivs
+    derivs1 <- sequence derivs
     return (NewtypeD ctxt1 tc tvs ksig con1 derivs1)
 
 classD :: CxtQ -> Name -> [TyVarBndr] -> [FunDep] -> [DecQ] -> DecQ
@@ -452,22 +455,24 @@ pragAnnD target expr
 pragLineD :: Int -> String -> DecQ
 pragLineD line file = return $ PragmaD $ LineP line file
 
-dataInstD :: CxtQ -> Name -> [TypeQ] -> Maybe Kind -> [ConQ] -> CxtQ -> DecQ
+dataInstD :: CxtQ -> Name -> [TypeQ] -> Maybe Kind -> [ConQ] -> [DerivClauseQ]
+          -> DecQ
 dataInstD ctxt tc tys ksig cons derivs =
   do
     ctxt1 <- ctxt
     tys1  <- sequence tys
     cons1 <- sequence cons
-    derivs1 <- derivs
+    derivs1 <- sequence derivs
     return (DataInstD ctxt1 tc tys1 ksig cons1 derivs1)
 
-newtypeInstD :: CxtQ -> Name -> [TypeQ] -> Maybe Kind -> ConQ -> CxtQ -> DecQ
+newtypeInstD :: CxtQ -> Name -> [TypeQ] -> Maybe Kind -> ConQ -> [DerivClauseQ]
+             -> DecQ
 newtypeInstD ctxt tc tys ksig con derivs =
   do
     ctxt1 <- ctxt
     tys1  <- sequence tys
     con1  <- con
-    derivs1 <- derivs
+    derivs1 <- sequence derivs
     return (NewtypeInstD ctxt1 tc tys1 ksig con1 derivs1)
 
 tySynInstD :: Name -> TySynEqnQ -> DecQ
@@ -534,11 +539,14 @@ roleAnnotD :: Name -> [Role] -> DecQ
 roleAnnotD name roles = return $ RoleAnnotD name roles
 
 standaloneDerivD :: CxtQ -> TypeQ -> DecQ
-standaloneDerivD ctxtq tyq =
+standaloneDerivD = standaloneDerivWithStrategyD Nothing
+
+standaloneDerivWithStrategyD :: Maybe DerivStrategy -> CxtQ -> TypeQ -> DecQ
+standaloneDerivWithStrategyD ds ctxtq tyq =
   do
     ctxt <- ctxtq
     ty   <- tyq
-    return $ StandaloneDerivD ctxt ty
+    return $ StandaloneDerivD ds ctxt ty
 
 defaultSigD :: Name -> TypeQ -> DecQ
 defaultSigD n tyq =
@@ -569,6 +577,10 @@ tySynEqn lhs rhs =
 
 cxt :: [PredQ] -> CxtQ
 cxt = sequence
+
+derivClause :: Maybe DerivStrategy -> [PredQ] -> DerivClauseQ
+derivClause ds p = do p' <- cxt p
+                      return $ DerivClause ds p'
 
 normalC :: Name -> [BangTypeQ] -> ConQ
 normalC con strtys = liftM (NormalC con) $ sequence strtys

@@ -16,6 +16,7 @@ import SrcLoc
 import Util
 
 import Data.Char
+import Data.Foldable (foldl')
 
 -- | Source Statistics
 ppSourceStats :: Bool -> Located (HsModule RdrName) -> SDoc
@@ -128,9 +129,10 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
     spec_info (Just (True, _))  = (0,0,0,0,0,0,1)
 
     data_info (DataDecl { tcdDataDefn = HsDataDefn { dd_cons = cs
-                                                   , dd_derivs = derivs}})
-        = (length cs, case derivs of Nothing -> 0
-                                     Just (L _ ds) -> length ds)
+                                                   , dd_derivs = L _ derivs}})
+        = ( length cs
+          , foldl' (\s dc -> length (deriv_clause_tys $ unLoc dc) + s)
+                   0 derivs )
     data_info _ = (0,0)
 
     class_info decl@(ClassDecl {})

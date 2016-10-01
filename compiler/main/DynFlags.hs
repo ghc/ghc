@@ -3561,6 +3561,7 @@ xFlagsDeps = [
   flagSpec "DeriveGeneric"                    LangExt.DeriveGeneric,
   flagSpec "DeriveLift"                       LangExt.DeriveLift,
   flagSpec "DeriveTraversable"                LangExt.DeriveTraversable,
+  flagSpec "DerivingStrategies"               LangExt.DerivingStrategies,
   flagSpec "DisambiguateRecordFields"         LangExt.DisambiguateRecordFields,
   flagSpec "DoAndIfThenElse"                  LangExt.DoAndIfThenElse,
   depFlagSpec' "DoRec"                        LangExt.RecursiveDo

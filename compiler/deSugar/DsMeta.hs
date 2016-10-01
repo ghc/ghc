@@ -455,11 +455,13 @@ repClsInstD (ClsInstDecl { cid_poly_ty = ty, cid_binds = binds
    (tvs, cxt, inst_ty) = splitLHsInstDeclTy ty
 
 repStandaloneDerivD :: LDerivDecl Name -> DsM (SrcSpan, Core TH.DecQ)
-repStandaloneDerivD (L loc (DerivDecl { deriv_type = ty }))
+repStandaloneDerivD (L loc (DerivDecl { deriv_strategy = strat
+                                      , deriv_type     = ty }))
   = do { dec <- addSimpleTyVarBinds tvs $
                 do { cxt'     <- repLContext cxt
+                   ; strat'   <- repDerivStrategy strat
                    ; inst_ty' <- repLTy inst_ty
-                   ; repDeriv cxt' inst_ty' }
+                   ; repDeriv strat' cxt' inst_ty' }
        ; return (loc, dec) }
   where
     (tvs, cxt, inst_ty) = splitLHsInstDeclTy ty
@@ -668,22 +670,22 @@ repBangTy ty = do
             _ -> (NoSrcUnpack, NoSrcStrict, ty)
 
 -------------------------------------------------------
---                      Deriving clause
+--                      Deriving clauses
 -------------------------------------------------------
 
-repDerivs :: HsDeriving Name -> DsM (Core TH.CxtQ)
-repDerivs deriv = do
-    let clauses = case deriv of
-                    Nothing         -> []
-                    Just (L _ ctxt) -> ctxt
-    tys <- repList typeQTyConName
-                   (rep_deriv . hsSigType)
-                   clauses
-           :: DsM (Core [TH.PredQ])
-    repCtxt tys
+repDerivs :: HsDeriving Name -> DsM (Core [TH.DerivClauseQ])
+repDerivs (L _ clauses) = repList derivClauseQTyConName repDerivClause clauses
+
+repDerivClause :: LHsDerivingClause Name
+               -> DsM (Core TH.DerivClauseQ)
+repDerivClause (L _ (HsDerivingClause { deriv_clause_strategy = dcs
+                                      , deriv_clause_tys      = L _ dct }))
+  = do MkC dcs' <- repDerivStrategy dcs
+       MkC dct' <- repList typeQTyConName (rep_deriv_ty . hsSigType) dct
+       rep2 derivClauseName [dcs',dct']
   where
-    rep_deriv :: LHsType Name -> DsM (Core TH.TypeQ)
-    rep_deriv (L _ ty) = repTy ty
+    rep_deriv_ty :: LHsType Name -> DsM (Core TH.TypeQ)
+    rep_deriv_ty (L _ ty) = repTy ty
 
 -------------------------------------------------------
 --   Signatures in a class decl, or a group of bindings
@@ -1982,7 +1984,7 @@ repFun (MkC nm) (MkC b) = rep2 funDName [nm, b]
 
 repData :: Core TH.CxtQ -> Core TH.Name -> Core [TH.TyVarBndr]
         -> Maybe (Core [TH.TypeQ]) -> Core (Maybe TH.Kind)
-        -> Core [TH.ConQ] -> Core TH.CxtQ -> DsM (Core TH.DecQ)
+        -> Core [TH.ConQ] -> Core [TH.DerivClauseQ] -> DsM (Core TH.DecQ)
 repData (MkC cxt) (MkC nm) (MkC tvs) Nothing (MkC ksig) (MkC cons) (MkC derivs)
   = rep2 dataDName [cxt, nm, tvs, ksig, cons, derivs]
 repData (MkC cxt) (MkC nm) (MkC _) (Just (MkC tys)) (MkC ksig) (MkC cons)
@@ -1991,7 +1993,7 @@ repData (MkC cxt) (MkC nm) (MkC _) (Just (MkC tys)) (MkC ksig) (MkC cons)
 
 repNewtype :: Core TH.CxtQ -> Core TH.Name -> Core [TH.TyVarBndr]
            -> Maybe (Core [TH.TypeQ]) -> Core (Maybe TH.Kind)
-           -> Core TH.ConQ -> Core TH.CxtQ -> DsM (Core TH.DecQ)
+           -> Core TH.ConQ -> Core [TH.DerivClauseQ] -> DsM (Core TH.DecQ)
 repNewtype (MkC cxt) (MkC nm) (MkC tvs) Nothing (MkC ksig) (MkC con)
            (MkC derivs)
   = rep2 newtypeDName [cxt, nm, tvs, ksig, con, derivs]
@@ -2008,6 +2010,20 @@ repInst :: Core (Maybe TH.Overlap) ->
            Core TH.CxtQ -> Core TH.TypeQ -> Core [TH.DecQ] -> DsM (Core TH.DecQ)
 repInst (MkC o) (MkC cxt) (MkC ty) (MkC ds) = rep2 instanceWithOverlapDName
                                                               [o, cxt, ty, ds]
+
+repDerivStrategy :: Maybe (Located DerivStrategy)
+                 -> DsM (Core (Maybe TH.DerivStrategy))
+repDerivStrategy mds =
+  case mds of
+    Nothing -> nothing
+    Just (L _ ds) ->
+      case ds of
+        DerivStock    -> just =<< dataCon stockDataConName
+        DerivAnyclass -> just =<< dataCon anyclassDataConName
+        DerivNewtype  -> just =<< dataCon newtypeDataConName
+  where
+  nothing = coreNothing derivStrategyTyConName
+  just    = coreJust    derivStrategyTyConName
 
 repOverlap :: Maybe OverlapMode -> DsM (Core (Maybe TH.Overlap))
 repOverlap mb =
@@ -2031,8 +2047,11 @@ repClass :: Core TH.CxtQ -> Core TH.Name -> Core [TH.TyVarBndr]
 repClass (MkC cxt) (MkC cls) (MkC tvs) (MkC fds) (MkC ds)
   = rep2 classDName [cxt, cls, tvs, fds, ds]
 
-repDeriv :: Core TH.CxtQ -> Core TH.TypeQ -> DsM (Core TH.DecQ)
-repDeriv (MkC cxt) (MkC ty) = rep2 standaloneDerivDName [cxt, ty]
+repDeriv :: Core (Maybe TH.DerivStrategy)
+         -> Core TH.CxtQ -> Core TH.TypeQ
+         -> DsM (Core TH.DecQ)
+repDeriv (MkC ds) (MkC cxt) (MkC ty)
+  = rep2 standaloneDerivWithStrategyDName [ds, cxt, ty]
 
 repPragInl :: Core TH.Name -> Core TH.Inline -> Core TH.RuleMatch
            -> Core TH.Phases -> DsM (Core TH.DecQ)

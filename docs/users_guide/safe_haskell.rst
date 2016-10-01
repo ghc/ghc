@@ -284,7 +284,12 @@ Furthermore, we restrict the following features:
   the structure of the data type for which the instance is defined, and
   allowing manually implemented ``Generic`` instances would break that
   invariant. Derived instances (through the :ghc-flag:`-XDeriveGeneric`
-  extension) are still allowed. Refer to the
+  extension) are still allowed. Note that the only allowed
+  :ref:`deriving strategy <deriving-strategies>` for deriving ``Generic`` under
+  Safe Haskell is ``stock``, as another strategy (e.g., ``anyclass``) would
+  produce an instance that violates the invariant.
+
+  Refer to the
   :ref:`generic programming <generic-programming>` section for more details.
 
 .. _safe-overlapping-instances:

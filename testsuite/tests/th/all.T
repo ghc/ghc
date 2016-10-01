@@ -368,6 +368,7 @@ test('T10267', extra_clean(['T10267a.hi', 'T10267a.o']),
 test('T10279', normal, compile_fail, ['-v0'])
 test('T10306', normal, compile, ['-v0'])
 test('T10596', normal, compile, ['-v0'])
+test('T10598_TH', normal, compile, ['-v0 -dsuppress-uniques -ddump-splices'])
 test('T10620', normal, compile_and_run, ['-v0'])
 test('T10638', normal, compile_fail, ['-v0'])
 test('T10697_decided_1', normal, compile_and_run, ['-v0'])

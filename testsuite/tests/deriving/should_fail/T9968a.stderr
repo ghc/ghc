@@ -1,6 +1,6 @@
 
 T9968a.hs:8:13: error:
     • Can't make a derived instance of ‘Bifunctor Blah’:
-        ‘Bifunctor’ is not a standard derivable class (Eq, Show, etc.)
+        ‘Bifunctor’ is not a stock derivable class (Eq, Show, etc.)
         The last argument of class ‘Bifunctor’ does not have kind * or (* -> *)
     • In the data declaration for ‘Blah’

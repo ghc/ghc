@@ -191,6 +191,13 @@ languageOptions =
          , flagReverse = "-XNoDeriveTraversable"
          , flagSince = "7.10.1"
          }
+  , flag { flagName = "-XDerivingStrategies"
+         , flagDescription =
+           "Enables :ref:`deriving strategies <deriving-strategies>`."
+         , flagType = DynamicFlag
+         , flagReverse = "-XNoDerivingStrategies"
+         , flagSince = "8.2.1"
+         }
   , flag { flagName = "-XDisambiguateRecordFields"
          , flagDescription =
            "Enable :ref:`record field disambiguation <disambiguate-fields>`. "++

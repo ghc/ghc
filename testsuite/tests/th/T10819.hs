@@ -16,7 +16,8 @@ data D = X
 instance C Int D where
   f X = 2
 
-$(doSomeTH "N" (mkName "D") [ConT (mkName "C") `AppT` ConT (mkName "Int")])
+$(doSomeTH "N" (mkName "D")
+    [DerivClause Nothing [ConT (mkName "C") `AppT` ConT (mkName "Int")]])
 
 thing :: N
 thing = N X

@@ -40,5 +40,7 @@ test('T9576', exit_code(1), compile_and_run, [''])
 test('T9830', extra_clean(['T9830a.hi', 'T9830a.o']), multimod_compile_and_run, ['T9830','-v0'])
 test('T10104', normal, compile_and_run, [''])
 test('T10447', normal, compile_and_run, [''])
+test('T10598_bug', normal, compile_and_run, [''])
+test('T10598_run', normal, compile_and_run, [''])
 test('T11535', when(opsys('mingw32'), expect_broken_for(12210, ['ghci'])),
      compile_and_run, [''])

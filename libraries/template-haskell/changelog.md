@@ -12,6 +12,9 @@
 
   * Add support for visible type applications. (#12530)
 
+  * Add support for attaching deriving strategies to `deriving` statements
+    (#10598)
+
 ## 2.11.0.0  *May 2016*
 
   * Bundled with GHC 8.0.1

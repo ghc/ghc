@@ -612,6 +612,8 @@ data Token
   | ITusing
   | ITpattern
   | ITstatic
+  | ITstock
+  | ITanyclass
 
   -- Pragmas, see  note [Pragma source text] in BasicTypes
   | ITinline_prag       SourceText InlineSpec RuleMatchInfo
@@ -803,6 +805,8 @@ reservedWordsFM = listToUFM $
          ( "role",           ITrole,          0 ),
          ( "pattern",        ITpattern,       xbit PatternSynonymsBit),
          ( "static",         ITstatic,        0 ),
+         ( "stock",          ITstock,         0 ),
+         ( "anyclass",       ITanyclass,      0 ),
          ( "group",          ITgroup,         xbit TransformComprehensionsBit),
          ( "by",             ITby,            xbit TransformComprehensionsBit),
          ( "using",          ITusing,         xbit TransformComprehensionsBit),

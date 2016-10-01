@@ -3955,10 +3955,10 @@ usually have one "main" parameter for which deriving new instances is
 most interesting.
 
 Lastly, all of this applies only for classes other than ``Read``,
-``Show``, ``Typeable``, and ``Data``, for which the built-in derivation
+``Show``, ``Typeable``, and ``Data``, for which the stock derivation
 applies (section 4.3.3. of the Haskell Report). (For the standard
 classes ``Eq``, ``Ord``, ``Ix``, and ``Bounded`` it is immaterial
-whether the standard method is used or the one described here.)
+whether the stock method is used or the one described here.)
 
 .. _derive-any-class:
 
@@ -4063,6 +4063,64 @@ Note the following details
 
   and then the normal rules for filling in associated types from the
   default will apply, making ``Size Bar`` equal to ``Int``.
+
+.. _deriving-strategies:
+
+Deriving strategies
+-------------------
+
+In most scenarios, every ``deriving`` statement generates a typeclass instance
+in an unambiguous fashion. There is a corner case, however, where
+simultaneously enabling both the :ghc-flag:`-XGeneralizedNewtypeDeriving` and
+:ghc-flag:`-XDeriveAnyClass` extensions can make deriving become ambiguous.
+Consider the following example ::
+
+    {-# LANGUAGE DeriveAnyClass, GeneralizedNewtypeDeriving #-}
+    newtype Foo = MkFoo Bar deriving C
+
+One could either pick the ``DeriveAnyClass`` approach to deriving ``C`` or the
+``GeneralizedNewtypeDeriving`` approach to deriving ``C``, both of which would
+be equally as valid. GHC defaults to favoring ``DeriveAnyClass`` in such a
+dispute, but this is not a satisfying solution, since that leaves users unable
+to use both language extensions in a single module.
+
+To make this more robust, GHC has a notion of deriving strategies, which allow
+the user to explicitly request which approach to use when deriving an instance.
+To enable this feature, one must enable the :ghc-flag:`-XDerivingStrategies`
+language extension. A deriving strategy can be specified in a deriving
+clause ::
+
+    newtype Foo = MkFoo Bar
+      deriving newtype C
+
+Or in a standalone deriving declaration ::
+
+    deriving anyclass instance C Foo
+
+:ghc-flag:`-XDerivingStrategies` also allows the use of multiple deriving
+clauses per data declaration so that a user can derive some instance with
+one deriving strategy and other instances with another deriving strategy.
+For example ::
+
+    newtype Baz = Baz Quux
+      deriving          (Eq, Ord)
+      deriving stock    (Read, Show)
+      deriving newtype  (Num, Floating)
+      deriving anyclass C
+
+Currently, the deriving strategies are:
+
+- ``stock``: Have GHC implement a "standard" instance for a data type,
+  if possible (e.g., ``Eq``, ``Ord``, ``Generic``, ``Data``, ``Functor``, etc.)
+
+- ``anyclass``: Use :ghc-flag:`-XDeriveAnyClass`
+
+- ``newtype``: Use :ghc-flag:`-XGeneralizedNewtypeDeriving`
+
+If an explicit deriving strategy is not given, GHC has an algorithm for
+determining how it will actually derive an instance. For brevity, the algorithm
+is omitted here. You can read the full algorithm at
+:ghc-wiki:`Wiki page <DerivingStrategies>`.
 
 .. _pattern-synonyms:
 

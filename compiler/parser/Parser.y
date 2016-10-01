@@ -88,7 +88,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 %expect 36 -- shift/reduce conflicts
 
-{- Last updated: 9 Jan 2016
+{- Last updated: 3 Aug 2016
 
 If you modify this parser and add a conflict, please update this comment.
 You can learn more about the conflicts by passing 'happy' the -i flag:
@@ -119,7 +119,7 @@ follows. Shift parses as if the 'module' keyword follows.
 
 -------------------------------------------------------------------------------
 
-state 46 contains 2 shift/reduce conflicts.
+state 48 contains 2 shift/reduce conflicts.
 
     *** strict_mark -> unpackedness .
         strict_mark -> unpackedness . strictness
@@ -128,7 +128,7 @@ state 46 contains 2 shift/reduce conflicts.
 
 -------------------------------------------------------------------------------
 
-state 50 contains 1 shift/reduce conflict.
+state 52 contains 1 shift/reduce conflict.
 
         context -> btype .
     *** type -> btype .
@@ -138,7 +138,7 @@ state 50 contains 1 shift/reduce conflict.
 
 -------------------------------------------------------------------------------
 
-state 51 contains 9 shift/reduce conflicts.
+state 53 contains 9 shift/reduce conflicts.
 
     *** btype -> tyapps .
         tyapps -> tyapps . tyapp
@@ -147,7 +147,7 @@ state 51 contains 9 shift/reduce conflicts.
 
 -------------------------------------------------------------------------------
 
-state 132 contains 14 shift/reduce conflicts.
+state 134 contains 14 shift/reduce conflicts.
 
         exp -> infixexp . '::' sigtype
         exp -> infixexp . '-<' exp
@@ -172,7 +172,7 @@ Shift parses as (per longest-parse rule):
 
 -------------------------------------------------------------------------------
 
-state 295 contains 1 shift/reduce conflicts.
+state 299 contains 1 shift/reduce conflicts.
 
         rule -> STRING . rule_activation rule_forall infixexp '=' exp
 
@@ -190,7 +190,7 @@ a rule instructing how to rewrite the expression '[0] f'.
 
 -------------------------------------------------------------------------------
 
-state 304 contains 1 shift/reduce conflict.
+state 309 contains 1 shift/reduce conflict.
 
     *** type -> btype .
         type -> btype . '->' ctype
@@ -201,7 +201,7 @@ Same as state 50 but without contexts.
 
 -------------------------------------------------------------------------------
 
-state 340 contains 1 shift/reduce conflicts.
+state 348 contains 1 shift/reduce conflicts.
 
         tup_exprs -> commas . tup_tail
         sysdcon_nolist -> '(' commas . ')'
@@ -216,7 +216,7 @@ if -XTupleSections is not specified.
 
 -------------------------------------------------------------------------------
 
-state 391 contains 1 shift/reduce conflicts.
+state 402 contains 1 shift/reduce conflicts.
 
         tup_exprs -> commas . tup_tail
         sysdcon_nolist -> '(#' commas . '#)'
@@ -228,7 +228,7 @@ Same as State 324 for unboxed tuples.
 
 -------------------------------------------------------------------------------
 
-state 465 contains 1 shift/reduce conflict.
+state 477 contains 1 shift/reduce conflict.
 
         oqtycon -> '(' qtyconsym . ')'
     *** qtyconop -> qtyconsym .
@@ -239,7 +239,7 @@ TODO: Why?
 
 -------------------------------------------------------------------------------
 
-state 639 contains 1 shift/reduce conflicts.
+state 658 contains 1 shift/reduce conflicts.
 
     *** aexp2 -> ipvar .
         dbind -> ipvar . '=' exp
@@ -254,7 +254,7 @@ sensible meaning, namely the lhs of an implicit binding.
 
 -------------------------------------------------------------------------------
 
-state 707 contains 1 shift/reduce conflicts.
+state 731 contains 1 shift/reduce conflicts.
 
         rule -> STRING rule_activation . rule_forall infixexp '=' exp
 
@@ -271,7 +271,7 @@ doesn't include 'forall'.
 
 -------------------------------------------------------------------------------
 
-state 933 contains 1 shift/reduce conflicts.
+state 963 contains 1 shift/reduce conflicts.
 
         transformqual -> 'then' 'group' . 'using' exp
         transformqual -> 'then' 'group' . 'by' exp 'using' exp
@@ -281,7 +281,7 @@ state 933 contains 1 shift/reduce conflicts.
 
 -------------------------------------------------------------------------------
 
-state 1269 contains 1 shift/reduce conflict.
+state 1303 contains 1 shift/reduce conflict.
 
     *** atype -> tyvar .
         tv_bndr -> '(' tyvar . '::' kind ')'
@@ -368,6 +368,8 @@ output it generates.
  'using'    { L _ ITusing }     -- for list transform extension
  'pattern'      { L _ ITpattern } -- for pattern synonyms
  'static'       { L _ ITstatic }  -- for static pointers extension
+ 'stock'        { L _ ITstock }    -- for DerivingStrategies extension
+ 'anyclass'     { L _ ITanyclass } -- for DerivingStrategies extension
 
  '{-# INLINE'             { L _ (ITinline_prag _ _ _) } -- INLINE or INLINABLE
  '{-# SPECIALISE'         { L _ (ITspec_prag _) }
@@ -870,10 +872,10 @@ ty_decl :: { LTyClDecl RdrName }
                            ++ (fst $ unLoc $5) ++ (fst $ unLoc $6)) }
 
           -- ordinary data type or newtype declaration
-        | data_or_newtype capi_ctype tycl_hdr constrs deriving
+        | data_or_newtype capi_ctype tycl_hdr constrs maybe_derivings
                 {% amms (mkTyData (comb4 $1 $3 $4 $5) (snd $ unLoc $1) $2 $3
                            Nothing (reverse (snd $ unLoc $4))
-                                   (unLoc $5))
+                                   (fmap reverse $5))
                                    -- We need the location on tycl_hdr in case
                                    -- constrs and deriving are both empty
                         ((fst $ unLoc $1):(fst $ unLoc $4)) }
@@ -881,9 +883,10 @@ ty_decl :: { LTyClDecl RdrName }
           -- ordinary GADT declaration
         | data_or_newtype capi_ctype tycl_hdr opt_kind_sig
                  gadt_constrlist
-                 deriving
+                 maybe_derivings
             {% amms (mkTyData (comb4 $1 $3 $5 $6) (snd $ unLoc $1) $2 $3
-                            (snd $ unLoc $4) (snd $ unLoc $5) (unLoc $6) )
+                            (snd $ unLoc $4) (snd $ unLoc $5)
+                            (fmap reverse $6) )
                                    -- We need the location on tycl_hdr in case
                                    -- constrs and deriving are both empty
                     ((fst $ unLoc $1):(fst $ unLoc $4)++(fst $ unLoc $5)) }
@@ -912,18 +915,20 @@ inst_decl :: { LInstDecl RdrName }
                     (mj AnnType $1:mj AnnInstance $2:(fst $ unLoc $3)) }
 
           -- data/newtype instance declaration
-        | data_or_newtype 'instance' capi_ctype tycl_hdr constrs deriving
+        | data_or_newtype 'instance' capi_ctype tycl_hdr constrs
+                          maybe_derivings
             {% amms (mkDataFamInst (comb4 $1 $4 $5 $6) (snd $ unLoc $1) $3 $4
                                       Nothing (reverse (snd  $ unLoc $5))
-                                              (unLoc $6))
+                                              (fmap reverse $6))
                     ((fst $ unLoc $1):mj AnnInstance $2:(fst $ unLoc $5)) }
 
           -- GADT instance declaration
         | data_or_newtype 'instance' capi_ctype tycl_hdr opt_kind_sig
                  gadt_constrlist
-                 deriving
+                 maybe_derivings
             {% amms (mkDataFamInst (comb4 $1 $4 $6 $7) (snd $ unLoc $1) $3 $4
-                                   (snd $ unLoc $5) (snd $ unLoc $6) (unLoc $7))
+                                   (snd $ unLoc $5) (snd $ unLoc $6)
+                                   (fmap reverse $7))
                     ((fst $ unLoc $1):mj AnnInstance $2
                        :(fst $ unLoc $5)++(fst $ unLoc $6)) }
 
@@ -938,6 +943,14 @@ overlap_pragma :: { Maybe (Located OverlapMode) }
                                        [mo $1,mc $2] }
   | {- empty -}                 { Nothing }
 
+deriv_strategy :: { Maybe (Located DerivStrategy) }
+  : 'stock'                     {% ajs (Just (sL1 $1 DerivStock))
+                                       [mj AnnStock $1] }
+  | 'anyclass'                  {% ajs (Just (sL1 $1 DerivAnyclass))
+                                       [mj AnnAnyclass $1] }
+  | 'newtype'                   {% ajs (Just (sL1 $1 DerivNewtype))
+                                       [mj AnnNewtype $1] }
+  | {- empty -}                 { Nothing }
 
 -- Injective type families
 
@@ -1048,18 +1061,19 @@ at_decl_inst :: { LInstDecl RdrName }
                         (mj AnnType $1:(fst $ unLoc $2)) }
 
         -- data/newtype instance declaration
-        | data_or_newtype capi_ctype tycl_hdr constrs deriving
+        | data_or_newtype capi_ctype tycl_hdr constrs maybe_derivings
                {% amms (mkDataFamInst (comb4 $1 $3 $4 $5) (snd $ unLoc $1) $2 $3
                                     Nothing (reverse (snd $ unLoc $4))
-                                            (unLoc $5))
+                                            (fmap reverse $5))
                        ((fst $ unLoc $1):(fst $ unLoc $4)) }
 
         -- GADT instance declaration
         | data_or_newtype capi_ctype tycl_hdr opt_kind_sig
                  gadt_constrlist
-                 deriving
+                 maybe_derivings
                 {% amms (mkDataFamInst (comb4 $1 $3 $5 $6) (snd $ unLoc $1) $2
-                                $3 (snd $ unLoc $4) (snd $ unLoc $5) (unLoc $6))
+                                $3 (snd $ unLoc $4) (snd $ unLoc $5)
+                                (fmap reverse $6))
                         ((fst $ unLoc $1):(fst $ unLoc $4)++(fst $ unLoc $5)) }
 
 data_or_newtype :: { Located (AddAnn, NewOrData) }
@@ -1120,11 +1134,11 @@ capi_ctype : '{-# CTYPE' STRING STRING '#-}'
 
 -- Glasgow extension: stand-alone deriving declarations
 stand_alone_deriving :: { LDerivDecl RdrName }
-  : 'deriving' 'instance' overlap_pragma inst_type
-                         {% do { let { err = text "in the stand-alone deriving instance"
-                                             <> colon <+> quotes (ppr $4) }
-                               ; ams (sLL $1 (hsSigType $>) (DerivDecl $4 $3))
-                                     [mj AnnDeriving $1, mj AnnInstance $2] } }
+  : 'deriving' deriv_strategy 'instance' overlap_pragma inst_type
+                {% do { let { err = text "in the stand-alone deriving instance"
+                                    <> colon <+> quotes (ppr $5) }
+                      ; ams (sLL $1 (hsSigType $>) (DerivDecl $5 $2 $4))
+                            [mj AnnDeriving $1, mj AnnInstance $3] } }
 
 -----------------------------------------------------------------------------
 -- Role annotations
@@ -1929,22 +1943,34 @@ fielddecl :: { LConDeclField RdrName }
                       (ConDeclField (reverse (map (\ln@(L l n) -> L l $ FieldOcc ln PlaceHolder) (unLoc $2))) $4 ($1 `mplus` $5)))
                    [mu AnnDcolon $3] }
 
+-- Reversed!
+maybe_derivings :: { HsDeriving RdrName }
+        : {- empty -}             { noLoc [] }
+        | derivings               { $1 }
+
+-- A list of one or more deriving clauses at the end of a datatype
+derivings :: { HsDeriving RdrName }
+        : derivings deriving      { sLL $1 $> $ $2 : unLoc $1 }
+        | deriving                { sLL $1 $> [$1] }
+
 -- The outer Located is just to allow the caller to
 -- know the rightmost extremity of the 'deriving' clause
-deriving :: { Located (HsDeriving RdrName) }
-        : {- empty -}             { noLoc Nothing }
-        | 'deriving' qtycondoc    {% let { full_loc = comb2 $1 $> }
-                                      in ams (L full_loc $ Just $ L full_loc $
-                                                 [mkLHsSigType $2])
-                                             [mj AnnDeriving $1] }
+deriving :: { LHsDerivingClause RdrName }
+        : 'deriving' deriv_strategy qtycondoc
+              {% let { full_loc = comb2 $1 $> }
+                 in ams (L full_loc $ HsDerivingClause $2 $ L full_loc
+                            [mkLHsSigType $3])
+                        [mj AnnDeriving $1] }
 
-        | 'deriving' '(' ')'      {% let { full_loc = comb2 $1 $> }
-                                     in ams (L full_loc $ Just $ L full_loc [])
-                                            [mj AnnDeriving $1,mop $2,mcp $3] }
+        | 'deriving' deriv_strategy '(' ')'
+              {% let { full_loc = comb2 $1 $> }
+                 in ams (L full_loc $ HsDerivingClause $2 $ L full_loc [])
+                        [mj AnnDeriving $1,mop $3,mcp $4] }
 
-        | 'deriving' '(' deriv_types ')'  {% let { full_loc = comb2 $1 $> }
-                                             in ams (L full_loc $ Just $ L full_loc $3)
-                                                    [mj AnnDeriving $1,mop $2,mcp $4] }
+        | 'deriving' deriv_strategy '(' deriv_types ')'
+              {% let { full_loc = comb2 $1 $> }
+                 in ams (L full_loc $ HsDerivingClause $2 $ L full_loc $4)
+                        [mj AnnDeriving $1,mop $3,mcp $5] }
              -- Glasgow extension: allow partial
              -- applications in derivings
 
@@ -3014,8 +3040,8 @@ qvarid :: { Located RdrName }
         | QVARID              { sL1 $1 $! mkQual varName (getQVARID $1) }
 
 -- Note that 'role' and 'family' get lexed separately regardless of
--- the use of extensions. However, because they are listed here, this
--- is OK and they can be used as normal varids.
+-- the use of extensions. However, because they are listed here,
+-- this is OK and they can be used as normal varids.
 -- See Note [Lexing type pseudo-keywords] in Lexer.x
 varid :: { Located RdrName }
         : VARID            { sL1 $1 $! mkUnqual varName (getVARID $1) }
@@ -3049,8 +3075,8 @@ varsym_no_minus :: { Located RdrName } -- varsym not including '-'
 
 -- These special_ids are treated as keywords in various places,
 -- but as ordinary ids elsewhere.   'special_id' collects all these
--- except 'unsafe', 'interruptible', 'forall', 'family', and 'role',
--- whose treatment differs depending on context
+-- except 'unsafe', 'interruptible', 'forall', 'family', 'role', 'stock', and
+-- 'anyclass', whose treatment differs depending on context
 special_id :: { Located FastString }
 special_id
         : 'as'                  { sL1 $1 (fsLit "as") }
@@ -3065,6 +3091,8 @@ special_id
         | 'prim'                { sL1 $1 (fsLit "prim") }
         | 'javascript'          { sL1 $1 (fsLit "javascript") }
         | 'group'               { sL1 $1 (fsLit "group") }
+        | 'stock'               { sL1 $1 (fsLit "stock") }
+        | 'anyclass'            { sL1 $1 (fsLit "anyclass") }
 
 special_sym :: { Located FastString }
 special_sym : '!'       {% ams (sL1 $1 (fsLit "!")) [mj AnnBang $1] }

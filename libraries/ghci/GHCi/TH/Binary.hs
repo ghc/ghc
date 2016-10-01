@@ -30,6 +30,8 @@ instance Binary TH.Pat
 instance Binary TH.Exp
 instance Binary TH.Dec
 instance Binary TH.Overlap
+instance Binary TH.DerivClause
+instance Binary TH.DerivStrategy
 instance Binary TH.Guard
 instance Binary TH.Body
 instance Binary TH.Match

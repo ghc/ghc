@@ -41,6 +41,8 @@ module BasicTypes(
 
         TopLevelFlag(..), isTopLevel, isNotTopLevel,
 
+        DerivStrategy(..),
+
         OverlapFlag(..), OverlapMode(..), setOverlapModeMaybe,
         hasOverlappingFlag, hasOverlappableFlag, hasIncoherentFlag,
 
@@ -475,6 +477,30 @@ isGenerated FromSource = False
 instance Outputable Origin where
   ppr FromSource  = text "FromSource"
   ppr Generated   = text "Generated"
+
+{-
+************************************************************************
+*                                                                      *
+                Deriving strategies
+*                                                                      *
+************************************************************************
+-}
+
+-- | Which technique the user explicitly requested when deriving an instance.
+data DerivStrategy
+  -- See Note [Deriving strategies] in TcDeriv
+  = DerivStock    -- ^ GHC's \"standard\" strategy, which is to implement a
+                  --   custom instance for the data type. This only works for
+                  --   certain types that GHC knows about (e.g., 'Eq', 'Show',
+                  --   'Functor' when @-XDeriveFunctor@ is enabled, etc.)
+  | DerivAnyclass -- ^ @-XDeriveAnyClass@
+  | DerivNewtype  -- ^ @-XGeneralizedNewtypeDeriving@
+  deriving (Eq, Data)
+
+instance Outputable DerivStrategy where
+    ppr DerivStock    = text "stock"
+    ppr DerivAnyclass = text "anyclass"
+    ppr DerivNewtype  = text "newtype"
 
 {-
 ************************************************************************

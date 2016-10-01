@@ -1,0 +1,41 @@
+T10598_TH.hs:(27,3)-(42,50): Splicing declarations
+    do { fooDataName <- newName "Foo";
+         mkFooConName <- newName "MkFoo";
+         let fooType = conT fooDataName;
+         sequence
+           [newtypeD
+              (cxt [])
+              fooDataName
+              []
+              Nothing
+              (normalC
+                 mkFooConName
+                 [bangType
+                    (bang noSourceUnpackedness noSourceStrictness) [t| Int |]])
+              [derivClause (Just Stock) [[t| Eq |]],
+               derivClause (Just Anyclass) [[t| C |]],
+               derivClause (Just Newtype) [[t| Read |]]],
+            standaloneDerivWithStrategyD
+              (Just Stock)
+              (cxt [])
+              [t| Ord $fooType |]
+              pending(rn) [<splice, fooType>],
+            standaloneDerivWithStrategyD
+              (Just Anyclass)
+              (cxt [])
+              [t| D $fooType |]
+              pending(rn) [<splice, fooType>],
+            standaloneDerivWithStrategyD
+              (Just Newtype)
+              (cxt [])
+              [t| Show $fooType |]
+              pending(rn) [<splice, fooType>]] }
+  ======>
+    newtype Foo
+      = MkFoo Int
+      deriving stock (Eq)
+      deriving anyclass (C)
+      deriving newtype (Read)
+    deriving stock instance Ord Foo
+    deriving anyclass instance D Foo
+    deriving newtype instance Show Foo

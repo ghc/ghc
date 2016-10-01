@@ -50,6 +50,7 @@ extra_src_files = {
   'T10529c': ['.hpc/', 'hpc_sample_no_parse.tix'],
   'T10576a': ['T10576.hs'],
   'T10576b': ['T10576.hs'],
+  'T10598':  ['Test10598.hs'],
   'T10637': ['A.hs', 'A.hs-boot'],
   'T10672_x64': ['Main.hs', 'Printf.hs', 'cxxy.cpp'],
   'T10672_x86': ['Main.hs', 'Printf.hs', 'cxxy.cpp'],

@@ -85,11 +85,11 @@ module Language.Haskell.TH(
 
     -- * Library functions
     -- ** Abbreviations
-        InfoQ, ExpQ, DecQ, DecsQ, ConQ, TypeQ, TyLitQ, CxtQ, PredQ, MatchQ,
-        ClauseQ, BodyQ, GuardQ, StmtQ, RangeQ, SourceStrictnessQ,
-        SourceUnpackednessQ, BangTypeQ, VarBangTypeQ, StrictTypeQ,
-        VarStrictTypeQ, PatQ, FieldPatQ, RuleBndrQ, TySynEqnQ, PatSynDirQ,
-        PatSynArgsQ,
+        InfoQ, ExpQ, DecQ, DecsQ, ConQ, TypeQ, TyLitQ, CxtQ, PredQ,
+        DerivClauseQ, MatchQ, ClauseQ, BodyQ, GuardQ, StmtQ, RangeQ,
+        SourceStrictnessQ, SourceUnpackednessQ, BangTypeQ, VarBangTypeQ,
+        StrictTypeQ, VarStrictTypeQ, PatQ, FieldPatQ, RuleBndrQ, TySynEqnQ,
+        PatSynDirQ, PatSynArgsQ,
 
     -- ** Constructors lifted to 'Q'
     -- *** Literals
@@ -144,9 +144,10 @@ module Language.Haskell.TH(
     -- *** Top Level Declarations
     -- **** Data
     valD, funD, tySynD, dataD, newtypeD,
+    derivClause, DerivClause(..), DerivStrategy(..),
     -- **** Class
     classD, instanceD, instanceWithOverlapD, Overlap(..),
-    sigD, standaloneDerivD, defaultSigD,
+    sigD, standaloneDerivD, standaloneDerivWithStrategyD, defaultSigD,
 
     -- **** Role annotations
     roleAnnotD,

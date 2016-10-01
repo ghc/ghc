@@ -19,6 +19,7 @@
 module HsDecls (
   -- * Toplevel declarations
   HsDecl(..), LHsDecl, HsDataDefn(..), HsDeriving,
+  HsDerivingClause(..), LHsDerivingClause,
 
   -- ** Class or type declarations
   TyClDecl(..), LTyClDecl,
@@ -1027,23 +1028,47 @@ data HsDataDefn name   -- The payload of a data type defn
 deriving instance (DataId id) => Data (HsDataDefn id)
 
 -- | Haskell Deriving clause
-type HsDeriving name = Maybe (Located [LHsSigType name])
-  -- ^ The optional 'deriving' clause of a data declaration
+type HsDeriving name = Located [LHsDerivingClause name]
+  -- ^ The optional @deriving@ clauses of a data declaration. "Clauses" is
+  -- plural because one can specify multiple deriving clauses using the
+  -- @-XDerivingStrategies@ language extension.
   --
-  --   @Nothing@ => not specified,
-  --   @Just []@ => derive exactly what is asked
-  --
-  -- It's a 'LHsSigType' because, with Generalised Newtype
-  -- Deriving, we can mention type variables that aren't
-  -- bound by the date type.   e.g.
-  --     data T b = ... deriving( C [a] )
-  -- should producd a derived instance for (C [a] (T b))
-  --
-  -- The payload of the Maybe is Located so that we have a
-  -- place to hang the API annotations:
-  --  - 'ApiAnnotation.AnnKeywordId' :
-  --       'ApiAnnotation.AnnDeriving',
-  --       'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose'
+  -- The list of 'LHsDerivingClause's corresponds to exactly what the user
+  -- requested to derive, in order. If no deriving clauses were specified,
+  -- the list is empty.
+
+type LHsDerivingClause name = Located (HsDerivingClause name)
+
+-- | A single @deriving@ clause of a data declaration.
+--
+--  - 'ApiAnnotation.AnnKeywordId' :
+--       'ApiAnnotation.AnnDeriving', 'ApiAnnotation.AnnStock',
+--       'ApiAnnotation.AnnAnyClass', 'Api.AnnNewtype',
+--       'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose'
+data HsDerivingClause name
+  -- See Note [Deriving strategies] in TcDeriv
+  = HsDerivingClause
+    { deriv_clause_strategy :: Maybe (Located DerivStrategy)
+      -- ^ The user-specified strategy (if any) to use when deriving
+      -- 'deriv_clause_tys'.
+    , deriv_clause_tys :: Located [LHsSigType name]
+      -- ^ The types to derive.
+      --
+      -- It uses 'LHsSigType's because, with @-XGeneralizedNewtypeDeriving@,
+      -- we can mention type variables that aren't bound by the datatype, e.g.
+      --
+      -- > data T b = ... deriving (C [a])
+      --
+      -- should produce a derived instance for @C [a] (T b)@.
+    }
+deriving instance (DataId id) => Data (HsDerivingClause id)
+
+instance (OutputableBndrId name) => Outputable (HsDerivingClause name) where
+  ppr (HsDerivingClause { deriv_clause_strategy = dcs
+                        , deriv_clause_tys      = L _ dct })
+    = hsep [ text "deriving"
+           , ppDerivStrategy dcs
+           , parens (interpp'SP dct) ]
 
 data NewOrData
   = NewType                     -- ^ @newtype Blah ...@
@@ -1159,15 +1184,12 @@ pp_data_defn pp_hdr (HsDataDefn { dd_ND = new_or_data, dd_ctxt = L _ context
 
   | otherwise
   = hang (ppr new_or_data <+> pp_hdr context <+> pp_sig)
-       2 (pp_condecls condecls $$ pp_derivings)
+       2 (pp_condecls condecls $$ pp_derivings derivings)
   where
     pp_sig = case mb_sig of
                Nothing   -> empty
                Just kind -> dcolon <+> ppr kind
-    pp_derivings = case derivings of
-                     Nothing -> empty
-                     Just (L _ ds) -> hsep [ text "deriving"
-                                           , parens (interpp'SP ds)]
+    pp_derivings (L _ ds) = vcat (map ppr ds)
 
 instance (OutputableBndrId name) => Outputable (HsDataDefn name) where
    ppr d = pp_data_defn (\_ -> text "Naked HsDataDefn") d
@@ -1455,6 +1477,12 @@ instance (OutputableBndrId name) => Outputable (ClsInstDecl name) where
         top_matter = text "instance" <+> ppOverlapPragma mbOverlap
                                              <+> ppr inst_ty
 
+ppDerivStrategy :: Maybe (Located DerivStrategy) -> SDoc
+ppDerivStrategy mb =
+  case mb of
+    Nothing       -> empty
+    Just (L _ ds) -> ppr ds
+
 ppOverlapPragma :: Maybe (Located OverlapMode) -> SDoc
 ppOverlapPragma mb =
   case mb of
@@ -1496,19 +1524,26 @@ type LDerivDecl name = Located (DerivDecl name)
 -- | Deriving Declaration
 data DerivDecl name = DerivDecl
         { deriv_type         :: LHsSigType name
+        , deriv_strategy     :: Maybe (Located DerivStrategy)
         , deriv_overlap_mode :: Maybe (Located OverlapMode)
-         -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
-         --                                    'ApiAnnotation.AnnClose',
-         --                                    'ApiAnnotation.AnnDeriving',
-         --                                    'ApiAnnotation.AnnInstance'
+         -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDeriving',
+         --        'ApiAnnotation.AnnInstance', 'ApiAnnotation.AnnStock',
+         --        'ApiAnnotation.AnnAnyClass', 'Api.AnnNewtype',
+         --        'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose'
 
   -- For details on above see note [Api annotations] in ApiAnnotation
         }
 deriving instance (DataId name) => Data (DerivDecl name)
 
 instance (OutputableBndrId name) => Outputable (DerivDecl name) where
-    ppr (DerivDecl ty o)
-        = hsep [text "deriving instance", ppOverlapPragma o, ppr ty]
+    ppr (DerivDecl { deriv_type = ty
+                   , deriv_strategy = ds
+                   , deriv_overlap_mode = o })
+        = hsep [ text "deriving"
+               , ppDerivStrategy ds
+               , text "instance"
+               , ppOverlapPragma o
+               , ppr ty ]
 
 {-
 ************************************************************************
