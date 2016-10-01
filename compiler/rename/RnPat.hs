@@ -62,7 +62,7 @@ import TysWiredIn          ( nilDataCon )
 import DataCon
 import qualified GHC.LanguageExtensions as LangExt
 
-import Control.Monad       ( when, liftM, ap )
+import Control.Monad       ( when, liftM, ap, unless )
 import Data.Ratio
 
 {-
@@ -248,6 +248,25 @@ We want to "see" this use, and in let-bindings we collect all uses and
 report unused variables at the binding level. So we must use bindLocalNames
 here, *not* bindLocalNameFV.  Trac #3943.
 
+
+Note: [Don't report shadowing for pattern synonyms]
+There is one special context where a pattern doesn't introduce any new binders -
+pattern synonym declarations. Therefore we don't check to see if pattern
+variables shadow existing identifiers as they are never bound to anything
+and have no scope.
+
+Without this check, there would be quite a cryptic warning that the `x`
+in the RHS of the pattern synonym declaration shadowed the top level `x`.
+
+```
+x :: ()
+x = ()
+
+pattern P x = Just x
+```
+
+See #12615 for some more examples.
+
 *********************************************************
 *                                                      *
         External entry points
@@ -293,9 +312,12 @@ rnPats ctxt pats thing_inside
           --    check incrementally for duplicates;
           -- Nor can we check incrementally for shadowing, else we'll
           --    complain *twice* about duplicates e.g. f (x,x) = ...
-        ; addErrCtxt doc_pat $
-          checkDupAndShadowedNames envs_before $
-          collectPatsBinders pats'
+          --
+          -- See note [Don't report shadowing for pattern synonyms]
+        ; unless (isPatSynCtxt ctxt)
+              (addErrCtxt doc_pat $
+                checkDupAndShadowedNames envs_before $
+                collectPatsBinders pats')
         ; thing_inside pats' } }
   where
     doc_pat = text "In" <+> pprMatchContext ctxt

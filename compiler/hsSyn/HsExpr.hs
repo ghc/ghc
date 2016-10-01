@@ -2277,6 +2277,12 @@ data HsMatchContext id
   deriving Functor
 deriving instance (DataIdPost id) => Data (HsMatchContext id)
 
+isPatSynCtxt :: HsMatchContext id -> Bool
+isPatSynCtxt ctxt =
+  case ctxt of
+    PatSyn -> True
+    _      -> False
+
 -- | Haskell Statement Context
 data HsStmtContext id
   = ListComp
