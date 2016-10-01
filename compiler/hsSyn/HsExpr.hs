@@ -2208,6 +2208,12 @@ data HsMatchContext id  -- Context of a Match
   | PatSyn                      -- A pattern synonym declaration
   deriving (Data, Typeable)
 
+isPatSynCtxt :: HsMatchContext id -> Bool
+isPatSynCtxt ctxt =
+  case ctxt of
+    PatSyn -> True
+    _      -> False
+
 data HsStmtContext id
   = ListComp
   | MonadComp
