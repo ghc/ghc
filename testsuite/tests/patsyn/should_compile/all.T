@@ -56,3 +56,5 @@ test('T12484', normal, compile, [''])
 test('T12489', normal, compile, [''])
 test('T11959', expect_broken(11959), multimod_compile, ['T11959', '-v0'])
 test('T12615', normal, compile, [''])
+test('T11987', normal, multimod_compile, ['T11987', '-v0'])
+
