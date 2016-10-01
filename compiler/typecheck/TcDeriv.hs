@@ -591,11 +591,20 @@ deriveStandalone (L loc (DerivDecl deriv_ty deriv_strat' overlap_mode))
               , text "class types:" <+> ppr cls_tys
               , text "type:" <+> ppr inst_ty ]
 
+       ; let bale_out msg = failWithTc (derivingThingErr False cls cls_tys
+                              inst_ty deriv_strat msg)
+
        ; case tcSplitTyConApp_maybe inst_ty of
            Just (tc, tc_args)
               | className cls == typeableClassName
               -> do warnUselessTypeable
                     return []
+
+              | isUnboxedTupleTyCon tc
+              -> bale_out $ unboxedTyConErr "tuple"
+
+              | isUnboxedSumTyCon tc
+              -> bale_out $ unboxedTyConErr "sum"
 
               | isAlgTyCon tc || isDataFamilyTyCon tc  -- All other classes
               -> do { spec <- mkEqnHelp (fmap unLoc overlap_mode)
@@ -604,8 +613,7 @@ deriveStandalone (L loc (DerivDecl deriv_ty deriv_strat' overlap_mode))
                     ; return [spec] }
 
            _  -> -- Complain about functions, primitive types, etc,
-                 failWithTc $ derivingThingErr False cls cls_tys
-                                               inst_ty deriv_strat $
+                 bale_out $
                  text "The last argument of the instance must be a data or newtype application"
         }
 
@@ -2672,3 +2680,7 @@ standaloneCtxt ty = hang (text "In the stand-alone deriving instance for")
 derivInstCtxt :: PredType -> MsgDoc
 derivInstCtxt pred
   = text "When deriving the instance for" <+> parens (ppr pred)
+
+unboxedTyConErr :: String -> MsgDoc
+unboxedTyConErr thing =
+  text "The last argument of the instance cannot be an unboxed" <+> text thing
