@@ -462,9 +462,9 @@ lookupConstructorFields con_name
              ; traceTc "lookupCF" (ppr con_name $$ ppr (lookupNameEnv field_env con_name) $$ ppr field_env)
              ; return (lookupNameEnv field_env con_name `orElse` []) }
           else
-          do { con <- tcLookupDataCon con_name
+          do { con <- tcLookupConLike con_name
              ; traceTc "lookupCF 2" (ppr con)
-             ; return (dataConFieldLabels con) } }
+             ; return (conLikeFieldLabels con) } }
 
 -----------------------------------------------
 -- Used for record construction and pattern matching

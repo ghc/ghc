@@ -58,4 +58,5 @@ test('T12094', normal, compile, [''])
 test('T11977', normal, compile, [''])
 test('T12108', normal, compile, [''])
 test('T12484', normal, compile, [''])
-test('T12489', normal, compile, [''])
+test('T11987', normal, multimod_compile, ['T11987', '-v0'])
+
