@@ -1,0 +1,10 @@
+
+T12512.hs:11:1: error:
+    • Can't make a derived instance of ‘Wat1 (# a, b #)’:
+        The last argument of the instance cannot be an unboxed tuple
+    • In the stand-alone deriving instance for ‘Wat1 (# a, b #)’
+
+T12512.hs:14:1: error:
+    • Can't make a derived instance of ‘Wat2 (# a | b #)’:
+        The last argument of the instance cannot be an unboxed sum
+    • In the stand-alone deriving instance for ‘Wat2 (# a | b #)’
