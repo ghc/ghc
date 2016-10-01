@@ -2303,7 +2303,7 @@ genCCall32' dflags target dest_regs args = do
              size = arg_size arg_ty -- Byte size
 
 genCCall64' :: DynFlags
-            -> ForeignTarget            -- function to call
+            -> ForeignTarget      -- function to call
             -> [CmmFormal]        -- where to put the result
             -> [CmmActual]        -- arguments (of mixed type)
             -> NatM InstrBlock
@@ -2311,15 +2311,20 @@ genCCall64' dflags target dest_regs args = do
     -- load up the register arguments
     let prom_args = map (maybePromoteCArg dflags W32) args
 
-    (stack_args, int_regs_used, fp_regs_used, load_args_code)
+    (stack_args, int_regs_used, fp_regs_used, load_args_code, assign_args_code)
          <-
         if platformOS platform == OSMinGW32
         then load_args_win prom_args [] [] (allArgRegs platform) nilOL
-        else do (stack_args, aregs, fregs, load_args_code)
-                    <- load_args prom_args (allIntArgRegs platform) (allFPArgRegs platform) nilOL
-                let fp_regs_used  = reverse (drop (length fregs) (reverse (allFPArgRegs platform)))
-                    int_regs_used = reverse (drop (length aregs) (reverse (allIntArgRegs platform)))
-                return (stack_args, int_regs_used, fp_regs_used, load_args_code)
+        else do
+           (stack_args, aregs, fregs, load_args_code, assign_args_code)
+               <- load_args prom_args (allIntArgRegs platform)
+                                      (allFPArgRegs platform)
+                                      nilOL nilOL
+           let used_regs rs as = reverse (drop (length rs) (reverse as))
+               fregs_used      = used_regs fregs (allFPArgRegs platform)
+               aregs_used      = used_regs aregs (allIntArgRegs platform)
+           return (stack_args, aregs_used, fregs_used, load_args_code
+                                                      , assign_args_code)
 
     let
         arg_regs_used = int_regs_used ++ fp_regs_used
@@ -2408,9 +2413,10 @@ genCCall64' dflags target dest_regs args = do
                 r_dest = getRegisterReg platform True (CmmLocal dest)
         assign_code _many = panic "genCCall.assign_code many"
 
-    return (load_args_code      `appOL`
-            adjust_rsp          `appOL`
+    return (adjust_rsp          `appOL`
             push_code           `appOL`
+            load_args_code      `appOL`
+            assign_args_code    `appOL`
             lss_code            `appOL`
             assign_eax sse_regs `appOL`
             call                `appOL`
@@ -2419,46 +2425,79 @@ genCCall64' dflags target dest_regs args = do
   where platform = targetPlatform dflags
         arg_size = 8 -- always, at the mo
 
-        load_args :: [CmmExpr]
-                  -> [Reg]                  -- int regs avail for args
-                  -> [Reg]                  -- FP regs avail for args
-                  -> InstrBlock
-                  -> NatM ([CmmExpr],[Reg],[Reg],InstrBlock)
-        load_args args [] [] code     =  return (args, [], [], code)
-            -- no more regs to use
-        load_args [] aregs fregs code =  return ([], aregs, fregs, code)
-            -- no more args to push
-        load_args (arg : rest) aregs fregs code
-            | isFloatType arg_rep =
-            case fregs of
-              [] -> push_this_arg
-              (r:rs) -> do
-                 arg_code <- getAnyReg arg
-                 load_args rest aregs rs (code `appOL` arg_code r)
-            | otherwise =
-            case aregs of
-              [] -> push_this_arg
-              (r:rs) -> do
-                 arg_code <- getAnyReg arg
-                 load_args rest rs fregs (code `appOL` arg_code r)
-            where
-              arg_rep = cmmExprType dflags arg
 
+        load_args :: [CmmExpr]
+                  -> [Reg]         -- int regs avail for args
+                  -> [Reg]         -- FP regs avail for args
+                  -> InstrBlock    -- code computing args
+                  -> InstrBlock    -- code assigning args to ABI regs
+                  -> NatM ([CmmExpr],[Reg],[Reg],InstrBlock,InstrBlock)
+        -- no more regs to use
+        load_args args [] [] code acode     =
+            return (args, [], [], code, acode)
+
+        -- no more args to push
+        load_args [] aregs fregs code acode =
+            return ([], aregs, fregs, code, acode)
+
+        load_args (arg : rest) aregs fregs code acode
+            | isFloatType arg_rep = case fregs of
+                 []     -> push_this_arg
+                 (r:rs) -> do
+                    (code',acode') <- reg_this_arg r
+                    load_args rest aregs rs code' acode'
+            | otherwise           = case aregs of
+                 []     -> push_this_arg
+                 (r:rs) -> do
+                    (code',acode') <- reg_this_arg r
+                    load_args rest rs fregs code' acode'
+            where
+
+              -- put arg into the list of stack pushed args
               push_this_arg = do
-                (args',ars,frs,code') <- load_args rest aregs fregs code
-                return (arg:args', ars, frs, code')
+                 (args',ars,frs,code',acode')
+                     <- load_args rest aregs fregs code acode
+                 return (arg:args', ars, frs, code', acode')
+
+              -- pass the arg into the given register
+              reg_this_arg r
+                -- "operand" args can be directly assigned into r
+                | isOperand False arg = do
+                    arg_code <- getAnyReg arg
+                    return (code, (acode `appOL` arg_code r))
+                -- The last non-operand arg can be directly assigned after its
+                -- computation without going into a temporary register
+                | all (isOperand False) rest = do
+                    arg_code   <- getAnyReg arg
+                    return (code `appOL` arg_code r,acode)
+
+                -- other args need to be computed beforehand to avoid clobbering
+                -- previously assigned registers used to pass parameters (see
+                -- #11792, #12614). They are assigned into temporary registers
+                -- and get assigned to proper call ABI registers after they all
+                -- have been computed.
+                | otherwise     = do
+                    arg_code <- getAnyReg arg
+                    tmp      <- getNewRegNat arg_fmt
+                    let
+                      code'  = code `appOL` arg_code tmp
+                      acode' = acode `snocOL` reg2reg arg_fmt tmp r
+                    return (code',acode')
+
+              arg_rep = cmmExprType dflags arg
+              arg_fmt = cmmTypeFormat arg_rep
 
         load_args_win :: [CmmExpr]
                       -> [Reg]        -- used int regs
                       -> [Reg]        -- used FP regs
                       -> [(Reg, Reg)] -- (int, FP) regs avail for args
                       -> InstrBlock
-                      -> NatM ([CmmExpr],[Reg],[Reg],InstrBlock)
+                      -> NatM ([CmmExpr],[Reg],[Reg],InstrBlock,InstrBlock)
         load_args_win args usedInt usedFP [] code
-            = return (args, usedInt, usedFP, code)
+            = return (args, usedInt, usedFP, code, nilOL)
             -- no more regs to use
         load_args_win [] usedInt usedFP _ code
-            = return ([], usedInt, usedFP, code)
+            = return ([], usedInt, usedFP, code, nilOL)
             -- no more args to push
         load_args_win (arg : rest) usedInt usedFP
                       ((ireg, freg) : regs) code

@@ -218,3 +218,8 @@ test('T12134',
      compile_and_run,
      ['T12134_c.c'])
 
+test('T12614',
+     [omit_ways(['ghci']), extra_clean(['T12614_c.o'])],
+     compile_and_run,
+     ['T12614_c.c'])
+
