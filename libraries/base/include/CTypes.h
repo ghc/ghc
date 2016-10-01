@@ -21,34 +21,19 @@
 #define FLOATING_CLASSES Fractional,Floating,RealFrac,RealFloat
 
 #define ARITHMETIC_TYPE(T,B) \
-newtype T = T B deriving (ARITHMETIC_CLASSES); \
-INSTANCE_READ(T,B); \
-INSTANCE_SHOW(T,B);
+newtype T = T B deriving (ARITHMETIC_CLASSES) \
+                deriving newtype (Read, Show);
 
 #define INTEGRAL_TYPE(T,B) \
-newtype T = T B deriving (ARITHMETIC_CLASSES, INTEGRAL_CLASSES); \
-INSTANCE_READ(T,B); \
-INSTANCE_SHOW(T,B);
+newtype T = T B deriving (ARITHMETIC_CLASSES, INTEGRAL_CLASSES) \
+                deriving newtype (Read, Show);
 
 #define INTEGRAL_TYPE_WITH_CTYPE(T,THE_CTYPE,B) \
-newtype {-# CTYPE "THE_CTYPE" #-} T = T B deriving (ARITHMETIC_CLASSES, INTEGRAL_CLASSES); \
-INSTANCE_READ(T,B); \
-INSTANCE_SHOW(T,B);
+newtype {-# CTYPE "THE_CTYPE" #-} T = T B deriving (ARITHMETIC_CLASSES, INTEGRAL_CLASSES) \
+                                          deriving newtype (Read, Show);
 
 #define FLOATING_TYPE(T,B) \
-newtype T = T B deriving (ARITHMETIC_CLASSES, FLOATING_CLASSES); \
-INSTANCE_READ(T,B); \
-INSTANCE_SHOW(T,B);
-
-#define INSTANCE_READ(T,B) \
-instance Read T where { \
-   readsPrec            = unsafeCoerce# (readsPrec :: Int -> ReadS B); \
-   readList             = unsafeCoerce# (readList  :: ReadS [B]); }
-
-#define INSTANCE_SHOW(T,B) \
-instance Show T where { \
-   showsPrec            = unsafeCoerce# (showsPrec :: Int -> B -> ShowS); \
-   show                 = unsafeCoerce# (show :: B -> String); \
-   showList             = unsafeCoerce# (showList :: [B] -> ShowS); }
+newtype T = T B deriving (ARITHMETIC_CLASSES, FLOATING_CLASSES) \
+                deriving newtype (Read, Show);
 
 #endif
