@@ -1522,7 +1522,7 @@ extendInteractiveContext ictxt new_tythings new_cls_insts new_fam_insts defaults
   = ictxt { ic_mod_index  = ic_mod_index ictxt + 1
                             -- Always bump this; even instances should create
                             -- a new mod_index (Trac #9426)
-          , ic_tythings   = new_tythings ++ old_tythings
+          , ic_tythings   = new_tythings ++ ic_tythings ictxt
           , ic_rn_gbl_env = ic_rn_gbl_env ictxt `icExtendGblRdrEnv` new_tythings
           , ic_instances  = ( new_cls_insts ++ old_cls_insts
                             , new_fam_insts ++ old_fam_insts )
@@ -1530,8 +1530,6 @@ extendInteractiveContext ictxt new_tythings new_cls_insts new_fam_insts defaults
           , ic_fix_env    = fix_env  -- See Note [Fixity declarations in GHCi]
           }
   where
-    new_ids = [id | AnId id <- new_tythings]
-    old_tythings = filterOut (shadowed_by new_ids) (ic_tythings ictxt)
 
     -- Discard old instances that have been fully overrridden
     -- See Note [Override identical instances in GHCi]
@@ -1544,17 +1542,10 @@ extendInteractiveContextWithIds :: InteractiveContext -> [Id] -> InteractiveCont
 extendInteractiveContextWithIds ictxt new_ids
   | null new_ids = ictxt
   | otherwise    = ictxt { ic_mod_index  = ic_mod_index ictxt + 1
-                         , ic_tythings   = new_tythings ++ old_tythings
+                         , ic_tythings   = new_tythings ++ ic_tythings ictxt
                          , ic_rn_gbl_env = ic_rn_gbl_env ictxt `icExtendGblRdrEnv` new_tythings }
   where
     new_tythings = map AnId new_ids
-    old_tythings = filterOut (shadowed_by new_ids) (ic_tythings ictxt)
-
-shadowed_by :: [Id] -> TyThing -> Bool
-shadowed_by ids = shadowed
-  where
-    shadowed id = getOccName id `elemOccSet` new_occs
-    new_occs = mkOccSet (map getOccName ids)
 
 setInteractivePackage :: HscEnv -> HscEnv
 -- Set the 'thisPackage' DynFlag to 'interactive'
