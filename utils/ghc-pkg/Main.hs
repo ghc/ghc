@@ -226,8 +226,8 @@ usageHeader prog = substProg prog $
   "    Register the package, overwriting any other package with the\n" ++
   "    same name. The input file should be encoded in UTF-8.\n" ++
   "\n" ++
-  "  $p unregister {pkg-id}\n" ++
-  "    Unregister the specified package.\n" ++
+  "  $p unregister [pkg-id] \n" ++
+  "    Unregister the specified packages in the order given.\n" ++
   "\n" ++
   "  $p expose {pkg-id}\n" ++
   "    Expose the specified package.\n" ++
@@ -422,9 +422,10 @@ runit verbosity cli nonopts = do
         registerPackage filename verbosity cli
                         multi_instance
                         expand_env_vars True force
-    ["unregister", pkgarg_str] -> do
-        pkgarg <- readPackageArg as_arg pkgarg_str
-        unregisterPackage pkgarg verbosity cli force
+    "unregister" : pkgarg_strs@(_:_) -> do
+        forM_ pkgarg_strs $ \pkgarg_str -> do
+          pkgarg <- readPackageArg as_arg pkgarg_str
+          unregisterPackage pkgarg verbosity cli force
     ["expose", pkgarg_str] -> do
         pkgarg <- readPackageArg as_arg pkgarg_str
         exposePackage pkgarg verbosity cli force
