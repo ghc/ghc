@@ -105,5 +105,7 @@ test('T11627b', [ extra_run_opts('+RTS -i0 -RTS')  # census after each GC
                 , [''])
 
 test('T11978a',
-     [only_ways(['profthreaded']), extra_run_opts('+RTS -hb -N10')],
+     [only_ways(['profthreaded']),
+      extra_run_opts('+RTS -hb -N10'),
+      expect_broken(12019)],
      compile_and_run, [''])
