@@ -291,7 +291,9 @@ defined by your local GHC installation, the following trick is useful:
 
     Only defined when ``-fllvm`` is specified. When GHC is using version
     ``x.y.z`` of LLVM, the value of ``__GLASGOW_HASKELL_LLVM__`` is the
-    integer ⟨xy⟩.
+    integer ⟨xyy⟩ (if ⟨y⟩ is a single digit, then a leading zero
+    is added, so for example when using version 3.7 of LLVM,
+    ``__GLASGOW_HASKELL_LLVM__==307``).
 
 ``__PARALLEL_HASKELL__``
     .. index::

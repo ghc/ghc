@@ -40,6 +40,12 @@ Compiler
    defaulting to decimal, hexadecimal if the address starts with `0x`, and
    octal if the address starts with `0`.
 
+-  Due to an oversight in GHC 8.0.1, the value of the preprocessor macro
+   ``__GLASGOW_HASKELL_LLVM__``, which exposes the LLVM version used by GHC, was
+   no longer an integer. This value is now turned into an integer again, but the
+   formatting is changed to be in line with ``__GLASGOW_HASKELL__``
+   (:ghc-ticket:`12628`).
+
 Runtime system
 ~~~~~~~~~~~~~~
 
