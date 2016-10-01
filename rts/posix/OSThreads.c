@@ -231,6 +231,8 @@ forkOS_createThread ( HsStablePtr entry )
     return result;
 }
 
+void freeThreadingResources (void) { /* nothing */ }
+
 uint32_t
 getNumberOfProcessors (void)
 {
@@ -334,6 +336,7 @@ void releaseThreadNode (void)
         stg_exit(1);
     }
 }
+
 #else
 void setThreadNode (uint32_t node STG_UNUSED) { /* nothing */ }
 void releaseThreadNode (void) { /* nothing */ }
@@ -352,6 +355,8 @@ forkOS_createThread ( HsStablePtr entry STG_UNUSED )
 {
     return -1;
 }
+
+void freeThreadingResources (void) { /* nothing */ }
 
 uint32_t getNumberOfProcessors (void)
 {

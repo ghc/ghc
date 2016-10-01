@@ -221,6 +221,11 @@ void releaseThreadNode (void);
 int forkOS_createThread ( HsStablePtr entry );
 
 //
+// Free any global resources created in OSThreads.
+//
+void freeThreadingResources(void);
+
+//
 // Returns the number of processor cores in the machine
 //
 uint32_t getNumberOfProcessors (void);

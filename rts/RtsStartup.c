@@ -434,6 +434,11 @@ hs_exit_(rtsBool wait_foreign)
 
     // Free the various argvs
     freeRtsArgs();
+
+#ifndef CMINUSMINUS
+    // Free threading resources
+    freeThreadingResources();
+#endif
 }
 
 // Flush stdout and stderr.  We do this during shutdown so that it

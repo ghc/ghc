@@ -71,6 +71,10 @@ Runtime system
   event log, allowing heap profiles to be correlated with other tracing events
   (see :ghc-ticket:`11094`).
 
+- Added processor group support for Windows. This allows the runtime to allocate
+  threads to all cores in systems which have multiple processor groups.
+  (e.g. > 64 cores, see :ghc-ticket:`11054`)
+
 Build system
 ~~~~~~~~~~~~
 
