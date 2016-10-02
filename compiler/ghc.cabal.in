@@ -58,6 +58,7 @@ Library
                    hpc        == 0.6.*,
                    transformers == 0.5.*,
                    ghc-boot   == @ProjectVersionMunged@,
+                   ghc-boot-th == @ProjectVersionMunged@,
                    hoopl      >= 3.10.2 && < 3.11
 
     if os(windows)

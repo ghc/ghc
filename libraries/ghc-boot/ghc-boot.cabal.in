@@ -38,7 +38,6 @@ Library
     exposed-modules:
             GHC.LanguageExtensions
             GHC.LanguageExtensions.Type
-            GHC.Lexeme
             GHC.PackageDb
             GHC.Serialized
 
