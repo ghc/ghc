@@ -45,8 +45,6 @@ includesDependencies = fmap (generatedPath -/-)
     [ "ghcautoconf.h"
     , "ghcplatform.h"
     , "ghcversion.h" ]
-    ++ -- TODO: This is a temporary fix, see #113:
-    [ "includes/ghcversion.h"]
 
 ghcPrimDependencies :: Expr [FilePath]
 ghcPrimDependencies = do
@@ -167,8 +165,6 @@ copyRules = do
     "inplace/lib/template-hsc.h"     <~ pkgPath hsc2hs
     rtsBuildPath -/- "sm/Evac_thr.c" %> copyFile (pkgPath rts -/- "sm/Evac.c")
     rtsBuildPath -/- "sm/Scav_thr.c" %> copyFile (pkgPath rts -/- "sm/Scav.c")
-    -- TODO: This is a temporary fix, see #113:
-    "includes/ghcversion.h"          <~ generatedPath
   where
     file <~ dir = file %> copyFile (dir -/- takeFileName file)
 

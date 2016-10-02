@@ -46,7 +46,8 @@ registerPackage rs context@Context {..} = do
             let fixRtsConf = unlines
                            . map
                            ( replace "\"\"" ""
-                           . replace "rts/dist/build" rtsBuildPath )
+                           . replace "rts/dist/build" rtsBuildPath
+                           . replace "includes/dist-derivedconstants/header" generatedPath )
                            . filter (not . null)
                            . lines
 
