@@ -14,6 +14,7 @@ Flags:
   --no-clean        don't make clean first, just carry on from
                     a previous interrupted validation run
   --testsuite-only  don't build the compiler, just run the test suite
+  --build-only      don't test the compiler, just build it
   --hpc             build stage2 with -fhpc, and see how much of the
                     compiler the test suite covers.
                     2008-07-01: 63% slower than the default.
@@ -46,6 +47,7 @@ EOF
 
 no_clean=0
 testsuite_only=0
+build_only=0
 hpc=NO
 speed=NORMAL
 use_dph=0
@@ -63,6 +65,9 @@ do
         ;;
     --testsuite-only)
         testsuite_only=1
+        ;;
+    --build-only)
+        build_only=1
         ;;
     --hpc)
         hpc=YES
@@ -239,6 +244,16 @@ fi # testsuite-only
 
 # -----------------------------------------------------------------------------
 # Run the testsuite
+
+if [ "$build_only" -eq 1 ]; then
+    cat <<EOF
+-------------------------------------------------------------------
+Congratulations!  This tree has compiled successfully.
+
+You can now test your new compiler using ./validate --testsuite-only.
+EOF
+    exit 0
+fi
 
 if [ "$hpc" = YES ]
 then
