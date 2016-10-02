@@ -23,6 +23,9 @@ gmpLibraryInTreeH = gmpBuildPath -/- "include/gmp.h"
 gmpLibrary :: FilePath
 gmpLibrary = gmpBuildPath -/- ".libs/libgmp.a"
 
+gmpMakefile :: FilePath
+gmpMakefile = gmpBuildPath -/- "Makefile"
+
 gmpPatches :: [FilePath]
 gmpPatches = (gmpBase -/-) <$> ["gmpsrc.patch", "tarball/gmp-5.0.4.patch"]
 
@@ -33,24 +36,27 @@ configureEnvironment = sequence [ builderEnvironment "CC" $ Cc CompileC Stage1
 
 gmpRules :: Rules ()
 gmpRules = do
-    gmpLibraryH %> \_ -> do
+    -- Copy appropriate GMP header and object files
+    gmpLibraryH %> \header -> do
+        createDirectory $ takeDirectory header
         windows  <- windowsHost
         configMk <- readFile' $ gmpBase -/- "config.mk"
         if not windows && -- TODO: We don't use system GMP on Windows. Fix?
            any (`isInfixOf` configMk) [ "HaveFrameworkGMP = YES", "HaveLibGmp = YES" ]
         then do
             putBuild "| GMP library/framework detected and will be used"
-            createDirectory $ takeDirectory gmpLibraryH
-            copyFile (gmpBase -/- "ghc-gmp.h") gmpLibraryH
+            copyFile (gmpBase -/- "ghc-gmp.h") header
         else do
             putBuild "| No GMP library/framework detected; in tree GMP will be built"
-            build $ Target gmpContext (Make gmpBuildPath) [] []
-            createDirectory $ takeDirectory gmpLibraryH
-            copyFile (gmpBuildPath -/- "gmp.h") gmpLibraryH
-            copyFile (gmpBuildPath -/- "gmp.h") gmpLibraryInTreeH
+            need [gmpLibrary]
             createDirectory gmpObjects
             build $ Target gmpContext Ar [gmpLibrary] [gmpObjects]
+            copyFile (gmpBuildPath -/- "gmp.h") header
+            copyFile (gmpBuildPath -/- "gmp.h") gmpLibraryInTreeH
 
+    -- Build in-tree GMP library
+    gmpLibrary %> \lib -> do
+        build $ Target gmpContext (Make gmpBuildPath) [gmpMakefile] [lib]
         putSuccess "| Successfully built custom library 'gmp'"
 
     -- In-tree GMP header is built in the gmpLibraryH rule
@@ -60,8 +66,15 @@ gmpRules = do
     [gmpBase -/- "config.mk", gmpBuildInfoPath] &%> \_ ->
         need [pkgDataFile gmpContext]
 
+    -- Run GMP's configure script
+    gmpMakefile %> \mk -> do
+        env <- configureEnvironment
+        need [mk <.> "in"]
+        buildWithCmdOptions env $
+            Target gmpContext (Configure gmpBuildPath) [mk <.> "in"] [mk]
+
     -- Extract in-tree GMP sources and apply patches
-    gmpBuildPath -/- "Makefile.in" %> \_ -> do
+    gmpMakefile <.> "in" %> \_ -> do
         removeDirectory gmpBuildPath
         -- Note: We use a tarball like gmp-4.2.4-nodoc.tar.bz2, which is
         -- gmp-4.2.4.tar.bz2 repacked without the doc/ directory contents.
@@ -89,10 +102,3 @@ gmpRules = do
                 libName = unpack $ stripSuffix "-nodoc-patched" name
 
             moveDirectory (tmp -/- libName) gmpBuildPath
-
-    -- Run GMP's configure script
-    gmpBuildPath -/- "Makefile" %> \mk -> do
-        env <- configureEnvironment
-        need [mk <.> "in"]
-        buildWithCmdOptions env $
-            Target gmpContext (Configure gmpBuildPath) [mk <.> "in"] [mk]
