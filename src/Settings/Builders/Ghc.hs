@@ -78,7 +78,8 @@ commonGhcArgs :: Args
 commonGhcArgs = do
     way     <- getWay
     path    <- getBuildPath
-    hsArgs  <- getPkgDataList HsArgs
+    confCc  <- getSettingList . ConfCcArgs =<< getStage
+    confCpp <- getSettingList . ConfCppArgs =<< getStage
     cppArgs <- getPkgDataList CppArgs
     mconcat [ arg "-hisuf", arg $ hisuf way
             , arg "-osuf" , arg $  osuf way
@@ -86,7 +87,9 @@ commonGhcArgs = do
             , wayGhcArgs
             , packageGhcArgs
             , includeGhcArgs
-            , append hsArgs
+            , append =<< getPkgDataList HsArgs
+            , append $ map ("-optc" ++) confCc
+            , append $ map ("-optP" ++) confCpp
             , append $ map ("-optP" ++) cppArgs
             , arg "-odir"    , arg path
             , arg "-hidir"   , arg path
