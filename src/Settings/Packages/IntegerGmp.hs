@@ -23,6 +23,5 @@ integerGmpPackageArgs = package integerGmp ? do
               [ (null gmpIncludeDir && null gmpLibDir) ?
                 arg "--configure-option=--with-intree-gmp"
               , appendSub "--configure-option=CFLAGS" [includeGmp]
-              , appendSub "--gcc-options"             [includeGmp]
-              ]
+              , appendSub "--gcc-options"             [includeGmp] ]
             ]

@@ -9,7 +9,6 @@ import Oracles.Dependencies
 import Rules.Actions
 import Rules.Generate
 import Rules.Libffi
-import Settings.Builders.Common
 import Settings.Paths
 import Target
 import UserSettings
@@ -60,7 +59,6 @@ buildPackageData context@Context {..} = do
     priority 2.0 $ do
         when (package == hp2ps) $ dataFile %> \mk -> do
             orderOnly =<< interpretInContext context generatedDependencies
-            includes <- interpretInContext context $ fromDiffExpr includesArgs
             let prefix = fixKey (buildPath context) ++ "_"
                 cSrcs  = [ "AreaBelow.c", "Curves.c", "Error.c", "Main.c"
                          , "Reorder.c", "TopTwenty.c", "AuxFile.c"
@@ -71,7 +69,7 @@ buildPackageData context@Context {..} = do
                     [ "PROGNAME = hp2ps"
                     , "C_SRCS = " ++ unwords cSrcs
                     , "DEP_EXTRA_LIBS = m"
-                    , "CC_OPTS = " ++ unwords includes ]
+                    , "CC_OPTS = -I" ++ generatedPath ]
             writeFileChanged mk contents
             putSuccess $ "| Successfully generated " ++ mk
 
@@ -126,10 +124,9 @@ buildPackageData context@Context {..} = do
                              ++ [ rtsBuildPath -/- "AutoApply.cmm"  ]
                              ++ [ rtsBuildPath -/- "sm/Evac_thr.c"  ]
                              ++ [ rtsBuildPath -/- "sm/Scav_thr.c"  ]
-                includes <- interpretInContext context $ fromDiffExpr includesArgs
                 let contents = unlines $ map (prefix++)
                         [ "C_SRCS = "  ++ unwords (cSrcs ++ cmmSrcs ++ extraSrcs)
-                        , "CC_OPTS = " ++ unwords includes
+                        , "CC_OPTS = -I" ++ generatedPath
                         , "COMPONENT_ID = rts" ]
                 writeFileChanged mk contents
                 putSuccess $ "| Successfully generated " ++ mk

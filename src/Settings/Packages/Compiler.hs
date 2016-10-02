@@ -7,7 +7,7 @@ import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Predicate
 import Settings
-import Settings.Builders.Common
+import Settings.Paths
 
 compilerPackageArgs :: Args
 compilerPackageArgs = package compiler ? do
@@ -17,9 +17,8 @@ compilerPackageArgs = package compiler ? do
     mconcat [ builder Alex ? arg "--latin1"
 
             , builder Ghc ? mconcat
-              [ arg ("-I" ++ path)
-              , includesArgs
-              , append [ "-optP-I" ++ dir | dir <- includes ] ]
+              [ arg $      "-I" ++ path
+              , arg $ "-optP-I" ++ generatedPath ]
 
             , builder GhcCabal ? mconcat
               [ arg $ "--ghc-option=-DSTAGE=" ++ show (fromEnum stage + 1)

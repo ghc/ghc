@@ -1,7 +1,7 @@
 module Settings.Paths (
     contextDirectory, buildPath, pkgDataFile, pkgHaddockFile, pkgLibraryFile,
     pkgLibraryFile0, pkgGhciLibraryFile, gmpBuildPath, gmpObjects, gmpLibraryH,
-    gmpBuildInfoPath, libffiBuildPath, shakeFilesPath, pkgConfFile,
+    gmpBuildInfoPath, generatedPath, libffiBuildPath, shakeFilesPath, pkgConfFile,
     packageDbDirectory, bootPackageConstraints, packageDependencies
     ) where
 
@@ -20,6 +20,9 @@ bootPackageConstraints = shakeFilesPath -/- "boot-package-constraints"
 
 packageDependencies :: FilePath
 packageDependencies = shakeFilesPath -/- "package-dependencies"
+
+generatedPath :: FilePath
+generatedPath = buildRootPath -/- "generated"
 
 -- | Path to the directory containing build artefacts of a given 'Context'.
 buildPath :: Context -> FilePath

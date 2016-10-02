@@ -1,6 +1,6 @@
 module Settings.Builders.Common (
-    includes, includesArgs, cIncludeArgs, ldArgs, cArgs, cWarnings,
-    argSetting, argSettingList, argStagedBuilderPath, argStagedSettingList
+    cIncludeArgs, ldArgs, cArgs, cWarnings, argSetting, argSettingList,
+    argStagedBuilderPath, argStagedSettingList
     ) where
 
 import Base
@@ -11,19 +11,14 @@ import Oracles.PackageData
 import Settings
 import UserSettings
 
-includes :: [FilePath]
-includes = ["includes", "includes/dist-derivedconstants/header"]
-
-includesArgs :: Args
-includesArgs = append $ map ("-I" ++) includes
-
 cIncludeArgs :: Args
 cIncludeArgs = do
     pkg     <- getPackage
     path    <- getBuildPath
     incDirs <- getPkgDataList IncludeDirs
     depDirs <- getPkgDataList DepIncludeDirs
-    mconcat [ arg $ "-I" ++ path
+    mconcat [ arg "-Iincludes"
+            , arg $ "-I" ++ path
             , arg $ "-I" ++ path -/- "autogen"
             , append [ "-I" ++ pkgPath pkg -/- dir | dir <- incDirs ]
             , append [ "-I" ++       unifyPath dir | dir <- depDirs ] ]

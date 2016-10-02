@@ -9,7 +9,7 @@ import Oracles.Config.Setting
 import Oracles.WindowsPath
 import Predicate
 import Settings
-import Settings.Builders.Common
+import Settings.Paths
 
 rtsConfIn :: FilePath
 rtsConfIn = pkgPath rts -/- "package.conf.in"
@@ -90,10 +90,9 @@ rtsPackageArgs = package rts ? do
             , input "//Evac_thr.c" ? arg "-funroll-loops"
 
             , input "//Evac_thr.c" ? append [ "-DPARALLEL_GC", "-Irts/sm" ]
-            , input "//Scav_thr.c" ? append [ "-DPARALLEL_GC", "-Irts/sm" ]
-            ]
+            , input "//Scav_thr.c" ? append [ "-DPARALLEL_GC", "-Irts/sm" ] ]
 
-        , builder Ghc ? (arg "-Irts" <> includesArgs)
+        , builder Ghc ? arg "-Irts" <> arg ("-I" ++ generatedPath)
 
         , builder (GhcPkg Stage1) ? mconcat
           [ remove ["rts/stage1/inplace-pkg-config"] -- TODO: fix, see #113
@@ -105,7 +104,6 @@ rtsPackageArgs = package rts ? do
           , "-DFFI_LIB_DIR="     ++ show ffiLibraryDir
           , "-DFFI_LIB="         ++ show libffiName ]
         ]
-
 
 -- # If we're compiling on windows, enforce that we only support XP+
 -- # Adding this here means it doesn't have to be done in individual .c files

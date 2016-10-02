@@ -20,20 +20,19 @@ deriveConstantsBuilderArgs = builder DeriveConstants ? do
         , arg "-o", arg outputFile
         , arg "--tmpdir", arg tempDir
         , arg "--gcc-program", arg =<< getBuilderPath (Cc CompileC Stage1)
-        , append . concat $ map (\a -> ["--gcc-flag", a]) cFlags
+        , append $ concatMap (\a -> ["--gcc-flag", a]) cFlags
         , arg "--nm-program", arg =<< getBuilderPath Nm
         , specified Objdump ? mconcat [ arg "--objdump-program"
                                       , arg =<< getBuilderPath Objdump ]
         , arg "--target-os", argSetting TargetOs ]
 
 includeCcArgs :: Args
-includeCcArgs = do
-    confCcArgs <- getSettingList $ ConfCcArgs Stage1
-    mconcat [ cArgs
-            , cWarnings
-            , append confCcArgs
-            , flag GhcUnregisterised ? arg "-DUSE_MINIINTERPRETER"
-            , includesArgs
-            , arg "-Irts"
-            , notM ghcWithSMP ? arg "-DNOSMP"
-            , arg "-fcommon" ]
+includeCcArgs = mconcat
+    [ cArgs
+    , cWarnings
+    , argSettingList $ ConfCcArgs Stage1
+    , flag GhcUnregisterised ? arg "-DUSE_MINIINTERPRETER"
+    , arg "-Irts"
+    , arg "-Iincludes"
+    , notM ghcWithSMP ? arg "-DNOSMP"
+    , arg "-fcommon" ]

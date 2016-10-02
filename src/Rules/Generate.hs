@@ -1,7 +1,6 @@
 module Rules.Generate (
     generatePackageCode, generateRules, installTargets, copyRules,
-    includesDependencies, derivedConstantsPath, generatedDependencies,
-    getPathIfGenerated
+    includesDependencies, generatedDependencies, getPathIfGenerated
     ) where
 
 import qualified System.Directory as IO
@@ -43,7 +42,7 @@ platformH stage = buildPath (vanillaContext stage compiler) -/- "ghc_boot_platfo
 
 -- TODO: move generated files to buildRootPath, see #113
 includesDependencies :: [FilePath]
-includesDependencies = fmap ("includes" -/-)
+includesDependencies = fmap (generatedPath -/-)
     [ "ghcautoconf.h"
     , "ghcplatform.h"
     , "ghcversion.h" ]
@@ -54,11 +53,8 @@ ghcPrimDependencies = do
     let path = buildPath $ vanillaContext stage ghcPrim
     return [path -/- "autogen/GHC/Prim.hs", path -/- "GHC/PrimopWrappers.hs"]
 
-derivedConstantsPath :: FilePath
-derivedConstantsPath = "includes/dist-derivedconstants/header"
-
 derivedConstantsDependencies :: [FilePath]
-derivedConstantsDependencies = installTargets ++ fmap (derivedConstantsPath -/-)
+derivedConstantsDependencies = installTargets ++ fmap (generatedPath -/-)
     [ "DerivedConstants.h"
     , "GHCConstantsHaskellExports.hs"
     , "GHCConstantsHaskellType.hs"
@@ -165,7 +161,7 @@ copyRules :: Rules ()
 copyRules = do
     "inplace/lib/ghc-usage.txt"      <~ "driver"
     "inplace/lib/ghci-usage.txt"     <~ "driver"
-    "inplace/lib/platformConstants"  <~ derivedConstantsPath
+    "inplace/lib/platformConstants"  <~ generatedPath
     "inplace/lib/settings"           <~ "."
     "inplace/lib/template-hsc.h"     <~ pkgPath hsc2hs
     rtsBuildPath -/- "sm/Evac_thr.c" %> copyFile (pkgPath rts -/- "sm/Evac.c")
@@ -175,16 +171,16 @@ copyRules = do
 
 generateRules :: Rules ()
 generateRules = do
-    "includes/ghcautoconf.h" <~ generateGhcAutoconfH
-    "includes/ghcplatform.h" <~ generateGhcPlatformH
-    "includes/ghcversion.h"  <~ generateGhcVersionH
+    (generatedPath -/- "ghcautoconf.h") <~ generateGhcAutoconfH
+    (generatedPath -/- "ghcplatform.h") <~ generateGhcPlatformH
+    (generatedPath -/-  "ghcversion.h") <~ generateGhcVersionH
 
     ghcSplit %> \_ -> do
         generate ghcSplit emptyTarget generateGhcSplit
         makeExecutable ghcSplit
 
     -- TODO: simplify, get rid of fake rts context
-    derivedConstantsPath ++ "//*" %> \file -> do
+    generatedPath ++ "//*" %> \file -> do
         withTempDir $ \dir -> build $
             Target rtsContext DeriveConstants [] [file, dir]
 

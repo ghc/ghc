@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Settings.Builders.GhcCabal (
     ghcCabalBuilderArgs, ghcCabalHsColourBuilderArgs, bootPackageDatabaseArgs,
-    PackageDatabaseKey (..), cppArgs, buildDll0
+    PackageDatabaseKey (..), buildDll0
     ) where
 
 import Base
@@ -17,25 +17,23 @@ import Settings.Builders.Common
 import Settings.Paths
 
 ghcCabalBuilderArgs :: Args
-ghcCabalBuilderArgs = builder GhcCabal ? do
-    path <- getPackagePath
-    dir  <- getContextDirectory
-    mconcat [ arg "configure"
-            , arg path
-            , arg dir
-            , dll0Args
-            , withStaged $ Ghc CompileHs
-            , withStaged GhcPkg
-            , bootPackageDatabaseArgs
-            , libraryArgs
-            , with HsColour
-            , configureArgs
-            , packageConstraints
-            , withStaged $ Cc CompileC
-            , notStage0 ? with Ld
-            , with Ar
-            , with Alex
-            , with Happy ]
+ghcCabalBuilderArgs = builder GhcCabal ? mconcat
+    [ arg "configure"
+    , arg =<< getPackagePath
+    , arg =<< getContextDirectory
+    , dll0Args
+    , withStaged $ Ghc CompileHs
+    , withStaged GhcPkg
+    , bootPackageDatabaseArgs
+    , libraryArgs
+    , with HsColour
+    , configureArgs
+    , packageConstraints
+    , withStaged $ Cc CompileC
+    , notStage0 ? with Ld
+    , with Ar
+    , with Alex
+    , with Happy ]
 
 ghcCabalHsColourBuilderArgs :: Args
 ghcCabalHsColourBuilderArgs = builder GhcCabalHsColour ? do
@@ -105,7 +103,7 @@ packageConstraints = stage0 ? do
     append $ concat [ ["--constraint", c] | c <- constraints ]
 
 cppArgs :: Args
-cppArgs = includesArgs
+cppArgs = arg $ "-I" ++ generatedPath
 
 withBuilderKey :: Builder -> String
 withBuilderKey b = case b of

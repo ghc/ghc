@@ -7,19 +7,20 @@ import Predicate
 import Settings.Builders.Common
 import Settings
 
--- TODO: handle custom $1_$2_MKDEPENDC_OPTS and
 ccBuilderArgs :: Args
-ccBuilderArgs = mconcat
-    [ builder (Cc CompileC) ?
-        mconcat [ commonCcArgs
-                , arg "-c", arg =<< getInput
+ccBuilderArgs = builder Cc ? mconcat
+    [ append =<< getPkgDataList CcArgs
+    , argSettingList . ConfCcArgs =<< getStage
+    , cIncludeArgs
+
+    , builder (Cc CompileC) ?
+        mconcat [ arg "-c", arg =<< getInput
                 , arg "-o", arg =<< getOutput ]
 
     , builder (Cc FindCDependencies) ? do
         output <- getOutput
         mconcat [ arg "-E"
                 , arg "-MM"
-                , commonCcArgs
                 , arg "-MF"
                 , arg output
                 , arg "-MT"
@@ -28,18 +29,11 @@ ccBuilderArgs = mconcat
                 , arg "c"
                 , arg =<< getInput ]
 
-    , builder (Cc FindMissingInclude) ? do
+    , builder (Cc FindMissingInclude) ?
         mconcat [ arg "-E"
                 , arg "-MM"
                 , arg "-MG"
-                , commonCcArgs
                 , arg "-MF"
                 , arg =<< getOutput
-                , arg =<< getInput
-                ]
+                , arg =<< getInput ]
     ]
-
-commonCcArgs :: Args
-commonCcArgs = mconcat [ append =<< getPkgDataList CcArgs
-                       , append =<< getSettingList . ConfCcArgs =<< getStage
-                       , cIncludeArgs ]
