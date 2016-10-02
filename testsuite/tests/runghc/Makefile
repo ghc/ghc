@@ -10,3 +10,7 @@ T7859:
 #compile.
 T8601:
 	-echo 'main = putStrLn "Hello World!"' | '$(RUNGHC)' -f '$(TEST_HC)' -hide-package --ghc-arg=bytestring
+
+T-signals-child:
+	-'$(RUNGHC)' T-signals-child.hs --runghc '$(RUNGHC)'
+
