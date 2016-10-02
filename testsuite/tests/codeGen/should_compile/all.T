@@ -37,4 +37,4 @@ test('T10667', [ when((arch('powerpc64') or arch('powerpc64le')),
                       expect_broken(11261))],
      compile, ['-g'])
 test('T12115', normal, compile, [''])
-test('T12355', expect_broken(12355), compile, [''])
+test('T12355', when(not opsys('darwin'), expect_broken(12355)), compile, [''])
