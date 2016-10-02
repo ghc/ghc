@@ -40,10 +40,6 @@ Library
             GHC.PackageDb
             GHC.Serialized
 
-    reexported-modules:
-            GHC.LanguageExtensions.Type,
-            GHC.Lexeme
-
     build-depends: base       >= 4.7 && < 4.10,
                    binary     == 0.8.*,
                    bytestring == 0.10.*,
