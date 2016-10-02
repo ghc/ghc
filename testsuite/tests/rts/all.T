@@ -25,8 +25,10 @@ test('derefnull',
       # the right exit code we're OK.
       when(opsys('linux'), ignore_stderr),
       # SIGBUS on OX X (PPC and x86 only; amd64 gives SEGV)
-      when(platform('i386-apple-darwin'), exit_code(138)),
-      when(platform('powerpc-apple-darwin'), exit_code(138)),
+      # The output under OS X is too unstable to readily compare
+      when(platform('i386-apple-darwin'), [ignore_stderr, exit_code(139)]),
+      when(platform('x86_64-apple-darwin'), [ignore_stderr, exit_code(139)]),
+      when(platform('powerpc-apple-darwin'), [ignore_stderr, exit_code(139)]),
       when(opsys('mingw32'), exit_code(1)),
       # since these test are supposed to crash the
       # profile report will be empty always.
@@ -47,6 +49,10 @@ test('divbyzero',
       when(platform('powerpc64-unknown-linux'), exit_code(0)),
       when(platform('powerpc64le-unknown-linux'), exit_code(0)),
       when(opsys('mingw32'), exit_code(1)),
+      # The output under OS X is too unstable to readily compare
+      when(platform('i386-apple-darwin'), [ignore_stderr, exit_code(136)]),
+      when(platform('x86_64-apple-darwin'), [ignore_stderr, exit_code(136)]),
+      when(platform('powerpc-apple-darwin'), [ignore_stderr, exit_code(136)]),
       # since these test are supposed to crash the
       # profile report will be empty always.
       # so disable the check for profiling
