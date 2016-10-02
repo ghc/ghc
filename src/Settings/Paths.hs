@@ -1,7 +1,7 @@
 module Settings.Paths (
     contextDirectory, buildPath, pkgDataFile, pkgHaddockFile, pkgLibraryFile,
-    pkgLibraryFile0, pkgGhciLibraryFile, gmpBuildPath, gmpLibrary, gmpObjects,
-    gmpLibraryH, gmpBuildInfoPath, libffiBuildPath, shakeFilesPath, pkgConfFile,
+    pkgLibraryFile0, pkgGhciLibraryFile, gmpBuildPath, gmpObjects, gmpLibraryH,
+    gmpBuildInfoPath, libffiBuildPath, shakeFilesPath, pkgConfFile,
     packageDbDirectory, bootPackageConstraints, packageDependencies
     ) where
 
@@ -65,10 +65,6 @@ pkgFile context prefix suffix = do
 -- | Build directory for in-tree GMP library.
 gmpBuildPath :: FilePath
 gmpBuildPath = buildRootPath -/- "stage1/gmp"
-
--- | Path to the GMP library.
-gmpLibrary :: FilePath
-gmpLibrary = gmpBuildPath -/- "libgmp.a"
 
 -- | Path to the GMP library header.
 gmpLibraryH :: FilePath
