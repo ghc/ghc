@@ -124,7 +124,7 @@ module DynFlags (
 #endif
         dynamicGhc,
 
-#include "../includes/dist-derivedconstants/header/GHCConstantsHaskellExports.hs"
+#include "GHCConstantsHaskellExports.hs"
         bLOCK_SIZE_W,
         wORD_SIZE_IN_BITS,
         tAG_MASK,
