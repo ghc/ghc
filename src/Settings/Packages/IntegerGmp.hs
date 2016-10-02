@@ -6,7 +6,6 @@ import Oracles.Config.Setting
 import Predicate
 import Settings.Paths
 
--- TODO: move build artefacts to buildRootPath, see #113
 -- TODO: Is this needed?
 -- ifeq "$(GMP_PREFER_FRAMEWORK)" "YES"
 -- libraries/integer-gmp_CONFIGURE_OPTS += --with-gmp-framework-preferred

@@ -97,6 +97,6 @@ hSources context = do
 extraObjects :: Context -> Action [FilePath]
 extraObjects context
     | context == gmpContext = do
-        need [gmpLibraryH] -- TODO: Move this dependency elsewhere, #113?
+        need [gmpLibraryH]
         map unifyPath <$> getDirectoryFiles "" [gmpObjects -/- "*.o"]
     | otherwise         = return []

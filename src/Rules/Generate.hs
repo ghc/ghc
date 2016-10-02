@@ -40,7 +40,6 @@ primopsTxt stage = buildPath (vanillaContext stage compiler) -/- "primops.txt"
 platformH :: Stage -> FilePath
 platformH stage = buildPath (vanillaContext stage compiler) -/- "ghc_boot_platform.h"
 
--- TODO: move generated files to buildRootPath, see #113
 includesDependencies :: [FilePath]
 includesDependencies = fmap (generatedPath -/-)
     [ "ghcautoconf.h"
