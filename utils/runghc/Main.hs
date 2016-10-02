@@ -26,7 +26,7 @@ import System.FilePath
 import System.IO
 
 #if defined(mingw32_HOST_OS)
-import System.Process (runProcess)
+import System.Process (rawSystem)
 import Foreign
 import Foreign.C.String
 #else
