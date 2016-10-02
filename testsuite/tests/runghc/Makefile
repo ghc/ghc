@@ -22,3 +22,6 @@ T11247:
 	# "foo.bar"
 	-'$(RUNGHC)' foo.
 	-'$(RUNGHC)' foo.bar
+
+T-signals-child:
+	-'$(RUNGHC)' T-signals-child.hs --runghc '$(RUNGHC)'
