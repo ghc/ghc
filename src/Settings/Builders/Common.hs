@@ -9,6 +9,7 @@ import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Oracles.PackageData
 import Settings
+import Settings.Paths
 import UserSettings
 
 cIncludeArgs :: Args
@@ -18,6 +19,7 @@ cIncludeArgs = do
     incDirs <- getPkgDataList IncludeDirs
     depDirs <- getPkgDataList DepIncludeDirs
     mconcat [ arg "-Iincludes"
+            , arg $ "-I" ++ generatedPath
             , arg $ "-I" ++ path
             , arg $ "-I" ++ path -/- "autogen"
             , append [ "-I" ++ pkgPath pkg -/- dir | dir <- incDirs ]

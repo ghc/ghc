@@ -9,7 +9,6 @@ import Oracles.Config.Setting
 import Oracles.WindowsPath
 import Predicate
 import Settings
-import Settings.Paths
 
 rtsConfIn :: FilePath
 rtsConfIn = pkgPath rts -/- "package.conf.in"
@@ -92,7 +91,7 @@ rtsPackageArgs = package rts ? do
             , input "//Evac_thr.c" ? append [ "-DPARALLEL_GC", "-Irts/sm" ]
             , input "//Scav_thr.c" ? append [ "-DPARALLEL_GC", "-Irts/sm" ] ]
 
-        , builder Ghc ? arg "-Irts" <> arg ("-I" ++ generatedPath)
+        , builder Ghc ? arg "-Irts"
 
         , builder (GhcPkg Stage1) ? mconcat
           [ remove ["rts/stage1/inplace-pkg-config"] -- TODO: fix, see #113

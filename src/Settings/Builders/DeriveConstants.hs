@@ -5,6 +5,7 @@ import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Predicate
 import Settings.Builders.Common
+import Settings.Paths
 
 -- TODO: do we need to support `includes_CC_OPTS += -DDYNAMIC_BY_DEFAULT`?
 deriveConstantsBuilderArgs :: Args
@@ -34,5 +35,6 @@ includeCcArgs = mconcat
     , flag GhcUnregisterised ? arg "-DUSE_MINIINTERPRETER"
     , arg "-Irts"
     , arg "-Iincludes"
+    , arg $ "-I" ++ generatedPath
     , notM ghcWithSMP ? arg "-DNOSMP"
     , arg "-fcommon" ]

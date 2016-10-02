@@ -135,6 +135,8 @@ includeGhcArgs = do
             , arg $ "-i" ++ path -/- "autogen"
             , append [ "-i" ++ pkgPath pkg -/- dir | dir <- srcDirs ]
             , cIncludeArgs
+            , arg $      "-I" ++ generatedPath
+            , arg $ "-optc-I" ++ generatedPath
             , arg "-optP-include"
             , arg $ "-optP" ++ path -/- "autogen/cabal_macros.h" ]
 

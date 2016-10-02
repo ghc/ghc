@@ -64,10 +64,12 @@ libraryArgs = do
 -- TODO: WARNING: unrecognized options: --with-compiler, --with-gmp-libraries, --with-cc
 configureArgs :: Args
 configureArgs = do
+    top <- getTopDirectory
     let conf key = appendSubD $ "--configure-option=" ++ key
         cFlags   = mconcat [ cArgs
                            , remove ["-Werror"]
-                           , argStagedSettingList ConfCcArgs ]
+                           , argStagedSettingList ConfCcArgs
+                           , arg $ "-I" ++ top -/- generatedPath ]
         ldFlags  = ldArgs  <> (argStagedSettingList ConfGccLinkerArgs)
         cppFlags = cppArgs <> (argStagedSettingList ConfCppArgs)
     mconcat

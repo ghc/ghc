@@ -16,9 +16,7 @@ compilerPackageArgs = package compiler ? do
     path    <- getBuildPath
     mconcat [ builder Alex ? arg "--latin1"
 
-            , builder Ghc ? mconcat
-              [ arg $      "-I" ++ path
-              , arg $ "-optP-I" ++ generatedPath ]
+            , builder Ghc ? arg ("-I" ++ path)
 
             , builder GhcCabal ? mconcat
               [ arg $ "--ghc-option=-DSTAGE=" ++ show (fromEnum stage + 1)
