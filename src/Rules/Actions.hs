@@ -200,16 +200,15 @@ putProgressInfo :: String -> Action ()
 putProgressInfo msg = when (cmdProgressInfo /= None) $ putBuild msg
 
 -- | Render an action.
-renderAction :: String -> String -> String -> String
+renderAction :: String -> FilePath -> FilePath -> String
 renderAction what input output = case cmdProgressInfo of
-    Normal  -> renderBox [ what
-                         , "     input: " ++ input
-                         , " => output: " ++ output ]
-    Brief   -> "| " ++ what ++ ": " ++ input ++ " => " ++ output
-    Unicorn -> renderUnicorn [ what
-                             , "     input: " ++ input
-                             , " => output: " ++ output ]
+    Normal  -> renderBox [ what, "     input: " ++ i, " => output: " ++ o ]
+    Brief   -> "| " ++ what ++ ": " ++ i ++ " => " ++ o
+    Unicorn -> renderUnicorn [ what, "     input: " ++ i, " => output: " ++ o ]
     None    -> ""
+  where
+    i = unifyPath input
+    o = unifyPath output
 
 -- | Render the successful build of a program
 renderProgram :: String -> String -> String -> String
