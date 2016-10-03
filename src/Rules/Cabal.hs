@@ -1,10 +1,11 @@
 module Rules.Cabal (cabalRules) where
 
-import Data.Version
 import Distribution.Package as DP
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse
+import Distribution.Text
 import Distribution.Verbosity
+import Text.PrettyPrint
 
 import Base
 import Expression
@@ -22,9 +23,8 @@ cabalRules = do
             need [pkgCabalFile pkg]
             pd <- liftIO . readPackageDescription silent $ pkgCabalFile pkg
             let identifier          = package . packageDescription $ pd
-                version             = showVersion . pkgVersion $ identifier
-                DP.PackageName name = DP.pkgName identifier
-            return $ name ++ " == " ++ version
+                version             = render . disp . pkgVersion $ identifier
+            return $ unPackageName (DP.pkgName identifier) ++ " == " ++ version
         writeFileChanged out . unlines $ constraints
 
     -- Cache package dependencies.
@@ -38,7 +38,7 @@ cabalRules = do
                 let depsLib  = collectDeps $ condLibrary pd
                     depsExes = map (collectDeps . Just . snd) $ condExecutables pd
                     deps     = concat $ depsLib : depsExes
-                    depNames = [ name | Dependency (DP.PackageName name) _ <- deps ]
+                    depNames = [ unPackageName name | Dependency name _ <- deps ]
                 return . unwords $ pkgNameString pkg : sort depNames
         writeFileChanged out . unlines $ pkgDeps
 
