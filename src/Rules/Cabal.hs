@@ -5,7 +5,6 @@ import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse
 import Distribution.Text
 import Distribution.Verbosity
-import Text.PrettyPrint
 
 import Base
 import Expression
@@ -23,7 +22,7 @@ cabalRules = do
             need [pkgCabalFile pkg]
             pd <- liftIO . readPackageDescription silent $ pkgCabalFile pkg
             let identifier          = package . packageDescription $ pd
-                version             = render . disp . pkgVersion $ identifier
+                version             = display . pkgVersion $ identifier
             return $ unPackageName (DP.pkgName identifier) ++ " == " ++ version
         writeFileChanged out . unlines $ constraints
 
