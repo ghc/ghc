@@ -93,7 +93,7 @@ zipWith4M f (x:xs) (y:ys) (z:zs) (a:as)
 
 zipWithAndUnzipM :: Monad m
                  => (a -> b -> m (c, d)) -> [a] -> [b] -> m ([c], [d])
-{-# INLINE zipWithAndUnzipM #-}
+{-# INLINABLE zipWithAndUnzipM #-}
 -- See Note [flatten_many performance] in TcFlatten for why this
 -- pragma is essential.
 zipWithAndUnzipM f (x:xs) (y:ys)
