@@ -12,7 +12,7 @@ checker.
 {-# LANGUAGE CPP, TupleSections #-}
 
 module TcHsSyn (
-        mkHsConApp, mkHsDictLet, mkHsApp,
+        mkHsDictLet, mkHsApp,
         hsLitType, hsLPatType, hsPatType,
         mkHsAppTy, mkHsCaseAlt,
         nlHsIntLit,
