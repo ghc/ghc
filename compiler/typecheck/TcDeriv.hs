@@ -712,6 +712,10 @@ deriveTyData tvs tc tc_args deriv_strat deriv_pred
                 --      do not mention any of the dropped type variables
                 --              newtype T a s = ... deriving( ST s )
                 --              newtype instance K a a = ... deriving( Monad )
+                --
+                -- It is vital that the implementation of allDistinctTyVars
+                -- expand any type synonyms.
+                -- See Note [Eta-reducing type synonyms]
 
         ; spec <- mkEqnHelp Nothing tkvs
                             cls final_cls_tys tc final_tc_args
@@ -885,17 +889,8 @@ the eta-reduced type variables are mentioned elsewhere in the declaration. But
 we need to be careful, because if we don't expand through the Const type
 synonym, we will mistakenly believe that f is an eta-reduced type variable and
 fail to derive Functor, even though the code above is correct (see Trac #11416,
-where this was first noticed).
-
-For this reason, we call exactTyCoVarsOfTypes on the eta-reduced types so that
-we only consider the type variables that remain after expanding through type
-synonyms.
-
-              -- Use exactTyCoVarsOfTypes, not tyCoVarsOfTypes, so that we
-              -- don't mistakenly grab a type variable mentioned in a type
-              -- synonym that drops it.
-              -- See Note [Eta-reducing type synonyms].
-              dropped_tvs     = exactTyCoVarsOfTypes args_to_drop
+where this was first noticed). For this reason, we expand the type synonyms in
+the eta-reduced types before doing any analysis.
 -}
 
 mkEqnHelp :: Maybe OverlapMode
