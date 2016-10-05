@@ -36,15 +36,13 @@ ghcLinkArgs :: Args
 ghcLinkArgs = builder (Ghc LinkHs) ? do
     stage   <- getStage
     libs    <- getPkgDataList DepExtraLibs
+    libDirs <- getPkgDataList DepLibDirs
     gmpLibs <- if stage > Stage0
                then do -- TODO: get this data more gracefully
+                   let strip = fromMaybe "" . stripPrefix "extra-libraries: "
                    buildInfo <- lift $ readFileLines gmpBuildInfoPath
-                   let extract s = case stripPrefix "extra-libraries: " s of
-                           Nothing    -> []
-                           Just value -> words value
-                   return $ concatMap extract buildInfo
+                   return $ concatMap (words . strip) buildInfo
                else return []
-    libDirs <- getPkgDataList DepLibDirs
     mconcat [ arg "-no-auto-link-packages"
             , append [ "-optl-l" ++           lib | lib <- libs ++ gmpLibs ]
             , append [ "-optl-L" ++ unifyPath dir | dir <- libDirs ] ]

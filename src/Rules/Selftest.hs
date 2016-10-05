@@ -35,7 +35,7 @@ testBuilder :: Action ()
 testBuilder = do
     putBuild $ "==== trackedArgument"
     test $ forAll (elements ["-j", "MAKEFLAGS=-j", "THREADS="])
-         $ \prefix -> \(NonNegative n) ->
+         $ \prefix (NonNegative n) ->
             trackedArgument (Make undefined) prefix == False &&
             trackedArgument (Make undefined) ("-j" ++ show (n :: Int)) == False
 
