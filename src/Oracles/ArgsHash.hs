@@ -30,6 +30,6 @@ checkArgsHash target = do
 argsHashOracle :: Rules ()
 argsHashOracle = void $
     addOracle $ \(ArgsHashKey target) -> do
-    	argList <- interpret target getArgs
-    	let trackedArgList = filter (trackedArgument $ builder target) argList
-    	return $ hash trackedArgList
+        argList <- interpret target getArgs
+        let trackedArgList = filter (trackedArgument $ builder target) argList
+        return $ hash trackedArgList

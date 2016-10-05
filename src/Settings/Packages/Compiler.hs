@@ -7,7 +7,6 @@ import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Predicate
 import Settings
-import Settings.Paths
 
 compilerPackageArgs :: Args
 compilerPackageArgs = package compiler ? do
