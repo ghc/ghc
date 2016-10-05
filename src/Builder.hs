@@ -1,10 +1,11 @@
 {-# LANGUAGE DeriveGeneric, LambdaCase #-}
 module Builder (
-    CcMode (..), GhcMode (..), Builder (..),
-    builderPath, getBuilderPath, builderEnvironment, specified, needBuilder
+    CcMode (..), GhcMode (..), Builder (..), builderPath, getBuilderPath,
+    builderEnvironment, specified, trackedArgument, needBuilder
     ) where
 
 import Control.Monad.Trans.Reader
+import Data.Char
 import GHC.Generics (Generic)
 
 import Base
@@ -148,6 +149,14 @@ builderEnvironment variable builder = do
 -- | Was the path to a given 'Builder' specified in configuration files?
 specified :: Builder -> Action Bool
 specified = fmap (not . null) . builderPath
+
+-- | Some arguments do not affect build results and therefore do not need to be
+-- tracked by the build system. A notable example is "-jN" that controls Make's
+-- parallelism. Given a 'Builder' and an argument, this function should return
+-- 'True' only if the argument needs to be tracked.
+trackedArgument :: Builder -> String -> Bool
+trackedArgument (Make _) ('-' : 'j' : xs) = not $ all isDigit xs
+trackedArgument _        _                = True
 
 -- | Make sure a Builder exists on the given path and rebuild it if out of date.
 needBuilder :: Builder -> Action ()

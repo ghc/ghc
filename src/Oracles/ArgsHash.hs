@@ -2,6 +2,7 @@
 module Oracles.ArgsHash (checkArgsHash, argsHashOracle) where
 
 import Base
+import Builder
 import Expression
 import Settings
 import Target
@@ -28,4 +29,7 @@ checkArgsHash target = do
 -- | Oracle for storing per-target argument list hashes.
 argsHashOracle :: Rules ()
 argsHashOracle = void $
-    addOracle $ \(ArgsHashKey target) -> hash <$> interpret target getArgs
+    addOracle $ \(ArgsHashKey target) -> do
+    	argList <- interpret target getArgs
+    	let trackedArgList = filter (trackedArgument $ builder target) argList
+    	return $ hash trackedArgList
