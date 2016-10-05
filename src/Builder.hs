@@ -155,8 +155,11 @@ specified = fmap (not . null) . builderPath
 -- parallelism. Given a 'Builder' and an argument, this function should return
 -- 'True' only if the argument needs to be tracked.
 trackedArgument :: Builder -> String -> Bool
-trackedArgument (Make _) ('-' : 'j' : xs) = not $ all isDigit xs
-trackedArgument _        _                = True
+trackedArgument (Make _) = not . threadArg
+trackedArgument _        = const True
+
+threadArg :: String -> Bool
+threadArg s = dropWhileEnd isDigit s `elem` ["-j", "MAKEFLAGS=-j", "THREADS="]
 
 -- | Make sure a Builder exists on the given path and rebuild it if out of date.
 needBuilder :: Builder -> Action ()

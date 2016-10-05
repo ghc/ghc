@@ -6,6 +6,7 @@ import Development.Shake
 import Test.QuickCheck
 
 import Base
+import Builder
 import Oracles.ModuleFiles
 import Settings.Builders.Ar
 import UserSettings
@@ -23,14 +24,23 @@ test = liftIO . quickCheck
 selftestRules :: Rules ()
 selftestRules =
     "selftest" ~> do
-        testWays
+        testBuilder
+        testWay
         testChunksOfSize
         testMatchVersionedFilePath
-        testModuleNames
+        testModuleName
         testLookupAll
 
-testWays :: Action ()
-testWays = do
+testBuilder :: Action ()
+testBuilder = do
+    putBuild $ "==== trackedArgument"
+    test $ forAll (elements ["-j", "MAKEFLAGS=-j", "THREADS="])
+         $ \prefix -> \(NonNegative n) ->
+            trackedArgument (Make undefined) prefix == False &&
+            trackedArgument (Make undefined) ("-j" ++ show (n :: Int)) == False
+
+testWay :: Action ()
+testWay = do
     putBuild $ "==== Read Way, Show Way"
     test $ \(x :: Way) -> read (show x) == x
 
@@ -59,8 +69,8 @@ testMatchVersionedFilePath = do
   where
     versions = listOf . elements $ '-' : '.' : ['0'..'9']
 
-testModuleNames :: Action ()
-testModuleNames = do
+testModuleName :: Action ()
+testModuleName = do
     putBuild $ "==== Encode/decode module name"
     test $ encodeModule "Data/Functor" "Identity.hs" == "Data.Functor.Identity"
     test $ encodeModule "" "Prelude"                 == "Prelude"
