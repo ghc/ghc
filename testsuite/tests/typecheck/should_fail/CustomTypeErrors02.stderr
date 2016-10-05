@@ -3,8 +3,3 @@ CustomTypeErrors02.hs:17:1: error:
     • The type 'a0 -> a0' cannot be represented as an integer.
     • When checking the inferred type
         err :: (TypeError ...)
-
-CustomTypeErrors02.hs:17:7: error:
-    • The type 'a0 -> a0' cannot be represented as an integer.
-    • In the expression: convert id
-      In an equation for ‘err’: err = convert id

@@ -14,13 +14,3 @@ T8142.hs:6:18: error:
             = h
             where
                 h = (\ (_, b) -> ((outI . fmap h) b)) . out
-
-T8142.hs:6:57: error:
-    • Couldn't match type ‘Nu ((,) a)’ with ‘g (Nu ((,) a))’
-      Expected type: Nu ((,) a) -> (a, g (Nu ((,) a)))
-        Actual type: Nu ((,) a) -> (a, Nu ((,) a))
-    • In the second argument of ‘(.)’, namely ‘out’
-      In the expression: (\ (_, b) -> ((outI . fmap h) b)) . out
-      In an equation for ‘h’: h = (\ (_, b) -> ((outI . fmap h) b)) . out
-    • Relevant bindings include
-        h :: Nu ((,) a) -> Nu g (bound at T8142.hs:6:18)

@@ -879,7 +879,7 @@ instance TH.Quasi TcM where
 
         -- For qRecover, discard error messages if
         -- the recovery action is chosen.  Otherwise
-        -- we'll only fail higher up.  c.f. tryTcLIE_
+        -- we'll only fail higher up.
   qRecover recover main = do { (msgs, mb_res) <- tryTcErrs main
                              ; case mb_res of
                                  Just val -> do { addMessages msgs      -- There might be warnings
