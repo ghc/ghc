@@ -20,7 +20,9 @@ updateArgs :: Args
 updateArgs = notM initPredicate ? do
     pkg <- getPackage
     dir <- getContextDirectory
+    verbosity <- lift $ getVerbosity
     mconcat [ arg "update"
             , arg "--force"
+            , verbosity < Chatty ? arg "-v0"
             , bootPackageDatabaseArgs
             , arg $ pkgPath pkg -/- dir -/- "inplace-pkg-config" ]

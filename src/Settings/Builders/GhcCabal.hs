@@ -17,23 +17,26 @@ import Settings.Builders.Common
 import Settings.Paths
 
 ghcCabalBuilderArgs :: Args
-ghcCabalBuilderArgs = builder GhcCabal ? mconcat
-    [ arg "configure"
-    , arg =<< getPackagePath
-    , arg =<< getContextDirectory
-    , dll0Args
-    , withStaged $ Ghc CompileHs
-    , withStaged GhcPkg
-    , bootPackageDatabaseArgs
-    , libraryArgs
-    , with HsColour
-    , configureArgs
-    , packageConstraints
-    , withStaged $ Cc CompileC
-    , notStage0 ? with Ld
-    , with Ar
-    , with Alex
-    , with Happy ]
+ghcCabalBuilderArgs = builder GhcCabal ? do
+    verbosity <- lift $ getVerbosity
+    mconcat [ arg "configure"
+            , arg =<< getPackagePath
+            , arg =<< getContextDirectory
+            , dll0Args
+            , withStaged $ Ghc CompileHs
+            , withStaged GhcPkg
+            , bootPackageDatabaseArgs
+            , libraryArgs
+            , with HsColour
+            , configureArgs
+            , packageConstraints
+            , withStaged $ Cc CompileC
+            , notStage0 ? with Ld
+            , with Ar
+            , with Alex
+            , with Happy
+            , verbosity < Chatty ? append [ "-v0", "--configure-option=--quiet"
+                , "--configure-option=--disable-option-checking"  ] ]
 
 ghcCabalHsColourBuilderArgs :: Args
 ghcCabalHsColourBuilderArgs = builder GhcCabalHsColour ? do
