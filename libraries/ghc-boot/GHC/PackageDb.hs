@@ -92,6 +92,7 @@ data InstalledPackageInfo compid srcpkgid srcpkgname instunitid unitid modulenam
        haddockHTMLs       :: [FilePath],
        exposedModules     :: [(modulename, Maybe mod)],
        hiddenModules      :: [modulename],
+       indefinite         :: Bool,
        exposed            :: Bool,
        trusted            :: Bool
      }
@@ -139,7 +140,7 @@ data DbUnitId compid unitid modulename mod
        dbUnitIdComponentId :: compid,
        dbUnitIdInsts :: [(modulename, mod)]
      }
-   | DbHashedUnitId {
+   | DbInstalledUnitId {
        dbUnitIdComponentId :: compid,
        dbUnitIdHash :: Maybe BS.ByteString
      }
@@ -175,6 +176,7 @@ emptyInstalledPackageInfo =
        haddockHTMLs       = [],
        exposedModules     = [],
        hiddenModules      = [],
+       indefinite         = False,
        exposed            = False,
        trusted            = False
   }
@@ -313,7 +315,7 @@ instance (RepInstalledPackageInfo a b c d e f g) =>
          includes includeDirs
          haddockInterfaces haddockHTMLs
          exposedModules hiddenModules
-         exposed trusted) = do
+         indefinite exposed trusted) = do
     put (toStringRep sourcePackageId)
     put (toStringRep packageName)
     put packageVersion
@@ -338,6 +340,7 @@ instance (RepInstalledPackageInfo a b c d e f g) =>
     put (map (\(mod_name, mb_mod) -> (toStringRep mod_name, fmap toDbModule mb_mod))
              exposedModules)
     put (map toStringRep hiddenModules)
+    put indefinite
     put exposed
     put trusted
 
@@ -364,6 +367,7 @@ instance (RepInstalledPackageInfo a b c d e f g) =>
     haddockHTMLs       <- get
     exposedModules     <- get
     hiddenModules      <- get
+    indefinite         <- get
     exposed            <- get
     trusted            <- get
     return (InstalledPackageInfo
@@ -384,7 +388,7 @@ instance (RepInstalledPackageInfo a b c d e f g) =>
                         (fromStringRep mod_name, fmap fromDbModule mb_mod))
                    exposedModules)
               (map fromStringRep hiddenModules)
-              exposed trusted)
+              indefinite exposed trusted)
 
 instance (BinaryStringRep modulename, BinaryStringRep compid,
           DbUnitIdModuleRep compid unitid modulename mod) =>
@@ -409,7 +413,7 @@ instance (BinaryStringRep modulename, BinaryStringRep compid,
 instance (BinaryStringRep modulename, BinaryStringRep compid,
           DbUnitIdModuleRep compid unitid modulename mod) =>
          Binary (DbUnitId compid unitid modulename mod) where
-  put (DbHashedUnitId cid hash) = do
+  put (DbInstalledUnitId cid hash) = do
     putWord8 0
     put (toStringRep cid)
     put hash
@@ -423,7 +427,7 @@ instance (BinaryStringRep modulename, BinaryStringRep compid,
       0 -> do
         cid <- get
         hash <- get
-        return (DbHashedUnitId (fromStringRep cid) hash)
+        return (DbInstalledUnitId (fromStringRep cid) hash)
       _ -> do
         dbUnitIdComponentId <- get
         dbUnitIdInsts <- get

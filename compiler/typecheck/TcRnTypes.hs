@@ -1171,12 +1171,12 @@ data ImportAvails
           -- compiling M might not need to consult X.hi, but X
           -- is still listed in M's dependencies.
 
-        imp_dep_pkgs :: [UnitId],
+        imp_dep_pkgs :: [InstalledUnitId],
           -- ^ Packages needed by the module being compiled, whether directly,
           -- or via other modules in this package, or via modules imported
           -- from other packages.
 
-        imp_trust_pkgs :: [UnitId],
+        imp_trust_pkgs :: [InstalledUnitId],
           -- ^ This is strictly a subset of imp_dep_pkgs and records the
           -- packages the current module needs to trust for Safe Haskell
           -- compilation to succeed. A package is required to be trusted if

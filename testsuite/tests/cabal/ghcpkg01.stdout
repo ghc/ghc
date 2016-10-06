@@ -16,6 +16,7 @@ description:
 category: none
 author: simonmar@microsoft.com
 exposed: True
+indefinite: False
 exposed-modules:
     A
 hidden-modules: B C.D
@@ -42,6 +43,7 @@ description:
 category: none
 author: simonmar@microsoft.com
 exposed: True
+indefinite: False
 exposed-modules:
     A
 hidden-modules: B C.D
@@ -74,6 +76,7 @@ description:
 category: none
 author: simonmar@microsoft.com
 exposed: False
+indefinite: False
 exposed-modules:
     A
 hidden-modules: B C.D C.E
@@ -100,6 +103,7 @@ description:
 category: none
 author: simonmar@microsoft.com
 exposed: False
+indefinite: False
 exposed-modules:
     A
 hidden-modules: B C.D C.E
@@ -126,6 +130,7 @@ description:
 category: none
 author: simonmar@microsoft.com
 exposed: True
+indefinite: False
 exposed-modules:
     A
 hidden-modules: B C.D
@@ -159,6 +164,7 @@ description:
 category: none
 author: simonmar@microsoft.com
 exposed: False
+indefinite: False
 exposed-modules:
     A
 hidden-modules: B C.D

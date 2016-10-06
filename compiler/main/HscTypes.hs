@@ -10,7 +10,7 @@
 module HscTypes (
         -- * compilation state
         HscEnv(..), hscEPS,
-        FinderCache, FindResult(..),
+        FinderCache, FindResult(..), InstalledFindResult(..),
         Target(..), TargetId(..), pprTarget, pprTargetId,
         ModuleGraph, emptyMG,
         HscStatus(..),
@@ -26,7 +26,7 @@ module HscTypes (
         ModGuts(..), CgGuts(..), ForeignStubs(..), appendStubC,
         ImportedMods, ImportedModsVal(..),
 
-        ModSummary(..), ms_imps, ms_mod_name, showModMsg, isBootSummary,
+        ModSummary(..), ms_imps, ms_installed_mod, ms_mod_name, showModMsg, isBootSummary,
         msHsFilePath, msHiFilePath, msObjFilePath,
         SourceModified(..),
 
@@ -771,16 +771,18 @@ prepareAnnotations hsc_env mb_guts = do
 -- modules along the search path. On @:load@, we flush the entire
 -- contents of this cache.
 --
--- Although the @FinderCache@ range is 'FindResult' for convenience,
--- in fact it will only ever contain 'Found' or 'NotFound' entries.
---
-type FinderCache = VirginModuleEnv FindResult
+type FinderCache = InstalledModuleEnv InstalledFindResult
+
+data InstalledFindResult
+  = InstalledFound ModLocation InstalledModule
+  | InstalledNoPackage InstalledUnitId
+  | InstalledNotFound [FilePath] (Maybe InstalledUnitId)
 
 -- | The result of searching for an imported module.
 --
 -- NB: FindResult manages both user source-import lookups
 -- (which can result in 'Module') as well as direct imports
--- for interfaces (which always result in 'VirginModule').
+-- for interfaces (which always result in 'InstalledModule').
 data FindResult
   = Found ModLocation Module
         -- ^ The module was found
@@ -1272,8 +1274,8 @@ data CgGuts
                 -- as part of the code-gen of tycons
 
         cg_foreign   :: !ForeignStubs,   -- ^ Foreign export stubs
-        cg_dep_pkgs  :: ![UnitId],    -- ^ Dependent packages, used to
-                                         -- generate #includes for C code gen
+        cg_dep_pkgs  :: ![InstalledUnitId], -- ^ Dependent packages, used to
+                                            -- generate #includes for C code gen
         cg_hpc_info  :: !HpcInfo,        -- ^ Program coverage tick box information
         cg_modBreaks :: !(Maybe ModBreaks) -- ^ Module breakpoints
     }
@@ -2240,7 +2242,7 @@ data Dependencies
                         -- I.e. modules that this one imports, or that are in the
                         --      dep_mods of those directly-imported modules
 
-         , dep_pkgs   :: [(UnitId, Bool)]
+         , dep_pkgs   :: [(InstalledUnitId, Bool)]
                         -- ^ All packages transitively below this module
                         -- I.e. packages to which this module's direct imports belong,
                         --      or that are in the dep_pkgs of those modules
@@ -2449,7 +2451,7 @@ data ExternalPackageState
                 --
                 -- * Deprecations and warnings
 
-        eps_free_holes :: ModuleEnv (UniqDSet ModuleName),
+        eps_free_holes :: InstalledModuleEnv (UniqDSet ModuleName),
                 -- ^ Cache for 'mi_free_holes'.  Ordinarily, we can rely on
                 -- the 'eps_PIT' for this information, EXCEPT that when
                 -- we do dependency analysis, we need to look at the
@@ -2601,6 +2603,9 @@ data ModSummary
         ms_hspp_buf     :: Maybe StringBuffer
           -- ^ The actual preprocessed source, if we have it
      }
+
+ms_installed_mod :: ModSummary -> InstalledModule
+ms_installed_mod = fst . splitModuleInsts . ms_mod
 
 ms_mod_name :: ModSummary -> ModuleName
 ms_mod_name = moduleName . ms_mod

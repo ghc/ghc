@@ -276,7 +276,8 @@ loadSrcInterface_maybe doc mod want_boot maybe_pkg
        ; res <- liftIO $ findImportedModule hsc_env mod maybe_pkg
        ; case res of
            Found _ mod -> initIfaceTcRn $ loadInterface doc mod (ImportByUser want_boot)
-           err         -> return (Failed (cannotFindInterface (hsc_dflags hsc_env) mod err)) }
+           -- TODO: Make sure this error message is good
+           err         -> return (Failed (cannotFindModule (hsc_dflags hsc_env) mod err)) }
 
 -- | Load interface directly for a fully qualified 'Module'.  (This is a fairly
 -- rare operation, but in particular it is used to load orphan modules
@@ -572,7 +573,7 @@ moduleFreeHolesPrecise doc_str mod
     tryEpsAndHpt dflags eps hpt =
         fmap mi_free_holes (lookupIfaceByModule dflags hpt (eps_PIT eps) mod)
     tryDepsCache eps imod insts =
-        case lookupModuleEnv (eps_free_holes eps) imod of
+        case lookupInstalledModuleEnv (eps_free_holes eps) imod of
             Just ifhs  -> Just (renameFreeHoles ifhs insts)
             _otherwise -> Nothing
     readAndCache imod insts = do
@@ -582,7 +583,7 @@ moduleFreeHolesPrecise doc_str mod
                 let ifhs = mi_free_holes iface
                 -- Cache it
                 updateEps_ (\eps ->
-                    eps { eps_free_holes = extendModuleEnv (eps_free_holes eps) imod ifhs })
+                    eps { eps_free_holes = extendInstalledModuleEnv (eps_free_holes eps) imod ifhs })
                 return (Succeeded (renameFreeHoles ifhs insts))
             Failed err -> return (Failed err)
 
@@ -769,7 +770,7 @@ This actually happened with P=base, Q=ghc-prim, via the AMP warnings.
 See Trac #8320.
 -}
 
-findAndReadIface :: SDoc -> VirginModule
+findAndReadIface :: SDoc -> InstalledModule
                  -> IsBootInterface     -- True  <=> Look for a .hi-boot file
                                         -- False <=> Look for .hi file
                  -> TcRnIf gbl lcl (MaybeErr MsgDoc (ModIface, FilePath))
@@ -788,7 +789,8 @@ findAndReadIface doc_str mod hi_boot_file
                      nest 4 (text "reason:" <+> doc_str)])
 
        -- Check for GHC.Prim, and return its static interface
-       if mod == gHC_PRIM
+       -- TODO: make this check a function
+       if mod `installedModuleEq` gHC_PRIM
            then do
                iface <- getHooked ghcPrimIfaceHook ghcPrimIface
                return (Succeeded (iface,
@@ -799,13 +801,13 @@ findAndReadIface doc_str mod hi_boot_file
                hsc_env <- getTopEnv
                mb_found <- liftIO (findExactModule hsc_env mod)
                case mb_found of
-                   Found loc mod -> do
+                   InstalledFound loc mod -> do
                        -- Found file, so read it
                        let file_path = addBootSuffix_maybe hi_boot_file
                                                            (ml_hi_file loc)
 
                        -- See Note [Home module load error]
-                       if thisPackage dflags == moduleUnitId mod &&
+                       if installedModuleUnitId mod `installedUnitIdEq` thisPackage dflags &&
                           not (isOneShot (ghcMode dflags))
                            then return (Failed (homeModError mod loc))
                            else do r <- read_file file_path
@@ -815,14 +817,14 @@ findAndReadIface doc_str mod hi_boot_file
                        traceIf (text "...not found")
                        dflags <- getDynFlags
                        return (Failed (cannotFindInterface dflags
-                                           (moduleName mod) err))
+                                           (installedModuleName mod) err))
     where read_file file_path = do
               traceIf (text "readIFace" <+> text file_path)
               read_result <- readIface mod file_path
               case read_result of
                 Failed err -> return (Failed (badIfaceFile file_path err))
                 Succeeded iface
-                    | mi_module iface /= mod ->
+                    | not (mod `installedModuleEq` mi_module iface) ->
                       return (Failed (wrongIfaceModErr iface mod file_path))
                     | otherwise ->
                       return (Succeeded (iface, file_path))
@@ -852,7 +854,7 @@ findAndReadIface doc_str mod hi_boot_file
 
 -- @readIface@ tries just the one file.
 
-readIface :: VirginModule -> FilePath
+readIface :: InstalledModule -> FilePath
           -> TcRnIf gbl lcl (MaybeErr MsgDoc ModIface)
         -- Failed err    <=> file not found, or unreadable, or illegible
         -- Succeeded iface <=> successfully found and parsed
@@ -862,8 +864,10 @@ readIface wanted_mod file_path
                  readBinIface CheckHiWay QuietBinIFaceReading file_path
         ; case res of
             Right iface
-                | wanted_mod == actual_mod -> return (Succeeded iface)
-                | otherwise                -> return (Failed err)
+                -- Same deal
+                | wanted_mod `installedModuleEq` actual_mod
+                                -> return (Succeeded iface)
+                | otherwise     -> return (Failed err)
                 where
                   actual_mod = mi_module iface
                   err = hiModuleNameMismatchWarn wanted_mod actual_mod
@@ -884,7 +888,7 @@ initExternalPackageState
   = EPS {
       eps_is_boot      = emptyUFM,
       eps_PIT          = emptyPackageIfaceTable,
-      eps_free_holes   = emptyModuleEnv,
+      eps_free_holes   = emptyInstalledModuleEnv,
       eps_PTE          = emptyTypeEnv,
       eps_inst_env     = emptyInstEnv,
       eps_fam_inst_env = emptyFamInstEnv,
@@ -1114,7 +1118,7 @@ badIfaceFile file err
   = vcat [text "Bad interface file:" <+> text file,
           nest 4 err]
 
-hiModuleNameMismatchWarn :: Module -> Module -> MsgDoc
+hiModuleNameMismatchWarn :: InstalledModule -> Module -> MsgDoc
 hiModuleNameMismatchWarn requested_mod read_mod =
   -- ToDo: This will fail to have enough qualification when the package IDs
   -- are the same
@@ -1127,11 +1131,11 @@ hiModuleNameMismatchWarn requested_mod read_mod =
          , ppr read_mod
          ]
 
-wrongIfaceModErr :: ModIface -> Module -> String -> SDoc
-wrongIfaceModErr iface mod_name file_path
+wrongIfaceModErr :: ModIface -> InstalledModule -> String -> SDoc
+wrongIfaceModErr iface mod file_path
   = sep [text "Interface file" <+> iface_file,
          text "contains module" <+> quotes (ppr (mi_module iface)) <> comma,
-         text "but we were expecting module" <+> quotes (ppr mod_name),
+         text "but we were expecting module" <+> quotes (ppr mod),
          sep [text "Probable cause: the source code which generated",
              nest 2 iface_file,
              text "has an incompatible module name"
@@ -1139,7 +1143,7 @@ wrongIfaceModErr iface mod_name file_path
         ]
   where iface_file = doubleQuotes (text file_path)
 
-homeModError :: Module -> ModLocation -> SDoc
+homeModError :: InstalledModule -> ModLocation -> SDoc
 -- See Note [Home module load error]
 homeModError mod location
   = text "attempting to use module " <> quotes (ppr mod)

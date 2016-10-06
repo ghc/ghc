@@ -223,7 +223,7 @@ findExtraSigImports' hsc_env HsigFile modname =
         (initIfaceLoad hsc_env
             . withException
             $ moduleFreeHolesPrecise (text "findExtraSigImports")
-                (mkModule (AnIndefUnitId iuid) mod_name)))
+                (mkModule (IndefiniteUnitId iuid) mod_name)))
   where
     reqs = requirementMerges (hsc_dflags hsc_env) modname
 
@@ -269,7 +269,7 @@ implicitRequirements' hsc_env normal_imports
 -- not; a component may have been filled with implementations for the holes
 -- that don't actually fulfill the requirements.
 --
--- INVARIANT: the UnitId is NOT a HashedUnitId
+-- INVARIANT: the UnitId is NOT a InstalledUnitId
 checkUnitId :: UnitId -> TcM ()
 checkUnitId uid = do
     case splitUnitIdInsts uid of
@@ -354,9 +354,7 @@ mergeSignatures lcl_iface0 = do
            fmap fst
          . withException
          . flip (findAndReadIface (text "mergeSignatures")) False
-         -- Blegh, temporarily violated invariant that hashed unit
-         -- ids are definite
-         $ mkModule (newSimpleUnitId (indefUnitIdComponentId iuid)) mod_name
+         $ fst (splitModuleInsts (mkModule (IndefiniteUnitId iuid) mod_name))
 
     -- STEP 3: Get the unrenamed exports of all these interfaces, and
     -- dO shaping on them.
@@ -478,8 +476,7 @@ tcRnInstantiateSignature hsc_env this_mod real_loc =
 -- explicitly.)
 checkImplements :: Module -> HoleModule -> TcRn TcGblEnv
 checkImplements impl_mod (uid, mod_name) = do
-    let cid   = indefUnitIdComponentId uid
-        insts = indefUnitIdInsts uid
+    let insts = indefUnitIdInsts uid
 
     -- STEP 1: Load the implementing interface, and make a RdrEnv
     -- for its exports
@@ -493,7 +490,7 @@ checkImplements impl_mod (uid, mod_name) = do
     -- the ORIGINAL signature.  We are going to eventually rename it,
     -- but we must proceed slowly, because it is NOT known if the
     -- instantiation is correct.
-    let isig_mod = mkModule (newSimpleUnitId cid) mod_name
+    let isig_mod = fst (splitModuleInsts (mkModule (IndefiniteUnitId uid) mod_name))
     mb_isig_iface <- findAndReadIface (text "checkImplements 2") isig_mod False
     isig_iface <- case mb_isig_iface of
         Succeeded (iface, _) -> return iface

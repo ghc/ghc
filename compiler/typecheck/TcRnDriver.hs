@@ -2471,7 +2471,7 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
          , text "Dependent modules:" <+>
                 pprUDFM (imp_dep_mods imports) ppr
          , text "Dependent packages:" <+>
-                ppr (sortBy stableUnitIdCmp $ imp_dep_pkgs imports)]
+                ppr (sortBy compare $ imp_dep_pkgs imports)]
   where         -- The use of sortBy is just to reduce unnecessary
                 -- wobbling in testsuite output
 

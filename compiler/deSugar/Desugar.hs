@@ -92,12 +92,12 @@ mkDependencies
                 --  on M.hi-boot, and hence that we should do the hi-boot consistency
                 --  check.)
 
-          pkgs | th_used   = insertList thUnitId (imp_dep_pkgs imports)
+          pkgs | th_used   = insertList (toInstalledUnitId thUnitId) (imp_dep_pkgs imports)
                | otherwise = imp_dep_pkgs imports
 
           -- Set the packages required to be Safe according to Safe Haskell.
           -- See Note [RnNames . Tracking Trust Transitively]
-          sorted_pkgs = sortBy stableUnitIdCmp pkgs
+          sorted_pkgs = sort pkgs
           trust_pkgs  = imp_trust_pkgs imports
           dep_pkgs'   = map (\x -> (x, x `elem` trust_pkgs)) sorted_pkgs
 

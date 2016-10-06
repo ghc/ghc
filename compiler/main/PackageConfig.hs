@@ -12,6 +12,8 @@ module PackageConfig (
         -- * UnitId
         packageConfigId,
         expandedPackageConfigId,
+        definitePackageConfigId,
+        installedPackageConfigId,
 
         -- * The PackageConfig type: information about a package
         PackageConfig,
@@ -35,6 +37,7 @@ import FastString
 import Outputable
 import Module
 import Unique
+import UniqDSet
 
 -- -----------------------------------------------------------------------------
 -- Our PackageConfig type is the InstalledPackageInfo from ghc-boot,
@@ -44,7 +47,7 @@ type PackageConfig = InstalledPackageInfo
                        ComponentId
                        SourcePackageId
                        PackageName
-                       Module.UnitId
+                       Module.InstalledUnitId
                        Module.UnitId
                        Module.ModuleName
                        Module.Module
@@ -129,11 +132,21 @@ pprPackageConfig InstalledPackageInfo {..} =
 -- version is, so these are handled specially; see #wired_in_packages#.
 
 -- | Get the GHC 'UnitId' right out of a Cabalish 'PackageConfig'
+installedPackageConfigId :: PackageConfig -> InstalledUnitId
+installedPackageConfigId = unitId
+
 packageConfigId :: PackageConfig -> UnitId
-packageConfigId = unitId
+packageConfigId p =
+    if indefinite p
+        then newUnitId (installedUnitIdComponentId (unitId p)) (instantiatedWith p)
+        else DefiniteUnitId (DefUnitId (unitId p))
 
 expandedPackageConfigId :: PackageConfig -> UnitId
 expandedPackageConfigId p =
-    case instantiatedWith p of
-        [] -> packageConfigId p
-        _ -> newUnitId (unitIdComponentId (packageConfigId p)) (instantiatedWith p)
+    newUnitId (installedUnitIdComponentId (unitId p)) (instantiatedWith p)
+
+definitePackageConfigId :: PackageConfig -> Maybe DefUnitId
+definitePackageConfigId p =
+    case packageConfigId p of
+        DefiniteUnitId def_uid -> Just def_uid
+        _ -> Nothing

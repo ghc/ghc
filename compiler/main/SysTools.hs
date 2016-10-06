@@ -1564,7 +1564,7 @@ linesPlatform xs =
 
 #endif
 
-linkDynLib :: DynFlags -> [String] -> [UnitId] -> IO ()
+linkDynLib :: DynFlags -> [String] -> [InstalledUnitId] -> IO ()
 linkDynLib dflags0 o_files dep_packages
  = do
     let -- This is a rather ugly hack to fix dynamically linked
@@ -1741,7 +1741,7 @@ linkDynLib dflags0 o_files dep_packages
                  ++ map Option pkg_link_opts
               )
 
-getPkgFrameworkOpts :: DynFlags -> Platform -> [UnitId] -> IO [String]
+getPkgFrameworkOpts :: DynFlags -> Platform -> [InstalledUnitId] -> IO [String]
 getPkgFrameworkOpts dflags platform dep_packages
   | platformUsesFrameworks platform = do
     pkg_framework_path_opts <- do

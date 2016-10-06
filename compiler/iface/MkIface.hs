@@ -651,7 +651,7 @@ getOrphanHashes hsc_env mods = do
 sortDependencies :: Dependencies -> Dependencies
 sortDependencies d
  = Deps { dep_mods   = sortBy (compare `on` (moduleNameFS.fst)) (dep_mods d),
-          dep_pkgs   = sortBy (stableUnitIdCmp `on` fst) (dep_pkgs d),
+          dep_pkgs   = sortBy (compare `on` fst) (dep_pkgs d),
           dep_orphs  = sortBy stableModuleCmp (dep_orphs d),
           dep_finsts = sortBy stableModuleCmp (dep_finsts d) }
 
@@ -1009,7 +1009,7 @@ check_old_iface hsc_env mod_summary src_modified maybe_iface
 
         loadIface = do
              let iface_path = msHiFilePath mod_summary
-             read_result <- readIface (ms_mod mod_summary) iface_path
+             read_result <- readIface (ms_installed_mod mod_summary) iface_path
              case read_result of
                  Failed err -> do
                      traceIf (text "FYI: cannot read old interface file:" $$ nest 4 err)
@@ -1107,7 +1107,7 @@ checkHsig mod_summary iface = do
     dflags <- getDynFlags
     let outer_mod = ms_mod mod_summary
         inner_mod = canonicalizeHomeModule dflags (moduleName outer_mod)
-    MASSERT( thisPackage dflags == moduleUnitId outer_mod )
+    MASSERT( moduleUnitId outer_mod == thisPackage dflags )
     case inner_mod == mi_semantic_module iface of
         True -> up_to_date (text "implementing module unchanged")
         False -> return (RecompBecause "implementing module changed")
@@ -1158,7 +1158,7 @@ checkDependencies hsc_env summary iface
                  else
                          return UpToDate
           | otherwise
-           -> if pkg `notElem` (map fst prev_dep_pkgs)
+           -> if toInstalledUnitId pkg `notElem` (map fst prev_dep_pkgs)
                  then do traceHiDiffs $
                            text "imported module " <> quotes (ppr mod) <>
                            text " is from package " <> quotes (ppr pkg) <>

@@ -60,7 +60,7 @@ import MonadUtils       ( liftIO )
 -- Imports for --abi-hash
 import LoadIface           ( loadUserInterface )
 import Module              ( mkModuleName )
-import Finder              ( findImportedModule, cannotFindInterface )
+import Finder              ( findImportedModule, cannotFindModule )
 import TcRnMonad           ( initIfaceCheck )
 import Binary              ( openBinMem, put_, fingerprintBinMem )
 
@@ -890,7 +890,7 @@ abiHash strs = do
          case r of
            Found _ m -> return m
            _error    -> throwGhcException $ CmdLineError $ showSDoc dflags $
-                          cannotFindInterface dflags modname r
+                          cannotFindModule dflags modname r
 
   mods <- mapM find_it strs
 

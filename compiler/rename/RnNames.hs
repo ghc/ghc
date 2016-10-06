@@ -358,6 +358,7 @@ calculateAvails dflags iface mod_safe' want_boot =
              | otherwise  = dep_finsts deps
 
       pkg = moduleUnitId (mi_module iface)
+      ipkg = toInstalledUnitId pkg
 
       -- Does this import mean we now require our own pkg
       -- to be trusted? See Note [Trust Own Package]
@@ -382,9 +383,9 @@ calculateAvails dflags iface mod_safe' want_boot =
             -- Imported module is from another package
             -- Dump the dependent modules
             -- Add the package imp_mod comes from to the dependent packages
-            ASSERT2( not (pkg `elem` (map fst $ dep_pkgs deps))
-                   , ppr pkg <+> ppr (dep_pkgs deps) )
-            ([], (pkg, False) : dep_pkgs deps, False)
+            ASSERT2( not (ipkg `elem` (map fst $ dep_pkgs deps))
+                   , ppr ipkg <+> ppr (dep_pkgs deps) )
+            ([], (ipkg, False) : dep_pkgs deps, False)
 
   in ImportAvails {
           imp_mods       = emptyModuleEnv, -- this gets filled in later

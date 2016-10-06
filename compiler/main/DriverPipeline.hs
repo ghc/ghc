@@ -402,7 +402,7 @@ link' dflags batch_attempt_linking hpt
         return Succeeded
 
 
-linkingNeeded :: DynFlags -> Bool -> [Linkable] -> [UnitId] -> IO Bool
+linkingNeeded :: DynFlags -> Bool -> [Linkable] -> [InstalledUnitId] -> IO Bool
 linkingNeeded dflags staticLink linkables pkg_deps = do
         -- if the modification time on the executable is later than the
         -- modification times on all of the objects and libraries, then omit
@@ -424,7 +424,7 @@ linkingNeeded dflags staticLink linkables pkg_deps = do
         -- next, check libraries. XXX this only checks Haskell libraries,
         -- not extra_libraries or -l things from the command line.
         let pkg_hslibs  = [ (libraryDirs c, lib)
-                          | Just c <- map (lookupPackage dflags) pkg_deps,
+                          | Just c <- map (lookupInstalledPackage dflags) pkg_deps,
                             lib <- packageHsLibs dflags c ]
 
         pkg_libfiles <- mapM (uncurry (findHSLib dflags)) pkg_hslibs
@@ -438,7 +438,7 @@ linkingNeeded dflags staticLink linkables pkg_deps = do
 
 -- Returns 'False' if it was, and we can avoid linking, because the
 -- previous binary was linked with "the same options".
-checkLinkInfo :: DynFlags -> [UnitId] -> FilePath -> IO Bool
+checkLinkInfo :: DynFlags -> [InstalledUnitId] -> FilePath -> IO Bool
 checkLinkInfo dflags pkg_deps exe_file
  | not (platformSupportsSavingLinkOpts (platformOS (targetPlatform dflags)))
  -- ToDo: Windows and OS X do not use the ELF binary format, so
@@ -1652,7 +1652,7 @@ mkExtraObjToLinkIntoBinary dflags = do
 -- this was included as inline assembly in the main.c file but this
 -- is pretty fragile. gas gets upset trying to calculate relative offsets
 -- that span the .note section (notably .text) when debug info is present
-mkNoteObjsToLinkIntoBinary :: DynFlags -> [UnitId] -> IO [FilePath]
+mkNoteObjsToLinkIntoBinary :: DynFlags -> [InstalledUnitId] -> IO [FilePath]
 mkNoteObjsToLinkIntoBinary dflags dep_packages = do
    link_info <- getLinkInfo dflags dep_packages
 
@@ -1677,7 +1677,7 @@ mkNoteObjsToLinkIntoBinary dflags dep_packages = do
 -- | Return the "link info" string
 --
 -- See Note [LinkInfo section]
-getLinkInfo :: DynFlags -> [UnitId] -> IO String
+getLinkInfo :: DynFlags -> [InstalledUnitId] -> IO String
 getLinkInfo dflags dep_packages = do
    package_link_opts <- getPackageLinkOpts dflags dep_packages
    pkg_frameworks <- if platformUsesFrameworks (targetPlatform dflags)
@@ -1714,13 +1714,13 @@ not follow the specified record-based format (see #11022).
 -----------------------------------------------------------------------------
 -- Look for the /* GHC_PACKAGES ... */ comment at the top of a .hc file
 
-getHCFilePackages :: FilePath -> IO [UnitId]
+getHCFilePackages :: FilePath -> IO [InstalledUnitId]
 getHCFilePackages filename =
   Exception.bracket (openFile filename ReadMode) hClose $ \h -> do
     l <- hGetLine h
     case l of
       '/':'*':' ':'G':'H':'C':'_':'P':'A':'C':'K':'A':'G':'E':'S':rest ->
-          return (map stringToUnitId (words rest))
+          return (map stringToInstalledUnitId (words rest))
       _other ->
           return []
 
@@ -1737,10 +1737,10 @@ getHCFilePackages filename =
 -- read any interface files), so the user must explicitly specify all
 -- the packages.
 
-linkBinary :: DynFlags -> [FilePath] -> [UnitId] -> IO ()
+linkBinary :: DynFlags -> [FilePath] -> [InstalledUnitId] -> IO ()
 linkBinary = linkBinary' False
 
-linkBinary' :: Bool -> DynFlags -> [FilePath] -> [UnitId] -> IO ()
+linkBinary' :: Bool -> DynFlags -> [FilePath] -> [InstalledUnitId] -> IO ()
 linkBinary' staticLink dflags o_files dep_packages = do
     let platform = targetPlatform dflags
         mySettings = settings dflags
@@ -1987,7 +1987,7 @@ maybeCreateManifest dflags exe_filename
  | otherwise = return []
 
 
-linkDynLibCheck :: DynFlags -> [String] -> [UnitId] -> IO ()
+linkDynLibCheck :: DynFlags -> [String] -> [InstalledUnitId] -> IO ()
 linkDynLibCheck dflags o_files dep_packages
  = do
     when (haveRtsOptsFlags dflags) $ do
@@ -1997,7 +1997,7 @@ linkDynLibCheck dflags o_files dep_packages
 
     linkDynLib dflags o_files dep_packages
 
-linkStaticLibCheck :: DynFlags -> [String] -> [UnitId] -> IO ()
+linkStaticLibCheck :: DynFlags -> [String] -> [InstalledUnitId] -> IO ()
 linkStaticLibCheck dflags o_files dep_packages
  = do
     when (platformOS (targetPlatform dflags) `notElem` [OSiOS, OSDarwin]) $
@@ -2229,7 +2229,7 @@ haveRtsOptsFlags dflags =
 -- | Find out path to @ghcversion.h@ file
 getGhcVersionPathName :: DynFlags -> IO FilePath
 getGhcVersionPathName dflags = do
-  dirs <- getPackageIncludePath dflags [rtsUnitId]
+  dirs <- getPackageIncludePath dflags [toInstalledUnitId rtsUnitId]
 
   found <- filterM doesFileExist (map (</> "ghcversion.h") dirs)
   case found of

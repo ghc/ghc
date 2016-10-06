@@ -1119,6 +1119,7 @@ convertPackageInfoToCacheFormat pkg =
        GhcPkg.haddockHTMLs       = haddockHTMLs pkg,
        GhcPkg.exposedModules     = map convertExposed (exposedModules pkg),
        GhcPkg.hiddenModules      = hiddenModules pkg,
+       GhcPkg.indefinite         = indefinite pkg,
        GhcPkg.exposed            = exposed pkg,
        GhcPkg.trusted            = trusted pkg
     }
@@ -1156,9 +1157,12 @@ instance GhcPkg.DbUnitIdModuleRep ComponentId OpenUnitId ModuleName OpenModule w
   toDbModule (OpenModule uid mod_name) = GhcPkg.DbModule uid mod_name
   toDbModule (OpenModuleVar mod_name) = GhcPkg.DbModuleVar mod_name
   fromDbUnitId (GhcPkg.DbUnitId cid insts) = IndefFullUnitId cid (Map.fromList insts)
-  fromDbUnitId (GhcPkg.DbHashedUnitId cid bs) = DefiniteUnitId (DefUnitId (UnitId cid (fmap fromStringRep bs)))
+  fromDbUnitId (GhcPkg.DbInstalledUnitId cid bs)
+    = DefiniteUnitId (unsafeMkDefUnitId (UnitId cid (fmap fromStringRep bs)))
   toDbUnitId (IndefFullUnitId cid insts) = GhcPkg.DbUnitId cid (Map.toList insts)
-  toDbUnitId (DefiniteUnitId (DefUnitId (UnitId cid mb_hash))) = GhcPkg.DbHashedUnitId cid (fmap toStringRep mb_hash)
+  toDbUnitId (DefiniteUnitId def_uid)
+    | UnitId cid mb_hash <- unDefUnitId def_uid
+    = GhcPkg.DbInstalledUnitId cid (fmap toStringRep mb_hash)
 
 -- -----------------------------------------------------------------------------
 -- Exposing, Hiding, Trusting, Distrusting, Unregistering are all similar
@@ -1809,8 +1813,9 @@ checkModule :: String
             -> Validate ()
 checkModule _ _ _ (OpenModuleVar _) = error "Impermissible reexport"
 checkModule field_name db_stack pkg
-    (OpenModule (DefiniteUnitId (DefUnitId definingPkgId)) definingModule) =
-  let mpkg = if definingPkgId == installedUnitId pkg
+    (OpenModule (DefiniteUnitId def_uid) definingModule) =
+  let definingPkgId = unDefUnitId def_uid
+      mpkg = if definingPkgId == installedUnitId pkg
               then Just pkg
               else PackageIndex.lookupUnitId ipix definingPkgId
   in case mpkg of

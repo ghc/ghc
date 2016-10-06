@@ -378,7 +378,7 @@ tcHiBootIface hsc_src mod
         -- to check consistency against, rather than just when we notice
         -- that an hi-boot is necessary due to a circular import.
         { read_result <- findAndReadIface
-                                need mod
+                                need (fst (splitModuleInsts mod))
                                 True    -- Hi-boot file
 
         ; case read_result of {

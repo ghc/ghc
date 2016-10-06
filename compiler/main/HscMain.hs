@@ -179,7 +179,7 @@ newHscEnv dflags = do
     eps_var <- newIORef initExternalPackageState
     us      <- mkSplitUniqSupply 'r'
     nc_var  <- newIORef (initNameCache us allKnownKeyNames)
-    fc_var  <- newIORef emptyModuleEnv
+    fc_var  <- newIORef emptyInstalledModuleEnv
 #ifdef GHCI
     iserv_mvar <- newMVar Nothing
 #endif
@@ -444,12 +444,14 @@ hscTypecheck keep_rn mod_summary mb_rdr_module = do
     let hsc_src = ms_hsc_src mod_summary
         dflags = hsc_dflags hsc_env
         outer_mod = ms_mod mod_summary
-        inner_mod = canonicalizeHomeModule dflags (moduleName outer_mod)
+        mod_name = moduleName outer_mod
+        outer_mod' = mkModule (thisPackage dflags) mod_name
+        inner_mod = canonicalizeHomeModule dflags mod_name
         src_filename  = ms_hspp_file mod_summary
         real_loc = realSrcLocSpan $ mkRealSrcLoc (mkFastString src_filename) 1 1
     MASSERT( moduleUnitId outer_mod == thisPackage dflags )
     if hsc_src == HsigFile && not (isHoleModule inner_mod)
-        then ioMsgMaybe $ tcRnInstantiateSignature hsc_env outer_mod real_loc
+        then ioMsgMaybe $ tcRnInstantiateSignature hsc_env outer_mod' real_loc
         else
          do hpm <- case mb_rdr_module of
                     Just hpm -> return hpm
@@ -1021,7 +1023,7 @@ hscCheckSafe hsc_env m l = runHsc hsc_env $ do
     return $ isEmptyBag errs
 
 -- | Return if a module is trusted and the pkgs it depends on to be trusted.
-hscGetSafe :: HscEnv -> Module -> SrcSpan -> IO (Bool, [UnitId])
+hscGetSafe :: HscEnv -> Module -> SrcSpan -> IO (Bool, [InstalledUnitId])
 hscGetSafe hsc_env m l = runHsc hsc_env $ do
     dflags       <- getDynFlags
     (self, pkgs) <- hscCheckSafe' dflags m l
@@ -1035,15 +1037,17 @@ hscGetSafe hsc_env m l = runHsc hsc_env $ do
 -- Return (regardless of trusted or not) if the trust type requires the modules
 -- own package be trusted and a list of other packages required to be trusted
 -- (these later ones haven't been checked) but the own package trust has been.
-hscCheckSafe' :: DynFlags -> Module -> SrcSpan -> Hsc (Maybe UnitId, [UnitId])
+hscCheckSafe' :: DynFlags -> Module -> SrcSpan -> Hsc (Maybe InstalledUnitId, [InstalledUnitId])
 hscCheckSafe' dflags m l = do
     (tw, pkgs) <- isModSafe m l
     case tw of
         False              -> return (Nothing, pkgs)
         True | isHomePkg m -> return (Nothing, pkgs)
-             | otherwise   -> return (Just $ moduleUnitId m, pkgs)
+             -- TODO: do we also have to check the trust of the instantiation?
+             -- Not necessary if that is reflected in dependencies
+             | otherwise   -> return (Just $ toInstalledUnitId (moduleUnitId m), pkgs)
   where
-    isModSafe :: Module -> SrcSpan -> Hsc (Bool, [UnitId])
+    isModSafe :: Module -> SrcSpan -> Hsc (Bool, [InstalledUnitId])
     isModSafe m l = do
         iface <- lookup' m
         case iface of
@@ -1123,7 +1127,7 @@ hscCheckSafe' dflags m l = do
         | otherwise                               = False
 
 -- | Check the list of packages are trusted.
-checkPkgTrust :: DynFlags -> [UnitId] -> Hsc ()
+checkPkgTrust :: DynFlags -> [InstalledUnitId] -> Hsc ()
 checkPkgTrust dflags pkgs =
     case errors of
         [] -> return ()
@@ -1131,7 +1135,7 @@ checkPkgTrust dflags pkgs =
     where
         errors = catMaybes $ map go pkgs
         go pkg
-            | trusted $ getPackageDetails dflags pkg
+            | trusted $ getInstalledPackageDetails dflags pkg
             = Nothing
             | otherwise
             = Just $ mkErrMsg dflags noSrcSpan (pkgQual dflags)

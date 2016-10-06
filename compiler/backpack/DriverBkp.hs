@@ -161,7 +161,7 @@ withBkpSession cid insts deps session_type do_this = do
                 TcSession -> newUnitId cid insts
                 -- No hash passed if no instances
                 _ | null insts -> newSimpleUnitId cid
-                  | otherwise  -> newHashedUnitId cid (Just (hashUnitId cid insts)),
+                  | otherwise  -> newDefiniteUnitId cid (Just (hashUnitId cid insts)),
         -- Setup all of the output directories according to our hierarchy
         objectDir   = Just (outdir objectDir),
         hiDir       = Just (outdir hiDir),
@@ -207,7 +207,7 @@ compileUnit cid insts = do
     lunit <- getSource cid
     buildUnit CompSession cid insts lunit
 
--- Invariant: this NEVER returns HashedUnitId
+-- Invariant: this NEVER returns InstalledUnitId
 hsunitDeps :: HsUnit HsComponentId -> [(UnitId, ModRenaming)]
 hsunitDeps unit = concatMap get_dep (hsunitBody unit)
   where
@@ -281,7 +281,7 @@ buildUnit session cid insts lunit = do
             sourcePackageId = SourcePackageId compat_fs,
             packageName = compat_pn,
             packageVersion = makeVersion [0],
-            unitId = thisPackage dflags,
+            unitId = toInstalledUnitId (thisPackage dflags),
             instantiatedWith = insts,
             -- Slight inefficiency here haha
             exposedModules = map (\(m,n) -> (m,Just n)) mods,
@@ -293,7 +293,7 @@ buildUnit session cid insts lunit = do
                         -- really used for anything, so we leave it
                         -- blank for now.
                         TcSession -> []
-                        _ -> map (unwireUnitId dflags)
+                        _ -> map (toInstalledUnitId . unwireUnitId dflags)
                                 $ deps ++ [ moduleUnitId mod
                                           | (_, mod) <- insts
                                           , not (isHoleModule mod) ],
@@ -302,6 +302,9 @@ buildUnit session cid insts lunit = do
                             _ -> obj_files,
             importDirs = [ hi_dir ],
             exposed = False,
+            indefinite = case session of
+                            TcSession -> True
+                            _ -> False,
             -- nope
             hsLibraries = [],
             extraLibraries = [],
@@ -353,7 +356,7 @@ addPackage pkg = do
                         -- liftIO $ setUnsafeGlobalDynFlags dflags
                         return ()
 
--- Precondition: UnitId is NOT HashedUnitId
+-- Precondition: UnitId is NOT InstalledUnitId
 compileInclude :: Int -> (Int, UnitId) -> BkpM ()
 compileInclude n (i, uid) = do
     hsc_env <- getSession

@@ -1916,7 +1916,8 @@ summariseFile hsc_env old_summaries file mb_phase obj_allowed maybe_buf
         extra_sig_imports <- findExtraSigImports hsc_env hsc_src mod_name
         required_by_imports <- implicitRequirements hsc_env the_imps
 
-        return (ModSummary { ms_mod = mod, ms_hsc_src = hsc_src,
+        return (ModSummary { ms_mod = mod,
+                             ms_hsc_src = hsc_src,
                              ms_location = location,
                              ms_hspp_file = hspp_fn,
                              ms_hspp_opts = dflags',

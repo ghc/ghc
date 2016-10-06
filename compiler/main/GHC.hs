@@ -576,7 +576,7 @@ checkBrokenTablesNextToCode' dflags
 -- flags.  If you are not doing linking or doing static linking, you
 -- can ignore the list of packages returned.
 --
-setSessionDynFlags :: GhcMonad m => DynFlags -> m [UnitId]
+setSessionDynFlags :: GhcMonad m => DynFlags -> m [InstalledUnitId]
 setSessionDynFlags dflags = do
   dflags' <- checkNewDynFlags dflags
   (dflags'', preload) <- liftIO $ initPackages dflags'
@@ -586,7 +586,7 @@ setSessionDynFlags dflags = do
   return preload
 
 -- | Sets the program 'DynFlags'.
-setProgramDynFlags :: GhcMonad m => DynFlags -> m [UnitId]
+setProgramDynFlags :: GhcMonad m => DynFlags -> m [InstalledUnitId]
 setProgramDynFlags dflags = do
   dflags' <- checkNewDynFlags dflags
   (dflags'', preload) <- liftIO $ initPackages dflags'
@@ -1435,7 +1435,7 @@ isModuleTrusted m = withSession $ \hsc_env ->
     liftIO $ hscCheckSafe hsc_env m noSrcSpan
 
 -- | Return if a module is trusted and the pkgs it depends on to be trusted.
-moduleTrustReqs :: GhcMonad m => Module -> m (Bool, [UnitId])
+moduleTrustReqs :: GhcMonad m => Module -> m (Bool, [InstalledUnitId])
 moduleTrustReqs m = withSession $ \hsc_env ->
     liftIO $ hscGetSafe hsc_env m noSrcSpan
 

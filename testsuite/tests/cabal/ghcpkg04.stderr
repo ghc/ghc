@@ -1,4 +1,4 @@
 
 ghcpkg04.hs:1:1: error:
-    Ambiguous interface for ‘A’:
-      it was found in multiple packages: testpkg-1.2.3.4 newtestpkg-2.0
+    Ambiguous module name ‘A’:
+      it was found in multiple packages: newtestpkg-2.0 testpkg-1.2.3.4

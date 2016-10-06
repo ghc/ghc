@@ -54,7 +54,8 @@ import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
                   setInteractivePrintName, hsc_dflags, msObjFilePath )
 import Module
 import Name
-import Packages ( trusted, getPackageDetails, listVisibleModuleNames, pprFlag )
+import Packages ( trusted, getPackageDetails, getInstalledPackageDetails,
+                  listVisibleModuleNames, pprFlag )
 import PprTyThing
 import PrelNames
 import RdrName ( RdrName, getGRE_NameQualifier_maybes, getRdrName )
@@ -2056,7 +2057,7 @@ isSafeModule m = do
 
     tallyPkgs dflags deps | not (packageTrustOn dflags) = ([], [])
                           | otherwise = partition part deps
-        where part pkg = trusted $ getPackageDetails dflags pkg
+        where part pkg = trusted $ getInstalledPackageDetails dflags pkg
 
 -----------------------------------------------------------------------------
 -- :browse
