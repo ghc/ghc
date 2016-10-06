@@ -959,10 +959,10 @@ mi_semantic_module iface = case mi_sig_of iface of
 mi_free_holes :: ModIface -> UniqDSet ModuleName
 mi_free_holes iface =
   case splitModuleInsts (mi_module iface) of
-    (_, Just insts)
+    (_, Just indef)
         -- A mini-hack: we rely on the fact that 'renameFreeHoles'
         -- drops things that aren't holes.
-        -> renameFreeHoles (mkUniqDSet cands) insts
+        -> renameFreeHoles (mkUniqDSet cands) (indefUnitIdInsts (indefModuleUnitId indef))
     _   -> emptyUniqDSet
   where
     cands = map fst (dep_mods (mi_deps iface))
@@ -1596,7 +1596,8 @@ extendInteractiveContextWithIds ictxt new_ids
 setInteractivePackage :: HscEnv -> HscEnv
 -- Set the 'thisPackage' DynFlag to 'interactive'
 setInteractivePackage hsc_env
-   = hsc_env { hsc_dflags = (hsc_dflags hsc_env) { thisPackage = interactiveUnitId } }
+   = hsc_env { hsc_dflags = (hsc_dflags hsc_env)
+                { thisInstalledUnitId = toInstalledUnitId interactiveUnitId } }
 
 setInteractivePrintName :: InteractiveContext -> Name -> InteractiveContext
 setInteractivePrintName ic n = ic{ic_int_print = n}

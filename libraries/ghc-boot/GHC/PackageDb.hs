@@ -71,6 +71,7 @@ import System.Directory
 data InstalledPackageInfo compid srcpkgid srcpkgname instunitid unitid modulename mod
    = InstalledPackageInfo {
        unitId             :: instunitid,
+       componentId        :: compid,
        instantiatedWith   :: [(modulename, mod)],
        sourcePackageId    :: srcpkgid,
        packageName        :: srcpkgname,
@@ -104,24 +105,25 @@ type RepInstalledPackageInfo compid srcpkgid srcpkgname instunitid unitid module
     (BinaryStringRep srcpkgid, BinaryStringRep srcpkgname,
      BinaryStringRep modulename, BinaryStringRep compid,
      BinaryStringRep instunitid,
-     DbUnitIdModuleRep compid unitid modulename mod)
+     DbUnitIdModuleRep instunitid compid unitid modulename mod)
 
 -- | A type-class for the types which can be converted into 'DbModule'/'DbUnitId'.
 -- There is only one type class because these types are mutually recursive.
 -- NB: The functional dependency helps out type inference in cases
 -- where types would be ambiguous.
-class DbUnitIdModuleRep compid unitid modulename mod
-    | mod -> unitid, unitid -> mod, mod -> modulename, unitid -> compid where
-  fromDbModule :: DbModule compid unitid modulename mod -> mod
-  toDbModule :: mod -> DbModule compid unitid modulename mod
-  fromDbUnitId :: DbUnitId compid unitid modulename mod -> unitid
-  toDbUnitId :: unitid -> DbUnitId compid unitid modulename mod
+class DbUnitIdModuleRep instunitid compid unitid modulename mod
+    | mod -> unitid, unitid -> mod, mod -> modulename, unitid -> compid, unitid -> instunitid
+    where
+  fromDbModule :: DbModule instunitid compid unitid modulename mod -> mod
+  toDbModule :: mod -> DbModule instunitid compid unitid modulename mod
+  fromDbUnitId :: DbUnitId instunitid compid unitid modulename mod -> unitid
+  toDbUnitId :: unitid -> DbUnitId instunitid compid unitid modulename mod
 
 -- | @ghc-boot@'s copy of 'Module', i.e. what is serialized to the database.
 -- Use 'DbUnitIdModuleRep' to convert it into an actual 'Module'.
 -- It has phantom type parameters as this is the most convenient way
 -- to avoid undecidable instances.
-data DbModule compid unitid modulename mod
+data DbModule instunitid compid unitid modulename mod
    = DbModule {
        dbModuleUnitId :: unitid,
        dbModuleName :: modulename
@@ -135,15 +137,9 @@ data DbModule compid unitid modulename mod
 -- Use 'DbUnitIdModuleRep' to convert it into an actual 'UnitId'.
 -- It has phantom type parameters as this is the most convenient way
 -- to avoid undecidable instances.
-data DbUnitId compid unitid modulename mod
-   = DbUnitId {
-       dbUnitIdComponentId :: compid,
-       dbUnitIdInsts :: [(modulename, mod)]
-     }
-   | DbInstalledUnitId {
-       dbUnitIdComponentId :: compid,
-       dbUnitIdHash :: Maybe BS.ByteString
-     }
+data DbUnitId instunitid compid unitid modulename mod
+   = DbUnitId compid [(modulename, mod)]
+   | DbInstalledUnitId instunitid
   deriving (Eq, Show)
 
 class BinaryStringRep a where
@@ -155,6 +151,7 @@ emptyInstalledPackageInfo :: RepInstalledPackageInfo a b c d e f g
 emptyInstalledPackageInfo =
   InstalledPackageInfo {
        unitId             = fromStringRep BS.empty,
+       componentId        = fromStringRep BS.empty,
        instantiatedWith   = [],
        sourcePackageId    = fromStringRep BS.empty,
        packageName        = fromStringRep BS.empty,
@@ -306,7 +303,7 @@ writeFileAtomic targetPath content = do
 instance (RepInstalledPackageInfo a b c d e f g) =>
          Binary (InstalledPackageInfo a b c d e f g) where
   put (InstalledPackageInfo
-         unitId instantiatedWith sourcePackageId
+         unitId componentId instantiatedWith sourcePackageId
          packageName packageVersion
          abiHash depends importDirs
          hsLibraries extraLibraries extraGHCiLibraries libraryDirs
@@ -320,6 +317,7 @@ instance (RepInstalledPackageInfo a b c d e f g) =>
     put (toStringRep packageName)
     put packageVersion
     put (toStringRep unitId)
+    put (toStringRep componentId)
     put (map (\(mod_name, mod) -> (toStringRep mod_name, toDbModule mod))
              instantiatedWith)
     put abiHash
@@ -349,6 +347,7 @@ instance (RepInstalledPackageInfo a b c d e f g) =>
     packageName        <- get
     packageVersion     <- get
     unitId             <- get
+    componentId        <- get
     instantiatedWith   <- get
     abiHash            <- get
     depends            <- get
@@ -372,6 +371,7 @@ instance (RepInstalledPackageInfo a b c d e f g) =>
     trusted            <- get
     return (InstalledPackageInfo
               (fromStringRep unitId)
+              (fromStringRep componentId)
               (map (\(mod_name, mod) -> (fromStringRep mod_name, fromDbModule mod))
                 instantiatedWith)
               (fromStringRep sourcePackageId)
@@ -391,8 +391,9 @@ instance (RepInstalledPackageInfo a b c d e f g) =>
               indefinite exposed trusted)
 
 instance (BinaryStringRep modulename, BinaryStringRep compid,
-          DbUnitIdModuleRep compid unitid modulename mod) =>
-         Binary (DbModule compid unitid modulename mod) where
+          BinaryStringRep instunitid,
+          DbUnitIdModuleRep instunitid compid unitid modulename mod) =>
+         Binary (DbModule instunitid compid unitid modulename mod) where
   put (DbModule dbModuleUnitId dbModuleName) = do
     putWord8 0
     put (toDbUnitId dbModuleUnitId)
@@ -411,12 +412,12 @@ instance (BinaryStringRep modulename, BinaryStringRep compid,
               return (DbModuleVar (fromStringRep dbModuleVarName))
 
 instance (BinaryStringRep modulename, BinaryStringRep compid,
-          DbUnitIdModuleRep compid unitid modulename mod) =>
-         Binary (DbUnitId compid unitid modulename mod) where
-  put (DbInstalledUnitId cid hash) = do
+          BinaryStringRep instunitid,
+          DbUnitIdModuleRep instunitid compid unitid modulename mod) =>
+         Binary (DbUnitId instunitid compid unitid modulename mod) where
+  put (DbInstalledUnitId instunitid) = do
     putWord8 0
-    put (toStringRep cid)
-    put hash
+    put (toStringRep instunitid)
   put (DbUnitId dbUnitIdComponentId dbUnitIdInsts) = do
     putWord8 1
     put (toStringRep dbUnitIdComponentId)
@@ -425,9 +426,8 @@ instance (BinaryStringRep modulename, BinaryStringRep compid,
     b <- getWord8
     case b of
       0 -> do
-        cid <- get
-        hash <- get
-        return (DbInstalledUnitId (fromStringRep cid) hash)
+        instunitid <- get
+        return (DbInstalledUnitId (fromStringRep instunitid))
       _ -> do
         dbUnitIdComponentId <- get
         dbUnitIdInsts <- get

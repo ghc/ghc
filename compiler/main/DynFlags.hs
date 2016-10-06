@@ -54,10 +54,11 @@ module DynFlags (
         dynFlagDependencies,
         tablesNextToCode, mkTablesNextToCode,
         makeDynFlagsConsistent,
-        thisUnitIdComponentId,
 
         Way(..), mkBuildTag, wayRTSOnly, addWay', updateWays,
         wayGeneralFlags, wayUnsetGeneralFlags,
+
+        thisPackage, thisComponentId, thisUnitIdInsts,
 
         -- ** Safe Haskell
         SafeHaskellMode(..),
@@ -688,9 +689,9 @@ data DynFlags = DynFlags {
   solverIterations      :: IntWithInf,   -- ^ Number of iterations in the constraints solver
                                          --   Typically only 1 is needed
 
-  thisPackage           :: UnitId,   -- ^ unit id of package currently being compiled.
-                                     --   Not properly initialized until initPackages
-  thisUnitIdInsts       :: [(ModuleName, Module)],
+  thisInstalledUnitId   :: InstalledUnitId,
+  thisComponentId_      :: Maybe ComponentId,
+  thisUnitIdInsts_      :: Maybe [(ModuleName, Module)],
 
   -- ways
   ways                  :: [Way],       -- ^ Way flags from the command line
@@ -1487,8 +1488,9 @@ defaultDynFlags mySettings =
         reductionDepth          = treatZeroAsInf mAX_REDUCTION_DEPTH,
         solverIterations        = treatZeroAsInf mAX_SOLVER_ITERATIONS,
 
-        thisPackage             = mainUnitId,
-        thisUnitIdInsts         = [],
+        thisInstalledUnitId     = toInstalledUnitId mainUnitId,
+        thisUnitIdInsts_        = Nothing,
+        thisComponentId_        = Nothing,
 
         objectDir               = Nothing,
         dylibInstallName        = Nothing,
@@ -2003,6 +2005,34 @@ setOutputFile f d = d { outputFile = f}
 setDynOutputFile f d = d { dynOutputFile = f}
 setOutputHi   f d = d { outputHi   = f}
 
+thisComponentId :: DynFlags -> ComponentId
+thisComponentId dflags =
+  case thisComponentId_ dflags of
+    Just cid -> cid
+    Nothing  ->
+      case thisUnitIdInsts_ dflags of
+        Just _  ->
+          throwGhcException $ CmdLineError ("Use of -instantiated-with requires -this-component-id")
+        Nothing -> ComponentId (unitIdFS (thisPackage dflags))
+
+thisUnitIdInsts :: DynFlags -> [(ModuleName, Module)]
+thisUnitIdInsts dflags =
+    case thisUnitIdInsts_ dflags of
+        Just insts -> insts
+        Nothing    -> []
+
+thisPackage :: DynFlags -> UnitId
+thisPackage dflags =
+    case thisUnitIdInsts_ dflags of
+        Nothing -> default_uid
+        Just insts
+          | all (\(x,y) -> mkHoleModule x == y) insts
+          -> newUnitId (thisComponentId dflags) insts
+          | otherwise
+          -> default_uid
+  where
+    default_uid = DefiniteUnitId (DefUnitId (thisInstalledUnitId dflags))
+
 parseUnitIdInsts :: String -> [(ModuleName, Module)]
 parseUnitIdInsts str = case filter ((=="").snd) (readP_to_S parse str) of
     [(r, "")] -> r
@@ -2015,17 +2045,12 @@ parseUnitIdInsts str = case filter ((=="").snd) (readP_to_S parse str) of
             return (n, m)
 
 setUnitIdInsts :: String -> DynFlags -> DynFlags
-setUnitIdInsts s d = updateWithInsts (parseUnitIdInsts s) d
+setUnitIdInsts s d =
+    d { thisUnitIdInsts_ = Just (parseUnitIdInsts s) }
 
-updateWithInsts :: [(ModuleName, Module)] -> DynFlags -> DynFlags
-updateWithInsts insts d =
-    -- Overwrite the instances, the instances are "indefinite"
-    d { thisPackage     =
-          if not (null insts) && all (\(x,y) -> mkHoleModule x == y) insts
-            then newUnitId (unitIdComponentId (thisPackage d)) insts
-            else thisPackage d
-      , thisUnitIdInsts = insts
-      }
+setComponentId :: String -> DynFlags -> DynFlags
+setComponentId s d =
+    d { thisComponentId_ = Just (ComponentId (fsLit s)) }
 
 addPluginModuleName :: String -> DynFlags -> DynFlags
 addPluginModuleName name d = d { pluginModNames = (mkModuleName name) : (pluginModNames d) }
@@ -2368,6 +2393,7 @@ dynamic_flags_deps = [
                  -- parallel builds is equal to the
                  -- result of getNumProcessors
   , make_ord_flag defFlag "instantiated-with"   (sepArg setUnitIdInsts)
+  , make_ord_flag defFlag "this-component-id"   (sepArg setComponentId)
 
     -- RTS options -------------------------------------------------------------
   , make_ord_flag defFlag "H"           (HasArg (\s -> upd (\d ->
@@ -4357,18 +4383,8 @@ parseUnitIdArg :: ReadP PackageArg
 parseUnitIdArg =
     fmap UnitIdArg parseUnitId
 
-
-thisUnitIdComponentId :: DynFlags -> ComponentId
-thisUnitIdComponentId = unitIdComponentId . thisPackage
-
 setUnitId :: String -> DynFlags -> DynFlags
-setUnitId p d =
-    updateWithInsts (thisUnitIdInsts d) $ d{ thisPackage = uid }
-  where
-    uid =
-        case filter ((=="").snd) (readP_to_S parseUnitId p) of
-            [(r, "")] -> r
-            _ -> throwGhcException $ CmdLineError ("Can't parse component id: " ++ p)
+setUnitId p d = d { thisInstalledUnitId = stringToInstalledUnitId p }
 
 -- | Given a 'ModuleName' of a signature in the home library, find
 -- out how it is instantiated.  E.g., the canonical form of

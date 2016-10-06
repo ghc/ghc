@@ -37,7 +37,6 @@ import FastString
 import Outputable
 import Module
 import Unique
-import UniqDSet
 
 -- -----------------------------------------------------------------------------
 -- Our PackageConfig type is the InstalledPackageInfo from ghc-boot,
@@ -138,12 +137,12 @@ installedPackageConfigId = unitId
 packageConfigId :: PackageConfig -> UnitId
 packageConfigId p =
     if indefinite p
-        then newUnitId (installedUnitIdComponentId (unitId p)) (instantiatedWith p)
+        then newUnitId (componentId p) (instantiatedWith p)
         else DefiniteUnitId (DefUnitId (unitId p))
 
 expandedPackageConfigId :: PackageConfig -> UnitId
 expandedPackageConfigId p =
-    newUnitId (installedUnitIdComponentId (unitId p)) (instantiatedWith p)
+    newUnitId (componentId p) (instantiatedWith p)
 
 definitePackageConfigId :: PackageConfig -> Maybe DefUnitId
 definitePackageConfigId p =

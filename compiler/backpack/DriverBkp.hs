@@ -155,13 +155,14 @@ withBkpSession cid insts deps session_type do_this = do
         hscTarget   = case session_type of
                         TcSession -> HscNothing
                         _ -> hscTarget dflags,
-        thisUnitIdInsts = insts,
-        thisPackage =
+        thisUnitIdInsts_ = Just insts,
+        thisComponentId_ = Just cid,
+        thisInstalledUnitId =
             case session_type of
-                TcSession -> newUnitId cid insts
+                TcSession -> newInstalledUnitId cid Nothing
                 -- No hash passed if no instances
-                _ | null insts -> newSimpleUnitId cid
-                  | otherwise  -> newDefiniteUnitId cid (Just (hashUnitId cid insts)),
+                _ | null insts -> newInstalledUnitId cid Nothing
+                  | otherwise  -> newInstalledUnitId cid (Just (hashUnitId cid insts)),
         -- Setup all of the output directories according to our hierarchy
         objectDir   = Just (outdir objectDir),
         hiDir       = Just (outdir hiDir),
@@ -186,7 +187,7 @@ withBkpSession cid insts deps session_type do_this = do
 
 withBkpExeSession :: [(UnitId, ModRenaming)] -> BkpM a -> BkpM a
 withBkpExeSession deps do_this = do
-    withBkpSession (unitIdComponentId mainUnitId) [] deps ExeSession do_this
+    withBkpSession (ComponentId (fsLit "main")) [] deps ExeSession do_this
 
 getSource :: ComponentId -> BkpM (LHsUnit HsComponentId)
 getSource cid = do
@@ -282,6 +283,7 @@ buildUnit session cid insts lunit = do
             packageName = compat_pn,
             packageVersion = makeVersion [0],
             unitId = toInstalledUnitId (thisPackage dflags),
+            componentId = cid,
             instantiatedWith = insts,
             -- Slight inefficiency here haha
             exposedModules = map (\(m,n) -> (m,Just n)) mods,
@@ -366,8 +368,9 @@ compileInclude n (i, uid) = do
     case lookupPackage dflags uid of
         Nothing -> do
             case splitUnitIdInsts uid of
-                (_, Just insts) ->
-                    innerBkpM $ compileUnit (unitIdComponentId uid) insts
+                (_, Just indef) ->
+                    innerBkpM $ compileUnit (indefUnitIdComponentId indef)
+                                            (indefUnitIdInsts indef)
                 _ -> return ()
         Just _ -> return ()
 
@@ -778,3 +781,11 @@ hsModuleToModSummary pn hsc_src modname
             ms_obj_date = Nothing, -- TODO do this, but problem: hi_timestamp is BOGUS
             ms_iface_date = hi_timestamp
         }
+
+-- | Create a new, externally provided hashed unit id from
+-- a hash.
+newInstalledUnitId :: ComponentId -> Maybe FastString -> InstalledUnitId
+newInstalledUnitId (ComponentId cid_fs) (Just fs)
+    = InstalledUnitId (cid_fs `appendFS` mkFastString "+" `appendFS` fs)
+newInstalledUnitId (ComponentId cid_fs) Nothing
+    = InstalledUnitId cid_fs

@@ -27,6 +27,7 @@ module Packages (
         getPackageDetails,
         getInstalledPackageDetails,
         componentIdString,
+        displayInstalledUnitId,
         listVisibleModuleNames,
         lookupModuleInAllPackages,
         lookupModuleWithSuggestions,
@@ -268,7 +269,7 @@ data UnitVisibility = UnitVisibility
       -- ^ The package name is associated with the 'UnitId'.  This is used
       -- to implement legacy behavior where @-package foo-0.1@ implicitly
       -- hides any packages named @foo@
-    , uv_requirements :: Map ModuleName (Set HoleModule)
+    , uv_requirements :: Map ModuleName (Set IndefModule)
       -- ^ The signatures which are contributed to the requirements context
       -- from this unit ID.
     , uv_explicit :: Bool
@@ -351,7 +352,7 @@ data PackageState = PackageState {
   -- and @r[C=<A>]:C@.
   --
   -- There's an entry in this map for each hole in our home library.
-  requirementContext :: Map ModuleName [HoleModule]
+  requirementContext :: Map ModuleName [IndefModule]
   }
 
 emptyPackageState :: PackageState
@@ -384,8 +385,8 @@ lookupPackage' :: Bool -> PackageConfigMap -> UnitId -> Maybe PackageConfig
 lookupPackage' False (PackageConfigMap pkg_map _) uid = lookupUDFM pkg_map uid
 lookupPackage' True m@(PackageConfigMap pkg_map _) uid =
     case splitUnitIdInsts uid of
-        (iuid, Just insts) ->
-            fmap (renamePackage m insts)
+        (iuid, Just indef) ->
+            fmap (renamePackage m (indefUnitIdInsts indef))
                  (lookupUDFM pkg_map iuid)
         (_, Nothing) -> lookupUDFM pkg_map uid
 
@@ -689,15 +690,14 @@ applyPackageFlag dflags pkg_db unusable no_hide_others pkgs vm flag =
                 | otherwise                 = Map.empty
 
            collectHoles uid = case splitUnitIdInsts uid of
-                (_, Just insts) ->
-                  let cid = unitIdComponentId uid
-                      local = [ Map.singleton
+                (_, Just indef) ->
+                  let local = [ Map.singleton
                                   (moduleName mod)
-                                  (Set.singleton $ (newIndefUnitId cid insts, mod_name))
-                              | (mod_name, mod) <- insts
+                                  (Set.singleton $ IndefModule indef mod_name)
+                              | (mod_name, mod) <- indefUnitIdInsts indef
                               , isHoleModule mod ]
                       recurse = [ collectHoles (moduleUnitId mod)
-                                | (_, mod) <- insts ]
+                                | (_, mod) <- indefUnitIdInsts indef ]
                   in Map.unionsWith Set.union $ local ++ recurse
                 -- Other types of unit identities don't have holes
                 (_, Nothing) -> Map.empty
@@ -764,11 +764,11 @@ findPackages pkg_db arg pkgs unusable
           then Just p
           else Nothing
     finder (UnitIdArg uid) p
-      = let (iuid, mb_insts) = splitUnitIdInsts uid
+      = let (iuid, mb_indef) = splitUnitIdInsts uid
         in if iuid == installedPackageConfigId p
-              then Just (case mb_insts of
+              then Just (case mb_indef of
                             Nothing    -> p
-                            Just insts -> renamePackage pkg_db insts p)
+                            Just indef -> renamePackage pkg_db (indefUnitIdInsts indef) p)
               else Nothing
 
 selectPackages :: PackageArg -> [PackageConfig]
@@ -968,9 +968,10 @@ findWiredInPackages dflags pkgs vis_map = do
           where upd_pkg pkg
                   | Just def_uid <- definitePackageConfigId pkg
                   , def_uid `elem` wired_in_ids
-                  = pkg {
-                      unitId = let PackageName fs = packageName pkg
-                               in fsToInstalledUnitId fs
+                  = let PackageName fs = packageName pkg
+                    in pkg {
+                      unitId = fsToInstalledUnitId fs,
+                      componentId = ComponentId fs
                     }
                   | otherwise
                   = pkg
@@ -1313,7 +1314,7 @@ mkPackageState dflags dbs preload0 = do
 
   let pkgname_map = foldl add Map.empty pkgs2
         where add pn_map p
-                = Map.insert (packageName p) (unitIdComponentId (packageConfigId p)) pn_map
+                = Map.insert (packageName p) (componentId p) pn_map
 
   -- The explicitPackages accurately reflects the set of packages we have turned
   -- on; as such, it also is the only way one can come up with requirements.
@@ -1713,7 +1714,12 @@ missingDependencyMsg (Just parent)
 
 componentIdString :: DynFlags -> ComponentId -> Maybe String
 componentIdString dflags cid =
-    fmap sourcePackageIdString (lookupInstalledPackage dflags (newInstalledUnitId cid Nothing))
+    fmap sourcePackageIdString (lookupInstalledPackage dflags
+        (componentIdToInstalledUnitId cid))
+
+displayInstalledUnitId :: DynFlags -> InstalledUnitId -> Maybe String
+displayInstalledUnitId dflags uid =
+    fmap sourcePackageIdString (lookupInstalledPackage dflags uid)
 
 -- | Will the 'Name' come from a dynamically linked library?
 isDllName :: DynFlags -> UnitId {- not used -} -> Module -> Name -> Bool

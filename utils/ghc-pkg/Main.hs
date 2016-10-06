@@ -998,7 +998,9 @@ registerPackage input verbosity my_flags multi_instance
      removes = [ RemovePackage p
                | not multi_instance,
                  p <- packages db_to_operate_on,
-                 sourcePackageId p == sourcePackageId pkg ]
+                 sourcePackageId p == sourcePackageId pkg,
+                 -- Only remove things that were instantiated the same way!
+                 instantiatedWith p == instantiatedWith pkg ]
   --
   changeDB verbosity (removes ++ [AddPackage pkg]) db_to_operate_on
 
@@ -1098,6 +1100,7 @@ convertPackageInfoToCacheFormat :: InstalledPackageInfo -> PackageCacheFormat
 convertPackageInfoToCacheFormat pkg =
     GhcPkg.InstalledPackageInfo {
        GhcPkg.unitId             = installedUnitId pkg,
+       GhcPkg.componentId        = installedComponentId pkg,
        GhcPkg.instantiatedWith   = instantiatedWith pkg,
        GhcPkg.sourcePackageId    = sourcePackageId pkg,
        GhcPkg.packageName        = packageName pkg,
@@ -1147,22 +1150,20 @@ instance GhcPkg.BinaryStringRep String where
   toStringRep   = BS.pack . toUTF8
 
 instance GhcPkg.BinaryStringRep UnitId where
-  fromStringRep = fromMaybe (error "BinaryStringRep UnitId")
-                . simpleParse . fromStringRep
+  fromStringRep = mkUnitId . fromStringRep
   toStringRep   = toStringRep . display
 
-instance GhcPkg.DbUnitIdModuleRep ComponentId OpenUnitId ModuleName OpenModule where
+instance GhcPkg.DbUnitIdModuleRep UnitId ComponentId OpenUnitId ModuleName OpenModule where
   fromDbModule (GhcPkg.DbModule uid mod_name) = OpenModule uid mod_name
   fromDbModule (GhcPkg.DbModuleVar mod_name) = OpenModuleVar mod_name
   toDbModule (OpenModule uid mod_name) = GhcPkg.DbModule uid mod_name
   toDbModule (OpenModuleVar mod_name) = GhcPkg.DbModuleVar mod_name
   fromDbUnitId (GhcPkg.DbUnitId cid insts) = IndefFullUnitId cid (Map.fromList insts)
-  fromDbUnitId (GhcPkg.DbInstalledUnitId cid bs)
-    = DefiniteUnitId (unsafeMkDefUnitId (UnitId cid (fmap fromStringRep bs)))
+  fromDbUnitId (GhcPkg.DbInstalledUnitId uid)
+    = DefiniteUnitId (unsafeMkDefUnitId uid)
   toDbUnitId (IndefFullUnitId cid insts) = GhcPkg.DbUnitId cid (Map.toList insts)
   toDbUnitId (DefiniteUnitId def_uid)
-    | UnitId cid mb_hash <- unDefUnitId def_uid
-    = GhcPkg.DbInstalledUnitId cid (fmap toStringRep mb_hash)
+    = GhcPkg.DbInstalledUnitId (unDefUnitId def_uid)
 
 -- -----------------------------------------------------------------------------
 -- Exposing, Hiding, Trusting, Distrusting, Unregistering are all similar

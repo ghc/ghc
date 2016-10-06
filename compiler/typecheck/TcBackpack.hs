@@ -190,7 +190,7 @@ check_inst sig_inst = do
 
 -- | Return this list of requirement interfaces that need to be merged
 -- to form @mod_name@, or @[]@ if this is not a requirement.
-requirementMerges :: DynFlags -> ModuleName -> [HoleModule]
+requirementMerges :: DynFlags -> ModuleName -> [IndefModule]
 requirementMerges dflags mod_name =
     fromMaybe [] (Map.lookup mod_name (requirementContext (pkgState dflags)))
 
@@ -219,7 +219,7 @@ findExtraSigImports' :: HscEnv
                      -> ModuleName
                      -> IO (UniqDSet ModuleName)
 findExtraSigImports' hsc_env HsigFile modname =
-    fmap unionManyUniqDSets (forM reqs $ \(iuid, mod_name) ->
+    fmap unionManyUniqDSets (forM reqs $ \(IndefModule iuid mod_name) ->
         (initIfaceLoad hsc_env
             . withException
             $ moduleFreeHolesPrecise (text "findExtraSigImports")
@@ -273,7 +273,8 @@ implicitRequirements' hsc_env normal_imports
 checkUnitId :: UnitId -> TcM ()
 checkUnitId uid = do
     case splitUnitIdInsts uid of
-      (_, Just insts) ->
+      (_, Just indef) ->
+        let insts = indefUnitIdInsts indef in
         forM_ insts $ \(mod_name, mod) ->
             -- NB: direct hole instantiations are well-typed by construction
             -- (because we FORCE things to be merged in), so don't check them
@@ -282,7 +283,7 @@ checkUnitId uid = do
                 _ <- addErrCtxt (text "while checking that" <+> ppr mod
                         <+> text "implements signature" <+> ppr mod_name <+> text "in"
                         <+> ppr uid) $
-                    mod `checkImplements` (newIndefUnitId (unitIdComponentId uid) insts, mod_name)
+                    mod `checkImplements` IndefModule indef mod_name
                 return ()
       _ -> return () -- if it's hashed, must be well-typed
 
@@ -350,7 +351,7 @@ mergeSignatures lcl_iface0 = do
     let reqs = requirementMerges dflags (moduleName (tcg_mod tcg_env))
 
     -- STEP 2: Read in the RAW forms of all of these interfaces
-    ireq_ifaces <- forM reqs $ \(iuid, mod_name) ->
+    ireq_ifaces <- forM reqs $ \(IndefModule iuid mod_name) ->
            fmap fst
          . withException
          . flip (findAndReadIface (text "mergeSignatures")) False
@@ -359,7 +360,7 @@ mergeSignatures lcl_iface0 = do
     -- STEP 3: Get the unrenamed exports of all these interfaces, and
     -- dO shaping on them.
     let extend_ns nsubst as = liftIO $ extendNameShape hsc_env nsubst as
-        gen_subst nsubst ((iuid, _), ireq_iface) = do
+        gen_subst nsubst ((IndefModule iuid _), ireq_iface) = do
             let insts = indefUnitIdInsts iuid
             as1 <- liftIO $ rnModExports hsc_env insts ireq_iface
             mb_r <- extend_ns nsubst as1
@@ -376,7 +377,7 @@ mergeSignatures lcl_iface0 = do
         }
 
     -- STEP 4: Rename the interfaces
-    ext_ifaces <- forM (zip reqs ireq_ifaces) $ \((iuid, _), ireq_iface) ->
+    ext_ifaces <- forM (zip reqs ireq_ifaces) $ \((IndefModule iuid _), ireq_iface) ->
         liftIO (rnModIface hsc_env (indefUnitIdInsts iuid) (Just nsubst) ireq_iface)
     lcl_iface <- liftIO $ rnModIface hsc_env (thisUnitIdInsts dflags) (Just nsubst) lcl_iface0
     let ifaces = lcl_iface : ext_ifaces
@@ -474,8 +475,8 @@ tcRnInstantiateSignature hsc_env this_mod real_loc =
 -- | Check if module implements a signature.  (The signature is
 -- always un-hashed, which is why its components are specified
 -- explicitly.)
-checkImplements :: Module -> HoleModule -> TcRn TcGblEnv
-checkImplements impl_mod (uid, mod_name) = do
+checkImplements :: Module -> IndefModule -> TcRn TcGblEnv
+checkImplements impl_mod (IndefModule uid mod_name) = do
     let insts = indefUnitIdInsts uid
 
     -- STEP 1: Load the implementing interface, and make a RdrEnv
@@ -545,5 +546,7 @@ instantiateSignature = do
     -- the local one just to get the information?  Hmm...
     MASSERT( moduleUnitId outer_mod == thisPackage dflags )
     inner_mod `checkImplements`
-        (newIndefUnitId (thisUnitIdComponentId dflags)
-                        (thisUnitIdInsts dflags), moduleName outer_mod)
+        IndefModule
+            (newIndefUnitId (thisComponentId dflags)
+                            (thisUnitIdInsts dflags))
+            (moduleName outer_mod)

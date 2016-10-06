@@ -1264,7 +1264,9 @@ unitIdsToCheck dflags =
  where
   goUnitId uid =
     case splitUnitIdInsts uid of
-      (_, Just insts) -> uid : concatMap (goUnitId . moduleUnitId . snd) insts
+      (_, Just indef) ->
+        let insts = indefUnitIdInsts indef
+        in uid : concatMap (goUnitId . moduleUnitId . snd) insts
       _ -> []
 
 maybeGetIfaceDate :: DynFlags -> ModLocation -> IO (Maybe UTCTime)

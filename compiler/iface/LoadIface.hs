@@ -533,12 +533,12 @@ computeInterface doc_str hi_boot_file mod0 = do
     MASSERT( not (isHoleModule mod0) )
     dflags <- getDynFlags
     case splitModuleInsts mod0 of
-        (imod, Just insts) | not (unitIdIsDefinite (thisPackage dflags)) -> do
+        (imod, Just indef) | not (unitIdIsDefinite (thisPackage dflags)) -> do
             r <- findAndReadIface doc_str imod hi_boot_file
             case r of
                 Succeeded (iface0, path) -> do
                     hsc_env <- getTopEnv
-                    r <- liftIO (rnModIface hsc_env insts Nothing iface0)
+                    r <- liftIO (rnModIface hsc_env (indefUnitIdInsts (indefModuleUnitId indef)) Nothing iface0)
                     return (Succeeded (r, path))
                 Failed err -> return (Failed err)
         (mod, _) ->
@@ -560,7 +560,8 @@ moduleFreeHolesPrecise doc_str mod
  | moduleIsDefinite mod = return (Succeeded emptyUniqDSet)
  | otherwise =
    case splitModuleInsts mod of
-    (imod, Just insts) -> do
+    (imod, Just indef) -> do
+        let insts = indefUnitIdInsts (indefModuleUnitId indef)
         traceIf (text "Considering whether to load" <+> ppr mod <+>
                  text "to compute precise free module holes")
         (eps, hpt) <- getEpsAndHpt
