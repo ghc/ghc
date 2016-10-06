@@ -14,3 +14,7 @@ main = do
     [arg1] <- withArgs ["你好!"] getArgs
     putStrLn arg1
     putStrLn ("Test 3: " ++ show (length arg1))
+
+    args2 <- withArgs ["a", "b"] getArgs
+    print args2
+    putStrLn ("Test 4: " ++ show (length args2))
