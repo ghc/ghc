@@ -897,12 +897,9 @@ livenessForward
 
 livenessForward _        _           []  = []
 livenessForward platform rsLiveEntry (li@(LiveInstr instr mLive) : lis)
-        | Nothing               <- mLive
-        = li : livenessForward platform rsLiveEntry lis
-
-        | Just live     <- mLive
-        , RU _ written  <- regUsageOfInstr platform instr
+        | Just live <- mLive
         = let
+                RU _ written  = regUsageOfInstr platform instr
                 -- Regs that are written to but weren't live on entry to this instruction
                 --      are recorded as being born here.
                 rsBorn          = mkUniqSet
@@ -914,6 +911,9 @@ livenessForward platform rsLiveEntry (li@(LiveInstr instr mLive) : lis)
 
         in LiveInstr instr (Just live { liveBorn = rsBorn })
                 : livenessForward platform rsLiveNext lis
+
+        | otherwise
+        = li : livenessForward platform rsLiveEntry lis
 
 
 -- | Calculate liveness going backwards,
