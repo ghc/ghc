@@ -32,12 +32,14 @@ module System.Environment
 import Foreign
 import Foreign.C
 import System.IO.Error (mkIOError)
-import Control.Exception.Base (bracket, throwIO)
+import Control.Exception.Base (bracket_, throwIO)
+#ifdef mingw32_HOST_OS
+import Control.Exception.Base (bracket)
+#endif
 -- import GHC.IO
 import GHC.IO.Exception
 import GHC.IO.Encoding (getFileSystemEncoding)
 import qualified GHC.Foreign as GHC
-import Data.List
 import Control.Monad
 #ifdef mingw32_HOST_OS
 import GHC.Environment
@@ -369,25 +371,17 @@ withProgArgv :: [String] -> IO a -> IO a
 withProgArgv new_args act = do
   pName <- System.Environment.getProgName
   existing_args <- System.Environment.getArgs
-  bracket (setProgArgv new_args)
-          (\argv -> do _ <- setProgArgv (pName:existing_args)
-                       freeProgArgv argv)
-          (const act)
+  bracket_ (setProgArgv new_args)
+           (setProgArgv (pName:existing_args))
+           act
 
-freeProgArgv :: Ptr CString -> IO ()
-freeProgArgv argv = do
-  size <- lengthArray0 nullPtr argv
-  sequence_ [ peek (argv `advancePtr` i) >>= free
-            | i <- [size - 1, size - 2 .. 0]]
-  free argv
-
-setProgArgv :: [String] -> IO (Ptr CString)
+setProgArgv :: [String] -> IO ()
 setProgArgv argv = do
   enc <- getFileSystemEncoding
-  vs <- mapM (GHC.newCString enc) argv >>= newArray0 nullPtr
-  c_setProgArgv (genericLength argv) vs
-  return vs
+  GHC.withCStringsLen enc argv $ \len css ->
+    c_setProgArgv (fromIntegral len) css
 
+-- setProgArgv copies the arguments
 foreign import ccall unsafe "setProgArgv"
   c_setProgArgv  :: CInt -> Ptr CString -> IO ()
 

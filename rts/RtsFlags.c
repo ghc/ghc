@@ -1876,6 +1876,7 @@ getProgArgv(int *argc, char **argv[])
 void
 setProgArgv(int argc, char *argv[])
 {
+    freeArgv(prog_argc,prog_argv);
     prog_argc = argc;
     prog_argv = copyArgv(argc,argv);
     setProgName(prog_argv);

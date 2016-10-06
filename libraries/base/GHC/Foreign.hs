@@ -32,6 +32,7 @@ module GHC.Foreign (
     --
     withCString,
     withCStringLen,
+    withCStringsLen,
 
     charIsRepresentable,
   ) where
@@ -134,6 +135,23 @@ withCString enc s act = withEncodedCString enc True s $ \(cp, _sz) -> act cp
 withCStringLen         :: TextEncoding -> String -> (CStringLen -> IO a) -> IO a
 withCStringLen enc = withEncodedCString enc False
 
+-- | Marshal a list of Haskell strings into an array of NUL terminated C strings
+-- using temporary storage.
+--
+-- * the Haskell strings may /not/ contain any NUL characters
+--
+-- * the memory is freed when the subcomputation terminates (either
+--   normally or via an exception), so the pointer to the temporary
+--   storage must /not/ be used after this.
+--
+withCStringsLen :: TextEncoding
+                -> [String]
+                -> (Int -> Ptr CString -> IO a)
+                -> IO a
+withCStringsLen enc strs f = go [] strs
+  where
+  go cs (s:ss) = withCString enc s $ \c -> go (c:cs) ss
+  go cs [] = withArrayLen (reverse cs) f
 
 -- | Determines whether a character can be accurately encoded in a 'CString'.
 --
