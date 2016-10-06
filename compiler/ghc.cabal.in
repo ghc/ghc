@@ -405,10 +405,13 @@ Library
         TcClassDcl
         TcDefaults
         TcDeriv
+        TcDerivInfer
+        TcDerivUtils
         TcEnv
         TcExpr
         TcForeign
         TcGenDeriv
+        TcGenFunctor
         TcGenGenerics
         TcHsSyn
         TcHsType

@@ -17,6 +17,7 @@ import HsSyn
 import Type
 import TcType
 import TcGenDeriv
+import TcGenFunctor
 import DataCon
 import TyCon
 import FamInstEnv       ( FamInst, FamFlavor(..), mkSingleCoAxiom )
