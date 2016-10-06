@@ -33,7 +33,8 @@ then
     cd dist-haddock
 
     HADDOCK=../../inplace/bin/haddock
-    HADDOCK_FILES=`find ../ -name *.haddock | sort`
+    # Exclude Cabal package-tests, which may run haddock
+    HADDOCK_FILES=`find ../ -name *.haddock | grep -v 'PackageTests' | sort`
     HADDOCK_ARGS="-p ../prologue.txt"
     for HADDOCK_FILE in $HADDOCK_FILES
     do
