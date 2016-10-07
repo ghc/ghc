@@ -4797,6 +4797,8 @@ compilerInfo dflags
        ("Support reexported-modules",  "YES"),
        -- Whether or not we support extended @-package foo (Foo)@ syntax.
        ("Support thinning and renaming package flags", "YES"),
+       -- Whether or not we support Backpack.
+       ("Support Backpack", "YES"),
        -- If true, we require that the 'id' field in installed package info
        -- match what is passed to the @-this-unit-id@ flag for modules
        -- built in it
