@@ -779,9 +779,8 @@ interactGivenIP inerts workItem@(CDictCan { cc_ev = ev, cc_class = cls
 interactGivenIP _ wi = pprPanic "interactGivenIP" (ppr wi)
 
 
-{-
-Note [Shadowing of Implicit Parameters]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Shadowing of Implicit Parameters]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the following example:
 
 f :: (?x :: Char) => Char
@@ -804,8 +803,19 @@ signature, and we implement this as follows: when we add a new
 *given* implicit parameter to the inert set, it replaces any existing
 givens for the same implicit parameter.
 
-This works for the normal cases but it has an odd side effect
-in some pathological programs like this:
+Similarly, consider
+   f :: (?x::a) => Bool -> a
+
+   g v = let ?x::Int = 3
+         in (f v, let ?x::Bool = True in f v)
+
+This should probably be well typed, with
+   g :: Bool -> (Int, Bool)
+
+So the inner binding for ?x::Bool *overrides* the outer one.
+
+All this works for the normal cases but it has an odd side effect in
+some pathological programs like this:
 
 -- This is accepted, the second parameter shadows
 f1 :: (?x :: Int, ?x :: Char) => Char
@@ -821,7 +831,7 @@ which would lead to an error.
 
 I can think of two ways to fix this:
 
-  1. Simply disallow multiple constratits for the same implicit
+  1. Simply disallow multiple constraints for the same implicit
     parameter---this is never useful, and it can be detected completely
     syntactically.
 
@@ -1498,11 +1508,13 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
         -- part of the tuple, which is the range of the substitution then
         -- the order could be important.
         let subst = theta `unionTCvSubst` theta'
-        return [ Pair arg (substTyUnchecked subst ax_arg)
+        return [ Pair (substTyUnchecked subst ax_arg) arg
+                   -- NB: the ax_arg part is on the left
+                   -- see Note [Improvement orientation]
                | case cabr of
                   Just cabr' -> apartnessCheck (substTys subst ax_args) cabr'
                   _          -> True
-               , (arg, ax_arg, True) <- zip3 args ax_args inj_args ]
+               , (ax_arg, arg, True) <- zip3 ax_args args inj_args ]
 
 
 shortCutReduction :: CtEvidence -> TcTyVar -> TcCoercion
@@ -1687,7 +1699,6 @@ Then it is solvable, but its very hard to detect this on the spot.
 It's exactly the same with implicit parameters, except that the
 "aggressive" approach would be much easier to implement.
 
-
 Note [Weird fundeps]
 ~~~~~~~~~~~~~~~~~~~~
 Consider   class Het a b | a -> b where
@@ -1709,19 +1720,42 @@ as the fundeps.
 
 Trac #7875 is a case in point.
 
-Note [Overriding implicit parameters]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-   f :: (?x::a) -> Bool -> a
+Note [Improvement orientation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A very delicate point is the orientation of derived equalities
+arising from injectivity improvement (Trac #12522).  Suppse we have
+  type family F x = t | t -> x
+  type instance F (a, Int) = (Int, G a)
+where G is injective; and wanted constraints
 
-   g v = let ?x::Int = 3
-         in (f v, let ?x::Bool = True in f v)
+  [W] TF (alpha, beta) ~ fuv
+  [W] fuv ~ (Int, <some type>)
 
-This should probably be well typed, with
-   g :: Bool -> (Int, Bool)
+The injectivity will give rise to derived constraionts
 
-So the inner binding for ?x::Bool *overrides* the outer one.
-Hence a work-item Given overrides an inert-item Given.
+  [D] gamma1 ~ alpha
+  [D] Int ~ beta
+
+The fresh unification variable gamma1 comes from the fact that we
+can only do "partial improvement" here; see Section 5.2 of
+"Injective type families for Haskell" (HS'15).
+
+Now, it's very important to orient the equations this way round,
+so that the fresh unification variable will be eliminated in
+favour of alpha.  If we instead had
+   [D] alpha ~ gamma1
+then we would unify alpha := gamma1; and kick out the wanted
+constraint.  But when we grough it back in, it'd look like
+   [W] TF (gamma1, beta) ~ fuv
+and exactly the same thing would happen again!  Infnite loop.
+
+This all sesms fragile, and it might seem more robust to avoid
+introducing gamma1 in the first place, in the case where the
+actual argument (alpha, beta) partly matches the improvement
+template.  But that's a bit tricky, esp when we remember that the
+kinds much match too; so it's easier to let the normal machinery
+handle it.  Instead we are careful to orient the new derived
+equality with the template on the left.  Delicate, but it works.
 -}
 
 {- *******************************************************************
