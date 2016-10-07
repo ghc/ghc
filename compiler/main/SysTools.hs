@@ -1573,14 +1573,24 @@ linesPlatform xs =
 linkDynLib :: DynFlags -> [String] -> [UnitId] -> IO ()
 linkDynLib dflags0 o_files dep_packages
  = do
-    let dflags = updateWays dflags0
+    let -- This is a rather ugly hack to fix dynamically linked
+        -- GHC on Windows. If GHC is linked with -threaded, then
+        -- it links against libHSrts_thr. But if base is linked
+        -- against libHSrts, then both end up getting loaded,
+        -- and things go wrong. We therefore link the libraries
+        -- with the same RTS flags that we link GHC with.
+        dflags1 = if cGhcThreaded then addWay' WayThreaded dflags0
+                                  else                     dflags0
+        dflags2 = if cGhcDebugged then addWay' WayDebug dflags1
+                                  else                  dflags1
+        dflags = updateWays dflags2
 
         verbFlags = getVerbFlags dflags
         o_file = outputFile dflags
 
     pkgs <- getPreloadPackagesAnd dflags dep_packages
 
-    pkg_lib_paths <- getPackageLibraryPath dflags dep_packages
+    let pkg_lib_paths = collectLibraryPaths pkgs
     let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
         get_pkg_lib_path_opts l
          | ( osElfTarget (platformOS (targetPlatform dflags)) ||
@@ -1601,8 +1611,13 @@ linkDynLib dflags0 o_files dep_packages
     -- The RTS library path is still added to the library search path
     -- above in case the RTS is being explicitly linked in (see #3807).
     let platform = targetPlatform dflags
-        os       = platformOS platform
-    let pkg_link_opts = let (package_hs_libs, extra_libs, other_flags) = collectLinkOpts dflags pkgs
+        os = platformOS platform
+        pkgs_no_rts = case os of
+                      OSMinGW32 ->
+                          pkgs
+                      _ ->
+                          filter ((/= rtsUnitId) . packageConfigId) pkgs
+    let pkg_link_opts = let (package_hs_libs, extra_libs, other_flags) = collectLinkOpts dflags pkgs_no_rts
                         in  package_hs_libs ++ extra_libs ++ other_flags
 
         -- probably _stub.o files

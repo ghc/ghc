@@ -120,30 +120,17 @@ createManifestDefinition dflags pkgs assembly = do
      where genDependencies :: [PackageConfig] -> IO [ManifestFile]
            genDependencies []       = return []
            genDependencies (dep:xs) = do              
-              let fullPkgName = if packageConfigId dep == rtsUnitId
-                                   then "libHS"
-                                        ++ packageNameString dep
-                                       <.> ".dll"
-                                   else "libHS"
-                                        ++ packageNameString dep
-                                        ++ "-"
-                                        ++ (showVersion $ packageVersion dep)
-                                        ++ "-ghc"
-                                        ++ projectVersion dflags
-                                       <.> ".dll"
+              let fullPkgName = "libHS"
+                              ++ packageNameString dep
+                              ++ "-"
+                              ++ (showVersion $ packageVersion dep)
+                              ++ "-ghc"
+                              ++ projectVersion dflags
+                             <.> ".dll"
 
-              let modPath = if packageConfigId dep == rtsUnitId
-                               then \base -> base </> "rts"
-                                                  </> ("ghc" ++ projectVersion dflags)
-                                                  </> mkBuildTag (filterRtsWays $ ways dflags)
-                               else id
+              let modName = packageNameString dep
 
-              let modName = if packageConfigId dep == rtsUnitId
-                               then packageNameString dep
-                                    ++ mkBuildTag (filterRtsWays $ ways dflags)
-                               else packageNameString dep
-
-              fullPkgPath <- findFile (map modPath $ libraryDirs dep) fullPkgName
+              fullPkgPath <- findFile (libraryDirs dep) fullPkgName
 
               let outDir = normalise $ takeDirectory $ fromJust (outputFile dflags)
 
