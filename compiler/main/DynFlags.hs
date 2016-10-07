@@ -186,6 +186,7 @@ import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Except
 import Control.Exception (throwIO)
 
+import Data.Ord
 import Data.Bits
 import Data.Char
 import Data.Int
@@ -2295,7 +2296,7 @@ flagsPackage = map snd package_flags_deps
 
 type FlagMaker m = String -> OptKind m -> Flag m
 type DynFlagMaker = FlagMaker (CmdLineP DynFlags)
-data Deprecation = Deprecated | NotDeprecated
+data Deprecation = NotDeprecated | Deprecated deriving (Eq, Ord)
 
 -- Make a non-deprecated flag
 make_ord_flag :: DynFlagMaker -> String -> OptKind (CmdLineP DynFlags)
@@ -3236,15 +3237,7 @@ flagSpecOf flag = listToMaybe $ filter check wWarningFlags
 
 -- | These @-W\<blah\>@ flags can all be reversed with @-Wno-\<blah\>@
 wWarningFlags :: [FlagSpec WarningFlag]
-wWarningFlags = wWarningFlagsDepsCurrent ++ wWarningFlagsDepsDeprecated
-  where
-    deprecatedWFlags = filter (not . isCurr) wWarningFlagsDeps
-    currentWFlags = filter isCurr wWarningFlagsDeps
-    wWarningFlagsDepsCurrent = map snd currentWFlags
-    wWarningFlagsDepsDeprecated = map snd deprecatedWFlags
-
-    isCurr ( Deprecated , _ ) = False
-    isCurr _ = True
+wWarningFlags = map snd (sortBy (comparing fst) wWarningFlagsDeps)
 
 wWarningFlagsDeps :: [(Deprecation, FlagSpec WarningFlag)]
 wWarningFlagsDeps = [
