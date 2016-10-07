@@ -3236,7 +3236,15 @@ flagSpecOf flag = listToMaybe $ filter check wWarningFlags
 
 -- | These @-W\<blah\>@ flags can all be reversed with @-Wno-\<blah\>@
 wWarningFlags :: [FlagSpec WarningFlag]
-wWarningFlags = map snd wWarningFlagsDeps
+wWarningFlags = wWarningFlagsDepsCurrent ++ wWarningFlagsDepsDeprecated
+  where
+    deprecatedWFlags = filter (not . isCurr) wWarningFlagsDeps
+    currentWFlags = filter isCurr wWarningFlagsDeps
+    wWarningFlagsDepsCurrent = map snd currentWFlags
+    wWarningFlagsDepsDeprecated = map snd deprecatedWFlags
+
+    isCurr ( Deprecated , _ ) = False
+    isCurr _ = True
 
 wWarningFlagsDeps :: [(Deprecation, FlagSpec WarningFlag)]
 wWarningFlagsDeps = [
