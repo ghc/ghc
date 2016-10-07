@@ -21,7 +21,8 @@ import TcClassDcl( tcClassDecl2, tcATDefault,
 import TcSigs
 import TcRnMonad
 import TcValidity
-import TcHsSyn    ( zonkTcTypeToTypes, emptyZonkEnv )
+import TcHsSyn    ( zonkTyBndrsX, emptyZonkEnv
+                  , zonkTcTypeToTypes, zonkTcTypeToType )
 import TcMType
 import TcType
 import BuildTyCl
@@ -623,22 +624,21 @@ tcDataFamInstDecl mb_clsinfo
          -- Kind check type patterns
        ; tcFamTyPats (famTyConShape fam_tc) mb_clsinfo pats
                      (kcDataDefn (unLoc fam_tc_name) pats defn) $
-           \tvs' pats' res_kind -> do
-       {
-         -- Check that left-hand sides are ok (mono-types, no type families,
-         -- consistent instantiations, etc)
-       ; checkValidFamPats mb_clsinfo fam_tc tvs' [] pats'
+             \tvs pats res_kind ->
+    do { stupid_theta <- solveEqualities $ tcHsContext ctxt
 
-         -- Result kind must be '*' (otherwise, we have too few patterns)
-       ; checkTc (isLiftedTypeKind res_kind) $ tooFewParmsErr (tyConArity fam_tc)
+            -- Zonk the patterns etc into the Type world
+       ; (ze, tvs')    <- zonkTyBndrsX emptyZonkEnv tvs
+       ; pats'         <- zonkTcTypeToTypes ze pats
+       ; res_kind'     <- zonkTcTypeToType  ze res_kind
+       ; stupid_theta' <- zonkTcTypeToTypes ze stupid_theta
 
-       ; stupid_theta <- solveEqualities $ tcHsContext ctxt
-       ; stupid_theta <- zonkTcTypeToTypes emptyZonkEnv stupid_theta
-       ; gadt_syntax <- dataDeclChecks (tyConName fam_tc) new_or_data stupid_theta cons
+       ; gadt_syntax <- dataDeclChecks (tyConName fam_tc) new_or_data stupid_theta' cons
 
          -- Construct representation tycon
        ; rep_tc_name <- newFamInstTyConName fam_tc_name pats'
        ; axiom_name  <- newFamInstAxiomName fam_tc_name [pats']
+
        ; let (eta_pats, etad_tvs) = eta_reduce pats'
              eta_tvs              = filterOut (`elem` etad_tvs) tvs'
              full_tvs             = eta_tvs ++ etad_tvs
@@ -680,6 +680,14 @@ tcDataFamInstDecl mb_clsinfo
               ; return (rep_tc, axiom) }
 
          -- Remember to check validity; no recursion to worry about here
+         -- Check that left-hand sides are ok (mono-types, no type families,
+         -- consistent instantiations, etc)
+       ; checkValidFamPats mb_clsinfo fam_tc tvs' [] pats'
+
+         -- Result kind must be '*' (otherwise, we have too few patterns)
+       ; checkTc (isLiftedTypeKind res_kind') $
+         tooFewParmsErr (tyConArity fam_tc)
+
        ; checkValidTyCon rep_tc
 
        ; let m_deriv_info = case derivs of

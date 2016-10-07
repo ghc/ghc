@@ -954,6 +954,7 @@ tcDataDefn roles_info
                                   stupid_theta tc_rhs
                                   (VanillaAlgTyCon tc_rep_nm)
                                   gadt_syntax) }
+       ; traceTc "tcDataDefn" (ppr tc_name $$ ppr tycon_binders $$ ppr extra_bndrs)
        ; return tycon }
   where
     mk_tc_rhs is_boot tycon data_cons
@@ -1056,16 +1057,19 @@ tcDefaultAssocDecl fam_tc [L loc (TyFamEqn { tfe_tycon = L _ tc_name
           -- are different.
        ; (pats', rhs_ty)
            <- tcFamTyPats shape Nothing pats
-              (discardResult . tcCheckLHsType rhs) $ \_ pats' rhs_kind ->
+              (discardResult . tcCheckLHsType rhs) $ \tvs pats rhs_kind ->
               do { rhs_ty <- solveEqualities $
                              tcCheckLHsType rhs rhs_kind
-                 ; return (pats', rhs_ty) }
-       -- pats' is fully zonked already
-       ; rhs_ty <- zonkTcTypeToType emptyZonkEnv rhs_ty
+
+                     -- Zonk the patterns etc into the Type world
+                 ; (ze, _) <- zonkTyBndrsX emptyZonkEnv tvs
+                 ; pats'   <- zonkTcTypeToTypes ze pats
+                 ; rhs_ty'  <- zonkTcTypeToType ze rhs_ty
+                 ; return (pats', rhs_ty') }
 
          -- See Note [Type-checking default assoc decls]
        ; case tcMatchTys pats' (mkTyVarTys (tyConTyVars fam_tc)) of
-           Just subst -> return ( Just (substTyUnchecked subst rhs_ty, loc) )
+           Just subst -> return (Just (substTyUnchecked subst rhs_ty, loc) )
            Nothing    -> failWithTc (defaultAssocKindErr fam_tc)
            -- We check for well-formedness and validity later,
            -- in checkValidClass
@@ -1114,13 +1118,17 @@ tcTyFamInstEqn fam_tc_shape@(fam_tc_name,_,_,_) mb_clsinfo
                      , tfe_rhs   = hs_ty }))
   = ASSERT( fam_tc_name == eqn_tc_name )
     setSrcSpan loc $
-    tcFamTyPats fam_tc_shape mb_clsinfo pats (discardResult . (tcCheckLHsType hs_ty)) $
-       \tvs' pats' res_kind ->
+    tcFamTyPats fam_tc_shape mb_clsinfo pats
+                (discardResult . (tcCheckLHsType hs_ty)) $
+                    \tvs pats res_kind ->
     do { rhs_ty <- solveEqualities $ tcCheckLHsType hs_ty res_kind
-       ; rhs_ty <- zonkTcTypeToType emptyZonkEnv rhs_ty
+
+       ; (ze, tvs') <- zonkTyBndrsX emptyZonkEnv tvs
+       ; pats'      <- zonkTcTypeToTypes ze pats
+       ; rhs_ty'    <- zonkTcTypeToType ze rhs_ty
        ; traceTc "tcTyFamInstEqn" (ppr fam_tc_name <+> pprTvBndrs tvs')
           -- don't print out the pats here, as they might be zonked inside the knot
-       ; return (mkCoAxBranch tvs' [] pats' rhs_ty
+       ; return (mkCoAxBranch tvs' [] pats' rhs_ty'
                               (map (const Nominal) tvs')
                               loc) }
 
@@ -1239,11 +1247,12 @@ tc_fam_ty_pats (name, _, binders, res_kind) mb_clsinfo
 -- See Note [tc_fam_ty_pats vs tcFamTyPats]
 tcFamTyPats :: FamTyConShape
             -> Maybe ClsInstInfo
-            -> HsTyPats Name          -- patterns
+            -> HsTyPats Name         -- patterns
             -> (TcKind -> TcM ())    -- kind-checker for RHS
-            -> (   [TyVar]           -- Kind and type variables
+            -> (   [TcTyVar]         -- Kind and type variables
                 -> [TcType]          -- Kind and type arguments
-                -> Kind -> TcM a)  -- NB: You can use solveEqualities here.
+                -> TcKind
+                -> TcM a)            -- NB: You can use solveEqualities here.
             -> TcM a
 tcFamTyPats fam_shape@(name,_,_,_) mb_clsinfo pats kind_checker thing_inside
   = do { (typats, res_kind)
@@ -1279,15 +1288,14 @@ tcFamTyPats fam_shape@(name,_,_,_) mb_clsinfo pats kind_checker thing_inside
            -- above would fail. TODO (RAE): Update once the solveEqualities
            -- bit is cleverer.
 
-            -- Zonk the patterns etc into the Type world
-       ; (ze, qtkvs') <- zonkTyBndrsX emptyZonkEnv qtkvs
-       ; typats'      <- zonkTcTypeToTypes ze typats
-       ; res_kind'    <- zonkTcTypeToType  ze res_kind
+       ; traceTc "tcFamTyPats" (ppr name $$ ppr typats $$ ppr qtkvs)
+            -- Don't print out too much, as we might be in the knot
 
-       ; traceTc "tcFamTyPats" (ppr name $$ ppr typats)
-            -- don't print out too much, as we might be in the knot
-       ; tcExtendTyVarEnv qtkvs' $
-         thing_inside qtkvs' typats' res_kind' }
+       ; tcExtendTyVarEnv qtkvs $
+            -- Extend envt with TcTyVars not TyVars, because the
+            -- kind checking etc done by thing_inside does not expect
+            -- to encounter TyVars; it expects TcTyVars
+         thing_inside qtkvs typats res_kind }
 
 {-
 Note [Constraints in patterns]
