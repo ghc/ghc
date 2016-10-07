@@ -252,8 +252,8 @@ extendIdZonkEnv1 (ZonkEnv zonk_ty ty_env id_env) id
   = ZonkEnv zonk_ty ty_env (extendVarEnv id_env id id)
 
 extendTyZonkEnv1 :: ZonkEnv -> TyVar -> ZonkEnv
-extendTyZonkEnv1 (ZonkEnv zonk_ty ty_env id_env) ty
-  = ZonkEnv zonk_ty (extendVarEnv ty_env ty ty) id_env
+extendTyZonkEnv1 (ZonkEnv zonk_ty ty_env id_env) tv
+  = ZonkEnv zonk_ty (extendVarEnv ty_env tv tv) id_env
 
 setZonkType :: ZonkEnv -> UnboundTyVarZonker -> ZonkEnv
 setZonkType (ZonkEnv _ ty_env id_env) zonk_ty
