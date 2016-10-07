@@ -1701,7 +1701,6 @@ tcTyClTyVars tycon_name thing_inside
           -- are the ones mentioned in the source.
        ; tcExtendTyVarEnv scoped_tvs $
          thing_inside binders res_kind }
-  where
 
 -----------------------------------
 tcDataKindSig :: Kind -> TcM ([TyConBinder], Kind)
