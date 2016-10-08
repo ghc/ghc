@@ -13,7 +13,7 @@ module RnNames (
         calculateAvails,
         reportUnusedNames,
         plusAvail,
-        checkConName
+        checkConName,
         nubAvails,
         mkChildEnv,
         findChildren,
