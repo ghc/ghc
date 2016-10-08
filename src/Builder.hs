@@ -104,6 +104,7 @@ builderPath builder = case builderProvenance builder of
     Just context
       | Just path <- programPath context -> return path
       | otherwise                        ->
+        -- TODO: Make builderPath total.
         error $ "Cannot determine builderPath for " ++ show builder
              ++ " in context " ++ show context
     Nothing -> case builder of

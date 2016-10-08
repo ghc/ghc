@@ -102,7 +102,10 @@ ghcSplit = "inplace/lib/bin/ghc-split"
 programPath :: Context -> Maybe FilePath
 programPath context@Context {..}
     | package == ghc = Just . inplaceProgram $ "ghc-stage" ++ show (fromEnum stage + 1)
-    | package `elem` [checkApiAnnotations, ghcTags, haddock, mkUserGuidePart] =
+    | package `elem` [mkUserGuidePart] =
+        case stage of Stage0 -> Just . inplaceProgram $ pkgNameString package
+                      _      -> Nothing
+    | package `elem` [checkApiAnnotations, ghcTags, haddock] =
         case stage of Stage2 -> Just . inplaceProgram $ pkgNameString package
                       _      -> Nothing
     | package `elem` [touchy, unlit] = case stage of
