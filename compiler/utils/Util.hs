@@ -56,7 +56,7 @@ module Util (
 
         -- * List operations controlled by another list
         takeList, dropList, splitAtList, split,
-        dropTail,
+        dropTail, capitalise,
 
         -- * For loop
         nTimes,
@@ -147,7 +147,7 @@ import System.IO.Error as IO ( isDoesNotExistError )
 import System.Directory ( doesDirectoryExist, getModificationTime )
 import System.FilePath
 
-import Data.Char        ( isUpper, isAlphaNum, isSpace, chr, ord, isDigit )
+import Data.Char        ( isUpper, isAlphaNum, isSpace, chr, ord, isDigit, toUpper)
 import Data.Int
 import Data.Ratio       ( (%) )
 import Data.Ord         ( comparing )
@@ -719,6 +719,12 @@ split c s = case rest of
                 []     -> [chunk]
                 _:rest -> chunk : split c rest
   where (chunk, rest) = break (==c) s
+
+-- | Convert a word to title case by capitalising the first letter
+capitalise :: String -> String
+capitalise [] = []
+capitalise (c:cs) = toUpper c : cs
+
 
 {-
 ************************************************************************

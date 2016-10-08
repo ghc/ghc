@@ -178,7 +178,7 @@ module TcType (
   toTcTypeBag, -- :: Bag EvVar -> Bag EvVar
 
   pprKind, pprParendKind, pprSigmaType,
-  pprType, pprParendType, pprTypeApp, pprTyThingCategory,
+  pprType, pprParendType, pprTypeApp, pprTyThingCategory, tyThingCategory,
   pprTheta, pprThetaArrowTy, pprClassPred,
   pprTvBndr, pprTvBndrs,
 

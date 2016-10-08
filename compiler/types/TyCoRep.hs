@@ -22,7 +22,7 @@ Note [The Type-related module hierarchy]
 {-# LANGUAGE ImplicitParams #-}
 
 module TyCoRep (
-        TyThing(..), pprTyThingCategory, pprShortTyThing,
+        TyThing(..), tyThingCategory, pprTyThingCategory, pprShortTyThing,
 
         -- * Types
         Type(..),
@@ -216,13 +216,16 @@ pprShortTyThing thing
   = pprTyThingCategory thing <+> quotes (ppr (getName thing))
 
 pprTyThingCategory :: TyThing -> SDoc
-pprTyThingCategory (ATyCon tc)
-  | isClassTyCon tc = text "Class"
-  | otherwise       = text "Type constructor"
-pprTyThingCategory (ACoAxiom _) = text "Coercion axiom"
-pprTyThingCategory (AnId   _)   = text "Identifier"
-pprTyThingCategory (AConLike (RealDataCon _)) = text "Data constructor"
-pprTyThingCategory (AConLike (PatSynCon _))  = text "Pattern synonym"
+pprTyThingCategory = text . capitalise . tyThingCategory
+
+tyThingCategory :: TyThing -> String
+tyThingCategory (ATyCon tc)
+  | isClassTyCon tc = "class"
+  | otherwise       = "type constructor"
+tyThingCategory (ACoAxiom _) = "coercion axiom"
+tyThingCategory (AnId   _)   = "identifier"
+tyThingCategory (AConLike (RealDataCon _)) = "data constructor"
+tyThingCategory (AConLike (PatSynCon _))  = "pattern synonym"
 
 
 {- **********************************************************************

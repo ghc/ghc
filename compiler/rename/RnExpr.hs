@@ -121,7 +121,7 @@ rnExpr (HsVar (L l v))
            Just (Right fs@(_:_:_)) -> return (HsRecFld (Ambiguous (L l v)
                                                         PlaceHolder)
                                              , mkFVs (map selectorFieldOcc fs));
-           Just (Right [])         -> error "runExpr/HsVar" } }
+           Just (Right [])         -> panic "runExpr/HsVar" } }
 
 rnExpr (HsIPVar v)
   = return (HsIPVar v, emptyFVs)

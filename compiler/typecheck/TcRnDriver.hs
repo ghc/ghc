@@ -66,6 +66,7 @@ import RdrName
 import TcHsSyn
 import TcExpr
 import TcRnMonad
+import TcRnExports
 import TcEvidence
 import PprTyThing( pprTyThing )
 import MkIface( tyThingToIfaceDecl )
@@ -95,7 +96,6 @@ import RnEnv
 import RnSource
 import ErrUtils
 import Id
-import IdInfo
 import VarEnv
 import Module
 import UniqDFM
@@ -110,7 +110,6 @@ import ListSetOps
 import Outputable
 import ConLike
 import DataCon
-import PatSyn
 import Type
 import Class
 import BasicTypes hiding( SuccessFlag(..) )
@@ -249,8 +248,7 @@ tcRnModuleTcRnM hsc_env hsc_src
 
                 -- Process the export list
         traceRn (text "rn4a: before exports");
-        (rn_exports, tcg_env) <- rnExports explicit_mod_hdr export_ies tcg_env ;
-        tcExports rn_exports ;
+        tcg_env <- tcRnExports explicit_mod_hdr export_ies tcg_env ;
         traceRn (text "rn4b: after exports") ;
 
                 -- Check that main is exported (must be after rnExports)
@@ -2288,140 +2286,6 @@ loadUnqualIfaces hsc_env ictxt
                   , isTcOcc (nameOccName name)   -- Types and classes only
                   , unQualOK gre ]               -- In scope unqualified
     doc = text "Need interface for module whose export(s) are in scope unqualified"
-
-{-
-******************************************************************************
-** Typechecking module exports
-The renamer makes sure that only the correct pieces of a type or class can be
-bundled with the type or class in the export list.
-
-When it comes to pattern synonyms, in the renamer we have no way to check that
-whether a pattern synonym should be allowed to be bundled or not so we allow
-them to be bundled with any type or class. Here we then check that
-
-1) Pattern synonyms are only bundled with types which are able to
-   have data constructors. Datatypes, newtypes and data families.
-2) Are the correct type, for example if P is a synonym
-   then if we export Foo(P) then P should be an instance of Foo.
-
-******************************************************************************
--}
-
-tcExports :: Maybe [LIE Name]
-          -> TcM ()
-tcExports Nothing = return ()
-tcExports (Just ies) = checkNoErrs $ mapM_ tc_export ies
-
-tc_export :: LIE Name -> TcM ()
-tc_export ie@(L _ (IEThingWith name _ names sels)) =
-  addExportErrCtxt ie
-    $ tc_export_with (unLoc name) (map unLoc names
-                                    ++ map (flSelector . unLoc) sels)
-tc_export _ = return ()
-
-addExportErrCtxt :: LIE Name -> TcM a -> TcM a
-addExportErrCtxt (L l ie) = setSrcSpan l . addErrCtxt exportCtxt
-  where
-    exportCtxt = text "In the export:" <+> ppr ie
-
-
--- Note: [Types of TyCon]
---
--- This check appears to be overlly complicated, Richard asked why it
--- is not simply just `isAlgTyCon`. The answer for this is that
--- a classTyCon is also an `AlgTyCon` which we explicitly want to disallow.
--- (It is either a newtype or data depending on the number of methods)
---
---
--- Note: [Typing Pattern Synonym Exports]
--- It proved quite a challenge to precisely specify which pattern synonyms
--- should be allowed to be bundled with which type constructors.
--- In the end it was decided to be quite liberal in what we allow. Below is
--- how Simon described the implementation.
---
--- "Personally I think we should Keep It Simple.  All this talk of
---  satisfiability makes me shiver.  I suggest this: allow T( P ) in all
---   situations except where `P`'s type is ''visibly incompatible'' with
---   `T`.
---
---    What does "visibly incompatible" mean?  `P` is visibly incompatible
---    with
---     `T` if
---       * `P`'s type is of form `... -> S t1 t2`
---       * `S` is a data/newtype constructor distinct from `T`
---
---  Nothing harmful happens if we allow `P` to be exported with
---  a type it can't possibly be useful for, but specifying a tighter
---  relationship is very awkward as you have discovered."
---
--- Note that this allows *any* pattern synonym to be bundled with any
--- datatype type constructor. For example, the following pattern `P` can be
--- bundled with any type.
---
--- ```
--- pattern P :: (A ~ f) => f
--- ```
---
--- So we provide basic type checking in order to help the user out, most
--- pattern synonyms are defined with definite type constructors, but don't
--- actually prevent a library author completely confusing their users if
--- they want to.
-
-exportErrCtxt :: Outputable o => String -> o -> SDoc
-exportErrCtxt herald exp =
-  text "In the" <+> text (herald ++ ":") <+> ppr exp
-
-tc_export_with :: Name  -- ^ Type constructor
-               -> [Name] -- ^ A mixture of data constructors, pattern syonyms
-                         -- , class methods and record selectors.
-               -> TcM ()
-tc_export_with n ns = do
-  ty_con <- tcLookupTyCon n
-  things <- mapM tcLookupGlobal ns
-  let psErr = exportErrCtxt "pattern synonym"
-      selErr = exportErrCtxt "pattern synonym record selector"
-      ps       = [(psErr p,p) | AConLike (PatSynCon p) <- things]
-      sels     = [(selErr i,p) | AnId i <- things
-                        , isId i
-                        , RecSelId {sel_tycon = RecSelPatSyn p} <- [idDetails i]]
-      pat_syns = ps ++ sels
-
-
-  -- See note [Types of TyCon]
-  checkTc ( null pat_syns || isTyConWithSrcDataCons ty_con) assocClassErr
-
-  let actual_res_ty =
-          mkTyConApp ty_con (mkTyVarTys (tyConTyVars ty_con))
-  mapM_ (tc_one_export_with actual_res_ty ty_con ) pat_syns
-
-  where
-    assocClassErr :: SDoc
-    assocClassErr =
-      text "Pattern synonyms can be bundled only with datatypes."
-
-
-    tc_one_export_with :: TcTauType -- ^ TyCon type
-                       -> TyCon       -- ^ Parent TyCon
-                       -> (SDoc, PatSyn)   -- ^ Corresponding bundled PatSyn
-                                           -- and pretty printed origin
-                       -> TcM ()
-    tc_one_export_with actual_res_ty ty_con (errCtxt, pat_syn)
-      = addErrCtxt errCtxt $
-      let (_, _, _, _, _, res_ty) = patSynSig pat_syn
-          mtycon = tcSplitTyConApp_maybe res_ty
-          typeMismatchError :: SDoc
-          typeMismatchError =
-            text "Pattern synonyms can only be bundled with matching type constructors"
-                $$ text "Couldn't match expected type of"
-                <+> quotes (ppr actual_res_ty)
-                <+> text "with actual type of"
-                <+> quotes (ppr res_ty)
-      in case mtycon of
-            Nothing -> return ()
-            Just (p_ty_con, _) ->
-              -- See note [Typing Pattern Synonym Exports]
-              unless (p_ty_con == ty_con)
-                (addErrTc typeMismatchError)
 
 
 

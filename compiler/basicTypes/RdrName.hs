@@ -463,15 +463,13 @@ data Parent = NoParent
             | ParentIs  { par_is :: Name }
             | FldParent { par_is :: Name, par_lbl :: Maybe FieldLabelString }
               -- ^ See Note [Parents for record fields]
-            | PatternSynonym
-            deriving (Eq, Data)
+            deriving (Eq, Data, Typeable)
 
 instance Outputable Parent where
    ppr NoParent        = empty
    ppr (ParentIs n)    = text "parent:" <> ppr n
    ppr (FldParent n f) = text "fldparent:"
                              <> ppr n <> colon <> ppr f
-   ppr (PatternSynonym) = text "pattern synonym"
 
 plusParent :: Parent -> Parent -> Parent
 -- See Note [Combining parents]
@@ -479,7 +477,6 @@ plusParent p1@(ParentIs _)    p2 = hasParent p1 p2
 plusParent p1@(FldParent _ _) p2 = hasParent p1 p2
 plusParent p1 p2@(ParentIs _)    = hasParent p2 p1
 plusParent p1 p2@(FldParent _ _) = hasParent p2 p1
-plusParent PatternSynonym PatternSynonym = PatternSynonym
 plusParent _ _                   = NoParent
 
 hasParent :: Parent -> Parent -> Parent
@@ -530,19 +527,12 @@ Note [Parents]
   class C          Class operations
                    Associated type constructors
 
-The `PatternSynonym` constructor is so called as pattern synonyms can be
-bundled with any type constructor (during renaming). In other words, they can
-have any parent.
-
 ~~~~~~~~~~~~~~~~~~~~~~~~~
  Constructor      Meaning
  ~~~~~~~~~~~~~~~~~~~~~~~~
   NoParent        Can not be bundled with a type constructor.
   ParentIs n      Can be bundled with the type constructor corresponding to
                   n.
-  PatternSynonym  Can be bundled with any type constructor. It is so called
-                  because only pattern synonyms can be bundled with any type
-                  constructor.
   FldParent       See Note [Parents for record fields]
 
 
@@ -572,6 +562,16 @@ entry looks like this:
 Note that the OccName used when adding a GRE to the environment
 (greOccName) now depends on the parent field: for FldParent it is the
 field label, if present, rather than the selector name.
+
+~~
+
+Record pattern synonym selectors are treated differently. Their parent
+information is `NoParent` in the module in which they are defined. This is because
+a pattern synonym `P` has no parent constructor either.
+
+However, if `f` is bundled with a type constructor `T` then whenever `f` is
+imported the parent will use the `Parent` constructor so the parent of `f` is
+now `T`.
 
 
 Note [Combining parents]
@@ -683,15 +683,13 @@ greSrcSpan gre@(GRE { gre_name = name, gre_lcl = lcl, gre_imp = iss } )
   | otherwise     = pprPanic "greSrcSpan" (ppr gre)
 
 mkParent :: Name -> AvailInfo -> Parent
-mkParent _ (Avail NotPatSyn _)           = NoParent
-mkParent _ (Avail IsPatSyn  _)           = PatternSynonym
+mkParent _ (Avail _)           = NoParent
 mkParent n (AvailTC m _ _) | n == m    = NoParent
                          | otherwise = ParentIs m
 
 availFromGRE :: GlobalRdrElt -> AvailInfo
 availFromGRE (GRE { gre_name = me, gre_par = parent })
   = case parent of
-      PatternSynonym              -> patSynAvail me
       ParentIs p                  -> AvailTC p [me] []
       NoParent   | isTyConName me -> AvailTC me [me] []
                  | otherwise      -> avail   me

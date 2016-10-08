@@ -30,3 +30,4 @@ test('T11167_ambiguous_fixity',
      extra_clean([ 'T11167_ambiguous_fixity_A.hi', 'T11167_ambiguous_fixity_A.o'
                  , 'T11167_ambiguous_fixity_B.hi', 'T11167_ambiguous_fixity_B.o' ]),
      multimod_compile_fail, ['T11167_ambiguous_fixity', ''])
+test('NoParent', normal, compile_fail, [''])

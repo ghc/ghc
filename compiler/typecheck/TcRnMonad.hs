@@ -66,7 +66,7 @@ module TcRnMonad(
 
   -- * Shared error message stuff: renamer and typechecker
   mkLongErrAt, mkErrDocAt, addLongErrAt, reportErrors, reportError,
-  reportWarning, recoverM, mapAndRecoverM, mapAndReportM,
+  reportWarning, recoverM, mapAndRecoverM, mapAndReportM, foldAndRecoverM,
   tryTc,
   askNoErrs, discardErrs,
   tryTcErrs, tryTcLIE_,
@@ -950,15 +950,20 @@ recoverM recover thing
 
 
 -----------------------
-mapAndRecoverM :: (a -> TcRn b) -> [a] -> TcRn [b]
--- Drop elements of the input that fail, so the result
+
+-- | Drop elements of the input that fail, so the result
 -- list can be shorter than the argument list
-mapAndRecoverM _ []     = return []
-mapAndRecoverM f (x:xs) = do { mb_r <- try_m (f x)
-                             ; rs <- mapAndRecoverM f xs
-                             ; return (case mb_r of
-                                          Left _  -> rs
-                                          Right r -> r:rs) }
+mapAndRecoverM :: (a -> TcRn b) -> [a] -> TcRn [b]
+mapAndRecoverM f = fmap reverse . foldAndRecoverM (\xs x -> (:xs) <$> f x ) []
+
+-- | The accumulator is not updated if the action fails
+foldAndRecoverM :: (b -> a -> TcRn b) -> b -> [a] -> TcRn b
+foldAndRecoverM _ acc []     = return acc
+foldAndRecoverM f acc (x:xs) =
+                          do { mb_r <- try_m (f acc x)
+                             ; case mb_r of
+                                Left _  -> foldAndRecoverM f acc xs
+                                Right acc' -> foldAndRecoverM f acc' xs  }
 
 -- | Succeeds if applying the argument to all members of the lists succeeds,
 --   but nevertheless runs it on all arguments, to collect all errors.
