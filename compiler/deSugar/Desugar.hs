@@ -369,7 +369,7 @@ deSugar hsc_env
         ; usages <- mkUsageInfo hsc_env mod (imp_mods imports) used_names dep_files merged
         -- id_mod /= mod when we are processing an hsig, but hsigs
         -- never desugared and compiled (there's no code!)
-        ; MASSERT ( id_mod == mod )
+        ; MASSERT( id_mod == mod )
 
         ; let mod_guts = ModGuts {
                 mg_module       = mod,

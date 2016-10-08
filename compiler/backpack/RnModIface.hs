@@ -140,7 +140,7 @@ rnModule mod = do
     return (renameHoleModule dflags hmap mod)
 
 rnAvailInfo :: Rename AvailInfo
-rnAvailInfo (Avail p n) = Avail p <$> rnIfaceGlobal n
+rnAvailInfo (Avail n) = Avail <$> rnIfaceGlobal n
 rnAvailInfo (AvailTC n ns fs) = do
     -- Why don't we rnIfaceGlobal the availName itself?  It may not
     -- actually be exported by the module it putatively is from, in
