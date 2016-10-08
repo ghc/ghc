@@ -49,7 +49,13 @@ topLevelTargets = do
                     docs <- interpretInContext context $ buildHaddock flavour
                     need $ libs ++ [ pkgHaddockFile context | docs && stage == Stage1 ]
                 else do -- otherwise build a program
-                    need [ fromJust $ programPath context ] -- TODO: drop fromJust
+                    need [ getProgramPath context ]
+  where
+    getProgramPath context =
+        case programPath context of
+          Nothing   -> error $ "topLevelTargets: Can't determine program path for context "
+                            ++ show context
+          Just path -> path
 
 packageRules :: Rules ()
 packageRules = do
