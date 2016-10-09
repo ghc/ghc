@@ -140,19 +140,6 @@ initStorage (void)
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(&stg_dummy_ret_closure));
   ASSERT(!HEAP_ALLOCED(&stg_dummy_ret_closure));
 
-  if (RtsFlags.GcFlags.maxHeapSize != 0 &&
-      RtsFlags.GcFlags.heapSizeSuggestion >
-      RtsFlags.GcFlags.maxHeapSize) {
-      RtsFlags.GcFlags.maxHeapSize = RtsFlags.GcFlags.heapSizeSuggestion;
-  }
-
-  if (RtsFlags.GcFlags.maxHeapSize != 0 &&
-      RtsFlags.GcFlags.minAllocAreaSize >
-      RtsFlags.GcFlags.maxHeapSize) {
-      errorBelch("maximum heap size (-M) is smaller than minimum alloc area size (-A)");
-      RtsFlags.GcFlags.minAllocAreaSize = RtsFlags.GcFlags.maxHeapSize;
-  }
-
   initBlockAllocator();
 
 #if defined(THREADED_RTS)

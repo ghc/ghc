@@ -1454,6 +1454,24 @@ static void normaliseRtsOpts (void)
         errorUsage();
     }
 
+    if (RtsFlags.GcFlags.maxHeapSize != 0 &&
+        RtsFlags.GcFlags.heapSizeSuggestion >
+        RtsFlags.GcFlags.maxHeapSize) {
+        RtsFlags.GcFlags.maxHeapSize = RtsFlags.GcFlags.heapSizeSuggestion;
+    }
+
+    if (RtsFlags.GcFlags.maxHeapSize != 0 &&
+        RtsFlags.GcFlags.minAllocAreaSize >
+        RtsFlags.GcFlags.maxHeapSize) {
+        errorBelch("maximum heap size (-M) is smaller than minimum alloc area size (-A)");
+        RtsFlags.GcFlags.minAllocAreaSize = RtsFlags.GcFlags.maxHeapSize;
+    }
+
+    // If we have -A16m or larger, use -n4m.
+    if (RtsFlags.GcFlags.minAllocAreaSize >= (16*1024*1024) / BLOCK_SIZE) {
+        RtsFlags.GcFlags.nurseryChunkSize = (4*1024*1024) / BLOCK_SIZE;
+    }
+
     if (RtsFlags.ParFlags.parGcLoadBalancingGen == ~0u) {
         StgWord alloc_area_bytes
             = RtsFlags.GcFlags.minAllocAreaSize * BLOCK_SIZE;
