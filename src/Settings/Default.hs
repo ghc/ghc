@@ -108,7 +108,7 @@ packagesStage0 = mconcat
              , ghcPkg, hsc2hs, hoopl, hpc, templateHaskell, transformers ]
     -- the stage0 predicate makes sure these packages are built only in Stage0
     , stage0 ? append [ deriveConstants, dllSplit, genapply, genprimopcode
-                      , hp2ps, unlit ]
+                      , hp2ps, unlit, mkUserGuidePart ]
     , stage0 ? windowsHost ? append [touchy]
     , notM windowsHost ? notM iosHost ? append [terminfo] ]
 
@@ -127,7 +127,7 @@ packagesStage1 = mconcat
 -- in Stage2 and Stage3. Can we check this in compile time?
 packagesStage2 :: Packages
 packagesStage2 = mconcat
-    [ append [checkApiAnnotations, ghcTags, mkUserGuidePart]
+    [ append [checkApiAnnotations, ghcTags ]
     , buildHaddock flavour ? append [haddock] ]
 
 -- TODO: What about profilingDynamic way? Do we need platformSupportsSharedLibs?
