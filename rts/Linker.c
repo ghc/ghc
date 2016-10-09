@@ -1427,6 +1427,11 @@ static void* lookupSymbol_ (char *lbl)
                 errorBelch("Could not on-demand load symbol '%s'\n", lbl);
                 return NULL;
             }
+#ifdef PROFILING
+            // collect any new cost centres & CCSs
+            // that were defined during runInit
+            initProfiling2();
+#endif
         }
 
         return val;
