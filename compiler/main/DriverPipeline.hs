@@ -284,13 +284,18 @@ compileStub hsc_env stub_c = do
 
         return stub_o
 
-compileEmptyStub :: DynFlags -> HscEnv -> FilePath -> ModLocation -> IO ()
-compileEmptyStub dflags hsc_env basename location = do
+compileEmptyStub :: DynFlags -> HscEnv -> FilePath -> ModLocation -> ModuleName -> IO ()
+compileEmptyStub dflags hsc_env basename location mod_name = do
   -- To maintain the invariant that every Haskell file
   -- compiles to object code, we make an empty (but
-  -- valid) stub object file for signatures
+  -- valid) stub object file for signatures.  However,
+  -- we make sure this object file has a unique symbol,
+  -- so that ranlib on OS X doesn't complain, see
+  -- http://ghc.haskell.org/trac/ghc/ticket/12673
+  -- and https://github.com/haskell/cabal/issues/2257
   empty_stub <- newTempName dflags "c"
-  writeFile empty_stub ""
+  let src = text "int" <+> ppr (mkModule (thisPackage dflags) mod_name) <+> text "= 0;"
+  writeFile empty_stub (showSDoc dflags (pprCode CStyle src))
   _ <- runPipeline StopLn hsc_env
                   (empty_stub, Nothing)
                   (Just basename)
@@ -1032,7 +1037,7 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                    PipeState{hsc_env=hsc_env'} <- getPipeState
                    let input_fn = expectJust "runPhase" (ml_hs_file location)
                        basename = dropExtension input_fn
-                   liftIO $ compileEmptyStub dflags hsc_env' basename location
+                   liftIO $ compileEmptyStub dflags hsc_env' basename location mod_name
                    return (RealPhase StopLn, o_file)
             HscRecomp cgguts mod_summary
               -> do output_fn <- phaseOutputFilename next_phase
