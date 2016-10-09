@@ -456,7 +456,7 @@ Instances of 'Monad' should satisfy the following laws:
 
 * @'return' a '>>=' k  =  k a@
 * @m '>>=' 'return'  =  m@
-* @m '>>=' (\x -> k x '>>=' h)  =  (m '>>=' k) '>>=' h@
+* @m '>>=' (\\x -> k x '>>=' h)  =  (m '>>=' k) '>>=' h@
 
 Furthermore, the 'Monad' and 'Applicative' operations should relate as follows:
 
