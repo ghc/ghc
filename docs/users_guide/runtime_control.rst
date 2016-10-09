@@ -467,7 +467,8 @@ performance.
 
 .. rts-flag:: -qn <x>
 
-    :default: the value of ``-N``
+    :default: the value of ``-N`` or the number of CPU cores,
+              whichever is smaller.
     :since: 8.2.1
 
     .. index::

@@ -1531,6 +1531,7 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
     uint32_t gc_type;
     uint32_t i;
     uint32_t need_idle;
+    uint32_t n_gc_threads;
     uint32_t n_idle_caps = 0, n_failed_trygrab_idles = 0;
     StgTSO *tso;
     rtsBool *idle_cap;
@@ -1561,9 +1562,17 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
         gc_type = SYNC_GC_SEQ;
     }
 
-    if (gc_type == SYNC_GC_PAR && RtsFlags.ParFlags.parGcThreads > 0) {
-        need_idle = stg_max(0, enabled_capabilities -
-                            RtsFlags.ParFlags.parGcThreads);
+    // If -qn is not set and we have more capabilities than cores, set the
+    // number of GC threads to #cores.  We do this here rather than in
+    // normaliseRtsOpts() because here it will work if the program calls
+    // setNumCapabilities.
+    n_gc_threads = RtsFlags.ParFlags.parGcThreads;
+    if (n_gc_threads == 0 && enabled_capabilities > getNumberOfProcessors()) {
+        n_gc_threads = getNumberOfProcessors();
+    }
+
+    if (gc_type == SYNC_GC_PAR && n_gc_threads > 0) {
+        need_idle = stg_max(0, enabled_capabilities - n_gc_threads);
     } else {
         need_idle = 0;
     }
