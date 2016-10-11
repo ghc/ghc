@@ -13,6 +13,7 @@ test('rnfail013', normal, compile_fail, [''])
 
 test('rnfail015', normal, compile_fail, [''])
 test('rnfail016', normal, compile_fail, [''])
+test('rnfail016a', normal, compile_fail, [''])
 test('rnfail017', normal, compile_fail, [''])
 test('rnfail018', normal, compile_fail, [''])
 test('rnfail019', normal, compile_fail, [''])
