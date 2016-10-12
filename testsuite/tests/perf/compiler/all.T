@@ -91,7 +91,7 @@ test('T1969',
              # 2014-06-29 303300692 (x86/Linux)
              # 2015-07-11 288699104 (x86/Linux, 64-bit machine) use +RTS -G1
              # 2016-04-06 344730660 (x86/Linux, 64-bit machine)
-           (wordsize(64), 695430728, 5)]),
+           (wordsize(64), 770088104, 5)]),
              # 17/11/2009 434845560 (amd64/Linux)
              # 08/12/2009 459776680 (amd64/Linux)
              # 17/05/2010 519377728 (amd64/Linux)
@@ -111,6 +111,7 @@ test('T1969',
              # 10/09/2014 630299456 (x86_64/Linux) post-AMP-cleanup
              # 03/06/2015 581460896 (x86_64/Linux) use +RTS -G1
              # 28/10/2015 695430728 (x86_64/Linux) emit Typeable at definition site
+             # 12/10/2016 770088104 (x86_64/Linux) Likely creep
       only_ways(['normal']),
 
       extra_hc_opts('-dcore-lint -static'),
