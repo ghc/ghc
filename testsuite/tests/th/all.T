@@ -425,6 +425,7 @@ test('T12130', extra_clean(['T12130a.hi','T12130a.o']),
 test('T12403', omit_ways(['ghci']),
               compile_and_run, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T12407', omit_ways(['ghci']), compile, ['-v0'])
+test('T12411', normal, compile_fail, [''])
 test('T12478_1', omit_ways(['ghci']), compile_and_run,
      ['-v0 -dsuppress-uniques'])
 test('T12478_2', omit_ways(['ghci']), compile_and_run, ['-v0'])
