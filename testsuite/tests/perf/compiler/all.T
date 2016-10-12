@@ -65,7 +65,7 @@ test('T1969',
              # 2014-06-29 5949188 (x86/Linux)
              # 2015-07-11 6241108 (x86/Linux, 64bit machine) use +RTS -G1
              # 2016-04-06 9093608 (x86/Linux, 64bit machine)
-           (wordsize(64), 15017528, 15)]),
+           (wordsize(64), 17285216, 15)]),
              # 2014-09-10 10463640, 10  # post-AMP-update (somewhat stabelish)
                # looks like the peak is around ~10M, but we're
                # unlikely to GC exactly on the peak.
@@ -76,6 +76,7 @@ test('T1969',
              # 2014-11-03 10584344,    # ghcspeed reports higher numbers consistently
              # 2015-07-11 11670120 (amd64/Linux)
              # 2015-10-28 15017528 (amd64/Linux) emit typeable at definition site
+             # 2016-10-12 17285216 (amd64/Linux) it's not entirely clear why
       compiler_stats_num_field('bytes allocated',
           [(platform('i386-unknown-mingw32'), 301784492, 5),
                                  #            215582916 (x86/Windows)
