@@ -920,8 +920,10 @@ of the scope of a `seq`, or dropped the `seq` altogether.
 -}
 
 cpe_ExprIsTrivial :: CoreExpr -> Bool
--- Version that doesn't consider an scc annotation to be trivial.
--- See also 'exprIsTrivial'
+-- This function differs from CoreUtils.exprIsTrivial only in its
+-- treatment of (Lit l).  Otherwise it's identical.
+-- No one knows why this difference is important: Trac #11158.
+-- Someone should find out
 cpe_ExprIsTrivial (Var _)         = True
 cpe_ExprIsTrivial (Type _)        = True
 cpe_ExprIsTrivial (Coercion _)    = True
