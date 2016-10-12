@@ -1,0 +1,2 @@
+
+T12589.hs:13:3: error: Variable not in scope: (&) :: t0 -> t1 -> t
