@@ -387,7 +387,7 @@ dictionary to the inert_solved_dicts.  In general, we use it to avoid
 creating a new EvVar when we have a new goal that we have solved in
 the past.
 
-But in particular, we can use it to create *recursive* dicationaries.
+But in particular, we can use it to create *recursive* dictionaries.
 The simplest, degnerate case is
     instance C [a] => C [a] where ...
 If we have
@@ -658,11 +658,12 @@ Note [inert_model: the inert model]
        decomposing injective arguments of type functions, and
        suchlike.
 
-     - A Derived "shadow copy" for every Given or Wanted (a ~N ty) in
-       inert_eqs.
+     - A Derived "shadow copy" for every Wanted (a ~N ty) in
+       inert_eqs.  (Originally included every Given too; but
+       see Note [Add derived shadows only for Wanteds])
 
    * The model is not subject to "kicking-out". Reason: we make a Derived
-     shadow copy of any Given/Wanted (a ~ ty), and that Derived copy will
+     shadow copy of any Wanted (a ~ ty), and that Derived copy will
      be fully rewritten by the model before it is added
 
    * The principal reason for maintaining the model is to generate
@@ -1116,26 +1117,22 @@ Note [Adding an inert canonical constraint the InertCans]
              NB: 'a' cannot be in fv(ty), because the constraint is canonical.
 
           2. (DShadow) Do emitDerivedShadows
-               For every inert G/W constraint c, st
+               For every inert [W] constraint c, st
                 (a) (a~ty) can rewrite c (see Note [Emitting shadow constraints]),
                     and
                 (b) the model cannot rewrite c
                kick out a Derived *copy*, leaving the original unchanged.
                Reason for (b) if the model can rewrite c, then we have already
                generated a shadow copy
+               See Note [Add derived shadows only for Wanteds]
 
        [Given/Wanted Nominal]  [G/W] a ~N ty:
           1. Add it to inert_eqs
-          2. Emit [D] a~ty
-          Step (2) is needed to allow the current model to fully
-          rewrite [D] a~ty before adding it using the [Derived Nominal]
-          steps above.
-
-          We must do this even for Givens, because
-             work-item [G] a ~ [b], model has [D] b ~ a.
-          We need a shadow [D] a ~ [b] in the work-list
-          When we process it, we'll rewrite to a ~ [a] and get an occurs check
-
+          2. For [W], Emit [D] a~ty
+             Step (2) is needed to allow the current model to fully
+             rewrite [D] a~ty before adding it using the [Derived Nominal]
+             steps above.
+             See Note [Add derived shadows only for Wanteds]
 
 * Unifying a:=ty, is like adding [G] a~ty, but we can't make a [D]
   a~ty, as in step (1) of the [G/W] case above.  So instead, do
@@ -1255,7 +1252,7 @@ emitDerivedShadows IC { inert_eqs      = tv_eqs
                   | otherwise      = cts
 
     want_shadow ct
-      =  not (isDerivedCt ct)              -- No need for a shadow of a Derived!
+      =  isWantedCt ct                     -- See Note [Add shadows only for Wanteds]
       && (new_tv `elemVarSet` rw_tvs)      -- New tv can rewrite ct, yielding a
                                            -- different ct
       && not (modelCanRewrite model rw_tvs)-- We have not already created a
@@ -1277,7 +1274,31 @@ mkShadowCt ct
     derived_ev = CtDerived { ctev_pred = ctEvPred ev
                            , ctev_loc  = ctEvLoc ev }
 
-{- Note [Keep CDictCan shadows as CDictCan]
+{- Note [Add derived shadows only for Wanteds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We now only add shadows for Wanted constraints.  Why add derived
+shadows for Givens?  After all, Givens can rewrite Deriveds.  But
+Deriveds can't rewrite Givens.  So in principle, if we created a
+Derived shadow of a Given, it could be rewritten by other Deriveds,
+and that could, conceivably, lead to a useful unification.
+
+But (a) I have been unable to come up with an example of this
+happening and (b) see Trac #12660 for how adding the derived shadows
+of a Given led to an infinite loop.  For (b) there may be other
+ways to solve the loop, but simply reraining from adding
+derived shadows of Givens is particularly simple.  And it's more
+efficient too!
+
+Still, here's one possible reason for adding derived shadows
+for Givens.  Consider
+           work-item [G] a ~ [b], model has [D] b ~ a.
+If we added the derived shadow (into the work list)
+         [D] a ~ [b]
+When we process it, we'll rewrite to a ~ [a] and get an
+occurs check.  Without it we'll miss the occurs check (reporting
+inaccessible code); but that's probably OK.
+
+Note [Keep CDictCan shadows as CDictCan]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have
   class C a => D a b
@@ -1327,7 +1348,8 @@ addInertCan ct
        -- Emit shadow derived if necessary
        -- See Note [Emitting shadow constraints]
        ; let rw_tvs = rewritableTyCoVars ct
-       ; when (not (isDerivedCt ct) && modelCanRewrite (inert_model ics) rw_tvs)
+       ; when (isWantedCt ct && modelCanRewrite (inert_model ics) rw_tvs)
+              -- See Note [Add shadows only for Wanteds]
               (emitWork [mkShadowCt ct])
 
        ; traceTcS "addInertCan }" $ empty }
@@ -2549,7 +2571,7 @@ nestTcS ::  TcS a -> TcS a
 -- Use the current untouchables, augmenting the current
 -- evidence bindings, and solved dictionaries
 -- But have no effect on the InertCans, or on the inert_flat_cache
---  (the latter because the thing inside a nestTcS does unflattening)
+-- (we want to inherit the latter from processing the Givens)
 nestTcS (TcS thing_inside)
   = TcS $ \ env@(TcSEnv { tcs_inerts = inerts_var }) ->
     do { inerts <- TcM.readTcRef inerts_var
