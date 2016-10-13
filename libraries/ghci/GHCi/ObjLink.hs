@@ -11,7 +11,7 @@
 -- | Primarily, this module consists of an interface to the C-land
 -- dynamic linker.
 module GHCi.ObjLink
-  ( initObjLinker
+  ( initObjLinker, ShouldRetainCAFs(..)
   , loadDLL
   , loadArchive
   , loadObj
@@ -33,9 +33,30 @@ import GHC.Exts
 import System.Posix.Internals ( CFilePath, withFilePath, peekFilePath )
 import System.FilePath  ( dropExtension, normalise )
 
+
+
+
 -- ---------------------------------------------------------------------------
 -- RTS Linker Interface
 -- ---------------------------------------------------------------------------
+
+data ShouldRetainCAFs
+  = RetainCAFs
+    -- ^ Retain CAFs unconditionally in linked Haskell code.
+    -- Note that this prevents any code from being unloaded.
+    -- It should not be necessary unless you are GHCi or
+    -- hs-plugins, which needs to be able call any function
+    -- in the compiled code.
+  | DontRetainCAFs
+    -- ^ Do not retain CAFs.  Everything reachable from foreign
+    -- exports will be retained, due to the StablePtrs
+    -- created by the module initialisation code.  unloadObj
+    -- frees these StablePtrs, which will allow the CAFs to
+    -- be GC'd and the code to be removed.
+
+initObjLinker :: ShouldRetainCAFs -> IO ()
+initObjLinker RetainCAFs = c_initLinker_ 1
+initObjLinker _ = c_initLinker_ 0
 
 lookupSymbol :: String -> IO (Maybe (Ptr a))
 lookupSymbol str_in = do
@@ -128,7 +149,7 @@ resolveObjs = do
 -- ---------------------------------------------------------------------------
 
 foreign import ccall unsafe "addDLL"                  c_addDLL                  :: CFilePath -> IO CString
-foreign import ccall unsafe "initLinker"              initObjLinker             :: IO ()
+foreign import ccall unsafe "initLinker_"             c_initLinker_             :: CInt -> IO ()
 foreign import ccall unsafe "lookupSymbol"            c_lookupSymbol            :: CString -> IO (Ptr a)
 foreign import ccall unsafe "loadArchive"             c_loadArchive             :: CFilePath -> IO Int
 foreign import ccall unsafe "loadObj"                 c_loadObj                 :: CFilePath -> IO Int

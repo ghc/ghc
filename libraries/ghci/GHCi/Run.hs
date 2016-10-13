@@ -45,7 +45,7 @@ import Unsafe.Coerce
 
 run :: Message a -> IO a
 run m = case m of
-  InitLinker -> initObjLinker
+  InitLinker -> initObjLinker RetainCAFs
   LookupSymbol str -> fmap toRemotePtr <$> lookupSymbol str
   LookupClosure str -> lookupClosure str
   LoadDLL str -> loadDLL str
