@@ -483,9 +483,11 @@ instance Ord a => Ord (Arg a b) where
 instance Bifunctor Arg where
   bimap f g (Arg a b) = Arg (f a) (g b)
 
+-- | @since 4.10.0.0
 instance Bifoldable Arg where
   bifoldMap f g (Arg a b) = f a `mappend` g b
 
+-- | @since 4.10.0.0
 instance Bitraversable Arg where
   bitraverse f g (Arg a b) = Arg <$> f a <*> g b
 
