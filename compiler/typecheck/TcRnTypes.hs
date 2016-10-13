@@ -83,7 +83,7 @@ module TcRnTypes(
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         toDerivedWC,
         andWC, unionsWC, mkSimpleWC, mkImplicWC,
-        addInsols, addSimples, addImplics,
+        addInsols, getInsolubles, addSimples, addImplics,
         tyCoVarsOfWC, dropDerivedWC, dropDerivedSimples, dropDerivedInsols,
         tyCoVarsOfWCList,
         isDroppableDerivedLoc, insolubleImplic,
@@ -2044,6 +2044,9 @@ addImplics wc implic = wc { wc_impl = wc_impl wc `unionBags` implic }
 addInsols :: WantedConstraints -> Bag Ct -> WantedConstraints
 addInsols wc cts
   = wc { wc_insol = wc_insol wc `unionBags` cts }
+
+getInsolubles :: WantedConstraints -> Cts
+getInsolubles = wc_insol
 
 dropDerivedWC :: WantedConstraints -> WantedConstraints
 -- See Note [Dropping derived constraints]
