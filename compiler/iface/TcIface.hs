@@ -765,7 +765,10 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
         ; let lbl_names = map find_lbl my_lbls
               find_lbl x = case find (\ fl -> flSelector fl == x) field_lbls of
                              Just fl -> fl
-                             Nothing -> error $ "find_lbl missing " ++ occNameString (occName x)
+                             Nothing -> pprPanic "TcIface.find_lbl" not_found
+                where
+                  not_found = text "missing:" <+> ppr (occName x)
+                           $$ text "known labels:" <+> ppr field_lbls
 
         -- Remember, tycon is the representation tycon
         ; let orig_res_ty = mkFamilyTyConApp tycon
