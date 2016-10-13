@@ -928,11 +928,12 @@ try_m :: TcRn r -> TcRn (Either IOEnvFailure r)
 -- Does tryM, with a debug-trace on failure
 try_m thing
   = do { mb_r <- tryM (captureConstraints thing)
+
             -- See Note [Constraints and errors] for the
             -- captureConstraints/emitContraints dance
        ; case mb_r of
            Left exn -> do { traceTc "tryTc/recoverM recovering from" $
-                                    text (showException exn)
+                            text (showException exn)
                           ; return (Left exn) }
            Right (res, lie) -> do { emitConstraints lie
                                   ; return (Right res) } }
@@ -1105,7 +1106,7 @@ We'll recover in tcPolyBinds, using recoverM.  But then the final
 tcSimplifyTop will see that (Monad m) constraint, with 'm' utterly
 un-filled-in, and will emit a misleading error message.
 
-The underlying problem is that an exception interrupts the connstraint
+The underlying problem is that an exception interrupts the constraint
 gathering process. Bottom line: if we have an exception, it's best
 simply to discard any gathered constraints.  Hence in 'try_m' we
 capture the constraints in a fresh variable, and only emit them into
@@ -1113,6 +1114,18 @@ the surrounding context if we exit normally.  If an exception is
 raised, simply discard the collected constraints... we have a hard
 error to report.  So this capture-the-emit dance isn't as stupid as it
 looks :-).
+
+However suppose we throw an exception inside an invocation of
+captureConstraints.  Then we'll discard all the costraints. But some
+of those contraints might be "variable out of scope" Hole constraints,
+and that might have been the actual original cause of the exception!
+For example (Trac #12529):
+   f = p @ Int
+Here 'p' is out of scope, so we get an insolube Hole constraint. But
+the visible type application fails in the monad (thows an exception).
+We must not discard the out-of-scope error.  Hence the use of tryM in
+captureConstraints to propagate insoluble constraints.
+
 
 ************************************************************************
 *                                                                      *
@@ -1423,17 +1436,16 @@ emitImplications ct
 
 emitInsoluble :: Ct -> TcM ()
 emitInsoluble ct
-  = do { lie_var <- getConstraintVar ;
-         updTcRef lie_var (`addInsols` unitBag ct) ;
-         v <- readTcRef lie_var ;
-         traceTc "emitInsoluble" (ppr v) }
+  = do { traceTc "emitInsoluble" (ppr ct)
+       ; lie_var <- getConstraintVar
+       ; updTcRef lie_var (`addInsols` unitBag ct) }
 
-emitInsolubles :: [Ct] -> TcM ()
+emitInsolubles :: Cts -> TcM ()
 emitInsolubles cts
-  = do { lie_var <- getConstraintVar ;
-         updTcRef lie_var (`addInsols` listToBag cts) ;
-         v <- readTcRef lie_var ;
-         traceTc "emitInsoluble" (ppr v) }
+  | isEmptyBag cts = return ()
+  | otherwise      = do { traceTc "emitInsolubles" (ppr cts)
+                        ; lie_var <- getConstraintVar
+                        ; updTcRef lie_var (`addInsols` cts) }
 
 -- | Throw out any constraints emitted by the thing_inside
 discardConstraints :: TcM a -> TcM a
@@ -1442,21 +1454,26 @@ discardConstraints thing_inside = fst <$> captureConstraints thing_inside
 captureConstraints :: TcM a -> TcM (a, WantedConstraints)
 -- (captureConstraints m) runs m, and returns the type constraints it generates
 captureConstraints thing_inside
-  = do { lie_var <- newTcRef emptyWC ;
-         res <- updLclEnv (\ env -> env { tcl_lie = lie_var })
-                          thing_inside ;
-         lie <- readTcRef lie_var ;
-         return (res, lie) }
+  = do { lie_var <- newTcRef emptyWC
+       ; mb_res <- tryM $
+                   updLclEnv (\ env -> env { tcl_lie = lie_var }) $
+                   thing_inside
+
+       ; lie <- readTcRef lie_var
+
+            -- See Note [Constraints and errors] for the
+            -- tryM/failM dance here
+       ; case mb_res of
+           Left _    -> do { emitInsolubles (getInsolubles lie)
+                           ; failM }
+           Right res -> return (res, lie) }
 
 pushLevelAndCaptureConstraints :: TcM a -> TcM (TcLevel, WantedConstraints, a)
 pushLevelAndCaptureConstraints thing_inside
   = do { env <- getLclEnv
-       ; lie_var <- newTcRef emptyWC
        ; let tclvl' = pushTcLevel (tcl_tclvl env)
-       ; res <- setLclEnv (env { tcl_tclvl = tclvl'
-                               , tcl_lie   = lie_var })
-                thing_inside
-       ; lie <- readTcRef lie_var
+       ; (res, lie) <- setLclEnv (env { tcl_tclvl = tclvl' }) $
+                       captureConstraints thing_inside
        ; return (tclvl', lie, res) }
 
 pushTcLevelM_ :: TcM a -> TcM a
@@ -1500,13 +1517,15 @@ traceTcConstraints :: String -> TcM ()
 traceTcConstraints msg
   = do { lie_var <- getConstraintVar
        ; lie     <- readTcRef lie_var
-       ; traceTc (msg ++ ": LIE:") (ppr lie)
+       ; traceOptTcRn Opt_D_dump_tc_trace $
+         hang (text (msg ++ ": LIE:")) 2 (ppr lie)
        }
 
 emitWildCardHoleConstraints :: [(Name, TcTyVar)] -> TcM ()
 emitWildCardHoleConstraints wcs
   = do { ct_loc <- getCtLocM HoleOrigin Nothing
-       ; emitInsolubles (map (do_one ct_loc) wcs) }
+       ; emitInsolubles $ listToBag $
+         map (do_one ct_loc) wcs }
   where
     do_one :: CtLoc -> (Name, TcTyVar) -> Ct
     do_one ct_loc (name, tv)
