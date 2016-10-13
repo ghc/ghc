@@ -932,7 +932,8 @@ tcDataDefn roles_info
        ; stupid_theta    <- zonkTcTypeToTypes emptyZonkEnv
                                               stupid_tc_theta
        ; kind_signatures <- xoptM LangExt.KindSignatures
-       ; is_boot         <- tcIsHsBootOrSig -- Are we compiling an hs-boot file?
+       ; tcg_env         <- getGblEnv
+       ; let hsc_src = tcg_src tcg_env
 
              -- Check that we don't use kind signatures without Glasgow extensions
        ; when (isJust mb_ksig) $
@@ -943,7 +944,7 @@ tcDataDefn roles_info
        ; tycon <- fixM $ \ tycon -> do
              { let res_ty = mkTyConApp tycon (mkTyVarTys (binderVars final_bndrs))
              ; data_cons <- tcConDecls tycon (final_bndrs, res_ty) cons
-             ; tc_rhs    <- mk_tc_rhs is_boot tycon data_cons
+             ; tc_rhs    <- mk_tc_rhs hsc_src tycon data_cons
              ; tc_rep_nm <- newTyConRepName tc_name
              ; return (mkAlgTyCon tc_name
                                   final_bndrs
@@ -956,10 +957,18 @@ tcDataDefn roles_info
        ; traceTc "tcDataDefn" (ppr tc_name $$ ppr tycon_binders $$ ppr extra_bndrs)
        ; return tycon }
   where
-    mk_tc_rhs is_boot tycon data_cons
-      | null data_cons, is_boot         -- In a hs-boot file, empty cons means
-      = return totallyAbstractTyConRhs  -- "don't know"; hence totally Abstract
-      | otherwise
+    -- In hs-boot, a 'data' declaration with no constructors
+    -- indicates an nominally distinct abstract data type.
+    mk_tc_rhs HsBootFile _ []
+      = return (AbstractTyCon DistinctNominalAbstract)
+
+    -- In hsig, a 'data' declaration indicates a skolem
+    -- abstract data type. See 'HowAbstract' and Note
+    -- [Skolem abstract data] for more commentary.
+    mk_tc_rhs HsigFile _ []
+      = return (AbstractTyCon SkolemAbstract)
+
+    mk_tc_rhs _ tycon data_cons
       = case new_or_data of
           DataType -> return (mkDataTyConRhs data_cons)
           NewType  -> ASSERT( not (null data_cons) )

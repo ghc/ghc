@@ -9,7 +9,6 @@ module BuildTyCl (
         buildDataCon, mkDataConUnivTyVarBinders,
         buildPatSyn,
         TcMethInfo, buildClass,
-        distinctAbstractTyConRhs, totallyAbstractTyConRhs,
         mkNewTyConRhs, mkDataTyConRhs,
         newImplicitBinder, newTyConRepName
     ) where
@@ -38,10 +37,6 @@ import TcRnMonad
 import UniqSupply
 import Util
 import Outputable
-
-distinctAbstractTyConRhs, totallyAbstractTyConRhs :: AlgTyConRhs
-distinctAbstractTyConRhs = AbstractTyCon True
-totallyAbstractTyConRhs  = AbstractTyCon False
 
 mkDataTyConRhs :: [DataCon] -> AlgTyConRhs
 mkDataTyConRhs cons

@@ -1,0 +1,10 @@
+[1 of 3] Processing p
+  [1 of 1] Compiling A[sig]           ( p/A.hsig, nothing )
+[2 of 3] Processing q
+  Instantiating q
+  [1 of 1] Compiling A                ( q/A.hs, bkp37.out/q/A.o )
+[3 of 3] Processing r
+  Instantiating r
+  [1 of 1] Including p[A=q:A]
+    Instantiating p[A=q:A]
+    [1 of 1] Compiling A[sig]           ( p/A.hsig, bkp37.out/p/p-HVmFlcYSefiK5n1aDP1v7x/A.o )

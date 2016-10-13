@@ -1,0 +1,18 @@
+{-# LANGUAGE TypeFamilies #-}
+unit p where
+    signature H where
+        data T
+    module M where
+        import H
+        instance Show T where
+            show = undefined
+
+unit q where
+    module H where
+        -- Illegal type family!
+        type family F
+        type instance F = Bool
+        type T = F
+
+unit r where
+    dependency p[H=q:H]

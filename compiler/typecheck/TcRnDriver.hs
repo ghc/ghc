@@ -956,10 +956,41 @@ checkBootTyCon is_boot tc1 tc2
     check (roles1 == roles2) roles_msg `andThenCheck`
     check (eqTypeX env syn_rhs1 syn_rhs2) empty   -- nothing interesting to say
 
-  -- Type synonyms for hs-boot are questionable, so they
-  -- are not supported at the moment
-  | not is_boot && isAbstractTyCon tc1 && isTypeSynonymTyCon tc2
-  = check (roles1 == roles2) roles_msg
+  -- A skolem abstract TyCon can be implemented using a type synonym, but ONLY
+  -- if the type synonym is nullary and has no type family applications.
+  -- This arises from two properties of skolem abstract data:
+  --
+  --    For any T (with some number of paramaters),
+  --
+  --    1. T is a valid type (it is "curryable"), and
+  --
+  --    2. T is valid in an instance head (no type families).
+  --
+  -- See also 'HowAbstract' and Note [Skolem abstract data].
+  --
+  | isSkolemAbstractTyCon tc1
+  , Just (tvs, ty) <- synTyConDefn_maybe tc2
+  , Just (tc2', args) <- tcSplitTyConApp_maybe ty
+  = check (null (tcTyFamInsts ty))
+          (text "Illegal type family application in implementation of abstract data.")
+            `andThenCheck`
+    check (null tvs)
+          (text "Illegal parameterized type synonym in implementation of abstract data." $$
+           text "(Try eta reducing your type synonym so that it is nullary.)")
+            `andThenCheck`
+    -- Don't report roles errors unless the type synonym is nullary
+    checkUnless (not (null tvs)) $
+        ASSERT ( null roles2 )
+        -- If we have something like:
+        --
+        --  signature H where
+        --      data T a
+        --  module H where
+        --      data K a b = ...
+        --      type T = K Int
+        --
+        -- we need to drop the first role of K when comparing!
+        check (roles1 == drop (length args) (tyConRoles tc2')) roles_msg
 
   | Just fam_flav1 <- famTyConFlav_maybe tc1
   , Just fam_flav2 <- famTyConFlav_maybe tc2
@@ -997,11 +1028,8 @@ checkBootTyCon is_boot tc1 tc2
                 (text "Roles on abstract types default to" <+>
                  quotes (text "representational") <+> text "in boot files.")
 
-    eqAlgRhs tc (AbstractTyCon dis1) rhs2
-      | dis1      = check (isGenInjAlgRhs rhs2)   --Check compatibility
-                          (text "The natures of the declarations for" <+>
-                           quotes (ppr tc) <+> text "are different")
-      | otherwise = checkSuccess
+    eqAlgRhs _ (AbstractTyCon _) _rhs2
+      = checkSuccess -- rhs2 is guaranteed to be injective, since it's an AlgTyCon
     eqAlgRhs _  tc1@DataTyCon{} tc2@DataTyCon{} =
         checkListBy eqCon (data_cons tc1) (data_cons tc2) (text "constructors")
     eqAlgRhs _  tc1@NewTyCon{} tc2@NewTyCon{} =

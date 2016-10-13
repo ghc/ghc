@@ -13,7 +13,7 @@ bkpfail10.bkp:8:9: error:
     Type constructor ‘q:H.H’ has conflicting definitions in the module
     and its hsig file
     Main module: data q:H.H a = q:H.H a
-    Hsig file:  abstract q:H.H
+    Hsig file:  skolem q:H.H
     The types have different kinds
 
 bkpfail10.bkp:10:9: error:

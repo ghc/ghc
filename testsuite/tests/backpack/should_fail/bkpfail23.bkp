@@ -1,0 +1,16 @@
+{-# LANGUAGE GADTs, RoleAnnotations #-}
+unit p where
+    signature H where
+        type role F phantom
+        data F a
+    module M where
+        import H
+        -- This will typecheck
+        f :: (F a ~ F b) => a -> b
+        f x = x
+unit h where
+    module H where
+        -- But this is an invalid implementation of F
+        type F a = ()
+unit r where
+    dependency p[H=h:H]

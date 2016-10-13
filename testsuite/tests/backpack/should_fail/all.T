@@ -19,3 +19,8 @@ test('bkpfail20', normal, backpack_compile_fail, [''])
 test('bkpfail21', normal, backpack_compile_fail, [''])
 # it does fail, but not quite in the right way yet...
 test('bkpfail22', expect_broken(0), backpack_compile_fail, [''])
+test('bkpfail23', normal, backpack_compile_fail, [''])
+test('bkpfail24', normal, backpack_compile_fail, [''])
+test('bkpfail25', normal, backpack_compile_fail, [''])
+test('bkpfail26', normal, backpack_compile_fail, [''])
+test('bkpfail27', normal, backpack_compile_fail, [''])

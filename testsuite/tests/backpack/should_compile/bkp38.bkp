@@ -1,0 +1,16 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE RoleAnnotations #-}
+unit p where
+    signature A where
+        type role K nominal
+        data K a
+        instance Show (K Int)
+        instance Show (K Bool)
+unit q where
+    module A where
+        type role T representational nominal
+        data T a b = MkT
+            deriving (Show)
+        type K = T ()
+unit r where
+    dependency p[A=q:A]

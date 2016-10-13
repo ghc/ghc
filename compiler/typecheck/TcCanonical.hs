@@ -924,6 +924,11 @@ canTyConApp ev eq_rel tc1 tys1 tc2 tys2
                  ; stopWith ev "Decomposed TyConApp" }
          else canEqFailure ev eq_rel ty1 ty2 }
 
+  -- See Note [Skolem abstract data] (at SkolemAbstract)
+  | isSkolemAbstractTyCon tc1 || isSkolemAbstractTyCon tc2
+  = do { traceTcS "canTyConApp: skolem abstract" (ppr tc1 $$ ppr tc2)
+       ; continueWith (CIrredEvCan { cc_ev = ev }) }
+
   -- Fail straight away for better error messages
   -- See Note [Use canEqFailure in canDecomposableTyConApp]
   | eq_rel == ReprEq && not (isGenerativeTyCon tc1 Representational &&

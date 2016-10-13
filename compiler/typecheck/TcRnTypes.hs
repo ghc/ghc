@@ -1427,7 +1427,7 @@ isPartialSig _                                       = False
 ************************************************************************
 -}
 
--- The syntax of xi types:
+-- The syntax of xi (ξ) types:
 -- xi ::= a | T xis | xis -> xis | ... | forall a. tau
 -- Two important notes:
 --      (i) No type families, unless we are under a ForAll

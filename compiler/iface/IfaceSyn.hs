@@ -62,7 +62,7 @@ import Fingerprint
 import Binary
 import BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
 import Var( TyVarBndr(..) )
-import TyCon ( Role (..), Injectivity(..) )
+import TyCon ( Role (..), Injectivity(..), HowAbstract(..) )
 import StaticFlags (opt_PprStyle_Debug)
 import Util( filterOut, filterByList )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
@@ -209,7 +209,7 @@ data IfaceAxBranch = IfaceAxBranch { ifaxbTyVars   :: [IfaceTvBndr]
                                      -- See Note [Storing compatibility] in CoAxiom
 
 data IfaceConDecls
-  = IfAbstractTyCon Bool                          -- c.f TyCon.AbstractTyCon
+  = IfAbstractTyCon HowAbstract                   -- c.f TyCon.AbstractTyCon
   | IfDataTyCon [IfaceConDecl] Bool [FieldLabelString] -- Data type decls
   | IfNewTyCon  IfaceConDecl   Bool [FieldLabelString] -- Newtype decls
 
@@ -697,7 +697,10 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     fls = ifaceConDeclFields condecls
 
     pp_nd = case condecls of
-              IfAbstractTyCon d -> text "abstract" <> ppShowIface ss (parens (ppr d))
+              IfAbstractTyCon how ->
+                case how of
+                  DistinctNominalAbstract           -> text "abstract"
+                  SkolemAbstract                    -> text "skolem"
               IfDataTyCon{}     -> text "data"
               IfNewTyCon{}      -> text "newtype"
 

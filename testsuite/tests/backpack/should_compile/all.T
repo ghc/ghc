@@ -29,3 +29,5 @@ test('bkp34', normal, backpack_compile, [''])
 # instance merging when heads overlap prefers an arbitrary instance
 test('bkp35', expect_broken(0), backpack_compile, [''])
 test('bkp36', normal, backpack_compile, [''])
+test('bkp37', normal, backpack_compile, [''])
+test('bkp38', normal, backpack_compile, [''])
