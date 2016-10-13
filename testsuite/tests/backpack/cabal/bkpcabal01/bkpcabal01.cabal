@@ -24,7 +24,7 @@ library q
   signatures: I
   hs-source-dirs: q
   build-depends: p, impl, base
-  backpack-includes: impl (H)
+  mixins: impl (H)
   default-language:    Haskell2010
 
 executable exe
