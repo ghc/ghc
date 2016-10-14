@@ -157,6 +157,7 @@ data Pat id
                                         --   the type of the pattern
 
         pat_tvs   :: [TyVar],           -- Existentially bound type variables
+                                        -- in correctly-scoped order e.g. [k:*, x:k]
         pat_dicts :: [EvVar],           -- Ditto *coercion variables* and *dictionaries*
                                         -- One reason for putting coercion variable here, I think,
                                         --      is to ensure their kinds are zonked
