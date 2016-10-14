@@ -3020,7 +3020,7 @@ If -fprint-equality-relations or -dppr-debug or we are in
 
 If ...something about heterogeneous equalities
 
-Ohherwise print 'Coercible' for (~#), and "~" for the others.
+Otherwise print 'Coercible' for (~R#), and "~" for the others.
 
 This is all a bit ad-hoc, trying to print out the best representation
 of equalities.  If you see a better design, go for it.
