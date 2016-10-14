@@ -484,10 +484,13 @@ instance Data Name where
 ************************************************************************
 -}
 
+-- | Assumes that the 'Name' is a non-binding one. See
+-- 'IfaceSyn.putIfaceTopBndr' and 'IfaceSyn.getIfaceTopBndr' for serializing
+-- binding 'Name's. See 'UserData' for the rationale for this distinction.
 instance Binary Name where
    put_ bh name =
       case getUserData bh of
-        UserData{ ud_put_name = put_name } -> put_name bh name
+        UserData{ ud_put_nonbinding_name = put_name } -> put_name bh name
 
    get bh =
       case getUserData bh of

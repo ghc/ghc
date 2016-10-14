@@ -42,9 +42,6 @@ module Unique (
         -- [the Oh-So-Wonderful Haskell module system wins again...]
         mkAlphaTyVarUnique,
         mkPrimOpIdUnique,
-        mkTupleTyConUnique, mkTupleDataConUnique,
-        mkSumTyConUnique, mkSumDataConUnique,
-        mkCTupleTyConUnique,
         mkPreludeMiscIdUnique, mkPreludeDataConUnique,
         mkPreludeTyConUnique, mkPreludeClassUnique,
         mkPArrDataConUnique, mkCoVarUnique,
@@ -53,13 +50,16 @@ module Unique (
         mkRegSingleUnique, mkRegPairUnique, mkRegClassUnique, mkRegSubUnique,
         mkCostCentreUnique,
 
-        tyConRepNameUnique,
-        dataConWorkerUnique, dataConRepNameUnique,
-
         mkBuiltinUnique,
         mkPseudoUniqueD,
         mkPseudoUniqueE,
-        mkPseudoUniqueH
+        mkPseudoUniqueH,
+
+        -- ** Deriving uniques
+        -- *** From TyCon name uniques
+        tyConRepNameUnique,
+        -- *** From DataCon name uniques
+        dataConWorkerUnique, dataConRepNameUnique
     ) where
 
 #include "HsVersions.h"
@@ -91,6 +91,8 @@ Fast comparison is everything on @Uniques@:
 -- The type of unique identifiers that are used in many places in GHC
 -- for fast ordering and equality tests. You should generate these with
 -- the functions from the 'UniqSupply' module
+--
+-- These are sometimes also referred to as \"keys\" in comments in GHC.
 newtype Unique = MkUnique Int
 
 {-
@@ -319,18 +321,18 @@ Allocation of unique supply characters:
         d       desugarer
         f       AbsC flattener
         g       SimplStg
+        k       constraint tuple tycons
+        m       constraint tuple datacons
         n       Native codegen
         r       Hsc name cache
         s       simplifier
+        z       anonymous sums
 -}
 
 mkAlphaTyVarUnique     :: Int -> Unique
 mkPreludeClassUnique   :: Int -> Unique
 mkPreludeTyConUnique   :: Int -> Unique
-mkTupleTyConUnique     :: Boxity -> Arity -> Unique
-mkCTupleTyConUnique    :: Arity -> Unique
 mkPreludeDataConUnique :: Arity -> Unique
-mkTupleDataConUnique   :: Boxity -> Arity -> Unique
 mkPrimOpIdUnique       :: Int -> Unique
 mkPreludeMiscIdUnique  :: Int -> Unique
 mkPArrDataConUnique    :: Int -> Unique
@@ -345,9 +347,6 @@ mkPreludeClassUnique i = mkUnique '2' i
 --    * u: the TyCon itself
 --    * u+1: the TyConRepName of the TyCon
 mkPreludeTyConUnique i                = mkUnique '3' (2*i)
-mkTupleTyConUnique Boxed           a  = mkUnique '4' (2*a)
-mkTupleTyConUnique Unboxed         a  = mkUnique '5' (2*a)
-mkCTupleTyConUnique                a  = mkUnique 'k' (2*a)
 
 tyConRepNameUnique :: Unique -> Unique
 tyConRepNameUnique  u = incrUnique u
@@ -366,30 +365,6 @@ tyConRepNameUnique  u = incrUnique u
 -- Prelude data constructors are too simple to need wrappers.
 
 mkPreludeDataConUnique i              = mkUnique '6' (3*i)    -- Must be alphabetic
-mkTupleDataConUnique Boxed          a = mkUnique '7' (3*a)    -- ditto (*may* be used in C labels)
-mkTupleDataConUnique Unboxed        a = mkUnique '8' (3*a)
-
---------------------------------------------------
--- Sum arities start from 2. The encoding is a bit funny: we break up the
--- integral part into bitfields for the arity and alternative index (which is
--- taken to be 0xff in the case of the TyCon)
---
--- TyCon for sum of arity k:
---   00000000 kkkkkkkk 11111111
--- DataCon for sum of arity k and alternative n:
---   00000000 kkkkkkkk nnnnnnnn
-
-mkSumTyConUnique :: Arity -> Unique
-mkSumTyConUnique arity =
-    ASSERT(arity < 0xff)
-    mkUnique 'z' (arity `shiftL` 8 .|. 0xff)
-
-mkSumDataConUnique :: ConTagZ -> Arity -> Unique
-mkSumDataConUnique alt arity
-  | alt >= arity
-  = panic ("mkSumDataConUnique: " ++ show alt ++ " >= " ++ show arity)
-  | otherwise
-  = mkUnique 'z' (arity `shiftL` 8 + alt) {- skip the tycon -}
 
 --------------------------------------------------
 dataConRepNameUnique, dataConWorkerUnique :: Unique -> Unique

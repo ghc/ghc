@@ -198,6 +198,7 @@ Library
         NameSet
         OccName
         RdrName
+        NameCache
         SrcLoc
         UniqSupply
         Unique
@@ -308,6 +309,7 @@ Library
         HsTypes
         HsUtils
         BinIface
+        BinFingerprint
         BuildTyCl
         IfaceEnv
         IfaceSyn
@@ -357,6 +359,7 @@ Library
         RdrHsSyn
         ApiAnnotation
         ForeignCall
+        KnownUniques
         PrelInfo
         PrelNames
         PrelRules

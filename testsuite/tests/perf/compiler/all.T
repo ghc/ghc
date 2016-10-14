@@ -586,7 +586,7 @@ test('T5837',
              # 2014-12-08: 115905208  Constraint solver perf improvements (esp kick-out)
              # 2016-04-06: 24199320  (x86/Linux, 64-bit machine) TypeInType
 
-           (wordsize(64), 42445672, 10)])
+           (wordsize(64), 41832056, 10)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
@@ -606,6 +606,7 @@ test('T5837',
              # 2016-03-18 48507272  Mac, accept small regression in exchange
              #                           for other optimisations
              # 2016-09-15 42445672  Linux; fixing #12422
+             # 2016-09-25 41832056  amd64/Linux, Rework handling of names (D2469)
       ],
       compile_fail,['-freduction-depth=50'])
 

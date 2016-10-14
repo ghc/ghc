@@ -141,8 +141,10 @@ importDecl name
         -- Now look it up again; this time we should find it
         { eps <- getEps
         ; case lookupTypeEnv (eps_PTE eps) name of
-            Just thing -> return (Succeeded thing)
-            Nothing    -> return $ Failed (ifPprDebug (found_things_msg eps) $$ not_found_msg)
+            Just thing -> return $ Succeeded thing
+            Nothing    -> let doc = ifPprDebug (found_things_msg eps $$ empty)
+                                    $$ not_found_msg
+                          in return $ Failed doc
     }}}
   where
     nd_doc = text "Need decl for" <+> ppr name
@@ -653,7 +655,7 @@ loadDecl :: Bool                    -- Don't load pragmas into the decl pool
 loadDecl ignore_prags (_version, decl)
   = do  {       -- Populate the name cache with final versions of all
                 -- the names associated with the decl
-          main_name      <- lookupIfaceTop (ifName decl)
+          let main_name = ifName decl
 
         -- Typecheck the thing, lazily
         -- NB. Firstly, the laziness is there in case we never need the

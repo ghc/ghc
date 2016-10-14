@@ -241,6 +241,18 @@ rnIfaceGlobal n = do
             let nsubst = mkNameShape (moduleName m) (mi_exports iface)
             return (substNameShape nsubst n)
 
+-- | Rename a DFun name. Here is where we ensure that DFuns have the correct
+-- module as described in Note [Bogus DFun renamings].
+rnIfaceDFun :: Name -> ShIfM Name
+rnIfaceDFun name = do
+    hmap <- getHoleSubst
+    dflags <- getDynFlags
+    iface_semantic_mod <- fmap sh_if_semantic_module getGblEnv
+    let m = renameHoleModule dflags hmap $ nameModule name
+    -- Doublecheck that this DFun was, indeed, locally defined.
+    MASSERT2( iface_semantic_mod == m, ppr iface_semantic_mod <+> ppr m )
+    setNameModule (Just m) name
+
 -- PILES AND PILES OF BOILERPLATE
 
 -- | Rename an 'IfaceClsInst', with special handling for an associated
@@ -249,9 +261,6 @@ rnIfaceClsInst :: Rename IfaceClsInst
 rnIfaceClsInst cls_inst = do
     n <- rnIfaceGlobal (ifInstCls cls_inst)
     tys <- mapM rnMaybeIfaceTyCon (ifInstTys cls_inst)
-
-    hmap <- getHoleSubst
-    dflags <- getDynFlags
 
     -- Note [Bogus DFun renamings]
     -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -312,12 +321,7 @@ rnIfaceClsInst cls_inst = do
     --    are unique; for instantiation, the final interface never
     --    mentions DFuns since they are implicitly exported.)  The
     --    important thing is that it's consistent everywhere.
-
-    iface_semantic_mod <- fmap sh_if_semantic_module getGblEnv
-    let m = renameHoleModule dflags hmap $ nameModule (ifDFun cls_inst)
-    -- Doublecheck that this DFun was, indeed, locally defined.
-    MASSERT2( iface_semantic_mod == m, ppr iface_semantic_mod <+> ppr m )
-    dfun <- setNameModule (Just m) (ifDFun cls_inst)
+    dfun <- rnIfaceDFun (ifDFun cls_inst)
     return cls_inst { ifInstCls = n
                     , ifInstTys = tys
                     , ifDFun = dfun
@@ -339,56 +343,71 @@ rnIfaceDecl' (fp, decl) = (,) fp <$> rnIfaceDecl decl
 
 rnIfaceDecl :: Rename IfaceDecl
 rnIfaceDecl d@IfaceId{} = do
+            name <- case ifIdDetails d of
+                      IfDFunId -> rnIfaceDFun (ifName d)
+                      _        -> rnIfaceGlobal (ifName d)
             ty <- rnIfaceType (ifType d)
             details <- rnIfaceIdDetails (ifIdDetails d)
             info <- rnIfaceIdInfo (ifIdInfo d)
-            return d { ifType = ty
+            return d { ifName = name
+                     , ifType = ty
                      , ifIdDetails = details
                      , ifIdInfo = info
                      }
 rnIfaceDecl d@IfaceData{} = do
+            name <- rnIfaceGlobal (ifName d)
             binders <- mapM rnIfaceTyConBinder (ifBinders d)
             ctxt <- mapM rnIfaceType (ifCtxt d)
             cons <- rnIfaceConDecls (ifCons d)
             parent <- rnIfaceTyConParent (ifParent d)
-            return d { ifBinders = binders
+            return d { ifName = name
+                     , ifBinders = binders
                      , ifCtxt = ctxt
                      , ifCons = cons
                      , ifParent = parent
                      }
 rnIfaceDecl d@IfaceSynonym{} = do
+            name <- rnIfaceGlobal (ifName d)
             binders <- mapM rnIfaceTyConBinder (ifBinders d)
             syn_kind <- rnIfaceType (ifResKind d)
             syn_rhs <- rnIfaceType (ifSynRhs d)
-            return d { ifBinders = binders
+            return d { ifName = name
+                     , ifBinders = binders
                      , ifResKind = syn_kind
                      , ifSynRhs = syn_rhs
                      }
 rnIfaceDecl d@IfaceFamily{} = do
+            name <- rnIfaceGlobal (ifName d)
             binders <- mapM rnIfaceTyConBinder (ifBinders d)
             fam_kind <- rnIfaceType (ifResKind d)
             fam_flav <- rnIfaceFamTyConFlav (ifFamFlav d)
-            return d { ifBinders = binders
+            return d { ifName = name
+                     , ifBinders = binders
                      , ifResKind = fam_kind
                      , ifFamFlav = fam_flav
                      }
 rnIfaceDecl d@IfaceClass{} = do
+            name <- rnIfaceGlobal (ifName d)
             ctxt <- mapM rnIfaceType (ifCtxt d)
             binders <- mapM rnIfaceTyConBinder (ifBinders d)
             ats <- mapM rnIfaceAT (ifATs d)
             sigs <- mapM rnIfaceClassOp (ifSigs d)
-            return d { ifCtxt = ctxt
+            return d { ifName = name
+                     , ifCtxt = ctxt
                      , ifBinders = binders
                      , ifATs = ats
                      , ifSigs = sigs
                      }
 rnIfaceDecl d@IfaceAxiom{} = do
+            name <- rnIfaceGlobal (ifName d)
             tycon <- rnIfaceTyCon (ifTyCon d)
             ax_branches <- mapM rnIfaceAxBranch (ifAxBranches d)
-            return d { ifTyCon = tycon
+            return d { ifName = name
+                     , ifTyCon = tycon
                      , ifAxBranches = ax_branches
                      }
 rnIfaceDecl d@IfacePatSyn{} =  do
+            name <- rnIfaceGlobal (ifName d)
             let rnPat (n, b) = (,) <$> rnIfaceGlobal n <*> pure b
             pat_matcher <- rnPat (ifPatMatcher d)
             pat_builder <- T.traverse rnPat (ifPatBuilder d)
@@ -398,7 +417,8 @@ rnIfaceDecl d@IfacePatSyn{} =  do
             pat_req_ctxt <- mapM rnIfaceType (ifPatReqCtxt d)
             pat_args <- mapM rnIfaceType (ifPatArgs d)
             pat_ty <- rnIfaceType (ifPatTy d)
-            return d { ifPatMatcher = pat_matcher
+            return d { ifName = name
+                     , ifPatMatcher = pat_matcher
                      , ifPatBuilder = pat_builder
                      , ifPatUnivBndrs = pat_univ_bndrs
                      , ifPatExBndrs = pat_ex_bndrs
@@ -435,23 +455,33 @@ rnIfaceConDecls (IfAbstractTyCon b) = pure (IfAbstractTyCon b)
 
 rnIfaceConDecl :: Rename IfaceConDecl
 rnIfaceConDecl d = do
+    con_name <- rnIfaceGlobal (ifConName d)
     con_ex_tvs <- mapM rnIfaceForAllBndr (ifConExTvs d)
     let rnIfConEqSpec (n,t) = (,) n <$> rnIfaceType t
     con_eq_spec <- mapM rnIfConEqSpec (ifConEqSpec d)
     con_ctxt <- mapM rnIfaceType (ifConCtxt d)
     con_arg_tys <- mapM rnIfaceType (ifConArgTys d)
+    -- TODO: It seems like we really should rename the field labels, but this
+    -- breaks due to tcIfaceDataCons projecting back to the field's OccName and
+    -- then looking up it up in the name cache. See #12699.
+    --con_fields <- mapM rnIfaceGlobal (ifConFields d)
     let rnIfaceBang (IfUnpackCo co) = IfUnpackCo <$> rnIfaceCo co
         rnIfaceBang bang = pure bang
     con_stricts <- mapM rnIfaceBang (ifConStricts d)
-    return d { ifConExTvs = con_ex_tvs
+    return d { ifConName = con_name
+             , ifConExTvs = con_ex_tvs
              , ifConEqSpec = con_eq_spec
              , ifConCtxt = con_ctxt
              , ifConArgTys = con_arg_tys
+             --, ifConFields = con_fields -- See TODO above
              , ifConStricts = con_stricts
              }
 
 rnIfaceClassOp :: Rename IfaceClassOp
-rnIfaceClassOp (IfaceClassOp n ty dm) = IfaceClassOp n <$> rnIfaceType ty <*> rnMaybeDefMethSpec dm
+rnIfaceClassOp (IfaceClassOp n ty dm) =
+    IfaceClassOp <$> rnIfaceGlobal n
+                 <*> rnIfaceType ty
+                 <*> rnMaybeDefMethSpec dm
 
 rnMaybeDefMethSpec :: Rename (Maybe (DefMethSpec IfaceType))
 rnMaybeDefMethSpec (Just (GenericDM ty)) = Just . GenericDM <$> rnIfaceType ty

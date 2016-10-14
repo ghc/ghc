@@ -59,6 +59,7 @@ Basic idea:
 #include "HsVersions.h"
 
 import IfaceSyn
+import BinFingerprint
 import LoadIface
 import FlagChecker
 
@@ -390,6 +391,32 @@ mkHashFun hsc_env eps name
 -- ---------------------------------------------------------------------------
 -- Compute fingerprints for the interface
 
+{-
+Note [Fingerprinting IfaceDecls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The general idea here is that we first examine the 'IfaceDecl's and determine
+the recursive groups of them. We then walk these groups in dependency order,
+serializing each contained 'IfaceDecl' to a "Binary" buffer which we then
+hash using MD5 to produce a fingerprint for the group.
+
+However, the serialization that we use is a bit funny: we override the @putName@
+operation with our own which serializes the hash of a 'Name' instead of the
+'Name' itself. This ensures that the fingerprint of a decl changes if anything
+in its transitive closure changes. This trick is why we must be careful about
+traversing in dependency order: we need to ensure that we have hashes for
+everything referenced by the decl which we are fingerprinting.
+
+Moreover, we need to be careful to distinguish between serialization of binding
+Names (e.g. the ifName field of a IfaceDecl) and non-binding (e.g. the ifInstCls
+field of a IfaceClsInst): only in the non-binding case should we include the
+fingerprint; in the binding case we shouldn't since it is merely the name of the
+thing that we are currently fingerprinting.
+-}
+
+-- | Add fingerprints for top-level declarations to a 'ModIface'.
+--
+-- See Note [Fingerprinting IfaceDecls]
 addFingerprints
         :: HscEnv
         -> Maybe Fingerprint -- the old fingerprint, if any
@@ -414,14 +441,15 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                                   non_orph_fis decl
 
        edges :: [(IfaceDeclABI, Unique, [Unique])]
-       edges = [ (abi, getUnique (ifName decl), out)
+       edges = [ (abi, getUnique (getOccName decl), out)
                | decl <- new_decls
                , let abi = declABI decl
                , let out = localOccs $ freeNamesDeclABI abi
                ]
 
        name_module n = ASSERT2( isExternalName n, ppr n ) nameModule n
-       localOccs = map (getUnique . getParent . getOccName)
+       localOccs =
+         map (getUnique . getParent . getOccName)
                         -- NB: names always use semantic module, so
                         -- filtering must be on the semantic module!
                         -- See Note [Identity versus semantic module]
@@ -432,7 +460,8 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                    -- stronglyConnCompFromEdgedVertices is deterministic
                    -- even with non-deterministic order of edges as
                    -- explained in Note [Deterministic SCC] in Digraph.
-          where getParent occ = lookupOccEnv parent_map occ `orElse` occ
+          where getParent :: OccName -> OccName
+                getParent occ = lookupOccEnv parent_map occ `orElse` occ
 
         -- maps OccNames to their parents in the current module.
         -- e.g. a reference to a constructor must be turned into a reference
@@ -441,20 +470,22 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
        parent_map = foldr extend emptyOccEnv new_decls
           where extend d env =
                   extendOccEnvList env [ (b,n) | b <- ifaceDeclImplicitBndrs d ]
-                  where n = ifName d
+                  where n = getOccName d
 
         -- strongly-connected groups of declarations, in dependency order
-       groups = stronglyConnCompFromEdgedVerticesUniq edges
+       groups :: [SCC IfaceDeclABI]
+       groups =
+           stronglyConnCompFromEdgedVerticesUniq edges
 
        global_hash_fn = mkHashFun hsc_env eps
 
-        -- how to output Names when generating the data to fingerprint.
+        -- How to output Names when generating the data to fingerprint.
         -- Here we want to output the fingerprint for each top-level
         -- Name, whether it comes from the current module or another
         -- module.  In this way, the fingerprint for a declaration will
         -- change if the fingerprint for anything it refers to (transitively)
         -- changes.
-       mk_put_name :: (OccEnv (OccName,Fingerprint))
+       mk_put_name :: OccEnv (OccName,Fingerprint)
                    -> BinHandle -> Name -> IO  ()
        mk_put_name local_env bh name
           | isWiredInName name  =  putNameLiterally bh name
@@ -552,7 +583,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    -- interface into EPS, you will see a duplicate orphan instance.
 
    orphan_hash <- computeFingerprint (mk_put_name local_env)
-                      (map ifDFun orph_insts, orph_rules, orph_fis)
+                                     (map ifDFun orph_insts, orph_rules, orph_fis)
 
    -- the export list hash doesn't depend on the fingerprints of
    -- the Names it mentions, only the Names themselves, hence putNameLiterally.
@@ -568,7 +599,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
 
    -- put the declarations in a canonical order, sorted by OccName
    let sorted_decls = Map.elems $ Map.fromList $
-                          [(ifName d, e) | e@(_, d) <- decls_w_hashes]
+                          [(getOccName d, e) | e@(_, d) <- decls_w_hashes]
 
    -- the flag hash depends on:
    --   - (some of) dflags
@@ -741,8 +772,8 @@ abiDecl :: IfaceDeclABI -> IfaceDecl
 abiDecl (_, decl, _) = decl
 
 cmp_abiNames :: IfaceDeclABI -> IfaceDeclABI -> Ordering
-cmp_abiNames abi1 abi2 = ifName (abiDecl abi1) `compare`
-                         ifName (abiDecl abi2)
+cmp_abiNames abi1 abi2 = getOccName (abiDecl abi1) `compare`
+                         getOccName (abiDecl abi2)
 
 freeNamesDeclABI :: IfaceDeclABI -> NameSet
 freeNamesDeclABI (_mod, decl, extras) =
@@ -819,7 +850,7 @@ declExtras fix_fn ann_fn rule_env inst_env fi_env decl
                         (map ifFamInstAxiom (lookupOccEnvL fi_env n) ++
                          map ifDFun         (lookupOccEnvL inst_env n))
                         (ann_fn n)
-                        (map (id_extras . ifConOcc) (visibleIfConDecls cons))
+                        (map (id_extras . occName . ifConName) (visibleIfConDecls cons))
       IfaceClass{ifSigs=sigs, ifATs=ats} ->
                      IfaceClassExtras (fix_fn n)
                         (map ifDFun $ (concatMap at_extras ats)
@@ -827,7 +858,7 @@ declExtras fix_fn ann_fn rule_env inst_env fi_env decl
                            -- Include instances of the associated types
                            -- as well as instances of the class (Trac #5147)
                         (ann_fn n)
-                        [id_extras op | IfaceClassOp op _ _ <- sigs]
+                        [id_extras (getOccName op) | IfaceClassOp op _ _ <- sigs]
       IfaceSynonym{} -> IfaceSynonymExtras (fix_fn n)
                                            (ann_fn n)
       IfaceFamily{} -> IfaceFamilyExtras (fix_fn n)
@@ -835,21 +866,13 @@ declExtras fix_fn ann_fn rule_env inst_env fi_env decl
                         (ann_fn n)
       _other -> IfaceOtherDeclExtras
   where
-        n = ifName decl
+        n = getOccName decl
         id_extras occ = IdExtras (fix_fn occ) (lookupOccEnvL rule_env occ) (ann_fn occ)
-        at_extras (IfaceAT decl _) = lookupOccEnvL inst_env (ifName decl)
+        at_extras (IfaceAT decl _) = lookupOccEnvL inst_env (getOccName decl)
 
 
 lookupOccEnvL :: OccEnv [v] -> OccName -> [v]
 lookupOccEnvL env k = lookupOccEnv env k `orElse` []
-
--- used when we want to fingerprint a structure without depending on the
--- fingerprints of external Names that it refers to.
-putNameLiterally :: BinHandle -> Name -> IO ()
-putNameLiterally bh name = ASSERT( isExternalName name )
-  do
-    put_ bh $! nameModule name
-    put_ bh $! nameOccName name
 
 {-
 -- for testing: use the md5sum command to generate fingerprints and
@@ -1341,7 +1364,7 @@ idToIfaceDecl :: Id -> IfaceDecl
 -- We can't tidy it here, locally, because it may have
 -- free variables in its type or IdInfo
 idToIfaceDecl id
-  = IfaceId { ifName      = getOccName id,
+  = IfaceId { ifName      = getName id,
               ifType      = toIfaceType (idType id),
               ifIdDetails = toIfaceIdDetails (idDetails id),
               ifIdInfo    = toIfaceIdInfo (idInfo id) }
@@ -1349,7 +1372,7 @@ idToIfaceDecl id
 --------------------------
 dataConToIfaceDecl :: DataCon -> IfaceDecl
 dataConToIfaceDecl dataCon
-  = IfaceId { ifName      = getOccName dataCon,
+  = IfaceId { ifName      = getName dataCon,
               ifType      = toIfaceType (dataConUserType dataCon),
               ifIdDetails = IfVanillaId,
               ifIdInfo    = NoInfo }
@@ -1357,7 +1380,7 @@ dataConToIfaceDecl dataCon
 --------------------------
 patSynToIfaceDecl :: PatSyn -> IfaceDecl
 patSynToIfaceDecl ps
-  = IfacePatSyn { ifName          = getOccName . getName $ ps
+  = IfacePatSyn { ifName          = getName $ ps
                 , ifPatMatcher    = to_if_pr (patSynMatcher ps)
                 , ifPatBuilder    = fmap to_if_pr (patSynBuilder ps)
                 , ifPatIsInfix    = patSynIsInfix ps
@@ -1383,7 +1406,7 @@ coAxiomToIfaceDecl :: CoAxiom br -> IfaceDecl
 -- conveniently be) built in tidy form
 coAxiomToIfaceDecl ax@(CoAxiom { co_ax_tc = tycon, co_ax_branches = branches
                                , co_ax_role = role })
- = IfaceAxiom { ifName       = name
+ = IfaceAxiom { ifName       = getName ax
               , ifTyCon      = toIfaceTyCon tycon
               , ifRole       = role
               , ifAxBranches = map (coAxBranchToIfaceBranch tycon
@@ -1391,7 +1414,6 @@ coAxiomToIfaceDecl ax@(CoAxiom { co_ax_tc = tycon, co_ax_branches = branches
                                    branch_list }
  where
    branch_list = fromBranches branches
-   name        = getOccName ax
 
 -- 2nd parameter is the list of branch LHSs, for conversion from incompatible branches
 -- to incompatible indices
@@ -1433,7 +1455,7 @@ tyConToIfaceDecl env tycon
 
   | Just syn_rhs <- synTyConRhs_maybe tycon
   = ( tc_env1
-    , IfaceSynonym { ifName    = getOccName tycon,
+    , IfaceSynonym { ifName    = getName tycon,
                      ifRoles   = tyConRoles tycon,
                      ifSynRhs  = if_syn_type syn_rhs,
                      ifBinders = if_binders,
@@ -1442,7 +1464,7 @@ tyConToIfaceDecl env tycon
 
   | Just fam_flav <- famTyConFlav_maybe tycon
   = ( tc_env1
-    , IfaceFamily { ifName    = getOccName tycon,
+    , IfaceFamily { ifName    = getName tycon,
                     ifResVar  = if_res_var,
                     ifFamFlav = to_if_fam_flav fam_flav,
                     ifBinders = if_binders,
@@ -1452,7 +1474,7 @@ tyConToIfaceDecl env tycon
 
   | isAlgTyCon tycon
   = ( tc_env1
-    , IfaceData { ifName    = getOccName tycon,
+    , IfaceData { ifName    = getName tycon,
                   ifBinders = if_binders,
                   ifResKind = if_res_kind,
                   ifCType   = tyConCType tycon,
@@ -1467,7 +1489,7 @@ tyConToIfaceDecl env tycon
   -- just about to pretty-print them, not because we are going
   -- to put them into interface files
   = ( env
-    , IfaceData { ifName       = getOccName tycon,
+    , IfaceData { ifName       = getName tycon,
                   ifBinders    = if_binders,
                   ifResKind    = if_res_kind,
                   ifCType      = Nothing,
@@ -1520,15 +1542,14 @@ tyConToIfaceDecl env tycon
         -- (Tuple declarations are not serialised into interface files.)
 
     ifaceConDecl data_con
-        = IfCon   { ifConOcc     = getOccName (dataConName data_con),
+        = IfCon   { ifConName    = dataConName data_con,
                     ifConInfix   = dataConIsInfix data_con,
                     ifConWrapper = isJust (dataConWrapId_maybe data_con),
                     ifConExTvs   = map toIfaceForAllBndr ex_bndrs',
                     ifConEqSpec  = map (to_eq_spec . eqSpecPair) eq_spec,
                     ifConCtxt    = tidyToIfaceContext con_env2 theta,
                     ifConArgTys  = map (tidyToIfaceType con_env2) arg_tys,
-                    ifConFields  = map (nameOccName . flSelector)
-                                       (dataConFieldLabels data_con),
+                    ifConFields  = map flSelector (dataConFieldLabels data_con),
                     ifConStricts = map (toIfaceBang con_env2)
                                        (dataConImplBangs data_con),
                     ifConSrcStricts = map toIfaceSrcBang
@@ -1569,7 +1590,7 @@ classToIfaceDecl :: TidyEnv -> Class -> (TidyEnv, IfaceDecl)
 classToIfaceDecl env clas
   = ( env1
     , IfaceClass { ifCtxt   = tidyToIfaceContext env1 sc_theta,
-                   ifName   = getOccName tycon,
+                   ifName   = getName tycon,
                    ifRoles  = tyConRoles (classTyCon clas),
                    ifBinders = toIfaceTyVarBinders tc_binders,
                    ifFDs    = map toIfaceFD clas_fds,
@@ -1591,7 +1612,7 @@ classToIfaceDecl env clas
 
     toIfaceClassOp (sel_id, def_meth)
         = ASSERT( sel_tyvars == binderVars tc_binders )
-          IfaceClassOp (getOccName sel_id)
+          IfaceClassOp (getName sel_id)
                        (tidyToIfaceType env1 op_ty)
                        (fmap toDmSpec def_meth)
         where

@@ -79,6 +79,7 @@ import Maybes
 import UniqSupply
 import UniqFM       ( UniqFM, mapUFM, filterUFM )
 import MonadUtils
+import NameCache
 import SrcLoc
 import ListSetOps       ( runs )
 import Data.List

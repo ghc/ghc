@@ -56,7 +56,6 @@ fingerprintData buf len = do
       c_MD5Final pdigest pctxt
       peek (castPtr pdigest :: Ptr Fingerprint)
 
--- This is duplicated in compiler/utils/Fingerprint.hsc
 fingerprintString :: String -> Fingerprint
 fingerprintString str = unsafeDupablePerformIO $
   withArrayLen word8s $ \len p ->

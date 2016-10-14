@@ -62,7 +62,8 @@ import LoadIface           ( loadUserInterface )
 import Module              ( mkModuleName )
 import Finder              ( findImportedModule, cannotFindModule )
 import TcRnMonad           ( initIfaceCheck )
-import Binary              ( openBinMem, put_, fingerprintBinMem )
+import Binary              ( openBinMem, put_ )
+import BinFingerprint      ( fingerprintBinMem )
 
 -- Standard Haskell libraries
 import System.IO

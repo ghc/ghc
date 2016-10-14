@@ -434,6 +434,7 @@ compiler_stage2_dll0_MODULES = \
 	Bag \
 	BasicTypes \
 	Binary \
+	BinFingerprint \
 	BooleanFormula \
 	BufWrite \
 	Class \
@@ -487,12 +488,14 @@ compiler_stage2_dll0_MODULES = \
 	HsUtils \
 	HscTypes \
 	IOEnv \
+  NameCache \
 	Id \
 	IdInfo \
 	IfaceSyn \
 	IfaceType \
 	InstEnv \
 	Kind \
+	KnownUniques \
 	Lexeme \
 	ListSetOps \
 	Literal \

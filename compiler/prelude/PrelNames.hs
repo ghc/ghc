@@ -73,33 +73,44 @@ This is accomplished through a combination of mechanisms:
      stuff gets the right Unique, and is why it is so important to
      place your known-key names in the appropriate lists.
 
-  3. For "infinite families" of known-key names (i.e. tuples), we have
-     to be extra careful. Because there are an infinite number of
+  3. For "infinite families" of known-key names (i.e. tuples and sums), we
+     have to be extra careful. Because there are an infinite number of
      these things, we cannot add them to the list of known-key names
      used to initialise the OrigNameCache. Instead, we have to
-     rely on never having to look them up in that cache.
+     rely on never having to look them up in that cache. See
+     Note [Infinite families of known-key names] for details.
 
-     This is accomplished through a variety of mechanisms:
 
-       a) The parser recognises them specially and generates an
-          Exact Name (hence not looked up in the orig-name cache)
+Note [Infinite families of known-key names]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-       b) The known infinite families of names are specially
-          serialised by BinIface.putName, with that special treatment
-          detected when we read back to ensure that we get back to the
-          correct uniques.
+Infinite families of known-key things (e.g. tuples and sums) pose a tricky
+problem: we can't add them to the knownKeyNames finite map which we use to
+ensure that, e.g., a reference to (,) gets assigned the right unique (if this
+doesn't sound familiar see Note [Known-key names] above).
 
-       Most of the infinite families cannot occur in source code,
-       so mechanisms (a,b) sufficies to ensure that they always have
-       the right Unique. In particular, implicit param TyCon names,
-       constraint tuples and Any TyCons cannot be mentioned by the
-       user.
+We instead handle tuples and sums separately from the "vanilla" known-key
+things,
 
-       c) IfaceEnv.lookupOrigNameCache uses isBuiltInOcc_maybe to map
-          built-in syntax directly onto the corresponding name, rather
-          than trying to find it in the original-name cache.
+  a) The parser recognises them specially and generates an Exact Name (hence not
+     looked up in the orig-name cache)
 
-          See also Note [Built-in syntax and the OrigNameCache]
+  b) The known infinite families of names are specially serialised by
+     BinIface.putName, with that special treatment detected when we read back to
+     ensure that we get back to the correct uniques. See Note [Symbol table
+     representation of names] in BinIface and Note [How tuples work] in
+     TysWiredIn.
+
+Most of the infinite families cannot occur in source code, so mechanisms (a) and (b)
+suffice to ensure that they always have the right Unique. In particular,
+implicit param TyCon names, constraint tuples and Any TyCons cannot be mentioned
+by the user. For those things that *can* appear in source programs,
+
+  c) IfaceEnv.lookupOrigNameCache uses isBuiltInOcc_maybe to map built-in syntax
+     directly onto the corresponding name, rather than trying to find it in the
+     original-name cache.
+
+     See also Note [Built-in syntax and the OrigNameCache]
 -}
 
 {-# LANGUAGE CPP #-}

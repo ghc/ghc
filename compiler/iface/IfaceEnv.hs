@@ -16,15 +16,13 @@ module IfaceEnv (
         ifaceExportNames,
 
         -- Name-cache stuff
-        allocateGlobalBinder,
-        initNameCache, updNameCache,
-        mkNameCacheUpdater, NameCacheUpdater(..)
+        allocateGlobalBinder, updNameCache,
+        mkNameCacheUpdater, NameCacheUpdater(..),
    ) where
 
 #include "HsVersions.h"
 
 import TcRnMonad
-import TysWiredIn
 import HscTypes
 import Type
 import Var
@@ -34,10 +32,9 @@ import Module
 import FastString
 import FastStringEnv
 import IfaceType
-import PrelNames ( gHC_TYPES, gHC_PRIM, gHC_TUPLE )
+import NameCache
 import UniqSupply
 import SrcLoc
-import Util
 
 import Outputable
 import Data.List     ( partition )
@@ -49,20 +46,7 @@ import Data.List     ( partition )
 *                                                      *
 *********************************************************
 
-Note [The Name Cache]
-~~~~~~~~~~~~~~~~~~~~~
-The Name Cache makes sure that, during any invocation of GHC, each
-External Name "M.x" has one, and only one globally-agreed Unique.
-
-* The first time we come across M.x we make up a Unique and record that
-  association in the Name Cache.
-
-* When we come across "M.x" again, we look it up in the Name Cache,
-  and get a hit.
-
-The functions newGlobalBinder, allocateGlobalBinder do the main work.
-When you make an External name, you should probably be calling one
-of them.
+See Also: Note [The Name Cache] in NameCache
 -}
 
 newGlobalBinder :: Module -> OccName -> SrcSpan -> TcRnIf a b Name
@@ -136,6 +120,28 @@ allocateGlobalBinder name_supply mod occ loc
 ifaceExportNames :: [IfaceExport] -> TcRnIf gbl lcl [AvailInfo]
 ifaceExportNames exports = return exports
 
+-- | A function that atomically updates the name cache given a modifier
+-- function.  The second result of the modifier function will be the result
+-- of the IO action.
+newtype NameCacheUpdater
+      = NCU { updateNameCache :: forall c. (NameCache -> (NameCache, c)) -> IO c }
+
+mkNameCacheUpdater :: TcRnIf a b NameCacheUpdater
+mkNameCacheUpdater = do { hsc_env <- getTopEnv
+                        ; return (NCU (updNameCacheIO hsc_env)) }
+
+updNameCache :: (NameCache -> (NameCache, c)) -> TcRnIf a b c
+updNameCache upd_fn = do { hsc_env <- getTopEnv
+                         ; liftIO $ updNameCacheIO hsc_env upd_fn }
+
+{-
+************************************************************************
+*                                                                      *
+                Name cache access
+*                                                                      *
+************************************************************************
+-}
+
 -- | Look up the 'Name' for a given 'Module' and 'OccName'.
 -- Consider alternately using 'lookupIfaceTop' if you're in the 'IfL' monad
 -- and 'Module' is simply that of the 'ModIface' you are typechecking.
@@ -148,7 +154,7 @@ lookupOrig mod occ
                 --      which does some stuff that modifies the name cache
                 -- This did happen, with tycon_mod in TcIface.tcIfaceAlt (DataAlt..)
           mod `seq` occ `seq` return ()
---      ; traceIf (text "lookup_orig" <+> ppr mod <+> ppr occ)
+        ; traceIf (text "lookup_orig" <+> ppr mod <+> ppr occ)
 
         ; updNameCache $ \name_cache ->
           case lookupOrigNameCache (nsNames name_cache) mod occ of {
@@ -180,92 +186,6 @@ setNameModule :: Maybe Module -> Name -> TcRnIf m n Name
 setNameModule Nothing n = return n
 setNameModule (Just m) n =
     newGlobalBinder m (nameOccName n) (nameSrcSpan n)
-
-{-
-************************************************************************
-*                                                                      *
-                Name cache access
-*                                                                      *
-************************************************************************
-
-See Note [The Name Cache] above.
-
-Note [Built-in syntax and the OrigNameCache]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Built-in syntax like tuples and unboxed sums are quite ubiquitous. To lower
-their cost we use two tricks,
-
-  b. We specially encode tuple Names in interface files' symbols tables to avoid
-     having to look up their names at all while loading interface files. See
-     Note [Symbol table representation of names] in BinIface for details.
-
-  a. We don't include them in the Orig name cache but instead parse their
-     OccNames (in isBuiltInOcc_maybe) to avoid bloating the name cache with
-     them.
-
-Why is the second measure necessary? Good question; afterall, 1) the parser
-emits built-in syntax directly as Exact RdrNames, and 2) built-in syntax never
-needs to looked-up during interface loading due to (a). It turns out that there
-are two reasons why we might look up an Orig RdrName for built-in syntax,
-
-  * If you use setRdrNameSpace on an Exact RdrName it may be
-    turned into an Orig RdrName.
-
-  * Template Haskell turns a BuiltInSyntax Name into a TH.NameG
-    (DsMeta.globalVar), and parses a NameG into an Orig RdrName
-    (Convert.thRdrName).  So, e.g. $(do { reify '(,); ... }) will
-    go this route (Trac #8954).
-
--}
-
-lookupOrigNameCache :: OrigNameCache -> Module -> OccName -> Maybe Name
-lookupOrigNameCache nc mod occ
-  | mod == gHC_TYPES || mod == gHC_PRIM || mod == gHC_TUPLE
-  , Just name <- isBuiltInOcc_maybe occ
-  =     -- See Note [Known-key names], 3(c) in PrelNames
-        -- Special case for tuples; there are too many
-        -- of them to pre-populate the original-name cache
-    Just name
-
-  | otherwise
-  = case lookupModuleEnv nc mod of
-        Nothing      -> Nothing
-        Just occ_env -> lookupOccEnv occ_env occ
-
-extendOrigNameCache :: OrigNameCache -> Name -> OrigNameCache
-extendOrigNameCache nc name
-  = ASSERT2( isExternalName name, ppr name )
-    extendNameCache nc (nameModule name) (nameOccName name) name
-
-extendNameCache :: OrigNameCache -> Module -> OccName -> Name -> OrigNameCache
-extendNameCache nc mod occ name
-  = extendModuleEnvWith combine nc mod (unitOccEnv occ name)
-  where
-    combine _ occ_env = extendOccEnv occ_env occ name
-
-updNameCache :: (NameCache -> (NameCache, c)) -> TcRnIf a b c
-updNameCache upd_fn = do { hsc_env <- getTopEnv
-                         ; liftIO $ updNameCacheIO hsc_env upd_fn }
-
--- | A function that atomically updates the name cache given a modifier
--- function.  The second result of the modifier function will be the result
--- of the IO action.
-newtype NameCacheUpdater
-      = NCU { updateNameCache :: forall c. (NameCache -> (NameCache, c)) -> IO c }
-
--- | Return a function to atomically update the name cache.
-mkNameCacheUpdater :: TcRnIf a b NameCacheUpdater
-mkNameCacheUpdater = do { hsc_env <- getTopEnv
-                        ; return (NCU (updNameCacheIO hsc_env)) }
-
-initNameCache :: UniqSupply -> [Name] -> NameCache
-initNameCache us names
-  = NameCache { nsUniqs = us,
-                nsNames = initOrigNames names }
-
-initOrigNames :: [Name] -> OrigNameCache
-initOrigNames names = foldl extendOrigNameCache emptyModuleEnv names
 
 {-
 ************************************************************************
@@ -335,27 +255,10 @@ extendIfaceEnvs tcvs thing_inside
 ************************************************************************
 -}
 
+-- | Look up a top-level name from the current Iface module
 lookupIfaceTop :: OccName -> IfL Name
--- Look up a top-level name from the current Iface module
-lookupIfaceTop occ = do
-    lcl_env <- getLclEnv
-    -- NB: this is a semantic module, see
-    -- Note [Identity versus semantic module]
-    mod <- getIfModule
-    case if_nsubst lcl_env of
-        -- NOT substNameShape because 'getIfModule' returns the
-        -- renamed module (d'oh!)
-        Just nsubst ->
-            case lookupOccEnv (ns_map nsubst) occ of
-              Just n' ->
-                -- I thought this would be help but it turns out
-                -- n' doesn't have any useful information. Drat!
-                -- return (setNameLoc n' (nameSrcSpan n))
-                return n'
-              -- This case can occur when we encounter a DFun;
-              -- see Note [Bogus DFun renamings]
-              Nothing -> lookupOrig mod occ
-        _ -> lookupOrig mod occ
+lookupIfaceTop occ
+  = do  { env <- getLclEnv; lookupOrig (if_mod env) occ }
 
 newIfaceName :: OccName -> IfL Name
 newIfaceName occ

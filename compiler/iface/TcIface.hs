@@ -263,7 +263,7 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
     -- NB: Don't include dfuns here, because we don't want to
     -- serialize them out.  See Note [Bogus DFun renamings]
     let mk_decl_env decls
-            = mkOccEnv [ (ifName decl, decl)
+            = mkOccEnv [ (getOccName decl, decl)
                        | decl <- decls
                        , case decl of
                             IfaceId { ifIdDetails = IfDFunId } -> False -- exclude DFuns
@@ -420,10 +420,10 @@ mkSelfBootInfo iface mds
   = do -- NB: This is computed DIRECTLY from the ModIface rather
        -- than from the ModDetails, so that we can query 'sb_tcs'
        -- WITHOUT forcing the contents of the interface.
-       tcs <- mapM (lookupOrig (mi_module iface) . ifName)
-            . filter isIfaceTyCon
-            . map snd
-            $ mi_decls iface
+       let tcs = map ifName
+                 . filter isIfaceTyCon
+                 . map snd
+                 $ mi_decls iface
        return $ SelfBoot { sb_mds = mds
                          , sb_tcs = mkNameSet tcs }
   where
@@ -498,15 +498,14 @@ tc_iface_decl :: Maybe Class  -- ^ For associated type/data family declarations
               -> Bool         -- ^ True <=> discard IdInfo on IfaceId bindings
               -> IfaceDecl
               -> IfL TyThing
-tc_iface_decl _ ignore_prags (IfaceId {ifName = occ_name, ifType = iface_type,
+tc_iface_decl _ ignore_prags (IfaceId {ifName = name, ifType = iface_type,
                                        ifIdDetails = details, ifIdInfo = info})
-  = do  { name <- lookupIfaceTop occ_name
-        ; ty <- tcIfaceType iface_type
+  = do  { ty <- tcIfaceType iface_type
         ; details <- tcIdDetails ty details
         ; info <- tcIdInfo ignore_prags name ty info
         ; return (AnId (mkGlobalId details name ty info)) }
 
-tc_iface_decl _ _ (IfaceData {ifName = occ_name,
+tc_iface_decl _ _ (IfaceData {ifName = tc_name,
                           ifCType = cType,
                           ifBinders = binders,
                           ifResKind = res_kind,
@@ -515,8 +514,7 @@ tc_iface_decl _ _ (IfaceData {ifName = occ_name,
                           ifCons = rdr_cons,
                           ifParent = mb_parent })
   = bindIfaceTyConBinders_AT binders $ \ binders' -> do
-    { tc_name <- lookupIfaceTop occ_name
-    ; res_kind' <- tcIfaceType res_kind
+    { res_kind' <- tcIfaceType res_kind
 
     ; tycon <- fixM $ \ tycon -> do
             { stupid_theta <- tcIfaceCtxt ctxt
@@ -539,14 +537,13 @@ tc_iface_decl _ _ (IfaceData {ifName = occ_name,
            ; lhs_tys <- tcIfaceTcArgs arg_tys
            ; return (DataFamInstTyCon ax_unbr fam_tc lhs_tys) }
 
-tc_iface_decl _ _ (IfaceSynonym {ifName = occ_name,
+tc_iface_decl _ _ (IfaceSynonym {ifName = tc_name,
                                       ifRoles = roles,
                                       ifSynRhs = rhs_ty,
                                       ifBinders = binders,
                                       ifResKind = res_kind })
    = bindIfaceTyConBinders_AT binders $ \ binders' -> do
-     { tc_name  <- lookupIfaceTop occ_name
-     ; res_kind' <- tcIfaceType res_kind     -- Note [Synonym kind loop]
+     { res_kind' <- tcIfaceType res_kind     -- Note [Synonym kind loop]
      ; rhs      <- forkM (mk_doc tc_name) $
                    tcIfaceType rhs_ty
      ; let tycon = mkSynonymTyCon tc_name binders' res_kind' roles rhs
@@ -554,14 +551,13 @@ tc_iface_decl _ _ (IfaceSynonym {ifName = occ_name,
    where
      mk_doc n = text "Type synonym" <+> ppr n
 
-tc_iface_decl parent _ (IfaceFamily {ifName = occ_name,
+tc_iface_decl parent _ (IfaceFamily {ifName = tc_name,
                                      ifFamFlav = fam_flav,
                                      ifBinders = binders,
                                      ifResKind = res_kind,
                                      ifResVar = res, ifFamInj = inj })
    = bindIfaceTyConBinders_AT binders $ \ binders' -> do
-     { tc_name   <- lookupIfaceTop occ_name
-     ; res_kind' <- tcIfaceType res_kind    -- Note [Synonym kind loop]
+     { res_kind' <- tcIfaceType res_kind    -- Note [Synonym kind loop]
      ; rhs      <- forkM (mk_doc tc_name) $
                    tc_fam_flav tc_name fam_flav
      ; res_name <- traverse (newIfaceName . mkTyVarOccFS) res
@@ -585,7 +581,7 @@ tc_iface_decl parent _ (IfaceFamily {ifName = occ_name,
                     (text "IfaceBuiltInSynFamTyCon in interface file")
 
 tc_iface_decl _parent ignore_prags
-            (IfaceClass {ifCtxt = rdr_ctxt, ifName = tc_occ,
+            (IfaceClass {ifCtxt = rdr_ctxt, ifName = tc_name,
                          ifRoles = roles,
                          ifBinders = binders,
                          ifFDs = rdr_fds,
@@ -594,17 +590,16 @@ tc_iface_decl _parent ignore_prags
 -- ToDo: in hs-boot files we should really treat abstract classes specially,
 --       as we do abstract tycons
   = bindIfaceTyConBinders binders $ \ binders' -> do
-    { tc_name <- lookupIfaceTop tc_occ
-    ; traceIf (text "tc-iface-class1" <+> ppr tc_occ)
+    { traceIf (text "tc-iface-class1" <+> ppr tc_name)
     ; ctxt <- mapM tc_sc rdr_ctxt
-    ; traceIf (text "tc-iface-class2" <+> ppr tc_occ)
+    ; traceIf (text "tc-iface-class2" <+> ppr tc_name)
     ; sigs <- mapM tc_sig rdr_sigs
     ; fds  <- mapM tc_fd rdr_fds
-    ; traceIf (text "tc-iface-class3" <+> ppr tc_occ)
+    ; traceIf (text "tc-iface-class3" <+> ppr tc_name)
     ; mindef <- traverse (lookupIfaceTop . mkVarOccFS) mindef_occ
     ; cls  <- fixM $ \ cls -> do
               { ats  <- mapM (tc_at cls) rdr_ats
-              ; traceIf (text "tc-iface-class4" <+> ppr tc_occ)
+              ; traceIf (text "tc-iface-class4" <+> ppr tc_name)
               ; buildClass tc_name binders' roles ctxt fds ats sigs mindef }
     ; return (ATyCon (classTyCon cls)) }
   where
@@ -618,9 +613,8 @@ tc_iface_decl _parent ignore_prags
         -- so we must not pull on T too eagerly.  See Trac #5970
 
    tc_sig :: IfaceClassOp -> IfL TcMethInfo
-   tc_sig (IfaceClassOp occ rdr_ty dm)
-     = do { op_name <- lookupIfaceTop occ
-          ; let doc = mk_op_doc op_name rdr_ty
+   tc_sig (IfaceClassOp op_name rdr_ty dm)
+     = do { let doc = mk_op_doc op_name rdr_ty
           ; op_ty <- forkM (doc <+> text "ty") $ tcIfaceType rdr_ty
                 -- Must be done lazily for just the same reason as the
                 -- type of a data con; to avoid sucking in types that
@@ -659,10 +653,9 @@ tc_iface_decl _parent ignore_prags
                            ; tvs2' <- mapM tcIfaceTyVar tvs2
                            ; return (tvs1', tvs2') }
 
-tc_iface_decl _ _ (IfaceAxiom { ifName = ax_occ, ifTyCon = tc
+tc_iface_decl _ _ (IfaceAxiom { ifName = tc_name, ifTyCon = tc
                               , ifAxBranches = branches, ifRole = role })
-  = do { tc_name     <- lookupIfaceTop ax_occ
-       ; tc_tycon    <- tcIfaceTyCon tc
+  = do { tc_tycon    <- tcIfaceTyCon tc
        ; tc_branches <- tc_ax_branches branches
        ; let axiom = CoAxiom { co_ax_unique   = nameUnique tc_name
                              , co_ax_name     = tc_name
@@ -672,7 +665,7 @@ tc_iface_decl _ _ (IfaceAxiom { ifName = ax_occ, ifTyCon = tc
                              , co_ax_implicit = False }
        ; return (ACoAxiom axiom) }
 
-tc_iface_decl _ _ (IfacePatSyn{ ifName = occ_name
+tc_iface_decl _ _ (IfacePatSyn{ ifName = name
                               , ifPatMatcher = if_matcher
                               , ifPatBuilder = if_builder
                               , ifPatIsInfix = is_infix
@@ -683,8 +676,7 @@ tc_iface_decl _ _ (IfacePatSyn{ ifName = occ_name
                               , ifPatArgs = args
                               , ifPatTy = pat_ty
                               , ifFieldLabels = field_labels })
-  = do { name <- lookupIfaceTop occ_name
-       ; traceIf (text "tc_iface_decl" <+> ppr name)
+  = do { traceIf (text "tc_iface_decl" <+> ppr name)
        ; matcher <- tc_pr if_matcher
        ; builder <- fmapMaybeM tc_pr if_builder
        ; bindIfaceForAllBndrs univ_bndrs $ \univ_tvs -> do
@@ -744,15 +736,15 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
 
     tc_con_decl field_lbls (IfCon { ifConInfix = is_infix,
                          ifConExTvs = ex_bndrs,
-                         ifConOcc = occ, ifConCtxt = ctxt, ifConEqSpec = spec,
+                         ifConName = dc_name,
+                         ifConCtxt = ctxt, ifConEqSpec = spec,
                          ifConArgTys = args, ifConFields = my_lbls,
                          ifConStricts = if_stricts,
                          ifConSrcStricts = if_src_stricts})
      = -- Universally-quantified tyvars are shared with
        -- parent TyCon, and are alrady in scope
        bindIfaceForAllBndrs ex_bndrs    $ \ ex_tv_bndrs -> do
-        { traceIf (text "Start interface-file tc_con_decl" <+> ppr occ)
-        ; dc_name  <- lookupIfaceTop occ
+        { traceIf (text "Start interface-file tc_con_decl" <+> ppr dc_name)
 
         -- Read the context and argument types, but lazily for two reasons
         -- (a) to avoid looking tugging on a recursive use of
@@ -771,9 +763,9 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
         -- Look up the field labels for this constructor; note that
         -- they should be in the same order as my_lbls!
         ; let lbl_names = map find_lbl my_lbls
-              find_lbl x = case find (\ fl -> nameOccName (flSelector fl) == x) field_lbls of
+              find_lbl x = case find (\ fl -> flSelector fl == x) field_lbls of
                              Just fl -> fl
-                             Nothing -> error $ "find_lbl missing " ++ occNameString x
+                             Nothing -> error $ "find_lbl missing " ++ occNameString (occName x)
 
         -- Remember, tycon is the representation tycon
         ; let orig_res_ty = mkFamilyTyConApp tycon

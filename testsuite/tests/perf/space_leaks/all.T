@@ -64,13 +64,14 @@ test('T4029',
             # 2016-07-13: 92 (amd64/Linux)           Changes to tidyType
             # 2016-09-01: 71 (amd64/Linux)           Restore w/w limit (#11565)
       stats_num_field('max_bytes_used',
-          [(wordsize(64), 21648488, 5)]),
+          [(wordsize(64), 20325248, 5)]),
             # 2016-02-26: 24071720 (amd64/Linux)     INITIAL
             # 2016-04-21: 25542832 (amd64/Linux)
             # 2016-05-23: 25247216 (amd64/Linux)     Use -G1
             # 2016-07-13: 27575416 (amd64/Linux)     Changes to tidyType
             # 2016-07-20: 22920616 (amd64/Linux)     Fix laziness of instance matching
             # 2016-09-01: 21648488 (amd64/Linux)     Restore w/w limit (#11565)
+            # 2016-10-13: 20325248 (amd64/Linux)     Creep (downwards, yay!)
       extra_hc_opts('+RTS -G1 -RTS' ),
       ],
      ghci_script,

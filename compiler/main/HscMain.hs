@@ -98,7 +98,6 @@ import ConLike
 import Control.Concurrent
 #endif
 
-import THNames          ( templateHaskellNames )
 import Module
 import Packages
 import RdrName
@@ -111,7 +110,7 @@ import SrcLoc
 import TcRnDriver
 import TcIface          ( typecheckIface )
 import TcRnMonad
-import IfaceEnv         ( initNameCache )
+import NameCache        ( initNameCache )
 import LoadIface        ( ifaceStats, initExternalPackageState )
 import PrelInfo
 import MkIface
@@ -144,7 +143,6 @@ import DynFlags
 import ErrUtils
 
 import Outputable
-import UniqFM
 import NameEnv
 import HscStats         ( ppSourceStats )
 import HscTypes
@@ -178,7 +176,7 @@ newHscEnv :: DynFlags -> IO HscEnv
 newHscEnv dflags = do
     eps_var <- newIORef initExternalPackageState
     us      <- mkSplitUniqSupply 'r'
-    nc_var  <- newIORef (initNameCache us allKnownKeyNames)
+    nc_var  <- newIORef (initNameCache us knownKeyNames)
     fc_var  <- newIORef emptyInstalledModuleEnv
 #ifdef GHCI
     iserv_mvar <- newMVar Nothing
@@ -196,39 +194,6 @@ newHscEnv dflags = do
                   , hsc_iserv        = iserv_mvar
 #endif
                   }
-
-
-allKnownKeyNames :: [Name]      -- Put here to avoid loops involving DsMeta,
-allKnownKeyNames                -- where templateHaskellNames are defined
-  | debugIsOn
-  , not (isNullUFM badNamesEnv)
-  = panic ("badAllKnownKeyNames:\n" ++ badNamesStr)
-       -- NB: We can't use ppr here, because this is sometimes evaluated in a
-       -- context where there are no DynFlags available, leading to a cryptic
-       -- "<<details unavailable>>" error. (This seems to happen only in the
-       -- stage 2 compiler, for reasons I [Richard] have no clue of.)
-
-  | otherwise
-  = all_names
-  where
-    all_names = knownKeyNames
-                ++ templateHaskellNames
-
-    namesEnv      = foldl (\m n -> extendNameEnv_Acc (:) singleton m n n)
-                          emptyUFM all_names
-    badNamesEnv   = filterNameEnv (\ns -> length ns > 1) namesEnv
-    badNamesPairs = nonDetUFMToList badNamesEnv
-      -- It's OK to use nonDetUFMToList here because the ordering only affects
-      -- the message when we get a panic
-    badNamesStrs  = map pairToStr badNamesPairs
-    badNamesStr   = unlines badNamesStrs
-
-    pairToStr (uniq, ns) = "        " ++
-                           show uniq ++
-                           ": [" ++
-                           intercalate ", " (map (occNameString . nameOccName) ns) ++
-                           "]"
-
 
 -- -----------------------------------------------------------------------------
 

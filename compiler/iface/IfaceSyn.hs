@@ -20,6 +20,10 @@ module IfaceSyn (
         IfaceAxBranch(..),
         IfaceTyConParent(..),
 
+        -- * Binding names
+        IfaceTopBndr,
+        putIfaceTopBndr, getIfaceTopBndr,
+
         -- Misc
         ifaceDeclImplicitBndrs, visibleIfConDecls,
         ifaceConDeclFields,
@@ -37,6 +41,7 @@ module IfaceSyn (
 #include "HsVersions.h"
 
 import IfaceType
+import BinFingerprint
 import CoreSyn( IsOrphan )
 import PprCore()            -- Printing DFunArgs
 import Demand
@@ -78,14 +83,28 @@ infixl 3 &&&
 ************************************************************************
 -}
 
-type IfaceTopBndr = OccName
-  -- It's convenient to have an OccName in the IfaceSyn, although in each
+-- | A binding top-level 'Name' in an interface file (e.g. the name of an
+-- 'IfaceDecl').
+type IfaceTopBndr = Name
+  -- It's convenient to have an Name in the IfaceSyn, although in each
   -- case the namespace is implied by the context. However, having an
-  -- OccNames makes things like ifaceDeclImplicitBndrs and ifaceDeclFingerprints
-  -- very convenient.
+  -- Name makes things like ifaceDeclImplicitBndrs and ifaceDeclFingerprints
+  -- very convenient. Moreover, having the key of the binder means that
+  -- we can encode known-key things cleverly in the symbol table. See Note
+  -- [Symbol table representation of Names]
   --
   -- We don't serialise the namespace onto the disk though; rather we
   -- drop it when serialising and add it back in when deserialising.
+
+getIfaceTopBndr :: BinHandle -> IO IfaceTopBndr
+getIfaceTopBndr bh = get bh
+
+putIfaceTopBndr :: BinHandle -> IfaceTopBndr -> IO ()
+putIfaceTopBndr bh name =
+    case getUserData bh of
+      UserData{ ud_put_binding_name = put_binding_name } ->
+          --pprTrace "putIfaceTopBndr" (ppr name) $
+          put_binding_name bh name
 
 data IfaceDecl
   = IfaceId { ifName      :: IfaceTopBndr,
@@ -202,7 +221,7 @@ data IfaceConDecls
 
 data IfaceConDecl
   = IfCon {
-        ifConOcc     :: IfaceTopBndr,                -- Constructor name
+        ifConName    :: IfaceTopBndr,                -- Constructor name
         ifConWrapper :: Bool,                   -- True <=> has a wrapper
         ifConInfix   :: Bool,                   -- True <=> declared infix
 
@@ -350,7 +369,8 @@ ifaceConDeclFields x = case x of
     IfDataTyCon cons is_over labels -> map (help cons  is_over) labels
     IfNewTyCon  con  is_over labels -> map (help [con] is_over) labels
   where
-    help (dc:_) is_over lbl = mkFieldLabelOccs lbl (ifConOcc dc) is_over
+    help (dc:_) is_over lbl =
+        mkFieldLabelOccs lbl (occName $ ifConName dc) is_over
     help [] _ _ = error "ifaceConDeclFields: data type has no constructors!"
 
 ifaceDeclImplicitBndrs :: IfaceDecl -> [OccName]
@@ -365,14 +385,16 @@ ifaceDeclImplicitBndrs :: IfaceDecl -> [OccName]
 -- This invariant is used in LoadIface.loadDecl (see note [Tricky iface loop])
 -- The order of the list does not matter.
 
-ifaceDeclImplicitBndrs (IfaceData {ifName = tc_occ, ifCons = cons })
+ifaceDeclImplicitBndrs (IfaceData {ifName = tc_name, ifCons = cons })
   = case cons of
       IfAbstractTyCon {}  -> []
-      IfNewTyCon  cd  _ _ -> mkNewTyCoOcc tc_occ : ifaceConDeclImplicitBndrs cd
+      IfNewTyCon  cd  _ _ -> mkNewTyCoOcc (occName tc_name) : ifaceConDeclImplicitBndrs cd
       IfDataTyCon cds _ _ -> concatMap ifaceConDeclImplicitBndrs cds
 
-ifaceDeclImplicitBndrs (IfaceClass { ifCtxt = sc_ctxt, ifName = cls_tc_occ
-                                   , ifSigs = sigs, ifATs = ats })
+ifaceDeclImplicitBndrs (IfaceClass { ifCtxt = sc_ctxt
+                                   , ifName = cls_tc_name
+                                   , ifSigs = sigs
+                                   , ifATs = ats })
   = --   (possibly) newtype coercion
     co_occs ++
     --    data constructor (DataCon namespace)
@@ -380,12 +402,13 @@ ifaceDeclImplicitBndrs (IfaceClass { ifCtxt = sc_ctxt, ifName = cls_tc_occ
     --    no wrapper (class dictionaries never have a wrapper)
     [dc_occ, dcww_occ] ++
     -- associated types
-    [ifName at | IfaceAT at _ <- ats ] ++
+    [occName (ifName at) | IfaceAT at _ <- ats ] ++
     -- superclass selectors
     [mkSuperDictSelOcc n cls_tc_occ | n <- [1..n_ctxt]] ++
     -- operation selectors
-    [op | IfaceClassOp op  _ _ <- sigs]
+    [occName op | IfaceClassOp op  _ _ <- sigs]
   where
+    cls_tc_occ = occName cls_tc_name
     n_ctxt = length sc_ctxt
     n_sigs = length sigs
     co_occs | is_newtype = [mkNewTyCoOcc cls_tc_occ]
@@ -397,9 +420,10 @@ ifaceDeclImplicitBndrs (IfaceClass { ifCtxt = sc_ctxt, ifName = cls_tc_occ
 ifaceDeclImplicitBndrs _ = []
 
 ifaceConDeclImplicitBndrs :: IfaceConDecl -> [OccName]
-ifaceConDeclImplicitBndrs (IfCon { ifConWrapper = has_wrapper, ifConOcc = con_occ })
-  = [con_occ, work_occ] ++ wrap_occs
+ifaceConDeclImplicitBndrs (IfCon { ifConWrapper = has_wrapper, ifConName = con_name })
+  = [occName con_name, work_occ] ++ wrap_occs
   where
+    con_occ = occName con_name
     work_occ  = mkDataConWorkerOcc con_occ                   -- Id namespace
     wrap_occs | has_wrapper = [mkDataConWrapperOcc con_occ]  -- Id namespace
               | otherwise   = []
@@ -413,7 +437,7 @@ ifaceConDeclImplicitBndrs (IfCon { ifConWrapper = has_wrapper, ifConOcc = con_oc
        -- declaration with the name of the binder. (#5614, #7215)
 ifaceDeclFingerprints :: Fingerprint -> IfaceDecl -> [(OccName,Fingerprint)]
 ifaceDeclFingerprints hash decl
-  = (ifName decl, hash) :
+  = (getOccName decl, hash) :
     [ (occ, computeFingerprint' (hash,occ))
     | occ <- ifaceDeclImplicitBndrs decl ]
   where
@@ -527,14 +551,23 @@ pprAxBranch pp_tc (IfaceAxBranch { ifaxbTyVars = tvs
 instance Outputable IfaceAnnotation where
   ppr (IfaceAnnotation target value) = ppr target <+> colon <+> ppr value
 
+instance NamedThing IfaceClassOp where
+  getName (IfaceClassOp n _ _) = n
+
 instance HasOccName IfaceClassOp where
-  occName (IfaceClassOp n _ _) = n
+  occName = getOccName
+
+instance NamedThing IfaceConDecl where
+  getName = ifConName
 
 instance HasOccName IfaceConDecl where
-  occName = ifConOcc
+  occName = getOccName
+
+instance NamedThing IfaceDecl where
+  getName = ifName
 
 instance HasOccName IfaceDecl where
-  occName = ifName
+  occName = getOccName
 
 instance Outputable IfaceDecl where
   ppr = pprIfaceDecl showAll
@@ -548,6 +581,7 @@ filtering of method signatures. Instead we just check if anything at all is
 filtered and hide it in that case.
 -}
 
+-- TODO: Kill this and Note [Printing IfaceDecl binders]
 data ShowSub
   = ShowSub
       { ss_ppr_bndr :: OccName -> SDoc  -- Pretty-printer for binders in IfaceDecl
@@ -647,7 +681,7 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     pp_roles
       | is_data_instance = empty
       | otherwise        = pprRoles (== Representational)
-                                    (pprPrefixIfDeclBndr ss tycon)
+                                    (pprPrefixIfDeclBndr ss (occName tycon))
                                     binders roles
             -- Don't display roles for data family instances (yet)
             -- See discussion on Trac #8672.
@@ -675,7 +709,7 @@ pprIfaceDecl ss (IfaceClass { ifATs = ats, ifSigs = sigs
                             , ifRoles = roles
                             , ifFDs    = fds, ifMinDef = minDef
                             , ifBinders = binders })
-  = vcat [ pprRoles (== Nominal) (pprPrefixIfDeclBndr ss clas) binders roles
+  = vcat [ pprRoles (== Nominal) (pprPrefixIfDeclBndr ss (occName clas)) binders roles
          , text "class" <+> pprIfaceDeclHead context ss clas binders Nothing
                                 <+> pprFundeps fds <+> pp_where
          , nest 2 (vcat [ vcat asocs, vcat dsigs
@@ -749,7 +783,7 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon
 
     pp_branches (IfaceClosedSynFamilyTyCon (Just (ax, brs)))
       = hang (text "where")
-           2 (vcat (map (pprAxBranch (pprPrefixIfDeclBndr ss tycon)) brs)
+           2 (vcat (map (pprAxBranch (pprPrefixIfDeclBndr ss (occName tycon))) brs)
               $$ ppShowIface ss (text "axiom" <+> ppr ax))
     pp_branches _ = Outputable.empty
 
@@ -775,7 +809,7 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name,
 
 pprIfaceDecl ss (IfaceId { ifName = var, ifType = ty,
                               ifIdDetails = details, ifIdInfo = info })
-  = vcat [ hang (pprPrefixIfDeclBndr ss var <+> dcolon)
+  = vcat [ hang (pprPrefixIfDeclBndr ss (occName var) <+> dcolon)
               2 (pprIfaceSigmaType ty)
          , ppShowIface ss (ppr details)
          , ppShowIface ss (ppr info) ]
@@ -801,10 +835,10 @@ pprRoles suppress_if tyCon bndrs roles
          text "type role" <+> tyCon <+> hsep (map ppr froles)
 
 pprInfixIfDeclBndr, pprPrefixIfDeclBndr :: ShowSub -> OccName -> SDoc
-pprInfixIfDeclBndr (ShowSub { ss_ppr_bndr = ppr_bndr }) occ
-  = pprInfixVar (isSymOcc occ) (ppr_bndr occ)
-pprPrefixIfDeclBndr (ShowSub { ss_ppr_bndr = ppr_bndr }) occ
-  = parenSymOcc occ (ppr_bndr occ)
+pprInfixIfDeclBndr (ShowSub { ss_ppr_bndr = ppr_bndr }) name
+  = pprInfixVar (isSymOcc name) (ppr_bndr name)
+pprPrefixIfDeclBndr (ShowSub { ss_ppr_bndr = ppr_bndr }) name
+  = parenSymOcc name (ppr_bndr name)
 
 instance Outputable IfaceClassOp where
    ppr = pprIfaceClassOp showAll
@@ -817,7 +851,7 @@ pprIfaceClassOp ss (IfaceClassOp n ty dm)
               =  text "default" <+> pp_sig n dm_ty
               | otherwise
               = empty
-   pp_sig n ty = pprPrefixIfDeclBndr ss n <+> dcolon <+> pprIfaceSigmaType ty
+   pp_sig n ty = pprPrefixIfDeclBndr ss (occName n) <+> dcolon <+> pprIfaceSigmaType ty
 
 instance Outputable IfaceAT where
    ppr = pprIfaceAT showAll
@@ -841,14 +875,14 @@ pprIfaceTyConParent (IfDataInstance _ tc tys)
     let ftys = stripInvisArgs dflags tys
     in pprIfaceTypeApp tc ftys
 
-pprIfaceDeclHead :: IfaceContext -> ShowSub -> OccName
+pprIfaceDeclHead :: IfaceContext -> ShowSub -> Name
                  -> [IfaceTyConBinder]   -- of the tycon, for invisible-suppression
                  -> Maybe IfaceKind
                  -> SDoc
 pprIfaceDeclHead context ss tc_occ bndrs m_res_kind
   = sdocWithDynFlags $ \ dflags ->
     sep [ pprIfaceContextArr context
-        , pprPrefixIfDeclBndr ss tc_occ
+        , pprPrefixIfDeclBndr ss (occName tc_occ)
           <+> pprIfaceTyConBinders (suppressIfaceInvisibles dflags bndrs bndrs)
         , maybe empty (\res_kind -> dcolon <+> pprIfaceType res_kind) m_res_kind ]
 
@@ -865,19 +899,19 @@ pprIfaceConDecl :: ShowSub -> Bool
                 -> IfaceTyConParent
                 -> IfaceConDecl -> SDoc
 pprIfaceConDecl ss gadt_style fls tycon tc_binders parent
-        (IfCon { ifConOcc = name, ifConInfix = is_infix,
+        (IfCon { ifConName = name, ifConInfix = is_infix,
                  ifConExTvs = ex_tvs,
                  ifConEqSpec = eq_spec, ifConCtxt = ctxt, ifConArgTys = arg_tys,
                  ifConStricts = stricts, ifConFields = fields })
   | gadt_style            = pp_prefix_con <+> dcolon <+> ppr_ty
   | not (null fields)     = pp_prefix_con <+> pp_field_args
   | is_infix
-  , [ty1, ty2] <- pp_args = sep [ty1, pprInfixIfDeclBndr ss name, ty2]
+  , [ty1, ty2] <- pp_args = sep [ty1, pprInfixIfDeclBndr ss (occName name), ty2]
   | otherwise             = pp_prefix_con <+> sep pp_args
   where
     tys_w_strs :: [(IfaceBang, IfaceType)]
     tys_w_strs = zip stricts arg_tys
-    pp_prefix_con = pprPrefixIfDeclBndr ss name
+    pp_prefix_con = pprPrefixIfDeclBndr ss (occName name)
 
     (univ_tvs, pp_res_ty) = mk_user_con_res_ty eq_spec
     ppr_ty = pprIfaceForAllPart (map tv_to_forall_bndr univ_tvs ++ ex_tvs)
@@ -906,16 +940,18 @@ pprIfaceConDecl ss gadt_style fls tycon tc_binders parent
 
     pp_field_args :: SDoc  -- Braces form:  { x :: !Maybe a, y :: Int }
     pp_field_args = braces $ sep $ punctuate comma $ ppr_trim $
-                    map maybe_show_label (zip fields tys_w_strs)
+                    zipWith maybe_show_label fields tys_w_strs
 
-    maybe_show_label (sel,bty)
+    maybe_show_label :: IfaceTopBndr -> (IfaceBang, IfaceType) -> Maybe SDoc
+    maybe_show_label sel bty
       | showSub ss sel = Just (pprPrefixIfDeclBndr ss lbl <+> dcolon <+> pprBangTy bty)
       | otherwise      = Nothing
       where
         -- IfaceConDecl contains the name of the selector function, so
         -- we have to look up the field label (in case
         -- DuplicateRecordFields was used for the definition)
-        lbl = maybe sel (mkVarOccFS . flLabel) $ find (\ fl -> flSelector fl == sel) fls
+        lbl = maybe (occName sel) (mkVarOccFS . flLabel)
+              $ find (\ fl -> flSelector fl == occName sel) fls
 
     mk_user_con_res_ty :: IfaceEqSpec -> ([IfaceTvBndr], SDoc)
     -- See Note [Result type of a data family GADT]
@@ -930,7 +966,7 @@ pprIfaceConDecl ss gadt_style fls tycon tc_binders parent
         con_univ_tvs = filterOut done_univ_tv (map ifTyConBinderTyVar tc_binders)
 
     ppr_tc_app gadt_subst dflags
-       = pprPrefixIfDeclBndr ss tycon
+       = pprPrefixIfDeclBndr ss (occName tycon)
          <+> sep [ pprParendIfaceType (substIfaceTyVar gadt_subst tv)
                  | (tv,_kind)
                      <- map ifTyConBinderTyVar $
@@ -1434,19 +1470,26 @@ to take account of the use of the data constructor PS in the pattern match.
                 Binary instances
 *                                                                      *
 ************************************************************************
+
+Note that there is a bit of subtlety here when we encode names. While
+IfaceTopBndrs is really just a synonym for Name, we need to take care to
+encode them with {get,put}IfaceTopBndr. The difference becomes important when
+we go to fingerprint an IfaceDecl. See Note [Fingerprinting IfaceDecls] for
+details.
+
 -}
 
 instance Binary IfaceDecl where
     put_ bh (IfaceId name ty details idinfo) = do
         putByte bh 0
-        put_ bh (occNameFS name)
+        putIfaceTopBndr bh name
         put_ bh ty
         put_ bh details
         put_ bh idinfo
 
     put_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7 a8 a9) = do
         putByte bh 2
-        put_ bh (occNameFS a1)
+        putIfaceTopBndr bh a1
         put_ bh a2
         put_ bh a3
         put_ bh a4
@@ -1458,7 +1501,7 @@ instance Binary IfaceDecl where
 
     put_ bh (IfaceSynonym a1 a2 a3 a4 a5) = do
         putByte bh 3
-        put_ bh (occNameFS a1)
+        putIfaceTopBndr bh a1
         put_ bh a2
         put_ bh a3
         put_ bh a4
@@ -1466,7 +1509,7 @@ instance Binary IfaceDecl where
 
     put_ bh (IfaceFamily a1 a2 a3 a4 a5 a6) = do
         putByte bh 4
-        put_ bh (occNameFS a1)
+        putIfaceTopBndr bh a1
         put_ bh a2
         put_ bh a3
         put_ bh a4
@@ -1476,7 +1519,7 @@ instance Binary IfaceDecl where
     put_ bh (IfaceClass a1 a2 a3 a4 a5 a6 a7 a8) = do
         putByte bh 5
         put_ bh a1
-        put_ bh (occNameFS a2)
+        putIfaceTopBndr bh a2
         put_ bh a3
         put_ bh a4
         put_ bh a5
@@ -1486,14 +1529,14 @@ instance Binary IfaceDecl where
 
     put_ bh (IfaceAxiom a1 a2 a3 a4) = do
         putByte bh 6
-        put_ bh (occNameFS a1)
+        putIfaceTopBndr bh a1
         put_ bh a2
         put_ bh a3
         put_ bh a4
 
-    put_ bh (IfacePatSyn name a2 a3 a4 a5 a6 a7 a8 a9 a10 a11) = do
+    put_ bh (IfacePatSyn a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11) = do
         putByte bh 7
-        put_ bh (occNameFS name)
+        putIfaceTopBndr bh a1
         put_ bh a2
         put_ bh a3
         put_ bh a4
@@ -1512,10 +1555,9 @@ instance Binary IfaceDecl where
                     ty      <- get bh
                     details <- get bh
                     idinfo  <- get bh
-                    occ <- return $! mkVarOccFS name
-                    return (IfaceId occ ty details idinfo)
+                    return (IfaceId name ty details idinfo)
             1 -> error "Binary.get(TyClDecl): ForeignType"
-            2 -> do a1  <- get bh
+            2 -> do a1  <- getIfaceTopBndr bh
                     a2  <- get bh
                     a3  <- get bh
                     a4  <- get bh
@@ -1524,40 +1566,35 @@ instance Binary IfaceDecl where
                     a7  <- get bh
                     a8  <- get bh
                     a9  <- get bh
-                    occ <- return $! mkTcOccFS a1
-                    return (IfaceData occ a2 a3 a4 a5 a6 a7 a8 a9)
-            3 -> do a1 <- get bh
+                    return (IfaceData a1 a2 a3 a4 a5 a6 a7 a8 a9)
+            3 -> do a1 <- getIfaceTopBndr bh
                     a2 <- get bh
                     a3 <- get bh
                     a4 <- get bh
                     a5 <- get bh
-                    occ <- return $! mkTcOccFS a1
-                    return (IfaceSynonym occ a2 a3 a4 a5)
-            4 -> do a1 <- get bh
+                    return (IfaceSynonym a1 a2 a3 a4 a5)
+            4 -> do a1 <- getIfaceTopBndr bh
                     a2 <- get bh
                     a3 <- get bh
                     a4 <- get bh
                     a5 <- get bh
                     a6 <- get bh
-                    occ <- return $! mkTcOccFS a1
-                    return (IfaceFamily occ a2 a3 a4 a5 a6)
+                    return (IfaceFamily a1 a2 a3 a4 a5 a6)
             5 -> do a1 <- get bh
-                    a2 <- get bh
+                    a2 <- getIfaceTopBndr bh
                     a3 <- get bh
                     a4 <- get bh
                     a5 <- get bh
                     a6 <- get bh
                     a7 <- get bh
                     a8 <- get bh
-                    occ <- return $! mkClsOccFS a2
-                    return (IfaceClass a1 occ a3 a4 a5 a6 a7 a8)
-            6 -> do a1 <- get bh
+                    return (IfaceClass a1 a2 a3 a4 a5 a6 a7 a8)
+            6 -> do a1 <- getIfaceTopBndr bh
                     a2 <- get bh
                     a3 <- get bh
                     a4 <- get bh
-                    occ <- return $! mkTcOccFS a1
-                    return (IfaceAxiom occ a2 a3 a4)
-            7 -> do a1 <- get bh
+                    return (IfaceAxiom a1 a2 a3 a4)
+            7 -> do a1 <- getIfaceTopBndr bh
                     a2 <- get bh
                     a3 <- get bh
                     a4 <- get bh
@@ -1568,8 +1605,7 @@ instance Binary IfaceDecl where
                     a9 <- get bh
                     a10 <- get bh
                     a11 <- get bh
-                    occ <- return $! mkDataOccFS a1
-                    return (IfacePatSyn occ a2 a3 a4 a5 a6 a7 a8 a9 a10 a11)
+                    return (IfacePatSyn a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11)
             _ -> panic (unwords ["Unknown IfaceDecl tag:", show h])
 
 instance Binary IfaceFamTyConFlav where
@@ -1592,15 +1628,14 @@ instance Binary IfaceFamTyConFlav where
 
 instance Binary IfaceClassOp where
     put_ bh (IfaceClassOp n ty def) = do
-        put_ bh (occNameFS n)
+        putIfaceTopBndr bh n
         put_ bh ty
         put_ bh def
     get bh = do
-        n   <- get bh
+        n   <- getIfaceTopBndr bh
         ty  <- get bh
         def <- get bh
-        occ <- return $! mkVarOccFS n
-        return (IfaceClassOp occ ty def)
+        return (IfaceClassOp n ty def)
 
 instance Binary IfaceAT where
     put_ bh (IfaceAT dec defs) = do
@@ -1642,25 +1677,27 @@ instance Binary IfaceConDecls where
 
 instance Binary IfaceConDecl where
     put_ bh (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9 a10) = do
-        put_ bh a1
+        putIfaceTopBndr bh a1
         put_ bh a2
         put_ bh a3
         put_ bh a4
         put_ bh a5
         put_ bh a6
         put_ bh a7
-        put_ bh a8
+        put_ bh (length a8)
+        mapM_ (putIfaceTopBndr bh) a8
         put_ bh a9
         put_ bh a10
     get bh = do
-        a1 <- get bh
+        a1 <- getIfaceTopBndr bh
         a2 <- get bh
         a3 <- get bh
         a4 <- get bh
         a5 <- get bh
         a6 <- get bh
         a7 <- get bh
-        a8 <- get bh
+        n_fields <- get bh
+        a8 <- replicateM n_fields (getIfaceTopBndr bh)
         a9 <- get bh
         a10 <- get bh
         return (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9 a10)

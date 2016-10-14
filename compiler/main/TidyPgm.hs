@@ -43,6 +43,7 @@ import BasicTypes
 import Name hiding (varName)
 import NameSet
 import NameEnv
+import NameCache
 import Avail
 import IfaceEnv
 import TcEnv

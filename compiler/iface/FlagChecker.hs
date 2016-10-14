@@ -13,6 +13,7 @@ import HscTypes
 import Module
 import Name
 import Fingerprint
+import BinFingerprint
 -- import Outputable
 
 import qualified Data.IntSet as IntSet
@@ -21,7 +22,8 @@ import System.FilePath (normalise)
 -- | Produce a fingerprint of a @DynFlags@ value. We only base
 -- the finger print on important fields in @DynFlags@ so that
 -- the recompilation checker can use this fingerprint.
-fingerprintDynFlags :: DynFlags -> Module -> (BinHandle -> Name -> IO ())
+fingerprintDynFlags :: DynFlags -> Module
+                    -> (BinHandle -> Name -> IO ())
                     -> IO Fingerprint
 
 fingerprintDynFlags dflags@DynFlags{..} this_mod nameio =
