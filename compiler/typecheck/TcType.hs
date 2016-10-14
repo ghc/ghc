@@ -1123,7 +1123,7 @@ isRuntimeUnkSkol x
 mkSigmaTy :: [TyVarBinder] -> [PredType] -> Type -> Type
 mkSigmaTy bndrs theta tau = mkForAllTys bndrs (mkPhiTy theta tau)
 
--- | Make a sigma ty wherea ll type variables are 'Inferred'. That is,
+-- | Make a sigma ty where all type variables are 'Inferred'. That is,
 -- they cannot be used with visible type application.
 mkInfSigmaTy :: [TyVar] -> [PredType] -> Type -> Type
 mkInfSigmaTy tyvars ty = mkSigmaTy (mkTyVarBinders Inferred tyvars) ty
