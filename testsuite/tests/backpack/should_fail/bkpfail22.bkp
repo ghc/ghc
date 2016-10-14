@@ -15,6 +15,7 @@ unit badimpl where
     module H2 where
         type S = ()
 unit check where
+    dependency q[H2=badimpl:H2]
     dependency p[H=q[H2=badimpl:H2]:N]
     -- signature H3 where
     module C where

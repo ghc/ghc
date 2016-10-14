@@ -1,13 +1,14 @@
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE IncoherentInstances #-}
+-- This doesn't work: GHC MUST pick the wrong one!
+-- {-# LANGUAGE IncoherentInstances #-}
 unit p where
     signature A where
         data K a
-        instance Show (K (a -> b))
+        instance Show a => Show (K a)
 unit q where
     signature A where
         data K a
-        instance Show a => Show (K a)
+        instance Read a => Show (K a)
 unit r where
     dependency p[A=<A>]
     dependency q[A=<A>]
@@ -15,5 +16,5 @@ unit r where
         import A
         f :: Show a => K a -> String
         f = show
-        g :: K (a -> b) -> String
+        g :: Read a => K a -> String
         g = show
