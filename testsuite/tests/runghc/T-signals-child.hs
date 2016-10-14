@@ -1,7 +1,7 @@
 import Control.Concurrent.MVar  (readMVar)
 import System.Environment       (getArgs)
 import System.Exit              (ExitCode (ExitFailure), exitFailure)
-import System.IO                (hGetLine, hPutStrLn)
+import System.IO                (hClose, hGetLine, hPutStrLn)
 import System.Posix.Process     (exitImmediately, getProcessID)
 import System.Posix.Signals     (Handler (Catch), installHandler, sigHUP,
                                  signalProcess)
@@ -9,6 +9,7 @@ import System.Process           (StdStream (CreatePipe), createProcess, proc,
                                  std_in, std_out, waitForProcess)
 import System.Process.Internals (ProcessHandle (..),
                                  ProcessHandle__ (OpenHandle))
+import System.Timeout           (timeout)
 
 main :: IO ()
 main = do
@@ -46,6 +47,7 @@ runParent runghc = do
     -- Send the child some input so that it will exit if it didn't
     -- have a sigHUP handler installed.
     hPutStrLn inH ""
+    hClose inH
 
     -- Read out the rest of stdout from the child, which will be
     -- either "NOSIGNAL\n" or "HUP\n"
@@ -95,7 +97,10 @@ runChild = do
     -- Block until we receive input, giving a chance for the signal
     -- handler to be triggered, and if the signal handler isn't
     -- triggered, gives us an escape route from this function.
-    _ <- getLine
+    --
+    -- Include a reasonable timeout to prevent this from running for
+    -- too long
+    _ <- timeout 10000000 getLine
 
     -- Reaching this point indicates a failure of the test. Print some
     -- non HUP message and exit with a non HUP exit
