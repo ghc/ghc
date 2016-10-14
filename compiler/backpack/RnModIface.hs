@@ -319,8 +319,9 @@ rnIfaceClsInst cls_inst = do
     --    really matter, since we throw it out shortly after
     --    (for merging, we rename all of the DFuns so that they
     --    are unique; for instantiation, the final interface never
-    --    mentions DFuns since they are implicitly exported.)  The
-    --    important thing is that it's consistent everywhere.
+    --    mentions DFuns since they are implicitly exported. See
+    --    Note [Signature merging DFuns])  The important thing is that it's
+    --    consistent everywhere.
     dfun <- rnIfaceDFun (ifDFun cls_inst)
     return cls_inst { ifInstCls = n
                     , ifInstTys = tys

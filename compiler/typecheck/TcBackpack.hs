@@ -384,20 +384,31 @@ mergeSignatures lcl_iface0 = do
 
     -- STEP 5: Typecheck the interfaces
     let type_env_var = tcg_type_env_var tcg_env
-    -- NB: This is a bit tricky.  Ordinarily, the way we would do this is
-    -- use tcExtendGlobalEnv to put all of the things that we believe are
-    -- going to be "the real TyThings" (type_env) into the type environment, so that
-    -- when we typecheck the rest of the interfaces they get knot-tied
-    -- to those.  But tcExtendGlobalEnv is a bit too strict, and forces thunks
-    -- before they are ready.
+
+    -- typecheckIfacesForMerging does two things:
+    --      1. It merges the all of the ifaces together, and typechecks the
+    --      result to type_env.
+    --      2. It typechecks each iface individually, but with their 'Name's
+    --      resolving to the merged type_env from (1).
+    -- See typecheckIfacesForMerging for more details.
     (type_env, detailss) <- initIfaceTcRn $
                             typecheckIfacesForMerging inner_mod ifaces type_env_var
-    -- Something very subtle but important about type_env:
-    -- it contains NO dfuns.  The dfuns are inside detailss,
-    -- and the names are complete nonsense.  We'll unwind this
-    -- in the rest of this function.
     let infos = zip ifaces detailss
-    -- Make sure we serialize these out!
+
+    -- NB on type_env: it contains NO dfuns.  DFuns are recorded inside
+    -- detailss, and given a Name that doesn't correspond to anything real.  See
+    -- also Note [Signature merging DFuns]
+
+    -- Add the merged type_env to TcGblEnv, so that it gets serialized
+    -- out when we finally write out the interface.
+    --
+    -- NB: Why do we set tcg_tcs/tcg_patsyns/tcg_type_env directly,
+    -- rather than use tcExtendGlobalEnv (the normal method to add newly
+    -- defined types to TcGblEnv?)  tcExtendGlobalEnv adds these
+    -- TyThings to 'tcg_type_env_var', which is consulted when
+    -- we read in interfaces to tie the knot.  But *these TyThings themselves
+    -- come from interface*, so that would result in deadlock.  Don't
+    -- update it!
     setGblEnv tcg_env {
         tcg_tcs = typeEnvTyCons type_env,
         tcg_patsyns = typeEnvPatSyns type_env,
@@ -408,6 +419,10 @@ mergeSignatures lcl_iface0 = do
     -- STEP 6: Check for compatibility/merge things
     tcg_env <- (\x -> foldM x tcg_env infos)
              $ \tcg_env (iface, details) -> do
+
+        -- For every TyThing in the type environment, compare it for
+        -- compatibility with the merged environment, but skip
+        -- DFunIds and implicit TyThings.
         let check_ty sig_thing
               -- We'll check these with the parent
               | isImplicitTyThing sig_thing
@@ -422,14 +437,41 @@ mergeSignatures lcl_iface0 = do
               | otherwise
               = panic "mergeSignatures check_ty"
         mapM_ check_ty (typeEnvElts (md_types details))
-        -- DFunId
+
+        -- Note [Signature merging instances]
+        -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        -- Merge instances into the global environment.  The algorithm here is
+        -- dumb and simple: if an instance has exactly the same DFun type
+        -- (tested by 'memberInstEnv') as an existing instance, we drop it;
+        -- otherwise, we add it even, even if this would cause overlap.
+        --
+        -- Why don't we deduplicate instances with identical heads?  There's no
+        -- good choice if they have premises:
+        --
+        --      instance K1 a => K (T a)
+        --      instance K2 a => K (T a)
+        --
+        -- Why not eagerly error in this case?  The overlapping head does not
+        -- necessarily mean that the instances are unimplementable: in fact,
+        -- they may be implemented without overlap (if, for example, the
+        -- implementing module has 'instance K (T a)'; both are implemented in
+        -- this case.)  The implements test just checks that the wanteds are
+        -- derivable assuming the givens.
+        --
+        -- Still, overlapping instances with hypotheses like above are going
+        -- to be a bad deal, because instance resolution when we're typechecking
+        -- against the merged signature is going to have a bad time when
+        -- there are overlapping heads like this: we never backtrack, so it
+        -- may be difficult to see that a wanted is derivable.  For now,
+        -- we hope that we get lucky / the overlapping instances never
+        -- get used, but it is not a very good situation to be in.
+        --
         let merge_inst (insts, inst_env) inst
-                -- TODO: It would be good if, when there IS an
-                -- existing interface, we check that the types
-                -- match up.
-                | memberInstEnv inst_env inst
+                | memberInstEnv inst_env inst -- test DFun Type equality
                 = (insts, inst_env)
                 | otherwise
+                -- NB: is_dfun_name inst is still nonsense here,
+                -- see Note [Signature merging DFuns]
                 = (inst:insts, extendInstEnv inst_env inst)
             (insts, inst_env) = foldl' merge_inst
                                     (tcg_insts tcg_env, tcg_inst_env tcg_env)
@@ -447,7 +489,19 @@ mergeSignatures lcl_iface0 = do
                     else (mi_module iface, mi_mod_hash iface) : tcg_merged tcg_env
             }
 
-    -- Rename and add dfuns to type_env
+    -- Note [Signature merging DFuns]
+    -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    -- Once we know all of instances which will be defined by this merged
+    -- signature, we go through each of the DFuns and rename them with a fresh,
+    -- new, unique DFun Name, and add these DFuns to tcg_type_env (thus fixing
+    -- up the "bogus" names that were setup in 'typecheckIfacesForMerging'.
+    --
+    -- We can't do this fixup earlier, because we need a way to identify each
+    -- source DFun (from each of the signatures we are merging in) so that
+    -- when we have a ClsInst, we can pull up the correct DFun to check if
+    -- the types match.
+    --
+    -- See also Note [Bogus DFun renamings] in RnModIface
     dfun_insts <- forM (tcg_insts tcg_env) $ \inst -> do
         n <- newDFunName (is_cls inst) (is_tys inst) (nameSrcSpan (is_dfun_name inst))
         let dfun = setVarName (is_dfun inst) n
