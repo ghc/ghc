@@ -3267,6 +3267,17 @@ number of important ways:
    necessarily more conservative, but any error message may be more
    comprehensible.
 
+-  Under most circumstances, you cannot use standalone deriving to create an
+   instance for a data type whose constructors are not all in scope. This is
+   because the derived instance would generate code that uses the constructors
+   behind the scenes, which would break abstraction.
+
+   The one exception to this rule is :ghc-flag:`-XDeriveAnyClass`, since
+   deriving an instance via :ghc-flag:`-XDeriveAnyClass` simply generates
+   an empty instance declaration, which does not require the use of any
+   constructors. See the `deriving any class <#derive-any-class>`__ section
+   for more details.
+
 In other ways, however, a standalone deriving obeys the same rules as
 ordinary deriving:
 

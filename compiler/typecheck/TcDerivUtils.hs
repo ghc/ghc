@@ -9,7 +9,9 @@ Error-checking and other utilities for @deriving@ clauses or declarations.
 {-# LANGUAGE ImplicitParams #-}
 
 module TcDerivUtils (
-        DerivSpec(..), pprDerivSpec, DerivSpecMechanism(..),
+        DerivSpec(..), pprDerivSpec,
+        DerivSpecMechanism(..), isDerivSpecStock,
+        isDerivSpecNewtype, isDerivSpecAnyClass,
         DerivContext, DerivStatus(..),
         PredOrigin(..), ThetaOrigin, mkPredOrigin,
         mkThetaOrigin, substPredOrigin, substThetaOrigin,
@@ -87,15 +89,16 @@ Example:
 -}
 
 pprDerivSpec :: Outputable theta => DerivSpec theta -> SDoc
-pprDerivSpec (DS { ds_loc = l, ds_name = n, ds_tvs = tvs,
-                   ds_cls = c, ds_tys = tys, ds_theta = rhs })
+pprDerivSpec (DS { ds_loc = l, ds_name = n, ds_tvs = tvs, ds_cls = c,
+                   ds_tys = tys, ds_theta = rhs, ds_mechanism = mech })
   = hang (text "DerivSpec")
-       2 (vcat [ text "ds_loc   =" <+> ppr l
-               , text "ds_name  =" <+> ppr n
-               , text "ds_tvs   =" <+> ppr tvs
-               , text "ds_cls   =" <+> ppr c
-               , text "ds_tys   =" <+> ppr tys
-               , text "ds_theta =" <+> ppr rhs ])
+       2 (vcat [ text "ds_loc       =" <+> ppr l
+               , text "ds_name      =" <+> ppr n
+               , text "ds_tvs       =" <+> ppr tvs
+               , text "ds_cls       =" <+> ppr c
+               , text "ds_tys       =" <+> ppr tys
+               , text "ds_theta     =" <+> ppr rhs
+               , text "ds_mechanism =" <+> ppr mech ])
 
 instance Outputable theta => Outputable (DerivSpec theta) where
   ppr = pprDerivSpec
@@ -111,6 +114,26 @@ data DerivSpecMechanism
       Type -- ^ The newtype rep type
 
   | DerivSpecAnyClass -- -XDeriveAnyClass
+
+isDerivSpecStock, isDerivSpecNewtype, isDerivSpecAnyClass
+  :: DerivSpecMechanism -> Bool
+isDerivSpecStock (DerivSpecStock{}) = True
+isDerivSpecStock _                  = False
+
+isDerivSpecNewtype (DerivSpecNewtype{}) = True
+isDerivSpecNewtype _                    = False
+
+isDerivSpecAnyClass (DerivSpecAnyClass{}) = True
+isDerivSpecAnyClass _                     = False
+
+-- A DerivSpecMechanism can be losslessly converted to a DerivStrategy.
+mechanismToStrategy :: DerivSpecMechanism -> DerivStrategy
+mechanismToStrategy (DerivSpecStock{})    = DerivStock
+mechanismToStrategy (DerivSpecNewtype{})  = DerivNewtype
+mechanismToStrategy (DerivSpecAnyClass{}) = DerivAnyclass
+
+instance Outputable DerivSpecMechanism where
+  ppr = ppr . mechanismToStrategy
 
 type DerivContext = Maybe ThetaType
    -- Nothing    <=> Vanilla deriving; infer the context of the instance decl

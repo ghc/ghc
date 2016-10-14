@@ -42,6 +42,20 @@ Compiler
   class instance using the :ghc-flag:`-XDerivingStrategies` language extension
   (see :ref:`deriving-strategies`).
 
+- GHC now allows standalone deriving using :ghc-flag:`-XDeriveAnyClass` on
+  any data type, even if its data constructors are not in scope. This is
+  consistent with the fact that this code (in the presence of
+  :ghc-flag:`-XDeriveAnyClass`): ::
+
+      deriving instance C T
+
+  is exactly equivalent to: ::
+
+      instance C T
+
+  and the latter code has no restrictions about whether the data constructors
+  of ``T`` are in scope.
+
 GHCi
 ~~~~
 
@@ -159,7 +173,7 @@ filepath
 ghc
 ~~~
 
--  
+-
 ghc-boot
 ~~~~~~~~
 
