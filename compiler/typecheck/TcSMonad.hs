@@ -3107,13 +3107,11 @@ matchFam tycon args = wrapTcS $ matchFamTcM tycon args
 matchFamTcM :: TyCon -> [Type] -> TcM (Maybe (Coercion, TcType))
 -- Given (F tys) return (ty, co), where co :: F tys ~ ty
 matchFamTcM tycon args
-  = do { fam_envs@(_,lcl) <- FamInst.tcGetFamInstEnvs
-       ; let match_fam_result
+  = do { let match_fam_result
               = reduceTyFamApp_maybe fam_envs Nominal tycon args
        ; TcM.traceTc "matchFamTcM" $
          vcat [ text "Matching:" <+> ppr (mkTyConApp tycon args)
-              , ppr_res match_fam_result
-              , text "Lcl fam env:" <+> ppr lcl ]
+              , ppr_res match_fam_result ]
        ; return match_fam_result }
   where
     ppr_res Nothing        = text "Match failed"
