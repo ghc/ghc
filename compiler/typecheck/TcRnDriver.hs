@@ -943,7 +943,10 @@ checkBootTyCon is_boot tc1 tc2
     check (eqListBy eqFD clas_fds1 clas_fds2)
           (text "The functional dependencies do not match") `andThenCheck`
     checkUnless (null sc_theta1 && null op_stuff1 && null ats1) $
-                     -- Above tests for an "abstract" class
+                     -- Above tests for an "abstract" class.
+                     -- This is duplicated in 'isAbstractIfaceDecl'
+                     -- and also below near
+                     -- Note [Constraint synonym implements abstract class]
     check (eqListBy (eqTypeX env) sc_theta1 sc_theta2)
           (text "The class constraints do not match") `andThenCheck`
     checkListBy eqSig op_stuff1 op_stuff2 (text "methods") `andThenCheck`
@@ -991,6 +994,47 @@ checkBootTyCon is_boot tc1 tc2
         --
         -- we need to drop the first role of K when comparing!
         check (roles1 == drop (length args) (tyConRoles tc2')) roles_msg
+
+  -- Note [Constraint synonym implements abstract class]
+  -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  -- This clause allows an abstract class to be implemented with a constraint
+  -- synonym. For instance, consider a signature requiring an abstract class,
+  --
+  --     signature ASig where
+  --         class K a
+  --
+  -- Since K has no methods (i.e. is abstract), the module implementing this
+  -- signature may want to implement it using a constraint synonym of another
+  -- class,
+  --
+  --     module AnImpl where
+  --         class SomeClass a where ...
+  --         type K a = SomeClass a
+  --
+  -- This was originally requested in #12679.  For now, we only allow this
+  -- in hsig files (@not is_boot@).
+
+  | not is_boot
+  , Just c1 <- tyConClass_maybe tc1
+  , let (_, _clas_fds1, sc_theta1, _, ats1, op_stuff1)
+          = classExtraBigSig c1
+  -- Is it abstract?
+  , null sc_theta1 && null op_stuff1 && null ats1
+  , Just (tvs, ty) <- synTyConDefn_maybe tc2
+  = -- The synonym may or may not be eta-expanded, so we need to
+    -- massage it into the correct form before checking if roles
+    -- match.
+    if length tvs == length roles1
+        then check (roles1 == roles2) roles_msg
+        else case tcSplitTyConApp_maybe ty of
+                Just (tc2', args) ->
+                    check (roles1 == drop (length args) (tyConRoles tc2') ++ roles2)
+                          roles_msg
+                Nothing -> Just roles_msg
+    -- TODO: We really should check if the fundeps are satisfied, but
+    -- there is not an obvious way to do this for a constraint synonym.
+    -- So for now, let it all through (it won't cause segfaults, anyway).
+    -- Tracked at #12704.
 
   | Just fam_flav1 <- famTyConFlav_maybe tc1
   , Just fam_flav2 <- famTyConFlav_maybe tc2

@@ -1,0 +1,19 @@
+[1 of 4] Processing user
+  [1 of 2] Compiling Map[sig]         ( user/Map.hsig, nothing )
+  [2 of 2] Compiling User             ( user/User.hs, nothing )
+[2 of 4] Processing ordmap
+  Instantiating ordmap
+  [1 of 1] Compiling Map              ( ordmap/Map.hs, bkp40.out/ordmap/Map.o )
+[3 of 4] Processing eqmap
+  Instantiating eqmap
+  [1 of 1] Compiling Map              ( eqmap/Map.hs, bkp40.out/eqmap/Map.o )
+[4 of 4] Processing main
+  Instantiating main
+  [1 of 2] Including user[Map=ordmap:Map]
+    Instantiating user[Map=ordmap:Map]
+    [1 of 2] Compiling Map[sig]         ( user/Map.hsig, bkp40.out/user/user-GzloW2NeDdA2M0V8qzN4g2/Map.o )
+    [2 of 2] Compiling User             ( user/User.hs, bkp40.out/user/user-GzloW2NeDdA2M0V8qzN4g2/User.o )
+  [2 of 2] Including user[Map=eqmap:Map]
+    Instantiating user[Map=eqmap:Map]
+    [1 of 2] Compiling Map[sig]         ( user/Map.hsig, bkp40.out/user/user-9YyTxEeqz3GG5thfDXwuAf/Map.o )
+    [2 of 2] Compiling User             ( user/User.hs, bkp40.out/user/user-9YyTxEeqz3GG5thfDXwuAf/User.o )

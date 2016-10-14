@@ -1,0 +1,41 @@
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE RoleAnnotations #-}
+unit user where
+    signature Map where
+        type role Map nominal representational
+        data Map k a
+        class Key k
+        instance Key String
+        empty  :: Map k a
+        lookup :: Key k => k -> Map k a -> Maybe a
+        insert :: Key k => k -> a -> Map k a -> Map k a
+    module User where
+        import Prelude hiding (lookup)
+        import Map
+        x = lookup "foo" (insert "foo" True empty)
+unit ordmap where
+    module Map(module Data.Map, Key) where
+        import Data.Map
+        type Key = Ord
+unit eqmap where
+    module Map where
+        import Prelude hiding (lookup)
+        import qualified Prelude
+        type role Map nominal representational
+        newtype Map k a = Assoc [(k, a)]
+        type Key = Eq
+        -- Ugh, need the type signatures, otherwise the quantifiers
+        -- are put in the wrong order.  See #12441
+        empty :: Map k a
+        empty = Assoc []
+        lookup :: Eq k => k -> Map k a -> Maybe a
+        lookup k (Assoc xs) = Prelude.lookup k xs
+        -- Need to insert redundant constraint to make it work...
+        insert :: Eq k => k -> a -> Map k a -> Map k a
+        insert k v (Assoc xs) = Assoc ((k,v):xs)
+unit main where
+    dependency user[Map=ordmap:Map] (User as User.Ord)
+    dependency user[Map=eqmap:Map] (User as User.Eq)
+

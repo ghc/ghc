@@ -202,6 +202,7 @@ typecheckIface iface
 -- | Returns true if an 'IfaceDecl' is for @data T@ (an abstract data type)
 isAbstractIfaceDecl :: IfaceDecl -> Bool
 isAbstractIfaceDecl IfaceData{ ifCons = IfAbstractTyCon _ } = True
+isAbstractIfaceDecl IfaceClass{ ifCtxt = [], ifSigs = [], ifATs = [] } = True
 isAbstractIfaceDecl _ = False
 
 -- | Merge two 'IfaceDecl's together, preferring a non-abstract one.  If
