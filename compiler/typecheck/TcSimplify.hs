@@ -1511,13 +1511,23 @@ works:
 
 ----- Shortcomings
 
-Consider (see Trac #9939)
-    f2 :: (Eq a, Ord a) => a -> a -> Bool
-    -- Ord a redundant, but Eq a is reported
-    f2 x y = (x == y)
+After I introduced -Wredundant-constraints there was extensive discussion
+about cases where it reported a redundant constraint but the programmer
+really wanted it.  See
 
-We report (Eq a) as redundant, whereas actually (Ord a) is.  But it's
-really not easy to detect that!
+  * #11370 (removed it from -Wdefault)
+  * #10635 (removed it from -Wall as well)
+  * #12142
+  * #11474, #10100 (class not used, but its fundeps are)
+  * #11099 (redundant, but still desired)
+  * #10183 (constraint necessary to exclude omitted case)
+
+  * #9939:     f2 :: (Eq a, Ord a) => a -> a -> Bool
+               -- Ord a redundant, but Eq a is reported
+              f2 x y = (x == y)
+
+    We report (Eq a) as redundant, whereas actually (Ord a) is.
+    But it's really not easy to detect that!
 
 
 Note [Cutting off simpl_loop]

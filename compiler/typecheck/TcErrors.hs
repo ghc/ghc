@@ -367,6 +367,7 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_given = given
                     _                             -> []
 
 warnRedundantConstraints :: ReportErrCtxt -> TcLclEnv -> SkolemInfo -> [EvVar] -> TcM ()
+-- See Note [Tracking redundant constraints] in TcSimplify
 warnRedundantConstraints ctxt env info ev_vars
  | null redundant_evs
  = return ()
