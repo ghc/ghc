@@ -83,6 +83,7 @@ import           Data.Monoid         (All (..), Any (..), Dual (..), Endo (..),
 import           Data.Monoid         (Alt (..))
 import qualified Data.Monoid         as Monoid
 import           Data.Void
+import           GHC.Event           (Event, Lifetime (..))
 import           GHC.Generics
 
 infixr 6 <>
@@ -705,3 +706,17 @@ instance Semigroup (Proxy s) where
   _ <> _ = Proxy
   sconcat _ = Proxy
   stimes _ _ = Proxy
+
+-- | @since 4.10.0.0
+instance Semigroup a => Semigroup (IO a) where
+    (<>) = liftA2 (<>)
+
+-- | @since 4.10.0.0
+instance Semigroup Event where
+    (<>) = mappend
+    stimes = stimesMonoid
+
+-- | @since 4.10.0.0
+instance Semigroup Lifetime where
+    (<>) = mappend
+    stimes = stimesMonoid
