@@ -1274,28 +1274,42 @@ mkImport :: Located CCallConv
          -> Located Safety
          -> (Located StringLiteral, Located RdrName, LHsSigType RdrName)
          -> P (HsDecl RdrName)
-mkImport (L lc cconv) (L ls safety) (L loc (StringLiteral esrc entity), v, ty)
-  | cconv == PrimCallConv                      = do
-  let funcTarget = CFunction (StaticTarget esrc entity Nothing True)
-      importSpec = CImport (L lc PrimCallConv) (L ls safety) Nothing funcTarget
-                           (L loc esrc)
-  return (ForD (ForeignImport { fd_name = v, fd_sig_ty = ty
-                              , fd_co = noForeignImportCoercionYet
-                              , fd_fi = importSpec }))
-  | cconv == JavaScriptCallConv = do
-  let funcTarget = CFunction (StaticTarget esrc entity Nothing True)
-      importSpec = CImport (L lc JavaScriptCallConv) (L ls safety) Nothing
-                           funcTarget (L loc (unpackFS entity))
-  return (ForD (ForeignImport { fd_name = v, fd_sig_ty = ty
-                              , fd_co = noForeignImportCoercionYet
-                              , fd_fi = importSpec }))
-  | otherwise = do
-    case parseCImport (L lc cconv) (L ls safety) (mkExtName (unLoc v))
-                      (unpackFS entity) (L loc (unpackFS entity)) of
-      Nothing         -> parseErrorSDoc loc (text "Malformed entity string")
-      Just importSpec -> return (ForD (ForeignImport { fd_name = v, fd_sig_ty = ty
-                                                     , fd_co = noForeignImportCoercionYet
-                                                     , fd_fi = importSpec }))
+mkImport cconv safety (L loc (StringLiteral esrc entity), v, ty) =
+    case cconv of
+      L _ CCallConv          -> mkCImport
+      L _ CApiConv           -> mkCImport
+      L _ StdCallConv        -> mkCImport
+      L _ PrimCallConv       -> mkOtherImport
+      L _ JavaScriptCallConv -> mkOtherImport
+  where
+    -- Parse a C-like entity string of the following form:
+    --   "[static] [chname] [&] [cid]" | "dynamic" | "wrapper"
+    -- If 'cid' is missing, the function name 'v' is used instead as symbol
+    -- name (cf section 8.5.1 in Haskell 2010 report).
+    mkCImport = do
+      let e = unpackFS entity
+      case parseCImport cconv safety (mkExtName (unLoc v)) e (L loc e) of
+        Nothing         -> parseErrorSDoc loc (text "Malformed entity string")
+        Just importSpec -> returnSpec importSpec
+
+    -- currently, all the other import conventions only support a symbol name in
+    -- the entity string. If it is missing, we use the function name instead.
+    mkOtherImport = returnSpec importSpec
+      where
+        entity'    = if nullFS entity
+                        then mkExtName (unLoc v)
+                        else entity
+        funcTarget = CFunction (StaticTarget esrc entity' Nothing True)
+        importSpec = CImport cconv safety Nothing funcTarget (L loc esrc)
+
+    returnSpec spec = return $ ForD $ ForeignImport
+          { fd_name   = v
+          , fd_sig_ty = ty
+          , fd_co     = noForeignImportCoercionYet
+          , fd_fi     = spec
+          }
+
+
 
 -- the string "foo" is ambiguous: either a header or a C identifier.  The
 -- C identifier case comes first in the alternatives below, so we pick
