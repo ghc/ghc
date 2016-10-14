@@ -169,6 +169,19 @@ instance CPU DummyCPU where
 -------------------------------------------------------------------------------
 -- Long compiling program.
 
+{-  cnst has very simple code, and should be fast to typecheck
+    But if you insist on normalising (Immediate DummyCPU) you get
+
+      Immediate DummyCPU =  Const (ImmSize DummyCPU)
+                         -> Const SIZE12
+                         =  Const (DPlus SIX SIX)
+                         ...etc...
+
+similarly for (RegVar DummyCPU).
+
+So you get a lot of work and big coercions, for no gain.
+-}
+
 cnst :: Integer -> Either (Immediate DummyCPU) (RegVar DummyCPU)
 cnst x = Left (Const x)
 
