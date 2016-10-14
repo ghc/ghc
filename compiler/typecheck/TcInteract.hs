@@ -1416,20 +1416,17 @@ reduce_top_fun_eq old_ev fsk ax_co rhs_ty
 
   | otherwise -- We must not assign ufsk := ...ufsk...!
   = do { alpha_ty <- newFlexiTcSTy (tyVarKind fsk)
-       ; new_ev <- case old_ev of
-           CtWanted {}  -> do { (ev, _) <- newWantedEq loc Nominal alpha_ty rhs_ty
-                              ; updWorkListTcS $
-                                  extendWorkListEq (mkNonCanonical ev)
-                              ; return ev }
+       ; new_co <- case old_ev of
+           CtWanted {}  -> emitNewWantedEq loc Nominal alpha_ty rhs_ty
            CtDerived {} -> do { ev <- newDerivedNC loc pred
                               ; updWorkListTcS (extendWorkListDerived loc ev)
-                              ; return ev }
-             where pred = mkPrimEqPred alpha_ty rhs_ty
+                              ; return (ctEvCoercion ev) }  -- Coercion is bottom
+                        where pred = mkPrimEqPred alpha_ty rhs_ty
            _ -> pprPanic "reduce_top_fun_eq" (ppr old_ev)
 
             -- By emitting this as non-canonical, we deal with all
             -- flattening, occurs-check, and ufsk := ufsk issues
-       ; let final_co = ax_co `mkTcTransCo` mkTcSymCo (ctEvCoercion new_ev)
+       ; let final_co = ax_co `mkTcTransCo` mkTcSymCo new_co
             --    ax_co :: fam_tc args ~ rhs_ty
             --       ev :: alpha ~ rhs_ty
             --     ufsk := alpha
@@ -1440,7 +1437,7 @@ reduce_top_fun_eq old_ev fsk ax_co rhs_ty
               , nest 2 (text ":=") <+>
                    if isDerived old_ev then text "(derived)"
                    else ppr final_co
-              , text "new_ev:" <+> ppr new_ev ]
+              , text "new_co:" <+> ppr new_co ]
        ; stopWith old_ev "Fun/Top (wanted)" }
   where
     loc = ctEvLoc old_ev

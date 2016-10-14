@@ -1456,11 +1456,10 @@ homogeniseRhsKind ev eq_rel lhs rhs build_ct
 
   | otherwise   -- Wanted and Derived. See Note [No derived kind equalities]
     -- evar :: (lhs :: k1) ~ (rhs :: k2)
-  = do { (kind_ev, kind_co) <- newWantedEq kind_loc Nominal k1 k2
+  = do { kind_co <- emitNewWantedEq kind_loc Nominal k1 k2
              -- kind_ev :: (k1 :: *) ~ (k2 :: *)
        ; traceTcS "Hetero equality gives rise to wanted kind equality" $
-           ppr (kind_ev)
-       ; emitWorkNC [kind_ev]
+           ppr (kind_co)
        ; let homo_co   = mkSymCo kind_co
            -- homo_co :: k2 ~ k1
              rhs'      = mkCastTy rhs homo_co
@@ -1471,7 +1470,7 @@ homogeniseRhsKind ev eq_rel lhs rhs build_ct
              where homo_pred = mkTcEqPredLikeEv ev lhs rhs'
            CtWanted { ctev_dest = dest } -> do
              { (type_ev, hole_co) <- newWantedEq loc role lhs rhs'
-                  -- type_ev :: (lhs :: k1) ~ (rhs |> sym kind_ev :: k1)
+                  -- type_ev :: (lhs :: k1) ~ (rhs |> sym kind_co :: k1)
              ; setWantedEq dest
                            (hole_co `mkTransCo`
                             (mkReflCo role rhs
