@@ -101,11 +101,10 @@ Note [About wired-in things]
 -}
 
 
+-- | This list is used to ensure that when you say "Prelude.map" in your source
+-- code, or in an interface file, you get a Name with the correct known key (See
+-- Note [Known-key names] in PrelNames)
 knownKeyNames :: [Name]
--- This list is used to ensure that when you say "Prelude.map"
---  in your source code, or in an interface file,
--- you get a Name with the correct known key
--- (See Note [Known-key names] in PrelNames)
 knownKeyNames
   | debugIsOn
   , Just badNamesStr <- knownKeyNamesOkay all_names
@@ -119,18 +118,18 @@ knownKeyNames
   where
     all_names =
       concat [ wired_tycon_kk_names funTyCon
-            , concatMap wired_tycon_kk_names primTyCons
+             , concatMap wired_tycon_kk_names primTyCons
 
-            , concatMap wired_tycon_kk_names wiredInTyCons
-              -- Does not include tuples
+             , concatMap wired_tycon_kk_names wiredInTyCons
+               -- Does not include tuples
 
-            , concatMap wired_tycon_kk_names typeNatTyCons
+             , concatMap wired_tycon_kk_names typeNatTyCons
 
-            , map idName wiredInIds
-            , map (idName . primOpId) allThePrimOps
-            , basicKnownKeyNames
-            , templateHaskellNames
-            ]
+             , map idName wiredInIds
+             , map (idName . primOpId) allThePrimOps
+             , basicKnownKeyNames
+             , templateHaskellNames
+             ]
     -- All of the names associated with a wired-in TyCon.
     -- This includes the TyCon itself, its DataCons and promoted TyCons.
     wired_tycon_kk_names :: TyCon -> [Name]
