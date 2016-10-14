@@ -370,31 +370,26 @@ mkTupleDataConUnique Boxed          a = mkUnique '7' (3*a)    -- ditto (*may* be
 mkTupleDataConUnique Unboxed        a = mkUnique '8' (3*a)
 
 --------------------------------------------------
--- Sum arities start from 2. A sum of arity N has N data constructors, so it
--- occupies N+1 slots: 1 TyCon + N DataCons.
+-- Sum arities start from 2. The encoding is a bit funny: we break up the
+-- integral part into bitfields for the arity and alternative index (which is
+-- taken to be 0xff in the case of the TyCon)
 --
--- So arity 2 sum takes uniques 0 (tycon), 1, 2  (2 data cons)
---    arity 3 sum takes uniques 3 (tycon), 4, 5, 6 (3 data cons)
--- etc.
+-- TyCon for sum of arity k:
+--   00000000 kkkkkkkk 11111111
+-- DataCon for sum of arity k and alternative n:
+--   00000000 kkkkkkkk nnnnnnnn
 
 mkSumTyConUnique :: Arity -> Unique
-mkSumTyConUnique arity = mkUnique 'z' (sumUniqsOccupied arity)
+mkSumTyConUnique arity =
+    ASSERT(arity < 0xff)
+    mkUnique 'z' (arity `shiftL` 8 .|. 0xff)
 
 mkSumDataConUnique :: ConTagZ -> Arity -> Unique
 mkSumDataConUnique alt arity
   | alt >= arity
   = panic ("mkSumDataConUnique: " ++ show alt ++ " >= " ++ show arity)
   | otherwise
-  = mkUnique 'z' (sumUniqsOccupied arity + alt + 1 {- skip the tycon -})
-
--- How many unique slots occupied by sum types (including constructors) up to
--- the given arity?
-sumUniqsOccupied :: Arity -> Int
-sumUniqsOccupied arity
-  = ASSERT(arity >= 2)
-    -- 3 + 4 + ... + arity
-    ((arity * (arity + 1)) `div` 2) - 3
-{-# INLINE sumUniqsOccupied #-}
+  = mkUnique 'z' (arity `shiftL` 8 + alt) {- skip the tycon -}
 
 --------------------------------------------------
 dataConRepNameUnique, dataConWorkerUnique :: Unique -> Unique
