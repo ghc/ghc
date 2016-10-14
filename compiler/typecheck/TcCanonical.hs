@@ -1823,25 +1823,27 @@ unifyWanted loc role orig_ty1 orig_ty2
       = do { cos <- zipWith3M (unifyWanted loc)
                               (tyConRolesX role tc1) tys1 tys2
            ; return (mkTyConAppCo role tc1 cos) }
-    go (TyVarTy tv) ty2
+
+    go ty1@(TyVarTy tv) ty2
       = do { mb_ty <- isFilledMetaTyVar_maybe tv
            ; case mb_ty of
                 Just ty1' -> go ty1' ty2
-                Nothing   -> bale_out }
-    go ty1 (TyVarTy tv)
+                Nothing   -> bale_out ty1 ty2}
+    go ty1 ty2@(TyVarTy tv)
       = do { mb_ty <- isFilledMetaTyVar_maybe tv
            ; case mb_ty of
                 Just ty2' -> go ty1 ty2'
-                Nothing   -> bale_out }
+                Nothing   -> bale_out ty1 ty2 }
 
     go ty1@(CoercionTy {}) (CoercionTy {})
       = return (mkReflCo role ty1) -- we just don't care about coercions!
 
-    go _ _ = bale_out
+    go ty1 ty2 = bale_out ty1 ty2
 
-    bale_out = do { (new_ev, co) <- newWantedEq loc role orig_ty1 orig_ty2
-                  ; emitWorkNC [new_ev]
-                  ; return co }
+    bale_out ty1 ty2
+       | ty1 `tcEqType` ty2 = return (mkTcReflCo role ty1)
+        -- Check for equality; e.g. a ~ a, or (m a) ~ (m a)
+       | otherwise = emitNewWantedEq loc role orig_ty1 orig_ty2
 
 unifyDeriveds :: CtLoc -> [Role] -> [TcType] -> [TcType] -> TcS ()
 -- See Note [unifyWanted and unifyDerived]
@@ -1869,19 +1871,22 @@ unify_derived loc role    orig_ty1 orig_ty2
       | tc1 == tc2, tys1 `equalLength` tys2
       , isInjectiveTyCon tc1 role
       = unifyDeriveds loc (tyConRolesX role tc1) tys1 tys2
-    go (TyVarTy tv) ty2
+    go ty1@(TyVarTy tv) ty2
       = do { mb_ty <- isFilledMetaTyVar_maybe tv
            ; case mb_ty of
                 Just ty1' -> go ty1' ty2
-                Nothing   -> bale_out }
-    go ty1 (TyVarTy tv)
+                Nothing   -> bale_out ty1 ty2 }
+    go ty1 ty2@(TyVarTy tv)
       = do { mb_ty <- isFilledMetaTyVar_maybe tv
            ; case mb_ty of
                 Just ty2' -> go ty1 ty2'
-                Nothing   -> bale_out }
-    go _ _ = bale_out
+                Nothing   -> bale_out ty1 ty2 }
+    go ty1 ty2 = bale_out ty1 ty2
 
-    bale_out = emitNewDerivedEq loc role orig_ty1 orig_ty2
+    bale_out ty1 ty2
+       | ty1 `tcEqType` ty2 = return ()
+        -- Check for equality; e.g. a ~ a, or (m a) ~ (m a)
+       | otherwise = emitNewDerivedEq loc role orig_ty1 orig_ty2
 
 maybeSym :: SwapFlag -> TcCoercion -> TcCoercion
 maybeSym IsSwapped  co = mkTcSymCo co
