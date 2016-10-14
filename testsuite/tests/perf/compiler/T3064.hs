@@ -56,20 +56,23 @@ runCA action = runCtxM (runCAT (unCA action))
 runCtxM :: (forall c. CtxM c v) -> IO v
 runCtxM action = runReaderT (unResourceT action) Ctx
 
--- test11 :: IO ()
--- test11 = runCA(newRgn(newRgn(newRgn(newRgn(newRgn(
---   newRgn(newRgn(newRgn(newRgn(return()))))))))))
-
--- test12 :: IO ()
--- test12 = runCA(newRgn(newRgn(newRgn(newRgn(newRgn(newRgn(
---   newRgn(newRgn(newRgn(newRgn(return())))))))))))
-
--- test13 :: IO ()
--- test13 = runCA(newRgn(newRgn(newRgn(newRgn(newRgn(newRgn(newRgn(
---   newRgn(newRgn(newRgn(newRgn(return()))))))))))))
-
-
 {-
+
+test4 :: IO ()
+test4 = runCA(newRgn(newRgn(newRgn(newRgn(return())))))
+
+test11 :: IO ()
+test11 = runCA(newRgn(newRgn(newRgn(newRgn(newRgn(
+               newRgn(newRgn(newRgn(newRgn(return()))))))))))
+
+test12 :: IO ()
+test12 = runCA(newRgn(newRgn(newRgn(newRgn(newRgn(newRgn(
+               newRgn(newRgn(newRgn(newRgn(return())))))))))))
+
+test13 :: IO ()
+test13 = runCA(newRgn(newRgn(newRgn(newRgn(newRgn(newRgn(newRgn(
+               newRgn(newRgn(newRgn(newRgn(return()))))))))))))
+
 test14 :: IO ()
 test14 = runCA(newRgn(newRgn(newRgn(newRgn(newRgn(newRgn(newRgn(newRgn(
                newRgn(newRgn(newRgn(newRgn(return())))))))))))))
