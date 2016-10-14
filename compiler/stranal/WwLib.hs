@@ -28,6 +28,7 @@ import Coercion
 import FamInstEnv
 import BasicTypes       ( Boxity(..), OneShotInfo(..), worstOneShot )
 import Literal          ( absentLiteralOf )
+import VarSet
 import TyCon
 import UniqSupply
 import Unique
@@ -107,15 +108,20 @@ the unusable strictness-info into the interfaces.
 @mkWwBodies@ is called when doing the worker\/wrapper split inside a module.
 -}
 
+type WwResult
+  = ([Demand],              -- Demands for worker (value) args
+     Id -> CoreExpr,        -- Wrapper body, lacking only the worker Id
+     CoreExpr -> CoreExpr)  -- Worker body, lacking the original function rhs
+
 mkWwBodies :: DynFlags
            -> FamInstEnvs
+           -> VarSet         -- Free vars of RHS
+                             -- See Note [Freshen WW arguments]
            -> Type                                  -- Type of original function
            -> [Demand]                              -- Strictness of original function
            -> DmdResult                             -- Info about function result
            -> [OneShotInfo]                         -- One-shot-ness of the function, value args only
-           -> UniqSM (Maybe ([Demand],              -- Demands for worker (value) args
-                             Id -> CoreExpr,        -- Wrapper body, lacking only the worker Id
-                             CoreExpr -> CoreExpr)) -- Worker body, lacking the original function rhs
+           -> UniqSM (Maybe WwResult)
 
 -- wrap_fn_args E       = \x y -> E
 -- work_fn_args E       = E x y
@@ -128,10 +134,11 @@ mkWwBodies :: DynFlags
 --                        let x = (a,b) in
 --                        E
 
-mkWwBodies dflags fam_envs fun_ty demands res_info one_shots
+mkWwBodies dflags fam_envs rhs_fvs fun_ty demands res_info one_shots
   = do  { let arg_info = demands `zip` (one_shots ++ repeat NoOneShotInfo)
               all_one_shots = foldr (worstOneShot . snd) OneShotLam arg_info
-              empty_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType fun_ty))
+              empty_subst = mkEmptyTCvSubst (mkInScopeSet rhs_fvs)
+                -- See Note [Freshen WW arguments]
         ; (wrap_args, wrap_fn_args, work_fn_args, res_ty) <- mkWWargs empty_subst fun_ty arg_info
         ; (useful1, work_args, wrap_fn_str, work_fn_str) <- mkWWstr dflags fam_envs wrap_args
 
@@ -292,7 +299,7 @@ the \x to get what we want.
 -- and keeps repeating that until it's satisfied the supplied arity
 
 mkWWargs :: TCvSubst            -- Freshening substitution to apply to the type
-                                --   See Note [Freshen type variables]
+                                --   See Note [Freshen WW arguments]
          -> Type                -- The type of the function
          -> [(Demand,OneShotInfo)]     -- Demands and one-shot info for value arguments
          -> UniqSM  ([Var],            -- Wrapper args
@@ -317,9 +324,9 @@ mkWWargs subst fun_ty arg_info
                   res_ty) }
 
   | Just (tv, fun_ty') <- splitForAllTy_maybe fun_ty
-  = do  { let (subst', tv') = substTyVarBndr subst tv
-                -- This substTyVarBndr clones the type variable when necy
-                -- See Note [Freshen type variables]
+  = do  { uniq <- getUniqueM
+        ; let (subst', tv') = cloneTyVarBndr subst tv uniq
+                -- See Note [Freshen WW arguments]
         ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
              <- mkWWargs subst' fun_ty' arg_info
         ; return (tv' : wrap_args,
@@ -338,9 +345,10 @@ mkWWargs subst fun_ty arg_info
 
   = do { (wrap_args, wrap_fn_args, work_fn_args, res_ty)
             <-  mkWWargs subst rep_ty arg_info
-        ; return (wrap_args,
-                  \e -> Cast (wrap_fn_args e) (mkSymCo co),
-                  \e -> work_fn_args (Cast e co),
+       ; let co' = substCo subst co
+       ; return (wrap_args,
+                  \e -> Cast (wrap_fn_args e) (mkSymCo co'),
+                  \e -> work_fn_args (Cast e co'),
                   res_ty) }
 
   | otherwise
@@ -356,17 +364,35 @@ mk_wrap_arg uniq ty dmd one_shot
        `setIdDemandInfo` dmd
        `setIdOneShotInfo` one_shot
 
-{-
-Note [Freshen type variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Wen we do a worker/wrapper split, we must not use shadowed names,
-else we'll get
-   f = /\ a /\a. fw a a
-which is obviously wrong.  Type variables can can in principle shadow,
-within a type (e.g. forall a. a -> forall a. a->a).  But type
-variables *are* mentioned in <blah>, so we must substitute.
+{- Note [Freshen WW arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Wen we do a worker/wrapper split, we must not in-scope names as the arguments
+of the worker, else we'll get name capture.  E.g.
 
-That's why we carry the TCvSubst through mkWWargs
+   -- y1 is in scope from further out
+   f x = ..y1..
+
+If we accidentally choose y1 as a worker argument disaster results:
+
+   fww y1 y2 = let x = (y1,y2) in ...y1...
+
+To avoid this:
+
+  * We use a fresh unique for both type-variable and term-variable binders
+    Originally we lacked this freshness for type variables, and that led
+    to the very obscure Trac #12562.  (A type varaible in the worker shadowed
+    an outer term-variable binding.)
+
+  * Because of this cloning we have to substitute in the type/kind of the
+    new binders.  That's why we carry the TCvSubst through mkWWargs.
+
+    So we need a decent in-scope set, just in case that type/kind
+    itself has foralls.  We get this from the free vars of the RHS of the
+    function since those are the only variables that might be captured.
+    It's a lazy thunk, which will only be poked if the type/kind has a forall.
+
+    Another tricky case was when f :: forall a. a -> forall a. a->a
+    (i.e. with shadowing), and then the worker used the same 'a' twice.
 
 ************************************************************************
 *                                                                      *
