@@ -654,7 +654,7 @@ We arrange the TcLevels like this
    ...etc...
 
 The even-numbered levels are for the flatten-meta-variables assigned
-at the next level in.  Eg for a second-level implication conststraint
+at the next level in.  Eg for a second-level implication constraint
 (level 5), the flatten meta-vars are level 4, which makes them untouchable.
 The flatten meta-vars could equally well all have level 0, or just NotALevel
 since they do not live across implications.

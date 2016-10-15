@@ -1484,7 +1484,7 @@ pushTcLevelM_ :: TcM a -> TcM a
 pushTcLevelM_ x = updLclEnv (\ env -> env { tcl_tclvl = pushTcLevel (tcl_tclvl env) }) x
 
 pushTcLevelM :: TcM a -> TcM (a, TcLevel)
--- See Note [TcLevel assignment]
+-- See Note [TcLevel assignment] in TcType
 pushTcLevelM thing_inside
   = do { env <- getLclEnv
        ; let tclvl' = pushTcLevel (tcl_tclvl env)
