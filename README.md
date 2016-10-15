@@ -5,9 +5,9 @@ Hadrian
 
 Hadrian is a new build system for the [Glasgow Haskell Compiler][ghc]. It is based
 on [Shake][shake] and we hope that it will eventually replace the current
-[`make`-based build system][make]. If you are curious about the rationale and initial
-ideas behind the project you can find more details on the [wiki page][ghc-shake-wiki]
-and in this [blog post][blog-post-1]. This project was formerly known as *Shaking-up-GHC*.
+[`make`-based build system][make]. If you are curious about the rationale behind the
+project and the architecture of the new build system you can find more details in
+this [Haskell Symposium 2016 paper][paper] and this [Haskell eXchange 2016 talk][talk].
 
 The new build system can work side-by-side with the existing build system. Note, there is
 some interaction between them: they put (some) build results in the same directories,
@@ -154,8 +154,8 @@ helped me endure and enjoy the project.
 [ghc]: https://en.wikipedia.org/wiki/Glasgow_Haskell_Compiler
 [shake]: https://github.com/ndmitchell/shake/blob/master/README.md
 [make]: https://ghc.haskell.org/trac/ghc/wiki/Building/Architecture
-[ghc-shake-wiki]: https://ghc.haskell.org/trac/ghc/wiki/Building/Shake
-[blog-post-1]: https://blogs.ncl.ac.uk/andreymokhov/shaking-up-ghc
+[paper]: https://www.staff.ncl.ac.uk/andrey.mokhov/Hadrian.pdf
+[talk]: https://skillsmatter.com/skillscasts/8722-meet-hadrian-a-new-build-system-for-ghc
 [issues]: https://github.com/snowleopard/hadrian/issues
 [ghc-preparation]: https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation
 [ghc-windows-quick-build]: https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation/Windows#AQuickBuild
