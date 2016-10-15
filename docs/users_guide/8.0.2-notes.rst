@@ -21,6 +21,10 @@ Language
 
 -  TODO FIXME.
 
+-  A bug has been fixed that caused derived ``Show`` instances to fail in the
+   presence of :ghc-flag:`-XRebindableSyntax` and
+   :ghc-flag:`-XOverloadedStrings` (:ghc-ticket:`12688`).
+
 Compiler
 ~~~~~~~~
 

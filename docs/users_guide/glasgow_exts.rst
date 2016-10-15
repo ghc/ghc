@@ -1464,6 +1464,33 @@ Be warned: this is an experimental facility, with fewer checks than
 usual. Use ``-dcore-lint`` to typecheck the desugared program. If Core
 Lint is happy you should be all right.
 
+Things unaffected by :ghc-flag:`-XRebindableSyntax`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:ghc-flag:`-XRebindableSyntax` does not apply to any code generated from a
+``deriving`` clause or declaration. To see why, consider the following code: ::
+
+    {-# LANGUAGE RebindableSyntax, OverloadedStrings #-}
+    newtype Text = Text String
+
+    fromString :: String -> Text
+    fromString = Text
+
+    data Foo = Foo deriving Show
+
+This will generate code to the effect of: ::
+
+    instance Show Foo where
+      showsPrec _ Foo = showString "Foo"
+
+But because :ghc-flag:`-XRebindableSyntax` and :ghc-flag:`-XOverloadedStrings`
+are enabled, the ``"Foo"`` string literal would now be of type ``Text``, not
+``String``, which ``showString`` doesn't accept! This causes the generated
+``Show`` instance to fail to typecheck. It's hard to imagine any scenario where
+it would be desirable have :ghc-flag:`-XRebindableSyntax` behavior within
+derived code, so GHC simply ignores :ghc-flag:`-XRebindableSyntax` entirely
+when checking derived code.
+
 .. _postfix-operators:
 
 Postfix operators

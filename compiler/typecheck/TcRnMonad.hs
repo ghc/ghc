@@ -18,7 +18,7 @@ module TcRnMonad(
   setGblEnv, getLclEnv, updLclEnv, setLclEnv,
   getEnvs, setEnvs,
   xoptM, doptM, goptM, woptM,
-  setXOptM, unsetGOptM, unsetWOptM,
+  setXOptM, unsetXOptM, unsetGOptM, unsetWOptM,
   whenDOptM, whenGOptM, whenWOptM, whenXOptM,
   getGhcMode,
   withDoDynamicToo,
@@ -446,6 +446,10 @@ woptM flag = do { dflags <- getDynFlags; return (wopt flag dflags) }
 setXOptM :: LangExt.Extension -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 setXOptM flag =
   updTopEnv (\top -> top { hsc_dflags = xopt_set (hsc_dflags top) flag})
+
+unsetXOptM :: LangExt.Extension -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+unsetXOptM flag =
+  updTopEnv (\top -> top { hsc_dflags = xopt_unset (hsc_dflags top) flag})
 
 unsetGOptM :: GeneralFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 unsetGOptM flag =
