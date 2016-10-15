@@ -1850,8 +1850,48 @@ def find_expected_file(name, suff):
 
     return basename
 
-def cleanup():
-    shutil.rmtree(getTestOpts().testdir, ignore_errors=True)
+# Windows seems to exhibit a strange behavior where processes' executables
+# remain locked even after the process itself has died.  When this happens
+# rmtree will fail with either Error 5 or Error 32. It takes some time for this
+# to resolve so we try several times to delete the directory, only eventually
+# failing if things seem really stuck. See #12554.
+if config.msys:
+    try:
+        from exceptions import WindowsError
+    except:
+        pass
+    import stat
+    def cleanup():
+        def on_error(function, path, excinfo):
+            # At least one test (T11489) removes the write bit from a file it
+            # produces. Windows refuses to delete read-only files with a
+            # permission error. Try setting the write bit and try again.
+            if excinfo[1].errno == 13:
+                os.chmod(path, stat.S_IWRITE)
+                os.unlink(path)
+
+        testdir = getTestOpts().testdir
+        attempts = 0
+        max_attempts = 10
+        while attempts < max_attempts and os.path.exists(testdir):
+            try:
+                shutil.rmtree(testdir, ignore_errors=False, onerror=on_error)
+            except WindowsError as e:
+                #print('failed deleting %s: %s' % (testdir, e))
+                if e.winerror in [5, 32]:
+                    attempts += 1
+                    if attempts == max_attempts:
+                        raise e
+                    else:
+                        time.sleep(0.1)
+                else:
+                    raise e
+else:
+    def cleanup():
+        testdir = getTestOpts().testdir
+        if os.path.exists(testdir):
+            shutil.rmtree(testdir, ignore_errors=False)
+
 
 # -----------------------------------------------------------------------------
 # Return a list of all the files ending in '.T' below directories roots.
