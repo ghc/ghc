@@ -13,23 +13,23 @@ data PackageData = BuildGhciLib FilePath
                  | Synopsis     FilePath
                  | Version      FilePath
 
-data PackageDataList = CcArgs             FilePath
-                     | CSrcs              FilePath
-                     | CppArgs            FilePath
-                     | DepCcArgs          FilePath
-                     | DepExtraLibs       FilePath
-                     | DepIds             FilePath
-                     | DepIncludeDirs     FilePath
-                     | DepLdArgs          FilePath
-                     | DepLibDirs         FilePath
-                     | DepNames           FilePath
-                     | Deps               FilePath
-                     | HiddenModules      FilePath
-                     | HsArgs             FilePath
-                     | IncludeDirs        FilePath
-                     | LdArgs             FilePath
-                     | Modules            FilePath
-                     | SrcDirs            FilePath
+data PackageDataList = CcArgs         FilePath
+                     | CSrcs          FilePath
+                     | CppArgs        FilePath
+                     | DepCcArgs      FilePath
+                     | DepExtraLibs   FilePath
+                     | DepIds         FilePath
+                     | DepIncludeDirs FilePath
+                     | DepLdArgs      FilePath
+                     | DepLibDirs     FilePath
+                     | DepNames       FilePath
+                     | Deps           FilePath
+                     | HiddenModules  FilePath
+                     | HsArgs         FilePath
+                     | IncludeDirs    FilePath
+                     | LdArgs         FilePath
+                     | Modules        FilePath
+                     | SrcDirs        FilePath
 
 newtype PackageDataKey = PackageDataKey (FilePath, String)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
@@ -55,23 +55,23 @@ pkgData packageData = case packageData of
 -- @pkgListData Modules@ therefore returns ["Data.Array", "Data.Array.Base", ...]
 pkgDataList :: PackageDataList -> Action [String]
 pkgDataList packageData = fmap (map unquote . words) $ case packageData of
-    CcArgs             path -> askPackageData path "CC_OPTS"
-    CSrcs              path -> askPackageData path "C_SRCS"
-    CppArgs            path -> askPackageData path "CPP_OPTS"
-    DepCcArgs          path -> askPackageData path "DEP_CC_OPTS"
-    DepExtraLibs       path -> askPackageData path "DEP_EXTRA_LIBS"
-    DepIds             path -> askPackageData path "DEP_IPIDS"
-    DepIncludeDirs     path -> askPackageData path "DEP_INCLUDE_DIRS_SINGLE_QUOTED"
-    DepLibDirs         path -> askPackageData path "DEP_LIB_DIRS_SINGLE_QUOTED"
-    DepLdArgs          path -> askPackageData path "DEP_LD_OPTS"
-    DepNames           path -> askPackageData path "DEP_NAMES"
-    Deps               path -> askPackageData path "DEPS"
-    HiddenModules      path -> askPackageData path "HIDDEN_MODULES"
-    HsArgs             path -> askPackageData path "HC_OPTS"
-    IncludeDirs        path -> askPackageData path "INCLUDE_DIRS"
-    LdArgs             path -> askPackageData path "LD_OPTS"
-    Modules            path -> askPackageData path "MODULES"
-    SrcDirs            path -> askPackageData path "HS_SRC_DIRS"
+    CcArgs         path -> askPackageData path "CC_OPTS"
+    CSrcs          path -> askPackageData path "C_SRCS"
+    CppArgs        path -> askPackageData path "CPP_OPTS"
+    DepCcArgs      path -> askPackageData path "DEP_CC_OPTS"
+    DepExtraLibs   path -> askPackageData path "DEP_EXTRA_LIBS"
+    DepIds         path -> askPackageData path "DEP_IPIDS"
+    DepIncludeDirs path -> askPackageData path "DEP_INCLUDE_DIRS_SINGLE_QUOTED"
+    DepLibDirs     path -> askPackageData path "DEP_LIB_DIRS_SINGLE_QUOTED"
+    DepLdArgs      path -> askPackageData path "DEP_LD_OPTS"
+    DepNames       path -> askPackageData path "DEP_NAMES"
+    Deps           path -> askPackageData path "DEPS"
+    HiddenModules  path -> askPackageData path "HIDDEN_MODULES"
+    HsArgs         path -> askPackageData path "HC_OPTS"
+    IncludeDirs    path -> askPackageData path "INCLUDE_DIRS"
+    LdArgs         path -> askPackageData path "LD_OPTS"
+    Modules        path -> askPackageData path "MODULES"
+    SrcDirs        path -> askPackageData path "HS_SRC_DIRS"
   where
     unquote = dropWhile (== '\'') . dropWhileEnd (== '\'')
 
