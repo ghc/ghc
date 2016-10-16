@@ -357,7 +357,7 @@ test('T10904', [ omit_ways(['ghci']), extra_run_opts('20000') ],
 test('T10728', [extra_run_opts('+RTS -maxN3 -RTS'), only_ways(['threaded2'])],
                compile_and_run, [''])
 
-test('T9405', [extra_clean(['T9405.ticky'])],
+test('T9405', [extra_clean(['T9405.ticky']), when(msys(), expect_broken(12714))],
               run_command, ['$MAKE -s --no-print-directory T9405'])
 
 test('T11788', when(ghc_dynamic(), skip),

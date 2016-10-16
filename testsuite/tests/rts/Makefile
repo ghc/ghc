@@ -52,7 +52,9 @@ T9405:
     sleep 0.2; \
     kill -2 $$!; \
     wait $$!; \
-    [ -s T9405.ticky ] && echo Ticky-Ticky
+    [ -e T9405.ticky ] || echo "Error: Ticky profile doesn't exist"; \
+    [ -s T9405.ticky ] || echo "Error: Ticky profile is empty"; \
+    echo Ticky-Ticky;
 
 # Naming convention: 'T5423_' obj-way '_' obj-src
 # obj-way ::= v | dyn
