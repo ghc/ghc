@@ -48,7 +48,10 @@ test('break007', extra_clean(['Break007.o', 'Break007.hi']),
 test('break008', normal, ghci_script, ['break008.script'])
 test('break009', combined_output, ghci_script, ['break009.script'])
 test('break010', normal, ghci_script, ['break010.script'])
-test('break011', combined_output, ghci_script, ['break011.script'])
+test('break011',
+     [combined_output,
+      when(msys(), expect_broken(12712))],
+     ghci_script, ['break011.script'])
 test('break012', normal, ghci_script, ['break012.script'])
 test('break013', normal, ghci_script, ['break013.script'])
 test('break014', normal, ghci_script, ['break014.script'])
