@@ -53,7 +53,7 @@ import GHC.Base         ( Int(..), StableName#, makeStableName#
 
   The reverse is not necessarily true: if two stable names are not
   equal, then the objects they name may still be equal.  Note in particular
-  that `mkStableName` may return a different `StableName` after an
+  that `makeStableName` may return a different `StableName` after an
   object is evaluated.
 
   Stable Names are similar to Stable Pointers ("Foreign.StablePtr"),
