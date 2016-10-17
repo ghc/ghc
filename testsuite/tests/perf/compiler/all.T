@@ -380,7 +380,7 @@ test('T5030',
            # 2015-07-11:  201882912 reason unknown
            # 2016-04-06:  345668088 likely TypeInType
 
-           (wordsize(64), 653710960, 10)]),
+           (wordsize(64), 794426536, 10)]),
              # Previously 530000000 (+/- 10%)
              # 17/1/13:   602993184  (x86_64/Linux)
              #            (new demand analyser)
@@ -398,6 +398,9 @@ test('T5030',
              #                          of family-applications leads to less sharing, I think
              # 2015-03-17 403932600  tweak to solver algorithm
              # 2015-12-11 653710960  TypeInType (see #11196)
+             # 2016-10-17 794426536  20% big increase following
+             #                       31621b12 * A collection of type-inference refactorings.
+             #                       See ticket for more info
 
        only_ways(['normal'])
       ],
