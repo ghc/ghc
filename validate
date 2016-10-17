@@ -284,10 +284,16 @@ if [ $be_quiet -eq 1 ] && [ -z $VERBOSE ]; then
     TEST_VERBOSITY="VERBOSE=1"
 fi
 
+# We need to be quite picky on Windows about which Python interpreter we use
+# (#12554, #12661). Allow the user to override it.
+if [ "z$PYTHON" != "z" ]; then
+    PYTHON_ARG="PYTHON=$PYTHON"
+fi
+
 rm -f testsuite_summary.txt testsuite_summary_stage1.txt
 
 # Use LOCAL=0, see Note [Running tests in /tmp].
-$make -C testsuite/tests $BINDIST \
+$make -C testsuite/tests $BINDIST $PYTHON_ARG \
       $MAKE_TEST_TARGET stage=2 LOCAL=0 $TEST_VERBOSITY THREADS=$threads \
       NO_PRINT_SUMMARY=YES SUMMARY_FILE=../../testsuite_summary.txt \
       2>&1 | tee testlog
@@ -295,7 +301,7 @@ $make -C testsuite/tests $BINDIST \
 # Run a few tests using the stage1 compiler.
 # See Note [Why is there no stage1 setup function?].
 # Don't use BINDIST=YES, as stage1 is not available in a bindist.
-$make -C testsuite/tests/stage1 \
+$make -C testsuite/tests/stage1 $PYTHON_ARG \
       $MAKE_TEST_TARGET stage=1 LOCAL=0 $TEST_VERBOSITY THREADS=$threads \
       NO_PRINT_SUMMARY=YES SUMMARY_FILE=../../../testsuite_summary_stage1.txt \
       2>&1 | tee testlog-stage1
