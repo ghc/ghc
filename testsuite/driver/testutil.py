@@ -1,5 +1,6 @@
 import errno
 import os
+import platform
 import subprocess
 import shutil
 
@@ -44,9 +45,14 @@ def lndir(srcdir, dstdir):
             os.mkdir(dst)
             lndir(src, dst)
 
-# On Windows, os.symlink is not defined. Except when using msys2, as ghc
-# does. Then it copies the source file, instead of creating a symbolic
-# link to it. We define the following function to make this magic more
-# explicit/discoverable. You are enouraged to use it instead of
-# os.symlink.
-link_or_copy_file = getattr(os, "symlink", shutil.copyfile)
+# On Windows, os.symlink is not defined with Python 2.7, but is in Python 3
+# when using msys2, as GHC does. Unfortunately, only Administrative users have
+# the privileges necessary to create symbolic links by default. Consequently we
+# are forced to just copy instead.
+#
+# We define the following function to make this magic more
+# explicit/discoverable. You are enouraged to use it instead of os.symlink.
+if platform.system() == 'Windows':
+    link_or_copy_file = shutil.copyfile
+else:
+    link_or_copy_file = os.symlink
