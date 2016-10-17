@@ -480,6 +480,7 @@ extra_src_files = {
   'recomp010': ['Main.hs', 'X1.hs', 'X2.hs'],
   'recomp011': ['Main.hs'],
   'recomp015': ['Generate.hs'],
+  'recomp016': ['A.hs', 'A2.hs', 'C.hs', 'D.hs', 'E.hs'],
   'record_upd': ['Main.hs'],
   'rename.prog001': ['Rn037Help.hs', 'rn037.hs'],
   'rename.prog002': ['Rn037Help.hs', 'rnfail037.hs'],

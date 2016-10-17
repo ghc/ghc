@@ -169,8 +169,19 @@ See Note [Unique Determinism] in Unique
 listToSet :: [ModulePair] -> ModulePairSet
 listToSet l = Set.fromList l
 
+-- | Check family instance consistency, given:
+--
+-- 1. The list of all modules transitively imported by us
+--    which define a family instance (these are the ones
+--    we have to check for consistency), and
+--
+-- 2. The list of modules which we directly imported
+--    (these specify the sets of family instance defining
+--    modules which are already known to be consistent).
+--
+-- See Note [Checking family instance consistency] for more
+-- details.
 checkFamInstConsistency :: [Module] -> [Module] -> TcM ()
--- See Note [Checking family instance consistency]
 checkFamInstConsistency famInstMods directlyImpMods
   = do { dflags     <- getDynFlags
        ; (eps, hpt) <- getEpsAndHpt

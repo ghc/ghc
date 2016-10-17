@@ -2258,10 +2258,13 @@ data Dependencies
                         -- instance orphans as they are anyway included in
                         -- 'dep_finsts'.  But then be careful about code
                         -- which relies on dep_orphs having the complete list!)
+                        -- This does NOT include us, unlike 'imp_orphs'.
 
          , dep_finsts :: [Module]
-                        -- ^ Modules that contain family instances (whether the
-                        -- instances are from the home or an external package)
+                        -- ^ Transitive closure of depended upon modules which
+                        -- contain family instances (whether home or external).
+                        -- This is used by 'checkFamInstConsistency'.  This
+                        -- does NOT include us, unlike 'imp_finsts'.
          }
   deriving( Eq )
         -- Equality used only for old/new comparison in MkIface.addFingerprints

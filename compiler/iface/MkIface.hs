@@ -569,6 +569,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    -- tracked by the usage on the ABI hash of package modules that we import.
    let orph_mods
         = filter (/= this_mod) -- Note [Do not update EPS with your own hi-boot]
+        -- TODO: the line below is not correct, see #12733
         . filter ((== this_pkg) . moduleUnitId)
         $ dep_orphs sorted_deps
    dep_orphan_hashes <- getOrphanHashes hsc_env orph_mods
@@ -592,10 +593,40 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                        orphan_hash,
                        dep_orphan_hashes,
                        dep_pkgs (mi_deps iface0),
+                       -- See Note [Export hash depends on non-orphan family instances]
+                       dep_finsts (mi_deps iface0),
                         -- dep_pkgs: see "Package Version Changes" on
                         -- wiki/Commentary/Compiler/RecompilationAvoidance
                        mi_trust iface0)
                         -- Make sure change of Safe Haskell mode causes recomp.
+
+   -- Note [Export hash depends on non-orphan family instances]
+   -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   --
+   -- Suppose we have:
+   --
+   --   module A where
+   --       type instance F Int = Bool
+   --
+   --   module B where
+   --       import A
+   --
+   --   module C where
+   --       import B
+   --
+   -- The family instance consistency check for C depends on the dep_finsts of
+   -- B.  If we rename module A to A2, when the dep_finsts of B changes, we need
+   -- to make sure that C gets rebuilt. Effectively, the dep_finsts are part of
+   -- the exports of B, because C always considers them when checking
+   -- consistency.
+   --
+   -- A full discussion is in #12723.
+   --
+   -- We do NOT need to hash dep_orphs, because this is implied by
+   -- dep_orphan_hashes, and we do not need to hash ordinary class instances,
+   -- because there is no eager consistency check as there is with type families
+   -- (also we didn't store it anywhere!)
+   --
 
    -- put the declarations in a canonical order, sorted by OccName
    let sorted_decls = Map.elems $ Map.fromList $
@@ -664,6 +695,36 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
     fix_fn = mi_fix_fn iface0
     ann_fn = mkIfaceAnnCache (mi_anns iface0)
 
+-- | Retrieve the orphan hashes 'mi_orphan_hash' for a list of modules
+-- (in particular, the orphan modules which are transitively imported by the
+-- current module).
+--
+-- Q: Why do we need the hash at all, doesn't the list of transitively
+-- imported orphan modules suffice?
+--
+-- A: If one of our transitive imports adds a new orphan instance, our
+-- export hash must change so that modules which import us rebuild.  If we just
+-- hashed the [Module], the hash would not change even when a new instance was
+-- added to a module that already had an orphan instance.
+--
+-- Q: Why don't we just hash the orphan hashes of our direct dependencies?
+-- Why the full transitive closure?
+--
+-- A: Suppose we have these modules:
+--
+--      module A where
+--          instance Show (a -> b) where
+--      module B where
+--          import A -- **
+--      module C where
+--          import A
+--          import B
+--
+-- Whether or not we add or remove the import to A in B affects the
+-- orphan hash of B.  But it shouldn't really affect the orphan hash
+-- of C.  If we hashed only direct dependencies, there would be no
+-- way to tell that the net effect was a wash, and we'd be forced
+-- to recompile C and everything else.
 getOrphanHashes :: HscEnv -> [Module] -> IO [Fingerprint]
 getOrphanHashes hsc_env mods = do
   eps <- hscEPS hsc_env

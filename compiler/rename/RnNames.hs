@@ -350,6 +350,11 @@ calculateAvails dflags iface mod_safe' want_boot =
 
 
       -- Compute new transitive dependencies
+      --
+      -- 'dep_orphs' and 'dep_finsts' do NOT include the imported module
+      -- itself, but we DO need to include this module in 'imp_orphs' and
+      -- 'imp_finsts' if it defines an orphan or instance family; thus the
+      -- orph_iface/has_iface tests.
 
       orphans | orph_iface = ASSERT( not (imp_mod `elem` dep_orphs deps) )
                              imp_mod : dep_orphs deps
