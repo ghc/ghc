@@ -826,9 +826,9 @@ def do_test(name, way, func, args, files):
         src_makefile = in_srcdir('Makefile')
         dst_makefile = in_testdir('Makefile')
         if os.path.exists(src_makefile):
-            with open(src_makefile, 'r') as src:
+            with io.open(src_makefile, 'r', encoding='utf8') as src:
                 makefile = re.sub('TOP=.*', 'TOP=' + config.top, src.read(), 1)
-                with open(dst_makefile, 'w') as dst:
+                with io.open(dst_makefile, 'w', encoding='utf8') as dst:
                     dst.write(makefile)
 
     if config.use_threads:
@@ -1289,20 +1289,20 @@ def interpreter_run(name, way, extra_hc_opts, top_mod):
 
     delimiter = '===== program output begins here\n'
 
-    with open(script, 'w') as f:
+    with io.open(script, 'w', encoding='utf8') as f:
         # set the prog name and command-line args to match the compiled
         # environment.
-        f.write(':set prog ' + name + '\n')
-        f.write(':set args ' + opts.extra_run_opts + '\n')
+        f.write(u':set prog ' + name + u'\n')
+        f.write(u':set args ' + opts.extra_run_opts + u'\n')
         # Add marker lines to the stdout and stderr output files, so we
         # can separate GHCi's output from the program's.
-        f.write(':! echo ' + delimiter)
-        f.write(':! echo 1>&2 ' + delimiter)
+        f.write(u':! echo ' + delimiter)
+        f.write(u':! echo 1>&2 ' + delimiter)
         # Set stdout to be line-buffered to match the compiled environment.
-        f.write('System.IO.hSetBuffering System.IO.stdout System.IO.LineBuffering\n')
+        f.write(u'System.IO.hSetBuffering System.IO.stdout System.IO.LineBuffering\n')
         # wrapping in GHC.TopHandler.runIO ensures we get the same output
         # in the event of an exception as for the compiled program.
-        f.write('GHC.TopHandler.runIOFastExit Main.main Prelude.>> Prelude.return ()\n')
+        f.write(u'GHC.TopHandler.runIOFastExit Main.main Prelude.>> Prelude.return ()\n')
 
     stdin = in_testdir(opts.stdin if opts.stdin else add_suffix(name, 'stdin'))
     if os.path.exists(stdin):

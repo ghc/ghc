@@ -208,7 +208,7 @@ from testlib import *
 # On Windows we need to set $PATH to include the paths to all the DLLs
 # in order for the dynamic library tests to work.
 if windows or darwin:
-    pkginfo = getStdout([config.ghc_pkg, 'dump'])
+    pkginfo = str(getStdout([config.ghc_pkg, 'dump']))
     topdir = config.libdir
     if windows:
         mingw = os.path.join(topdir, '../mingw/bin')
@@ -303,7 +303,12 @@ for file in t_files:
     if_verbose(2, '====> Scanning %s' % file)
     newTestDir(tempdir, os.path.dirname(file))
     try:
-        exec(open(file).read())
+        if PYTHON3:
+            src = io.open(file, encoding='utf8').read()
+        else:
+            src = open(file).read()
+
+        exec(src)
     except Exception as e:
         traceback.print_exc()
         framework_fail(file, '', str(e))
