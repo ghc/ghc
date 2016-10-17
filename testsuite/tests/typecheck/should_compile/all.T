@@ -359,7 +359,7 @@ test('tc263',
     multimod_compile, ['tc263','-v0'])
 test('tc265', compile_timeout_multiplier(0.01), compile, [''])
 test('tc266',
-     [extra_clean(['Tc266.hi-boot', 'Tc266.o-boot', 'Tc266a.hi', 'Tc266a.o', 'Tc266.hi', 'Tc266.o']), run_timeout_multiplier(0.01)] ,
+     [extra_clean(['Tc266.hi-boot', 'Tc266.o-boot', 'Tc266a.hi', 'Tc266a.o', 'Tc266.hi', 'Tc266.o'])] ,
      run_command,
      ['$MAKE -s --no-print-directory tc266'])
 test('Tc267',
