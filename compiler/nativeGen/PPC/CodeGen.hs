@@ -744,7 +744,7 @@ temporary, then do the other computation, and then use the temporary:
 
 {- Note [Power instruction format]
 In some instructions the 16 bit offset must be a multiple of 4, i.e.
-the two least significant bits mus be zero. The "Power ISA" specification
+the two least significant bits must be zero. The "Power ISA" specification
 calls these instruction formats "DS-FORM" and the instructions with
 arbitrary 16 bit offsets are "D-FORM".
 

@@ -774,7 +774,7 @@ collectLocalBinders (HsIPBinds _)      = []
 collectLocalBinders EmptyLocalBinds    = []
 
 collectHsIdBinders, collectHsValBinders :: HsValBindsLR idL idR -> [idL]
--- Collect Id binders only, or Ids + pattern synonmys, respectively
+-- Collect Id binders only, or Ids + pattern synonyms, respectively
 collectHsIdBinders  = collect_hs_val_binders True
 collectHsValBinders = collect_hs_val_binders False
 

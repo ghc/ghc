@@ -243,7 +243,7 @@ unify x := [a] during type checking, and then use the instantiating type
                                               dl = $dfunEqList d
                                           in k [a] dl ys
 
-This "concealing" story works for /uni-directional/ pattern synonmys,
+This "concealing" story works for /uni-directional/ pattern synonyms,
 but obviously not for bidirectional ones.  So in the bidirectional case
 we use SigTv, rather than a generic TauTv, meta-tyvar so that.  And
 we should really check that those SigTvs don't get unified with each

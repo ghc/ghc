@@ -433,7 +433,7 @@ schemeE d s p (AnnLet (AnnNonRec x (_,rhs)) (_,body))
      Just data_con <- isDataConWorkId_maybe v,
      dataConRepArity data_con == length args_r_to_l
    = do -- Special case for a non-recursive let whose RHS is a
-        -- saturatred constructor application.
+        -- saturated constructor application.
         -- Just allocate the constructor and carry on
         alloc_code <- mkConAppCode d s p data_con args_r_to_l
         body_code <- schemeE (d+1) s (Map.insert x d p) body
