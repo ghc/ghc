@@ -110,23 +110,26 @@ run secs cmd =
        unless b $ errorWin "createProcessW"
        pi <- peek p_pi
        assignProcessToJobObject job (piProcess pi)
-       resumeThread (piThread pi)
+       let handleInterrupt action =
+               action `onException` terminateJobObject job 99
+       handleInterrupt $ do
+          resumeThread (piThread pi)
 
-       -- The program is now running
+          -- The program is now running
 
-       let handle = piProcess pi
-       let millisecs = secs * 1000
-       rc <- waitForSingleObject handle (fromIntegral millisecs)
-       if rc == cWAIT_TIMEOUT
-           then do terminateJobObject job 99
-                   exitWith (ExitFailure 99)
-           else alloca $ \p_exitCode ->
-                do r <- getExitCodeProcess handle p_exitCode
-                   if r then do ec <- peek p_exitCode
-                                let ec' = if ec == 0
-                                          then ExitSuccess
-                                          else ExitFailure $ fromIntegral ec
-                                exitWith ec'
-                        else errorWin "getExitCodeProcess"
+          let handle = piProcess pi
+          let millisecs = secs * 1000
+          rc <- waitForSingleObject handle (fromIntegral millisecs)
+          if rc == cWAIT_TIMEOUT
+              then do terminateJobObject job 99
+                      exitWith (ExitFailure 99)
+              else alloca $ \p_exitCode ->
+                    do r <- getExitCodeProcess handle p_exitCode
+                       if r then do ec <- peek p_exitCode
+                                    let ec' = if ec == 0
+                                              then ExitSuccess
+                                              else ExitFailure $ fromIntegral ec
+                                    exitWith ec'
+                            else errorWin "getExitCodeProcess"
 #endif
 
