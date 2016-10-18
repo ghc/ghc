@@ -192,8 +192,8 @@ getInputs = asks inputs
 getInput :: Expr FilePath
 getInput = do
     target <- ask
-    getSingleton getInputs $
-        "getInput: exactly one input file expected in target " ++ show target
+    getSingleton ("Exactly one input file expected in " ++ show target)
+        <$> getInputs
 
 -- | Get the files produced by the current 'Target'.
 getOutputs :: Expr [FilePath]
@@ -203,10 +203,11 @@ getOutputs = asks outputs
 getOutput :: Expr FilePath
 getOutput = do
     target <- ask
-    getSingleton getOutputs $
-        "getOutput: exactly one output file expected in target " ++ show target
+    getSingleton ("Exactly one output file expected in " ++ show target)
+        <$> getOutputs
 
-getSingleton :: Monad m => m [a] -> String -> m a
-getSingleton expr msg = expr >>= \case
-    [res] -> return res
-    _     -> error msg
+-- | Extract a value from a singleton list, or raise an error if the list does
+-- not contain exactly one value.
+getSingleton :: String -> [a] -> a
+getSingleton _ [res] = res
+getSingleton msg _   = error msg

@@ -80,9 +80,9 @@ libffiRules = do
     libffiMakefile <.> "in" %> \mkIn -> do
         removeDirectory libffiBuildPath
         createDirectory $ buildRootPath -/- stageString Stage0
-        let tarballs = "libffi-tarballs/libffi*.tar.gz"
-        tarball <- unifyPath <$> getSingleton (getDirectoryFiles "" [tarballs])
-                                 "Exactly one LibFFI tarball is expected."
+        tarball <- unifyPath . getSingleton "Exactly one LibFFI tarball is expected"
+               <$> getDirectoryFiles "" ["libffi-tarballs/libffi*.tar.gz"]
+
         need [tarball]
         let libname = dropExtension . dropExtension $ takeFileName tarball
 

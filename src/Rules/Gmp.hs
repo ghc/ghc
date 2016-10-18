@@ -81,9 +81,9 @@ gmpRules = do
         -- gmp-4.2.4.tar.bz2 repacked without the doc/ directory contents.
         -- That's because the doc/ directory contents are under the GFDL,
         -- which causes problems for Debian.
-        let tarballs = gmpBase -/- "tarball/gmp*.tar.bz2"
-        tarball <- unifyPath <$> getSingleton (getDirectoryFiles "" [tarballs])
-                                 "Exactly one GMP tarball is expected."
+        tarball <- unifyPath . getSingleton "Exactly one GMP tarball is expected"
+               <$> getDirectoryFiles "" [gmpBase -/- "tarball/gmp*.tar.bz2"]
+
         withTempDir $ \dir -> do
             let tmp = unifyPath dir
             need [tarball]
