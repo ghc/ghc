@@ -31,7 +31,7 @@ import GHCi.UI          ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 
 -- Frontend plugins
 #ifdef GHCI
-import DynamicLoading
+import DynamicLoading   ( loadFrontendPlugin )
 import Plugins
 #else
 import DynamicLoading   ( pluginError )
