@@ -463,11 +463,10 @@ loadInterface doc_str mod from
         --     If we do loadExport first the wrong info gets into the cache (unless we
         --      explicitly tag each export which seems a bit of a bore)
 
-        ; ignore_prags      <- goptM Opt_IgnoreInterfacePragmas
-        ; new_eps_decls     <- loadDecls ignore_prags (mi_decls iface)
+        ; new_eps_decls     <- loadDecls (mi_decls iface)
         ; new_eps_insts     <- mapM tcIfaceInst (mi_insts iface)
         ; new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
-        ; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules iface)
+        ; new_eps_rules     <- tcIfaceRules (mi_rules iface)
         ; new_eps_anns      <- tcIfaceAnnotations (mi_anns iface)
         ; new_eps_complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs iface)
 
@@ -746,19 +745,17 @@ badSourceImport mod
 addDeclsToPTE :: PackageTypeEnv -> [(Name,TyThing)] -> PackageTypeEnv
 addDeclsToPTE pte things = extendNameEnvList pte things
 
-loadDecls :: Bool
-          -> [(Fingerprint, IfaceDecl)]
+loadDecls :: [(Fingerprint, IfaceDecl)]
           -> IfL [(Name,TyThing)]
-loadDecls ignore_prags ver_decls
-   = do { thingss <- mapM (loadDecl ignore_prags) ver_decls
+loadDecls ver_decls
+   = do { thingss <- mapM loadDecl ver_decls
         ; return (concat thingss)
         }
 
-loadDecl :: Bool                    -- Don't load pragmas into the decl pool
-          -> (Fingerprint, IfaceDecl)
+loadDecl :: (Fingerprint, IfaceDecl)
           -> IfL [(Name,TyThing)]   -- The list can be poked eagerly, but the
                                     -- TyThings are forkM'd thunks
-loadDecl ignore_prags (_version, decl)
+loadDecl (_version, decl)
   = do  {       -- Populate the name cache with final versions of all
                 -- the names associated with the decl
           let main_name = ifName decl
@@ -771,7 +768,7 @@ loadDecl ignore_prags (_version, decl)
         -- which includes its nameParent.
 
         ; thing <- forkM doc $ do { bumpDeclStats main_name
-                                  ; tcIfaceDecl ignore_prags decl }
+                                  ; tcIfaceDecl decl }
 
         -- Populate the type environment with the implicitTyThings too.
         --

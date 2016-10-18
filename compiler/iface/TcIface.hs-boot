@@ -11,8 +11,8 @@ import CoreSyn     ( CoreRule )
 import HscTypes    ( CompleteMatch )
 import Annotations ( Annotation )
 
-tcIfaceDecl         :: Bool -> IfaceDecl -> IfL TyThing
-tcIfaceRules        :: Bool -> [IfaceRule] -> IfL [CoreRule]
+tcIfaceDecl         :: IfaceDecl -> IfL TyThing
+tcIfaceRules        :: [IfaceRule] -> IfL [CoreRule]
 tcIfaceInst         :: IfaceClsInst -> IfL ClsInst
 tcIfaceFamInst      :: IfaceFamInst -> IfL FamInst
 tcIfaceAnnotations  :: [IfaceAnnotation] -> IfL [Annotation]

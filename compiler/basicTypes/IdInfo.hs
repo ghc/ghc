@@ -240,7 +240,7 @@ data IdInfo
         arityInfo       :: !ArityInfo,          -- ^ 'Id' arity
         ruleInfo        :: RuleInfo,            -- ^ Specialisations of the 'Id's function which exist
                                                 -- See Note [Specialisations and RULES in IdInfo]
-        unfoldingInfo   :: Unfolding,           -- ^ The 'Id's unfolding
+        unfoldingInfo   :: Unfolding,           -- ^ The 'Id's unfolding. Lazily loaded from interface files.
         cafInfo         :: CafInfo,             -- ^ 'Id' CAF info
         oneShotInfo     :: OneShotInfo,         -- ^ Info about a lambda-bound variable, if the 'Id' is one
         inlinePragInfo  :: InlinePragma,        -- ^ Any inline pragma atached to the 'Id'

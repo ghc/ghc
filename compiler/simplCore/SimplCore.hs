@@ -135,6 +135,7 @@ getCoreToDo dflags
     rules_on      = gopt Opt_EnableRewriteRules           dflags
     eta_expand_on = gopt Opt_DoLambdaEtaExpansion         dflags
     ww_on         = gopt Opt_WorkerWrapper                dflags
+    ignore_prags  = gopt Opt_IgnoreInterfacePragmas       dflags
     static_ptrs   = xopt LangExt.StaticPointers           dflags
 
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
@@ -147,7 +148,7 @@ getCoreToDo dflags
                           , sm_dflags     = dflags
                           , sm_rules      = rules_on
                           , sm_eta_expand = eta_expand_on
-                          , sm_inline     = True
+                          , sm_inline     = not ignore_prags
                           , sm_case_case  = True }
 
     simpl_phase phase names iter
