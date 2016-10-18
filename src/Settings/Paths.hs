@@ -2,7 +2,7 @@ module Settings.Paths (
     contextDirectory, buildPath, pkgDataFile, pkgHaddockFile, pkgLibraryFile,
     pkgLibraryFile0, pkgGhciLibraryFile, gmpBuildPath, gmpObjects, gmpLibraryH,
     gmpBuildInfoPath, generatedPath, libffiBuildPath, shakeFilesPath, pkgConfFile,
-    packageDbDirectory, bootPackageConstraints, packageDependencies
+    packageDbDirectory, packageDbStamp, bootPackageConstraints, packageDependencies
     ) where
 
 import Base
@@ -91,6 +91,10 @@ libffiBuildPath = buildRootPath -/- "stage1/libffi"
 packageDbDirectory :: Stage -> FilePath
 packageDbDirectory Stage0 = buildRootPath -/- "stage0/bootstrapping.conf"
 packageDbDirectory _      = "inplace/lib/package.conf.d"
+
+-- | We use a stamp file to track the existence of a package database.
+packageDbStamp :: Stage -> FilePath
+packageDbStamp stage = packageDbDirectory stage -/- ".stamp"
 
 -- | Path to the configuration file of a given 'Context'.
 pkgConfFile :: Context -> Action FilePath

@@ -9,20 +9,22 @@ import Rules.Libffi
 import Settings.Packages.Rts
 import Settings.Paths
 import Target
+import UserSettings
 
--- | Build package-data.mk by processing the .cabal file with ghc-cabal utility.
+-- | Build rules for registering packages and initialising package databases
+-- by running the @ghc-pkg@ utility.
 registerPackage :: [(Resource, Int)] -> Context -> Rules ()
-registerPackage rs context@Context {..} = do
-    let path    = buildPath context
-        oldPath = pkgPath package -/- contextDirectory context -- TODO: remove, #113
-        pkgConf = packageDbDirectory stage -/- pkgNameString package
+registerPackage rs context@Context {..} = when (stage <= Stage1) $ do
+    let dir = packageDbDirectory stage
 
-    when (stage <= Stage1) $ matchVersionedFilePath pkgConf "conf" ?> \conf -> do
+    matchVersionedFilePath (dir -/- pkgNameString package) "conf" ?> \conf -> do
         -- This produces inplace-pkg-config. TODO: Add explicit tracking.
         need [pkgDataFile context]
 
         -- Post-process inplace-pkg-config. TODO: remove, see #113, #148.
-        let pkgConfig    = oldPath -/- "inplace-pkg-config"
+        let path         = buildPath context
+            oldPath      = pkgPath package -/- contextDirectory context
+            pkgConfig    = oldPath -/- "inplace-pkg-config"
             oldBuildPath = oldPath -/- "build"
             fixPkgConf   = unlines
                          . map
@@ -52,3 +54,9 @@ registerPackage rs context@Context {..} = do
                            . lines
 
             fixFile rtsConf fixRtsConf
+
+    when (package == ghc) $ packageDbStamp stage %> \stamp -> do
+        removeDirectory dir
+        buildWithResources rs $ Target (vanillaContext stage ghc) (GhcPkg stage) [] [dir]
+        writeFileLines stamp []
+        putSuccess $ "| Successfully initialised " ++ dir

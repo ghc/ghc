@@ -35,7 +35,6 @@ executable hadrian
                        , Oracles.LookupInPath
                        , Oracles.ModuleFiles
                        , Oracles.PackageData
-                       , Oracles.PackageDatabase
                        , Oracles.WindowsPath
                        , Package
                        , Predicate
