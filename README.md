@@ -138,8 +138,8 @@ The best way to contribute is to try the new build system, report the issues
 you found, and attempt to fix them. Please note: the codebase is very unstable
 at present and we expect a lot of further refactoring. If you would like to
 work on a particular issue, please let everyone know by adding a comment about
-this. The issues that are currently on the critical path are listed in
-[#239](https://github.com/snowleopard/hadrian/issues/239).
+this. The issues that are currently on the critical path and therefore require
+particular attention are listed in [#239](https://github.com/snowleopard/hadrian/issues/239).
 
 Acknowledgements
 ----------------
