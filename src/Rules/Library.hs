@@ -9,9 +9,9 @@ import Base
 import Context
 import Expression
 import Flavour
+import GHC
 import Oracles.PackageData
 import Rules.Actions
-import Rules.Gmp
 import Settings
 import Settings.Paths
 import Target
@@ -96,7 +96,7 @@ hSources context = do
 
 extraObjects :: Context -> Action [FilePath]
 extraObjects context
-    | context == gmpContext = do
+    | package context == integerGmp = do
         need [gmpLibraryH]
         map unifyPath <$> getDirectoryFiles "" [gmpObjects -/- "*.o"]
     | otherwise         = return []

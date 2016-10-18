@@ -1,4 +1,4 @@
-module Rules.Gmp (gmpRules, gmpContext) where
+module Rules.Gmp (gmpRules) where
 
 import Base
 import Builder
@@ -81,12 +81,9 @@ gmpRules = do
         -- gmp-4.2.4.tar.bz2 repacked without the doc/ directory contents.
         -- That's because the doc/ directory contents are under the GFDL,
         -- which causes problems for Debian.
-        tarballs <- getDirectoryFiles "" [gmpBase -/- "tarball/gmp*.tar.bz2"]
-        tarball  <- case tarballs of -- TODO: Drop code duplication.
-            [file] -> return $ unifyPath file
-            _      -> error $ "gmpRules: exactly one tarball expected"
-                      ++ "(found: " ++ show tarballs ++ ")."
-
+        let tarballs = gmpBase -/- "tarball/gmp*.tar.bz2"
+        tarball <- unifyPath <$> getSingleton (getDirectoryFiles "" [tarballs])
+                                 "Exactly one GMP tarball is expected."
         withTempDir $ \dir -> do
             let tmp = unifyPath dir
             need [tarball]

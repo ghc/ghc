@@ -16,7 +16,7 @@ module Expression (
 
     -- * Convenient accessors
     getContext, getStage, getPackage, getBuilder, getOutputs, getInputs, getWay,
-    getInput, getOutput,
+    getInput, getOutput, getSingleton,
 
     -- * Re-exports
     module Control.Monad.Trans.Reader,
@@ -206,7 +206,7 @@ getOutput = do
     getSingleton getOutputs $
         "getOutput: exactly one output file expected in target " ++ show target
 
-getSingleton :: Expr [a] -> String -> Expr a
+getSingleton :: Monad m => m [a] -> String -> m a
 getSingleton expr msg = expr >>= \case
     [res] -> return res
     _     -> error msg
