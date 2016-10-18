@@ -1,4 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Settings.Builders.GhcCabal (
     ghcCabalBuilderArgs, ghcCabalHsColourBuilderArgs, bootPackageDatabaseArgs, buildDll0
     ) where
