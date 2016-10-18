@@ -71,12 +71,12 @@ import Data.List        ( intercalate )
 loadPlugins :: HscEnv -> IO [(ModuleName, Plugin, [CommandLineOption])]
 loadPlugins hsc_env
   = do { plugins <- mapM (loadPlugin hsc_env) to_load
-       ; return $ map attachOptions $ to_load `zip` plugins }
+       ; return $ zipWith attachOptions to_load plugins }
   where
     dflags  = hsc_dflags hsc_env
     to_load = pluginModNames dflags
 
-    attachOptions (mod_nm, plug) = (mod_nm, plug, options)
+    attachOptions mod_nm plug = (mod_nm, plug, options)
       where
         options = [ option | (opt_mod_nm, option) <- pluginModNameOpts dflags
                             , opt_mod_nm == mod_nm ]
