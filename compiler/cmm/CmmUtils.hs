@@ -58,8 +58,8 @@ module CmmUtils(
         toBlockListEntryFirst, toBlockListEntryFirstFalseFallthrough,
         foldGraphBlocks, mapGraphNodes, postorderDfs, mapGraphNodes1,
 
-        analFwd, analBwd, analRewFwd, analRewBwd,
-        dataflowPassFwd, dataflowPassBwd, dataflowAnalFwd, dataflowAnalBwd,
+        analFwd, analBwd,
+        dataflowAnalFwd, dataflowAnalBwd,
         dataflowAnalFwdBlocks,
 
         -- * Ticks
@@ -565,30 +565,10 @@ postorderDfs g = {-# SCC "postorderDfs" #-} postorder_dfs_from (toBlockMap g) (g
 analFwd    :: DataflowLattice f -> FwdTransfer n f -> FwdPass UniqSM n f
 analBwd    :: DataflowLattice f -> BwdTransfer n f -> BwdPass UniqSM n f
 
-analFwd lat xfer = analRewFwd lat xfer noFwdRewrite
-analBwd lat xfer = analRewBwd lat xfer noBwdRewrite
-
--- Constructing forward and backward analysis + rewrite pass
-analRewFwd :: DataflowLattice f -> FwdTransfer n f
-           -> FwdRewrite UniqSM n f
-           -> FwdPass UniqSM n f
-
-analRewBwd :: DataflowLattice f
-           -> BwdTransfer n f
-           -> BwdRewrite UniqSM n f
-           -> BwdPass UniqSM n f
-
-analRewFwd lat xfer rew = FwdPass {fp_lattice = lat, fp_transfer = xfer, fp_rewrite = rew}
-analRewBwd lat xfer rew = BwdPass {bp_lattice = lat, bp_transfer = xfer, bp_rewrite = rew}
-
--- Running forward and backward dataflow analysis + optional rewrite
-dataflowPassFwd :: NonLocal n =>
-                   GenCmmGraph n -> [(BlockId, f)]
-                -> FwdPass UniqSM n f
-                -> UniqSM (GenCmmGraph n, BlockEnv f)
-dataflowPassFwd (CmmGraph {g_entry=entry, g_graph=graph}) facts fwd = do
-  (graph, facts, NothingO) <- analyzeAndRewriteFwd fwd (JustC [entry]) graph (mkFactBase (fp_lattice fwd) facts)
-  return (CmmGraph {g_entry=entry, g_graph=graph}, facts)
+analFwd lat xfer =
+    FwdPass {fp_lattice = lat, fp_transfer = xfer, fp_rewrite = noFwdRewrite}
+analBwd lat xfer =
+    BwdPass {bp_lattice = lat, bp_transfer = xfer, bp_rewrite = noBwdRewrite}
 
 dataflowAnalFwd :: NonLocal n =>
                    GenCmmGraph n -> [(BlockId, f)]
@@ -612,14 +592,6 @@ dataflowAnalBwd :: NonLocal n =>
                 -> BlockEnv f
 dataflowAnalBwd (CmmGraph {g_entry=entry, g_graph=graph}) facts bwd =
   analyzeBwd bwd (JustC [entry]) graph (mkFactBase (bp_lattice bwd) facts)
-
-dataflowPassBwd :: NonLocal n =>
-                   GenCmmGraph n -> [(BlockId, f)]
-                -> BwdPass UniqSM n f
-                -> UniqSM (GenCmmGraph n, BlockEnv f)
-dataflowPassBwd (CmmGraph {g_entry=entry, g_graph=graph}) facts bwd = do
-  (graph, facts, NothingO) <- analyzeAndRewriteBwd bwd (JustC [entry]) graph (mkFactBase (bp_lattice bwd) facts)
-  return (CmmGraph {g_entry=entry, g_graph=graph}, facts)
 
 -------------------------------------------------
 -- Tick utilities
