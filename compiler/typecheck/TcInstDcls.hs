@@ -675,8 +675,7 @@ tcDataFamInstDecl mb_clsinfo
 
        ; (rep_tc, axiom) <- fixM $ \ ~(rec_rep_tc, _) ->
            do { let ty_binders = mkTyBindersPreferAnon full_tvs liftedTypeKind
-              ; data_cons <- tcConDecls new_or_data
-                                        rec_rep_tc
+              ; data_cons <- tcConDecls rec_rep_tc
                                         (full_tvs, ty_binders, orig_res_ty) cons
               ; tc_rhs <- case new_or_data of
                      DataType -> return (mkDataTyConRhs data_cons)

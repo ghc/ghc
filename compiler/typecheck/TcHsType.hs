@@ -21,7 +21,7 @@ module TcHsType (
 
                 -- Type checking type and class decls
         kcLookupTcTyCon, kcTyClTyVars, tcTyClTyVars,
-        tcHsConArgType, tcDataKindSig,
+        tcDataKindSig,
 
         -- Kind-checking types
         -- No kind generalisation, no checkValidType
@@ -286,17 +286,6 @@ tcHsTypeApp wc_ty kind
 
         First a couple of simple wrappers for kcHsType
 -}
-
-tcHsConArgType :: NewOrData ->  LHsType Name -> TcM Type
--- Permit a bang, but discard it
-tcHsConArgType NewType  bty = tcHsLiftedType (getBangType bty)
-  -- Newtypes can't have bangs, but we don't check that
-  -- until checkValidDataCon, so do not want to crash here
-
-tcHsConArgType DataType bty = tcHsOpenType (getBangType bty)
-  -- Can't allow an unlifted type for newtypes, because we're effectively
-  -- going to remove the constructor while coercing it to a lifted type.
-  -- And newtypes can't be bang'd
 
 ---------------------------
 tcHsOpenType, tcHsLiftedType,
