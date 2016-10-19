@@ -942,8 +942,7 @@ tcDataDefn roles_info
 
        ; tycon <- fixM $ \ tycon -> do
              { let res_ty = mkTyConApp tycon (mkTyVarTys (binderVars final_bndrs))
-             ; data_cons <- tcConDecls new_or_data tycon
-                                       (final_bndrs, res_ty) cons
+             ; data_cons <- tcConDecls tycon (final_bndrs, res_ty) cons
              ; tc_rhs    <- mk_tc_rhs is_boot tycon data_cons
              ; tc_rep_nm <- newTyConRepName tc_name
              ; return (mkAlgTyCon tc_name
@@ -1426,23 +1425,22 @@ consUseGadtSyntax _                           = False
                  -- All constructors have same shape
 
 -----------------------------------
-tcConDecls :: NewOrData -> TyCon -> ([TyConBinder], Type)
+tcConDecls :: TyCon -> ([TyConBinder], Type)
            -> [LConDecl Name] -> TcM [DataCon]
   -- Why both the tycon tyvars and binders? Because the tyvars
   -- have all the names and the binders have the visibilities.
-tcConDecls new_or_data rep_tycon (tmpl_bndrs, res_tmpl)
+tcConDecls rep_tycon (tmpl_bndrs, res_tmpl)
   = concatMapM $ addLocM $
-    tcConDecl new_or_data rep_tycon tmpl_bndrs res_tmpl
+    tcConDecl rep_tycon tmpl_bndrs res_tmpl
 
-tcConDecl :: NewOrData
-          -> TyCon             -- Representation tycon. Knot-tied!
+tcConDecl :: TyCon             -- Representation tycon. Knot-tied!
           -> [TyConBinder] -> Type
                  -- Return type template (with its template tyvars)
                  --    (tvs, T tys), where T is the family TyCon
           -> ConDecl Name
           -> TcM [DataCon]
 
-tcConDecl new_or_data rep_tycon tmpl_bndrs res_tmpl
+tcConDecl rep_tycon tmpl_bndrs res_tmpl
           (ConDeclH98 { con_name = name
                       , con_qvars = hs_qvars, con_cxt = hs_ctxt
                       , con_details = hs_details })
@@ -1458,7 +1456,7 @@ tcConDecl new_or_data rep_tycon tmpl_bndrs res_tmpl
               tcExplicitTKBndrs hs_tvs $ \ exp_tvs ->
               do { traceTc "tcConDecl" (ppr name <+> text "tvs:" <+> ppr hs_tvs)
                  ; ctxt <- tcHsContext (fromMaybe (noLoc []) hs_ctxt)
-                 ; btys <- tcConArgs new_or_data hs_details
+                 ; btys <- tcConArgs hs_details
                  ; field_lbls <- lookupConstructorFields (unLoc name)
                  ; let (arg_tys, stricts) = unzip btys
                        bound_vars  = allBoundVariabless ctxt `unionVarSet`
@@ -1516,7 +1514,7 @@ tcConDecl new_or_data rep_tycon tmpl_bndrs res_tmpl
        ; mapM buildOneDataCon [name]
        }
 
-tcConDecl _new_or_data rep_tycon tmpl_bndrs res_tmpl
+tcConDecl rep_tycon tmpl_bndrs res_tmpl
           (ConDeclGADT { con_names = names, con_type = ty })
   = addErrCtxt (dataConCtxtName names) $
     do { traceTc "tcConDecl 1" (ppr names)
@@ -1583,7 +1581,7 @@ tcGadtSigType doc name ty@(HsIB { hsib_vars = vars })
               tcImplicitTKBndrs vars $
               tcExplicitTKBndrs gtvs $ \ exp_tvs ->
               do { ctxt <- tcHsContext cxt
-                 ; btys <- tcConArgs DataType hs_details
+                 ; btys <- tcConArgs hs_details
                  ; ty' <- tcHsLiftedType res_ty
                  ; field_lbls <- lookupConstructorFields name
                  ; let (arg_tys, stricts) = unzip btys
@@ -1617,16 +1615,16 @@ tcConIsInfixGADT con details
                         ; return (con `elemNameEnv` fix_env) }
                | otherwise -> return False
 
-tcConArgs :: NewOrData -> HsConDeclDetails Name
+tcConArgs :: HsConDeclDetails Name
           -> TcM [(TcType, HsSrcBang)]
-tcConArgs new_or_data (PrefixCon btys)
-  = mapM (tcConArg new_or_data) btys
-tcConArgs new_or_data (InfixCon bty1 bty2)
-  = do { bty1' <- tcConArg new_or_data bty1
-       ; bty2' <- tcConArg new_or_data bty2
+tcConArgs (PrefixCon btys)
+  = mapM tcConArg btys
+tcConArgs (InfixCon bty1 bty2)
+  = do { bty1' <- tcConArg bty1
+       ; bty2' <- tcConArg bty2
        ; return [bty1', bty2'] }
-tcConArgs new_or_data (RecCon fields)
-  = mapM (tcConArg new_or_data) btys
+tcConArgs (RecCon fields)
+  = mapM tcConArg btys
   where
     -- We need a one-to-one mapping from field_names to btys
     combined = map (\(L _ f) -> (cd_fld_names f,cd_fld_type f)) (unLoc fields)
@@ -1635,10 +1633,13 @@ tcConArgs new_or_data (RecCon fields)
     (_,btys) = unzip exploded
 
 
-tcConArg :: NewOrData -> LHsType Name -> TcM (TcType, HsSrcBang)
-tcConArg new_or_data bty
+tcConArg :: LHsType Name -> TcM (TcType, HsSrcBang)
+tcConArg bty
   = do  { traceTc "tcConArg 1" (ppr bty)
-        ; arg_ty <- tcHsConArgType new_or_data bty
+        ; arg_ty <- tcHsOpenType (getBangType bty)
+             -- Newtypes can't have unboxed types, but we check
+             -- that in checkValidDataCon; this tcConArg stuff
+             -- doesn't happen for GADT-style declarations
         ; traceTc "tcConArg 2" (ppr bty)
         ; return (arg_ty, getBangStrictness bty) }
 
@@ -2340,6 +2341,9 @@ checkNewDataCon con
   = do  { checkTc (isSingleton arg_tys) (newtypeFieldErr con (length arg_tys))
               -- One argument
 
+        ; checkTc (not (isUnliftedType arg_ty1)) $
+          text "A newtype cannot have an unlifted argument type"
+
         ; check_con (null eq_spec) $
           text "A newtype constructor must have a return type of form T a1 ... an"
                 -- Return type is (T a b c)
@@ -2360,6 +2364,8 @@ checkNewDataCon con
       = dataConFullSig con
     check_con what msg
        = checkTc what (msg $$ ppr con <+> dcolon <+> ppr (dataConUserType con))
+
+    (arg_ty1 : _) = arg_tys
 
     ok_bang (HsSrcBang _ _ SrcStrict) = False
     ok_bang (HsSrcBang _ _ SrcLazy)   = False

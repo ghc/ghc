@@ -429,4 +429,4 @@ test('T12170a', normal, compile_fail, [''])
 test('T12124', normal, compile_fail, [''])
 test('T12589', normal, compile_fail, [''])
 test('T12529', normal, compile_fail, [''])
-
+test('T12729', normal, compile_fail, [''])
