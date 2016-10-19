@@ -572,10 +572,15 @@
       SymI_HasProto(genericRaise)                                       \
       SymI_HasProto(getProgArgv)                                        \
       SymI_HasProto(getFullProgArgv)                                    \
+      SymI_HasProto(setFullProgArgv)                                    \
+      SymI_HasProto(freeFullProgArgv)                                   \
       SymI_HasProto(getStablePtr)                                       \
       SymI_HasProto(foreignExportStablePtr)                             \
       SymI_HasProto(hs_init)                                            \
+      SymI_HasProto(hs_init_with_rtsopts)                               \
+      SymI_HasProto(hs_init_ghc)                                        \
       SymI_HasProto(hs_exit)                                            \
+      SymI_HasProto(hs_exit_nowait)                                     \
       SymI_HasProto(hs_set_argv)                                        \
       SymI_HasProto(hs_add_root)                                        \
       SymI_HasProto(hs_perform_gc)                                      \
@@ -586,6 +591,9 @@
       SymI_HasProto(hs_free_fun_ptr)                                    \
       SymI_HasProto(hs_hpc_rootModule)                                  \
       SymI_HasProto(hs_hpc_module)                                      \
+      SymI_HasProto(hs_thread_done)                                     \
+      SymI_HasProto(hs_try_putmvar)                                     \
+      SymI_HasProto(defaultRtsConfig)                                   \
       SymI_HasProto(initLinker)                                         \
       SymI_HasProto(initLinker_)                                        \
       SymI_HasProto(stg_unpackClosurezh)                                \
@@ -702,6 +710,7 @@
       SymI_HasProto(rtsSupportsBoundThreads)                            \
       SymI_HasProto(rts_isProfiled)                                     \
       SymI_HasProto(rts_isDynamic)                                      \
+      SymI_HasProto(rts_setInCallCapability)                            \
       SymI_HasProto(rts_getThreadAllocationCounter)                     \
       SymI_HasProto(rts_setThreadAllocationCounter)                     \
       SymI_HasProto(rts_enableThreadAllocationLimit)                    \
