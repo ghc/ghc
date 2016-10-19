@@ -561,16 +561,33 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    -- lists of modules and suchlike, so put these all in canonical order:
    let sorted_deps = sortDependencies (mi_deps iface0)
 
-   -- the export hash of a module depends on the orphan hashes of the
+   -- The export hash of a module depends on the orphan hashes of the
    -- orphan modules below us in the dependency tree.  This is the way
    -- that changes in orphans get propagated all the way up the
-   -- dependency tree.  We only care about orphan modules in the current
-   -- package, because changes to orphans outside this package will be
-   -- tracked by the usage on the ABI hash of package modules that we import.
+   -- dependency tree.
+   --
+   -- Note [A bad dep_orphs optimization]
+   -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   -- In a previous version of this code, we filtered out orphan modules which
+   -- were not from the home package, justifying it by saying that "we'd
+   -- pick up the ABI hashes of the external module instead".  This is wrong.
+   -- Suppose that we have:
+   --
+   --       module External where
+   --           instance Show (a -> b)
+   --
+   --       module Home1 where
+   --           import External
+   --
+   --       module Home2 where
+   --           import Home1
+   --
+   -- The export hash of Home1 needs to reflect the orphan instances of
+   -- External. It's true that Home1 will get rebuilt if the orphans
+   -- of External, but we also need to make sure Home2 gets rebuilt
+   -- as well.  See #12733 for more details.
    let orph_mods
         = filter (/= this_mod) -- Note [Do not update EPS with your own hi-boot]
-        -- TODO: the line below is not correct, see #12733
-        . filter ((== this_pkg) . moduleUnitId)
         $ dep_orphs sorted_deps
    dep_orphan_hashes <- getOrphanHashes hsc_env orph_mods
 
@@ -688,7 +705,6 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
     this_mod = mi_module iface0
     semantic_mod = mi_semantic_module iface0
     dflags = hsc_dflags hsc_env
-    this_pkg = thisPackage dflags
     (non_orph_insts, orph_insts) = mkOrphMap ifInstOrph    (mi_insts iface0)
     (non_orph_rules, orph_rules) = mkOrphMap ifRuleOrph    (mi_rules iface0)
     (non_orph_fis,   orph_fis)   = mkOrphMap ifFamInstOrph (mi_fam_insts iface0)
@@ -734,10 +750,14 @@ getOrphanHashes hsc_env mods = do
     dflags     = hsc_dflags hsc_env
     get_orph_hash mod =
           case lookupIfaceByModule dflags hpt pit mod of
-            Nothing    -> pprPanic "moduleOrphanHash" (ppr mod)
-            Just iface -> mi_orphan_hash iface
+            Just iface -> return (mi_orphan_hash iface)
+            Nothing    -> do -- similar to 'mkHashFun'
+                iface <- initIfaceLoad hsc_env . withException
+                            $ loadInterface (text "getOrphanHashes") mod ImportBySystem
+                return (mi_orphan_hash iface)
+
   --
-  return (map get_orph_hash mods)
+  mapM get_orph_hash mods
 
 
 sortDependencies :: Dependencies -> Dependencies
