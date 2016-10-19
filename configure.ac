@@ -1171,6 +1171,7 @@ echo ["\
    Using $CompilerName       : $CC
       which is version       : $GccVersion
    Building a cross compiler : $CrossCompiling
+   Unregisterised            : $Unregisterised
    hs-cpp       : $HaskellCPPCmd
    hs-cpp-flags : $HaskellCPPArgs
    ld           : $LdCmd
