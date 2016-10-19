@@ -1349,6 +1349,10 @@ doWritePtrArrayOp :: CmmExpr
 doWritePtrArrayOp addr idx val
   = do dflags <- getDynFlags
        let ty = cmmExprType dflags val
+       -- This write barrier is to ensure that the heap writes to the object
+       -- referred to by val have happened before we write val into the array.
+       -- See #12469 for details.
+       emitPrimCall [] MO_WriteBarrier []
        mkBasicIndexedWrite (arrPtrsHdrSize dflags) Nothing addr ty idx val
        emit (setInfo addr (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
   -- the write barrier.  We must write a byte into the mark table:
