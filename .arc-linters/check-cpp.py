@@ -6,6 +6,7 @@
 import sys
 import logging
 import os
+import re
 import json
 
 def setup_logging(logger):
@@ -24,10 +25,11 @@ logger.debug(sys.argv)
 
 path = sys.argv[1]
 warnings = []
+r = re.compile(r'ASSERT\s+\(')
 if os.path.isfile(path):
     with open(path) as f:
         for lineno, line in enumerate(f):
-            if 'ASSERT (' in line:
+            if r.search(line):
                 warning = {
                     'severity': 'warning',
                     'message': 'CPP macros should not have a space between the macro name and their argument list',
