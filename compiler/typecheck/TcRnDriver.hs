@@ -983,7 +983,7 @@ checkBootTyCon is_boot tc1 tc2
             `andThenCheck`
     -- Don't report roles errors unless the type synonym is nullary
     checkUnless (not (null tvs)) $
-        ASSERT ( null roles2 )
+        ASSERT( null roles2 )
         -- If we have something like:
         --
         --  signature H where
