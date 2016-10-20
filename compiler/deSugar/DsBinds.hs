@@ -825,7 +825,8 @@ decomposeRuleLhs orig_bndrs orig_lhs
 
    -- We do not represent data con using their workers, but the rule code really likes
    -- having IDs around, so lets return that here. The matcher will know what to do with it.
-   collectArgs' (ConApp dc args) = (Var (dataConWorkId dc), args)
+   collectArgs' e@(ConApp dc _) = (Var (dataConWorkId dc), args)
+     where args = collectConArgs e
    collectArgs' e = collectArgs e
 
    decompose (Var fn_id) args

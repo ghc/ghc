@@ -585,8 +585,10 @@ vectDictExpr (Lam bndr e)
   = Lam bndr <$> vectDictExpr e
 vectDictExpr (App fn arg)
   = App <$> vectDictExpr fn <*> vectDictExpr arg
-vectDictExpr (ConApp dc args)
-  = ConApp dc <$> mapM vectDictExpr args
+vectDictExpr (ConApp dc cargs)
+    -- safe use of compressed args
+    -- (assuming that vectorized expressions have vectorized types)
+  = ConApp dc <$> mapM vectDictExpr cargs
 vectDictExpr (Case e bndr ty alts)
   = Case <$> vectDictExpr e <*> pure bndr <*> vectType ty <*> mapM vectDictAlt alts
   where

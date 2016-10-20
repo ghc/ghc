@@ -330,7 +330,7 @@ inlineBoringOk e
     go credit (App f (Type {}))            = go credit f
     go credit (App f a) | credit > 0
                         , exprIsTrivial a  = go (credit-1) f
-    go credit (ConApp dc args)             = all exprIsTrivial args &&
+    go credit (ConApp dc cargs)            = all exprIsTrivial cargs && -- safe use of compressed args
                                              credit >= dataConRepArity dc
     go credit (Tick _ e)                   = go credit e -- dubious
     go credit (Cast e _)                   = go credit e
@@ -507,11 +507,11 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
       | isTyCoArg arg = size_up fun
       | otherwise     = size_up arg  `addSizeNSD`
                         size_up_app fun [arg] (if isRealWorldExpr arg then 1 else 0)
-    size_up (ConApp dc args)
+    size_up (ConApp dc cargs) -- safe use of compressed args
         = foldr (addSizeNSD . size_up)
                 (conSize dc (length val_args))
                 val_args
-      where val_args = filter (not . isTyCoArg) args
+      where val_args = filter (not . isTyCoArg) cargs
 
     size_up (Lam b e)
       | isId b && not (isRealWorldId b) = lamScrutDiscount dflags (size_up e `addSizeN` 10)

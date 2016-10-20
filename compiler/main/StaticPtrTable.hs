@@ -52,6 +52,7 @@ module StaticPtrTable (sptModuleInitCode) where
 
 import CLabel
 import CoreSyn
+import CoreUtils ( collectConArgs )
 import DataCon
 import Id
 import Literal
@@ -82,7 +83,8 @@ sptModuleInitCode this_mod binds =
       , Just w0 <- fromPlatformWord64Rep lit0
       , Just w1 <- fromPlatformWord64Rep lit1
       = Just $ Fingerprint (fromInteger w0) (fromInteger w1)
-      | ConApp dc (_ : Lit lit0 : Lit lit1 : _) <- e
+      | (ConApp dc _) <- e
+      , (_ : Lit lit0 : Lit lit1 : _) <- collectConArgs e
       , dataConName dc == staticPtrDataConName
       , Just w0 <- fromPlatformWord64Rep lit0
       , Just w1 <- fromPlatformWord64Rep lit1

@@ -68,6 +68,7 @@ import Demand
 import Coercion( tidyCo )
 import Annotations
 import CoreSyn
+import CoreUtils ( collectConArgs )
 import Class
 import TyCon
 import CoAxiom
@@ -1770,13 +1771,14 @@ toIfaceExpr (Type ty)        = IfaceType (toIfaceType ty)
 toIfaceExpr (Coercion co)    = IfaceCo   (toIfaceCoercion co)
 toIfaceExpr (Lam x b)        = IfaceLam (toIfaceBndr x, toIfaceOneShot x) (toIfaceExpr b)
 toIfaceExpr (App f a)        = toIfaceApp f [a]
-toIfaceExpr (ConApp dc args) | Just tup_sort <- tyConTuple_maybe tc
+toIfaceExpr e@(ConApp dc _) | Just tup_sort <- tyConTuple_maybe tc
                              = IfaceTuple tup_sort tup_args
   where
+    args = collectConArgs e
     val_args  = dropWhile isTypeArg args
     tup_args  = map toIfaceExpr val_args
     tc        = dataConTyCon dc
-toIfaceExpr (ConApp dc args) = IfaceConApp (dataConName dc) (map toIfaceExpr args)
+toIfaceExpr (ConApp dc cargs) = IfaceConApp (dataConName dc) (map toIfaceExpr cargs) -- safe use of compressed args
 toIfaceExpr (Case s x ty as)
   | null as                  = IfaceECase (toIfaceExpr s) (toIfaceType ty)
   | otherwise                = IfaceCase (toIfaceExpr s) (getOccFS x) (map toIfaceAlt as)

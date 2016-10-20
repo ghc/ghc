@@ -334,8 +334,8 @@ coreToStgExpr expr@(App _ _)
   where
     (f, args, ticks) = myCollectArgs expr
 
-coreToStgExpr e@(ConApp dc args)
-  = do (args', args_fvs, ticks') <- coreToStgArgs args
+coreToStgExpr e@(ConApp dc cargs) -- safe use of compressed args
+  = do (args', args_fvs, ticks') <- coreToStgArgs cargs
        let res_ty = exprType e
        let app = StgConApp dc args' (dropRuntimeRepArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
        let tapp = foldr StgTick app ticks'
@@ -1058,7 +1058,7 @@ myCollectArgs expr
   where
     go (Var v)          as ts = (v, as, ts)
     go (App f a)        as ts = go f (a:as) ts
-    go (ConApp dc args) as ts = ASSERT( all isTypeArg as && all isTypeArg args )
+    go (ConApp dc cas)  as ts = ASSERT( all isTypeArg as && all isTypeArg cas )
                                 (dataConWorkId dc, [], ts)
     go (Tick t e)       as ts = ASSERT( all isTypeArg as )
                                 go e as (t:ts) -- ticks can appear in type apps

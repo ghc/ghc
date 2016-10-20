@@ -451,6 +451,7 @@ Library
         Kind
         Type
         TyCoRep
+        CompressArgs
         Unify
         Bag
         Binary

@@ -1104,7 +1104,7 @@ tcIfaceExpr (IfaceApp fun arg)
   = App <$> tcIfaceExpr fun <*> tcIfaceExpr arg
 
 tcIfaceExpr (IfaceConApp dcn arg)
-  = ConApp <$> tcIfaceDataCon dcn <*> mapM tcIfaceExpr arg
+  = ConApp <$> tcIfaceDataCon dcn <*> mapM tcIfaceExpr arg -- safe use of compressed args
 
 tcIfaceExpr (IfaceECase scrut ty)
   = do { scrut' <- tcIfaceExpr scrut

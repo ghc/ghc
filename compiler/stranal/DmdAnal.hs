@@ -190,7 +190,7 @@ dmdAnal' env dmd (App fun arg)
 --         , text "overall res dmd_ty =" <+> ppr (res_ty `bothDmdType` arg_ty) ])
     (res_ty `bothDmdType` arg_ty, App fun' arg')
 
-dmdAnal' env dmd (ConApp dc args)
+dmdAnal' env dmd (ConApp dc cargs) -- safe use of compressed args
   = -- pprTrace "dmdAnal:ConApp" (vcat
     --      [ text "dmd =" <+> ppr dmd
     --      , text "dc =" <+> ppr dc
@@ -199,12 +199,12 @@ dmdAnal' env dmd (ConApp dc args)
     --      , text "dmd' =" <+> ppr dmd'
     --      , text "final_ty =" <+> ppr final_ty
     --      ])
-    (final_ty, ConApp dc args')
+    (final_ty, ConApp dc cargs')
   where
     dc_strictSig = dataConWorkStrictSig dc
     dmd' = dmdTransformSatDataConSig (dataConRepArity dc) dc_strictSig dmd
     -- TODO: unpack dmd'
-    (final_ty, args') = go dmd' args
+    (final_ty, cargs') = go dmd' cargs
 
     go :: DmdType -> [CoreArg] -> (DmdType, [CoreArg])
     go fun_ty [] = (fun_ty, [])

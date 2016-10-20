@@ -294,10 +294,10 @@ floatExpr (App e a)
     case (floatExpr  a) of { (fsa, floats_a, a') ->
     (fse `add_stats` fsa, floats_e `plusFloats` floats_a, App e' a') }}
 
-floatExpr (ConApp dc args)
-  = (sum_stats flss, sumFloats floatss, ConApp dc args')
+floatExpr (ConApp dc cargs)
+  = (sum_stats flss, sumFloats floatss, ConApp dc cargs') -- safe use of compressed args
   where
-    (flss, floatss, args') = unzip3 $ map floatExpr args
+    (flss, floatss, cargs') = unzip3 $ map floatExpr cargs
 
 floatExpr lam@(Lam (TB _ lam_spec) _)
   = let (bndrs_w_lvls, body) = collectBinders lam

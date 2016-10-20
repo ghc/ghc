@@ -32,7 +32,7 @@ import TysWiredIn
 import TysPrim
 import TyCon       ( tyConDataCons_maybe, isEnumerationTyCon, isNewTyCon, unwrapNewTyCon_maybe )
 import DataCon     ( dataConTag, dataConTyCon, dataConRepType )
-import CoreUtils   ( cheapEqExpr, exprIsHNF )
+import CoreUtils   ( cheapEqExpr, exprIsHNF, collectConArgs )
 import CoreUnfold  ( exprIsConApp_maybe )
 import Type
 import OccName     ( occNameFS )
@@ -831,8 +831,8 @@ trueValInt  dflags = Lit $ onei  dflags -- see Note [What's true and false]
 falseValInt dflags = Lit $ zeroi dflags
 
 trueValBool, falseValBool :: Expr CoreBndr
-trueValBool   = ConApp trueDataCon [] -- see Note [What's true and false]
-falseValBool  = ConApp falseDataCon []
+trueValBool   = mkConApp trueDataCon [] -- see Note [What's true and false]
+falseValBool  = mkConApp falseDataCon []
 
 ltVal, eqVal, gtVal :: Expr CoreBndr
 ltVal = Var ltDataConId
@@ -893,7 +893,7 @@ tagToEnumRule = do
           correct_tag dc = (dataConTag dc - fIRST_TAG) == tag
       (dc:rest) <- return $ filter correct_tag (tyConDataCons_maybe tycon `orElse` [])
       ASSERT(null rest) return ()
-      return $ ConApp dc (map Type tc_args)
+      return $ mkConApp dc (map Type tc_args)
 
     -- See Note [tagToEnum#]
     _ -> WARN( True, text "tagToEnum# on non-enumeration type" <+> ppr ty )
@@ -1187,8 +1187,9 @@ match_inline _ = Nothing
 -- See Note [magicDictId magic] in `basicTypes/MkId.hs`
 -- for a description of what is going on here.
 match_magicDict :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
-match_magicDict [Type _, ConApp dc [Type a, Type _ , f], x, y ]
-  | Just (fieldTy, _)   <- splitFunTy_maybe $ dropForAlls $ dataConRepType dc
+match_magicDict [Type _, e@(ConApp dc _) , x, y ]
+  | [Type a, Type _ , f] <- collectConArgs e
+  , Just (fieldTy, _)   <- splitFunTy_maybe $ dropForAlls $ dataConRepType dc
   , Just (dictTy, _)    <- splitFunTy_maybe fieldTy
   , Just dictTc         <- tyConAppTyCon_maybe dictTy
   , Just (_,_,co)       <- unwrapNewTyCon_maybe dictTc

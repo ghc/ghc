@@ -322,7 +322,7 @@ resultWrapper result_ty
 
   -- Base case 2: the unit type ()
   | Just (tc,_) <- maybe_tc_app, tc `hasKey` unitTyConKey
-  = return (Nothing, \_ -> ConApp unitDataCon [])
+  = return (Nothing, \_ -> mkConApp unitDataCon [])
 
   -- Base case 3: the boolean type
   | Just (tc,_) <- maybe_tc_app, tc `hasKey` boolTyConKey
@@ -331,8 +331,8 @@ resultWrapper result_ty
     return
      (Just intPrimTy, \e -> mkWildCase e intPrimTy
                                    boolTy
-                                   [(DEFAULT                    ,[],ConApp trueDataCon []),
-                                    (LitAlt (mkMachInt dflags 0),[],ConApp falseDataCon [])])
+                                   [(DEFAULT                    ,[],mkConApp trueDataCon []),
+                                    (LitAlt (mkMachInt dflags 0),[],mkConApp falseDataCon [])])
 
   -- Newtypes
   | Just (co, rep_ty) <- topNormaliseNewType_maybe result_ty

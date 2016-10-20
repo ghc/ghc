@@ -67,7 +67,7 @@ import CoreMonad        ( FloatOutSwitches(..) )
 import CoreUtils        ( exprType
                         , exprOkForSpeculation
                         , exprIsBottom
-                        , collectStaticPtrSatArgs
+                        , isStaticPtrApp
                         )
 import CoreArity        ( exprBotStrictness_maybe )
 import CoreFVs          -- all of it
@@ -90,7 +90,6 @@ import Outputable
 import FastString
 import UniqDFM
 import FV
-import Data.Maybe
 
 {-
 ************************************************************************
@@ -1121,7 +1120,7 @@ newLvlVar lvld_rhs is_bot
     rhs_ty = exprType de_tagged_rhs
     mk_id uniq
       -- See Note [Grand plan for static forms] in SimplCore.
-      | isJust (collectStaticPtrSatArgs lvld_rhs)
+      | isStaticPtrApp lvld_rhs
       = mkExportedVanillaId (mkSystemVarName uniq (mkFastString "static_ptr"))
                             rhs_ty
       | otherwise

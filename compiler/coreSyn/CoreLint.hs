@@ -715,7 +715,7 @@ lintCoreExpr e@(App _ _)
 
     (fun, args) = collectArgs e
 
-lintCoreExpr e@(ConApp dc args)
+lintCoreExpr e@(ConApp dc _)
     = do lf <- getLintFlags
          -- Check for a nested occurrence of the StaticPtr constructor.
          -- See Note [Checking StaticPtrs].
@@ -726,8 +726,12 @@ lintCoreExpr e@(ConApp dc args)
             addErrL $ hang (text "Un-saturated data con application") 2 (ppr e)
          when (isNewTyCon (dataConTyCon dc)) $
             addErrL $ hang (text "ConApp with newtype constructor") 2 (ppr e)
+         in_scope <- getInScope
+         unless (eqExpr in_scope (mkConApp dc args) e) $
+            addErrL $ hang (text "mkConApp . collectConArgs not the identity") 2 (ppr e)
          let dc_ty = dataConRepType dc
          addLoc (AnExpr e) $ foldM lintCoreArg dc_ty args
+  where args = collectConArgs e
 
 lintCoreExpr (Lam var expr)
   = addLoc (LambdaBodyOf var) $

@@ -535,6 +535,7 @@ compiler_stage2_dll0_MODULES = \
 	TyCon \
 	Type \
 	TyCoRep \
+	CompressArgs \
 	TysPrim \
 	TysWiredIn \
 	Unify \

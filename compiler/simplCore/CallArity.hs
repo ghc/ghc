@@ -479,10 +479,10 @@ callArityAnal arity int (App e1 e2)
     (ae2', e2') = callArityArg int e2
     final_ae = ae1 `both` ae2'
 
-callArityAnal _ int (ConApp dc args)
-    = (boths aes, ConApp dc args')
+callArityAnal _ int (ConApp dc cargs) -- safe use of compressed args
+    = (boths aes, ConApp dc cargs')
   where
-    (aes, args') = unzip (map (callArityArg int) args)
+    (aes, cargs') = unzip (map (callArityArg int) cargs)
 
 -- Case expression.
 callArityAnal arity int (Case scrut bndr ty alts)

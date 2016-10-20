@@ -60,7 +60,7 @@ tidyExpr env (Type ty)        = Type (tidyType env ty)
 tidyExpr env (Coercion co)    = Coercion (tidyCo env co)
 tidyExpr _   (Lit lit)        = Lit lit
 tidyExpr env (App f a)        = App (tidyExpr env f) (tidyExpr env a)
-tidyExpr env (ConApp dc args) = ConApp dc (map (tidyExpr env) args)
+tidyExpr env (ConApp dc cargs) = ConApp dc (map (tidyExpr env) cargs) -- safe use of compressed args
 tidyExpr env (Tick t e)       = Tick (tidyTickish env t) (tidyExpr env e)
 tidyExpr env (Cast e co)      = Cast (tidyExpr env e) (tidyCo env co)
 

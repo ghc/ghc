@@ -213,10 +213,11 @@ satExpr (App fn arg) interesting_ids = do
                sat_info = mergeIdSATInfo sat_info_fn sat_info_arg'
            return (App fn' arg', sat_info, app_info)
 
-satExpr (ConApp dc args) interesting_ids = do
+satExpr e@(ConApp dc _) interesting_ids = do
   (args', sat_info_args) <- go args
-  return (ConApp dc args', sat_info_args, Nothing)
+  return (mkConApp dc args', sat_info_args, Nothing)
   where
+    args = collectConArgs e
     go [] = return ([], emptyIdSATInfo)
     go (arg:args) =
         do (args', sat_info_args) <- go args

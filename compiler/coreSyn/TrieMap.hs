@@ -503,9 +503,10 @@ instance Eq (DeBruijn CoreExpr) where
     go (Coercion co1) (Coercion co2)     = D env1 co1 == D env2 co2
     go (Cast e1 co1) (Cast e2 co2)       = D env1 co1 == D env2 co2 && go e1 e2
     go (App f1 a1)   (App f2 a2)         = go f1 f2 && go a1 a2
-    go (ConApp dc1 as1) (ConApp dc2 as2) = dc1 == dc2 && all2 go as1 as2
-    -- This seems a bit dodgy, see 'eqTickish'
+    go (ConApp dc1 cas1) (ConApp dc2 cas2) = dc1 == dc2 && all2 go cas1 cas2
+        -- safe use of compressed args
     go (Tick n1 e1)  (Tick n2 e2)  = n1 == n2 && go e1 e2
+        -- This seems a bit dodgy, see 'eqTickish'
 
     go (Lam b1 e1)  (Lam b2 e2)
       =  D env1 (varType b1) == D env2 (varType b2)
@@ -622,7 +623,8 @@ lkE (D env expr) cm = go expr cm
     go (Cast e c)           = cm_cast >.> lkG (D env e) >=> lkG (D env c)
     go (Tick tickish e)     = cm_tick >.> lkG (D env e) >=> lkTickish tickish
     go (App e1 e2)          = cm_app  >.> lkG (D env e2) >=> lkG (D env e1)
-    go (ConApp dc es)       = cm_conapp >.> lkDNamed dc  >=> lkList (lkG . D env) es
+    go (ConApp dc cas)      = cm_conapp >.> lkDNamed dc  >=> lkList (lkG . D env) cas
+        -- safe use of compressed args (really? TODO #12618)
     go (Lam v e)            = cm_lam  >.> lkG (D (extendCME env v) e)
                               >=> lkBndr env v
     go (Let (NonRec b r) e) = cm_letn >.> lkG (D env r)
@@ -652,9 +654,9 @@ xtE (D env (Tick t e))           f m = m { cm_tick = cm_tick m |> xtG (D env e)
                                                  |>> xtTickish t f }
 xtE (D env (App e1 e2))          f m = m { cm_app = cm_app m |> xtG (D env e2)
                                                  |>> xtG (D env e1) f }
-xtE (D env (ConApp dc es))       f m = m { cm_conapp = cm_conapp m
+xtE (D env (ConApp dc cas))      f m = m { cm_conapp = cm_conapp m
                                                  |> xtDNamed dc
-                                                 |>> xtList (xtG . D env) es f }
+                                                 |>> xtList (xtG . D env) cas f }
 xtE (D env (Lam v e))            f m = m { cm_lam = cm_lam m
                                                  |> xtG (D (extendCME env v) e)
                                                  |>> xtBndr env v f }

@@ -22,7 +22,7 @@ module OccurAnal (
 import CoreSyn
 import CoreFVs
 import CoreUtils        ( exprIsTrivial, isDefaultAlt, isExpandableApp,
-                          stripTicksTopE, mkTicks )
+                          stripTicksTopE, mkTicks, collectConArgs )
 import Id
 import Name( localiseName )
 import BasicTypes
@@ -1248,9 +1248,10 @@ occAnal env app@(App _ _)
 --   (a) occurrences inside type lambdas only not marked as InsideLam
 --   (b) type variables not in environment
 
-occAnal env (ConApp dc args)
-  = (final_uds, ConApp dc args')
+occAnal env e@(ConApp dc _)
+  = (final_uds, mkConApp dc args')
   where
+    args = collectConArgs e
     !(uds, args') = occAnalArgs env args one_shots
     !final_uds = markManyIf (isRhsEnv env) uds
     one_shots = [] -- no one-shots info for data cons

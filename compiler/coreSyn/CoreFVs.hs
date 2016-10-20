@@ -73,6 +73,7 @@ import Var
 import Type
 import TyCoRep
 import TyCon
+import CompressArgs
 import DataCon ( dataConRepType, dataConWorkId )
 import CoAxiom
 import FamInstEnv
@@ -260,8 +261,8 @@ expr_fvs (Tick t expr) fv_cand in_scope acc =
   (tickish_fvs t `unionFV` expr_fvs expr) fv_cand in_scope acc
 expr_fvs (App fun arg) fv_cand in_scope acc =
   (expr_fvs fun `unionFV` expr_fvs arg) fv_cand in_scope acc
-expr_fvs (ConApp dc args) fv_cand in_scope acc =
-  (FV.unitFV (dataConWorkId dc) `unionFV` mapUnionFV expr_fvs args) fv_cand in_scope acc
+expr_fvs (ConApp dc cargs) fv_cand in_scope acc = -- Safe use of compressed arguments
+  (FV.unitFV (dataConWorkId dc) `unionFV` mapUnionFV expr_fvs cargs) fv_cand in_scope acc
 expr_fvs (Lam bndr body) fv_cand in_scope acc =
   addBndr bndr (expr_fvs body) fv_cand in_scope acc
 expr_fvs (Cast expr co) fv_cand in_scope acc =
@@ -744,15 +745,20 @@ freeVars = go
         arg'   = go arg
         res_ty = applyTypeToArg fun_ty arg
 
-    go (ConApp dc args)
-      = ( FVAnn { fva_fvs    = unionFVss (map freeVarsOf args')
+    go (ConApp dc cargs)
+      = ( FVAnn { fva_fvs    = unionFVss (map freeVarsOf cargs')
                 , fva_ty_fvs = tyCoVarsOfTypeDSet res_ty
                 , fva_ty     = res_ty }
-        , AnnConApp dc args' )
+        , AnnConApp dc cargs' )
       where
-        args'    = map go args
+        cargs'   = map go cargs
+        args     = uncompressArgs exprTypeFV (go . Type) dc_ty cargs'
         dc_ty    = dataConRepType dc
-        res_ty   = foldl applyTypeToArg dc_ty args
+        res_ty   = foldl applyTypeToArg dc_ty (map deAnnotate args)
+        -- Why does this not work? Isn't piResultTys just iterated application
+        -- of piResultTy, which is what applyTypeToArg uses?
+        -- arg_tys  = map (exprToType . deAnnotate) args
+        -- res_ty   = piResultTys dc_ty arg_tys
 
     go (Case scrut bndr ty alts)
       = ( FVAnn { fva_fvs = (bndr `delBinderFV` alts_fvs)

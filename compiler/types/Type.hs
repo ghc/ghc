@@ -833,6 +833,9 @@ piResultTy_maybe :: Type -> Type -> Maybe Type
 -- ^ Just like 'piResultTys' but for a single argument
 -- Try not to iterate 'piResultTy', because it's inefficient to substitute
 -- one variable at a time; instead use 'piResultTys"
+--
+-- This is lazy in the second argument if the type is an arrow, so it is ok to
+-- pass (exprToType arg) as the argument, even if the argument is not (Type ty).
 piResultTy_maybe ty arg
   | Just ty' <- coreView ty = piResultTy_maybe ty' arg
 
@@ -868,6 +871,10 @@ piResultTy_maybe ty arg
 -- so we pay attention to efficiency, especially in the special case
 -- where there are no for-alls so we are just dropping arrows from
 -- a function type/kind.
+--
+-- This is lazy in the the elements of the argument list if the function type is an arrow.
+-- Therefore it is ok to pass (exprToType arg) as the argument, even if the
+-- argument is not (Type ty).
 piResultTys :: Type -> [Type] -> Type
 piResultTys ty [] = ty
 piResultTys ty orig_args@(arg:args)

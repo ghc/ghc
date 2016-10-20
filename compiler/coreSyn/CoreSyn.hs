@@ -96,6 +96,7 @@ import VarEnv( InScopeSet )
 import Var
 import Type
 import Coercion
+import CompressArgs
 import Name
 import NameSet
 import NameEnv( NameEnv, emptyNameEnv )
@@ -1201,7 +1202,7 @@ maybeUnfoldingTemplate :: Unfolding -> Maybe CoreExpr
 maybeUnfoldingTemplate (CoreUnfolding { uf_tmpl = expr })
   = Just expr
 maybeUnfoldingTemplate (DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = args })
-  = Just (mkLams bndrs (ConApp con args))
+  = Just (mkLams bndrs (mkConApp con args))
 maybeUnfoldingTemplate _
   = Nothing
 
@@ -1498,9 +1499,9 @@ mkConApp      :: DataCon -> [Arg b] -> Expr b
 mkApps    f args = foldl App                       f args
 mkCoApps  f args = foldl (\ e a -> App e (Coercion a)) f args
 mkVarApps f vars = foldl (\ e a -> App e (varToCoreExpr a)) f vars
-mkConApp con args =
-    WARN ( dataConRepFullArity con /= length args, text "mkConApp: artiy mismatch" $$ ppr con )
-    ConApp con args
+mkConApp dc args =
+    ASSERT2 ( dataConRepFullArity dc == length args, text "mkConApp: artiy mismatch" $$ ppr dc )
+    ConApp dc (compressArgs (dataConRepType dc) args)
 
 mkTyApps  f args = foldl (\ e a -> App e (typeOrCoercion a)) f args
   where

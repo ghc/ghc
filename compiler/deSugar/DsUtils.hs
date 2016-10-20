@@ -943,8 +943,8 @@ mkBinaryTickBox ixT ixF e = do
        this_mod <- getModule
        let bndr1 = mkSysLocal (fsLit "t1") uq boolTy
        let
-           falseBox = Tick (HpcTick this_mod ixF) (ConApp falseDataCon [])
-           trueBox  = Tick (HpcTick this_mod ixT) (ConApp trueDataCon [])
+           falseBox = Tick (HpcTick this_mod ixF) (mkConApp falseDataCon [])
+           trueBox  = Tick (HpcTick this_mod ixT) (mkConApp trueDataCon [])
        --
        return $ Case e bndr1 boolTy
                        [ (DataAlt falseDataCon, [], falseBox)

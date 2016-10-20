@@ -859,9 +859,9 @@ specExpr env (Cast e co)
 specExpr env (Tick tickish body)
   = do { (body', uds) <- specExpr env body
        ; return (Tick (specTickish env tickish) body', uds) }
-specExpr env (ConApp dc args)
-  = do (args', upds_args) <- unzip <$> mapM (specExpr env) (reverse args)
-       return (ConApp dc (reverse args'), plusUDList upds_args)
+specExpr env (ConApp dc cargs) -- safe us of compressed args
+  = do (cargs', upds_args) <- unzip <$> mapM (specExpr env) (reverse cargs)
+       return (ConApp dc (reverse cargs'), plusUDList upds_args)
 
 ---------------- Applications might generate a call instance --------------------
 specExpr env expr@(App {})

@@ -1182,9 +1182,10 @@ scExpr' env (Cast e co)  = do (usg, e') <- scExpr env e
                               -- Important to use mkCast here
                               -- See Note [SpecConstr call patterns]
 scExpr' env e@(App _ _)  = scApp env (collectArgs e)
-scExpr' env (ConApp dc args) = -- TODO #12618: Can a datacon be in scSubstId?
-    do  { (arg_usgs, args') <- unzip <$> mapM (scExpr env) args
-        ; return (combineUsages arg_usgs, ConApp dc args')
+scExpr' env (ConApp dc cargs) = -- safe use of compressed args
+    -- TODO #12618: Can a datacon be in scSubstId?
+    do  { (arg_usgs, cargs') <- unzip <$> mapM (scExpr env) cargs
+        ; return (combineUsages arg_usgs, ConApp dc cargs')
         }
 scExpr' env (Lam b e)    = do let (env', b') = extendBndr env b
                               (usg, e') <- scExpr env' e
@@ -2072,7 +2073,9 @@ isValue env (Tick t e)
   | not (tickishIsCode t)
   = isValue env e
 
-isValue _env (ConApp dc args) = Just (ConVal (DataAlt dc) args)
+isValue _env e@(ConApp dc _)
+  = Just (ConVal (DataAlt dc) args)
+  where args = collectConArgs e
 
 isValue _env expr       -- Maybe it's a constructor application
   | (Var fun, args, _) <- collectArgsTicks (not . tickishIsCode) expr
@@ -2106,7 +2109,8 @@ samePat (vs1, as1) (vs2, as2)
 
     same (Lit l1)    (Lit l2)    = l1==l2
     same (App f1 a1) (App f2 a2) = same f1 f2 && same a1 a2
-    same (ConApp dc1 args1) (ConApp dc2 args2) = dc1 == dc2 && all2 same args1 args2
+    same (ConApp dc1 cargs1) (ConApp dc2 cargs2)
+        = dc1 == dc2 && all2 same cargs1 cargs2
 
     same (Type {}) (Type {}) = True     -- Note [Ignore type differences]
     same (Coercion {}) (Coercion {}) = True

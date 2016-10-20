@@ -645,8 +645,7 @@ schemeT d s p (AnnConApp dc all_args)
                   unboxedTupleReturn d s p arg1
         _other -> multiValException
    | otherwise
-   = do ASSERT( dataConRepFullArity dc == length all_args ) return ()
-        alloc_con <- mkConAppCode d s p dc (reverse args)
+   = do alloc_con <- mkConAppCode d s p dc (reverse args)
         return (alloc_con         `appOL`
                 mkSLIDE 1 (d - s) `snocOL`
                 ENTER)

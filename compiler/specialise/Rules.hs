@@ -763,9 +763,9 @@ match renv subst (App f1 a1) (App f2 a2)
   = do  { subst' <- match renv subst f1 f2
         ; match renv subst' a1 a2 }
 
-match renv subst (ConApp dc1 args1) (ConApp dc2 args2)
+match renv subst (ConApp dc1 cargs1) (ConApp dc2 cargs2) -- safe use of compressed args
   | dc1 == dc2
-  = go subst args1 args2
+  = go subst cargs1 cargs2
   where
     go subst [] [] = Just subst
     go subst (a1:args1) (a2:args2)
@@ -1165,7 +1165,7 @@ ruleCheck _   (Lit _)       = emptyBag
 ruleCheck _   (Type _)      = emptyBag
 ruleCheck _   (Coercion _)  = emptyBag
 ruleCheck env (App f a)     = ruleCheckApp env (App f a) []
-ruleCheck env (ConApp _ args) = unionManyBags (map (ruleCheck env) args)
+ruleCheck env (ConApp _ cargs) = unionManyBags (map (ruleCheck env) cargs) -- safe use of compressed args
     -- TODO #12618 check dc?
 ruleCheck env (Tick _ e)  = ruleCheck env e
 ruleCheck env (Cast e _)    = ruleCheck env e

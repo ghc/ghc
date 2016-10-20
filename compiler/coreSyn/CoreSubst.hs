@@ -382,7 +382,7 @@ subst_expr doc subst expr
     go (Coercion co)    = Coercion (substCo subst co)
     go (Lit lit)        = Lit lit
     go (App fun arg)    = App (go fun) (go arg)
-    go (ConApp dc args) = ConApp dc (map go args)
+    go (ConApp dc cargs) = ConApp dc (map go cargs) -- safe use of compressed args
     go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
     go (Cast e co)      = Cast (go e) (substCo subst co)
        -- Do not optimise even identity coercions
@@ -931,7 +931,7 @@ simple_opt_expr subst expr
                =  go (unfoldingTemplate (idUnfolding v))
     go (Var v)          = lookupIdSubst (text "simpleOptExpr") subst v
     go (App e1 e2)      = simple_app subst e1 [go e2]
-    go (ConApp dc args) = ConApp dc (map go args)
+    go (ConApp dc cargs) = ConApp dc (map go cargs) -- safe use of compressed args
     go (Type ty)        = Type     (substTy subst ty)
     go (Coercion co)    = Coercion (optCoercion (getTCvSubst subst) co)
     go (Lit lit)        = Lit lit
@@ -1086,9 +1086,9 @@ maybe_substitute subst b r
 
     trivial | exprIsTrivial r = True
                      -- See Note [Getting the map/coerce RULE to work]
-            | (ConApp dc args) <- r
+            | (ConApp dc cargs) <- r -- safe use of compressed args
             , dc `hasKey` heqDataConKey || dc `hasKey` coercibleDataConKey
-            , all exprIsTrivial args = True
+            , all exprIsTrivial cargs = True
             | (Var fun, args) <- collectArgs r
             , Just dc <- isDataConWorkId_maybe fun
             , dc `hasKey` heqDataConKey || dc `hasKey` coercibleDataConKey
@@ -1232,8 +1232,9 @@ exprIsConApp_maybe (in_scope, id_unf) expr
        | not (tickishIsCode t) = go subst expr cont
     go subst (Cast expr co1) (CC [] co2)
        = go subst expr (CC [] (subst_co subst co1 `mkTransCo` co2))
-    go subst (ConApp dc args) (CC [] co)
+    go subst e@(ConApp dc _) (CC [] co)
        = dealWithCoercion co dc (map (subst_arg subst) args)
+       where args = collectConArgs e
     go subst (App fun arg) (CC args co)
        = go subst fun (CC (subst_arg subst arg : args) co)
     go subst (Lam var body) (CC (arg:args) co)

@@ -517,7 +517,7 @@ cpeRhsE env (Lit (LitInteger i _))
 cpeRhsE _env expr@(Lit {}) = return (emptyFloats, expr)
 cpeRhsE env expr@(Var {})  = cpeApp env expr
 cpeRhsE env expr@(App {}) = cpeApp env expr
-cpeRhsE env (ConApp dc args) = cpeConApp env dc args
+cpeRhsE env expr@(ConApp dc _) = cpeConApp env dc (collectConArgs expr)
 
 cpeRhsE env (Let bind expr)
   = do { (env', new_binds) <- cpeBind NotTopLevel env bind
@@ -811,7 +811,7 @@ cpeConApp top_env dc all_args
   = go (dataConRepType dc) [] all_args
   where
     go _ cpe_args []
-        = return (emptyFloats, ConApp dc (reverse cpe_args))
+        = return (emptyFloats, mkConApp dc (reverse cpe_args))
 
     go fun_ty cpe_args (Type arg:args)
         = go (piResultTy fun_ty arg) (Type arg:cpe_args) args
@@ -945,18 +945,18 @@ of the scope of a `seq`, or dropped the `seq` altogether.
 cpe_ExprIsTrivial :: CoreExpr -> Bool
 -- Version that doesn't consider an scc annotation to be trivial.
 -- See also 'exprIsTrivial'
-cpe_ExprIsTrivial (Var _)         = True
-cpe_ExprIsTrivial (Type _)        = True
-cpe_ExprIsTrivial (Coercion _)    = True
-cpe_ExprIsTrivial (Lit _)         = True
-cpe_ExprIsTrivial (App e arg)     = not (isRuntimeArg arg) && cpe_ExprIsTrivial e
-cpe_ExprIsTrivial (ConApp _ args) = not (any isRuntimeArg args)
-cpe_ExprIsTrivial (Lam b e)       = not (isRuntimeVar b) && cpe_ExprIsTrivial e
-cpe_ExprIsTrivial (Tick t e)      = not (tickishIsCode t) && cpe_ExprIsTrivial e
-cpe_ExprIsTrivial (Cast e _)      = cpe_ExprIsTrivial e
-cpe_ExprIsTrivial (Case e _ _ []) = cpe_ExprIsTrivial e
-                                    -- See Note [Empty case is trivial] in CoreUtils
-cpe_ExprIsTrivial _               = False
+cpe_ExprIsTrivial (Var _)          = True
+cpe_ExprIsTrivial (Type _)         = True
+cpe_ExprIsTrivial (Coercion _)     = True
+cpe_ExprIsTrivial (Lit _)          = True
+cpe_ExprIsTrivial (App e arg)      = not (isRuntimeArg arg) && cpe_ExprIsTrivial e
+cpe_ExprIsTrivial (ConApp _ cargs) = not (any isRuntimeArg cargs) -- safe use of compressed args
+cpe_ExprIsTrivial (Lam b e)        = not (isRuntimeVar b) && cpe_ExprIsTrivial e
+cpe_ExprIsTrivial (Tick t e)       = not (tickishIsCode t) && cpe_ExprIsTrivial e
+cpe_ExprIsTrivial (Cast e _)       = cpe_ExprIsTrivial e
+cpe_ExprIsTrivial (Case e _ _ [])  = cpe_ExprIsTrivial e
+                                     -- See Note [Empty case is trivial] in CoreUtils
+cpe_ExprIsTrivial _                = False
 
 {-
 -- -----------------------------------------------------------------------------

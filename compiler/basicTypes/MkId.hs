@@ -782,7 +782,7 @@ dataConArgUnpack arg_ty
           ; return (rep_ids, unbox_fn) }
      , Boxer $ \ subst ->
        do { rep_ids <- mapM (newLocal . TcType.substTyUnchecked subst) rep_tys
-          ; return (rep_ids, ConApp con (
+          ; return (rep_ids, mkConApp con (
                 map Type (substTysUnchecked subst tc_args) ++
                 map Var rep_ids))
           }))

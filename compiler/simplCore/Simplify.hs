@@ -472,10 +472,10 @@ prepareRhs top_lvl env0 id rhs0
     go n_val_args env (Cast rhs co)
         = do { (is_exp, env', rhs') <- go n_val_args env rhs
              ; return (is_exp, env', Cast rhs' co) }
-    go n_val_args env (ConApp dc args)
-        = WARN( n_val_args > 0, ppr (ConApp dc args) <+> ppr n_val_args )
-          do { (env', args') <- makeTrivials top_lvl env (getOccFS id) args
-             ; return (True, env', ConApp dc args')
+    go n_val_args env (ConApp dc cargs)
+        = WARN( n_val_args > 0, ppr (ConApp dc cargs) <+> ppr n_val_args )
+          do { (env', cargs') <- makeTrivials top_lvl env (getOccFS id) cargs
+             ; return (True, env', ConApp dc cargs')
              }
     go n_val_args env (App fun (Type ty))
         = do { (is_exp, env', rhs') <- go n_val_args env fun
@@ -899,15 +899,16 @@ simplExprF1 env (App fun arg) cont
       _       -> ApplyToVal { sc_arg = arg, sc_env = env
                             , sc_dup = NoDup, sc_cont = cont }
 
-simplExprF1 env (ConApp dc args) cont -- TODO #12618 is that all there is to do here?
-  = do args' <- mapM (simplExpr env) args
+simplExprF1 env e@(ConApp dc _) cont -- TODO #12618 is that all there is to do here?
+  = do let args = collectConArgs e
+       args' <- mapM (simplExpr env) args
        -- check for rules
        rule_base <- getSimplRules
        let workId = dataConWorkId dc
        mb_rule <- tryRules env (getRules rule_base workId) workId (argsToArgSpecs args') cont
        case mb_rule of
            Just (rule_rhs, cont') -> simplExprF env rule_rhs cont'
-           Nothing                -> rebuild env (ConApp dc args') cont
+           Nothing                -> rebuild env (mkConApp dc args') cont
 
 simplExprF1 env expr@(Lam {}) cont
   = simplLam env zapped_bndrs body cont
@@ -2336,7 +2337,7 @@ knownCon env scrut dc dc_ty_args dc_args bndr bs rhs cont
       | otherwise           = do { dc_args <- mapM (simplVar env) bs
                                          -- dc_ty_args are aready OutTypes,
                                          -- but bs are InBndrs
-                                 ; let con_app = ConApp dc (map Type dc_ty_args ++ dc_args)
+                                 ; let con_app = mkConApp dc (map Type dc_ty_args ++ dc_args)
                                  ; simplNonRecX env bndr con_app }
 
 -------------------

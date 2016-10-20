@@ -154,7 +154,7 @@ mkCoreConApps :: DataCon -> [CoreExpr] -> CoreExpr
 mkCoreConApps con args
     | length args >= dataConRepFullArity con
     , not (isNewTyCon (dataConTyCon con))
-    = let sat_app = mk_val_apps 0 res_ty (ConApp con) con_args
+    = let sat_app = mk_val_apps 0 res_ty (mkConApp con) con_args
       in  mkCoreApps sat_app extra_args
     | otherwise
     -- Unsaturated or newtype constructor application.
@@ -163,7 +163,7 @@ mkCoreConApps con args
     -- TODO #12618: Can there ever be more than dataConRepArity con arguments
     -- in a type-safe program?
     (con_args, extra_args) = splitAt (dataConRepFullArity con) args
-    res_ty = exprType (ConApp con args)
+    res_ty = exprType (mkConApp con args)
 
 mk_val_app :: CoreExpr -> CoreExpr -> Type -> Type -> CoreExpr
 -- Build an application (e1 e2),
@@ -368,7 +368,7 @@ mkCoreVarTupTy ids = mkBoxedTupleTy (map idType ids)
 -- | Build a small tuple holding the specified expressions
 -- One-tuples are flattened; see Note [Flattening one-tuples]
 mkCoreTup :: [CoreExpr] -> CoreExpr
-mkCoreTup []  = ConApp unitDataCon []
+mkCoreTup []  = mkConApp unitDataCon []
 mkCoreTup [c] = c
 mkCoreTup cs  = mkCoreConApps (tupleDataCon Boxed (length cs))
                               (map (Type . exprType) cs ++ cs)
