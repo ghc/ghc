@@ -1,6 +1,7 @@
 module Rules.Generate (
-    generatePackageCode, generateRules, installTargets, copyRules,
-    includesDependencies, generatedDependencies, getPathIfGenerated
+    isGeneratedCFile, isGeneratedCmmFile, generatePackageCode, generateRules,
+    installTargets, copyRules, includesDependencies, generatedDependencies,
+    getPathIfGenerated
     ) where
 
 import qualified System.Directory as IO
@@ -39,6 +40,12 @@ primopsTxt stage = buildPath (vanillaContext stage compiler) -/- "primops.txt"
 
 platformH :: Stage -> FilePath
 platformH stage = buildPath (vanillaContext stage compiler) -/- "ghc_boot_platform.h"
+
+isGeneratedCFile :: FilePath -> Bool
+isGeneratedCFile file = takeBaseName file `elem` ["Evac_thr", "Scav_thr"]
+
+isGeneratedCmmFile :: FilePath -> Bool
+isGeneratedCmmFile file = takeBaseName file == "AutoApply"
 
 includesDependencies :: [FilePath]
 includesDependencies = fmap (generatedPath -/-)
@@ -133,7 +140,7 @@ generatePackageCode context@(Context stage pkg _) =
                 liftIO $ IO.copyFile file newFile
                 putBuild $ "| Duplicate file " ++ file ++ " -> " ++ newFile
 
-        when (pkg == rts) $ path -/- "AutoApply.cmm" %> \file -> do
+        when (pkg == rts) $ path -/- "cmm/AutoApply.cmm" %> \file -> do
             build $ Target context GenApply [] [file]
 
         priority 2.0 $ do
@@ -163,8 +170,8 @@ copyRules = do
     "inplace/lib/platformConstants"  <~ generatedPath
     "inplace/lib/settings"           <~ "."
     "inplace/lib/template-hsc.h"     <~ pkgPath hsc2hs
-    rtsBuildPath -/- "sm/Evac_thr.c" %> copyFile (pkgPath rts -/- "sm/Evac.c")
-    rtsBuildPath -/- "sm/Scav_thr.c" %> copyFile (pkgPath rts -/- "sm/Scav.c")
+    rtsBuildPath -/- "c/sm/Evac_thr.c" %> copyFile (pkgPath rts -/- "sm/Evac.c")
+    rtsBuildPath -/- "c/sm/Scav_thr.c" %> copyFile (pkgPath rts -/- "sm/Scav.c")
   where
     file <~ dir = file %> copyFile (dir -/- takeFileName file)
 

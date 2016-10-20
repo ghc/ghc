@@ -1,5 +1,5 @@
 module Rules.Library (
-    buildPackageLibrary, buildPackageGhciLibrary, cSources, hSources
+    buildPackageLibrary, buildPackageGhciLibrary, cSources, hsSources
     ) where
 
 import Data.Char
@@ -12,6 +12,7 @@ import Flavour
 import GHC
 import Oracles.PackageData
 import Rules.Actions
+import Rules.Generate
 import Settings
 import Settings.Paths
 import Target
@@ -19,34 +20,36 @@ import UserSettings
 
 buildPackageLibrary :: Context -> Rules ()
 buildPackageLibrary context@Context {..} = do
-    let path = buildPath context
-        libPrefix = path -/- "libHS" ++ pkgNameString package
+    let path       = buildPath context
+        libPrefix  = path -/- "libHS" ++ pkgNameString package
 
     -- TODO: handle dynamic libraries
     matchVersionedFilePath libPrefix (waySuffix way <.> "a") ?> \a -> do
         removeFile a
-        cSrcs <- cSources context
-        hSrcs <- hSources context
+        asmSrcs <- asmSources context
+        cSrcs   <- cSources   context
+        cmmSrcs <- cmmSources context
+        hsSrcs  <- hsSources  context
 
-        let cObjs = [ objFile context src | src <- cSrcs
-                    , takeFileName src `notElem` ["Evac_thr.c", "Scav_thr.c"]
-                      || way == threaded ]
-            hObjs = [ path -/- src <.> osuf way | src <- hSrcs ]
+        let asmObjs = [ objFile    context src    | src <- asmSrcs ]
+            cObjs   = [ objFile    context src    | src <- cSrcs   ]
+            cmmObjs = [ objFile    context src    | src <- cmmSrcs ]
+            hsObjs  = [ path -/- src <.> osuf way | src <- hsSrcs   ]
 
         -- This will create split objects if required (we don't track them
         -- explicitly as this would needlessly bloat the Shake database).
-        need $ cObjs ++ hObjs
+        need $ asmObjs ++ cObjs ++ cmmObjs ++ hsObjs
 
         split <- interpretInContext context $ splitObjects flavour
-        splitObjs <- if not split then return hObjs else -- TODO: make clearer!
-            concatForM hSrcs $ \src -> do
+        splitObjs <- if not split then return hsObjs else -- TODO: make clearer!
+            concatForM hsSrcs $ \src -> do
                 let splitPath = path -/- src ++ "_" ++ osuf way ++ "_split"
                 contents <- liftIO $ IO.getDirectoryContents splitPath
                 return . map (splitPath -/-)
                        . filter (not . all (== '.')) $ contents
 
         eObjs <- extraObjects context
-        let objs = cObjs ++ splitObjs ++ eObjs
+        let objs = asmObjs ++ cObjs ++ cmmObjs ++ splitObjs ++ eObjs
 
         asuf <- libsuf way
         let isLib0 = ("//*-0" ++ asuf) ?== a
@@ -66,30 +69,47 @@ buildPackageGhciLibrary context@Context {..} = priority 2 $ do
         libPrefix = path -/- "HS" ++ pkgNameString package
 
     matchVersionedFilePath libPrefix (waySuffix way <.> "o") ?> \obj -> do
-        cSrcs <- cSources context
-        hSrcs <- hSources context
-        eObjs <- extraObjects context
-        let cObjs = map (objFile context) cSrcs
-            hObjs = [ path -/- src <.> osuf way | src <- hSrcs ]
-            objs  = cObjs ++ hObjs ++ eObjs
+        cSrcs  <- cSources context
+        hsSrcs <- hsSources context
+        eObjs  <- extraObjects context
+        let cObjs  = map (objFile context) cSrcs
+            hsObjs = [ path -/- src <.> osuf way | src <- hsSrcs ]
+            objs   = cObjs ++ hsObjs ++ eObjs
         need objs
         build $ Target context Ld objs [obj]
 
--- TODO: Get rid of code duplication and simplify. See also src2dep.
 -- | Given a 'Context' and a 'FilePath' to a source file, compute the 'FilePath'
--- to its object file. For example, in Context Stage1 rts threaded:
--- * "Task.c"                          -> "_build/stage1/rts/Task.thr_o"
--- * "_build/stage1/rts/sm/Evac_thr.c" -> "_build/stage1/rts/sm/Evac_thr.thr_o"
+-- to its object file. For example:
+-- * "Task.c"                              -> "_build/stage1/rts/Task.thr_o"
+-- * "_build/stage1/rts/cmm/AutoApply.cmm" -> "_build/stage1/rts/cmm/AutoApply.o"
 objFile :: Context -> FilePath -> FilePath
 objFile context@Context {..} src
-    | buildRootPath `isPrefixOf` src = src -<.> osuf way
-    | otherwise                      = buildPath context -/- src -<.> osuf way
+    | isGenerated src = src -<.> osuf way
+    | otherwise       = buildPath context -/- extension -/- src -<.> osuf way
+  where
+    extension = drop 1 $ takeExtension src
+    isGenerated
+        | extension == "c"   = isGeneratedCFile
+        | extension == "cmm" = isGeneratedCmmFile
+        | otherwise          = const False
 
+asmSources :: Context -> Action [FilePath]
+asmSources context = interpretInContext context $ getPkgDataList AsmSrcs
+
+-- TODO: simplify
 cSources :: Context -> Action [FilePath]
-cSources context = interpretInContext context $ getPkgDataList CSrcs
+cSources context = do
+    srcs <- interpretInContext context $ getPkgDataList CSrcs
+    if way context == threaded
+    then return srcs
+    else return [ src | src <- srcs
+                      , takeFileName src `notElem` ["Evac_thr.c", "Scav_thr.c"] ]
 
-hSources :: Context -> Action [FilePath]
-hSources context = do
+cmmSources :: Context -> Action [FilePath]
+cmmSources context = interpretInContext context $ getPkgDataList CmmSrcs
+
+hsSources :: Context -> Action [FilePath]
+hsSources context = do
     modules <- interpretInContext context $ getPkgDataList Modules
     -- GHC.Prim is special: we do not build it.
     return . map (replaceEq '.' '/') . filter (/= "GHC.Prim") $ modules

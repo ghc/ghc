@@ -15,39 +15,33 @@ import qualified Data.Set as Set
 
 compilePackage :: [(Resource, Int)] -> Context -> Rules ()
 compilePackage rs context@Context {..} = do
-    let path = buildPath context
-
-    path <//> "*" <.> hisuf way %> \hi -> need [ hi -<.> osuf way ]
-
-    path <//> "*" <.> hibootsuf way %> \hiboot -> need [ hiboot -<.> obootsuf way ]
-
-    -- TODO: Add dependencies for #include of .h and .hs-incl files (gcc -MM?).
-    path <//> "*" <.> osuf way %> \obj -> do
-        (src, deps) <- fileDependencies context obj
-        if ("//*.c" ?== src)
-        then do
+    let path            = buildPath context
+        nonHs extension = path </> extension <//> "*" <.> osuf way
+        compile compiler obj2src obj = do
+            let depFile = obj -<.> "d"
+                src     = obj2src context obj
+            need [src]
+            needGenerated context src
+            build $ Target context (Cc FindCDependencies stage) [src] [depFile]
+            needMakefileDependencies depFile -- TODO: Is this actually needed?
+            build $ Target context (compiler stage) [src] [obj]
+        compileHs = \[obj, _] -> do
+            (src, deps) <- fileDependencies context obj
             need $ src : deps
-            -- TODO: Improve parallelism by collecting all dependencies and
-            -- need'ing them all at once
-            mapM_  (needGenerated context) . filter ("//*.c" ?==) $ src : deps
-            build $ Target context (Cc CompileC stage) [src] [obj]
-        else do
-            need $ src : deps
-            needCompileDependencies context
+            when (isLibrary package) $ need =<< return <$> pkgConfFile context
+            needContext =<< contextDependencies context
             buildWithResources rs $ Target context (Ghc CompileHs stage) [src] [obj]
 
-    -- TODO: Get rid of these special cases.
-    path <//> "*" <.> obootsuf way %> \obj -> do
-        (src, deps) <- fileDependencies context obj
-        need $ src : deps
-        needCompileDependencies context
-        buildWithResources rs $ Target context (Ghc CompileHs stage) [src] [obj]
+    priority 2.0 $ do
+        nonHs "c"   %> compile (Cc  CompileC ) (obj2src "c"   isGeneratedCFile  )
+        nonHs "cmm" %> compile (Ghc CompileHs) (obj2src "cmm" isGeneratedCmmFile)
+        nonHs "s"   %> compile (Ghc CompileHs) (obj2src "S"   $ const False     )
 
-needCompileDependencies :: Context -> Action ()
-needCompileDependencies context@Context {..} = do
-    when (isLibrary package) $ need =<< return <$> pkgConfFile context
-    needContext =<< contextDependencies context
+    -- TODO: Add dependencies for #include of .h and .hs-incl files (gcc -MM?).
+    [ path <//> "*" <.> suf way | suf <- [    osuf,     hisuf] ] &%> compileHs
+    [ path <//> "*" <.> suf way | suf <- [obootsuf, hibootsuf] ] &%> compileHs
 
+-- TODO: Simplify.
 needGenerated :: Context -> FilePath -> Action ()
 needGenerated context origFile = go Set.empty
   where
@@ -77,3 +71,11 @@ needGenerated context origFile = go Set.empty
             [(_file, deps)] -> return deps
             _               -> return []
 
+obj2src :: String -> (FilePath -> Bool) -> Context -> FilePath -> FilePath
+obj2src extension isGenerated context@Context {..} obj
+    | isGenerated src = src
+    | otherwise       = pkgPath package ++ suffix
+  where
+    src    = obj -<.> extension
+    suffix = fromMaybe ("Cannot determine source for " ++ obj)
+           $ stripPrefix (buildPath context -/- extension) src

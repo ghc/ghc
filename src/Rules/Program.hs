@@ -73,19 +73,19 @@ buildWrapper context@Context {..} wrapper wrapperPath binPath = do
 -- TODO: Do we need to consider other ways when building programs?
 buildBinary :: [(Resource, Int)] -> Context -> FilePath -> Action ()
 buildBinary rs context@Context {..} bin = do
-    hSrcs   <- hSources context
+    hsSrcs  <- hsSources context
     binDeps <- if stage == Stage0 && package == ghcCabal
-        then return [ pkgPath package -/- src <.> "hs" | src <- hSrcs ]
+        then return [ pkgPath package -/- src <.> "hs" | src <- hsSrcs ]
         else do
             ways <- interpretInContext context getLibraryWays
             deps <- contextDependencies context
             needContext [ dep { way = w } | dep <- deps, w <- ways ]
             cSrcs <- cSources context -- TODO: Drop code duplication (Library.hs).
             let path = buildPath context
-            return $ [ path -/- src -<.> osuf vanilla | src <- cSrcs       ]
-                  ++ [ path -/- src  <.> osuf vanilla | src <- hSrcs       ]
-                  ++ [ path -/- "Paths_hsc2hs.o"      | package == hsc2hs  ]
-                  ++ [ path -/- "Paths_haddock.o"     | package == haddock ]
+            return $ [ path -/- "c" -/- src -<.> osuf vanilla | src <- cSrcs       ]
+                  ++ [ path -/- src  <.> osuf vanilla         | src <- hsSrcs      ]
+                  ++ [ path -/- "Paths_hsc2hs.o"              | package == hsc2hs  ]
+                  ++ [ path -/- "Paths_haddock.o"             | package == haddock ]
     need binDeps
     buildWithResources rs $ Target context (Ghc LinkHs stage) binDeps [bin]
     synopsis <- interpretInContext context $ getPkgData Synopsis

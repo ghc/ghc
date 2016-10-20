@@ -17,15 +17,14 @@ newtype ObjDepsKey = ObjDepsKey (FilePath, FilePath)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
 
 -- | 'Action' @fileDependencies context file@ looks up dependencies of a @file@
--- in a generated dependecy file @path/.dependencies@, where @path@ is the build
+-- in a generated dependency file @path/.dependencies@, where @path@ is the build
 -- path of the given @context@. The action returns a pair @(source, files)@,
 -- such that the @file@ can be produced by compiling @source@, which in turn
 -- also depends on a number of other @files@.
 fileDependencies :: Context -> FilePath -> Action (FilePath, [FilePath])
 fileDependencies context obj = do
     let path = buildPath context -/- ".dependencies"
-    -- If no dependencies found, try to drop the way suffix (for *.c sources).
-    deps <- firstJustM (askOracle . ObjDepsKey . (,) path) [obj, obj -<.> "o"]
+    deps <- askOracle $ ObjDepsKey (path, obj)
     case deps of
         Nothing -> error $ "No dependencies found for file " ++ obj
         Just [] -> error $ "No source file found for file " ++ obj

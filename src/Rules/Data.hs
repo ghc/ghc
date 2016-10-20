@@ -113,19 +113,20 @@ buildPackageData context@Context {..} = do
                 let prefix = fixKey (buildPath context) ++ "_"
                     dirs   = [ ".", "hooks", "sm", "eventlog", "linker" ]
                           ++ [ if windows then "win32" else "posix" ]
-                -- TODO: Adding cmm/S sources to C_SRCS is a hack -- refactor.
                 cSrcs   <- map unifyPath <$>
                            getDirectoryFiles (pkgPath package) (map (-/- "*.c") dirs)
                 cmmSrcs <- getDirectoryFiles (pkgPath package) ["*.cmm"]
                 buildAdjustor   <- anyTargetArch ["i386", "powerpc", "powerpc64"]
                 buildStgCRunAsm <- anyTargetArch ["powerpc64le"]
-                let extraSrcs = [ "AdjustorAsm.S" | buildAdjustor   ]
-                             ++ [ "StgCRunAsm.S"  | buildStgCRunAsm ]
-                             ++ [ rtsBuildPath -/- "AutoApply.cmm"  ]
-                             ++ [ rtsBuildPath -/- "sm/Evac_thr.c"  ]
-                             ++ [ rtsBuildPath -/- "sm/Scav_thr.c"  ]
-                let contents = unlines $ map (prefix++)
-                        [ "C_SRCS = "  ++ unwords (cSrcs ++ cmmSrcs ++ extraSrcs)
+                let extraCSrcs   = [ rtsBuildPath -/- "c/sm/Evac_thr.c"   ]
+                                ++ [ rtsBuildPath -/- "c/sm/Scav_thr.c"   ]
+                    extraCmmSrcs = [ rtsBuildPath -/- "cmm/AutoApply.cmm" ]
+                    extraAsmSrcs = [ "AdjustorAsm.S" | buildAdjustor      ]
+                                ++ [ "StgCRunAsm.S"  | buildStgCRunAsm    ]
+                let contents = unlines $ map (prefix ++)
+                        [ "C_SRCS = "    ++ unwords (cSrcs   ++ extraCSrcs)
+                        , "CMM_SRCS = "  ++ unwords (cmmSrcs ++ extraCmmSrcs)
+                        , "S_SRCS = "    ++ unwords extraAsmSrcs
                         , "CC_OPTS = -I" ++ generatedPath
                         , "COMPONENT_ID = rts" ]
                 writeFileChanged mk contents

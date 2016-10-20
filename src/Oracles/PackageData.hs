@@ -13,8 +13,10 @@ data PackageData = BuildGhciLib FilePath
                  | Synopsis     FilePath
                  | Version      FilePath
 
-data PackageDataList = CcArgs         FilePath
+data PackageDataList = AsmSrcs        FilePath
+                     | CcArgs         FilePath
                      | CSrcs          FilePath
+                     | CmmSrcs        FilePath
                      | CppArgs        FilePath
                      | DepCcArgs      FilePath
                      | DepExtraLibs   FilePath
@@ -55,8 +57,10 @@ pkgData packageData = case packageData of
 -- @pkgListData Modules@ therefore returns ["Data.Array", "Data.Array.Base", ...]
 pkgDataList :: PackageDataList -> Action [String]
 pkgDataList packageData = fmap (map unquote . words) $ case packageData of
+    AsmSrcs        path -> askPackageData path "S_SRCS"
     CcArgs         path -> askPackageData path "CC_OPTS"
     CSrcs          path -> askPackageData path "C_SRCS"
+    CmmSrcs        path -> askPackageData path "CMM_SRCS"
     CppArgs        path -> askPackageData path "CPP_OPTS"
     DepCcArgs      path -> askPackageData path "DEP_CC_OPTS"
     DepExtraLibs   path -> askPackageData path "DEP_EXTRA_LIBS"
