@@ -693,7 +693,7 @@ mkPiTys :: [TyBinder] -> Type -> Type
 mkPiTys tbs ty = foldr mkPiTy ty tbs
 
 -- | Does this type classify a core (unlifted) Coercion?
--- At either role nominal or reprsentational
+-- At either role nominal or representational
 --    (t1 ~# t2) or (t1 ~R# t2)
 isCoercionType :: Type -> Bool
 isCoercionType (TyConApp tc tys)

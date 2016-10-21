@@ -321,7 +321,7 @@ rts_HC_OPTS += -dcmm-lint
 # StgClosure, StgMVar, etc.), and without -fno-strict-aliasing gcc is
 # allowed to assume that these pointers do not alias.  eg. without
 # this flag we get problems in sm/Evac.c:copy() with gcc 3.4.3, the
-# upd_evacee() assigments get moved before the object copy.
+# upd_evacuee() assignments get moved before the object copy.
 rts_CC_OPTS += -fno-strict-aliasing
 
 rts_CC_OPTS += -fno-common

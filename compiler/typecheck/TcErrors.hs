@@ -624,7 +624,7 @@ mkGivenErrorReporter ctxt cts
 
 {- Note [Given errors]
 ~~~~~~~~~~~~~~~~~~~~~~
-Given constaints reprsent things for which we have (or will have)
+Given constraints represent things for which we have (or will have)
 evidence, so they aren't errors.  But if a Given constraint is
 insoluble, this code is inaccessible, and we might want to at least
 warn about that.  A classic case is
@@ -679,7 +679,7 @@ reportGroup :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg) -> ReportErrCtxt
 reportGroup mk_err ctxt cts =
   case partition isMonadFailInstanceMissing cts of
         -- Only warn about missing MonadFail constraint when
-        -- there are no other missing contstraints!
+        -- there are no other missing constraints!
         (monadFailCts, []) ->
             do { err <- mk_err ctxt monadFailCts
                ; reportWarning (Reason Opt_WarnMissingMonadFailInstances) err }
