@@ -21,19 +21,11 @@ ccBuilderArgs = builder Cc ? mconcat
         output <- getOutput
         mconcat [ arg "-E"
                 , arg "-MM"
+                , arg "-MG"
                 , arg "-MF"
                 , arg output
                 , arg "-MT"
                 , arg $ dropExtension output -<.> "o"
                 , arg "-x"
                 , arg "c"
-                , arg =<< getInput ]
-
-    , builder (Cc FindMissingInclude) ?
-        mconcat [ arg "-E"
-                , arg "-MM"
-                , arg "-MG"
-                , arg "-MF"
-                , arg =<< getOutput
-                , arg =<< getInput ]
-    ]
+                , arg =<< getInput ] ]

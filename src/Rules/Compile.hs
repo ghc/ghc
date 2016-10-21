@@ -1,5 +1,7 @@
 module Rules.Compile (compilePackage) where
 
+import Development.Shake.Util
+
 import Base
 import Context
 import Expression
@@ -9,21 +11,14 @@ import Rules.Generate
 import Settings.Paths
 import Target
 
-import Development.Shake.Util
-
-import qualified Data.Set as Set
-
 compilePackage :: [(Resource, Int)] -> Context -> Rules ()
 compilePackage rs context@Context {..} = do
     let path            = buildPath context
         nonHs extension = path </> extension <//> "*" <.> osuf way
         compile compiler obj2src obj = do
-            let depFile = obj -<.> "d"
-                src     = obj2src context obj
+            let src = obj2src context obj
             need [src]
-            needGenerated context src
-            build $ Target context (Cc FindCDependencies stage) [src] [depFile]
-            needMakefileDependencies depFile -- TODO: Is this actually needed?
+            needDependencies context src $ obj <.> "d"
             build $ Target context (compiler stage) [src] [obj]
         compileHs = \[obj, _] -> do
             (src, deps) <- fileDependencies context obj
@@ -41,28 +36,27 @@ compilePackage rs context@Context {..} = do
     [ path <//> "*" <.> suf way | suf <- [    osuf,     hisuf] ] &%> compileHs
     [ path <//> "*" <.> suf way | suf <- [obootsuf, hibootsuf] ] &%> compileHs
 
--- TODO: Simplify.
-needGenerated :: Context -> FilePath -> Action ()
-needGenerated context origFile = go Set.empty
+-- | Discover dependencies of a given source file by iteratively calling @gcc@
+-- in the @-MM -MG@ mode and building generated dependencies if they are missing
+-- until reaching a fixed point.
+needDependencies :: Context -> FilePath -> FilePath -> Action ()
+needDependencies context@Context {..} src depFile = discover
   where
-    go :: Set.Set String -> Action ()
-    go done = withTempFile $ \outFile -> do
-        let builder = Cc FindMissingInclude $ stage context
-            target = Target context builder [origFile] [outFile]
-        build target
-        deps <- parseFile outFile
+    discover = do
+        build $ Target context (Cc FindCDependencies stage) [src] [depFile]
+        deps <- parseFile depFile
+        -- Generated dependencies, if not yet built, will not be found and hence
+        -- will be referred to simply by their file names.
+        let notFound = filter (\file -> file == takeFileName file) deps
+        -- We find the full paths to generated dependencies, so we can request
+        -- to build them by calling 'need'.
+        todo <- catMaybes <$> mapM (fullPathIfGenerated context) notFound
 
-        -- Get the full path if the include refers to a generated file and call
-        -- `need` on it.
-        needed <- liftM catMaybes $
-            interpretInContext context (mapM getPathIfGenerated deps)
-        need needed
-
-        let newdone = Set.fromList needed `Set.union` done
-        -- If we added a new file to the set of needed files, let's try one more
-        -- time, since the new file might include a genreated header of itself
-        -- (which we'll `need`).
-        when (Set.size newdone > Set.size done) (go newdone)
+        if null todo
+        then need deps -- The list of dependencies is final, need all
+        else do
+            need todo  -- Build newly discovered generated dependencies
+            discover   -- Continue the discovery process
 
     parseFile :: FilePath -> Action [String]
     parseFile file = do
@@ -70,6 +64,13 @@ needGenerated context origFile = go Set.empty
         case parseMakefile input of
             [(_file, deps)] -> return deps
             _               -> return []
+
+-- | Find a given 'FilePath' in the list of generated files in the given
+-- 'Context' and return its full path.
+fullPathIfGenerated :: Context -> FilePath -> Action (Maybe FilePath)
+fullPathIfGenerated context file = interpretInContext context $ do
+    generated <- generatedDependencies
+    return $ find ((== file) . takeFileName) generated
 
 obj2src :: String -> (FilePath -> Bool) -> Context -> FilePath -> FilePath
 obj2src extension isGenerated context@Context {..} obj

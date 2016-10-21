@@ -20,12 +20,8 @@ import Stage
 -- 1) Compiling sources into object files.
 -- 2) Extracting source dependencies, e.g. by passing -M command line argument.
 -- 3) Linking object files & static libraries into an executable.
--- We have CcMode for CC and GhcMode for GHC.
-
--- TODO: Consider merging FindCDependencies and FindMissingInclude
-data CcMode = CompileC | FindCDependencies | FindMissingInclude
-    deriving (Eq, Generic, Show)
-
+-- We have CcMode for C compiler and GhcMode for GHC.
+data CcMode  = CompileC  | FindCDependencies deriving (Eq, Generic, Show)
 data GhcMode = CompileHs | FindHsDependencies | LinkHs
     deriving (Eq, Generic, Show)
 

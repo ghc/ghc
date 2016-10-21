@@ -1,7 +1,6 @@
 module Rules.Generate (
     isGeneratedCFile, isGeneratedCmmFile, generatePackageCode, generateRules,
-    installTargets, copyRules, includesDependencies, generatedDependencies,
-    getPathIfGenerated
+    installTargets, copyRules, includesDependencies, generatedDependencies
     ) where
 
 import qualified System.Directory as IO
@@ -199,17 +198,3 @@ generateRules = do
 emptyTarget :: Context
 emptyTarget = vanillaContext (error "Rules.Generate.emptyTarget: unknown stage")
                              (error "Rules.Generate.emptyTarget: unknown package")
-
-getPathIfGenerated :: FilePath -> Expr (Maybe FilePath)
-getPathIfGenerated include = do
-  generated <- generatedFiles
-  -- For includes of generated files, we cannot get the full path of the file
-  -- (since it might be included due to some include dir, i.e., through `-I`).
-  -- So here we try both the name and the path.
-  let nameOrPath (name, path) = include == name || include == path
-  return . fmap snd $ find nameOrPath generated
-
-generatedFiles :: Expr [(FilePath, FilePath)]
-generatedFiles = do
-  deps <- generatedDependencies
-  return [ (takeFileName fp, fp) | fp <- deps ]
