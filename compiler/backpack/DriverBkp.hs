@@ -311,6 +311,7 @@ buildUnit session cid insts lunit = do
             hsLibraries = [],
             extraLibraries = [],
             extraGHCiLibraries = [],
+            libraryDynDirs = [],
             libraryDirs = [],
             frameworks = [],
             frameworkDirs = [],

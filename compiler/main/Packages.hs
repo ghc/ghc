@@ -541,7 +541,8 @@ readPackageConfig dflags conf_file = do
   let
       top_dir = topDir dflags
       pkgroot = takeDirectory conf_file
-      pkg_configs1 = map (mungePackagePaths top_dir pkgroot) proto_pkg_configs
+      pkg_configs1 = map (mungePackageConfig top_dir pkgroot)
+                         proto_pkg_configs
       pkg_configs2 = setBatchPackageFlags dflags pkg_configs1
   --
   return (conf_file, pkg_configs2)
@@ -580,6 +581,22 @@ setBatchPackageFlags dflags pkgs = maybeDistrustAll pkgs
 
     distrust pkg = pkg{ trusted = False }
 
+mungePackageConfig :: FilePath -> FilePath
+                   -> PackageConfig -> PackageConfig
+mungePackageConfig top_dir pkgroot =
+    mungeDynLibFields
+  . mungePackagePaths top_dir pkgroot
+
+mungeDynLibFields :: PackageConfig -> PackageConfig
+mungeDynLibFields pkg =
+    pkg {
+      libraryDynDirs     = libraryDynDirs pkg
+                `orIfNull` libraryDirs pkg
+    }
+  where
+    orIfNull [] flags = flags
+    orIfNull flags _  = flags
+
 -- TODO: This code is duplicated in utils/ghc-pkg/Main.hs
 mungePackagePaths :: FilePath -> FilePath -> PackageConfig -> PackageConfig
 -- Perform path/URL variable substitution as per the Cabal ${pkgroot} spec
@@ -595,6 +612,7 @@ mungePackagePaths top_dir pkgroot pkg =
       importDirs  = munge_paths (importDirs pkg),
       includeDirs = munge_paths (includeDirs pkg),
       libraryDirs = munge_paths (libraryDirs pkg),
+      libraryDynDirs = munge_paths (libraryDynDirs pkg),
       frameworkDirs = munge_paths (frameworkDirs pkg),
       haddockInterfaces = munge_paths (haddockInterfaces pkg),
       haddockHTMLs = munge_urls (haddockHTMLs pkg)
@@ -1459,10 +1477,11 @@ collectIncludeDirs ps = nub (filter notNull (concatMap includeDirs ps))
 -- | Find all the library paths in these and the preload packages
 getPackageLibraryPath :: DynFlags -> [PreloadUnitId] -> IO [String]
 getPackageLibraryPath dflags pkgs =
-  collectLibraryPaths `fmap` getPreloadPackagesAnd dflags pkgs
+  collectLibraryPaths dflags `fmap` getPreloadPackagesAnd dflags pkgs
 
-collectLibraryPaths :: [PackageConfig] -> [FilePath]
-collectLibraryPaths ps = nub (filter notNull (concatMap libraryDirs ps))
+collectLibraryPaths :: DynFlags -> [PackageConfig] -> [FilePath]
+collectLibraryPaths dflags = nub . filter notNull
+                           . concatMap (libraryDirsForWay dflags)
 
 -- | Find all the link options in these and the preload packages,
 -- returning (package hs lib options, extra library options, other flags)
@@ -1513,6 +1532,12 @@ packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)
 
         expandTag t | null t = ""
                     | otherwise = '_':t
+
+-- | Either the 'libraryDirs' or 'libraryDynDirs' as appropriate for the way.
+libraryDirsForWay :: DynFlags -> PackageConfig -> [String]
+libraryDirsForWay dflags
+  | WayDyn `elem` ways dflags = libraryDynDirs
+  | otherwise                 = libraryDirs
 
 -- | Find all the C-compiler options in these and the preload packages
 getPackageExtraCcOpts :: DynFlags -> [PreloadUnitId] -> IO [String]

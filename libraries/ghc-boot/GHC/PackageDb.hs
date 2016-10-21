@@ -83,6 +83,7 @@ data InstalledPackageInfo compid srcpkgid srcpkgname instunitid unitid modulenam
        extraLibraries     :: [String],
        extraGHCiLibraries :: [String],
        libraryDirs        :: [FilePath],
+       libraryDynDirs     :: [FilePath],
        frameworks         :: [String],
        frameworkDirs      :: [FilePath],
        ldOptions          :: [String],
@@ -163,6 +164,7 @@ emptyInstalledPackageInfo =
        extraLibraries     = [],
        extraGHCiLibraries = [],
        libraryDirs        = [],
+       libraryDynDirs     = [],
        frameworks         = [],
        frameworkDirs      = [],
        ldOptions          = [],
@@ -306,7 +308,8 @@ instance (RepInstalledPackageInfo a b c d e f g) =>
          unitId componentId instantiatedWith sourcePackageId
          packageName packageVersion
          abiHash depends importDirs
-         hsLibraries extraLibraries extraGHCiLibraries libraryDirs
+         hsLibraries extraLibraries extraGHCiLibraries
+         libraryDirs libraryDynDirs
          frameworks frameworkDirs
          ldOptions ccOptions
          includes includeDirs
@@ -327,6 +330,7 @@ instance (RepInstalledPackageInfo a b c d e f g) =>
     put extraLibraries
     put extraGHCiLibraries
     put libraryDirs
+    put libraryDynDirs
     put frameworks
     put frameworkDirs
     put ldOptions
@@ -356,6 +360,7 @@ instance (RepInstalledPackageInfo a b c d e f g) =>
     extraLibraries     <- get
     extraGHCiLibraries <- get
     libraryDirs        <- get
+    libraryDynDirs     <- get
     frameworks         <- get
     frameworkDirs      <- get
     ldOptions          <- get
@@ -379,7 +384,8 @@ instance (RepInstalledPackageInfo a b c d e f g) =>
               abiHash
               (map fromStringRep depends)
               importDirs
-              hsLibraries extraLibraries extraGHCiLibraries libraryDirs
+              hsLibraries extraLibraries extraGHCiLibraries
+              libraryDirs libraryDynDirs
               frameworks frameworkDirs
               ldOptions ccOptions
               includes includeDirs

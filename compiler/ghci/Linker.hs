@@ -1182,7 +1182,8 @@ linkPackage hsc_env pkg
    = do
         let dflags    = hsc_dflags hsc_env
             platform  = targetPlatform dflags
-            dirs      = Packages.libraryDirs pkg
+            dirs | interpreterDynamic dflags = Packages.libraryDynDirs pkg
+                 | otherwise                 = Packages.libraryDirs pkg
 
         let hs_libs   =  Packages.hsLibraries pkg
             -- The FFI GHCi import lib isn't needed as

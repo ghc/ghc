@@ -1584,7 +1584,7 @@ linkDynLib dflags0 o_files dep_packages
 
     pkgs <- getPreloadPackagesAnd dflags dep_packages
 
-    let pkg_lib_paths = collectLibraryPaths pkgs
+    let pkg_lib_paths = collectLibraryPaths dflags pkgs
     let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
         get_pkg_lib_path_opts l
          | ( osElfTarget (platformOS (targetPlatform dflags)) ||

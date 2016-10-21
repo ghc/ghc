@@ -428,7 +428,7 @@ linkingNeeded dflags staticLink linkables pkg_deps = do
 
         -- next, check libraries. XXX this only checks Haskell libraries,
         -- not extra_libraries or -l things from the command line.
-        let pkg_hslibs  = [ (libraryDirs c, lib)
+        let pkg_hslibs  = [ (collectLibraryPaths dflags [c], lib)
                           | Just c <- map (lookupInstalledPackage dflags) pkg_deps,
                             lib <- packageHsLibs dflags c ]
 
