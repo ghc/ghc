@@ -1,6 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Oracles.ModuleFiles (
-    decodeModule, encodeModule, findGenerator, haskellSources, moduleFilesOracle
+    decodeModule, encodeModule, findGenerator, hsSources, hsObjects, moduleFilesOracle
     ) where
 
 import qualified Data.HashMap.Strict as Map
@@ -73,8 +73,8 @@ findGenerator Context {..} file = do
         return (source, builder)
 
 -- | Find all Haskell source files for a given 'Context'.
-haskellSources :: Context -> Action [FilePath]
-haskellSources context = do
+hsSources :: Context -> Action [FilePath]
+hsSources context = do
     let autogen = buildPath context -/- "autogen"
     -- Generated source files live in buildPath and have extension "hs", except
     -- for GHC/Prim.hs that lives in autogen. TODO: fix the inconsistency?
@@ -85,10 +85,21 @@ haskellSources context = do
             | otherwise = generatedFile context m
     map modFile <$> contextFiles context
 
+-- | Find all Haskell object files for a given 'Context'. Note: this is a much
+-- simpler function compared to 'hsSources', because all object files live in
+-- the build directory regardless of whether they are generated or not.
+hsObjects :: Context -> Action [FilePath]
+hsObjects context = do
+    modules <- pkgDataList $ Modules (buildPath context)
+    -- GHC.Prim module is only for documentation, we do not actually build it.
+    return . map (objectPath context . moduleSource) $ filter (/= "GHC.Prim") modules
+
 -- | Generated module files live in the 'Context' specific build directory.
 generatedFile :: Context -> String -> FilePath
-generatedFile context moduleName =
-    buildPath context -/- replaceEq '.' '/' moduleName <.> "hs"
+generatedFile context moduleName = buildPath context -/- moduleSource moduleName
+
+moduleSource :: String -> FilePath
+moduleSource moduleName = replaceEq '.' '/' moduleName <.> "hs"
 
 -- | Module files for a given 'Context'.
 contextFiles :: Context -> Action [(String, Maybe FilePath)]

@@ -17,14 +17,14 @@ haddockHtmlLib = "inplace/lib/html/haddock-util.js"
 
 -- Note: this build rule creates plenty of files, not just the .haddock one.
 -- All of them go into the 'doc' subdirectory. Pedantically tracking all built
--- files in the Shake databases seems fragile and unnecesarry.
+-- files in the Shake databases seems fragile and unnecessary.
 buildPackageDocumentation :: Context -> Rules ()
 buildPackageDocumentation context@Context {..} =
     let cabalFile   = pkgCabalFile package
         haddockFile = pkgHaddockFile context
     in when (stage == Stage1) $ do
         haddockFile %> \file -> do
-            srcs <- haskellSources context
+            srcs <- hsSources context
             deps <- map PackageName <$> interpretInContext context (getPkgDataList DepNames)
             let haddocks = [ pkgHaddockFile $ vanillaContext Stage1 depPkg
                            | Just depPkg <- map findKnownPackage deps

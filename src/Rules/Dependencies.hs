@@ -13,7 +13,7 @@ import Target
 buildPackageDependencies :: [(Resource, Int)] -> Context -> Rules ()
 buildPackageDependencies rs context@Context {..} =
     buildPath context -/- ".dependencies" %> \deps -> do
-        srcs <- haskellSources context
+        srcs <- hsSources context
         need srcs
         let mk = deps <.> "mk"
         if srcs == []

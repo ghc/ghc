@@ -8,9 +8,9 @@ import Expression
 import GHC
 import Oracles.Config.Setting
 import Oracles.Dependencies
+import Oracles.ModuleFiles
 import Oracles.PackageData
 import Rules.Actions
-import Rules.Library
 import Rules.Wrappers.Ghc
 import Rules.Wrappers.GhcPkg
 import Settings
@@ -23,43 +23,35 @@ import UserSettings
 programInplaceLibPath :: FilePath
 programInplaceLibPath = "inplace/lib/bin"
 
--- | Wrapper is parameterised by the path to the wrapped binary.
+-- | Wrapper is an expression depending on the 'FilePath' to the wrapped binary.
 type Wrapper = FilePath -> Expr String
 
 -- | List of wrappers we build.
 wrappers :: [(Context, Wrapper)]
 wrappers = [ (vanillaContext Stage0 ghc   , ghcWrapper   )
            , (vanillaContext Stage1 ghc   , ghcWrapper   )
-           , (vanillaContext Stage0 ghcPkg, ghcPkgWrapper)]
+           , (vanillaContext Stage0 ghcPkg, ghcPkgWrapper) ]
 
 buildProgram :: [(Resource, Int)] -> Context -> Rules ()
 buildProgram rs context@Context {..} = do
-    let match file = case programPath context of
-            Nothing      -> False
-            Just program -> program == file
-        matchWrapped file = case programPath context of
-            Nothing      -> False
-            Just program -> case computeWrappedPath program of
-                Nothing             -> False
-                Just wrappedProgram -> wrappedProgram == file
-
+    let match file        = any (== file) (programPath context)
+        matchWrapped file = any (== file) (programPath context >>= wrappedPath)
     match ?> \bin -> do
         windows <- windowsHost
         if windows
         then buildBinary rs context bin -- We don't build wrappers on Windows
-        else case find ((== context) . fst) wrappers of
-            Nothing -> buildBinary rs context bin -- No wrapper found
-            Just (_, wrapper) -> do
-                let Just wrappedBin = computeWrappedPath bin
+        else case lookup context wrappers of
+            Nothing      -> buildBinary rs context bin -- No wrapper found
+            Just wrapper -> do
+                let Just wrappedBin = wrappedPath bin
                 need [wrappedBin]
                 buildWrapper context wrapper bin wrappedBin
 
-    matchWrapped ?> \bin -> buildBinary rs context bin
+    matchWrapped ?> buildBinary rs context
 
 -- | Replace 'programInplacePath' with 'programInplaceLibPath' in a given path.
-computeWrappedPath :: FilePath -> Maybe FilePath
-computeWrappedPath =
-    fmap (programInplaceLibPath ++) . stripPrefix programInplacePath
+wrappedPath :: FilePath -> Maybe FilePath
+wrappedPath = fmap (programInplaceLibPath ++) . stripPrefix programInplacePath
 
 buildWrapper :: Context -> Wrapper -> FilePath -> FilePath -> Action ()
 buildWrapper context@Context {..} wrapper wrapperPath binPath = do
@@ -73,19 +65,18 @@ buildWrapper context@Context {..} wrapper wrapperPath binPath = do
 -- TODO: Do we need to consider other ways when building programs?
 buildBinary :: [(Resource, Int)] -> Context -> FilePath -> Action ()
 buildBinary rs context@Context {..} bin = do
-    hsSrcs  <- hsSources context
     binDeps <- if stage == Stage0 && package == ghcCabal
-        then return [ pkgPath package -/- src <.> "hs" | src <- hsSrcs ]
+        then hsSources context
         else do
             ways <- interpretInContext context getLibraryWays
             deps <- contextDependencies context
             needContext [ dep { way = w } | dep <- deps, w <- ways ]
-            cSrcs <- cSources context -- TODO: Drop code duplication (Library.hs).
             let path = buildPath context
-            return $ [ path -/- "c" -/- src -<.> osuf vanilla | src <- cSrcs       ]
-                  ++ [ path -/- src  <.> osuf vanilla         | src <- hsSrcs      ]
-                  ++ [ path -/- "Paths_hsc2hs.o"              | package == hsc2hs  ]
-                  ++ [ path -/- "Paths_haddock.o"             | package == haddock ]
+            cObjs  <- map (objectPath context) <$> pkgDataList (CSrcs path)
+            hsObjs <- hsObjects context
+            return $ cObjs ++ hsObjs
+                  ++ [ path -/- "Paths_hsc2hs.o"  | package == hsc2hs  ]
+                  ++ [ path -/- "Paths_haddock.o" | package == haddock ]
     need binDeps
     buildWithResources rs $ Target context (Ghc LinkHs stage) binDeps [bin]
     synopsis <- interpretInContext context $ getPkgData Synopsis

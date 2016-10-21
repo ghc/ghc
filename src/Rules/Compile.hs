@@ -20,7 +20,7 @@ compilePackage rs context@Context {..} = do
             need [src]
             needDependencies context src $ obj <.> "d"
             build $ Target context (compiler stage) [src] [obj]
-        compileHs = \[obj, _] -> do
+        compileHs = \[obj, _hi] -> do
             (src, deps) <- fileDependencies context obj
             need $ src : deps
             when (isLibrary package) $ need =<< return <$> pkgConfFile context
