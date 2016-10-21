@@ -246,7 +246,7 @@ test('conc068', [ omit_ways('threaded2'), exit_code(1) ], compile_and_run, [''])
 
 test('setnumcapabilities001',
      [ only_ways(['threaded1','threaded2']),
-       extra_run_opts('4 12 2000'),
+       extra_run_opts('8 12 2000'),
        req_smp ],
      compile_and_run, [''])
 

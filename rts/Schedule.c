@@ -1543,27 +1543,14 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
         gc_type = SYNC_GC_SEQ;
     }
 
-    if (gc_type == SYNC_GC_PAR && RtsFlags.ParFlags.parGcThreads > 0) {
-        need_idle = stg_max(0, enabled_capabilities -
-                            RtsFlags.ParFlags.parGcThreads);
-    } else {
-        need_idle = 0;
-    }
-
     // In order to GC, there must be no threads running Haskell code.
-    // Therefore, the GC thread needs to hold *all* the capabilities,
-    // and release them after the GC has completed.
+    // Therefore, for single-threaded GC, the GC thread needs to hold *all* the
+    // capabilities, and release them after the GC has completed.  For parallel
+    // GC, we synchronise all the running threads using requestSync().
     //
-    // This seems to be the simplest way: previous attempts involved
-    // making all the threads with capabilities give up their
-    // capabilities and sleep except for the *last* one, which
-    // actually did the GC.  But it's quite hard to arrange for all
-    // the other tasks to sleep and stay asleep.
-    //
-
-    /*  Other capabilities are prevented from running yet more Haskell
-        threads if pending_sync is set. Tested inside
-        yieldCapability() and releaseCapability() in Capability.c */
+    // Other capabilities are prevented from running yet more Haskell threads if
+    // pending_sync is set. Tested inside yieldCapability() and
+    // releaseCapability() in Capability.c
 
     PendingSync sync = {
         .type = gc_type,
@@ -1575,6 +1562,26 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
         SyncType prev_sync = 0;
         rtsBool was_syncing;
         do {
+            // If -qn is not set and we have more capabilities than cores, set
+            // the number of GC threads to #cores.  We do this here rather than
+            // in normaliseRtsOpts() because here it will work if the program
+            // calls setNumCapabilities.
+            //
+            n_gc_threads = RtsFlags.ParFlags.parGcThreads;
+            if (n_gc_threads == 0 &&
+                enabled_capabilities > getNumberOfProcessors()) {
+                n_gc_threads = getNumberOfProcessors();
+            }
+
+            // This calculation must be inside the loop because
+            // enabled_capabilities may change if requestSync() below fails and
+            // we retry.
+            if (gc_type == SYNC_GC_PAR && n_gc_threads > 0) {
+                need_idle = stg_max(0, enabled_capabilities - n_gc_threads);
+            } else {
+                need_idle = 0;
+            }
+
             // We need an array of size n_capabilities, but since this may
             // change each time around the loop we must allocate it afresh.
             idle_cap = (rtsBool *)stgMallocBytes(n_capabilities *
