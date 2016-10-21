@@ -212,7 +212,7 @@ applyTypeToArgs e op_ty args
 -}
 
 collectConArgs :: CoreExpr -> [CoreArg]
-collectConArgs (ConApp dc cargs) = uncompressArgs exprTypeOrKind Type (dataConRepType dc) cargs
+collectConArgs (ConApp dc cargs) = uncompressArgs exprTypeOrKind Type (dataConCompressScheme dc) cargs
 collectConArgs _ = panic "conAppArgs"
 
 

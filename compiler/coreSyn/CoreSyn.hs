@@ -1501,7 +1501,7 @@ mkCoApps  f args = foldl (\ e a -> App e (Coercion a)) f args
 mkVarApps f vars = foldl (\ e a -> App e (varToCoreExpr a)) f vars
 mkConApp dc args =
     ASSERT2 ( dataConRepFullArity dc == length args, text "mkConApp: artiy mismatch" $$ ppr dc )
-    ConApp dc (compressArgs (dataConRepType dc) args)
+    ConApp dc (compressArgs (dataConCompressScheme dc) args)
 
 mkTyApps  f args = foldl (\ e a -> App e (typeOrCoercion a)) f args
   where

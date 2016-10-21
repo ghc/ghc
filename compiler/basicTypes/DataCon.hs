@@ -28,6 +28,7 @@ module DataCon (
 
         -- ** Type deconstruction
         dataConRepType, dataConSig, dataConInstSig, dataConFullSig,
+        dataConCompressScheme,
         dataConName, dataConIdentity, dataConTag, dataConTyCon,
         dataConOrigTyCon, dataConUserType,
         dataConUnivTyVars, dataConUnivTyVarBinders,
@@ -66,6 +67,7 @@ import ForeignCall ( CType )
 import Coercion
 import Unify
 import TyCon
+import CompressArgs
 import FieldLabel
 import Class
 import Name
@@ -406,6 +408,8 @@ data DataCon
         --      forall x y. (t~(x,y), x~y, Ord x) => x -> y -> T t
         -- and use that to check the pattern.  Mind you, this is really only
         -- used in CoreLint.
+
+        dcCompressScheme  :: CompressScheme,
 
 
         dcInfix :: Bool,        -- True <=> declared infix
@@ -797,6 +801,7 @@ mkDataCon name declared_infix prom_info
                   dcRepTyCon = rep_tycon,
                   dcSrcBangs = arg_stricts,
                   dcFields = fields, dcTag = tag, dcRepType = rep_ty,
+                  dcCompressScheme = genCompressScheme rep_ty,
                   dcWorkId = work_id,
                   dcRep = rep,
                   dcSourceArity = length orig_arg_tys,
@@ -881,6 +886,9 @@ dataConOrigTyCon dc
 -- type that will represent values of this type at runtime
 dataConRepType :: DataCon -> Type
 dataConRepType = dcRepType
+
+dataConCompressScheme :: DataCon -> CompressScheme
+dataConCompressScheme = dcCompressScheme
 
 -- | Should the 'DataCon' be presented infix?
 dataConIsInfix :: DataCon -> Bool

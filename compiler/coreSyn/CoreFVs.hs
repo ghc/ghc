@@ -74,7 +74,7 @@ import Type
 import TyCoRep
 import TyCon
 import CompressArgs
-import DataCon ( dataConRepType, dataConWorkId )
+import DataCon ( dataConRepType, dataConCompressScheme, dataConWorkId )
 import CoAxiom
 import FamInstEnv
 import TysPrim( funTyConName )
@@ -752,7 +752,7 @@ freeVars = go
         , AnnConApp dc cargs' )
       where
         cargs'   = map go cargs
-        args     = uncompressArgs exprTypeFV (go . Type) dc_ty cargs'
+        args     = uncompressArgs exprTypeFV (go . Type) (dataConCompressScheme dc) cargs'
         dc_ty    = dataConRepType dc
         res_ty   = foldl applyTypeToArg dc_ty (map deAnnotate args)
         -- Why does this not work? Isn't piResultTys just iterated application
