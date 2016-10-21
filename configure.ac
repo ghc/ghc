@@ -1070,7 +1070,7 @@ AC_CHECK_HEADERS([numa.h numaif.h])
 if test "$ac_cv_header_numa_h$ac_cv_header_numaif_h" = "yesyes" ; then
     AC_CHECK_LIB(numa, numa_available,HaveLibNuma=1)
 fi
-AC_DEFINE_UNQUOTED([USE_LIBNUMA], [$HaveLibNuma], [Define to 1 if you have libnuma])
+AC_DEFINE_UNQUOTED([HAVE_LIBNUMA], [$HaveLibNuma], [Define to 1 if you have libnuma])
 
 dnl ** Documentation
 dnl --------------------------------------------------------------
