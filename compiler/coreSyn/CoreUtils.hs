@@ -111,6 +111,7 @@ exprType (Lam binder expr)   = mkLamType binder (exprType expr)
 exprType e@(App _ _)
   = case collectArgs e of
         (fun, args) -> applyTypeToArgs e (exprType fun) args
+exprType e@(ConApp dc args)  = applyTypeToArgs e (dataConRepType dc) args
 
 exprType other = pprTrace "exprType" (pprCoreExpr other) alphaTy
 
@@ -331,7 +332,8 @@ mkTicks ticks expr = foldr mkTick expr ticks
 
 isSaturatedConApp :: CoreExpr -> Bool
 isSaturatedConApp e = go e []
-  where go (App f a) as = go f (a:as)
+  where go (ConApp _ _) [] = True
+        go (App f a) as = go f (a:as)
         go (Var fun) args
            = isConLikeId fun && idArity fun == valArgCount args
         go (Cast f _) as = go f as
@@ -803,6 +805,7 @@ exprIsTrivial (Type _)         = True
 exprIsTrivial (Coercion _)     = True
 exprIsTrivial (Lit lit)        = litIsTrivial lit
 exprIsTrivial (App e arg)      = not (isRuntimeArg arg) && exprIsTrivial e
+exprIsTrivial (ConApp _ args)  = all isTypeArg args
 exprIsTrivial (Tick t e)       = not (tickishIsCode t) && exprIsTrivial e
                                  -- See Note [Tick trivial]
 exprIsTrivial (Cast e _)       = exprIsTrivial e
@@ -837,6 +840,7 @@ getIdFromTrivialExpr_maybe :: CoreExpr -> Maybe Id
 getIdFromTrivialExpr_maybe e = go e
   where go (Var v) = Just v
         go (App f t) | not (isRuntimeArg t) = go f
+        go (ConApp dc args) | all isTypeArg args = Just (dataConWorkId dc)
         go (Tick t e) | not (tickishIsCode t) = go e
         go (Cast e _) = go e
         go (Lam b e) | not (isRuntimeVar b) = go e
@@ -992,10 +996,11 @@ exprIsWorkFree e = go 0 e
     go n (Var v)                      = isCheapApp v n
     go n (Tick t e) | tickishCounts t = False
                     | otherwise       = go n e
-    go n (Lam x e)  | isRuntimeVar x = n==0 || go (n-1) e
-                    | otherwise      = go n e
-    go n (App f e)  | isRuntimeArg e = exprIsWorkFree e && go (n+1) f
-                    | otherwise      = go n f
+    go n (Lam x e)  | isRuntimeVar x  = n==0 || go (n-1) e
+                    | otherwise       = go n e
+    go n (App f e)  | isRuntimeArg e  = exprIsWorkFree e && go (n+1) f
+                    | otherwise       = go n f
+    go _ (ConApp _ args)              = all exprIsWorkFree args
 
 {-
 Note [Case expressions are work-free]
@@ -1055,13 +1060,14 @@ exprIsExpandable :: CoreExpr -> Bool
 exprIsExpandable = exprIsCheap' isExpandableApp -- See Note [CONLIKE pragma] in BasicTypes
 
 exprIsCheap' :: CheapAppFun -> CoreExpr -> Bool
-exprIsCheap' _        (Lit _)      = True
-exprIsCheap' _        (Type _)    = True
-exprIsCheap' _        (Coercion _) = True
-exprIsCheap' _        (Var _)      = True
-exprIsCheap' good_app (Cast e _)   = exprIsCheap' good_app e
-exprIsCheap' good_app (Lam x e)    = isRuntimeVar x
-                                  || exprIsCheap' good_app e
+exprIsCheap' _        (Lit _)         = True
+exprIsCheap' _        (Type _)        = True
+exprIsCheap' _        (Coercion _)    = True
+exprIsCheap' _        (Var _)         = True
+exprIsCheap' good_app (ConApp _ args) = all (exprIsCheap' good_app) args
+exprIsCheap' good_app (Cast e _)      = exprIsCheap' good_app e
+exprIsCheap' good_app (Lam x e)       = isRuntimeVar x
+                                      || exprIsCheap' good_app e
 
 exprIsCheap' good_app (Case e _ _ alts) = exprIsCheap' good_app e &&
                                           and [exprIsCheap' good_app rhs | (_,_,rhs) <- alts]
@@ -1251,6 +1257,7 @@ expr_ok :: (PrimOp -> Bool) -> Expr b -> Bool
 expr_ok _ (Lit _)      = True
 expr_ok _ (Type _)     = True
 expr_ok _ (Coercion _) = True
+expr_ok _ (ConApp _ _) = True
 expr_ok primop_ok (Var v)      = app_ok primop_ok v []
 expr_ok primop_ok (Cast e _)   = expr_ok primop_ok e
 
@@ -1476,6 +1483,7 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
     is_hnf_like (Type _)         = True       -- Types are honorary Values;
                                               -- we don't mind copying them
     is_hnf_like (Coercion _)     = True       -- Same for coercions
+    is_hnf_like (ConApp _ _)     = True
     is_hnf_like (Lam b e)        = isRuntimeVar b || is_hnf_like e
     is_hnf_like (Tick tickish e) = not (tickishCounts tickish)
                                       && is_hnf_like e
@@ -1641,6 +1649,10 @@ cheapEqExpr' ignoreTick = go_s
         go (Type t1)  (Type t2)  = t1 `eqType` t2
         go (Coercion c1) (Coercion c2) = c1 `eqCoercion` c2
 
+        go (ConApp dc1 args1) (ConApp dc2 args2)
+          = dc1 == dc2 &&
+            (ASSERT (args1 `equalLength` args2) all2 go_s args1 args2)
+
         go (App f1 a1) (App f2 a2)
           = f1 `go_s` f2 && a1 `go_s` a2
 
@@ -1656,15 +1668,16 @@ cheapEqExpr' ignoreTick = go_s
 
 exprIsBig :: Expr b -> Bool
 -- ^ Returns @True@ of expressions that are too big to be compared by 'cheapEqExpr'
-exprIsBig (Lit _)      = False
-exprIsBig (Var _)      = False
-exprIsBig (Type _)     = False
-exprIsBig (Coercion _) = False
-exprIsBig (Lam _ e)    = exprIsBig e
-exprIsBig (App f a)    = exprIsBig f || exprIsBig a
-exprIsBig (Cast e _)   = exprIsBig e    -- Hopefully coercions are not too big!
-exprIsBig (Tick _ e)   = exprIsBig e
-exprIsBig _            = True
+exprIsBig (Lit _)         = False
+exprIsBig (Var _)         = False
+exprIsBig (Type _)        = False
+exprIsBig (Coercion _)    = False
+exprIsBig (Lam _ e)       = exprIsBig e
+exprIsBig (App f a)       = exprIsBig f || exprIsBig a
+exprIsBig (ConApp _ args) = any exprIsBig args
+exprIsBig (Cast e _)      = exprIsBig e    -- Hopefully coercions are not too big!
+exprIsBig (Tick _ e)      = exprIsBig e
+exprIsBig _               = True
 
 eqExpr :: InScopeSet -> CoreExpr -> CoreExpr -> Bool
 -- Compares for equality, modulo alpha
@@ -1680,6 +1693,8 @@ eqExpr in_scope e1 e2
     go env (Coercion co1) (Coercion co2) = eqCoercionX env co1 co2
     go env (Cast e1 co1) (Cast e2 co2) = eqCoercionX env co1 co2 && go env e1 e2
     go env (App f1 a1)   (App f2 a2)   = go env f1 f2 && go env a1 a2
+    go env (ConApp dc1 args1) (ConApp dc2 args2)
+                                       = dc1 == dc2 && all2 (go env) args1 args2
     go env (Tick n1 e1)  (Tick n2 e2)  = eqTickish env n1 n2 && go env e1 e2
 
     go env (Lam b1 e1)  (Lam b2 e2)
@@ -2141,6 +2156,10 @@ rhsIsStatic platform is_dynamic_name cvt_integer rhs = is_static False rhs
   is_static in_arg (Lit (LitInteger i _)) = is_static in_arg (cvt_integer i)
   is_static _      (Lit (MachLabel {}))   = False
   is_static _      (Lit _)                = True
+
+  is_static _      (Type _ ) = True
+  is_static False  (ConApp _ args) = all (is_static True) args
+
         -- A MachLabel (foreign import "&foo") in an argument
         -- prevents a constructor application from being static.  The
         -- reason is that it might give rise to unresolvable symbols
@@ -2222,6 +2241,10 @@ isEmptyTy ty
 --
 -- Yields @Nothing@ otherwise.
 collectStaticPtrSatArgs :: Expr b -> Maybe (Expr b, [Arg b])
+collectStaticPtrSatArgs (ConApp dc args)
+    | dataConName dc == staticPtrDataConName
+    , length args == 5
+    = Just (Var (dataConWorkId dc), args) -- TODO #12618 hack
 collectStaticPtrSatArgs e
     | (fun@(Var b), args, _) <- collectArgsTicks (const True) e
     , Just con <- isDataConId_maybe b

@@ -970,6 +970,7 @@ reOrderNodes depth bndr_set weak_fvs (node : nodes) binds
         --      Note [Closure conversion]
     is_con_app (Var v)    = isConLikeId v
     is_con_app (App f _)  = is_con_app f
+    is_con_app (ConApp _ _) = True
     is_con_app (Lam _ e)  = is_con_app e
     is_con_app (Tick _ e) = is_con_app e
     is_con_app _          = False
@@ -1246,6 +1247,13 @@ occAnal env app@(App _ _)
 -- Ignore type variables altogether
 --   (a) occurrences inside type lambdas only not marked as InsideLam
 --   (b) type variables not in environment
+
+occAnal env (ConApp dc args)
+  = (final_uds, ConApp dc args')
+  where
+    !(uds, args') = occAnalArgs env args one_shots
+    !final_uds = markManyIf (isRhsEnv env) uds
+    one_shots = [] -- no one-shots info for data cons
 
 occAnal env (Lam x body) | isTyVar x
   = case occAnal env body of { (body_usage, body') ->

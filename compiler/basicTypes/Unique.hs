@@ -48,13 +48,14 @@ module Unique (
         mkPreludeMiscIdUnique, mkPreludeDataConUnique,
         mkPreludeTyConUnique, mkPreludeClassUnique,
         mkPArrDataConUnique, mkCoVarUnique,
+        mkCoreConAppUnique,
 
         mkVarOccUnique, mkDataOccUnique, mkTvOccUnique, mkTcOccUnique,
         mkRegSingleUnique, mkRegPairUnique, mkRegClassUnique, mkRegSubUnique,
         mkCostCentreUnique,
 
         tyConRepNameUnique,
-        dataConWorkerUnique, dataConRepNameUnique,
+        dataConWorkerUnique, dataConWrapperUnique, dataConRepNameUnique,
 
         mkBuiltinUnique,
         mkPseudoUniqueD,
@@ -322,6 +323,8 @@ Allocation of unique supply characters:
         n       Native codegen
         r       Hsc name cache
         s       simplifier
+        c       typechecker
+        a       binders for case expressions in mkCoreConApp (desugarer)
 -}
 
 mkAlphaTyVarUnique     :: Int -> Unique
@@ -335,10 +338,12 @@ mkPrimOpIdUnique       :: Int -> Unique
 mkPreludeMiscIdUnique  :: Int -> Unique
 mkPArrDataConUnique    :: Int -> Unique
 mkCoVarUnique          :: Int -> Unique
+mkCoreConAppUnique     :: Int -> Unique
 
 mkAlphaTyVarUnique   i = mkUnique '1' i
 mkCoVarUnique        i = mkUnique 'g' i
 mkPreludeClassUnique i = mkUnique '2' i
+mkCoreConAppUnique   i = mkUnique 'a' i
 
 --------------------------------------------------
 -- Wired-in type constructor keys occupy *two* slots:
@@ -362,12 +367,12 @@ tyConRepNameUnique  u = incrUnique u
 -- Wired-in data constructor keys occupy *three* slots:
 --    * u: the DataCon itself
 --    * u+1: its worker Id
---    * u+2: the TyConRepName of the promoted TyCon
--- Prelude data constructors are too simple to need wrappers.
+--    * u+2: its wrapper Id
+--    * u+3: the TyConRepName of the promoted TyCon
 
-mkPreludeDataConUnique i              = mkUnique '6' (3*i)    -- Must be alphabetic
-mkTupleDataConUnique Boxed          a = mkUnique '7' (3*a)    -- ditto (*may* be used in C labels)
-mkTupleDataConUnique Unboxed        a = mkUnique '8' (3*a)
+mkPreludeDataConUnique i              = mkUnique '6' (4*i)    -- Must be alphabetic
+mkTupleDataConUnique Boxed          a = mkUnique '7' (4*a)    -- ditto (*may* be used in C labels)
+mkTupleDataConUnique Unboxed        a = mkUnique '8' (4*a)
 
 --------------------------------------------------
 -- Sum arities start from 2. A sum of arity N has N data constructors, so it
@@ -397,9 +402,10 @@ sumUniqsOccupied arity
 {-# INLINE sumUniqsOccupied #-}
 
 --------------------------------------------------
-dataConRepNameUnique, dataConWorkerUnique :: Unique -> Unique
+dataConRepNameUnique, dataConWrapperUnique, dataConWorkerUnique :: Unique -> Unique
 dataConWorkerUnique  u = incrUnique u
-dataConRepNameUnique u = stepUnique u 2
+dataConWrapperUnique u = stepUnique u 2
+dataConRepNameUnique u = stepUnique u 3
 
 --------------------------------------------------
 mkPrimOpIdUnique op         = mkUnique '9' op

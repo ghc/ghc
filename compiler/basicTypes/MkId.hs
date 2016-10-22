@@ -23,7 +23,8 @@ module MkId (
         wrapFamInstBody, unwrapFamInstScrut,
         wrapTypeUnbranchedFamInstBody, unwrapTypeUnbranchedFamInstScrut,
 
-        DataConBoxer(..), mkDataConRep, mkDataConWorkId,
+        DataConBoxer(..), mkDataConRep, mkSimpleDataConRep,
+        mkDataConWorkId, dataConWorkStrictSig,
 
         -- And some particular Ids; see below for why they are wired in
         wiredInIds, ghcPrimIds,
@@ -377,30 +378,11 @@ mkDataConWorkId wkr_name data_con
 
         ----------- Workers for data types --------------
     alg_wkr_ty = dataConRepType data_con
-    wkr_arity = dataConRepArity data_con
     wkr_info  = noCafIdInfo
-                `setArityInfo`       wkr_arity
-                `setStrictnessInfo`  wkr_sig
+                `setArityInfo`       dataConRepArity data_con
+                `setStrictnessInfo`  dataConWorkStrictSig data_con
                 `setUnfoldingInfo`   evaldUnfolding  -- Record that it's evaluated,
                                                      -- even if arity = 0
-
-    wkr_sig = mkClosedStrictSig (replicate wkr_arity topDmd) (dataConCPR data_con)
-        --      Note [Data-con worker strictness]
-        -- Notice that we do *not* say the worker is strict
-        -- even if the data constructor is declared strict
-        --      e.g.    data T = MkT !(Int,Int)
-        -- Why?  Because the *wrapper* is strict (and its unfolding has case
-        -- expressions that do the evals) but the *worker* itself is not.
-        -- If we pretend it is strict then when we see
-        --      case x of y -> $wMkT y
-        -- the simplifier thinks that y is "sure to be evaluated" (because
-        --  $wMkT is strict) and drops the case.  No, $wMkT is not strict.
-        --
-        -- When the simplifier sees a pattern
-        --      case e of MkT x -> ...
-        -- it uses the dataConRepStrictness of MkT to mark x as evaluated;
-        -- but that's fine... dataConRepStrictness comes from the data con
-        -- not from the worker Id.
 
         ----------- Workers for newtypes --------------
     (nt_tvs, _, nt_arg_tys, _) = dataConSig data_con
@@ -417,6 +399,26 @@ mkDataConWorkId wkr_name data_con
                    mkCompulsoryUnfolding $
                    mkLams nt_tvs $ Lam id_arg1 $
                    wrapNewTypeBody tycon res_ty_args (Var id_arg1)
+
+dataConWorkStrictSig :: DataCon -> StrictSig
+dataConWorkStrictSig dc = mkClosedStrictSig (replicate (dataConRepArity dc) topDmd) (dataConCPR dc)
+
+        --      Note [Data-con worker strictness]
+        -- Notice that we do *not* say the worker is strict
+        -- even if the data constructor is declared strict
+        --      e.g.    data T = MkT !(Int,Int)
+        -- Why?  Because the *wrapper* is strict (and its unfolding has case
+        -- expressions that do the evals) but the *worker* itself is not.
+        -- If we pretend it is strict then when we see
+        --      case x of y -> $wMkT y
+        -- the simplifier thinks that y is "sure to be evaluated" (because
+        --  $wMkT is strict) and drops the case.  No, $wMkT is not strict.
+        --
+        -- When the simplifier sees a pattern
+        --      case e of MkT x -> ...
+        -- it uses the dataConRepStrictness of MkT to mark x as evaluated;
+        -- but that's fine... dataConRepStrictness comes from the data con
+        -- not from the worker Id.
 
 dataConCPR :: DataCon -> DmdResult
 dataConCPR con
@@ -466,6 +468,52 @@ newtype DataConBoxer = DCB ([Type] -> [Var] -> UniqSM ([Var], [CoreBind]))
                        -- Bind these src-level vars, returning the
                        -- rep-level vars to bind in the pattern
 
+unitDataConBoxer :: DataConBoxer
+unitDataConBoxer = DCB (\_ vs -> return (vs, []))
+
+mkSimpleDataConRep :: Name -> DataCon -> DataConRep
+mkSimpleDataConRep _ dc | isNewTyCon (dataConTyCon dc) = NoDataConRep
+mkSimpleDataConRep wrap_name dc
+    = DCR { dcr_wrap_id = wrap_id
+          , dcr_boxer   = unitDataConBoxer
+          , dcr_arg_tys = arg_tys
+          , dcr_stricts = rep_strs
+          , dcr_bangs   = arg_ibangs }
+  where
+    wrap_ty = dataConRepType dc
+    wrap_id = mkGlobalId (DataConWrapId dc) wrap_name wrap_ty wrap_info
+    (ty_vars, theta , orig_arg_tys, _) = dataConSig dc
+    arg_tys = theta ++ orig_arg_tys
+    wrap_args = [ mkSysLocalOrCoVar (fsLit "wa") (mkCoreConAppUnique i) ty
+           | (i,ty) <- zip [0..] arg_tys ]
+
+    wrap_info = noCafIdInfo
+                `setArityInfo`         wrap_arity
+                    -- It's important to specify the arity, so that partial
+                    -- applications are treated as values
+                `setInlinePragInfo`    alwaysInlinePragma
+                `setUnfoldingInfo`     wrap_unf
+                `setStrictnessInfo`    wrap_sig
+    wrap_arity = dataConRepArity dc
+    wrap_unf
+        -- Somewhat ugly, but there is no code generated for wrappers
+        -- for unboxed tuples. Let's just get rid of them as soon as possible.
+        | is_unbox_tup = mkCompulsoryUnfolding wrap_rhs
+        | otherwise    = mkSimpleWrapperUnfolding wrap_arity wrap_rhs
+    wrap_sig = mkClosedStrictSig wrap_arg_dmds (dataConCPR dc)
+    wrap_arg_dmds = replicate wrap_arity topDmd
+    rep_strs = [ NotMarkedStrict | _ <- arg_tys ]
+    arg_ibangs = [ HsLazy | _ <- arg_tys ]
+
+    wrap_rhs = mkLams ty_vars $
+               mkLams wrap_args $
+               mkConApp dc $ concat
+                [ map (Type . mkTyVarTy) ty_vars
+                , map varToCoreExpr wrap_args
+                ]
+
+    is_unbox_tup = isUnboxedTupleCon dc
+
 mkDataConRep :: DynFlags
              -> FamInstEnvs
              -> Name
@@ -474,13 +522,18 @@ mkDataConRep :: DynFlags
              -> DataCon
              -> UniqSM DataConRep
 mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
-  | not wrapper_reqd
+  | isNewTyCon tycon  -- Newtypes have only a worker
   = return NoDataConRep
+
+  | not $ any isBanged (ev_ibangs ++ arg_ibangs) -- Some forcing/unboxing (includes eq_spec)
+          || isFamInstTyCon tycon  -- Cast result
+          || not (null eq_spec) -- GADT
+  = return (mkSimpleDataConRep wrap_name data_con)
 
   | otherwise
   = do { wrap_args <- mapM newLocal wrap_arg_tys
-       ; wrap_body <- mk_rep_app (wrap_args `zip` dropList eq_spec unboxers)
-                                 initial_wrap_app
+       ; (rep_ids, unbox_fn) <- combine_unboxers (wrap_args `zip` dropList eq_spec unboxers)
+       ; let wrap_body = unbox_fn $ build_con_app rep_ids
 
        ; let wrap_id = mkGlobalId (DataConWrapId data_con) wrap_name wrap_ty wrap_info
              wrap_info = noCafIdInfo
@@ -550,16 +603,12 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
     (unboxers, boxers) = unzip wrappers
     (rep_tys, rep_strs) = unzip (concat rep_tys_w_strs)
 
-    wrapper_reqd = not (isNewTyCon tycon)  -- Newtypes have only a worker
-                && (any isBanged (ev_ibangs ++ arg_ibangs)
-                      -- Some forcing/unboxing (includes eq_spec)
-                    || isFamInstTyCon tycon  -- Cast result
-                    || (not $ null eq_spec)) -- GADT
-
-    initial_wrap_app = Var (dataConWorkId data_con)
-                       `mkTyApps`  res_ty_args
-                       `mkVarApps` ex_tvs
-                       `mkCoApps`  map (mkReflCo Nominal . eqSpecType) eq_spec
+    build_con_app rep_ids = mkConApp data_con $ concat
+        [ map Type res_ty_args
+        , map (Type . mkTyVarTy) ex_tvs
+        , map (Coercion . mkReflCo Nominal . eqSpecType) eq_spec
+        , map Var rep_ids
+        ]
 
     mk_boxer :: [Boxer] -> DataConBoxer
     mk_boxer boxers = DCB (\ ty_args src_vars ->
@@ -580,13 +629,14 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
            ; return (rep_ids1 ++ rep_ids2, NonRec src_var arg : binds) }
     go _ (_:_) [] = pprPanic "mk_boxer" (ppr data_con)
 
-    mk_rep_app :: [(Id,Unboxer)] -> CoreExpr -> UniqSM CoreExpr
-    mk_rep_app [] con_app
-      = return con_app
-    mk_rep_app ((wrap_arg, unboxer) : prs) con_app
+    combine_unboxers :: [(Id,Unboxer)] -> UniqSM ([Id],CoreExpr -> CoreExpr)
+    combine_unboxers []
+      = return ([],id)
+    combine_unboxers ((wrap_arg, unboxer) : other_unboxers)
       = do { (rep_ids, unbox_fn) <- unboxer wrap_arg
-           ; expr <- mk_rep_app prs (mkVarApps con_app rep_ids)
-           ; return (unbox_fn expr) }
+           ; (other_rep_ids, other_unbox_fn) <- combine_unboxers other_unboxers
+           ; return (rep_ids ++ other_rep_ids, unbox_fn . other_unbox_fn)
+           }
 
 {-
 Note [Bangs on imported data constructors]
@@ -732,9 +782,10 @@ dataConArgUnpack arg_ty
           ; return (rep_ids, unbox_fn) }
      , Boxer $ \ subst ->
        do { rep_ids <- mapM (newLocal . TcType.substTyUnchecked subst) rep_tys
-          ; return (rep_ids, Var (dataConWorkId con)
-                             `mkTyApps` (substTysUnchecked subst tc_args)
-                             `mkVarApps` rep_ids ) } ) )
+          ; return (rep_ids, ConApp con (
+                map Type (substTysUnchecked subst tc_args) ++
+                map Var rep_ids))
+          }))
   | otherwise
   = pprPanic "dataConArgUnpack" (ppr arg_ty)
     -- An interface file specified Unpacked, but we couldn't unpack it

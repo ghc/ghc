@@ -41,6 +41,8 @@ endif
 SRC_HC_WARNING_OPTS_STAGE1 += -Wnoncanonical-monad-instances
 SRC_HC_WARNING_OPTS_STAGE2 += -Wnoncanonical-monad-instances
 
+# TODO #12618 see https://ghc.haskell.org/trac/ghc/ticket/12618#comment:25
+SRC_HC_WARNING_OPTS += -fno-warn-inline-rule-shadowing
 
 ######################################################################
 # Disable some warnings in packages we use

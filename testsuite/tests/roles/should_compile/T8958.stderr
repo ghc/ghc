@@ -21,44 +21,44 @@ Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,
 
 ==================== Typechecker ====================
 T8958.$tcMap
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       11173210732975605893##
       6338753504925142034##
       T8958.$trModule
-      (GHC.Types.TrNameS "Map"#)
+      (GHC.Types.$WTrNameS "Map"#)
 T8958.$tc'MkMap
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       10702411725744601909##
       8660532495248702786##
       T8958.$trModule
-      (GHC.Types.TrNameS "'MkMap"#)
+      (GHC.Types.$WTrNameS "'MkMap"#)
 T8958.$tcRepresentational
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       17939208465687456137##
       86959701938445380##
       T8958.$trModule
-      (GHC.Types.TrNameS "Representational"#)
+      (GHC.Types.$WTrNameS "Representational"#)
 T8958.$tc'C:Representational
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       6623579006299218188##
       18041743345929230411##
       T8958.$trModule
-      (GHC.Types.TrNameS "'C:Representational"#)
+      (GHC.Types.$WTrNameS "'C:Representational"#)
 T8958.$tcNominal
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       5048799062136959048##
       4899664595355811926##
       T8958.$trModule
-      (GHC.Types.TrNameS "Nominal"#)
+      (GHC.Types.$WTrNameS "Nominal"#)
 T8958.$tc'C:Nominal
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       13167926310643805202##
       1726092271306256063##
       T8958.$trModule
-      (GHC.Types.TrNameS "'C:Nominal"#)
+      (GHC.Types.$WTrNameS "'C:Nominal"#)
 T8958.$trModule
-  = GHC.Types.Module
-      (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "T8958"#)
+  = GHC.Types.$WModule
+      (GHC.Types.$WTrNameS "main"#) (GHC.Types.$WTrNameS "T8958"#)
 AbsBinds [a] []
   {Exports: [T8958.$fRepresentationala <= $dRepresentational
                wrap: <>]
@@ -66,7 +66,7 @@ AbsBinds [a] []
                      :: forall a. Representational a
                    [LclIdX[DFunId],
                     Unf=DFun: \ (@ a[ssk]) -> T8958.C:Representational TYPE: a[ssk]]
-   Binds: $dRepresentational = T8958.C:Representational @ a
+   Binds: $dRepresentational = T8958.$WC:Representational @ a
    Evidence: [EvBinds{}]}
 AbsBinds [a] []
   {Exports: [T8958.$fNominala <= $dNominal
@@ -75,6 +75,6 @@ AbsBinds [a] []
                      :: forall a. Nominal a
                    [LclIdX[DFunId],
                     Unf=DFun: \ (@ a[ssk]) -> T8958.C:Nominal TYPE: a[ssk]]
-   Binds: $dNominal = T8958.C:Nominal @ a
+   Binds: $dNominal = T8958.$WC:Nominal @ a
    Evidence: [EvBinds{}]}
 

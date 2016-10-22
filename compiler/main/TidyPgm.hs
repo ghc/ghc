@@ -817,6 +817,7 @@ insert v = DFFV $ \ env (set, ids) ->
 dffvExpr :: CoreExpr -> DFFV ()
 dffvExpr (Var v)              = insert v
 dffvExpr (App e1 e2)          = dffvExpr e1 >> dffvExpr e2
+dffvExpr (ConApp dc args)     = insert (dataConWorkId dc) >> mapM_ dffvExpr args
 dffvExpr (Lam v e)            = extendScope v (dffvExpr e)
 dffvExpr (Tick (Breakpoint _ ids) e) = mapM_ insert ids >> dffvExpr e
 dffvExpr (Tick _other e)    = dffvExpr e
@@ -1351,6 +1352,7 @@ cafRefsE :: CafRefEnv -> Expr a -> Bool
 cafRefsE p (Var id)            = cafRefsV p id
 cafRefsE p (Lit lit)           = cafRefsL p lit
 cafRefsE p (App f a)           = cafRefsE p f || cafRefsE p a
+cafRefsE p (ConApp _ args)     = any (cafRefsE p) args
 cafRefsE p (Lam _ e)           = cafRefsE p e
 cafRefsE p (Let b e)           = cafRefsEs p (rhssOfBind b) || cafRefsE p e
 cafRefsE p (Case e _ _ alts)   = cafRefsE p e || cafRefsEs p (rhssOfAlts alts)

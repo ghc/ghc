@@ -853,7 +853,9 @@ augment g xs = g (:) xs
                 foldr k z (augment g xs) = g k (foldr k z xs)
 
 "foldr/id"                        foldr (:) [] = \x  -> x
+"foldr/id2"                       foldr (\x xs -> x : xs) [] = \x  -> x
 "foldr/app"     [1] forall ys. foldr (:) ys = \xs -> xs ++ ys
+"foldr/app2"     [1] forall ys. foldr (\x xs -> x : xs) ys = \xs -> xs ++ ys
         -- Only activate this from phase 1, because that's
         -- when we disable the rule that expands (++) into foldr
 

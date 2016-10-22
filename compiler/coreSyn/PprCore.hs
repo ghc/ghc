@@ -176,6 +176,16 @@ ppr_expr add_par expr@(App {})
         _ -> parens (hang (pprParendExpr fun) 2 pp_args)
     }
 
+ppr_expr _ (ConApp dc args)
+  | Just sort <- tyConTuple_maybe (dataConTyCon dc)
+  = tupleParens sort pp_tup_args
+  where val_args    = dropWhile isTypeArg args   -- Drop the type arguments for tuples
+        pp_tup_args = pprWithCommas pprCoreExpr val_args
+
+ppr_expr add_par (ConApp dc args)
+  = let pp_args = sep (punctuate comma (map pprArg args))
+    in  add_par (hang (ppr dc) 2 (brackets pp_args))
+
 ppr_expr add_par (Case expr var ty [(con,args,rhs)])
   = sdocWithDynFlags $ \dflags ->
     if gopt Opt_PprCaseAsLet dflags
@@ -480,6 +490,7 @@ instance Outputable UnfoldingGuidance where
 instance Outputable UnfoldingSource where
   ppr InlineCompulsory  = text "Compulsory"
   ppr InlineStable      = text "InlineStable"
+  ppr InlineWrapper     = text "Wrapper"
   ppr InlineRhs         = text "<vanilla>"
 
 instance Outputable Unfolding where

@@ -176,6 +176,25 @@ fiExpr dflags to_drop ann_expr@(_,AnnApp {})
            mapUnionDVarSet freeVarsOfType ann_args)
           to_drop
 
+fiExpr dflags to_drop (_,AnnConApp ds ann_args)
+  = wrapFloats drop_here $ wrapFloats extra_drop $
+    ConApp ds (zipWith (fiExpr dflags) arg_drops ann_args)
+  where
+    (extra_fvs, arg_fvs) = mapAccumL mk_arg_fvs emptyDVarSet ann_args
+
+    mk_arg_fvs :: FreeVarSet -> CoreExprWithFVs -> (FreeVarSet, FreeVarSet)
+    mk_arg_fvs extra_fvs ann_arg
+      | noFloatIntoRhs ann_arg
+      = (extra_fvs `unionDVarSet` freeVarsOf ann_arg, emptyDVarSet)
+      | otherwise
+      = (extra_fvs, freeVarsOf ann_arg)
+
+    drop_here : extra_drop : arg_drops
+      = sepBindsByDropPoint dflags False
+          (extra_fvs : arg_fvs)
+          (mapUnionDVarSet freeVarsOfType ann_args)
+          to_drop
+
 {-
 Note [Do not destroy the let/app invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

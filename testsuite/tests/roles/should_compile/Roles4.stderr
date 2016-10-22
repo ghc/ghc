@@ -19,30 +19,30 @@ Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,
 
 ==================== Typechecker ====================
 Roles4.$tcC3
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       16502190608089501863##
       13971441568961069854##
       Roles4.$trModule
-      (GHC.Types.TrNameS "C3"#)
+      (GHC.Types.$WTrNameS "C3"#)
 Roles4.$tc'C:C3
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       16482122951248115051##
       8497036782794772516##
       Roles4.$trModule
-      (GHC.Types.TrNameS "'C:C3"#)
+      (GHC.Types.$WTrNameS "'C:C3"#)
 Roles4.$tcC1
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       11951908835899020229##
       6518430686554778113##
       Roles4.$trModule
-      (GHC.Types.TrNameS "C1"#)
+      (GHC.Types.$WTrNameS "C1"#)
 Roles4.$tc'C:C1
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       11393997571952951642##
       4382794907973051606##
       Roles4.$trModule
-      (GHC.Types.TrNameS "'C:C1"#)
+      (GHC.Types.$WTrNameS "'C:C1"#)
 Roles4.$trModule
-  = GHC.Types.Module
-      (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "Roles4"#)
+  = GHC.Types.$WModule
+      (GHC.Types.$WTrNameS "main"#) (GHC.Types.$WTrNameS "Roles4"#)
 

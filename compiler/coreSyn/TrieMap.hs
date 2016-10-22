@@ -28,6 +28,7 @@ import Var
 import UniqDFM
 import Unique( Unique )
 import FastString(FastString)
+import Util ( all2 )
 
 import qualified Data.Map    as Map
 import qualified Data.IntMap as IntMap
@@ -476,18 +477,19 @@ type CoreMapG = GenMap CoreMapX
 -- | @CoreMapX a@ is the base map from @DeBruijn CoreExpr@ to @a@, but without
 -- the 'GenMap' optimization.
 data CoreMapX a
-  = CM { cm_var   :: VarMap a
-       , cm_lit   :: LiteralMap a
-       , cm_co    :: CoercionMapG a
-       , cm_type  :: TypeMapG a
-       , cm_cast  :: CoreMapG (CoercionMapG a)
-       , cm_tick  :: CoreMapG (TickishMap a)
-       , cm_app   :: CoreMapG (CoreMapG a)
-       , cm_lam   :: CoreMapG (BndrMap a)    -- Note [Binders]
-       , cm_letn  :: CoreMapG (CoreMapG (BndrMap a))
-       , cm_letr  :: ListMap CoreMapG (CoreMapG (ListMap BndrMap a))
-       , cm_case  :: CoreMapG (ListMap AltMap a)
-       , cm_ecase :: CoreMapG (TypeMapG a)    -- Note [Empty case alternatives]
+  = CM { cm_var    :: VarMap a
+       , cm_lit    :: LiteralMap a
+       , cm_co     :: CoercionMapG a
+       , cm_type   :: TypeMapG a
+       , cm_cast   :: CoreMapG (CoercionMapG a)
+       , cm_tick   :: CoreMapG (TickishMap a)
+       , cm_app    :: CoreMapG (CoreMapG a)
+       , cm_conapp :: DNameEnv (ListMap CoreMapG a)
+       , cm_lam    :: CoreMapG (BndrMap a)    -- Note [Binders]
+       , cm_letn   :: CoreMapG (CoreMapG (BndrMap a))
+       , cm_letr   :: ListMap CoreMapG (CoreMapG (ListMap BndrMap a))
+       , cm_case   :: CoreMapG (ListMap AltMap a)
+       , cm_ecase  :: CoreMapG (TypeMapG a)    -- Note [Empty case alternatives]
      }
 
 instance Eq (DeBruijn CoreExpr) where
@@ -496,11 +498,12 @@ instance Eq (DeBruijn CoreExpr) where
                             (Just b1, Just b2) -> b1 == b2
                             (Nothing, Nothing) -> v1 == v2
                             _ -> False
-    go (Lit lit1)    (Lit lit2)      = lit1 == lit2
-    go (Type t1)    (Type t2)        = D env1 t1 == D env2 t2
-    go (Coercion co1) (Coercion co2) = D env1 co1 == D env2 co2
-    go (Cast e1 co1) (Cast e2 co2) = D env1 co1 == D env2 co2 && go e1 e2
-    go (App f1 a1)   (App f2 a2)   = go f1 f2 && go a1 a2
+    go (Lit lit1)    (Lit lit2)          = lit1 == lit2
+    go (Type t1)    (Type t2)            = D env1 t1 == D env2 t2
+    go (Coercion co1) (Coercion co2)     = D env1 co1 == D env2 co2
+    go (Cast e1 co1) (Cast e2 co2)       = D env1 co1 == D env2 co2 && go e1 e2
+    go (App f1 a1)   (App f2 a2)         = go f1 f2 && go a1 a2
+    go (ConApp dc1 as1) (ConApp dc2 as2) = dc1 == dc2 && all2 go as1 as2
     -- This seems a bit dodgy, see 'eqTickish'
     go (Tick n1 e1)  (Tick n2 e2)  = n1 == n2 && go e1 e2
 
@@ -534,6 +537,7 @@ emptyE :: CoreMapX a
 emptyE = CM { cm_var = emptyTM, cm_lit = emptyLiteralMap
             , cm_co = emptyTM, cm_type = emptyTM
             , cm_cast = emptyTM, cm_app = emptyTM
+            , cm_conapp = emptyTM
             , cm_lam = emptyTM, cm_letn = emptyTM
             , cm_letr = emptyTM, cm_case = emptyTM
             , cm_ecase = emptyTM, cm_tick = emptyTM }
@@ -548,18 +552,32 @@ instance TrieMap CoreMapX where
 
 --------------------------
 mapE :: (a->b) -> CoreMapX a -> CoreMapX b
-mapE f (CM { cm_var = cvar, cm_lit = clit
-           , cm_co = cco, cm_type = ctype
-           , cm_cast = ccast , cm_app = capp
-           , cm_lam = clam, cm_letn = cletn
-           , cm_letr = cletr, cm_case = ccase
-           , cm_ecase = cecase, cm_tick = ctick })
-  = CM { cm_var = mapTM f cvar, cm_lit = mapTM f clit
-       , cm_co = mapTM f cco, cm_type = mapTM f ctype
-       , cm_cast = mapTM (mapTM f) ccast, cm_app = mapTM (mapTM f) capp
-       , cm_lam = mapTM (mapTM f) clam, cm_letn = mapTM (mapTM (mapTM f)) cletn
-       , cm_letr = mapTM (mapTM (mapTM f)) cletr, cm_case = mapTM (mapTM f) ccase
-       , cm_ecase = mapTM (mapTM f) cecase, cm_tick = mapTM (mapTM f) ctick }
+mapE f (CM { cm_var = cvar
+           , cm_lit = clit
+           , cm_co = cco
+           , cm_type = ctype
+           , cm_cast = ccast
+           , cm_app = capp
+           , cm_conapp = cm_conapp
+           , cm_lam = clam
+           , cm_letn = cletn
+           , cm_letr = cletr
+           , cm_case = ccase
+           , cm_ecase = cecase
+           , cm_tick = ctick })
+  = CM { cm_var = mapTM f cvar
+       , cm_lit = mapTM f clit
+       , cm_co = mapTM f cco
+       , cm_type = mapTM f ctype
+       , cm_cast = mapTM (mapTM f) ccast
+       , cm_app = mapTM (mapTM f) capp
+       , cm_conapp = mapTM (mapTM f) cm_conapp
+       , cm_lam = mapTM (mapTM f) clam
+       , cm_letn = mapTM (mapTM (mapTM f)) cletn
+       , cm_letr = mapTM (mapTM (mapTM f)) cletr
+       , cm_case = mapTM (mapTM f) ccase
+       , cm_ecase = mapTM (mapTM f) cecase
+       , cm_tick = mapTM (mapTM f) ctick }
 
 --------------------------
 lookupCoreMap :: CoreMap a -> CoreExpr -> Maybe a
@@ -604,6 +622,7 @@ lkE (D env expr) cm = go expr cm
     go (Cast e c)           = cm_cast >.> lkG (D env e) >=> lkG (D env c)
     go (Tick tickish e)     = cm_tick >.> lkG (D env e) >=> lkTickish tickish
     go (App e1 e2)          = cm_app  >.> lkG (D env e2) >=> lkG (D env e1)
+    go (ConApp dc es)       = cm_conapp >.> lkDNamed dc  >=> lkList (lkG . D env) es
     go (Lam v e)            = cm_lam  >.> lkG (D (extendCME env v) e)
                               >=> lkBndr env v
     go (Let (NonRec b r) e) = cm_letn >.> lkG (D env r)
@@ -633,6 +652,9 @@ xtE (D env (Tick t e))           f m = m { cm_tick = cm_tick m |> xtG (D env e)
                                                  |>> xtTickish t f }
 xtE (D env (App e1 e2))          f m = m { cm_app = cm_app m |> xtG (D env e2)
                                                  |>> xtG (D env e1) f }
+xtE (D env (ConApp dc es))       f m = m { cm_conapp = cm_conapp m
+                                                 |> xtDNamed dc
+                                                 |>> xtList (xtG . D env) es f }
 xtE (D env (Lam v e))            f m = m { cm_lam = cm_lam m
                                                  |> xtG (D (extendCME env v) e)
                                                  |>> xtBndr env v f }

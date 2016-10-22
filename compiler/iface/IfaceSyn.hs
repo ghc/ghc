@@ -61,7 +61,7 @@ import Var( TyVarBndr(..) )
 import TyCon ( Role (..), Injectivity(..) )
 import StaticFlags (opt_PprStyle_Debug)
 import Util( filterOut, filterByList )
-import DataCon (SrcStrictness(..), SrcUnpackedness(..))
+import DataCon ( SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
 
 import Control.Monad
@@ -309,6 +309,8 @@ data IfaceUnfolding
 
   | IfCompulsory IfaceExpr      -- Only used for default methods, in fact
 
+  | IfInlineWrapper Arity IfaceExpr -- Only used for default methods, in fact
+
   | IfInlineRule Arity          -- INLINE pragmas
                  Bool           -- OK to inline even if *un*-saturated
                  Bool           -- OK to inline even if context is boring
@@ -438,6 +440,7 @@ data IfaceExpr
   | IfaceTuple  TupleSort [IfaceExpr]   -- Saturated; type arguments omitted
   | IfaceLam    IfaceLamBndr IfaceExpr
   | IfaceApp    IfaceExpr IfaceExpr
+  | IfaceConApp Name [IfaceExpr]
   | IfaceCase   IfaceExpr IfLclName [IfaceAlt]
   | IfaceECase  IfaceExpr IfaceType     -- See Note [Empty case alternatives]
   | IfaceLet    IfaceBinding  IfaceExpr
@@ -1015,6 +1018,7 @@ pprIfaceExpr _       (IfaceType ty)     = char '@' <+> pprParendIfaceType ty
 pprIfaceExpr _       (IfaceCo co)       = text "@~" <+> pprParendIfaceCoercion co
 
 pprIfaceExpr add_par app@(IfaceApp _ _) = add_par (pprIfaceApp app [])
+pprIfaceExpr add_par (IfaceConApp dc args) = add_par (ppr dc <+> brackets (pprWithCommas ppr args))
 pprIfaceExpr _       (IfaceTuple c as)  = tupleParens c (pprWithCommas ppr as)
 
 pprIfaceExpr add_par i@(IfaceLam _ _)
@@ -1120,6 +1124,7 @@ instance Outputable IfaceInfoItem where
 
 instance Outputable IfaceUnfolding where
   ppr (IfCompulsory e)     = text "<compulsory>" <+> parens (ppr e)
+  ppr (IfInlineWrapper a e) = text "<wrapper>" <+> ppr a <+> parens (ppr e)
   ppr (IfCoreUnfold s e)   = (if s
                                 then text "<stable>"
                                 else Outputable.empty)
@@ -1337,6 +1342,7 @@ freeNamesItem _              = emptyNameSet
 freeNamesIfUnfold :: IfaceUnfolding -> NameSet
 freeNamesIfUnfold (IfCoreUnfold _ e)     = freeNamesIfExpr e
 freeNamesIfUnfold (IfCompulsory e)       = freeNamesIfExpr e
+freeNamesIfUnfold (IfInlineWrapper _ e)       = freeNamesIfExpr e
 freeNamesIfUnfold (IfInlineRule _ _ _ e) = freeNamesIfExpr e
 freeNamesIfUnfold (IfDFunUnfold bs es)   = freeNamesIfBndrs bs &&& fnList freeNamesIfExpr es
 
@@ -1348,6 +1354,8 @@ freeNamesIfExpr (IfaceCo co)          = freeNamesIfCoercion co
 freeNamesIfExpr (IfaceTuple _ as)     = fnList freeNamesIfExpr as
 freeNamesIfExpr (IfaceLam (b,_) body) = freeNamesIfBndr b &&& freeNamesIfExpr body
 freeNamesIfExpr (IfaceApp f a)        = freeNamesIfExpr f &&& freeNamesIfExpr a
+freeNamesIfExpr (IfaceConApp dc args) = unitNameSet dc &&&
+                                        fnList freeNamesIfExpr args
 freeNamesIfExpr (IfaceCast e co)      = freeNamesIfExpr e &&& freeNamesIfCoercion co
 freeNamesIfExpr (IfaceTick _ e)       = freeNamesIfExpr e
 freeNamesIfExpr (IfaceECase e ty)     = freeNamesIfExpr e &&& freeNamesIfType ty
@@ -1804,6 +1812,10 @@ instance Binary IfaceUnfolding where
     put_ bh (IfCompulsory e) = do
         putByte bh 3
         put_ bh e
+    put_ bh (IfInlineWrapper a e) = do
+        putByte bh 4
+        put_ bh a
+        put_ bh e
     get bh = do
         h <- getByte bh
         case h of
@@ -1818,8 +1830,11 @@ instance Binary IfaceUnfolding where
             2 -> do as <- get bh
                     bs <- get bh
                     return (IfDFunUnfold as bs)
-            _ -> do e <- get bh
+            3 -> do e <- get bh
                     return (IfCompulsory e)
+            _ -> do a <- get bh
+                    e <- get bh
+                    return (IfInlineWrapper a e)
 
 
 instance Binary IfaceExpr where
@@ -1845,35 +1860,39 @@ instance Binary IfaceExpr where
         putByte bh 5
         put_ bh ag
         put_ bh ah
-    put_ bh (IfaceCase ai aj ak) = do
+    put_ bh (IfaceConApp adcn aargs) = do
         putByte bh 6
+        put_ bh adcn
+        put_ bh aargs
+    put_ bh (IfaceCase ai aj ak) = do
+        putByte bh 7
         put_ bh ai
         put_ bh aj
         put_ bh ak
     put_ bh (IfaceLet al am) = do
-        putByte bh 7
+        putByte bh 8
         put_ bh al
         put_ bh am
     put_ bh (IfaceTick an ao) = do
-        putByte bh 8
+        putByte bh 9
         put_ bh an
         put_ bh ao
     put_ bh (IfaceLit ap) = do
-        putByte bh 9
+        putByte bh 10
         put_ bh ap
     put_ bh (IfaceFCall as at) = do
-        putByte bh 10
+        putByte bh 11
         put_ bh as
         put_ bh at
     put_ bh (IfaceExt aa) = do
-        putByte bh 11
+        putByte bh 12
         put_ bh aa
     put_ bh (IfaceCast ie ico) = do
-        putByte bh 12
+        putByte bh 13
         put_ bh ie
         put_ bh ico
     put_ bh (IfaceECase a b) = do
-        putByte bh 13
+        putByte bh 14
         put_ bh a
         put_ bh b
     get bh = do
@@ -1895,27 +1914,30 @@ instance Binary IfaceExpr where
             5 -> do ag <- get bh
                     ah <- get bh
                     return (IfaceApp ag ah)
-            6 -> do ai <- get bh
+            6 -> do adcn <- get bh
+                    aargs <- get bh
+                    return (IfaceConApp adcn aargs)
+            7 -> do ai <- get bh
                     aj <- get bh
                     ak <- get bh
                     return (IfaceCase ai aj ak)
-            7 -> do al <- get bh
+            8 -> do al <- get bh
                     am <- get bh
                     return (IfaceLet al am)
-            8 -> do an <- get bh
+            9 -> do an <- get bh
                     ao <- get bh
                     return (IfaceTick an ao)
-            9 -> do ap <- get bh
-                    return (IfaceLit ap)
-            10 -> do as <- get bh
+            10 -> do ap <- get bh
+                     return (IfaceLit ap)
+            11 -> do as <- get bh
                      at <- get bh
                      return (IfaceFCall as at)
-            11 -> do aa <- get bh
+            12 -> do aa <- get bh
                      return (IfaceExt aa)
-            12 -> do ie <- get bh
+            13 -> do ie <- get bh
                      ico <- get bh
                      return (IfaceCast ie ico)
-            13 -> do a <- get bh
+            14 -> do a <- get bh
                      b <- get bh
                      return (IfaceECase a b)
             _ -> panic ("get IfaceExpr " ++ show h)

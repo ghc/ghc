@@ -1,4 +1,4 @@
-test :: Integer = 0
+test :: Integer = _
 test = 0
 test :: Integer = 0
 Ghci1.test :: Integer = 0

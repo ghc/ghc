@@ -334,6 +334,20 @@ coreToStgExpr expr@(App _ _)
   where
     (f, args, ticks) = myCollectArgs expr
 
+coreToStgExpr e@(ConApp dc args)
+  = do (args', args_fvs, ticks') <- coreToStgArgs args
+       let res_ty = exprType e
+       let app = StgConApp dc args' (dropRuntimeRepArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
+       let tapp = foldr StgTick app ticks'
+       let vars = getFVSet args_fvs
+       let fun_fvs = singletonFVInfo (dataConWorkId dc) ImportBound noBinderInfo
+       let fvs = fun_fvs  `unionFVInfo` args_fvs
+       app `seq` fvs `seq` seqVarSet vars `seq` return (
+           tapp,
+           fvs,
+           vars
+        )
+
 coreToStgExpr expr@(Lam _ _)
   = let
         (args, body) = myCollectBinders expr
@@ -1044,6 +1058,8 @@ myCollectArgs expr
   where
     go (Var v)          as ts = (v, as, ts)
     go (App f a)        as ts = go f (a:as) ts
+    go (ConApp dc args) as ts = ASSERT( all isTypeArg as && all isTypeArg args )
+                                (dataConWorkId dc, [], ts)
     go (Tick t e)       as ts = ASSERT( all isTypeArg as )
                                 go e as (t:ts) -- ticks can appear in type apps
     go (Cast e _)       as ts = go e as ts
@@ -1056,6 +1072,10 @@ myCollectArgs expr
 --
 -- This big-lambda case occurred following a rather obscure eta expansion.
 -- It all seems a bit yukky to me.
+--
+-- It can happen more often now with saturated constructor applications, where
+--    (\ (@a) -> [] [@a]) @Type
+-- can happen.
 
 stgArity :: Id -> HowBound -> Arity
 stgArity _ (LetBound _ arity) = arity

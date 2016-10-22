@@ -471,6 +471,13 @@ lintSingleBinding :: TopLevelFlag -> RecFlag -> (Id, CoreExpr) -> LintM ()
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
 lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
+  -- CorePrep introduces bindings for data constructors. This is just a hack for the
+  -- code generator, the definitions do not matter (and would fail some of the
+  -- checks below). Therefore, skip these.
+  -- See Note [Data constructor workers] in CorePrep
+  | isDataConWorkId binder
+  = return ()
+  | otherwise
   = addLoc (RhsOf binder) $
          -- Check the rhs
     do { ty <- lintRhs rhs
@@ -624,6 +631,7 @@ lintCoreExpr (Var var)
   = do  { checkL (isNonCoVarId var)
                  (text "Non term variable" <+> ppr var)
 
+        ; checkBadDataConWorker var
         ; checkDeadIdOcc var
         ; var' <- lookupIdInScope var
         ; return (idType var') }
@@ -684,6 +692,7 @@ lintCoreExpr e@(App _ _)
     = do lf <- getLintFlags
          -- Check for a nested occurrence of the StaticPtr constructor.
          -- See Note [Checking StaticPtrs].
+         -- TODO #12618 remove here eventually
          case fun of
            Var b | lf_check_static_ptrs lf
                  , Just con <- isDataConId_maybe b
@@ -691,12 +700,34 @@ lintCoreExpr e@(App _ _)
                  -> do
               failWithL $ text "Found StaticPtr nested in an expression: " <+>
                           ppr e
+           Var b | Just con <- isDataConWorkId_maybe b
+                 , dataConRepFullArity con <= length args
+                 -> do
+              addErrL $ text "Found saturated use of data con worker (should use ConApp): " <+> ppr e
+              go
+           ConApp _ _ -> do
+              addErrL $ text "Found ConApp in argument position. Is that possible?" <+> ppr e $$ ppr args
+              go
            _     -> go
   where
     go = do { fun_ty <- lintCoreExpr fun
             ; addLoc (AnExpr e) $ foldM lintCoreArg fun_ty args }
 
     (fun, args) = collectArgs e
+
+lintCoreExpr e@(ConApp dc args)
+    = do lf <- getLintFlags
+         -- Check for a nested occurrence of the StaticPtr constructor.
+         -- See Note [Checking StaticPtrs].
+         when (lf_check_static_ptrs lf && dataConName dc == staticPtrDataConName) $
+            failWithL $ text "Found StaticPtr nested in an expression: " <+>
+                        ppr e
+         when (length args /= dataConRepFullArity dc) $
+            addErrL $ hang (text "Un-saturated data con application") 2 (ppr e)
+         when (isNewTyCon (dataConTyCon dc)) $
+            addErrL $ hang (text "ConApp with newtype constructor") 2 (ppr e)
+         let dc_ty = dataConRepType dc
+         addLoc (AnExpr e) $ foldM lintCoreArg dc_ty args
 
 lintCoreExpr (Lam var expr)
   = addLoc (LambdaBodyOf var) $
@@ -872,6 +903,17 @@ checkDeadIdOcc id
   = do { in_case <- inCasePat
        ; checkL in_case
                 (text "Occurrence of a dead Id" <+> ppr id) }
+  | otherwise
+  = return ()
+
+checkBadDataConWorker :: Id -> LintM ()
+-- We do not want to see data con workers here, but for newtypes
+-- (It should either be a ConApp or a reference to the wrapper)
+checkBadDataConWorker id
+  | Just dc <- isDataConWorkId_maybe id
+  , dataConName dc /= staticPtrDataConName
+  = checkL (isNewTyCon (dataConTyCon dc))
+           (text "data constructor worker found" <+> ppr id) 
   | otherwise
   = return ()
 

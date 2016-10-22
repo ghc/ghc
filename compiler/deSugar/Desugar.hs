@@ -42,7 +42,6 @@ import TysPrim     ( eqReprPrimTyCon )
 import Unique      ( hasKey )
 import Coercion    ( mkCoVarCo )
 import TysWiredIn  ( coercibleDataCon )
-import DataCon     ( dataConWrapId )
 import MkCore      ( mkCoreLet )
 import Module
 import NameSet
@@ -642,9 +641,7 @@ unfold_coerce bndrs lhs rhs = do
             let ty' = mkTyConApp eqReprPrimTyCon [k, k, t1, t2]
                 v'  = mkLocalCoVar
                         (mkDerivedInternalName mkRepEqOcc u (getName v)) ty'
-                box = Var (dataConWrapId coercibleDataCon) `mkTyApps`
-                      [k, t1, t2] `App`
-                      Coercion (mkCoVarCo v')
+                box = mkConApp coercibleDataCon (map Type [k, t1, t2] ++  [Coercion (mkCoVarCo v')])
 
             (bndrs, wrap) <- go vs
             return (v':bndrs, mkCoreLet (NonRec v box) . wrap)

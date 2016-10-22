@@ -476,13 +476,13 @@ callArityAnal arity int (App e1 e2)
     = (final_ae, App e1' e2')
   where
     (ae1, e1') = callArityAnal (arity + 1) int e1
-    (ae2, e2') = callArityAnal 0           int e2
-    -- If the argument is trivial (e.g. a variable), then it will _not_ be
-    -- let-bound in the Core to STG transformation (CorePrep actually),
-    -- so no sharing will happen here, and we have to assume many calls.
-    ae2' | exprIsTrivial e2 = calledMultipleTimes ae2
-         | otherwise        = ae2
+    (ae2', e2') = callArityArg int e2
     final_ae = ae1 `both` ae2'
+
+callArityAnal _ int (ConApp dc args)
+    = (boths aes, ConApp dc args')
+  where
+    (aes, args') = unzip (map (callArityArg int) args)
 
 -- Case expression.
 callArityAnal arity int (Case scrut bndr ty alts)
@@ -506,6 +506,17 @@ callArityAnal arity int (Let bind e)
     int_body = int `addInterestingBinds` bind
     (ae_body, e') = callArityAnal arity int_body e
     (final_ae, bind') = callArityBind (boringBinds bind) ae_body int bind
+
+callArityArg :: VarSet -> CoreExpr -> (CallArityRes, CoreExpr)
+callArityArg int arg
+    = (ae', arg')
+  where
+    (ae, arg') = callArityAnal 0 int arg
+    -- If the argument is trivial (e.g. a variable), then it will _not_ be
+    -- let-bound in the Core to STG transformation (CorePrep actually),
+    -- so no sharing will happen here, and we have to assume many calls.
+    ae' | exprIsTrivial arg = calledMultipleTimes ae
+        | otherwise         = ae
 
 -- Which bindings should we look at?
 -- See Note [Which variables are interesting]
@@ -716,6 +727,9 @@ calledMultipleTimes res = first (const (completeGraph (domRes res))) res
 -- Used for application and cases
 both :: CallArityRes -> CallArityRes -> CallArityRes
 both r1 r2 = addCrossCoCalls (domRes r1) (domRes r2) $ r1 `lubRes` r2
+
+boths :: [CallArityRes] -> CallArityRes
+boths rs = foldl both emptyArityRes rs
 
 -- Used when combining results from alternative cases; take the minimum
 lubRes :: CallArityRes -> CallArityRes -> CallArityRes

@@ -28,7 +28,6 @@ import TyCon
 import StgCmmMonad
 import StgCmmUtils
 import StgCmmClosure
-import StgSyn (StgArg)
 
 import CLabel
 

@@ -10,12 +10,12 @@ Dependent packages: [array-0.5.1.1, base-4.9.0.0, deepseq-1.4.2.0,
 
 ==================== Typechecker ====================
 TH_Roles2.$tcT
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       6325001754388382679##
       4656387726417942748##
       TH_Roles2.$trModule
-      (GHC.Types.TrNameS "T"#)
+      (GHC.Types.$WTrNameS "T"#)
 TH_Roles2.$trModule
-  = GHC.Types.Module
-      (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "TH_Roles2"#)
+  = GHC.Types.$WModule
+      (GHC.Types.$WTrNameS "main"#) (GHC.Types.$WTrNameS "TH_Roles2"#)
 

@@ -157,6 +157,7 @@ simpleFreeVars = go . freeVars
     go' (AnnLit lit)                 = AnnLit lit
     go' (AnnLam bndr body)           = AnnLam bndr (go body)
     go' (AnnApp fun arg)             = AnnApp (go fun) (go arg)
+    go' (AnnConApp dc args)          = AnnConApp dc (map go args)
     go' (AnnCase scrut bndr ty alts) = AnnCase (go scrut) bndr ty (map go_alt alts)
     go' (AnnLet bind body)           = AnnLet (go_bind bind) (go body)
     go' (AnnCast expr (ann, co))     = AnnCast (go expr) (freeVarsOfAnn ann, co)
@@ -420,6 +421,7 @@ schemeE d s p e
 
 -- Delegate tail-calls to schemeT.
 schemeE d s p e@(AnnApp _ _) = schemeT d s p e
+schemeE d s p e@(AnnConApp _ _) = schemeT d s p e
 
 schemeE d s p e@(AnnLit lit)     = returnUnboxedAtom d s p e (typeArgRep (literalType lit))
 schemeE d s p e@(AnnCoercion {}) = returnUnboxedAtom d s p e V
@@ -432,10 +434,20 @@ schemeE d s p (AnnLet (AnnNonRec x (_,rhs)) (_,body))
    | (AnnVar v, args_r_to_l) <- splitApp rhs,
      Just data_con <- isDataConWorkId_maybe v,
      dataConRepArity data_con == length args_r_to_l
+     -- TODO #12618 remove eventually
    = do -- Special case for a non-recursive let whose RHS is a
         -- saturatred constructor application.
         -- Just allocate the constructor and carry on
         alloc_code <- mkConAppCode d s p data_con args_r_to_l
+        body_code <- schemeE (d+1) s (Map.insert x d p) body
+        return (alloc_code `appOL` body_code)
+
+schemeE d s p (AnnLet (AnnNonRec x (_,AnnConApp dc args)) (_,body))
+   = do -- Special case for a non-recursive let whose RHS is a
+        -- saturatred constructor application.
+        -- Just allocate the constructor and carry on
+        let args_r_to_l = reverse $ map snd $ dropWhile isAnnTypeArg args
+        alloc_code <- mkConAppCode d s p dc args_r_to_l
         body_code <- schemeE (d+1) s (Map.insert x d p) body
         return (alloc_code `appOL` body_code)
 
@@ -624,6 +636,21 @@ schemeT :: Word         -- Stack depth
         -> AnnExpr' Id DVarSet
         -> BcM BCInstrList
 
+schemeT d s p (AnnConApp dc all_args)
+   | isUnboxedTupleCon dc
+   = case args of
+        [arg2,arg1] | isVAtom arg1 ->
+                  unboxedTupleReturn d s p arg2
+        [arg2,arg1] | isVAtom arg2 ->
+                  unboxedTupleReturn d s p arg1
+        _other -> multiValException
+   | otherwise
+   = do ASSERT( dataConRepFullArity dc == length all_args ) return ()
+        alloc_con <- mkConAppCode d s p dc (reverse args)
+        return (alloc_con         `appOL`
+                mkSLIDE 1 (d - s) `snocOL`
+                ENTER)
+  where args = map snd $ dropWhile isAnnTypeArg all_args
 schemeT d s p app
 
 --   | trace ("schemeT: env in = \n" ++ showSDocDebug (ppBCEnv p)) False
@@ -694,7 +721,7 @@ mkConAppCode _ _ _ con []       -- Nullary constructor
         -- copy of this constructor, use the single shared version.
 
 mkConAppCode orig_d _ p con args_r_to_l
-  = ASSERT( dataConRepArity con == length args_r_to_l )
+  = ASSERT2( dataConRepArity con == length args_r_to_l, ppr con <+> ppr (length args_r_to_l) )
     do_pushery orig_d (non_ptr_args ++ ptr_args)
  where
         -- The args are already in reverse order, which is the way PACK
@@ -1361,6 +1388,16 @@ pushAtom d p (AnnVar v)
         MASSERT(sz == 1)
         return (unitOL (PUSH_G (getName v)), sz)
 
+pushAtom _ _ (AnnConApp dc args) = do
+    MASSERT( all isAnnTypeArg args )
+    dflags <- getDynFlags
+    let v = dataConWorkId dc
+    let sz :: Word16
+        sz = fromIntegral (idSizeW dflags v)
+    MASSERT(sz == 1)
+    return (unitOL (PUSH_G (getName v)), sz)
+
+
 
 pushAtom _ _ (AnnLit lit) = do
      dflags <- getDynFlags
@@ -1605,6 +1642,7 @@ bcView :: AnnExpr' Var ann -> Maybe (AnnExpr' Var ann)
 --  d) ticks (but not breakpoints)
 -- Type lambdas *can* occur in random expressions,
 -- whereas value lambdas cannot; that is why they are nuked here
+-- TODO #12618: what to do with data con apps here? Keep types or not?
 bcView (AnnCast (_,e) _)             = Just e
 bcView (AnnLam v (_,e)) | isTyVar v  = Just e
 bcView (AnnApp (_,e) (_, AnnType _)) = Just e
@@ -1621,6 +1659,8 @@ isVAtom _                     = False
 atomPrimRep :: AnnExpr' Id ann -> PrimRep
 atomPrimRep e | Just e' <- bcView e = atomPrimRep e'
 atomPrimRep (AnnVar v)              = bcIdPrimRep v
+atomPrimRep (AnnConApp dc args)     = ASSERT (all isAnnTypeArg args)
+                                      bcIdPrimRep (dataConWorkId dc)
 atomPrimRep (AnnLit l)              = typePrimRep (literalType l)
 
 -- Trac #12128:

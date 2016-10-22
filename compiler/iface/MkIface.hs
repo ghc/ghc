@@ -1707,6 +1707,11 @@ toIfUnfolding lb (CoreUnfolding { uf_tmpl = rhs
                UnfWhen {ug_arity = arity, ug_unsat_ok = unsat_ok, ug_boring_ok =  boring_ok }
                       -> IfInlineRule arity unsat_ok boring_ok if_rhs
                _other -> IfCoreUnfold True if_rhs
+        InlineWrapper
+          -> case guidance of
+               UnfWhen {ug_arity = arity}
+                      -> IfInlineWrapper arity if_rhs
+               _other -> pprPanic "toIfUnfolding" (ppr src)
         InlineCompulsory -> IfCompulsory if_rhs
         InlineRhs        -> IfCoreUnfold False if_rhs
         -- Yes, even if guidance is UnfNever, expose the unfolding
@@ -1759,17 +1764,24 @@ bogusIfaceRule id_name
 
 ---------------------
 toIfaceExpr :: CoreExpr -> IfaceExpr
-toIfaceExpr (Var v)         = toIfaceVar v
-toIfaceExpr (Lit l)         = IfaceLit l
-toIfaceExpr (Type ty)       = IfaceType (toIfaceType ty)
-toIfaceExpr (Coercion co)   = IfaceCo   (toIfaceCoercion co)
-toIfaceExpr (Lam x b)       = IfaceLam (toIfaceBndr x, toIfaceOneShot x) (toIfaceExpr b)
-toIfaceExpr (App f a)       = toIfaceApp f [a]
+toIfaceExpr (Var v)          = toIfaceVar v
+toIfaceExpr (Lit l)          = IfaceLit l
+toIfaceExpr (Type ty)        = IfaceType (toIfaceType ty)
+toIfaceExpr (Coercion co)    = IfaceCo   (toIfaceCoercion co)
+toIfaceExpr (Lam x b)        = IfaceLam (toIfaceBndr x, toIfaceOneShot x) (toIfaceExpr b)
+toIfaceExpr (App f a)        = toIfaceApp f [a]
+toIfaceExpr (ConApp dc args) | Just tup_sort <- tyConTuple_maybe tc
+                             = IfaceTuple tup_sort tup_args
+  where
+    val_args  = dropWhile isTypeArg args
+    tup_args  = map toIfaceExpr val_args
+    tc        = dataConTyCon dc
+toIfaceExpr (ConApp dc args) = IfaceConApp (dataConName dc) (map toIfaceExpr args)
 toIfaceExpr (Case s x ty as)
-  | null as                 = IfaceECase (toIfaceExpr s) (toIfaceType ty)
-  | otherwise               = IfaceCase (toIfaceExpr s) (getOccFS x) (map toIfaceAlt as)
-toIfaceExpr (Let b e)       = IfaceLet (toIfaceBind b) (toIfaceExpr e)
-toIfaceExpr (Cast e co)     = IfaceCast (toIfaceExpr e) (toIfaceCoercion co)
+  | null as                  = IfaceECase (toIfaceExpr s) (toIfaceType ty)
+  | otherwise                = IfaceCase (toIfaceExpr s) (getOccFS x) (map toIfaceAlt as)
+toIfaceExpr (Let b e)        = IfaceLet (toIfaceBind b) (toIfaceExpr e)
+toIfaceExpr (Cast e co)      = IfaceCast (toIfaceExpr e) (toIfaceCoercion co)
 toIfaceExpr (Tick t e)
   | Just t' <- toIfaceTickish t = IfaceTick t' (toIfaceExpr e)
   | otherwise                   = toIfaceExpr e

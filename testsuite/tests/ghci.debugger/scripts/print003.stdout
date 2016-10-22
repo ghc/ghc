@@ -1,15 +1,13 @@
-t = O (_t1::a)
+t = (_t1::Opaque)
+t :: Opaque = _
+_t1 :: Opaque = _
+()
+t = O (_t2::a)
 t :: Opaque = O _
-_t1 :: a = _
-()
-t = O ((_t2::a1) : (_t3::[a1]))
-t :: Opaque = O (_ : _)
-_t1 :: [a] = _ : _
+_t1 :: Opaque = O _
 it :: () = ()
-_t3 :: [a1] = _
-_t2 :: a1 = _
+_t2 :: a = _
 ()
-t = O (Just [1,1] : (_t4::[Maybe [Integer]]))
+t = O ((_t3::a1) : (_t4::[a1]))
 ()
-t = O (Just [1,1] : (_t5::Maybe [Integer]) :
-       (_t6::[Maybe [Integer]]))
+t = O ((_t5::a2) : (_t6::a2) : (_t7::[a2]))

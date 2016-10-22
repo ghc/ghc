@@ -13,18 +13,18 @@ Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,
 
 ==================== Typechecker ====================
 Roles12.$tcC2
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       4006088231579841122##
       4783761708993822739##
       Roles12.$trModule
-      (GHC.Types.TrNameS "C2"#)
+      (GHC.Types.$WTrNameS "C2"#)
 Roles12.$tc'C:C2
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       5555822832309788726##
       2795860317217328413##
       Roles12.$trModule
-      (GHC.Types.TrNameS "'C:C2"#)
+      (GHC.Types.$WTrNameS "'C:C2"#)
 Roles12.$trModule
-  = GHC.Types.Module
-      (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "Roles12"#)
+  = GHC.Types.$WModule
+      (GHC.Types.$WTrNameS "main"#) (GHC.Types.$WTrNameS "Roles12"#)
 

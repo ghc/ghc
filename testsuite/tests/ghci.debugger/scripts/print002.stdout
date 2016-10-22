@@ -1,6 +1,6 @@
 Just 1.2
 f = Just 1.2
-i = Just 10
+i = (_t1::Maybe Integer)
 10
 i = Just 10
 'a'

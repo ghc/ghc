@@ -1,8 +1,28 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 82, types: 42, coercions: 0}
+Result size of Tidy Core = {terms: 67, types: 44, coercions: 0}
 
--- RHS size: {terms: 6, types: 3, coercions: 0}
+-- RHS size: {terms: 0, types: 0, coercions: 0}
+T7360.$WFoo1 [InlPrag=INLINE] :: Foo
+[GblId[DataConWrapper],
+ Caf=NoCafRefs,
+ Unf=Unf{Src=Wrapper, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=False,boring_ok=True)
+         Tmpl= Foo1 []}]
+T7360.$WFoo1 = Foo1 []
+
+-- RHS size: {terms: 0, types: 0, coercions: 0}
+T7360.$WFoo2 [InlPrag=INLINE] :: Foo
+[GblId[DataConWrapper],
+ Caf=NoCafRefs,
+ Unf=Unf{Src=Wrapper, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=False,boring_ok=True)
+         Tmpl= Foo2 []}]
+T7360.$WFoo2 = Foo2 []
+
+-- RHS size: {terms: 5, types: 3, coercions: 0}
 T7360.$WFoo3 [InlPrag=INLINE] :: Int -> Foo
 [GblId[DataConWrapper],
  Arity=1,
@@ -12,33 +32,33 @@ T7360.$WFoo3 [InlPrag=INLINE] :: Int -> Foo
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=False,boring_ok=False)
          Tmpl= \ (dt [Occ=Once!] :: Int) ->
-                 case dt of { GHC.Types.I# dt [Occ=Once] -> T7360.Foo3 dt }}]
+                 case dt of { GHC.Types.I# dt [Occ=Once] -> Foo3 [dt] }}]
 T7360.$WFoo3 =
   \ (dt [Occ=Once!] :: Int) ->
-    case dt of { GHC.Types.I# dt [Occ=Once] -> T7360.Foo3 dt }
+    case dt of { GHC.Types.I# dt [Occ=Once] -> Foo3 [dt] }
 
--- RHS size: {terms: 5, types: 2, coercions: 0}
+-- RHS size: {terms: 4, types: 2, coercions: 0}
 fun1 [InlPrag=NOINLINE] :: Foo -> ()
 [GblId, Arity=1, Caf=NoCafRefs, Str=<S,1*U>]
-fun1 = \ (x :: Foo) -> case x of { __DEFAULT -> GHC.Tuple.() }
+fun1 = \ (x :: Foo) -> case x of { __DEFAULT -> () }
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 T7360.fun5 :: ()
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
          WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
-T7360.fun5 = fun1 T7360.Foo1
+T7360.fun5 = fun1 (Foo1 [])
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 T7360.fun4 :: Int
 [GblId,
  Caf=NoCafRefs,
  Str=m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
-T7360.fun4 = GHC.Types.I# 0#
+T7360.fun4 = GHC.Types.I# [0#]
 
--- RHS size: {terms: 16, types: 13, coercions: 0}
+-- RHS size: {terms: 14, types: 13, coercions: 0}
 fun2 :: forall a. [a] -> ((), Int)
 [GblId,
  Arity=1,
@@ -52,7 +72,7 @@ fun2 :: forall a. [a] -> ((), Int)
                     [] -> T7360.fun4;
                     : _ [Occ=Dead] _ [Occ=Dead] ->
                       case GHC.List.$wlenAcc @ a wild 0# of ww2 { __DEFAULT ->
-                      GHC.Types.I# ww2
+                      GHC.Types.I# [ww2]
                       }
                   })}]
 fun2 =
@@ -62,29 +82,29 @@ fun2 =
        [] -> T7360.fun4;
        : ds ds1 ->
          case GHC.List.$wlenAcc @ a wild 0# of ww2 { __DEFAULT ->
-         GHC.Types.I# ww2
+         GHC.Types.I# [ww2]
          }
      })
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 T7360.$trModule2 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 20}]
-T7360.$trModule2 = GHC.Types.TrNameS "main"#
+T7360.$trModule2 = GHC.Types.TrNameS ["main"#]
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 T7360.$trModule1 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
-T7360.$trModule1 = GHC.Types.TrNameS "T7360"#
+T7360.$trModule1 = GHC.Types.TrNameS ["T7360"#]
 
--- RHS size: {terms: 3, types: 0, coercions: 0}
+-- RHS size: {terms: 2, types: 0, coercions: 0}
 T7360.$trModule :: GHC.Types.Module
 [GblId,
  Caf=NoCafRefs,
@@ -92,18 +112,18 @@ T7360.$trModule :: GHC.Types.Module
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
 T7360.$trModule =
-  GHC.Types.Module T7360.$trModule2 T7360.$trModule1
+  GHC.Types.Module [T7360.$trModule2, T7360.$trModule1]
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 T7360.$tc'Foo6 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
-T7360.$tc'Foo6 = GHC.Types.TrNameS "'Foo3"#
+T7360.$tc'Foo6 = GHC.Types.TrNameS ["'Foo3"#]
 
--- RHS size: {terms: 5, types: 0, coercions: 0}
+-- RHS size: {terms: 4, types: 0, coercions: 0}
 T7360.$tc'Foo3 :: GHC.Types.TyCon
 [GblId,
  Caf=NoCafRefs,
@@ -112,21 +132,21 @@ T7360.$tc'Foo3 :: GHC.Types.TyCon
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 50}]
 T7360.$tc'Foo3 =
   GHC.Types.TyCon
-    10507205234936349519##
-    8302184214013227554##
-    T7360.$trModule
-    T7360.$tc'Foo6
+    [10507205234936349519##,
+     8302184214013227554##,
+     T7360.$trModule,
+     T7360.$tc'Foo6]
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 T7360.$tc'Foo5 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
-T7360.$tc'Foo5 = GHC.Types.TrNameS "'Foo2"#
+T7360.$tc'Foo5 = GHC.Types.TrNameS ["'Foo2"#]
 
--- RHS size: {terms: 5, types: 0, coercions: 0}
+-- RHS size: {terms: 4, types: 0, coercions: 0}
 T7360.$tc'Foo2 :: GHC.Types.TyCon
 [GblId,
  Caf=NoCafRefs,
@@ -135,21 +155,21 @@ T7360.$tc'Foo2 :: GHC.Types.TyCon
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 50}]
 T7360.$tc'Foo2 =
   GHC.Types.TyCon
-    9825259700232563546##
-    11056638024476048052##
-    T7360.$trModule
-    T7360.$tc'Foo5
+    [9825259700232563546##,
+     11056638024476048052##,
+     T7360.$trModule,
+     T7360.$tc'Foo5]
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 T7360.$tc'Foo4 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
-T7360.$tc'Foo4 = GHC.Types.TrNameS "'Foo1"#
+T7360.$tc'Foo4 = GHC.Types.TrNameS ["'Foo1"#]
 
--- RHS size: {terms: 5, types: 0, coercions: 0}
+-- RHS size: {terms: 4, types: 0, coercions: 0}
 T7360.$tc'Foo1 :: GHC.Types.TyCon
 [GblId,
  Caf=NoCafRefs,
@@ -158,21 +178,21 @@ T7360.$tc'Foo1 :: GHC.Types.TyCon
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 50}]
 T7360.$tc'Foo1 =
   GHC.Types.TyCon
-    2058692068419561651##
-    9152017373001677943##
-    T7360.$trModule
-    T7360.$tc'Foo4
+    [2058692068419561651##,
+     9152017373001677943##,
+     T7360.$trModule,
+     T7360.$tc'Foo4]
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 T7360.$tcFoo1 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 20}]
-T7360.$tcFoo1 = GHC.Types.TrNameS "Foo"#
+T7360.$tcFoo1 = GHC.Types.TrNameS ["Foo"#]
 
--- RHS size: {terms: 5, types: 0, coercions: 0}
+-- RHS size: {terms: 4, types: 0, coercions: 0}
 T7360.$tcFoo :: GHC.Types.TyCon
 [GblId,
  Caf=NoCafRefs,
@@ -181,10 +201,10 @@ T7360.$tcFoo :: GHC.Types.TyCon
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 50}]
 T7360.$tcFoo =
   GHC.Types.TyCon
-    8358641983981300860##
-    582034888424804490##
-    T7360.$trModule
-    T7360.$tcFoo1
+    [8358641983981300860##,
+     582034888424804490##,
+     T7360.$trModule,
+     T7360.$tcFoo1]
 
 
 

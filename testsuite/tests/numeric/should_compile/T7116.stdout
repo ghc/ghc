@@ -1,26 +1,26 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 46, types: 23, coercions: 0}
+Result size of Tidy Core = {terms: 39, types: 23, coercions: 0}
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 T7116.$trModule2 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 20}]
-T7116.$trModule2 = GHC.Types.TrNameS "main"#
+T7116.$trModule2 = GHC.Types.TrNameS ["main"#]
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 T7116.$trModule1 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
-T7116.$trModule1 = GHC.Types.TrNameS "T7116"#
+T7116.$trModule1 = GHC.Types.TrNameS ["T7116"#]
 
--- RHS size: {terms: 3, types: 0, coercions: 0}
+-- RHS size: {terms: 2, types: 0, coercions: 0}
 T7116.$trModule :: GHC.Types.Module
 [GblId,
  Caf=NoCafRefs,
@@ -28,9 +28,9 @@ T7116.$trModule :: GHC.Types.Module
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
 T7116.$trModule =
-  GHC.Types.Module T7116.$trModule2 T7116.$trModule1
+  GHC.Types.Module [T7116.$trModule2, T7116.$trModule1]
 
--- RHS size: {terms: 8, types: 3, coercions: 0}
+-- RHS size: {terms: 7, types: 3, coercions: 0}
 dr :: Double -> Double
 [GblId,
  Arity=1,
@@ -41,13 +41,15 @@ dr :: Double -> Double
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once!] :: Double) ->
                  case x of { GHC.Types.D# x1 ->
-                 GHC.Types.D# (GHC.Prim.+## x1 x1)
+                 GHC.Types.D# [(GHC.Prim.+## x1 x1)]
                  }}]
 dr =
   \ (x :: Double) ->
-    case x of { GHC.Types.D# x1 -> GHC.Types.D# (GHC.Prim.+## x1 x1) }
+    case x of { GHC.Types.D# x1 ->
+    GHC.Types.D# [(GHC.Prim.+## x1 x1)]
+    }
 
--- RHS size: {terms: 8, types: 3, coercions: 0}
+-- RHS size: {terms: 7, types: 3, coercions: 0}
 dl :: Double -> Double
 [GblId,
  Arity=1,
@@ -57,12 +59,12 @@ dl :: Double -> Double
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once!] :: Double) ->
-                 case x of { GHC.Types.D# y -> GHC.Types.D# (GHC.Prim.+## y y) }}]
+                 case x of { GHC.Types.D# y -> GHC.Types.D# [(GHC.Prim.+## y y)] }}]
 dl =
   \ (x :: Double) ->
-    case x of { GHC.Types.D# y -> GHC.Types.D# (GHC.Prim.+## y y) }
+    case x of { GHC.Types.D# y -> GHC.Types.D# [(GHC.Prim.+## y y)] }
 
--- RHS size: {terms: 8, types: 3, coercions: 0}
+-- RHS size: {terms: 7, types: 3, coercions: 0}
 fr :: Float -> Float
 [GblId,
  Arity=1,
@@ -73,15 +75,15 @@ fr :: Float -> Float
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once!] :: Float) ->
                  case x of { GHC.Types.F# x1 ->
-                 GHC.Types.F# (GHC.Prim.plusFloat# x1 x1)
+                 GHC.Types.F# [(GHC.Prim.plusFloat# x1 x1)]
                  }}]
 fr =
   \ (x :: Float) ->
     case x of { GHC.Types.F# x1 ->
-    GHC.Types.F# (GHC.Prim.plusFloat# x1 x1)
+    GHC.Types.F# [(GHC.Prim.plusFloat# x1 x1)]
     }
 
--- RHS size: {terms: 8, types: 3, coercions: 0}
+-- RHS size: {terms: 7, types: 3, coercions: 0}
 fl :: Float -> Float
 [GblId,
  Arity=1,
@@ -92,12 +94,12 @@ fl :: Float -> Float
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once!] :: Float) ->
                  case x of { GHC.Types.F# y ->
-                 GHC.Types.F# (GHC.Prim.plusFloat# y y)
+                 GHC.Types.F# [(GHC.Prim.plusFloat# y y)]
                  }}]
 fl =
   \ (x :: Float) ->
     case x of { GHC.Types.F# y ->
-    GHC.Types.F# (GHC.Prim.plusFloat# y y)
+    GHC.Types.F# [(GHC.Prim.plusFloat# y y)]
     }
 
 

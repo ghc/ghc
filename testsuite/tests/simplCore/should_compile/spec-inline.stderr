@@ -1,26 +1,26 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 172, types: 65, coercions: 0}
+Result size of Tidy Core = {terms: 165, types: 65, coercions: 0}
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 Roman.$trModule2 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 20}]
-Roman.$trModule2 = GHC.Types.TrNameS "main"#
+Roman.$trModule2 = GHC.Types.TrNameS ["main"#]
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 Roman.$trModule1 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
-Roman.$trModule1 = GHC.Types.TrNameS "Roman"#
+Roman.$trModule1 = GHC.Types.TrNameS ["Roman"#]
 
--- RHS size: {terms: 3, types: 0, coercions: 0}
+-- RHS size: {terms: 2, types: 0, coercions: 0}
 Roman.$trModule :: GHC.Types.Module
 [GblId,
  Caf=NoCafRefs,
@@ -28,7 +28,7 @@ Roman.$trModule :: GHC.Types.Module
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
 Roman.$trModule =
-  GHC.Types.Module Roman.$trModule2 Roman.$trModule1
+  GHC.Types.Module [Roman.$trModule2, Roman.$trModule1]
 
 -- RHS size: {terms: 2, types: 2, coercions: 0}
 Roman.foo3 :: Int
@@ -114,7 +114,7 @@ Roman.$wgo =
         }
     }
 
--- RHS size: {terms: 9, types: 5, coercions: 0}
+-- RHS size: {terms: 8, types: 5, coercions: 0}
 Roman.foo_go [InlPrag=INLINE[0]] :: Maybe Int -> Maybe Int -> Int
 [GblId,
  Arity=2,
@@ -123,30 +123,30 @@ Roman.foo_go [InlPrag=INLINE[0]] :: Maybe Int -> Maybe Int -> Int
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
          Tmpl= \ (w [Occ=Once] :: Maybe Int) (w1 [Occ=Once] :: Maybe Int) ->
-                 case Roman.$wgo w w1 of ww { __DEFAULT -> GHC.Types.I# ww }}]
+                 case Roman.$wgo w w1 of ww { __DEFAULT -> GHC.Types.I# [ww] }}]
 Roman.foo_go =
   \ (w :: Maybe Int) (w1 :: Maybe Int) ->
-    case Roman.$wgo w w1 of ww { __DEFAULT -> GHC.Types.I# ww }
+    case Roman.$wgo w w1 of ww { __DEFAULT -> GHC.Types.I# [ww] }
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 Roman.foo2 :: Int
 [GblId,
  Caf=NoCafRefs,
  Str=m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
-Roman.foo2 = GHC.Types.I# 6#
+Roman.foo2 = GHC.Types.I# [6#]
 
--- RHS size: {terms: 2, types: 1, coercions: 0}
+-- RHS size: {terms: 1, types: 1, coercions: 0}
 Roman.foo1 :: Maybe Int
 [GblId,
  Caf=NoCafRefs,
  Str=m2,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
-Roman.foo1 = GHC.Base.Just @ Int Roman.foo2
+Roman.foo1 = Just [@ Int, Roman.foo2]
 
--- RHS size: {terms: 11, types: 4, coercions: 0}
+-- RHS size: {terms: 10, types: 4, coercions: 0}
 foo :: Int -> Int
 [GblId,
  Arity=1,
@@ -157,20 +157,22 @@ foo :: Int -> Int
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (n [Occ=Once!] :: Int) ->
                  case n of n1 { GHC.Types.I# _ [Occ=Dead] ->
-                 Roman.foo_go (GHC.Base.Just @ Int n1) Roman.foo1
+                 Roman.foo_go (Just [@ Int, n1]) Roman.foo1
                  }}]
 foo =
   \ (n :: Int) ->
     case n of { GHC.Types.I# ipv ->
-    case Roman.foo_$s$wgo 6# ipv of ww { __DEFAULT -> GHC.Types.I# ww }
+    case Roman.foo_$s$wgo 6# ipv of ww { __DEFAULT ->
+    GHC.Types.I# [ww]
+    }
     }
 
 
 ------ Local rules for imported ids --------
 "SC:$wgo0" [0]
     forall (sc :: GHC.Prim.Int#) (sc1 :: GHC.Prim.Int#).
-      Roman.$wgo (GHC.Base.Just @ Int (GHC.Types.I# sc1))
-                 (GHC.Base.Just @ Int (GHC.Types.I# sc))
+      Roman.$wgo (Just [@ Int, (GHC.Types.I# [sc1])])
+                 (Just [@ Int, (GHC.Types.I# [sc])])
       = Roman.foo_$s$wgo sc sc1
 
 

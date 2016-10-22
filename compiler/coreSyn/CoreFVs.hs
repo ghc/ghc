@@ -73,6 +73,7 @@ import Var
 import Type
 import TyCoRep
 import TyCon
+import DataCon ( dataConRepType, dataConWorkId )
 import CoAxiom
 import FamInstEnv
 import TysPrim( funTyConName )
@@ -259,6 +260,8 @@ expr_fvs (Tick t expr) fv_cand in_scope acc =
   (tickish_fvs t `unionFV` expr_fvs expr) fv_cand in_scope acc
 expr_fvs (App fun arg) fv_cand in_scope acc =
   (expr_fvs fun `unionFV` expr_fvs arg) fv_cand in_scope acc
+expr_fvs (ConApp dc args) fv_cand in_scope acc =
+  (FV.unitFV (dataConWorkId dc) `unionFV` mapUnionFV expr_fvs args) fv_cand in_scope acc
 expr_fvs (Lam bndr body) fv_cand in_scope acc =
   addBndr bndr (expr_fvs body) fv_cand in_scope acc
 expr_fvs (Cast expr co) fv_cand in_scope acc =
@@ -318,6 +321,7 @@ exprOrphNames e
     go (Type ty)            = orphNamesOfType ty        -- Don't need free tyvars
     go (Coercion co)        = orphNamesOfCo co
     go (App e1 e2)          = go e1 `unionNameSet` go e2
+    go (ConApp _ args)     = unionNameSets (map go args)
     go (Lam v e)            = go e `delFromNameSet` idName v
     go (Tick _ e)           = go e
     go (Cast e co)          = go e `unionNameSet` orphNamesOfCo co
@@ -739,6 +743,16 @@ freeVars = go
         fun_ty = exprTypeFV fun'
         arg'   = go arg
         res_ty = applyTypeToArg fun_ty arg
+
+    go (ConApp dc args)
+      = ( FVAnn { fva_fvs    = unionFVss (map freeVarsOf args')
+                , fva_ty_fvs = tyCoVarsOfTypeDSet res_ty
+                , fva_ty     = res_ty }
+        , AnnConApp dc args' )
+      where
+        args'    = map go args
+        dc_ty    = dataConRepType dc
+        res_ty   = foldl applyTypeToArg dc_ty args
 
     go (Case scrut bndr ty alts)
       = ( FVAnn { fva_fvs = (bndr `delBinderFV` alts_fvs)

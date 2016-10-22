@@ -772,7 +772,7 @@ test('T9872d',
 test('T9961',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 537297968, 5),
+          [(wordsize(64), 468300048, 5),
           # 2015-01-12    807117816   Initally created
           # 2015-spring   772510192   Got better
           # 2015-05-22    663978160   Fix for #10370 improves it more
@@ -781,6 +781,7 @@ test('T9961',
           # 2016-03-20    519436672   x64_64/Linux   Don't use build desugaring for large lists (#11707)
           # 2016-03-24    568526784   x64_64/Linux   Add eqInt* variants (#11688)
           # 2016-09-01    537297968   x64_64/Linux   Restore w/w limit (#11565)
+          # 2016-10-19    468300048   x64_64/Linux   ConApp
            (wordsize(32), 275264188, 5)
           # was           375647160
           # 2016-04-06    275264188   x86/Linux
@@ -792,10 +793,11 @@ test('T9961',
 test('T9233',
     [ only_ways(['normal']),
       compiler_stats_num_field('bytes allocated',
-        [(wordsize(64), 984268712, 5),
+        [(wordsize(64),  928854208, 5),
          # 2015-08-04    999826288     initial value
          # 2016-04-14   1066246248     Final demand analyzer run
          # 2016-06-18    984268712     shuffling around of Data.Functor.Identity
+         # 2016-10-19    928854208     ConApp
          (wordsize(32),  515672240, 5)   # Put in your value here if you hit this
          # 2016-04-06    515672240     (x86/Linux) initial value
         ]),

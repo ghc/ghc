@@ -294,6 +294,11 @@ floatExpr (App e a)
     case (floatExpr  a) of { (fsa, floats_a, a') ->
     (fse `add_stats` fsa, floats_e `plusFloats` floats_a, App e' a') }}
 
+floatExpr (ConApp dc args)
+  = (sum_stats flss, sumFloats floatss, ConApp dc args')
+  where
+    (flss, floatss, args') = unzip3 $ map floatExpr args
+
 floatExpr lam@(Lam (TB _ lam_spec) _)
   = let (bndrs_w_lvls, body) = collectBinders lam
         bndrs                = [b | TB b _ <- bndrs_w_lvls]
@@ -519,6 +524,9 @@ unitLetFloat lvl@(Level major minor) b
 plusFloats :: FloatBinds -> FloatBinds -> FloatBinds
 plusFloats (FB t1 l1) (FB t2 l2)
   = FB (t1 `unionBags` t2) (l1 `plusMajor` l2)
+
+sumFloats :: [FloatBinds] -> FloatBinds
+sumFloats = foldr plusFloats emptyFloats
 
 plusMajor :: MajorEnv -> MajorEnv -> MajorEnv
 plusMajor = M.unionWith plusMinor

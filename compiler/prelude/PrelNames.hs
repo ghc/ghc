@@ -813,6 +813,20 @@ dataQual_RDR mod str = mkOrig mod (mkOccNameFS dataName str)
 {-
 ************************************************************************
 *                                                                      *
+\subsection{Internal names}
+*                                                                      *
+************************************************************************
+-}
+
+wildCardName :: Name
+wildCardName = mkSystemVarName wildCardKey (fsLit "wild")
+
+coreConAppUnique :: Int -> Name
+coreConAppUnique n = mkSystemVarName (mkCoreConAppUnique n) (fsLit "x")
+
+{-
+************************************************************************
+*                                                                      *
 \subsection{Known-key names}
 *                                                                      *
 ************************************************************************
@@ -824,9 +838,6 @@ and it's convenient to write them all down in one place.
 --MetaHaskell Extension  add the constrs and the lower case case
 -- guys as well (perhaps) e.g. see  trueDataConName     below
 -}
-
-wildCardName :: Name
-wildCardName = mkSystemVarName wildCardKey (fsLit "wild")
 
 runMainIOName :: Name
 runMainIOName = varQual gHC_TOP_HANDLER (fsLit "runMainIO") runMainKey

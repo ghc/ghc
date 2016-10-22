@@ -23,6 +23,7 @@ import BasicTypes
 import Data.List
 import DataCon
 import Id
+import MkId             ( dataConWorkStrictSig )
 import CoreUtils        ( exprIsHNF, exprType, exprIsTrivial )
 import TyCon
 import Type
@@ -188,6 +189,38 @@ dmdAnal' env dmd (App fun arg)
 --         , text "res dmd_ty =" <+> ppr res_ty
 --         , text "overall res dmd_ty =" <+> ppr (res_ty `bothDmdType` arg_ty) ])
     (res_ty `bothDmdType` arg_ty, App fun' arg')
+
+dmdAnal' env dmd (ConApp dc args)
+  = -- pprTrace "dmdAnal:ConApp" (vcat
+    --      [ text "dmd =" <+> ppr dmd
+    --      , text "dc =" <+> ppr dc
+    --      , text "arity =" <+> ppr (dataConRepArity dc)
+    --      , text "dc_strictSig =" <+> ppr dc_strictSig
+    --      , text "dmd' =" <+> ppr dmd'
+    --      , text "final_ty =" <+> ppr final_ty
+    --      ])
+    (final_ty, ConApp dc args')
+  where
+    dc_strictSig = dataConWorkStrictSig dc
+    dmd' = dmdTransformSatDataConSig (dataConRepArity dc) dc_strictSig dmd
+    -- TODO: unpack dmd'
+    (final_ty, args') = go dmd' args
+
+    go :: DmdType -> [CoreArg] -> (DmdType, [CoreArg])
+    go fun_ty [] = (fun_ty, [])
+
+    go fun_ty (Type ty : args)
+       = (args_ty, Type ty : args')
+      where
+        (args_ty, args') = go fun_ty args
+
+    go fun_ty (arg : args)
+       = (args_ty `bothDmdType` arg_ty, arg': args')
+      where
+        (arg_dmd, res_ty) = splitDmdTy fun_ty
+        (arg_ty, arg')    = dmdAnalStar env (dmdTransformThunkDmd arg arg_dmd) arg
+        (args_ty, args') = go res_ty args
+
 
 -- this is an anonymous lambda, since @dmdAnalRhsLetDown@ uses @collectBinders@
 dmdAnal' env dmd (Lam var body)

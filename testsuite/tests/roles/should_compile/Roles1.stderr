@@ -26,90 +26,90 @@ Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,
 
 ==================== Typechecker ====================
 Roles1.$tcT7
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       12795488517584970699##
       6852268802866176810##
       Roles1.$trModule
-      (GHC.Types.TrNameS "T7"#)
+      (GHC.Types.$WTrNameS "T7"#)
 Roles1.$tc'K7
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       12022030613939361326##
       11727141136040515167##
       Roles1.$trModule
-      (GHC.Types.TrNameS "'K7"#)
+      (GHC.Types.$WTrNameS "'K7"#)
 Roles1.$tcT6
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       1052116432298682626##
       4782516991847719023##
       Roles1.$trModule
-      (GHC.Types.TrNameS "T6"#)
+      (GHC.Types.$WTrNameS "T6"#)
 Roles1.$tc'K6
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       14383224451764499060##
       13586832700239872984##
       Roles1.$trModule
-      (GHC.Types.TrNameS "'K6"#)
+      (GHC.Types.$WTrNameS "'K6"#)
 Roles1.$tcT5
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       10855726709479635304##
       5574528370049939204##
       Roles1.$trModule
-      (GHC.Types.TrNameS "T5"#)
+      (GHC.Types.$WTrNameS "T5"#)
 Roles1.$tc'K5
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       17986294396600628264##
       15784122741796850983##
       Roles1.$trModule
-      (GHC.Types.TrNameS "'K5"#)
+      (GHC.Types.$WTrNameS "'K5"#)
 Roles1.$tcT4
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       5809060867006837344##
       8795972313583150301##
       Roles1.$trModule
-      (GHC.Types.TrNameS "T4"#)
+      (GHC.Types.$WTrNameS "T4"#)
 Roles1.$tc'K4
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       6498964159768283182##
       956453098475971212##
       Roles1.$trModule
-      (GHC.Types.TrNameS "'K4"#)
+      (GHC.Types.$WTrNameS "'K4"#)
 Roles1.$tcT3
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       17827258502042208248##
       10404219359416482652##
       Roles1.$trModule
-      (GHC.Types.TrNameS "T3"#)
+      (GHC.Types.$WTrNameS "T3"#)
 Roles1.$tc'K3
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       18386915834109553575##
       773967725306507064##
       Roles1.$trModule
-      (GHC.Types.TrNameS "'K3"#)
+      (GHC.Types.$WTrNameS "'K3"#)
 Roles1.$tcT2
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       14324923875690440398##
       17626224477681351106##
       Roles1.$trModule
-      (GHC.Types.TrNameS "T2"#)
+      (GHC.Types.$WTrNameS "T2"#)
 Roles1.$tc'K2
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       17795591238510508397##
       10155757471958311507##
       Roles1.$trModule
-      (GHC.Types.TrNameS "'K2"#)
+      (GHC.Types.$WTrNameS "'K2"#)
 Roles1.$tcT1
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       12633763300352597178##
       11103726621424210926##
       Roles1.$trModule
-      (GHC.Types.TrNameS "T1"#)
+      (GHC.Types.$WTrNameS "T1"#)
 Roles1.$tc'K1
-  = GHC.Types.TyCon
+  = GHC.Types.$WTyCon
       1949157551035372857##
       3576433963139282451##
       Roles1.$trModule
-      (GHC.Types.TrNameS "'K1"#)
+      (GHC.Types.$WTrNameS "'K1"#)
 Roles1.$trModule
-  = GHC.Types.Module
-      (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "Roles1"#)
+  = GHC.Types.$WModule
+      (GHC.Types.$WTrNameS "main"#) (GHC.Types.$WTrNameS "Roles1"#)
 

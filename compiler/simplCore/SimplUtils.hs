@@ -28,7 +28,7 @@ module SimplUtils (
         -- ArgInfo
         ArgInfo(..), ArgSpec(..), mkArgInfo,
         addValArgTo, addCastTo, addTyArgTo,
-        argInfoExpr, argInfoAppArgs, pushSimplifiedArgs,
+        argInfoExpr, argInfoAppArgs, argsToArgSpecs, pushSimplifiedArgs,
 
         abstractFloats
     ) where
@@ -264,6 +264,11 @@ argInfoAppArgs []                              = []
 argInfoAppArgs (CastBy {}                : _)  = []  -- Stop at a cast
 argInfoAppArgs (ValArg e                 : as) = e       : argInfoAppArgs as
 argInfoAppArgs (TyArg { as_arg_ty = ty } : as) = Type ty : argInfoAppArgs as
+
+argsToArgSpecs :: [OutExpr] -> [ArgSpec]
+argsToArgSpecs = map go
+  where go (Type t) = TyArg t undefined
+        go e        = ValArg e
 
 pushSimplifiedArgs :: SimplEnv -> [ArgSpec] -> SimplCont -> SimplCont
 pushSimplifiedArgs _env []           k = k
@@ -630,6 +635,7 @@ interestingArg env e = go env 0 e
     go _   _ (Coercion _)      = TrivArg
     go env n (App fn (Type _)) = go env n fn
     go env n (App fn _)        = go env (n+1) fn
+    go _   _ (ConApp _ _)      = ValueArg
     go env n (Tick _ a)        = go env n a
     go env n (Cast e _)        = go env n e
     go env n (Lam v e)
@@ -864,12 +870,9 @@ active_unfolding_minimal :: Id -> Bool
 -- Ignore SimplGently, because we want to inline regardless;
 -- the Id has no top-level binding at all
 --
--- NB: we used to have a second exception, for data con wrappers.
--- On the grounds that we use gentle mode for rule LHSs, and
--- they match better when data con wrappers are inlined.
--- But that only really applies to the trivial wrappers (like (:)),
--- and they are now constructed as Compulsory unfoldings (in MkId)
--- so they'll happen anyway.
+-- This includes simple data conwrappers, just make ConApp partilly applicable,
+-- which do no case expressions or anything else we do not want to have on the
+-- LHS of a rule.
 active_unfolding_minimal id = isCompulsoryUnfolding (realIdUnfolding id)
 
 active_unfolding :: PhaseNum -> Id -> Bool
@@ -1819,6 +1822,8 @@ mkCase1 _dflags scrut case_bndr _ alts@((_,_,rhs1) : _)      -- Identity case
         -- See Note [RHS casts]
     check_eq (Lit lit)  (LitAlt lit') _    = lit == lit'
     check_eq (Var v) _ _  | v == case_bndr = True
+    check_eq (ConApp con [])  (DataAlt con') [] = con == con'
+                                             -- Optimisation only
     check_eq (Var v)    (DataAlt con) []   = v == dataConWorkId con
                                              -- Optimisation only
     check_eq (Tick t e) alt           args = tickishFloatable t &&

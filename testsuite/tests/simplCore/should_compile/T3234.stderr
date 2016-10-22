@@ -10,10 +10,12 @@
 
 
 ==================== Grand total simplifier statistics ====================
-Total ticks:     51
+Total ticks:     57
 
-14 PreInlineUnconditionally
+16 PreInlineUnconditionally
   1 n
+  1 wa
+  1 wa
   1 g
   1 a
   1 xs
@@ -32,7 +34,9 @@ Total ticks:     51
   1 n
   1 c
   1 c
-1 UnfoldingDone 1 GHC.Base.build
+2 UnfoldingDone
+  1 GHC.Base.build
+  1 GHC.Types.$W:
 5 RuleFired
   1 ++
   1 augment/build
@@ -40,10 +44,13 @@ Total ticks:     51
   1 unpack
   1 unpack-list
 2 LetFloatFromLet 2
-25 BetaReduction
+28 BetaReduction
+  1 a
   1 a
   1 c
   1 n
+  1 wa
+  1 wa
   1 a
   1 g
   1 a

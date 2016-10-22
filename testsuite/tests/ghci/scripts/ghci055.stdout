@@ -3,4 +3,4 @@ CallStack (from HasCallStack):
   error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
   undefined, called at <interactive>:1:5 in interactive:Ghci1
 x :: a = _
-y :: Integer = 3
+y :: Integer = _

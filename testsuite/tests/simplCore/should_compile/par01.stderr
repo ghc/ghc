@@ -1,6 +1,6 @@
 
 ==================== CorePrep ====================
-Result size of CorePrep = {terms: 18, types: 8, coercions: 0}
+Result size of CorePrep = {terms: 15, types: 8, coercions: 0}
 
 Rec {
 -- RHS size: {terms: 7, types: 3, coercions: 0}
@@ -13,21 +13,21 @@ Par01.depth =
     }
 end Rec }
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 Par01.$trModule2 :: GHC.Types.TrName
 [GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []]
-Par01.$trModule2 = GHC.Types.TrNameS "main"#
+Par01.$trModule2 = GHC.Types.TrNameS ["main"#]
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 Par01.$trModule1 :: GHC.Types.TrName
 [GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []]
-Par01.$trModule1 = GHC.Types.TrNameS "Par01"#
+Par01.$trModule1 = GHC.Types.TrNameS ["Par01"#]
 
--- RHS size: {terms: 3, types: 0, coercions: 0}
+-- RHS size: {terms: 2, types: 0, coercions: 0}
 Par01.$trModule :: GHC.Types.Module
 [GblId, Caf=NoCafRefs, Str=m, Unf=OtherCon []]
 Par01.$trModule =
-  GHC.Types.Module Par01.$trModule2 Par01.$trModule1
+  GHC.Types.Module [Par01.$trModule2, Par01.$trModule1]
 
 
 

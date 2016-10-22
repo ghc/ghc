@@ -24,6 +24,7 @@ replaceInExpr (Lit (MachStr _)) = mkStringLit "Hello From The Plugin" -- The pay
 replaceInExpr (Lit l) = Lit l
 replaceInExpr (Lam b e) = Lam b (replaceInExpr e)
 replaceInExpr (App e1 e2) = App (replaceInExpr e1) (replaceInExpr e2)
+replaceInExpr (ConApp dc args) = ConApp dc (map replaceInExpr args)
 replaceInExpr (Let bi e) = Let (replaceInBind bi) (replaceInExpr e)
 replaceInExpr (Tick t e) = Tick t (replaceInExpr e)
 replaceInExpr (Cast e co) = Cast (replaceInExpr e) co

@@ -491,8 +491,8 @@ dsPArrComp (BindStmt p e _ _ _ : qs) = do
     filterP <- dsDPHBuiltin filterPVar
     ce <- dsLExpr e
     let ety'ce  = parrElemType ce
-        false   = Var falseDataConId
-        true    = Var trueDataConId
+        false   = ConApp falseDataCon []
+        true    = ConApp trueDataCon []
     v <- newSysLocalDs ety'ce
     pred <- matchSimply (Var v) (StmtCtxt PArrComp) p true false
     let gen | isIrrefutableHsPat p = ce
@@ -552,8 +552,8 @@ dePArrComp (BindStmt p e _ _ _ : qs) pa cea = do
     ce <- dsLExpr e
     let ety'cea = parrElemType cea
         ety'ce  = parrElemType ce
-        false   = Var falseDataConId
-        true    = Var trueDataConId
+        false   = ConApp falseDataCon []
+        true    = ConApp trueDataCon []
     v <- newSysLocalDs ety'ce
     pred <- matchSimply (Var v) (StmtCtxt PArrComp) p true false
     let cef | isIrrefutableHsPat p = ce

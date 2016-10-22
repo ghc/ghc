@@ -377,34 +377,37 @@ subst_expr :: SDoc -> Subst -> CoreExpr -> CoreExpr
 subst_expr doc subst expr
   = go expr
   where
-    go (Var v)         = lookupIdSubst (doc $$ text "subst_expr") subst v
-    go (Type ty)       = Type (substTy subst ty)
-    go (Coercion co)   = Coercion (substCo subst co)
-    go (Lit lit)       = Lit lit
-    go (App fun arg)   = App (go fun) (go arg)
+    go (Var v)          = lookupIdSubst (doc $$ text "subst_expr") subst v
+    go (Type ty)        = Type (substTy subst ty)
+    go (Coercion co)    = Coercion (substCo subst co)
+    go (Lit lit)        = Lit lit
+    go (App fun arg)    = App (go fun) (go arg)
+    go (ConApp dc args) = ConApp dc (map go args)
     go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
-    go (Cast e co)     = Cast (go e) (substCo subst co)
+    go (Cast e co)      = Cast (go e) (substCo subst co)
        -- Do not optimise even identity coercions
        -- Reason: substitution applies to the LHS of RULES, and
        --         if you "optimise" an identity coercion, you may
        --         lose a binder. We optimise the LHS of rules at
        --         construction time
 
-    go (Lam bndr body) = Lam bndr' (subst_expr doc subst' body)
-                       where
-                         (subst', bndr') = substBndr subst bndr
+    go (Lam bndr body)  = Lam bndr' (subst_expr doc subst' body)
+      where
+       (subst', bndr') = substBndr subst bndr
 
-    go (Let bind body) = Let bind' (subst_expr doc subst' body)
-                       where
-                         (subst', bind') = substBind subst bind
+    go (Let bind body)  = Let bind' (subst_expr doc subst' body)
+      where
+       (subst', bind') = substBind subst bind
 
-    go (Case scrut bndr ty alts) = Case (go scrut) bndr' (substTy subst ty) (map (go_alt subst') alts)
-                                 where
-                                 (subst', bndr') = substBndr subst bndr
+    go (Case scrut bndr ty alts)
+        = Case (go scrut) bndr' (substTy subst ty) (map (go_alt subst') alts)
+      where
+        (subst', bndr') = substBndr subst bndr
 
-    go_alt subst (con, bndrs, rhs) = (con, bndrs', subst_expr doc subst' rhs)
-                                 where
-                                   (subst', bndrs') = substBndrs subst bndrs
+    go_alt subst (con, bndrs, rhs)
+        = (con, bndrs', subst_expr doc subst' rhs)
+      where
+        (subst', bndrs') = substBndrs subst bndrs
 
 -- | Apply a substitution to an entire 'CoreBind', additionally returning an updated 'Subst'
 -- that should be used by subsequent substitutions.
@@ -924,8 +927,11 @@ simple_opt_expr subst expr
   where
     in_scope_env = (substInScope subst, simpleUnfoldingFun)
 
+    go (Var v) | isSimpleWrapperUnfolding (idUnfolding v) 0
+               =  go (unfoldingTemplate (idUnfolding v))
     go (Var v)          = lookupIdSubst (text "simpleOptExpr") subst v
     go (App e1 e2)      = simple_app subst e1 [go e2]
+    go (ConApp dc args) = ConApp dc (map go args)
     go (Type ty)        = Type     (substTy subst ty)
     go (Coercion co)    = Coercion (optCoercion (getTCvSubst subst) co)
     go (Lit lit)        = Lit lit
@@ -999,7 +1005,8 @@ simple_app subst (Lam b e) (a:as)
     (subst', b') = subst_opt_bndr subst b
     b2 = add_info subst' b b'
 simple_app subst (Var v) as
-  | isCompulsoryUnfolding (idUnfolding v)
+  | isCompulsoryUnfolding (idUnfolding v) ||
+    isSimpleWrapperUnfolding (idUnfolding v) (length as)
   , isAlwaysActive (idInlineActivation v)
   -- See Note [Unfold compulsory unfoldings in LHSs]
   =  simple_app subst (unfoldingTemplate (idUnfolding v)) as
@@ -1078,11 +1085,14 @@ maybe_substitute subst b r
     safe_to_inline NoOccInfo                = trivial
 
     trivial | exprIsTrivial r = True
+                     -- See Note [Getting the map/coerce RULE to work]
+            | (ConApp dc args) <- r
+            , dc `hasKey` heqDataConKey || dc `hasKey` coercibleDataConKey
+            , all exprIsTrivial args = True
             | (Var fun, args) <- collectArgs r
             , Just dc <- isDataConWorkId_maybe fun
             , dc `hasKey` heqDataConKey || dc `hasKey` coercibleDataConKey
             , all exprIsTrivial args = True
-                     -- See Note [Getting the map/coerce RULE to work]
             | otherwise = False
 
 ----------------------
@@ -1222,6 +1232,8 @@ exprIsConApp_maybe (in_scope, id_unf) expr
        | not (tickishIsCode t) = go subst expr cont
     go subst (Cast expr co1) (CC [] co2)
        = go subst expr (CC [] (subst_co subst co1 `mkTransCo` co2))
+    go subst (ConApp dc args) (CC [] co)
+       = dealWithCoercion co dc (map (subst_arg subst) args)
     go subst (App fun arg) (CC args co)
        = go subst fun (CC (subst_arg subst arg : args) co)
     go subst (Lam var body) (CC (arg:args) co)

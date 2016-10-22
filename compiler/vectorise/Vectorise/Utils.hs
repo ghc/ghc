@@ -10,7 +10,6 @@ module Vectorise.Utils (
   collectAnnDictArgs,
   collectAnnTypeBinders,
   collectAnnValBinders,
-  isAnnTypeArg,
 
   -- * PD Functions
   replicatePD, emptyPD, packByTagPD,
@@ -67,11 +66,6 @@ collectAnnValBinders expr = go [] expr
     go bs (_, AnnLam b e) | isId b
                           && (not . isPredTy . idType $ b) = go (b : bs) e
     go bs e                                                = (reverse bs, e)
-
-isAnnTypeArg :: AnnExpr b ann -> Bool
-isAnnTypeArg (_, AnnType _) = True
-isAnnTypeArg _              = False
-
 
 -- PD "Parallel Data" Functions -----------------------------------------------
 --

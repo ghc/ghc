@@ -55,13 +55,14 @@ tidyBind env (Rec prs)
 
 ------------  Expressions  --------------
 tidyExpr :: TidyEnv -> CoreExpr -> CoreExpr
-tidyExpr env (Var v)     =  Var (tidyVarOcc env v)
-tidyExpr env (Type ty)  =  Type (tidyType env ty)
-tidyExpr env (Coercion co) = Coercion (tidyCo env co)
-tidyExpr _   (Lit lit)   =  Lit lit
-tidyExpr env (App f a)   =  App (tidyExpr env f) (tidyExpr env a)
-tidyExpr env (Tick t e) =  Tick (tidyTickish env t) (tidyExpr env e)
-tidyExpr env (Cast e co) =  Cast (tidyExpr env e) (tidyCo env co)
+tidyExpr env (Var v)          = Var (tidyVarOcc env v)
+tidyExpr env (Type ty)        = Type (tidyType env ty)
+tidyExpr env (Coercion co)    = Coercion (tidyCo env co)
+tidyExpr _   (Lit lit)        = Lit lit
+tidyExpr env (App f a)        = App (tidyExpr env f) (tidyExpr env a)
+tidyExpr env (ConApp dc args) = ConApp dc (map (tidyExpr env) args)
+tidyExpr env (Tick t e)       = Tick (tidyTickish env t) (tidyExpr env e)
+tidyExpr env (Cast e co)      = Cast (tidyExpr env e) (tidyCo env co)
 
 tidyExpr env (Let b e)
   = tidyBind env b      =: \ (env', b') ->

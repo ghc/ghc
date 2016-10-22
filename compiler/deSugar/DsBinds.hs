@@ -46,6 +46,7 @@ import Type
 import Coercion
 import TysWiredIn ( typeNatKind, typeSymbolKind )
 import Id
+import DataCon ( dataConWorkId )
 import MkId(proxyHashId)
 import Class
 import Name
@@ -801,7 +802,7 @@ decomposeRuleLhs orig_bndrs orig_lhs
  where
    lhs1         = drop_dicts orig_lhs
    lhs2         = simpleOptExpr lhs1  -- See Note [Simplify rule LHS]
-   (fun2,args2) = collectArgs lhs2
+   (fun2,args2) = collectArgs' lhs2
 
    lhs_fvs    = exprFreeVars lhs2
    unbound    = filterOut (`elemVarSet` lhs_fvs) orig_bndrs
@@ -821,6 +822,11 @@ decomposeRuleLhs orig_bndrs orig_lhs
                            , not (v == fn_id) ]
          -- fn_id: do not quantify over the function itself, which may
          -- itself be a dictionary (in pathological cases, Trac #10251)
+
+   -- We do not represent data con using their workers, but the rule code really likes
+   -- having IDs around, so lets return that here. The matcher will know what to do with it.
+   collectArgs' (ConApp dc args) = (Var (dataConWorkId dc), args)
+   collectArgs' e = collectArgs e
 
    decompose (Var fn_id) args
       | not (fn_id `elemVarSet` orig_bndr_set)
@@ -1138,7 +1144,7 @@ dsEvTypeable ty ev
                       $ mkLams [mkWildValBinder proxyT] (Var repName)
 
        -- Package up the method as `Typeable` dictionary
-       ; return $ mkConApp typeable_data_con [Type kind, Type ty, method] }
+       ; return $ mkCoreConApps typeable_data_con [Type kind, Type ty, method] }
 
 
 ds_ev_typeable :: Type -> EvTypeable -> DsM CoreExpr

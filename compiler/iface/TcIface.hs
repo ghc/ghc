@@ -1088,8 +1088,8 @@ tcIfaceExpr (IfaceTuple sort args)
                UnboxedTuple -> map (Type . getRuntimeRep "tcIfaceExpr") con_tys ++ some_con_args
                _            -> some_con_args
                         -- Put the missing type arguments back in
-             con_id   = dataConWorkId (tyConSingleDataCon tc)
-       ; return (mkApps (Var con_id) con_args) }
+             dc = tyConSingleDataCon tc
+       ; return (mkConApp dc con_args) }
   where
     arity = length args
 
@@ -1102,6 +1102,9 @@ tcIfaceExpr (IfaceLam (bndr, os) body)
 
 tcIfaceExpr (IfaceApp fun arg)
   = App <$> tcIfaceExpr fun <*> tcIfaceExpr arg
+
+tcIfaceExpr (IfaceConApp dcn arg)
+  = ConApp <$> tcIfaceDataCon dcn <*> mapM tcIfaceExpr arg
 
 tcIfaceExpr (IfaceECase scrut ty)
   = do { scrut' <- tcIfaceExpr scrut
@@ -1287,6 +1290,12 @@ tcUnfolding name _ _ (IfCompulsory if_expr)
         ; return (case mb_expr of
                     Nothing   -> NoUnfolding
                     Just expr -> mkCompulsoryUnfolding expr) }
+
+tcUnfolding name _ _ (IfInlineWrapper arity if_expr)
+  = do  { mb_expr <- tcPragExpr name if_expr
+        ; return (case mb_expr of
+                    Nothing   -> NoUnfolding
+                    Just expr -> mkSimpleWrapperUnfolding arity expr) }
 
 tcUnfolding name _ _ (IfInlineRule arity unsat_ok boring_ok if_expr)
   = do  { mb_expr <- tcPragExpr name if_expr

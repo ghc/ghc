@@ -306,6 +306,7 @@ cseExpr env (Coercion c)           = Coercion (substCo (csEnvSubst env) c)
 cseExpr _   (Lit lit)              = Lit lit
 cseExpr env (Var v)                = lookupSubst env v
 cseExpr env (App f a)              = App (cseExpr env f) (tryForCSE env a)
+cseExpr env (ConApp dc args)       = ConApp dc (map (tryForCSE env) args)
 cseExpr env (Tick t e)             = Tick t (cseExpr env e)
 cseExpr env (Cast e co)            = Cast (cseExpr env e) (substCo (csEnvSubst env) co)
 cseExpr env (Lam b e)              = let (env', b') = addBinder env b

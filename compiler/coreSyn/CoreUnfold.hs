@@ -24,7 +24,7 @@ module CoreUnfold (
         mkUnfolding, mkCoreUnfolding,
         mkTopUnfolding, mkSimpleUnfolding, mkWorkerUnfolding,
         mkInlineUnfolding, mkInlinableUnfolding, mkWwInlineRule,
-        mkCompulsoryUnfolding, mkDFunUnfolding,
+        mkCompulsoryUnfolding, mkSimpleWrapperUnfolding, mkDFunUnfolding,
         specUnfolding,
 
         ArgSummary(..),
@@ -123,6 +123,15 @@ mkWorkerUnfolding dflags work_fn
     guidance = calcUnfoldingGuidance dflags new_tmpl
 
 mkWorkerUnfolding _ _ _ = noUnfolding
+
+-- Inline very early, even in gentle, but only if saturated.
+mkSimpleWrapperUnfolding :: Arity -> CoreExpr -> Unfolding
+mkSimpleWrapperUnfolding arity expr
+  = mkCoreUnfolding InlineWrapper True
+                    (simpleOptExpr expr)
+                    (UnfWhen { ug_arity = arity
+                             , ug_unsat_ok = False
+                             , ug_boring_ok = True })
 
 mkInlineUnfolding :: Maybe Arity -> CoreExpr -> Unfolding
 mkInlineUnfolding mb_arity expr
@@ -321,7 +330,9 @@ inlineBoringOk e
     go credit (App f (Type {}))            = go credit f
     go credit (App f a) | credit > 0
                         , exprIsTrivial a  = go (credit-1) f
-    go credit (Tick _ e)                 = go credit e -- dubious
+    go credit (ConApp dc args)             = all exprIsTrivial args &&
+                                             credit >= dataConRepArity dc
+    go credit (Tick _ e)                   = go credit e -- dubious
     go credit (Cast e _)                   = go credit e
     go _      (Var {})                     = boringCxtOk
     go _      _                            = boringCxtNotOk
@@ -496,6 +507,11 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
       | isTyCoArg arg = size_up fun
       | otherwise     = size_up arg  `addSizeNSD`
                         size_up_app fun [arg] (if isRealWorldExpr arg then 1 else 0)
+    size_up (ConApp dc args)
+        = foldr (addSizeNSD . size_up)
+                (conSize dc (length val_args))
+                val_args
+      where val_args = filter (not . isTyCoArg) args
 
     size_up (Lam b e)
       | isId b && not (isRealWorldId b) = lamScrutDiscount dflags (size_up e `addSizeN` 10)

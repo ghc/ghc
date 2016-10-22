@@ -585,6 +585,8 @@ vectDictExpr (Lam bndr e)
   = Lam bndr <$> vectDictExpr e
 vectDictExpr (App fn arg)
   = App <$> vectDictExpr fn <*> vectDictExpr arg
+vectDictExpr (ConApp dc args)
+  = ConApp dc <$> mapM vectDictExpr args
 vectDictExpr (Case e bndr ty alts)
   = Case <$> vectDictExpr e <*> pure bndr <*> vectType ty <*> mapM vectDictAlt alts
   where
@@ -1070,6 +1072,17 @@ vectAvoidInfo pvs ce@(_, AnnApp e1 e2)
     ; let vi = ceVI `unlessVIParrExpr` eVI1 `unlessVIParrExpr` eVI2
     -- ; viTrace ce vi [eVI1, eVI2]
     ; return ((fvs, vi), AnnApp eVI1 eVI2)
+    }
+  where
+    fvs = freeVarsOf ce
+
+vectAvoidInfo pvs ce@(_, AnnConApp dc args)
+  = do
+    { ceVI <- vectAvoidInfoTypeOf ce
+    ; eVIs <- mapM (vectAvoidInfo pvs) args
+    ; let vi = foldl unlessVIParrExpr ceVI eVIs
+    -- ; viTrace ce vi [eVI1, eVI2]
+    ; return ((fvs, vi), AnnConApp dc eVIs)
     }
   where
     fvs = freeVarsOf ce

@@ -1,2 +1,2 @@
 test_case :: T
-test_case = T3990.T 1.0## 1.0##
+test_case = T [1.0##, 1.0##]

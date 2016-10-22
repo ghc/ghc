@@ -1,26 +1,26 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 45, types: 17, coercions: 0}
+Result size of Tidy Core = {terms: 39, types: 17, coercions: 0}
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 T4930.$trModule2 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 20}]
-T4930.$trModule2 = GHC.Types.TrNameS "main"#
+T4930.$trModule2 = GHC.Types.TrNameS ["main"#]
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 T4930.$trModule1 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
-T4930.$trModule1 = GHC.Types.TrNameS "T4930"#
+T4930.$trModule1 = GHC.Types.TrNameS ["T4930"#]
 
--- RHS size: {terms: 3, types: 0, coercions: 0}
+-- RHS size: {terms: 2, types: 0, coercions: 0}
 T4930.$trModule :: GHC.Types.Module
 [GblId,
  Caf=NoCafRefs,
@@ -28,19 +28,19 @@ T4930.$trModule :: GHC.Types.Module
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
 T4930.$trModule =
-  GHC.Types.Module T4930.$trModule2 T4930.$trModule1
+  GHC.Types.Module [T4930.$trModule2, T4930.$trModule1]
 
 Rec {
--- RHS size: {terms: 23, types: 6, coercions: 0}
+-- RHS size: {terms: 21, types: 6, coercions: 0}
 T4930.$wfoo [InlPrag=[0], Occ=LoopBreaker]
   :: GHC.Prim.Int# -> GHC.Prim.Int#
 [GblId, Arity=1, Caf=NoCafRefs, Str=<S,U>]
 T4930.$wfoo =
   \ (ww :: GHC.Prim.Int#) ->
     case case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# ww 5#) of {
-           False -> GHC.Types.I# (GHC.Prim.+# ww 2#);
+           False -> GHC.Types.I# [(GHC.Prim.+# ww 2#)];
            True ->
-             case T4930.$wfoo ww of ww1 { __DEFAULT -> GHC.Types.I# ww1 }
+             case T4930.$wfoo ww of ww1 { __DEFAULT -> GHC.Types.I# [ww1] }
          }
     of
     { GHC.Types.I# ipv ->
@@ -48,7 +48,7 @@ T4930.$wfoo =
     }
 end Rec }
 
--- RHS size: {terms: 10, types: 4, coercions: 0}
+-- RHS size: {terms: 9, types: 4, coercions: 0}
 foo [InlPrag=INLINE[0]] :: Int -> Int
 [GblId,
  Arity=1,
@@ -59,12 +59,12 @@ foo [InlPrag=INLINE[0]] :: Int -> Int
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (w [Occ=Once!] :: Int) ->
                  case w of { GHC.Types.I# ww1 [Occ=Once] ->
-                 case T4930.$wfoo ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }
+                 case T4930.$wfoo ww1 of ww2 { __DEFAULT -> GHC.Types.I# [ww2] }
                  }}]
 foo =
   \ (w :: Int) ->
     case w of { GHC.Types.I# ww1 ->
-    case T4930.$wfoo ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }
+    case T4930.$wfoo ww1 of ww2 { __DEFAULT -> GHC.Types.I# [ww2] }
     }
 
 

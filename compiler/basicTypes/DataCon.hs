@@ -39,7 +39,7 @@ module DataCon (
         dataConInstOrigArgTys, dataConRepArgTys,
         dataConFieldLabels, dataConFieldType,
         dataConSrcBangs,
-        dataConSourceArity, dataConRepArity,
+        dataConSourceArity, dataConRepArity, dataConRepFullArity,
         dataConIsInfix,
         dataConWorkId, dataConWrapId, dataConWrapId_maybe,
         dataConImplicitTyThings,
@@ -385,8 +385,10 @@ data DataCon
         -- Cached; see Note [DataCon arities]
         -- INVARIANT: dcRepArity    == length dataConRepArgTys
         -- INVARIANT: dcSourceArity == length dcOrigArgTys
-        dcRepArity    :: Arity,
-        dcSourceArity :: Arity,
+        -- INVARIANT: dcRepFullArity == length univ_tvs + length ex_tvs + dcRepArity
+        dcRepArity     :: Arity,
+        dcSourceArity  :: Arity,
+        dcRepFullArity :: Arity,
 
         -- Result type of constructor is T t1..tn
         dcRepTyCon  :: TyCon,           -- Result tycon, T
@@ -799,6 +801,7 @@ mkDataCon name declared_infix prom_info
                   dcRep = rep,
                   dcSourceArity = length orig_arg_tys,
                   dcRepArity = length rep_arg_tys,
+                  dcRepFullArity = length univ_tvs + length ex_tvs + dcRepArity con,
                   dcPromoted = promoted }
 
         -- The 'arg_stricts' passed to mkDataCon are simply those for the
@@ -994,6 +997,11 @@ dataConSourceArity (MkData { dcSourceArity = arity }) = arity
 -- the extra ones are the existentially quantified dictionaries
 dataConRepArity :: DataCon -> Arity
 dataConRepArity (MkData { dcRepArity = arity }) = arity
+
+-- | Gives the number of arguments expected in ConApp: the universal type
+-- variables, the existential type variables, the value arguments
+dataConRepFullArity :: DataCon -> Arity
+dataConRepFullArity (MkData { dcRepFullArity = arity }) = arity
 
 -- | Return whether there are any argument types for this 'DataCon's original source type
 -- See Note [DataCon arities]

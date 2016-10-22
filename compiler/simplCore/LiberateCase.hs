@@ -202,6 +202,7 @@ libCase _   (Lit lit)           = Lit lit
 libCase _   (Type ty)           = Type ty
 libCase _   (Coercion co)       = Coercion co
 libCase env (App fun arg)       = App (libCase env fun) (libCase env arg)
+libCase env (ConApp dc args)    = ConApp dc (map (libCase env) args)
 libCase env (Tick tickish body) = Tick tickish (libCase env body)
 libCase env (Cast e co)         = Cast (libCase env e) co
 

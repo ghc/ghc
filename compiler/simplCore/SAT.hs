@@ -213,6 +213,18 @@ satExpr (App fn arg) interesting_ids = do
                sat_info = mergeIdSATInfo sat_info_fn sat_info_arg'
            return (App fn' arg', sat_info, app_info)
 
+satExpr (ConApp dc args) interesting_ids = do
+  (args', sat_info_args) <- go args
+  return (ConApp dc args', sat_info_args, Nothing)
+  where
+    go [] = return ([], emptyIdSATInfo)
+    go (arg:args) =
+        do (args', sat_info_args) <- go args
+           (arg', sat_info_arg, arg_app) <- satExpr arg interesting_ids
+           let sat_info_arg' = finalizeApp arg_app sat_info_arg
+               sat_info = mergeIdSATInfo sat_info_args sat_info_arg'
+           return (arg':args', sat_info)
+
 satExpr (Case expr bndr ty alts) interesting_ids = do
     (expr', sat_info_expr, expr_app) <- satExpr expr interesting_ids
     let sat_info_expr' = finalizeApp expr_app sat_info_expr

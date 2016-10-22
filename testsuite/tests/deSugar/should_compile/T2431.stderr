@@ -1,8 +1,8 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 36, types: 30, coercions: 1}
+Result size of Tidy Core = {terms: 28, types: 30, coercions: 1}
 
--- RHS size: {terms: 2, types: 4, coercions: 1}
+-- RHS size: {terms: 1, types: 4, coercions: 1}
 T2431.$WRefl [InlPrag=INLINE] :: forall a. a :~: a
 [GblId[DataConWrapper],
  Caf=NoCafRefs,
@@ -11,60 +11,60 @@ T2431.$WRefl [InlPrag=INLINE] :: forall a. a :~: a
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=0,unsat_ok=False,boring_ok=False)
          Tmpl= \ (@ a) ->
-                 T2431.Refl @ a @ a @~ (<a>_N :: (a :: *) GHC.Prim.~# (a :: *))}]
+                 Refl [@ a, @ a, @~ (<a>_N :: (a :: *) GHC.Prim.~# (a :: *))]}]
 T2431.$WRefl =
   \ (@ a) ->
-    T2431.Refl @ a @ a @~ (<a>_N :: (a :: *) GHC.Prim.~# (a :: *))
+    Refl [@ a, @ a, @~ (<a>_N :: (a :: *) GHC.Prim.~# (a :: *))]
 
 -- RHS size: {terms: 4, types: 8, coercions: 0}
 absurd :: forall a. Int :~: Bool -> a
 [GblId, Arity=1, Caf=NoCafRefs, Str=<L,U>x]
 absurd = \ (@ a) (x :: Int :~: Bool) -> case x of { }
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 $trModule1 :: GHC.Types.TrName
 [GblId, Caf=NoCafRefs]
-$trModule1 = GHC.Types.TrNameS "main"#
+$trModule1 = GHC.Types.TrNameS ["main"#]
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 $trModule2 :: GHC.Types.TrName
 [GblId, Caf=NoCafRefs]
-$trModule2 = GHC.Types.TrNameS "T2431"#
-
--- RHS size: {terms: 3, types: 0, coercions: 0}
-T2431.$trModule :: GHC.Types.Module
-[GblId, Caf=NoCafRefs]
-T2431.$trModule = GHC.Types.Module $trModule1 $trModule2
+$trModule2 = GHC.Types.TrNameS ["T2431"#]
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
+T2431.$trModule :: GHC.Types.Module
+[GblId, Caf=NoCafRefs]
+T2431.$trModule = GHC.Types.Module [$trModule1, $trModule2]
+
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 $tc'Refl1 :: GHC.Types.TrName
 [GblId, Caf=NoCafRefs]
-$tc'Refl1 = GHC.Types.TrNameS "'Refl"#
+$tc'Refl1 = GHC.Types.TrNameS ["'Refl"#]
 
--- RHS size: {terms: 5, types: 0, coercions: 0}
+-- RHS size: {terms: 4, types: 0, coercions: 0}
 T2431.$tc'Refl :: GHC.Types.TyCon
 [GblId, Caf=NoCafRefs]
 T2431.$tc'Refl =
   GHC.Types.TyCon
-    15026191172322750497##
-    3898273167927206410##
-    T2431.$trModule
-    $tc'Refl1
+    [15026191172322750497##,
+     3898273167927206410##,
+     T2431.$trModule,
+     $tc'Refl1]
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 $tc:~:1 :: GHC.Types.TrName
 [GblId, Caf=NoCafRefs]
-$tc:~:1 = GHC.Types.TrNameS ":~:"#
+$tc:~:1 = GHC.Types.TrNameS [":~:"#]
 
--- RHS size: {terms: 5, types: 0, coercions: 0}
+-- RHS size: {terms: 4, types: 0, coercions: 0}
 T2431.$tc:~: :: GHC.Types.TyCon
 [GblId, Caf=NoCafRefs]
 T2431.$tc:~: =
   GHC.Types.TyCon
-    9759653149176674453##
-    12942818337407067047##
-    T2431.$trModule
-    $tc:~:1
+    [9759653149176674453##,
+     12942818337407067047##,
+     T2431.$trModule,
+     $tc:~:1]
 
 
 

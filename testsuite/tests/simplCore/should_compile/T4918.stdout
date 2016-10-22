@@ -1,2 +1,2 @@
-  {- HasNoCafRefs, Strictness: m, Unfolding: (C# 'p'#) -}
-  {- HasNoCafRefs, Strictness: m, Unfolding: (C# 'q'#) -}
+  {- HasNoCafRefs, Strictness: m, Unfolding: (C# ['p'#]) -}
+  {- HasNoCafRefs, Strictness: m, Unfolding: (C# ['q'#]) -}

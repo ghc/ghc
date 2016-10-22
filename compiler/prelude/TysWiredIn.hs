@@ -24,7 +24,7 @@ module TysWiredIn (
         -- * Bool
         boolTy, boolTyCon, boolTyCon_RDR, boolTyConName,
         trueDataCon,  trueDataConId,  true_RDR,
-        falseDataCon, falseDataConId, false_RDR,
+        falseDataCon, false_RDR,
         promotedFalseDataCon, promotedTrueDataCon,
 
         -- * Ordering
@@ -70,7 +70,7 @@ module TysWiredIn (
         mkTupleTy, mkBoxedTupleTy,
         tupleTyCon, tupleDataCon, tupleTyConName,
         promotedTupleDataCon,
-        unitTyCon, unitDataCon, unitDataConId, unitTy, unitTyConKey,
+        unitTyCon, unitDataCon, unitTy, unitTyConKey,
         pairTyCon,
         unboxedUnitTyCon, unboxedUnitDataCon,
         cTupleTyConName, cTupleTyConNames, isCTupleTyConName,
@@ -122,7 +122,7 @@ module TysWiredIn (
 #include "HsVersions.h"
 #include "MachDeps.h"
 
-import {-# SOURCE #-} MkId( mkDataConWorkId, mkDictSelId )
+import {-# SOURCE #-} MkId( mkDataConWorkId, mkSimpleDataConRep, mkDictSelId )
 
 -- friends:
 import PrelNames
@@ -489,22 +489,23 @@ pcDataConWithFixity :: Bool      -- ^ declared infix?
                     -> [Type]    -- ^ args
                     -> TyCon
                     -> DataCon
-pcDataConWithFixity infx n = pcDataConWithFixity' infx n (dataConWorkerUnique (nameUnique n))
+pcDataConWithFixity infx n = pcDataConWithFixity' infx n (dataConWorkerUnique (nameUnique n)) (dataConWrapperUnique (nameUnique n))
                                                   NoRRI
--- The Name's unique is the first of two free uniques;
+-- The Name's unique is the first of four free uniques;
 -- the first is used for the datacon itself,
 -- the second is used for the "worker name"
+-- the third is used for the "wrapper name"
 --
 -- To support this the mkPreludeDataConUnique function "allocates"
 -- one DataCon unique per pair of Ints.
 
-pcDataConWithFixity' :: Bool -> Name -> Unique -> RuntimeRepInfo
+pcDataConWithFixity' :: Bool -> Name -> Unique -> Unique -> RuntimeRepInfo
                      -> [TyVar] -> [TyVar]
                      -> [Type] -> TyCon -> DataCon
 -- The Name should be in the DataName name space; it's the name
 -- of the DataCon itself.
 
-pcDataConWithFixity' declared_infix dc_name wrk_key rri tyvars ex_tyvars arg_tys tycon
+pcDataConWithFixity' declared_infix dc_name wrk_key wrp_key rri tyvars ex_tyvars arg_tys tycon
   = data_con
   where
     data_con = mkDataCon dc_name declared_infix prom_info
@@ -519,7 +520,7 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri tyvars ex_tyvars arg_tys
                 tycon
                 []      -- No stupid theta
                 (mkDataConWorkId wrk_name data_con)
-                NoDataConRep    -- Wired-in types are too simple to need wrappers
+                (mkSimpleDataConRep wrp_name data_con)
 
     no_bang = HsSrcBang Nothing NoSrcUnpack NoSrcStrict
 
@@ -530,12 +531,20 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri tyvars ex_tyvars arg_tys
     wrk_name = mkWiredInName modu wrk_occ wrk_key
                              (AnId (dataConWorkId data_con)) UserSyntax
 
+    wrp_occ  = mkDataConWrapperOcc dc_occ
+    wrp_name = mkWiredInName modu wrp_occ wrp_key
+                             (AnId (dataConWrapId data_con)) UserSyntax
+
     prom_info = mkPrelTyConRepName dc_name
+
 
 -- used for RuntimeRep and friends
 pcSpecialDataCon :: Name -> [Type] -> TyCon -> RuntimeRepInfo -> DataCon
 pcSpecialDataCon dc_name arg_tys tycon rri
-  = pcDataConWithFixity' False dc_name (dataConWorkerUnique (nameUnique dc_name)) rri
+  = pcDataConWithFixity' False dc_name
+                         (dataConWorkerUnique (nameUnique dc_name))
+                         (dataConWrapperUnique (nameUnique dc_name))
+                         rri
                          [] [] arg_tys tycon
 
 {-
@@ -823,9 +832,6 @@ unitTyConKey = getUnique unitTyCon
 
 unitDataCon :: DataCon
 unitDataCon   = head (tyConDataCons unitTyCon)
-
-unitDataConId :: Id
-unitDataConId = dataConWorkId unitDataCon
 
 pairTyCon :: TyCon
 pairTyCon = tupleTyCon Boxed 2
@@ -1246,9 +1252,8 @@ falseDataCon, trueDataCon :: DataCon
 falseDataCon = pcDataCon falseDataConName [] [] boolTyCon
 trueDataCon  = pcDataCon trueDataConName  [] [] boolTyCon
 
-falseDataConId, trueDataConId :: Id
-falseDataConId = dataConWorkId falseDataCon
-trueDataConId  = dataConWorkId trueDataCon
+trueDataConId :: Id
+trueDataConId  = dataConWrapId trueDataCon
 
 orderingTyCon :: TyCon
 orderingTyCon = pcTyCon True orderingTyConName Nothing

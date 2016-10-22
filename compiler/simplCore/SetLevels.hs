@@ -336,7 +336,11 @@ lvlExpr env expr@(_, AnnApp _ _) = do
       _otherwise -> do
          args' <- mapM (lvlMFE False env) args
          fun'  <- lvlExpr env fun
-         return (foldl App fun' args')
+         return (mkApps fun' args')
+
+lvlExpr env (_, AnnConApp dc args) = do
+    args' <- mapM (lvlMFE False env) args
+    return (ConApp dc args')
 
 -- We don't split adjacent lambdas.  That is, given
 --      \x y -> (x+1,y)
@@ -613,11 +617,12 @@ notWorthFloating :: CoreExprWithFVs -> [Var] -> Bool
 notWorthFloating e abs_vars
   = go e (count isId abs_vars)
   where
-    go (_, AnnVar {}) n    = n >= 0
-    go (_, AnnLit lit) n   = ASSERT( n==0 )
-                             litIsTrivial lit   -- Note [Floating literals]
-    go (_, AnnTick t e) n  = not (tickishIsCode t) && go e n
-    go (_, AnnCast e _)  n = go e n
+    go (_, AnnVar {}) n        = n >= 0
+    go (_, AnnConApp _ args) _ = all isAnnTypeArg args
+    go (_, AnnLit lit) n       = ASSERT( n==0 )
+                                 litIsTrivial lit   -- Note [Floating literals]
+    go (_, AnnTick t e) n      = not (tickishIsCode t) && go e n
+    go (_, AnnCast e _)  n     = go e n
     go (_, AnnApp e arg) n
        | (_, AnnType {}) <- arg = go e n
        | (_, AnnCoercion {}) <- arg = go e n
@@ -630,6 +635,7 @@ notWorthFloating e abs_vars
     is_triv (_, AnnVar {})                = True        -- (ie not worth floating)
     is_triv (_, AnnCast e _)              = is_triv e
     is_triv (_, AnnApp e (_, AnnType {})) = is_triv e
+    is_triv (_, AnnConApp _ args)         = all isAnnTypeArg args
     is_triv (_, AnnApp e (_, AnnCoercion {})) = is_triv e
     is_triv (_, AnnTick t e)              = not (tickishIsCode t) && is_triv e
     is_triv _                             = False

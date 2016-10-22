@@ -31,7 +31,7 @@ import PrimOp      ( PrimOp(..), tagToEnumKey )
 import TysWiredIn
 import TysPrim
 import TyCon       ( tyConDataCons_maybe, isEnumerationTyCon, isNewTyCon, unwrapNewTyCon_maybe )
-import DataCon     ( dataConTag, dataConTyCon, dataConWorkId )
+import DataCon     ( dataConTag, dataConTyCon, dataConRepType )
 import CoreUtils   ( cheapEqExpr, exprIsHNF )
 import CoreUnfold  ( exprIsConApp_maybe )
 import Type
@@ -831,8 +831,8 @@ trueValInt  dflags = Lit $ onei  dflags -- see Note [What's true and false]
 falseValInt dflags = Lit $ zeroi dflags
 
 trueValBool, falseValBool :: Expr CoreBndr
-trueValBool   = Var trueDataConId -- see Note [What's true and false]
-falseValBool  = Var falseDataConId
+trueValBool   = ConApp trueDataCon [] -- see Note [What's true and false]
+falseValBool  = ConApp falseDataCon []
 
 ltVal, eqVal, gtVal :: Expr CoreBndr
 ltVal = Var ltDataConId
@@ -893,7 +893,7 @@ tagToEnumRule = do
           correct_tag dc = (dataConTag dc - fIRST_TAG) == tag
       (dc:rest) <- return $ filter correct_tag (tyConDataCons_maybe tycon `orElse` [])
       ASSERT(null rest) return ()
-      return $ mkTyApps (Var (dataConWorkId dc)) tc_args
+      return $ ConApp dc (map Type tc_args)
 
     -- See Note [tagToEnum#]
     _ -> WARN( True, text "tagToEnum# on non-enumeration type" <+> ppr ty )
@@ -1187,6 +1187,14 @@ match_inline _ = Nothing
 -- See Note [magicDictId magic] in `basicTypes/MkId.hs`
 -- for a description of what is going on here.
 match_magicDict :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
+match_magicDict [Type _, ConApp dc [Type a, Type _ , f], x, y ]
+  | Just (fieldTy, _)   <- splitFunTy_maybe $ dropForAlls $ dataConRepType dc
+  , Just (dictTy, _)    <- splitFunTy_maybe fieldTy
+  , Just dictTc         <- tyConAppTyCon_maybe dictTy
+  , Just (_,_,co)       <- unwrapNewTyCon_maybe dictTc
+  = Just
+  $ f `App` Cast x (mkSymCo (mkUnbranchedAxInstCo Representational co [a] []))
+      `App` y
 match_magicDict [Type _, Var wrap `App` Type a `App` Type _ `App` f, x, y ]
   | Just (fieldTy, _)   <- splitFunTy_maybe $ dropForAlls $ idType wrap
   , Just (dictTy, _)    <- splitFunTy_maybe fieldTy

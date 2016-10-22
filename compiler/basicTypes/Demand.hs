@@ -49,7 +49,8 @@ module Demand (
         postProcessUnsat, postProcessDmdType,
 
         splitProdDmd_maybe, peelCallDmd, mkCallDmd, mkWorkerDemand,
-        dmdTransformSig, dmdTransformDataConSig, dmdTransformDictSelSig,
+        dmdTransformSig, dmdTransformDataConSig,
+        dmdTransformSatDataConSig, dmdTransformDictSelSig,
         argOneShots, argsOneShots, saturatedByOneShots,
         trimToType, TypeShape(..),
 
@@ -1735,6 +1736,20 @@ dmdTransformDataConSig arity (StrictSig (DmdType _ _ con_res))
     go_abs 0 dmd            = splitUseProdDmd arity dmd
     go_abs n (UCall One u') = go_abs (n-1) u'
     go_abs _ _              = Nothing
+
+dmdTransformSatDataConSig :: Arity -> StrictSig -> CleanDemand -> DmdType
+-- Same as dmdTransformDataConSig, but for a saturated data constructor,
+-- so no need to peel of calls from the incoming demand
+-- TODO #12618 remove dmdTransformDataConSig, rename this one
+dmdTransformSatDataConSig arity
+    (StrictSig (DmdType _ _ con_res))
+    (JD { sd = str, ud = abs })
+  | Just str_dmds <- splitStrProdDmd arity str
+  , Just abs_dmds <- splitUseProdDmd arity abs
+  = DmdType emptyDmdEnv (mkJointDmds str_dmds abs_dmds) con_res
+                -- Must remember whether it's a product, hence con_res, not TopRes
+  | otherwise
+  = nopDmdType -- Something is weird, e.g. a call demand on a data type
 
 dmdTransformDictSelSig :: StrictSig -> CleanDemand -> DmdType
 -- Like dmdTransformDataConSig, we have a special demand transformer

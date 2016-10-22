@@ -29,7 +29,7 @@ T7865:
 T3055:
 	$(RM) -f T3055.o T3055.hi T3055.simpl
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T3055.hs -ddump-simpl > T3055.simpl
-	grep 'I# -28#' T3055.simpl | sed 's/.*\(I# -28#\).*/\1/'
+	grep -F 'I# [-28#]' T3055.simpl | sed 's/.*\(I# \[-28#\]\).*/\1/'
 
 T5658b:
 	$(RM) -f T5658b.o T5658b.hi

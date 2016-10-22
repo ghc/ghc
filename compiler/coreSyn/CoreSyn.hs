@@ -57,6 +57,7 @@ module CoreSyn (
         maybeUnfoldingTemplate, otherCons,
         isValueUnfolding, isEvaldUnfolding, isCheapUnfolding,
         isExpandableUnfolding, isConLikeUnfolding, isCompulsoryUnfolding,
+        isSimpleWrapperUnfolding,
         isStableUnfolding, hasStableCoreUnfolding_maybe,
         isClosedUnfolding, hasSomeUnfolding,
         isBootUnfolding,
@@ -66,7 +67,7 @@ module CoreSyn (
         AnnExpr, AnnExpr'(..), AnnBind(..), AnnAlt,
 
         -- ** Operations on annotated expressions
-        collectAnnArgs, collectAnnArgsTicks,
+        isAnnTypeArg, collectAnnArgs, collectAnnArgsTicks,
 
         -- ** Operations on annotations
         deAnnotate, deAnnotate', deAnnAlt, collectAnnBndrs,
@@ -259,6 +260,7 @@ data Expr b
   = Var   Id
   | Lit   Literal
   | App   (Expr b) (Arg b)
+  | ConApp DataCon [Arg b]
   | Lam   b (Expr b)
   | Let   (Bind b) (Expr b)
   | Case  (Expr b) b Type [Alt b]       -- See #case_invariant#
@@ -1063,6 +1065,12 @@ data UnfoldingSource
                        --
                        -- See Note [InlineRules]
 
+  | InlineWrapper      -- A simple wrapper (e.g. for data constructors). Simple means that
+                       -- it applies in all phases, and the right hand side is simple
+                       -- enough so that it may occur on the LHS of a rule
+                       -- (no case expressions, for example).
+                       -- Such unfolding are applied in the LHS of a rule!
+
   | InlineCompulsory   -- Something that *has* no binding, so you *must* inline it
                        -- Only a few primop-like things have this property
                        -- (see MkId.hs, calls to mkCompulsoryUnfolding).
@@ -1178,6 +1186,7 @@ isStableSource :: UnfoldingSource -> Bool
 -- Keep the unfolding template
 isStableSource InlineCompulsory   = True
 isStableSource InlineStable       = True
+isStableSource InlineWrapper      = True
 isStableSource InlineRhs          = False
 
 -- | Retrieves the template of an unfolding: panics if none is known
@@ -1192,7 +1201,7 @@ maybeUnfoldingTemplate :: Unfolding -> Maybe CoreExpr
 maybeUnfoldingTemplate (CoreUnfolding { uf_tmpl = expr })
   = Just expr
 maybeUnfoldingTemplate (DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = args })
-  = Just (mkLams bndrs (mkApps (Var (dataConWorkId con)) args))
+  = Just (mkLams bndrs (ConApp con args))
 maybeUnfoldingTemplate _
   = Nothing
 
@@ -1256,6 +1265,15 @@ hasStableCoreUnfolding_maybe _ = Nothing
 isCompulsoryUnfolding :: Unfolding -> Bool
 isCompulsoryUnfolding (CoreUnfolding { uf_src = InlineCompulsory }) = True
 isCompulsoryUnfolding _                                             = False
+
+isSimpleWrapperUnfolding :: Unfolding -> Arity -> Bool
+isSimpleWrapperUnfolding (CoreUnfolding { uf_src = InlineWrapper, uf_guidance = guidance }) arity
+    | arity_ok guidance
+    = True
+  where arity_ok (UnfWhen { ug_arity = ug_arity })  = ug_arity <= arity
+        arity_ok _ = True
+isSimpleWrapperUnfolding _ _
+    = False
 
 isStableUnfolding :: Unfolding -> Bool
 -- True of unfoldings that should not be overwritten
@@ -1442,6 +1460,7 @@ deTagExpr (Lit l)                   = Lit l
 deTagExpr (Type ty)                 = Type ty
 deTagExpr (Coercion co)             = Coercion co
 deTagExpr (App e1 e2)               = App (deTagExpr e1) (deTagExpr e2)
+deTagExpr (ConApp dc es)            = ConApp dc (map deTagExpr es)
 deTagExpr (Lam (TB b _) e)          = Lam b (deTagExpr e)
 deTagExpr (Let bind body)           = Let (deTagBind bind) (deTagExpr body)
 deTagExpr (Case e (TB b _) ty alts) = Case (deTagExpr e) b ty (map deTagAlt alts)
@@ -1479,7 +1498,9 @@ mkConApp      :: DataCon -> [Arg b] -> Expr b
 mkApps    f args = foldl App                       f args
 mkCoApps  f args = foldl (\ e a -> App e (Coercion a)) f args
 mkVarApps f vars = foldl (\ e a -> App e (varToCoreExpr a)) f vars
-mkConApp con args = mkApps (Var (dataConWorkId con)) args
+mkConApp con args =
+    WARN ( dataConRepFullArity con /= length args, text "mkConApp: artiy mismatch" $$ ppr con )
+    ConApp con args
 
 mkTyApps  f args = foldl (\ e a -> App e (typeOrCoercion a)) f args
   where
@@ -1488,9 +1509,7 @@ mkTyApps  f args = foldl (\ e a -> App e (typeOrCoercion a)) f args
       | otherwise                        = Type ty
 
 mkConApp2 :: DataCon -> [Type] -> [Var] -> Expr b
-mkConApp2 con tys arg_ids = Var (dataConWorkId con)
-                            `mkApps` map Type tys
-                            `mkApps` map varToCoreExpr arg_ids
+mkConApp2 con tys arg_ids = mkConApp con (map Type tys ++ map varToCoreExpr arg_ids)
 
 
 -- | Create a machine integer literal expression of type @Int#@ from an @Integer@.
@@ -1759,6 +1778,7 @@ data AnnExpr' bndr annot
   | AnnLit      Literal
   | AnnLam      bndr (AnnExpr bndr annot)
   | AnnApp      (AnnExpr bndr annot) (AnnExpr bndr annot)
+  | AnnConApp   DataCon [AnnExpr bndr annot]
   | AnnCase     (AnnExpr bndr annot) bndr Type [AnnAlt bndr annot]
   | AnnLet      (AnnBind bndr annot) (AnnExpr bndr annot)
   | AnnCast     (AnnExpr bndr annot) (annot, Coercion)
@@ -1794,6 +1814,11 @@ collectAnnArgsTicks tickishOk expr
                               = go e as (t:ts)
     go e                as ts = (e, as, reverse ts)
 
+
+isAnnTypeArg :: AnnExpr b ann -> Bool
+isAnnTypeArg (_, AnnType _) = True
+isAnnTypeArg _              = False
+
 deAnnotate :: AnnExpr bndr annot -> Expr bndr
 deAnnotate (_, e) = deAnnotate' e
 
@@ -1804,6 +1829,7 @@ deAnnotate' (AnnVar  v)           = Var v
 deAnnotate' (AnnLit  lit)         = Lit lit
 deAnnotate' (AnnLam  binder body) = Lam binder (deAnnotate body)
 deAnnotate' (AnnApp  fun arg)     = App (deAnnotate fun) (deAnnotate arg)
+deAnnotate' (AnnConApp dc args)   = ConApp dc (map deAnnotate args)
 deAnnotate' (AnnCast e (_,co))    = Cast (deAnnotate e) co
 deAnnotate' (AnnTick tick body)   = Tick tick (deAnnotate body)
 

@@ -61,6 +61,7 @@ exprStats (Lit {})        = oneTM
 exprStats (Type t)        = tyStats t
 exprStats (Coercion c)    = coStats c
 exprStats (App f a)       = exprStats f `plusCS` exprStats a
+exprStats (ConApp _ args) = sumCS exprStats args
 exprStats (Lam b e)       = bndrStats b `plusCS` exprStats e
 exprStats (Let b e)       = bindStats b `plusCS` exprStats e
 exprStats (Case e b _ as) = exprStats e `plusCS` bndrStats b
@@ -94,6 +95,7 @@ exprSize :: CoreExpr -> Int
 exprSize (Var v)         = v `seq` 1
 exprSize (Lit lit)       = lit `seq` 1
 exprSize (App f a)       = exprSize f + exprSize a
+exprSize (ConApp _ args) = foldr ((+) . exprSize) 1 args
 exprSize (Lam b e)       = bndrSize b + exprSize e
 exprSize (Let b e)       = bindSize b + exprSize e
 exprSize (Case e b t as) = seqType t `seq`

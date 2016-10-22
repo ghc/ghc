@@ -114,6 +114,9 @@ wwExpr dflags fam_envs (Lam binder expr)
 wwExpr dflags fam_envs (App f a)
   = App <$> wwExpr dflags fam_envs f <*> wwExpr dflags fam_envs a
 
+wwExpr dflags fam_envs (ConApp dc args)
+  = ConApp dc <$> mapM (wwExpr dflags fam_envs) args
+
 wwExpr dflags fam_envs (Tick note expr)
   = Tick note <$> wwExpr dflags fam_envs expr
 

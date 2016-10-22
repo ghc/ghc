@@ -1,50 +1,50 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 36, types: 14, coercions: 0}
+Result size of Tidy Core = {terms: 31, types: 14, coercions: 0}
 
 Rec {
--- RHS size: {terms: 10, types: 2, coercions: 0}
+-- RHS size: {terms: 9, types: 2, coercions: 0}
 $wxs :: GHC.Prim.Int# -> ()
 [GblId, Arity=1, Caf=NoCafRefs, Str=<S,1*U>]
 $wxs =
   \ (ww :: GHC.Prim.Int#) ->
     case ww of ds1 {
       __DEFAULT -> $wxs (GHC.Prim.-# ds1 1#);
-      1# -> GHC.Tuple.()
+      1# -> ()
     }
 end Rec }
 
--- RHS size: {terms: 14, types: 5, coercions: 0}
+-- RHS size: {terms: 13, types: 5, coercions: 0}
 foo [InlPrag=NOINLINE] :: Int -> ()
 [GblId, Arity=1, Caf=NoCafRefs, Str=<S(S),1*U(U)>]
 foo =
   \ (n :: Int) ->
     case n of { GHC.Types.I# y ->
     case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# 0# y) of {
-      False -> GHC.Tuple.();
+      False -> ();
       True -> $wxs y
     }
     }
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 T3772.$trModule1 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
-T3772.$trModule1 = GHC.Types.TrNameS "T3772"#
+T3772.$trModule1 = GHC.Types.TrNameS ["T3772"#]
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0}
 T3772.$trModule2 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 20}]
-T3772.$trModule2 = GHC.Types.TrNameS "main"#
+T3772.$trModule2 = GHC.Types.TrNameS ["main"#]
 
--- RHS size: {terms: 3, types: 0, coercions: 0}
+-- RHS size: {terms: 2, types: 0, coercions: 0}
 T3772.$trModule :: GHC.Types.Module
 [GblId,
  Caf=NoCafRefs,
@@ -52,7 +52,7 @@ T3772.$trModule :: GHC.Types.Module
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
 T3772.$trModule =
-  GHC.Types.Module T3772.$trModule2 T3772.$trModule1
+  GHC.Types.Module [T3772.$trModule2, T3772.$trModule1]
 
 
 
