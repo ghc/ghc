@@ -127,6 +127,7 @@ pprPackageConfig InstalledPackageInfo {..} =
       field "trusted"              (ppr trusted),
       field "import-dirs"          (fsep (map text importDirs)),
       field "library-dirs"         (fsep (map text libraryDirs)),
+      field "dynamic-library-dirs" (fsep (map text libraryDynDirs)),
       field "hs-libraries"         (fsep (map text hsLibraries)),
       field "extra-libraries"      (fsep (map text extraLibraries)),
       field "extra-ghci-libraries" (fsep (map text extraGHCiLibraries)),

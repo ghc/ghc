@@ -252,6 +252,10 @@ updateInstallDirTemplates relocatableBuild myPrefix myLibdir myDocdir idts
                           if relocatableBuild
                           then "$topdir"
                           else myLibdir,
+          dynlibdir = toPathTemplate $
+                          (if relocatableBuild
+                          then "$topdir"
+                          else myLibdir) </> "$libname",
           libsubdir = toPathTemplate "$libname",
           docdir    = toPathTemplate $
                           if relocatableBuild

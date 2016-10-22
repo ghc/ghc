@@ -1094,6 +1094,7 @@ convertPackageInfoToCacheFormat pkg =
        GhcPkg.extraLibraries     = extraLibraries pkg,
        GhcPkg.extraGHCiLibraries = extraGHCiLibraries pkg,
        GhcPkg.libraryDirs        = libraryDirs pkg,
+       GhcPkg.libraryDynDirs     = libraryDynDirs pkg,
        GhcPkg.frameworks         = frameworks pkg,
        GhcPkg.frameworkDirs      = frameworkDirs pkg,
        GhcPkg.ldOptions          = ldOptions pkg,
@@ -1583,6 +1584,7 @@ checkPackageConfig pkg verbosity db_stack
   checkDuplicateDepends (depends pkg)
   mapM_ (checkDir False "import-dirs")  (importDirs pkg)
   mapM_ (checkDir True  "library-dirs") (libraryDirs pkg)
+  mapM_ (checkDir True  "dynamic-library-dirs") (libraryDynDirs pkg)
   mapM_ (checkDir True  "include-dirs") (includeDirs pkg)
   mapM_ (checkDir True  "framework-dirs") (frameworkDirs pkg)
   mapM_ (checkFile   True "haddock-interfaces") (haddockInterfaces pkg)
@@ -1590,7 +1592,7 @@ checkPackageConfig pkg verbosity db_stack
   checkDuplicateModules pkg
   checkExposedModules db_stack pkg
   checkOtherModules pkg
-  mapM_ (checkHSLib verbosity (libraryDirs pkg)) (hsLibraries pkg)
+  mapM_ (checkHSLib verbosity (libraryDirs pkg ++ libraryDynDirs pkg)) (hsLibraries pkg)
   -- ToDo: check these somehow?
   --    extra_libraries :: [String],
   --    c_includes      :: [String],
