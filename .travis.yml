@@ -39,17 +39,13 @@ install:
     - mv .git ghc/hadrian
     - cd ghc/hadrian
     - git reset --hard HEAD
-    - cd ..
-    - ./boot
-    - ./configure --with-nm=$(xcrun --find nm-classic)
-    - cd hadrian
 
 script:
     # Run internal Hadrian tests
     - ./build.sh selftest
 
     # Build GHC
-    - ./build.sh -j --skip-configure --flavour=quickest --verbose --no-progress --progress-colour=never --progress-info=brief --profile=-
+    - ./build.sh -j --flavour=quickest --verbose --no-progress --progress-colour=never --progress-info=brief --profile=-
 
     # Test GHC binary
     - cd ..
