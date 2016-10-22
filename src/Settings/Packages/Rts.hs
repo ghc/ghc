@@ -9,13 +9,13 @@ import Oracles.Config.Setting
 import Oracles.WindowsPath
 import Predicate
 import Settings
+import Settings.Paths
 
 rtsConfIn :: FilePath
 rtsConfIn = pkgPath rts -/- "package.conf.in"
 
--- TODO: move to buildRootPath, see #113
 rtsConf :: FilePath
-rtsConf = pkgPath rts -/- contextDirectory rtsContext -/- "package.conf.inplace"
+rtsConf = buildPath rtsContext -/- "package.conf.inplace"
 
 rtsLibffiLibraryName :: Action FilePath
 rtsLibffiLibraryName = do
