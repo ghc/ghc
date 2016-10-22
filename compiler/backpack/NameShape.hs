@@ -22,8 +22,9 @@ import Name
 import NameEnv
 import TcRnMonad
 import Util
-import ListSetOps
 import IfaceEnv
+
+import Avail ( plusAvail )
 
 import Control.Monad
 
@@ -195,30 +196,6 @@ mergeAvails :: [AvailInfo] -> [AvailInfo] -> [AvailInfo]
 mergeAvails as1 as2 =
     let mkNE as = mkNameEnv [(availName a, a) | a <- as]
     in nameEnvElts (plusNameEnv_C plusAvail (mkNE as1) (mkNE as2))
-
--- | Join two 'AvailInfo's together.
-plusAvail :: AvailInfo -> AvailInfo -> AvailInfo
-plusAvail a1 a2
-  | debugIsOn && availName a1 /= availName a2
-  = pprPanic "RnEnv.plusAvail names differ" (hsep [ppr a1,ppr a2])
-plusAvail a1@(Avail {})         (Avail {})        = a1
-plusAvail (AvailTC _ [] [])     a2@(AvailTC {})   = a2
-plusAvail a1@(AvailTC {})       (AvailTC _ [] []) = a1
-plusAvail (AvailTC n1 (s1:ss1) fs1) (AvailTC n2 (s2:ss2) fs2)
-  = case (n1==s1, n2==s2) of  -- Maintain invariant the parent is first
-       (True,True)   -> AvailTC n1 (s1 : (ss1 `unionLists` ss2))
-                                   (fs1 `unionLists` fs2)
-       (True,False)  -> AvailTC n1 (s1 : (ss1 `unionLists` (s2:ss2)))
-                                   (fs1 `unionLists` fs2)
-       (False,True)  -> AvailTC n1 (s2 : ((s1:ss1) `unionLists` ss2))
-                                   (fs1 `unionLists` fs2)
-       (False,False) -> AvailTC n1 ((s1:ss1) `unionLists` (s2:ss2))
-                                   (fs1 `unionLists` fs2)
-plusAvail (AvailTC n1 ss1 fs1) (AvailTC _ [] fs2)
-  = AvailTC n1 ss1 (fs1 `unionLists` fs2)
-plusAvail (AvailTC n1 [] fs1)  (AvailTC _ ss2 fs2)
-  = AvailTC n1 ss2 (fs1 `unionLists` fs2)
-plusAvail a1 a2 = pprPanic "RnEnv.plusAvail" (hsep [ppr a1,ppr a2])
 
 {-
 ************************************************************************

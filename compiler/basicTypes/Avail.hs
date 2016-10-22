@@ -1,6 +1,9 @@
+{-# LANGUAGE CPP #-}
 --
 -- (c) The University of Glasgow
 --
+
+#include "HsVersions.h"
 
 module Avail (
     Avails,
@@ -12,7 +15,14 @@ module Avail (
     availName, availNames, availNonFldNames,
     availNamesWithSelectors,
     availFlds,
-    stableAvailCmp
+    stableAvailCmp,
+    plusAvail,
+    trimAvail,
+    filterAvail,
+    filterAvails,
+    nubAvails
+
+
   ) where
 
 import Name
@@ -21,9 +31,11 @@ import NameSet
 
 import FieldLabel
 import Binary
+import ListSetOps
 import Outputable
 import Util
 
+import Data.List ( find )
 import Data.Function
 
 -- -----------------------------------------------------------------------------
@@ -156,6 +168,66 @@ availNonFldNames (AvailTC _ ns _) = ns
 availFlds :: AvailInfo -> [FieldLabel]
 availFlds (AvailTC _ _ fs) = fs
 availFlds _                = []
+
+
+-- -----------------------------------------------------------------------------
+-- Utility
+
+plusAvail :: AvailInfo -> AvailInfo -> AvailInfo
+plusAvail a1 a2
+  | debugIsOn && availName a1 /= availName a2
+  = pprPanic "RnEnv.plusAvail names differ" (hsep [ppr a1,ppr a2])
+plusAvail a1@(Avail {})         (Avail {})        = a1
+plusAvail (AvailTC _ [] [])     a2@(AvailTC {})   = a2
+plusAvail a1@(AvailTC {})       (AvailTC _ [] []) = a1
+plusAvail (AvailTC n1 (s1:ss1) fs1) (AvailTC n2 (s2:ss2) fs2)
+  = case (n1==s1, n2==s2) of  -- Maintain invariant the parent is first
+       (True,True)   -> AvailTC n1 (s1 : (ss1 `unionLists` ss2))
+                                   (fs1 `unionLists` fs2)
+       (True,False)  -> AvailTC n1 (s1 : (ss1 `unionLists` (s2:ss2)))
+                                   (fs1 `unionLists` fs2)
+       (False,True)  -> AvailTC n1 (s2 : ((s1:ss1) `unionLists` ss2))
+                                   (fs1 `unionLists` fs2)
+       (False,False) -> AvailTC n1 ((s1:ss1) `unionLists` (s2:ss2))
+                                   (fs1 `unionLists` fs2)
+plusAvail (AvailTC n1 ss1 fs1) (AvailTC _ [] fs2)
+  = AvailTC n1 ss1 (fs1 `unionLists` fs2)
+plusAvail (AvailTC n1 [] fs1)  (AvailTC _ ss2 fs2)
+  = AvailTC n1 ss2 (fs1 `unionLists` fs2)
+plusAvail a1 a2 = pprPanic "RnEnv.plusAvail" (hsep [ppr a1,ppr a2])
+
+-- | trims an 'AvailInfo' to keep only a single name
+trimAvail :: AvailInfo -> Name -> AvailInfo
+trimAvail (Avail n)         _ = Avail n
+trimAvail (AvailTC n ns fs) m = case find ((== m) . flSelector) fs of
+    Just x  -> AvailTC n [] [x]
+    Nothing -> ASSERT( m `elem` ns ) AvailTC n [m] []
+
+-- | filters 'AvailInfo's by the given predicate
+filterAvails  :: (Name -> Bool) -> [AvailInfo] -> [AvailInfo]
+filterAvails keep avails = foldr (filterAvail keep) [] avails
+
+-- | filters an 'AvailInfo' by the given predicate
+filterAvail :: (Name -> Bool) -> AvailInfo -> [AvailInfo] -> [AvailInfo]
+filterAvail keep ie rest =
+  case ie of
+    Avail n | keep n    -> ie : rest
+            | otherwise -> rest
+    AvailTC tc ns fs ->
+        let ns' = filter keep ns
+            fs' = filter (keep . flSelector) fs in
+        if null ns' && null fs' then rest else AvailTC tc ns' fs' : rest
+
+
+-- | Combines 'AvailInfo's from the same family
+-- 'avails' may have several items with the same availName
+-- E.g  import Ix( Ix(..), index )
+-- will give Ix(Ix,index,range) and Ix(index)
+-- We want to combine these; addAvail does that
+nubAvails :: [AvailInfo] -> [AvailInfo]
+nubAvails avails = nameEnvElts (foldl add emptyNameEnv avails)
+  where
+    add env avail = extendNameEnv_C plusAvail env (availName avail) avail
 
 -- -----------------------------------------------------------------------------
 -- Printing
