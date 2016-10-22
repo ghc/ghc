@@ -75,7 +75,8 @@ test('T5558',
      compile_and_run, [''])
 
 test('T5421', normal, compile_and_run, [''])
-test('T5611', normal, compile_and_run, [''])
+# See #12751, the test fails non-deterministically so we skip it.
+test('T5611', when ( opsys('darwin'), skip) , compile_and_run, [''])
 test('T5238', normal, compile_and_run, [''])
 test('T5866', exit_code(1), compile_and_run, [''])
 
