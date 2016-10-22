@@ -41,7 +41,7 @@ install:
     - git reset --hard HEAD
     - cd ..
     - ./boot
-    - ./configure
+    - ./configure --with-nm=$(xcrun --find nm-classic)
     - cd hadrian
 
 script:
