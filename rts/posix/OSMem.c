@@ -39,7 +39,7 @@
 
 #include <errno.h>
 
-#if darwin_HOST_OS || ios_HOST_OS
+#if defined darwin_HOST_OS || defined ios_HOST_OS
 #include <mach/mach.h>
 #include <mach/vm_map.h>
 #include <sys/sysctl.h>
@@ -114,7 +114,7 @@ my_mmap (void *addr, W_ size, int operation)
 {
     void *ret;
 
-#if darwin_HOST_OS
+#ifdef darwin_HOST_OS
     // Without MAP_FIXED, Apple's mmap ignores addr.
     // With MAP_FIXED, it overwrites already mapped regions, whic
     // mmap(0, ... MAP_FIXED ...) is worst of all: It unmaps the program text
@@ -170,9 +170,9 @@ my_mmap (void *addr, W_ size, int operation)
     else
         flags = 0;
 
-#if hpux_HOST_OS
+#ifdef hpux_HOST_OS
     ret = mmap(addr, size, prot, flags | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-#elif linux_HOST_OS
+#elif defined linux_HOST_OS
     ret = mmap(addr, size, prot, flags | MAP_ANON | MAP_PRIVATE, -1, 0);
     if (ret == (void *)-1 && errno == EPERM) {
         // Linux may return EPERM if it tried to give us

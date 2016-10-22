@@ -52,7 +52,7 @@ isPartiallyFull(bdescr *bd)
 }
 
 
-#if DEBUG
+#ifdef DEBUG
 void printMutableList (bdescr *bd);
 #endif
 

@@ -187,7 +187,7 @@ cLeadingUnderscore = False
 #endif
 
 isWindowsHost :: Bool
-#if mingw32_HOST_OS
+#ifdef mingw32_HOST_OS
 isWindowsHost = True
 #else
 isWindowsHost = False
