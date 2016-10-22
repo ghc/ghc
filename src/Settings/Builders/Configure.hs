@@ -26,8 +26,7 @@ configureBuilderArgs = mconcat
                , "--enable-shared=no" -- TODO: add support for yes
                , "--host=" ++ targetPlatform ]
 
-    -- On OS X, use "nm-classic" instead of "nm" due to a bug in the later.
+    -- On OS X, use "nm-classic" instead of "nm" due to a bug in the latter.
     -- See https://ghc.haskell.org/trac/ghc/ticket/11744
     , builder (Configure ".") ? System.os == "darwin" ?
-        arg "--with-nm=$(xcrun --find nm-classic)"
-    ]
+        arg "--with-nm=$(xcrun --find nm-classic)" ]
