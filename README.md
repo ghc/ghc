@@ -43,14 +43,6 @@ runs the `boot` and `configure` scripts automatically on the first build, so tha
 need to. Use `--skip-configure` to suppress this behaviour (see overview of command line
 flags below).
 
-* Also note on OS X newer versions of XCode ship with a broken `nm` tool
-([#11744](https://ghc.haskell.org/trac/ghc/ticket/11744)). One way to mitigate the
-problem is to add the following into your `UserSettings.hs`:
-  ````haskell
-  userArgs :: Args
-  userArgs = builder (Configure ".") ? arg "--with-nm=$(xcrun --find nm-classic)"
-  ````
-
 Using the build system
 ----------------------
 Once your first build is successful, simply run `build` to rebuild. Most build artefacts

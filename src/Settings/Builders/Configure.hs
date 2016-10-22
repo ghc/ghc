@@ -1,5 +1,7 @@
 module Settings.Builders.Configure (configureBuilderArgs) where
 
+import qualified System.Info as System
+
 import Base
 import Oracles.Config.Setting
 import Oracles.WindowsPath
@@ -23,4 +25,9 @@ configureBuilderArgs = mconcat
                , "--enable-static=yes"
                , "--enable-shared=no" -- TODO: add support for yes
                , "--host=" ++ targetPlatform ]
+
+    -- On OS X, use "nm-classic" instead of "nm" due to a bug in the later.
+    -- See https://ghc.haskell.org/trac/ghc/ticket/11744
+    , builder (Configure ".") ? System.os == "darwin" ?
+        arg "--with-nm=$(xcrun --find nm-classic)"
     ]
