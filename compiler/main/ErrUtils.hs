@@ -356,7 +356,7 @@ dumpSDoc dflags print_unqual flag hdr doc
                         gd <- readIORef gdref
                         let append = Set.member fileName gd
                             mode = if append then AppendMode else WriteMode
-                        when (not append) $
+                        unless append $
                             writeIORef gdref (Set.insert fileName gd)
                         createDirectoryIfMissing True (takeDirectory fileName)
                         handle <- openFile fileName mode
