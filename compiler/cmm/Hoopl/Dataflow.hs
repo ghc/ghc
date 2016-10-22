@@ -45,12 +45,6 @@ noFwdRewrite = FwdRewrite3 (noRewrite, noRewrite, noRewrite)
 noBwdRewrite :: BwdRewrite UniqSM n f
 noBwdRewrite = BwdRewrite3 (noRewrite, noRewrite, noRewrite)
 
-forwardBlockList :: (NonLocal n)
-                 => [Label] -> Body n -> [Block n C C]
--- This produces a list of blocks in order suitable for forward analysis,
--- along with the list of Labels it may depend on for facts.
-forwardBlockList entries blks = postorder_dfs_from blks entries
-
 ----------------------------------------------------------------
 --       Forward Analysis only
 ----------------------------------------------------------------
@@ -180,19 +174,6 @@ analyzeBwd BwdPass { bp_lattice = lattice,
     cat :: forall f1 f2 f3 . (f2 -> f3) -> (f1 -> f2) -> (f1 -> f3)
     cat ft1 ft2 = \f -> ft1 $! ft2 f
 
-{-
-
-The forward and backward cases are not dual.  In the forward case, the
-entry points are known, and one simply traverses the body blocks from
-those points.  In the backward case, something is known about the exit
-points, but this information is essentially useless, because we don't
-actually have a dual graph (that is, one with edges reversed) to
-compute with.  (Even if we did have a dual graph, it would not avail
-us---a backward analysis must include reachable blocks that don't
-reach the exit, as in a procedure that loops forever and has side
-effects.)
-
--}
 
 -----------------------------------------------------------------------------
 --      fixpoint
@@ -284,13 +265,46 @@ we'll propagate (x=4) to L4, and nuke the otherwise-good rewriting of L4.
 --  Pieces that are shared by fixpoint and fixpoint_anal
 -----------------------------------------------------------------------------
 
--- | Sort the blocks into the right order for analysis.
-sortBlocks :: NonLocal n => Direction -> [Label] -> LabelMap (Block n C C)
-           -> [Block n C C]
-sortBlocks direction entries blockmap
-   = case direction of Fwd -> fwd
-                       Bwd -> reverse fwd
-  where fwd = forwardBlockList entries blockmap
+-- | Sort the blocks into the right order for analysis. This means reverse
+-- postorder for a forward analysis. For the backward one, we simply reverse
+-- that (see Note [Backward vs forward analysis]).
+--
+-- Note: We're using Hoopl's confusingly named `postorder_dfs_from` but AFAICS
+-- it returns the *reverse* postorder of the blocks (it visits blocks in the
+-- postorder and uses (:) to collect them, which gives the reverse of the
+-- visitation order).
+sortBlocks
+    :: NonLocal n
+    => Direction -> [Label] -> LabelMap (Block n C C) -> [Block n C C]
+sortBlocks direction entries blockmap =
+    case direction of
+        Fwd -> fwd
+        Bwd -> reverse fwd
+  where
+    fwd = postorder_dfs_from blockmap entries
+
+-- Note [Backward vs forward analysis]
+--
+-- The forward and backward cases are not dual.  In the forward case, the entry
+-- points are known, and one simply traverses the body blocks from those points.
+-- In the backward case, something is known about the exit points, but a
+-- backward analysis must also include reachable blocks that don't reach the
+-- exit, as in a procedure that loops forever and has side effects.)
+-- For instance, let E be the entry and X the exit blocks (arrows indicate
+-- control flow)
+--   E -> X
+--   E -> B
+--   B -> C
+--   C -> B
+-- We do need to include B and C even though they're unreachable in the
+-- *reverse* graph (that we could use for backward analysis):
+--   E <- X
+--   E <- B
+--   B <- C
+--   C <- B
+-- So when sorting the blocks for the backward analysis, we simply take the
+-- reverse of what is used for the forward one.
+
 
 -- | construct a mapping from L -> block indices.  If the fact for L
 -- changes, re-analyse the given blocks.
