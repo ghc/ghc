@@ -491,9 +491,11 @@ test('T12135',
      run_command,
      ['$MAKE -s --no-print-directory T12135'])
 
-test('T12192', normal, run_command, ['mkdir foo && (cd foo && {compiler} -v0 ../T12192)']) 
+test('T12192', normal, run_command, ['mkdir foo && (cd foo && {compiler} -v0 ../T12192)'])
 
 test('T10923',
      extra_clean(['T10923.o', 'T10923.hi']),
      run_command,
      ['$MAKE -s --no-print-directory T10923'])
+
+test('T12752pass', normal, compile, ['-DSHOULD_PASS=1 -Wcpp-undef'])

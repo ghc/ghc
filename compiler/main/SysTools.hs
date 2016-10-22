@@ -403,9 +403,8 @@ runCpp :: DynFlags -> [Option] -> IO ()
 runCpp dflags args =   do
   let (p,args0) = pgm_P dflags
       args1 = map Option (getOpts dflags opt_P)
-      args2 = if gopt Opt_WarnIsError dflags
-                 then [Option "-Werror"]
-                 else []
+      args2 = [Option "-Werror" | gopt Opt_WarnIsError dflags]
+                ++ [Option "-Wundef" | wopt Opt_WarnCPPUndef dflags]
   mb_env <- getGccEnv args2
   runSomethingFiltered dflags id  "C pre-processor" p
                        (args0 ++ args1 ++ args2 ++ args) mb_env

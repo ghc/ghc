@@ -56,6 +56,10 @@ Compiler
   and the latter code has no restrictions about whether the data constructors
   of ``T`` are in scope.
 
+- Add warning flag :ghc-flag:`-Wcpp-undef` which passes ``-Wundef`` to the C
+  pre-processor causing the pre-processor to warn on uses of the ``#if``
+  directive on undefined identifiers.
+
 GHCi
 ~~~~
 

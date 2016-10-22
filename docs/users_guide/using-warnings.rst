@@ -1007,6 +1007,12 @@ of ``-W(no-)*``.
     be inlined before the rule has a chance to fire. See
     :ref:`rules-inline`.
 
+.. ghc-flag:: -Wcpp-undef
+
+    This flag passes ``-Wundef`` to the C pre-processor (if its being used)
+    which causes the pre-processor to warn on uses of the `#if` directive on
+    undefined identifiers.
+
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's
 sanity, not yours.)

@@ -619,6 +619,7 @@ data WarningFlag =
    | Opt_WarnMissingPatternSynonymSignatures -- since 8.0
    | Opt_WarnUnrecognisedWarningFlags     -- since 8.0
    | Opt_WarnSimplifiableClassConstraints -- Since 8.2
+   | Opt_WarnCPPUndef                     -- Since 8.2
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -3287,6 +3288,7 @@ wWarningFlagsDeps = [
     "it has no effect",
   depFlagSpec "auto-orphans"             Opt_WarnAutoOrphans
     "it has no effect",
+  flagSpec "cpp-undef"                   Opt_WarnCPPUndef,
   flagSpec "deferred-type-errors"        Opt_WarnDeferredTypeErrors,
   flagSpec "deferred-out-of-scope-variables"
                                          Opt_WarnDeferredOutOfScopeVariables,
