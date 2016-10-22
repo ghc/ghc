@@ -45,8 +45,7 @@ customBuild rs opts target@Target {..} = do
     argList <- interpret target getArgs
     verbose <- interpret target verboseCommands
     let quietlyUnlessVerbose = if verbose then withVerbosity Loud else quietly
-    -- The line below forces the rule to be rerun if the args hash has changed.
-    checkArgsHash target
+    checkArgsHash target -- Rerun the rule if the hash of argList has changed.
     withResources rs $ do
         putInfo target
         quietlyUnlessVerbose $ case builder of
@@ -133,12 +132,12 @@ copyDirectory source target = do
 copyDirectoryContent :: Match -> FilePath -> FilePath -> Action ()
 copyDirectoryContent expr source target = do
     putProgressInfo $ renderAction "Copy directory content" source target
-    getDirectoryContent expr source >>= mapM_ cp
+    mapM_ cp =<< directoryContent expr source
   where
-    cp a = do
-        createDirectory $ dropFileName $ target' a
-        copyFile a $ target' a
-    target' a = target -/- fromJust (stripPrefix source a)
+    cp file = do
+        let newFile = target -/- drop (length source) file
+        createDirectory $ dropFileName newFile -- TODO: Why do it for each file?
+        copyFile file newFile
 
 -- | Move a directory. The contents of the source directory is untracked.
 moveDirectory :: FilePath -> FilePath -> Action ()
