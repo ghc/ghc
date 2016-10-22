@@ -37,7 +37,7 @@ extra-libraries:
 #ifdef HAVE_LIBFFI
                               , "ffi"
 #endif
-#ifdef HAVE_LIBNUMA
+#if HAVE_LIBNUMA
                               , "numa"
 #endif
 #ifdef mingw32_HOST_OS
