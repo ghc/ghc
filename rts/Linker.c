@@ -28,6 +28,7 @@
 #include "Profiling.h"
 #include "sm/OSMem.h"
 #include "linker/M32Alloc.h"
+#include "PathUtils.h"
 
 #if !defined(mingw32_HOST_OS)
 #include "posix/Signals.h"
@@ -45,7 +46,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
-#include <libgen.h>
 
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
@@ -231,81 +231,6 @@ static ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
                          int misalignment
                        );
 
-// Use wchar_t for pathnames on Windows (#5697)
-#if defined(mingw32_HOST_OS)
-#define pathcmp wcscmp
-#define pathlen wcslen
-#define pathopen _wfopen
-#define pathstat _wstat
-#define struct_stat struct _stat
-#define open wopen
-#define WSTR(s) L##s
-#define pathprintf swprintf
-#define pathsize sizeof(wchar_t)
-#else
-#define pathcmp strcmp
-#define pathlen strlen
-#define pathopen fopen
-#define pathstat stat
-#define struct_stat struct stat
-#define WSTR(s) s
-#define pathprintf snprintf
-#define pathsize sizeof(char)
-#endif
-
-static pathchar* pathdup(pathchar *path)
-{
-    pathchar *ret;
-#if defined(mingw32_HOST_OS)
-    ret = wcsdup(path);
-#else
-    /* sigh, strdup() isn't a POSIX function, so do it the long way */
-    ret = stgMallocBytes( strlen(path)+1, "pathdup" );
-    strcpy(ret, path);
-#endif
-    return ret;
-}
-
-static pathchar* pathdir(pathchar *path)
-{
-    pathchar *ret;
-#if defined(mingw32_HOST_OS)
-    pathchar *drive, *dirName;
-    size_t memberLen = pathlen(path) + 1;
-    dirName = stgMallocBytes(pathsize * memberLen, "pathdir(path)");
-    ret     = stgMallocBytes(pathsize * memberLen, "pathdir(path)");
-    drive   = stgMallocBytes(pathsize * _MAX_DRIVE, "pathdir(path)");
-    _wsplitpath_s(path, drive, _MAX_DRIVE, dirName, pathsize * pathlen(path), NULL, 0, NULL, 0);
-    pathprintf(ret, memberLen, WSTR("%" PATH_FMT "%" PATH_FMT), drive, dirName);
-    stgFree(drive);
-    stgFree(dirName);
-#else
-    pathchar* dirName = dirname(path);
-    size_t memberLen  = pathlen(dirName);
-    ret = stgMallocBytes(pathsize * (memberLen + 2), "pathdir(path)");
-    strcpy(ret, dirName);
-    ret[memberLen  ] = '/';
-    ret[memberLen+1] = '\0';
-#endif
-    return ret;
-}
-
-static pathchar* mkPath(char* path)
-{
-#if defined(mingw32_HOST_OS)
-    size_t required = mbstowcs(NULL, path, 0);
-    pathchar *ret = stgMallocBytes(sizeof(pathchar) * (required + 1), "mkPath");
-    if (mbstowcs(ret, path, required) == (size_t)-1)
-    {
-        barf("mkPath failed converting char* to wchar_t*");
-    }
-    ret[required] = '\0';
-    return ret;
-#else
-    return pathdup(path);
-#endif
-}
-
 /* Generic wrapper function to try and Resolve and RunInit oc files */
 int ocTryLoad( ObjectCode* oc );
 
@@ -361,13 +286,6 @@ static void machoInitSymbolsWithoutUnderscore( void );
 #endif
 
 #if defined(OBJFORMAT_PEi386)
-/* string utility function */
-static HsBool endsWithPath(pathchar* base, pathchar* str) {
-    int blen = pathlen(base);
-    int slen = pathlen(str);
-    return (blen >= slen) && (0 == pathcmp(base + blen - slen, str));
-}
-
 static int checkAndLoadImportLibrary(
     pathchar* arch_name,
     char* member_name,
