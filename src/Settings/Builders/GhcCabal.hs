@@ -1,18 +1,10 @@
 module Settings.Builders.GhcCabal (
-    ghcCabalBuilderArgs, ghcCabalHsColourBuilderArgs, bootPackageDatabaseArgs, buildDll0
+    ghcCabalBuilderArgs, ghcCabalHsColourBuilderArgs, buildDll0
     ) where
 
-import Base
 import Context
 import Flavour
-import GHC
-import Oracles.Config.Flag
-import Oracles.Config.Setting
-import Oracles.WindowsPath
-import Predicate
-import Settings
 import Settings.Builders.Common
-import Settings.Paths
 
 ghcCabalBuilderArgs :: Args
 ghcCabalBuilderArgs = builder GhcCabal ? do
@@ -83,15 +75,6 @@ configureArgs = do
         , conf "--with-gmp-libraries"     $ argSetting GmpLibDir
         , crossCompiling ? (conf "--host" $ argSetting TargetPlatformFull)
         , conf "--with-cc" $ argStagedBuilderPath (Cc CompileC) ]
-
-bootPackageDatabaseArgs :: Args
-bootPackageDatabaseArgs = do
-    stage <- getStage
-    lift $ need [packageDbStamp stage]
-    stage0 ? do
-        path   <- getTopDirectory
-        prefix <- ifM (builder Ghc) (return "-package-db ") (return "--package-db=")
-        arg $ prefix ++ path -/- packageDbDirectory Stage0
 
 packageConstraints :: Args
 packageConstraints = stage0 ? do

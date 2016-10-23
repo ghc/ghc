@@ -1,10 +1,6 @@
 module Settings.Builders.GhcPkg (ghcPkgBuilderArgs) where
 
-import Base
-import Predicate
-import Settings
-import Settings.Builders.GhcCabal
-import Settings.Paths
+import Settings.Builders.Common
 
 ghcPkgBuilderArgs :: Args
 ghcPkgBuilderArgs = builder GhcPkg ? (initArgs <> updateArgs)

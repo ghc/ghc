@@ -1,16 +1,7 @@
 module Settings.Builders.Ghc (ghcBuilderArgs, ghcMBuilderArgs, commonGhcArgs) where
 
-import Base
 import Flavour
-import GHC
-import Oracles.Config.Flag
-import Oracles.Config.Setting
-import Oracles.PackageData
-import Predicate
-import Settings
 import Settings.Builders.Common
-import Settings.Builders.GhcCabal
-import Settings.Paths
 
 -- TODO: Add support for -dyno.
 -- $1/$2/build/%.$$($3_o-bootsuf) : $1/$4/%.hs-boot

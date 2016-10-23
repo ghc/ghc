@@ -1,6 +1,6 @@
 module Settings.Builders.GenPrimopCode (genPrimopCodeBuilderArgs) where
 
-import Predicate
+import Settings.Builders.Common
 
 genPrimopCodeBuilderArgs :: Args
 genPrimopCodeBuilderArgs = builder GenPrimopCode ? mconcat

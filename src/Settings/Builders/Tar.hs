@@ -1,6 +1,6 @@
 module Settings.Builders.Tar (tarBuilderArgs) where
 
-import Predicate
+import Settings.Builders.Common
 
 tarBuilderArgs :: Args
 tarBuilderArgs = builder Tar ? mconcat [ arg "-xf"

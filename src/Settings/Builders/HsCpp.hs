@@ -1,10 +1,6 @@
 module Settings.Builders.HsCpp (hsCppBuilderArgs) where
 
-import GHC
-import Oracles.Config.Setting
-import Predicate
 import Settings.Builders.Common
-import Settings.Paths
 
 hsCppBuilderArgs :: Args
 hsCppBuilderArgs = builder HsCpp ? do

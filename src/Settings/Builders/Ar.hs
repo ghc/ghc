@@ -1,9 +1,6 @@
 module Settings.Builders.Ar (arBuilderArgs, arCmd, chunksOfSize) where
 
-import Base
-import Oracles.Config.Flag
-import Oracles.Config.Setting
-import Predicate
+import Settings.Builders.Common
 
 arBuilderArgs :: Args
 arBuilderArgs = builder Ar ? mconcat [ arg "q"

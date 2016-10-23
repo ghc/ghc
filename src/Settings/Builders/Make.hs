@@ -1,8 +1,6 @@
 module Settings.Builders.Make (makeBuilderArgs) where
 
-import Base
-import Predicate
-import Settings.Paths
+import Settings.Builders.Common
 
 makeBuilderArgs :: Args
 makeBuilderArgs = do

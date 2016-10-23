@@ -1,7 +1,5 @@
 module Settings.Builders.Ld (ldBuilderArgs) where
 
-import Oracles.Config.Setting
-import Predicate
 import Settings.Builders.Common
 
 ldBuilderArgs :: Args

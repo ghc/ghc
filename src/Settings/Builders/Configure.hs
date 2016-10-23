@@ -2,11 +2,7 @@ module Settings.Builders.Configure (configureBuilderArgs) where
 
 import qualified System.Info as System
 
-import Base
-import Oracles.Config.Setting
-import Oracles.WindowsPath
-import Predicate
-import Settings.Paths
+import Settings.Builders.Common
 
 configureBuilderArgs :: Args
 configureBuilderArgs = mconcat

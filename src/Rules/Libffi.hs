@@ -1,18 +1,9 @@
 module Rules.Libffi (rtsBuildPath, libffiRules, libffiDependencies) where
 
-import Base
-import Builder
-import Expression
-import GHC
-import Oracles.Config.Flag
-import Oracles.Config.Setting
-import Oracles.WindowsPath
 import Rules.Actions
 import Settings.Builders.Common
 import Settings.Packages.Rts
-import Settings.Paths
 import Target
-import UserSettings
 
 -- TODO: this should be moved elsewhere
 rtsBuildPath :: FilePath

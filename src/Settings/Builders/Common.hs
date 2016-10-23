@@ -1,13 +1,27 @@
 module Settings.Builders.Common (
+    module Base,
+    module Expression,
+    module GHC,
+    module Oracles.Config.Flag,
+    module Oracles.Config.Setting,
+    module Oracles.PackageData,
+    module Oracles.WindowsPath,
+    module Predicate,
+    module Settings,
+    module Settings.Paths,
+    module UserSettings,
     cIncludeArgs, ldArgs, cArgs, cWarnings, argSetting, argSettingList,
-    argStagedBuilderPath, argStagedSettingList
+    argStagedBuilderPath, argStagedSettingList, bootPackageDatabaseArgs
     ) where
 
 import Base
 import Expression
+import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Oracles.PackageData
+import Oracles.WindowsPath
+import Predicate
 import Settings
 import Settings.Paths
 import UserSettings
@@ -56,3 +70,12 @@ argStagedSettingList ss = argSettingList . ss =<< getStage
 
 argStagedBuilderPath :: (Stage -> Builder) -> Args
 argStagedBuilderPath sb = argM . builderPath . sb =<< getStage
+
+bootPackageDatabaseArgs :: Args
+bootPackageDatabaseArgs = do
+    stage <- getStage
+    lift $ need [packageDbStamp stage]
+    stage0 ? do
+        path   <- getTopDirectory
+        prefix <- ifM (builder Ghc) (return "-package-db ") (return "--package-db=")
+        arg $ prefix ++ path -/- packageDbDirectory Stage0

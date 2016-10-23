@@ -1,11 +1,6 @@
 module Settings.Builders.Cc (ccBuilderArgs) where
 
-import Base
-import Oracles.Config.Setting
-import Oracles.PackageData
-import Predicate
 import Settings.Builders.Common
-import Settings
 
 ccBuilderArgs :: Args
 ccBuilderArgs = builder Cc ? mconcat
