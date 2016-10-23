@@ -114,6 +114,9 @@ programPath context@Context {..}
     | package == hpcBin = case stage of
         Stage1 -> Just $ inplaceProgram "hpc"
         _      -> Nothing
+    | package == runGhc = case stage of
+        Stage1 -> Just $ inplaceProgram "runhaskell"
+        _      -> Nothing
     | isProgram package = case stage of
         Stage0 -> Just . inplaceProgram $ pkgNameString package
         _      -> Just . installProgram $ pkgNameString package
