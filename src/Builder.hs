@@ -6,7 +6,7 @@ module Builder (
 
 import Control.Monad.Trans.Reader
 import Data.Char
-import GHC.Generics (Generic)
+import GHC.Generics
 
 import Base
 import Context
@@ -16,22 +16,20 @@ import Oracles.LookupInPath
 import Oracles.WindowsPath
 import Stage
 
--- | A compiler can typically be used in one of three modes:
--- 1) Compiling sources into object files.
--- 2) Extracting source dependencies, e.g. by passing -M command line argument.
--- 3) Linking object files & static libraries into an executable.
+-- | A compiler can typically be used in different modes:
+-- * Compiling or preprocessing a source file;
+-- * Extracting source dependencies, e.g. by passing @-M@ command line argument;
+-- * Linking object files & static libraries into an executable.
 -- We have CcMode for C compiler and GhcMode for GHC.
 data CcMode  = CompileC  | FindCDependencies deriving (Eq, Generic, Show)
 data GhcMode = CompileHs | FindHsDependencies | LinkHs
     deriving (Eq, Generic, Show)
 
--- TODO: Do we really need HsCpp builder? Can't we use Cc instead?
--- | A 'Builder' is an external command invoked in separate process using 'Shake.cmd'
---
--- @Ghc Stage0@ is the bootstrapping compiler
--- @Ghc StageN@, N > 0, is the one built on stage (N - 1)
--- @GhcPkg Stage0@ is the bootstrapping @GhcPkg@
--- @GhcPkg StageN@, N > 0, is the one built in Stage0 (TODO: need only Stage1?)
+-- | A 'Builder' is an external command invoked in a separate process via 'cmd'.
+-- @Ghc Stage0@ is the bootstrapping compiler.
+-- @Ghc StageN@, N > 0, is the one built in stage (N - 1).
+-- @GhcPkg Stage0@ is the bootstrapping @GhcPkg@.
+-- @GhcPkg Stage1@ is the one built in Stage0.
 data Builder = Alex
              | Ar
              | DeriveConstants
@@ -169,7 +167,10 @@ needBuilder = \case
         path <- builderPath builder
         need [path]
 
--- | Instances for storing in the Shake database.
+instance Binary Builder
+instance Hashable Builder
+instance NFData Builder
+
 instance Binary CcMode
 instance Hashable CcMode
 instance NFData CcMode
@@ -177,7 +178,3 @@ instance NFData CcMode
 instance Binary GhcMode
 instance Hashable GhcMode
 instance NFData GhcMode
-
-instance Binary Builder
-instance Hashable Builder
-instance NFData Builder

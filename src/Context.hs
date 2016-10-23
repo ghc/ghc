@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 module Context (Context (..), vanillaContext, stageContext) where
 
-import GHC.Generics (Generic)
+import GHC.Generics
 
 import Base
 import Package
@@ -26,5 +26,5 @@ stageContext :: Stage -> Context
 stageContext s = vanillaContext s $ error "stageContext: package not set"
 
 instance Binary Context
-instance NFData Context
 instance Hashable Context
+instance NFData Context

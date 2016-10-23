@@ -2,7 +2,7 @@
 module Target (Target (..), dummyTarget) where
 
 import Control.Monad.Trans.Reader
-import GHC.Generics (Generic)
+import GHC.Generics
 
 import Base
 import Builder
@@ -18,7 +18,6 @@ data Target = Target
 
 -- | If values of type @a@ form a 'Monoid' then we can also derive a 'Monoid'
 -- instance for values of type @'ReaderT' 'Target' 'Action' a@:
---
 -- * the empty computation is the identity element of the underlying type
 -- * two computations can be combined by combining their results
 instance Monoid a => Monoid (ReaderT Target Action a) where
@@ -33,5 +32,5 @@ dummyTarget ctx = Target
     , outputs = error "dummyTarget: outputs not set" }
 
 instance Binary Target
-instance NFData Target
 instance Hashable Target
+instance NFData Target

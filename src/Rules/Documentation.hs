@@ -17,7 +17,7 @@ haddockHtmlLib = "inplace/lib/html/haddock-util.js"
 
 -- Note: this build rule creates plenty of files, not just the .haddock one.
 -- All of them go into the 'doc' subdirectory. Pedantically tracking all built
--- files in the Shake databases seems fragile and unnecessary.
+-- files in the Shake database seems fragile and unnecessary.
 buildPackageDocumentation :: Context -> Rules ()
 buildPackageDocumentation context@Context {..} =
     let cabalFile   = pkgCabalFile package

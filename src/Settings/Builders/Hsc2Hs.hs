@@ -25,7 +25,7 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
     tArch   <- getSetting TargetArch
     tOs     <- getSetting TargetOs
     version <- if stage == Stage0
-               then lift $ ghcCanonVersion
+               then lift ghcCanonVersion
                else getSetting ProjectVersionInt
     lift $ need [templateHsc]
     mconcat [ arg $ "--cc=" ++ ccPath

@@ -4,11 +4,10 @@ import Base
 import Expression
 import Rules.Actions
 
--- TODO: get rid of perl scripts
--- | Generate perl scripts the build system requires, such as @ghc-split@,
--- from the corresponding literate perl source.
+-- | Build Perl scripts, such as @ghc-split@, from their literate Perl sources.
 perlScriptRules :: Rules ()
 perlScriptRules = do
     "//*.prl" %> \out -> do
         let src = out -<.> "lprl"
+        need [src]
         runBuilder Unlit [src, out]

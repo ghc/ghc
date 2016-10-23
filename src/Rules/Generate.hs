@@ -139,7 +139,7 @@ generatePackageCode context@(Context stage pkg _) =
                 liftIO $ IO.copyFile file newFile
                 putBuild $ "| Duplicate file " ++ file ++ " -> " ++ newFile
 
-        when (pkg == rts) $ path -/- "cmm/AutoApply.cmm" %> \file -> do
+        when (pkg == rts) $ path -/- "cmm/AutoApply.cmm" %> \file ->
             build $ Target context GenApply [] [file]
 
         priority 2.0 $ do

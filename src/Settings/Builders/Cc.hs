@@ -20,12 +20,8 @@ ccBuilderArgs = builder Cc ? mconcat
     , builder (Cc FindCDependencies) ? do
         output <- getOutput
         mconcat [ arg "-E"
-                , arg "-MM"
-                , arg "-MG"
-                , arg "-MF"
-                , arg output
-                , arg "-MT"
-                , arg $ dropExtension output -<.> "o"
-                , arg "-x"
-                , arg "c"
+                , arg "-MM", arg "-MG"
+                , arg "-MF", arg output
+                , arg "-MT", arg $ dropExtension output -<.> "o"
+                , arg "-x", arg "c"
                 , arg =<< getInput ] ]

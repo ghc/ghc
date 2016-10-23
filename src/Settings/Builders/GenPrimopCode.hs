@@ -2,7 +2,6 @@ module Settings.Builders.GenPrimopCode (genPrimopCodeBuilderArgs) where
 
 import Predicate
 
--- Stdin/stdout are handled in a special way. See Rules/Actions.hs.
 genPrimopCodeBuilderArgs :: Args
 genPrimopCodeBuilderArgs = builder GenPrimopCode ? mconcat
     [ output "//PrimopWrappers.hs"                 ? arg "--make-haskell-wrappers"

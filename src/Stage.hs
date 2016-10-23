@@ -2,7 +2,7 @@
 module Stage (Stage (..), stageString) where
 
 import Development.Shake.Classes
-import GHC.Generics (Generic)
+import GHC.Generics
 
 -- | A stage refers to a certain compiler in GHC's build process.
 --
@@ -27,7 +27,6 @@ data Stage = Stage0 | Stage1 | Stage2 | Stage3
 stageString :: Stage -> String
 stageString stage = "stage" ++ show (fromEnum stage)
 
--- Instances for storing in the Shake database
 instance Binary Stage
 instance Hashable Stage
 instance NFData Stage

@@ -160,7 +160,6 @@ libsuf way@(Way set) =
         -- e.g., p_ghc7.11.20141222.dll (the result)
         return $ prefix ++ "ghc" ++ version ++ extension
 
--- Instances for storing in the Shake database
 instance Binary Way where
     put = put . show
     get = fmap read get

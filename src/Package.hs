@@ -8,7 +8,7 @@ module Package (
     ) where
 
 import Data.String
-import GHC.Generics (Generic)
+import GHC.Generics
 
 import Base
 
@@ -77,10 +77,8 @@ instance Eq Package where
 instance Ord Package where
     compare = compare `on` pkgName
 
--- | Instances for storing in the Shake database.
 instance Binary Package
 instance Hashable Package where
-    hashWithSalt salt = hashWithSalt salt . show
 instance NFData Package
 
 instance Binary PackageType

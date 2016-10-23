@@ -14,7 +14,7 @@ import Settings.Paths
 
 cabalRules :: Rules ()
 cabalRules = do
-    -- Cache boot package constraints (to be used in cabalArgs).
+    -- Cache boot package constraints (to be used in 'cabalArgs').
     bootPackageConstraints %> \out -> do
         bootPkgs <- interpretInContext (stageContext Stage0) getPackages
         let pkgs = filter (\p -> p /= compiler && isLibrary p) bootPkgs
