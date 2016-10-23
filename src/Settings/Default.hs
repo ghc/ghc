@@ -16,7 +16,6 @@ import Settings.Builders.Ar
 import Settings.Builders.DeriveConstants
 import Settings.Builders.Cc
 import Settings.Builders.Configure
-import Settings.Builders.GenApply
 import Settings.Builders.GenPrimopCode
 import Settings.Builders.Ghc
 import Settings.Builders.GhcCabal
@@ -52,7 +51,6 @@ defaultBuilderArgs = mconcat
     , ccBuilderArgs
     , configureBuilderArgs
     , deriveConstantsBuilderArgs
-    , genApplyBuilderArgs
     , genPrimopCodeBuilderArgs
     , ghcBuilderArgs
     , ghcCabalBuilderArgs
