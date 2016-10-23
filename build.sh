@@ -39,7 +39,7 @@ if type cabal > /dev/null 2>&1; then
     fi
 fi
 
-mkdir -p "$root/../_build/hadrian"
+mkdir -p "$root/bin"
 
 ghc                                      \
     "$root/src/Main.hs"                  \
@@ -51,11 +51,11 @@ ghc                                      \
     -rtsopts                             \
     -with-rtsopts=-I0                    \
     -threaded                            \
-    -outputdir="$root/../_build/hadrian" \
+    -outputdir="$root/bin" \
     -j -O                                \
-    -o "$root/hadrian"
+    -o "$root/bin/hadrian"
 
-"$root/hadrian"            \
+"$root/bin/hadrian"        \
     --lint                 \
     --directory "$root/.." \
     "$@"

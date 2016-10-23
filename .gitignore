@@ -2,8 +2,7 @@
 cfg/system.config
 
 # build.bat and build.sh specific
-/hadrian
-/hadrian.exe
+/bin/
 
 # build.cabal.sh specific
 /dist/

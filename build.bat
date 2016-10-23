@@ -1,20 +1,20 @@
 @cd %~dp0
-@mkdir ../_build/hadrian 2> nul
+@mkdir bin 2> nul
 
-@set ghcArgs=--make                       ^
-             -Wall                        ^
-             -fno-warn-name-shadowing     ^
-             -XRecordWildCards            ^
-             src/Main.hs                  ^
-             -threaded                    ^
-             -isrc                        ^
-             -rtsopts                     ^
-             -with-rtsopts=-I0            ^
-             -outputdir=../_build/hadrian ^
-             -i../libraries/Cabal/Cabal   ^
-             -j                           ^
-             -O                           ^
-             -o hadrian
+@set ghcArgs=--make                     ^
+             -Wall                      ^
+             -fno-warn-name-shadowing   ^
+             -XRecordWildCards          ^
+             src\Main.hs                ^
+             -threaded                  ^
+             -isrc                      ^
+             -i..\libraries\Cabal\Cabal ^
+             -rtsopts                   ^
+             -with-rtsopts=-I0          ^
+             -outputdir=bin             ^
+             -j                         ^
+             -O                         ^
+             -o bin\hadrian
 
 @set hadrianArgs=--lint      ^
                  --directory ^
@@ -28,4 +28,4 @@
 
 @rem Unset GHC_PACKAGE_PATH variable, as otherwise ghc-cabal complains
 @set GHC_PACKAGE_PATH=
-@hadrian %hadrianArgs%
+@bin\hadrian %hadrianArgs%
