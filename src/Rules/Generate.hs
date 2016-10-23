@@ -143,24 +143,14 @@ generatePackageCode context@(Context stage pkg _) =
             build $ Target context GenApply [] [file]
 
         priority 2.0 $ do
-            -- TODO: this is temporary hack, get rid of this (#113)
-            let oldPath = pkgPath pkg -/- contextDirectory context -/- "build"
-                olden f = oldPath ++ (drop (length (buildPath context)) f)
-
             when (pkg == compiler) $ path -/- "Config.hs" %> \file -> do
                 file <~ generateConfigHs
-                olden file <~ generateConfigHs -- TODO: get rid of this (#113)
 
             when (pkg == compiler) $ platformH stage %> \file -> do
                 file <~ generateGhcBootPlatformH
 
             when (pkg == ghcPkg) $ path -/- "Version.hs" %> \file -> do
                 file <~ generateVersionHs
-                olden file <~ generateVersionHs -- TODO: get rid of this (#113)
-
-            when (pkg == runGhc) $ path -/- "Main.hs" %> \file -> do
-                copyFileChanged (pkgPath pkg -/- "runghc.hs") file
-                putSuccess $ "| Successfully generated " ++ file ++ "."
 
 copyRules :: Rules ()
 copyRules = do
