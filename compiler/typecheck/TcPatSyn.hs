@@ -72,7 +72,7 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
        ; let (arg_names, rec_fields, is_infix) = collectPatSynArgInfo details
        ; (tclvl, wanted, ((lpat', args), pat_ty))
             <- pushLevelAndCaptureConstraints  $
-               tcInferInst $ \ exp_ty ->
+               tcInferNoInst $ \ exp_ty ->
                tcPat PatSyn lpat exp_ty $
                mapM tcLookupId arg_names
 
