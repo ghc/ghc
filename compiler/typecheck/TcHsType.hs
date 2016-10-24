@@ -200,8 +200,7 @@ tcHsSigType ctxt sig_ty
     do { kind <- case expectedKindInCtxt ctxt of
                     AnythingKind -> newMetaKindVar
                     TheKind k    -> return k
-                    OpenKind     -> do { rr <- newFlexiTyVarTy runtimeRepTy
-                                       ; return $ tYPE rr }
+                    OpenKind     -> newOpenTypeKind
               -- The kind is checked by checkValidType, and isn't necessarily
               -- of kind * in a Template Haskell quote eg [t| Maybe |]
 
@@ -305,7 +304,7 @@ tcHsOpenType, tcHsLiftedType,
 tcHsOpenType ty   = addTypeCtxt ty $ tcHsOpenTypeNC ty
 tcHsLiftedType ty = addTypeCtxt ty $ tcHsLiftedTypeNC ty
 
-tcHsOpenTypeNC   ty = do { ek <- ekOpen
+tcHsOpenTypeNC   ty = do { ek <- newOpenTypeKind
                          ; tc_lhs_type typeLevelMode ty ek }
 tcHsLiftedTypeNC ty = tc_lhs_type typeLevelMode ty liftedTypeKind
 
@@ -464,10 +463,10 @@ tc_lhs_type mode (L span ty) exp_kind
 tc_fun_type :: TcTyMode -> LHsType Name -> LHsType Name -> TcKind -> TcM TcType
 tc_fun_type mode ty1 ty2 exp_kind = case mode_level mode of
   TypeLevel ->
-    do { arg_rr <- newFlexiTyVarTy runtimeRepTy
-       ; res_rr <- newFlexiTyVarTy runtimeRepTy
-       ; ty1' <- tc_lhs_type mode ty1 (tYPE arg_rr)
-       ; ty2' <- tc_lhs_type mode ty2 (tYPE res_rr)
+    do { arg_k <- newOpenTypeKind
+       ; res_k <- newOpenTypeKind
+       ; ty1' <- tc_lhs_type mode ty1 arg_k
+       ; ty2' <- tc_lhs_type mode ty2 res_k
        ; checkExpectedKind (mkFunTy ty1' ty2') liftedTypeKind exp_kind }
   KindLevel ->  -- no representation polymorphism in kinds. yet.
     do { ty1' <- tc_lhs_type mode ty1 liftedTypeKind
@@ -534,8 +533,9 @@ tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_body = ty }) exp_kind
          -- See Note [Body kind of a HsQualTy]
        ; ty' <- if isConstraintKind exp_kind
                 then tc_lhs_type mode ty constraintKind
-                else do { ek <- ekOpen -- The body kind (result of the
-                                       -- function) can be * or #, hence ekOpen
+                else do { ek <- newOpenTypeKind
+                                -- The body kind (result of the function)
+                                -- can be * or #, hence newOpenTypeKind
                         ; ty <- tc_lhs_type mode ty ek
                         ; checkExpectedKind ty liftedTypeKind exp_kind }
 
@@ -594,8 +594,8 @@ tc_hs_type mode (HsTupleTy hs_tup_sort tys) exp_kind
 
 tc_hs_type mode (HsSumTy hs_tys) exp_kind
   = do { let arity = length hs_tys
-       ; arg_kinds <- map tYPE `fmap` newFlexiTyVarTys arity runtimeRepTy
-       ; tau_tys <- zipWithM (tc_lhs_type mode) hs_tys arg_kinds
+       ; arg_kinds <- mapM (\_ -> newOpenTypeKind) hs_tys
+       ; tau_tys   <- zipWithM (tc_lhs_type mode) hs_tys arg_kinds
        ; let arg_tys = map (getRuntimeRepFromKind "tc_hs_type HsSumTy") arg_kinds ++ tau_tys
        ; checkExpectedKind (mkTyConApp (sumTyCon arity) arg_tys) (tYPE unboxedSumRepDataConTy) exp_kind
        }
@@ -692,8 +692,7 @@ tc_tuple :: TcTyMode -> TupleSort -> [LHsType Name] -> TcKind -> TcM TcType
 tc_tuple mode tup_sort tys exp_kind
   = do { arg_kinds <- case tup_sort of
            BoxedTuple      -> return (nOfThem arity liftedTypeKind)
-           UnboxedTuple    -> do { rrs <- newFlexiTyVarTys arity runtimeRepTy
-                                 ; return $ map tYPE rrs }
+           UnboxedTuple    -> mapM (\_ -> newOpenTypeKind) tys
            ConstraintTuple -> return (nOfThem arity constraintKind)
        ; tau_tys <- zipWithM (tc_lhs_type mode) tys arg_kinds
        ; finish_tuple tup_sort tau_tys arg_kinds exp_kind }
@@ -1988,11 +1987,6 @@ in-scope variables that it should not unify with, but it's fiddly.
 ************************************************************************
 
 -}
-
--- | Produce an 'TcKind' suitable for a checking a type that can be * or #.
-ekOpen :: TcM TcKind
-ekOpen = do { rr <- newFlexiTyVarTy runtimeRepTy
-            ; return (tYPE rr) }
 
 unifyKinds :: [(TcType, TcKind)] -> TcM ([TcType], TcKind)
 unifyKinds act_kinds

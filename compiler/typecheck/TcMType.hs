@@ -19,8 +19,8 @@ module TcMType (
   newFlexiTyVar,
   newFlexiTyVarTy,              -- Kind -> TcM TcType
   newFlexiTyVarTys,             -- Int -> Kind -> TcM [TcType]
-  newOpenFlexiTyVarTy,
-  newMetaKindVar, newMetaKindVars,
+  newOpenFlexiTyVarTy, newOpenTypeKind,
+  newMetaKindVar, newMetaKindVars, newMetaTyVarTyAtLevel,
   cloneMetaTyVar,
   newFmvTyVar, newFskTyVar,
 
@@ -34,7 +34,7 @@ module TcMType (
   newInferExpType, newInferExpTypeInst, newInferExpTypeNoInst,
   readExpType, readExpType_maybe,
   expTypeToType, checkingExpType_maybe, checkingExpType,
-  tauifyExpType, inferResultToType, promoteTcType,
+  tauifyExpType, inferResultToType,
 
   --------------------------------
   -- Creating fresh type variables for pm checking
@@ -345,15 +345,12 @@ newInferExpTypeInst = newInferExpType True
 
 newInferExpType :: Bool -> TcM ExpType
 newInferExpType inst
-  = do { rr <- newFlexiTyVarTy runtimeRepTy
-       ; u <- newUnique
+  = do { u <- newUnique
        ; tclvl <- getTcLevel
-       ; let ki = tYPE rr
-       ; traceTc "newOpenInferExpType" (ppr u <+> dcolon <+> ppr ki)
+       ; traceTc "newOpenInferExpType" (ppr u <+> ppr inst <+> ppr tclvl)
        ; ref <- newMutVar Nothing
        ; return (Infer (IR { ir_uniq = u, ir_lvl = tclvl
-                           , ir_kind = ki, ir_ref = ref
-                           , ir_inst = inst })) }
+                           , ir_ref = ref, ir_inst = inst })) }
 
 -- | Extract a type out of an ExpType, if one exists. But one should always
 -- exist. Unless you're quite sure you know what you're doing.
@@ -395,126 +392,21 @@ expTypeToType (Infer inf_res) = inferResultToType inf_res
 
 inferResultToType :: InferResult -> TcM Type
 inferResultToType (IR { ir_uniq = u, ir_lvl = tc_lvl
-                      , ir_kind = kind, ir_ref = ref })
-  = do { tau_tv <- newMetaTyVarAtLevel tc_lvl kind
+                      , ir_ref = ref })
+  = do { rr  <- newMetaTyVarTyAtLevel tc_lvl runtimeRepTy
+       ; tau <- newMetaTyVarTyAtLevel tc_lvl (tYPE rr)
              -- See Note [TcLevel of ExpType]
-       ; let tau = mkTyVarTy tau_tv
        ; writeMutVar ref (Just tau)
        ; traceTc "Forcing ExpType to be monomorphic:"
-                 (ppr u <+> dcolon <+> ppr kind <+> text ":=" <+> ppr tau)
+                 (ppr u <+> text ":=" <+> ppr tau)
        ; return tau }
+
 
 {- *********************************************************************
 *                                                                      *
-              Promoting types
-*                                                                      *
-********************************************************************* -}
-
-promoteTcType :: TcLevel -> TcType -> TcM (TcCoercion, TcType)
--- See Note [Promoting a type]
--- promoteTcType level ty = (co, ty')
---   * Returns ty' whose max level is just 'level'
---             and whose kind is the same as 'ty'
---   * and co :: ty ~ ty'
---   * and emits constraints to justify the coercion
-promoteTcType dest_lvl ty
-  = do { cur_lvl <- getTcLevel
-       ; if (cur_lvl `sameDepthAs` dest_lvl)
-         then dont_promote_it
-         else promote_it }
-  where
-    promote_it :: TcM (TcCoercion, TcType)
-    promote_it
-      = do { prom_tv <- newMetaTyVarAtLevel dest_lvl (typeKind ty)
-           ; let prom_ty = mkTyVarTy prom_tv
-                 eq_orig = TypeEqOrigin { uo_actual   = ty
-                                        , uo_expected = prom_ty
-                                        , uo_thing    = Nothing }
-
-           ; co <- emitWantedEq eq_orig TypeLevel Nominal ty prom_ty
-           ; return (co, prom_ty) }
-
-    dont_promote_it :: TcM (TcCoercion, TcType)
-    dont_promote_it = return (mkTcNomReflCo ty, ty)
-
-{- Note [Promoting a type]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (Trac #12427)
-
-  data T where
-    MkT :: (Int -> Int) -> a -> T
-
-  h y = case y of MkT v w -> v
-
-We'll infer the RHS type with an expected type ExpType of
-  (IR { ir_lvl = l, ir_ref = ref, ... )
-where 'l' is the TcLevel of the RHS of 'h'.  Then the MkT pattern
-match will increase the level, so we'll end up in tcSubType, trying to
-unify the type of v,
-  v :: Int -> Int
-with the expected type.  But this attempt takes place at level (l+1),
-rightly so, since v's type could have mentioned existential variables,
-(like w's does) and we want to catch that.
-
-So we
-  - create a new meta-var alpha[l+1]
-  - fill in the InferRes ref cell 'ref' with alpha
-  - emit an equality constraint, thus
-        [W] alpha[l+1] ~ (Int -> Int)
-
-That constraint will float outwards, as it should, unless v's
-type mentions a skolem-captured variable.
-
-This approach fails if v has a higher rank type; see
-Note [Promotion and higher rank types]
-
-
-Note [Promotion and higher rank types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If v had a higher-rank type, say v :: (forall a. a->a) -> Int,
-then we'd emit an equality
-        [W] alpha[l+1] ~ ((forall a. a->a) -> Int)
-which will sadly fail because we can't unify a unification variable
-with a polytype.  But there is nothing really wrong with the program
-here.
-
-We could just about solve this by "promote the type" of v, to expose
-its polymorphic "shape" while still leaving constraints that will
-prevent existential escape.  But we must be careful!  Exposing
-the "shape" of the type is precisely what we must NOT do under
-a GADT pattern match!  So in this case we might promote the type
-to
-        (forall a. a->a) -> alpha[l+1]
-and emit the constraint
-        [W] alpha[l+1] ~ Int
-Now the poromoted type can fill the ref cell, while the emitted
-equality can float or not, according to the usual rules.
-
-But that's not quite right!  We are exposing the arrow! We could
-deal with that too:
-        (forall a. mu[l+1] a a) -> alpha[l+1]
-with constraints
-        [W] alpha[l+1] ~ Int
-        [W] mu[l+1] ~ (->)
-Here we abstract over the '->' inside the forall, in case that
-is subject to an equality constraint from a GADT match.
-
-Note that we kept the outer (->) becuase that's part of
-the polymorphic "shape".  And becauuse of impredicativity,
-GADT matches can't give equalities that affect polymorphic
-shape.
-
-This reasoning just seems too complicated, so I decided not
-to do it.  These higher-rank notes are just here to record
-the thinking.
-
-
-************************************************************************
-*                                                                      *
         SkolemTvs (immutable)
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
 tcInstType :: ([TyVar] -> TcM (TCvSubst, [TcTyVar]))
                    -- ^ How to instantiate the type variables
@@ -861,7 +753,7 @@ newAnonMetaTyVar meta_info kind
 newFlexiTyVar :: Kind -> TcM TcTyVar
 newFlexiTyVar kind = newAnonMetaTyVar TauTv kind
 
-newFlexiTyVarTy  :: Kind -> TcM TcType
+newFlexiTyVarTy :: Kind -> TcM TcType
 newFlexiTyVarTy kind = do
     tc_tyvar <- newFlexiTyVar kind
     return (mkTyVarTy tc_tyvar)
@@ -869,11 +761,17 @@ newFlexiTyVarTy kind = do
 newFlexiTyVarTys :: Int -> Kind -> TcM [TcType]
 newFlexiTyVarTys n kind = mapM newFlexiTyVarTy (nOfThem n kind)
 
+newOpenTypeKind :: TcM TcKind
+newOpenTypeKind
+  = do { rr <- newFlexiTyVarTy runtimeRepTy
+       ; return (tYPE rr) }
+
 -- | Create a tyvar that can be a lifted or unlifted type.
+-- Returns alpha :: TYPE kappa, where both alpha and kappa are fresh
 newOpenFlexiTyVarTy :: TcM TcType
 newOpenFlexiTyVarTy
-  = do { rr <- newFlexiTyVarTy runtimeRepTy
-       ; newFlexiTyVarTy (tYPE rr) }
+  = do { kind <- newOpenTypeKind
+       ; newFlexiTyVarTy kind }
 
 newMetaSigTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
 newMetaSigTyVars = mapAccumLM newMetaSigTyVarX emptyTCvSubst
@@ -913,15 +811,15 @@ new_meta_tv_x info subst tv
               subst1 = extendTvSubstWithClone subst tv new_tv
         ; return (subst1, new_tv) }
 
-newMetaTyVarAtLevel :: TcLevel -> TcKind -> TcM TcTyVar
-newMetaTyVarAtLevel tc_lvl kind
+newMetaTyVarTyAtLevel :: TcLevel -> TcKind -> TcM TcType
+newMetaTyVarTyAtLevel tc_lvl kind
   = do  { uniq <- newUnique
         ; ref  <- newMutVar Flexi
         ; let name = mkMetaTyVarName uniq (fsLit "p")
               details = MetaTv { mtv_info  = TauTv
                                , mtv_ref   = ref
                                , mtv_tclvl = tc_lvl }
-        ; return (mkTcTyVar name kind details) }
+        ; return (mkTyVarTy (mkTcTyVar name kind details)) }
 
 {- Note [Name of an instantiated type variable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

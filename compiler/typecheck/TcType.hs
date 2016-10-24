@@ -305,8 +305,9 @@ data InferResult
                             --           i.e. return a RhoType
                             -- False <=> do not instantaite before returning
                             --           i.e. return a SigmaType
-       , ir_kind :: Kind
        , ir_ref  :: IORef (Maybe TcType) }
+         -- The type that fills in this hole should be a Type,
+         -- that is, its kind should be (TYPE rr) for some rr
 
 type ExpSigmaType = ExpType
 type ExpRhoType   = ExpType
@@ -317,9 +318,8 @@ instance Outputable ExpType where
 
 instance Outputable InferResult where
   ppr (IR { ir_uniq = u, ir_lvl = lvl
-          , ir_kind = ki, ir_inst = inst })
+          , ir_inst = inst })
     = text "Infer" <> braces (ppr u <> comma <> ppr lvl <+> ppr inst)
-       <+> dcolon <+> ppr ki
 
 -- | Make an 'ExpType' suitable for checking.
 mkCheckExpType :: TcType -> ExpType

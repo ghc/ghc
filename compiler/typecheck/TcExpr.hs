@@ -54,7 +54,6 @@ import NameSet
 import RdrName
 import TyCon
 import Type
-import TysPrim        ( tYPE )
 import TcEvidence
 import VarSet
 import TysWiredIn
@@ -1743,8 +1742,8 @@ tcSeq loc fun_name args res_ty
 
         ; (arg1, arg2, arg2_exp_ty) <- case args1 of
             [Right hs_ty_arg2, Left term_arg1, Left term_arg2]
-              -> do { rr_ty <- newFlexiTyVarTy runtimeRepTy
-                    ; ty_arg2 <- tcHsTypeApp hs_ty_arg2 (tYPE rr_ty)
+              -> do { arg2_kind <- newOpenTypeKind
+                    ; ty_arg2 <- tcHsTypeApp hs_ty_arg2 arg2_kind
                                    -- see Note [Typing rule for seq]
                     ; _ <- tcSubTypeDS (OccurrenceOf fun_name) GenSigCtxt ty_arg2 res_ty
                     ; return (term_arg1, term_arg2, mkCheckExpType ty_arg2) }

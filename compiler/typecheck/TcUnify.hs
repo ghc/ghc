@@ -17,7 +17,7 @@ module TcUnify (
 
   -- Various unifications
   unifyType, unifyTheta, unifyKind, noThing,
-  uType,
+  uType, promoteTcType,
   swapOverTyVars, canSolveByUnification,
 
   --------------------------------
@@ -52,6 +52,7 @@ import Name ( isSystemName )
 import Inst
 import TyCon
 import TysWiredIn
+import TysPrim( tYPE )
 import Var
 import VarSet
 import VarEnv
@@ -830,34 +831,24 @@ fillInferResult_Inst orig ty inf_res@(IR { ir_inst = instantiate_me })
 fillInferResult :: TcType -> InferResult -> TcM TcCoercionN
 -- If wrap = fillInferResult t1 t2
 --    => wrap :: t1 ~> t2
-fillInferResult ty (IR { ir_uniq = u, ir_lvl = res_lvl
-                       , ir_kind = res_kind, ir_ref = ref })
-  = do { (ty_co, ty) <- promoteTcType res_lvl ty
-       ; ki_co <- uType kind_orig KindLevel ty_kind res_kind
-       ; let ty_to_fill_with = ty `mkCastTy` ki_co
-             co = ty_co `mkTcCoherenceRightCo` ki_co
-
-       ; when debugIsOn (check_hole ty_to_fill_with)
+fillInferResult orig_ty (IR { ir_uniq = u, ir_lvl = res_lvl
+                            , ir_ref = ref })
+  = do { (ty_co, ty_to_fill_with) <- promoteTcType res_lvl orig_ty
 
        ; traceTc "Filling ExpType" $
          ppr u <+> text ":=" <+> ppr ty_to_fill_with
 
-       ; writeTcRef ref (Just ty)
+       ; when debugIsOn (check_hole ty_to_fill_with)
 
-       ; return co }
+       ; writeTcRef ref (Just ty_to_fill_with)
+
+       ; return ty_co }
   where
-    ty_kind = typeKind ty
-    kind_orig = TypeEqOrigin { uo_actual   = ty_kind
-                             , uo_expected = res_kind
-                             , uo_thing    = Nothing }
-
     check_hole ty   -- Debug check only
-      = do { ki1 <- zonkTcType (typeKind ty)
-           ; ki2 <- zonkTcType res_kind
-           ; MASSERT2( ki1 `eqType` ki2, ppr ki1 $$ ppr ki2 $$ ppr u )
-           ; let ty_lvl = tcTypeLevel ty
+      = do { let ty_lvl = tcTypeLevel ty
            ; MASSERT2( not (ty_lvl `strictlyDeeperThan` res_lvl),
-                       ppr u $$ ppr res_lvl $$ ppr ty_lvl )
+                       ppr u $$ ppr res_lvl $$ ppr ty_lvl $$
+                       ppr ty <+> ppr (typeKind ty) $$ ppr orig_ty )
            ; cts <- readTcRef ref
            ; case cts of
                Just already_there -> pprPanic "writeExpType"
@@ -901,6 +892,121 @@ has the ir_inst flag.
   We'll call TcExpr.tcInferFun to infer the type of the (let .. in f)
   And we don't want to instantite the type of 'f' when we reach it,
   else the outer visible type application won't work
+-}
+
+{- *********************************************************************
+*                                                                      *
+              Promoting types
+*                                                                      *
+********************************************************************* -}
+
+promoteTcType :: TcLevel -> TcType -> TcM (TcCoercion, TcType)
+-- See Note [Promoting a type]
+-- promoteTcType level ty = (co, ty')
+--   * Returns ty'  whose max level is just 'level'
+--             and  whose kind is ~# to the kind of 'ty'
+--             and  whose kind has form TYPE rr
+--   * and co :: ty ~ ty'
+--   * and emits constraints to justify the coercion
+promoteTcType dest_lvl ty
+  = do { cur_lvl <- getTcLevel
+       ; if (cur_lvl `sameDepthAs` dest_lvl)
+         then dont_promote_it
+         else promote_it }
+  where
+    promote_it :: TcM (TcCoercion, TcType)
+    promote_it  -- Emit a constraint  (alpha :: TYPE rr) ~ ty
+                -- where alpha and rr are fresh and from level dest_lvl
+      = do { rr      <- newMetaTyVarTyAtLevel dest_lvl runtimeRepTy
+           ; prom_ty <- newMetaTyVarTyAtLevel dest_lvl (tYPE rr)
+           ; let eq_orig = TypeEqOrigin { uo_actual   = ty
+                                        , uo_expected = prom_ty
+                                        , uo_thing    = Nothing }
+
+           ; co <- emitWantedEq eq_orig TypeLevel Nominal ty prom_ty
+           ; return (co, prom_ty) }
+
+    dont_promote_it :: TcM (TcCoercion, TcType)
+    dont_promote_it  -- Check that ty :: TYPE rr, for some (fresh) rr
+      = do { res_kind <- newOpenTypeKind
+           ; let ty_kind = typeKind ty
+                 kind_orig = TypeEqOrigin { uo_actual   = ty_kind
+                                          , uo_expected = res_kind
+                                          , uo_thing    = Nothing }
+           ; ki_co <- uType kind_orig KindLevel (typeKind ty) res_kind
+           ; let co = mkTcNomReflCo ty `mkTcCoherenceRightCo` ki_co
+           ; return (co, ty `mkCastTy` ki_co) }
+
+{- Note [Promoting a type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (Trac #12427)
+
+  data T where
+    MkT :: (Int -> Int) -> a -> T
+
+  h y = case y of MkT v w -> v
+
+We'll infer the RHS type with an expected type ExpType of
+  (IR { ir_lvl = l, ir_ref = ref, ... )
+where 'l' is the TcLevel of the RHS of 'h'.  Then the MkT pattern
+match will increase the level, so we'll end up in tcSubType, trying to
+unify the type of v,
+  v :: Int -> Int
+with the expected type.  But this attempt takes place at level (l+1),
+rightly so, since v's type could have mentioned existential variables,
+(like w's does) and we want to catch that.
+
+So we
+  - create a new meta-var alpha[l+1]
+  - fill in the InferRes ref cell 'ref' with alpha
+  - emit an equality constraint, thus
+        [W] alpha[l+1] ~ (Int -> Int)
+
+That constraint will float outwards, as it should, unless v's
+type mentions a skolem-captured variable.
+
+This approach fails if v has a higher rank type; see
+Note [Promotion and higher rank types]
+
+
+Note [Promotion and higher rank types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If v had a higher-rank type, say v :: (forall a. a->a) -> Int,
+then we'd emit an equality
+        [W] alpha[l+1] ~ ((forall a. a->a) -> Int)
+which will sadly fail because we can't unify a unification variable
+with a polytype.  But there is nothing really wrong with the program
+here.
+
+We could just about solve this by "promote the type" of v, to expose
+its polymorphic "shape" while still leaving constraints that will
+prevent existential escape.  But we must be careful!  Exposing
+the "shape" of the type is precisely what we must NOT do under
+a GADT pattern match!  So in this case we might promote the type
+to
+        (forall a. a->a) -> alpha[l+1]
+and emit the constraint
+        [W] alpha[l+1] ~ Int
+Now the poromoted type can fill the ref cell, while the emitted
+equality can float or not, according to the usual rules.
+
+But that's not quite right!  We are exposing the arrow! We could
+deal with that too:
+        (forall a. mu[l+1] a a) -> alpha[l+1]
+with constraints
+        [W] alpha[l+1] ~ Int
+        [W] mu[l+1] ~ (->)
+Here we abstract over the '->' inside the forall, in case that
+is subject to an equality constraint from a GADT match.
+
+Note that we kept the outer (->) becuase that's part of
+the polymorphic "shape".  And becauuse of impredicativity,
+GADT matches can't give equalities that affect polymorphic
+shape.
+
+This reasoning just seems too complicated, so I decided not
+to do it.  These higher-rank notes are just here to record
+the thinking.
 -}
 
 {- *********************************************************************
