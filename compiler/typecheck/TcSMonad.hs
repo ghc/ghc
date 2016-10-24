@@ -123,6 +123,7 @@ import qualified TcRnMonad as TcM
 import qualified TcMType as TcM
 import qualified TcEnv as TcM
        ( checkWellStaged, topIdLvl, tcGetDefaultTys, tcLookupClass )
+import PrelNames( heqTyConKey, eqTyConKey )
 import Kind
 import TcType
 import DynFlags
@@ -194,15 +195,37 @@ We can often solve all goals without processing *any* derived constraints.
 The derived constraints are just there to help us if we get stuck.  So
 we keep them in a separate list.
 
+Note [Prioritise class equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We prioritise equalities in the solver (see selectWorkItem). But class
+constraints like (a ~ b) and (a ~~ b) are actually equalities too;
+see Note [The equality types story] in TysPrim.
+
+Failing to prioritise these is inefficient (more kick-outs etc).
+But, worse, it can prevent us spotting a "recursive knot" among
+Wanted constraints.  See comment:10 of Trac #12734 for a worked-out
+example.
+
+So we arrange to put these particular class constraints in the wl_eqs.
+
+  NB: since we do not currently apply the substition to the
+  inert_solved_dicts, the knot-tying still seems a bit fragile.
+  But this makes it better.
 -}
 
 -- See Note [WorkList priorities]
 data WorkList
-  = WL { wl_eqs     :: [Ct]
+  = WL { wl_eqs     :: [Ct]  -- Both equality constraints and their
+                             -- class-level variants (a~b) and (a~~b);
+                             -- See Note [Prioritise class equalities]
+
        , wl_funeqs  :: [Ct]  -- LIFO stack of goals
+
        , wl_rest    :: [Ct]
+
        , wl_deriv   :: [CtEvidence]  -- Implicitly non-canonical
                                      -- See Note [Process derived items last]
+
        , wl_implics :: Bag Implication  -- See Note [Residual implications]
     }
 
@@ -260,7 +283,13 @@ extendWorkListCt ct wl
        | Just (tc,_) <- tcSplitTyConApp_maybe ty1
        , isTypeFamilyTyCon tc
        -> extendWorkListFunEq ct wl
+
      EqPred {}
+       -> extendWorkListEq ct wl
+
+     ClassPred cls _  -- See Note [Prioritise class equalites]
+       |  cls `hasKey` heqTyConKey
+       || cls `hasKey` eqTyConKey
        -> extendWorkListEq ct wl
 
      _ -> extendWorkListNonEq ct wl
