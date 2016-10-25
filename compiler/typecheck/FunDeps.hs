@@ -195,11 +195,9 @@ improveFromInstEnv :: InstEnvs
                    -> [FunDepEqn loc] -- Needs to be a FunDepEqn because
                                       -- of quantified variables
 -- Post: Equations oriented from the template (matching instance) to the workitem!
-improveFromInstEnv _inst_env _ pred
-  | not (isClassPred pred)
-  = panic "improveFromInstEnv: not a class predicate"
 improveFromInstEnv inst_env mk_loc pred
-  | Just (cls, tys) <- getClassPredTys_maybe pred
+  | Just (cls, tys) <- ASSERT2( isClassPred pred, ppr pred )
+                       getClassPredTys_maybe pred
   , let (cls_tvs, cls_fds) = classTvsFds cls
         instances          = classInstances inst_env cls
         rough_tcs          = roughMatchTcs tys
