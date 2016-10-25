@@ -432,15 +432,20 @@ mk_superclasses_of :: NameSet -> CtEvidence -> Class -> [Type] -> TcS [Ct]
 -- Always return this class constraint,
 -- and expand its superclasses
 mk_superclasses_of rec_clss ev cls tys
-  | loop_found = return [this_ct]  -- cc_pend_sc of this_ct = True
-  | otherwise  = do { sc_cts <- mk_strict_superclasses rec_clss' ev cls tys
+  | loop_found = do { traceTcS "mk_superclasses_of: loop" (ppr cls <+> ppr tys)
+                    ; return [this_ct] }  -- cc_pend_sc of this_ct = True
+  | otherwise  = do { traceTcS "mk_superclasses_of" (vcat [ ppr cls <+> ppr tys
+                                                          , ppr (isCTupleClass cls)
+                                                          , ppr rec_clss
+                                                          ])
+                    ; sc_cts <- mk_strict_superclasses rec_clss' ev cls tys
                     ; return (this_ct : sc_cts) }
                                    -- cc_pend_sc of this_ct = False
   where
     cls_nm     = className cls
-    loop_found = cls_nm `elemNameSet` rec_clss
-    rec_clss'  | isCTupleClass cls = rec_clss  -- Never contribute to recursion
-               | otherwise         = rec_clss `extendNameSet` cls_nm
+    loop_found = not (isCTupleClass cls) && cls_nm `elemNameSet` rec_clss
+                 -- Tuples neveer contribute to recursion, and can be nested
+    rec_clss'  = rec_clss `extendNameSet` cls_nm
     this_ct    = CDictCan { cc_ev = ev, cc_class = cls, cc_tyargs = tys
                           , cc_pend_sc = loop_found }
                  -- NB: If there is a loop, we cut off, so we have not
@@ -460,7 +465,8 @@ mk_strict_superclasses rec_clss ev cls tys
   = return [] -- Wanteds with no variables yield no deriveds.
               -- See Note [Improvement from Ground Wanteds]
 
-  | otherwise -- Wanted/Derived case, just add those SC that can lead to improvement.
+  | otherwise -- Wanted/Derived case, just add Derived superclasses
+              -- that can lead to improvement.
   = do { let loc = ctEvLoc ev
        ; sc_evs <- mapM (newDerivedNC loc) (immSuperClasses cls tys)
        ; concatMapM (mk_superclasses rec_clss) sc_evs }
