@@ -9,7 +9,8 @@ module TcInteract (
 
 #include "HsVersions.h"
 
-import BasicTypes ( infinity, IntWithInf, intGtLimit )
+import BasicTypes ( SwapFlag(..), isSwapped,
+                    infinity, IntWithInf, intGtLimit )
 import HsTypes ( HsIPName(..) )
 import TcCanonical
 import TcFlatten
@@ -133,16 +134,14 @@ that prepareInertsForImplications will discard the insolubles, so we
 must keep track of them separately.
 -}
 
-solveSimpleGivens :: [Ct] -> TcS Cts
+solveSimpleGivens :: [Ct] -> TcS ()
 solveSimpleGivens givens
   | null givens  -- Shortcut for common case
-  = return emptyCts
+  = return ()
   | otherwise
   = do { traceTcS "solveSimpleGivens {" (ppr givens)
        ; go givens
-       ; given_insols <- takeGivenInsolubles
-       ; traceTcS "End solveSimpleGivens }" (text "Insoluble:" <+> pprCts given_insols)
-       ; return given_insols }
+       ; traceTcS "End solveSimpleGivens }" empty }
   where
     go givens = do { solveSimples (listToBag givens)
                    ; new_givens <- runTcPluginsGiven
@@ -183,7 +182,8 @@ solveSimpleWanteds simples
 
           ; if unif_count == 0 && not rerun_plugin
             then return (n, wc2)             -- Done
-            else do { traceTcS "solveSimple going round again:" (ppr rerun_plugin)
+            else do { traceTcS "solveSimple going round again:" $
+                      ppr unif_count $$ ppr rerun_plugin
                     ; go (n+1) limit wc2 } }      -- Loop
 
 
@@ -355,11 +355,8 @@ runTcPlugins plugins all_cts
     without = deleteFirstsBy eqCt
 
     eqCt :: Ct -> Ct -> Bool
-    eqCt c c' = case (ctEvidence c, ctEvidence c') of
-      (CtGiven   pred _ _, CtGiven   pred' _ _) -> pred `eqType` pred'
-      (CtWanted  pred _ _, CtWanted  pred' _ _) -> pred `eqType` pred'
-      (CtDerived pred _  , CtDerived pred' _  ) -> pred `eqType` pred'
-      (_                 , _                  ) -> False
+    eqCt c c' = ctFlavour c == ctFlavour c'
+             && ctPred c `tcEqType` ctPred c'
 
     add :: [(EvTerm,Ct)] -> SolvedCts -> SolvedCts
     add xs scs = foldl' addOne scs xs
@@ -386,19 +383,19 @@ runSolverPipeline pipeline workItem
 
        ; bumpStepCountTcS    -- One step for each constraint processed
        ; final_res  <- run_pipeline pipeline (ContinueWith workItem)
-
-       ; final_is <- getTcSInerts
        ; case final_res of
            Stop ev s       -> do { traceFireTcS ev s
+                                 ; final_is <- getTcSInerts
                                  ; traceTcS "End solver pipeline (discharged) }"
                                        (text "inerts =" <+> ppr final_is)
                                  ; return () }
            ContinueWith ct -> do { traceFireTcS (ctEvidence ct) (text "Kept as inert")
+                                 ; addInertCan ct
+                                 ; final_is <- getTcSInerts
                                  ; traceTcS "End solver pipeline (kept as inert) }" $
                                        vcat [ text "final_item =" <+> ppr ct
                                             , pprTyVars $ tyCoVarsOfCtList ct
-                                            , text "inerts     =" <+> ppr final_is]
-                                 ; addInertCan ct }
+                                            , text "inerts     =" <+> ppr final_is] }
        }
   where run_pipeline :: [(String,SimplifierStage)] -> StopOrContinue Ct
                      -> TcS (StopOrContinue Ct)
@@ -740,6 +737,7 @@ addFunDepWork inerts work_ev cls
   where
     work_pred = ctEvPred work_ev
     work_loc  = ctEvLoc work_ev
+
     add_fds inert_ct
       = emitFunDepDeriveds $
         improveFromAnother derived_loc inert_pred work_pred
@@ -819,7 +817,6 @@ So the inner binding for ?x::Bool *overrides* the outer one.
 
 All this works for the normal cases but it has an odd side effect in
 some pathological programs like this:
-
 -- This is accepted, the second parameter shadows
 f1 :: (?x :: Int, ?x :: Char) => Char
 f1 = ?x
@@ -852,57 +849,77 @@ I can think of two ways to fix this:
 
 interactFunEq :: InertCans -> Ct -> TcS (StopOrContinue Ct)
 -- Try interacting the work item with the inert set
-interactFunEq inerts workItem@(CFunEqCan { cc_ev = ev, cc_fun = tc
-                                         , cc_tyargs = args, cc_fsk = fsk })
-  | Just (CFunEqCan { cc_ev = ev_i
-                    , cc_fsk = fsk_i }) <- matching_inerts
-  = if ev_i `funEqCanDischarge` ev
-    then  -- Rewrite work-item using inert
-      do { traceTcS "reactFunEq (discharge work item):" $
-           vcat [ text "workItem =" <+> ppr workItem
-                , text "inertItem=" <+> ppr ev_i ]
-         ; reactFunEq ev_i fsk_i ev fsk
-         ; stopWith ev "Inert rewrites work item" }
-    else  -- Rewrite inert using work-item
-      ASSERT2( ev `funEqCanDischarge` ev_i, ppr ev $$ ppr ev_i )
-      do { traceTcS "reactFunEq (rewrite inert item):" $
-           vcat [ text "workItem =" <+> ppr workItem
-                , text "inertItem=" <+> ppr ev_i ]
-         ; updInertFunEqs $ \ feqs -> insertFunEq feqs tc args workItem
-               -- Do the updInertFunEqs before the reactFunEq, so that
-               -- we don't kick out the inertItem as well as consuming it!
-         ; reactFunEq ev fsk ev_i fsk_i
-         ; stopWith ev "Work item rewrites inert" }
+interactFunEq inerts work_item@(CFunEqCan { cc_ev = ev, cc_fun = tc
+                                          , cc_tyargs = args, cc_fsk = fsk })
+  | Just inert_ct@(CFunEqCan { cc_ev = ev_i
+                             , cc_fsk = fsk_i })
+         <- findFunEq (inert_funeqs inerts) tc args
+  , pr@(swap_flag, upgrade_flag) <- ev_i `funEqCanDischarge` ev
+  = do { traceTcS "reactFunEq (rewrite inert item):" $
+         vcat [ text "work_item =" <+> ppr work_item
+              , text "inertItem=" <+> ppr ev_i
+              , text "(swap_flag, upgrade)" <+> ppr pr ]
+       ; if isSwapped swap_flag
+         then do {   -- Rewrite inert using work-item
+                   let work_item' | upgrade_flag = upgradeWanted work_item
+                                  | otherwise    = work_item
+                 ; updInertFunEqs $ \ feqs -> insertFunEq feqs tc args work_item'
+                      -- Do the updInertFunEqs before the reactFunEq, so that
+                      -- we don't kick out the inertItem as well as consuming it!
+                 ; reactFunEq ev fsk ev_i fsk_i
+                 ; stopWith ev "Work item rewrites inert" }
+         else do {   -- Rewrite work-item using inert
+                 ; when upgrade_flag $
+                   updInertFunEqs $ \ feqs -> insertFunEq feqs tc args
+                                                 (upgradeWanted inert_ct)
+                 ; reactFunEq ev_i fsk_i ev fsk
+                 ; stopWith ev "Inert rewrites work item" } }
 
   | otherwise   -- Try improvement
-  = do { improveLocalFunEqs loc inerts tc args fsk
-       ; continueWith workItem }
+  = do { improveLocalFunEqs ev inerts tc args fsk
+       ; continueWith work_item }
+
+interactFunEq _ work_item = pprPanic "interactFunEq" (ppr work_item)
+
+upgradeWanted :: Ct -> Ct
+-- We are combining a [W] F tys ~ fmv1 and [D] F tys ~ fmv2
+-- so upgrade the [W] to [WD] before putting it in the inert set
+upgradeWanted ct = ct { cc_ev = upgrade_ev (cc_ev ct) }
   where
-    loc             = ctEvLoc ev
-    funeqs          = inert_funeqs inerts
-    matching_inerts = findFunEq funeqs tc args
+    upgrade_ev ev = ASSERT2( isWanted ev, ppr ct )
+                    ev { ctev_nosh = WDeriv }
 
-interactFunEq _ workItem = pprPanic "interactFunEq" (ppr workItem)
-
-improveLocalFunEqs :: CtLoc -> InertCans -> TyCon -> [TcType] -> TcTyVar
+improveLocalFunEqs :: CtEvidence -> InertCans -> TyCon -> [TcType] -> TcTyVar
                    -> TcS ()
 -- Generate derived improvement equalities, by comparing
 -- the current work item with inert CFunEqs
 -- E.g.   x + y ~ z,   x + y' ~ z   =>   [D] y ~ y'
-improveLocalFunEqs loc inerts fam_tc args fsk
-  | not (null improvement_eqns)
-  = do { traceTcS "interactFunEq improvements: " $
+--
+-- See Note [FunDep and implicit parameter reactions]
+improveLocalFunEqs ev inerts fam_tc args fsk
+  | isGiven ev   -- See Note [No FunEq improvement for Givens]
+  = return ()
+
+  | null improvement_eqns
+  = do { traceTcS "improveLocalFunEqs no improvements: " $
+         vcat [ text "Candidates:" <+> ppr funeqs_for_tc
+              , text "Inert eqs:" <+> ppr ieqs ]
+       ; return () }
+
+  | otherwise
+  = do { traceTcS "improveLocalFunEqs improvements: " $
          vcat [ text "Eqns:" <+> ppr improvement_eqns
               , text "Candidates:" <+> ppr funeqs_for_tc
-              , text "Model:" <+> ppr model ]
+              , text "Inert eqs:" <+> ppr ieqs ]
        ; mapM_ (unifyDerived loc Nominal) improvement_eqns }
-  | otherwise
-  = return ()
+
   where
-    model         = inert_model inerts
+    loc           = ctEvLoc ev
+    ieqs          = inert_eqs inerts
     funeqs        = inert_funeqs inerts
     funeqs_for_tc = findFunEqsByTyCon funeqs fam_tc
-    rhs           = lookupFlattenTyVar model fsk
+    rhs           = lookupFlattenTyVar ieqs fsk
+    fam_inj_info  = familyTyConInjectivityInfo fam_tc
 
     --------------------
     improvement_eqns
@@ -910,37 +927,30 @@ improveLocalFunEqs loc inerts fam_tc args fsk
       =    -- Try built-in families, notably for arithmethic
          concatMap (do_one_built_in ops) funeqs_for_tc
 
-      | Injective injective_args <- familyTyConInjectivityInfo fam_tc
+      | Injective injective_args <- fam_inj_info
       =    -- Try improvement from type families with injectivity annotations
-         concatMap (do_one_injective injective_args) funeqs_for_tc
+        concatMap (do_one_injective injective_args) funeqs_for_tc
 
       | otherwise
       = []
 
     --------------------
     do_one_built_in ops (CFunEqCan { cc_tyargs = iargs, cc_fsk = ifsk })
-      = sfInteractInert ops args rhs iargs (lookupFlattenTyVar model ifsk)
+      = sfInteractInert ops args rhs iargs (lookupFlattenTyVar ieqs ifsk)
     do_one_built_in _ _ = pprPanic "interactFunEq 1" (ppr fam_tc)
 
     --------------------
     -- See Note [Type inference for type families with injectivity]
-    do_one_injective injective_args
-                    (CFunEqCan { cc_tyargs = iargs, cc_fsk = ifsk })
-      | rhs `tcEqType` lookupFlattenTyVar model ifsk
-      = [Pair arg iarg | (arg, iarg, True)
-                           <- zip3 args iargs injective_args ]
-      | otherwise
-      = []
+    do_one_injective inj_args (CFunEqCan { cc_tyargs = iargs, cc_fsk = ifsk })
+      | rhs `tcEqType` lookupFlattenTyVar ieqs ifsk
+      = [ Pair arg iarg
+        | (arg, iarg, True) <- zip3 args iargs inj_args ]
+
+      | otherwise = []
+
     do_one_injective _ _ = pprPanic "interactFunEq 2" (ppr fam_tc)
 
 -------------
-lookupFlattenTyVar :: InertModel -> TcTyVar -> TcType
--- See Note [lookupFlattenTyVar]
-lookupFlattenTyVar model ftv
-  = case lookupDVarEnv model ftv of
-      Just (CTyEqCan { cc_rhs = rhs, cc_eq_rel = NomEq }) -> rhs
-      _                                                   -> mkTyVarTy ftv
-
 reactFunEq :: CtEvidence -> TcTyVar    -- From this  :: F args1 ~ fsk1
            -> CtEvidence -> TcTyVar    -- Solve this :: F args2 ~ fsk2
            -> TcS ()
@@ -955,26 +965,20 @@ reactFunEq from_this fsk1 solve_this fsk2
        ; new_ev <- newGivenEvVar loc (fsk_eq_pred, EvCoercion fsk_eq_co)
        ; emitWorkNC [new_ev] }
 
-  | otherwise
+  | CtDerived { ctev_loc = loc } <- solve_this
+  = do { traceTcS "reactFunEq (Derived)" (ppr from_this $$ ppr fsk1 $$
+                                          ppr solve_this $$ ppr fsk2)
+       ; emitNewDerivedEq loc Nominal (mkTyVarTy fsk1) (mkTyVarTy fsk2) }
+              -- FunEqs are always at Nominal role
+
+  | otherwise  -- Wanted
   = do { traceTcS "reactFunEq" (ppr from_this $$ ppr fsk1 $$
                                 ppr solve_this $$ ppr fsk2)
        ; dischargeFmv solve_this fsk2 (ctEvCoercion from_this) (mkTyVarTy fsk1)
        ; traceTcS "reactFunEq done" (ppr from_this $$ ppr fsk1 $$
                                      ppr solve_this $$ ppr fsk2) }
 
-{- Note [lookupFlattenTyVar]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Supppose we have an injective function F and
-  inert_funeqs:   F t1 ~ fsk1
-                  F t2 ~ fsk2
-  model           fsk1 ~ fsk2
-
-We never rewrite the RHS (cc_fsk) of a CFunEqCan.  But we /do/ want to
-get the [D] t1 ~ t2 from the injectiveness of F.  So we look up the
-cc_fsk of CFunEqCans in the model when trying to find derived
-equalities arising from injectivity.
-
-Note [Type inference for type families with injectivity]
+{- Note [Type inference for type families with injectivity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have a type family with an injectivity annotation:
     type family F a b = r | r -> b
@@ -1101,24 +1105,19 @@ test when solving pairwise CFunEqCan.
 **********************************************************************
 -}
 
-interactTyVarEq :: InertCans -> Ct -> TcS (StopOrContinue Ct)
--- CTyEqCans are always consumed, so always returns Stop
-interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv
-                                          , cc_rhs = rhs
-                                          , cc_ev = ev
-                                          , cc_eq_rel = eq_rel })
+inertsCanDischarge :: InertCans -> TcTyVar -> TcType -> CtEvidence
+                   -> Maybe ( CtEvidence  -- The evidence for the inert
+                            , SwapFlag    -- Whether we need mkSymCo
+                            , Bool)       -- True <=> keep a [D] version
+                                          --          of the [WD] constraint
+inertsCanDischarge inerts tv rhs ev
   | (ev_i : _) <- [ ev_i | CTyEqCan { cc_ev = ev_i, cc_rhs = rhs_i }
                              <- findTyEqs inerts tv
                          , ev_i `eqCanDischarge` ev
                          , rhs_i `tcEqType` rhs ]
   =  -- Inert:     a ~ ty
      -- Work item: a ~ ty
-    do { setEvBindIfWanted ev $
-          EvCoercion (tcDowngradeRole (eqRelRole eq_rel)
-                                      (ctEvRole ev_i)
-                                      (ctEvCoercion ev_i))
-
-       ; stopWith ev "Solved from inert" }
+    Just (ev_i, NotSwapped, keep_deriv ev_i)
 
   | Just tv_rhs <- getTyVar_maybe rhs
   , (ev_i : _) <- [ ev_i | CTyEqCan { cc_ev = ev_i, cc_rhs = rhs_i }
@@ -1127,13 +1126,41 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv
                          , rhs_i `tcEqType` mkTyVarTy tv ]
   =  -- Inert:     a ~ b
      -- Work item: b ~ a
-    do { setEvBindIfWanted ev $
-           EvCoercion (mkTcSymCo $
-                       tcDowngradeRole (eqRelRole eq_rel)
-                                       (ctEvRole ev_i)
-                                       (ctEvCoercion ev_i))
+     Just (ev_i, IsSwapped, keep_deriv ev_i)
 
-       ; stopWith ev "Solved from inert (r)" }
+  | otherwise
+  = Nothing
+
+  where
+    keep_deriv ev_i
+      | Wanted WOnly  <- ctEvFlavour ev_i  -- inert is [W]
+      , Wanted WDeriv <- ctEvFlavour ev    -- work item is [WD]
+      = True   -- Keep a derived verison of the work item
+      | otherwise
+      = False  -- Work item is fully discharged
+
+interactTyVarEq :: InertCans -> Ct -> TcS (StopOrContinue Ct)
+-- CTyEqCans are always consumed, so always returns Stop
+interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv
+                                          , cc_rhs = rhs
+                                          , cc_ev = ev
+                                          , cc_eq_rel = eq_rel })
+  | Just (ev_i, swapped, keep_deriv)
+       <- inertsCanDischarge inerts tv rhs ev
+  = do { setEvBindIfWanted ev $
+         EvCoercion (maybeSym swapped $
+                     tcDowngradeRole (eqRelRole eq_rel)
+                                     (ctEvRole ev_i)
+                                     (ctEvCoercion ev_i))
+
+       ; let deriv_ev = CtDerived { ctev_pred = ctEvPred ev
+                                  , ctev_loc  = ctEvLoc  ev }
+       ; when keep_deriv $
+         emitWork [workItem { cc_ev = deriv_ev }]
+         -- As a Derived it might not be fully rewritten,
+         -- so we emit it as new work
+
+       ; stopWith ev "Solved from inert" }
 
   | ReprEq <- eq_rel   -- We never solve representational
   = unsolved_inert     -- equalities by unification
@@ -1159,7 +1186,7 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv
                                 <+> text "is" <+> ppr (metaTyVarTcLevel tv))
                       , text "RHS:" <+> ppr rhs <+> dcolon <+> ppr (typeKind rhs) ])
            ; addInertEq workItem
-           ; return (Stop ev (text "Kept as inert")) }
+           ; stopWith ev "Kept as inert" }
 
 interactTyVarEq _ wi = pprPanic "interactTyVarEq" (ppr wi)
 
@@ -1233,9 +1260,78 @@ constraint right away.  This avoids two dangers
 
 To achieve this required some refactoring of FunDeps.hs (nicer
 now!).
+
+Note [FunDep and implicit parameter reactions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Currently, our story of interacting two dictionaries (or a dictionary
+and top-level instances) for functional dependencies, and implicit
+parameters, is that we simply produce new Derived equalities.  So for example
+
+        class D a b | a -> b where ...
+    Inert:
+        d1 :g D Int Bool
+    WorkItem:
+        d2 :w D Int alpha
+
+    We generate the extra work item
+        cv :d alpha ~ Bool
+    where 'cv' is currently unused.  However, this new item can perhaps be
+    spontaneously solved to become given and react with d2,
+    discharging it in favour of a new constraint d2' thus:
+        d2' :w D Int Bool
+        d2 := d2' |> D Int cv
+    Now d2' can be discharged from d1
+
+We could be more aggressive and try to *immediately* solve the dictionary
+using those extra equalities, but that requires those equalities to carry
+evidence and derived do not carry evidence.
+
+If that were the case with the same inert set and work item we might dischard
+d2 directly:
+
+        cv :w alpha ~ Bool
+        d2 := d1 |> D Int cv
+
+But in general it's a bit painful to figure out the necessary coercion,
+so we just take the first approach. Here is a better example. Consider:
+    class C a b c | a -> b
+And:
+     [Given]  d1 : C T Int Char
+     [Wanted] d2 : C T beta Int
+In this case, it's *not even possible* to solve the wanted immediately.
+So we should simply output the functional dependency and add this guy
+[but NOT its superclasses] back in the worklist. Even worse:
+     [Given] d1 : C T Int beta
+     [Wanted] d2: C T beta Int
+Then it is solvable, but its very hard to detect this on the spot.
+
+It's exactly the same with implicit parameters, except that the
+"aggressive" approach would be much easier to implement.
+
+Note [Weird fundeps]
+~~~~~~~~~~~~~~~~~~~~
+Consider   class Het a b | a -> b where
+              het :: m (f c) -> a -> m b
+
+           class GHet (a :: * -> *) (b :: * -> *) | a -> b
+           instance            GHet (K a) (K [a])
+           instance Het a b => GHet (K a) (K b)
+
+The two instances don't actually conflict on their fundeps,
+although it's pretty strange.  So they are both accepted. Now
+try   [W] GHet (K Int) (K Bool)
+This triggers fundeps from both instance decls;
+      [D] K Bool ~ K [a]
+      [D] K Bool ~ K beta
+And there's a risk of complaining about Bool ~ [a].  But in fact
+the Wanted matches the second instance, so we never get as far
+as the fundeps.
+
+Trac #7875 is a case in point.
 -}
 
 emitFunDepDeriveds :: [FunDepEqn CtLoc] -> TcS ()
+-- See Note [FunDep and implicit parameter reactions]
 emitFunDepDeriveds fd_eqns
   = mapM_ do_one_FDEqn fd_eqns
   where
@@ -1282,12 +1378,415 @@ doTopReact work_item
            _  -> -- Any other work item does not react with any top-level equations
                  continueWith work_item  }
 
+
 --------------------
+doTopReactFunEq :: Ct -> TcS (StopOrContinue Ct)
+doTopReactFunEq work_item@(CFunEqCan { cc_ev = old_ev, cc_fun = fam_tc
+                                     , cc_tyargs = args, cc_fsk = fsk })
+
+  | fsk `elemVarSet` tyCoVarsOfTypes args
+  = no_reduction    -- See Note [FunEq occurs-check principle]
+
+  | otherwise  -- Note [Reduction for Derived CFunEqCans]
+  = do { match_res <- matchFam fam_tc args
+                           -- Look up in top-level instances, or built-in axiom
+                           -- See Note [MATCHING-SYNONYMS]
+       ; case match_res of
+           Nothing         -> no_reduction
+           Just match_info -> reduce_top_fun_eq old_ev fsk match_info }
+  where
+    no_reduction
+      = do { improveTopFunEqs old_ev fam_tc args fsk
+           ; continueWith work_item }
+
+doTopReactFunEq w = pprPanic "doTopReactFunEq" (ppr w)
+
+reduce_top_fun_eq :: CtEvidence -> TcTyVar -> (TcCoercion, TcType)
+                  -> TcS (StopOrContinue Ct)
+-- We have found an applicable top-level axiom: use it to reduce
+-- Precondition: fsk is not free in rhs_ty
+--               old_ev is not Derived
+reduce_top_fun_eq old_ev fsk (ax_co, rhs_ty)
+  | isDerived old_ev
+  = do { emitNewDerivedEq loc Nominal (mkTyVarTy fsk) rhs_ty
+       ; stopWith old_ev "Fun/Top (derived)" }
+
+  | Just (tc, tc_args) <- tcSplitTyConApp_maybe rhs_ty
+  , isTypeFamilyTyCon tc
+  , tc_args `lengthIs` tyConArity tc    -- Short-cut
+  = -- RHS is another type-family application
+    -- Try shortcut; see Note [Top-level reductions for type functions]
+    shortCutReduction old_ev fsk ax_co tc tc_args
+
+  | isGiven old_ev  -- Not shortcut
+  = do { let final_co = mkTcSymCo (ctEvCoercion old_ev) `mkTcTransCo` ax_co
+              -- final_co :: fsk ~ rhs_ty
+       ; new_ev <- newGivenEvVar deeper_loc (mkPrimEqPred (mkTyVarTy fsk) rhs_ty,
+                                             EvCoercion final_co)
+       ; emitWorkNC [new_ev] -- Non-cannonical; that will mean we flatten rhs_ty
+       ; stopWith old_ev "Fun/Top (given)" }
+
+  | otherwise   -- So old_ev is Wanted (cannot be Derived)
+  = ASSERT2( not (fsk `elemVarSet` tyCoVarsOfType rhs_ty)
+           , ppr old_ev $$ ppr rhs_ty )
+           -- Guaranteed by Note [FunEq occurs-check principle]
+    do { dischargeFmv old_ev fsk ax_co rhs_ty
+       ; traceTcS "doTopReactFunEq" $
+         vcat [ text "old_ev:" <+> ppr old_ev
+              , nest 2 (text ":=") <+> ppr ax_co ]
+       ; stopWith old_ev "Fun/Top (wanted)" }
+
+  where
+    loc = ctEvLoc old_ev
+    deeper_loc = bumpCtLocDepth loc
+
+improveTopFunEqs :: CtEvidence -> TyCon -> [TcType] -> TcTyVar -> TcS ()
+-- See Note [FunDep and implicit parameter reactions]
+improveTopFunEqs ev fam_tc args fsk
+  | isGiven ev    -- See Note [No FunEq improvement for Givens]
+  = return ()
+
+  | otherwise
+  = do { ieqs <- getInertEqs
+       ; fam_envs <- getFamInstEnvs
+       ; eqns <- improve_top_fun_eqs fam_envs fam_tc args
+                                    (lookupFlattenTyVar ieqs fsk)
+       ; traceTcS "improveTopFunEqs" (vcat [ ppr fam_tc <+> ppr args <+> ppr fsk
+                                          , ppr eqns ])
+       ; mapM_ (unifyDerived loc Nominal) eqns }
+  where
+    loc = ctEvLoc ev
+
+improve_top_fun_eqs :: FamInstEnvs
+                    -> TyCon -> [TcType] -> TcType
+                    -> TcS [Eqn]
+improve_top_fun_eqs fam_envs fam_tc args rhs_ty
+  | Just ops <- isBuiltInSynFamTyCon_maybe fam_tc
+  = return (sfInteractTop ops args rhs_ty)
+
+  -- see Note [Type inference for type families with injectivity]
+  | isOpenTypeFamilyTyCon fam_tc
+  , Injective injective_args <- familyTyConInjectivityInfo fam_tc
+  = -- it is possible to have several compatible equations in an open type
+    -- family but we only want to derive equalities from one such equation.
+    concatMapM (injImproveEqns injective_args) (take 1 $
+      buildImprovementData (lookupFamInstEnvByTyCon fam_envs fam_tc)
+                           fi_tys fi_rhs (const Nothing))
+
+  | Just ax <- isClosedSynFamilyTyConWithAxiom_maybe fam_tc
+  , Injective injective_args <- familyTyConInjectivityInfo fam_tc
+  = concatMapM (injImproveEqns injective_args) $
+      buildImprovementData (fromBranches (co_ax_branches ax))
+                           cab_lhs cab_rhs Just
+
+  | otherwise
+  = return []
+
+  where
+      buildImprovementData
+          :: [a]                     -- axioms for a TF (FamInst or CoAxBranch)
+          -> (a -> [Type])           -- get LHS of an axiom
+          -> (a -> Type)             -- get RHS of an axiom
+          -> (a -> Maybe CoAxBranch) -- Just => apartness check required
+          -> [( [Type], TCvSubst, [TyVar], Maybe CoAxBranch )]
+             -- Result:
+             -- ( [arguments of a matching axiom]
+             -- , RHS-unifying substitution
+             -- , axiom variables without substitution
+             -- , Maybe matching axiom [Nothing - open TF, Just - closed TF ] )
+      buildImprovementData axioms axiomLHS axiomRHS wrap =
+          [ (ax_args, subst, unsubstTvs, wrap axiom)
+          | axiom <- axioms
+          , let ax_args = axiomLHS axiom
+          , let ax_rhs  = axiomRHS axiom
+          , Just subst <- [tcUnifyTyWithTFs False ax_rhs rhs_ty]
+          , let tvs           = tyCoVarsOfTypesList ax_args
+                notInSubst tv = not (tv `elemVarEnv` getTvSubstEnv subst)
+                unsubstTvs    = filter (notInSubst <&&> isTyVar) tvs ]
+
+      injImproveEqns :: [Bool]
+                     -> ([Type], TCvSubst, [TyCoVar], Maybe CoAxBranch)
+                     -> TcS [Eqn]
+      injImproveEqns inj_args (ax_args, theta, unsubstTvs, cabr) = do
+        (theta', _) <- instFlexiTcS unsubstTvs
+        -- The use of deterministically ordered list for `unsubstTvs`
+        -- is not strictly necessary here, we only use the substitution
+        -- part of the result of instFlexiTcS. If we used the second
+        -- part of the tuple, which is the range of the substitution then
+        -- the order could be important.
+        let subst = theta `unionTCvSubst` theta'
+        return [ Pair (substTyUnchecked subst ax_arg) arg
+                   -- NB: the ax_arg part is on the left
+                   -- see Note [Improvement orientation]
+               | case cabr of
+                  Just cabr' -> apartnessCheck (substTys subst ax_args) cabr'
+                  _          -> True
+               , (ax_arg, arg, True) <- zip3 ax_args args inj_args ]
+
+
+shortCutReduction :: CtEvidence -> TcTyVar -> TcCoercion
+                  -> TyCon -> [TcType] -> TcS (StopOrContinue Ct)
+-- See Note [Top-level reductions for type functions]
+shortCutReduction old_ev fsk ax_co fam_tc tc_args
+  = ASSERT( ctEvEqRel old_ev == NomEq)
+    do { (xis, cos) <- flattenManyNom old_ev tc_args
+               -- ax_co :: F args ~ G tc_args
+               -- cos   :: xis ~ tc_args
+               -- old_ev :: F args ~ fsk
+               -- G cos ; sym ax_co ; old_ev :: G xis ~ fsk
+
+       ; new_ev <- case ctEvFlavour old_ev of
+           Given -> newGivenEvVar deeper_loc
+                         ( mkPrimEqPred (mkTyConApp fam_tc xis) (mkTyVarTy fsk)
+                         , EvCoercion (mkTcTyConAppCo Nominal fam_tc cos
+                                        `mkTcTransCo` mkTcSymCo ax_co
+                                        `mkTcTransCo` ctEvCoercion old_ev) )
+
+           Wanted {} ->
+             do { (new_ev, new_co) <- newWantedEq deeper_loc Nominal
+                                        (mkTyConApp fam_tc xis) (mkTyVarTy fsk)
+                ; setWantedEq (ctev_dest old_ev) $
+                     ax_co `mkTcTransCo` mkTcSymCo (mkTcTyConAppCo Nominal
+                                                      fam_tc cos)
+                           `mkTcTransCo` new_co
+                ; return new_ev }
+
+           Derived -> pprPanic "shortCutReduction" (ppr old_ev)
+
+       ; let new_ct = CFunEqCan { cc_ev = new_ev, cc_fun = fam_tc
+                                , cc_tyargs = xis, cc_fsk = fsk }
+       ; updWorkListTcS (extendWorkListFunEq new_ct)
+       ; stopWith old_ev "Fun/Top (shortcut)" }
+  where
+    deeper_loc = bumpCtLocDepth (ctEvLoc old_ev)
+
+dischargeFmv :: CtEvidence -> TcTyVar -> TcCoercion -> TcType -> TcS ()
+-- (dischargeFmv x fmv co ty)
+--     [W] ev :: F tys ~ fmv
+--         co :: F tys ~ xi
+-- Precondition: fmv is not filled, and fmv `notElem` xi
+--               ev is Wanted
+--
+-- Then set fmv := xi,
+--      set ev  := co
+--      kick out any inert things that are now rewritable
+--
+-- Does not evaluate 'co' if 'ev' is Derived
+dischargeFmv ev@(CtWanted { ctev_dest = dest }) fmv co xi
+  = ASSERT2( not (fmv `elemVarSet` tyCoVarsOfType xi), ppr ev $$ ppr fmv $$ ppr xi )
+    do { setWantedEvTerm dest (EvCoercion co)
+       ; unflattenFmv fmv xi
+       ; n_kicked <- kickOutAfterUnification fmv
+       ; traceTcS "dischargeFmv" (ppr fmv <+> equals <+> ppr xi $$ ppr_kicked n_kicked) }
+dischargeFmv ev _ _ _ = pprPanic "dischargeFmv" (ppr ev)
+
+{- Note [Top-level reductions for type functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+c.f. Note [The flattening story] in TcFlatten
+
+Suppose we have a CFunEqCan  F tys ~ fmv/fsk, and a matching axiom.
+Here is what we do, in four cases:
+
+* Wanteds: general firing rule
+    (work item) [W]        x : F tys ~ fmv
+    instantiate axiom: ax_co : F tys ~ rhs
+
+   Then:
+      Discharge   fmv := rhs
+      Discharge   x := ax_co ; sym x2
+   This is *the* way that fmv's get unified; even though they are
+   "untouchable".
+
+   NB: Given Note [FunEq occurs-check principle], fmv does not appear
+   in tys, and hence does not appear in the instantiated RHS.  So
+   the unification can't make an infinite type.
+
+* Wanteds: short cut firing rule
+  Applies when the RHS of the axiom is another type-function application
+      (work item)        [W] x : F tys ~ fmv
+      instantiate axiom: ax_co : F tys ~ G rhs_tys
+
+  It would be a waste to create yet another fmv for (G rhs_tys).
+  Instead (shortCutReduction):
+      - Flatten rhs_tys (cos : rhs_tys ~ rhs_xis)
+      - Add G rhs_xis ~ fmv to flat cache  (note: the same old fmv)
+      - New canonical wanted   [W] x2 : G rhs_xis ~ fmv  (CFunEqCan)
+      - Discharge x := ax_co ; G cos ; x2
+
+* Givens: general firing rule
+      (work item)        [G] g : F tys ~ fsk
+      instantiate axiom: ax_co : F tys ~ rhs
+
+   Now add non-canonical given (since rhs is not flat)
+      [G] (sym g ; ax_co) : fsk ~ rhs  (Non-canonical)
+
+* Givens: short cut firing rule
+  Applies when the RHS of the axiom is another type-function application
+      (work item)        [G] g : F tys ~ fsk
+      instantiate axiom: ax_co : F tys ~ G rhs_tys
+
+  It would be a waste to create yet another fsk for (G rhs_tys).
+  Instead (shortCutReduction):
+     - Flatten rhs_tys: flat_cos : tys ~ flat_tys
+     - Add new Canonical given
+          [G] (sym (G flat_cos) ; co ; g) : G flat_tys ~ fsk   (CFunEqCan)
+
+Note [FunEq occurs-check principle]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+I have spent a lot of time finding a good way to deal with
+CFunEqCan constraints like
+    F (fuv, a) ~ fuv
+where flatten-skolem occurs on the LHS.  Now in principle we
+might may progress by doing a reduction, but in practice its
+hard to find examples where it is useful, and easy to find examples
+where we fall into an infinite reduction loop.  A rule that works
+very well is this:
+
+  *** FunEq occurs-check principle ***
+
+      Do not reduce a CFunEqCan
+          F tys ~ fsk
+      if fsk appears free in tys
+      Instead we treat it as stuck.
+
+Examples:
+
+* Trac #5837 has [G] a ~ TF (a,Int), with an instance
+    type instance TF (a,b) = (TF a, TF b)
+  This readily loops when solving givens.  But with the FunEq occurs
+  check principle, it rapidly gets stuck which is fine.
+
+* Trac #12444 is a good example, explained in comment:2.  We have
+    type instance F (Succ x) = Succ (F x)
+    [W] alpha ~ Succ (F alpha)
+  If we allow the reduction to happen, we get an infinite loop
+
+Note [Cached solved FunEqs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When trying to solve, say (FunExpensive big-type ~ ty), it's important
+to see if we have reduced (FunExpensive big-type) before, lest we
+simply repeat it.  Hence the lookup in inert_solved_funeqs.  Moreover
+we must use `funEqCanDischarge` because both uses might (say) be Wanteds,
+and we *still* want to save the re-computation.
+
+Note [MATCHING-SYNONYMS]
+~~~~~~~~~~~~~~~~~~~~~~~~
+When trying to match a dictionary (D tau) to a top-level instance, or a
+type family equation (F taus_1 ~ tau_2) to a top-level family instance,
+we do *not* need to expand type synonyms because the matcher will do that for us.
+
+Note [Improvement orientation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A very delicate point is the orientation of derived equalities
+arising from injectivity improvement (Trac #12522).  Suppse we have
+  type family F x = t | t -> x
+  type instance F (a, Int) = (Int, G a)
+where G is injective; and wanted constraints
+
+  [W] TF (alpha, beta) ~ fuv
+  [W] fuv ~ (Int, <some type>)
+
+The injectivity will give rise to derived constraints
+
+  [D] gamma1 ~ alpha
+  [D] Int ~ beta
+
+The fresh unification variable gamma1 comes from the fact that we
+can only do "partial improvement" here; see Section 5.2 of
+"Injective type families for Haskell" (HS'15).
+
+Now, it's very important to orient the equations this way round,
+so that the fresh unification variable will be eliminated in
+favour of alpha.  If we instead had
+   [D] alpha ~ gamma1
+then we would unify alpha := gamma1; and kick out the wanted
+constraint.  But when we grough it back in, it'd look like
+   [W] TF (gamma1, beta) ~ fuv
+and exactly the same thing would happen again!  Infnite loop.
+
+This all sesms fragile, and it might seem more robust to avoid
+introducing gamma1 in the first place, in the case where the
+actual argument (alpha, beta) partly matches the improvement
+template.  But that's a bit tricky, esp when we remember that the
+kinds much match too; so it's easier to let the normal machinery
+handle it.  Instead we are careful to orient the new derived
+equality with the template on the left.  Delicate, but it works.
+
+Note [No FunEq improvement for Givens]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We don't do improvements (injectivity etc) for Givens. Why?
+
+* It generates Derived constraints on skolems, which don't do us
+  much good, except perhaps identify inaccessible branches.
+  (They'd be perfectly valid though.)
+
+* For type-nat stuff the derived constraints include type families;
+  e.g.  (a < b), (b < c) ==> a < c If we generate a Derived for this,
+  we'll generate a Derived/Wanted CFunEqCan; and, since the same
+  InertCans (after solving Givens) are used for each iteration, that
+  massively confused the unflattening step (TcFlatten.unflatten).
+
+  In fact it led to some infinite loops:
+     indexed-types/should_compile/T10806
+     indexed-types/should_compile/T10507
+     polykinds/T10742
+
+Note [Reduction for Derived CFunEqCans]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+You may wonder if it's important to use top-level instances to
+simplify [D] CFunEqCan's.  But it is.  Here's an example (T10226).
+
+   type instance F    Int = Int
+   type instance FInv Int = Int
+
+Suppose we have to solve
+    [WD] FInv (F alpha) ~ alpha
+    [WD] F alpha ~ Int
+
+  --> flatten
+    [WD] F alpha ~ fuv0
+    [WD] FInv fuv0 ~ fuv1  -- (A)
+    [WD] fuv1 ~ alpha
+    [WD] fuv0 ~ Int        -- (B)
+
+  --> Rewwrite (A) with (B), splitting it
+    [WD] F alpha ~ fuv0
+    [W] FInv fuv0 ~ fuv1
+    [D] FInv Int ~ fuv1    -- (C)
+    [WD] fuv1 ~ alpha
+    [WD] fuv0 ~ Int
+
+  --> Reduce (C) with top-level instance
+      **** This is the key step ***
+    [WD] F alpha ~ fuv0
+    [W] FInv fuv0 ~ fuv1
+    [D] fuv1 ~ Int        -- (D)
+    [WD] fuv1 ~ alpha     -- (E)
+    [WD] fuv0 ~ Int
+
+  --> Rewrite (D) with (E)
+    [WD] F alpha ~ fuv0
+    [W] FInv fuv0 ~ fuv1
+    [D] alpha ~ Int       -- (F)
+    [WD] fuv1 ~ alpha
+    [WD] fuv0 ~ Int
+
+  --> unify (F)  alpha := Int, and that solves it
+
+Another example is indexed-types/should_compile/T10634
+-}
+
+{- *******************************************************************
+*                                                                    *
+         Top-level reaction for class constraints (CDictCan)
+*                                                                    *
+**********************************************************************-}
+
 doTopReactDict :: InertSet -> Ct -> TcS (StopOrContinue Ct)
 -- Try to use type-class instance declarations to simplify the constraint
 doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
                                           , cc_tyargs = xis })
-  | isGiven fl   -- Never use instances for Given constraints
+  | isGiven fl
   = do { try_fundep_improvement
        ; continueWith work_item }
 
@@ -1373,390 +1872,6 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
 
 doTopReactDict _ w = pprPanic "doTopReactDict" (ppr w)
 
---------------------
-doTopReactFunEq :: Ct -> TcS (StopOrContinue Ct)
-doTopReactFunEq work_item@(CFunEqCan { cc_ev = old_ev, cc_fun = fam_tc
-                                     , cc_tyargs = args, cc_fsk = fsk })
-  = do { match_res <- matchFam fam_tc args
-                           -- Look up in top-level instances, or built-in axiom
-                           -- See Note [MATCHING-SYNONYMS]
-       ; case match_res of
-           Nothing -> do { improveTopFunEqs (ctEvLoc old_ev) fam_tc args fsk
-                         ; continueWith work_item }
-           Just (ax_co, rhs_ty)
-             -> reduce_top_fun_eq old_ev fsk ax_co rhs_ty }
-
-doTopReactFunEq w = pprPanic "doTopReactFunEq" (ppr w)
-
-reduce_top_fun_eq :: CtEvidence -> TcTyVar -> TcCoercion -> TcType
-                  -> TcS (StopOrContinue Ct)
--- Found an applicable top-level axiom: use it to reduce
-reduce_top_fun_eq old_ev fsk ax_co rhs_ty
-  | Just (tc, tc_args) <- tcSplitTyConApp_maybe rhs_ty
-  , isTypeFamilyTyCon tc
-  , tc_args `lengthIs` tyConArity tc    -- Short-cut
-  = shortCutReduction old_ev fsk ax_co tc tc_args
-       -- Try shortcut; see Note [Short cut for top-level reaction]
-
-  | isGiven old_ev  -- Not shortcut
-  = do { let final_co = mkTcSymCo (ctEvCoercion old_ev) `mkTcTransCo` ax_co
-              -- final_co :: fsk ~ rhs_ty
-       ; new_ev <- newGivenEvVar deeper_loc (mkPrimEqPred (mkTyVarTy fsk) rhs_ty,
-                                             EvCoercion final_co)
-       ; emitWorkNC [new_ev] -- Non-cannonical; that will mean we flatten rhs_ty
-       ; stopWith old_ev "Fun/Top (given)" }
-
-  -- So old_ev is Wanted or Derived
-  | not (fsk `elemVarSet` tyCoVarsOfType rhs_ty)
-  = do { dischargeFmv old_ev fsk ax_co rhs_ty
-       ; traceTcS "doTopReactFunEq" $
-         vcat [ text "old_ev:" <+> ppr old_ev
-              , nest 2 (text ":=") <+> ppr ax_co ]
-       ; stopWith old_ev "Fun/Top (wanted)" }
-
-  | otherwise -- We must not assign ufsk := ...ufsk...!
-  = do { alpha_ty <- newFlexiTcSTy (tyVarKind fsk)
-       ; new_co <- case old_ev of
-           CtWanted {}  -> emitNewWantedEq loc Nominal alpha_ty rhs_ty
-           CtDerived {} -> do { ev <- newDerivedNC loc pred
-                              ; updWorkListTcS (extendWorkListDerived loc ev)
-                              ; return (ctEvCoercion ev) }  -- Coercion is bottom
-                        where pred = mkPrimEqPred alpha_ty rhs_ty
-           _ -> pprPanic "reduce_top_fun_eq" (ppr old_ev)
-
-            -- By emitting this as non-canonical, we deal with all
-            -- flattening, occurs-check, and ufsk := ufsk issues
-       ; let final_co = ax_co `mkTcTransCo` mkTcSymCo new_co
-            --    ax_co :: fam_tc args ~ rhs_ty
-            --       ev :: alpha ~ rhs_ty
-            --     ufsk := alpha
-            -- final_co :: fam_tc args ~ alpha
-       ; dischargeFmv old_ev fsk final_co alpha_ty
-       ; traceTcS "doTopReactFunEq (occurs)" $
-         vcat [ text "old_ev:" <+> ppr old_ev
-              , nest 2 (text ":=") <+>
-                   if isDerived old_ev then text "(derived)"
-                   else ppr final_co
-              , text "new_co:" <+> ppr new_co ]
-       ; stopWith old_ev "Fun/Top (wanted)" }
-  where
-    loc = ctEvLoc old_ev
-    deeper_loc = bumpCtLocDepth loc
-
-improveTopFunEqs :: CtLoc -> TyCon -> [TcType] -> TcTyVar -> TcS ()
-improveTopFunEqs loc fam_tc args fsk
-  = do { model <- getInertModel
-       ; fam_envs <- getFamInstEnvs
-       ; eqns <- improve_top_fun_eqs fam_envs fam_tc args
-                                    (lookupFlattenTyVar model fsk)
-       ; mapM_ (unifyDerived loc Nominal) eqns }
-
-improve_top_fun_eqs :: FamInstEnvs
-                    -> TyCon -> [TcType] -> TcType
-                    -> TcS [Eqn]
-improve_top_fun_eqs fam_envs fam_tc args rhs_ty
-  | Just ops <- isBuiltInSynFamTyCon_maybe fam_tc
-  = return (sfInteractTop ops args rhs_ty)
-
-  -- see Note [Type inference for type families with injectivity]
-  | isOpenTypeFamilyTyCon fam_tc
-  , Injective injective_args <- familyTyConInjectivityInfo fam_tc
-  = -- it is possible to have several compatible equations in an open type
-    -- family but we only want to derive equalities from one such equation.
-    concatMapM (injImproveEqns injective_args) (take 1 $
-      buildImprovementData (lookupFamInstEnvByTyCon fam_envs fam_tc)
-                           fi_tys fi_rhs (const Nothing))
-
-  | Just ax <- isClosedSynFamilyTyConWithAxiom_maybe fam_tc
-  , Injective injective_args <- familyTyConInjectivityInfo fam_tc
-  = concatMapM (injImproveEqns injective_args) $
-      buildImprovementData (fromBranches (co_ax_branches ax))
-                           cab_lhs cab_rhs Just
-
-  | otherwise
-  = return []
-     where
-      buildImprovementData
-          :: [a]                     -- axioms for a TF (FamInst or CoAxBranch)
-          -> (a -> [Type])           -- get LHS of an axiom
-          -> (a -> Type)             -- get RHS of an axiom
-          -> (a -> Maybe CoAxBranch) -- Just => apartness check required
-          -> [( [Type], TCvSubst, [TyVar], Maybe CoAxBranch )]
-             -- Result:
-             -- ( [arguments of a matching axiom]
-             -- , RHS-unifying substitution
-             -- , axiom variables without substitution
-             -- , Maybe matching axiom [Nothing - open TF, Just - closed TF ] )
-      buildImprovementData axioms axiomLHS axiomRHS wrap =
-          [ (ax_args, subst, unsubstTvs, wrap axiom)
-          | axiom <- axioms
-          , let ax_args = axiomLHS axiom
-          , let ax_rhs  = axiomRHS axiom
-          , Just subst <- [tcUnifyTyWithTFs False ax_rhs rhs_ty]
-          , let tvs           = tyCoVarsOfTypesList ax_args
-                notInSubst tv = not (tv `elemVarEnv` getTvSubstEnv subst)
-                unsubstTvs    = filter (notInSubst <&&> isTyVar) tvs ]
-
-      injImproveEqns :: [Bool]
-                     -> ([Type], TCvSubst, [TyCoVar], Maybe CoAxBranch)
-                     -> TcS [Eqn]
-      injImproveEqns inj_args (ax_args, theta, unsubstTvs, cabr) = do
-        (theta', _) <- instFlexiTcS unsubstTvs
-        -- The use of deterministically ordered list for `unsubstTvs`
-        -- is not strictly necessary here, we only use the substitution
-        -- part of the result of instFlexiTcS. If we used the second
-        -- part of the tuple, which is the range of the substitution then
-        -- the order could be important.
-        let subst = theta `unionTCvSubst` theta'
-        return [ Pair (substTyUnchecked subst ax_arg) arg
-                   -- NB: the ax_arg part is on the left
-                   -- see Note [Improvement orientation]
-               | case cabr of
-                  Just cabr' -> apartnessCheck (substTys subst ax_args) cabr'
-                  _          -> True
-               , (ax_arg, arg, True) <- zip3 ax_args args inj_args ]
-
-
-shortCutReduction :: CtEvidence -> TcTyVar -> TcCoercion
-                  -> TyCon -> [TcType] -> TcS (StopOrContinue Ct)
--- See Note [Top-level reductions for type functions]
-shortCutReduction old_ev fsk ax_co fam_tc tc_args
-  = ASSERT( ctEvEqRel old_ev == NomEq)
-    do { (xis, cos) <- flattenManyNom old_ev tc_args
-               -- ax_co :: F args ~ G tc_args
-               -- cos   :: xis ~ tc_args
-               -- old_ev :: F args ~ fsk
-               -- G cos ; sym ax_co ; old_ev :: G xis ~ fsk
-
-       ; new_ev <- case ctEvFlavour old_ev of
-           Given -> newGivenEvVar deeper_loc
-                         ( mkPrimEqPred (mkTyConApp fam_tc xis) (mkTyVarTy fsk)
-                         , EvCoercion (mkTcTyConAppCo Nominal fam_tc cos
-                                        `mkTcTransCo` mkTcSymCo ax_co
-                                        `mkTcTransCo` ctEvCoercion old_ev) )
-
-           Derived -> newDerivedNC deeper_loc $
-                      mkPrimEqPred (mkTyConApp fam_tc xis)
-                                   (mkTyVarTy fsk)
-
-           Wanted ->
-             do { (new_ev, new_co) <- newWantedEq deeper_loc Nominal
-                                        (mkTyConApp fam_tc xis) (mkTyVarTy fsk)
-                ; setWantedEq (ctev_dest old_ev) $
-                     ax_co `mkTcTransCo` mkTcSymCo (mkTcTyConAppCo Nominal
-                                                      fam_tc cos)
-                           `mkTcTransCo` new_co
-                ; return new_ev }
-
-       ; let new_ct = CFunEqCan { cc_ev = new_ev, cc_fun = fam_tc
-                                , cc_tyargs = xis, cc_fsk = fsk }
-       ; updWorkListTcS (extendWorkListFunEq new_ct)
-       ; stopWith old_ev "Fun/Top (shortcut)" }
-  where
-    deeper_loc = bumpCtLocDepth (ctEvLoc old_ev)
-
-dischargeFmv :: CtEvidence -> TcTyVar -> TcCoercion -> TcType -> TcS ()
--- (dischargeFmv x fmv co ty)
---     [W] ev :: F tys ~ fmv
---         co :: F tys ~ xi
--- Precondition: fmv is not filled, and fuv `notElem` xi
---
--- Then set fmv := xi,
---      set ev := co
---      kick out any inert things that are now rewritable
---
--- Does not evaluate 'co' if 'ev' is Derived
-dischargeFmv ev fmv co xi
-  = ASSERT2( not (fmv `elemVarSet` tyCoVarsOfType xi), ppr ev $$ ppr fmv $$ ppr xi )
-    do { setEvBindIfWanted ev (EvCoercion co)
-       ; unflattenFmv fmv xi
-       ; n_kicked <- kickOutAfterUnification fmv
-       ; traceTcS "dischargeFmv" (ppr fmv <+> equals <+> ppr xi $$ ppr_kicked n_kicked) }
-
-{- Note [Top-level reductions for type functions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-c.f. Note [The flattening story] in TcFlatten
-
-Suppose we have a CFunEqCan  F tys ~ fmv/fsk, and a matching axiom.
-Here is what we do, in four cases:
-
-* Wanteds: general firing rule
-    (work item) [W]        x : F tys ~ fmv
-    instantiate axiom: ax_co : F tys ~ rhs
-
-   Then:
-      Discharge   fmv := alpha
-      Discharge   x := ax_co ; sym x2
-      New wanted  [W] x2 : alpha ~ rhs  (Non-canonical)
-   This is *the* way that fmv's get unified; even though they are
-   "untouchable".
-
-   NB: it can be the case that fmv appears in the (instantiated) rhs.
-   In that case the new Non-canonical wanted will be loopy, but that's
-   ok.  But it's good reason NOT to claim that it is canonical!
-
-* Wanteds: short cut firing rule
-  Applies when the RHS of the axiom is another type-function application
-      (work item)        [W] x : F tys ~ fmv
-      instantiate axiom: ax_co : F tys ~ G rhs_tys
-
-  It would be a waste to create yet another fmv for (G rhs_tys).
-  Instead (shortCutReduction):
-      - Flatten rhs_tys (cos : rhs_tys ~ rhs_xis)
-      - Add G rhs_xis ~ fmv to flat cache  (note: the same old fmv)
-      - New canonical wanted   [W] x2 : G rhs_xis ~ fmv  (CFunEqCan)
-      - Discharge x := ax_co ; G cos ; x2
-
-* Givens: general firing rule
-      (work item)        [G] g : F tys ~ fsk
-      instantiate axiom: ax_co : F tys ~ rhs
-
-   Now add non-canonical given (since rhs is not flat)
-      [G] (sym g ; ax_co) : fsk ~ rhs  (Non-canonical)
-
-* Givens: short cut firing rule
-  Applies when the RHS of the axiom is another type-function application
-      (work item)        [G] g : F tys ~ fsk
-      instantiate axiom: ax_co : F tys ~ G rhs_tys
-
-  It would be a waste to create yet another fsk for (G rhs_tys).
-  Instead (shortCutReduction):
-     - Flatten rhs_tys: flat_cos : tys ~ flat_tys
-     - Add new Canonical given
-          [G] (sym (G flat_cos) ; co ; g) : G flat_tys ~ fsk   (CFunEqCan)
-
-Note [Cached solved FunEqs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When trying to solve, say (FunExpensive big-type ~ ty), it's important
-to see if we have reduced (FunExpensive big-type) before, lest we
-simply repeat it.  Hence the lookup in inert_solved_funeqs.  Moreover
-we must use `funEqCanDischarge` because both uses might (say) be Wanteds,
-and we *still* want to save the re-computation.
-
-Note [MATCHING-SYNONYMS]
-~~~~~~~~~~~~~~~~~~~~~~~~
-When trying to match a dictionary (D tau) to a top-level instance, or a
-type family equation (F taus_1 ~ tau_2) to a top-level family instance,
-we do *not* need to expand type synonyms because the matcher will do that for us.
-
-
-Note [RHS-FAMILY-SYNONYMS]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-The RHS of a family instance is represented as yet another constructor which is
-like a type synonym for the real RHS the programmer declared. Eg:
-    type instance F (a,a) = [a]
-Becomes:
-    :R32 a = [a]      -- internal type synonym introduced
-    F (a,a) ~ :R32 a  -- instance
-
-When we react a family instance with a type family equation in the work list
-we keep the synonym-using RHS without expansion.
-
-Note [FunDep and implicit parameter reactions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Currently, our story of interacting two dictionaries (or a dictionary
-and top-level instances) for functional dependencies, and implicit
-parameters, is that we simply produce new Derived equalities.  So for example
-
-        class D a b | a -> b where ...
-    Inert:
-        d1 :g D Int Bool
-    WorkItem:
-        d2 :w D Int alpha
-
-    We generate the extra work item
-        cv :d alpha ~ Bool
-    where 'cv' is currently unused.  However, this new item can perhaps be
-    spontaneously solved to become given and react with d2,
-    discharging it in favour of a new constraint d2' thus:
-        d2' :w D Int Bool
-        d2 := d2' |> D Int cv
-    Now d2' can be discharged from d1
-
-We could be more aggressive and try to *immediately* solve the dictionary
-using those extra equalities, but that requires those equalities to carry
-evidence and derived do not carry evidence.
-
-If that were the case with the same inert set and work item we might dischard
-d2 directly:
-
-        cv :w alpha ~ Bool
-        d2 := d1 |> D Int cv
-
-But in general it's a bit painful to figure out the necessary coercion,
-so we just take the first approach. Here is a better example. Consider:
-    class C a b c | a -> b
-And:
-     [Given]  d1 : C T Int Char
-     [Wanted] d2 : C T beta Int
-In this case, it's *not even possible* to solve the wanted immediately.
-So we should simply output the functional dependency and add this guy
-[but NOT its superclasses] back in the worklist. Even worse:
-     [Given] d1 : C T Int beta
-     [Wanted] d2: C T beta Int
-Then it is solvable, but its very hard to detect this on the spot.
-
-It's exactly the same with implicit parameters, except that the
-"aggressive" approach would be much easier to implement.
-
-Note [Weird fundeps]
-~~~~~~~~~~~~~~~~~~~~
-Consider   class Het a b | a -> b where
-              het :: m (f c) -> a -> m b
-
-           class GHet (a :: * -> *) (b :: * -> *) | a -> b
-           instance            GHet (K a) (K [a])
-           instance Het a b => GHet (K a) (K b)
-
-The two instances don't actually conflict on their fundeps,
-although it's pretty strange.  So they are both accepted. Now
-try   [W] GHet (K Int) (K Bool)
-This triggers fundeps from both instance decls;
-      [D] K Bool ~ K [a]
-      [D] K Bool ~ K beta
-And there's a risk of complaining about Bool ~ [a].  But in fact
-the Wanted matches the second instance, so we never get as far
-as the fundeps.
-
-Trac #7875 is a case in point.
-
-Note [Improvement orientation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A very delicate point is the orientation of derived equalities
-arising from injectivity improvement (Trac #12522).  Suppse we have
-  type family F x = t | t -> x
-  type instance F (a, Int) = (Int, G a)
-where G is injective; and wanted constraints
-
-  [W] TF (alpha, beta) ~ fuv
-  [W] fuv ~ (Int, <some type>)
-
-The injectivity will give rise to derived constraints
-
-  [D] gamma1 ~ alpha
-  [D] Int ~ beta
-
-The fresh unification variable gamma1 comes from the fact that we
-can only do "partial improvement" here; see Section 5.2 of
-"Injective type families for Haskell" (HS'15).
-
-Now, it's very important to orient the equations this way round,
-so that the fresh unification variable will be eliminated in
-favour of alpha.  If we instead had
-   [D] alpha ~ gamma1
-then we would unify alpha := gamma1; and kick out the wanted
-constraint.  But when we grough it back in, it'd look like
-   [W] TF (gamma1, beta) ~ fuv
-and exactly the same thing would happen again!  Infnite loop.
-
-This all sesms fragile, and it might seem more robust to avoid
-introducing gamma1 in the first place, in the case where the
-actual argument (alpha, beta) partly matches the improvement
-template.  But that's a bit tricky, esp when we remember that the
-kinds much match too; so it's easier to let the normal machinery
-handle it.  Instead we are careful to orient the new derived
-equality with the template on the left.  Delicate, but it works.
--}
 
 {- *******************************************************************
 *                                                                    *

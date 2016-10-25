@@ -107,6 +107,8 @@ toIfaceKind = toIfaceType
 toIfaceType :: Type -> IfaceType
 -- Synonyms are retained in the interface type
 toIfaceType (TyVarTy tv)      = IfaceTyVar (toIfaceTyVar tv)
+--  | isTcTyVar tv = IfaceTyVar (toIfaceTyVar tv `appendFS` consFS '_' (mkFastString (showSDocUnsafe (ppr (getUnique tv)))))
+--  | otherwise
 toIfaceType (AppTy t1 t2)     = IfaceAppTy (toIfaceType t1) (toIfaceType t2)
 toIfaceType (LitTy n)         = IfaceLitTy (toIfaceTyLit n)
 toIfaceType (ForAllTy b t)    = IfaceForAllTy (toIfaceForAllBndr b) (toIfaceType t)

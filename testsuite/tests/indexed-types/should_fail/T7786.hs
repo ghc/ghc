@@ -55,17 +55,17 @@ type family Intersect (l :: Inventory a) (r :: Inventory a) :: Inventory a where
   Intersect l Empty = Empty
   Intersect (More ls l) r = InterAppend (Intersect ls r) r l
 
-type family InterAppend (l :: Inventory a) 
-                        (r :: Inventory a) 
-                        (one :: a) 
+type family InterAppend (l :: Inventory a)
+                        (r :: Inventory a)
+                        (one :: a)
             :: Inventory a where
   InterAppend acc Empty one = acc
   InterAppend acc (More rs one) one = More acc one
   InterAppend acc (More rs r) one = InterAppend acc rs one
 
-type family BuriedUnder (sub :: Inventory [KeySegment]) 
-                        (post :: [KeySegment]) 
-                        (inv :: Inventory [KeySegment]) 
+type family BuriedUnder (sub :: Inventory [KeySegment])
+                        (post :: [KeySegment])
+                        (inv :: Inventory [KeySegment])
             :: Inventory [KeySegment] where
   BuriedUnder Empty post inv = inv
   BuriedUnder (More ps p) post inv = More ((ps `BuriedUnder` post) inv) (p `Under` post)
@@ -82,9 +82,23 @@ foo :: Database inv
 foo db k sub = buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db
 -}
 
+foogle :: Database inv
+       -> Sing post
+       -> Database sub
+       -> Maybe (Sing (Intersect (BuriedUnder sub post 'Empty) inv))
+
+foogle db k sub = return (buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db)
+
+
 addSub :: Database inv -> Sing k -> Database sub -> Maybe (Database ((sub `BuriedUnder` k) inv))
-addSub db k sub = do Nil :: Sing xxx <- return (buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db)
+addSub db k sub = do Nil :: Sing xxx <- foogle db k sub
+                     return $ Sub db k sub
+
+{-
+addSub :: Database inv -> Sing k -> Database sub -> Maybe (Database ((sub `BuriedUnder` k) inv))
+addSub db k sub = do Nil :: Sing xxx <- foogle db sub k
                      -- Nil :: Sing ((sub `BuriedUnder` k) Empty `Intersect` inv) <- return (buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db)
                      -- Nil :: Sing Empty <- return (buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db)
                      -- Nil <- return (buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db)
                      return $ Sub db k sub
+-}

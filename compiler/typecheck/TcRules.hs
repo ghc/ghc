@@ -287,16 +287,14 @@ EvVar for the coercion, fill the hole with the invented EvVar, and
 then quantify over the EvVar. Not too tricky -- just some
 impedence matching, really.
 
-Note [Simplify *derived* constraints]
+Note [Simplify cloned constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 At this stage, we're simplifying constraints only for insolubility
 and for unification. Note that all the evidence is quickly discarded.
-We make this explicit by working over derived constraints, for which
-there is no evidence. Using derived constraints also prevents solved
-equalities from being written to coercion holes. If we don't do this,
+We use a clone of the real constraint. If we don't do this,
 then RHS coercion-hole constraints get filled in, only to get filled
 in *again* when solving the implications emitted from tcRule. That's
-terrible, so we avoid the problem by using derived constraints.
+terrible, so we avoid the problem by cloning the constraints.
 
 -}
 
@@ -310,15 +308,16 @@ simplifyRule :: RuleName
 simplifyRule name lhs_wanted rhs_wanted
   = do {         -- We allow ourselves to unify environment
                  -- variables: runTcS runs with topTcLevel
-       ; tc_lvl    <- getTcLevel
+       ; lhs_clone <- cloneWC lhs_wanted
+       ; rhs_clone <- cloneWC rhs_wanted
        ; insoluble <- runTcSDeriveds $
              do { -- First solve the LHS and *then* solve the RHS
                   -- See Note [Solve order for RULES]
-                  -- See Note [Simplify *derived* constraints]
-                  lhs_resid <- solveWanteds $ toDerivedWC lhs_wanted
-                ; rhs_resid <- solveWanteds $ toDerivedWC rhs_wanted
-                ; return ( insolubleWC tc_lvl lhs_resid ||
-                           insolubleWC tc_lvl rhs_resid ) }
+                  -- See Note [Simplify cloned constraints]
+                  lhs_resid <- solveWanteds lhs_clone
+                ; rhs_resid <- solveWanteds rhs_clone
+                ; return ( insolubleWC lhs_resid ||
+                           insolubleWC rhs_resid ) }
 
 
        ; zonked_lhs_simples <- zonkSimples (wc_simple lhs_wanted)

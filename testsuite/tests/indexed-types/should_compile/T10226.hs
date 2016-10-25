@@ -42,6 +42,30 @@ showFromF fa = undefined
 showFromF' :: (Show (FInv b), F (FInv b) ~ b) => b -> String
 showFromF' = showFromF
 
+{- [G] F (FInv b) ~ b
+   [W] FInv (F alpha) ~ alpha
+   [W] F alpha ~ b
+-->
+   [G] g1: FInv b ~ fsk1
+   [G] g2: F fsk1 ~ fsk2
+   [G} g3: fsk2 ~ b
+
+   [W] F alpha ~ fmv1
+   [W] FInv fmv1 ~ fmv2
+   [W] fmv2 ~ alpha
+   [W] fmv1 ~ b
+
+   [D] d1: F alpha ~ fmv1
+   [D] d2: FInv fmv1 ~ fmv2
+   [D] d3: fmv2 ~ alpha
+   [D] d4: fmv1 ~ b
+
+--> d2 + d4: [D] FInv b ~ fmv2
+       + g1: [D] fmv2 ~ b
+--> d3: b ~ alpha, and we are done
+
+-}
+
 {-------------------------------------------------------------------------------
   In 7.10 the definition of showFromF' is not accepted, but it gets stranger.
   In 7.10 we cannot _call_ showFromF at all, even at a concrete type. Below
@@ -57,3 +81,36 @@ type instance FInv Int = Int
 
 test :: String
 test = showFromF (0 :: Int)
+
+{-
+
+  [WD] FInv (F alpha) ~ alpha
+  [WD] F alpha ~ Int
+
+-->
+  [WD] F alpha ~ fuv0
+* [WD] FInv fuv0 ~ fuv1
+  [WD] fuv1 ~ alpha
+  [WD] fuv0 ~ Int
+
+-->
+  [WD] F alpha ~ fuv0
+  [W] FInv fuv0 ~ fuv1
+*  [D] FInv Int ~ fuv1
+  [WD] fuv1 ~ alpha
+  [WD] fuv0 ~ Int
+
+-->
+  [WD] F alpha ~ fuv0
+  [W] FInv fuv0 ~ fuv1
+* [D] fuv1 ~ Int
+  [WD] fuv1 ~ alpha
+  [WD] fuv0 ~ Int
+
+-->
+  [WD] F alpha ~ fuv0
+  [W] FInv fuv0 ~ fuv1
+  [D] alpha := Int
+  [WD] fuv1 ~ alpha
+  [WD] fuv0 ~ Int
+-}
