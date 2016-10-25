@@ -1436,7 +1436,13 @@ tcSplitMethodTy ty
   | otherwise
   = pprPanic "tcSplitMethodTy" (ppr ty)
 
------------------------
+
+{- *********************************************************************
+*                                                                      *
+            Type equalities
+*                                                                      *
+********************************************************************* -}
+
 tcEqKind :: TcKind -> TcKind -> Bool
 tcEqKind = tcEqType
 
@@ -1546,39 +1552,9 @@ pickyEqType ty1 ty2
   = isNothing $
     tc_eq_type (const Nothing) ty1 ty2
 
-{- Note [Expanding superclasses]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When we expand superclasses, we use the following algorithm:
-
-expand( so_far, pred ) returns the transitive superclasses of pred,
-                               not including pred itself
- 1. If pred is not a class constraint, return empty set
-       Otherwise pred = C ts
- 2. If C is in so_far, return empty set (breaks loops)
- 3. Find the immediate superclasses constraints of (C ts)
- 4. For each such sc_pred, return (sc_pred : expand( so_far+C, D ss )
-
-Notice that
-
- * With normal Haskell-98 classes, the loop-detector will never bite,
-   so we'll get all the superclasses.
-
- * Since there is only a finite number of distinct classes, expansion
-   must terminate.
-
- * The loop breaking is a bit conservative. Notably, a tuple class
-   could contain many times without threatening termination:
-      (Eq a, (Ord a, Ix a))
-   And this is try of any class that we can statically guarantee
-   as non-recursive (in some sense).  For now, we just make a special
-   case for tuples.  Somthing better would be cool.
-
-See also TcTyDecls.checkClassCycles.
-
-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
-\subsection{Predicate types}
+                       Predicate types
 *                                                                      *
 ************************************************************************
 
@@ -1760,7 +1736,35 @@ isImprovementPred ty
       ClassPred cls _    -> classHasFds cls
       IrredPred {}       -> True -- Might have equalities after reduction?
 
-{-
+{- Note [Expanding superclasses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we expand superclasses, we use the following algorithm:
+
+expand( so_far, pred ) returns the transitive superclasses of pred,
+                               not including pred itself
+ 1. If pred is not a class constraint, return empty set
+       Otherwise pred = C ts
+ 2. If C is in so_far, return empty set (breaks loops)
+ 3. Find the immediate superclasses constraints of (C ts)
+ 4. For each such sc_pred, return (sc_pred : expand( so_far+C, D ss )
+
+Notice that
+
+ * With normal Haskell-98 classes, the loop-detector will never bite,
+   so we'll get all the superclasses.
+
+ * Since there is only a finite number of distinct classes, expansion
+   must terminate.
+
+ * The loop breaking is a bit conservative. Notably, a tuple class
+   could contain many times without threatening termination:
+      (Eq a, (Ord a, Ix a))
+   And this is try of any class that we can statically guarantee
+   as non-recursive (in some sense).  For now, we just make a special
+   case for tuples.  Somthing better would be cool.
+
+See also TcTyDecls.checkClassCycles.
+
 Note [Inheriting implicit parameters]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this:
