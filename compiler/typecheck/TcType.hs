@@ -102,6 +102,7 @@ module TcType (
   -- * Finding "exact" (non-dead) type variables
   exactTyCoVarsOfType, exactTyCoVarsOfTypes,
   splitDepVarsOfType, splitDepVarsOfTypes, TcDepVars(..), tcDepVarSet,
+  rewritableTyVarsOfTypes, rewritableTyVarsOfType,
 
   -- * Extracting bound variables
   allBoundVariables, allBoundVariabless,
@@ -834,6 +835,23 @@ exactTyCoVarsOfType ty
 
 exactTyCoVarsOfTypes :: [Type] -> TyVarSet
 exactTyCoVarsOfTypes tys = mapUnionVarSet exactTyCoVarsOfType tys
+
+rewritableTyVarsOfTypes :: [TcType] -> TcTyVarSet
+rewritableTyVarsOfTypes tys = mapUnionVarSet rewritableTyVarsOfType tys
+
+rewritableTyVarsOfType :: TcType -> TcTyVarSet
+rewritableTyVarsOfType ty
+  = go ty
+  where
+    go (TyVarTy tv)     = unitVarSet tv
+    go (LitTy {})       = emptyVarSet
+    go (TyConApp _ tys) = rewritableTyVarsOfTypes tys
+    go (AppTy fun arg)  = go fun `unionVarSet` go arg
+    go (FunTy arg res)  = go arg `unionVarSet` go res
+    go ty@(ForAllTy {}) = pprPanic "rewriteableTyVarOfType" (ppr ty)
+    go (CastTy ty _co)  = go ty
+    go (CoercionTy _co) = emptyVarSet
+
 
 {- *********************************************************************
 *                                                                      *

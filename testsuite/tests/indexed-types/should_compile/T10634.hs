@@ -21,3 +21,18 @@ instance Convert Int32 where
 
 x :: Int8
 x = down 8
+
+{- From x = down 8
+
+[WD] Num alpha
+[WD] Convert alpha
+[WD] Down alpha ~ Int8
+
+--> superclasses
+[D] Up (Down alpha) ~ alpha
+
+--> substitute (Down alpha ~ Int8)
+[D] Up Int8 ~ alpha
+
+--> alpha := Int16
+-}

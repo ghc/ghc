@@ -2,10 +2,10 @@
 [2 of 3] Compiling T6018a          (.hs -> .o)
 [3 of 3] Compiling T6018           (.hs -> .o)
 
-T6018.hs:75:5: warning:
+T6018.hs:107:5: warning:
     Type family instance equation is overlapped:
-      Foo Bool = Bool -- Defined at T6018.hs:75:5
+      Foo Bool = Bool -- Defined at T6018.hs:107:5
 
-T6018.hs:82:5: warning:
+T6018.hs:114:5: warning:
     Type family instance equation is overlapped:
-      Bar Bool = Char -- Defined at T6018.hs:82:5
+      Bar Bool = Char -- Defined at T6018.hs:114:5

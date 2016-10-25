@@ -8,6 +8,38 @@
 
 module T6018 where
 
+{-
+barapp2 :: Int
+barapp2 = bar 1
+
+bar :: Bar a -> Bar a
+bar x = x
+
+type family Bar a = r | r -> a where
+    Bar Int  = Bool
+    Bar Bool = Int
+    Bar Bool = Char
+
+type family F a b c = (result :: k) | result -> a b c
+
+type family FClosed a b c = result | result -> a b c where
+    FClosed Int  Char Bool = Bool
+    FClosed Char Bool Int  = Int
+    FClosed Bool Int  Char = Char
+-}
+{-
+g6_use :: [Char]
+g6_use = g6_id "foo"
+
+g6_id :: G6 a -> G6 a
+g6_id x = x
+
+type family G6 a = r | r -> a
+type instance G6 [a]  = [Gi a]
+type family Gi a = r | r -> a
+type instance Gi Int = Char
+-}
+
 import T6018a -- defines G, identical to F
 
 type family F a b c = (result :: k) | result -> a b c

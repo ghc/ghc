@@ -336,7 +336,7 @@ test('T8428', normal, compile_fail, [''])
 test('T8450', normal, compile_fail, [''])
 test('T8514', normal, compile_fail, [''])
 test('ContextStack1', normal, compile_fail, ['-freduction-depth=10'])
-test('ContextStack2', normal, compile_fail, ['-freduction-depth=10'])
+test('ContextStack2', normal, compile, [''])
 test('T8570', extra_clean(['T85570a.o', 'T8570a.hi','T85570b.o', 'T8570b.hi']),
      multimod_compile_fail, ['T8570', '-v0'])
 test('T8603', normal, compile_fail, [''])

@@ -1509,8 +1509,10 @@ maybe_sym IsSwapped  = mkSymCo
 maybe_sym NotSwapped = id
 
 swapOverTyVars :: TcTyVar -> TcTyVar -> Bool
--- See Note [Canonical orientation for tyvar/tyvar equality constraints]
 swapOverTyVars tv1 tv2
+  | isFmvTyVar tv1 = False  -- See Note [Fmv Orientation Invariant]
+  | isFmvTyVar tv2 = True
+
   | Just lvl1 <- metaTyVarTcLevel_maybe tv1
       -- If tv1 is touchable, swap only if tv2 is also
       -- touchable and it's strictly better to update the latter
@@ -1565,7 +1567,46 @@ canSolveByUnification tclvl tv xi
                        FlatSkol {} -> False
                        RuntimeUnk  -> True
 
-{-
+{- Note [Fmv Orientation Invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * We always orient a constraint
+        fmv ~ alpha
+     with fmv on the left, even if alpha is
+     a touchable unification variable
+
+Reason: doing it the other way round would unify alpha:=fmv, but that
+really doesn't add any info to alpha.  But a later constraint alpha ~
+Int might unlock everything.  Comment:9 of #12526 gives a detailed
+example.
+
+WARNING: I've gone to and fro on this one several times.
+I'm now pretty sure that unifying alpha:=fmv is a bad idea!
+So orienting with fmvs on the left is a good thing.
+
+This example comes from IndTypesPerfMerge. (Others include
+T10226, T10009.)
+    From the ambiguity check for
+      f :: (F a ~ a) => a
+    we get:
+          [G] F a ~ a
+          [WD] F alpha ~ alpha, alpha ~ a
+
+    From Givens we get
+          [G] F a ~ fsk, fsk ~ a
+
+    Now if we flatten we get
+          [WD] alpha ~ fmv, F alpha ~ fmv, alpha ~ a
+
+    Now, if we unified alpha := fmv, we'd get
+          [WD] F fmv ~ fmv, [WD] fmv ~ a
+    And now we are stuck.
+
+So instead the Fmv Orientation Invariant puts te fmv on the
+left, giving
+      [WD] fmv ~ alpha, [WD] F alpha ~ fmv, [WD] alpha ~ a
+
+    Now we get alpha:=a, and everything works out
+
 Note [Prevent unification with type families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We prevent unification with type families because of an uneasy compromise.

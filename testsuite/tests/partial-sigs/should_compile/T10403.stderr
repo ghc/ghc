@@ -60,18 +60,3 @@ T10403.hs:28:8: warning: [-Wdeferred-type-errors (in -Wdefault)]
       In an equation for ‘app2’: app2 = h2 (H . I) (B ())
     • Relevant bindings include
         app2 :: H (B t) (bound at T10403.hs:28:1)
-
-T10403.hs:28:20: warning: [-Wdeferred-type-errors (in -Wdefault)]
-    • Couldn't match type ‘f0’ with ‘B t’
-        because type variable ‘t’ would escape its scope
-      This (rigid, skolem) type variable is bound by
-        the type signature for:
-          app2 :: H (B t)
-        at T10403.hs:27:1-15
-      Expected type: f0 ()
-        Actual type: B t ()
-    • In the second argument of ‘h2’, namely ‘(B ())’
-      In the expression: h2 (H . I) (B ())
-      In an equation for ‘app2’: app2 = h2 (H . I) (B ())
-    • Relevant bindings include
-        app2 :: H (B t) (bound at T10403.hs:28:1)

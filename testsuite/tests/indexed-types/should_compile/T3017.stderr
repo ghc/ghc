@@ -4,7 +4,7 @@ TYPE SIGNATURES
   emptyL :: forall a. ListColl a
   insert :: forall c. Coll c => Elem c -> c -> c
   test2 ::
-    forall a b c. (Elem c ~ (a, b), Coll c, Num a, Num b) => c -> c
+    forall a b c. (Elem c ~ (a, b), Num b, Num a, Coll c) => c -> c
 TYPE CONSTRUCTORS
   class Coll c where
     type family Elem c :: * open

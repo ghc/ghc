@@ -13,25 +13,34 @@ t = undefined
          [G] a ~ TF (a,Int)               -- a = a_am1
 -->
          [G] TF (a,Int) ~ fsk             -- fsk = fsk_am8
+
 inert    [G] fsk ~ a
 
---->
-    [G] fsk ~ (TF a, TF Int)
+---> reduce
+         [G] fsk ~ (TF a, TF Int)
+
 inert    [G] fsk ~ a
 
---->
-    a ~ (TF a, TF Int)
-inert    [G] fsk ~ a
+---> substitute for fsk and flatten
+         [G] TF a ~ fsk1
+         [G] TF Int ~ fsk2
 
----> (attempting to flatten (TF a) so that it does not mention a
-         TF a ~ fsk2
+inert    [G] fsk ~ a
+         [G] a ~ (fsk1, fsk2)
+
+---> (substitute for a in first constraint)
+         TF (fsk1, fsk2) ~ fsk1     (C1)
+         TF Int ~ fsk2
+
 inert    a ~ (fsk2, TF Int)
 inert    fsk ~ (fsk2, TF Int)
 
----> (substitute for a)
-         TF (fsk2, TF Int) ~ fsk2
-inert    a ~ (fsk2, TF Int)
-inert    fsk ~ (fsk2, TF Int)
+
+------- At this point we are stuck because of
+--      the recursion in the first constraint C1
+--      Hooray
+
+-- Before, we reduced C1, which led to a loop
 
 ---> (top-level reduction, re-orient)
          fsk2 ~ (TF fsk2, TF Int)

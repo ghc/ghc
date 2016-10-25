@@ -78,10 +78,8 @@ module TcRnTypes(
         ctEvTerm, ctEvCoercion, ctEvId,
         tyCoVarsOfCt, tyCoVarsOfCts,
         tyCoVarsOfCtList, tyCoVarsOfCtsList,
-        toDerivedCt,
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
-        toDerivedWC,
         andWC, unionsWC, mkSimpleWC, mkImplicWC,
         addInsols, getInsolubles, addSimples, addImplics,
         tyCoVarsOfWC, dropDerivedWC, dropDerivedSimples, dropDerivedInsols,
@@ -107,7 +105,7 @@ module TcRnTypes(
 
         CtEvidence(..), TcEvDest(..),
         mkGivenLoc, mkKindLoc, toKindLoc,
-        isWanted, isGiven, isDerived,
+        isWanted, isGiven, isDerived, isGivenOrWDeriv,
         ctEvRole,
 
         -- Constraint solver plugins
@@ -115,10 +113,11 @@ module TcRnTypes(
         TcPluginM, runTcPluginM, unsafeTcPluginTcM,
         getEvBindsTcPluginM,
 
-        CtFlavour(..), ctEvFlavour,
+        CtFlavour(..), ShadowInfo(..), ctEvFlavour,
         CtFlavourRole, ctEvFlavourRole, ctFlavourRole,
-        eqCanRewrite, eqCanRewriteFR,  eqCanDischarge,
-        funEqCanDischarge, funEqCanDischargeFR,
+        eqCanRewriteFR, eqMayRewriteFR,
+        eqCanDischarge,
+        funEqCanDischarge, funEqCanDischargeF,
 
         -- Pretty printing
         pprEvVarTheta,
@@ -174,6 +173,7 @@ import ListSetOps
 import FastString
 import qualified GHC.LanguageExtensions as LangExt
 import Fingerprint
+import Util
 
 import Control.Monad (ap, liftM, msum)
 #if __GLASGOW_HASKELL__ > 710
@@ -1509,7 +1509,8 @@ data Ct
       cc_tyvar  :: TcTyVar,
       cc_rhs    :: TcType,     -- Not necessarily function-free (hence not Xi)
                                -- See invariants above
-      cc_eq_rel :: EqRel
+
+      cc_eq_rel :: EqRel       -- INVARIANT: cc_eq_rel = ctEvEqRel cc_ev
     }
 
   | CFunEqCan {  -- F xis ~ fsk
@@ -1624,16 +1625,6 @@ ctOrigin = ctLocOrigin . ctLoc
 ctPred :: Ct -> PredType
 -- See Note [Ct/evidence invariant]
 ctPred ct = ctEvPred (cc_ev ct)
-
--- | Convert a Wanted to a Derived
-toDerivedCt :: Ct -> Ct
-toDerivedCt ct
-  = case ctEvidence ct of
-      CtWanted { ctev_pred = pred, ctev_loc = loc }
-        -> ct {cc_ev = CtDerived {ctev_pred = pred, ctev_loc = loc}}
-
-      CtDerived {} -> ct
-      CtGiven   {} -> pprPanic "to_derived" (ppr ct)
 
 -- | Makes a new equality predicate with the same role as the given
 -- evidence.
@@ -2074,16 +2065,6 @@ andWC (WC { wc_simple = f1, wc_impl = i1, wc_insol = n1 })
 unionsWC :: [WantedConstraints] -> WantedConstraints
 unionsWC = foldr andWC emptyWC
 
--- | Convert all Wanteds into Deriveds (ignoring insolubles)
-toDerivedWC :: WantedConstraints -> WantedConstraints
-toDerivedWC wc@(WC { wc_simple = simples, wc_impl = implics })
-  = wc { wc_simple = mapBag toDerivedCt simples
-       , wc_impl   = mapBag to_derived_implic implics }
-  where
-    to_derived_implic implic@(Implic { ic_wanted = inner_wanted })
-      = implic { ic_wanted = toDerivedWC inner_wanted }
-
-
 addSimples :: WantedConstraints -> Bag Ct -> WantedConstraints
 addSimples wc cts
   = wc { wc_simple = wc_simple wc `unionBags` cts }
@@ -2113,21 +2094,23 @@ isInsolubleStatus _            = False
 insolubleImplic :: Implication -> Bool
 insolubleImplic ic = isInsolubleStatus (ic_status ic)
 
-insolubleWC :: TcLevel -> WantedConstraints -> Bool
-insolubleWC tc_lvl (WC { wc_impl = implics, wc_insol = insols })
-  =  anyBag (trulyInsoluble tc_lvl) insols
+insolubleWC :: WantedConstraints -> Bool
+insolubleWC (WC { wc_impl = implics, wc_insol = insols })
+  =  anyBag trulyInsoluble insols
   || anyBag insolubleImplic implics
 
-trulyInsoluble :: TcLevel -> Ct -> Bool
+trulyInsoluble :: Ct -> Bool
 -- Constraints in the wc_insol set which ARE NOT
 -- treated as truly insoluble:
 --   a) type holes, arising from PartialTypeSignatures,
 --   b) "true" expression holes arising from TypedHoles
 --
--- Out-of-scope variables masquerading as expression holes
--- ARE treated as truly insoluble.
+-- A "expression hole" or "type hole" constraint isn't really an error
+-- at all; it's a report saying "_ :: Int" here.  But an out-of-scope
+-- variable masquerading as expression holes IS treated as truly
+-- insoluble, so that it trumps other errors during error reporting.
 -- Yuk!
-trulyInsoluble _tc_lvl insol
+trulyInsoluble insol
   | isHoleCt insol = isOutOfScopeCt insol
   | otherwise      = True
 
@@ -2342,22 +2325,25 @@ data TcEvDest
               -- See Note [Coercion holes] in TyCoRep
 
 data CtEvidence
-  = CtGiven { ctev_pred :: TcPredType      -- See Note [Ct/evidence invariant]
-            , ctev_evar :: EvVar           -- See Note [Evidence field of CtEvidence]
-            , ctev_loc  :: CtLoc }
-    -- Truly given, not depending on subgoals
-    -- NB: Spontaneous unifications belong here
+  = CtGiven    -- Truly given, not depending on subgoals
+               -- NB: Spontaneous unifications belong here
+      { ctev_pred :: TcPredType      -- See Note [Ct/evidence invariant]
+      , ctev_evar :: EvVar           -- See Note [Evidence field of CtEvidence]
+      , ctev_loc  :: CtLoc }
 
-  | CtWanted { ctev_pred :: TcPredType     -- See Note [Ct/evidence invariant]
-             , ctev_dest :: TcEvDest
-             , ctev_loc  :: CtLoc }
-    -- Wanted goal
 
-  | CtDerived { ctev_pred :: TcPredType
-              , ctev_loc  :: CtLoc }
-    -- A goal that we don't really have to solve and can't immediately
-    -- rewrite anything other than a derived (there's no evidence!)
-    -- but if we do manage to solve it may help in solving other goals.
+  | CtWanted   -- Wanted goal
+      { ctev_pred :: TcPredType     -- See Note [Ct/evidence invariant]
+      , ctev_dest :: TcEvDest
+      , ctev_nosh :: ShadowInfo     -- See Note [Constraint flavours]
+      , ctev_loc  :: CtLoc }
+
+  | CtDerived  -- A goal that we don't really have to solve and can't
+               -- immediately rewrite anything other than a derived
+               -- (there's no evidence!) but if we do manage to solve
+               -- it may help in solving other goals.
+      { ctev_pred :: TcPredType
+      , ctev_loc  :: CtLoc }
 
 ctEvPred :: CtEvidence -> TcPredType
 -- The predicate of a flavor
@@ -2399,11 +2385,12 @@ instance Outputable TcEvDest where
   ppr (EvVarDest ev) = ppr ev
 
 instance Outputable CtEvidence where
-  ppr fl = case fl of
-             CtGiven {}   -> text "[G]" <+> ppr (ctev_evar fl) <+> ppr_pty
-             CtWanted {}  -> text "[W]" <+> ppr (ctev_dest fl) <+> ppr_pty
-             CtDerived {} -> text "[D]" <+> text "_" <+> ppr_pty
-         where ppr_pty = dcolon <+> ppr (ctEvPred fl)
+  ppr ev = ppr (ctEvFlavour ev) <+> pp_ev <+> dcolon <+> ppr (ctEvPred ev)
+    where
+      pp_ev = case ev of
+             CtGiven { ctev_evar = v } -> ppr v
+             CtWanted {ctev_dest = d } -> ppr d
+             CtDerived {}              -> text "_"
 
 isWanted :: CtEvidence -> Bool
 isWanted (CtWanted {}) = True
@@ -2424,23 +2411,62 @@ isDerived _              = False
 %*                                                                      *
 %************************************************************************
 
-Just an enum type that tracks whether a constraint is wanted, derived,
-or given, when we need to separate that info from the constraint itself.
+Note [Constraint flavours]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Constraints come in four flavours:
 
+* [G] Given: we have evidence
+
+* [W] Wanted WOnly: we want evidence
+
+* [D] Derived: any solution must satisfy this constraint, but
+      we don't need evidence for it.  Examples include:
+        - superclasses of [W] class constraints
+        - equalities arising from functional dependencies
+          or injectivity
+
+* [WD] Wanted WDeriv: a single constraint that represents
+                      both [W] and [D]
+  We keep them paired as one both for efficiency, and because
+  when we have a finite map  F tys -> CFunEqCan, it's inconvenient
+  to have two CFunEqCans in the range
+
+The ctev_nosh field of a Wanted distinguishes between [W] and [WD]
+
+Wanted constraints are born as [WD], but are split into [W] and its
+"shadow" [D] in TcSMonad.maybeEmitShadow.
+
+See Note [The improvement story and derived shadows] in TcSMonad
 -}
 
-data CtFlavour = Given | Wanted | Derived
+data CtFlavour  -- See Note [Constraint flavours]
+  = Given
+  | Wanted ShadowInfo
+  | Derived
   deriving Eq
 
+data ShadowInfo
+  = WDeriv   -- [WD] This Wanted constraint has no Derived shadow,
+             -- so it behaves like a pair of a Wanted and a Derived
+  | WOnly    -- [W] It has a separate derived shadow
+             -- See Note [Derived shadows]
+  deriving( Eq )
+  
+isGivenOrWDeriv :: CtFlavour -> Bool
+isGivenOrWDeriv Given           = True
+isGivenOrWDeriv (Wanted WDeriv) = True
+isGivenOrWDeriv _               = False
+
 instance Outputable CtFlavour where
-  ppr Given   = text "[G]"
-  ppr Wanted  = text "[W]"
-  ppr Derived = text "[D]"
+  ppr Given           = text "[G]"
+  ppr (Wanted WDeriv) = text "[WD]"
+  ppr (Wanted WOnly)  = text "[W]"  
+  ppr Derived         = text "[D]"
 
 ctEvFlavour :: CtEvidence -> CtFlavour
-ctEvFlavour (CtWanted {})  = Wanted
-ctEvFlavour (CtGiven {})   = Given
-ctEvFlavour (CtDerived {}) = Derived
+ctEvFlavour (CtWanted { ctev_nosh = nosh }) = Wanted nosh
+ctEvFlavour (CtGiven {})                    = Given           
+ctEvFlavour (CtDerived {})                  = Derived
 
 -- | Whether or not one 'Ct' can rewrite another is determined by its
 -- flavour and its equality relation. See also
@@ -2456,7 +2482,7 @@ ctFlavourRole :: Ct -> CtFlavourRole
 ctFlavourRole = ctEvFlavourRole . cc_ev
 
 {- Note [eqCanRewrite]
-~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 (eqCanRewrite ct1 ct2) holds if the constraint ct1 (a CTyEqCan of form
 tv ~ ty) can be used to rewrite ct2.  It must satisfy the properties of
 a can-rewrite relation, see Definition [Can-rewrite relation] in
@@ -2498,9 +2524,31 @@ I thought maybe we could never get Derived ReprEq constraints, but
 we can; straight from the Wanteds during improvment. And from a Derived
 ReprEq we could conceivably get a Derived NomEq improvment (by decomposing
 a type constructor with Nomninal role), and hence unify.
+-}
 
-Note [funEqCanDischarge]
-~~~~~~~~~~~~~~~~~~~~~~~~~
+eqCanRewriteFR :: CtFlavourRole -> CtFlavourRole -> Bool
+-- Can fr1 actually rewrite fr2?
+-- Very important function!
+-- See Note [eqCanRewrite]
+-- See Note [Wanteds do not rewrite Wanteds]
+-- See Note [Deriveds do rewrite Deriveds]
+eqCanRewriteFR (Given, NomEq)         (_, _)           = True
+eqCanRewriteFR (Given, ReprEq)        (_, ReprEq)      = True
+eqCanRewriteFR (Wanted WDeriv, NomEq) (Derived, NomEq) = True
+eqCanRewriteFR (Derived,       NomEq) (Derived, NomEq) = True
+eqCanRewriteFR _                      _                = False
+
+eqMayRewriteFR :: CtFlavourRole -> CtFlavourRole -> Bool
+-- Is it /possible/ that fr1 can rewrite fr2?
+-- This is used when deciding which inerts to kick out,
+-- at which time a [WD] inert may be split into [W] and [D]
+eqMayRewriteFR (Wanted WDeriv, NomEq) (Wanted WDeriv, NomEq) = True
+eqMayRewriteFR (Derived,       NomEq) (Wanted WDeriv, NomEq) = True
+eqMayRewriteFR fr1 fr2 = eqCanRewriteFR fr1 fr2
+
+-----------------
+{- Note [funEqCanDischarge]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have two CFunEqCans with the same LHS:
     (x1:F ts ~ f1) `funEqCanDischarge` (x2:F ts ~ f2)
 Can we drop x2 in favour of x1, either unifying
@@ -2508,12 +2556,37 @@ f2 (if it's a flatten meta-var) or adding a new Given
 (f1 ~ f2), if x2 is a Given?
 
 Answer: yes if funEqCanDischarge is true.
+-}
 
-Note [eqCanDischarge]
-~~~~~~~~~~~~~~~~~~~~~
-Suppose we have two identicla equality constraints
+funEqCanDischarge
+  :: CtEvidence -> CtEvidence
+  -> ( SwapFlag   -- NotSwapped => lhs can discharge rhs
+                  -- Swapped    => rhs can discharge lhs
+     , Bool)      -- True <=> upgrade non-discharded one
+                  --          from [W] to [WD]
+-- See Note [funEqCanDischarge]
+funEqCanDischarge ev1 ev2
+  = ASSERT2( ctEvEqRel ev1 == NomEq, ppr ev1 )
+    ASSERT2( ctEvEqRel ev2 == NomEq, ppr ev2 )
+    -- CFunEqCans are all Nominal, hence asserts
+    funEqCanDischargeF (ctEvFlavour ev1) (ctEvFlavour ev2)
+
+funEqCanDischargeF :: CtFlavour -> CtFlavour -> (SwapFlag, Bool)
+funEqCanDischargeF Given           _               = (NotSwapped, False)
+funEqCanDischargeF _               Given           = (IsSwapped,  False)
+funEqCanDischargeF (Wanted WDeriv) _               = (NotSwapped, False)
+funEqCanDischargeF _               (Wanted WDeriv) = (IsSwapped,  True)
+funEqCanDischargeF (Wanted WOnly)  (Wanted WOnly)  = (NotSwapped, False)
+funEqCanDischargeF (Wanted WOnly)  Derived         = (NotSwapped, True)
+funEqCanDischargeF Derived         (Wanted WOnly)  = (IsSwapped,  True)
+funEqCanDischargeF Derived         Derived         = (NotSwapped, False)
+
+
+{- Note [eqCanDischarge]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have two identical CTyEqCan equality constraints
 (i.e. both LHS and RHS are the same)
-      (x1:s~t) `eqCanDischarge` (xs:s~t)
+      (x1:a~t) `eqCanDischarge` (xs:a~t)
 Can we just drop x2 in favour of x1?
 
 Answer: yes if eqCanDischarge is true.
@@ -2525,48 +2598,27 @@ other Deriveds in the model whereas the Wanted cannot.
 However a Wanted can certainly discharge an identical Wanted.  So
 eqCanDischarge does /not/ define a can-rewrite relation in the
 sense of Definition [Can-rewrite relation] in TcSMonad.
--}
 
------------------
-eqCanRewrite :: CtEvidence -> CtEvidence -> Bool
--- Very important function!
--- See Note [eqCanRewrite]
--- See Note [Wanteds do not rewrite Wanteds]
--- See Note [Deriveds do rewrite Deriveds]
-eqCanRewrite ev1 ev2 = eqCanRewriteFR (ctEvFlavourRole ev1)
-                                      (ctEvFlavourRole ev2)
+We /do/ say that a [W] can discharge a [WD].  In evidence terms it
+certainly can, and the /caller/ arranges that the otherwise-lost [D]
+is spat out as a new Derived.  -}
 
-eqCanRewriteFR :: CtFlavourRole -> CtFlavourRole -> Bool
-eqCanRewriteFR (Given, NomEq)   (_, _)           = True
-eqCanRewriteFR (Given, ReprEq)  (_, ReprEq)      = True
-eqCanRewriteFR (Derived, NomEq) (Derived, NomEq) = True
-eqCanRewriteFR _                _                = False
-
------------------
-funEqCanDischarge :: CtEvidence -> CtEvidence -> Bool
--- See Note [funEqCanDischarge]
-funEqCanDischarge ev1 ev2 = funEqCanDischargeFR (ctEvFlavourRole ev1)
-                                      (ctEvFlavourRole ev2)
-
-funEqCanDischargeFR :: CtFlavourRole -> CtFlavourRole -> Bool
-funEqCanDischargeFR (_, ReprEq)  (_, NomEq)   = False
-funEqCanDischargeFR (Given,   _) _            = True
-funEqCanDischargeFR (Wanted,  _) (Wanted,  _) = True
-funEqCanDischargeFR (Wanted,  _) (Derived, _) = True
-funEqCanDischargeFR (Derived, _) (Derived, _) = True
-funEqCanDischargeFR _            _            = False
-
------------------
 eqCanDischarge :: CtEvidence -> CtEvidence -> Bool
 -- See Note [eqCanDischarge]
 eqCanDischarge ev1 ev2 = eqCanDischargeFR (ctEvFlavourRole ev1)
                                           (ctEvFlavourRole ev2)
+
 eqCanDischargeFR :: CtFlavourRole -> CtFlavourRole -> Bool
-eqCanDischargeFR (_, ReprEq)  (_, NomEq)   = False
-eqCanDischargeFR (Given,   _) (Given,_)    = True
-eqCanDischargeFR (Wanted,  _) (Wanted,  _) = True
-eqCanDischargeFR (Derived, _) (Derived, _) = True
-eqCanDischargeFR _            _            = False
+eqCanDischargeFR (_, ReprEq) (_, NomEq) = False
+eqCanDischargeFR (f1,_)      (f2, _)    = eqCanDischargeF f1 f2
+
+eqCanDischargeF :: CtFlavour -> CtFlavour -> Bool
+eqCanDischargeF Given   _                  = True
+eqCanDischargeF (Wanted _)      (Wanted _) = True
+eqCanDischargeF (Wanted WDeriv) Derived    = True
+eqCanDischargeF Derived         Derived    = True
+eqCanDischargeF _               _          = False
+
 
 {-
 ************************************************************************

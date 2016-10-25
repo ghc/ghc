@@ -2682,13 +2682,14 @@ relevantBindings want_filtering ctxt ct
                    -- et really should be filled in by now. But there's a chance
                    -- it hasn't, if, say, we're reporting a kind error en route to
                    -- checking a term. See test indexed-types/should_fail/T8129
-               ; ty <- case mb_ty of
-                   Just ty -> return ty
-                   Nothing -> do { traceTc "Defaulting an ExpType in relevantBindings"
-                                     (ppr et)
-                                 ; expTypeToType et }
-               ; go2 name ty top_lvl }
+                   -- Or we are reporting errors from the ambiguity check on
+                   -- a local type signature
+               ; case mb_ty of
+                   Just ty -> go2 name ty top_lvl
+                   Nothing -> discard_it  -- No info; discard
+               }
       where
+        discard_it = go tidy_env ct_tvs n_left tvs_seen docs discards tc_bndrs
         go2 id_name id_type top_lvl
           = do { (tidy_env', tidy_ty) <- zonkTidyTcType tidy_env id_type
                ; traceTc "relevantBindings 1" (ppr id_name <+> dcolon <+> ppr tidy_ty)
@@ -2702,17 +2703,19 @@ relevantBindings want_filtering ctxt ct
                                     && id_tvs `disjointVarSet` ct_tvs)
                           -- We want to filter out this binding anyway
                           -- so discard it silently
-                 then go tidy_env ct_tvs n_left tvs_seen docs discards tc_bndrs
+                 then discard_it
 
                  else if isTopLevel top_lvl && not (isNothing n_left)
                           -- It's a top-level binding and we have not specified
                           -- -fno-max-relevant-bindings, so discard it silently
-                 then go tidy_env ct_tvs n_left tvs_seen docs discards tc_bndrs
+                 then discard_it 
 
                  else if run_out n_left && id_tvs `subVarSet` tvs_seen
                           -- We've run out of n_left fuel and this binding only
                           -- mentions aleady-seen type variables, so discard it
-                 then go tidy_env ct_tvs n_left tvs_seen docs True tc_bndrs
+                 then go tidy_env ct_tvs n_left tvs_seen docs
+                         True      -- Record that we have now discarded something
+                         tc_bndrs
 
                           -- Keep this binding, decrement fuel
                  else go tidy_env' ct_tvs (dec_max n_left) new_seen (doc:docs) discards tc_bndrs }
