@@ -856,7 +856,6 @@ data DynFlags = DynFlags {
   -- Output style options
   pprUserLength         :: Int,
   pprCols               :: Int,
-  traceLevel            :: Int, -- Standard level is 1. Less verbose is 0.
 
   useUnicode      :: Bool,
 
@@ -1601,7 +1600,6 @@ defaultDynFlags mySettings =
         pprUserLength = 5,
         pprCols = 100,
         useUnicode = False,
-        traceLevel = 1,
         profAuto = NoProfAuto,
         interactivePrint = Nothing,
         nextWrapperNum = panic "defaultDynFlags: No nextWrapperNum",
@@ -2640,8 +2638,6 @@ dynamic_flags_deps = [
                                                        d { pprUserLength = n }))
   , make_ord_flag defFlag "dppr-cols"        (intSuffix (\n d ->
                                                              d { pprCols = n }))
-  , make_ord_flag defGhcFlag "dtrace-level"  (intSuffix (\n d ->
-                                                          d { traceLevel = n }))
   -- Suppress all that is suppressable in core dumps.
   -- Except for uniques, as some simplifier phases introduce new variables that
   -- have otherwise identical names.

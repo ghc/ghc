@@ -669,12 +669,10 @@ traceRn :: String -> SDoc -> TcRn ()
 traceRn =
   guardedTraceOptTcRn Opt_D_dump_rn_trace
 
--- | Do not display a trace if `-dno-debug-output` is on or `-dtrace-level=0`.
+-- | Do not display a trace if `-dno-debug-output` is on
 guardedTraceOptTcRn :: DumpFlag -> String -> SDoc -> TcRn ()
 guardedTraceOptTcRn flag herald doc = do
-  dflags <- getDynFlags
-  when ( traceLevel dflags >= 1
-         && not opt_NoDebugOutput)
+  unless opt_NoDebugOutput
        ( traceOptTcRn flag (formatTraceMsg herald doc) )
 
 formatTraceMsg :: String -> SDoc -> SDoc

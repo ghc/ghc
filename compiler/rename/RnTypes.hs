@@ -267,6 +267,9 @@ rnImplicitBndrs no_implicit_if_forall free_vars hs_ty@(L loc _) thing_inside
              real_rdrs = freeKiTyVarsKindVars free_vars ++ real_tv_rdrs
        ; traceRn "rnSigType" (ppr hs_ty $$ ppr free_vars $$
                                         ppr real_rdrs)
+
+       ; traceRn "" (text "rnSigType2" <+> ppr hs_ty $$ ppr free_vars $$
+                                        ppr real_rdrs)
        ; vars <- mapM (newLocalBndrRn . L loc . unLoc) real_rdrs
        ; bindLocalNamesFV vars $
          thing_inside vars }

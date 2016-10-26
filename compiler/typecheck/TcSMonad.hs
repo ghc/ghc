@@ -2424,12 +2424,12 @@ bumpStepCountTcS = TcS $ \env -> do { let ref = tcs_count env
 
 csTraceTcS :: SDoc -> TcS ()
 csTraceTcS doc
-  = wrapTcS $ csTraceTcM 1 (return doc)
+  = wrapTcS $ csTraceTcM (return doc)
 
 traceFireTcS :: CtEvidence -> SDoc -> TcS ()
 -- Dump a rule-firing trace
 traceFireTcS ev doc
-  = TcS $ \env -> csTraceTcM 1 $
+  = TcS $ \env -> csTraceTcM $
     do { n <- TcM.readTcRef (tcs_count env)
        ; tclvl <- TcM.getTcLevel
        ; return (hang (int n <> brackets (text "U:" <> ppr tclvl
@@ -2437,14 +2437,14 @@ traceFireTcS ev doc
                        <+> doc <> colon)
                      4 (ppr ev)) }
 
-csTraceTcM :: Int -> TcM SDoc -> TcM ()
+csTraceTcM :: TcM SDoc -> TcM ()
 -- Constraint-solver tracing, -ddump-cs-trace
-csTraceTcM trace_level mk_doc
+csTraceTcM mk_doc
   = do { dflags <- getDynFlags
-       ; when (  (dopt Opt_D_dump_cs_trace dflags || dopt Opt_D_dump_tc_trace dflags)
-              && trace_level <= traceLevel dflags ) $
-         do { msg <- mk_doc
-            ; TcM.traceTcRn Opt_D_dump_cs_trace msg } }
+       ; when (  dopt Opt_D_dump_cs_trace dflags
+                  || dopt Opt_D_dump_tc_trace dflags )
+              ( do { msg <- mk_doc
+                   ; TcM.traceTcRn Opt_D_dump_cs_trace msg }) }
 
 runTcS :: TcS a                -- What to run
        -> TcM (a, EvBindMap)
@@ -2489,7 +2489,7 @@ runTcSWithEvBinds solve_deriveds ev_binds_var tcs
 
        ; count <- TcM.readTcRef step_count
        ; when (count > 0) $
-         csTraceTcM 0 $ return (text "Constraint solver steps =" <+> int count)
+         csTraceTcM $ return (text "Constraint solver steps =" <+> int count)
 
 #ifdef DEBUG
        ; ev_binds <- TcM.getTcEvBindsMap ev_binds_var
