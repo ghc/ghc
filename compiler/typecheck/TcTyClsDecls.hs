@@ -742,14 +742,12 @@ tcTyClDecl1 _parent roles_info
             , tcdATs = ats, tcdATDefs = at_defs })
   = ASSERT( isNothing _parent )
     do { clas <- fixM $ \ clas ->
+            -- We need the knot becase 'clas' is passed into tcClassATs
             tcTyClTyVars class_name $ \ binders res_kind ->
             do { MASSERT( isConstraintKind res_kind )
-                 -- This little knot is just so we can get
-                 -- hold of the name of the class TyCon, which we
-                 -- need to look up its recursiveness
                ; traceTc "tcClassDecl 1" (ppr class_name $$ ppr binders)
-               ; let tycon_name = tyConName (classTyCon clas)
-                     roles = roles_info tycon_name
+               ; let tycon_name = class_name        -- We use the same name
+                     roles = roles_info tycon_name  -- for TyCon and Class
 
                ; ctxt' <- solveEqualities $ tcHsContext ctxt
                ; ctxt' <- zonkTcTypeToTypes emptyZonkEnv ctxt'
