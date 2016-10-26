@@ -888,7 +888,7 @@ rnStmt ctxt _ (L loc (TransStmt { trS_stmts = stmts, trS_by = by, trS_form = for
              bndr_map = used_bndrs `zip` used_bndrs
              -- See Note [TransStmt binder map] in HsExpr
 
-       ; traceRn (text "rnStmt: implicitly rebound these used binders:" <+> ppr bndr_map)
+       ; traceRn "rnStmt: implicitly rebound these used binders:" (ppr bndr_map)
        ; return (([(L loc (TransStmt { trS_stmts = stmts', trS_bndrs = bndr_map
                                     , trS_by = by', trS_using = using', trS_form = form
                                     , trS_ret = return_op, trS_bind = bind_op

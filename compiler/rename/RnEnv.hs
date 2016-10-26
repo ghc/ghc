@@ -215,7 +215,7 @@ newTopSrcBinder (L loc rdr_name)
                 ; return (mkInternalName uniq (rdrNameOcc rdr_name) loc) }
           else
              do { this_mod <- getModule
-                ; traceRn (text "newTopSrcBinder" <+> (ppr this_mod $$ ppr rdr_name $$ ppr loc))
+                ; traceRn "newTopSrcBinder" (ppr this_mod $$ ppr rdr_name $$ ppr loc)
                 ; newGlobalBinder this_mod (rdrNameOcc rdr_name) loc }
         }
 
@@ -245,7 +245,7 @@ lookupTopBndrRn :: RdrName -> RnM Name
 lookupTopBndrRn n = do nopt <- lookupTopBndrRn_maybe n
                        case nopt of
                          Just n' -> return n'
-                         Nothing -> do traceRn $ (text "lookupTopBndrRn fail" <+> ppr n)
+                         Nothing -> do traceRn "lookupTopBndrRn fail" (ppr n)
                                        unboundName WL_LocalTop n
 
 lookupLocatedTopBndrRn :: Located RdrName -> RnM (Located Name)
@@ -497,7 +497,9 @@ lookupSubBndrOcc warn_if_deprec the_parent doc rdr_name
                 -- NB: lookupGlobalRdrEnv, not lookupGRE_RdrName!
                 --     The latter does pickGREs, but we want to allow 'x'
                 --     even if only 'M.x' is in scope
-       ; traceRn (text "lookupSubBndrOcc" <+> vcat [ppr the_parent, ppr rdr_name, ppr gres, ppr (pick_gres rdr_name gres)])
+       ; traceRn "lookupSubBndrOcc"
+            (vcat [ ppr the_parent, ppr rdr_name
+                  , ppr gres, ppr (pick_gres rdr_name gres)])
        ; case pick_gres rdr_name gres of
             (gre:_) -> do { addUsedGRE warn_if_deprec gre
                             -- Add a usage; this is an *occurrence* site
@@ -832,7 +834,7 @@ lookupGlobalOccRn rdr_name
   = do { mb_name <- lookupGlobalOccRn_maybe rdr_name
        ; case mb_name of
            Just n  -> return n
-           Nothing -> do { traceRn (text "lookupGlobalOccRn" <+> ppr rdr_name)
+           Nothing -> do { traceRn "lookupGlobalOccRn" (ppr rdr_name)
                          ; unboundName WL_Global rdr_name } }
 
 lookupInfoOccRn :: RdrName -> RnM [Name]
@@ -933,7 +935,8 @@ lookupGreRn_maybe rdr_name
             [gre] -> do { addUsedGRE True gre
                         ; return (Just gre) }
             gres  -> do { addNameClashErrRn rdr_name gres
-                        ; traceRn (text "name clash" <+> (ppr rdr_name $$ ppr gres $$ ppr env))
+                        ; traceRn "lookupGreRn:name clash"
+                            (ppr rdr_name $$ ppr gres $$ ppr env)
                         ; return (Just (head gres)) } }
 
 lookupGreRn2_maybe :: RdrName -> RnM (Maybe GlobalRdrElt)
@@ -950,7 +953,8 @@ lookupGreRn2_maybe rdr_name
             [gre] -> do { addUsedGRE True gre
                         ; return (Just gre) }
             gres  -> do { addNameClashErrRn rdr_name gres
-                        ; traceRn (text "name clash" <+> (ppr rdr_name $$ ppr gres $$ ppr env))
+                        ; traceRn "lookupGreRn_maybe:name clash"
+                            (ppr rdr_name $$ ppr gres $$ ppr env)
                         ; return Nothing } }
 
 lookupGreAvailRn :: RdrName -> RnM (Name, AvailInfo)
@@ -962,7 +966,7 @@ lookupGreAvailRn rdr_name
         ; case mb_gre of {
             Just gre -> return (gre_name gre, availFromGRE gre) ;
             Nothing  ->
-    do  { traceRn (text "lookupGreRn" <+> ppr rdr_name)
+    do  { traceRn "lookupGreAvailRn" (ppr rdr_name)
         ; let name = mkUnboundNameRdr rdr_name
         ; return (name, avail name) } } }
 
@@ -1004,7 +1008,7 @@ addUsedGRE warn_if_deprec gre
   = do { when warn_if_deprec (warnIfDeprecated gre)
        ; unless (isLocalGRE gre) $
          do { env <- getGblEnv
-            ; traceRn (text "addUsedGRE" <+> ppr gre)
+            ; traceRn "addUsedGRE" (ppr gre)
             ; updMutVar (tcg_used_gres env) (gre :) } }
 
 addUsedGREs :: [GlobalRdrElt] -> RnM ()
@@ -1014,7 +1018,7 @@ addUsedGREs :: [GlobalRdrElt] -> RnM ()
 addUsedGREs gres
   | null imp_gres = return ()
   | otherwise     = do { env <- getGblEnv
-                       ; traceRn (text "addUsedGREs" <+> ppr imp_gres)
+                       ; traceRn "addUsedGREs" (ppr imp_gres)
                        ; updMutVar (tcg_used_gres env) (imp_gres ++) }
   where
     imp_gres = filterOut isLocalGRE gres
@@ -1126,11 +1130,11 @@ lookupQualifiedNameGHCi rdr_name
 
                 _ -> -- Either we couldn't load the interface, or
                      -- we could but we didn't find the name in it
-                     do { traceRn (text "lookupQualifiedNameGHCi" <+> ppr rdr_name)
+                     do { traceRn "lookupQualifiedNameGHCi" (ppr rdr_name)
                         ; return [] } }
 
       | otherwise
-      = do { traceRn (text "lookupQualifedNameGHCi: off" <+> ppr rdr_name)
+      = do { traceRn "lookupQualifedNameGHCi: off" (ppr rdr_name)
            ; return [] }
 
     doc = text "Need to find" <+> ppr rdr_name
@@ -1455,7 +1459,7 @@ lookupFixityRn_help' name occ
                             Just f ->
                                   text "looking up name in iface and found:"
                               <+> vcat [ppr name, ppr f]
-           ; traceRn (text "lookupFixityRn_either:" <+> msg)
+           ; traceRn "lookupFixityRn_either:" msg
            ; return (maybe (False, defaultFixity) (\f -> (True, f)) mb_fix)  }
 
     doc = text "Checking fixity for" <+> ppr name
@@ -1476,7 +1480,7 @@ lookupFieldFixityRn (Ambiguous   (L _ rdr) _) = get_ambiguous_fixity rdr
   where
     get_ambiguous_fixity :: RdrName -> RnM Fixity
     get_ambiguous_fixity rdr_name = do
-      traceRn $ text "get_ambiguous_fixity" <+> ppr rdr_name
+      traceRn "get_ambiguous_fixity" (ppr rdr_name)
       rdr_env <- getGlobalRdrEnv
       let elts =  lookupGRE_RdrName rdr_name rdr_env
 
@@ -1729,7 +1733,7 @@ checkShadowedOccs :: (GlobalRdrEnv, LocalRdrEnv)
                   -> [a] -> RnM ()
 checkShadowedOccs (global_env,local_env) get_loc_occ ns
   = whenWOptM Opt_WarnNameShadowing $
-    do  { traceRn (text "shadow" <+> ppr (map get_loc_occ ns))
+    do  { traceRn "checkShadowedOccs:shadow" (ppr (map get_loc_occ ns))
         ; mapM_ check_shadow ns }
   where
     check_shadow n

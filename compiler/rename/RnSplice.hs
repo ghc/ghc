@@ -99,13 +99,13 @@ rnBracket e br_body
        ; recordThUse
 
        ; case isTypedBracket br_body of
-            True  -> do { traceRn (text "Renaming typed TH bracket")
+            True  -> do { traceRn "Renaming typed TH bracket" empty
                         ; (body', fvs_e) <-
                           setStage (Brack cur_stage RnPendingTyped) $
                                    rn_bracket cur_stage br_body
                         ; return (HsBracket body', fvs_e) }
 
-            False -> do { traceRn (text "Renaming untyped TH bracket")
+            False -> do { traceRn "Renaming untyped TH bracket" empty
                         ; ps_var <- newMutVar []
                         ; (body', fvs_e) <-
                           setStage (Brack cur_stage (RnPendingUntyped ps_var)) $
@@ -130,7 +130,9 @@ rn_bracket outer_stage br@(VarBr flg rdr_name)
                              | isTopLevel top_lvl
                              -> when (isExternalName name) (keepAlive name)
                              | otherwise
-                             -> do { traceRn (text "rn_bracket VarBr" <+> ppr name <+> ppr bind_lvl <+> ppr outer_stage)
+                             -> do { traceRn "rn_bracket VarBr"
+                                      (ppr name <+> ppr bind_lvl
+                                                <+> ppr outer_stage)
                                    ; checkTc (thLevel outer_stage + 1 == bind_lvl)
                                              (quotedNameStageErr br) }
                         }
@@ -155,8 +157,8 @@ rn_bracket _ (DecBrL decls)
                               rnSrcDecls group
 
               -- Discard the tcg_env; it contains only extra info about fixity
-        ; traceRn (text "rn_bracket dec" <+> (ppr (tcg_dus tcg_env) $$
-                   ppr (duUses (tcg_dus tcg_env))))
+        ; traceRn "rn_bracket dec" (ppr (tcg_dus tcg_env) $$
+                   ppr (duUses (tcg_dus tcg_env)))
         ; return (DecBrG group', duUses (tcg_dus tcg_env)) }
   where
     groupDecls :: [LHsDecl RdrName] -> RnM (HsGroup RdrName)
@@ -420,7 +422,7 @@ rnSpliceExpr splice
     run_expr_splice rn_splice
       | isTypedSplice rn_splice   -- Run it later, in the type checker
       = do {  -- Ugh!  See Note [Splices] above
-             traceRn (text "rnSpliceExpr: typed expression splice")
+             traceRn "rnSpliceExpr: typed expression splice" empty
            ; lcl_rdr <- getLocalRdrEnv
            ; gbl_rdr <- getGlobalRdrEnv
            ; let gbl_names = mkNameSet [gre_name gre | gre <- globalRdrEnvElts gbl_rdr
@@ -430,7 +432,7 @@ rnSpliceExpr splice
            ; return (HsSpliceE rn_splice, lcl_names `plusFV` gbl_names) }
 
       | otherwise  -- Run it here, see Note [Running splices in the Renamer]
-      = do { traceRn (text "rnSpliceExpr: untyped expression splice")
+      = do { traceRn "rnSpliceExpr: untyped expression splice" empty
            ; (rn_expr, mod_finalizers) <-
                 runRnSplice UntypedExpSplice runMetaE ppr rn_splice
            ; (lexpr3, fvs) <- checkNoErrs (rnLExpr rn_expr)
@@ -542,7 +544,7 @@ rnSpliceType splice k
        = (makePending UntypedTypeSplice rn_splice, HsSpliceTy rn_splice k)
 
     run_type_splice rn_splice
-      = do { traceRn (text "rnSpliceType: untyped type splice")
+      = do { traceRn "rnSpliceType: untyped type splice" empty
            ; (hs_ty2, mod_finalizers) <-
                 runRnSplice UntypedTypeSplice runMetaT ppr rn_splice
            ; (hs_ty3, fvs) <- do { let doc = SpliceTypeCtx hs_ty2
@@ -609,7 +611,7 @@ rnSplicePat splice
       = (makePending UntypedPatSplice rn_splice, Right (SplicePat rn_splice))
 
     run_pat_splice rn_splice
-      = do { traceRn (text "rnSplicePat: untyped pattern splice")
+      = do { traceRn "rnSplicePat: untyped pattern splice" empty
            ; (pat, mod_finalizers) <-
                 runRnSplice UntypedPatSplice runMetaP ppr rn_splice
              -- See Note [Delaying modFinalizers in untyped splices].
@@ -640,7 +642,7 @@ rnTopSpliceDecls splice
                                rnSplice splice
            -- As always, be sure to checkNoErrs above lest we end up with
            -- holes making it to typechecking, hence #12584.
-         ; traceRn (text "rnTopSpliceDecls: untyped declaration splice")
+         ; traceRn "rnTopSpliceDecls: untyped declaration splice" empty
          ; (decls, mod_finalizers) <-
               runRnSplice UntypedDeclSplice runMetaD ppr_decls rn_splice
          ; add_mod_finalizers_now mod_finalizers
@@ -766,14 +768,16 @@ checkThLocalName name
   = return ()            --   $(not_in_scope args)
 
   | otherwise
-  = do  { traceRn (text "checkThLocalName" <+> ppr name)
+  = do  { traceRn "checkThLocalName" (ppr name)
         ; mb_local_use <- getStageAndBindLevel name
         ; case mb_local_use of {
              Nothing -> return () ;  -- Not a locally-bound thing
              Just (top_lvl, bind_lvl, use_stage) ->
     do  { let use_lvl = thLevel use_stage
         ; checkWellStaged (quotes (ppr name)) bind_lvl use_lvl
-        ; traceRn (text "checkThLocalName" <+> ppr name <+> ppr bind_lvl <+> ppr use_stage <+> ppr use_lvl)
+        ; traceRn "checkThLocalName" (ppr name <+> ppr bind_lvl
+                                               <+> ppr use_stage
+                                               <+> ppr use_lvl)
         ; checkCrossStageLifting top_lvl bind_lvl use_stage use_lvl name } } }
 
 --------------------------------------
@@ -817,7 +821,7 @@ check_cross_stage_lifting top_lvl name ps_var
         -- If 'x' occurs many times we may get many identical
         -- bindings of the same SplicePointName, but that doesn't
         -- matter, although it's a mite untidy.
-    do  { traceRn (text "checkCrossStageLifting" <+> ppr name)
+    do  { traceRn "checkCrossStageLifting" (ppr name)
 
           -- Construct the (lift x) expression
         ; let lift_expr   = nlHsApp (nlHsVar liftName) (nlHsVar name)

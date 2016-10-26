@@ -233,13 +233,14 @@ test('T4801',
            # 2014-09-03:  185242032 (Windows laptop)
            # 2014-12-01:  203962148 (Windows laptop)
            # 2016-04-06:  239556572 (x86/Linux)
-           (wordsize(64), 434278248, 10)]),
+           (wordsize(64), 388898280, 10)]),
             # prev:       360243576 (amd64/Linux)
             # 19/10/2012: 447190832 (amd64/Linux) (-fPIC turned on)
             # 19/10/2012: 392409984 (amd64/Linux) (-fPIC turned off)
             # 2014-04-08: 362939272 (amd64/Linux) cumulation of various smaller improvements over recent commits
             # 2014-10-08: 382056344 (amd64/Linux) stricter foldr2 488e95b
             # 2015-10-28: 434278248 (amd64/Linux) emit Typeable at definition site
+            # 2016-10-19: 388898280 (amd64/Linux) Refactor traceRn interface (#12617)
 
 ###################################
 # deactivated for now, as this metric became too volatile recently
@@ -415,7 +416,7 @@ test('T5631',
         # 2014-04-04:     346389856 (x86 Windows, 64 bit machine)
         # 2014-12-01:     390199244 (Windows laptop)
         # 2016-04-06:     570137436 (amd64/Linux) many reasons
-           (wordsize(64), 1124068664, 5)]),
+           (wordsize(64), 1024926024, 5)]),
         # expected value: 774595008 (amd64/Linux):
         # expected value: 735486328 (amd64/Linux) 2012/12/12:
         # expected value: 690742040 (amd64/Linux) Call Arity improvements
@@ -425,6 +426,7 @@ test('T5631',
         # 2015-12-11:     1128828928 (amd64/Linux) TypeInType (see #11196)
         # 2015-12-21:     1198327544 (Mac) TypeApplications (will fix with #11196)
         # 2015-03-18:     1124068664 (Mac) optimize Unify & zonking
+        # 2016-10-19:     1024926024 (amd64/Linux) Refactor traceRn interface (#12617)
        only_ways(['normal'])
       ],
      compile,
@@ -705,12 +707,13 @@ test('T9675',
 test('T9872a',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 3352882080, 5),
+          [(wordsize(64), 3134866040    , 5),
           # 2014-12-10    5521332656    Initally created
           # 2014-12-16    5848657456    Flattener parameterized over roles
           # 2014-12-18    2680733672    Reduce type families even more eagerly
           # 2015-12-11    3581500440    TypeInType (see #11196)
           # 2016-04-07    3352882080    CSE improvements
+          # 2016-10-19    3134866040    Refactor traceRn interface (#12617)
            (wordsize(32), 1740903516, 5)
           # was           1325592896
           # 2016-04-06    1740903516    x86/Linux

@@ -265,8 +265,8 @@ rnImplicitBndrs no_implicit_if_forall free_vars hs_ty@(L loc _) thing_inside
                , L _ (HsForAllTy {}) <- hs_ty = []
                | otherwise                    = freeKiTyVarsTypeVars free_vars
              real_rdrs = freeKiTyVarsKindVars free_vars ++ real_tv_rdrs
-       ; traceRn (text "rnSigType" <+> (ppr hs_ty $$ ppr free_vars $$
-                                        ppr real_rdrs))
+       ; traceRn "rnSigType" (ppr hs_ty $$ ppr free_vars $$
+                                        ppr real_rdrs)
        ; vars <- mapM (newLocalBndrRn . L loc . unLoc) real_rdrs
        ; bindLocalNamesFV vars $
          thing_inside vars }
@@ -429,11 +429,10 @@ rnHsKind ctxt kind = rnHsTyKi  (mkTyKiEnv ctxt KindLevel RnTypeBody) kind
 --------------
 rnTyKiContext :: RnTyKiEnv -> LHsContext RdrName -> RnM (LHsContext Name, FreeVars)
 rnTyKiContext env (L loc cxt)
-  = do { traceRn (text "rncontext" <+> ppr cxt)
+  = do { traceRn "rncontext" (ppr cxt)
        ; let env' = env { rtke_what = RnConstraint }
        ; (cxt', fvs) <- mapFvRn (rnLHsTyKi env') cxt
        ; return (L loc cxt', fvs) }
-  where
 
 rnContext :: HsDocContext -> LHsContext RdrName -> RnM (LHsContext Name, FreeVars)
 rnContext doc theta = rnTyKiContext (mkTyKiEnv doc TypeLevel RnConstraint) theta
@@ -892,10 +891,10 @@ bindLHsTyVarBndrs doc mb_in_doc mb_assoc kv_bndrs tv_bndrs thing_inside
                                | v <- all_rn_tvs
                                , let name = hsLTyVarName v
                                , name `elemNameSet` all_dep_vars ]
-           ; traceRn (text "bindHsTyVars" <+> (ppr env $$
-                                               ppr all_rn_kvs $$
-                                               ppr all_rn_tvs $$
-                                               ppr exp_dep_vars))
+           ; traceRn "bindHsTyVars" (ppr env $$
+                                     ppr all_rn_kvs $$
+                                     ppr all_rn_tvs $$
+                                     ppr exp_dep_vars)
            ; thing_inside all_rn_kvs all_rn_tvs exp_dep_vars all_dep_vars }
 
     warn_unused tv_bndr fvs = case mb_in_doc of

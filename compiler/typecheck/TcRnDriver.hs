@@ -238,7 +238,7 @@ tcRnModuleTcRnM hsc_env hsc_src
         setGblEnv tcg_env1 $ do {
 
                 -- Rename and type check the declarations
-        traceRn (text "rn1a") ;
+        traceRn "rn1a" empty ;
         tcg_env <- if isHsBootOrSig hsc_src then
                         tcRnHsBootDecls hsc_src local_decls
                    else
@@ -247,9 +247,9 @@ tcRnModuleTcRnM hsc_env hsc_src
         setGblEnv tcg_env               $ do {
 
                 -- Process the export list
-        traceRn (text "rn4a: before exports");
+        traceRn "rn4a: before exports" empty;
         tcg_env <- tcRnExports explicit_mod_hdr export_ies tcg_env ;
-        traceRn (text "rn4b: after exports") ;
+        traceRn "rn4b: after exports" empty ;
 
                 -- Check that main is exported (must be after rnExports)
         checkMainExported tcg_env ;
@@ -330,7 +330,7 @@ tcRnImports hsc_env import_decls
               tcg_hpc          = hpc_info
             }) $ do {
 
-        ; traceRn (text "rn1" <+> ppr (imp_dep_mods imports))
+        ; traceRn "rn1" (ppr (imp_dep_mods imports))
                 -- Fail if there are any errors so far
                 -- The error printing (if needed) takes advantage
                 -- of the tcg_env we have now set
@@ -345,7 +345,7 @@ tcRnImports hsc_env import_decls
                                (filter (/= this_mod) (imp_orphs imports))
 
                 -- Check type-family consistency
-        ; traceRn (text "rn1: checking family instance consistency")
+        ; traceRn "rn1: checking family instance consistency" empty
         ; let { dir_imp_mods = moduleEnvKeys
                              . imp_mods
                              $ imports }
@@ -1177,9 +1177,9 @@ rnTopSrcDecls :: HsGroup RdrName -> TcM (TcGblEnv, HsGroup Name)
 -- Fails if there are any errors
 rnTopSrcDecls group
  = do { -- Rename the source decls
-        traceRn (text "rn12") ;
+        traceRn "rn12" empty ;
         (tcg_env, rn_decls) <- checkNoErrs $ rnSrcDecls group ;
-        traceRn (text "rn13") ;
+        traceRn "rn13" empty ;
 
         -- save the renamed syntax, if we want it
         let { tcg_env'
@@ -1915,7 +1915,7 @@ tcUserStmt rdr_stmt@(L loc _)
              fix_env <- getFixityEnv
              return (fix_env, emptyFVs)
             -- Don't try to typecheck if the renamer fails!
-       ; traceRn (text "tcRnStmt" <+> vcat [ppr rdr_stmt, ppr rn_stmt, ppr fvs])
+       ; traceRn "tcRnStmt" (vcat [ppr rdr_stmt, ppr rn_stmt, ppr fvs])
        ; rnDump (ppr rn_stmt) ;
 
        ; ghciStep <- getGhciStepIO

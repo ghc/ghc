@@ -132,9 +132,9 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    -- Bind the LHSes (and their fixities) in the global rdr environment
    let { id_bndrs = collectHsIdBinders new_lhs } ;  -- Excludes pattern-synonym binders
                                                     -- They are already in scope
-   traceRn (text "rnSrcDecls" <+> ppr id_bndrs) ;
+   traceRn "rnSrcDecls" (ppr id_bndrs) ;
    tc_envs <- extendGlobalRdrEnvRn (map avail id_bndrs) local_fix_env ;
-   traceRn (text "D2" <+> ppr (tcg_rdr_env (fst tc_envs)));
+   traceRn "D2" (ppr (tcg_rdr_env (fst tc_envs)));
    setEnvs tc_envs $ do {
 
    --  Now everything is in scope, as the remaining renaming assumes.
@@ -149,11 +149,11 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    -- So we content ourselves with gathering uses only; that
    -- means we'll only report a declaration as unused if it isn't
    -- mentioned at all.  Ah well.
-   traceRn (text "Start rnTyClDecls" <+> ppr tycl_decls) ;
+   traceRn "Start rnTyClDecls" (ppr tycl_decls) ;
    (rn_tycl_decls, src_fvs1) <- rnTyClDecls tycl_decls ;
 
    -- (F) Rename Value declarations right-hand sides
-   traceRn (text "Start rnmono") ;
+   traceRn "Start rnmono" empty ;
    let { val_bndr_set = mkNameSet id_bndrs `unionNameSet` mkNameSet pat_syn_bndrs } ;
    is_boot <- tcIsHsBootOrSig ;
    (rn_val_decls, bind_dus) <- if is_boot
@@ -162,7 +162,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
     -- bindings in an hs-boot.)
     then rnTopBindsBoot tc_bndrs new_lhs
     else rnValBindsRHS (TopSigCtxt val_bndr_set) new_lhs ;
-   traceRn (text "finish rnmono" <+> ppr rn_val_decls) ;
+   traceRn "finish rnmono" (ppr rn_val_decls) ;
 
    -- (G) Rename Fixity and deprecations
 
@@ -220,9 +220,9 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
                         in -- we return the deprecs in the env, not in the HsGroup above
                         tcg_env' { tcg_warns = tcg_warns tcg_env' `plusWarns` rn_warns };
        } ;
-   traceRn (text "last" <+> ppr (tcg_rdr_env final_tcg_env)) ;
-   traceRn (text "finish rnSrc" <+> ppr rn_group) ;
-   traceRn (text "finish Dus" <+> ppr src_dus ) ;
+   traceRn "last" (ppr (tcg_rdr_env final_tcg_env)) ;
+   traceRn "finish rnSrc" (ppr rn_group) ;
+   traceRn "finish Dus" (ppr src_dus ) ;
    return (final_tcg_env, rn_group)
                     }}}}
 
@@ -682,7 +682,7 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
 
        -- Rename the associated types, and type signatures
        -- Both need to have the instance type variables in scope
-       ; traceRn (text "rnSrcInstDecl"  <+> ppr inst_ty' $$ ppr ktv_names)
+       ; traceRn "rnSrcInstDecl" (ppr inst_ty' $$ ppr ktv_names)
        ; ((ats', adts'), more_fvs)
              <- extendTyVarEnvFVRn ktv_names $
                 do { (ats',  at_fvs)  <- rnATInstDecls rnTyFamInstDecl cls ktv_names ats
@@ -1319,7 +1319,7 @@ rnTyClDecls tycl_ds
                                        $$ ppr (flattenSCCs tycl_sccs) $$ ppr final_inst_ds  )
          mapM_ orphanRoleAnnotErr (nameEnvElts orphan_roles)
 
-       ; traceRn (text "rnTycl dependency analysis made groups" $$ ppr all_groups)
+       ; traceRn "rnTycl dependency analysis made groups" (ppr all_groups)
        ; return (all_groups, all_fvs) }
   where
     mk_group :: (InstDeclFreeVarsMap, RoleAnnotEnv)
@@ -1636,7 +1636,7 @@ rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars, tcdRhs = rhs })
   = do { tycon' <- lookupLocatedTopBndrRn tycon
        ; kvs <- freeKiTyVarsKindVars <$> extractHsTyRdrTyVars rhs
        ; let doc = TySynCtx tycon
-       ; traceRn (text "rntycl-ty" <+> ppr tycon <+> ppr kvs)
+       ; traceRn "rntycl-ty" (ppr tycon <+> ppr kvs)
        ; ((tyvars', rhs'), fvs) <- bindHsQTyVars doc Nothing Nothing kvs tyvars $
                                     \ tyvars' _ ->
                                     do { (rhs', fvs) <- rnTySyn doc rhs
@@ -1650,7 +1650,7 @@ rnTyClDecl (DataDecl { tcdLName = tycon, tcdTyVars = tyvars, tcdDataDefn = defn 
   = do { tycon' <- lookupLocatedTopBndrRn tycon
        ; kvs <- extractDataDefnKindVars defn
        ; let doc = TyDataCtx tycon
-       ; traceRn (text "rntycl-data" <+> ppr tycon <+> ppr kvs)
+       ; traceRn "rntycl-data" (ppr tycon <+> ppr kvs)
        ; ((tyvars', defn', no_kvs), fvs)
            <- bindHsQTyVars doc Nothing Nothing kvs tyvars $ \ tyvars' dep_vars ->
               do { ((defn', kind_sig_fvs), fvs) <- rnDataDefn doc defn
@@ -2016,7 +2016,7 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_qvars = qtvs
                                              ; return (Just lctx',fvs) }
         ; (new_details, fvs2) <- rnConDeclDetails (unLoc new_name) doc details
         ; let (new_details',fvs3) = (new_details,emptyFVs)
-        ; traceRn (text "rnConDecl" <+> ppr name <+> vcat
+        ; traceRn "rnConDecl" (ppr name <+> vcat
              [ text "free_kvs:" <+> ppr kvs
              , text "qtvs:" <+> ppr qtvs
              , text "qtvs':" <+> ppr qtvs' ])
@@ -2049,7 +2049,7 @@ rnConDecl decl@(ConDeclGADT { con_names = names, con_type = ty
         ; mb_doc'      <- rnMbLHsDoc mb_doc
 
         ; (ty', fvs) <- rnHsSigType doc ty
-        ; traceRn (text "rnConDecl" <+> ppr names <+> vcat
+        ; traceRn "rnConDecl" (ppr names <+> vcat
              [ text "fvs:" <+> ppr fvs ])
         ; return (decl { con_names = new_names, con_type = ty'
                        , con_doc = mb_doc' },

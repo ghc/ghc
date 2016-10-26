@@ -137,11 +137,11 @@ tcRnExports explicit_mod exports
                         --       turns out to be out of scope
 
         ; (rn_exports, avails) <- exports_from_avail real_exports rdr_env imports this_mod
-        ; traceRn (ppr avails)
+        ; traceRn "Exported Avails" (ppr avails)
         ; let final_avails = nubAvails avails    -- Combine families
               final_ns     = availsToNameSetWithSelectors final_avails
 
-        ; traceRn (text "rnExports: Exports:" <+> ppr final_avails)
+        ; traceRn "rnExports: Exports:" (ppr final_avails)
 
         ; let new_tcg_env =
                   tcg_env { tcg_exports    = final_avails,
@@ -221,7 +221,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                       (exportValid && null gre_prs)
                       (nullModuleExport mod)
 
-             ; traceRn (text "efa" <+> (ppr mod $$ ppr all_gres))
+             ; traceRn "efa" (ppr mod $$ ppr all_gres)
              ; addUsedGREs all_gres
 
              ; occs' <- check_occs (IEModuleContents (noLoc mod)) occs names
@@ -231,7 +231,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                       -- 'M.x' is in scope in several ways, we'll have
                       -- several members of mod_avails with the same
                       -- OccName.
-             ; traceRn (vcat [ text "export mod" <+> ppr mod
+             ; traceRn "export_mod"
+                       (vcat [ ppr mod
                              , ppr new_exports ])
              ; return (ExportAccum (L loc (IEModuleContents (L lm mod)) : ie_names)
                                    occs'
@@ -463,7 +464,7 @@ lookupExportChild parent rdr_name
   -- The remaining GREs are things that we *could* export here, note that
   -- this includes things which have `NoParent`. Those are sorted in
   -- `checkPatSynParent`.
-  traceRn (text "lookupExportChild original_gres:" <+> ppr original_gres)
+  traceRn "lookupExportChild original_gres:" (ppr original_gres)
   case picked_gres original_gres of
     NoOccurence ->
       noMatchingParentErr original_gres

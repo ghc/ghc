@@ -494,7 +494,7 @@ extendGlobalRdrEnvRn avails new_fixities
         ; let fix_env' = foldl extend_fix_env fix_env new_gres
               gbl_env' = gbl_env { tcg_rdr_env = rdr_env2, tcg_fix_env = fix_env' }
 
-        ; traceRn (text "extendGlobalRdrEnvRn 2" <+> (pprGlobalRdrEnv True rdr_env2))
+        ; traceRn "extendGlobalRdrEnvRn 2" (pprGlobalRdrEnv True rdr_env2)
         ; return (gbl_env', lcl_env3) }
   where
     new_names = concatMap availNames avails
@@ -560,7 +560,7 @@ getLocalNonValBinders fixity_env
         ; (tc_avails, tc_fldss)
             <- fmap unzip $ mapM (new_tc overload_ok)
                                  (tyClGroupTyClDecls tycl_decls)
-        ; traceRn (text "getLocalNonValBinders 1" <+> ppr tc_avails)
+        ; traceRn "getLocalNonValBinders 1" (ppr tc_avails)
         ; envs <- extendGlobalRdrEnvRn tc_avails fixity_env
         ; setEnvs envs $ do {
             -- Bring these things into scope first
@@ -583,7 +583,7 @@ getLocalNonValBinders fixity_env
               new_bndrs = availsToNameSetWithSelectors avails `unionNameSet`
                           availsToNameSetWithSelectors tc_avails
               flds      = concat nti_fldss ++ concat tc_fldss
-        ; traceRn (text "getLocalNonValBinders 2" <+> ppr avails)
+        ; traceRn "getLocalNonValBinders 2" (ppr avails)
         ; (tcg_env, tcl_env) <- extendGlobalRdrEnvRn avails fixity_env
 
         -- Extend tcg_field_env with new fields (this used to be the
@@ -591,7 +591,7 @@ getLocalNonValBinders fixity_env
         ; let field_env = extendNameEnvList (tcg_field_env tcg_env) flds
               envs      = (tcg_env { tcg_field_env = field_env }, tcl_env)
 
-        ; traceRn (text "getLocalNonValBinders 3" <+> vcat [ppr flds, ppr field_env])
+        ; traceRn "getLocalNonValBinders 3" (vcat [ppr flds, ppr field_env])
         ; return (envs, new_bndrs) } }
   where
     ValBindsIn _val_binds val_sigs = binds
@@ -1067,7 +1067,7 @@ lookupChildren all_kids rdr_items
 reportUnusedNames :: Maybe (Located [LIE RdrName])  -- Export list
                   -> TcGblEnv -> RnM ()
 reportUnusedNames _export_decls gbl_env
-  = do  { traceRn ((text "RUN") <+> (ppr (tcg_dus gbl_env)))
+  = do  { traceRn "RUN" (ppr (tcg_dus gbl_env))
         ; warnUnusedImportDecls gbl_env
         ; warnUnusedTopBinds unused_locals
         ; warnMissingSignatures gbl_env }
@@ -1137,7 +1137,8 @@ warnUnusedImportDecls gbl_env
        ; let usage :: [ImportDeclUsage]
              usage = findImportUsage user_imports uses
 
-       ; traceRn (vcat [ text "Uses:" <+> ppr uses
+       ; traceRn "warnUnusedImportDecls" $
+                       (vcat [ text "Uses:" <+> ppr uses
                        , text "Import usage" <+> ppr usage])
        ; whenWOptM Opt_WarnUnusedImports $
          mapM_ (warnUnusedImport Opt_WarnUnusedImports fld_env) usage
