@@ -2960,7 +2960,7 @@ setEvBind ev_bind
        ; wrapTcS $ TcM.addTcEvBind evb ev_bind }
 
 -- | Mark variables as used filling a coercion hole
-useVars :: TyCoVarSet -> TcS ()
+useVars :: CoVarSet -> TcS ()
 useVars vars
   = do { EvBindsVar { ebv_tcvs = ref } <- getTcEvBindsVar
        ; wrapTcS $
@@ -2971,7 +2971,7 @@ useVars vars
 -- | Equalities only
 setWantedEq :: TcEvDest -> Coercion -> TcS ()
 setWantedEq (HoleDest hole) co
-  = do { useVars (tyCoVarsOfCo co)
+  = do { useVars (coVarsOfCo co)
        ; wrapTcS $ TcM.fillCoercionHole hole co }
 setWantedEq (EvVarDest ev) _ = pprPanic "setWantedEq" (ppr ev)
 
@@ -2984,7 +2984,7 @@ setEqIfWanted _ _ = return ()
 setWantedEvTerm :: TcEvDest -> EvTerm -> TcS ()
 setWantedEvTerm (HoleDest hole) tm
   = do { let co = evTermCoercion tm
-       ; useVars (tyCoVarsOfCo co)
+       ; useVars (coVarsOfCo co)
        ; wrapTcS $ TcM.fillCoercionHole hole co }
 setWantedEvTerm (EvVarDest ev) tm = setWantedEvBind ev tm
 

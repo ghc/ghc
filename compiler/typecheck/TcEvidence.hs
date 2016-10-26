@@ -292,8 +292,8 @@ data EvBindsVar
       -- The main payload: the value-level evidence bindings
       --     (dictionaries etc)
 
-      ebv_tcvs :: IORef TyCoVarSet
-      -- The free vars of the (rhss of) the coercion bindings
+      ebv_tcvs :: IORef CoVarSet
+      -- The free coercion vars of the (rhss of) the coercion bindings
       --
       -- Coercions don't actually have bindings
       -- because we plug them in-place (via a mutable
