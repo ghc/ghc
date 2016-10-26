@@ -172,7 +172,7 @@ improveFromAnother :: loc
 improveFromAnother loc pred1 pred2
   | Just (cls1, tys1) <- getClassPredTys_maybe pred1
   , Just (cls2, tys2) <- getClassPredTys_maybe pred2
-  , tys1 `lengthAtLeast` 2 && cls1 == cls2
+  , cls1 == cls2
   = [ FDEqn { fd_qtvs = [], fd_eqs = eqs, fd_pred1 = pred1, fd_pred2 = pred2, fd_loc = loc }
     | let (cls_tvs, cls_fds) = classTvsFds cls1
     , fd <- cls_fds
@@ -205,7 +205,6 @@ improveFromInstEnv _inst_env _ pred
   = panic "improveFromInstEnv: not a class predicate"
 improveFromInstEnv inst_env mk_loc pred
   | Just (cls, tys) <- getClassPredTys_maybe pred
-  , tys `lengthAtLeast` 2
   , let (cls_tvs, cls_fds) = classTvsFds cls
         instances          = classInstances inst_env cls
         rough_tcs          = roughMatchTcs tys
