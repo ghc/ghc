@@ -18,10 +18,9 @@ where
 import DynFlags
 import BlockId
 import Cmm
-import CmmUtils
 import PprCmmExpr ()
+import Hoopl.Dataflow
 
-import Hoopl
 import Maybes
 import Outputable
 
@@ -52,14 +51,14 @@ type BlockEntryLiveness r = BlockEnv (CmmLive r)
 
 cmmLocalLiveness :: DynFlags -> CmmGraph -> BlockEntryLiveness LocalReg
 cmmLocalLiveness dflags graph =
-  check $ dataflowAnalBwd graph [] $ analBwd liveLattice (xferLive dflags)
+  check $ dataflowAnalBwd graph [] liveLattice (xferLive dflags)
   where entry = g_entry graph
         check facts = noLiveOnEntry entry
                         (expectJust "check" $ mapLookup entry facts) facts
 
 cmmGlobalLiveness :: DynFlags -> CmmGraph -> BlockEntryLiveness GlobalReg
 cmmGlobalLiveness dflags graph =
-  dataflowAnalBwd graph [] $ analBwd liveLattice (xferLive dflags)
+  dataflowAnalBwd graph [] liveLattice (xferLive dflags)
 
 -- | On entry to the procedure, there had better not be any LocalReg's live-in.
 noLiveOnEntry :: BlockId -> CmmLive LocalReg -> a -> a

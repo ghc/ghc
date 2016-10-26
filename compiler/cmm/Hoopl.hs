@@ -10,13 +10,9 @@ import Compiler.Hoopl hiding
     Unique,
     FwdTransfer(..), FwdRewrite(..), FwdPass(..),
     BwdTransfer(..), BwdRewrite(..), BwdPass(..),
-    noFwdRewrite, noBwdRewrite,
-    analyzeAndRewriteFwd, analyzeAndRewriteBwd,
     mkFactBase, Fact,
-    mkBRewrite, mkBRewrite3, mkBTransfer, mkBTransfer3,
-    mkFRewrite, mkFRewrite3, mkFTransfer, mkFTransfer3,
-    deepFwdRw, deepFwdRw3, thenFwdRw, iterFwdRw,
-    deepBwdRw, deepBwdRw3, thenBwdRw, iterBwdRw
+    mkBRewrite3, mkBTransfer3,
+    mkFRewrite3, mkFTransfer3,
   )
 
 import Hoopl.Dataflow

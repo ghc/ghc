@@ -18,32 +18,55 @@
 --
 
 module Hoopl.Dataflow
-  ( DataflowLattice(..), OldFact(..), NewFact(..), Fact, mkFactBase
+  ( C, O, DataflowLattice(..), OldFact(..), NewFact(..), Fact, FactBase
+  , mkFactBase
   , ChangeFlag(..)
-  , FwdPass(..), FwdTransfer, mkFTransfer, mkFTransfer3, getFTransfer3
+  , FwdPass(..), FwdTransfer, mkFTransfer3
 
-  , BwdPass(..), BwdTransfer, mkBTransfer, mkBTransfer3, getBTransfer3
+  , BwdPass(..), BwdTransfer, mkBTransfer3
 
-  , noBwdRewrite, noFwdRewrite
-
+  , dataflowAnalFwdBlocks, dataflowAnalBwd
   , analyzeFwd, analyzeFwdBlocks, analyzeBwd
+
+  , changeIf
+  , joinOutFacts
   )
 where
 
-import UniqSupply
+import BlockId
+import Cmm
 
 import Data.Array
 
-import Compiler.Hoopl hiding (noFwdRewrite, noBwdRewrite)
+import Compiler.Hoopl
 
-noRewrite :: a -> b -> UniqSM (Maybe c)
-noRewrite _ _ = return Nothing
+-- TODO(michalt): This wrapper will go away once we refactor the analyze*
+-- methods.
+dataflowAnalFwdBlocks
+    :: NonLocal n
+    => GenCmmGraph n
+    -> [(BlockId, f)]
+    -> DataflowLattice f
+    -> FwdTransfer n f
+    -> BlockEnv f
+dataflowAnalFwdBlocks
+        (CmmGraph {g_entry = entry, g_graph = graph}) facts lattice xfer =
+    analyzeFwdBlocks
+        lattice xfer (JustC [entry]) graph (mkFactBase lattice facts)
 
-noFwdRewrite :: FwdRewrite UniqSM n f
-noFwdRewrite = FwdRewrite3 (noRewrite, noRewrite, noRewrite)
+-- TODO(michalt): This wrapper will go away once we refactor the analyze*
+-- methods.
+dataflowAnalBwd
+    :: NonLocal n
+    => GenCmmGraph n
+    -> [(BlockId, f)]
+    -> DataflowLattice f
+    -> BwdTransfer n f
+    -> BlockEnv f
+dataflowAnalBwd
+        (CmmGraph {g_entry = entry, g_graph = graph}) facts lattice xfer =
+    analyzeBwd lattice xfer (JustC [entry]) graph (mkFactBase lattice facts)
 
-noBwdRewrite :: BwdRewrite UniqSM n f
-noBwdRewrite = BwdRewrite3 (noRewrite, noRewrite, noRewrite)
 
 ----------------------------------------------------------------
 --       Forward Analysis only
@@ -52,14 +75,14 @@ noBwdRewrite = BwdRewrite3 (noRewrite, noRewrite, noRewrite)
 -- | if the graph being analyzed is open at the entry, there must
 --   be no other entry point, or all goes horribly wrong...
 analyzeFwd
-   :: forall n f e .  NonLocal n =>
-      FwdPass UniqSM n f
+   :: forall n f e .  NonLocal n
+   => DataflowLattice f
+   -> FwdTransfer n f
    -> MaybeC e [Label]
    -> Graph n e C -> Fact e f
    -> FactBase f
-analyzeFwd FwdPass { fp_lattice = lattice,
-                     fp_transfer = FwdTransfer3 (ftr, mtr, ltr) }
-  entries g in_fact = graph g in_fact
+analyzeFwd lattice (FwdTransfer3 (ftr, mtr, ltr)) entries g in_fact =
+    graph g in_fact
   where
     graph :: Graph n e C -> Fact e f -> FactBase f
     graph (GMany entry blockmap NothingO)
@@ -94,14 +117,14 @@ analyzeFwd FwdPass { fp_lattice = lattice,
 -- | if the graph being analyzed is open at the entry, there must
 --   be no other entry point, or all goes horribly wrong...
 analyzeFwdBlocks
-   :: forall n f e .  NonLocal n =>
-      FwdPass UniqSM n f
+   :: forall n f e .  NonLocal n
+   => DataflowLattice f
+   -> FwdTransfer n f
    -> MaybeC e [Label]
    -> Graph n e C -> Fact e f
    -> FactBase f
-analyzeFwdBlocks FwdPass { fp_lattice = lattice,
-                           fp_transfer = FwdTransfer3 (ftr, _, ltr) }
-  entries g in_fact = graph g in_fact
+analyzeFwdBlocks lattice (FwdTransfer3 (ftr, _, ltr)) entries g in_fact =
+    graph g in_fact
   where
     graph :: Graph n e C -> Fact e f -> FactBase f
     graph (GMany entry blockmap NothingO)
@@ -136,14 +159,14 @@ analyzeFwdBlocks FwdPass { fp_lattice = lattice,
 -- | if the graph being analyzed is open at the entry, there must
 --   be no other entry point, or all goes horribly wrong...
 analyzeBwd
-   :: forall n f e .  NonLocal n =>
-      BwdPass UniqSM n f
+   :: forall n f e .  NonLocal n
+   => DataflowLattice f
+   -> BwdTransfer n f
    -> MaybeC e [Label]
    -> Graph n e C -> Fact C f
    -> FactBase f
-analyzeBwd BwdPass { bp_lattice = lattice,
-                     bp_transfer = BwdTransfer3 (ftr, mtr, ltr) }
-   entries g in_fact = graph g in_fact
+analyzeBwd lattice (BwdTransfer3 (ftr, mtr, ltr)) entries g in_fact =
+    graph g in_fact
   where
     graph :: Graph n e C -> Fact C f -> FactBase f
     graph (GMany entry blockmap NothingO)

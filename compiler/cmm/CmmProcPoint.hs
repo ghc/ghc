@@ -135,7 +135,7 @@ procPointAnalysis :: ProcPointSet -> CmmGraph -> UniqSM (BlockEnv Status)
 -- See Note [Proc-point analysis]
 procPointAnalysis procPoints g@(CmmGraph {g_graph = graph}) =
   -- pprTrace "procPointAnalysis" (ppr procPoints) $
-  dataflowAnalFwdBlocks g initProcPoints $ analFwd lattice forward
+  return $ dataflowAnalFwdBlocks g initProcPoints lattice forward
   where initProcPoints = [(id, ProcPoint) | id <- setElems procPoints,
                                             id `setMember` labelsInGraph ]
                                     -- See Note [Non-existing proc-points]
