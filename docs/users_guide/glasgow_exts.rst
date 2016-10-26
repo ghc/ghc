@@ -1615,7 +1615,7 @@ has no non-bottom values. For example:
       f :: Void -> Int
       f x = case x of { }
 
-With dependently-typed features it is more useful (see :ghc-ticket:`2431``). For
+With dependently-typed features it is more useful (see :ghc-ticket:`2431`). For
 example, consider these two candidate definitions of ``absurd``:
 
 ::
