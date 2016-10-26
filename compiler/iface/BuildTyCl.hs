@@ -19,6 +19,7 @@ module BuildTyCl (
 import IfaceEnv
 import FamInstEnv( FamInstEnvs, mkNewTypeCoAxiom )
 import TysWiredIn( isCTupleTyConName )
+import TysPrim ( voidPrimTy )
 import DataCon
 import PatSyn
 import Var
@@ -197,7 +198,7 @@ buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
                  , pat_ty `eqType` substTy subst pat_ty1
                  , prov_theta `eqTypes` substTys subst prov_theta1
                  , req_theta `eqTypes` substTys subst req_theta1
-                 , arg_tys `eqTypes` substTys subst arg_tys1
+                 , compareArgTys arg_tys (substTys subst arg_tys1)
                  ])
             , (vcat [ ppr univ_tvs <+> twiddle <+> ppr univ_tvs1
                     , ppr ex_tvs <+> twiddle <+> ppr ex_tvs1
@@ -217,6 +218,13 @@ buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
     twiddle = char '~'
     subst = zipTvSubst (univ_tvs1 ++ ex_tvs1)
                        (mkTyVarTys (univ_tvs ++ ex_tvs))
+
+    -- For a nullary pattern synonym we add a single void argument to the
+    -- matcher to preserve laziness in the case of unlifted types.
+    -- See #12746
+    compareArgTys :: [Type] -> [Type] -> Bool
+    compareArgTys [] [x] = x `eqType` voidPrimTy
+    compareArgTys arg_tys matcher_arg_tys = arg_tys `eqTypes` matcher_arg_tys
 
 ------------------------------------------------------
 type TcMethInfo     -- A temporary intermediate, to communicate
