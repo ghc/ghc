@@ -301,4 +301,11 @@ getting, here. */
 
 #endif /* OBJFORMAT_PEi386 */
 
+HsInt isAlreadyLoaded( pathchar *path );
+HsInt loadOc( ObjectCode* oc );
+ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
+                  rtsBool mapped, char *archiveMemberName,
+                  int misalignment
+                  );
+
 #endif /* LINKERINTERNALS_H */
