@@ -44,16 +44,11 @@ $1_$2_DIST_CC_OPTS = \
  $$($1_$2_DEP_CC_OPTS) \
  $$(SRC_CC_WARNING_OPTS)
 
-ifneq ($$(strip $$($1_$2_DEP_LIB_DIRS_SINGLE_QUOTED)),)
-$1_$2_DIST_LD_LIB_DIRS := $$(subst $$(space)',$$(space)-L',$$(space)$$($1_$2_DEP_LIB_DIRS_SINGLE_QUOTED))
-endif
-
 $1_$2_DIST_LD_OPTS = \
  $$(SRC_LD_OPTS) \
  $$($1_LD_OPTS) \
  $$($1_$2_LD_OPTS) \
  $$($1_$2_DIST_LD_LIB_DIRS) \
- $$(foreach opt,$$($1_$2_DEP_EXTRA_LIBS),-l$$(opt)) \
  $$($1_$2_DEP_LD_OPTS)
 
 # c.f. Cabal's Distribution.Simple.PreProcess.ppHsc2hs
