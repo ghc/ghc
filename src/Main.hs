@@ -7,6 +7,7 @@ import qualified Environment
 import qualified Rules
 import qualified Rules.Clean
 import qualified Rules.Oracles
+import qualified Rules.SourceDist
 import qualified Rules.Selftest
 import qualified Rules.Test
 import qualified Settings.Paths
@@ -23,6 +24,7 @@ main = shakeArgsWith options CmdLineFlag.cmdFlags $ \cmdLineFlags targets -> do
     rules = do
         Rules.Clean.cleanRules
         Rules.Oracles.oracleRules
+        Rules.SourceDist.sourceDistRules
         Rules.Selftest.selftestRules
         Rules.Test.testRules
         Rules.buildRules
