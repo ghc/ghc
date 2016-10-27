@@ -140,7 +140,7 @@ Trac #12708):
   x1 :: T LiftedPtrRep Int
   x1 =  MkT LiftedPtrRep Int  (\x::Int -> 3)
 
-  x2 :: T IntRep INt#
+  x2 :: T IntRep Int#
   x2 = MkT IntRep Int# (\x:Int# -> 3)
 
 Note that the lambdas are just fine!
