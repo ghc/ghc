@@ -65,7 +65,6 @@ defaultBuilderArgs = mconcat
     , makeBuilderArgs
     , tarBuilderArgs ]
 
-
 -- | All 'Package'-dependent command line arguments.
 defaultPackageArgs :: Args
 defaultPackageArgs = mconcat

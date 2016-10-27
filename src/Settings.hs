@@ -1,7 +1,7 @@
 module Settings (
     getArgs, getPackages, getLibraryWays, getRtsWays, flavour, knownPackages,
     findKnownPackage, getPkgData, getPkgDataList, isLibrary, getPackagePath,
-    getContextDirectory, getBuildPath
+    getContextDirectory, getBuildPath, stagePackages
     ) where
 
 import Base
@@ -27,6 +27,9 @@ getRtsWays = fromDiffExpr $ rtsWays flavour
 
 getPackages :: Expr [Package]
 getPackages = fromDiffExpr $ packages flavour
+
+stagePackages :: Stage -> Action [Package]
+stagePackages stage = interpretInContext (stageContext stage) getPackages
 
 getPackagePath :: Expr FilePath
 getPackagePath = pkgPath <$> getPackage

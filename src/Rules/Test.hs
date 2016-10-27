@@ -23,7 +23,7 @@ testRules = do
 
     "test" ~> do
         let yesNo x = show $ if x then "YES" else "NO"
-        pkgs     <- interpretInContext (stageContext Stage1) getPackages
+        pkgs     <- stagePackages Stage1
         tests    <- filterM doesDirectoryExist $ concat
                     [ [ pkgPath pkg -/- "tests", pkgPath pkg -/- "tests-ghc" ]
                     | pkg <- pkgs, isLibrary pkg, pkg /= rts, pkg /= libffi ]
