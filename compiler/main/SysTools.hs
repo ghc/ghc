@@ -910,26 +910,9 @@ runLink dflags args = do
   let (p,args0) = pgm_l dflags
       args1     = map Option (getOpts dflags opt_l)
       args2     = args0 ++ linkargs ++ args1 ++ args
-      args3     = argFixup args2 []
-  mb_env <- getGccEnv args3
-  runSomethingResponseFile dflags ld_filter "Linker" p args3 mb_env
+  mb_env <- getGccEnv args2
+  runSomethingResponseFile dflags ld_filter "Linker" p args2 mb_env
   where
-    testLib lib = "-l" `isPrefixOf` lib || ".a" `isSuffixOf` lib
-    {- GHC is just blindly appending linker arguments from libraries and
-       the commandline together. This results in very problematic link orders
-       which will cause incorrect linking. Since we're changing the link
-       arguments anyway, let's just make sure libraries are last.
-       This functions moves libraries on the link all the way back
-       but keeps the order amongst them the same. -}
-    argFixup []                        r = [] ++ r
-    -- retain any lib in "-o" position.
-    argFixup (o@(Option "-o"):o'@(FileOption _ _):xs) r = o:o':argFixup xs r
-    argFixup (o@(Option       opt):xs) r = if testLib opt
-                                              then argFixup xs (r ++ [o])
-                                              else o:argFixup xs r
-    argFixup (o@(FileOption _ opt):xs) r = if testLib opt
-                                              then argFixup xs (r ++ [o])
-                                              else o:argFixup xs r
     ld_filter = case (platformOS (targetPlatform dflags)) of
                   OSSolaris2 -> sunos_ld_filter
                   _ -> id
