@@ -153,8 +153,8 @@ static void start_gc_threads        (void);
 static void scavenge_until_all_done (void);
 static StgWord inc_running          (void);
 static StgWord dec_running          (void);
-static void wakeup_gc_threads       (uint32_t me);
-static void shutdown_gc_threads     (uint32_t me);
+static void wakeup_gc_threads       (uint32_t me, rtsBool idle_cap[]);
+static void shutdown_gc_threads     (uint32_t me, rtsBool idle_cap[]);
 static void collect_gct_blocks      (void);
 static void collect_pinned_object_blocks (void);
 
@@ -182,7 +182,8 @@ void
 GarbageCollect (uint32_t collect_gen,
                 rtsBool do_heap_census,
                 uint32_t gc_type USED_IF_THREADS,
-                Capability *cap)
+                Capability *cap,
+                rtsBool idle_cap[])
 {
   bdescr *bd;
   generation *gen;
@@ -339,7 +340,7 @@ GarbageCollect (uint32_t collect_gen,
   // NB. do this after the mutable lists have been saved above, otherwise
   // the other GC threads will be writing into the old mutable lists.
   inc_running();
-  wakeup_gc_threads(gct->thread_index);
+  wakeup_gc_threads(gct->thread_index, idle_cap);
 
   traceEventGcWork(gct->cap);
 
@@ -358,7 +359,7 @@ GarbageCollect (uint32_t collect_gen,
   } else {
       scavenge_capability_mut_lists(gct->cap);
       for (n = 0; n < n_capabilities; n++) {
-          if (gc_threads[n]->idle) {
+          if (idle_cap[n]) {
               markCapability(mark_root, gct, capabilities[n],
                              rtsTrue/*don't mark sparks*/);
               scavenge_capability_mut_lists(capabilities[n]);
@@ -416,7 +417,7 @@ GarbageCollect (uint32_t collect_gen,
       break;
   }
 
-  shutdown_gc_threads(gct->thread_index);
+  shutdown_gc_threads(gct->thread_index, idle_cap);
 
   // Now see which stable names are still alive.
   gcStableTables();
@@ -428,7 +429,7 @@ GarbageCollect (uint32_t collect_gen,
       }
   } else {
       for (n = 0; n < n_capabilities; n++) {
-          if (n == cap->no || gc_threads[n]->idle) {
+          if (n == cap->no || idle_cap[n]) {
               pruneSparkQueue(capabilities[n]);
          }
       }
@@ -814,7 +815,6 @@ new_gc_thread (uint32_t n, gc_thread *t)
 #endif
 
     t->thread_index = n;
-    t->idle = rtsFalse;
     t->free_blocks = NULL;
     t->gc_count = 0;
 
@@ -1092,7 +1092,7 @@ gcWorkerThread (Capability *cap)
 #if defined(THREADED_RTS)
 
 void
-waitForGcThreads (Capability *cap USED_IF_THREADS)
+waitForGcThreads (Capability *cap USED_IF_THREADS, rtsBool idle_cap[])
 {
     const uint32_t n_threads = n_capabilities;
     const uint32_t me = cap->no;
@@ -1101,7 +1101,7 @@ waitForGcThreads (Capability *cap USED_IF_THREADS)
 
     while(retry) {
         for (i=0; i < n_threads; i++) {
-            if (i == me || gc_threads[i]->idle) continue;
+            if (i == me || idle_cap[i]) continue;
             if (gc_threads[i]->wakeup != GC_THREAD_STANDING_BY) {
                 prodCapability(capabilities[i], cap->running_task);
             }
@@ -1109,7 +1109,7 @@ waitForGcThreads (Capability *cap USED_IF_THREADS)
         for (j=0; j < 10; j++) {
             retry = rtsFalse;
             for (i=0; i < n_threads; i++) {
-                if (i == me || gc_threads[i]->idle) continue;
+                if (i == me || idle_cap[i]) continue;
                 write_barrier();
                 interruptCapability(capabilities[i]);
                 if (gc_threads[i]->wakeup != GC_THREAD_STANDING_BY) {
@@ -1133,7 +1133,8 @@ start_gc_threads (void)
 }
 
 static void
-wakeup_gc_threads (uint32_t me USED_IF_THREADS)
+wakeup_gc_threads (uint32_t me USED_IF_THREADS,
+                   rtsBool idle_cap[] USED_IF_THREADS)
 {
 #if defined(THREADED_RTS)
     uint32_t i;
@@ -1141,10 +1142,11 @@ wakeup_gc_threads (uint32_t me USED_IF_THREADS)
     if (n_gc_threads == 1) return;
 
     for (i=0; i < n_gc_threads; i++) {
-        if (i == me || gc_threads[i]->idle) continue;
+        if (i == me || idle_cap[i]) continue;
         inc_running();
         debugTrace(DEBUG_gc, "waking up gc thread %d", i);
-        if (gc_threads[i]->wakeup != GC_THREAD_STANDING_BY) barf("wakeup_gc_threads");
+        if (gc_threads[i]->wakeup != GC_THREAD_STANDING_BY)
+            barf("wakeup_gc_threads");
 
         gc_threads[i]->wakeup = GC_THREAD_RUNNING;
         ACQUIRE_SPIN_LOCK(&gc_threads[i]->mut_spin);
@@ -1157,7 +1159,8 @@ wakeup_gc_threads (uint32_t me USED_IF_THREADS)
 // standby state, otherwise they may still be executing inside
 // any_work(), and may even remain awake until the next GC starts.
 static void
-shutdown_gc_threads (uint32_t me USED_IF_THREADS)
+shutdown_gc_threads (uint32_t me USED_IF_THREADS,
+                     rtsBool idle_cap[] USED_IF_THREADS)
 {
 #if defined(THREADED_RTS)
     uint32_t i;
@@ -1165,7 +1168,7 @@ shutdown_gc_threads (uint32_t me USED_IF_THREADS)
     if (n_gc_threads == 1) return;
 
     for (i=0; i < n_gc_threads; i++) {
-        if (i == me || gc_threads[i]->idle) continue;
+        if (i == me || idle_cap[i]) continue;
         while (gc_threads[i]->wakeup != GC_THREAD_WAITING_TO_CONTINUE) {
             busy_wait_nop();
             write_barrier();
@@ -1176,13 +1179,13 @@ shutdown_gc_threads (uint32_t me USED_IF_THREADS)
 
 #if defined(THREADED_RTS)
 void
-releaseGCThreads (Capability *cap USED_IF_THREADS)
+releaseGCThreads (Capability *cap USED_IF_THREADS, rtsBool idle_cap[])
 {
     const uint32_t n_threads = n_capabilities;
     const uint32_t me = cap->no;
     uint32_t i;
     for (i=0; i < n_threads; i++) {
-        if (i == me || gc_threads[i]->idle) continue;
+        if (i == me || idle_cap[i]) continue;
         if (gc_threads[i]->wakeup != GC_THREAD_WAITING_TO_CONTINUE)
             barf("releaseGCThreads");
 

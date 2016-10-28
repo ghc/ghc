@@ -6,7 +6,7 @@
  *
  * Documentation on the architecture of the Garbage Collector can be
  * found in the online commentary:
- * 
+ *
  *   http://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage/GC
  *
  * ---------------------------------------------------------------------------*/
@@ -21,7 +21,7 @@
 
 /* -----------------------------------------------------------------------------
    General scheme
-   
+
    ToDo: move this to the wiki when the implementation is done.
 
    We're only going to try to parallelise the copying GC for now.  The
@@ -67,13 +67,13 @@
 
 /* -----------------------------------------------------------------------------
    Generation Workspace
-  
+
    A generation workspace exists for each generation for each GC
    thread. The GC thread takes a block from the todos list of the
    generation into the scanbd and then scans it.  Objects referred to
    by those in the scan block are copied into the todo or scavd blocks
    of the relevant generation.
-  
+
    ------------------------------------------------------------------------- */
 
 typedef struct gen_workspace_ {
@@ -127,7 +127,6 @@ typedef struct gc_thread_ {
     volatile StgWord wakeup;       // NB not StgWord8; only StgWord is guaranteed atomic
 #endif
     uint32_t thread_index;         // a zero based index identifying the thread
-    rtsBool idle;                  // sitting out of this GC cycle
 
     bdescr * free_blocks;          // a buffer of free blocks for this thread
                                    //  during GC without accessing the block
@@ -211,4 +210,3 @@ extern ThreadLocalKey gctKey;
 #include "EndPrivate.h"
 
 #endif // SM_GCTHREAD_H
-

@@ -1535,6 +1535,9 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
     uint32_t n_idle_caps = 0, n_failed_trygrab_idles = 0;
     StgTSO *tso;
     rtsBool *idle_cap;
+      // idle_cap is an array (allocated later) of size n_capabilities, where
+      // idle_cap[i] is rtsTrue if capability i will be idle during this GC
+      // cycle.
 #endif
 
     if (sched_state == SCHED_SHUTTING_DOWN) {
@@ -1735,23 +1738,13 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
         }
         debugTrace(DEBUG_sched, "%d idle caps", n_idle_caps);
 
-        // We set the gc_thread[i]->idle flag if that
-        // capability/thread is not participating in this collection.
-        // We also keep a local record of which capabilities are idle
-        // in idle_cap[], because scheduleDoGC() is re-entrant:
-        // another thread might start a GC as soon as we've finished
-        // this one, and thus the gc_thread[]->idle flags are invalid
-        // as soon as we release any threads after GC.  Getting this
-        // wrong leads to a rare and hard to debug deadlock!
-
         for (i=0; i < n_capabilities; i++) {
-            gc_threads[i]->idle = idle_cap[i];
             capabilities[i]->idle++;
         }
 
         // For all capabilities participating in this GC, wait until
         // they have stopped mutating and are standing by for GC.
-        waitForGcThreads(cap);
+        waitForGcThreads(cap, idle_cap);
 
 #if defined(THREADED_RTS)
         // Stable point where we can do a global check on our spark counters
@@ -1819,9 +1812,9 @@ delete_threads_and_gc:
     // reset pending_sync *before* GC, so that when the GC threads
     // emerge they don't immediately re-enter the GC.
     pending_sync = 0;
-    GarbageCollect(collect_gen, heap_census, gc_type, cap);
+    GarbageCollect(collect_gen, heap_census, gc_type, cap, idle_cap);
 #else
-    GarbageCollect(collect_gen, heap_census, 0, cap);
+    GarbageCollect(collect_gen, heap_census, 0, cap, NULL);
 #endif
 
     traceSparkCounters(cap);
@@ -1871,7 +1864,6 @@ delete_threads_and_gc:
 
     if (gc_type == SYNC_GC_PAR)
     {
-        releaseGCThreads(cap);
         for (i = 0; i < n_capabilities; i++) {
             if (i != cap->no) {
                 if (idle_cap[i]) {
@@ -1884,6 +1876,16 @@ delete_threads_and_gc:
             }
         }
         task->cap = cap;
+
+        // releaseGCThreads() happens *after* we have released idle
+        // capabilities.  Otherwise what can happen is one of the released
+        // threads starts a new GC, and finds that it can't acquire some of
+        // the disabled capabilities, because the previous GC still holds
+        // them, so those disabled capabilities will not be idle during the
+        // next GC round.  However, if we release the capabilities first,
+        // then they will be free (because they're disabled) when the next
+        // GC cycle happens.
+        releaseGCThreads(cap, idle_cap);
     }
 #endif
 
