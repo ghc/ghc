@@ -247,7 +247,7 @@ data Type
   -- See Note [Non-trivial definitional equality]
   = TyVarTy Var -- ^ Vanilla type or kind variable (*never* a coercion variable)
 
-  | AppTy         -- See Note [AppTy rep]
+  | AppTy
         Type
         Type            -- ^ Type application to something other than a 'TyCon'. Parameters:
                         --
@@ -256,7 +256,7 @@ data Type
                         --
                         --  2) Argument type
 
-  | TyConApp      -- See Note [AppTy rep]
+  | TyConApp
         TyCon
         [KindOrType]    -- ^ Application of a 'TyCon', including newtypes /and/ synonyms.
                         -- Invariant: saturated applications of 'FunTyCon' must
@@ -304,34 +304,7 @@ data TyLit
   | StrTyLit FastString
   deriving (Eq, Ord, Data.Data)
 
-{- Note [The kind invariant]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The kinds
-   #          UnliftedTypeKind
-   OpenKind   super-kind of *, #
-
-can never appear under an arrow or type constructor in a kind; they
-can only be at the top level of a kind.  It follows that primitive TyCons,
-which have a naughty pseudo-kind
-   State# :: * -> #
-must always be saturated, so that we can never get a type whose kind
-has a UnliftedTypeKind or ArgTypeKind underneath an arrow.
-
-Nor can we abstract over a type variable with any of these kinds.
-
-    k :: = kk | # | ArgKind | (#) | OpenKind
-    kk :: = * | kk -> kk | T kk1 ... kkn
-
-So a type variable can only be abstracted kk.
-
-Note [AppTy rep]
-~~~~~~~~~~~~~~~~
-Types of the form 'f a' must be of kind *, not #, so we are guaranteed
-that they are represented by pointers.  The reason is that f must have
-kind (kk -> kk) and kk cannot be unlifted; see Note [The kind invariant]
-in TyCoRep.
-
-Note [Arguments to type constructors]
+{- Note [Arguments to type constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Because of kind polymorphism, in addition to type application we now
 have kind instantiation. We reuse the same notations to do so.
