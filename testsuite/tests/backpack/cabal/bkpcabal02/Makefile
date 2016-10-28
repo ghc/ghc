@@ -9,11 +9,14 @@ bkpcabal02: clean
 	$(MAKE) -s --no-print-directory clean
 	'$(GHC_PKG)' init tmp.d
 	'$(TEST_HC)' -v0 --make Setup
+	# Here is a working signature which this
+	# package can typecheck with
 	cp p/H.hsig.in1 p/H.hsig
 	# typecheck everything
 	$(CONFIGURE)
 	$(SETUP) build
 	$(SETUP) -v1 build
+	# This signature doesn't typecheck with the package
 	cp p/H.hsig.in2 p/H.hsig
 	! $(SETUP) build
 ifneq "$(CLEANUP)" ""
