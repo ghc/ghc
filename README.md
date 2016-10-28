@@ -96,7 +96,11 @@ use `hadrian/UserSettings.hs` for the same purpose, see [documentation](doc/user
 complete separation of GHC sources and build artefacts: [#113][build-artefacts-issue].
 
 * `build -B` forces Shake to rerun all rules, even if results of the previous build
-are still in the GHC tree. 
+are still in the GHC tree.
+
+#### Source distribution
+
+To build a GHC source distribution tarball, run Hadrian with the `sdist-ghc` target.
 
 #### Testing
 
@@ -119,7 +123,7 @@ The new build system still lacks many important features:
 * Only HTML Haddock documentation is supported (use `--haddock` flag). 
 * Build flavours and conventional command line flags are not implemented: [#188][flavours-issue].
 * Cross-compilation is not implemented: [#177][cross-compilation-issue].
-* There is no support for installation or binary/source distribution: [#219][install-issue].
+* There is no support for installation or binary distribution: [#219][install-issue].
 
 Check out [milestones] to see when we hope to resolve the above limitations.
 
