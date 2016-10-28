@@ -141,6 +141,34 @@ SymbolExtra* makeSymbolExtra( ObjectCode* oc,
 #endif
 
 #ifdef arm_HOST_ARCH
+/*
+  Note [The ARM/Thumb Story]
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  Support for the ARM architecture is complicated by the fact that ARM has not
+  one but several instruction encodings. The two relevant ones here are the original
+  ARM encoding and Thumb, a more dense variant of ARM supporting only a subset
+  of the instruction set.
+
+  How the CPU decodes a particular instruction is determined by a mode bit. This
+  mode bit is set on jump instructions, the value being determined by the low
+  bit of the target address: An odd address means the target is a procedure
+  encoded in the Thumb encoding whereas an even address means it's a traditional
+  ARM procedure (the actual address jumped to is even regardless of the encoding bit).
+
+  Interoperation between Thumb- and ARM-encoded object code (known as "interworking")
+  is tricky. If the linker needs to link a call by an ARM object into Thumb code
+  (or vice-versa) it will produce a jump island using makeArmSymbolExtra. This,
+  however, is incompatible with GHC's tables-next-to-code since pointers
+  fixed-up in this way will point to a bit of generated code, not a info
+  table/Haskell closure like TNTC expects. For this reason, it is critical that
+  GHC emit exclusively ARM or Thumb objects for all Haskell code.
+
+  We still do, however, need to worry about calls to foreign code, hence the
+  need for makeArmSymbolExtra.
+*/
+
+/* Produce a jump island for ARM/Thumb interworking */
 SymbolExtra* makeArmSymbolExtra( ObjectCode* oc,
                                  unsigned long symbolNumber,
                                  unsigned long target,

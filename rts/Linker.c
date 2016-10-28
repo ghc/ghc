@@ -202,30 +202,6 @@ int ocTryLoad( ObjectCode* oc );
 #endif
 
 /*
-  Note [The ARM/Thumb Story]
-  ~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-  Support for the ARM architecture is complicated by the fact that ARM has not
-  one but several instruction encodings. The two relevant ones here are the original
-  ARM encoding and Thumb, a more dense variant of ARM supporting only a subset
-  of the instruction set.
-
-  How the CPU decodes a particular instruction is determined by a mode bit. This
-  mode bit is set on jump instructions, the value being determined by the low
-  bit of the target address: An odd address means the target is a procedure
-  encoded in the Thumb encoding whereas an even address means it's a traditional
-  ARM procedure (the actual address jumped to is even regardless of the encoding bit).
-
-  Interoperation between Thumb- and ARM-encoded object code (known as "interworking")
-  is tricky. If the linker needs to link a call by an ARM object into Thumb code
-  (or vice-versa) it will produce a jump island. This, however, is incompatible with
-  GHC's tables-next-to-code. For this reason, it is critical that GHC emit
-  exclusively ARM or Thumb objects for all Haskell code.
-
-  We still do, however, need to worry about foreign code.
-*/
-
-/*
  * Due to the small memory model (see above), on x86_64 we have to map
  * all our non-PIC object files into the low 2Gb of the address space
  * (why 2Gb and not 4Gb?  Because all addresses must be reachable
