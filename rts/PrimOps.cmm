@@ -2119,8 +2119,9 @@ stg_mkApUpd0zh ( P_ bco )
 
 stg_unpackClosurezh ( P_ closure )
 {
-    W_ info, ptrs, nptrs, p, ptrs_arr, nptrs_arr;
-    info  = %GET_STD_INFO(UNTAG(closure));
+    W_ clos, info, ptrs, nptrs, p, ptrs_arr, nptrs_arr;
+    clos  = UNTAG(closure);
+    info  = %GET_STD_INFO(clos);
 
     // Some closures have non-standard layout, so we omit those here.
     W_ type;
@@ -2142,17 +2143,14 @@ stg_unpackClosurezh ( P_ closure )
         nptrs = TO_W_(%INFO_NPTRS(info));
         goto out;
     }}
-out:
 
+out:
     W_ ptrs_arr_sz, ptrs_arr_cards, nptrs_arr_sz;
     nptrs_arr_sz = SIZEOF_StgArrBytes   + WDS(nptrs);
     ptrs_arr_cards = mutArrPtrsCardWords(ptrs);
     ptrs_arr_sz  = SIZEOF_StgMutArrPtrs + WDS(ptrs) + WDS(ptrs_arr_cards);
 
     ALLOC_PRIM_P (ptrs_arr_sz + nptrs_arr_sz, stg_unpackClosurezh, closure);
-
-    W_ clos;
-    clos = UNTAG(closure);
 
     ptrs_arr  = Hp - nptrs_arr_sz - ptrs_arr_sz + WDS(1);
     nptrs_arr = Hp - nptrs_arr_sz + WDS(1);
@@ -2162,11 +2160,12 @@ out:
     StgMutArrPtrs_size(ptrs_arr) = ptrs + ptrs_arr_cards;
 
     p = 0;
-for:
+
+write_ptrs:
     if(p < ptrs) {
          W_[ptrs_arr + SIZEOF_StgMutArrPtrs + WDS(p)] = StgClosure_payload(clos,p);
          p = p + 1;
-         goto for;
+         goto write_ptrs;
     }
     /* We can leave the card table uninitialised, since the array is
        allocated in the nursery.  The GC will fill it in if/when the array
@@ -2175,12 +2174,14 @@ for:
     SET_HDR(nptrs_arr, stg_ARR_WORDS_info, CCCS);
     StgArrBytes_bytes(nptrs_arr) = WDS(nptrs);
     p = 0;
-for2:
+
+write_nptrs:
     if(p < nptrs) {
          W_[BYTE_ARR_CTS(nptrs_arr) + WDS(p)] = StgClosure_payload(clos, p+ptrs);
          p = p + 1;
-         goto for2;
+         goto write_nptrs;
     }
+
     return (info, ptrs_arr, nptrs_arr);
 }
 
