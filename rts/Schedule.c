@@ -1596,7 +1596,11 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
             // enabled_capabilities may change if requestSync() below fails and
             // we retry.
             if (gc_type == SYNC_GC_PAR && n_gc_threads > 0) {
-                need_idle = stg_max(0, enabled_capabilities - n_gc_threads);
+                if (n_gc_threads >= enabled_capabilities) {
+                    need_idle = 0;
+                } else {
+                    need_idle = enabled_capabilities - n_gc_threads;
+                }
             } else {
                 need_idle = 0;
             }

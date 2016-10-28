@@ -1487,13 +1487,6 @@ static void normaliseRtsOpts (void)
             RtsFlags.ParFlags.parGcLoadBalancingGen = 1;
         }
     }
-
-#ifdef THREADED_RTS
-    if (RtsFlags.ParFlags.parGcThreads > RtsFlags.ParFlags.nCapabilities) {
-        errorBelch("GC threads (-qn) must be between 1 and the value of -N");
-        errorUsage();
-    }
-#endif
 }
 
 static void errorUsage (void)
