@@ -204,16 +204,20 @@ getCoreToDo dflags
                            [simpl_phase 0 ["post-worker-wrapper"] max_iter]
                            ))
 
+    -- Static forms are moved to the top level with the FloatOut pass.
+    -- See Note [Grand plan for static forms].
+    static_ptrs_float_outwards =
+      runWhen static_ptrs $ CoreDoFloatOutwards FloatOutSwitches
+        { floatOutLambdas   = Just 0
+        , floatOutConstants = True
+        , floatOutOverSatApps = False
+        , floatToTopLevelOnly = True
+        }
+
     core_todo =
      if opt_level == 0 then
        [ vectorisation,
-         -- Static forms are moved to the top level with the FloatOut pass.
-         -- See Note [Grand plan for static forms].
-         runWhen static_ptrs $ CoreDoFloatOutwards FloatOutSwitches {
-                                 floatOutLambdas   = Just 0,
-                                 floatOutConstants = True,
-                                 floatOutOverSatApps = False,
-                                 floatToTopLevelOnly = True },
+         static_ptrs_float_outwards,
          CoreDoSimplify max_iter
              (base_mode { sm_phase = Phase 0
                         , sm_names = ["Non-opt simplification"] })
@@ -238,12 +242,12 @@ getCoreToDo dflags
         -- so that overloaded functions have all their dictionary lambdas manifest
         runWhen do_specialise CoreDoSpecialising,
 
-        runWhen full_laziness $
+        if full_laziness then
            CoreDoFloatOutwards FloatOutSwitches {
                                  floatOutLambdas   = Just 0,
                                  floatOutConstants = True,
                                  floatOutOverSatApps = False,
-                                 floatToTopLevelOnly = False },
+                                 floatToTopLevelOnly = False }
                 -- Was: gentleFloatOutSwitches
                 --
                 -- I have no idea why, but not floating constants to
@@ -261,6 +265,10 @@ getCoreToDo dflags
                 -- difference at all to performance if we do it here,
                 -- but maybe we save some unnecessary to-and-fro in
                 -- the simplifier.
+        else
+           -- Even with full laziness turned off, we still need to float static
+           -- forms to the top level. See Note [Grand plan for static forms].
+           static_ptrs_float_outwards,
 
         simpl_phases,
 

@@ -119,6 +119,8 @@ test('T8256', normal, compile_and_run, ['-dcore-lint -O1'])
 test('T6084',normal, compile_and_run, ['-O2'])
 test('CgStaticPointers', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
      compile_and_run, [''])
+test('CgStaticPointersNoFullLazyness', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
+     compile_and_run, ['-O -fno-full-laziness'])
 test('StaticArraySize', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
      compile_and_run, ['-O2'])
 test('StaticByteArraySize', normal, compile_and_run, ['-O2'])
