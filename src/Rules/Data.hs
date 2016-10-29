@@ -19,7 +19,7 @@ buildPackageData context@Context {..} = do
     let cabalFile = pkgCabalFile package
         configure = pkgPath package -/- "configure"
         dataFile  = pkgDataFile context
-        oldPath   = pkgPath package -/- contextDirectory context -- TODO: remove, #113
+        oldPath   = pkgPath package -/- stageDirectory stage -- TODO: remove, #113
         inTreeMk  = oldPath -/- takeFileName dataFile -- TODO: remove, #113
 
     inTreeMk %> \mk -> do
@@ -123,7 +123,7 @@ packageCmmSources pkg
 -- is replaced by libraries_deepseq_dist-install_VERSION = 1.4.0.0
 -- Reason: Shake's built-in makefile parser doesn't recognise slashes
 postProcessPackageData :: Context -> FilePath -> Action ()
-postProcessPackageData context@Context {..} file = fixFile file fixPackageData
+postProcessPackageData Context {..} file = fixFile file fixPackageData
   where
     fixPackageData = unlines . map processLine . filter (not . null) . filter ('$' `notElem`) . lines
     processLine line = fixKey fixedPrefix ++ suffix
@@ -132,7 +132,7 @@ postProcessPackageData context@Context {..} file = fixFile file fixPackageData
         -- Change package/path/targetDir to takeDirectory file
         -- This is a temporary hack until we get rid of ghc-cabal
         fixedPrefix = takeDirectory file ++ drop len prefix
-        len         = length (pkgPath package -/- contextDirectory context)
+        len         = length (pkgPath package -/- stageDirectory stage)
 
 -- TODO: Remove, see #113.
 fixKey :: String -> String

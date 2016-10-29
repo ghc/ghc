@@ -35,7 +35,7 @@ getPackagePath :: Expr FilePath
 getPackagePath = pkgPath <$> getPackage
 
 getContextDirectory :: Expr FilePath
-getContextDirectory = contextDirectory <$> getContext
+getContextDirectory = stageDirectory <$> getStage
 
 getBuildPath :: Expr FilePath
 getBuildPath = buildPath <$> getContext

@@ -133,7 +133,7 @@ generatePackageCode context@(Context stage pkg _) =
                 need [primopsTxt stage]
                 build $ Target context GenPrimopCode [primopsTxt stage] [file]
                 -- TODO: this is temporary hack, get rid of this (#113)
-                let oldPath = pkgPath pkg -/- contextDirectory context -/- "build"
+                let oldPath = pkgPath pkg -/- stageDirectory stage -/- "build"
                     newFile = oldPath ++ (drop (length path) file)
                 createDirectory $ takeDirectory newFile
                 liftIO $ IO.copyFile file newFile

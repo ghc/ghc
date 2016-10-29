@@ -9,7 +9,7 @@ module GHC (
     parallel, pretty, primitive, process, rts, runGhc, stm, templateHaskell,
     terminfo, time, touchy, transformers, unlit, unix, win32, xhtml,
 
-    defaultKnownPackages, programPath, contextDirectory, rtsContext
+    defaultKnownPackages, stageDirectory, rtsContext, programPath
     ) where
 
 import Base
@@ -91,16 +91,15 @@ xhtml               = library  "xhtml"
 ghcSplit :: FilePath
 ghcSplit = "inplace/lib/bin/ghc-split"
 
--- TODO: The following utils are not included into the build system because
--- they seem to be unused or unrelated to the build process: checkUniques,
--- completion, count_lines, coverity, debugNGC, describe-unexpected, genargs,
--- lndir, mkdirhier, testremove, vagrant
+-- | Relative path to the directory containing build artefacts of a given 'Stage'.
+stageDirectory :: Stage -> FilePath
+stageDirectory = stageString
 
 -- TODO: move to buildRootPath, see #113
 -- TODO: simplify, add programInplaceLibPath
 -- | The relative path to the program executable
 programPath :: Context -> Maybe FilePath
-programPath context@Context {..}
+programPath Context {..}
     | package == ghc = Just . inplaceProgram $ "ghc-stage" ++ show (fromEnum stage + 1)
     | package `elem` [mkUserGuidePart] =
         case stage of Stage0 -> Just . inplaceProgram $ pkgNameString package
@@ -123,19 +122,9 @@ programPath context@Context {..}
     | otherwise = Nothing
   where
     inplaceProgram name = programInplacePath -/- name <.> exe
-    installProgram name = pkgPath package -/- contextDirectory context
+    installProgram name = pkgPath package -/- stageDirectory stage
                                           -/- "build/tmp" -/- name <.> exe
 
 -- TODO: Move this elsewhere.
 rtsContext :: Context
 rtsContext = vanillaContext Stage1 rts
-
--- | GHC build results will be placed into target directories with the
--- following typical structure:
-
--- * @build/@ contains compiled object code
--- * @doc/@ is produced by haddock
--- * @package-data.mk@ contains output of ghc-cabal applied to pkgCabal
-contextDirectory :: Context -> FilePath
-contextDirectory Context {..} = stageString stage
-

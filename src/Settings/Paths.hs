@@ -1,5 +1,5 @@
 module Settings.Paths (
-    contextDirectory, buildPath, pkgDataFile, pkgHaddockFile, pkgLibraryFile,
+    stageDirectory, buildPath, pkgDataFile, pkgHaddockFile, pkgLibraryFile,
     pkgLibraryFile0, pkgGhciLibraryFile, gmpBuildPath, gmpObjects, gmpLibraryH,
     gmpBuildInfoPath, generatedPath, libffiBuildPath, shakeFilesPath, pkgConfFile,
     packageDbDirectory, packageDbStamp, bootPackageConstraints, packageDependencies,
@@ -33,8 +33,7 @@ generatedPath = buildRootPath -/- "generated"
 
 -- | Path to the directory containing build artefacts of a given 'Context'.
 buildPath :: Context -> FilePath
-buildPath context@Context {..} =
-    buildRootPath -/- contextDirectory context -/- pkgPath package
+buildPath Context {..} = buildRootPath -/- stageDirectory stage -/- pkgPath package
 
 -- | Path to the @package-data.mk@ of a given 'Context'.
 pkgDataFile :: Context -> FilePath

@@ -23,7 +23,7 @@ registerPackage rs context@Context {..} = when (stage <= Stage1) $ do
 
         -- Post-process inplace-pkg-config. TODO: remove, see #113, #148.
         let path         = buildPath context
-            oldPath      = pkgPath package -/- contextDirectory context
+            oldPath      = pkgPath package -/- stageDirectory stage
             pkgConfig    = oldPath -/- "inplace-pkg-config"
             oldBuildPath = oldPath -/- "build"
             fixPkgConf   = unlines
