@@ -96,31 +96,46 @@ stageDirectory :: Stage -> FilePath
 stageDirectory = stageString
 
 -- TODO: move to buildRootPath, see #113
--- TODO: simplify, add programInplaceLibPath
--- | The relative path to the program executable
+-- | The 'FilePath' to a program executable in a given 'Context'.
 programPath :: Context -> Maybe FilePath
-programPath Context {..}
-    | package == ghc = Just . inplaceProgram $ "ghc-stage" ++ show (fromEnum stage + 1)
-    | package `elem` [mkUserGuidePart] =
-        case stage of Stage0 -> Just . inplaceProgram $ pkgNameString package
-                      _      -> Nothing
-    | package `elem` [checkApiAnnotations, ghcTags, haddock] =
-        case stage of Stage2 -> Just . inplaceProgram $ pkgNameString package
-                      _      -> Nothing
-    | package `elem` [touchy, unlit] = case stage of
-        Stage0 -> Just $ "inplace/lib/bin" -/- pkgNameString package <.> exe
-        _      -> Nothing
-    | package == hpcBin = case stage of
-        Stage1 -> Just $ inplaceProgram "hpc"
-        _      -> Nothing
-    | package == runGhc = case stage of
-        Stage1 -> Just $ inplaceProgram "runhaskell"
-        _      -> Nothing
-    | isProgram package = case stage of
-        Stage0 -> Just . inplaceProgram $ pkgNameString package
-        _      -> Just . installProgram $ pkgNameString package
-    | otherwise = Nothing
+programPath Context {..} = lookup (stage, package) exes
   where
-    inplaceProgram name = programInplacePath -/- name <.> exe
-    installProgram name = pkgPath package -/- stageDirectory stage
-                                          -/- "build/tmp" -/- name <.> exe
+    exes = [ inplace2 checkApiAnnotations
+           , install1 compareSizes
+           , inplace0 deriveConstants
+           , inplace0 dllSplit
+           , inplace0 genapply
+           , inplace0 genprimopcode
+           , inplace0 ghc             `setFile` "ghc-stage1"
+           , inplace1 ghc             `setFile` "ghc-stage2"
+           , install0 ghcCabal
+           , inplace1 ghcCabal
+           , inplace0 ghcPkg
+           , install1 ghcPkg
+           , inplace2 ghcTags
+           , inplace2 haddock
+           , inplace0 hp2ps
+           , inplace1 hpcBin          `setFile` "hpc"
+           , inplace0 hsc2hs
+           , install1 hsc2hs
+           , inplace0 mkUserGuidePart
+           , inplace1 runGhc          `setFile` "runhaskell"
+           , inplace0 touchy          `setDir`  "inplace/lib/bin"
+           , inplace0 unlit           `setDir`  "inplace/lib/bin" ]
+    inplace  pkg = programInplacePath -/- pkgNameString pkg <.> exe
+    inplace0 pkg = ((Stage0, pkg), inplace pkg)
+    inplace1 pkg = ((Stage1, pkg), inplace pkg)
+    inplace2 pkg = ((Stage2, pkg), inplace pkg)
+    install stage pkg = pkgPath package -/- stageDirectory stage -/- "build"
+                                        -/- pkgNameString pkg <.> exe
+    install0 pkg = ((Stage0, pkg), install Stage0 pkg)
+    install1 pkg = ((Stage1, pkg), install Stage1 pkg)
+    setFile ((stage, pkg), x) y = ((stage, pkg), takeDirectory x -/- y <.> exe)
+    setDir  ((stage, pkg), x) y = ((stage, pkg), y -/- takeFileName x)
+
+    -- | isProgram package = case stage of
+    --     Stage0 -> Just . inplaceProgram $ pkgNameString package
+    --     _      -> Just . installProgram $ pkgNameString package
+    -- | otherwise = Nothing
+  -- where
+  --   inplaceProgram name = programInplacePath -/- name <.> exe
