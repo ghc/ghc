@@ -1,5 +1,5 @@
 module Settings.Packages.Rts (
-    rtsPackageArgs, rtsConfIn, rtsConf, rtsLibffiLibraryName
+    rtsPackageArgs, rtsConfIn, rtsConf, rtsContext, rtsLibffiLibraryName
     ) where
 
 import Base
@@ -10,6 +10,9 @@ import Oracles.WindowsPath
 import Predicate
 import Settings
 import Settings.Paths
+
+rtsContext :: Context
+rtsContext = vanillaContext Stage1 rts
 
 rtsConfIn :: FilePath
 rtsConfIn = pkgPath rts -/- "package.conf.in"

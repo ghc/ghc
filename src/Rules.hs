@@ -19,6 +19,7 @@ import qualified Rules.Perl
 import qualified Rules.Program
 import qualified Rules.Register
 import Settings
+import Settings.Packages.Rts
 import Settings.Paths
 
 allStages :: [Stage]

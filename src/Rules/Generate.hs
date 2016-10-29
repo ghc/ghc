@@ -20,6 +20,7 @@ import Rules.Generators.GhcSplit
 import Rules.Generators.GhcVersionH
 import Rules.Generators.VersionHs
 import Rules.Libffi
+import Settings.Packages.Rts
 import Settings.Paths
 import Target
 import UserSettings

@@ -9,7 +9,7 @@ module GHC (
     parallel, pretty, primitive, process, rts, runGhc, stm, templateHaskell,
     terminfo, time, touchy, transformers, unlit, unix, win32, xhtml,
 
-    defaultKnownPackages, stageDirectory, rtsContext, programPath
+    defaultKnownPackages, stageDirectory, programPath
     ) where
 
 import Base
@@ -124,7 +124,3 @@ programPath Context {..}
     inplaceProgram name = programInplacePath -/- name <.> exe
     installProgram name = pkgPath package -/- stageDirectory stage
                                           -/- "build/tmp" -/- name <.> exe
-
--- TODO: Move this elsewhere.
-rtsContext :: Context
-rtsContext = vanillaContext Stage1 rts
