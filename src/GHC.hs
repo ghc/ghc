@@ -95,6 +95,7 @@ ghcSplit = "inplace/lib/bin/ghc-split"
 stageDirectory :: Stage -> FilePath
 stageDirectory = stageString
 
+-- TODO: Create a separate rule for copying executables to inplace/bin
 -- TODO: move to buildRootPath, see #113
 -- | The 'FilePath' to a program executable in a given 'Context'.
 programPath :: Context -> Maybe FilePath
@@ -118,6 +119,7 @@ programPath Context {..} = lookup (stage, package) exes
            , inplace1 hpcBin          `setFile` "hpc"
            , inplace0 hsc2hs
            , install1 hsc2hs
+           , install1 iservBin
            , inplace0 mkUserGuidePart
            , inplace1 runGhc          `setFile` "runhaskell"
            , inplace0 touchy          `setDir`  "inplace/lib/bin"
@@ -132,10 +134,3 @@ programPath Context {..} = lookup (stage, package) exes
     install1 pkg = ((Stage1, pkg), install Stage1 pkg)
     setFile ((stage, pkg), x) y = ((stage, pkg), takeDirectory x -/- y <.> exe)
     setDir  ((stage, pkg), x) y = ((stage, pkg), y -/- takeFileName x)
-
-    -- | isProgram package = case stage of
-    --     Stage0 -> Just . inplaceProgram $ pkgNameString package
-    --     _      -> Just . installProgram $ pkgNameString package
-    -- | otherwise = Nothing
-  -- where
-  --   inplaceProgram name = programInplacePath -/- name <.> exe
