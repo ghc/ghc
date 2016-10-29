@@ -602,6 +602,63 @@ the stack. See Note [Overlapping global registers] for implications.
 #define REG_D3          d14
 #define REG_D4          d15
 
+/* -----------------------------------------------------------------------------
+   The RISC-V 64 register mapping (RV64MD)
+
+   RISC-V registers (see Section 2.1 in RISC-V User-Level ISA V2.1)
+
+   RISC-V   ABI    STG
+   name     name   name       Saver      RISC-V usage
+   x0       zero              -          Constant 0
+   x1       ra                Caller     Return address
+   x2       sp     Sp         Callee     Stack pointer
+   x3       gp     Base       ?          Global pointer
+   x4       tp     Hp         ?          Thread pointer
+   x5       t0     R1         Caller     Temporaries
+   x6       t1     R2         Caller     Temporaries
+   x7       t2     R3         Caller     Temporaries
+   x8       s0/fp  SpLim      Caller     Saved register/frame pointer
+   x10      a0     R4         Caller     Function arguments/return values
+   x11      a1     R5         Caller     Function arguments/return values
+   x12      a2     R6         Caller     Function arguments/return values
+
+   f0       ft0    D1         Caller     FP temporaries
+   f1       ft1    D2         Caller     FP temporaries
+   f2       ft2    D3         Caller     FP temporaries
+   f3       ft3    D4         Caller     FP temporaries
+
+   f4       ft4    F1         Caller     FP temporaries
+   f5       ft5    F2         Caller     FP temporaries
+   f6       ft6    F3         Caller     FP temporaries
+   f7       ft7    F4         Caller     FP temporaries
+
+   Following x86-64's model we use caller-saves registers.
+   ----------------------------------------------------------------------------- */
+#elif MACHREGS_riscv64
+
+#define REG(x) __asm__(#x)
+
+#define REG_Base        x3
+#define REG_Sp          x2
+#define REG_Hp          x4
+#define REG_R1          x5
+#define REG_R2          x6
+#define REG_R3          x7
+#define REG_SpLim       x8
+#define REG_R4          x10
+#define REG_R5          x11
+#define REG_R6          x12
+
+#define REG_F1          f4
+#define REG_F2          f5
+#define REG_F3          f6
+#define REG_F4          f7
+
+#define REG_D1          f0
+#define REG_D2          f1
+#define REG_D3          f2
+#define REG_D4          f3
+
 #else
 
 #error Cannot find platform to give register info for

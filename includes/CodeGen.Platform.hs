@@ -349,6 +349,74 @@ import Reg
 # define f30 62
 # define f31 63
 
+#elif MACHREGS_riscv64
+
+# define x0  0
+# define x1  1
+# define x2  2
+# define x3  3
+# define x4  4
+# define x5  5
+# define x6  6
+# define x7  7
+# define x8  8
+# define x9  9
+# define x10 10
+# define x11 11
+# define x12 12
+# define x13 13
+# define x14 14
+# define x15 15
+# define x16 16
+# define x17 17
+# define x18 18
+# define x19 19
+# define x20 20
+# define x21 21
+# define x22 22
+# define x23 23
+# define x24 24
+# define x25 25
+# define x26 26
+# define x27 27
+# define x28 28
+# define x29 29
+# define x30 30
+# define x31 31
+
+# define f0  32
+# define f1  33
+# define f2  34
+# define f3  35
+# define f4  36
+# define f5  37
+# define f6  38
+# define f7  39
+# define f8  40
+# define f9  41
+# define f10 42
+# define f11 43
+# define f12 44
+# define f13 45
+# define f14 46
+# define f15 47
+# define f16 48
+# define f17 49
+# define f18 50
+# define f19 51
+# define f20 52
+# define f21 53
+# define f22 54
+# define f23 55
+# define f24 56
+# define f25 57
+# define f26 58
+# define f27 59
+# define f28 60
+# define f29 61
+# define f30 62
+# define f31 63
+
 #endif
 
 callerSaves :: GlobalReg -> Bool
@@ -635,7 +703,8 @@ haveRegBase = False
 globalRegMaybe :: GlobalReg -> Maybe RealReg
 #if defined(MACHREGS_i386) || defined(MACHREGS_x86_64) \
     || defined(MACHREGS_sparc) || defined(MACHREGS_powerpc) \
-    || defined(MACHREGS_arm) || defined(MACHREGS_aarch64)
+    || defined(MACHREGS_arm) || defined(MACHREGS_aarch64) \
+    || defined(MACHREGS_riscv64)
 # if defined(REG_Base)
 globalRegMaybe BaseReg                  = Just (RealRegSingle REG_Base)
 # endif

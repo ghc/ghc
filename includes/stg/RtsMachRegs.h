@@ -67,6 +67,10 @@
 #define MACHREGS_darwin   1
 #endif
 
+#if defined(riscv64_HOST_ARCH)
+#define MACHREGS_riscv64   1
+#endif
+
 #endif
 
 #include "MachRegs.h"

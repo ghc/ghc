@@ -126,6 +126,7 @@ data Arch = ArchSPARC
           | ArchARM64
           | ArchPPC64
           | ArchPPC64LE
+          | ArchRiscV64
           | ArchUnknown
  deriving Show
 
@@ -149,6 +150,8 @@ platform =
        ArchPPC64
 #elif defined(powerpc64le_HOST_ARCH)
        ArchPPC64LE
+#elif defined(riscv64_HOST_ARCH)
+       ArchRiscV64
 #else
 #    if defined(TABLES_NEXT_TO_CODE)
 #        error Unimplemented architecture
@@ -317,6 +320,22 @@ mkJumpToAddr a = case platform of
         in Right [ 0x3D800000 .|. hi16 w32,
                    0x618C0000 .|. lo16 w32,
                    0x7D8903A6, 0x4E800420 ]
+
+    ArchRiscV64 ->
+        -- We place the entry address in x28 (also known as t3).
+        -- This looks like (where 0xdeadbeef is the address of the function
+        -- pointer),
+        --      auipc   t3, 0
+        --      ld      t3, 0(t3)
+        --      jr      t3
+        -- label:
+        --      .quad <addr>
+        let w64 = fromIntegral (funPtrToInt a)
+        in Right [ 0x00000e17    -- auipc t3, 0x0
+                 , 0x000e3e03    -- ld t3, 0(t3)
+                 , 0x000e0067    -- jr t3
+                 , fromIntegral w64
+                 , fromIntegral (w64 `shiftR` 32) ]
 
     -- This code must not be called. You either need to
     -- add your architecture as a distinct case or

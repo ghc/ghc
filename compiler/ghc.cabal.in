@@ -260,6 +260,7 @@ Library
         CodeGen.Platform.SPARC
         CodeGen.Platform.X86
         CodeGen.Platform.X86_64
+        CodeGen.Platform.RiscV64
         CgUtils
         StgCmm
         StgCmmBind

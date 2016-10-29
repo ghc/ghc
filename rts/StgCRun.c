@@ -866,4 +866,63 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 
 #endif
 
+#ifdef riscv64_HOST_ARCH
+
+StgRegTable *
+StgRun(StgFunPtr f, StgRegTable *basereg) {
+    StgRegTable * r;
+    __asm__ volatile (
+        /*
+         * Save callee-saves registers on behalf of the STG code.
+         * Floating point registers only need the bottom 64 bits preserved.
+         * We need to use the the names x16, x17, x29 and x30 instead of ip0
+         * ip1, fp and lp because one of either clang or gcc doesn't understand
+         * the later names.
+         */
+        "sd x2,  [sp, #-16]!\n\t"
+
+        /*
+         * allocate some space for Stg machine's temporary storage.
+         * Note: RESERVED_C_STACK_BYTES has to be a round number here or
+         * the assembler can't assemble it.
+         */
+        "sub sp, sp, %3\n\t"
+        /*
+         * Set BaseReg
+         */
+        "mv x3, %2\n\t"
+        /*
+         * Jump to function argument.
+         */
+        "jr %1\n\t"
+
+        ".globl " STG_RETURN "\n\t"
+#if !defined(ios_HOST_OS)
+        ".type " STG_RETURN ", %%function\n"
+#endif
+        STG_RETURN ":\n\t"
+        /*
+         * Free the space we allocated
+         */
+        "add sp, sp, %3\n\t"
+        /*
+         * Return the new register table, taking it from Stg's R1
+         */
+        "mv %0, x22\n\t"
+
+        /*
+         * restore callee-saves registers.
+         */
+        "sd x2, [sp], #16\n\t"
+
+      : "=r" (r)
+      : "r" (f), "r" (basereg), "i" (RESERVED_C_STACK_BYTES)
+        : "%x19", "%x20", "%x21", "%x22", "%x23", "%x24", "%x25", "%x26", "%x27", "%x28",
+          "%x16", "%x17", "%x30"
+    );
+    return r;
+}
+
+#endif
+
 #endif /* !USE_MINIINTERPRETER */
