@@ -86,7 +86,7 @@ unix                = library  "unix"
 win32               = library  "Win32"
 xhtml               = library  "xhtml"
 
--- | ghc-split is a perl script used by GHC with @-split-objs@ flag. It is
+-- | @ghc-split@ is a Perl script used by GHC with @-split-objs@ flag. It is
 -- generated in "Rules.Generators.GhcSplit".
 ghcSplit :: FilePath
 ghcSplit = "inplace/lib/bin/ghc-split"

@@ -17,7 +17,6 @@ newtype PackageName = PackageName { fromPackageName :: String }
     deriving (Binary, Eq, Generic, Hashable, IsString, NFData, Ord, Typeable)
 
 -- TODO: Make PackageType more precise, #12.
--- TODO: Turn Program to Program FilePath thereby getting rid of programPath
 -- | We regard packages as either being libraries or programs. This is bit of a
 -- convenient lie as Cabal packages can be both, but it works for now.
 data PackageType = Library | Program deriving Generic
