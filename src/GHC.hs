@@ -128,7 +128,7 @@ programPath Context {..} = lookup (stage, package) exes
     inplace0 pkg = ((Stage0, pkg), inplace pkg)
     inplace1 pkg = ((Stage1, pkg), inplace pkg)
     inplace2 pkg = ((Stage2, pkg), inplace pkg)
-    install stage pkg = pkgPath package -/- stageDirectory stage -/- "build"
+    install stage pkg = pkgPath package -/- stageDirectory stage -/- "build/tmp"
                                         -/- pkgNameString pkg <.> exe
     install0 pkg = ((Stage0, pkg), install Stage0 pkg)
     install1 pkg = ((Stage1, pkg), install Stage1 pkg)
