@@ -619,6 +619,7 @@ countTyClDecls decls
 hsDeclHasCusk :: TyClDecl Name -> Bool
 hsDeclHasCusk (FamDecl { tcdFam = fam_decl }) = famDeclHasCusk Nothing fam_decl
 hsDeclHasCusk (SynDecl { tcdTyVars = tyvars, tcdRhs = rhs })
+  -- NB: Keep this synchronized with 'getInitialKind'
   = hsTvbAllKinded tyvars && rhs_annotated rhs
   where
     rhs_annotated (L _ ty) = case ty of

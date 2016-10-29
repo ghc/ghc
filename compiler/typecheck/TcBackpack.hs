@@ -21,6 +21,7 @@ import DynFlags
 import HsSyn
 import RdrName
 import TcRnMonad
+import TcTyDecls
 import InstEnv
 import FamInstEnv
 import Inst
@@ -394,6 +395,9 @@ mergeSignatures lcl_iface0 = do
     (type_env, detailss) <- initIfaceTcRn $
                             typecheckIfacesForMerging inner_mod ifaces type_env_var
     let infos = zip ifaces detailss
+
+    -- Test for cycles
+    checkSynCycles (thisPackage dflags) (typeEnvTyCons type_env) []
 
     -- NB on type_env: it contains NO dfuns.  DFuns are recorded inside
     -- detailss, and given a Name that doesn't correspond to anything real.  See

@@ -334,6 +334,8 @@ expandTypeSynonyms :: Type -> Type
 --
 -- 'expandTypeSynonyms' only expands out type synonyms mentioned in the type,
 -- not in the kinds of any TyCon or TyVar mentioned in the type.
+--
+-- Keep this synchronized with 'synonymTyConsOfType'
 expandTypeSynonyms ty
   = go (mkEmptyTCvSubst in_scope) ty
   where

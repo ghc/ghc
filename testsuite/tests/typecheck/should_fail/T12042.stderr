@@ -1,0 +1,9 @@
+[1 of 3] Compiling T12042[boot]     (.hs-boot -> .o-boot)
+[2 of 3] Compiling T12042a          (.hs -> .o)
+[3 of 3] Compiling T12042           (.hs -> .o)
+
+T12042.hs:3:1: error:
+    Cycle in type synonym declarations:
+      T12042.hs:3:1-12: type S = R
+      T12042a.hs:3:1-10: B.U from external module
+      T12042.hs:4:1-12: type R = B.U

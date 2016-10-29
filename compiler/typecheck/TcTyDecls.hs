@@ -14,7 +14,7 @@ files for imported data types.
 module TcTyDecls(
         RolesInfo,
         inferRoles,
-        calcSynCycles,
+        checkSynCycles,
         checkClassCycles,
 
         -- * Implicits
@@ -30,7 +30,7 @@ import TcRnMonad
 import TcEnv
 import TcBinds( tcRecSelBinds )
 import RnEnv( RoleAnnotEnv, lookupRoleAnnot )
-import TyCoRep( Type(..) )
+import TyCoRep( Type(..), Coercion(..), UnivCoProvenance(..) )
 import TcType
 import TysWiredIn( unitTy )
 import MkCore( rEC_SEL_ERROR_ID )
@@ -50,7 +50,6 @@ import VarEnv
 import VarSet
 import NameSet  ( NameSet, unitNameSet, extendNameSet, elemNameSet )
 import Coercion ( ltRole )
-import Digraph
 import BasicTypes
 import SrcLoc
 import Unique ( mkBuiltinUnique )
@@ -60,7 +59,7 @@ import Maybes
 import Bag
 import FastString
 import FV
-import UniqFM
+import Module
 
 import Control.Monad
 
@@ -70,77 +69,163 @@ import Control.Monad
         Cycles in type synonym declarations
 *                                                                      *
 ************************************************************************
-
-Checking for class-decl loops is easy, because we don't allow class decls
-in interface files.
-
-We allow type synonyms in hi-boot files, but we *trust* hi-boot files,
-so we don't check for loops that involve them.  So we only look for synonym
-loops in the module being compiled.
-
-We check for type synonym and class cycles on the *source* code.
-Main reasons:
-
-  a) Otherwise we'd need a special function to extract type-synonym tycons
-     from a type, whereas we already have the free vars pinned on the decl
-
-  b) If we checked for type synonym loops after building the TyCon, we
-        can't do a hoistForAllTys on the type synonym rhs, (else we fall into
-        a black hole) which seems unclean.  Apart from anything else, it'd mean
-        that a type-synonym rhs could have for-alls to the right of an arrow,
-        which means adding new cases to the validity checker
-
-        Indeed, in general, checking for cycles beforehand means we need to
-        be less careful about black holes through synonym cycles.
-
-The main disadvantage is that a cycle that goes via a type synonym in an
-.hi-boot file can lead the compiler into a loop, because it assumes that cycles
-only occur entirely within the source code of the module being compiled.
-But hi-boot files are trusted anyway, so this isn't much worse than (say)
-a kind error.
-
-[  NOTE ----------------------------------------------
-If we reverse this decision, this comment came from tcTyDecl1, and should
- go back there
-        -- dsHsType, not tcHsKindedType, to avoid a loop.  tcHsKindedType does hoisting,
-        -- which requires looking through synonyms... and therefore goes into a loop
-        -- on (erroneously) recursive synonyms.
-        -- Solution: do not hoist synonyms, because they'll be hoisted soon enough
-        --           when they are substituted
-
-We'd also need to add back in this definition
+-}
 
 synonymTyConsOfType :: Type -> [TyCon]
 -- Does not look through type synonyms at all
 -- Return a list of synonym tycons
+-- Keep this synchronized with 'expandTypeSynonyms'
 synonymTyConsOfType ty
   = nameEnvElts (go ty)
   where
      go :: Type -> NameEnv TyCon  -- The NameEnv does duplicate elim
-     go (TyVarTy v)               = emptyNameEnv
-     go (TyConApp tc tys)         = go_tc tc tys
+     go (TyConApp tc tys)         = go_tc tc `plusNameEnv` go_s tys
+     go (LitTy _)                 = emptyNameEnv
+     go (TyVarTy _)               = emptyNameEnv
      go (AppTy a b)               = go a `plusNameEnv` go b
      go (FunTy a b)               = go a `plusNameEnv` go b
      go (ForAllTy _ ty)           = go ty
+     go (CastTy ty co)            = go ty `plusNameEnv` go_co co
+     go (CoercionTy co)           = go_co co
 
-     go_tc tc tys | isTypeSynonymTyCon tc = extendNameEnv (go_s tys)
-                                                          (tyConName tc) tc
-                  | otherwise             = go_s tys
+     -- Note [TyCon cycles through coercions?!]
+     -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     -- Although, in principle, it's possible for a type synonym loop
+     -- could go through a coercion (since a coercion can refer to
+     -- a TyCon or Type), it doesn't seem possible to actually construct
+     -- a Haskell program which tickles this case.  Here is an example
+     -- program which causes a coercion:
+     --
+     --   type family Star where
+     --       Star = Type
+     --
+     --   data T :: Star -> Type
+     --   data S :: forall (a :: Type). T a -> Type
+     --
+     -- Here, the application 'T a' must first coerce a :: Type to a :: Star,
+     -- witnessed by the type family.  But if we now try to make Type refer
+     -- to a type synonym which in turn refers to Star, we'll run into
+     -- trouble: we're trying to define and use the type constructor
+     -- in the same recursive group.  Possibly this restriction will be
+     -- lifted in the future but for now, this code is "just for completeness
+     -- sake".
+     go_co (Refl _ ty)            = go ty
+     go_co (TyConAppCo _ tc cs)   = go_tc tc `plusNameEnv` go_co_s cs
+     go_co (AppCo co co')         = go_co co `plusNameEnv` go_co co'
+     go_co (ForAllCo _ co co')    = go_co co `plusNameEnv` go_co co'
+     go_co (CoVarCo _)            = emptyNameEnv
+     go_co (AxiomInstCo _ _ cs)   = go_co_s cs
+     go_co (UnivCo p _ ty ty')    = go_prov p `plusNameEnv` go ty `plusNameEnv` go ty'
+     go_co (SymCo co)             = go_co co
+     go_co (TransCo co co')       = go_co co `plusNameEnv` go_co co'
+     go_co (NthCo _ co)           = go_co co
+     go_co (LRCo _ co)            = go_co co
+     go_co (InstCo co co')        = go_co co `plusNameEnv` go_co co'
+     go_co (CoherenceCo co co')   = go_co co `plusNameEnv` go_co co'
+     go_co (KindCo co)            = go_co co
+     go_co (SubCo co)             = go_co co
+     go_co (AxiomRuleCo _ cs)     = go_co_s cs
+
+     go_prov UnsafeCoerceProv     = emptyNameEnv
+     go_prov (PhantomProv co)     = go_co co
+     go_prov (ProofIrrelProv co)  = go_co co
+     go_prov (PluginProv _)       = emptyNameEnv
+     go_prov (HoleProv _)         = emptyNameEnv
+
+     go_tc tc | isTypeSynonymTyCon tc = unitNameEnv (tyConName tc) tc
+              | otherwise             = emptyNameEnv
      go_s tys = foldr (plusNameEnv . go) emptyNameEnv tys
----------------------------------------- END NOTE ]
--}
+     go_co_s cos = foldr (plusNameEnv . go_co) emptyNameEnv cos
 
-mkSynEdges :: [LTyClDecl Name] -> [(LTyClDecl Name, Name, [Name])]
-mkSynEdges syn_decls = [ (ldecl, name, nonDetEltsUFM fvs)
-                       | ldecl@(L _ (SynDecl { tcdLName = L _ name
-                                             , tcdFVs = fvs })) <- syn_decls ]
-            -- It's OK to use nonDetEltsUFM here as
-            -- stronglyConnCompFromEdgedVertices is still deterministic even
-            -- if the edges are in nondeterministic order as explained in
-            -- Note [Deterministic SCC] in Digraph.
+-- | A monad for type synonym cycle checking, which keeps
+-- track of the TyCons which are known to be acyclic, or
+-- a failure message reporting that a cycle was found.
+newtype SynCycleM a = SynCycleM {
+    runSynCycleM :: SynCycleState -> Either (SrcSpan, SDoc) (a, SynCycleState) }
 
-calcSynCycles :: [LTyClDecl Name] -> [SCC (LTyClDecl Name)]
-calcSynCycles = stronglyConnCompFromEdgedVerticesUniq . mkSynEdges
+type SynCycleState = NameSet
+
+instance Functor SynCycleM where
+    fmap = liftM
+
+instance Applicative SynCycleM where
+    pure x = SynCycleM $ \state -> Right (x, state)
+    (<*>) = ap
+
+instance Monad SynCycleM where
+    m >>= f = SynCycleM $ \state ->
+        case runSynCycleM m state of
+            Right (x, state') ->
+                runSynCycleM (f x) state'
+            Left err -> Left err
+
+failSynCycleM :: SrcSpan -> SDoc -> SynCycleM ()
+failSynCycleM loc err = SynCycleM $ \_ -> Left (loc, err)
+
+-- | Test if a 'Name' is acyclic, short-circuiting if we've
+-- seen it already.
+checkNameIsAcyclic :: Name -> SynCycleM () -> SynCycleM ()
+checkNameIsAcyclic n m = SynCycleM $ \s ->
+    if n `elemNameSet` s
+        then Right ((), s) -- short circuit
+        else case runSynCycleM m s of
+                Right ((), s') -> Right ((), extendNameSet s' n)
+                Left err -> Left err
+
+-- | Checks if any of the passed in 'TyCon's have cycles.
+-- Takes the 'UnitId' of the home package (as we can avoid
+-- checking those TyCons: cycles never go through foreign packages) and
+-- the corresponding @LTyClDecl Name@ for each 'TyCon', so we
+-- can give better error messages.
+checkSynCycles :: UnitId -> [TyCon] -> [LTyClDecl Name] -> TcM ()
+checkSynCycles this_uid tcs tyclds = do
+    case runSynCycleM (mapM_ (go emptyNameEnv []) tcs) emptyNameEnv of
+        Left (loc, err) -> setSrcSpan loc $ failWithTc err
+        Right _  -> return ()
+  where
+    -- Try our best to print the LTyClDecl for locally defined things
+    lcl_decls = mkNameEnv (zip (map tyConName tcs) tyclds)
+
+    -- Short circuit if we've already seen this Name and concluded
+    -- it was acyclic.
+    go :: NameSet -> [TyCon] -> TyCon -> SynCycleM ()
+    go so_far seen_tcs tc =
+        checkNameIsAcyclic (tyConName tc) $ go' so_far seen_tcs tc
+
+    -- Expand type synonyms, complaining if you find the same
+    -- type synonym a second time.
+    go' :: NameSet -> [TyCon] -> TyCon -> SynCycleM ()
+    go' so_far seen_tcs tc
+        | n `elemNameSet` so_far
+            = failSynCycleM (getSrcSpan (head seen_tcs)) $
+                  sep [ text "Cycle in type synonym declarations:"
+                      , nest 2 (vcat (map ppr_decl seen_tcs)) ]
+        -- Optimization: we don't allow cycles through external packages,
+        -- so once we find a non-local name we are guaranteed to not
+        -- have a cycle.
+        --
+        -- This won't hold once we get recursive packages with Backpack,
+        -- but for now it's fine.
+        | not (isHoleModule mod ||
+               moduleUnitId mod == this_uid ||
+               isInteractiveModule mod)
+            = return ()
+        | Just ty <- synTyConRhs_maybe tc =
+            go_ty (extendNameSet so_far (tyConName tc)) (tc:seen_tcs) ty
+        | otherwise = return ()
+      where
+        n = tyConName tc
+        mod = nameModule n
+        ppr_decl tc =
+          case lookupNameEnv lcl_decls n of
+            Just (L loc decl) -> ppr loc <> colon <+> ppr decl
+            Nothing -> ppr (getSrcSpan n) <> colon <+> ppr n <+> text "from external module"
+         where
+          n = tyConName tc
+
+    go_ty :: NameSet -> [TyCon] -> Type -> SynCycleM ()
+    go_ty so_far seen_tcs ty =
+        mapM_ (go so_far seen_tcs) (synonymTyConsOfType ty)
 
 {- Note [Superclass cycle check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

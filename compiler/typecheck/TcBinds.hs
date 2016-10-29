@@ -1134,7 +1134,9 @@ tcMonoBinds is_rec sig_fn no_gen
                              -- Single function binding,
   | NonRecursive <- is_rec   -- ...binder isn't mentioned in RHS
   , Nothing <- sig_fn name   -- ...with no type signature
-  =     -- In this very special case we infer the type of the
+  =     -- Note [Single function non-recursive binding special-case]
+        -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        -- In this very special case we infer the type of the
         -- right hand side first (it may have a higher-rank type)
         -- and *then* make the monomorphic Id for the LHS
         -- e.g.         f = \(x::forall a. a->a) -> <body>

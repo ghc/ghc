@@ -63,7 +63,6 @@ import Unify
 import Util
 import SrcLoc
 import ListSetOps
-import Digraph
 import DynFlags
 import Unique
 import BasicTypes
@@ -150,6 +149,12 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
            -- Step 1: Typecheck the type/class declarations
        ; tyclss <- tcTyClDecls tyclds role_annots
 
+           -- Step 1.5: Make sure we don't have any type synonym cycles
+       ; traceTc "Starting synonym cycle check" (ppr tyclss)
+       ; this_uid <- fmap thisPackage getDynFlags
+       ; checkSynCycles this_uid tyclss tyclds
+       ; traceTc "Done synonym cycle check" (ppr tyclss)
+
            -- Step 2: Perform the validity check on those types/classes
            -- We can do this now because we are done with the recursive knot
            -- Do it before Step 3 (adding implicit things) because the latter
@@ -172,7 +177,6 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
 
        ; return (gbl_env, inst_info, datafam_deriv_info) } } }
 
-
 tcTyClDecls :: [LTyClDecl Name] -> RoleAnnotEnv -> TcM [TyCon]
 tcTyClDecls tyclds role_annots
   = do {    -- Step 1: kind-check this group and returns the final
@@ -183,6 +187,10 @@ tcTyClDecls tyclds role_annots
 
             -- Step 2: type-check all groups together, returning
             -- the final TyCons and Classes
+            --
+            -- NB: We have to be careful here to NOT eagerly unfold
+            -- type synonyms, as we have not tested for type synonym
+            -- loops yet and could fall into a black hole.
        ; fixM $ \ ~rec_tyclss -> do
            { is_boot   <- tcIsHsBootOrSig
            ; let roles = inferRoles is_boot role_annots rec_tyclss
@@ -241,14 +249,10 @@ Note [Kind checking for type and class decls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Kind checking is done thus:
 
-   1. Make up a kind variable for each parameter of the *data* type, class,
-      and closed type family decls, and extend the kind environment (which is
-      in the TcLclEnv)
+   1. Make up a kind variable for each parameter of the declarations,
+      and extend the kind environment (which is in the TcLclEnv)
 
-   2. Dependency-analyse the type *synonyms* (which must be non-recursive),
-      and kind-check them in dependency order.  Extend the kind envt.
-
-   3. Kind check the data type and class decls
+   2. Kind check the declarations
 
 We need to kind check all types in the mutually recursive group
 before we know the kind of the type variables.  For example:
@@ -263,21 +267,18 @@ Here, the kind of the locally-polymorphic type variable "b"
 depends on *all the uses of class D*.  For example, the use of
 Monad c in bop's type signature means that D must have kind Type->Type.
 
-However type synonyms work differently.  They can have kinds which don't
-just involve (->) and *:
-        type R = Int#           -- Kind #
-        type S a = Array# a     -- Kind * -> #
-        type T a b = (# a,b #)  -- Kind * -> * -> (# a,b #)
-and a kind variable can't unify with UnboxedTypeKind.
+Note: we don't treat type synonyms specially (we used to, in the past);
+in particular, even if we have a type synonym cycle, we still kind check
+it normally, and test for cycles later (checkSynCycles).  The reason
+we can get away with this is because we have more systematic TYPE r
+inference, which means that we can do unification between kinds that
+aren't lifted (this historically was not true.)
 
-So we must infer the kinds of type synonyms from their right-hand
-sides *first* and then use them, whereas for the mutually recursive
-data types D we bring into scope kind bindings D -> k, where k is a
-kind variable, and do inference.
-
-NB: synonyms can be mutually recursive with data type declarations though!
-   type T = D -> D
-   data D = MkD Int T
+The downside of not directly reading off the kinds off the RHS of
+type synonyms in topological order is that we don't transparently
+support making synonyms of types with higher-rank kinds.  But
+you can always specify a CUSK directly to make this work out.
+See tc269 for an example.
 
 Open type families
 ~~~~~~~~~~~~~~~~~~
@@ -296,7 +297,28 @@ See also Note [Kind checking recursive type and class declarations]
 
 -}
 
+
+-- Note [Missed opportunity to retain higher-rank kinds]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- In 'kcTyClGroup', there is a missed opportunity to make kind
+-- inference work in a few more cases.  The idea is analogous
+-- to Note [Single function non-recursive binding special-case]:
+--
+--      * If we have an SCC with a single decl, which is non-recursive,
+--        instead of creating a unification variable representing the
+--        kind of the decl and unifying it with the rhs, we can just
+--        read the type directly of the rhs.
+--
+--      * Furthermore, we can update our SCC analysis to ignore
+--        dependencies on declarations which have CUSKs: we don't
+--        have to kind-check these all at once, since we can use
+--        the CUSK to initialize the kind environment.
+--
+-- Unfortunately this requires reworking a bit of the code in
+-- 'kcLTyClDecl' so I've decided to punt unless someone shouts about it.
+--
 kcTyClGroup :: [LTyClDecl Name] -> TcM [TcTyCon]
+
 -- Kind check this group, kind generalize, and return the resulting local env
 -- This bindds the TyCons and Classes of the group, but not the DataCons
 -- See Note [Kind checking for type and class decls]
@@ -307,29 +329,23 @@ kcTyClGroup decls
         ; traceTc "kcTyClGroup" (text "module" <+> ppr mod $$ vcat (map ppr decls))
 
           -- Kind checking;
-          --    1. Bind kind variables for non-synonyms
-          --    2. Kind-check synonyms, and bind kinds of those synonyms
-          --    3. Kind-check non-synonyms
-          --    4. Generalise the inferred kinds
+          --    1. Bind kind variables for decls
+          --    2. Kind-check decls
+          --    3. Generalise the inferred kinds
           -- See Note [Kind checking for type and class decls]
 
         ; lcl_env <- solveEqualities $
           do {
-               -- Step 1: Bind kind variables for non-synonyms
-               let (syn_decls, non_syn_decls) = partition (isSynDecl . unLoc) decls
-             ; initial_kinds <- getInitialKinds non_syn_decls
+               -- Step 1: Bind kind variables for all decls
+               initial_kinds <- getInitialKinds decls
              ; traceTc "kcTyClGroup: initial kinds" $
                vcat (map pp_initial_kind initial_kinds)
+             ; tcExtendKindEnv2 initial_kinds $ do {
 
-             -- Step 2: Set initial envt, kind-check the synonyms
-             ; lcl_env <- tcExtendKindEnv2 initial_kinds $
-                          kcSynDecls (calcSynCycles syn_decls)
+             -- Step 2: Set extended envt, kind-check the decls
+             ; mapM_ kcLTyClDecl decls
 
-             -- Step 3: Set extended envt, kind-check the non-synonyms
-             ; setLclEnv lcl_env $
-               mapM_ kcLTyClDecl non_syn_decls
-
-             ; return lcl_env }
+             ; getLclEnv } }
 
              -- Step 4: generalisation
              -- Kind checking done for this group
@@ -462,8 +478,22 @@ getInitialKind decl@(DataDecl { tcdLName = L _ name
 getInitialKind (FamDecl { tcdFam = decl })
   = getFamDeclInitialKind Nothing decl
 
-getInitialKind decl@(SynDecl {})
-  = pprPanic "getInitialKind" (ppr decl)
+getInitialKind decl@(SynDecl { tcdLName = L _ name
+                             , tcdTyVars = ktvs
+                             , tcdRhs = rhs })
+  = do  { (tycon, _) <- kcHsTyVarBndrs name False (hsDeclHasCusk decl)
+                            False {- not open -} True ktvs $
+            do  { res_k <- case kind_annotation rhs of
+                            Nothing -> newMetaKindVar
+                            Just ksig -> tcLHsKind ksig
+                ; return (res_k, ()) }
+        ; return [ mkTcTyConPair tycon ] }
+  where
+    -- Keep this synchronized with 'hsDeclHasCusk'.
+    kind_annotation (L _ ty) = case ty of
+        HsParTy lty     -> kind_annotation lty
+        HsKindSig _ k   -> Just k
+        _               -> Nothing
 
 ---------------------------------
 getFamDeclInitialKinds :: Maybe Bool  -- if assoc., CUSKness of assoc. class
@@ -499,37 +529,6 @@ getFamDeclInitialKind mb_cusk decl@(FamilyDecl { fdLName     = L _ name
       OpenTypeFamily     -> (True,  False)
       ClosedTypeFamily _ -> (False, False)
 
-----------------
-kcSynDecls :: [SCC (LTyClDecl Name)]
-           -> TcM TcLclEnv -- Kind bindings
-kcSynDecls [] = getLclEnv
-kcSynDecls (group : groups)
-  = do  { tc <- kcSynDecl1 group
-        ; traceTc "kcSynDecl" (ppr tc <+> dcolon <+> ppr (tyConKind tc))
-        ; tcExtendKindEnv2 [ mkTcTyConPair tc ] $
-          kcSynDecls groups }
-
-kcSynDecl1 :: SCC (LTyClDecl Name)
-           -> TcM TcTyCon -- Kind bindings
-kcSynDecl1 (AcyclicSCC (L _ decl)) = kcSynDecl decl
-kcSynDecl1 (CyclicSCC decls)       = do { recSynErr decls; failM }
-                                     -- Fail here to avoid error cascade
-                                     -- of out-of-scope tycons
-
-kcSynDecl :: TyClDecl Name -> TcM TcTyCon
-kcSynDecl decl@(SynDecl { tcdTyVars = hs_tvs, tcdLName = L _ name
-                        , tcdRhs = rhs })
-  -- Returns a possibly-unzonked kind
-  = tcAddDeclCtxt decl $
-    do { (tycon, _) <-
-           kcHsTyVarBndrs name False (hsDeclHasCusk decl) False True hs_tvs $
-           do { traceTc "kcd1" (ppr name <+> brackets (ppr hs_tvs))
-              ; (_, rhs_kind) <- tcLHsType rhs
-              ; traceTc "kcd2" (ppr name)
-              ; return (rhs_kind, ()) }
-       ; return tycon }
-kcSynDecl decl = pprPanic "kcSynDecl" (ppr decl)
-
 ------------------------------------------------------------------------
 kcLTyClDecl :: LTyClDecl Name -> TcM ()
   -- See Note [Kind checking for type and class decls]
@@ -557,7 +556,12 @@ kcTyClDecl (DataDecl { tcdLName = L _ name, tcdDataDefn = defn })
     do  { _ <- tcHsContext ctxt
         ; mapM_ (wrapLocM kcConDecl) cons }
 
-kcTyClDecl decl@(SynDecl {}) = pprPanic "kcTyClDecl" (ppr decl)
+kcTyClDecl (SynDecl { tcdLName = L _ name, tcdRhs = lrhs })
+  = kcTyClTyVars name $
+    do  { syn_tc <- kcLookupTcTyCon name
+        -- NB: check against the result kind that we allocated
+        -- in getInitialKinds.
+        ; discardResult $ tcCheckLHsType lrhs (tyConResKind syn_tc) }
 
 kcTyClDecl (ClassDecl { tcdLName = L _ name
                       , tcdCtxt = ctxt, tcdSigs = sigs })
@@ -2741,15 +2745,6 @@ noClassTyVarErr clas fam_tc
   = sep [ text "The associated type" <+> quotes (ppr fam_tc)
         , text "mentions none of the type or kind variables of the class" <+>
                 quotes (ppr clas <+> hsep (map ppr (classTyVars clas)))]
-
-recSynErr :: [LTyClDecl Name] -> TcRn ()
-recSynErr syn_decls
-  = setSrcSpan (getLoc (head sorted_decls)) $
-    addErr (sep [text "Cycle in type synonym declarations:",
-                 nest 2 (vcat (map ppr_decl sorted_decls))])
-  where
-    sorted_decls = sortLocated syn_decls
-    ppr_decl (L loc decl) = ppr loc <> colon <+> ppr decl
 
 badDataConTyCon :: DataCon -> Type -> Type -> SDoc
 badDataConTyCon data_con res_ty_tmpl actual_res_ty

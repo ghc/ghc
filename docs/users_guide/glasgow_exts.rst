@@ -2144,10 +2144,10 @@ much more liberal about type synonyms than Haskell 98.
          foo :: forall x. x -> [x]
 
 GHC currently does kind checking before expanding synonyms (though even
-that could be changed)..
+that could be changed).
 
 After expanding type synonyms, GHC does validity checking on types,
-looking for the following mal-formedness which isn't detected simply by
+looking for the following malformedness which isn't detected simply by
 kind checking:
 
 -  Type constructor applied to a type involving for-alls (if
