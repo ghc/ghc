@@ -57,80 +57,61 @@ buildPackageData context@Context {..} = do
 
     -- TODO: PROGNAME was $(CrossCompilePrefix)hp2ps.
     priority 2.0 $ do
-        when (package == hp2ps) $ dataFile %> \mk -> do
-            orderOnly =<< interpretInContext context generatedDependencies
-            let prefix = fixKey (buildPath context) ++ "_"
-                cSrcs  = [ "AreaBelow.c", "Curves.c", "Error.c", "Main.c"
-                         , "Reorder.c", "TopTwenty.c", "AuxFile.c"
-                         , "Deviation.c", "HpFile.c", "Marks.c", "Scale.c"
-                         , "TraceElement.c", "Axes.c", "Dimensions.c", "Key.c"
-                         , "PsFile.c", "Shade.c", "Utilities.c" ]
-                contents = unlines $ map (prefix++)
-                    [ "PROGNAME = hp2ps"
-                    , "C_SRCS = " ++ unwords cSrcs
-                    , "DEP_EXTRA_LIBS = m"
-                    , "CC_OPTS = -I" ++ generatedPath ]
-            writeFileChanged mk contents
-            putSuccess $ "| Successfully generated " ++ mk
-
-        when (package == unlit) $ dataFile %> \mk -> do
-            orderOnly =<< interpretInContext context generatedDependencies
-            let prefix   = fixKey (buildPath context) ++ "_"
-                contents = unlines $ map (prefix++)
-                    [ "PROGNAME = unlit"
-                    , "C_SRCS = unlit.c"
-                    , "SYNOPSIS = Literate script filter." ]
-            writeFileChanged mk contents
-            putSuccess $ "| Successfully generated " ++ mk
-
-        when (package == touchy) $ dataFile %> \mk -> do
-            orderOnly =<< interpretInContext context generatedDependencies
-            let prefix   = fixKey (buildPath context) ++ "_"
-                contents = unlines $ map (prefix++)
-                    [ "PROGNAME = touchy"
-                    , "C_SRCS = touchy.c" ]
-            writeFileChanged mk contents
-            putSuccess $ "| Successfully generated " ++ mk
+        when (package `elem` [hp2ps, rts, touchy, unlit]) $ dataFile %>
+            generatePackageData context
 
         -- Bootstrapping `ghcCabal`: although `ghcCabal` is a proper cabal
         -- package, we cannot generate the corresponding `package-data.mk` file
         -- by running by running `ghcCabal`, because it has not yet been built.
-        when (package == ghcCabal && stage == Stage0) $ dataFile %> \mk -> do
-            orderOnly =<< interpretInContext context generatedDependencies
-            let prefix   = fixKey (buildPath context) ++ "_"
-                contents = unlines $ map (prefix++)
-                    [ "PROGNAME = ghc-cabal"
-                    , "MODULES = Main"
-                    , "SYNOPSIS = Bootstrapped ghc-cabal utility."
-                    , "HS_SRC_DIRS = ." ]
-            writeFileChanged mk contents
-            putSuccess $ "| Successfully generated " ++ mk
+        when (package == ghcCabal && stage == Stage0) $ dataFile %>
+            generatePackageData context
 
-        when (package == rts && stage == Stage1) $ do
-            dataFile %> \mk -> do
-                orderOnly =<< interpretInContext context generatedDependencies
-                windows <- windowsHost
-                let prefix = fixKey (buildPath context) ++ "_"
-                    dirs   = [ ".", "hooks", "sm", "eventlog", "linker" ]
-                          ++ [ if windows then "win32" else "posix" ]
-                cSrcs   <- map unifyPath <$>
-                           getDirectoryFiles (pkgPath package) (map (-/- "*.c") dirs)
-                cmmSrcs <- getDirectoryFiles (pkgPath package) ["*.cmm"]
-                buildAdjustor   <- anyTargetArch ["i386", "powerpc", "powerpc64"]
-                buildStgCRunAsm <- anyTargetArch ["powerpc64le"]
-                let extraCSrcs   = [ rtsBuildPath -/- "c/sm/Evac_thr.c"   ]
-                                ++ [ rtsBuildPath -/- "c/sm/Scav_thr.c"   ]
-                    extraCmmSrcs = [ rtsBuildPath -/- "cmm/AutoApply.cmm" ]
-                    extraAsmSrcs = [ "AdjustorAsm.S" | buildAdjustor      ]
-                                ++ [ "StgCRunAsm.S"  | buildStgCRunAsm    ]
-                let contents = unlines $ map (prefix ++)
-                        [ "C_SRCS = "    ++ unwords (cSrcs   ++ extraCSrcs)
-                        , "CMM_SRCS = "  ++ unwords (cmmSrcs ++ extraCmmSrcs)
-                        , "S_SRCS = "    ++ unwords extraAsmSrcs
-                        , "CC_OPTS = -I" ++ generatedPath
-                        , "COMPONENT_ID = rts" ]
-                writeFileChanged mk contents
-                putSuccess $ "| Successfully generated " ++ mk
+generatePackageData :: Context -> FilePath -> Action ()
+generatePackageData context@Context {..} file = do
+    orderOnly =<< interpretInContext context generatedDependencies
+    asmSrcs <- packageAsmSources package
+    cSrcs   <- packageCSources   package
+    cmmSrcs <- packageCmmSources package
+    let prefix = fixKey (buildPath context) ++ "_"
+        pkgKey = if isLibrary package then "COMPONENT_ID = " else "PROGNAME = "
+    writeFileChanged file . unlines . map (prefix ++) $
+        [ pkgKey ++ pkgNameString package                                   ] ++
+        [ "S_SRCS = "   ++ unwords asmSrcs                                  ] ++
+        [ "C_SRCS = "   ++ unwords cSrcs                                    ] ++
+        [ "CMM_SRCS = " ++ unwords cmmSrcs                                  ] ++
+        [ "DEP_EXTRA_LIBS = m"                 | package == hp2ps           ] ++
+        [ "CC_OPTS = -I" ++ generatedPath      | package `elem` [hp2ps, rts]] ++
+        [ "MODULES = Main"                     | package == ghcCabal        ] ++
+        [ "HS_SRC_DIRS = ."                    | package == ghcCabal        ] ++
+        [ "SYNOPSIS = Bootstrapped ghc-cabal." | package == ghcCabal        ]
+    putSuccess $ "| Successfully generated " ++ file
+
+packageCSources :: Package -> Action [FilePath]
+packageCSources pkg
+    | pkg /= rts = getDirectoryFiles (pkgPath pkg) ["*.c"]
+    | otherwise  = do
+        windows <- windowsHost
+        sources <- fmap (map unifyPath) . getDirectoryFiles (pkgPath pkg) .
+            map (-/- "*.c") $ [ ".", "hooks", "sm", "eventlog", "linker" ] ++
+                              [ if windows then "win32" else "posix"     ]
+        return $ sources ++ [ rtsBuildPath -/- "c/sm/Evac_thr.c" ]
+                         ++ [ rtsBuildPath -/- "c/sm/Scav_thr.c" ]
+
+packageAsmSources :: Package -> Action [FilePath]
+packageAsmSources pkg
+    | pkg /= rts = return []
+    | otherwise  = do
+        buildAdjustor   <- anyTargetArch ["i386", "powerpc", "powerpc64"]
+        buildStgCRunAsm <- anyTargetArch ["powerpc64le"]
+        return $ [ "AdjustorAsm.S" | buildAdjustor   ]
+              ++ [ "StgCRunAsm.S"  | buildStgCRunAsm ]
+
+packageCmmSources :: Package -> Action [FilePath]
+packageCmmSources pkg
+    | pkg /= rts = return []
+    | otherwise  = do
+        sources <- getDirectoryFiles (pkgPath pkg) ["*.cmm"]
+        return $ sources ++ [ rtsBuildPath -/- "cmm/AutoApply.cmm" ]
 
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:
 -- 1) Drop lines containing '$'
