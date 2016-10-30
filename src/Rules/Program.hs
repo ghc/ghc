@@ -29,15 +29,23 @@ wrappers = [ (vanillaContext Stage0 ghc   , ghcWrapper   )
 
 buildProgram :: [(Resource, Int)] -> Context -> Rules ()
 buildProgram rs context@Context {..} = when (isProgram package) $ do
+    let installStage = do
+            latest <- latestBuildStage package -- isJust below is safe
+            return $ if package == ghc then stage else fromJust latest
+
     buildPath context -/- programName context <.> exe %>
         buildBinaryAndWrapper rs context
 
     -- Rules for programs built in install directories
-    when (stage == Stage0 || package == ghc) $
-        installPath package -/- programName context <.> exe %> \bin -> do
-            latest <- latestBuildStage package -- isJust below is safe
-            let binStage = if package == ghc then stage else fromJust latest
+    when (stage == Stage0 || package == ghc) $ do
+        -- Some binaries in programInplacePath are wrapped
+        programInplacePath -/- programName context <.> exe %> \bin -> do
+            binStage <- installStage
             buildBinaryAndWrapper rs (context { stage = binStage }) bin
+        -- We build only unwrapped binaries in programInplaceLibPath
+        programInplaceLibPath -/- programName context <.> exe %> \bin -> do
+            binStage <- installStage
+            buildBinary rs (context { stage = binStage }) bin
 
 buildBinaryAndWrapper :: [(Resource, Int)] -> Context -> FilePath -> Action ()
 buildBinaryAndWrapper rs context bin = do
