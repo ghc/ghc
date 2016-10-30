@@ -69,7 +69,6 @@ import UniqSet
 import Util
 import qualified GHC.LanguageExtensions as LangExt
 import NameEnv
-import TcRnDriver (findExtraSigImports, implicitRequirements)
 
 import Data.Either ( rights, partitionEithers )
 import qualified Data.Map as Map

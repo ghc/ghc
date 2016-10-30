@@ -24,8 +24,6 @@ import TcRnMonad
 import Util
 import IfaceEnv
 
-import Avail ( plusAvail )
-
 import Control.Monad
 
 -- Note [NameShape]
