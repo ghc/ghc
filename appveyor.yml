@@ -29,7 +29,7 @@ build_script:
     - stack build
 
     # Run internal Hadrian tests
-    - stack exec hadrian -- selftest
+    - stack exec hadrian -- --directory ".." selftest
 
     # Build GHC
     - stack exec hadrian -- --lint --directory ".." -j --flavour=quickest --verbose --no-progress --progress-info=brief --progress-colour=never --profile=-
