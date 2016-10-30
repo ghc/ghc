@@ -14,7 +14,7 @@ import Rules.Actions
 import Rules.Wrappers.Ghc
 import Rules.Wrappers.GhcPkg
 import Settings
-import Settings.Paths
+import Settings.Path
 import Target
 import UserSettings
 

@@ -9,7 +9,7 @@ import Oracles.ModuleFiles
 import Oracles.PackageData
 import Rules.Actions
 import Settings
-import Settings.Paths
+import Settings.Path
 import Target
 
 haddockHtmlLib :: FilePath

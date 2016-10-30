@@ -7,7 +7,7 @@ import GHC
 import Rules.Actions
 import Rules.Libffi
 import Settings.Packages.Rts
-import Settings.Paths
+import Settings.Path
 import Target
 import UserSettings
 

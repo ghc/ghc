@@ -20,7 +20,7 @@ import qualified Rules.Program
 import qualified Rules.Register
 import Settings
 import Settings.Packages.Rts
-import Settings.Paths
+import Settings.Path
 
 allStages :: [Stage]
 allStages = [minBound ..]

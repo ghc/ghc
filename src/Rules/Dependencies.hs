@@ -7,7 +7,7 @@ import Context
 import Expression
 import Oracles.ModuleFiles
 import Rules.Actions
-import Settings.Paths
+import Settings.Path
 import Target
 
 buildPackageDependencies :: [(Resource, Int)] -> Context -> Rules ()

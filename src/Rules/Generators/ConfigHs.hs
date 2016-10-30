@@ -8,7 +8,7 @@ import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Rules.Generators.Common
 import Settings
-import Settings.Paths
+import Settings.Path
 import UserSettings
 
 generateConfigHs :: Expr String

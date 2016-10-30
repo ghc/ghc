@@ -10,7 +10,7 @@ import qualified Rules.Oracles
 import qualified Rules.SourceDist
 import qualified Rules.Selftest
 import qualified Rules.Test
-import qualified Settings.Paths
+import qualified Settings.Path
 
 main :: IO ()
 main = shakeArgsWith options CmdLineFlag.cmdFlags $ \cmdLineFlags targets -> do
@@ -32,6 +32,6 @@ main = shakeArgsWith options CmdLineFlag.cmdFlags $ \cmdLineFlags targets -> do
     options :: ShakeOptions
     options = shakeOptions
         { shakeChange   = ChangeModtimeAndDigest
-        , shakeFiles    = Settings.Paths.shakeFilesPath
+        , shakeFiles    = Settings.Path.shakeFilesPath
         , shakeProgress = progressSimple
         , shakeTimings  = True }

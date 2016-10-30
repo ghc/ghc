@@ -3,7 +3,7 @@ module Rules.Wrappers.GhcPkg (ghcPkgWrapper) where
 import Base
 import Expression
 import Oracles.Path
-import Settings.Paths
+import Settings.Path
 
 ghcPkgWrapper :: FilePath -> Expr String
 ghcPkgWrapper program = do

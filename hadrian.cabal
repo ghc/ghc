@@ -102,7 +102,7 @@ executable hadrian
                        , Settings.Packages.RunGhc
                        , Settings.Packages.Touchy
                        , Settings.Packages.Unlit
-                       , Settings.Paths
+                       , Settings.Path
                        , Stage
                        , Target
                        , UserSettings

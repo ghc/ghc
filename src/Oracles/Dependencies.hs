@@ -11,7 +11,7 @@ import Expression
 import Oracles.PackageData
 import Settings
 import Settings.Builders.GhcCabal
-import Settings.Paths
+import Settings.Path
 
 newtype ObjDepsKey = ObjDepsKey (FilePath, FilePath)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)

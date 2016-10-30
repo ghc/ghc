@@ -9,7 +9,7 @@ import Oracles.Dependencies
 import Rules.Actions
 import Rules.Generate
 import Rules.Libffi
-import Settings.Paths
+import Settings.Path
 import Target
 import UserSettings
 

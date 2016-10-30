@@ -4,7 +4,7 @@ import Base
 import GHC
 import Oracles.Config.Setting
 import Predicate
-import Settings.Paths
+import Settings.Path
 
 -- TODO: Is this needed?
 -- ifeq "$(GMP_PREFER_FRAMEWORK)" "YES"

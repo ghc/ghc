@@ -9,7 +9,7 @@ import Oracles.Config.Setting
 import Oracles.Path
 import Predicate
 import Settings
-import Settings.Paths
+import Settings.Path
 
 rtsContext :: Context
 rtsContext = vanillaContext Stage1 rts

@@ -1,4 +1,4 @@
-module Settings.Paths (
+module Settings.Path (
     stageDirectory, buildPath, pkgDataFile, pkgHaddockFile, pkgLibraryFile,
     pkgLibraryFile0, pkgGhciLibraryFile, gmpBuildPath, gmpObjects, gmpLibraryH,
     gmpBuildInfoPath, generatedPath, libffiBuildPath, shakeFilesPath, pkgConfFile,

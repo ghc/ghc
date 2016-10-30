@@ -10,7 +10,7 @@ import Oracles.Config.Setting
 import Oracles.Path
 import Rules.Actions
 import Settings
-import Settings.Paths
+import Settings.Path
 import Target
 
 -- TODO: clean up after testing

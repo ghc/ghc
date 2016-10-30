@@ -21,7 +21,7 @@ import Rules.Generators.GhcVersionH
 import Rules.Generators.VersionHs
 import Rules.Libffi
 import Settings.Packages.Rts
-import Settings.Paths
+import Settings.Path
 import Target
 import UserSettings
 

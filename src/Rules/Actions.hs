@@ -20,7 +20,7 @@ import Oracles.DirectoryContent
 import Oracles.Path
 import Settings
 import Settings.Builders.Ar
-import Settings.Paths
+import Settings.Path
 import Target
 import UserSettings
 

@@ -4,7 +4,7 @@ import Base
 import Expression
 import Oracles.Config.Setting
 import Rules.Generators.Common
-import Settings.Paths
+import Settings.Path
 
 ghcSplitSource :: FilePath
 ghcSplitSource = "driver/split/ghc-split.prl"

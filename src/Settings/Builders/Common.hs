@@ -8,7 +8,7 @@ module Settings.Builders.Common (
     module Oracles.Path,
     module Predicate,
     module Settings,
-    module Settings.Paths,
+    module Settings.Path,
     module UserSettings,
     cIncludeArgs, ldArgs, cArgs, cWarnings, argSetting, argSettingList,
     argStagedBuilderPath, argStagedSettingList, bootPackageDatabaseArgs
@@ -23,7 +23,7 @@ import Oracles.PackageData
 import Oracles.Path
 import Predicate
 import Settings
-import Settings.Paths
+import Settings.Path
 import UserSettings
 
 cIncludeArgs :: Args

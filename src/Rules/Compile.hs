@@ -8,7 +8,7 @@ import Expression
 import Oracles.Dependencies
 import Rules.Actions
 import Rules.Generate
-import Settings.Paths
+import Settings.Path
 import Target
 
 compilePackage :: [(Resource, Int)] -> Context -> Rules ()

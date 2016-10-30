@@ -9,7 +9,7 @@ import Base
 import Context
 import Expression
 import Oracles.PackageData
-import Settings.Paths
+import Settings.Path
 
 newtype ModuleFilesKey = ModuleFilesKey (Stage, Package)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)

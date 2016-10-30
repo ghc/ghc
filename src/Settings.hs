@@ -13,7 +13,7 @@ import Oracles.PackageData
 import {-# SOURCE #-} Settings.Default
 import Settings.Flavours.Quick
 import Settings.Flavours.Quickest
-import Settings.Paths
+import Settings.Path
 import UserSettings
 
 getArgs :: Expr [String]

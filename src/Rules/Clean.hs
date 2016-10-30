@@ -4,7 +4,7 @@ import Base
 import Package
 import Rules.Actions
 import Settings
-import Settings.Paths
+import Settings.Path
 import Stage
 import UserSettings
 

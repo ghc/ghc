@@ -7,7 +7,7 @@ import GHC
 import Oracles.Config.Setting
 import Rules.Actions
 import Settings.Packages.IntegerGmp
-import Settings.Paths
+import Settings.Path
 import Target
 import UserSettings
 
