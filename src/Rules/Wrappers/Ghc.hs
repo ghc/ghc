@@ -2,7 +2,7 @@ module Rules.Wrappers.Ghc (ghcWrapper) where
 
 import Base
 import Expression
-import Oracles.WindowsPath
+import Oracles.Path
 
 ghcWrapper :: FilePath -> Expr String
 ghcWrapper program = do

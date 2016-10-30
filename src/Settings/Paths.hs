@@ -3,7 +3,8 @@ module Settings.Paths (
     pkgLibraryFile0, pkgGhciLibraryFile, gmpBuildPath, gmpObjects, gmpLibraryH,
     gmpBuildInfoPath, generatedPath, libffiBuildPath, shakeFilesPath, pkgConfFile,
     packageDbDirectory, packageDbStamp, bootPackageConstraints, packageDependencies,
-    objectPath
+    objectPath, builderPath, getBuilderPath, isSpecified, programPath,
+    programInplaceLibPath
     ) where
 
 import Base
@@ -11,6 +12,7 @@ import Context
 import Expression
 import GHC
 import Oracles.PackageData
+import Oracles.Path
 import UserSettings
 
 -- | Path to the directory containing the Shake database and other auxiliary
@@ -30,6 +32,15 @@ packageDependencies = shakeFilesPath -/- "package-dependencies"
 -- package-specific, e.g. @ghcplatform.h@.
 generatedPath :: FilePath
 generatedPath = buildRootPath -/- "generated"
+
+-- | Relative path to the directory containing build artefacts of a given 'Stage'.
+stageDirectory :: Stage -> FilePath
+stageDirectory = stageString
+
+-- TODO: Move to buildRootPath, see #113.
+-- | Directory for wrapped binaries.
+programInplaceLibPath :: FilePath
+programInplaceLibPath = "inplace/lib/bin"
 
 -- | Path to the directory containing build artefacts of a given 'Context'.
 buildPath :: Context -> FilePath
@@ -127,3 +138,54 @@ objectPath context@Context {..} src
   where
     extension = drop 1 $ takeExtension src
     obj       = src -<.> osuf way
+
+-- | Determine the location of a 'Builder'.
+builderPath :: Builder -> Action FilePath
+builderPath builder = case programPath =<< builderProvenance builder of
+    Just path -> return path
+    Nothing   -> systemBuilderPath builder
+
+getBuilderPath :: Builder -> ReaderT a Action FilePath
+getBuilderPath = lift . builderPath
+
+-- | Was the path to a given 'Builder' specified in configuration files?
+isSpecified :: Builder -> Action Bool
+isSpecified = fmap (not . null) . builderPath
+
+-- | The 'FilePath' to a program executable in a given 'Context'.
+programPath :: Context -> Maybe FilePath
+programPath Context {..} = lookup (stage, package) exes
+  where
+    exes = [ inplace2 checkApiAnnotations
+           , install1 compareSizes
+           , inplace0 deriveConstants
+           , inplace0 dllSplit
+           , inplace0 genapply
+           , inplace0 genprimopcode
+           , inplace0 ghc             `setFile` "ghc-stage1"
+           , inplace1 ghc             `setFile` "ghc-stage2"
+           , install0 ghcCabal
+           , inplace1 ghcCabal
+           , inplace0 ghcPkg
+           , install1 ghcPkg
+           , inplace2 ghcTags
+           , inplace2 haddock
+           , inplace0 hp2ps
+           , inplace1 hpcBin          `setFile` "hpc"
+           , inplace0 hsc2hs
+           , install1 hsc2hs
+           , install1 iservBin
+           , inplace0 mkUserGuidePart
+           , inplace1 runGhc          `setFile` "runhaskell"
+           , inplace0 touchy          `setDir`  programInplaceLibPath
+           , inplace0 unlit           `setDir`  programInplaceLibPath ]
+    inplace  pkg = programInplacePath -/- pkgNameString pkg <.> exe
+    inplace0 pkg = ((Stage0, pkg), inplace pkg)
+    inplace1 pkg = ((Stage1, pkg), inplace pkg)
+    inplace2 pkg = ((Stage2, pkg), inplace pkg)
+    install stage pkg = pkgPath package -/- stageDirectory stage -/- "build/tmp"
+                                        -/- pkgNameString pkg <.> exe
+    install0 pkg = ((Stage0, pkg), install Stage0 pkg)
+    install1 pkg = ((Stage1, pkg), install Stage1 pkg)
+    setFile ((stage, pkg), x) y = ((stage, pkg), takeDirectory x -/- y <.> exe)
+    setDir  ((stage, pkg), x) y = ((stage, pkg), y -/- takeFileName x)

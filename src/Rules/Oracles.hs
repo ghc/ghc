@@ -8,7 +8,7 @@ import qualified Oracles.DirectoryContent
 import qualified Oracles.LookupInPath
 import qualified Oracles.ModuleFiles
 import qualified Oracles.PackageData
-import qualified Oracles.WindowsPath
+import qualified Oracles.Path
 
 oracleRules :: Rules ()
 oracleRules = do
@@ -19,4 +19,4 @@ oracleRules = do
     Oracles.LookupInPath.lookupInPathOracle
     Oracles.ModuleFiles.moduleFilesOracle
     Oracles.PackageData.packageDataOracle
-    Oracles.WindowsPath.windowsPathOracle
+    Oracles.Path.windowsPathOracle

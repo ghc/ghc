@@ -7,9 +7,10 @@ import Flavour
 import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
-import Oracles.WindowsPath
+import Oracles.Path
 import Rules.Actions
 import Settings
+import Settings.Paths
 import Target
 
 -- TODO: clean up after testing

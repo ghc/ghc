@@ -5,7 +5,7 @@ module Settings.Builders.Common (
     module Oracles.Config.Flag,
     module Oracles.Config.Setting,
     module Oracles.PackageData,
-    module Oracles.WindowsPath,
+    module Oracles.Path,
     module Predicate,
     module Settings,
     module Settings.Paths,
@@ -20,7 +20,7 @@ import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Oracles.PackageData
-import Oracles.WindowsPath
+import Oracles.Path
 import Predicate
 import Settings
 import Settings.Paths

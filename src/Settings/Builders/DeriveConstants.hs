@@ -18,8 +18,8 @@ deriveConstantsBuilderArgs = builder DeriveConstants ? do
         , arg "--gcc-program", arg =<< getBuilderPath (Cc CompileC Stage1)
         , append $ concatMap (\a -> ["--gcc-flag", a]) cFlags
         , arg "--nm-program", arg =<< getBuilderPath Nm
-        , specified Objdump ? mconcat [ arg "--objdump-program"
-                                      , arg =<< getBuilderPath Objdump ]
+        , isSpecified Objdump ? mconcat [ arg "--objdump-program"
+                                        , arg =<< getBuilderPath Objdump ]
         , arg "--target-os", argSetting TargetOs ]
 
 includeCcArgs :: Args

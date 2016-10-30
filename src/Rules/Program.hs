@@ -18,11 +18,6 @@ import Settings.Paths
 import Target
 import UserSettings
 
--- TODO: Move to buildRootPath, see #113.
--- | Directory for wrapped binaries.
-programInplaceLibPath :: FilePath
-programInplaceLibPath = "inplace/lib/bin"
-
 -- | Wrapper is an expression depending on the 'FilePath' to the wrapped binary.
 type Wrapper = FilePath -> Expr String
 

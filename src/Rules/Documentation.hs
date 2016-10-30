@@ -33,7 +33,7 @@ buildPackageDocumentation context@Context {..} =
 
             -- HsColour sources
             -- TODO: what is the output of GhcCabalHsColour?
-            whenM (specified HsColour) $ do
+            whenM (isSpecified HsColour) $ do
                 pkgConf <- pkgConfFile context
                 need [ cabalFile, pkgConf ] -- TODO: check if need pkgConf
                 build $ Target context GhcCabalHsColour [cabalFile] []

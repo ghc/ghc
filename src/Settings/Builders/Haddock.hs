@@ -39,10 +39,9 @@ haddockBuilderArgs = builder Haddock ? do
                    , Just depPkg <- [findKnownPackage $ PackageName depName]
                    , depPkg /= rts ]
         , append [ "--optghc=" ++ opt | opt <- ghcOpts ]
-        , specified HsColour ?
-          arg "--source-module=src/%{MODULE/./-}.html"
-        , specified HsColour ?
-          arg "--source-entity=src/%{MODULE/./-}.html\\#%{NAME}"
+        , isSpecified HsColour ?
+          append [ "--source-module=src/%{MODULE/./-}.html"
+                 , "--source-entity=src/%{MODULE/./-}.html\\#%{NAME}" ]
         , append =<< getInputs
         , arg "+RTS"
         , arg $ "-t" ++ path -/- "haddock.t"

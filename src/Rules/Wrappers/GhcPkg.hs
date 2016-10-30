@@ -2,7 +2,7 @@ module Rules.Wrappers.GhcPkg (ghcPkgWrapper) where
 
 import Base
 import Expression
-import Oracles.WindowsPath
+import Oracles.Path
 import Settings.Paths
 
 ghcPkgWrapper :: FilePath -> Expr String

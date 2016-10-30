@@ -2,7 +2,8 @@ module Rules.Actions (
     build, buildWithCmdOptions, buildWithResources, copyFile, fixFile, moveFile,
     removeFile, copyDirectory, copyDirectoryContent, createDirectory,
     moveDirectory, removeDirectory, applyPatch, runBuilder, runBuilderWith,
-    makeExecutable, renderProgram, renderLibrary, Match(..)
+    makeExecutable, renderProgram, renderLibrary, Match(..), builderEnvironment,
+    needBuilder
     ) where
 
 import qualified System.Directory.Extra as IO
@@ -13,11 +14,13 @@ import Base
 import CmdLineFlag
 import Context
 import Expression
+import GHC
 import Oracles.ArgsHash
 import Oracles.DirectoryContent
-import Oracles.WindowsPath
+import Oracles.Path
 import Settings
 import Settings.Builders.Ar
+import Settings.Paths
 import Target
 import UserSettings
 
@@ -163,6 +166,23 @@ applyPatch dir patch = do
     path <- builderPath Patch
     putBuild $ "| Apply patch " ++ file
     quietly $ cmd Shell cmdEcho [Cwd dir] [path, "-p0 <", patch]
+
+isInternal :: Builder -> Bool
+isInternal = isJust . builderProvenance
+
+-- | Make sure a 'Builder' exists and rebuild it if out of date.
+needBuilder :: Builder -> Action ()
+needBuilder (Configure dir) = need [dir -/- "configure"]
+needBuilder builder         = when (isInternal builder) $ do
+    path <- builderPath builder
+    need [path]
+
+-- | Write a Builder's path into a given environment variable.
+builderEnvironment :: String -> Builder -> Action CmdOption
+builderEnvironment variable builder = do
+    needBuilder builder
+    path <- builderPath builder
+    return $ AddEnv variable path
 
 runBuilder :: Builder -> [String] -> Action ()
 runBuilder = runBuilderWith []

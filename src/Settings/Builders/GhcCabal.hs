@@ -4,6 +4,7 @@ module Settings.Builders.GhcCabal (
 
 import Context
 import Flavour
+import Rules.Actions
 import Settings.Builders.Common
 
 ghcCabalBuilderArgs :: Args
@@ -98,7 +99,7 @@ withBuilderKey b = case b of
 
 -- Expression 'with Alex' appends "--with-alex=/path/to/alex" and needs Alex.
 with :: Builder -> Args
-with b = specified b ? do
+with b = isSpecified b ? do
     top  <- getTopDirectory
     path <- getBuilderPath b
     lift $ needBuilder b

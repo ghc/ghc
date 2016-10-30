@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, LambdaCase #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module GHC (
     array, base, binary, bytestring, cabal, checkApiAnnotations, compiler,
@@ -9,10 +9,10 @@ module GHC (
     parallel, pretty, primitive, process, rts, runGhc, stm, templateHaskell,
     terminfo, time, touchy, transformers, unlit, unix, win32, xhtml,
 
-    defaultKnownPackages, stageDirectory, programPath
+    defaultKnownPackages, builderProvenance
     ) where
 
-import Base
+import Builder
 import Context
 import Package
 import Stage
@@ -91,46 +91,23 @@ xhtml               = library  "xhtml"
 ghcSplit :: FilePath
 ghcSplit = "inplace/lib/bin/ghc-split"
 
--- | Relative path to the directory containing build artefacts of a given 'Stage'.
-stageDirectory :: Stage -> FilePath
-stageDirectory = stageString
-
--- TODO: Create a separate rule for copying executables to inplace/bin
--- TODO: move to buildRootPath, see #113
--- | The 'FilePath' to a program executable in a given 'Context'.
-programPath :: Context -> Maybe FilePath
-programPath Context {..} = lookup (stage, package) exes
+-- | Some builders are built by this very build system, in which case
+-- 'builderProvenance' returns the corresponding build 'Context' (which includes
+-- 'Stage' and GHC 'Package').
+builderProvenance :: Builder -> Maybe Context
+builderProvenance = \case
+    DeriveConstants  -> context Stage0 deriveConstants
+    GenApply         -> context Stage0 genapply
+    GenPrimopCode    -> context Stage0 genprimopcode
+    Ghc _ Stage0     -> Nothing
+    Ghc _ stage      -> context (pred stage) ghc
+    GhcCabal         -> context Stage0 ghcCabal
+    GhcCabalHsColour -> builderProvenance $ GhcCabal
+    GhcPkg stage     -> if stage > Stage0 then context Stage0 ghcPkg else Nothing
+    Haddock          -> context Stage2 haddock
+    Hpc              -> context Stage1 hpcBin
+    Hsc2Hs           -> context Stage0 hsc2hs
+    Unlit            -> context Stage0 unlit
+    _                -> Nothing
   where
-    exes = [ inplace2 checkApiAnnotations
-           , install1 compareSizes
-           , inplace0 deriveConstants
-           , inplace0 dllSplit
-           , inplace0 genapply
-           , inplace0 genprimopcode
-           , inplace0 ghc             `setFile` "ghc-stage1"
-           , inplace1 ghc             `setFile` "ghc-stage2"
-           , install0 ghcCabal
-           , inplace1 ghcCabal
-           , inplace0 ghcPkg
-           , install1 ghcPkg
-           , inplace2 ghcTags
-           , inplace2 haddock
-           , inplace0 hp2ps
-           , inplace1 hpcBin          `setFile` "hpc"
-           , inplace0 hsc2hs
-           , install1 hsc2hs
-           , install1 iservBin
-           , inplace0 mkUserGuidePart
-           , inplace1 runGhc          `setFile` "runhaskell"
-           , inplace0 touchy          `setDir`  "inplace/lib/bin"
-           , inplace0 unlit           `setDir`  "inplace/lib/bin" ]
-    inplace  pkg = programInplacePath -/- pkgNameString pkg <.> exe
-    inplace0 pkg = ((Stage0, pkg), inplace pkg)
-    inplace1 pkg = ((Stage1, pkg), inplace pkg)
-    inplace2 pkg = ((Stage2, pkg), inplace pkg)
-    install stage pkg = pkgPath package -/- stageDirectory stage -/- "build/tmp"
-                                        -/- pkgNameString pkg <.> exe
-    install0 pkg = ((Stage0, pkg), install Stage0 pkg)
-    install1 pkg = ((Stage1, pkg), install Stage1 pkg)
-    setFile ((stage, pkg), x) y = ((stage, pkg), takeDirectory x -/- y <.> exe)
-    setDir  ((stage, pkg), x) y = ((stage, pkg), y -/- takeFileName x)
+    context s p = Just $ vanillaContext s p

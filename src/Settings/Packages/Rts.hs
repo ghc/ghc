@@ -6,7 +6,7 @@ import Base
 import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
-import Oracles.WindowsPath
+import Oracles.Path
 import Predicate
 import Settings
 import Settings.Paths
