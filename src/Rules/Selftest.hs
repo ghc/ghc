@@ -6,11 +6,11 @@ import Development.Shake
 import Test.QuickCheck
 
 import Base
-import Builder
+import Expression
 import Oracles.ModuleFiles
+import Settings
 import Settings.Builders.Ar
 import UserSettings
-import Way
 
 instance Arbitrary Way where
     arbitrary = wayFromUnits <$> arbitrary
@@ -25,11 +25,12 @@ selftestRules :: Rules ()
 selftestRules =
     "selftest" ~> do
         testBuilder
-        testWay
         testChunksOfSize
+        testLookupAll
         testMatchVersionedFilePath
         testModuleName
-        testLookupAll
+        testPackages
+        testWay
 
 testBuilder :: Action ()
 testBuilder = do
@@ -39,11 +40,6 @@ testBuilder = do
             trackedArgument (Make undefined) prefix == False &&
             trackedArgument (Make undefined) ("-j" ++ show (n :: Int)) == False
 
-testWay :: Action ()
-testWay = do
-    putBuild $ "==== Read Way, Show Way"
-    test $ \(x :: Way) -> read (show x) == x
-
 testChunksOfSize :: Action ()
 testChunksOfSize = do
     putBuild $ "==== chunksOfSize"
@@ -52,6 +48,20 @@ testChunksOfSize = do
     test $ \n xs ->
         let res = chunksOfSize n xs
         in concat res == xs && all (\r -> length r == 1 || length (concat r) <= n) res
+
+testLookupAll :: Action ()
+testLookupAll = do
+    putBuild $ "==== lookupAll"
+    test $ lookupAll ["b"    , "c"            ] [("a", 1), ("c", 3), ("d", 4)]
+                  == [Nothing, Just (3 :: Int)]
+    test $ forAll dicts $ \dict -> forAll extras $ \extra ->
+        let items = sort $ map fst dict ++ extra
+        in lookupAll items (sort dict) == map (flip lookup dict) items
+  where
+    dicts :: Gen [(Int, Int)]
+    dicts = nubBy ((==) `on` fst) <$> vector 20
+    extras :: Gen [Int]
+    extras = vector 20
 
 testMatchVersionedFilePath :: Action ()
 testMatchVersionedFilePath = do
@@ -82,16 +92,15 @@ testModuleName = do
   where
     names = intercalate "." <$> listOf1 (listOf1 $ elements "abcABC123_'")
 
-testLookupAll :: Action ()
-testLookupAll = do
-    putBuild $ "==== lookupAll"
-    test $ lookupAll ["b"    , "c"            ] [("a", 1), ("c", 3), ("d", 4)]
-                  == [Nothing, Just (3 :: Int)]
-    test $ forAll dicts $ \dict -> forAll extras $ \extra ->
-        let items = sort $ map fst dict ++ extra
-        in lookupAll items (sort dict) == map (flip lookup dict) items
-  where
-    dicts :: Gen [(Int, Int)]
-    dicts = nubBy ((==) `on` fst) <$> vector 20
-    extras :: Gen [Int]
-    extras = vector 20
+testPackages :: Action ()
+testPackages = do
+    putBuild $ "==== Packages, interpretInContext"
+    forM_ [Stage0 ..] $ \stage -> do
+        pkgs <- stagePackages stage
+        test $ pkgs == nubOrd pkgs
+
+testWay :: Action ()
+testWay = do
+    putBuild $ "==== Read Way, Show Way"
+    test $ \(x :: Way) -> read (show x) == x
+
