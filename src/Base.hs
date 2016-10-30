@@ -15,7 +15,7 @@ module Base (
     module Development.Shake.FilePath,
 
     -- * Paths
-    configPath, configFile, sourcePath, programInplacePath,
+    configPath, configFile, sourcePath,
 
     -- * Miscellaneous utilities
     minusOrd, intersectOrd, lookupAll, replaceEq, replaceSeparators, unifyPath,
@@ -57,10 +57,6 @@ configFile = configPath -/- "system.config"
 -- sourcePath -/- "Base.hs". We use this to `need` some of the source files.
 sourcePath :: FilePath
 sourcePath = hadrianPath -/- "src"
-
--- TODO: move to buildRootPath, see #113
-programInplacePath :: FilePath
-programInplacePath = "inplace/bin"
 
 -- | Find and replace all occurrences of a value in a list.
 replaceEq :: Eq a => a -> a -> [a] -> [a]

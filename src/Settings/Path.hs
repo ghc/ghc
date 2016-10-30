@@ -3,7 +3,7 @@ module Settings.Path (
     pkgLibraryFile0, pkgGhciLibraryFile, gmpBuildPath, gmpObjects, gmpLibraryH,
     gmpBuildInfoPath, generatedPath, libffiBuildPath, shakeFilesPath, pkgConfFile,
     packageDbDirectory, packageDbStamp, bootPackageConstraints, packageDependencies,
-    objectPath, programInplaceLibPath, installPath
+    objectPath, programInplacePath, programInplaceLibPath, installPath
     ) where
 
 import Base
@@ -36,7 +36,11 @@ stageDirectory :: Stage -> FilePath
 stageDirectory = stageString
 
 -- TODO: Move to buildRootPath, see #113.
--- | Directory for wrapped binaries.
+-- | Directory for binaries that are built "in place".
+programInplacePath :: FilePath
+programInplacePath = "inplace/bin"
+
+-- | Directory for binary wrappers, and auxiliary binaries such as @touchy@.
 programInplaceLibPath :: FilePath
 programInplaceLibPath = "inplace/lib/bin"
 
