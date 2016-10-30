@@ -28,25 +28,28 @@ wrappers = [ (vanillaContext Stage0 ghc   , ghcWrapper   )
            , (vanillaContext Stage0 ghcPkg, ghcPkgWrapper) ]
 
 buildProgram :: [(Resource, Int)] -> Context -> Rules ()
-buildProgram rs context@Context {..} = do
-    let match file        = any (== file) (programPath context)
-        matchWrapped file = any (== file) (programPath context >>= wrappedPath)
-    match ?> \bin -> do
-        windows <- windowsHost
-        if windows
-        then buildBinary rs context bin -- We don't build wrappers on Windows
-        else case lookup context wrappers of
-            Nothing      -> buildBinary rs context bin -- No wrapper found
-            Just wrapper -> do
-                let Just wrappedBin = wrappedPath bin
-                need [wrappedBin]
-                buildWrapper context wrapper bin wrappedBin
+buildProgram rs context@Context {..} = when (isProgram package) $ do
+    buildPath context -/- programName context <.> exe %>
+        buildBinaryAndWrapper rs context
 
-    matchWrapped ?> buildBinary rs context
+    -- Rules for programs built in install directories
+    when (stage == Stage0 || package == ghc) $
+        installPath package -/- programName context <.> exe %> \bin -> do
+            latest <- latestBuildStage package -- isJust below is safe
+            let binStage = if package == ghc then stage else fromJust latest
+            buildBinaryAndWrapper rs (context { stage = binStage }) bin
 
--- | Replace 'programInplacePath' with 'programInplaceLibPath' in a given path.
-wrappedPath :: FilePath -> Maybe FilePath
-wrappedPath = fmap (programInplaceLibPath ++) . stripPrefix programInplacePath
+buildBinaryAndWrapper :: [(Resource, Int)] -> Context -> FilePath -> Action ()
+buildBinaryAndWrapper rs context bin = do
+    windows <- windowsHost
+    if windows
+    then buildBinary rs context bin -- We don't build wrappers on Windows
+    else case lookup context wrappers of
+        Nothing      -> buildBinary rs context bin -- No wrapper found
+        Just wrapper -> do
+            let wrappedBin = programInplaceLibPath -/- takeFileName bin
+            need [wrappedBin]
+            buildWrapper context wrapper bin wrappedBin
 
 buildWrapper :: Context -> Wrapper -> FilePath -> FilePath -> Action ()
 buildWrapper context@Context {..} wrapper wrapperPath binPath = do

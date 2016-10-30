@@ -1,15 +1,18 @@
 module Settings (
     getArgs, getPackages, getLibraryWays, getRtsWays, flavour, knownPackages,
     findKnownPackage, getPkgData, getPkgDataList, isLibrary, getPackagePath,
-    getContextDirectory, getBuildPath, stagePackages
+    getContextDirectory, getBuildPath, stagePackages, builderPath,
+    getBuilderPath, isSpecified, latestBuildStage, programPath
     ) where
 
 import Base
+import Context
 import CmdLineFlag
 import Expression
 import Flavour
 import GHC
 import Oracles.PackageData
+import Oracles.Path
 import {-# SOURCE #-} Settings.Default
 import Settings.Flavours.Quick
 import Settings.Flavours.Quickest
@@ -66,9 +69,34 @@ knownPackages = sort $ defaultKnownPackages ++ userKnownPackages
 findKnownPackage :: PackageName -> Maybe Package
 findKnownPackage name = find (\pkg -> pkgName pkg == name) knownPackages
 
--- TODO: add src-hc-args = -H32m -O
--- TODO: GhcStage2HcOpts=-O2 unless GhcUnregisterised
--- TODO: compiler/stage1/build/Parser_HC_OPTS += -O0 -fno-ignore-interface-pragmas
--- TODO: compiler/main/GhcMake_HC_OPTS        += -auto-all
--- TODO: compiler/prelude/PrimOp_HC_OPTS  += -fforce-recomp
--- TODO: is GhcHcOpts=-Rghc-timing needed?
+-- | Determine the location of a 'Builder'.
+builderPath :: Builder -> Action FilePath
+builderPath builder = case builderProvenance builder of
+    Nothing      -> systemBuilderPath builder
+    Just context -> do
+        maybePath <- programPath context
+        let msg = error $ show builder ++ " is never built by Hadrian."
+        return $ fromMaybe msg maybePath
+
+getBuilderPath :: Builder -> ReaderT a Action FilePath
+getBuilderPath = lift . builderPath
+
+-- | Was the path to a given 'Builder' specified in configuration files?
+isSpecified :: Builder -> Action Bool
+isSpecified = fmap (not . null) . builderPath
+
+-- | Determine the latest 'Stage' in which a given 'Package' is built. Returns
+-- Nothing if the package is never built.
+latestBuildStage :: Package -> Action (Maybe Stage)
+latestBuildStage pkg = do
+    stages <- filterM (fmap (pkg `elem`) . stagePackages) [Stage0 ..]
+    return $ if null stages then Nothing else Just $ maximum stages
+
+-- | The 'FilePath' to a program executable in a given 'Context'.
+programPath :: Context -> Action (Maybe FilePath)
+programPath context@Context {..} = do
+    maybeLatest <- latestBuildStage package
+    return $ do
+        install <- (\l -> l == stage || package == ghc) <$> maybeLatest
+        let path = if install then installPath package else buildPath context
+        return $ path -/- programName context <.> exe

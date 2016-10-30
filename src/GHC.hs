@@ -9,7 +9,7 @@ module GHC (
     parallel, pretty, primitive, process, rts, runGhc, stm, templateHaskell,
     terminfo, time, touchy, transformers, unlit, unix, win32, xhtml,
 
-    defaultKnownPackages, builderProvenance
+    defaultKnownPackages, builderProvenance, programName
     ) where
 
 import Builder
@@ -103,7 +103,8 @@ builderProvenance = \case
     Ghc _ stage      -> context (pred stage) ghc
     GhcCabal         -> context Stage0 ghcCabal
     GhcCabalHsColour -> builderProvenance $ GhcCabal
-    GhcPkg stage     -> if stage > Stage0 then context Stage0 ghcPkg else Nothing
+    GhcPkg Stage0    -> Nothing
+    GhcPkg _         -> context Stage0 ghcPkg
     Haddock          -> context Stage2 haddock
     Hpc              -> context Stage1 hpcBin
     Hsc2Hs           -> context Stage0 hsc2hs
@@ -111,3 +112,14 @@ builderProvenance = \case
     _                -> Nothing
   where
     context s p = Just $ vanillaContext s p
+
+-- | Given a 'Context', compute the name of the program that is built in it
+-- assuming that the corresponding package's type is 'Program'. For example, GHC
+-- built in 'Stage0' is called @ghc-stage1@. If the given package is a
+-- 'Library', the function simply returns its name.
+programName :: Context -> String
+programName Context {..}
+    | package == ghc    = "ghc-stage" ++ show (fromEnum stage + 1)
+    | package == hpcBin = "hpc"
+    | package == runGhc = "runhaskell"
+    | otherwise         = pkgNameString package
