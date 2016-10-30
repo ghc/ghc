@@ -489,7 +489,7 @@ shortcutFlags flags = do
 
   when ((Flag_GenIndex `elem` flags || Flag_GenContents `elem` flags)
         && Flag_Html `elem` flags) $
-    throwE "-h cannot be used with --gen-index or --gen-contents"
+    throwE "-h/--html cannot be used with --gen-index or --gen-contents"
 
   when ((Flag_GenIndex `elem` flags || Flag_GenContents `elem` flags)
         && Flag_Hoogle `elem` flags) $
