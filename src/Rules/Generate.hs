@@ -11,7 +11,6 @@ import Expression
 import GHC
 import Oracles.ModuleFiles
 import Predicate
-import Rules.Actions
 import Rules.Generators.ConfigHs
 import Rules.Generators.GhcAutoconfH
 import Rules.Generators.GhcBootPlatformH
@@ -24,6 +23,7 @@ import Settings.Packages.Rts
 import Settings.Path
 import Target
 import UserSettings
+import Util
 
 installTargets :: [FilePath]
 installTargets = [ "inplace/lib/ghc-usage.txt"

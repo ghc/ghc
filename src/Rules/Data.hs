@@ -6,12 +6,12 @@ import Expression
 import GHC
 import Oracles.Config.Setting
 import Oracles.Dependencies
-import Rules.Actions
 import Rules.Generate
 import Rules.Libffi
 import Settings.Path
 import Target
 import UserSettings
+import Util
 
 -- | Build @package-data.mk@ by using ghc-cabal utility to process .cabal files.
 buildPackageData :: Context -> Rules ()

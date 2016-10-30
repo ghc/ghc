@@ -6,10 +6,10 @@ import Base
 import Context
 import Expression
 import Oracles.Dependencies
-import Rules.Actions
 import Rules.Generate
 import Settings.Path
 import Target
+import Util
 
 compilePackage :: [(Resource, Int)] -> Context -> Rules ()
 compilePackage rs context@Context {..} = do

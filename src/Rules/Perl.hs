@@ -2,7 +2,7 @@ module Rules.Perl (perlScriptRules) where
 
 import Base
 import Expression
-import Rules.Actions
+import Util
 
 -- | Build Perl scripts, such as @ghc-split@, from their literate Perl sources.
 perlScriptRules :: Rules ()

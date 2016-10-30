@@ -1,4 +1,4 @@
-module Rules.Actions (
+module Util (
     build, buildWithCmdOptions, buildWithResources, copyFile, fixFile, moveFile,
     removeFile, copyDirectory, copyDirectoryContent, createDirectory,
     moveDirectory, removeDirectory, applyPatch, runBuilder, runBuilderWith,

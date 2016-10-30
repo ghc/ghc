@@ -1,9 +1,9 @@
 module Rules.Libffi (rtsBuildPath, libffiRules, libffiDependencies) where
 
-import Rules.Actions
 import Settings.Builders.Common
 import Settings.Packages.Rts
 import Target
+import Util
 
 -- TODO: this should be moved elsewhere
 rtsBuildPath :: FilePath

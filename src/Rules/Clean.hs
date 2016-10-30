@@ -2,11 +2,11 @@ module Rules.Clean (cleanRules) where
 
 import Base
 import Package
-import Rules.Actions
 import Settings
 import Settings.Path
 import Stage
 import UserSettings
+import Util
 
 cleanRules :: Rules ()
 cleanRules = do

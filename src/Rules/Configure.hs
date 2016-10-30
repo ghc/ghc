@@ -7,11 +7,11 @@ import Builder
 import CmdLineFlag
 import Context
 import GHC
-import Rules.Actions
 import Rules.Generators.GhcAutoconfH
 import Stage
 import Target
 import UserSettings
+import Util
 
 configureRules :: Rules ()
 configureRules = do

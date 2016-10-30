@@ -4,8 +4,8 @@ module Settings.Builders.GhcCabal (
 
 import Context
 import Flavour
-import Rules.Actions
 import Settings.Builders.Common
+import Util
 
 ghcCabalBuilderArgs :: Args
 ghcCabalBuilderArgs = builder GhcCabal ? do

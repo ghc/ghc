@@ -7,10 +7,10 @@ import Flavour
 import GHC
 import Oracles.ModuleFiles
 import Oracles.PackageData
-import Rules.Actions
 import Settings
 import Settings.Path
 import Target
+import Util
 
 haddockHtmlLib :: FilePath
 haddockHtmlLib = "inplace/lib/html/haddock-util.js"

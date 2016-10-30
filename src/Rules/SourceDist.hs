@@ -4,8 +4,8 @@ import Base
 import Builder
 import Oracles.Config.Setting
 import Oracles.DirectoryContent
-import Rules.Actions
 import UserSettings
+import Util
 
 sourceDistRules :: Rules ()
 sourceDistRules = do

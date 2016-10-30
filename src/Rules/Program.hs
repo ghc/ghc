@@ -10,13 +10,13 @@ import Oracles.Config.Setting
 import Oracles.Dependencies
 import Oracles.ModuleFiles
 import Oracles.PackageData
-import Rules.Actions
 import Rules.Wrappers.Ghc
 import Rules.Wrappers.GhcPkg
 import Settings
 import Settings.Path
 import Target
 import UserSettings
+import Util
 
 -- | Wrapper is an expression depending on the 'FilePath' to the wrapped binary.
 type Wrapper = FilePath -> Expr String

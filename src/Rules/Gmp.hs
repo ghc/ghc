@@ -5,11 +5,11 @@ import Builder
 import Expression
 import GHC
 import Oracles.Config.Setting
-import Rules.Actions
 import Settings.Packages.IntegerGmp
 import Settings.Path
 import Target
 import UserSettings
+import Util
 
 gmpBase :: FilePath
 gmpBase = pkgPath integerGmp -/- "gmp"

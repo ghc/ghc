@@ -4,12 +4,12 @@ import Base
 import Context
 import Expression
 import GHC
-import Rules.Actions
 import Rules.Libffi
 import Settings.Packages.Rts
 import Settings.Path
 import Target
 import UserSettings
+import Util
 
 -- | Build rules for registering packages and initialising package databases
 -- by running the @ghc-pkg@ utility.

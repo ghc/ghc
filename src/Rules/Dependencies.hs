@@ -6,9 +6,9 @@ import Base
 import Context
 import Expression
 import Oracles.ModuleFiles
-import Rules.Actions
 import Settings.Path
 import Target
+import Util
 
 buildPackageDependencies :: [(Resource, Int)] -> Context -> Rules ()
 buildPackageDependencies rs context@Context {..} =

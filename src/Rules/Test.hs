@@ -8,10 +8,10 @@ import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Oracles.Path
-import Rules.Actions
 import Settings
 import Settings.Path
 import Target
+import Util
 
 -- TODO: clean up after testing
 testRules :: Rules ()

@@ -10,11 +10,11 @@ import Flavour
 import GHC
 import Oracles.ModuleFiles
 import Oracles.PackageData
-import Rules.Actions
 import Settings
 import Settings.Path
 import Target
 import UserSettings
+import Util
 
 buildPackageLibrary :: Context -> Rules ()
 buildPackageLibrary context@Context {..} = do
