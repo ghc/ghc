@@ -1,21 +1,17 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Oracles.Path (
-    fixAbsolutePathOnWindows, topDirectory, getTopDirectory, windowsPathOracle,
-    systemBuilderPath
+    topDirectory, getTopDirectory, systemBuilderPath, pathOracle
     ) where
 
 import Control.Monad.Trans.Reader
 import Data.Char
+import System.Directory
 
 import Base
 import Builder
 import Oracles.Config
 import Oracles.Config.Setting
-import Oracles.LookupInPath
 import Stage
-
-newtype WindowsPath = WindowsPath FilePath
-    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
 
 -- | Path to the GHC source tree.
 topDirectory :: Action FilePath
@@ -59,6 +55,12 @@ systemBuilderPath builder = case builder of
             return "" -- TODO: Use a safe interface.
         else fixAbsolutePathOnWindows =<< lookupInPath path
 
+-- | Lookup an executable in @PATH@.
+lookupInPath :: FilePath -> Action FilePath
+lookupInPath name
+    | name == takeFileName name = askOracle $ LookupInPath name
+    | otherwise                 = return name
+
 -- | Fix an absolute path on Windows:
 -- * "/c/" => "C:/"
 -- * "/usr/bin/tar.exe" => "C:/msys/usr/bin/tar.exe"
@@ -73,11 +75,24 @@ fixAbsolutePathOnWindows path = do
     else
         return path
 
--- | Compute path mapping on Windows. This is slow and requires caching.
-windowsPathOracle :: Rules ()
-windowsPathOracle = void $
-    addOracle $ \(WindowsPath path) -> do
+newtype LookupInPath = LookupInPath String
+    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+
+newtype WindowsPath = WindowsPath FilePath
+    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+
+-- | Oracles for looking up paths. These are slow and require caching.
+pathOracle :: Rules ()
+pathOracle = do
+    void $ addOracle $ \(WindowsPath path) -> do
         Stdout out <- quietly $ cmd ["cygpath", "-m", path]
         let windowsPath = unifyPath $ dropWhileEnd isSpace out
         putLoud $ "Windows path mapping: " ++ path ++ " => " ++ windowsPath
         return windowsPath
+
+    void $ addOracle $ \(LookupInPath name) -> do
+        let unpack = fromMaybe . error $ "Cannot find executable " ++ quote name
+        path <- unifyPath <$> unpack <$> liftIO (findExecutable name)
+        putLoud $ "Executable found: " ++ name ++ " => " ++ path
+        return path
+

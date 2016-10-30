@@ -32,7 +32,6 @@ executable hadrian
                        , Oracles.Config.Setting
                        , Oracles.Dependencies
                        , Oracles.DirectoryContent
-                       , Oracles.LookupInPath
                        , Oracles.ModuleFiles
                        , Oracles.PackageData
                        , Oracles.Path
