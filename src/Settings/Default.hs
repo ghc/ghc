@@ -43,46 +43,6 @@ import Settings.Packages.Touchy
 import Settings.Packages.Unlit
 import UserSettings
 
--- | All 'Builder'-dependent command line arguments.
-defaultBuilderArgs :: Args
-defaultBuilderArgs = mconcat
-    [ alexBuilderArgs
-    , arBuilderArgs
-    , ccBuilderArgs
-    , configureBuilderArgs
-    , deriveConstantsBuilderArgs
-    , genPrimopCodeBuilderArgs
-    , ghcBuilderArgs
-    , ghcCabalBuilderArgs
-    , ghcCabalHsColourBuilderArgs
-    , ghcMBuilderArgs
-    , ghcPkgBuilderArgs
-    , haddockBuilderArgs
-    , happyBuilderArgs
-    , hsc2hsBuilderArgs
-    , hsCppBuilderArgs
-    , ldBuilderArgs
-    , makeBuilderArgs
-    , tarBuilderArgs ]
-
--- | All 'Package'-dependent command line arguments.
-defaultPackageArgs :: Args
-defaultPackageArgs = mconcat
-    [ basePackageArgs
-    , compilerPackageArgs
-    , directoryPackageArgs
-    , ghcPackageArgs
-    , ghcCabalPackageArgs
-    , ghcPrimPackageArgs
-    , haddockPackageArgs
-    , hp2psPackageArgs
-    , integerGmpPackageArgs
-    , iservBinPackageArgs
-    , rtsPackageArgs
-    , runGhcPackageArgs
-    , touchyPackageArgs
-    , unlitPackageArgs ]
-
 -- | All default command line arguments.
 defaultArgs :: Args
 defaultArgs = mconcat
@@ -93,10 +53,12 @@ defaultArgs = mconcat
 -- | Packages that are built by default. You can change this by editing
 -- 'userPackages' in "UserSettings".
 defaultPackages :: Packages
-defaultPackages = mconcat [ packagesStage0, packagesStage1, packagesStage2 ]
+defaultPackages = mconcat [ stage0 ? stage0Packages
+                          , stage1 ? stage1Packages
+                          , stage2 ? stage2Packages ]
 
-packagesStage0 :: Packages
-packagesStage0 = stage0 ? do
+stage0Packages :: Packages
+stage0Packages = do
     win <- lift windowsHost
     ios <- lift iosHost
     append $ [ binary
@@ -122,52 +84,41 @@ packagesStage0 = stage0 ? do
              [ terminfo | not win, not ios ] ++
              [ touchy   | win              ]
 
-packagesStage1 :: Packages
-packagesStage1 = stage1 ? do
+stage1Packages :: Packages
+stage1Packages = do
     win <- lift windowsHost
-    ios <- lift iosHost
     doc <- buildHaddock flavour
-    append $ [ array
-             , base
-             , binary
-             , bytestring
-             , cabal
-             , containers
-             , compareSizes
-             , compiler
-             , deepseq
-             , directory
-             , filepath
-             , ghc
-             , ghcBoot
-             , ghcBootTh
-             , ghcCabal
-             , ghci
-             , ghcPkg
-             , ghcPrim
-             , haskeline
-             , hoopl
-             , hpc
-             , hpcBin
-             , hsc2hs
-             , integerLibrary
-             , pretty
-             , process
-             , rts
-             , runGhc
-             , templateHaskell
-             , time
-             , transformers                ] ++
-             [ iservBin | not win          ] ++
-             [ terminfo | not win, not ios ] ++
-             [ unix     | not win          ] ++
-             [ win32    | win              ] ++
-             [ xhtml    | doc              ]
+    mconcat [ stage0Packages
+            , apply (filter isLibrary) -- Build all Stage0 libraries in Stage1
+            , append $ [ array
+                       , base
+                       , bytestring
+                       , containers
+                       , compareSizes
+                       , deepseq
+                       , directory
+                       , filepath
+                       , ghc
+                       , ghcCabal
+                       , ghci
+                       , ghcPkg
+                       , ghcPrim
+                       , haskeline
+                       , hpcBin
+                       , hsc2hs
+                       , integerLibrary
+                       , pretty
+                       , process
+                       , rts
+                       , runGhc
+                       , time               ] ++
+                       [ iservBin | not win ] ++
+                       [ unix     | not win ] ++
+                       [ win32    | win     ] ++
+                       [ xhtml    | doc     ] ]
 
--- TODO: Currently there is an unchecked assumption that we build only programs
--- in Stage2 and Stage3. Can we check this in compile time?
-packagesStage2 :: Packages
-packagesStage2 = stage2 ? do
+stage2Packages :: Packages
+stage2Packages = do
     doc <- buildHaddock flavour
     append $ [ checkApiAnnotations
              , ghcTags       ] ++
@@ -220,3 +171,43 @@ defaultSplitObjects = do
     supported <- lift supportsSplitObjects
     let goodPackage = isLibrary pkg && pkg /= compiler && pkg /= rts
     return $ cmdSplitObjects && goodStage && goodPackage && supported
+
+-- | All 'Builder'-dependent command line arguments.
+defaultBuilderArgs :: Args
+defaultBuilderArgs = mconcat
+    [ alexBuilderArgs
+    , arBuilderArgs
+    , ccBuilderArgs
+    , configureBuilderArgs
+    , deriveConstantsBuilderArgs
+    , genPrimopCodeBuilderArgs
+    , ghcBuilderArgs
+    , ghcCabalBuilderArgs
+    , ghcCabalHsColourBuilderArgs
+    , ghcMBuilderArgs
+    , ghcPkgBuilderArgs
+    , haddockBuilderArgs
+    , happyBuilderArgs
+    , hsc2hsBuilderArgs
+    , hsCppBuilderArgs
+    , ldBuilderArgs
+    , makeBuilderArgs
+    , tarBuilderArgs ]
+
+-- | All 'Package'-dependent command line arguments.
+defaultPackageArgs :: Args
+defaultPackageArgs = mconcat
+    [ basePackageArgs
+    , compilerPackageArgs
+    , directoryPackageArgs
+    , ghcPackageArgs
+    , ghcCabalPackageArgs
+    , ghcPrimPackageArgs
+    , haddockPackageArgs
+    , hp2psPackageArgs
+    , integerGmpPackageArgs
+    , iservBinPackageArgs
+    , rtsPackageArgs
+    , runGhcPackageArgs
+    , touchyPackageArgs
+    , unlitPackageArgs ]
