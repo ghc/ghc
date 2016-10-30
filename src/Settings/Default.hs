@@ -90,42 +90,88 @@ defaultArgs = mconcat
     , defaultPackageArgs
     , builder Ghc ? remove ["-Wall", "-fwarn-tabs"] ] -- TODO: Fix warning Args.
 
--- TODO: Simplify.
 -- | Packages that are built by default. You can change this by editing
 -- 'userPackages' in "UserSettings".
 defaultPackages :: Packages
-defaultPackages = mconcat
-    [ stage0 ? packagesStage0
-    , stage1 ? packagesStage1
-    , stage2 ? packagesStage2 ]
+defaultPackages = mconcat [ packagesStage0, packagesStage1, packagesStage2 ]
 
 packagesStage0 :: Packages
-packagesStage0 = mconcat
-    [ append [ binary, cabal, compiler, ghc, ghcBoot, ghcBootTh, ghcCabal
-             , ghcPkg, hsc2hs, hoopl, hpc, templateHaskell, transformers ]
-    -- the stage0 predicate makes sure these packages are built only in Stage0
-    , stage0 ? append [ deriveConstants, dllSplit, genapply, genprimopcode
-                      , hp2ps, unlit, mkUserGuidePart ]
-    , stage0 ? windowsHost ? append [touchy]
-    , notM windowsHost ? notM iosHost ? append [terminfo] ]
+packagesStage0 = stage0 ? do
+    win <- lift windowsHost
+    ios <- lift iosHost
+    append $ [ binary
+             , cabal
+             , compiler
+             , deriveConstants
+             , dllSplit
+             , genapply
+             , genprimopcode
+             , ghc
+             , ghcBoot
+             , ghcBootTh
+             , ghcCabal
+             , ghcPkg
+             , hsc2hs
+             , hoopl
+             , hp2ps
+             , hpc
+             , mkUserGuidePart
+             , templateHaskell
+             , transformers
+             , unlit                       ] ++
+             [ terminfo | not win, not ios ] ++
+             [ touchy   | win              ]
 
 packagesStage1 :: Packages
-packagesStage1 = mconcat
-    [ packagesStage0
-    , append [ array, base, bytestring, containers, compareSizes, deepseq
-             , directory, filepath, ghci, ghcPrim, haskeline, hpcBin
-             , integerLibrary, pretty, process, rts, runGhc, time ]
-    , windowsHost      ? append [win32]
-    , notM windowsHost ? append [unix]
-    , notM windowsHost ? append [iservBin]
-    , buildHaddock flavour ? append [xhtml] ]
+packagesStage1 = stage1 ? do
+    win <- lift windowsHost
+    ios <- lift iosHost
+    doc <- buildHaddock flavour
+    append $ [ array
+             , base
+             , binary
+             , bytestring
+             , cabal
+             , containers
+             , compareSizes
+             , compiler
+             , deepseq
+             , directory
+             , filepath
+             , ghc
+             , ghcBoot
+             , ghcBootTh
+             , ghcCabal
+             , ghci
+             , ghcPkg
+             , ghcPrim
+             , haskeline
+             , hoopl
+             , hpc
+             , hpcBin
+             , hsc2hs
+             , integerLibrary
+             , pretty
+             , process
+             , rts
+             , runGhc
+             , templateHaskell
+             , time
+             , transformers                ] ++
+             [ iservBin | not win          ] ++
+             [ terminfo | not win, not ios ] ++
+             [ unix     | not win          ] ++
+             [ win32    | win              ] ++
+             [ xhtml    | doc              ]
 
 -- TODO: Currently there is an unchecked assumption that we build only programs
 -- in Stage2 and Stage3. Can we check this in compile time?
 packagesStage2 :: Packages
-packagesStage2 = mconcat
-    [ append [checkApiAnnotations, ghcTags ]
-    , buildHaddock flavour ? append [haddock] ]
+packagesStage2 = stage2 ? do
+    doc <- buildHaddock flavour
+    append $ [ checkApiAnnotations
+             , ghcTags       ] ++
+             [ haddock | doc ]
 
 -- TODO: What about profilingDynamic way? Do we need platformSupportsSharedLibs?
 -- | Default build ways for library packages:
