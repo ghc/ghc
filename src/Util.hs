@@ -92,7 +92,7 @@ captureStdout target path argList = do
     Stdout output <- cmd [path] argList
     writeFileChanged file output
 
--- | Copy a file tracking the source.
+-- | Copy a file tracking the source, create the target directory if missing.
 copyFile :: FilePath -> FilePath -> Action ()
 copyFile source target = do
     need [source] -- Guarantee source is built before printing progress info.

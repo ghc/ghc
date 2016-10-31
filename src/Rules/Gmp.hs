@@ -44,14 +44,12 @@ gmpRules = do
            any (`isInfixOf` configMk) [ "HaveFrameworkGMP = YES", "HaveLibGmp = YES" ]
         then do
             putBuild "| GMP library/framework detected and will be used"
-            createDirectory $ takeDirectory header
             copyFile (gmpBase -/- "ghc-gmp.h") header
         else do
             putBuild "| No GMP library/framework detected; in tree GMP will be built"
             need [gmpLibrary]
             createDirectory gmpObjects
             build $ Target gmpContext Ar [gmpLibrary] [gmpObjects]
-            createDirectory $ takeDirectory header
             copyFile (gmpBuildPath -/- "gmp.h") header
             copyFile (gmpBuildPath -/- "gmp.h") gmpLibraryInTreeH
 

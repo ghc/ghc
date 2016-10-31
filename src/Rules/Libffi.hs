@@ -70,7 +70,6 @@ libffiRules = do
 
     libffiMakefile <.> "in" %> \mkIn -> do
         removeDirectory libffiBuildPath
-        createDirectory $ buildRootPath -/- stageString Stage0
         tarball <- unifyPath . getSingleton "Exactly one LibFFI tarball is expected"
                <$> getDirectoryFiles "" ["libffi-tarballs/libffi*.tar.gz"]
 

@@ -47,7 +47,6 @@ buildPackageData context@Context {..} = do
                 | otherwise           = oldPath -/- "build" -/- pkgNameString package
         copyFile inTreeMk mk
         autogenFiles <- getDirectoryFiles oldBuild ["autogen/*"]
-        createDirectory $ buildPath context -/- "autogen"
         forM_ autogenFiles $ \file' -> do
             let file = unifyPath file'
             copyFile (oldBuild -/- file) (buildPath context -/- file)
