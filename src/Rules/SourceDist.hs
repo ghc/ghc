@@ -3,7 +3,7 @@ module Rules.SourceDist (sourceDistRules) where
 import Base
 import Builder
 import Oracles.Config.Setting
-import Oracles.DirectoryContent
+import Oracles.DirectoryContents
 import UserSettings
 import Util
 
@@ -32,7 +32,7 @@ prepareTree dest = do
     mapM_ cpFile srcFiles
   where
     cpFile a = copyFile a (dest </> a)
-    cpDir  a = copyDirectoryContent (Not excluded) a (dest </> takeFileName a)
+    cpDir  a = copyDirectoryContents (Not excluded) a (dest </> takeFileName a)
     excluded = Or
       [ Test "//.*"
       , Test "//#*"

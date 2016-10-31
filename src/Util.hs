@@ -1,6 +1,6 @@
 module Util (
     build, buildWithCmdOptions, buildWithResources, copyFile, fixFile, moveFile,
-    removeFile, copyDirectory, copyDirectoryContent, createDirectory,
+    removeFile, copyDirectory, copyDirectoryContents, createDirectory,
     moveDirectory, removeDirectory, applyPatch, runBuilder, runBuilderWith,
     makeExecutable, renderProgram, renderLibrary, Match(..), builderEnvironment,
     needBuilder
@@ -16,7 +16,7 @@ import Context
 import Expression
 import GHC
 import Oracles.ArgsHash
-import Oracles.DirectoryContent
+import Oracles.DirectoryContents
 import Oracles.Path
 import Settings
 import Settings.Builders.Ar
@@ -96,6 +96,8 @@ captureStdout target path argList = do
 copyFile :: FilePath -> FilePath -> Action ()
 copyFile source target = do
     need [source] -- Guarantee source is built before printing progress info.
+    let dir = takeDirectory target
+    unlessM (liftIO $ IO.doesDirectoryExist dir) $ createDirectory dir
     putProgressInfo $ renderAction "Copy file" source target
     copyFileChanged source target
 
@@ -129,17 +131,13 @@ copyDirectory source target = do
     putProgressInfo $ renderAction "Copy directory" source target
     quietly $ cmd cmdEcho ["cp", "-r", source, target]
 
--- | Copy the content of the source directory into the target directory.
--- The copied content is tracked.
-copyDirectoryContent :: Match -> FilePath -> FilePath -> Action ()
-copyDirectoryContent expr source target = do
-    putProgressInfo $ renderAction "Copy directory content" source target
-    mapM_ cp =<< directoryContent expr source
-  where
-    cp file = do
-        let newFile = target -/- drop (length source) file
-        createDirectory $ dropFileName newFile -- TODO: Why do it for each file?
-        copyFile file newFile
+-- | Copy the contents of the source directory that matches a given 'Match'
+-- expression into the target directory. The copied contents is tracked.
+copyDirectoryContents :: Match -> FilePath -> FilePath -> Action ()
+copyDirectoryContents expr source target = do
+    putProgressInfo $ renderAction "Copy directory contents" source target
+    let cp file = copyFile file $ target -/- makeRelative source file
+    mapM_ cp =<< directoryContents expr source
 
 -- | Move a directory. The contents of the source directory is untracked.
 moveDirectory :: FilePath -> FilePath -> Action ()
