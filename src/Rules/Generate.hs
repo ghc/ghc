@@ -3,8 +3,6 @@ module Rules.Generate (
     installTargets, copyRules, includesDependencies, generatedDependencies
     ) where
 
-import qualified System.Directory as IO
-
 import Base
 import Context hiding (package)
 import Expression
@@ -110,21 +108,27 @@ generatePackageCode :: Context -> Rules ()
 generatePackageCode context@(Context stage pkg _) =
     let path        = buildPath context
         generated f = (path ++ "//*.hs") ?== f && not ("//autogen/*" ?== f)
-        file <~ gen = generate file context gen
+        go gen file = generate file context gen
     in do
         generated ?> \file -> do
             let unpack = fromMaybe . error $ "No generator for " ++ file ++ "."
             (src, builder) <- unpack <$> findGenerator context file
             need [src]
             build $ Target context builder [src] [file]
-            let srcBoot = src -<.> "hs-boot"
-            whenM (doesFileExist srcBoot) $
-                copyFile srcBoot $ file -<.> "hs-boot"
+            let boot = src -<.> "hs-boot"
+            whenM (doesFileExist boot) . copyFile boot $ file -<.> "hs-boot"
+
+        priority 2.0 $ do
+            when (pkg == compiler) $ path -/- "Config.hs" %> go generateConfigHs
+            when (pkg == ghcPkg) $ path -/- "Version.hs" %> go generateVersionHs
 
         -- TODO: needing platformH is ugly and fragile
-        when (pkg == compiler) $ primopsTxt stage %> \file -> do
-            need $ [platformH stage, primopsSource] ++ includesDependencies
-            build $ Target context HsCpp [primopsSource] [file]
+        when (pkg == compiler) $ do
+            primopsTxt stage %> \file -> do
+                need $ [platformH stage, primopsSource] ++ includesDependencies
+                build $ Target context HsCpp [primopsSource] [file]
+
+            platformH stage %> go generateGhcBootPlatformH
 
         -- TODO: why different folders for generated files?
         fmap (path -/-)
@@ -133,25 +137,9 @@ generatePackageCode context@(Context stage pkg _) =
             , "*.hs-incl" ] |%> \file -> do
                 need [primopsTxt stage]
                 build $ Target context GenPrimopCode [primopsTxt stage] [file]
-                -- TODO: this is temporary hack, get rid of this (#113)
-                let oldPath = pkgPath pkg -/- stageDirectory stage -/- "build"
-                    newFile = oldPath ++ (drop (length path) file)
-                createDirectory $ takeDirectory newFile
-                liftIO $ IO.copyFile file newFile
-                putBuild $ "| Duplicate file " ++ file ++ " -> " ++ newFile
 
         when (pkg == rts) $ path -/- "cmm/AutoApply.cmm" %> \file ->
             build $ Target context GenApply [] [file]
-
-        priority 2.0 $ do
-            when (pkg == compiler) $ path -/- "Config.hs" %> \file -> do
-                file <~ generateConfigHs
-
-            when (pkg == compiler) $ platformH stage %> \file -> do
-                file <~ generateGhcBootPlatformH
-
-            when (pkg == ghcPkg) $ path -/- "Version.hs" %> \file -> do
-                file <~ generateVersionHs
 
 copyRules :: Rules ()
 copyRules = do
@@ -179,7 +167,6 @@ generateRules = do
     generatedPath ++ "//*" %> \file -> do
         withTempDir $ \dir -> build $
             Target rtsContext DeriveConstants [] [file, dir]
-
   where
     file <~ gen = file %> \out -> generate out emptyTarget gen
 
