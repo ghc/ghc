@@ -15,9 +15,9 @@ sourceDistRules = do
         putSuccess "| Done. "
     "sdistprep/ghc-*-src.tar.xz" %> \fname -> do
         let tarName = takeFileName fname
-            treePath = "sdistprep/ghc" </> dropTarXz tarName
+            treePath = "sdistprep/ghc" -/- dropTarXz tarName
         prepareTree treePath
-        runBuilderWith [Cwd "sdistprep/ghc"] Tar ["cJf", ".." </> tarName, dropTarXz tarName]
+        runBuilderWith [Cwd "sdistprep/ghc"] Tar ["cJf", ".." -/- tarName, dropTarXz tarName]
     "GIT_COMMIT_ID" %> \fname ->
         setting ProjectGitCommitId >>= writeFileChanged fname
     "VERSION" %> \fname ->
@@ -25,14 +25,13 @@ sourceDistRules = do
   where
     dropTarXz = dropExtension . dropExtension
 
-
 prepareTree :: FilePath -> Action ()
 prepareTree dest = do
     mapM_ cpDir  srcDirs
     mapM_ cpFile srcFiles
   where
-    cpFile a = copyFile a (dest </> a)
-    cpDir  a = copyDirectoryContents (Not excluded) a (dest </> takeFileName a)
+    cpFile a = copyFile a (dest -/- a)
+    cpDir  a = copyDirectoryContents (Not excluded) a (dest -/- takeFileName a)
     excluded = Or
       [ Test "//.*"
       , Test "//#*"

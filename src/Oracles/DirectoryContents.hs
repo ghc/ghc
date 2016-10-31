@@ -27,7 +27,7 @@ directoryContents expr dir = askOracle $ DirectoryContents (expr, dir)
 
 directoryContentsOracle :: Rules ()
 directoryContentsOracle = void $
-    addOracle $ \(DirectoryContents (expr, dir)) -> liftIO $
+    addOracle $ \(DirectoryContents (expr, dir)) -> liftIO $ map unifyPath .
         filter (matches expr) <$> listFilesInside (return . matches expr) dir
 
 instance Binary Match

@@ -14,7 +14,7 @@ import Util
 compilePackage :: [(Resource, Int)] -> Context -> Rules ()
 compilePackage rs context@Context {..} = do
     let path            = buildPath context
-        nonHs extension = path </> extension <//> "*" <.> osuf way
+        nonHs extension = path -/- extension <//> "*" <.> osuf way
         compile compiler obj2src obj = do
             let src = obj2src context obj
             need [src]
