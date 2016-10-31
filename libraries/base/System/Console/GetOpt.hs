@@ -124,7 +124,7 @@ data OptKind a                -- kind of cmd line arg (internal use only):
 -- second argument.
 usageInfo :: String                    -- header
           -> [OptDescr a]              -- option descriptors
-          -> String                    -- nicely formatted decription of options
+          -> String                    -- nicely formatted description of options
 usageInfo header optDescr = unlines (header:table)
    where (ss,ls,ds)     = (unzip3 . concatMap fmtOpt) optDescr
          table          = zipWith3 paste (sameLen ss) (sameLen ls) ds

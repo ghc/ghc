@@ -1024,7 +1024,7 @@ mkIfaceExports exports
     sort_flds = sortBy (stableNameCmp `on` flSelector)
 
 {-
-Note [Orignal module]
+Note [Original module]
 ~~~~~~~~~~~~~~~~~~~~~
 Consider this:
         module X where { data family T }

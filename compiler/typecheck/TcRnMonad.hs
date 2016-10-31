@@ -1123,7 +1123,7 @@ error to report.  So this capture-the-emit dance isn't as stupid as it
 looks :-).
 
 However suppose we throw an exception inside an invocation of
-captureConstraints.  Then we'll discard all the costraints. But some
+captureConstraints.  Then we'll discard all the constraints. But some
 of those contraints might be "variable out of scope" Hole constraints,
 and that might have been the actual original cause of the exception!
 For example (Trac #12529):

@@ -303,7 +303,7 @@ data InferResult
        , ir_lvl  :: TcLevel -- See Note [TcLevel of ExpType] in TcMType
        , ir_inst :: Bool    -- True <=> deeply instantiate before returning
                             --           i.e. return a RhoType
-                            -- False <=> do not instantaite before returning
+                            -- False <=> do not instantiate before returning
                             --           i.e. return a SigmaType
        , ir_ref  :: IORef (Maybe TcType) }
          -- The type that fills in this hole should be a Type,

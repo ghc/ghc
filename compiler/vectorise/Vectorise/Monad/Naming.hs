@@ -35,7 +35,7 @@ import Control.Monad
 
 -- |Create a localised variant of a name, using the provided function to transform its `OccName`.
 --
--- If the name external, encode the orignal name's module into the new 'OccName'.  The result is
+-- If the name external, encode the original name's module into the new 'OccName'.  The result is
 -- always an internal system name.
 --
 mkLocalisedName :: (Maybe String -> OccName -> OccName) -> Name -> VM Name

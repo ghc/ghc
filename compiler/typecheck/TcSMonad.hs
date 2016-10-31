@@ -607,7 +607,7 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
 
        , inert_safehask :: DictMap Ct
               -- Failed dictionary resolution due to Safe Haskell overlapping
-              -- instances restriction. We keep this seperate from inert_dicts
+              -- instances restriction. We keep this separate from inert_dicts
               -- as it doesn't cause compilation failure, just safe inference
               -- failure.
               --

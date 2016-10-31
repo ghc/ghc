@@ -742,7 +742,7 @@ tcTyClDecl1 _parent roles_info
             , tcdATs = ats, tcdATDefs = at_defs })
   = ASSERT( isNothing _parent )
     do { clas <- fixM $ \ clas ->
-            -- We need the knot becase 'clas' is passed into tcClassATs
+            -- We need the knot because 'clas' is passed into tcClassATs
             tcTyClTyVars class_name $ \ binders res_kind ->
             do { MASSERT( isConstraintKind res_kind )
                ; traceTc "tcClassDecl 1" (ppr class_name $$ ppr binders)

@@ -1,4 +1,4 @@
---module Parse(Parse(..),whiteSpace,seperatedBy) where
+--module Parse(Parse(..),whiteSpace,separatedBy) where
 --import StdLib
 module ShouldSucceed where
 
@@ -27,14 +27,14 @@ instance Parse Char where
        forced n = True
 
 instance (Parse a) => Parse [a] where
-        parseType more = (map parseLine (seperatedBy ',' (l++",")),out)
+        parseType more = (map parseLine (separatedBy ',' (l++",")),out)
                        where    (l,']':out) = span' (\x->x/=']') (tail more)
         forced = all forced
 
-seperatedBy :: Char -> String -> [String]
-seperatedBy ch [] = []
-seperatedBy ch xs = twaddle ch (span' (\x->x/=ch) xs)
-               where    twaddle ch (l,_:r) = l:seperatedBy ch r
+separatedBy :: Char -> String -> [String]
+separatedBy ch [] = []
+separatedBy ch xs = twaddle ch (span' (\x->x/=ch) xs)
+               where    twaddle ch (l,_:r) = l:separatedBy ch r
 
 whiteSpace :: String -> String
 whiteSpace = dropWhile isSpace

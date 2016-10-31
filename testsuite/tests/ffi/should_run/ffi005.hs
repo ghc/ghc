@@ -1,4 +1,4 @@
--- !!! test for foreign import dynamic/wrapper, orignally by Alastair Reid,
+-- !!! test for foreign import dynamic/wrapper, originally by Alastair Reid,
 -- with a few changes to get it to run on GHC by Simon Marlow.
 
 import Foreign hiding ( unsafePerformIO )

@@ -63,8 +63,8 @@ hence
 Now things are delicate.  Either the instance Monoid (DC d) will fire or,
 if we are lucky, we might spot that (Monoid (DC d)) is a superclass of
 a given.  But now (Decl 15) we add superclasses lazily, so that is less
-likely to happen, and was always fragile.  So include (MOnoid d) in the
-signature, as was the case in the orignal ticket.
+likely to happen, and was always fragile.  So include (Monoid d) in the
+signature, as was the case in the original ticket.
 -}
 
 

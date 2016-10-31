@@ -1572,7 +1572,7 @@ respectively.  Initially, we just store the "standard" name (PrelNames.fromInteg
 fromRationalName etc), but the renamer changes this to the appropriate user
 name if Opt_NoImplicitPrelude is on.  That is what lookupSyntaxName does.
 
-We treat the orignal (standard) names as free-vars too, because the type checker
+We treat the original (standard) names as free-vars too, because the type checker
 checks the type of the user thing against the type of the standard thing.
 -}
 
