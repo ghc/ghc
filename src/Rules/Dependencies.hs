@@ -6,6 +6,7 @@ import Base
 import Context
 import Expression
 import Oracles.ModuleFiles
+import Rules.Generate
 import Settings.Path
 import Target
 import Util
@@ -15,6 +16,7 @@ buildPackageDependencies rs context@Context {..} =
     buildPath context -/- ".dependencies" %> \deps -> do
         srcs <- hsSources context
         need srcs
+        orderOnly =<< interpretInContext context generatedDependencies
         let mk = deps <.> "mk"
         if srcs == []
         then writeFileChanged mk ""
