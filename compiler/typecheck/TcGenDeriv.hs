@@ -1600,7 +1600,7 @@ gen_Newtype_binds :: SrcSpan
                   -> Type    -- the representation type (already eta-reduced)
                   -> LHsBinds RdrName
 -- See Note [Newtype-deriving instances]
-gen_Newtype_binds loc cls inst_tvs cls_tys rhs_ty
+gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
   = listToBag $ map mk_bind (classMethods cls)
   where
     coerce_RDR = getRdrName coerceId
@@ -1611,7 +1611,7 @@ gen_Newtype_binds loc cls inst_tvs cls_tys rhs_ty
                                          (FunRhs (L loc meth_RDR) Prefix)
                                          [] rhs_expr]
       where
-        Pair from_ty to_ty = mkCoerceClassMethEqn cls inst_tvs cls_tys rhs_ty meth_id
+        Pair from_ty to_ty = mkCoerceClassMethEqn cls inst_tvs inst_tys rhs_ty meth_id
 
         meth_RDR = getRdrName meth_id
 
@@ -1638,14 +1638,14 @@ mkCoerceClassMethEqn :: Class   -- the class being derived
 -- See Note [Newtype-deriving instances]
 -- The pair is the (from_type, to_type), where to_type is
 -- the type of the method we are tyrying to get
-mkCoerceClassMethEqn cls inst_tvs cls_tys rhs_ty id
+mkCoerceClassMethEqn cls inst_tvs inst_tys rhs_ty id
   = Pair (substTy rhs_subst user_meth_ty)
          (substTy lhs_subst user_meth_ty)
   where
     cls_tvs = classTyVars cls
     in_scope = mkInScopeSet $ mkVarSet inst_tvs
-    lhs_subst = mkTvSubst in_scope (zipTyEnv cls_tvs cls_tys)
-    rhs_subst = mkTvSubst in_scope (zipTyEnv cls_tvs (changeLast cls_tys rhs_ty))
+    lhs_subst = mkTvSubst in_scope (zipTyEnv cls_tvs inst_tys)
+    rhs_subst = mkTvSubst in_scope (zipTyEnv cls_tvs (changeLast inst_tys rhs_ty))
     (_class_tvs, _class_constraint, user_meth_ty)
       = tcSplitMethodTy (varType id)
 

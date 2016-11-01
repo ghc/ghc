@@ -1367,9 +1367,9 @@ genInst spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon
                 , Just $ getName $ head $ tyConDataCons rep_tycon ) }
               -- See Note [Newtype deriving and unused constructors]
   | otherwise
-  = do { (meth_binds, deriv_stuff) <- genDerivStuff mechanism loc clas
+  = do { inst_spec <- newDerivClsInst theta spec
+       ; (meth_binds, deriv_stuff) <- genDerivStuff mechanism loc clas
                                         rep_tycon tys tvs
-       ; inst_spec <- newDerivClsInst theta spec
        ; doDerivInstErrorChecks2 clas inst_spec mechanism
        ; traceTc "newder" (ppr inst_spec)
        ; let inst_info
