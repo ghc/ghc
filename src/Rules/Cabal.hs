@@ -11,6 +11,7 @@ import Expression
 import GHC
 import Settings
 import Settings.Path
+import UserSettings
 
 cabalRules :: Rules ()
 cabalRules = do
@@ -25,13 +26,13 @@ cabalRules = do
                 version             = display . pkgVersion $ identifier
             return $ unPackageName (DP.pkgName identifier) ++ " == " ++ version
         writeFileChanged out . unlines $ constraints
+        putSuccess $ "| Successfully computed boot package constraints"
 
     -- Cache package dependencies.
     packageDependencies %> \out -> do
-        pkgs <- concatMapM stagePackages [Stage0 .. Stage2]
-        pkgDeps <- forM (sort pkgs) $ \pkg ->
-            if pkg `elem` [hp2ps, libffi, rts, touchy, unlit]
-            then return $ pkgNameString pkg
+        pkgDeps <- forM (sort knownPackages) $ \pkg -> do
+            exists <- doesFileExist $ pkgCabalFile pkg
+            if not exists then return $ pkgNameString pkg
             else do
                 need [pkgCabalFile pkg]
                 pd <- liftIO . readPackageDescription silent $ pkgCabalFile pkg
@@ -40,7 +41,8 @@ cabalRules = do
                     deps     = concat $ depsLib : depsExes
                     depNames = [ unPackageName name | Dependency name _ <- deps ]
                 return . unwords $ pkgNameString pkg : sort depNames
-        writeFileChanged out . unlines $ pkgDeps
+        writeFileChanged out $ unlines pkgDeps
+        putSuccess $ "| Successfully computed package dependencies"
 
 collectDeps :: Maybe (CondTree v [Dependency] a) -> [Dependency]
 collectDeps Nothing = []
