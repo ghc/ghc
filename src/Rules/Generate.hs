@@ -55,7 +55,7 @@ ghcPrimDependencies :: Expr [FilePath]
 ghcPrimDependencies = do
     stage <- getStage
     let path = buildPath $ vanillaContext stage ghcPrim
-    return [path -/- "autogen/GHC/Prim.hs", path -/- "GHC/PrimopWrappers.hs"]
+    return [path -/- "GHC/Prim.hs", path -/- "GHC/PrimopWrappers.hs"]
 
 derivedConstantsDependencies :: [FilePath]
 derivedConstantsDependencies = installTargets ++ fmap (generatedPath -/-)
@@ -132,7 +132,7 @@ generatePackageCode context@(Context stage pkg _) =
 
         -- TODO: why different folders for generated files?
         fmap (path -/-)
-            [ "autogen/GHC/Prim.hs"
+            [ "GHC/Prim.hs"
             , "GHC/PrimopWrappers.hs"
             , "*.hs-incl" ] |%> \file -> do
                 need [primopsTxt stage]

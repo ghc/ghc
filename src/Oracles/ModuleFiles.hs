@@ -75,11 +75,7 @@ findGenerator Context {..} file = do
 -- | Find all Haskell source files for a given 'Context'.
 hsSources :: Context -> Action [FilePath]
 hsSources context = do
-    let autogen = buildPath context -/- "autogen"
-    -- Generated source files live in buildPath and have extension "hs", except
-    -- for GHC/Prim.hs that lives in autogen. TODO: fix the inconsistency?
-        modFile ("GHC.Prim", _) = autogen -/- "GHC/Prim.hs"
-        modFile (m, Nothing   ) = generatedFile context m
+    let modFile (m, Nothing   ) = generatedFile context m
         modFile (m, Just file )
             | takeExtension file `elem` haskellExtensions = file
             | otherwise = generatedFile context m
