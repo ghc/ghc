@@ -28,6 +28,7 @@
 #include "Profiling.h"
 #include "sm/OSMem.h"
 #include "linker/M32Alloc.h"
+#include "linker/CacheFlush.h"
 #include "PathUtils.h"
 
 #if !defined(mingw32_HOST_OS)
@@ -2775,29 +2776,6 @@ static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
 #endif
 #endif // NEED_SYMBOL_EXTRAS
 
-#if defined(arm_HOST_ARCH)
-
-static void
-ocFlushInstructionCache( ObjectCode *oc )
-{
-    int i;
-    // Object code
-    for (i=0; i < oc->n_sections; i++) {
-        Section *s = &oc->sections[i];
-        // This is a bit too broad but we don't have any way to determine what
-        // is certainly code
-        if (s->kind == SECTIONKIND_CODE_OR_RODATA)
-            __clear_cache(s->start, (void*) ((uintptr_t) s->start + s->size));
-    }
-
-    // Jump islands
-    // Note the (+1) to ensure that the last symbol extra is covered by the
-    // flush.
-    __clear_cache(oc->symbol_extras, &oc->symbol_extras[oc->n_symbol_extras+1]);
-}
-
-#endif
-
 #if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
 #if !defined(x86_64_HOST_ARCH) || !defined(mingw32_HOST_OS)
 
@@ -2904,51 +2882,6 @@ static SymbolExtra* makeArmSymbolExtra( ObjectCode* oc,
   return extra;
 }
 #endif // arm_HOST_ARCH
-
-/* --------------------------------------------------------------------------
- * PowerPC specifics (instruction cache flushing)
- * ------------------------------------------------------------------------*/
-
-#ifdef powerpc_HOST_ARCH
-/*
-   ocFlushInstructionCache
-
-   Flush the data & instruction caches.
-   Because the PPC has split data/instruction caches, we have to
-   do that whenever we modify code at runtime.
- */
-
-static void
-ocFlushInstructionCacheFrom(void* begin, size_t length)
-{
-    size_t         n = (length + 3) / 4;
-    unsigned long* p = begin;
-
-    while (n--)
-    {
-        __asm__ volatile ( "dcbf 0,%0\n\t"
-                           "sync\n\t"
-                           "icbi 0,%0"
-                           :
-                           : "r" (p)
-                         );
-        p++;
-    }
-    __asm__ volatile ( "sync\n\t"
-                       "isync"
-                     );
-}
-
-static void
-ocFlushInstructionCache( ObjectCode *oc )
-{
-    /* The main object code */
-    ocFlushInstructionCacheFrom(oc->image + oc->misalignment, oc->fileSize);
-
-    /* Jump Islands */
-    ocFlushInstructionCacheFrom(oc->symbol_extras, sizeof(SymbolExtra) * oc->n_symbol_extras);
-}
-#endif /* powerpc_HOST_ARCH */
 
 
 /* --------------------------------------------------------------------------
