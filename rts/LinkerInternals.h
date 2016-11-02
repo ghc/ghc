@@ -12,6 +12,8 @@
 #include "Rts.h"
 #include "Hash.h"
 
+#include "BeginPrivate.h"
+
 /* See Linker.c Note [runtime-linker-phases] */
 typedef enum {
     OBJECT_LOADED,
@@ -184,6 +186,8 @@ void exitLinker( void );
 
 void freeObjectCode (ObjectCode *oc);
 
+void *mmapForLinker (size_t bytes, uint32_t flags, int fd, int offset);
+
 #if defined(mingw32_HOST_OS)
 
 typedef unsigned char          UChar;
@@ -323,6 +327,6 @@ getting, here. */
 #define USE_CONTIGUOUS_MMAP 0
 #endif
 
-
+#include "EndPrivate.h"
 
 #endif /* LINKERINTERNALS_H */

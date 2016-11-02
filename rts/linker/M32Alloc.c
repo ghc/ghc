@@ -9,6 +9,7 @@
 #include "Rts.h"
 #include "sm/OSMem.h"
 #include "linker/M32Alloc.h"
+#include "LinkerInternals.h"
 
 #include <inttypes.h>
 #include <stdlib.h>

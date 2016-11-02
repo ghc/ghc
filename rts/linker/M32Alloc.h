@@ -40,8 +40,6 @@ void m32_free(void *addr, size_t size) M32_NO_RETURN;
 
 void * m32_alloc(size_t size, size_t alignment) M32_NO_RETURN;
 
-void * mmapForLinker (size_t bytes, uint32_t flags, int fd, int offset);
-
 #include "EndPrivate.h"
 
 #endif
