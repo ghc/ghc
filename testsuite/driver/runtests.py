@@ -160,17 +160,18 @@ if windows:
 if windows:
     import ctypes
     # Windows and mingw* Python provide windll, msys2 python provides cdll.
-    if hasattr(ctypes, 'windll'):
-        mydll = ctypes.windll
+    if hasattr(ctypes, 'WinDLL'):
+        mydll = ctypes.WinDLL
     else:
-        mydll = ctypes.cdll
+        mydll = ctypes.CDLL
 
     # This actually leaves the terminal in codepage 65001 (UTF8) even
     # after python terminates. We ought really remember the old codepage
     # and set it back.
-    if mydll.kernel32.SetConsoleCP(65001) == 0:
+    kernel32 = mydll('kernel32.dll')
+    if kernel32.SetConsoleCP(65001) == 0:
         raise Exception("Failure calling SetConsoleCP(65001)")
-    if mydll.kernel32.SetConsoleOutputCP(65001) == 0:
+    if kernel32.SetConsoleOutputCP(65001) == 0:
         raise Exception("Failure calling SetConsoleOutputCP(65001)")
 else:
     # Try and find a utf8 locale to use
