@@ -346,7 +346,38 @@ nullAddrLit = MachNullAddr
 -}
 
 -- | True if there is absolutely no penalty to duplicating the literal.
--- False principally of strings
+-- False principally of strings.
+--
+-- "Why?", you say? I'm glad you asked. Well, for one duplicating strings would
+-- blow up code sizes. Not only this, it's also unsafe.
+--
+-- Consider a program that wants to traverse a string. One way it might do this
+-- is to first compute the Addr# pointing to the end of the string, and then,
+-- starting from the beginning, bump a pointer using eqAddr# to determine the
+-- end. For instance,
+--
+-- @
+-- -- Given pointers to the start and end of a string, count how many zeros
+-- -- the string contains.
+-- countZeros :: Addr# -> Addr# -> -> Int
+-- countZeros start end = go start 0
+--   where
+--     go off n
+--       | off `addrEq#` end = n
+--       | otherwise         = go (off `plusAddr#` 1) n'
+--       where n' | isTrue# (indexInt8OffAddr# off 0# ==# 0#) = n + 1
+--                | otherwise                                 = n
+-- @
+--
+-- Consider what happens if we considered strings to be trivial (and therefore
+-- duplicable) and emitted a call like @countZeros "hello"# ("hello"#
+-- `plusAddr`# 5)@. The beginning and end pointers do not belong to the same
+-- string, meaning that an iteration like the above would blow up terribly.
+-- This is what happened in #12757.
+--
+-- Ultimately the solution here is to make primitive strings a bit more
+-- structured, ensuring that the compiler can't inline in ways that will break
+-- user code. One approach to this is described in #8472.
 litIsTrivial :: Literal -> Bool
 --      c.f. CoreUtils.exprIsTrivial
 litIsTrivial (MachStr _)      = False

@@ -5,7 +5,7 @@
 Core pass to saturate constructors and PrimOps
 -}
 
-{-# LANGUAGE BangPatterns, CPP #-}
+{-# LANGUAGE BangPatterns, CPP, MultiWayIf #-}
 
 module CorePrep (
       corePrepPgm, corePrepExpr, cvtLitInteger,
@@ -382,7 +382,7 @@ cpeBind top_lvl env (NonRec bndr rhs)
                                           is_unlifted
                                           env bndr1 rhs
        -- See Note [Inlining in CorePrep]
-       ; if cpe_ExprIsTrivial rhs2 && isNotTopLevel top_lvl
+       ; if exprIsTrivial rhs2 && isNotTopLevel top_lvl
             then return (extendCorePrepEnvExpr env bndr rhs2, floats)
             else do {
 
@@ -732,7 +732,7 @@ cpeApp top_env expr
            -- NB: depth from collect_args is right, because e2 is a trivial expression
            -- and thus its embedded Id *must* be at the same depth as any
            -- Apps it is under are type applications only (c.f.
-           -- cpe_ExprIsTrivial).  But note that we need the type of the
+           -- exprIsTrivial).  But note that we need the type of the
            -- expression, not the id.
            ; (app, floats) <- rebuild_app args e2 (exprType e2) emptyFloats stricts
            ; mb_saturate hd app floats depth }
@@ -817,6 +817,40 @@ isLazyExpr _                       = False
 --      CpeArg: produces a result satisfying CpeArg
 -- ---------------------------------------------------------------------------
 
+{-
+Note [ANF-ising literal string arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Consider a program like,
+
+    data Foo = Foo Addr#
+
+    foo = Foo "turtle"#
+
+When we go to ANFise this we might think that we want to float the string
+literal like we do any other non-trivial argument. This would look like,
+
+    foo = u\ [] case "turtle"# of s { __DEFAULT__ -> Foo s }
+
+However, this 1) isn't necessary since strings are in a sense "trivial"; and 2)
+wreaks havoc on the CAF annotations that we produce here since we the result
+above is caffy since it is updateable. Ideally at some point in the future we
+would like to just float the literal to the top level as suggested in #11312,
+
+    s = "turtle"#
+    foo = Foo s
+
+However, until then we simply add a special case excluding literals from the
+floating done by cpeArg.
+-}
+
+-- | Is an argument okay to CPE?
+okCpeArg :: CoreExpr -> Bool
+-- Don't float literals. See Note [ANF-ising literal string arguments].
+okCpeArg (Lit _) = False
+-- Do not eta expand a trivial argument
+okCpeArg expr    = not (exprIsTrivial expr)
+
 -- This is where we arrange that a non-trivial argument is let-bound
 cpeArg :: CorePrepEnv -> Demand
        -> CoreArg -> Type -> UniqSM (Floats, CpeTriv)
@@ -828,13 +862,13 @@ cpeArg env dmd arg arg_ty
                 -- Else case: arg1 might have lambdas, and we can't
                 --            put them inside a wrapBinds
 
-       ; if cpe_ExprIsTrivial arg2    -- Do not eta expand a trivial argument
-         then return (floats2, arg2)
-         else do
-       { v <- newVar arg_ty
-       ; let arg3      = cpeEtaExpand (exprArity arg2) arg2
-             arg_float = mkFloat dmd is_unlifted v arg3
-       ; return (addFloat floats2 arg_float, varToCoreExpr v) } }
+       ; if okCpeArg arg2
+         then do { v <- newVar arg_ty
+                 ; let arg3      = cpeEtaExpand (exprArity arg2) arg2
+                       arg_float = mkFloat dmd is_unlifted v arg3
+                 ; return (addFloat floats2 arg_float, varToCoreExpr v) }
+         else return (floats2, arg2)
+       }
   where
     is_unlifted = isUnliftedType arg_ty
     want_float  = wantFloatNested NonRecursive dmd is_unlifted
@@ -920,21 +954,6 @@ of the scope of a `seq`, or dropped the `seq` altogether.
 *                                                                      *
 ************************************************************************
 -}
-
-cpe_ExprIsTrivial :: CoreExpr -> Bool
--- Version that doesn't consider an scc annotation to be trivial.
--- See also 'exprIsTrivial'
-cpe_ExprIsTrivial (Var _)         = True
-cpe_ExprIsTrivial (Type _)        = True
-cpe_ExprIsTrivial (Coercion _)    = True
-cpe_ExprIsTrivial (Lit _)         = True
-cpe_ExprIsTrivial (App e arg)     = not (isRuntimeArg arg) && cpe_ExprIsTrivial e
-cpe_ExprIsTrivial (Lam b e)       = not (isRuntimeVar b) && cpe_ExprIsTrivial e
-cpe_ExprIsTrivial (Tick t e)      = not (tickishIsCode t) && cpe_ExprIsTrivial e
-cpe_ExprIsTrivial (Cast e _)      = cpe_ExprIsTrivial e
-cpe_ExprIsTrivial (Case e _ _ []) = cpe_ExprIsTrivial e
-                                    -- See Note [Empty case is trivial] in CoreUtils
-cpe_ExprIsTrivial _               = False
 
 {-
 -- -----------------------------------------------------------------------------
