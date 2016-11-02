@@ -224,6 +224,18 @@ void addSection (Section *s, SectionKind kind, SectionAlloc alloc,
 HsBool ghciLookupSymbolInfo(HashTable *table,
                             const SymbolName* key, RtsSymbolInfo **result);
 
+int ghciInsertSymbolTable(
+    pathchar* obj_name,
+    HashTable *table,
+    const SymbolName* key,
+    SymbolAddr* data,
+    HsBool weak,
+    ObjectCode *owner);
+
+/* lock-free version of lookupSymbol */
+SymbolAddr* lookupSymbol_ (SymbolName* lbl);
+
+extern /*Str*/HashTable *symhash;
 
 
 /*************************************************
