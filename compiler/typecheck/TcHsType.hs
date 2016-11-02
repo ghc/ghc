@@ -1262,16 +1262,15 @@ tcWildCardBindersX new_wc wc_names thing_inside
 --
 -- This function does not do telescope checking.
 kcHsTyVarBndrs :: Name    -- ^ of the thing being checked
+               -> Bool    -- ^ True <=> the TyCon being kind-checked can be unsaturated
                -> Bool    -- ^ True <=> the decl being checked has a CUSK
                -> Bool    -- ^ True <=> the decl is an open type/data family
                -> Bool    -- ^ True <=> all the hsq_implicit are *kind* vars
                           -- (will give these kind * if -XNoTypeInType)
                -> LHsQTyVars Name
-               -> TcM (Kind, r)  -- ^ the result kind, possibly with other info
-               -> TcM (Bool -> TcTyCon, r)
-                     -- ^ a way to make a TcTyCon, with the other info.
-                     -- The Bool says whether the tycon can be unsaturated.
-kcHsTyVarBndrs name cusk open_fam all_kind_vars
+               -> TcM (Kind, r)     -- ^ The result kind, possibly with other info
+               -> TcM (TcTyCon, r)  -- ^ A suitably-kinded TcTyCon
+kcHsTyVarBndrs name unsat cusk open_fam all_kind_vars
   (HsQTvs { hsq_implicit = kv_ns, hsq_explicit = hs_tvs
           , hsq_dependent = dep_names }) thing_inside
   | cusk
@@ -1310,13 +1309,13 @@ kcHsTyVarBndrs name cusk open_fam all_kind_vars
 
        ; let final_binders = map (mkNamedTyConBinder Specified) good_tvs
                             ++ tc_binders
-             mk_tctc unsat = mkTcTyCon name final_binders res_kind
-                                       unsat (scoped_kvs ++ tc_tvs)
+             tycon = mkTcTyCon name final_binders res_kind
+                               unsat (scoped_kvs ++ tc_tvs)
                            -- the tvs contain the binders already
                            -- in scope from an enclosing class, but
                            -- re-adding tvs to the env't doesn't cause
                            -- harm
-       ; return ( mk_tctc, stuff ) }}
+       ; return (tycon, stuff) }}
 
   | otherwise
   = do { kv_kinds <- mk_kv_kinds
@@ -1327,9 +1326,9 @@ kcHsTyVarBndrs name cusk open_fam all_kind_vars
               bind_telescope hs_tvs thing_inside
        ; let   -- NB: Don't add scoped_kvs to tyConTyVars, because they
                -- must remain lined up with the binders
-             mk_tctc unsat = mkTcTyCon name binders res_kind unsat
-                                       (scoped_kvs ++ binderVars binders)
-       ; return (mk_tctc, stuff) }
+             tycon = mkTcTyCon name binders res_kind unsat
+                               (scoped_kvs ++ binderVars binders)
+       ; return (tycon, stuff) }
   where
       -- if -XNoTypeInType and we know all the implicits are kind vars,
       -- just give the kind *. This prevents test

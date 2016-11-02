@@ -437,12 +437,11 @@ getInitialKind :: TyClDecl Name
 -- No family instances are passed to getInitialKinds
 
 getInitialKind decl@(ClassDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdATs = ats })
-  = do { (mk_tctc, inner_prs) <-
-           kcHsTyVarBndrs name cusk False True ktvs $
+  = do { (tycon, inner_prs) <-
+           kcHsTyVarBndrs name True cusk False True ktvs $
            do { inner_prs <- getFamDeclInitialKinds (Just cusk) ats
               ; return (constraintKind, inner_prs) }
-       ; let main_pr = mkTcTyConPair (mk_tctc True)
-       ; return (main_pr : inner_prs) }
+       ; return (mkTcTyConPair tycon : inner_prs) }
   where
     cusk = hsDeclHasCusk decl
 
@@ -450,16 +449,15 @@ getInitialKind decl@(DataDecl { tcdLName = L _ name
                               , tcdTyVars = ktvs
                               , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig
                                                          , dd_cons = cons } })
-  = do  { (mk_tctc, _) <-
-           kcHsTyVarBndrs name (hsDeclHasCusk decl) False True ktvs $
+  = do  { (tycon, _) <-
+           kcHsTyVarBndrs name True (hsDeclHasCusk decl) False True ktvs $
            do { res_k <- case m_sig of
                            Just ksig -> tcLHsKind ksig
                            Nothing   -> return liftedTypeKind
               ; return (res_k, ()) }
-        ; let main_pr = mkTcTyConPair (mk_tctc True)
-              inner_prs = [ (unLoc con, APromotionErr RecDataConPE)
+        ; let inner_prs = [ (unLoc con, APromotionErr RecDataConPE)
                           | L _ con' <- cons, con <- getConNames con' ]
-        ; return (main_pr : inner_prs) }
+        ; return (mkTcTyConPair tycon : inner_prs) }
 
 getInitialKind (FamDecl { tcdFam = decl })
   = getFamDeclInitialKind Nothing decl
@@ -482,8 +480,8 @@ getFamDeclInitialKind mb_cusk decl@(FamilyDecl { fdLName     = L _ name
                                                , fdTyVars    = ktvs
                                                , fdResultSig = L _ resultSig
                                                , fdInfo      = info })
-  = do { (mk_tctc, _) <-
-           kcHsTyVarBndrs name cusk open True ktvs $
+  = do { (tycon, _) <-
+           kcHsTyVarBndrs name unsat cusk open True ktvs $
            do { res_k <- case resultSig of
                       KindSig ki                        -> tcLHsKind ki
                       TyVarSig (L _ (KindedTyVar _ ki)) -> tcLHsKind ki
@@ -493,7 +491,7 @@ getFamDeclInitialKind mb_cusk decl@(FamilyDecl { fdLName     = L _ name
                         -- by default
                         | otherwise                -> newMetaKindVar
               ; return (res_k, ()) }
-       ; return [ mkTcTyConPair (mk_tctc unsat) ] }
+       ; return [ mkTcTyConPair tycon ] }
   where
     cusk  = famDeclHasCusk mb_cusk decl
     (open, unsat) = case info of
@@ -523,13 +521,13 @@ kcSynDecl decl@(SynDecl { tcdTyVars = hs_tvs, tcdLName = L _ name
                         , tcdRhs = rhs })
   -- Returns a possibly-unzonked kind
   = tcAddDeclCtxt decl $
-    do { (mk_tctc, _) <-
-           kcHsTyVarBndrs name (hsDeclHasCusk decl) False True hs_tvs $
+    do { (tycon, _) <-
+           kcHsTyVarBndrs name False (hsDeclHasCusk decl) False True hs_tvs $
            do { traceTc "kcd1" (ppr name <+> brackets (ppr hs_tvs))
               ; (_, rhs_kind) <- tcLHsType rhs
               ; traceTc "kcd2" (ppr name)
               ; return (rhs_kind, ()) }
-       ; return (mk_tctc False) }
+       ; return tycon }
 kcSynDecl decl = pprPanic "kcSynDecl" (ppr decl)
 
 ------------------------------------------------------------------------
@@ -588,7 +586,7 @@ kcConDecl (ConDeclH98 { con_name = name, con_qvars = ex_tvs
          -- the 'False' says that the existentials don't have a CUSK, as the
          -- concept doesn't really apply here. We just need to bring the variables
          -- into scope.
-    do { _ <- kcHsTyVarBndrs (unLoc name) False False False
+    do { _ <- kcHsTyVarBndrs (unLoc name) False False False False
                              ((fromMaybe emptyLHsQTvs ex_tvs)) $
               do { _ <- tcHsContext (fromMaybe (noLoc []) ex_ctxt)
                  ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys details)
