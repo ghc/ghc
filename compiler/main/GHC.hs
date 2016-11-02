@@ -13,7 +13,7 @@ module GHC (
         defaultErrorHandler,
         defaultCleanupHandler,
         prettyPrintGhcErrors,
-        installSignalHandlers,
+        withSignalHandlers,
         withCleanupSession,
 
         -- * GHC Monad
@@ -438,12 +438,9 @@ runGhc :: Maybe FilePath  -- ^ See argument to 'initGhcMonad'.
 runGhc mb_top_dir ghc = do
   ref <- newIORef (panic "empty session")
   let session = Session ref
-  flip unGhc session $ do
-    liftIO installSignalHandlers  -- catch ^C
+  flip unGhc session $ withSignalHandlers $ do -- catch ^C
     initGhcMonad mb_top_dir
     withCleanupSession ghc
-
-  -- XXX: unregister interrupt handlers here?
 
 -- | Run function for 'GhcT' monad transformer.
 --
@@ -458,8 +455,7 @@ runGhcT :: ExceptionMonad m =>
 runGhcT mb_top_dir ghct = do
   ref <- liftIO $ newIORef (panic "empty session")
   let session = Session ref
-  flip unGhcT session $ do
-    liftIO installSignalHandlers  -- catch ^C
+  flip unGhcT session $ withSignalHandlers $ do -- catch ^C
     initGhcMonad mb_top_dir
     withCleanupSession ghct
 

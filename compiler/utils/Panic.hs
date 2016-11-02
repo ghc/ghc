@@ -8,7 +8,7 @@ It's hard to put these functions anywhere else without causing
 some unnecessary loops in the module dependency graph.
 -}
 
-{-# LANGUAGE CPP, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, ScopedTypeVariables, LambdaCase #-}
 
 module Panic (
      GhcException(..), showGhcException,
@@ -23,7 +23,7 @@ module Panic (
      Exception.Exception(..), showException, safeShowException,
      try, tryMost, throwTo,
 
-     installSignalHandlers,
+     withSignalHandlers,
 ) where
 #include "HsVersions.h"
 
@@ -32,17 +32,18 @@ import {-# SOURCE #-} Outputable (SDoc, showSDocUnsafe)
 import Config
 import Exception
 
+import Control.Monad.IO.Class
 import Control.Concurrent
 import Debug.Trace        ( trace )
 import System.IO.Unsafe
 import System.Environment
 
 #ifndef mingw32_HOST_OS
-import System.Posix.Signals
+import System.Posix.Signals as S
 #endif
 
 #if defined(mingw32_HOST_OS)
-import GHC.ConsoleHandler
+import GHC.ConsoleHandler as S
 #endif
 
 import GHC.Stack
@@ -222,15 +223,23 @@ tryMost action = do r <- try action
                                         Nothing -> throwIO se
                         Right v -> return (Right v)
 
+-- | We use reference counting for signal handlers
+{-# NOINLINE signalHandlersRefCount #-}
+#if !defined(mingw32_HOST_OS)
+signalHandlersRefCount :: MVar (Word, Maybe (S.Handler,S.Handler
+                                            ,S.Handler,S.Handler))
+#else
+signalHandlersRefCount :: MVar (Word, Maybe S.Handler)
+#endif
+signalHandlersRefCount = unsafePerformIO $ newMVar (0,Nothing)
 
--- | Install standard signal handlers for catching ^C, which just throw an
---   exception in the target thread.  The current target thread is the
---   thread at the head of the list in the MVar passed to
---   installSignalHandlers.
-installSignalHandlers :: IO ()
-installSignalHandlers = do
-  main_thread <- myThreadId
-  wtid <- mkWeakThreadId main_thread
+
+-- | Temporarily install standard signal handlers for catching ^C, which just
+-- throw an exception in the current thread.
+withSignalHandlers :: (ExceptionMonad m, MonadIO m) => m a -> m a
+withSignalHandlers act = do
+  main_thread <- liftIO myThreadId
+  wtid <- liftIO (mkWeakThreadId main_thread)
 
   let
       interrupt = do
@@ -240,14 +249,23 @@ installSignalHandlers = do
           Just t  -> throwTo t UserInterrupt
 
 #if !defined(mingw32_HOST_OS)
-  _ <- installHandler sigQUIT  (Catch interrupt) Nothing
-  _ <- installHandler sigINT   (Catch interrupt) Nothing
-  -- see #3656; in the future we should install these automatically for
-  -- all Haskell programs in the same way that we install a ^C handler.
-  let fatal_signal n = throwTo main_thread (Signal (fromIntegral n))
-  _ <- installHandler sigHUP   (Catch (fatal_signal sigHUP))  Nothing
-  _ <- installHandler sigTERM  (Catch (fatal_signal sigTERM)) Nothing
-  return ()
+  let installHandlers = do
+        let installHandler' a b = installHandler a b Nothing
+        hdlQUIT <- installHandler' sigQUIT  (Catch interrupt)
+        hdlINT  <- installHandler' sigINT   (Catch interrupt)
+        -- see #3656; in the future we should install these automatically for
+        -- all Haskell programs in the same way that we install a ^C handler.
+        let fatal_signal n = throwTo main_thread (Signal (fromIntegral n))
+        hdlHUP  <- installHandler' sigHUP   (Catch (fatal_signal sigHUP))
+        hdlTERM <- installHandler' sigTERM  (Catch (fatal_signal sigTERM))
+        return (hdlQUIT,hdlINT,hdlHUP,hdlTERM)
+
+  let uninstallHandlers (hdlQUIT,hdlINT,hdlHUP,hdlTERM) = do
+        _ <- installHandler sigQUIT  hdlQUIT Nothing
+        _ <- installHandler sigINT   hdlINT  Nothing
+        _ <- installHandler sigHUP   hdlHUP  Nothing
+        _ <- installHandler sigTERM  hdlTERM Nothing
+        return ()
 #else
   -- GHC 6.3+ has support for console events on Windows
   -- NOTE: running GHCi under a bash shell for some reason requires
@@ -258,6 +276,23 @@ installSignalHandlers = do
       sig_handler Break    = interrupt
       sig_handler _        = return ()
 
-  _ <- installHandler (Catch sig_handler)
-  return ()
+  let installHandlers   = installHandler (Catch sig_handler)
+  let uninstallHandlers = installHandler -- directly install the old handler
 #endif
+
+  -- install signal handlers if necessary
+  let mayInstallHandlers = liftIO $ modifyMVar_ signalHandlersRefCount $ \case
+        (0,Nothing)     -> do
+          hdls <- installHandlers
+          return (1,Just hdls)
+        (c,oldHandlers) -> return (c+1,oldHandlers)
+
+  -- uninstall handlers if necessary
+  let mayUninstallHandlers = liftIO $ modifyMVar_ signalHandlersRefCount $ \case
+        (1,Just hdls)   -> do
+          uninstallHandlers hdls
+          return (0,Nothing)
+        (c,oldHandlers) -> return (c-1,oldHandlers)
+
+  mayInstallHandlers
+  act `gfinally` mayUninstallHandlers

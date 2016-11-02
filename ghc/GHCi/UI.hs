@@ -1139,9 +1139,9 @@ afterRunStmt step_here run_result = do
                         afterRunStmt step_here >> return ()
 
   flushInterpBuffers
-  liftIO installSignalHandlers
-  b <- isOptionSet RevertCAFs
-  when b revertCAFs
+  withSignalHandlers $ do
+     b <- isOptionSet RevertCAFs
+     when b revertCAFs
 
   return run_result
 
@@ -3626,8 +3626,8 @@ handler :: SomeException -> GHCi Bool
 
 handler exception = do
   flushInterpBuffers
-  liftIO installSignalHandlers
-  ghciHandle handler (showException exception >> return False)
+  withSignalHandlers $
+     ghciHandle handler (showException exception >> return False)
 
 showException :: SomeException -> GHCi ()
 showException se =
