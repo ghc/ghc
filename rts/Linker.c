@@ -56,23 +56,6 @@
 #include <dlfcn.h>
 #endif
 
-/* PowerPC and ARM have relative branch instructions with only 24 bit
- * displacements and therefore need jump islands contiguous with each object
- * code module.
- */
-#if defined(powerpc_HOST_ARCH)
-#define SHORT_REL_BRANCH 1
-#endif
-#if defined(arm_HOST_ARCH)
-#define SHORT_REL_BRANCH 1
-#endif
-
-#if (RTS_LINKER_USE_MMAP && defined(SHORT_REL_BRANCH) && defined(linux_HOST_OS))
-#define USE_CONTIGUOUS_MMAP 1
-#else
-#define USE_CONTIGUOUS_MMAP 0
-#endif
-
 #if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) || defined(freebsd_HOST_OS) || defined(kfreebsdgnu_HOST_OS) || defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) || defined(openbsd_HOST_OS) || defined(gnu_HOST_OS)
 #  define OBJFORMAT_ELF
 #  include <regex.h>    // regex is already used by dlopen() so this is OK
