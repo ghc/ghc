@@ -55,6 +55,7 @@ import TcUnify
 import TcIface
 import TcSimplify ( solveEqualities )
 import TcType
+import TcHsSyn( zonkSigType )
 import Inst   ( tcInstBinders, tcInstBindersX, tcInstBinderX )
 import Type
 import Kind
@@ -1543,7 +1544,9 @@ kindGeneralizeType :: Type -> TcM Type
 -- Result is zonked
 kindGeneralizeType ty
   = do { kvs <- kindGeneralize ty
-       ; zonkTcType (mkInvForAllTys kvs ty) }
+       ; ty <- zonkSigType (mkInvForAllTys kvs ty)
+       ; traceTc "kindGen" (ppr (mkInvForAllTys kvs ty) $$ ppr ty)
+       ; return ty  }
 
 kindGeneralize :: TcType -> TcM [KindVar]
 -- Quantify the free kind variables of a kind or type

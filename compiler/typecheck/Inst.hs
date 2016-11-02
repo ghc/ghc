@@ -638,13 +638,15 @@ newClsInst overlap_mode dfun_name tvs theta clas tys
   = do { (subst, tvs') <- freshenTyVarBndrs tvs
              -- Be sure to freshen those type variables,
              -- so they are sure not to appear in any lookup
-       ; let tys'   = substTys subst tys
-             theta' = substTheta subst theta
-             dfun   = mkDictFunId dfun_name tvs' theta' clas tys'
-             -- Substituting in the DFun type just makes sure that
-             -- we are using TyVars rather than TcTyVars
-             -- Not sure if this is really the right place to do so,
-             -- but it'll do fine
+       ; let tys' = substTys subst tys
+
+             dfun = mkDictFunId dfun_name tvs theta clas tys
+             -- The dfun uses the original 'tvs' because
+             -- (a) they don't need to be fresh
+             -- (b) they may be mentioned in the ib_binds field of
+             --     an InstInfo, and in TcEnv.pprInstInfoDetails it's
+             --     helpful to use the same names
+
        ; oflag <- getOverlapFlag overlap_mode
        ; let inst = mkLocalInstance dfun oflag tvs' clas tys'
        ; warnIf (Reason Opt_WarnOrphans)

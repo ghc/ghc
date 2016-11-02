@@ -30,7 +30,7 @@ module TcHsSyn (
         zonkTyConBinders,
         emptyZonkEnv, mkEmptyZonkEnv,
         zonkTcTypeToType, zonkTcTypeToTypes, zonkTyVarOcc,
-        zonkCoToCo,
+        zonkCoToCo, zonkSigType,
         zonkEvBinds,
 
         -- * Validity checking
@@ -187,6 +187,8 @@ the environment manipulation is tiresome.
 -- Confused by zonking? See Note [What is zonking?] in TcMType.
 type UnboundTyVarZonker = TcTyVar -> TcM Type
         -- How to zonk an unbound type variable
+        -- The TcTyVar is (a) a MetaTv (b) Flexi and
+        --     (c) its kind is alrady zonked
         -- Note [Zonking the LHS of a RULE]
 
 -- | A ZonkEnv carries around several bits.
@@ -1594,6 +1596,19 @@ zonkTcTypeToTypes env tys = mapM (zonkTcTypeToType env) tys
 
 zonkCoToCo :: ZonkEnv -> Coercion -> TcM Coercion
 zonkCoToCo = mapCoercion zonk_tycomapper
+
+zonkSigType :: TcType -> TcM Type
+-- Zonk the type obtained from a user type signature
+-- We want to turn any quantified (forall'd) variables into TyVars
+-- but we may find some free TcTyVars, and we want to leave them
+-- completely alone.  They may even have unification variables inside
+-- e.g.  f (x::a) = ...(e :: a -> a)....
+-- The type sig for 'e' mentions a free 'a' which will be a
+-- unification SigTv variable.
+zonkSigType = zonkTcTypeToType (mkEmptyZonkEnv zonk_unbound_tv)
+  where
+    zonk_unbound_tv :: UnboundTyVarZonker
+    zonk_unbound_tv tv = return (mkTyVarTy tv)
 
 zonkTvSkolemising :: UnboundTyVarZonker
 -- This variant is used for the LHS of rules

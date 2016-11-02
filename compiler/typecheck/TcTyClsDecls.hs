@@ -350,19 +350,18 @@ kcTyClGroup decls
                  kc_res_kind = tyConResKind tc
                  kc_tyvars   = tyConTyVars tc
            ; kvs <- kindGeneralize (mkTyConKind kc_binders kc_res_kind)
+           ; let all_binders = mkNamedTyConBinders Inferred kvs ++ kc_binders
 
-           ; (env, kc_binders') <- zonkTyConBinders emptyZonkEnv kc_binders
-           ; kc_res_kind' <- zonkTcTypeToType env kc_res_kind
+           ; (env, all_binders') <- zonkTyConBinders emptyZonkEnv all_binders
+           ; kc_res_kind'        <- zonkTcTypeToType env kc_res_kind
 
                       -- Make sure kc_kind' has the final, zonked kind variables
            ; traceTc "Generalise kind" $
-             vcat [ ppr name, ppr kc_binders, ppr kc_res_kind
-                  , ppr kvs, ppr kc_binders', ppr kc_res_kind'
+             vcat [ ppr name, ppr kc_binders, ppr kvs, ppr all_binders, ppr kc_res_kind
+                  , ppr all_binders', ppr kc_res_kind'
                   , ppr kc_tyvars, ppr (tcTyConScopedTyVars tc)]
 
-           ; return (mkTcTyCon name
-                               (mkNamedTyConBinders Inferred kvs ++ kc_binders')
-                               kc_res_kind'
+           ; return (mkTcTyCon name all_binders' kc_res_kind'
                                (mightBeUnsaturatedTyCon tc)
                                (tcTyConScopedTyVars tc)) }
 
