@@ -20,7 +20,7 @@
 module Hoopl.Dataflow
   ( C, O, DataflowLattice(..), OldFact(..), NewFact(..), Fact, FactBase
   , mkFactBase
-  , ChangeFlag(..)
+  , JoinedFact(..)
   , FwdPass(..), FwdTransfer, mkFTransfer3
 
   , BwdPass(..), BwdTransfer, mkBTransfer3
@@ -28,7 +28,7 @@ module Hoopl.Dataflow
   , dataflowAnalFwdBlocks, dataflowAnalBwd
   , analyzeFwd, analyzeFwdBlocks, analyzeBwd
 
-  , changeIf
+  , changedIf
   , joinOutFacts
   )
 where
@@ -37,8 +37,37 @@ import BlockId
 import Cmm
 
 import Data.Array
+import Data.List
+import Data.Maybe
 
-import Compiler.Hoopl
+-- Hide definitions from Hoopl's Dataflow module.
+import Compiler.Hoopl hiding ( DataflowLattice, OldFact, NewFact, JoinFun
+                             , fact_bot, fact_join, joinOutFacts, mkFactBase
+                             )
+
+newtype OldFact a = OldFact a
+
+newtype NewFact a = NewFact a
+
+-- | The result of joining OldFact and NewFact.
+data JoinedFact a
+    = Changed !a     -- ^ Result is different than OldFact.
+    | NotChanged !a  -- ^ Result is the same as OldFact.
+
+getJoined :: JoinedFact a -> a
+getJoined (Changed a) = a
+getJoined (NotChanged a) = a
+
+changedIf :: Bool -> a -> JoinedFact a
+changedIf True = Changed
+changedIf False = NotChanged
+
+type JoinFun a = OldFact a -> NewFact a -> JoinedFact a
+
+data DataflowLattice a = DataflowLattice
+    { fact_bot :: a
+    , fact_join :: JoinFun a
+    }
 
 -- TODO(michalt): This wrapper will go away once we refactor the analyze*
 -- methods.
@@ -356,9 +385,9 @@ updateFact fact_join dep_blocks lbl new_fact (todo, fbase)
       Nothing       -> let !z = mapInsert lbl new_fact fbase in (changed, z)
                            -- Note [no old fact]
       Just old_fact ->
-        case fact_join lbl (OldFact old_fact) (NewFact new_fact) of
-          (NoChange, _) -> (todo, fbase)
-          (_,        f) -> let !z = mapInsert lbl f fbase in (changed, z)
+        case fact_join (OldFact old_fact) (NewFact new_fact) of
+          (NotChanged _) -> (todo, fbase)
+          (Changed f) -> let !z = mapInsert lbl f fbase in (changed, z)
   where
      changed = foldr insertIntHeap todo $
                  mapFindWithDefault [] lbl dep_blocks
@@ -380,6 +409,33 @@ out that always recording a change is faster.
 getFact  :: DataflowLattice f -> Label -> FactBase f -> f
 getFact lat l fb = case lookupFact l fb of Just  f -> f
                                            Nothing -> fact_bot lat
+
+-- | Returns the result of joining the facts from all the successors of the
+-- provided node or block.
+joinOutFacts :: (NonLocal n) => DataflowLattice f -> n O C -> FactBase f -> f
+joinOutFacts lattice nonLocal fact_base = foldl' join (fact_bot lattice) facts
+  where
+    join new old = getJoined $ fact_join lattice (OldFact old) (NewFact new)
+    facts =
+        [ fromJust fact
+        | s <- successors nonLocal
+        , let fact = lookupFact s fact_base
+        , isJust fact
+        ]
+
+-- | Returns the joined facts for each label.
+mkFactBase :: DataflowLattice f -> [(Label, f)] -> FactBase f
+mkFactBase lattice = foldl' add mapEmpty
+  where
+    join = fact_join lattice
+
+    add result (l, f1) =
+        let !newFact =
+                case mapLookup l result of
+                    Nothing -> f1
+                    Just f2 -> getJoined $ join (OldFact f1) (NewFact f2)
+        in mapInsert l newFact result
+
 
 -- -----------------------------------------------------------------------------
 -- a Heap of Int

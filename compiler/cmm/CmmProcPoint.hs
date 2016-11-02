@@ -155,14 +155,14 @@ forward = mkFTransfer3 first middle last
       last l x = mkFactBase lattice $ map (\id -> (id, x)) (successors l)
 
 lattice :: DataflowLattice Status
-lattice = DataflowLattice "direct proc-point reachability" unreached add_to
+lattice = DataflowLattice unreached add_to
     where unreached = ReachedBy setEmpty
-          add_to _ (OldFact ProcPoint) _ = (NoChange, ProcPoint)
-          add_to _ _ (NewFact ProcPoint) = (SomeChange, ProcPoint)
+          add_to (OldFact ProcPoint) _ = NotChanged ProcPoint
+          add_to _ (NewFact ProcPoint) = Changed ProcPoint
                        -- because of previous case
-          add_to _ (OldFact (ReachedBy p)) (NewFact (ReachedBy p'))
-             | setSize union > setSize p = (SomeChange, ReachedBy union)
-             | otherwise                 = (NoChange, ReachedBy p)
+          add_to (OldFact (ReachedBy p)) (NewFact (ReachedBy p'))
+             | setSize union > setSize p = Changed (ReachedBy union)
+             | otherwise                 = NotChanged (ReachedBy p)
            where
              union = setUnion p' p
 

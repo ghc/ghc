@@ -3,9 +3,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
--- See Note [Deprecations in Hoopl] in Hoopl module
-{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
-
 module CmmLive
     ( CmmLocalLive
     , cmmLocalLiveness
@@ -36,10 +33,11 @@ type CmmLocalLive = CmmLive LocalReg
 liveLattice :: Ord r => DataflowLattice (CmmLive r)
 {-# SPECIALIZE liveLattice :: DataflowLattice (CmmLive LocalReg) #-}
 {-# SPECIALIZE liveLattice :: DataflowLattice (CmmLive GlobalReg) #-}
-liveLattice = DataflowLattice "live LocalReg's" emptyRegSet add
-    where add _ (OldFact old) (NewFact new) =
-               (changeIf $ sizeRegSet join > sizeRegSet old, join)
-              where !join = plusRegSet old new
+liveLattice = DataflowLattice emptyRegSet add
+  where
+    add (OldFact old) (NewFact new) =
+        let !join = plusRegSet old new
+        in changedIf (sizeRegSet join > sizeRegSet old) join
 
 
 -- | A mapping from block labels to the variables live on entry

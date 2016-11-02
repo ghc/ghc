@@ -1,7 +1,5 @@
-{-# LANGUAGE CPP, GADTs #-}
+{-# LANGUAGE BangPatterns, CPP, GADTs #-}
 
--- See Note [Deprecations in Hoopl] in Hoopl module
-{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 module CmmBuildInfoTables
     ( CAFSet, CAFEnv, cafAnal
     , doSRTs, TopSRT, emptySRT, isEmptySRT, srtToData )
@@ -89,9 +87,11 @@ type CAFEnv = BlockEnv CAFSet
 
 -- First, an analysis to find live CAFs.
 cafLattice :: DataflowLattice CAFSet
-cafLattice = DataflowLattice "live cafs" Set.empty add
-  where add _ (OldFact old) (NewFact new) = case old `Set.union` new of
-                                              new' -> (changeIf $ Set.size new' > Set.size old, new')
+cafLattice = DataflowLattice Set.empty add
+  where
+    add (OldFact old) (NewFact new) =
+        let !new' = old `Set.union` new
+        in changedIf (Set.size new' > Set.size old) new'
 
 cafTransfers :: BwdTransfer CmmNode CAFSet
 cafTransfers = mkBTransfer3 first middle last
