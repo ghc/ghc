@@ -806,7 +806,12 @@ new_meta_tv_x info subst tv
         ; details <- newMetaDetails info
         ; let name   = mkSystemName uniq (getOccName tv)
                        -- See Note [Name of an instantiated type variable]
-              kind   = substTy subst (tyVarKind tv)
+              kind   = substTyUnchecked subst (tyVarKind tv)
+                       -- Unchecked because we call newMetaTyVarX from
+                       -- tcInstBinderX, which is called from tc_infer_args
+                       -- which does not yet take enough trouble to ensure
+                       -- the in-scope set is right; e.g. Trac #12785 trips
+                       -- if we use substTy here
               new_tv = mkTcTyVar name kind details
               subst1 = extendTvSubstWithClone subst tv new_tv
         ; return (subst1, new_tv) }
