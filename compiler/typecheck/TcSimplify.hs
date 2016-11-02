@@ -581,7 +581,7 @@ simplifyInfer rhs_tclvl apply_mr sigs name_taus wanteds
                                -- NB: must include derived errors in this test,
                                --     hence "incl_derivs"
 
-              else do { let quant_cand = approximateWC wanted_transformed
+              else do { let quant_cand = approximateWC False wanted_transformed
                             meta_tvs   = filter isMetaTyVar $
                                          tyCoVarsOfCtsList quant_cand
 
@@ -1567,10 +1567,10 @@ defaultTyVarTcS the_tv
   | otherwise
   = return False  -- the common case
 
-approximateWC :: WantedConstraints -> Cts
+approximateWC :: Bool -> WantedConstraints -> Cts
 -- Postcondition: Wanted or Derived Cts
 -- See Note [ApproximateWC]
-approximateWC wc
+approximateWC float_past_equalities wc
   = float_wc emptyVarSet wc
   where
     float_wc :: TcTyCoVarSet -> WantedConstraints -> Cts
@@ -1591,18 +1591,17 @@ approximateWC wc
 
     float_implic :: TcTyCoVarSet -> Implication -> Cts
     float_implic trapping_tvs imp
-      | ic_no_eqs imp                 -- No equalities, so float
+      | float_past_equalities || ic_no_eqs imp
       = float_wc new_trapping_tvs (ic_wanted imp)
-      | otherwise                     -- Don't float out of equalities
-      = emptyCts                      -- See Note [ApproximateWC]
+      | otherwise   -- Take care with equalities
+      = emptyCts    -- See (1) under Note [ApproximateWC]
       where
         new_trapping_tvs = trapping_tvs `extendVarSetList` ic_skols imp
     do_bag :: (a -> Bag c) -> Bag a -> Bag c
     do_bag f = foldrBag (unionBags.f) emptyBag
 
-{-
-Note [ApproximateWC]
-~~~~~~~~~~~~~~~~~~~~
+{- Note [ApproximateWC]
+~~~~~~~~~~~~~~~~~~~~~~~
 approximateWC takes a constraint, typically arising from the RHS of a
 let-binding whose type we are *inferring*, and extracts from it some
 *simple* constraints that we might plausibly abstract over.  Of course
@@ -1614,8 +1613,9 @@ to applyDefaultingRules) to extract constraints that that might be defaulted.
 
 There are two caveats:
 
-1.  We do *not* float anything out if the implication binds equality
-    constraints, because that defeats the OutsideIn story.  Consider
+1.  When infering most-general types (in simplifyInfer), we do *not*
+    float anything out if the implication binds equality constraints,
+    because that defeats the OutsideIn story.  Consider
        data T a where
          TInt :: T Int
          MkT :: T a
@@ -1629,6 +1629,10 @@ There are two caveats:
     which is only on of the possible types. (GHC 7.6 accidentally *did*
     float out of such implications, which meant it would happily infer
     non-principal types.)
+
+   HOWEVER (Trac #12797) in findDefaultableGroups we are not worried about
+   the most-general type; and we /do/ want to float out of equalities.
+   Hence the boolean flag to approximateWC.
 
 2. We do not float out an inner constraint that shares a type variable
    (transitively) with one that is trapped by a skolem.  Eg
@@ -1961,7 +1965,7 @@ findDefaultableGroups (default_tys, (ovl_strings, extended_defaults)) wanteds
     , defaultable_tyvar tv
     , defaultable_classes (map sndOf3 group) ]
   where
-    simples                = approximateWC wanteds
+    simples                = approximateWC True wanteds
     (unaries, non_unaries) = partitionWith find_unary (bagToList simples)
     unary_groups           = equivClasses cmp_tv unaries
 
