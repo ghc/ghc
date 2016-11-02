@@ -223,9 +223,20 @@ typedef struct StgInfoTable_ {
       them doesn't affect the layout).
 
    -  If srt_bitmap (in the std info table part) is zero, then the srt
-      field may be omitted.  This only applies if the slow_apply and
+      field needn't be set.  This only applies if the slow_apply and
       bitmap fields have also been omitted.
    -------------------------------------------------------------------------- */
+
+/*
+   Note [Encoding static reference tables]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   As static reference tables appear frequently in code, we use a special
+   compact encoding for the common case of a module defining only a few CAFs: We
+   produce one table containing a list of CAFs in the module and then include a
+   bitmap in each info table describing which entries of this table the closure
+   references.
+ */
 
 typedef struct StgFunInfoExtraRev_ {
     OFFSET_FIELD(slow_apply_offset); /* apply to args on the stack */

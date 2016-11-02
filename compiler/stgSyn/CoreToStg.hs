@@ -86,6 +86,34 @@ import Control.Monad (liftM, ap)
 -- live then so is `q'. Furthermore, if `e' mentions an enclosing
 -- let-no-escaped variable, then its free variables are also live if `v' is.
 
+-- Note [What are these SRTs all about?]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Consider the Core program,
+--
+--     fibs = go 1 1
+--       where go a b = let c = a + c
+--                      in c : go b c
+--     add x = map (\y -> x*y) fibs
+--
+-- In this case we have a CAF, 'fibs', which is quite large after evaluation and
+-- has only one possible user, 'add'. Consequently, we want to ensure that when
+-- all references to 'add' die we can garbage collect any bit of 'fibs' that we
+-- have evaluated.
+--
+-- However, how do we know whether there are any references to 'fibs' still
+-- around? Afterall, the only reference to it is buried in the code generated
+-- for 'add'. The answer is that we record the CAFs referred to by a definition
+-- in its info table, namely a part of it known as the Static Reference Table
+-- (SRT).
+--
+-- Since SRTs are so common, we use a special compact encoding for them in: we
+-- produce one table containing a list of CAFs in a module and then include a
+-- bitmap in each info table describing which entries of this table the closure
+-- references.
+--
+-- See also: Commentary/Rts/Storage/GC/CAFs on the GHC Wiki.
+
 -- Note [Collecting live CAF info]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
