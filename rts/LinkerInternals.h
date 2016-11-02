@@ -14,6 +14,9 @@
 
 #include "BeginPrivate.h"
 
+typedef void SymbolAddr;
+typedef char SymbolName;
+
 /* See Linker.c Note [runtime-linker-phases] */
 typedef enum {
     OBJECT_LOADED,
@@ -182,11 +185,40 @@ extern Mutex linker_mutex;
 extern Mutex linker_unloaded_mutex;
 #endif
 
+/* Type of the initializer */
+typedef void (*init_t) (int argc, char **argv, char **env);
+
+/* SymbolInfo tracks a symbol's address, the object code from which
+   it originated, and whether or not it's weak.
+
+   RtsSymbolInfo is used to track the state of the symbols currently
+   loaded or to be loaded by the Linker.
+
+   Where the information in the `ObjectCode` is used to track the
+   original status of the symbol inside the `ObjectCode`.
+
+   A weak symbol that has been used will still be marked as weak
+   in the `ObjectCode` but in the `RtsSymbolInfo` it won't be.
+*/
+typedef struct _RtsSymbolInfo {
+    SymbolAddr* value;
+    ObjectCode *owner;
+    HsBool weak;
+} RtsSymbolInfo;
+
 void exitLinker( void );
 
 void freeObjectCode (ObjectCode *oc);
 
 void *mmapForLinker (size_t bytes, uint32_t flags, int fd, int offset);
+
+void addProddableBlock ( ObjectCode* oc, void* start, int size );
+void checkProddableBlock (ObjectCode *oc, void *addr, size_t size );
+void freeProddableBlocks (ObjectCode *oc);
+
+void addSection (Section *s, SectionKind kind, SectionAlloc alloc,
+                 void* start, StgWord size, StgWord mapped_offset,
+                 void* mapped_start, StgWord mapped_size);
 
 #if defined(mingw32_HOST_OS)
 

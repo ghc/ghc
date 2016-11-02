@@ -91,24 +91,6 @@
 #include <sys/tls.h>
 #endif
 
-/* SymbolInfo tracks a symbol's address, the object code from which
-   it originated, and whether or not it's weak.
-
-   RtsSymbolInfo is used to track the state of the symbols currently
-   loaded or to be loaded by the Linker.
-
-   Where the information in the `ObjectCode` is used to track the
-   original status of the symbol inside the `ObjectCode`.
-
-   A weak symbol that has been used will still be marked as weak
-   in the `ObjectCode` but in the `RtsSymbolInfo` it won't be.
-*/
-typedef struct _RtsSymbolInfo {
-    SymbolAddr* value;
-    ObjectCode *owner;
-    HsBool weak;
-} RtsSymbolInfo;
-
 /* `symhash` is a Hash table mapping symbol names to RtsSymbolInfo.
    This hashtable will contain information on all symbols
    that we know of, however the .o they are in may not be loaded.
@@ -205,9 +187,6 @@ Mutex linker_mutex;
  */
 Mutex linker_unloaded_mutex;
 #endif
-
-/* Type of the initializer */
-typedef void (*init_t) (int argc, char **argv, char **env);
 
 static HsInt isAlreadyLoaded( pathchar *path );
 static HsInt loadOc( ObjectCode* oc );
@@ -306,8 +285,6 @@ extern IMAGE_DOS_HEADER __ImageBase;
 typedef DLL_DIRECTORY_COOKIE(WINAPI *LPAddDLLDirectory)(PCWSTR NewDirectory);
 typedef WINBOOL(WINAPI *LPRemoveDLLDirectory)(DLL_DIRECTORY_COOKIE Cookie);
 #endif /* OBJFORMAT_PEi386 */
-
-static void freeProddableBlocks (ObjectCode *oc);
 
 /* on x86_64 we have a problem with relocating symbol references in
  * code that was compiled without -fPIC.  By default, the small memory
@@ -2606,7 +2583,7 @@ HsInt purgeObj (pathchar *path)
  * which may be prodded during relocation, and abort if we try and write
  * outside any of these.
  */
-static void
+void
 addProddableBlock ( ObjectCode* oc, void* start, int size )
 {
    ProddableBlock* pb
@@ -2620,7 +2597,7 @@ addProddableBlock ( ObjectCode* oc, void* start, int size )
    oc->proddables = pb;
 }
 
-static void
+void
 checkProddableBlock (ObjectCode *oc, void *addr, size_t size )
 {
    ProddableBlock* pb;
@@ -2634,7 +2611,7 @@ checkProddableBlock (ObjectCode *oc, void *addr, size_t size )
    barf("checkProddableBlock: invalid fixup in runtime linker: %p", addr);
 }
 
-static void freeProddableBlocks (ObjectCode *oc)
+void freeProddableBlocks (ObjectCode *oc)
 {
     ProddableBlock *pb, *next;
 
@@ -2648,7 +2625,7 @@ static void freeProddableBlocks (ObjectCode *oc)
 /* -----------------------------------------------------------------------------
  * Section management.
  */
-static void
+void
 addSection (Section *s, SectionKind kind, SectionAlloc alloc,
             void* start, StgWord size, StgWord mapped_offset,
             void* mapped_start, StgWord mapped_size)
