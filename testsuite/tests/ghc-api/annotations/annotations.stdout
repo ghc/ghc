@@ -19,8 +19,6 @@
 
 (AK AnnotationLet.hs:5:1-32 AnnSemi = [AnnotationLet.hs:6:1])
 
-(AK AnnotationLet.hs:5:1-32 AnnVal = [AnnotationLet.hs:5:31-32])
-
 (AK AnnotationLet.hs:(7,1)-(11,12) AnnEqual = [AnnotationLet.hs:7:5])
 
 (AK AnnotationLet.hs:(7,1)-(11,12) AnnFunId = [AnnotationLet.hs:7:1-3])

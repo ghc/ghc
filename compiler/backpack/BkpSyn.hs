@@ -73,5 +73,6 @@ data IncludeDecl n = IncludeDecl {
 
 -- | Rename a module from one name to another.  The identity renaming
 -- means that the module should be brought into scope.
-data Renaming = Renaming { renameFrom :: ModuleName, renameTo :: ModuleName }
+data Renaming = Renaming { renameFrom :: Located ModuleName
+                         , renameTo :: Maybe (Located ModuleName) }
 type LRenaming = Located Renaming

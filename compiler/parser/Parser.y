@@ -575,8 +575,8 @@ rns :: { OrdList LRenaming }
         | rn         { unitOL $1 }
 
 rn :: { LRenaming }
-        : modid 'as' modid { sLL $1 $> $ Renaming (unLoc $1) (unLoc $3) }
-        | modid            { sL1 $1    $ Renaming (unLoc $1) (unLoc $1) }
+        : modid 'as' modid { sLL $1 $> $ Renaming $1 (Just $3) }
+        | modid            { sL1 $1    $ Renaming $1 Nothing }
 
 unitbody :: { OrdList (LHsUnitDecl PackageName) }
         : '{'     unitdecls '}'   { $2 }
@@ -847,9 +847,9 @@ optqualified :: { ([AddAnn],Bool) }
         : 'qualified'                           { ([mj AnnQualified $1],True)  }
         | {- empty -}                           { ([],False) }
 
-maybeas :: { ([AddAnn],Located (Maybe ModuleName)) }
-        : 'as' modid                           { ([mj AnnAs $1,mj AnnVal $2]
-                                                 ,sLL $1 $> (Just (unLoc $2))) }
+maybeas :: { ([AddAnn],Located (Maybe (Located ModuleName))) }
+        : 'as' modid                           { ([mj AnnAs $1]
+                                                 ,sLL $1 $> (Just $2)) }
         | {- empty -}                          { ([],noLoc Nothing) }
 
 maybeimpspec :: { Located (Maybe (Bool, Located [LIE RdrName])) }

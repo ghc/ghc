@@ -30,8 +30,6 @@
 
 (AK AnnotationTuple.hs:6:1-32 AnnSemi = [AnnotationTuple.hs:7:1])
 
-(AK AnnotationTuple.hs:6:1-32 AnnVal = [AnnotationTuple.hs:6:31-32])
-
 (AK AnnotationTuple.hs:(8,1)-(11,14) AnnEqual = [AnnotationTuple.hs:8:5])
 
 (AK AnnotationTuple.hs:(8,1)-(11,14) AnnFunId = [AnnotationTuple.hs:8:1-3])

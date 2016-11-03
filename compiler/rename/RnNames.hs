@@ -266,7 +266,7 @@ rnImportDecl this_mod
                                    ++ "Safe, Trustworthy or Unsafe"))
 
     let
-        qual_mod_name = as_mod `orElse` imp_mod_name
+        qual_mod_name = fmap unLoc as_mod `orElse` imp_mod_name
         imp_spec  = ImpDeclSpec { is_mod = imp_mod_name, is_qual = qual_only,
                                   is_dloc = loc, is_as = qual_mod_name }
 

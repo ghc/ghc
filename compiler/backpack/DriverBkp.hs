@@ -213,9 +213,12 @@ hsunitDeps :: HsUnit HsComponentId -> [(UnitId, ModRenaming)]
 hsunitDeps unit = concatMap get_dep (hsunitBody unit)
   where
     get_dep (L _ (IncludeD (IncludeDecl (L _ hsuid) mb_lrn))) = [(convertHsUnitId hsuid, go mb_lrn)]
-      where go Nothing = ModRenaming True []
-            go (Just lrns) = ModRenaming False (map convRn lrns)
-              where convRn (L _ (Renaming from to)) = (from, to)
+      where
+        go Nothing = ModRenaming True []
+        go (Just lrns) = ModRenaming False (map convRn lrns)
+          where
+            convRn (L _ (Renaming (L _ from) Nothing))         = (from, from)
+            convRn (L _ (Renaming (L _ from) (Just (L _ to)))) = (from, to)
     get_dep _ = []
 
 buildUnit :: SessionType -> ComponentId -> [(ModuleName, Module)] -> LHsUnit HsComponentId -> BkpM ()

@@ -749,7 +749,7 @@ getInfoForPrompt = do
 
         rev_imports = reverse imports -- rightmost are the most recent
 
-        myIdeclName d | Just m <- ideclAs d = m
+        myIdeclName d | Just m <- ideclAs d = unLoc m
                       | otherwise           = unLoc (ideclName d)
 
         modules_names =

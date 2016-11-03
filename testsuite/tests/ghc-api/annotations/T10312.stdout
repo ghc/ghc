@@ -12,7 +12,6 @@
 ((Test10312.hs:9:1-30,AnnImport), [Test10312.hs:9:1-6]),
 ((Test10312.hs:9:1-30,AnnQualified), [Test10312.hs:9:8-16]),
 ((Test10312.hs:9:1-30,AnnSemi), [Test10312.hs:10:1]),
-((Test10312.hs:9:1-30,AnnVal), [Test10312.hs:9:30]),
 ((Test10312.hs:10:1-27,AnnImport), [Test10312.hs:10:1-6]),
 ((Test10312.hs:10:1-27,AnnSemi), [Test10312.hs:11:1]),
 ((Test10312.hs:10:17-27,AnnCloseP), [Test10312.hs:10:27]),

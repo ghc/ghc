@@ -53,7 +53,7 @@ data ImportDecl name
       ideclSafe      :: Bool,          -- ^ True => safe import
       ideclQualified :: Bool,          -- ^ True => qualified
       ideclImplicit  :: Bool,          -- ^ True => implicit import (of Prelude)
-      ideclAs        :: Maybe ModuleName,  -- ^ as Module
+      ideclAs        :: Maybe (Located ModuleName),  -- ^ as Module
       ideclHiding    :: Maybe (Bool, Located [LIE name])
                                        -- ^ (True => hiding, names)
     }

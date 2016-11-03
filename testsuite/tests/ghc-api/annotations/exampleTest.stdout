@@ -14,7 +14,6 @@
 ((AnnotationTuple.hs:6:1-32,AnnImport), [AnnotationTuple.hs:6:1-6]),
 ((AnnotationTuple.hs:6:1-32,AnnQualified), [AnnotationTuple.hs:6:8-16]),
 ((AnnotationTuple.hs:6:1-32,AnnSemi), [AnnotationTuple.hs:7:1]),
-((AnnotationTuple.hs:6:1-32,AnnVal), [AnnotationTuple.hs:6:31-32]),
 ((AnnotationTuple.hs:(8,1)-(11,14),AnnEqual), [AnnotationTuple.hs:8:5]),
 ((AnnotationTuple.hs:(8,1)-(11,14),AnnFunId), [AnnotationTuple.hs:8:1-3]),
 ((AnnotationTuple.hs:(8,1)-(11,14),AnnSemi), [AnnotationTuple.hs:13:1]),
