@@ -949,7 +949,8 @@ ppr_mono_ty ctxt_prec (HsQualTy ctxt ty) unicode
         , ppr_mono_lty pREC_TOP ty unicode ]
 
 ppr_mono_ty _         (HsBangTy b ty)     u = ppBang b <> ppLParendType u ty
-ppr_mono_ty _         (HsTyVar (L _ name)) _ = ppDocName name
+ppr_mono_ty _         (HsTyVar NotPromoted (L _ name)) _ = ppDocName name
+ppr_mono_ty _         (HsTyVar Promoted    (L _ name)) _ = char '\'' <> ppDocName name
 ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)   u = ppr_fun_ty ctxt_prec ty1 ty2 u
 ppr_mono_ty _         (HsTupleTy con tys) u = tupleParens con (map (ppLType u) tys)
 ppr_mono_ty _         (HsSumTy tys) u       = sumParens (map (ppLType u) tys)
@@ -960,7 +961,8 @@ ppr_mono_ty _         (HsIParamTy n ty)   u = brackets (ppIPName n <+> dcolon u 
 ppr_mono_ty _         (HsSpliceTy {})     _ = error "ppr_mono_ty HsSpliceTy"
 ppr_mono_ty _         (HsRecTy {})        _ = error "ppr_mono_ty HsRecTy"
 ppr_mono_ty _         (HsCoreTy {})       _ = error "ppr_mono_ty HsCoreTy"
-ppr_mono_ty _         (HsExplicitListTy _ tys) u = Pretty.quote $ brackets $ hsep $ punctuate comma $ map (ppLType u) tys
+ppr_mono_ty _         (HsExplicitListTy Promoted _ tys) u = Pretty.quote $ brackets $ hsep $ punctuate comma $ map (ppLType u) tys
+ppr_mono_ty _         (HsExplicitListTy NotPromoted _ tys) u = brackets $ hsep $ punctuate comma $ map (ppLType u) tys
 ppr_mono_ty _         (HsExplicitTupleTy _ tys) u = Pretty.quote $ parenList $ map (ppLType u) tys
 
 ppr_mono_ty ctxt_prec (HsEqTy ty1 ty2) unicode

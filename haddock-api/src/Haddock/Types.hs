@@ -344,7 +344,7 @@ data InstType name
   | TypeInst  (Maybe (HsType name)) -- ^ Body (right-hand side)
   | DataInst (TyClDecl name)        -- ^ Data constructors
 
-instance (OutputableBndr a, OutputableBndr (NameOrRdrName a))
+instance (OutputableBndrId a, HasOccNameId a)
          => Outputable (InstType a) where
   ppr (ClassInst { .. }) = text "ClassInst"
       <+> ppr clsiCtx
@@ -380,8 +380,8 @@ mkPseudoFamilyDecl (FamilyDecl { .. }) = PseudoFamilyDecl
     mkType (KindedTyVar (L loc name) lkind) =
         HsKindSig tvar lkind
       where
-        tvar = L loc (HsTyVar (L loc name))
-    mkType (UserTyVar name) = HsTyVar name
+        tvar = L loc (HsTyVar NotPromoted (L loc name))
+    mkType (UserTyVar name) = HsTyVar NotPromoted name
 
 
 -- | An instance head that may have documentation and a source location.

@@ -984,12 +984,12 @@ ppr_mono_ty ctxt_prec (HsQualTy ctxt ty) unicode qual
     ppLContext ctxt unicode qual <+> ppr_mono_lty pREC_TOP ty unicode qual
 
 -- UnicodeSyntax alternatives
-ppr_mono_ty _ (HsTyVar (L _ name)) True _
+ppr_mono_ty _ (HsTyVar _ (L _ name)) True _
   | getOccString (getName name) == "*"    = toHtml "★"
   | getOccString (getName name) == "(->)" = toHtml "(→)"
 
 ppr_mono_ty _         (HsBangTy b ty)     u q = ppBang b +++ ppLParendType u q ty
-ppr_mono_ty _         (HsTyVar (L _ name)) _ q = ppDocName q Prefix True name
+ppr_mono_ty _         (HsTyVar _ (L _ name)) _ q = ppDocName q Prefix True name
 ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)   u q = ppr_fun_ty ctxt_prec ty1 ty2 u q
 ppr_mono_ty _         (HsTupleTy con tys) u q = tupleParens con (map (ppLType u q) tys)
 ppr_mono_ty _         (HsSumTy tys) u q = sumParens (map (ppLType u q) tys)
@@ -1005,7 +1005,8 @@ ppr_mono_ty _         (HsRecTy {})        _ _ = toHtml "{..}"
        -- placeholder in the signature, which is followed by the field
        -- declarations.
 ppr_mono_ty _         (HsCoreTy {})       _ _ = error "ppr_mono_ty HsCoreTy"
-ppr_mono_ty _         (HsExplicitListTy _ tys) u q = promoQuote $ brackets $ hsep $ punctuate comma $ map (ppLType u q) tys
+ppr_mono_ty _         (HsExplicitListTy Promoted _ tys) u q = promoQuote $ brackets $ hsep $ punctuate comma $ map (ppLType u q) tys
+ppr_mono_ty _         (HsExplicitListTy NotPromoted _ tys) u q = brackets $ hsep $ punctuate comma $ map (ppLType u q) tys
 ppr_mono_ty _         (HsExplicitTupleTy _ tys) u q = promoQuote $ parenList $ map (ppLType u q) tys
 ppr_mono_ty _         (HsAppsTy {})       _ _ = error "ppr_mono_ty HsAppsTy"
 

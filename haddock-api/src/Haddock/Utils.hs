@@ -151,7 +151,7 @@ addClassContext _ _ sig = sig   -- E.g. a MinimalSig is fine
 
 lHsQTyVarsToTypes :: LHsQTyVars Name -> [LHsType Name]
 lHsQTyVarsToTypes tvs
-  = [ noLoc (HsTyVar (noLoc (hsLTyVarName tv)))
+  = [ noLoc (HsTyVar NotPromoted (noLoc (hsLTyVarName tv)))
     | tv <- hsQTvExplicit tvs ]
 
 --------------------------------------------------------------------------------

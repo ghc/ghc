@@ -36,7 +36,7 @@ specialize :: (Eq name, Typeable name)
 specialize name details =
     everywhere $ mkT step
   where
-    step (HsTyVar (L _ name')) | name == name' = details
+    step (HsTyVar _ (L _ name')) | name == name' = details
     step typ = typ
 
 
@@ -123,7 +123,7 @@ sugar =
 
 
 sugarLists :: NamedThing name => HsType name -> HsType name
-sugarLists (HsAppTy (L _ (HsTyVar (L _ name))) ltyp)
+sugarLists (HsAppTy (L _ (HsTyVar _ (L _ name))) ltyp)
     | isBuiltInSyntax name' && strName == "[]" = HsListTy ltyp
   where
     name' = getName name
@@ -137,7 +137,7 @@ sugarTuples typ =
   where
     aux apps (HsAppTy (L _ ftyp) atyp) = aux (atyp:apps) ftyp
     aux apps (HsParTy (L _ typ')) = aux apps typ'
-    aux apps (HsTyVar (L _ name))
+    aux apps (HsTyVar _ (L _ name))
         | isBuiltInSyntax name' && suitable = HsTupleTy HsBoxedTuple apps
       where
         name' = getName name
@@ -149,7 +149,7 @@ sugarTuples typ =
 
 
 sugarOperators :: NamedThing name => HsType name -> HsType name
-sugarOperators (HsAppTy (L _ (HsAppTy (L _ (HsTyVar (L l name))) la)) lb)
+sugarOperators (HsAppTy (L _ (HsAppTy (L _ (HsTyVar _ (L l name))) la)) lb)
     | isSymOcc $ getOccName name' = mkHsOpTy la (L l name) lb
     | isBuiltInSyntax name' && getOccString name == "(->)" = HsFunTy la lb
   where
@@ -224,7 +224,7 @@ freeVariables =
     query term ctx = case cast term :: Maybe (HsType name) of
         Just (HsForAllTy bndrs _) ->
             (Set.empty, Set.union ctx (bndrsNames bndrs))
-        Just (HsTyVar (L _ name))
+        Just (HsTyVar _ (L _ name))
             | getName name `Set.member` ctx -> (Set.empty, ctx)
             | otherwise -> (Set.singleton $ getNameRep name, ctx)
         _ -> (Set.empty, ctx)
@@ -267,7 +267,7 @@ renameType (HsQualTy lctxt lt) =
   HsQualTy
         <$> located renameContext lctxt
         <*> renameLType lt
-renameType (HsTyVar name) = HsTyVar <$> located renameName name
+renameType (HsTyVar ip name) = HsTyVar ip <$> located renameName name
 renameType (HsAppTy lf la) = HsAppTy <$> renameLType lf <*> renameLType la
 renameType (HsFunTy la lr) = HsFunTy <$> renameLType la <*> renameLType lr
 renameType (HsListTy lt) = HsListTy <$> renameLType lt
@@ -285,8 +285,8 @@ renameType (HsDocTy lt doc) = HsDocTy <$> renameLType lt <*> pure doc
 renameType (HsBangTy bang lt) = HsBangTy bang <$> renameLType lt
 renameType t@(HsRecTy _) = pure t
 renameType t@(HsCoreTy _) = pure t
-renameType (HsExplicitListTy ph ltys) =
-    HsExplicitListTy ph <$> renameLTypes ltys
+renameType (HsExplicitListTy ip ph ltys) =
+    HsExplicitListTy ip ph <$> renameLTypes ltys
 renameType (HsExplicitTupleTy phs ltys) =
     HsExplicitTupleTy phs <$> renameLTypes ltys
 renameType t@(HsTyLit _) = pure t

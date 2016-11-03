@@ -219,7 +219,7 @@ renameType t = case t of
     ltype'    <- renameLType ltype
     return (HsQualTy { hst_ctxt = lcontext', hst_body = ltype' })
 
-  HsTyVar (L l n) -> return . HsTyVar . L l =<< rename n
+  HsTyVar ip (L l n) -> return . HsTyVar ip . L l =<< rename n
   HsBangTy b ltype -> return . HsBangTy b =<< renameLType ltype
 
   HsAppTy a b -> do
@@ -262,7 +262,7 @@ renameType t = case t of
 
   HsRecTy a               -> HsRecTy <$> mapM renameConDeclFieldField a
   HsCoreTy a              -> pure (HsCoreTy a)
-  HsExplicitListTy  a b   -> HsExplicitListTy  a <$> mapM renameLType b
+  HsExplicitListTy i a b  -> HsExplicitListTy i a <$> mapM renameLType b
   HsExplicitTupleTy a b   -> HsExplicitTupleTy a <$> mapM renameLType b
   HsSpliceTy _ _          -> error "renameType: HsSpliceTy"
   HsWildCardTy a          -> HsWildCardTy <$> renameWildCardInfo a

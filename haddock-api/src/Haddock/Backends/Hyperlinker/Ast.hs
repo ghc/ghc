@@ -72,7 +72,7 @@ types =
     everything (<|>) ty
   where
     ty term = case cast term of
-        (Just (GHC.L sspan (GHC.HsTyVar name))) ->
+        (Just (GHC.L sspan (GHC.HsTyVar _ name))) ->
             pure (sspan, RtkType (GHC.unLoc name))
         _ -> empty
 

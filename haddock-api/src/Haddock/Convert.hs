@@ -17,7 +17,7 @@ module Haddock.Convert where
 -- instance heads, which aren't TyThings, so just export everything.
 
 import Bag ( emptyBag )
-import BasicTypes ( TupleSort(..) )
+import BasicTypes ( TupleSort(..), SourceText(..) )
 import Class
 import CoAxiom
 import ConLike
@@ -80,7 +80,7 @@ tyThingToLHsDecl t = case t of
          , tcdFDs = map (\ (l,r) -> noLoc
                         (map (noLoc . getName) l, map (noLoc . getName) r) ) $
                          snd $ classTvsFds cl
-         , tcdSigs = noLoc (MinimalSig mempty . noLoc . fmap noLoc $ classMinimalDef cl) :
+         , tcdSigs = noLoc (MinimalSig NoSourceText . noLoc . fmap noLoc $ classMinimalDef cl) :
                       map (noLoc . synifyTcIdSig DeleteTopLevelQuantification)
                         (classMethods cl)
          , tcdMeths = emptyBag --ignore default method definitions, they don't affect signature
@@ -366,17 +366,17 @@ synifyPatSynSigType :: PatSyn -> LHsSigType Name
 synifyPatSynSigType ps = mkEmptyImplicitBndrs (synifyPatSynType ps)
 
 synifyType :: SynifyTypeState -> Type -> LHsType Name
-synifyType _ (TyVarTy tv) = noLoc $ HsTyVar $ noLoc (getName tv)
+synifyType _ (TyVarTy tv) = noLoc $ HsTyVar NotPromoted $ noLoc (getName tv)
 synifyType _ (TyConApp tc tys)
   -- Use */# instead of TYPE 'Lifted/TYPE 'Unlifted (#473)
   | tc `hasKey` tYPETyConKey
   , [TyConApp lev []] <- tys
   , lev `hasKey` ptrRepLiftedDataConKey
-  = noLoc (HsTyVar (noLoc starKindTyConName))
+  = noLoc (HsTyVar NotPromoted (noLoc starKindTyConName))
   | tc `hasKey` tYPETyConKey
   , [TyConApp lev []] <- tys
   , lev `hasKey` ptrRepUnliftedDataConKey
-  = noLoc (HsTyVar (noLoc unliftedTypeKindTyConName))
+  = noLoc (HsTyVar NotPromoted (noLoc unliftedTypeKindTyConName))
   -- Use non-prefix tuple syntax where possible, because it looks nicer.
   | Just sort <- tyConTuple_maybe tc
   , tyConArity tc == length tys
@@ -400,7 +400,7 @@ synifyType _ (TyConApp tc tys)
   -- Most TyCons:
   | otherwise =
     foldl (\t1 t2 -> noLoc (HsAppTy t1 t2))
-      (noLoc $ HsTyVar $ noLoc (getName tc))
+      (noLoc $ HsTyVar NotPromoted $ noLoc (getName tc))
       (map (synifyType WithinType) $
        filterOut isCoercionTy tys)
 synifyType s (AppTy t1 (CoercionTy {})) = synifyType s t1
@@ -443,8 +443,8 @@ synifyPatSynType ps = let
   in noLoc $ sForAll univ_tvs $ sQual req_theta' $ sForAll ex_tvs $ sQual prov_theta sTau
 
 synifyTyLit :: TyLit -> HsTyLit
-synifyTyLit (NumTyLit n) = HsNumTy mempty n
-synifyTyLit (StrTyLit s) = HsStrTy mempty s
+synifyTyLit (NumTyLit n) = HsNumTy NoSourceText n
+synifyTyLit (StrTyLit s) = HsStrTy NoSourceText s
 
 synifyKindSig :: Kind -> LHsKind Name
 synifyKindSig k = synifyType WithinType k
