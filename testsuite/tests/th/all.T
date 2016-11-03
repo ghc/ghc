@@ -417,3 +417,6 @@ test('T12130', extra_clean(['T12130a.hi','T12130a.o']),
               multimod_compile, ['T12130', '-v0 ' + config.ghc_th_way_flags])
 test('T12407', omit_ways(['ghci']), compile, ['-v0'])
 test('T12411', normal, compile_fail, [''])
+test('T12788', extra_clean(['T12788_Lib.hi', 'T12788_Lib.o']),
+               multimod_compile_fail,
+               ['T12788.hs', '-v0 ' + config.ghc_th_way_flags])
