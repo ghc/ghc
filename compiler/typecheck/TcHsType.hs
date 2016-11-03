@@ -1544,7 +1544,6 @@ kindGeneralizeType :: Type -> TcM Type
 kindGeneralizeType ty
   = do { kvs <- kindGeneralize ty
        ; ty <- zonkSigType (mkInvForAllTys kvs ty)
-       ; traceTc "kindGen" (ppr (mkInvForAllTys kvs ty) $$ ppr ty)
        ; return ty  }
 
 kindGeneralize :: TcType -> TcM [KindVar]
