@@ -1591,6 +1591,33 @@ The type checker checks this code, and it currently requires
 so ew have to switch that flag on locally in TcDeriv.genInst.
 
 See #8503 for more discussion.
+
+Note [Newtype-deriving trickiness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (Trac #12768):
+  class C a where { op :: D a => a -> a }
+
+  instance C a  => C [a] where { op = opList }
+
+  opList :: (C a, D [a]) => [a] -> [a]
+  opList = ...
+
+Now suppose we try GND on this:
+  newtype N a = MkN [a] deriving( C )
+
+The GND is expecting to get an implementation of op for N by
+coercing opList, thus:
+
+  instance C a => C (N a) where { op = opN }
+
+  opN :: (C a, D (N a)) => N a -> N a
+  opN = coerce @(D [a]   => [a] -> [a])
+               @(D (N a) => [N a] -> [N a]
+               opList
+
+But there is no reason to suppose that (D [a]) and (D (N a))
+are inter-coercible; these instances might completely different.
+So GHC rightly rejects this code.
 -}
 
 gen_Newtype_binds :: SrcSpan
@@ -1636,6 +1663,7 @@ mkCoerceClassMethEqn :: Class   -- the class being derived
                      -> Id      -- the method to look at
                      -> Pair Type
 -- See Note [Newtype-deriving instances]
+-- See also Note [Newtype-deriving trickiness]
 -- The pair is the (from_type, to_type), where to_type is
 -- the type of the method we are tyrying to get
 mkCoerceClassMethEqn cls inst_tvs inst_tys rhs_ty id
