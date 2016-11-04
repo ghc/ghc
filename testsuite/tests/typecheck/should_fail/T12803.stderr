@@ -1,0 +1,8 @@
+
+T12803.hs:9:10: error:
+    • Illegal instance declaration for ‘C p [q]’
+        The liberal coverage condition fails in class ‘C’
+          for functional dependency: ‘a -> b’
+        Reason: lhs type ‘p’ does not determine rhs type ‘[q]’
+        Un-determined variable: q
+    • In the instance declaration for ‘C p [q]’

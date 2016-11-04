@@ -10,7 +10,7 @@ module FamInst (
         newFamInst,
 
         -- * Injectivity
-        makeInjectivityErrors
+        makeInjectivityErrors, injTyVarsOfType, injTyVarsOfTypes
     ) where
 
 import HscTypes
@@ -504,35 +504,39 @@ unusedInjTvsInRHS tycon injList lhs rhs =
       -- set of type variables appearing in the RHS on an injective position.
       -- For all returned variables we assume their associated kind variables
       -- also appear in the RHS.
-      injRhsVars = collectInjVars rhs
+      injRhsVars = injTyVarsOfType rhs
 
-      -- Collect all type variables that are either arguments to a type
-      -- constructor or to injective type families.
-      collectInjVars :: Type -> VarSet
-      collectInjVars (TyVarTy v)
-        = unitVarSet v `unionVarSet` collectInjVars (tyVarKind v)
-      collectInjVars (TyConApp tc tys)
-        | isTypeFamilyTyCon tc = collectInjTFVars tys
-                                                 (familyTyConInjectivityInfo tc)
-        | otherwise            = mapUnionVarSet collectInjVars tys
-      collectInjVars (LitTy {})
-        = emptyVarSet
-      collectInjVars (FunTy arg res)
-        = collectInjVars arg `unionVarSet` collectInjVars res
-      collectInjVars (AppTy fun arg)
-        = collectInjVars fun `unionVarSet` collectInjVars arg
-      -- no forall types in the RHS of a type family
-      collectInjVars (ForAllTy {})    =
-          panic "unusedInjTvsInRHS.collectInjVars"
-      collectInjVars (CastTy ty _)   = collectInjVars ty
-      collectInjVars (CoercionTy {}) = emptyVarSet
+injTyVarsOfType :: TcTauType -> TcTyVarSet
+-- Collect all type variables that are either arguments to a type
+--   constructor or to /injective/ type families.
+-- Determining the overall type determines thes variables
+--
+-- E.g.   Suppose F is injective in its second arg, but not its first
+--        then injVarOfType (Either a (F [b] (a,c))) = {a,c}
+--        Determining the overall type determines a,c but not b.
+injTyVarsOfType (TyVarTy v)
+  = unitVarSet v `unionVarSet` injTyVarsOfType (tyVarKind v)
+injTyVarsOfType (TyConApp tc tys)
+  | isTypeFamilyTyCon tc
+   = case familyTyConInjectivityInfo tc of
+        NotInjective  -> emptyVarSet
+        Injective inj -> injTyVarsOfTypes (filterByList inj tys)
+  | otherwise
+  = injTyVarsOfTypes tys
+injTyVarsOfType (LitTy {})
+  = emptyVarSet
+injTyVarsOfType (FunTy arg res)
+  = injTyVarsOfType arg `unionVarSet` injTyVarsOfType res
+injTyVarsOfType (AppTy fun arg)
+  = injTyVarsOfType fun `unionVarSet` injTyVarsOfType arg
+-- No forall types in the RHS of a type family
+injTyVarsOfType (CastTy ty _)   = injTyVarsOfType ty
+injTyVarsOfType (CoercionTy {}) = emptyVarSet
+injTyVarsOfType (ForAllTy {})    =
+    panic "unusedInjTvsInRHS.injTyVarsOfType"
 
-      collectInjTFVars :: [Type] -> Injectivity -> VarSet
-      collectInjTFVars _ NotInjective
-          = emptyVarSet
-      collectInjTFVars tys (Injective injList)
-          = mapUnionVarSet collectInjVars (filterByList injList tys)
-
+injTyVarsOfTypes :: [Type] -> VarSet
+injTyVarsOfTypes tys = mapUnionVarSet injTyVarsOfType tys
 
 -- | Is type headed by a type family application?
 isTFHeaded :: Type -> Bool

@@ -148,7 +148,7 @@ The SrcSpan is for the entire original declaration.
 -}
 
 mkClass :: Name -> [TyVar]
-        -> [([TyVar], [TyVar])]
+        -> [FunDep TyVar]
         -> [PredType] -> [Id]
         -> [ClassATItem]
         -> [ClassOpItem]

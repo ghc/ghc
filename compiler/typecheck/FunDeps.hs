@@ -25,6 +25,7 @@ import Class
 import Type
 import TcType( transSuperClasses )
 import Unify
+import FamInst( injTyVarsOfTypes )
 import InstEnv
 import VarSet
 import VarEnv
@@ -491,6 +492,36 @@ also know `t2` and the other way.
 
 oclose is used (only) when checking the coverage condition for
 an instance declaration
+
+Note [Equality superclasses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+  class (a ~ [b]) => C a b
+
+Remember from Note [The equality types story] in TysPrim, that
+  * (a ~~ b) is a superclass of (a ~ b)
+  * (a ~# b) is a superclass of (a ~~ b)
+
+So when oclose expands superclasses we'll get a (a ~# [b]) superclass.
+But that's an EqPred not a ClassPred, and we jolly well do want to
+account for the mutual functional dependencies implied by (t1 ~# t2).
+Hence the EqPred handling in oclose.  See Trac #10778.
+
+Note [Care with type functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (Trac #12803)
+  class C x y | x -> y
+  type family F a b
+  type family G c d = r | r -> d
+
+Now consider
+  oclose (C (F a b) (G c d)) {a,b}
+
+Knowing {a,b} fixes (F a b) regardless of the injectivity of F.
+But knowing (G c d) fixes only {d}, because G is only injective
+in its second parameter.
+
+Hence the tyCoVarsOfTypes/injTyVarsOfTypes dance in tv_fds.
 -}
 
 oclose :: [PredType] -> TyCoVarSet -> TyCoVarSet
@@ -507,7 +538,8 @@ oclose preds fixed_tvs
             -- closeOverKinds: see Note [Closing over kinds in coverage]
 
     tv_fds  :: [(TyCoVarSet,TyCoVarSet)]
-    tv_fds  = [ (tyCoVarsOfTypes ls, tyCoVarsOfTypes rs)
+    tv_fds  = [ (tyCoVarsOfTypes ls, injTyVarsOfTypes rs)
+                  -- See Note [Care with type functions]
               | pred <- preds
               , pred' <- pred : transSuperClasses pred
                    -- Look for fundeps in superclasses too
@@ -517,13 +549,14 @@ oclose preds fixed_tvs
     determined pred
        = case classifyPredType pred of
             EqPred NomEq t1 t2 -> [([t1],[t2]), ([t2],[t1])]
+               -- See Note [Equality superclasses]
             ClassPred cls tys  -> [ instFD fd cls_tvs tys
                                   | let (cls_tvs, cls_fds) = classTvsFds cls
                                   , fd <- cls_fds ]
             _ -> []
 
-{-
-************************************************************************
+
+{- *********************************************************************
 *                                                                      *
         Check that a new instance decl is OK wrt fundeps
 *                                                                      *
