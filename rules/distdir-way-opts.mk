@@ -30,13 +30,22 @@ define distdir-way-opts # args: $1 = dir, $2 = distdir, $3 = way, $4 = stage
 #  Variable              Purpose                           Defined by
 #  --------------        ------------------------------    --------------
 #  $1_PACKAGE            Package name for this dir,        $1/$2/ghc.mk
-#                        if it is a package   
-#   
+#                        if it is a package
+#
 #  CONF_HC_OPTS          GHC options from ./configure      mk/config.mk.in
-#   
+#
+#  CONF_CPP_OPTS_STAGE$4 CPP options from ./configure      mk/config.mk.in
+#
+#  CONF_CC_OPTS_STAGE$4  C compiler options from           mk/config.mk.in
+#                        ./configure
+#
 #  CONF_HC_OPTS_STAGE$4  GHC options from ./configure      mk/config.mk.in
-#                        specific to stage $4   
-#   
+#                        specific to stage $4
+#
+#  CONF_LD_LINKER_OPTS_STAGE$4
+#                        GHC options from ./configure      mk/config.mk.in
+#                        specific to stage $4
+#
 #  WAY_$3_HC_OPTS        GHC options specific to way $3    mk/ways.mk
 #   
 #  SRC_HC_OPTS           source-tree-wide GHC options      mk/config.mk.in
@@ -82,7 +91,7 @@ define distdir-way-opts # args: $1 = dir, $2 = distdir, $3 = way, $4 = stage
 #                        source files   
 #   
 #  $1_$2_CPP_OPTS        CPP options                       $1/$2/package-data.mk
-#  
+#
 #  <file>_HC_OPTS        GHC options for this source       $1/$2/ghc.mk
 #                        file (without the extension)
 
@@ -193,7 +202,8 @@ $1_$2_$3_ALL_LD_OPTS = \
  $$($1_$2_DIST_LD_OPTS) \
  $$($1_$2_$3_LD_OPTS) \
  $$($1_$2_EXTRA_LD_OPTS) \
- $$(EXTRA_LD_OPTS)
+ $$(EXTRA_LD_OPTS) \
+ $$(CONF_LD_LINKER_OPTS_STAGE$4)
 
 # Options for passing to GHC when we use it for linking
 $1_$2_$3_GHC_LD_OPTS = \
