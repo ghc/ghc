@@ -54,9 +54,9 @@ struct callback_queue* mkCallbackQueue(int use_foreign_export)
     pthread_t t;
     pthread_mutex_init(&q->lock, NULL);
     pthread_cond_init(&q->cond, NULL);
-    pthread_create(&t, NULL, (threadfunc*)callback, q);
     q->pending = NULL;
     q->use_foreign_export = use_foreign_export;
+    pthread_create(&t, NULL, (threadfunc*)callback, q);
     return q;
 }
 
