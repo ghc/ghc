@@ -682,6 +682,10 @@ AC_SUBST(CONF_LD_LINKER_OPTS_STAGE2)
 AC_SUBST(CONF_CPP_OPTS_STAGE0)
 AC_SUBST(CONF_CPP_OPTS_STAGE1)
 AC_SUBST(CONF_CPP_OPTS_STAGE2)
+# Flags passed to the Haskell compiler
+AC_SUBST(CONF_HC_OPTS_STAGE0)
+AC_SUBST(CONF_HC_OPTS_STAGE1)
+AC_SUBST(CONF_HC_OPTS_STAGE2)
 
 dnl ** Set up the variables for the platform in the settings file.
 dnl May need to use gcc to find platform details.
