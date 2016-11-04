@@ -47,7 +47,7 @@ $(ghc-cabal_DIST_BINARY): $(wildcard libraries/Cabal/Cabal/Distribution/*.hs)
 $(ghc-cabal_DIST_BINARY): utils/ghc-cabal/Main.hs $(TOUCH_DEP) | $$(dir $$@)/. bootstrapping/.
 	"$(GHC)" $(SRC_HC_OPTS) \
 	       $(addprefix -optc, $(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE0)) \
-	       $(addprefix -optl, $(SRC_LD_OPTS) $(CONF_LD_OPTS_STAGE0)) \
+	       $(addprefix -optl, $(SRC_LD_OPTS) $(CONF_GCC_LINKER_OPTS_STAGE0)) \
 	       -hide-all-packages \
 	       $(addprefix -package , $(CABAL_BUILD_DEPS)) \
 	       --make utils/ghc-cabal/Main.hs -o $@ \
