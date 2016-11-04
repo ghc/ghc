@@ -2125,7 +2125,7 @@ getGhciStepIO = do
         ioM     = nlHsAppTy (nlHsTyVar ioTyConName) (nlHsTyVar a_tv)
 
         step_ty = noLoc $ HsForAllTy { hst_bndrs = [noLoc $ UserTyVar (noLoc a_tv)]
-                                     , hst_body  = nlHsFunTy ghciM ioM }
+                                     , hst_body  = nlHsFunTy ghciM Omega ioM }
 
         stepTy :: LHsSigWcType Name
         stepTy = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs step_ty)

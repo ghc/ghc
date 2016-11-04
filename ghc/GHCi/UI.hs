@@ -1504,12 +1504,12 @@ defineMacro overwrite s = do
   handleSourceError GHC.printException $ do
     step <- getGhciStepIO
     expr <- GHC.parseExpr definition
-    -- > ghciStepIO . definition :: String -> IO String
+    -- > ghciStepIO . definition :: StringstringTy  -> IO String
     let stringTy = nlHsTyVar stringTy_RDR
         ioM = nlHsTyVar (getRdrName ioTyConName) `nlHsAppTy` stringTy
         body = nlHsVar compose_RDR `mkHsApp` (nlHsPar step)
                                    `mkHsApp` (nlHsPar expr)
-        tySig = mkLHsSigWcType (stringTy `nlHsFunTy` ioM)
+        tySig = mkLHsSigWcType (nlHsFunTy stringTy Omega ioM)
         new_expr = L (getLoc expr) $ ExprWithTySig body tySig
     hv <- GHC.compileParsedExprRemote new_expr
 
@@ -1573,7 +1573,7 @@ getGhciStepIO = do
       ghciM = nlHsTyVar (getRdrName ghciTyConName) `nlHsAppTy` stringTy
       ioM = nlHsTyVar (getRdrName ioTyConName) `nlHsAppTy` stringTy
       body = nlHsVar (getRdrName ghciStepIoMName)
-      tySig = mkLHsSigWcType (ghciM `nlHsFunTy` ioM)
+      tySig = mkLHsSigWcType (nlHsFunTy ghciM Omega ioM) -- TODO:arnaud: check
   return $ noLoc $ ExprWithTySig body tySig
 
 -----------------------------------------------------------------------------

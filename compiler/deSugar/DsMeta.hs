@@ -1006,7 +1006,7 @@ repTy (HsAppTy f a)         = do
                                 f1 <- repLTy f
                                 a1 <- repLTy a
                                 repTapp f1 a1
-repTy (HsFunTy f a)         = do
+repTy (HsFunTy f _weight a)         = do
                                 f1   <- repLTy f
                                 a1   <- repLTy a
                                 tcon <- repArrowTyCon

@@ -645,8 +645,8 @@ getLocalNonValBinders fixity_env
               cdflds = case tau of
                  L _ (HsFunTy
                       (L _ (HsAppsTy
-                        [L _ (HsAppPrefix (L _ (HsRecTy flds)))])) _) -> flds
-                 L _ (HsFunTy (L _ (HsRecTy flds)) _) -> flds
+                        [L _ (HsAppPrefix (L _ (HsRecTy flds)))])) _ _) -> flds
+                 L _ (HsFunTy (L _ (HsRecTy flds)) _ _) -> flds
                  _                                    -> []
         find_con_flds _ = []
 

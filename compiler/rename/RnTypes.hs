@@ -507,7 +507,7 @@ rnHsTyKi env ty@(HsRecTy flds)
                                    2 (ppr ty))
            ; return [] }
 
-rnHsTyKi env (HsFunTy ty1 ty2)
+rnHsTyKi env (HsFunTy ty1 weight ty2)
   = do { (ty1', fvs1) <- rnLHsTyKi env ty1
         -- Might find a for-all as the arg of a function type
        ; (ty2', fvs2) <- rnLHsTyKi env ty2
@@ -515,8 +515,10 @@ rnHsTyKi env (HsFunTy ty1 ty2)
         -- when we find return :: forall m. Monad m -> forall a. a -> m a
 
         -- Check for fixity rearrangements
-       ; res_ty <- mkHsOpTyRn HsFunTy funTyConName funTyFixity ty1' ty2'
+       ; res_ty <- mkHsOpTyRn hs_fun_ty funTyConName funTyFixity ty1' ty2'
        ; return (res_ty, fvs1 `plusFV` fvs2) }
+  where
+    hs_fun_ty a b = HsFunTy a weight b
 
 rnHsTyKi env listTy@(HsListTy ty)
   = do { data_kinds <- xoptM LangExt.DataKinds
@@ -1040,7 +1042,7 @@ collectAnonWildCards lty = go lty
       HsWildCardTy (AnonWildCard (L _ wc)) -> [wc]
       HsAppsTy tys                 -> gos (mapMaybe (prefix_types_only . unLoc) tys)
       HsAppTy ty1 ty2              -> go ty1 `mappend` go ty2
-      HsFunTy ty1 ty2              -> go ty1 `mappend` go ty2
+      HsFunTy ty1 _ ty2              -> go ty1 `mappend` go ty2
       HsListTy ty                  -> go ty
       HsPArrTy ty                  -> go ty
       HsTupleTy _ tys              -> gos tys
@@ -1153,9 +1155,11 @@ mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsOpTy ty21 op2 ty22))
                       (\t1 t2 -> HsOpTy t1 op2 t2)
                       (unLoc op2) fix2 ty21 ty22 loc2 }
 
-mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsFunTy ty21 ty22))
+mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsFunTy ty21 weight ty22))
   = mk_hs_op_ty mk1 pp_op1 fix1 ty1
-                HsFunTy funTyConName funTyFixity ty21 ty22 loc2
+                hs_fun_ty funTyConName funTyFixity ty21 ty22 loc2
+  where
+    hs_fun_ty a b = HsFunTy a weight b
 
 mkHsOpTyRn mk1 _ _ ty1 ty2              -- Default case, no rearrangment
   = return (mk1 ty1 ty2)
@@ -1663,7 +1667,7 @@ extract_lty t_or_k (L _ ty) acc
       HsPArrTy ty               -> extract_lty t_or_k ty acc
       HsTupleTy _ tys           -> extract_ltys t_or_k tys acc
       HsSumTy tys               -> extract_ltys t_or_k tys acc
-      HsFunTy ty1 ty2           -> extract_lty t_or_k ty1 =<<
+      HsFunTy ty1 _ ty2         -> extract_lty t_or_k ty1 =<<
                                    extract_lty t_or_k ty2 acc
       HsIParamTy _ ty           -> extract_lty t_or_k ty acc
       HsEqTy ty1 ty2            -> extract_lty t_or_k ty1 =<<

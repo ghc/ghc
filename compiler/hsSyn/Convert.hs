@@ -537,7 +537,7 @@ cvtConstr (RecGadtC c varstrtys ty)
   = do  { c'       <- mapM cNameL c
         ; ty'      <- cvtType ty
         ; rec_flds <- mapM cvt_id_arg varstrtys
-        ; let rec_ty = noLoc (HsFunTy (noLoc $ HsRecTy rec_flds) ty')
+        ; let rec_ty = noLoc (HsFunTy (noLoc $ HsRecTy rec_flds) Omega ty')
         ; returnL $ mkGadtDecl c' (mkLHsSigType rec_ty) }
 
 cvtSrcUnpackedness :: TH.SourceUnpackedness -> SrcUnpackedness
@@ -1209,8 +1209,8 @@ cvtTypeKind ty_str ty
              | otherwise
              -> mk_apps (HsTyVar NotPromoted (noLoc (getRdrName (sumTyCon n))))
                         tys'
-           ArrowT
-             | [x',y'] <- tys' -> returnL (HsFunTy x' y')
+           ArrowT-- TODO: arnaud: linear syntax for template haskell.
+             | [x',y'] <- tys' -> returnL (HsFunTy x' Omega y')
              | otherwise ->
                   mk_apps (HsTyVar NotPromoted (noLoc (getRdrName funTyCon)))
                           tys'
@@ -1328,7 +1328,8 @@ mk_arr_apps :: [LHsType RdrName] -> HsType RdrName -> CvtM (LHsType RdrName)
 mk_arr_apps tys return_ty = foldrM go return_ty tys >>= returnL
     where go :: LHsType RdrName -> HsType RdrName -> CvtM (HsType RdrName)
           go arg ret_ty = do { ret_ty_l <- returnL ret_ty
-                             ; return (HsFunTy arg ret_ty_l) }
+                             ; return (HsFunTy arg Omega ret_ty_l) }
+            -- TODO: arnaud: linear syntax for template haskell
 
 split_ty_app :: TH.Type -> CvtM (TH.Type, [LHsType RdrName])
 split_ty_app ty = go ty []

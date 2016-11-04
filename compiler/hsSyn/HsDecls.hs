@@ -1184,8 +1184,8 @@ gadtDeclDetails HsIB {hsib_body = lbody_ty} = (details,res_ty,cxt,tvs)
   where
     (tvs, cxt, tau) = splitLHsSigmaTy lbody_ty
     (details, res_ty)           -- See Note [Sorting out the result type]
-      = case tau of
-          L _ (HsFunTy (L l (HsRecTy flds)) res_ty')
+      = case tau of -- TODO: arnaud: ignoring weight. Don't know what this does
+          L _ (HsFunTy (L l (HsRecTy flds)) _weight res_ty')
                   -> (RecCon (L l flds), res_ty')
           _other  -> (PrefixCon [], tau)
 

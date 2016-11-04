@@ -547,7 +547,9 @@ tc_hs_type _ ty@(HsSpliceTy {}) _exp_kind
   = failWithTc (text "Unexpected type splice:" <+> ppr ty)
 
 ---------- Functions and applications
-tc_hs_type mode (HsFunTy ty1 ty2) exp_kind
+-- Type elaboration forgets about the weight (core does not know about
+-- linearity yet).
+tc_hs_type mode (HsFunTy ty1 _weight ty2) exp_kind
   = tc_fun_type mode ty1 ty2 exp_kind
 
 tc_hs_type mode (HsOpTy ty1 (L _ op) ty2) exp_kind
