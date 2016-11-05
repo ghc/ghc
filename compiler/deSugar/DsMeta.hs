@@ -1616,14 +1616,9 @@ repP (ConPatIn dc details)
 repP (NPat (L _ l) Nothing _ _) = do { a <- repOverloadedLiteral l; repPlit a }
 repP (ViewPat e p _) = do { e' <- repLE e; p' <- repLP p; repPview e' p' }
 repP p@(NPat _ (Just _) _ _) = notHandled "Negative overloaded patterns" (ppr p)
-repP p@(SigPatIn {})  = notHandled "Type signatures in patterns" (ppr p)
-        -- The problem is to do with scoped type variables.
-        -- To implement them, we have to implement the scoping rules
-        -- here in DsMeta, and I don't want to do that today!
-        --       do { p' <- repLP p; t' <- repLTy t; repPsig p' t' }
-        --      repPsig :: Core TH.PatQ -> Core TH.TypeQ -> DsM (Core TH.PatQ)
-        --      repPsig (MkC p) (MkC t) = rep2 sigPName [p, t]
-
+repP (SigPatIn p t) = do { p' <- repLP p
+                         ; t' <- repLTy (hsSigWcType t)
+                         ; repPsig p' t' }
 repP (SplicePat splice) = repSplice splice
 
 repP other = notHandled "Exotic pattern" (ppr other)
@@ -1840,6 +1835,9 @@ repPlist (MkC ps) = rep2 listPName [ps]
 
 repPview :: Core TH.ExpQ -> Core TH.PatQ -> DsM (Core TH.PatQ)
 repPview (MkC e) (MkC p) = rep2 viewPName [e,p]
+
+repPsig :: Core TH.PatQ -> Core TH.TypeQ -> DsM (Core TH.PatQ)
+repPsig (MkC p) (MkC t) = rep2 sigPName [p, t]
 
 --------------- Expressions -----------------
 repVarOrCon :: Name -> Core TH.Name -> DsM (Core TH.ExpQ)

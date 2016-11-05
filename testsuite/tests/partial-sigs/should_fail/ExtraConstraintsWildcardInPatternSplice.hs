@@ -2,4 +2,4 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module ExtraConstraintsWildcardInPatternSplice where
 
-foo $( [p| (x :: _) |] ) = x
+foo $( [p| (_ :: _) |] ) = ()

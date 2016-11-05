@@ -1,17 +1,17 @@
 {-# LANGUAGE ScopedTypeVariables #-}
--- test the representation of unboxed literals
 
 module Main
 where
 
-import Language.Haskell.TH
+import TH_repPatSig_asserts
 
-$(
-  [d|
-     foo :: Int -> Int
-     foo (x :: Int) = x
-   |]
- )
+assertFoo [d| foo :: Int -> Int
+              foo (x :: Int) = x
+            |]
+
+assertCon [| \(x :: Either Char Int -> (Char, Int)) -> x |]
+
+assertVar [| \(x :: Maybe a) -> case x of Just y -> (y :: a) |]
 
 main :: IO ()
 main = return ()

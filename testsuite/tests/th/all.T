@@ -24,7 +24,11 @@ test('TH_repPrimOutput', normal, compile_and_run, [''])
 test('TH_repPrimOutput2', normal, compile_and_run, [''])
 test('TH_repGuard', normal, compile, ['-v0'])
 test('TH_repGuardOutput', normal, compile_and_run, [''])
-test('TH_repPatSig', normal, compile_fail, [''])
+test('TH_repPatSig',
+     extra_clean(['TH_repPatSig_asserts.hi', 'TH_repPatSig_asserts.o']),
+     multimod_compile,
+     ['TH_repPatSig.hs', '-v0 ' + config.ghc_th_way_flags])
+test('TH_repPatSigTVar', normal, compile_fail, ['-v0'])
 
 test('TH_overlaps', normal, compile, ['-v0'])
 

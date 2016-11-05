@@ -38,6 +38,7 @@ test('PatBind', normal, compile, ['-ddump-types -fno-warn-partial-type-signature
 # Bug
 test('PatBind2', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('PatternSig', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
+test('PatternSplice', normal, compile, ['-fno-warn-partial-type-signatures'])
 test('Recursive', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('ScopedNamedWildcards', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('ScopedNamedWildcardsGood', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
