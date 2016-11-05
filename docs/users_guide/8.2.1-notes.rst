@@ -80,6 +80,8 @@ Template Haskell
    correctly. Previously, Template Haskell would implicitly remove the
    parentheses when splicing, which would turn ``(# Int #)`` into ``Int``.
 
+-  Add support for type signatures in patterns. (:ghc-ticket:`12164`)
+
 Runtime system
 ~~~~~~~~~~~~~~
 
