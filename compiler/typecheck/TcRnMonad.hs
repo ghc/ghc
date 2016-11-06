@@ -662,18 +662,18 @@ updTcRef ref fn = liftIO $ do { old <- readIORef ref
 -- Typechecker trace
 traceTc :: String -> SDoc -> TcRn ()
 traceTc =
-  guardedTraceOptTcRn Opt_D_dump_tc_trace
+  labelledTraceOptTcRn Opt_D_dump_tc_trace
 
 -- Renamer Trace
 traceRn :: String -> SDoc -> TcRn ()
 traceRn =
-  guardedTraceOptTcRn Opt_D_dump_rn_trace
+  labelledTraceOptTcRn Opt_D_dump_rn_trace
 
--- | Do not display a trace if `-dno-debug-output` is on
-guardedTraceOptTcRn :: DumpFlag -> String -> SDoc -> TcRn ()
-guardedTraceOptTcRn flag herald doc = do
-  unless opt_NoDebugOutput
-       ( traceOptTcRn flag (formatTraceMsg herald doc) )
+-- | Trace when a certain flag is enabled. This is like `traceOptTcRn`
+-- but accepts a string as a label and formats the trace message uniformly.
+labelledTraceOptTcRn :: DumpFlag -> String -> SDoc -> TcRn ()
+labelledTraceOptTcRn flag herald doc = do
+   traceOptTcRn flag (formatTraceMsg herald doc)
 
 formatTraceMsg :: String -> SDoc -> SDoc
 formatTraceMsg herald doc = hang (text herald) 2 doc
