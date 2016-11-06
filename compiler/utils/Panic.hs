@@ -290,7 +290,7 @@ withSignalHandlers act = do
   -- uninstall handlers if necessary
   let mayUninstallHandlers = liftIO $ modifyMVar_ signalHandlersRefCount $ \case
         (1,Just hdls)   -> do
-          uninstallHandlers hdls
+          _ <- uninstallHandlers hdls
           return (0,Nothing)
         (c,oldHandlers) -> return (c-1,oldHandlers)
 
