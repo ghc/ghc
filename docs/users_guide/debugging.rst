@@ -193,6 +193,11 @@ Dumping out compiler intermediate structures
 
     Make the renamer be *real* chatty about what it is up to.
 
+.. ghc-flag:: -ddump-ec-trace
+
+    Make the pattern match exhaustiveness checker be *real* chatty about
+    what it is up to.
+
 .. ghc-flag:: -ddump-rn-stats
 
     Print out summary of what kind of information the renamer had to

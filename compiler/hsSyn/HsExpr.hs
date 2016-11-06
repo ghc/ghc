@@ -1347,6 +1347,10 @@ data Match id body
   }
 deriving instance (Data body,DataId id) => Data (Match id body)
 
+instance (OutputableBndrId idR, Outputable body)
+            => Outputable (Match idR body) where
+  ppr = pprMatch
+
 {-
 Note [m_ctxt in Match]
 ~~~~~~~~~~~~~~~~~~~~~~

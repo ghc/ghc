@@ -142,6 +142,7 @@ type PmResult = ([Located [LPat Id]], Uncovered, [Located [LPat Id]])
 -- | Check a single pattern binding (let)
 checkSingle :: DynFlags -> DsMatchContext -> Id -> Pat Id -> DsM ()
 checkSingle dflags ctxt@(DsMatchContext _ locn) var p = do
+  tracePm "checkSingle" (vcat [ppr ctxt, ppr var, ppr p])
   mb_pm_res <- tryM (checkSingle' locn var p)
   case mb_pm_res of
     Left  _   -> warnPmIters dflags ctxt
@@ -154,6 +155,7 @@ checkSingle' locn var p = do
   fam_insts <- dsGetFamInstEnvs
   clause    <- translatePat fam_insts p
   missing   <- mkInitialUncovered [var]
+  tracePm "checkSingle: missing" (vcat (map pprValVecDebug missing))
   (cs,us,ds) <- runMany (pmcheckI clause []) missing -- no guards
   return $ case (cs,ds) of
     (True,  _    ) -> ([], us, []) -- useful
@@ -165,6 +167,11 @@ checkSingle' locn var p = do
 checkMatches :: DynFlags -> DsMatchContext
              -> [Id] -> [LMatch Id (LHsExpr Id)] -> DsM ()
 checkMatches dflags ctxt vars matches = do
+  tracePm "checkMatches" (hang (vcat [ppr ctxt
+                               , ppr vars
+                               , text "Matches:"])
+                               2
+                               (vcat (map ppr matches)))
   mb_pm_res <- tryM (checkMatches' vars matches)
   case mb_pm_res of
     Left  _   -> warnPmIters dflags ctxt
@@ -177,11 +184,13 @@ checkMatches' vars matches
   | otherwise = do
       resetPmIterDs -- set the iter-no to zero
       missing    <- mkInitialUncovered vars
+      tracePm "checkMatches: missing" (vcat (map pprValVecDebug missing))
       (rs,us,ds) <- go matches missing
       return (map hsLMatchToLPats rs, us, map hsLMatchToLPats ds)
   where
     go []     missing = return ([], missing, [])
     go (m:ms) missing = do
+      tracePm "checMatches': go" (ppr m $$ ppr missing)
       fam_insts          <- dsGetFamInstEnvs
       (clause, guards)   <- translateMatch fam_insts m
       (cs, missing', ds) <- runMany (pmcheckI clause guards) missing
@@ -900,7 +909,12 @@ mkInitialUncovered vars = do
 -- | Increase the counter for elapsed algorithm iterations, check that the
 -- limit is not exceeded and call `pmcheck`
 pmcheckI :: PatVec -> [PatVec] -> ValVec -> PmM Triple
-pmcheckI ps guards vva = incrCheckPmIterDs >> pmcheck ps guards vva
+pmcheckI ps guards vva = do
+  n <- incrCheckPmIterDs
+  tracePm "pmCheck" (ppr n <> colon <+> pprPatVec ps
+                        $$ hang (text "guards:") 2 (vcat (map pprPatVec guards))
+                        $$ pprValVecDebug vva)
+  pmcheck ps guards vva
 {-# INLINE pmcheckI #-}
 
 -- | Increase the counter for elapsed algorithm iterations, check that the
@@ -912,8 +926,15 @@ pmcheckGuardsI gvs vva = incrCheckPmIterDs >> pmcheckGuards gvs vva
 -- | Increase the counter for elapsed algorithm iterations, check that the
 -- limit is not exceeded and call `pmcheckHd`
 pmcheckHdI :: Pattern -> PatVec -> [PatVec] -> ValAbs -> ValVec -> PmM Triple
-pmcheckHdI p ps guards va vva = incrCheckPmIterDs >>
-                                  pmcheckHd p ps guards va vva
+pmcheckHdI p ps guards va vva = do
+  n <- incrCheckPmIterDs
+  tracePm "pmCheckHdI" (ppr n <> colon <+> pprPmPatDebug p
+                        $$ pprPatVec ps
+                        $$ hang (text "guards:") 2 (vcat (map pprPatVec guards))
+                        $$ pprPmPatDebug va
+                        $$ pprValVecDebug vva)
+
+  pmcheckHd p ps guards va vva
 {-# INLINE pmcheckHdI #-}
 
 -- | Matching function: Check simultaneously a clause (takes separately the
@@ -1416,3 +1437,36 @@ If instead we allow constraints of the form (e ~ e),
 The performance improvement becomes even more important when more arguments are
 involved.
 -}
+
+-- Debugging Infrastructre
+
+tracePm :: String -> SDoc -> PmM ()
+tracePm herald doc = do
+  dflags <- getDynFlags
+  printer <- mkPrintUnqualifiedDs
+  liftIO $ dumpIfSet_dyn_printer printer dflags
+            Opt_D_dump_ec_trace (text herald $$ (nest 2 doc))
+
+
+pprPmPatDebug :: PmPat a -> SDoc
+pprPmPatDebug (PmCon cc _arg_tys _con_tvs _con_dicts con_args)
+  = hsep [text "PmCon", ppr cc, hsep (map pprPmPatDebug con_args)]
+pprPmPatDebug (PmVar vid) = text "PmVar" <+> ppr vid
+pprPmPatDebug (PmLit li)  = text "PmLit" <+> ppr li
+pprPmPatDebug (PmNLit i nl) = text "PmNLit" <+> ppr i <+> ppr nl
+pprPmPatDebug (PmGrd pv ge) = text "PmGrd" <+> hsep (map pprPmPatDebug pv)
+                                           <+> ppr ge
+
+pprPatVec :: PatVec -> SDoc
+pprPatVec ps = hang (text "Pattern:") 2
+                (brackets $ sep
+                  $ punctuate (comma <> char '\n') (map pprPmPatDebug ps))
+
+pprValAbs :: [ValAbs] -> SDoc
+pprValAbs ps = hang (text "ValAbs:") 2
+                (brackets $ sep
+                  $ punctuate (comma) (map pprPmPatDebug ps))
+
+pprValVecDebug :: ValVec -> SDoc
+pprValVecDebug (ValVec vas _d) = text "ValVec" <+>
+                                  parens (pprValAbs vas)

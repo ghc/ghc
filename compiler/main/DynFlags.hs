@@ -355,6 +355,7 @@ data DumpFlag
    | Opt_D_dump_simpl_stats
    | Opt_D_dump_cs_trace -- Constraint solver in type checker
    | Opt_D_dump_tc_trace
+   | Opt_D_dump_ec_trace -- Pattern match exhaustiveness checker
    | Opt_D_dump_if_trace
    | Opt_D_dump_vt_trace
    | Opt_D_dump_splices
@@ -1808,6 +1809,7 @@ dopt f dflags = (fromEnum f `IntSet.member` dumpFlags dflags)
           enableIfVerbose Opt_D_dump_view_pattern_commoning = False
           enableIfVerbose Opt_D_dump_mod_cycles             = False
           enableIfVerbose Opt_D_dump_mod_map                = False
+          enableIfVerbose Opt_D_dump_ec_trace               = False
           enableIfVerbose _                                 = True
 
 -- | Set a 'DumpFlag'
@@ -2760,6 +2762,8 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "ddump-tc-trace"
         (NoArg (do setDumpFlag' Opt_D_dump_tc_trace
                    setDumpFlag' Opt_D_dump_cs_trace))
+  , make_ord_flag defGhcFlag "ddump-ec-trace"
+        (setDumpFlag Opt_D_dump_ec_trace)
   , make_ord_flag defGhcFlag "ddump-vt-trace"
         (setDumpFlag Opt_D_dump_vt_trace)
   , make_ord_flag defGhcFlag "ddump-splices"
