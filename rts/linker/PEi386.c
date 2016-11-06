@@ -1559,7 +1559,7 @@ SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl)
     RtsSymbolInfo *pinfo;
 
     if (!ghciLookupSymbolInfo(symhash, lbl, &pinfo)) {
-        IF_DEBUG(linker, debugBelch("lookupSymbol: symbol not found\n"));
+        IF_DEBUG(linker, debugBelch("lookupSymbol: symbol '%s' not found\n", lbl));
 
         SymbolAddr* sym;
 

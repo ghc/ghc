@@ -1349,7 +1349,7 @@ locateLib hsc_env is_hs dirs lib
                      in liftM2 (<|>) local linked
      findHSDll     = liftM (fmap DLLPath) $ findFile dirs hs_dyn_lib_file
      findDll       = liftM (fmap DLLPath) $ findFile dirs dyn_lib_file
-     findSysDll    = fmap (fmap $ DLL . takeFileName) $ findSystemLibrary hsc_env so_name
+     findSysDll    = fmap (fmap $ DLL . dropExtension . takeFileName) $ findSystemLibrary hsc_env so_name
      tryGcc        = let short = liftM (fmap DLLPath) $ searchForLibUsingGcc dflags so_name     dirs
                          full  = liftM (fmap DLLPath) $ searchForLibUsingGcc dflags lib_so_name dirs
                      in liftM2 (<|>) short full

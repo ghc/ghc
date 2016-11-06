@@ -2521,9 +2521,8 @@ updNameCacheIO hsc_env upd_fn
 mkSOName :: Platform -> FilePath -> FilePath
 mkSOName platform root
     = case platformOS platform of
-      OSDarwin  -> ("lib" ++ root) <.> "dylib"
-      OSMinGW32 ->           root  <.> "dll"
-      _         -> ("lib" ++ root) <.> "so"
+      OSMinGW32 ->           root  <.> soExt platform
+      _         -> ("lib" ++ root) <.> soExt platform
 
 mkHsSOName :: Platform -> FilePath -> FilePath
 mkHsSOName platform root = ("lib" ++ root) <.> soExt platform
