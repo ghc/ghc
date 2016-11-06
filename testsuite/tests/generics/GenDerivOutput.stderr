@@ -1,6 +1,6 @@
 
 ==================== Derived instances ====================
-Derived instances:
+Derived class instances:
   instance GHC.Generics.Generic (GenDerivOutput.List a) where
     GHC.Generics.from x
       = GHC.Generics.M1
@@ -93,7 +93,7 @@ Derived instances:
                     (GHC.Base.fmap GHC.Generics.unRec1) GHC.Generics.unComp1 g2) }
   
 
-GHC.Generics representation types:
+Derived type family instances:
   type GHC.Generics.Rep (GenDerivOutput.List a) = GHC.Generics.D1
                                                     ('GHC.Generics.MetaData
                                                        "List"

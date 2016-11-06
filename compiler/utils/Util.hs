@@ -47,6 +47,8 @@ module Util (
 
         chunkList,
 
+        changeLast,
+
         -- * Tuples
         fstOf3, sndOf3, thdOf3,
         firstM, first3M,
@@ -570,6 +572,12 @@ isn'tIn msg x ys
 chunkList :: Int -> [a] -> [[a]]
 chunkList _ [] = []
 chunkList n xs = as : chunkList n bs where (as,bs) = splitAt n xs
+
+-- | Replace the last element of a list with another element.
+changeLast :: [a] -> a -> [a]
+changeLast []     _  = panic "changeLast"
+changeLast [_]    x  = [x]
+changeLast (x:xs) x' = x : changeLast xs x'
 
 {-
 ************************************************************************

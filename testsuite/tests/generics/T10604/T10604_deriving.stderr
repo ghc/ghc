@@ -1,6 +1,6 @@
 
 ==================== Derived instances ====================
-Derived instances:
+Derived class instances:
   instance GHC.Generics.Generic (T10604_deriving.Empty a) where
     GHC.Generics.from x
       = GHC.Generics.M1
@@ -185,7 +185,7 @@ Derived instances:
             -> T10604_deriving.Starify2 (GHC.Generics.unK1 g1) }
   
 
-GHC.Generics representation types:
+Derived type family instances:
   type GHC.Generics.Rep (T10604_deriving.Empty a) = GHC.Generics.D1
                                                       *
                                                       ('GHC.Generics.MetaData

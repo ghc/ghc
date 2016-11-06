@@ -230,19 +230,38 @@ tcDeriving deriv_infos deriv_decls
 
         ; let (infer_specs, given_specs) = splitEarlyDerivSpec early_specs
         ; insts1 <- mapM genInst given_specs
+        ; insts2 <- mapM genInst infer_specs
 
-        -- the stand-alone derived instances (@insts1@) are used when inferring
-        -- the contexts for "deriving" clauses' instances (@infer_specs@)
-        ; final_specs <- extendLocalInstEnv (map (iSpec . fstOf3) insts1) $
-                         simplifyInstanceContexts infer_specs
-
-        ; insts2 <- mapM genInst final_specs
-
-        ; let (inst_infos, deriv_stuff, maybe_fvs) = unzip3 (insts1 ++ insts2)
+        ; let (_, deriv_stuff, maybe_fvs) = unzip3 (insts1 ++ insts2)
         ; loc <- getSrcSpanM
         ; let (binds, famInsts) = genAuxBinds loc (unionManyBags deriv_stuff)
 
         ; dflags <- getDynFlags
+
+        ; let mk_inst_infos1 = map fstOf3 insts1
+        ; inst_infos1 <- apply_inst_infos mk_inst_infos1 given_specs
+
+          -- We must put all the derived type family instances (from both
+          -- infer_specs and given_specs) in the local instance environment
+          -- before proceeding, or else simplifyInstanceContexts might
+          -- get stuck if it has to reason about any of those family instances.
+          -- See Note [Staging of tcDeriving]
+        ; tcExtendLocalFamInstEnv (bagToList famInsts) $
+          -- NB: only call tcExtendLocalFamInstEnv once, as it performs
+          -- validity checking for all of the family instances you give it.
+          -- If the family instances have errors, calling it twice will result
+          -- in duplicate error messages!
+
+     do {
+        -- the stand-alone derived instances (@inst_infos1@) are used when
+        -- inferring the contexts for "deriving" clauses' instances
+        -- (@infer_specs@)
+        ; final_specs <- extendLocalInstEnv (map iSpec inst_infos1) $
+                         simplifyInstanceContexts infer_specs
+
+        ; let mk_inst_infos2 = map fstOf3 insts2
+        ; inst_infos2 <- apply_inst_infos mk_inst_infos2 final_specs
+        ; let inst_infos = inst_infos1 ++ inst_infos2
 
         ; (inst_info, rn_binds, rn_dus) <-
             renameDeriv is_boot inst_infos binds
@@ -251,22 +270,28 @@ tcDeriving deriv_infos deriv_decls
              liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
                         (ddump_deriving inst_info rn_binds famInsts))
 
-        ; gbl_env <- tcExtendLocalFamInstEnv (bagToList famInsts) $
-                     tcExtendLocalInstEnv (map iSpec (bagToList inst_info)) getGblEnv
+        ; gbl_env <- tcExtendLocalInstEnv (map iSpec (bagToList inst_info))
+                                          getGblEnv
         ; let all_dus = rn_dus `plusDU` usesOnly (NameSet.mkFVs $ catMaybes maybe_fvs)
-        ; return (addTcgDUs gbl_env all_dus, inst_info, rn_binds) }
+        ; return (addTcgDUs gbl_env all_dus, inst_info, rn_binds) } }
   where
     ddump_deriving :: Bag (InstInfo Name) -> HsValBinds Name
                    -> Bag FamInst             -- ^ Rep type family instances
                    -> SDoc
     ddump_deriving inst_infos extra_binds repFamInsts
-      =    hang (text "Derived instances:")
+      =    hang (text "Derived class instances:")
               2 (vcat (map (\i -> pprInstInfoDetails i $$ text "") (bagToList inst_infos))
                  $$ ppr extra_binds)
-        $$ hangP "GHC.Generics representation types:"
+        $$ hangP "Derived type family instances:"
              (vcat (map pprRepTy (bagToList repFamInsts)))
 
     hangP s x = text "" $$ hang (ptext (sLit s)) 2 x
+
+    -- Apply the suspended computations given by genInst calls.
+    -- See Note [Staging of tcDeriving]
+    apply_inst_infos :: [ThetaType -> TcM (InstInfo RdrName)]
+                     -> [DerivSpec ThetaType] -> TcM [InstInfo RdrName]
+    apply_inst_infos = zipWithM (\f ds -> f (ds_theta ds))
 
 -- Prints the representable type family instance
 pprRepTy :: FamInst -> SDoc
@@ -353,6 +378,66 @@ had written
 So we want to signal a user of the data constructor 'MkP'.
 This is the reason behind the (Maybe Name) part of the return type
 of genInst.
+
+Note [Staging of tcDeriving]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here's a tricky corner case for deriving (adapted from Trac #2721):
+
+    class C a where
+      type T a
+      foo :: a -> T a
+
+    instance C Int where
+      type T Int = Int
+      foo = id
+
+    newtype N = N Int deriving C
+
+This will produce an instance something like this:
+
+    instance C N where
+      type T N = T Int
+      foo = coerce (foo :: Int -> T Int) :: N -> T N
+
+We must be careful in order to typecheck this code. When determining the
+context for the instance (in simplifyInstanceContexts), we need to determine
+that T N and T Int have the same representation, but to do that, the T N
+instance must be in the local family instance environment. Otherwise, GHC
+would be unable to conclude that T Int is representationally equivalent to
+T Int, and simplifyInstanceContexts would get stuck.
+
+Previously, tcDeriving would defer adding any derived type family instances to
+the instance environment until the very end, which meant that
+simplifyInstanceContexts would get called without all the type family instances
+it needed in the environment in order to properly simplify instance like
+the C N instance above.
+
+To avoid this scenario, we carefully structure the order of events in
+tcDeriving. We first call genInst on the standalone derived instance specs and
+the instance specs obtained from deriving clauses. Note that the return type of
+genInst is a triple:
+
+    TcM (ThetaType -> TcM (InstInfo RdrName), BagDerivStuff, Maybe Name)
+
+The type family instances are in the BagDerivStuff. The first field of the
+triple is a suspended computation which, given an instance context, produces
+the rest of the instance. The fact that it is suspended is important, because
+right now, we don't have ThetaTypes for the instances that use deriving clauses
+(only the standalone-derived ones).
+
+Now we can can collect the type family instances and extend the local instance
+environment. At this point, it is safe to run simplifyInstanceContexts on the
+deriving-clause instance specs, which gives us the ThetaTypes for the
+deriving-clause instances. Now we can feed all the ThetaTypes to the
+suspended computations and obtain our InstInfos, at which point
+tcDeriving is done.
+
+An alternative design would be to split up genInst so that the
+family instances are generated separately from the InstInfos. But this would
+require carving up a lot of the GHC deriving internals to accommodate the
+change. On the other hand, we can keep all of the InstInfo and type family
+instance logic together in genInst simply by converting genInst to
+continuation-returning style, so we opt for that route.
 
 Note [Why we don't pass rep_tc into deriveTyData]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1206,7 +1291,12 @@ mkNewTypeEqn dflags overlap_mode tvs
            =  not (non_coercible_class cls)
            && coercion_looks_sensible
 --         && not (isRecursiveTyCon tycon)      -- Note [Recursive newtypes]
-        coercion_looks_sensible = eta_ok && ats_ok
+        coercion_looks_sensible
+           =  eta_ok
+              -- Check (a) from Note [GND and associated type families]
+           && ats_ok
+              -- Check (b) from Note [GND and associated type families]
+           && isNothing at_without_last_cls_tv
 
         -- Check that eta reduction is OK
         eta_ok = nt_eta_arity <= length rep_tc_args
@@ -1217,16 +1307,27 @@ mkNewTypeEqn dflags overlap_mode tvs
                 --     And the [a] must not mention 'b'.  That's all handled
                 --     by nt_eta_rity.
 
-        ats_ok = null (classATs cls)
-               -- No associated types for the class, because we don't
-               -- currently generate type 'instance' decls; and cannot do
-               -- so for 'data' instance decls
+        (adf_tcs, atf_tcs) = partition isDataFamilyTyCon at_tcs
+        ats_ok             = null adf_tcs
+               -- We cannot newtype-derive data family instances
+
+        at_without_last_cls_tv
+          = find (\tc -> last_cls_tv `notElem` tyConTyVars tc) atf_tcs
+        at_tcs = classATs cls
+        last_cls_tv = ASSERT( notNull cls_tyvars )
+                      last cls_tyvars
 
         cant_derive_err
            = vcat [ ppUnless eta_ok eta_msg
-                  , ppUnless ats_ok ats_msg ]
+                  , ppUnless ats_ok ats_msg
+                  , maybe empty at_tv_msg
+                          at_without_last_cls_tv]
         eta_msg   = text "cannot eta-reduce the representation type enough"
-        ats_msg   = text "the class has associated types"
+        ats_msg   = text "the class has associated data types"
+        at_tv_msg at_tc = hang
+          (text "the associated type" <+> quotes (ppr at_tc)
+           <+> text "is not parameterized over the last type variable")
+          2 (text "of the class" <+> quotes (ppr cls))
 
 {-
 Note [Recursive newtypes]
@@ -1270,6 +1371,82 @@ Note that newtype deriving might fail, even after we commit to it. This
 is because the derived instance uses `coerce`, which must satisfy its
 `Coercible` constraint. This is different than other deriving scenarios,
 where we're sure that the resulting instance will type-check.
+
+Note [GND and associated type families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's possible to use GeneralizedNewtypeDeriving (GND) to derive instances for
+classes with associated type families. A general recipe is:
+
+    class C x y z where
+      type T y z x
+      op :: x -> [y] -> z
+
+    newtype N a = MkN <rep-type> deriving( C )
+
+    =====>
+
+    instance C x y <rep-type> => C x y (N a) where
+      type T y (N a) x = T y <rep-type> x
+      op = coerce (op :: x -> [y] -> <rep-type>)
+
+However, we must watch out for three things:
+
+(a) The class must not contain any data families. If it did, we'd have to
+    generate a fresh data constructor name for the derived data family
+    instance, and it's not clear how to do this.
+
+(b) Each associated type family's type variables must mention the last type
+    variable of the class. As an example, you wouldn't be able to use GND to
+    derive an instance of this class:
+
+      class C a b where
+        type T a
+
+    But you would be able to derive an instance of this class:
+
+      class C a b where
+        type T b
+
+    The difference is that in the latter T mentions the last parameter of C
+    (i.e., it mentions b), but the former T does not. If you tried, e.g.,
+
+      newtype Foo x = Foo x deriving (C a)
+
+    with the former definition of C, you'd end up with something like this:
+
+      instance C a x => C a (Foo x) where
+        type T a = T ???
+
+    This T family instance doesn't mention the newtype (or its representation
+    type) at all, so we disallow such constructions with GND.
+
+(c) UndecidableInstances might need to be enabled. Here's a case where it is
+    most definitely necessary:
+
+      class C a where
+        type T a
+      newtype Loop = Loop MkLoop deriving C
+
+      =====>
+
+      instance C Loop where
+        type T Loop = T Loop
+
+    Obviously, T Loop would send the typechecker into a loop. Unfortunately,
+    you might even need UndecidableInstances even in cases where the
+    typechecker would be guaranteed to terminate. For example:
+
+      instance C Int where
+        type C Int = Int
+      newtype MyInt = MyInt Int deriving C
+
+      =====>
+
+      instance C MyInt where
+        type T MyInt = T Int
+
+    GHC's termination checker isn't sophisticated enough to conclude that the
+    definition of T MyInt terminates, so UndecidableInstances is required.
 
 ************************************************************************
 *                                                                      *
@@ -1341,46 +1518,46 @@ the renamer.  What a great hack!
 -- Representation tycons differ from the tycon in the instance signature in
 -- case of instances for indexed families.
 --
-genInst :: DerivSpec ThetaType
-        -> TcM (InstInfo RdrName, BagDerivStuff, Maybe Name)
+genInst :: DerivSpec theta
+        -> TcM (ThetaType -> TcM (InstInfo RdrName), BagDerivStuff, Maybe Name)
+-- We must use continuation-returning style here to get the order in which we
+-- typecheck family instances and derived instances right.
+-- See Note [Staging of tcDeriving]
 genInst spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon
-                 , ds_theta = theta, ds_mechanism = mechanism, ds_tys = tys
+                 , ds_mechanism = mechanism, ds_tys = tys
                  , ds_cls = clas, ds_loc = loc })
-  -- See Note [Bindings for Generalised Newtype Deriving]
-  | DerivSpecNewtype rhs_ty <- mechanism
-  = do { inst_spec <- newDerivClsInst theta spec
-       ; doDerivInstErrorChecks2 clas inst_spec mechanism
-       ; return ( InstInfo
-                    { iSpec   = inst_spec
-                    , iBinds  = InstBindings
-                        { ib_binds      = gen_Newtype_binds loc clas
-                                            tvs tys rhs_ty
-                          -- Scope over bindings
-                        , ib_tyvars     = map Var.varName tvs
-                        , ib_pragmas    = []
-                        , ib_extensions = [ LangExt.ImpredicativeTypes
-                                          , LangExt.RankNTypes ]
-                          -- Both these flags are needed for higher-rank uses of coerce
-                          -- See Note [Newtype-deriving instances] in TcGenDeriv
-                        , ib_derived    = True } }
-                , emptyBag
-                , Just $ getName $ head $ tyConDataCons rep_tycon ) }
-              -- See Note [Newtype deriving and unused constructors]
-  | otherwise
-  = do { inst_spec <- newDerivClsInst theta spec
-       ; (meth_binds, deriv_stuff) <- genDerivStuff mechanism loc clas
-                                        rep_tycon tys tvs
-       ; doDerivInstErrorChecks2 clas inst_spec mechanism
-       ; traceTc "newder" (ppr inst_spec)
-       ; let inst_info
-               = InstInfo { iSpec   = inst_spec
-                          , iBinds  = InstBindings
-                                        { ib_binds = meth_binds
-                                        , ib_tyvars = map Var.varName tvs
-                                        , ib_pragmas = []
-                                        , ib_extensions = []
-                                        , ib_derived = True } }
-       ; return ( inst_info, deriv_stuff, Nothing ) }
+  = do (meth_binds, deriv_stuff) <- genDerivStuff mechanism loc clas
+                                      rep_tycon tys tvs
+       let mk_inst_info theta = do
+             inst_spec <- newDerivClsInst theta spec
+             doDerivInstErrorChecks2 clas inst_spec mechanism
+             traceTc "newder" (ppr inst_spec)
+             return $ InstInfo
+                       { iSpec   = inst_spec
+                       , iBinds  = InstBindings
+                                     { ib_binds = meth_binds
+                                     , ib_tyvars = map Var.varName tvs
+                                     , ib_pragmas = []
+                                     , ib_extensions = extensions
+                                     , ib_derived = True } }
+       return (mk_inst_info, deriv_stuff, unusedConName)
+  where
+    unusedConName :: Maybe Name
+    unusedConName
+      | isDerivSpecNewtype mechanism
+        -- See Note [Newtype deriving and unused constructors]
+      = Just $ getName $ head $ tyConDataCons rep_tycon
+      | otherwise
+      = Nothing
+
+    extensions :: [LangExt.Extension]
+    extensions
+      | isDerivSpecNewtype mechanism
+        -- Both these flags are needed for higher-rank uses of coerce
+        -- See Note [Newtype-deriving instances] in TcGenDeriv
+      = [LangExt.ImpredicativeTypes, LangExt.RankNTypes]
+      | otherwise
+      = []
 
 doDerivInstErrorChecks1 :: Class -> [Type] -> TyCon -> [Type] -> TyCon
                         -> DerivContext -> Bool -> DerivSpecMechanism
@@ -1428,13 +1605,15 @@ doDerivInstErrorChecks2 clas clas_inst mechanism
                          text "In the following instance:")
                       2 (pprInstanceHdr clas_inst)
 
--- Generate the bindings needed for a derived class that isn't handled by
--- -XGeneralizedNewtypeDeriving.
 genDerivStuff :: DerivSpecMechanism -> SrcSpan -> Class
               -> TyCon -> [Type] -> [TyVar]
               -> TcM (LHsBinds RdrName, BagDerivStuff)
 genDerivStuff mechanism loc clas tycon inst_tys tyvars
   = case mechanism of
+      -- See Note [Bindings for Generalised Newtype Deriving]
+      DerivSpecNewtype rhs_ty -> gen_Newtype_binds loc clas tyvars
+                                                   inst_tys rhs_ty
+
       -- Try a stock deriver
       DerivSpecStock gen_fn -> gen_fn loc tycon inst_tys
 
@@ -1455,8 +1634,6 @@ genDerivStuff mechanism loc clas tycon inst_tys tyvars
                -- family default instances.
                -- See Note [DeriveAnyClass and default family instances]
                )
-
-      _ -> panic "genDerivStuff"
 
 {-
 Note [Bindings for Generalised Newtype Deriving]

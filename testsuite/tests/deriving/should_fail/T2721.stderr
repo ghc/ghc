@@ -1,6 +1,0 @@
-
-T2721.hs:15:28: error:
-    Can't make a derived instance of ‘C N’
-      (even with cunning GeneralizedNewtypeDeriving):
-      the class has associated types
-    In the newtype declaration for ‘N’

@@ -1,6 +1,6 @@
 
 ==================== Derived instances ====================
-Derived instances:
+Derived class instances:
   instance GHC.Generics.Generic1 CanDoRep1_1.Dd where
     GHC.Generics.from1 x
       = GHC.Generics.M1
@@ -162,7 +162,7 @@ Derived instances:
                  (GHC.Generics.unPar1 g1) (GHC.Generics.unRec1 g2) }
   
 
-GHC.Generics representation types:
+Derived type family instances:
   type GHC.Generics.Rep1 CanDoRep1_1.Dd = GHC.Generics.D1
                                             ('GHC.Generics.MetaData
                                                "Dd" "CanDoRep1_1" "main" 'GHC.Types.False)

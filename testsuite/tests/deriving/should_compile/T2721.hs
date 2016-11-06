@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving #-}
-
+{-# LANGUAGE UndecidableInstances #-}
 -- Trac #2721
 
 module T2721 where

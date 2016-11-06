@@ -3963,6 +3963,10 @@ where
    missing last argument to ``C`` is not used at a nominal role in any
    of the ``C``'s methods. (See :ref:`roles`.)
 
+- ``C`` is allowed to have associated type families, provided they meet the
+  requirements laid out in the section on :ref:`GND and associated types
+  <gnd-and-associated-types>`.
+
 Then the derived instance declaration is of the form ::
 
       instance C t1..tj t => C t1..tj (T v1...vk)
@@ -3997,6 +4001,129 @@ Lastly, all of this applies only for classes other than ``Read``,
 applies (section 4.3.3. of the Haskell Report). (For the standard
 classes ``Eq``, ``Ord``, ``Ix``, and ``Bounded`` it is immaterial
 whether the stock method is used or the one described here.)
+
+.. _gnd-and-associated-types:
+
+Associated type families
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+:ghc-flag:`-XGeneralizedNewtypeDeriving` also works for some type classes with
+associated type families. Here is an example: ::
+
+      class HasRing a where
+        type Ring a
+
+      newtype L1Norm a = L1Norm a
+        deriving HasRing
+
+The derived ``HasRing`` instance would look like ::
+
+      instance HasRing a => HasRing (L1Norm a) where
+        type Ring (L1Norm a) = Ring a
+
+To be precise, if the class being derived is of the form ::
+
+      class C c_1 c_2 ... c_m where
+        type T1 t1_1 t1_2 ... t1_n
+        ...
+        type Tk tk_1 tk_2 ... tk_p
+
+and the newtype is of the form ::
+
+      newtype N n_1 n_2 ... n_q = MkN <rep-type>
+
+then you can derive a ``C c_1 c_2 ... c_(m-1)`` instance for
+``N n_1 n_2 ... n_q``, provided that:
+
+- The type parameter ``c_m`` occurs once in each of the type variables of
+  ``T1`` through ``Tk``. Imagine a class where this condition didn't hold.
+  For example: ::
+
+      class Bad a b where
+        type B a
+
+      instance Bad Int a where
+        type B Int = Char
+
+      newtype Foo a = Foo a
+        deriving (Bad Int)
+
+  For the derived ``Bad Int`` instance, GHC would need to generate something
+  like this: ::
+
+      instance Bad Int a => Bad Int (Foo a) where
+        type B Int = B ???
+
+  Now we're stuck, since we have no way to refer to ``a`` on the right-hand
+  side of the ``B`` family instance, so this instance doesn't really make sense
+  in a :ghc-flag:`-XGeneralizedNewtypeDeriving` setting.
+
+- ``C`` does not have any associated data families (only type families). To
+  see why data families are forbidden, imagine the following scenario: ::
+
+      class Ex a where
+        data D a
+
+      instance Ex Int where
+        data D Int = DInt Bool
+
+      newtype Age = MkAge Int deriving Ex
+
+  For the derived ``Ex`` instance, GHC would need to generate something like
+  this: ::
+
+      instance Ex Age where
+        data D Age = ???
+
+  But it is not clear what GHC would fill in for ``???``, as each data family
+  instance must generate fresh data constructors.
+
+If both of these conditions are met, GHC will generate this instance: ::
+
+      instance C c_1 c_2 ... c_(m-1) <rep-type> =>
+               C c_1 c_2 ... c_(m-1) (N n_1 n_2 ... n_q) where
+        type T1 t1_1 t1_2 ... (N n_1 n_2 ... n_q) ... t1_n
+           = T1 t1_1 t1_2 ... <rep-type>          ... t1_n
+        ...
+        type Tk tk_1 tk_2 ... (N n_1 n_2 ... n_q) ... tk_p
+           = Tk tk_1 tk_2 ... <rep-type>          ... tk_p
+
+Beware that in some cases, you may need to enable the
+:ghc-flag:`-XUndecidableInstances` extension in order to use this feature.
+Here's a pathological case that illustrates why this might happen: ::
+
+      class C a where
+        type T a
+
+      newtype Loop = MkLoop Loop
+        deriving C
+
+This will generate the derived instance: ::
+
+      instance C Loop where
+        type T Loop = T Loop
+
+Here, it is evident that attempting to use the type ``T Loop`` will throw the
+typechecker into an infinite loop, as its definition recurses endlessly. In
+other cases, you might need to enable :ghc-flag:`-XUndecidableInstances` even
+if the generated code won't put the typechecker into a loop. For example: ::
+
+      instance C Int where
+        type C Int = Int
+
+      newtype MyInt = MyInt Int
+        deriving C
+
+This will generate the derived instance: ::
+
+      instance C MyInt where
+        type T MyInt = T Int
+
+Although typechecking ``T MyInt`` will terminate, GHC's termination checker
+isn't sophisticated enough to determine this, so you'll need to enable
+:ghc-flag:`-XUndecidableInstances` in order to use this derived instance. If
+you do go down this route, make sure you can convince yourself that all of
+the type family instances you're deriving will eventually terminate if used!
 
 .. _derive-any-class:
 

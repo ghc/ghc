@@ -56,6 +56,11 @@ Compiler
   and the latter code has no restrictions about whether the data constructors
   of ``T`` are in scope.
 
+- :ghc-flag:`-XGeneralizedNewtypeDeriving` now supports deriving type classes
+  with associated type families. See the section on
+  :ref:`GeneralizedNewtypeDeriving and associated type families
+  <gnd-and-associated-types>`.
+
 - Add warning flag :ghc-flag:`-Wcpp-undef` which passes ``-Wundef`` to the C
   pre-processor causing the pre-processor to warn on uses of the ``#if``
   directive on undefined identifiers.

@@ -47,7 +47,8 @@ import Encoding
 
 import DynFlags
 import PrelInfo
-import FamInstEnv( FamInst )
+import FamInst
+import FamInstEnv
 import PrelNames
 import THNames
 import Module ( moduleName, moduleNameString
@@ -56,7 +57,9 @@ import MkId ( coerceId )
 import PrimOp
 import SrcLoc
 import TyCon
+import TcEnv
 import TcType
+import TcValidity ( checkValidTyFamEqn )
 import TysPrim
 import TysWiredIn
 import Type
@@ -1622,13 +1625,19 @@ So GHC rightly rejects this code.
 
 gen_Newtype_binds :: SrcSpan
                   -> Class   -- the class being derived
-                  -> [TyVar] -- the tvs in the instance head
+                  -> [TyVar] -- the tvs in the instance head (this includes
+                             -- the tvs from both the class types and the
+                             -- newtype itself)
                   -> [Type]  -- instance head parameters (incl. newtype)
-                  -> Type    -- the representation type (already eta-reduced)
-                  -> LHsBinds RdrName
+                  -> Type    -- the representation type
+                  -> TcM (LHsBinds RdrName, BagDerivStuff)
 -- See Note [Newtype-deriving instances]
 gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
-  = listToBag $ map mk_bind (classMethods cls)
+  = do let ats = classATs cls
+       atf_insts <- ASSERT( all (not . isDataFamilyTyCon) ats )
+                    mapM mk_atf_inst ats
+       return ( listToBag $ map mk_bind (classMethods cls)
+              , listToBag $ map DerivFamInst atf_insts )
   where
     coerce_RDR = getRdrName coerceId
 
@@ -1646,6 +1655,32 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
                                       `nlHsAppType` to_ty
                                       `nlHsApp`     nlHsVar meth_RDR
 
+    mk_atf_inst :: TyCon -> TcM FamInst
+    mk_atf_inst fam_tc = do
+        rep_tc_name <- newFamInstTyConName (L loc (tyConName fam_tc))
+                                           rep_lhs_tys
+        let axiom = mkSingleCoAxiom Nominal rep_tc_name rep_tvs' rep_cvs'
+                                    fam_tc rep_lhs_tys rep_rhs_ty
+        -- Check (c) from Note [GND and associated type families] in TcDeriv
+        checkValidTyFamEqn (Just (cls, cls_tvs, lhs_env)) fam_tc rep_tvs'
+                           rep_cvs' rep_lhs_tys rep_rhs_ty loc
+        newFamInst SynFamilyInst axiom
+      where
+        cls_tvs     = classTyVars cls
+        in_scope    = mkInScopeSet $ mkVarSet inst_tvs
+        lhs_env     = zipTyEnv cls_tvs inst_tys
+        lhs_subst   = mkTvSubst in_scope lhs_env
+        rhs_env     = zipTyEnv cls_tvs $ changeLast inst_tys rhs_ty
+        rhs_subst   = mkTvSubst in_scope rhs_env
+        fam_tvs     = tyConTyVars fam_tc
+        rep_lhs_tys = substTyVars lhs_subst fam_tvs
+        rep_rhs_tys = substTyVars rhs_subst fam_tvs
+        rep_rhs_ty  = mkTyConApp fam_tc rep_rhs_tys
+        rep_tcvs    = tyCoVarsOfTypesList rep_lhs_tys
+        (rep_tvs, rep_cvs) = partition isTyVar rep_tcvs
+        rep_tvs'    = toposortTyVars rep_tvs
+        rep_cvs'    = toposortTyVars rep_cvs
+
 nlHsAppType :: LHsExpr RdrName -> Type -> LHsExpr RdrName
 nlHsAppType e s = noLoc (e `HsAppType` hs_ty)
   where
@@ -1657,9 +1692,11 @@ nlExprWithTySig e s = noLoc (e `ExprWithTySig` hs_ty)
     hs_ty = mkLHsSigWcType (typeToLHsType s)
 
 mkCoerceClassMethEqn :: Class   -- the class being derived
-                     -> [TyVar] -- the tvs in the instance head
+                     -> [TyVar] -- the tvs in the instance head (this includes
+                                -- the tvs from both the class types and the
+                                -- newtype itself)
                      -> [Type]  -- instance head parameters (incl. newtype)
-                     -> Type    -- the representation type (already eta-reduced)
+                     -> Type    -- the representation type
                      -> Id      -- the method to look at
                      -> Pair Type
 -- See Note [Newtype-deriving instances]
@@ -1676,11 +1713,6 @@ mkCoerceClassMethEqn cls inst_tvs inst_tys rhs_ty id
     rhs_subst = mkTvSubst in_scope (zipTyEnv cls_tvs (changeLast inst_tys rhs_ty))
     (_class_tvs, _class_constraint, user_meth_ty)
       = tcSplitMethodTy (varType id)
-
-    changeLast :: [a] -> a -> [a]
-    changeLast []     _  = panic "changeLast"
-    changeLast [_]    x  = [x]
-    changeLast (x:xs) x' = x : changeLast xs x'
 
 {-
 ************************************************************************
