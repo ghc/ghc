@@ -1578,6 +1578,15 @@ linesPlatform xs =
 
 #endif
 
+{-
+Note [No PIE eating while linking]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As of 2016 some Linux distributions (e.g. Debian) have started enabling -pie by
+default in their gcc builds. This is incompatible with -r as it implies that we
+are producing an executable. Consequently, we must manually pass -no-pie to gcc
+when joining object files or linking dynamic libraries. See #12759.
+-}
+
 linkDynLib :: DynFlags -> [String] -> [UnitId] -> IO ()
 linkDynLib dflags0 o_files dep_packages
  = do
@@ -1743,6 +1752,10 @@ linkDynLib dflags0 o_files dep_packages
                  ++ [ Option "-o"
                     , FileOption "" output_fn
                     ]
+#if GCC_SUPPORTS_NO_PIE
+                    -- See Note [No PIE eating when linking]
+                 ++ [ Option "-no-pie" ]
+#endif
                  ++ map Option o_files
                  ++ [ Option "-shared" ]
                  ++ map Option bsymbolicFlag
