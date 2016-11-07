@@ -46,6 +46,10 @@ Language
       class C m where
         foo :: m ()
 
+-  Some programs using :ghc-flag:`-XDefaultSignatures` that incorrectly
+   type-checked in GHC 8.0.1 are now rejected by GHC 8.0.2. See
+   :ghc-ticket:`12784` for details.
+
 Compiler
 ~~~~~~~~
 
