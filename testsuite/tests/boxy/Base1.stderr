@@ -13,6 +13,6 @@ Base1.hs:25:39: error:
     • In the expression: Just (x, y)
       In a case alternative: MRight y -> Just (x, y)
       In the expression:
-        case m of {
+        case m of
           MRight y -> Just (x, y)
-          _ -> Nothing }
+          _ -> Nothing

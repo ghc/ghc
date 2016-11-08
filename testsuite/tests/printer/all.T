@@ -1,0 +1,7 @@
+test('Ppr001', normal, run_command, ['$MAKE -s --no-print-directory ppr001'])
+test('Ppr002', normal, run_command, ['$MAKE -s --no-print-directory ppr002'])
+test('Ppr003', normal, run_command, ['$MAKE -s --no-print-directory ppr003'])
+test('Ppr004', normal, run_command, ['$MAKE -s --no-print-directory ppr004'])
+test('Ppr005', normal, run_command, ['$MAKE -s --no-print-directory ppr005'])
+test('Ppr006', normal, run_command, ['$MAKE -s --no-print-directory ppr006'])
+test('Ppr007', normal, run_command, ['$MAKE -s --no-print-directory ppr007'])

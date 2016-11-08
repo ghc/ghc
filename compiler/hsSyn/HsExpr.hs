@@ -880,9 +880,12 @@ ppr_expr (HsLamCase matches)
   = sep [ sep [text "\\case {"],
           nest 2 (pprMatches matches <+> char '}') ]
 
-ppr_expr (HsCase expr matches)
+ppr_expr (HsCase expr matches@(MG { mg_alts = L _ [_] }))
   = sep [ sep [text "case", nest 4 (ppr expr), ptext (sLit "of {")],
-          nest 2 (pprMatches matches <+> char '}') ]
+          nest 2 (pprMatches matches) <+> char '}']
+ppr_expr (HsCase expr matches)
+  = sep [ sep [text "case", nest 4 (ppr expr), ptext (sLit "of")],
+          nest 2 (pprMatches matches) ]
 
 ppr_expr (HsIf _ e1 e2 e3)
   = sep [hsep [text "if", nest 2 (ppr e1), ptext (sLit "then")],
@@ -1280,7 +1283,7 @@ pprCmdArg :: (OutputableBndrId id) => HsCmdTop id -> SDoc
 pprCmdArg (HsCmdTop cmd@(L _ (HsCmdArrForm _ Nothing [])) _ _ _)
   = ppr_lcmd cmd
 pprCmdArg (HsCmdTop cmd _ _ _)
-  = parens (ppr_lcmd cmd)
+  = ppr_lcmd cmd
 
 instance (OutputableBndrId id) => Outputable (HsCmdTop id) where
     ppr = pprCmdArg

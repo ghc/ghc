@@ -100,7 +100,7 @@ Derived class instances:
            GHC.Generics.Generic (T10604_deriving.SumOfProducts k a) where
     GHC.Generics.from x
       = GHC.Generics.M1
-          (case x of {
+          (case x of
              T10604_deriving.Prod1 g1 g2
                -> GHC.Generics.L1
                     (GHC.Generics.M1
@@ -112,21 +112,21 @@ Derived class instances:
                     (GHC.Generics.M1
                        ((GHC.Generics.:*:)
                           (GHC.Generics.M1 (GHC.Generics.K1 g1))
-                          (GHC.Generics.M1 (GHC.Generics.K1 g2)))) })
+                          (GHC.Generics.M1 (GHC.Generics.K1 g2)))))
     GHC.Generics.to (GHC.Generics.M1 x)
-      = case x of {
+      = case x of
           GHC.Generics.L1 (GHC.Generics.M1 ((GHC.Generics.:*:) (GHC.Generics.M1 (GHC.Generics.K1 g1))
                                                                (GHC.Generics.M1 (GHC.Generics.K1 g2))))
             -> T10604_deriving.Prod1 g1 g2
           GHC.Generics.R1 (GHC.Generics.M1 ((GHC.Generics.:*:) (GHC.Generics.M1 (GHC.Generics.K1 g1))
                                                                (GHC.Generics.M1 (GHC.Generics.K1 g2))))
-            -> T10604_deriving.Prod2 g1 g2 }
+            -> T10604_deriving.Prod2 g1 g2
   
   instance GHC.Generics.Generic1
              k (T10604_deriving.SumOfProducts k) where
     GHC.Generics.from1 x
       = GHC.Generics.M1
-          (case x of {
+          (case x of
              T10604_deriving.Prod1 g1 g2
                -> GHC.Generics.L1
                     (GHC.Generics.M1
@@ -138,9 +138,9 @@ Derived class instances:
                     (GHC.Generics.M1
                        ((GHC.Generics.:*:)
                           (GHC.Generics.M1 (GHC.Generics.Rec1 g1))
-                          (GHC.Generics.M1 (GHC.Generics.Rec1 g2)))) })
+                          (GHC.Generics.M1 (GHC.Generics.Rec1 g2)))))
     GHC.Generics.to1 (GHC.Generics.M1 x)
-      = case x of {
+      = case x of
           GHC.Generics.L1 (GHC.Generics.M1 ((GHC.Generics.:*:) (GHC.Generics.M1 g1)
                                                                (GHC.Generics.M1 g2)))
             -> T10604_deriving.Prod1
@@ -148,41 +148,41 @@ Derived class instances:
           GHC.Generics.R1 (GHC.Generics.M1 ((GHC.Generics.:*:) (GHC.Generics.M1 g1)
                                                                (GHC.Generics.M1 g2)))
             -> T10604_deriving.Prod2
-                 (GHC.Generics.unRec1 g1) (GHC.Generics.unRec1 g2) }
+                 (GHC.Generics.unRec1 g1) (GHC.Generics.unRec1 g2)
   
   instance GHC.Generics.Generic (T10604_deriving.Starify a) where
     GHC.Generics.from x
       = GHC.Generics.M1
-          (case x of {
+          (case x of
              T10604_deriving.Starify1 g1
                -> GHC.Generics.L1
                     (GHC.Generics.M1 (GHC.Generics.M1 (GHC.Generics.K1 g1)))
              T10604_deriving.Starify2 g1
                -> GHC.Generics.R1
-                    (GHC.Generics.M1 (GHC.Generics.M1 (GHC.Generics.K1 g1))) })
+                    (GHC.Generics.M1 (GHC.Generics.M1 (GHC.Generics.K1 g1))))
     GHC.Generics.to (GHC.Generics.M1 x)
-      = case x of {
+      = case x of
           GHC.Generics.L1 (GHC.Generics.M1 (GHC.Generics.M1 (GHC.Generics.K1 g1)))
             -> T10604_deriving.Starify1 g1
           GHC.Generics.R1 (GHC.Generics.M1 (GHC.Generics.M1 (GHC.Generics.K1 g1)))
-            -> T10604_deriving.Starify2 g1 }
+            -> T10604_deriving.Starify2 g1
   
   instance GHC.Generics.Generic1 * T10604_deriving.Starify where
     GHC.Generics.from1 x
       = GHC.Generics.M1
-          (case x of {
+          (case x of
              T10604_deriving.Starify1 g1
                -> GHC.Generics.L1
                     (GHC.Generics.M1 (GHC.Generics.M1 (GHC.Generics.Par1 g1)))
              T10604_deriving.Starify2 g1
                -> GHC.Generics.R1
-                    (GHC.Generics.M1 (GHC.Generics.M1 (GHC.Generics.K1 g1))) })
+                    (GHC.Generics.M1 (GHC.Generics.M1 (GHC.Generics.K1 g1))))
     GHC.Generics.to1 (GHC.Generics.M1 x)
-      = case x of {
+      = case x of
           GHC.Generics.L1 (GHC.Generics.M1 (GHC.Generics.M1 g1))
             -> T10604_deriving.Starify1 (GHC.Generics.unPar1 g1)
           GHC.Generics.R1 (GHC.Generics.M1 (GHC.Generics.M1 g1))
-            -> T10604_deriving.Starify2 (GHC.Generics.unK1 g1) }
+            -> T10604_deriving.Starify2 (GHC.Generics.unK1 g1)
   
 
 Derived type family instances:

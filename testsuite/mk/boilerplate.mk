@@ -223,6 +223,7 @@ PYTHON = python2
 endif
 
 CHECK_API_ANNOTATIONS := $(abspath $(TOP)/../inplace/bin/check-api-annotations)
+CHECK_PPR             := $(abspath $(TOP)/../inplace/bin/check-ppr)
 
 # -----------------------------------------------------------------------------
 # configuration of TEST_HC

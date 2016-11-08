@@ -4,7 +4,7 @@ Derived class instances:
   instance GHC.Generics.Generic1 CanDoRep1_1.Dd where
     GHC.Generics.from1 x
       = GHC.Generics.M1
-          (case x of {
+          (case x of
              CanDoRep1_1.D0d
                -> GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)
              CanDoRep1_1.D1d g1 g2
@@ -12,20 +12,20 @@ Derived class instances:
                     (GHC.Generics.M1
                        ((GHC.Generics.:*:)
                           (GHC.Generics.M1 (GHC.Generics.Par1 g1))
-                          (GHC.Generics.M1 (GHC.Generics.Rec1 g2)))) })
+                          (GHC.Generics.M1 (GHC.Generics.Rec1 g2)))))
     GHC.Generics.to1 (GHC.Generics.M1 x)
-      = case x of {
+      = case x of
           GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)
             -> CanDoRep1_1.D0d
           GHC.Generics.R1 (GHC.Generics.M1 ((GHC.Generics.:*:) (GHC.Generics.M1 g1)
                                                                (GHC.Generics.M1 g2)))
             -> CanDoRep1_1.D1d
-                 (GHC.Generics.unPar1 g1) (GHC.Generics.unRec1 g2) }
+                 (GHC.Generics.unPar1 g1) (GHC.Generics.unRec1 g2)
   
   instance GHC.Generics.Generic (CanDoRep1_1.Dd a) where
     GHC.Generics.from x
       = GHC.Generics.M1
-          (case x of {
+          (case x of
              CanDoRep1_1.D0d
                -> GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)
              CanDoRep1_1.D1d g1 g2
@@ -33,19 +33,19 @@ Derived class instances:
                     (GHC.Generics.M1
                        ((GHC.Generics.:*:)
                           (GHC.Generics.M1 (GHC.Generics.K1 g1))
-                          (GHC.Generics.M1 (GHC.Generics.K1 g2)))) })
+                          (GHC.Generics.M1 (GHC.Generics.K1 g2)))))
     GHC.Generics.to (GHC.Generics.M1 x)
-      = case x of {
+      = case x of
           GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)
             -> CanDoRep1_1.D0d
           GHC.Generics.R1 (GHC.Generics.M1 ((GHC.Generics.:*:) (GHC.Generics.M1 (GHC.Generics.K1 g1))
                                                                (GHC.Generics.M1 (GHC.Generics.K1 g2))))
-            -> CanDoRep1_1.D1d g1 g2 }
+            -> CanDoRep1_1.D1d g1 g2
   
   instance GHC.Generics.Generic (CanDoRep1_1.Dc a) where
     GHC.Generics.from x
       = GHC.Generics.M1
-          (case x of {
+          (case x of
              CanDoRep1_1.D0c
                -> GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)
              CanDoRep1_1.D1c g1 g2
@@ -53,19 +53,19 @@ Derived class instances:
                     (GHC.Generics.M1
                        ((GHC.Generics.:*:)
                           (GHC.Generics.M1 (GHC.Generics.K1 g1))
-                          (GHC.Generics.M1 (GHC.Generics.K1 g2)))) })
+                          (GHC.Generics.M1 (GHC.Generics.K1 g2)))))
     GHC.Generics.to (GHC.Generics.M1 x)
-      = case x of {
+      = case x of
           GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)
             -> CanDoRep1_1.D0c
           GHC.Generics.R1 (GHC.Generics.M1 ((GHC.Generics.:*:) (GHC.Generics.M1 (GHC.Generics.K1 g1))
                                                                (GHC.Generics.M1 (GHC.Generics.K1 g2))))
-            -> CanDoRep1_1.D1c g1 g2 }
+            -> CanDoRep1_1.D1c g1 g2
   
   instance GHC.Generics.Generic1 CanDoRep1_1.Db where
     GHC.Generics.from1 x
       = GHC.Generics.M1
-          (case x of {
+          (case x of
              CanDoRep1_1.D0b
                -> GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)
              CanDoRep1_1.D1b g1 g2
@@ -73,57 +73,56 @@ Derived class instances:
                     (GHC.Generics.M1
                        ((GHC.Generics.:*:)
                           (GHC.Generics.M1 (GHC.Generics.Par1 g1))
-                          (GHC.Generics.M1 (GHC.Generics.Rec1 g2)))) })
+                          (GHC.Generics.M1 (GHC.Generics.Rec1 g2)))))
     GHC.Generics.to1 (GHC.Generics.M1 x)
-      = case x of {
+      = case x of
           GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)
             -> CanDoRep1_1.D0b
           GHC.Generics.R1 (GHC.Generics.M1 ((GHC.Generics.:*:) (GHC.Generics.M1 g1)
                                                                (GHC.Generics.M1 g2)))
             -> CanDoRep1_1.D1b
-                 (GHC.Generics.unPar1 g1) (GHC.Generics.unRec1 g2) }
+                 (GHC.Generics.unPar1 g1) (GHC.Generics.unRec1 g2)
   
   instance GHC.Generics.Generic (CanDoRep1_1.Da a) where
     GHC.Generics.from x
       = GHC.Generics.M1
-          (case x of {
+          (case x of
              CanDoRep1_1.D0 -> GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)
              CanDoRep1_1.D1 g1 g2
                -> GHC.Generics.R1
                     (GHC.Generics.M1
                        ((GHC.Generics.:*:)
                           (GHC.Generics.M1 (GHC.Generics.K1 g1))
-                          (GHC.Generics.M1 (GHC.Generics.K1 g2)))) })
+                          (GHC.Generics.M1 (GHC.Generics.K1 g2)))))
     GHC.Generics.to (GHC.Generics.M1 x)
-      = case x of {
+      = case x of
           GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1) -> CanDoRep1_1.D0
           GHC.Generics.R1 (GHC.Generics.M1 ((GHC.Generics.:*:) (GHC.Generics.M1 (GHC.Generics.K1 g1))
                                                                (GHC.Generics.M1 (GHC.Generics.K1 g2))))
-            -> CanDoRep1_1.D1 g1 g2 }
+            -> CanDoRep1_1.D1 g1 g2
   
   instance GHC.Generics.Generic1 CanDoRep1_1.Da where
     GHC.Generics.from1 x
       = GHC.Generics.M1
-          (case x of {
+          (case x of
              CanDoRep1_1.D0 -> GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)
              CanDoRep1_1.D1 g1 g2
                -> GHC.Generics.R1
                     (GHC.Generics.M1
                        ((GHC.Generics.:*:)
                           (GHC.Generics.M1 (GHC.Generics.Par1 g1))
-                          (GHC.Generics.M1 (GHC.Generics.Rec1 g2)))) })
+                          (GHC.Generics.M1 (GHC.Generics.Rec1 g2)))))
     GHC.Generics.to1 (GHC.Generics.M1 x)
-      = case x of {
+      = case x of
           GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1) -> CanDoRep1_1.D0
           GHC.Generics.R1 (GHC.Generics.M1 ((GHC.Generics.:*:) (GHC.Generics.M1 g1)
                                                                (GHC.Generics.M1 g2)))
-            -> CanDoRep1_1.D1
-                 (GHC.Generics.unPar1 g1) (GHC.Generics.unRec1 g2) }
+            -> CanDoRep1_1.D1 (GHC.Generics.unPar1 g1) (GHC.Generics.unRec1 g2)
   
   instance GHC.Generics.Generic (CanDoRep1_1.Db a) where
     GHC.Generics.from x
       = GHC.Generics.M1
-          (case x of {
+          (case x of
              CanDoRep1_1.D0b
                -> GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)
              CanDoRep1_1.D1b g1 g2
@@ -131,19 +130,19 @@ Derived class instances:
                     (GHC.Generics.M1
                        ((GHC.Generics.:*:)
                           (GHC.Generics.M1 (GHC.Generics.K1 g1))
-                          (GHC.Generics.M1 (GHC.Generics.K1 g2)))) })
+                          (GHC.Generics.M1 (GHC.Generics.K1 g2)))))
     GHC.Generics.to (GHC.Generics.M1 x)
-      = case x of {
+      = case x of
           GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)
             -> CanDoRep1_1.D0b
           GHC.Generics.R1 (GHC.Generics.M1 ((GHC.Generics.:*:) (GHC.Generics.M1 (GHC.Generics.K1 g1))
                                                                (GHC.Generics.M1 (GHC.Generics.K1 g2))))
-            -> CanDoRep1_1.D1b g1 g2 }
+            -> CanDoRep1_1.D1b g1 g2
   
   instance GHC.Generics.Generic1 CanDoRep1_1.Dc where
     GHC.Generics.from1 x
       = GHC.Generics.M1
-          (case x of {
+          (case x of
              CanDoRep1_1.D0c
                -> GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)
              CanDoRep1_1.D1c g1 g2
@@ -151,15 +150,15 @@ Derived class instances:
                     (GHC.Generics.M1
                        ((GHC.Generics.:*:)
                           (GHC.Generics.M1 (GHC.Generics.Par1 g1))
-                          (GHC.Generics.M1 (GHC.Generics.Rec1 g2)))) })
+                          (GHC.Generics.M1 (GHC.Generics.Rec1 g2)))))
     GHC.Generics.to1 (GHC.Generics.M1 x)
-      = case x of {
+      = case x of
           GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)
             -> CanDoRep1_1.D0c
           GHC.Generics.R1 (GHC.Generics.M1 ((GHC.Generics.:*:) (GHC.Generics.M1 g1)
                                                                (GHC.Generics.M1 g2)))
             -> CanDoRep1_1.D1c
-                 (GHC.Generics.unPar1 g1) (GHC.Generics.unRec1 g2) }
+                 (GHC.Generics.unPar1 g1) (GHC.Generics.unRec1 g2)
   
 
 Derived type family instances:
