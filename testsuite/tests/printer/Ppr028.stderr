@@ -1,0 +1,6 @@
+
+Ppr028.hs:1:1:
+    The IO action ‘main’ is not defined in module ‘Main’
+
+Ppr028.ppr.hs:1:1:
+    The IO action ‘main’ is not defined in module ‘Main’

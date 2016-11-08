@@ -39,8 +39,6 @@ import MonadUtils ( foldrM )
 import qualified Data.ByteString as BS
 import Control.Monad( unless, liftM, ap )
 
-import Data.Char ( chr )
-import Data.Word ( Word8 )
 import Data.Maybe( catMaybes, fromMaybe, isNothing )
 import Language.Haskell.TH as TH hiding (sigP)
 import Language.Haskell.TH.Syntax as TH
@@ -268,10 +266,10 @@ cvtDec (InstanceD o ctxt ty decs)
   where
   overlap pragma =
     case pragma of
-      TH.Overlaps      -> Hs.Overlaps     "OVERLAPS"
-      TH.Overlappable  -> Hs.Overlappable "OVERLAPPABLE"
-      TH.Overlapping   -> Hs.Overlapping  "OVERLAPPING"
-      TH.Incoherent    -> Hs.Incoherent   "INCOHERENT"
+      TH.Overlaps      -> Hs.Overlaps     (SourceText "OVERLAPS")
+      TH.Overlappable  -> Hs.Overlappable (SourceText "OVERLAPPABLE")
+      TH.Overlapping   -> Hs.Overlapping  (SourceText "OVERLAPPING")
+      TH.Incoherent    -> Hs.Incoherent   (SourceText "INCOHERENT")
 
 
 
@@ -550,7 +548,7 @@ cvt_arg (Bang su ss, ty)
   = do { ty' <- cvtType ty
        ; let su' = cvtSrcUnpackedness su
        ; let ss' = cvtSrcStrictness ss
-       ; returnL $ HsBangTy (HsSrcBang Nothing su' ss') ty' }
+       ; returnL $ HsBangTy (HsSrcBang NoSourceText su' ss') ty' }
 
 cvt_id_arg :: (TH.Name, TH.Bang, TH.Type) -> CvtM (LConDeclField RdrName)
 cvt_id_arg (i, str, ty)
@@ -582,12 +580,13 @@ cvtForD (ImportF callconv safety from nm ty)
   -- and are inserted verbatim, analogous to mkImport in RdrHsSyn
   | callconv == TH.Prim || callconv == TH.JavaScript
   = mk_imp (CImport (noLoc (cvt_conv callconv)) (noLoc safety') Nothing
-                    (CFunction (StaticTarget from (mkFastString from) Nothing
+                    (CFunction (StaticTarget (SourceText from)
+                                             (mkFastString from) Nothing
                                              True))
-                    (noLoc from))
+                    (noLoc $ quotedSourceText from))
   | Just impspec <- parseCImport (noLoc (cvt_conv callconv)) (noLoc safety')
                                  (mkFastString (TH.nameBase nm))
-                                 from (noLoc from)
+                                 from (noLoc $ quotedSourceText from)
   = mk_imp impspec
   | otherwise
   = failWith $ text (show from) <+> text "is not a valid ccall impent"
@@ -608,10 +607,10 @@ cvtForD (ImportF callconv safety from nm ty)
 cvtForD (ExportF callconv as nm ty)
   = do  { nm' <- vNameL nm
         ; ty' <- cvtType ty
-        ; let e = CExport (noLoc (CExportStatic as
+        ; let e = CExport (noLoc (CExportStatic (SourceText as)
                                                 (mkFastString as)
                                                 (cvt_conv callconv)))
-                                                (noLoc as)
+                                                (noLoc (SourceText as))
         ; return $ ForeignExport { fd_name = nm'
                                  , fd_sig_ty = mkLHsSigType ty'
                                  , fd_co = noForeignExportCoercionYet
@@ -632,7 +631,10 @@ cvtPragmaD :: Pragma -> CvtM (Maybe (LHsDecl RdrName))
 cvtPragmaD (InlineP nm inline rm phases)
   = do { nm' <- vNameL nm
        ; let dflt = dfltActivation inline
-       ; let ip   = InlinePragma { inl_src    = "{-# INLINE"
+       ; let src TH.NoInline  = "{-# NOINLINE"
+             src TH.Inline    = "{-# INLINE"
+             src TH.Inlinable = "{-# INLINABLE"
+       ; let ip   = InlinePragma { inl_src    = SourceText $ src inline
                                  , inl_inline = cvtInline inline
                                  , inl_rule   = cvtRuleMatch rm
                                  , inl_act    = cvtPhases phases dflt
@@ -642,10 +644,15 @@ cvtPragmaD (InlineP nm inline rm phases)
 cvtPragmaD (SpecialiseP nm ty inline phases)
   = do { nm' <- vNameL nm
        ; ty' <- cvtType ty
-       ; let (inline', dflt) = case inline of
-               Just inline1 -> (cvtInline inline1, dfltActivation inline1)
-               Nothing      -> (EmptyInlineSpec,   AlwaysActive)
-       ; let ip = InlinePragma { inl_src    = "{-# INLINE"
+       ; let src TH.NoInline  = "{-# SPECIALISE NOINLINE"
+             src TH.Inline    = "{-# SPECIALISE INLINE"
+             src TH.Inlinable = "{-# SPECIALISE INLINE"
+       ; let (inline', dflt,srcText) = case inline of
+               Just inline1 -> (cvtInline inline1, dfltActivation inline1,
+                                src inline1)
+               Nothing      -> (EmptyInlineSpec,   AlwaysActive,
+                                "{-# SPECIALISE")
+       ; let ip = InlinePragma { inl_src    = SourceText srcText
                                , inl_inline = inline'
                                , inl_rule   = Hs.FunLike
                                , inl_act    = cvtPhases phases dflt
@@ -655,7 +662,7 @@ cvtPragmaD (SpecialiseP nm ty inline phases)
 cvtPragmaD (SpecialiseInstP ty)
   = do { ty' <- cvtType ty
        ; returnJustL $ Hs.SigD $
-         SpecInstSig "{-# SPECIALISE" (mkLHsSigType ty') }
+         SpecInstSig (SourceText "{-# SPECIALISE") (mkLHsSigType ty') }
 
 cvtPragmaD (RuleP nm bndrs lhs rhs phases)
   = do { let nm' = mkFastString nm
@@ -664,7 +671,8 @@ cvtPragmaD (RuleP nm bndrs lhs rhs phases)
        ; lhs'   <- cvtl lhs
        ; rhs'   <- cvtl rhs
        ; returnJustL $ Hs.RuleD
-            $ HsRules "{-# RULES" [noLoc $ HsRule (noLoc (nm,nm')) act bndrs'
+            $ HsRules (SourceText "{-# RULES")
+                      [noLoc $ HsRule (noLoc (SourceText nm,nm')) act bndrs'
                                                   lhs' placeHolderNames
                                                   rhs' placeHolderNames]
        }
@@ -679,7 +687,8 @@ cvtPragmaD (AnnP target exp)
          ValueAnnotation n -> do
            n' <- vcName n
            return (ValueAnnProvenance (noLoc n'))
-       ; returnJustL $ Hs.AnnD $ HsAnnotation "{-# ANN" target' exp'
+       ; returnJustL $ Hs.AnnD $ HsAnnotation (SourceText "{-# ANN") target'
+                                               exp'
        }
 
 cvtPragmaD (LineP line file)
@@ -702,8 +711,8 @@ cvtRuleMatch TH.FunLike = Hs.FunLike
 
 cvtPhases :: TH.Phases -> Activation -> Activation
 cvtPhases AllPhases       dflt = dflt
-cvtPhases (FromPhase i)   _    = ActiveAfter (show i) i
-cvtPhases (BeforePhase i) _    = ActiveBefore (show i) i
+cvtPhases (FromPhase i)   _    = ActiveAfter NoSourceText i
+cvtPhases (BeforePhase i) _    = ActiveBefore NoSourceText i
 
 cvtRuleBndr :: TH.RuleBndr -> CvtM (Hs.LRuleBndr RdrName)
 cvtRuleBndr (RuleVar n)
@@ -980,13 +989,13 @@ cvtpair (PatG gs,rhs)    = do { gs' <- cvtStmts gs; rhs' <- cvtl rhs
 
 cvtOverLit :: Lit -> CvtM (HsOverLit RdrName)
 cvtOverLit (IntegerL i)
-  = do { force i; return $ mkHsIntegral (show i) i placeHolderType}
+  = do { force i; return $ mkHsIntegral NoSourceText i placeHolderType}
 cvtOverLit (RationalL r)
   = do { force r; return $ mkHsFractional (cvtFractionalLit r) placeHolderType}
 cvtOverLit (StringL s)
   = do { let { s' = mkFastString s }
        ; force s'
-       ; return $ mkHsIsString s s' placeHolderType
+       ; return $ mkHsIsString (quotedSourceText s) s' placeHolderType
        }
 cvtOverLit _ = panic "Convert.cvtOverLit: Unexpected overloaded literal"
 -- An Integer is like an (overloaded) '3' in a Haskell source program
@@ -1014,25 +1023,25 @@ allCharLs xs
     go _  _                     = Nothing
 
 cvtLit :: Lit -> CvtM HsLit
-cvtLit (IntPrimL i)    = do { force i; return $ HsIntPrim (show i) i }
-cvtLit (WordPrimL w)   = do { force w; return $ HsWordPrim (show w) w }
+cvtLit (IntPrimL i)    = do { force i; return $ HsIntPrim NoSourceText i }
+cvtLit (WordPrimL w)   = do { force w; return $ HsWordPrim NoSourceText w }
 cvtLit (FloatPrimL f)  = do { force f; return $ HsFloatPrim (cvtFractionalLit f) }
 cvtLit (DoublePrimL f) = do { force f; return $ HsDoublePrim (cvtFractionalLit f) }
-cvtLit (CharL c)       = do { force c; return $ HsChar (show c) c }
-cvtLit (CharPrimL c)   = do { force c; return $ HsCharPrim (show c) c }
+cvtLit (CharL c)       = do { force c; return $ HsChar NoSourceText c }
+cvtLit (CharPrimL c)   = do { force c; return $ HsCharPrim NoSourceText c }
 cvtLit (StringL s)     = do { let { s' = mkFastString s }
                             ; force s'
-                            ; return $ HsString s s' }
+                            ; return $ HsString (quotedSourceText s) s' }
 cvtLit (StringPrimL s) = do { let { s' = BS.pack s }
                             ; force s'
-                            ; return $ HsStringPrim (w8ToString s) s' }
+                            ; return $ HsStringPrim NoSourceText s' }
 cvtLit _ = panic "Convert.cvtLit: Unexpected literal"
         -- cvtLit should not be called on IntegerL, RationalL
         -- That precondition is established right here in
         -- Convert.hs, hence panic
 
-w8ToString :: [Word8] -> String
-w8ToString ws = map (\w -> chr (fromIntegral w)) ws
+quotedSourceText :: String -> SourceText
+quotedSourceText s = SourceText $ "\"" ++ s ++ "\""
 
 cvtPats :: [TH.Pat] -> CvtM [Hs.LPat RdrName]
 cvtPats pats = mapM cvtPat pats
@@ -1153,13 +1162,14 @@ cvtTypeKind ty_str ty
              | n == 1
              -> failWith (ptext (sLit ("Illegal 1-tuple " ++ ty_str ++ " constructor")))
              | otherwise
-             -> mk_apps (HsTyVar (noLoc (getRdrName (tupleTyCon Boxed n)))) tys'
+             -> mk_apps (HsTyVar NotPromoted
+                               (noLoc (getRdrName (tupleTyCon Boxed n)))) tys'
            UnboxedTupleT n
              | length tys' == n         -- Saturated
              -> returnL (HsTupleTy HsUnboxedTuple tys')
              | otherwise
-             -> mk_apps (HsTyVar (noLoc (getRdrName (tupleTyCon Unboxed n))))
-                        tys'
+             -> mk_apps (HsTyVar NotPromoted
+                             (noLoc (getRdrName (tupleTyCon Unboxed n)))) tys'
            UnboxedSumT n
              | n < 2
             -> failWith $
@@ -1169,18 +1179,22 @@ cvtTypeKind ty_str ty
              | length tys' == n -- Saturated
              -> returnL (HsSumTy tys')
              | otherwise
-             -> mk_apps (HsTyVar (noLoc (getRdrName (sumTyCon n)))) tys'
+             -> mk_apps (HsTyVar NotPromoted (noLoc (getRdrName (sumTyCon n))))
+                        tys'
            ArrowT
              | [x',y'] <- tys' -> returnL (HsFunTy x' y')
-             | otherwise -> mk_apps (HsTyVar (noLoc (getRdrName funTyCon))) tys'
+             | otherwise ->
+                  mk_apps (HsTyVar NotPromoted (noLoc (getRdrName funTyCon)))
+                          tys'
            ListT
              | [x']    <- tys' -> returnL (HsListTy x')
-             | otherwise
-                        -> mk_apps (HsTyVar (noLoc (getRdrName listTyCon))) tys'
+             | otherwise ->
+                  mk_apps (HsTyVar NotPromoted (noLoc (getRdrName listTyCon)))
+                           tys'
            VarT nm -> do { nm' <- tNameL nm
-                         ; mk_apps (HsTyVar nm') tys' }
+                         ; mk_apps (HsTyVar NotPromoted nm') tys' }
            ConT nm -> do { nm' <- tconName nm
-                         ; mk_apps (HsTyVar (noLoc nm')) tys' }
+                         ; mk_apps (HsTyVar NotPromoted (noLoc nm')) tys' }
 
            ForallT tvs cxt ty
              | null tys'
@@ -1213,7 +1227,7 @@ cvtTypeKind ty_str ty
              -> do { s'  <- tconName s
                    ; t1' <- cvtType t1
                    ; t2' <- cvtType t2
-                   ; mk_apps (HsTyVar (noLoc s')) [t1', t2']
+                   ; mk_apps (HsTyVar NotPromoted (noLoc s')) [t1', t2']
                    }
 
            UInfixT t1 s t2
@@ -1229,7 +1243,7 @@ cvtTypeKind ty_str ty
                    }
 
            PromotedT nm -> do { nm' <- cName nm
-                              ; mk_apps (HsTyVar (noLoc nm')) tys' }
+                              ; mk_apps (HsTyVar NotPromoted (noLoc nm')) tys' }
                  -- Promoted data constructor; hence cName
 
            PromotedTupleT n
@@ -1243,25 +1257,29 @@ cvtTypeKind ty_str ty
                m = length tys'
 
            PromotedNilT
-             -> returnL (HsExplicitListTy placeHolderKind [])
+             -> returnL (HsExplicitListTy Promoted placeHolderKind [])
 
            PromotedConsT  -- See Note [Representing concrete syntax in types]
                           -- in Language.Haskell.TH.Syntax
-             | [ty1, L _ (HsExplicitListTy _ tys2)] <- tys'
-             -> returnL (HsExplicitListTy placeHolderKind (ty1:tys2))
+             | [ty1, L _ (HsExplicitListTy ip _ tys2)] <- tys'
+             -> returnL (HsExplicitListTy ip placeHolderKind (ty1:tys2))
              | otherwise
-             -> mk_apps (HsTyVar (noLoc (getRdrName consDataCon))) tys'
+             -> mk_apps (HsTyVar NotPromoted (noLoc (getRdrName consDataCon)))
+                        tys'
 
            StarT
-             -> returnL (HsTyVar (noLoc (getRdrName liftedTypeKindTyCon)))
+             -> returnL (HsTyVar NotPromoted (noLoc
+                                              (getRdrName liftedTypeKindTyCon)))
 
            ConstraintT
-             -> returnL (HsTyVar (noLoc (getRdrName constraintKindTyCon)))
+             -> returnL (HsTyVar NotPromoted
+                              (noLoc (getRdrName constraintKindTyCon)))
 
            EqualityT
              | [x',y'] <- tys' -> returnL (HsEqTy x' y')
-             | otherwise
-                      -> mk_apps (HsTyVar (noLoc (getRdrName eqPrimTyCon))) tys'
+             | otherwise ->
+                   mk_apps (HsTyVar NotPromoted
+                            (noLoc (getRdrName eqPrimTyCon))) tys'
 
            _ -> failWith (ptext (sLit ("Malformed " ++ ty_str)) <+> text (show ty))
     }
@@ -1286,8 +1304,8 @@ split_ty_app ty = go ty []
     go f as           = return (f,as)
 
 cvtTyLit :: TH.TyLit -> HsTyLit
-cvtTyLit (TH.NumTyLit i) = HsNumTy (show i) i
-cvtTyLit (TH.StrTyLit s) = HsStrTy s        (fsLit s)
+cvtTyLit (TH.NumTyLit i) = HsNumTy NoSourceText i
+cvtTyLit (TH.StrTyLit s) = HsStrTy NoSourceText (fsLit s)
 
 {- | @cvtOpAppT x op y@ takes converted arguments and flattens any HsAppsTy
    structure in them.
@@ -1359,7 +1377,7 @@ cvtPatSynSigTy ty         = cvtType ty
 
 -----------------------------------------------------------
 cvtFixity :: TH.Fixity -> Hs.Fixity
-cvtFixity (TH.Fixity prec dir) = Hs.Fixity (show prec) prec (cvt_dir dir)
+cvtFixity (TH.Fixity prec dir) = Hs.Fixity NoSourceText prec (cvt_dir dir)
    where
      cvt_dir TH.InfixL = Hs.InfixL
      cvt_dir TH.InfixR = Hs.InfixR

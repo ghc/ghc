@@ -55,18 +55,18 @@ tc211.hs:68:8: error:
                   with actual type ‘a2 -> a2’
     • In the expression:
           Cons ::
-            (forall a. a -> a)
-            -> List (forall a. a -> a) -> List (forall a. a -> a)
+            ((forall a. a -> a)
+            -> List (forall a. a -> a) -> List (forall a. a -> a))
       In the expression:
         (Cons ::
-           (forall a. a -> a)
-           -> List (forall a. a -> a) -> List (forall a. a -> a))
+           ((forall a. a -> a)
+           -> List (forall a. a -> a) -> List (forall a. a -> a)))
           (\ x -> x) Nil
       In an equation for ‘xs2’:
           xs2
             = (Cons ::
-                 (forall a. a -> a)
-                 -> List (forall a. a -> a) -> List (forall a. a -> a))
+                 ((forall a. a -> a)
+                 -> List (forall a. a -> a) -> List (forall a. a -> a)))
                 (\ x -> x) Nil
 
 tc211.hs:76:9: error:

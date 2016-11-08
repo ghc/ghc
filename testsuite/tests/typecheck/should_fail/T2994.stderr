@@ -14,7 +14,7 @@ T2994.hs:13:10: error:
 T2994.hs:13:23: error:
     • Expecting one more argument to ‘Reader' r’
       Expected a type, but ‘Reader' r’ has kind ‘* -> *’
-    • In the first argument of ‘MonadReader’, namely ‘Reader' r’
+    • In the first argument of ‘MonadReader’, namely ‘(Reader' r)’
       In the instance declaration for ‘MonadReader (Reader' r)’
 
 T2994.hs:15:10: error:

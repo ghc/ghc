@@ -2,6 +2,6 @@
 T5716.hs:13:33: error:
     Data constructor ‘U1’ cannot be used here
       (Perhaps you intended to use TypeInType)
-    In the first argument of ‘I’, namely ‘U1 DFInt’
+    In the first argument of ‘I’, namely ‘(U1 DFInt)’
     In the type ‘I (U1 DFInt)’
     In the definition of data constructor ‘I1’

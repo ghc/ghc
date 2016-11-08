@@ -1122,7 +1122,8 @@ seqId = pcMiscPrelId seqName ty info
                        `setRuleInfo`       mkRuleInfo [seq_cast_rule]
 
     inline_prag
-         = alwaysInlinePragma `setInlinePragmaActivation` ActiveAfter "0" 0
+         = alwaysInlinePragma `setInlinePragmaActivation` ActiveAfter
+                 NoSourceText 0
                   -- Make 'seq' not inline-always, so that simpleOptExpr
                   -- (see CoreSubst.simple_app) won't inline 'seq' on the
                   -- LHS of rules.  That way we can have rules for 'seq';

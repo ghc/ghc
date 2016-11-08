@@ -281,7 +281,7 @@ mkSpliceDecl lexpr@(L loc expr)
   = SpliceD (SpliceDecl (L loc splice) ExplicitSplice)
 
   | otherwise
-  = SpliceD (SpliceDecl (L loc (mkUntypedSplice lexpr)) ImplicitSplice)
+  = SpliceD (SpliceDecl (L loc (mkUntypedSplice NoParens lexpr)) ImplicitSplice)
 
 mkRoleAnnotDecl :: SrcSpan
                 -> Located RdrName                   -- type being annotated
@@ -465,8 +465,8 @@ splitCon ty
  where
    -- This is used somewhere where HsAppsTy is not used
    split (L _ (HsAppTy t u)) ts       = split t (u : ts)
-   split (L l (HsTyVar (L _ tc)))  ts = do data_con <- tyConToDataCon l tc
-                                           return (data_con, mk_rest ts)
+   split (L l (HsTyVar _ (L _ tc)))  ts = do data_con <- tyConToDataCon l tc
+                                             return (data_con, mk_rest ts)
    split (L l (HsTupleTy HsBoxedOrConstraintTuple ts)) []
       = return (L l (getRdrName (tupleDataCon Boxed (length ts))), PrefixCon ts)
    split (L l _) _ = parseErrorSDoc l (text "Cannot parse data constructor in a data/newtype declaration:" <+> ppr ty)
@@ -681,9 +681,9 @@ checkTyVars pp_what equals_or_where tc tparms
 
         -- Check that the name space is correct!
     chk (L l (HsKindSig
-              (L _ (HsAppsTy [L _ (HsAppPrefix (L lv (HsTyVar (L _ tv))))])) k))
+            (L _ (HsAppsTy [L _ (HsAppPrefix (L lv (HsTyVar _ (L _ tv))))])) k))
         | isRdrTyVar tv    = return (L l (KindedTyVar (L lv tv) k))
-    chk (L l (HsTyVar (L ltv tv)))
+    chk (L l (HsTyVar _ (L ltv tv)))
         | isRdrTyVar tv    = return (L l (UserTyVar (L ltv tv)))
     chk t@(L loc _)
         = Left (loc,
@@ -732,7 +732,7 @@ checkTyClHdr is_cls ty
   where
     goL (L l ty) acc ann = go l ty acc ann
 
-    go l (HsTyVar (L _ tc)) acc ann
+    go l (HsTyVar _ (L _ tc)) acc ann
       | isRdrTc tc               = return (L l tc, acc, ann)
     go _ (HsOpTy t1 ltc@(L _ tc) t2) acc ann
       | isRdrTc tc               = return (ltc, t1:t2:acc, ann)
@@ -1088,7 +1088,8 @@ isFunLhs e = go e [] []
 splitTilde :: LHsType RdrName -> P (LHsType RdrName)
 splitTilde t = go t
   where go (L loc (HsAppTy t1 t2))
-          | L lo (HsBangTy (HsSrcBang Nothing NoSrcUnpack SrcLazy) t2') <- t2
+          | L lo (HsBangTy (HsSrcBang NoSourceText NoSrcUnpack SrcLazy) t2')
+                                                                          <- t2
           = do
               moveAnnotations lo loc
               t1' <- go t1
@@ -1116,7 +1117,7 @@ splitTildeApps (t : rest) = do
   return (t : rest')
   where go (L l (HsAppPrefix
             (L loc (HsBangTy
-                    (HsSrcBang Nothing NoSrcUnpack SrcLazy)
+                    (HsSrcBang NoSourceText NoSrcUnpack SrcLazy)
                     ty))))
           = addAnnotation l AnnTilde tilde_loc >>
             return
@@ -1160,7 +1161,7 @@ checkCmd :: SrcSpan -> HsExpr RdrName -> P (HsCmd RdrName)
 checkCmd _ (HsArrApp e1 e2 ptt haat b) =
     return $ HsCmdArrApp e1 e2 ptt haat b
 checkCmd _ (HsArrForm e mf args) =
-    return $ HsCmdArrForm e mf args
+    return $ HsCmdArrForm e Prefix mf args
 checkCmd _ (HsApp e1 e2) =
     checkCommand e1 >>= (\c -> return $ HsCmdApp c e2)
 checkCmd _ (HsLam mg) =
@@ -1184,7 +1185,7 @@ checkCmd _ (OpApp eLeft op _fixity eRight) = do
     c2 <- checkCommand eRight
     let arg1 = L (getLoc c1) $ HsCmdTop c1 placeHolderType placeHolderType []
         arg2 = L (getLoc c2) $ HsCmdTop c2 placeHolderType placeHolderType []
-    return $ HsCmdArrForm op Nothing [arg1, arg2]
+    return $ HsCmdArrForm op Infix Nothing [arg1, arg2]
 
 checkCmd l e = cmdFail l e
 
@@ -1274,7 +1275,7 @@ mk_rec_upd_field :: HsRecField RdrName (LHsExpr RdrName) -> HsRecUpdField RdrNam
 mk_rec_upd_field (HsRecField (L loc (FieldOcc rdr _)) arg pun)
   = HsRecField (L loc (Unambiguous rdr PlaceHolder)) arg pun
 
-mkInlinePragma :: String -> (InlineSpec, RuleMatchInfo) -> Maybe Activation
+mkInlinePragma :: SourceText -> (InlineSpec, RuleMatchInfo) -> Maybe Activation
                -> InlinePragma
 -- The (Maybe Activation) is because the user can omit
 -- the activation spec (and usually does)
@@ -1357,7 +1358,8 @@ parseCImport cconv safety nm str sourceText =
              ((mk Nothing <$> cimp nm) +++
               (do h <- munch1 hdr_char
                   skipSpaces
-                  mk (Just (Header h (mkFastString h))) <$> cimp nm))
+                  mk (Just (Header (SourceText h) (mkFastString h)))
+                      <$> cimp nm))
          ]
        skipSpaces
        return r
@@ -1386,7 +1388,7 @@ parseCImport cconv safety nm str sourceText =
                                              return False)
                               _ -> return True
                      cid' <- cid
-                     return (CFunction (StaticTarget (unpackFS cid') cid'
+                     return (CFunction (StaticTarget NoSourceText cid'
                                         Nothing isFun)))
           where
             cid = return nm +++
@@ -1405,7 +1407,7 @@ mkExport (L lc cconv) (L le (StringLiteral esrc entity), v, ty)
    ForeignExport { fd_name = v, fd_sig_ty = ty
                  , fd_co = noForeignExportCoercionYet
                  , fd_fe = CExport (L lc (CExportStatic esrc entity' cconv))
-                                   (L le (unpackFS entity)) }
+                                   (L le esrc) }
   where
     entity' | nullFS entity = mkExtName (unLoc v)
             | otherwise     = entity

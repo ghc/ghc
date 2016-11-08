@@ -1,0 +1,38 @@
+
+Ppr040.hs:35:1: error:
+    • Too many parameters to Sing:
+        x is unexpected;
+        expected only two parameters
+    • In the data instance declaration for ‘Sing’
+
+Ppr040.hs:35:20: error:
+    • Expecting two more arguments to ‘Sigma’
+      Expected a type, but
+      ‘Sigma’ has kind
+      ‘forall p -> TyPi p (MkStar p) -> *’
+    • In the first argument of ‘Sing’, namely ‘Sigma’
+      In the data instance declaration for ‘Sing’
+
+Ppr040.hs:35:27: error:
+    • Expected kind ‘Sigma’, but ‘Sigma p r’ has kind ‘*’
+    • In the second argument of ‘Sing’, namely ‘(Sigma p r)’
+      In the data instance declaration for ‘Sing’
+
+Ppr040.ppr.hs:30:1: error:
+    • Too many parameters to Sing:
+        x is unexpected;
+        expected only two parameters
+    • In the data instance declaration for ‘Sing’
+
+Ppr040.ppr.hs:30:20: error:
+    • Expecting two more arguments to ‘Sigma’
+      Expected a type, but
+      ‘Sigma’ has kind
+      ‘forall p -> TyPi p (MkStar p) -> *’
+    • In the first argument of ‘Sing’, namely ‘Sigma’
+      In the data instance declaration for ‘Sing’
+
+Ppr040.ppr.hs:30:27: error:
+    • Expected kind ‘Sigma’, but ‘Sigma p r’ has kind ‘*’
+    • In the second argument of ‘Sing’, namely ‘(Sigma p r)’
+      In the data instance declaration for ‘Sing’

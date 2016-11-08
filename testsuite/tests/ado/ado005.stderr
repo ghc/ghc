@@ -11,11 +11,11 @@ ado005.hs:8:3: error:
           test :: Applicative f => (Int -> f Int) -> f Int
     In a stmt of a 'do' block: x <- f 3
     In the expression:
-      do { x <- f 3;
-           y <- f x;
-           return (x + y) }
+      do x <- f 3
+         y <- f x
+         return (x + y)
     In an equation for ‘test’:
         test f
-          = do { x <- f 3;
-                 y <- f x;
-                 return (x + y) }
+          = do x <- f 3
+               y <- f x
+               return (x + y)

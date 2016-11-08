@@ -402,7 +402,7 @@ pprIdBndrInfo info
     has_lbv   = not (hasNoOneShotInfo lbv_info)
 
     doc = showAttributes
-          [ (has_prag, text "InlPrag=" <> ppr prag_info)
+          [ (has_prag, text "InlPrag=" <> pprInlineDebug prag_info)
           , (has_occ,  text "Occ=" <> ppr occ_info)
           , (has_dmd,  text "Dmd=" <> ppr dmd_info)
           , (has_lbv , text "OS=" <> ppr lbv_info)

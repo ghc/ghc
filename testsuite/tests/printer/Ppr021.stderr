@@ -1,0 +1,16 @@
+
+Ppr021.hs:22:1: error:
+    Could not find module ‘BootImport’
+    Use -v to see a list of the files searched for.
+
+Ppr021.hs:23:1: error:
+    Could not find module ‘BootImport’
+    Use -v to see a list of the files searched for.
+
+Ppr021.ppr.hs:10:1: error:
+    Could not find module ‘BootImport’
+    Use -v to see a list of the files searched for.
+
+Ppr021.ppr.hs:11:1: error:
+    Could not find module ‘BootImport’
+    Use -v to see a list of the files searched for.

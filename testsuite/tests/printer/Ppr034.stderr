@@ -1,0 +1,42 @@
+
+Ppr034.hs:25:1:
+    Could not find module ‘Algebra.Laws’
+    Use -v to see a list of the files searched for.
+
+Ppr034.hs:30:1:
+    Could not find module ‘NumericPrelude.Elementwise’
+    Use -v to see a list of the files searched for.
+
+Ppr034.hs:32:1:
+    Could not find module ‘Data.Tuple.HT’
+    Perhaps you meant Data.Tuple (from base-4.9.0.0)
+    Use -v to see a list of the files searched for.
+
+Ppr034.hs:33:1:
+    Could not find module ‘Data.List.Match’
+    Use -v to see a list of the files searched for.
+
+Ppr034.hs:39:1:
+    Could not find module ‘NumericPrelude.Base’
+    Use -v to see a list of the files searched for.
+
+Ppr034.ppr.hs:8:1:
+    Could not find module ‘Algebra.Laws’
+    Use -v to see a list of the files searched for.
+
+Ppr034.ppr.hs:11:1:
+    Could not find module ‘NumericPrelude.Elementwise’
+    Use -v to see a list of the files searched for.
+
+Ppr034.ppr.hs:13:1:
+    Could not find module ‘Data.Tuple.HT’
+    Perhaps you meant Data.Tuple (from base-4.9.0.0)
+    Use -v to see a list of the files searched for.
+
+Ppr034.ppr.hs:14:1:
+    Could not find module ‘Data.List.Match’
+    Use -v to see a list of the files searched for.
+
+Ppr034.ppr.hs:19:1:
+    Could not find module ‘NumericPrelude.Base’
+    Use -v to see a list of the files searched for.

@@ -1,0 +1,49 @@
+Ppr023.hs:15:1: error:
+    Multiple declarations of ‘Minimal’
+    Declared at: Ppr023.hs:11:1
+                 Ppr023.hs:15:1
+
+Ppr023.hs:15:1: error:
+    Multiple declarations of ‘Minimal’
+    Declared at: Ppr023.hs:7:1
+                 Ppr023.hs:15:1
+
+Ppr023.hs:16:3: error:
+    Multiple declarations of ‘toText’
+    Declared at: Ppr023.hs:12:3
+                 Ppr023.hs:16:3
+
+Ppr023.hs:16:3: error:
+    Multiple declarations of ‘toText’
+    Declared at: Ppr023.hs:8:3
+                 Ppr023.hs:16:3
+
+Ppr023.hs:16:3: error:
+    Multiple declarations of ‘toText’
+    Declared at: Ppr023.hs:2:5
+                 Ppr023.hs:16:3
+
+Ppr023.ppr.hs:11:1: error:
+    Multiple declarations of ‘Minimal’
+    Declared at: Ppr023.ppr.hs:8:1
+                 Ppr023.ppr.hs:11:1
+
+Ppr023.ppr.hs:11:1: error:
+    Multiple declarations of ‘Minimal’
+    Declared at: Ppr023.ppr.hs:5:1
+                 Ppr023.ppr.hs:11:1
+
+Ppr023.ppr.hs:12:3: error:
+    Multiple declarations of ‘toText’
+    Declared at: Ppr023.ppr.hs:9:3
+                 Ppr023.ppr.hs:12:3
+
+Ppr023.ppr.hs:12:3: error:
+    Multiple declarations of ‘toText’
+    Declared at: Ppr023.ppr.hs:6:3
+                 Ppr023.ppr.hs:12:3
+
+Ppr023.ppr.hs:12:3: error:
+    Multiple declarations of ‘toText’
+    Declared at: Ppr023.ppr.hs:3:3
+                 Ppr023.ppr.hs:12:3

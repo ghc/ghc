@@ -1,0 +1,76 @@
+
+Ppr014.hs:16:24: error: Not in scope: type variable ‘k’
+
+Ppr014.hs:16:29: error: Not in scope: type variable ‘k’
+
+Ppr014.hs:16:37: error: Not in scope: type variable ‘k’
+
+Ppr014.hs:16:39: error: Not in scope: type variable ‘v’
+
+Ppr014.hs:16:50: error: Not in scope: type variable ‘v’
+
+Ppr014.hs:17:24: error: Not in scope: type variable ‘k’
+
+Ppr014.hs:17:29: error: Not in scope: type variable ‘k’
+
+Ppr014.hs:17:34: error: Not in scope: type variable ‘v’
+
+Ppr014.hs:17:42: error: Not in scope: type variable ‘k’
+
+Ppr014.hs:17:44: error: Not in scope: type variable ‘v’
+
+Ppr014.hs:17:52: error: Not in scope: type variable ‘k’
+
+Ppr014.hs:17:54: error: Not in scope: type variable ‘v’
+
+Ppr014.hs:18:24: error: Not in scope: type variable ‘k’
+
+Ppr014.hs:18:32: error: Not in scope: type variable ‘k’
+
+Ppr014.hs:18:34: error: Not in scope: type variable ‘v’
+
+Ppr014.hs:18:42: error: Not in scope: type variable ‘k’
+
+Ppr014.hs:18:44: error: Not in scope: type variable ‘v’
+
+Ppr014.hs:18:52: error: Not in scope: type variable ‘k’
+
+Ppr014.hs:18:54: error: Not in scope: type variable ‘v’
+
+Ppr014.ppr.hs:11:34: error: Not in scope: type variable ‘k’
+
+Ppr014.ppr.hs:11:39: error: Not in scope: type variable ‘k’
+
+Ppr014.ppr.hs:11:47: error: Not in scope: type variable ‘k’
+
+Ppr014.ppr.hs:11:49: error: Not in scope: type variable ‘v’
+
+Ppr014.ppr.hs:11:60: error: Not in scope: type variable ‘v’
+
+Ppr014.ppr.hs:12:34: error: Not in scope: type variable ‘k’
+
+Ppr014.ppr.hs:12:39: error: Not in scope: type variable ‘k’
+
+Ppr014.ppr.hs:12:44: error: Not in scope: type variable ‘v’
+
+Ppr014.ppr.hs:12:52: error: Not in scope: type variable ‘k’
+
+Ppr014.ppr.hs:12:54: error: Not in scope: type variable ‘v’
+
+Ppr014.ppr.hs:12:62: error: Not in scope: type variable ‘k’
+
+Ppr014.ppr.hs:12:64: error: Not in scope: type variable ‘v’
+
+Ppr014.ppr.hs:13:33: error: Not in scope: type variable ‘k’
+
+Ppr014.ppr.hs:13:41: error: Not in scope: type variable ‘k’
+
+Ppr014.ppr.hs:13:43: error: Not in scope: type variable ‘v’
+
+Ppr014.ppr.hs:13:51: error: Not in scope: type variable ‘k’
+
+Ppr014.ppr.hs:13:53: error: Not in scope: type variable ‘v’
+
+Ppr014.ppr.hs:13:61: error: Not in scope: type variable ‘k’
+
+Ppr014.ppr.hs:13:63: error: Not in scope: type variable ‘v’

@@ -607,7 +607,7 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdDo (L _ stmts) _) env_ids = do
 -- -----------------------------------
 -- D; xs |-a (|e c1 ... cn|) :: stk --> t       ---> e [t_xs] c1 ... cn
 
-dsCmd _ids local_vars _stack_ty _res_ty (HsCmdArrForm op _ args) env_ids = do
+dsCmd _ids local_vars _stack_ty _res_ty (HsCmdArrForm op _ _ args) env_ids = do
     let env_ty = mkBigCoreVarTupTy env_ids
     core_op <- dsLExpr op
     (core_args, fv_sets) <- mapAndUnzipM (dsTrimCmdArg local_vars env_ids) args

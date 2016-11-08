@@ -8,6 +8,7 @@
 module TcTypeable(mkTypeableBinds) where
 
 
+import BasicTypes ( SourceText(..) )
 import TcBinds( addTypecheckedBinds )
 import IfaceEnv( newGlobalBinder )
 import TcEnv
@@ -286,5 +287,6 @@ mkTyConRepRHS (Stuff {..}) tycon = rep_rhs
     Fingerprint high low = fingerprintString hashThis
 
     word64 :: Word64 -> HsLit
-    word64 | wORD_SIZE dflags == 4 = \n -> HsWord64Prim (show n) (toInteger n)
-           | otherwise             = \n -> HsWordPrim   (show n) (toInteger n)
+    word64
+      | wORD_SIZE dflags == 4 = \n -> HsWord64Prim NoSourceText (toInteger n)
+      | otherwise             = \n -> HsWordPrim   NoSourceText (toInteger n)

@@ -3,7 +3,7 @@
 -- argument.
 module Main where
 
--- import Data.Generics
+import BasicTypes
 import Data.Data
 import Data.List
 import System.IO
@@ -42,21 +42,33 @@ testOneFile libdir fileName = do
      gq ast = everything (++) ([] `mkQ` doHsLit `extQ` doOverLit) ast
 
      doHsLit :: HsLit -> [String]
-     doHsLit (HsChar       src c) = ["HsChar [" ++ src ++ "] " ++ show c]
-     doHsLit (HsCharPrim   src c) = ["HsCharPrim [" ++ src ++ "] " ++ show c]
-     doHsLit (HsString     src c) = ["HsString [" ++ src ++ "] " ++ show c]
-     doHsLit (HsStringPrim src c) = ["HsStringPrim [" ++ src ++ "] " ++ show c]
-     doHsLit (HsInt        src c) = ["HsInt [" ++ src ++ "] " ++ show c]
-     doHsLit (HsIntPrim    src c) = ["HsIntPrim [" ++ src ++ "] " ++ show c]
-     doHsLit (HsWordPrim   src c) = ["HsWordPrim [" ++ src ++ "] " ++ show c]
-     doHsLit (HsInt64Prim  src c) = ["HsInt64Prim [" ++ src ++ "] " ++ show c]
-     doHsLit (HsWord64Prim src c) = ["HsWord64Prim [" ++ src ++ "] " ++ show c]
-     doHsLit (HsInteger  src c _) = ["HsInteger [" ++ src ++ "] " ++ show c]
+     doHsLit (HsChar       (SourceText src) c)
+       = ["HsChar [" ++ src ++ "] " ++ show c]
+     doHsLit (HsCharPrim   (SourceText src) c)
+       = ["HsCharPrim [" ++ src ++ "] " ++ show c]
+     doHsLit (HsString     (SourceText src) c)
+       = ["HsString [" ++ src ++ "] " ++ show c]
+     doHsLit (HsStringPrim (SourceText src) c)
+       = ["HsStringPrim [" ++ src ++ "] " ++ show c]
+     doHsLit (HsInt        (SourceText src) c)
+       = ["HsInt [" ++ src ++ "] " ++ show c]
+     doHsLit (HsIntPrim    (SourceText src) c)
+       = ["HsIntPrim [" ++ src ++ "] " ++ show c]
+     doHsLit (HsWordPrim   (SourceText src) c)
+       = ["HsWordPrim [" ++ src ++ "] " ++ show c]
+     doHsLit (HsInt64Prim  (SourceText src) c)
+       = ["HsInt64Prim [" ++ src ++ "] " ++ show c]
+     doHsLit (HsWord64Prim (SourceText src) c)
+       = ["HsWord64Prim [" ++ src ++ "] " ++ show c]
+     doHsLit (HsInteger  (SourceText src) c _)
+       = ["HsInteger [" ++ src ++ "] " ++ show c]
      doHsLit _ = []
 
      doOverLit :: OverLitVal -> [String]
-     doOverLit (HsIntegral  src c) = ["HsIntegral [" ++ src ++ "] " ++ show c]
-     doOverLit (HsIsString  src c) = ["HsIsString [" ++ src ++ "] " ++ show c]
+     doOverLit (HsIntegral  (SourceText src) c)
+       = ["HsIntegral [" ++ src ++ "] " ++ show c]
+     doOverLit (HsIsString  (SourceText src) c)
+       = ["HsIsString [" ++ src ++ "] " ++ show c]
      doOverLit _ = []
 
 pp a = showPpr unsafeGlobalDynFlags a

@@ -495,7 +495,7 @@ data DataConRep
 -- emit a warning (in checkValidDataCon) and treat it like
 -- @(HsSrcBang _ NoSrcUnpack SrcLazy)@
 data HsSrcBang =
-  HsSrcBang (Maybe SourceText) -- Note [Pragma source text] in BasicTypes
+  HsSrcBang SourceText -- Note [Pragma source text] in BasicTypes
             SrcUnpackedness
             SrcStrictness
   deriving Data.Data

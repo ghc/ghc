@@ -23,6 +23,7 @@ import MonadUtils
 import Outputable
 import Binary
 import SrcLoc
+import OccName ( HasOccName(..), isSymOcc )
 
 ----------------------------------------------------------------------
 -- Boolean formula type and smart constructors
@@ -200,8 +201,19 @@ pprBooleanFormulaNice = pprBooleanFormula' pprVar pprAnd pprOr 0
   pprAnd' xs@(_:_) = fsep (punctuate comma (init xs)) <> text ", and" <+> last xs
   pprOr p xs = cparen (p > 1) $ text "either" <+> sep (intersperse (text "or") xs)
 
-instance Outputable a => Outputable (BooleanFormula a) where
-  pprPrec = pprBooleanFormula pprPrec
+instance (Outputable a, HasOccName a) => Outputable (BooleanFormula a) where
+  ppr = pprBooleanFormulaNormal
+
+pprBooleanFormulaNormal :: (Outputable a, HasOccName a)
+                        => BooleanFormula a -> SDoc
+pprBooleanFormulaNormal = go
+  where
+    go (Var x)    = pprPrefixVar (isSymOcc (occName x)) (ppr x)
+    go (And xs)   = fsep $ punctuate comma (map (go . unLoc) xs)
+    go (Or [])    = keyword $ text "FALSE"
+    go (Or xs)    = fsep $ intersperse vbar (map (go . unLoc) xs)
+    go (Parens x) = parens (go $ unLoc x)
+
 
 ----------------------------------------------------------------------
 -- Binary

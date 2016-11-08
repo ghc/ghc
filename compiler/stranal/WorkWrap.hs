@@ -371,7 +371,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
       Just (work_demands, wrap_fn, work_fn) -> do
         work_uniq <- getUniqueM
         let work_rhs = work_fn rhs
-            work_prag = InlinePragma { inl_src = "{-# INLINE"
+            work_prag = InlinePragma { inl_src = SourceText "{-# INLINE"
                                      , inl_inline = inl_inline inl_prag
                                      , inl_sat    = Nothing
                                      , inl_act    = wrap_act
@@ -410,9 +410,9 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
 
                                 -- arity is consistent with the demand type goes through
 
-            wrap_act  = ActiveAfter "0" 0
+            wrap_act  = ActiveAfter NoSourceText 0
             wrap_rhs  = wrap_fn work_id
-            wrap_prag = InlinePragma { inl_src = "{-# INLINE"
+            wrap_prag = InlinePragma { inl_src = SourceText "{-# INLINE"
                                      , inl_inline = Inline
                                      , inl_sat    = Nothing
                                      , inl_act    = wrap_act

@@ -1,0 +1,28 @@
+Ppr009.hs:5:15: error: Not in scope: data constructor ‘Bitstream’
+
+Ppr009.hs:7:7: error:
+    Not in scope: ‘S.concatMap’
+    No module named ‘S’ is imported.
+
+Ppr009.hs:7:27: error:
+    Not in scope: ‘GV.stream’
+    No module named ‘GV’ is imported.
+
+Ppr009.hs:8:7: error:
+    Not in scope: ‘S.sized’
+    No module named ‘S’ is imported.
+
+Ppr009.ppr.hs:4:15: error:
+    Not in scope: data constructor ‘Bitstream’
+
+Ppr009.ppr.hs:6:5: error:
+    Not in scope: ‘S.concatMap’
+    No module named ‘S’ is imported.
+
+Ppr009.ppr.hs:6:25: error:
+    Not in scope: ‘GV.stream’
+    No module named ‘GV’ is imported.
+
+Ppr009.ppr.hs:6:38: error:
+    Not in scope: ‘S.sized’
+    No module named ‘S’ is imported.

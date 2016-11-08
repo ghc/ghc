@@ -3,13 +3,13 @@ tcfail132.hs:17:37: error:
     • Expecting one fewer arguments to ‘Object f' f t’
       Expected kind ‘* -> * -> * -> *’,
         but ‘Object f' f t’ has kind ‘* -> * -> *’
-    • In the first argument of ‘T’, namely ‘Object f' f t’
+    • In the first argument of ‘T’, namely ‘(Object f' f t)’
       In the type ‘T (Object f' f t) (DUnit t)’
       In the type declaration for ‘LiftObject’
 
 tcfail132.hs:17:53: error:
     • Expected kind ‘* -> * -> * -> *’,
         but ‘DUnit t’ has kind ‘* -> * -> *’
-    • In the second argument of ‘T’, namely ‘DUnit t’
+    • In the second argument of ‘T’, namely ‘(DUnit t)’
       In the type ‘T (Object f' f t) (DUnit t)’
       In the type declaration for ‘LiftObject’

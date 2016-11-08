@@ -824,10 +824,10 @@ importdecl :: { LImportDecl RdrName }
                    ((mj AnnImport $1 : (fst $ fst $2) ++ fst $3 ++ fst $4
                                     ++ fst $5 ++ fst $7)) }
 
-maybe_src :: { (([AddAnn],Maybe SourceText),IsBootInterface) }
-        : '{-# SOURCE' '#-}'        { (([mo $1,mc $2],Just (getSOURCE_PRAGs $1))
+maybe_src :: { (([AddAnn],SourceText),IsBootInterface) }
+        : '{-# SOURCE' '#-}'        { (([mo $1,mc $2],getSOURCE_PRAGs $1)
                                       ,True) }
-        | {- empty -}               { (([],Nothing),False) }
+        | {- empty -}               { (([],NoSourceText),False) }
 
 maybe_safe :: { ([AddAnn],Bool) }
         : 'safe'                                { ([mj AnnSafe $1],True) }
@@ -871,7 +871,7 @@ impspec :: { Located (Bool, Located [LIE RdrName]) }
 -- Fixity Declarations
 
 prec    :: { Located (SourceText,Int) }
-        : {- empty -}           { noLoc ("",9) }
+        : {- empty -}           { noLoc (NoSourceText,9) }
         | INTEGER
                  {% checkPrecP (sL1 $1 (getINTEGERs $1,fromInteger (getINTEGER $1))) }
 
@@ -1444,11 +1444,11 @@ binds   ::  { Located ([AddAnn],Located (HsLocalBinds RdrName)) }
                                                     ,sL1 $1 $ HsValBinds val_binds)) } }
 
         | '{'            dbinds '}'     { sLL $1 $> ([moc $1,mcc $3]
-                                             ,sL1 $2 $ HsIPBinds (IPBinds (unLoc $2)
+                                             ,sL1 $2 $ HsIPBinds (IPBinds (reverse $ unLoc $2)
                                                          emptyTcEvBinds)) }
 
         |     vocurly    dbinds close   { L (getLoc $2) ([]
-                                            ,sL1 $2 $ HsIPBinds (IPBinds (unLoc $2)
+                                            ,sL1 $2 $ HsIPBinds (IPBinds (reverse $ unLoc $2)
                                                         emptyTcEvBinds)) }
 
 
@@ -1521,7 +1521,7 @@ warnings :: { OrdList (LWarnDecl RdrName) }
 -- SUP: TEMPORARY HACK, not checking for `module Foo'
 warning :: { OrdList (LWarnDecl RdrName) }
         : namelist strings
-                {% amsu (sLL $1 $> (Warning (unLoc $1) (WarningTxt (noLoc "") $ snd $ unLoc $2)))
+                {% amsu (sLL $1 $> (Warning (unLoc $1) (WarningTxt (noLoc NoSourceText) $ snd $ unLoc $2)))
                      (fst $ unLoc $2) }
 
 deprecations :: { OrdList (LWarnDecl RdrName) }
@@ -1536,7 +1536,7 @@ deprecations :: { OrdList (LWarnDecl RdrName) }
 -- SUP: TEMPORARY HACK, not checking for `module Foo'
 deprecation :: { OrdList (LWarnDecl RdrName) }
         : namelist strings
-             {% amsu (sLL $1 $> $ (Warning (unLoc $1) (DeprecatedTxt (noLoc "") $ snd $ unLoc $2)))
+             {% amsu (sLL $1 $> $ (Warning (unLoc $1) (DeprecatedTxt (noLoc NoSourceText) $ snd $ unLoc $2)))
                      (fst $ unLoc $2) }
 
 strings :: { Located ([AddAnn],[Located StringLiteral]) }
@@ -1601,7 +1601,7 @@ fspec :: { Located ([AddAnn]
                                              ,(L (getLoc $1)
                                                     (getStringLiteral $1), $2, mkLHsSigType $4)) }
        |        var '::' sigtypedoc     { sLL $1 $> ([mu AnnDcolon $2]
-                                             ,(noLoc (StringLiteral "" nilFS), $1, mkLHsSigType $3)) }
+                                             ,(noLoc (StringLiteral NoSourceText nilFS), $1, mkLHsSigType $3)) }
          -- if the entity string is missing, it defaults to the empty string;
          -- the meaning of an empty entity string depends on the calling
          -- convention
@@ -1639,7 +1639,7 @@ sigtypes1 :: { (OrdList (LHsSigType RdrName)) }
 -- Types
 
 strict_mark :: { Located ([AddAnn],HsSrcBang) }
-        : strictness { sL1 $1 (let (a, str) = unLoc $1 in (a, HsSrcBang Nothing NoSrcUnpack str)) }
+        : strictness { sL1 $1 (let (a, str) = unLoc $1 in (a, HsSrcBang NoSourceText NoSrcUnpack str)) }
         | unpackedness { sL1 $1 (let (a, prag, unpk) = unLoc $1 in (a, HsSrcBang prag unpk NoSrcStrict)) }
         | unpackedness strictness { sLL $1 $> (let { (a, prag, unpk) = unLoc $1
                                                    ; (a', str) = unLoc $2 }
@@ -1651,9 +1651,9 @@ strictness :: { Located ([AddAnn], SrcStrictness) }
         : '!' { sL1 $1 ([mj AnnBang $1], SrcStrict) }
         | '~' { sL1 $1 ([mj AnnTilde $1], SrcLazy) }
 
-unpackedness :: { Located ([AddAnn], Maybe SourceText, SrcUnpackedness) }
-        : '{-# UNPACK' '#-}'   { sLL $1 $> ([mo $1, mc $2], Just $ getUNPACK_PRAGs $1, SrcUnpack) }
-        | '{-# NOUNPACK' '#-}' { sLL $1 $> ([mo $1, mc $2], Just $ getNOUNPACK_PRAGs $1, SrcNoUnpack) }
+unpackedness :: { Located ([AddAnn], SourceText, SrcUnpackedness) }
+        : '{-# UNPACK' '#-}'   { sLL $1 $> ([mo $1, mc $2], getUNPACK_PRAGs $1, SrcUnpack) }
+        | '{-# NOUNPACK' '#-}' { sLL $1 $> ([mo $1, mc $2], getNOUNPACK_PRAGs $1, SrcNoUnpack) }
 
 -- A ctype is a for-all type
 ctype   :: { LHsType RdrName }
@@ -1785,8 +1785,8 @@ tyapp :: { LHsAppType RdrName }
                                                [mj AnnSimpleQuote $1] }
 
 atype :: { LHsType RdrName }
-        : ntgtycon                       { sL1 $1 (HsTyVar $1) }      -- Not including unit tuples
-        | tyvar                          { sL1 $1 (HsTyVar $1) }      -- (See Note [Unit tuples])
+        : ntgtycon                       { sL1 $1 (HsTyVar NotPromoted $1) }      -- Not including unit tuples
+        | tyvar                          { sL1 $1 (HsTyVar NotPromoted $1) }      -- (See Note [Unit tuples])
         | strict_mark atype              {% ams (sLL $1 $> (HsBangTy (snd $ unLoc $1) $2))
                                                 (fst $ unLoc $1) }  -- Constructor sigs only
         | '{' fielddecls '}'             {% amms (checkRecordSyntax
@@ -1813,21 +1813,21 @@ atype :: { LHsType RdrName }
         | '(' ctype '::' kind ')'     {% ams (sLL $1 $> $ HsKindSig $2 $4)
                                              [mop $1,mu AnnDcolon $3,mcp $5] }
         | quasiquote                  { sL1 $1 (HsSpliceTy (unLoc $1) placeHolderKind) }
-        | '$(' exp ')'                {% ams (sLL $1 $> $ mkHsSpliceTy $2)
+        | '$(' exp ')'                {% ams (sLL $1 $> $ mkHsSpliceTy HasParens $2)
                                              [mj AnnOpenPE $1,mj AnnCloseP $3] }
-        | TH_ID_SPLICE                {%ams (sLL $1 $> $ mkHsSpliceTy $ sL1 $1 $ HsVar $
+        | TH_ID_SPLICE                {%ams (sLL $1 $> $ mkHsSpliceTy NoParens $ sL1 $1 $ HsVar $
                                              (sL1 $1 (mkUnqual varName (getTH_ID_SPLICE $1))))
                                              [mj AnnThIdSplice $1] }
                                       -- see Note [Promotion] for the followings
-        | SIMPLEQUOTE qcon_nowiredlist {% ams (sLL $1 $> $ HsTyVar $2) [mj AnnSimpleQuote $1,mj AnnName $2] }
+        | SIMPLEQUOTE qcon_nowiredlist {% ams (sLL $1 $> $ HsTyVar Promoted $2) [mj AnnSimpleQuote $1,mj AnnName $2] }
         | SIMPLEQUOTE  '(' ctype ',' comma_types1 ')'
                              {% addAnnotation (gl $3) AnnComma (gl $4) >>
                                 ams (sLL $1 $> $ HsExplicitTupleTy [] ($3 : $5))
                                     [mj AnnSimpleQuote $1,mop $2,mcp $6] }
-        | SIMPLEQUOTE  '[' comma_types0 ']'     {% ams (sLL $1 $> $ HsExplicitListTy
+        | SIMPLEQUOTE  '[' comma_types0 ']'     {% ams (sLL $1 $> $ HsExplicitListTy Promoted
                                                             placeHolderKind $3)
                                                        [mj AnnSimpleQuote $1,mos $2,mcs $4] }
-        | SIMPLEQUOTE var                       {% ams (sLL $1 $> $ HsTyVar $2)
+        | SIMPLEQUOTE var                       {% ams (sLL $1 $> $ HsTyVar Promoted $2)
                                                        [mj AnnSimpleQuote $1,mj AnnName $2] }
 
         -- Two or more [ty, ty, ty] must be a promoted list type, just as
@@ -1836,7 +1836,7 @@ atype :: { LHsType RdrName }
         -- so you have to quote those.)
         | '[' ctype ',' comma_types1 ']'  {% addAnnotation (gl $2) AnnComma
                                                            (gl $3) >>
-                                             ams (sLL $1 $> $ HsExplicitListTy
+                                             ams (sLL $1 $> $ HsExplicitListTy NotPromoted
                                                      placeHolderKind ($2 : $4))
                                                  [mos $1,mcs $5] }
         | INTEGER              { sLL $1 $> $ HsTyLit $ HsNumTy (getINTEGERs $1)
@@ -2362,7 +2362,7 @@ scc_annot :: { Located (([AddAnn],SourceText),StringLiteral) }
                                                 ,mc $3],getSCC_PRAGs $1),(StringLiteral (getSTRINGs $2) scc)) }
         | '{-# SCC' VARID  '#-}'      { sLL $1 $> (([mo $1,mj AnnVal $2
                                          ,mc $3],getSCC_PRAGs $1)
-                                        ,(StringLiteral (unpackFS $ getVARID $2) (getVARID $2))) }
+                                        ,(StringLiteral NoSourceText (getVARID $2))) }
 
 hpc_annot :: { Located ( (([AddAnn],SourceText),(StringLiteral,(Int,Int),(Int,Int))),
                          ((SourceText,SourceText),(SourceText,SourceText))
@@ -2471,17 +2471,17 @@ aexp2   :: { LHsExpr RdrName }
                                           [mo $1,mc $4] }
 
 splice_exp :: { LHsExpr RdrName }
-        : TH_ID_SPLICE          {% ams (sL1 $1 $ mkHsSpliceE
+        : TH_ID_SPLICE          {% ams (sL1 $1 $ mkHsSpliceE NoParens
                                         (sL1 $1 $ HsVar (sL1 $1 (mkUnqual varName
                                                            (getTH_ID_SPLICE $1)))))
                                        [mj AnnThIdSplice $1] }
-        | '$(' exp ')'          {% ams (sLL $1 $> $ mkHsSpliceE $2)
+        | '$(' exp ')'          {% ams (sLL $1 $> $ mkHsSpliceE HasParens $2)
                                        [mj AnnOpenPE $1,mj AnnCloseP $3] }
-        | TH_ID_TY_SPLICE       {% ams (sL1 $1 $ mkHsSpliceTE
+        | TH_ID_TY_SPLICE       {% ams (sL1 $1 $ mkHsSpliceTE NoParens
                                         (sL1 $1 $ HsVar (sL1 $1 (mkUnqual varName
                                                         (getTH_ID_TY_SPLICE $1)))))
                                        [mj AnnThIdTySplice $1] }
-        | '$$(' exp ')'         {% ams (sLL $1 $> $ mkHsSpliceTE $2)
+        | '$$(' exp ')'         {% ams (sLL $1 $> $ mkHsSpliceTE HasParens $2)
                                        [mj AnnOpenPTE $1,mj AnnCloseP $3] }
 
 cmdargs :: { [LHsCmdTop RdrName] }
@@ -3046,8 +3046,8 @@ qtycon :: { Located RdrName }   -- Qualified or unqualified
         | tycon             { $1 }
 
 qtycondoc :: { LHsType RdrName } -- Qualified or unqualified
-        : qtycon            { sL1 $1                     (HsTyVar $1)      }
-        | qtycon docprev    { sLL $1 $> (HsDocTy (sL1 $1 (HsTyVar $1)) $2) }
+        : qtycon            { sL1 $1                     (HsTyVar NotPromoted $1)      }
+        | qtycon docprev    { sLL $1 $> (HsDocTy (sL1 $1 (HsTyVar NotPromoted $1)) $2) }
 
 tycon   :: { Located RdrName }  -- Unqualified
         : CONID                   { sL1 $1 $! mkUnqual tcClsName (getCONID $1) }

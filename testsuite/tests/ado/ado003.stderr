@@ -4,6 +4,6 @@ ado003.hs:7:3: error:
     In the pattern: 'a'
     In a stmt of a 'do' block: 'a' <- return (3 :: Int)
     In the expression:
-      do { x <- getChar;
-           'a' <- return (3 :: Int);
-           return () }
+      do x <- getChar
+         'a' <- return (3 :: Int)
+         return ()

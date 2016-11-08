@@ -316,6 +316,9 @@ instance Data Var where
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = mkNoRepType "Var"
 
+instance HasOccName Var where
+  occName = nameOccName . varName
+
 varUnique :: Var -> Unique
 varUnique var = mkUniqueGrimily (realUnique var)
 

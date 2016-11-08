@@ -9,14 +9,14 @@ tcfail128.hs:18:16: error:
         (use -fprint-potential-instances to see them all)
     • In a stmt of a 'do' block: v <- thaw tmp
       In the expression:
-        do { let sL = ...
-                 dim = length sL
-                 ....;
-             v <- thaw tmp;
-             return () }
+        do let sL = ...
+               dim = length sL
+               ....
+           v <- thaw tmp
+           return ()
       In an equation for ‘main’:
           main
-            = do { let sL = ...
-                       ....;
-                   v <- thaw tmp;
-                   return () }
+            = do let sL = ...
+                     ....
+                 v <- thaw tmp
+                 return ()

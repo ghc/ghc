@@ -944,7 +944,7 @@ repTy :: HsType Name -> DsM (Core TH.TypeQ)
 repTy ty@(HsForAllTy {}) = repForall ty
 repTy ty@(HsQualTy {})   = repForall ty
 
-repTy (HsTyVar (L _ n))
+repTy (HsTyVar _ (L _ n))
   | isTvOcc occ   = do tv1 <- lookupOcc n
                        repTvar tv1
   | isDataOcc occ = do tc1 <- lookupOcc n
@@ -970,7 +970,8 @@ repTy (HsListTy t)          = do
                                 repTapp tcon t1
 repTy (HsPArrTy t)     = do
                            t1   <- repLTy t
-                           tcon <- repTy (HsTyVar (noLoc (tyConName parrTyCon)))
+                           tcon <- repTy (HsTyVar NotPromoted
+                                                  (noLoc (tyConName parrTyCon)))
                            repTapp tcon t1
 repTy (HsTupleTy HsUnboxedTuple tys) = do
                                 tys1 <- repLTys tys
@@ -995,7 +996,7 @@ repTy (HsKindSig t k)       = do
                                 k1 <- repLKind k
                                 repTSig t1 k1
 repTy (HsSpliceTy splice _)     = repSplice splice
-repTy (HsExplicitListTy _ tys)  = do
+repTy (HsExplicitListTy _ _ tys) = do
                                     tys1 <- repLTys tys
                                     repTPromotedList tys1
 repTy (HsExplicitTupleTy _ tys) = do
@@ -1041,7 +1042,7 @@ repNonArrowLKind :: LHsKind Name -> DsM (Core TH.Kind)
 repNonArrowLKind (L _ ki) = repNonArrowKind ki
 
 repNonArrowKind :: HsKind Name -> DsM (Core TH.Kind)
-repNonArrowKind (HsTyVar (L _ name))
+repNonArrowKind (HsTyVar _ (L _ name))
   | isLiftedTypeKindTyConName name       = repKStar
   | name `hasKey` constraintKindTyConKey = repKConstraint
   | isTvOcc (nameOccName name)      = lookupOcc name >>= repKVar
@@ -1073,10 +1074,10 @@ repRole (L _ Nothing)                 = rep2 inferRName []
 repSplice :: HsSplice Name -> DsM (Core a)
 -- See Note [How brackets and nested splices are handled] in TcSplice
 -- We return a CoreExpr of any old type; the context should know
-repSplice (HsTypedSplice   n _)  = rep_splice n
-repSplice (HsUntypedSplice n _)  = rep_splice n
-repSplice (HsQuasiQuote n _ _ _) = rep_splice n
-repSplice e@(HsSpliced _ _)      = pprPanic "repSplice" (ppr e)
+repSplice (HsTypedSplice   _ n _) = rep_splice n
+repSplice (HsUntypedSplice _ n _) = rep_splice n
+repSplice (HsQuasiQuote n _ _ _)  = rep_splice n
+repSplice e@(HsSpliced _ _)       = pprPanic "repSplice" (ppr e)
 
 rep_splice :: Name -> DsM (Core a)
 rep_splice splice_name
@@ -2345,15 +2346,15 @@ repLiteral lit
 
 mk_integer :: Integer -> DsM HsLit
 mk_integer  i = do integer_ty <- lookupType integerTyConName
-                   return $ HsInteger "" i integer_ty
+                   return $ HsInteger NoSourceText i integer_ty
 mk_rational :: FractionalLit -> DsM HsLit
 mk_rational r = do rat_ty <- lookupType rationalTyConName
                    return $ HsRat r rat_ty
 mk_string :: FastString -> DsM HsLit
-mk_string s = return $ HsString "" s
+mk_string s = return $ HsString NoSourceText s
 
 mk_char :: Char -> DsM HsLit
-mk_char c = return $ HsChar "" c
+mk_char c = return $ HsChar NoSourceText c
 
 repOverloadedLiteral :: HsOverLit Name -> DsM (Core TH.Lit)
 repOverloadedLiteral (OverLit { ol_val = val})

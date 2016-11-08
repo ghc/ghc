@@ -3,7 +3,7 @@ rnfail026.hs:16:27: error:
     • Expecting one fewer arguments to ‘Set a’
       Expected kind ‘* -> *’, but ‘Set a’ has kind ‘*’
     • In the first argument of ‘Monad’, namely
-        ‘forall a. Eq a => Set a’
+        ‘(forall a. Eq a => Set a)’
       In the instance declaration for ‘Monad (forall a. Eq a => Set a)’
 
 rnfail026.hs:19:10: error:

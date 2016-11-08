@@ -2,6 +2,6 @@
 T9201.hs:6:17: error:
     • Expected kind ‘x’, but ‘a’ has kind ‘y’
     • In the first argument of ‘f’, namely ‘a’
-      In the second argument of ‘d’, namely ‘f a’
+      In the second argument of ‘d’, namely ‘(f a)’
       In the type signature:
         ret :: d a (f a)

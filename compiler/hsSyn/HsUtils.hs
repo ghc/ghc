@@ -49,13 +49,13 @@ module HsUtils(
   -- Patterns
   mkNPat, mkNPlusKPat, nlVarPat, nlLitPat, nlConVarPat, nlConVarPatName, nlConPat,
   nlConPatName, nlInfixConPat, nlNullaryConPat, nlWildConPat, nlWildPat,
-  nlWildPatName, nlWildPatId, nlTuplePat, mkParPat,
+  nlWildPatName, nlWildPatId, nlTuplePat, mkParPat, nlParPat,
   mkBigLHsVarTup, mkBigLHsTup, mkBigLHsVarPatTup, mkBigLHsPatTup,
 
   -- Types
   mkHsAppTy, mkHsAppTys, userHsTyVarBndrs, userHsLTyVarBndrs,
   mkLHsSigType, mkLHsSigWcType, mkClassOpSigs, mkHsSigEnv,
-  nlHsAppTy, nlHsTyVar, nlHsFunTy, nlHsTyConApp,
+  nlHsAppTy, nlHsTyVar, nlHsFunTy, nlHsParTy, nlHsTyConApp,
 
   -- Stmts
   mkTransformStmt, mkTransformByStmt, mkBodyStmt, mkBindStmt, mkTcBindStmt,
@@ -207,14 +207,18 @@ mkParPat :: LPat name -> LPat name
 mkParPat lp@(L loc p) | hsPatNeedsParens p = L loc (ParPat lp)
                       | otherwise          = lp
 
+nlParPat :: LPat name -> LPat name
+nlParPat p = noLoc (ParPat p)
 
 -------------------------------
 -- These are the bits of syntax that contain rebindable names
 -- See RnEnv.lookupSyntaxName
 
-mkHsIntegral   :: String -> Integer -> PostTc RdrName Type -> HsOverLit RdrName
+mkHsIntegral   :: SourceText -> Integer -> PostTc RdrName Type
+               -> HsOverLit RdrName
 mkHsFractional :: FractionalLit -> PostTc RdrName Type -> HsOverLit RdrName
-mkHsIsString :: String -> FastString -> PostTc RdrName Type -> HsOverLit RdrName
+mkHsIsString :: SourceText -> FastString -> PostTc RdrName Type
+             -> HsOverLit RdrName
 mkHsDo         :: HsStmtContext Name -> [ExprLStmt RdrName] -> HsExpr RdrName
 mkHsComp       :: HsStmtContext Name -> [ExprLStmt RdrName] -> LHsExpr RdrName
                -> HsExpr RdrName
@@ -312,17 +316,18 @@ mkHsOpApp e1 op e2 = OpApp e1 (noLoc (HsVar (noLoc op)))
 unqualSplice :: RdrName
 unqualSplice = mkRdrUnqual (mkVarOccFS (fsLit "splice"))
 
-mkUntypedSplice :: LHsExpr RdrName -> HsSplice RdrName
-mkUntypedSplice e = HsUntypedSplice unqualSplice e
+mkUntypedSplice :: HasParens -> LHsExpr RdrName -> HsSplice RdrName
+mkUntypedSplice hasParen e = HsUntypedSplice hasParen unqualSplice e
 
-mkHsSpliceE :: LHsExpr RdrName -> HsExpr RdrName
-mkHsSpliceE e = HsSpliceE (mkUntypedSplice e)
+mkHsSpliceE :: HasParens -> LHsExpr RdrName -> HsExpr RdrName
+mkHsSpliceE hasParen e = HsSpliceE (mkUntypedSplice hasParen e)
 
-mkHsSpliceTE :: LHsExpr RdrName -> HsExpr RdrName
-mkHsSpliceTE e = HsSpliceE (HsTypedSplice unqualSplice e)
+mkHsSpliceTE :: HasParens -> LHsExpr RdrName -> HsExpr RdrName
+mkHsSpliceTE hasParen e = HsSpliceE (HsTypedSplice hasParen unqualSplice e)
 
-mkHsSpliceTy :: LHsExpr RdrName -> HsType RdrName
-mkHsSpliceTy e = HsSpliceTy (HsUntypedSplice unqualSplice e) placeHolderKind
+mkHsSpliceTy :: HasParens -> LHsExpr RdrName -> HsType RdrName
+mkHsSpliceTy hasParen e
+  = HsSpliceTy (HsUntypedSplice hasParen unqualSplice e) placeHolderKind
 
 mkHsQuasiQuote :: RdrName -> SrcSpan -> FastString -> HsSplice RdrName
 mkHsQuasiQuote quoter span quote = HsQuasiQuote unqualSplice quoter span quote
@@ -333,11 +338,11 @@ unqualQuasiQuote = mkRdrUnqual (mkVarOccFS (fsLit "quasiquote"))
                 -- identify the quasi-quote
 
 mkHsString :: String -> HsLit
-mkHsString s = HsString s (mkFastString s)
+mkHsString s = HsString NoSourceText (mkFastString s)
 
 mkHsStringPrimLit :: FastString -> HsLit
 mkHsStringPrimLit fs
-  = HsStringPrim (unpackFS fs) (fastStringToByteString fs)
+  = HsStringPrim NoSourceText (fastStringToByteString fs)
 
 -------------
 userHsLTyVarBndrs :: SrcSpan -> [Located name] -> [LHsTyVarBndr name]
@@ -385,7 +390,7 @@ nlHsSyntaxApps (SyntaxExpr { syn_expr      = fun
                                                      mkLHsWrap arg_wraps args))
 
 nlHsIntLit :: Integer -> LHsExpr id
-nlHsIntLit n = noLoc (HsLit (HsInt (show n) n))
+nlHsIntLit n = noLoc (HsLit (HsInt NoSourceText n))
 
 nlHsApps :: id -> [LHsExpr id] -> LHsExpr id
 nlHsApps f xs = foldl nlHsApp (nlHsVar f) xs
@@ -455,10 +460,12 @@ nlList exprs           = noLoc (ExplicitList placeHolderType Nothing exprs)
 nlHsAppTy :: LHsType name -> LHsType name -> LHsType name
 nlHsTyVar :: name                         -> LHsType name
 nlHsFunTy :: LHsType name -> LHsType name -> LHsType name
+nlHsParTy :: LHsType name                 -> LHsType name
 
 nlHsAppTy f t           = noLoc (HsAppTy f t)
-nlHsTyVar x             = noLoc (HsTyVar (noLoc x))
+nlHsTyVar x             = noLoc (HsTyVar NotPromoted (noLoc x))
 nlHsFunTy a b           = noLoc (HsFunTy a b)
+nlHsParTy t             = noLoc (HsParTy t)
 
 nlHsTyConApp :: name -> [LHsType name] -> LHsType name
 nlHsTyConApp tycon tys  = foldl nlHsAppTy (nlHsTyVar tycon) tys
@@ -613,8 +620,8 @@ typeToLHsType ty
                           , hst_body = go tau })
     go (TyVarTy tv)         = nlHsTyVar (getRdrName tv)
     go (AppTy t1 t2)        = nlHsAppTy (go t1) (go t2)
-    go (LitTy (NumTyLit n)) = noLoc $ HsTyLit (HsNumTy "" n)
-    go (LitTy (StrTyLit s)) = noLoc $ HsTyLit (HsStrTy "" s)
+    go (LitTy (NumTyLit n)) = noLoc $ HsTyLit (HsNumTy NoSourceText n)
+    go (LitTy (StrTyLit s)) = noLoc $ HsTyLit (HsStrTy NoSourceText s)
     go (TyConApp tc args)   = nlHsTyConApp (getRdrName tc) (map go args')
        where
          args' = filterOutInvisibleTypes tc args

@@ -1,0 +1,6 @@
+
+Ppr036.hs:15:16:
+    The deprecation for ‘withBool’ lacks an accompanying binding
+
+Ppr036.ppr.hs:13:16:
+    The deprecation for ‘withBool’ lacks an accompanying binding

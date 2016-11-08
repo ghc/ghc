@@ -6,6 +6,6 @@ T5883.hs:(7,4)-(12,4): Splicing declarations
           {-# INLINE show #-} |]
   ======>
     data Unit = Unit
-    instance Show Unit where
+    instance () => Show Unit where
       {-# INLINE show #-}
       show _ = ""

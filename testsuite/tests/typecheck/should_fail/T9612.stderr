@@ -7,12 +7,12 @@ T9612.hs:16:9: error:
       instance ‘MonadWriter w (WriterT w m)’ at T9612.hs:20:10-59
     In a stmt of a 'do' block: tell (n, x)
     In the expression:
-      do { tell (n, x);
-           return (1, y) }
+      do tell (n, x)
+         return (1, y)
     In an equation for ‘f’:
         f y (n, x)
-          = do { tell (n, x);
-                 return (1, y) }
+          = do tell (n, x)
+               return (1, y)
     Relevant bindings include
       x :: a (bound at T9612.hs:14:8)
       y :: a (bound at T9612.hs:14:3)

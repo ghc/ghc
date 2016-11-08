@@ -6,6 +6,6 @@ TH_unresolvedInfix2.hs:14:11:
         in the section: ‘:+ N :+ N’
     In the untyped splice:
       $(let
-          plus = conE ':+
+          plus = conE '(:+)
           n = conE 'N
         in infixE Nothing plus (Just $ uInfixE n plus n))

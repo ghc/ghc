@@ -441,7 +441,7 @@ When a variable is used, we compare
 ************************************************************************
 -}
 
-tcSpliceExpr splice@(HsTypedSplice name expr) res_ty
+tcSpliceExpr splice@(HsTypedSplice _ name expr) res_ty
   = addErrCtxt (spliceCtxtDoc splice) $
     setSrcSpan (getLoc expr)    $ do
     { stage <- getStage

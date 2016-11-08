@@ -10,5 +10,6 @@ data Nil = Nil
 
 nestedTuple n = do
      xs <- replicateM n (newName "x")
-     return $ LamE [foldr (\v prev -> ConP 'Cons [VarP v,prev]) (ConP 'Nil []) xs]
+     return $ LamE [foldr (\v prev -> ParensP (ConP 'Cons [VarP v,prev]))
+                       (ConP 'Nil []) xs]
                    (TupE $ map VarE xs)

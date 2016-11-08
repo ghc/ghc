@@ -827,10 +827,11 @@ data InstBindings a
            --          Used only to improve error messages
       }
 
-instance (OutputableBndrId a) => Outputable (InstInfo a) where
+instance (OutputableBndrId a, HasOccNameId a) => Outputable (InstInfo a) where
     ppr = pprInstInfoDetails
 
-pprInstInfoDetails :: (OutputableBndrId a) => InstInfo a -> SDoc
+pprInstInfoDetails :: (OutputableBndrId a, HasOccNameId a)
+                   => InstInfo a -> SDoc
 pprInstInfoDetails info
    = hang (pprInstanceHdr (iSpec info) <+> text "where")
         2 (details (iBinds info))

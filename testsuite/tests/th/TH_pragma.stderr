@@ -8,9 +8,9 @@ TH_pragma.hs:(6,4)-(8,26): Splicing declarations
     foo x = (x + 1)
 TH_pragma.hs:(10,4)-(12,31): Splicing declarations
     [d| bar :: Num a => a -> a
-        {-# SPECIALIZE INLINE[~1] bar :: Float -> Float #-}
+        {-# SPECIALISE INLINE [~1] bar :: Float -> Float #-}
         bar x = x * 10 |]
   ======>
     bar :: forall a. Num a => a -> a
-    {-# SPECIALIZE INLINE[~1] bar :: Float -> Float #-}
+    {-# SPECIALISE INLINE [~1] bar :: Float -> Float #-}
     bar x = (x * 10)

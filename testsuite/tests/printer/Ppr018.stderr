@@ -1,0 +1,12 @@
+
+Ppr018.hs:20:21:
+     Can't make a derived instance of
+        ‘Show FooNewType’ with the newtype strategy:
+        Try GeneralizedNewtypeDeriving for GHC's newtype-deriving extension
+     In the newtype declaration for ‘FooNewType’
+
+Ppr018.ppr.hs:20:21:
+     Can't make a derived instance of
+        ‘Show FooNewType’ with the newtype strategy:
+        Try GeneralizedNewtypeDeriving for GHC's newtype-deriving extension
+     In the newtype declaration for ‘FooNewType’

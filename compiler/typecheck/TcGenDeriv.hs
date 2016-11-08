@@ -198,8 +198,8 @@ gen_Eq_binds loc tycon
     ------------------------------------------------------------------
     pats_etc data_con
       = let
-            con1_pat = nlConVarPat data_con_RDR as_needed
-            con2_pat = nlConVarPat data_con_RDR bs_needed
+            con1_pat = nlParPat $ nlConVarPat data_con_RDR as_needed
+            con2_pat = nlParPat $ nlConVarPat data_con_RDR bs_needed
 
             data_con_RDR = getRdrName data_con
             con_arity   = length tys_needed
@@ -439,7 +439,7 @@ gen_Ord_binds loc tycon
                                  , mkHsCaseAlt nlWildPat (gtResult op) ]
       where
         tag     = get_tag data_con
-        tag_lit = noLoc (HsLit (HsIntPrim "" (toInteger tag)))
+        tag_lit = noLoc (HsLit (HsIntPrim NoSourceText (toInteger tag)))
 
     mkInnerEqAlt :: OrdOp -> DataCon -> LMatch RdrName (LHsExpr RdrName)
     -- First argument 'a' known to be built with K
@@ -602,7 +602,7 @@ gen_Enum_binds loc tycon
              (illegal_Expr "pred" occ_nm "tried to take `pred' of first tag in enumeration")
              (nlHsApp (nlHsVar (tag2con_RDR tycon))
                            (nlHsApps plus_RDR [nlHsVarApps intDataCon_RDR [ah_RDR],
-                                               nlHsLit (HsInt "-1" (-1))]))
+                                           nlHsLit (HsInt NoSourceText (-1))]))
 
     to_enum
       = mk_easy_FunBind loc toEnum_RDR [a_Pat] $
@@ -1118,7 +1118,7 @@ gen_Show_binds get_fixity loc tycon
       | otherwise   =
          ([a_Pat, con_pat],
           showParen_Expr (genOpApp a_Expr ge_RDR
-                              (nlHsLit (HsInt "" con_prec_plus_one)))
+                              (nlHsLit (HsInt NoSourceText con_prec_plus_one)))
                          (nlHsPar (nested_compose_Expr show_thingies)))
         where
              data_con_RDR  = getRdrName data_con
@@ -1201,7 +1201,8 @@ mk_showString_app str = nlHsApp (nlHsVar showString_RDR) (nlHsLit (mkHsString st
 
 -- | showsPrec :: Show a => Int -> a -> ShowS
 mk_showsPrec_app :: Integer -> LHsExpr RdrName -> LHsExpr RdrName
-mk_showsPrec_app p x = nlHsApps showsPrec_RDR [nlHsLit (HsInt "" p), x]
+mk_showsPrec_app p x
+  = nlHsApps showsPrec_RDR [nlHsLit (HsInt NoSourceText p), x]
 
 -- | shows :: Show a => a -> ShowS
 mk_shows_app :: LHsExpr RdrName -> LHsExpr RdrName
@@ -1359,7 +1360,7 @@ gen_data dflags data_type_name constr_names loc rep_tc
                         -- redundant test, and annoying warning
       | tag-fIRST_TAG == n_cons-1 = nlWildPat   -- Last constructor
       | otherwise = nlConPat intDataCon_RDR
-                             [nlLitPat (HsIntPrim "" (toInteger tag))]
+                             [nlLitPat (HsIntPrim NoSourceText (toInteger tag))]
       where
         tag = dataConTag dc
 
@@ -1684,7 +1685,7 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
 nlHsAppType :: LHsExpr RdrName -> Type -> LHsExpr RdrName
 nlHsAppType e s = noLoc (e `HsAppType` hs_ty)
   where
-    hs_ty = mkHsWildCardBndrs (typeToLHsType s)
+    hs_ty = mkHsWildCardBndrs $ nlHsParTy (typeToLHsType s)
 
 nlExprWithTySig :: LHsExpr RdrName -> Type -> LHsExpr RdrName
 nlExprWithTySig e s = noLoc (e `ExprWithTySig` hs_ty)
@@ -1755,7 +1756,7 @@ genAuxBindSpec loc (DerivCon2Tag tycon)
 
     mk_eqn :: DataCon -> ([LPat RdrName], LHsExpr RdrName)
     mk_eqn con = ([nlWildConPat con],
-                  nlHsLit (HsIntPrim ""
+                  nlHsLit (HsIntPrim NoSourceText
                                     (toInteger ((dataConTag con) - fIRST_TAG))))
 
 genAuxBindSpec loc (DerivTag2Con tycon)
@@ -1776,7 +1777,8 @@ genAuxBindSpec loc (DerivMaxTag tycon)
   where
     rdr_name = maxtag_RDR tycon
     sig_ty = mkLHsSigWcType (L loc (HsCoreTy intTy))
-    rhs = nlHsApp (nlHsVar intDataCon_RDR) (nlHsLit (HsIntPrim "" max_tag))
+    rhs = nlHsApp (nlHsVar intDataCon_RDR)
+                  (nlHsLit (HsIntPrim NoSourceText max_tag))
     max_tag =  case (tyConDataCons tycon) of
                  data_cons -> toInteger ((length data_cons) - fIRST_TAG)
 

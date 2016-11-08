@@ -2,5 +2,5 @@
 T11520.hs:15:77: error:
     • Expected kind ‘k20 -> k10’, but ‘g’ has kind ‘k’
     • In the second argument of ‘Compose’, namely ‘g’
-      In the first argument of ‘Typeable’, namely ‘Compose f g’
+      In the first argument of ‘Typeable’, namely ‘(Compose f g)’
       In the instance declaration for ‘Typeable (Compose f g)’

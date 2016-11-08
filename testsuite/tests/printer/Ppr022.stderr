@@ -1,0 +1,28 @@
+
+Ppr022.hs:3:23:
+    Not in scope: type constructor or class ‘Stmt’
+
+Ppr022.hs:3:32:
+    Not in scope: type constructor or class ‘ExpQ’
+
+Ppr022.hs:5:34:
+     Not in scope: ‘<**>’
+      Perhaps you meant ‘<*>’ (imported from Prelude)
+     In the Template Haskell quotation '(<**>)
+
+Ppr022.hs:9:17:
+    Not in scope: type constructor or class ‘ExpQ’
+
+Ppr022.ppr.hs:2:23:
+    Not in scope: type constructor or class ‘Stmt’
+
+Ppr022.ppr.hs:2:32:
+    Not in scope: type constructor or class ‘ExpQ’
+
+Ppr022.ppr.hs:6:29:
+     Not in scope: ‘<**>’
+      Perhaps you meant ‘<*>’ (imported from Prelude)
+     In the Template Haskell quotation '(<**>)
+
+Ppr022.ppr.hs:7:17:
+    Not in scope: type constructor or class ‘ExpQ’

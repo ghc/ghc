@@ -293,7 +293,7 @@ tc_cmd env (HsCmdDo (L l stmts) _) (cmd_stk, res_ty)
 --      ----------------------------------------------
 --      D; G |-a  (| e c1 ... cn |)  :  stk --> t
 
-tc_cmd env cmd@(HsCmdArrForm expr fixity cmd_args) (cmd_stk, res_ty)
+tc_cmd env cmd@(HsCmdArrForm expr f fixity cmd_args) (cmd_stk, res_ty)
   = addErrCtxt (cmdCtxt cmd)    $
     do  { (cmd_args', cmd_tys) <- mapAndUnzipM tc_cmd_arg cmd_args
                               -- We use alphaTyVar for 'w'
@@ -301,7 +301,7 @@ tc_cmd env cmd@(HsCmdArrForm expr fixity cmd_args) (cmd_stk, res_ty)
                      mkFunTys cmd_tys $
                      mkCmdArrTy env (mkPairTy alphaTy cmd_stk) res_ty
         ; expr' <- tcPolyExpr expr e_ty
-        ; return (HsCmdArrForm expr' fixity cmd_args') }
+        ; return (HsCmdArrForm expr' f fixity cmd_args') }
 
   where
     tc_cmd_arg :: LHsCmdTop Name -> TcM (LHsCmdTop TcId, TcType)

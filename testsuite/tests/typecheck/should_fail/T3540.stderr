@@ -1,25 +1,20 @@
 
 T3540.hs:4:12: error:
     • Expected a type, but ‘a ~ Int’ has kind ‘Constraint’
-    • In the type signature:
-        thing :: a ~ Int
+    • In the type signature: thing :: (a ~ Int)
 
 T3540.hs:7:20: error:
     • Expected a type, but ‘a ~ Int’ has kind ‘Constraint’
-    • In the type signature:
-        thing1 :: Int -> (a ~ Int)
+    • In the type signature: thing1 :: Int -> (a ~ Int)
 
 T3540.hs:10:13: error:
     • Expected a type, but ‘a ~ Int’ has kind ‘Constraint’
-    • In the type signature:
-        thing2 :: (a ~ Int) -> Int
+    • In the type signature: thing2 :: (a ~ Int) -> Int
 
 T3540.hs:13:12: error:
     • Expected a type, but ‘?dude::Int’ has kind ‘Constraint’
-    • In the type signature:
-        thing3 :: (?dude :: Int) -> Int
+    • In the type signature: thing3 :: (?dude :: Int) -> Int
 
 T3540.hs:16:11: error:
     • Expected a type, but ‘Eq a’ has kind ‘Constraint’
-    • In the type signature:
-        thing4 :: (Eq a) -> Int
+    • In the type signature: thing4 :: (Eq a) -> Int

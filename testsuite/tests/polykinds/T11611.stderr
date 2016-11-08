@@ -2,5 +2,5 @@
 T11611.hs:8:37: error:
     • Expected kind ‘[*]’, but ‘a’ has kind ‘*’
     • In the first argument of ‘A’, namely ‘a’
-      In the first argument of ‘Show’, namely ‘A a’
+      In the first argument of ‘Show’, namely ‘(A a)’
       In the stand-alone deriving instance for ‘Show a => Show (A a)’

@@ -114,7 +114,7 @@ import DynFlags
 import SrcLoc
 import Module
 import BasicTypes     ( InlineSpec(..), RuleMatchInfo(..), FractionalLit(..),
-                        SourceText )
+                        SourceText(..) )
 
 -- compiler/parser
 import Ctype
@@ -1126,7 +1126,7 @@ rulePrag :: Action
 rulePrag span buf len = do
   setExts (.|. xbit InRulePragBit)
   let !src = lexemeToString buf len
-  return (L span (ITrules_prag src))
+  return (L span (ITrules_prag (SourceText src)))
 
 endPrag :: Action
 endPrag span _buf _len = do
@@ -1260,13 +1260,13 @@ sym con span buf len =
     !fs = lexemeToFastString buf len
 
 -- Variations on the integral numeric literal.
-tok_integral :: (String -> Integer -> Token)
+tok_integral :: (SourceText -> Integer -> Token)
              -> (Integer -> Integer)
              -> Int -> Int
              -> (Integer, (Char -> Int))
              -> Action
 tok_integral itint transint transbuf translen (radix,char_to_int) span buf len
- = return $ L span $ itint (lexemeToString buf len)
+ = return $ L span $ itint (SourceText $ lexemeToString buf len)
        $! transint $ parseUnsignedInteger
        (offsetBytes transbuf buf) (subtract translen len) radix char_to_int
 
@@ -1452,8 +1452,8 @@ lex_string_tok span buf _len = do
   (AI end bufEnd) <- getInput
   let
     tok' = case tok of
-            ITprimstring _ bs -> ITprimstring src bs
-            ITstring _ s -> ITstring src s
+            ITprimstring _ bs -> ITprimstring (SourceText src) bs
+            ITstring _ s -> ITstring (SourceText src) s
             _ -> panic "lex_string_tok"
     src = lexemeToString buf (cur bufEnd - cur buf)
   return (L (mkRealSrcSpan (realSrcSpanStart span) end) tok')
@@ -1476,11 +1476,13 @@ lex_string s = do
                    if any (> '\xFF') s
                     then failMsgP "primitive string literal must contain only characters <= \'\\xFF\'"
                     else let bs = unsafeMkByteString (reverse s)
-                         in return (ITprimstring "" bs)
+                         in return (ITprimstring (SourceText (reverse s)) bs)
               _other ->
-                return (ITstring "" (mkFastString (reverse s)))
+                return (ITstring (SourceText (reverse s))
+                                 (mkFastString (reverse s)))
           else
-                return (ITstring "" (mkFastString (reverse s)))
+                return (ITstring (SourceText (reverse s))
+                                 (mkFastString (reverse s)))
 
     Just ('\\',i)
         | Just ('&',i) <- next -> do
@@ -1555,14 +1557,16 @@ finish_char_tok buf loc ch  -- We've already seen the closing quote
         i@(AI end bufEnd) <- getInput
         let src = lexemeToString buf (cur bufEnd - cur buf)
         if magicHash then do
-                case alexGetChar' i of
-                        Just ('#',i@(AI end _)) -> do
-                          setInput i
-                          return (L (mkRealSrcSpan loc end) (ITprimchar src ch))
-                        _other ->
-                          return (L (mkRealSrcSpan loc end) (ITchar src ch))
+            case alexGetChar' i of
+              Just ('#',i@(AI end _)) -> do
+                setInput i
+                return (L (mkRealSrcSpan loc end)
+                          (ITprimchar (SourceText src) ch))
+              _other ->
+                return (L (mkRealSrcSpan loc end)
+                          (ITchar (SourceText src) ch))
             else do
-                   return (L (mkRealSrcSpan loc end) (ITchar src ch))
+              return (L (mkRealSrcSpan loc end) (ITchar (SourceText src) ch))
 
 isAny :: Char -> Bool
 isAny c | c > '\x7f' = isPrint c
@@ -2713,37 +2717,46 @@ ignoredPrags = Map.fromList (map ignored pragmas)
                      pragmas = options_pragmas ++ ["cfiles", "contract"]
 
 oneWordPrags = Map.fromList([
-           ("rules", rulePrag),
-           ("inline", strtoken (\s -> (ITinline_prag s Inline FunLike))),
-           ("inlinable", strtoken (\s -> (ITinline_prag s Inlinable FunLike))),
-           ("inlineable", strtoken (\s -> (ITinline_prag s Inlinable FunLike))),
-                                          -- Spelling variant
-           ("notinline", strtoken (\s -> (ITinline_prag s NoInline FunLike))),
-           ("specialize", strtoken (\s -> ITspec_prag s)),
-           ("source", strtoken (\s -> ITsource_prag s)),
-           ("warning", strtoken (\s -> ITwarning_prag s)),
-           ("deprecated", strtoken (\s -> ITdeprecated_prag s)),
-           ("scc", strtoken (\s -> ITscc_prag s)),
-           ("generated", strtoken (\s -> ITgenerated_prag s)),
-           ("core", strtoken (\s -> ITcore_prag s)),
-           ("unpack", strtoken (\s -> ITunpack_prag s)),
-           ("nounpack", strtoken (\s -> ITnounpack_prag s)),
-           ("ann", strtoken (\s -> ITann_prag s)),
-           ("vectorize", strtoken (\s -> ITvect_prag s)),
-           ("novectorize", strtoken (\s -> ITnovect_prag s)),
-           ("minimal", strtoken (\s -> ITminimal_prag s)),
-           ("overlaps", strtoken (\s -> IToverlaps_prag s)),
-           ("overlappable", strtoken (\s -> IToverlappable_prag s)),
-           ("overlapping", strtoken (\s -> IToverlapping_prag s)),
-           ("incoherent", strtoken (\s -> ITincoherent_prag s)),
-           ("ctype", strtoken (\s -> ITctype s))])
+     ("rules", rulePrag),
+     ("inline",
+         strtoken (\s -> (ITinline_prag (SourceText s) Inline FunLike))),
+     ("inlinable",
+         strtoken (\s -> (ITinline_prag (SourceText s) Inlinable FunLike))),
+     ("inlineable",
+         strtoken (\s -> (ITinline_prag (SourceText s) Inlinable FunLike))),
+                                    -- Spelling variant
+     ("notinline",
+         strtoken (\s -> (ITinline_prag (SourceText s) NoInline FunLike))),
+     ("specialize", strtoken (\s -> ITspec_prag (SourceText s))),
+     ("source", strtoken (\s -> ITsource_prag (SourceText s))),
+     ("warning", strtoken (\s -> ITwarning_prag (SourceText s))),
+     ("deprecated", strtoken (\s -> ITdeprecated_prag (SourceText s))),
+     ("scc", strtoken (\s -> ITscc_prag (SourceText s))),
+     ("generated", strtoken (\s -> ITgenerated_prag (SourceText s))),
+     ("core", strtoken (\s -> ITcore_prag (SourceText s))),
+     ("unpack", strtoken (\s -> ITunpack_prag (SourceText s))),
+     ("nounpack", strtoken (\s -> ITnounpack_prag (SourceText s))),
+     ("ann", strtoken (\s -> ITann_prag (SourceText s))),
+     ("vectorize", strtoken (\s -> ITvect_prag (SourceText s))),
+     ("novectorize", strtoken (\s -> ITnovect_prag (SourceText s))),
+     ("minimal", strtoken (\s -> ITminimal_prag (SourceText s))),
+     ("overlaps", strtoken (\s -> IToverlaps_prag (SourceText s))),
+     ("overlappable", strtoken (\s -> IToverlappable_prag (SourceText s))),
+     ("overlapping", strtoken (\s -> IToverlapping_prag (SourceText s))),
+     ("incoherent", strtoken (\s -> ITincoherent_prag (SourceText s))),
+     ("ctype", strtoken (\s -> ITctype (SourceText s)))])
 
 twoWordPrags = Map.fromList([
-     ("inline conlike", strtoken (\s -> (ITinline_prag s Inline ConLike))),
-     ("notinline conlike", strtoken (\s -> (ITinline_prag s NoInline ConLike))),
-     ("specialize inline", strtoken (\s -> (ITspec_inline_prag s True))),
-     ("specialize notinline", strtoken (\s -> (ITspec_inline_prag s False))),
-     ("vectorize scalar", strtoken (\s -> ITvect_scalar_prag s))])
+     ("inline conlike",
+         strtoken (\s -> (ITinline_prag (SourceText s) Inline ConLike))),
+     ("notinline conlike",
+         strtoken (\s -> (ITinline_prag (SourceText s) NoInline ConLike))),
+     ("specialize inline",
+         strtoken (\s -> (ITspec_inline_prag (SourceText s) True))),
+     ("specialize notinline",
+         strtoken (\s -> (ITspec_inline_prag (SourceText s) False))),
+     ("vectorize scalar",
+         strtoken (\s -> ITvect_scalar_prag (SourceText s)))])
 
 dispatch_pragmas :: Map String Action -> Action
 dispatch_pragmas prags span buf len = case Map.lookup (clean_pragma (lexemeToString buf len)) prags of

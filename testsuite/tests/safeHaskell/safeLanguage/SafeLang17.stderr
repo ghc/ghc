@@ -15,6 +15,6 @@ SafeLang17.hs:8:13:
     In the expression: res [(1 :: Int)]
     In an equation for ‘r’: r = res [(1 :: Int)]
     In the expression:
-      do { let r = res ...;
-           putStrLn $ "Result: " ++ show r;
-           putStrLn $ "Result: " ++ show function }
+      do let r = res ...
+         putStrLn $ "Result: " ++ show r
+         putStrLn $ "Result: " ++ show function

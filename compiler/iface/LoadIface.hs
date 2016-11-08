@@ -923,7 +923,8 @@ ghcPrimIface
         mi_fix_fn  = mkIfaceFixCache fixities
     }
   where
-    fixities = (getOccName seqId, Fixity "0" 0 InfixR)  -- seq is infixr 0
+    fixities = (getOccName seqId, Fixity NoSourceText 0 InfixR)
+                                      -- seq is infixr 0
              : (occName funTyConName, funTyFixity)  -- trac #10145
              : mapMaybe mkFixity allThePrimOps
     mkFixity op = (,) (primOpOcc op) <$> primOpFixity op

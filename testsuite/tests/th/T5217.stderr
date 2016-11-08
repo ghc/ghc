@@ -9,6 +9,6 @@ T5217.hs:(6,3)-(9,53): Splicing declarations
     data T a b
       where
         T1 :: Int -> T Int Char
-        T2 :: forall a. a -> T a a
-        T3 :: forall a. a -> T [a] a
-        T4 :: forall a b. a -> b -> T b [a]
+        T2 :: forall a. () => a -> T a a
+        T3 :: forall a. () => a -> T [a] a
+        T4 :: forall a b. () => a -> b -> T b [a]

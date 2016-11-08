@@ -817,7 +817,7 @@ rnLit _ = return ()
 -- Integer-looking literal.
 generalizeOverLitVal :: OverLitVal -> OverLitVal
 generalizeOverLitVal (HsFractional (FL {fl_text=src,fl_value=val}))
-    | denominator val == 1 = HsIntegral src (numerator val)
+    | denominator val == 1 = HsIntegral (SourceText src) (numerator val)
 generalizeOverLitVal lit = lit
 
 rnOverLit :: HsOverLit t -> RnM (HsOverLit Name, FreeVars)

@@ -310,7 +310,10 @@ mkSimpleConMatch :: Monad m => HsMatchContext RdrName
 mkSimpleConMatch ctxt fold extra_pats con insides = do
     let con_name = getRdrName con
     let vars_needed = takeList insides as_RDRs
-    let pat = nlConVarPat con_name vars_needed
+    let bare_pat = nlConVarPat con_name vars_needed
+    let pat = if null vars_needed
+          then bare_pat
+          else nlParPat bare_pat
     rhs <- fold con_name (zipWith nlHsApp insides (map nlHsVar vars_needed))
     return $ mkMatch ctxt (extra_pats ++ [pat]) rhs
                      (noLoc emptyLocalBinds)

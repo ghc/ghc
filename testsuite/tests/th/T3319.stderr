@@ -4,4 +4,4 @@ T3319.hs:8:3-93: Splicing declarations
          (ImportF
             CCall Unsafe "&" (mkName "foo") (AppT (ConT ''Ptr) (ConT ''())))]
   ======>
-    foreign import ccall unsafe "static &foo" foo :: Ptr GHC.Tuple.()
+    foreign import ccall unsafe "&" foo :: Ptr GHC.Tuple.()

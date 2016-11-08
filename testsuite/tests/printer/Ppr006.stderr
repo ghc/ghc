@@ -1,0 +1,45 @@
+Ppr006.hs:4:14: error:
+    Not in scope: type constructor or class ‘Command’
+
+Ppr006.hs:7:23: error:
+    Not in scope: ‘Macro.guessCommands’
+    No module named ‘Macro’ is imported.
+
+Ppr006.hs:12:20: error:
+    Not in scope: ‘ListWidget.moveLast’
+    No module named ‘ListWidget’ is imported.
+
+Ppr006.hs:12:41: error:
+    Not in scope: ‘ListWidget.new’
+    No module named ‘ListWidget’ is imported.
+
+Ppr006.hs:21:19: error:
+    • Not in scope: ‘help’
+    • In the quasi-quotation:
+        [help|
+        Bind the command {expansion} to the key {name}.  The same command may
+        be bound to different keys.
+        |]
+
+Ppr006.ppr.hs:3:14: error:
+    Not in scope: type constructor or class ‘Command’
+
+Ppr006.ppr.hs:8:29: error:
+    Not in scope: ‘Macro.guessCommands’
+    No module named ‘Macro’ is imported.
+
+Ppr006.ppr.hs:14:21: error:
+    Not in scope: ‘ListWidget.moveLast’
+    No module named ‘ListWidget’ is imported.
+
+Ppr006.ppr.hs:14:42: error:
+    Not in scope: ‘ListWidget.new’
+    No module named ‘ListWidget’ is imported.
+
+Ppr006.ppr.hs:26:8: error:
+    • Not in scope: ‘help’
+    • In the quasi-quotation:
+        [help|
+        Bind the command {expansion} to the key {name}.  The same command may
+        be bound to different keys.
+        |]

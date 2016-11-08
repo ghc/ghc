@@ -2,5 +2,5 @@
 T7328.hs:8:34: error:
     • Occurs check: cannot construct the infinite kind: k1 ~ k0 -> k1
     • In the first argument of ‘Foo’, namely ‘f’
-      In the first argument of ‘Proxy’, namely ‘Foo f’
+      In the first argument of ‘Proxy’, namely ‘(Foo f)’
       In the type signature: foo :: a ~ f i => Proxy (Foo f)

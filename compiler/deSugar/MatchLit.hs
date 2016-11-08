@@ -291,11 +291,11 @@ tidyNPat tidy_lit_pat (OverLit val False _ ty) mb_neg _eq outer_ty
         --     which might be ok if we have 'instance IsString Int'
         --
   | not type_change, isIntTy ty,    Just int_lit <- mb_int_lit
-                            = mk_con_pat intDataCon    (HsIntPrim    "" int_lit)
+                 = mk_con_pat intDataCon    (HsIntPrim    NoSourceText int_lit)
   | not type_change, isWordTy ty,   Just int_lit <- mb_int_lit
-                            = mk_con_pat wordDataCon   (HsWordPrim   "" int_lit)
+                 = mk_con_pat wordDataCon   (HsWordPrim   NoSourceText int_lit)
   | not type_change, isStringTy ty, Just str_lit <- mb_str_lit
-                            = tidy_lit_pat (HsString "" str_lit)
+                 = tidy_lit_pat (HsString NoSourceText str_lit)
      -- NB: do /not/ convert Float or Double literals to F# 3.8 or D# 5.3
      -- If we do convert to the constructor form, we'll generate a case
      -- expression on a Float# or Double# and that's not allowed in Core; see

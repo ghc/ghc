@@ -14,10 +14,10 @@ tcfail103.hs:15:13: error:
     • In the expression: readSTRef v
       In an equation for ‘g’: g = readSTRef v
       In the expression:
-        do { v <- newSTRef 5;
-             let g :: ST s Int
-                 g = readSTRef v;
-             g }
+        do v <- newSTRef 5
+           let g :: ST s Int
+               g = readSTRef v
+           g
     • Relevant bindings include
         g :: ST s Int (bound at tcfail103.hs:15:9)
         v :: STRef t Int (bound at tcfail103.hs:12:5)

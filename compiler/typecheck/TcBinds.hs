@@ -1703,7 +1703,7 @@ the common case.) -}
 
 -- This one is called on LHS, when pat and grhss are both Name
 -- and on RHS, when pat is TcId and grhss is still Name
-patMonoBindsCtxt :: (OutputableBndrId id, Outputable body)
+patMonoBindsCtxt :: (OutputableBndrId id, HasOccNameId id, Outputable body)
                  => LPat id -> GRHSs Name body -> SDoc
 patMonoBindsCtxt pat grhss
   = hang (text "In a pattern binding:") 2 (pprPatBind pat grhss)

@@ -9,10 +9,10 @@ T7748a.hs:16:24: error:
     • In the pattern: Just (Just p)
       In a case alternative: Just (Just p) -> p
       In the expression:
-        case zd of {
+        case zd of
           Nothing -> const ()
           Just Nothing -> const ()
-          Just (Just p) -> p }
+          Just (Just p) -> p
     • Relevant bindings include
         g :: r -> () (bound at T7748a.hs:13:16)
         f :: r -> () (bound at T7748a.hs:13:8)

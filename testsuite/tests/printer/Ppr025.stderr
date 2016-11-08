@@ -1,0 +1,6 @@
+
+Ppr025.hs:24:47: error:
+    Not in scope: type constructor or class ‘Event’
+
+Ppr025.ppr.hs:17:77: error:
+    Not in scope: type constructor or class ‘Event’

@@ -218,7 +218,7 @@ dsFCall fn_id co fcall mDeclHeader = do
                                CApiConv safety) ->
                do wrapperName <- mkWrapperName "ghc_wrapper" (unpackFS cName)
                   let fcall' = CCall (CCallSpec
-                                      (StaticTarget (unpackFS wrapperName)
+                                      (StaticTarget NoSourceText
                                                     wrapperName mUnitId
                                                     True)
                                       CApiConv safety)

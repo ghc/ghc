@@ -980,3 +980,18 @@ instance Binary Serialized where
         the_type <- get bh
         bytes <- get bh
         return (Serialized the_type bytes)
+
+instance Binary SourceText where
+  put_ bh NoSourceText = putByte bh 0
+  put_ bh (SourceText s) = do
+        putByte bh 1
+        put_ bh s
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> return NoSourceText
+      1 -> do
+        s <- get bh
+        return (SourceText s)
+      _ -> panic $ "Binary SourceText:" ++ show h

@@ -14,6 +14,7 @@ import Vectorise.Generic.Description
 import Vectorise.Utils
 import Vectorise.Env( GlobalEnv( global_fam_inst_env ) )
 
+import BasicTypes ( SourceText(..) )
 import BuildTyCl
 import DataCon
 import TyCon
@@ -89,7 +90,7 @@ buildPDataDataCon orig_name vect_tc repr_tc repr
                             (mkFamilyTyConApp repr_tc (mkTyVarTys tvs))
                             repr_tc
   where
-    no_bang = HsSrcBang Nothing NoSrcUnpack NoSrcStrict
+    no_bang = HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict
 
 
 -- buildPDatasTyCon -----------------------------------------------------------
@@ -133,7 +134,7 @@ buildPDatasDataCon orig_name vect_tc repr_tc repr
                             (mkFamilyTyConApp repr_tc (mkTyVarTys tvs))
                             repr_tc
   where
-     no_bang = HsSrcBang Nothing NoSrcUnpack NoSrcStrict
+     no_bang = HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict
 
 
 -- Utils ----------------------------------------------------------------------

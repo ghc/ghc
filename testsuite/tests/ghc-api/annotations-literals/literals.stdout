@@ -24,7 +24,7 @@
 
 (LiteralsTest.hs:5:3,ITequal,[=]),
 
-(LiteralsTest.hs:5:5-8,ITinteger "0003" 3,[0003]),
+(LiteralsTest.hs:5:5-8,ITinteger (SourceText "0003") 3,[0003]),
 
 (LiteralsTest.hs:6:1,ITsemi,[]),
 
@@ -32,7 +32,7 @@
 
 (LiteralsTest.hs:6:3,ITequal,[=]),
 
-(LiteralsTest.hs:6:5-8,ITinteger "0x04" 4,[0x04]),
+(LiteralsTest.hs:6:5-8,ITinteger (SourceText "0x04") 4,[0x04]),
 
 (LiteralsTest.hs:8:1,ITsemi,[]),
 
@@ -48,7 +48,7 @@
 
 (LiteralsTest.hs:9:3,ITequal,[=]),
 
-(LiteralsTest.hs:9:5-10,ITstring "\"\\x20\"" " ",["\x20"]),
+(LiteralsTest.hs:9:5-10,ITstring (SourceText "\"\\x20\"") " ",["\x20"]),
 
 (LiteralsTest.hs:11:1,ITsemi,[]),
 
@@ -64,7 +64,7 @@
 
 (LiteralsTest.hs:12:3,ITequal,[=]),
 
-(LiteralsTest.hs:12:5-10,ITchar "'\\x20'" ' ',['\x20']),
+(LiteralsTest.hs:12:5-10,ITchar (SourceText "'\\x20'") ' ',['\x20']),
 
 (LiteralsTest.hs:14:1,ITsemi,[]),
 
@@ -98,7 +98,7 @@
 
 (LiteralsTest.hs:19:11,ITequal,[=]),
 
-(LiteralsTest.hs:19:13-19,ITprimchar "'\\x41'" 'A',['\x41'#]),
+(LiteralsTest.hs:19:13-19,ITprimchar (SourceText "'\\x41'") 'A',['\x41'#]),
 
 (LiteralsTest.hs:20:5,ITsemi,[]),
 
@@ -106,7 +106,7 @@
 
 (LiteralsTest.hs:20:10,ITequal,[=]),
 
-(LiteralsTest.hs:20:12-16,ITprimint "0004#" 4,[0004#]),
+(LiteralsTest.hs:20:12-16,ITprimint (SourceText "0004#") 4,[0004#]),
 
 (LiteralsTest.hs:21:5,ITsemi,[]),
 
@@ -114,7 +114,7 @@
 
 (LiteralsTest.hs:21:11,ITequal,[=]),
 
-(LiteralsTest.hs:21:13-17,ITprimword "005##" 5,[005##]),
+(LiteralsTest.hs:21:13-17,ITprimword (SourceText "005##") 5,[005##]),
 
 (LiteralsTest.hs:22:5,ITsemi,[]),
 
@@ -138,7 +138,7 @@
 
 (LiteralsTest.hs:24:7,ITequal,[=]),
 
-(LiteralsTest.hs:24:9,ITinteger "1" 1,[1]),
+(LiteralsTest.hs:24:9,ITinteger (SourceText "1") 1,[1]),
 
 (LiteralsTest.hs:25:1,ITvccurly,[]),
 

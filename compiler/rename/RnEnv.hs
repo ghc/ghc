@@ -75,7 +75,8 @@ import DataCon
 import TyCon
 import PrelNames        ( mkUnboundName, isUnboundName, rOOT_MAIN, forall_tv_RDR )
 import ErrUtils         ( MsgDoc )
-import BasicTypes       ( Fixity(..), FixityDirection(..), minPrecedence, defaultFixity )
+import BasicTypes       ( Fixity(..), FixityDirection(..), minPrecedence,
+                          defaultFixity, pprWarningTxtForMsg, SourceText(..) )
 import SrcLoc
 import Outputable
 import Util
@@ -1072,7 +1073,7 @@ warnIfDeprecated gre@(GRE { gre_name = name, gre_imp = iss })
                     <+> pprNonVarNameSpace (occNameSpace occ)
                     <+> quotes (ppr occ)
                   , parens imp_msg <> colon ]
-            , ppr txt ]
+            , pprWarningTxtForMsg txt ]
       where
         imp_mod  = importSpecModule imp_spec
         imp_msg  = text "imported from" <+> ppr imp_mod <> extra
@@ -1438,7 +1439,7 @@ lookupFixityRn_help' :: Name
                      -> RnM (Bool, Fixity)
 lookupFixityRn_help' name occ
   | isUnboundName name
-  = return (False, Fixity (show minPrecedence) minPrecedence InfixL)
+  = return (False, Fixity NoSourceText minPrecedence InfixL)
     -- Minimise errors from ubound names; eg
     --    a>0 `foo` b>0
     -- where 'foo' is not in scope, should not give an error (Trac #7937)
@@ -1517,7 +1518,7 @@ lookupFieldFixityRn (Ambiguous   (L _ rdr) _) = get_ambiguous_fixity rdr
         [] -> panic "get_ambiguous_fixity: no candidates for a given RdrName"
         [ (_, fix):_ ] -> return fix
         ambigs -> addErr (ambiguous_fixity_err rdr_name ambigs)
-                  >> return (Fixity(show minPrecedence) minPrecedence InfixL)
+                  >> return (Fixity NoSourceText minPrecedence InfixL)
 
     lookup_gre_fixity gre = lookupFixityRn' (gre_name gre) (greOccName gre)
 

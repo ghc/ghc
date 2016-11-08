@@ -168,7 +168,7 @@ rnExpr (OpApp e1 op  _ e2)
         ; fixity <- case op' of
               L _ (HsVar (L _ n)) -> lookupFixityRn n
               L _ (HsRecFld f)    -> lookupFieldFixityRn f
-              _ -> return (Fixity (show minPrecedence) minPrecedence InfixL)
+              _ -> return (Fixity NoSourceText minPrecedence InfixL)
                    -- c.f. lookupFixity for unbound
 
         ; final_e <- mkOpAppRn e1' op' fixity e2'
@@ -474,7 +474,7 @@ rnCmd (HsCmdArrApp arrow arg _ ho rtl)
         -- inside 'arrow'.  In the higher-order case (-<<), they are.
 
 -- infix form
-rnCmd (HsCmdArrForm op (Just _) [arg1, arg2])
+rnCmd (HsCmdArrForm op _ (Just _) [arg1, arg2])
   = do { (op',fv_op) <- escapeArrowScope (rnLExpr op)
        ; let L _ (HsVar (L _ op_name)) = op'
        ; (arg1',fv_arg1) <- rnCmdTop arg1
@@ -484,10 +484,10 @@ rnCmd (HsCmdArrForm op (Just _) [arg1, arg2])
        ; final_e <- mkOpFormRn arg1' op' fixity arg2'
        ; return (final_e, fv_arg1 `plusFV` fv_op `plusFV` fv_arg2) }
 
-rnCmd (HsCmdArrForm op fixity cmds)
+rnCmd (HsCmdArrForm op f fixity cmds)
   = do { (op',fvOp) <- escapeArrowScope (rnLExpr op)
        ; (cmds',fvCmds) <- rnCmdArgs cmds
-       ; return (HsCmdArrForm op' fixity cmds', fvOp `plusFV` fvCmds) }
+       ; return (HsCmdArrForm op' f fixity cmds', fvOp `plusFV` fvCmds) }
 
 rnCmd (HsCmdApp fun arg)
   = do { (fun',fvFun) <- rnLCmd  fun

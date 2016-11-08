@@ -1,0 +1,186 @@
+
+==================== Demand analysis ====================
+Result size of Demand analysis
+  = {terms: 19, types: 8, coercions: 0}
+
+-- RHS size: {terms: 2, types: 0, coercions: 0}
+$trModule_sK3 :: GHC.Types.TrName
+[LclId,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 20}]
+$trModule_sK3 = GHC.Types.TrNameS "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0}
+$trModule_sK4 :: GHC.Types.TrName
+[LclId,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
+$trModule_sK4 = GHC.Types.TrNameS "Dead1"#
+
+-- RHS size: {terms: 3, types: 0, coercions: 0}
+Dead1.$trModule :: GHC.Types.Module
+[LclIdX,
+ Str=m,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
+Dead1.$trModule = GHC.Types.Module $trModule_sK3 $trModule_sK4
+
+-- RHS size: {terms: 8, types: 3, coercions: 0}
+foo :: Int -> Int
+[LclIdX,
+ Arity=1,
+ Str=<S(S),1*U(U)>m,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [20] 21 20}]
+foo =
+  \ (n_axW [Dmd=<S(S),1*U(U)>] :: Int) ->
+    case n_axW of { GHC.Types.I# x_aKq [Dmd=<S,U>] ->
+    GHC.Types.I# (GHC.Prim.+# x_aKq 1#)
+    }
+
+
+
+
+==================== Demand analysis ====================
+Result size of Demand analysis
+  = {terms: 19, types: 8, coercions: 0}
+
+-- RHS size: {terms: 2, types: 0, coercions: 0}
+$trModule_sK3 :: GHC.Types.TrName
+[LclId,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 20}]
+$trModule_sK3 = GHC.Types.TrNameS "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0}
+$trModule_sK4 :: GHC.Types.TrName
+[LclId,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
+$trModule_sK4 = GHC.Types.TrNameS "Dead1"#
+
+-- RHS size: {terms: 3, types: 0, coercions: 0}
+Dead1.$trModule :: GHC.Types.Module
+[LclIdX,
+ Str=m,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
+Dead1.$trModule = GHC.Types.Module $trModule_sK3 $trModule_sK4
+
+-- RHS size: {terms: 8, types: 3, coercions: 0}
+foo :: Int -> Int
+[LclIdX,
+ Arity=1,
+ Str=<S(S),1*U(U)>m,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (n_axW [Occ=Once!] :: Int) ->
+                 case n_axW of { GHC.Types.I# x_aKq [Occ=Once] ->
+                 GHC.Types.I# (GHC.Prim.+# x_aKq 1#)
+                 }}]
+foo =
+  \ (n_axW [Dmd=<S(S),1*U(U)>] :: Int) ->
+    case n_axW of { GHC.Types.I# x_aKq [Dmd=<S,U>] ->
+    GHC.Types.I# (GHC.Prim.+# x_aKq 1#)
+    }
+
+
+
+
+==================== Demand analysis ====================
+Result size of Demand analysis
+  = {terms: 19, types: 8, coercions: 0}
+
+-- RHS size: {terms: 2, types: 0, coercions: 0}
+$trModule_s1vS :: GHC.Types.TrName
+[LclId,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 20}]
+$trModule_s1vS = GHC.Types.TrNameS "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0}
+$trModule_s1vT :: GHC.Types.TrName
+[LclId,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
+$trModule_s1vT = GHC.Types.TrNameS "Dead1"#
+
+-- RHS size: {terms: 3, types: 0, coercions: 0}
+Dead1.$trModule :: GHC.Types.Module
+[LclIdX,
+ Str=m,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
+Dead1.$trModule = GHC.Types.Module $trModule_s1vS $trModule_s1vT
+
+-- RHS size: {terms: 8, types: 3, coercions: 0}
+foo :: Int -> Int
+[LclIdX,
+ Arity=1,
+ Str=<S(S),1*U(U)>m,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [20] 21 20}]
+foo =
+  \ (n_a1jL [Dmd=<S(S),1*U(U)>] :: Int) ->
+    case n_a1jL of { GHC.Types.I# x_a1wf [Dmd=<S,U>] ->
+    GHC.Types.I# (GHC.Prim.+# x_a1wf 1#)
+    }
+
+
+
+
+==================== Demand analysis ====================
+Result size of Demand analysis
+  = {terms: 19, types: 8, coercions: 0}
+
+-- RHS size: {terms: 2, types: 0, coercions: 0}
+$trModule_s1vS :: GHC.Types.TrName
+[LclId,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 20}]
+$trModule_s1vS = GHC.Types.TrNameS "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0}
+$trModule_s1vT :: GHC.Types.TrName
+[LclId,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
+$trModule_s1vT = GHC.Types.TrNameS "Dead1"#
+
+-- RHS size: {terms: 3, types: 0, coercions: 0}
+Dead1.$trModule :: GHC.Types.Module
+[LclIdX,
+ Str=m,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
+Dead1.$trModule = GHC.Types.Module $trModule_s1vS $trModule_s1vT
+
+-- RHS size: {terms: 8, types: 3, coercions: 0}
+foo :: Int -> Int
+[LclIdX,
+ Arity=1,
+ Str=<S(S),1*U(U)>m,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (n_a1jL [Occ=Once!] :: Int) ->
+                 case n_a1jL of { GHC.Types.I# x_a1wf [Occ=Once] ->
+                 GHC.Types.I# (GHC.Prim.+# x_a1wf 1#)
+                 }}]
+foo =
+  \ (n_a1jL [Dmd=<S(S),1*U(U)>] :: Int) ->
+    case n_a1jL of { GHC.Types.I# x_a1wf [Dmd=<S,U>] ->
+    GHC.Types.I# (GHC.Prim.+# x_a1wf 1#)
+    }
+
+
+

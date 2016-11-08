@@ -3,7 +3,7 @@
 module T11768 where
 data Foo
   = Foo
-  deriving (Eq  Documenting a single type)
+  deriving Eq  Documenting a single type
 data Bar
   = Bar
   deriving (Eq  Documenting one of multiple types, Ord)

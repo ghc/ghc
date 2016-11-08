@@ -2,5 +2,5 @@
 T11464.hs:5:14: error:
     • Expecting one more argument to ‘Either a’
       Expected a type, but ‘Either a’ has kind ‘* -> *’
-    • In the first argument of ‘Eq’, namely ‘Either a’
+    • In the first argument of ‘Eq’, namely ‘(Either a)’
       In the instance declaration for ‘Eq (Either a)’

@@ -1,0 +1,28 @@
+
+Ppr042.hs:6:1: error:
+    • Unacceptable result type in foreign declaration:
+        ‘Word#’ cannot be marshalled in a foreign call
+        To marshal unlifted types, use UnliftedFFITypes
+    • When checking declaration:
+        foreign import prim safe cheneycopy :: Any -> Word#
+
+Ppr042.hs:8:1: error:
+    • Unacceptable result type in foreign declaration:
+        ‘Word#’ cannot be marshalled in a foreign call
+        To marshal unlifted types, use UnliftedFFITypes
+    • When checking declaration:
+        foreign import prim safe "foo" foo :: Any -> Word#
+
+Ppr042.ppr.hs:4:1: error:
+    • Unacceptable result type in foreign declaration:
+        ‘Word#’ cannot be marshalled in a foreign call
+        To marshal unlifted types, use UnliftedFFITypes
+    • When checking declaration:
+        foreign import prim safe cheneycopy :: Any -> Word#
+
+Ppr042.ppr.hs:5:1: error:
+    • Unacceptable result type in foreign declaration:
+        ‘Word#’ cannot be marshalled in a foreign call
+        To marshal unlifted types, use UnliftedFFITypes
+    • When checking declaration:
+        foreign import prim safe "foo" foo :: Any -> Word#

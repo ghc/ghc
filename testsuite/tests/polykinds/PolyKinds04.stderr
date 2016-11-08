@@ -3,5 +3,5 @@ PolyKinds04.hs:5:16:
     Expecting one more argument to ‘Maybe’
     Expected a type, but ‘Maybe’ has kind ‘* -> *’
     In the first argument of ‘A’, namely ‘Maybe’
-    In the type ‘A Maybe’
+    In the type ‘(A Maybe)’
     In the definition of data constructor ‘B1’

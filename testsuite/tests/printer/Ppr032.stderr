@@ -1,0 +1,18 @@
+
+Ppr032.hs:10:21:
+     No instance for (Show a)
+        arising from the "provided" constraints claimed by
+          the signature of ‘Single’
+      In other words, a successful match on the pattern
+        [x]
+      does not provide the constraint (Show a)
+     In the declaration for pattern synonym ‘Single’
+
+Ppr032.ppr.hs:6:21:
+     No instance for (Show a)
+        arising from the "provided" constraints claimed by
+          the signature of ‘Single’
+      In other words, a successful match on the pattern
+        [x]
+      does not provide the constraint (Show a)
+     In the declaration for pattern synonym ‘Single’

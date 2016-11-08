@@ -2,11 +2,9 @@
 T3177a.hs:8:8: error:
     • Expecting one fewer arguments to ‘Int’
       Expected kind ‘* -> *’, but ‘Int’ has kind ‘*’
-    • In the type signature:
-        f :: Int Int
+    • In the type signature: f :: (Int Int)
 
 T3177a.hs:11:6: error:
     • Expecting one fewer arguments to ‘Int’
       Expected kind ‘* -> *’, but ‘Int’ has kind ‘*’
-    • In the type signature:
-        g :: Int Int
+    • In the type signature: g :: Int Int

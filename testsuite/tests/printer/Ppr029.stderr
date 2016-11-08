@@ -1,0 +1,16 @@
+
+Ppr029.hs:15:11: warning: [-Winline-rule-shadowing]
+    Rule "foo1" may never fire because ‘foo1’ might inline first
+    Probable fix: add an INLINE[n] or NOINLINE[n] pragma for ‘foo1’
+
+Ppr029.hs:20:11: warning: [-Winline-rule-shadowing]
+    Rule "foo2" may never fire because ‘foo2’ might inline first
+    Probable fix: add an INLINE[n] or NOINLINE[n] pragma for ‘foo2’
+
+Ppr029.ppr.hs:10:11: warning: [-Winline-rule-shadowing]
+    Rule "foo1" may never fire because ‘foo1’ might inline first
+    Probable fix: add an INLINE[n] or NOINLINE[n] pragma for ‘foo1’
+
+Ppr029.ppr.hs:13:11: warning: [-Winline-rule-shadowing]
+    Rule "foo2" may never fire because ‘foo2’ might inline first
+    Probable fix: add an INLINE[n] or NOINLINE[n] pragma for ‘foo2’

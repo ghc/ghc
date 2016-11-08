@@ -144,7 +144,8 @@ import Class            ( Class, mkClass )
 import RdrName
 import Name
 import NameSet          ( NameSet, mkNameSet, elemNameSet )
-import BasicTypes       ( Arity, Boxity(..), TupleSort(..), ConTagZ )
+import BasicTypes       ( Arity, Boxity(..), TupleSort(..), ConTagZ,
+                          SourceText(..) )
 import ForeignCall
 import SrcLoc           ( noSrcSpan )
 import Unique
@@ -525,7 +526,7 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri tyvars ex_tyvars arg_tys
                 (mkDataConWorkId wrk_name data_con)
                 NoDataConRep    -- Wired-in types are too simple to need wrappers
 
-    no_bang = HsSrcBang Nothing NoSrcUnpack NoSrcStrict
+    no_bang = HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict
 
     wrk_name = mkDataConWorkerName data_con wrk_key
 
@@ -1179,8 +1180,9 @@ charTy = mkTyConTy charTyCon
 
 charTyCon :: TyCon
 charTyCon   = pcNonEnumTyCon charTyConName
-                       (Just (CType "" Nothing ("HsChar",fsLit "HsChar")))
-                       [] [charDataCon]
+                   (Just (CType NoSourceText Nothing
+                                  (NoSourceText,fsLit "HsChar")))
+                   [] [charDataCon]
 charDataCon :: DataCon
 charDataCon = pcDataCon charDataConName [] [charPrimTy] charTyCon
 
@@ -1192,8 +1194,8 @@ intTy = mkTyConTy intTyCon
 
 intTyCon :: TyCon
 intTyCon = pcNonEnumTyCon intTyConName
-                            (Just (CType "" Nothing ("HsInt",fsLit "HsInt"))) []
-                            [intDataCon]
+               (Just (CType NoSourceText Nothing (NoSourceText,fsLit "HsInt")))
+                 [] [intDataCon]
 intDataCon :: DataCon
 intDataCon = pcDataCon intDataConName [] [intPrimTy] intTyCon
 
@@ -1202,8 +1204,8 @@ wordTy = mkTyConTy wordTyCon
 
 wordTyCon :: TyCon
 wordTyCon = pcNonEnumTyCon wordTyConName
-                      (Just (CType "" Nothing ("HsWord", fsLit "HsWord"))) []
-                      [wordDataCon]
+            (Just (CType NoSourceText Nothing (NoSourceText, fsLit "HsWord")))
+               [] [wordDataCon]
 wordDataCon :: DataCon
 wordDataCon = pcDataCon wordDataConName [] [wordPrimTy] wordTyCon
 
@@ -1212,7 +1214,8 @@ word8Ty = mkTyConTy word8TyCon
 
 word8TyCon :: TyCon
 word8TyCon = pcNonEnumTyCon word8TyConName
-                      (Just (CType "" Nothing ("HsWord8", fsLit "HsWord8"))) []
+                      (Just (CType NoSourceText Nothing
+                             (NoSourceText, fsLit "HsWord8"))) []
                       [word8DataCon]
 word8DataCon :: DataCon
 word8DataCon = pcDataCon word8DataConName [] [wordPrimTy] word8TyCon
@@ -1222,7 +1225,8 @@ floatTy = mkTyConTy floatTyCon
 
 floatTyCon :: TyCon
 floatTyCon   = pcNonEnumTyCon floatTyConName
-                      (Just (CType "" Nothing ("HsFloat", fsLit "HsFloat"))) []
+                      (Just (CType NoSourceText Nothing
+                             (NoSourceText, fsLit "HsFloat"))) []
                       [floatDataCon]
 floatDataCon :: DataCon
 floatDataCon = pcDataCon         floatDataConName [] [floatPrimTy] floatTyCon
@@ -1232,7 +1236,8 @@ doubleTy = mkTyConTy doubleTyCon
 
 doubleTyCon :: TyCon
 doubleTyCon = pcNonEnumTyCon doubleTyConName
-                      (Just (CType "" Nothing ("HsDouble",fsLit "HsDouble"))) []
+                      (Just (CType NoSourceText Nothing
+                             (NoSourceText,fsLit "HsDouble"))) []
                       [doubleDataCon]
 
 doubleDataCon :: DataCon
@@ -1293,7 +1298,8 @@ boolTy = mkTyConTy boolTyCon
 
 boolTyCon :: TyCon
 boolTyCon = pcTyCon True boolTyConName
-                    (Just (CType "" Nothing ("HsBool", fsLit "HsBool")))
+                    (Just (CType NoSourceText Nothing
+                           (NoSourceText, fsLit "HsBool")))
                     [] [falseDataCon, trueDataCon]
 
 falseDataCon, trueDataCon :: DataCon

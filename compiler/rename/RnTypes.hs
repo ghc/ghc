@@ -464,9 +464,9 @@ rnHsTyKi env ty@(HsQualTy { hst_ctxt = lctxt, hst_body = tau })
        ; return (HsQualTy { hst_ctxt = ctxt', hst_body =  tau' }
                 , fvs1 `plusFV` fvs2) }
 
-rnHsTyKi env (HsTyVar (L loc rdr_name))
+rnHsTyKi env (HsTyVar ip (L loc rdr_name))
   = do { name <- rnTyVar env rdr_name
-       ; return (HsTyVar (L loc name), unitFV name) }
+       ; return (HsTyVar ip (L loc name), unitFV name) }
 
 rnHsTyKi env ty@(HsOpTy ty1 l_op ty2)
   = setSrcSpan (getLoc l_op) $
@@ -586,7 +586,8 @@ rnHsTyKi env overall_ty@(HsAppsTy tys)
                    (non_syms1 : non_syms2 : non_syms) (L loc star : ops)
       | star `hasKey` starKindTyConKey || star `hasKey` unicodeStarKindTyConKey
       = deal_with_star acc1 acc2
-                       ((non_syms1 ++ L loc (HsTyVar (L loc star)) : non_syms2) : non_syms)
+                       ((non_syms1 ++ L loc (HsTyVar NotPromoted (L loc star))
+                            : non_syms2) : non_syms)
                        ops
     deal_with_star acc1 acc2 (non_syms1 : non_syms) (op1 : ops)
       = deal_with_star (non_syms1 : acc1) (op1 : acc2) non_syms ops
@@ -643,12 +644,12 @@ rnHsTyKi _ (HsCoreTy ty)
     -- The emptyFVs probably isn't quite right
     -- but I don't think it matters
 
-rnHsTyKi env ty@(HsExplicitListTy k tys)
+rnHsTyKi env ty@(HsExplicitListTy ip k tys)
   = do { checkTypeInType env ty
        ; data_kinds <- xoptM LangExt.DataKinds
        ; unless data_kinds (addErr (dataKindsErr env ty))
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi env) tys
-       ; return (HsExplicitListTy k tys', fvs) }
+       ; return (HsExplicitListTy ip k tys', fvs) }
 
 rnHsTyKi env ty@(HsExplicitTupleTy kis tys)
   = do { checkTypeInType env ty
@@ -1034,7 +1035,7 @@ collectAnonWildCards lty = go lty
       HsDocTy ty _                 -> go ty
       HsBangTy _ ty                -> go ty
       HsRecTy flds                 -> gos $ map (cd_fld_type . unLoc) flds
-      HsExplicitListTy _ tys       -> gos tys
+      HsExplicitListTy _ _ tys     -> gos tys
       HsExplicitTupleTy _ tys      -> gos tys
       HsForAllTy { hst_bndrs = bndrs
                  , hst_body = ty } -> collectAnonWildCardsBndrs bndrs
@@ -1247,15 +1248,16 @@ mkOpFormRn :: LHsCmdTop Name            -- Left operand; already rearranged
           -> RnM (HsCmd Name)
 
 -- (e11 `op1` e12) `op2` e2
-mkOpFormRn a1@(L loc (HsCmdTop (L _ (HsCmdArrForm op1 (Just fix1) [a11,a12])) _ _ _))
+mkOpFormRn a1@(L loc (HsCmdTop (L _ (HsCmdArrForm op1 f (Just fix1)
+                                     [a11,a12])) _ _ _))
         op2 fix2 a2
   | nofix_error
   = do precParseErr (get_op op1,fix1) (get_op op2,fix2)
-       return (HsCmdArrForm op2 (Just fix2) [a1, a2])
+       return (HsCmdArrForm op2 f (Just fix2) [a1, a2])
 
   | associate_right
   = do new_c <- mkOpFormRn a12 op2 fix2 a2
-       return (HsCmdArrForm op1 (Just fix1)
+       return (HsCmdArrForm op1 f (Just fix1)
                [a11, L loc (HsCmdTop (L loc new_c)
                placeHolderType placeHolderType [])])
         -- TODO: locs are wrong
@@ -1264,7 +1266,7 @@ mkOpFormRn a1@(L loc (HsCmdTop (L _ (HsCmdArrForm op1 (Just fix1) [a11,a12])) _ 
 
 --      Default case
 mkOpFormRn arg1 op fix arg2                     -- Default case, no rearrangment
-  = return (HsCmdArrForm op (Just fix) [arg1, arg2])
+  = return (HsCmdArrForm op Infix (Just fix) [arg1, arg2])
 
 
 --------------------------------------
@@ -1600,7 +1602,7 @@ extract_lkind = extract_lty KindLevel
 extract_lty :: TypeOrKind -> LHsType RdrName -> FreeKiTyVars -> RnM FreeKiTyVars
 extract_lty t_or_k (L _ ty) acc
   = case ty of
-      HsTyVar ltv               -> extract_tv t_or_k ltv acc
+      HsTyVar _  ltv            -> extract_tv t_or_k ltv acc
       HsBangTy _ ty             -> extract_lty t_or_k ty acc
       HsRecTy flds              -> foldrM (extract_lty t_or_k
                                            . cd_fld_type . unLoc) acc
@@ -1624,7 +1626,7 @@ extract_lty t_or_k (L _ ty) acc
       HsCoreTy {}               -> return acc  -- The type is closed
       HsSpliceTy {}             -> return acc  -- Type splices mention no tvs
       HsDocTy ty _              -> extract_lty t_or_k ty acc
-      HsExplicitListTy _ tys    -> extract_ltys t_or_k tys acc
+      HsExplicitListTy _ _ tys  -> extract_ltys t_or_k tys acc
       HsExplicitTupleTy _ tys   -> extract_ltys t_or_k tys acc
       HsTyLit _                 -> return acc
       HsKindSig ty ki           -> extract_lty t_or_k ty =<<

@@ -56,20 +56,24 @@ testOneFile libdir fileName = do
                               ) ast
 
      doFixity :: Fixity -> [(String,[String])]
-     doFixity (Fixity ss _ _) = [("f",[ss])]
+     doFixity (Fixity (SourceText ss) _ _) = [("f",[ss])]
 
      doRuleDecl :: RuleDecl RdrName
                 -> [(String,[String])]
-     doRuleDecl (HsRule _ (ActiveBefore ss _) _ _ _ _ _) = [("rb",[ss])]
-     doRuleDecl (HsRule _ (ActiveAfter ss _) _ _ _ _ _) = [("ra",[ss])]
+     doRuleDecl (HsRule _ (ActiveBefore (SourceText ss) _) _ _ _ _ _)
+       = [("rb",[ss])]
+     doRuleDecl (HsRule _ (ActiveAfter (SourceText ss) _) _ _ _ _ _)
+       = [("ra",[ss])]
      doRuleDecl (HsRule _ _ _ _ _ _ _) = []
 
      doHsExpr :: HsExpr RdrName -> [(String,[String])]
      doHsExpr (HsTickPragma src (_,_,_) ss _) = [("tp",[show ss])]
      doHsExpr _ = []
 
-     doInline (InlinePragma _ _ _ (ActiveBefore ss _) _) = [("ib",[ss])]
-     doInline (InlinePragma _ _ _ (ActiveAfter ss _) _) = [("ia",[ss])]
+     doInline (InlinePragma _ _ _ (ActiveBefore (SourceText ss) _) _)
+         = [("ib",[ss])]
+     doInline (InlinePragma _ _ _ (ActiveAfter (SourceText ss) _) _)
+         = [("ia",[ss])]
      doInline (InlinePragma _ _ _ _ _ ) = []
 
 showAnns anns = "[\n" ++ (intercalate "\n"

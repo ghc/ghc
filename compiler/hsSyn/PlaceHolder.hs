@@ -142,3 +142,10 @@ type OutputableBndrId id =
   ( OutputableBndr id
   , OutputableBndr (NameOrRdrName id)
   )
+
+-- |Constraint type to bundle up the requirement for 'HasOccName' on both
+-- the @id@ and the 'NameOrRdrName' type for it
+type HasOccNameId id =
+  ( HasOccName id
+  , HasOccName (NameOrRdrName id)
+  )

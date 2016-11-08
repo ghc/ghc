@@ -6,10 +6,10 @@ instance C Bool where
 T7532.hs:11:3-7: Splicing declarations
     bang'
   ======>
-    instance C Int where
+    instance () => C Int where
       data D Int = T
 
 ==================== Renamer ====================
-instance C Int where
+instance () => C Int where
   data D Int = T7532.T
 

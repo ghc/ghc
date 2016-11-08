@@ -117,7 +117,7 @@ mkPrelImports this_mod loc implicit_prelude import_decls
 
       preludeImportDecl :: LImportDecl RdrName
       preludeImportDecl
-        = L loc $ ImportDecl { ideclSourceSrc = Nothing,
+        = L loc $ ImportDecl { ideclSourceSrc = NoSourceText,
                                ideclName      = L loc pRELUDE_NAME,
                                ideclPkgQual   = Nothing,
                                ideclSource    = False,

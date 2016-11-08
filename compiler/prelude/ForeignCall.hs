@@ -22,7 +22,7 @@ import FastString
 import Binary
 import Outputable
 import Module
-import BasicTypes ( SourceText )
+import BasicTypes ( SourceText, pprWithSourceText )
 
 import Data.Char
 import Data.Data
@@ -203,14 +203,14 @@ instance Outputable CCallSpec where
       gc_suf | playSafe safety = text "_GC"
              | otherwise       = empty
 
-      ppr_fun (StaticTarget _ fn mPkgId isFun)
+      ppr_fun (StaticTarget st _fn mPkgId isFun)
         = text (if isFun then "__pkg_ccall"
                          else "__pkg_ccall_value")
        <> gc_suf
        <+> (case mPkgId of
             Nothing -> empty
             Just pkgId -> ppr pkgId)
-       <+> pprCLabelString fn
+       <+> (pprWithSourceText st empty)
 
       ppr_fun DynamicTarget
         = text "__dyn_ccall" <> gc_suf <+> text "\"\""
@@ -221,7 +221,7 @@ data Header = Header SourceText FastString
     deriving (Eq, Data)
 
 instance Outputable Header where
-    ppr (Header _ h) = quotes $ ppr h
+    ppr (Header st h) = pprWithSourceText st (doubleQuotes $ ppr h)
 
 -- | A C type, used in CAPI FFI calls
 --
@@ -236,7 +236,9 @@ data CType = CType SourceText -- Note [Pragma source text] in BasicTypes
     deriving (Eq, Data)
 
 instance Outputable CType where
-    ppr (CType _ mh (_,ct)) = hDoc <+> ftext ct
+    ppr (CType stp mh (stct,ct))
+      = pprWithSourceText stp (text "{-# CTYPE") <+> hDoc
+        <+> pprWithSourceText stct (doubleQuotes (ftext ct)) <+> text "#-}"
         where hDoc = case mh of
                      Nothing -> empty
                      Just h -> ppr h

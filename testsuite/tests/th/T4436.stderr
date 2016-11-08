@@ -1,11 +1,6 @@
 T4436.hs:5:7-56: Splicing expression
-    return
-      (LitE
-         (StringL
-            "hello\n\
-            \goodbye\n\
-            \and then"))
+    return (LitE (StringL "hello/ngoodbye/nand then"))
   ======>
-    "hello\n\
-    \goodbye\n\
-    \and then"
+    "hello
+goodbye
+and then"

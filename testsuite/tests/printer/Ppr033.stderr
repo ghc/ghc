@@ -1,0 +1,8 @@
+
+Ppr033.hs:5:12:
+     Not in scope: type constructor or class ‘PostscriptFont’
+     In the Template Haskell quotation ''PostscriptFont
+
+Ppr033.ppr.hs:3:12:
+     Not in scope: type constructor or class ‘PostscriptFont’
+     In the Template Haskell quotation ''PostscriptFont

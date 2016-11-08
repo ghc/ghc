@@ -86,7 +86,8 @@ module HsDecls (
     ) where
 
 -- friends:
-import {-# SOURCE #-}   HsExpr( LHsExpr, HsExpr, HsSplice, pprExpr, pprSplice )
+import {-# SOURCE #-}   HsExpr( LHsExpr, HsExpr, HsSplice, pprExpr,
+                                pprSpliceDecl )
         -- Because Expr imports Decls via HsBracket
 
 import HsBinds
@@ -97,7 +98,8 @@ import Name
 import BasicTypes
 import Coercion
 import ForeignCall
-import PlaceHolder ( PostTc,PostRn,PlaceHolder(..),DataId, OutputableBndrId )
+import PlaceHolder ( PostTc,PostRn,PlaceHolder(..),DataId, OutputableBndrId,
+                     HasOccNameId )
 import NameSet
 
 -- others:
@@ -250,7 +252,8 @@ appendGroups
         hs_vects  = vects1 ++ vects2,
         hs_docs   = docs1  ++ docs2 }
 
-instance (OutputableBndrId name) => Outputable (HsDecl name) where
+instance (OutputableBndrId name, HasOccNameId name)
+        => Outputable (HsDecl name) where
     ppr (TyClD dcl)             = ppr dcl
     ppr (ValD binds)            = ppr binds
     ppr (DefD def)              = ppr def
@@ -266,7 +269,8 @@ instance (OutputableBndrId name) => Outputable (HsDecl name) where
     ppr (DocD doc)              = ppr doc
     ppr (RoleAnnotD ra)         = ppr ra
 
-instance (OutputableBndrId name) => Outputable (HsGroup name) where
+instance (OutputableBndrId name, HasOccNameId name)
+        => Outputable (HsGroup name) where
     ppr (HsGroup { hs_valds  = val_decls,
                    hs_tyclds = tycl_decls,
                    hs_derivds = deriv_decls,
@@ -300,10 +304,6 @@ instance (OutputableBndrId name) => Outputable (HsGroup name) where
           vcat_mb gap (Nothing : ds) = vcat_mb gap ds
           vcat_mb gap (Just d  : ds) = gap $$ d $$ vcat_mb blankLine ds
 
-data SpliceExplicitFlag = ExplicitSplice | -- <=> $(f x y)
-                          ImplicitSplice   -- <=> f x y,  i.e. a naked top level expression
-    deriving Data
-
 -- | Located Splice Declaration
 type LSpliceDecl name = Located (SpliceDecl name)
 
@@ -314,8 +314,9 @@ data SpliceDecl id
         SpliceExplicitFlag
 deriving instance (DataId id) => Data (SpliceDecl id)
 
-instance (OutputableBndrId name) => Outputable (SpliceDecl name) where
-   ppr (SpliceDecl (L _ e) _) = pprSplice e
+instance (OutputableBndrId name, HasOccNameId name)
+        => Outputable (SpliceDecl name) where
+   ppr (SpliceDecl (L _ e) f) = pprSpliceDecl e f
 
 {-
 ************************************************************************
@@ -632,7 +633,8 @@ hsDeclHasCusk (ClassDecl { tcdTyVars = tyvars }) = hsTvbAllKinded tyvars
 -- Pretty-printing TyClDecl
 -- ~~~~~~~~~~~~~~~~~~~~~~~~
 
-instance (OutputableBndrId name) => Outputable (TyClDecl name) where
+instance (OutputableBndrId name, HasOccNameId name)
+       => Outputable (TyClDecl name) where
 
     ppr (FamDecl { tcdFam = decl }) = ppr decl
     ppr (SynDecl { tcdLName = ltycon, tcdTyVars = tyvars, tcdRhs = rhs })
@@ -660,7 +662,8 @@ instance (OutputableBndrId name) => Outputable (TyClDecl name) where
                      <+> pp_vanilla_decl_head lclas tyvars (unLoc context)
                      <+> pprFundeps (map unLoc fds)
 
-instance (OutputableBndrId name) => Outputable (TyClGroup name) where
+instance (OutputableBndrId name, HasOccNameId name)
+        => Outputable (TyClGroup name) where
   ppr (TyClGroup { group_tyclds = tyclds
                  , group_roles = roles
                  , group_instds = instds
@@ -670,13 +673,21 @@ instance (OutputableBndrId name) => Outputable (TyClGroup name) where
       ppr roles $$
       ppr instds
 
-pp_vanilla_decl_head :: (OutputableBndrId name)
+pp_vanilla_decl_head :: (OutputableBndrId name, HasOccNameId name)
    => Located name
    -> LHsQTyVars name
    -> HsContext name
    -> SDoc
-pp_vanilla_decl_head thing tyvars context
- = hsep [pprHsContext context, pprPrefixOcc (unLoc thing), ppr tyvars]
+pp_vanilla_decl_head thing (HsQTvs { hsq_explicit = tyvars }) context
+ = hsep [pprHsContext context, pp_tyvars tyvars]
+  where
+    pp_tyvars (varl:varsr)
+      | isSymOcc $ occName (unLoc thing)
+         = hsep [ppr (unLoc varl), pprInfixOcc (unLoc thing)
+         , hsep (map (ppr.unLoc) varsr)]
+      | otherwise = hsep [ pprPrefixOcc (unLoc thing)
+                  , hsep (map (ppr.unLoc) (varl:varsr))]
+    pp_tyvars [] = ppr thing
 
 pprTyClDeclFlavour :: TyClDecl a -> SDoc
 pprTyClDeclFlavour (ClassDecl {})   = text "class"
@@ -944,10 +955,11 @@ resultVariableName :: FamilyResultSig a -> Maybe a
 resultVariableName (TyVarSig sig) = Just $ hsLTyVarName sig
 resultVariableName _              = Nothing
 
-instance (OutputableBndrId name) => Outputable (FamilyDecl name) where
+instance (OutputableBndrId name, HasOccNameId name)
+        => Outputable (FamilyDecl name) where
   ppr = pprFamilyDecl TopLevel
 
-pprFamilyDecl :: (OutputableBndrId name)
+pprFamilyDecl :: (OutputableBndrId name, HasOccNameId name)
               => TopLevelFlag -> FamilyDecl name -> SDoc
 pprFamilyDecl top_level (FamilyDecl { fdInfo = info, fdLName = ltycon
                                     , fdTyVars = tyvars
@@ -1064,12 +1076,20 @@ data HsDerivingClause name
     }
 deriving instance (DataId id) => Data (HsDerivingClause id)
 
-instance (OutputableBndrId name) => Outputable (HsDerivingClause name) where
+instance (OutputableBndrId name, HasOccNameId name)
+       => Outputable (HsDerivingClause name) where
   ppr (HsDerivingClause { deriv_clause_strategy = dcs
                         , deriv_clause_tys      = L _ dct })
     = hsep [ text "deriving"
            , ppDerivStrategy dcs
-           , parens (interpp'SP dct) ]
+           , pp_dct dct ]
+      where
+        -- This complexity is to distinguish between
+        --    deriving Show
+        --    deriving (Show)
+        pp_dct [a@(HsIB _ (L _ HsAppsTy{}))] = parens (ppr a)
+        pp_dct [a] = ppr a
+        pp_dct _   = parens (interpp'SP dct)
 
 data NewOrData
   = NewType                     -- ^ @newtype Blah ...@
@@ -1173,42 +1193,51 @@ hsConDeclArgTys (PrefixCon tys)    = tys
 hsConDeclArgTys (InfixCon ty1 ty2) = [ty1,ty2]
 hsConDeclArgTys (RecCon flds)      = map (cd_fld_type . unLoc) (unLoc flds)
 
-pp_data_defn :: (OutputableBndrId name)
+pp_data_defn :: (OutputableBndrId name, HasOccNameId name)
                   => (HsContext name -> SDoc)   -- Printing the header
                   -> HsDataDefn name
                   -> SDoc
 pp_data_defn pp_hdr (HsDataDefn { dd_ND = new_or_data, dd_ctxt = L _ context
+                                , dd_cType = mb_ct
                                 , dd_kindSig = mb_sig
                                 , dd_cons = condecls, dd_derivs = derivings })
   | null condecls
-  = ppr new_or_data <+> pp_hdr context <+> pp_sig
+  = ppr new_or_data <+> pp_ct <+> pp_hdr context <+> pp_sig
+    <+> pp_derivings derivings
 
   | otherwise
-  = hang (ppr new_or_data <+> pp_hdr context <+> pp_sig)
+  = hang (ppr new_or_data <+> pp_ct  <+> pp_hdr context <+> pp_sig)
        2 (pp_condecls condecls $$ pp_derivings derivings)
   where
+    pp_ct = case mb_ct of
+               Nothing   -> empty
+               Just ct -> ppr ct
     pp_sig = case mb_sig of
                Nothing   -> empty
                Just kind -> dcolon <+> ppr kind
     pp_derivings (L _ ds) = vcat (map ppr ds)
 
-instance (OutputableBndrId name) => Outputable (HsDataDefn name) where
+instance (OutputableBndrId name, HasOccNameId name)
+       => Outputable (HsDataDefn name) where
    ppr d = pp_data_defn (\_ -> text "Naked HsDataDefn") d
 
 instance Outputable NewOrData where
   ppr NewType  = text "newtype"
   ppr DataType = text "data"
 
-pp_condecls :: (OutputableBndrId name) => [LConDecl name] -> SDoc
+pp_condecls :: (OutputableBndrId name, HasOccNameId name)
+            => [LConDecl name] -> SDoc
 pp_condecls cs@(L _ ConDeclGADT{} : _) -- In GADT syntax
   = hang (text "where") 2 (vcat (map ppr cs))
 pp_condecls cs                    -- In H98 syntax
   = equals <+> sep (punctuate (text " |") (map ppr cs))
 
-instance (OutputableBndrId name) => Outputable (ConDecl name) where
+instance (OutputableBndrId name, HasOccNameId name)
+       => Outputable (ConDecl name) where
     ppr = pprConDecl
 
-pprConDecl :: (OutputableBndrId name) => ConDecl name -> SDoc
+pprConDecl :: (OutputableBndrId name, HasOccNameId name)
+           => ConDecl name -> SDoc
 pprConDecl (ConDeclH98 { con_name = L _ con
                        , con_qvars = mtvs
                        , con_cxt = mcxt
@@ -1411,10 +1440,11 @@ data InstDecl name  -- Both class and family instances
       { tfid_inst :: TyFamInstDecl name }
 deriving instance (DataId id) => Data (InstDecl id)
 
-instance (OutputableBndrId name) => Outputable (TyFamInstDecl name) where
+instance (OutputableBndrId name, HasOccNameId name)
+       => Outputable (TyFamInstDecl name) where
   ppr = pprTyFamInstDecl TopLevel
 
-pprTyFamInstDecl :: (OutputableBndrId name)
+pprTyFamInstDecl :: (OutputableBndrId name, HasOccNameId name)
                  => TopLevelFlag -> TyFamInstDecl name -> SDoc
 pprTyFamInstDecl top_lvl (TyFamInstDecl { tfid_eqn = eqn })
    = text "type" <+> ppr_instance_keyword top_lvl <+> ppr_fam_inst_eqn eqn
@@ -1423,22 +1453,25 @@ ppr_instance_keyword :: TopLevelFlag -> SDoc
 ppr_instance_keyword TopLevel    = text "instance"
 ppr_instance_keyword NotTopLevel = empty
 
-ppr_fam_inst_eqn :: (OutputableBndrId name) => LTyFamInstEqn name -> SDoc
+ppr_fam_inst_eqn :: (OutputableBndrId name, HasOccNameId name)
+                 => LTyFamInstEqn name -> SDoc
 ppr_fam_inst_eqn (L _ (TyFamEqn { tfe_tycon = tycon
                                 , tfe_pats  = pats
                                 , tfe_rhs   = rhs }))
     = pp_fam_inst_lhs tycon pats [] <+> equals <+> ppr rhs
 
-ppr_fam_deflt_eqn :: (OutputableBndrId name) => LTyFamDefltEqn name -> SDoc
+ppr_fam_deflt_eqn :: (OutputableBndrId name, HasOccNameId name)
+                  => LTyFamDefltEqn name -> SDoc
 ppr_fam_deflt_eqn (L _ (TyFamEqn { tfe_tycon = tycon
                                  , tfe_pats  = tvs
                                  , tfe_rhs   = rhs }))
     = text "type" <+> pp_vanilla_decl_head tycon tvs [] <+> equals <+> ppr rhs
 
-instance (OutputableBndrId name) => Outputable (DataFamInstDecl name) where
+instance (OutputableBndrId name, HasOccNameId name)
+       => Outputable (DataFamInstDecl name) where
   ppr = pprDataFamInstDecl TopLevel
 
-pprDataFamInstDecl :: (OutputableBndrId name)
+pprDataFamInstDecl :: (OutputableBndrId name, HasOccNameId name)
                    => TopLevelFlag -> DataFamInstDecl name -> SDoc
 pprDataFamInstDecl top_lvl (DataFamInstDecl { dfid_tycon = tycon
                                             , dfid_pats  = pats
@@ -1451,16 +1484,25 @@ pprDataFamInstFlavour :: DataFamInstDecl name -> SDoc
 pprDataFamInstFlavour (DataFamInstDecl { dfid_defn = (HsDataDefn { dd_ND = nd }) })
   = ppr nd
 
-pp_fam_inst_lhs :: (OutputableBndrId name)
+pp_fam_inst_lhs :: (OutputableBndrId name, HasOccNameId name)
    => Located name
    -> HsTyPats name
    -> HsContext name
    -> SDoc
-pp_fam_inst_lhs thing (HsIB { hsib_body = typats }) context -- explicit type patterns
-   = hsep [ pprHsContext context, pprPrefixOcc (unLoc thing)
-          , hsep (map (pprParendHsType.unLoc) typats)]
+pp_fam_inst_lhs thing (HsIB { hsib_body = typats }) context
+                                              -- explicit type patterns
+   = hsep [ pprHsContext context, pp_pats typats]
+   where
+     pp_pats (patl:patsr)
+       | isSymOcc $ occName (unLoc thing)
+          = hsep [pprParendHsType (unLoc patl), pprInfixOcc (unLoc thing)
+          , hsep (map (pprParendHsType.unLoc) patsr)]
+       | otherwise = hsep [ pprPrefixOcc (unLoc thing)
+                   , hsep (map (pprParendHsType.unLoc) (patl:patsr))]
+     pp_pats [] = empty
 
-instance (OutputableBndrId name) => Outputable (ClsInstDecl name) where
+instance (OutputableBndrId name, HasOccNameId name)
+       => Outputable (ClsInstDecl name) where
     ppr (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = binds
                      , cid_sigs = sigs, cid_tyfam_insts = ats
                      , cid_overlap_mode = mbOverlap
@@ -1488,14 +1530,18 @@ ppOverlapPragma :: Maybe (Located OverlapMode) -> SDoc
 ppOverlapPragma mb =
   case mb of
     Nothing           -> empty
-    Just (L _ (NoOverlap _))    -> text "{-# NO_OVERLAP #-}"
-    Just (L _ (Overlappable _)) -> text "{-# OVERLAPPABLE #-}"
-    Just (L _ (Overlapping _))  -> text "{-# OVERLAPPING #-}"
-    Just (L _ (Overlaps _))     -> text "{-# OVERLAPS #-}"
-    Just (L _ (Incoherent _))   -> text "{-# INCOHERENT #-}"
+    Just (L _ (NoOverlap s))    -> maybe_stext s "{-# NO_OVERLAP #-}"
+    Just (L _ (Overlappable s)) -> maybe_stext s "{-# OVERLAPPABLE #-}"
+    Just (L _ (Overlapping s))  -> maybe_stext s "{-# OVERLAPPING #-}"
+    Just (L _ (Overlaps s))     -> maybe_stext s "{-# OVERLAPS #-}"
+    Just (L _ (Incoherent s))   -> maybe_stext s "{-# INCOHERENT #-}"
+  where
+    maybe_stext NoSourceText     alt = text alt
+    maybe_stext (SourceText src) _   = text src <+> text "#-}"
 
 
-instance (OutputableBndrId name) => Outputable (InstDecl name) where
+instance (OutputableBndrId name, HasOccNameId name)
+       => Outputable (InstDecl name) where
     ppr (ClsInstD     { cid_inst  = decl }) = ppr decl
     ppr (TyFamInstD   { tfid_inst = decl }) = ppr decl
     ppr (DataFamInstD { dfid_inst = decl }) = ppr decl
@@ -1536,7 +1582,8 @@ data DerivDecl name = DerivDecl
         }
 deriving instance (DataId name) => Data (DerivDecl name)
 
-instance (OutputableBndrId name) => Outputable (DerivDecl name) where
+instance (OutputableBndrId name, HasOccNameId name)
+       => Outputable (DerivDecl name) where
     ppr (DerivDecl { deriv_type = ty
                    , deriv_strategy = ds
                    , deriv_overlap_mode = o })
@@ -1570,7 +1617,8 @@ data DefaultDecl name
         -- For details on above see note [Api annotations] in ApiAnnotation
 deriving instance (DataId name) => Data (DefaultDecl name)
 
-instance (OutputableBndrId name) => Outputable (DefaultDecl name) where
+instance (OutputableBndrId name, HasOccNameId name)
+       => Outputable (DefaultDecl name) where
 
     ppr (DefaultDecl tys)
       = text "default" <+> parens (interpp'SP tys)
@@ -1673,7 +1721,8 @@ data ForeignExport = CExport  (Located CExportSpec) -- contains the calling
 -- pretty printing of foreign declarations
 --
 
-instance (OutputableBndrId name) => Outputable (ForeignDecl name) where
+instance (OutputableBndrId name, HasOccNameId name)
+       => Outputable (ForeignDecl name) where
   ppr (ForeignImport { fd_name = n, fd_sig_ty = ty, fd_fi = fimport })
     = hang (text "foreign import" <+> ppr fimport <+> ppr n)
          2 (dcolon <+> ppr ty)
@@ -1682,24 +1731,32 @@ instance (OutputableBndrId name) => Outputable (ForeignDecl name) where
        2 (dcolon <+> ppr ty)
 
 instance Outputable ForeignImport where
-  ppr (CImport  cconv safety mHeader spec _) =
-    ppr cconv <+> ppr safety <+>
-    char '"' <> pprCEntity spec <> char '"'
+  ppr (CImport  cconv safety mHeader spec (L _ srcText)) =
+    ppr cconv <+> ppr safety
+      <+> pprWithSourceText srcText (pprCEntity spec "")
     where
       pp_hdr = case mHeader of
                Nothing -> empty
                Just (Header _ header) -> ftext header
 
-      pprCEntity (CLabel lbl) =
-        text "static" <+> pp_hdr <+> char '&' <> ppr lbl
-      pprCEntity (CFunction (StaticTarget _ lbl _ isFun)) =
-            text "static"
-        <+> pp_hdr
-        <+> (if isFun then empty else text "value")
-        <+> ppr lbl
-      pprCEntity (CFunction (DynamicTarget)) =
-        text "dynamic"
-      pprCEntity (CWrapper) = text "wrapper"
+      pprCEntity (CLabel lbl) _ =
+        doubleQuotes $ text "static" <+> pp_hdr <+> char '&' <> ppr lbl
+      pprCEntity (CFunction (StaticTarget st _lbl _ isFun)) src =
+        if dqNeeded then doubleQuotes ce else empty
+          where
+            dqNeeded = (take 6 src == "static")
+                    || isJust mHeader
+                    || not isFun
+                    || st /= NoSourceText
+            ce =
+                  -- We may need to drop leading spaces first
+                  (if take 6 src == "static" then text "static" else empty)
+              <+> pp_hdr
+              <+> (if isFun then empty else text "value")
+              <+> (pprWithSourceText st empty)
+      pprCEntity (CFunction DynamicTarget) _ =
+        doubleQuotes $ text "dynamic"
+      pprCEntity CWrapper _ = doubleQuotes $ text "wrapper"
 
 instance Outputable ForeignExport where
   ppr (CExport  (L _ (CExportStatic _ lbl cconv)) _) =
@@ -1769,24 +1826,28 @@ collectRuleBndrSigTys :: [RuleBndr name] -> [LHsSigWcType name]
 collectRuleBndrSigTys bndrs = [ty | RuleBndrSig _ ty <- bndrs]
 
 pprFullRuleName :: Located (SourceText, RuleName) -> SDoc
-pprFullRuleName (L _ (_, n)) = doubleQuotes $ ftext n
+pprFullRuleName (L _ (st, n)) = pprWithSourceText st (doubleQuotes $ ftext n)
 
-instance (OutputableBndrId name) => Outputable (RuleDecls name) where
-  ppr (HsRules _ rules) = ppr rules
+instance (OutputableBndrId name, HasOccNameId name)
+       => Outputable (RuleDecls name) where
+  ppr (HsRules st rules)
+    = pprWithSourceText st (text "{-# RULES")
+          <+> vcat (punctuate semi (map ppr rules)) <+> text "#-}"
 
-instance (OutputableBndrId name) => Outputable (RuleDecl name) where
+instance (OutputableBndrId name, HasOccNameId name)
+       => Outputable (RuleDecl name) where
   ppr (HsRule name act ns lhs _fv_lhs rhs _fv_rhs)
-        = sep [text "{-# RULES" <+> pprFullRuleName name
-                                <+> ppr act,
+        = sep [pprFullRuleName name <+> ppr act,
                nest 4 (pp_forall <+> pprExpr (unLoc lhs)),
-               nest 4 (equals <+> pprExpr (unLoc rhs) <+> text "#-}") ]
+               nest 6 (equals <+> pprExpr (unLoc rhs)) ]
         where
           pp_forall | null ns   = empty
                     | otherwise = forAllLit <+> fsep (map ppr ns) <> dot
 
-instance (OutputableBndrId name) => Outputable (RuleBndr name) where
+instance (OutputableBndrId name, HasOccNameId name)
+        => Outputable (RuleBndr name) where
    ppr (RuleBndr name) = ppr name
-   ppr (RuleBndrSig name ty) = ppr name <> dcolon <> ppr ty
+   ppr (RuleBndrSig name ty) = parens (ppr name <> dcolon <> ppr ty)
 
 {-
 ************************************************************************
@@ -1871,7 +1932,8 @@ lvectInstDecl (L _ (HsVectInstIn _))  = True
 lvectInstDecl (L _ (HsVectInstOut _)) = True
 lvectInstDecl _                       = False
 
-instance (OutputableBndrId name) => Outputable (VectDecl name) where
+instance (OutputableBndrId name, HasOccNameId name)
+       => Outputable (VectDecl name) where
   ppr (HsVect _ v rhs)
     = sep [text "{-# VECTORISE" <+> ppr v,
            nest 4 $
@@ -1960,11 +2022,14 @@ data WarnDecl name = Warning [Located name] WarningTxt
   deriving Data
 
 instance OutputableBndr name => Outputable (WarnDecls name) where
-    ppr (Warnings _ decls) = ppr decls
+    ppr (Warnings (SourceText src) decls)
+      = text src <+> vcat (punctuate comma (map ppr decls)) <+> text "#-}"
+    ppr (Warnings NoSourceText _decls) = panic "WarnDecls"
 
 instance OutputableBndr name => Outputable (WarnDecl name) where
     ppr (Warning thing txt)
-      = hsep [text "{-# DEPRECATED", ppr thing, doubleQuotes (ppr txt), text "#-}"]
+      = hsep ( punctuate comma (map ppr thing))
+              <+> ppr txt
 
 {-
 ************************************************************************
@@ -1989,7 +2054,8 @@ data AnnDecl name = HsAnnotation
       -- For details on above see note [Api annotations] in ApiAnnotation
 deriving instance (DataId name) => Data (AnnDecl name)
 
-instance (OutputableBndrId name) => Outputable (AnnDecl name) where
+instance (OutputableBndrId name, HasOccNameId name)
+       => Outputable (AnnDecl name) where
     ppr (HsAnnotation _ provenance expr)
       = hsep [text "{-#", pprAnnProvenance provenance, pprExpr (unLoc expr), text "#-}"]
 

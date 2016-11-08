@@ -1,0 +1,73 @@
+
+Ppr039.hs:4:12: error: Variable not in scope: test1 :: Bool
+
+Ppr039.hs:4:21: error:
+    • Variable not in scope: e1
+    • Perhaps you meant ‘x1’ (line 15)
+
+Ppr039.hs:5:12: error: Variable not in scope: test2 :: t0 -> Bool
+
+Ppr039.hs:5:18: error: Variable not in scope: witharg
+
+Ppr039.hs:5:29: error:
+    • Variable not in scope: e2
+    • Perhaps you meant ‘x2’ (line 16)
+
+Ppr039.hs:6:25: error: Variable not in scope: def
+
+Ppr039.hs:8:14: error: Variable not in scope: test1 :: Bool
+
+Ppr039.hs:8:30: error: Variable not in scope: test2 :: Bool
+
+Ppr039.hs:8:39: error:
+    • Variable not in scope: e1
+    • Perhaps you meant ‘x1’ (line 15)
+
+Ppr039.hs:9:30: error: Variable not in scope: test3 :: Bool
+
+Ppr039.hs:9:39: error:
+    • Variable not in scope: e2
+    • Perhaps you meant ‘x2’ (line 16)
+
+Ppr039.hs:10:14: error: Variable not in scope: test4 :: Bool
+
+Ppr039.hs:10:23: error:
+    • Variable not in scope: e3
+    • Perhaps you meant ‘x3’ (line 18)
+
+Ppr039.ppr.hs:4:10: error: Variable not in scope: test1 :: Bool
+
+Ppr039.ppr.hs:4:19: error:
+    • Variable not in scope: e1
+    • Perhaps you meant ‘x1’ (line 13)
+
+Ppr039.ppr.hs:5:10: error:
+    Variable not in scope: test2 :: t0 -> Bool
+
+Ppr039.ppr.hs:5:16: error: Variable not in scope: witharg
+
+Ppr039.ppr.hs:5:27: error:
+    • Variable not in scope: e2
+    • Perhaps you meant ‘x2’ (line 16)
+
+Ppr039.ppr.hs:6:23: error: Variable not in scope: def
+
+Ppr039.ppr.hs:8:10: error: Variable not in scope: test1 :: Bool
+
+Ppr039.ppr.hs:9:20: error: Variable not in scope: test2 :: Bool
+
+Ppr039.ppr.hs:9:29: error:
+    • Variable not in scope: e1
+    • Perhaps you meant ‘x1’ (line 13)
+
+Ppr039.ppr.hs:10:20: error: Variable not in scope: test3 :: Bool
+
+Ppr039.ppr.hs:10:29: error:
+    • Variable not in scope: e2
+    • Perhaps you meant ‘x2’ (line 16)
+
+Ppr039.ppr.hs:11:10: error: Variable not in scope: test4 :: Bool
+
+Ppr039.ppr.hs:11:19: error:
+    • Variable not in scope: e3
+    • Perhaps you meant ‘x3’ (line 19)

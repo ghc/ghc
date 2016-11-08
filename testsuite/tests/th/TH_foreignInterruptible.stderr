@@ -8,5 +8,4 @@ TH_foreignInterruptible.hs:8:3-100: Splicing declarations
             (mkName "foo")
             (AppT (ConT ''Ptr) (ConT ''())))]
   ======>
-    foreign import ccall interruptible "static &foo" foo
-      :: Ptr GHC.Tuple.()
+    foreign import ccall interruptible "&" foo :: Ptr GHC.Tuple.()

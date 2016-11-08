@@ -885,7 +885,7 @@ mkOneRecordSelector all_cons idDetails fl
     inst_tys = substTyVars eq_subst univ_tvs
 
     unit_rhs = mkLHsTupleExpr []
-    msg_lit = HsStringPrim "" (fastStringToByteString lbl)
+    msg_lit = HsStringPrim NoSourceText (fastStringToByteString lbl)
 
 {-
 Note [Polymorphic selectors]

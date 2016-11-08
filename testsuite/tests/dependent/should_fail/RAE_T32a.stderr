@@ -15,5 +15,5 @@ RAE_T32a.hs:28:20: error:
 
 RAE_T32a.hs:28:27: error:
     Expected kind ‘Sigma’, but ‘Sigma p r’ has kind ‘*’
-    In the second argument of ‘Sing’, namely ‘Sigma p r’
+    In the second argument of ‘Sing’, namely ‘(Sigma p r)’
     In the data instance declaration for ‘Sing’

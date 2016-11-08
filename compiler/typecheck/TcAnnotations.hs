@@ -65,6 +65,6 @@ annProvenanceToTarget _   (TypeAnnProvenance (L _ name))  = NamedTarget name
 annProvenanceToTarget mod ModuleAnnProvenance             = ModuleTarget mod
 #endif
 
-annCtxt :: (OutputableBndrId id) => AnnDecl id -> SDoc
+annCtxt :: (OutputableBndrId id, HasOccNameId id) => AnnDecl id -> SDoc
 annCtxt ann
   = hang (text "In the annotation:") 2 (ppr ann)

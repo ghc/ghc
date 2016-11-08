@@ -34,6 +34,7 @@ module Inst (
 import {-# SOURCE #-}   TcExpr( tcPolyExpr, tcSyntaxOp )
 import {-# SOURCE #-}   TcUnify( unifyType, unifyKind, noThing )
 
+import BasicTypes ( SourceText(..) )
 import FastString
 import HsSyn
 import TcHsSyn
@@ -639,9 +640,9 @@ getOverlapFlag overlap_mode
               incoherent_ok = xopt LangExt.IncoherentInstances  dflags
               use x = OverlapFlag { isSafeOverlap = safeLanguageOn dflags
                                   , overlapMode   = x }
-              default_oflag | incoherent_ok = use (Incoherent "")
-                            | overlap_ok    = use (Overlaps "")
-                            | otherwise     = use (NoOverlap "")
+              default_oflag | incoherent_ok = use (Incoherent NoSourceText)
+                            | overlap_ok    = use (Overlaps NoSourceText)
+                            | otherwise     = use (NoOverlap NoSourceText)
 
               final_oflag = setOverlapModeMaybe default_oflag overlap_mode
         ; return final_oflag }

@@ -24,6 +24,7 @@ module HsTypes (
         HsWildCardBndrs(..),
         LHsSigType, LHsSigWcType, LHsWcType,
         HsTupleSort(..),
+        Promoted(..),
         HsContext, LHsContext,
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
@@ -70,7 +71,7 @@ module HsTypes (
 import {-# SOURCE #-} HsExpr ( HsSplice, pprSplice )
 
 import PlaceHolder ( PostTc,PostRn,DataId,PlaceHolder(..),
-                     OutputableBndrId )
+                     OutputableBndrId, HasOccNameId )
 
 import Id ( Id )
 import Name( Name )
@@ -112,7 +113,7 @@ getBangType ty                    = ty
 
 getBangStrictness :: LHsType a -> HsSrcBang
 getBangStrictness (L _ (HsBangTy s _)) = s
-getBangStrictness _ = (HsSrcBang Nothing NoSrcUnpack NoSrcStrict)
+getBangStrictness _ = (HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict)
 
 {-
 ************************************************************************
@@ -432,7 +433,9 @@ data HsType name
       { hst_ctxt :: LHsContext name       -- Context C => blah
       , hst_body :: LHsType name }
 
-  | HsTyVar    (Located name)
+  | HsTyVar             Promoted -- whether explictly promoted, for the pretty
+                                 -- printer
+                        (Located name)
                   -- Type variable, type constructor, or data constructor
                   -- see Note [Promotions (HsTyVar)]
                   -- See Note [Located RdrNames] in HsExpr
@@ -440,7 +443,7 @@ data HsType name
 
       -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsAppsTy            [LHsAppType name]  -- Used only before renaming,
+  | HsAppsTy            [LHsAppType name] -- Used only before renaming,
                                           -- Note [HsAppsTy]
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
@@ -555,6 +558,7 @@ data HsType name
       -- For details on above see note [Api annotations] in ApiAnnotation
 
   | HsExplicitListTy       -- A promoted explicit list
+        Promoted           -- whether explcitly promoted, for pretty printer
         (PostTc name Kind) -- See Note [Promoted lists and tuples]
         [LHsType name]
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @"'["@,
@@ -606,7 +610,8 @@ data HsAppType name
   | HsAppPrefix (LHsType name)      -- anything else, including things like (+)
 deriving instance (DataId name) => Data (HsAppType name)
 
-instance (OutputableBndrId name) => Outputable (HsAppType name) where
+instance (OutputableBndrId name, HasOccNameId name)
+        => Outputable (HsAppType name) where
   ppr = ppr_app_ty TopPrec
 
 {-
@@ -660,6 +665,9 @@ HsTyVar: A name in a type or kind.
       Var, Data: not allowed
       Tv: kind variable
       TcCls: kind constructor or promoted type constructor
+
+  The 'Promoted' field in an HsTyVar captures whether the type was promoted in
+  the source code by prefixing an apostrophe.
 
 Note [HsAppsTy]
 ~~~~~~~~~~~~~~~
@@ -724,6 +732,11 @@ data HsTupleSort = HsUnboxedTuple
                  deriving Data
 
 
+-- | Promoted data types.
+data Promoted = Promoted
+              | NotPromoted
+              deriving (Data, Eq, Show)
+
 -- | Located Constructor Declaration Field
 type LConDeclField name = Located (ConDeclField name)
       -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma' when
@@ -742,7 +755,8 @@ data ConDeclField name  -- Record fields have Haddoc docs on them
       -- For details on above see note [Api annotations] in ApiAnnotation
 deriving instance (DataId name) => Data (ConDeclField name)
 
-instance (OutputableBndrId name) => Outputable (ConDeclField name) where
+instance (OutputableBndrId name, HasOccNameId name)
+       => Outputable (ConDeclField name) where
   ppr (ConDeclField fld_n fld_ty _) = ppr fld_n <+> dcolon <+> ppr fld_ty
 
 -- HsConDetails is used for patterns/expressions *and* for data type
@@ -873,9 +887,9 @@ hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvExplicit qtvs)
 -- | Convert a LHsTyVarBndr to an equivalent LHsType.
 hsLTyVarBndrToType :: LHsTyVarBndr name -> LHsType name
 hsLTyVarBndrToType = fmap cvt
-  where cvt (UserTyVar n)                     = HsTyVar n
+  where cvt (UserTyVar n) = HsTyVar NotPromoted n
         cvt (KindedTyVar (L name_loc n) kind)
-                   = HsKindSig (L name_loc (HsTyVar (L name_loc n))) kind
+          = HsKindSig (L name_loc (HsTyVar NotPromoted (L name_loc n))) kind
 
 -- | Convert a LHsTyVarBndrs to a list of types.
 -- Works on *type* variable only, no kind vars.
@@ -942,7 +956,7 @@ splitHsFunType (L _ (HsFunTy x y))
 splitHsFunType orig_ty@(L _ (HsAppTy t1 t2))
   = go t1 [t2]
   where  -- Look for (->) t1 t2, possibly with parenthesisation
-    go (L _ (HsTyVar (L _ fn))) tys | fn == funTyConName
+    go (L _ (HsTyVar _ (L _ fn))) tys | fn == funTyConName
                                  , [t1,t2] <- tys
                                  , (args, res) <- splitHsFunType t2
                                  = (t1:args, res)
@@ -960,7 +974,8 @@ getAppsTyHead_maybe tys = case splitHsAppsTy tys of
   ([app1:apps], []) ->  -- no symbols, some normal types
     Just (mkHsAppTys app1 apps, [])
   ([app1l:appsl, app1r:appsr], [L loc op]) ->  -- one operator
-    Just (L loc (HsTyVar (L loc op)), [mkHsAppTys app1l appsl, mkHsAppTys app1r appsr])
+    Just ( L loc (HsTyVar NotPromoted (L loc op))
+         , [mkHsAppTys app1l appsl, mkHsAppTys app1r appsr])
   _ -> -- can't figure it out
     Nothing
 
@@ -986,7 +1001,7 @@ splitHsAppsTy = go [] [] []
 hsTyGetAppHead_maybe :: LHsType name -> Maybe (Located name, [LHsType name])
 hsTyGetAppHead_maybe = go []
   where
-    go tys (L _ (HsTyVar ln))           = Just (ln, tys)
+    go tys (L _ (HsTyVar _ ln))          = Just (ln, tys)
     go tys (L _ (HsAppsTy apps))
       | Just (head, args) <- getAppsTyHead_maybe apps
                                          = go (args ++ tys) head
@@ -1137,16 +1152,19 @@ ambiguousFieldOcc (FieldOcc rdr sel) = Unambiguous rdr sel
 ************************************************************************
 -}
 
-instance (OutputableBndrId name) => Outputable (HsType name) where
+instance (OutputableBndrId name, HasOccNameId name)
+       => Outputable (HsType name) where
     ppr ty = pprHsType ty
 
 instance Outputable HsTyLit where
     ppr = ppr_tylit
 
-instance (OutputableBndrId name) => Outputable (LHsQTyVars name) where
+instance (OutputableBndrId name, HasOccNameId name)
+        => Outputable (LHsQTyVars name) where
     ppr (HsQTvs { hsq_explicit = tvs }) = interppSP tvs
 
-instance (OutputableBndrId name) => Outputable (HsTyVarBndr name) where
+instance (OutputableBndrId name, HasOccNameId name)
+          => Outputable (HsTyVarBndr name) where
     ppr (UserTyVar n)     = ppr n
     ppr (KindedTyVar n k) = parens $ hsep [ppr n, dcolon, ppr k]
 
@@ -1159,7 +1177,7 @@ instance (Outputable thing) => Outputable (HsWildCardBndrs name thing) where
 instance Outputable (HsWildCardInfo name) where
     ppr (AnonWildCard _)  = char '_'
 
-pprHsForAll :: (OutputableBndrId name)
+pprHsForAll :: (OutputableBndrId name, HasOccNameId name)
             => [LHsTyVarBndr name] -> LHsContext name -> SDoc
 pprHsForAll = pprHsForAllExtra Nothing
 
@@ -1170,7 +1188,7 @@ pprHsForAll = pprHsForAllExtra Nothing
 -- function for this is needed, as the extra-constraints wildcard is removed
 -- from the actual context and type, and stored in a separate field, thus just
 -- printing the type will not print the extra-constraints wildcard.
-pprHsForAllExtra :: (OutputableBndrId name)
+pprHsForAllExtra :: (OutputableBndrId name, HasOccNameId name)
                  => Maybe SrcSpan -> [LHsTyVarBndr name] -> LHsContext name
                  -> SDoc
 pprHsForAllExtra extra qtvs cxt
@@ -1178,26 +1196,38 @@ pprHsForAllExtra extra qtvs cxt
   where
     show_extra = isJust extra
 
-pprHsForAllTvs :: (OutputableBndrId name) => [LHsTyVarBndr name] -> SDoc
+pprHsForAllTvs :: (OutputableBndrId name, HasOccNameId name)
+               => [LHsTyVarBndr name] -> SDoc
 pprHsForAllTvs qtvs
   | show_forall = forAllLit <+> interppSP qtvs <> dot
   | otherwise   = empty
   where
     show_forall = opt_PprStyle_Debug || not (null qtvs)
 
-pprHsContext :: (OutputableBndrId name) => HsContext name -> SDoc
+pprHsContext :: (OutputableBndrId name, HasOccNameId name)
+             => HsContext name -> SDoc
 pprHsContext = maybe empty (<+> darrow) . pprHsContextMaybe
 
-pprHsContextNoArrow :: (OutputableBndrId name) => HsContext name -> SDoc
+pprHsContextNoArrow :: (OutputableBndrId name, HasOccNameId name)
+                    => HsContext name -> SDoc
 pprHsContextNoArrow = fromMaybe empty . pprHsContextMaybe
 
-pprHsContextMaybe :: (OutputableBndrId name) => HsContext name -> Maybe SDoc
+pprHsContextMaybe :: (OutputableBndrId name, HasOccNameId name)
+                  => HsContext name -> Maybe SDoc
 pprHsContextMaybe []         = Nothing
 pprHsContextMaybe [L _ pred] = Just $ ppr_mono_ty FunPrec pred
 pprHsContextMaybe cxt        = Just $ parens (interpp'SP cxt)
 
+-- For use in a HsQualTy, which always gets printed if it exists.
+pprHsContextAlways :: (OutputableBndrId name, HasOccNameId name)
+                  => HsContext name -> SDoc
+pprHsContextAlways []  = parens empty <+> darrow
+pprHsContextAlways [L _ ty] = ppr_mono_ty FunPrec ty <+> darrow
+pprHsContextAlways cxt = parens (interpp'SP cxt) <+> darrow
+
 -- True <=> print an extra-constraints wildcard, e.g. @(Show a, _) =>@
-pprHsContextExtra :: (OutputableBndrId name) => Bool -> HsContext name -> SDoc
+pprHsContextExtra :: (OutputableBndrId name, HasOccNameId name)
+                  => Bool -> HsContext name -> SDoc
 pprHsContextExtra show_extra ctxt
   | not show_extra
   = pprHsContext ctxt
@@ -1208,7 +1238,8 @@ pprHsContextExtra show_extra ctxt
   where
     ctxt' = map ppr ctxt ++ [char '_']
 
-pprConDeclFields :: (OutputableBndrId name) => [LConDeclField name] -> SDoc
+pprConDeclFields :: (OutputableBndrId name, HasOccNameId name)
+                 => [LConDeclField name] -> SDoc
 pprConDeclFields fields = braces (sep (punctuate comma (map ppr_fld fields)))
   where
     ppr_fld (L _ (ConDeclField { cd_fld_names = ns, cd_fld_type = ty,
@@ -1232,32 +1263,32 @@ seems like the Right Thing anyway.)
 
 -- Printing works more-or-less as for Types
 
-pprHsType, pprParendHsType :: (OutputableBndrId name) => HsType name -> SDoc
+pprHsType, pprParendHsType :: (OutputableBndrId name, HasOccNameId name)
+                           => HsType name -> SDoc
 
-pprHsType ty       = ppr_mono_ty TopPrec (prepare ty)
+pprHsType ty       = ppr_mono_ty TopPrec ty
 pprParendHsType ty = ppr_mono_ty TyConPrec ty
 
--- Before printing a type, remove outermost HsParTy parens
-prepare :: HsType name -> HsType name
-prepare (HsParTy ty)                            = prepare (unLoc ty)
-prepare (HsAppsTy [L _ (HsAppPrefix (L _ ty))]) = prepare ty
-prepare ty                                      = ty
-
-ppr_mono_lty :: (OutputableBndrId name) => TyPrec -> LHsType name -> SDoc
+ppr_mono_lty :: (OutputableBndrId name, HasOccNameId name)
+             => TyPrec -> LHsType name -> SDoc
 ppr_mono_lty ctxt_prec ty = ppr_mono_ty ctxt_prec (unLoc ty)
 
-ppr_mono_ty :: (OutputableBndrId name) => TyPrec -> HsType name -> SDoc
+ppr_mono_ty :: (OutputableBndrId name, HasOccNameId name)
+            => TyPrec -> HsType name -> SDoc
 ppr_mono_ty ctxt_prec (HsForAllTy { hst_bndrs = tvs, hst_body = ty })
   = maybeParen ctxt_prec FunPrec $
     sep [pprHsForAllTvs tvs, ppr_mono_lty TopPrec ty]
 
-ppr_mono_ty ctxt_prec (HsQualTy { hst_ctxt = L _ ctxt, hst_body = ty })
-  = maybeParen ctxt_prec FunPrec $
-    sep [pprHsContext ctxt, ppr_mono_lty TopPrec ty]
+ppr_mono_ty _ctxt_prec (HsQualTy { hst_ctxt = L _ ctxt, hst_body = ty })
+  = sep [pprHsContextAlways ctxt, ppr_mono_lty TopPrec ty]
 
 ppr_mono_ty _    (HsBangTy b ty)     = ppr b <> ppr_mono_lty TyConPrec ty
 ppr_mono_ty _    (HsRecTy flds)      = pprConDeclFields flds
-ppr_mono_ty _    (HsTyVar (L _ name))= pprPrefixOcc name
+ppr_mono_ty _    (HsTyVar NotPromoted (L _ name))= pprPrefixOcc name
+ppr_mono_ty _    (HsTyVar Promoted (L _ name))
+  = space <> quote (pprPrefixOcc name)
+                         -- We need a space before the ' above, so the parser
+                         -- does not attach it to the previous symbol
 ppr_mono_ty prec (HsFunTy ty1 ty2)   = ppr_fun_ty prec ty1 ty2
 ppr_mono_ty _    (HsTupleTy con tys) = tupleParens std_con (pprWithCommas ppr tys)
   where std_con = case con of
@@ -1270,7 +1301,10 @@ ppr_mono_ty _    (HsPArrTy ty)       = paBrackets (ppr_mono_lty TopPrec ty)
 ppr_mono_ty prec (HsIParamTy n ty)   = maybeParen prec FunPrec (ppr n <+> dcolon <+> ppr_mono_lty TopPrec ty)
 ppr_mono_ty _    (HsSpliceTy s _)    = pprSplice s
 ppr_mono_ty _    (HsCoreTy ty)       = ppr ty
-ppr_mono_ty _    (HsExplicitListTy _ tys)  = quote $ brackets (interpp'SP tys)
+ppr_mono_ty _    (HsExplicitListTy Promoted _ tys)
+  = quote $ brackets (interpp'SP tys)
+ppr_mono_ty _    (HsExplicitListTy NotPromoted _ tys)
+  = brackets (interpp'SP tys)
 ppr_mono_ty _    (HsExplicitTupleTy _ tys) = quote $ parens (interpp'SP tys)
 ppr_mono_ty _    (HsTyLit t)         = ppr_tylit t
 ppr_mono_ty _    (HsWildCardTy {})   = char '_'
@@ -1279,13 +1313,11 @@ ppr_mono_ty ctxt_prec (HsEqTy ty1 ty2)
   = maybeParen ctxt_prec TyOpPrec $
     ppr_mono_lty TyOpPrec ty1 <+> char '~' <+> ppr_mono_lty TyOpPrec ty2
 
-ppr_mono_ty ctxt_prec (HsAppsTy tys)
-  = maybeParen ctxt_prec TyConPrec $
-    hsep (map (ppr_app_ty TopPrec . unLoc) tys)
+ppr_mono_ty _ctxt_prec (HsAppsTy tys)
+  = hsep (map (ppr_app_ty TopPrec . unLoc) tys)
 
-ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty)
-  = maybeParen ctxt_prec TyConPrec $
-    hsep [ppr_mono_lty FunPrec fun_ty, ppr_mono_lty TyConPrec arg_ty]
+ppr_mono_ty _ctxt_prec (HsAppTy fun_ty arg_ty)
+  = hsep [ppr_mono_lty FunPrec fun_ty, ppr_mono_lty TyConPrec arg_ty]
 
 ppr_mono_ty ctxt_prec (HsOpTy ty1 (L _ op) ty2)
   = maybeParen ctxt_prec TyOpPrec $
@@ -1305,7 +1337,7 @@ ppr_mono_ty ctxt_prec (HsDocTy ty doc)
   -- postfix operators
 
 --------------------------
-ppr_fun_ty :: (OutputableBndrId name)
+ppr_fun_ty :: (OutputableBndrId name, HasOccNameId name)
            => TyPrec -> LHsType name -> LHsType name -> SDoc
 ppr_fun_ty ctxt_prec ty1 ty2
   = let p1 = ppr_mono_lty FunPrec ty1
@@ -1315,9 +1347,15 @@ ppr_fun_ty ctxt_prec ty1 ty2
     sep [p1, text "->" <+> p2]
 
 --------------------------
-ppr_app_ty :: (OutputableBndrId name) => TyPrec -> HsAppType name -> SDoc
+ppr_app_ty :: (OutputableBndrId name, HasOccNameId name)
+           => TyPrec -> HsAppType name -> SDoc
 ppr_app_ty _    (HsAppInfix (L _ n))                  = pprInfixOcc n
-ppr_app_ty _    (HsAppPrefix (L _ (HsTyVar (L _ n)))) = pprPrefixOcc n
+ppr_app_ty _    (HsAppPrefix (L _ (HsTyVar NotPromoted (L _ n))))
+  = pprPrefixOcc n
+ppr_app_ty _    (HsAppPrefix (L _ (HsTyVar Promoted  (L _ n))))
+  = space <> quote (pprPrefixOcc n) -- We need a space before the ' above, so
+                                    -- the parser does not attach it to the
+                                    -- previous symbol
 ppr_app_ty ctxt (HsAppPrefix ty)                      = ppr_mono_lty ctxt ty
 
 --------------------------
