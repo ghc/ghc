@@ -57,14 +57,12 @@ typedef struct {
 #define _HNF (1<<0)  /* head normal form?    */
 #define _BTM (1<<1)  /* uses info->layout.bitmap */
 #define _NS  (1<<2)  /* non-sparkable        */
-#define _STA (1<<3)  /* static?              */
-#define _THU (1<<4)  /* thunk?               */
-#define _MUT (1<<5)  /* mutable?             */
-#define _UPT (1<<6)  /* unpointed?           */
-#define _SRT (1<<7)  /* has an SRT?          */
-#define _IND (1<<8)  /* is an indirection?   */
+#define _THU (1<<3)  /* thunk?               */
+#define _MUT (1<<4)  /* mutable?             */
+#define _UPT (1<<5)  /* unpointed?           */
+#define _SRT (1<<6)  /* has an SRT?          */
+#define _IND (1<<7)  /* is an indirection?   */
 
-#define isSTATIC(flags)    ((flags) &_STA)
 #define isMUTABLE(flags)   ((flags) &_MUT)
 #define isBITMAP(flags)    ((flags) &_BTM)
 #define isTHUNK(flags)     ((flags) &_THU)
@@ -80,7 +78,6 @@ extern StgWord16 closure_flags[];
 #define closure_BITMAP(c)       (  closureFlags(c) & _BTM)
 #define closure_NON_SPARK(c)    ( (closureFlags(c) & _NS))
 #define closure_SHOULD_SPARK(c) (!(closureFlags(c) & _NS))
-#define closure_STATIC(c)       (  closureFlags(c) & _STA)
 #define closure_THUNK(c)        (  closureFlags(c) & _THU)
 #define closure_MUTABLE(c)      (  closureFlags(c) & _MUT)
 #define closure_UNPOINTED(c)    (  closureFlags(c) & _UPT)
@@ -93,7 +90,6 @@ extern StgWord16 closure_flags[];
 #define ip_HNF(ip)               (  ipFlags(ip) & _HNF)
 #define ip_BITMAP(ip)            (  ipFlags(ip) & _BTM)
 #define ip_SHOULD_SPARK(ip)      (!(ipFlags(ip) & _NS))
-#define ip_STATIC(ip)            (  ipFlags(ip) & _STA)
 #define ip_THUNK(ip)             (  ipFlags(ip) & _THU)
 #define ip_MUTABLE(ip)           (  ipFlags(ip) & _MUT)
 #define ip_UNPOINTED(ip)         (  ipFlags(ip) & _UPT)

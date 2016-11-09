@@ -128,10 +128,9 @@ processHeapClosureForDead( const StgClosure *c )
         */
         // static objects
     case IND_STATIC:
-    case CONSTR_STATIC:
     case FUN_STATIC:
     case THUNK_STATIC:
-    case CONSTR_NOCAF_STATIC:
+    case CONSTR_NOCAF:
         // stack objects
     case UPDATE_FRAME:
     case CATCH_FRAME:

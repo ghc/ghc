@@ -177,6 +177,7 @@ data SMRep
 
 -- | True <=> This is a static closure.  Affects how we garbage-collect it.
 -- Static closure have an extra static link field at the end.
+-- Constructors do not have a static variant; see Note [static constructors]
 type IsStatic = Bool
 
 -- From an SMRep you can get to the closure type defined in
@@ -287,10 +288,10 @@ isFunRep (HeapRep _ _ _ Fun{}) = True
 isFunRep _                     = False
 
 isStaticNoCafCon :: SMRep -> Bool
--- This should line up exactly with CONSTR_NOCAF_STATIC above
+-- This should line up exactly with CONSTR_NOCAF below
 -- See Note [Static NoCaf constructors]
-isStaticNoCafCon (HeapRep True 0 _ Constr{}) = True
-isStaticNoCafCon _                           = False
+isStaticNoCafCon (HeapRep _ 0 _ Constr{}) = True
+isStaticNoCafCon _                        = False
 
 
 -----------------------------------------------------------------------------
@@ -428,12 +429,15 @@ rtsClosureType rep
     = case rep of
       RTSRep ty _ -> ty
 
-      HeapRep False 1 0 Constr{} -> CONSTR_1_0
-      HeapRep False 0 1 Constr{} -> CONSTR_0_1
-      HeapRep False 2 0 Constr{} -> CONSTR_2_0
-      HeapRep False 1 1 Constr{} -> CONSTR_1_1
-      HeapRep False 0 2 Constr{} -> CONSTR_0_2
-      HeapRep False _ _ Constr{} -> CONSTR
+      -- See Note [static constructors]
+      HeapRep _     1 0 Constr{} -> CONSTR_1_0
+      HeapRep _     0 1 Constr{} -> CONSTR_0_1
+      HeapRep _     2 0 Constr{} -> CONSTR_2_0
+      HeapRep _     1 1 Constr{} -> CONSTR_1_1
+      HeapRep _     0 2 Constr{} -> CONSTR_0_2
+      HeapRep _     0 _ Constr{} -> CONSTR_NOCAF
+           -- See Note [Static NoCaf constructors]
+      HeapRep _     _ _ Constr{} -> CONSTR
 
       HeapRep False 1 0 Fun{} -> FUN_1_0
       HeapRep False 0 1 Fun{} -> FUN_0_1
@@ -451,10 +455,6 @@ rtsClosureType rep
 
       HeapRep False _ _ ThunkSelector{} ->  THUNK_SELECTOR
 
-      -- Approximation: we use the CONSTR_NOCAF_STATIC type for static
-      -- constructors -- that have no pointer words only.
-      HeapRep True 0 _ Constr{} -> CONSTR_NOCAF_STATIC  -- See isStaticNoCafCon below
-      HeapRep True _ _ Constr{} -> CONSTR_STATIC
       HeapRep True _ _ Fun{}    -> FUN_STATIC
       HeapRep True _ _ Thunk{}  -> THUNK_STATIC
 
@@ -472,6 +472,34 @@ aRG_GEN     = ARG_GEN
 aRG_GEN_BIG = ARG_GEN_BIG
 
 {-
+Note [static constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We used to have a CONSTR_STATIC closure type, and each constructor had
+two info tables: one with CONSTR (or CONSTR_1_0 etc.), and one with
+CONSTR_STATIC.
+
+This distinction was removed, because when copying a data structure
+into a compact region, we must copy static constructors into the
+compact region too.  If we didn't do this, we would need to track the
+references from the compact region out to the static constructors,
+because they might (indirectly) refer to CAFs.
+
+Since static constructors will be copied to the heap, if we wanted to
+use different info tables for static and dynamic constructors, we
+would have to switch the info pointer when copying the constructor
+into the compact region, which means we would need an extra field of
+the static info table to point to the dynamic one.
+
+However, since the distinction between static and dynamic closure
+types is never actually needed (other than for assertions), we can
+just drop the distinction and use the same info table for both.
+
+The GC *does* need to distinguish between static and dynamic closures,
+but it does this using the HEAP_ALLOCED() macro which checks whether
+the address of the closure resides within the dynamic heap.
+HEAP_ALLOCED() doesn't read the closure's info table.
+
 Note [Static NoCaf constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we know that a top-level binding 'x' is not Caffy (ie no CAFs are

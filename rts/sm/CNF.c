@@ -621,8 +621,7 @@ simple_scavenge_block (Capability            *cap,
 
         case CONSTR:
         case PRIM:
-        case CONSTR_NOCAF_STATIC:
-        case CONSTR_STATIC:
+        case CONSTR_NOCAF:
         {
             StgPtr end;
 
@@ -705,8 +704,7 @@ objectIsWHNFData (StgClosure *what)
     case CONSTR_2_0:
     case CONSTR_1_1:
     case CONSTR_0_2:
-    case CONSTR_STATIC:
-    case CONSTR_NOCAF_STATIC:
+    case CONSTR_NOCAF:
     case ARR_WORDS:
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
@@ -776,8 +774,7 @@ verify_consistency_block (StgCompactNFData *str, StgCompactNFDataBlock *block)
 
         case CONSTR:
         case PRIM:
-        case CONSTR_STATIC:
-        case CONSTR_NOCAF_STATIC:
+        case CONSTR_NOCAF:
         {
             uint32_t i;
 
@@ -1108,8 +1105,7 @@ fixup_block(StgCompactNFDataBlock *block, StgWord *fixup_table, uint32_t count)
 
         case CONSTR:
         case PRIM:
-        case CONSTR_STATIC:
-        case CONSTR_NOCAF_STATIC:
+        case CONSTR_NOCAF:
         {
             StgPtr end;
 

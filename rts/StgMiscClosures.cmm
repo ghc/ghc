@@ -13,8 +13,8 @@
 #include "Cmm.h"
 
 import pthread_mutex_lock;
-import ghczmprim_GHCziTypes_Czh_static_info;
-import ghczmprim_GHCziTypes_Izh_static_info;
+import ghczmprim_GHCziTypes_Czh_info;
+import ghczmprim_GHCziTypes_Izh_info;
 import EnterCriticalSection;
 import LeaveCriticalSection;
 
@@ -423,7 +423,7 @@ INFO_TABLE_CONSTR(stg_C_FINALIZER_LIST,1,4,0,CONSTR,"C_FINALIZER_LIST","C_FINALI
    finalizer in a weak pointer object.
    ------------------------------------------------------------------------- */
 
-INFO_TABLE_CONSTR(stg_NO_FINALIZER,0,0,0,CONSTR_NOCAF_STATIC,"NO_FINALIZER","NO_FINALIZER")
+INFO_TABLE_CONSTR(stg_NO_FINALIZER,0,0,0,CONSTR_NOCAF,"NO_FINALIZER","NO_FINALIZER")
 { foreign "C" barf("NO_FINALIZER object entered!") never returns; }
 
 CLOSURE(stg_NO_FINALIZER_closure,stg_NO_FINALIZER);
@@ -473,16 +473,16 @@ INFO_TABLE(stg_TREC_CHUNK, 0, 0, TREC_CHUNK, "TREC_CHUNK", "TREC_CHUNK")
 INFO_TABLE(stg_TREC_HEADER, 3, 1, MUT_PRIM, "TREC_HEADER", "TREC_HEADER")
 { foreign "C" barf("TREC_HEADER object entered!") never returns; }
 
-INFO_TABLE_CONSTR(stg_END_STM_WATCH_QUEUE,0,0,0,CONSTR_NOCAF_STATIC,"END_STM_WATCH_QUEUE","END_STM_WATCH_QUEUE")
+INFO_TABLE_CONSTR(stg_END_STM_WATCH_QUEUE,0,0,0,CONSTR_NOCAF,"END_STM_WATCH_QUEUE","END_STM_WATCH_QUEUE")
 { foreign "C" barf("END_STM_WATCH_QUEUE object entered!") never returns; }
 
-INFO_TABLE_CONSTR(stg_END_INVARIANT_CHECK_QUEUE,0,0,0,CONSTR_NOCAF_STATIC,"END_INVARIANT_CHECK_QUEUE","END_INVARIANT_CHECK_QUEUE")
+INFO_TABLE_CONSTR(stg_END_INVARIANT_CHECK_QUEUE,0,0,0,CONSTR_NOCAF,"END_INVARIANT_CHECK_QUEUE","END_INVARIANT_CHECK_QUEUE")
 { foreign "C" barf("END_INVARIANT_CHECK_QUEUE object entered!") never returns; }
 
-INFO_TABLE_CONSTR(stg_END_STM_CHUNK_LIST,0,0,0,CONSTR_NOCAF_STATIC,"END_STM_CHUNK_LIST","END_STM_CHUNK_LIST")
+INFO_TABLE_CONSTR(stg_END_STM_CHUNK_LIST,0,0,0,CONSTR_NOCAF,"END_STM_CHUNK_LIST","END_STM_CHUNK_LIST")
 { foreign "C" barf("END_STM_CHUNK_LIST object entered!") never returns; }
 
-INFO_TABLE_CONSTR(stg_NO_TREC,0,0,0,CONSTR_NOCAF_STATIC,"NO_TREC","NO_TREC")
+INFO_TABLE_CONSTR(stg_NO_TREC,0,0,0,CONSTR_NOCAF,"NO_TREC","NO_TREC")
 { foreign "C" barf("NO_TREC object entered!") never returns; }
 
 CLOSURE(stg_END_STM_WATCH_QUEUE_closure,stg_END_STM_WATCH_QUEUE);
@@ -519,7 +519,7 @@ INFO_TABLE_CONSTR(stg_MSG_NULL,1,0,0,PRIM,"MSG_NULL","MSG_NULL")
    end of a linked TSO queue.
    ------------------------------------------------------------------------- */
 
-INFO_TABLE_CONSTR(stg_END_TSO_QUEUE,0,0,0,CONSTR_NOCAF_STATIC,"END_TSO_QUEUE","END_TSO_QUEUE")
+INFO_TABLE_CONSTR(stg_END_TSO_QUEUE,0,0,0,CONSTR_NOCAF,"END_TSO_QUEUE","END_TSO_QUEUE")
 { foreign "C" barf("END_TSO_QUEUE object entered!") never returns; }
 
 CLOSURE(stg_END_TSO_QUEUE_closure,stg_END_TSO_QUEUE);
@@ -528,7 +528,7 @@ CLOSURE(stg_END_TSO_QUEUE_closure,stg_END_TSO_QUEUE);
    GCD_CAF
    ------------------------------------------------------------------------- */
 
-INFO_TABLE_CONSTR(stg_GCD_CAF,0,0,0,CONSTR_NOCAF_STATIC,"GCD_CAF","GCD_CAF")
+INFO_TABLE_CONSTR(stg_GCD_CAF,0,0,0,CONSTR_NOCAF,"GCD_CAF","GCD_CAF")
 { foreign "C" barf("Evaluated a CAF that was GC'd!") never returns; }
 
 /* ----------------------------------------------------------------------------
@@ -538,7 +538,7 @@ INFO_TABLE_CONSTR(stg_GCD_CAF,0,0,0,CONSTR_NOCAF_STATIC,"GCD_CAF","GCD_CAF")
    thread waiting on an STM wakeup
    ------------------------------------------------------------------------- */
 
-INFO_TABLE_CONSTR(stg_STM_AWOKEN,0,0,0,CONSTR_NOCAF_STATIC,"STM_AWOKEN","STM_AWOKEN")
+INFO_TABLE_CONSTR(stg_STM_AWOKEN,0,0,0,CONSTR_NOCAF,"STM_AWOKEN","STM_AWOKEN")
 { foreign "C" barf("STM_AWOKEN object entered!") never returns; }
 
 CLOSURE(stg_STM_AWOKEN_closure,stg_STM_AWOKEN);
@@ -602,7 +602,7 @@ INFO_TABLE(stg_MUT_VAR_DIRTY, 1, 0, MUT_VAR_DIRTY, "MUT_VAR_DIRTY", "MUT_VAR_DIR
    just enter the top stack word to start the thread.  (see deleteThread)
  * ------------------------------------------------------------------------- */
 
-INFO_TABLE( stg_dummy_ret, 0, 0, CONSTR_NOCAF_STATIC, "DUMMY_RET", "DUMMY_RET")
+INFO_TABLE( stg_dummy_ret, 0, 0, CONSTR_NOCAF, "DUMMY_RET", "DUMMY_RET")
     ()
 {
     return ();
@@ -646,20 +646,16 @@ INFO_TABLE( stg_COMPACT_NFDATA, 0, 0, COMPACT_NFDATA, "COMPACT_NFDATA", "COMPACT
  *    we don't rewrite to static closures at all with Windows DLLs.
  */
 // #warning Is this correct? _imp is a pointer!
-#define Char_hash_static_info _imp__ghczmprim_GHCziTypes_Czh_static_info
-#define Int_hash_static_info _imp__ghczmprim_GHCziTypes_Izh_static_info
+#define Char_hash_con_info _imp__ghczmprim_GHCziTypes_Czh_con_info
+#define Int_hash_con_info _imp__ghczmprim_GHCziTypes_Izh_con_info
 #else
-#define Char_hash_static_info ghczmprim_GHCziTypes_Czh_static_info
-#define Int_hash_static_info ghczmprim_GHCziTypes_Izh_static_info
+#define Char_hash_con_info ghczmprim_GHCziTypes_Czh_con_info
+#define Int_hash_con_info ghczmprim_GHCziTypes_Izh_con_info
 #endif
 
 
-#define CHARLIKE_HDR(n)  CLOSURE(Char_hash_static_info, n)
-#define INTLIKE_HDR(n)   CLOSURE(Int_hash_static_info, n)
-
-/* put these in the *data* section, since the garbage collector relies
- * on the fact that static closures live in the data section.
- */
+#define CHARLIKE_HDR(n)  CLOSURE(Char_hash_con_info, n)
+#define INTLIKE_HDR(n)   CLOSURE(Int_hash_con_info, n)
 
 #if !(defined(COMPILING_WINDOWS_DLL))
 section "data" {

@@ -1193,8 +1193,7 @@ fprintCCS_stderr (CostCentreStack *ccs, StgClosure *exception, StgTSO *tso)
         case CONSTR_2_0:
         case CONSTR_1_1:
         case CONSTR_0_2:
-        case CONSTR_STATIC:
-        case CONSTR_NOCAF_STATIC:
+        case CONSTR_NOCAF:
             desc = GET_CON_DESC(itbl_to_con_itbl(info));
             break;
        default:

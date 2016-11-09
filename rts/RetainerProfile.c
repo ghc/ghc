@@ -504,10 +504,10 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
         // layout.payload.ptrs, no SRT
     case TVAR:
     case CONSTR:
+    case CONSTR_NOCAF:
     case PRIM:
     case MUT_PRIM:
     case BCO:
-    case CONSTR_STATIC:
         init_ptrs(&se.info, get_itbl(c)->layout.payload.ptrs,
                   (StgPtr)c->payload);
         *first_child = find_ptrs(&se.info);
@@ -609,7 +609,6 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
     case TSO:
     case STACK:
     case IND_STATIC:
-    case CONSTR_NOCAF_STATIC:
         // stack objects
     case UPDATE_FRAME:
     case CATCH_FRAME:
@@ -859,7 +858,6 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
         case PRIM:
         case MUT_PRIM:
         case BCO:
-        case CONSTR_STATIC:
             // StgMutArrPtr.ptrs, no SRT
         case MUT_ARR_PTRS_CLEAN:
         case MUT_ARR_PTRS_DIRTY:
@@ -938,7 +936,7 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
         case TSO:
         case STACK:
         case IND_STATIC:
-        case CONSTR_NOCAF_STATIC:
+        case CONSTR_NOCAF:
             // stack objects
         case UPDATE_FRAME:
         case CATCH_FRAME:
@@ -1050,6 +1048,7 @@ isRetainer( StgClosure *c )
 
         // constructors
     case CONSTR:
+    case CONSTR_NOCAF:
     case CONSTR_1_0:
     case CONSTR_0_1:
     case CONSTR_2_0:
@@ -1071,7 +1070,6 @@ isRetainer( StgClosure *c )
     case IND_STATIC:
     case BLACKHOLE:
         // static objects
-    case CONSTR_STATIC:
     case FUN_STATIC:
         // misc
     case PRIM:
@@ -1087,9 +1085,6 @@ isRetainer( StgClosure *c )
         //
         // Error case
         //
-        // CONSTR_NOCAF_STATIC
-        // cannot be *c, *cp, *r in the retainer profiling loop.
-    case CONSTR_NOCAF_STATIC:
         // Stack objects are invalid because they are never treated as
         // legal objects during retainer profiling.
     case UPDATE_FRAME:
@@ -1527,8 +1522,7 @@ inner_loop:
 #ifdef DEBUG_RETAINER
     switch (typeOfc) {
     case IND_STATIC:
-    case CONSTR_NOCAF_STATIC:
-    case CONSTR_STATIC:
+    case CONSTR_NOCAF:
     case THUNK_STATIC:
     case FUN_STATIC:
         break;
@@ -1558,9 +1552,9 @@ inner_loop:
         c = ((StgIndStatic *)c)->indirectee;
         goto inner_loop;
         // static objects with no pointers out, so goto loop.
-    case CONSTR_NOCAF_STATIC:
+    case CONSTR_NOCAF:
         // It is not just enough not to compute the retainer set for *c; it is
-        // mandatory because CONSTR_NOCAF_STATIC are not reachable from
+        // mandatory because CONSTR_NOCAF are not reachable from
         // scavenged_static_objects, the list from which is assumed to traverse
         // all static objects after major garbage collections.
         goto loop;
@@ -1585,7 +1579,7 @@ inner_loop:
             // "appear".  A closure with a non-empty SRT, and which is
             // still required, will always be reachable.
             //
-            // But what about CONSTR_STATIC?  Surely these may be able
+            // But what about CONSTR?  Surely these may be able
             // to appear, and they don't have SRTs, so we can't
             // check.  So for now, we're calling
             // resetStaticObjectForRetainerProfiling() from the
@@ -1819,8 +1813,7 @@ computeRetainerSet( void )
                     case IND_STATIC:
                         // no cost involved
                         break;
-                    case CONSTR_NOCAF_STATIC:
-                    case CONSTR_STATIC:
+                    case CONSTR_NOCAF:
                     case THUNK_STATIC:
                     case FUN_STATIC:
                         barf("Invalid object in computeRetainerSet(): %d", get_itbl((StgClosure*)ml)->type);
@@ -1896,7 +1889,11 @@ resetStaticObjectForRetainerProfiling( StgClosure *static_objects )
             maybeInitRetainerSet(p);
             p = (StgClosure*)*FUN_STATIC_LINK(p);
             break;
-        case CONSTR_STATIC:
+        case CONSTR:
+        case CONSTR_1_0:
+        case CONSTR_2_0:
+        case CONSTR_1_1:
+        case CONSTR_NOCAF:
             maybeInitRetainerSet(p);
             p = (StgClosure*)*STATIC_LINK(get_itbl(p), p);
             break;
@@ -1958,8 +1955,7 @@ retainerProfile(void)
     debugBelch("costArrayLinear[" #index "] = %u\n", costArrayLinear[index])
   pcostArrayLinear(THUNK_STATIC);
   pcostArrayLinear(FUN_STATIC);
-  pcostArrayLinear(CONSTR_STATIC);
-  pcostArrayLinear(CONSTR_NOCAF_STATIC);
+  pcostArrayLinear(CONSTR_NOCAF);
 */
 #endif
 
@@ -2067,7 +2063,6 @@ static uint32_t
 sanityCheckHeapClosure( StgClosure *c )
 {
     ASSERT(LOOKS_LIKE_GHC_INFO(c->header.info));
-    ASSERT(!closure_STATIC(c));
     ASSERT(LOOKS_LIKE_PTR(c));
 
     if ((((StgWord)RSET(c) & 1) ^ flip) != 0) {

@@ -342,8 +342,7 @@ eval_obj:
     case CONSTR_2_0:
     case CONSTR_1_1:
     case CONSTR_0_2:
-    case CONSTR_STATIC:
-    case CONSTR_NOCAF_STATIC:
+    case CONSTR_NOCAF:
     case FUN:
     case FUN_1_0:
     case FUN_0_1:

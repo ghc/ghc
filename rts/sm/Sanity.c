@@ -86,13 +86,6 @@ checkClosureShallow( const StgClosure* p )
 
     q = UNTAG_CONST_CLOSURE(p);
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));
-
-    /* Is it a static closure? */
-    if (!HEAP_ALLOCED(q)) {
-        ASSERT(closure_STATIC(q));
-    } else {
-        ASSERT(!closure_STATIC(q));
-    }
 }
 
 // check an individual stack object
@@ -225,12 +218,6 @@ checkClosure( const StgClosure* p )
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
 
     p = UNTAG_CONST_CLOSURE(p);
-    /* Is it a static closure (i.e. in the data segment)? */
-    if (!HEAP_ALLOCED(p)) {
-        ASSERT(closure_STATIC(p));
-    } else {
-        ASSERT(!closure_STATIC(p));
-    }
 
     info = p->header.info;
 
@@ -272,6 +259,7 @@ checkClosure( const StgClosure* p )
     case FUN_0_2:
     case FUN_2_0:
     case CONSTR:
+    case CONSTR_NOCAF:
     case CONSTR_1_0:
     case CONSTR_0_1:
     case CONSTR_1_1:
@@ -283,8 +271,6 @@ checkClosure( const StgClosure* p )
     case MUT_VAR_CLEAN:
     case MUT_VAR_DIRTY:
     case TVAR:
-    case CONSTR_STATIC:
-    case CONSTR_NOCAF_STATIC:
     case THUNK_STATIC:
     case FUN_STATIC:
         {
@@ -692,7 +678,11 @@ checkStaticObjects ( StgClosure* static_objects )
       p = *FUN_STATIC_LINK((StgClosure *)p);
       break;
 
-    case CONSTR_STATIC:
+    case CONSTR:
+    case CONSTR_NOCAF:
+    case CONSTR_1_0:
+    case CONSTR_2_0:
+    case CONSTR_1_1:
       p = *STATIC_LINK(info,(StgClosure *)p);
       break;
 

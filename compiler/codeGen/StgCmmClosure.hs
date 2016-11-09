@@ -1040,12 +1040,8 @@ mkDataConInfoTable dflags data_con is_static ptr_wds nonptr_wds
                 , cit_srt  = NoC_SRT }
  where
    name = dataConName data_con
-
-   info_lbl | is_static = mkStaticInfoTableLabel name NoCafRefs
-            | otherwise = mkConInfoTableLabel    name NoCafRefs
-
+   info_lbl = mkConInfoTableLabel name NoCafRefs
    sm_rep = mkHeapRep dflags is_static ptr_wds nonptr_wds cl_type
-
    cl_type = Constr (dataConTagZ data_con) (dataConIdentity data_con)
 
    prof | not (gopt Opt_SccProfilingOn dflags) = NoProfilingInfo
@@ -1074,16 +1070,10 @@ indStaticInfoTable
 staticClosureNeedsLink :: Bool -> CmmInfoTable -> Bool
 -- A static closure needs a link field to aid the GC when traversing
 -- the static closure graph.  But it only needs such a field if either
---         a) it has an SRT
+--        a) it has an SRT
 --        b) it's a constructor with one or more pointer fields
 -- In case (b), the constructor's fields themselves play the role
 -- of the SRT.
---
--- At this point, the cit_srt field has not been calculated (that
--- happens right at the end of the Cmm pipeline), but we do have the
--- VarSet of CAFs that CoreToStg attached, and if that is empty there
--- will definitely not be an SRT.
---
 staticClosureNeedsLink has_srt CmmInfoTable{ cit_rep = smrep }
   | isConRep smrep         = not (isStaticNoCafCon smrep)
   | otherwise              = has_srt -- needsSRT (cit_srt info_tbl)

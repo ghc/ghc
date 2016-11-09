@@ -548,11 +548,16 @@ loop:
           evacuate_static_object(IND_STATIC_LINK((StgClosure *)q), q);
           return;
 
-      case CONSTR_STATIC:
+      case CONSTR:
+      case CONSTR_1_0:
+      case CONSTR_2_0:
+      case CONSTR_1_1:
           evacuate_static_object(STATIC_LINK(info,(StgClosure *)q), q);
           return;
 
-      case CONSTR_NOCAF_STATIC:
+      case CONSTR_0_1:
+      case CONSTR_0_2:
+      case CONSTR_NOCAF:
           /* no need to put these on the static linked list, they don't need
            * to be scavenged.
            */
@@ -716,6 +721,7 @@ loop:
 
   case FUN:
   case CONSTR:
+  case CONSTR_NOCAF:
       copy_tag_nolock(p,info,q,sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),gen_no,tag);
       return;
 
@@ -1048,8 +1054,7 @@ selector_loop:
       case CONSTR_2_0:
       case CONSTR_1_1:
       case CONSTR_0_2:
-      case CONSTR_STATIC:
-      case CONSTR_NOCAF_STATIC:
+      case CONSTR_NOCAF:
           {
               // check that the size is in range
               ASSERT(field <  (StgWord32)(info->layout.payload.ptrs +

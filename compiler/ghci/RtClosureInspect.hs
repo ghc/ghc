@@ -191,7 +191,7 @@ getClosureData dflags a =
 
 readCType :: Integral a => a -> ClosureType
 readCType i
- | i >= CONSTR && i <= CONSTR_NOCAF_STATIC = Constr
+ | i >= CONSTR && i <= CONSTR_NOCAF        = Constr
  | i >= FUN    && i <= FUN_STATIC          = Fun
  | i >= THUNK  && i < THUNK_SELECTOR       = Thunk i'
  | i == THUNK_SELECTOR                     = ThunkSelector

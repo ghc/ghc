@@ -122,13 +122,14 @@ static void searchHeapBlocks (HashTable *addrs, bdescr *bd)
                 size = sizeofW(StgThunkHeader) + 1;
                 break;
 
-            case CONSTR:
             case FUN:
             case FUN_1_0:
             case FUN_0_1:
             case FUN_1_1:
             case FUN_0_2:
             case FUN_2_0:
+            case CONSTR:
+            case CONSTR_NOCAF:
             case CONSTR_1_0:
             case CONSTR_0_1:
             case CONSTR_1_1:

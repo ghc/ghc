@@ -560,6 +560,7 @@ scavenge_block (bdescr *bd)
 
     gen_obj:
     case CONSTR:
+    case CONSTR_NOCAF:
     case WEAK:
     case PRIM:
     {
@@ -968,6 +969,7 @@ scavenge_mark_stack(void)
 
         gen_obj:
         case CONSTR:
+        case CONSTR_NOCAF:
         case WEAK:
         case PRIM:
         {
@@ -1290,6 +1292,7 @@ scavenge_one(StgPtr p)
     case FUN_0_2:
     case FUN_2_0:
     case CONSTR:
+    case CONSTR_NOCAF:
     case CONSTR_1_0:
     case CONSTR_0_1:
     case CONSTR_1_1:
@@ -1754,7 +1757,13 @@ scavenge_static(void)
       scavenge_fun_srt(info);
       break;
 
-    case CONSTR_STATIC:
+    case CONSTR:
+    case CONSTR_NOCAF:
+    case CONSTR_1_0:
+    case CONSTR_0_1:
+    case CONSTR_2_0:
+    case CONSTR_1_1:
+    case CONSTR_0_2:
       {
         StgPtr q, next;
 
