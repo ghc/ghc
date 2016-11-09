@@ -585,8 +585,8 @@ StgWord osNumaMask(void)
 #if HAVE_LIBNUMA
     struct bitmask *mask;
     mask = numa_get_mems_allowed();
-    if (mask->size > sizeof(StgWord)*8) {
-        barf("Too many NUMA nodes");
+    if (osNumaNodes() > sizeof(StgWord)*8) {
+        barf("osNumaMask: too many NUMA nodes (%d)", osNumaNodes());
     }
     return mask->maskp[0];
 #else
