@@ -416,7 +416,7 @@ test('T5631',
         # 2014-04-04:     346389856 (x86 Windows, 64 bit machine)
         # 2014-12-01:     390199244 (Windows laptop)
         # 2016-04-06:     570137436 (amd64/Linux) many reasons
-           (wordsize(64), 1024926024, 5)]),
+           (wordsize(64), 1077429456, 5)]),
         # expected value: 774595008 (amd64/Linux):
         # expected value: 735486328 (amd64/Linux) 2012/12/12:
         # expected value: 690742040 (amd64/Linux) Call Arity improvements
@@ -427,6 +427,8 @@ test('T5631',
         # 2015-12-21:     1198327544 (Mac) TypeApplications (will fix with #11196)
         # 2015-03-18:     1124068664 (Mac) optimize Unify & zonking
         # 2016-10-19:     1024926024 (amd64/Linux) Refactor traceRn interface (#12617)
+        # 2016-11-10:     1077429456 (amd64/Linux) Stop -dno-debug-output supressing -ddump-tc-trace
+
        only_ways(['normal'])
       ],
      compile,
