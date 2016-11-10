@@ -872,7 +872,7 @@ emitEnter fun = do
       -- The generated code will be something like this:
       --
       --    R1 = fun  -- copyout
-      --    if (fun & 7 != 0) goto Lcall else goto Lret
+      --    if (fun & 7 != 0) goto Lret else goto Lcall
       --  Lcall:
       --    call [fun] returns to Lret
       --  Lret:
