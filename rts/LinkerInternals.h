@@ -261,4 +261,36 @@ extern /*Str*/HashTable *symhash;
 
 #include "EndPrivate.h"
 
+HsInt isAlreadyLoaded( pathchar *path );
+HsInt loadOc( ObjectCode* oc );
+ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
+                  rtsBool mapped, char *archiveMemberName,
+                  int misalignment
+                  );
+
+#ifdef darwin_HOST_OS
+int machoGetMisalignment( FILE * f );
+#endif /* darwin_HOST_OS */
+
+#if defined (mingw32_HOST_OS)
+/* We use myindex to calculate array addresses, rather than
+   simply doing the normal subscript thing.  That's because
+   some of the above structs have sizes which are not
+   a whole number of words.  GCC rounds their sizes up to a
+   whole number of words, which means that the address calcs
+   arising from using normal C indexing or pointer arithmetic
+   are just plain wrong.  Sigh.
+*/
+STATIC_INLINE UChar *
+myindex ( int scale, void* base, int index )
+{
+    return
+        ((UChar*)base) + scale * index;
+}
+
+char *cstring_from_section_name(
+    UChar* name,
+    UChar* strtab);
+#endif /* mingw32_HOST_OS */
+
 #endif /* LINKERINTERNALS_H */
