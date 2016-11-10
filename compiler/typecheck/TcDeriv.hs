@@ -1271,9 +1271,9 @@ mkNewTypeEqn dflags overlap_mode tvs
         -- and constraints to coerce each individual method
         meth_theta :: [PredOrigin]
         meths = classMethods cls
-        meth_theta = rep_pred_o : coercible_constraints
---        meth_theta | null meths = []    -- No methods => no constraints (Trac #12814)
---                   | otherwise = rep_pred_o : coercible_constraints
+        meth_theta | null meths = [] -- No methods => no constraints
+                                     -- (Trac #12814)
+                   | otherwise = rep_pred_o : coercible_constraints
         coercible_constraints
           = [ mkPredOrigin (DerivOriginCoerce meth t1 t2) TypeLevel
                            (mkReprPrimEqPred t1 t2)
@@ -1415,7 +1415,7 @@ However, we must watch out for three things:
 
     with the former definition of C, you'd end up with something like this:
 
-      instance C a x => C a (Foo x) where
+      instance C a (Foo x) where
         type T a = T ???
 
     This T family instance doesn't mention the newtype (or its representation

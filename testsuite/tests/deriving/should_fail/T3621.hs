@@ -3,7 +3,7 @@ module T3621 where
 
 -- This one is ok, even though the deriving clause mentions 'a'
 -- which is not a parameter of 'T'
-class C a b 
+class C a b
 instance C a S
 data S = MkS
 
@@ -12,6 +12,7 @@ newtype T = MkT S deriving( C a )
 
 -- But this one fails, and should fail
 class (Monad m) => MonadState s m | m -> s where
+  state :: (s -> (a, s)) -> m a
 
 newtype State s a = State { runState :: s -> (a, s) }
 instance Functor (State s) where {}

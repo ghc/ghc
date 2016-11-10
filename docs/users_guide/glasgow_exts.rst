@@ -3971,6 +3971,11 @@ Then the derived instance declaration is of the form ::
 
       instance C t1..tj t => C t1..tj (T v1...vk)
 
+Note that if ``C`` does not contain any class methods, the instance context
+is wholly unnecessary, and as such GHC will instead generate: ::
+
+      instance C t1..tj (T v1..vk)
+
 As an example which does *not* work, consider ::
 
       newtype NonMonad m s = NonMonad (State s m s) deriving Monad
@@ -4018,7 +4023,7 @@ associated type families. Here is an example: ::
 
 The derived ``HasRing`` instance would look like ::
 
-      instance HasRing a => HasRing (L1Norm a) where
+      instance HasRing (L1Norm a) where
         type Ring (L1Norm a) = Ring a
 
 To be precise, if the class being derived is of the form ::
@@ -4051,7 +4056,7 @@ then you can derive a ``C c_1 c_2 ... c_(m-1)`` instance for
   For the derived ``Bad Int`` instance, GHC would need to generate something
   like this: ::
 
-      instance Bad Int a => Bad Int (Foo a) where
+      instance Bad Int (Foo a) where
         type B Int = B ???
 
   Now we're stuck, since we have no way to refer to ``a`` on the right-hand
@@ -4087,6 +4092,10 @@ If both of these conditions are met, GHC will generate this instance: ::
         ...
         type Tk tk_1 tk_2 ... (N n_1 n_2 ... n_q) ... tk_p
            = Tk tk_1 tk_2 ... <rep-type>          ... tk_p
+
+Again, if ``C`` contains no class methods, the instance context will be
+redundant, so GHC will instead generate
+``instance C c_1 c_2 ... c_(m-1) (N n_1 n_2 ... n_q)``.
 
 Beware that in some cases, you may need to enable the
 :ghc-flag:`-XUndecidableInstances` extension in order to use this feature.

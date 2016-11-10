@@ -61,6 +61,28 @@ Compiler
   :ref:`GeneralizedNewtypeDeriving and associated type families
   <gnd-and-associated-types>`.
 
+- :ghc-flag:`-XGeneralizedNewtypeDeriving` will no longer infer constraints
+  when deriving a class with no methods. That is, this code: ::
+
+      class Throws e
+      newtype Id a = MkId a
+        deriving Throws
+
+  will now generate this instance: ::
+
+      instance Throws (Id a)
+
+  instead of this instance: ::
+
+      instance Throws a => Throws (Id a)
+
+  This change was motivated by the fact that the latter code has a strictly
+  redundant ``Throws a`` constraint, so it would emit a warning when compiled
+  with :ghc-flag:`-Wredundant-constraints`. The latter instance could still
+  be derived if so desired using :ghc-flag:`-XStandaloneDeriving`: ::
+
+      deriving instance Throws a => Throws (Id a)
+
 - Add warning flag :ghc-flag:`-Wcpp-undef` which passes ``-Wundef`` to the C
   pre-processor causing the pre-processor to warn on uses of the ``#if``
   directive on undefined identifiers.

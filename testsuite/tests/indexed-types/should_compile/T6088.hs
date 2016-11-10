@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}  
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE EmptyDataDecls #-}
 
 module T6088 where
@@ -15,4 +15,4 @@ instance (Pos n ~ True) => C (A n)
 
 newtype B n = B (A n) deriving (C)
   -- This should work, giving
-  -- instance (Pos n ~ True) => C (B n)
+  -- instance C (B n)

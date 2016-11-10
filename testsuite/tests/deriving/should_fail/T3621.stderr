@@ -1,8 +1,9 @@
 
-T3621.hs:23:43:
-    No instance for (MonadState state (State s))
-      arising from the 'deriving' clause of a data type declaration
-    Possible fix:
-      use a standalone 'deriving instance' declaration,
-        so you can specify the instance context yourself
-    When deriving the instance for (MonadState state (WrappedState s))
+T3621.hs:24:43: error:
+    • No instance for (MonadState state (State s))
+        arising from the 'deriving' clause of a data type declaration
+      Possible fix:
+        use a standalone 'deriving instance' declaration,
+          so you can specify the instance context yourself
+    • When deriving the instance for (MonadState
+                                        state (WrappedState s))
