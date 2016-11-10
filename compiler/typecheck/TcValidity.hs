@@ -39,7 +39,6 @@ import TyCon
 -- others:
 import HsSyn            -- HsType
 import TcRnMonad        -- TcType, amongst others
-import TcHsSyn     ( checkForRepresentationPolymorphism )
 import TcEnv       ( tcGetInstEnvs )
 import FunDeps
 import InstEnv     ( ClsInst, lookupInstEnv, isOverlappable )
@@ -342,6 +341,7 @@ checkValidType ctxt ty
                  InfSigCtxt _   -> ArbitraryRank        -- Inferred type
                  ConArgCtxt _   -> rank1 -- We are given the type of the entire
                                          -- constructor, hence rank 1
+                 PatSynCtxt _   -> rank1
 
                  ForSigCtxt _   -> rank1
                  SpecInstCtxt   -> rank1
@@ -441,16 +441,6 @@ forAllAllowed ArbitraryRank             = True
 forAllAllowed (LimitedRank forall_ok _) = forall_ok
 forAllAllowed _                         = False
 
--- The zonker issues errors if it zonks a representation-polymorphic binder
--- But sometimes it's nice to check a little more eagerly, trying to report
--- errors earlier.
-representationPolymorphismForbidden :: UserTypeCtxt -> Bool
-representationPolymorphismForbidden = go
-  where
-    go (ConArgCtxt _) = True     -- A rep-polymorphic datacon won't be useful
-    go (PatSynCtxt _) = True     -- Similar to previous case
-    go _              = False    -- Other cases are caught by zonker
-
 ----------------------------------------
 check_type :: TidyEnv -> UserTypeCtxt -> Rank -> Type -> TcM ()
 -- The args say what the *type context* requires, independent
@@ -487,8 +477,6 @@ check_type _ _ _ (TyVarTy _) = return ()
 
 check_type env ctxt rank (FunTy arg_ty res_ty)
   = do  { check_type env ctxt arg_rank arg_ty
-        ; when (representationPolymorphismForbidden ctxt) $
-          checkForRepresentationPolymorphism empty arg_ty
         ; check_type env ctxt res_rank res_ty }
   where
     (arg_rank, res_rank) = funArgResRank rank

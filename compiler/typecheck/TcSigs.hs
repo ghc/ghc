@@ -30,6 +30,8 @@ import TcRnTypes
 import TcRnMonad
 import TcType
 import TcMType
+import TcHsSyn ( checkForRepresentationPolymorphism )
+import TcValidity ( checkValidType )
 import TcUnify( tcSkolemise, unifyType, noThing )
 import Inst( topInstantiate )
 import TcEnv( tcLookupId )
@@ -367,16 +369,12 @@ tcPatSynSig name sig_ty
 
        -- Kind generalisation
        ; kvs <- kindGeneralize $
-                mkSpecForAllTys (implicit_tvs ++ univ_tvs) $
-                mkFunTys req $
-                mkSpecForAllTys ex_tvs $
-                mkFunTys prov $
-                body_ty
+                build_patsyn_type [] implicit_tvs univ_tvs req
+                                  ex_tvs prov body_ty
 
        -- These are /signatures/ so we zonk to squeeze out any kind
        -- unification variables.  Do this after quantifyTyVars which may
        -- default kind variables to *.
-       -- ToDo: checkValidType?
        ; traceTc "about zonk" empty
        ; implicit_tvs <- mapM zonkTcTyCoVarBndr implicit_tvs
        ; univ_tvs     <- mapM zonkTcTyCoVarBndr univ_tvs
@@ -384,6 +382,15 @@ tcPatSynSig name sig_ty
        ; req          <- zonkTcTypes req
        ; prov         <- zonkTcTypes prov
        ; body_ty      <- zonkTcType  body_ty
+
+       -- Now do validity checking
+       ; checkValidType ctxt $
+         build_patsyn_type kvs implicit_tvs univ_tvs req ex_tvs prov body_ty
+
+       -- arguments become the types of binders. We thus cannot allow
+       -- levity polymorphism here
+       ; let (arg_tys, _) = tcSplitFunTys body_ty
+       ; mapM_ (checkForRepresentationPolymorphism empty) arg_tys
 
        ; traceTc "tcTySig }" $
          vcat [ text "implicit_tvs" <+> ppr_tvs implicit_tvs
@@ -402,6 +409,15 @@ tcPatSynSig name sig_ty
                       , patsig_prov           = prov
                       , patsig_body_ty        = body_ty }) }
   where
+    ctxt = PatSynCtxt name
+
+    build_patsyn_type kvs imp univ req ex prov body
+      = mkInvForAllTys kvs $
+        mkSpecForAllTys (imp ++ univ) $
+        mkFunTys req $
+        mkSpecForAllTys ex $
+        mkFunTys prov $
+        body
 
 ppr_tvs :: [TyVar] -> SDoc
 ppr_tvs tvs = braces (vcat [ ppr tv <+> dcolon <+> ppr (tyVarKind tv)

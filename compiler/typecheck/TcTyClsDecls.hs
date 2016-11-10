@@ -2299,6 +2299,8 @@ checkValidDataCon dflags existential_ok tc con
 
           -- Check all argument types for validity
         ; checkValidType ctxt (dataConUserType con)
+        ; mapM_ (checkForRepresentationPolymorphism empty)
+                (dataConOrigArgTys con)
 
           -- Extra checks for newtype data constructors
         ; when (isNewTyCon tc) (checkNewDataCon con)
