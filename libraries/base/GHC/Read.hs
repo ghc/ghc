@@ -287,22 +287,39 @@ lexP = lift L.lex
 expectP :: L.Lexeme -> ReadPrec ()
 expectP lexeme = lift (L.expect lexeme)
 
+expectCharP :: Char -> ReadPrec a -> ReadPrec a
+expectCharP c a = do
+  q <- get
+  if q == c
+    then a
+    else pfail
+{-# INLINE expectCharP #-}
+
+skipSpacesThenP :: ReadPrec a -> ReadPrec a
+skipSpacesThenP m =
+  do s <- look
+     skip s
+ where
+   skip (c:s) | isSpace c = get *> skip s
+   skip _ = m
+
 paren :: ReadPrec a -> ReadPrec a
 -- ^ @(paren p)@ parses \"(P0)\"
 --      where @p@ parses \"P0\" in precedence context zero
-paren p = do expectP (L.Punc "(")
-             x <- reset p
-             expectP (L.Punc ")")
-             return x
+paren p = skipSpacesThenP (paren' p)
+
+paren' :: ReadPrec a -> ReadPrec a
+paren' p = expectCharP '(' $ reset p >>= \x ->
+              skipSpacesThenP (expectCharP ')' (pure x))
 
 parens :: ReadPrec a -> ReadPrec a
 -- ^ @(parens p)@ parses \"P\", \"(P0)\", \"((P0))\", etc,
 --      where @p@ parses \"P\"  in the current precedence context
 --          and parses \"P0\" in precedence context zero
 parens p = optional
- where
-  optional  = p +++ mandatory
-  mandatory = paren optional
+  where
+    optional = skipSpacesThenP (p +++ mandatory)
+    mandatory = paren' optional
 
 list :: ReadPrec a -> ReadPrec [a]
 -- ^ @(list p)@ parses a list of things parsed by @p@,
