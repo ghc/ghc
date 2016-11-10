@@ -9997,9 +9997,14 @@ splices.
 -  Typed expression splices: the same wildcards as in (untyped)
    expression splices are supported.
 
--  Pattern splices: Template Haskell doesn't support type signatures in
-   pattern splices. Consequently, partial type signatures are not
-   supported either.
+-  Pattern splices: anonymous and named wildcards can be used in pattern
+   signatures. Note that :ghc-flag:`-XScopedTypeVariables` has to be enabled
+   to allow pattern signatures. Extra-constraints wildcards are not supported,
+   just like in regular pattern signatures.
+   ::
+
+       {-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
+       foo $( [p| (x :: _) |] ) = x
 
 -  Type splices: only anonymous wildcards are supported in type splices.
    Named and extra-constraints wildcards are not. ::
