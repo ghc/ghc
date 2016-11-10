@@ -506,11 +506,19 @@ void rts_setInCallCapability (
         if (RtsFlags.ParFlags.setAffinity) {
             setThreadAffinity(preferred_capability, n_capabilities);
         }
-        if (RtsFlags.GcFlags.numa) {
-            task->node = capNoToNumaNode(preferred_capability);
-            if (!DEBUG_IS_ON || !RtsFlags.DebugFlags.numa) { // faking NUMA
-                setThreadNode(numa_map[task->node]);
-            }
+    }
+#endif
+}
+
+void rts_pinThreadToNumaNode (
+    int node USED_IF_THREADS)
+{
+#ifdef THREADED_RTS
+    if (RtsFlags.GcFlags.numa) {
+        Task *task = getTask();
+        task->node = capNoToNumaNode(node);
+        if (!DEBUG_IS_ON || !RtsFlags.DebugFlags.numa) { // faking NUMA
+            setThreadNode(numa_map[task->node]);
         }
     }
 #endif

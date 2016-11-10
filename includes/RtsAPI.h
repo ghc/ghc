@@ -172,6 +172,24 @@ void rts_unlock (Capability *token);
 // when there is no current capability.
 Capability *rts_unsafeGetMyCapability (void);
 
+/* ----------------------------------------------------------------------------
+   Which cpu should the OS thread and Haskell thread run on?
+
+   1. Run the current thread on the given capability:
+     rts_setInCallCapability(cap, 0);
+
+   2. Run the current thread on the given capability and set the cpu affinity
+      for this thread:
+     rts_setInCallCapability(cap, 1);
+
+   3. Run the current thread on the given numa node:
+     rts_pinThreadToNumaNode(node);
+
+   4. Run the current thread on the given capability and on the given numa node:
+     rts_setInCallCapability(cap, 0);
+     rts_pinThreadToNumaNode(cap);
+   ------------------------------------------------------------------------- */
+
 // Specify the Capability that the current OS thread should run on when it calls
 // into Haskell.  The actual capability will be calculated as the supplied
 // value modulo the number of enabled Capabilities.
@@ -184,6 +202,12 @@ Capability *rts_unsafeGetMyCapability (void);
 // specific CPUs according to the prevailing affinity policy for the
 // specified capability, set by either +RTS -qa or +RTS --numa.
 void rts_setInCallCapability (int preferred_capability, int affinity);
+
+// Specify the CPU Node that the current OS thread should run on when it calls
+// into Haskell. The argument can be either a node number or capability number.
+// The actual node will be calculated as the supplied value modulo the number
+// of numa nodes.
+void rts_pinThreadToNumaNode (int node);
 
 /* ----------------------------------------------------------------------------
    Building Haskell objects from C datatypes.
