@@ -1256,6 +1256,7 @@ mkNewTypeEqn dflags overlap_mode tvs
 
         -- Next we figure out what superclass dictionaries to use
         -- See Note [Newtype deriving superclasses] above
+        sc_theta   :: [PredOrigin]
         cls_tyvars = classTyVars cls
         dfun_tvs   = tyCoVarsOfTypesWellScoped inst_tys
         inst_ty    = mkTyConApp tycon tc_args
@@ -1264,24 +1265,24 @@ mkNewTypeEqn dflags overlap_mode tvs
                      substTheta (zipTvSubst cls_tyvars inst_tys) $
                      classSCTheta cls
 
-        -- Next we collect Coercible constraints between
-        -- the Class method types, instantiated with the representation and the
-        -- newtype type; precisely the constraints required for the
-        -- calls to coercible that we are going to generate.
-        coercible_constraints =
-            [ let (Pair t1 t2) = mkCoerceClassMethEqn cls dfun_tvs inst_tys rep_inst_ty meth
-              in mkPredOrigin (DerivOriginCoerce meth t1 t2) TypeLevel
-                              (mkReprPrimEqPred t1 t2)
-            | meth <- classMethods cls ]
+        -- Next we collect constraints for the class methods
+        -- If there are no methods, we don't need any constraints
+        -- Otherwise we need (C rep_ty), for the representation methods,
+        -- and constraints to coerce each individual method
+        meth_theta :: [PredOrigin]
+        meths = classMethods cls
+        meth_theta = rep_pred_o : coercible_constraints
+--        meth_theta | null meths = []    -- No methods => no constraints (Trac #12814)
+--                   | otherwise = rep_pred_o : coercible_constraints
+        coercible_constraints
+          = [ mkPredOrigin (DerivOriginCoerce meth t1 t2) TypeLevel
+                           (mkReprPrimEqPred t1 t2)
+            | meth <- meths
+            , let (Pair t1 t2) = mkCoerceClassMethEqn cls dfun_tvs
+                                         inst_tys rep_inst_ty meth ]
 
-                -- If there are no tyvars, there's no need
-                -- to abstract over the dictionaries we need
-                -- Example:     newtype T = MkT Int deriving( C )
-                -- We get the derived instance
-                --              instance C T
-                -- rather than
-                --              instance C Int => C T
-        all_preds = rep_pred_o : coercible_constraints ++ sc_theta -- NB: rep_pred comes first
+        all_preds :: [PredOrigin]
+        all_preds = meth_theta ++ sc_theta
 
         -------------------------------------------------------------------
         --  Figuring out whether we can only do this newtype-deriving thing
