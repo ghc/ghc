@@ -29,6 +29,7 @@ module TyCoRep (
         KindOrType, Kind,
         PredType, ThetaType,      -- Synonyms
         ArgFlag(..),
+        Rig(..),
 
         -- * Coercions
         Coercion(..),
@@ -37,7 +38,7 @@ module TyCoRep (
 
         -- * Functions over types
         mkTyConTy, mkTyVarTy, mkTyVarTys,
-        mkFunTy, mkFunTys, mkForAllTy, mkForAllTys,
+        mkFunTy, mkFunTyOm, mkFunTys, mkForAllTy, mkForAllTys,
         mkPiTy, mkPiTys,
         isLiftedTypeKind, isUnliftedTypeKind,
         isCoercionType, isRuntimeRepTy, isRuntimeRepVar,
@@ -175,6 +176,36 @@ import Data.List
 import Data.IORef ( IORef )   -- for CoercionHole
 
 {-
+************************************************************************
+*                                                                      *
+\subsection{Weights}
+*                                                                      *
+************************************************************************
+-}
+
+-- TODO: arnaud: clean up
+data Rig =  -- Zero |
+  One | Omega
+  deriving (Eq,Ord,Data.Data)
+
+instance Num Rig where
+  -- Zero * _ = Zero
+  -- _ * Zero = Zero
+  Omega * One = Omega
+  One * Omega = Omega
+  One * One   = One
+  Omega * Omega = Omega
+
+  -- Zero + x = x
+  -- x + Zero = x
+  _ + _ = Omega
+
+-- instance Outputable Rig where
+--   ppr One = fromString "1"
+--   ppr Omega = fromString "ω"
+
+
+{-
 %************************************************************************
 %*                                                                      *
                         TyThing
@@ -283,7 +314,10 @@ data Type
         {-# UNPACK #-} !TyVarBinder
         Type            -- ^ A Π type.
 
-  | FunTy Type Type     -- ^ t1 -> t2   Very common, so an important special case
+  | FunTy Rig Type Type     -- ^ t1 ->_p t2   Very common, so an important special case
+
+    -- TODO: arnaud: also PI
+    -- TODO: arnaud: ignored by Core. Nonetheless, maybe should update the Formalism
 
   | LitTy TyLit     -- ^ Type literals are similar to type constructors.
 
@@ -648,12 +682,17 @@ mkTyVarTys = map mkTyVarTy -- a common use of mkTyVarTy
 
 infixr 3 `mkFunTy`      -- Associates to the right
 -- | Make an arrow type
-mkFunTy :: Type -> Type -> Type
-mkFunTy arg res = FunTy arg res
+mkFunTy :: Rig -> Type -> Type -> Type
+mkFunTy weight arg res = FunTy weight arg res
+
+-- | Special, common, case: Arrow type with weight Omega
+mkFunTyOm :: Type -> Type -> Type
+mkFunTyOm = mkFunTy Omega
 
 -- | Make nested arrow types
 mkFunTys :: [Type] -> Type -> Type
-mkFunTys tys ty = foldr mkFunTy ty tys
+mkFunTys tys ty = foldr (mkFunTy Omega) ty tys
+-- FIXME: arnaud: see at use-site how to best refine this. Probably the list argument should be of pairs `(Rig,Type)`.
 
 mkForAllTy :: TyVar -> ArgFlag -> Type -> Type
 mkForAllTy tv vis ty = ForAllTy (TvBndr tv vis) ty
@@ -663,7 +702,7 @@ mkForAllTys :: [TyVarBinder] -> Type -> Type
 mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
 
 mkPiTy :: TyBinder -> Type -> Type
-mkPiTy (Anon ty1) ty2 = FunTy ty1 ty2
+mkPiTy (Anon ty1) ty2 = FunTy Omega ty1 ty2 -- TODO: Arnaud: fix
 mkPiTy (Named tvb) ty = ForAllTy tvb ty
 
 mkPiTys :: [TyBinder] -> Type -> Type
@@ -1380,7 +1419,7 @@ tyCoFVsOfType (TyVarTy v)        a b c = (unitFV v `unionFV` tyCoFVsOfType (tyVa
 tyCoFVsOfType (TyConApp _ tys)   a b c = tyCoFVsOfTypes tys a b c
 tyCoFVsOfType (LitTy {})         a b c = emptyFV a b c
 tyCoFVsOfType (AppTy fun arg)    a b c = (tyCoFVsOfType fun `unionFV` tyCoFVsOfType arg) a b c
-tyCoFVsOfType (FunTy arg res)    a b c = (tyCoFVsOfType arg `unionFV` tyCoFVsOfType res) a b c
+tyCoFVsOfType (FunTy _ arg res)  a b c = (tyCoFVsOfType arg `unionFV` tyCoFVsOfType res) a b c
 tyCoFVsOfType (ForAllTy bndr ty) a b c = tyCoFVsBndr bndr (tyCoFVsOfType ty)  a b c
 tyCoFVsOfType (CastTy ty co)     a b c = (tyCoFVsOfType ty `unionFV` tyCoFVsOfCo co) a b c
 tyCoFVsOfType (CoercionTy co)    a b c = tyCoFVsOfCo co a b c
@@ -1492,7 +1531,7 @@ coVarsOfType (TyVarTy v)         = coVarsOfType (tyVarKind v)
 coVarsOfType (TyConApp _ tys)    = coVarsOfTypes tys
 coVarsOfType (LitTy {})          = emptyVarSet
 coVarsOfType (AppTy fun arg)     = coVarsOfType fun `unionVarSet` coVarsOfType arg
-coVarsOfType (FunTy arg res)     = coVarsOfType arg `unionVarSet` coVarsOfType res
+coVarsOfType (FunTy _ arg res)   = coVarsOfType arg `unionVarSet` coVarsOfType res
 coVarsOfType (ForAllTy (TvBndr tv _) ty)
   = (coVarsOfType ty `delVarSet` tv)
     `unionVarSet` coVarsOfType (tyVarKind tv)
@@ -1564,7 +1603,7 @@ noFreeVarsOfType (TyVarTy _)      = False
 noFreeVarsOfType (AppTy t1 t2)    = noFreeVarsOfType t1 && noFreeVarsOfType t2
 noFreeVarsOfType (TyConApp _ tys) = all noFreeVarsOfType tys
 noFreeVarsOfType ty@(ForAllTy {}) = isEmptyVarSet (tyCoVarsOfType ty)
-noFreeVarsOfType (FunTy t1 t2)    = noFreeVarsOfType t1 && noFreeVarsOfType t2
+noFreeVarsOfType (FunTy _ t1 t2)  = noFreeVarsOfType t1 && noFreeVarsOfType t2
 noFreeVarsOfType (LitTy _)        = True
 noFreeVarsOfType (CastTy ty co)   = noFreeVarsOfType ty && noFreeVarsOfCo co
 noFreeVarsOfType (CoercionTy co)  = noFreeVarsOfCo co
@@ -2179,7 +2218,7 @@ subst_ty subst ty
                 -- by [Int], represented with TyConApp
     go (TyConApp tc tys) = let args = map go tys
                            in  args `seqList` TyConApp tc args
-    go (FunTy arg res)   = (FunTy $! go arg) $! go res
+    go (FunTy w arg res) = ((FunTy $! w) $! go arg) $! go res
     go (ForAllTy (TvBndr tv vis) ty)
                          = case substTyVarBndrUnchecked subst tv of
                              (subst', tv') ->
@@ -2713,7 +2752,7 @@ tidyType env (TyVarTy tv)         = TyVarTy (tidyTyVarOcc env tv)
 tidyType env (TyConApp tycon tys) = let args = tidyTypes env tys
                                     in args `seqList` TyConApp tycon args
 tidyType env (AppTy fun arg)      = (AppTy $! (tidyType env fun)) $! (tidyType env arg)
-tidyType env (FunTy fun arg)      = (FunTy $! (tidyType env fun)) $! (tidyType env arg)
+tidyType env (FunTy w fun arg)    = ((FunTy $! w) $! (tidyType env fun)) $! (tidyType env arg)
 tidyType env (ty@(ForAllTy{}))    = mkForAllTys' (zip tvs' vis) $! tidyType env' body_ty
   where
     (tvs, vis, body_ty) = splitForAllTys' ty
@@ -2833,7 +2872,7 @@ typeSize :: Type -> Int
 typeSize (LitTy {})                 = 1
 typeSize (TyVarTy {})               = 1
 typeSize (AppTy t1 t2)              = typeSize t1 + typeSize t2
-typeSize (FunTy t1 t2)              = typeSize t1 + typeSize t2
+typeSize (FunTy _ t1 t2)            = typeSize t1 + typeSize t2
 typeSize (ForAllTy (TvBndr tv _) t) = typeSize (tyVarKind tv) + typeSize t
 typeSize (TyConApp _ ts)            = 1 + sum (map typeSize ts)
 typeSize (CastTy ty co)             = typeSize ty + coercionSize co

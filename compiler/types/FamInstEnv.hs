@@ -1426,11 +1426,11 @@ normalise_type ty
       = do { (co,  nty1) <- go ty1
            ; (arg, nty2) <- withRole Nominal $ go ty2
            ; return (mkAppCo co arg, mkAppTy nty1 nty2) }
-    go (FunTy ty1 ty2)
+    go (FunTy w ty1 ty2)
       = do { (co1, nty1) <- go ty1
            ; (co2, nty2) <- go ty2
            ; r <- getRole
-           ; return (mkFunCo r co1 co2, mkFunTy nty1 nty2) }
+           ; return (mkFunCo r co1 co2, mkFunTy w nty1 nty2) }
     go (ForAllTy (TvBndr tyvar vis) ty)
       = do { (lc', tv', h, ki') <- normalise_tyvar_bndr tyvar
            ; (co, nty)          <- withLC lc' $ normalise_type ty
@@ -1596,9 +1596,9 @@ coreFlattenTy = go
       = let (env', tys') = coreFlattenTys env tys in
         (env', mkTyConApp tc tys')
 
-    go env (FunTy ty1 ty2) = let (env1, ty1') = go env  ty1
-                                 (env2, ty2') = go env1 ty2 in
-                             (env2, mkFunTy ty1' ty2')
+    go env (FunTy weight ty1 ty2) = let (env1, ty1') = go env  ty1
+                                        (env2, ty2') = go env1 ty2 in
+                                    (env2, mkFunTy weight ty1' ty2')
 
     go env (ForAllTy (TvBndr tv vis) ty)
       = let (env1, tv') = coreFlattenVarBndr env tv
@@ -1679,7 +1679,7 @@ allTyVarsInTy = go
     go (TyVarTy tv)      = unitVarSet tv
     go (TyConApp _ tys)  = allTyVarsInTys tys
     go (AppTy ty1 ty2)   = (go ty1) `unionVarSet` (go ty2)
-    go (FunTy ty1 ty2)   = (go ty1) `unionVarSet` (go ty2)
+    go (FunTy _ ty1 ty2) = (go ty1) `unionVarSet` (go ty2)
     go (ForAllTy (TvBndr tv _) ty) = unitVarSet tv     `unionVarSet`
                                      go (tyVarKind tv) `unionVarSet`
                                      go ty

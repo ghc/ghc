@@ -1951,10 +1951,10 @@ expandSynonymsToMatch ty1 ty2 = (ty1_ret, ty2_ret)
           (t1_2', t2_2') = go t1_2 t2_2
        in (mkAppTy t1_1' t1_2', mkAppTy t2_1' t2_2')
 
-    go (FunTy t1_1 t1_2) (FunTy t2_1 t2_2) =
+    go (FunTy w1 t1_1 t1_2) (FunTy w2 t2_1 t2_2) | w1 == w2 =
       let (t1_1', t2_1') = go t1_1 t2_1
           (t1_2', t2_2') = go t1_2 t2_2
-       in (mkFunTy t1_1' t1_2', mkFunTy t2_1' t2_2')
+       in (mkFunTy w1 t1_1' t1_2', mkFunTy w2 t2_1' t2_2')
 
     go (ForAllTy b1 t1) (ForAllTy b2 t2) =
       -- NOTE: We may have a bug here, but we just can't reproduce it easily.

@@ -58,9 +58,9 @@ vectType (TyVarTy tv)      = return $ TyVarTy tv
 vectType (LitTy l)         = return $ LitTy l
 vectType (AppTy ty1 ty2)   = AppTy <$> vectType ty1 <*> vectType ty2
 vectType (TyConApp tc tys) = TyConApp <$> vectTyCon tc <*> mapM vectType tys
-vectType (FunTy ty1 ty2)
+vectType (FunTy w ty1 ty2)
   | isPredTy ty1
-  = mkFunTy <$> vectType ty1 <*> vectType ty2   -- don't build a closure for dictionary abstraction
+  = mkFunTy w <$> vectType ty1 <*> vectType ty2   -- don't build a closure for dictionary abstraction
   | otherwise
   = TyConApp <$> builtin closureTyCon <*> mapM vectType [ty1, ty2]
 vectType ty@(ForAllTy {})

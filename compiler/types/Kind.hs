@@ -85,7 +85,7 @@ isTYPEApp _ = Nothing
 -- ends in @*@ and @Maybe a -> [a]@ ends in @[]@.
 returnsTyCon :: Unique -> Type -> Bool
 returnsTyCon tc_u (ForAllTy _ ty)  = returnsTyCon tc_u ty
-returnsTyCon tc_u (FunTy    _ ty)  = returnsTyCon tc_u ty
+returnsTyCon tc_u (FunTy  _ _ ty)  = returnsTyCon tc_u ty
 returnsTyCon tc_u (TyConApp tc' _) = tc' `hasKey` tc_u
 returnsTyCon _  _                  = False
 
@@ -104,7 +104,7 @@ isKindLevPoly k = ASSERT2( isStarKind k || _is_type, ppr k )
     go AppTy{}           = True  -- it can't be a TyConApp
     go (TyConApp tc tys) = isFamilyTyCon tc || any go tys
     go ForAllTy{}        = True
-    go (FunTy t1 t2)     = go t1 || go t2
+    go (FunTy _ t1 t2)   = go t1 || go t2
     go LitTy{}           = False
     go CastTy{}          = True
     go CoercionTy{}      = True

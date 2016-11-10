@@ -1637,8 +1637,8 @@ tidySigSkol env cx ty tv_prs
       where
         (env', tv') = tidy_tv_bndr env tv
 
-    tidy_ty env (FunTy arg res)
-      = FunTy (tidyType env arg) (tidy_ty env res)
+    tidy_ty env (FunTy w arg res)
+      = FunTy w (tidyType env arg) (tidy_ty env res)
 
     tidy_ty env ty = tidyType env ty
 

@@ -1019,14 +1019,14 @@ getTyDescription ty
       TyVarTy _              -> "*"
       AppTy fun _            -> getTyDescription fun
       TyConApp tycon _       -> getOccString tycon
-      FunTy _ res            -> '-' : '>' : fun_result res
+      FunTy _ _ res          -> '-' : '>' : fun_result res
       ForAllTy _  ty         -> getTyDescription ty
       LitTy n                -> getTyLitDescription n
       CastTy ty _            -> getTyDescription ty
       CoercionTy co          -> pprPanic "getTyDescription" (ppr co)
     }
   where
-    fun_result (FunTy _ res) = '>' : fun_result res
+    fun_result (FunTy _ _ res) = '>' : fun_result res
     fun_result other         = getTyDescription other
 
 getTyLitDescription :: TyLit -> String

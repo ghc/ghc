@@ -120,7 +120,7 @@ toIfaceTypeX fr (AppTy t1 t2)  = IfaceAppTy (toIfaceTypeX fr t1) (toIfaceTypeX f
 toIfaceTypeX _  (LitTy n)      = IfaceLitTy (toIfaceTyLit n)
 toIfaceTypeX fr (ForAllTy b t) = IfaceForAllTy (toIfaceForAllBndr b)
                                                (toIfaceTypeX (fr `delVarSet` binderVar b) t)
-toIfaceTypeX fr (FunTy t1 t2)
+toIfaceTypeX fr (FunTy _ t1 t2)
   | isPredTy t1                 = IfaceDFunTy (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
   | otherwise                   = IfaceFunTy  (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
 toIfaceTypeX fr (CastTy ty co)  = IfaceCastTy (toIfaceTypeX fr ty) (toIfaceCoercionX fr co)
@@ -280,7 +280,7 @@ toIfaceTcArgsX fr tc ty_args
         t'  = toIfaceTypeX fr t
         ts' = go (extendTvSubst env tv t) res ts
 
-    go env (FunTy _ res) (t:ts) -- No type-class args in tycon apps
+    go env (FunTy _ _ res) (t:ts) -- No type-class args in tycon apps
       = ITC_Vis (toIfaceTypeX fr t) (go env res ts)
 
     go env (TyVarTy tv) ts

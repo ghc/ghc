@@ -231,7 +231,7 @@ inferConstraints tvs main_cls cls_tys inst_ty
              | otherwise   = cls_tys
 
 typeToTypeKind :: Kind
-typeToTypeKind = liftedTypeKind `mkFunTy` liftedTypeKind
+typeToTypeKind = liftedTypeKind `mkFunTyOm` liftedTypeKind
 
 -- | Like 'inferConstraints', but used only in the case of @DeriveAnyClass@,
 -- which gathers its constraints based on the type signatures of the class's

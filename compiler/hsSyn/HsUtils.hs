@@ -617,16 +617,12 @@ typeToLHsType ty
   = go ty
   where
     go :: Type -> LHsType RdrName
-    go ty@(FunTy arg _)
+    go ty@(FunTy _ arg _) -- TODO: arnaud: check assumption: if arg is a pred, then we don't care about linearity (it is always Omega)
       | isPredTy arg
       , (theta, tau) <- tcSplitPhiTy ty
       = noLoc (HsQualTy { hst_ctxt = noLoc (map go theta)
                         , hst_body = go tau })
-    -- TODO: arnaud: FunTy is a core type, so in this first approximation we
-    -- lost the information that a function is linear or not. I guess it means
-    -- that without some backporting to core, Generalizednewtypederiving can
-    -- yield incorrect result.
-    go (FunTy arg res) = nlHsFunTy (go arg) Omega (go res)
+    go (FunTy weight arg res) = nlHsFunTy (go arg) weight (go res)
     go ty@(ForAllTy {})
       | (tvs, tau) <- tcSplitForAllTys ty
       = noLoc (HsForAllTy { hst_bndrs = map go_tv tvs

@@ -374,8 +374,8 @@ contHoleType (StrictBind b _ _ se _)          = substTy se (idType b)
 contHoleType (StrictArg ai _ _)               = funArgTy (ai_type ai)
 contHoleType (ApplyToTy  { sc_hole_ty = ty }) = ty  -- See Note [The hole type in ApplyToTy]
 contHoleType (ApplyToVal { sc_arg = e, sc_env = se, sc_dup = dup, sc_cont = k })
-  = mkFunTy (perhapsSubstTy dup se (exprType e))
-            (contHoleType k)
+  = mkFunTy Omega (perhapsSubstTy dup se (exprType e))
+                  (contHoleType k)
 contHoleType (Select { sc_dup = d, sc_bndr =  b, sc_env = se })
   = perhapsSubstTy d se (idType b)
 

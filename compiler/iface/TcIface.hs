@@ -1241,8 +1241,8 @@ tcIfaceType = go
     go (IfaceFreeTyVar n)     = pprPanic "tcIfaceType:IfaceFreeTyVar" (ppr n)
     go (IfaceAppTy t1 t2)     = AppTy <$> go t1 <*> go t2
     go (IfaceLitTy l)         = LitTy <$> tcIfaceTyLit l
-    go (IfaceFunTy t1 t2)     = FunTy <$> go t1 <*> go t2
-    go (IfaceDFunTy t1 t2)    = FunTy <$> go t1 <*> go t2
+    go (IfaceFunTy t1 t2)     = FunTy Omega <$> go t1 <*> go t2 -- TODO: arnaud: I'm not sure what I'm doing here. It may be right or wrong depending on what interface types mean.
+    go (IfaceDFunTy t1 t2)    = FunTy Omega <$> go t1 <*> go t2
     go (IfaceTupleTy s i tks) = tcIfaceTupleTy s i tks
     go (IfaceTyConApp tc tks)
       = do { tc' <- tcIfaceTyCon tc

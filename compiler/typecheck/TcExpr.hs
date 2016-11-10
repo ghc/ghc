@@ -432,7 +432,7 @@ tcExpr expr@(SectionR op arg2) res_ty
        ; (wrap_fun, [arg1_ty, arg2_ty], op_res_ty)
                   <- matchActualFunTys (mk_op_msg op) fn_orig (Just op) 2 op_ty
        ; wrap_res <- tcSubTypeHR SectionOrigin (Just expr)
-                                 (mkFunTy arg1_ty op_res_ty) res_ty
+                                 (mkFunTy Omega arg1_ty op_res_ty) res_ty -- arnaud: TODO: operator sections could have linear types too. The weight should be derived from the operator's type.
        ; arg2' <- tcArg op arg2 arg2_ty 2
        ; return ( mkHsWrap wrap_res $
                   SectionR (mkLHsWrap wrap_fun op') arg2' ) }

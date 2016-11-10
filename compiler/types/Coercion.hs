@@ -608,7 +608,7 @@ mkFunCo r co1 co2
     -- See Note [Refl invariant]
   | Just (ty1, _) <- isReflCo_maybe co1
   , Just (ty2, _) <- isReflCo_maybe co2
-  = Refl r (mkFunTy ty1 ty2)
+  = Refl r (mkFunTyOm ty1 ty2)
   | otherwise = FunCo r co1 co2
 
 -- | Make nested function 'Coercion's
@@ -1603,7 +1603,8 @@ ty_co_subst lc role ty
                              liftCoSubstTyVar lc r tv
     go r (AppTy ty1 ty2)   = mkAppCo (go r ty1) (go Nominal ty2)
     go r (TyConApp tc tys) = mkTyConAppCo r tc (zipWith go (tyConRolesX r tc) tys)
-    go r (FunTy ty1 ty2)   = mkFunCo r (go r ty1) (go r ty2)
+    go r (FunTy _ ty1 ty2) = mkFunCo r (go r ty1) (go r ty2)
+                             -- only in Core, which ignores linearity so we can leave Omega here.
     go r (ForAllTy (TvBndr v _) ty)
                            = let (lc', v', h) = liftCoSubstVarBndr lc v in
                              mkForAllCo v' h $! ty_co_subst lc' r ty
@@ -1814,7 +1815,7 @@ coercionKind co = go co
             -- This is doing repeated substitutions and probably doesn't
             -- need to, see #11735
         mkInvForAllTy <$> Pair tv1 tv2 <*> Pair ty1 ty2'
-    go (FunCo _ co1 co2)    = mkFunTy <$> go co1 <*> go co2
+    go (FunCo _ co1 co2)    = mkFunTyOm <$> go co1 <*> go co2
     go (CoVarCo cv)         = coVarTypes cv
     go (AxiomInstCo ax ind cos)
       | CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
@@ -1896,7 +1897,7 @@ coercionKindRole = go
             -- need to, see #11735
         (mkInvForAllTy <$> Pair tv1 tv2 <*> Pair ty1 ty2', r)
     go (FunCo r co1 co2)
-      = (mkFunTy <$> coercionKind co1 <*> coercionKind co2, r)
+      = (mkFunTyOm <$> coercionKind co1 <*> coercionKind co2, r)
     go (CoVarCo cv) = (coVarTypes cv, coVarRole cv)
     go co@(AxiomInstCo ax _ _) = (coercionKind co, coAxiomRole ax)
     go (UnivCo _ r ty1 ty2)  = (Pair ty1 ty2, r)

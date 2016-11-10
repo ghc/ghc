@@ -509,11 +509,11 @@ tc_fun_type mode ty1 ty2 exp_kind = case mode_level mode of
        ; res_k <- newOpenTypeKind
        ; ty1' <- tc_lhs_type mode ty1 arg_k
        ; ty2' <- tc_lhs_type mode ty2 res_k
-       ; checkExpectedKind (mkFunTy ty1' ty2') liftedTypeKind exp_kind }
+       ; checkExpectedKind (mkFunTy Omega ty1' ty2') liftedTypeKind exp_kind }
   KindLevel ->  -- no representation polymorphism in kinds. yet.
     do { ty1' <- tc_lhs_type mode ty1 liftedTypeKind
        ; ty2' <- tc_lhs_type mode ty2 liftedTypeKind
-       ; checkExpectedKind (mkFunTy ty1' ty2') liftedTypeKind exp_kind }
+       ; checkExpectedKind (mkFunTy Omega ty1' ty2') liftedTypeKind exp_kind } -- TODO: arnaud: probably not correct
 
 ------------------------------------------
 -- See also Note [Bidirectional type checking]

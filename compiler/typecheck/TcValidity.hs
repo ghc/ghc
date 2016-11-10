@@ -475,7 +475,7 @@ check_type env ctxt rank ty
 
 check_type _ _ _ (TyVarTy _) = return ()
 
-check_type env ctxt rank (FunTy arg_ty res_ty)
+check_type env ctxt rank (FunTy _ arg_ty res_ty)
   = do  { check_type env ctxt arg_rank arg_ty
         ; check_type env ctxt res_rank res_ty }
   where
@@ -1108,7 +1108,7 @@ dropCasts :: Type -> Type
 -- To consider: drop only UnivCo(HoleProv) casts
 dropCasts (CastTy ty _)     = dropCasts ty
 dropCasts (AppTy t1 t2)     = mkAppTy (dropCasts t1) (dropCasts t2)
-dropCasts (FunTy t1 t2)     = mkFunTy (dropCasts t1) (dropCasts t2)
+dropCasts (FunTy w t1 t2)   = mkFunTy w (dropCasts t1) (dropCasts t2)
 dropCasts (TyConApp tc tys) = mkTyConApp tc (map dropCasts tys)
 dropCasts (ForAllTy b ty)   = ForAllTy (dropCastsB b) (dropCasts ty)
 dropCasts ty                = ty  -- LitTy, TyVarTy, CoercionTy
@@ -1942,7 +1942,7 @@ fvType (TyVarTy tv)          = [tv]
 fvType (TyConApp _ tys)      = fvTypes tys
 fvType (LitTy {})            = []
 fvType (AppTy fun arg)       = fvType fun ++ fvType arg
-fvType (FunTy arg res)       = fvType arg ++ fvType res
+fvType (FunTy _ arg res)     = fvType arg ++ fvType res
 fvType (ForAllTy (TvBndr tv _) ty)
   = fvType (tyVarKind tv) ++
     filter (/= tv) (fvType ty)
@@ -1985,7 +1985,7 @@ sizeType (TyVarTy {})      = 1
 sizeType (TyConApp _ tys)  = sizeTypes tys + 1
 sizeType (LitTy {})        = 1
 sizeType (AppTy fun arg)   = sizeType fun + sizeType arg
-sizeType (FunTy arg res)   = sizeType arg + sizeType res + 1
+sizeType (FunTy _ arg res) = sizeType arg + sizeType res + 1
 sizeType (ForAllTy _ ty)   = sizeType ty
 sizeType (CastTy ty _)     = sizeType ty
 sizeType (CoercionTy _)    = 1

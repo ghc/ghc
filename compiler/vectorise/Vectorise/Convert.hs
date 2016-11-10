@@ -44,7 +44,7 @@ fromVect ty expr
 
 -- For each function constructor in the original type we add an outer
 -- lambda to bind the parameter variable, and an inner application of it.
-fromVect (FunTy arg_ty res_ty) expr
+fromVect (FunTy _ arg_ty res_ty) expr
   = do
       arg     <- newLocalVar (fsLit "x") arg_ty
       varg    <- toVect arg_ty (Var arg)

@@ -1259,7 +1259,7 @@ ty_co_match menv subst ty1 (AppCo co2 arg2) _lkco _rkco
 
 ty_co_match menv subst (TyConApp tc1 tys) (TyConAppCo _ tc2 cos) _lkco _rkco
   = ty_co_match_tc menv subst tc1 tys tc2 cos
-ty_co_match menv subst (FunTy ty1 ty2) co _lkco _rkco
+ty_co_match menv subst (FunTy _ ty1 ty2) co _lkco _rkco
     -- Despite the fact that (->) is polymorphic in four type variables (two
     -- runtime rep and two types), we shouldn't need to explicitly unify the
     -- runtime reps here; unifying the types themselves should be sufficient.
@@ -1330,7 +1330,7 @@ ty_co_match_args _    _     _        _          _ _ = Nothing
 pushRefl :: Coercion -> Maybe Coercion
 pushRefl (Refl Nominal (AppTy ty1 ty2))
   = Just (AppCo (Refl Nominal ty1) (mkNomReflCo ty2))
-pushRefl (Refl r (FunTy ty1 ty2))
+pushRefl (Refl r (FunTy _ ty1 ty2))
   | Just rep1 <- getRuntimeRep_maybe ty1
   , Just rep2 <- getRuntimeRep_maybe ty2
   = Just (TyConAppCo r funTyCon [ mkReflCo r rep1, mkReflCo r rep2

@@ -17,6 +17,7 @@ HsTypes: Abstract syntax: user-defined types
 {-# LANGUAGE CPP #-}
 
 module HsTypes (
+        Rig(..),
         HsType(..), LHsType, HsKind, LHsKind,
         HsTyVarBndr(..), LHsTyVarBndr,
         LHsQTyVars(..),
@@ -46,8 +47,6 @@ module HsTypes (
 
         HsWildCardInfo(..), mkAnonWildCardTy,
         wildCardName, sameWildCard,
-
-        Rig(..),
 
         mkHsImplicitBndrs, mkHsWildCardBndrs, hsImplicitBody,
         mkEmptyImplicitBndrs, mkEmptyWildCardBndrs,
@@ -93,35 +92,6 @@ import Maybes( isJust )
 import Data.Data hiding ( Fixity, Prefix, Infix )
 import Data.Maybe ( fromMaybe )
 import Control.Monad ( unless )
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Weights}
-*                                                                      *
-************************************************************************
--}
-
-data Rig =  -- Zero |
-  One | Omega
-  deriving (Eq,Ord,Data)
-
-instance Num Rig where
-  -- Zero * _ = Zero
-  -- _ * Zero = Zero
-  Omega * One = Omega
-  One * Omega = Omega
-  One * One   = One
-  Omega * Omega = Omega
-
-  -- Zero + x = x
-  -- x + Zero = x
-  _ + _ = Omega
-
--- instance Outputable Rig where
---   ppr One = fromString "1"
---   ppr Omega = fromString "ω"
-
 
 {-
 ************************************************************************

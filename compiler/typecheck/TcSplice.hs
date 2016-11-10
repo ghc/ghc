@@ -1671,7 +1671,7 @@ reifyType (LitTy t)         = do { r <- reifyTyLit t; return (TH.LitT r) }
 reifyType (TyVarTy tv)      = return (TH.VarT (reifyName tv))
 reifyType (TyConApp tc tys) = reify_tc_app tc tys   -- Do not expand type synonyms here
 reifyType (AppTy t1 t2)     = do { [r1,r2] <- reifyTypes [t1,t2] ; return (r1 `TH.AppT` r2) }
-reifyType ty@(FunTy t1 t2)
+reifyType ty@(FunTy _ t1 t2) -- TODO: arnaud: linear arrows in template haskell
   | isPredTy t1 = reify_for_all ty  -- Types like ((?x::Int) => Char -> Char)
   | otherwise   = do { [r1,r2] <- reifyTypes [t1,t2] ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
 reifyType ty@(CastTy {})    = noTH (sLit "kind casts") (ppr ty)
@@ -1717,7 +1717,7 @@ reifyKind  ki
     reifyNonArrowKind k | isLiftedTypeKind k = return TH.StarT
                         | isConstraintKind k = return TH.ConstraintT
     reifyNonArrowKind (TyVarTy v)            = return (TH.VarT (reifyName v))
-    reifyNonArrowKind (FunTy _ k)            = reifyKind k
+    reifyNonArrowKind (FunTy _ _ k)          = reifyKind k
     reifyNonArrowKind (ForAllTy _ k)         = reifyKind k
     reifyNonArrowKind (TyConApp kc kis)      = reify_kc_app kc kis
     reifyNonArrowKind (AppTy k1 k2)          = do { k1' <- reifyKind k1

@@ -842,8 +842,8 @@ ppType (TyApp (VecTyCon _ pptc) [])      = pptc
 ppType (TyUTup ts) = "(mkTupleTy Unboxed "
                      ++ listify (map ppType ts) ++ ")"
 
-ppType (TyF s d) = "(mkFunTy (" ++ ppType s ++ ") (" ++ ppType d ++ "))"
-ppType (TyC s d) = "(mkFunTy (" ++ ppType s ++ ") (" ++ ppType d ++ "))"
+ppType (TyF s d) = "(mkFunTy Omega (" ++ ppType s ++ ") (" ++ ppType d ++ "))" -- TODO: arnaud: maybe primops are allowed to have linear types too
+ppType (TyC s d) = "(mkFunTy Omega (" ++ ppType s ++ ") (" ++ ppType d ++ "))" -- TODO: arnaud: maybe primops are allowed to have linear types too
 
 ppType other
    = error ("ppType: can't handle: " ++ show other ++ "\n")

@@ -356,7 +356,7 @@ orphNamesOfType (TyConApp tycon tys) = orphNamesOfTyCon tycon
                                        `unionNameSet` orphNamesOfTypes tys
 orphNamesOfType (ForAllTy bndr res)  = orphNamesOfType (binderKind bndr)
                                        `unionNameSet` orphNamesOfType res
-orphNamesOfType (FunTy arg res)      = unitNameSet funTyConName    -- NB!  See Trac #8535
+orphNamesOfType (FunTy _ arg res)    = unitNameSet funTyConName    -- NB!  See Trac #8535
                                        `unionNameSet` orphNamesOfType arg
                                        `unionNameSet` orphNamesOfType res
 orphNamesOfType (AppTy fun arg)      = orphNamesOfType fun `unionNameSet` orphNamesOfType arg
@@ -741,7 +741,7 @@ freeVars = go
     go (Lam b body)
       = ( FVAnn { fva_fvs    = b_fvs `unionFVs` (b `delBinderFV` body_fvs)
                 , fva_ty_fvs = b_fvs `unionFVs` (b `delBinderFV` body_ty_fvs)
-                , fva_ty     = mkFunTy b_ty body_ty }
+                , fva_ty     = mkFunTy Omega b_ty body_ty } -- In Core, linearity is ignored.
         , AnnLam b body' )
       where
         body'@(FVAnn { fva_fvs = body_fvs, fva_ty_fvs = body_ty_fvs

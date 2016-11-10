@@ -759,7 +759,7 @@ mkRuntimeErrorId name
     -- forall (rr :: RuntimeRep) (a :: rr). Addr# -> a
     --   See Note [Error and friends have an "open-tyvar" forall]
     runtime_err_ty = mkSpecSigmaTy [runtimeRep1TyVar, openAlphaTyVar] []
-                                   (mkFunTy addrPrimTy openAlphaTy)
+                                   (mkFunTy Omega addrPrimTy openAlphaTy)
 
 {- Note [Error and friends have an "open-tyvar" forall]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

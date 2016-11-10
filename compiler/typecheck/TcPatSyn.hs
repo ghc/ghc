@@ -403,7 +403,7 @@ tcPatSynMatcher (L loc name) lpat
              cont_ty = mkInfSigmaTy ex_tvs prov_theta $
                        mkFunTys cont_arg_tys res_ty
 
-             fail_ty  = mkFunTy voidPrimTy res_ty
+             fail_ty  = mkFunTyOm voidPrimTy res_ty -- TODO: arnaud: unsure about Omega here
 
        ; matcher_name <- newImplicitBinder name mkMatcherOcc
        ; scrutinee    <- newSysLocalId (fsLit "scrut") pat_ty
@@ -600,7 +600,7 @@ tcPatSynBuilderOcc ps
 
 add_void :: Bool -> Type -> Type
 add_void need_dummy_arg ty
-  | need_dummy_arg = mkFunTy voidPrimTy ty
+  | need_dummy_arg = mkFunTyOm voidPrimTy ty
   | otherwise      = ty
 
 tcPatToExpr :: [Located Name] -> LPat Name -> Either MsgDoc (LHsExpr Name)
