@@ -770,8 +770,9 @@ occAnalRec (CyclicSCC nodes) (body_uds, binds)
 
   | otherwise   -- At this point we always build a single Rec
   = -- pprTrace "occAnalRec" (vcat
-    --   [ text "tagged nodes" <+> ppr tagged_nodes
-    --   , text "lb edges" <+> ppr loop_breaker_edges])
+    --  [ text "weak_fvs" <+> ppr weak_fvs
+    --  , text "tagged nodes" <+> ppr tagged_nodes
+    --  , text "lb edges" <+> ppr loop_breaker_edges])
     (final_uds, Rec pairs : binds)
 
   where
