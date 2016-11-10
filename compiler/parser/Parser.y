@@ -453,6 +453,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '|'            { L _ ITvbar }
  '<-'           { L _ (ITlarrow _) }
  '->'           { L _ (ITrarrow _) }
+ '⊸'           { L _ (ITlolly _) }
  '@'            { L _ ITat }
  '~'            { L _ ITtilde }
  '~#'           { L _ ITtildehsh }
@@ -1806,6 +1807,9 @@ type :: { LHsType RdrName }
         | btype '->' ctype             {% ams $1 [mu AnnRarrow $2] -- See note [GADT decl discards annotations]
                                        >> ams (sLL $1 $> $ HsFunTy $1 Omega $3)
                                               [mu AnnRarrow $2] }
+        | btype '⊸' ctype             {% ams $1 [mu AnnRarrow $2] -- See note [GADT decl discards annotations]
+                                       >> ams (sLL $1 $> $ HsFunTy $1 One $3)
+                                              [mu AnnRarrow $2] }
 
 
 typedoc :: { LHsType RdrName }
@@ -1816,6 +1820,13 @@ typedoc :: { LHsType RdrName }
         | btype docprev '->' ctypedoc    {% ams (sLL $1 $> $
                                                  HsFunTy (L (comb2 $1 $2) (HsDocTy $1 $2))
                                                          Omega
+$4)
+                                                [mu AnnRarrow $3] }
+        | btype '⊸'     ctypedoc        {% ams (sLL $1 $> $ HsFunTy $1 One $3)
+                                                [mu AnnRarrow $2] }
+        | btype docprev '⊸' ctypedoc    {% ams (sLL $1 $> $
+                                                 HsFunTy (L (comb2 $1 $2) (HsDocTy $1 $2))
+                                                         One
                                                          $4)
                                                 [mu AnnRarrow $3] }
 

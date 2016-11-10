@@ -665,6 +665,7 @@ data Token
   | ITvbar
   | ITlarrow            IsUnicodeSyntax
   | ITrarrow            IsUnicodeSyntax
+  | ITlolly             IsUnicodeSyntax
   | ITat
   | ITtilde
   | ITtildehsh
@@ -895,6 +896,7 @@ reservedSymsFM = listToUFM $
        ,("∀",   ITforall UnicodeSyntax, unicodeSyntaxEnabled)
        ,("→",   ITrarrow UnicodeSyntax, unicodeSyntaxEnabled)
        ,("←",   ITlarrow UnicodeSyntax, unicodeSyntaxEnabled)
+       ,("⊸",   ITlolly NormalSyntax, always) -- TODO: arnaud: UnicodeSyntax, unicodeSyntaxEnabled)
 
        ,("⤙",   ITlarrowtail UnicodeSyntax,
                                 \i -> unicodeSyntaxEnabled i && arrowsEnabled i)
