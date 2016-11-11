@@ -14,9 +14,9 @@ T3613.hs:17:24: error:
         Actual type: IO ()
     • In a stmt of a 'do' block: bar
       In the first argument of ‘fooThen’, namely
-        ‘(do { bar;
-               undefined })’
+        ‘(do bar
+             undefined)’
       In the expression:
         fooThen
-          (do { bar;
-                undefined })
+          (do bar
+              undefined)

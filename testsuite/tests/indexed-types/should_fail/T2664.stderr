@@ -14,16 +14,16 @@ T2664.hs:31:9: error:
           (O $ takeMVar v, 
            E (pchoose Right v newPChan) (pchoose Left v newPChan))
       In the expression:
-        do { v <- newEmptyMVar;
-             return
-               (O $ takeMVar v, 
-                E (pchoose Right v newPChan) (pchoose Left v newPChan)) }
+        do v <- newEmptyMVar
+           return
+             (O $ takeMVar v, 
+              E (pchoose Right v newPChan) (pchoose Left v newPChan))
       In an equation for ‘newPChan’:
           newPChan
-            = do { v <- newEmptyMVar;
-                   return
-                     (O $ takeMVar v, 
-                      E (pchoose Right v newPChan) (pchoose Left v newPChan)) }
+            = do v <- newEmptyMVar
+                 return
+                   (O $ takeMVar v, 
+                    E (pchoose Right v newPChan) (pchoose Left v newPChan))
     • Relevant bindings include
         v :: MVar (Either (PChan a) (PChan b)) (bound at T2664.hs:24:9)
         newPChan :: IO (PChan (a :*: b), PChan c) (bound at T2664.hs:23:5)

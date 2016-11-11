@@ -13,7 +13,7 @@ T8603.hs:29:17: error:
       has only one
       In a stmt of a 'do' block: prize <- lift uniform [1, 2, 3]
       In the expression:
-        do { prize <- lift uniform [1, 2, ....];
-             return False }
+        do prize <- lift uniform [1, 2, ....]
+           return False
     • Relevant bindings include
         testRVState1 :: RVState s Bool (bound at T8603.hs:28:1)

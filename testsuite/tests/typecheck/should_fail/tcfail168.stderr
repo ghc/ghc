@@ -5,14 +5,14 @@ tcfail168.hs:7:11: error:
     • Probable cause: ‘putChar’ is applied to too few arguments
       In a stmt of a 'do' block: putChar
       In the expression:
-        do { putChar;
-             putChar 'a';
-             putChar 'a';
-             putChar 'a';
-             .... }
+        do putChar
+           putChar 'a'
+           putChar 'a'
+           putChar 'a'
+           ....
       In an equation for ‘foo’:
           foo
-            = do { putChar;
-                   putChar 'a';
-                   putChar 'a';
-                   .... }
+            = do putChar
+                 putChar 'a'
+                 putChar 'a'
+                 ....

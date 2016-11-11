@@ -10,9 +10,9 @@ T7786.hs:86:49: error:
         Nil :: Sing xxx <- return
                              (buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db)
       In the expression:
-        do { Nil :: Sing xxx <- return
-                                  (buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db);
-             return $ Sub db k sub }
+        do Nil :: Sing xxx <- return
+                                (buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db)
+           return $ Sub db k sub
     • Relevant bindings include
         sub :: Database sub (bound at T7786.hs:86:13)
         k :: Sing k (bound at T7786.hs:86:11)
@@ -36,9 +36,9 @@ T7786.hs:90:31: error:
     • In the second argument of ‘($)’, namely ‘Sub db k sub’
       In a stmt of a 'do' block: return $ Sub db k sub
       In the expression:
-        do { Nil :: Sing xxx <- return
-                                  (buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db);
-             return $ Sub db k sub }
+        do Nil :: Sing xxx <- return
+                                (buryUnder (dbKeys sub) k Nil `intersectPaths` dbKeys db)
+           return $ Sub db k sub
     • Relevant bindings include
         sub :: Database sub (bound at T7786.hs:86:13)
         k :: Sing k (bound at T7786.hs:86:11)

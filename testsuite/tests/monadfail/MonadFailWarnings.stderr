@@ -13,12 +13,12 @@ MonadFailWarnings.hs:19:5: warning: [-Wmissing-monadfail-instances (in -Wcompat)
             general :: Monad m => m a
     • In a stmt of a 'do' block: Just x <- undefined
       In the expression:
-        do { Just x <- undefined;
-             undefined }
+        do Just x <- undefined
+           undefined
       In an equation for ‘general’:
           general
-            = do { Just x <- undefined;
-                   undefined }
+            = do Just x <- undefined
+                 undefined
 
 MonadFailWarnings.hs:35:5: warning: [-Wmissing-monadfail-instances (in -Wcompat)]
     • No instance for (MonadFail Identity)
@@ -26,12 +26,12 @@ MonadFailWarnings.hs:35:5: warning: [-Wmissing-monadfail-instances (in -Wcompat)
         (this will become an error in a future GHC release)
     • In a stmt of a 'do' block: Just x <- undefined
       In the expression:
-        do { Just x <- undefined;
-             undefined }
+        do Just x <- undefined
+           undefined
       In an equation for ‘identity’:
           identity
-            = do { Just x <- undefined;
-                   undefined }
+            = do Just x <- undefined
+                 undefined
 
 MonadFailWarnings.hs:51:5: warning: [-Wmissing-monadfail-instances (in -Wcompat)]
     • No instance for (MonadFail (ST s))
@@ -39,12 +39,12 @@ MonadFailWarnings.hs:51:5: warning: [-Wmissing-monadfail-instances (in -Wcompat)
         (this will become an error in a future GHC release)
     • In a stmt of a 'do' block: Just x <- undefined
       In the expression:
-        do { Just x <- undefined;
-             undefined }
+        do Just x <- undefined
+           undefined
       In an equation for ‘st’:
           st
-            = do { Just x <- undefined;
-                   undefined }
+            = do Just x <- undefined
+                 undefined
 
 MonadFailWarnings.hs:59:5: warning: [-Wmissing-monadfail-instances (in -Wcompat)]
     • No instance for (MonadFail ((->) r))
@@ -52,9 +52,9 @@ MonadFailWarnings.hs:59:5: warning: [-Wmissing-monadfail-instances (in -Wcompat)
         (this will become an error in a future GHC release)
     • In a stmt of a 'do' block: Just x <- undefined
       In the expression:
-        do { Just x <- undefined;
-             undefined }
+        do Just x <- undefined
+           undefined
       In an equation for ‘reader’:
           reader
-            = do { Just x <- undefined;
-                   undefined }
+            = do Just x <- undefined
+                 undefined

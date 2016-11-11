@@ -1889,7 +1889,7 @@ pprStmt (ApplicativeStmt args mb_join _)
   -- make all the Applicative stuff invisible in error messages by
   -- flattening the whole ApplicativeStmt nest back to a sequence
   -- of statements.
-   pp_for_user = vcat $ punctuate semi $ concatMap flattenArg args
+   pp_for_user = vcat $ concatMap flattenArg args
 
    -- ppr directly rather than transforming here, because we need to
    -- inject a "return" which is hard when we're polymorphic in the id
@@ -1952,11 +1952,8 @@ pprDo _             _     = panic "pprDo" -- PatGuard, ParStmtCxt
 
 ppr_do_stmts :: (OutputableBndrId idL, OutputableBndrId idR, Outputable body)
              => [LStmtLR idL idR body] -> SDoc
--- Print a bunch of do stmts, with explicit braces and semicolons,
--- so that we are not vulnerable to layout bugs
-ppr_do_stmts stmts
-  = lbrace <+> pprDeeperList vcat (punctuate semi (map ppr stmts))
-           <+> rbrace
+-- Print a bunch of do stmts
+ppr_do_stmts stmts = pprDeeperList vcat (map ppr stmts)
 
 pprComp :: (OutputableBndrId id, Outputable body)
         => [LStmt id body] -> SDoc

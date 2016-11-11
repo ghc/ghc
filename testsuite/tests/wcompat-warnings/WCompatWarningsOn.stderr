@@ -13,12 +13,12 @@ WCompatWarningsOn.hs:13:5: warning: [-Wmissing-monadfail-instances (in -Wcompat)
             monadFail :: Monad m => m a
     • In a stmt of a 'do' block: Just _ <- undefined
       In the expression:
-        do { Just _ <- undefined;
-             undefined }
+        do Just _ <- undefined
+           undefined
       In an equation for ‘monadFail’:
           monadFail
-            = do { Just _ <- undefined;
-                   undefined }
+            = do Just _ <- undefined
+                 undefined
 
 WCompatWarningsOn.hs:16:1: warning: [-Wsemigroup (in -Wcompat)]
     Local definition of ‘<>’ clashes with a future Prelude name.

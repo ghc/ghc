@@ -39,6 +39,6 @@ T2693.hs:29:20: error:
     • In the first argument of ‘mapM’, namely ‘g’
       In a stmt of a 'do' block: pvs <- mapM g undefined
       In the expression:
-        do { pvs <- mapM g undefined;
-             let n = (map pvrX pvs) `min` (map pvrX pvs);
-             undefined }
+        do pvs <- mapM g undefined
+           let n = (map pvrX pvs) `min` (map pvrX pvs)
+           undefined
