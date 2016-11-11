@@ -1067,6 +1067,7 @@ hsExprNeedsParens (HsTcBracketOut {}) = False
 hsExprNeedsParens (HsDo sc _ _)
        | isListCompExpr sc            = False
 hsExprNeedsParens (HsRecFld{})        = False
+hsExprNeedsParens (HsSpliceE{})       = False
 hsExprNeedsParens _ = True
 
 
