@@ -280,7 +280,7 @@ test('T3064',
             # 2014-01-22:     23 (x86/Linux)
             # 2014-12-22:     23 (x86/Linux) death to silent superclasses
             # 2015-07-11      28 (x86/Linux, 64-bit machine) use +RTS -G1
-           (wordsize(64), 54, 20)]),
+           (wordsize(64), 66, 20)]),
             # (amd64/Linux):            18
             # (amd64/Linux) 2012-02-07: 26
             # (amd64/Linux) 2013-02-12: 23; increased range to 10%
@@ -294,6 +294,7 @@ test('T3064',
             # (amd64/Linux) 2014-12-22: 27: death to silent superclasses
             # (amd64/Linux) 2015-01-22: 32: Varies from 30 to 34, at least here.
             # (amd64/Linux) 2015-06-03: 54: use +RTS -G1
+            # (amd64/Linux) 2016-11-03: 66: Parenthesis reading for Read
 
       compiler_stats_num_field('bytes allocated',
           [(wordsize(32), 153261024, 10),

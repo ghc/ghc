@@ -262,13 +262,49 @@ lexP = lift L.lex
 expectP :: L.Lexeme -> ReadPrec ()
 expectP lexeme = lift (L.expect lexeme)
 
+expectCharP :: Char -> ReadPrec a -> ReadPrec a
+expectCharP c a = do
+  q <- get
+  if q == c
+    then a
+    else pfail
+{-# INLINE expectCharP #-}
+
+-- A version of skipSpaces that takes the next
+-- parser as an argument. That is,
+--
+-- skipSpacesThenP m = lift skipSpaces >> m
+--
+-- Since skipSpaces is recursive, it appears that we get
+-- cleaner code by providing the continuation explicitly.
+-- In particular, we avoid passing an extra continuation
+-- of the form
+--
+-- \ () -> ...
+skipSpacesThenP :: ReadPrec a -> ReadPrec a
+skipSpacesThenP m =
+  do s <- look
+     skip s
+ where
+   skip (c:s) | isSpace c = get *> skip s
+   skip _ = m
+
 paren :: ReadPrec a -> ReadPrec a
 -- ^ @(paren p)@ parses \"(P0)\"
 --      where @p@ parses \"P0\" in precedence context zero
-paren p = do expectP (L.Punc "(")
-             x <- reset p
-             expectP (L.Punc ")")
-             return x
+paren p = skipSpacesThenP (paren' p)
+
+-- We try very hard to make paren' efficient, because parens is ubiquitous.
+-- Earlier code used `expectP` to look for the parentheses. The problem is that
+-- this lexes a (potentially long) token just to check if it's a parenthesis or
+-- not. So the first token of pretty much every value would be fully lexed
+-- twice. Now, we look for the '(' by hand instead. Since there's no reason not
+-- to, and it allows for faster failure, we do the same for ')'. This strategy
+-- works particularly well here because neither '(' nor ')' can begin any other
+-- lexeme.
+paren' :: ReadPrec a -> ReadPrec a
+paren' p = expectCharP '(' $ reset p >>= \x ->
+              skipSpacesThenP (expectCharP ')' (pure x))
 
 parens :: ReadPrec a -> ReadPrec a
 -- ^ @(parens p)@ parses \"P\", \"(P0)\", \"((P0))\", etc,
