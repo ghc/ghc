@@ -148,7 +148,42 @@ simpl_top wanteds
              then do { wc_residual <- nestTcS (solveWantedsAndDrop wc)
                      ; try_class_defaulting wc_residual }
                   -- See Note [Overview of implicit CallStacks] in TcEvidence
-             else return wc }
+             else try_callstack_defaulting wc }
+
+    try_callstack_defaulting :: WantedConstraints -> TcS WantedConstraints
+    try_callstack_defaulting wc
+      | isEmptyWC wc
+      = return wc
+      | otherwise
+      = defaultCallStacks wc
+
+-- | Default any remaining @CallStack@ constraints to empty @CallStack@s.
+defaultCallStacks :: WantedConstraints -> TcS WantedConstraints
+-- See Note [Overview of implicit CallStacks] in TcEvidence
+defaultCallStacks wanteds
+  = do simples <- handle_simples (wc_simple wanteds)
+       implics <- mapBagM handle_implic (wc_impl wanteds)
+       return (wanteds { wc_simple = simples, wc_impl = implics })
+
+  where
+
+  handle_simples simples
+    = catBagMaybes <$> mapBagM defaultCallStack simples
+
+  handle_implic implic
+    = do { wanteds <- setEvBindsTcS (ic_binds implic) $
+                      -- defaultCallStack sets a binding, so
+                      -- we must set the correct binding group
+                      defaultCallStacks (ic_wanted implic)
+         ; return (implic { ic_wanted = wanteds }) }
+
+  defaultCallStack ct
+    | Just _ <- isCallStackPred (ctPred ct)
+    = do { solveCallStack (cc_ev ct) EvCsEmpty
+         ; return Nothing }
+
+  defaultCallStack ct
+    = return (Just ct)
 
 
 {- Note [Fail fast on kind errors]
@@ -1070,12 +1105,9 @@ solveWanteds wc@(WC { wc_simple = simples, wc_insol = insols, wc_impl = implics 
        ; (floated_eqs, implics2) <- solveNestedImplications (implics `unionBags` implics1)
 
        ; dflags <- getDynFlags
-       ; wc2 <- simpl_loop 0 (solverIterations dflags) floated_eqs no_new_scs
-                             (WC { wc_simple = simples1, wc_impl = implics2
-                                 , wc_insol  = insols `unionBags` insols1 })
-
-       -- Do call-stack defaultin
-       ; final_wc <- defaultCallStacks wc2
+       ; final_wc <- simpl_loop 0 (solverIterations dflags) floated_eqs no_new_scs
+                                (WC { wc_simple = simples1, wc_impl = implics2
+                                    , wc_insol  = insols `unionBags` insols1 })
 
        ; bb <- TcS.getTcEvBindsMap
        ; traceTcS "solveWanteds }" $
@@ -1524,35 +1556,7 @@ Conclusion: we should call solveNestedImplications only if we did
 some unifiction in solveSimpleWanteds; because that's the only way
 we'll get more Givens (a unificaiton is like adding a Given) to
 allow the implication to make progress.
-
-Note [CallStack defaulting]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See Note [Overview of implicit CallStacks] in TcEvidence.
-
-We default an unsolved call stack to EvCsEmpty, in solveWanteds, after
-solving the wanteds as hard as we can, because that means that there
-are no gratuitous unsolved CallStack constraints lying around to
-clutter up the constraint tree. (Previously it was done in simpl_top,
-but that's really not the right place, because it left us with
-Unsolved impliations that has no wanted constraints, because
-defaultCallStacks had got rid of them.)
 -}
-
--- | Default any remaining @CallStack@ constraints to empty @CallStack@s.
--- See Note [CallStack defaulting]
-defaultCallStacks :: WantedConstraints -> TcS WantedConstraints
-defaultCallStacks wanteds@(WC { wc_simple = simples })
-  = do { simples' <- catBagMaybes <$> mapBagM defaultCallStack simples
-       ; return (wanteds { wc_simple = simples' }) }
-  where
-    defaultCallStack ct
-      | Just _ <- isCallStackPred (ctEvPred ev)
-      = do { solveCallStack ev EvCsEmpty
-           ; return Nothing }
-
-      | otherwise = return (Just ct)
-      where
-        ev = ctEvidence ct
 
 promoteTyVar :: TcLevel -> TcTyVar  -> TcM ()
 -- When we float a constraint out of an implication we must restore
