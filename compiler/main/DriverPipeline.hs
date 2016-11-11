@@ -1859,6 +1859,11 @@ linkBinary' staticLink dflags o_files dep_packages = do
                       ++ map SysTools.Option (
                          []
 
+                      -- See Note [No PIE eating when linking]
+                      ++ (if sGccSupportsNoPie mySettings
+                             then ["-no-pie"]
+                             else [])
+
                       -- Permit the linker to auto link _symbol to _imp_symbol.
                       -- This lets us link against DLLs without needing an "import library".
                       ++ (if platformOS platform == OSMinGW32
@@ -2157,6 +2162,11 @@ joinObjectFiles dflags o_files output_fn = do
                        SysTools.Option "-nostdlib",
                        SysTools.Option "-Wl,-r"
                      ]
+                        -- See Note [No PIE eating while linking] in SysTools
+                     ++ (if sGccSupportsNoPie mySettings
+                          then [SysTools.Option "-no-pie"]
+                          else [])
+
                      ++ (if any (cc ==) [Clang, AppleClang, AppleClang51]
                           then []
                           else [SysTools.Option "-nodefaultlibs"])
