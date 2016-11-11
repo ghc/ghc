@@ -1681,24 +1681,25 @@ instance (OutputableBndrId name) => Outputable (ForeignDecl name) where
        2 (dcolon <+> ppr ty)
 
 instance Outputable ForeignImport where
-  ppr (CImport  cconv safety mHeader spec _) =
+  ppr (CImport  cconv safety mHeader spec (L _ srcText)) =
     ppr cconv <+> ppr safety <+>
-    char '"' <> pprCEntity spec <> char '"'
+    char '"' <> pprCEntity spec srcText <> char '"'
     where
       pp_hdr = case mHeader of
                Nothing -> empty
                Just (Header _ header) -> ftext header
 
-      pprCEntity (CLabel lbl) =
+      pprCEntity (CLabel lbl) _ =
         text "static" <+> pp_hdr <+> char '&' <> ppr lbl
-      pprCEntity (CFunction (StaticTarget _ lbl _ isFun)) =
-            text "static"
+      pprCEntity (CFunction (StaticTarget _ lbl _ isFun)) src =
+            -- We may need to drop leading spaces first
+            (if (take 6 src == "static") then text "static" else empty)
         <+> pp_hdr
         <+> (if isFun then empty else text "value")
         <+> ppr lbl
-      pprCEntity (CFunction (DynamicTarget)) =
+      pprCEntity (CFunction (DynamicTarget)) _ =
         text "dynamic"
-      pprCEntity (CWrapper) = text "wrapper"
+      pprCEntity (CWrapper) _ = text "wrapper"
 
 instance Outputable ForeignExport where
   ppr (CExport  (L _ (CExportStatic _ lbl cconv)) _) =

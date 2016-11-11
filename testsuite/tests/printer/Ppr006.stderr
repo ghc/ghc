@@ -24,15 +24,15 @@ Ppr006.hs:21:19: error:
 Ppr006.ppr.hs:3:14: error:
     Not in scope: type constructor or class ‘Command’
 
-Ppr006.ppr.hs:8:27: error:
+Ppr006.ppr.hs:8:29: error:
     Not in scope: ‘Macro.guessCommands’
     No module named ‘Macro’ is imported.
 
-Ppr006.ppr.hs:14:19: error:
+Ppr006.ppr.hs:14:21: error:
     Not in scope: ‘ListWidget.moveLast’
     No module named ‘ListWidget’ is imported.
 
-Ppr006.ppr.hs:14:40: error:
+Ppr006.ppr.hs:14:42: error:
     Not in scope: ‘ListWidget.new’
     No module named ‘ListWidget’ is imported.
 

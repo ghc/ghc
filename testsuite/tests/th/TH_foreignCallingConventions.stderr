@@ -25,4 +25,4 @@ TH_foreignCallingConventions.hs:(13,4)-(23,25): Splicing declarations
        return [dec1, dec2]
   ======>
     foreign import ccall interruptible "static &foo" foo :: Ptr ()
-    foreign import prim safe "static bar" bar :: Int# -> Int#
+    foreign import prim safe "bar" bar :: Int# -> Int#
