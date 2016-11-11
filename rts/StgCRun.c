@@ -909,7 +909,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
         /*
          * restore callee-saves registers.
          */
-        "sd x2, 16[sp]\n\t"
+        "sd x2, 16(sp)\n\t"
 
       : "=r" (r)
       : "r" (f), "r" (basereg), "r" (RESERVED_C_STACK_BYTES)
