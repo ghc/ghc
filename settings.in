@@ -2,6 +2,7 @@
  ("C compiler command", "@SettingsCCompilerCommand@"),
  ("C compiler flags", "@SettingsCCompilerFlags@"),
  ("C compiler link flags", "@SettingsCCompilerLinkFlags@"),
+ ("C compiler supports -no-pie", "@SettingsCCompilerSupportsNoPie@"),
  ("Haskell CPP command","@SettingsHaskellCPPCommand@"),
  ("Haskell CPP flags","@SettingsHaskellCPPFlags@"),
  ("ld command", "@SettingsLdCommand@"),

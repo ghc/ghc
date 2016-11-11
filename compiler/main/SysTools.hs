@@ -242,6 +242,7 @@ initSysTools mbMinusB
        -- to make that possible, so for now you can't.
        gcc_prog <- getSetting "C compiler command"
        gcc_args_str <- getSetting "C compiler flags"
+       gccSupportsNoPie <- getBooleanSetting "C compiler supports -no-pie"
        cpp_prog <- getSetting "Haskell CPP command"
        cpp_args_str <- getSetting "Haskell CPP flags"
        let unreg_gcc_args = if targetUnregisterised
@@ -333,6 +334,7 @@ initSysTools mbMinusB
                     sLdSupportsBuildId       = ldSupportsBuildId,
                     sLdSupportsFilelist      = ldSupportsFilelist,
                     sLdIsGnuLd               = ldIsGnuLd,
+                    sGccSupportsNoPie        = gccSupportsNoPie,
                     sProgramName             = "ghc",
                     sProjectVersion          = cProjectVersion,
                     sPgm_L   = unlit_path,
@@ -1719,6 +1721,10 @@ linkDynLib dflags0 o_files dep_packages
                  ++ [ Option "-o"
                     , FileOption "" output_fn
                     ]
+                    -- See Note [No PIE eating when linking]
+                 ++ (if sGccSupportsNoPie (settings dflags)
+                     then [Option "-no-pie"]
+                     else [])
                  ++ map Option o_files
                  ++ [ Option "-shared" ]
                  ++ map Option bsymbolicFlag

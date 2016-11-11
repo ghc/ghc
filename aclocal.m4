@@ -489,12 +489,14 @@ AC_DEFUN([FP_SETTINGS],
     fi
     SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
     SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2"
+    SettingsCCompilerSupportsNoPie="$CONF_GCC_SUPPORTS_NO_PIE"
     SettingsLdFlags="$CONF_LD_LINKER_OPTS_STAGE2"
     AC_SUBST(SettingsCCompilerCommand)
     AC_SUBST(SettingsHaskellCPPCommand)
     AC_SUBST(SettingsHaskellCPPFlags)
     AC_SUBST(SettingsCCompilerFlags)
     AC_SUBST(SettingsCCompilerLinkFlags)
+    AC_SUBST(SettingsCCompilerSupportsNoPie)
     AC_SUBST(SettingsLdCommand)
     AC_SUBST(SettingsLdFlags)
     AC_SUBST(SettingsArCommand)
@@ -1247,6 +1249,25 @@ fi
 AC_SUBST(GccIsClang)
 
 rm -f conftest.txt
+])
+
+# FP_GCC_SUPPORTS_NO_PIE
+# ----------------------
+# Does gcc support the -no-pie option? If so we should pass it to gcc when
+# joining objects since -pie may be enabled by default.
+AC_DEFUN([FP_GCC_SUPPORTS_NO_PIE],
+[
+   AC_REQUIRE([AC_PROG_CC])
+   AC_MSG_CHECKING([whether GCC supports -no-pie])
+   echo 'int main() { return 0; }' > conftest.c
+   if ${CC-cc} -o conftest -no-pie conftest.c > /dev/null 2>&1; then
+       CONF_GCC_SUPPORTS_NO_PIE=YES
+       AC_MSG_RESULT([yes])
+   else
+       CONF_GCC_SUPPORTS_NO_PIE=NO
+       AC_MSG_RESULT([no])
+   fi
+   rm -f conftest.c conftest.o conftest
 ])
 
 dnl Small feature test for perl version. Assumes PerlCmd

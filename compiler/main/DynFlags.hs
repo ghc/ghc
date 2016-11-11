@@ -922,6 +922,7 @@ data Settings = Settings {
   sLdSupportsBuildId       :: Bool,
   sLdSupportsFilelist      :: Bool,
   sLdIsGnuLd               :: Bool,
+  sGccSupportsNoPie        :: Bool,
   -- commands for particular phases
   sPgm_L                 :: String,
   sPgm_P                 :: (String,[Option]),
