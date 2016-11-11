@@ -1322,24 +1322,6 @@ AC_SUBST(GccIsClang)
 rm -f conftest.txt
 ])
 
-# FP_GCC_SUPPORTS_NO_PIE
-# ----------------------
-# Does gcc support the -no-pie option? If so we should pass it to gcc when
-# joining objects since -pie may be enabled by default.
-AC_DEFUN([FP_GCC_SUPPORTS_NO_PIE],
-[
-   AC_REQUIRE([AC_PROG_CC])
-   AC_MSG_CHECKING([whether GCC supports -no-pie])
-   echo 'int main() { return 0; }' > conftest.c
-   if ${CC-cc} -o conftest -no-pie conftest.c > /dev/null 2>&1; then
-       AC_DEFINE(GCC_SUPPORTS_NO_PIE, 1, [gcc supports -no-pie])
-       AC_MSG_RESULT([yes])
-   else
-       AC_MSG_RESULT([no])
-   fi
-   rm -f conftest.c conftest.o conftest
-])
-
 dnl Small feature test for perl version. Assumes PerlCmd
 dnl contains path to perl binary.
 dnl
