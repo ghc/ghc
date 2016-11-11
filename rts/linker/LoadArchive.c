@@ -9,8 +9,15 @@
 #include "PathUtils.h"
 #include "LinkerInternals.h"
 #include "linker/M32Alloc.h"
+
+/* Platform specific headers */
 #if defined(OBJFORMAT_PEi386)
-#include "linkers/PEi386.h"
+#  include "linkers/PEi386.h"
+#elif defined(darwin_HOST_OS)
+#  include "linker/MachO.h"
+#  include <regex.h>
+#  include <mach/machine.h>
+#  include <mach-o/fat.h>
 #endif
 
 #include <ctype.h>

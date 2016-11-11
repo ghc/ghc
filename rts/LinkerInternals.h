@@ -293,4 +293,13 @@ char *cstring_from_section_name(
     UChar* strtab);
 #endif /* mingw32_HOST_OS */
 
+/* Which object file format are we targetting? */
+#if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) || defined(freebsd_HOST_OS) || defined(kfreebsdgnu_HOST_OS) || defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) || defined(openbsd_HOST_OS) || defined(gnu_HOST_OS)
+#  define OBJFORMAT_ELF
+#elif defined (mingw32_HOST_OS)
+#  define OBJFORMAT_PEi386
+#elif defined(darwin_HOST_OS)
+#  define OBJFORMAT_MACHO
+#endif
+
 #endif /* LINKERINTERNALS_H */

@@ -57,17 +57,14 @@
 #include <dlfcn.h>
 #endif
 
-#if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) || defined(freebsd_HOST_OS) || defined(kfreebsdgnu_HOST_OS) || defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) || defined(openbsd_HOST_OS) || defined(gnu_HOST_OS)
-#  define OBJFORMAT_ELF
+#if defined(OBJFORMAT_ELF)
 #  include "linker/Elf.h"
 #  include <regex.h>    // regex is already used by dlopen() so this is OK
                         // to use here without requiring an additional lib
-#elif defined (mingw32_HOST_OS)
-#  define OBJFORMAT_PEi386
+#elif defined(OBJFORMAT_PEi386)
 #  include "linker/PEi386.h"
 #  include <windows.h>
-#elif defined(darwin_HOST_OS)
-#  define OBJFORMAT_MACHO
+#elif defined(OBJFORMAT_MACHO)
 #  include "linker/MachO.h"
 #  include <regex.h>
 #  include <mach/machine.h>
