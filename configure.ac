@@ -647,6 +647,9 @@ dnl     If gcc, make sure it's at least 3.0
 dnl
 FP_GCC_VERSION
 
+dnl ** See whether gcc supports -no-pie
+FP_GCC_SUPPORTS_NO_PIE
+
 dnl ** look to see if we have a C compiler using an llvm back end.
 dnl
 FP_CC_LLVM_BACKEND
