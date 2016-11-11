@@ -874,12 +874,8 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
     __asm__ volatile (
         /*
          * Save callee-saves registers on behalf of the STG code.
-         * Floating point registers only need the bottom 64 bits preserved.
-         * We need to use the the names x16, x17, x29 and x30 instead of ip0
-         * ip1, fp and lp because one of either clang or gcc doesn't understand
-         * the later names.
          */
-        "sd x2,  [sp, #-16]!\n\t"
+        "sd x2,  -16(sp)\n\t"
 
         /*
          * allocate some space for Stg machine's temporary storage.
@@ -913,7 +909,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
         /*
          * restore callee-saves registers.
          */
-        "sd x2, [sp], #16\n\t"
+        "sd x2, 16[sp]\n\t"
 
       : "=r" (r)
       : "r" (f), "r" (basereg), "i" (RESERVED_C_STACK_BYTES)
