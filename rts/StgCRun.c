@@ -875,7 +875,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
         /*
          * Save callee-saves registers on behalf of the STG code.
          */
-        "sd x2,  -16(sp)\n\t"
+        "sd x2, -16(sp)\n\t"
 
         /*
          * allocate some space for Stg machine's temporary storage.
