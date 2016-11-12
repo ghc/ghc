@@ -2,6 +2,7 @@
 
 #include "ghcconfig.h"
 #include "rts/Config.h"
+#include "MachDeps.h"
 
 name:           rts
 version:        1.0
@@ -42,17 +43,7 @@ extra-libraries:
                               ,"gdi32"      /* for the linker */
                               ,"winmm"      /* for the linker */
 #endif
-#ifdef freebsd_HOST_OS
-                              , "pthread" /* for pthread_getthreadid_np() */
-#endif
-#ifdef openbsd_HOST_OS
-/* OpenBSD's libffi is not directly linked to the libpthread but still requires
-pthread functionality. This means that any client binary which links with libffi
-also need to link with libpthread. If it does not, then linking fails with
-unresolved symbols. */
-                              , "pthread"
-
-#endif
+                              , "pthread"   /* for pthread_getthreadid_np, pthread_create, etc. */
 #if defined(DEBUG) && defined(HAVE_LIBBFD)
                               ,"bfd", "iberty"  /* for debugging */
 #endif
