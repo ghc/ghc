@@ -1,7 +1,7 @@
 first run
-[1 of 3] Compiling A                ( A.hs, A.o )
-[2 of 3] Compiling B                ( B.hs, B.o )
-[3 of 3] Compiling C                ( C.hs, C.o )
+[1 of 3] Compiling A                (.hs -> .o)
+[2 of 3] Compiling B                (.hs -> .o)
+[3 of 3] Compiling C                (.hs -> .o)
 second run
-[2 of 3] Compiling B                ( B.hs, B.o )
-[3 of 3] Compiling C                ( C.hs, C.o ) [B changed]
+[2 of 3] Compiling B                (.hs -> .o)
+[3 of 3] Compiling C                (.hs -> .o) [B changed]

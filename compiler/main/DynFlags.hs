@@ -392,6 +392,7 @@ data GeneralFlag
 
    | Opt_WarnIsError                    -- -Werror; makes warnings fatal
    | Opt_ShowWarnGroups                 -- Show the group a warning belongs to
+   | Opt_ShowSourcePaths                -- Show module source/object paths
 
    | Opt_PrintExplicitForalls
    | Opt_PrintExplicitKinds
@@ -3487,7 +3488,8 @@ fFlagsDeps = [
   flagSpec "vectorise"                        Opt_Vectorise,
   flagSpec "version-macros"                   Opt_VersionMacros,
   flagSpec "worker-wrapper"                   Opt_WorkerWrapper,
-  flagSpec "show-warning-groups"              Opt_ShowWarnGroups
+  flagSpec "show-warning-groups"              Opt_ShowWarnGroups,
+  flagSpec "show-source-paths"                Opt_ShowSourcePaths
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@

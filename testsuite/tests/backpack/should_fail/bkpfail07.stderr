@@ -1,11 +1,11 @@
 [1 of 3] Processing p
-  [1 of 1] Compiling H[sig]           ( p/H.hsig, nothing )
+  [1 of 1] Compiling H[sig]          (.hsig -> nothing)
 [2 of 3] Processing h
-  [1 of 3] Compiling T                ( h/T.hs, nothing )
-  [2 of 3] Compiling H                ( h/H.hs, nothing )
-  [3 of 3] Compiling A[sig]           ( h/A.hsig, nothing )
+  [1 of 3] Compiling T               (.hs -> nothing)
+  [2 of 3] Compiling H               (.hs -> nothing)
+  [3 of 3] Compiling A[sig]          (.hsig -> nothing)
 [3 of 3] Processing q
-  [1 of 1] Compiling A[sig]           ( q/A.hsig, nothing )
+  [1 of 1] Compiling A[sig]          (.hsig -> nothing)
 
 bkpfail07.bkp:6:9: error:
     • Type constructor ‘h[A=<A>]:T.T’ has conflicting definitions in the module

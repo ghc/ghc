@@ -1,6 +1,6 @@
-[1 of 3] Compiling SH_Overlap11_B   ( SH_Overlap11_B.hs, SH_Overlap11_B.o )
-[2 of 3] Compiling SH_Overlap11_A   ( SH_Overlap11_A.hs, SH_Overlap11_A.o )
-[3 of 3] Compiling SH_Overlap11     ( SH_Overlap11.hs, SH_Overlap11.o )
+[1 of 3] Compiling SH_Overlap11_B  (.hs -> .o)
+[2 of 3] Compiling SH_Overlap11_A  (.hs -> .o)
+[3 of 3] Compiling SH_Overlap11    (.hs -> .o)
 
 SH_Overlap11.hs:1:16: warning: [-Wunsafe]
     ‘SH_Overlap11’ has been inferred as unsafe!

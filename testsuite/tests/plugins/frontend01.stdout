@@ -1,4 +1,4 @@
 ["foobar"]
-[1 of 1] Compiling Main             ( frontend01.hs, frontend01.o )
+[1 of 1] Compiling Main             (.hs -> .o)
 Linking frontend01 ...
 hello world

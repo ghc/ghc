@@ -1,4 +1,4 @@
-[1 of 2] Compiling ExtraConstraintsWildcardInTypeSplice ( ExtraConstraintsWildcardInTypeSplice.hs, ExtraConstraintsWildcardInTypeSplice.o )
+[1 of 2] Compiling ExtraConstraintsWildcardInTypeSplice (.hs -> .o)
 
 ExtraConstraintsWildcardInTypeSplice.hs:7:16: error:
     • Wildcard ‘_’ not allowed in a constraint

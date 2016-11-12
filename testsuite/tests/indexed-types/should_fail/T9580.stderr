@@ -1,5 +1,5 @@
-[1 of 2] Compiling T9580a           ( T9580a.hs, T9580a.o )
-[2 of 2] Compiling T9580            ( T9580.hs, T9580.o )
+[1 of 2] Compiling T9580a          (.hs -> .o)
+[2 of 2] Compiling T9580           (.hs -> .o)
 
 T9580.hs:7:9: error:
     Couldn't match representation of type ‘Dimensional Int Double’

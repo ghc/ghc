@@ -2637,20 +2637,23 @@ instance Outputable ModSummary where
             ]
 
 showModMsg :: DynFlags -> HscTarget -> Bool -> ModSummary -> String
-showModMsg dflags target recomp mod_summary
-  = showSDoc dflags $
-        hsep [text (mod_str ++ replicate (max 0 (16 - length mod_str)) ' '),
-              char '(', text (normalise $ msHsFilePath mod_summary) <> comma,
-              case target of
-                  HscInterpreted | recomp
-                             -> text "interpreted"
-                  HscNothing -> text "nothing"
-                  _ -> text (normalise $ msObjFilePath mod_summary),
-              char ')']
- where
+showModMsg dflags target recomp mod_summary = showSDoc dflags $ hcat
+   [ text (mod_str ++ replicate (max 1 (17 - length mod_str)) ' ')
+   , char '('
+   , text (op $ msHsFilePath mod_summary)
+   , text " -> "
+   , case target of
+        HscInterpreted | recomp -> text "interpreted"
+        HscNothing              -> text "nothing"
+        _                       -> text (op $ msObjFilePath mod_summary)
+   , char ')'
+   ]
+  where
+    op      = if verbosity dflags > 1 || gopt Opt_ShowSourcePaths dflags
+                  then normalise
+                  else takeExtension
     mod     = moduleName (ms_mod mod_summary)
-    mod_str = showPpr dflags mod
-                ++ hscSourceString (ms_hsc_src mod_summary)
+    mod_str = showPpr dflags mod ++ hscSourceString (ms_hsc_src mod_summary)
 
 {-
 ************************************************************************

@@ -3,6 +3,6 @@ nub :: Eq a => [a] -> [a]
 nub :: Eq a => [a] -> [a]
 "tan"
 nub :: Eq a => [a] -> [a]
-A                ( A.hs, interpreted )
+A                (.hs -> interpreted)
 nub :: Eq a => [a] -> [a]
 "tan"

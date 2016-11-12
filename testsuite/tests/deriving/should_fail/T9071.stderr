@@ -1,5 +1,5 @@
-[1 of 2] Compiling T9071a           ( T9071a.hs, T9071a.o )
-[2 of 2] Compiling T9071            ( T9071.hs, T9071.o )
+[1 of 2] Compiling T9071a          (.hs -> .o)
+[2 of 2] Compiling T9071           (.hs -> .o)
 
 T9071.hs:7:37: error:
     Couldn't match kind ‘* -> *’ with ‘*’

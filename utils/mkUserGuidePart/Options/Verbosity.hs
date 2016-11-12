@@ -13,6 +13,11 @@ verbosityOptions =
          , flagType = DynamicFlag
          , flagReverse = ""
          }
+  , flag { flagName = "-fshow-source-paths"
+         , flagDescription = "show module source and object paths"
+         , flagType = DynamicFlag
+         , flagReverse = ""
+         }
   , flag { flagName = "-fprint-potential-instances"
          , flagDescription =
            "display all available instances in type error messages"
