@@ -83,9 +83,10 @@ test('T876',
      [stats_num_field('bytes allocated',
           [(platform('x86_64-unknown-mingw32'), 71904, 5),
               # 2015-04-03: 71904 (amd64/Windows, unknown cause)
-           (wordsize(64), 63216 , 5),
+           (wordsize(64), 58128, 5),
               # 2013-02-14: 1263712 (x86_64/Linux)
               # 2014-02-10:   63216 (x86_64/Linux), call arity analysis
+              # 2016-11-11:   58128 (x86_64/Linux), it's not clear
 
            (wordsize(32), 53156, 5) ]),
               # some date:  663712  (Windows, 64-bit machine)
