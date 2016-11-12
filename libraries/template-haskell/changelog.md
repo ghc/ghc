@@ -1,6 +1,13 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
-## 2.11.0.0  *TBA*
+## 2.11.1.0  Nov 2016
+
+  * Bundled with GHC 8.0.2
+
+  * Fix pretty-printing of list comprehensions with only one statement. Previously this was rendered as `[Foo|]` instead of `Foo]`.
+
+
+## 2.11.0.0  May 2016
 
   * Bundled with GHC 8.0.1
 
