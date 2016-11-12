@@ -12,7 +12,7 @@
 
 /* Platform specific headers */
 #if defined(OBJFORMAT_PEi386)
-#  include "linkers/PEi386.h"
+#  include "linker/PEi386.h"
 #elif defined(darwin_HOST_OS)
 #  include "linker/MachO.h"
 #  include <regex.h>
