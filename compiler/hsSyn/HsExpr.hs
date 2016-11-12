@@ -812,7 +812,7 @@ ppr_expr (HsOverLit lit)  = ppr lit
 ppr_expr (HsPar e)        = parens (ppr_lexpr e)
 
 ppr_expr (HsCoreAnn _ (StringLiteral _ s) e)
-  = vcat [text "HsCoreAnn" <+> ftext s, ppr_lexpr e]
+  = vcat [text "{-# CORE \"" <> ftext s <> text "\" #-}", ppr_lexpr e]
 
 ppr_expr e@(HsApp {})        = ppr_apps e []
 ppr_expr e@(HsAppType {})    = ppr_apps e []
