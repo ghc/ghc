@@ -2401,7 +2401,7 @@ Maybe operator applications should bind a bit less tightly?
 Anyway, that's the current story, and it is used consistently for Type and HsType
 -}
 
-data TyPrec   -- See Note [Prededence in types]
+data TyPrec   -- See Note [Precedence in types]
   = TopPrec         -- No parens
   | FunPrec         -- Function args; no parens for tycon apps
   | TyOpPrec        -- Infix operator

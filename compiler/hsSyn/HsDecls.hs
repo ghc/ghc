@@ -1177,15 +1177,19 @@ pp_data_defn :: (OutputableBndrId name)
                   -> HsDataDefn name
                   -> SDoc
 pp_data_defn pp_hdr (HsDataDefn { dd_ND = new_or_data, dd_ctxt = L _ context
+                                , dd_cType = mb_ct
                                 , dd_kindSig = mb_sig
                                 , dd_cons = condecls, dd_derivs = derivings })
   | null condecls
-  = ppr new_or_data <+> pp_hdr context <+> pp_sig
+  = ppr new_or_data <+> pp_ct <+> pp_hdr context <+> pp_sig
 
   | otherwise
-  = hang (ppr new_or_data <+> pp_hdr context <+> pp_sig)
+  = hang (ppr new_or_data <+> pp_ct  <+> pp_hdr context <+> pp_sig)
        2 (pp_condecls condecls $$ pp_derivings derivings)
   where
+    pp_ct = case mb_ct of
+               Nothing   -> empty
+               Just ct -> ppr ct
     pp_sig = case mb_sig of
                Nothing   -> empty
                Just kind -> dcolon <+> ppr kind
@@ -1772,14 +1776,13 @@ pprFullRuleName :: Located (SourceText, RuleName) -> SDoc
 pprFullRuleName (L _ (_, n)) = doubleQuotes $ ftext n
 
 instance (OutputableBndrId name) => Outputable (RuleDecls name) where
-  ppr (HsRules _ rules) = ppr rules
+  ppr (HsRules _ rules) = text "{-# RULES" <+> vcat (map ppr rules) <+> text "#-}"
 
 instance (OutputableBndrId name) => Outputable (RuleDecl name) where
   ppr (HsRule name act ns lhs _fv_lhs rhs _fv_rhs)
-        = sep [text "{-# RULES" <+> pprFullRuleName name
-                                <+> ppr act,
+        = sep [pprFullRuleName name <+> ppr act,
                nest 4 (pp_forall <+> pprExpr (unLoc lhs)),
-               nest 4 (equals <+> pprExpr (unLoc rhs) <+> text "#-}") ]
+               nest 4 (equals <+> pprExpr (unLoc rhs)) ]
         where
           pp_forall | null ns   = empty
                     | otherwise = forAllLit <+> fsep (map ppr ns) <> dot

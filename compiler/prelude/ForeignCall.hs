@@ -221,7 +221,7 @@ data Header = Header SourceText FastString
     deriving (Eq, Data)
 
 instance Outputable Header where
-    ppr (Header _ h) = quotes $ ppr h
+    ppr (Header _ h) = doubleQuotes $ ppr h
 
 -- | A C type, used in CAPI FFI calls
 --
@@ -236,7 +236,8 @@ data CType = CType SourceText -- Note [Pragma source text] in BasicTypes
     deriving (Eq, Data)
 
 instance Outputable CType where
-    ppr (CType _ mh (_,ct)) = hDoc <+> ftext ct
+    ppr (CType _ mh (_,ct))
+      = text "{-# Ctype" <+> hDoc <+> doubleQuotes (ftext ct) <+> text "#-}"
         where hDoc = case mh of
                      Nothing -> empty
                      Just h -> ppr h
