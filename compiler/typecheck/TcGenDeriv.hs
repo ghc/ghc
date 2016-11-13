@@ -198,8 +198,8 @@ gen_Eq_binds loc tycon
     ------------------------------------------------------------------
     pats_etc data_con
       = let
-            con1_pat = nlConVarPat data_con_RDR as_needed
-            con2_pat = nlConVarPat data_con_RDR bs_needed
+            con1_pat = nlParPat $ nlConVarPat data_con_RDR as_needed
+            con2_pat = nlParPat $ nlConVarPat data_con_RDR bs_needed
 
             data_con_RDR = getRdrName data_con
             con_arity   = length tys_needed

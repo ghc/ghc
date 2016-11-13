@@ -1,7 +1,9 @@
 *.ast
 *.ppr.hs
+*.ppr
 *.o
 *.hi
 *.out
 Ppr003
 Ppr004
+Ppr016

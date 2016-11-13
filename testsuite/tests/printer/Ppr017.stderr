@@ -1,0 +1,3 @@
+
+Ppr017.ppr.hs:4:22: error:
+    Not in scope: type constructor or class ‘Single’

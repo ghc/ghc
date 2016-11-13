@@ -49,7 +49,7 @@ module HsUtils(
   -- Patterns
   mkNPat, mkNPlusKPat, nlVarPat, nlLitPat, nlConVarPat, nlConVarPatName, nlConPat,
   nlConPatName, nlInfixConPat, nlNullaryConPat, nlWildConPat, nlWildPat,
-  nlWildPatName, nlWildPatId, nlTuplePat, mkParPat,
+  nlWildPatName, nlWildPatId, nlTuplePat, mkParPat, nlParPat,
   mkBigLHsVarTup, mkBigLHsTup, mkBigLHsVarPatTup, mkBigLHsPatTup,
 
   -- Types
@@ -206,6 +206,8 @@ mkParPat :: LPat name -> LPat name
 mkParPat lp@(L loc p) | hsPatNeedsParens p = L loc (ParPat lp)
                       | otherwise          = lp
 
+nlParPat :: LPat name -> LPat name
+nlParPat p = noLoc (ParPat p)
 
 -------------------------------
 -- These are the bits of syntax that contain rebindable names

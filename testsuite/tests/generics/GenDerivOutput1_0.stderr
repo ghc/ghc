@@ -15,10 +15,10 @@ Derived class instances:
                           (GHC.Generics.M1 (GHC.Generics.Rec1 g2)))))
     GHC.Generics.to1 (GHC.Generics.M1 x)
       = case x of
-          GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)
+          (GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1))
             -> GenDerivOutput1_0.Nil
-          GHC.Generics.R1 (GHC.Generics.M1 ((GHC.Generics.:*:) (GHC.Generics.M1 g1)
-                                                               (GHC.Generics.M1 g2)))
+          (GHC.Generics.R1 (GHC.Generics.M1 ((GHC.Generics.:*:) (GHC.Generics.M1 g1)
+                                                                (GHC.Generics.M1 g2))))
             -> GenDerivOutput1_0.Cons
                  (GHC.Generics.unPar1 g1) (GHC.Generics.unRec1 g2)
   

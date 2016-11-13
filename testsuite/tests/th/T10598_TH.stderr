@@ -33,9 +33,9 @@ T10598_TH.hs:(27,3)-(42,50): Splicing declarations
   ======>
     newtype Foo
       = MkFoo Int
-      deriving stock (Eq)
-      deriving anyclass (C)
-      deriving newtype (Read)
+      deriving stock Eq
+      deriving anyclass C
+      deriving newtype Read
     deriving stock instance Ord Foo
     deriving anyclass instance D Foo
     deriving newtype instance Show Foo

@@ -331,7 +331,8 @@ mkBindsRep gk tycon =
         -- to save some allocations during typechecking.
         -- See Note [Generics compilation speed tricks]
         from_eqn = mkHsCaseAlt x_Pat $ mkM1_E $ nlHsCase x_Expr from_matches
-        to_eqn   = mkHsCaseAlt (mkM1_P x_Pat) $ nlHsCase x_Expr to_matches
+        to_eqn   = mkHsCaseAlt (mkM1_P x_Pat)
+                               $ nlHsCase x_Expr to_matches
 
         from_matches  = [mkHsCaseAlt pat rhs | (pat,rhs) <- from_alts]
         to_matches    = [mkHsCaseAlt pat rhs | (pat,rhs) <- to_alts  ]
@@ -760,8 +761,8 @@ genLR_P :: Int -> Int -> LPat RdrName -> LPat RdrName
 genLR_P i n p
   | n == 0       = error "impossible"
   | n == 1       = p
-  | i <= div n 2 = nlConPat l1DataCon_RDR [genLR_P i     (div n 2) p]
-  | otherwise    = nlConPat r1DataCon_RDR [genLR_P (i-m) (n-m)     p]
+  | i <= div n 2 = nlParPat $ nlConPat l1DataCon_RDR [genLR_P i     (div n 2) p]
+  | otherwise    = nlParPat $ nlConPat r1DataCon_RDR [genLR_P (i-m) (n-m)     p]
                      where m = div n 2
 
 -- Generates the L1/R1 sum expression
@@ -832,12 +833,12 @@ mkProd_P gk _ varTys = mkM1_P (foldBal prod appVars)
                      -- These M1s are meta-information for the constructor
   where
     appVars = unzipWith (wrapArg_P gk) varTys
-    prod a b = prodDataCon_RDR `nlConPat` [a,b]
+    prod a b = nlParPat $ prodDataCon_RDR `nlConPat` [a,b]
 
 wrapArg_P :: GenericKind -> RdrName -> Type -> LPat RdrName
-wrapArg_P Gen0 v ty = mkM1_P (boxRepRDR ty `nlConVarPat` [v])
+wrapArg_P Gen0 v ty = mkM1_P (nlParPat $ boxRepRDR ty `nlConVarPat` [v])
                    -- This M1 is meta-information for the selector
-wrapArg_P Gen1 v _  = m1DataCon_RDR `nlConVarPat` [v]
+wrapArg_P Gen1 v _  = nlParPat $ m1DataCon_RDR `nlConVarPat` [v]
 
 mkGenericLocal :: US -> RdrName
 mkGenericLocal u = mkVarUnqual (mkFastString ("g" ++ show u))
@@ -855,7 +856,7 @@ mkM1_E :: LHsExpr RdrName -> LHsExpr RdrName
 mkM1_E e = nlHsVar m1DataCon_RDR `nlHsApp` e
 
 mkM1_P :: LPat RdrName -> LPat RdrName
-mkM1_P p = m1DataCon_RDR `nlConPat` [p]
+mkM1_P p = nlParPat $ m1DataCon_RDR `nlConPat` [p]
 
 nlHsCompose :: LHsExpr RdrName -> LHsExpr RdrName -> LHsExpr RdrName
 nlHsCompose x y = compose_RDR `nlHsApps` [x, y]

@@ -1444,11 +1444,11 @@ binds   ::  { Located ([AddAnn],Located (HsLocalBinds RdrName)) }
                                                     ,sL1 $1 $ HsValBinds val_binds)) } }
 
         | '{'            dbinds '}'     { sLL $1 $> ([moc $1,mcc $3]
-                                             ,sL1 $2 $ HsIPBinds (IPBinds (unLoc $2)
+                                             ,sL1 $2 $ HsIPBinds (IPBinds (reverse $ unLoc $2)
                                                          emptyTcEvBinds)) }
 
         |     vocurly    dbinds close   { L (getLoc $2) ([]
-                                            ,sL1 $2 $ HsIPBinds (IPBinds (unLoc $2)
+                                            ,sL1 $2 $ HsIPBinds (IPBinds (reverse $ unLoc $2)
                                                         emptyTcEvBinds)) }
 
 

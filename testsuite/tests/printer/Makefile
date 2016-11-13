@@ -57,3 +57,27 @@ ppr012:
 .PHONY: ppr013
 ppr013:
 	$(CHECK_PPR) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Ppr013.hs
+
+.PHONY: ppr014
+ppr014:
+	$(CHECK_PPR) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Ppr014.hs
+
+.PHONY: ppr015
+ppr015:
+	$(CHECK_PPR) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Ppr015.hs
+
+.PHONY: ppr016
+ppr016:
+	$(CHECK_PPR) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Ppr016.hs
+
+.PHONY: ppr017
+ppr017:
+	$(CHECK_PPR) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Ppr017.hs
+
+.PHONY: ppr018
+ppr018:
+	$(CHECK_PPR) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Ppr018.hs
+
+.PHONY: ppr019
+ppr019:
+	$(CHECK_PPR) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Ppr019.hs

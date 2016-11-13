@@ -1068,7 +1068,14 @@ instance (OutputableBndrId name) => Outputable (HsDerivingClause name) where
                         , deriv_clause_tys      = L _ dct })
     = hsep [ text "deriving"
            , ppDerivStrategy dcs
-           , parens (interpp'SP dct) ]
+           , pp_dct dct ]
+      where
+        -- This complexity is to distinguish between
+        --    deriving Show
+        --    deriving (Show)
+        pp_dct [a@(HsIB _ (L _ HsAppsTy{}))] = parens (ppr a)
+        pp_dct [a] = ppr a
+        pp_dct _   = parens (interpp'SP dct)
 
 data NewOrData
   = NewType                     -- ^ @newtype Blah ...@

@@ -670,9 +670,9 @@ hsPatNeedsParens (LitPat {})         = False
 hsPatNeedsParens (NPat {})           = False
 
 conPatNeedsParens :: HsConDetails a b -> Bool
-conPatNeedsParens (PrefixCon args) = not (null args)
-conPatNeedsParens (InfixCon {})    = True
-conPatNeedsParens (RecCon {})      = True
+conPatNeedsParens (PrefixCon {}) = False
+conPatNeedsParens (InfixCon {})  = True
+conPatNeedsParens (RecCon {})    = False
 
 {-
 % Collect all EvVars from all constructor patterns
