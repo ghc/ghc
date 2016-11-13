@@ -1436,7 +1436,7 @@ mkClassTyCon name binders roles rhs clas tc_rep_name
 mkTupleTyCon :: Name
              -> [TyConBinder]
              -> Kind    -- ^ Result kind of the 'TyCon'
-             -> Arity   -- ^ Arity of the tuple
+             -> Arity   -- ^ Arity of the tuple 'TyCon'
              -> DataCon
              -> TupleSort    -- ^ Whether the tuple is boxed or unboxed
              -> AlgTyConFlav

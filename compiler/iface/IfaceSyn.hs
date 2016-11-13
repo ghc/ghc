@@ -62,6 +62,7 @@ import Fingerprint
 import Binary
 import BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
 import Var( TyVarBndr(..) )
+import Type ( TyPrec(..) )
 import TyCon ( Role (..), Injectivity(..), HowAbstract(..) )
 import StaticFlags (opt_PprStyle_Debug)
 import Util( filterOut, filterByList )
@@ -540,9 +541,10 @@ pprAxBranch pp_tc (IfaceAxBranch { ifaxbTyVars = tvs
   where
     ppr_binders
       | null tvs && null cvs = empty
-      | null cvs             = brackets (pprWithCommas pprIfaceTvBndr tvs)
+      | null cvs
+      = brackets (pprWithCommas (pprIfaceTvBndr True) tvs)
       | otherwise
-      = brackets (pprWithCommas pprIfaceTvBndr tvs <> semi <+>
+      = brackets (pprWithCommas (pprIfaceTvBndr True) tvs <> semi <+>
                   pprWithCommas pprIfaceIdBndr cvs)
     pp_lhs = hang pp_tc 2 (pprParendIfaceTcArgs pat_tys)
     maybe_incomps = ppUnless (null incomps) $ parens $
@@ -876,7 +878,7 @@ pprIfaceTyConParent IfNoParent
 pprIfaceTyConParent (IfDataInstance _ tc tys)
   = sdocWithDynFlags $ \dflags ->
     let ftys = stripInvisArgs dflags tys
-    in pprIfaceTypeApp tc ftys
+    in pprIfaceTypeApp TopPrec tc ftys
 
 pprIfaceDeclHead :: IfaceContext -> ShowSub -> Name
                  -> [IfaceTyConBinder]   -- of the tycon, for invisible-suppression
@@ -1336,6 +1338,7 @@ freeNamesIfProv IfaceUnsafeCoerceProv    = emptyNameSet
 freeNamesIfProv (IfacePhantomProv co)    = freeNamesIfCoercion co
 freeNamesIfProv (IfaceProofIrrelProv co) = freeNamesIfCoercion co
 freeNamesIfProv (IfacePluginProv _)      = emptyNameSet
+freeNamesIfProv (IfaceHoleProv _)        = emptyNameSet
 
 freeNamesIfTyVarBndr :: TyVarBndr IfaceTvBndr vis -> NameSet
 freeNamesIfTyVarBndr (TvBndr tv _) = freeNamesIfTvBndr tv

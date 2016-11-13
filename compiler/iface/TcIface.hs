@@ -1114,16 +1114,16 @@ tcIfaceType = go
     go (IfaceCastTy ty co)   = CastTy <$> go ty <*> tcIfaceCo co
     go (IfaceCoercionTy co)  = CoercionTy <$> tcIfaceCo co
 
-tcIfaceTupleTy :: TupleSort -> IfaceTyConInfo -> IfaceTcArgs -> IfL Type
-tcIfaceTupleTy sort info args
+tcIfaceTupleTy :: TupleSort -> IsPromoted -> IfaceTcArgs -> IfL Type
+tcIfaceTupleTy sort is_promoted args
  = do { args' <- tcIfaceTcArgs args
       ; let arity = length args'
       ; base_tc <- tcTupleTyCon True sort arity
-      ; case info of
-          NoIfaceTyConInfo
+      ; case is_promoted of
+          IsNotPromoted
             -> return (mkTyConApp base_tc args')
 
-          IfacePromotedDataCon
+          IsPromoted
             -> do { let tc        = promoteDataCon (tyConSingleDataCon base_tc)
                         kind_args = map typeKind args'
                   ; return (mkTyConApp tc (kind_args ++ args')) } }
@@ -1206,6 +1206,8 @@ tcIfaceUnivCoProv IfaceUnsafeCoerceProv     = return UnsafeCoerceProv
 tcIfaceUnivCoProv (IfacePhantomProv kco)    = PhantomProv <$> tcIfaceCo kco
 tcIfaceUnivCoProv (IfaceProofIrrelProv kco) = ProofIrrelProv <$> tcIfaceCo kco
 tcIfaceUnivCoProv (IfacePluginProv str)     = return $ PluginProv str
+tcIfaceUnivCoProv (IfaceHoleProv _)         =
+    pprPanic "tcIfaceUnivCoProv" (text "holes can't occur in interface files")
 
 {-
 ************************************************************************
@@ -1596,9 +1598,9 @@ tcIfaceTyConByName name
 tcIfaceTyCon :: IfaceTyCon -> IfL TyCon
 tcIfaceTyCon (IfaceTyCon name info)
   = do { thing <- tcIfaceGlobal name
-       ; return $ case info of
-           NoIfaceTyConInfo     -> tyThingTyCon thing
-           IfacePromotedDataCon -> promoteDataCon $ tyThingDataCon thing }
+       ; return $ case ifaceTyConIsPromoted info of
+           IsNotPromoted -> tyThingTyCon thing
+           IsPromoted    -> promoteDataCon $ tyThingDataCon thing }
 
 tcIfaceCoAxiom :: Name -> IfL (CoAxiom Branched)
 tcIfaceCoAxiom name = do { thing <- tcIfaceGlobal name

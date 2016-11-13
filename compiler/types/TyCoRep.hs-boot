@@ -6,9 +6,10 @@ import Data.Data  ( Data )
 data Type
 data TyThing
 data Coercion
-data LeftOrRight
 data UnivCoProvenance
 data TCvSubst
+data TyLit
+data TyBinder
 
 type PredType = Type
 type Kind = Type

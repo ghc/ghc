@@ -102,7 +102,7 @@ module TysWiredIn (
         -- * RuntimeRep and friends
         runtimeRepTyCon, vecCountTyCon, vecElemTyCon,
 
-        runtimeRepTy, ptrRepLiftedTy,
+        runtimeRepTy, ptrRepLiftedTy, ptrRepLiftedDataCon, ptrRepLiftedDataConTyCon,
 
         vecRepDataConTyCon, ptrRepUnliftedDataConTyCon,
 
@@ -1161,9 +1161,12 @@ int8ElemRepDataConTy, int16ElemRepDataConTy, int32ElemRepDataConTy,
   doubleElemRepDataConTy] = map (mkTyConTy . promoteDataCon)
                                 vecElemDataCons
 
+ptrRepLiftedDataConTyCon :: TyCon
+ptrRepLiftedDataConTyCon = promoteDataCon ptrRepLiftedDataCon
+
 -- The type ('PtrRepLifted)
 ptrRepLiftedTy :: Type
-ptrRepLiftedTy = mkTyConTy $ promoteDataCon ptrRepLiftedDataCon
+ptrRepLiftedTy = mkTyConTy ptrRepLiftedDataConTyCon
 
 {- *********************************************************************
 *                                                                      *

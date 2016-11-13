@@ -1003,7 +1003,7 @@ lintCoBndr cv thing_inside
        ; let (subst', cv') = substCoVarBndr subst cv
        ; lintKind (varType cv')
        ; lintL (isCoercionType (varType cv'))
-               (text "CoVar with non-coercion type:" <+> pprTvBndr cv)
+               (text "CoVar with non-coercion type:" <+> pprTyVar cv)
        ; updateTCvSubst subst' (thing_inside cv') }
 
 lintIdBndr :: Id -> (Id -> LintM a) -> LintM a

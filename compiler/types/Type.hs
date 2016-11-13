@@ -175,12 +175,12 @@ module Type (
 
         -- * Pretty-printing
         pprType, pprParendType, pprTypeApp, pprTyThingCategory, pprShortTyThing,
-        pprTvBndr, pprTvBndrs, pprForAll, pprForAllImplicit, pprUserForAll,
+        pprTvBndr, pprTvBndrs, pprForAll, pprUserForAll,
         pprSigmaType, ppSuggestExplicitKinds,
         pprTheta, pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprSourceTyCon,
         TyPrec(..), maybeParen,
-        pprTyVar, pprTcAppTy, pprPrefixApp, pprArrowChain,
+        pprTyVar, pprTyVars, pprTcAppTy, pprPrefixApp, pprArrowChain,
 
         -- * Tidying type related things up for printing
         tidyType,      tidyTypes,
@@ -2177,10 +2177,6 @@ typeLiteralKind l =
   case l of
     NumTyLit _ -> typeNatKind
     StrTyLit _ -> typeSymbolKind
-
--- | Print a tyvar with its kind
-pprTyVar :: TyVar -> SDoc
-pprTyVar tv = ppr tv <+> dcolon <+> ppr (tyVarKind tv)
 
 {-
 %************************************************************************

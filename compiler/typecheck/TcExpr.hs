@@ -1207,7 +1207,7 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
                           kind = tyVarKind tv
                     ; MASSERT2( vis == Specified
                         , (vcat [ ppr fun_ty, ppr upsilon_ty, ppr tvb
-                                , ppr inner_ty, pprTvBndr tv
+                                , ppr inner_ty, pprTyVar tv
                                 , ppr vis ]) )
                     ; ty_arg <- tcHsTypeApp hs_ty_arg kind
                     ; let insted_ty = substTyWithUnchecked [tv] [ty_arg] inner_ty

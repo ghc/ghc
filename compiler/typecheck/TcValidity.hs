@@ -1790,7 +1790,7 @@ checkZonkValidTelescope hs_tvs orig_tvs extra
          addErr $
          vcat [ hang (text "These kind and type variables:" <+> hs_tvs $$
                       text "are out of dependency order. Perhaps try this ordering:")
-                   2 (sep (map pprTvBndr sorted_tidied_tvs))
+                   2 (sep (map pprTyVar sorted_tidied_tvs))
               , extra ]
        ; return orig_tvs }
 

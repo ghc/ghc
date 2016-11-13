@@ -61,13 +61,11 @@ Basic idea:
 import IfaceSyn
 import BinFingerprint
 import LoadIface
+import ToIface
 import FlagChecker
 
 import Desugar ( mkUsageInfo, mkUsedNames, mkDependencies )
 import Id
-import IdInfo
-import Demand
-import Coercion( tidyCo )
 import Annotations
 import CoreSyn
 import Class
@@ -75,7 +73,6 @@ import TyCon
 import CoAxiom
 import ConLike
 import DataCon
-import PatSyn
 import Type
 import TcType
 import InstEnv
@@ -110,7 +107,6 @@ import Fingerprint
 import Exception
 import UniqFM
 import UniqDFM
-import MkId
 
 import Control.Monad
 import Data.Function
@@ -1459,29 +1455,6 @@ dataConToIfaceDecl dataCon
               ifIdInfo    = NoInfo }
 
 --------------------------
-patSynToIfaceDecl :: PatSyn -> IfaceDecl
-patSynToIfaceDecl ps
-  = IfacePatSyn { ifName          = getName $ ps
-                , ifPatMatcher    = to_if_pr (patSynMatcher ps)
-                , ifPatBuilder    = fmap to_if_pr (patSynBuilder ps)
-                , ifPatIsInfix    = patSynIsInfix ps
-                , ifPatUnivBndrs  = map toIfaceForAllBndr univ_bndrs'
-                , ifPatExBndrs    = map toIfaceForAllBndr ex_bndrs'
-                , ifPatProvCtxt   = tidyToIfaceContext env2 prov_theta
-                , ifPatReqCtxt    = tidyToIfaceContext env2 req_theta
-                , ifPatArgs       = map (tidyToIfaceType env2) args
-                , ifPatTy         = tidyToIfaceType env2 rhs_ty
-                , ifFieldLabels   = (patSynFieldLabels ps)
-                }
-  where
-    (_univ_tvs, req_theta, _ex_tvs, prov_theta, args, rhs_ty) = patSynSig ps
-    univ_bndrs = patSynUnivTyVarBinders ps
-    ex_bndrs   = patSynExTyVarBinders ps
-    (env1, univ_bndrs') = tidyTyVarBinders emptyTidyEnv univ_bndrs
-    (env2, ex_bndrs')   = tidyTyVarBinders env1 ex_bndrs
-    to_if_pr (id, needs_dummy) = (idName id, needs_dummy)
-
---------------------------
 coAxiomToIfaceDecl :: CoAxiom br -> IfaceDecl
 -- We *do* tidy Axioms, because they are not (and cannot
 -- conveniently be) built in tidy form
@@ -1658,15 +1631,6 @@ tyConToIfaceDecl env tycon
                              []   -> False
     ifaceFields flds = map flLabel $ dFsEnvElts flds
 
-toIfaceBang :: TidyEnv -> HsImplBang -> IfaceBang
-toIfaceBang _    HsLazy              = IfNoBang
-toIfaceBang _   (HsUnpack Nothing)   = IfUnpack
-toIfaceBang env (HsUnpack (Just co)) = IfUnpackCo (toIfaceCoercion (tidyCo env co))
-toIfaceBang _   HsStrict             = IfStrict
-
-toIfaceSrcBang :: HsSrcBang -> IfaceSrcBang
-toIfaceSrcBang (HsSrcBang _ unpk bang) = IfSrcBang unpk bang
-
 classToIfaceDecl :: TidyEnv -> Class -> (TidyEnv, IfaceDecl)
 classToIfaceDecl env clas
   = ( env1
@@ -1713,20 +1677,6 @@ classToIfaceDecl env clas
                              ,map (tidyTyVar env1) tvs2)
 
 --------------------------
-tidyToIfaceType :: TidyEnv -> Type -> IfaceType
-tidyToIfaceType env ty = toIfaceType (tidyType env ty)
-
-tidyToIfaceTcArgs :: TidyEnv -> TyCon -> [Type] -> IfaceTcArgs
-tidyToIfaceTcArgs env tc tys = toIfaceTcArgs tc (tidyTypes env tys)
-
-tidyToIfaceContext :: TidyEnv -> ThetaType -> IfaceContext
-tidyToIfaceContext env theta = map (tidyToIfaceType env) theta
-
-toIfaceTyVarBinder :: TyVarBndr TyVar vis -> TyVarBndr IfaceTvBndr vis
-toIfaceTyVarBinder (TvBndr tv vis) = TvBndr (toIfaceTvBndr tv) vis
-
-toIfaceTyVarBinders :: [TyVarBndr TyVar vis] -> [TyVarBndr IfaceTvBndr vis]
-toIfaceTyVarBinders = map toIfaceTyVarBinder
 
 tidyTyConBinder :: TidyEnv -> TyConBinder -> (TidyEnv, TyConBinder)
 -- If the type variable "binder" is in scope, don't re-bind it
@@ -1788,94 +1738,6 @@ famInstToIfaceFamInst (FamInst { fi_axiom    = axiom,
          = chooseOrphanAnchor lhs_names
 
 --------------------------
-toIfaceLetBndr :: Id -> IfaceLetBndr
-toIfaceLetBndr id  = IfLetBndr (occNameFS (getOccName id))
-                               (toIfaceType (idType id))
-                               (toIfaceIdInfo (idInfo id))
-  -- Put into the interface file any IdInfo that CoreTidy.tidyLetBndr
-  -- has left on the Id.  See Note [IdInfo on nested let-bindings] in IfaceSyn
-
---------------------------t
-toIfaceIdDetails :: IdDetails -> IfaceIdDetails
-toIfaceIdDetails VanillaId                      = IfVanillaId
-toIfaceIdDetails (DFunId {})                    = IfDFunId
-toIfaceIdDetails (RecSelId { sel_naughty = n
-                           , sel_tycon = tc })  =
-  let iface = case tc of
-                RecSelData ty_con -> Left (toIfaceTyCon ty_con)
-                RecSelPatSyn pat_syn -> Right (patSynToIfaceDecl pat_syn)
-  in IfRecSelId iface n
-
-  -- The remaining cases are all "implicit Ids" which don't
-  -- appear in interface files at all
-toIfaceIdDetails other = pprTrace "toIfaceIdDetails" (ppr other)
-                         IfVanillaId   -- Unexpected; the other
-
-toIfaceIdInfo :: IdInfo -> IfaceIdInfo
-toIfaceIdInfo id_info
-  = case catMaybes [arity_hsinfo, caf_hsinfo, strict_hsinfo,
-                    inline_hsinfo,  unfold_hsinfo] of
-       []    -> NoInfo
-       infos -> HasInfo infos
-               -- NB: strictness and arity must appear in the list before unfolding
-               -- See TcIface.tcUnfolding
-  where
-    ------------  Arity  --------------
-    arity_info = arityInfo id_info
-    arity_hsinfo | arity_info == 0 = Nothing
-                 | otherwise       = Just (HsArity arity_info)
-
-    ------------ Caf Info --------------
-    caf_info   = cafInfo id_info
-    caf_hsinfo = case caf_info of
-                   NoCafRefs -> Just HsNoCafRefs
-                   _other    -> Nothing
-
-    ------------  Strictness  --------------
-        -- No point in explicitly exporting TopSig
-    sig_info = strictnessInfo id_info
-    strict_hsinfo | not (isTopSig sig_info) = Just (HsStrictness sig_info)
-                  | otherwise               = Nothing
-
-    ------------  Unfolding  --------------
-    unfold_hsinfo = toIfUnfolding loop_breaker (unfoldingInfo id_info)
-    loop_breaker  = isStrongLoopBreaker (occInfo id_info)
-
-    ------------  Inline prag  --------------
-    inline_prag = inlinePragInfo id_info
-    inline_hsinfo | isDefaultInlinePragma inline_prag = Nothing
-                  | otherwise = Just (HsInline inline_prag)
-
---------------------------
-toIfUnfolding :: Bool -> Unfolding -> Maybe IfaceInfoItem
-toIfUnfolding lb (CoreUnfolding { uf_tmpl = rhs
-                                , uf_src = src
-                                , uf_guidance = guidance })
-  = Just $ HsUnfold lb $
-    case src of
-        InlineStable
-          -> case guidance of
-               UnfWhen {ug_arity = arity, ug_unsat_ok = unsat_ok, ug_boring_ok =  boring_ok }
-                      -> IfInlineRule arity unsat_ok boring_ok if_rhs
-               _other -> IfCoreUnfold True if_rhs
-        InlineCompulsory -> IfCompulsory if_rhs
-        InlineRhs        -> IfCoreUnfold False if_rhs
-        -- Yes, even if guidance is UnfNever, expose the unfolding
-        -- If we didn't want to expose the unfolding, TidyPgm would
-        -- have stuck in NoUnfolding.  For supercompilation we want
-        -- to see that unfolding!
-  where
-    if_rhs = toIfaceExpr rhs
-
-toIfUnfolding lb (DFunUnfolding { df_bndrs = bndrs, df_args = args })
-  = Just (HsUnfold lb (IfDFunUnfold (map toIfaceBndr bndrs) (map toIfaceExpr args)))
-      -- No need to serialise the data constructor;
-      -- we can recover it from the type of the dfun
-
-toIfUnfolding _ _
-  = Nothing
-
---------------------------
 coreRuleToIfaceRule :: CoreRule -> IfaceRule
 coreRuleToIfaceRule (BuiltinRule { ru_fn = fn})
   = pprTrace "toHsRule: builtin" (ppr fn) $
@@ -1909,89 +1771,6 @@ bogusIfaceRule id_name
         ifRuleAuto = True }
 
 ---------------------
-toIfaceExpr :: CoreExpr -> IfaceExpr
-toIfaceExpr (Var v)         = toIfaceVar v
-toIfaceExpr (Lit l)         = IfaceLit l
-toIfaceExpr (Type ty)       = IfaceType (toIfaceType ty)
-toIfaceExpr (Coercion co)   = IfaceCo   (toIfaceCoercion co)
-toIfaceExpr (Lam x b)       = IfaceLam (toIfaceBndr x, toIfaceOneShot x) (toIfaceExpr b)
-toIfaceExpr (App f a)       = toIfaceApp f [a]
-toIfaceExpr (Case s x ty as)
-  | null as                 = IfaceECase (toIfaceExpr s) (toIfaceType ty)
-  | otherwise               = IfaceCase (toIfaceExpr s) (getOccFS x) (map toIfaceAlt as)
-toIfaceExpr (Let b e)       = IfaceLet (toIfaceBind b) (toIfaceExpr e)
-toIfaceExpr (Cast e co)     = IfaceCast (toIfaceExpr e) (toIfaceCoercion co)
-toIfaceExpr (Tick t e)
-  | Just t' <- toIfaceTickish t = IfaceTick t' (toIfaceExpr e)
-  | otherwise                   = toIfaceExpr e
-
-toIfaceOneShot :: Id -> IfaceOneShot
-toIfaceOneShot id | isId id
-                  , OneShotLam <- oneShotInfo (idInfo id)
-                  = IfaceOneShot
-                  | otherwise
-                  = IfaceNoOneShot
-
----------------------
-toIfaceTickish :: Tickish Id -> Maybe IfaceTickish
-toIfaceTickish (ProfNote cc tick push) = Just (IfaceSCC cc tick push)
-toIfaceTickish (HpcTick modl ix)       = Just (IfaceHpcTick modl ix)
-toIfaceTickish (SourceNote src names)  = Just (IfaceSource src names)
-toIfaceTickish (Breakpoint {})         = Nothing
-   -- Ignore breakpoints, since they are relevant only to GHCi, and
-   -- should not be serialised (Trac #8333)
-
----------------------
-toIfaceBind :: Bind Id -> IfaceBinding
-toIfaceBind (NonRec b r) = IfaceNonRec (toIfaceLetBndr b) (toIfaceExpr r)
-toIfaceBind (Rec prs)    = IfaceRec [(toIfaceLetBndr b, toIfaceExpr r) | (b,r) <- prs]
-
----------------------
-toIfaceAlt :: (AltCon, [Var], CoreExpr)
-           -> (IfaceConAlt, [FastString], IfaceExpr)
-toIfaceAlt (c,bs,r) = (toIfaceCon c, map getOccFS bs, toIfaceExpr r)
-
----------------------
-toIfaceCon :: AltCon -> IfaceConAlt
-toIfaceCon (DataAlt dc) = IfaceDataAlt (getName dc)
-toIfaceCon (LitAlt l)   = IfaceLitAlt l
-toIfaceCon DEFAULT      = IfaceDefault
-
----------------------
-toIfaceApp :: Expr CoreBndr -> [Arg CoreBndr] -> IfaceExpr
-toIfaceApp (App f a) as = toIfaceApp f (a:as)
-toIfaceApp (Var v) as
-  = case isDataConWorkId_maybe v of
-        -- We convert the *worker* for tuples into IfaceTuples
-        Just dc |  saturated
-                ,  Just tup_sort <- tyConTuple_maybe tc
-                -> IfaceTuple tup_sort tup_args
-          where
-            val_args  = dropWhile isTypeArg as
-            saturated = val_args `lengthIs` idArity v
-            tup_args  = map toIfaceExpr val_args
-            tc        = dataConTyCon dc
-
-        _ -> mkIfaceApps (toIfaceVar v) as
-
-toIfaceApp e as = mkIfaceApps (toIfaceExpr e) as
-
-mkIfaceApps :: IfaceExpr -> [CoreExpr] -> IfaceExpr
-mkIfaceApps f as = foldl (\f a -> IfaceApp f (toIfaceExpr a)) f as
-
----------------------
-toIfaceVar :: Id -> IfaceExpr
-toIfaceVar v
-    | Just fcall <- isFCallId_maybe v            = IfaceFCall fcall (toIfaceType (idType v))
-       -- Foreign calls have special syntax
-    | isBootUnfolding (idUnfolding v)
-    = IfaceApp (IfaceApp (IfaceExt noinlineIdName) (IfaceType (toIfaceType (idType v))))
-               (IfaceExt name) -- don't use mkIfaceApps, or infinite loop
-       -- See Note [Inlining and hs-boot files]
-    | isExternalName name                        = IfaceExt name
-    | otherwise                                  = IfaceLcl (getOccFS name)
-  where name = idName v
-
 {-
 Note [Inlining and hs-boot files]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

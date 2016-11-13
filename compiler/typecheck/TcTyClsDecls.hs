@@ -1129,7 +1129,7 @@ tcTyFamInstEqn fam_tc_shape@(fam_tc_name,_,_,_) mb_clsinfo
        ; (ze, tvs') <- zonkTyBndrsX emptyZonkEnv tvs
        ; pats'      <- zonkTcTypeToTypes ze pats
        ; rhs_ty'    <- zonkTcTypeToType ze rhs_ty
-       ; traceTc "tcTyFamInstEqn" (ppr fam_tc_name <+> pprTvBndrs tvs')
+       ; traceTc "tcTyFamInstEqn" (ppr fam_tc_name <+> pprTyVars tvs')
           -- don't print out the pats here, as they might be zonked inside the knot
        ; return (mkCoAxBranch tvs' [] pats' rhs_ty'
                               (map (const Nominal) tvs')
@@ -2236,7 +2236,7 @@ checkValidTyConTyVars tc
                    = text "NB: Implicitly declared kind variables are put first."
                    | otherwise
                    = empty
-       ; checkValidTelescope (pprTvBndrs vis_tvs) stripped_tvs extra
+       ; checkValidTelescope (pprTyVars vis_tvs) stripped_tvs extra
          `and_if_that_doesn't_error`
            -- This triggers on test case dependent/should_fail/InferDependency
            -- It reports errors around Note [Dependent LHsQTyVars] in TcHsType

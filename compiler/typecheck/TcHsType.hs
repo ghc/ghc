@@ -1468,7 +1468,7 @@ tcExplicitTKBndrsX new_tv orig_hs_tvs thing_inside
 
        ; traceTc "tcExplicitTKBndrs" $
            vcat [ text "Hs vars:" <+> ppr orig_hs_tvs
-                , text "tvs:" <+> sep (map pprTvBndr tvs) ]
+                , text "tvs:" <+> sep (map pprTyVar tvs) ]
 
        ; return (result, bound_tvs `unionVarSet` mkVarSet tvs)
        }

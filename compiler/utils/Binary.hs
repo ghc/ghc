@@ -750,6 +750,14 @@ instance Binary FastString where
         UserData { ud_get_fs = get_fs } -> get_fs bh
 
 -- Here to avoid loop
+instance Binary LeftOrRight where
+   put_ bh CLeft  = putByte bh 0
+   put_ bh CRight = putByte bh 1
+
+   get bh = do { h <- getByte bh
+               ; case h of
+                   0 -> return CLeft
+                   _ -> return CRight }
 
 instance Binary Fingerprint where
   put_ h (Fingerprint w1 w2) = do put_ h w1; put_ h w2

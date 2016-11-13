@@ -657,8 +657,9 @@ deriveTyData tvs tc tc_args deriv_strat deriv_pred
         ; traceTc "Deriving strategy (deriving clause)" $
             vcat [ppr deriv_strat, ppr deriv_pred]
 
-        ; traceTc "derivTyData1" (vcat [ pprTvBndrs tvs, ppr tc, ppr tc_args, ppr deriv_pred
-                                       , pprTvBndrs (tyCoVarsOfTypesList tc_args)
+        ; traceTc "derivTyData1" (vcat [ pprTyVars tvs, ppr tc, ppr tc_args
+                                       , ppr deriv_pred
+                                       , pprTyVars (tyCoVarsOfTypesList tc_args)
                                        , ppr n_args_to_keep, ppr n_args_to_drop
                                        , ppr inst_ty_kind, ppr cls_arg_kind, ppr mb_match
                                        , ppr final_tc_args, ppr final_cls_tys ])

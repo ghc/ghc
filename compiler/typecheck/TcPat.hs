@@ -29,6 +29,7 @@ import RdrName
 import TcEnv
 import TcMType
 import TcValidity( arityErr )
+import Type ( pprTyVars )
 import TcType
 import TcUnify
 import TcHsType
@@ -757,11 +758,11 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty arg_pats thing_inside
               arg_tys' = substTys tenv arg_tys
 
         ; traceTc "tcConPat" (vcat [ ppr con_name
-                                   , pprTvBndrs univ_tvs
-                                   , pprTvBndrs ex_tvs
+                                   , pprTyVars univ_tvs
+                                   , pprTyVars ex_tvs
                                    , ppr eq_spec
                                    , ppr theta
-                                   , pprTvBndrs ex_tvs'
+                                   , pprTyVars ex_tvs'
                                    , ppr ctxt_res_tys
                                    , ppr arg_tys'
                                    , ppr arg_pats ])

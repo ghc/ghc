@@ -17,7 +17,7 @@ T2431.$WRefl =
     T2431.Refl @ a @ a @~ (<a>_N :: (a :: *) GHC.Prim.~# (a :: *))
 
 -- RHS size: {terms: 4, types: 8, coercions: 0}
-absurd :: forall a. Int :~: Bool -> a
+absurd :: forall a. (Int :~: Bool) -> a
 [GblId, Arity=1, Caf=NoCafRefs, Str=<L,U>x]
 absurd = \ (@ a) (x :: Int :~: Bool) -> case x of { }
 

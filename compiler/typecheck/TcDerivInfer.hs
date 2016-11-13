@@ -526,7 +526,7 @@ simplifyDeriv pred tvs theta
        ; (wanted, tclvl) <- pushTcLevelM (mapM mk_ct theta)
 
        ; traceTc "simplifyDeriv inputs" $
-         vcat [ pprTvBndrs tvs $$ ppr theta $$ ppr wanted, doc ]
+         vcat [ pprTyVars tvs $$ ppr theta $$ ppr wanted, doc ]
        -- Simplify the constraints
        ; residual_wanted <- simplifyWantedsTcM wanted
             -- Result is zonked

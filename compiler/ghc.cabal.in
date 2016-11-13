@@ -314,6 +314,7 @@ Library
         IfaceEnv
         IfaceSyn
         IfaceType
+        ToIface
         LoadIface
         MkIface
         TcIface

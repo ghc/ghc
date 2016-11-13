@@ -396,7 +396,7 @@ runSolverPipeline pipeline workItem
            ContinueWith ct -> do { traceFireTcS (ctEvidence ct) (text "Kept as inert")
                                  ; traceTcS "End solver pipeline (kept as inert) }" $
                                        vcat [ text "final_item =" <+> ppr ct
-                                            , pprTvBndrs $ tyCoVarsOfCtList ct
+                                            , pprTyVars $ tyCoVarsOfCtList ct
                                             , text "inerts     =" <+> ppr final_is]
                                  ; addInertCan ct }
        }

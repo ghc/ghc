@@ -3,6 +3,7 @@ module Coercion where
 import {-# SOURCE #-} TyCoRep
 import {-# SOURCE #-} TyCon
 
+import BasicTypes ( LeftOrRight )
 import CoAxiom
 import Var
 import Outputable

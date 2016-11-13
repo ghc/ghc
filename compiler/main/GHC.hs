@@ -219,7 +219,7 @@ module GHC (
         pprParendType, pprTypeApp,
         Kind,
         PredType,
-        ThetaType, pprForAll, pprForAllImplicit, pprThetaArrowTy,
+        ThetaType, pprForAll, pprThetaArrowTy,
 
         -- ** Entities
         TyThing(..),

@@ -2174,7 +2174,7 @@ instance Outputable Implication where
               , ic_binds = binds, ic_info = info })
    = hang (text "Implic" <+> lbrace)
         2 (sep [ text "TcLevel =" <+> ppr tclvl
-               , text "Skolems =" <+> pprTvBndrs skols
+               , text "Skolems =" <+> pprTyVars skols
                , text "No-eqs =" <+> ppr no_eqs
                , text "Status =" <+> ppr status
                , hang (text "Given =")  2 (pprEvVars given)

@@ -19,7 +19,7 @@ runtimeRepTyCon, vecCountTyCon, vecElemTyCon :: TyCon
 runtimeRepTy :: Type
 ptrRepLiftedTy :: Type
 
-ptrRepUnliftedDataConTyCon, vecRepDataConTyCon :: TyCon
+ptrRepLiftedDataConTyCon, ptrRepUnliftedDataConTyCon, vecRepDataConTyCon :: TyCon
 
 voidRepDataConTy, intRepDataConTy,
   wordRepDataConTy, int64RepDataConTy, word64RepDataConTy, addrRepDataConTy,
