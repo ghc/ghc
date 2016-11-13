@@ -1491,11 +1491,14 @@ ppOverlapPragma :: Maybe (Located OverlapMode) -> SDoc
 ppOverlapPragma mb =
   case mb of
     Nothing           -> empty
-    Just (L _ (NoOverlap _))    -> text "{-# NO_OVERLAP #-}"
-    Just (L _ (Overlappable _)) -> text "{-# OVERLAPPABLE #-}"
-    Just (L _ (Overlapping _))  -> text "{-# OVERLAPPING #-}"
-    Just (L _ (Overlaps _))     -> text "{-# OVERLAPS #-}"
-    Just (L _ (Incoherent _))   -> text "{-# INCOHERENT #-}"
+    Just (L _ (NoOverlap s))    -> maybe_stext s "{-# NO_OVERLAP #-}"
+    Just (L _ (Overlappable s)) -> maybe_stext s "{-# OVERLAPPABLE #-}"
+    Just (L _ (Overlapping s))  -> maybe_stext s "{-# OVERLAPPING #-}"
+    Just (L _ (Overlaps s))     -> maybe_stext s "{-# OVERLAPS #-}"
+    Just (L _ (Incoherent s))   -> maybe_stext s "{-# INCOHERENT #-}"
+  where
+    maybe_stext "" alt = text alt
+    maybe_stext src _  = text src <+> text "#-}"
 
 
 instance (OutputableBndrId name) => Outputable (InstDecl name) where
