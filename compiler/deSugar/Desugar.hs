@@ -421,10 +421,11 @@ warnRuleShadowing rule_name rule_act fn_id arg_ids
   = do { check False fn_id    -- We often have multiple rules for the same Id in a
                               -- module. Maybe we should check that they don't overlap
                               -- but currently we don't
-       ; mapM_ (check True) arg_ids }
+       ; dflags <- getDynFlags
+       ; mapM_ (check dflags True) arg_ids }
   where
-    check check_rules_too lhs_id
-      | isLocalId lhs_id || canUnfold (idUnfolding lhs_id)
+    check dflags check_rules_too lhs_id
+      | isLocalId lhs_id || (canUnfold (idOptUnfolding dflags lhs_id)
                        -- If imported with no unfolding, no worries
       , idInlineActivation lhs_id `competesWith` rule_act
       = warnDs (Reason Opt_WarnInlineRuleShadowing)

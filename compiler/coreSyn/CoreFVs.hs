@@ -655,7 +655,10 @@ idUnfoldingVars :: Id -> VarSet
 idUnfoldingVars id = fvVarSet $ idUnfoldingFVs id
 
 idUnfoldingFVs :: Id -> FV
-idUnfoldingFVs id = stableUnfoldingFVs (realIdUnfolding id) `orElse` emptyFV
+idUnfoldingFVs id
+  | isLocalVar id = stableUnfoldingFVs (realIdUnfolding id) `orElse` emptyFV
+  -- Global vars have no free variables
+  | otherwise     = emptyFV
 
 stableUnfoldingVars :: Unfolding -> Maybe VarSet
 stableUnfoldingVars unf = fvVarSet `fmap` stableUnfoldingFVs unf

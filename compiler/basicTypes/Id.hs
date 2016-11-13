@@ -93,7 +93,7 @@ module Id (
         -- ** Reading 'IdInfo' fields
         idArity,
         idCallArity, idFunRepArity,
-        idUnfolding, realIdUnfolding,
+        idUnfolding, realIdUnfolding, idOptUnfolding,
         idSpecialisation, idCoreRules, idHasRules,
         idCafInfo,
         idOneShotInfo, idStateHackOneShotInfo,
@@ -701,6 +701,14 @@ idUnfolding id
   | otherwise                          = unfoldingInfo info
   where
     info = idInfo id
+
+-- | Return the unfolding associated with an 'Id' only if optimization is
+-- enabled or the 'Id' is a local variable (and consequently retrieving the
+-- unfolding costs us nothing).
+idOptUnfolding :: DynFlags -> Id -> Unfolding
+idOptUnfolding dflags id
+  | optLevel dflags > 0 || isLocalId id = idUnfolding id
+  | otherwise                           = NoUnfolding
 
 realIdUnfolding :: Id -> Unfolding
 -- Expose the unfolding if there is one, including for loop breakers
