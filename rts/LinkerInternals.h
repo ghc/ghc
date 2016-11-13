@@ -281,16 +281,17 @@ int machoGetMisalignment( FILE * f );
    arising from using normal C indexing or pointer arithmetic
    are just plain wrong.  Sigh.
 */
-STATIC_INLINE UChar *
+STATIC_INLINE unsigned char *
 myindex ( int scale, void* base, int index )
 {
     return
-        ((UChar*)base) + scale * index;
+        ((unsigned char*)base) + scale * index;
 }
 
+// Defined in linker/PEi386.c
 char *cstring_from_section_name(
-    UChar* name,
-    UChar* strtab);
+    unsigned char* name,
+    unsigned char* strtab);
 #endif /* mingw32_HOST_OS */
 
 /* Which object file format are we targetting? */

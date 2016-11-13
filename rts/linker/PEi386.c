@@ -64,15 +64,7 @@
 #include <math.h>
 #include <wchar.h>
 
-static UChar *myindex(
-    int scale,
-    void* base,
-    int index);
-
 static UChar *cstring_from_COFF_symbol_name(
-    UChar* name,
-    UChar* strtab);
-static char *cstring_from_section_name(
     UChar* name,
     UChar* strtab);
 
@@ -84,6 +76,7 @@ static size_t makeSymbolExtra_PEi386(
 static void addDLLHandle(
     pathchar* dll_name,
     HINSTANCE instance);
+
 static int verifyCOFFHeader(
     COFF_header *hdr,
     pathchar *filename);
@@ -553,22 +546,6 @@ int checkAndLoadImportLibrary( pathchar* arch_name, char* member_name, FILE* f)
     return 1;
 }
 
-/* We use myindex to calculate array addresses, rather than
-   simply doing the normal subscript thing.  That's because
-   some of the above structs have sizes which are not
-   a whole number of words.  GCC rounds their sizes up to a
-   whole number of words, which means that the address calcs
-   arising from using normal C indexing or pointer arithmetic
-   are just plain wrong.  Sigh.
-*/
-static UChar *
-myindex ( int scale, void* base, int index )
-{
-   return
-      ((UChar*)base) + scale * index;
-}
-
-
 static void
 printName ( UChar* name, UChar* strtab )
 {
@@ -635,7 +612,7 @@ cstring_from_COFF_symbol_name ( UChar* name, UChar* strtab )
    (when it is exactly 8 bytes long there's no trailing '\0'), so for
    consistency we *always* copy the string; the caller must free it
 */
-static char *
+char *
 cstring_from_section_name (UChar* name, UChar* strtab)
 {
     char *newstr;
