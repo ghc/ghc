@@ -379,7 +379,7 @@ checkingExpType err et         = pprPanic "checkingExpType" (text err $$ ppr et)
 
 tauifyExpType :: ExpType -> TcM ExpType
 -- ^ Turn a (Infer hole) type into a (Check alpha),
--- where alpha is a fresh unificaiton variable
+-- where alpha is a fresh unification variable
 tauifyExpType (Check ty)      = return (Check ty)  -- No-op for (Check ty)
 tauifyExpType (Infer inf_res) = do { ty <- inferResultToType inf_res
                                    ; return (Check ty) }

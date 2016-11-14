@@ -432,7 +432,7 @@ Assuming NOT rewriting wanteds with wanteds
           [G] V a ~ f_aBg
 
    Worklist includes  [W] Scalar fmv_aBi ~ fmv_aBk
-   fmv_aBi, fmv_aBk are flatten unificaiton variables
+   fmv_aBi, fmv_aBk are flatten unification variables
 
    Work item: [W] V fsk_aBh ~ fmv_aBi
 

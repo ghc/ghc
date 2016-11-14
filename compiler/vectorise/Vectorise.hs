@@ -275,7 +275,7 @@ vectTopBind b@(Rec binds)
 -- Add a vectorised binding to an imported top-level variable that has a VECTORISE pragma
 -- in this module.
 --
--- RESTIRCTION: Currently, we cannot use the pragma for mutually recursive definitions.
+-- RESTRICTION: Currently, we cannot use the pragma for mutually recursive definitions.
 --
 vectImpBind :: (Id, CoreExpr) -> VM CoreBind
 vectImpBind (var, expr)

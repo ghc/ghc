@@ -306,7 +306,7 @@ People write
 so much, where
    runST :: (forall s. ST s a) -> a
 that I have finally given in and written a special type-checking
-rule just for saturated appliations of ($).
+rule just for saturated applications of ($).
   * Infer the type of the first argument
   * Decompose it; should be of form (arg2_ty -> res_ty),
        where arg2_ty might be a polytype
@@ -1938,7 +1938,7 @@ getFixedTyVars upd_fld_occs univ_tvs cons
                                     -- Universally-quantified tyvars that
                                     -- appear in any of the *implicit*
                                     -- arguments to the constructor are fixed
-                                    -- See Note [Implict type sharing]
+                                    -- See Note [Implicit type sharing]
 
                             fixed_tys = [ty | (fl, ty) <- zip flds arg_tys
                                             , not (flLabel fl `elem` upd_fld_occs)]

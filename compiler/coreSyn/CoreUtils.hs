@@ -2091,7 +2091,7 @@ rhsIsStatic :: Platform
 --
 -- (ii) We treat partial applications as redexes, because in fact we
 --      make a thunk for them that runs and builds a PAP
---      at run-time.  The only appliations that are treated as
+--      at run-time.  The only applications that are treated as
 --      static are *saturated* applications of constructors.
 
 -- We used to try to be clever with nested structures like this:

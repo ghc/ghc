@@ -1591,7 +1591,7 @@ a polytype.  E.g.
 
 The type checker checks this code, and it currently requires
 -XImpredicativeTypes to permit that polymorphic type instantiation,
-so ew have to switch that flag on locally in TcDeriv.genInst.
+so we have to switch that flag on locally in TcDeriv.genInst.
 
 See #8503 for more discussion.
 

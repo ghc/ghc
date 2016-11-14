@@ -941,7 +941,7 @@ Notice that
    be usused in some, but dead-code elimination will drop it.)
 
    We achieve this by putting the the evidence variable for the overall
-   instance implicaiton into the AbsBinds for each method/superclass.
+   instance implication into the AbsBinds for each method/superclass.
    Hence the 'dfun_ev_binds' passed into tcMethods and tcSuperClasses.
    (And that in turn is why the abs_ev_binds field of AbBinds is a
    [TcEvBinds] rather than simply TcEvBinds.

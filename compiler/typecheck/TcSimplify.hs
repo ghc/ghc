@@ -1553,8 +1553,8 @@ of progress.  Trac #8474 is a classic example:
     exponentially many) iterations!
 
 Conclusion: we should call solveNestedImplications only if we did
-some unifiction in solveSimpleWanteds; because that's the only way
-we'll get more Givens (a unificaiton is like adding a Given) to
+some unification in solveSimpleWanteds; because that's the only way
+we'll get more Givens (a unification is like adding a Given) to
 allow the implication to make progress.
 -}
 

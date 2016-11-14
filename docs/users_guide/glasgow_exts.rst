@@ -9493,13 +9493,13 @@ your ``forall``\s explicitly. Indeed, doing so is strongly advised for
 rank-2 types.
 
 Sometimes there *is* no "outermost level", in which case no
-implicit quanification happens: ::
+implicit quantification happens: ::
 
       data PackMap a b s t = PackMap (Monad f => (a -> f b) -> s -> f t)
 
 This is rejected because there is no "outermost level" for the types on the RHS
 (it would obviously be terrible to add extra parameters to ``PackMap``),
-so no implicit quantificaiton happens, and the declaration is rejected
+so no implicit quantification happens, and the declaration is rejected
 (with "``f`` is out of scope").  Solution: use an explicit ``forall``: ::
 
       data PackMap a b s t = PackMap (forall f. Monad f => (a -> f b) -> s -> f t)
@@ -11590,7 +11590,7 @@ optionally had by adding ``!`` in front of a variable.
    In ordinary Haskell, ``f`` is lazy in its argument and hence in
    ``x``; and ``g`` is strict in its argument and hence also strict in
    ``x``. With ``Strict``, both become strict because ``f``'s argument
-   gets an implict bang.
+   gets an implicit bang.
 
 
 .. _strict-modularity:

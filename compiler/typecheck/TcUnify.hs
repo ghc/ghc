@@ -999,7 +999,7 @@ with constraints
 Here we abstract over the '->' inside the forall, in case that
 is subject to an equality constraint from a GADT match.
 
-Note that we kept the outer (->) becuase that's part of
+Note that we kept the outer (->) because that's part of
 the polymorphic "shape".  And becauuse of impredicativity,
 GADT matches can't give equalities that affect polymorphic
 shape.
