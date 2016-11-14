@@ -1,26 +1,5 @@
-True
-data S = MkS {Ghci1.foo :: Int} 	-- Defined at <interactive>:3:16
-
-data T a = MkT {Ghci2.foo :: Bool, ...}
-  	-- Defined at <interactive>:4:18
-
-<interactive>:1:1: error:
-    Ambiguous occurrence ‘foo’
-    It could refer to either the field ‘foo’,
-                             defined at <interactive>:3:16
-                          or the field ‘foo’, defined at <interactive>:4:18
-
-<interactive>:9:1: error:
-    Ambiguous occurrence ‘foo’
-    It could refer to either the field ‘foo’,
-                             defined at <interactive>:3:16
-                          or the field ‘foo’, defined at <interactive>:4:18
-True
-
-<interactive>:1:1: error:
-    Ambiguous occurrence ‘foo’
-    It could refer to either the field ‘foo’,
-                             defined at <interactive>:3:16
-                          or the field ‘foo’, defined at <interactive>:4:18
-foo :: U -> Int
+#x :: GHC.Records.HasField "x" t2 t1 => t2 -> t1
+#foo . #bar
+  :: (HasField "foo" t1 c, HasField "bar" t2 t1) => t2 -> c
 42
+#x :: GHC.OverloadedLabels.IsLabel "x" t => t

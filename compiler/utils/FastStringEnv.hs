@@ -24,7 +24,7 @@ module FastStringEnv (
         DFastStringEnv,
 
         -- ** Manipulating these environments
-        mkDFsEnv, emptyDFsEnv, dFsEnvElts,
+        mkDFsEnv, emptyDFsEnv, dFsEnvElts, lookupDFsEnv
     ) where
 
 import UniqFM
@@ -93,3 +93,6 @@ dFsEnvElts = eltsUDFM
 
 mkDFsEnv :: [(FastString,a)] -> DFastStringEnv a
 mkDFsEnv l = listToUDFM l
+
+lookupDFsEnv :: DFastStringEnv a -> FastString -> Maybe a
+lookupDFsEnv = lookupUDFM

@@ -1110,7 +1110,7 @@ repE (HsVar (L _ x))            =
         Just (DsSplice e)  -> do { e' <- dsExpr e
                                  ; return (MkC e') } }
 repE e@(HsIPVar _) = notHandled "Implicit parameters" (ppr e)
-repE e@(HsOverLabel _) = notHandled "Overloaded labels" (ppr e)
+repE e@(HsOverLabel{}) = notHandled "Overloaded labels" (ppr e)
 
 repE e@(HsRecFld f) = case f of
   Unambiguous _ x -> repE (HsVar (noLoc x))

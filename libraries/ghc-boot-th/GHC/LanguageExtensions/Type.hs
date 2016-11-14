@@ -121,6 +121,7 @@ data Extension
    | BinaryLiterals
    | NegativeLiterals
    | DuplicateRecordFields
+   | OverloadedRecordFields
    | OverloadedLabels
    | EmptyCase
    | PatternSynonyms

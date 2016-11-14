@@ -1,31 +1,28 @@
 
 overloadedlabelsfail01.hs:6:5: error:
-    • No instance for (IsLabel "x" t2)
-        arising from the overloaded label ‘#x’
+    • Ambiguous type variable ‘t0’ arising from the overloaded label ‘#x’
+      prevents the constraint ‘(IsLabel "x" t0)’ from being solved.
+      Relevant bindings include
+        a :: t0 (bound at overloadedlabelsfail01.hs:6:1)
+      Probable fix: use a type annotation to specify what ‘t0’ should be.
+      These potential instance exist:
+        instance GHC.Records.HasField x r a => IsLabel x (r -> a)
+          -- Defined in ‘GHC.OverloadedLabels’
     • In the expression: #x
       In an equation for ‘a’: a = #x
 
-overloadedlabelsfail01.hs:9:5: error:
-    • No instance for (IsLabel "x" (t1 -> t0))
+overloadedlabelsfail01.hs:10:5: error:
+    • No instance for (IsLabel "x" Int)
         arising from the overloaded label ‘#x’
-        (maybe you haven't applied a function to enough arguments?)
     • In the expression: #x
-      In the expression: #x #y
-      In an equation for ‘b’: b = #x #y
+      In an equation for ‘b’: b = #x
 
-overloadedlabelsfail01.hs:9:8: error:
-    • No instance for (IsLabel "y" t1)
-        arising from the overloaded label ‘#y’
-    • In the first argument of ‘#x’, namely ‘#y’
-      In the expression: #x #y
-      In an equation for ‘b’: b = #x #y
-
-overloadedlabelsfail01.hs:13:5: error:
+overloadedlabelsfail01.hs:14:5: error:
     • Could not deduce (IsLabel "y" t)
         arising from the overloaded label ‘#y’
       from the context: IsLabel "x" t
         bound by the type signature for:
                    c :: IsLabel "x" t => t
-        at overloadedlabelsfail01.hs:12:1-23
+        at overloadedlabelsfail01.hs:13:1-23
     • In the expression: #y
       In an equation for ‘c’: c = #y

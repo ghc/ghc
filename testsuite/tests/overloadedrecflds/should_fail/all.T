@@ -25,9 +25,16 @@ test('overloadedrecfldsfail12',
 test('overloadedrecfldsfail13', normal, compile_fail, [''])
 test('overloadedrecfldsfail14', normal, compile_fail, [''])
 test('overloadedlabelsfail01', normal, compile_fail, [''])
+test('overloadedlabelsfail02', normal, compile_fail, [''])
+test('overloadedlabelsfail03', normal, compile_fail, [''])
 test('T11103', normal, compile_fail, [''])
 test('T11167_ambiguous_fixity',
      extra_clean([ 'T11167_ambiguous_fixity_A.hi', 'T11167_ambiguous_fixity_A.o'
                  , 'T11167_ambiguous_fixity_B.hi', 'T11167_ambiguous_fixity_B.o' ]),
      multimod_compile_fail, ['T11167_ambiguous_fixity', ''])
 test('NoParent', normal, compile_fail, [''])
+test('hasfieldfail01',
+     extra_clean(['HasFieldFail01_A.hi', 'HasFieldFail01_A.o']),
+     multimod_compile_fail, ['hasfieldfail01', ''])
+test('hasfieldfail02', normal, compile_fail, [''])
+test('hasfieldfail03', normal, compile_fail, [''])

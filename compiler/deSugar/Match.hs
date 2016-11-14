@@ -939,7 +939,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     -- the instance for IPName derives using the id, so this works if the
     -- above does
     exp (HsIPVar i) (HsIPVar i') = i == i'
-    exp (HsOverLabel l) (HsOverLabel l') = l == l'
+    exp (HsOverLabel l x) (HsOverLabel l' x') = l == l' && x == x'
     exp (HsOverLit l) (HsOverLit l') =
         -- Overloaded lits are equal if they have the same type
         -- and the data is the same.

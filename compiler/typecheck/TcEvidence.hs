@@ -401,6 +401,10 @@ data EvTerm
 
   | EvTypeable Type EvTypeable   -- Dictionary for (Typeable ty)
 
+  | EvSelector Id [Type] -- Selector id plus the types at which it should be
+                         -- instantiated, used for HasField dictionaries;
+                         -- see Note [HasField instances] in TcInterface
+
   deriving Data.Data
 
 
@@ -703,6 +707,7 @@ evVarsOfTerm (EvDelayedError _ _) = emptyVarSet
 evVarsOfTerm (EvLit _)            = emptyVarSet
 evVarsOfTerm (EvCallStack cs)     = evVarsOfCallStack cs
 evVarsOfTerm (EvTypeable _ ev)    = evVarsOfTypeable ev
+evVarsOfTerm (EvSelector{})       = emptyVarSet
 
 evVarsOfTerms :: [EvTerm] -> VarSet
 evVarsOfTerms = mapUnionVarSet evVarsOfTerm
@@ -808,6 +813,7 @@ instance Outputable EvTerm where
   ppr (EvDelayedError ty msg) =     text "error"
                                 <+> sep [ char '@' <> ppr ty, ppr msg ]
   ppr (EvTypeable ty ev)      = ppr ev <+> dcolon <+> text "Typeable" <+> ppr ty
+  ppr (EvSelector sel tys)    = ppr sel <+> sep (map ppr tys)
 
 instance Outputable EvLit where
   ppr (EvNum n) = integer n

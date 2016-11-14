@@ -617,8 +617,8 @@ zonkExpr env (HsVar (L l id))
 zonkExpr _ (HsIPVar id)
   = return (HsIPVar id)
 
-zonkExpr _ (HsOverLabel l)
-  = return (HsOverLabel l)
+zonkExpr _ (HsOverLabel mv_fromLabel l)
+  = return (HsOverLabel mv_fromLabel l)
 
 zonkExpr env (HsLit (HsRat f ty))
   = do new_ty <- zonkTcTypeToType env ty
@@ -1421,6 +1421,10 @@ zonkEvTerm env (EvDFunApp df tys tms)
 zonkEvTerm env (EvDelayedError ty msg)
   = do { ty' <- zonkTcTypeToType env ty
        ; return (EvDelayedError ty' msg) }
+zonkEvTerm env (EvSelector sel_id tys)
+  = do { sel_id' <- zonkIdBndr env sel_id
+       ; tys'    <- zonkTcTypeToTypes env tys
+       ; return (EvSelector sel_id' tys') }
 
 zonkEvTypeable :: ZonkEnv -> EvTypeable -> TcM EvTypeable
 zonkEvTypeable env (EvTypeableTyCon ts)

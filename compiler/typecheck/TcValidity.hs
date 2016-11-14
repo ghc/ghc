@@ -1029,6 +1029,9 @@ checkValidInstHead ctxt clas cls_args
                   nameModule (getName clas) == mod)
                  (instTypeErr clas cls_args abstract_class_msg)
 
+       ; when (clas `hasKey` hasFieldClassNameKey) $
+             checkHasFieldInst clas cls_args
+
            -- Check language restrictions;
            -- but not for SPECIALISE instance pragmas
        ; let ty_args = filterOutInvisibleTypes (classTyCon clas) cls_args
@@ -1121,6 +1124,27 @@ instTypeErr cls tys msg
              2 (quotes (pprClassPred cls tys)))
        2 msg
 
+-- | See Note [Validity checking of HasField instances]
+checkHasFieldInst :: Class -> [Type] -> TcM ()
+checkHasFieldInst cls tys@[_k_ty, x_ty, r_ty, _a_ty] =
+  case splitTyConApp_maybe r_ty of
+    Nothing -> whoops (text "Record data type must be specified")
+    Just (tc, _)
+      | isFamilyTyCon tc
+                  -> whoops (text "Record data type may not be a data family")
+      | otherwise -> case isStrLitTy x_ty of
+       Just lbl
+         | isJust (lookupTyConFieldLabel lbl tc)
+                     -> whoops (ppr tc <+> text "already has a field"
+                                       <+> quotes (ppr lbl))
+         | otherwise -> return ()
+       Nothing
+         | null (tyConFieldLabels tc) -> return ()
+         | otherwise -> whoops (ppr tc <+> text "has fields")
+  where
+    whoops = addErrTc . instTypeErr cls tys
+checkHasFieldInst _ tys = pprPanic "checkHasFieldInst" (ppr tys)
+
 {- Note [Casts during validity checking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the (bogus)
@@ -1134,6 +1158,26 @@ CastTys here.
 Another example:  Eq (Either a).  Then we actually get a cast in
 the middle:
    Eq ((Either |> g) a)
+
+
+Note [Validity checking of HasField instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The HasField class has magic constraint solving behaviour (see Note
+[HasField instances] in TcInteract).  However, we permit users to
+declare their own instances, provided they do not clash with the
+built-in behaviour.  In particular, we forbid:
+
+  1. `HasField _ r _` where r is a variable
+
+  2. `HasField _ (T ...) _` if T is a data family
+     (because it might have fields introduced later)
+
+  3. `HasField x (T ...) _` where x is a variable,
+      if T has any fields at all
+
+  4. `HasField "foo" (T ...) _` if T has a "foo" field
+
+The usual functional dependency checks also apply.
 
 
 Note [Valid 'deriving' predicate]

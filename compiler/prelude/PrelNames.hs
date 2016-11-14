@@ -346,6 +346,9 @@ basicKnownKeyNames
         -- Implicit Parameters
         ipClassName,
 
+        -- Overloaded record fields
+        hasFieldClassName,
+
         -- Call Stacks
         callStackTyConName,
         emptyCallStackName, pushCallStackName,
@@ -526,6 +529,9 @@ gHC_FINGERPRINT_TYPE = mkBaseModule (fsLit "GHC.Fingerprint.Type")
 
 gHC_OVER_LABELS :: Module
 gHC_OVER_LABELS = mkBaseModule (fsLit "GHC.OverloadedLabels")
+
+gHC_RECORDS :: Module
+gHC_RECORDS = mkBaseModule (fsLit "GHC.Records")
 
 mAIN, rOOT_MAIN :: Module
 mAIN            = mkMainModule_ mAIN_NAME
@@ -1365,6 +1371,11 @@ ipClassName :: Name
 ipClassName
   = clsQual gHC_CLASSES (fsLit "IP") ipClassKey
 
+-- Overloaded record fields
+hasFieldClassName :: Name
+hasFieldClassName
+ = clsQual gHC_RECORDS (fsLit "HasField") hasFieldClassNameKey
+
 -- Source Locations
 callStackTyConName, emptyCallStackName, pushCallStackName,
   srcLocDataConName :: Name
@@ -1527,6 +1538,11 @@ monoidClassKey    = mkPreludeClassUnique 47
 -- Implicit Parameters
 ipClassKey :: Unique
 ipClassKey = mkPreludeClassUnique 48
+
+-- Overloaded record fields
+hasFieldClassNameKey :: Unique
+hasFieldClassNameKey = mkPreludeClassUnique 49
+
 
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES ClassUniques 200-299

@@ -2231,7 +2231,8 @@ mkParserFlags flags =
                .|. ThQuotesBit                 `setBitIf` xopt LangExt.TemplateHaskellQuotes    flags
                .|. QqBit                       `setBitIf` xopt LangExt.QuasiQuotes              flags
                .|. IpBit                       `setBitIf` xopt LangExt.ImplicitParams           flags
-               .|. OverloadedLabelsBit         `setBitIf` xopt LangExt.OverloadedLabels         flags
+               .|. OverloadedLabelsBit         `setBitIf` (xopt LangExt.OverloadedLabels        flags
+                                                        || xopt LangExt.OverloadedRecordFields  flags)
                .|. ExplicitForallBit           `setBitIf` xopt LangExt.ExplicitForAll           flags
                .|. BangPatBit                  `setBitIf` xopt LangExt.BangPatterns             flags
                .|. HaddockBit                  `setBitIf` gopt Opt_Haddock                      flags

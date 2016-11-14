@@ -37,7 +37,7 @@ module DataCon (
         dataConStupidTheta,
         dataConInstArgTys, dataConOrigArgTys, dataConOrigResTy,
         dataConInstOrigArgTys, dataConRepArgTys,
-        dataConFieldLabels, dataConFieldType,
+        dataConFieldLabels, dataConFieldType, dataConFieldType_maybe,
         dataConSrcBangs,
         dataConSourceArity, dataConRepArity,
         dataConIsInfix,
@@ -85,7 +85,7 @@ import Unique( mkAlphaTyVarUnique )
 import qualified Data.Data as Data
 import Data.Char
 import Data.Word
-import Data.List( mapAccumL, find )
+import Data.List( mapAccumL )
 
 {-
 Data constructor representation
@@ -973,10 +973,15 @@ dataConFieldLabels = dcFields
 
 -- | Extract the type for any given labelled field of the 'DataCon'
 dataConFieldType :: DataCon -> FieldLabelString -> Type
-dataConFieldType con label
-  = case find ((== label) . flLabel . fst) (dcFields con `zip` dcOrigArgTys con) of
-      Just (_, ty) -> ty
+dataConFieldType con label = case dataConFieldType_maybe con label of
+      Just ty -> ty
       Nothing -> pprPanic "dataConFieldType" (ppr con <+> ppr label)
+
+-- | Extract the type for any given labelled field of the 'DataCon',
+-- or return 'Nothing' if the field does not belong to it
+dataConFieldType_maybe :: DataCon -> FieldLabelString -> Maybe Type
+dataConFieldType_maybe con label
+  = lookup label (map flLabel (dcFields con) `zip` dcOrigArgTys con)
 
 -- | Strictness/unpack annotations, from user; or, for imported
 -- DataCons, from the interface file

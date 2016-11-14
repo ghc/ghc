@@ -2962,7 +2962,7 @@ exprCtOrigin :: HsExpr Name -> CtOrigin
 exprCtOrigin (HsVar (L _ name)) = OccurrenceOf name
 exprCtOrigin (HsUnboundVar uv)  = UnboundOccurrenceOf (unboundVarOcc uv)
 exprCtOrigin (HsRecFld f)       = OccurrenceOfRecSel (rdrNameAmbiguousFieldOcc f)
-exprCtOrigin (HsOverLabel l)    = OverLabelOrigin l
+exprCtOrigin (HsOverLabel _ l)  = OverLabelOrigin l
 exprCtOrigin (HsIPVar ip)       = IPOccOrigin ip
 exprCtOrigin (HsOverLit lit)    = LiteralOrigin lit
 exprCtOrigin (HsLit {})         = Shouldn'tHappenOrigin "concrete literal"

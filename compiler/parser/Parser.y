@@ -2417,7 +2417,7 @@ aexp2   :: { LHsExpr RdrName }
         : qvar                          { sL1 $1 (HsVar   $! $1) }
         | qcon                          { sL1 $1 (HsVar   $! $1) }
         | ipvar                         { sL1 $1 (HsIPVar $! unLoc $1) }
-        | overloaded_label              { sL1 $1 (HsOverLabel $! unLoc $1) }
+        | overloaded_label              { sL1 $1 (HsOverLabel Nothing $! unLoc $1) }
         | literal                       { sL1 $1 (HsLit   $! unLoc $1) }
 -- This will enable overloaded strings permanently.  Normally the renamer turns HsString
 -- into HsOverLit when -foverloaded-strings is on.

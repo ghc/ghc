@@ -1102,6 +1102,9 @@ dsEvTerm (EvSuperClass d n)
              sc_sel_id  = classSCSelId cls n    -- Zero-indexed
        ; return $ Var sc_sel_id `mkTyApps` tys `App` d' }
 
+dsEvTerm (EvSelector sel_id tys)
+  = return $ Var sel_id `mkTyApps` tys
+
 dsEvTerm (EvDelayedError ty msg) = return $ dsEvDelayedError ty msg
 
 dsEvDelayedError :: Type -> FastString -> CoreExpr

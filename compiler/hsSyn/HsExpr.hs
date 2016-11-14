@@ -290,8 +290,10 @@ data HsExpr id
 
   | HsRecFld (AmbiguousFieldOcc id) -- ^ Variable pointing to record selector
 
-  | HsOverLabel FastString   -- ^ Overloaded label (See Note [Overloaded labels]
-                             --   in GHC.OverloadedLabels)
+  -- | Overloaded label (See Note [Overloaded labels] in GHC.OverloadedLabels)
+  | HsOverLabel (Maybe id) -- For RebindableSyntax, the fromLabel witness
+                FastString
+
   | HsIPVar   HsIPName       -- ^ Implicit parameter
   | HsOverLit (HsOverLit id) -- ^ Overloaded literals
 
@@ -806,7 +808,7 @@ ppr_expr :: forall id. (OutputableBndrId id) => HsExpr id -> SDoc
 ppr_expr (HsVar (L _ v))  = pprPrefixOcc v
 ppr_expr (HsUnboundVar uv)= pprPrefixOcc (unboundVarOcc uv)
 ppr_expr (HsIPVar v)      = ppr v
-ppr_expr (HsOverLabel l)  = char '#' <> ppr l
+ppr_expr (HsOverLabel _ l)= char '#' <> ppr l
 ppr_expr (HsLit lit)      = ppr lit
 ppr_expr (HsOverLit lit)  = ppr lit
 ppr_expr (HsPar e)        = parens (ppr_lexpr e)

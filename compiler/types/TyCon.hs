@@ -23,7 +23,7 @@ module TyCon(
         isVisibleTyConBinder, isInvisibleTyConBinder,
 
         -- ** Field labels
-        tyConFieldLabels, tyConFieldLabelEnv,
+        tyConFieldLabels, lookupTyConFieldLabel,
 
         -- ** Constructing TyCons
         mkAlgTyCon,
@@ -1350,6 +1350,9 @@ tyConFieldLabelEnv tc
   | isAlgTyCon tc = algTcFields tc
   | otherwise     = emptyDFsEnv
 
+-- | Look up a field label belonging to this 'TyCon'
+lookupTyConFieldLabel :: FieldLabelString -> TyCon -> Maybe FieldLabel
+lookupTyConFieldLabel lbl tc = lookupDFsEnv (tyConFieldLabelEnv tc) lbl
 
 -- | Make a map from strings to FieldLabels from all the data
 -- constructors of this algebraic tycon
