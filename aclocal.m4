@@ -1269,7 +1269,8 @@ AC_DEFUN([FP_GCC_SUPPORTS_NO_PIE],
    AC_REQUIRE([AC_PROG_CC])
    AC_MSG_CHECKING([whether GCC supports -no-pie])
    echo 'int main() { return 0; }' > conftest.c
-   if ${CC-cc} -o conftest -no-pie conftest.c > /dev/null 2>&1; then
+   # Some GCC versions only warn when passed an unrecognized flag.
+   if $CC -no-pie -x c /dev/null -dM -E > conftest.txt 2>&1 && ! grep -i unrecognized conftest.txt > /dev/null 2>&1; then
        CONF_GCC_SUPPORTS_NO_PIE=YES
        AC_MSG_RESULT([yes])
    else
