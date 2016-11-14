@@ -288,12 +288,14 @@ static HsInt loadArchive_ (pathchar *path)
                 memcpy(fileName, gnuFileIndex + n, thisFileNameSize);
                 fileName[thisFileNameSize] = '\0';
             }
-            else if (fileName[1] == ' ') {
+            /* Skip 32-bit symbol table ("/" + 15 blank characters)
+               and  64-bit symbol table ("/SYM64/" + 9 blank characters) */
+            else if (fileName[1] == ' ' || (0 == strncmp(&fileName[1], "SYM64/", 6))) {
                 fileName[0] = '\0';
                 thisFileNameSize = 0;
             }
             else {
-                barf("loadArchive: GNU-variant filename offset not found while reading filename from `%s'", path);
+                barf("loadArchive: invalid GNU-variant filename `%.16s' while reading filename from `%s'", fileName, path);
             }
         }
         /* Finally, the case where the filename field actually contains
