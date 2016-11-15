@@ -2564,7 +2564,7 @@ setOptions wds =
       let (plus_opts, minus_opts)  = partitionWith isPlus wds
       mapM_ setOpt plus_opts
       -- then, dynamic flags
-      newDynFlags False minus_opts
+      when (not (null minus_opts)) $ newDynFlags False minus_opts
 
 packageFlagsChanged :: DynFlags -> DynFlags -> Bool
 packageFlagsChanged idflags1 idflags0 =
@@ -2661,7 +2661,7 @@ unsetOptions str
              mapM_ unsetOpt plus_opts
 
              no_flags <- mapM no_flag minus_opts
-             newDynFlags False no_flags
+             when (not (null no_flags)) $ newDynFlags False no_flags
 
 isMinus :: String -> Bool
 isMinus ('-':_) = True
