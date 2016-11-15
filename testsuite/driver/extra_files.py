@@ -290,6 +290,7 @@ extra_src_files = {
   'ghci026': ['../prog002'],
   'ghci038': ['../shell.hs'],
   'ghci058': ['../shell.hs'],
+  'ghci062': ['ghci062/', 'ghci062/Test.hs'],
   'ghcilink001': ['TestLink.hs', 'f.c'],
   'ghcilink002': ['TestLink.hs', 'f.c'],
   'ghcilink004': ['TestLink.hs', 'f.c'],

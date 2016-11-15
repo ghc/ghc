@@ -79,6 +79,7 @@ import GHC.IO.Handle.Types (Handle)
 import Foreign.C
 import GHC.IO.Handle.FD (fdToHandle)
 #else
+import System.Directory
 import System.Posix as Posix
 #endif
 import System.Process
@@ -383,13 +384,24 @@ loadDLL :: HscEnv -> String -> IO (Maybe String)
 loadDLL hsc_env str = iservCmd hsc_env (LoadDLL str)
 
 loadArchive :: HscEnv -> String -> IO ()
-loadArchive hsc_env str = iservCmd hsc_env (LoadArchive str)
+loadArchive hsc_env path = do
+  path' <- canonicalizePath path -- Note [loadObj and relative paths]
+  iservCmd hsc_env (LoadArchive path')
 
 loadObj :: HscEnv -> String -> IO ()
-loadObj hsc_env str = iservCmd hsc_env (LoadObj str)
+loadObj hsc_env path = do
+  path' <- canonicalizePath path -- Note [loadObj and relative paths]
+  iservCmd hsc_env (LoadObj path')
 
 unloadObj :: HscEnv -> String -> IO ()
-unloadObj hsc_env str = iservCmd hsc_env (UnloadObj str)
+unloadObj hsc_env path = do
+  path' <- canonicalizePath path -- Note [loadObj and relative paths]
+  iservCmd hsc_env (UnloadObj path')
+
+-- Note [loadObj and relative paths]
+-- the iserv process might have a different current directory from the
+-- GHC process, so we must make paths absolute before sending them
+-- over.
 
 addLibrarySearchPath :: HscEnv -> String -> IO (Ptr ())
 addLibrarySearchPath hsc_env str =
