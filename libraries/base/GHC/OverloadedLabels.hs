@@ -3,7 +3,6 @@
            , FlexibleInstances
            , KindSignatures
            , MultiParamTypeClasses
-           , NoImplicitPrelude
            , ScopedTypeVariables
            , TypeApplications
   #-}

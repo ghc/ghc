@@ -1,13 +1,8 @@
 {-# LANGUAGE AllowAmbiguousTypes
-           , DataKinds
-           , ExplicitForAll
            , FunctionalDependencies
            , KindSignatures
            , MultiParamTypeClasses
-           , NoImplicitPrelude
            , PolyKinds
-           , ScopedTypeVariables
-           , TypeApplications
   #-}
 
 -----------------------------------------------------------------------------
