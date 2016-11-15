@@ -58,7 +58,7 @@ library
 
     Build-Depends:
         array            == 0.5.*,
-        base             == 4.9.*,
+        base             == 4.10.*,
         binary           == 0.8.*,
         bytestring       == 0.10.*,
         containers       == 0.5.*,

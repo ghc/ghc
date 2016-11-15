@@ -7,5 +7,5 @@ cabal-version:       >=1.10
 library
   exposed-modules:     SayAnnNames
   other-extensions:    DeriveDataTypeable
-  build-depends:       base >=4.8 && <4.10, ghc
+  build-depends:       base, ghc
   default-language:    Haskell2010

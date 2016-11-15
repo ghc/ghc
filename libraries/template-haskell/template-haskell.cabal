@@ -49,7 +49,7 @@ Library
         Language.Haskell.TH.Lib.Map
 
     build-depends:
-        base        >= 4.8 && < 4.10,
+        base        >= 4.8 && < 4.11,
         ghc-boot-th == 8.1,
         pretty      == 1.1.*
 

@@ -7,7 +7,7 @@ TYPE SIGNATURES
 TYPE CONSTRUCTORS
 COERCION AXIOMS
 Dependent modules: []
-Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,
+Dependent packages: [base-4.10.0.0, ghc-prim-0.5.0.0,
                      integer-gmp-1.0.0.1]
 [1 of 1] Compiling A                ( A.hs, A.o )
 TYPE SIGNATURES
@@ -18,5 +18,5 @@ TYPE SIGNATURES
 TYPE CONSTRUCTORS
 COERCION AXIOMS
 Dependent modules: []
-Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,
+Dependent packages: [base-4.10.0.0, ghc-prim-0.5.0.0,
                      integer-gmp-1.0.0.1]

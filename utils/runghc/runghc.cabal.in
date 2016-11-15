@@ -27,7 +27,7 @@ Executable runghc
     Main-Is: Main.hs
 
     Build-Depends: base       >= 3   && < 5,
-                   directory  >= 1   && < 1.3,
+                   directory  >= 1   && < 1.4,
                    process    >= 1   && < 1.5,
                    filepath
 

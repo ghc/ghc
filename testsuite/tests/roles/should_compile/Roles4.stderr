@@ -14,7 +14,7 @@ COERCION AXIOMS
   axiom Roles4.N:C3 ::
     C3 a = a -> Syn1 a -- Defined at Roles4.hs:11:1
 Dependent modules: []
-Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,
+Dependent packages: [base-4.10.0.0, ghc-prim-0.5.0.0,
                      integer-gmp-1.0.0.1]
 
 ==================== Typechecker ====================

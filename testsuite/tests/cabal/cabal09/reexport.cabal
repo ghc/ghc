@@ -11,7 +11,7 @@ cabal-version:       >=1.23
 
 library
   reexported-modules:  Data.List.NonEmpty
-  build-depends:       base >=4.9 && <4.10
+  build-depends:       base
   default-language:    Haskell2010
 
 executable foo

@@ -16,7 +16,7 @@ INSTANCES
     -- Defined at T8958.hs:10:10
   instance [incoherent] Nominal a -- Defined at T8958.hs:7:10
 Dependent modules: []
-Dependent packages: [base-4.9.0.0, ghc-prim-0.5.0.0,
+Dependent packages: [base-4.10.0.0, ghc-prim-0.5.0.0,
                      integer-gmp-1.0.0.1]
 
 ==================== Typechecker ====================
