@@ -43,7 +43,7 @@ executable haddock
   ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs -O2 -threaded
 
   build-depends:
-    base >= 4.3 && < 4.10
+    base >= 4.3 && < 4.11
   if flag(in-ghc-tree)
     hs-source-dirs: haddock-api/src, haddock-library/vendor/attoparsec-0.12.1.1, haddock-library/src
     cpp-options: -DIN_GHC_TREE
