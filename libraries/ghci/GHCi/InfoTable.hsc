@@ -330,7 +330,8 @@ mkJumpToAddr a = case platform of
         --      jr      t3
         -- label:
         --      .quad <addr>
-        let w64 = fromIntegral (funPtrToInt a)
+        let w64 :: Word64
+            w64 = fromIntegral (funPtrToInt a)
         in Right [ 0x00000e17    -- auipc t3, 0x0
                  , 0x000e3e03    -- ld t3, 0(t3)
                  , 0x000e0067    -- jr t3
