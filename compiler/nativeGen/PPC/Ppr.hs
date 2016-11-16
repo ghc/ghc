@@ -68,7 +68,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
       -- elimination, it might be the target of a goto.
       (if platformHasSubsectionsViaSymbols platform
        then
-       -- See Note [Subsections Via Symbols]
+       -- See Note [Subsections Via Symbols] in X86/Ppr.hs
                 text "\t.long "
             <+> ppr info_lbl
             <+> char '-'
