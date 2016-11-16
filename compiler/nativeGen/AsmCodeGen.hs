@@ -8,7 +8,18 @@
 
 {-# LANGUAGE BangPatterns, CPP, GADTs, ScopedTypeVariables, UnboxedTuples #-}
 
-module AsmCodeGen ( nativeCodeGen ) where
+module AsmCodeGen (
+                    -- * Module entry point
+                    nativeCodeGen
+
+                    -- * Test-only exports: see trac #12744
+                    -- used by testGraphNoSpills, which needs to access
+                    -- the register allocator intermediate data structures
+                    -- cmmNativeGen emits
+                  , cmmNativeGen
+                  , NcgImpl(..)
+                  , x86NcgImpl
+                  ) where
 
 #include "HsVersions.h"
 #include "nativeGen/NCG.h"
