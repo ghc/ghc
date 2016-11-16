@@ -147,6 +147,7 @@ import DataCon  ( DataCon, dataConUserType, dataConOrigArgTys )
 import PatSyn   ( PatSyn, pprPatSynType )
 import Id       ( idType, idName )
 import FieldLabel ( FieldLabel )
+import Weight
 import TcType
 import Annotations
 import InstEnv
@@ -810,7 +811,7 @@ data TcLclEnv           -- Changes as we move inside an expression
         tcl_errs :: TcRef Messages              -- Place to accumulate errors
     }
 
-type TcTypeEnv = NameEnv TcTyThing
+type TcTypeEnv = NameEnv (Weighted TcTyThing)
 
 type ThBindEnv = NameEnv (TopLevelFlag, ThLevel)
    -- Domain = all Ids bound in this module (ie not imported)

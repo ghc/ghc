@@ -57,6 +57,7 @@ import TcSimplify ( solveEqualities )
 import TcType
 import TcHsSyn( zonkSigType )
 import Inst   ( tcInstBinders, tcInstBindersX, tcInstBinderX )
+import Weight
 import Type
 import Kind
 import RdrName( lookupLocalRdrOcc )
@@ -1294,7 +1295,8 @@ tcWildCardBindersX :: (Name -> TcM TcTyVar)
 tcWildCardBindersX new_wc wc_names thing_inside
   = do { wcs <- mapM new_wc wc_names
        ; let wc_prs = wc_names `zip` wcs
-       ; tcExtendTyVarEnv2 wc_prs $
+       ; let wc_prs_env = wc_names `zip` (unrestricted <$> wcs)
+       ; tcExtendTyVarEnv2 wc_prs_env $
          thing_inside wc_prs }
 
 -- | Kind-check a 'LHsQTyVars'. If the decl under consideration has a complete,
@@ -1321,7 +1323,7 @@ kcHsTyVarBndrs name unsat cusk open_fam all_kind_vars
   = do { kv_kinds <- mk_kv_kinds
        ; lvl <- getTcLevel
        ; let scoped_kvs = zipWith (mk_skolem_tv lvl) kv_ns kv_kinds
-       ; tcExtendTyVarEnv2 (kv_ns `zip` scoped_kvs) $
+       ; tcExtendTyVarEnv2 (kv_ns `zip` (unrestricted <$> scoped_kvs)) $
     do { (tc_binders, res_kind, stuff) <- solveEqualities $
                                           bind_telescope hs_tvs thing_inside
 
@@ -1366,7 +1368,7 @@ kcHsTyVarBndrs name unsat cusk open_fam all_kind_vars
        ; scoped_kvs <- zipWithM newSigTyVar kv_ns kv_kinds
                      -- the names must line up in splitTelescopeTvs
        ; (binders, res_kind, stuff)
-           <- tcExtendTyVarEnv2 (kv_ns `zip` scoped_kvs) $
+           <- tcExtendTyVarEnv2 (kv_ns `zip` (unrestricted <$> scoped_kvs)) $
               bind_telescope hs_tvs thing_inside
        ; let   -- NB: Don't add scoped_kvs to tyConTyVars, because they
                -- must remain lined up with the binders
@@ -1410,7 +1412,7 @@ kcHsTyVarBndrs name unsat cusk open_fam all_kind_vars
     bind_unless_scoped :: (TcTyVar, Bool) -> TcM a -> TcM a
     bind_unless_scoped (_, True)   thing_inside = thing_inside
     bind_unless_scoped (tv, False) thing_inside
-      = tcExtendTyVarEnv [tv] thing_inside
+      = tcExtendTyVarEnv [unrestricted tv] thing_inside
 
     kc_hs_tv :: HsTyVarBndr Name -> TcM (TcTyVar, Bool)
     kc_hs_tv (UserTyVar (L _ name))
@@ -1469,7 +1471,7 @@ tcImplicitTKBndrsX :: (Name -> TcM (TcTyVar, Bool))  -- new_tv function
 --   i.e. no cloning of fresh names
 tcImplicitTKBndrsX new_tv var_ns thing_inside
   = do { tkvs_pairs <- mapM new_tv var_ns
-       ; let must_scope_tkvs = [ tkv | (tkv, False) <- tkvs_pairs ]
+       ; let must_scope_tkvs = [ unrestricted tkv | (tkv, False) <- tkvs_pairs ]
              tkvs            = map fst tkvs_pairs
        ; (result, bound_tvs) <- tcExtendTyVarEnv must_scope_tkvs $
                                 thing_inside
@@ -1520,7 +1522,7 @@ tcExplicitTKBndrsX new_tv orig_hs_tvs thing_inside
     go [] thing = thing []
     go (L _ hs_tv : hs_tvs) thing
       = do { tv <- tcHsTyVarBndr new_tv hs_tv
-           ; tcExtendTyVarEnv [tv] $
+           ; tcExtendTyVarEnv [unrestricted tv] $
              go hs_tvs $ \ tvs ->
              thing (tv : tvs) }
 
@@ -1699,7 +1701,7 @@ kcLookupTcTyCon nm
 kcTyClTyVars :: Name -> TcM a -> TcM a
 kcTyClTyVars tycon_name thing_inside
   = do { tycon <- kcLookupTcTyCon tycon_name
-       ; tcExtendTyVarEnv (tcTyConScopedTyVars tycon) $ thing_inside }
+       ; tcExtendTyVarEnv (unrestricted <$> tcTyConScopedTyVars tycon) $ thing_inside }
 
 tcTyClTyVars :: Name
              -> ([TyConBinder] -> Kind -> TcM a) -> TcM a
@@ -1735,7 +1737,7 @@ tcTyClTyVars tycon_name thing_inside
 
           -- Add the *unzonked* tyvars to the env't, because those
           -- are the ones mentioned in the source.
-       ; tcExtendTyVarEnv scoped_tvs $
+       ; tcExtendTyVarEnv (unrestricted <$> scoped_tvs) $
          thing_inside binders res_kind }
 
 -----------------------------------
@@ -1900,23 +1902,25 @@ tcHsPatSigType ctxt sig_ty
 
 tcPatSig :: Bool                    -- True <=> pattern binding
          -> LHsSigWcType Name
-         -> ExpSigmaType
+         -> Weighted ExpSigmaType
          -> TcM (TcType,            -- The type to use for "inside" the signature
-                 [TcTyVar],         -- The new bit of type environment, binding
+                 [Weighted TcTyVar],-- The new bit of type environment, binding
                                     -- the scoped type variables
-                 [(Name,TcTyVar)],  -- The wildcards
+                 [(Name, Weighted TcTyVar)],  -- The wildcards
                  HsWrapper)         -- Coercion due to unification with actual ty
                                     -- Of shape:  res_ty ~ sig_ty
 tcPatSig in_pat_bind sig res_ty
- = do  { (sig_wcs, sig_tvs, sig_ty) <- tcHsPatSigType PatSigCtxt sig
+ = do  { (sig_wcs0, sig_tvs, sig_ty) <- tcHsPatSigType PatSigCtxt sig
         -- sig_tvs are the type variables free in 'sig',
         -- and not already in scope. These are the ones
         -- that should be brought into scope
 
+        ; let sig_wcs = map (\(x,y)-> (x,weightedSet res_ty y)) sig_wcs0 -- TODO: arnaud: distributes the weight of the type to the component. Correct for now as the weight of the component is always 1, but should actually be a multiplication, using the join of (multiplicative, writer) monadic structure of Weighted
+        ; let sig_tvs_weighted = map (weightedSet res_ty) sig_tvs -- TODO: arnaud: see previous
         ; if null sig_tvs then do {
                 -- Just do the subsumption check and return
                   wrap <- addErrCtxtM (mk_msg sig_ty) $
-                          tcSubTypeET PatSigOrigin PatSigCtxt res_ty sig_ty
+                          tcSubTypeET PatSigOrigin PatSigCtxt (weightedThing res_ty) sig_ty
                 ; return (sig_ty, [], sig_wcs, wrap)
         } else do
                 -- Type signature binds at least one scoped type variable
@@ -1939,15 +1943,15 @@ tcPatSig in_pat_bind sig res_ty
 
         -- Now do a subsumption check of the pattern signature against res_ty
         ; wrap <- addErrCtxtM (mk_msg sig_ty) $
-                  tcSubTypeET PatSigOrigin PatSigCtxt res_ty sig_ty
+                  tcSubTypeET PatSigOrigin PatSigCtxt (weightedThing res_ty) sig_ty
 
         -- Phew!
-        ; return (sig_ty, sig_tvs, sig_wcs, wrap)
+        ; return (sig_ty, sig_tvs_weighted, sig_wcs, wrap)
         } }
   where
     mk_msg sig_ty tidy_env
        = do { (tidy_env, sig_ty) <- zonkTidyTcType tidy_env sig_ty
-            ; res_ty <- readExpType res_ty   -- should be filled in by now
+            ; res_ty <- readExpType (weightedThing res_ty)   -- should be filled in by now
             ; (tidy_env, res_ty) <- zonkTidyTcType tidy_env res_ty
             ; let msg = vcat [ hang (text "When checking that the pattern signature:")
                                   4 (ppr sig_ty)

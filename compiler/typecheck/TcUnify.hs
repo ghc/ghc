@@ -46,6 +46,7 @@ import TcMType
 import TcRnMonad
 import TcType
 import Type
+import Weight
 import Coercion
 import TcEvidence
 import Name ( isSystemName )
@@ -122,7 +123,7 @@ matchExpectedFunTys :: forall a.
                        SDoc   -- See Note [Herald for matchExpectedFunTys]
                     -> Arity
                     -> ExpRhoType  -- deeply skolemised
-                    -> ([ExpSigmaType] -> ExpRhoType -> TcM a)
+                    -> ([Weighted ExpSigmaType] -> ExpRhoType -> TcM a)
                           -- must fill in these ExpTypes here
                     -> TcM (a, HsWrapper)
 -- If    matchExpectedFunTys n ty = (_, wrap)
@@ -140,9 +141,9 @@ matchExpectedFunTys herald arity orig_ty thing_inside
     go acc_arg_tys n ty
       | Just ty' <- tcView ty = go acc_arg_tys n ty'
 
-    go acc_arg_tys n (FunTy _ arg_ty res_ty)
+    go acc_arg_tys n (FunTy weight arg_ty res_ty)
       = ASSERT( not (isPredTy arg_ty) )
-        do { (result, wrap_res) <- go (mkCheckExpType arg_ty : acc_arg_tys)
+        do { (result, wrap_res) <- go ((Weighted weight $ mkCheckExpType arg_ty) : acc_arg_tys)
                                       (n-1) res_ty
            ; return ( result
                     , mkWpFun idHsWrapper wrap_res arg_ty res_ty doc ) }
@@ -176,11 +177,11 @@ matchExpectedFunTys herald arity orig_ty thing_inside
                           defer acc_arg_tys n (mkCheckExpType ty)
 
     ------------
-    defer :: [ExpSigmaType] -> Arity -> ExpRhoType -> TcM (a, HsWrapper)
+    defer :: [Weighted ExpSigmaType] -> Arity -> ExpRhoType -> TcM (a, HsWrapper)
     defer acc_arg_tys n fun_ty
       = do { more_arg_tys <- replicateM n newInferExpTypeNoInst
            ; res_ty       <- newInferExpTypeInst
-           ; result       <- thing_inside (reverse acc_arg_tys ++ more_arg_tys) res_ty
+           ; result       <- thing_inside (reverse acc_arg_tys ++ (map unrestricted more_arg_tys)) res_ty
            ; more_arg_tys <- mapM readExpType more_arg_tys
            ; res_ty       <- readExpType res_ty
            ; let unif_fun_ty = mkFunTys more_arg_tys res_ty

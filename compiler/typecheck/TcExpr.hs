@@ -35,6 +35,7 @@ import FamInstEnv       ( FamInstEnvs )
 import RnEnv            ( addUsedGRE, addNameClashErrRn
                         , unknownSubordinateErr )
 import TcEnv
+import Weight
 import TcArrows
 import TcMatches
 import TcHsType
@@ -559,7 +560,7 @@ tcExpr (HsCase scrut matches) res_ty
           (scrut', scrut_ty) <- tcInferRho scrut
 
         ; traceTc "HsCase" (ppr scrut_ty)
-        ; matches' <- tcMatchesCase match_ctxt scrut_ty matches res_ty
+        ; matches' <- tcMatchesCase match_ctxt (unrestricted scrut_ty) matches res_ty -- TODO: arnaud: add support for weight annotation on case. In the meantime, suppose it's always Omega (it's incorrect, of course, as we can make 1-things into ω-things this way, and when a check is implemented to prevent that behaviour, then we will not be able to typecheck linear matches)
         ; return (HsCase scrut' matches') }
  where
     match_ctxt = MC { mc_what = CaseAlt,
@@ -1363,7 +1364,7 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
              , match_wrapper )         -- :: (arg_ty -> res_ty) "->" rho_ty
                <- matchExpectedFunTys herald 1 (mkCheckExpType rho_ty) $
                   \ [arg_ty] res_ty ->
-                  do { arg_tc_ty <- expTypeToType arg_ty
+                  do { arg_tc_ty <- expTypeToType (weightedThing arg_ty) -- TODO: arnaud: rather fmap, probably, but it changes the type of thing_inside, which I have to check whether it's worth it or not
                      ; res_tc_ty <- expTypeToType res_ty
 
                          -- another nested arrow is too much for now,
@@ -1495,7 +1496,7 @@ tcExprSig expr (CompleteSig { sig_bndr = poly_id, sig_loc = loc })
        ; let skol_info = SigSkol ExprSigCtxt (idType poly_id) tv_prs
              skol_tvs  = map snd tv_prs
        ; (ev_binds, expr') <- checkConstraints skol_info skol_tvs given $
-                              tcExtendTyVarEnv2 tv_prs $
+                              tcExtendTyVarEnv2 (map (fmap unrestricted) tv_prs) $ -- TODO: arnaud: type variables, should be Zero
                               tcPolyExprNC expr tau
 
        ; let poly_wrap = mkWpTyLams   skol_tvs
@@ -1508,8 +1509,8 @@ tcExprSig expr sig@(PartialSig { psig_name = name, sig_loc = loc })
     do { (tclvl, wanted, (expr', sig_inst))
              <- pushLevelAndCaptureConstraints  $
                 do { sig_inst <- tcInstSig sig
-                   ; expr' <- tcExtendTyVarEnv2 (sig_inst_skols sig_inst) $
-                              tcExtendTyVarEnv2 (sig_inst_wcs   sig_inst) $
+                   ; expr' <- tcExtendTyVarEnv2 (map (fmap unrestricted) $ sig_inst_skols sig_inst) $ -- TODO: arnaud: (also line below) type variables, should be Zero
+                              tcExtendTyVarEnv2 (map (fmap unrestricted) $ sig_inst_wcs   sig_inst) $
                               tcPolyExprNC expr (sig_inst_tau sig_inst)
                    ; return (expr', sig_inst) }
        -- See Note [Partial expression signatures]
@@ -2600,7 +2601,7 @@ checkClosedInStaticForm name = do
       -- The @visited@ set is an accumulating parameter that contains the set of
       -- visited nodes, so we avoid repeating cycles in the traversal.
       case lookupNameEnv type_env n of
-        Just (ATcId { tct_id = tcid, tct_info = info }) -> case info of
+        Just (Weighted _ (ATcId { tct_id = tcid, tct_info = info })) -> case info of
           ClosedLet   -> Nothing
           NotLetBound -> Just NotLetBoundReason
           NonClosedLet fvs type_closed -> listToMaybe $

@@ -39,6 +39,7 @@ import Unify( tcUnifyTy )
 import BasicTypes ( DerivStrategy(..) )
 import Class
 import Type
+import Weight
 import ErrUtils
 import DataCon
 import Maybes
@@ -602,7 +603,7 @@ deriveTyData :: [TyVar] -> TyCon -> [Type]   -- LHS of data or data instance
 deriveTyData tvs tc tc_args deriv_strat deriv_pred
   = setSrcSpan (getLoc (hsSigType deriv_pred)) $  -- Use loc of the 'deriving' item
     do  { (deriv_tvs, cls, cls_tys, cls_arg_kinds)
-                <- tcExtendTyVarEnv tvs $
+                <- tcExtendTyVarEnv (map unrestricted tvs) $
                    tcHsDeriv deriv_pred
                 -- Deriving preds may (now) mention
                 -- the type variables for the type constructor, hence tcExtendTyVarenv

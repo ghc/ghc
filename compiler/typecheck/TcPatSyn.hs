@@ -16,6 +16,7 @@ import HsSyn
 import TcPat
 import Type( mkTyVarBinders, mkEmptyTCvSubst
            , tidyTyVarBinders, tidyTypes, tidyType )
+import Weight ( unrestricted )
 import TcRnMonad
 import TcSigs( emptyPragEnv, completeSigFromId )
 import TcEnv
@@ -75,7 +76,7 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
        ; (tclvl, wanted, ((lpat', args), pat_ty))
             <- pushLevelAndCaptureConstraints  $
                tcInferNoInst $ \ exp_ty ->
-               tcPat PatSyn lpat exp_ty $
+               tcPat PatSyn lpat (unrestricted exp_ty) $
                mapM tcLookupId arg_names
 
        ; let named_taus = (name, pat_ty) : map (\arg -> (getName arg, varType arg)) args
@@ -118,7 +119,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
 
        ; tcCheckPatSynPat lpat
 
-       ; (arg_tys, pat_ty) <- case tcSplitFunTysN decl_arity sig_body_ty of
+       ; (arg_tys, pat_ty) <- case tcSplitFunTysN decl_arity sig_body_ty of -- TODO: arnaud: tcSplitFunTysN should return weighted types
                                  Right stuff  -> return stuff
                                  Left missing -> wrongNumberOfParmsErr name decl_arity missing
 
@@ -147,8 +148,8 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        ; (tclvl, wanted, (lpat', (ex_tvs', prov_dicts, args'))) <-
            ASSERT2( equalLength arg_names arg_tys, ppr name $$ ppr arg_names $$ ppr arg_tys )
            pushLevelAndCaptureConstraints            $
-           tcExtendTyVarEnv univ_tvs                 $
-           tcPat PatSyn lpat (mkCheckExpType pat_ty) $
+           tcExtendTyVarEnv (map unrestricted univ_tvs)  $ -- TODO: arnaud: I'm not sure
+           tcPat PatSyn lpat (unrestricted $ mkCheckExpType pat_ty) $ -- TODO: arnaud: when tclSplitFunTysN returns weighted type, should preserve the weight
            do { let in_scope    = mkInScopeSet (mkVarSet univ_tvs)
                     empty_subst = mkEmptyTCvSubst in_scope
               ; (subst, ex_tvs') <- mapAccumLM newMetaTyVarX empty_subst ex_tvs
@@ -430,7 +431,7 @@ tcPatSynMatcher (L loc name) lpat
                     L (getLoc lpat) $
                     HsCase (nlHsVar scrutinee) $
                     MG{ mg_alts = L (getLoc lpat) cases
-                      , mg_arg_tys = [pat_ty]
+                      , mg_arg_tys = [unrestricted pat_ty] -- TODO: arnaud: unrestricted is surely incorrect here
                       , mg_res_ty = res_ty
                       , mg_origin = Generated
                       }
@@ -438,7 +439,7 @@ tcPatSynMatcher (L loc name) lpat
                      HsLam $
                      MG{ mg_alts = noLoc [mkSimpleMatch LambdaExpr
                                                         args body]
-                       , mg_arg_tys = [pat_ty, cont_ty, fail_ty]
+                       , mg_arg_tys = map unrestricted [pat_ty, cont_ty, fail_ty] -- TODO: arnaud: unrestricted is surely incorrect here
                        , mg_res_ty = res_ty
                        , mg_origin = Generated
                        }

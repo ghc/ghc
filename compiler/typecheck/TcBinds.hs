@@ -30,6 +30,7 @@ import TcEnv
 import TcUnify
 import TcSimplify
 import TcEvidence
+import Weight
 import TcHsType
 import TcPat
 import TcMType
@@ -407,7 +408,7 @@ tcValBinds top_lvl binds sigs thing_inside
                 -- declared with complete type signatures
                 -- Do not extend the TcIdBinderStack; instead
                 -- we extend it on a per-rhs basis in tcExtendForRhs
-        ; tcExtendLetEnvIds top_lvl [(idName id, id) | id <- poly_ids] $ do
+        ; tcExtendLetEnvIds top_lvl [(idName id, unrestricted id) | id <- poly_ids] $ do -- TODO: arnaud: it may be right to use unrestricted here, since we don't have type information (unless `LSig` is), but I need to make sure
             { (binds', (extra_binds', thing)) <- tcBindGroups top_lvl sig_fn prag_fn binds $ do
                    { thing <- thing_inside
                      -- See Note [Pattern synonym builders don't yield dependencies]
@@ -499,7 +500,7 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
 
     go :: [SCC (LHsBind Name)] -> TcM (LHsBinds TcId, thing)
     go (scc:sccs) = do  { (binds1, ids1) <- tc_scc scc
-                        ; (binds2, thing) <- tcExtendLetEnv top_lvl closed ids1
+                        ; (binds2, thing) <- tcExtendLetEnv top_lvl closed (map unrestricted ids1) -- recursive bindings must be unrestricted (the ids added to the environment here are the name of the recursive definitions).
                                                             (go sccs)
                         ; return (binds1 `unionBags` binds2, thing) }
     go []         = do  { thing <- thing_inside; return (emptyBag, thing) }
@@ -543,7 +544,7 @@ tc_single top_lvl sig_fn prag_fn lbind closed thing_inside
                                       NonRecursive NonRecursive
                                       closed
                                       [lbind]
-       ; thing <- tcExtendLetEnv top_lvl closed ids thing_inside
+       ; thing <- tcExtendLetEnv top_lvl closed (map unrestricted ids) thing_inside -- since we are defining a non-recursive binding, it is not necessary here to define an unrestricted binding. But we do so until toplevel linear bindings are supported.
        ; return (binds1, thing) }
 
 ------------------------
@@ -698,7 +699,7 @@ tcPolyCheck prag_fn
        ; (ev_binds, (co_fn, matches'))
             <- checkConstraints skol_info skol_tvs ev_vars $
                tcExtendIdBndrs [TcIdBndr mono_id NotTopLevel]  $
-               tcExtendTyVarEnv2 tv_prs $
+               tcExtendTyVarEnv2 (map (fmap unrestricted) tv_prs) $
                setSrcSpan loc           $
                tcMatchesFun (L nm_loc mono_name) matches (mkCheckExpType tau)
 
@@ -1294,7 +1295,7 @@ tcMonoBinds _ sig_fn no_gen binds
 
         ; traceTc "tcMonoBinds" $ vcat [ ppr n <+> ppr id <+> ppr (idType id)
                                        | (n,id) <- rhs_id_env]
-        ; binds' <- tcExtendLetEnvIds NotTopLevel rhs_id_env $
+        ; binds' <- tcExtendLetEnvIds NotTopLevel (map (fmap unrestricted) rhs_id_env) $
                     mapM (wrapLocM tcRhs) tc_binds
 
         ; return (listToBag binds', mono_infos) }
@@ -1357,7 +1358,10 @@ tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
         ; ((pat', nosig_mbis), pat_ty)
             <- addErrCtxt (patMonoBindsCtxt pat grhss) $
                tcInferNoInst $ \ exp_ty ->
-               tcLetPat inst_sig_fun no_gen pat exp_ty $
+               tcLetPat inst_sig_fun no_gen pat (unrestricted exp_ty) $
+                 -- ^^ inferred type get an unrestricted multiplicity. It may be
+                 -- worth it to try and find a finer-grained multiplicity here
+                 -- if examples warrant it.
                mapM lookup_info nosig_names
 
         ; let mbis = sig_mbis ++ nosig_mbis
@@ -1444,8 +1448,8 @@ tcExtendTyVarEnvForRhs (Just sig) thing_inside
 tcExtendTyVarEnvFromSig :: TcIdSigInst -> TcM a -> TcM a
 tcExtendTyVarEnvFromSig sig_inst thing_inside
   | TISI { sig_inst_skols = skol_prs, sig_inst_wcs = wcs } <- sig_inst
-  = tcExtendTyVarEnv2 wcs $
-    tcExtendTyVarEnv2 skol_prs $
+  = tcExtendTyVarEnv2 (map (fmap unrestricted) wcs) $
+    tcExtendTyVarEnv2 (map (fmap unrestricted) skol_prs) $
     thing_inside
 
 tcExtendIdBinderStackForRhs :: [MonoBindInfo] -> TcM a -> TcM a
@@ -1688,7 +1692,7 @@ isClosedBndrGroup binds = do
     -- See Note [Bindings with closed types] in TcRnTypes
     is_closed_id type_env name
       | Just thing <- lookupNameEnv type_env name
-      = case thing of
+      = case weightedThing thing of
           ATcId { tct_info = ClosedLet } -> True  -- This is the key line
           ATcId {}                       -> False
           ATyVar {}                      -> False -- In-scope type variables

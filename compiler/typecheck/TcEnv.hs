@@ -72,6 +72,7 @@ import HsSyn
 import IfaceEnv
 import TcRnMonad
 import TcMType
+import Weight
 import TcType
 import LoadIface
 import PrelNames
@@ -324,13 +325,13 @@ tcLookupLocated = addLocM tcLookup
 tcLookupLcl_maybe :: Name -> TcM (Maybe TcTyThing)
 tcLookupLcl_maybe name
   = do { local_env <- getLclTypeEnv
-       ; return (lookupNameEnv local_env name) }
+       ; return (fmap weightedThing $ lookupNameEnv local_env name) } -- NEXTSTEP: arnaud: don't ignore weights
 
 tcLookup :: Name -> TcM TcTyThing
 tcLookup name = do
     local_env <- getLclTypeEnv
     case lookupNameEnv local_env name of
-        Just thing -> return thing
+        Just thing -> return (weightedThing thing)
         Nothing    -> AGlobal <$> tcLookupGlobal name
 
 tcLookupTyVar :: Name -> TcM TcTyVar
@@ -361,14 +362,14 @@ tcLookupLocalIds ns
   where
     lookup lenv name
         = case lookupNameEnv lenv name of
-                Just (ATcId { tct_id = id }) ->  id
+                Just (Weighted { weightedThing = (ATcId { tct_id = id })}) ->  id
                 _ -> pprPanic "tcLookupLocalIds" (ppr name)
 
 getInLocalScope :: TcM (Name -> Bool)
 getInLocalScope = do { lcl_env <- getLclTypeEnv
                      ; return (`elemNameEnv` lcl_env) }
 
-tcExtendKindEnvList :: [(Name, TcTyThing)] -> TcM r -> TcM r
+tcExtendKindEnvList :: [(Name, Weighted TcTyThing)] -> TcM r -> TcM r
 -- Used only during kind checking, for TcThings that are
 --      ATcTyCon or APromotionErr
 -- No need to update the global tyvars, or tcl_th_bndrs, or tcl_rdr
@@ -378,7 +379,7 @@ tcExtendKindEnvList things thing_inside
   where
     upd_env env = env { tcl_env = extendNameEnvList (tcl_env env) things }
 
-tcExtendKindEnv :: NameEnv TcTyThing -> TcM r -> TcM r
+tcExtendKindEnv :: NameEnv (Weighted TcTyThing) -> TcM r -> TcM r
 -- A variant of tcExtendKindEvnList
 tcExtendKindEnv extra_env thing_inside
   = do { traceTc "txExtendKindEnv" (ppr extra_env)
@@ -388,16 +389,16 @@ tcExtendKindEnv extra_env thing_inside
 
 -----------------------
 -- Scoped type and kind variables
-tcExtendTyVarEnv :: [TyVar] -> TcM r -> TcM r
+tcExtendTyVarEnv :: [Weighted TyVar] -> TcM r -> TcM r
 tcExtendTyVarEnv tvs thing_inside
-  = tcExtendTyVarEnv2 [(tyVarName tv, tv) | tv <- tvs] thing_inside
+  = tcExtendTyVarEnv2 [(tyVarName (weightedThing tv), tv) | tv <- tvs] thing_inside
 
-tcExtendTyVarEnv2 :: [(Name,TcTyVar)] -> TcM r -> TcM r
+tcExtendTyVarEnv2 :: [(Name,Weighted TcTyVar)] -> TcM r -> TcM r
 tcExtendTyVarEnv2 binds thing_inside
   -- this should be used only for explicitly mentioned scoped variables.
   -- thus, no coercion variables
   = do { tc_extend_local_env NotTopLevel
-                    [(name, ATyVar name tv) | (name, tv) <- binds] $
+                    [(name, fmap (ATyVar name) tv) | (name, tv) <- binds] $
          do { env <- getLclEnv
             ; let env' = env { tcl_tidy = add_tidy_tvs (tcl_tidy env) }
             ; setLclEnv env' thing_inside }}
@@ -407,8 +408,8 @@ tcExtendTyVarEnv2 binds thing_inside
     -- We initialise the "tidy-env", used for tidying types before printing,
     -- by building a reverse map from the in-scope type variables to the
     -- OccName that the programmer originally used for them
-    add :: TidyEnv -> (Name, TcTyVar) -> TidyEnv
-    add (env,subst) (name, tyvar)
+    add :: TidyEnv -> (Name, Weighted TcTyVar) -> TidyEnv
+    add (env,subst) (name, Weighted _ tyvar)
         = ASSERT( isTyVar tyvar )
           case tidyOccName env (nameOccName name) of
             (env', occ') ->  (env', extendVarEnv subst tyvar tyvar')
@@ -420,29 +421,29 @@ isTypeClosedLetBndr :: Id -> Bool
 -- See Note [Bindings with closed types] in TcRnTypes
 isTypeClosedLetBndr = noFreeVarsOfType . idType
 
-tcExtendLetEnv :: TopLevelFlag -> IsGroupClosed -> [TcId] -> TcM a -> TcM a
+tcExtendLetEnv :: TopLevelFlag -> IsGroupClosed -> [Weighted TcId] -> TcM a -> TcM a
 -- Used for both top-level value bindings and and nested let/where-bindings
 -- Adds to the TcIdBinderStack too
 tcExtendLetEnv top_lvl closed_group ids thing_inside
-  = tcExtendIdBndrs [TcIdBndr id top_lvl | id <- ids] $
+  = tcExtendIdBndrs [TcIdBndr id top_lvl | Weighted _ id <- ids] $
     tcExtendLetEnvIds' top_lvl closed_group
-                       [(idName id, id) | id <- ids]
+                       [(idName (weightedThing id), id) | id <- ids]
                        thing_inside
 
-tcExtendLetEnvIds :: TopLevelFlag -> [(Name, TcId)] -> TcM a -> TcM a
+tcExtendLetEnvIds :: TopLevelFlag -> [(Name, Weighted TcId)] -> TcM a -> TcM a
 -- Used for both top-level value bindings and and nested let/where-bindings
 -- Does not extend the TcIdBinderStack
 tcExtendLetEnvIds top_lvl
   = tcExtendLetEnvIds' top_lvl ClosedGroup
 
 tcExtendLetEnvIds' :: TopLevelFlag -> IsGroupClosed
-                   -> [(Name,TcId)] -> TcM a
+                   -> [(Name,Weighted TcId)] -> TcM a
                    -> TcM a
 -- Used for both top-level value bindings and and nested let/where-bindings
 -- Does not extend the TcIdBinderStack
 tcExtendLetEnvIds' top_lvl closed_group pairs thing_inside
   = tc_extend_local_env top_lvl
-      [ (name, ATcId { tct_id = let_id
+      [ (name, Weighted Omega (ATcId { tct_id = let_id -- TODO: arnaud: eventually let-bindings need to have a weight
                      , tct_info = case closed_group of
                          ClosedGroup
                            | isTypeClosedLetBndr let_id -> ClosedLet
@@ -451,32 +452,32 @@ tcExtendLetEnvIds' top_lvl closed_group pairs thing_inside
                            NonClosedLet
                              (maybe emptyNameSet id $ lookupNameEnv fvs name)
                              (isTypeClosedLetBndr let_id)
-                     })
-      | (name, let_id) <- pairs ] $
+                     }))
+      | (name, Weighted Omega let_id) <- pairs ] $
     thing_inside
 
-tcExtendIdEnv :: [TcId] -> TcM a -> TcM a
+tcExtendIdEnv :: [Weighted TcId] -> TcM a -> TcM a
 -- For lambda-bound and case-bound Ids
 -- Extends the the TcIdBinderStack as well
 tcExtendIdEnv ids thing_inside
-  = tcExtendIdEnv2 [(idName id, id) | id <- ids] thing_inside
+  = tcExtendIdEnv2 [(idName (weightedThing id), id) | id <- ids] thing_inside
 
-tcExtendIdEnv1 :: Name -> TcId -> TcM a -> TcM a
+tcExtendIdEnv1 :: Name -> Weighted TcId -> TcM a -> TcM a
 -- Exactly like tcExtendIdEnv2, but for a single (name,id) pair
 tcExtendIdEnv1 name id thing_inside
   = tcExtendIdEnv2 [(name,id)] thing_inside
 
-tcExtendIdEnv2 :: [(Name,TcId)] -> TcM a -> TcM a
+tcExtendIdEnv2 :: [(Name,Weighted TcId)] -> TcM a -> TcM a
 tcExtendIdEnv2 names_w_ids thing_inside
   = tcExtendIdBndrs [ TcIdBndr mono_id NotTopLevel
-                    | (_,mono_id) <- names_w_ids ] $
+                    | (_,Weighted _ mono_id) <- names_w_ids ] $
     do  { tc_extend_local_env NotTopLevel
-                              [ (name, ATcId { tct_id = id
-                                             , tct_info = NotLetBound })
-                              | (name,id) <- names_w_ids] $
+                              [ (name, Weighted w (ATcId { tct_id = id
+                                             , tct_info = NotLetBound }))
+                              | (name,Weighted w id) <- names_w_ids] $
           thing_inside }
 
-tc_extend_local_env :: TopLevelFlag -> [(Name, TcTyThing)]
+tc_extend_local_env :: TopLevelFlag -> [(Name, Weighted TcTyThing)]
                     -> TcM a -> TcM a
 tc_extend_local_env top_lvl extra_env thing_inside
 -- Precondition: the argument list extra_env has TcTyThings
@@ -499,7 +500,7 @@ tc_extend_local_env top_lvl extra_env thing_inside
         ; let env2 = extend_local_env (top_lvl, thLevel stage) extra_env env1
         ; setLclEnv env2 thing_inside }
   where
-    extend_local_env :: (TopLevelFlag, ThLevel) -> [(Name, TcTyThing)] -> TcLclEnv -> TcLclEnv
+    extend_local_env :: (TopLevelFlag, ThLevel) -> [(Name, Weighted TcTyThing)] -> TcLclEnv -> TcLclEnv
     -- Extend the local LocalRdrEnv and Template Haskell staging env simultaneously
     -- Reason for extending LocalRdrEnv: after running a TH splice we need
     -- to do renaming.
@@ -510,9 +511,9 @@ tc_extend_local_env top_lvl extra_env thing_inside
                                 -- The LocalRdrEnv contains only non-top-level names
                                 -- (GlobalRdrEnv handles the top level)
             , tcl_th_bndrs = extendNameEnvList th_bndrs  -- We only track Ids in tcl_th_bndrs
-                                 [(n, thlvl) | (n, ATcId {}) <- pairs] }
+                                 [(n, thlvl) | (n, Weighted _ ATcId {}) <- pairs] }
 
-tcExtendLocalTypeEnv :: TcLclEnv -> [(Name, TcTyThing)] -> TcM TcLclEnv
+tcExtendLocalTypeEnv :: TcLclEnv -> [(Name, Weighted TcTyThing)] -> TcM TcLclEnv
 tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things
   | isEmptyVarSet extra_tvs
   = return (lcl_env { tcl_env = extendNameEnvList lcl_type_env tc_ty_things })
@@ -524,7 +525,7 @@ tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things
   where
     extra_tvs = foldr get_tvs emptyVarSet tc_ty_things
 
-    get_tvs (_, ATcId { tct_id = id, tct_info = closed }) tvs
+    get_tvs (_, Weighted _ (ATcId { tct_id = id, tct_info = closed })) tvs
       = case closed of
           ClosedLet ->
             ASSERT2( isEmptyVarSet id_tvs, ppr id $$ ppr (idType id) ) tvs
@@ -532,13 +533,13 @@ tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things
             tvs `unionVarSet` id_tvs
         where id_tvs = tyCoVarsOfType (idType id)
 
-    get_tvs (_, ATyVar _ tv) tvs          -- See Note [Global TyVars]
+    get_tvs (_, Weighted _ (ATyVar _ tv)) tvs          -- See Note [Global TyVars]
       = tvs `unionVarSet` tyCoVarsOfType (tyVarKind tv) `extendVarSet` tv
 
-    get_tvs (_, ATcTyCon tc) tvs = tvs `unionVarSet` tyCoVarsOfType (tyConKind tc)
+    get_tvs (_, Weighted _ (ATcTyCon tc)) tvs = tvs `unionVarSet` tyCoVarsOfType (tyConKind tc)
 
-    get_tvs (_, AGlobal {})       tvs = tvs
-    get_tvs (_, APromotionErr {}) tvs = tvs
+    get_tvs (_, Weighted _ (AGlobal {}))       tvs = tvs
+    get_tvs (_, Weighted _ (APromotionErr {})) tvs = tvs
 
         -- Note [Global TyVars]
         -- It's important to add the in-scope tyvars to the global tyvar set
@@ -569,7 +570,7 @@ tcExtendIdBndrs bndrs thing_inside
 tcAddDataFamConPlaceholders :: [LInstDecl Name] -> TcM a -> TcM a
 -- See Note [AFamDataCon: not promoting data family constructors]
 tcAddDataFamConPlaceholders inst_decls thing_inside
-  = tcExtendKindEnvList [ (con, APromotionErr FamDataConPE)
+  = tcExtendKindEnvList [ (con, Weighted Omega (APromotionErr FamDataConPE)) -- TODO: arnaud: unsure. Probably correct: when type is unclear, assume Omega.
                         | lid <- inst_decls, con <- get_cons lid ]
       thing_inside
       -- Note [AFamDataCon: not promoting data family constructors]
@@ -589,7 +590,7 @@ tcAddDataFamConPlaceholders inst_decls thing_inside
 tcAddPatSynPlaceholders :: [PatSynBind Name Name] -> TcM a -> TcM a
 -- See Note [Don't promote pattern synonyms]
 tcAddPatSynPlaceholders pat_syns thing_inside
-  = tcExtendKindEnvList [ (name, APromotionErr PatSynPE)
+  = tcExtendKindEnvList [ (name, Weighted Omega (APromotionErr PatSynPE)) -- TODO: arnaud: see just above
                         | PSB{ psb_id = L _ name } <- pat_syns ]
        thing_inside
 

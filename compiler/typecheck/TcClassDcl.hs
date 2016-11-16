@@ -27,6 +27,7 @@ import TcUnify
 import TcHsType
 import TcMType
 import Type     ( getClassPredTys_maybe, piResultTys )
+import Weight   ( unrestricted )
 import TcType
 import TcRnMonad
 import DriverPhases (HscSource(..))
@@ -190,7 +191,7 @@ tcClassDecl2 (L _ (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
 
         ; let tc_item = tcDefMeth clas clas_tyvars this_dict
                                   default_binds sig_fn prag_fn
-        ; dm_binds <- tcExtendTyVarEnv clas_tyvars $
+        ; dm_binds <- tcExtendTyVarEnv (map unrestricted clas_tyvars) $
                       mapM tc_item op_items
 
         ; return (unionManyBags dm_binds) }

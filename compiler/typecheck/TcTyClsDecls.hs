@@ -37,6 +37,7 @@ import TcHsType
 import TcMType
 import TysWiredIn ( unitTy )
 import TcType
+import Weight
 import RnEnv( RoleAnnotEnv, mkRoleAnnotEnv, lookupRoleAnnot
             , lookupConstructorFields )
 import FamInst
@@ -364,7 +365,7 @@ kcTyClGroup decls
     -- For polymorphic things this is a no-op
     generalise kind_env name
       = do { let tc = case lookupNameEnv kind_env name of
-                        Just (ATcTyCon tc) -> tc
+                        Just (Weighted _ (ATcTyCon tc)) -> tc
                         _ -> pprPanic "kcTyClGroup" (ppr name $$ ppr kind_env)
                  kc_binders  = tyConBinders tc
                  kc_res_kind = tyConResKind tc
@@ -410,13 +411,13 @@ kcTyClGroup decls
 
 --------------
 mkTcTyConEnv :: TcTyCon -> TcTypeEnv
-mkTcTyConEnv tc = unitNameEnv (getName tc) (ATcTyCon tc)
+mkTcTyConEnv tc = unitNameEnv (getName tc) (unrestricted $ ATcTyCon tc)
 
 extendEnvWithTcTyCon :: TcTypeEnv -> TcTyCon -> TcTypeEnv
 -- Makes a binding to put in the local envt, binding
 -- a name to a TcTyCon
 extendEnvWithTcTyCon env tc
-  = extendNameEnv env (getName tc) (ATcTyCon tc)
+  = extendNameEnv env (getName tc) (unrestricted $ ATcTyCon tc)
 
 --------------
 mkPromotionErrorEnv :: [LTyClDecl Name] -> TcTypeEnv
@@ -431,24 +432,24 @@ mkPromotionErrorEnv decls
 
 mk_prom_err_env :: TyClDecl Name -> TcTypeEnv
 mk_prom_err_env (ClassDecl { tcdLName = L _ nm, tcdATs = ats })
-  = unitNameEnv nm (APromotionErr ClassPE)
+  = unitNameEnv nm (unrestricted $ APromotionErr ClassPE)
     `plusNameEnv`
-    mkNameEnv [ (name, APromotionErr TyConPE)
+    mkNameEnv [ (name, unrestricted $ APromotionErr TyConPE)
               | L _ (FamilyDecl { fdLName = L _ name }) <- ats ]
 
 mk_prom_err_env (DataDecl { tcdLName = L _ name
                           , tcdDataDefn = HsDataDefn { dd_cons = cons } })
-  = unitNameEnv name (APromotionErr TyConPE)
+  = unitNameEnv name (unrestricted $ APromotionErr TyConPE)
     `plusNameEnv`
-    mkNameEnv [ (con, APromotionErr RecDataConPE)
+    mkNameEnv [ (con, unrestricted $ APromotionErr RecDataConPE)
               | L _ con' <- cons, L _ con <- getConNames con' ]
 
 mk_prom_err_env decl
-  = unitNameEnv (tcdName decl) (APromotionErr TyConPE)
+  = unitNameEnv (tcdName decl) (unrestricted $ APromotionErr TyConPE)
     -- Works for family declarations too
 
 --------------
-getInitialKinds :: [LTyClDecl Name] -> TcM (NameEnv TcTyThing)
+getInitialKinds :: [LTyClDecl Name] -> TcM (NameEnv (Weighted TcTyThing))
 -- Maps each tycon to its initial kind,
 -- and each datacon to a suitable promotion error
 --    tc :-> ATcTyCon (tc:initial_kind)
@@ -463,7 +464,7 @@ getInitialKinds decls
     promotion_err_env = mkPromotionErrorEnv decls
 
 getInitialKind :: TyClDecl Name
-               -> TcM (NameEnv TcTyThing)
+               -> TcM (NameEnv (Weighted TcTyThing))
 -- Allocate a fresh kind variable for each TyCon and Class
 -- For each tycon, return a NameEnv with
 --      name :-> ATcTyCon (TcCyCon with kind k))
@@ -1324,7 +1325,7 @@ tcFamTyPats fam_shape@(name,_,_,_) mb_clsinfo pats kind_checker thing_inside
        ; traceTc "tcFamTyPats" (ppr name $$ ppr typats $$ ppr qtkvs)
             -- Don't print out too much, as we might be in the knot
 
-       ; tcExtendTyVarEnv qtkvs $
+       ; tcExtendTyVarEnv (map unrestricted qtkvs) $
             -- Extend envt with TcTyVars not TyVars, because the
             -- kind checking etc done by thing_inside does not expect
             -- to encounter TyVars; it expects TcTyVars

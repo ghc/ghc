@@ -38,6 +38,7 @@ import Type
 import Coercion ( eqCoercion )
 import TcType ( toTcTypeBag )
 import TyCon( isNewTyCon )
+import Weight
 import TysWiredIn
 import ListSetOps
 import SrcLoc
@@ -732,7 +733,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
         ; locn   <- getSrcSpanDs
 
         ; new_vars    <- case matches of
-                           []    -> mapM newSysLocalDsNoLP arg_tys
+                           []    -> mapM newSysLocalDsNoLP $ map weightedThing arg_tys -- Dropping the weight information as we are just extracting a list of names.
                            (m:_) -> selectMatchVars (map unLoc (hsLMatchPats m))
 
         ; eqns_info   <- mapM (mk_eqn_info new_vars) matches

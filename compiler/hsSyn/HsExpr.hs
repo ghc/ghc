@@ -23,6 +23,7 @@ import HsPat
 import HsLit
 import PlaceHolder ( PostTc,PostRn,DataId,DataIdPost,
                      NameOrRdrName,OutputableBndrId )
+import Weight
 import HsTypes
 import HsBinds
 
@@ -1381,7 +1382,7 @@ patterns in each equation.
 
 data MatchGroup id body
   = MG { mg_alts    :: Located [LMatch id body]  -- The alternatives
-       , mg_arg_tys :: [PostTc id Type]  -- Types of the arguments, t1..tn
+       , mg_arg_tys :: [Weighted (PostTc id Type)]  -- Types of the arguments, t1..tn
        , mg_res_ty  :: PostTc id Type    -- Type of the result, tr
        , mg_origin  :: Origin }
      -- The type is the type of the entire group

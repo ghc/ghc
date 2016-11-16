@@ -44,6 +44,7 @@ import Id
 import IdInfo
 import TcRnMonad
 import PrelNames
+import Weight
 import TcType
 import TcMType
 import TcEvidence
@@ -571,7 +572,7 @@ zonkMatchGroup :: ZonkEnv
 zonkMatchGroup env zBody (MG { mg_alts = L l ms, mg_arg_tys = arg_tys
                              , mg_res_ty = res_ty, mg_origin = origin })
   = do  { ms' <- mapM (zonkMatch env zBody) ms
-        ; arg_tys' <- zonkTcTypeToTypes env arg_tys
+        ; arg_tys' <- zonkWeightedTcTypeToTypes env arg_tys
         ; res_ty'  <- zonkTcTypeToType env res_ty
         ; return (MG { mg_alts = L l ms', mg_arg_tys = arg_tys'
                      , mg_res_ty = res_ty', mg_origin = origin }) }
@@ -1625,6 +1626,9 @@ zonkTcTypeToType = mapType zonk_tycomapper
 
 zonkTcTypeToTypes :: ZonkEnv -> [TcType] -> TcM [Type]
 zonkTcTypeToTypes env tys = mapM (zonkTcTypeToType env) tys
+
+zonkWeightedTcTypeToTypes :: ZonkEnv -> [Weighted TcType] -> TcM [Weighted Type]
+zonkWeightedTcTypeToTypes env tys = mapM (mapM (zonkTcTypeToType env)) tys
 
 zonkCoToCo :: ZonkEnv -> Coercion -> TcM Coercion
 zonkCoToCo = mapCoercion zonk_tycomapper
