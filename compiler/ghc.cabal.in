@@ -467,6 +467,7 @@ Library
         FamInstEnv
         FunDeps
         InstEnv
+        Weight
         TyCon
         CoAxiom
         Kind
