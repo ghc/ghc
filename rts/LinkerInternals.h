@@ -303,4 +303,14 @@ char *cstring_from_section_name(
 #  define OBJFORMAT_MACHO
 #endif
 
+/* In order to simplify control flow a bit, some references to mmap-related
+   definitions are blocked off by a C-level if statement rather than a CPP-level
+   #if statement. Since those are dead branches when !RTS_LINKER_USE_MMAP, we
+   just stub out the relevant symbols here
+*/
+#if !RTS_LINKER_USE_MMAP
+#define munmap(x,y) /* nothing */
+#define MAP_ANONYMOUS 0
+#endif
+
 #endif /* LINKERINTERNALS_H */
