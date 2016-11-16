@@ -1314,7 +1314,7 @@ calcNeeded (rtsBool force_major, memcount *blocks_needed)
    ------------------------------------------------------------------------- */
 
 #if (defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)) && defined(ios_HOST_OS)
-void sys_icache_invalidate(void *start, size_t len);
+#include <libkern/OSCacheControl.h>
 #endif
 
 /* On ARM and other platforms, we need to flush the cache after
@@ -1327,7 +1327,7 @@ void flushExec (W_ len, AdjustorExecutable exec_addr)
   (void)exec_addr;
 #elif (defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)) && defined(ios_HOST_OS)
   /* On iOS we need to use the special 'sys_icache_invalidate' call. */
-  sys_icache_invalidate(exec_addr, ((unsigned char*)exec_addr)+len);
+  sys_icache_invalidate(exec_addr, len);
 #elif defined(__GNUC__)
   /* For all other platforms, fall back to a libgcc builtin. */
   unsigned char* begin = (unsigned char*)exec_addr;
