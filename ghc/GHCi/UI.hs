@@ -448,6 +448,7 @@ interactiveUI config srcs maybe_exprs = do
 
    default_editor <- liftIO $ findEditor
    eval_wrapper <- mkEvalWrapper default_progname default_args
+   let prelude_import = simpleImportDecl preludeModuleName
    startGHCi (runGHCi srcs maybe_exprs)
         GHCiState{ progname           = default_progname,
                    args               = default_args,
@@ -470,6 +471,8 @@ interactiveUI config srcs maybe_exprs = do
                    cmdqueue           = [],
                    remembered_ctx     = [],
                    transient_ctx      = [],
+                   extra_imports      = [],
+                   prelude_imports    = [prelude_import],
                    ghc_e              = isJust maybe_exprs,
                    short_help         = shortHelpText config,
                    long_help          = fullHelpText config,
@@ -2315,13 +2318,33 @@ setGHCContextFromGHCiState = do
       -- the actual exception thrown by checkAdd, using tryBool to
       -- turn it into a Bool.
   iidecls <- filterM (tryBool.checkAdd) (transient_ctx st ++ remembered_ctx st)
-  dflags <- GHC.getSessionDynFlags
-  GHC.setContext $
-     if xopt LangExt.ImplicitPrelude dflags && not (any isPreludeImport iidecls)
-        then iidecls ++ [implicitPreludeImport]
-        else iidecls
-    -- XXX put prel at the end, so that guessCurrentModule doesn't pick it up.
 
+  prel_iidecls <- getImplicitPreludeImports iidecls
+  valid_prel_iidecls <- filterM (tryBool . checkAdd) prel_iidecls
+
+  extra_imports <- filterM (tryBool . checkAdd) (map IIDecl (extra_imports st))
+
+  GHC.setContext $ iidecls ++ extra_imports ++ valid_prel_iidecls
+
+
+getImplicitPreludeImports :: [InteractiveImport] -> GHCi [InteractiveImport]
+getImplicitPreludeImports iidecls = do
+  dflags <- GHC.getInteractiveDynFlags
+     -- allow :seti to override -XNoImplicitPrelude
+  st <- getGHCiState
+
+  -- We add the prelude imports if there are no *-imports, and we also
+  -- allow each prelude import to be subsumed by another explicit import
+  -- of the same module.  This means that you can override the prelude import
+  -- with "import Prelude hiding (map)", for example.
+  let prel_iidecls =
+         if xopt LangExt.ImplicitPrelude dflags && not (any isIIModule iidecls)
+            then [ IIDecl imp
+                 | imp <- prelude_imports st
+                 , not (any (sameImpModule imp) iidecls) ]
+            else []
+
+  return prel_iidecls
 
 -- -----------------------------------------------------------------------------
 -- Utils on InteractiveImport
@@ -2335,6 +2358,10 @@ mkIIDecl = IIDecl . simpleImportDecl
 iiModules :: [InteractiveImport] -> [ModuleName]
 iiModules is = [m | IIModule m <- is]
 
+isIIModule :: InteractiveImport -> Bool
+isIIModule (IIModule _) = True
+isIIModule _ = False
+
 iiModuleName :: InteractiveImport -> ModuleName
 iiModuleName (IIModule m) = m
 iiModuleName (IIDecl d)   = unLoc (ideclName d)
@@ -2342,12 +2369,9 @@ iiModuleName (IIDecl d)   = unLoc (ideclName d)
 preludeModuleName :: ModuleName
 preludeModuleName = GHC.mkModuleName "Prelude"
 
-implicitPreludeImport :: InteractiveImport
-implicitPreludeImport = IIDecl (simpleImportDecl preludeModuleName)
-
-isPreludeImport :: InteractiveImport -> Bool
-isPreludeImport (IIModule {}) = True
-isPreludeImport (IIDecl d)    = unLoc (ideclName d) == preludeModuleName
+sameImpModule :: ImportDecl RdrName -> InteractiveImport -> Bool
+sameImpModule _ (IIModule _) = False -- we only care about imports here
+sameImpModule imp (IIDecl d) = unLoc (ideclName d) == unLoc (ideclName imp)
 
 addNotSubsumed :: InteractiveImport
                -> [InteractiveImport] -> [InteractiveImport]
@@ -2765,15 +2789,17 @@ showImports = do
           = ":module +*" ++ moduleNameString star_m
       show_one (IIDecl imp) = showPpr dflags imp
 
-      prel_imp
-        | any isPreludeImport (rem_ctx ++ trans_ctx) = []
-        | not (xopt LangExt.ImplicitPrelude dflags)      = []
-        | otherwise = ["import Prelude -- implicit"]
+  prel_iidecls <- getImplicitPreludeImports (rem_ctx ++ trans_ctx)
+
+  let show_prel p = show_one p ++ " -- implicit"
+      show_extra p = show_one (IIDecl p) ++ " -- fixed"
 
       trans_comment s = s ++ " -- added automatically" :: String
   --
-  liftIO $ mapM_ putStrLn (prel_imp ++ map show_one rem_ctx
-                                    ++ map (trans_comment . show_one) trans_ctx)
+  liftIO $ mapM_ putStrLn (map show_one rem_ctx ++
+                           map (trans_comment . show_one) trans_ctx ++
+                           map show_prel prel_iidecls ++
+                           map show_extra (extra_imports st))
 
 showModules :: GHCi ()
 showModules = do

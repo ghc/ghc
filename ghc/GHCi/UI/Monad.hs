@@ -44,6 +44,8 @@ import SrcLoc
 import Module
 import GHCi
 import GHCi.RemoteTypes
+import HsSyn (ImportDecl)
+import RdrName (RdrName)
 
 import Exception
 import Numeric
@@ -105,6 +107,26 @@ data GHCiState = GHCiState
             -- there are no modules loaded.  This list is replaced by
             -- :load, :reload, and :add.  In between it may be modified
             -- by :module.
+
+        extra_imports  :: [ImportDecl RdrName],
+            -- ^ These are "always-on" imports, added to the
+            -- context regardless of what other imports we have.
+            -- This is useful for adding imports that are required
+            -- by setGHCiMonad.  Be careful adding things here:
+            -- you can create ambiguities if these imports overlap
+            -- with other things in scope.
+            --
+            -- NB. although this is not currently used by GHCi itself,
+            -- it was added to support other front-ends that are based
+            -- on the GHCi code.  Potentially we could also expose
+            -- this functionality via GHCi commands.
+
+        prelude_imports :: [ImportDecl RdrName],
+            -- ^ These imports are added to the context when
+            -- -XImplicitPrelude is on and we don't have a *-module
+            -- in the context.  They can also be overridden by another
+            -- import for the same module, e.g.
+            -- "import Prelude hiding (map)"
 
         ghc_e :: Bool, -- ^ True if this is 'ghc -e' (or runghc)
 
