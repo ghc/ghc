@@ -26,6 +26,8 @@ module StgCmmMonad (
         getCodeR, getCode, getCodeScoped, getHeapUsage,
 
         mkCmmIfThenElse, mkCmmIfThen, mkCmmIfGoto,
+        mkCmmIfThenElse', mkCmmIfThen', mkCmmIfGoto',
+
         mkCall, mkCmmCall,
 
         forkClosureBody, forkLneBody, forkAlts, codeOnly,
@@ -833,29 +835,49 @@ getCmm code
 
 
 mkCmmIfThenElse :: CmmExpr -> CmmAGraph -> CmmAGraph -> FCode CmmAGraph
-mkCmmIfThenElse e tbranch fbranch = do
+mkCmmIfThenElse e tbranch fbranch = mkCmmIfThenElse' e tbranch fbranch Nothing
+
+mkCmmIfThenElse' :: CmmExpr -> CmmAGraph -> CmmAGraph
+                 -> Maybe Bool -> FCode CmmAGraph
+mkCmmIfThenElse' e tbranch fbranch likely = do
   tscp  <- getTickScope
   endif <- newLabelC
   tid   <- newLabelC
   fid   <- newLabelC
-  return $ catAGraphs [ mkCbranch e tid fid Nothing
-                      , mkLabel tid tscp, tbranch, mkBranch endif
-                      , mkLabel fid tscp, fbranch, mkLabel endif tscp ]
+
+  let
+    (test, then_, else_, likely') = case likely of
+      Just False | Just e' <- maybeInvertCmmExpr e
+        -- currently NCG doesn't know about likely
+        -- annotations. We manually switch then and
+        -- else branch so the likely false branch
+        -- becomes a fallthrough.
+        -> (e', fbranch, tbranch, Just True)
+      _ -> (e, tbranch, fbranch, likely)
+
+  return $ catAGraphs [ mkCbranch test tid fid likely'
+                      , mkLabel tid tscp, then_, mkBranch endif
+                      , mkLabel fid tscp, else_, mkLabel endif tscp ]
 
 mkCmmIfGoto :: CmmExpr -> BlockId -> FCode CmmAGraph
-mkCmmIfGoto e tid = do
+mkCmmIfGoto e tid = mkCmmIfGoto' e tid Nothing
+
+mkCmmIfGoto' :: CmmExpr -> BlockId -> Maybe Bool -> FCode CmmAGraph
+mkCmmIfGoto' e tid l = do
   endif <- newLabelC
   tscp  <- getTickScope
-  return $ catAGraphs [ mkCbranch e tid endif Nothing, mkLabel endif tscp ]
+  return $ catAGraphs [ mkCbranch e tid endif l, mkLabel endif tscp ]
 
 mkCmmIfThen :: CmmExpr -> CmmAGraph -> FCode CmmAGraph
-mkCmmIfThen e tbranch = do
+mkCmmIfThen e tbranch = mkCmmIfThen' e tbranch Nothing
+
+mkCmmIfThen' :: CmmExpr -> CmmAGraph -> Maybe Bool -> FCode CmmAGraph
+mkCmmIfThen' e tbranch l = do
   endif <- newLabelC
   tid   <- newLabelC
   tscp  <- getTickScope
-  return $ catAGraphs [ mkCbranch e tid endif Nothing
+  return $ catAGraphs [ mkCbranch e tid endif l
                       , mkLabel tid tscp, tbranch, mkLabel endif tscp ]
-
 
 mkCall :: CmmExpr -> (Convention, Convention) -> [CmmFormal] -> [CmmExpr]
        -> UpdFrameOffset -> [CmmExpr] -> FCode CmmAGraph

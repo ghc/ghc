@@ -118,8 +118,8 @@ stmtToInstrs stmt = case stmt of
     CmmStore addr src    -> genStore addr src
 
     CmmBranch id         -> genBranch id
-    CmmCondBranch arg true false _      -- TODO: likely annotation
-                         -> genCondBranch arg true false
+    CmmCondBranch arg true false likely
+                         -> genCondBranch arg true false likely
     CmmSwitch arg ids    -> genSwitch arg ids
 
     -- Foreign Call
@@ -925,19 +925,40 @@ genBranch id =
 
 
 -- | Conditional branch
-genCondBranch :: CmmExpr -> BlockId -> BlockId -> LlvmM StmtData
-genCondBranch cond idT idF = do
+genCondBranch :: CmmExpr -> BlockId -> BlockId -> Maybe Bool -> LlvmM StmtData
+genCondBranch cond idT idF likely = do
     let labelT = blockIdToLlvm idT
     let labelF = blockIdToLlvm idF
     -- See Note [Literals and branch conditions].
-    (vc, stmts, top) <- exprToVarOpt i1Option cond
+    (vc, stmts1, top1) <- exprToVarOpt i1Option cond
     if getVarType vc == i1
         then do
-            let s1 = BranchIf vc labelT labelF
-            return (stmts `snocOL` s1, top)
+            (vc', (stmts2, top2)) <- case likely of
+              Just b -> genExpectLit (if b then 1 else 0) i1  vc
+              _      -> pure (vc, (nilOL, []))
+            let s1 = BranchIf vc' labelT labelF
+            return (stmts1 `appOL` stmts2 `snocOL` s1, top1 ++ top2)
         else do
             dflags <- getDynFlags
             panic $ "genCondBranch: Cond expr not bool! (" ++ showSDoc dflags (ppr vc) ++ ")"
+
+
+-- | Generate call to llvm.expect.x intrinsic. Assigning result to a new var.
+genExpectLit :: Integer -> LlvmType -> LlvmVar -> LlvmM (LlvmVar, StmtData)
+genExpectLit expLit expTy var = do
+  dflags <- getDynFlags
+
+  let
+    lit = LMLitVar $ LMIntLit expLit expTy
+
+    llvmExpectName
+      | isInt expTy = fsLit $ "llvm.expect." ++ showSDoc dflags (ppr expTy)
+      | otherwise   = panic $ "genExpectedLit: Type not an int!"
+
+  (llvmExpect, stmts, top) <-
+    getInstrinct llvmExpectName expTy [expTy, expTy]
+  (var', call) <- doExpr expTy $ Call StdCall llvmExpect [var, lit] []
+  return (var', (stmts `snocOL` call, top))
 
 {- Note [Literals and branch conditions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

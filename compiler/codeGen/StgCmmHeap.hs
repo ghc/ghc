@@ -636,7 +636,8 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
 
   case mb_stk_hwm of
     Nothing -> return ()
-    Just stk_hwm -> tickyStackCheck >> (emit =<< mkCmmIfGoto (sp_oflo stk_hwm) gc_id)
+    Just stk_hwm -> tickyStackCheck
+      >> (emit =<< mkCmmIfGoto' (sp_oflo stk_hwm) gc_id (Just False) )
 
   -- Emit new label that might potentially be a header
   -- of a self-recursive tail call.
@@ -651,14 +652,14 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
     then do
      tickyHeapCheck
      emitAssign hpReg bump_hp
-     emit =<< mkCmmIfThen hp_oflo (alloc_n <*> mkBranch gc_id)
+     emit =<< mkCmmIfThen' hp_oflo (alloc_n <*> mkBranch gc_id) (Just False)
     else do
       when (checkYield && not (gopt Opt_OmitYields dflags)) $ do
          -- Yielding if HpLim == 0
          let yielding = CmmMachOp (mo_wordEq dflags)
                                   [CmmReg (CmmGlobal HpLim),
                                    CmmLit (zeroCLit dflags)]
-         emit =<< mkCmmIfGoto yielding gc_id
+         emit =<< mkCmmIfGoto' yielding gc_id (Just False)
 
   tscope <- getTickScope
   emitOutOfLine gc_id
