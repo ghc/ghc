@@ -281,7 +281,7 @@ int machoGetMisalignment( FILE * f );
    arising from using normal C indexing or pointer arithmetic
    are just plain wrong.  Sigh.
 */
-STATIC_INLINE unsigned char *
+INLINE_HEADER unsigned char *
 myindex ( int scale, void* base, int index )
 {
     return
