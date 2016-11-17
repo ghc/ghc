@@ -635,12 +635,35 @@ data TcGblEnv
         -- ^ The RealSrcSpan this module came from
 
         tcg_static_wc :: TcRef WantedConstraints
-          -- ^ Wanted constraints of static forms.
+        -- ^ Wanted constraints of static forms.
+        -- See Note [Constraints in static forms].
     }
 
 -- NB: topModIdentity, not topModSemantic!
 -- Definition sites of orphan identities will be identity modules, not semantic
 -- modules.
+
+-- Note [Constraints in static forms]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- When a static form produces constraints like
+--
+-- f :: StaticPtr (Bool -> String)
+-- f = static show
+--
+-- we collect them in tcg_static_wc and resolve them at the end
+-- of type checking. They need to be resolved separately because
+-- we don't want to resolve them in the context of the enclosing
+-- expression. Consider
+--
+-- g :: Show a => StaticPtr (a -> String)
+-- g = static show
+--
+-- If the @Show a0@ constraint that the body of the static form produces was
+-- resolved in the context of the enclosing expression, then the body of the
+-- static form wouldn't be closed because the Show dictionary would come from
+-- g's context instead of coming from the top level.
+
 tcVisibleOrphanMods :: TcGblEnv -> ModuleSet
 tcVisibleOrphanMods tcg_env
     = mkModuleSet (tcg_mod tcg_env : imp_orphs (tcg_imports tcg_env))

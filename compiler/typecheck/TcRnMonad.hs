@@ -95,7 +95,7 @@ module TcRnMonad(
   getConstraintVar, setConstraintVar,
   emitConstraints, emitSimple, emitSimples,
   emitImplication, emitImplications, emitInsoluble,
-  discardConstraints, captureConstraints,
+  discardConstraints, captureConstraints, captureTopConstraints,
   pushLevelAndCaptureConstraints,
   pushTcLevelM_, pushTcLevelM,
   getTcLevel, setTcLevel, isTouchableTcM,
@@ -1476,6 +1476,18 @@ captureConstraints thing_inside
            Left _    -> do { emitInsolubles (getInsolubles lie)
                            ; failM }
            Right res -> return (res, lie) }
+
+captureTopConstraints :: TcM a -> TcM (a, WantedConstraints)
+-- (captureTopConstraints m) runs m, and returns the type constraints it
+-- generates plus the constraints produced by static forms inside.
+captureTopConstraints thing_inside
+  = do { (res, lie) <- captureConstraints thing_inside ;
+         -- wanted constraints from static forms
+       ; tcg_static_wc_ref <- tcg_static_wc <$> getGblEnv
+       ; stWC <- readTcRef tcg_static_wc_ref
+       ; writeTcRef tcg_static_wc_ref emptyWC
+       ; return (res, andWC stWC lie)
+       }
 
 pushLevelAndCaptureConstraints :: TcM a -> TcM (TcLevel, WantedConstraints, a)
 pushLevelAndCaptureConstraints thing_inside
