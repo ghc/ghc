@@ -64,7 +64,7 @@ import Data.Bits
 -- Therefore all that is left for llvm code gen, is to ensure
 -- that all the `iTableSuf` symbols are marked as used.
 -- As of this writing the documentation regarding the
--- .subsections_via_symbols and -dead_stip can be found at
+-- .subsections_via_symbols and -dead_strip can be found at
 -- <https://developer.apple.com/library/mac/documentation/DeveloperTools/Reference/Assembler/040-Assembler_Directives/asm_directives.html#//apple_ref/doc/uid/TP30000823-TPXREF101>
 
 pprNatCmmDecl :: NatCmmDecl (Alignment, CmmStatics) Instr -> SDoc
