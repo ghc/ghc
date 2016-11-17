@@ -2090,7 +2090,7 @@ tcRnExpr hsc_env mode rdr_expr
     return (snd (normaliseType fam_envs Nominal ty))
     }
   where
-    -- See Note [Deeply instantiate in :type]
+    -- See Note [TcRnExprMode]
     (inst, infer_mode, perhaps_disable_default_warnings) = case mode of
       TM_Inst    -> (True,  NoRestrictions, id)
       TM_NoInst  -> (False, NoRestrictions, id)
