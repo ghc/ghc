@@ -76,6 +76,7 @@ test('TH_spliceD2',
 test('TH_reifyDecl1', normal, compile, ['-v0'])
 test('TH_reifyDecl2', normal, compile, ['-v0'])
 test('TH_reifyLocalDefs', normal, compile, ['-v0'])
+test('TH_reifyLocalDefs2', normal, compile, ['-v0'])
 
 test('TH_reifyMkName', normal, compile, ['-v0'])
 

@@ -476,9 +476,8 @@ tcRnSrcDecls :: Bool  -- False => no 'module M(..) where' header at all
         -- Reason: solely to report unused imports and bindings
 tcRnSrcDecls explicit_mod_hdr decls
  = do { -- Do all the declarations
-      ; ((tcg_env, tcl_env), lie) <- captureConstraints $
-              do { envs <- tc_rn_src_decls decls
-                 ; (tcg_env, tcl_env) <- setEnvs envs run_th_modfinalizers
+      ; ((tcg_env, tcl_env), lie) <- captureTopConstraints $
+              do { (tcg_env, tcl_env) <- tc_rn_src_decls decls
 
                  ; tcg_env <- setEnvs (tcg_env, tcl_env) $
                               checkMain explicit_mod_hdr
@@ -489,13 +488,6 @@ tcRnSrcDecls explicit_mod_hdr decls
       ; tcg_env <- setGblEnv tcg_env mkTypeableBinds
 
       ; setGblEnv tcg_env $ do {
-
-#ifdef GHCI
-      ; finishTH
-#endif /* GHCI */
-
-        -- wanted constraints from static forms
-      ; stWC <- tcg_static_wc <$> getGblEnv >>= readTcRef
 
              --         Finish simplifying class constraints
              --
@@ -512,7 +504,17 @@ tcRnSrcDecls explicit_mod_hdr decls
              --  * the local env exposes the local Ids to simplifyTop,
              --    so that we get better error messages (monomorphism restriction)
       ; new_ev_binds <- {-# SCC "simplifyTop" #-}
-                        simplifyTop (andWC stWC lie)
+                        simplifyTop lie
+
+#ifdef GHCI
+        -- Finalizers must run after constraints are simplified, or some types
+        -- might not be complete when using reify (see #12777).
+      ; (tcg_env, tcl_env) <- run_th_modfinalizers
+      ; setEnvs (tcg_env, tcl_env) $ do {
+
+      ; finishTH
+#endif /* GHCI */
+
       ; traceTc "Tc9" empty
 
       ; failIfErrsM     -- Don't zonk if there have been errors
@@ -548,6 +550,9 @@ tcRnSrcDecls explicit_mod_hdr decls
 
       ; setGlobalTypeEnv tcg_env' final_type_env
 
+#ifdef GHCI
+   }
+#endif /* GHCI */
    } } }
 
 #ifdef GHCI
@@ -561,14 +566,21 @@ run_th_modfinalizers = do
   then getEnvs
   else do
     writeTcRef th_modfinalizers_var []
-    sequence_ th_modfinalizers
-    -- Finalizers can add top-level declarations with addTopDecls.
-    envs <- tc_rn_src_decls []
-    -- addTopDecls can add declarations which add new finalizers.
-    setEnvs envs run_th_modfinalizers
-#else
-run_th_modfinalizers :: TcM (TcGblEnv, TcLclEnv)
-run_th_modfinalizers = getEnvs
+    (envs, lie) <- captureTopConstraints $ do
+      sequence_ th_modfinalizers
+      -- Finalizers can add top-level declarations with addTopDecls.
+      tc_rn_src_decls []
+    setEnvs envs $ do
+      -- Subsequent rounds of finalizers run after any new constraints are
+      -- simplified, or some types might not be complete when using reify
+      -- (see #12777).
+      new_ev_binds <- {-# SCC "simplifyTop2" #-}
+                      simplifyTop lie
+      updGblEnv (\tcg_env ->
+        tcg_env { tcg_ev_binds = tcg_ev_binds tcg_env `unionBags` new_ev_binds }
+        )
+        -- addTopDecls can add declarations which add new finalizers.
+        run_th_modfinalizers
 #endif /* GHCI */
 
 tc_rn_src_decls :: [LHsDecl RdrName]
