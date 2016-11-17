@@ -9,7 +9,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE TypeInType #-}
 {-# LANGUAGE TypeOperators #-}
 
 -----------------------------------------------------------------------------
@@ -1197,9 +1196,6 @@ deriving instance (Coercible a b, Data a, Data b) => Data (Coercion a b)
 
 -- | @since 4.9.0.0
 deriving instance Data a => Data (Identity a)
-
--- | @since 4.10.0.0
-deriving instance (Typeable k, Data a, Typeable (b :: k)) => Data (Const a b)
 
 -- | @since 4.7.0.0
 deriving instance Data Version
