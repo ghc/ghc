@@ -79,9 +79,9 @@ import GHC.IO.Handle.Types (Handle)
 import Foreign.C
 import GHC.IO.Handle.FD (fdToHandle)
 #else
-import System.Directory
 import System.Posix as Posix
 #endif
+import System.Directory
 import System.Process
 import GHC.Conc (getNumProcessors, pseq, par)
 
