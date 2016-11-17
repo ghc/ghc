@@ -134,14 +134,11 @@ LOCAL_GHC_PKGSHADOW3 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONFSHADOW3)
 LOCAL_GHC_PKGSHADOW12 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONFSHADOW1) -f $(PKGCONFSHADOW2)
 LOCAL_GHC_PKGSHADOW13 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONFSHADOW1) -f $(PKGCONFSHADOW3)
 
-# Test package shadowing behaviour.
+# Test package overriding behaviour.
 #
 #     localshadow1.package.conf:  shadowdep-1-XXX <- shadow-1-XXX
 #     localshadow2.package.conf:                     shadow-1-XXX
 #
-# If the ABI hash of boths shadow-1s are the same, we'll just accept
-# the later shadow version.  However, if the ABIs are different, we
-# should complain!
 shadow:
 	rm -rf $(PKGCONFSHADOW1) $(PKGCONFSHADOW2) $(PKGCONFSHADOW3) shadow.hs shadow.o shadow.hi shadow.out shadow.hs shadow.hi
 	$(LOCAL_GHC_PKGSHADOW1) init $(PKGCONFSHADOW1)
@@ -150,7 +147,7 @@ shadow:
 	$(LOCAL_GHC_PKGSHADOW1) register -v0 --force shadow1.pkg
 	$(LOCAL_GHC_PKGSHADOW1) register -v0 --force shadow2.pkg
 	$(LOCAL_GHC_PKGSHADOW2) register -v0 --force shadow3.pkg
-	$(LOCAL_GHC_PKGSHADOW3) register -v0 --force shadow1.pkg
+	$(LOCAL_GHC_PKGSHADOW3) register -v0 --force shadow2.pkg
 	@echo "databases 1 and 2:"
 	$(LOCAL_GHC_PKGSHADOW12) list
 	@echo "databases 1 and 3:"
@@ -158,22 +155,21 @@ shadow:
 	echo "main = return ()" >shadow.hs
 #
 # In this test, the later database defines a new shadow-1-XXX which
-# shadows the old one, making shadowdep unsatisfiable.
+# overrides the old one.
 #
-	@echo "should FAIL:"
-	if '$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(PKGCONFSHADOW1) -package-db $(PKGCONFSHADOW2) -package shadowdep -c shadow.hs -fno-code; then false; else true; fi
+	@echo "should SUCCEED:"
+	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(PKGCONFSHADOW1) -package-db $(PKGCONFSHADOW2) -package shadowdep -c shadow.hs -fno-code
 #
-# Reversing the orders of the configs fixes the problem, because now
-# the shadow-1-XXX defined in the same DB as shadowdep shadows
-# shadow-1-XXX in localshadow2.package.conf
+# Reversing the orders of the configs also works; this time the copy from
+# db1 wins out.
 #
 	@echo "should SUCCEED:"
 	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(PKGCONFSHADOW2) -package-db $(PKGCONFSHADOW1) -package shadowdep -c shadow.hs -fno-code
 #
-# When the ABIs are the same, dependencies don't break, we just swap it in
+# We can pass DBs out of order
 #
 	@echo "should SUCCEED:"
-	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(PKGCONFSHADOW3) -package-db $(PKGCONFSHADOW1) -package shadowdep -c shadow.hs -fno-code
+	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(PKGCONFSHADOW3) -package-db $(PKGCONFSHADOW2) -package shadowdep -c shadow.hs -fno-code
 
 # If we pass --global, we should ignore instances in the user database
 T5442a:

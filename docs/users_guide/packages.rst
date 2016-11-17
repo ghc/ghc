@@ -392,10 +392,10 @@ to packages below, but not vice versa).
 *Package shadowing:* When multiple package databases are in use it
 is possible, though rarely, that the same installed package id is present in
 more than one database. In that case, packages closer to the top of the stack
-will override (*shadow*) those below them. If the conflicting packages are
-found to be equivalent (by ABI hash comparison) then one of them replaces all
-references to the other, otherwise the overridden package and all those
-depending on it will be removed.
+will *override* those below them.  Shadowing is an *unsafe* operation:
+if a package overrides another package it is not ABI compatible with,
+it is possible that GHC will end up with an inconsistent view of the
+package database that could induce it to build segfaulting executables.
 
 *Package version selection:* When selecting a package, GHC will search for
 packages in all available databases. If multiple versions of the same package
