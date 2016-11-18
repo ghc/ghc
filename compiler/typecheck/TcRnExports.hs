@@ -136,10 +136,9 @@ tcRnExports explicit_mod exports
                         -- ToDo: the 'noLoc' here is unhelpful if 'main'
                         --       turns out to be out of scope
 
-        ; (rn_exports, avails) <- exports_from_avail real_exports rdr_env imports this_mod
-        ; traceRn "Exported Avails" (ppr avails)
-        ; let final_avails = nubAvails avails    -- Combine families
-              final_ns     = availsToNameSetWithSelectors final_avails
+        ; (rn_exports, final_avails)
+            <- exports_from_avail real_exports rdr_env imports this_mod
+        ; let final_ns     = availsToNameSetWithSelectors final_avails
 
         ; traceRn "rnExports: Exports:" (ppr final_avails)
 
@@ -164,9 +163,9 @@ exports_from_avail Nothing rdr_env _imports _this_mod
    -- The same as (module M) where M is the current module name,
    -- so that's how we handle it, except we also export the data family
    -- when a data instance is exported.
-  = let avails = [ fix_faminst $ availFromGRE gre
-                 | gre <- globalRdrEnvElts rdr_env
-                 , isLocalGRE gre ]
+  = let avails =
+          map fix_faminst . gresToAvailInfo
+            . filter isLocalGRE . globalRdrEnvElts $ rdr_env
     in return (Nothing, avails)
   where
     -- #11164: when we define a data instance
@@ -174,9 +173,12 @@ exports_from_avail Nothing rdr_env _imports _this_mod
     -- Even though we don't check whether this is actually a data family
     -- only data families can locally define subordinate things (`ns` here)
     -- without locally defining (and instead importing) the parent (`n`)
-    fix_faminst (AvailTC n ns flds)
-      | n `notElem` ns
-      = AvailTC n (n:ns) flds
+    fix_faminst (AvailTC n ns flds) =
+      let new_ns =
+            case ns of
+              [] -> [n]
+              (p:_) -> if p == n then ns else n:ns
+      in AvailTC n new_ns flds
 
     fix_faminst avail = avail
 
@@ -184,7 +186,8 @@ exports_from_avail Nothing rdr_env _imports _this_mod
 exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
   = do ExportAccum ie_names _ exports
         <-  checkNoErrs $ foldAndRecoverM do_litem emptyExportAccum rdr_items
-       return (Just ie_names, exports)
+       let final_exports = nubAvails exports -- Combine families
+       return (Just ie_names, final_exports)
   where
     do_litem :: ExportAccum -> LIE RdrName -> RnM ExportAccum
     do_litem acc lie = setSrcSpan (getLoc lie) (exports_from_item acc lie)

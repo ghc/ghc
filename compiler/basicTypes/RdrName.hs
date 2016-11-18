@@ -52,6 +52,7 @@ module RdrName (
         -- * GlobalRdrElts
         gresFromAvails, gresFromAvail, localGREsFromAvail, availFromGRE,
         greUsedRdrName, greRdrNames, greSrcSpan, greQualModName,
+        gresToAvailInfo,
 
         -- ** Global 'RdrName' mapping elements: 'GlobalRdrElt', 'Provenance', 'ImportSpec'
         GlobalRdrElt(..), isLocalGRE, isRecFldGRE, greLabel,
@@ -77,9 +78,10 @@ import Unique
 import UniqFM
 import Util
 import StaticFlags( opt_PprStyle_Debug )
+import NameEnv
 
 import Data.Data
-import Data.List( sortBy )
+import Data.List( sortBy, foldl', nub )
 
 {-
 ************************************************************************
@@ -453,7 +455,7 @@ data GlobalRdrElt
         , gre_par  :: Parent
         , gre_lcl :: Bool          -- ^ True <=> the thing was defined locally
         , gre_imp :: [ImportSpec]  -- ^ In scope through these imports
-    } deriving Data
+    } deriving (Data, Eq)
          -- INVARIANT: either gre_lcl = True or gre_imp is non-empty
          -- See Note [GlobalRdrElt provenance]
 
@@ -687,15 +689,60 @@ mkParent _ (Avail _)           = NoParent
 mkParent n (AvailTC m _ _) | n == m    = NoParent
                          | otherwise = ParentIs m
 
+greParentName :: GlobalRdrElt -> Maybe Name
+greParentName gre = case gre_par gre of
+                      NoParent -> Nothing
+                      ParentIs n -> Just n
+                      FldParent n _ -> Just n
+
+-- | Takes a list of distinct GREs and folds them
+-- into AvailInfos. This is more efficient than mapping each individual
+-- GRE to an AvailInfo and the folding using `plusAvail` but needs the
+-- uniqueness assumption.
+gresToAvailInfo :: [GlobalRdrElt] -> [AvailInfo]
+gresToAvailInfo gres
+  = ASSERT( nub gres == gres ) nameEnvElts avail_env
+  where
+    avail_env :: NameEnv AvailInfo -- keyed by the parent
+    avail_env = foldl' add emptyNameEnv gres
+
+    add :: NameEnv AvailInfo -> GlobalRdrElt -> NameEnv AvailInfo
+    add env gre = extendNameEnv_Acc comb availFromGRE env
+                    (fromMaybe (gre_name gre)
+                               (greParentName gre)) gre
+
+      where
+        -- We want to insert the child `k` into a list of children but
+        -- need to maintain the invariant that the parent is first.
+        --
+        -- We also use the invariant that `k` is not already in `ns`.
+        insertChildIntoChildren :: Name -> [Name] -> Name -> [Name]
+        insertChildIntoChildren _ [] k = [k]
+        insertChildIntoChildren p (n:ns) k
+          | p == k = k:n:ns
+          | otherwise = n:k:ns
+
+        comb :: GlobalRdrElt -> AvailInfo -> AvailInfo
+        comb _ (Avail n) = Avail n -- Duplicated name
+        comb gre (AvailTC m ns fls) =
+          let n = gre_name gre
+          in case gre_par gre of
+              NoParent -> AvailTC m (n:ns) fls -- Not sure this ever happens
+              ParentIs {} -> AvailTC m (insertChildIntoChildren m ns n) fls
+              FldParent _ mb_lbl ->  AvailTC m ns (mkFieldLabel n mb_lbl : fls)
+
 availFromGRE :: GlobalRdrElt -> AvailInfo
 availFromGRE (GRE { gre_name = me, gre_par = parent })
   = case parent of
       ParentIs p                  -> AvailTC p [me] []
       NoParent   | isTyConName me -> AvailTC me [me] []
                  | otherwise      -> avail   me
-      FldParent p mb_lbl -> AvailTC p [] [fld]
+      FldParent p mb_lbl -> AvailTC p [] [mkFieldLabel me mb_lbl]
         where
-         fld = case mb_lbl of
+
+mkFieldLabel :: Name -> Maybe FastString -> FieldLabel
+mkFieldLabel me mb_lbl =
+          case mb_lbl of
                  Nothing  -> FieldLabel { flLabel = occNameFS (nameOccName me)
                                         , flIsOverloaded = False
                                         , flSelector = me }
