@@ -2817,7 +2817,7 @@ raiseExceptionHelper (StgRegTable *reg, StgTSO *tso, StgClosure *exception)
     //
     // This closure represents the expression 'raise# E' where E
     // is the exception raise.  It is used to overwrite all the
-    // thunks which are currently under evaluataion.
+    // thunks which are currently under evaluation.
     //
 
     // OLD COMMENT (we don't have MIN_UPD_SIZE now):

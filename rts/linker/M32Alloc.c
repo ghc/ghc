@@ -22,10 +22,10 @@ Note [Compile Time Trickery]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This file implements two versions of each of the `m32_*` functions. At the top
-of the file there is the real implementaion (compiled in when
+of the file there is the real implementation (compiled in when
 `RTS_LINKER_USE_MMAP` is true) and a dummy implementation that exists only to
 satisfy the compiler and which hould never be called. If any of these dummy
-implementaions are called the program will abort.
+implementations are called the program will abort.
 
 The rationale for this is to allow the calling code to be written without using
 the C pre-processor (CPP) `#if` hackery. The value of `RTS_LINKER_USE_MMAP` is

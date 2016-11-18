@@ -1177,7 +1177,7 @@ data ImportAvails
           --      = ModuleEnv [ImportedModsVal],
           -- ^ Domain is all directly-imported modules
           --
-          -- See the documentaion on ImportedModsVal in HscTypes for the
+          -- See the documentation on ImportedModsVal in HscTypes for the
           -- meaning of the fields.
           --
           -- We need a full ModuleEnv rather than a ModuleNameEnv here,

@@ -70,7 +70,7 @@ vectModule guts@(ModGuts { mg_tcs        = tycons
             cls_vect_decls = [vd | vd@(VectClass _)    <- vect_decls]
 
           -- Vectorise the type environment.  This will add vectorised
-          -- type constructors, their representaions, and the
+          -- type constructors, their representations, and the
           -- conrresponding data constructors.  Moreover, we produce
           -- bindings for dfuns and family instances of the classes
           -- and type families used in the DPH library to represent
