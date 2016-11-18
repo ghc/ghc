@@ -872,6 +872,10 @@
       SymI_HasProto(hs_spt_remove)                                      \
       SymI_HasProto(hs_spt_keys)                                        \
       SymI_HasProto(hs_spt_key_count)                                   \
+      SymI_HasProto(write_barrier)                                      \
+      SymI_HasProto(store_load_barrier)                                 \
+      SymI_HasProto(load_load_barrier)                                  \
+      SymI_HasProto(cas)                                                \
       RTS_USER_SIGNALS_SYMBOLS                                          \
       RTS_INTCHAR_SYMBOLS
 
