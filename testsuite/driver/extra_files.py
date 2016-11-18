@@ -418,6 +418,7 @@ extra_src_files = {
   'overloadedrecfldsfail11': ['OverloadedRecFldsFail11_A.hs'],
   'overloadedrecfldsfail12': ['OverloadedRecFldsFail12_A.hs'],
   'overloadedrecfldsrun02': ['OverloadedRecFldsRun02_A.hs'],
+  'hasfieldfail01': ['HasFieldFail01_A.hs'],
   'p10': ['D.hs'],
   'p11': ['E.hs'],
   'p13': ['P13_A.hs'],

@@ -627,24 +627,25 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                    --      f x = R { .. }   -- Should expand to R {x=x}, not R{x=x,y=y}
                  arg_in_scope lbl = mkVarUnqual lbl `elemLocalRdrEnv` lcl_env
 
-                 dot_dot_gres = [ (lbl, sel, head gres)
+                 (dot_dot_fields, dot_dot_gres)
+                        = unzip [ (fl, gre)
                                 | fl <- con_fields
                                 , let lbl = flLabel fl
-                                , let sel = flSelector fl
                                 , not (lbl `elem` present_flds)
-                                , let gres = lookupGRE_Field_Name rdr_env sel lbl
-                                , not (null gres)  -- Check selector is in scope
+                                , Just gre <- [lookupGRE_FieldLabel rdr_env fl]
+                                              -- Check selector is in scope
                                 , case ctxt of
                                     HsRecFieldCon {} -> arg_in_scope lbl
                                     _other           -> True ]
 
-           ; addUsedGREs (map thdOf3 dot_dot_gres)
+           ; addUsedGREs dot_dot_gres
            ; return [ L loc (HsRecField
                         { hsRecFieldLbl = L loc (FieldOcc (L loc arg_rdr) sel)
                         , hsRecFieldArg = L loc (mk_arg loc arg_rdr)
                         , hsRecPun      = False })
-                    | (lbl, sel, _) <- dot_dot_gres
-                    , let arg_rdr = mkVarUnqual lbl ] }
+                    | fl <- dot_dot_fields
+                    , let sel     = flSelector fl
+                    , let arg_rdr = mkVarUnqual (flLabel fl) ] }
 
     check_disambiguation :: Bool -> Maybe Name -> RnM (Maybe Name)
     -- When disambiguation is on, return name of parent tycon.

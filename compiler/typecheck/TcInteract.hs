@@ -20,20 +20,25 @@ import Type
 import InstEnv( DFunInstType, lookupInstEnv, instanceDFunId )
 import CoAxiom( sfInteractTop, sfInteractInert )
 
+import TcMType (newMetaTyVars)
+
 import Var
 import TcType
 import Name
+import RdrName ( lookupGRE_FieldLabel )
 import PrelNames ( knownNatClassName, knownSymbolClassName,
                    typeableClassName, coercibleTyConKey,
+                   hasFieldClassName,
                    heqTyConKey, ipClassKey )
 import TysWiredIn ( typeNatKind, typeSymbolKind, heqDataCon,
                     coercibleDataCon )
 import TysPrim    ( eqPrimTyCon, eqReprPrimTyCon )
-import Id( idType )
+import Id( idType, isNaughtyRecordSelector )
 import CoAxiom ( TypeEqn, CoAxiom(..), CoAxBranch(..), fromBranches )
 import Class
 import TyCon
 import DataCon( dataConWrapId )
+import FieldLabel
 import FunDeps
 import FamInst
 import FamInstEnv
@@ -1948,6 +1953,7 @@ match_class_inst dflags clas tys loc
   | cls_name == typeableClassName     = matchTypeable        clas tys
   | clas `hasKey` heqTyConKey         = matchLiftedEquality       tys
   | clas `hasKey` coercibleTyConKey   = matchLiftedCoercible      tys
+  | cls_name == hasFieldClassName     = matchHasField dflags clas tys loc
   | otherwise                         = matchInstEnv dflags clas tys loc
   where
     cls_name = className clas
@@ -2285,3 +2291,122 @@ matchLiftedCoercible args@[k, t1, t2]
   where
     args' = [k, k, t1, t2]
 matchLiftedCoercible args = pprPanic "matchLiftedCoercible" (ppr args)
+
+
+{- ********************************************************************
+*                                                                     *
+              Class lookup for overloaded record fields
+*                                                                     *
+***********************************************************************-}
+
+{-
+Note [HasField instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+
+    data T y = MkT { foo :: [y] }
+
+and `foo` is in scope.  Then GHC will automatically solve a constraint like
+
+    HasField "foo" (T Int) b
+
+by emitting a new wanted
+
+    T alpha -> [alpha] ~# T Int -> b
+
+and building a HasField dictionary out of the selector function `foo`,
+appropriately cast.
+
+The HasField class is defined (in GHC.Records) thus:
+
+    class HasField (x :: k) r a | x r -> a where
+      getField :: r -> a
+
+Since this is a one-method class, it is represented as a newtype.
+Hence we can solve `HasField "foo" (T Int) b` by taking an expression
+of type `T Int -> b` and casting it using the newtype coercion.
+Note that
+
+    foo :: forall y . T y -> [y]
+
+so the expression we construct is
+
+    foo @alpha |> co
+
+where
+
+    co :: (T alpha -> [alpha]) ~# HasField "foo" (T Int) b
+
+is built from
+
+    co1 :: (T alpha -> [alpha]) ~# (T Int -> b)
+
+which is the new wanted, and
+
+    co2 :: (T Int -> b) ~# HasField "foo" (T Int) b
+
+which can be derived from the newtype coercion.
+
+If `foo` is not in scope, or has a higher-rank or existentially
+quantified type, then the constraint is not solved automatically, but
+may be solved by a user-supplied HasField instance.  Similarly, if we
+encounter a HasField constraint where the field is not a literal
+string, or does not belong to the type, then we fall back on the
+normal constraint solver behaviour.
+-}
+
+-- See Note [HasField instances]
+matchHasField :: DynFlags -> Class -> [Type] -> CtLoc -> TcS LookupInstResult
+matchHasField dflags clas tys loc
+  = do { fam_inst_envs <- getFamInstEnvs
+       ; rdr_env       <- getGlobalRdrEnvTcS
+       ; case tys of
+           -- We are matching HasField {k} x r a...
+           [_k_ty, x_ty, r_ty, a_ty]
+               -- x should be a literal string
+             | Just x <- isStrLitTy x_ty
+               -- r should be an applied type constructor
+             , Just (tc, args) <- tcSplitTyConApp_maybe r_ty
+               -- use representation tycon (if data family); it has the fields
+             , let r_tc = fstOf3 (tcLookupDataFamInst fam_inst_envs tc args)
+               -- x should be a field of r
+             , Just fl <- lookupTyConFieldLabel x r_tc
+               -- the field selector should be in scope
+             , Just gre <- lookupGRE_FieldLabel rdr_env fl
+
+             -> do { sel_id <- tcLookupId (flSelector fl)
+                   ; (tv_prs, preds, sel_ty) <- tcInstType newMetaTyVars sel_id
+
+                         -- The first new wanted constraint equates the actual
+                         -- type of the selector with the type (r -> a) within
+                         -- the HasField x r a dictionary.  The preds will
+                         -- typically be empty, but if the datatype has a
+                         -- "stupid theta" then we have to include it here.
+                   ; let theta = mkPrimEqPred sel_ty (mkFunTy r_ty a_ty) : preds
+
+                         -- Use the equality proof to cast the selector Id to
+                         -- type (r -> a), then use the newtype coercion to cast
+                         -- it to a HasField dictionary.
+                         mk_ev (ev1:evs) = EvSelector sel_id tvs evs `EvCast` co
+                           where
+                             co = mkTcSubCo (evTermCoercion ev1)
+                                      `mkTcTransCo` mkTcSymCo co2
+                         mk_ev [] = panic "matchHasField.mk_ev"
+
+                         Just (_, co2) = tcInstNewTyCon_maybe (classTyCon clas)
+                                                              tys
+
+                         tvs = mkTyVarTys (map snd tv_prs)
+
+                     -- The selector must not be "naughty" (i.e. the field
+                     -- cannot have an existentially quantified type), and
+                     -- it must not be higher-rank.
+                   ; if not (isNaughtyRecordSelector sel_id) && isTauTy sel_ty
+                     then do { addUsedGRE True gre
+                             ; return GenInst { lir_new_theta = theta
+                                              , lir_mk_ev     = mk_ev
+                                              , lir_safe_over = True
+                                              } }
+                     else matchInstEnv dflags clas tys loc }
+
+           _ -> matchInstEnv dflags clas tys loc }
