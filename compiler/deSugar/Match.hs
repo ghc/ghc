@@ -92,7 +92,7 @@ is an embryonic @CoreExpr@ with a ``hole'' at the end for the
 final ``else expression''.
 \end{itemize}
 
-There is a type synonym, @EquationInfo@, defined in module @DsUtils@.
+There is a data type, @EquationInfo@, defined in module @DsMonad@.
 
 An experiment with re-ordering this information about equations (in
 particular, having the patterns available in column-major order)
