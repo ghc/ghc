@@ -57,7 +57,7 @@ libraries/pretty             -           -                               https:/
 libraries/process            -           -                               ssh://git@github.com/haskell/process.git
 libraries/terminfo           -           -                               https://github.com/judah/terminfo.git
 libraries/time               -           -                               https://github.com/haskell/time.git
-libraries/transformers       -           -                               http://git.haskell.org/darcs-mirrors/transformers.git
+libraries/transformers       -           -                               https://git.haskell.org/darcs-mirrors/transformers.git
 libraries/unix               -           -                               ssh://git@github.com/haskell/unix.git
 libraries/Win32              -           -                               https://github.com/haskell/win32.git
 libraries/xhtml              -           -                               https://github.com/haskell/xhtml.git
