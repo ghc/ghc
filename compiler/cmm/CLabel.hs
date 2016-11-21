@@ -842,7 +842,12 @@ math_funs = mkUniqSet [
         (fsLit "significand"),  (fsLit "significandf"), (fsLit "significandl"),
         (fsLit "y0"),           (fsLit "y0f"),          (fsLit "y0l"),
         (fsLit "y1"),           (fsLit "y1f"),          (fsLit "y1l"),
-        (fsLit "yn"),           (fsLit "ynf"),          (fsLit "ynl")
+        (fsLit "yn"),           (fsLit "ynf"),          (fsLit "ynl"),
+
+        -- These functions are described in IEEE Std 754-2008 -
+        -- Standard for Floating-Point Arithmetic and ISO/IEC TS 18661
+        (fsLit "nextup"),       (fsLit "nextupf"),      (fsLit "nextupl"),
+        (fsLit "nextdown"),     (fsLit "nextdownf"),    (fsLit "nextdownl")
     ]
 
 -- -----------------------------------------------------------------------------
