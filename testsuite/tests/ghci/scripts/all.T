@@ -265,3 +265,4 @@ test('T12091',
      [expect_broken(12091), extra_run_opts('-fobject-code')],
      ghci_script, ['T12091.script'])
 test('T12523', normal, ghci_script, ['T12523.script'])
+test('T12024', normal, ghci_script, ['T12024.script'])
