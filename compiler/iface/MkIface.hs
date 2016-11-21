@@ -1159,7 +1159,7 @@ check_old_iface hsc_env mod_summary src_modified maybe_iface
 -- two things may have changed that mean we should recompile M:
 --   * The interface export by a dependency of M has changed.
 --   * The compiler flags specified this time for M have changed
---     in a manner that is significant for recompilaiton.
+--     in a manner that is significant for recompilation.
 -- We return not just if we should recompile the object file but also
 -- if we should rebuild the interface file.
 checkVersions :: HscEnv

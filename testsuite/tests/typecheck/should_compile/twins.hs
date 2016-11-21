@@ -2,7 +2,7 @@
 {-# LANGUAGE RankNTypes, LiberalTypeSynonyms #-}
 
 -- This test checks that deep skolemisation and deep
--- instanatiation work right.  A buggy prototype
+-- instantiation work right.  A buggy prototype
 -- of GHC 7.0, where the type checker generated wrong
 -- code, sent applyTypeToArgs into a loop.
 

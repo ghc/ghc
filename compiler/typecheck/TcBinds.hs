@@ -1399,7 +1399,7 @@ We typecheck pattern bindings as follows.  First tcLhs does this:
      gives us a fresh "mono_id" qm :: instantiate(ty), where qm has
      a fresh name.
 
-     Any fresh unification variables in instiatiate(ty) born here, not
+     Any fresh unification variables in instantiate(ty) born here, not
      deep under implications as would happen if we allocated them when
      we encountered q during tcPat.
 

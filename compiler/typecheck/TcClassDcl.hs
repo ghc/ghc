@@ -457,7 +457,7 @@ tcATDefault emit_warn loc inst_subst defined_ats (ATI fam_tc defs)
   | tyConName fam_tc `elemNameSet` defined_ats
   = return []
 
-  -- No user instance, have defaults ==> instatiate them
+  -- No user instance, have defaults ==> instantiate them
    -- Example:   class C a where { type F a b :: *; type F a b = () }
    --            instance C [x]
    -- Then we want to generate the decl:   type F [x] b = ()

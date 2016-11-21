@@ -189,7 +189,7 @@ import {-# SOURCE #-} Packages (componentIdString, improveUnitId, PackageConfigM
 --      - Same as Distribution.Package.ComponentId
 --
 -- UnitId/InstalledUnitId: A ComponentId + a mapping from hole names
--- (ModuleName) to Modules.  This is how the compiler identifies instantatiated
+-- (ModuleName) to Modules.  This is how the compiler identifies instantiated
 -- components, and also is the main identifier by which GHC identifies things.
 --      - When Backpack is not being used, UnitId = ComponentId.
 --        this means a useful fiction for end-users is that there are

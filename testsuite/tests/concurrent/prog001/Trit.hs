@@ -61,7 +61,7 @@ subTrits x y = addTrits x (neg y)
 
 
 
--- Shift left = *2 opertaion with Trit
+-- Shift left = *2 operation with Trit
 shiftLeft :: Trit -> Trit
 shiftLeft (x, (y:ys)) = (x++ [y], ys)
 

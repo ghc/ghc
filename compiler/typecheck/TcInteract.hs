@@ -1731,7 +1731,7 @@ where G is injective; and wanted constraints
   [W] TF (alpha, beta) ~ fuv
   [W] fuv ~ (Int, <some type>)
 
-The injectivity will give rise to derived constraionts
+The injectivity will give rise to derived constraints
 
   [D] gamma1 ~ alpha
   [D] Int ~ beta

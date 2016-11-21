@@ -1267,8 +1267,8 @@ Consider this
 
 Here the declaration of S depends on the /data instance/ declaration
 for 'D Int'.  That makes things a lot more complicated, especially
-if the data instance is an assocaited type of an enclosing class instance.
-(And the class instance might have several assocatiated type instances
+if the data instance is an associated type of an enclosing class instance.
+(And the class instance might have several associated type instances
 with different dependency structure!)
 
 Ugh.  For now we simply don't allow promotion of data constructors for
