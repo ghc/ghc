@@ -31,10 +31,20 @@ warningsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-Wwarn"
          }
+  , flag { flagName = "-Werror=<wflag>"
+         , flagDescription = "make a specific warning fatal"
+         , flagType = DynamicFlag
+         , flagReverse = "-Wwarn=<wflag>"
+         }
   , flag { flagName = "-Wwarn"
          , flagDescription = "make warnings non-fatal"
          , flagType = DynamicFlag
          , flagReverse = "-Werror"
+         }
+  , flag { flagName = "-Wwarn=<wflag>"
+         , flagDescription = "make a specific warning non-fatal"
+         , flagType = DynamicFlag
+         , flagReverse = "-Werror=<wflag>"
          }
   , flag { flagName = "-Wunrecognised-warning-flags"
          , flagDescription =

@@ -92,15 +92,32 @@ The following flags are simple ways to select standard "packages" of warnings:
     Turns off all warnings, including the standard ones and those that
     :ghc-flag:`-Wall` doesn't enable.
 
+These options control which warnings are considered fatal and cause compilation
+to abort.
+
 .. ghc-flag:: -Werror
 
     Makes any warning into a fatal error. Useful so that you don't miss
     warnings when doing batch compilation.
 
+.. ghc-flag:: -Werror=<wflag>
+
+    :implies: ``-W<wflag>``
+
+    Makes a specific warning into a fatal error. The warning will be enabled if
+    it hasn't been enabled yet.
+
 .. ghc-flag:: -Wwarn
 
     Warnings are treated only as warnings, not as errors. This is the
     default, but can be useful to negate a :ghc-flag:`-Werror` flag.
+
+.. ghc-flag:: -Wwarn=<wflag>
+
+    Causes a specific warning to be treated as normal warning, not fatal error.
+
+    Note that it doesn't fully negate the effects of ``-Werror=<wflag>`` - the
+    warning will still be enabled.
 
 When a warning is emitted, the specific warning flag which controls
 it is shown.

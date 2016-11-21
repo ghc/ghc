@@ -21,3 +21,6 @@ test('DeprU',
 		'DeprM.o',  'DeprU.o',
 		'DeprM.hi', 'DeprU.hi']),
 	multimod_compile, ['DeprU', '-Wall'])
+
+test('Werror01', normal, compile, [''])
+test('Werror02', normal, compile, [''])
