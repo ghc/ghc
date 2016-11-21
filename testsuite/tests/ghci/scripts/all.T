@@ -266,3 +266,4 @@ test('T12091',
      ghci_script, ['T12091.script'])
 test('T12523', normal, ghci_script, ['T12523.script'])
 test('T12024', normal, ghci_script, ['T12024.script'])
+test('T12447', expect_broken(12447), ghci_script, ['T12447.script'])
