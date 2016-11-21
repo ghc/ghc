@@ -1,0 +1,10 @@
+:set -fprint-unicode-syntax -fprint-explicit-foralls
+
+:t fmap
+:i fmap
+:k Functor
+:m + GHC.Generics
+:i Functor
+:t datatypeName
+:i datatypeName
+:t (:*:)
