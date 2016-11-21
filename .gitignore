@@ -44,6 +44,13 @@ configure
 # Temporarily generated configure files
 confdefs.h
 
+# Hadrian files
+stage0
+stage1
+stage2
+_build
+hadrian
+
 # -----------------------------------------------------------------------------
 # Ignore any overlapped darcs repos and back up files
 
