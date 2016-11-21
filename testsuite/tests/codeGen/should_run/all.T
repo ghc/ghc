@@ -147,3 +147,4 @@ test('PopCnt', omit_ways(['ghci']), multi_compile_and_run,
 test('T12059', normal, compile_and_run, [''])
 test('T12433', normal, compile_and_run, [''])
 test('T12757', normal, compile_and_run, [''])
+test('T12855', normal, compile_and_run, [''])
