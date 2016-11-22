@@ -16,7 +16,7 @@
 #include <dwarf.h>
 #include <unistd.h>
 
-const int max_backtrace_depth = 5000;
+const int max_backtrace_depth = 500;
 
 static BacktraceChunk *backtraceAllocChunk(BacktraceChunk *next) {
     BacktraceChunk *chunk = stgMallocBytes(sizeof(BacktraceChunk),
