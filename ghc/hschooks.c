@@ -5,7 +5,7 @@ in instead of the defaults.
 */
 
 #include "../rts/PosixSource.h"
-#include "Rts.h"
+#include "../includes/Rts.h"
 
 #include "HsFFI.h"
 
