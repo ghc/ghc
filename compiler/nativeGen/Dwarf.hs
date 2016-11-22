@@ -16,6 +16,8 @@ import Platform
 import Unique
 import UniqSupply
 
+import ErrUtils
+
 import Dwarf.Constants
 import Dwarf.Types
 
@@ -92,6 +94,11 @@ dwarfGen df modLoc us blocks = do
                | otherwise                 = [DwarfARange lowLabel highLabel]
   let aranges = dwarfARangesSection $$ pprDwarfARanges aranges' unitU
 
+  let extractUnwinds blk = dblUnwind blk : foldMap extractUnwinds (dblBlocks blk)
+  dumpIfSet_dyn df Opt_D_dump_debug "Pre-dwarfGen"
+      (nest 4 $ vcat $ map (ppr . extractUnwinds) blocks)
+  dumpIfSet_dyn df Opt_D_dump_debug "Post-dwarfGen"
+      (nest 4 $ vcat $ foldMap (map ppr . extractUnwinds) procs)
   return (infoSct $$ abbrevSct $$ lineSct $$ frameSct $$ aranges, us'')
 
 -- | Build an address range entry for one proc.
