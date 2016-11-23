@@ -1486,7 +1486,7 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
   | (implic:_) <- cec_encl ctxt   -- Get the innermost context
   , Implic { ic_env = env, ic_given = given
            , ic_tclvl = lvl, ic_info = skol_info } <- implic
-  = ASSERT2( isTcTyVar tv1 && not (isTouchableMetaTyVar lvl tv1)
+  = ASSERT2( not (isTouchableMetaTyVar lvl tv1)
            , ppr tv1 )  -- See Note [Error messages for untouchables]
     do { let msg = important $ misMatchMsg ct oriented ty1 ty2
              tclvl_extra = important $
@@ -1602,8 +1602,7 @@ extraTyVarInfo :: ReportErrCtxt -> TcTyVar -> TcType -> SDoc
 -- Add on extra info about skolem constants
 -- NB: The types themselves are already tidied
 extraTyVarInfo ctxt tv1 ty2
-  = ASSERT2( isTcTyVar tv1, ppr tv1 )
-    tv_extra tv1 $$ ty_extra ty2
+  = tv_extra tv1 $$ ty_extra ty2
   where
     implics = cec_encl ctxt
     ty_extra ty = case tcGetTyVar_maybe ty of

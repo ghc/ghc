@@ -965,8 +965,8 @@ incoherent instances as long as there are others.
 -}
 
 instanceBindFun :: TyCoVar -> BindFlag
-instanceBindFun tv | isTcTyVar tv && isOverlappableTyVar tv = Skolem
-                   | otherwise                              = BindMe
+instanceBindFun tv | isOverlappableTyVar tv = Skolem
+                   | otherwise              = BindMe
    -- Note [Binding when looking up instances]
 
 {-

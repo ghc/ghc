@@ -148,7 +148,7 @@ matchExpectedFunTys herald arity orig_ty thing_inside
                     , mkWpFun idHsWrapper wrap_res arg_ty res_ty ) }
 
     go acc_arg_tys n ty@(TyVarTy tv)
-      | ASSERT( isTcTyVar tv) isMetaTyVar tv
+      | isMetaTyVar tv
       = do { cts <- readMetaTyVar tv
            ; case cts of
                Indirect ty' -> go acc_arg_tys n ty'
@@ -275,7 +275,7 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
                     , arg_ty : tys, ty_r ) }
 
     go n acc_args ty@(TyVarTy tv)
-      | ASSERT( isTcTyVar tv) isMetaTyVar tv
+      | isMetaTyVar tv
       = do { cts <- readMetaTyVar tv
            ; case cts of
                Indirect ty' -> go n acc_args ty'
@@ -372,7 +372,7 @@ matchExpectedTyConApp tc orig_ty
        = return (mkTcNomReflCo ty, args)
 
     go (TyVarTy tv)
-       | ASSERT( isTcTyVar tv) isMetaTyVar tv
+       | isMetaTyVar tv
        = do { cts <- readMetaTyVar tv
             ; case cts of
                 Indirect ty -> go ty
@@ -415,7 +415,7 @@ matchExpectedAppTy orig_ty
       = return (mkTcNomReflCo orig_ty, (fun_ty, arg_ty))
 
     go (TyVarTy tv)
-      | ASSERT( isTcTyVar tv) isMetaTyVar tv
+      | isMetaTyVar tv
       = do { cts <- readMetaTyVar tv
            ; case cts of
                Indirect ty -> go ty
@@ -1121,8 +1121,7 @@ buildImplicationFor tclvl skol_info skol_tvs given wanted
   = return (emptyBag, emptyTcEvBinds)
 
   | otherwise
-  = ASSERT2( all isTcTyVar skol_tvs, ppr skol_tvs )
-    ASSERT2( all isSkolemTyVar skol_tvs, ppr skol_tvs )
+  = ASSERT2( all isSkolemTyVar skol_tvs, ppr skol_tvs )
     do { ev_binds_var <- newTcEvBinds
        ; env <- getLclEnv
        ; let implic = Implic { ic_tclvl = tclvl

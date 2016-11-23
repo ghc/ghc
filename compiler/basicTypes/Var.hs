@@ -51,7 +51,7 @@ module Var (
         setIdExported, setIdNotExported,
 
         -- ** Predicates
-        isId, isTKVar, isTyVar, isTcTyVar,
+        isId, isTyVar, isTcTyVar,
         isLocalVar, isLocalId, isCoVar, isNonCoVarId, isTyCoVar,
         isGlobalId, isExportedId,
         mustHaveLocalBinding,
@@ -452,6 +452,7 @@ mkTcTyVar name kind details
         }
 
 tcTyVarDetails :: TyVar -> TcTyVarDetails
+-- See Note [TcTyVars in the typechecker] in TcType
 tcTyVarDetails (TcTyVar { tc_tv_details = details }) = details
 tcTyVarDetails (TyVar {})                            = vanillaSkolemTv
 tcTyVarDetails var = pprPanic "tcTyVarDetails" (ppr var <+> dcolon <+> pprKind (tyVarKind var))
@@ -563,15 +564,12 @@ setIdNotExported id = ASSERT( isLocalId id )
 ************************************************************************
 -}
 
-isTyVar :: Var -> Bool
-isTyVar = isTKVar     -- Historical
+isTyVar :: Var -> Bool        -- True of both TyVar and TcTyVar
+isTyVar (TyVar {})   = True
+isTyVar (TcTyVar {}) = True
+isTyVar _            = False
 
-isTKVar :: Var -> Bool  -- True of both type and kind variables
-isTKVar (TyVar {})   = True
-isTKVar (TcTyVar {}) = True
-isTKVar _            = False
-
-isTcTyVar :: Var -> Bool
+isTcTyVar :: Var -> Bool      -- True of TcTyVar only
 isTcTyVar (TcTyVar {}) = True
 isTcTyVar _            = False
 
