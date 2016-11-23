@@ -32,7 +32,7 @@ module VarEnv (
         dVarEnvElts,
         extendDVarEnv, extendDVarEnv_C,
         extendDVarEnvList,
-        lookupDVarEnv,
+        lookupDVarEnv, elemDVarEnv,
         isEmptyDVarEnv, foldDVarEnv,
         mapDVarEnv,
         modifyDVarEnv,
@@ -570,6 +570,9 @@ delDVarEnvList = delListFromUDFM
 
 isEmptyDVarEnv :: DVarEnv a -> Bool
 isEmptyDVarEnv = isNullUDFM
+
+elemDVarEnv :: Var -> DVarEnv a -> Bool
+elemDVarEnv = elemUDFM
 
 extendDVarEnv_C :: (a -> a -> a) -> DVarEnv a -> Var -> a -> DVarEnv a
 extendDVarEnv_C = addToUDFM_C
