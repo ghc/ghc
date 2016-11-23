@@ -119,18 +119,18 @@ threadWaitWrite fd
 -- is an IO action that can be used to deregister interest
 -- in the file descriptor.
 threadWaitReadSTM :: Fd -> IO (Sync.STM (), IO ())
-threadWaitReadSTM fd 
+threadWaitReadSTM fd
 #ifndef mingw32_HOST_OS
   | threaded  = Event.threadWaitReadSTM fd
 #endif
   | otherwise = do
       m <- Sync.newTVarIO False
-      _ <- Sync.forkIO $ do
+      t <- Sync.forkIO $ do
         threadWaitRead fd
         Sync.atomically $ Sync.writeTVar m True
       let waitAction = do b <- Sync.readTVar m
                           if b then return () else retry
-      let killAction = return ()
+      let killAction = Sync.killThread t
       return (waitAction, killAction)
 
 -- | Returns an STM action that can be used to wait until data
@@ -138,18 +138,18 @@ threadWaitReadSTM fd
 -- is an IO action that can be used to deregister interest
 -- in the file descriptor.
 threadWaitWriteSTM :: Fd -> IO (Sync.STM (), IO ())
-threadWaitWriteSTM fd 
+threadWaitWriteSTM fd
 #ifndef mingw32_HOST_OS
   | threaded  = Event.threadWaitWriteSTM fd
 #endif
   | otherwise = do
       m <- Sync.newTVarIO False
-      _ <- Sync.forkIO $ do
+      t <- Sync.forkIO $ do
         threadWaitWrite fd
         Sync.atomically $ Sync.writeTVar m True
       let waitAction = do b <- Sync.readTVar m
                           if b then return () else retry
-      let killAction = return ()
+      let killAction = Sync.killThread t
       return (waitAction, killAction)
 
 -- | Close a file descriptor in a concurrency-safe way (GHC only).  If

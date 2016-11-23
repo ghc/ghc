@@ -205,3 +205,4 @@ test('T9848',
 test('T10149', normal, compile_and_run, [''])
 test('T11334a', normal, compile_and_run, [''])
 test('T11555', normal, compile_and_run, [''])
+test('T12852', when(opsys('mingw32'), skip), compile_and_run, [''])
