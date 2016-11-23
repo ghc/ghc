@@ -260,8 +260,45 @@ tau ::= tyvar
 
 -- In all cases, a (saturated) type synonym application is legal,
 -- provided it expands to the required form.
+
+Note [TcTyVars in the typechecker]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The typechecker uses a lot of type variables with special properties,
+notably being a unification variable with a mutable reference.  These
+use the 'TcTyVar' variant of Var.Var.
+
+However, the type checker and constraint solver can encounter type
+variables that use the 'TyVar' variant of Var.Var, for a couple of
+reasons:
+
+  - When unifying or flattening under (forall a. ty)
+
+  - When typechecking a class decl, say
+       class C (a :: k) where
+          foo :: T a -> Int
+    We have first kind-check the header; fix k and (a:k) to be
+    TyVars, bring 'k' and 'a' into scope, and kind check the
+    signature for 'foo'.  In doing so we call solveEqualities to
+    solve any kind equalities in foo's signature.  So the solver
+    may see free occurences of 'k'.
+
+It's convenient to simply treat these TyVars as skolem constants,
+which of course they are.  So
+
+* Var.tcTyVarDetails succeeds on a TyVar, returning
+  vanillaSkolemTv, as well as on a TcTyVar.
+
+* tcIsTcTyVar returns True for both TyVar and TcTyVar variants
+  of Var.Var.  The "tc" prefix means "a type variable that can be
+  encountered by the typechecker".
+
+This is a bit of a change from an earlier era when we remoselessly
+insisted on real TcTyVars in the type checker.  But that seems
+unnecessary (for skolems, TyVars are fine) and it's now very hard
+to guarantee, with the advent of kind equalities.
 -}
 
+-- See Note [TcTyVars in the typechecker]
 type TcTyVar = TyVar    -- Used only during type inference
 type TcCoVar = CoVar    -- Used only during type inference
 type TcType = Type      -- A TcType can have mutable type variables
@@ -701,7 +738,7 @@ checkTcLevelInvariant (TcLevel ctxt_tclvl) (TcLevel tv_tclvl)
 
 tcTyVarLevel :: TcTyVar -> TcLevel
 tcTyVarLevel tv
-  = ASSERT2( isTcTyVar tv, ppr tv )
+  = ASSERT2( tcIsTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
           MetaTv { mtv_tclvl = tv_lvl } -> tv_lvl
           SkolemTv tv_lvl _             -> tv_lvl
@@ -840,6 +877,9 @@ rewritableTyVarsOfTypes :: [TcType] -> TcTyVarSet
 rewritableTyVarsOfTypes tys = mapUnionVarSet rewritableTyVarsOfType tys
 
 rewritableTyVarsOfType :: TcType -> TcTyVarSet
+-- Used during kick-out from the inert set
+-- Ignores coercions and casts, because rewriting those does
+-- not help solving, and it's more efficient to ignore them
 rewritableTyVarsOfType ty
   = go ty
   where
@@ -1006,9 +1046,13 @@ splitDepVarsOfType = go
 ************************************************************************
 -}
 
+tcIsTcTyVar :: TcTyVar -> Bool
+-- See Note [TcTyVars in the typechecker]
+tcIsTcTyVar tv = isTyVar tv
+
 isTouchableOrFmv :: TcLevel -> TcTyVar -> Bool
 isTouchableOrFmv ctxt_tclvl tv
-  = ASSERT2( isTcTyVar tv, ppr tv )
+  = ASSERT2( tcIsTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
       MetaTv { mtv_tclvl = tv_tclvl, mtv_info = info }
         -> ASSERT2( checkTcLevelInvariant ctxt_tclvl tv_tclvl,
@@ -1020,7 +1064,7 @@ isTouchableOrFmv ctxt_tclvl tv
 
 isTouchableMetaTyVar :: TcLevel -> TcTyVar -> Bool
 isTouchableMetaTyVar ctxt_tclvl tv
-  = ASSERT2( isTcTyVar tv, ppr tv )
+  = ASSERT2( tcIsTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
       MetaTv { mtv_tclvl = tv_tclvl }
         -> ASSERT2( checkTcLevelInvariant ctxt_tclvl tv_tclvl,
@@ -1030,15 +1074,13 @@ isTouchableMetaTyVar ctxt_tclvl tv
 
 isFloatedTouchableMetaTyVar :: TcLevel -> TcTyVar -> Bool
 isFloatedTouchableMetaTyVar ctxt_tclvl tv
-  = ASSERT2( isTcTyVar tv, ppr tv )
+  = ASSERT2( tcIsTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
       MetaTv { mtv_tclvl = tv_tclvl } -> tv_tclvl `strictlyDeeperThan` ctxt_tclvl
       _ -> False
 
 isImmutableTyVar :: TyVar -> Bool
-isImmutableTyVar tv
-  | isTcTyVar tv = isSkolemTyVar tv
-  | otherwise    = True
+isImmutableTyVar tv = isSkolemTyVar tv
 
 isTyConableTyVar, isSkolemTyVar, isOverlappableTyVar,
   isMetaTyVar, isAmbiguousTyVar,
@@ -1048,20 +1090,20 @@ isTyConableTyVar tv
         -- True of a meta-type variable that can be filled in
         -- with a type constructor application; in particular,
         -- not a SigTv
-  = ASSERT2( isTcTyVar tv, ppr tv )
+  = ASSERT2( tcIsTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
         MetaTv { mtv_info = SigTv } -> False
         _                           -> True
 
 isFmvTyVar tv
-  = ASSERT2( isTcTyVar tv, ppr tv )
+  = ASSERT2( tcIsTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
         MetaTv { mtv_info = FlatMetaTv } -> True
         _                                -> False
 
 -- | True of both given and wanted flatten-skolems (fak and usk)
 isFlattenTyVar tv
-  = ASSERT2( isTcTyVar tv, ppr tv )
+  = ASSERT2( tcIsTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
         FlatSkol {}                      -> True
         MetaTv { mtv_info = FlatMetaTv } -> True
@@ -1069,25 +1111,25 @@ isFlattenTyVar tv
 
 -- | True of FlatSkol skolems only
 isFskTyVar tv
-  = ASSERT2( isTcTyVar tv, ppr tv )
+  = ASSERT2( tcIsTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
         FlatSkol {} -> True
         _           -> False
 
 isSkolemTyVar tv
-  = ASSERT2( isTcTyVar tv, ppr tv )
+  = ASSERT2( tcIsTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
         MetaTv {} -> False
         _other    -> True
 
 isOverlappableTyVar tv
-  = ASSERT2( isTcTyVar tv, ppr tv )
+  = ASSERT2( tcIsTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
         SkolemTv _ overlappable -> overlappable
         _                       -> False
 
 isMetaTyVar tv
-  = ASSERT2( isTcTyVar tv, ppr tv )
+  = ASSERT2( tcIsTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
         MetaTv {} -> True
         _         -> False
@@ -1153,8 +1195,8 @@ isIndirect _            = False
 isRuntimeUnkSkol :: TyVar -> Bool
 -- Called only in TcErrors; see Note [Runtime skolems] there
 isRuntimeUnkSkol x
-  | isTcTyVar x, RuntimeUnk <- tcTyVarDetails x = True
-  | otherwise                                   = False
+  | RuntimeUnk <- tcTyVarDetails x = True
+  | otherwise                      = False
 
 {-
 ************************************************************************
@@ -1958,7 +2000,7 @@ isRigidEqPred :: TcLevel -> PredTree -> Bool
 --   * Meta-tv SigTv on LHS, tyvar on right
 isRigidEqPred tc_lvl (EqPred NomEq ty1 _)
   | Just tv1 <- tcGetTyVar_maybe ty1
-  = ASSERT2( isTcTyVar tv1, ppr tv1 )
+  = ASSERT2( tcIsTcTyVar tv1, ppr tv1 )
     not (isMetaTyVar tv1) || isTouchableMetaTyVar tc_lvl tv1
 
   | otherwise  -- LHS is not a tyvar

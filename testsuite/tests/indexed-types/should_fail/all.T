@@ -137,6 +137,5 @@ test('T10899', normal, compile_fail, [''])
 test('T11136', normal, compile_fail, [''])
 test('T7788', normal, compile_fail, [''])
 test('T11450', normal, compile_fail, [''])
-test('T12041', when(compiler_debugged(), expect_broken(12826)),
-               compile_fail, [''])
+test('T12041', normal, compile_fail, [''])
 test('T12522a', normal, compile_fail, [''])
