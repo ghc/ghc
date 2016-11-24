@@ -402,7 +402,10 @@ data InertSet
 
 instance Outputable InertSet where
   ppr is = vcat [ ppr $ inert_cans is
-                , text "Solved dicts" <+> vcat (map ppr (bagToList (dictsToBag (inert_solved_dicts is)))) ]
+                , ppUnless (null dicts) $
+                  text "Solved dicts" <+> vcat (map ppr dicts) ]
+         where
+           dicts = bagToList (dictsToBag (inert_solved_dicts is))
 
 emptyInert :: InertSet
 emptyInert
@@ -2258,8 +2261,9 @@ traceFireTcS ev doc
   = TcS $ \env -> csTraceTcM $
     do { n <- TcM.readTcRef (tcs_count env)
        ; tclvl <- TcM.getTcLevel
-       ; return (hang (int n <> brackets (text "U:" <> ppr tclvl
-                                          <> ppr (ctLocDepth (ctEvLoc ev)))
+       ; return (hang (text "Step" <+> int n
+                       <> brackets (text "l:" <> ppr tclvl <> comma <>
+                                    text "d:" <> ppr (ctLocDepth (ctEvLoc ev)))
                        <+> doc <> colon)
                      4 (ppr ev)) }
 

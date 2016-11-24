@@ -30,7 +30,7 @@ import TysWiredIn ( typeNatKind, typeSymbolKind, heqDataCon,
                     coercibleDataCon )
 import TysPrim    ( eqPrimTyCon, eqReprPrimTyCon )
 import Id( idType )
-import CoAxiom ( Eqn, CoAxiom(..), CoAxBranch(..), fromBranches )
+import CoAxiom ( TypeEqn, CoAxiom(..), CoAxBranch(..), fromBranches )
 import Class
 import TyCon
 import DataCon( dataConWrapId )
@@ -377,25 +377,24 @@ runSolverPipeline :: [(String,SimplifierStage)] -- The pipeline
 -- Run this item down the pipeline, leaving behind new work and inerts
 runSolverPipeline pipeline workItem
   = do { wl <- getWorkList
+       ; inerts <- getTcSInerts
+       ; traceTcS "----------------------------- " empty
        ; traceTcS "Start solver pipeline {" $
                   vcat [ text "work item =" <+> ppr workItem
+                       , text "inerts =" <+> ppr inerts
                        , text "rest of worklist =" <+> ppr wl ]
 
        ; bumpStepCountTcS    -- One step for each constraint processed
        ; final_res  <- run_pipeline pipeline (ContinueWith workItem)
+
        ; case final_res of
            Stop ev s       -> do { traceFireTcS ev s
-                                 ; final_is <- getTcSInerts
-                                 ; traceTcS "End solver pipeline (discharged) }"
-                                       (text "inerts =" <+> ppr final_is)
+                                 ; traceTcS "End solver pipeline (discharged) }" empty
                                  ; return () }
-           ContinueWith ct -> do { traceFireTcS (ctEvidence ct) (text "Kept as inert")
-                                 ; addInertCan ct
-                                 ; final_is <- getTcSInerts
+           ContinueWith ct -> do { addInertCan ct
+                                 ; traceFireTcS (ctEvidence ct) (text "Kept as inert")
                                  ; traceTcS "End solver pipeline (kept as inert) }" $
-                                       vcat [ text "final_item =" <+> ppr ct
-                                            , pprTyVars $ tyCoVarsOfCtList ct
-                                            , text "inerts     =" <+> ppr final_is] }
+                                            (text "final_item =" <+> ppr ct) }
        }
   where run_pipeline :: [(String,SimplifierStage)] -> StopOrContinue Ct
                      -> TcS (StopOrContinue Ct)
@@ -748,7 +747,9 @@ addFunDepWork inerts work_ev cls
       where
         inert_pred = ctPred inert_ct
         inert_loc  = ctLoc inert_ct
-        derived_loc = work_loc { ctl_origin = FunDepOrigin1 work_pred  work_loc
+        derived_loc = work_loc { ctl_depth  = ctl_depth work_loc `maxSubGoalDepth`
+                                              ctl_depth inert_loc
+                               , ctl_origin = FunDepOrigin1 work_pred  work_loc
                                                             inert_pred inert_loc }
 
 {-
@@ -894,34 +895,31 @@ improveLocalFunEqs :: CtEvidence -> InertCans -> TyCon -> [TcType] -> TcTyVar
 -- Generate derived improvement equalities, by comparing
 -- the current work item with inert CFunEqs
 -- E.g.   x + y ~ z,   x + y' ~ z   =>   [D] y ~ y'
---
--- See Note [FunDep and implicit parameter reactions]
-improveLocalFunEqs ev inerts fam_tc args fsk
-  | isGiven ev   -- See Note [No FunEq improvement for Givens]
+improveLocalFunEqs work_ev inerts fam_tc args fsk
+  | isGiven work_ev   -- See Note [No FunEq improvement for Givens]
   = return ()
 
-  | null improvement_eqns
-  = do { traceTcS "improveLocalFunEqs no improvements: " $
-         vcat [ text "Candidates:" <+> ppr funeqs_for_tc
-              , text "Inert eqs:" <+> ppr ieqs ]
-       ; return () }
-
-  | otherwise
-  = do { traceTcS "improveLocalFunEqs improvements: " $
+  | not (null improvement_eqns)
+  = do { traceTcS "interactFunEq improvements: " $
          vcat [ text "Eqns:" <+> ppr improvement_eqns
               , text "Candidates:" <+> ppr funeqs_for_tc
               , text "Inert eqs:" <+> ppr ieqs ]
-       ; mapM_ (unifyDerived loc Nominal) improvement_eqns }
+       ; emitFunDepDeriveds improvement_eqns }
+
+  | otherwise
+  = return ()
 
   where
-    loc           = ctEvLoc ev
     ieqs          = inert_eqs inerts
     funeqs        = inert_funeqs inerts
     funeqs_for_tc = findFunEqsByTyCon funeqs fam_tc
     rhs           = lookupFlattenTyVar ieqs fsk
+    work_loc      = ctEvLoc work_ev
+    work_pred     = ctEvPred work_ev
     fam_inj_info  = familyTyConInjectivityInfo fam_tc
 
     --------------------
+    improvement_eqns :: [FunDepEqn CtLoc]
     improvement_eqns
       | Just ops <- isBuiltInSynFamTyCon_maybe fam_tc
       =    -- Try built-in families, notably for arithmethic
@@ -935,20 +933,37 @@ improveLocalFunEqs ev inerts fam_tc args fsk
       = []
 
     --------------------
-    do_one_built_in ops (CFunEqCan { cc_tyargs = iargs, cc_fsk = ifsk })
-      = sfInteractInert ops args rhs iargs (lookupFlattenTyVar ieqs ifsk)
+    do_one_built_in ops (CFunEqCan { cc_tyargs = iargs, cc_fsk = ifsk, cc_ev = inert_ev })
+      = mk_fd_eqns inert_ev (sfInteractInert ops args rhs iargs
+                                             (lookupFlattenTyVar ieqs ifsk))
+
     do_one_built_in _ _ = pprPanic "interactFunEq 1" (ppr fam_tc)
 
     --------------------
     -- See Note [Type inference for type families with injectivity]
-    do_one_injective inj_args (CFunEqCan { cc_tyargs = iargs, cc_fsk = ifsk })
+    do_one_injective inj_args (CFunEqCan { cc_tyargs = inert_args
+                                         , cc_fsk = ifsk, cc_ev = inert_ev })
       | rhs `tcEqType` lookupFlattenTyVar ieqs ifsk
-      = [ Pair arg iarg
-        | (arg, iarg, True) <- zip3 args iargs inj_args ]
-
-      | otherwise = []
+      = mk_fd_eqns inert_ev $
+            [ Pair arg iarg
+            | (arg, iarg, True) <- zip3 args inert_args inj_args ]
+      | otherwise
+      = []
 
     do_one_injective _ _ = pprPanic "interactFunEq 2" (ppr fam_tc)
+
+    --------------------
+    mk_fd_eqns :: CtEvidence -> [TypeEqn] -> [FunDepEqn CtLoc]
+    mk_fd_eqns inert_ev eqns
+      | null eqns  = []
+      | otherwise  = [ FDEqn { fd_qtvs = [], fd_eqs = eqns
+                             , fd_pred1 = work_pred
+                             , fd_pred2 = ctEvPred inert_ev
+                             , fd_loc   = loc } ]
+      where
+        inert_loc = ctEvLoc inert_ev
+        loc = inert_loc { ctl_depth = ctl_depth inert_loc `maxSubGoalDepth`
+                                      ctl_depth work_loc }
 
 -------------
 reactFunEq :: CtEvidence -> TcTyVar    -- From this  :: F args1 ~ fsk1
@@ -1337,9 +1352,11 @@ emitFunDepDeriveds fd_eqns
   where
     do_one_FDEqn (FDEqn { fd_qtvs = tvs, fd_eqs = eqs, fd_loc = loc })
      | null tvs  -- Common shortcut
-     = mapM_ (unifyDerived loc Nominal) eqs
+     = do { traceTcS "emitFunDepDeriveds 1" (ppr (ctl_depth loc) $$ ppr eqs)
+          ; mapM_ (unifyDerived loc Nominal) eqs }
      | otherwise
-     = do { (subst, _) <- instFlexiTcS tvs  -- Takes account of kind substitution
+     = do { traceTcS "emitFunDepDeriveds 2" (ppr (ctl_depth loc) $$ ppr eqs)
+          ; (subst, _) <- instFlexiTcS tvs  -- Takes account of kind substitution
           ; mapM_ (do_one_eq loc subst) eqs }
 
     do_one_eq loc subst (Pair ty1 ty2)
@@ -1459,7 +1476,7 @@ improveTopFunEqs ev fam_tc args fsk
 
 improve_top_fun_eqs :: FamInstEnvs
                     -> TyCon -> [TcType] -> TcType
-                    -> TcS [Eqn]
+                    -> TcS [TypeEqn]
 improve_top_fun_eqs fam_envs fam_tc args rhs_ty
   | Just ops <- isBuiltInSynFamTyCon_maybe fam_tc
   = return (sfInteractTop ops args rhs_ty)
@@ -1506,7 +1523,7 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
 
       injImproveEqns :: [Bool]
                      -> ([Type], TCvSubst, [TyCoVar], Maybe CoAxBranch)
-                     -> TcS [Eqn]
+                     -> TcS [TypeEqn]
       injImproveEqns inj_args (ax_args, theta, unsubstTvs, cabr) = do
         (theta', _) <- instFlexiTcS unsubstTvs
         -- The use of deterministically ordered list for `unsubstTvs`
@@ -1786,7 +1803,7 @@ doTopReactDict :: InertSet -> Ct -> TcS (StopOrContinue Ct)
 -- Try to use type-class instance declarations to simplify the constraint
 doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
                                           , cc_tyargs = xis })
-  | isGiven fl
+  | isGiven fl   -- Never use instances for Given constraints
   = do { try_fundep_improvement
        ; continueWith work_item }
 
@@ -1794,34 +1811,18 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
   = do { setEvBindIfWanted fl (ctEvTerm ev)
        ; stopWith fl "Dict/Top (cached)" }
 
-  | isDerived fl  -- Use type-class instances for Deriveds, in the hope
-                  -- of generating some improvements
-                  -- C.f. Example 3 of Note [The improvement story]
-                  -- It's easy because no evidence is involved
-   = do { dflags <- getDynFlags
-        ; lkup_inst_res <- matchClassInst dflags inerts cls xis dict_loc
-        ; case lkup_inst_res of
-               GenInst { lir_new_theta = preds
-                       , lir_safe_over = s } ->
-                 do { emitNewDeriveds dict_loc preds
-                    ; unless s $ insertSafeOverlapFailureTcS work_item
-                    ; stopWith fl "Dict/Top (solved)" }
-
-               NoInstance ->
-                 do { -- If there is no instance, try improvement
-                      try_fundep_improvement
-                    ; continueWith work_item } }
-
-  | otherwise  -- Wanted, but not cached
+  | otherwise  -- Wanted or Derived, but not cached
    = do { dflags <- getDynFlags
         ; lkup_inst_res <- matchClassInst dflags inerts cls xis dict_loc
         ; case lkup_inst_res of
                GenInst { lir_new_theta = theta
                        , lir_mk_ev     = mk_ev
                        , lir_safe_over = s } ->
-                 do { addSolvedDict fl cls xis
+                 do { traceTcS "doTopReact/found instance for" $ ppr fl
+                    ; checkReductionDepth deeper_loc dict_pred
                     ; unless s $ insertSafeOverlapFailureTcS work_item
-                    ; solve_from_instance theta mk_ev }
+                    ; if isDerived fl then finish_derived theta
+                                      else finish_wanted  theta mk_ev }
                NoInstance ->
                  do { try_fundep_improvement
                     ; continueWith work_item } }
@@ -1838,21 +1839,23 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
        | otherwise
        = loc
 
-     solve_from_instance :: [TcPredType]
-                         -> ([EvTerm] -> EvTerm) -> TcS (StopOrContinue Ct)
+     finish_wanted :: [TcPredType]
+                   -> ([EvTerm] -> EvTerm) -> TcS (StopOrContinue Ct)
       -- Precondition: evidence term matches the predicate workItem
-     solve_from_instance theta mk_ev
-        | null theta
-        = do { traceTcS "doTopReact/found nullary instance for" $ ppr fl
-             ; setWantedEvBind (ctEvId fl) (mk_ev [])
-             ; stopWith fl "Dict/Top (solved, no new work)" }
-        | otherwise
-        = do { checkReductionDepth deeper_loc dict_pred
-             ; traceTcS "doTopReact/found non-nullary instance for" $ ppr fl
+     finish_wanted theta mk_ev
+        = do { addSolvedDict fl cls xis
              ; evc_vars <- mapM (newWanted deeper_loc) theta
              ; setWantedEvBind (ctEvId fl) (mk_ev (map getEvTerm evc_vars))
              ; emitWorkNC (freshGoals evc_vars)
-             ; stopWith fl "Dict/Top (solved, more work)" }
+             ; stopWith fl "Dict/Top (solved wanted)" }
+
+     finish_derived theta  -- Use type-class instances for Deriveds, in the hope
+       =                   -- of generating some improvements
+                           -- C.f. Example 3 of Note [The improvement story]
+                           -- It's easy because no evidence is involved
+         do { emitNewDeriveds deeper_loc theta
+            ; traceTcS "finish_derived" (ppr (ctl_depth deeper_loc))
+            ; stopWith fl "Dict/Top (solved derived)" }
 
      -- We didn't solve it; so try functional dependencies with
      -- the instance environment, and return

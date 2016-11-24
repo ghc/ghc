@@ -21,7 +21,7 @@ import TyCon      ( TyCon, FamTyConFlav(..), mkFamilyTyCon
                   , Injectivity(..) )
 import Coercion   ( Role(..) )
 import TcRnTypes  ( Xi )
-import CoAxiom    ( CoAxiomRule(..), BuiltInSynFamily(..), Eqn )
+import CoAxiom    ( CoAxiomRule(..), BuiltInSynFamily(..), TypeEqn )
 import Name       ( Name, BuiltInSyntax(..) )
 import TysWiredIn
 import TysPrim    ( mkTemplateAnonTyConBinders )
@@ -359,7 +359,7 @@ mkBinAxiom str tc f =
 
 
 
-mkAxiom1 :: String -> (Eqn -> Eqn) -> CoAxiomRule
+mkAxiom1 :: String -> (TypeEqn -> TypeEqn) -> CoAxiomRule
 mkAxiom1 str f =
   CoAxiomRule
     { coaxrName      = fsLit str

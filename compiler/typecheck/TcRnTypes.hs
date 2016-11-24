@@ -88,7 +88,7 @@ module TcRnTypes(
         arisesFromGivens,
 
         Implication(..), ImplicStatus(..), isInsolubleStatus,
-        SubGoalDepth, initialSubGoalDepth,
+        SubGoalDepth, initialSubGoalDepth, maxSubGoalDepth,
         bumpSubGoalDepth, subGoalDepthExceeded,
         CtLoc(..), ctLocSpan, ctLocEnv, ctLocLevel, ctLocOrigin,
         ctLocTypeOrKind_maybe,
@@ -2385,7 +2385,11 @@ instance Outputable TcEvDest where
   ppr (EvVarDest ev) = ppr ev
 
 instance Outputable CtEvidence where
-  ppr ev = ppr (ctEvFlavour ev) <+> pp_ev <+> dcolon <+> ppr (ctEvPred ev)
+  ppr ev = ppr (ctEvFlavour ev)
+           <+> pp_ev
+           <+> braces (ppr (ctl_depth (ctEvLoc ev))) <> dcolon
+                  -- Show the sub-goal depth too
+           <+> ppr (ctEvPred ev)
     where
       pp_ev = case ev of
              CtGiven { ctev_evar = v } -> ppr v
@@ -2686,6 +2690,9 @@ initialSubGoalDepth = SubGoalDepth 0
 bumpSubGoalDepth :: SubGoalDepth -> SubGoalDepth
 bumpSubGoalDepth (SubGoalDepth n) = SubGoalDepth (n + 1)
 
+maxSubGoalDepth :: SubGoalDepth -> SubGoalDepth -> SubGoalDepth
+maxSubGoalDepth (SubGoalDepth n) (SubGoalDepth m) = SubGoalDepth (n `max` m)
+
 subGoalDepthExceeded :: DynFlags -> SubGoalDepth -> Bool
 subGoalDepthExceeded dflags (SubGoalDepth d)
   = mkIntWithInf d > reductionDepth dflags
@@ -2973,7 +2980,7 @@ data CtOrigin
 
   | FunDepOrigin2       -- A functional dependency from combining
         PredType CtOrigin   -- This constraint arising from ...
-        PredType SrcSpan    -- and this instance
+        PredType SrcSpan    -- and this top-level instance
         -- We only need a CtOrigin on the first, because the location
         -- is pinned on the entire error message
 

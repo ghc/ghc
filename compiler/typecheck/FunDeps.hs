@@ -24,6 +24,7 @@ import Var
 import Class
 import Type
 import TcType( transSuperClasses )
+import CoAxiom( TypeEqn )
 import Unify
 import FamInst( injTyVarsOfTypes )
 import InstEnv
@@ -104,10 +105,10 @@ data FunDepEqn loc
                                  --   to fresh unification vars,
                                  -- Non-empty only for FunDepEqns arising from instance decls
 
-          , fd_eqs  :: [Pair Type]  -- Make these pairs of types equal
-          , fd_pred1 :: PredType    -- The FunDepEqn arose from
-          , fd_pred2 :: PredType    --  combining these two constraints
-          , fd_loc :: loc  }
+          , fd_eqs   :: [TypeEqn]  -- Make these pairs of types equal
+          , fd_pred1 :: PredType   -- The FunDepEqn arose from
+          , fd_pred2 :: PredType   --  combining these two constraints
+          , fd_loc   :: loc  }
 
 {-
 Given a bunch of predicates that must hold, such as
@@ -148,7 +149,7 @@ instFD (ls,rs) tvs tys
 
 zipAndComputeFDEqs :: (Type -> Type -> Bool) -- Discard this FDEq if true
                    -> [Type] -> [Type]
-                   -> [Pair Type]
+                   -> [TypeEqn]
 -- Create a list of (Type,Type) pairs from two lists of types,
 -- making sure that the types are not already equal
 zipAndComputeFDEqs discard (ty1:tys1) (ty2:tys2)
@@ -182,6 +183,9 @@ improveFromAnother _ _ _ = []
 
 -- Improve a class constraint from instance declarations
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+instance Outputable (FunDepEqn a) where
+  ppr = pprEquation
 
 pprEquation :: FunDepEqn a -> SDoc
 pprEquation (FDEqn { fd_qtvs = qtvs, fd_eqs = pairs })
@@ -222,7 +226,7 @@ improveFromInstEnv _ _ _ = []
 improveClsFD :: [TyVar] -> FunDep TyVar    -- One functional dependency from the class
              -> ClsInst                    -- An instance template
              -> [Type] -> [Maybe Name]     -- Arguments of this (C tys) predicate
-             -> [([TyCoVar], [Pair Type])] -- Empty or singleton
+             -> [([TyCoVar], [TypeEqn])]   -- Empty or singleton
 
 improveClsFD clas_tvs fd
              (ClsInst { is_tvs = qtvs, is_tys = tys_inst, is_tcs = rough_tcs_inst })

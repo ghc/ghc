@@ -25,7 +25,7 @@ module CoAxiom (
 
        Role(..), fsFromRole,
 
-       CoAxiomRule(..), Eqn,
+       CoAxiomRule(..), TypeEqn,
        BuiltInSynFamily(..), trivialBuiltInFamily
        ) where
 
@@ -464,14 +464,14 @@ as `CoAxiom` is the special case when there are no assumptions.
 -}
 
 -- | A more explicit representation for `t1 ~ t2`.
-type Eqn = Pair Type
+type TypeEqn = Pair Type
 
 -- | For now, we work only with nominal equality.
 data CoAxiomRule = CoAxiomRule
   { coaxrName      :: FastString
   , coaxrAsmpRoles :: [Role]    -- roles of parameter equations
   , coaxrRole      :: Role      -- role of resulting equation
-  , coaxrProves    :: [Eqn] -> Maybe Eqn
+  , coaxrProves    :: [TypeEqn] -> Maybe TypeEqn
         -- ^ coaxrProves returns @Nothing@ when it doesn't like
         -- the supplied arguments.  When this happens in a coercion
         -- that means that the coercion is ill-formed, and Core Lint
@@ -500,9 +500,9 @@ instance Outputable CoAxiomRule where
 -- Type checking of built-in families
 data BuiltInSynFamily = BuiltInSynFamily
   { sfMatchFam      :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
-  , sfInteractTop   :: [Type] -> Type -> [Eqn]
+  , sfInteractTop   :: [Type] -> Type -> [TypeEqn]
   , sfInteractInert :: [Type] -> Type ->
-                       [Type] -> Type -> [Eqn]
+                       [Type] -> Type -> [TypeEqn]
   }
 
 -- Provides default implementations that do nothing.
