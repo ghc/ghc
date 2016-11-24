@@ -1025,6 +1025,7 @@ collectAnonWildCards lty = go lty
       HsListTy ty                  -> go ty
       HsPArrTy ty                  -> go ty
       HsTupleTy _ tys              -> gos tys
+      HsSumTy tys                  -> gos tys
       HsOpTy ty1 _ ty2             -> go ty1 `mappend` go ty2
       HsParTy ty                   -> go ty
       HsIParamTy _ ty              -> go ty
@@ -1041,8 +1042,10 @@ collectAnonWildCards lty = go lty
       HsQualTy { hst_ctxt = L _ ctxt
                , hst_body = ty }  -> gos ctxt `mappend` go ty
       HsSpliceTy (HsSpliced _ (HsSplicedTy ty)) _ -> go $ L noSrcSpan ty
-      -- HsQuasiQuoteTy, HsSpliceTy, HsCoreTy, HsTyLit
-      _ -> mempty
+      HsSpliceTy{} -> mempty
+      HsCoreTy{} -> mempty
+      HsTyLit{} -> mempty
+      HsTyVar{} -> mempty
 
     gos = mconcat . map go
 
