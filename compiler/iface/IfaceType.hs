@@ -63,7 +63,6 @@ import Binary
 import Outputable
 import FastString
 import FastStringEnv
-import UniqSet
 import UniqFM
 import Util
 
@@ -321,73 +320,26 @@ ifTyConBinderTyVar = binderVar
 ifTyConBinderName :: IfaceTyConBinder -> IfLclName
 ifTyConBinderName tcb = ifaceTvBndrName (ifTyConBinderTyVar tcb)
 
-ifTyVarsOfType :: IfaceType -> UniqSet IfLclName
-ifTyVarsOfType ty
-  = case ty of
-      IfaceTyVar v -> unitUniqSet v
-      IfaceAppTy fun arg
-        -> ifTyVarsOfType fun `unionUniqSets` ifTyVarsOfType arg
-      IfaceFunTy arg res
-        -> ifTyVarsOfType arg `unionUniqSets` ifTyVarsOfType res
-      IfaceDFunTy arg res
-        -> ifTyVarsOfType arg `unionUniqSets` ifTyVarsOfType res
-      IfaceForAllTy bndr ty
-        -> let (free, bound) = ifTyVarsOfForAllBndr bndr in
-           delListFromUniqSet (ifTyVarsOfType ty) bound `unionUniqSets` free
-      IfaceTyConApp _ args -> ifTyVarsOfArgs args
-      IfaceLitTy    _      -> emptyUniqSet
-      IfaceCastTy ty co
-        -> ifTyVarsOfType ty `unionUniqSets` ifTyVarsOfCoercion co
-      IfaceCoercionTy co    -> ifTyVarsOfCoercion co
-      IfaceTupleTy _ _ args -> ifTyVarsOfArgs args
-
-ifTyVarsOfForAllBndr :: IfaceForAllBndr
-                     -> ( UniqSet IfLclName   -- names used free in the binder
-                        , [IfLclName] )       -- names bound by this binder
-ifTyVarsOfForAllBndr (TvBndr (name, kind) _) = (ifTyVarsOfType kind, [name])
-
-ifTyVarsOfArgs :: IfaceTcArgs -> UniqSet IfLclName
-ifTyVarsOfArgs args = argv emptyUniqSet args
-   where
-     argv vs (ITC_Vis   t ts) = argv (vs `unionUniqSets` (ifTyVarsOfType t)) ts
-     argv vs (ITC_Invis k ks) = argv (vs `unionUniqSets` (ifTyVarsOfType k)) ks
-     argv vs ITC_Nil          = vs
-
-ifTyVarsOfCoercion :: IfaceCoercion -> UniqSet IfLclName
-ifTyVarsOfCoercion = go
+ifTypeIsVarFree :: IfaceType -> Bool
+-- Returns True if the type definitely has no variables at all
+-- Just used to control pretty printing
+ifTypeIsVarFree ty = go ty
   where
-    go (IfaceReflCo _ ty)         = ifTyVarsOfType ty
-    go (IfaceFunCo _ c1 c2)       = go c1 `unionUniqSets` go c2
-    go (IfaceTyConAppCo _ _ cos)  = ifTyVarsOfCoercions cos
-    go (IfaceAppCo c1 c2)         = go c1 `unionUniqSets` go c2
-    go (IfaceForAllCo (bound, _) kind_co co)
-     = go co `delOneFromUniqSet` bound `unionUniqSets` go kind_co
-    go (IfaceCoVarCo cv)          = unitUniqSet cv
-    go (IfaceAxiomInstCo _ _ cos) = ifTyVarsOfCoercions cos
-    go (IfaceUnivCo p _ ty1 ty2)  = go_prov p `unionUniqSets`
-                                    ifTyVarsOfType ty1 `unionUniqSets`
-                                    ifTyVarsOfType ty2
-    go (IfaceSymCo co)            = go co
-    go (IfaceTransCo c1 c2)       = go c1 `unionUniqSets` go c2
-    go (IfaceNthCo _ co)          = go co
-    go (IfaceLRCo _ co)           = go co
-    go (IfaceInstCo c1 c2)        = go c1 `unionUniqSets` go c2
-    go (IfaceCoherenceCo c1 c2)   = go c1 `unionUniqSets` go c2
-    go (IfaceKindCo co)           = go co
-    go (IfaceSubCo co)            = go co
-    go (IfaceAxiomRuleCo rule cos)
-      = unionManyUniqSets
-          [ unitUniqSet rule
-          , ifTyVarsOfCoercions cos ]
+    go (IfaceTyVar {})         = False
+    go (IfaceTcTyVar {})       = False
+    go (IfaceAppTy fun arg)    = go fun && go arg
+    go (IfaceFunTy arg res)    = go arg && go res
+    go (IfaceDFunTy arg res)   = go arg && go res
+    go (IfaceForAllTy {})      = False
+    go (IfaceTyConApp _ args)  = go_args args
+    go (IfaceTupleTy _ _ args) = go_args args
+    go (IfaceLitTy _)          = True
+    go (IfaceCastTy {})        = False -- Safe
+    go (IfaceCoercionTy {})    = False -- Safe
 
-    go_prov IfaceUnsafeCoerceProv    = emptyUniqSet
-    go_prov (IfacePhantomProv co)    = go co
-    go_prov (IfaceProofIrrelProv co) = go co
-    go_prov (IfacePluginProv _)      = emptyUniqSet
-    go_prov (IfaceHoleProv _)        = emptyUniqSet
-
-ifTyVarsOfCoercions :: [IfaceCoercion] -> UniqSet IfLclName
-ifTyVarsOfCoercions = foldr (unionUniqSets . ifTyVarsOfCoercion) emptyUniqSet
+    go_args ITC_Nil = True
+    go_args (ITC_Vis   arg args) = go arg && go_args args
+    go_args (ITC_Invis arg args) = go arg && go_args args
 
 {-
 Substitutions on IfaceType. This is only used during pretty-printing to construct
@@ -927,8 +879,8 @@ pprUserIfaceForAll tvs
      ppWhen (any tv_has_kind_var tvs || gopt Opt_PrintExplicitForalls dflags) $
      pprIfaceForAll tvs
    where
-     tv_has_kind_var bndr
-       = not (isEmptyUniqSet (fst (ifTyVarsOfForAllBndr bndr)))
+     tv_has_kind_var (TvBndr (_,kind) _) = not (ifTypeIsVarFree kind)
+
 
 -------------------
 
