@@ -45,7 +45,7 @@ module TyCon(
         isFunTyCon,
         isPrimTyCon,
         isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon,
-        isUnboxedSumTyCon,
+        isUnboxedSumTyCon, isPromotedTupleTyCon,
         isTypeSynonymTyCon,
         mightBeUnsaturatedTyCon,
         isPromotedDataCon, isPromotedDataCon_maybe,
@@ -121,11 +121,12 @@ module TyCon(
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} TyCoRep ( Kind, Type, PredType, pprType )
-import {-# SOURCE #-} TysWiredIn  ( runtimeRepTyCon, constraintKind
-                                  , vecCountTyCon, vecElemTyCon, liftedTypeKind
-                                  , mkFunKind, mkForAllKind )
-import {-# SOURCE #-} DataCon ( DataCon, dataConExTyVars, dataConFieldLabels )
+import {-# SOURCE #-} TyCoRep    ( Kind, Type, PredType, pprType )
+import {-# SOURCE #-} TysWiredIn ( runtimeRepTyCon, constraintKind
+                                 , vecCountTyCon, vecElemTyCon, liftedTypeKind
+                                 , mkFunKind, mkForAllKind )
+import {-# SOURCE #-} DataCon    ( DataCon, dataConExTyVars, dataConFieldLabels
+                                 , dataConTyCon )
 
 import Binary
 import Var
@@ -1957,6 +1958,13 @@ isUnboxedSumTyCon (AlgTyCon { algTcRhs = rhs })
   | SumTyCon {} <- rhs
   = True
 isUnboxedSumTyCon _ = False
+
+-- | Is this the 'TyCon' for a /promoted/ tuple?
+isPromotedTupleTyCon :: TyCon -> Bool
+isPromotedTupleTyCon tyCon
+  | Just dataCon <- isPromotedDataCon_maybe tyCon
+  , isTupleTyCon (dataConTyCon dataCon) = True
+  | otherwise                           = False
 
 -- | Is this a PromotedDataCon?
 isPromotedDataCon :: TyCon -> Bool

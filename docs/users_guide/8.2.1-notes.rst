@@ -119,6 +119,8 @@ Template Haskell
 
 -  Add support for type signatures in patterns. (:ghc-ticket:`12164`)
 
+-  Make quoting and reification return the same types.  (:ghc-ticket:`11629`)
+
 Runtime system
 ~~~~~~~~~~~~~~
 

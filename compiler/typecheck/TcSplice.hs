@@ -1818,6 +1818,7 @@ reify_tc_app tc tys
 
     r_tc | isUnboxedSumTyCon tc           = TH.UnboxedSumT (arity `div` 2)
          | isUnboxedTupleTyCon tc         = TH.UnboxedTupleT (arity `div` 2)
+         | isPromotedTupleTyCon tc        = TH.PromotedTupleT (arity `div` 2)
              -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
          | isTupleTyCon tc                = if isPromotedDataCon tc
                                             then TH.PromotedTupleT arity
@@ -1828,6 +1829,7 @@ reify_tc_app tc tys
          | tc `hasKey` heqTyConKey        = TH.EqualityT
          | tc `hasKey` eqPrimTyConKey     = TH.EqualityT
          | tc `hasKey` eqReprPrimTyConKey = TH.ConT (reifyName coercibleTyCon)
+         | isPromotedDataCon tc           = TH.PromotedT (reifyName tc)
          | otherwise                      = TH.ConT (reifyName tc)
 
     -- See Note [Kind annotations on TyConApps]
@@ -1841,11 +1843,9 @@ reify_tc_app tc tys
 
     needs_kind_sig
       | GT <- compareLength tys tc_binders
-      , tcIsTyVarTy tc_res_kind
-      = True
+      = tcIsTyVarTy tc_res_kind
       | otherwise
-      = not $
-        isEmptyVarSet $
+      = not . isEmptyVarSet $
         filterVarSet isTyVar $
         tyCoVarsOfType $
         mkTyConKind (dropList tys tc_binders) tc_res_kind
